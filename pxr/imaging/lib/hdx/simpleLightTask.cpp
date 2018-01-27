@@ -37,7 +37,7 @@
 #include "pxr/imaging/hd/renderPass.h"
 #include "pxr/imaging/hd/sceneDelegate.h"
 
-#include "pxr/imaging/glf/simpleLight.h"
+#include "pxr/imaging/garch/simpleLight.h"
 
 #include "pxr/base/gf/frustum.h"
 
@@ -61,9 +61,9 @@ HdxSimpleLightTask::HdxSimpleLightTask(HdSceneDelegate* delegate, SdfPath const&
     , _material()
     , _sceneAmbient()
     , _shadows()
-    , _glfSimpleLights()
+    , _simpleLights()
 {
-    _shadows = TfCreateRefPtr(new GlfSimpleShadowArray(_defaultShadowRes, 0));
+    _shadows = TfCreateRefPtr(GarchSimpleShadowArray::New(_defaultShadowRes, 0));
 }
 
 void
@@ -147,9 +147,9 @@ HdxSimpleLightTask::_Sync(HdTaskContext* ctx)
     if (!TF_VERIFY(_camera)) {
         return;
     }
+    GarchSimpleLightingContextRefPtr const& lightingContext =
+    _lightingShader->GetLightingContext();
 
-    GlfSimpleLightingContextRefPtr const& lightingContext = 
-                                    _lightingShader->GetLightingContext(); 
     if (!TF_VERIFY(lightingContext)) {
         return;
     }
@@ -188,13 +188,13 @@ HdxSimpleLightTask::_Sync(HdTaskContext* ctx)
     // vector.
     size_t numLights = _lights.size();
 
-    _glfSimpleLights.clear();
-    if (numLights != _glfSimpleLights.capacity()) {
+    _simpleLights.clear();
+    if (numLights != _simpleLights.capacity()) {
         // We don't just want to reserve here as we want to try and
         // recover memory if the number of lights shrinks.
 
-        _glfSimpleLights.shrink_to_fit();
-        _glfSimpleLights.reserve(numLights);
+        _simpleLights.shrink_to_fit();
+        _simpleLights.reserve(numLights);
     }
 
     for (size_t lightId = 0; lightId < numLights; ++lightId) {
@@ -202,15 +202,15 @@ HdxSimpleLightTask::_Sync(HdTaskContext* ctx)
         // update it with viewer-dependant values.
         VtValue vtLightParams = _lights[lightId]->Get(HdStLightTokens->params);
 
-        if (TF_VERIFY(vtLightParams.IsHolding<GlfSimpleLight>())) {
-            _glfSimpleLights.push_back(
-                vtLightParams.UncheckedGet<GlfSimpleLight>());
+        if (TF_VERIFY(vtLightParams.IsHolding<GarchSimpleLight>())) {
+            _simpleLights.push_back(
+                vtLightParams.UncheckedGet<GarchSimpleLight>());
         } else {
-            _glfSimpleLights.push_back(GlfSimpleLight());
+            _simpleLights.push_back(GarchSimpleLight());
         }
 
         // Get a reference to the light, so we can patch it.
-        GlfSimpleLight &glfl = _glfSimpleLights.back();
+        GarchSimpleLight &glfl = _simpleLights.back();
 
         // XXX: Pass id of light to Glf simple light, so that
         // glim can get access back to the light prim
@@ -271,7 +271,7 @@ HdxSimpleLightTask::_Sync(HdTaskContext* ctx)
     }
 
     lightingContext->SetUseLighting(numLights > 0);
-    lightingContext->SetLights(_glfSimpleLights);
+    lightingContext->SetLights(_simpleLights);
     lightingContext->SetCamera(modelViewMatrix.Get<GfMatrix4d>(),
                                projectionMatrix.Get<GfMatrix4d>());
 
@@ -290,7 +290,7 @@ HdxSimpleLightTask::_Sync(HdTaskContext* ctx)
 
     if (shadowIndex > -1) {
         for (size_t lightId = 0; lightId < numLights; ++lightId) {
-            if (!_glfSimpleLights[lightId].HasShadow()) {
+            if (!_simpleLights[lightId].HasShadow()) {
                 continue;
             }
 
@@ -301,11 +301,11 @@ HdxSimpleLightTask::_Sync(HdTaskContext* ctx)
                                                              HdxShadowParams());
 
             // Complete the shadow setup for this light
-            int shadowId = _glfSimpleLights[lightId].GetShadowIndex();
+            int shadowId = _simpleLights[lightId].GetShadowIndex();
 
             _shadows->SetViewMatrix(shadowId, GfMatrix4d(1));
             _shadows->SetProjectionMatrix(shadowId,
-                _glfSimpleLights[lightId].GetShadowMatrix());
+                _simpleLights[lightId].GetShadowMatrix());
         }
     }
     lightingContext->SetShadows(_shadows);

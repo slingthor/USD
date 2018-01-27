@@ -25,11 +25,11 @@
 
 #include "pxr/imaging/hd/renderPassState.h"
 
-#include "pxr/imaging/hd/bufferArrayRangeGL.h"
+#include "pxr/imaging/hd/bufferArrayRange.h"
 #include "pxr/imaging/hd/changeTracker.h"
 #include "pxr/imaging/hd/fallbackLightingShader.h"
 #include "pxr/imaging/hd/drawItem.h"
-#include "pxr/imaging/hd/glslProgram.h"
+#include "pxr/imaging/hd/program.h"
 #include "pxr/imaging/hd/renderPassShader.h"
 #include "pxr/imaging/hd/resourceRegistry.h"
 #include "pxr/imaging/hd/shaderCode.h"
@@ -148,8 +148,8 @@ HdRenderPassState::Sync(HdResourceRegistrySharedPtr const &resourceRegistry)
         _renderPassStateBar = resourceRegistry->AllocateUniformBufferArrayRange(
             HdTokens->drawingShader, bufferSpecs);
 
-        HdBufferArrayRangeGLSharedPtr _renderPassStateBar_ =
-            boost::static_pointer_cast<HdBufferArrayRangeGL> (_renderPassStateBar);
+        HdBufferArrayRangeSharedPtr _renderPassStateBar_ =
+            boost::static_pointer_cast<HdBufferArrayRange> (_renderPassStateBar);
 
         // add buffer binding request
         _renderPassShader->AddBufferBinding(
@@ -304,8 +304,8 @@ HdRenderPassState::SetRenderPassShader(HdRenderPassShaderSharedPtr const &render
     _renderPassShader = renderPassShader;
     if (_renderPassStateBar) {
 
-        HdBufferArrayRangeGLSharedPtr _renderPassStateBar_ =
-            boost::static_pointer_cast<HdBufferArrayRangeGL> (_renderPassStateBar);
+        HdBufferArrayRangeSharedPtr _renderPassStateBar_ =
+            boost::static_pointer_cast<HdBufferArrayRange> (_renderPassStateBar);
 
         _renderPassShader->AddBufferBinding(
             HdBindingRequest(HdBinding::UBO, _tokens->renderPassState,
@@ -391,6 +391,10 @@ HdRenderPassState::Bind()
     // which states to be altered at the comment in the header file
 
     // Apply polygon offset to whole pass.
+    
+#if defined(ARCH_GFX_METAL)
+    TF_CODING_ERROR("Not Implemented");
+#else
     if (!_depthBiasUseDefault) {
         if (_depthBiasEnabled) {
             glEnable(GL_POLYGON_OFFSET_FILL);
@@ -427,13 +431,16 @@ HdRenderPassState::Bind()
                 break;
         }
     }
+#endif
 }
 
 void
 HdRenderPassState::Unbind()
 {
     // restore back to the GL defaults
-
+#if defined(ARCH_GFX_METAL)
+    TF_CODING_ERROR("Not Implemented");
+#else
     glDisable(GL_POLYGON_OFFSET_FILL);
     glDisable(GL_SAMPLE_ALPHA_TO_COVERAGE);
     glDisable(GL_PROGRAM_POINT_SIZE);
@@ -445,6 +452,7 @@ HdRenderPassState::Unbind()
     }
 
     glColorMask(true, true, true, true);
+#endif
 }
 
 size_t

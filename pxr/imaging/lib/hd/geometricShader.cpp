@@ -27,10 +27,11 @@
 
 #include "pxr/imaging/hd/binding.h"
 #include "pxr/imaging/hd/debugCodes.h"
+#include "pxr/imaging/hd/engine.h"
 #include "pxr/imaging/hd/perfLog.h"
 #include "pxr/imaging/hd/tokens.h"
 
-#include "pxr/imaging/glf/glslfx.h"
+#include "pxr/imaging/garch/glslfx.h"
 
 #include <boost/functional/hash.hpp>
 
@@ -66,7 +67,9 @@ Hd_GeometricShader::Hd_GeometricShader(std::string const &glslfxString,
     }
 
     std::stringstream ss(glslfxString);
-    _glslfx.reset(new GlfGLSLFX(ss));
+
+    _glslfx.reset(HdEngine::CreateGLSLFX(ss));
+
     boost::hash_combine(_hash, _glslfx->GetHash());
     boost::hash_combine(_hash, cullingPass);
     boost::hash_combine(_hash, primType);
@@ -96,7 +99,7 @@ Hd_GeometricShader::GetSource(TfToken const &shaderStageKey) const
 }
 
 void
-Hd_GeometricShader::BindResources(Hd_ResourceBinder const &binder, int program)
+Hd_GeometricShader::BindResources(Hd_ResourceBinder const &binder, HdBufferResourceGPUHandle program)
 {
     if (_cullStyle != HdCullStyleDontCare) {
         unsigned int cullStyle = _cullStyle;
@@ -115,7 +118,7 @@ Hd_GeometricShader::BindResources(Hd_ResourceBinder const &binder, int program)
 }
 
 void
-Hd_GeometricShader::UnbindResources(Hd_ResourceBinder const &binder, int program)
+Hd_GeometricShader::UnbindResources(Hd_ResourceBinder const &binder, HdBufferResourceGPUHandle program)
 {
     if (_polygonMode == HdPolygonModeLine) {
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);

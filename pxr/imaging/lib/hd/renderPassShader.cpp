@@ -24,14 +24,13 @@
 #include "pxr/imaging/glf/glew.h"
 
 #include "pxr/imaging/hd/binding.h"
+#include "pxr/imaging/hd/engine.h"
 #include "pxr/imaging/hd/package.h"
 #include "pxr/imaging/hd/perfLog.h"
 #include "pxr/imaging/hd/renderPassShader.h"
 #include "pxr/imaging/hd/tokens.h"
 
-#include "pxr/imaging/hf/perfLog.h"
-
-#include "pxr/imaging/glf/glslfx.h"
+#include "pxr/imaging/garch/glslfx.h"
 
 #include "pxr/base/tf/staticTokens.h"
 
@@ -54,7 +53,7 @@ HdRenderPassShader::HdRenderPassShader()
     , _hashValid(false)
     , _cullStyle(HdCullStyleNothing)
 {
-    _glslfx.reset(new GlfGLSLFX(_glslfxFile));
+    _glslfx.reset(HdEngine::CreateGLSLFX(_glslfxFile));
 }
 
 HdRenderPassShader::HdRenderPassShader(TfToken const &glslfxFile)
@@ -64,7 +63,7 @@ HdRenderPassShader::HdRenderPassShader(TfToken const &glslfxFile)
     , _hashValid(false)
     , _cullStyle(HdCullStyleNothing)
 {
-    _glslfx.reset(new GlfGLSLFX(_glslfxFile));
+    _glslfx.reset(HdEngine::CreateGLSLFX(_glslfxFile));
 }
 
 /*virtual*/
@@ -107,7 +106,7 @@ HdRenderPassShader::GetSource(TfToken const &shaderStageKey) const
 
 /*virtual*/
 void
-HdRenderPassShader::BindResources(Hd_ResourceBinder const &binder, int program)
+HdRenderPassShader::BindResources(Hd_ResourceBinder const &binder, HdBufferResourceGPUHandle program)
 {
     TF_FOR_ALL(it, _customBuffers) {
         binder.Bind(it->second);
@@ -121,7 +120,7 @@ HdRenderPassShader::BindResources(Hd_ResourceBinder const &binder, int program)
 /*virtual*/
 void
 HdRenderPassShader::UnbindResources(Hd_ResourceBinder const &binder,
-                                     int program)
+                                     HdBufferResourceGPUHandle program)
 {
     TF_FOR_ALL(it, _customBuffers) {
         binder.Unbind(it->second);

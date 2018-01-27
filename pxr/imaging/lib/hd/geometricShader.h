@@ -31,7 +31,8 @@
 #include "pxr/imaging/hd/shaderCode.h"
 #include "pxr/imaging/hd/shaderKey.h"
 #include "pxr/usd/sdf/path.h"
-#include "pxr/imaging/glf/glslfx.h"
+
+#include "pxr/imaging/garch/glslfx.h"
 
 #include <boost/scoped_ptr.hpp>
 
@@ -108,9 +109,9 @@ public:
     HD_API
     virtual std::string GetSource(TfToken const &shaderStageKey) const;
     HD_API
-    virtual void BindResources(Hd_ResourceBinder const &binder, int program);
+    virtual void BindResources(Hd_ResourceBinder const &binder, HdBufferResourceGPUHandle program);
     HD_API
-    virtual void UnbindResources(Hd_ResourceBinder const &binder, int program);
+    virtual void UnbindResources(Hd_ResourceBinder const &binder, HdBufferResourceGPUHandle program);
     HD_API
     virtual void AddBindings(HdBindingRequestVector *customBindings);
 
@@ -194,7 +195,7 @@ private:
     HdPolygonMode _polygonMode;
     // depth offset?
 
-    boost::scoped_ptr<GlfGLSLFX> _glslfx;
+    boost::scoped_ptr<GLSLFX> _glslfx;
     bool _cullingPass;
     ID _hash;
 

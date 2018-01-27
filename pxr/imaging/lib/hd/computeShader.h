@@ -73,9 +73,9 @@ public:
     HD_API
     virtual TextureDescriptorVector GetTextures() const;
     HD_API
-    virtual void BindResources(Hd_ResourceBinder const &binder, int program);
+    virtual void BindResources(Hd_ResourceBinder const &binder, HdBufferResourceGPUHandle program);
     HD_API
-    virtual void UnbindResources(Hd_ResourceBinder const &binder, int program);
+    virtual void UnbindResources(Hd_ResourceBinder const &binder, HdBufferResourceGPUHandle program);
     HD_API
     virtual void AddBindings(HdBindingRequestVector *customBindings);
     HD_API

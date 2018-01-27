@@ -1303,7 +1303,7 @@ UsdStage::_CreatePropertySpecForEditing(const UsdProperty &prop)
         for (Usd_Resolver r(&prim.GetPrimIndex()); r.IsValid(); r.NextLayer()) {
             if (SdfPropertySpecHandle propSpec = r.GetLayer()->
                 GetPropertyAtPath(r.GetLocalPath().AppendProperty(propName))) {
-                if (specToCopy = TfDynamic_cast<TypedSpecHandle>(propSpec))
+                if ((specToCopy = TfDynamic_cast<TypedSpecHandle>(propSpec)))
                     break;
                 // Type mismatch.
                 TF_RUNTIME_ERROR("Spec type mismatch.  Failed to create %s for "
@@ -1786,7 +1786,7 @@ UsdStage::_IsValidForLoad(const SdfPath& path) const
         // Lets see if any ancestor exists, if so it's safe to attempt to load.
         SdfPath parentPath = path;
         while (parentPath != SdfPath::AbsoluteRootPath()) {
-            if (curPrim = GetPrimAtPath(parentPath)) {
+            if ((curPrim = GetPrimAtPath(parentPath))) {
                 break;
             }
             parentPath = parentPath.GetParentPath();
@@ -2027,7 +2027,7 @@ UsdStage::_LoadAndUnload(const SdfPathSet &loadSet,
         tbb::concurrent_vector<SdfPath> unloadIndexPaths;
         _WalkPrimsWithMasters(
             path,
-            [this, &unloadIndexPaths] (UsdPrim const &prim) {
+            [&unloadIndexPaths] (UsdPrim const &prim) {
                 if (prim.IsInMaster() && prim.HasPayload()) {
                     unloadIndexPaths.push_back(
                         prim._GetSourcePrimIndex().GetPath());
@@ -5765,11 +5765,11 @@ public:
         else {
             if (!TF_VERIFY(layer->GetBracketingTimeSamplesForPath(
                         specId, localTime, &lower, &upper),
-                TfStringPrintf("No bracketing time samples for "
-                               "%s on <%s> for time %g between %g and %g",
-                               layer->GetIdentifier().c_str(),
-                               specId.GetFullSpecPath().GetText(),
-                               localTime, lower, upper).c_str())) {
+                           "%s", TfStringPrintf("No bracketing time samples for "
+                                     "%s on <%s> for time %g between %g and %g",
+                                     layer->GetIdentifier().c_str(),
+                                     specId.GetFullSpecPath().GetText(),
+                                     localTime, lower, upper).c_str())) {
                 return false;
             }
         }

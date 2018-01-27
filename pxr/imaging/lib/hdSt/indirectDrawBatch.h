@@ -29,7 +29,8 @@
 #include "pxr/imaging/hd/version.h"
 #include "pxr/imaging/hdSt/dispatchBuffer.h"
 #include "pxr/imaging/hdSt/drawBatch.h"
-#include "pxr/imaging/hdSt/persistentBuffer.h"
+
+#include "pxr/imaging/hd/persistentBuffer.h"
 
 #include <vector>
 
@@ -48,128 +49,34 @@ typedef std::vector<HdBindingRequest> HdBindingRequestVector;
 ///
 class HdSt_IndirectDrawBatch : public HdSt_DrawBatch {
 public:
+    static HDST_API
+    HdSt_DrawBatchSharedPtr New(HdStDrawItemInstance * drawItemInstance);
+
     HDST_API
-    HdSt_IndirectDrawBatch(HdStDrawItemInstance * drawItemInstance);
-    HDST_API
-    ~HdSt_IndirectDrawBatch();
+    virtual ~HdSt_IndirectDrawBatch();
 
     // HdSt_DrawBatch overrides
     HDST_API
-    virtual bool Validate(bool deepValidation);
+    virtual bool Validate(bool deepValidation) = 0;
 
     /// Prepare draw commands and apply view frustum culling for this batch.
     HDST_API
     virtual void PrepareDraw(HdRenderPassStateSharedPtr const &renderPassState,
-                             HdStResourceRegistrySharedPtr const &resourceRegistry) override;
+                             HdStResourceRegistrySharedPtr const &resourceRegistry) override = 0;
 
     /// Executes the drawing commands for this batch.
     HDST_API
     virtual void ExecuteDraw(HdRenderPassStateSharedPtr const &renderPassState,
-                             HdStResourceRegistrySharedPtr const &resourceRegistry) override;
+                             HdStResourceRegistrySharedPtr const &resourceRegistry) override = 0;
 
     HDST_API
-    virtual void DrawItemInstanceChanged(HdStDrawItemInstance const* instance);
-
-    /// Returns whether to do frustum culling on the GPU
-    HDST_API
-    static bool IsEnabledGPUFrustumCulling();
-
-    /// Returns whether to read back the count of visible items from the GPU
-    /// Disabled by default, since there is some performance penalty.
-    HDST_API
-    static bool IsEnabledGPUCountVisibleInstances();
-
-    /// Returns whether to cull tiny prims (in screen space) during GPU culling 
-    /// Enabled by default.
-    HDST_API
-    static bool IsEnabledGPUTinyPrimCulling();
-
-    /// Returns whether to do per-instance culling on the GPU
-    HDST_API
-    static bool IsEnabledGPUInstanceFrustumCulling();
+    virtual void DrawItemInstanceChanged(HdStDrawItemInstance const* instance) = 0;
 
 protected:
     HDST_API
-    virtual void _Init(HdStDrawItemInstance * drawItemInstance) override;
-
-private:
-    void _ValidateCompatibility(
-            HdBufferArrayRangeGLSharedPtr const& constantBar,
-            HdBufferArrayRangeGLSharedPtr const& indexBar,
-            HdBufferArrayRangeGLSharedPtr const& elementBar,
-            HdBufferArrayRangeGLSharedPtr const& fvarBar,
-            HdBufferArrayRangeGLSharedPtr const& vertexBar,
-            int instancerNumLevels,
-            HdBufferArrayRangeGLSharedPtr const& instanceIndexBar,
-            std::vector<HdBufferArrayRangeGLSharedPtr> const& instanceBars) const;
-
-    // Culling requires custom resource binding.
-    class _CullingProgram : public _DrawingProgram {
-    public:
-        _CullingProgram()
-            : _useDrawArrays(false)
-            , _useInstanceCulling(false)
-            , _bufferArrayHash(0) { }
-        void Initialize(bool useDrawArrays, bool useInstanceCulling,
-                        size_t bufferArrayHash);
-    protected:
-        // _DrawingProgram overrides
-        virtual void _GetCustomBindings(
-            HdBindingRequestVector *customBindings,
-            bool *enableInstanceDraw) const;
-        virtual bool _Link(HdGLSLProgramSharedPtr const & glslProgram);
-    private:
-        bool _useDrawArrays;
-        bool _useInstanceCulling;
-        size_t _bufferArrayHash;
-    };
-
-    _CullingProgram &_GetCullingProgram(
-        HdStResourceRegistrySharedPtr const &resourceRegistry);
-
-    void _CompileBatch(HdStResourceRegistrySharedPtr const &resourceRegistry);
-
-    void _GPUFrustumCulling(HdDrawItem const *item,
-                            HdRenderPassStateSharedPtr const &renderPassState,
-                            HdStResourceRegistrySharedPtr const &resourceRegistry);
-
-    void _GPUFrustumCullingXFB(HdDrawItem const *item,
-                               HdRenderPassStateSharedPtr const &renderPassState,
-                               HdStResourceRegistrySharedPtr const &resourceRegistry);
-
-    void _BeginGPUCountVisibleInstances(HdStResourceRegistrySharedPtr const &resourceRegistry);
-
-    // GLsync is not defined in gl.h. It's defined in spec as an opaque pointer:
-    typedef struct __GLsync *GLsync;
-    void _EndGPUCountVisibleInstances(GLsync resultSync, size_t * result);
-
-    HdStDispatchBufferSharedPtr _dispatchBuffer;
-    HdStDispatchBufferSharedPtr _dispatchBufferCullInput;
-
-    std::vector<GLuint> _drawCommandBuffer;
-    bool _drawCommandBufferDirty;
-    size_t _bufferArraysHash;
-
-    HdStPersistentBufferSharedPtr _resultBuffer;
-
-    size_t _numVisibleItems;
-    size_t _numTotalVertices;
-    size_t _numTotalElements;
-
-    _CullingProgram _cullingProgram;
-    bool _lastTinyPrimCulling;
-
-    bool _useDrawArrays;
-    bool _useInstancing;
-    bool _useGpuCulling;
-    bool _useGpuInstanceCulling;
-
-    int _instanceCountOffset;
-    int _cullInstanceCountOffset;
-
-    // We'll use this fence to signal when GPU frustum culling is
-    // complete if we need to read back result data from the GPU.
-    GLsync _cullResultSync;
+    HdSt_IndirectDrawBatch(HdStDrawItemInstance * drawItemInstance);
+    HDST_API
+    virtual void _Init(HdStDrawItemInstance * drawItemInstance) override = 0;
 };
 
 

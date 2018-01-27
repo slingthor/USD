@@ -22,12 +22,16 @@
 // language governing permissions and limitations under the Apache License.
 //
 #include "pxr/imaging/glf/glew.h"
+#if defined(ARCH_GFX_METAL)
+#include "pxr/imaging/mtlf/mtlDevice.h"
+#endif
+
 #include "pxr/imaging/hd/resourceBinder.h"
-#include "pxr/imaging/hd/bufferArrayRangeGL.h"
-#include "pxr/imaging/hd/bufferResourceGL.h"
+#include "pxr/imaging/hd/bufferArrayRange.h"
+#include "pxr/imaging/hd/bufferResource.h"
 #include "pxr/imaging/hd/bufferSpec.h"
 #include "pxr/imaging/hd/renderContextCaps.h"
-#include "pxr/imaging/hd/resourceGL.h"
+#include "pxr/imaging/hd/resource.h"
 #include "pxr/imaging/hd/shaderCode.h"
 #include "pxr/imaging/hd/drawItem.h"
 #include "pxr/imaging/hd/tokens.h"
@@ -195,8 +199,8 @@ Hd_ResourceBinder::ResolveBindings(HdDrawItem const *drawItem,
     if (HdBufferArrayRangeSharedPtr constantBar_ =
         drawItem->GetConstantPrimVarRange()) {
 
-        HdBufferArrayRangeGLSharedPtr constantBar =
-            boost::static_pointer_cast<HdBufferArrayRangeGL>(constantBar_);
+        HdBufferArrayRangeSharedPtr constantBar =
+            boost::static_pointer_cast<HdBufferArrayRange>(constantBar_);
 
         MetaData::StructBlock sblock(HdTokens->constantPrimVars);
         TF_FOR_ALL (it, constantBar->GetResources()) {
@@ -226,8 +230,8 @@ Hd_ResourceBinder::ResolveBindings(HdDrawItem const *drawItem,
         if (HdBufferArrayRangeSharedPtr instanceBar_ =
             drawItem->GetInstancePrimVarRange(i)) {
 
-            HdBufferArrayRangeGLSharedPtr instanceBar =
-                boost::static_pointer_cast<HdBufferArrayRangeGL>(instanceBar_);
+            HdBufferArrayRangeSharedPtr instanceBar =
+                boost::static_pointer_cast<HdBufferArrayRange>(instanceBar_);
 
             TF_FOR_ALL (it, instanceBar->GetResources()) {
                 // non-interleaved, always create new binding.
@@ -248,8 +252,8 @@ Hd_ResourceBinder::ResolveBindings(HdDrawItem const *drawItem,
     if (HdBufferArrayRangeSharedPtr vertexBar_ =
         drawItem->GetVertexPrimVarRange()) {
 
-        HdBufferArrayRangeGLSharedPtr vertexBar =
-            boost::static_pointer_cast<HdBufferArrayRangeGL>(vertexBar_);
+        HdBufferArrayRangeSharedPtr vertexBar =
+            boost::static_pointer_cast<HdBufferArrayRange>(vertexBar_);
 
         TF_FOR_ALL (it, vertexBar->GetResources()) {
             HdBinding vertexPrimVarBinding =
@@ -266,8 +270,8 @@ Hd_ResourceBinder::ResolveBindings(HdDrawItem const *drawItem,
     if (HdBufferArrayRangeSharedPtr topologyBar_ =
         drawItem->GetTopologyRange()) {
 
-        HdBufferArrayRangeGLSharedPtr topologyBar =
-            boost::static_pointer_cast<HdBufferArrayRangeGL>(topologyBar_);
+        HdBufferArrayRangeSharedPtr topologyBar =
+            boost::static_pointer_cast<HdBufferArrayRange>(topologyBar_);
 
         TF_FOR_ALL (it, topologyBar->GetResources()) {
             if (it->first == HdTokens->indices) {
@@ -291,8 +295,8 @@ Hd_ResourceBinder::ResolveBindings(HdDrawItem const *drawItem,
     if (HdBufferArrayRangeSharedPtr elementBar_ =
         drawItem->GetElementPrimVarRange()) {
 
-        HdBufferArrayRangeGLSharedPtr elementBar =
-            boost::static_pointer_cast<HdBufferArrayRangeGL>(elementBar_);
+        HdBufferArrayRangeSharedPtr elementBar =
+            boost::static_pointer_cast<HdBufferArrayRange>(elementBar_);
 
         TF_FOR_ALL (it, elementBar->GetResources()) {
             HdBinding elementPrimVarBinding =
@@ -308,8 +312,8 @@ Hd_ResourceBinder::ResolveBindings(HdDrawItem const *drawItem,
     if (HdBufferArrayRangeSharedPtr fvarBar_ =
         drawItem->GetFaceVaryingPrimVarRange()) {
 
-        HdBufferArrayRangeGLSharedPtr fvarBar =
-            boost::static_pointer_cast<HdBufferArrayRangeGL>(fvarBar_);
+        HdBufferArrayRangeSharedPtr fvarBar =
+            boost::static_pointer_cast<HdBufferArrayRange>(fvarBar_);
 
         TF_FOR_ALL (it, fvarBar->GetResources()) {
             HdBinding fvarPrimVarBinding =
@@ -365,12 +369,12 @@ Hd_ResourceBinder::ResolveBindings(HdDrawItem const *drawItem,
     if (HdBufferArrayRangeSharedPtr instanceIndexBar_ =
         drawItem->GetInstanceIndexRange()) {
 
-        HdBufferArrayRangeGLSharedPtr instanceIndexBar =
-            boost::static_pointer_cast<HdBufferArrayRangeGL>(instanceIndexBar_);
+        HdBufferArrayRangeSharedPtr instanceIndexBar =
+            boost::static_pointer_cast<HdBufferArrayRange>(instanceIndexBar_);
 
-        HdBufferResourceGLSharedPtr instanceIndices
+        HdBufferResourceSharedPtr instanceIndices
             = instanceIndexBar->GetResource(HdTokens->instanceIndices);
-        HdBufferResourceGLSharedPtr culledInstanceIndices
+        HdBufferResourceSharedPtr culledInstanceIndices
             = instanceIndexBar->GetResource(HdTokens->culledInstanceIndices);
 
         if (instanceIndices) {
@@ -409,8 +413,8 @@ Hd_ResourceBinder::ResolveBindings(HdDrawItem const *drawItem,
 
         // uniform block
         HdBufferArrayRangeSharedPtr const &shaderBar_ = (*shader)->GetShaderData();
-        HdBufferArrayRangeGLSharedPtr shaderBar =
-            boost::static_pointer_cast<HdBufferArrayRangeGL> (shaderBar_);
+        HdBufferArrayRangeSharedPtr shaderBar =
+            boost::static_pointer_cast<HdBufferArrayRange> (shaderBar_);
         if (shaderBar) {
             HdBinding shaderParamBinding =
                 locator.GetBinding(structBufferBindingType, HdTokens->surfaceShaderParams);
@@ -499,8 +503,8 @@ Hd_ResourceBinder::ResolveBindings(HdDrawItem const *drawItem,
             MetaData::StructBlock sblock(it->GetName());
 
             HdBufferArrayRangeSharedPtr bar_ = it->GetBar();
-            HdBufferArrayRangeGLSharedPtr bar =
-                boost::static_pointer_cast<HdBufferArrayRangeGL> (bar_);
+            HdBufferArrayRangeSharedPtr bar =
+                boost::static_pointer_cast<HdBufferArrayRange> (bar_);
 
             for (auto const& nameRes : bar->GetResources()) {
                 sblock.entries.push_back(MetaData::StructEntry(
@@ -520,8 +524,8 @@ Hd_ResourceBinder::ResolveBindings(HdDrawItem const *drawItem,
                 // binding type and binding location.
 
                 HdBufferArrayRangeSharedPtr bar_ = it->GetBar();
-                HdBufferArrayRangeGLSharedPtr bar =
-                    boost::static_pointer_cast<HdBufferArrayRangeGL> (bar_);
+                HdBufferArrayRangeSharedPtr bar =
+                    boost::static_pointer_cast<HdBufferArrayRange> (bar_);
 
                 for (auto const& nameRes : bar->GetResources()) {
                     HdBinding binding = locator.GetBinding(it->GetType(), nameRes.first);
@@ -626,14 +630,139 @@ Hd_ResourceBinder::ResolveComputeBindings(
 
 void
 Hd_ResourceBinder::BindBuffer(TfToken const &name,
-                              HdBufferResourceGLSharedPtr const &buffer) const
+                              HdBufferResourceSharedPtr const &buffer) const
 {
     BindBuffer(name, buffer, buffer->GetOffset(), /*level=*/-1);
 }
 
+#if defined(ARCH_GFX_METAL)
 void
 Hd_ResourceBinder::BindBuffer(TfToken const &name,
-                              HdBufferResourceGLSharedPtr const &buffer,
+                              HdBufferResourceSharedPtr const &buffer,
+                              int offset,
+                              int level) const
+{
+    HD_TRACE_FUNCTION();
+
+    // it is possible that the buffer has not been initialized when
+    // the instanceIndex is empty (e.g. FX points. see bug 120354)
+    if (buffer->GetId() == 0) return;
+    
+    HdBinding binding = GetBinding(name, level);
+    HdBinding::Type type = binding.GetType();
+    int loc              = binding.GetLocation();
+    int textureUnit      = binding.GetTextureUnit();
+    id<MTLBuffer> bufferId = (__bridge id<MTLBuffer>)buffer->GetId();
+    
+    TF_CODING_ERROR("Not Implemented");
+    /*
+    void const* offsetPtr =
+    reinterpret_cast<const void*>(
+        static_cast<intptr_t>(offset));
+    switch(type) {
+        case HdBinding::VERTEX_ATTR:
+            glBindBuffer(GL_ARRAY_BUFFER, bufferId);
+            glVertexAttribPointer(loc,
+                                  _GetNumComponents(buffer->GetNumComponents(),
+                                                    buffer->GetGLDataType()),
+                                  buffer->GetGLDataType(),
+                                  _ShouldBeNormalized(buffer->GetGLDataType()),
+                                  buffer->GetStride(),
+                                  offsetPtr);
+            glBindBuffer(GL_ARRAY_BUFFER, 0);
+            
+            glEnableVertexAttribArray(loc);
+            break;
+        case HdBinding::DRAW_INDEX:
+            glBindBuffer(GL_ARRAY_BUFFER, bufferId);
+            glVertexAttribIPointer(loc,
+                                   buffer->GetNumComponents(),
+                                   GL_INT,
+                                   buffer->GetStride(),
+                                   offsetPtr);
+            glBindBuffer(GL_ARRAY_BUFFER, 0);
+            glEnableVertexAttribArray(loc);
+            break;
+        case HdBinding::DRAW_INDEX_INSTANCE:
+            glBindBuffer(GL_ARRAY_BUFFER, bufferId);
+            glVertexAttribIPointer(loc,
+                                   buffer->GetNumComponents(),
+                                   GL_INT,
+                                   buffer->GetStride(),
+                                   offsetPtr);
+            glBindBuffer(GL_ARRAY_BUFFER, 0);
+            
+            // set the divisor to uint-max so that the same base value is used
+            // for all instances.
+            glVertexAttribDivisor(loc,
+                                  std::numeric_limits<GLint>::max());
+            glEnableVertexAttribArray(loc);
+            break;
+        case HdBinding::DRAW_INDEX_INSTANCE_ARRAY:
+            glBindBuffer(GL_ARRAY_BUFFER, bufferId);
+            // a trick : we store instancerNumLevels in numComponents.
+            // it could be more than 4. we unroll it to an array of int[1] attributes.
+            //
+            for (int i = 0; i < buffer->GetNumComponents(); ++i) {
+                offsetPtr = reinterpret_cast<const void*>(offset + i*sizeof(int));
+                glVertexAttribIPointer(loc, 1, GL_INT, buffer->GetStride(),
+                                       offsetPtr);
+                
+                // set the divisor to uint-max so that the same base value is used
+                // for all instances.
+                glVertexAttribDivisor(loc, std::numeric_limits<GLint>::max());
+                glEnableVertexAttribArray(loc);
+                ++loc;
+            }
+            glBindBuffer(GL_ARRAY_BUFFER, 0);
+            break;
+        case HdBinding::INDEX_ATTR:
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, bufferId);
+            break;
+        case HdBinding::BINDLESS_UNIFORM:
+            // at least in nvidia driver 346.59, this query call doesn't show
+            // any pipeline stall.
+            if (!glIsNamedBufferResidentNV(bufferId)) {
+                glMakeNamedBufferResidentNV(bufferId, GL_READ_WRITE);
+            }
+            glUniformui64NV(loc, buffer->GetGPUAddress());
+            break;
+        case HdBinding::SSBO:
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, loc,
+                             bufferId);
+            break;
+        case HdBinding::DISPATCH:
+            glBindBuffer(GL_DRAW_INDIRECT_BUFFER, bufferId);
+            break;
+        case HdBinding::UBO:
+        case HdBinding::UNIFORM:
+            glBindBufferRange(GL_UNIFORM_BUFFER, loc,
+                              bufferId,
+                              offset,
+                              buffer->GetStride());
+            break;
+        case HdBinding::TBO:
+            if (loc != HdBinding::NOT_EXIST) {
+                glUniform1i(loc, textureUnit);
+                glActiveTexture(GL_TEXTURE0 + textureUnit);
+                glBindSampler(textureUnit, 0);
+                glBindTexture(GL_TEXTURE_BUFFER, (GLuint)(uint64_t)buffer->GetTextureBuffer());
+            }
+            break;
+        case HdBinding::TEXTURE_2D:
+            // nothing
+            break;
+        default:
+            TF_CODING_ERROR("binding type %d not found for %s",
+                            type, name.GetText());
+            break;
+    }
+     */
+}
+#else
+void
+Hd_ResourceBinder::BindBuffer(TfToken const &name,
+                              HdBufferResourceSharedPtr const &buffer,
                               int offset,
                               int level) const
 {
@@ -647,13 +776,14 @@ Hd_ResourceBinder::BindBuffer(TfToken const &name,
     HdBinding::Type type = binding.GetType();
     int loc              = binding.GetLocation();
     int textureUnit      = binding.GetTextureUnit();
+    GLuint bufferId      = (GLuint)(uint64_t)buffer->GetId();
 
     void const* offsetPtr =
         reinterpret_cast<const void*>(
             static_cast<intptr_t>(offset));
     switch(type) {
     case HdBinding::VERTEX_ATTR:
-        glBindBuffer(GL_ARRAY_BUFFER, buffer->GetId());
+        glBindBuffer(GL_ARRAY_BUFFER, bufferId);
         glVertexAttribPointer(loc,
                               _GetNumComponents(buffer->GetNumComponents(),
                                                 buffer->GetGLDataType()),
@@ -666,7 +796,7 @@ Hd_ResourceBinder::BindBuffer(TfToken const &name,
         glEnableVertexAttribArray(loc);
         break;
     case HdBinding::DRAW_INDEX:
-        glBindBuffer(GL_ARRAY_BUFFER, buffer->GetId());
+        glBindBuffer(GL_ARRAY_BUFFER, bufferId);
         glVertexAttribIPointer(loc,
                                buffer->GetNumComponents(),
                                GL_INT,
@@ -676,7 +806,7 @@ Hd_ResourceBinder::BindBuffer(TfToken const &name,
         glEnableVertexAttribArray(loc);
         break;
     case HdBinding::DRAW_INDEX_INSTANCE:
-        glBindBuffer(GL_ARRAY_BUFFER, buffer->GetId());
+        glBindBuffer(GL_ARRAY_BUFFER, bufferId);
         glVertexAttribIPointer(loc,
                                buffer->GetNumComponents(),
                                GL_INT,
@@ -691,7 +821,7 @@ Hd_ResourceBinder::BindBuffer(TfToken const &name,
         glEnableVertexAttribArray(loc);
         break;
     case HdBinding::DRAW_INDEX_INSTANCE_ARRAY:
-        glBindBuffer(GL_ARRAY_BUFFER, buffer->GetId());
+        glBindBuffer(GL_ARRAY_BUFFER, bufferId);
         // a trick : we store instancerNumLevels in numComponents.
         // it could be more than 4. we unroll it to an array of int[1] attributes.
         //
@@ -709,27 +839,27 @@ Hd_ResourceBinder::BindBuffer(TfToken const &name,
         glBindBuffer(GL_ARRAY_BUFFER, 0);
         break;
     case HdBinding::INDEX_ATTR:
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, buffer->GetId());
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, bufferId);
         break;
     case HdBinding::BINDLESS_UNIFORM:
         // at least in nvidia driver 346.59, this query call doesn't show
         // any pipeline stall.
-        if (!glIsNamedBufferResidentNV(buffer->GetId())) {
-            glMakeNamedBufferResidentNV(buffer->GetId(), GL_READ_WRITE);
+        if (!glIsNamedBufferResidentNV(bufferId)) {
+            glMakeNamedBufferResidentNV(bufferId, GL_READ_WRITE);
         }
         glUniformui64NV(loc, buffer->GetGPUAddress());
         break;
     case HdBinding::SSBO:
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, loc,
-                         buffer->GetId());
+                         bufferId);
         break;
     case HdBinding::DISPATCH:
-        glBindBuffer(GL_DRAW_INDIRECT_BUFFER, buffer->GetId());
+        glBindBuffer(GL_DRAW_INDIRECT_BUFFER, bufferId);
         break;
     case HdBinding::UBO:
     case HdBinding::UNIFORM:
         glBindBufferRange(GL_UNIFORM_BUFFER, loc,
-                          buffer->GetId(),
+                          bufferId,
                           offset,
                           buffer->GetStride());
         break;
@@ -738,7 +868,7 @@ Hd_ResourceBinder::BindBuffer(TfToken const &name,
             glUniform1i(loc, textureUnit);
             glActiveTexture(GL_TEXTURE0 + textureUnit);
             glBindSampler(textureUnit, 0);
-            glBindTexture(GL_TEXTURE_BUFFER, buffer->GetTextureBuffer());
+            glBindTexture(GL_TEXTURE_BUFFER, (GLuint)(uint64_t)buffer->GetTextureBuffer());
         }
         break;
     case HdBinding::TEXTURE_2D:
@@ -750,10 +880,11 @@ Hd_ResourceBinder::BindBuffer(TfToken const &name,
         break;
     }
 }
+#endif
 
 void
 Hd_ResourceBinder::UnbindBuffer(TfToken const &name,
-                                HdBufferResourceGLSharedPtr const &buffer,
+                                HdBufferResourceSharedPtr const &buffer,
                                 int level) const
 {
     HD_TRACE_FUNCTION();
@@ -766,6 +897,9 @@ Hd_ResourceBinder::UnbindBuffer(TfToken const &name,
     HdBinding::Type type = binding.GetType();
     int loc = binding.GetLocation();
 
+#if defined(ARCH_GFX_METAL)
+    TF_CODING_ERROR("Not Implemented");
+#else
     switch(type) {
     case HdBinding::VERTEX_ATTR:
         glDisableVertexAttribArray(loc);
@@ -788,8 +922,8 @@ Hd_ResourceBinder::UnbindBuffer(TfToken const &name,
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
         break;
     case HdBinding::BINDLESS_UNIFORM:
-        if (glIsNamedBufferResidentNV(buffer->GetId())) {
-            glMakeNamedBufferNonResidentNV(buffer->GetId());
+        if (glIsNamedBufferResidentNV((GLuint)(uint64_t)buffer->GetId())) {
+            glMakeNamedBufferNonResidentNV((GLuint)(uint64_t)buffer->GetId());
         }
         break;
     case HdBinding::SSBO:
@@ -816,11 +950,12 @@ Hd_ResourceBinder::UnbindBuffer(TfToken const &name,
                         type, name.GetText());
         break;
     }
+#endif
 }
 
 void
 Hd_ResourceBinder::BindConstantBuffer(
-    HdBufferArrayRangeGLSharedPtr const &constantBar) const
+    HdBufferArrayRangeSharedPtr const &constantBar) const
 {
     if (!constantBar) return;
 
@@ -830,7 +965,7 @@ Hd_ResourceBinder::BindConstantBuffer(
 
 void
 Hd_ResourceBinder::UnbindConstantBuffer(
-    HdBufferArrayRangeGLSharedPtr const &constantBar) const
+    HdBufferArrayRangeSharedPtr const &constantBar) const
 {
     if (!constantBar) return;
 
@@ -839,7 +974,7 @@ Hd_ResourceBinder::UnbindConstantBuffer(
 
 void
 Hd_ResourceBinder::BindInstanceBufferArray(
-    HdBufferArrayRangeGLSharedPtr const &bar, int level) const
+    HdBufferArrayRangeSharedPtr const &bar, int level) const
 {
     if (!bar) return;
 
@@ -850,7 +985,7 @@ Hd_ResourceBinder::BindInstanceBufferArray(
 
 void
 Hd_ResourceBinder::UnbindInstanceBufferArray(
-    HdBufferArrayRangeGLSharedPtr const &bar, int level) const
+    HdBufferArrayRangeSharedPtr const &bar, int level) const
 {
     if (!bar) return;
 
@@ -910,7 +1045,7 @@ Hd_ResourceBinder::UnbindShaderResources(HdShaderCode const *shader) const
 }
 
 void
-Hd_ResourceBinder::BindBufferArray(HdBufferArrayRangeGLSharedPtr const &bar) const
+Hd_ResourceBinder::BindBufferArray(HdBufferArrayRangeSharedPtr const &bar) const
 {
     if (!bar) return;
 
@@ -926,20 +1061,20 @@ Hd_ResourceBinder::Bind(HdBindingRequest const& req) const
         return;
     } else if (req.IsResource()) {
         HdBufferResourceSharedPtr res_ = req.GetResource();
-        HdBufferResourceGLSharedPtr res =
-            boost::static_pointer_cast<HdBufferResourceGL> (res_);
+        HdBufferResourceSharedPtr res =
+            boost::static_pointer_cast<HdBufferResource> (res_);
 
         BindBuffer(req.GetName(), res, req.GetOffset());
     } else if (req.IsInterleavedBufferArray()) {
         // note: interleaved buffer needs only 1 binding
         HdBufferArrayRangeSharedPtr bar_ = req.GetBar();
-        HdBufferArrayRangeGLSharedPtr bar =
-            boost::static_pointer_cast<HdBufferArrayRangeGL> (bar_);
+        HdBufferArrayRangeSharedPtr bar =
+            boost::static_pointer_cast<HdBufferArrayRange> (bar_);
         BindBuffer(req.GetName(), bar->GetResource(), req.GetOffset());
     } else if (req.IsBufferArray()) {
         HdBufferArrayRangeSharedPtr bar_ = req.GetBar();
-        HdBufferArrayRangeGLSharedPtr bar =
-            boost::static_pointer_cast<HdBufferArrayRangeGL> (bar_);
+        HdBufferArrayRangeSharedPtr bar =
+            boost::static_pointer_cast<HdBufferArrayRange> (bar_);
         BindBufferArray(bar);
     }
 }
@@ -951,21 +1086,21 @@ Hd_ResourceBinder::Unbind(HdBindingRequest const& req) const
         return;
     } else if (req.IsResource()) {
         HdBufferResourceSharedPtr res_ = req.GetResource();
-        HdBufferResourceGLSharedPtr res =
-            boost::static_pointer_cast<HdBufferResourceGL> (res_);
+        HdBufferResourceSharedPtr res =
+            boost::static_pointer_cast<HdBufferResource> (res_);
 
         UnbindBuffer(req.GetName(), res);
     } else if (req.IsInterleavedBufferArray()) {
         // note: interleaved buffer needs only 1 binding
         HdBufferArrayRangeSharedPtr bar_ = req.GetBar();
-        HdBufferArrayRangeGLSharedPtr bar =
-            boost::static_pointer_cast<HdBufferArrayRangeGL> (bar_);
+        HdBufferArrayRangeSharedPtr bar =
+            boost::static_pointer_cast<HdBufferArrayRange> (bar_);
 
         UnbindBuffer(req.GetName(), bar->GetResource());
     } else if (req.IsBufferArray()) {
         HdBufferArrayRangeSharedPtr bar_ = req.GetBar();
-        HdBufferArrayRangeGLSharedPtr bar =
-            boost::static_pointer_cast<HdBufferArrayRangeGL> (bar_);
+        HdBufferArrayRangeSharedPtr bar =
+            boost::static_pointer_cast<HdBufferArrayRange> (bar_);
 
         UnbindBufferArray(bar);
     }
@@ -973,7 +1108,7 @@ Hd_ResourceBinder::Unbind(HdBindingRequest const& req) const
 
 void
 Hd_ResourceBinder::UnbindBufferArray(
-    HdBufferArrayRangeGLSharedPtr const &bar) const
+    HdBufferArrayRangeSharedPtr const &bar) const
 {
     if (!bar) return;
 
@@ -1068,11 +1203,13 @@ Hd_ResourceBinder::BindUniformf(TfToken const &name,
 }
 
 void
-Hd_ResourceBinder::IntrospectBindings(HdResourceGL const & programResource)
+Hd_ResourceBinder::IntrospectBindings(HdResource const & programResource)
 {
     HdRenderContextCaps const &caps = HdRenderContextCaps::GetInstance();
-
-    GLuint program = programResource.GetId();
+#if defined(ARCH_GFX_METAL)
+    TF_CODING_ERROR("Not Implemented");
+#else
+    GLuint program = programResource.GetOpenGLId();
 
     if (ARCH_UNLIKELY(!caps.shadingLanguage420pack)) {
         GLint numUBO = 0;
@@ -1124,6 +1261,7 @@ Hd_ResourceBinder::IntrospectBindings(HdResourceGL const & programResource)
             }
         }
     }
+#endif
 }
 
 Hd_ResourceBinder::MetaData::ID

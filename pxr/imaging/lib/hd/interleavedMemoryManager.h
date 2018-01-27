@@ -30,7 +30,7 @@
 #include "pxr/base/tf/mallocTag.h"
 #include "pxr/base/tf/token.h"
 #include "pxr/imaging/hd/bufferArray.h"
-#include "pxr/imaging/hd/bufferArrayRangeGL.h"
+#include "pxr/imaging/hd/bufferArrayRange.h"
 #include "pxr/imaging/hd/bufferSpec.h"
 #include "pxr/imaging/hd/bufferSource.h"
 #include "pxr/imaging/hd/resource.h"
@@ -52,7 +52,7 @@ protected:
     class _StripedInterleavedBuffer;
 
     /// specialized buffer array range
-    class _StripedInterleavedBufferRange : public HdBufferArrayRangeGL {
+    class _StripedInterleavedBufferRange : public HdBufferArrayRange {
     public:
         /// Constructor.
         _StripedInterleavedBufferRange() :
@@ -123,15 +123,15 @@ protected:
         /// Returns the GPU resource. If the buffer array contains more than one
         /// resource, this method raises a coding error.
         HD_API
-        virtual HdBufferResourceGLSharedPtr GetResource() const;
+        virtual HdBufferResourceSharedPtr GetResource() const;
 
         /// Returns the named GPU resource.
         HD_API
-        virtual HdBufferResourceGLSharedPtr GetResource(TfToken const& name);
+        virtual HdBufferResourceSharedPtr GetResource(TfToken const& name);
 
         /// Returns the list of all named GPU resources for this bufferArrayRange.
         HD_API
-        virtual HdBufferResourceGLNamedList const& GetResources() const;
+        virtual HdBufferResourceNamedList const& GetResources() const;
 
         /// Sets the buffer array assosiated with this buffer;
         HD_API
@@ -140,6 +140,9 @@ protected:
         /// Debug dump
         HD_API
         virtual void DebugDump(std::ostream &out) const;
+        
+        HD_API
+        virtual void AddBufferSpecs(HdBufferSpecVector *specs) const {}
 
         /// Set the relative offset for this range.
         void SetIndex(int index) {
@@ -224,17 +227,17 @@ protected:
         /// Returns the GPU resource. If the buffer array contains more than one
         /// resource, this method raises a coding error.
         HD_API
-        HdBufferResourceGLSharedPtr GetResource() const;
+        HdBufferResourceSharedPtr GetResource() const;
 
         /// Returns the named GPU resource. This method returns the first found
         /// resource. In HD_SAFE_MODE it checkes all underlying GL buffers
         /// in _resourceMap and raises a coding error if there are more than
         /// one GL buffers exist.
         HD_API
-        HdBufferResourceGLSharedPtr GetResource(TfToken const& name);
+        HdBufferResourceSharedPtr GetResource(TfToken const& name);
 
         /// Returns the list of all named GPU resources for this bufferArray.
-        HdBufferResourceGLNamedList const& GetResources() const {return _resourceList;}
+        HdBufferResourceNamedList const& GetResources() const {return _resourceList;}
 
         /// Reconstructs the bufferspecs and returns it (for buffer splitting)
         HD_API
@@ -246,7 +249,7 @@ protected:
 
         /// Adds a new, named GPU resource and returns it.
         HD_API
-        HdBufferResourceGLSharedPtr _AddResource(TfToken const& name,
+        HdBufferResourceSharedPtr _AddResource(TfToken const& name,
                                             int glDataType,
                                             short numComponents,
                                             int arraySize,
@@ -259,7 +262,7 @@ protected:
         int _bufferOffsetAlignment;  // ranged binding offset alignment
         size_t _maxSize;             // maximum size of single buffer
 
-        HdBufferResourceGLNamedList _resourceList;
+        HdBufferResourceNamedList _resourceList;
 
         _StripedInterleavedBufferRangeSharedPtr _GetRangeSharedPtr(size_t idx) const {
             return boost::static_pointer_cast<_StripedInterleavedBufferRange>(GetRange(idx).lock());

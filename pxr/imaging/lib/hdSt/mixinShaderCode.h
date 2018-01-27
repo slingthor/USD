@@ -64,11 +64,11 @@ public:
 
     /// Binds shader-specific resources to \a program
     virtual void BindResources(Hd_ResourceBinder const &binder,
-                               int program) override;
+                               HdBufferResourceGPUHandle program) override;
 
     /// Unbinds shader-specific resources.
     virtual void UnbindResources(Hd_ResourceBinder const &binder,
-                                 int program) override;
+                                 HdBufferResourceGPUHandle program) override;
 
     /// Add custom bindings (used by codegen)
     virtual void AddBindings(HdBindingRequestVector* customBindings) override;

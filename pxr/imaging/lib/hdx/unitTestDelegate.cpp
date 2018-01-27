@@ -44,7 +44,8 @@
 #include "pxr/imaging/hdx/shadowTask.h"
 #include "pxr/imaging/hdx/shadowMatrixComputation.h"
 
-#include "pxr/imaging/glf/drawTarget.h"
+#include "pxr/imaging/garch/drawTarget.h"
+
 #include "pxr/imaging/pxOsd/tokens.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -85,7 +86,7 @@ namespace {
 class ShadowMatrix : public HdxShadowMatrixComputation
 {
 public:
-    ShadowMatrix(GlfSimpleLight const &light) {
+    ShadowMatrix(GarchSimpleLight const &light) {
         GfFrustum frustum;
         frustum.SetProjectionType(GfFrustum::Orthographic);
         frustum.SetWindow(GfRange2d(GfVec2d(-10, -10), GfVec2d(10, 10)));
@@ -110,7 +111,7 @@ private:
 class DrawTargetTextureResource : public HdTextureResource
 {
 public:
-    DrawTargetTextureResource(GlfDrawTargetRefPtr const &drawTarget)
+    DrawTargetTextureResource(GarchDrawTargetRefPtr const &drawTarget)
         : _drawTarget(drawTarget) {
     }
     virtual ~DrawTargetTextureResource() {
@@ -120,20 +121,20 @@ public:
         return false;
     }
 
-    virtual GLuint GetTexelsTextureId() {
-        return _drawTarget->GetAttachment("color")->GetGlTextureName();
+    virtual GarchTextureGPUHandle GetTexelsTextureId() {
+        return _drawTarget->GetAttachment("color")->GetTextureName();
     }
-    virtual GLuint GetTexelsSamplerId() {
+    virtual GarchSamplerGPUHandle GetTexelsSamplerId() {
         return 0;
     }
-    virtual uint64_t GetTexelsTextureHandle() {
+    virtual GarchTextureGPUHandle GetTexelsTextureHandle() {
         return 0;
     }
 
-    virtual GLuint GetLayoutTextureId() {
+    virtual GarchTextureGPUHandle GetLayoutTextureId() {
         return 0;
     }
-    virtual uint64_t GetLayoutTextureHandle() {
+    virtual GarchTextureGPUHandle GetLayoutTextureHandle() {
         return 0;
     }
 
@@ -142,7 +143,7 @@ public:
     }
 
 private:
-    GlfDrawTargetRefPtr _drawTarget;
+    GarchDrawTargetRefPtr _drawTarget;
 };
 
 }
@@ -210,7 +211,7 @@ Hdx_UnitTestDelegate::AddCamera(SdfPath const &id)
 }
 
 void
-Hdx_UnitTestDelegate::AddLight(SdfPath const &id, GlfSimpleLight const &light)
+Hdx_UnitTestDelegate::AddLight(SdfPath const &id, GarchSimpleLight const &light)
 {
     // add light
     GetRenderIndex().InsertSprim(HdPrimTypeTokens->light, this, id);
@@ -238,7 +239,7 @@ Hdx_UnitTestDelegate::SetLight(SdfPath const &id, TfToken const &key,
     cache[key] = value;
     if (key == HdStLightTokens->params) {
         // update shadow matrix too
-        GlfSimpleLight light = value.Get<GlfSimpleLight>();
+        GarchSimpleLight light = value.Get<GarchSimpleLight>();
         HdxShadowParams shadowParams
             = cache[HdStLightTokens->shadowParams].Get<HdxShadowParams>();
         shadowParams.shadowMatrix
@@ -936,7 +937,7 @@ Hdx_UnitTestDelegate::GetTextureResource(SdfPath const& textureId)
         if (drawTarget != nullptr) {
             HdTextureResourceSharedPtr texResource(
                 new DrawTargetTextureResource(
-                    drawTarget->GetGlfDrawTarget()));
+                    drawTarget->GetGarchDrawTarget()));
             return texResource;
         }
     }

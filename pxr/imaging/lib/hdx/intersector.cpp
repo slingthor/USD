@@ -36,7 +36,8 @@
 #include "pxr/imaging/hd/renderPassShader.h"
 #include "pxr/imaging/hd/rprim.h"
 
-#include "pxr/imaging/glf/drawTarget.h"
+#include "pxr/imaging/garch/drawTarget.h"
+
 #include "pxr/imaging/glf/diagnostic.h"
 #include "pxr/imaging/glf/glContext.h"
 #include "pxr/imaging/glf/info.h"
@@ -80,7 +81,7 @@ HdxIntersector::_Init(GfVec2i const& size)
         // TODO: determine this size from the incoming projection, we need two
         // different sizes, one for ray picking and one for marquee picking. we
         // could perhaps just use the large size for both.
-        _drawTarget = GlfDrawTarget::New(size);
+        _drawTarget = GarchDrawTarget::New(size);
 
         // Future work: these attachments must match
         // hd/shaders/renderPassShader.glslfx, which is a point of fragility.
@@ -248,7 +249,7 @@ HdxIntersector::Query(HdxIntersector::Params const& params,
 
     // Use a separate drawTarget (framebuffer object) for each GL context
     // that uses this renderer, but the drawTargets share attachments/textures.
-    GlfDrawTargetRefPtr drawTarget = GlfDrawTarget::New(size);
+    GarchDrawTargetRefPtr drawTarget = GarchDrawTarget::New(size);
 
     // Clone attachments into this context. Note that this will do a
     // light-weight copy of the textures, it does not produce a full copy of the
@@ -377,19 +378,19 @@ HdxIntersector::Query(HdxIntersector::Params const& params,
     std::unique_ptr<float[]> depths(new float[len]);
 
     glBindTexture(GL_TEXTURE_2D,
-        drawTarget->GetAttachments().at("primId")->GetGlTextureName());
+        (GLuint)(uint64_t)drawTarget->GetAttachments().at("primId")->GetTextureName());
     glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, &primId[0]);
 
     glBindTexture(GL_TEXTURE_2D,
-        drawTarget->GetAttachments().at("instanceId")->GetGlTextureName());
+        (GLuint)(uint64_t)drawTarget->GetAttachments().at("instanceId")->GetTextureName());
     glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, &instanceId[0]);
 
     glBindTexture(GL_TEXTURE_2D,
-        drawTarget->GetAttachments().at("elementId")->GetGlTextureName());
+        (GLuint)(uint64_t)drawTarget->GetAttachments().at("elementId")->GetTextureName());
     glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, &elementId[0]);
 
     glBindTexture(GL_TEXTURE_2D,
-        drawTarget->GetAttachments().at("depth")->GetGlTextureName());
+        (GLuint)(uint64_t)drawTarget->GetAttachments().at("depth")->GetTextureName());
     glGetTexImage(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, GL_FLOAT,
                     &depths[0]);
 

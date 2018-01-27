@@ -38,9 +38,9 @@
 #include "pxr/base/gf/matrix4f.h"
 #include "pxr/base/tf/envSetting.h"
 
-#include "pxr/imaging/hd/bufferArrayRangeGL.h"
+#include "pxr/imaging/hd/bufferArrayRange.h"
 #include "pxr/imaging/hd/bufferSource.h"
-#include "pxr/imaging/hd/bufferResourceGL.h"
+#include "pxr/imaging/hd/bufferResource.h"
 #include "pxr/imaging/hd/computation.h"
 #include "pxr/imaging/hd/geometricShader.h"
 #include "pxr/imaging/hd/perfLog.h"
@@ -689,10 +689,10 @@ HdStMesh::_PopulateVertexPrimVars(HdSceneDelegate *sceneDelegate,
 
                 if (bar) {
                     if (bar->IsValid()) {
-                        HdBufferArrayRangeGLSharedPtr bar_ =
-                            boost::static_pointer_cast<HdBufferArrayRangeGL>
+                        HdBufferArrayRangeSharedPtr bar_ =
+                            boost::static_pointer_cast<HdBufferArrayRange>
                                                                           (bar);
-                        HdBufferResourceGLSharedPtr pointsResource =
+                        HdBufferResourceSharedPtr pointsResource =
                                             bar_->GetResource(HdTokens->points);
 
                         if (pointsResource) {

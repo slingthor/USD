@@ -24,19 +24,19 @@
 #include "pxr/pxr.h"
 #include "pxr/imaging/glf/glew.h"
 
+#include "pxr/imaging/garch/glslfx.h"
+
 #include "pxr/imaging/hdSt/quadrangulate.h"
 #include "pxr/imaging/hdSt/meshTopology.h"
+#include "pxr/imaging/hdSt/resourceRegistry.h"
 
 #include "pxr/imaging/hd/bufferArrayRange.h"
-#include "pxr/imaging/hd/bufferArrayRangeGL.h"
-#include "pxr/imaging/hd/bufferResourceGL.h"
-#include "pxr/imaging/hd/glslProgram.h"
+#include "pxr/imaging/hd/bufferResource.h"
 #include "pxr/imaging/hd/meshUtil.h"
 #include "pxr/imaging/hd/perfLog.h"
+#include "pxr/imaging/hd/program.h"
 #include "pxr/imaging/hd/renderContextCaps.h"
-#include "pxr/imaging/hdSt/resourceRegistry.h"
 #include "pxr/imaging/hd/vtBufferSource.h"
-#include "pxr/imaging/glf/glslfx.h"
 
 #include "pxr/base/gf/vec2i.h"
 #include "pxr/base/gf/vec4i.h"
@@ -415,6 +415,9 @@ HdSt_QuadrangulateComputationGPU::Execute(
         return;
     }
 
+#if defined(ARCH_GFX_METAL)
+    TF_CODING_ERROR("Not Implemented");
+#else
     if (!glDispatchCompute)
         return;
 
@@ -487,8 +490,8 @@ HdSt_QuadrangulateComputationGPU::Execute(
     }
 
     glBindBufferBase(GL_UNIFORM_BUFFER, 0, ubo);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, primVar->GetId());
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, quadrangulateTable->GetId());
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, (GLuint)(uint64_t)primVar->GetId());
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, (GLuint)(uint64_t)quadrangulateTable->GetId());
 
     // dispatch compute kernel
     glUseProgram(program);
@@ -503,7 +506,7 @@ HdSt_QuadrangulateComputationGPU::Execute(
     glBindBufferBase(GL_UNIFORM_BUFFER, 0, 0);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, 0);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, 0);
-
+#endif
     HD_PERF_COUNTER_ADD(HdPerfTokens->quadrangulatedVerts,
                         quadInfo->numAdditionalPoints);
 }

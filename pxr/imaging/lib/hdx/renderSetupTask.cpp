@@ -30,6 +30,7 @@
 #include "pxr/imaging/hdSt/glslfxShader.h"
 
 #include "pxr/imaging/hd/changeTracker.h"
+#include "pxr/imaging/hd/engine.h"
 #include "pxr/imaging/hd/package.h"
 #include "pxr/imaging/hd/renderIndex.h"
 #include "pxr/imaging/hd/renderPassShader.h"
@@ -191,9 +192,8 @@ HdxRenderSetupTask::_CreateOverrideShader()
         std::lock_guard<std::mutex> lock(shaderCreateLock);
         {
             if (!_overrideShader) {
-                GlfGLSLFXSharedPtr glslfx =
-                        GlfGLSLFXSharedPtr(
-                               new GlfGLSLFX(HdPackageFallbackSurfaceShader()));
+                GLSLFXSharedPtr glslfx =
+                    GLSLFXSharedPtr(HdEngine::CreateGLSLFX(HdPackageFallbackSurfaceShader()));
 
                 _overrideShader =
                               HdShaderCodeSharedPtr(

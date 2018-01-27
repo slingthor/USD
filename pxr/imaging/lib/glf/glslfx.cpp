@@ -21,9 +21,10 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
+#include "pxr/imaging/garch/glslfxConfig.h"
+#include "pxr/imaging/garch/debugCodes.h"
+
 #include "pxr/imaging/glf/glslfx.h"
-#include "pxr/imaging/glf/glslfxConfig.h"
-#include "pxr/imaging/glf/debugCodes.h"
 
 #include "pxr/base/plug/plugin.h"
 #include "pxr/base/plug/registry.h"
@@ -199,7 +200,7 @@ GlfGLSLFX::GlfGLSLFX(string const & filePath) :
     _globalContext(filePath),
     _valid(true), _hash(0)
 {
-    TF_DEBUG(GLF_DEBUG_GLSLFX).Msg("Creating GLSLFX data from %s\n",
+    TF_DEBUG(GARCH_DEBUG_GLSLFX).Msg("Creating GLSLFX data from %s\n",
                                     filePath.c_str());
 
     _valid = _ProcessFile(filePath, _globalContext);
@@ -213,7 +214,7 @@ GlfGLSLFX::GlfGLSLFX(istream &is) :
     _globalContext("istream"),
     _valid(true), _hash(0)
 {
-    TF_DEBUG(GLF_DEBUG_GLSLFX).Msg("Creating GLSLFX data from istream\n");
+    TF_DEBUG(GARCH_DEBUG_GLSLFX).Msg("Creating GLSLFX data from istream\n");
 
     _valid = _ProcessInput(&is, _globalContext);
 
@@ -242,7 +243,7 @@ GlfGLSLFX::_ProcessFile(string const & filePath, _ParseContext & context)
 
     if (_seenFiles.count(filePath)) {
         // for now, just ignore files that have already been included
-        TF_DEBUG(GLF_DEBUG_GLSLFX).Msg("Multiple import of %s\n",
+        TF_DEBUG(GARCH_DEBUG_GLSLFX).Msg("Multiple import of %s\n",
                                         filePath.c_str());
         return true;
     }
@@ -284,7 +285,7 @@ GlfGLSLFX::_ProcessInput(std::istream * input,
                 return false;
             }
 
-            TF_DEBUG(GLF_DEBUG_GLSLFX).Msg("  %s : %d : %s\n",
+            TF_DEBUG(GARCH_DEBUG_GLSLFX).Msg("  %s : %d : %s\n",
                 TfGetBaseName(context.filename).c_str(), context.lineNo,
                 context.currentLine.c_str());
 
@@ -309,7 +310,7 @@ GlfGLSLFX::_ProcessInput(std::istream * input,
     }
 
     for (std::string const& importFile : context.imports) {
-        TF_DEBUG(GLF_DEBUG_GLSLFX).Msg(" Importing File : %s\n",
+        TF_DEBUG(GARCH_DEBUG_GLSLFX).Msg(" Importing File : %s\n",
                                         importFile.c_str());
 
         _ParseContext localContext(importFile);
@@ -491,11 +492,11 @@ GlfGLSLFX::_ComposeConfiguration(std::string *reason)
 
     for (std::string const& item : _configOrder) {
         TF_AXIOM(_configMap.find(item) != _configMap.end());
-        TF_DEBUG(GLF_DEBUG_GLSLFX).Msg("    Parsing config for %s\n",
+        TF_DEBUG(GARCH_DEBUG_GLSLFX).Msg("    Parsing config for %s\n",
                                         TfGetBaseName(item).c_str());
 
         string errorStr;
-        _config.reset(GlfGLSLFXConfig::Read(_configMap[item], item, &errorStr));
+        _config.reset(GLSLFXConfig::Read(_configMap[item], item, &errorStr));
 
         if (!errorStr.empty()) {
             *reason = 
@@ -508,44 +509,44 @@ GlfGLSLFX::_ComposeConfiguration(std::string *reason)
     return true;
 }
 
-GlfGLSLFXConfig::Parameters
+GLSLFXConfig::Parameters
 GlfGLSLFX::GetParameters() const
 {
     if (_config) {
         return _config->GetParameters();
     }
 
-    return GlfGLSLFXConfig::Parameters();
+    return GLSLFXConfig::Parameters();
 }
 
-GlfGLSLFXConfig::Textures
+GLSLFXConfig::Textures
 GlfGLSLFX::GetTextures() const
 {
     if (_config) {
         return _config->GetTextures();
     }
 
-    return GlfGLSLFXConfig::Textures();
+    return GLSLFXConfig::Textures();
 }
 
-GlfGLSLFXConfig::Attributes
+GLSLFXConfig::Attributes
 GlfGLSLFX::GetAttributes() const
 {
     if (_config) {
         return _config->GetAttributes();
     }
 
-    return GlfGLSLFXConfig::Attributes();
+    return GLSLFXConfig::Attributes();
 }
 
-GlfGLSLFXConfig::MetadataDictionary
+GLSLFXConfig::MetadataDictionary
 GlfGLSLFX::GetMetadata() const
 {
     if (_config) {
         return _config->GetMetadata();
     }
 
-    return GlfGLSLFXConfig::MetadataDictionary();
+    return GLSLFXConfig::MetadataDictionary();
 }
 
 string

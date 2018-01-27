@@ -214,7 +214,7 @@ def RunCMake(context, force, extraArgs = None):
                     generator=(generator or ""),
                     extraArgs=(" ".join(extraArgs) if extraArgs else "")))
         Run("cmake --build . --config Release --target install -- {multiproc}"
-            .format(multiproc=("/M:{procs}" if Windows() else "-j{procs}")
+            .format(multiproc=("/M:{procs}" if Windows() else "-jobs {procs}")
                                .format(procs=context.numJobs)))
 
 def PatchFile(filename, patches):
@@ -882,6 +882,11 @@ def InstallUSD(context):
         if Windows():
             # Increase the precompiled header buffer limit.
             extraArgs.append('-DCMAKE_CXX_FLAGS="/Zm150"')
+
+        if MacOS():
+            # Increase the precompiled header buffer limit.
+            extraArgs.append('-G "Xcode"')
+            extraArgs.append('-DCMAKE_CXX_FLAGS="-x objective-c++"')
 
         RunCMake(context, False, extraArgs)
 

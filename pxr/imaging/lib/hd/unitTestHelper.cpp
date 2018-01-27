@@ -90,7 +90,7 @@ _BuildArray(T values[], int numValues)
 }
 
 Hd_TestDriver::Hd_TestDriver()
- : _engine()
+ : _engine(HdEngine::OpenGL)
  , _renderDelegate()
  , _renderIndex(nullptr)
  , _sceneDelegate(nullptr)
@@ -108,7 +108,7 @@ Hd_TestDriver::Hd_TestDriver()
 }
 
 Hd_TestDriver::Hd_TestDriver(TfToken const &reprName)
- : _engine()
+ : _engine(HdEngine::OpenGL)
  , _renderDelegate()
  , _renderIndex(nullptr)
  , _sceneDelegate(nullptr)

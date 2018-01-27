@@ -43,7 +43,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 class HdRenderIndex;
 class HdSceneDelegate;
-class GlfSimpleLight;
+class GarchSimpleLight;
 
 typedef boost::shared_ptr<class HdRenderPassShader> HdRenderPassShaderSharedPtr;
 typedef boost::shared_ptr<class HdRenderPassState> HdRenderPassStateSharedPtr;
@@ -51,7 +51,7 @@ typedef boost::shared_ptr<class HdRenderPass> HdRenderPassSharedPtr;
 typedef std::vector<HdRenderPassStateSharedPtr> HdRenderPassStateSharedPtrVector;
 typedef std::vector<HdRenderPassSharedPtr> HdRenderPassSharedPtrVector;
 
-TF_DECLARE_WEAK_AND_REF_PTRS(GlfSimpleShadowArray);
+TF_DECLARE_WEAK_AND_REF_PTRS(GarchSimpleShadowArray);
 
 /// \class HdxShadowTask
 ///

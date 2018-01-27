@@ -75,7 +75,7 @@ Garch_GetModifierKeys(NSUInteger flags)
         NSOpenGLPFAAlphaSize, 8,
         NSOpenGLPFAColorSize, 32,
         NSOpenGLPFANoRecovery,
-        NSOpenGLPFAOpenGLProfile, NSOpenGLProfileVersion3_2Core,
+        NSOpenGLPFAOpenGLProfile, NSOpenGLProfileVersion4_1Core,
         0
     };
 

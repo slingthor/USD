@@ -37,14 +37,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 GlfSimpleShadowArray::GlfSimpleShadowArray(GfVec2i const & size,
                                            size_t numLayers) :
-    _size(size),
-    _numLayers(numLayers),
-    _viewMatrix(_numLayers),
-    _projectionMatrix(_numLayers),
-    _texture(0),
-    _framebuffer(0),
-    _shadowDepthSampler(0),
-    _shadowCompareSampler(0),
+    GarchSimpleShadowArray(size, numLayers),
     _unbindRestoreDrawFramebuffer(0),
     _unbindRestoreReadFramebuffer(0),
     _unbindRestoreViewport{0,0,0,0}
@@ -56,102 +49,22 @@ GlfSimpleShadowArray::~GlfSimpleShadowArray()
     _FreeTextureArray();
 }
 
-GfVec2i
-GlfSimpleShadowArray::GetSize() const
-{
-    return _size;
-}
-
 void
 GlfSimpleShadowArray::SetSize(GfVec2i const & size)
 {
     if (_size != size) {
         _FreeTextureArray();
-        _size = size;
     }
-}
-
-size_t
-GlfSimpleShadowArray::GetNumLayers() const
-{
-    return _numLayers;
+    GarchSimpleShadowArray::SetSize(size);
 }
 
 void
 GlfSimpleShadowArray::SetNumLayers(size_t numLayers)
 {
     if (_numLayers != numLayers) {
-        _viewMatrix.resize(numLayers, GfMatrix4d().SetIdentity());
-        _projectionMatrix.resize(numLayers, GfMatrix4d().SetIdentity());
         _FreeTextureArray();
-        _numLayers = numLayers;
     }
-}
-
-GfMatrix4d
-GlfSimpleShadowArray::GetViewMatrix(size_t index) const
-{
-    if (!TF_VERIFY(index < _viewMatrix.size())) {
-        return GfMatrix4d(1.0);
-    }
-
-    return _viewMatrix[index];
-}
-
-void
-GlfSimpleShadowArray::SetViewMatrix(size_t index, GfMatrix4d const & matrix)
-{
-    if (!TF_VERIFY(index < _viewMatrix.size())) {
-        return;
-    }
-
-    _viewMatrix[index] = matrix;
-}
-
-GfMatrix4d
-GlfSimpleShadowArray::GetProjectionMatrix(size_t index) const
-{
-    if (!TF_VERIFY(index < _projectionMatrix.size())) {
-        return GfMatrix4d(1.0);
-    }
-
-    return _projectionMatrix[index];
-}
-
-void
-GlfSimpleShadowArray::SetProjectionMatrix(size_t index, GfMatrix4d const & matrix)
-{
-    if (!TF_VERIFY(index < _projectionMatrix.size())) {
-        return;
-    }
-
-    _projectionMatrix[index] = matrix;
-}
-
-GfMatrix4d
-GlfSimpleShadowArray::GetWorldToShadowMatrix(size_t index) const
-{
-    GfMatrix4d size = GfMatrix4d().SetScale(GfVec3d(0.5, 0.5, 0.5));
-    GfMatrix4d center = GfMatrix4d().SetTranslate(GfVec3d(0.5, 0.5, 0.5));
-    return GetViewMatrix(index) * GetProjectionMatrix(index) * size * center;
-}
-
-GLuint
-GlfSimpleShadowArray::GetShadowMapTexture() const
-{
-    return _texture;
-}
-
-GLuint
-GlfSimpleShadowArray::GetShadowMapDepthSampler() const
-{
-    return _shadowDepthSampler;
-}
-
-GLuint
-GlfSimpleShadowArray::GetShadowMapCompareSampler() const
-{
-    return _shadowCompareSampler;
+    GarchSimpleShadowArray::SetNumLayers(numLayers);
 }
 
 void
@@ -197,62 +110,74 @@ GlfSimpleShadowArray::EndCapture(size_t)
 void
 GlfSimpleShadowArray::_AllocTextureArray()
 {
-    glGenTextures(1, &_texture);
-    glBindTexture(GL_TEXTURE_2D_ARRAY, _texture);
+    GLuint shadowDepthSampler;
+    GLuint shadowCompareSampler;
+    GLuint framebuffer;
+    GLuint texture;
+
+    glGenTextures(1, &texture);
+    glBindTexture(GL_TEXTURE_2D_ARRAY, texture);
 
     glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_DEPTH_COMPONENT32F,
                  _size[0], _size[1], _numLayers, 0, 
                  GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
 
     GLfloat border[] = {1, 1, 1, 1};
+    glGenSamplers(1, &shadowDepthSampler);
+    glSamplerParameteri(shadowDepthSampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glSamplerParameteri(shadowDepthSampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glSamplerParameteri(shadowDepthSampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+    glSamplerParameteri(shadowDepthSampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+    glSamplerParameterfv(shadowDepthSampler, GL_TEXTURE_BORDER_COLOR, border);
 
-    glGenSamplers(1, &_shadowDepthSampler);
-    glSamplerParameteri(_shadowDepthSampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glSamplerParameteri(_shadowDepthSampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glSamplerParameteri(_shadowDepthSampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-    glSamplerParameteri(_shadowDepthSampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
-    glSamplerParameterfv(_shadowDepthSampler, GL_TEXTURE_BORDER_COLOR, border);
-
-    glGenSamplers(1, &_shadowCompareSampler);
-    glSamplerParameteri(_shadowCompareSampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glSamplerParameteri(_shadowCompareSampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glSamplerParameteri(_shadowCompareSampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-    glSamplerParameteri(_shadowCompareSampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
-    glSamplerParameterfv(_shadowCompareSampler, GL_TEXTURE_BORDER_COLOR, border);
-    glSamplerParameteri(_shadowCompareSampler, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_R_TO_TEXTURE );
-    glSamplerParameteri(_shadowCompareSampler, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL );
+    glGenSamplers(1, &shadowCompareSampler);
+    glSamplerParameteri(shadowCompareSampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glSamplerParameteri(shadowCompareSampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glSamplerParameteri(shadowCompareSampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+    glSamplerParameteri(shadowCompareSampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+    glSamplerParameterfv(shadowCompareSampler, GL_TEXTURE_BORDER_COLOR, border);
+    glSamplerParameteri(shadowCompareSampler, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_R_TO_TEXTURE );
+    glSamplerParameteri(shadowCompareSampler, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL );
 
     glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
 
-    glGenFramebuffers(1, &_framebuffer);
-    glBindFramebuffer(GL_FRAMEBUFFER, _framebuffer);
+    glGenFramebuffers(1, &framebuffer);
+    glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
 
     glFramebufferTextureLayer(GL_FRAMEBUFFER,
-                              GL_DEPTH_ATTACHMENT, _texture, 0, 0);
+                              GL_DEPTH_ATTACHMENT, texture, 0, 0);
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
+    _shadowDepthSampler = (GarchSamplerGPUHandle)(uint64_t)shadowDepthSampler;
+    _shadowCompareSampler = (GarchSamplerGPUHandle)(uint64_t)shadowCompareSampler;
+    _framebuffer = (GarchSamplerGPUHandle)(uint64_t)framebuffer;
+    _texture = (GarchSamplerGPUHandle)(uint64_t)texture;
 }
 
 void
 GlfSimpleShadowArray::_FreeTextureArray()
 {
     GlfSharedGLContextScopeHolder sharedContextScopeHolder;
-
+    
     if (_texture) {
-        glDeleteTextures(1, &_texture);
+        GLuint texture = (GLuint)(uint64_t)_texture;
+        glDeleteTextures(1, &texture);
         _texture = 0;
     }
     if (_framebuffer) {
-        glDeleteFramebuffers(1, &_framebuffer);
+        GLuint framebuffer = (GLuint)(uint64_t)_framebuffer;
+        glDeleteFramebuffers(1, &framebuffer);
         _framebuffer = 0;
     }
     if (_shadowDepthSampler) {
-        glDeleteSamplers(1, &_shadowDepthSampler);
+        GLuint shadowDepthSampler = (GLuint)(uint64_t)_shadowDepthSampler;
+        glDeleteSamplers(1, &shadowDepthSampler);
         _shadowDepthSampler = 0;
     }
     if (_shadowCompareSampler) {
-        glDeleteSamplers(1, &_shadowCompareSampler);
+        GLuint shadowCompareSampler = (GLuint)(uint64_t)_shadowCompareSampler;
+        glDeleteSamplers(1, &shadowCompareSampler);
         _shadowCompareSampler = 0;
     }
 }
@@ -269,9 +194,12 @@ GlfSimpleShadowArray::_BindFramebuffer(size_t index)
         _AllocTextureArray();
     }
 
-    glBindFramebuffer(GL_FRAMEBUFFER, _framebuffer);
+    GLuint framebuffer = (GLuint)(uint64_t)_framebuffer;
+    GLuint texture = (GLuint)(uint64_t)_texture;
+    
+    glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
     glFramebufferTextureLayer(GL_FRAMEBUFFER,
-                              GL_DEPTH_ATTACHMENT, _texture, 0, index);
+                              GL_DEPTH_ATTACHMENT, texture, 0, index);
 }
 
 void

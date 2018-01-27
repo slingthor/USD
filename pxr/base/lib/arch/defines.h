@@ -108,6 +108,11 @@ PXR_NAMESPACE_OPEN_SCOPE
 #define ARCH_HAS_MMAP_MAP_POPULATE
 #endif
 
+// Metal API present
+#if defined(ARCH_OS_DARWIN)
+#define ARCH_GFX_METAL
+#endif
+
 PXR_NAMESPACE_CLOSE_SCOPE
 
 #endif // ARCH_DEFINES_H 

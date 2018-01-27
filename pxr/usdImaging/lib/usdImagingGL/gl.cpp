@@ -71,8 +71,9 @@ _IsEnabledHydra()
 bool
 UsdImagingGL::IsEnabledHydra()
 {
+#if !defined(ARCH_GFX_METAL)
     GlfGlewInit();
-
+#endif
     static bool isEnabledHydra = _IsEnabledHydra();
     return isEnabledHydra;
 }

@@ -32,8 +32,8 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 typedef boost::shared_ptr<class HdStDispatchBuffer>
     HdStDispatchBufferSharedPtr;
-typedef boost::shared_ptr<class HdStPersistentBuffer>
-    HdStPersistentBufferSharedPtr;
+typedef boost::shared_ptr<class HdPersistentBuffer>
+    HdPersistentBufferSharedPtr;
 typedef boost::shared_ptr<class HdStResourceRegistry>
     HdStResourceRegistrySharedPtr;
 
@@ -60,7 +60,7 @@ public:
     /// Register a buffer initialized with \a dataSize bytes of \a data
     /// to be used as a persistently mapped shader storage buffer.
     HDST_API
-    HdStPersistentBufferSharedPtr RegisterPersistentBuffer(
+    HdPersistentBufferSharedPtr RegisterPersistentBuffer(
         TfToken const &role, size_t dataSize, void *data);
 
     /// Remove any entries associated with expired dispatch buffers.
@@ -81,7 +81,7 @@ private:
         _DispatchBufferRegistry;
     _DispatchBufferRegistry _dispatchBufferRegistry;
 
-    typedef std::vector<HdStPersistentBufferSharedPtr>
+    typedef std::vector<HdPersistentBufferSharedPtr>
         _PersistentBufferRegistry;
     _PersistentBufferRegistry _persistentBufferRegistry;
 

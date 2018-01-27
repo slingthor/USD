@@ -22,18 +22,22 @@
 // language governing permissions and limitations under the Apache License.
 //
 #include "pxr/imaging/glf/glew.h"
-
+#if defined(ARCH_GFX_METAL)
+#include "pxr/imaging/mtlf/mtlDevice.h"
+#endif
 #include "pxr/imaging/hd/interleavedMemoryManager.h"
 
 #include <boost/make_shared.hpp>
+#include <boost/scoped_ptr.hpp>
 #include <vector>
 
 #include "pxr/base/arch/hash.h"
 #include "pxr/base/tf/diagnostic.h"
 #include "pxr/base/tf/iterator.h"
 
-#include "pxr/imaging/hd/bufferResourceGL.h"
-#include "pxr/imaging/hd/glUtils.h"
+#include "pxr/imaging/hd/bufferRelocator.h"
+#include "pxr/imaging/hd/bufferResource.h"
+#include "pxr/imaging/hd/engine.h"
 #include "pxr/imaging/hd/renderContextCaps.h"
 #include "pxr/imaging/hd/perfLog.h"
 #include "pxr/imaging/hd/tokens.h"
@@ -68,17 +72,18 @@ HdInterleavedMemoryManager::GetResourceAllocation(
     HdBufferArraySharedPtr const &bufferArray, 
     VtDictionary &result) const 
 { 
-    std::set<GLuint> idSet;
+    std::set<void*> idSet;
     size_t gpuMemoryUsed = 0;
 
     _StripedInterleavedBufferSharedPtr bufferArray_ =
         boost::static_pointer_cast<_StripedInterleavedBuffer> (bufferArray);
 
     TF_FOR_ALL(resIt, bufferArray_->GetResources()) {
-        HdBufferResourceGLSharedPtr const & resource = resIt->second;
+        HdBufferResourceSharedPtr const & resource = resIt->second;
 
         // XXX avoid double counting of resources shared within a buffer
-        GLuint id = resource->GetId();
+        void *id = resource->GetId();
+
         if (idSet.count(id) == 0) {
             idSet.insert(id);
 
@@ -300,7 +305,7 @@ HdInterleavedMemoryManager::_StripedInterleavedBuffer::_StripedInterleavedBuffer
     TF_VERIFY(_stride + offset);
 }
 
-HdBufferResourceGLSharedPtr
+HdBufferResourceSharedPtr
 HdInterleavedMemoryManager::_StripedInterleavedBuffer::_AddResource(TfToken const& name,
                             int glDataType,
                             short numComponents,
@@ -312,15 +317,15 @@ HdInterleavedMemoryManager::_StripedInterleavedBuffer::_AddResource(TfToken cons
 
     if (TfDebug::IsEnabled(HD_SAFE_MODE)) {
         // duplication check
-        HdBufferResourceGLSharedPtr bufferRes = GetResource(name);
+        HdBufferResourceSharedPtr bufferRes = GetResource(name);
         if (!TF_VERIFY(!bufferRes)) {
             return bufferRes;
         }
     }
 
-    HdBufferResourceGLSharedPtr bufferRes = HdBufferResourceGLSharedPtr(
-        new HdBufferResourceGL(GetRole(), glDataType,
-                             numComponents, arraySize, offset, stride));
+    HdBufferResourceSharedPtr bufferRes = HdBufferResourceSharedPtr(
+        HdEngine::CreateResourceBuffer(GetRole(), glDataType,
+                                       numComponents, arraySize, offset, stride));
 
     _resourceList.push_back(std::make_pair(name, bufferRes));
     return bufferRes;
@@ -415,13 +420,87 @@ HdInterleavedMemoryManager::_StripedInterleavedBuffer::Reallocate(
     // allocate new one
     // curId and oldId will be different when we are adopting ranges
     // from another buffer array.
+    TF_CODING_ERROR("Not Implemented");
+
+#if defined(ARCH_GFX_METAL)
+    id<MTLBuffer> newId = nil;
+    id<MTLBuffer> oldId = (__bridge id<MTLBuffer>)GetResources().begin()->second->GetId();
+    
+    _StripedInterleavedBufferSharedPtr curRangeOwner_ =
+    boost::static_pointer_cast<_StripedInterleavedBuffer> (curRangeOwner);
+    
+    id<MTLBuffer> curId = (__bridge id<MTLBuffer>)curRangeOwner_->GetResources().begin()->second->GetId();
+    id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->device;
+    
+    newId = [device newBufferWithLength:totalSize options:MTLResourceStorageModeManaged];
+    
+    // if old buffer exists, copy unchanged data
+    if (curId) {
+        int index = 0;
+        
+        size_t rangeCount = GetRangeCount();
+        
+        // pre-pass to combine consecutive buffer range relocation
+        boost::scoped_ptr<HdBufferRelocator> relocator(HdEngine::CreateBufferRelocator(curId, newId));
+        for (size_t rangeIdx = 0; rangeIdx < rangeCount; ++rangeIdx) {
+            _StripedInterleavedBufferRangeSharedPtr range = _GetRangeSharedPtr(rangeIdx);
+            
+            if (!range) {
+                TF_CODING_ERROR("_StripedInterleavedBufferRange expired "
+                                "unexpectedly.");
+                continue;
+            }
+            int oldIndex = range->GetIndex();
+            if (oldIndex >= 0) {
+                // copy old data
+                GLintptr readOffset = oldIndex * _stride;
+                GLintptr writeOffset = index * _stride;
+                GLsizeiptr copySize = _stride * range->GetNumElements();
+                
+                relocator->AddRange(readOffset, writeOffset, copySize);
+            }
+            
+            range->SetIndex(index);
+            index += range->GetNumElements();
+        }
+        
+        // buffer copy
+        relocator->Commit();
+        
+    } else {
+        // just set index
+        int index = 0;
+        
+        size_t rangeCount = GetRangeCount();
+        for (size_t rangeIdx = 0; rangeIdx < rangeCount; ++rangeIdx) {
+            _StripedInterleavedBufferRangeSharedPtr range = _GetRangeSharedPtr(rangeIdx);
+            if (!range) {
+                TF_CODING_ERROR("_StripedInterleavedBufferRange expired "
+                                "unexpectedly.");
+                continue;
+            }
+            
+            range->SetIndex(index);
+            index += range->GetNumElements();
+        }
+    }
+    // delete old buffer
+    if(oldId != nil) {
+        [oldId release];
+    }
+    
+    // update id to all buffer resources
+    TF_FOR_ALL(it, GetResources()) {
+        it->second->SetAllocation((__bridge void*)newId, totalSize);
+    }
+#else
     GLuint newId = 0;
-    GLuint oldId = GetResources().begin()->second->GetId();
+    GLuint oldId = (GLuint)GetResources().begin()->second->GetId();
 
     _StripedInterleavedBufferSharedPtr curRangeOwner_ =
         boost::static_pointer_cast<_StripedInterleavedBuffer> (curRangeOwner);
 
-    GLuint curId = curRangeOwner_->GetResources().begin()->second->GetId();
+    GLuint curId = (GLuint)curRangeOwner_->GetResources().begin()->second->GetId();
 
     if (glGenBuffers) {
         glGenBuffers(1, &newId);
@@ -499,6 +578,7 @@ HdInterleavedMemoryManager::_StripedInterleavedBuffer::Reallocate(
     TF_FOR_ALL(it, GetResources()) {
         it->second->SetAllocation(newId, totalSize);
     }
+#endif
 
     _needsReallocation = false;
     _needsCompaction = false;
@@ -506,13 +586,28 @@ HdInterleavedMemoryManager::_StripedInterleavedBuffer::Reallocate(
     // increment version to rebuild dispatch buffers.
     IncrementVersion();
 }
-
+#if defined(ARCH_GFX_METAL)
 void
 HdInterleavedMemoryManager::_StripedInterleavedBuffer::_DeallocateResources()
 {
-    HdBufferResourceGLSharedPtr resource = GetResource();
+    TF_CODING_ERROR("Not Implemented");
+
+    HdBufferResourceSharedPtr resource = GetResource();
     if (resource) {
-        GLuint id = resource->GetId();
+        id<MTLBuffer> _id = (__bridge id<MTLBuffer>)resource->GetId();
+        if (_id != nil) {
+            [_id release];
+            resource->SetAllocation(nil, 0);
+        }
+    }
+}
+#else
+void
+HdInterleavedMemoryManager::_StripedInterleavedBuffer::_DeallocateResources()
+{
+    HdBufferResourceSharedPtr resource = GetResource();
+    if (resource) {
+        GLuint id = (GLuint)(uint64_t)resource->GetId();
         if (id) {
             if (glDeleteBuffers) {
                 glDeleteBuffers(1, &id);
@@ -521,6 +616,7 @@ HdInterleavedMemoryManager::_StripedInterleavedBuffer::_DeallocateResources()
         }
     }
 }
+#endif
 
 void
 HdInterleavedMemoryManager::_StripedInterleavedBuffer::DebugDump(std::ostream &out) const
@@ -538,16 +634,16 @@ HdInterleavedMemoryManager::_StripedInterleavedBuffer::DebugDump(std::ostream &o
     }
 }
 
-HdBufferResourceGLSharedPtr
+HdBufferResourceSharedPtr
 HdInterleavedMemoryManager::_StripedInterleavedBuffer::GetResource() const
 {
     HD_TRACE_FUNCTION();
 
-    if (_resourceList.empty()) return HdBufferResourceGLSharedPtr();
+    if (_resourceList.empty()) return HdBufferResourceSharedPtr();
 
     if (TfDebug::IsEnabled(HD_SAFE_MODE)) {
         // make sure this buffer array has only one resource.
-        GLuint id = _resourceList.begin()->second->GetId();
+        void *id = _resourceList.begin()->second->GetId();
         TF_FOR_ALL (it, _resourceList) {
             if (it->second->GetId() != id) {
                 TF_CODING_ERROR("GetResource(void) called on"
@@ -560,18 +656,18 @@ HdInterleavedMemoryManager::_StripedInterleavedBuffer::GetResource() const
     return _resourceList.begin()->second;
 }
 
-HdBufferResourceGLSharedPtr
+HdBufferResourceSharedPtr
 HdInterleavedMemoryManager::_StripedInterleavedBuffer::GetResource(TfToken const& name)
 {
     HD_TRACE_FUNCTION();
 
     // linear search.
     // The number of buffer resources should be small (<10 or so).
-    for (HdBufferResourceGLNamedList::iterator it = _resourceList.begin();
+    for (HdBufferResourceNamedList::iterator it = _resourceList.begin();
          it != _resourceList.end(); ++it) {
         if (it->first == name) return it->second;
     }
-    return HdBufferResourceGLSharedPtr();
+    return HdBufferResourceSharedPtr();
 }
 
 HdBufferSpecVector
@@ -580,7 +676,7 @@ HdInterleavedMemoryManager::_StripedInterleavedBuffer::GetBufferSpecs() const
     HdBufferSpecVector result;
     result.reserve(_resourceList.size());
     TF_FOR_ALL (it, _resourceList) {
-        HdBufferResourceGLSharedPtr const &bres = it->second;
+        HdBufferResourceSharedPtr const &bres = it->second;
         HdBufferSpec spec(it->first, bres->GetGLDataType(), bres->GetNumComponents());
         result.push_back(spec);
     }
@@ -644,7 +740,7 @@ HdInterleavedMemoryManager::_StripedInterleavedBufferRange::CopyData(
 
     if (!TF_VERIFY(_stripedBuffer)) return;
 
-    HdBufferResourceGLSharedPtr VBO =
+    HdBufferResourceSharedPtr VBO =
         _stripedBuffer->GetResource(bufferSource->GetName());
 
     if (!VBO || VBO->GetId() == 0) {
@@ -661,7 +757,12 @@ HdInterleavedMemoryManager::_StripedInterleavedBufferRange::CopyData(
         !TF_VERIFY(bufferSource->GetNumComponents() == VBO->GetNumComponents())) return;
 
     HdRenderContextCaps const &caps = HdRenderContextCaps::GetInstance();
-    if (glBufferSubData != NULL) {
+
+    TF_CODING_ERROR("Not Implemented"); // Just need to check glBufferSubData when using a GL renderer
+#if !defined(ARCH_GFX_METAL)
+    if (glBufferSubData != NULL)
+#endif
+    {
         int vboStride = VBO->GetStride();
         GLintptr vboOffset = VBO->GetOffset() + vboStride * _index;
         int dataSize = VBO->GetNumComponents() * VBO->GetComponentSize() * VBO->GetArraySize();
@@ -671,18 +772,8 @@ HdInterleavedMemoryManager::_StripedInterleavedBufferRange::CopyData(
         for (int i = 0; i < _numElements; ++i) {
             HD_PERF_COUNTER_INCR(HdPerfTokens->glBufferSubData);
 
-            // XXX: MapBuffer?
-            // XXX
-            // using glNamedBuffer against UBO randomly triggers a crash at
-            // glXSwapBuffers on driver 319.32. It doesn't occur on 331.49.
-            // XXX: move this workaround into renderContextCaps.
-            if (false && caps.directStateAccessEnabled) {
-                glNamedBufferSubDataEXT(VBO->GetId(), vboOffset, dataSize, data);
-            } else {
-                glBindBuffer(GL_ARRAY_BUFFER, VBO->GetId());
-                glBufferSubData(GL_ARRAY_BUFFER, vboOffset, dataSize, data);
-                glBindBuffer(GL_ARRAY_BUFFER, 0);
-            }
+            VBO->CopyData(vboOffset, dataSize, data);
+
             vboOffset += vboStride;
             data += dataSize;
         }
@@ -699,20 +790,19 @@ HdInterleavedMemoryManager::_StripedInterleavedBufferRange::ReadData(
     VtValue result;
     if (!TF_VERIFY(_stripedBuffer)) return result;
 
-    HdBufferResourceGLSharedPtr VBO = _stripedBuffer->GetResource(name);
+    HdBufferResourceSharedPtr VBO = _stripedBuffer->GetResource(name);
 
     if (!VBO || VBO->GetId() == 0) {
         TF_CODING_ERROR("VBO doesn't exist for %s", name.GetText());
         return result;
     }
 
-    result = HdGLUtils::ReadBuffer(VBO->GetId(),
-                                   VBO->GetGLDataType(),
-                                   VBO->GetNumComponents(),
-                                   VBO->GetArraySize(),
-                                   VBO->GetOffset() + VBO->GetStride() * _index,
-                                   VBO->GetStride(),
-                                   _numElements);
+    result = VBO->ReadBuffer(VBO->GetGLDataType(),
+                             VBO->GetNumComponents(),
+                             VBO->GetArraySize(),
+                             VBO->GetOffset() + VBO->GetStride() * _index,
+                             VBO->GetStride(),
+                             _numElements);
 
     return result;
 }
@@ -723,20 +813,20 @@ HdInterleavedMemoryManager::_StripedInterleavedBufferRange::GetMaxNumElements() 
     return _stripedBuffer->GetMaxNumElements();
 }
 
-HdBufferResourceGLSharedPtr
+HdBufferResourceSharedPtr
 HdInterleavedMemoryManager::_StripedInterleavedBufferRange::GetResource() const
 {
-    if (!TF_VERIFY(_stripedBuffer)) return HdBufferResourceGLSharedPtr();
+    if (!TF_VERIFY(_stripedBuffer)) return HdBufferResourceSharedPtr();
 
     return _stripedBuffer->GetResource();
 }
 
-HdBufferResourceGLSharedPtr
+HdBufferResourceSharedPtr
 HdInterleavedMemoryManager::_StripedInterleavedBufferRange::GetResource(
     TfToken const& name)
 {
     if (!TF_VERIFY(_stripedBuffer))
-        return HdBufferResourceGLSharedPtr();
+        return HdBufferResourceSharedPtr();
 
     // don't use GetResource(void) as a shortcut even an interleaved buffer
     // is sharing one underlying GL resource. We may need an appropriate
@@ -744,11 +834,11 @@ HdInterleavedMemoryManager::_StripedInterleavedBufferRange::GetResource(
     return _stripedBuffer->GetResource(name);
 }
 
-HdBufferResourceGLNamedList const&
+HdBufferResourceNamedList const&
 HdInterleavedMemoryManager::_StripedInterleavedBufferRange::GetResources() const
 {
     if (!TF_VERIFY(_stripedBuffer)) {
-        static HdBufferResourceGLNamedList empty;
+        static HdBufferResourceNamedList empty;
         return empty;
     }
     return _stripedBuffer->GetResources();

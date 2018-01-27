@@ -29,7 +29,7 @@
 #include "pxr/imaging/hd/version.h"
 #include "pxr/imaging/hd/strategyBase.h"
 #include "pxr/imaging/hd/bufferArray.h"
-#include "pxr/imaging/hd/bufferArrayRangeGL.h"
+#include "pxr/imaging/hd/bufferArrayRange.h"
 #include "pxr/imaging/hd/bufferSpec.h"
 #include "pxr/imaging/hd/bufferSource.h"
 
@@ -76,7 +76,7 @@ protected:
     ///
     /// Specialized buffer array range for SimpleBufferArray.
     ///
-    class _SimpleBufferArrayRange : public HdBufferArrayRangeGL
+    class _SimpleBufferArrayRange : public HdBufferArrayRange
     {
     public:
         /// Constructor.
@@ -148,15 +148,15 @@ protected:
         /// Returns the GPU resource. If the buffer array contains more than one
         /// resource, this method raises a coding error.
         HD_API
-        virtual HdBufferResourceGLSharedPtr GetResource() const;
+        virtual HdBufferResourceSharedPtr GetResource() const;
 
         /// Returns the named GPU resource.
         HD_API
-        virtual HdBufferResourceGLSharedPtr GetResource(TfToken const& name);
+        virtual HdBufferResourceSharedPtr GetResource(TfToken const& name);
 
         /// Returns the list of all named GPU resources for this bufferArrayRange.
         HD_API
-        virtual HdBufferResourceGLNamedList const& GetResources() const;
+        virtual HdBufferResourceNamedList const& GetResources() const;
 
         /// Sets the buffer array assosiated with this buffer;
         HD_API
@@ -166,9 +166,12 @@ protected:
         HD_API
         virtual void DebugDump(std::ostream &out) const;
 
+        HD_API
+        virtual void AddBufferSpecs(HdBufferSpecVector *bufferSpecs) const {}
+        
         /// Make this range invalid
         void Invalidate() {
-            _bufferArray = NULL;
+            _bufferArray = nullptr;
         }
 
     protected:
@@ -178,7 +181,7 @@ protected:
 
         /// Adds a new, named GPU resource and returns it.
         HD_API
-        HdBufferResourceGLSharedPtr _AddResource(TfToken const& name,
+        HdBufferResourceSharedPtr _AddResource(TfToken const& name,
                                                 int glDataType,
                                                 short numComponents,
                                                 int arraySize,
@@ -248,17 +251,17 @@ protected:
         /// Returns the GPU resource. If the buffer array contains more than one
         /// resource, this method raises a coding error.
         HD_API
-        HdBufferResourceGLSharedPtr GetResource() const;
+        HdBufferResourceSharedPtr GetResource() const;
 
         /// Returns the named GPU resource. This method returns the first found
         /// resource. In HD_SAFE_MODE it checkes all underlying GL buffers
         /// in _resourceMap and raises a coding error if there are more than
         /// one GL buffers exist.
         HD_API
-        HdBufferResourceGLSharedPtr GetResource(TfToken const& name);
+        HdBufferResourceSharedPtr GetResource(TfToken const& name);
 
         /// Returns the list of all named GPU resources for this bufferArray.
-        HdBufferResourceGLNamedList const& GetResources() const {return _resourceList;}
+        HdBufferResourceNamedList const& GetResources() const {return _resourceList;}
 
         /// Reconstructs the bufferspecs and returns it (for buffer splitting)
         HD_API
@@ -270,7 +273,7 @@ protected:
 
         /// Adds a new, named GPU resource and returns it.
         HD_API
-        HdBufferResourceGLSharedPtr _AddResource(TfToken const& name,
+        HdBufferResourceSharedPtr _AddResource(TfToken const& name,
                                             int glDataType,
                                             short numComponents,
                                             int arraySize,
@@ -280,7 +283,7 @@ protected:
         int _capacity;
         size_t _maxBytesPerElement;
 
-        HdBufferResourceGLNamedList _resourceList;
+        HdBufferResourceNamedList _resourceList;
 
         _SimpleBufferArrayRangeSharedPtr _GetRangeSharedPtr() const {
             return GetRangeCount() > 0

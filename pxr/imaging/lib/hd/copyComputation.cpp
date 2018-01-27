@@ -22,9 +22,9 @@
 // language governing permissions and limitations under the Apache License.
 //
 #include "pxr/imaging/glf/glew.h"
+#include "pxr/imaging/hd/bufferArrayRange.h"
+#include "pxr/imaging/hd/bufferResource.h"
 #include "pxr/imaging/hd/copyComputation.h"
-#include "pxr/imaging/hd/bufferArrayRangeGL.h"
-#include "pxr/imaging/hd/bufferResourceGL.h"
 #include "pxr/imaging/hd/perfLog.h"
 #include "pxr/imaging/hd/renderContextCaps.h"
 #include "pxr/imaging/hd/tokens.h"
@@ -51,13 +51,13 @@ HdCopyComputationGPU::Execute(HdBufferArrayRangeSharedPtr const &range_,
         return;
     }
 
-    HdBufferArrayRangeGLSharedPtr srcRange =
-        boost::static_pointer_cast<HdBufferArrayRangeGL> (_src);
-    HdBufferArrayRangeGLSharedPtr range =
-        boost::static_pointer_cast<HdBufferArrayRangeGL> (range_);
+    HdBufferArrayRangeSharedPtr srcRange =
+        boost::static_pointer_cast<HdBufferArrayRange> (_src);
+    HdBufferArrayRangeSharedPtr range =
+        boost::static_pointer_cast<HdBufferArrayRange> (range_);
 
-    HdBufferResourceGLSharedPtr src = srcRange->GetResource(_name);
-    HdBufferResourceGLSharedPtr dst = range->GetResource(_name);
+    HdBufferResourceSharedPtr src = srcRange->GetResource(_name);
+    HdBufferResourceSharedPtr dst = range->GetResource(_name);
 
     if (!TF_VERIFY(src)) {
         return;
@@ -92,29 +92,33 @@ HdCopyComputationGPU::Execute(HdBufferArrayRangeSharedPtr const &range_,
         // be allocated, so the check for resource allocation has been moved
         // until after the copy size check.
 
-        GLint srcId = src->GetId();
-        GLint dstId = dst->GetId();
+        // Create a virtual copy method on the ArrayRange object to do the below block
+        TF_CODING_ERROR("Not Implemented");
+        {/*
+            GLint srcId = src->GetId();
+            GLint dstId = dst->GetId();
 
-        if (!TF_VERIFY(srcId)) {
-            return;
-        }
-        if (!TF_VERIFY(dstId)) {
-            return;
-        }
+            if (!TF_VERIFY(srcId)) {
+                return;
+            }
+            if (!TF_VERIFY(dstId)) {
+                return;
+            }
 
-        HD_PERF_COUNTER_INCR(HdPerfTokens->glCopyBufferSubData);
+            HD_PERF_COUNTER_INCR(HdPerfTokens->glCopyBufferSubData);
 
-        if (caps.directStateAccessEnabled) {
-            glNamedCopyBufferSubDataEXT(srcId, dstId,
-                                        readOffset, writeOffset, copySize);
-        } else {
-            glBindBuffer(GL_COPY_READ_BUFFER, srcId);
-            glBindBuffer(GL_COPY_WRITE_BUFFER, dstId);
-            glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER,
-                                readOffset, writeOffset, copySize);
+            if (caps.directStateAccessEnabled) {
+                glNamedCopyBufferSubDataEXT((GLint)srcId, (GLint)dstId,
+                                            readOffset, writeOffset, copySize);
+            } else {
+                glBindBuffer(GL_COPY_READ_BUFFER, (GLint)srcId);
+                glBindBuffer(GL_COPY_WRITE_BUFFER, (GLint)dstId);
+                glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER,
+                                    readOffset, writeOffset, copySize);
 
-            glBindBuffer(GL_COPY_READ_BUFFER, 0);
-            glBindBuffer(GL_COPY_WRITE_BUFFER, 0);
+                glBindBuffer(GL_COPY_READ_BUFFER, 0);
+                glBindBuffer(GL_COPY_WRITE_BUFFER, 0);
+            }*/
         }
     }
 }
@@ -128,10 +132,10 @@ HdCopyComputationGPU::GetNumOutputElements() const
 void
 HdCopyComputationGPU::AddBufferSpecs(HdBufferSpecVector *specs) const
 {
-    HdBufferArrayRangeGLSharedPtr srcRange =
-        boost::static_pointer_cast<HdBufferArrayRangeGL> (_src);
+    HdBufferArrayRangeSharedPtr srcRange =
+        boost::static_pointer_cast<HdBufferArrayRange> (_src);
 
-    HdBufferResourceGLSharedPtr const &resource = srcRange->GetResource(_name);
+    HdBufferResourceSharedPtr const &resource = srcRange->GetResource(_name);
     specs->push_back(HdBufferSpec(_name,
                                   resource->GetGLDataType(),
                                   resource->GetNumComponents()));

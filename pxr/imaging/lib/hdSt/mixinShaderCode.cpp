@@ -73,13 +73,13 @@ HdShaderCode::TextureDescriptorVector HdStMixinShaderCode::GetTextures() const
 }
 
 void HdStMixinShaderCode::BindResources(Hd_ResourceBinder const &binder,
-                                        int program) 
+                                        HdBufferResourceGPUHandle program)
 {
     _baseShader->BindResources(binder, program);
 }
 
 void HdStMixinShaderCode::UnbindResources(Hd_ResourceBinder const &binder,
-                                          int program)
+                                          HdBufferResourceGPUHandle program)
 {
     _baseShader->UnbindResources(binder, program);
 }

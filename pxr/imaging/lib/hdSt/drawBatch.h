@@ -43,7 +43,7 @@ class HdStDrawItemInstance;
 
 typedef boost::shared_ptr<class HdSt_DrawBatch> HdSt_DrawBatchSharedPtr;
 typedef boost::shared_ptr<class Hd_GeometricShader> Hd_GeometricShaderSharedPtr;
-typedef boost::shared_ptr<class HdGLSLProgram> HdGLSLProgramSharedPtr;
+typedef boost::shared_ptr<class HdProgram> HdProgramSharedPtr;
 typedef boost::shared_ptr<class HdRenderPassState> HdRenderPassStateSharedPtr;
 typedef std::vector<HdSt_DrawBatchSharedPtr> HdSt_DrawBatchSharedPtrVector;
 typedef std::vector<class HdBindingRequest> HdBindingRequestVector;
@@ -116,8 +116,8 @@ protected:
                 bool indirect,
                 HdStResourceRegistrySharedPtr const &resourceRegistry);
 
-        HdGLSLProgramSharedPtr GetGLSLProgram() const {
-            return _glslProgram;
+        HdProgramSharedPtr GetProgram() const {
+            return _program;
         }
 
         /// Returns the resouce binder, which is used for buffer resource
@@ -127,7 +127,7 @@ protected:
         }
 
         void Reset() {
-            _glslProgram.reset();
+            _program.reset();
             _surfaceShader.reset();
             _geometricShader.reset();
             _resourceBinder = Hd_ResourceBinder();
@@ -182,10 +182,10 @@ protected:
             bool *enableInstanceDraw) const;
 
         HDST_API
-        virtual bool _Link(HdGLSLProgramSharedPtr const & glslProgram);
+        virtual bool _Link(HdProgramSharedPtr const & glslProgram);
 
     private:
-        HdGLSLProgramSharedPtr _glslProgram;
+        HdProgramSharedPtr _program;
         Hd_ResourceBinder _resourceBinder;
         HdShaderCodeSharedPtrVector _shaders;
         Hd_GeometricShaderSharedPtr _geometricShader;

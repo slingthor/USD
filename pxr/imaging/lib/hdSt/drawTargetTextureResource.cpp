@@ -24,62 +24,49 @@
 #include "pxr/imaging/glf/glew.h"
 
 #include "pxr/imaging/hdSt/drawTargetTextureResource.h"
+
 #include "pxr/imaging/hd/conversions.h"
+#include "pxr/imaging/hd/engine.h"
+
+#include "pxr/imaging/hdSt/GL/drawTargetTextureResourceGL.h"
+#if defined(ARCH_GFX_METAL)
+#include "pxr/imaging/hdSt/Metal/drawTargetTextureResourceMetal.h"
+#endif
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-
+HdTextureResourceSharedPtr HdSt_DrawTargetTextureResource::New()
+{
+    switch(HdEngine::GetRenderAPI()) {
+        case HdEngine::OpenGL:
+            return HdTextureResourceSharedPtr(new HdSt_DrawTargetTextureResourceGL());
+#if defined(ARCH_GFX_METAL)
+        case HdEngine::Metal:
+            return HdTextureResourceSharedPtr(new HdSt_DrawTargetTextureResourceMetal());
+#endif
+        default:
+            TF_FATAL_CODING_ERROR("No program for this API");
+    }
+    return HdTextureResourceSharedPtr();
+}
 
 HdSt_DrawTargetTextureResource::HdSt_DrawTargetTextureResource()
  : HdTextureResource()
  , _attachment()
  , _sampler(0)
 {
-    // GL initialization guard for headless unit testing
-    if (glGenSamplers) {
-        glGenSamplers(1, &_sampler);
-    }
-
-
 }
 
 HdSt_DrawTargetTextureResource::~HdSt_DrawTargetTextureResource()
 {
-    // GL initialization guard for headless unit test
-    if (glDeleteSamplers) {
-        glDeleteSamplers(1, &_sampler);
-    }
 }
 
 void
 HdSt_DrawTargetTextureResource::SetAttachment(
-                              const GlfDrawTarget::AttachmentRefPtr &attachment)
+                              const GarchDrawTarget::AttachmentRefPtr &attachment)
 {
     _attachment = attachment;
 }
-
-void
-HdSt_DrawTargetTextureResource::SetSampler(HdWrap wrapS,
-                                          HdWrap wrapT,
-                                          HdMinFilter minFilter,
-                                          HdMagFilter magFilter)
-{
-    static const float borderColor[4] = {0.0f, 0.0f, 0.0f, 0.0f};
-
-    // Convert params to Gl
-    GLenum glWrapS = HdConversions::GetWrap(wrapS);
-    GLenum glWrapT = HdConversions::GetWrap(wrapT);
-    GLenum glMinFilter = HdConversions::GetMinFilter(minFilter);
-    GLenum glMagFilter = HdConversions::GetMagFilter(magFilter);
-
-    glSamplerParameteri(_sampler, GL_TEXTURE_WRAP_S, glWrapS);
-    glSamplerParameteri(_sampler, GL_TEXTURE_WRAP_T, glWrapT);
-    glSamplerParameteri(_sampler, GL_TEXTURE_MIN_FILTER, glMinFilter);
-    glSamplerParameteri(_sampler, GL_TEXTURE_MAG_FILTER, glMagFilter);
-    glSamplerParameterf(_sampler, GL_TEXTURE_MAX_ANISOTROPY_EXT, 1.0);
-    glSamplerParameterfv(_sampler, GL_TEXTURE_BORDER_COLOR, borderColor);
-}
-
 
 bool
 HdSt_DrawTargetTextureResource::IsPtex() const
@@ -87,45 +74,26 @@ HdSt_DrawTargetTextureResource::IsPtex() const
     return false;
 }
 
-GLuint
+GarchTextureGPUHandle
 HdSt_DrawTargetTextureResource::GetTexelsTextureId()
 {
-    return _attachment->GetGlTextureName();
+    return _attachment->GetTextureName();
 }
 
-GLuint
+GarchSamplerGPUHandle
 HdSt_DrawTargetTextureResource::GetTexelsSamplerId()
 {
     return _sampler;
 }
 
-GLuint64EXT
-HdSt_DrawTargetTextureResource::GetTexelsTextureHandle()
-{
-    GLuint textureId = GetTexelsTextureId();
-
-    if (textureId == 0) {
-        return 0;
-    }
-
-    if (!TF_VERIFY(glGetTextureHandleARB) ||
-        !TF_VERIFY(glGetTextureSamplerHandleARB)) {
-        return 0;
-    }
-
-    GLuint samplerId = GetTexelsSamplerId();
-
-    return glGetTextureSamplerHandleARB(textureId, samplerId);
-}
-
-GLuint
+GarchTextureGPUHandle
 HdSt_DrawTargetTextureResource::GetLayoutTextureId()
 {
     TF_CODING_ERROR("Draw targets are not ptex");
     return 0;
 }
 
-GLuint64EXT
+GarchTextureGPUHandle
 HdSt_DrawTargetTextureResource::GetLayoutTextureHandle()
 {
     TF_CODING_ERROR("Draw targets are not ptex");

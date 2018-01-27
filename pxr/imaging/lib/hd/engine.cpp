@@ -21,6 +21,9 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
+
+#include "pxr/imaging/glf/glew.h"
+
 #include "pxr/imaging/hd/engine.h"
 
 #include "pxr/imaging/hd/debugCodes.h"
@@ -37,18 +40,56 @@
 #include "pxr/imaging/hd/task.h"
 #include "pxr/imaging/hd/tokens.h"
 
+#include "pxr/imaging/hd/GL/codeGenGLSL.h"
+#include "pxr/imaging/hd/GL/bufferResourceGL.h"
+#include "pxr/imaging/hd/GL/bufferRelocatorGL.h"
+#include "pxr/imaging/hd/GL/glslProgram.h"
+#include "pxr/imaging/hd/GL/persistentBufferGL.h"
+#include "pxr/imaging/hd/GL/textureResourceGL.h"
+#include "pxr/imaging/glf/drawTarget.h"
+#include "pxr/imaging/glf/glslfx.h"
+
+#if defined(ARCH_GFX_METAL)
+#include "pxr/imaging/hd/Metal/codeGenMSL.h"
+#include "pxr/imaging/hd/Metal/bufferResourceMetal.h"
+#include "pxr/imaging/hd/Metal/bufferRelocatorMetal.h"
+#include "pxr/imaging/hd/Metal/mslProgram.h"
+#include "pxr/imaging/hd/Metal/persistentBufferMetal.h"
+#include "pxr/imaging/hd/Metal/textureResourceMetal.h"
+#include "pxr/imaging/mtlf/drawTarget.h"
+#include "pxr/imaging/mtlf/glslfx.h"
+#endif
+
+#include "pxr/base/tf/envSetting.h"
+
 #include <sstream>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+TF_DEFINE_ENV_SETTING(HD_ENABLE_GPU_TINY_PRIM_CULLING, true,
+                      "Enable tiny prim culling");
+TF_DEFINE_ENV_SETTING(HD_ENABLE_GPU_FRUSTUM_CULLING, true,
+                      "Enable GPU frustum culling");
+TF_DEFINE_ENV_SETTING(HD_ENABLE_GPU_COUNT_VISIBLE_INSTANCES, false,
+                      "Enable GPU frustum culling visible count query");
+TF_DEFINE_ENV_SETTING(HD_ENABLE_GPU_INSTANCE_FRUSTUM_CULLING, true,
+                      "Enable GPU per-instance frustum culling");
 
-HdEngine::HdEngine() 
+
+HdEngine::RenderAPI HdEngine::_renderAPI = HdEngine::RenderAPI::Unset;
+
+HdEngine::HdEngine(RenderAPI api)
  : _taskContext()
 {
+    if(_renderAPI != RenderAPI::Unset) {
+        TF_FATAL_CODING_ERROR("Only one HdEngine instance can be created at one time");
+    }
+    _renderAPI = api;
 }
 
 HdEngine::~HdEngine()
 {
+    _renderAPI = RenderAPI::Unset;
 }
 
 void 
@@ -158,6 +199,256 @@ HdEngine::ReloadAllShaders(HdRenderIndex& index)
     // - Render Pass Shaders
     // - Culling Shader
 
+}
+
+Hd_CodeGen *HdEngine::CreateCodeGen(Hd_GeometricShaderPtr const &geometricShader,
+                                    HdShaderCodeSharedPtrVector const &shaders)
+{
+    switch(_renderAPI) {
+        case RenderAPI::OpenGL: return new Hd_CodeGenGLSL(geometricShader, shaders);
+#if defined(ARCH_GFX_METAL)
+        case RenderAPI::Metal: return new Hd_CodeGenMSL(geometricShader, shaders);
+#endif
+        default:
+            TF_FATAL_CODING_ERROR("No Hd_CodeGen for this API");
+    }
+    return nullptr;
+}
+
+Hd_CodeGen *HdEngine::CreateCodeGen(HdShaderCodeSharedPtrVector const &shaders)
+{
+    switch(_renderAPI) {
+        case RenderAPI::OpenGL: return new Hd_CodeGenGLSL(shaders);
+#if defined(ARCH_GFX_METAL)
+        case RenderAPI::Metal: return new Hd_CodeGenMSL(shaders);
+#endif
+        default:
+        TF_FATAL_CODING_ERROR("No Hd_CodeGen for this API");
+    }
+    return nullptr;
+}
+
+GLSLFX *HdEngine::CreateGLSLFX()
+{
+    switch(_renderAPI) {
+        case RenderAPI::OpenGL: return new GlfGLSLFX();
+#if defined(ARCH_GFX_METAL)
+        case RenderAPI::Metal: return new MtlfGLSLFX();
+#endif
+        default:
+        TF_FATAL_CODING_ERROR("No GLSLFX for this API");
+    }
+    return nullptr;
+}
+
+GLSLFX *HdEngine::CreateGLSLFX(std::string const & filePath)
+{
+    switch(_renderAPI) {
+        case RenderAPI::OpenGL: return new GlfGLSLFX(filePath);
+#if defined(ARCH_GFX_METAL)
+        case RenderAPI::Metal: return new MtlfGLSLFX(filePath);
+#endif
+        default:
+        TF_FATAL_CODING_ERROR("No GLSLFX for this API");
+    }
+    return nullptr;
+}
+
+GLSLFX *HdEngine::CreateGLSLFX(std::istream &is)
+{
+    switch(_renderAPI) {
+        case RenderAPI::OpenGL: return new GlfGLSLFX(is);
+#if defined(ARCH_GFX_METAL)
+        case RenderAPI::Metal: return new MtlfGLSLFX(is);
+#endif
+        default:
+        TF_FATAL_CODING_ERROR("No GLSLFX for this API");
+    }
+    return nullptr;
+}
+
+HdBufferResource *HdEngine::CreateResourceBuffer(TfToken const &role,
+                                             int glDataType,
+                                             short numComponents,
+                                             int arraySize,
+                                             int offset,
+                                             int stride)
+{
+    switch(_renderAPI) {
+        case RenderAPI::OpenGL: return new HdBufferResourceGL(
+            role, glDataType, numComponents, arraySize, offset, stride);
+#if defined(ARCH_GFX_METAL)
+        case RenderAPI::Metal: return new HdBufferResourceMetal(
+            role, glDataType, numComponents, arraySize, offset, stride);
+#endif
+        default:
+        TF_FATAL_CODING_ERROR("No resource buffer for this API");
+    }
+    return nullptr;
+}
+
+HdProgram *HdEngine::CreateProgram(TfToken const &role)
+{
+    switch(_renderAPI) {
+        case RenderAPI::OpenGL: return new HdGLSLProgram(role);
+#if defined(ARCH_GFX_METAL)
+        case RenderAPI::Metal: return new HdMSLProgram(role);
+#endif
+        default:
+        TF_FATAL_CODING_ERROR("No program for this API");
+    }
+    return nullptr;
+}
+
+HdBufferRelocator *HdEngine::CreateBufferRelocator(HdBufferResourceGPUHandle srcBuffer, HdBufferResourceGPUHandle dstBuffer)
+{
+    switch(_renderAPI) {
+        case RenderAPI::OpenGL: return new HdBufferRelocatorGL(srcBuffer, dstBuffer);
+#if defined(ARCH_GFX_METAL)
+        case RenderAPI::Metal: return new HdBufferRelocatorMetal(srcBuffer, dstBuffer);
+#endif
+        default:
+        TF_FATAL_CODING_ERROR("No program for this API");
+    }
+    return nullptr;
+}
+
+HdPersistentBuffer *HdEngine::CreatePersistentBuffer(TfToken const &role, size_t dataSize, void* data)
+{
+    switch(_renderAPI) {
+        case RenderAPI::OpenGL: return new HdPersistentBufferGL(role, dataSize, data);
+#if defined(ARCH_GFX_METAL)
+        case RenderAPI::Metal: return new HdPersistentBufferMetal(role, dataSize, data);
+#endif
+        default:
+        TF_FATAL_CODING_ERROR("No program for this API");
+    }
+    return nullptr;
+}
+
+GarchDrawTargetRefPtr HdEngine::CreateDrawTarget(GfVec2i const & size, bool requestMSAA)
+{
+    switch(_renderAPI) {
+        case RenderAPI::OpenGL: return TfCreateRefPtr(GlfDrawTarget::New(size, requestMSAA));
+#if defined(ARCH_GFX_METAL)
+        case RenderAPI::Metal: return TfCreateRefPtr(MtlfDrawTarget::New(size, requestMSAA));
+#endif
+        default:
+            TF_FATAL_CODING_ERROR("No program for this API");
+    }
+    return nullptr;
+}
+
+HdTextureResource *HdEngine::CreateSimpleTextureResource(GarchTextureHandleRefPtr const &textureHandle, bool isPtex)
+{
+    switch(_renderAPI) {
+        case RenderAPI::OpenGL: return new HdSimpleTextureResourceGL(textureHandle, isPtex);
+#if defined(ARCH_GFX_METAL)
+        case RenderAPI::Metal: return new HdSimpleTextureResourceMetal(textureHandle, isPtex);
+#endif
+        default:
+            TF_FATAL_CODING_ERROR("No program for this API");
+    }
+    return nullptr;
+}
+
+HdTextureResource *HdEngine::CreateSimpleTextureResource(GarchTextureHandleRefPtr const &textureHandle, bool isPtex,
+                                                         HdWrap wrapS, HdWrap wrapT, HdMinFilter minFilter, HdMagFilter magFilter)
+{
+    switch(_renderAPI) {
+        case RenderAPI::OpenGL: return new HdSimpleTextureResourceGL(textureHandle, isPtex,
+                                                                     wrapS, wrapT, minFilter, magFilter);
+#if defined(ARCH_GFX_METAL)
+        case RenderAPI::Metal: return new HdSimpleTextureResourceMetal(textureHandle, isPtex,
+                                                                       wrapS, wrapT, minFilter, magFilter);
+#endif
+        default:
+            TF_FATAL_CODING_ERROR("No program for this API");
+    }
+    return nullptr;
+}
+
+bool
+HdEngine::IsEnabledGPUFrustumCulling()
+{
+    HdRenderContextCaps const &caps = HdRenderContextCaps::GetInstance();
+    
+    switch(_renderAPI) {
+        case RenderAPI::OpenGL:
+            // GPU XFB frustum culling should work since GL 4.0, but for now
+            // the shader frustumCull.glslfx requires explicit uniform location
+            static bool isEnabledGPUFrustumCulling =
+            TfGetEnvSetting(HD_ENABLE_GPU_FRUSTUM_CULLING) &&
+            (caps.explicitUniformLocation);
+            return isEnabledGPUFrustumCulling &&
+                !TfDebug::IsEnabled(HD_DISABLE_FRUSTUM_CULLING);
+#if defined(ARCH_GFX_METAL)
+        case RenderAPI::Metal:
+            return true;
+#endif
+        default:
+            TF_FATAL_CODING_ERROR("No program for this API");
+    }
+    return false;
+}
+
+bool
+HdEngine::IsEnabledGPUCountVisibleInstances()
+{
+    switch(_renderAPI) {
+        case RenderAPI::OpenGL:
+            static bool isEnabledGPUCountVisibleInstances =
+            TfGetEnvSetting(HD_ENABLE_GPU_COUNT_VISIBLE_INSTANCES);
+            return isEnabledGPUCountVisibleInstances;
+#if defined(ARCH_GFX_METAL)
+        case RenderAPI::Metal:
+            return true;
+#endif
+        default:
+            TF_FATAL_CODING_ERROR("No program for this API");
+    }
+    return false;
+}
+
+bool
+HdEngine::IsEnabledGPUTinyPrimCulling()
+{
+    switch(_renderAPI) {
+        case RenderAPI::OpenGL:
+            static bool isEnabledGPUTinyPrimCulling =
+            TfGetEnvSetting(HD_ENABLE_GPU_TINY_PRIM_CULLING);
+            return isEnabledGPUTinyPrimCulling &&
+                    !TfDebug::IsEnabled(HD_DISABLE_TINY_PRIM_CULLING);
+#if defined(ARCH_GFX_METAL)
+        case RenderAPI::Metal:
+            return true;
+#endif
+        default:
+            TF_FATAL_CODING_ERROR("No program for this API");
+    }
+    return false;
+}
+
+bool
+HdEngine::IsEnabledGPUInstanceFrustumCulling()
+{
+    HdRenderContextCaps const &caps = HdRenderContextCaps::GetInstance();
+ 
+    switch(_renderAPI) {
+        case RenderAPI::OpenGL:
+            // GPU instance frustum culling requires SSBO of bindless buffer
+            static bool isEnabledGPUInstanceFrustumCulling =
+            TfGetEnvSetting(HD_ENABLE_GPU_INSTANCE_FRUSTUM_CULLING) &&
+                (caps.shaderStorageBufferEnabled || caps.bindlessBufferEnabled);
+            return isEnabledGPUInstanceFrustumCulling;
+#if defined(ARCH_GFX_METAL)
+        case RenderAPI::Metal:
+            return true;
+#endif
+        default:
+            TF_FATAL_CODING_ERROR("No program for this API");
+    }
+    return false;
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

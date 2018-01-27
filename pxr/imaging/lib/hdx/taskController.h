@@ -35,7 +35,8 @@
 #include "pxr/imaging/hd/sceneDelegate.h"
 #include "pxr/imaging/hd/task.h"
 
-#include "pxr/imaging/glf/simpleLightingContext.h"
+#include "pxr/imaging/garch/simpleLightingContext.h"
+
 #include "pxr/usd/sdf/path.h"
 #include "pxr/base/tf/staticTokens.h"
 #include "pxr/base/gf/matrix4d.h"
@@ -122,8 +123,8 @@ public:
     ///               state in Sprims.
     /// XXX: remove "bypass"
     HDX_API
-    void SetLightingState(GlfSimpleLightingContextPtr const& src,
-                                  bool bypass);
+    void SetLightingState(GarchSimpleLightingContextPtr const& src,
+                          bool bypass);
 
     /// -------------------------------------------------------
     /// Camera API

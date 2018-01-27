@@ -23,10 +23,11 @@
 //
 #include "pxr/imaging/hd/sceneDelegate.h"
 
-#include "pxr/imaging/glf/glslfx.h"
+#include "pxr/imaging/garch/glslfx.h"
 
-#include "pxr/imaging/hd/tokens.h"
+#include "pxr/imaging/hd/engine.h"
 #include "pxr/imaging/hd/package.h"
+#include "pxr/imaging/hd/tokens.h"
 
 #include "pxr/imaging/pxOsd/subdivTags.h"
 
@@ -232,11 +233,11 @@ HdSceneDelegate::GetMixinShaderSource(TfToken const &shaderStageKey)
     // TODO: each delegate should provide their own package of mixin shaders
     // the lighting mixins are fallback only.
     static std::once_flag firstUse;
-    static std::unique_ptr<GlfGLSLFX> mixinFX;
-   
+    static std::unique_ptr<GLSLFX> mixinFX;
+    
     std::call_once(firstUse, [](){
         std::string filePath = HdPackageLightingIntegrationShader();
-        mixinFX.reset(new GlfGLSLFX(filePath));
+        mixinFX.reset(HdEngine::CreateGLSLFX(filePath));
     });
 
     return mixinFX->GetSource(shaderStageKey);

@@ -93,7 +93,7 @@ _BuildArray(T values[], int numValues)
 }
 
 HdSt_TestDriver::HdSt_TestDriver()
- : _engine()
+ : _engine(HdEngine::OpenGL)
  , _renderDelegate()
  , _renderIndex(nullptr)
  , _sceneDelegate(nullptr)
@@ -111,7 +111,7 @@ HdSt_TestDriver::HdSt_TestDriver()
 }
 
 HdSt_TestDriver::HdSt_TestDriver(TfToken const &reprName)
- : _engine()
+ : _engine(HdEngine::OpenGL)
  , _renderDelegate()
  , _renderIndex(nullptr)
  , _sceneDelegate(nullptr)
@@ -273,7 +273,7 @@ HdSt_TestLightingShader::HdSt_TestLightingShader()
     _sceneAmbient    = GfVec3f(0.04, 0.04, 0.04);
 
     std::stringstream ss(lightingShader);
-    _glslfx.reset(new GlfGLSLFX(ss));
+    _glslfx.reset(HdEngine::CreateGLSLFX(ss));
 }
 
 HdSt_TestLightingShader::~HdSt_TestLightingShader()
@@ -315,7 +315,7 @@ HdSt_TestLightingShader::SetCamera(GfMatrix4d const &worldToViewMatrix,
 /* virtual */
 void
 HdSt_TestLightingShader::BindResources(Hd_ResourceBinder const &binder,
-                                      int program)
+                                      HdProgramGPUHandle program)
 {
     binder.BindUniformf(_tokens->l0dir,   3, _lights[0].eyeDir.GetArray());
     binder.BindUniformf(_tokens->l0color, 3, _lights[0].color.GetArray());
@@ -327,7 +327,7 @@ HdSt_TestLightingShader::BindResources(Hd_ResourceBinder const &binder,
 /* virtual */
 void
 HdSt_TestLightingShader::UnbindResources(Hd_ResourceBinder const &binder,
-                                        int program)
+                                        HdProgramGPUHandle program)
 {
 }
 

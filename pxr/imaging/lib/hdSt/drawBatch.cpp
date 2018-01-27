@@ -31,8 +31,9 @@
 
 #include "pxr/imaging/hd/binding.h"
 #include "pxr/imaging/hd/codeGen.h"
+#include "pxr/imaging/hd/engine.h"
 #include "pxr/imaging/hd/geometricShader.h"
-#include "pxr/imaging/hd/glslProgram.h"
+#include "pxr/imaging/hd/program.h"
 #include "pxr/imaging/hd/lightingShader.h"
 #include "pxr/imaging/hd/package.h"
 #include "pxr/imaging/hd/perfLog.h"
@@ -41,7 +42,7 @@
 #include "pxr/imaging/hd/tokens.h"
 #include "pxr/imaging/hd/vtBufferSource.h"
 
-#include "pxr/imaging/glf/glslfx.h"
+#include "pxr/imaging/garch/glslfx.h"
 
 #include "pxr/base/tf/getenv.h"
 
@@ -216,7 +217,7 @@ HdSt_DrawBatch::_GetDrawingProgram(HdRenderPassStateSharedPtr const &state,
 
     // XXX: if this function appears to be expensive, we might consider caching
     //      programs by shaderHash.
-    if (!_program.GetGLSLProgram() || shaderChanged) {
+    if (!_program.GetProgram() || shaderChanged) {
         
         _program.SetSurfaceShader(surfaceShader);
 
@@ -237,16 +238,14 @@ HdSt_DrawBatch::_GetDrawingProgram(HdRenderPassStateSharedPtr const &state,
             // expect all the other shaders to compile or else the shipping
             // code is broken and needs to be fixed.  When we open up more
             // shaders for customization, we will need to check them as well.
-            
-            typedef boost::shared_ptr<class GlfGLSLFX> GlfGLSLFXSharedPtr;
+            typedef boost::shared_ptr<class GLSLFX> MtlfGLSLFXSharedPtr;
 
-            GlfGLSLFXSharedPtr glslSurfaceFallback = 
-                GlfGLSLFXSharedPtr(
-                        new GlfGLSLFX(HdPackageFallbackSurfaceShader()));
+            GLSLFXSharedPtr glslfxSurfaceFallback =
+                GLSLFXSharedPtr(HdEngine::CreateGLSLFX(HdPackageFallbackSurfaceShader()));
 
             HdShaderCodeSharedPtr fallbackSurface =
                 HdShaderCodeSharedPtr(
-                    new HdStGLSLFXShader(glslSurfaceFallback));
+                    new HdStGLSLFXShader(glslfxSurfaceFallback));
 
             _program.SetSurfaceShader(fallbackSurface);
 
@@ -294,38 +293,38 @@ HdSt_DrawBatch::_DrawingProgram::CompileShader(
         (*it)->AddBindings(&customBindings);
     }
 
-    Hd_CodeGen codeGen(_geometricShader, shaders);
+    Hd_CodeGen *codeGen = HdEngine::CreateCodeGen(_geometricShader, shaders);
 
     // let resourcebinder resolve bindings and populate metadata
     // which is owned by codegen.
     _resourceBinder.ResolveBindings(drawItem,
                                     shaders,
-                                    codeGen.GetMetaData(),
+                                    codeGen->GetMetaData(),
                                     indirect,
                                     instanceDraw,
                                     customBindings);
 
-    HdGLSLProgram::ID hash = codeGen.ComputeHash();
+    HdProgram::ID hash = codeGen->ComputeHash();
 
     {
-        HdInstance<HdGLSLProgram::ID, HdGLSLProgramSharedPtr> programInstance;
+        HdInstance<HdProgram::ID, HdProgramSharedPtr> programInstance;
 
         // ask registry to see if there's already compiled program
         std::unique_lock<std::mutex> regLock = 
-            resourceRegistry->RegisterGLSLProgram(hash, &programInstance);
+            resourceRegistry->RegisterProgram(hash, &programInstance);
 
         if (programInstance.IsFirstInstance()) {
-            HdGLSLProgramSharedPtr glslProgram = codeGen.Compile();
+            HdProgramSharedPtr glslProgram = codeGen->Compile();
             if (glslProgram && _Link(glslProgram)) {
                 // store the program into the program registry.
                 programInstance.SetValue(glslProgram);
             }
         }
 
-        _glslProgram = programInstance.GetValue();
+        _program = programInstance.GetValue();
 
-        if (_glslProgram) {
-            _resourceBinder.IntrospectBindings(_glslProgram->GetProgram());
+        if (_program) {
+            _resourceBinder.IntrospectBindings(_program->GetProgram());
         } else {
             // Failed to compile and link a valid glsl program.
             return false;
@@ -351,11 +350,11 @@ HdSt_DrawBatch::_DrawingProgram::_GetCustomBindings(
 /* virtual */
 bool
 HdSt_DrawBatch::_DrawingProgram::_Link(
-        HdGLSLProgramSharedPtr const & glslProgram)
+        HdProgramSharedPtr const & program)
 {
-    if (!TF_VERIFY(glslProgram)) return false;
+    if (!TF_VERIFY(program)) return false;
 
-    return glslProgram->Link();
+    return program->Link();
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

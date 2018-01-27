@@ -30,49 +30,6 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-
-int
-GlfGetNumElements(GLenum format)
-{
-    switch (format) {
-        case GL_DEPTH_COMPONENT:
-	case GL_COLOR_INDEX:
-	case GL_ALPHA:
-	case GL_LUMINANCE:
-	case GL_RED:
-            return 1;
-	case GL_LUMINANCE_ALPHA :
-	    return 2;
-        case GL_RGB:
-            return 3;
-        case GL_RGBA:
-            return 4;
-        default:
-            TF_CODING_ERROR("Unsupported format");
-            return 1;
-    }
-}
-
-int
-GlfGetElementSize(GLenum type)
-{
-    switch (type) {
-        case GL_UNSIGNED_BYTE:
-        case GL_BYTE:
-            return sizeof(GLubyte);
-        case GL_UNSIGNED_SHORT:
-        case GL_SHORT:
-            return sizeof(GLshort);
-        case GL_FLOAT:
-            return sizeof(GLfloat);
-        case GL_DOUBLE:
-            return sizeof(GLdouble);
-        default:
-            TF_CODING_ERROR("Unsupported type");
-            return sizeof(GLfloat);
-    }
-}
-
 bool
 GlfCheckGLFrameBufferStatus(GLuint target, std::string * reason)
 {

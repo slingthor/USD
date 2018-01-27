@@ -24,13 +24,14 @@
 #include "pxr/imaging/hd/fallbackLightingShader.h"
 
 #include "pxr/imaging/hd/binding.h"
+#include "pxr/imaging/hd/engine.h"
 #include "pxr/imaging/hd/package.h"
 #include "pxr/imaging/hd/perfLog.h"
 #include "pxr/imaging/hd/tokens.h"
 
 #include "pxr/imaging/hf/perfLog.h"
 
-#include "pxr/imaging/glf/glslfx.h"
+#include "pxr/imaging/garch/glslfx.h"
 
 #include <boost/functional/hash.hpp>
 
@@ -41,7 +42,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 Hd_FallbackLightingShader::Hd_FallbackLightingShader()
 {
-    _glslfx.reset(new GlfGLSLFX(HdPackageFallbackLightingShader()));
+    _glslfx.reset(HdEngine::CreateGLSLFX(HdPackageFallbackLightingShader()));
 }
 
 Hd_FallbackLightingShader::~Hd_FallbackLightingShader()
@@ -80,14 +81,14 @@ Hd_FallbackLightingShader::SetCamera(GfMatrix4d const &worldToViewMatrix,
 
 void
 Hd_FallbackLightingShader::BindResources(Hd_ResourceBinder const &binder,
-                                        int program)
+                                        HdBufferResourceGPUHandle program)
 {
     // nothing
 }
 
 void
 Hd_FallbackLightingShader::UnbindResources(Hd_ResourceBinder const &binder,
-                                          int program)
+                                          HdBufferResourceGPUHandle program)
 {
     // nothing
 }

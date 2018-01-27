@@ -36,7 +36,7 @@
 
 #include "pxr/imaging/hd/renderPassState.h"
 
-#include "pxr/imaging/glf/drawTarget.h"
+#include "pxr/imaging/garch/drawTarget.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -126,8 +126,7 @@ HdxDrawTargetTask::_Sync(HdTaskContext* ctx)
                 if (drawTarget->IsEnabled()) {
                     HdxDrawTargetRenderPassUniquePtr pass(
                                     new HdxDrawTargetRenderPass(&renderIndex));
-
-                    pass->SetDrawTarget(drawTarget->GetGlfDrawTarget());
+                    pass->SetDrawTarget(drawTarget->GetGarchDrawTarget());
                     pass->SetRenderPassState(drawTarget->GetRenderPassState());
 
                     HdRenderPassStateSharedPtr renderPassState(
@@ -160,7 +159,7 @@ HdxDrawTargetTask::_Sync(HdTaskContext* ctx)
             unsigned int targetVersion = target->GetVersion();
 
             if (renderPassInfo.version != targetVersion) {
-                _renderPasses[renderPassIdx]->SetDrawTarget(target->GetGlfDrawTarget());
+                _renderPasses[renderPassIdx]->SetDrawTarget(target->GetGarchDrawTarget());
                 renderPassInfo.version = targetVersion;
             }
         }
@@ -175,7 +174,7 @@ HdxDrawTargetTask::_Sync(HdTaskContext* ctx)
         GfVec3d(1.0, -1.0, 1.0));
 
     // lighting context
-    GlfSimpleLightingContextRefPtr lightingContext;
+    GarchSimpleLightingContextRefPtr lightingContext;
     _GetTaskContextData(ctx, HdxTokens->lightingContext, &lightingContext);
 
     size_t numRenderPasses = _renderPassesInfo.size();
@@ -203,7 +202,7 @@ HdxDrawTargetTask::_Sync(HdTaskContext* ctx)
             return;
         }
 
-        GfVec2i const &resolution = drawTarget->GetGlfDrawTarget()->GetSize();
+        GfVec2i const &resolution = drawTarget->GetGarchDrawTarget()->GetSize();
 
         VtValue viewMatrixVt  = camera->Get(HdStCameraTokens->worldToViewMatrix);
         VtValue projMatrixVt  = camera->Get(HdStCameraTokens->projectionMatrix);
@@ -235,7 +234,7 @@ HdxDrawTargetTask::_Sync(HdTaskContext* ctx)
 
         HdxSimpleLightingShaderSharedPtr &simpleLightingShader
             = _renderPassesInfo[renderPassIdx].simpleLightingShader;
-        GlfSimpleLightingContextRefPtr const& simpleLightingContext =
+        GarchSimpleLightingContextRefPtr const& simpleLightingContext =
             simpleLightingShader->GetLightingContext();
 
         renderPassState->SetLightingShader(simpleLightingShader);

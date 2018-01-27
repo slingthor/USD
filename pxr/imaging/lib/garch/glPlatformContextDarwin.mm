@@ -117,7 +117,7 @@ GarchSelectCoreProfileMacVisual()
     int c = 0;
 
     attribs[c++] = NSOpenGLPFAOpenGLProfile;
-    attribs[c++] = NSOpenGLProfileVersion3_2Core;
+    attribs[c++] = NSOpenGLProfileVersion4_1Core;
     attribs[c++] = NSOpenGLPFADoubleBuffer;
     attribs[c++] = 0;
 

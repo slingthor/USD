@@ -29,11 +29,16 @@
 #include "pxr/usdImaging/usdImaging/primAdapter.h"
 #include "pxr/usdImaging/usdImaging/tokens.h"
 
+#if defined(ARCH_GFX_METAL)
+#include "pxr/imaging/mtlf/ptexTexture.h"
+#endif
 #include "pxr/imaging/glf/ptexTexture.h"
-#include "pxr/imaging/glf/textureRegistry.h"
+
+#include "pxr/imaging/garch/textureRegistry.h"
 
 #include "pxr/imaging/hd/basisCurves.h"
 #include "pxr/imaging/hd/basisCurvesTopology.h"
+#include "pxr/imaging/hd/engine.h"
 #include "pxr/imaging/hd/enums.h"
 #include "pxr/imaging/hd/mesh.h"
 #include "pxr/imaging/hd/meshTopology.h"
@@ -165,7 +170,7 @@ UsdImagingDelegate::_IsDrawModeApplied(UsdPrim const& prim)
     UsdAttribute attr;
     if (model.GetKind(&kind) && KindRegistry::IsA(kind, KindTokens->component))
         applyDrawMode = true;
-    else if (attr = model.GetModelApplyDrawModeAttr())
+    else if ((attr = model.GetModelApplyDrawModeAttr()))
         attr.Get(&applyDrawMode);
 
     if (!applyDrawMode)
@@ -3026,8 +3031,13 @@ UsdImagingDelegate::GetTextureResource(SdfPath const &textureId)
                                     filePath.GetText());
     TfStopwatch timer;
     timer.Start();
-    GlfTextureHandleRefPtr texture =
-        GlfTextureRegistry::GetInstance().GetTextureHandle(filePath);
+#if defined(ARCH_GFX_METAL)
+    GarchTextureHandleRefPtr texture =
+        GarchTextureRegistry::GetInstance().GetTextureHandle(filePath);
+#else
+    GarchTextureHandleRefPtr texture =
+        GarchTextureRegistry::GetInstance().GetTextureHandle(filePath);
+#endif
     texture->AddMemoryRequest(memoryLimit);
     HdWrap wrapShd = (wrapS == UsdHydraTokens->clamp) ? HdWrapClamp
                  : (wrapS == UsdHydraTokens->repeat) ? HdWrapRepeat
@@ -3051,8 +3061,8 @@ UsdImagingDelegate::GetTextureResource(SdfPath const &textureId)
                  : HdMinFilterLinear; 
 
     texResource = HdTextureResourceSharedPtr(
-        new HdSimpleTextureResource(texture, isPtex, wrapShd, wrapThd,
-                                    minFilterHd, magFilterHd));
+                        HdEngine::CreateSimpleTextureResource(texture, isPtex, wrapShd, wrapThd,
+                                                              minFilterHd, magFilterHd));
     timer.Stop();
 
     TF_DEBUG(USDIMAGING_TEXTURES).Msg("    Load time: %.3f s\n", 

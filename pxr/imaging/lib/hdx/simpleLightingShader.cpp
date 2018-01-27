@@ -25,14 +25,15 @@
 #include "pxr/imaging/hdx/package.h"
 
 #include "pxr/imaging/hd/binding.h"
+#include "pxr/imaging/hd/engine.h"
 #include "pxr/imaging/hd/perfLog.h"
 #include "pxr/imaging/hd/tokens.h"
 
 #include "pxr/imaging/hf/perfLog.h"
 
-#include "pxr/imaging/glf/glslfx.h"
-#include "pxr/imaging/glf/bindingMap.h"
-#include "pxr/imaging/glf/simpleLightingContext.h"
+#include "pxr/imaging/garch/glslfx.h"
+#include "pxr/imaging/garch/bindingMap.h"
+#include "pxr/imaging/garch/simpleLightingContext.h"
 
 #include <boost/functional/hash.hpp>
 
@@ -42,9 +43,9 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 
-HdxSimpleLightingShader::HdxSimpleLightingShader() 
-    : _lightingContext(GlfSimpleLightingContext::New())
-    , _bindingMap(TfCreateRefPtr(new GlfBindingMap()))
+HdxSimpleLightingShader::HdxSimpleLightingShader()
+    : _lightingContext(GarchSimpleLightingContext::New())
+    , _bindingMap(GarchBindingMap::New())
     , _useLighting(true)
 {
     // TODO: robust binding from codegen
@@ -52,8 +53,7 @@ HdxSimpleLightingShader::HdxSimpleLightingShader()
     _bindingMap->GetUniformBinding(TfToken("DrawDataBuffer"));
     _lightingContext->InitUniformBlockBindings(_bindingMap);
     _lightingContext->InitSamplerUnitBindings(_bindingMap);
-
-    _glslfx.reset(new GlfGLSLFX(HdxPackageSimpleLightingShader()));
+    _glslfx.reset(HdEngine::CreateGLSLFX(HdxPackageSimpleLightingShader()));
 }
 
 HdxSimpleLightingShader::~HdxSimpleLightingShader()
@@ -108,21 +108,21 @@ HdxSimpleLightingShader::SetCamera(GfMatrix4d const &worldToViewMatrix,
 /* virtual */
 void
 HdxSimpleLightingShader::BindResources(Hd_ResourceBinder const &binder,
-                                      int program)
+                                       HdBufferResourceGPUHandle program)
 {
     // XXX: we'd like to use Hd_ResourceBinder instead of GlfBindingMap.
     //
-    _bindingMap->AssignUniformBindingsToProgram(program);
+    _bindingMap->AssignUniformBindingsToProgram((GLuint)(uint64_t)program);
     _lightingContext->BindUniformBlocks(_bindingMap);
 
-    _bindingMap->AssignSamplerUnitsToProgram(program);
+    _bindingMap->AssignSamplerUnitsToProgram((GLuint)(uint64_t)program);
     _lightingContext->BindSamplers(_bindingMap);
 }
 
 /* virtual */
 void
 HdxSimpleLightingShader::UnbindResources(Hd_ResourceBinder const &binder,
-                                        int program)
+                                         HdBufferResourceGPUHandle program)
 {
     // XXX: we'd like to use Hd_ResourceBinder instead of GlfBindingMap.
     //
@@ -143,7 +143,7 @@ HdxSimpleLightingShader::SetLightingStateFromOpenGL()
 
 void
 HdxSimpleLightingShader::SetLightingState(
-    GlfSimpleLightingContextPtr const &src)
+    GarchSimpleLightingContextPtr const &src)
 {
     if (src) {
         _useLighting = true;

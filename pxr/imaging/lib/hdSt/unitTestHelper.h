@@ -32,7 +32,7 @@
 #include "pxr/imaging/hd/renderPass.h"
 #include "pxr/imaging/hd/renderPassState.h"
 #include "pxr/imaging/hd/unitTestDelegate.h"
-#include "pxr/imaging/glf/glslfx.h"
+#include "pxr/imaging/garch/glslfx.h"
 
 #include "pxr/base/gf/vec4d.h"
 #include "pxr/base/gf/matrix4d.h"
@@ -113,8 +113,8 @@ public:
     /// HdShaderCode overrides
     virtual ID ComputeHash() const;
     virtual std::string GetSource(TfToken const &shaderStageKey) const;
-    virtual void BindResources(Hd_ResourceBinder const &binder, int program);
-    virtual void UnbindResources(Hd_ResourceBinder const &binder, int program);
+    virtual void BindResources(Hd_ResourceBinder const &binder, HdBufferResourceGPUHandle program);
+    virtual void UnbindResources(Hd_ResourceBinder const &binder, HdBufferResourceGPUHandle program);
     virtual void AddBindings(HdBindingRequestVector *customBindings);
 
     /// HdLightingShader overrides
@@ -132,7 +132,7 @@ private:
     };
     Light _lights[2];
     GfVec3f _sceneAmbient;
-    boost::scoped_ptr<GlfGLSLFX> _glslfx;
+    boost::scoped_ptr<GLSLFX> _glslfx;
 };
 
 

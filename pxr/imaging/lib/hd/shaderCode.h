@@ -25,6 +25,9 @@
 #define HD_SHADER_CODE_H
 
 #include "pxr/pxr.h"
+
+#include "pxr/imaging/garch/texture.h"
+
 #include "pxr/imaging/hd/api.h"
 #include "pxr/imaging/hd/version.h"
 
@@ -80,10 +83,10 @@ public:
 
     struct TextureDescriptor {
         TfToken name;
-        size_t handle; // GLuint64, for bindless textures
+        GarchTextureGPUHandle handle;
+        GarchSamplerGPUHandle sampler;
         enum { TEXTURE_2D, TEXTURE_PTEX_TEXEL, TEXTURE_PTEX_LAYOUT };
         int type;
-        unsigned int sampler;
     };
     typedef std::vector<TextureDescriptor> TextureDescriptorVector;
 
@@ -101,11 +104,11 @@ public:
     /// XXX: this interface is meant to be used for bridging
     /// the GlfSimpleLightingContext mechanism, and not for generic use-cases.
     virtual void BindResources(Hd_ResourceBinder const &binder,
-                               int program) = 0;
+                               HdBufferResourceGPUHandle program) = 0;
 
     /// Unbinds shader-specific resources.
     virtual void UnbindResources(Hd_ResourceBinder const &binder,
-                                 int program) = 0;
+                                 HdBufferResourceGPUHandle program) = 0;
 
     /// Add custom bindings (used by codegen)
     virtual void AddBindings(HdBindingRequestVector* customBindings) = 0;

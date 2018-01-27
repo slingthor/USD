@@ -54,6 +54,12 @@ TF_DEFINE_PRIVATE_TOKENS(
     ((isamplerBuffer, "isamplerBuffer"))
 );
 
+HdBufferResource::HdBufferResource(TfToken const &role)
+    : HdResource(role)
+{
+    /*NOTHING*/
+}
+
 HdBufferResource::HdBufferResource(TfToken const &role,
                                    int glDataType,
                                    short numComponents,

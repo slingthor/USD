@@ -24,11 +24,13 @@
 #include "pxr/imaging/glf/glew.h"
 #include "pxr/imaging/hdSt/drawTarget.h"
 #include "pxr/imaging/hdSt/drawTargetAttachmentDescArray.h"
-#include "pxr/imaging/hdSt/drawTargetTextureResource.h"
 #include "pxr/imaging/hdSt/camera.h"
 #include "pxr/imaging/hdSt/resourceRegistry.h"
 
+#include "pxr/imaging/hdSt/drawTargetTextureResource.h"
+
 #include "pxr/imaging/hd/conversions.h"
+#include "pxr/imaging/hd/engine.h"
 #include "pxr/imaging/hd/perfLog.h"
 #include "pxr/imaging/hd/sceneDelegate.h"
 #include "pxr/imaging/hd/sprim.h"
@@ -52,7 +54,7 @@ HdStDrawTarget::HdStDrawTarget(SdfPath const &id)
     , _resolution(512, 512)
     , _collections()
     , _renderPassState()
-    , _drawTargetContext()
+    , _drawTargetContextGL()
     , _drawTarget()
 
 {
@@ -191,13 +193,13 @@ HdStDrawTarget::WriteToFile(const HdRenderIndex &renderIndex,
 {
     HF_MALLOC_TAG_FUNCTION();
 
-    // Check the draw targets been allocated
-    if (!_drawTarget || !_drawTargetContext) {
+    // Check the draw target's been allocated
+    if (!_drawTarget || (HdEngine::GetRenderAPI()==HdEngine::OpenGL && !_drawTargetContextGL)) {
         TF_WARN("Missing draw target");
         return false;
     }
 
-    // XXX: The GlfDrawTarget will throw an error if attachment is invalid,
+    // XXX: The GarchDrawTarget will throw an error if attachment is invalid,
     // so need to check that it is valid first.
     //
     // This ends in a double-search of the map, but this path is for
@@ -220,15 +222,19 @@ HdStDrawTarget::WriteToFile(const HdRenderIndex &renderIndex,
     const GfMatrix4d &viewMatrix = viewMatrixVt.Get<GfMatrix4d>();
     const GfMatrix4d &projMatrix = projMatrixVt.Get<GfMatrix4d>();
 
-    // Make sure all draw target operations happen on the same
-    // context.
-    GlfGLContextSharedPtr oldContext = GlfGLContext::GetCurrentGLContext();
-    GlfGLContext::MakeCurrent(_drawTargetContext);
-
+    GlfGLContextSharedPtr oldContext;
+    if (HdEngine::GetRenderAPI()==HdEngine::OpenGL)
+    {
+        // Make sure all draw target operations happen on the same
+        // context.
+        oldContext = GlfGLContext::GetCurrentGLContext();
+        GlfGLContext::MakeCurrent(_drawTargetContextGL);
+    }
     bool result = _drawTarget->WriteToFile(attachment, path,
                                            viewMatrix, projMatrix);
 
-    GlfGLContext::MakeCurrent(oldContext);
+    if (HdEngine::GetRenderAPI()==HdEngine::OpenGL)
+        GlfGLContext::MakeCurrent(oldContext);
 
     return result;
 }
@@ -240,22 +246,25 @@ HdStDrawTarget::_SetAttachments(
 {
     HF_MALLOC_TAG_FUNCTION();
 
-    if (!_drawTargetContext) {
-        // Use one of the shared contexts as the master.
-        _drawTargetContext = GlfGLContext::GetSharedGLContext();
+    if (HdEngine::GetRenderAPI()==HdEngine::OpenGL) {
+        if (!_drawTargetContextGL) {
+            // Use one of the shared contexts as the master.
+            _drawTargetContextGL = GlfGLContext::GetSharedGLContext();
+        }
     }
 
     // Clear out old texture resources for the attachments.
     _colorTextureResources.clear();
     _depthTextureResource.reset();
 
+    GlfGLContextSharedPtr oldContext;
 
     // Make sure all draw target operations happen on the same
     // context.
-    GlfGLContextSharedPtr oldContext = GlfGLContext::GetCurrentGLContext();
-
-    GlfGLContext::MakeCurrent(_drawTargetContext);
-
+    if (HdEngine::GetRenderAPI()==HdEngine::OpenGL) {
+        oldContext = GlfGLContext::GetCurrentGLContext();
+        GlfGLContext::MakeCurrent(_drawTargetContextGL);
+    }
 
     if (_drawTarget) {
         // If we had a prior draw target, we need to garbage collect
@@ -272,7 +281,7 @@ HdStDrawTarget::_SetAttachments(
     // XXX : All draw targets in Hydra are currently trying to create MSAA
     // buffers (as long as they are allowed by the environment variables) 
     // because we need alpha to coverage for transparent object.
-    _drawTarget = GlfDrawTarget::New(_resolution, /* MSAA */ true);
+    _drawTarget = HdEngine::CreateDrawTarget(_resolution, /* MSAA */ true);
 
     size_t numAttachments = attachments.GetNumAttachments();
     _renderPassState.SetNumColorAttachments(numAttachments);
@@ -317,7 +326,7 @@ HdStDrawTarget::_SetAttachments(
     }
 
     // Always add depth texture
-    // XXX: GlfDrawTarget requires the depth texture be added last,
+    // XXX: GarchDrawTarget requires the depth texture be added last,
     // otherwise the draw target indexes are off-by-1.
     _drawTarget->AddAttachment(DEPTH_ATTACHMENT_NAME,
                                GL_DEPTH_COMPONENT,
@@ -340,7 +349,8 @@ HdStDrawTarget::_SetAttachments(
                               attachments.GetDepthMagFilter());
    _drawTarget->Unbind();
 
-   GlfGLContext::MakeCurrent(oldContext);
+    if (HdEngine::GetRenderAPI()==HdEngine::OpenGL)
+        GlfGLContext::MakeCurrent(oldContext);
 
    // The texture bindings have changed so increment the version
    ++_version;
@@ -361,9 +371,12 @@ HdStDrawTarget::_ResizeDrawTarget()
 
     // Make sure all draw target operations happen on the same
     // context.
-    GlfGLContextSharedPtr oldContext = GlfGLContext::GetCurrentGLContext();
-
-    GlfGLContext::MakeCurrent(_drawTargetContext);
+    GlfGLContextSharedPtr oldContext;
+    
+    if (HdEngine::GetRenderAPI()==HdEngine::OpenGL) {
+        oldContext = GlfGLContext::GetCurrentGLContext();
+        GlfGLContext::MakeCurrent(_drawTargetContextGL);
+    }
 
     _drawTarget->Bind();
     _drawTarget->SetSize(_resolution);
@@ -372,7 +385,8 @@ HdStDrawTarget::_ResizeDrawTarget()
     // The texture bindings might have changed so increment the version
     ++_version;
 
-    GlfGLContext::MakeCurrent(oldContext);
+    if (HdEngine::GetRenderAPI()==HdEngine::OpenGL)
+        GlfGLContext::MakeCurrent(oldContext);
 }
 
 void
@@ -399,8 +413,7 @@ HdStDrawTarget::_RegisterTextureResource(
                   resourceRegistry->RegisterTextureResource(texID, &texInstance);
 
     if (texInstance.IsFirstInstance()) {
-        texInstance.SetValue(HdTextureResourceSharedPtr(
-                                         new HdSt_DrawTargetTextureResource()));
+        texInstance.SetValue(HdSt_DrawTargetTextureResource::New());
     }
 
     *resourcePtr =  texInstance.GetValue();

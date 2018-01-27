@@ -39,7 +39,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 TF_REGISTRY_FUNCTION(TfType)
 {
-    TfType::Define<GlfArrayTexture, TfType::Bases<GlfUVTexture> >();
+    TfType::Define<GlfArrayTexture, TfType::Bases<GarchUVTexture> >();
 }
 
 GlfArrayTextureRefPtr 
@@ -85,7 +85,7 @@ GlfArrayTexture::New(
 bool 
 GlfArrayTexture::IsSupportedImageFile(TfToken const &imageFilePath)
 {
-    return GlfUVTexture::IsSupportedImageFile(imageFilePath);
+    return GarchUVTexture::IsSupportedImageFile(imageFilePath);
 }
 
 GlfArrayTexture::GlfArrayTexture(
@@ -96,7 +96,7 @@ GlfArrayTexture::GlfArrayTexture(
     unsigned int cropLeft,
     unsigned int cropRight)
     
-    : GlfUVTexture(imageFilePaths[0],
+    : GarchUVTexture(imageFilePaths[0],
                     cropTop,
                     cropBottom,
                     cropLeft,
@@ -111,10 +111,10 @@ GlfArrayTexture::GlfArrayTexture(
 void
 GlfArrayTexture::_OnSetMemoryRequested(size_t targetMemory)
 {
-    GlfBaseTextureDataConstRefPtrVector texDataVec(_arraySize, 0);
+    GarchBaseTextureDataConstRefPtrVector texDataVec(_arraySize, 0);
     for (size_t i = 0; i < _arraySize; ++i) {
-        GlfUVTextureDataRefPtr texData =
-            GlfUVTextureData::New(_GetImageFilePath(i), targetMemory,
+        GarchUVTextureDataRefPtr texData =
+            GarchUVTextureData::New(_GetImageFilePath(i), targetMemory,
                                   _GetCropTop(), _GetCropBottom(),
                                   _GetCropLeft(), _GetCropRight());
         if (texData) {
@@ -131,7 +131,7 @@ GlfArrayTexture::_OnSetMemoryRequested(size_t targetMemory)
         }
     }
 
-    _CreateTexture(texDataVec, _GenerateMipmap());
+    _CreateTextures(texDataVec, _GenerateMipmap());
 }
 
 /* virtual */
@@ -147,18 +147,18 @@ GlfArrayTexture::_GetImageFilePath(size_t index) const
 }
 
 /* virtual */
-GlfTexture::BindingVector
+GarchTexture::BindingVector
 GlfArrayTexture::GetBindings(TfToken const & identifier,
-                              GLuint samplerName) const
+                              GarchSamplerGPUHandle samplerName) const
 {
     return BindingVector(1,
-                Binding(identifier, GlfTextureTokens->texels,
+                Binding(identifier, GarchTextureTokens->texels,
                         GL_TEXTURE_2D_ARRAY, GetGlTextureName(), samplerName));
 }
 
 void
-GlfArrayTexture::_CreateTexture(
-    GlfBaseTextureDataConstRefPtrVector texDataVec,
+GlfArrayTexture::_CreateTextures(
+    GarchBaseTextureDataConstRefPtrVector texDataVec,
     bool const generateMipmap)
 {
     TRACE_FUNCTION();
@@ -171,7 +171,7 @@ GlfArrayTexture::_CreateTexture(
     
     glBindTexture(
         GL_TEXTURE_2D_ARRAY,
-        GetGlTextureName());
+        (GLuint)(uint64_t)GetGlTextureName());
     
     glTexParameteri(
         GL_TEXTURE_2D_ARRAY,
@@ -200,7 +200,7 @@ GlfArrayTexture::_CreateTexture(
     
     int memUsed = 0;
     for (size_t i = 0; i < _arraySize; ++i) {
-        GlfBaseTextureDataConstPtr texData = texDataVec[i];
+        GarchBaseTextureDataConstPtr texData = texDataVec[i];
         if (texData && texData->HasRawBuffer()) {
 
             glTexSubImage3D(

@@ -40,7 +40,7 @@
 #include "pxr/imaging/hd/sceneDelegate.h"
 #include "pxr/imaging/hd/lightingShader.h"
 
-#include "pxr/imaging/glf/simpleLightingContext.h"
+#include "pxr/imaging/garch/simpleLightingContext.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -62,7 +62,7 @@ HdxShadowTask::_Execute(HdTaskContext* ctx)
     HF_MALLOC_TAG_FUNCTION();
 
     // Extract the lighting context information from the task context
-    GlfSimpleLightingContextRefPtr lightingContext;
+    GarchSimpleLightingContextRefPtr lightingContext;
     if (!_GetTaskContextData(ctx, HdxTokens->lightingContext, &lightingContext)) {
         return;
     }
@@ -79,7 +79,7 @@ HdxShadowTask::_Execute(HdTaskContext* ctx)
     glEnable(GL_PROGRAM_POINT_SIZE);
 
     // Generate the actual shadow maps
-    GlfSimpleShadowArrayRefPtr const shadows = lightingContext->GetShadows();
+    GarchSimpleShadowArrayRefPtr const shadows = lightingContext->GetShadows();
     for(size_t shadowId = 0; shadowId < shadows->GetNumLayers(); shadowId++) {
 
         // Bind the framebuffer that will store shadowId shadow map
@@ -104,11 +104,11 @@ HdxShadowTask::_Sync(HdTaskContext* ctx)
     HF_MALLOC_TAG_FUNCTION();
 
     // Extract the lighting context information from the task context
-    GlfSimpleLightingContextRefPtr lightingContext;
+    GarchSimpleLightingContextRefPtr lightingContext;
     if (!_GetTaskContextData(ctx, HdxTokens->lightingContext, &lightingContext)) {
         return;
     }
-    GlfSimpleShadowArrayRefPtr const shadows = lightingContext->GetShadows();
+    GarchSimpleShadowArrayRefPtr const shadows = lightingContext->GetShadows();
 
     _TaskDirtyState dirtyState;
 
@@ -176,7 +176,7 @@ HdxShadowTask::_Sync(HdTaskContext* ctx)
             }
         }
         
-        GlfSimpleLightVector const glfLights = lightingContext->GetLights();
+        GarchSimpleLightVector const glfLights = lightingContext->GetLights();
         
         if (!renderIndex.IsSprimTypeSupported(HdPrimTypeTokens->light) ||
             !TF_VERIFY(lights.size() == glfLights.size())) {

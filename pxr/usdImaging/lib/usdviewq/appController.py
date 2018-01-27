@@ -31,7 +31,8 @@ from time import time, sleep
 from collections import deque, OrderedDict
 
 # Usd Library Components
-from pxr import Usd, UsdGeom, UsdUtils, UsdImagingGL, Glf, Sdf, Tf, Ar
+from pxr import Usd, UsdGeom, UsdUtils, Glf, Sdf, Tf, Ar
+from pxr import UsdImagingMetal
 
 # UI Components
 from ._usdviewq import Utils
@@ -2890,7 +2891,7 @@ class AppController(QtCore.QObject):
         return self._primToItemMap[self._stage.GetPrimAtPath(path)]
 
     def resetSelectionToPseudoroot(self):
-        self.selectPrimByPath("/", UsdImagingGL.GL.ALL_INSTANCES, "replace")
+        self.selectPrimByPath("/", UsdImagingMetal.Metal.ALL_INSTANCES, "replace")
 
     def selectPrimByPath(self, path, instanceIndex, updateMode,
                          applyPickMode=False):
@@ -2927,7 +2928,7 @@ class AppController(QtCore.QObject):
         if not (applyPickMode and self._pickMode == PickModes.INSTANCES):
             if self._stageView:
                 self._stageView.clearInstanceSelection()
-            instanceIndex = UsdImagingGL.GL.ALL_INSTANCES
+            instanceIndex = UsdImagingMetal.Metal.ALL_INSTANCES
 
         item = self._getItemAtPath(path, ensureExpanded=True)
 
@@ -2941,7 +2942,7 @@ class AppController(QtCore.QObject):
                 self._stageView.setInstanceSelection(path, instanceIndex, True)
             item.setSelected(True)
         else:   # "toggle"
-            if instanceIndex != UsdImagingGL.GL.ALL_INSTANCES:
+            if instanceIndex != UsdImagingMetal.Metal.ALL_INSTANCES:
                 if self._stageView:
                     self._stageView.setInstanceSelection(path, instanceIndex,
                         not self._stageView.getInstanceSelection(path, instanceIndex))
@@ -2959,7 +2960,7 @@ class AppController(QtCore.QObject):
                 item = self._getItemAtPath(self._stage.GetPseudoRoot().GetPath())
                 item.setSelected(True)
 
-        if instanceIndex != UsdImagingGL.GL.ALL_INSTANCES:
+        if instanceIndex != UsdImagingMetal.Metal.ALL_INSTANCES:
             self._itemSelectionChanged()
 
         return item
@@ -3001,7 +3002,7 @@ class AppController(QtCore.QObject):
             first = True
             for prim in primsToSelect:
                 if self._primShouldBeShown(prim):
-                    instanceIndex = UsdImagingGL.GL.ALL_INSTANCES
+                    instanceIndex = UsdImagingMetal.Metal.ALL_INSTANCES
                     item = self.selectPrimByPath(prim.GetPath(), instanceIndex,
                                                  "replace" if first else "add")
                     first = False

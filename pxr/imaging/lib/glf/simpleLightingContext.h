@@ -28,9 +28,8 @@
 
 #include "pxr/pxr.h"
 #include "pxr/imaging/glf/api.h"
-#include "pxr/imaging/glf/simpleLight.h"
-#include "pxr/imaging/glf/simpleMaterial.h"
-#include "pxr/imaging/glf/simpleShadowArray.h"
+
+#include "pxr/imaging/garch/simpleLightingContext.h"
 
 #include "pxr/base/gf/matrix4d.h"
 #include "pxr/base/gf/vec4f.h"
@@ -41,105 +40,25 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-
-TF_DECLARE_WEAK_AND_REF_PTRS(GlfBindingMap);
-TF_DECLARE_WEAK_AND_REF_PTRS(GlfUniformBlock);
-TF_DECLARE_WEAK_AND_REF_PTRS(GlfSimpleLightingContext);
-TF_DECLARE_WEAK_AND_REF_PTRS(GlfSimpleShadowArray);
-
-class GlfSimpleLightingContext : public TfRefBase, public TfWeakBase {
+class GlfSimpleLightingContext : public GarchSimpleLightingContext {
 public:
-    typedef GlfSimpleLightingContext This;
 
     GLF_API
-    static GlfSimpleLightingContextRefPtr New();
+    virtual void BindUniformBlocks(GarchBindingMapPtr const &bindingMap) override;
+    GLF_API
+    virtual void BindSamplers(GarchBindingMapPtr const &bindingMap) override;
 
     GLF_API
-    void SetLights(GlfSimpleLightVector const & lights);
-    GLF_API
-    GlfSimpleLightVector & GetLights();
-
-    // returns the effective number of lights taken into account
-    // in composable/compatible shader constraints
-    GLF_API
-    int GetNumLightsUsed() const;
+    virtual void UnbindSamplers(GarchBindingMapPtr const &bindingMap) override;
 
     GLF_API
-    void SetShadows(GlfSimpleShadowArrayRefPtr const & shadows);
-    GLF_API
-    GlfSimpleShadowArrayRefPtr const & GetShadows();
-
-    GLF_API
-    void SetMaterial(GlfSimpleMaterial const & material);
-    GLF_API
-    GlfSimpleMaterial const & GetMaterial() const;
-
-    GLF_API
-    void SetSceneAmbient(GfVec4f const & sceneAmbient);
-    GLF_API
-    GfVec4f const & GetSceneAmbient() const;
-
-    GLF_API
-    void SetCamera(GfMatrix4d const &worldToViewMatrix,
-                   GfMatrix4d const &projectionMatrix);
-
-    GLF_API
-    void SetUseLighting(bool val);
-    GLF_API
-    bool GetUseLighting() const;
-
-    // returns true if any light has shadow enabled.
-    GLF_API
-    bool GetUseShadows() const;
-
-    GLF_API
-    void SetUseColorMaterialDiffuse(bool val);
-    GLF_API
-    bool GetUseColorMaterialDiffuse() const;
-
-    GLF_API
-    void InitUniformBlockBindings(GlfBindingMapPtr const &bindingMap) const;
-    GLF_API
-    void InitSamplerUnitBindings(GlfBindingMapPtr const &bindingMap) const;
-
-    GLF_API
-    void BindUniformBlocks(GlfBindingMapPtr const &bindingMap);
-    GLF_API
-    void BindSamplers(GlfBindingMapPtr const &bindingMap);
-
-    GLF_API
-    void UnbindSamplers(GlfBindingMapPtr const &bindingMap);
-
-    GLF_API
-    void SetStateFromOpenGL();
+    virtual void SetStateFromOpenGL() override;
 
 protected:
     GLF_API
     GlfSimpleLightingContext();
     GLF_API
-    ~GlfSimpleLightingContext();
-
-private:
-    GlfSimpleLightVector _lights;
-    GlfSimpleShadowArrayRefPtr _shadows;
-
-    GfMatrix4d _worldToViewMatrix;
-    GfMatrix4d _projectionMatrix;
-
-    GlfSimpleMaterial _material;
-    GfVec4f _sceneAmbient;
-
-    bool _useLighting;
-    bool _useShadows;
-    bool _useColorMaterialDiffuse;
-
-    GlfUniformBlockRefPtr _lightingUniformBlock;
-    GlfUniformBlockRefPtr _shadowUniformBlock;
-    GlfUniformBlockRefPtr _materialUniformBlock;
-
-    bool _lightingUniformBlockValid;
-    bool _shadowUniformBlockValid;
-    bool _materialUniformBlockValid;
+    virtual ~GlfSimpleLightingContext();
 };
 
 

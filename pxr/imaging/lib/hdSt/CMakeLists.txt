@@ -8,6 +8,15 @@ if (OPENSUBDIV_HAS_GLSL_COMPUTE)
     add_definitions(-DOPENSUBDIV_HAS_GLSL_COMPUTE)
 endif()
 
+if (APPLE)
+    set(GFX    mtlf)
+    set(GFXADDITIONAL   Metal/indirectDrawBatchMetal
+                        Metal/drawTargetTextureResourceMetal)
+else()
+    set(GFX)
+    set(GFXADDITIONAL)
+endif()
+
 pxr_library(hdSt
     LIBRARIES
         cameraUtil
@@ -33,7 +42,6 @@ pxr_library(hdSt
         light      
         mesh
         mixinShaderCode
-        persistentBuffer
         points
         renderDelegate
         renderPass
@@ -62,6 +70,9 @@ pxr_library(hdSt
         subdivision3
         triangulate
         unitTestHelper
+        GL/indirectDrawBatchGL
+        GL/drawTargetTextureResourceGL
+        ${GFXADDITIONAL}
 
     RESOURCE_FILES
 )
@@ -73,7 +84,9 @@ pxr_build_test(testHdStBasicDrawing
         hd
         garch
         glf
+        ${GFX}
     CPPFILES
         testenv/testHdStBasicDrawing.cpp
 )
 endif()
+

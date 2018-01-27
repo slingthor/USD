@@ -73,8 +73,8 @@ PXR_NAMESPACE_OPEN_SCOPE
 TF_REGISTRY_FUNCTION(TfType)
 {
     typedef GlfPtexTexture Type;
-    TfType t = TfType::Define<Type, TfType::Bases<GlfTexture> >();
-    t.SetFactory< GlfTextureFactory<Type> >();
+    TfType t = TfType::Define<Type, TfType::Bases<GarchTexture> >();
+    t.SetFactory< GarchTextureFactory<Type> >();
 }
 
 //------------------------------------------------------------------------------
@@ -272,19 +272,19 @@ GlfPtexTexture::_FreePtexTextureObject()
 //------------------------------------------------------------------------------
 
 /* virtual */
-GlfTexture::BindingVector
+GarchTexture::BindingVector
 GlfPtexTexture::GetBindings(TfToken const & identifier, GLuint samplerName) const
 {
     BindingVector result;
     result.reserve(2);
 
     result.push_back(Binding(
-        TfToken(identifier.GetString() + "_Data"), GlfTextureTokens->texels,
+        TfToken(identifier.GetString() + "_Data"), GarchTextureTokens->texels,
         GL_TEXTURE_2D_ARRAY, _texels, samplerName));
 
     // packing buffer doesn't need external sampler
     result.push_back(Binding(
-        TfToken(identifier.GetString() + "_Packing"), GlfTextureTokens->layout,
+        TfToken(identifier.GetString() + "_Packing"), GarchTextureTokens->layout,
         GL_TEXTURE_BUFFER, _layout, /*samplerId=*/0));
 
     return result;

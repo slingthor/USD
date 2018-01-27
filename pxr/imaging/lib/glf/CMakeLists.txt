@@ -28,14 +28,12 @@ pxr_library(glf
         ${Boost_SYSTEM_LIBRARY}
         ${OPENGL_gl_LIBRARY}
         ${OPENGL_glu_LIBRARY}
-        ${OIIO_LIBRARIES}
         ${GLEW_LIBRARY}
         ${X11_LIBRARIES}
         ${OPENEXR_LIBRARY}
         ${optionalLibs}
 
     INCLUDE_DIRS
-        ${OIIO_INCLUDE_DIRS}
         ${Boost_INCLUDE_DIRS}
         ${GLEW_INCLUDE_DIR}
         ${OPENEXR_INCLUDE_DIRS}
@@ -44,33 +42,20 @@ pxr_library(glf
     PUBLIC_CLASSES
         arrayTexture
         baseTexture
-        baseTextureData
         bindingMap
         diagnostic
         drawTarget
         glew
         glslfx
-        glslfxConfig
         glContext
         glRawContext
-        image
-        imageRegistry
         info
         package
         ptexTexture
-        simpleLight
         simpleLightingContext
-        simpleMaterial
         simpleShadowArray
-        texture
-        textureHandle
-        textureRegistry
         uniformBlock
         utils
-        uvTexture
-        uvTextureData
-        uvTextureStorage
-        uvTextureStorageData
         ${optionalPublicClasses}
 
     PRIVATE_CLASSES
@@ -79,29 +64,14 @@ pxr_library(glf
 
     PUBLIC_HEADERS
         api.h
-        
-    PRIVATE_HEADERS
-        rankedTypeMap.h
-
-    CPPFILES
-        dictionary.cpp
-        oiioImage.cpp
 
     PYTHON_CPPFILES
         moduleDeps.cpp
 
     PYMODULE_CPPFILES
         module.cpp
-        wrapBaseTexture.cpp
         wrapDiagnostic.cpp
-        wrapDrawTarget.cpp
         wrapGlew.cpp
-        wrapSimpleLight.cpp
-        wrapSimpleMaterial.cpp
-        wrapTexture.cpp
-        wrapTextureRegistry.cpp
-        wrapUVTexture.cpp
-        wrapUVTextureStorage.cpp
 
     PYMODULE_FILES
         __init__.py

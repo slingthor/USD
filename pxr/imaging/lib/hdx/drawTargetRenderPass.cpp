@@ -24,6 +24,10 @@
 #include "pxr/imaging/glf/glew.h"
 #include "pxr/imaging/glf/glContext.h"
 
+#if defined(ARCH_GFX_METAL)
+#include "pxr/imaging/mtlf/mtlDevice.h"
+#endif
+
 #include "pxr/imaging/hdx/drawTargetRenderPass.h"
 #include "pxr/imaging/hdSt/drawTargetRenderPassState.h"
 #include "pxr/imaging/hd/renderPassState.h"
@@ -74,11 +78,11 @@ HdxDrawTargetRenderPass::~HdxDrawTargetRenderPass()
 }
 
 void
-HdxDrawTargetRenderPass::SetDrawTarget(const GlfDrawTargetRefPtr &drawTarget)
+HdxDrawTargetRenderPass::SetDrawTarget(const GarchDrawTargetRefPtr &drawTarget)
 {
     // XXX: The Draw Target may have been created on a different GL
     // context, so create a local copy here to use on this context.
-    _drawTarget = GlfDrawTarget::New(drawTarget);
+    _drawTarget = GarchDrawTarget::New(drawTarget);
     _drawTargetContext = GlfGLContext::GetCurrentGLContext();
 }
 
@@ -163,7 +167,7 @@ HdxDrawTargetRenderPass::_ClearBuffers()
     }
 }
 
-GlfDrawTargetRefPtr 
+GarchDrawTargetRefPtr
 HdxDrawTargetRenderPass::GetDrawTarget()
 {
     return _drawTarget;

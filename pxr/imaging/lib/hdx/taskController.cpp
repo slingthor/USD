@@ -32,8 +32,8 @@
 #include "pxr/imaging/hdx/simpleLightBypassTask.h"
 #include "pxr/imaging/hdx/tokens.h"
 
-#include "pxr/imaging/glf/simpleLight.h"
-#include "pxr/imaging/glf/simpleLightingContext.h"
+#include "pxr/imaging/garch/simpleLight.h"
+#include "pxr/imaging/garch/simpleLightingContext.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -378,7 +378,7 @@ HdxTaskController::TestIntersection(
 }
 
 void
-HdxTaskController::SetLightingState(GlfSimpleLightingContextPtr const& src,
+HdxTaskController::SetLightingState(GarchSimpleLightingContextPtr const& src,
                                     bool bypass)
 {
     if (bypass) {
@@ -406,7 +406,7 @@ HdxTaskController::SetLightingState(GlfSimpleLightingContextPtr const& src,
         return;
     }
 
-    GlfSimpleLightVector const& lights = src->GetLights();
+    GarchSimpleLightVector const& lights = src->GetLights();
     bool hasNumLightsChanged = false;
 
     // Create or remove Sprims so that the render index has the correct

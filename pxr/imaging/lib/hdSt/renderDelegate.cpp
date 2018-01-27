@@ -36,12 +36,12 @@
 #include "pxr/imaging/hdSt/shader.h"
 #include "pxr/imaging/hdSt/resourceRegistry.h"
 
+#include "pxr/imaging/hd/engine.h"
 #include "pxr/imaging/hd/package.h"
 #include "pxr/imaging/hd/perfLog.h"
 #include "pxr/imaging/hd/texture.h"
 
-#include "pxr/imaging/glf/glslfx.h"
-
+#include "pxr/imaging/garch/glslfx.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -243,8 +243,7 @@ HdStRenderDelegate::DestroyBprim(HdBprim *bPrim)
 HdSprim *
 HdStRenderDelegate::_CreateFallbackShaderPrim()
 {
-    GlfGLSLFXSharedPtr glslfx(new GlfGLSLFX(HdPackageFallbackSurfaceShader()));
-
+    GLSLFXSharedPtr glslfx(HdEngine::CreateGLSLFX(HdPackageFallbackSurfaceShader()));
     HdStSurfaceShaderSharedPtr fallbackShaderCode(new HdStGLSLFXShader(glslfx));
 
     HdStShader *shader = new HdStShader(SdfPath::EmptyPath());

@@ -109,7 +109,8 @@ bool operator==(const HdMaterialNode& lhs, const HdMaterialNode& rhs);
 ///
 /// Describes a material network composed of nodes and relationships
 /// between the nodes and terminals of those nodes.
-struct HdMaterialNodes {
+class HdMaterialNodes {
+public:
     std::vector<HdMaterialRelationship> relationships;
     std::vector<HdMaterialNode> nodes;
 };

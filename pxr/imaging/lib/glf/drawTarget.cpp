@@ -29,8 +29,10 @@
 #include "pxr/imaging/glf/drawTarget.h"
 #include "pxr/imaging/glf/glContext.h"
 #include "pxr/imaging/glf/diagnostic.h"
-#include "pxr/imaging/glf/image.h"
 #include "pxr/imaging/glf/utils.h"
+
+#include "pxr/imaging/garch/image.h"
+#include "pxr/imaging/garch/utils.h"
 
 #include "pxr/base/tf/stringUtils.h"
 #include "pxr/base/tf/envSetting.h"
@@ -54,10 +56,10 @@ GetNumSamples()
     return numSamples;
 }
 
-GlfDrawTargetRefPtr
+GlfDrawTarget*
 GlfDrawTarget::New( GfVec2i const & size, bool requestMSAA )
 {
-    return TfCreateRefPtr(new This(size, requestMSAA));
+    return new This(size, requestMSAA);
 }
 
 GlfDrawTarget::GlfDrawTarget( GfVec2i const & size, bool requestMSAA /* =false */) :
@@ -78,26 +80,24 @@ GlfDrawTarget::GlfDrawTarget( GfVec2i const & size, bool requestMSAA /* =false *
     }
 
     _GenFrameBuffer();
-
-    _attachmentsPtr = TfCreateRefPtr( new AttachmentsContainer );
 }
 
-GlfDrawTargetRefPtr
-GlfDrawTarget::New( GlfDrawTargetPtr const & drawtarget )
+GlfDrawTarget*
+GlfDrawTarget::New( GarchDrawTargetPtr const & drawtarget )
 {
-    return TfCreateRefPtr(new This(drawtarget));
+    return new This(drawtarget);
 }
 
 // clone constructor : generates a new GL framebuffer, but share the texture
 // attachments.
-GlfDrawTarget::GlfDrawTarget( GlfDrawTargetPtr const & drawtarget ) :
+GlfDrawTarget::GlfDrawTarget( GarchDrawTargetPtr const & drawtarget ) :
     _framebuffer(0),
     _framebufferMS(0),
     _unbindRestoreReadFB(0),
     _unbindRestoreDrawFB(0),
     _bindDepth(0),
-    _size(drawtarget->_size),
-    _numSamples(drawtarget->_numSamples),
+    _size(drawtarget->GetSize()),
+    _numSamples(drawtarget->GetNumSamples()),
     _owningContext()
 {
     GlfGlewInit();
@@ -111,7 +111,7 @@ GlfDrawTarget::GlfDrawTarget( GlfDrawTargetPtr const & drawtarget ) :
 
     // attach the textures to the correct framebuffer mount points
     for (AttachmentsMap::value_type const& p :  _attachmentsPtr->attachments) {
-        _BindAttachment( p.second );
+        _BindAttachment(TfStatic_cast<TfRefPtr<GlfDrawTarget::GlfAttachment>>(p.second));
     }
 
     Unbind();
@@ -161,7 +161,7 @@ GlfDrawTarget::AddAttachment( std::string const & name,
 
     if (it==attachments.end()) {
 
-        AttachmentRefPtr attachment = Attachment::New((int)attachments.size(),
+        GlfAttachment::GlfAttachmentRefPtr attachment = GlfAttachment::New((int)attachments.size(),
                                                       format, type,
                                                       internalFormat, _size,
                                                       _numSamples);
@@ -169,7 +169,7 @@ GlfDrawTarget::AddAttachment( std::string const & name,
         attachments.insert(AttachmentsMap::value_type(name, attachment));
 
 
-        TF_VERIFY( attachment->GetGlTextureName() > 0 ,
+        TF_VERIFY( attachment->GetGlTextureName() > 0 , "%s", 
                    std::string("Attachment \""+name+"\" was not added "
                        "and cannot be bound in MatDisplayMaterial").c_str());
 
@@ -215,7 +215,7 @@ GlfDrawTarget::ClearAttachments()
 }
 
 void
-GlfDrawTarget::CloneAttachments( GlfDrawTargetPtr const & drawtarget )
+GlfDrawTarget::CloneAttachments( GarchDrawTargetPtr const & drawtarget )
 {
     if (!drawtarget) {
         TF_CODING_ERROR( "Cannot clone TfNullPtr attachments." );
@@ -226,7 +226,7 @@ GlfDrawTarget::CloneAttachments( GlfDrawTargetPtr const & drawtarget )
     _attachmentsPtr = drawtarget->_attachmentsPtr;
 
     for (AttachmentsMap::value_type const& p :  _attachmentsPtr->attachments) {
-        _BindAttachment( p.second );
+        _BindAttachment( TfStatic_cast<TfRefPtr<GlfDrawTarget::GlfAttachment>>(p.second) );
     }
 }
 
@@ -265,7 +265,7 @@ GlfDrawTarget::SetSize( GfVec2i size )
 
         var->ResizeTexture(_size);
 
-        _BindAttachment(var);
+        _BindAttachment(TfStatic_cast<TfRefPtr<GlfDrawTarget::GlfAttachment>>(var));
     }
 }
 
@@ -333,7 +333,7 @@ GlfDrawTarget::GetFramebufferMSId() const
 // Attach a texture to one of the attachment points of the framebuffer.
 // We assume that the framebuffer is currently bound !
 void
-GlfDrawTarget::_BindAttachment( GlfDrawTarget::AttachmentRefPtr const & a )
+GlfDrawTarget::_BindAttachment( GlfDrawTarget::GlfAttachment::GlfAttachmentRefPtr const & a )
 {
     GLuint id = a->GetGlTextureName();
     GLuint idMS = a->GetGlTextureMSName();
@@ -464,25 +464,27 @@ GlfDrawTarget::Resolve()
 
 /* static */
 void
-GlfDrawTarget::Resolve(const std::vector<GlfDrawTarget*>& drawTargets)
+GlfDrawTarget::Resolve(const std::vector<GarchDrawTarget*>& drawTargets)
 {
-    bool anyResolved = false;
+    GlfDrawTarget* firstDrawTarget = NULL;
 
-    for(GlfDrawTarget* dt : drawTargets) {
+    for(GarchDrawTarget* dt : drawTargets) {
         if (dt->HasMSAA()) {
-            if (!anyResolved) {
+            GlfDrawTarget* gldt = dynamic_cast<GlfDrawTarget*>(dt);
+
+            if (!firstDrawTarget) {
                 // If this is the first draw target to be resolved,
                 // save the old binding state.
-                anyResolved = true;
-                drawTargets[0]->_SaveBindingState();
+                firstDrawTarget = dynamic_cast<GlfDrawTarget*>(drawTargets[0]);
+                firstDrawTarget->_SaveBindingState();
             }
-            dt->_Resolve();
+            gldt->_Resolve();
         }
     }
 
-    if (anyResolved) {
+    if (firstDrawTarget) {
         // If any draw targets were resolved, restore the old binding state.
-        drawTargets[0]->_RestoreBindingState();
+        firstDrawTarget->_RestoreBindingState();
     }
 }
 
@@ -527,15 +529,15 @@ GlfDrawTarget::WriteToFile(std::string const & name,
         return false;
     }
 
-    AttachmentRefPtr const & a = it->second;
+    GlfAttachment::GlfAttachmentRefPtr const & a = TfStatic_cast<TfRefPtr<GlfDrawTarget::GlfAttachment>>(it->second);
 
     if (!_framebuffer) {
         TF_CODING_ERROR( "DrawTarget has no framebuffer" );
         return false;
     }
 
-    int nelems = GlfGetNumElements(a->GetFormat()),
-        elemsize = GlfGetElementSize(a->GetType()),
+    int nelems = GarchGetNumElements(a->GetFormat()),
+        elemsize = GarchGetElementSize(a->GetType()),
         stride = _size[0] * nelems * elemsize,
         bufsize = _size[1] * stride;
 
@@ -587,7 +589,7 @@ GlfDrawTarget::WriteToFile(std::string const & name,
         metadata["NP"] = worldToScreenTransform;
     }
 
-    GlfImage::StorageSpec storage;
+    GarchImage::StorageSpec storage;
     storage.width = _size[0];
     storage.height = _size[1];
     storage.format = a->GetFormat();
@@ -595,7 +597,7 @@ GlfDrawTarget::WriteToFile(std::string const & name,
     storage.flipped = true;
     storage.data = buf;
 
-    GlfImageSharedPtr image = GlfImage::OpenForWriting(filename);
+    GarchImageSharedPtr image = GarchImage::OpenForWriting(filename);
     bool writeSuccess = image && image->Write(storage, metadata);
 
     free(buf);
@@ -612,20 +614,20 @@ GlfDrawTarget::WriteToFile(std::string const & name,
 
 //----------------------------------------------------------------------
 
-GlfDrawTarget::AttachmentRefPtr
-GlfDrawTarget::Attachment::New(int glIndex, GLenum format, GLenum type,
+GlfDrawTarget::GlfAttachment::GlfAttachmentRefPtr
+GlfDrawTarget::GlfAttachment::New(int glIndex, GLenum format, GLenum type,
                                 GLenum internalFormat, GfVec2i size,
                                 unsigned int numSamples)
 {
-    return TfCreateRefPtr(new Attachment(glIndex, format, type,
+    return TfCreateRefPtr(new GlfDrawTarget::GlfAttachment(glIndex, format, type,
                                          internalFormat, size, 
                                          numSamples));
 }
 
-GlfDrawTarget::Attachment::Attachment(int glIndex, GLenum format,
-                                       GLenum type, GLenum internalFormat,
-                                       GfVec2i size, 
-                                       unsigned int numSamples) :
+GlfDrawTarget::GlfAttachment::GlfAttachment(int glIndex, GLenum format,
+                                            GLenum type, GLenum internalFormat,
+                                            GfVec2i size,
+                                            unsigned int numSamples) :
     _textureName(0),
     _textureNameMS(0),
     _format(format),
@@ -638,7 +640,7 @@ GlfDrawTarget::Attachment::Attachment(int glIndex, GLenum format,
     _GenTexture();
 }
 
-GlfDrawTarget::Attachment::~Attachment()
+GlfDrawTarget::GlfAttachment::~GlfAttachment()
 {
     _DeleteTexture();
 }
@@ -646,7 +648,7 @@ GlfDrawTarget::Attachment::~Attachment()
 // Generate a simple GL_TEXTURE_2D to use as an attachment
 // we assume that the framebuffer is currently bound !
 void
-GlfDrawTarget::Attachment::_GenTexture()
+GlfDrawTarget::GlfAttachment::_GenTexture()
 {
     GLenum internalFormat = _internalFormat;
     GLenum type = _type;
@@ -730,7 +732,7 @@ GlfDrawTarget::Attachment::_GenTexture()
 }
 
 void
-GlfDrawTarget::Attachment::_DeleteTexture()
+GlfDrawTarget::GlfAttachment::_DeleteTexture()
 {
     if (_textureName) {
         GlfSharedGLContextScopeHolder sharedGLContextScopeHolder;
@@ -752,7 +754,7 @@ GlfDrawTarget::Attachment::_DeleteTexture()
 }
 
 void
-GlfDrawTarget::Attachment::ResizeTexture(const GfVec2i &size)
+GlfDrawTarget::GlfAttachment::ResizeTexture(const GfVec2i &size)
 {
     _size = size;
 
@@ -761,22 +763,20 @@ GlfDrawTarget::Attachment::ResizeTexture(const GfVec2i &size)
 }
 
 /* virtual */
-GlfTexture::BindingVector
-GlfDrawTarget::Attachment::GetBindings(TfToken const & identifier,
-                                       GLuint samplerName) const
+GarchTexture::BindingVector
+GlfDrawTarget::GlfAttachment::GetBindings(TfToken const & identifier,
+                                          GarchSamplerGPUHandle samplerName) const
 {
     return BindingVector(1,
-                Binding(identifier, GlfTextureTokens->texels,
-                        GL_TEXTURE_2D, GetGlTextureName(), samplerName));
+                Binding(identifier, GarchTextureTokens->texels,
+                        GL_TEXTURE_2D, GetTextureName(), samplerName));
 }
 
 /* virtual */
 VtDictionary
-GlfDrawTarget::Attachment::GetTextureInfo() const
+GlfDrawTarget::GlfAttachment::GetTextureInfo() const
 {
     VtDictionary info;
-
-
 
     info["width"] = (int)_size[0];
     info["height"] = (int)_size[1];
@@ -791,7 +791,7 @@ GlfDrawTarget::Attachment::GetTextureInfo() const
 }
 
 void
-GlfDrawTarget::Attachment::TouchContents()
+GlfDrawTarget::GlfAttachment::TouchContents()
 {
     _UpdateContentsID();
 }

@@ -113,6 +113,16 @@ public:
     /// Sets the bufferSpecs for all resources.
     HD_API
     virtual void AddBufferSpecs(HdBufferSpecVector *bufferSpecs) const = 0;
+    
+    /// Returns the GPU resource. If the buffer array contains more than one
+    /// resource, this method raises a coding error.
+    virtual HdBufferResourceSharedPtr GetResource() const = 0;
+    
+    /// Returns the named GPU resource.
+    virtual HdBufferResourceSharedPtr GetResource(TfToken const& name) = 0;
+    
+    /// Returns the list of all named GPU resources for this bufferArrayRange.
+    virtual HdBufferResourceNamedList const& GetResources() const = 0;
 
 protected:
     /// Returns the aggregation container to be used in IsAggregatedWith()

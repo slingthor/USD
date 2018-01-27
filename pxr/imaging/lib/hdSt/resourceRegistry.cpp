@@ -22,10 +22,11 @@
 // language governing permissions and limitations under the Apache License.
 //
 #include "pxr/imaging/hdSt/resourceRegistry.h"
-
-#include "pxr/imaging/hd/tokens.h"
 #include "pxr/imaging/hdSt/dispatchBuffer.h"
-#include "pxr/imaging/hdSt/persistentBuffer.h"
+
+#include "pxr/imaging/hd/persistentBuffer.h"
+#include "pxr/imaging/hd/engine.h"
+#include "pxr/imaging/hd/tokens.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -72,13 +73,13 @@ HdStResourceRegistry::_TallyResourceAllocation(VtDictionary *result) const
 
     // persistent buffers
     TF_FOR_ALL (bufferIt, _persistentBufferRegistry) {
-        HdStPersistentBufferSharedPtr buffer = (*bufferIt);
+        HdPersistentBufferSharedPtr buffer = (*bufferIt);
         if (!TF_VERIFY(buffer)) {
             continue;
         }
 
-        std::string const & role = buffer->GetRole().GetString();
-        size_t size = size_t(buffer->GetSize());
+        std::string const & role = buffer->GetResource()->GetRole().GetString();
+        size_t size = size_t(buffer->GetResource()->GetSize());
 
         (*result)[role] = VtDictionaryGet<size_t>(*result, role,
                                                   VtDefault = 0) + size;
@@ -114,12 +115,12 @@ HdStResourceRegistry::GarbageCollectDispatchBuffers()
         _dispatchBufferRegistry.end());
 }
 
-HdStPersistentBufferSharedPtr
+HdPersistentBufferSharedPtr
 HdStResourceRegistry::RegisterPersistentBuffer(
         TfToken const &role, size_t dataSize, void *data)
 {
-    HdStPersistentBufferSharedPtr result(
-            new HdStPersistentBuffer(role, dataSize, data));
+    HdPersistentBufferSharedPtr result(
+            HdEngine::CreatePersistentBuffer(role, dataSize, data));
 
     _persistentBufferRegistry.push_back(result);
 
@@ -134,7 +135,7 @@ HdStResourceRegistry::GarbageCollectPersistentBuffers()
     _persistentBufferRegistry.erase(
         std::remove_if(
             _persistentBufferRegistry.begin(), _persistentBufferRegistry.end(),
-            std::bind(&HdStPersistentBufferSharedPtr::unique,
+            std::bind(&HdPersistentBufferSharedPtr::unique,
                       std::placeholders::_1)),
         _persistentBufferRegistry.end());
 }

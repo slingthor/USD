@@ -35,7 +35,7 @@
 #include "pxr/base/gf/matrix4f.h"
 #include "pxr/base/gf/vec2i.h"
 
-#include "pxr/imaging/hd/bufferArrayRangeGL.h"
+#include "pxr/imaging/hd/bufferArrayRange.h"
 #include "pxr/imaging/hd/bufferSource.h"
 #include "pxr/imaging/hd/computation.h"
 #include "pxr/imaging/hd/geometricShader.h"
@@ -160,26 +160,26 @@ HdStBasisCurves::_UpdateDrawItemGeometricShader(
         // Check if we picked up normals on a previous update.
         typedef HdBufferArrayRangeSharedPtr HdBarPtr;
         if (HdBarPtr const& bar = drawItem->GetConstantPrimVarRange()){
-            HdBufferArrayRangeGLSharedPtr bar_ =
-                boost::static_pointer_cast<HdBufferArrayRangeGL> (bar);
+            HdBufferArrayRangeSharedPtr bar_ =
+                boost::static_pointer_cast<HdBufferArrayRange> (bar);
             hasAuthoredNormals |= bool(bar_->GetResource(HdTokens->normals));
         }
         if (HdBarPtr const& bar = drawItem->GetVertexPrimVarRange()) {
-            HdBufferArrayRangeGLSharedPtr bar_ =
-                boost::static_pointer_cast<HdBufferArrayRangeGL> (bar);
+            HdBufferArrayRangeSharedPtr bar_ =
+                boost::static_pointer_cast<HdBufferArrayRange> (bar);
             hasAuthoredNormals |= bool(bar_->GetResource(HdTokens->normals));
         }
         if (HdBarPtr const& bar = drawItem->GetElementPrimVarRange()){
-            HdBufferArrayRangeGLSharedPtr bar_ =
-                boost::static_pointer_cast<HdBufferArrayRangeGL> (bar);
+            HdBufferArrayRangeSharedPtr bar_ =
+                boost::static_pointer_cast<HdBufferArrayRange> (bar);
 
             hasAuthoredNormals |= bool(bar_->GetResource(HdTokens->normals));
         }
         int instanceNumLevels = drawItem->GetInstancePrimVarNumLevels();
         for (int i = 0; i < instanceNumLevels; ++i) {
             if (HdBarPtr const& bar = drawItem->GetInstancePrimVarRange(i)) {
-                HdBufferArrayRangeGLSharedPtr bar_ =
-                    boost::static_pointer_cast<HdBufferArrayRangeGL> (bar);
+                HdBufferArrayRangeSharedPtr bar_ =
+                    boost::static_pointer_cast<HdBufferArrayRange> (bar);
 
                 hasAuthoredNormals |= bool(bar_->GetResource(HdTokens->normals));
             }

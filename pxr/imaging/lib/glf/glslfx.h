@@ -27,8 +27,10 @@
 /// \file glf/glslfx.h
 
 #include "pxr/pxr.h"
+#include "pxr/imaging/garch/glslfxConfig.h"
+#include "pxr/imaging/garch/glslfx.h"
+
 #include "pxr/imaging/glf/api.h"
-#include "pxr/imaging/glf/glslfxConfig.h"
 
 #include "pxr/base/tf/token.h"
 
@@ -117,7 +119,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 /// }
 /// \endcode
 ///
-class GlfGLSLFX
+class GlfGLSLFX: public GLSLFX
 {
 public:
     /// Create an invalid glslfx object
@@ -128,52 +130,55 @@ public:
     GLF_API
     GlfGLSLFX(std::string const & filePath);
 
+    GLF_API
+    virtual ~GlfGLSLFX() {}
+    
     /// Create a glslfx object from a stream
     GLF_API
     GlfGLSLFX(std::istream &is);
 
     /// Return the parameters specified in the configuration
     GLF_API
-    GlfGLSLFXConfig::Parameters GetParameters() const;
+    virtual GLSLFXConfig::Parameters GetParameters() const;
 
     /// Return the textures specified in the configuration
     GLF_API
-    GlfGLSLFXConfig::Textures GetTextures() const;
+    virtual GLSLFXConfig::Textures GetTextures() const;
 
     /// Return the attributes specified in the configuration
     GLF_API
-    GlfGLSLFXConfig::Attributes GetAttributes() const;
+    virtual GLSLFXConfig::Attributes GetAttributes() const;
 
     /// Return the metadata specified in the configuration
     GLF_API
-    GlfGLSLFXConfig::MetadataDictionary GetMetadata() const;
+    virtual GLSLFXConfig::MetadataDictionary GetMetadata() const;
 
     /// Returns true if this is a valid glslfx file
     GLF_API
-    bool IsValid(std::string *reason=NULL) const;
+    virtual bool IsValid(std::string *reason=NULL) const;
 
     /// \name Compatible shader sources
     /// @{
 
     /// Get the vertex source string
     GLF_API
-    std::string GetVertexSource() const;
+    virtual std::string GetVertexSource() const;
 
     /// Get the tess control source string
     GLF_API
-    std::string GetTessControlSource() const;
+    virtual std::string GetTessControlSource() const;
 
     /// Get the tess eval source string
     GLF_API
-    std::string GetTessEvalSource() const;
+    virtual std::string GetTessEvalSource() const;
 
     /// Get the geometry source string
     GLF_API
-    std::string GetGeometrySource() const;
+    virtual std::string GetGeometrySource() const;
 
     /// Get the fragment source string
     GLF_API
-    std::string GetFragmentSource() const;
+    virtual std::string GetFragmentSource() const;
 
     /// @}
 
@@ -182,41 +187,41 @@ public:
 
     /// Get the preamble (osd uniform definitions)
     GLF_API
-    std::string GetPreambleSource() const;
+    virtual std::string GetPreambleSource() const;
 
     /// Get the surface source string
     GLF_API
-    std::string GetSurfaceSource() const;
+    virtual std::string GetSurfaceSource() const;
 
     /// Get the displacement source string
     GLF_API
-    std::string GetDisplacementSource() const;
+    virtual std::string GetDisplacementSource() const;
 
     /// Get the vertex injection source string
     GLF_API
-    std::string GetVertexInjectionSource() const;
+    virtual std::string GetVertexInjectionSource() const;
 
     /// Get the geometry injection source string
     GLF_API
-    std::string GetGeometryInjectionSource() const;
+    virtual std::string GetGeometryInjectionSource() const;
 
     /// @}
 
     /// Get the shader source associated with given key
     GLF_API
-    std::string GetSource(const TfToken &shaderStageKey) const;
+    virtual std::string GetSource(const TfToken &shaderStageKey) const;
 
     /// Get the original file name passed to the constructor
-    const std::string &GetFilePath() const { return _globalContext.filename; }
+    virtual std::string const& GetFilePath() const { return _globalContext.filename; }
 
     /// Return set of all files processed for this glslfx object.
     /// This includes the original file given to the constructor
     /// as well as any other files that were imported. This set
     /// will only contain files that exist.
-    const std::set<std::string>& GetFiles() const { return _seenFiles; }
+    virtual std::set<std::string> const& GetFiles() const { return _seenFiles; }
 
     /// Return the computed hash value based on the string
-    size_t GetHash() const { return _hash; }
+    virtual size_t GetHash() const { return _hash; }
 
 private:
     class _ParseContext {
@@ -262,7 +267,7 @@ private:
     std::vector<std::string> _configOrder;
     std::set<std::string> _seenFiles;
 
-    boost::scoped_ptr<GlfGLSLFXConfig> _config;
+    boost::scoped_ptr<GLSLFXConfig> _config;
 
     bool _valid;
     std::string _invalidReason; // if _valid is false, reason why

@@ -44,7 +44,7 @@
 #include "pxr/imaging/hd/texture.h"
 #include "pxr/imaging/hd/tokens.h"
 
-#include "pxr/imaging/glf/glslfx.h"
+#include "pxr/imaging/garch/glslfx.h"
 
 #include "pxr/base/work/arenaDispatcher.h"
 #include "pxr/base/work/loops.h"
@@ -59,9 +59,7 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-
-typedef boost::shared_ptr<class GlfGLSLFX> GlfGLSLFXSharedPtr;
-
+typedef boost::shared_ptr<class GLSLFX> GLSLFXSharedPtr;
 
 HdRenderIndex::HdRenderIndex(HdRenderDelegate *renderDelegate)
     :  _rprimMap()

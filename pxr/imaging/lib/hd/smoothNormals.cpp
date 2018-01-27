@@ -24,9 +24,9 @@
 #include "pxr/imaging/glf/glew.h"
 
 #include "pxr/imaging/hd/smoothNormals.h"
-#include "pxr/imaging/hd/bufferArrayRangeGL.h"
-#include "pxr/imaging/hd/bufferResourceGL.h"
-#include "pxr/imaging/hd/glslProgram.h"
+#include "pxr/imaging/hd/bufferArrayRange.h"
+#include "pxr/imaging/hd/bufferResource.h"
+#include "pxr/imaging/hd/program.h"
 #include "pxr/imaging/hd/perfLog.h"
 #include "pxr/imaging/hd/renderContextCaps.h"
 #include "pxr/imaging/hd/resourceRegistry.h"
@@ -199,8 +199,8 @@ Hd_SmoothNormalsComputationGPU::Execute(
         _adjacency->GetAdjacencyRange();
     TF_VERIFY(adjacencyRange_);
 
-    HdBufferArrayRangeGLSharedPtr adjacencyRange =
-        boost::static_pointer_cast<HdBufferArrayRangeGL> (adjacencyRange_);
+    HdBufferArrayRangeSharedPtr adjacencyRange =
+        boost::static_pointer_cast<HdBufferArrayRange> (adjacencyRange_);
 
     // select shader by datatype
     TfToken shaderToken;
@@ -223,19 +223,19 @@ Hd_SmoothNormalsComputationGPU::Execute(
     }
     if (!TF_VERIFY(!shaderToken.IsEmpty())) return;
 
-    HdGLSLProgramSharedPtr computeProgram
-        = HdGLSLProgram::GetComputeProgram(shaderToken, resourceRegistry);
+    HdProgramSharedPtr computeProgram
+        = HdProgram::GetComputeProgram(shaderToken, resourceRegistry);
     if (!computeProgram) return;
 
-    GLuint program = computeProgram->GetProgram().GetId();
+    HdProgramGPUHandle program = computeProgram->GetProgram().GetId();
 
-    HdBufferArrayRangeGLSharedPtr range =
-        boost::static_pointer_cast<HdBufferArrayRangeGL> (range_);
+    HdBufferArrayRangeSharedPtr range =
+        boost::static_pointer_cast<HdBufferArrayRange> (range_);
 
     // buffer resources for GPU computation
-    HdBufferResourceGLSharedPtr points = range->GetResource(_srcName);
-    HdBufferResourceGLSharedPtr normals = range->GetResource(_dstName);
-    HdBufferResourceGLSharedPtr adjacency = adjacencyRange->GetResource();
+    HdBufferResourceSharedPtr points = range->GetResource(_srcName);
+    HdBufferResourceSharedPtr normals = range->GetResource(_dstName);
+    HdBufferResourceSharedPtr adjacency = adjacencyRange->GetResource();
 
     // prepare uniform buffer for GPU computation
     struct Uniform {
@@ -275,10 +275,16 @@ Hd_SmoothNormalsComputationGPU::Execute(
     int numPoints = std::min(numSrcPoints, numDestPoints);
 
     // transfer uniform buffer
-    GLuint ubo = computeProgram->GetGlobalUniformBuffer().GetId();
+    HdBufferResourceGPUHandle ubo = computeProgram->GetGlobalUniformBuffer().GetId();
     HdRenderContextCaps const &caps = HdRenderContextCaps::GetInstance();
     // XXX: workaround for 319.xx driver bug of glNamedBufferDataEXT on UBO
     // XXX: move this workaround to renderContextCaps
+    
+#if defined(ARCH_GFX_METAL)
+    TF_CODING_ERROR("Not Implemented");
+    return;
+#endif
+    /*
     if (false && caps.directStateAccessEnabled) {
         glNamedBufferDataEXT(ubo, sizeof(uniform), &uniform, GL_STATIC_DRAW);
     } else {
@@ -288,9 +294,9 @@ Hd_SmoothNormalsComputationGPU::Execute(
     }
 
     glBindBufferBase(GL_UNIFORM_BUFFER, 0, ubo);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, points->GetId());
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, normals->GetId());
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, adjacency->GetId());
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, (GLuint)(uint64_t)points->GetId());
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, (GLuint)(uint64_t)normals->GetId());
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, (GLuint)(uint64_t)adjacency->GetId());
 
     // dispatch compute kernel
     glUseProgram(program);
@@ -304,6 +310,7 @@ Hd_SmoothNormalsComputationGPU::Execute(
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, 0);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, 0);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, 0);
+     */
 }
 
 void

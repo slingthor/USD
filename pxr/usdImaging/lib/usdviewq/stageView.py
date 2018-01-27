@@ -27,6 +27,7 @@ Module that provides the StageView class.
 
 from math import tan, atan, floor, ceil, radians as rad
 import os
+from sys import platform as _platform
 from time import time
 
 from qt import QtCore, QtGui, QtWidgets, QtOpenGL
@@ -34,8 +35,9 @@ from qt import QtCore, QtGui, QtWidgets, QtOpenGL
 from pxr import Tf
 from pxr import Gf
 from pxr import Glf
+from pxr import Mtlf
 from pxr import Sdf, Usd, UsdGeom
-from pxr import UsdImagingGL
+from pxr import UsdImagingMetal
 from pxr import CameraUtil
 
 from common import RenderModes, ShadedRenderModes
@@ -1281,7 +1283,7 @@ class StageView(QtOpenGL.QGLWidget):
     signalBboxUpdateTimeChanged = QtCore.Signal(int)
 
     # First arg is primPath, (which could be empty Path)
-    # Second arg is instanceIndex (or UsdImagingGL.GL.ALL_INSTANCES for all instances)
+    # Second arg is instanceIndex (or UsdImagingMetal.Metal.ALL_INSTANCES for all instances)
     # Third and Fourth args represent state at time of the pick
     signalPrimSelected = QtCore.Signal(Sdf.Path, int, QtCore.Qt.MouseButton,
                                        QtCore.Qt.KeyboardModifiers)
@@ -1460,17 +1462,17 @@ class StageView(QtOpenGL.QGLWidget):
 
         self._renderer = None
         self._reportedContextError = False
-        self._renderModeDict={RenderModes.WIREFRAME:UsdImagingGL.GL.DrawMode.DRAW_WIREFRAME,
-                              RenderModes.WIREFRAME_ON_SURFACE:UsdImagingGL.GL.DrawMode.DRAW_WIREFRAME_ON_SURFACE,
-                              RenderModes.SMOOTH_SHADED:UsdImagingGL.GL.DrawMode.DRAW_SHADED_SMOOTH,
-                              RenderModes.POINTS:UsdImagingGL.GL.DrawMode.DRAW_POINTS,
-                              RenderModes.FLAT_SHADED:UsdImagingGL.GL.DrawMode.DRAW_SHADED_FLAT,
-                              RenderModes.GEOM_ONLY:UsdImagingGL.GL.DrawMode.DRAW_GEOM_ONLY,
-                              RenderModes.GEOM_SMOOTH:UsdImagingGL.GL.DrawMode.DRAW_GEOM_SMOOTH,
-                              RenderModes.GEOM_FLAT:UsdImagingGL.GL.DrawMode.DRAW_GEOM_FLAT,
-                              RenderModes.HIDDEN_SURFACE_WIREFRAME:UsdImagingGL.GL.DrawMode.DRAW_WIREFRAME}
+        self._renderModeDict={RenderModes.WIREFRAME:UsdImagingMetal.Metal.DrawMode.DRAW_WIREFRAME,
+                              RenderModes.WIREFRAME_ON_SURFACE:UsdImagingMetal.Metal.DrawMode.DRAW_WIREFRAME_ON_SURFACE,
+                              RenderModes.SMOOTH_SHADED:UsdImagingMetal.Metal.DrawMode.DRAW_SHADED_SMOOTH,
+                              RenderModes.POINTS:UsdImagingMetal.Metal.DrawMode.DRAW_POINTS,
+                              RenderModes.FLAT_SHADED:UsdImagingMetal.Metal.DrawMode.DRAW_SHADED_FLAT,
+                              RenderModes.GEOM_ONLY:UsdImagingMetal.Metal.DrawMode.DRAW_GEOM_ONLY,
+                              RenderModes.GEOM_SMOOTH:UsdImagingMetal.Metal.DrawMode.DRAW_GEOM_SMOOTH,
+                              RenderModes.GEOM_FLAT:UsdImagingMetal.Metal.DrawMode.DRAW_GEOM_FLAT,
+                              RenderModes.HIDDEN_SURFACE_WIREFRAME:UsdImagingMetal.Metal.DrawMode.DRAW_WIREFRAME}
 
-        self._renderParams = UsdImagingGL.GL.RenderParams()
+        self._renderParams = UsdImagingMetal.Metal.RenderParams()
         self._defaultFov = 60
         self._dist = 50
         self._oldDist = self._dist
@@ -1522,7 +1524,7 @@ class StageView(QtOpenGL.QGLWidget):
         # create the renderer lazily, when we try to do real work with it.
         if not self._renderer:
             if self.isValid():
-                self._renderer = UsdImagingGL.GL()
+                self._renderer = UsdImagingMetal.Metal()
                 self._rendererPluginName = ""
             elif not self._reportedContextError:
                 self._reportedContextError = True
@@ -1825,7 +1827,7 @@ class StageView(QtOpenGL.QGLWidget):
                 for instanceIndex in self._selectedInstances[p.GetPath()]:
                     renderer.AddSelected(p.GetPath(), instanceIndex)
             else:
-                renderer.AddSelected(p.GetPath(), UsdImagingGL.GL.ALL_INSTANCES)
+                renderer.AddSelected(p.GetPath(), UsdImagingMetal.Metal.ALL_INSTANCES)
 
     def _getEmptyBBox(self):
         return Gf.BBox3d()
@@ -1880,9 +1882,9 @@ class StageView(QtOpenGL.QGLWidget):
         self._renderParams.showProxy = self._dataModel.displayProxy
         self._renderParams.showRender = self._dataModel.displayRender
         self._renderParams.forceRefresh = self._forceRefresh
-        self._renderParams.cullStyle =  (UsdImagingGL.GL.CullStyle.CULL_STYLE_BACK_UNLESS_DOUBLE_SIDED
+        self._renderParams.cullStyle =  (UsdImagingMetal.Metal.CullStyle.CULL_STYLE_BACK_UNLESS_DOUBLE_SIDED
                                                if self._dataModel.cullBackfaces
-                                               else UsdImagingGL.GL.CullStyle.CULL_STYLE_NOTHING)
+                                               else UsdImagingMetal.Metal.CullStyle.CULL_STYLE_NOTHING)
         self._renderParams.gammaCorrectColors = False
         self._renderParams.enableIdRender = self._dataModel.displayPrimId
         self._renderParams.enableSampleAlphaToCoverage = not self._dataModel.displayPrimId
@@ -1899,10 +1901,11 @@ class StageView(QtOpenGL.QGLWidget):
     def initializeGL(self):
         if not self.isValid():
             return
-        from pxr import Glf
-        if not Glf.GlewInit():
-            return
-        Glf.RegisterDefaultDebugOutputMessageCallback()
+        if _platform != "darwin":
+            from pxr import Glf
+            if not Glf.GlewInit():
+                return
+            Glf.RegisterDefaultDebugOutputMessageCallback()
 
     def updateGL(self):
         """We override this virtual so that we can make it a no-op during
@@ -2085,9 +2088,15 @@ class StageView(QtOpenGL.QGLWidget):
 
         if self._dataModel.showHUD_GPUstats:
             if self._glPrimitiveGeneratedQuery is None:
-                self._glPrimitiveGeneratedQuery = Glf.GLQueryObject()
+                if _platform == "darwin":
+                    self._glPrimitiveGeneratedQuery = Mtlf.GLQueryObject()
+                else:
+                    self._glPrimitiveGeneratedQuery = Glf.GLQueryObject()
             if self._glTimeElapsedQuery is None:
-                self._glTimeElapsedQuery = Glf.GLQueryObject()
+                if _platform == "darwin":
+                    self._glTimeElapsedQuery = Mtlf.GLQueryObject()
+                else:
+                    self._glTimeElapsedQuery = Glf.GLQueryObject()
             self._glPrimitiveGeneratedQuery.BeginPrimitivesGenerated()
             self._glTimeElapsedQuery.BeginTimeElapsed()
 
@@ -2137,7 +2146,10 @@ class StageView(QtOpenGL.QGLWidget):
 
         if self._selectedPrims:
             sceneAmbient = (0.01, 0.01, 0.01, 1.0)
-            material = Glf.SimpleMaterial()
+            if _platform == "darwin":
+                material = Mtlf.SimpleMaterial()
+            else:
+                material = Glf.SimpleMaterial()
             lights = []
             # for renderModes that need lights
             if self._dataModel.renderMode in ShadedRenderModes:
@@ -2148,7 +2160,10 @@ class StageView(QtOpenGL.QGLWidget):
 
                 # ambient light located at the camera
                 if self._dataModel.ambientLightOnly:
-                    l = Glf.SimpleLight()
+                    if _platform == "darwin":
+                        l = Mtlf.SimpleLight()
+                    else:
+                        l = Glf.SimpleLight()
                     l.ambient = (0, 0, 0, 0)
                     l.position = (cam_pos[0], cam_pos[1], cam_pos[2], 1)
                     lights.append(l)
@@ -2161,7 +2176,10 @@ class StageView(QtOpenGL.QGLWidget):
                         keyPos = cam_pos + (keyVert + keyHorz) * self._dist
                         keyColor = (.8, .8, .8, 1.0)
 
-                        l = Glf.SimpleLight()
+                        if _platform == "darwin":
+                            l = Mtlf.SimpleLight()
+                        else:
+                            l = Glf.SimpleLight()
                         l.ambient = (0, 0, 0, 0)
                         l.diffuse = keyColor
                         l.specular = keyColor
@@ -2175,7 +2193,10 @@ class StageView(QtOpenGL.QGLWidget):
                         fillPos = cam_pos + (fillVert + fillHorz) * self._dist
                         fillColor = (.6, .6, .6, 1.0)
 
-                        l = Glf.SimpleLight()
+                        if _platform == "darwin":
+                            l = Mtlf.SimpleLight()
+                        else:
+                            l = Glf.SimpleLight()
                         l.ambient = (0, 0, 0, 0)
                         l.diffuse = fillColor
                         l.specular = fillColor
@@ -2191,7 +2212,10 @@ class StageView(QtOpenGL.QGLWidget):
                         backPos += (backHorz + backVert) * self._dist
                         backColor = (.6, .6, .6, 1.0)
 
-                        l = Glf.SimpleLight()
+                        if _platform == "darwin":
+                            l = Mtlf.SimpleLight()
+                        else:
+                            l = Glf.SimpleLight()
                         l.ambient = (0, 0, 0, 0)
                         l.diffuse = backColor
                         l.specular = backColor
@@ -2321,7 +2345,7 @@ class StageView(QtOpenGL.QGLWidget):
         # Hydra Enabled (Top Right)
         hydraMode = "Disabled"
 
-        if UsdImagingGL.GL.IsEnabledHydra():
+        if UsdImagingMetal.Metal.IsEnabledHydra():
             hydraMode = self._rendererPluginName
             if not hydraMode:
                 hydraMode = "Enabled"
@@ -2531,9 +2555,9 @@ class StageView(QtOpenGL.QGLWidget):
         self._renderParams.showProxy = self._dataModel.displayProxy
         self._renderParams.showRender = self._dataModel.displayRender
         self._renderParams.forceRefresh = self._forceRefresh
-        self._renderParams.cullStyle =  (UsdImagingGL.GL.CullStyle.CULL_STYLE_BACK_UNLESS_DOUBLE_SIDED
+        self._renderParams.cullStyle =  (UsdImagingMetal.Metal.CullStyle.CULL_STYLE_BACK_UNLESS_DOUBLE_SIDED
                                                if self._dataModel.cullBackfaces
-                                               else UsdImagingGL.GL.CullStyle.CULL_STYLE_NOTHING)
+                                               else UsdImagingMetal.Metal.CullStyle.CULL_STYLE_NOTHING)
         self._renderParams.gammaCorrectColors = False
         self._renderParams.enableIdRender = True
         self._renderParams.enableSampleAlphaToCoverage = False
@@ -2611,7 +2635,7 @@ class StageView(QtOpenGL.QGLWidget):
                 selectedPrimPath = instancePrimPath
                 selectedInstanceIndex = absInstanceIndex
         else:
-            selectedInstanceIndex = UsdImagingGL.GL.ALL_INSTANCES
+            selectedInstanceIndex = UsdImagingMetal.Metal.ALL_INSTANCES
 
         selectedPrim = self._stage.GetPrimAtPath(selectedPrimPath)
 
@@ -2627,7 +2651,7 @@ class StageView(QtOpenGL.QGLWidget):
         if selected:
             if not self._selectedInstances.has_key(path):
                 self._selectedInstances[path] = set()
-            if instanceIndex == UsdImagingGL.GL.ALL_INSTANCES:
+            if instanceIndex == UsdImagingMetal.Metal.ALL_INSTANCES:
                 del self._selectedInstances[path]
             else:
                 self._selectedInstances[path].add(instanceIndex)

@@ -28,7 +28,8 @@
 #include "pxr/imaging/hdx/api.h"
 #include "pxr/imaging/hdx/version.h"
 #include "pxr/imaging/hd/task.h"
-#include "pxr/imaging/glf/simpleLightingContext.h"
+
+#include "pxr/imaging/garch/simpleLightingContext.h"
 
 #include <boost/shared_ptr.hpp>
 
@@ -69,13 +70,12 @@ protected:
 private:
     const HdStCamera *_camera;
     HdxSimpleLightingShaderSharedPtr _lightingShader;
-
-    GlfSimpleLightingContextRefPtr _simpleLightingContext;
+    GarchSimpleLightingContextRefPtr _simpleLightingContext;
 };
 
 struct HdxSimpleLightBypassTaskParams {
     SdfPath cameraPath;
-    GlfSimpleLightingContextRefPtr simpleLightingContext;
+    GarchSimpleLightingContextRefPtr simpleLightingContext;
 };
 
 // VtValue requirements

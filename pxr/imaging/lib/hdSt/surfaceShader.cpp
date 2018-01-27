@@ -99,7 +99,7 @@ HdStSurfaceShader::GetTextures() const
 }
 /*virtual*/
 void
-HdStSurfaceShader::BindResources(Hd_ResourceBinder const &binder, int program)
+HdStSurfaceShader::BindResources(Hd_ResourceBinder const &binder, HdProgramGPUHandle program)
 {
     // XXX: there's an issue where other shaders try to use textures.
     int samplerUnit = binder.GetNumReservedTextureUnits();
@@ -108,22 +108,22 @@ HdStSurfaceShader::BindResources(Hd_ResourceBinder const &binder, int program)
         // XXX: put this into resource binder.
         if (binding.GetType() == HdBinding::TEXTURE_2D) {
             glActiveTexture(GL_TEXTURE0 + samplerUnit);
-            glBindTexture(GL_TEXTURE_2D, (GLuint)it->handle);
-            glBindSampler(samplerUnit, it->sampler);
+            glBindTexture(GL_TEXTURE_2D, (GLuint)(uint64_t)it->handle);
+            glBindSampler(samplerUnit, (GLuint)(uint64_t)it->sampler);
             
-            glProgramUniform1i(program, binding.GetLocation(), samplerUnit);
+            glProgramUniform1i((GLuint)(uint64_t)program, binding.GetLocation(), samplerUnit);
             samplerUnit++;
         } else if (binding.GetType() == HdBinding::TEXTURE_PTEX_TEXEL) {
             glActiveTexture(GL_TEXTURE0 + samplerUnit);
-            glBindTexture(GL_TEXTURE_2D_ARRAY, (GLuint)it->handle);
+            glBindTexture(GL_TEXTURE_2D_ARRAY, (GLuint)(uint64_t)it->handle);
 
-            glProgramUniform1i(program, binding.GetLocation(), samplerUnit);
+            glProgramUniform1i((GLuint)(uint64_t)program, binding.GetLocation(), samplerUnit);
             samplerUnit++;
         } else if (binding.GetType() == HdBinding::TEXTURE_PTEX_LAYOUT) {
             glActiveTexture(GL_TEXTURE0 + samplerUnit);
-            glBindTexture(GL_TEXTURE_BUFFER, (GLuint)it->handle);
+            glBindTexture(GL_TEXTURE_BUFFER, (GLuint)(uint64_t)it->handle);
 
-            glProgramUniform1i(program, binding.GetLocation(), samplerUnit);
+            glProgramUniform1i((GLuint)(uint64_t)program, binding.GetLocation(), samplerUnit);
             samplerUnit++;
         }
     }
@@ -132,7 +132,7 @@ HdStSurfaceShader::BindResources(Hd_ResourceBinder const &binder, int program)
 }
 /*virtual*/
 void
-HdStSurfaceShader::UnbindResources(Hd_ResourceBinder const &binder, int program)
+HdStSurfaceShader::UnbindResources(Hd_ResourceBinder const &binder, HdProgramGPUHandle program)
 {
     binder.UnbindShaderResources(this);
 

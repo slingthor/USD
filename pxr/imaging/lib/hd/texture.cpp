@@ -23,14 +23,16 @@
 //
 #include "pxr/imaging/hd/texture.h"
 
-#include "pxr/imaging/glf/textureRegistry.h"
-#include "pxr/imaging/glf/uvTextureStorage.h"
 #include "pxr/imaging/hd/bufferArrayRange.h"
+#include "pxr/imaging/hd/engine.h"
 #include "pxr/imaging/hd/resource.h"
 #include "pxr/imaging/hd/resourceRegistry.h"
 #include "pxr/imaging/hd/sceneDelegate.h"
 #include "pxr/imaging/hd/tokens.h"
 #include "pxr/imaging/hd/vtBufferSource.h"
+
+#include "pxr/imaging/garch/textureRegistry.h"
+#include "pxr/imaging/garch/uvTextureStorage.h"
 
 #include "pxr/base/gf/vec3d.h"
 
@@ -79,13 +81,14 @@ HdTexture::Sync(HdSceneDelegate *sceneDelegate,
 
             if (texInstance.IsFirstInstance()) {
                 if (texID == HdTextureResource::ComputeFallbackUVHash()) {
-                    GlfUVTextureStorageRefPtr texPtr = 
-                        GlfUVTextureStorage::New(1,1,VtValue(GfVec3d(0.0, 0.0, 0.0))); 
-                    GlfTextureHandleRefPtr texture =
-                        GlfTextureRegistry::GetInstance().GetTextureHandle(texPtr);
+
+                    GarchUVTextureStorageRefPtr texPtr =
+                        GarchUVTextureStorage::New(1,1,VtValue(GfVec3d(0.0, 0.0, 0.0)));
+                    GarchTextureHandleRefPtr texture =
+                        GarchTextureRegistry::GetInstance().GetTextureHandle(texPtr);
+
                     texture->AddMemoryRequest(0); 
-                    _textureResource = HdTextureResourceSharedPtr(
-                        new HdSimpleTextureResource(texture, false));
+                    _textureResource = HdTextureResourceSharedPtr(HdEngine::CreateSimpleTextureResource(texture, false));
                 } else if (texID == HdTextureResource::ComputeFallbackPtexHash()) {
                     _textureResource = sceneDelegate->GetTextureResource(id);
                     // Hacky Ptex Fallback Implementation (nonfunctional)

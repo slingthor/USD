@@ -28,7 +28,7 @@
 #include "pxr/imaging/hd/api.h"
 #include "pxr/imaging/hd/version.h"
 #include "pxr/imaging/hd/lightingShader.h"
-#include "pxr/imaging/glf/glslfx.h"
+#include "pxr/imaging/garch/glslfx.h"
 
 #include "pxr/base/gf/vec4d.h"
 
@@ -60,9 +60,9 @@ public:
     HD_API
     virtual std::string GetSource(TfToken const &shaderStageKey) const;
     HD_API
-    virtual void BindResources(Hd_ResourceBinder const &binder, int program);
+    virtual void BindResources(Hd_ResourceBinder const &binder, HdBufferResourceGPUHandle program);
     HD_API
-    virtual void UnbindResources(Hd_ResourceBinder const &binder, int program);
+    virtual void UnbindResources(Hd_ResourceBinder const &binder, HdBufferResourceGPUHandle program);
     HD_API
     virtual void AddBindings(HdBindingRequestVector *customBindings);
 
@@ -72,7 +72,7 @@ public:
                            GfMatrix4d const &projectionMatrix);
 
 private:
-    boost::scoped_ptr<GlfGLSLFX> _glslfx;
+    boost::scoped_ptr<GLSLFX> _glslfx;
 };
 
 

@@ -42,8 +42,7 @@
 #include "pxr/base/vt/array.h"
 #include "pxr/base/vt/types.h"
 
-
-#include "pxr/imaging/hd/glUtils.h"
+#include "pxr/imaging/hd/GL/glUtils.h"
 
 #include <boost/mpl/vector/vector40.hpp>
 

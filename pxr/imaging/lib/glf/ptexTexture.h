@@ -50,7 +50,7 @@ PXR_NAMESPACE_CLOSE_SCOPE
 
 #ifdef PXR_PTEX_SUPPORT_ENABLED
 
-#include "pxr/imaging/glf/texture.h"
+#include "pxr/imaging/garch/texture.h"
 
 #include "pxr/base/tf/declarePtrs.h"
 #include "pxr/base/tf/token.h"
@@ -79,7 +79,7 @@ TF_DECLARE_WEAK_AND_REF_PTRS(GlfPtexTexture);
 /// the _texels texture array.
 ///
 
-class GlfPtexTexture : public GlfTexture {
+class GlfPtexTexture : public GarchTexture {
 public:
     GLF_API
     virtual ~GlfPtexTexture();
@@ -88,7 +88,7 @@ public:
     GLF_API
     static GlfPtexTextureRefPtr New(const TfToken &imageFilePath);
 
-    /// GlfTexture overrides
+    /// GarchTexture overrides
     GLF_API
     virtual BindingVector GetBindings(TfToken const & identifier,
                                       GLuint samplerName) const;

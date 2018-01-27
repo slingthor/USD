@@ -92,13 +92,13 @@ HdComputeShader::GetTextures() const
 }
 /*virtual*/
 void
-HdComputeShader::BindResources(Hd_ResourceBinder const &binder, int program)
+HdComputeShader::BindResources(Hd_ResourceBinder const &binder, HdBufferResourceGPUHandle program)
 {
     binder.BindShaderResources(this);
 }
 /*virtual*/
 void
-HdComputeShader::UnbindResources(Hd_ResourceBinder const &binder, int program)
+HdComputeShader::UnbindResources(Hd_ResourceBinder const &binder, HdBufferResourceGPUHandle program)
 {
     binder.UnbindShaderResources(this);
 }

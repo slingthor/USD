@@ -31,7 +31,8 @@
 #include "pxr/imaging/hd/binding.h"
 #include "pxr/imaging/hd/resourceBinder.h"
 #include "pxr/imaging/hd/shaderCode.h"
-#include "pxr/imaging/glf/glslfx.h"
+
+#include "pxr/imaging/garch/glslfx.h"
 
 #include "pxr/base/tf/declarePtrs.h"
 #include "pxr/base/tf/token.h"
@@ -62,9 +63,9 @@ public:
     HD_API
     virtual std::string GetSource(TfToken const &shaderStageKey) const override;
     HD_API
-    virtual void BindResources(Hd_ResourceBinder const &binder, int program) override;
+    virtual void BindResources(Hd_ResourceBinder const &binder, HdBufferResourceGPUHandle program) override;
     HD_API
-    virtual void UnbindResources(Hd_ResourceBinder const &binder, int program) override;
+    virtual void UnbindResources(Hd_ResourceBinder const &binder, HdBufferResourceGPUHandle program) override;
     HD_API
     virtual void AddBindings(HdBindingRequestVector *customBindings) override;
 
@@ -90,7 +91,7 @@ public:
 
 private:
     TfToken _glslfxFile;
-    boost::scoped_ptr<GlfGLSLFX> _glslfx;
+    boost::scoped_ptr<GLSLFX> _glslfx;
     mutable size_t  _hash;
     mutable bool    _hashValid;
 

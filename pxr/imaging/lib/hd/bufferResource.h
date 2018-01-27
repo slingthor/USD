@@ -30,6 +30,7 @@
 #include "pxr/imaging/hd/resource.h"
 
 #include "pxr/base/tf/token.h"
+#include "pxr/base/vt/value.h"
 
 #include <boost/shared_ptr.hpp>
 #include <cstddef>
@@ -52,6 +53,9 @@ typedef std::vector<
 ///
 class HdBufferResource : public HdResource {
 public:
+    HD_API
+    HdBufferResource(TfToken const &role);
+
     HD_API
     HdBufferResource(TfToken const &role,
                      int glDataType,
@@ -88,6 +92,22 @@ public:
     HD_API
     TfToken GetGLTypeName() const;
 
+    HD_API
+    virtual void CopyData(size_t vboOffset, size_t dataSize, void const *data) = 0;
+
+    HD_API
+    virtual HdBufferResourceGPUHandle GetId() const = 0;
+
+    HD_API
+    virtual VtValue ReadBuffer(int glDataType,
+                               int numComponents,
+                               int arraySize,
+                               int vboOffset,
+                               int stride,
+                               int numElements) = 0;
+
+    HD_API
+    virtual uint8_t* GetBufferContents() = 0;
 protected:
     int _glDataType;
     short _numComponents;

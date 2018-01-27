@@ -40,15 +40,15 @@ class HdSt_BindlessSamplerBufferSource : public HdBufferSource {
 public:
     HdSt_BindlessSamplerBufferSource(TfToken const &name,
                                      GLenum type,
-                                     size_t value)
+                                     GarchTextureGPUHandle value)
      : HdBufferSource()
      , _name(name)
      , _type(type)
      , _value(value)
     {
         if (_value == 0) {
-            TF_CODING_ERROR("Invalid texture handle: %s: %ld\n",
-                            name.GetText(), value);
+            TF_CODING_ERROR("Invalid texture handle: %s: %llu\n",
+                            name.GetText(), (uint64_t)value);
         }
     }
 
@@ -89,7 +89,7 @@ protected:
 private:
     TfToken _name;
     GLenum _type;
-    size_t _value;
+    GarchTextureGPUHandle _value;
 };
 
 HdStShader::HdStShader(SdfPath const &id)

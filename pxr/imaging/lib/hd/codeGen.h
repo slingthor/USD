@@ -27,7 +27,7 @@
 #include "pxr/pxr.h"
 #include "pxr/imaging/hd/api.h"
 #include "pxr/imaging/hd/version.h"
-#include "pxr/imaging/hd/glslProgram.h"
+#include "pxr/imaging/hd/program.h"
 #include "pxr/imaging/hd/resourceBinder.h"
 
 #include <boost/shared_ptr.hpp>
@@ -55,22 +55,18 @@ public:
 
     /// Constructor.
     HD_API
-    Hd_CodeGen(Hd_GeometricShaderPtr const &geometricShader,
-               HdShaderCodeSharedPtrVector const &shaders);
-
-    /// Constructor for non-geometric use cases.
-    /// Don't call compile when constructed this way.
-    /// Call CompileComputeProgram instead.
-    HD_API
-    Hd_CodeGen(HdShaderCodeSharedPtrVector const &shaders);
+    Hd_CodeGen() {}
     
+    HD_API
+    virtual ~Hd_CodeGen() {};
+
     /// Return the hash value of glsl shader to be generated.
     HD_API
-    ID ComputeHash() const;
+    virtual ID ComputeHash() const = 0;
 
     /// Generate shader source and compile it.
     HD_API
-    HdGLSLProgramSharedPtr Compile();
+    virtual HdProgramSharedPtr Compile() = 0;
 
     /// Generate compute shader source and compile it.
     /// It uses the compute information in the meta data to determine
@@ -88,53 +84,28 @@ public:
     /// \see GetComputeShaderSource
     /// \see Hd_ResourceBinder::ResolveBindings
     HD_API
-    HdGLSLProgramSharedPtr CompileComputeProgram();
+    virtual HdProgramSharedPtr CompileComputeProgram() = 0;
     
     /// Return the generated vertex shader source
-    const std::string &GetVertexShaderSource() const { return _vsSource; }
+    virtual const std::string &GetVertexShaderSource() const = 0;
 
     /// Return the generated tess control shader source
-    const std::string &GetTessControlShaderSource() const { return _tcsSource; }
+    virtual const std::string &GetTessControlShaderSource() const = 0;
 
     /// Return the generated tess eval shader source
-    const std::string &GetTessEvalShaderSource() const { return _tesSource; }
+    virtual const std::string &GetTessEvalShaderSource() const = 0;
 
     /// Return the generated geometry shader source
-    const std::string &GetGeometryShaderSource() const { return _gsSource; }
+    virtual const std::string &GetGeometryShaderSource() const = 0;
 
     /// Return the generated fragment shader source
-    const std::string &GetFragmentShaderSource() const { return _fsSource; }
+    virtual const std::string &GetFragmentShaderSource() const = 0;
 
     /// Return the generated compute shader source
-    const std::string &GetComputeShaderSource() const { return _csSource; }
+    virtual const std::string &GetComputeShaderSource() const = 0;
     
     /// Return the pointer of metadata to be populated by resource binder.
-    Hd_ResourceBinder::MetaData *GetMetaData() { return &_metaData; }
-
-private:
-    void _GenerateDrawingCoord();
-    void _GenerateConstantPrimVar();
-    void _GenerateInstancePrimVar();
-    void _GenerateElementPrimVar();
-    void _GenerateVertexPrimVar();
-    void _GenerateShaderParameters();
-
-    Hd_ResourceBinder::MetaData _metaData;
-    Hd_GeometricShaderPtr _geometricShader;
-    HdShaderCodeSharedPtrVector _shaders;
-
-    // source buckets
-    std::stringstream _genCommon, _genVS, _genTCS, _genTES;
-    std::stringstream _genGS, _genFS, _genCS;
-    std::stringstream _procVS, _procTCS, _procTES, _procGS;
-
-    // generated sources (for diagnostics)
-    std::string _vsSource;
-    std::string _tcsSource;
-    std::string _tesSource;
-    std::string _gsSource;
-    std::string _fsSource;
-    std::string _csSource;
+    virtual Hd_ResourceBinder::MetaData *GetMetaData() = 0;
 };
 
 

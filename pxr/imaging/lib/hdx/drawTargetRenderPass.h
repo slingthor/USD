@@ -29,7 +29,7 @@
 #include "pxr/imaging/hdSt/renderPass.h"
 #include "pxr/imaging/hd/rprimCollection.h"
 
-#include "pxr/imaging/glf/drawTarget.h"
+#include "pxr/imaging/garch/drawTarget.h"
 
 #include <vector>
 
@@ -58,11 +58,11 @@ public:
     /// Sets the target draw object of this render pass containing
     /// the color buffers and depth buffer to use.
     HDX_API
-    void SetDrawTarget(const GlfDrawTargetRefPtr &drawTarget);
+    void SetDrawTarget(const GarchDrawTargetRefPtr &drawTarget);
 
     /// Returns the draw target associated to this render pass.
     HDX_API
-    GlfDrawTargetRefPtr GetDrawTarget();
+    GarchDrawTargetRefPtr GetDrawTarget();
 
     /// Sets the non-context dependent state.  The object is expected to
     /// live longer than this class.
@@ -89,7 +89,7 @@ private:
     const HdStDrawTargetRenderPassState *_drawTargetRenderPassState;
 
     /// Local copy of the draw target object.
-    GlfDrawTargetRefPtr  _drawTarget;
+    GarchDrawTargetRefPtr  _drawTarget;
 
     /// The context which owns the draw target object.
     GlfGLContextSharedPtr  _drawTargetContext;

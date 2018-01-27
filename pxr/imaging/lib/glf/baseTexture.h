@@ -28,7 +28,8 @@
 
 #include "pxr/pxr.h"
 #include "pxr/imaging/glf/api.h"
-#include "pxr/imaging/glf/texture.h"
+
+#include "pxr/imaging/garch/baseTexture.h"
 
 #include "pxr/base/tf/declarePtrs.h"
 #include "pxr/base/tf/refPtr.h"
@@ -41,20 +42,20 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 
-TF_DECLARE_WEAK_AND_REF_PTRS(GlfBaseTexture);
-TF_DECLARE_WEAK_AND_REF_PTRS(GlfBaseTextureData);
+TF_DECLARE_WEAK_AND_REF_PTRS(GarchBaseTexture);
+TF_DECLARE_WEAK_AND_REF_PTRS(GarchBaseTextureData);
 
 /// \class GlfBaseTexture
 ///
 /// Represents a texture object in Glf
 ///
-class GlfBaseTexture : public GlfTexture {
+class GlfBaseTexture : public GarchBaseTexture {
 public:
     GLF_API
     virtual ~GlfBaseTexture();
 
     /// Returns the OpenGl texture name for the texture. 
-    GLuint GetGlTextureName() const {
+    GarchTextureGPUHandle GetGlTextureName() const {
         return _textureName;
     }
 
@@ -70,12 +71,16 @@ public:
         return _format;
     }
 
-    // GlfTexture overrides
+    // GarchTexture overrides
+    /// Returns the Metal texture object for the texture.
+    GLF_API
+    virtual GarchTextureGPUHandle GetTextureName() const override {
+        return (GarchTextureGPUHandle)(uint64_t)_textureName;
+    }
+    
     GLF_API
     virtual BindingVector GetBindings(TfToken const & identifier,
-                                      GLuint samplerName) const;
-    GLF_API
-    virtual VtDictionary GetTextureInfo() const;
+                                      GarchSamplerGPUHandle samplerName) const override;
 
 protected:
     
@@ -83,27 +88,14 @@ protected:
     GlfBaseTexture();
 
     GLF_API
-    void _UpdateTexture(GlfBaseTextureDataConstPtr texData);
+    void _UpdateTexture(GarchBaseTextureDataConstPtr texData);
     GLF_API
-    void _CreateTexture(GlfBaseTextureDataConstPtr texData,
+    void _CreateTexture(GarchBaseTextureDataConstPtr texData,
                         bool const useMipmaps,
                         int const unpackCropTop = 0,
                         int const unpackCropBottom = 0,
                         int const unpackCropLeft = 0,
                         int const unpackCropRight = 0);
-
-private:
-
-    // GL texture object
-    const GLuint _textureName;
-
-    // required for stats/tracking
-    int     _currentWidth, _currentHeight;
-    int     _format;
-    bool    _hasWrapModeS;
-    bool    _hasWrapModeT;
-    GLenum	_wrapModeS;
-    GLenum	_wrapModeT;
 };
 
 

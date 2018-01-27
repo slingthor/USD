@@ -25,6 +25,9 @@
 
 #include "pxr/imaging/hd/debugCodes.h"
 #include "pxr/imaging/glf/glew.h"
+#if defined(ARCH_GFX_METAL)
+#include "pxr/imaging/mtlf/mtlDevice.h"
+#endif
 
 #include "pxr/base/tf/diagnostic.h"
 #include "pxr/base/tf/envSetting.h"
@@ -110,10 +113,14 @@ HdRenderContextCaps::GetInstance()
 bool
 HdRenderContextCaps::SupportsHydra() const
 {
+#if defined(ARCH_GFX_METAL)
+    return true;
+#else
     // Minimum OpenGL version to run Hydra. Currently, OpenGL 4.0.
     if (glVersion >= 400) {
         return true;
     }
+#endif
     return false;
 }
 
@@ -122,6 +129,22 @@ HdRenderContextCaps::_LoadCaps()
 {
     // XXX: consider to move this class into glf
 
+#if defined(ARCH_GFX_METAL)
+    shaderStorageBufferEnabled   = true;
+    bindlessTextureEnabled       = false;
+    bindlessBufferEnabled        = false;
+    multiDrawIndirectEnabled     = false;
+    directStateAccessEnabled     = true;
+    bufferStorageEnabled         = true;
+    shadingLanguage420pack       = true;
+    explicitUniformLocation      = true;
+    maxUniformBlockSize          = 64*1024;
+    maxShaderStorageBlockSize    = 1*1024*1024*1024;
+    maxTextureBufferSize         = 16*1024;
+    uniformBufferOffsetAlignment = 256;
+    gpuComputeEnabled            = true;
+#else
+    
     // note that this function is called without GL context, in some unit tests.
 
     shaderStorageBufferEnabled   = false;
@@ -312,6 +335,7 @@ HdRenderContextCaps::_LoadCaps()
             std::cout << "  CopyBuffer : disabled\n";
         }
     }
+#endif
 }
 
 

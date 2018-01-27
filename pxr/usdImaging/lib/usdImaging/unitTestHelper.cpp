@@ -82,7 +82,7 @@ UsdImaging_TestDriver::UsdImaging_TestDriver(std::string const& usdFilePath,
                                              TfToken const &collectionName,
                                              TfToken const &reprName,
                                              TfTokenVector const &renderTags)
- : _engine()
+: _engine(HdEngine::OpenGL)
  , _renderDelegate()
  , _renderIndex(nullptr)
  , _delegate(nullptr)
@@ -94,7 +94,7 @@ UsdImaging_TestDriver::UsdImaging_TestDriver(std::string const& usdFilePath,
 }
 
 UsdImaging_TestDriver::UsdImaging_TestDriver(std::string const& usdFilePath)
- : _engine()
+ : _engine(HdEngine::OpenGL)
  , _renderDelegate()
  , _renderIndex(nullptr)
  , _delegate(nullptr)
@@ -111,7 +111,7 @@ UsdImaging_TestDriver::UsdImaging_TestDriver(UsdStageRefPtr const& usdStage,
                                              TfToken const &collectionName,
                                              TfToken const &reprName,
                                              TfTokenVector const &renderTags)
- : _engine()
+ : _engine(HdEngine::OpenGL)
  , _renderDelegate()
  , _renderIndex(nullptr)
  , _delegate(nullptr)
@@ -123,7 +123,7 @@ UsdImaging_TestDriver::UsdImaging_TestDriver(UsdStageRefPtr const& usdStage,
 }
 
 UsdImaging_TestDriver::UsdImaging_TestDriver(UsdStageRefPtr const& usdStage)
- : _engine()
+ : _engine(HdEngine::OpenGL)
  , _renderDelegate()
  , _renderIndex(nullptr)
  , _delegate(nullptr)

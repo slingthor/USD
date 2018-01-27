@@ -23,11 +23,12 @@
 //
 #include "pxr/imaging/glf/glew.h"
 #include "pxr/imaging/hd/extCompGpuComputationResource.h"
-#include "pxr/imaging/hd/bufferArrayRangeGL.h"
-#include "pxr/imaging/hd/codeGen.h"
-#include "pxr/imaging/hd/glslProgram.h"
-#include "pxr/imaging/hd/glUtils.h"
+#include "pxr/imaging/hd/bufferArrayRange.h"
+#include "pxr/imaging/hd/engine.h"
 #include "pxr/imaging/hd/tokens.h"
+#include "pxr/imaging/hd/codeGen.h"
+#include "pxr/imaging/hd/GL/resourceGL.h"
+#include "pxr/imaging/hd/GL/glUtils.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -96,34 +97,34 @@ HdExtCompGpuComputationResource::Resolve()
     if (!_computeProgram || _shaderSourceHash != shaderSourceHash) {
         HdShaderCodeSharedPtrVector shaders;
         shaders.push_back(_kernel);
-        Hd_CodeGen codeGen(shaders);
-        
+        boost::scoped_ptr<Hd_CodeGen> codeGen(HdEngine::CreateCodeGen(shaders));
         // let resourcebinder resolve bindings and populate metadata
         // which is owned by codegen.
         _resourceBinder.ResolveComputeBindings(_outputBufferSpecs,
                                               inputBufferSpecs,
                                               shaders,
-                                              codeGen.GetMetaData());
+                                              codeGen->GetMetaData());
 
-        HdGLSLProgram::ID registryID = codeGen.ComputeHash();
+        HdProgram::ID registryID = codeGen->ComputeHash();
 
         {
-            HdInstance<HdGLSLProgram::ID, HdGLSLProgramSharedPtr> programInstance;
+            HdInstance<HdProgram::ID, HdProgramSharedPtr> programInstance;
 
             // ask registry to see if there's already compiled program
             std::unique_lock<std::mutex> regLock =
-                _registry->RegisterGLSLProgram(registryID, &programInstance);
+                _registry->RegisterProgram(registryID, &programInstance);
 
             if (programInstance.IsFirstInstance()) {
-                HdGLSLProgramSharedPtr glslProgram = codeGen.CompileComputeProgram();
-                if (!TF_VERIFY(glslProgram)) {
+                HdProgramSharedPtr program = codeGen->CompileComputeProgram();
+                if (!TF_VERIFY(program)) {
                     return false;
                 }
-                
-                if (!glslProgram->Link()) {
+
+                if (!program->Link()) {
                     std::string logString;
+
                     HdGLUtils::GetProgramLinkStatus(
-                        glslProgram->GetProgram().GetId(),
+                        (GLuint)(uint64_t)program->GetProgram().GetId(),
                         &logString);
                     TF_WARN("Failed to link compute shader:\n%s\n",
                             logString.c_str());
@@ -131,7 +132,7 @@ HdExtCompGpuComputationResource::Resolve()
                 }
                 
                 // store the program into the program registry.
-                programInstance.SetValue(glslProgram);
+                programInstance.SetValue(program);
             }
 
             _computeProgram = programInstance.GetValue();
@@ -185,7 +186,7 @@ HdExtCompGpuComputationResource::AllocateInternalRange(
                              arraySize));
         }
 
-        _internalRange = boost::static_pointer_cast<HdBufferArrayRangeGL>(
+        _internalRange = boost::static_pointer_cast<HdBufferArrayRange>(
             resourceRegistry->AllocateShaderStorageBufferArrayRange(
                 HdTokens->primVar, bufferSpecs));
     }

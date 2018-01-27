@@ -25,13 +25,14 @@
 
 #include "pxr/imaging/glf/glew.h"
 
+#include "pxr/imaging/garch/bindingMap.h"
+#include "pxr/imaging/garch/simpleLight.h"
+#include "pxr/imaging/garch/simpleMaterial.h"
+#include "pxr/imaging/garch/uniformBlock.h"
+
 #include "pxr/imaging/glf/simpleLightingContext.h"
-#include "pxr/imaging/glf/bindingMap.h"
 #include "pxr/imaging/glf/diagnostic.h"
 #include "pxr/imaging/glf/package.h"
-#include "pxr/imaging/glf/simpleLight.h"
-#include "pxr/imaging/glf/simpleMaterial.h"
-#include "pxr/imaging/glf/uniformBlock.h"
 
 #include "pxr/base/arch/pragmas.h"
 #include "pxr/base/tf/stringUtils.h"
@@ -54,175 +55,12 @@ TF_DEFINE_PRIVATE_TOKENS(
     ((shadowCompareSampler, "shadowCompareTexture"))
 );
 
-// XXX:
-// currently max number of lights are limited to 16 by
-// GL_MAX_VARYING_VECTORS for having the varying attribute
-//    out vec2 FshadowFilterWidth[NUM_LIGHTS];
-// which is defined in simpleLighting.glslfx.
-static const int _maxLightsUsed = 16;
-
-/* static */
-GlfSimpleLightingContextRefPtr
-GlfSimpleLightingContext::New()
-{
-    return TfCreateRefPtr(new This());
-}
-
-GlfSimpleLightingContext::GlfSimpleLightingContext() :
-    _shadows(new GlfSimpleShadowArray(GfVec2i(1024, 1024), 0)),
-    _worldToViewMatrix(1.0),
-    _projectionMatrix(1.0),
-    _sceneAmbient(0.01, 0.01, 0.01, 1.0),
-    _useLighting(false),
-    _useShadows(false),
-    _useColorMaterialDiffuse(false),
-    _lightingUniformBlockValid(false),
-    _shadowUniformBlockValid(false),
-    _materialUniformBlockValid(false)
+GlfSimpleLightingContext::GlfSimpleLightingContext()
 {
 }
 
 GlfSimpleLightingContext::~GlfSimpleLightingContext()
 {
-}
-
-void
-GlfSimpleLightingContext::SetLights(GlfSimpleLightVector const & lights)
-{
-    _lights = lights;
-    _lightingUniformBlockValid = false;
-    _shadowUniformBlockValid = false;
-
-    int numLights = GetNumLightsUsed();
-
-    _useShadows = false;
-    for (int i = 0;i < numLights; ++i) {
-        if (_lights[i].HasShadow()) {
-            _useShadows = true;
-            break;
-        }
-    }
-}
-
-GlfSimpleLightVector &
-GlfSimpleLightingContext::GetLights()
-{
-    return _lights;
-}
-
-int
-GlfSimpleLightingContext::GetNumLightsUsed() const
-{
-    return std::min((int)_lights.size(), _maxLightsUsed);
-}
-
-void
-GlfSimpleLightingContext::SetShadows(GlfSimpleShadowArrayRefPtr const & shadows)
-{
-    _shadows = shadows;
-    _shadowUniformBlockValid = false;
-}
-
-GlfSimpleShadowArrayRefPtr const &
-GlfSimpleLightingContext::GetShadows()
-{
-    return _shadows;
-}
-
-void
-GlfSimpleLightingContext::SetMaterial(GlfSimpleMaterial const & material)
-{
-    if (_material != material) {
-        _material = material;
-        _materialUniformBlockValid = false;
-    }
-}
-
-GlfSimpleMaterial const &
-GlfSimpleLightingContext::GetMaterial() const
-{
-    return _material;
-}
-
-void
-GlfSimpleLightingContext::SetSceneAmbient(GfVec4f const & sceneAmbient)
-{
-    if (_sceneAmbient != sceneAmbient) {
-        _sceneAmbient = sceneAmbient;
-        _materialUniformBlockValid = false;
-    }
-}
-
-GfVec4f const &
-GlfSimpleLightingContext::GetSceneAmbient() const
-{
-    return _sceneAmbient;
-}
-
-void
-GlfSimpleLightingContext::SetCamera(GfMatrix4d const &worldToViewMatrix,
-                                     GfMatrix4d const &projectionMatrix)
-{
-    if (_worldToViewMatrix != worldToViewMatrix) {
-        _worldToViewMatrix = worldToViewMatrix;
-        _lightingUniformBlockValid = false;
-        _shadowUniformBlockValid = false;
-    }
-    _projectionMatrix = projectionMatrix;
-}
-
-void
-GlfSimpleLightingContext::SetUseLighting(bool val)
-{
-    if (_useLighting != val) {
-        _useLighting = val;
-        _lightingUniformBlockValid = false;
-    }
-}
-
-bool
-GlfSimpleLightingContext::GetUseLighting() const
-{
-    return _useLighting;
-}
-
-bool
-GlfSimpleLightingContext::GetUseShadows() const
-{
-    return _useShadows;
-}
-
-void
-GlfSimpleLightingContext::SetUseColorMaterialDiffuse(bool val)
-{
-    if (_useColorMaterialDiffuse != val) {
-        _lightingUniformBlockValid = false;
-        _useColorMaterialDiffuse = val;
-    }
-}
-
-bool
-GlfSimpleLightingContext::GetUseColorMaterialDiffuse() const
-{
-    return _useColorMaterialDiffuse;
-}
-
-void
-GlfSimpleLightingContext::InitUniformBlockBindings(
-        GlfBindingMapPtr const &bindingMap) const
-{
-    // populate uniform bindings (XXX: need better API)
-    bindingMap->GetUniformBinding(_tokens->lightingUB);
-    bindingMap->GetUniformBinding(_tokens->shadowUB);
-    bindingMap->GetUniformBinding(_tokens->materialUB);
-}
-
-void
-GlfSimpleLightingContext::InitSamplerUnitBindings(
-        GlfBindingMapPtr const &bindingMap) const
-{
-    bindingMap->GetSamplerUnit(_tokens->shadowSampler);
-    bindingMap->GetSamplerUnit(_tokens->shadowCompareSampler);
 }
 
 inline void
@@ -251,14 +89,14 @@ setMatrix(float *dst, GfMatrix4d const & mat)
 }
 
 void
-GlfSimpleLightingContext::BindUniformBlocks(GlfBindingMapPtr const &bindingMap)
+GlfSimpleLightingContext::BindUniformBlocks(GarchBindingMapPtr const &bindingMap)
 {
     if (!_lightingUniformBlock)
-        _lightingUniformBlock = GlfUniformBlock::New();
+        _lightingUniformBlock = GarchUniformBlock::New();
     if (!_shadowUniformBlock)
-        _shadowUniformBlock = GlfUniformBlock::New();
+        _shadowUniformBlock = GarchUniformBlock::New();
     if (!_materialUniformBlock)
-        _materialUniformBlock = GlfUniformBlock::New();
+        _materialUniformBlock = GarchUniformBlock::New();
 
     bool shadowExists = false;
     if ((!_lightingUniformBlockValid ||
@@ -322,7 +160,7 @@ GlfSimpleLightingContext::BindUniformBlocks(GlfBindingMapPtr const &bindingMap)
         lightingData->useColorMaterialDiffuse = _useColorMaterialDiffuse;
 
         for (int i = 0; _useLighting && i < numLights; ++i) {
-            GlfSimpleLight const &light = _lights[i];
+            GarchSimpleLight const &light = _lights[i];
 
             setVec4(lightingData->lightSource[i].position,
                     light.GetPosition() * _worldToViewMatrix);
@@ -405,24 +243,29 @@ GlfSimpleLightingContext::BindUniformBlocks(GlfBindingMapPtr const &bindingMap)
 }
 
 void
-GlfSimpleLightingContext::BindSamplers(GlfBindingMapPtr const &bindingMap)
+GlfSimpleLightingContext::BindSamplers(GarchBindingMapPtr const &bindingMap)
 {
     int shadowSampler = bindingMap->GetSamplerUnit(_tokens->shadowSampler);
     int shadowCompareSampler = bindingMap->GetSamplerUnit(_tokens->shadowCompareSampler);
+    
+    GLuint _shadowMapTexture = (GLuint)(uint64_t)_shadows->GetShadowMapTexture();
+    
+    GLuint _shadowMapDepthSampler = (GLuint)(uint64_t)_shadows->GetShadowMapDepthSampler();
+    GLuint _shadowMapCompareSampler = (GLuint)(uint64_t)_shadows->GetShadowMapCompareSampler();
 
     glActiveTexture(GL_TEXTURE0 + shadowSampler);
-    glBindTexture(GL_TEXTURE_2D_ARRAY, _shadows->GetShadowMapTexture());
-    glBindSampler(shadowSampler, _shadows->GetShadowMapDepthSampler());
+    glBindTexture(GL_TEXTURE_2D_ARRAY, _shadowMapTexture);
+    glBindSampler(shadowSampler, _shadowMapDepthSampler);
 
     glActiveTexture(GL_TEXTURE0 + shadowCompareSampler);
-    glBindTexture(GL_TEXTURE_2D_ARRAY, _shadows->GetShadowMapTexture());
-    glBindSampler(shadowCompareSampler, _shadows->GetShadowMapCompareSampler());
+    glBindTexture(GL_TEXTURE_2D_ARRAY, _shadowMapTexture);
+    glBindSampler(shadowCompareSampler, _shadowMapCompareSampler);
 
     glActiveTexture(GL_TEXTURE0);
 }
 
 void
-GlfSimpleLightingContext::UnbindSamplers(GlfBindingMapPtr const &bindingMap)
+GlfSimpleLightingContext::UnbindSamplers(GarchBindingMapPtr const &bindingMap)
 {
     int shadowSampler = bindingMap->GetSamplerUnit(_tokens->shadowSampler);
     int shadowCompareSampler = bindingMap->GetSamplerUnit(_tokens->shadowCompareSampler);
@@ -451,10 +294,10 @@ GlfSimpleLightingContext::SetStateFromOpenGL()
     GLint nLights = 0;
     glGetIntegerv(GL_MAX_LIGHTS, &nLights);
 
-    GlfSimpleLightVector lights;
+    GarchSimpleLightVector lights;
     lights.reserve(nLights);
 
-    GlfSimpleLight light;
+    GarchSimpleLight light;
     for(int i = 0; i < nLights; ++i)
     {
         int lightName = GL_LIGHT0 + i;
@@ -504,7 +347,7 @@ GlfSimpleLightingContext::SetStateFromOpenGL()
 
     SetLights(lights);
 
-    GlfSimpleMaterial material;
+    GarchSimpleMaterial material;
 
     GLfloat color[4], shininess;
     glGetMaterialfv(GL_FRONT, GL_AMBIENT, color);

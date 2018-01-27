@@ -30,9 +30,9 @@
 #include "pxr/imaging/hd/lightingShader.h"
 #include "pxr/imaging/hd/resource.h"
 
-#include "pxr/imaging/glf/bindingMap.h"
-#include "pxr/imaging/glf/glslfx.h"
-#include "pxr/imaging/glf/simpleLightingContext.h"
+#include "pxr/imaging/garch/bindingMap.h"
+#include "pxr/imaging/garch/glslfx.h"
+#include "pxr/imaging/garch/simpleLightingContext.h"
 
 #include "pxr/base/gf/matrix4d.h"
 
@@ -66,9 +66,9 @@ public:
     HDX_API
     virtual std::string GetSource(TfToken const &shaderStageKey) const;
     HDX_API
-    virtual void BindResources(Hd_ResourceBinder const &binder, int program);
+    virtual void BindResources(Hd_ResourceBinder const &binder, HdBufferResourceGPUHandle program);
     HDX_API
-    virtual void UnbindResources(Hd_ResourceBinder const &binder, int program);
+    virtual void UnbindResources(Hd_ResourceBinder const &binder, HdBufferResourceGPUHandle program);
     HDX_API
     virtual void AddBindings(HdBindingRequestVector *customBindings);
 
@@ -80,17 +80,17 @@ public:
     HDX_API
     void SetLightingStateFromOpenGL();
     HDX_API
-    void SetLightingState(GlfSimpleLightingContextPtr const &lightingContext);
+    void SetLightingState(GarchSimpleLightingContextPtr const &lightingContext);
 
-    GlfSimpleLightingContextRefPtr GetLightingContext() {
+    GarchSimpleLightingContextRefPtr GetLightingContext() {
         return _lightingContext;
     };
 
 private:
-    GlfSimpleLightingContextRefPtr _lightingContext; 
-    GlfBindingMapRefPtr _bindingMap;
+    GarchSimpleLightingContextRefPtr _lightingContext;
+    GarchBindingMapRefPtr _bindingMap;
     bool _useLighting;
-    boost::scoped_ptr<GlfGLSLFX> _glslfx;
+    boost::scoped_ptr<GLSLFX> _glslfx;
 };
 
 

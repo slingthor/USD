@@ -219,7 +219,7 @@ public:
 
     /// Texture
     HD_API
-    void AddTexture(SdfPath const& id, GlfTextureRefPtr const& texture);
+    void AddTexture(SdfPath const& id, GarchTextureRefPtr const& texture);
 
     /// Camera
     HD_API
@@ -458,10 +458,10 @@ private:
     };
     struct _Texture {
         _Texture() {}
-        _Texture(GlfTextureRefPtr const &tex)
-            : texture(tex) {
+        _Texture(GarchTextureRefPtr const &tex)
+        : texture(tex) {
         }
-        GlfTextureRefPtr texture;
+        GarchTextureRefPtr texture;
     };
     struct _Camera {
         VtDictionary params;

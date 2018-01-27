@@ -24,6 +24,7 @@
 #include "pxr/imaging/hd/unitTestDelegate.h"
 
 #include "pxr/imaging/hd/basisCurves.h"
+#include "pxr/imaging/hd/engine.h"
 #include "pxr/imaging/hd/sprim.h"
 #include "pxr/imaging/hd/mesh.h"
 #include "pxr/imaging/hd/meshTopology.h"
@@ -36,8 +37,12 @@
 #include "pxr/base/gf/matrix4f.h"
 #include "pxr/base/gf/rotation.h"
 
-#include "pxr/imaging/glf/simpleLight.h"
-#include "pxr/imaging/glf/textureRegistry.h"
+#include "pxr/imaging/garch/textureRegistry.h"
+
+#if defined(ARCH_GFX_METAL)
+#include "pxr/imaging/mtlf/ptexTexture.h"
+#endif
+
 #include "pxr/imaging/glf/ptexTexture.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -326,8 +331,8 @@ Hd_UnitTestDelegate::RebindMaterial(SdfPath const &rprimId,
 }
 
 void
-Hd_UnitTestDelegate::AddTexture(SdfPath const& id, 
-                                GlfTextureRefPtr const& texture)
+Hd_UnitTestDelegate::AddTexture(SdfPath const& id,
+                                GarchTextureRefPtr const& texture)
 {
     HdRenderIndex& index = GetRenderIndex();
     index.InsertBprim(HdPrimTypeTokens->texture, this, id);
@@ -743,21 +748,27 @@ Hd_UnitTestDelegate::GetTextureResourceID(SdfPath const& textureId)
 HdTextureResourceSharedPtr
 Hd_UnitTestDelegate::GetTextureResource(SdfPath const& textureId)
 {
-    GlfTextureHandleRefPtr texture =
-        GlfTextureRegistry::GetInstance().GetTextureHandle(_textures[textureId].texture);
+    GarchTextureHandleRefPtr texture =
+        GarchTextureRegistry::GetInstance().GetTextureHandle(_textures[textureId].texture);
 
     // Simple way to detect if the glf texture is ptex or not
     bool isPtex = false;
 #ifdef PXR_PTEX_SUPPORT_ENABLED
-    GlfPtexTextureRefPtr pTex = 
-        TfDynamic_cast<GlfPtexTextureRefPtr>(_textures[textureId].texture);
-    if (pTex) {
+#if defined(ARCH_GFX_METAL)
+    MtlfPtexTextureRefPtr pTexMtl =
+        TfDynamic_cast<MtlfPtexTextureRefPtr>(_textures[textureId].texture);
+    if (pTexMtl) {
+        isPtex = true;
+    }
+#endif
+    GlfPtexTextureRefPtr pTexGL =
+    TfDynamic_cast<GlfPtexTextureRefPtr>(_textures[textureId].texture);
+    if (pTexGL) {
         isPtex = true;
     }
 #endif
 
-    return HdTextureResourceSharedPtr(
-        new HdSimpleTextureResource(texture, isPtex));
+    return HdTextureResourceSharedPtr(HdEngine::CreateSimpleTextureResource(texture, isPtex));
 }
 
 /*virtual*/

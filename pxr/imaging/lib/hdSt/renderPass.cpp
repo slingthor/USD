@@ -26,6 +26,7 @@
 #include "pxr/imaging/hdSt/resourceRegistry.h"
 
 #include "pxr/imaging/hd/drawItem.h"
+#include "pxr/imaging/hd/engine.h"
 #include "pxr/imaging/hd/renderContextCaps.h"
 #include "pxr/imaging/hd/renderPassShader.h"
 #include "pxr/imaging/hd/renderPassState.h"
@@ -117,7 +118,7 @@ HdSt_RenderPass::_PrepareCommandBuffer(
     const bool 
        skipCulling = TfDebug::IsEnabled(HD_DISABLE_FRUSTUM_CULLING) ||
            (caps.multiDrawIndirectEnabled
-               && HdSt_IndirectDrawBatch::IsEnabledGPUFrustumCulling());
+               && HdEngine::IsEnabledGPUFrustumCulling());
 
     const bool 
        cameraChanged = true,

@@ -25,10 +25,11 @@
 #include "pxr/imaging/glf/glew.h"
 
 #include "pxr/imaging/glf/baseTexture.h"
-#include "pxr/imaging/glf/baseTextureData.h"
 #include "pxr/imaging/glf/diagnostic.h"
 #include "pxr/imaging/glf/glContext.h"
-#include "pxr/imaging/glf/utils.h"
+
+#include "pxr/imaging/garch/baseTextureData.h"
+#include "pxr/imaging/garch/utils.h"
 
 #include "pxr/base/tf/registryManager.h"
 #include "pxr/base/tf/type.h"
@@ -39,7 +40,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 TF_REGISTRY_FUNCTION(TfType)
 {
-    TfType::Define<GlfBaseTexture, TfType::Bases<GlfTexture> >();
+    TfType::Define<GlfBaseTexture, TfType::Bases<GarchTexture> >();
 }
 
 static GLuint
@@ -53,59 +54,32 @@ _GenName()
 }
 
 GlfBaseTexture::GlfBaseTexture()
-  : _textureName(_GenName()),
-    _currentWidth(0),
-    _currentHeight(0),
-    _format(GL_RGBA),
-    _hasWrapModeS(false),
-    _hasWrapModeT(false),
-    _wrapModeS(GL_REPEAT),
-    _wrapModeT(GL_REPEAT)
 {
-    /* nothing */
+    _textureName = (GarchTextureGPUHandle)(uint64_t)_GenName();
 }
 
 GlfBaseTexture::~GlfBaseTexture()
 {
     GlfSharedGLContextScopeHolder sharedGLContextScopeHolder;
 
-    if (glIsTexture(_textureName)) {
-        glDeleteTextures(1, &_textureName);
+    GLuint t = (GLuint)(uint64_t)_textureName;
+    if (glIsTexture(t)) {
+        glDeleteTextures(1, &t);
     }
 }
 
 /* virtual */
-GlfTexture::BindingVector
+GarchTexture::BindingVector
 GlfBaseTexture::GetBindings(TfToken const & identifier,
-                             GLuint samplerName) const
+                            GarchSamplerGPUHandle samplerName) const
 {
     return BindingVector(1,
-                Binding(identifier, GlfTextureTokens->texels,
+                Binding(identifier, GarchTextureTokens->texels,
                         GL_TEXTURE_2D, _textureName, samplerName));
 }
 
-VtDictionary
-GlfBaseTexture::GetTextureInfo() const
-{
-    VtDictionary info;
-    info["memoryUsed"] = GetMemoryUsed();
-    info["width"] = _currentWidth;
-    info["height"] = _currentHeight;
-    info["depth"] = 1;
-    info["format"] = _format;
-    info["referenceCount"] = GetRefCount().Get();
-
-    if (_hasWrapModeS)
-        info["wrapModeS"] = _wrapModeS;
-
-    if (_hasWrapModeT)
-        info["wrapModeT"] = _wrapModeT;
-
-    return info;
-}
-
 void 
-GlfBaseTexture::_UpdateTexture(GlfBaseTextureDataConstPtr texData)
+GlfBaseTexture::_UpdateTexture(GarchBaseTextureDataConstPtr texData)
 {
     // Copy or clear fields required for tracking/reporting.
     if (texData && texData->HasRawBuffer()) {
@@ -130,7 +104,7 @@ GlfBaseTexture::_UpdateTexture(GlfBaseTextureDataConstPtr texData)
 }
 
 void 
-GlfBaseTexture::_CreateTexture(GlfBaseTextureDataConstPtr texData,
+GlfBaseTexture::_CreateTexture(GarchBaseTextureDataConstPtr texData,
                 bool const useMipmaps,
                 int const unpackCropTop,
                 int const unpackCropBottom,
@@ -140,7 +114,7 @@ GlfBaseTexture::_CreateTexture(GlfBaseTextureDataConstPtr texData,
     TRACE_FUNCTION();
     
     if (texData && texData->HasRawBuffer()) {
-        glBindTexture(GL_TEXTURE_2D, _textureName);
+        glBindTexture(GL_TEXTURE_2D, (GLuint)(uint64_t)_textureName);
 
         // Check if mip maps have been requested, if so, it will either
         // enable automatic generation or use the ones loaded in cpu memory
@@ -180,7 +154,7 @@ GlfBaseTexture::_CreateTexture(GlfBaseTextureDataConstPtr texData,
         } else {
             // Uncompressed textures can have cropping and other special 
             // behaviours.
-            if (GlfGetNumElements(texData->GLFormat()) == 1) {
+            if (GarchGetNumElements(texData->GLFormat()) == 1) {
                 GLint swizzleMask[] = {GL_RED, GL_RED, GL_RED, GL_ONE};
                 glTexParameteriv(
                     GL_TEXTURE_2D,

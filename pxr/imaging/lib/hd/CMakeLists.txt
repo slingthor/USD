@@ -10,6 +10,22 @@ if (OPENSUBDIV_HAS_GLSL_COMPUTE)
     add_definitions(-DOPENSUBDIV_HAS_GLSL_COMPUTE)
 endif()
 
+if (APPLE)
+    set(GFX             mtlf)
+    set(GFXADDITIONAL   Metal/codeGenMSL
+                        Metal/bufferRelocatorMetal
+                        Metal/bufferResourceMetal
+                        Metal/mslProgram
+                        Metal/mtlUtils
+                        Metal/persistentBufferMetal
+                        Metal/resourceMetal
+                        Metal/textureResourceMetal)
+
+else()
+    set(GFX)
+    set(GFXADDITIONAL)
+endif()
+
 pxr_library(hd
     LIBRARIES
         plug
@@ -20,8 +36,9 @@ pxr_library(hd
         sdf
         garch
         hf
-        glf
         pxOsd
+        glf
+        ${GFX}
         ${OPENSUBDIV_LIBRARIES}
         ${GLEW_LIBRARY}
         ${TBB_tbb_LIBRARY}
@@ -39,10 +56,9 @@ pxr_library(hd
         bprim
         bufferArray
         bufferArrayRange
-        bufferArrayRangeGL
         bufferArrayRegistry
+        bufferRelocator
         bufferResource
-        bufferResourceGL
         bufferSource
         bufferSpec
         changeTracker
@@ -65,8 +81,6 @@ pxr_library(hd
         extComputationContext
         fallbackLightingShader
         geometricShader
-        glslProgram
-        glUtils
         instancer
         instanceRegistry
         interleavedMemoryManager
@@ -80,6 +94,7 @@ pxr_library(hd
         points
         primGather
         primTypeIndex
+        program
         renderContextCaps
         renderDelegate
         renderIndex
@@ -88,7 +103,6 @@ pxr_library(hd
         renderPassState
         repr
         resource
-        resourceGL
         resourceBinder
         resourceRegistry
         rprim
@@ -113,10 +127,20 @@ pxr_library(hd
         vboSimpleMemoryManager
         vertexAdjacency
         vtBufferSource
+        GL/bufferRelocatorGL
+        GL/bufferResourceGL
+        GL/codeGenGLSL
+        GL/glslProgram
+        GL/glUtils
+        GL/persistentBufferGL
+        GL/resourceGL
+        GL/textureResourceGL
+        ${GFXADDITIONAL}
 
     PUBLIC_HEADERS
         api.h
         enums.h
+        persistentBuffer.h
         types.h
         version.h
 

@@ -68,7 +68,8 @@ public:
                 BINDLESS_TEXTURE_2D,          // bindless uv texture
                 BINDLESS_TEXTURE_PTEX_TEXEL,  // bindless ptex texels
                 BINDLESS_TEXTURE_PTEX_LAYOUT, // bindless ptex layout
-                PRIMVAR_REDIRECT     // primvar redirection
+                PRIMVAR_REDIRECT,    // primvar redirection
+                VERTEX_ID            // vertex ID
     };
     enum Location {
                 // NOT_EXIST is a special value of location for a uniform

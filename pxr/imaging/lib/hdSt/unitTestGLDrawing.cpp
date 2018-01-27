@@ -22,9 +22,12 @@
 // language governing permissions and limitations under the Apache License.
 //
 #include "pxr/imaging/glf/glew.h"
+#include "pxr/imaging/glf/diagnostic.h"
 
 #include "pxr/imaging/hdSt/unitTestGLDrawing.h"
-#include "pxr/imaging/glf/diagnostic.h"
+
+#include "pxr/imaging/hd/engine.h"
+
 #include "pxr/imaging/glf/drawTarget.h"
 #include "pxr/imaging/garch/glDebugWindow.h"
 
@@ -67,7 +70,7 @@ public:
 
 private:
     HdSt_UnitTestGLDrawing *_unitTest;
-    GlfDrawTargetRefPtr _drawTarget;
+    GarchDrawTargetRefPtr _drawTarget;
     bool _animate;
 };
 
@@ -98,7 +101,8 @@ HdSt_UnitTestWindow::OnInitializeGL()
     // Create an offscreen draw target which is the same size as this
     // widget and initialize the unit test with the draw target bound.
     //
-    _drawTarget = GlfDrawTarget::New(GfVec2i(GetWidth(), GetHeight()));
+    _drawTarget = HdEngine::CreateDrawTarget(GfVec2i(GetWidth(), GetHeight()));
+
     _drawTarget->Bind();
     _drawTarget->AddAttachment("color", GL_RGBA, GL_FLOAT, GL_RGBA);
     _drawTarget->AddAttachment("depth", GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8,
@@ -112,7 +116,7 @@ HdSt_UnitTestWindow::OnInitializeGL()
 void
 HdSt_UnitTestWindow::OnUninitializeGL()
 {
-    _drawTarget = GlfDrawTargetRefPtr();
+    _drawTarget = GarchDrawTargetRefPtr();
 }
 
 /* virtual */

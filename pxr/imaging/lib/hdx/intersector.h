@@ -53,7 +53,7 @@ class HdRprimCollection;
 typedef boost::shared_ptr<class HdRenderPass> HdRenderPassSharedPtr;
 typedef boost::shared_ptr<class HdRenderPassState> HdRenderPassStateSharedPtr;
 
-TF_DECLARE_WEAK_AND_REF_PTRS(GlfDrawTarget);
+TF_DECLARE_WEAK_AND_REF_PTRS(GarchDrawTarget);
 
 HDX_API
 void HdxNoDepthMask();
@@ -222,7 +222,7 @@ private:
 
     // A single draw target is shared for all contexts. Since the FBO cannot be
     // shared, we clone the attachements on each request.
-    GlfDrawTargetRefPtr _drawTarget;
+    GarchDrawTargetRefPtr _drawTarget;
 
     // The render index for which this intersector is valid.
     HdRenderIndex *_index;

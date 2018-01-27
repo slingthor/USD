@@ -26,39 +26,42 @@
 
 #include "pxr/pxr.h"
 #include "pxr/imaging/hd/textureResource.h"
-#include "pxr/imaging/glf/drawTarget.h"
+#include "pxr/imaging/garch/drawTarget.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
 
-class HdSt_DrawTargetTextureResource final : public HdTextureResource {
+class HdSt_DrawTargetTextureResource : public HdTextureResource {
 public:
-    HdSt_DrawTargetTextureResource();
     virtual ~HdSt_DrawTargetTextureResource();
 
-    void SetAttachment(const GlfDrawTarget::AttachmentRefPtr &attachment);
-    void SetSampler(HdWrap wrapS, HdWrap wrapT,
-                    HdMinFilter minFilter, HdMagFilter magFilter);
+    static HdTextureResourceSharedPtr New();
+    
+    virtual void SetAttachment(const GarchDrawTarget::AttachmentRefPtr &attachment);
+    virtual void SetSampler(HdWrap wrapS, HdWrap wrapT,
+                            HdMinFilter minFilter, HdMagFilter magFilter) = 0;
 
     //
     // HdTextureResource API
     //
     virtual bool IsPtex() const override;
 
-    virtual GLuint GetTexelsTextureId() override;
-    virtual GLuint GetTexelsSamplerId() override;
-    virtual uint64_t GetTexelsTextureHandle() override;
+    virtual GarchTextureGPUHandle GetTexelsTextureId() override;
+    virtual GarchSamplerGPUHandle GetTexelsSamplerId() override;
+    virtual GarchTextureGPUHandle GetTexelsTextureHandle() = 0;
 
-    virtual GLuint GetLayoutTextureId() override;
-    virtual uint64_t GetLayoutTextureHandle() override;
+    virtual GarchTextureGPUHandle GetLayoutTextureId() override;
+    virtual GarchTextureGPUHandle GetLayoutTextureHandle() override;
 
     virtual size_t GetMemoryUsed() override;
 
+protected:
+    GarchDrawTarget::AttachmentRefPtr  _attachment;
+    GarchSamplerGPUHandle              _sampler;
+    
+    HdSt_DrawTargetTextureResource();
+
 private:
-    GlfDrawTarget::AttachmentRefPtr  _attachment;
-    GLuint                           _sampler;
-
-
     // No copying
     HdSt_DrawTargetTextureResource(const HdSt_DrawTargetTextureResource &)             = delete;
     HdSt_DrawTargetTextureResource &operator =(const HdSt_DrawTargetTextureResource &) = delete;

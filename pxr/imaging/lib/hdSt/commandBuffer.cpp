@@ -30,6 +30,7 @@
 
 #include "pxr/imaging/hd/bufferArrayRange.h"
 #include "pxr/imaging/hd/debugCodes.h"
+#include "pxr/imaging/hd/engine.h"
 #include "pxr/imaging/hd/geometricShader.h"
 #include "pxr/imaging/hd/perfLog.h"
 #include "pxr/imaging/hd/renderContextCaps.h"
@@ -65,14 +66,17 @@ HdSt_DrawBatchSharedPtr
 _NewDrawBatch(HdStDrawItemInstance * drawItemInstance)
 {
     HdRenderContextCaps const &caps = HdRenderContextCaps::GetInstance();
+    HdSt_DrawBatchSharedPtr drawBatch;
 
     if (caps.multiDrawIndirectEnabled) {
-        return HdSt_DrawBatchSharedPtr(
-            new HdSt_IndirectDrawBatch(drawItemInstance));
+        // TODO: Move into a factory class
+        drawBatch = HdSt_IndirectDrawBatch::New(drawItemInstance);
     } else {
-        return HdSt_DrawBatchSharedPtr(
+        drawBatch = HdSt_DrawBatchSharedPtr(
             new HdSt_ImmediateDrawBatch(drawItemInstance));
     }
+    
+    return drawBatch;
 }
 
 void
@@ -218,7 +222,7 @@ HdStCommandBuffer::SyncDrawItemVisibility(unsigned visChangeCount)
     tbb::enumerable_thread_specific<size_t> visCounts;
 
     WorkParallelForN(_drawItemInstances.size()/N+1,
-      [&visCounts, this, N](size_t start, size_t end) {
+      [&visCounts, this](size_t start, size_t end) {
         TRACE_SCOPE("SetVis");
         start *= N;
         end = std::min(end*N, _drawItemInstances.size());

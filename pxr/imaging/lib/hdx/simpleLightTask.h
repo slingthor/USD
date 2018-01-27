@@ -33,8 +33,8 @@
 #include "pxr/imaging/hd/rprimCollection.h"
 #include "pxr/imaging/hd/task.h"
 
-#include "pxr/imaging/glf/simpleLight.h"
-#include "pxr/imaging/glf/simpleMaterial.h"
+#include "pxr/imaging/garch/simpleLight.h"
+#include "pxr/imaging/garch/simpleMaterial.h"
 
 #include "pxr/base/gf/matrix4d.h"
 #include "pxr/base/gf/vec3f.h"
@@ -52,7 +52,7 @@ typedef boost::shared_ptr<class HdRenderPass> HdRenderPassSharedPtr;
 typedef boost::shared_ptr<class HdxSimpleLightingShader> HdxSimpleLightingShaderSharedPtr;
 typedef boost::shared_ptr<class HdxShadowMatrixComputation> HdxShadowMatrixComputationSharedPtr;
 
-TF_DECLARE_REF_PTRS(GlfSimpleShadowArray);
+TF_DECLARE_REF_PTRS(GarchSimpleShadowArray);
 
 
 class HdxSimpleLightTask : public HdSceneTask {
@@ -81,13 +81,13 @@ private:
 
     // XXX: compatibility hack for passing some unit tests until we have
     //      more formal material plumbing.
-    GlfSimpleMaterial _material;
+    GarchSimpleMaterial _material;
     GfVec4f _sceneAmbient;
 
     // For now these are only valid for the lifetime of a single pass of
     // the render graph.  Maybe long-term these could be change-tracked.
-    GlfSimpleShadowArrayRefPtr _shadows;
-    GlfSimpleLightVector _glfSimpleLights;
+    GarchSimpleShadowArrayRefPtr _shadows;
+    GarchSimpleLightVector _simpleLights;
 };
 
 struct HdxSimpleLightTaskParams {
@@ -109,7 +109,7 @@ struct HdxSimpleLightTaskParams {
     
     // XXX: compatibility hack for passing some unit tests until we have
     //      more formal material plumbing.
-    GlfSimpleMaterial material;
+    GarchSimpleMaterial material;
     GfVec4f sceneAmbient;
 };
 

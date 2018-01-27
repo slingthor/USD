@@ -31,7 +31,8 @@
 #include "pxr/imaging/hd/rprimCollection.h"
 #include "pxr/imaging/hd/sprim.h"
 #include "pxr/imaging/hd/textureResource.h"
-#include "pxr/imaging/glf/drawTarget.h"
+
+#include "pxr/imaging/garch/drawTarget.h"
 
 #include "pxr/usd/sdf/path.h"
 #include "pxr/base/tf/staticTokens.h"
@@ -58,7 +59,6 @@ class HdSceneDelegate;
 class HdRenderIndex;
 class HdStCamera;
 class HdStDrawTargetAttachmentDescArray;
-
 
 typedef boost::shared_ptr<class GlfGLContext> GlfGLContextSharedPtr;
 
@@ -124,7 +124,8 @@ public:
     /// \name Draw Target API
     // ---------------------------------------------------------------------- //
     bool                       IsEnabled()        const { return  _enabled;    }
-    const GlfDrawTargetRefPtr &GetGlfDrawTarget() const { return  _drawTarget; }
+    const GarchDrawTargetRefPtr &GetGarchDrawTarget() const { return  _drawTarget; }
+
     const HdStDrawTargetRenderPassState *GetRenderPassState() const
     {
         return &_renderPassState;
@@ -154,9 +155,10 @@ private:
     std::vector<HdTextureResourceSharedPtr> _colorTextureResources;
     HdTextureResourceSharedPtr              _depthTextureResource;
 
-    /// The context which owns the draw target object.
-    GlfGLContextSharedPtr  _drawTargetContext;
-    GlfDrawTargetRefPtr    _drawTarget;
+    /// The context which owns the draw target object, when using OpenGL.
+    GlfGLContextSharedPtr       _drawTargetContextGL;
+
+    GarchDrawTargetRefPtr       _drawTarget;
 
     void _SetAttachments(HdSceneDelegate *sceneDelegate,
                          const HdStDrawTargetAttachmentDescArray &attachments);

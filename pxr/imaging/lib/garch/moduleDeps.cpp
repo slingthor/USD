@@ -38,7 +38,10 @@ TF_REGISTRY_FUNCTION(TfScriptModuleLoader) {
     std::vector<TfToken> reqs;
     reqs.reserve(2);
     reqs.push_back(TfToken("arch"));
+    reqs.push_back(TfToken("js"));
+    reqs.push_back(TfToken("plug"));
     reqs.push_back(TfToken("tf"));
+    reqs.push_back(TfToken("vt"));
     TfScriptModuleLoader::GetInstance().
         RegisterLibrary(TfToken("garch"), TfToken("pxr.Garch"), reqs);
 }

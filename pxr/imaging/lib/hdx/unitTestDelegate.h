@@ -27,7 +27,7 @@
 #include "pxr/pxr.h"
 #include "pxr/imaging/hd/sceneDelegate.h"
 #include "pxr/imaging/hd/tokens.h"
-#include "pxr/imaging/glf/simpleLight.h"
+#include "pxr/imaging/garch/simpleLight.h"
 #include "pxr/imaging/pxOsd/tokens.h"
 
 #include "pxr/base/gf/vec3f.h"
@@ -65,7 +65,7 @@ public:
     void AddCamera(SdfPath const &id);
 
     // light
-    void AddLight(SdfPath const &id, GlfSimpleLight const &light);
+    void AddLight(SdfPath const &id, GarchSimpleLight const &light);
     void SetLight(SdfPath const &id, TfToken const &key, VtValue value);
 
     // draw target

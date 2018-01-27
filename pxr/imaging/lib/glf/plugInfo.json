@@ -4,11 +4,6 @@
             "Info": {
                 "ShaderResources": "shaders",
                 "Types": {                                                                  
-                    "Glf_OIIOImage" : {
-                        "bases": ["GlfImage"],
-                        "imageTypes": ["bmp", "exr", "jpg", "png", "tif", "zfile"],
-                        "precedence": 0
-                    },
                     "GlfPtexTexture" : {
                         "bases": ["GlfTexture"],
                         "textureTypes": ["ptx", "ptex"],

@@ -33,23 +33,6 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-
-/// Number of elements.
-///
-/// Returns the number of elements (channels) in a given GL enum format.
-///
-/// Supported formats are : GL_DEPTH_COMPONENT, GL_COLOR_INDEX, GL_ALPHA, 
-/// GL_LUMINANCE, GL_LUMINANCE_ALPHA, GL_RGB, GL_RGBA
-int GlfGetNumElements(GLenum format);
-
-/// Byte size of a GL type.
-///
-/// Returns the size in bytes of a give GL type.
-///
-/// Supported types are : GL_UNSIGNED_BYTE, GL_BYTE, GL_UNSIGNED_SHORT, GL_SHORT,
-/// GL_FLOAT, GL_DOUBLE
-int GlfGetElementSize(GLenum type);
-
 /// Checks the valitidy of a GL framebuffer
 ///
 /// True if the currently bound GL framebuffer is valid and can be bound

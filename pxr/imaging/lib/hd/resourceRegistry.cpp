@@ -28,7 +28,7 @@
 #include "pxr/imaging/hd/bufferResource.h"
 #include "pxr/imaging/hd/computation.h"
 #include "pxr/imaging/hd/copyComputation.h"
-#include "pxr/imaging/hd/glslProgram.h"
+#include "pxr/imaging/hd/program.h"
 #include "pxr/imaging/hd/interleavedMemoryManager.h"
 #include "pxr/imaging/hd/meshTopology.h"
 #include "pxr/imaging/hd/tokens.h"
@@ -36,7 +36,7 @@
 #include "pxr/imaging/hd/vboSimpleMemoryManager.h"
 #include "pxr/imaging/hd/vertexAdjacency.h"
 
-#include "pxr/imaging/glf/textureRegistry.h"
+#include "pxr/imaging/garch/textureRegistry.h"
 
 #include "pxr/base/tf/instantiateSingleton.h"
 #include "pxr/base/tf/getenv.h"
@@ -613,7 +613,7 @@ HdResourceRegistry::GarbageCollect()
 
     // Cleanup Shader registries
     _geometricShaderRegistry.GarbageCollect();
-    _glslProgramRegistry.GarbageCollect();
+    _programRegistry.GarbageCollect();
 
     // Cleanup texture registries
     _textureResourceRegistry.GarbageCollect();
@@ -662,8 +662,8 @@ HdResourceRegistry::GetResourceAllocation() const
                      singleBufferSize;
 
     // glsl program & ubo allocation
-    TF_FOR_ALL (progIt, _glslProgramRegistry) {
-        HdGLSLProgramSharedPtr const &program = progIt->second;
+    TF_FOR_ALL (progIt, _programRegistry) {
+        HdProgramSharedPtr const &program = progIt->second;
         if (!program) continue;
         size_t size =
             program->GetProgram().GetSize() +
@@ -691,7 +691,7 @@ HdResourceRegistry::GetResourceAllocation() const
     result[HdPerfTokens->textureResourceMemory] = VtValue(hydraTexturesMemory);
     gpuMemoryUsed += hydraTexturesMemory;
 
-    GlfTextureRegistry &textureReg = GlfTextureRegistry::GetInstance();
+    GarchTextureRegistry &textureReg = GarchTextureRegistry::GetInstance();
     std::vector<VtDictionary> textureInfo = textureReg.GetTextureInfos();
     size_t textureMemory = 0;
     TF_FOR_ALL (textureIt, textureInfo) {
@@ -806,10 +806,10 @@ HdResourceRegistry::RegisterGeometricShader(HdShaderKey::ID id,
 }
 
 std::unique_lock<std::mutex>
-HdResourceRegistry::RegisterGLSLProgram(HdGLSLProgram::ID id,
-                        HdInstance<HdGLSLProgram::ID, HdGLSLProgramSharedPtr> *instance)
+HdResourceRegistry::RegisterProgram(HdProgram::ID id,
+                        HdInstance<HdProgram::ID, HdProgramSharedPtr> *instance)
 {
-    return _glslProgramRegistry.GetInstance(id, instance);
+    return _programRegistry.GetInstance(id, instance);
 }
 
 std::unique_lock<std::mutex>

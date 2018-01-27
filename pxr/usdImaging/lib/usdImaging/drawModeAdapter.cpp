@@ -30,11 +30,13 @@
 #include "pxr/usdImaging/usdImaging/package.h"
 #include "pxr/usdImaging/usdImaging/tokens.h"
 
+#include "pxr/imaging/hd/engine.h"
 #include "pxr/imaging/hd/perfLog.h"
 #include "pxr/imaging/hd/shader.h"
 
-#include "pxr/imaging/glf/glslfx.h"
-#include "pxr/imaging/glf/image.h"
+#include "pxr/imaging/garch/glslfx.h"
+#include "pxr/imaging/garch/image.h"
+
 #include "pxr/imaging/pxOsd/tokens.h"
 
 #include "pxr/usd/usdGeom/modelAPI.h"
@@ -826,7 +828,7 @@ UsdImagingDrawModeAdapter::_GetMatrixFromImageMetadata(
         file = asset.GetAssetPath();
     }
 
-    GlfImageSharedPtr img = GlfImage::OpenForReading(file);
+    GarchImageSharedPtr img = GarchImage::OpenForReading(file);
     if (!img) {
         return false;
     }
@@ -905,12 +907,15 @@ UsdImagingDrawModeAdapter::_GenerateTextureCoordinates(
 std::string
 UsdImagingDrawModeAdapter::_GetSurfaceShaderSource()
 {
-    GlfGLSLFX gfx (UsdImagingPackageDrawModeShader());
-    if (!gfx.IsValid()) {
+    GLSLFX* gfx = HdEngine::CreateGLSLFX(UsdImagingPackageDrawModeShader());
+    if (!gfx->IsValid()) {
         TF_CODING_ERROR("Couldn't load UsdImagingPackageDrawModeShader");
         return std::string();
     }
-    return gfx.GetSurfaceSource();
+    std::string s = gfx->GetSurfaceSource();
+    delete gfx;
+
+    return s;
 }
 
 GfRange3d

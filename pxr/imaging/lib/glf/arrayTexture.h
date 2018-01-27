@@ -48,10 +48,10 @@ TF_DECLARE_WEAK_AND_REF_PTRS(GlfArrayTexture);
 /// Currently accepted image formats are png, jpg and bmp.
 ///
 
-class GlfArrayTexture : public GlfUVTexture {
+class GlfArrayTexture : public GarchUVTexture {
 public:
 
-    typedef GlfUVTexture Parent;
+    typedef GarchUVTexture Parent;
     typedef GlfArrayTexture This;
     
     /// Creates a new texture instance for the image file at \p imageFilePath.
@@ -79,10 +79,10 @@ public:
     GLF_API
     static bool IsSupportedImageFile(TfToken const &imageFilePath);
 
-    // GlfBaseTexture overrides
+    // GarchBaseTexture overrides
     GLF_API
     virtual BindingVector GetBindings(TfToken const & identifier,
-                                      GLuint samplerName) const;
+                                      GarchSamplerGPUHandle samplerName) const;
 
 protected:
     GLF_API
@@ -98,10 +98,10 @@ protected:
     virtual void _OnSetMemoryRequested(size_t targetMemory);
     GLF_API
     const TfToken& _GetImageFilePath(size_t index) const;
-    using GlfUVTexture::_GetImageFilePath;
+    using GarchUVTexture::_GetImageFilePath;
 
     GLF_API
-    void _CreateTexture(GlfBaseTextureDataConstRefPtrVector texDataVec,
+    void _CreateTextures(GarchBaseTextureDataConstRefPtrVector texDataVec,
                         bool const generateMipmap);
 
 private:

@@ -79,7 +79,7 @@ public:
     /// Gets the GPU program to run to execute the computation.
     /// This may have been shared with many other instances in the same
     /// registry.
-    HdGLSLProgramSharedPtr const &GetProgram() const {
+    HdProgramSharedPtr const &GetProgram() const {
         return _computeProgram;
     }
     
@@ -110,7 +110,7 @@ private:
     
     size_t                                _shaderSourceHash;
     HdBufferArrayRangeSharedPtr           _internalRange;  
-    HdGLSLProgramSharedPtr                _computeProgram;
+    HdProgramSharedPtr                    _computeProgram;
     Hd_ResourceBinder                     _resourceBinder;
     
     HdExtCompGpuComputationResource()                = delete;

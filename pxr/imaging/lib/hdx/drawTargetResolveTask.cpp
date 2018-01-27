@@ -27,9 +27,14 @@
 #include "pxr/imaging/hdx/drawTargetRenderPass.h"
 #include "pxr/imaging/hdx/tokens.h"
 
+#include "pxr/imaging/hd/engine.h"
+
 #include "pxr/imaging/hdSt/drawTarget.h"
 
 #include "pxr/imaging/glf/drawTarget.h"
+#if defined(ARCH_GFX_METAL)
+#include "pxr/imaging/mtlf/drawTarget.h"
+#endif
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -65,11 +70,23 @@ HdxDrawTargetResolveTask::_Execute(HdTaskContext* ctx)
     // regular buffers so use them in the rest of the pipeline.
     size_t numDrawTargets = passes->size();
     if (numDrawTargets > 0) {
-        std::vector<GlfDrawTarget*> drawTargets(numDrawTargets);
+        std::vector<GarchDrawTarget*> drawTargets(numDrawTargets);
+
         for (size_t i = 0; i < numDrawTargets; ++i) {
             drawTargets[i] = boost::get_pointer((*passes)[i]->GetDrawTarget());
         }
-        GlfDrawTarget::Resolve(drawTargets);
+        switch(HdEngine::GetRenderAPI()) {
+            case HdEngine::OpenGL:
+                GlfDrawTarget::Resolve(drawTargets);
+                break;
+#if defined(ARCH_GFX_METAL)
+            case HdEngine::Metal:
+                MtlfDrawTarget::Resolve(drawTargets);
+                break;
+#endif
+            default:
+                TF_FATAL_CODING_ERROR("No program for this API");
+        }
     }
 }
 

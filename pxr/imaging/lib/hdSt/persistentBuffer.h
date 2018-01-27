@@ -26,7 +26,7 @@
 
 #include "pxr/pxr.h"
 #include "pxr/imaging/hdSt/api.h"
-#include "pxr/imaging/hd/resourceGL.h"
+#include "pxr/imaging/hd/resource.h"
 
 #include <boost/shared_ptr.hpp>
 
