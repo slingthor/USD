@@ -64,8 +64,8 @@ public:
 
     /// Set lighting state
     USDIMAGINGGL_API
-    virtual void SetLightingState(GlfSimpleLightVector const &lights,
-                                  GlfSimpleMaterial const &material,
+    virtual void SetLightingState(GarchSimpleLightVector const &lights,
+                                  GarchSimpleMaterial const &material,
                                   GfVec4f const &sceneAmbient);
 
     USDIMAGINGGL_API

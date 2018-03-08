@@ -135,7 +135,7 @@ public:
         return _buffer->GetResources();
     }
 
-    /// Sets the buffer array assosiated with this buffer;
+    /// Sets the buffer array associated with this buffer;
     virtual void SetBufferArray(HdBufferArray *bufferArray) override {
         TF_CODING_ERROR("Hd_DispatchBufferArrayRange doesn't support this operation");
     }

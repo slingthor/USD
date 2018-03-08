@@ -54,6 +54,8 @@ HdSt_DrawTargetTextureResource::HdSt_DrawTargetTextureResource()
  : HdStTextureResource()
  , _attachment()
  , _sampler(0)
+ , _borderColor(0.0,0.0,0.0,0.0)
+ , _maxAnisotropy(16.0)
 {
 }
 
@@ -74,8 +76,6 @@ HdSt_DrawTargetTextureResource::SetSampler(HdWrap wrapS,
                                            HdMinFilter minFilter,
                                            HdMagFilter magFilter)
 {
-    static const float borderColor[4] = {0.0f, 0.0f, 0.0f, 0.0f};
-
     // Convert params to Gl
     GLenum glWrapS = HdStGLConversions::GetWrap(wrapS);
     GLenum glWrapT = HdStGLConversions::GetWrap(wrapT);
@@ -87,10 +87,11 @@ HdSt_DrawTargetTextureResource::SetSampler(HdWrap wrapS,
     glSamplerParameteri(s, GL_TEXTURE_WRAP_T, glWrapT);
     glSamplerParameteri(s, GL_TEXTURE_MIN_FILTER, glMinFilter);
     glSamplerParameteri(s, GL_TEXTURE_MAG_FILTER, glMagFilter);
-    glSamplerParameterf(s, GL_TEXTURE_MAX_ANISOTROPY_EXT, 1.0);
-    glSamplerParameterfv(s, GL_TEXTURE_BORDER_COLOR, borderColor);
+    glSamplerParameterf(s, GL_TEXTURE_MAX_ANISOTROPY_EXT,
+                        _maxAnisotropy);
+    glSamplerParameterfv(s, GL_TEXTURE_BORDER_COLOR,
+                         _borderColor.GetArray());
 }
-
 
 bool
 HdSt_DrawTargetTextureResource::IsPtex() const

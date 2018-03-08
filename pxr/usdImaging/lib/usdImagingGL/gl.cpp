@@ -34,7 +34,8 @@
 #include "pxr/base/tf/diagnostic.h"
 
 #include "pxr/imaging/glf/glContext.h"
-#include "pxr/imaging/glf/textureRegistry.h"
+
+#include "pxr/imaging/garch/textureRegistry.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -228,8 +229,8 @@ UsdImagingGL::SetLightingStateFromOpenGL()
 
 /* virtual */
 void
-UsdImagingGL::SetLightingState(GlfSimpleLightVector const &lights,
-                               GlfSimpleMaterial const &material,
+UsdImagingGL::SetLightingState(GarchSimpleLightVector const &lights,
+                               GarchSimpleMaterial const &material,
                                GfVec4f const &sceneAmbient)
 {
     _engine->SetLightingState(lights, material, sceneAmbient);
@@ -238,7 +239,7 @@ UsdImagingGL::SetLightingState(GlfSimpleLightVector const &lights,
 
 /* virtual */
 void
-UsdImagingGL::SetLightingState(GlfSimpleLightingContextPtr const &src)
+UsdImagingGL::SetLightingState(GarchSimpleLightingContextPtr const &src)
 {
     _engine->SetLightingState(src);
 }
@@ -351,7 +352,7 @@ UsdImagingGL::GetResourceAllocation() const
     // append texture usage
     size_t texMem = 0;
     for (auto const &texInfo :
-             GlfTextureRegistry::GetInstance().GetTextureInfos()) {
+             GarchTextureRegistry::GetInstance().GetTextureInfos()) {
         VtDictionary::const_iterator it = texInfo.find("memoryUsed");
         if (it != texInfo.end()) {
             VtValue mem = it->second;

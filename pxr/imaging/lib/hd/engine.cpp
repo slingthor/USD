@@ -79,44 +79,52 @@ HdEngine::RemoveTaskContextData(const TfToken &id)
 void
 HdEngine::Execute(HdRenderIndex& index, HdTaskSharedPtrVector const &tasks)
 {
-    // Note: For Hydra Stream render delegate.
-    //
-    //
-    // The following order is important, be careful.
-    //
-    // If Sync updates topology varying prims, it triggers both:
-    //   1. changing drawing coordinate and bumps up the global collection
-    //      version to invalidate the (indirect) batch.
-    //   2. marking garbage collection needed so that the unused BAR
-    //      resources will be reclaimed.
-    //   Also resizing ranges likely cause the buffer reallocation
-    //   (==drawing coordinate changes) anyway.
-    //
-    // Note that the garbage collection also changes the drawing coordinate,
-    // so the collection should be invalidated in that case too.
-    //
-    // Once we reflect all conditions which provoke the batch recompilation
-    // into the collection dirtiness, we can call
-    // HdRenderPass::GetCommandBuffer() to get the right batch.
-
     // --------------------------------------------------------------------- //
     // DATA DISCOVERY PHASE
     // --------------------------------------------------------------------- //
     // Discover all required input data needed to render the required render
     // prim representations. At this point, we must read enough data to
     // establish the resource dependency graph, but we do not yet populate CPU-
-    // nor GPU-memory with data.
+    // or GPU-memory with data.
 
     // As a result of the next call, the resource registry will be populated
     // with both BufferSources that need to be resolved (possibly generating
-    // data on the CPU) and computations to run on the GPU.
+    // data on the CPU) and computations to run on the CPU/GPU.
 
+    TF_DEBUG(HD_ENGINE_PHASE_INFO).Msg(
+            "\n"
+            "==============================================================\n"
+            "      HdEngine [Data Discovery Phase](RenderIndex::SyncAll)   \n"
+            "--------------------------------------------------------------\n");
 
-    // Process all pending dirty lists
     index.SyncAll(tasks, &_taskContext);
 
+    // --------------------------------------------------------------------- //
+    // DATA COMMIT PHASE
+    // --------------------------------------------------------------------- //
+    // Having acquired handles to the data needed to update various resources,
+    // we let the render delegate 'commit' these resources. These resources may
+    // reside either on the CPU/GPU/both; that depends on the render delegate
+    // implementation.
+    TF_DEBUG(HD_ENGINE_PHASE_INFO).Msg(
+            "\n"
+            "==============================================================\n"
+            " HdEngine [Data Commit Phase](RenderDelegate::CommitResources)\n"
+            "--------------------------------------------------------------\n");
+    
     HdRenderDelegate *renderDelegate = index.GetRenderDelegate();
     renderDelegate->CommitResources(&index.GetChangeTracker());
+
+    // --------------------------------------------------------------------- //
+    // EXECUTE PHASE
+    // --------------------------------------------------------------------- //
+    // Having updated all the necessary data buffers, we can finally execute
+    // the rendering tasks.
+    TF_DEBUG(HD_ENGINE_PHASE_INFO).Msg(
+            "\n"
+            "==============================================================\n"
+            "             HdEngine [Execute Phase](Task::Execute)          \n"
+            "--------------------------------------------------------------\n");
 
     TF_FOR_ALL(it, tasks) {
         (*it)->Execute(&_taskContext);
@@ -133,7 +141,7 @@ HdEngine::ReloadAllShaders(HdRenderIndex& index)
 
     // Dirty all materials
     SdfPathVector materials = index.GetSprimSubtree(HdPrimTypeTokens->material,
-                                                  SdfPath::EmptyPath());
+                                                    SdfPath::AbsoluteRootPath());
 
     for (SdfPathVector::iterator materialIt  = materials.begin();
                                  materialIt != materials.end();
@@ -155,173 +163,6 @@ HdEngine::ReloadAllShaders(HdRenderIndex& index)
     // - Render Pass Shaders
     // - Culling Shader
 }
-/*
-Hd_CodeGen *HdEngine::CreateCodeGen(Hd_GeometricShaderPtr const &geometricShader,
-                                    HdShaderCodeSharedPtrVector const &shaders)
-{
-    switch(_renderAPI) {
-        case RenderAPI::OpenGL: return new Hd_CodeGenGLSL(geometricShader, shaders);
-#if defined(ARCH_GFX_METAL)
-        case RenderAPI::Metal: return new Hd_CodeGenMSL(geometricShader, shaders);
-#endif
-        default:
-            TF_FATAL_CODING_ERROR("No Hd_CodeGen for this API");
-    }
-    return nullptr;
-}
 
-Hd_CodeGen *HdEngine::CreateCodeGen(HdShaderCodeSharedPtrVector const &shaders)
-{
-    switch(_renderAPI) {
-        case RenderAPI::OpenGL: return new Hd_CodeGenGLSL(shaders);
-#if defined(ARCH_GFX_METAL)
-        case RenderAPI::Metal: return new Hd_CodeGenMSL(shaders);
-#endif
-        default:
-        TF_FATAL_CODING_ERROR("No Hd_CodeGen for this API");
-    }
-    return nullptr;
-}
-
-GLSLFX *HdEngine::CreateGLSLFX()
-{
-    switch(_renderAPI) {
-        case RenderAPI::OpenGL: return new GlfGLSLFX();
-#if defined(ARCH_GFX_METAL)
-        case RenderAPI::Metal: return new MtlfGLSLFX();
-#endif
-        default:
-        TF_FATAL_CODING_ERROR("No GLSLFX for this API");
-    }
-    return nullptr;
-}
-
-GLSLFX *HdEngine::CreateGLSLFX(std::string const & filePath)
-{
-    switch(_renderAPI) {
-        case RenderAPI::OpenGL: return new GlfGLSLFX(filePath);
-#if defined(ARCH_GFX_METAL)
-        case RenderAPI::Metal: return new MtlfGLSLFX(filePath);
-#endif
-        default:
-        TF_FATAL_CODING_ERROR("No GLSLFX for this API");
-    }
-    return nullptr;
-}
-
-GLSLFX *HdEngine::CreateGLSLFX(std::istream &is)
-{
-    switch(_renderAPI) {
-        case RenderAPI::OpenGL: return new GlfGLSLFX(is);
-#if defined(ARCH_GFX_METAL)
-        case RenderAPI::Metal: return new MtlfGLSLFX(is);
-#endif
-        default:
-        TF_FATAL_CODING_ERROR("No GLSLFX for this API");
-    }
-    return nullptr;
-}
-
-HdBufferResource *HdEngine::CreateResourceBuffer(TfToken const &role,
-                                             int glDataType,
-                                             short numComponents,
-                                             int arraySize,
-                                             int offset,
-                                             int stride)
-{
-    switch(_renderAPI) {
-        case RenderAPI::OpenGL: return new HdStBufferResourceGL(
-            role, glDataType, numComponents, arraySize, offset, stride);
-#if defined(ARCH_GFX_METAL)
-        case RenderAPI::Metal: return new HdStBufferResourceMetal(
-            role, glDataType, numComponents, arraySize, offset, stride);
-#endif
-        default:
-        TF_FATAL_CODING_ERROR("No resource buffer for this API");
-    }
-    return nullptr;
-}
-
-HdProgram *HdEngine::CreateProgram(TfToken const &role)
-{
-    switch(_renderAPI) {
-        case RenderAPI::OpenGL: return new HdGLSLProgram(role);
-#if defined(ARCH_GFX_METAL)
-        case RenderAPI::Metal: return new HdMSLProgram(role);
-#endif
-        default:
-        TF_FATAL_CODING_ERROR("No program for this API");
-    }
-    return nullptr;
-}
-
-HdBufferRelocator *HdEngine::CreateBufferRelocator(HdBufferResourceGPUHandle srcBuffer, HdBufferResourceGPUHandle dstBuffer)
-{
-    switch(_renderAPI) {
-        case RenderAPI::OpenGL: return new HdStBufferRelocator(srcBuffer, dstBuffer);
-#if defined(ARCH_GFX_METAL)
-        case RenderAPI::Metal: return new HdBufferRelocatorMetal(srcBuffer, dstBuffer);
-#endif
-        default:
-        TF_FATAL_CODING_ERROR("No program for this API");
-    }
-    return nullptr;
-}
-
-HdPersistentBuffer *HdEngine::CreatePersistentBuffer(TfToken const &role, size_t dataSize, void* data)
-{
-    switch(_renderAPI) {
-        case RenderAPI::OpenGL: return new HdStPersistentBufferGL(role, dataSize, data);
-#if defined(ARCH_GFX_METAL)
-        case RenderAPI::Metal: return new HdStPersistentBufferMetal(role, dataSize, data);
-#endif
-        default:
-        TF_FATAL_CODING_ERROR("No program for this API");
-    }
-    return nullptr;
-}
-
-GarchDrawTargetRefPtr HdEngine::CreateDrawTarget(GfVec2i const & size, bool requestMSAA)
-{
-    switch(_renderAPI) {
-        case RenderAPI::OpenGL: return TfCreateRefPtr(GlfDrawTarget::New(size, requestMSAA));
-#if defined(ARCH_GFX_METAL)
-        case RenderAPI::Metal: return TfCreateRefPtr(MtlfDrawTarget::New(size, requestMSAA));
-#endif
-        default:
-            TF_FATAL_CODING_ERROR("No program for this API");
-    }
-    return nullptr;
-}
-
-HdTextureResource *HdEngine::CreateSimpleTextureResource(GarchTextureHandleRefPtr const &textureHandle, bool isPtex)
-{
-    switch(_renderAPI) {
-        case RenderAPI::OpenGL: return new HdSimpleTextureResourceGL(textureHandle, isPtex);
-#if defined(ARCH_GFX_METAL)
-        case RenderAPI::Metal: return new HdSimpleTextureResourceMetal(textureHandle, isPtex);
-#endif
-        default:
-            TF_FATAL_CODING_ERROR("No program for this API");
-    }
-    return nullptr;
-}
-
-HdTextureResource *HdEngine::CreateSimpleTextureResource(GarchTextureHandleRefPtr const &textureHandle, bool isPtex,
-                                                         HdWrap wrapS, HdWrap wrapT, HdMinFilter minFilter, HdMagFilter magFilter)
-{
-    switch(_renderAPI) {
-        case RenderAPI::OpenGL: return new HdSimpleTextureResourceGL(textureHandle, isPtex,
-                                                                     wrapS, wrapT, minFilter, magFilter);
-#if defined(ARCH_GFX_METAL)
-        case RenderAPI::Metal: return new HdSimpleTextureResourceMetal(textureHandle, isPtex,
-                                                                       wrapS, wrapT, minFilter, magFilter);
-#endif
-        default:
-            TF_FATAL_CODING_ERROR("No program for this API");
-    }
-    return nullptr;
-}
-*/
 PXR_NAMESPACE_CLOSE_SCOPE
 

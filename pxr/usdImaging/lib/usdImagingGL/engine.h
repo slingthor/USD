@@ -31,8 +31,8 @@
 #include "pxr/usdImaging/usdImagingGL/api.h"
 #include "pxr/usdImaging/usdImaging/version.h"
 
-#include "pxr/imaging/glf/simpleLight.h"
-#include "pxr/imaging/glf/simpleMaterial.h"
+#include "pxr/imaging/garch/simpleLight.h"
+#include "pxr/imaging/garch/simpleMaterial.h"
 
 #include "pxr/base/tf/declarePtrs.h"
 #include "pxr/usd/sdf/path.h"
@@ -54,8 +54,8 @@ PXR_NAMESPACE_OPEN_SCOPE
 class UsdPrim;
 
 typedef boost::shared_ptr<class GlfGLContext> GlfGLContextSharedPtr;
-TF_DECLARE_WEAK_AND_REF_PTRS(GlfDrawTarget);
-TF_DECLARE_WEAK_PTRS(GlfSimpleLightingContext);
+TF_DECLARE_WEAK_AND_REF_PTRS(GarchDrawTarget);
+TF_DECLARE_WEAK_PTRS(GarchSimpleLightingContext);
 
 /// \class UsdImagingGLEngine
 ///
@@ -196,15 +196,15 @@ public:
 
     /// Copy lighting state from another lighting context.
     USDIMAGINGGL_API
-    virtual void SetLightingState(GlfSimpleLightingContextPtr const &src);
+    virtual void SetLightingState(GarchSimpleLightingContextPtr const &src);
 
     /// Set lighting state
     /// Derived classes should ensure that passing an empty lights
     /// vector disables lighting.
     /// \param lights is the set of lights to use, or empty to disable lighting.
     USDIMAGINGGL_API
-    virtual void SetLightingState(GlfSimpleLightVector const &lights,
-                                  GlfSimpleMaterial const &material,
+    virtual void SetLightingState(GarchSimpleLightVector const &lights,
+                                  GarchSimpleMaterial const &material,
                                   GfVec4f const &sceneAmbient);
 
     /// Sets the root transform.
@@ -238,14 +238,14 @@ public:
     USDIMAGINGGL_API
     virtual void SetSelectionColor(GfVec4f const& color);
 
-    /// Finds closest point of interesection with a frustum by rendering.
+    /// Finds closest point of intersection with a frustum by rendering.
     ///	
     /// This method uses a PickRender and a customized depth buffer to find an
     /// approximate point of intersection by rendering. This is less accurate
     /// than implicit methods or rendering with GL_SELECT, but leverages any data
     /// already cached in the renderer.
     ///
-    /// Returns whether a hit occured and if so, \p outHitPoint will contain the
+    /// Returns whether a hit occurred and if so, \p outHitPoint will contain the
     /// intersection point in world space (i.e. \p projectionMatrix and
     /// \p viewMatrix factored back out of the result).
     ///
@@ -266,7 +266,7 @@ public:
     /// See the documentation for TestIntersectionBatch() below for more detail.
     typedef std::function< SdfPath(const SdfPath&, const SdfPath&, const int) > PathTranslatorCallback;
 
-    /// Finds closest point of interesection with a frustum by rendering a batch.
+    /// Finds closest point of intersection with a frustum by rendering a batch.
     ///
     /// This method uses a PickRender and a customized depth buffer to find an
     /// approximate point of intersection by rendering. This is less accurate
@@ -379,7 +379,7 @@ public:
 protected:
     // Intentionally putting these under protected so that subclasses can share the usage of draw targets.
     // Once refEngine goes away and we only have hdEngine, it may be best to move this to private
-    typedef boost::unordered_map<GlfGLContextSharedPtr, GlfDrawTargetRefPtr> _DrawTargetPerContextMap;
+    typedef boost::unordered_map<GlfGLContextSharedPtr, GarchDrawTargetRefPtr> _DrawTargetPerContextMap;
     _DrawTargetPerContextMap _drawTargets;
 };
 

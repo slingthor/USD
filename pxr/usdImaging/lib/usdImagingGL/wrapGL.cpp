@@ -88,8 +88,8 @@ _GetPrimPathFromInstanceIndex(
 }
 
 static void
-_SetLightingState(UsdImagingGL &self, GlfSimpleLightVector const &lights,
-                  GlfSimpleMaterial const &material, GfVec4f const &sceneAmbient)
+_SetLightingState(UsdImagingGL &self, GarchSimpleLightVector const &lights,
+                  GarchSimpleMaterial const &material, GfVec4f const &sceneAmbient)
 {
     self.SetLightingState(lights, material, sceneAmbient);
 }
@@ -135,11 +135,11 @@ void wrapGL()
             .value("DRAW_POINTS", UsdImagingGL::DRAW_POINTS)
             .value("DRAW_WIREFRAME", UsdImagingGL::DRAW_WIREFRAME)
             .value("DRAW_WIREFRAME_ON_SURFACE", UsdImagingGL::DRAW_WIREFRAME_ON_SURFACE)
-	    .value("DRAW_SHADED_FLAT", UsdImagingGL::DRAW_SHADED_FLAT)
-	    .value("DRAW_SHADED_SMOOTH", UsdImagingGL::DRAW_SHADED_SMOOTH)
-	    .value("DRAW_GEOM_ONLY", UsdImagingGL::DRAW_GEOM_ONLY)
-	    .value("DRAW_GEOM_FLAT", UsdImagingGL::DRAW_GEOM_FLAT)
-	    .value("DRAW_GEOM_SMOOTH", UsdImagingGL::DRAW_GEOM_SMOOTH)
+            .value("DRAW_SHADED_FLAT", UsdImagingGL::DRAW_SHADED_FLAT)
+            .value("DRAW_SHADED_SMOOTH", UsdImagingGL::DRAW_SHADED_SMOOTH)
+            .value("DRAW_GEOM_ONLY", UsdImagingGL::DRAW_GEOM_ONLY)
+            .value("DRAW_GEOM_FLAT", UsdImagingGL::DRAW_GEOM_FLAT)
+            .value("DRAW_GEOM_SMOOTH", UsdImagingGL::DRAW_GEOM_SMOOTH)
         ;
 
         // Wrap the CullStyle enum. Accessible as UsdImaging.GL.CullStyle
@@ -175,7 +175,7 @@ void wrapGL()
         ;
 
         TfPyContainerConversions::from_python_sequence<
-            std::vector<GlfSimpleLight>,
+            std::vector<GarchSimpleLight>,
                 TfPyContainerConversions::variable_capacity_policy>();
     }
 }

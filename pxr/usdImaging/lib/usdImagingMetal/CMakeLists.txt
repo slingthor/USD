@@ -32,13 +32,19 @@ pxr_library(usdImagingMetal
         ${TBB_INCLUDE_DIRS}
 
     PUBLIC_CLASSES
+        drawModeAdapter
         engine
         metal
         hdEngine
+        hydraMaterialAdapter
+        package
 
     PUBLIC_HEADERS
         api.h
         version.h
+
+    PRIVATE_CLASSES
+        textureUtils
 
     PRIVATE_HEADERS
         unitTestMetalDrawing.h
@@ -52,21 +58,23 @@ pxr_library(usdImagingMetal
 
     PYMODULE_FILES
         __init__.py
+
+    RESOURCE_FILES
+        plugInfo.json
+        shaders/drawMode.glslfx
 )
 
-if (X11_FOUND OR APPLE)
-    pxr_build_test(testUsdImagingMetalBasicDrawing
-        LIBRARIES
-            hd
-            garch
-            mtlf
-            usd
-            usdUtils
-            usdImaging
-            usdImagingMetal
-            sdf
-        CPPFILES
-            unitTestMetalDrawing.cpp
-            testenv/testUsdImagingMetalBasicDrawing.cpp
-    )
-endif()
+pxr_build_test(testUsdImagingMetalBasicDrawing
+    LIBRARIES
+        hd
+        garch
+        mtlf
+        usd
+        usdUtils
+        usdImaging
+        usdImagingMetal
+        sdf
+    CPPFILES
+        unitTestMetalDrawing.cpp
+        testenv/testUsdImagingMetalBasicDrawing.cpp
+)

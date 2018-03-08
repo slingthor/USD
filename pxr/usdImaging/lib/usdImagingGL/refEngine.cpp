@@ -474,8 +474,8 @@ UsdImagingGLRefEngine::SetCameraState(const GfMatrix4d& viewMatrix,
 }
 
 void
-UsdImagingGLRefEngine::SetLightingState(GlfSimpleLightVector const &lights,
-                                        GlfSimpleMaterial const &material,
+UsdImagingGLRefEngine::SetLightingState(GarchSimpleLightVector const &lights,
+                                        GarchSimpleMaterial const &material,
                                         GfVec4f const &sceneAmbient)
 {
     if (lights.empty()) {
@@ -491,7 +491,7 @@ UsdImagingGLRefEngine::SetLightingState(GlfSimpleLightVector const &lights,
         for (size_t i = 0; i < static_cast<size_t>(maxLights); ++i) {
             if (i < lights.size()) {
                 glEnable(GL_LIGHT0+i);
-                GlfSimpleLight const &light = lights[i];
+                GarchSimpleLight const &light = lights[i];
 
                 glLightfv(GL_LIGHT0+i, GL_POSITION, light.GetPosition().data());
                 glLightfv(GL_LIGHT0+i, GL_AMBIENT,  light.GetAmbient().data());
@@ -513,17 +513,17 @@ UsdImagingGLRefEngine::SetLightingState(GlfSimpleLightVector const &lights,
 
 void 
 UsdImagingGLRefEngine::_OnObjectsChanged(UsdNotice::ObjectsChanged const& notice,
-                                       UsdStageWeakPtr const& sender)
+                                         UsdStageWeakPtr const& sender)
 {
     InvalidateBuffers(); 
 }
 
 static void 
 UsdImagingGLRefEngine_ComputeSmoothNormals(const VtVec3fArray &points,
-                                  const VtIntArray &numVerts,
-                                  const VtIntArray &verts, 
-                                  bool ccw,
-                                  VtVec3fArray * normals)
+                                           const VtIntArray &numVerts,
+                                           const VtIntArray &verts,
+                                           bool ccw,
+                                           VtVec3fArray * normals)
 {
     TRACE_FUNCTION();
 

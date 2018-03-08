@@ -30,7 +30,7 @@
 #include "pxr/imaging/mtlf/drawTarget.h"
 #include "pxr/imaging/mtlf/info.h"
 
-#include "pxr/imaging/hdx/renderSetupTask.h"
+#include "pxr/imaging/hdx/intersector.h"
 
 #include "pxr/base/tf/stl.h"
 
@@ -312,47 +312,45 @@ UsdImagingMetalEngine::TestIntersection(
     for (int y=0, i=0; y<height; y++) {
         for (int x=0; x<width; x++, i++) {
             if (depths[i] < zMin) {
-	            xMin = x;
-	            yMin = y;
-	            zMin = depths[i];
-                    zMinIndex = i;
+                xMin = x;
+                yMin = y;
+                zMin = depths[i];
+                zMinIndex = i;
             }
         }
     }
-
+    
     bool didHit = (zMin < 1.0);
-
+    
     if (didHit) {
         GLint viewport[4] = { 0, 0, width, height };
         GfVec3d hitPoint;
-
-        TF_CODING_ERROR("Not Implemented");
-        /*
+        
         gluUnProject( xMin, yMin, zMin,
-                      viewMatrix.GetArray(),
-                      projectionMatrix.GetArray(),
-                      viewport,
-                      &((*outHitPoint)[0]),
-                      &((*outHitPoint)[1]),
-                      &((*outHitPoint)[2]));
-*/
+                     viewMatrix.GetArray(),
+                     projectionMatrix.GetArray(),
+                     viewport,
+                     &((*outHitPoint)[0]),
+                     &((*outHitPoint)[1]),
+                     &((*outHitPoint)[2]));
+        
         if (outHitPrimPath) {
             int idIndex = zMinIndex*4;
-
+            
             *outHitPrimPath = GetRprimPathFromPrimId(
-                    HdxRenderSetupTask::DecodeIDRenderColor(&primId[idIndex]));
+                HdxIntersector::DecodeIDRenderColor(&primId[idIndex]));
             if (outHitInstanceIndex) {
-                *outHitInstanceIndex = HdxRenderSetupTask::DecodeIDRenderColor(
-                        &instanceId[idIndex]);
+                *outHitInstanceIndex = HdxIntersector::DecodeIDRenderColor(
+                    &instanceId[idIndex]);
             }
             if (outHitElementIndex) {
-                *outHitElementIndex = HdxRenderSetupTask::DecodeIDRenderColor(
-                        &elementId[idIndex]);
+                *outHitElementIndex = HdxIntersector::DecodeIDRenderColor(
+                    &elementId[idIndex]);
             }
-
+            
         }
     }
-
+    
     drawTarget->Unbind();
 
     return didHit;
@@ -639,7 +637,7 @@ UsdImagingMetalEngine::GetPrimPathFromPrimIdColor(GfVec4i const &primIdColor,
         uint8_t(primIdColor[3])
     };
 
-    int primId = HdxRenderSetupTask::DecodeIDRenderColor(primIdColorBytes);
+    int primId = HdxIntersector::DecodeIDRenderColor(primIdColorBytes);
     SdfPath result = GetRprimPathFromPrimId(primId);
     if (!result.IsEmpty()) {
         if (instanceIndexOut) {
@@ -649,7 +647,7 @@ UsdImagingMetalEngine::GetPrimPathFromPrimIdColor(GfVec4i const &primIdColor,
                 uint8_t(instanceIdColor[2]),
                 uint8_t(instanceIdColor[3])
             };
-            *instanceIndexOut = HdxRenderSetupTask::DecodeIDRenderColor(
+            *instanceIndexOut = HdxIntersector::DecodeIDRenderColor(
                     instanceIdColorBytes);
         }
     }

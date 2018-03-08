@@ -57,13 +57,17 @@ public:
 protected:
     GarchDrawTarget::AttachmentRefPtr  _attachment;
     GarchSamplerGPUHandle              _sampler;
+    GfVec4f                            _borderColor;
+    float                              _maxAnisotropy;
     
     HdSt_DrawTargetTextureResource();
 
 private:
     // No copying
-    HdSt_DrawTargetTextureResource(const HdSt_DrawTargetTextureResource &)             = delete;
-    HdSt_DrawTargetTextureResource &operator =(const HdSt_DrawTargetTextureResource &) = delete;
+    HdSt_DrawTargetTextureResource(
+        const HdSt_DrawTargetTextureResource &) = delete;
+    HdSt_DrawTargetTextureResource &operator =(
+        const HdSt_DrawTargetTextureResource &) = delete;
 };
 
 

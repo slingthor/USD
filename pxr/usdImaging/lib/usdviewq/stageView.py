@@ -26,8 +26,7 @@ Module that provides the StageView class.
 '''
 
 from math import tan, atan, floor, ceil, radians as rad
-import os
-from sys import platform as _platform
+import os, sys
 from time import time
 
 from qt import QtCore, QtGui, QtWidgets, QtOpenGL
@@ -1109,7 +1108,7 @@ class StageView(QtOpenGL.QGLWidget):
     signalBboxUpdateTimeChanged = QtCore.Signal(int)
 
     # First arg is primPath, (which could be empty Path)
-    # Second arg is instanceIndex (or UsdImagingMetal.Metal.ALL_INSTANCES for all instances)
+    # Second arg is instanceIndex (or UsdImagingOpenGL.GL.ALL_INSTANCES for all instances)
     # Third and Fourth args represent state at time of the pick
     signalPrimSelected = QtCore.Signal(Sdf.Path, int, QtCore.Qt.MouseButton,
                                        QtCore.Qt.KeyboardModifiers)
@@ -1289,17 +1288,17 @@ class StageView(QtOpenGL.QGLWidget):
 
         self._renderer = None
         self._reportedContextError = False
-        self._renderModeDict={RenderModes.WIREFRAME:UsdImagingMetal.Metal.DrawMode.DRAW_WIREFRAME,
-                              RenderModes.WIREFRAME_ON_SURFACE:UsdImagingMetal.Metal.DrawMode.DRAW_WIREFRAME_ON_SURFACE,
-                              RenderModes.SMOOTH_SHADED:UsdImagingMetal.Metal.DrawMode.DRAW_SHADED_SMOOTH,
-                              RenderModes.POINTS:UsdImagingMetal.Metal.DrawMode.DRAW_POINTS,
-                              RenderModes.FLAT_SHADED:UsdImagingMetal.Metal.DrawMode.DRAW_SHADED_FLAT,
-                              RenderModes.GEOM_ONLY:UsdImagingMetal.Metal.DrawMode.DRAW_GEOM_ONLY,
-                              RenderModes.GEOM_SMOOTH:UsdImagingMetal.Metal.DrawMode.DRAW_GEOM_SMOOTH,
-                              RenderModes.GEOM_FLAT:UsdImagingMetal.Metal.DrawMode.DRAW_GEOM_FLAT,
-                              RenderModes.HIDDEN_SURFACE_WIREFRAME:UsdImagingMetal.Metal.DrawMode.DRAW_WIREFRAME}
+        self._renderModeDict={RenderModes.WIREFRAME:UsdImagingOpenGL.GL.DrawMode.DRAW_WIREFRAME,
+                              RenderModes.WIREFRAME_ON_SURFACE:UsdImagingOpenGL.GL.DrawMode.DRAW_WIREFRAME_ON_SURFACE,
+                              RenderModes.SMOOTH_SHADED:UsdImagingOpenGL.GL.DrawMode.DRAW_SHADED_SMOOTH,
+                              RenderModes.POINTS:UsdImagingOpenGL.GL.DrawMode.DRAW_POINTS,
+                              RenderModes.FLAT_SHADED:UsdImagingOpenGL.GL.DrawMode.DRAW_SHADED_FLAT,
+                              RenderModes.GEOM_ONLY:UsdImagingOpenGL.GL.DrawMode.DRAW_GEOM_ONLY,
+                              RenderModes.GEOM_SMOOTH:UsdImagingOpenGL.GL.DrawMode.DRAW_GEOM_SMOOTH,
+                              RenderModes.GEOM_FLAT:UsdImagingOpenGL.GL.DrawMode.DRAW_GEOM_FLAT,
+                              RenderModes.HIDDEN_SURFACE_WIREFRAME:UsdImagingOpenGL.GL.DrawMode.DRAW_WIREFRAME}
 
-        self._renderParams = UsdImagingMetal.Metal.RenderParams()
+        self._renderParams = UsdImagingOpenGL.GL.RenderParams()
         self._defaultFov = 60
         self._dist = 50
         self._oldDist = self._dist
@@ -1349,7 +1348,7 @@ class StageView(QtOpenGL.QGLWidget):
         # create the renderer lazily, when we try to do real work with it.
         if not self._renderer:
             if self.isValid():
-                self._renderer = UsdImagingMetal.Metal()
+                self._renderer = UsdImagingOpenGL.GL()
                 self._rendererPluginName = ""
             elif not self._reportedContextError:
                 self._reportedContextError = True
@@ -1670,7 +1669,7 @@ class StageView(QtOpenGL.QGLWidget):
                 for instanceIndex in primInstances:
                     renderer.AddSelected(prim.GetPath(), instanceIndex)
             else:
-                renderer.AddSelected(prim.GetPath(), UsdImagingMetal.Metal.ALL_INSTANCES)
+                renderer.AddSelected(prim.GetPath(), UsdImagingOpenGL.GL.ALL_INSTANCES)
 
     def _getEmptyBBox(self):
         return Gf.BBox3d()
@@ -1720,15 +1719,15 @@ class StageView(QtOpenGL.QGLWidget):
 
         # update rendering parameters
         self._renderParams.frame = self._dataModel.currentFrame
-        self._renderParams.complexity = self._dataModel.viewSettings.complexity
+        self._renderParams.complexity = self._dataModel.viewSettings.complexity.value
         self._renderParams.drawMode = renderMode
         self._renderParams.showGuides = self._dataModel.viewSettings.displayGuide
         self._renderParams.showProxy = self._dataModel.viewSettings.displayProxy
         self._renderParams.showRender = self._dataModel.viewSettings.displayRender
         self._renderParams.forceRefresh = self._forceRefresh
-        self._renderParams.cullStyle =  (UsdImagingMetal.Metal.CullStyle.CULL_STYLE_BACK_UNLESS_DOUBLE_SIDED
+        self._renderParams.cullStyle =  (UsdImagingOpenGL.GL.CullStyle.CULL_STYLE_BACK_UNLESS_DOUBLE_SIDED
                                                if self._dataModel.viewSettings.cullBackfaces
-                                               else UsdImagingMetal.Metal.CullStyle.CULL_STYLE_NOTHING)
+                                               else UsdImagingOpenGL.GL.CullStyle.CULL_STYLE_NOTHING)
         self._renderParams.gammaCorrectColors = False
         self._renderParams.enableIdRender = self._dataModel.viewSettings.displayPrimId
         self._renderParams.enableSampleAlphaToCoverage = not self._dataModel.viewSettings.displayPrimId
@@ -1738,7 +1737,13 @@ class StageView(QtOpenGL.QGLWidget):
         pseudoRoot = self._dataModel.stage.GetPseudoRoot()
 
         renderer.SetSelectionColor(self._dataModel.viewSettings.highlightColor)
-        renderer.Render(pseudoRoot, self._renderParams)
+        try:
+            renderer.Render(pseudoRoot, self._renderParams)
+        except Tf.ErrorException as e:
+            # If we encounter an error during a render, we want to continue
+            # running. Just log the error and continue.
+            sys.stderr.write(
+                "ERROR: Usdview encountered an error while rendering.{}\n".format(e))
         self._forceRefresh = False
 
 
@@ -2183,7 +2188,7 @@ class StageView(QtOpenGL.QGLWidget):
             if self._cameraPrim:
                 camName = self._cameraPrim.GetName()
 
-            toPrint = {"Complexity" : self._dataModel.viewSettings.complexity,
+            toPrint = {"Complexity" : self._dataModel.viewSettings.complexity.name,
                        "Camera" : camName}
             self._hud.updateGroup("BottomRight",
                                   self.width()-200, self.height()-self._hud._HUDLineSpacing*2,
@@ -2194,7 +2199,7 @@ class StageView(QtOpenGL.QGLWidget):
         # Hydra Enabled (Top Right)
         hydraMode = "Disabled"
 
-        if UsdImagingMetal.Metal.IsEnabledHydra():
+        if UsdImagingOpenGL.GL.IsEnabledHydra():
             hydraMode = self._rendererPluginName
             if not hydraMode:
                 hydraMode = "Enabled"
@@ -2398,15 +2403,15 @@ class StageView(QtOpenGL.QGLWidget):
 
         # update rendering parameters
         self._renderParams.frame = self._dataModel.currentFrame
-        self._renderParams.complexity = self._dataModel.viewSettings.complexity
+        self._renderParams.complexity = self._dataModel.viewSettings.complexity.value
         self._renderParams.drawMode = self._renderModeDict[self._dataModel.viewSettings.renderMode]
         self._renderParams.showGuides = self._dataModel.viewSettings.displayGuide
         self._renderParams.showProxy = self._dataModel.viewSettings.displayProxy
         self._renderParams.showRender = self._dataModel.viewSettings.displayRender
         self._renderParams.forceRefresh = self._forceRefresh
-        self._renderParams.cullStyle =  (UsdImagingMetal.Metal.CullStyle.CULL_STYLE_BACK_UNLESS_DOUBLE_SIDED
+        self._renderParams.cullStyle =  (UsdImagingOpenGL.GL.CullStyle.CULL_STYLE_BACK_UNLESS_DOUBLE_SIDED
                                                if self._dataModel.viewSettings.cullBackfaces
-                                               else UsdImagingMetal.Metal.CullStyle.CULL_STYLE_NOTHING)
+                                               else UsdImagingOpenGL.GL.CullStyle.CULL_STYLE_NOTHING)
         self._renderParams.gammaCorrectColors = False
         self._renderParams.enableIdRender = True
         self._renderParams.enableSampleAlphaToCoverage = False

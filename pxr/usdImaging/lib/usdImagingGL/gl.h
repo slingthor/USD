@@ -131,12 +131,12 @@ public:
 
     /// Copy lighting state from another lighting context.
     USDIMAGINGGL_API
-    virtual void SetLightingState(GlfSimpleLightingContextPtr const &src);
+    virtual void SetLightingState(GarchSimpleLightingContextPtr const &src);
 
     /// Set lighting state
     USDIMAGINGGL_API
-    virtual void SetLightingState(GlfSimpleLightVector const &lights,
-                                  GlfSimpleMaterial const &material,
+    virtual void SetLightingState(GarchSimpleLightVector const &lights,
+                                  GarchSimpleMaterial const &material,
                                   GfVec4f const &sceneAmbient);
 
     USDIMAGINGGL_API

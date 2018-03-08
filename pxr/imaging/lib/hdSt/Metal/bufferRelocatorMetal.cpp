@@ -28,6 +28,7 @@
 
 #include "pxr/imaging/hdSt/Metal/bufferRelocatorMetal.h"
 
+#include "pxr/base/tf/iterator.h"
 #include "pxr/base/vt/array.h"
 
 PXR_NAMESPACE_OPEN_SCOPE

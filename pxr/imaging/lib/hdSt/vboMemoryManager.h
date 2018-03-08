@@ -169,7 +169,7 @@ protected:
         HDST_API
         virtual HdBufferResourceNamedList const& GetResources() const override;
 
-        /// Sets the buffer array assosiated with this buffer;
+        /// Sets the buffer array associated with this buffer;
         HDST_API
         virtual void SetBufferArray(HdBufferArray *bufferArray) override;
 
@@ -281,7 +281,7 @@ protected:
         HdBufferResourceSharedPtr GetResource() const;
 
         /// Returns the named GPU resource. This method returns the first found
-        /// resource. In HD_SAFE_MODE it checkes all underlying GL buffers
+        /// resource. In HD_SAFE_MODE it checks all underlying GL buffers
         /// in _resourceMap and raises a coding error if there are more than
         /// one GL buffers exist.
         HDST_API
@@ -314,7 +314,7 @@ protected:
 
         HdBufferResourceNamedList _resourceList;
 
-        // Helpper routine to cast the range shared pointer.
+        // Helper routine to cast the range shared pointer.
         _StripedBufferArrayRangeSharedPtr _GetRangeSharedPtr(size_t idx) const {
             return boost::static_pointer_cast<_StripedBufferArrayRange>(GetRange(idx).lock());
         }

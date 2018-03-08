@@ -29,7 +29,7 @@
 #include "pxr/imaging/glf/drawTarget.h"
 #include "pxr/imaging/glf/info.h"
 
-#include "pxr/imaging/hdx/renderSetupTask.h"
+#include "pxr/imaging/hdx/intersector.h"
 
 #include "pxr/base/tf/stl.h"
 
@@ -81,15 +81,15 @@ UsdImagingGLEngine::SetLightingStateFromOpenGL()
 
 /* virtual */
 void
-UsdImagingGLEngine::SetLightingState(GlfSimpleLightingContextPtr const &src)
+UsdImagingGLEngine::SetLightingState(GarchSimpleLightingContextPtr const &src)
 {
     // By default, do nothing.
 }
 
 /* virtual */
 void
-UsdImagingGLEngine::SetLightingState(GlfSimpleLightVector const &lights,
-                                     GlfSimpleMaterial const &material,
+UsdImagingGLEngine::SetLightingState(GarchSimpleLightVector const &lights,
+                                     GarchSimpleMaterial const &material,
                                      GfVec4f const &sceneAmbient)
 {
     // By default, do nothing.
@@ -190,11 +190,11 @@ UsdImagingGLEngine::TestIntersection(
     }
 
     GfVec2i attachmentSize(width,height);
-    GlfDrawTargetRefPtr drawTarget;
+    GarchDrawTargetRefPtr drawTarget;
     if (!TfMapLookup(_drawTargets, context, &drawTarget)) {
 
         // Create an instance for use with this GL context
-        drawTarget = GlfDrawTarget::New(attachmentSize);
+        drawTarget = GarchDrawTarget::New(attachmentSize);
 
         if (!_drawTargets.empty()) {
             // Share existing attachments
@@ -287,22 +287,22 @@ UsdImagingGLEngine::TestIntersection(
 
     GLubyte primId[width*height*4];
     glBindTexture(GL_TEXTURE_2D,
-        drawTarget->GetAttachments().at("primId")->GetGlTextureName());
+        (GLuint)(uint64_t)drawTarget->GetAttachments().at("primId")->GetTextureName());
     glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, primId);
 
     GLubyte instanceId[width*height*4];
     glBindTexture(GL_TEXTURE_2D,
-        drawTarget->GetAttachments().at("instanceId")->GetGlTextureName());
+        (GLuint)(uint64_t)drawTarget->GetAttachments().at("instanceId")->GetTextureName());
     glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, instanceId);
 
     GLubyte elementId[width*height*4];
     glBindTexture(GL_TEXTURE_2D,
-        drawTarget->GetAttachments().at("elementId")->GetGlTextureName());
+        (GLuint)(uint64_t)drawTarget->GetAttachments().at("elementId")->GetTextureName());
     glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, elementId);
 
     GLfloat depths[width*height];
     glBindTexture(GL_TEXTURE_2D,
-        drawTarget->GetAttachments().at("depth")->GetGlTextureName());
+        (GLuint)(uint64_t)drawTarget->GetAttachments().at("depth")->GetTextureName());
     glGetTexImage(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, GL_FLOAT, depths);
 
     glPopAttrib(); /* GL_VIEWPORT_BIT |
@@ -343,13 +343,13 @@ UsdImagingGLEngine::TestIntersection(
             int idIndex = zMinIndex*4;
 
             *outHitPrimPath = GetRprimPathFromPrimId(
-                    HdxRenderSetupTask::DecodeIDRenderColor(&primId[idIndex]));
+                    HdxIntersector::DecodeIDRenderColor(&primId[idIndex]));
             if (outHitInstanceIndex) {
-                *outHitInstanceIndex = HdxRenderSetupTask::DecodeIDRenderColor(
+                *outHitInstanceIndex = HdxIntersector::DecodeIDRenderColor(
                         &instanceId[idIndex]);
             }
             if (outHitElementIndex) {
-                *outHitElementIndex = HdxRenderSetupTask::DecodeIDRenderColor(
+                *outHitElementIndex = HdxIntersector::DecodeIDRenderColor(
                         &elementId[idIndex]);
             }
 
@@ -419,11 +419,11 @@ UsdImagingGLEngine::TestIntersectionBatch(
     }
 
     GfVec2i attachmentSize(width,height);
-    GlfDrawTargetRefPtr drawTarget;
+    GarchDrawTargetRefPtr drawTarget;
     if (!TfMapLookup(_drawTargets, context, &drawTarget)) {
 
         // Create an instance for use with this GL context
-        drawTarget = GlfDrawTarget::New(attachmentSize);
+        drawTarget = GarchDrawTarget::New(attachmentSize);
 
         if (!_drawTargets.empty()) {
             // Share existing attachments
@@ -509,17 +509,17 @@ UsdImagingGLEngine::TestIntersectionBatch(
 
     std::vector<GLubyte> primId(width*height*4);
     glBindTexture(GL_TEXTURE_2D,
-        drawTarget->GetAttachments().at("primId")->GetGlTextureName());
+        (GLuint)(uint64_t)drawTarget->GetAttachments().at("primId")->GetTextureName());
     glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, primId.data());
 
     std::vector<GLubyte> instanceId(width*height*4);
     glBindTexture(GL_TEXTURE_2D,
-        drawTarget->GetAttachments().at("instanceId")->GetGlTextureName());
+        (GLuint)(uint64_t)drawTarget->GetAttachments().at("instanceId")->GetTextureName());
     glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, instanceId.data());
 
     std::vector<GLfloat> depths(width*height);
     glBindTexture(GL_TEXTURE_2D,
-        drawTarget->GetAttachments().at("depth")->GetGlTextureName());
+        (GLuint)(uint64_t)drawTarget->GetAttachments().at("depth")->GetTextureName());
     glGetTexImage(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, GL_FLOAT, depths.data());
 
     glPopAttrib(); /* GL_VIEWPORT_BIT |
@@ -647,7 +647,7 @@ UsdImagingGLEngine::GetPrimPathFromPrimIdColor(GfVec4i const &primIdColor,
         uint8_t(primIdColor[3])
     };
 
-    int primId = HdxRenderSetupTask::DecodeIDRenderColor(primIdColorBytes);
+    int primId = HdxIntersector::DecodeIDRenderColor(primIdColorBytes);
     SdfPath result = GetRprimPathFromPrimId(primId);
     if (!result.IsEmpty()) {
         if (instanceIndexOut) {
@@ -657,7 +657,7 @@ UsdImagingGLEngine::GetPrimPathFromPrimIdColor(GfVec4i const &primIdColor,
                 uint8_t(instanceIdColor[2]),
                 uint8_t(instanceIdColor[3])
             };
-            *instanceIndexOut = HdxRenderSetupTask::DecodeIDRenderColor(
+            *instanceIndexOut = HdxIntersector::DecodeIDRenderColor(
                     instanceIdColorBytes);
         }
     }

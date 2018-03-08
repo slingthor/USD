@@ -171,9 +171,9 @@ GlfDrawTarget::AddAttachment( std::string const & name,
         attachments.insert(AttachmentsMap::value_type(name, attachment));
 
 
-        TF_VERIFY( attachment->GetGlTextureName() > 0 , "%s", 
-                   std::string("Attachment \""+name+"\" was not added "
-                       "and cannot be bound in MatDisplayMaterial").c_str());
+        TF_VERIFY( attachment->GetGlTextureName() > 0 ,
+                   "Attachment \"%s\" was not added "
+                       "and cannot be bound in MatDisplayMaterial", name.c_str());
 
         _BindAttachment( attachment );
 

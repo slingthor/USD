@@ -61,6 +61,7 @@ UsdImagingGLHdEngine::UsdImagingGLHdEngine(
         const SdfPathVector& invisedPrimPaths,
         const SdfPath& delegateID)
     : UsdImagingGLEngine()
+    , _engine(HdEngine::OpenGL)
     , _renderIndex(nullptr)
     , _selTracker(new HdxSelectionTracker)
     , _delegateID(delegateID)
@@ -180,7 +181,7 @@ UsdImagingGLHdEngine::_PostSetTime(const UsdPrim& root, const RenderParams& para
         return;
 
     // The delegate may have been populated from somewhere other than
-    // where we are drawing. This applys a compensating transformation that
+    // where we are drawing. This applies a compensating transformation that
     // cancels out any accumulated transformation from the population root.
     _delegate->SetRootCompensation(root.GetPath());
 }
@@ -664,7 +665,7 @@ UsdImagingGLHdEngine::TestIntersectionBatch(
 void
 UsdImagingGLHdEngine::Render(RenderParams params)
 {
-    // User is responsible for initalizing GL contenxt and glew
+    // User is responsible for initializing GL context and glew
     if (!HdStRenderContextCaps::GetInstance().SupportsHydra()) {
         TF_CODING_ERROR("Current GL context doesn't support Hydra");
         return;
@@ -797,8 +798,8 @@ UsdImagingGLHdEngine::SetLightingStateFromOpenGL()
 
 /* virtual */
 void
-UsdImagingGLHdEngine::SetLightingState(GlfSimpleLightVector const &lights,
-                                       GlfSimpleMaterial const &material,
+UsdImagingGLHdEngine::SetLightingState(GarchSimpleLightVector const &lights,
+                                       GarchSimpleMaterial const &material,
                                        GfVec4f const &sceneAmbient)
 {
     // we still use _lightingContextForOpenGLState for convenience, but
@@ -817,7 +818,7 @@ UsdImagingGLHdEngine::SetLightingState(GlfSimpleLightVector const &lights,
 
 /* virtual */
 void
-UsdImagingGLHdEngine::SetLightingState(GlfSimpleLightingContextPtr const &src)
+UsdImagingGLHdEngine::SetLightingState(GarchSimpleLightingContextPtr const &src)
 {
     // Use the bypass lighting task; leave all lighting plumbing work to
     // the incoming lighting context.

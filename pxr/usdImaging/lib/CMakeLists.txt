@@ -1,5 +1,7 @@
 set(DIRS
     usdImaging
+    usdImagingGL
+    usdSkelImaging
     usdviewq
 )
 
@@ -9,6 +11,4 @@ endforeach()
 
 if (APPLE)
     add_subdirectory(usdImagingMetal)
-else()
-    add_subdirectory(usdImagingGL)
 endif()

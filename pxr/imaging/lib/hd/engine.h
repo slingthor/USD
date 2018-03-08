@@ -85,44 +85,6 @@ public:
     /// Returns the current renderAPI in use
     static RenderAPI GetRenderAPI() { return _renderAPI; }
 
-    /*
-    /// Creates a graphics API specific Hd_CodeGen
-    static HdSt_CodeGen *CreateCodeGen(HdSt_GeometricShaderPtr const &geometricShader,
-                                       HdStShaderCodeSharedPtrVector const &shaders);
-    static HdSt_CodeGen *CreateCodeGen(HdStShaderCodeSharedPtrVector const &shaders);
-    
-    /// Creates a graphics API specific GLSLFX
-    static GLSLFX *CreateGLSLFX();
-    static GLSLFX *CreateGLSLFX(std::string const & filePath);
-    static GLSLFX *CreateGLSLFX(std::istream &is);
-
-    /// Create a graphics API specific buffer resource
-    static HdStBufferResource *CreateResourceBuffer(TfToken const &role,
-                                                    HdTupleType tupleType,
-                                                    int arraySize,
-                                                    int offset,
-                                                    int stride);
-    
-    /// Creates a graphics API specific program
-    static HdStProgram *CreateProgram(TfToken const &role);
-    
-    /// Creates a graphics API specific buffer relocator
-    static HdStBufferRelocator *CreateBufferRelocator(HdBufferResourceGPUHandle srcBuffer, HdBufferResourceGPUHandle dstBuffer);
-    
-    /// Creates a graphics API specific persistent buffer
-    static HdStPersistentBuffer *CreatePersistentBuffer(TfToken const &role, size_t dataSize, void* data);
-    
-    /// Creates a graphics API specific Draw Target
-    static GarchDrawTargetRefPtr CreateDrawTarget(GfVec2i const & size, bool requestMSAA = false);
-    
-    /// Creates a graphics API specific simple texture resource
-    static HdStTextureResource *CreateSimpleTextureResource(GarchTextureHandleRefPtr const &textureHandle, bool isPtex);
-    
-    /// Creates a graphics API specific simple texture resource
-    static HdStTextureResource *CreateSimpleTextureResource(GarchTextureHandleRefPtr const &textureHandle, bool isPtex,
-                                                            HdWrap wrapS, HdWrap wrapT, HdMinFilter minFilter, HdMagFilter magFilter);
-    */
-
 private:
     /// Context containing token-value pairs, that is passed to each
     /// task in the render graph.  The task-context can be pre-populated
