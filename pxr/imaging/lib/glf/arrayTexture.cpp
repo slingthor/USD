@@ -26,9 +26,10 @@
 
 #include "pxr/imaging/glf/glew.h"
 
+#include "pxr/imaging/garch/uvTextureData.h"
+
 #include "pxr/imaging/glf/arrayTexture.h"
 #include "pxr/imaging/glf/diagnostic.h"
-#include "pxr/imaging/glf/uvTextureData.h"
 #include "pxr/imaging/glf/utils.h"
 #include "pxr/base/tf/registryManager.h"
 #include "pxr/base/tf/type.h"

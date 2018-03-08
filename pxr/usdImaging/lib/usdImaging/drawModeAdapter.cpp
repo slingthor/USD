@@ -32,7 +32,7 @@
 
 #include "pxr/imaging/hd/engine.h"
 #include "pxr/imaging/hd/perfLog.h"
-#include "pxr/imaging/hd/shader.h"
+#include "pxr/imaging/hd/material.h"
 
 #include "pxr/imaging/garch/glslfx.h"
 #include "pxr/imaging/garch/image.h"
@@ -48,7 +48,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 TF_DEFINE_PRIVATE_TOKENS(
     _tokens,
 
-    (shader)
+    (material)
 
     (cardsUv)
     (cardsTexAssign)
@@ -170,21 +170,21 @@ UsdImagingDrawModeAdapter::Populate(UsdPrim const& prim,
         return SdfPath();
     }
 
-    // Additionally, insert the shader.
-    SdfPath shaderPath = prim.GetPath().AppendProperty(_tokens->shader);
-    if (index->IsSprimTypeSupported(HdPrimTypeTokens->shader) &&
-        !index->IsPopulated(shaderPath)) {
-        index->InsertSprim(HdPrimTypeTokens->shader,
-            shaderPath, prim, shared_from_this());
+    // Additionally, insert the material.
+    SdfPath materialPath = prim.GetPath().AppendProperty(_tokens->material);
+    if (index->IsSprimTypeSupported(HdPrimTypeTokens->material) &&
+        !index->IsPopulated(materialPath)) {
+        index->InsertSprim(HdPrimTypeTokens->material,
+            materialPath, prim, shared_from_this());
         HD_PERF_COUNTER_INCR(UsdImagingTokens->usdPopulatedPrimCount);
     }
     return cachePath;
 }
 
 bool
-UsdImagingDrawModeAdapter::_IsShaderPath(SdfPath const& path)
+UsdImagingDrawModeAdapter::_IsMaterialPath(SdfPath const& path)
 {
-    return IsChildPath(path) && path.GetNameToken() == _tokens->shader;
+    return IsChildPath(path) && path.GetNameToken() == _tokens->material;
 }
 
 bool
@@ -207,8 +207,8 @@ void
 UsdImagingDrawModeAdapter::_RemovePrim(SdfPath const& cachePath,
                                        UsdImagingIndexProxy* index)
 {
-    if (_IsShaderPath(cachePath)) {
-        index->RemoveSprim(HdPrimTypeTokens->shader, cachePath);
+    if (_IsMaterialPath(cachePath)) {
+        index->RemoveSprim(HdPrimTypeTokens->material, cachePath);
     } else if (_IsTexturePath(cachePath)) {
         index->RemoveBprim(HdPrimTypeTokens->texture, cachePath);
     } else {
@@ -222,7 +222,7 @@ UsdImagingDrawModeAdapter::MarkDirty(UsdPrim const& prim,
                                      HdDirtyBits dirty,
                                      UsdImagingIndexProxy* index)
 {
-    if (_IsShaderPath(cachePath)) {
+    if (_IsMaterialPath(cachePath)) {
         index->MarkSprimDirty(cachePath, dirty);
     } else if (_IsTexturePath(cachePath)) {
         index->MarkBprimDirty(cachePath, dirty);
@@ -236,7 +236,7 @@ UsdImagingDrawModeAdapter::MarkTransformDirty(UsdPrim const& prim,
                                               SdfPath const& cachePath,
                                               UsdImagingIndexProxy* index)
 {
-    if (!_IsShaderPath(cachePath) && !_IsTexturePath(cachePath)) {
+    if (!_IsMaterialPath(cachePath) && !_IsTexturePath(cachePath)) {
         index->MarkRprimDirty(cachePath, HdChangeTracker::DirtyTransform);
     }
 }
@@ -246,7 +246,7 @@ UsdImagingDrawModeAdapter::MarkVisibilityDirty(UsdPrim const& prim,
                                                SdfPath const& cachePath,
                                                UsdImagingIndexProxy* index)
 {
-    if (!_IsShaderPath(cachePath) && !_IsTexturePath(cachePath)) {
+    if (!_IsMaterialPath(cachePath) && !_IsTexturePath(cachePath)) {
         index->MarkRprimDirty(cachePath, HdChangeTracker::DirtyVisibility);
     }
 }
@@ -258,7 +258,7 @@ UsdImagingDrawModeAdapter::TrackVariability(UsdPrim const& prim,
                                             UsdImagingInstancerContext const*
                                                instancerContext)
 {
-    if (_IsShaderPath(cachePath) || _IsTexturePath(cachePath)) {
+    if (_IsMaterialPath(cachePath) || _IsTexturePath(cachePath)) {
         // Shader/texture aspects aren't time-varying.
         return;
     }
@@ -313,20 +313,20 @@ UsdImagingDrawModeAdapter::UpdateForTime(UsdPrim const& prim,
         return;
     }
 
-    if (_IsShaderPath(cachePath)) {
+    if (_IsMaterialPath(cachePath)) {
         // DirtySurfaceShader indicates we should return the shader source.
-        if (requestedBits & HdShader::DirtySurfaceShader) {
+        if (requestedBits & HdMaterial::DirtySurfaceShader) {
             valueCache->GetSurfaceShaderSource(cachePath) =
                 _GetSurfaceShaderSource();
             valueCache->GetDisplacementShaderSource(cachePath) =
                 std::string();
         }
 
-        // DirtyParams indicates we should return shader bindings;
+        // DirtyParams indicates we should return material bindings;
         // in our case, loop through the texture attributes to see
         // which ones to add. Use the draw mode color as a fallback value.
-        if (requestedBits & HdShader::DirtyParams) {
-            HdShaderParamVector params;
+        if (requestedBits & HdMaterial::DirtyParams) {
+            HdMaterialParamVector params;
             UsdAttribute attr;
 
             TfToken textureAttrs[6] = {
@@ -357,12 +357,12 @@ UsdImagingDrawModeAdapter::UpdateForTime(UsdPrim const& prim,
             for (int i = 0; i < 6; ++i) {
                 attr = prim.GetAttribute(textureAttrs[i]);
                 if (attr) {
-                    params.push_back(HdShaderParam(
+                    params.push_back(HdMaterialParam(
                                 textureNames[i], fallback,
                                 attr.GetPath(), samplerParams, false));
                 }
             }
-            valueCache->GetSurfaceShaderParams(cachePath) = params;
+            valueCache->GetMaterialParams(cachePath) = params;
         }
     }
 
@@ -383,7 +383,7 @@ UsdImagingDrawModeAdapter::UpdateForTime(UsdPrim const& prim,
 
     if (requestedBits & HdChangeTracker::DirtyMaterialId) {
         valueCache->GetMaterialId(cachePath) =
-            cachePath.GetPrimPath().AppendProperty(_tokens->shader);
+            cachePath.GetPrimPath().AppendProperty(_tokens->material);
     }
 
     if (requestedBits & HdChangeTracker::DirtyWidths) {
@@ -907,7 +907,7 @@ UsdImagingDrawModeAdapter::_GenerateTextureCoordinates(
 std::string
 UsdImagingDrawModeAdapter::_GetSurfaceShaderSource()
 {
-    GLSLFX* gfx = HdEngine::CreateGLSLFX(UsdImagingPackageDrawModeShader());
+    GLSLFX* gfx = GLSLFX::New(UsdImagingPackageDrawModeShader());
     if (!gfx->IsValid()) {
         TF_CODING_ERROR("Couldn't load UsdImagingPackageDrawModeShader");
         return std::string();

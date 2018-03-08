@@ -22,20 +22,19 @@
 // language governing permissions and limitations under the Apache License.
 //
 #include "pxr/imaging/glf/glew.h"
+#include "pxr/imaging/glf/glContext.h"
+
 #include "pxr/imaging/hdSt/drawTarget.h"
 #include "pxr/imaging/hdSt/drawTargetAttachmentDescArray.h"
+#include "pxr/imaging/hdSt/drawTargetTextureResource.h"
 #include "pxr/imaging/hdSt/camera.h"
 #include "pxr/imaging/hdSt/resourceRegistry.h"
+#include "pxr/imaging/hdSt/GL/glConversions.h"
 
-#include "pxr/imaging/hdSt/drawTargetTextureResource.h"
-
-#include "pxr/imaging/hd/conversions.h"
 #include "pxr/imaging/hd/engine.h"
 #include "pxr/imaging/hd/perfLog.h"
 #include "pxr/imaging/hd/sceneDelegate.h"
 #include "pxr/imaging/hd/sprim.h"
-
-#include "pxr/imaging/glf/glContext.h"
 
 #include "pxr/base/tf/stl.h"
 
@@ -281,7 +280,7 @@ HdStDrawTarget::_SetAttachments(
     // XXX : All draw targets in Hydra are currently trying to create MSAA
     // buffers (as long as they are allowed by the environment variables) 
     // because we need alpha to coverage for transparent object.
-    _drawTarget = HdEngine::CreateDrawTarget(_resolution, /* MSAA */ true);
+    _drawTarget = GarchDrawTarget::New(_resolution, /* MSAA */ true);
 
     size_t numAttachments = attachments.GetNumAttachments();
     _renderPassState.SetNumColorAttachments(numAttachments);
@@ -298,7 +297,7 @@ HdStDrawTarget::_SetAttachments(
         GLenum format = GL_RGBA;
         GLenum type   = GL_BYTE;
         GLenum internalFormat = GL_RGBA8;
-        HdConversions::GetGlFormat(desc.GetFormat(),
+        HdStGLConversions::GetGlFormat(desc.GetFormat(),
                                    &format, &type, &internalFormat);
 
         const std::string &name = desc.GetName();

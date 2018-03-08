@@ -47,7 +47,7 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 TF_DECLARE_WEAK_PTRS(PlugPlugin);
-struct Plug_RegistrationMetadata;
+class Plug_RegistrationMetadata;
 
 /// \class PlugRegistry
 ///

@@ -33,21 +33,22 @@
 #include "pxr/imaging/mtlf/ptexTexture.h"
 #endif
 #include "pxr/imaging/glf/ptexTexture.h"
-
+#include "pxr/imaging/garch/textureHandle.h"
 #include "pxr/imaging/garch/textureRegistry.h"
 
 #include "pxr/imaging/hd/basisCurves.h"
 #include "pxr/imaging/hd/basisCurvesTopology.h"
-#include "pxr/imaging/hd/engine.h"
 #include "pxr/imaging/hd/enums.h"
+#include "pxr/imaging/hd/material.h"
 #include "pxr/imaging/hd/mesh.h"
 #include "pxr/imaging/hd/meshTopology.h"
 #include "pxr/imaging/hd/perfLog.h"
 #include "pxr/imaging/hd/points.h"
 #include "pxr/imaging/hd/primGather.h"
 #include "pxr/imaging/hd/renderDelegate.h"
-#include "pxr/imaging/hd/shader.h"
 #include "pxr/imaging/hd/tokens.h"
+
+#include "pxr/imaging/hdSt/textureResource.h"
 
 #include "pxr/usd/ar/resolver.h"
 #include "pxr/usd/ar/resolverContext.h"
@@ -80,8 +81,8 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 
 // TODO: 
-// reduce shader traversals to a single pass; currently usdImaging will traverse
-// a single shader network multiple times during sync.
+// reduce material traversals to a single pass; currently usdImaging will traverse
+// a single material network multiple times during sync.
 
 // XXX: Perhaps all interpolation tokens for Hydra should come from Hd and
 // UsdGeom tokens should be passed through a mapping function.
@@ -963,7 +964,7 @@ UsdImagingDelegate::_Populate(UsdImagingIndexProxy* proxy)
                 continue;
             }
             if (_AdapterSharedPtr adapter = _AdapterLookup(*iter)) {
-                // We delay populating some parts of the scene (e.g. shaders)
+                // We delay populating some parts of the scene (e.g. material)
                 // until they are needed by some other prim.
                 if (adapter->IsPopulatedIndirectly()) {
                     continue;
@@ -2544,7 +2545,7 @@ UsdImagingDelegate::Get(SdfPath const& id, TfToken const& key)
     SdfPath usdPath = GetPathForUsd(id);
     VtValue value;
 
-    if (key == HdShaderTokens->surfaceShader) {
+    if (key == HdShaderTokens->material) {
         SdfPath pathValue;
         if (!_valueCache.ExtractMaterialId(usdPath, &pathValue)) {
             _UpdateSingleValue(usdPath, HdChangeTracker::DirtyMaterialId);
@@ -2781,23 +2782,23 @@ UsdImagingDelegate::GetInstancerTransform(SdfPath const &instancerId,
 
 /*virtual*/
 std::string
-UsdImagingDelegate::GetSurfaceShaderSource(SdfPath const &shaderId)
+UsdImagingDelegate::GetSurfaceShaderSource(SdfPath const &materialId)
 {
     HD_TRACE_FUNCTION();
 
-    if (shaderId.IsEmpty()) {
+    if (materialId.IsEmpty()) {
         // Handle fallback shader
         return std::string();
     }
 
-    SdfPath usdPath = GetPathForUsd(shaderId);
+    SdfPath usdPath = GetPathForUsd(materialId);
     std::string source;
 
     if (!_valueCache.ExtractSurfaceShaderSource(usdPath, &source)) {
         TF_DEBUG(HD_SAFE_MODE).Msg(
             "WARNING: Slow surface shader source fetch for %s\n",
-            shaderId.GetText());
-        _UpdateSingleValue(usdPath, HdShader::DirtySurfaceShader);
+            materialId.GetText());
+        _UpdateSingleValue(usdPath, HdMaterial::DirtySurfaceShader);
         TF_VERIFY(_valueCache.ExtractSurfaceShaderSource(usdPath, &source));
     }
 
@@ -2806,16 +2807,16 @@ UsdImagingDelegate::GetSurfaceShaderSource(SdfPath const &shaderId)
 
 /*virtual*/
 std::string
-UsdImagingDelegate::GetDisplacementShaderSource(SdfPath const &shaderId)
+UsdImagingDelegate::GetDisplacementShaderSource(SdfPath const &materialId)
 {
     HD_TRACE_FUNCTION();
 
-    if (shaderId.IsEmpty()) {
+    if (materialId.IsEmpty()) {
         // Handle fallback shader
         return std::string();
     }
 
-    SdfPath usdPath = GetPathForUsd(shaderId);
+    SdfPath usdPath = GetPathForUsd(materialId);
     std::string source;
 
     // Hydra calls GetDisplacementShaderSource multiple times, so we need to
@@ -2823,8 +2824,8 @@ UsdImagingDelegate::GetDisplacementShaderSource(SdfPath const &shaderId)
     if (!_valueCache.FindDisplacementShaderSource(usdPath, &source)) {
         TF_DEBUG(HD_SAFE_MODE).Msg(
             "WARNING: Slow displacement shader source fetch for %s\n",
-            shaderId.GetText());
-        _UpdateSingleValue(usdPath, HdShader::DirtySurfaceShader);
+            materialId.GetText());
+        _UpdateSingleValue(usdPath, HdMaterial::DirtySurfaceShader);
         TF_VERIFY(_valueCache.FindDisplacementShaderSource(
                   usdPath, &source));
     }
@@ -2834,23 +2835,23 @@ UsdImagingDelegate::GetDisplacementShaderSource(SdfPath const &shaderId)
 
 /*virtual*/
 VtValue
-UsdImagingDelegate::GetSurfaceShaderParamValue(SdfPath const &shaderId, 
-                                               TfToken const &paramName)
+UsdImagingDelegate::GetMaterialParamValue(SdfPath const &materialId, 
+                                          TfToken const &paramName)
 {
     HD_TRACE_FUNCTION();
 
-    if (shaderId.IsEmpty()) {
-        // Handle fallback shader
+    if (materialId.IsEmpty()) {
+        // Handle fallback material
         VtFloatArray dummy;
         dummy.resize(1);
         return VtValue(dummy);
     }
 
-    SdfPath usdPath = GetPathForUsd(shaderId);
+    SdfPath usdPath = GetPathForUsd(materialId);
     VtValue param;
 
-    // XXX: See comment in GetSurfaceShaderParams.
-    TF_VERIFY(_valueCache.ExtractSurfaceShaderParam(
+    // XXX: See comment in GetMaterialParams.
+    TF_VERIFY(_valueCache.ExtractMaterialParam(
                 usdPath, paramName, &param));
 
     if (param.IsEmpty()) {
@@ -2863,46 +2864,46 @@ UsdImagingDelegate::GetSurfaceShaderParamValue(SdfPath const &shaderId,
 }
 
 /*virtual*/
-HdShaderParamVector
-UsdImagingDelegate::GetSurfaceShaderParams(SdfPath const &shaderId)
+HdMaterialParamVector
+UsdImagingDelegate::GetMaterialParams(SdfPath const &materialId)
 {
     HD_TRACE_FUNCTION();
 
-    if (shaderId.IsEmpty()) {
-        // Handle fallback shader
-        return HdShaderParamVector();
+    if (materialId.IsEmpty()) {
+        // Handle fallback material
+        return HdMaterialParamVector();
     }
 
-    SdfPath usdPath = GetPathForUsd(shaderId);
-    HdShaderParamVector params;
+    SdfPath usdPath = GetPathForUsd(materialId);
+    HdMaterialParamVector params;
 
-    // XXX: This is a little complicated. Shaders aren't part of the
+    // XXX: This is a little complicated. Materials aren't part of the
     // delegate sync, since they aren't rprims. We can manually call
-    // UpdateForTime() on shaders via _UpdateSingleValue, but we can't rely
+    // UpdateForTime() on materials via _UpdateSingleValue, but we can't rely
     // on the value cache's "ExtractFoo" to fail if unpopulated, like we do
     // elsewhere, because the value cache GarbageCollect is called *ONLY* on
     // delegates with rprims that participated in delegate sync.  So if a
-    // shader is the only thing changing this frame, you'll have stale empty
+    // material is the only thing changing this frame, you'll have stale empty
     // values from the last time you called Extract (since Extract just
     // swap()s with an empty value, and doesn't delete the cache entry until
     // GC).
     //
-    // As a workaround: Every time we update shaders, we'll call
+    // As a workaround: Every time we update materials, we'll call
     // GetSurfaceShaderParams() once, and then GetSurfaceShaderParamValue()
     // many times.  We unconditionally update params here, and let GetParamValue
     // hitch a free ride. This happens to work with HdStShader's implementation.
     //
     // The correct long-term solution is to include sprims in delegate sync!
 
-    _UpdateSingleValue(usdPath, HdShader::DirtyParams);
-    TF_VERIFY(_valueCache.FindSurfaceShaderParams(usdPath, &params));
+    _UpdateSingleValue(usdPath, HdMaterial::DirtyParams);
+    TF_VERIFY(_valueCache.FindMaterialParams(usdPath, &params));
 
     // Connections need to be represented as index paths...
     TF_FOR_ALL(paramIt, params) {
         if (paramIt->IsTexture()) {
-            // Unfortunately, HdShaderParam is immutable;
+            // Unfortunately, HdMaterialParam is immutable;
             // fortunately, it has relatively lightweight members.
-            *paramIt = HdShaderParam(
+            *paramIt = HdMaterialParam(
                 paramIt->GetName(),
                 paramIt->GetFallbackValue(),
                 GetPathForIndex(paramIt->GetConnection()),
@@ -3031,13 +3032,10 @@ UsdImagingDelegate::GetTextureResource(SdfPath const &textureId)
                                     filePath.GetText());
     TfStopwatch timer;
     timer.Start();
-#if defined(ARCH_GFX_METAL)
+
     GarchTextureHandleRefPtr texture =
         GarchTextureRegistry::GetInstance().GetTextureHandle(filePath);
-#else
-    GarchTextureHandleRefPtr texture =
-        GarchTextureRegistry::GetInstance().GetTextureHandle(filePath);
-#endif
+
     texture->AddMemoryRequest(memoryLimit);
     HdWrap wrapShd = (wrapS == UsdHydraTokens->clamp) ? HdWrapClamp
                  : (wrapS == UsdHydraTokens->repeat) ? HdWrapRepeat
@@ -3060,9 +3058,9 @@ UsdImagingDelegate::GetTextureResource(SdfPath const &textureId)
                                 ? HdMinFilterLinearMipmapLinear
                  : HdMinFilterLinear; 
 
-    texResource = HdTextureResourceSharedPtr(
-                        HdEngine::CreateSimpleTextureResource(texture, isPtex, wrapShd, wrapThd,
-                                                              minFilterHd, magFilterHd));
+    texResource = HdStSimpleTextureResourceSharedPtr(
+        HdStSimpleTextureResource::New(texture, isPtex, wrapShd, wrapThd,
+                                       minFilterHd, magFilterHd));
     timer.Stop();
 
     TF_DEBUG(USDIMAGING_TEXTURES).Msg("    Load time: %.3f s\n", 
@@ -3103,24 +3101,14 @@ UsdImagingDelegate::GetLightParamValue(SdfPath const &id,
                 return VtValue();
             }
             return VtValue(asset.GetResolvedPath());
-
-        // XXX : As soon as we have sprim dirty bits and time variability 
-        // we can use another mechanism
-        } else if (paramName == HdTokens->transform) {
-            GfMatrix4d ctm = UsdImaging_XfStrategy::ComputeTransform(
-                prim, _xformCache.GetRootPath(), UsdTimeCode(1.0), 
-                _rigidXformOverrides) * GetRootTransform();
-            return VtValue(ctm);
         }
-        
-        TF_WARN("Unable to find attribute '%s' in prim '%s'.", 
-            paramName.GetText(), id.GetText());
-        return VtValue();
+
+        return Get(id, paramName);
     }
 
     // Reading the value may fail, should we warn here when it does?
     attr.Get(&value, GetTime());
-    return value;    
+    return value;
 }
 
 VtValue
@@ -3138,13 +3126,30 @@ UsdImagingDelegate::GetMaterialResource(SdfPath const &materialId)
         TF_DEBUG(HD_SAFE_MODE).Msg(
             "WARNING: Slow material resource fetch for %s\n",
             materialId.GetText());
-        _UpdateSingleValue(usdPath, HdShader::DirtyResource);
+        _UpdateSingleValue(usdPath, HdMaterial::DirtyResource);
         TF_VERIFY(_valueCache.ExtractMaterialResource(usdPath, &vtMatResource));
     }
 
     return vtMatResource;
 }
 
+TfTokenVector 
+UsdImagingDelegate::GetMaterialPrimvars(SdfPath const &materialId)
+{
+    if (!TF_VERIFY(materialId != SdfPath())) {
+        return TfTokenVector();
+    }
+
+    SdfPath usdPath = GetPathForUsd(materialId);
+
+    VtValue vtMaterialPrimvars;
+    if (_valueCache.FindMaterialPrimvars(usdPath, &vtMaterialPrimvars)) {
+        if (vtMaterialPrimvars.IsHolding<TfTokenVector>()) {
+            return vtMaterialPrimvars.Get<TfTokenVector>();
+        }
+    }
+    return TfTokenVector();
+}
 
 PXR_NAMESPACE_CLOSE_SCOPE
 

@@ -24,7 +24,7 @@
 #include "pxr/imaging/glf/glew.h"
 
 #include "pxr/imaging/hdSt/GL/drawTargetTextureResourceGL.h"
-#include "pxr/imaging/hd/conversions.h"
+#include "pxr/imaging/hdSt/GL/glConversions.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -59,10 +59,10 @@ HdSt_DrawTargetTextureResourceGL::SetSampler(HdWrap wrapS,
     static const float borderColor[4] = {0.0f, 0.0f, 0.0f, 0.0f};
 
     // Convert params to Gl
-    GLenum glWrapS = HdConversions::GetWrap(wrapS);
-    GLenum glWrapT = HdConversions::GetWrap(wrapT);
-    GLenum glMinFilter = HdConversions::GetMinFilter(minFilter);
-    GLenum glMagFilter = HdConversions::GetMagFilter(magFilter);
+    GLenum glWrapS = HdStGLConversions::GetWrap(wrapS);
+    GLenum glWrapT = HdStGLConversions::GetWrap(wrapT);
+    GLenum glMinFilter = HdStGLConversions::GetMinFilter(minFilter);
+    GLenum glMagFilter = HdStGLConversions::GetMagFilter(magFilter);
 
     GLuint s = (uint32_t)(uint64_t)_sampler;
     glSamplerParameteri(s, GL_TEXTURE_WRAP_S, glWrapS);

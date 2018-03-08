@@ -25,12 +25,11 @@
 #define HDST_INDIRECT_DRAW_BATCH_H
 
 #include "pxr/pxr.h"
-#include "pxr/imaging/hdSt/api.h"
 #include "pxr/imaging/hd/version.h"
+#include "pxr/imaging/hdSt/api.h"
 #include "pxr/imaging/hdSt/dispatchBuffer.h"
 #include "pxr/imaging/hdSt/drawBatch.h"
-
-#include "pxr/imaging/hd/persistentBuffer.h"
+#include "pxr/imaging/hdSt/persistentBuffer.h"
 
 #include <vector>
 
@@ -61,13 +60,15 @@ public:
 
     /// Prepare draw commands and apply view frustum culling for this batch.
     HDST_API
-    virtual void PrepareDraw(HdRenderPassStateSharedPtr const &renderPassState,
-                             HdStResourceRegistrySharedPtr const &resourceRegistry) override = 0;
+    virtual void PrepareDraw(
+        HdStRenderPassStateSharedPtr const &renderPassState,
+        HdStResourceRegistrySharedPtr const &resourceRegistry) override = 0;
 
     /// Executes the drawing commands for this batch.
     HDST_API
-    virtual void ExecuteDraw(HdRenderPassStateSharedPtr const &renderPassState,
-                             HdStResourceRegistrySharedPtr const &resourceRegistry) override = 0;
+    virtual void ExecuteDraw(
+        HdStRenderPassStateSharedPtr const &renderPassState,
+        HdStResourceRegistrySharedPtr const &resourceRegistry) override = 0;
 
     HDST_API
     virtual void DrawItemInstanceChanged(HdStDrawItemInstance const* instance) = 0;

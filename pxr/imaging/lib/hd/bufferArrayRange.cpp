@@ -70,5 +70,17 @@ HdBufferArrayRangeContainer::Get(int index) const
     return _ranges[index];
 }
 
+void
+HdBufferArrayRange::AddBufferSpecs(HdBufferSpecVector *specs) const
+{
+    HD_TRACE_FUNCTION();
+    
+    HdBufferResourceNamedList const &resources = GetResources();
+    
+    TF_FOR_ALL(it, resources) {
+        specs->emplace_back(it->first, it->second->GetTupleType());
+    }
+}
+
 PXR_NAMESPACE_CLOSE_SCOPE
 

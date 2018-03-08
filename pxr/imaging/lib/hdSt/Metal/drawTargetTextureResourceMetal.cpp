@@ -22,7 +22,7 @@
 // language governing permissions and limitations under the Apache License.
 //
 #include "pxr/imaging/hdSt/Metal/drawTargetTextureResourceMetal.h"
-#include "pxr/imaging/hd/conversions.h"
+#include "pxr/imaging/hdSt/GL/glConversions.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 

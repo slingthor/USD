@@ -121,7 +121,15 @@ class GLSLFX
 public:
     /// Create an invalid glslfx object
     GARCH_API
-    GLSLFX() {}
+    static GLSLFX *New();
+    
+    /// Create a glslfx object from a file
+    GARCH_API
+    static GLSLFX *New(std::string const & filePath);
+    
+    /// Create a glslfx object from a stream
+    GARCH_API
+    static GLSLFX *New(std::istream &is);
     
     GARCH_API
     virtual ~GLSLFX() {};
@@ -211,6 +219,10 @@ public:
 
     /// Return the computed hash value based on the string
     virtual size_t GetHash() const = 0;
+    
+protected:
+    GARCH_API
+    GLSLFX() {}
 };
 
 

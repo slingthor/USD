@@ -69,8 +69,8 @@ public:
 public:
     /// Returns a new instance.
     GARCH_API
-    static GarchDrawTargetRefPtr New( GfVec2i const & size,
-                                   bool requestMSAA = false );
+    static GarchDrawTargetRefPtr New(GfVec2i const &size,
+                                     bool requestMSAA = false);
     
     /// Returns a new instance.
     /// GL framebuffers cannot be shared across contexts, but texture
@@ -81,7 +81,7 @@ public:
     /// This constructor creates a new framebuffer, but populates its map of
     /// attachments by sharing the RefPtr of the source GarchDrawTarget.
     GARCH_API
-    static GarchDrawTargetRefPtr New( GarchDrawTargetPtr const & drawtarget );
+    static GarchDrawTargetRefPtr New(GarchDrawTargetPtr const &drawtarget);
 
     class Attachment : public GarchTexture {
     public:

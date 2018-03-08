@@ -27,11 +27,13 @@
 #endif
 
 #include "pxr/imaging/hdSt/dispatchBuffer.h"
+#include "pxr/imaging/hdSt/renderContextCaps.h"
 #include "pxr/imaging/hd/engine.h"
 #include "pxr/imaging/hd/perfLog.h"
-#include "pxr/imaging/hd/renderContextCaps.h"
 
 #include "pxr/imaging/hf/perfLog.h"
+
+using namespace boost;
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -119,17 +121,17 @@ public:
 
     /// Returns the GPU resource. If the buffer array contains more than one
     /// resource, this method raises a coding error.
-    virtual HdBufferResourceSharedPtr GetResource() const override {
+    virtual HdBufferResourceSharedPtr GetResource() const {
         return _buffer->GetResource();
     }
 
     /// Returns the named GPU resource.
-    virtual HdBufferResourceSharedPtr GetResource(TfToken const& name) override {
+    virtual HdBufferResourceSharedPtr GetResource(TfToken const& name) {
         return _buffer->GetResource(name);
     }
 
     /// Returns the list of all named GPU resources for this bufferArrayRange.
-    virtual HdBufferResourceNamedList const& GetResources() const override {
+    virtual HdBufferResourceNamedList const& GetResources() const {
         return _buffer->GetResources();
     }
 
@@ -168,36 +170,48 @@ HdStDispatchBuffer::HdStDispatchBuffer(TfToken const &role, int count,
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
 
-    HdRenderContextCaps const &caps = HdRenderContextCaps::GetInstance();
-    void *newId = 0;
+    HdStRenderContextCaps const &caps = HdStRenderContextCaps::GetInstance();
 
     size_t stride = commandNumUints * sizeof(GLuint);
     size_t dataSize = count * stride;
-
-    // monolithic resource
-    _entireResource = HdBufferResourceSharedPtr(
-                            HdEngine::CreateResourceBuffer(role, GL_INT, /*numComponent=*/1, /*arraySize=*/1,
-                                                           /*offset=*/0, stride));
+    
+    HdBufferResourceGPUHandle newId = 0;
 
 #if defined(ARCH_GFX_METAL)
-    id<MTLBuffer> nid = nil;
-    nid = [MtlfMetalContext::GetMetalContext()->device newBufferWithLength:dataSize options:MTLResourceStorageModeManaged];
+    if(HdEngine::GetRenderAPI() == HdEngine::Metal)
+    {
+        id<MTLBuffer> nid = nil;
+        nid = [MtlfMetalContext::GetMetalContext()->device newBufferWithLength:dataSize options:MTLResourceStorageModeManaged];
+        
+        newId = (__bridge HdBufferResourceGPUHandle)nid;
+    }
+    else
+#endif
+    if(HdEngine::GetRenderAPI() == HdEngine::OpenGL)
+    {
+        GLuint nid = 0;
+        glGenBuffers(1, &nid);
+        // just allocate uninitialized
+        if (caps.directStateAccessEnabled) {
+            glNamedBufferDataEXT(nid, dataSize, NULL, GL_STATIC_DRAW);
+        } else {
+            glBindBuffer(GL_ARRAY_BUFFER, nid);
+            glBufferData(GL_ARRAY_BUFFER, dataSize, NULL, GL_STATIC_DRAW);
+            glBindBuffer(GL_ARRAY_BUFFER, 0);
+        }
 
-    newId = (__bridge void*)nid;
-#else
-    GLuint nid = 0;
-    glGenBuffers(1, &nid);
-    // just allocate uninitialized
-    if (caps.directStateAccessEnabled) {
-        glNamedBufferDataEXT(nid, dataSize, NULL, GL_STATIC_DRAW);
-    } else {
-        glBindBuffer(GL_ARRAY_BUFFER, nid);
-        glBufferData(GL_ARRAY_BUFFER, dataSize, NULL, GL_STATIC_DRAW);
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        newId = (HdBufferResourceGPUHandle)(uint64_t)nid;
+    }
+    else
+    {
+        TF_FATAL_CODING_ERROR("No implementation for this API");
     }
 
-    newId = (void*)(uint64_t)nid;
-#endif
+    // monolithic resource
+    _entireResource = HdStBufferResourceSharedPtr(
+            HdStBufferResource::New(
+            role, {HdTypeInt32, 1},
+            /*offset=*/0, stride));
     _entireResource->SetAllocation(newId, dataSize);
 
     // create a buffer array range, which aggregates all views
@@ -209,12 +223,23 @@ HdStDispatchBuffer::~HdStDispatchBuffer()
 {
     void *_id = _entireResource->GetId();
 #if defined(ARCH_GFX_METAL)
-    id<MTLBuffer> oid = (__bridge id<MTLBuffer>)_id;
-    [oid release];
-#else
-    GLuint oid = (GLint)(uint64_t)_id;
-    glDeleteBuffers(1, &oid);
+    if(HdEngine::GetRenderAPI() == HdEngine::Metal)
+    {
+        id<MTLBuffer> oid = (__bridge id<MTLBuffer>)_id;
+        [oid release];
+    }
+    else
 #endif
+    if(HdEngine::GetRenderAPI() == HdEngine::OpenGL)
+    {
+        GLuint oid = (GLint)(uint64_t)_id;
+        glDeleteBuffers(1, &oid);
+    }
+    else
+    {
+        TF_FATAL_CODING_ERROR("No implementation for this API");
+    }
+    
     _entireResource->SetAllocation(0, 0);
 }
 
@@ -225,36 +250,45 @@ HdStDispatchBuffer::CopyData(std::vector<GLuint> const &data)
         return;
 
 #if defined(ARCH_GFX_METAL)
-    id<MTLBuffer> buffer = (__bridge id<MTLBuffer>)_entireResource->GetId();
-    memcpy([buffer contents], &data[0], _entireResource->GetSize());
-#else
-    HdRenderContextCaps const &caps = HdRenderContextCaps::GetInstance();
-
-    if (caps.directStateAccessEnabled) {
-        glNamedBufferSubDataEXT((GLuint)(uint64_t)_entireResource->GetId(),
-                                0,
-                                _entireResource->GetSize(),
-                                &data[0]);
-    } else {
-        glBindBuffer(GL_ARRAY_BUFFER, (GLuint)(uint64_t)_entireResource->GetId());
-        glBufferSubData(GL_ARRAY_BUFFER, 0,
-                        _entireResource->GetSize(),
-                        &data[0]);
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
+    if(HdEngine::GetRenderAPI() == HdEngine::Metal)
+    {
+        id<MTLBuffer> buffer = (__bridge id<MTLBuffer>)_entireResource->GetId();
+        memcpy([buffer contents], &data[0], _entireResource->GetSize());
     }
+    else
 #endif
+    if(HdEngine::GetRenderAPI() == HdEngine::OpenGL)
+    {
+        HdStRenderContextCaps const &caps = HdStRenderContextCaps::GetInstance();
+
+        if (caps.directStateAccessEnabled) {
+            glNamedBufferSubDataEXT((GLuint)(uint64_t)_entireResource->GetId(),
+                                    0,
+                                    _entireResource->GetSize(),
+                                    &data[0]);
+        } else {
+            glBindBuffer(GL_ARRAY_BUFFER, (GLuint)(uint64_t)_entireResource->GetId());
+            glBufferSubData(GL_ARRAY_BUFFER, 0,
+                            _entireResource->GetSize(),
+                            &data[0]);
+            glBindBuffer(GL_ARRAY_BUFFER, 0);
+        }
+    }
+    else
+    {
+        TF_FATAL_CODING_ERROR("No implementation for this API");
+    }
 }
 
 void
 HdStDispatchBuffer::AddBufferResourceView(
-    TfToken const &name, GLenum glDataType, int numComponents, int offset)
+    TfToken const &name, HdTupleType tupleType, int offset)
 {
     size_t stride = _commandNumUints * sizeof(GLuint);
 
     // add a binding view (resource binder iterates and automatically binds)
-    HdBufferResourceSharedPtr view =
-        _AddResource(name, glDataType, numComponents, /*arraySize=*/1,
-                     offset, stride);
+    HdStBufferResourceSharedPtr view =
+        _AddResource(name, tupleType, offset, stride);
 
     // this is just a view, not consuming memory
     view->SetAllocation(_entireResource->GetId(), /*size=*/0);
@@ -270,7 +304,7 @@ HdStDispatchBuffer::GarbageCollect()
 
 void
 HdStDispatchBuffer::Reallocate(std::vector<HdBufferArrayRangeSharedPtr> const &,
-                             HdBufferArraySharedPtr const &)
+                               HdBufferArraySharedPtr const &)
 {
     TF_CODING_ERROR("HdStDispatchBuffer doesn't support this operation");
 }
@@ -281,12 +315,12 @@ HdStDispatchBuffer::DebugDump(std::ostream &out) const
     /*nothing*/
 }
 
-HdBufferResourceSharedPtr
+HdStBufferResourceSharedPtr
 HdStDispatchBuffer::GetResource() const
 {
     HD_TRACE_FUNCTION();
 
-    if (_resourceList.empty()) return HdBufferResourceSharedPtr();
+    if (_resourceList.empty()) return HdStBufferResourceSharedPtr();
 
     if (TfDebug::IsEnabled(HD_SAFE_MODE)) {
         // make sure this buffer array has only one resource.
@@ -300,10 +334,10 @@ HdStDispatchBuffer::GetResource() const
     }
 
     // returns the first item
-    return _resourceList.begin()->second;
+    return dynamic_pointer_cast<HdStBufferResource>(_resourceList.begin()->second);
 }
 
-HdBufferResourceSharedPtr
+HdStBufferResourceSharedPtr
 HdStDispatchBuffer::GetResource(TfToken const& name)
 {
     HD_TRACE_FUNCTION();
@@ -312,33 +346,33 @@ HdStDispatchBuffer::GetResource(TfToken const& name)
     // The number of buffer resources should be small (<10 or so).
     for (HdBufferResourceNamedList::iterator it = _resourceList.begin();
          it != _resourceList.end(); ++it) {
-        if (it->first == name) return it->second;
+        if (it->first == name)
+            return dynamic_pointer_cast<HdStBufferResource>(it->second);
     }
-    return HdBufferResourceSharedPtr();
+    return HdStBufferResourceSharedPtr();
 }
 
-HdBufferResourceSharedPtr
+HdStBufferResourceSharedPtr
 HdStDispatchBuffer::_AddResource(TfToken const& name,
-                            int glDataType,
-                            short numComponents,
-                            int arraySize,
-                            int offset,
-                            int stride)
+                                 HdTupleType tupleType,
+                                 int offset,
+                                 int stride)
 {
     HD_TRACE_FUNCTION();
 
     if (TfDebug::IsEnabled(HD_SAFE_MODE)) {
         // duplication check
-        HdBufferResourceSharedPtr bufferRes = GetResource(name);
+        HdStBufferResourceSharedPtr bufferRes = GetResource(name);
         if (!TF_VERIFY(!bufferRes)) {
             return bufferRes;
         }
     }
-    HdBufferResourceSharedPtr bufferRes = HdBufferResourceSharedPtr(
-        HdEngine::CreateResourceBuffer(GetRole(), glDataType,
-                            numComponents, arraySize, offset, stride));
 
-    _resourceList.push_back(std::make_pair(name, bufferRes));
+    HdStBufferResourceSharedPtr bufferRes = HdStBufferResourceSharedPtr(
+        HdStBufferResource::New(GetRole(), tupleType,
+                                offset, stride));
+
+    _resourceList.emplace_back(name, bufferRes);
     return bufferRes;
 }
 

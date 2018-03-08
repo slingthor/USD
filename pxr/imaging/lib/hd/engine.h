@@ -26,7 +26,6 @@
 
 #include "pxr/pxr.h"
 #include "pxr/imaging/hd/api.h"
-#include "pxr/imaging/hd/codeGen.h"
 #include "pxr/imaging/hd/version.h"
 
 #include "pxr/imaging/hd/task.h"
@@ -35,21 +34,7 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-class HdRenderIndex;
-class HdRenderDelegate;
-class HdResourceRegistry;
-class Hd_CodeGen;
-class GLSLFX;
-class HdProgram;
-class HdBufferRelocator;
-class HdPersistentBuffer;
-class GarchDrawTarget;
-class HdTextureResource;
-
 TF_DECLARE_WEAK_AND_REF_PTRS(GarchDrawTarget);
-
-typedef boost::shared_ptr<class HdRenderPass> HdRenderPassSharedPtr;
-typedef boost::shared_ptr<class HdRenderPassState> HdRenderPassStateSharedPtr;
 
 /// \class HdEngine
 ///
@@ -100,10 +85,11 @@ public:
     /// Returns the current renderAPI in use
     static RenderAPI GetRenderAPI() { return _renderAPI; }
 
+    /*
     /// Creates a graphics API specific Hd_CodeGen
-    static Hd_CodeGen *CreateCodeGen(Hd_GeometricShaderPtr const &geometricShader,
-                                     HdShaderCodeSharedPtrVector const &shaders);
-    static Hd_CodeGen *CreateCodeGen(HdShaderCodeSharedPtrVector const &shaders);
+    static HdSt_CodeGen *CreateCodeGen(HdSt_GeometricShaderPtr const &geometricShader,
+                                       HdStShaderCodeSharedPtrVector const &shaders);
+    static HdSt_CodeGen *CreateCodeGen(HdStShaderCodeSharedPtrVector const &shaders);
     
     /// Creates a graphics API specific GLSLFX
     static GLSLFX *CreateGLSLFX();
@@ -111,45 +97,31 @@ public:
     static GLSLFX *CreateGLSLFX(std::istream &is);
 
     /// Create a graphics API specific buffer resource
-    static HdBufferResource *CreateResourceBuffer(TfToken const &role,
-                                                  int glDataType,
-                                                  short numComponents,
-                                                  int arraySize,
-                                                  int offset,
-                                                  int stride);
+    static HdStBufferResource *CreateResourceBuffer(TfToken const &role,
+                                                    HdTupleType tupleType,
+                                                    int arraySize,
+                                                    int offset,
+                                                    int stride);
     
     /// Creates a graphics API specific program
-    static HdProgram *CreateProgram(TfToken const &role);
+    static HdStProgram *CreateProgram(TfToken const &role);
     
     /// Creates a graphics API specific buffer relocator
-    static HdBufferRelocator *CreateBufferRelocator(HdBufferResourceGPUHandle srcBuffer, HdBufferResourceGPUHandle dstBuffer);
+    static HdStBufferRelocator *CreateBufferRelocator(HdBufferResourceGPUHandle srcBuffer, HdBufferResourceGPUHandle dstBuffer);
     
     /// Creates a graphics API specific persistent buffer
-    static HdPersistentBuffer *CreatePersistentBuffer(TfToken const &role, size_t dataSize, void* data);
+    static HdStPersistentBuffer *CreatePersistentBuffer(TfToken const &role, size_t dataSize, void* data);
     
     /// Creates a graphics API specific Draw Target
     static GarchDrawTargetRefPtr CreateDrawTarget(GfVec2i const & size, bool requestMSAA = false);
     
     /// Creates a graphics API specific simple texture resource
-    static HdTextureResource *CreateSimpleTextureResource(GarchTextureHandleRefPtr const &textureHandle, bool isPtex);
+    static HdStTextureResource *CreateSimpleTextureResource(GarchTextureHandleRefPtr const &textureHandle, bool isPtex);
     
     /// Creates a graphics API specific simple texture resource
-    static HdTextureResource *CreateSimpleTextureResource(GarchTextureHandleRefPtr const &textureHandle, bool isPtex,
-                                                          HdWrap wrapS, HdWrap wrapT, HdMinFilter minFilter, HdMagFilter magFilter);
-    
-    /// Returns whether to do frustum culling on the GPU
-    static bool IsEnabledGPUFrustumCulling();
-    
-    /// Returns whether to read back the count of visible items from the GPU
-    /// Disabled by default, since there is some performance penalty.
-    static bool IsEnabledGPUCountVisibleInstances();
-    
-    /// Returns whether to cull tiny prims (in screen space) during GPU culling
-    /// Enabled by default.
-    static bool IsEnabledGPUTinyPrimCulling();
-    
-    /// Returns whether to do per-instance culling on the GPU
-    static bool IsEnabledGPUInstanceFrustumCulling();
+    static HdStTextureResource *CreateSimpleTextureResource(GarchTextureHandleRefPtr const &textureHandle, bool isPtex,
+                                                            HdWrap wrapS, HdWrap wrapT, HdMinFilter minFilter, HdMagFilter magFilter);
+    */
 
 private:
     /// Context containing token-value pairs, that is passed to each

@@ -24,8 +24,8 @@
 #include "pxr/imaging/glf/glew.h"
 
 #include "pxr/imaging/hdSt/drawTargetTextureResource.h"
+#include "pxr/imaging/hdSt/GL/glConversions.h"
 
-#include "pxr/imaging/hd/conversions.h"
 #include "pxr/imaging/hd/engine.h"
 
 #include "pxr/imaging/hdSt/GL/drawTargetTextureResourceGL.h"
@@ -51,7 +51,7 @@ HdTextureResourceSharedPtr HdSt_DrawTargetTextureResource::New()
 }
 
 HdSt_DrawTargetTextureResource::HdSt_DrawTargetTextureResource()
- : HdTextureResource()
+ : HdStTextureResource()
  , _attachment()
  , _sampler(0)
 {
@@ -67,6 +67,30 @@ HdSt_DrawTargetTextureResource::SetAttachment(
 {
     _attachment = attachment;
 }
+
+void
+HdSt_DrawTargetTextureResource::SetSampler(HdWrap wrapS,
+                                           HdWrap wrapT,
+                                           HdMinFilter minFilter,
+                                           HdMagFilter magFilter)
+{
+    static const float borderColor[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+
+    // Convert params to Gl
+    GLenum glWrapS = HdStGLConversions::GetWrap(wrapS);
+    GLenum glWrapT = HdStGLConversions::GetWrap(wrapT);
+    GLenum glMinFilter = HdStGLConversions::GetMinFilter(minFilter);
+    GLenum glMagFilter = HdStGLConversions::GetMagFilter(magFilter);
+    GLuint s = (GLuint)(uint64_t)_sampler;
+
+    glSamplerParameteri(s, GL_TEXTURE_WRAP_S, glWrapS);
+    glSamplerParameteri(s, GL_TEXTURE_WRAP_T, glWrapT);
+    glSamplerParameteri(s, GL_TEXTURE_MIN_FILTER, glMinFilter);
+    glSamplerParameteri(s, GL_TEXTURE_MAG_FILTER, glMagFilter);
+    glSamplerParameterf(s, GL_TEXTURE_MAX_ANISOTROPY_EXT, 1.0);
+    glSamplerParameterfv(s, GL_TEXTURE_BORDER_COLOR, borderColor);
+}
+
 
 bool
 HdSt_DrawTargetTextureResource::IsPtex() const

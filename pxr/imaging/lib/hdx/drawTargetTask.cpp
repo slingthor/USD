@@ -31,11 +31,10 @@
 #include "pxr/imaging/hdx/tokens.h"
 #include "pxr/imaging/hdx/debugCodes.h"
 
+#include "pxr/imaging/hdSt/GL/glConversions.h"
 #include "pxr/imaging/hdSt/camera.h"
 #include "pxr/imaging/hdSt/drawTarget.h"
-
-#include "pxr/imaging/hd/renderPassState.h"
-
+#include "pxr/imaging/hdSt/renderPassState.h"
 #include "pxr/imaging/garch/drawTarget.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -129,8 +128,8 @@ HdxDrawTargetTask::_Sync(HdTaskContext* ctx)
                     pass->SetDrawTarget(drawTarget->GetGarchDrawTarget());
                     pass->SetRenderPassState(drawTarget->GetRenderPassState());
 
-                    HdRenderPassStateSharedPtr renderPassState(
-                        new HdRenderPassState());
+                    HdStRenderPassStateSharedPtr renderPassState(
+                        new HdStRenderPassState());
                     HdxSimpleLightingShaderSharedPtr simpleLightingShader(
                         new HdxSimpleLightingShader());
 
@@ -184,7 +183,7 @@ HdxDrawTargetTask::_Sync(HdTaskContext* ctx)
 
         RenderPassInfo &renderPassInfo =  _renderPassesInfo[renderPassIdx];
         HdxDrawTargetRenderPass *renderPass = _renderPasses[renderPassIdx].get();
-        HdRenderPassStateSharedPtr &renderPassState = renderPassInfo.renderPassState;
+        HdStRenderPassStateSharedPtr &renderPassState = renderPassInfo.renderPassState;
         const HdStDrawTarget *drawTarget = renderPassInfo.target;
 
         const SdfPath &cameraId = drawTarget->GetRenderPassState()->GetCamera();
@@ -279,7 +278,7 @@ HdxDrawTargetTask::_Execute(HdTaskContext* ctx)
     }
     // XXX: Move conversion to sync once header is made private
     // to the library
-    glDepthFunc(HdConversions::GetGlDepthFunc(_depthFunc));
+    glDepthFunc(HdStGLConversions::GetGlDepthFunc(_depthFunc));
 
     // XXX: Long-term Alpha to Coverage will be a render style on the
     // task.  However, as there isn't a fallback we current force it
@@ -311,7 +310,7 @@ HdxDrawTargetTask::_Execute(HdTaskContext* ctx)
 
         HdxDrawTargetRenderPass *renderPass = 
             _renderPasses[renderPassIdx].get();
-        HdRenderPassStateSharedPtr renderPassState =
+        HdStRenderPassStateSharedPtr renderPassState =
             _renderPassesInfo[renderPassIdx].renderPassState;
         renderPassState->Bind();
         renderPass->Execute(renderPassState);

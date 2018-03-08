@@ -116,12 +116,15 @@ public:
     
     /// Returns the GPU resource. If the buffer array contains more than one
     /// resource, this method raises a coding error.
+    HD_API
     virtual HdBufferResourceSharedPtr GetResource() const = 0;
     
     /// Returns the named GPU resource.
+    HD_API
     virtual HdBufferResourceSharedPtr GetResource(TfToken const& name) = 0;
     
     /// Returns the list of all named GPU resources for this bufferArrayRange.
+    HD_API
     virtual HdBufferResourceNamedList const& GetResources() const = 0;
 
 protected:

@@ -26,8 +26,6 @@
 
 #include "pxr/imaging/hdSt/unitTestGLDrawing.h"
 
-#include "pxr/imaging/hd/engine.h"
-
 #include "pxr/imaging/glf/drawTarget.h"
 #include "pxr/imaging/garch/glDebugWindow.h"
 
@@ -101,7 +99,7 @@ HdSt_UnitTestWindow::OnInitializeGL()
     // Create an offscreen draw target which is the same size as this
     // widget and initialize the unit test with the draw target bound.
     //
-    _drawTarget = HdEngine::CreateDrawTarget(GfVec2i(GetWidth(), GetHeight()));
+    _drawTarget = GarchDrawTarget::New(GfVec2i(GetWidth(), GetHeight()));
 
     _drawTarget->Bind();
     _drawTarget->AddAttachment("color", GL_RGBA, GL_FLOAT, GL_RGBA);

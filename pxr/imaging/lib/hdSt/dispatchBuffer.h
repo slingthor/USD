@@ -25,12 +25,12 @@
 #define HDST_DISPATCH_BUFFER_H
 
 #include "pxr/pxr.h"
-#include "pxr/imaging/hdSt/api.h"
 #include "pxr/imaging/hd/version.h"
 #include "pxr/imaging/hd/bufferArray.h"
 #include "pxr/imaging/hd/bufferArrayRange.h"
-#include "pxr/imaging/hd/bufferResource.h"
 #include "pxr/imaging/hd/bufferSpec.h"
+#include "pxr/imaging/hdSt/api.h"
+#include "pxr/imaging/hdSt/bufferResource.h"
 
 #include <boost/shared_ptr.hpp>
 
@@ -104,8 +104,8 @@ public:
 
     /// Add an interleaved view to this buffer.
     HDST_API
-    void AddBufferResourceView(TfToken const &name, GLenum glDataType,
-                               int numComponents, int offset);
+    void AddBufferResourceView(TfToken const &name,
+                               HdTupleType tupleType, int offset);
 
     /// Returns the dispatch count
     int GetCount() const { return _count; }
@@ -120,7 +120,7 @@ public:
     }
 
     /// Returns entire buffer as a single HdBufferResource.
-    HdBufferResourceSharedPtr GetEntireResource() const {
+    HdStBufferResourceSharedPtr GetEntireResource() const {
         return _entireResource;
     }
 
@@ -138,14 +138,14 @@ public:
     /// Returns the GPU resource. If the buffer array contains more than one
     /// resource, this method raises a coding error.
     HDST_API
-    HdBufferResourceSharedPtr GetResource() const;
+    HdStBufferResourceSharedPtr GetResource() const;
 
     /// Returns the named GPU resource. This method returns the first found
     /// resource. In HDST_SAFE_MODE it checkes all underlying GL buffers
     /// in _resourceMap and raises a coding error if there are more than
     /// one GL buffers exist.
     HDST_API
-    HdBufferResourceSharedPtr GetResource(TfToken const& name);
+    HdStBufferResourceSharedPtr GetResource(TfToken const& name);
 
     /// Returns the list of all named GPU resources for this bufferArray.
     HdBufferResourceNamedList const& GetResources() const {return _resourceList;}
@@ -153,18 +153,16 @@ public:
 protected:
     /// Adds a new, named GPU resource and returns it.
     HDST_API
-    HdBufferResourceSharedPtr _AddResource(TfToken const& name,
-                                           int glDataType,
-                                           short numComponents,
-                                           int arraySize,
-                                           int offset,
-                                           int stride);
+    HdStBufferResourceSharedPtr _AddResource(TfToken const& name,
+                                             HdTupleType tupleType,
+                                             int offset,
+                                             int stride);
 
 private:
     int _count;
     unsigned int _commandNumUints;
     HdBufferResourceNamedList _resourceList;
-    HdBufferResourceSharedPtr _entireResource;
+    HdStBufferResourceSharedPtr _entireResource;
     HdBufferArrayRangeSharedPtr _bar;  // Alternative to range list in base class
 };
 

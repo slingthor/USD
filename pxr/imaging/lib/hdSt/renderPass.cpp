@@ -21,16 +21,18 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
+#include "pxr/imaging/glf/glew.h"
+
 #include "pxr/imaging/hdSt/renderPass.h"
 #include "pxr/imaging/hdSt/indirectDrawBatch.h"
 #include "pxr/imaging/hdSt/resourceRegistry.h"
+#include "pxr/imaging/hdSt/renderPassShader.h"
+#include "pxr/imaging/hdSt/renderPassState.h"
+#include "pxr/imaging/hdSt/drawItem.h"
+#include "pxr/imaging/hdSt/renderContextCaps.h"
+#include "pxr/imaging/hdSt/shaderCode.h"
 
-#include "pxr/imaging/hd/drawItem.h"
 #include "pxr/imaging/hd/engine.h"
-#include "pxr/imaging/hd/renderContextCaps.h"
-#include "pxr/imaging/hd/renderPassShader.h"
-#include "pxr/imaging/hd/renderPassState.h"
-#include "pxr/imaging/hd/shaderCode.h"
 #include "pxr/imaging/hd/vtBufferSource.h"
 
 #include "pxr/base/gf/frustum.h"
@@ -58,20 +60,27 @@ HdSt_RenderPass::_Execute(HdRenderPassStateSharedPtr const &renderPassState,
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
 
-    // CPU frustum culling (if chosen)
-    _PrepareCommandBuffer(renderPassState);
+    // Downcast render pass state
+    HdStRenderPassStateSharedPtr stRenderPassState =
+        boost::dynamic_pointer_cast<HdStRenderPassState>(
+        renderPassState);
+    TF_VERIFY(stRenderPassState);
 
-    // Get the resource registry
+    // CPU frustum culling (if chosen)
+    _PrepareCommandBuffer(stRenderPassState);
+
+    // Downcast the resource registry
     HdStResourceRegistrySharedPtr const& resourceRegistry = 
-        boost::static_pointer_cast<HdStResourceRegistry>(
+        boost::dynamic_pointer_cast<HdStResourceRegistry>(
         GetRenderIndex()->GetResourceRegistry());
+    TF_VERIFY(resourceRegistry);
 
     // renderTags.empty() means draw everything in the collection.
     if (renderTags.empty()) {
         for (_HdStCommandBufferMap::iterator it  = _cmdBuffers.begin();
                                            it != _cmdBuffers.end(); it++) {
-            it->second.PrepareDraw(renderPassState, resourceRegistry);
-            it->second.ExecuteDraw(renderPassState, resourceRegistry);
+            it->second.PrepareDraw(stRenderPassState, resourceRegistry);
+            it->second.ExecuteDraw(stRenderPassState, resourceRegistry);
         }
     } else {
         TF_FOR_ALL(tag, renderTags) {
@@ -81,8 +90,8 @@ HdSt_RenderPass::_Execute(HdRenderPassStateSharedPtr const &renderPassState,
             }
 
             // GPU frustum culling (if chosen)
-            _cmdBuffers[*tag].PrepareDraw(renderPassState, resourceRegistry);
-            _cmdBuffers[*tag].ExecuteDraw(renderPassState, resourceRegistry);
+            _cmdBuffers[*tag].PrepareDraw(stRenderPassState, resourceRegistry);
+            _cmdBuffers[*tag].ExecuteDraw(stRenderPassState, resourceRegistry);
         }
     }
 }
@@ -97,7 +106,7 @@ HdSt_RenderPass::_MarkCollectionDirty()
 
 void
 HdSt_RenderPass::_PrepareCommandBuffer(
-    HdRenderPassStateSharedPtr const &renderPassState)
+    HdStRenderPassStateSharedPtr const &renderPassState)
 {
     HD_TRACE_FUNCTION();
     // ------------------------------------------------------------------- #
@@ -107,7 +116,7 @@ HdSt_RenderPass::_PrepareCommandBuffer(
     // so iterate over each prim, cull it and schedule it to be drawn.
 
     HdChangeTracker const &tracker = GetRenderIndex()->GetChangeTracker();
-    HdRenderContextCaps const &caps = HdRenderContextCaps::GetInstance();
+    HdStRenderContextCaps const &caps = HdStRenderContextCaps::GetInstance();
     HdRprimCollection const &collection = GetRprimCollection();
 
     const int
@@ -118,7 +127,7 @@ HdSt_RenderPass::_PrepareCommandBuffer(
     const bool 
        skipCulling = TfDebug::IsEnabled(HD_DISABLE_FRUSTUM_CULLING) ||
            (caps.multiDrawIndirectEnabled
-               && HdEngine::IsEnabledGPUFrustumCulling());
+               && caps.IsEnabledGPUFrustumCulling());
 
     const bool 
        cameraChanged = true,
@@ -157,8 +166,10 @@ HdSt_RenderPass::_PrepareCommandBuffer(
         _cmdBuffers.clear();
         for (HdRenderIndex::HdDrawItemView::iterator it = items.begin();
                                                     it != items.end(); it++ ) {
-            _cmdBuffers[it->first].SwapDrawItems(&it->second, 
-                                                 shaderBindingsVersion);
+            _cmdBuffers[it->first].SwapDrawItems(
+                // Downcast the HdDrawItem entries to HdStDrawItems:
+                reinterpret_cast<std::vector<HdStDrawItem const*>*>(&it->second),
+                shaderBindingsVersion);
             itemCount += _cmdBuffers[it->first].GetTotalSize();
         }
 

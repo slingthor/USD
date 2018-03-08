@@ -25,8 +25,9 @@
 
 #include "pxr/imaging/hd/GL/bufferRelocatorGL.h"
 #include "pxr/imaging/hd/perfLog.h"
-#include "pxr/imaging/hd/renderContextCaps.h"
 #include "pxr/imaging/hd/tokens.h"
+
+#include "pxr/imaging/hdSt/renderContextCaps.h"
 
 #include "pxr/base/vt/array.h"
 

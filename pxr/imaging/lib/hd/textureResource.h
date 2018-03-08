@@ -27,15 +27,12 @@
 #include "pxr/pxr.h"
 #include "pxr/imaging/hd/api.h"
 #include "pxr/imaging/hd/enums.h"
-#include "pxr/imaging/hd/texture.h"
 
 #include "pxr/imaging/garch/texture.h"
 #include "pxr/imaging/garch/textureHandle.h"
 #include "pxr/imaging/garch/gl.h"
 
-#include "pxr/base/tf/declarePtrs.h"
 #include "pxr/base/tf/token.h"
-#include "pxr/base/gf/vec4f.h"
 
 #include <boost/noncopyable.hpp>
 #include <boost/shared_ptr.hpp>
@@ -63,13 +60,6 @@ public:
     virtual ~HdTextureResource();
 
     virtual bool IsPtex() const = 0;
-
-    virtual GarchTextureGPUHandle GetTexelsTextureId() = 0;
-    virtual GarchSamplerGPUHandle GetTexelsSamplerId() = 0;
-    virtual GarchTextureGPUHandle GetTexelsTextureHandle() = 0;
-
-    virtual GarchTextureGPUHandle GetLayoutTextureId() = 0;
-    virtual GarchTextureGPUHandle GetLayoutTextureHandle() = 0;
 
     virtual size_t GetMemoryUsed() = 0;
 };

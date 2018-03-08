@@ -31,22 +31,23 @@
 #include "pxr/imaging/hdSt/commandBuffer.h"
 #include "pxr/imaging/hdSt/cullingShaderKey.h"
 #include "pxr/imaging/hdSt/drawItemInstance.h"
+#include "pxr/imaging/hdSt/geometricShader.h"
+#include "pxr/imaging/hdSt/program.h"
+#include "pxr/imaging/hdSt/renderContextCaps.h"
+#include "pxr/imaging/hdSt/renderPassState.h"
 #include "pxr/imaging/hdSt/resourceRegistry.h"
+#include "pxr/imaging/hdSt/shaderCode.h"
+#include "pxr/imaging/hdSt/shaderKey.h"
+
 #include "pxr/imaging/hdSt/Metal/indirectDrawBatchMetal.h"
+#include "pxr/imaging/hdSt/Metal/persistentBufferMetal.h"
 
 #include "pxr/imaging/hd/binding.h"
 #include "pxr/imaging/hd/bufferArrayRange.h"
 #include "pxr/imaging/hd/debugCodes.h"
 #include "pxr/imaging/hd/engine.h"
-#include "pxr/imaging/hd/geometricShader.h"
-#include "pxr/imaging/hd/program.h"
 #include "pxr/imaging/hd/perfLog.h"
-#include "pxr/imaging/hd/renderContextCaps.h"
-#include "pxr/imaging/hd/renderPassState.h"
-#include "pxr/imaging/hd/shaderCode.h"
-#include "pxr/imaging/hd/shaderKey.h"
 #include "pxr/imaging/hd/tokens.h"
-#include "pxr/imaging/hd/Metal/persistentBufferMetal.h"
 
 #include "pxr/base/tf/diagnostic.h"
 #include "pxr/base/tf/iterator.h"
@@ -81,18 +82,20 @@ HdSt_IndirectDrawBatchMetal::_Init(HdStDrawItemInstance * drawItemInstance)
     drawItemInstance->SetBatch(this);
 
     // remember buffer arrays version for dispatch buffer updating
-    HdDrawItem const* drawItem = drawItemInstance->GetDrawItem();
+    HdStDrawItem const* drawItem = drawItemInstance->GetDrawItem();
     _bufferArraysHash = drawItem->GetBufferArraysHash();
 
+    HdStRenderContextCaps const &caps = HdStRenderContextCaps::GetInstance();
+    
     // determine gpu culling program by the first drawitem
     _useDrawArrays  = !drawItem->GetTopologyRange();
     _useInstancing = static_cast<bool>(drawItem->GetInstanceIndexRange());
-    _useGpuCulling = HdEngine::IsEnabledGPUFrustumCulling();
+    _useGpuCulling = caps.IsEnabledGPUFrustumCulling();
 
     // note: _useInstancing condition is not necessary. it can be removed
     //       if we decide always to use instance culling instead of XFB.
     _useGpuInstanceCulling = _useInstancing &&
-        _useGpuCulling && HdEngine::IsEnabledGPUInstanceFrustumCulling();
+        _useGpuCulling && caps.IsEnabledGPUInstanceFrustumCulling();
 
     if (_useGpuCulling) {
         _cullingProgram.Initialize(
@@ -104,17 +107,19 @@ HdSt_IndirectDrawBatchMetal::_CullingProgram &
 HdSt_IndirectDrawBatchMetal::_GetCullingProgram(
     HdStResourceRegistrySharedPtr const &resourceRegistry)
 {
+    HdStRenderContextCaps const &caps = HdStRenderContextCaps::GetInstance();
+
     if (!_cullingProgram.GetProgram() ||
-        _lastTinyPrimCulling != HdEngine::IsEnabledGPUTinyPrimCulling()) {
+        _lastTinyPrimCulling != caps.IsEnabledGPUTinyPrimCulling()) {
     
         // create a culling shader key
         HdSt_CullingShaderKey shaderKey(_useGpuInstanceCulling,
-                                      HdEngine::IsEnabledGPUTinyPrimCulling(),
-                                      HdEngine::IsEnabledGPUCountVisibleInstances());
+                                        caps.IsEnabledGPUTinyPrimCulling(),
+                                        caps.IsEnabledGPUCountVisibleInstances());
 
         // sharing the culling geometric shader for the same configuration.
-        Hd_GeometricShaderSharedPtr cullShader =
-            Hd_GeometricShader::Create(shaderKey, resourceRegistry);
+        HdSt_GeometricShaderSharedPtr cullShader =
+            HdSt_GeometricShader::Create(shaderKey, resourceRegistry);
         _cullingProgram.SetGeometricShader(cullShader);
 
         _cullingProgram.CompileShader(_drawItemInstances.front()->GetDrawItem(),
@@ -123,7 +128,7 @@ HdSt_IndirectDrawBatchMetal::_GetCullingProgram(
 
         // track the last tiny prim culling state as it can be modified at
         // runtime via TF_DEBUG_CODE HD_DISABLE_TINY_PRIM_CULLING
-        _lastTinyPrimCulling = HdEngine::IsEnabledGPUTinyPrimCulling();
+        _lastTinyPrimCulling = caps.IsEnabledGPUTinyPrimCulling();
     }
     return _cullingProgram;
 }
@@ -232,7 +237,7 @@ HdSt_IndirectDrawBatchMetal::_CompileBatch(
     _numTotalElements = 0;
     _numTotalVertices = 0;
 
-    int instancerNumLevels
+    size_t instancerNumLevels
         = _drawItemInstances[0]->GetDrawItem()->GetInstancePrimVarNumLevels();
 
     // how many integers in the dispatch struct
@@ -264,7 +269,7 @@ HdSt_IndirectDrawBatchMetal::_CompileBatch(
     TF_DEBUG(HD_MDI).Msg(" - Processing Items:\n");
     for (size_t item = 0; item < numDrawItemInstances; ++item) {
         HdStDrawItemInstance const * instance = _drawItemInstances[item];
-        HdDrawItem const * drawItem = _drawItemInstances[item]->GetDrawItem();
+        HdStDrawItem const * drawItem = _drawItemInstances[item]->GetDrawItem();
 
         //
         // index buffer data
@@ -332,7 +337,7 @@ HdSt_IndirectDrawBatchMetal::_CompileBatch(
         // shader parameter
         //
         HdBufferArrayRangeSharedPtr const &
-            shaderBar_ = drawItem->GetMaterial()->GetShaderData();
+            shaderBar_ = drawItem->GetMaterialShader()->GetShaderData();
         HdBufferArrayRangeSharedPtr shaderBar =
             boost::static_pointer_cast<HdBufferArrayRange>(shaderBar_);
 
@@ -473,44 +478,47 @@ HdSt_IndirectDrawBatchMetal::_CompileBatch(
         resourceRegistry->RegisterDispatchBuffer(HdTokens->drawIndirect,
                                                  drawCount,
                                                  commandNumUints);
+    
     // define binding views
     if (_useDrawArrays) {
         if (_useGpuInstanceCulling) {
             // draw indirect command
             _dispatchBuffer->AddBufferResourceView(
-                HdTokens->drawDispatch, GL_INT, 1,
+                HdTokens->drawDispatch, {HdTypeInt32, 1},
                 offsetof(_DrawArraysInstanceCullCommand, count));
             // drawing coords 0
             _dispatchBuffer->AddBufferResourceView(
-                HdTokens->drawingCoord0, GL_INT, 4,
+                HdTokens->drawingCoord0, {HdTypeInt32Vec4, 1},
                 offsetof(_DrawArraysInstanceCullCommand, modelDC));
             // drawing coords 1
             _dispatchBuffer->AddBufferResourceView(
-                HdTokens->drawingCoord1, GL_INT, 3,
+                HdTokens->drawingCoord1, {HdTypeInt32Vec3, 1},
                 offsetof(_DrawArraysInstanceCullCommand, fvarDC));
             // instance drawing coords
             if (instancerNumLevels > 0) {
                 _dispatchBuffer->AddBufferResourceView(
-                    HdTokens->drawingCoordI, GL_INT, instancerNumLevels,
+                    HdTokens->drawingCoordI,
+                    {HdTypeInt32, instancerNumLevels},
                     sizeof(_DrawArraysInstanceCullCommand));
             }
         } else {
             // draw indirect command
             _dispatchBuffer->AddBufferResourceView(
-                HdTokens->drawDispatch, GL_INT, 1,
+                HdTokens->drawDispatch, {HdTypeInt32, 1},
                 offsetof(_DrawArraysCommand, count));
             // drawing coords 0
             _dispatchBuffer->AddBufferResourceView(
-                HdTokens->drawingCoord0, GL_INT, 4,
+                HdTokens->drawingCoord0, {HdTypeInt32Vec4, 1},
                 offsetof(_DrawArraysCommand, modelDC));
             // drawing coords 1
             _dispatchBuffer->AddBufferResourceView(
-                HdTokens->drawingCoord1, GL_INT, 3,
+                HdTokens->drawingCoord1, {HdTypeInt32Vec3, 1},
                 offsetof(_DrawArraysCommand, fvarDC));
             // instance drawing coords
             if (instancerNumLevels > 0) {
                 _dispatchBuffer->AddBufferResourceView(
-                    HdTokens->drawingCoordI, GL_INT, instancerNumLevels,
+                    HdTokens->drawingCoordI,
+                    {HdTypeInt32, instancerNumLevels},
                     sizeof(_DrawArraysCommand));
             }
         }
@@ -518,39 +526,41 @@ HdSt_IndirectDrawBatchMetal::_CompileBatch(
         if (_useGpuInstanceCulling) {
             // draw indirect command
             _dispatchBuffer->AddBufferResourceView(
-                HdTokens->drawDispatch, GL_INT, 1,
+                HdTokens->drawDispatch, {HdTypeInt32, 1},
                 offsetof(_DrawElementsInstanceCullCommand, count));
             // drawing coords 0
             _dispatchBuffer->AddBufferResourceView(
-                HdTokens->drawingCoord0, GL_INT, 4,
+                HdTokens->drawingCoord0, {HdTypeInt32Vec4, 1},
                 offsetof(_DrawElementsInstanceCullCommand, modelDC));
             // drawing coords 1
             _dispatchBuffer->AddBufferResourceView(
-                HdTokens->drawingCoord1, GL_INT, 3,
+                HdTokens->drawingCoord1, {HdTypeInt32Vec3, 1},
                 offsetof(_DrawElementsInstanceCullCommand, fvarDC));
             // instance drawing coords
             if (instancerNumLevels > 0) {
                 _dispatchBuffer->AddBufferResourceView(
-                    HdTokens->drawingCoordI, GL_INT, instancerNumLevels,
+                    HdTokens->drawingCoordI,
+                    {HdTypeInt32, instancerNumLevels},
                     sizeof(_DrawElementsInstanceCullCommand));
             }
         } else {
             // draw indirect command
             _dispatchBuffer->AddBufferResourceView(
-                HdTokens->drawDispatch, GL_INT, 1,
+                HdTokens->drawDispatch, {HdTypeInt32, 1},
                 offsetof(_DrawElementsCommand, count));
             // drawing coords 0
             _dispatchBuffer->AddBufferResourceView(
-                HdTokens->drawingCoord0, GL_INT, 4,
+                HdTokens->drawingCoord0, {HdTypeInt32Vec4, 1},
                 offsetof(_DrawElementsCommand, modelDC));
             // drawing coords 1
             _dispatchBuffer->AddBufferResourceView(
-                HdTokens->drawingCoord1, GL_INT, 3,
-                    offsetof(_DrawElementsCommand, fvarDC));
+                HdTokens->drawingCoord1, {HdTypeInt32Vec3, 1},
+                offsetof(_DrawElementsCommand, fvarDC));
             // instance drawing coords
             if (instancerNumLevels > 0) {
                 _dispatchBuffer->AddBufferResourceView(
-                    HdTokens->drawingCoordI, GL_INT, instancerNumLevels,
+                    HdTokens->drawingCoordI,
+                    {HdTypeInt32, instancerNumLevels},
                     sizeof(_DrawElementsCommand));
             }
         }
@@ -599,76 +609,80 @@ HdSt_IndirectDrawBatchMetal::_CompileBatch(
             if (_useGpuInstanceCulling) {
                 // cull indirect command
                 _dispatchBufferCullInput->AddBufferResourceView(
-                    HdTokens->drawDispatch, GL_INT, 1,
+                    HdTokens->drawDispatch, {HdTypeInt32, 1},
                     offsetof(_DrawArraysInstanceCullCommand, cullCount));
                 // cull drawing coord 0
                 _dispatchBufferCullInput->AddBufferResourceView(
-                    HdTokens->drawingCoord0, GL_INT, 4,
+                    HdTokens->drawingCoord0, {HdTypeInt32Vec4, 1},
                     offsetof(_DrawArraysInstanceCullCommand, modelDC));
                 // cull drawing coord 1
                 _dispatchBufferCullInput->AddBufferResourceView(
-                    HdTokens->drawingCoord1, GL_INT, 2, // see the comment above
+                    // see the comment above
+                    HdTokens->drawingCoord1, {HdTypeInt32Vec2, 1},
                     offsetof(_DrawArraysInstanceCullCommand, fvarDC));
                 // cull instance drawing coord
                 if (instancerNumLevels > 0) {
                     _dispatchBufferCullInput->AddBufferResourceView(
-                        HdTokens->drawingCoordI, GL_INT, instancerNumLevels,
+                        HdTokens->drawingCoordI,
+                        {HdTypeInt32, instancerNumLevels},
                         sizeof(_DrawArraysInstanceCullCommand));
                 }
                 // cull draw index
                 _dispatchBufferCullInput->AddBufferResourceView(
-                    HdTokens->drawCommandIndex, GL_INT, 1,
+                    HdTokens->drawCommandIndex, {HdTypeInt32, 1},
                     offsetof(_DrawArraysInstanceCullCommand, baseInstance));
             } else {
                 // cull indirect command
                 _dispatchBufferCullInput->AddBufferResourceView(
-                    HdTokens->drawDispatch, GL_INT, 1,
+                    HdTokens->drawDispatch, {HdTypeInt32, 1},
                     offsetof(_DrawArraysCommand, count));
                 // cull drawing coord 0
                 _dispatchBufferCullInput->AddBufferResourceView(
-                    HdTokens->drawingCoord0, GL_INT, 4,
+                    HdTokens->drawingCoord0, {HdTypeInt32Vec4, 1},
                     offsetof(_DrawArraysCommand, modelDC));
                 // cull instance count input
                 _dispatchBufferCullInput->AddBufferResourceView(
-                    HdTokens->instanceCountInput, GL_INT, 1,
+                    HdTokens->instanceCountInput, {HdTypeInt32, 1},
                     offsetof(_DrawArraysCommand, instanceCount));
             }
         } else {
             if (_useGpuInstanceCulling) {
                 // cull indirect command
                 _dispatchBufferCullInput->AddBufferResourceView(
-                    HdTokens->drawDispatch, GL_INT, 1,
+                    HdTokens->drawDispatch, {HdTypeInt32, 1},
                     offsetof(_DrawElementsInstanceCullCommand, cullCount));
                 // cull drawing coord 0
                 _dispatchBufferCullInput->AddBufferResourceView(
-                    HdTokens->drawingCoord0, GL_INT, 4,
+                    HdTokens->drawingCoord0, {HdTypeInt32Vec4, 1},
                     offsetof(_DrawElementsInstanceCullCommand, modelDC));
                 // cull drawing coord 1
                 _dispatchBufferCullInput->AddBufferResourceView(
-                    HdTokens->drawingCoord1, GL_INT, 2, // see the comment above
+                    // see the comment above
+                    HdTokens->drawingCoord1, {HdTypeInt32Vec2, 1},
                     offsetof(_DrawElementsInstanceCullCommand, fvarDC));
                 // cull instance drawing coord
                 if (instancerNumLevels > 0) {
                     _dispatchBufferCullInput->AddBufferResourceView(
-                        HdTokens->drawingCoordI, GL_INT, instancerNumLevels,
+                        HdTokens->drawingCoordI,
+                        {HdTypeInt32, instancerNumLevels},
                         sizeof(_DrawElementsInstanceCullCommand));
                 }
                 // cull draw index
                 _dispatchBufferCullInput->AddBufferResourceView(
-                    HdTokens->drawCommandIndex, GL_INT, 1,
+                    HdTokens->drawCommandIndex, {HdTypeInt32, 1},
                     offsetof(_DrawElementsInstanceCullCommand, baseInstance));
             } else {
                 // cull indirect command
                 _dispatchBufferCullInput->AddBufferResourceView(
-                    HdTokens->drawDispatch, GL_INT, 1,
+                    HdTokens->drawDispatch, {HdTypeInt32, 1},
                     offsetof(_DrawElementsCommand, count));
                 // cull drawing coord 0
                 _dispatchBufferCullInput->AddBufferResourceView(
-                    HdTokens->drawingCoord0, GL_INT, 4,
+                    HdTokens->drawingCoord0, {HdTypeInt32Vec4, 1},
                     offsetof(_DrawElementsCommand, modelDC));
                 // cull instance count input
                 _dispatchBufferCullInput->AddBufferResourceView(
-                    HdTokens->instanceCountInput, GL_INT, 1,
+                    HdTokens->instanceCountInput, {HdTypeInt32, 1},
                     offsetof(_DrawElementsCommand, instanceCount));
             }
         }
@@ -712,7 +726,7 @@ HdSt_IndirectDrawBatchMetal::Validate(bool deepValidation)
     // since drawitems are aggregated and ensure that they are sharing
     // same buffer arrays.
 
-    HdDrawItem const* batchItem = _drawItemInstances.front()->GetDrawItem();
+    HdStDrawItem const* batchItem = _drawItemInstances.front()->GetDrawItem();
 
     size_t bufferArraysHash = batchItem->GetBufferArraysHash();
 
@@ -729,7 +743,7 @@ HdSt_IndirectDrawBatchMetal::Validate(bool deepValidation)
 
         size_t numDrawItemInstances = _drawItemInstances.size();
         for (size_t item = 0; item < numDrawItemInstances; ++item) {
-            HdDrawItem const * drawItem
+            HdStDrawItem const * drawItem
                 = _drawItemInstances[item]->GetDrawItem();
 
             if (!TF_VERIFY(drawItem->GetGeometricShader())) {
@@ -757,10 +771,10 @@ HdSt_IndirectDrawBatchMetal::_ValidateCompatibility(
             HdBufferArrayRangeSharedPtr const& instanceIndexBar,
             std::vector<HdBufferArrayRangeSharedPtr> const& instanceBars) const
 {
-    HdDrawItem const* failed = nullptr;
+    HdStDrawItem const* failed = nullptr;
 
     for (HdStDrawItemInstance const* itemInstance : _drawItemInstances) {
-        HdDrawItem const* itm = itemInstance->GetDrawItem();
+        HdStDrawItem const* itm = itemInstance->GetDrawItem();
 
         if (constantBar && !TF_VERIFY(constantBar 
                         ->IsAggregatedWith(itm->GetConstantPrimVarRange())))
@@ -804,7 +818,7 @@ HdSt_IndirectDrawBatchMetal::_ValidateCompatibility(
 
 void
 HdSt_IndirectDrawBatchMetal::PrepareDraw(
-    HdRenderPassStateSharedPtr const &renderPassState,
+    HdStRenderPassStateSharedPtr const &renderPassState,
     HdStResourceRegistrySharedPtr const &resourceRegistry)
 {
     HD_TRACE_FUNCTION();
@@ -821,7 +835,7 @@ HdSt_IndirectDrawBatchMetal::PrepareDraw(
     if ((    _useDrawArrays && _numTotalVertices == 0) ||
         (!_useDrawArrays && _numTotalElements == 0)) return;
 
-    HdDrawItem const* batchItem = _drawItemInstances.front()->GetDrawItem();
+    HdStDrawItem const* batchItem = _drawItemInstances.front()->GetDrawItem();
 
     // Bypass freezeCulling if the command buffer is dirty.
     bool freezeCulling = TfDebug::IsEnabled(HD_FREEZE_CULL_FRUSTUM)
@@ -860,6 +874,8 @@ HdSt_IndirectDrawBatchMetal::PrepareDraw(
             _GPUFrustumCullingXFB(batchItem, renderPassState, resourceRegistry);
         }
     }
+    
+    HdStRenderContextCaps const &caps = HdStRenderContextCaps::GetInstance();
 
     if (TfDebug::IsEnabled(HD_DRAWITEM_DRAWN)) {
         void const *bufferData = NULL;
@@ -872,7 +888,6 @@ HdSt_IndirectDrawBatchMetal::PrepareDraw(
         const int dispatchBufferStride =
             _dispatchBuffer->GetEntireResource()->GetStride();
 
-        HdRenderContextCaps const &caps = HdRenderContextCaps::GetInstance();
         if (gpuCulling) {
             bufferData = _dispatchBuffer->GetEntireResource()->GetBufferContents();
         }
@@ -885,7 +900,7 @@ HdSt_IndirectDrawBatchMetal::PrepareDraw(
                 continue;
             }
 
-            HdDrawItem const * drawItem = drawItemInstance->GetDrawItem();
+            HdStDrawItem const * drawItem = drawItemInstance->GetDrawItem();
 
             if (gpuCulling) {
                 GLint const *instanceCount =
@@ -908,7 +923,7 @@ HdSt_IndirectDrawBatchMetal::PrepareDraw(
     }
 
     if (gpuCulling && !freezeCulling) {
-        if (HdEngine::IsEnabledGPUCountVisibleInstances()) {
+        if (caps.IsEnabledGPUCountVisibleInstances()) {
             _EndGPUCountVisibleInstances(_cullResultSync, &_numVisibleItems);
             glDeleteSync(_cullResultSync);
             _cullResultSync = 0;
@@ -918,14 +933,14 @@ HdSt_IndirectDrawBatchMetal::PrepareDraw(
 
 void
 HdSt_IndirectDrawBatchMetal::ExecuteDraw(
-    HdRenderPassStateSharedPtr const &renderPassState,
+    HdStRenderPassStateSharedPtr const &renderPassState,
     HdStResourceRegistrySharedPtr const &resourceRegistry)
 {
     HD_TRACE_FUNCTION();
 
     if (!TF_VERIFY(!_drawItemInstances.empty())) return;
 
-    HdDrawItem const* batchItem = _drawItemInstances.front()->GetDrawItem();
+    HdStDrawItem const* batchItem = _drawItemInstances.front()->GetDrawItem();
 
     if (!TF_VERIFY(batchItem)) return;
 
@@ -940,22 +955,22 @@ HdSt_IndirectDrawBatchMetal::ExecuteDraw(
     //
 
     // bind program
-    _DrawingProgram & program = _GetDrawingProgram(renderPassState,
+    _DrawingProgram & drawingProgram = _GetDrawingProgram(renderPassState,
                                                    /*indirect=*/true,
                                                    resourceRegistry);
-    HdProgramSharedPtr const &glslProgram = program.GetProgram();
-    if (!TF_VERIFY(glslProgram)) return;
-    if (!TF_VERIFY(glslProgram->Validate())) return;
+    HdStProgramSharedPtr const &program = drawingProgram.GetProgram();
+    if (!TF_VERIFY(program)) return;
+    if (!TF_VERIFY(program->Validate())) return;
 
-    HdBufferResourceGPUHandle programId = glslProgram->GetProgram().GetId();
+    HdBufferResourceGPUHandle programId = program->GetProgram().GetId();
     TF_VERIFY(programId);
 
     TF_CODING_ERROR("Not Implemented");
 /*
     glUseProgram(programId);
 
-    const Hd_ResourceBinder &binder = program.GetBinder();
-    const HdShaderCodeSharedPtrVector &shaders = program.GetComposedShaders();
+    const Hd_ResourceBinder &binder = drawingProgram.GetBinder();
+    const HdShaderCodeSharedPtrVector &shaders = drawingProgram.GetComposedShaders();
 
     // XXX: for surfaces shader, we need to iterate all drawItems to
     //      make textures resident, instead of just the first batchItem
@@ -1055,7 +1070,7 @@ HdSt_IndirectDrawBatchMetal::ExecuteDraw(
                 " - indirect: %d\n"
                 " - drawCount: %d\n"
                 " - stride: %zu\n",
-               program.GetGeometricShader()->GetPrimitiveMode(),
+               drawingProgram.GetGeometricShader()->GetPrimitiveMode(),
                0, batchCount,
                _dispatchBuffer->GetCommandNumUints()*sizeof(GLuint));
 
@@ -1071,12 +1086,12 @@ HdSt_IndirectDrawBatchMetal::ExecuteDraw(
                 " - indirect: %d\n"
                 " - drawCount: %d\n"
                 " - stride: %zu\n",
-               program.GetGeometricShader()->GetPrimitiveMode(),
+               drawingProgram.GetGeometricShader()->GetPrimitiveMode(),
                0, batchCount,
                _dispatchBuffer->GetCommandNumUints()*sizeof(GLuint));
 
         glMultiDrawElementsIndirect(
-            program.GetGeometricShader()->GetPrimitiveMode(),
+            drawingProgram.GetGeometricShader()->GetPrimitiveMode(),
             GL_UNSIGNED_INT,
             0, // draw command always starts with 0
             batchCount,
@@ -1118,8 +1133,8 @@ HdSt_IndirectDrawBatchMetal::ExecuteDraw(
 
 void
 HdSt_IndirectDrawBatchMetal::_GPUFrustumCulling(
-    HdDrawItem const *batchItem,
-    HdRenderPassStateSharedPtr const &renderPassState,
+    HdStDrawItem const *batchItem,
+    HdStRenderPassStateSharedPtr const &renderPassState,
     HdStResourceRegistrySharedPtr const &resourceRegistry)
 {
     HdBufferArrayRangeSharedPtr constantBar_ =
@@ -1146,7 +1161,7 @@ HdSt_IndirectDrawBatchMetal::_GPUFrustumCulling(
 
     _CullingProgram cullingProgram = _GetCullingProgram(resourceRegistry);
 
-    HdProgramSharedPtr const &
+    HdStProgramSharedPtr const &
         program = cullingProgram.GetProgram();
 
     if (!TF_VERIFY(program)) return;
@@ -1157,7 +1172,7 @@ HdSt_IndirectDrawBatchMetal::_GPUFrustumCulling(
     // dispatch buffer to 0 for primitives that are culled, skipping
     // over other elements.
 
-    const Hd_ResourceBinder &binder = cullingProgram.GetBinder();
+    const HdSt_ResourceBinder &binder = cullingProgram.GetBinder();
 
     HdBufferResourceGPUHandle programId = program->GetProgram().GetId();
     TF_CODING_ERROR("Not Implemented");
@@ -1177,7 +1192,9 @@ HdSt_IndirectDrawBatchMetal::_GPUFrustumCulling(
         binder.BindBufferArray(instanceIndexBar);
     }
 
-    if (HdEngine::IsEnabledGPUCountVisibleInstances()) {
+    HdStRenderContextCaps const &caps = HdStRenderContextCaps::GetInstance();
+    
+    if (caps.IsEnabledGPUCountVisibleInstances()) {
         _BeginGPUCountVisibleInstances(resourceRegistry);
     }
 
@@ -1191,7 +1208,7 @@ HdSt_IndirectDrawBatchMetal::_GPUFrustumCulling(
     GfVec2f drawRangeNDC(renderPassState->GetDrawingRangeNDC());
     binder.BindUniformui(HdTokens->ulocDrawCommandNumUints, 1, &drawCommandNumUints);
     binder.BindUniformf(HdTokens->ulocCullMatrix, 16, cullMatrix.GetArray());
-    if (HdEngine::IsEnabledGPUTinyPrimCulling()) {
+    if (caps.IsEnabledGPUTinyPrimCulling()) {
         binder.BindUniformf(HdTokens->ulocDrawRangeNDC, 2, drawRangeNDC.GetArray());
     }
 
@@ -1262,7 +1279,7 @@ HdSt_IndirectDrawBatchMetal::_GPUFrustumCulling(
         GL_UNIFORM_BARRIER_BIT);         // instanceIndices
 
     // a fence has to be added after the memory barrier.
-    if (HdEngine::IsEnabledGPUCountVisibleInstances()) {
+    if (caps.IsEnabledGPUCountVisibleInstances()) {
         _cullResultSync = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
     } else {
         _cullResultSync = 0;
@@ -1272,8 +1289,8 @@ HdSt_IndirectDrawBatchMetal::_GPUFrustumCulling(
 
 void
 HdSt_IndirectDrawBatchMetal::_GPUFrustumCullingXFB(
-    HdDrawItem const *batchItem,
-    HdRenderPassStateSharedPtr const &renderPassState,
+    HdStDrawItem const *batchItem,
+    HdStRenderPassStateSharedPtr const &renderPassState,
     HdStResourceRegistrySharedPtr const &resourceRegistry)
 {
     HdBufferArrayRangeSharedPtr constantBar_ =
@@ -1286,7 +1303,7 @@ HdSt_IndirectDrawBatchMetal::_GPUFrustumCullingXFB(
 
     _CullingProgram &cullingProgram = _GetCullingProgram(resourceRegistry);
 
-    HdProgramSharedPtr const &
+    HdStProgramSharedPtr const &
         program = cullingProgram.GetProgram();
     if (!TF_VERIFY(program)) return;
     if (!TF_VERIFY(program->Validate())) return;
@@ -1489,7 +1506,7 @@ HdSt_IndirectDrawBatchMetal::_CullingProgram::_GetCustomBindings(
 /* virtual */
 bool
 HdSt_IndirectDrawBatchMetal::_CullingProgram::_Link(
-        HdProgramSharedPtr const & program)
+        HdStProgramSharedPtr const & program)
 {
     if (!TF_VERIFY(program)) return false;
     

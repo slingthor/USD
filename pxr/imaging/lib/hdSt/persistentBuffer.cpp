@@ -23,62 +23,43 @@
 //
 #include "pxr/imaging/glf/glew.h"
 
-#include "pxr/imaging/hdSt/persistentBuffer.h"
-#include "pxr/imaging/hd/perfLog.h"
-#include "pxr/imaging/hd/renderContextCaps.h"
+#include "pxr/imaging/hd/engine.h"
 
-#include "pxr/imaging/hf/perfLog.h"
+#include "pxr/imaging/hdSt/persistentBuffer.h"
+#include "pxr/imaging/hdSt/renderContextCaps.h"
+#include "pxr/imaging/hdSt/GL/persistentBufferGL.h"
+#if defined(ARCH_GFX_METAL)
+#include "pxr/imaging/hdSt/Metal/persistentBufferMetal.h"
+#endif
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-
-HdStPersistentBuffer::HdStPersistentBuffer(
-    TfToken const &role, size_t dataSize, void* data)
-    : HdResourceGL(role)
-    , _mappedAddress(0)
+HdStPersistentBuffer *HdStPersistentBuffer::New(TfToken const &role, size_t dataSize, void* data)
 {
-    HD_TRACE_FUNCTION();
-    HF_MALLOC_TAG_FUNCTION();
-
-    HdRenderContextCaps const &caps = HdRenderContextCaps::GetInstance();
-
-    GLuint newId = 0;
-    glGenBuffers(1, &newId);
-
-    if (caps.bufferStorageEnabled) {
-        GLbitfield access = 
-            GL_MAP_READ_BIT | GL_MAP_WRITE_BIT |
-            GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT;
-
-        if (caps.directStateAccessEnabled) {
-            glNamedBufferStorageEXT(newId, dataSize, data, access);
-            _mappedAddress = glMapNamedBufferRangeEXT(newId, 0, dataSize, access);
-        } else {
-            glBindBuffer(GL_ARRAY_BUFFER, newId);
-            glBufferStorage(GL_ARRAY_BUFFER, dataSize, data, access);
-            _mappedAddress = glMapBufferRange(GL_ARRAY_BUFFER, 0, dataSize, access);
-            glBindBuffer(GL_ARRAY_BUFFER, 0);
-        }
-    } else {
-        if (caps.directStateAccessEnabled) {
-            glNamedBufferDataEXT(newId, dataSize, data, GL_DYNAMIC_DRAW);
-        } else {
-            glBindBuffer(GL_ARRAY_BUFFER, newId);
-            glBufferData(GL_ARRAY_BUFFER, dataSize, data, GL_DYNAMIC_DRAW);
-            glBindBuffer(GL_ARRAY_BUFFER, 0);
-        }
+    HdEngine::RenderAPI api = HdEngine::GetRenderAPI();
+    switch(api)
+    {
+        case HdEngine::OpenGL:
+            return new HdStPersistentBufferGL(role, dataSize, data);
+#if defined(ARCH_GFX_METAL)
+        case HdEngine::Metal:
+            return new HdStPersistentBufferMetal(role, dataSize, data);
+#endif
+        default:
+            TF_FATAL_CODING_ERROR("No HdStBufferResource for this API");
     }
+    return NULL;
+}
 
-    SetAllocation(newId, dataSize);
+HdStPersistentBuffer::HdStPersistentBuffer(HdResourceSharedPtr resource):
+    _resource(resource)
+{
+    /*NOTHING*/
 }
 
 HdStPersistentBuffer::~HdStPersistentBuffer()
 {
-    GLuint id = GetId();
-    if (id) {
-        glDeleteBuffers(1, &id);
-    }
-    SetAllocation(0, 0);
+    /*NOTHING*/
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

@@ -31,6 +31,8 @@
 #include "pxr/imaging/garch/baseTextureData.h"
 #include "pxr/imaging/garch/utils.h"
 
+#include "pxr/imaging/hf/perfLog.h"
+
 #include "pxr/base/tf/registryManager.h"
 #include "pxr/base/tf/type.h"
 #include "pxr/base/tracelite/trace.h"
@@ -89,7 +91,7 @@ GlfBaseTexture::_UpdateTexture(GarchBaseTextureDataConstPtr texData)
         _hasWrapModeS  = texData->GetWrapInfo().hasWrapModeS;
         _hasWrapModeT  = texData->GetWrapInfo().hasWrapModeT;
         _wrapModeS     = texData->GetWrapInfo().wrapModeS;
-        _wrapModeT     = texData->GetWrapInfo().wrapModeT;        
+        _wrapModeT     = texData->GetWrapInfo().wrapModeT;
 
         _SetMemoryUsed(texData->ComputeBytesUsed());
 
@@ -112,7 +114,8 @@ GlfBaseTexture::_CreateTexture(GarchBaseTextureDataConstPtr texData,
                 int const unpackCropRight)
 {
     TRACE_FUNCTION();
-    
+    HF_MALLOC_TAG_FUNCTION();
+
     if (texData && texData->HasRawBuffer()) {
         glBindTexture(GL_TEXTURE_2D, (GLuint)(uint64_t)_textureName);
 

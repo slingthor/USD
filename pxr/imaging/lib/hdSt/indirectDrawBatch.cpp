@@ -22,12 +22,16 @@
 // language governing permissions and limitations under the Apache License.
 //
 #include "pxr/imaging/glf/glew.h"
-
 #include "pxr/imaging/hdSt/commandBuffer.h"
 #include "pxr/imaging/hdSt/cullingShaderKey.h"
 #include "pxr/imaging/hdSt/drawItemInstance.h"
+#include "pxr/imaging/hdSt/geometricShader.h"
 #include "pxr/imaging/hdSt/indirectDrawBatch.h"
+#include "pxr/imaging/hdSt/program.h"
+#include "pxr/imaging/hdSt/renderPassState.h"
 #include "pxr/imaging/hdSt/resourceRegistry.h"
+#include "pxr/imaging/hdSt/shaderCode.h"
+#include "pxr/imaging/hdSt/shaderKey.h"
 
 #include "pxr/imaging/hdSt/GL/indirectDrawBatchGL.h"
 #if defined(ARCH_GFX_METAL)
@@ -36,15 +40,10 @@
 
 #include "pxr/imaging/hd/binding.h"
 #include "pxr/imaging/hd/bufferArrayRange.h"
+
 #include "pxr/imaging/hd/debugCodes.h"
 #include "pxr/imaging/hd/engine.h"
-#include "pxr/imaging/hd/geometricShader.h"
-#include "pxr/imaging/hd/program.h"
 #include "pxr/imaging/hd/perfLog.h"
-#include "pxr/imaging/hd/renderContextCaps.h"
-#include "pxr/imaging/hd/renderPassState.h"
-#include "pxr/imaging/hd/shaderCode.h"
-#include "pxr/imaging/hd/shaderKey.h"
 #include "pxr/imaging/hd/tokens.h"
 
 #include "pxr/imaging/glf/diagnostic.h"
@@ -60,17 +59,6 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-
-static const GLuint64 HD_CULL_RESULT_TIMEOUT_NS = 5e9; // XXX how long to wait?
-
-TF_DEFINE_ENV_SETTING(HD_ENABLE_GPU_TINY_PRIM_CULLING, true,
-                      "Enable tiny prim culling");
-TF_DEFINE_ENV_SETTING(HD_ENABLE_GPU_FRUSTUM_CULLING, true,
-                      "Enable GPU frustum culling");
-TF_DEFINE_ENV_SETTING(HD_ENABLE_GPU_COUNT_VISIBLE_INSTANCES, false,
-                      "Enable GPU frustum culling visible count query");
-TF_DEFINE_ENV_SETTING(HD_ENABLE_GPU_INSTANCE_FRUSTUM_CULLING, true,
-                      "Enable GPU per-instance frustum culling");
 
 HdSt_DrawBatchSharedPtr HdSt_IndirectDrawBatch::New(HdStDrawItemInstance * drawItemInstance)
 {

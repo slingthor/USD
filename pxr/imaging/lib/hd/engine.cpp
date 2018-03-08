@@ -27,54 +27,20 @@
 #include "pxr/imaging/hd/engine.h"
 
 #include "pxr/imaging/hd/debugCodes.h"
-#include "pxr/imaging/hd/drawItem.h"
+#include "pxr/imaging/hd/material.h"
 #include "pxr/imaging/hd/perfLog.h"
-#include "pxr/imaging/hd/renderContextCaps.h"
 #include "pxr/imaging/hd/renderDelegate.h"
 #include "pxr/imaging/hd/renderIndex.h"
 #include "pxr/imaging/hd/renderPass.h"
 #include "pxr/imaging/hd/renderPassState.h"
 #include "pxr/imaging/hd/resourceRegistry.h"
 #include "pxr/imaging/hd/rprim.h"
-#include "pxr/imaging/hd/shader.h"
 #include "pxr/imaging/hd/task.h"
 #include "pxr/imaging/hd/tokens.h"
-
-#include "pxr/imaging/hd/GL/codeGenGLSL.h"
-#include "pxr/imaging/hd/GL/bufferResourceGL.h"
-#include "pxr/imaging/hd/GL/bufferRelocatorGL.h"
-#include "pxr/imaging/hd/GL/glslProgram.h"
-#include "pxr/imaging/hd/GL/persistentBufferGL.h"
-#include "pxr/imaging/hd/GL/textureResourceGL.h"
-#include "pxr/imaging/glf/drawTarget.h"
-#include "pxr/imaging/glf/glslfx.h"
-
-#if defined(ARCH_GFX_METAL)
-#include "pxr/imaging/hd/Metal/codeGenMSL.h"
-#include "pxr/imaging/hd/Metal/bufferResourceMetal.h"
-#include "pxr/imaging/hd/Metal/bufferRelocatorMetal.h"
-#include "pxr/imaging/hd/Metal/mslProgram.h"
-#include "pxr/imaging/hd/Metal/persistentBufferMetal.h"
-#include "pxr/imaging/hd/Metal/textureResourceMetal.h"
-#include "pxr/imaging/mtlf/drawTarget.h"
-#include "pxr/imaging/mtlf/glslfx.h"
-#endif
-
-#include "pxr/base/tf/envSetting.h"
 
 #include <sstream>
 
 PXR_NAMESPACE_OPEN_SCOPE
-
-TF_DEFINE_ENV_SETTING(HD_ENABLE_GPU_TINY_PRIM_CULLING, true,
-                      "Enable tiny prim culling");
-TF_DEFINE_ENV_SETTING(HD_ENABLE_GPU_FRUSTUM_CULLING, true,
-                      "Enable GPU frustum culling");
-TF_DEFINE_ENV_SETTING(HD_ENABLE_GPU_COUNT_VISIBLE_INSTANCES, false,
-                      "Enable GPU frustum culling visible count query");
-TF_DEFINE_ENV_SETTING(HD_ENABLE_GPU_INSTANCE_FRUSTUM_CULLING, true,
-                      "Enable GPU per-instance frustum culling");
-
 
 HdEngine::RenderAPI HdEngine::_renderAPI = HdEngine::RenderAPI::Unset;
 
@@ -111,13 +77,6 @@ HdEngine::RemoveTaskContextData(const TfToken &id)
 }
 
 void
-HdEngine::_InitCaps() const
-{
-    // Make sure we initialize caps in main thread.
-    HdRenderContextCaps::GetInstance();
-}
-
-void
 HdEngine::Execute(HdRenderIndex& index, HdTaskSharedPtrVector const &tasks)
 {
     // Note: For Hydra Stream render delegate.
@@ -139,8 +98,6 @@ HdEngine::Execute(HdRenderIndex& index, HdTaskSharedPtrVector const &tasks)
     // Once we reflect all conditions which provoke the batch recompilation
     // into the collection dirtiness, we can call
     // HdRenderPass::GetCommandBuffer() to get the right batch.
-
-    _InitCaps();
 
     // --------------------------------------------------------------------- //
     // DATA DISCOVERY PHASE
@@ -174,33 +131,31 @@ HdEngine::ReloadAllShaders(HdRenderIndex& index)
     // 1st dirty all rprims, so they will trigger shader reload
     tracker.MarkAllRprimsDirty(HdChangeTracker::AllDirty);
 
-    // Dirty all surface shaders
-    SdfPathVector shaders = index.GetSprimSubtree(HdPrimTypeTokens->shader,
+    // Dirty all materials
+    SdfPathVector materials = index.GetSprimSubtree(HdPrimTypeTokens->material,
                                                   SdfPath::EmptyPath());
 
-    for (SdfPathVector::iterator shaderIt  = shaders.begin();
-                                 shaderIt != shaders.end();
-                               ++shaderIt) {
+    for (SdfPathVector::iterator materialIt  = materials.begin();
+                                 materialIt != materials.end();
+                               ++materialIt) {
 
-        tracker.MarkSprimDirty(*shaderIt, HdChangeTracker::AllDirty);
+        tracker.MarkSprimDirty(*materialIt, HdChangeTracker::AllDirty);
     }
 
-    // Invalidate Geometry shader cache in Resource Registry.
-    index.GetResourceRegistry()->InvalidateGeometricShaderRegistry();
+    // Invalidate shader cache in Resource Registry.
+    index.GetResourceRegistry()->InvalidateShaderRegistry();
 
-    // Fallback Shader
-    HdShader *shader = static_cast<HdShader *>(
-                              index.GetFallbackSprim(HdPrimTypeTokens->shader));
-    shader->Reload();
-
+    // Fallback material
+    HdMaterial *material = static_cast<HdMaterial *>(
+                        index.GetFallbackSprim(HdPrimTypeTokens->material));
+    material->Reload();
 
     // Note: Several Shaders are not currently captured in this
     // - Lighting Shaders
     // - Render Pass Shaders
     // - Culling Shader
-
 }
-
+/*
 Hd_CodeGen *HdEngine::CreateCodeGen(Hd_GeometricShaderPtr const &geometricShader,
                                     HdShaderCodeSharedPtrVector const &shaders)
 {
@@ -275,10 +230,10 @@ HdBufferResource *HdEngine::CreateResourceBuffer(TfToken const &role,
                                              int stride)
 {
     switch(_renderAPI) {
-        case RenderAPI::OpenGL: return new HdBufferResourceGL(
+        case RenderAPI::OpenGL: return new HdStBufferResourceGL(
             role, glDataType, numComponents, arraySize, offset, stride);
 #if defined(ARCH_GFX_METAL)
-        case RenderAPI::Metal: return new HdBufferResourceMetal(
+        case RenderAPI::Metal: return new HdStBufferResourceMetal(
             role, glDataType, numComponents, arraySize, offset, stride);
 #endif
         default:
@@ -303,7 +258,7 @@ HdProgram *HdEngine::CreateProgram(TfToken const &role)
 HdBufferRelocator *HdEngine::CreateBufferRelocator(HdBufferResourceGPUHandle srcBuffer, HdBufferResourceGPUHandle dstBuffer)
 {
     switch(_renderAPI) {
-        case RenderAPI::OpenGL: return new HdBufferRelocatorGL(srcBuffer, dstBuffer);
+        case RenderAPI::OpenGL: return new HdStBufferRelocator(srcBuffer, dstBuffer);
 #if defined(ARCH_GFX_METAL)
         case RenderAPI::Metal: return new HdBufferRelocatorMetal(srcBuffer, dstBuffer);
 #endif
@@ -316,9 +271,9 @@ HdBufferRelocator *HdEngine::CreateBufferRelocator(HdBufferResourceGPUHandle src
 HdPersistentBuffer *HdEngine::CreatePersistentBuffer(TfToken const &role, size_t dataSize, void* data)
 {
     switch(_renderAPI) {
-        case RenderAPI::OpenGL: return new HdPersistentBufferGL(role, dataSize, data);
+        case RenderAPI::OpenGL: return new HdStPersistentBufferGL(role, dataSize, data);
 #if defined(ARCH_GFX_METAL)
-        case RenderAPI::Metal: return new HdPersistentBufferMetal(role, dataSize, data);
+        case RenderAPI::Metal: return new HdStPersistentBufferMetal(role, dataSize, data);
 #endif
         default:
         TF_FATAL_CODING_ERROR("No program for this API");
@@ -367,89 +322,6 @@ HdTextureResource *HdEngine::CreateSimpleTextureResource(GarchTextureHandleRefPt
     }
     return nullptr;
 }
-
-bool
-HdEngine::IsEnabledGPUFrustumCulling()
-{
-    HdRenderContextCaps const &caps = HdRenderContextCaps::GetInstance();
-    
-    switch(_renderAPI) {
-        case RenderAPI::OpenGL:
-            // GPU XFB frustum culling should work since GL 4.0, but for now
-            // the shader frustumCull.glslfx requires explicit uniform location
-            static bool isEnabledGPUFrustumCulling =
-            TfGetEnvSetting(HD_ENABLE_GPU_FRUSTUM_CULLING) &&
-            (caps.explicitUniformLocation);
-            return isEnabledGPUFrustumCulling &&
-                !TfDebug::IsEnabled(HD_DISABLE_FRUSTUM_CULLING);
-#if defined(ARCH_GFX_METAL)
-        case RenderAPI::Metal:
-            return true;
-#endif
-        default:
-            TF_FATAL_CODING_ERROR("No program for this API");
-    }
-    return false;
-}
-
-bool
-HdEngine::IsEnabledGPUCountVisibleInstances()
-{
-    switch(_renderAPI) {
-        case RenderAPI::OpenGL:
-            static bool isEnabledGPUCountVisibleInstances =
-            TfGetEnvSetting(HD_ENABLE_GPU_COUNT_VISIBLE_INSTANCES);
-            return isEnabledGPUCountVisibleInstances;
-#if defined(ARCH_GFX_METAL)
-        case RenderAPI::Metal:
-            return true;
-#endif
-        default:
-            TF_FATAL_CODING_ERROR("No program for this API");
-    }
-    return false;
-}
-
-bool
-HdEngine::IsEnabledGPUTinyPrimCulling()
-{
-    switch(_renderAPI) {
-        case RenderAPI::OpenGL:
-            static bool isEnabledGPUTinyPrimCulling =
-            TfGetEnvSetting(HD_ENABLE_GPU_TINY_PRIM_CULLING);
-            return isEnabledGPUTinyPrimCulling &&
-                    !TfDebug::IsEnabled(HD_DISABLE_TINY_PRIM_CULLING);
-#if defined(ARCH_GFX_METAL)
-        case RenderAPI::Metal:
-            return true;
-#endif
-        default:
-            TF_FATAL_CODING_ERROR("No program for this API");
-    }
-    return false;
-}
-
-bool
-HdEngine::IsEnabledGPUInstanceFrustumCulling()
-{
-    HdRenderContextCaps const &caps = HdRenderContextCaps::GetInstance();
- 
-    switch(_renderAPI) {
-        case RenderAPI::OpenGL:
-            // GPU instance frustum culling requires SSBO of bindless buffer
-            static bool isEnabledGPUInstanceFrustumCulling =
-            TfGetEnvSetting(HD_ENABLE_GPU_INSTANCE_FRUSTUM_CULLING) &&
-                (caps.shaderStorageBufferEnabled || caps.bindlessBufferEnabled);
-            return isEnabledGPUInstanceFrustumCulling;
-#if defined(ARCH_GFX_METAL)
-        case RenderAPI::Metal:
-            return true;
-#endif
-        default:
-            TF_FATAL_CODING_ERROR("No program for this API");
-    }
-    return false;
-}
-
+*/
 PXR_NAMESPACE_CLOSE_SCOPE
 

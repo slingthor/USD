@@ -25,13 +25,13 @@
 #define HDST_DRAW_TARGET_TEXTURE_RESOURCE_H
 
 #include "pxr/pxr.h"
-#include "pxr/imaging/hd/textureResource.h"
+#include "pxr/imaging/hdSt/textureResource.h"
 #include "pxr/imaging/garch/drawTarget.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
 
-class HdSt_DrawTargetTextureResource : public HdTextureResource {
+class HdSt_DrawTargetTextureResource : public HdStTextureResource {
 public:
     virtual ~HdSt_DrawTargetTextureResource();
 
@@ -45,6 +45,7 @@ public:
     // HdTextureResource API
     //
     virtual bool IsPtex() const override;
+    virtual size_t GetMemoryUsed() override;
 
     virtual GarchTextureGPUHandle GetTexelsTextureId() override;
     virtual GarchSamplerGPUHandle GetTexelsSamplerId() override;
@@ -52,8 +53,6 @@ public:
 
     virtual GarchTextureGPUHandle GetLayoutTextureId() override;
     virtual GarchTextureGPUHandle GetLayoutTextureHandle() override;
-
-    virtual size_t GetMemoryUsed() override;
 
 protected:
     GarchDrawTarget::AttachmentRefPtr  _attachment;

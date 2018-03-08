@@ -25,7 +25,6 @@
 #include "pxr/imaging/hdx/package.h"
 
 #include "pxr/imaging/hd/binding.h"
-#include "pxr/imaging/hd/engine.h"
 #include "pxr/imaging/hd/perfLog.h"
 #include "pxr/imaging/hd/tokens.h"
 
@@ -53,7 +52,7 @@ HdxSimpleLightingShader::HdxSimpleLightingShader()
     _bindingMap->GetUniformBinding(TfToken("DrawDataBuffer"));
     _lightingContext->InitUniformBlockBindings(_bindingMap);
     _lightingContext->InitSamplerUnitBindings(_bindingMap);
-    _glslfx.reset(HdEngine::CreateGLSLFX(HdxPackageSimpleLightingShader()));
+    _glslfx.reset(GLSLFX::New(HdxPackageSimpleLightingShader()));
 }
 
 HdxSimpleLightingShader::~HdxSimpleLightingShader()
@@ -107,10 +106,10 @@ HdxSimpleLightingShader::SetCamera(GfMatrix4d const &worldToViewMatrix,
 
 /* virtual */
 void
-HdxSimpleLightingShader::BindResources(Hd_ResourceBinder const &binder,
+HdxSimpleLightingShader::BindResources(HdSt_ResourceBinder const &binder,
                                        HdBufferResourceGPUHandle program)
 {
-    // XXX: we'd like to use Hd_ResourceBinder instead of GlfBindingMap.
+    // XXX: we'd like to use HdSt_ResourceBinder instead of GlfBindingMap.
     //
     _bindingMap->AssignUniformBindingsToProgram((GLuint)(uint64_t)program);
     _lightingContext->BindUniformBlocks(_bindingMap);
@@ -121,10 +120,10 @@ HdxSimpleLightingShader::BindResources(Hd_ResourceBinder const &binder,
 
 /* virtual */
 void
-HdxSimpleLightingShader::UnbindResources(Hd_ResourceBinder const &binder,
+HdxSimpleLightingShader::UnbindResources(HdSt_ResourceBinder const &binder,
                                          HdBufferResourceGPUHandle program)
 {
-    // XXX: we'd like to use Hd_ResourceBinder instead of GlfBindingMap.
+    // XXX: we'd like to use HdSt_ResourceBinder instead of GlfBindingMap.
     //
     _lightingContext->UnbindSamplers(_bindingMap);
 }

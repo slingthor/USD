@@ -24,9 +24,10 @@
 /// \file ArrayTexture.cpp
 //
 
+#include "pxr/imaging/garch/uvTextureData.h"
+
 #include "pxr/imaging/mtlf/arrayTexture.h"
 #include "pxr/imaging/mtlf/diagnostic.h"
-#include "pxr/imaging/mtlf/uvTextureData.h"
 #include "pxr/imaging/mtlf/utils.h"
 #include "pxr/base/tf/registryManager.h"
 #include "pxr/base/tf/type.h"

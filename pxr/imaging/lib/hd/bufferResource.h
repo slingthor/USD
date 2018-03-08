@@ -26,8 +26,10 @@
 
 #include "pxr/pxr.h"
 #include "pxr/imaging/hd/api.h"
-#include "pxr/imaging/hd/version.h"
 #include "pxr/imaging/hd/resource.h"
+#include "pxr/imaging/hd/texture.h"
+#include "pxr/imaging/hd/version.h"
+#include "pxr/imaging/hd/types.h"
 
 #include "pxr/base/tf/token.h"
 #include "pxr/base/vt/value.h"
@@ -47,6 +49,8 @@ typedef boost::shared_ptr<HdBufferResource> HdBufferResourceSharedPtr;
 typedef std::vector<
     std::pair<TfToken, HdBufferResourceSharedPtr> > HdBufferResourceNamedList;
 
+typedef void* HdBufferResourceGPUHandle;
+
 /// \class HdBufferResource
 ///
 /// A specific type of HdResource (GPU resource) representing a buffer object.
@@ -58,39 +62,20 @@ public:
 
     HD_API
     HdBufferResource(TfToken const &role,
-                     int glDataType,
-                     short numComponents,
-                     int arraySize,
+                     HdTupleType tupleType,
                      int offset,
                      int stride);
     HD_API
-    ~HdBufferResource();
+    virtual ~HdBufferResource();
 
-    /// OpenGL data type; GL_UNSIGNED_INT, etc
-    int GetGLDataType() const {return _glDataType;}
-
-    /// Returns the number of components in a single element.
-    /// This value is always in the range [1,4].
-    short GetNumComponents() const {return _numComponents;}
-
-    /// Returns the size of a single component.
-    HD_API 
-    size_t GetComponentSize() const;
+    /// Data type and count
+    HdTupleType GetTupleType() const { return _tupleType; }
 
     /// Returns the interleaved offset (in bytes) of this data.
     int GetOffset() const {return _offset;}
 
     /// Returns the stride (in bytes) of underlying buffer.
     int GetStride() const {return _stride;}
-
-    /// Returns the size of array if this resource is a static-sized array.
-    /// returns 1 for non-array resource.
-    int GetArraySize() const {return _arraySize;}
-
-    /// Returns the type name string of this resource
-    /// to be used in codegen.
-    HD_API
-    TfToken GetGLTypeName() const;
 
     HD_API
     virtual void CopyData(size_t vboOffset, size_t dataSize, void const *data) = 0;
@@ -99,19 +84,23 @@ public:
     virtual HdBufferResourceGPUHandle GetId() const = 0;
 
     HD_API
-    virtual VtValue ReadBuffer(int glDataType,
-                               int numComponents,
-                               int arraySize,
+    virtual VtValue ReadBuffer(HdTupleType tupleType,
                                int vboOffset,
                                int stride,
                                int numElements) = 0;
 
     HD_API
-    virtual uint8_t* GetBufferContents() = 0;
+    virtual uint8_t const* GetBufferContents() const = 0;
+    
+    /// Returns the gpu address (if available. otherwise returns 0).
+    HD_API
+    virtual uint64_t GetGPUAddress() const = 0;
+    
+    HD_API
+    virtual GarchTextureGPUHandle GetTextureBuffer() = 0;
+
 protected:
-    int _glDataType;
-    short _numComponents;
-    int _arraySize;
+    HdTupleType _tupleType;
     int _offset;
     int _stride;
 };

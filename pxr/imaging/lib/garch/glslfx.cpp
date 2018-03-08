@@ -25,6 +25,26 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+GARCH_API
+GLSLFX *GLSLFX::New()
+{
+    TF_CODING_ERROR("Not Implemented");
+    return NULL;
+}
+
+/// Create a glslfx object from a file
+GLSLFX *GLSLFX::New(std::string const & filePath)
+{
+    TF_CODING_ERROR("Not Implemented");
+    return NULL;
+}
+
+/// Create a glslfx object from a stream
+GLSLFX *GLSLFX::New(std::istream &is)
+{
+    TF_CODING_ERROR("Not Implemented");
+    return NULL;
+}
 
 PXR_NAMESPACE_CLOSE_SCOPE
 

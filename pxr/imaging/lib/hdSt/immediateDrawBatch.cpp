@@ -24,22 +24,27 @@
 #include "pxr/imaging/glf/glew.h"
 
 #include "pxr/imaging/hdSt/immediateDrawBatch.h"
+
+#include "pxr/imaging/hdSt/bufferResource.h"
 #include "pxr/imaging/hdSt/commandBuffer.h"
+#include "pxr/imaging/hdSt/drawItem.h"
 #include "pxr/imaging/hdSt/drawItemInstance.h"
+#include "pxr/imaging/hdSt/geometricShader.h"
+#include "pxr/imaging/hdSt/program.h"
+#include "pxr/imaging/hdSt/renderPassState.h"
 #include "pxr/imaging/hdSt/resourceRegistry.h"
+#include "pxr/imaging/hdSt/shaderCode.h"
 
 #include "pxr/imaging/hd/bufferArrayRange.h"
 #include "pxr/imaging/hd/debugCodes.h"
-#include "pxr/imaging/hd/geometricShader.h"
-#include "pxr/imaging/hd/program.h"
 #include "pxr/imaging/hd/mesh.h"
 #include "pxr/imaging/hd/perfLog.h"
-#include "pxr/imaging/hd/renderPassState.h"
-#include "pxr/imaging/hd/shaderCode.h"
 #include "pxr/imaging/hd/tokens.h"
 
 #include "pxr/base/tf/diagnostic.h"
 #include "pxr/base/tf/iterator.h"
+
+using namespace boost;
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -68,7 +73,7 @@ HdSt_ImmediateDrawBatch::Validate(bool deepValidation)
 {
     if (!TF_VERIFY(!_drawItemInstances.empty())) return false;
 
-    HdDrawItem const* batchItem = _drawItemInstances.front()->GetDrawItem();
+    HdStDrawItem const* batchItem = _drawItemInstances.front()->GetDrawItem();
 
     // immediate batch doesn't need to verify buffer array hash unlike indirect
     // batch.
@@ -77,7 +82,7 @@ HdSt_ImmediateDrawBatch::Validate(bool deepValidation)
 
         size_t numDrawItemInstances = _drawItemInstances.size();
         for (size_t item = 0; item < numDrawItemInstances; ++item) {
-            HdDrawItem const * drawItem
+            HdStDrawItem const * drawItem
                 = _drawItemInstances[item]->GetDrawItem();
 
             if (!TF_VERIFY(drawItem->GetGeometricShader())) {
@@ -95,14 +100,14 @@ HdSt_ImmediateDrawBatch::Validate(bool deepValidation)
 
 void
 HdSt_ImmediateDrawBatch::PrepareDraw(
-    HdRenderPassStateSharedPtr const &renderPassState,
+    HdStRenderPassStateSharedPtr const &renderPassState,
     HdStResourceRegistrySharedPtr const &resourceRegistry)
 {
 }
 
 void
 HdSt_ImmediateDrawBatch::ExecuteDraw(
-    HdRenderPassStateSharedPtr const &renderPassState,
+    HdStRenderPassStateSharedPtr const &renderPassState,
     HdStResourceRegistrySharedPtr const &resourceRegistry)
 {
     HD_TRACE_FUNCTION();
@@ -125,12 +130,12 @@ HdSt_ImmediateDrawBatch::ExecuteDraw(
                                                    /*indirect=*/false,
                                                    resourceRegistry);
 
-    HdProgramSharedPtr const &gpu_program = program.GetProgram();
+    HdStProgramSharedPtr const &gpu_program = program.GetProgram();
     if (!TF_VERIFY(gpu_program)) return;
     if (!TF_VERIFY(gpu_program->Validate())) return;
 
-    const Hd_ResourceBinder &binder = program.GetBinder();
-    const HdShaderCodeSharedPtrVector &shaders = program.GetComposedShaders();
+    const HdSt_ResourceBinder &binder = program.GetBinder();
+    const HdStShaderCodeSharedPtrVector &shaders = program.GetComposedShaders();
 
     HdBufferResourceGPUHandle programId = gpu_program->GetProgram().GetId();
     TF_VERIFY(programId);
@@ -146,7 +151,7 @@ HdSt_ImmediateDrawBatch::ExecuteDraw(
 
     // Set up geometric shader states
     // all batch item should have the same geometric shader.
-    Hd_GeometricShaderSharedPtr const &geometricShader
+    HdSt_GeometricShaderSharedPtr const &geometricShader
         = program.GetGeometricShader();
     geometricShader->BindResources(binder, programId);
 
@@ -156,7 +161,7 @@ HdSt_ImmediateDrawBatch::ExecuteDraw(
             continue;
         }
 
-        HdDrawItem const * drawItem = (*drawItemIt)->GetDrawItem();
+        HdStDrawItem const * drawItem = (*drawItemIt)->GetDrawItem();
 
         ++numItemsDrawn;
         if (TfDebug::IsEnabled(HD_DRAWITEM_DRAWN)) {
@@ -292,14 +297,14 @@ HdSt_ImmediateDrawBatch::ExecuteDraw(
         HdBufferArrayRangeSharedPtr shaderBar =
             boost::static_pointer_cast<HdBufferArrayRange> (shaderBar_);
 
-        // shaderBar isn't needed when the surfaceShader is overriden
+        // shaderBar isn't needed when the material is overriden
         if (shaderBar && (!shaderBar->IsAggregatedWith(shaderBarCurrent))) {
             if (shaderBarCurrent) {
-                binder.UnbindBuffer(HdTokens->surfaceShaderParams,
-                                    shaderBarCurrent->GetResource());
+                binder.UnbindBuffer(HdTokens->materialParams,
+                                    dynamic_pointer_cast<HdStBufferResource>(shaderBarCurrent->GetResource()));
             }
-            binder.BindBuffer(HdTokens->surfaceShaderParams,
-                              shaderBar->GetResource());
+            binder.BindBuffer(HdTokens->materialParams,
+                              dynamic_pointer_cast<HdStBufferResource>(shaderBar->GetResource()));
             shaderBarCurrent = shaderBar;
         }
 
@@ -441,8 +446,8 @@ HdSt_ImmediateDrawBatch::ExecuteDraw(
     if (indexBarCurrent)
         binder.UnbindBufferArray(indexBarCurrent);
     if (shaderBarCurrent) {
-        binder.UnbindBuffer(HdTokens->surfaceShaderParams,
-                            shaderBarCurrent->GetResource());
+        binder.UnbindBuffer(HdTokens->materialParams,
+                            dynamic_pointer_cast<HdStBufferResource>(shaderBarCurrent->GetResource()));
     }
 
     glUseProgram(0);

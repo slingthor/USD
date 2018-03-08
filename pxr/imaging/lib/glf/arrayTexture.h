@@ -28,7 +28,8 @@
 
 #include "pxr/pxr.h"
 #include "pxr/imaging/glf/api.h"
-#include "pxr/imaging/glf/uvTexture.h"
+
+#include "pxr/imaging/garch/uvTexture.h"
 
 #include "pxr/base/tf/declarePtrs.h"
 #include "pxr/base/tf/token.h"
@@ -103,6 +104,16 @@ protected:
     GLF_API
     void _CreateTextures(GarchBaseTextureDataConstRefPtrVector texDataVec,
                         bool const generateMipmap);
+    
+    GLF_API
+    virtual void _UpdateTexture(GarchBaseTextureDataConstPtr texData) {}
+    GLF_API
+    virtual void _CreateTexture(GarchBaseTextureDataConstPtr texData,
+                                bool const useMipmaps,
+                                int const unpackCropTop = 0,
+                                int const unpackCropBottom = 0,
+                                int const unpackCropLeft = 0,
+                                int const unpackCropRight = 0) {}
 
 private:
 

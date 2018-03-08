@@ -25,11 +25,9 @@
 #define HDST_INDIRECT_DRAW_BATCH_GL_H
 
 #include "pxr/imaging/hdSt/indirectDrawBatch.h"
-#include "pxr/imaging/hd/version.h"
 #include "pxr/imaging/hdSt/dispatchBuffer.h"
 #include "pxr/imaging/hdSt/drawBatch.h"
-
-#include "pxr/imaging/hd/GL/persistentBufferGL.h"
+#include "pxr/imaging/hdSt/GL/persistentBufferGL.h"
 
 #include <vector>
 
@@ -59,12 +57,12 @@ public:
 
     /// Prepare draw commands and apply view frustum culling for this batch.
     HDST_API
-    virtual void PrepareDraw(HdRenderPassStateSharedPtr const &renderPassState,
+    virtual void PrepareDraw(HdStRenderPassStateSharedPtr const &renderPassState,
                              HdStResourceRegistrySharedPtr const &resourceRegistry) override;
 
     /// Executes the drawing commands for this batch.
     HDST_API
-    virtual void ExecuteDraw(HdRenderPassStateSharedPtr const &renderPassState,
+    virtual void ExecuteDraw(HdStRenderPassStateSharedPtr const &renderPassState,
                              HdStResourceRegistrySharedPtr const &resourceRegistry) override;
 
     HDST_API
@@ -99,7 +97,7 @@ private:
         virtual void _GetCustomBindings(
             HdBindingRequestVector *customBindings,
             bool *enableInstanceDraw) const;
-        virtual bool _Link(HdProgramSharedPtr const & glslProgram);
+        virtual bool _Link(HdStProgramSharedPtr const & glslProgram) override;
     private:
         bool _useDrawArrays;
         bool _useInstanceCulling;
@@ -111,12 +109,12 @@ private:
 
     void _CompileBatch(HdStResourceRegistrySharedPtr const &resourceRegistry);
 
-    void _GPUFrustumCulling(HdDrawItem const *item,
-                            HdRenderPassStateSharedPtr const &renderPassState,
+    void _GPUFrustumCulling(HdStDrawItem const *item,
+                            HdStRenderPassStateSharedPtr const &renderPassState,
                             HdStResourceRegistrySharedPtr const &resourceRegistry);
 
-    void _GPUFrustumCullingXFB(HdDrawItem const *item,
-                               HdRenderPassStateSharedPtr const &renderPassState,
+    void _GPUFrustumCullingXFB(HdStDrawItem const *item,
+                               HdStRenderPassStateSharedPtr const &renderPassState,
                                HdStResourceRegistrySharedPtr const &resourceRegistry);
 
     void _BeginGPUCountVisibleInstances(HdStResourceRegistrySharedPtr const &resourceRegistry);
@@ -132,7 +130,7 @@ private:
     bool _drawCommandBufferDirty;
     size_t _bufferArraysHash;
 
-    HdPersistentBufferGLSharedPtr _resultBuffer;
+    HdStPersistentBufferGLSharedPtr _resultBuffer;
 
     size_t _numVisibleItems;
     size_t _numTotalVertices;

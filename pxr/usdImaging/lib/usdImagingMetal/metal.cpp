@@ -28,7 +28,7 @@
 #include "pxr/usdImaging/usdImagingMetal/metal.h"
 #include "pxr/usdImaging/usdImagingMetal/hdEngine.h"
 
-#include "pxr/imaging/hd/renderContextCaps.h"
+#include "pxr/imaging/hdSt/renderContextCaps.h"
 
 #include "pxr/base/tf/getenv.h"
 #include "pxr/base/tf/diagnostic.h"

@@ -26,10 +26,10 @@
 
 /// \file glf/glew.h
 
+#include <GL/glew.h>
+
 #include "pxr/pxr.h"
 #include "pxr/imaging/glf/api.h"
-
-#include <GL/glew.h>
 
 PXR_NAMESPACE_OPEN_SCOPE
 

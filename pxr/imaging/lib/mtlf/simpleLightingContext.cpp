@@ -27,9 +27,10 @@
 #include "pxr/imaging/mtlf/bindingMap.h"
 #include "pxr/imaging/mtlf/diagnostic.h"
 #include "pxr/imaging/mtlf/package.h"
-#include "pxr/imaging/mtlf/simpleLight.h"
-#include "pxr/imaging/mtlf/simpleMaterial.h"
 #include "pxr/imaging/mtlf/uniformBlock.h"
+
+#include "pxr/imaging/garch/simpleLight.h"
+#include "pxr/imaging/garch/simpleMaterial.h"
 
 #include "pxr/base/arch/pragmas.h"
 #include "pxr/base/tf/stringUtils.h"

@@ -26,16 +26,22 @@
 
 #include "pxr/pxr.h"
 #include "pxr/imaging/hdSt/api.h"
+#include "pxr/imaging/hdSt/shaderKey.h"
+#include "pxr/imaging/hdSt/program.h"
+
 #include "pxr/imaging/hd/resourceRegistry.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
 typedef boost::shared_ptr<class HdStDispatchBuffer>
     HdStDispatchBufferSharedPtr;
-typedef boost::shared_ptr<class HdPersistentBuffer>
-    HdPersistentBufferSharedPtr;
+typedef boost::shared_ptr<class HdStPersistentBuffer>
+    HdStPersistentBufferSharedPtr;
 typedef boost::shared_ptr<class HdStResourceRegistry>
     HdStResourceRegistrySharedPtr;
+typedef boost::shared_ptr<class HdSt_GeometricShader>
+    HdSt_GeometricShaderSharedPtr;
+typedef boost::shared_ptr<class HdStProgram> HdStProgramSharedPtr;
 
 /// \class HdStResourceRegistry
 ///
@@ -60,7 +66,7 @@ public:
     /// Register a buffer initialized with \a dataSize bytes of \a data
     /// to be used as a persistently mapped shader storage buffer.
     HDST_API
-    HdPersistentBufferSharedPtr RegisterPersistentBuffer(
+    HdStPersistentBufferSharedPtr RegisterPersistentBuffer(
         TfToken const &role, size_t dataSize, void *data);
 
     /// Remove any entries associated with expired dispatch buffers.
@@ -70,6 +76,59 @@ public:
     /// Remove any entries associated with expired persistently mapped buffers.
     HDST_API
     void GarbageCollectPersistentBuffers();
+
+    /// Check if \p range is compatible with \p newBufferSpecs.
+    /// If not, allocate new bufferArrayRange with merged buffer specs,
+    /// register migration computation and return the new range.
+    /// Otherwise just return the same range.
+    HDST_API
+    HdBufferArrayRangeSharedPtr MergeBufferArrayRange(
+        HdAggregationStrategy *strategy,
+        HdBufferArrayRegistry &bufferArrayRegistry,
+        TfToken const &role,
+        HdBufferSpecVector const &newBufferSpecs,
+        HdBufferArrayRangeSharedPtr const &range);
+
+    /// MergeBufferArrayRange of non uniform buffer.
+    HDST_API
+    HdBufferArrayRangeSharedPtr MergeNonUniformBufferArrayRange(
+        TfToken const &role,
+        HdBufferSpecVector const &newBufferSpecs,
+        HdBufferArrayRangeSharedPtr const &range);
+
+    /// MergeBufferArrayRange of non uniform immutable buffer.
+    HDST_API
+    HdBufferArrayRangeSharedPtr MergeNonUniformImmutableBufferArrayRange(
+        TfToken const &role,
+        HdBufferSpecVector const &newBufferSpecs,
+        HdBufferArrayRangeSharedPtr const &range);
+
+    /// MergeBufferArrayRange of uniform buffer.
+    HDST_API
+    HdBufferArrayRangeSharedPtr MergeUniformBufferArrayRange(
+        TfToken const &role,
+        HdBufferSpecVector const &newBufferSpecs,
+        HdBufferArrayRangeSharedPtr const &range);
+
+    /// MergeBufferArrayRange of shader storage buffer.
+    HDST_API
+    HdBufferArrayRangeSharedPtr MergeShaderStorageBufferArrayRange(
+        TfToken const &role,
+        HdBufferSpecVector const &newBufferSpecs,
+        HdBufferArrayRangeSharedPtr const &range);
+
+    /// Register a geometric shader.
+    HDST_API
+    std::unique_lock<std::mutex> RegisterGeometricShader(HdStShaderKey::ID id,
+         HdInstance<HdStShaderKey::ID, HdSt_GeometricShaderSharedPtr> *pInstance);
+
+    /// Register a GLSL program into the program registry.
+    /// note: Currently no garbage collection enforced on the shader registry
+    HDST_API
+    std::unique_lock<std::mutex> RegisterProgram(HdStProgram::ID id,
+        HdInstance<HdStProgram::ID, HdStProgramSharedPtr> *pInstance);
+
+    void InvalidateShaderRegistry() override;
 
 protected:
     virtual void _GarbageCollect() override;
@@ -81,10 +140,19 @@ private:
         _DispatchBufferRegistry;
     _DispatchBufferRegistry _dispatchBufferRegistry;
 
-    typedef std::vector<HdPersistentBufferSharedPtr>
+    typedef std::vector<HdStPersistentBufferSharedPtr>
         _PersistentBufferRegistry;
     _PersistentBufferRegistry _persistentBufferRegistry;
 
+    // geometric shader registry
+    typedef HdInstance<HdStShaderKey::ID, HdSt_GeometricShaderSharedPtr>
+         _GeometricShaderInstance;
+    HdInstanceRegistry<_GeometricShaderInstance> _geometricShaderRegistry;
+
+    // glsl shader program registry
+    typedef HdInstance<HdStProgram::ID, HdStProgramSharedPtr>
+        _ProgramInstance;
+    HdInstanceRegistry<_ProgramInstance> _programRegistry;
 };
 
 

@@ -10,8 +10,15 @@ endif()
 
 if (APPLE)
     set(GFX    mtlf)
-    set(GFXADDITIONAL   Metal/indirectDrawBatchMetal
-                        Metal/drawTargetTextureResourceMetal)
+    set(GFXADDITIONAL   Metal/bufferRelocatorMetal
+                        Metal/bufferResourceMetal
+                        Metal/drawTargetTextureResourceMetal
+                        Metal/indirectDrawBatchMetal
+                        Metal/mslProgram
+                        Metal/mtlUtils
+                        Metal/persistentBufferMetal
+                        Metal/resourceMetal
+                        Metal/textureResourceMetal)
 else()
     set(GFX)
     set(GFXADDITIONAL)
@@ -20,35 +27,69 @@ endif()
 pxr_library(hdSt
     LIBRARIES
         cameraUtil
+        garch
+        glf
         hd
         tf
         tracelite
+        ${GFX}
+        ${GLEW_LIBRARY}
+        ${OPENSUBDIV_LIBRARIES}
 
     INCLUDE_DIRS
+        ${GLEW_INCLUDE_DIR}
         ${OPENSUBDIV_INCLUDE_DIR}
 
     PUBLIC_CLASSES
         basisCurves
+        bufferRelocator
+        bufferResource
         camera
         commandBuffer
+        computeShader
+        copyComputation
         dispatchBuffer
+        drawItem
         drawItemInstance
         drawTarget
         drawTargetAttachmentDesc
         drawTargetAttachmentDescArray
         drawTargetRenderPassState
+        extCompGpuComputation
+        extCompGpuComputationBufferSource
+        extCompGpuComputationResource
+        fallbackLightingShader
+        geometricShader
         glslfxShader
+        glUtils
         instancer
+        interleavedMemoryManager
         light      
+        lightingShader
+        material
         mesh
         mixinShaderCode
+        package
+        persistentBuffer
         points
+        program
+        renderContextCaps
         renderDelegate
         renderPass
+        renderPassShader
+        renderPassState
+        resourceBinder
         resourceRegistry
-        shader
+        shaderCode
+        shaderKey
+        smoothNormals
         surfaceShader
+        texture
+        textureResource
+        tokens
         unitTestGLDrawing
+        vboMemoryManager
+        vboSimpleMemoryManager
 
     PUBLIC_HEADERS
         api.h
@@ -57,6 +98,7 @@ pxr_library(hdSt
         basisCurvesComputations
         basisCurvesShaderKey
         basisCurvesTopology
+        codeGen
         cullingShaderKey
         drawBatch
         drawTargetTextureResource
@@ -69,12 +111,40 @@ pxr_library(hdSt
         subdivision
         subdivision3
         triangulate
+        unitTestDelegate
         unitTestHelper
-        GL/indirectDrawBatchGL
+        GL/bufferRelocatorGL
+        GL/bufferResourceGL
+        GL/codeGenGLSL
+        GL/glConversions
         GL/drawTargetTextureResourceGL
+        GL/glslProgram
+        GL/glUtils
+        GL/indirectDrawBatchGL
+        GL/persistentBufferGL
+        GL/resourceGL
+        GL/textureResourceGL
         ${GFXADDITIONAL}
 
     RESOURCE_FILES
+        plugInfo.json
+        shaders/basisCurves.glslfx
+        shaders/compute.glslfx
+        shaders/fallbackLighting.glslfx
+        shaders/fallbackLightingShader.glslfx
+        shaders/fallbackSurface.glslfx
+        shaders/frustumCull.glslfx
+        shaders/instancing.glslfx
+        shaders/lighting.glslfx
+        shaders/lightingIntegrationShader.glslfx
+        shaders/mesh.glslfx
+        shaders/meshNormal.glslfx
+        shaders/meshWire.glslfx
+        shaders/points.glslfx
+        shaders/ptexTexture.glslfx
+        shaders/renderPass.glslfx
+        shaders/renderPassShader.glslfx
+        shaders/terminals.glslfx
 )
 
 if (X11_FOUND OR APPLE)

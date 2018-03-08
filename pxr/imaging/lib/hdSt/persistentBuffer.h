@@ -26,7 +26,7 @@
 
 #include "pxr/pxr.h"
 #include "pxr/imaging/hdSt/api.h"
-#include "pxr/imaging/hd/resource.h"
+#include "pxr/base/tf/token.h"
 
 #include <boost/shared_ptr.hpp>
 
@@ -34,23 +34,34 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 
 typedef boost::shared_ptr<class HdStPersistentBuffer> HdStPersistentBufferSharedPtr;
+typedef boost::shared_ptr<class HdResource> HdResourceSharedPtr;
+
 
 /// \class HdStPersistentBuffer
 ///
 /// A buffer used to prepare data on the GPU that has a persistent mapping
 /// from the CPU.
 ///
-class HdStPersistentBuffer : public HdResourceGL {
+class HdStPersistentBuffer {
 public:
     HDST_API
-    HdStPersistentBuffer(TfToken const &role, size_t dataSize, void* data);
+    static HdStPersistentBuffer *New(TfToken const &role, size_t dataSize, void* data);
+    
     HDST_API
-    ~HdStPersistentBuffer();
+    virtual ~HdStPersistentBuffer();
 
     /// Returns the mapped address
-    void * GetMappedAddress() const { return _mappedAddress; }
+    virtual void * GetMappedAddress() const { return _mappedAddress; }
+
+    /// Returns the GPU resource.
+    HdResourceSharedPtr GetResource() const { return _resource; }
+    
+protected:
+    HDST_API
+    HdStPersistentBuffer(HdResourceSharedPtr resource);
 
 private:
+    HdResourceSharedPtr _resource;
     void * _mappedAddress;
 };
 
