@@ -24,6 +24,7 @@
 /// \file simpleShadowArray.cpp
 
 #include "pxr/imaging/garch/simpleShadowArray.h"
+#include "pxr/imaging/garch/resourceFactory.h"
 
 #include "pxr/base/gf/vec2i.h"
 #include "pxr/base/gf/vec4d.h"
@@ -32,9 +33,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 GarchSimpleShadowArray* GarchSimpleShadowArray::New(GfVec2i const & size, size_t numLayers)
 {
-    // Create some sort of low level Garch awareness of the current render API in use
-    TF_CODING_ERROR("Not Implemented");
-    return nullptr;
+    return GarchResourceFactory::GetInstance()->NewSimpleShadowArray(size, numLayers);
 }
 
 GarchSimpleShadowArray::GarchSimpleShadowArray(GfVec2i const & size,

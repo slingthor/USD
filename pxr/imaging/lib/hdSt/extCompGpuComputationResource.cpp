@@ -55,7 +55,7 @@ HdStExtCompGpuComputationResource::HdStExtCompGpuComputationResource(
  , _shaderSourceHash()
  , _internalRange()
  , _computeProgram()
- , _resourceBinder()
+ , _resourceBinder(HdSt_ResourceBinder::New())
 {
     
 }
@@ -99,10 +99,10 @@ HdStExtCompGpuComputationResource::Resolve()
         boost::scoped_ptr<HdSt_CodeGen> codeGen(HdSt_CodeGen::New(shaders));
         // let resourcebinder resolve bindings and populate metadata
         // which is owned by codegen.
-        _resourceBinder.ResolveComputeBindings(_outputBufferSpecs,
-                                              inputBufferSpecs,
-                                              shaders,
-                                              codeGen->GetMetaData());
+        _resourceBinder->ResolveComputeBindings(_outputBufferSpecs,
+                                               inputBufferSpecs,
+                                               shaders,
+                                               codeGen->GetMetaData());
 
         HdStProgram::ID registryID = codeGen->ComputeHash();
 

@@ -29,6 +29,7 @@
 #include "pxr/pxr.h"
 #include "pxr/imaging/mtlf/api.h"
 #include "pxr/imaging/garch/gl.h"
+#include "pxr/imaging/garch/bindingMap.h"
 #include "pxr/base/tf/refBase.h"
 #include "pxr/base/tf/stringUtils.h"
 #include "pxr/base/tf/token.h"
@@ -39,7 +40,7 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 
-class MtlfBindingMap : public TfRefBase, public TfWeakBase {
+class MtlfBindingMap : public GarchBindingMap {
 public:
     typedef TfHashMap<TfToken, int, TfToken::HashFunctor> BindingMap;
 
@@ -92,6 +93,11 @@ public:
 
     MTLF_API
     void Debug() const;
+    
+protected:
+    MtlfBindingMap() {}
+    
+    friend class MtlfResourceFactory;
 
 private:
     void _AddActiveAttributeBindings(GLuint program);

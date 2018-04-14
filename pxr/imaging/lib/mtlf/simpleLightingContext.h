@@ -59,6 +59,8 @@ protected:
     MtlfSimpleLightingContext();
     MTLF_API
     virtual ~MtlfSimpleLightingContext();
+    
+    friend class MtlfResourceFactory;
 };
 
 

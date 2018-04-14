@@ -44,10 +44,6 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 class MtlfSimpleShadowArray : public GarchSimpleShadowArray {
 public:
-    MTLF_API
-    MtlfSimpleShadowArray(GfVec2i const & size, size_t numLayers);
-    MTLF_API
-    virtual ~MtlfSimpleShadowArray();
 
     MTLF_API
     virtual void SetSize(GfVec2i const & size) override;
@@ -59,6 +55,14 @@ public:
     virtual void BeginCapture(size_t index, bool clear) override;
     MTLF_API
     virtual void EndCapture(size_t index) override;
+
+protected:
+    MTLF_API
+    MtlfSimpleShadowArray(GfVec2i const & size, size_t numLayers);
+    MTLF_API
+    virtual ~MtlfSimpleShadowArray();
+
+    friend class MtlfResourceFactory;
 
 private:
     void _AllocTextureArray();

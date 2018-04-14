@@ -297,12 +297,12 @@ HdSt_DrawBatch::_DrawingProgram::CompileShader(
 
     // let resourcebinder resolve bindings and populate metadata
     // which is owned by codegen.
-    _resourceBinder.ResolveBindings(drawItem,
-                                    shaders,
-                                    codeGen->GetMetaData(),
-                                    indirect,
-                                    instanceDraw,
-                                    customBindings);
+    _resourceBinder->ResolveBindings(drawItem,
+                                     shaders,
+                                     codeGen->GetMetaData(),
+                                     indirect,
+                                     instanceDraw,
+                                     customBindings);
 
     HdStProgram::ID hash = codeGen->ComputeHash();
 
@@ -324,7 +324,7 @@ HdSt_DrawBatch::_DrawingProgram::CompileShader(
         _program = programInstance.GetValue();
 
         if (_program) {
-            _resourceBinder.IntrospectBindings(_program->GetProgram());
+            _resourceBinder->IntrospectBindings(_program->GetProgram());
         } else {
             // Failed to compile and link a valid glsl program.
             return false;

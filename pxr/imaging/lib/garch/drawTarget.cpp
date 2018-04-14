@@ -25,21 +25,20 @@
 //
 
 #include "pxr/imaging/garch/drawTarget.h"
+#include "pxr/imaging/garch/resourceFactory.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
 GarchDrawTargetRefPtr
 GarchDrawTarget::New( GfVec2i const & size, bool requestMSAA )
 {
-    TF_CODING_ERROR("Not Implemented");
-    return TfNullPtr;//TfCreateRefPtr(new This(size, requestMSAA));
+    return TfCreateRefPtr(GarchResourceFactory::GetInstance()->NewDrawTarget(size, requestMSAA));
 }
 
 GarchDrawTargetRefPtr
 GarchDrawTarget::New( GarchDrawTargetPtr const & drawtarget )
 {
-    TF_CODING_ERROR("Not Implemented");
-    return TfNullPtr;//TfCreateRefPtr(new This(drawtarget));
+    return TfCreateRefPtr(GarchResourceFactory::GetInstance()->NewDrawTarget(drawtarget));
 }
 
 GarchDrawTarget::GarchDrawTarget()

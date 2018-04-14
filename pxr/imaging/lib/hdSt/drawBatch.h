@@ -108,7 +108,9 @@ protected:
     ///
     class _DrawingProgram {
     public:
-        _DrawingProgram() {}
+        _DrawingProgram() {
+            _resourceBinder = HdSt_ResourceBinderSharedPtr(HdSt_ResourceBinder::New());
+        }
 
         HDST_API
         bool CompileShader(
@@ -123,14 +125,14 @@ protected:
         /// Returns the resouce binder, which is used for buffer resource
         /// bindings at draw time.
         const HdSt_ResourceBinder &GetBinder() const { 
-            return _resourceBinder; 
+            return *_resourceBinder; 
         }
 
         void Reset() {
             _program.reset();
             _surfaceShader.reset();
             _geometricShader.reset();
-            _resourceBinder = HdSt_ResourceBinder();
+            _resourceBinder = HdSt_ResourceBinderSharedPtr(HdSt_ResourceBinder::New());
             _shaders.clear();
         }
         
@@ -186,7 +188,7 @@ protected:
 
     private:
         HdStProgramSharedPtr _program;
-        HdSt_ResourceBinder _resourceBinder;
+        HdSt_ResourceBinderSharedPtr _resourceBinder;
         HdStShaderCodeSharedPtrVector _shaders;
         HdSt_GeometricShaderSharedPtr _geometricShader;
         HdStShaderCodeSharedPtr _surfaceShader;

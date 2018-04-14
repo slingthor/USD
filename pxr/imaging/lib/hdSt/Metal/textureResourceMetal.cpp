@@ -63,7 +63,7 @@ HdStSimpleTextureResourceMetal::HdStSimpleTextureResourceMetal(
             , _sampler(0)
             , _isPtex(isPtex)
 {
-    TF_CODING_ERROR("Not Implemented");
+    TF_FATAL_CODING_ERROR("Not Implemented");
     /*
     // When we are not using Ptex we will use samplers,
     // that includes both, bindless textures and no-bindless textures
@@ -129,7 +129,7 @@ HdStSimpleTextureResourceMetal::HdStSimpleTextureResourceMetal(
 
 HdStSimpleTextureResourceMetal::~HdStSimpleTextureResourceMetal()
 {
-    TF_CODING_ERROR("Not Implemented");
+    TF_FATAL_CODING_ERROR("Not Implemented");
     /*
     if (!_isPtex) {
         glDeleteSamplers(1, &_sampler);
@@ -146,7 +146,7 @@ GarchTextureGPUHandle HdStSimpleTextureResourceMetal::GetTexelsTextureId()
 {
     if (_isPtex) {
 #ifdef PXR_PTEX_SUPPORT_ENABLED
-        TF_CODING_ERROR("Not Implemented"); // Make this graphics api abstract
+        TF_FATAL_CODING_ERROR("Not Implemented"); // Make this graphics api abstract
         return TfDynamic_cast<MtlfPtexTextureRefPtr>(_texture)->GetTexelsTextureName();
 #else
         TF_CODING_ERROR("Ptex support is disabled.  "
@@ -168,7 +168,7 @@ GarchTextureGPUHandle HdStSimpleTextureResourceMetal::GetTexelsTextureHandle()
     GarchTextureGPUHandle textureId = GetTexelsTextureId();
     GarchSamplerGPUHandle samplerId = GetTexelsSamplerId();
 
-    TF_CODING_ERROR("Not Implemented"); // Make this graphics api abstract
+    TF_FATAL_CODING_ERROR("Not Implemented"); // Make this graphics api abstract
     return 0;
     /*
     if (!TF_VERIFY(glGetTextureHandleARB) ||
@@ -187,7 +187,7 @@ GarchTextureGPUHandle HdStSimpleTextureResourceMetal::GetTexelsTextureHandle()
 GarchTextureGPUHandle HdStSimpleTextureResourceMetal::GetLayoutTextureId()
 {
 #ifdef PXR_PTEX_SUPPORT_ENABLED
-    TF_CODING_ERROR("Not Implemented"); // Make this graphics api abstract
+    TF_FATAL_CODING_ERROR("Not Implemented"); // Make this graphics api abstract
     return TfDynamic_cast<MtlfPtexTextureRefPtr>(_texture)->GetLayoutTextureName();
 #else
     TF_CODING_ERROR("Ptex support is disabled.  "
@@ -204,7 +204,7 @@ GarchTextureGPUHandle HdStSimpleTextureResourceMetal::GetLayoutTextureHandle()
 
     GarchTextureGPUHandle textureId = GetLayoutTextureId();
 
-    TF_CODING_ERROR("Not Implemented");
+    TF_FATAL_CODING_ERROR("Not Implemented");
     return textureId;
 }
 

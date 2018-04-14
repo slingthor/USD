@@ -21,16 +21,15 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#ifndef HD_CODE_GEN_MSL_H
-#define HD_CODE_GEN_MSL_H
+#ifndef HDST_CODE_GEN_MSL_H
+#define HDST_CODE_GEN_MSL_H
 
 #include "pxr/pxr.h"
-#include "pxr/imaging/hd/api.h"
-#include "pxr/imaging/hd/version.h"
-#include "pxr/imaging/hd/resourceBinder.h"
-#include "pxr/imaging/hd/codeGen.h"
+#include "pxr/imaging/hdSt/api.h"
+#include "pxr/imaging/hdSt/resourceBinder.h"
+#include "pxr/imaging/hdSt/codeGen.h"
 
-#include "pxr/imaging/hd/Metal/mslProgram.h"
+#include "pxr/imaging/hdSt/Metal/mslProgram.h"
 
 #include <boost/shared_ptr.hpp>
 
@@ -46,7 +45,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 /// A utility class to compose glsl shader sources and compile them
 /// upon request of HdShaderSpec.
 ///
-class Hd_CodeGenMSL : public Hd_CodeGen
+class HdSt_CodeGenMSL : public HdSt_CodeGen
 {
 public:
     struct TParam {
@@ -68,18 +67,18 @@ public:
 
     /// Constructor.
     HD_API
-    Hd_CodeGenMSL(Hd_GeometricShaderPtr const &geometricShader,
-               HdShaderCodeSharedPtrVector const &shaders);
+    HdSt_CodeGenMSL(HdSt_GeometricShaderPtr const &geometricShader,
+                    HdStShaderCodeSharedPtrVector const &shaders);
 
     /// Constructor for non-geometric use cases.
     /// Don't call compile when constructed this way.
     /// Call CompileComputeProgram instead.
     HD_API
-    Hd_CodeGenMSL(HdShaderCodeSharedPtrVector const &shaders);
+    HdSt_CodeGenMSL(HdStShaderCodeSharedPtrVector const &shaders);
     
     /// Destructor
     HD_API
-    virtual ~Hd_CodeGenMSL() {};
+    virtual ~HdSt_CodeGenMSL() {};
     
     /// Return the hash value of glsl shader to be generated.
     HD_API
@@ -87,7 +86,7 @@ public:
 
     /// Generate shader source and compile it.
     HD_API
-    virtual HdProgramSharedPtr Compile();
+    virtual HdStProgramSharedPtr Compile();
 
     /// Generate compute shader source and compile it.
     /// It uses the compute information in the meta data to determine
@@ -105,7 +104,7 @@ public:
     /// \see GetComputeShaderSource
     /// \see Hd_ResourceBinder::ResolveBindings
     HD_API
-    virtual HdProgramSharedPtr CompileComputeProgram();
+    virtual HdStProgramSharedPtr CompileComputeProgram();
     
     /// Return the generated vertex shader source
     virtual const std::string &GetVertexShaderSource() const { return _vsSource; }
@@ -126,7 +125,7 @@ public:
     virtual const std::string &GetComputeShaderSource() const { return _csSource; }
     
     /// Return the pointer of metadata to be populated by resource binder.
-    virtual Hd_ResourceBinder::MetaData *GetMetaData() { return &_metaData; }
+    virtual HdSt_ResourceBinder::MetaData *GetMetaData() { return &_metaData; }
 
 private:
     void _GenerateDrawingCoord();
@@ -138,9 +137,9 @@ private:
     
     void _ParseGLSL(std::stringstream &source);
 
-    Hd_ResourceBinder::MetaData _metaData;
-    Hd_GeometricShaderPtr _geometricShader;
-    HdShaderCodeSharedPtrVector _shaders;
+    HdSt_ResourceBinder::MetaData _metaData;
+    HdSt_GeometricShaderPtr _geometricShader;
+    HdStShaderCodeSharedPtrVector _shaders;
 
     // source buckets
     std::stringstream _genCommon, _genVS, _genTCS, _genTES;
@@ -162,4 +161,4 @@ private:
 
 PXR_NAMESPACE_CLOSE_SCOPE
 
-#endif  // HD_CODE_GEN_H
+#endif  // HDST_CODE_GEN_H

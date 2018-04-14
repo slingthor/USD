@@ -22,9 +22,6 @@
 // language governing permissions and limitations under the Apache License.
 //
 #include "pxr/imaging/glf/glew.h"
-#if defined(ARCH_GFX_METAL)
-#include "pxr/imaging/mtlf/mtlDevice.h"
-#endif
 
 #include <boost/make_shared.hpp>
 #include <vector>
@@ -40,6 +37,10 @@
 #include "pxr/imaging/hdSt/renderContextCaps.h"
 #include "pxr/imaging/hdSt/vboMemoryManager.h"
 #include "pxr/imaging/hdSt/GL/glConversions.h"
+
+#include "pxr/imaging/hdSt/GL/vboMemoryBufferGL.h"
+#include "pxr/imaging/hdSt/Metal/vboMemoryBufferMetal.h"
+
 #include "pxr/imaging/hd/engine.h"
 #include "pxr/imaging/hd/perfLog.h"
 #include "pxr/imaging/hd/tokens.h"
@@ -60,8 +61,22 @@ HdStVBOMemoryManager::CreateBufferArray(
     TfToken const &role,
     HdBufferSpecVector const &bufferSpecs)
 {
-    return boost::make_shared<HdStVBOMemoryManager::_StripedBufferArray>(
-        role, bufferSpecs, _isImmutable);
+    HdEngine::RenderAPI api = HdEngine::GetRenderAPI();
+    switch(api)
+    {
+        case HdEngine::OpenGL:
+            return boost::make_shared<HdStVBOMemoryBufferGL>(
+                            role, bufferSpecs, _isImmutable);
+#if defined(ARCH_GFX_METAL)
+        case HdEngine::Metal:
+            return boost::make_shared<HdStVBOMemoryBufferMetal>(
+                            role, bufferSpecs, _isImmutable);
+#endif
+        default:
+            TF_FATAL_CODING_ERROR("No HdStVBOMemoryBuffer for this API");
+    }
+    
+    return NULL;
 }
 
 
@@ -266,218 +281,6 @@ HdStVBOMemoryManager::_StripedBufferArray::GarbageCollect()
         return true;
     }
     return false;
-}
-
-void
-HdStVBOMemoryManager::_StripedBufferArray::Reallocate(
-    std::vector<HdBufferArrayRangeSharedPtr> const &ranges,
-    HdBufferArraySharedPtr const &curRangeOwner)
-{
-    HD_TRACE_FUNCTION();
-    HF_MALLOC_TAG_FUNCTION();
-
-    // XXX: make sure glcontext
-    HdStRenderContextCaps const &caps = HdStRenderContextCaps::GetInstance();
-
-    HD_PERF_COUNTER_INCR(HdPerfTokens->vboRelocated);
-
-    _StripedBufferArraySharedPtr curRangeOwner_ =
-        boost::static_pointer_cast<_StripedBufferArray> (curRangeOwner);
-
-    if (!TF_VERIFY(GetResources().size() ==
-                      curRangeOwner_->GetResources().size())) {
-        TF_CODING_ERROR("Resource mismatch when reallocating buffer array");
-        return;
-    }
-
-    if (TfDebug::IsEnabled(HD_SAFE_MODE)) {
-        HdStBufferResourceNamedList::size_type bresIdx = 0;
-        TF_FOR_ALL(bresIt, GetResources()) {
-            TF_VERIFY(curRangeOwner_->GetResources()[bresIdx++].second ==
-                      curRangeOwner_->GetResource(bresIt->first));
-        }
-    }
-
-    // count up total elements and update new offsets
-    size_t totalNumElements = 0;
-    std::vector<size_t> newOffsets;
-    newOffsets.reserve(ranges.size());
-
-    TF_FOR_ALL (it, ranges) {
-        HdBufferArrayRangeSharedPtr const &range = *it;
-        if (!range) {
-            TF_CODING_ERROR("Expired range found in the reallocation list");
-            continue;
-        }
-
-        // save new offset
-        newOffsets.push_back(totalNumElements);
-
-        // XXX: always tightly pack for now.
-        totalNumElements += range->GetNumElements();
-    }
-
-    // update range list (should be done before early exit)
-    _SetRangeList(ranges);
-
-    // If there is no data to reallocate, it is the caller's responsibility to
-    // deallocate the underlying resource. 
-    //
-    // XXX: There is an issue here if the caller does not deallocate
-    // after this return, we will hold onto unused GPU resources until the next
-    // reallocation. Perhaps we should free the buffer here to avoid that
-    // situation.
-    if (totalNumElements == 0)
-        return;
-
-    _totalCapacity = totalNumElements;
-
-    // resize each BufferResource
-    HdBufferResourceNamedList const& resources = GetResources();
-    for (size_t bresIdx=0; bresIdx<resources.size(); ++bresIdx) {
-        HdBufferResourceSharedPtr const &bres = resources[bresIdx].second;
-        HdBufferResourceSharedPtr const &curRes =
-                curRangeOwner_->GetResources()[bresIdx].second;
-
-        int bytesPerElement = HdDataSizeOfTupleType(bres->GetTupleType());
-        TF_VERIFY(bytesPerElement > 0);
-        GLsizeiptr bufferSize = bytesPerElement * _totalCapacity;
-
-        // allocate new one
-        // curId and oldId will be different when we are adopting ranges
-        // from another buffer array.
-        void *newId = 0;
-        void *oldId = bres->GetId();
-        void *curId = curRes->GetId();
-
-        TF_CODING_ERROR("Not Implemented");
-        /*
-#if !defined(ARCH_GFX_METAL)
-        if(glGenBuffers) {
-            GLuint nid = 0;
-            glGenBuffers(1, &nid);
-            
-            if (ARCH_LIKELY(caps.directStateAccessEnabled)) {
-                glNamedBufferDataEXT(nid,
-                                     bufferSize, NULL, GL_STATIC_DRAW);
-            } else {
-                glBindBuffer(GL_ARRAY_BUFFER, nid);
-                glBufferData(GL_ARRAY_BUFFER,
-                             bufferSize, NULL, GL_STATIC_DRAW);
-                glBindBuffer(GL_ARRAY_BUFFER, 0);
-            }
-#else
-            id<MTLBuffer> nid = nil;
-            nid = [MtlfMetalContext::GetMetalContext()->device newBufferWithLength:bufferSize options:MTLResourceStorageModeManaged];
-            newId = (__bridge void*)nid;
-#endif
-
-            // if old buffer exists, copy unchanged data
-            if (curId) {
-                std::vector<size_t>::iterator newOffsetIt = newOffsets.begin();
-
-                // pre-pass to combine consecutive buffer range relocation
-                HdStBufferRelocator relocator(curId, newId);
-                TF_FOR_ALL (it, ranges) {
-                    _StripedBufferArrayRangeSharedPtr range =
-                        boost::static_pointer_cast<_StripedBufferArrayRange>(*it);
-                    if (!range) {
-                        TF_CODING_ERROR("_StripedBufferArrayRange "
-                                        "expired unexpectedly.");
-                        continue;
-                    }
-
-                    // copy the range. There are three cases:
-                    //
-                    // 1. src length (capacity) == dst length (numElements)
-                    //   Copy the entire range
-                    //
-                    // 2. src length < dst length
-                    //   Enlarging the range. This typically happens when
-                    //   applying quadrangulation/subdivision to populate
-                    //   additional data at the end of source data.
-                    //
-                    // 3. src length > dst length
-                    //   Shrinking the range. When the garbage collection
-                    //   truncates ranges.
-                    //
-                    int oldSize = range->GetCapacity();
-                    int newSize = range->GetNumElements();
-                    GLsizeiptr copySize =
-                        std::min(oldSize, newSize) * bytesPerElement;
-                    int oldOffset = range->GetOffset();
-                    if (copySize > 0) {
-                        GLintptr readOffset = oldOffset * bytesPerElement;
-                        GLintptr writeOffset = *newOffsetIt * bytesPerElement;
-
-                        relocator->AddRange(readOffset, writeOffset, copySize);
-                    }
-                    ++newOffsetIt;
-                }
-
-                // buffer copy
-                relocator->Commit();
-            }
-
-            if (oldId) {
-                // delete old buffer
-#if defined(ARCH_GFX_METAL)
-                id<MTLBuffer> oid = (__bridge id<MTLBuffer>)oldId;
-                [oid release];
-#else
-                GLuint oid = (GLuint)(uint64_t)oldId;
-                glDeleteBuffers(1, &oid);
-#endif
-            }
-#if !defined(ARCH_GFX_METAL)
-        } else {
-            // for unit test
-            static int id = 1;
-            newId = (void*)(uint64_t)id++;
-        }
-#endif
-         */
-
-        // update id of buffer resource
-        bres->SetAllocation(newId, bufferSize);
-    }
-
-    // update ranges
-    for (size_t idx = 0; idx < ranges.size(); ++idx) {
-        _StripedBufferArrayRangeSharedPtr range =
-            boost::static_pointer_cast<_StripedBufferArrayRange>(ranges[idx]);
-        if (!range) {
-            TF_CODING_ERROR("_StripedBufferArrayRange expired unexpectedly.");
-            continue;
-        }
-        range->SetOffset(newOffsets[idx]);
-        range->SetCapacity(range->GetNumElements());
-    }
-    _needsReallocation = false;
-    _needsCompaction = false;
-
-    // increment version to rebuild dispatch buffers.
-    IncrementVersion();
-}
-
-void
-HdStVBOMemoryManager::_StripedBufferArray::_DeallocateResources()
-{
-    TF_FOR_ALL (it, GetResources()) {
-        void *oldId = it->second->GetId();
-        if (oldId) {
-#if defined(ARCH_GFX_METAL)
-            id<MTLBuffer> buffer = (__bridge id<MTLBuffer>)oldId;
-            [buffer release];
-#else
-            if (glDeleteBuffers) {
-                GLint oid = (GLint)(uint64_t)oldId;
-                glDeleteBuffers(1, &oid);
-            }
-#endif
-            it->second->SetAllocation(0, 0);
-        }
-    }
 }
 
 /*virtual*/

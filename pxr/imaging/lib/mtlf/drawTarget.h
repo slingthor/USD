@@ -266,6 +266,8 @@ protected:
 
     MTLF_API
     virtual ~MtlfDrawTarget();
+    
+    friend class MtlfResourceFactory;
 
 private:
     void _GenFrameBuffer();

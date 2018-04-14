@@ -45,13 +45,13 @@ TF_REGISTRY_FUNCTION(TfType)
 
 MtlfBaseTexture::MtlfBaseTexture()
 {
-    TF_CODING_ERROR("Not Implemented");
+    TF_FATAL_CODING_ERROR("Not Implemented");
 //    _textureName = new texture
 }
 
 MtlfBaseTexture::~MtlfBaseTexture()
 {
-    TF_CODING_ERROR("Not Implemented");
+    TF_FATAL_CODING_ERROR("Not Implemented");
     /*
     if (glIsTexture(_textureName)) {
         glDeleteTextures(1, &_textureName);
@@ -64,7 +64,7 @@ GarchTexture::BindingVector
 MtlfBaseTexture::GetBindings(TfToken const & identifier,
                              GarchSamplerGPUHandle samplerName) const
 {
-    TF_CODING_ERROR("Not Implemented");
+    TF_FATAL_CODING_ERROR("Not Implemented");
     return BindingVector(1,
                 Binding(identifier, GarchTextureTokens->texels,
                         0, _textureName, samplerName));
@@ -106,7 +106,7 @@ MtlfBaseTexture::_CreateTexture(GarchBaseTextureDataConstPtr texData,
     TRACE_FUNCTION();
     
     if (texData && texData->HasRawBuffer()) {
-        TF_CODING_ERROR("Not Implemented");
+        TF_FATAL_CODING_ERROR("Not Implemented");
         /*
         glBindTexture(GL_TEXTURE_2D, _textureName);
 
@@ -149,7 +149,7 @@ MtlfBaseTexture::_CreateTexture(GarchBaseTextureDataConstPtr texData,
             // Uncompressed textures can have cropping and other special 
             // behaviours.
             
-            TF_CODING_ERROR("Not Implemented");
+            TF_FATAL_CODING_ERROR("Not Implemented");
             if (MtlfGetNumElements(texData->GLFormat()) == 1) {
                 GLint swizzleMask[] = {GL_RED, GL_RED, GL_RED, GL_ONE};
                 glTexParameteriv(

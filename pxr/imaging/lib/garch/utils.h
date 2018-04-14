@@ -24,7 +24,7 @@
 #ifndef GARCH_UTILS_H
 #define GARCH_UTILS_H
 
-/// \file glf/utils.h
+/// \file garch/utils.h
 
 #include "pxr/pxr.h"
 #include "pxr/imaging/garch/gl.h"

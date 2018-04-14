@@ -24,6 +24,7 @@
 /// \file bindingMap.cpp
 
 #include "pxr/imaging/garch/bindingMap.h"
+#include "pxr/imaging/garch/resourceFactory.h"
 
 #include "pxr/base/tf/stl.h"
 #include "pxr/base/tf/type.h"
@@ -32,8 +33,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 GarchBindingMapRefPtr GarchBindingMap::New()
 {
-    TF_CODING_ERROR("Not Implemented");
-    return TfNullPtr;//TfCreateRefPtr(new GarchBindingMap());
+    return TfCreateRefPtr(GarchResourceFactory::GetInstance()->NewBindingMap());
 }
 
 int

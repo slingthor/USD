@@ -210,13 +210,13 @@ void
 MtlfMetalQueryObject::BeginPrimitivesGenerated()
 {
     //Begin(GL_PRIMITIVES_GENERATED);
-    TF_CODING_ERROR("Not Implemented");
+    TF_FATAL_CODING_ERROR("Not Implemented");
 }
 void
 MtlfMetalQueryObject::BeginTimeElapsed()
 {
     //Begin(GL_TIME_ELAPSED);
-    TF_CODING_ERROR("Not Implemented");
+    TF_FATAL_CODING_ERROR("Not Implemented");
 }
 
 void
@@ -244,7 +244,7 @@ MtlfMetalQueryObject::GetResult()
     //if (glGetQueryObjecti64v && _id) {
     //    glGetQueryObjecti64v(_id, GL_QUERY_RESULT, &value);
     //}
-    TF_CODING_ERROR("Not Implemented");
+    TF_FATAL_CODING_ERROR("Not Implemented");
     return value;
 }
 
@@ -258,7 +258,7 @@ MtlfMetalQueryObject::GetResultNoWait()
     //        glGetQueryObjecti64v(_id, GL_QUERY_RESULT, &value);
     //    }
     //}
-    TF_CODING_ERROR("Not Implemented");
+    TF_FATAL_CODING_ERROR("Not Implemented");
     return value;
 }
 

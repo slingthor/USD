@@ -26,6 +26,7 @@
 #include "pxr/imaging/glf/glew.h"
 
 #include "pxr/imaging/garch/bindingMap.h"
+#include "pxr/imaging/garch/resourceFactory.h"
 #include "pxr/imaging/garch/simpleLight.h"
 #include "pxr/imaging/garch/simpleMaterial.h"
 #include "pxr/imaging/garch/uniformBlock.h"
@@ -92,11 +93,11 @@ void
 GlfSimpleLightingContext::BindUniformBlocks(GarchBindingMapPtr const &bindingMap)
 {
     if (!_lightingUniformBlock)
-        _lightingUniformBlock = GarchUniformBlock::New();
+        _lightingUniformBlock = GarchResourceFactory::GetInstance()->NewUniformBlock();
     if (!_shadowUniformBlock)
-        _shadowUniformBlock = GarchUniformBlock::New();
+        _shadowUniformBlock = GarchResourceFactory::GetInstance()->NewUniformBlock();
     if (!_materialUniformBlock)
-        _materialUniformBlock = GarchUniformBlock::New();
+        _materialUniformBlock = GarchResourceFactory::GetInstance()->NewUniformBlock();
 
     bool shadowExists = false;
     if ((!_lightingUniformBlockValid ||

@@ -54,7 +54,7 @@ GarchArrayTexture::New(
         return TfNullPtr;
     }
 
-    TF_CODING_ERROR("Not Implemented");
+    TF_FATAL_CODING_ERROR("Not Implemented");
     return TfNullPtr;
 //    return TfCreateRefPtr(new GarchArrayTexture(
 //                              imageFilePaths, arraySize,
@@ -72,7 +72,7 @@ GarchArrayTexture::New(
     unsigned int cropRight)
 {
     TfTokenVector imageFilePathTokens(imageFilePaths.begin(), imageFilePaths.end());
-    TF_CODING_ERROR("Not Implemented");
+    TF_FATAL_CODING_ERROR("Not Implemented");
     return TfNullPtr;
 //    return TfCreateRefPtr(new GarchArrayTexture(
 //                              imageFilePathTokens,

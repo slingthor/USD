@@ -44,11 +44,6 @@ TF_DECLARE_WEAK_PTRS(GarchBindingMap);
 ///
 class GarchUniformBlock : public TfRefBase, public TfWeakBase {
 public:
-
-    /// Returns a new instance.
-    GARCH_API
-    static GarchUniformBlockRefPtr New();
-
     GARCH_API
     virtual ~GarchUniformBlock();
 

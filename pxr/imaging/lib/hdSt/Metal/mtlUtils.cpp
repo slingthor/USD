@@ -31,7 +31,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 bool
 HdMetalUtils::GetShaderCompileStatus(uint32_t shader, std::string * reason)
 {
-    TF_CODING_ERROR("Not Implemented");
+    TF_FATAL_CODING_ERROR("Not Implemented");
     return true;
 }
 

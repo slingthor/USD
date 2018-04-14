@@ -59,6 +59,8 @@ protected:
     GlfSimpleLightingContext();
     GLF_API
     virtual ~GlfSimpleLightingContext();
+
+    friend class GlfResourceFactory;
 };
 
 

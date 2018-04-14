@@ -102,7 +102,7 @@ public:
     /// The binder is only valid for resolving layouts after Resolve has been
     /// called.
     HdSt_ResourceBinder const &GetResourceBinder() const {
-        return _resourceBinder;
+        return *_resourceBinder;
     }
 
     /// Resolve the resource bindings and program for use by a computation.
@@ -136,8 +136,8 @@ private:
     
     size_t                                _shaderSourceHash;
     HdBufferArrayRangeSharedPtr           _internalRange;  
-    HdStProgramSharedPtr              _computeProgram;
-    HdSt_ResourceBinder                   _resourceBinder;
+    HdStProgramSharedPtr                  _computeProgram;
+    HdSt_ResourceBinderSharedPtr          _resourceBinder;
     
     HdStExtCompGpuComputationResource()                = delete;
     HdStExtCompGpuComputationResource(

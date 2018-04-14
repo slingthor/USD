@@ -344,7 +344,7 @@ MtlfDrawTarget::_BindAttachment( MtlfAttachmentRefPtr const & a )
         attachment += attach;
     }
     
-    TF_CODING_ERROR("Not Implemented");
+    TF_FATAL_CODING_ERROR("Not Implemented");
     /*
     // Multisampled framebuffer
     if (HasMSAA()) {
@@ -659,7 +659,7 @@ MtlfDrawTarget::MtlfAttachment::_GenTexture()
                                     _size[0]     *
                                     _size[1]);
 
-    TF_CODING_ERROR("Not Implemented");
+    TF_FATAL_CODING_ERROR("Not Implemented");
     /*
     // Create multisampled texture
     if (_numSamples > 1) {

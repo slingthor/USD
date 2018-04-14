@@ -46,15 +46,9 @@ GlfUniformBlock::~GlfUniformBlock()
     if (_buffer) glDeleteBuffers(1, &_buffer);
 }
 
-GlfUniformBlockRefPtr
-GlfUniformBlock::New()
-{
-    return TfCreateRefPtr(new GlfUniformBlock());
-}
-
 void
-GlfUniformBlock::Bind(GlfBindingMapPtr const & bindingMap,
-                       std::string const & identifier)
+GlfUniformBlock::Bind(GarchBindingMapPtr const & bindingMap,
+                      std::string const & identifier)
 {
     if (!bindingMap) return;
     int binding = bindingMap->GetUniformBinding(identifier);

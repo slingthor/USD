@@ -589,7 +589,7 @@ UsdImagingMetalEngine::TestIntersectionBatch(
                 bool exists = TfMapLookup( minDistToPath, hitPath, &minDist );
                 if( !exists || primHitData.zMin < minDist ) {
 
-                    TF_CODING_ERROR("Not Implemented");
+                    TF_FATAL_CODING_ERROR("Not Implemented");
                     /*
                     GfVec3d hitPoint;
                     gluUnProject( primHitData.xMin, primHitData.yMin, primHitData.zMin,

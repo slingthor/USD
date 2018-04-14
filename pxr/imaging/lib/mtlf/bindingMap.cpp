@@ -68,7 +68,7 @@ MtlfBindingMap::GetAttributeIndex(TfToken const & name)
 void
 MtlfBindingMap::AssignSamplerUnitsToProgram(GLuint program)
 {
-    TF_CODING_ERROR("Not Implemented");
+    TF_FATAL_CODING_ERROR("Not Implemented");
 /*
     for (BindingMap::value_type const& p : _samplerBindings) {
         GLint loc = glGetUniformLocation(program, p.first.GetText());
@@ -112,7 +112,7 @@ MtlfBindingMap::HasUniformBinding(TfToken const & name) const
 void
 MtlfBindingMap::AssignUniformBindingsToProgram(GLuint program)
 {
-    TF_CODING_ERROR("Not Implemented");
+    TF_FATAL_CODING_ERROR("Not Implemented");
 /*
     for (BindingMap::value_type const& p : _uniformBindings) {
         GLuint uboIndex = glGetUniformBlockIndex(program, p.first.GetText());
@@ -176,7 +176,7 @@ MtlfBindingMap::_AddActiveUniformBindings(GLuint program)
     glGetProgramiv(program, GL_ACTIVE_UNIFORM_MAX_LENGTH, &maxNameLength);
     char * name = new char[maxNameLength];
     
-    TF_CODING_ERROR("Not Implemented");
+    TF_FATAL_CODING_ERROR("Not Implemented");
 /*
     for (int i = 0; i < numUniforms; ++i) {
         glGetActiveUniform(program, i, maxNameLength, NULL, &size, &type, name);
@@ -228,7 +228,7 @@ MtlfBindingMap::_AddActiveUniformBindings(GLuint program)
 void
 MtlfBindingMap::_AddActiveUniformBlockBindings(GLuint program)
 {
-    TF_CODING_ERROR("Not Implemented");
+    TF_FATAL_CODING_ERROR("Not Implemented");
 /*
     GLint numUniformBlocks = 0;
     glGetProgramiv(program, GL_ACTIVE_UNIFORM_BLOCKS, &numUniformBlocks);

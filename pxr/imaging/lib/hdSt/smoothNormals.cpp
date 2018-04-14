@@ -171,7 +171,7 @@ HdSt_SmoothNormalsComputationGPU::Execute(
 
     int numPoints = std::min(numSrcPoints, numDestPoints);
 
-    TF_CODING_ERROR("Not Implemented");
+    TF_FATAL_CODING_ERROR("Not Implemented");
     /*
     // transfer uniform buffer
     GLuint ubo = computeProgram->GetGlobalUniformBuffer().GetId();

@@ -965,7 +965,7 @@ HdSt_IndirectDrawBatchMetal::ExecuteDraw(
     HdBufferResourceGPUHandle programId = program->GetProgram().GetId();
     TF_VERIFY(programId);
 
-    TF_CODING_ERROR("Not Implemented");
+    TF_FATAL_CODING_ERROR("Not Implemented");
 /*
     glUseProgram(programId);
 
@@ -1175,7 +1175,7 @@ HdSt_IndirectDrawBatchMetal::_GPUFrustumCulling(
     const HdSt_ResourceBinder &binder = cullingProgram.GetBinder();
 
     HdBufferResourceGPUHandle programId = program->GetProgram().GetId();
-    TF_CODING_ERROR("Not Implemented");
+    TF_FATAL_CODING_ERROR("Not Implemented");
     //glUseProgram(programId);
 
     // bind buffers
@@ -1223,7 +1223,7 @@ HdSt_IndirectDrawBatchMetal::_GPUFrustumCulling(
     }
 
     if (validProgram) {
-        TF_CODING_ERROR("Not Implemented");
+        TF_FATAL_CODING_ERROR("Not Implemented");
         /*
         glEnable(GL_RASTERIZER_DISCARD);
 
@@ -1312,7 +1312,7 @@ HdSt_IndirectDrawBatchMetal::_GPUFrustumCullingXFB(
     // stomping the instanceCount of each drawing command in the
     // dispatch buffer to 0 for primitives that are culled, skipping
     // over other elements.
-    TF_CODING_ERROR("Not Implemented");
+    TF_FATAL_CODING_ERROR("Not Implemented");
 /*
     GLuint programId = program->GetProgram().GetId();
     glUseProgram(programId);
@@ -1546,7 +1546,7 @@ HdSt_IndirectDrawBatchMetal::_CullingProgram::_Link(
             sizeof(drawElementsOutputs)/sizeof(drawElementsOutputs[0])
             == nOutputs,
             "Size of drawElementsOutputs element must equal nOutputs.");
-        TF_CODING_ERROR("Not Implemented");
+        TF_FATAL_CODING_ERROR("Not Implemented");
 //        glTransformFeedbackVaryings(program->GetProgram().GetId(),
 //                                    nOutputs,
 //                                    outputs, GL_INTERLEAVED_ATTRIBS);

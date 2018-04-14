@@ -65,7 +65,7 @@ GarchUVTexture::New(
     unsigned int cropLeft,
     unsigned int cropRight)
 {
-    TF_CODING_ERROR("Not Implemented");
+    TF_FATAL_CODING_ERROR("Not Implemented");
     return TfNullPtr;
 //    return TfCreateRefPtr(new GarchUVTexture(
 //            imageFilePath, cropTop, cropBottom, cropLeft, cropRight));
@@ -79,7 +79,7 @@ GarchUVTexture::New(
     unsigned int cropLeft,
     unsigned int cropRight)
 {
-    TF_CODING_ERROR("Not Implemented");
+    TF_FATAL_CODING_ERROR("Not Implemented");
     return TfNullPtr;
 //    return TfCreateRefPtr(new GarchUVTexture(
 //            TfToken(imageFilePath), cropTop, cropBottom, cropLeft, cropRight));

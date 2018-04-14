@@ -39,10 +39,6 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 class GlfSimpleShadowArray : public GarchSimpleShadowArray {
 public:
-    GLF_API
-    GlfSimpleShadowArray(GfVec2i const & size, size_t numLayers);
-    GLF_API
-    virtual ~GlfSimpleShadowArray();
 
     GLF_API
     virtual void SetSize(GfVec2i const & size) override;
@@ -55,6 +51,14 @@ public:
     GLF_API
     virtual void EndCapture(size_t index) override;
 
+protected:
+    GLF_API
+    GlfSimpleShadowArray(GfVec2i const & size, size_t numLayers);
+    GLF_API
+    virtual ~GlfSimpleShadowArray();
+
+    friend class GlfResourceFactory;
+    
 private:
     void _AllocTextureArray();
     void _FreeTextureArray();
