@@ -34,25 +34,21 @@ PXR_NAMESPACE_OPEN_SCOPE
 MtlfUniformBlock::MtlfUniformBlock() :
     _buffer(0), _size(0)
 {
-    glGenBuffers(1, &_buffer);
+    TF_FATAL_CODING_ERROR("Not Implemented");
+//    glGenBuffers(1, &_buffer);
 }
 
 MtlfUniformBlock::~MtlfUniformBlock()
 {
-    if (_buffer) glDeleteBuffers(1, &_buffer);
-}
-
-MtlfUniformBlockRefPtr
-MtlfUniformBlock::New()
-{
-    return TfCreateRefPtr(new MtlfUniformBlock());
+    TF_FATAL_CODING_ERROR("Not Implemented");
+//    if (_buffer) glDeleteBuffers(1, &_buffer);
 }
 
 void
-MtlfUniformBlock::Bind(MtlfBindingMapPtr const & bindingMap,
+MtlfUniformBlock::Bind(GarchBindingMapPtr const & bindingMap,
                        std::string const & identifier)
 {
-    TF_CODING_ERROR("Not Implemented");
+    TF_FATAL_CODING_ERROR("Not Implemented");
 
     if (!bindingMap) return;
 //    int binding = bindingMap->GetUniformBinding(identifier);
@@ -62,7 +58,7 @@ MtlfUniformBlock::Bind(MtlfBindingMapPtr const & bindingMap,
 void
 MtlfUniformBlock::Update(const void *data, int size)
 {
-    TF_CODING_ERROR("Not Implemented");
+    TF_FATAL_CODING_ERROR("Not Implemented");
     /*
     glBindBuffer(GL_UNIFORM_BUFFER, _buffer);
     if (_size != size) {

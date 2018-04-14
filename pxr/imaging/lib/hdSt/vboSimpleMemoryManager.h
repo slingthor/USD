@@ -69,7 +69,7 @@ public:
         HdBufferArraySharedPtr const &bufferArray, 
         VtDictionary &result) const;
 
-protected:
+public:
     class _SimpleBufferArray;
 
     /// \class _SimpleBufferArrayRange
@@ -181,10 +181,10 @@ protected:
 
         /// Adds a new, named GPU resource and returns it.
         HDST_API
-        HdStBufferResourceSharedPtr _AddResource(TfToken const& name,
-                                                 HdTupleType tupleType,
-                                                 int offset,
-                                                 int stride);
+        HdBufferResourceSharedPtr _AddResource(TfToken const& name,
+                                               HdTupleType tupleType,
+                                               int offset,
+                                               int stride);
 
     private:
         _SimpleBufferArray * _bufferArray;
@@ -230,7 +230,7 @@ protected:
         HDST_API
         virtual void Reallocate(
                 std::vector<HdBufferArrayRangeSharedPtr> const &ranges,
-                HdBufferArraySharedPtr const &curRangeOwner) override;
+                HdBufferArraySharedPtr const &curRangeOwner) override = 0;
 
         /// Returns the maximum number of elements capacity.
         HDST_API
@@ -267,15 +267,14 @@ protected:
 
     protected:
         HDST_API
-        void _DeallocateResources();
+        virtual void _DeallocateResources() = 0;
 
         /// Adds a new, named GPU resource and returns it.
         HDST_API
-        HdStBufferResourceSharedPtr _AddResource(TfToken const& name,
-                                                 HdTupleType tupleType,
-                                                 int offset,
-                                                 int stride);
-    private:
+        HdBufferResourceSharedPtr _AddResource(TfToken const& name,
+                                               HdTupleType tupleType,
+                                               int offset,
+                                               int stride);
         int _capacity;
         size_t _maxBytesPerElement;
 

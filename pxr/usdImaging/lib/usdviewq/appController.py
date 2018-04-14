@@ -1737,7 +1737,7 @@ class AppController(QtCore.QObject):
         self._ui.actionRollover_Prim_Info.setChecked(self._dataModel.viewSettings.rolloverPrimInfo)
 
         # Seems like a good time to clear the texture registry
-        Glf.TextureRegistry.Reset()
+        Garch.TextureRegistry.Reset()
 
         # RELOAD fixed and varying UI
         self._reloadFixedUI()
@@ -2240,7 +2240,7 @@ class AppController(QtCore.QObject):
         try:
             self._dataModel.stage.Reload()
             # Seems like a good time to clear the texture registry
-            Glf.TextureRegistry.Reset()
+            Garch.TextureRegistry.Reset()
             # reset timeline, and playback settings from stage metadata
             self._reloadFixedUI(resetStageDataOnly=True)
             self._updateForStageChanges()

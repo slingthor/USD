@@ -85,7 +85,7 @@ HdStProgram::GetComputeProgram(
     TfToken const &shaderToken,
     HdStResourceRegistry *resourceRegistry)
 {
-    TF_CODING_ERROR("Not Implemented");
+    TF_FATAL_CODING_ERROR("Not Implemented");
 
     // Find the program from registry
     HdInstance<HdStProgram::ID, HdStProgramSharedPtr> programInstance;

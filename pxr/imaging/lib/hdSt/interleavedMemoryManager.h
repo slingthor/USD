@@ -49,7 +49,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 /// Interleaved memory manager (base class).
 ///
 class HdStInterleavedMemoryManager : public HdAggregationStrategy {
-protected:
+public:
     class _StripedInterleavedBuffer;
 
     /// specialized buffer array range
@@ -203,7 +203,7 @@ protected:
         HDST_API
         virtual void Reallocate(
                 std::vector<HdBufferArrayRangeSharedPtr> const &ranges,
-                HdBufferArraySharedPtr const &curRangeOwner) override;
+                HdBufferArraySharedPtr const &curRangeOwner) override = 0;
 
         /// Mark to perform reallocation on Reallocate()
         void SetNeedsReallocation() {
@@ -246,7 +246,7 @@ protected:
 
     protected:
         HDST_API
-        void _DeallocateResources();
+        virtual void _DeallocateResources() = 0;
 
         /// Adds a new, named GPU resource and returns it.
         HDST_API
@@ -255,7 +255,6 @@ protected:
                                                  int offset,
                                                  int stride);
 
-    private:
         bool _needsCompaction;
         int _stride;
         int _bufferOffsetAlignment;  // ranged binding offset alignment
@@ -269,6 +268,7 @@ protected:
 
     };
 
+protected:
     /// Factory for creating HdBufferArrayRange
     virtual HdBufferArrayRangeSharedPtr CreateBufferArrayRange();
 

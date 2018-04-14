@@ -96,7 +96,7 @@ setMatrix(float *dst, GfMatrix4d const & mat)
 void
 MtlfSimpleLightingContext::BindUniformBlocks(GarchBindingMapPtr const &bindingMap)
 {
-    TF_CODING_ERROR("Not Implemented");
+    TF_FATAL_CODING_ERROR("Not Implemented");
     /*
     if (!_lightingUniformBlock)
         _lightingUniformBlock = MtlfUniformBlock::New();
@@ -253,7 +253,7 @@ MtlfSimpleLightingContext::BindUniformBlocks(GarchBindingMapPtr const &bindingMa
 void
 MtlfSimpleLightingContext::BindSamplers(GarchBindingMapPtr const &bindingMap)
 {
-    TF_CODING_ERROR("Not Implemented");
+    TF_FATAL_CODING_ERROR("Not Implemented");
     /*
     int shadowSampler = bindingMap->GetSamplerUnit(_tokens->shadowSampler);
     int shadowCompareSampler = bindingMap->GetSamplerUnit(_tokens->shadowCompareSampler);
@@ -273,7 +273,7 @@ MtlfSimpleLightingContext::BindSamplers(GarchBindingMapPtr const &bindingMap)
 void
 MtlfSimpleLightingContext::UnbindSamplers(GarchBindingMapPtr const &bindingMap)
 {
-    TF_CODING_ERROR("Not Implemented");
+    TF_FATAL_CODING_ERROR("Not Implemented");
     /*
     int shadowSampler = bindingMap->GetSamplerUnit(_tokens->shadowSampler);
     int shadowCompareSampler = bindingMap->GetSamplerUnit(_tokens->shadowCompareSampler);
@@ -293,7 +293,7 @@ MtlfSimpleLightingContext::UnbindSamplers(GarchBindingMapPtr const &bindingMap)
 void
 MtlfSimpleLightingContext::SetStateFromOpenGL()
 {
-    TF_CODING_ERROR("Not Implemented");
+    TF_FATAL_CODING_ERROR("Not Implemented");
     /*
     // import classic GL light's parameters into shaded lights
     SetUseLighting(glIsEnabled(GL_LIGHTING) == GL_TRUE);

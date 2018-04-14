@@ -48,8 +48,15 @@ struct _HitData {
 };
 typedef TfHashMap< int32_t, _HitData > _HitDataById;
 
+UsdImagingGLEngine::UsdImagingGLEngine()
+{
+    GarchResourceFactory::GetInstance().SetResourceFactory(&resourceFactory);
+}
 
-UsdImagingGLEngine::~UsdImagingGLEngine() { /*nothing*/ }
+UsdImagingGLEngine::~UsdImagingGLEngine()
+{
+    GarchResourceFactory::GetInstance().SetResourceFactory(NULL);
+}
 
 /*virtual*/
 void 

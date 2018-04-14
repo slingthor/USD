@@ -99,7 +99,7 @@ HdStMSLProgram::CompileShader(GLenum type,
     }
 
     printf("%s", shaderSource.c_str());
-    TF_CODING_ERROR("Not Implemented");
+    TF_FATAL_CODING_ERROR("Not Implemented");
     return false;
 /*
     // create a program if not exists
@@ -144,7 +144,7 @@ HdStMSLProgram::Link()
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
 
-    TF_CODING_ERROR("Not Implemented");
+    TF_FATAL_CODING_ERROR("Not Implemented");
     return false;
 /*
     if (!glLinkProgram) return false; // glew initialized
@@ -215,7 +215,7 @@ HdStMSLProgram::GetProgramLinkStatus(std::string * reason) const
 bool
 HdStMSLProgram::Validate() const
 {
-    TF_CODING_ERROR("Not Implemented");
+    TF_FATAL_CODING_ERROR("Not Implemented");
 /*    GLuint program = _program.GetId();
     if (program == 0) return false;
 

@@ -41,7 +41,7 @@ GarchUVTextureStorage::New(
     unsigned int height, 
     const VtValue &storageData)
 {
-    TF_CODING_ERROR("Not Implemented");
+    TF_FATAL_CODING_ERROR("Not Implemented");
     return TfNullPtr;
 //    return TfCreateRefPtr(new GarchUVTextureStorage(
 //        width, height, storageData));

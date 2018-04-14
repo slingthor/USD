@@ -98,7 +98,7 @@ HdStCopyComputationGPU::Execute(HdBufferArrayRangeSharedPtr const &range_,
         // until after the copy size check.
 
         // Create a virtual copy method on the ArrayRange object to do the below block
-        TF_CODING_ERROR("Not Implemented");
+        TF_FATAL_CODING_ERROR("Not Implemented");
         {/*
             GLint srcId = src->GetId();
             GLint dstId = dst->GetId();

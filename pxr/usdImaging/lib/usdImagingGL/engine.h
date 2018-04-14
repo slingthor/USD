@@ -33,8 +33,10 @@
 
 #include "pxr/imaging/garch/simpleLight.h"
 #include "pxr/imaging/garch/simpleMaterial.h"
+#include "pxr/imaging/glf/resourceFactory.h"
 
 #include "pxr/base/tf/declarePtrs.h"
+
 #include "pxr/usd/sdf/path.h"
 #include "pxr/usd/usd/timeCode.h"
 
@@ -63,6 +65,9 @@ TF_DECLARE_WEAK_PTRS(GarchSimpleLightingContext);
 ///
 class UsdImagingGLEngine : private boost::noncopyable {
 public:
+    USDIMAGINGGL_API
+    UsdImagingGLEngine();
+
     USDIMAGINGGL_API
     virtual ~UsdImagingGLEngine();
 
@@ -381,6 +386,10 @@ protected:
     // Once refEngine goes away and we only have hdEngine, it may be best to move this to private
     typedef boost::unordered_map<GlfGLContextSharedPtr, GarchDrawTargetRefPtr> _DrawTargetPerContextMap;
     _DrawTargetPerContextMap _drawTargets;
+    
+private:
+    // Our base GPU resources are provided by Glf
+    GlfResourceFactory resourceFactory;
 };
 
 

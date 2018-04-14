@@ -21,23 +21,25 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
+
+#include "pxr/imaging/glf/glew.h"
 #include "pxr/imaging/mtlf/mtlDevice.h"
 #include "pxr/imaging/mtlf/glslfx.h"
 
-#include "pxr/imaging/hd/Metal/codeGenMSL.h"
-#include "pxr/imaging/hd/Metal/mslProgram.h"
+#include "pxr/imaging/hdSt/Metal/codeGenMSL.h"
+#include "pxr/imaging/hdSt/Metal/mslProgram.h"
+
+#include "pxr/imaging/hdSt/geometricShader.h"
+#include "pxr/imaging/hdSt/package.h"
+#include "pxr/imaging/hdSt/renderContextCaps.h"
+#include "pxr/imaging/hdSt/resourceBinder.h"
+#include "pxr/imaging/hdSt/resourceRegistry.h"
+#include "pxr/imaging/hdSt/shaderCode.h"
 
 #include "pxr/imaging/hd/binding.h"
-#include "pxr/imaging/hd/geometricShader.h"
 #include "pxr/imaging/hd/instanceRegistry.h"
-#include "pxr/imaging/hd/package.h"
-#include "pxr/imaging/hd/renderContextCaps.h"
-#include "pxr/imaging/hd/resourceBinder.h"
-#include "pxr/imaging/hd/resourceRegistry.h"
-#include "pxr/imaging/hd/shaderCode.h"
 #include "pxr/imaging/hd/tokens.h"
 #include "pxr/imaging/hd/vtBufferSource.h"
-
 
 #include "pxr/base/tf/iterator.h"
 #include "pxr/base/tf/staticTokens.h"
@@ -81,26 +83,26 @@ TF_DEFINE_PRIVATE_TOKENS(
     (samplerBuffer)
 );
 
-Hd_CodeGenMSL::Hd_CodeGenMSL(Hd_GeometricShaderPtr const &geometricShader,
-                             HdShaderCodeSharedPtrVector const &shaders)
+HdSt_CodeGenMSL::HdSt_CodeGenMSL(HdSt_GeometricShaderPtr const &geometricShader,
+                             HdStShaderCodeSharedPtrVector const &shaders)
 {
     TF_VERIFY(geometricShader);
 }
 
-Hd_CodeGenMSL::Hd_CodeGenMSL(HdShaderCodeSharedPtrVector const &shaders)
+HdSt_CodeGenMSL::HdSt_CodeGenMSL(HdStShaderCodeSharedPtrVector const &shaders)
     : _geometricShader(), _shaders(shaders)
 {
 }
 
-Hd_CodeGenMSL::ID
-Hd_CodeGenMSL::ComputeHash() const
+HdSt_CodeGenMSL::ID
+HdSt_CodeGenMSL::ComputeHash() const
 {
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
 
     ID hash = _geometricShader ? _geometricShader->ComputeHash() : 0;
     boost::hash_combine(hash, _metaData.ComputeHash());
-    boost::hash_combine(hash, HdShaderCode::ComputeHash(_shaders));
+    boost::hash_combine(hash, HdStShaderCode::ComputeHash(_shaders));
 
     return hash;
 }
@@ -110,14 +112,14 @@ std::string
 _GetPtexTextureShaderSource()
 {
     static std::string source =
-        MtlfGLSLFX(HdPackagePtexTextureShader()).GetSource(
+        MtlfGLSLFX(HdStPackagePtexTextureShader()).GetSource(
             _tokens->ptexTextureSampler);
     return source;
 }
 
 // TODO: Shuffle code to remove these declarations.
 static void _EmitDeclaration(std::stringstream &str,
-                             Hd_CodeGenMSL::InOutParams &inputParams,
+                             HdSt_CodeGenMSL::InOutParams &inputParams,
                              TfToken const &name,
                              TfToken const &type,
                              TfToken const &attribute,
@@ -126,7 +128,7 @@ static void _EmitDeclaration(std::stringstream &str,
                              bool forceIncludeAsFunc=false);
 
 static void _EmitDeclarationPtr(std::stringstream &str,
-                                Hd_CodeGenMSL::InOutParams &inputParams,
+                                HdSt_CodeGenMSL::InOutParams &inputParams,
                                 TfToken const &name,
                                 TfToken const &type,
                                 TfToken const &attribute,
@@ -160,12 +162,12 @@ static void _EmitAccessor(std::stringstream &str,
                           const char *index=NULL);
 
 static void _EmitOutput(std::stringstream &str,
-                        Hd_CodeGenMSL::InOutParams &outputParams,
+                        HdSt_CodeGenMSL::InOutParams &outputParams,
                         TfToken const &name,
                         TfToken const &type,
                         TfToken const &attribute = TfToken());
 
-static void _EmitStructMemberOutput(Hd_CodeGenMSL::InOutParams &outputParams,
+static void _EmitStructMemberOutput(HdSt_CodeGenMSL::InOutParams &outputParams,
                                     TfToken const &name,
                                     TfToken const &accessor,
                                     TfToken const &type);
@@ -302,7 +304,7 @@ namespace {
     };
     std::ostream & operator << (std::ostream & out, const AddressSpace &lq)
     {
-        HdRenderContextCaps const &caps = HdRenderContextCaps::GetInstance();
+        HdStRenderContextCaps const &caps = HdStRenderContextCaps::GetInstance();
         int location = lq.binding.GetLocation();
 
         switch (lq.binding.GetType()) {
@@ -330,7 +332,7 @@ namespace {
 }
 
 void
-Hd_CodeGenMSL::_ParseGLSL(std::stringstream &source)
+HdSt_CodeGenMSL::_ParseGLSL(std::stringstream &source)
 {
     static std::regex regex_word("(\\S+)");
 
@@ -426,23 +428,22 @@ Hd_CodeGenMSL::_ParseGLSL(std::stringstream &source)
     source.str(result);
 }
 
-HdProgramSharedPtr
-Hd_CodeGenMSL::Compile()
+HdStProgramSharedPtr
+HdSt_CodeGenMSL::Compile()
 {
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
     
     // create GLSL program.
     
-    HdProgramSharedPtr glslProgram(
-                                       new HdMSLProgram(HdTokens->drawingShader));
+    HdStProgramSharedPtr mslProgram(new HdStMSLProgram(HdTokens->drawingShader));
     
     // initialize autogen source buckets
     _genCommon.str(""); _genVS.str(""); _genTCS.str(""); _genTES.str("");
     _genGS.str(""); _genFS.str(""); _genCS.str("");
     _procVS.str(""); _procTCS.str(""), _procTES.str(""), _procGS.str("");
 
-    HdRenderContextCaps const &caps = HdRenderContextCaps::GetInstance();
+    HdStRenderContextCaps const &caps = HdStRenderContextCaps::GetInstance();
     
     // Used in glslfx files to determine if it is using new/old
     // imaging system. It can also be used as API guards when
@@ -467,11 +468,8 @@ Hd_CodeGenMSL::Compile()
     << "#define dmat4 float4x4\n";
     
     // XXX: this macro is still used in GlobalUniform.
-    if (HdVtBufferSource::GetDefaultMatrixType() == GL_FLOAT) {
-        _genCommon << "#define MAT4 mat4\n";
-    } else {
-        _genCommon << "#define MAT4 dmat4\n";
-    }
+    _genCommon << "#define MAT4 mat4\n";
+    
     // a trick to tightly pack vec3 into SSBO/UBO.
     _genCommon << _GetPackedTypeDefinitions();
     
@@ -524,7 +522,7 @@ Hd_CodeGenMSL::Compile()
     std::stringstream declarations;
     std::stringstream accessors;
     TF_FOR_ALL(it, _metaData.customInterleavedBindings) {
-        // note: _constantData has been sorted by offset in Hd_ResourceBinder.
+        // note: _constantData has been sorted by offset in HdSt_ResourceBinder.
         // XXX: not robust enough, should consider padding and layouting rules
         // to match with the logic in HdInterleavedMemoryManager if we
         // want to use a layouting policy other than default padding.
@@ -628,8 +626,8 @@ Hd_CodeGenMSL::Compile()
     // geometry shader plumbing
     switch(_geometricShader->GetPrimitiveType())
     {
-        case Hd_GeometricShader::PrimitiveType::PRIM_MESH_REFINED_QUADS:
-        case Hd_GeometricShader::PrimitiveType::PRIM_MESH_PATCHES:
+        case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_REFINED_QUADS:
+        case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_PATCHES:
         {
             // patch interpolation
             _procGS << "vec4 GetPatchCoord(int index);\n"
@@ -638,7 +636,7 @@ Hd_CodeGenMSL::Compile()
             break;
         }
             
-        case Hd_GeometricShader::PrimitiveType::PRIM_MESH_COARSE_QUADS:
+        case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_COARSE_QUADS:
         {
             // quad interpolation
             _procGS  << "void ProcessPrimVars(int index) {\n"
@@ -646,8 +644,8 @@ Hd_CodeGenMSL::Compile()
             break;
         }
             
-        case Hd_GeometricShader::PrimitiveType::PRIM_MESH_COARSE_TRIANGLES:
-        case Hd_GeometricShader::PrimitiveType::PRIM_MESH_REFINED_TRIANGLES:
+        case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_COARSE_TRIANGLES:
+        case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_REFINED_TRIANGLES:
         {
             // barycentric interpolation
             _procGS  << "void ProcessPrimVars(int index) {\n"
@@ -703,7 +701,7 @@ Hd_CodeGenMSL::Compile()
     
     // other shaders (renderpass, lighting, surface) first
     TF_FOR_ALL(it, _shaders) {
-        HdShaderCodeSharedPtr const &shader = *it;
+        HdStShaderCodeSharedPtr const &shader = *it;
         if (hasVS)
             _genVS  << shader->GetSource(HdShaderTokens->vertexShader);
         if (hasTCS)
@@ -830,50 +828,50 @@ Hd_CodeGenMSL::Compile()
     // note: _vsSource, _fsSource etc are used for diagnostics (see header)
     if (hasVS) {
         _vsSource = _genCommon.str() + _genVS.str() + termination.str() + glue.str();
-        if (!glslProgram->CompileShader(GL_VERTEX_SHADER, _vsSource)) {
-            return HdProgramSharedPtr();
+        if (!mslProgram->CompileShader(GL_VERTEX_SHADER, _vsSource)) {
+            return HdStProgramSharedPtr();
         }
         shaderCompiled = true;
     }
     if (hasFS) {
         _fsSource = _genCommon.str() + _genFS.str() + termination.str();
-        if (!glslProgram->CompileShader(GL_FRAGMENT_SHADER, _fsSource)) {
-            return HdProgramSharedPtr();
+        if (!mslProgram->CompileShader(GL_FRAGMENT_SHADER, _fsSource)) {
+            return HdStProgramSharedPtr();
         }
         shaderCompiled = true;
     }
     if (hasTCS) {
         _tcsSource = _genCommon.str() + _genTCS.str() + termination.str();
-        if (!glslProgram->CompileShader(GL_TESS_CONTROL_SHADER, _tcsSource)) {
-            return HdProgramSharedPtr();
+        if (!mslProgram->CompileShader(GL_TESS_CONTROL_SHADER, _tcsSource)) {
+            return HdStProgramSharedPtr();
         }
         shaderCompiled = true;
     }
     if (hasTES) {
         _tesSource = _genCommon.str() + _genTES.str() + termination.str();
-        if (!glslProgram->CompileShader(
-                                        GL_TESS_EVALUATION_SHADER, _tesSource)) {
-            return HdProgramSharedPtr();
+        if (!mslProgram->CompileShader(
+                GL_TESS_EVALUATION_SHADER, _tesSource)) {
+            return HdStProgramSharedPtr();
         }
         shaderCompiled = true;
     }
     if (hasGS) {
         _gsSource = _genCommon.str() + _genGS.str() + termination.str();
-        if (!glslProgram->CompileShader(GL_GEOMETRY_SHADER, _gsSource)) {
-            return HdProgramSharedPtr();
+        if (!mslProgram->CompileShader(GL_GEOMETRY_SHADER, _gsSource)) {
+            return HdStProgramSharedPtr();
         }
         shaderCompiled = true;
     }
     
     if (!shaderCompiled) {
-        return HdProgramSharedPtr();
+        return HdStProgramSharedPtr();
     }
     
-    return glslProgram;
+    return mslProgram;
 }
 
-HdProgramSharedPtr
-Hd_CodeGenMSL::CompileComputeProgram()
+HdStProgramSharedPtr
+HdSt_CodeGenMSL::CompileComputeProgram()
 {
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
@@ -884,7 +882,7 @@ Hd_CodeGenMSL::CompileComputeProgram()
     _procVS.str(""); _procTCS.str(""), _procTES.str(""), _procGS.str("");
     
     // GLSL version.
-    HdRenderContextCaps const &caps = HdRenderContextCaps::GetInstance();
+    HdStRenderContextCaps const &caps = HdStRenderContextCaps::GetInstance();
     _genCommon << "#version " << caps.glslVersion << "\n";
     // default workgroup size
     _genCommon << "layout(local_size_x = 1, local_size_y = 1) in;\n";
@@ -982,7 +980,7 @@ Hd_CodeGenMSL::CompileComputeProgram()
     
     // other shaders (renderpass, lighting, surface) first
     TF_FOR_ALL(it, _shaders) {
-        HdShaderCodeSharedPtr const &shader = *it;
+        HdStShaderCodeSharedPtr const &shader = *it;
         _genCS  << shader->GetSource(HdShaderTokens->computeShader);
     }
 
@@ -993,10 +991,10 @@ Hd_CodeGenMSL::CompileComputeProgram()
     _genCS << "}\n";
     
     // create Metal function.
-    HdProgramSharedPtr program(
-        new HdMSLProgram(HdTokens->computeShader));
+    HdStProgramSharedPtr program(
+        new HdStMSLProgram(HdTokens->computeShader));
     
-    TF_CODING_ERROR("Not Implemented");
+    TF_FATAL_CODING_ERROR("Not Implemented");
     /*
     // compile shaders
     {
@@ -1021,7 +1019,7 @@ Hd_CodeGenMSL::CompileComputeProgram()
 }
 
 static void _EmitDeclaration(std::stringstream &str,
-                             Hd_CodeGenMSL::InOutParams &inputParams,
+                             HdSt_CodeGenMSL::InOutParams &inputParams,
                              TfToken const &name,
                              TfToken const &type,
                              TfToken const &attribute,
@@ -1030,7 +1028,7 @@ static void _EmitDeclaration(std::stringstream &str,
                              bool forceIncludeAsFunc)
 {
     str << type << " " << name << ";\n";
-    Hd_CodeGenMSL::TParam in(name, type, TfToken(), attribute);
+    HdSt_CodeGenMSL::TParam in(name, type, TfToken(), attribute);
     
     if(forceIncludeAsFunc || binding.GetType() == HdBinding::VERTEX_ID) {
         in.includeAsFuncParam = true;
@@ -1041,8 +1039,8 @@ static void _EmitDeclaration(std::stringstream &str,
 
 static void _EmitDeclaration(
     std::stringstream &str,
-    Hd_CodeGenMSL::InOutParams &inputParams,
-    Hd_ResourceBinder::MetaData::BindingDeclaration const &bindingDeclaration,
+    HdSt_CodeGenMSL::InOutParams &inputParams,
+    HdSt_ResourceBinder::MetaData::BindingDeclaration const &bindingDeclaration,
     TfToken const &attribute = TfToken(),
     int arraySize=0)
 {
@@ -1057,7 +1055,7 @@ static void _EmitDeclaration(
 }
 
 static void _EmitDeclarationPtr(std::stringstream &str,
-                                Hd_CodeGenMSL::InOutParams &inputParams,
+                                HdSt_CodeGenMSL::InOutParams &inputParams,
                                 TfToken const &name,
                                 TfToken const &type,
                                 TfToken const &attribute,
@@ -1265,27 +1263,27 @@ static void _EmitAccessor(std::stringstream &str,
 }
 
 static void _EmitOutput(std::stringstream &str,
-                        Hd_CodeGenMSL::InOutParams &outputParams,
+                        HdSt_CodeGenMSL::InOutParams &outputParams,
                         TfToken const &name,
                         TfToken const &type,
                         TfToken const &attribute)
 {
     str << type << " " << name << ";\n";
-    Hd_CodeGenMSL::TParam out(name, type, TfToken(), attribute);
+    HdSt_CodeGenMSL::TParam out(name, type, TfToken(), attribute);
     outputParams.push_back(out);
 }
 
-static void _EmitStructMemberOutput(Hd_CodeGenMSL::InOutParams &outputParams,
+static void _EmitStructMemberOutput(HdSt_CodeGenMSL::InOutParams &outputParams,
                                     TfToken const &name,
                                     TfToken const &accessor,
                                     TfToken const &type)
 {
-    Hd_CodeGenMSL::TParam out(name, type, accessor, TfToken());
+    HdSt_CodeGenMSL::TParam out(name, type, accessor, TfToken());
     outputParams.push_back(out);
 }
 
 void
-Hd_CodeGenMSL::_GenerateDrawingCoord()
+HdSt_CodeGenMSL::_GenerateDrawingCoord()
 {
     TF_VERIFY(_metaData.drawingCoord0Binding.binding.IsValid());
     TF_VERIFY(_metaData.drawingCoord1Binding.binding.IsValid());
@@ -1574,7 +1572,7 @@ Hd_CodeGenMSL::_GenerateDrawingCoord()
 
 }
 void
-Hd_CodeGenMSL::_GenerateConstantPrimVar()
+HdSt_CodeGenMSL::_GenerateConstantPrimVar()
 {
     /*
       // --------- constant data declaration ----------
@@ -1605,7 +1603,7 @@ Hd_CodeGenMSL::_GenerateConstantPrimVar()
     std::stringstream declarations;
     std::stringstream accessors;
     TF_FOR_ALL (it, _metaData.constantData) {
-        // note: _constantData has been sorted by offset in Hd_ResourceBinder.
+        // note: _constantData has been sorted by offset in HdSt_ResourceBinder.
         // XXX: not robust enough, should consider padding and layouting rules
         // to match with the logic in HdInterleavedMemoryManager if we
         // want to use a layouting policy other than default padding.
@@ -1643,7 +1641,7 @@ Hd_CodeGenMSL::_GenerateConstantPrimVar()
 }
 
 void
-Hd_CodeGenMSL::_GenerateInstancePrimVar()
+HdSt_CodeGenMSL::_GenerateInstancePrimVar()
 {
     /*
       // --------- instance data declaration ----------
@@ -1720,7 +1718,7 @@ Hd_CodeGenMSL::_GenerateInstancePrimVar()
 }
 
 void
-Hd_CodeGenMSL::_GenerateElementPrimVar()
+HdSt_CodeGenMSL::_GenerateElementPrimVar()
 {
     /*
     Accessing uniform primvar data:
@@ -1875,8 +1873,8 @@ Hd_CodeGenMSL::_GenerateElementPrimVar()
         else if (_geometricShader->IsPrimTypeMesh()) {
             // GetPatchParam, GetEdgeFlag
             switch (_geometricShader->GetPrimitiveType()) {
-                case Hd_GeometricShader::PrimitiveType::PRIM_MESH_REFINED_QUADS:
-                case Hd_GeometricShader::PrimitiveType::PRIM_MESH_REFINED_TRIANGLES:
+                case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_REFINED_QUADS:
+                case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_REFINED_TRIANGLES:
                 {
                     // refined quads or tris (loop subdiv)
                     accessors
@@ -1891,7 +1889,7 @@ Hd_CodeGenMSL::_GenerateElementPrimVar()
                     break;
                 }
 
-                case Hd_GeometricShader::PrimitiveType::PRIM_MESH_PATCHES:
+                case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_PATCHES:
                 {
                     // refined patches (tessellated triangles)
                     accessors
@@ -1907,7 +1905,7 @@ Hd_CodeGenMSL::_GenerateElementPrimVar()
                     break;
                 }
 
-                case Hd_GeometricShader::PrimitiveType::PRIM_MESH_COARSE_QUADS:
+                case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_COARSE_QUADS:
                 {
                     // coarse quads (for ptex)
                     // put ptexIndex into the first element of PatchParam.
@@ -1923,12 +1921,12 @@ Hd_CodeGenMSL::_GenerateElementPrimVar()
                     break;
                 }
 
-                case Hd_GeometricShader::PrimitiveType::PRIM_MESH_COARSE_TRIANGLES:
+                case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_COARSE_TRIANGLES:
                 {
                     // coarse triangles                
                     // note that triangulated meshes don't have ptexIndex.
                     // Here we're passing primitiveID as ptexIndex PatchParam
-                    // since Hd_TriangulateFaceVaryingComputation unrolls facevaring
+                    // since HdSt_TriangulateFaceVaryingComputation unrolls facevaring
                     // primvars for each triangles.
                     accessors
                         << "ivec3 GetPatchParam() {\n"
@@ -1943,7 +1941,7 @@ Hd_CodeGenMSL::_GenerateElementPrimVar()
 
                 default:
                 {
-                    TF_CODING_ERROR("Hd_GeometricShader::PrimitiveType %d is "
+                    TF_CODING_ERROR("HdSt_GeometricShader::PrimitiveType %d is "
                       "unexpected in _GenerateElementPrimVar().",
                       _geometricShader->GetPrimitiveType());
                 }
@@ -1953,7 +1951,7 @@ Hd_CodeGenMSL::_GenerateElementPrimVar()
             if (_geometricShader->IsPrimTypeTriangles()) {
                 // note that triangulated meshes don't have ptexIndex.
                 // Here we're passing primitiveID as ptexIndex PatchParam
-                // since Hd_TriangulateFaceVaryingComputation unrolls facevaring
+                // since HdSt_TriangulateFaceVaryingComputation unrolls facevaring
                 // primvars for each triangles.
                 accessors
                     << "int GetFVarIndex(int localIndex) {\n"
@@ -1984,7 +1982,7 @@ Hd_CodeGenMSL::_GenerateElementPrimVar()
                 << "}\n";
         }
         else {
-            TF_CODING_ERROR("Hd_GeometricShader::PrimitiveType %d is "
+            TF_CODING_ERROR("HdSt_GeometricShader::PrimitiveType %d is "
                   "unexpected in _GenerateElementPrimVar().",
                   _geometricShader->GetPrimitiveType());
         }
@@ -2044,7 +2042,7 @@ Hd_CodeGenMSL::_GenerateElementPrimVar()
 }
 
 void
-Hd_CodeGenMSL::_GenerateVertexPrimVar()
+HdSt_CodeGenMSL::_GenerateVertexPrimVar()
 {
     /*
       // --------- vertex data declaration (VS) ----------
@@ -2196,9 +2194,9 @@ Hd_CodeGenMSL::_GenerateVertexPrimVar()
 
         switch(_geometricShader->GetPrimitiveType())
         {
-            case Hd_GeometricShader::PrimitiveType::PRIM_MESH_COARSE_QUADS:
-            case Hd_GeometricShader::PrimitiveType::PRIM_MESH_REFINED_QUADS:
-            case Hd_GeometricShader::PrimitiveType::PRIM_MESH_PATCHES:            
+            case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_COARSE_QUADS:
+            case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_REFINED_QUADS:
+            case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_PATCHES:
             {
                 // linear interpolation within a quad.
                 _procGS << "   outPrimVars->" << name
@@ -2210,8 +2208,8 @@ Hd_CodeGenMSL::_GenerateVertexPrimVar()
                 break;
             }
 
-            case Hd_GeometricShader::PrimitiveType::PRIM_MESH_REFINED_TRIANGLES:
-            case Hd_GeometricShader::PrimitiveType::PRIM_MESH_COARSE_TRIANGLES:
+            case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_REFINED_TRIANGLES:
+            case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_COARSE_TRIANGLES:
             {
                 // barycentric interpolation within a triangle.
                 _procGS << "   outPrimVars->" << name
@@ -2221,7 +2219,7 @@ Hd_CodeGenMSL::_GenerateVertexPrimVar()
                 break;  
             }
 
-            case Hd_GeometricShader::PrimitiveType::PRIM_POINTS:
+            case HdSt_GeometricShader::PrimitiveType::PRIM_POINTS:
             {
                 // do nothing. 
                 // e.g. if a prim's geomstyle is points and it has valid
@@ -2232,7 +2230,7 @@ Hd_CodeGenMSL::_GenerateVertexPrimVar()
 
             default:
                 TF_CODING_ERROR("Face varing bindings for unexpected for" 
-                                " Hd_GeometricShader::PrimitiveType %d", 
+                                " HdSt_GeometricShader::PrimitiveType %d",
                                 _geometricShader->GetPrimitiveType());
         }
     }
@@ -2275,7 +2273,7 @@ Hd_CodeGenMSL::_GenerateVertexPrimVar()
 }
 
 void
-Hd_CodeGenMSL::_GenerateShaderParameters()
+HdSt_CodeGenMSL::_GenerateShaderParameters()
 {
     /*
       ------------- Declarations -------------
@@ -2354,7 +2352,7 @@ Hd_CodeGenMSL::_GenerateShaderParameters()
     std::stringstream declarations;
     std::stringstream accessors;
 
-    HdRenderContextCaps const &caps = HdRenderContextCaps::GetInstance();
+    HdStRenderContextCaps const &caps = HdStRenderContextCaps::GetInstance();
 
     TfToken typeName("ShaderData");
     TfToken varName("shaderData");

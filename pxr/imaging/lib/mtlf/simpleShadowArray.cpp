@@ -68,7 +68,7 @@ MtlfSimpleShadowArray::BeginCapture(size_t index, bool clear)
 {
     _BindFramebuffer(index);
     
-    TF_CODING_ERROR("Not Implemented");
+    TF_FATAL_CODING_ERROR("Not Implemented");
     /*
     if (clear) {
         glClear(GL_DEPTH_BUFFER_BIT);
@@ -89,7 +89,7 @@ MtlfSimpleShadowArray::BeginCapture(size_t index, bool clear)
 void
 MtlfSimpleShadowArray::EndCapture(size_t)
 {
-    TF_CODING_ERROR("Not Implemented");
+    TF_FATAL_CODING_ERROR("Not Implemented");
     /*
     // reset to GL default, except viewport
     glDepthRange(0, 1.0);
@@ -108,7 +108,7 @@ MtlfSimpleShadowArray::EndCapture(size_t)
 void
 MtlfSimpleShadowArray::_AllocTextureArray()
 {
-    TF_CODING_ERROR("Not Implemented");
+    TF_FATAL_CODING_ERROR("Not Implemented");
     /*
     glGenTextures(1, &_texture);
     glBindTexture(GL_TEXTURE_2D_ARRAY, _texture);
@@ -150,7 +150,7 @@ MtlfSimpleShadowArray::_AllocTextureArray()
 void
 MtlfSimpleShadowArray::_FreeTextureArray()
 {
-    TF_CODING_ERROR("Not Implemented");
+    TF_FATAL_CODING_ERROR("Not Implemented");
     /*
     if (_texture) {
         glDeleteTextures(1, &_texture);
@@ -174,7 +174,7 @@ MtlfSimpleShadowArray::_FreeTextureArray()
 void
 MtlfSimpleShadowArray::_BindFramebuffer(size_t index)
 {
-    TF_CODING_ERROR("Not Implemented");
+    TF_FATAL_CODING_ERROR("Not Implemented");
     /*
     glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING,
                   (GLint*)&_unbindRestoreDrawFramebuffer);
@@ -194,7 +194,7 @@ MtlfSimpleShadowArray::_BindFramebuffer(size_t index)
 void
 MtlfSimpleShadowArray::_UnbindFramebuffer()
 {
-    TF_CODING_ERROR("Not Implemented");
+    TF_FATAL_CODING_ERROR("Not Implemented");
     /*
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, _unbindRestoreDrawFramebuffer);
     glBindFramebuffer(GL_READ_FRAMEBUFFER, _unbindRestoreReadFramebuffer);

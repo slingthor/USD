@@ -25,6 +25,7 @@
 //
 
 #include "pxr/imaging/garch/uniformBlock.h"
+#include "pxr/imaging/garch/resourceFactory.h"
 #include "pxr/imaging/garch/bindingMap.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -35,14 +36,6 @@ GarchUniformBlock::GarchUniformBlock()
 
 GarchUniformBlock::~GarchUniformBlock()
 {
-}
-
-GarchUniformBlockRefPtr
-GarchUniformBlock::New()
-{
-    TF_CODING_ERROR("Not Implemented");
-    return TfNullPtr;
-    //return TfCreateRefPtr(new GarchUniformBlock());
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

@@ -12,13 +12,18 @@ if (APPLE)
     set(GFX    mtlf)
     set(GFXADDITIONAL   Metal/bufferRelocatorMetal
                         Metal/bufferResourceMetal
+                        Metal/codeGenMSL
                         Metal/drawTargetTextureResourceMetal
                         Metal/indirectDrawBatchMetal
+                        Metal/interleavedMemoryBufferMetal
                         Metal/mslProgram
                         Metal/mtlUtils
                         Metal/persistentBufferMetal
+                        Metal/resourceBinderMetal
                         Metal/resourceMetal
-                        Metal/textureResourceMetal)
+                        Metal/textureResourceMetal
+                        Metal/vboMemoryBufferMetal
+                        Metal/vboSimpleMemoryBufferMetal)
 else()
     set(GFX)
     set(GFXADDITIONAL)
@@ -121,9 +126,13 @@ pxr_library(hdSt
         GL/glslProgram
         GL/glUtils
         GL/indirectDrawBatchGL
+        GL/interleavedMemoryBufferGL
         GL/persistentBufferGL
+        GL/resourceBinderGL
         GL/resourceGL
         GL/textureResourceGL
+        GL/vboMemoryBufferGL
+        GL/vboSimpleMemoryBufferGL
         ${GFXADDITIONAL}
 
     RESOURCE_FILES

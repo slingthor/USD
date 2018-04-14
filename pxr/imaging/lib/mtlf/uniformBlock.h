@@ -28,44 +28,37 @@
 
 #include "pxr/pxr.h"
 #include "pxr/imaging/mtlf/api.h"
-#include "pxr/imaging/garch/gl.h"
-#include "pxr/base/tf/declarePtrs.h"
-#include "pxr/base/tf/refBase.h"
-#include "pxr/base/tf/weakBase.h"
+#include "pxr/imaging/garch/uniformBlock.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-
 TF_DECLARE_WEAK_AND_REF_PTRS(MtlfUniformBlock);
-TF_DECLARE_WEAK_PTRS(MtlfBindingMap);
 
 /// \class MtlfUniformBlock
 ///
-/// Manages a GL uniform buffer object.
+/// Manages a Metal uniform buffer object.
 ///
-class MtlfUniformBlock : public TfRefBase, public TfWeakBase {
+class MtlfUniformBlock : public GarchUniformBlock {
 public:
-
-    /// Returns a new instance.
-    MTLF_API
-    static MtlfUniformBlockRefPtr New();
 
     MTLF_API
     virtual ~MtlfUniformBlock();
 
     /// Binds the uniform buffer using a bindingMap and identifier.
     MTLF_API
-    void Bind(MtlfBindingMapPtr const & bindingMap,
-              std::string const & identifier);
+    virtual void Bind(GarchBindingMapPtr const & bindingMap,
+                      std::string const & identifier) override;
 
     /// Updates the content of the uniform buffer. If the size
     /// is different, the buffer will be reallocated.
     MTLF_API
-    void Update(const void *data, int size);
+    virtual void Update(const void *data, int size) override;
 
 protected:
     MTLF_API
     MtlfUniformBlock();
+    
+    friend class MtlfResourceFactory;
 
 private:
     GLuint _buffer;

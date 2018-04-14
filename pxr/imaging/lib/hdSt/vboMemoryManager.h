@@ -79,7 +79,7 @@ public:
 private:
     bool _isImmutable;
 
-protected:
+public:
     class _StripedBufferArray;
 
     /// specialized buffer array range
@@ -254,7 +254,7 @@ protected:
         HDST_API
         virtual void Reallocate(
             std::vector<HdBufferArrayRangeSharedPtr> const &ranges,
-            HdBufferArraySharedPtr const &curRangeOwner);
+            HdBufferArraySharedPtr const &curRangeOwner) = 0;
 
         /// Returns the maximum number of elements capacity.
         HDST_API
@@ -297,7 +297,7 @@ protected:
 
     protected:
         HDST_API
-        void _DeallocateResources();
+        virtual void _DeallocateResources() = 0;
 
         /// Adds a new, named GPU resource and returns it.
         HDST_API
@@ -305,8 +305,6 @@ protected:
                                                HdTupleType tupleType,
                                                int offset,
                                                int stride);
-
-    private:
 
         bool _needsCompaction;
         int _totalCapacity;

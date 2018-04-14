@@ -173,7 +173,7 @@ GarchTextureGPUHandle HdStSimpleTextureResourceGL::GetTexelsTextureHandle()
 GarchTextureGPUHandle HdStSimpleTextureResourceGL::GetLayoutTextureId()
 {
 #ifdef PXR_PTEX_SUPPORT_ENABLED
-    TF_CODING_ERROR("Not Implemented"); // Make this graphics api abstract
+    TF_FATAL_CODING_ERROR("Not Implemented"); // Make this graphics api abstract
     return TfDynamic_cast<GarchTextureGPUHandle>(_texture)->GetLayoutTextureName();
 #else
     TF_CODING_ERROR("Ptex support is disabled.  "

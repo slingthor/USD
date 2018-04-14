@@ -98,9 +98,9 @@ public:
     bool GetUseColorMaterialDiffuse() const;
 
     GARCH_API
-    virtual void InitUniformBlockBindings(GarchBindingMapPtr const &bindingMap) const = 0;
+    virtual void InitUniformBlockBindings(GarchBindingMapPtr const &bindingMap) const;
     GARCH_API
-    virtual void InitSamplerUnitBindings(GarchBindingMapPtr const &bindingMap) const = 0;
+    virtual void InitSamplerUnitBindings(GarchBindingMapPtr const &bindingMap) const;
 
     GARCH_API
     virtual void BindUniformBlocks(GarchBindingMapPtr const &bindingMap) = 0;

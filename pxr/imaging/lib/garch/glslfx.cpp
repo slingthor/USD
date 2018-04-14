@@ -22,28 +22,26 @@
 // language governing permissions and limitations under the Apache License.
 //
 #include "pxr/imaging/garch/glslfx.h"
+#include "pxr/imaging/garch/resourceFactory.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
 GARCH_API
 GLSLFX *GLSLFX::New()
 {
-    TF_CODING_ERROR("Not Implemented");
-    return NULL;
+    return GarchResourceFactory::GetInstance()->NewGLSLFX();
 }
 
 /// Create a glslfx object from a file
 GLSLFX *GLSLFX::New(std::string const & filePath)
 {
-    TF_CODING_ERROR("Not Implemented");
-    return NULL;
+    return GarchResourceFactory::GetInstance()->NewGLSLFX(filePath);
 }
 
 /// Create a glslfx object from a stream
 GLSLFX *GLSLFX::New(std::istream &is)
 {
-    TF_CODING_ERROR("Not Implemented");
-    return NULL;
+    return GarchResourceFactory::GetInstance()->NewGLSLFX(is);
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

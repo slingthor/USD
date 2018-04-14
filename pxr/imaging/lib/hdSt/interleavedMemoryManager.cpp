@@ -22,16 +22,15 @@
 // language governing permissions and limitations under the Apache License.
 //
 #include "pxr/imaging/glf/glew.h"
-#if defined(ARCH_GFX_METAL)
-#include "pxr/imaging/mtlf/mtlDevice.h"
-#endif
 
 #include "pxr/imaging/hdSt/interleavedMemoryManager.h"
 #include "pxr/imaging/hdSt/bufferResource.h"
 #include "pxr/imaging/hdSt/bufferRelocator.h"
 #include "pxr/imaging/hdSt/renderContextCaps.h"
 #include "pxr/imaging/hdSt/glUtils.h"
-#include "pxr/imaging/hdSt/GL/glConversions.h"
+
+#include "pxr/imaging/hdSt/GL/interleavedMemoryBufferGL.h"
+#include "pxr/imaging/hdSt/Metal/interleavedMemoryBufferMetal.h"
 
 #include <boost/make_shared.hpp>
 #include <boost/scoped_ptr.hpp>
@@ -119,13 +118,32 @@ HdStInterleavedUBOMemoryManager::CreateBufferArray(
 {
     HdStRenderContextCaps &caps = HdStRenderContextCaps::GetInstance();
 
-    return boost::make_shared<
-        HdStInterleavedMemoryManager::_StripedInterleavedBuffer>(
-            role, bufferSpecs,
-            caps.uniformBufferOffsetAlignment,
-            /*structAlignment=*/sizeof(float)*4,
-            caps.maxUniformBlockSize,
-            HdPerfTokens->garbageCollectedUbo);
+    HdEngine::RenderAPI api = HdEngine::GetRenderAPI();
+    switch(api)
+    {
+        case HdEngine::OpenGL:
+            return boost::make_shared<
+                HdStStripedInterleavedBufferGL>(
+                     role, bufferSpecs,
+                     caps.uniformBufferOffsetAlignment,
+                     /*structAlignment=*/sizeof(float)*4,
+                     caps.maxUniformBlockSize,
+                     HdPerfTokens->garbageCollectedUbo);
+
+#if defined(ARCH_GFX_METAL)
+        case HdEngine::Metal:
+            return boost::make_shared<
+                HdStStripedInterleavedBufferMetal>(
+                     role, bufferSpecs,
+                     caps.uniformBufferOffsetAlignment,
+                     /*structAlignment=*/sizeof(float)*4,
+                     caps.maxUniformBlockSize,
+                     HdPerfTokens->garbageCollectedUbo);
+#endif
+        default:
+            TF_FATAL_CODING_ERROR("No HdStInterleavedMemoryBuffer for this API");
+    }
+    return NULL;
 }
 
 HdAggregationStrategy::AggregationId
@@ -157,13 +175,33 @@ HdStInterleavedSSBOMemoryManager::CreateBufferArray(
 {
     HdStRenderContextCaps &caps = HdStRenderContextCaps::GetInstance();
 
-    return boost::make_shared<
-        HdStInterleavedMemoryManager::_StripedInterleavedBuffer>(
-            role, bufferSpecs,
-            /*bufferOffsetAlignment=*/0,
-            /*structAlignment=*/0,
-            caps.maxShaderStorageBlockSize,
-            HdPerfTokens->garbageCollectedSsbo);
+    HdEngine::RenderAPI api = HdEngine::GetRenderAPI();
+    switch(api)
+    {
+        case HdEngine::OpenGL:
+            return boost::make_shared<
+                HdStStripedInterleavedBufferGL>(
+                     role, bufferSpecs,
+                     /*bufferOffsetAlignment=*/0,
+                     /*structAlignment=*/0,
+                     caps.maxShaderStorageBlockSize,
+                     HdPerfTokens->garbageCollectedSsbo);
+
+#if defined(ARCH_GFX_METAL)
+        case HdEngine::Metal:
+            return boost::make_shared<
+                HdStStripedInterleavedBufferMetal>(
+                     role, bufferSpecs,
+                     /*bufferOffsetAlignment=*/0,
+                     /*structAlignment=*/0,
+                     caps.maxShaderStorageBlockSize,
+                     HdPerfTokens->garbageCollectedSsbo);
+#endif
+        default:
+            TF_FATAL_CODING_ERROR("No HdStInterleavedMemoryBuffer for this API");
+    }
+
+    return NULL;
 }
 
 HdAggregationStrategy::AggregationId
@@ -379,259 +417,6 @@ HdStInterleavedMemoryManager::_StripedInterleavedBuffer::GarbageCollect()
     }
 
     return false;
-}
-
-void
-HdStInterleavedMemoryManager::_StripedInterleavedBuffer::Reallocate(
-    std::vector<HdBufferArrayRangeSharedPtr> const &ranges,
-    HdBufferArraySharedPtr const &curRangeOwner)
-{
-    HD_TRACE_FUNCTION();
-    HF_MALLOC_TAG_FUNCTION();
-
-    // XXX: make sure glcontext
-
-    HD_PERF_COUNTER_INCR(HdPerfTokens->vboRelocated);
-
-    // Calculate element count
-    size_t elementCount = 0;
-    TF_FOR_ALL (it, ranges) {
-        HdBufferArrayRangeSharedPtr const &range = *it;
-        if (!range) {
-            TF_CODING_ERROR("Expired range found in the reallocation list");
-        }
-        elementCount += (*it)->GetNumElements();
-    }
-    size_t totalSize = elementCount * _stride;
-
-    // update range list (should be done before early exit)
-    _SetRangeList(ranges);
-
-    // If there is no data to reallocate, it is the caller's responsibility to
-    // deallocate the underlying resource. 
-    //
-    // XXX: There is an issue here if the caller does not deallocate
-    // after this return, we will hold onto unused GPU resources until the next
-    // reallocation. Perhaps we should free the buffer here to avoid that
-    // situation.
-    if (totalSize == 0)
-        return;
-
-    // resize each BufferResource
-    // all HdBufferSources are sharing same VBO
-
-    // allocate new one
-    // curId and oldId will be different when we are adopting ranges
-    // from another buffer array.
-    TF_CODING_ERROR("Not Implemented");
-
-#if defined(ARCH_GFX_METAL)
-    if (HdEngine::GetRenderAPI() == HdEngine::Metal)
-    {
-        id<MTLBuffer> newId = nil;
-        id<MTLBuffer> oldId = (__bridge id<MTLBuffer>)GetResources().begin()->second->GetId();
-        
-        _StripedInterleavedBufferSharedPtr curRangeOwner_ =
-        boost::static_pointer_cast<_StripedInterleavedBuffer> (curRangeOwner);
-        
-        id<MTLBuffer> curId = (__bridge id<MTLBuffer>)curRangeOwner_->GetResources().begin()->second->GetId();
-        id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->device;
-        
-        newId = [device newBufferWithLength:totalSize options:MTLResourceStorageModeManaged];
-        
-        // if old buffer exists, copy unchanged data
-        if (curId) {
-            int index = 0;
-            
-            size_t rangeCount = GetRangeCount();
-            
-            // pre-pass to combine consecutive buffer range relocation
-            boost::scoped_ptr<HdStBufferRelocator> relocator(HdStBufferRelocator::New(curId, newId));
-            for (size_t rangeIdx = 0; rangeIdx < rangeCount; ++rangeIdx) {
-                _StripedInterleavedBufferRangeSharedPtr range = _GetRangeSharedPtr(rangeIdx);
-                
-                if (!range) {
-                    TF_CODING_ERROR("_StripedInterleavedBufferRange expired "
-                                    "unexpectedly.");
-                    continue;
-                }
-                int oldIndex = range->GetIndex();
-                if (oldIndex >= 0) {
-                    // copy old data
-                    GLintptr readOffset = oldIndex * _stride;
-                    GLintptr writeOffset = index * _stride;
-                    GLsizeiptr copySize = _stride * range->GetNumElements();
-                    
-                    relocator->AddRange(readOffset, writeOffset, copySize);
-                }
-                
-                range->SetIndex(index);
-                index += range->GetNumElements();
-            }
-            
-            // buffer copy
-            relocator->Commit();
-            
-        } else {
-            // just set index
-            int index = 0;
-            
-            size_t rangeCount = GetRangeCount();
-            for (size_t rangeIdx = 0; rangeIdx < rangeCount; ++rangeIdx) {
-                _StripedInterleavedBufferRangeSharedPtr range = _GetRangeSharedPtr(rangeIdx);
-                if (!range) {
-                    TF_CODING_ERROR("_StripedInterleavedBufferRange expired "
-                                    "unexpectedly.");
-                    continue;
-                }
-                
-                range->SetIndex(index);
-                index += range->GetNumElements();
-            }
-        }
-        // delete old buffer
-        if(oldId != nil) {
-            [oldId release];
-        }
-        
-        // update id to all buffer resources
-        TF_FOR_ALL(it, GetResources()) {
-            it->second->SetAllocation((__bridge HdBufferResourceGPUHandle)newId, totalSize);
-        }
-    }
-    else
-#endif
-    if (HdEngine::GetRenderAPI() == HdEngine::OpenGL)
-    {
-        GLuint newId = 0;
-        GLuint oldId = (GLuint)(uint64_t)GetResources().begin()->second->GetId();
-
-        _StripedInterleavedBufferSharedPtr curRangeOwner_ =
-            boost::static_pointer_cast<_StripedInterleavedBuffer> (curRangeOwner);
-
-        GLuint curId = (GLuint)(uint64_t)curRangeOwner_->GetResources().begin()->second->GetId();
-
-        if (glGenBuffers) {
-            glGenBuffers(1, &newId);
-
-            HdStRenderContextCaps const &caps = HdStRenderContextCaps::GetInstance();
-            if (caps.directStateAccessEnabled) {
-                glNamedBufferDataEXT(newId, totalSize, /*data=*/NULL, GL_STATIC_DRAW);
-            } else {
-                glBindBuffer(GL_ARRAY_BUFFER, newId);
-                glBufferData(GL_ARRAY_BUFFER, totalSize, /*data=*/NULL, GL_STATIC_DRAW);
-                glBindBuffer(GL_ARRAY_BUFFER, 0);
-            }
-
-            // if old buffer exists, copy unchanged data
-            if (curId) {
-                int index = 0;
-
-                size_t rangeCount = GetRangeCount();
-
-                // pre-pass to combine consecutive buffer range relocation
-                boost::scoped_ptr<HdStBufferRelocator> relocator(
-                    HdStBufferRelocator::New((HdBufferResourceGPUHandle)(uint64_t)curId,
-                                             (HdBufferResourceGPUHandle)(uint64_t)newId));
-                for (size_t rangeIdx = 0; rangeIdx < rangeCount; ++rangeIdx) {
-                    _StripedInterleavedBufferRangeSharedPtr range = _GetRangeSharedPtr(rangeIdx);
-
-                    if (!range) {
-                        TF_CODING_ERROR("_StripedInterleavedBufferRange expired "
-                                        "unexpectedly.");
-                        continue;
-                    }
-                    int oldIndex = range->GetIndex();
-                    if (oldIndex >= 0) {
-                        // copy old data
-                        GLintptr readOffset = oldIndex * _stride;
-                        GLintptr writeOffset = index * _stride;
-                        GLsizeiptr copySize = _stride * range->GetNumElements();
-
-                        relocator->AddRange(readOffset, writeOffset, copySize);
-                    }
-
-                    range->SetIndex(index);
-                    index += range->GetNumElements();
-                }
-
-                // buffer copy
-                relocator->Commit();
-
-            } else {
-                // just set index
-                int index = 0;
-
-                size_t rangeCount = GetRangeCount();
-                for (size_t rangeIdx = 0; rangeIdx < rangeCount; ++rangeIdx) {
-                    _StripedInterleavedBufferRangeSharedPtr range = _GetRangeSharedPtr(rangeIdx);
-                    if (!range) {
-                        TF_CODING_ERROR("_StripedInterleavedBufferRange expired "
-                                        "unexpectedly.");
-                        continue;
-                    }
-
-                    range->SetIndex(index);
-                    index += range->GetNumElements();
-                }
-            }
-            if (oldId) {
-                // delete old buffer
-                glDeleteBuffers(1, &oldId);
-            }
-        } else {
-            // for unit test
-            static int id = 1;
-            newId = id++;
-        }
-
-        // update id to all buffer resources
-        TF_FOR_ALL(it, GetResources()) {
-            it->second->SetAllocation((HdBufferResourceGPUHandle)(uint64_t)newId, totalSize);
-        }
-    }
-    else
-    {
-        TF_FATAL_CODING_ERROR("No implementation for this API");
-    }
-
-    _needsReallocation = false;
-    _needsCompaction = false;
-
-    // increment version to rebuild dispatch buffers.
-    IncrementVersion();
-}
-
-void
-HdStInterleavedMemoryManager::_StripedInterleavedBuffer::_DeallocateResources()
-{
-    TF_CODING_ERROR("Not Implemented");
-
-    HdBufferResourceSharedPtr resource = GetResource();
-    if (resource) {
-#if defined(ARCH_GFX_METAL)
-        if (HdEngine::GetRenderAPI() == HdEngine::Metal) {
-            id<MTLBuffer> _id = (__bridge id<MTLBuffer>)resource->GetId();
-            if (_id != nil) {
-                [_id release];
-                resource->SetAllocation(nil, 0);
-            }
-        }
-        else
-#endif
-        if (HdEngine::GetRenderAPI() == HdEngine::Metal) {
-            GLuint id = (GLuint)(uint64_t)resource->GetId();
-            if (id) {
-                if (glDeleteBuffers) {
-                    glDeleteBuffers(1, &id);
-                }
-                resource->SetAllocation(0, 0);
-            }
-        }
-        else {
-            TF_FATAL_CODING_ERROR("No implementation for this API");
-        }
-    }
 }
 
 void

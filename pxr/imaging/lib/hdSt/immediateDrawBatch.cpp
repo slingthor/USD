@@ -140,8 +140,8 @@ HdSt_ImmediateDrawBatch::ExecuteDraw(
     HdBufferResourceGPUHandle programId = gpu_program->GetProgram().GetId();
     TF_VERIFY(programId);
 
-    TF_CODING_ERROR("Not Implemented");
-    //glUseProgram(programId);
+    //TF_FATAL_CODING_ERROR("Not Implemented");
+    glUseProgram((GLuint)(uint64_t)programId);
 
     bool hasOverrideShader = bool(renderPassState->GetOverrideShader());
 

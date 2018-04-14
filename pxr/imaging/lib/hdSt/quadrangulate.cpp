@@ -429,7 +429,7 @@ HdSt_QuadrangulateComputationGPU::Execute(
     }
 
 #if defined(ARCH_GFX_METAL)
-    TF_CODING_ERROR("Not Implemented");
+    TF_FATAL_CODING_ERROR("Not Implemented");
 #else
     if (!glDispatchCompute)
         return;

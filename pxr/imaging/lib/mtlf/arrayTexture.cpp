@@ -46,7 +46,7 @@ GarchTexture::BindingVector
 MtlfArrayTexture::GetBindings(TfToken const & identifier,
                               GarchSamplerGPUHandle samplerName) const
 {
-    TF_CODING_ERROR("Not Implemented");
+    TF_FATAL_CODING_ERROR("Not Implemented");
 
     return BindingVector(1,
                 Binding(identifier, GarchTextureTokens->texels,
@@ -66,7 +66,7 @@ MtlfArrayTexture::_CreateTextures(
         return;
     }
     
-    TF_CODING_ERROR("Not Implemented");
+    TF_FATAL_CODING_ERROR("Not Implemented");
     /*
     glBindTexture(
         GL_TEXTURE_2D_ARRAY,

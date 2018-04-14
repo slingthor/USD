@@ -43,10 +43,12 @@ class HdResource;
 
 typedef boost::shared_ptr<class HdBufferResource> HdBufferResourceSharedPtr;
 typedef boost::shared_ptr<class HdBufferArrayRange> HdBufferArrayRangeSharedPtr;
+typedef boost::shared_ptr<class HdSt_ResourceBinder> HdSt_ResourceBinderSharedPtr;
 
 typedef boost::shared_ptr<class HdStShaderCode> HdStShaderCodeSharedPtr;
 typedef std::vector<HdStShaderCodeSharedPtr> HdStShaderCodeSharedPtrVector;
 typedef std::vector<class HdBindingRequest> HdBindingRequestVector;
+
 
 /// \class HdSt_ResourceBinder
 /// 
@@ -247,10 +249,14 @@ public:
         StructBlockBinding customInterleavedBindings;
         std::vector<BindingDeclaration> customBindings;
     };
-
-    /// Constructor.
+    
+    /// Destructor
     HDST_API
-    HdSt_ResourceBinder();
+    virtual ~HdSt_ResourceBinder() {}
+
+    /// Create a new resouce binder
+    HDST_API
+    static HdSt_ResourceBinder* New();
 
     /// Assign all binding points used in drawitem and custom bindings.
     /// Returns metadata to be used for codegen.
@@ -270,11 +276,11 @@ public:
                                 HdStShaderCodeSharedPtrVector const &shaders,
                                 MetaData *metaDataOut);
     
-    /// call GL introspection APIs and fix up binding locations,
+    /// call introspection APIs and fix up binding locations,
     /// in case if explicit resource location qualifier is not available
     /// (GL 4.2 or before)
     HDST_API
-    void IntrospectBindings(HdResource const & programResource);
+    virtual void IntrospectBindings(HdResource const & programResource) = 0;
 
     HDST_API
     void Bind(HdBindingRequest const& req) const;
@@ -305,9 +311,9 @@ public:
 
     /// bind/unbind shader parameters and textures
     HDST_API
-    void BindShaderResources(HdStShaderCode const *shader) const;
+    virtual void BindShaderResources(HdStShaderCode const *shader) const = 0;
     HDST_API
-    void UnbindShaderResources(HdStShaderCode const *shader) const;
+    virtual void UnbindShaderResources(HdStShaderCode const *shader) const = 0;
 
     /// piecewise buffer binding utility
     /// (to be used for frustum culling, draw indirect result)
@@ -315,30 +321,30 @@ public:
     void BindBuffer(TfToken const &name,
                     HdBufferResourceSharedPtr const &resource) const;
     HDST_API
-    void BindBuffer(TfToken const &name,
+    virtual void BindBuffer(TfToken const &name,
                     HdBufferResourceSharedPtr const &resource,
-                    int offset, int level=-1) const;
+                    int offset, int level=-1) const = 0;
     HDST_API
-    void UnbindBuffer(TfToken const &name,
+    virtual void UnbindBuffer(TfToken const &name,
                       HdBufferResourceSharedPtr const &resource,
-                      int level=-1) const;
+                      int level=-1) const = 0;
 
     /// bind(update) a standalone uniform (unsigned int)
     HDST_API
-    void BindUniformui(TfToken const &name, int count,
-                       const unsigned int *value) const;
+    virtual void BindUniformui(TfToken const &name, int count,
+                       const unsigned int *value) const = 0;
 
     /// bind a standalone uniform (signed int, ivec2, ivec3, ivec4)
     HDST_API
-    void BindUniformi(TfToken const &name, int count, const int *value) const;
+    virtual void BindUniformi(TfToken const &name, int count, const int *value) const = 0;
 
     /// bind a standalone uniform array (int[N])
     HDST_API
-    void BindUniformArrayi(TfToken const &name, int count, const int *value) const;
+    virtual void BindUniformArrayi(TfToken const &name, int count, const int *value) const = 0;
 
     /// bind a standalone uniform (float, vec2, vec3, vec4, mat4)
     HDST_API
-    void BindUniformf(TfToken const &name, int count, const float *value) const;
+    virtual void BindUniformf(TfToken const &name, int count, const float *value) const = 0;
 
     /// Returns binding point.
     /// XXX: exposed temporarily for drawIndirectResult
@@ -353,7 +359,11 @@ public:
         return _numReservedTextureUnits;
     }
 
-private:
+protected:
+    /// Constructor
+    HDST_API
+    HdSt_ResourceBinder();
+
     // for batch execution
     struct NameAndLevel {
         NameAndLevel(TfToken const &n, int lv=-1) :

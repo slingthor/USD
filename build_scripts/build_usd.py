@@ -217,7 +217,7 @@ def RunCMake(context, force, extraArgs = None):
                     generator=(generator or ""),
                     extraArgs=(" ".join(extraArgs) if extraArgs else "")))
         Run("cmake --build . --config Release --target install -- {multiproc}"
-            .format(multiproc=("/M:{procs}" if Windows() else "-jobs {procs}")
+            .format(multiproc=("/M:{procs}" if Windows() else "-j {procs}")
                                .format(procs=context.numJobs)))
 
 def PatchFile(filename, patches):

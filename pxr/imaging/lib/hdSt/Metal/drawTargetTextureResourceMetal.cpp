@@ -45,7 +45,7 @@ HdSt_DrawTargetTextureResourceMetal::SetSampler(HdWrap wrapS,
 {
     static const float borderColor[4] = {0.0f, 0.0f, 0.0f, 0.0f};
 
-    TF_CODING_ERROR("Not Implemented");
+    TF_FATAL_CODING_ERROR("Not Implemented");
     /*
     GLenum glWrapS = HdConversions::GetWrap(wrapS);
     GLenum glWrapT = HdConversions::GetWrap(wrapT);
@@ -70,7 +70,7 @@ HdSt_DrawTargetTextureResourceMetal::GetTexelsTextureHandle()
         return 0;
     }
 
-    TF_CODING_ERROR("Not Implemented");
+    TF_FATAL_CODING_ERROR("Not Implemented");
     return textureId;
 }
 

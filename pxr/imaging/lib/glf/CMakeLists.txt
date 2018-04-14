@@ -53,6 +53,7 @@ pxr_library(glf
         info
         package
         ptexTexture
+        resourceFactory
         simpleLightingContext
         simpleShadowArray
         uniformBlock
