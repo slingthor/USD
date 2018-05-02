@@ -28,6 +28,7 @@
 
 #include "pxr/pxr.h"
 #include "pxr/imaging/mtlf/api.h"
+
 #include "pxr/imaging/garch/drawTarget.h"
 #include "pxr/imaging/garch/texture.h"
 
@@ -44,6 +45,8 @@
 #include <string>
 
 #include <boost/shared_ptr.hpp>
+
+#include <Metal/Metal.h>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -92,21 +95,21 @@ public:
         typedef TfDeclarePtrs<class MtlfAttachment>::RefPtr MtlfAttachmentRefPtr;
 
         MTLF_API
-        static MtlfAttachmentRefPtr New(int glIndex, GLenum format, GLenum type,
-                                    GLenum internalFormat, GfVec2i size,
-                                    unsigned int numSamples);
+        static MtlfAttachmentRefPtr New(uint32_t attachmentIndex, GLenum format,
+                                        GLenum type, GfVec2i size,
+                                        uint32_t numSamples);
 
         MTLF_API
         virtual ~MtlfAttachment();
 
         /// Returns the texture object (can be used as any regular GL texture)
-        virtual GarchTextureGPUHandle GetTextureName() const override { return (GarchTextureGPUHandle)(uint64_t)_textureName; }
+        virtual GarchTextureGPUHandle GetTextureName() const override { return GarchTextureGPUHandle(_textureName); }
 
         /// Returns the Metal texture object (can be used as any regular Metal texture object)
-        virtual GLuint GetMtlTextureName() const { return _textureName; }
+        virtual id<MTLTexture> GetMtlTextureName() const { return _textureName; }
 
         /// Returns the GL texture index multisampled of this attachment
-        GLuint GetGlTextureMSName() const { return _textureNameMS; }
+        id<MTLTexture> GetMtlTextureMSName() const { return _textureNameMS; }
 
         /// Returns the GL format of the texture (GL_RGB, GL_DEPTH_COMPONENT...)
         GLenum GetFormat() const { return _format; }
@@ -114,8 +117,11 @@ public:
         /// Returns the GL type of the texture (GL_BYTE, GL_INT, GL_FLOAT...)
         GLenum GetType() const { return _type; }
 
-        /// Returns the GL attachment point index in the framebuffer.
-        int GetAttach() const { return _glIndex; }
+        /// Returns the attachment point index in the framebuffer.
+        int GetAttach() const { return _attachmentIndex; }
+        
+        /// Get the bytes per pixel for the texture format
+        int GetBytesPerPixel() const { return _bytesPerPixel; }
 
         /// Resize the attachment recreating the texture
         MTLF_API
@@ -135,37 +141,28 @@ public:
         void TouchContents();
 
     private:
-        MtlfAttachment(int glIndex, GLenum format, GLenum type,
-                       GLenum internalFormat, GfVec2i size,
-                       unsigned int numSamples);
+        MtlfAttachment(uint32_t attachmentIndex, GLenum format,
+                       GLenum type, GfVec2i size, uint32_t numSamples);
 
         void _GenTexture();
         void _DeleteTexture();
 
-        GLuint       _textureName;
-        GLuint       _textureNameMS;
+        id<MTLTexture>  _textureName;
+        id<MTLTexture>  _textureNameMS;
 
-        GLenum       _format,
-                     _type,
-                     _internalFormat;
+        GLenum          _format,
+                        _type;
+        MTLPixelFormat  _internalFormat;
 
-        int          _glIndex;
+        uint32_t        _attachmentIndex;
+        
+        GfVec2i         _size;
 
-        GfVec2i      _size;
-
-        unsigned int _numSamples;
+        uint32_t        _numSamples;
+        uint32_t        _bytesPerPixel;
     };
 
     typedef TfDeclarePtrs<class MtlfAttachment>::RefPtr MtlfAttachmentRefPtr;
-    
-    /// Add an attachment to the DrawTarget.
-    MTLF_API
-    virtual void AddAttachment( std::string const & name,
-                        GLenum format, GLenum type, GLenum internalFormat ) override;
-
-    /// Removes the named attachment from the DrawTarget.
-    MTLF_API
-    virtual void DeleteAttachment( std::string const & name ) override;
     
     /// Clears all the attachments for this DrawTarget.
     MTLF_API
@@ -183,12 +180,16 @@ public:
     MTLF_API
     virtual GarchDrawTarget::AttachmentRefPtr GetAttachment(std::string const & name) override;
     
+    /// Save the Attachment buffer to an array.
+    MTLF_API
+    virtual void GetImage(std::string const & name, void* buffer) const override;
+    
     /// Write the Attachment buffer to an image file (debugging).
     MTLF_API
     virtual bool WriteToFile(std::string const & name,
-                     std::string const & filename,
-                     GfMatrix4d const & viewMatrix = GfMatrix4d(1),
-                     GfMatrix4d const & projectionMatrix = GfMatrix4d(1)) override;
+                             std::string const & filename,
+                             GfMatrix4d const & viewMatrix = GfMatrix4d(1),
+                             GfMatrix4d const & projectionMatrix = GfMatrix4d(1)) const override;
 
     /// Resize the DrawTarget.
     MTLF_API
@@ -206,17 +207,27 @@ public:
     MTLF_API
     virtual uint32_t const & GetNumSamples() const override { return _numSamples; }
     
-    /// Returns the framebuffer object Id.
+    /// Invalid for Metal.
     MTLF_API
-    virtual GLuint GetFramebufferId() const override;
+    virtual GLuint GetFramebufferId() const override {
+        TF_FATAL_CODING_ERROR("Not Valid");
+        return 0;
+    }
     
-    /// Returns the id of the framebuffer object with MSAA buffers.
+    /// Invalid for Metal.
     MTLF_API
-    virtual GLuint GetFramebufferMSId() const override;
+    virtual GLuint GetFramebufferMSId() const override {
+        TF_FATAL_CODING_ERROR("Not Valid");
+        return 0;
+    }
 
     /// Binds the framebuffer.
     MTLF_API
     virtual void Bind() override;
+    
+    /// Sets the attachments to the framebuffer. There is no bound frame buffer when this method returns.
+    MTLF_API
+    virtual void SetAttachments(std::vector<GarchDrawTarget::AttachmentDesc>& attachments) override;
 
     /// Unbinds the framebuffer.
     MTLF_API
@@ -271,6 +282,10 @@ protected:
 
 private:
     void _GenFrameBuffer();
+    
+    /// Add an attachment to the DrawTarget.
+    void _AddAttachment(std::string const & name,
+                        GLenum format, GLenum type, GLenum internalFormat );
 
     void _BindAttachment( MtlfAttachmentRefPtr const & a );
     
@@ -284,18 +299,11 @@ private:
 
     bool _Validate(std::string * reason = NULL);
 
-    void _SaveBindingState();
-
-    void _RestoreBindingState();
-
     void _Resolve();
 
-    GLuint _framebuffer;
-    GLuint _framebufferMS;
+    MTLRenderPassDescriptor *_mtlRenderPassDescriptor;
+    id<MTLRenderCommandEncoder> _renderEncoder;
     
-    GLuint _unbindRestoreReadFB,
-           _unbindRestoreDrawFB;
-
     int _bindDepth;
 
     GfVec2i _size;

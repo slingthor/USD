@@ -98,7 +98,7 @@ HdStProgram::GetComputeProgram(
         // if not exists, create new one
         
         HdStProgramSharedPtr newProgram(HdStProgram::New(HdTokens->computeShader));
-        boost::scoped_ptr<GLSLFX> glslfx(GLSLFX::New(HdStPackageComputeShader()));
+        boost::scoped_ptr<GLSLFX> glslfx(new GLSLFX(HdStPackageComputeShader()));
 
         std::string version = "#version 430\n";
         if (!newProgram->CompileShader(

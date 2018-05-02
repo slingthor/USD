@@ -24,7 +24,8 @@
 
 #include "pxr/imaging/glf/glew.h"
 #include "pxr/imaging/mtlf/mtlDevice.h"
-#include "pxr/imaging/mtlf/glslfx.h"
+
+#include "pxr/imaging/garch/glslfx.h"
 
 #include "pxr/imaging/hdSt/Metal/codeGenMSL.h"
 #include "pxr/imaging/hdSt/Metal/mslProgram.h"
@@ -83,8 +84,19 @@ TF_DEFINE_PRIVATE_TOKENS(
     (samplerBuffer)
 );
 
+HdSt_CodeGenMSL::TParam::Usage operator|(HdSt_CodeGenMSL::TParam::Usage const &lhs,
+                                         HdSt_CodeGenMSL::TParam::Usage const &rhs) {
+    return HdSt_CodeGenMSL::TParam::Usage(int(lhs) | int(rhs));
+}
+
+HdSt_CodeGenMSL::TParam::Usage operator|=(HdSt_CodeGenMSL::TParam::Usage &lhs,
+                                         HdSt_CodeGenMSL::TParam::Usage const &rhs) {
+    return lhs = lhs | rhs;
+}
+
 HdSt_CodeGenMSL::HdSt_CodeGenMSL(HdSt_GeometricShaderPtr const &geometricShader,
                              HdStShaderCodeSharedPtrVector const &shaders)
+    : _geometricShader(geometricShader), _shaders(shaders)
 {
     TF_VERIFY(geometricShader);
 }
@@ -112,35 +124,35 @@ std::string
 _GetPtexTextureShaderSource()
 {
     static std::string source =
-        MtlfGLSLFX(HdStPackagePtexTextureShader()).GetSource(
+        GLSLFX(HdStPackagePtexTextureShader()).GetSource(
             _tokens->ptexTextureSampler);
     return source;
 }
 
 // TODO: Shuffle code to remove these declarations.
-static void _EmitDeclaration(std::stringstream &str,
-                             HdSt_CodeGenMSL::InOutParams &inputParams,
-                             TfToken const &name,
-                             TfToken const &type,
-                             TfToken const &attribute,
-                             HdBinding const &binding,
-                             int arraySize=0,
-                             bool forceIncludeAsFunc=false);
+static HdSt_CodeGenMSL::TParam& _EmitDeclaration(std::stringstream &str,
+                                                 HdSt_CodeGenMSL::InOutParams &inputParams,
+                                                 TfToken const &name,
+                                                 TfToken const &type,
+                                                 TfToken const &attribute,
+                                                 HdBinding const &binding,
+                                                 int arraySize=0);
 
-static void _EmitDeclarationPtr(std::stringstream &str,
-                                HdSt_CodeGenMSL::InOutParams &inputParams,
-                                TfToken const &name,
-                                TfToken const &type,
-                                TfToken const &attribute,
-                                HdBinding const &binding,
-                                int arraySize=0,
-                                bool programScope=false);
+static HdSt_CodeGenMSL::TParam& _EmitDeclarationPtr(std::stringstream &str,
+                                                    HdSt_CodeGenMSL::InOutParams &inputParams,
+                                                    TfToken const &name,
+                                                    TfToken const &type,
+                                                    TfToken const &attribute,
+                                                    HdBinding const &binding,
+                                                    int arraySize=0,
+                                                    bool programScope=false);
 
 static void _EmitStructAccessor(std::stringstream &str,
                                 TfToken const &structMemberName,
                                 TfToken const &name,
                                 TfToken const &type,
                                 int arraySize,
+                                bool pointerDereference,
                                 const char *index);
 
 static void _EmitComputeAccessor(std::stringstream &str,
@@ -161,16 +173,18 @@ static void _EmitAccessor(std::stringstream &str,
                           HdBinding const &binding,
                           const char *index=NULL);
 
-static void _EmitOutput(std::stringstream &str,
-                        HdSt_CodeGenMSL::InOutParams &outputParams,
-                        TfToken const &name,
-                        TfToken const &type,
-                        TfToken const &attribute = TfToken());
+static HdSt_CodeGenMSL::TParam& _EmitOutput(std::stringstream &str,
+                                            HdSt_CodeGenMSL::InOutParams &outputParams,
+                                            TfToken const &name,
+                                            TfToken const &type,
+                                            TfToken const &attribute = TfToken(),
+                                            HdSt_CodeGenMSL::TParam::Usage usage = HdSt_CodeGenMSL::TParam::Unspecified);
 
-static void _EmitStructMemberOutput(HdSt_CodeGenMSL::InOutParams &outputParams,
-                                    TfToken const &name,
-                                    TfToken const &accessor,
-                                    TfToken const &type);
+static HdSt_CodeGenMSL::TParam& _EmitStructMemberOutput(HdSt_CodeGenMSL::InOutParams &outputParams,
+                                                        TfToken const &name,
+                                                        TfToken const &accessor,
+                                                        TfToken const &type,
+                                                        HdSt_CodeGenMSL::TParam::Usage usage = HdSt_CodeGenMSL::TParam::Unspecified);
 /*
   1. If the member is a scalar consuming N basic machine units,
   the base alignment is N.
@@ -332,100 +346,432 @@ namespace {
 }
 
 void
-HdSt_CodeGenMSL::_ParseGLSL(std::stringstream &source)
+HdSt_CodeGenMSL::_ParseGLSL(std::stringstream &source, InOutParams& inParams, InOutParams& outParams)
 {
     static std::regex regex_word("(\\S+)");
 
     std::string result = source.str();
-    std::string::size_type pos = 0;
     std::stringstream dummy;
+    
+    struct TagSpec {
+        TagSpec(char const* const _tag, InOutParams& _params)
+        : glslTag(_tag),
+          params(_params)
+        {}
 
-    while ((pos = result.find("\nout ", pos)) != std::string::npos) {
-        
-        // check for a ';' before the next '\n'
-        std::string::size_type newLine = result.find_first_of('\n', pos + 4);
-        std::string::size_type semiColon = result.find_first_of(';', pos + 4);
-        
-        if (newLine < semiColon) {
-            // output structure. Replace the 'out' tag with 'struct'. Search between the {} for lines, and extract a type and name from each one.
-            result.replace(pos, 4, std::string("\nstruct"));
-            
-            std::string::size_type openParenthesis = result.find_first_of('{', pos);
-            std::string::size_type closeParenthesis = result.find_first_of('}', pos);
-            std::string::size_type lineStart = openParenthesis + 1;
-            
-            // Grab the variable instance name
-            std::string::size_type endLine = result.find_first_of(';', closeParenthesis + 1);
-            std::string line = result.substr(closeParenthesis + 1, endLine - closeParenthesis - 1);
-            
-            std::smatch match;
-            std::string parent;
-            if (std::regex_search(line, match, regex_word)) {
-                const std::string::size_type s   = match[0].first  - line.begin();
-                const std::string::size_type count = match[0].second - match[0].first;
-                
-                parent = line.substr(s, count) + ".";
-            }
+        std::string glslTag;
+        InOutParams& params;
+    };
+    
+    std::vector<TagSpec> tags;
+    
+    tags.push_back(TagSpec("\nout ", outParams));
+    tags.push_back(TagSpec("\nin ", inParams));
+    tags.push_back(TagSpec("\nuniform ", inParams));
+    
+    int firstFlatIndex = tags.size();
+    tags.push_back(TagSpec("\nflat out ", outParams));
+    tags.push_back(TagSpec("\nflat in ", inParams));
 
-            pos = lineStart;
+    int pass = 0;
+    for (auto tag : tags) {
+
+        std::string::size_type pos = 0;
+        int tagSize = tag.glslTag.length() - 1;
+
+        while ((pos = result.find(tag.glslTag, pos)) != std::string::npos) {
             
-            while ((pos = result.find("\n", pos)) != std::string::npos &&
-                pos < closeParenthesis)
-            {
-                endLine = result.find_first_of(';', lineStart + 1);
-                line = result.substr(lineStart, endLine - lineStart);
+            // check for a ';' before the next '\n'
+            std::string::size_type newLine = result.find_first_of('\n', pos + tagSize);
+            std::string::size_type semiColon = result.find_first_of(';', pos + tagSize);
+            
+            if (newLine < semiColon) {
+                // output structure. Replace the 'out' tag with 'struct'. Search between the {} for lines, and extract a type and name from each one.
+                result.replace(pos, tagSize, std::string("\nstruct"));
                 
-                auto words_begin = std::sregex_iterator(result.begin() + lineStart, result.begin() + endLine, regex_word);
-                auto words_end = std::sregex_iterator();
-                int numWords = std::distance(words_begin, words_end);
+                std::string::size_type openParenthesis = result.find_first_of('{', pos);
+                std::string::size_type closeParenthesis = result.find_first_of('}', pos);
+                std::string::size_type lineStart = openParenthesis + 1;
                 
-                if (numWords == 2)
-                {
-                    std::sregex_iterator i = words_begin;
-                    TfToken type((*i).str().c_str());
-                    ++i;
-                    TfToken name((*i).str().c_str());
-                    TfToken accessor((parent + (*i).str()).c_str());
-                    _EmitStructMemberOutput(_mslOutputParams, name, accessor, type);
+                // Grab the variable instance name
+                std::string::size_type endLine = result.find_first_of(';', closeParenthesis + 1);
+                std::string line = result.substr(closeParenthesis + 1, endLine - closeParenthesis - 1);
+                
+                std::smatch match;
+                std::string parent;
+                if (std::regex_search(line, match, regex_word)) {
+                    const std::string::size_type s   = match[0].first  - line.begin();
+                    const std::string::size_type count = match[0].second - match[0].first;
+                    
+                    parent = line.substr(s, count) + ".";
                 }
-                else if (numWords) { // Allow blank lines
-                    TF_CODING_WARNING("Unparsable glslfx line in 'out <type> <name>;' definition. Expecting '<type> <name>;'. Got %s",
-                                      result.substr(pos + 1, endLine - pos - 1).c_str());
-                }
 
-                lineStart = result.find("\n", endLine) + 1;
                 pos = lineStart;
-            }
-            
-            pos = closeParenthesis + 1;
-        }
-        else {
-            // Single line - remove the 'out' tag from the GLSL. Extract the type and variable name from the string.
-            result.replace(pos, 4, std::string("\n"));
-            std::string::size_type endLine = result.find_first_of(';', pos + 1);
+                
+                while ((pos = result.find("\n", pos)) != std::string::npos &&
+                    pos < closeParenthesis)
+                {
+                    endLine = result.find_first_of(';', lineStart + 1);
+                    line = result.substr(lineStart, endLine - lineStart);
+                    
+                    auto words_begin = std::sregex_iterator(result.begin() + lineStart, result.begin() + endLine, regex_word);
+                    auto words_end = std::sregex_iterator();
+                    int numWords = std::distance(words_begin, words_end);
+                    
+                    if (numWords == 2)
+                    {
+                        std::sregex_iterator i = words_begin;
+                        TfToken type((*i).str().c_str());
+                        ++i;
+                        TfToken name((*i).str().c_str());
+                        TfToken accessor((parent + (*i).str()).c_str());
+                        
+                        _EmitStructMemberOutput(tag.params, name, accessor, type);
+                    }
+                    else if (numWords) { // Allow blank lines
+                        TF_CODING_WARNING("Unparsable glslfx line in '%s<type> <name>;' definition. Expecting '%s<type> <name>;'. Got %s",
+                                          tag.glslTag.substr(1).c_str(),
+                                          tag.glslTag.substr(1).c_str(),
+                                          result.substr(pos + 1, endLine - pos - 1).c_str());
+                    }
 
-            std::string line = result.substr(pos + 1, endLine - pos - 1);
-
-            auto words_begin = std::sregex_iterator(result.begin() + pos + 1, result.begin() + endLine, regex_word);
-            auto words_end = std::sregex_iterator();
-            
-            if (std::distance(words_begin, words_end) == 2)
-            {
-                std::sregex_iterator i = words_begin;
-                TfToken type((*i).str().c_str());
-                ++i;
-                TfToken name((*i).str().c_str());
-                _EmitOutput(dummy, _mslOutputParams, name, type);
+                    lineStart = result.find("\n", endLine) + 1;
+                    pos = lineStart;
+                }
+                
+                pos = closeParenthesis + 1;
             }
             else {
-                TF_CODING_WARNING("Unparsable glslfx line in 'out <type> <name>;' definition. Expecting '<type> <name>;'. Got %s",
-                                  result.substr(pos + 1, endLine - pos - 1).c_str());
+                // Single line - remove the tag from the GLSL. Extract the type and variable name from the string.
+                result.replace(pos, tagSize, std::string("\n"));
+                std::string::size_type endLine = result.find_first_of(';', pos + 1);
+
+                std::string line = result.substr(pos + 1, endLine - pos - 1);
+
+                auto words_begin = std::sregex_iterator(result.begin() + pos + 1, result.begin() + endLine, regex_word);
+                auto words_end = std::sregex_iterator();
+                
+                if (std::distance(words_begin, words_end) == 2)
+                {
+                    std::sregex_iterator i = words_begin;
+                    char const* typeStr = (*i).str().c_str();
+                    TfToken type(typeStr);
+                    
+                    // detect if this is a texture or a sampler, and mark accordingly
+                    HdSt_CodeGenMSL::TParam::Usage usage = HdSt_CodeGenMSL::TParam::Unspecified;
+                    if (!strncmp(typeStr, "texture", 7) ||
+                        !strncmp(typeStr, "depth", 5)) {
+                        usage = HdSt_CodeGenMSL::TParam::Texture;
+                    }
+                    else if (!strncmp(typeStr, "sampler", 7)) {
+                        usage = HdSt_CodeGenMSL::TParam::Sampler;
+                    }
+
+                    ++i;
+                    char const * const nameStr = (*i).str().c_str();
+                    if (nameStr[0] == '*') {
+                        result.replace(pos, 0, std::string("\ndevice "));
+                        usage |= HdSt_CodeGenMSL::TParam::EntryFuncArgument;
+                        
+                        // If this is a built-in type, we want to use global scope to access
+                        // If it's a custom struct, we want to use ProgramScope to access
+                        // We crudely detect this by searching for 'struct TypeName' in the source.
+                        // XXX This needs improving, as it's very easy to break it!
+                        std::stringstream search;
+                        search << "struct " << type.GetString();
+                        if (result.find(search.str())) {
+                            usage |= HdSt_CodeGenMSL::TParam::ProgramScope;
+                        }
+                    }
+                    TfToken name(nameStr);
+                    
+                    _EmitOutput(dummy, tag.params, name, type, TfToken(pass >= firstFlatIndex?"[[flat]]":""), usage);
+                }
+                else {
+                    TF_CODING_WARNING("Unparsable glslfx line in '%s<type> <name>;' definition. Expecting '%s<type> <name>;'. Got %s",
+                                      tag.glslTag.substr(1).c_str(),
+                                      tag.glslTag.substr(1).c_str(),
+                                      result.substr(pos + 1, endLine - pos - 1).c_str());
+                }
             }
         }
+        pass++;
     }
-    
     source.clear();
     source.str(result);
+}
+
+void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream& gluePS, HdStMSLProgramSharedPtr mslProgram)
+{
+    std::stringstream glueCommon, copyInputsVtx, copyOutputsVtx;
+    std::stringstream copyInputsFrag, copyOutputsFrag;
+
+    glueCommon.str("");
+    copyInputsVtx.str("");
+    copyInputsFrag.str("");
+    copyOutputsVtx.str("");
+    copyOutputsFrag.str("");
+    
+    glueCommon << "struct MSLVtxOutputs {\n";
+    TF_FOR_ALL(it, _mslVSOutputParams) {
+        HdSt_CodeGenMSL::TParam const &output = *it;
+        glueCommon << output.dataType << " " << output.name << output.attribute << ";\n";
+        
+        copyOutputsVtx << "out." << output.name << "=scope.";
+        if (output.accessorStr.IsEmpty()) {
+            copyOutputsVtx << output.name << ";\n";
+        }
+        else {
+            copyOutputsVtx << output.accessorStr << ";\n";
+        }
+    }
+    glueCommon << "};\n";
+    
+    glueVS << glueCommon.str();
+    gluePS << glueCommon.str();
+    
+    glueVS << "struct MSLVtxInputs {\n";
+    int location = 0;
+    TF_FOR_ALL(it, _mslVSInputParams) {
+        HdSt_CodeGenMSL::TParam const &input = *it;
+        TfToken attrib;
+        
+        if (input.usage & HdSt_CodeGenMSL::TParam::EntryFuncArgument) {
+            if (input.name.GetText()[0] == '*') {
+                std::string n = input.name.GetString().substr(1);
+                copyInputsVtx << "scope." << n << "=" << n << ";\n";
+            }
+            else {
+                copyInputsVtx << "scope." << input.name << "=" << input.name << ";\n";
+            }
+            continue;
+        }
+        copyInputsVtx << "scope." << input.name << "=input." << input.name << ";\n";
+        
+        if (input.name.GetText()[0] == '*') {
+            glueVS << "device ";
+            mslProgram->AddBinding(input.name.GetText() + 1, location);
+        }
+        else {
+            mslProgram->AddBinding(input.name.GetString(), location);
+        }
+        
+//        if (!input.attribute.IsEmpty())
+//            attrib = input.attribute;
+//        else
+            attrib = TfToken(TfStringPrintf("[[attribute(%d)]]", location++));
+        
+        glueVS << input.dataType << " " << input.name << attrib << ";\n";
+    }
+    glueVS << "};\n";
+    
+    gluePS << "struct MSLFragOutputs {\n";
+    TF_FOR_ALL(it, _mslPSOutputParams) {
+        HdSt_CodeGenMSL::TParam const &output = *it;
+        gluePS << output.dataType << " " << output.name << output.attribute << ";\n";
+        
+        copyOutputsFrag << "out." << output.name << "=scope.";
+        if (output.accessorStr.IsEmpty()) {
+            copyOutputsFrag << output.name << ";\n";
+        }
+        else {
+            copyOutputsFrag << output.accessorStr << ";\n";
+        }
+    }
+    gluePS << "};\n";
+    
+    // Check if there's any texturing parameters
+    bool hasTexturing = false;
+    TF_FOR_ALL(it, _mslPSInputParams) {
+        HdSt_CodeGenMSL::TParam const &input = *it;
+        if (input.usage != HdSt_CodeGenMSL::TParam::Unspecified) {
+            hasTexturing = true;
+            break;
+        }
+    }
+    if (hasTexturing) {
+        gluePS << "struct MSLTexturing {\n";
+        int textureLocation = 0;
+        int samplerLocation = 0;
+        std::stringstream attribute;
+
+        TF_FOR_ALL(it, _mslPSInputParams) {
+            HdSt_CodeGenMSL::TParam const &input = *it;
+
+            attribute.str("");
+
+            switch (input.usage & HdSt_CodeGenMSL::TParam::maskShaderUsage) {
+                case HdSt_CodeGenMSL::TParam::Unspecified:
+                    continue;
+                case HdSt_CodeGenMSL::TParam::Texture:
+                    location = textureLocation++;
+                    attribute << "[[texture(" << location << ")]]";
+                    break;
+                case HdSt_CodeGenMSL::TParam::Sampler:
+                    location = samplerLocation++;
+                    attribute << "[[sampler(" << location << ")]]";
+                    break;
+                default:
+                    TF_FATAL_CODING_ERROR("Not Implemented");
+            }
+
+            gluePS << input.dataType << " " << input.name << attribute.str() << ";\n";
+
+            std::string n;
+            if (input.name.GetText()[0] == '*') {
+                n = input.name.GetString().substr(1);
+            }
+            else {
+                n = input.name.GetString();
+            }
+            mslProgram->AddBinding(n, location);
+            copyInputsFrag << "scope." << n << "=texturing." << n << ";\n";
+        }
+        gluePS << "};\n";
+    }
+
+    gluePS << "struct MSLFragInputs {\n";
+    location = 0;
+    TF_FOR_ALL(it, _mslPSInputParams) {
+        HdSt_CodeGenMSL::TParam const &input = *it;
+        TfToken attrib;
+        
+        if (input.usage & (HdSt_CodeGenMSL::TParam::maskShaderUsage)) {
+            continue;
+        }
+        else if (input.usage & HdSt_CodeGenMSL::TParam::EntryFuncArgument) {
+            if (input.name.GetText()[0] == '*') {
+                std::string n = input.name.GetString().substr(1);
+                copyInputsFrag << "scope." << n << "=" << n << ";\n";
+            }
+            else {
+                copyInputsFrag << "scope." << input.name << "=" << input.name << ";\n";
+            }
+            continue;
+        }
+
+        // Look for the input name in the vertex outputs and if so, wire it up to the [[stage_in]]
+        bool bFound = false;
+        for (auto output : _mslVSOutputParams) {
+            if (input.name == output.name) {
+                bFound = true;
+                break;
+            }
+        }
+        TfToken accessor;
+        if (input.accessorStr.IsEmpty()) {
+            accessor = input.name;
+        }
+        else {
+            accessor = input.accessorStr;
+        }
+        if (bFound) {
+            if (input.usage & HdSt_CodeGenMSL::TParam::VertexShaderOnly) {
+                continue;
+            }
+            copyInputsFrag << "scope." << accessor << "=vsInput." << input.name << ";\n";
+        }
+        else {
+            copyInputsFrag << "scope." << accessor << "=input->" << input.name << ";\n";
+        }
+
+        attrib = input.attribute;
+        gluePS << input.dataType << " " << input.name << attrib << ";\n";
+    }
+    gluePS << "};\n";
+    
+    glueVS << "vertex MSLVtxOutputs vertexEntryPoint(MSLVtxInputs input[[stage_in]]\n";
+    
+    location = 0;
+    TF_FOR_ALL(it, _mslVSInputParams) {
+        HdSt_CodeGenMSL::TParam const &input = *it;
+        TfToken attrib;
+        if (!(input.usage & HdSt_CodeGenMSL::TParam::EntryFuncArgument)) {
+            continue;
+        }
+        if (!input.attribute.IsEmpty()) {
+            attrib = input.attribute;
+        }
+        else {
+            std::string n;
+            if (input.name.GetText()[0] == '*') {
+                n = input.name.GetText() + 1;
+            }
+            else {
+                n = input.name.GetString();
+            }
+
+            mslProgram->AddBinding(n, location);
+            attrib = TfToken(TfStringPrintf("[[buffer(%d)]]", location++));
+        }
+        glueVS << ", ";
+        if (input.name.GetText()[0] == '*') {
+            glueVS << "device ";
+        }
+        if (input.usage & HdSt_CodeGenMSL::TParam::ProgramScope) {
+            glueVS << "ProgramScope::";
+        }
+        glueVS << input.dataType << " " << input.name << attrib << "\n";
+    }
+    
+    glueVS  << ") {\n"
+            << "ProgramScope scope;\n"
+            << copyInputsVtx.str()
+            << "scope.main();\n"
+            << "MSLVtxOutputs out;\n"
+            << copyOutputsVtx.str()
+            << "return out;\n"
+            << "}\n";
+    
+    gluePS << "fragment MSLFragOutputs fragmentEntryPoint(MSLVtxOutputs vsInput[[stage_in]]\n"
+           << ", device MSLFragInputs *input[[buffer(0)]]\n";
+
+    location = 1;
+
+    if (hasTexturing) {
+        gluePS << ", MSLTexturing texturing\n";
+    }
+
+    // This is the fragment entry point argument list. This takes all inputs that are individual bound buffers
+    TF_FOR_ALL(it, _mslPSInputParams) {
+        HdSt_CodeGenMSL::TParam const &input = *it;
+        TfToken attrib;
+        if (! (input.usage & HdSt_CodeGenMSL::TParam::EntryFuncArgument)) {
+            continue;
+        }
+//        if (!input.attribute.IsEmpty()) {
+//            attrib = input.attribute;
+//        }
+//        else {
+            attrib = TfToken(TfStringPrintf("[[buffer(%d)]]", location));
+//        }
+        gluePS << ", ";
+        
+        std::string n;
+        if (input.name.GetText()[0] == '*') {
+            gluePS << "device ";
+            n = input.name.GetText() + 1;
+        }
+        else {
+            n = input.name.GetString();
+        }
+
+        mslProgram->AddBinding(n, location++);
+
+        if (input.usage & HdSt_CodeGenMSL::TParam::ProgramScope) {
+            gluePS << " ProgramScope::";
+        }
+        gluePS << input.dataType << " " << input.name << attrib << "\n";
+    }
+
+    gluePS  << ") {\n"
+            << "ProgramScope scope;\n"
+            << copyInputsFrag.str()
+            << "scope.main();\n"
+            << "MSLFragOutputs out;\n"
+            << copyOutputsFrag.str()
+            << "return out;\n"
+            << "}\n";
 }
 
 HdStProgramSharedPtr
@@ -436,7 +782,7 @@ HdSt_CodeGenMSL::Compile()
     
     // create GLSL program.
     
-    HdStProgramSharedPtr mslProgram(new HdStMSLProgram(HdTokens->drawingShader));
+    HdStMSLProgramSharedPtr mslProgram(new HdStMSLProgram(HdTokens->drawingShader));
     
     // initialize autogen source buckets
     _genCommon.str(""); _genVS.str(""); _genTCS.str(""); _genTES.str("");
@@ -449,6 +795,7 @@ HdSt_CodeGenMSL::Compile()
     // imaging system. It can also be used as API guards when
     // we need new versions of Hydra shading.
     _genCommon << "#define HD_SHADER_API " << HD_SHADER_API << "\n";
+    _genCommon << "#define ARCH_GFX_METAL\n";
     
     _genCommon << "#include <metal_stdlib>\n"
     << "#include <simd/simd.h>\n"
@@ -473,12 +820,36 @@ HdSt_CodeGenMSL::Compile()
     // a trick to tightly pack vec3 into SSBO/UBO.
     _genCommon << _GetPackedTypeDefinitions();
     
+    _genCommon << "#define in\n"
+               << "#define discard discard_fragment();\n"
+               << "#define radians(d) (d * 0.01745329252)\n";
+    
     _genCommon << "class ProgramScope {\n"
                << "public:\n";
     
-    _EmitOutput(_genCommon, _mslOutputParams, TfToken("gl_Position"), TfToken("vec4"), TfToken("[[position]]"));
-    _EmitOutput(_genCommon, _mslOutputParams, TfToken("gl_PointSize"), TfToken("float"), TfToken("[[point_size]]"));
-    //_EmitOutput(_genCommon, _mslOutputParams, TfToken("gl_ClipDistance"), TfToken("float"), TfToken("[[clip_distance]]"));
+    _EmitOutput(_genCommon,
+                _mslVSOutputParams,
+                TfToken("gl_Position"),
+                TfToken("vec4"),
+                TfToken("[[position]]")).usage |= TParam::VertexShaderOnly;
+    
+    _EmitOutput(_genCommon,
+                _mslVSOutputParams,
+                TfToken("gl_PointSize"),
+                TfToken("float"),
+                TfToken("[[point_size]]")).usage |= TParam::VertexShaderOnly;
+    
+    _EmitOutput(_genCommon,
+                _mslVSOutputParams,
+                TfToken("gl_ClipDistance"),
+                TfToken("float"),
+                // XXX - Causes an internal error
+                //TfToken("[[clip_distance]]")).usage |= TParam::VertexShaderOnly;
+                TfToken("")).usage |= TParam::VertexShaderOnly;
+
+    // _EmitOutput(_genCommon, _mslVSOutputParams, TfToken("gl_PrimitiveID"), TfToken("uint"), TfToken("[[flat]]"));
+    // XXX - Hook this up somehow. Output from the vertex shader perhaps?
+    _genCommon << "uint gl_PrimitiveID = 0;\n";
     
     // ------------------
     // Custom Buffer Bindings
@@ -497,7 +868,7 @@ HdSt_CodeGenMSL::Compile()
             if (binDecl->dataType.IsEmpty()) continue;
     
             _EmitDeclaration(_genCommon,
-                             _mslInputParams,
+                             _mslVSInputParams,
                              binDecl->name,
                              binDecl->dataType,
                              TfToken(),
@@ -513,11 +884,18 @@ HdSt_CodeGenMSL::Compile()
     }
     
     _EmitDeclaration(_genCommon,
-                     _mslInputParams,
+                     _mslVSInputParams,
                      TfToken("gl_VertexID"),
                      TfToken("uint"),
                      TfToken("[[vertex_id]]"),
                      HdBinding(HdBinding::VERTEX_ID, 0));
+    
+    _EmitDeclaration(_genCommon,
+                     _mslPSInputParams,
+                     TfToken("gl_FrontFacing"),
+                     TfToken("bool"),
+                     TfToken("[[front_facing]]"),
+                     HdBinding());
     
     std::stringstream declarations;
     std::stringstream accessors;
@@ -547,11 +925,11 @@ HdSt_CodeGenMSL::Compile()
             
             _EmitStructAccessor(accessors, varName,
                                 dbIt->name, dbIt->dataType, dbIt->arraySize,
-                                NULL);
+                                true, NULL);
         }
         
         declarations << "};\n";
-        _EmitDeclarationPtr(declarations, _mslInputParams, varName, typeName, TfToken(), binding, 0, true);
+        _EmitDeclarationPtr(declarations, _mslVSInputParams, varName, typeName, TfToken(), binding, 0, true);
     }
     _genCommon << declarations.str() << accessors.str();
     
@@ -630,7 +1008,7 @@ HdSt_CodeGenMSL::Compile()
         case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_PATCHES:
         {
             // patch interpolation
-            _procGS << "vec4 GetPatchCoord(int index);\n"
+            _procGS //<< "vec4 GetPatchCoord(int index);\n"
             << "void ProcessPrimVars(int index) {\n"
             << "   vec2 localST = GetPatchCoord(index).xy;\n";
             break;
@@ -754,87 +1132,27 @@ HdSt_CodeGenMSL::Compile()
     termination << "}; // ProgramScope\n";
     
     // Externally sourced glslfx translation to MSL
-    _ParseGLSL(_genVS);
+    _ParseGLSL(_genVS, _mslVSInputParams, _mslVSOutputParams);
+    _ParseGLSL(_genFS, _mslPSInputParams, _mslPSOutputParams);
 
     // MSL<->Metal API plumbing
-    std::stringstream glue, copyInputs, copyOutputs;
-    glue.str(""); copyInputs.str(""); copyOutputs.str("");
+    std::stringstream glueVS, gluePS;
+    glueVS.str(""); gluePS.str("");
     
-    glue << "struct MSLInputs {\n";
-    int location = 0;
-    TF_FOR_ALL(it, _mslInputParams) {
-        TParam const &input = *it;
-        TfToken attrib;
+    _GenerateGlue(glueVS, gluePS, mslProgram);
 
-        if (input.includeAsFuncParam) {
-            if (input.name.GetText()[0] == '*') {
-                std::string n = input.name.GetString().substr(1);
-                copyInputs << "scope." << n << "=" << n << ";\n";
-            }
-            else {
-                copyInputs << "scope." << input.name << "=" << input.name << ";\n";
-            }
-            continue;
-        }
-        copyInputs << "scope." << input.name << "=in." << input.name << ";\n";
-
-        if (!input.attribute.IsEmpty())
-            attrib = input.attribute;
-        else
-            attrib = TfToken(TfStringPrintf("[[attribute(%d)]]", location++));
-        glue << input.dataType << " " << input.name << attrib << ";\n";
-    }
-    glue << "};\n";
-    
-    glue << "struct MSLOutputs {\n";
-    TF_FOR_ALL(it, _mslOutputParams) {
-        TParam const &output = *it;
-        glue << output.dataType << " " << output.name << output.attribute << ";\n";
-
-        copyOutputs << "out." << output.name << "=scope." << output.accessorStr << ";\n";
-    }
-    glue << "};\n";
-    
-    glue << "vertex MSLOutputs vertexShader(MSLInputs in [[stage_in]]\n";
-    
-    location = 0;
-    TF_FOR_ALL(it, _mslInputParams) {
-        TParam const &input = *it;
-        TfToken attrib;
-        if (!input.includeAsFuncParam) {
-            continue;
-        }
-        if (!input.attribute.IsEmpty()) {
-            attrib = input.attribute;
-        }
-        else {
-            attrib = TfToken(TfStringPrintf("[[buffer(%d)]]", location++));
-        }
-        glue << ", ";
-        glue << input.dataType << " " << input.name << attrib << "\n";
-    }
-
-    glue << ") {\n"
-         << "ProgramScope scope;\n"
-         << copyInputs.str()
-         << "scope.main();\n"
-         << "MSLOutputs out;\n"
-         << copyOutputs.str()
-         << "return out;\n"
-         << "}\n";
-    
     bool shaderCompiled = false;
     // compile shaders
     // note: _vsSource, _fsSource etc are used for diagnostics (see header)
     if (hasVS) {
-        _vsSource = _genCommon.str() + _genVS.str() + termination.str() + glue.str();
+        _vsSource = _genCommon.str() + _genVS.str() + termination.str() + glueVS.str();
         if (!mslProgram->CompileShader(GL_VERTEX_SHADER, _vsSource)) {
             return HdStProgramSharedPtr();
         }
         shaderCompiled = true;
     }
     if (hasFS) {
-        _fsSource = _genCommon.str() + _genFS.str() + termination.str();
+        _fsSource = _genCommon.str() + _genFS.str() + termination.str() + gluePS.str();
         if (!mslProgram->CompileShader(GL_FRAGMENT_SHADER, _fsSource)) {
             return HdStProgramSharedPtr();
         }
@@ -849,8 +1167,7 @@ HdSt_CodeGenMSL::Compile()
     }
     if (hasTES) {
         _tesSource = _genCommon.str() + _genTES.str() + termination.str();
-        if (!mslProgram->CompileShader(
-                GL_TESS_EVALUATION_SHADER, _tesSource)) {
+        if (!mslProgram->CompileShader(GL_TESS_EVALUATION_SHADER, _tesSource)) {
             return HdStProgramSharedPtr();
         }
         shaderCompiled = true;
@@ -884,22 +1201,6 @@ HdSt_CodeGenMSL::CompileComputeProgram()
     // GLSL version.
     HdStRenderContextCaps const &caps = HdStRenderContextCaps::GetInstance();
     _genCommon << "#version " << caps.glslVersion << "\n";
-    // default workgroup size
-    _genCommon << "layout(local_size_x = 1, local_size_y = 1) in;\n";
-
-    if (caps.bindlessBufferEnabled) {
-        _genCommon << "#extension GL_NV_shader_buffer_load : require\n"
-                   << "#extension GL_NV_gpu_shader5 : require\n";
-    }
-    if (caps.bindlessTextureEnabled) {
-        _genCommon << "#extension GL_ARB_bindless_texture : require\n";
-    }
-    if (caps.glslVersion < 430 && caps.explicitUniformLocation) {
-        _genCommon << "#extension GL_ARB_explicit_uniform_location : require\n";
-    }
-    if (caps.glslVersion < 420 && caps.shadingLanguage420pack) {
-        _genCommon << "#extension GL_ARB_shading_language_420pack : require\n";
-    }
 
     // Used in glslfx files to determine if it is using new/old
     // imaging system. It can also be used as API guards when
@@ -927,7 +1228,7 @@ HdSt_CodeGenMSL::CompileComputeProgram()
         uniforms << "    int " << name << "Stride;\n";
         
         _EmitDeclaration(declarations,
-                _mslInputParams,
+                _mslVSInputParams,
                 name,
                 //compute shaders need vector types to be flat arrays
                 _GetFlatType(dataType),
@@ -955,7 +1256,7 @@ HdSt_CodeGenMSL::CompileComputeProgram()
         uniforms << "    int " << name << "Offset;\n";
         uniforms << "    int " << name << "Stride;\n";
         _EmitDeclaration(declarations,
-                _mslInputParams,
+                _mslVSInputParams,
                 name,
                 //compute shaders need vector types to be flat arrays
                 _GetFlatType(dataType),
@@ -1018,60 +1319,78 @@ HdSt_CodeGenMSL::CompileComputeProgram()
     return program;
 }
 
-static void _EmitDeclaration(std::stringstream &str,
+static HdSt_CodeGenMSL::TParam& _EmitDeclaration(std::stringstream &str,
                              HdSt_CodeGenMSL::InOutParams &inputParams,
                              TfToken const &name,
                              TfToken const &type,
                              TfToken const &attribute,
                              HdBinding const &binding,
-                             int arraySize,
-                             bool forceIncludeAsFunc)
+                             int arraySize)
 {
     str << type << " " << name << ";\n";
-    HdSt_CodeGenMSL::TParam in(name, type, TfToken(), attribute);
-    
-    if(forceIncludeAsFunc || binding.GetType() == HdBinding::VERTEX_ID) {
-        in.includeAsFuncParam = true;
+    HdSt_CodeGenMSL::TParam in(name, type, TfToken(), attribute, HdSt_CodeGenMSL::TParam::Unspecified);
+
+    if(binding.GetType() == HdBinding::VERTEX_ID) {
+        in.usage |= HdSt_CodeGenMSL::TParam::EntryFuncArgument;
     }
 
     inputParams.push_back(in);
+
+    return inputParams.back();
 }
 
-static void _EmitDeclaration(
+static HdSt_CodeGenMSL::TParam& _EmitDeclaration(
     std::stringstream &str,
     HdSt_CodeGenMSL::InOutParams &inputParams,
     HdSt_ResourceBinder::MetaData::BindingDeclaration const &bindingDeclaration,
     TfToken const &attribute = TfToken(),
     int arraySize=0)
 {
-    _EmitDeclaration(str,
-                     inputParams,
-                     bindingDeclaration.name,
-                     bindingDeclaration.dataType,
-                     attribute,
-                     bindingDeclaration.binding,
-                     arraySize,
-                     false);
+    return _EmitDeclaration(str,
+                            inputParams,
+                            bindingDeclaration.name,
+                            bindingDeclaration.dataType,
+                            attribute,
+                            bindingDeclaration.binding,
+                            arraySize);
 }
 
-static void _EmitDeclarationPtr(std::stringstream &str,
-                                HdSt_CodeGenMSL::InOutParams &inputParams,
-                                TfToken const &name,
-                                TfToken const &type,
-                                TfToken const &attribute,
-                                HdBinding const &binding,
-                                int arraySize,
-                                bool programScope)
+static HdSt_CodeGenMSL::TParam& _EmitDeclarationPtr(std::stringstream &str,
+                                                    HdSt_CodeGenMSL::InOutParams &inputParams,
+                                                    TfToken const &name,
+                                                    TfToken const &type,
+                                                    TfToken const &attribute,
+                                                    HdBinding const &binding,
+                                                    int arraySize,
+                                                    bool programScope)
 {
     TfToken ptrName(std::string("*") + name.GetString());
-    TfToken addressSpaceAndType;
+    str << "device ";
     if (programScope) {
-        addressSpaceAndType = TfToken(std::string("device ProgramScope::") + type.GetString());
+        str << "ProgramScope::";
     }
-    else {
-        addressSpaceAndType = TfToken(std::string("device ") + type.GetString());
+    HdSt_CodeGenMSL::TParam& result(_EmitDeclaration(str, inputParams, ptrName, type, attribute, binding, arraySize));
+    result.usage |= HdSt_CodeGenMSL::TParam::Usage::EntryFuncArgument;
+    if (programScope) {
+        result.usage |= HdSt_CodeGenMSL::TParam::Usage::ProgramScope;
     }
-    _EmitDeclaration(str, inputParams, ptrName, addressSpaceAndType, attribute, binding, arraySize, true);
+    return result;
+}
+
+static HdSt_CodeGenMSL::TParam& _EmitDeclarationPtr(std::stringstream &str,
+                                HdSt_CodeGenMSL::InOutParams &inputParams,
+                                HdSt_ResourceBinder::MetaData::BindingDeclaration const &bindingDeclaration,
+                                TfToken const &attribute = TfToken(),
+                                int arraySize = 0)
+{
+    return _EmitDeclarationPtr(str,
+                               inputParams,
+                               bindingDeclaration.name,
+                               bindingDeclaration.dataType,
+                               attribute,
+                               bindingDeclaration.binding,
+                               arraySize,
+                               false);
 }
 
 static void _EmitStructAccessor(std::stringstream &str,
@@ -1079,10 +1398,19 @@ static void _EmitStructAccessor(std::stringstream &str,
                                 TfToken const &name,
                                 TfToken const &type,
                                 int arraySize,
+                                bool pointerDereference,
                                 const char *index = NULL)
 {
     // index != NULL  if the struct is an array
     // arraySize > 1  if the struct entry is an array.
+    char const* ptrAccessor;
+    if (pointerDereference) {
+        ptrAccessor = "->";
+    }
+    else {
+        ptrAccessor = ".";
+    }
+
     if (index) {
         if (arraySize > 1) {
             str << type << " HdGet_" << name << "(" << "int arrayIndex, int localIndex) {\n"
@@ -1094,10 +1422,10 @@ static void _EmitStructAccessor(std::stringstream &str,
     } else {
         if (arraySize > 1) {
             str << type << " HdGet_" << name << "(" << "int arrayIndex, int localIndex) { return "
-                << structMemberName << "->" << name << "[arrayIndex];}\n";
+                << structMemberName << ptrAccessor << name << "[arrayIndex];}\n";
         } else {
             str << type << " HdGet_" << name << "(" << "int localIndex) { return "
-                << structMemberName << "->" << name << ";}\n";
+                << structMemberName << ptrAccessor << name << ";}\n";
         }
     }
     // GLSL spec doesn't allow default parameter. use function overload instead.
@@ -1262,24 +1590,28 @@ static void _EmitAccessor(std::stringstream &str,
     
 }
 
-static void _EmitOutput(std::stringstream &str,
-                        HdSt_CodeGenMSL::InOutParams &outputParams,
-                        TfToken const &name,
-                        TfToken const &type,
-                        TfToken const &attribute)
+static HdSt_CodeGenMSL::TParam& _EmitOutput(std::stringstream &str,
+                                            HdSt_CodeGenMSL::InOutParams &outputParams,
+                                            TfToken const &name,
+                                            TfToken const &type,
+                                            TfToken const &attribute,
+                                            HdSt_CodeGenMSL::TParam::Usage usage)
 {
     str << type << " " << name << ";\n";
-    HdSt_CodeGenMSL::TParam out(name, type, TfToken(), attribute);
+    HdSt_CodeGenMSL::TParam out(name, type, TfToken(), attribute, usage);
     outputParams.push_back(out);
+    return outputParams.back();
 }
 
-static void _EmitStructMemberOutput(HdSt_CodeGenMSL::InOutParams &outputParams,
-                                    TfToken const &name,
-                                    TfToken const &accessor,
-                                    TfToken const &type)
+static HdSt_CodeGenMSL::TParam& _EmitStructMemberOutput(HdSt_CodeGenMSL::InOutParams &outputParams,
+                                                        TfToken const &name,
+                                                        TfToken const &accessor,
+                                                        TfToken const &type,
+                                                        HdSt_CodeGenMSL::TParam::Usage usage)
 {
-    HdSt_CodeGenMSL::TParam out(name, type, accessor, TfToken());
+    HdSt_CodeGenMSL::TParam out(name, type, accessor, TfToken(), usage);
     outputParams.push_back(out);
+    return outputParams.back();
 }
 
 void
@@ -1424,10 +1756,10 @@ HdSt_CodeGenMSL::_GenerateDrawingCoord()
 
     if (_metaData.instanceIndexArrayBinding.binding.IsValid()) {
         // << layout (location=x) uniform (int|ivec[234]) *instanceIndices;
-        _EmitDeclaration(_genCommon, _mslInputParams, _metaData.instanceIndexArrayBinding);
+        _EmitDeclaration(_genCommon, _mslVSInputParams, _metaData.instanceIndexArrayBinding);
 
         // << layout (location=x) uniform (int|ivec[234]) *culledInstanceIndices;
-        _EmitDeclaration(_genCommon, _mslInputParams, _metaData.culledInstanceIndexArrayBinding);
+        _EmitDeclaration(_genCommon, _mslVSInputParams, _metaData.culledInstanceIndexArrayBinding);
 
         /// if \p cullingPass is true, CodeGen generates GetInstanceIndex()
         /// such that it refers instanceIndices buffer (before culling).
@@ -1480,19 +1812,19 @@ HdSt_CodeGenMSL::_GenerateDrawingCoord()
     _genVS << "hd_drawingCoord vsDrawingCoord;\n";
     _genVS << "hd_drawingCoord gsDrawingCoord;\n";
 
-    _EmitStructMemberOutput(_mslOutputParams, TfToken("vsdc_modelCoord"), TfToken("vsDrawingCoord.modelCoord"), intType);
-    _EmitStructMemberOutput(_mslOutputParams, TfToken("vsdc_constantCoord"), TfToken("vsDrawingCoord.constantCoord"), intType);
-    _EmitStructMemberOutput(_mslOutputParams, TfToken("vsdc_elementCoord"), TfToken("vsDrawingCoord.elementCoord"), intType);
-    _EmitStructMemberOutput(_mslOutputParams, TfToken("vsdc_primitiveCoord"), TfToken("vsDrawingCoord.primitiveCoord"), intType);
-    _EmitStructMemberOutput(_mslOutputParams, TfToken("vsdc_fvarCoord"), TfToken("vsDrawingCoord.fvarCoord"), intType);
-    _EmitStructMemberOutput(_mslOutputParams, TfToken("vsdc_shaderCoord"), TfToken("vsDrawingCoord.shaderCoord"), intType);
+    _EmitStructMemberOutput(_mslVSOutputParams, TfToken("vsdc_modelCoord"), TfToken("vsDrawingCoord.modelCoord"), intType);
+    _EmitStructMemberOutput(_mslVSOutputParams, TfToken("vsdc_constantCoord"), TfToken("vsDrawingCoord.constantCoord"), intType);
+    _EmitStructMemberOutput(_mslVSOutputParams, TfToken("vsdc_elementCoord"), TfToken("vsDrawingCoord.elementCoord"), intType);
+    _EmitStructMemberOutput(_mslVSOutputParams, TfToken("vsdc_primitiveCoord"), TfToken("vsDrawingCoord.primitiveCoord"), intType);
+    _EmitStructMemberOutput(_mslVSOutputParams, TfToken("vsdc_fvarCoord"), TfToken("vsDrawingCoord.fvarCoord"), intType);
+    _EmitStructMemberOutput(_mslVSOutputParams, TfToken("vsdc_shaderCoord"), TfToken("vsDrawingCoord.shaderCoord"), intType);
     
     for(int i = 0; i <= _metaData.instancerNumLevels; i++)
     {
-        _EmitStructMemberOutput(_mslOutputParams,
+        _EmitStructMemberOutput(_mslVSOutputParams,
                                 TfToken(TfStringPrintf("vsdc_instanceIndex%d", i)),
                                 TfToken(TfStringPrintf("vsDrawingCoord.instanceIndex[%d]", i)), intType);
-        _EmitStructMemberOutput(_mslOutputParams,
+        _EmitStructMemberOutput(_mslVSOutputParams,
                                 TfToken(TfStringPrintf("vsdc_instanceCoord%d", i)),
                                 TfToken(TfStringPrintf("vsDrawingCoord.instanceCoords[%d]", i)), intType);
     }
@@ -1552,7 +1884,7 @@ HdSt_CodeGenMSL::_GenerateDrawingCoord()
 
     // fragment shader ( VSdc + gl_PrimitiveID )
     // note that gsDrawingCoord isn't offsetted by gl_PrimitiveIDIn
-    _genFS << "flat in hd_drawingCoord gsDrawingCoord;\n"
+    _genFS << "hd_drawingCoord gsDrawingCoord;\n"
            << "hd_drawingCoord GetDrawingCoord() { \n"
            << "  hd_drawingCoord dc = gsDrawingCoord; \n"
            << "  dc.primitiveCoord += gl_PrimitiveID; \n"
@@ -1630,7 +1962,7 @@ HdSt_CodeGenMSL::_GenerateConstantPrimVar()
             declarations << ";\n";
 
             _EmitStructAccessor(accessors, varName, dbIt->name, dbIt->dataType,
-                                dbIt->arraySize,
+                                dbIt->arraySize, true,
                                 "GetDrawingCoord().constantCoord");
         }
         declarations << "};\n"
@@ -1682,7 +2014,7 @@ HdSt_CodeGenMSL::_GenerateInstancePrimVar()
         n << "GetDrawingCoord().instanceCoords[" << level << "]";
 
         // << layout (location=x) uniform float *translate_0;
-        _EmitDeclaration(declarations, _mslInputParams, name, dataType, TfToken(), binding);
+        _EmitDeclaration(declarations, _mslVSInputParams, name, dataType, TfToken(), binding);
         _EmitAccessor(accessors, name, dataType, binding, n.str().c_str());
 
     }
@@ -1846,7 +2178,9 @@ HdSt_CodeGenMSL::_GenerateElementPrimVar()
     if (_metaData.primitiveParamBinding.binding.IsValid()) {
 
         HdBinding binding = _metaData.primitiveParamBinding.binding;
-        //_EmitDeclaration(declarations, _mslInputParams, _metaData.primitiveParamBinding);
+        TParam& entry(_EmitDeclarationPtr(declarations, _mslPSInputParams, _metaData.primitiveParamBinding));
+        entry.usage |= TParam::EntryFuncArgument;
+
         _EmitAccessor(accessors, _metaData.primitiveParamBinding.name,
                         _metaData.primitiveParamBinding.dataType, binding,
                         "GetDrawingCoord().primitiveCoord");
@@ -2014,17 +2348,13 @@ HdSt_CodeGenMSL::_GenerateElementPrimVar()
             << "  return 0;\n"
             << "}\n";
     }
-    declarations
-        << "int GetElementID();\n"
-        << "int GetAggregatedElementID();\n";
-
 
     TF_FOR_ALL (it, _metaData.elementData) {
         HdBinding binding = it->first;
         TfToken const &name = it->second.name;
         TfToken const &dataType = it->second.dataType;
 
-        _EmitDeclaration(declarations, _mslInputParams, name, dataType, TfToken(), binding);
+        _EmitDeclaration(declarations, _mslVSInputParams, name, dataType, TfToken(), binding);
         // AggregatedElementID gives us the buffer index post batching, which
         // is what we need for accessing element (uniform) primvar data.
         _EmitAccessor(accessors, name, dataType, binding,"GetAggregatedElementID()");
@@ -2089,7 +2419,7 @@ HdSt_CodeGenMSL::_GenerateVertexPrimVar()
         accessorsGS, accessorsFS;
 
     TfToken structName("PrimVars");
-    interstageStruct << structName << " {\n";
+    interstageStruct << "struct " << structName << " {\n";
     
     // vertex varying
     TF_FOR_ALL (it, _metaData.vertexData) {
@@ -2097,21 +2427,22 @@ HdSt_CodeGenMSL::_GenerateVertexPrimVar()
         TfToken const &name = it->second.name;
         TfToken const &dataType = it->second.dataType;
 
-        _EmitDeclaration(vertexInputs, _mslInputParams, name, dataType, TfToken(), binding);
+        _EmitDeclaration(vertexInputs, _mslVSInputParams, name, dataType, TfToken(), binding);
 
         interstageStruct << "  " << dataType << " " << name << ";\n";
 
         // primvar accessors
         _EmitAccessor(accessorsVS, name, dataType, binding);
 
-        _EmitStructAccessor(accessorsTCS, structName,
-                            name, dataType, /*arraySize=*/1, "gl_InvocationID");
-        _EmitStructAccessor(accessorsTES, structName,
-                            name, dataType, /*arraySize=*/1, "localIndex");
-        _EmitStructAccessor(accessorsGS,  structName,
-                            name, dataType, /*arraySize=*/1, "localIndex");
-        _EmitStructAccessor(accessorsFS,  structName,
-                            name, dataType, /*arraySize=*/1);
+        TfToken readStructName(std::string("in") + structName.GetString());
+        _EmitStructAccessor(accessorsTCS, readStructName,
+                            name, dataType, /*arraySize=*/1, false, "gl_InvocationID");
+        _EmitStructAccessor(accessorsTES, readStructName,
+                            name, dataType, /*arraySize=*/1, false, "localIndex");
+        _EmitStructAccessor(accessorsGS,  readStructName,
+                            name, dataType, /*arraySize=*/1, false, "localIndex");
+        _EmitStructAccessor(accessorsFS,  readStructName,
+                            name, dataType, /*arraySize=*/1, false);
 
         // interstage plumbing
         _procVS << "  outPrimVars." << name
@@ -2170,14 +2501,14 @@ HdSt_CodeGenMSL::_GenerateVertexPrimVar()
         TfToken const &name = it->second.name;
         TfToken const &dataType = it->second.dataType;
 
-        _EmitDeclaration(fvarDeclarations, _mslInputParams, name, dataType, TfToken(), binding);
+        _EmitDeclaration(fvarDeclarations, _mslVSInputParams, name, dataType, TfToken(), binding);
 
         interstageStruct << "  " << dataType << " " << name << ";\n";
 
         // primvar accessors (only in GS and FS)
         _EmitAccessor(accessorsGS, name, dataType, binding, "GetFVarIndex(localIndex)");
         _EmitStructAccessor(accessorsFS, structName, name, dataType,
-                            /*arraySize=*/1, NULL);
+                            /*arraySize=*/1, true, NULL);
 
         // interstage plumbing
         _procVS << "  outPrimVars->" << name
@@ -2238,7 +2569,7 @@ HdSt_CodeGenMSL::_GenerateVertexPrimVar()
     interstageStruct << "}";
 
     _genVS << vertexInputs.str()
-           << "struct " << interstageStruct.str()
+           << interstageStruct.str()
            << " outPrimVars;\n"
            << accessorsVS.str();
 
@@ -2266,7 +2597,7 @@ HdSt_CodeGenMSL::_GenerateVertexPrimVar()
            << accessorsFS.str();
 
     // ---------
-    _genFS << "vec4 GetPatchCoord(int index);\n";
+    //_genFS << "vec4 GetPatchCoord(int index);\n";
     _genFS << "vec4 GetPatchCoord() { return GetPatchCoord(0); }\n";
 
     _genGS << "vec4 GetPatchCoord(int localIndex);\n";
@@ -2377,7 +2708,7 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
         //      may not work some GPUs.
         // XXX: we only have 1 shaderData entry (interleaved).
         int arraySize = (binding.GetType() == HdBinding::UBO) ? 1 : 0;
-        _EmitDeclaration(declarations, _mslInputParams, varName, typeName, TfToken(), binding, arraySize);
+        _EmitDeclaration(declarations, _mslVSInputParams, varName, typeName, TfToken(), binding, arraySize);
 
         break;
     }

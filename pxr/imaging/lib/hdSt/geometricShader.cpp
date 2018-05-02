@@ -70,7 +70,7 @@ HdSt_GeometricShader::HdSt_GeometricShader(std::string const &glslfxString,
 
     std::stringstream ss(glslfxString);
 
-    _glslfx.reset(GLSLFX::New(ss));
+    _glslfx.reset(new GLSLFX(ss));
 
     boost::hash_combine(_hash, _glslfx->GetHash());
     boost::hash_combine(_hash, cullingPass);
@@ -101,7 +101,7 @@ HdSt_GeometricShader::GetSource(TfToken const &shaderStageKey) const
 }
 
 void
-HdSt_GeometricShader::BindResources(HdSt_ResourceBinder const &binder, HdBufferResourceGPUHandle program)
+HdSt_GeometricShader::BindResources(HdSt_ResourceBinder const &binder, HdStProgram const &program)
 {
     if (_cullStyle != HdCullStyleDontCare) {
         unsigned int cullStyle = _cullStyle;
@@ -123,7 +123,7 @@ HdSt_GeometricShader::BindResources(HdSt_ResourceBinder const &binder, HdBufferR
 }
 
 void
-HdSt_GeometricShader::UnbindResources(HdSt_ResourceBinder const &binder, HdBufferResourceGPUHandle program)
+HdSt_GeometricShader::UnbindResources(HdSt_ResourceBinder const &binder, HdStProgram const &program)
 {
     if (_polygonMode == HdPolygonModeLine) {
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);

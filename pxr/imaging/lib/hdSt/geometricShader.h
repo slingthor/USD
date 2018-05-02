@@ -109,15 +109,15 @@ public:
 
     // HdShader overrides
     HDST_API
-    virtual ID ComputeHash() const;
+    virtual ID ComputeHash() const override;
     HDST_API
-    virtual std::string GetSource(TfToken const &shaderStageKey) const;
+    virtual std::string GetSource(TfToken const &shaderStageKey) const override;
     HDST_API
-    virtual void BindResources(HdSt_ResourceBinder const &binder, HdBufferResourceGPUHandle program);
+    virtual void BindResources(HdSt_ResourceBinder const &binder, HdStProgram const &program) override;
     HDST_API
-    virtual void UnbindResources(HdSt_ResourceBinder const &binder, HdBufferResourceGPUHandle program);
+    virtual void UnbindResources(HdSt_ResourceBinder const &binder, HdStProgram const &program) override;
     HDST_API
-    virtual void AddBindings(HdBindingRequestVector *customBindings);
+    virtual void AddBindings(HdBindingRequestVector *customBindings) override;
 
     /// Returns true if this geometric shader is used for GPU frustum culling.
     bool IsCullingPass() const {
@@ -129,7 +129,7 @@ public:
     }
 
     /// member query functions for PrimitiveType
-     inline bool IsPrimTypePoints() const {
+    inline bool IsPrimTypePoints() const {
         return IsPrimTypePoints(_primType);
     }
 

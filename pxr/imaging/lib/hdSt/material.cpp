@@ -50,7 +50,7 @@ public:
      , _type(type)
      , _value(value)
     {
-        if (_value == 0) {
+        if (!_value.IsSet()) {
             TF_CODING_ERROR("Invalid texture handle: %s: %llu\n",
                             name.GetText(), (uint64_t)value);
         }

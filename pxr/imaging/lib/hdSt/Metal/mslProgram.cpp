@@ -23,7 +23,10 @@
 //
 #include "pxr/imaging/glf/glew.h"
 #include "pxr/imaging/mtlf/mtlDevice.h"
-#include "pxr/imaging/mtlf/glslfx.h"
+
+#include "pxr/imaging/mtlf/bindingMap.h"
+
+#include "pxr/imaging/garch/glslfx.h"
 
 #include "pxr/imaging/hdSt/Metal/mslProgram.h"
 #include "pxr/imaging/hdSt/package.h"
@@ -39,20 +42,19 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-
 HdStMSLProgram::HdStMSLProgram(TfToken const &role)
-    : HdStProgram(role), _program(role), _uniformBuffer(role)
+: HdStProgram(role)
+, _role(role)
+, _vertexFunction(nil)
+, _fragmentFunction(nil)
+, _computeFunction(nil)
+, _valid(false)
+, _uniformBuffer(role)
 {
 }
 
 HdStMSLProgram::~HdStMSLProgram()
 {
-    id<MTLFunction> program = (__bridge id<MTLFunction>)_program.GetId();
-    if (program != nil) {
-        [program release];
-        program = nil;
-        _program.SetAllocation((HdBufferResourceGPUHandle)0, 0);
-    }
     id<MTLBuffer> uniformBuffer = (__bridge id<MTLBuffer>)_uniformBuffer.GetId();
     if (uniformBuffer) {
         [uniformBuffer release];
@@ -74,18 +76,22 @@ HdStMSLProgram::CompileShader(GLenum type,
     if (shaderSource.empty()) return false;
     
     const char *shaderType = NULL;
+    NSString *entryPoint = nil;
     if (type == GL_VERTEX_SHADER) {
-        shaderType = "GL_VERTEX_SHADER";
-    } else if (type == GL_TESS_CONTROL_SHADER) {
-        shaderType = "GL_TESS_CONTROL_SHADER";
-    } else if (type == GL_TESS_EVALUATION_SHADER) {
-        shaderType = "GL_TESS_EVALUATION_SHADER";
-    } else if (type == GL_GEOMETRY_SHADER) {
-        shaderType = "GL_GEOMETRY_SHADER";
+        shaderType = "Vertx Shader";
+        entryPoint = @"vertexEntryPoint";
+//    } else if (type == GL_TESS_CONTROL_SHADER) {
+//        shaderType = "GL_TESS_CONTROL_SHADER";
+//    } else if (type == GL_TESS_EVALUATION_SHADER) {
+//        shaderType = "GL_TESS_EVALUATION_SHADER";
+//    } else if (type == GL_GEOMETRY_SHADER) {
+//        shaderType = "GL_GEOMETRY_SHADER";
     } else if (type == GL_FRAGMENT_SHADER) {
-        shaderType = "GL_FRAGMENT_SHADER";
+        shaderType = "Fragment Shader";
+        entryPoint = @"fragmentEntryPoint";
     } else if (type == GL_COMPUTE_SHADER) {
-        shaderType = "GL_COMPUTE_SHADER";
+        shaderType = "Compute Shader";
+        entryPoint = @"computeEntryPoint";
     } else {
         TF_CODING_ERROR("Invalid shader type %d\n", type);
         return false;
@@ -98,44 +104,41 @@ HdStMSLProgram::CompileShader(GLenum type,
         std::cout << std::flush;
     }
 
-    printf("%s", shaderSource.c_str());
-    TF_FATAL_CODING_ERROR("Not Implemented");
-    return false;
-/*
-    // create a program if not exists
-    id<MTLFunction> program = _program.GetId();
-    if (program == 0) {
-        program = glCreateProgram();
-        _program.SetAllocation(program, 0);
-    }
-
     // create a shader, compile it
-    const char *shaderSources[1];
-    shaderSources[0] = shaderSource.c_str();
-    GLuint shader = glCreateShader(type);
-    glShaderSource(shader, sizeof(shaderSources)/sizeof(const char *), shaderSources, NULL);
-    glCompileShader(shader);
-
-    std::string logString;
-    if (!HdGLUtils::GetShaderCompileStatus(shader, &logString)) {
+    NSError *error = NULL;
+    id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->device;
+    
+    MTLCompileOptions *options = [[MTLCompileOptions alloc] init];
+    options.fastMathEnabled = YES;
+    options.languageVersion = MTLLanguageVersion2_0;
+    
+    id<MTLLibrary> library = [device newLibraryWithSource:[NSString stringWithUTF8String:shaderSource.c_str()]
+                                                  options:options
+                                                    error:&error];
+    
+    // Load the function into the library
+    id <MTLFunction> function = [library newFunctionWithName:entryPoint];
+    if (!function) {
         // XXX:validation
         TF_WARN("Failed to compile shader (%s): \n%s",
-                shaderType, logString.c_str());
-
-        // shader is no longer needed.
-        glDeleteShader(shader);
+                shaderType, [[error localizedDescription] UTF8String]);
         
         return false;
     }
-
-    // attach the shader to the program
-    glAttachShader(program, shader);
-
-    // shader is no longer needed.
-    glDeleteShader(shader);
+    
+    if (type == GL_VERTEX_SHADER) {
+        _vertexFunction = function;
+    } else if (type == GL_FRAGMENT_SHADER) {
+        _fragmentFunction = function;
+    } else if (type == GL_COMPUTE_SHADER) {
+        _computeFunction = function;
+    }
+    else {
+        TF_FATAL_CODING_ERROR("Not Implemented");
+        return false;
+    }
 
     return true;
- */
 }
 
 bool
@@ -144,98 +147,89 @@ HdStMSLProgram::Link()
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
 
-    TF_FATAL_CODING_ERROR("Not Implemented");
-    return false;
-/*
-    if (!glLinkProgram) return false; // glew initialized
-
-    GLuint program = _program.GetId();
-    if (program == 0) {
-        TF_CODING_ERROR("At least one shader has to be compiled before linking.");
+    bool vertexFuncPresent = _vertexFunction != nil;
+    bool fragmentFuncPresent = _fragmentFunction != nil;
+    bool computeFuncPresent = _computeFunction != nil;
+    
+    if (computeFuncPresent && (vertexFuncPresent ^ fragmentFuncPresent)) {
+        TF_CODING_ERROR("A compute shader can't be set with a vertex shader or fragment shader also set.");
         return false;
     }
-
-    // set RETRIEVABLE_HINT to true for getting program binary length.
-    // note: Actually the GL driver may recompile the program dynamically on
-    // some state changes, so the size of program could be inaccurate.
-    glProgramParameteri(program, GL_PROGRAM_BINARY_RETRIEVABLE_HINT, GL_TRUE);
-
-    // link
-    glLinkProgram(program);
-
-    std::string logString;
-    bool success = true;
-    if (!HdGLUtils::GetProgramLinkStatus(program, &logString)) {
-        // XXX:validation
-        TF_WARN("Failed to link shader: \n%s", logString.c_str());
-        success = false;
+    
+    if (vertexFuncPresent ^ fragmentFuncPresent) {
+        TF_CODING_ERROR("Both a vertex shader and a fragment shader must be compiled before linking.");
+        return false;
     }
-
-    // initial program size
-    GLint size;
-    glGetProgramiv(program, GL_PROGRAM_BINARY_LENGTH, &size);
+    
+    id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->device;
 
     // update the program resource allocation
-    _program.SetAllocation(program, size);
-
+    _valid = true;
+    
     // create an uniform buffer
-    GLuint uniformBuffer = _uniformBuffer.GetId();
+    id<MTLBuffer> uniformBuffer = (__bridge id<MTLBuffer>)_uniformBuffer.GetMetalId();
     if (uniformBuffer == 0) {
-        glGenBuffers(1, &uniformBuffer);
-        _uniformBuffer.SetAllocation(uniformBuffer, 0);
+        int const defaultLength = 1024;
+        uniformBuffer = [device newBufferWithLength:defaultLength options:MTLResourceStorageModeManaged];
+        _uniformBuffer.SetAllocation(uniformBuffer, defaultLength);
     }
 
-    // binary dump out
-    if (TfDebug::IsEnabled(HD_DUMP_SHADER_BINARY)) {
-        std::vector<char> bin(size);
-        GLsizei len;
-        GLenum format;
-        glGetProgramBinary(program, size, &len, &format, &bin[0]);
-        static int id = 0;
-        std::stringstream fname;
-        fname << "program" << id++ << ".bin";
-
-        std::fstream output(fname.str().c_str(), std::ios::out|std::ios::binary);
-        output.write(&bin[0], size);
-        output.close();
-
-        std::cout << "Write " << fname.str() << " (size=" << size << ")\n";
-    }
-
-    return success;
- */
+    return true;
 }
 
 bool
 HdStMSLProgram::GetProgramLinkStatus(std::string * reason) const
 {
-    return _program.GetMetalId() != nil;
+    return _valid;
 }
 
 bool
 HdStMSLProgram::Validate() const
 {
+    return _valid;
+}
+
+void HdStMSLProgram::AssignUniformBindings(GarchBindingMapRefPtr bindingMap) const
+{
+    MtlfBindingMapRefPtr glfBindingMap(TfDynamic_cast<MtlfBindingMapRefPtr>(bindingMap));
     TF_FATAL_CODING_ERROR("Not Implemented");
-/*    GLuint program = _program.GetId();
-    if (program == 0) return false;
+}
 
-    if (TfDebug::IsEnabled(HD_SAFE_MODE) ||
-        TfGetEnvSetting(HD_ENABLE_SHARED_CONTEXT_CHECK)) {
+void HdStMSLProgram::AssignSamplerUnits(GarchBindingMapRefPtr bindingMap) const
+{
+    MtlfBindingMapRefPtr glfBindingMap(TfDynamic_cast<MtlfBindingMapRefPtr>(bindingMap));
+    TF_FATAL_CODING_ERROR("Not Implemented");
+}
 
-        HD_TRACE_FUNCTION();
+void HdStMSLProgram::AddCustomBindings(GarchBindingMapRefPtr bindingMap) const
+{
+    MtlfBindingMapRefPtr glfBindingMap(TfDynamic_cast<MtlfBindingMapRefPtr>(bindingMap));
+    TF_FATAL_CODING_ERROR("Not Implemented");
+}
 
-        // make sure the binary size is same as when it's created.
-        if (glIsProgram(program) == GL_FALSE) return false;
-        GLint size = 0;
-        glGetProgramiv(program, GL_PROGRAM_BINARY_LENGTH, &size);
-        if (size == 0) {
-            return false;
-        }
-        if (static_cast<size_t>(size) != _program.GetSize()) {
-            return false;
-        }
-    }*/
-    return true;
+void HdStMSLProgram::SetProgram() const {
+    TF_FATAL_CODING_ERROR("Not Implemented");
+}
+
+void HdStMSLProgram::UnsetProgram() const {
+    TF_FATAL_CODING_ERROR("Not Implemented");
+}
+
+
+void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
+                                                      int indexCount,
+                                                      GLint indexType,
+                                                      GLint firstIndex,
+                                                      GLint instanceCount,
+                                                      GLint baseVertex) const {
+    TF_FATAL_CODING_ERROR("Not Implemented");
+}
+
+void HdStMSLProgram::DrawArraysInstanced(GLenum primitiveMode,
+                                          GLint baseVertex,
+                                          GLint vertexCount,
+                                          GLint instanceCount) const {
+    TF_FATAL_CODING_ERROR("Not Implemented");
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

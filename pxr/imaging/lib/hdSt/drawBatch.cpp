@@ -238,10 +238,10 @@ HdSt_DrawBatch::_GetDrawingProgram(HdStRenderPassStateSharedPtr const &state,
             // expect all the other shaders to compile or else the shipping
             // code is broken and needs to be fixed.  When we open up more
             // shaders for customization, we will need to check them as well.
-            typedef boost::shared_ptr<class GLSLFX> MtlfGLSLFXSharedPtr;
+            typedef boost::shared_ptr<class GLSLFX> GLSLFXSharedPtr;
 
             GLSLFXSharedPtr glslfxSurfaceFallback =
-                GLSLFXSharedPtr(GLSLFX::New(HdStPackageFallbackSurfaceShader()));
+                GLSLFXSharedPtr(new GLSLFX(HdStPackageFallbackSurfaceShader()));
 
             HdStShaderCodeSharedPtr fallbackSurface =
                 HdStShaderCodeSharedPtr(
@@ -324,7 +324,7 @@ HdSt_DrawBatch::_DrawingProgram::CompileShader(
         _program = programInstance.GetValue();
 
         if (_program) {
-            _resourceBinder->IntrospectBindings(_program->GetProgram());
+            _resourceBinder->IntrospectBindings(_program);
         } else {
             // Failed to compile and link a valid glsl program.
             return false;

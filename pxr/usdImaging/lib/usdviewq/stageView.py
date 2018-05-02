@@ -35,9 +35,12 @@ from pxr import Tf
 from pxr import Gf
 from pxr import Garch
 from pxr import Sdf, Usd, UsdGeom
-from pxr import UsdImagingGL
-from pxr import UsdImagingMetal
 from pxr import CameraUtil
+
+if sys.platform != "darwin":
+    from pxr import UsdImagingGL as _usdImaging
+else:
+    from pxr import UsdImagingMetal as _usdImaging
 
 from common import (RenderModes, ShadedRenderModes, Timer,
     GetInstanceIndicesForIds, SelectionHighlightModes)
@@ -46,8 +49,6 @@ from selectionDataModel import ALL_INSTANCES, SelectionDataModel
 from viewSettingsDataModel import ViewSettingsDataModel
 
 DEBUG_CLIPPING = "USDVIEWQ_DEBUG_CLIPPING"
-
-_platform = sys.platform;
 
 # A viewport rectangle to be used for GL must be integer values.
 # In order to loose the least amount of precision the viewport
@@ -1291,17 +1292,17 @@ class StageView(QtOpenGL.QGLWidget):
 
         self._renderer = None
         self._reportedContextError = False
-        self._renderModeDict={RenderModes.WIREFRAME:UsdImagingGL.GL.DrawMode.DRAW_WIREFRAME,
-                              RenderModes.WIREFRAME_ON_SURFACE:UsdImagingGL.GL.DrawMode.DRAW_WIREFRAME_ON_SURFACE,
-                              RenderModes.SMOOTH_SHADED:UsdImagingGL.GL.DrawMode.DRAW_SHADED_SMOOTH,
-                              RenderModes.POINTS:UsdImagingGL.GL.DrawMode.DRAW_POINTS,
-                              RenderModes.FLAT_SHADED:UsdImagingGL.GL.DrawMode.DRAW_SHADED_FLAT,
-                              RenderModes.GEOM_ONLY:UsdImagingGL.GL.DrawMode.DRAW_GEOM_ONLY,
-                              RenderModes.GEOM_SMOOTH:UsdImagingGL.GL.DrawMode.DRAW_GEOM_SMOOTH,
-                              RenderModes.GEOM_FLAT:UsdImagingGL.GL.DrawMode.DRAW_GEOM_FLAT,
-                              RenderModes.HIDDEN_SURFACE_WIREFRAME:UsdImagingGL.GL.DrawMode.DRAW_WIREFRAME}
+        self._renderModeDict={RenderModes.WIREFRAME:_usdImaging.GL.DrawMode.DRAW_WIREFRAME,
+                              RenderModes.WIREFRAME_ON_SURFACE:_usdImaging.GL.DrawMode.DRAW_WIREFRAME_ON_SURFACE,
+                              RenderModes.SMOOTH_SHADED:_usdImaging.GL.DrawMode.DRAW_SHADED_SMOOTH,
+                              RenderModes.POINTS:_usdImaging.GL.DrawMode.DRAW_POINTS,
+                              RenderModes.FLAT_SHADED:_usdImaging.GL.DrawMode.DRAW_SHADED_FLAT,
+                              RenderModes.GEOM_ONLY:_usdImaging.GL.DrawMode.DRAW_GEOM_ONLY,
+                              RenderModes.GEOM_SMOOTH:_usdImaging.GL.DrawMode.DRAW_GEOM_SMOOTH,
+                              RenderModes.GEOM_FLAT:_usdImaging.GL.DrawMode.DRAW_GEOM_FLAT,
+                              RenderModes.HIDDEN_SURFACE_WIREFRAME:_usdImaging.GL.DrawMode.DRAW_WIREFRAME}
 
-        self._renderParams = UsdImagingGL.GL.RenderParams()
+        self._renderParams = _usdImaging.GL.RenderParams()
         self._defaultFov = 60
         self._dist = 50
         self._oldDist = self._dist
@@ -1351,7 +1352,7 @@ class StageView(QtOpenGL.QGLWidget):
         # create the renderer lazily, when we try to do real work with it.
         if not self._renderer:
             if self.isValid():
-                self._renderer = UsdImagingGL.GL()
+                self._renderer = _usdImaging.GL()
                 self._rendererPluginName = ""
             elif not self._reportedContextError:
                 self._reportedContextError = True
@@ -1672,7 +1673,7 @@ class StageView(QtOpenGL.QGLWidget):
                 for instanceIndex in primInstances:
                     renderer.AddSelected(prim.GetPath(), instanceIndex)
             else:
-                renderer.AddSelected(prim.GetPath(), UsdImagingGL.GL.ALL_INSTANCES)
+                renderer.AddSelected(prim.GetPath(), _usdImaging.GL.ALL_INSTANCES)
 
     def _getEmptyBBox(self):
         return Gf.BBox3d()
@@ -1728,9 +1729,9 @@ class StageView(QtOpenGL.QGLWidget):
         self._renderParams.showProxy = self._dataModel.viewSettings.displayProxy
         self._renderParams.showRender = self._dataModel.viewSettings.displayRender
         self._renderParams.forceRefresh = self._forceRefresh
-        self._renderParams.cullStyle =  (UsdImagingGL.GL.CullStyle.CULL_STYLE_BACK_UNLESS_DOUBLE_SIDED
+        self._renderParams.cullStyle =  (_usdImaging.GL.CullStyle.CULL_STYLE_BACK_UNLESS_DOUBLE_SIDED
                                                if self._dataModel.viewSettings.cullBackfaces
-                                               else UsdImagingGL.GL.CullStyle.CULL_STYLE_NOTHING)
+                                               else _usdImaging.GL.CullStyle.CULL_STYLE_NOTHING)
         self._renderParams.gammaCorrectColors = False
         self._renderParams.enableIdRender = self._dataModel.viewSettings.displayPrimId
         self._renderParams.enableSampleAlphaToCoverage = not self._dataModel.viewSettings.displayPrimId
@@ -1753,11 +1754,10 @@ class StageView(QtOpenGL.QGLWidget):
     def initializeGL(self):
         if not self.isValid():
             return
-        if _platform != "darwin":
-            from pxr import Glf
-            if not Glf.GlewInit():
-                return
-            Glf.RegisterDefaultDebugOutputMessageCallback()
+        from pxr import Glf
+        if not Glf.GlewInit():
+            return
+        Glf.RegisterDefaultDebugOutputMessageCallback()
 
     def updateGL(self):
         """We override this virtual so that we can make it a no-op during
@@ -2184,7 +2184,7 @@ class StageView(QtOpenGL.QGLWidget):
         # Hydra Enabled (Top Right)
         hydraMode = "Disabled"
 
-        if UsdImagingGL.GL.IsEnabledHydra():
+        if _usdImaging.GL.IsEnabledHydra():
             hydraMode = self._rendererPluginName
             if not hydraMode:
                 hydraMode = "Enabled"
@@ -2394,9 +2394,9 @@ class StageView(QtOpenGL.QGLWidget):
         self._renderParams.showProxy = self._dataModel.viewSettings.displayProxy
         self._renderParams.showRender = self._dataModel.viewSettings.displayRender
         self._renderParams.forceRefresh = self._forceRefresh
-        self._renderParams.cullStyle =  (UsdImagingGL.GL.CullStyle.CULL_STYLE_BACK_UNLESS_DOUBLE_SIDED
+        self._renderParams.cullStyle =  (_usdImaging.GL.CullStyle.CULL_STYLE_BACK_UNLESS_DOUBLE_SIDED
                                                if self._dataModel.viewSettings.cullBackfaces
-                                               else UsdImagingGL.GL.CullStyle.CULL_STYLE_NOTHING)
+                                               else _usdImaging.GL.CullStyle.CULL_STYLE_NOTHING)
         self._renderParams.gammaCorrectColors = False
         self._renderParams.enableIdRender = True
         self._renderParams.enableSampleAlphaToCoverage = False

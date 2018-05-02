@@ -100,7 +100,7 @@ HdStSimpleTextureResourceGL::HdStSimpleTextureResourceGL(
     bool bindlessTexture = 
         HdStRenderContextCaps::GetInstance().bindlessTextureEnabled;
     if (bindlessTexture) {
-        GLuint handle = (GLuint)(uint64_t)GetTexelsTextureHandle();
+        GLuint handle = GetTexelsTextureHandle();
         if (handle) {
             if (!glIsTextureHandleResidentNV(handle)) {
                 glMakeTextureHandleResidentNV(handle);
@@ -108,7 +108,7 @@ HdStSimpleTextureResourceGL::HdStSimpleTextureResourceGL(
         }
 
         if (_isPtex) {
-            handle = (GLuint)(uint64_t)GetLayoutTextureHandle();
+            handle = GetLayoutTextureHandle();
             if (handle) {
                 if (!glIsTextureHandleResidentNV(handle)) {
                     glMakeTextureHandleResidentNV(handle);
@@ -141,7 +141,7 @@ GarchTextureGPUHandle HdStSimpleTextureResourceGL::GetTexelsTextureId()
 #else
         TF_CODING_ERROR("Ptex support is disabled.  "
             "This code path should be unreachable");
-        return 0;
+        return GarchTextureGPUHandle();
 #endif
     }
     
@@ -155,19 +155,19 @@ GarchSamplerGPUHandle HdStSimpleTextureResourceGL::GetTexelsSamplerId()
 
 GarchTextureGPUHandle HdStSimpleTextureResourceGL::GetTexelsTextureHandle()
 { 
-    GLuint textureId = (GLuint)(uint64_t)GetTexelsTextureId();
+    GLuint textureId = GetTexelsTextureId();
     GLuint samplerId = (GLuint)(uint64_t)GetTexelsSamplerId();
 
     if (!TF_VERIFY(glGetTextureHandleARB) ||
         !TF_VERIFY(glGetTextureSamplerHandleARB)) {
-        return 0;
+        return GarchTextureGPUHandle();
     }
 
     if (_isPtex) {
-        return textureId ? (GarchTextureGPUHandle)(uint64_t)glGetTextureHandleARB(textureId) : 0;
+        return GarchTextureGPUHandle(textureId ? glGetTextureHandleARB(textureId) : 0);
     } 
 
-    return textureId ? (GarchTextureGPUHandle)(uint64_t)glGetTextureSamplerHandleARB(textureId, samplerId) : 0;
+    return GarchTextureGPUHandle(textureId ? glGetTextureSamplerHandleARB(textureId, samplerId) : 0);
 }
 
 GarchTextureGPUHandle HdStSimpleTextureResourceGL::GetLayoutTextureId()
@@ -178,23 +178,23 @@ GarchTextureGPUHandle HdStSimpleTextureResourceGL::GetLayoutTextureId()
 #else
     TF_CODING_ERROR("Ptex support is disabled.  "
         "This code path should be unreachable");
-    return 0;
+    return GarchTextureGPUHandle();
 #endif
 }
 
 GarchTextureGPUHandle HdStSimpleTextureResourceGL::GetLayoutTextureHandle()
 {
     if (!TF_VERIFY(_isPtex)) {
-        return 0;
+        return GarchTextureGPUHandle();
     }
     
     if (!TF_VERIFY(glGetTextureHandleARB)) {
-        return 0;
+        return GarchTextureGPUHandle();
     }
 
-    GarchTextureGPUHandle textureId = GetLayoutTextureId();
+    GLuint textureId = GetLayoutTextureId();
 
-    return textureId ? (GarchTextureGPUHandle)(uint64_t)glGetTextureHandleARB((GLuint)(uint64_t)textureId) : 0;
+    return GarchTextureGPUHandle(textureId ? glGetTextureHandleARB(textureId) : 0);
 }
 
 size_t HdStSimpleTextureResourceGL::GetMemoryUsed()

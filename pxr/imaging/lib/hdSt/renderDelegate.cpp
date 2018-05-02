@@ -261,7 +261,7 @@ HdStRenderDelegate::DestroyBprim(HdBprim *bPrim)
 HdSprim *
 HdStRenderDelegate::_CreateFallbackMaterialPrim()
 {
-    GLSLFXSharedPtr glslfx(GLSLFX::New(HdStPackageFallbackSurfaceShader()));
+    GLSLFXSharedPtr glslfx(new GLSLFX(HdStPackageFallbackSurfaceShader()));
     HdStSurfaceShaderSharedPtr fallbackShaderCode(new HdStGLSLFXShader(glslfx));
 
     HdStMaterial *material = new HdStMaterial(SdfPath::EmptyPath());

@@ -27,8 +27,8 @@
 --- This is what an import might look like.
 --- #import $TOOLS/hdx/shaders/simpleLightingShader.glslfx
 
-#import $TOOLS/glf/shaders/pcfShader.glslfx
-#import $TOOLS/glf/shaders/simpleLighting.glslfx
+#import $TOOLS/$BASE_GFX/shaders/pcfShader.glslfx
+#import $TOOLS/$BASE_GFX/shaders/simpleLighting.glslfx
 
 -- configuration
 {

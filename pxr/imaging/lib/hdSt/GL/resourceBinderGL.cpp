@@ -24,6 +24,7 @@
 #include "pxr/imaging/glf/glew.h"
 
 #include "pxr/imaging/hdSt/GL/resourceBinderGL.h"
+#include "pxr/imaging/hdSt/GL/glslProgram.h"
 #include "pxr/imaging/hdSt/bufferResource.h"
 #include "pxr/imaging/hdSt/renderContextCaps.h"
 #include "pxr/imaging/hdSt/shaderCode.h"
@@ -233,7 +234,7 @@ HdSt_ResourceBinderGL::BindBuffer(TfToken const &name,
             glUniform1i(loc, textureUnit);
             glActiveTexture(GL_TEXTURE0 + textureUnit);
             glBindSampler(textureUnit, 0);
-            glBindTexture(GL_TEXTURE_BUFFER, (GLuint)(uint64_t)buffer->GetTextureBuffer());
+            glBindTexture(GL_TEXTURE_BUFFER, buffer->GetTextureBuffer());
         }
         break;
     case HdBinding::TEXTURE_2D:
@@ -450,11 +451,10 @@ HdSt_ResourceBinderGL::BindUniformf(TfToken const &name,
 }
 
 void
-HdSt_ResourceBinderGL::IntrospectBindings(HdResource const & programResource)
+HdSt_ResourceBinderGL::IntrospectBindings(HdStProgramSharedPtr programResource)
 {
     HdStRenderContextCaps const &caps = HdStRenderContextCaps::GetInstance();
-
-    GLuint program = (GLuint)(uint64_t)programResource.GetId();
+    GLuint program = boost::dynamic_pointer_cast<HdStGLSLProgram>(programResource)->GetGLProgram();
 
     if (ARCH_UNLIKELY(!caps.shadingLanguage420pack)) {
         GLint numUBO = 0;

@@ -44,11 +44,11 @@ pxr_library(mtlf
         bindingMap
         diagnostic
         drawTarget
-        glslfx
         info
         mtlDevice
         package
         ptexTexture
+        resourceFactory
         simpleLightingContext
         simpleShadowArray
         uniformBlock

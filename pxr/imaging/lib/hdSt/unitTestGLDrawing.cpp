@@ -101,10 +101,14 @@ HdSt_UnitTestWindow::OnInitializeGL()
     //
     _drawTarget = GarchDrawTarget::New(GfVec2i(GetWidth(), GetHeight()));
 
+    std::vector<GarchDrawTarget::AttachmentDesc> attachmentDesc;
+    attachmentDesc.push_back(
+        GarchDrawTarget::AttachmentDesc("color", GL_RGBA, GL_FLOAT, GL_RGBA));
+    attachmentDesc.push_back(
+        GarchDrawTarget::AttachmentDesc("depth", GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8,
+                                        GL_DEPTH24_STENCIL8));
+    _drawTarget->SetAttachments(attachmentDesc);
     _drawTarget->Bind();
-    _drawTarget->AddAttachment("color", GL_RGBA, GL_FLOAT, GL_RGBA);
-    _drawTarget->AddAttachment("depth", GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8,
-                               GL_DEPTH24_STENCIL8);
     _unitTest->InitTest();
 
     _drawTarget->Unbind();

@@ -83,6 +83,20 @@ public:
     GARCH_API
     static GarchDrawTargetRefPtr New(GarchDrawTargetPtr const &drawtarget);
 
+    struct AttachmentDesc {
+        AttachmentDesc(std::string const & _name,
+                       GLenum _format, GLenum _type, GLenum _internalFormat)
+            : name(_name)
+            , format(_format)
+            , type(_type)
+            , internalFormat(_internalFormat) {}
+
+        std::string const &name;
+        GLenum format;
+        GLenum type;
+        GLenum internalFormat;
+    };
+    
     class Attachment : public GarchTexture {
     public:
         typedef TfDeclarePtrs<class Attachment>::RefPtr AttachmentRefPtr;
@@ -118,20 +132,11 @@ public:
 
     typedef std::map<std::string, AttachmentRefPtr> AttachmentsMap;
     
-    /// Add an attachment to the DrawTarget.
-    GARCH_API
-    virtual void AddAttachment( std::string const & name,
-                        GLenum format, GLenum type, GLenum internalFormat ) = 0;
-
-    /// Removes the named attachment from the DrawTarget.
-    GARCH_API
-    virtual void DeleteAttachment( std::string const & name ) = 0;
-    
     /// Clears all the attachments for this DrawTarget.
     GARCH_API
     virtual void ClearAttachments() = 0;
     
-    /// Copies the list of attachments from DrawTarget.
+    /// Copies the list of attachments from DrawTarget. This binds and unbinds the frame buffer.
     GARCH_API
     virtual void CloneAttachments( GarchDrawTargetPtr const & drawtarget ) = 0;
     
@@ -143,12 +148,16 @@ public:
     GARCH_API
     virtual AttachmentRefPtr GetAttachment(std::string const & name) = 0;
     
+    /// Save the Attachment buffer to an array.
+    GARCH_API
+    virtual void GetImage(std::string const & name, void* buffer) const = 0;
+
     /// Write the Attachment buffer to an image file (debugging).
     GARCH_API
     virtual bool WriteToFile(std::string const & name,
                      std::string const & filename,
                      GfMatrix4d const & viewMatrix = GfMatrix4d(1),
-                     GfMatrix4d const & projectionMatrix = GfMatrix4d(1)) = 0;
+                     GfMatrix4d const & projectionMatrix = GfMatrix4d(1)) const = 0;
 
     /// Resize the DrawTarget.
     GARCH_API
@@ -177,6 +186,10 @@ public:
     /// Binds the framebuffer.
     GARCH_API
     virtual void Bind() = 0;
+
+    /// Sets the attachments to the framebuffer. There is no bound frame buffer when this method returns.
+    GARCH_API
+    virtual void SetAttachments(std::vector<GarchDrawTarget::AttachmentDesc>& attachments) = 0;
 
     /// Unbinds the framebuffer.
     GARCH_API

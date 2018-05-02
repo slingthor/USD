@@ -50,27 +50,25 @@ TF_DECLARE_WEAK_AND_REF_PTRS(GarchUniformBlock);
 class GarchResourceFactoryInterface {
 public:
     virtual ~GarchResourceFactoryInterface() {}
-
-    // GLSLFX creation
-    virtual GLSLFX *NewGLSLFX() = 0;
-    virtual GLSLFX *NewGLSLFX(std::string const & filePath) = 0;
-    virtual GLSLFX *NewGLSLFX(std::istream &is) = 0;
     
     // GarchSimpleLightingContext creation
-    virtual GarchSimpleLightingContext *NewSimpleLightingContext() = 0;
+    virtual GarchSimpleLightingContext *NewSimpleLightingContext() const = 0;
     
     // GarchSimpleShadowArray creation
-    virtual GarchSimpleShadowArray *NewSimpleShadowArray(GfVec2i const & size, size_t numLayers) = 0;
+    virtual GarchSimpleShadowArray *NewSimpleShadowArray(GfVec2i const & size, size_t numLayers) const = 0;
     
     // GarchBindingMap
-    virtual GarchBindingMap *NewBindingMap() = 0;
+    virtual GarchBindingMap *NewBindingMap() const = 0;
     
     // GarchDrawTarget
-    virtual GarchDrawTarget *NewDrawTarget(GfVec2i const & size, bool requestMSAA) = 0;
-    virtual GarchDrawTarget *NewDrawTarget(GarchDrawTargetPtr const & drawtarget) = 0;
+    virtual GarchDrawTarget *NewDrawTarget(GfVec2i const & size, bool requestMSAA) const = 0;
+    virtual GarchDrawTarget *NewDrawTarget(GarchDrawTargetPtr const & drawtarget) const = 0;
     
     // UniformBlock creation
-    virtual GarchUniformBlockRefPtr NewUniformBlock() = 0;
+    virtual GarchUniformBlockRefPtr NewUniformBlock() const = 0;
+    
+    // Package Name accessor
+    virtual std::string GetPackageName() const = 0;
     
 protected:
     GarchResourceFactoryInterface() {}

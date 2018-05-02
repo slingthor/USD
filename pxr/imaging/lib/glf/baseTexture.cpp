@@ -57,14 +57,14 @@ _GenName()
 
 GlfBaseTexture::GlfBaseTexture()
 {
-    _textureName = (GarchTextureGPUHandle)(uint64_t)_GenName();
+    _textureName = _GenName();
 }
 
 GlfBaseTexture::~GlfBaseTexture()
 {
     GlfSharedGLContextScopeHolder sharedGLContextScopeHolder;
 
-    GLuint t = (GLuint)(uint64_t)_textureName;
+    GLuint t = _textureName;
     if (glIsTexture(t)) {
         glDeleteTextures(1, &t);
     }
@@ -117,7 +117,7 @@ GlfBaseTexture::_CreateTexture(GarchBaseTextureDataConstPtr texData,
     HF_MALLOC_TAG_FUNCTION();
 
     if (texData && texData->HasRawBuffer()) {
-        glBindTexture(GL_TEXTURE_2D, (GLuint)(uint64_t)_textureName);
+        glBindTexture(GL_TEXTURE_2D, _textureName);
 
         // Check if mip maps have been requested, if so, it will either
         // enable automatic generation or use the ones loaded in cpu memory

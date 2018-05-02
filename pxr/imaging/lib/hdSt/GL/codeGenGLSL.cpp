@@ -109,7 +109,7 @@ std::string
 _GetPtexTextureShaderSource()
 {
     static std::string source =
-        GlfGLSLFX(HdStPackagePtexTextureShader()).GetSource(
+        GLSLFX(HdStPackagePtexTextureShader()).GetSource(
             _tokens->ptexTextureSampler);
     return source;
 }
@@ -359,6 +359,7 @@ HdSt_CodeGenGLSL::Compile()
     // imaging system. It can also be used as API guards when
     // we need new versions of Hydra shading. 
     _genCommon << "#define HD_SHADER_API " << HD_SHADER_API << "\n";
+    _genCommon << "#define ARCH_GFX_OPENGL\n";
 
     // XXX: this is a hacky workaround for experimental support of GL 3.3
     //      the double is used in hd_dvec3 akin, so we are likely able to

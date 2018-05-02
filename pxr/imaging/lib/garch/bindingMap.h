@@ -36,9 +36,50 @@
 #include "pxr/base/tf/token.h"
 #include "pxr/base/tf/weakBase.h"
 
+#if defined(ARCH_GFX_METAL)
+#include <Metal/Metal.h>
+#endif
+
 PXR_NAMESPACE_OPEN_SCOPE
 
 TF_DECLARE_WEAK_AND_REF_PTRS(GarchBindingMap);
+
+// XXX Move this somewhere else
+struct GarchProgramGPUHandle {
+    GarchProgramGPUHandle() {
+        handle = 0;
+    }
+    GarchProgramGPUHandle(GarchProgramGPUHandle const & _gpuHandle) {
+        handle = _gpuHandle.handle;
+    }
+    
+    void Clear() { handle = 0; }
+    bool IsSet() const { return handle != 0; }
+    
+    // OpenGL
+    GarchProgramGPUHandle(GLuint const _handle) {
+        handle = _handle;
+    }
+    GarchProgramGPUHandle& operator =(GLuint const _handle) {
+        handle = _handle;
+        return *this;
+    }
+    operator GLuint() const { return (GLuint)handle; }
+
+#if defined(ARCH_GFX_METAL)
+    // Metal
+    GarchProgramGPUHandle(id<MTLFunction> const _handle) {
+        handle = (__bridge uint64_t)_handle;
+    }
+    GarchProgramGPUHandle& operator =(id<MTLFunction> const _handle) {
+        handle = (__bridge uint64_t)_handle;
+        return *this;
+    }
+    operator id<MTLFunction>() const { return (__bridge id<MTLFunction>)handle; }
+#endif
+    
+    uint64_t handle;
+};
 
 class GarchBindingMap : public TfRefBase, public TfWeakBase {
 public:
@@ -87,18 +128,18 @@ public:
     }
 
     GARCH_API
-    virtual void AssignSamplerUnitsToProgram(GLuint program) = 0;
+    virtual void AssignSamplerUnitsToProgram(GarchProgramGPUHandle program) = 0;
 
     GARCH_API
-    virtual void AssignUniformBindingsToProgram(GLuint program) = 0;
+    virtual void AssignUniformBindingsToProgram(GarchProgramGPUHandle program) = 0;
 
     GARCH_API
-    virtual void AddCustomBindings(GLuint program) = 0;
+    virtual void AddCustomBindings(GarchProgramGPUHandle program) = 0;
 
     GARCH_API
     virtual void Debug() const = 0;
 
-private:
+protected:
 
     BindingMap _attribBindings;
     BindingMap _samplerBindings;

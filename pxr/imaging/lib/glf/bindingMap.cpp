@@ -68,7 +68,7 @@ GlfBindingMap::GetAttributeIndex(TfToken const & name)
 }
 
 void
-GlfBindingMap::AssignSamplerUnitsToProgram(GLuint program)
+GlfBindingMap::AssignSamplerUnitsToProgram(GarchProgramGPUHandle program)
 {
     for (BindingMap::value_type const& p : _samplerBindings) {
         GLint loc = glGetUniformLocation(program, p.first.GetText());
@@ -109,7 +109,7 @@ GlfBindingMap::HasUniformBinding(TfToken const & name) const
 }
 
 void
-GlfBindingMap::AssignUniformBindingsToProgram(GLuint program)
+GlfBindingMap::AssignUniformBindingsToProgram(GarchProgramGPUHandle program)
 {
     for (BindingMap::value_type const& p : _uniformBindings) {
         GLuint uboIndex = glGetUniformBlockIndex(program, p.first.GetText());
@@ -120,7 +120,7 @@ GlfBindingMap::AssignUniformBindingsToProgram(GLuint program)
 }
 
 void
-GlfBindingMap::AddCustomBindings(GLuint program)
+GlfBindingMap::AddCustomBindings(GarchProgramGPUHandle program)
 {
     _AddActiveAttributeBindings(program);
     _AddActiveUniformBindings(program);
@@ -132,7 +132,7 @@ GlfBindingMap::AddCustomBindings(GLuint program)
 }
 
 void
-GlfBindingMap::_AddActiveAttributeBindings(GLuint program)
+GlfBindingMap::_AddActiveAttributeBindings(GarchProgramGPUHandle program)
 {
     GLint numAttributes = 0;
     glGetProgramiv(program, GL_ACTIVE_ATTRIBUTES, &numAttributes);
@@ -162,7 +162,7 @@ GlfBindingMap::_AddActiveAttributeBindings(GLuint program)
 }
 
 void
-GlfBindingMap::_AddActiveUniformBindings(GLuint program)
+GlfBindingMap::_AddActiveUniformBindings(GarchProgramGPUHandle program)
 {
     GLint numUniforms = 0;
     glGetProgramiv(program, GL_ACTIVE_UNIFORMS, &numUniforms);
@@ -221,7 +221,7 @@ GlfBindingMap::_AddActiveUniformBindings(GLuint program)
 }
 
 void
-GlfBindingMap::_AddActiveUniformBlockBindings(GLuint program)
+GlfBindingMap::_AddActiveUniformBlockBindings(GarchProgramGPUHandle program)
 {
     GLint numUniformBlocks = 0;
     glGetProgramiv(program, GL_ACTIVE_UNIFORM_BLOCKS, &numUniformBlocks);

@@ -110,7 +110,7 @@ HdStBufferResourceMetal::SetAllocation(HdBufferResourceGPUHandle idBuffer, size_
     _gpuAddr = 0;
 }
 
-HdBufferResourceGPUHandle
+GarchTextureGPUHandle
 HdStBufferResourceMetal::GetTextureBuffer()
 {
     // XXX: need change tracking.
@@ -149,13 +149,13 @@ HdStBufferResourceMetal::GetTextureBuffer()
         size_t numPixels = [_id length] / pixelSize;
 
         MTLTextureDescriptor* texDesc =
-        [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatBGRA8Unorm
+        [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:format
                                                            width:numPixels
                                                           height:1
                                                        mipmapped:NO];
         _texId = [_id newTextureWithDescriptor:texDesc offset:0 bytesPerRow:pixelSize * numPixels];
     }
-    return (__bridge HdBufferResourceGPUHandle)_texId;
+    return _texId;
 }
 
 void

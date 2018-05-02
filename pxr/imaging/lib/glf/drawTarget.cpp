@@ -150,7 +150,7 @@ GlfDrawTarget::~GlfDrawTarget( )
 }
 
 void
-GlfDrawTarget::AddAttachment( std::string const & name, 
+GlfDrawTarget::_AddAttachment( std::string const & name, 
                               GLenum format, GLenum type,
                               GLenum internalFormat )
 {
@@ -183,20 +183,6 @@ GlfDrawTarget::AddAttachment( std::string const & name,
     }
 }
 
-void 
-GlfDrawTarget::DeleteAttachment( std::string const & name )
-{
-    AttachmentsMap & attachments = _GetAttachments();
-    AttachmentsMap::iterator it = attachments.find( name );
-
-    if (it!=attachments.end()) {
-        attachments.erase( it );
-    } else {
-        TF_CODING_ERROR( "Attachment \""+name+"\" does not exist for this "
-                         "DrawTarget" );        
-    }
-}
-
 GlfDrawTarget::AttachmentRefPtr 
 GlfDrawTarget::GetAttachment(std::string const & name)
 {
@@ -223,6 +209,8 @@ GlfDrawTarget::CloneAttachments( GarchDrawTargetPtr const & drawtarget )
         TF_CODING_ERROR( "Cannot clone TfNullPtr attachments." );
     }
 
+    Bind();
+
     // garbage collection will take care of the existing instance pointed to
     // by the RefPtr
     _attachmentsPtr = drawtarget->_attachmentsPtr;
@@ -230,6 +218,8 @@ GlfDrawTarget::CloneAttachments( GarchDrawTargetPtr const & drawtarget )
     for (AttachmentsMap::value_type const& p :  _attachmentsPtr->attachments) {
         _BindAttachment( TfStatic_cast<TfRefPtr<GlfDrawTarget::GlfAttachment>>(p.second) );
     }
+    
+    Unbind();
 }
 
 GlfDrawTarget::AttachmentsMap const &
@@ -420,6 +410,20 @@ GlfDrawTarget::Bind()
     GLF_POST_PENDING_GL_ERRORS();
 }
 
+void
+GlfDrawTarget::SetAttachments(std::vector<GarchDrawTarget::AttachmentDesc>& attachmentDesc)
+{
+    if (!TF_VERIFY(GetAttachments().empty(), "There's already attachments bound to this draw target")) {
+        return;
+    }
+
+    Bind();
+    for(auto desc : attachmentDesc) {
+        _AddAttachment(desc.name, desc.format, desc.type, desc.internalFormat);
+    }
+    Unbind();
+}
+
 bool
 GlfDrawTarget::IsBound() const
 {
@@ -516,11 +520,18 @@ GlfDrawTarget::_Validate(std::string * reason)
     return GlfCheckGLFrameBufferStatus(GL_FRAMEBUFFER, reason);
 }
 
+void
+GlfDrawTarget::GetImage(std::string const & name, void* buffer) const
+{
+    glBindTexture(GL_TEXTURE_2D, GetAttachments().at(name)->GetTextureName());
+    glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, buffer);
+}
+
 bool
 GlfDrawTarget::WriteToFile(std::string const & name,
                             std::string const & filename,
                             GfMatrix4d const & viewMatrix,
-                            GfMatrix4d const & projectionMatrix)
+                            GfMatrix4d const & projectionMatrix) const
 {
     AttachmentsMap const & attachments = GetAttachments();
     AttachmentsMap::const_iterator it = attachments.find( name );

@@ -197,7 +197,12 @@ vec4 ApplyColorOverrides(vec4 color)
     return color;
 }
 
+#if defined(ARCH_GFX_METAL)
+// Still need to use the 'out' semantic as this is picked up by the glslfx parser
+out vec4 colorOut;
+#else
 layout (location = 0) out vec4 colorOut;
+#endif
 
 void RenderColor(vec4 color)
 {

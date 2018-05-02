@@ -89,7 +89,7 @@ public:
         virtual ~GlfAttachment();
         
         /// Returns the GL texture index (can be used as any regular GL texture)
-        virtual GarchTextureGPUHandle GetTextureName() const override { return (GarchTextureGPUHandle)(uint64_t)_textureName; }
+        virtual GarchTextureGPUHandle GetTextureName() const override { return GarchTextureGPUHandle(_textureName); }
 
         /// Returns the GL texture index (can be used as any regular GL texture)
         GLuint GetGlTextureName() const { return _textureName; }
@@ -125,8 +125,8 @@ public:
         
     private:
         GlfAttachment(int glIndex, GLenum format, GLenum type,
-                   GLenum internalFormat, GfVec2i size,
-                   unsigned int numSamples);
+                      GLenum internalFormat, GfVec2i size,
+                      unsigned int numSamples);
         
         void _GenTexture();
         void _DeleteTexture();
@@ -157,21 +157,12 @@ public:
     /// attachments by sharing the RefPtr of the source GlfDrawTarget.
     GLF_API
     static GlfDrawTarget * New( GarchDrawTargetPtr const & drawtarget );
-    
-    /// Add an attachment to the DrawTarget.
-    GLF_API
-    virtual void AddAttachment( std::string const & name,
-                        GLenum format, GLenum type, GLenum internalFormat ) override;
 
-    /// Removes the named attachment from the DrawTarget.
-    GLF_API
-    virtual void DeleteAttachment( std::string const & name ) override;
-    
     /// Clears all the attachments for this DrawTarget.
     GLF_API
     virtual void ClearAttachments() override;
     
-    /// Copies the list of attachments from DrawTarget.
+    /// Copies the list of attachments from DrawTarget. This binds and unbinds the frame buffer.
     GLF_API
     virtual void CloneAttachments( GarchDrawTargetPtr const & drawtarget ) override;
     
@@ -183,12 +174,16 @@ public:
     GLF_API
     virtual GarchDrawTarget::AttachmentRefPtr GetAttachment(std::string const & name) override;
     
+    /// Save the Attachment buffer to an array.
+    GLF_API
+    virtual void GetImage(std::string const & name, void* buffer) const override;
+
     /// Write the Attachment buffer to an image file (debugging).
     GLF_API
     virtual bool WriteToFile(std::string const & name,
-                     std::string const & filename,
-                     GfMatrix4d const & viewMatrix = GfMatrix4d(1),
-                     GfMatrix4d const & projectionMatrix = GfMatrix4d(1)) override;
+                             std::string const & filename,
+                             GfMatrix4d const & viewMatrix = GfMatrix4d(1),
+                             GfMatrix4d const & projectionMatrix = GfMatrix4d(1)) const override;
 
     /// Resize the DrawTarget.
     GLF_API
@@ -217,6 +212,10 @@ public:
     /// Binds the framebuffer.
     GLF_API
     virtual void Bind() override;
+    
+    /// Sets the attachments to the framebuffer. There is no bound frame buffer when this method returns.
+    GLF_API
+    virtual void SetAttachments(std::vector<GarchDrawTarget::AttachmentDesc>& attachments) override;
 
     /// Unbinds the framebuffer.
     GLF_API
@@ -263,6 +262,10 @@ protected:
     
 private:
     void _GenFrameBuffer();
+
+    /// Add an attachment to the DrawTarget.
+    void _AddAttachment( std::string const & name,
+                         GLenum format, GLenum type, GLenum internalFormat );
 
     void _BindAttachment( GlfAttachmentRefPtr const & a );
     

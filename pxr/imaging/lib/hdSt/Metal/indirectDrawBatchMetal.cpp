@@ -962,11 +962,11 @@ HdSt_IndirectDrawBatchMetal::ExecuteDraw(
     if (!TF_VERIFY(program)) return;
     if (!TF_VERIFY(program->Validate())) return;
 
-    HdBufferResourceGPUHandle programId = program->GetProgram().GetId();
+    TF_FATAL_CODING_ERROR("Not Implemented");
+    /*
+    HdBufferResourceGPUHandle programId = program->GetGLProgram().GetId();
     TF_VERIFY(programId);
 
-    TF_FATAL_CODING_ERROR("Not Implemented");
-/*
     glUseProgram(programId);
 
     const Hd_ResourceBinder &binder = drawingProgram.GetBinder();
@@ -1174,8 +1174,8 @@ HdSt_IndirectDrawBatchMetal::_GPUFrustumCulling(
 
     const HdSt_ResourceBinder &binder = cullingProgram.GetBinder();
 
-    HdBufferResourceGPUHandle programId = program->GetProgram().GetId();
     TF_FATAL_CODING_ERROR("Not Implemented");
+    //HdBufferResourceGPUHandle programId = program->GetProgram().GetId();
     //glUseProgram(programId);
 
     // bind buffers

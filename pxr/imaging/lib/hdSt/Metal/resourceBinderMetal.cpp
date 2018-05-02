@@ -25,6 +25,7 @@
 #include "pxr/imaging/mtlf/mtlDevice.h"
 
 #include "pxr/imaging/hdSt/Metal/resourceBinderMetal.h"
+#include "pxr/imaging/hdSt/Metal/mslProgram.h"
 #include "pxr/imaging/hdSt/bufferResource.h"
 #include "pxr/imaging/hdSt/renderContextCaps.h"
 #include "pxr/imaging/hdSt/shaderCode.h"
@@ -236,9 +237,33 @@ HdSt_ResourceBinderMetal::BindUniformf(TfToken const &name,
 }
 
 void
-HdSt_ResourceBinderMetal::IntrospectBindings(HdResource const & programResource)
+HdSt_ResourceBinderMetal::IntrospectBindings(HdStProgramSharedPtr programResource)
 {
-    TF_FATAL_CODING_ERROR("Not Implemented");
+    HdStMSLProgramSharedPtr program(boost::dynamic_pointer_cast<HdStMSLProgram>(programResource));
+    HdStMSLProgram::BindingLocationMap const& locationMap(program->GetBindingLocations());
+
+    TF_FOR_ALL(it, _bindingMap) {
+        HdBinding binding = it->second;
+        HdBinding::Type type = binding.GetType();
+        std::string name = it->first.name;
+        int level = it->first.level;
+        if (level >=0) {
+            // follow nested instancing naming convention.
+            std::stringstream n;
+            n << name << "_" << level;
+            name = n.str();
+        }
+
+        int loc = -1;
+        auto item = locationMap.find(name);
+        if (item != locationMap.end()) {
+            loc = item->second;
+        }
+        // update location in resource binder.
+        // some uniforms may be optimized out.
+        if (loc < 0) loc = HdBinding::NOT_EXIST;
+        it->second.Set(type, loc, binding.GetTextureUnit());
+    }
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

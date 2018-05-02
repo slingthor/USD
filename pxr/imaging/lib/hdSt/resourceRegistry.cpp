@@ -121,11 +121,11 @@ HdStResourceRegistry::_TallyResourceAllocation(VtDictionary *result) const
         HdStProgramSharedPtr const &program = progIt->second;
         if (!program) continue;
         size_t size =
-            program->GetProgram().GetSize() +
+            program->GetProgramSize() +
             program->GetGlobalUniformBuffer().GetSize();
 
         // the role of program and global uniform buffer is always same.
-        std::string const &role = program->GetProgram().GetRole().GetString();
+        std::string const &role = program->GetGlobalUniformBuffer().GetRole().GetString();
         (*result)[role] = VtDictionaryGet<size_t>(*result, role,
                                                   VtDefault = 0) + size;
 

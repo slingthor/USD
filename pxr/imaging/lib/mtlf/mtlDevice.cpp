@@ -97,6 +97,7 @@ MtlfMetalContext::MtlfMetalContext()
 
     // Create a new command queue
     commandQueue = [device newCommandQueue];
+    commandBuffer = nil;
     
     // Load all the default shader files
     NSError *error = NULL;
@@ -106,8 +107,10 @@ MtlfMetalContext::MtlfMetalContext()
     NSString *shaderSource = [NSString stringWithContentsOfFile:[NSString stringWithUTF8String:shaderToken.GetText()]
                                                        encoding:NSUTF8StringEncoding
                                                           error:&error];
+    MTLCompileOptions *options = [[MTLCompileOptions alloc] init];
+    options.fastMathEnabled = YES;
 
-    defaultLibrary = [device newLibraryWithSource:shaderSource options:nullptr error:&error];
+    defaultLibrary = [device newLibraryWithSource:shaderSource options:options error:&error];
     
     // Load the fragment program into the library
     id <MTLFunction> fragmentProgram = [defaultLibrary newFunctionWithName:@"tex_fs"];
@@ -128,7 +131,7 @@ MtlfMetalContext::MtlfMetalContext()
     
     // Create a reusable pipeline state
     MTLRenderPipelineDescriptor *pipelineStateDescriptor = [[MTLRenderPipelineDescriptor alloc] init];
-    pipelineStateDescriptor.label = @"MyPipeline";
+    pipelineStateDescriptor.label = @"Metal/GL interop";
     pipelineStateDescriptor.sampleCount = 1;
     pipelineStateDescriptor.vertexFunction = vertexProgram;
     pipelineStateDescriptor.fragmentFunction = fragmentProgram;

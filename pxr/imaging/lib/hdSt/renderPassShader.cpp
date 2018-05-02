@@ -46,7 +46,7 @@ HdStRenderPassShader::HdStRenderPassShader()
     , _hashValid(false)
     , _cullStyle(HdCullStyleNothing)
 {
-    _glslfx.reset(GLSLFX::New(_glslfxFile));
+    _glslfx.reset(new GLSLFX(_glslfxFile));
 }
 
 HdStRenderPassShader::HdStRenderPassShader(TfToken const &glslfxFile)
@@ -56,7 +56,7 @@ HdStRenderPassShader::HdStRenderPassShader(TfToken const &glslfxFile)
     , _hashValid(false)
     , _cullStyle(HdCullStyleNothing)
 {
-    _glslfx.reset(GLSLFX::New(_glslfxFile));
+    _glslfx.reset(new GLSLFX(_glslfxFile));
 }
 
 /*virtual*/
@@ -99,7 +99,7 @@ HdStRenderPassShader::GetSource(TfToken const &shaderStageKey) const
 /*virtual*/
 void
 HdStRenderPassShader::BindResources(HdSt_ResourceBinder const &binder,
-                                    HdBufferResourceGPUHandle program)
+                                    HdStProgram const &program)
 {
     TF_FOR_ALL(it, _customBuffers) {
         binder.Bind(it->second);
@@ -113,7 +113,7 @@ HdStRenderPassShader::BindResources(HdSt_ResourceBinder const &binder,
 /*virtual*/
 void
 HdStRenderPassShader::UnbindResources(HdSt_ResourceBinder const &binder,
-                                      HdBufferResourceGPUHandle program)
+                                      HdStProgram const &program)
 {
     TF_FOR_ALL(it, _customBuffers) {
         binder.Unbind(it->second);

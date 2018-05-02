@@ -418,7 +418,7 @@ UsdImagingGLHydraMaterialAdapter::_GetShaderSource(UsdPrim const& prim,
         filePath = asset.GetAssetPath();
     }
 
-    GlfGLSLFX gfx(filePath);
+    GLSLFX gfx(filePath);
     if (!gfx.IsValid()){
         return std::string();
     }

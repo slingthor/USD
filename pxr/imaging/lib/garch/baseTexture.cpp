@@ -39,8 +39,7 @@ TF_REGISTRY_FUNCTION(TfType)
 }
 
 GarchBaseTexture::GarchBaseTexture()
-  : _textureName(0),
-    _currentWidth(0),
+  : _currentWidth(0),
     _currentHeight(0),
     _format(GL_RGBA),
     _hasWrapModeS(false),

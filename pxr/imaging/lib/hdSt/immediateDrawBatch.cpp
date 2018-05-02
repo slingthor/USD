@@ -130,30 +130,26 @@ HdSt_ImmediateDrawBatch::ExecuteDraw(
                                                    /*indirect=*/false,
                                                    resourceRegistry);
 
-    HdStProgramSharedPtr const &gpu_program = program.GetProgram();
-    if (!TF_VERIFY(gpu_program)) return;
-    if (!TF_VERIFY(gpu_program->Validate())) return;
+    HdStProgramSharedPtr const &gpuProgram = program.GetProgram();
+    if (!TF_VERIFY(gpuProgram)) return;
+    if (!TF_VERIFY(gpuProgram->Validate())) return;
 
     const HdSt_ResourceBinder &binder = program.GetBinder();
     const HdStShaderCodeSharedPtrVector &shaders = program.GetComposedShaders();
 
-    HdBufferResourceGPUHandle programId = gpu_program->GetProgram().GetId();
-    TF_VERIFY(programId);
-
-    //TF_FATAL_CODING_ERROR("Not Implemented");
-    glUseProgram((GLuint)(uint64_t)programId);
+    gpuProgram->SetProgram();
 
     bool hasOverrideShader = bool(renderPassState->GetOverrideShader());
 
     TF_FOR_ALL(it, shaders) {
-        (*it)->BindResources(binder, programId);
+        (*it)->BindResources(binder, *gpuProgram);
     }
 
     // Set up geometric shader states
     // all batch item should have the same geometric shader.
     HdSt_GeometricShaderSharedPtr const &geometricShader
         = program.GetGeometricShader();
-    geometricShader->BindResources(binder, programId);
+    geometricShader->BindResources(binder, *gpuProgram);
 
     size_t numItemsDrawn = 0;
     TF_FOR_ALL(drawItemIt, _drawItemInstances) {
@@ -312,7 +308,7 @@ HdSt_ImmediateDrawBatch::ExecuteDraw(
         // shader textures
         //
         if (!hasOverrideShader) {
-            program.GetSurfaceShader()->BindResources(binder, programId);
+            program.GetSurfaceShader()->BindResources(binder, *gpuProgram);
         }
 
         /*
@@ -400,15 +396,15 @@ HdSt_ImmediateDrawBatch::ExecuteDraw(
         }
 
         if (indexCount > 0 && indexBar) {
-            glDrawElementsInstancedBaseVertex(
+            gpuProgram->DrawElementsInstancedBaseVertex(
                 geometricShader->GetPrimitiveMode(),
                 indexCount,
                 GL_UNSIGNED_INT, // GL_INT is invalid: indexBar->GetResource(HdTokens->indices)->GetGLDataType(),
-                (void *)(firstIndex * sizeof(GLuint)),
+                firstIndex,
                 instanceCount,
                 baseVertex);
         } else if (vertexCount > 0) {
-            glDrawArraysInstanced(
+            gpuProgram->DrawArraysInstanced(
                 geometricShader->GetPrimitiveMode(),
                 baseVertex,
                 vertexCount,
@@ -416,7 +412,7 @@ HdSt_ImmediateDrawBatch::ExecuteDraw(
         }
 
         if (!hasOverrideShader) {
-            program.GetSurfaceShader()->UnbindResources(binder, programId);
+            program.GetSurfaceShader()->UnbindResources(binder, *gpuProgram);
         }
 
         HD_PERF_COUNTER_INCR(HdPerfTokens->drawCalls);
@@ -425,9 +421,9 @@ HdSt_ImmediateDrawBatch::ExecuteDraw(
     HD_PERF_COUNTER_ADD(HdTokens->itemsDrawn, numItemsDrawn);
 
     TF_FOR_ALL(it, shaders) {
-        (*it)->UnbindResources(binder, programId);
+        (*it)->UnbindResources(binder, *gpuProgram);
     }
-    geometricShader->UnbindResources(binder, programId);
+    geometricShader->UnbindResources(binder, *gpuProgram);
 
     // unbind (make non resident all bindless buffers)
     if (constantBarCurrent)
@@ -450,7 +446,7 @@ HdSt_ImmediateDrawBatch::ExecuteDraw(
                             dynamic_pointer_cast<HdStBufferResource>(shaderBarCurrent->GetResource()));
     }
 
-    glUseProgram(0);
+    gpuProgram->UnsetProgram();
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

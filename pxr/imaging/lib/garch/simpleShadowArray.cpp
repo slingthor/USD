@@ -42,10 +42,8 @@ GarchSimpleShadowArray::GarchSimpleShadowArray(GfVec2i const & size,
     _numLayers(numLayers),
     _viewMatrix(_numLayers),
     _projectionMatrix(_numLayers),
-    _texture(0),
-    _framebuffer(0),
-    _shadowDepthSampler(0),
-    _shadowCompareSampler(0)
+    _shadowDepthSampler(),
+    _shadowCompareSampler()
 {
 }
 

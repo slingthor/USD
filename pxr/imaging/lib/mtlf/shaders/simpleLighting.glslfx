@@ -48,9 +48,7 @@ struct ShadowMatrix {
     float padding2;
 };
 
-layout(std140) uniform Shadow {
-    ShadowMatrix shadow[NUM_LIGHTS];
-};
+in ShadowMatrix shadow[NUM_LIGHTS];
 
 out vec2 FshadowFilterWidth[NUM_LIGHTS];
 
@@ -130,15 +128,11 @@ struct LightingInterfaceProperties {
 
 #else  // NUM_LIGHTS == 0
 
-layout(std140) uniform Lighting {
-    bool useLighting;
-    bool useColorMaterialDiffuse;
-    LightSource lightSource[NUM_LIGHTS];
-};
+in bool useLighting;
+in bool useColorMaterialDiffuse;
+in LightSource *lightSource;
 
-layout(std140) uniform Shadow {
-    ShadowMatrix shadow[NUM_LIGHTS];
-};
+in ShadowMatrix *shadow;
 
 vec2
 computeShadowFilterWidth(int index, vec4 Peye)
@@ -159,8 +153,10 @@ computeShadowFilterWidth(int index, vec4 Peye)
 // ---------------------------------------------------------------------------
 // textures
 // ---------------------------------------------------------------------------
-uniform sampler2DArray shadowTexture;
-uniform sampler2DArrayShadow shadowCompareTexture;
+uniform depth2d_array<float,access::sample> shadowTexture;
+uniform depth2d_array<float,access::sample> shadowCompareTexture;
+uniform sampler shadowTextureSampler;
+uniform sampler shadowCompareTextureSampler;
 
 // ---------------------------------------------------------------------------
 // lighting functions
@@ -191,8 +187,8 @@ integrateLightsDefault(vec4 Peye, vec3 Neye, LightingInterfaceProperties props)
 float
 shadowCompare(int index, vec4 coord)
 {
-    return texture(shadowCompareTexture,
-                   vec4(coord.x/coord.w, coord.y/coord.w, index, coord.z));
+    return shadowCompareTexture.sample_compare(shadowCompareTextureSampler,
+                   vec2(coord.x/coord.w, coord.y/coord.w), index, coord.z);
 }
 
 #ifndef SHADOW_FILTER
@@ -214,7 +210,7 @@ shadowing(int index, vec4 Peye)
     // coord.w : shadow projection w
 
     float dReceiver = coord.z/coord.w;
-    coord.z = min(1, dReceiver + shadow[index].bias);
+    coord.z = min(1.0, dReceiver + shadow[index].bias);
     return shadowFilter(index, coord, Peye);
 }
 
@@ -323,7 +319,7 @@ integrateLightsConstant(vec4 Peye, vec3 Neye, LightingInterfaceProperties props)
 // uniform blocks
 // ---------------------------------------------------------------------------
 
-layout(std140) uniform Material {
+struct Material {
     vec4 ambient;
     vec4 diffuse;
     vec4 specular;
@@ -364,8 +360,9 @@ simpleLighting(vec4 color, vec4 Peye, vec3 Neye, vec4 Ctint)
 #else // NUM_LIGHTS == 0
 
 
-LightingContribution
-integrateLights(vec4 Peye, vec3 Neye, LightingInterfaceProperties props);
+// Defined elsewhere
+//LightingContribution
+//integrateLights(vec4 Peye, vec3 Neye, LightingInterfaceProperties props);
 
 vec4
 simpleLighting(vec4 color, vec4 Peye, vec3 Neye, vec4 Ctint,
@@ -374,14 +371,14 @@ simpleLighting(vec4 color, vec4 Peye, vec3 Neye, vec4 Ctint,
 
     // Get the roughness and metallic values
 
-#if defined(HD_HAS_roughness)
-    float roughness = max(0.0, min(1.0, float(HdGet_roughness())));
+#if defined(HD_HAS_displayRoughness)
+    float roughness = max(0.0, min(1.0, float(HdGet_displayRoughness())));
 #else
     float roughness = 0.0;
 #endif
 
-#if defined(HD_HAS_metallic)
-    float metallic  = max(0.0, min(1.0, float(HdGet_metallic())));
+#if defined(HD_HAS_displayMetallic)
+    float metallic  = max(0.0, min(1.0, float(HdGet_displayMetallic())));
 #else
     float metallic = 0.0;
 #endif
@@ -391,7 +388,7 @@ simpleLighting(vec4 color, vec4 Peye, vec3 Neye, vec4 Ctint,
 
     LightingInterfaceProperties props;
 
-#if defined(HD_HAS_roughness)
+#if defined(HD_HAS_displayRoughness)
     float specularExp = (1.0 - roughness) * 120.0 + 8.0;
     props.shininess = specularExp;
     matSpecular.rgb = mix(vec3(1.0), matDiffuse.rgb, metallic);
@@ -429,8 +426,6 @@ simpleLightingMaterial(vec4 color, vec4 Peye, vec3 Neye, vec4 Ctint)
 vec4
 simpleLighting(vec4 color, vec4 Peye, vec3 Neye, vec4 Ctint)
 {
-    Neye = (gl_FrontFacing ? Neye : -Neye);
-
     return simpleLightingMaterial(color, Peye, Neye, Ctint);
 }
 

@@ -61,7 +61,6 @@ void wrapDrawTarget()
         .def(TfPyRefAndWeakPtr())
         .def("__init__",TfMakePyConstructor(&_NewDrawTarget))
         .def("__init__",TfMakePyConstructor(&_NewDrawTarget2))
-        .def("AddAttachment", &This::AddAttachment)
         .def("Bind", &This::Bind)
         .def("Unbind", &This::Unbind)
         .def("WriteToFile", 

@@ -58,6 +58,7 @@ public:
 
     id<MTLDevice> device;
     id<MTLCommandQueue> commandQueue;
+    id<MTLCommandBuffer> commandBuffer;
     
     id<MTLLibrary> defaultLibrary;
     id<MTLRenderPipelineState> pipelineState;

@@ -150,23 +150,22 @@ MtlfSimpleShadowArray::_AllocTextureArray()
 void
 MtlfSimpleShadowArray::_FreeTextureArray()
 {
-    TF_FATAL_CODING_ERROR("Not Implemented");
+    if (_texture.IsSet()) {
+        [_texture release];
+        _texture = nil;
+    }
+    if (_framebuffer.IsSet()) {
+        [_framebuffer release];
+        _framebuffer = nil;
+    }
     /*
-    if (_texture) {
-        glDeleteTextures(1, &_texture);
-        _texture = 0;
-    }
-    if (_framebuffer) {
-        glDeleteFramebuffers(1, &_framebuffer);
-        _framebuffer = 0;
-    }
     if (_shadowDepthSampler) {
-        glDeleteSamplers(1, &_shadowDepthSampler);
-        _shadowDepthSampler = 0;
+        [_shadowDepthSampler release];
+        _shadowDepthSampler = nil;
     }
     if (_shadowCompareSampler) {
-        glDeleteSamplers(1, &_shadowCompareSampler);
-        _shadowCompareSampler = 0;
+        [_shadowCompareSampler release];
+        _shadowCompareSampler = nil;
     }
      */
 }

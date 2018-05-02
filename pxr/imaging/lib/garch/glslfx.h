@@ -21,13 +21,15 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#ifndef HD_GLSLFX_H
-#define HD_GLSLFX_H
+#ifndef GARCH_GLSLFX_H
+#define GARCH_GLSLFX_H
 
-/// \file hd/glslfx.h
+/// \file garch/glslfx.h
 
 #include "pxr/pxr.h"
 #include "pxr/imaging/garch/glslfxConfig.h"
+#include "pxr/imaging/garch/glslfx.h"
+#include "pxr/imaging/garch/api.h"
 
 #include "pxr/base/tf/token.h"
 
@@ -121,61 +123,61 @@ class GLSLFX
 public:
     /// Create an invalid glslfx object
     GARCH_API
-    static GLSLFX *New();
-    
+    GLSLFX();
+
     /// Create a glslfx object from a file
     GARCH_API
-    static GLSLFX *New(std::string const & filePath);
+    GLSLFX(std::string const & filePath);
+
+    GARCH_API
+    virtual ~GLSLFX() {}
     
     /// Create a glslfx object from a stream
     GARCH_API
-    static GLSLFX *New(std::istream &is);
-    
-    GARCH_API
-    virtual ~GLSLFX() {};
+    GLSLFX(std::istream &is);
 
     /// Return the parameters specified in the configuration
     GARCH_API
-    virtual GLSLFXConfig::Parameters GetParameters() const = 0;
+    virtual GLSLFXConfig::Parameters GetParameters() const;
 
     /// Return the textures specified in the configuration
     GARCH_API
-    virtual GLSLFXConfig::Textures GetTextures() const = 0;
+    virtual GLSLFXConfig::Textures GetTextures() const;
 
     /// Return the attributes specified in the configuration
     GARCH_API
-    virtual GLSLFXConfig::Attributes GetAttributes() const = 0;
+    virtual GLSLFXConfig::Attributes GetAttributes() const;
 
     /// Return the metadata specified in the configuration
     GARCH_API
-    virtual GLSLFXConfig::MetadataDictionary GetMetadata() const = 0;
+    virtual GLSLFXConfig::MetadataDictionary GetMetadata() const;
 
     /// Returns true if this is a valid glslfx file
     GARCH_API
-    virtual bool IsValid(std::string *reason=NULL) const = 0;
+    virtual bool IsValid(std::string *reason=NULL) const;
 
     /// \name Compatible shader sources
     /// @{
 
     /// Get the vertex source string
     GARCH_API
-    virtual std::string GetVertexSource() const = 0;
+    virtual std::string GetVertexSource() const;
 
     /// Get the tess control source string
     GARCH_API
-    virtual std::string GetTessControlSource() const = 0;
+    virtual std::string GetTessControlSource() const;
 
     /// Get the tess eval source string
     GARCH_API
-    virtual std::string GetTessEvalSource() const = 0;
+    virtual std::string GetTessEvalSource() const;
 
     /// Get the geometry source string
     GARCH_API
-    virtual std::string GetGeometrySource() const = 0;
+    virtual std::string GetGeometrySource() const;
 
     /// Get the fragment source string
     GARCH_API
-    virtual std::string GetFragmentSource() const = 0;
+    virtual std::string GetFragmentSource() const;
 
     /// @}
 
@@ -184,49 +186,95 @@ public:
 
     /// Get the preamble (osd uniform definitions)
     GARCH_API
-    virtual std::string GetPreambleSource() const = 0;
+    virtual std::string GetPreambleSource() const;
 
     /// Get the surface source string
     GARCH_API
-    virtual std::string GetSurfaceSource() const = 0;
+    virtual std::string GetSurfaceSource() const;
 
     /// Get the displacement source string
     GARCH_API
-    virtual std::string GetDisplacementSource() const = 0;
+    virtual std::string GetDisplacementSource() const;
 
     /// Get the vertex injection source string
     GARCH_API
-    virtual std::string GetVertexInjectionSource() const = 0;
+    virtual std::string GetVertexInjectionSource() const;
 
     /// Get the geometry injection source string
     GARCH_API
-    virtual std::string GetGeometryInjectionSource() const = 0;
+    virtual std::string GetGeometryInjectionSource() const;
 
     /// @}
 
     /// Get the shader source associated with given key
     GARCH_API
-    virtual std::string GetSource(const TfToken &shaderStageKey) const = 0;
+    virtual std::string GetSource(const TfToken &shaderStageKey) const;
 
     /// Get the original file name passed to the constructor
-    virtual std::string const &GetFilePath() const = 0;
+    virtual std::string const& GetFilePath() const { return _globalContext.filename; }
 
     /// Return set of all files processed for this glslfx object.
     /// This includes the original file given to the constructor
     /// as well as any other files that were imported. This set
     /// will only contain files that exist.
-    virtual std::set<std::string> const& GetFiles() const = 0;
+    virtual std::set<std::string> const& GetFiles() const { return _seenFiles; }
 
     /// Return the computed hash value based on the string
-    virtual size_t GetHash() const = 0;
-    
-protected:
-    GARCH_API
-    GLSLFX() {}
+    virtual size_t GetHash() const { return _hash; }
+
+private:
+    class _ParseContext {
+    public:
+        _ParseContext() { }
+
+        _ParseContext(std::string const & filePath) :
+            filename(filePath), lineNo(0), version(-1.0) { }
+
+        std::string filename;
+        int lineNo;
+        double version;
+        std::string currentLine;
+        std::string currentSectionType;
+        std::string currentSectionId;
+        std::vector<std::string> imports;
+    };
+
+private:
+    bool _ProcessFile(std::string const & filePath,
+                      _ParseContext & context);
+    bool _ProcessInput(std::istream * input,
+                       _ParseContext & context);
+    bool _ProcessImport(_ParseContext & context);
+    bool _ParseSectionLine(_ParseContext & context);
+    bool _ParseGLSLSectionLine(std::vector<std::string> const &tokens,
+                               _ParseContext & context);
+    bool _ParseVersionLine(std::vector<std::string> const &tokens,
+                           _ParseContext & context);
+    bool _ParseConfigurationLine(_ParseContext & context);
+    bool _ComposeConfiguration(std::string *reason);
+    std::string _GetSource(const TfToken &shaderStageKey) const;
+
+private:
+    _ParseContext _globalContext;
+
+    std::set<std::string> _importedFiles;
+
+    typedef std::map<std::string, std::string> _SourceMap;
+
+    _SourceMap _sourceMap;
+    _SourceMap _configMap;
+    std::vector<std::string> _configOrder;
+    std::set<std::string> _seenFiles;
+
+    boost::scoped_ptr<GLSLFXConfig> _config;
+
+    bool _valid;
+    std::string _invalidReason; // if _valid is false, reason why
+    size_t _hash;
 };
 
 
 PXR_NAMESPACE_CLOSE_SCOPE
 
-#endif // HD_GLSLFX_H
+#endif // GARCH_GLSLFX_H
 

@@ -42,7 +42,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 HdSt_FallbackLightingShader::HdSt_FallbackLightingShader()
 {
-    _glslfx.reset(GLSLFX::New(HdStPackageFallbackLightingShader()));
+    _glslfx.reset(new GLSLFX(HdStPackageFallbackLightingShader()));
 }
 
 HdSt_FallbackLightingShader::~HdSt_FallbackLightingShader()
@@ -74,21 +74,21 @@ HdSt_FallbackLightingShader::GetSource(TfToken const &shaderStageKey) const
 /* virtual */
 void
 HdSt_FallbackLightingShader::SetCamera(GfMatrix4d const &worldToViewMatrix,
-                                            GfMatrix4d const &projectionMatrix)
+                                       GfMatrix4d const &projectionMatrix)
 {
     // nothing
 }
 
 void
 HdSt_FallbackLightingShader::BindResources(HdSt_ResourceBinder const &binder,
-                                           HdBufferResourceGPUHandle program)
+                                           HdStProgram const &program)
 {
     // nothing
 }
 
 void
 HdSt_FallbackLightingShader::UnbindResources(HdSt_ResourceBinder const &binder,
-                                             HdBufferResourceGPUHandle program)
+                                             HdStProgram const &program)
 {
     // nothing
 }

@@ -66,7 +66,7 @@ MtlfBindingMap::GetAttributeIndex(TfToken const & name)
 }
 
 void
-MtlfBindingMap::AssignSamplerUnitsToProgram(GLuint program)
+MtlfBindingMap::AssignSamplerUnitsToProgram(GarchProgramGPUHandle program)
 {
     TF_FATAL_CODING_ERROR("Not Implemented");
 /*
@@ -110,7 +110,7 @@ MtlfBindingMap::HasUniformBinding(TfToken const & name) const
 }
 
 void
-MtlfBindingMap::AssignUniformBindingsToProgram(GLuint program)
+MtlfBindingMap::AssignUniformBindingsToProgram(GarchProgramGPUHandle program)
 {
     TF_FATAL_CODING_ERROR("Not Implemented");
 /*
@@ -124,7 +124,7 @@ MtlfBindingMap::AssignUniformBindingsToProgram(GLuint program)
 }
 
 void
-MtlfBindingMap::AddCustomBindings(GLuint program)
+MtlfBindingMap::AddCustomBindings(GarchProgramGPUHandle program)
 {
     _AddActiveAttributeBindings(program);
     _AddActiveUniformBindings(program);
@@ -136,7 +136,7 @@ MtlfBindingMap::AddCustomBindings(GLuint program)
 }
 
 void
-MtlfBindingMap::_AddActiveAttributeBindings(GLuint program)
+MtlfBindingMap::_AddActiveAttributeBindings(GarchProgramGPUHandle program)
 {
     GLint numAttributes = 0;
     glGetProgramiv(program, GL_ACTIVE_ATTRIBUTES, &numAttributes);
@@ -166,8 +166,10 @@ MtlfBindingMap::_AddActiveAttributeBindings(GLuint program)
 }
 
 void
-MtlfBindingMap::_AddActiveUniformBindings(GLuint program)
+MtlfBindingMap::_AddActiveUniformBindings(GarchProgramGPUHandle program)
 {
+    TF_FATAL_CODING_ERROR("Not Implemented");
+/*
     GLint numUniforms = 0;
     glGetProgramiv(program, GL_ACTIVE_UNIFORMS, &numUniforms);
     if (numUniforms == 0) return;
@@ -176,8 +178,6 @@ MtlfBindingMap::_AddActiveUniformBindings(GLuint program)
     glGetProgramiv(program, GL_ACTIVE_UNIFORM_MAX_LENGTH, &maxNameLength);
     char * name = new char[maxNameLength];
     
-    TF_FATAL_CODING_ERROR("Not Implemented");
-/*
     for (int i = 0; i < numUniforms; ++i) {
         glGetActiveUniform(program, i, maxNameLength, NULL, &size, &type, name);
         switch(type) {
@@ -221,12 +221,13 @@ MtlfBindingMap::_AddActiveUniformBindings(GLuint program)
             break;
         }
     }
- */
+
     delete[] name;
+ */
 }
 
 void
-MtlfBindingMap::_AddActiveUniformBlockBindings(GLuint program)
+MtlfBindingMap::_AddActiveUniformBlockBindings(GarchProgramGPUHandle program)
 {
     TF_FATAL_CODING_ERROR("Not Implemented");
 /*

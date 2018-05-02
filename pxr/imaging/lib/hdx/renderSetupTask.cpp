@@ -211,7 +211,7 @@ HdxRenderSetupTask::_CreateOverrideShader()
         {
             if (!_overrideShader) {
                 GLSLFXSharedPtr glslfx =
-                GLSLFXSharedPtr(GLSLFX::New(HdStPackageFallbackSurfaceShader()));
+                GLSLFXSharedPtr(new GLSLFX(HdStPackageFallbackSurfaceShader()));
 
                 _overrideShader =
                               HdStShaderCodeSharedPtr(

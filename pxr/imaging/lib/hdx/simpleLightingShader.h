@@ -63,20 +63,20 @@ public:
 
     /// HdShader overrides
     HDX_API
-    virtual ID ComputeHash() const;
+    virtual ID ComputeHash() const override;
     HDX_API
-    virtual std::string GetSource(TfToken const &shaderStageKey) const;
+    virtual std::string GetSource(TfToken const &shaderStageKey) const override;
     HDX_API
-    virtual void BindResources(HdSt_ResourceBinder const &binder, HdBufferResourceGPUHandle program);
+    virtual void BindResources(HdSt_ResourceBinder const &binder, HdStProgram const &program) override;
     HDX_API
-    virtual void UnbindResources(HdSt_ResourceBinder const &binder, HdBufferResourceGPUHandle program);
+    virtual void UnbindResources(HdSt_ResourceBinder const &binder, HdStProgram const &program) override;
     HDX_API
-    virtual void AddBindings(HdBindingRequestVector *customBindings);
+    virtual void AddBindings(HdBindingRequestVector *customBindings) override;
 
     /// HdStLightingShader overrides
     HDX_API
     virtual void SetCamera(GfMatrix4d const &worldToViewMatrix,
-                           GfMatrix4d const &projectionMatrix);
+                           GfMatrix4d const &projectionMatrix) override;
 
     HDX_API
     void SetLightingStateFromOpenGL();

@@ -22,15 +22,22 @@
 // language governing permissions and limitations under the Apache License.
 //
 #include "pxr/imaging/glf/glew.h"
+
 #include "pxr/imaging/hdSt/package.h"
 #include "pxr/imaging/hdSt/GL/glslProgram.h"
 #include "pxr/imaging/hdSt/GL/glUtils.h"
+
 #include "pxr/imaging/hd/perfLog.h"
 #include "pxr/imaging/hd/resourceRegistry.h"
 #include "pxr/imaging/hd/tokens.h"
+
+#include "pxr/imaging/glf/bindingMap.h"
+
 #include "pxr/imaging/garch/glslfx.h"
+
 #include "pxr/base/tf/diagnostic.h"
 #include "pxr/base/tf/envSetting.h"
+
 #include <string>
 #include <fstream>
 #include <iostream>
@@ -42,17 +49,15 @@ TF_DEFINE_ENV_SETTING(HD_ENABLE_SHARED_CONTEXT_CHECK, 0,
     "Enable GL context sharing validation");
 
 HdStGLSLProgram::HdStGLSLProgram(TfToken const &role)
-    : HdStProgram(role), _program(role), _uniformBuffer(role)
+    : HdStProgram(role), _program(0), _programSize(0), _uniformBuffer(role)
 {
 }
 
 HdStGLSLProgram::~HdStGLSLProgram()
 {
-    GLuint program = _program.GetOpenGLId();
-    if (program != 0) {
+    if (_program != 0) {
         if (glDeleteProgram)
-            glDeleteProgram(program);
-        _program.SetAllocation((GLuint)0, 0);
+            glDeleteProgram(_program);
     }
     GLuint uniformBuffer = _uniformBuffer.GetOpenGLId();
     if (uniformBuffer) {
@@ -104,10 +109,8 @@ HdStGLSLProgram::CompileShader(GLenum type,
         return false;
 
     // create a program if not exists
-    GLuint program = _program.GetOpenGLId();
-    if (program == 0) {
-        program = glCreateProgram();
-        _program.SetAllocation(program, 0);
+    if (_program == 0) {
+        _program = glCreateProgram();
     }
 
     // create a shader, compile it
@@ -130,7 +133,7 @@ HdStGLSLProgram::CompileShader(GLenum type,
     }
 
     // attach the shader to the program
-    glAttachShader(program, shader);
+    glAttachShader(_program, shader);
 
     // shader is no longer needed.
     glDeleteShader(shader);
@@ -146,8 +149,7 @@ HdStGLSLProgram::Link()
 
     if (!glLinkProgram) return false; // glew initialized
 
-    GLuint program = _program.GetOpenGLId();
-    if (program == 0) {
+    if (_program == 0) {
         TF_CODING_ERROR("At least one shader has to be compiled before linking.");
         return false;
     }
@@ -155,14 +157,14 @@ HdStGLSLProgram::Link()
     // set RETRIEVABLE_HINT to true for getting program binary length.
     // note: Actually the GL driver may recompile the program dynamically on
     // some state changes, so the size of program could be inaccurate.
-    glProgramParameteri(program, GL_PROGRAM_BINARY_RETRIEVABLE_HINT, GL_TRUE);
+    glProgramParameteri(_program, GL_PROGRAM_BINARY_RETRIEVABLE_HINT, GL_TRUE);
 
     // link
-    glLinkProgram(program);
+    glLinkProgram(_program);
 
     std::string logString;
     bool success = true;
-    if (!HdGLUtils::GetProgramLinkStatus(program, &logString)) {
+    if (!HdGLUtils::GetProgramLinkStatus(_program, &logString)) {
         // XXX:validation
         TF_WARN("Failed to link shader: %s", logString.c_str());
         success = false;
@@ -170,10 +172,10 @@ HdStGLSLProgram::Link()
 
     // initial program size
     GLint size;
-    glGetProgramiv(program, GL_PROGRAM_BINARY_LENGTH, &size);
+    glGetProgramiv(_program, GL_PROGRAM_BINARY_LENGTH, &size);
 
     // update the program resource allocation
-    _program.SetAllocation(program, size);
+    _programSize = size;
 
     // create an uniform buffer
     GLuint uniformBuffer = _uniformBuffer.GetOpenGLId();
@@ -187,7 +189,7 @@ HdStGLSLProgram::Link()
         std::vector<char> bin(size);
         GLsizei len;
         GLenum format;
-        glGetProgramBinary(program, size, &len, &format, &bin[0]);
+        glGetProgramBinary(_program, size, &len, &format, &bin[0]);
         static int id = 0;
         std::stringstream fname;
         fname << "program" << id++ << ".bin";
@@ -205,8 +207,7 @@ HdStGLSLProgram::Link()
 bool
 HdStGLSLProgram::Validate() const
 {
-    GLuint program = _program.GetOpenGLId();
-    if (program == 0) return false;
+    if (_program == 0) return false;
 
     if (TfDebug::IsEnabled(HD_SAFE_MODE) ||
         TfGetEnvSetting(HD_ENABLE_SHARED_CONTEXT_CHECK)) {
@@ -214,13 +215,13 @@ HdStGLSLProgram::Validate() const
         HD_TRACE_FUNCTION();
 
         // make sure the binary size is same as when it's created.
-        if (glIsProgram(program) == GL_FALSE) return false;
+        if (glIsProgram(_program) == GL_FALSE) return false;
         GLint size = 0;
-        glGetProgramiv(program, GL_PROGRAM_BINARY_LENGTH, &size);
+        glGetProgramiv(_program, GL_PROGRAM_BINARY_LENGTH, &size);
         if (size == 0) {
             return false;
         }
-        if (static_cast<size_t>(size) != _program.GetSize()) {
+        if (static_cast<size_t>(size) != _programSize) {
             return false;
         }
     }
@@ -234,19 +235,81 @@ HdStGLSLProgram::GetProgramLinkStatus(std::string * reason) const
     if (!glGetProgramiv) return true;
     
     GLint status = 0;
-    GLuint program = _program.GetOpenGLId();
-    glGetProgramiv(program, GL_LINK_STATUS, &status);
+    glGetProgramiv(_program, GL_LINK_STATUS, &status);
     if (reason) {
         GLint infoLength = 0;
-        glGetProgramiv(program, GL_INFO_LOG_LENGTH, &infoLength);
+        glGetProgramiv(_program, GL_INFO_LOG_LENGTH, &infoLength);
         if (infoLength > 0) {
             char *infoLog = new char[infoLength];;
-            glGetProgramInfoLog(program, infoLength, NULL, infoLog);
+            glGetProgramInfoLog(_program, infoLength, NULL, infoLog);
             reason->assign(infoLog, infoLength);
             delete[] infoLog;
         }
     }
     return (status == GL_TRUE);
+}
+
+void HdStGLSLProgram::AssignUniformBindings(GarchBindingMapRefPtr bindingMap) const
+{
+    GlfBindingMapRefPtr glfBindingMap(TfDynamic_cast<GlfBindingMapRefPtr>(bindingMap));
+    
+    glfBindingMap->AssignUniformBindingsToProgram(GetGLProgram());
+}
+
+void HdStGLSLProgram::AssignSamplerUnits(GarchBindingMapRefPtr bindingMap) const
+{
+    GlfBindingMapRefPtr glfBindingMap(TfDynamic_cast<GlfBindingMapRefPtr>(bindingMap));
+    
+    glfBindingMap->AssignSamplerUnitsToProgram(GetGLProgram());
+}
+
+void HdStGLSLProgram::AddCustomBindings(GarchBindingMapRefPtr bindingMap) const
+{
+    GlfBindingMapRefPtr glfBindingMap(TfDynamic_cast<GlfBindingMapRefPtr>(bindingMap));
+    
+    glfBindingMap->AddCustomBindings(GetGLProgram());
+}
+
+void HdStGLSLProgram::SetProgram() const {
+    
+}
+
+void HdStGLSLProgram::UnsetProgram() const {
+    glUseProgram(0);
+}
+
+void HdStGLSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
+                                                      int indexCount,
+                                                      GLint indexType,
+                                                      GLint firstIndex,
+                                                      GLint instanceCount,
+                                                      GLint baseVertex) const {
+    uint64_t size;
+    
+    switch(indexType) {
+        case GL_UNSIGNED_BYTE:
+            size = sizeof(GLubyte);
+            break;
+        case GL_UNSIGNED_SHORT:
+            size = sizeof(GLushort);
+            break;
+        case GL_UNSIGNED_INT:
+            size = sizeof(GLuint);
+            break;
+    }
+    glDrawElementsInstancedBaseVertex(primitiveMode,
+                                      indexCount,
+                                      indexType,
+                                      (void *)(firstIndex * size),
+                                      instanceCount,
+                                      baseVertex);
+}
+
+void HdStGLSLProgram::DrawArraysInstanced(GLenum primitiveMode,
+                                          GLint baseVertex,
+                                          GLint vertexCount,
+                                          GLint instanceCount) const {
+    glDrawArraysInstanced(primitiveMode, baseVertex, vertexCount, instanceCount);
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

@@ -21,8 +21,8 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#ifndef GLF_RESOURCEFACTORY_H
-#define GLF_RESOURCEFACTORY_H
+#ifndef MTLF_RESOURCEFACTORY_H
+#define MTLF_RESOURCEFACTORY_H
 
 /// \file glf/resourceFactory.h
 
@@ -31,10 +31,10 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-class GlfResourceFactory : public GarchResourceFactoryInterface {
+class MtlfResourceFactory : public GarchResourceFactoryInterface {
 public:
-    GlfResourceFactory();
-    virtual ~GlfResourceFactory();
+    MtlfResourceFactory();
+    virtual ~MtlfResourceFactory();
 
     // GarchSimpleLightingContext creation
     virtual GarchSimpleLightingContext *NewSimpleLightingContext() const override;
@@ -53,9 +53,9 @@ public:
     virtual GarchUniformBlockRefPtr NewUniformBlock() const override;
     
     // Package Name accessor
-    virtual std::string GetPackageName() const override { return "Glf"; }
+    virtual std::string GetPackageName() const override { return "mtlf"; }
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE
 
-#endif // GLF_RESOURCEFACTORY_H
+#endif // MTLF_RESOURCEFACTORY_H

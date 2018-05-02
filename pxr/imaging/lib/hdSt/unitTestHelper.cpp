@@ -277,7 +277,7 @@ HdSt_TestLightingShader::HdSt_TestLightingShader()
     _sceneAmbient    = GfVec3f(0.04, 0.04, 0.04);
 
     std::stringstream ss(lightingShader);
-    _glslfx.reset(GLSLFX::New(ss));
+    _glslfx.reset(new GLSLFX(ss));
 }
 
 HdSt_TestLightingShader::~HdSt_TestLightingShader()
@@ -308,7 +308,7 @@ HdSt_TestLightingShader::GetSource(TfToken const &shaderStageKey) const
 /* virtual */
 void
 HdSt_TestLightingShader::SetCamera(GfMatrix4d const &worldToViewMatrix,
-                                 GfMatrix4d const &projectionMatrix)
+                                   GfMatrix4d const &projectionMatrix)
 {
     for (int i = 0; i < 2; ++i) {
         _lights[i].eyeDir
@@ -319,7 +319,7 @@ HdSt_TestLightingShader::SetCamera(GfMatrix4d const &worldToViewMatrix,
 /* virtual */
 void
 HdSt_TestLightingShader::BindResources(HdSt_ResourceBinder const &binder,
-                                       HdStProgramGPUHandle program)
+                                       HdStProgram const &program)
 {
     binder.BindUniformf(_tokens->l0dir,   3, _lights[0].eyeDir.GetArray());
     binder.BindUniformf(_tokens->l0color, 3, _lights[0].color.GetArray());
@@ -331,7 +331,7 @@ HdSt_TestLightingShader::BindResources(HdSt_ResourceBinder const &binder,
 /* virtual */
 void
 HdSt_TestLightingShader::UnbindResources(HdSt_ResourceBinder const &binder,
-                                         HdStProgramGPUHandle program)
+                                         HdStProgram const &program)
 {
 }
 

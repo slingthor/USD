@@ -24,11 +24,10 @@
 #ifndef GARCH_BASETEXTURE_H
 #define GARCH_BASETEXTURE_H
 
-/// \file glf/uvTexture.h
+/// \file garch/uvTexture.h
 
 #include "pxr/pxr.h"
-#include "pxr/imaging/glf/api.h"
-
+#include "pxr/imaging/garch/api.h"
 #include "pxr/imaging/garch/texture.h"
 
 #include "pxr/base/tf/declarePtrs.h"
@@ -72,7 +71,7 @@ public:
     }
 
     // GarchTexture overrides
-    /// Returns the Metal texture object for the texture.
+    /// Returns the GPU API texture object for the texture.
     GARCH_API
     virtual GarchTextureGPUHandle GetTextureName() const override {
         return _textureName;

@@ -285,9 +285,50 @@ HdStDrawTarget::_SetAttachments(
     size_t numAttachments = attachments.GetNumAttachments();
     _renderPassState.SetNumColorAttachments(numAttachments);
 
-    _drawTarget->Bind();
-
     _colorTextureResources.resize(numAttachments);
+
+    std::vector<GarchDrawTarget::AttachmentDesc> attachmentDesc;
+    for (size_t attachmentNum = 0; attachmentNum < numAttachments;
+         ++attachmentNum) {
+        const HdStDrawTargetAttachmentDesc &desc =
+        attachments.GetAttachment(attachmentNum);
+        
+        GLenum format = GL_RGBA;
+        GLenum type   = GL_BYTE;
+        GLenum internalFormat = GL_RGBA8;
+        HdStGLConversions::GetGlFormat(desc.GetFormat(),
+                                       &format, &type, &internalFormat);
+        
+        const std::string &name = desc.GetName();
+        attachmentDesc.push_back(
+            GarchDrawTarget::AttachmentDesc(name, format, type, internalFormat));
+    }
+
+    // Always add depth texture
+    // XXX: GarchDrawTarget requires the depth texture be added last,
+    // otherwise the draw target indexes are off-by-1.
+    attachmentDesc.push_back(
+         GarchDrawTarget::AttachmentDesc(DEPTH_ATTACHMENT_NAME,
+                                         GL_DEPTH_COMPONENT,
+                                         GL_FLOAT,
+                                         GL_DEPTH_COMPONENT32F));
+    _drawTarget->SetAttachments(attachmentDesc);
+    _drawTarget->Bind();
+    
+    _RegisterTextureResource(sceneDelegate,
+                             DEPTH_ATTACHMENT_NAME,
+                             &_depthTextureResource);
+    
+    
+    HdSt_DrawTargetTextureResource *depthResource =
+    static_cast<HdSt_DrawTargetTextureResource *>(
+                                                  _depthTextureResource.get());
+    
+    depthResource->SetAttachment(_drawTarget->GetAttachment(DEPTH_ATTACHMENT_NAME));
+    depthResource->SetSampler(attachments.GetDepthWrapS(),
+                              attachments.GetDepthWrapT(),
+                              attachments.GetDepthMinFilter(),
+                              attachments.GetDepthMagFilter());
 
     for (size_t attachmentNum = 0; attachmentNum < numAttachments;
                                                               ++attachmentNum) {
@@ -301,10 +342,6 @@ HdStDrawTarget::_SetAttachments(
                                    &format, &type, &internalFormat);
 
         const std::string &name = desc.GetName();
-        _drawTarget->AddAttachment(name,
-                                   format,
-                                   type,
-                                   internalFormat);
 
         _renderPassState.SetColorClearValue(attachmentNum, desc.GetClearColor());
 
@@ -324,28 +361,6 @@ HdStDrawTarget::_SetAttachments(
 
     }
 
-    // Always add depth texture
-    // XXX: GarchDrawTarget requires the depth texture be added last,
-    // otherwise the draw target indexes are off-by-1.
-    _drawTarget->AddAttachment(DEPTH_ATTACHMENT_NAME,
-                               GL_DEPTH_COMPONENT,
-                               GL_FLOAT,
-                               GL_DEPTH_COMPONENT32F);
-
-    _RegisterTextureResource(sceneDelegate,
-                             DEPTH_ATTACHMENT_NAME,
-                             &_depthTextureResource);
-
-
-    HdSt_DrawTargetTextureResource *depthResource =
-                    static_cast<HdSt_DrawTargetTextureResource *>(
-                                                  _depthTextureResource.get());
-
-    depthResource->SetAttachment(_drawTarget->GetAttachment(DEPTH_ATTACHMENT_NAME));
-    depthResource->SetSampler(attachments.GetDepthWrapS(),
-                              attachments.GetDepthWrapT(),
-                              attachments.GetDepthMinFilter(),
-                              attachments.GetDepthMagFilter());
    _drawTarget->Unbind();
 
     if (HdEngine::GetRenderAPI()==HdEngine::OpenGL)

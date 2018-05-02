@@ -113,6 +113,8 @@ HdStExtCompGpuComputation::Execute(
         return;
     }
     
+    TF_FATAL_CODING_ERROR("Not Implemented");
+    /*
     GLuint kernel = (GLuint)(uint64_t)computeProgram->GetProgram().GetId();
     glUseProgram(kernel);
 
@@ -208,6 +210,7 @@ HdStExtCompGpuComputation::Execute(
     }
 
     glUseProgram(0);
+     */
 }
 
 void

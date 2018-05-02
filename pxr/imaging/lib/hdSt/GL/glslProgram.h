@@ -62,10 +62,6 @@ public:
     HDST_API
     virtual bool Validate() const override;
 
-    /// Returns HdResource of the program object.
-    HDST_API
-    virtual HdResource const &GetProgram() const override { return _program; }
-
     /// Returns HdResource of the global uniform buffer object for this program.
     HDST_API
     virtual HdResource const &GetGlobalUniformBuffer() const override {
@@ -77,8 +73,46 @@ public:
     HDST_API
     virtual bool GetProgramLinkStatus(std::string * reason) const override;
 
+    /// Returns the binary size of the program (if available)
+    HDST_API
+    virtual uint32_t GetProgramSize() const { return _programSize; }
+    
+    HDST_API
+    virtual void AssignUniformBindings(GarchBindingMapRefPtr bindingMap) const override;
+    
+    HDST_API
+    virtual void AssignSamplerUnits(GarchBindingMapRefPtr bindingMap) const override;
+    
+    HDST_API
+    virtual void AddCustomBindings(GarchBindingMapRefPtr bindingMap) const override;
+
+    HDST_API
+    virtual void SetProgram() const override;
+    
+    HDST_API
+    virtual void UnsetProgram() const override;
+    
+    HDST_API
+    virtual void DrawElementsInstancedBaseVertex(GLenum primitiveMode,
+                                                 int indexCount,
+                                                 GLint indexType,
+                                                 GLint firstIndex,
+                                                 GLint instanceCount,
+                                                 GLint baseVertex) const override;
+    
+    HDST_API
+    virtual void DrawArraysInstanced(GLenum primitiveMode,
+                                     GLint baseVertex,
+                                     GLint vertexCount,
+                                     GLint instanceCount) const override;
+    
+    /// Returns the GL program object.
+    HDST_API
+    GLuint GetGLProgram() const { return _program; }
+
 private:
-    HdStResourceGL _program;
+    GLuint _program;
+    GLuint _programSize;
     HdStResourceGL _uniformBuffer;
 };
 

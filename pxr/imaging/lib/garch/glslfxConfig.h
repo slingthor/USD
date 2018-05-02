@@ -119,7 +119,7 @@ public:
 
     typedef std::vector<Attribute> Attributes;
 
-    /// Create a new GlfGLSLFXConfig from an input string
+    /// Create a new GLSLFXConfig from an input string
     ///
     /// The \p filename parameter is only used for error reporting.
     ///

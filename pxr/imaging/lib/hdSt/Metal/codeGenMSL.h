@@ -49,18 +49,37 @@ class HdSt_CodeGenMSL : public HdSt_CodeGen
 {
 public:
     struct TParam {
-        TParam() {}
+        enum Usage {
+            Unspecified = 0,
+            Texture,
+            Sampler,
+            
+            // The following are bit flags | with one of the above
+            EntryFuncArgument   = 1 << 4,
+            ProgramScope        = 1 << 5,
+            VertexShaderOnly    = 1 << 6
+        };
+        static Usage const maskShaderUsage = Usage(EntryFuncArgument - 1);
+        
+        TParam()
+        : usage(Unspecified) {}
+
         TParam(TfToken const &_name,
                TfToken const &_dataType,
                TfToken const &_accessorStr,
-               TfToken const &_attribute)
-        : name(_name), dataType(_dataType), accessorStr(_accessorStr), attribute(_attribute) {}
+               TfToken const &_attribute,
+               Usage const _usage)
+        : name(_name)
+        , dataType(_dataType)
+        , accessorStr(_accessorStr)
+        , attribute(_attribute)
+        , usage(_usage) {}
         
         TfToken const name;
         TfToken const dataType;
         TfToken const accessorStr;
         TfToken const attribute;
-        bool includeAsFuncParam;
+        Usage usage;
     };
     
     typedef std::vector<TParam> InOutParams;
@@ -135,7 +154,8 @@ private:
     void _GenerateVertexPrimVar();
     void _GenerateShaderParameters();
     
-    void _ParseGLSL(std::stringstream &source);
+    void _ParseGLSL(std::stringstream &source, InOutParams& inParams, InOutParams& outParams);
+    void _GenerateGlue(std::stringstream& glueVS, std::stringstream& gluePS, HdStMSLProgramSharedPtr mslProgram);
 
     HdSt_ResourceBinder::MetaData _metaData;
     HdSt_GeometricShaderPtr _geometricShader;
@@ -154,8 +174,10 @@ private:
     std::string _fsSource;
     std::string _csSource;
     
-    InOutParams _mslInputParams;
-    InOutParams _mslOutputParams;
+    InOutParams _mslVSInputParams;
+    InOutParams _mslVSOutputParams;
+    InOutParams _mslPSInputParams;
+    InOutParams _mslPSOutputParams;
 };
 
 

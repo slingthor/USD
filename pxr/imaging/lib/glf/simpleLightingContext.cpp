@@ -249,7 +249,7 @@ GlfSimpleLightingContext::BindSamplers(GarchBindingMapPtr const &bindingMap)
     int shadowSampler = bindingMap->GetSamplerUnit(_tokens->shadowSampler);
     int shadowCompareSampler = bindingMap->GetSamplerUnit(_tokens->shadowCompareSampler);
     
-    GLuint _shadowMapTexture = (GLuint)(uint64_t)_shadows->GetShadowMapTexture();
+    GLuint _shadowMapTexture = _shadows->GetShadowMapTexture();
     
     GLuint _shadowMapDepthSampler = (GLuint)(uint64_t)_shadows->GetShadowMapDepthSampler();
     GLuint _shadowMapCompareSampler = (GLuint)(uint64_t)_shadows->GetShadowMapCompareSampler();

@@ -1098,7 +1098,7 @@ _GetMixinShaderSource(TfToken const &shaderStageKey)
    
     std::call_once(firstUse, [](){
         std::string filePath = HdStPackageLightingIntegrationShader();
-        mixinFX.reset(GLSLFX::New(filePath));
+        mixinFX.reset(new GLSLFX(filePath));
     });
 
     return mixinFX->GetSource(shaderStageKey);

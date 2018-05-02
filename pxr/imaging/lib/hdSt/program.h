@@ -27,6 +27,7 @@
 #include "pxr/pxr.h"
 #include "pxr/imaging/hdSt/api.h"
 
+#include "pxr/base/tf/declarePtrs.h"
 #include "pxr/base/tf/token.h"
 
 #include <boost/shared_ptr.hpp>
@@ -35,9 +36,10 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 class HdStResourceRegistry;
 class HdResource;
+
 typedef boost::shared_ptr<class HdStProgram> HdStProgramSharedPtr;
 
-typedef void* HdStProgramGPUHandle;
+TF_DECLARE_WEAK_AND_REF_PTRS(GarchBindingMap);
 
 /// \class HdProgram
 ///
@@ -68,10 +70,6 @@ public:
     HDST_API
     virtual bool Validate() const = 0;
 
-    /// Returns HdResource of the program object.
-    HDST_API
-    virtual HdResource const &GetProgram() const = 0;
-
     /// Returns HdResource of the global uniform buffer object for this program.
     HDST_API
     virtual HdResource const &GetGlobalUniformBuffer() const = 0;
@@ -80,6 +78,39 @@ public:
     /// if not, returns false and fills the error log into reason.
     HDST_API
     virtual bool GetProgramLinkStatus(std::string * reason) const = 0;
+    
+    /// Returns the binary size of the program (if available)
+    HDST_API
+    virtual uint32_t GetProgramSize() const = 0;
+    
+    HDST_API
+    virtual void AssignUniformBindings(GarchBindingMapRefPtr bindingMap) const = 0;
+    
+    HDST_API
+    virtual void AssignSamplerUnits(GarchBindingMapRefPtr bindingMap) const = 0;
+    
+    HDST_API
+    virtual void AddCustomBindings(GarchBindingMapRefPtr bindingMap) const = 0;
+    
+    HDST_API
+    virtual void SetProgram() const = 0;
+    
+    HDST_API
+    virtual void UnsetProgram() const = 0;
+    
+    HDST_API
+    virtual void DrawElementsInstancedBaseVertex(GLenum primitiveMode,
+                                                 int indexCount,
+                                                 GLint indexType,
+                                                 GLint firstIndex,
+                                                 GLint instanceCount,
+                                                 GLint baseVertex) const = 0;
+
+    HDST_API
+    virtual void DrawArraysInstanced(GLenum primitiveMode,
+                                     GLint baseVertex,
+                                     GLint vertexCount,
+                                     GLint instanceCount) const = 0;
     
     /// Returns the hash value of the program for \a sourceFile
     HDST_API

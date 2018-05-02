@@ -172,7 +172,7 @@ GlfArrayTexture::_CreateTextures(
     
     glBindTexture(
         GL_TEXTURE_2D_ARRAY,
-        (GLuint)(uint64_t)GetGlTextureName());
+        GetGlTextureName());
     
     glTexParameteri(
         GL_TEXTURE_2D_ARRAY,

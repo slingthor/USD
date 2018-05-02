@@ -100,7 +100,7 @@ void wrapMetal()
 {
     { 
         // Start a new scope so that DrawMode, CullStyle and RenderParams are under Metal.
-        scope Metal = class_<UsdImagingMetal, boost::noncopyable>("Metal",
+        scope Metal = class_<UsdImagingMetal, boost::noncopyable>("GL",
                                         "UsdImaging Metal Renderer class")
             .def( init<>() )
             .def( init<const SdfPath &, const SdfPathVector&, const SdfPathVector& >() )

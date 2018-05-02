@@ -44,7 +44,7 @@ HdStGLSLFXShader::~HdStGLSLFXShader()
 void
 HdStGLSLFXShader::Reload()
 {
-    GLSLFXSharedPtr newGlslFx(GLSLFX::New(_glslfx->GetFilePath()));
+    GLSLFXSharedPtr newGlslFx(new GLSLFX(_glslfx->GetFilePath()));
     if (newGlslFx->IsValid())
     {
         _glslfx = newGlslFx;

@@ -151,8 +151,8 @@ GlfSimpleShadowArray::_AllocTextureArray()
 
     _shadowDepthSampler = (GarchSamplerGPUHandle)(uint64_t)shadowDepthSampler;
     _shadowCompareSampler = (GarchSamplerGPUHandle)(uint64_t)shadowCompareSampler;
-    _framebuffer = (GarchSamplerGPUHandle)(uint64_t)framebuffer;
-    _texture = (GarchSamplerGPUHandle)(uint64_t)texture;
+    _framebuffer = framebuffer;
+    _texture = texture;
 }
 
 void
@@ -160,25 +160,25 @@ GlfSimpleShadowArray::_FreeTextureArray()
 {
     GlfSharedGLContextScopeHolder sharedContextScopeHolder;
     
-    if (_texture) {
-        GLuint texture = (GLuint)(uint64_t)_texture;
+    if (_texture.IsSet()) {
+        GLuint texture = _texture;
         glDeleteTextures(1, &texture);
-        _texture = 0;
+        _texture.Clear();
     }
-    if (_framebuffer) {
-        GLuint framebuffer = (GLuint)(uint64_t)_framebuffer;
+    if (_framebuffer.IsSet()) {
+        GLuint framebuffer = _framebuffer;
         glDeleteFramebuffers(1, &framebuffer);
-        _framebuffer = 0;
+        _framebuffer.Clear();
     }
-    if (_shadowDepthSampler) {
+    if (_shadowDepthSampler.IsSet()) {
         GLuint shadowDepthSampler = (GLuint)(uint64_t)_shadowDepthSampler;
         glDeleteSamplers(1, &shadowDepthSampler);
-        _shadowDepthSampler = 0;
+        _shadowDepthSampler.Clear();
     }
-    if (_shadowCompareSampler) {
+    if (_shadowCompareSampler.IsSet()) {
         GLuint shadowCompareSampler = (GLuint)(uint64_t)_shadowCompareSampler;
         glDeleteSamplers(1, &shadowCompareSampler);
-        _shadowCompareSampler = 0;
+        _shadowCompareSampler.Clear();
     }
 }
 
@@ -190,16 +190,13 @@ GlfSimpleShadowArray::_BindFramebuffer(size_t index)
     glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING,
                   (GLint*)&_unbindRestoreReadFramebuffer);
 
-    if (!_framebuffer || !_texture) {
+    if (!_framebuffer.IsSet() || !_texture.IsSet()) {
         _AllocTextureArray();
     }
 
-    GLuint framebuffer = (GLuint)(uint64_t)_framebuffer;
-    GLuint texture = (GLuint)(uint64_t)_texture;
-    
-    glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+    glBindFramebuffer(GL_FRAMEBUFFER, _framebuffer);
     glFramebufferTextureLayer(GL_FRAMEBUFFER,
-                              GL_DEPTH_ATTACHMENT, texture, 0, index);
+                              GL_DEPTH_ATTACHMENT, _texture, 0, index);
 }
 
 void

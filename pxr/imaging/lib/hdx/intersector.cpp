@@ -105,24 +105,22 @@ HdxIntersector::_Init(GfVec2i const& size)
         // would know nothing about these outputs, making this code more robust in
         // the face of future changes.
 
-        _drawTarget->Bind();
-
         // Create initial attachments
-        _drawTarget->AddAttachment(
-            "primId", GL_RGBA, GL_UNSIGNED_BYTE, GL_RGBA8);
-        _drawTarget->AddAttachment(
-            "instanceId", GL_RGBA, GL_UNSIGNED_BYTE, GL_RGBA8);
-        _drawTarget->AddAttachment(
-            "elementId", GL_RGBA, GL_UNSIGNED_BYTE, GL_RGBA8);
-        _drawTarget->AddAttachment(
-            "edgeId", GL_RGBA, GL_UNSIGNED_BYTE, GL_RGBA8);
-        _drawTarget->AddAttachment(
-            "pointId", GL_RGBA, GL_UNSIGNED_BYTE, GL_RGBA8);
-        _drawTarget->AddAttachment(
-            "depth", GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8, GL_DEPTH24_STENCIL8);
-            //"depth", GL_DEPTH_COMPONENT, GL_FLOAT, GL_DEPTH_COMPONENT32F);
-
-        _drawTarget->Unbind();
+        std::vector<GarchDrawTarget::AttachmentDesc> attachmentDesc;
+        attachmentDesc.push_back(
+            GarchDrawTarget::AttachmentDesc("primId", GL_RGBA, GL_UNSIGNED_BYTE, GL_RGBA8));
+        attachmentDesc.push_back(
+            GarchDrawTarget::AttachmentDesc("instanceId", GL_RGBA, GL_UNSIGNED_BYTE, GL_RGBA8));
+        attachmentDesc.push_back(
+            GarchDrawTarget::AttachmentDesc("elementId", GL_RGBA, GL_UNSIGNED_BYTE, GL_RGBA8));
+        attachmentDesc.push_back(
+            GarchDrawTarget::AttachmentDesc("edgeId", GL_RGBA, GL_UNSIGNED_BYTE, GL_RGBA8));
+        attachmentDesc.push_back(
+            GarchDrawTarget::AttachmentDesc("pointId", GL_RGBA, GL_UNSIGNED_BYTE, GL_RGBA8));
+        attachmentDesc.push_back(
+            GarchDrawTarget::AttachmentDesc("depth", GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8, GL_DEPTH24_STENCIL8));
+                                            //"depth", GL_DEPTH_COMPONENT, GL_FLOAT, GL_DEPTH_COMPONENT32F));
+        _drawTarget->SetAttachments(attachmentDesc);
     }
 }
 
@@ -292,8 +290,8 @@ HdxIntersector::Query(HdxIntersector::Params const& params,
     // Clone attachments into this context. Note that this will do a
     // light-weight copy of the textures, it does not produce a full copy of the
     // underlying images.
-    drawTarget->Bind();
     drawTarget->CloneAttachments(_drawTarget);
+    drawTarget->Bind();
 
     //
     // Setup GL raster state
@@ -451,30 +449,12 @@ HdxIntersector::Query(HdxIntersector::Params const& params,
     std::unique_ptr<unsigned char[]> pointId(new unsigned char[len*4]);
     std::unique_ptr<float[]> depths(new float[len]);
 
-    glBindTexture(GL_TEXTURE_2D,
-        (GLuint)(uint64_t)drawTarget->GetAttachments().at("primId")->GetTextureName());
-    glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, &primId[0]);
-
-    glBindTexture(GL_TEXTURE_2D,
-        (GLuint)(uint64_t)drawTarget->GetAttachments().at("instanceId")->GetTextureName());
-    glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, &instanceId[0]);
-
-    glBindTexture(GL_TEXTURE_2D,
-        (GLuint)(uint64_t)drawTarget->GetAttachments().at("elementId")->GetTextureName());
-    glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, &elementId[0]);
-
-    glBindTexture(GL_TEXTURE_2D,
-        (GLuint)(uint64_t)drawTarget->GetAttachments().at("edgeId")->GetTextureName());
-    glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, &edgeId[0]);
-    
-    glBindTexture(GL_TEXTURE_2D,
-        (GLuint)(uint64_t)drawTarget->GetAttachments().at("pointId")->GetTextureName());
-    glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, &pointId[0]);
-
-    glBindTexture(GL_TEXTURE_2D,
-        (GLuint)(uint64_t)drawTarget->GetAttachments().at("depth")->GetTextureName());
-    glGetTexImage(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, GL_FLOAT,
-                    &depths[0]);
+    drawTarget->GetImage("primId", &primId[0]);
+    drawTarget->GetImage("instanceId", &instanceId[0]);
+    drawTarget->GetImage("elementId", &elementId[0]);
+    drawTarget->GetImage("edgeId", &edgeId[0]);
+    drawTarget->GetImage("pointId", &pointId[0]);
+    drawTarget->GetImage("depth", &depths[0]);
 
     glBindTexture(GL_TEXTURE_2D, 0);
 

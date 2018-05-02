@@ -36,6 +36,10 @@
 
 #include "pxr/imaging/garch/gl.h"
 
+#if defined(ARCH_GFX_METAL)
+#include <Metal/Metal.h>
+#endif
+
 #include <map>
 #include <string>
 #include <vector>
@@ -52,8 +56,93 @@ TF_DECLARE_PUBLIC_TOKENS(GarchTextureTokens, GARCH_API, GARCH_TEXTURE_TOKENS);
 
 TF_DECLARE_WEAK_AND_REF_PTRS(GarchTexture);
 
-typedef void* GarchTextureGPUHandle;
-typedef void* GarchSamplerGPUHandle;
+struct GarchTextureGPUHandle {
+    GarchTextureGPUHandle() {
+        handle = 0;
+    }
+    GarchTextureGPUHandle(GarchTextureGPUHandle const & _gpuHandle) {
+        handle = _gpuHandle.handle;
+    }
+    
+    void Clear() { handle = 0; }
+    bool IsSet() const { return handle != 0; }
+
+    // OpenGL
+    GarchTextureGPUHandle(GLuint const _handle) {
+        handle = _handle;
+    }
+    GarchTextureGPUHandle(GLuint64 const _handle) {
+        handle = _handle;
+    }
+    GarchTextureGPUHandle& operator =(GLuint const _handle) {
+        handle = _handle;
+        return *this;
+    }
+    GarchTextureGPUHandle& operator =(GLuint64 const _handle) {
+        handle = _handle;
+        return *this;
+    }
+    operator GLuint() const { return (GLuint)handle; }
+    operator GLuint64() const { return handle; }
+
+#if defined(ARCH_GFX_METAL)
+    // Metal
+    GarchTextureGPUHandle(id<MTLTexture> const _handle) {
+        handle = (__bridge uint64_t)_handle;
+    }
+    GarchTextureGPUHandle& operator =(id<MTLTexture> const _handle) {
+        handle = (__bridge uint64_t)_handle;
+        return *this;
+    }
+    operator id<MTLTexture>() const { return (__bridge id<MTLTexture>)handle; }
+#endif
+    
+    uint64_t handle;
+};
+
+struct GarchSamplerGPUHandle {
+    GarchSamplerGPUHandle() {
+        handle = 0;
+    }
+    GarchSamplerGPUHandle(GarchSamplerGPUHandle const & _gpuHandle) {
+        handle = _gpuHandle.handle;
+    }
+    
+    void Clear() { handle = 0; }
+    bool IsSet() const { return handle != 0; }
+    
+    // OpenGL
+    GarchSamplerGPUHandle(GLuint const _handle) {
+        handle = _handle;
+    }
+    GarchSamplerGPUHandle(GLuint64 const _handle) {
+        handle = _handle;
+    }
+    GarchSamplerGPUHandle& operator =(GLuint const _handle) {
+        handle = _handle;
+        return *this;
+    }
+    GarchSamplerGPUHandle& operator =(GLuint64 const _handle) {
+        handle = _handle;
+        return *this;
+    }
+    operator GLuint() const { return (GLuint)handle; }
+    operator GLuint64() const { return handle; }
+    
+#if defined(ARCH_GFX_METAL)
+    // Metal
+    GarchSamplerGPUHandle(id<MTLSamplerState> const _handle) {
+        handle = (__bridge uint64_t)_handle;
+    }
+    GarchSamplerGPUHandle& operator =(id<MTLSamplerState> const _handle) {
+        handle = (__bridge uint64_t)_handle;
+        return *this;
+    }
+    operator id<MTLSamplerState>() const { return (__bridge id<MTLSamplerState>)handle; }
+#endif
+    
+    uint64_t handle;
+};
 
 /// \class GarchTexture
 ///
@@ -96,7 +185,7 @@ public:
     /// named \a identifier. If \a samplerId is specified, the bindings
     /// returned will use this samplerId for resources which can be sampled.
     virtual BindingVector GetBindings(TfToken const & identifier,
-                                      GarchSamplerGPUHandle samplerId = 0) const = 0;
+                                      GarchSamplerGPUHandle samplerId = GarchSamplerGPUHandle()) const = 0;
 
     /// Amount of memory used to store the texture
     GARCH_API

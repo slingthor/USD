@@ -73,11 +73,6 @@ public:
     // GarchTexture overrides
     /// Returns the Metal texture object for the texture.
     MTLF_API
-    virtual GarchTextureGPUHandle GetTextureName() const override {
-        return (GarchTextureGPUHandle)(uint64_t)_textureName;
-    }
-
-    MTLF_API
     virtual BindingVector GetBindings(TfToken const & identifier,
                                       GarchSamplerGPUHandle samplerName) const override;
     

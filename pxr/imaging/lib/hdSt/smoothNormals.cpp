@@ -115,8 +115,6 @@ HdSt_SmoothNormalsComputationGPU::Execute(
             static_cast<HdStResourceRegistry*>(resourceRegistry));
     if (!computeProgram) return;
 
-    HdBufferResourceGPUHandle program = computeProgram->GetProgram().GetId();
-
     HdBufferArrayRangeSharedPtr range =
         boost::static_pointer_cast<HdBufferArrayRange> (range_);
 
@@ -173,6 +171,8 @@ HdSt_SmoothNormalsComputationGPU::Execute(
 
     TF_FATAL_CODING_ERROR("Not Implemented");
     /*
+    HdBufferResourceGPUHandle program = computeProgram->GetProgram().GetId();
+
     // transfer uniform buffer
     GLuint ubo = computeProgram->GetGlobalUniformBuffer().GetId();
     

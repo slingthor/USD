@@ -23,13 +23,13 @@
 //
 // utils.cpp
 //
-#include <pxr/imaging/glf/resourceFactory.h>
+#include <pxr/imaging/mtlf/resourceFactory.h>
 
-#include <pxr/imaging/glf/bindingMap.h>
-#include <pxr/imaging/glf/drawTarget.h>
-#include <pxr/imaging/glf/simpleLightingContext.h>
-#include <pxr/imaging/glf/simpleShadowArray.h>
-#include <pxr/imaging/glf/uniformBlock.h>
+#include <pxr/imaging/mtlf/bindingMap.h>
+#include <pxr/imaging/mtlf/drawTarget.h>
+#include <pxr/imaging/mtlf/simpleLightingContext.h>
+#include <pxr/imaging/mtlf/simpleShadowArray.h>
+#include <pxr/imaging/mtlf/uniformBlock.h>
 
 #include <pxr/imaging/garch/glslfx.h>
 
@@ -37,44 +37,44 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-GlfResourceFactory::GlfResourceFactory()
+MtlfResourceFactory::MtlfResourceFactory()
 {
     // Empty
 }
 
-GlfResourceFactory::~GlfResourceFactory()
+MtlfResourceFactory::~MtlfResourceFactory()
 {
     // Empty
 }
 
-GarchSimpleLightingContext *GlfResourceFactory::NewSimpleLightingContext() const
+GarchSimpleLightingContext *MtlfResourceFactory::NewSimpleLightingContext() const
 {
-    return new GlfSimpleLightingContext();
+    return new MtlfSimpleLightingContext();
 }
 
-GarchSimpleShadowArray *GlfResourceFactory::NewSimpleShadowArray(GfVec2i const & size, size_t numLayers) const
+GarchSimpleShadowArray *MtlfResourceFactory::NewSimpleShadowArray(GfVec2i const & size, size_t numLayers) const
 {
-    return new GlfSimpleShadowArray(size, numLayers);
+    return new MtlfSimpleShadowArray(size, numLayers);
 }
 
-GarchBindingMap *GlfResourceFactory::NewBindingMap() const
+GarchBindingMap *MtlfResourceFactory::NewBindingMap() const
 {
-    return new GlfBindingMap();
+    return new MtlfBindingMap();
 }
 
-GarchDrawTarget *GlfResourceFactory::NewDrawTarget(GfVec2i const & size, bool requestMSAA) const
+GarchDrawTarget *MtlfResourceFactory::NewDrawTarget(GfVec2i const & size, bool requestMSAA) const
 {
-    return new GlfDrawTarget(size, requestMSAA);
+    return new MtlfDrawTarget(size, requestMSAA);
 }
 
-GarchDrawTarget *GlfResourceFactory::NewDrawTarget(GarchDrawTargetPtr const & drawtarget) const
+GarchDrawTarget *MtlfResourceFactory::NewDrawTarget(GarchDrawTargetPtr const & drawtarget) const
 {
-    return new GlfDrawTarget(drawtarget);
+    return new MtlfDrawTarget(drawtarget);
 }
 
-GarchUniformBlockRefPtr GlfResourceFactory::NewUniformBlock() const
+GarchUniformBlockRefPtr MtlfResourceFactory::NewUniformBlock() const
 {
-    return TfCreateRefPtr(new GlfUniformBlock());
+    return TfCreateRefPtr(new MtlfUniformBlock());
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

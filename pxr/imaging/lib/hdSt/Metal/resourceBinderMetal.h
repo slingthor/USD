@@ -46,7 +46,7 @@ public:
     /// in case if explicit resource location qualifier is not available
     /// (GL 4.2 or before)
     HDST_API
-    virtual void IntrospectBindings(HdResource const & programResource) override;
+    virtual void IntrospectBindings(HdStProgramSharedPtr programResource) override;
 
     /// bind/unbind shader parameters and textures
     HDST_API

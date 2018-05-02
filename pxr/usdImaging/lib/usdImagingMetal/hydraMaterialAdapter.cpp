@@ -419,7 +419,7 @@ UsdImagingMetalHydraMaterialAdapter::_GetShaderSource(UsdPrim const& prim,
         filePath = asset.GetAssetPath();
     }
 
-    boost::scoped_ptr<GLSLFX> gfx(GLSLFX::New(filePath));
+    boost::scoped_ptr<GLSLFX> gfx(new GLSLFX(filePath));
     if (!gfx->IsValid()){
         return std::string();
     }

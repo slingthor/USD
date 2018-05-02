@@ -53,7 +53,12 @@ bool ShouldCullFace(bool frontFacing, bool doubleSided)
 
 -- glsl HdxRenderPass.RenderColorShadowsOutput
 
+#if defined(ARCH_GFX_METAL)
+// Still need to use the 'out' semantic as this is picked up by the glslfx parser
+out vec4 colorOut;
+#else
 layout (location = 0) out vec4 colorOut;
+#endif
 
 vec4 ApplyColorOverrides(vec4 color)
 {
@@ -339,7 +344,12 @@ vec4 ApplyColorOverrides(vec4 color)
     return ApplySelectionColor(color);
 }
 
+#if defined(ARCH_GFX_METAL)
+// Still need to use the 'out' semantic as this is picked up by the glslfx parser
+out vec4 colorOut;
+#else
 layout (location = 0) out vec4 colorOut;
+#endif
 
 void RenderColor(vec4 color)
 {
@@ -348,11 +358,20 @@ void RenderColor(vec4 color)
 
 -- glsl HdxRenderPass.RenderColorIdOutput
 
+#if defined(ARCH_GFX_METAL)
+// Still need to use the 'out' semantic as this is picked up by the glslfx parser
+out vec4 primIdOut;
+out vec4 instanceIdOut;
+out vec4 elementIdOut;
+out vec4 edgeIdOut;
+out vec4 pointIdOut;
+#else
 layout (location = 0) out vec4 primIdOut;
 layout (location = 1) out vec4 instanceIdOut;
 layout (location = 2) out vec4 elementIdOut;
 layout (location = 3) out vec4 edgeIdOut;
 layout (location = 4) out vec4 pointIdOut;
+#endif
 
 // Forward declare relevant helper functions that are defined in
 // hdSt/shaders/edgeId.glslfx (or) generated via code gen.

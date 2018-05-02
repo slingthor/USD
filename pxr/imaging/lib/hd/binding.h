@@ -40,7 +40,7 @@ typedef std::vector<class HdBindingRequest> HdBindingRequestVector;
 
 /// \class HdBinding
 ///
-/// Bindings are used for buffers or textures, it simple associates a binding
+/// Bindings are used for buffers or textures, it simply associates a binding
 /// type with a binding location.
 ///
 class HdBinding {
@@ -70,7 +70,8 @@ public:
                 BINDLESS_TEXTURE_PTEX_TEXEL,  // bindless ptex texels
                 BINDLESS_TEXTURE_PTEX_LAYOUT, // bindless ptex layout
                 PRIMVAR_REDIRECT,    // primvar redirection
-                VERTEX_ID            // vertex ID
+                VERTEX_ID,           // vertex ID
+                SAMPLER              // texture sampler in non-GL APIs
     };
     enum Location {
                 // NOT_EXIST is a special value of location for a uniform

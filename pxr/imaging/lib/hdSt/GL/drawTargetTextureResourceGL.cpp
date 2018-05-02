@@ -76,20 +76,20 @@ HdSt_DrawTargetTextureResourceGL::SetSampler(HdWrap wrapS,
 GarchTextureGPUHandle
 HdSt_DrawTargetTextureResourceGL::GetTexelsTextureHandle()
 {
-    GLuint textureId = (GLuint)(uint64_t)GetTexelsTextureId();
+    GLuint textureId = GetTexelsTextureId();
 
     if (textureId == 0) {
-        return 0;
+        return GarchTextureGPUHandle();
     }
 
     if (!TF_VERIFY(glGetTextureHandleARB) ||
         !TF_VERIFY(glGetTextureSamplerHandleARB)) {
-        return 0;
+        return GarchTextureGPUHandle();
     }
 
     GLuint s = (GLuint)(uint64_t)GetTexelsSamplerId();
 
-    return (GarchTextureGPUHandle)(uint64_t)glGetTextureSamplerHandleARB(textureId, s);
+    return glGetTextureSamplerHandleARB(textureId, s);
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

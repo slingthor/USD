@@ -90,7 +90,7 @@ shadowing(int index, vec4 Peye)
     // coord.w : shadow projection w
 
     float dReceiver = coord.z/coord.w;
-    coord.z = min(1, dReceiver + shadow[index].bias);
+    coord.z = min(1.0, dReceiver + shadow[index].bias);
     return shadowFilter(index, coord, Peye);
 }
 

@@ -205,21 +205,19 @@ UsdImagingGLEngine::TestIntersection(
 
         if (!_drawTargets.empty()) {
             // Share existing attachments
-            drawTarget->Bind();
             drawTarget->CloneAttachments(_drawTargets.begin()->second);
-            drawTarget->Unbind();
         } else {
             // Need to create initial attachments
-            drawTarget->Bind();
-            drawTarget->AddAttachment(
-                "primId", GL_RGBA, GL_UNSIGNED_BYTE, GL_RGBA8);
-            drawTarget->AddAttachment(
-                "instanceId", GL_RGBA, GL_UNSIGNED_BYTE, GL_RGBA8);
-            drawTarget->AddAttachment(
-                "elementId", GL_RGBA, GL_UNSIGNED_BYTE, GL_RGBA8);
-            drawTarget->AddAttachment(
-                "depth", GL_DEPTH_COMPONENT, GL_FLOAT, GL_DEPTH_COMPONENT32F);
-            drawTarget->Unbind();
+            std::vector<GarchDrawTarget::AttachmentDesc> attachmentDesc;
+            attachmentDesc.push_back(
+                GarchDrawTarget::AttachmentDesc("primId", GL_RGBA, GL_UNSIGNED_BYTE, GL_RGBA8));
+            attachmentDesc.push_back(
+                GarchDrawTarget::AttachmentDesc("instanceId", GL_RGBA, GL_UNSIGNED_BYTE, GL_RGBA8));
+            attachmentDesc.push_back(
+                GarchDrawTarget::AttachmentDesc("elementId", GL_RGBA, GL_UNSIGNED_BYTE, GL_RGBA8));
+            attachmentDesc.push_back(
+                GarchDrawTarget::AttachmentDesc("depth", GL_DEPTH_COMPONENT, GL_FLOAT, GL_DEPTH_COMPONENT32F));
+            drawTarget->SetAttachments(attachmentDesc);
         }
 
         // This is a good time to clean up any drawTargets no longer in use.
@@ -293,24 +291,16 @@ UsdImagingGLEngine::TestIntersection(
     int zMinIndex = -1;
 
     GLubyte primId[width*height*4];
-    glBindTexture(GL_TEXTURE_2D,
-        (GLuint)(uint64_t)drawTarget->GetAttachments().at("primId")->GetTextureName());
-    glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, primId);
+    drawTarget->GetImage("primId", primId);
 
     GLubyte instanceId[width*height*4];
-    glBindTexture(GL_TEXTURE_2D,
-        (GLuint)(uint64_t)drawTarget->GetAttachments().at("instanceId")->GetTextureName());
-    glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, instanceId);
+    drawTarget->GetImage("instanceId", instanceId);
 
     GLubyte elementId[width*height*4];
-    glBindTexture(GL_TEXTURE_2D,
-        (GLuint)(uint64_t)drawTarget->GetAttachments().at("elementId")->GetTextureName());
-    glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, elementId);
+    drawTarget->GetImage("elementId", elementId);
 
     GLfloat depths[width*height];
-    glBindTexture(GL_TEXTURE_2D,
-        (GLuint)(uint64_t)drawTarget->GetAttachments().at("depth")->GetTextureName());
-    glGetTexImage(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, GL_FLOAT, depths);
+    drawTarget->GetImage("depth", depths);
 
     glPopAttrib(); /* GL_VIEWPORT_BIT |
                       GL_ENABLE_BIT |
@@ -434,19 +424,17 @@ UsdImagingGLEngine::TestIntersectionBatch(
 
         if (!_drawTargets.empty()) {
             // Share existing attachments
-            drawTarget->Bind();
             drawTarget->CloneAttachments(_drawTargets.begin()->second);
-            drawTarget->Unbind();
         } else {
             // Need to create initial attachments
-            drawTarget->Bind();
-            drawTarget->AddAttachment(
-                "primId", GL_RGBA, GL_UNSIGNED_BYTE, GL_RGBA8);
-            drawTarget->AddAttachment(
-                "instanceId", GL_RGBA, GL_UNSIGNED_BYTE, GL_RGBA8);
-            drawTarget->AddAttachment(
-                "depth", GL_DEPTH_COMPONENT, GL_FLOAT, GL_DEPTH_COMPONENT32F);
-            drawTarget->Unbind();
+            std::vector<GarchDrawTarget::AttachmentDesc> attachmentDesc;
+            attachmentDesc.push_back(
+                GarchDrawTarget::AttachmentDesc("primId", GL_RGBA, GL_UNSIGNED_BYTE, GL_RGBA8));
+            attachmentDesc.push_back(
+                GarchDrawTarget::AttachmentDesc("instanceId", GL_RGBA, GL_UNSIGNED_BYTE, GL_RGBA8));
+            attachmentDesc.push_back(
+                GarchDrawTarget::AttachmentDesc("depth", GL_DEPTH_COMPONENT, GL_FLOAT, GL_DEPTH_COMPONENT32F));
+            drawTarget->SetAttachments(attachmentDesc);
         }
 
         // This is a good time to clean up any drawTargets no longer in use.
@@ -515,19 +503,13 @@ UsdImagingGLEngine::TestIntersectionBatch(
     glPopMatrix();
 
     std::vector<GLubyte> primId(width*height*4);
-    glBindTexture(GL_TEXTURE_2D,
-        (GLuint)(uint64_t)drawTarget->GetAttachments().at("primId")->GetTextureName());
-    glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, primId.data());
+    drawTarget->GetImage("primId", primId.data());
 
     std::vector<GLubyte> instanceId(width*height*4);
-    glBindTexture(GL_TEXTURE_2D,
-        (GLuint)(uint64_t)drawTarget->GetAttachments().at("instanceId")->GetTextureName());
-    glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, instanceId.data());
+    drawTarget->GetImage("instanceId", instanceId.data());
 
     std::vector<GLfloat> depths(width*height);
-    glBindTexture(GL_TEXTURE_2D,
-        (GLuint)(uint64_t)drawTarget->GetAttachments().at("depth")->GetTextureName());
-    glGetTexImage(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, GL_FLOAT, depths.data());
+    drawTarget->GetImage("depth", depths.data());
 
     glPopAttrib(); /* GL_VIEWPORT_BIT |
                       GL_ENABLE_BIT |

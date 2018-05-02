@@ -77,7 +77,9 @@ integrateLights(vec4 Peye, vec3 Neye, LightingInterfaceProperties props)
 #endif // HD_HAS_definedIntegrateLights
 #endif
 
+#if !defined(ARCH_GFX_METAL)
 vec4 surfaceShader(vec4 Peye, vec3 Neye, vec4 color, vec4 patchCoord);
+#endif
 
 vec4 _ShadingTerminal(vec4 Peye, vec3 Neye, vec4 color, vec4 patchCoord)
 {
@@ -100,7 +102,9 @@ integrateLights(vec4 Peye, vec3 Neye, LightingInterfaceProperties props)
 #endif // HD_HAS_definedIntegrateLights
 #endif
 
+#if !defined(ARCH_GFX_METAL)
 vec4 surfaceShader(vec4 Peye, vec3 Neye, vec4 color, vec4 patchCoord);
+#endif
 
 vec4 _ShadingTerminal(vec4 Peye, vec3 Neye, vec4 color, vec4 patchCoord)
 {
@@ -123,7 +127,9 @@ integrateLights(vec4 Peye, vec3 Neye, LightingInterfaceProperties props)
 #endif // HD_HAS_definedIntegrateLights
 #endif
 
+#if !defined(ARCH_GFX_METAL)
 vec4 surfaceShader(vec4 Peye, vec3 Neye, vec4 color, vec4 patchCoord);
+#endif
 
 vec4 _ShadingTerminal(vec4 Peye, vec3 Neye, vec4 color, vec4 patchCoord)
 {
@@ -156,7 +162,9 @@ integrateLights(vec4 Peye, vec3 Neye, LightingInterfaceProperties props)
 #endif // HD_HAS_definedIntegrateLights
 #endif
 
+#if !defined(ARCH_GFX_METAL)
 vec4 surfaceShader(vec4 Peye, vec3 Neye, vec4 color, vec4 patchCoord);
+#endif
 
 vec4 _ShadingTerminal(vec4 Peye, vec3 Neye, vec4 color, vec4 patchCoord)
 {

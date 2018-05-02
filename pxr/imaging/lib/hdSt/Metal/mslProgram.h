@@ -34,16 +34,17 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 class HdResourceRegistry;
-typedef boost::shared_ptr<class HdMSLProgram> HdMSLProgramSharedPtr;
+typedef boost::shared_ptr<class HdStMSLProgram> HdStMSLProgramSharedPtr;
 
-/// \class HdGLSLProgram
+/// \class HdStMSLProgram
 ///
-/// An instance of a glsl program.
+/// An instance of an MSL program.
 ///
-// XXX: this design is transitional and will be revised soon.
 class HdStMSLProgram: public HdStProgram
 {
 public:
+    typedef std::map<std::string, int> BindingLocationMap;
+
     HDST_API
     HdStMSLProgram(TfToken const &role);
     HDST_API
@@ -51,7 +52,7 @@ public:
 
     /// Compile shader source of type
     HDST_API
-    virtual bool CompileShader(GLenum type, std::string const & source)HDST_API;
+    virtual bool CompileShader(GLenum type, std::string const & source) override;
 
     /// Link the compiled shaders together.
     HDST_API
@@ -60,10 +61,6 @@ public:
     /// Validate if this program is a valid progam in the current context.
     HDST_API
     virtual bool Validate() const override;
-
-    /// Returns HdResource of the program object.
-    HDST_API
-    virtual HdResource const &GetProgram() const override { return _program; }
 
     /// Returns HdResource of the global uniform buffer object for this program.
     HDST_API
@@ -75,13 +72,76 @@ public:
     /// if not, returns false and fills the error log into reason.
     HDST_API
     virtual bool GetProgramLinkStatus(std::string * reason) const override;
+    
+    /// Returns the binary size of the program (if available)
+    HDST_API
+    virtual uint32_t GetProgramSize() const { return 0; }
+    
+    HDST_API
+    virtual void AssignUniformBindings(GarchBindingMapRefPtr bindingMap) const override;
+    
+    HDST_API
+    virtual void AssignSamplerUnits(GarchBindingMapRefPtr bindingMap) const override;
+    
+    HDST_API
+    virtual void AddCustomBindings(GarchBindingMapRefPtr bindingMap) const override;
 
+    HDST_API
+    virtual void SetProgram() const override;
+    
+    HDST_API
+    virtual void UnsetProgram() const override;
+    
+    HDST_API
+    virtual void DrawElementsInstancedBaseVertex(GLenum primitiveMode,
+                                                 int indexCount,
+                                                 GLint indexType,
+                                                 GLint firstIndex,
+                                                 GLint instanceCount,
+                                                 GLint baseVertex) const override;
+
+    HDST_API
+    virtual void DrawArraysInstanced(GLenum primitiveMode,
+                                     GLint baseVertex,
+                                     GLint vertexCount,
+                                     GLint instanceCount) const override;
+    
+    HDST_API
+    BindingLocationMap const &GetBindingLocations() const {
+        return _locationMap;
+    }
+    
+    HDST_API
+    void AddBinding(std::string const &name, int location) {
+        _locationMap.insert(make_pair(name, location));
+    }
+
+    HDST_API
+    id<MTLFunction> GetVertexFunction() const {
+        return _vertexFunction;
+    }
+    
+    HDST_API
+    id<MTLFunction> GetFragmentFunction() const {
+        return _fragmentFunction;
+    }
+    
+    HDST_API
+    id<MTLFunction> GetComputeFunction() const {
+        return _computeFunction;
+    }
 
 private:
-    HdStResourceMetal _program;
-    HdStResourceMetal _uniformBuffer;
-};
+    TfToken const _role;
 
+    id<MTLFunction> _vertexFunction;
+    id<MTLFunction> _fragmentFunction;
+    id<MTLFunction> _computeFunction;
+
+    bool _valid;
+    HdStResourceMetal _uniformBuffer;
+    BindingLocationMap  _locationMap;
+};
 
 PXR_NAMESPACE_CLOSE_SCOPE
 

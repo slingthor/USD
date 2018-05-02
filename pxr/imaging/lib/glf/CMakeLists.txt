@@ -47,7 +47,6 @@ pxr_library(glf
         diagnostic
         drawTarget
         glew
-        glslfx
         glContext
         glRawContext
         info

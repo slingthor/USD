@@ -76,7 +76,7 @@ public:
 
     /// Returns the texture buffer view
     HDST_API
-    virtual HdBufferResourceGPUHandle GetTextureBuffer() override;
+    virtual GarchTextureGPUHandle GetTextureBuffer() override;
 
     HDST_API
     virtual void CopyData(size_t vboOffset, size_t dataSize, void const *data) override;

@@ -125,17 +125,17 @@ public:
         return _drawTarget->GetAttachment("color")->GetTextureName();
     }
     virtual GarchSamplerGPUHandle GetTexelsSamplerId() {
-        return 0;
+        return GarchSamplerGPUHandle();
     }
     virtual GarchTextureGPUHandle GetTexelsTextureHandle() {
-        return 0;
+        return GarchTextureGPUHandle();
     }
 
     virtual GarchTextureGPUHandle GetLayoutTextureId() {
-        return 0;
+        return GarchTextureGPUHandle();
     }
     virtual GarchTextureGPUHandle GetLayoutTextureHandle() {
-        return 0;
+        return GarchTextureGPUHandle();
     }
 
     virtual size_t GetMemoryUsed() {

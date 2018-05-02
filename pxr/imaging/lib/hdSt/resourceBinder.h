@@ -44,6 +44,7 @@ class HdResource;
 typedef boost::shared_ptr<class HdBufferResource> HdBufferResourceSharedPtr;
 typedef boost::shared_ptr<class HdBufferArrayRange> HdBufferArrayRangeSharedPtr;
 typedef boost::shared_ptr<class HdSt_ResourceBinder> HdSt_ResourceBinderSharedPtr;
+typedef boost::shared_ptr<class HdStProgram> HdStProgramSharedPtr;
 
 typedef boost::shared_ptr<class HdStShaderCode> HdStShaderCodeSharedPtr;
 typedef std::vector<HdStShaderCodeSharedPtr> HdStShaderCodeSharedPtrVector;
@@ -280,7 +281,7 @@ public:
     /// in case if explicit resource location qualifier is not available
     /// (GL 4.2 or before)
     HDST_API
-    virtual void IntrospectBindings(HdResource const & programResource) = 0;
+    virtual void IntrospectBindings(HdStProgramSharedPtr programResource) = 0;
 
     HDST_API
     void Bind(HdBindingRequest const& req) const;

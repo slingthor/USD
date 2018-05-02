@@ -126,7 +126,7 @@ HdStBufferResourceGL::GetTextureBuffer()
 
     if (_tupleType.count != 1) {
         TF_CODING_ERROR("unsupported tuple size: %zu\n", _tupleType.count);
-        return 0;
+        return GarchTextureGPUHandle();
     }
     
     if (_texId == 0) {
@@ -167,7 +167,7 @@ HdStBufferResourceGL::GetTextureBuffer()
         glTexBuffer(GL_TEXTURE_BUFFER, format, (GLuint)(uint64_t)GetId());
         glBindTexture(GL_TEXTURE_BUFFER, 0);
     }
-    return (GarchTextureGPUHandle)(uint64_t)_texId;
+    return _texId;
 }
 
 void

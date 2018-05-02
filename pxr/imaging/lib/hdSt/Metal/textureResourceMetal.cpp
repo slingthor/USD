@@ -60,7 +60,7 @@ HdStSimpleTextureResourceMetal::HdStSimpleTextureResourceMetal(
             , _texture(textureHandle->GetTexture())
             , _borderColor(0.0,0.0,0.0,0.0)
             , _maxAnisotropy(16.0)
-            , _sampler(0)
+            , _sampler()
             , _isPtex(isPtex)
 {
     TF_FATAL_CODING_ERROR("Not Implemented");
@@ -129,12 +129,9 @@ HdStSimpleTextureResourceMetal::HdStSimpleTextureResourceMetal(
 
 HdStSimpleTextureResourceMetal::~HdStSimpleTextureResourceMetal()
 {
-    TF_FATAL_CODING_ERROR("Not Implemented");
-    /*
     if (!_isPtex) {
-        glDeleteSamplers(1, &_sampler);
+        [_sampler release];
     }
-     */
 }
 
 bool HdStSimpleTextureResourceMetal::IsPtex() const
@@ -151,7 +148,7 @@ GarchTextureGPUHandle HdStSimpleTextureResourceMetal::GetTexelsTextureId()
 #else
         TF_CODING_ERROR("Ptex support is disabled.  "
             "This code path should be unreachable");
-        return 0;
+        return GarchTextureGPUHandle();
 #endif
     }
     
@@ -168,20 +165,11 @@ GarchTextureGPUHandle HdStSimpleTextureResourceMetal::GetTexelsTextureHandle()
     GarchTextureGPUHandle textureId = GetTexelsTextureId();
     GarchSamplerGPUHandle samplerId = GetTexelsSamplerId();
 
-    TF_FATAL_CODING_ERROR("Not Implemented"); // Make this graphics api abstract
-    return 0;
-    /*
-    if (!TF_VERIFY(glGetTextureHandleARB) ||
-        !TF_VERIFY(glGetTextureSamplerHandleARB)) {
-        return 0;
-    }
-
     if (_isPtex) {
-        return textureId ? glGetTextureHandleARB(textureId) : 0;
+        return textureId;
     } 
 
-    return textureId ? glGetTextureSamplerHandleARB(textureId, samplerId) : 0;
-     */
+    return textureId;
 }
 
 GarchTextureGPUHandle HdStSimpleTextureResourceMetal::GetLayoutTextureId()
@@ -192,14 +180,14 @@ GarchTextureGPUHandle HdStSimpleTextureResourceMetal::GetLayoutTextureId()
 #else
     TF_CODING_ERROR("Ptex support is disabled.  "
         "This code path should be unreachable");
-    return 0;
+    return GarchTextureGPUHandle();
 #endif
 }
 
 GarchTextureGPUHandle HdStSimpleTextureResourceMetal::GetLayoutTextureHandle()
 {
     if (!TF_VERIFY(_isPtex)) {
-        return 0;
+        return GarchTextureGPUHandle();
     }
 
     GarchTextureGPUHandle textureId = GetLayoutTextureId();

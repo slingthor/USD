@@ -37,6 +37,7 @@
 #include "pxr/imaging/hdSt/shaderCode.h"
 #include "pxr/imaging/hdSt/shaderKey.h"
 
+#include "pxr/imaging/hdSt/GL/glslProgram.h"
 #include "pxr/imaging/hdSt/GL/indirectDrawBatchGL.h"
 #include "pxr/imaging/hdSt/GL/persistentBufferGL.h"
 
@@ -971,14 +972,15 @@ HdSt_IndirectDrawBatchGL::ExecuteDraw(
     _DrawingProgram & program = _GetDrawingProgram(renderPassState,
                                                    /*indirect=*/true,
                                                    resourceRegistry);
-    HdStProgramSharedPtr const &glslProgram = program.GetProgram();
+    HdStProgramSharedPtr const &hdStProgram(program.GetProgram());
+    HdStGLSLProgramSharedPtr const &glslProgram(boost::dynamic_pointer_cast<HdStGLSLProgram>(hdStProgram));
     if (!TF_VERIFY(glslProgram)) return;
     if (!TF_VERIFY(glslProgram->Validate())) return;
 
-    HdBufferResourceGPUHandle programId = glslProgram->GetProgram().GetId();
+    GLuint programId = glslProgram->GetGLProgram();
     TF_VERIFY(programId);
 
-    glUseProgram((GLuint)(uint64_t)programId);
+    glUseProgram(programId);
 
     const HdSt_ResourceBinder &binder = program.GetBinder();
     const HdStShaderCodeSharedPtrVector &shaders = program.GetComposedShaders();
@@ -986,7 +988,7 @@ HdSt_IndirectDrawBatchGL::ExecuteDraw(
     // XXX: for surfaces shader, we need to iterate all drawItems to
     //      make textures resident, instead of just the first batchItem
     TF_FOR_ALL(it, shaders) {
-        (*it)->BindResources(binder, programId);
+        (*it)->BindResources(binder, *hdStProgram);
     }
 
     // constant buffer bind
@@ -1069,7 +1071,7 @@ HdSt_IndirectDrawBatchGL::ExecuteDraw(
     binder.BindBufferArray(dispatchBar);
 
     // update geometric shader states
-    program.GetGeometricShader()->BindResources(binder, programId);
+    program.GetGeometricShader()->BindResources(binder, *hdStProgram);
 
     GLuint batchCount = _dispatchBuffer->GetCount();
 
@@ -1134,9 +1136,9 @@ HdSt_IndirectDrawBatchGL::ExecuteDraw(
     }
 
     TF_FOR_ALL(it, shaders) {
-        (*it)->UnbindResources(binder, programId);
+        (*it)->UnbindResources(binder, *hdStProgram);
     }
-    program.GetGeometricShader()->UnbindResources(binder, programId);
+    program.GetGeometricShader()->UnbindResources(binder, *hdStProgram);
 
     glUseProgram(0);
 }
@@ -1184,8 +1186,7 @@ HdSt_IndirectDrawBatchGL::_GPUFrustumCulling(
 
     const HdSt_ResourceBinder &binder = cullingProgram.GetBinder();
 
-    HdBufferResourceGPUHandle programId = program->GetProgram().GetId();
-    glUseProgram((GLuint)(uint64_t)programId);
+    glUseProgram(boost::dynamic_pointer_cast<HdStGLSLProgram>(program)->GetGLProgram());
 
     // bind buffers
     binder.BindConstantBuffer(constantBar);
@@ -1318,8 +1319,8 @@ HdSt_IndirectDrawBatchGL::_GPUFrustumCullingXFB(
     // stomping the instanceCount of each drawing command in the
     // dispatch buffer to 0 for primitives that are culled, skipping
     // over other elements.
-    GLuint programId = (GLuint)(uint64_t)program->GetProgram().GetId();
-    glUseProgram(programId);
+
+    glUseProgram(boost::dynamic_pointer_cast<HdStGLSLProgram>(program)->GetGLProgram());
 
     const HdSt_ResourceBinder &binder = cullingProgram.GetBinder();
 
@@ -1585,7 +1586,7 @@ HdSt_IndirectDrawBatchGL::_CullingProgram::_Link(
             sizeof(drawElementsOutputs)/sizeof(drawElementsOutputs[0])
             == nOutputs,
             "Size of drawElementsOutputs element must equal nOutputs.");
-        glTransformFeedbackVaryings((GLuint)(uint64_t)program->GetProgram().GetId(),
+        glTransformFeedbackVaryings(boost::dynamic_pointer_cast<HdStGLSLProgram>(program)->GetGLProgram(),
                                     nOutputs,
                                     outputs, GL_INTERLEAVED_ATTRIBS);
     }

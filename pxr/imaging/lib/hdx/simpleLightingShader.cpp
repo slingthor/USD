@@ -52,7 +52,7 @@ HdxSimpleLightingShader::HdxSimpleLightingShader()
     _bindingMap->GetUniformBinding(TfToken("DrawDataBuffer"));
     _lightingContext->InitUniformBlockBindings(_bindingMap);
     _lightingContext->InitSamplerUnitBindings(_bindingMap);
-    _glslfx.reset(GLSLFX::New(HdxPackageSimpleLightingShader()));
+    _glslfx.reset(new GLSLFX(HdxPackageSimpleLightingShader()));
 }
 
 HdxSimpleLightingShader::~HdxSimpleLightingShader()
@@ -107,21 +107,21 @@ HdxSimpleLightingShader::SetCamera(GfMatrix4d const &worldToViewMatrix,
 /* virtual */
 void
 HdxSimpleLightingShader::BindResources(HdSt_ResourceBinder const &binder,
-                                       HdBufferResourceGPUHandle program)
+                                       HdStProgram const &program)
 {
     // XXX: we'd like to use HdSt_ResourceBinder instead of GlfBindingMap.
     //
-    _bindingMap->AssignUniformBindingsToProgram((GLuint)(uint64_t)program);
+    program.AssignUniformBindings(_bindingMap);
     _lightingContext->BindUniformBlocks(_bindingMap);
 
-    _bindingMap->AssignSamplerUnitsToProgram((GLuint)(uint64_t)program);
+    program.AssignSamplerUnits(_bindingMap);
     _lightingContext->BindSamplers(_bindingMap);
 }
 
 /* virtual */
 void
 HdxSimpleLightingShader::UnbindResources(HdSt_ResourceBinder const &binder,
-                                         HdBufferResourceGPUHandle program)
+                                         HdStProgram const &program)
 {
     // XXX: we'd like to use HdSt_ResourceBinder instead of GlfBindingMap.
     //

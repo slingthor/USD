@@ -66,8 +66,8 @@ HdSt_DrawTargetTextureResourceMetal::GetTexelsTextureHandle()
 {
     GarchTextureGPUHandle textureId = GetTexelsTextureId();
 
-    if (textureId == 0) {
-        return 0;
+    if (!textureId.IsSet()) {
+        return textureId;
     }
 
     TF_FATAL_CODING_ERROR("Not Implemented");

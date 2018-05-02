@@ -100,8 +100,10 @@ HdStSurfaceShader::GetTextures() const
 /*virtual*/
 void
 HdStSurfaceShader::BindResources(HdSt_ResourceBinder const &binder,
-                                 HdStProgramGPUHandle program)
+                                 HdStProgram const &program)
 {
+    TF_FATAL_CODING_ERROR("Not Implemented");
+/*
     // XXX: there's an issue where other shaders try to use textures.
     int samplerUnit = binder.GetNumReservedTextureUnits();
     TF_FOR_ALL(it, _textureDescriptors) {
@@ -109,35 +111,37 @@ HdStSurfaceShader::BindResources(HdSt_ResourceBinder const &binder,
         // XXX: put this into resource binder.
         if (binding.GetType() == HdBinding::TEXTURE_2D) {
             glActiveTexture(GL_TEXTURE0 + samplerUnit);
-            glBindTexture(GL_TEXTURE_2D, (GLuint)(uint64_t)it->handle);
+            glBindTexture(GL_TEXTURE_2D, it->handle);
             glBindSampler(samplerUnit, (GLuint)(uint64_t)it->sampler);
             
             glProgramUniform1i((GLuint)(uint64_t)program, binding.GetLocation(), samplerUnit);
             samplerUnit++;
         } else if (binding.GetType() == HdBinding::TEXTURE_PTEX_TEXEL) {
             glActiveTexture(GL_TEXTURE0 + samplerUnit);
-            glBindTexture(GL_TEXTURE_2D_ARRAY, (GLuint)(uint64_t)it->handle);
+            glBindTexture(GL_TEXTURE_2D_ARRAY, it->handle);
 
             glProgramUniform1i((GLuint)(uint64_t)program, binding.GetLocation(), samplerUnit);
             samplerUnit++;
         } else if (binding.GetType() == HdBinding::TEXTURE_PTEX_LAYOUT) {
             glActiveTexture(GL_TEXTURE0 + samplerUnit);
-            glBindTexture(GL_TEXTURE_BUFFER, (GLuint)(uint64_t)it->handle);
+            glBindTexture(GL_TEXTURE_BUFFER, it->handle);
 
             glProgramUniform1i((GLuint)(uint64_t)program, binding.GetLocation(), samplerUnit);
             samplerUnit++;
         }
     }
     glActiveTexture(GL_TEXTURE0);
+ */
     binder.BindShaderResources(this);
 }
 /*virtual*/
 void
 HdStSurfaceShader::UnbindResources(HdSt_ResourceBinder const &binder,
-                                   HdStProgramGPUHandle program)
+                                   HdStProgram const &program)
 {
     binder.UnbindShaderResources(this);
 
+    TF_FATAL_CODING_ERROR("Not Implemented");
     int samplerUnit = binder.GetNumReservedTextureUnits();
     TF_FOR_ALL(it, _textureDescriptors) {
         HdBinding binding = binder.GetBinding(it->name);
@@ -158,7 +162,6 @@ HdStSurfaceShader::UnbindResources(HdSt_ResourceBinder const &binder,
         }
     }
     glActiveTexture(GL_TEXTURE0);
-
 }
 /*virtual*/
 void

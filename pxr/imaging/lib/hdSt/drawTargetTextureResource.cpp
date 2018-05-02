@@ -53,7 +53,7 @@ HdTextureResourceSharedPtr HdSt_DrawTargetTextureResource::New()
 HdSt_DrawTargetTextureResource::HdSt_DrawTargetTextureResource()
  : HdStTextureResource()
  , _attachment()
- , _sampler(0)
+ , _sampler()
  , _borderColor(0.0,0.0,0.0,0.0)
  , _maxAnisotropy(16.0)
 {
@@ -115,14 +115,14 @@ GarchTextureGPUHandle
 HdSt_DrawTargetTextureResource::GetLayoutTextureId()
 {
     TF_CODING_ERROR("Draw targets are not ptex");
-    return 0;
+    return GarchTextureGPUHandle();
 }
 
 GarchTextureGPUHandle
 HdSt_DrawTargetTextureResource::GetLayoutTextureHandle()
 {
     TF_CODING_ERROR("Draw targets are not ptex");
-    return 0;
+    return GarchTextureGPUHandle();
 }
 
 size_t

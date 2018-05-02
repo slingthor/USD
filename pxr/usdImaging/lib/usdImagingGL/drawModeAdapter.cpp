@@ -907,7 +907,7 @@ UsdImagingGLDrawModeAdapter::_GenerateTextureCoordinates(
 std::string
 UsdImagingGLDrawModeAdapter::_GetSurfaceShaderSource()
 {
-    boost::scoped_ptr<GLSLFX> gfx(GLSLFX::New(UsdImagingGLPackageDrawModeShader()));
+    boost::scoped_ptr<GLSLFX> gfx(new GLSLFX(UsdImagingGLPackageDrawModeShader()));
     if (!gfx->IsValid()) {
         TF_CODING_ERROR("Couldn't load UsdImagingPackageDrawModeShader");
         return std::string();

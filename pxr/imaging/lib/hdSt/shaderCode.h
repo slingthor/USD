@@ -106,11 +106,11 @@ public:
     /// XXX: this interface is meant to be used for bridging
     /// the GlfSimpleLightingContext mechanism, and not for generic use-cases.
     virtual void BindResources(HdSt_ResourceBinder const &binder,
-                               HdStProgramGPUHandle program) = 0;
+                               HdStProgram const &program) = 0;
 
     /// Unbinds shader-specific resources.
     virtual void UnbindResources(HdSt_ResourceBinder const &binder,
-                                 HdStProgramGPUHandle program) = 0;
+                                 HdStProgram const &program) = 0;
 
     /// Add custom bindings (used by codegen)
     virtual void AddBindings(HdBindingRequestVector* customBindings) = 0;

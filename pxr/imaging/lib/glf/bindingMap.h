@@ -30,69 +30,52 @@
 #include "pxr/imaging/glf/api.h"
 #include "pxr/imaging/garch/gl.h"
 #include "pxr/imaging/garch/bindingMap.h"
-#include "pxr/base/tf/refBase.h"
 #include "pxr/base/tf/stringUtils.h"
 #include "pxr/base/tf/token.h"
-#include "pxr/base/tf/weakBase.h"
 
 #include "pxr/base/tf/hashmap.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+TF_DECLARE_WEAK_AND_REF_PTRS(GlfBindingMap);
 
 class GlfBindingMap : public GarchBindingMap {
 public:
     typedef TfHashMap<TfToken, int, TfToken::HashFunctor> BindingMap;
 
     GLF_API
-    int GetSamplerUnit(std::string const &name);
+    virtual int GetSamplerUnit(std::string const &name) override;
     GLF_API
-    int GetSamplerUnit(TfToken const & name);
+    virtual int GetSamplerUnit(TfToken const & name) override;
 
     // If GetAttributeIndex is called with an unknown
     // attribute token they return -1
     GLF_API
-    int GetAttributeIndex(std::string const & name);
+    virtual int GetAttributeIndex(std::string const & name) override;
     GLF_API
-    int GetAttributeIndex(TfToken const & name);
-
-    GLF_API
-    int GetUniformBinding(std::string const & name);
-    GLF_API
-    int GetUniformBinding(TfToken const & name);
+    virtual int GetAttributeIndex(TfToken const & name) override;
 
     GLF_API
-    bool HasUniformBinding(std::string const & name) const;
+    virtual int GetUniformBinding(std::string const & name) override;
     GLF_API
-    bool HasUniformBinding(TfToken const & name) const;
-
-    int GetNumSamplerBindings() const {
-        return (int)_samplerBindings.size();
-    }
-
-    void ClearAttribBindings() {
-        _attribBindings.clear();
-    }
-
-    void AddAttribBinding(TfToken const &name, int location) {
-        _attribBindings[name] = location;
-    }
-
-    BindingMap const &GetAttributeBindings() const {
-        return _attribBindings;
-    }
+    virtual int GetUniformBinding(TfToken const & name) override;
 
     GLF_API
-    void AssignSamplerUnitsToProgram(GLuint program);
+    virtual bool HasUniformBinding(std::string const & name) const override;
+    GLF_API
+    virtual bool HasUniformBinding(TfToken const & name) const override;
 
     GLF_API
-    void AssignUniformBindingsToProgram(GLuint program);
+    virtual void AssignSamplerUnitsToProgram(GarchProgramGPUHandle program) override;
 
     GLF_API
-    void AddCustomBindings(GLuint program);
+    virtual void AssignUniformBindingsToProgram(GarchProgramGPUHandle program) override;
 
     GLF_API
-    void Debug() const;
+    virtual void AddCustomBindings(GarchProgramGPUHandle program) override;
+
+    GLF_API
+    virtual void Debug() const override;
     
 protected:
     GlfBindingMap() {}
@@ -100,13 +83,9 @@ protected:
     friend class GlfResourceFactory;
 
 private:
-    void _AddActiveAttributeBindings(GLuint program);
-    void _AddActiveUniformBindings(GLuint program);
-    void _AddActiveUniformBlockBindings(GLuint program);
-
-    BindingMap _attribBindings;
-    BindingMap _samplerBindings;
-    BindingMap _uniformBindings;
+    void _AddActiveAttributeBindings(GarchProgramGPUHandle program);
+    void _AddActiveUniformBindings(GarchProgramGPUHandle program);
+    void _AddActiveUniformBlockBindings(GarchProgramGPUHandle program);
 };
 
 
