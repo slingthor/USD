@@ -32,33 +32,36 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 
 MtlfUniformBlock::MtlfUniformBlock() :
-    _buffer(0), _size(0)
+    _buffer(nil), _size(0)
 {
-    TF_FATAL_CODING_ERROR("Not Implemented");
-//    glGenBuffers(1, &_buffer);
 }
 
 MtlfUniformBlock::~MtlfUniformBlock()
 {
-    TF_FATAL_CODING_ERROR("Not Implemented");
-//    if (_buffer) glDeleteBuffers(1, &_buffer);
+    if (_buffer) {
+        [_buffer release];
+        _buffer = nil;
+    }
 }
 
 void
 MtlfUniformBlock::Bind(GarchBindingMapPtr const & bindingMap,
                        std::string const & identifier)
 {
-    TF_FATAL_CODING_ERROR("Not Implemented");
+    if (!bindingMap)
+        return;
 
-    if (!bindingMap) return;
-//    int binding = bindingMap->GetUniformBinding(identifier);
-//    glBindBufferBase(GL_UNIFORM_BUFFER, binding, _buffer);
+    int binding = bindingMap->GetUniformBinding(identifier);
+    MtlfMetalContext::GetMetalContext()->SetBuffer(binding, _buffer);
 }
 
 void
 MtlfUniformBlock::Update(const void *data, int size)
 {
-    TF_FATAL_CODING_ERROR("Not Implemented");
+    if (_buffer == nil) {
+    id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->device;
+    _buffer = [device newBufferWithBytes:data length:size options:MTLResourceStorageModeManaged];
+    }
     /*
     glBindBuffer(GL_UNIFORM_BUFFER, _buffer);
     if (_size != size) {

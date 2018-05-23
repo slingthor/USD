@@ -95,7 +95,7 @@ HdStBufferResourceMetal::~HdStBufferResourceMetal()
 }
 
 void
-HdStBufferResourceMetal::SetAllocation(HdBufferResourceGPUHandle idBuffer, size_t size)
+HdStBufferResourceMetal::SetAllocation(HdResourceGPUHandle idBuffer, size_t size)
 {
     // release texid if exist. SetAllocation is guaranteed to be called
     // at the destruction of the hosting buffer array.
@@ -104,7 +104,7 @@ HdStBufferResourceMetal::SetAllocation(HdBufferResourceGPUHandle idBuffer, size_
         _texId = nil;
     }
 
-    _id = (__bridge id<MTLBuffer>)idBuffer;
+    _id = idBuffer;
     HdResource::SetSize(size);
 
     _gpuAddr = 0;

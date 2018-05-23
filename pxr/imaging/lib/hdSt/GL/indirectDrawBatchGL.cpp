@@ -1432,10 +1432,10 @@ HdSt_IndirectDrawBatchGL::_BeginGPUCountVisibleInstances(
         GLint count = 0;
         HdStRenderContextCaps const &caps = HdStRenderContextCaps::GetInstance();
         if (caps.directStateAccessEnabled) {
-            glNamedBufferSubDataEXT(_resultBuffer->GetOpenGLId(), 0,
+            glNamedBufferSubDataEXT(_resultBuffer->GetId(), 0,
                                     sizeof(count), &count);
         } else {
-            glBindBuffer(GL_ARRAY_BUFFER, _resultBuffer->GetOpenGLId());
+            glBindBuffer(GL_ARRAY_BUFFER, _resultBuffer->GetId());
             glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(count), &count);
             glBindBuffer(GL_ARRAY_BUFFER, 0);
         }
@@ -1445,7 +1445,7 @@ HdSt_IndirectDrawBatchGL::_BeginGPUCountVisibleInstances(
     // we'd like to use the same API as other buffers.
     int binding = _cullingProgram.GetBinder().GetBinding(
         HdTokens->drawIndirectResult).GetLocation();
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, binding, _resultBuffer->GetOpenGLId());
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, binding, _resultBuffer->GetId());
 }
 
 void
@@ -1468,10 +1468,10 @@ HdSt_IndirectDrawBatchGL::_EndGPUCountVisibleInstances(GLsync resultSync, size_t
         GLint count = 0;
         HdStRenderContextCaps const &caps = HdStRenderContextCaps::GetInstance();
         if (caps.directStateAccessEnabled) {
-            glGetNamedBufferSubDataEXT(_resultBuffer->GetOpenGLId(), 0,
+            glGetNamedBufferSubDataEXT(_resultBuffer->GetId(), 0,
                                        sizeof(count), &count);
         } else {
-            glBindBuffer(GL_ARRAY_BUFFER, _resultBuffer->GetOpenGLId());
+            glBindBuffer(GL_ARRAY_BUFFER, _resultBuffer->GetId());
             glGetBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(count), &count);
             glBindBuffer(GL_ARRAY_BUFFER, 0);
         }

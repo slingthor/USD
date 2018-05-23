@@ -129,9 +129,9 @@ HdSt_ResourceBinderGL::HdSt_ResourceBinderGL()
 
 void
 HdSt_ResourceBinderGL::BindBuffer(TfToken const &name,
-                                HdBufferResourceSharedPtr const &buffer,
-                                int offset,
-                                int level) const
+                                  HdBufferResourceSharedPtr const &buffer,
+                                  int offset,
+                                  int level) const
 {
     HD_TRACE_FUNCTION();
 

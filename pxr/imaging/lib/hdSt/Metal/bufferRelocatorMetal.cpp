@@ -32,10 +32,10 @@
 #include "pxr/base/vt/array.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
-HdStBufferRelocatorMetal::HdStBufferRelocatorMetal(HdBufferResourceGPUHandle srcBuffer, HdBufferResourceGPUHandle dstBuffer)
+HdStBufferRelocatorMetal::HdStBufferRelocatorMetal(HdResourceGPUHandle srcBuffer, HdResourceGPUHandle dstBuffer)
 {
-    _srcBuffer = (__bridge id<MTLBuffer>)srcBuffer;
-    _dstBuffer = (__bridge id<MTLBuffer>)dstBuffer;
+    _srcBuffer = srcBuffer;
+    _dstBuffer = dstBuffer;
 }
 
 void
@@ -48,9 +48,9 @@ HdStBufferRelocatorMetal::Commit()
     id<MTLBlitCommandEncoder> blitEncoder = [commandBuffer blitCommandEncoder];
 
     TF_FOR_ALL (it, _queue) {
-        [blitEncoder copyFromBuffer:(__bridge id<MTLBuffer>)_srcBuffer
+        [blitEncoder copyFromBuffer:_srcBuffer
                        sourceOffset:it->readOffset
-                           toBuffer:(__bridge id<MTLBuffer>)_dstBuffer
+                           toBuffer:_dstBuffer
                   destinationOffset:it->writeOffset
                                size:it->copySize];
     }

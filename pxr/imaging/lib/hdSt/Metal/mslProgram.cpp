@@ -30,6 +30,7 @@
 
 #include "pxr/imaging/hdSt/Metal/mslProgram.h"
 #include "pxr/imaging/hdSt/package.h"
+#include "pxr/imaging/hdSt/surfaceShader.h"
 
 #include "pxr/imaging/hd/perfLog.h"
 #include "pxr/imaging/hd/resourceRegistry.h"
@@ -55,11 +56,11 @@ HdStMSLProgram::HdStMSLProgram(TfToken const &role)
 
 HdStMSLProgram::~HdStMSLProgram()
 {
-    id<MTLBuffer> uniformBuffer = (__bridge id<MTLBuffer>)_uniformBuffer.GetId();
+    id<MTLBuffer> uniformBuffer = _uniformBuffer.GetId();
     if (uniformBuffer) {
         [uniformBuffer release];
         uniformBuffer = nil;
-        _uniformBuffer.SetAllocation((HdBufferResourceGPUHandle)0, 0);
+        _uniformBuffer.SetAllocation(HdResourceGPUHandle(), 0);
     }
 }
 
@@ -167,7 +168,7 @@ HdStMSLProgram::Link()
     _valid = true;
     
     // create an uniform buffer
-    id<MTLBuffer> uniformBuffer = (__bridge id<MTLBuffer>)_uniformBuffer.GetMetalId();
+    id<MTLBuffer> uniformBuffer = _uniformBuffer.GetId();
     if (uniformBuffer == 0) {
         int const defaultLength = 1024;
         uniformBuffer = [device newBufferWithLength:defaultLength options:MTLResourceStorageModeManaged];
@@ -191,28 +192,55 @@ HdStMSLProgram::Validate() const
 
 void HdStMSLProgram::AssignUniformBindings(GarchBindingMapRefPtr bindingMap) const
 {
-    MtlfBindingMapRefPtr glfBindingMap(TfDynamic_cast<MtlfBindingMapRefPtr>(bindingMap));
-    TF_FATAL_CODING_ERROR("Not Implemented");
+    MtlfBindingMapRefPtr mtlfBindingMap(TfDynamic_cast<MtlfBindingMapRefPtr>(bindingMap));
+
+//    mtlfBindingMap->AssignUniformBindingsToProgram(nil);
 }
 
 void HdStMSLProgram::AssignSamplerUnits(GarchBindingMapRefPtr bindingMap) const
 {
-    MtlfBindingMapRefPtr glfBindingMap(TfDynamic_cast<MtlfBindingMapRefPtr>(bindingMap));
-    TF_FATAL_CODING_ERROR("Not Implemented");
+    MtlfBindingMapRefPtr mtlfBindingMap(TfDynamic_cast<MtlfBindingMapRefPtr>(bindingMap));
+    
+    mtlfBindingMap->AssignSamplerUnitsToProgram(nil);
 }
 
 void HdStMSLProgram::AddCustomBindings(GarchBindingMapRefPtr bindingMap) const
 {
-    MtlfBindingMapRefPtr glfBindingMap(TfDynamic_cast<MtlfBindingMapRefPtr>(bindingMap));
-    TF_FATAL_CODING_ERROR("Not Implemented");
+    MtlfBindingMapRefPtr mtlfBindingMap(TfDynamic_cast<MtlfBindingMapRefPtr>(bindingMap));
+    
+    mtlfBindingMap->AddCustomBindings(nil);
+}
+
+void HdStMSLProgram::BindResources(HdStSurfaceShader* surfaceShader, HdSt_ResourceBinder const &binder) const
+{
+    // XXX: there's an issue where other shaders try to use textures.
+    TF_FOR_ALL(it, surfaceShader->GetTextureDescriptors()) {
+        HdBinding binding = binder.GetBinding(it->name);
+        // XXX: put this into resource binder.
+        if (binding.GetType() == HdBinding::TEXTURE_2D ||
+            binding.GetType() == HdBinding::TEXTURE_PTEX_TEXEL) {
+            MtlfMetalContext::GetMetalContext()->SetTexture(binding.GetLocation(), it->handle);
+            MtlfMetalContext::GetMetalContext()->SetSampler(binding.GetLocation(), it->sampler);
+        } else if (binding.GetType() == HdBinding::TEXTURE_PTEX_LAYOUT) {
+            TF_FATAL_CODING_ERROR("Not Implemented");
+            // glActiveTexture(GL_TEXTURE0 + samplerUnit);
+            // glBindTexture(GL_TEXTURE_BUFFER, it->handle);
+            //glProgramUniform1i(_program, binding.GetLocation(), samplerUnit);
+        }
+    }
+}
+
+void HdStMSLProgram::UnbindResources(HdStSurfaceShader* surfaceShader, HdSt_ResourceBinder const &binder) const
+{
+    // Nothing
 }
 
 void HdStMSLProgram::SetProgram() const {
-    TF_FATAL_CODING_ERROR("Not Implemented");
+//    TF_FATAL_CODING_ERROR("Not Implemented");
 }
 
 void HdStMSLProgram::UnsetProgram() const {
-    TF_FATAL_CODING_ERROR("Not Implemented");
+//    TF_FATAL_CODING_ERROR("Not Implemented");
 }
 
 
@@ -222,14 +250,19 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
                                                       GLint firstIndex,
                                                       GLint instanceCount,
                                                       GLint baseVertex) const {
-    TF_FATAL_CODING_ERROR("Not Implemented");
+    const_cast<HdStMSLProgram*>(this)->BakeState();
 }
 
 void HdStMSLProgram::DrawArraysInstanced(GLenum primitiveMode,
                                           GLint baseVertex,
                                           GLint vertexCount,
                                           GLint instanceCount) const {
-    TF_FATAL_CODING_ERROR("Not Implemented");
+    const_cast<HdStMSLProgram*>(this)->BakeState();
+}
+
+void HdStMSLProgram::BakeState()
+{
+
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

@@ -23,6 +23,8 @@
 //
 /// \file bindingMap.cpp
 
+#include "pxr/imaging/mtlf/mtlDevice.h"
+
 #include "pxr/imaging/mtlf/bindingMap.h"
 #include "pxr/base/tf/stl.h"
 #include "pxr/base/tf/type.h"
@@ -68,15 +70,13 @@ MtlfBindingMap::GetAttributeIndex(TfToken const & name)
 void
 MtlfBindingMap::AssignSamplerUnitsToProgram(GarchProgramGPUHandle program)
 {
-    TF_FATAL_CODING_ERROR("Not Implemented");
-/*
     for (BindingMap::value_type const& p : _samplerBindings) {
-        GLint loc = glGetUniformLocation(program, p.first.GetText());
+        GLint loc = 0;//glGetUniformLocation(program, p.first.GetText());
         if (loc != -1) {
-            glProgramUniform1i(program, loc, p.second);
+            //glProgramUniform1i(program, loc, p.second);
+            //MtlfMetalContext::GetMetalContext()->SetSamplerState(loc, p.second);
         }
     }
- */
 }
 
 int

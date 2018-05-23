@@ -29,6 +29,12 @@
 #include "pxr/imaging/hd/version.h"
 #include "pxr/base/tf/token.h"
 
+#include "pxr/imaging/garch/gl.h"
+
+#if defined(ARCH_GFX_METAL)
+#include <Metal/Metal.h>
+#endif
+
 #include <boost/noncopyable.hpp>
 #include <boost/shared_ptr.hpp>
 
@@ -39,8 +45,45 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 typedef boost::shared_ptr<class HdResource> HdResourceSharedPtr;
 
-typedef void* HdBufferResourceGPUHandle;
-
+struct HdResourceGPUHandle {
+    HdResourceGPUHandle() {
+        handle = 0;
+    }
+    HdResourceGPUHandle(HdResourceGPUHandle const & _gpuHandle) {
+        handle = _gpuHandle.handle;
+    }
+    
+    void Clear() { handle = 0; }
+    bool IsSet() const { return handle != 0; }
+    
+    // OpenGL
+    HdResourceGPUHandle(GLuint const _handle) {
+        handle = _handle;
+    }
+    HdResourceGPUHandle& operator =(GLuint const _handle) {
+        handle = _handle;
+        return *this;
+    }
+    operator GLuint() const { return (GLuint)handle; }
+    
+    bool operator !=(HdResourceGPUHandle const _handle) const {
+        return handle != _handle;
+    }
+    
+#if defined(ARCH_GFX_METAL)
+    // Metal
+    HdResourceGPUHandle(id<MTLBuffer> const _handle) {
+        handle = (__bridge uint64_t)_handle;
+    }
+    HdResourceGPUHandle& operator =(id<MTLBuffer> const _handle) {
+        handle = (__bridge uint64_t)_handle;
+        return *this;
+    }
+    operator id<MTLBuffer>() const { return (__bridge id<MTLBuffer>)handle; }
+#endif
+    
+    uint64_t handle;
+};
 /// \class HdResource
 ///
 /// Base class for all GPU resource objects.
@@ -63,11 +106,11 @@ public:
     /// Sets the OpenGL name/identifier for this resource and its size.
     /// also caches the gpu address of the buffer.
     HD_API
-    virtual void SetAllocation(HdBufferResourceGPUHandle id, size_t size) = 0;
+    virtual void SetAllocation(HdResourceGPUHandle id, size_t size) = 0;
     
     /// The graphics API name/identifier for this resource
     HD_API
-    virtual HdBufferResourceGPUHandle GetId() const = 0;
+    virtual HdResourceGPUHandle GetId() const = 0;
 
 protected:
     /// Stores the size of the resource allocated in the GPU

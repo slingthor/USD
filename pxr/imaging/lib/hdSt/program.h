@@ -26,6 +26,7 @@
 
 #include "pxr/pxr.h"
 #include "pxr/imaging/hdSt/api.h"
+#include "pxr/imaging/hdSt/resourceBinder.h"
 
 #include "pxr/base/tf/declarePtrs.h"
 #include "pxr/base/tf/token.h"
@@ -36,6 +37,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 class HdStResourceRegistry;
 class HdResource;
+class HdStSurfaceShader;
 
 typedef boost::shared_ptr<class HdStProgram> HdStProgramSharedPtr;
 
@@ -91,6 +93,12 @@ public:
     
     HDST_API
     virtual void AddCustomBindings(GarchBindingMapRefPtr bindingMap) const = 0;
+    
+    HDST_API
+    virtual void BindResources(HdStSurfaceShader* surfaceShader, HdSt_ResourceBinder const &binder) const = 0;
+
+    HDST_API
+    virtual void UnbindResources(HdStSurfaceShader* surfaceShader, HdSt_ResourceBinder const &binder) const = 0;
     
     HDST_API
     virtual void SetProgram() const = 0;

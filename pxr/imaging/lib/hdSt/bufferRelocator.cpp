@@ -33,7 +33,7 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-HdStBufferRelocator *HdStBufferRelocator::New(HdBufferResourceGPUHandle srcBuffer, HdBufferResourceGPUHandle dstBuffer)
+HdStBufferRelocator *HdStBufferRelocator::New(HdResourceGPUHandle srcBuffer, HdResourceGPUHandle dstBuffer)
 {
     HdEngine::RenderAPI api = HdEngine::GetRenderAPI();
     switch(api)

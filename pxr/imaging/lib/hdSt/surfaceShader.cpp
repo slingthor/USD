@@ -102,36 +102,7 @@ void
 HdStSurfaceShader::BindResources(HdSt_ResourceBinder const &binder,
                                  HdStProgram const &program)
 {
-    TF_FATAL_CODING_ERROR("Not Implemented");
-/*
-    // XXX: there's an issue where other shaders try to use textures.
-    int samplerUnit = binder.GetNumReservedTextureUnits();
-    TF_FOR_ALL(it, _textureDescriptors) {
-        HdBinding binding = binder.GetBinding(it->name);
-        // XXX: put this into resource binder.
-        if (binding.GetType() == HdBinding::TEXTURE_2D) {
-            glActiveTexture(GL_TEXTURE0 + samplerUnit);
-            glBindTexture(GL_TEXTURE_2D, it->handle);
-            glBindSampler(samplerUnit, (GLuint)(uint64_t)it->sampler);
-            
-            glProgramUniform1i((GLuint)(uint64_t)program, binding.GetLocation(), samplerUnit);
-            samplerUnit++;
-        } else if (binding.GetType() == HdBinding::TEXTURE_PTEX_TEXEL) {
-            glActiveTexture(GL_TEXTURE0 + samplerUnit);
-            glBindTexture(GL_TEXTURE_2D_ARRAY, it->handle);
-
-            glProgramUniform1i((GLuint)(uint64_t)program, binding.GetLocation(), samplerUnit);
-            samplerUnit++;
-        } else if (binding.GetType() == HdBinding::TEXTURE_PTEX_LAYOUT) {
-            glActiveTexture(GL_TEXTURE0 + samplerUnit);
-            glBindTexture(GL_TEXTURE_BUFFER, it->handle);
-
-            glProgramUniform1i((GLuint)(uint64_t)program, binding.GetLocation(), samplerUnit);
-            samplerUnit++;
-        }
-    }
-    glActiveTexture(GL_TEXTURE0);
- */
+    program.BindResources(this, binder);
     binder.BindShaderResources(this);
 }
 /*virtual*/
@@ -140,28 +111,7 @@ HdStSurfaceShader::UnbindResources(HdSt_ResourceBinder const &binder,
                                    HdStProgram const &program)
 {
     binder.UnbindShaderResources(this);
-
-    TF_FATAL_CODING_ERROR("Not Implemented");
-    int samplerUnit = binder.GetNumReservedTextureUnits();
-    TF_FOR_ALL(it, _textureDescriptors) {
-        HdBinding binding = binder.GetBinding(it->name);
-        // XXX: put this into resource binder.
-        if (binding.GetType() == HdBinding::TEXTURE_2D) {
-            glActiveTexture(GL_TEXTURE0 + samplerUnit);
-            glBindTexture(GL_TEXTURE_2D, 0);
-            glBindSampler(samplerUnit, 0);
-            samplerUnit++;
-        } else if (binding.GetType() == HdBinding::TEXTURE_PTEX_TEXEL) {
-            glActiveTexture(GL_TEXTURE0 + samplerUnit);
-            glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
-            samplerUnit++;
-        } else if (binding.GetType() == HdBinding::TEXTURE_PTEX_LAYOUT) {
-            glActiveTexture(GL_TEXTURE0 + samplerUnit);
-            glBindTexture(GL_TEXTURE_BUFFER, 0);
-            samplerUnit++;
-        }
-    }
-    glActiveTexture(GL_TEXTURE0);
+    program.UnbindResources(this, binder);
 }
 /*virtual*/
 void

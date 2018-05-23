@@ -40,24 +40,17 @@ HdStResourceGL::~HdStResourceGL()
 }
 
 void
-HdStResourceGL::SetAllocation(HdBufferResourceGPUHandle id, size_t size)
-{
-    _id = (GLuint)(uint64_t)id;
-    HdResource::SetSize(size);
-}
-
-void
-HdStResourceGL::SetAllocation(GLuint id, size_t size)
+HdStResourceGL::SetAllocation(HdResourceGPUHandle id, size_t size)
 {
     _id = id;
     HdResource::SetSize(size);
 }
 
-HdBufferResourceGPUHandle
+HdResourceGPUHandle
 GetId()
 {
     TF_FATAL_CODING_ERROR("Not a valid call - HdStResourceGL was instantiated directly");
-    return NULL;
+    return HdResourceGPUHandle();
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

@@ -110,12 +110,12 @@ HdStStripedInterleavedBufferGL::Reallocate(
     // from another buffer array.
 
     GLuint newId = 0;
-    GLuint oldId = (GLuint)(uint64_t)GetResources().begin()->second->GetId();
+    HdResourceGPUHandle oldId = (GLuint)(uint64_t)GetResources().begin()->second->GetId();
 
     HdStInterleavedMemoryManager::_StripedInterleavedBufferSharedPtr curRangeOwner_ =
         boost::static_pointer_cast<HdStInterleavedMemoryManager::_StripedInterleavedBuffer> (curRangeOwner);
 
-    GLuint curId = (GLuint)(uint64_t)curRangeOwner_->GetResources().begin()->second->GetId();
+    HdResourceGPUHandle curId = (GLuint)(uint64_t)curRangeOwner_->GetResources().begin()->second->GetId();
 
     if (glGenBuffers) {
         glGenBuffers(1, &newId);
@@ -137,8 +137,7 @@ HdStStripedInterleavedBufferGL::Reallocate(
 
             // pre-pass to combine consecutive buffer range relocation
             boost::scoped_ptr<HdStBufferRelocator> relocator(
-                HdStBufferRelocator::New((HdBufferResourceGPUHandle)(uint64_t)curId,
-                                         (HdBufferResourceGPUHandle)(uint64_t)newId));
+                HdStBufferRelocator::New(curId, newId));
             for (size_t rangeIdx = 0; rangeIdx < rangeCount; ++rangeIdx) {
                 HdStInterleavedMemoryManager::_StripedInterleavedBufferRangeSharedPtr range = _GetRangeSharedPtr(rangeIdx);
 
@@ -183,17 +182,18 @@ HdStStripedInterleavedBufferGL::Reallocate(
         }
         if (oldId) {
             // delete old buffer
-            glDeleteBuffers(1, &oldId);
+            GLuint oid = oldId;
+            glDeleteBuffers(1, &oid);
         }
     } else {
         // for unit test
-        static int id = 1;
+        static GLuint id = 1;
         newId = id++;
     }
 
     // update id to all buffer resources
     TF_FOR_ALL(it, GetResources()) {
-        it->second->SetAllocation((HdBufferResourceGPUHandle)(uint64_t)newId, totalSize);
+        it->second->SetAllocation(newId, totalSize);
     }
 
     _needsReallocation = false;
@@ -208,12 +208,12 @@ HdStStripedInterleavedBufferGL::_DeallocateResources()
 {
     HdBufferResourceSharedPtr resource = GetResource();
     if (resource) {
-        GLuint id = (GLuint)(uint64_t)resource->GetId();
+        GLuint id = resource->GetId();
         if (id) {
             if (glDeleteBuffers) {
                 glDeleteBuffers(1, &id);
             }
-            resource->SetAllocation(0, 0);
+            resource->SetAllocation(HdResourceGPUHandle(), 0);
         }
     }
 }

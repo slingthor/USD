@@ -49,8 +49,6 @@ typedef boost::shared_ptr<HdBufferResource> HdBufferResourceSharedPtr;
 typedef std::vector<
     std::pair<TfToken, HdBufferResourceSharedPtr> > HdBufferResourceNamedList;
 
-typedef void* HdBufferResourceGPUHandle;
-
 /// \class HdBufferResource
 ///
 /// A specific type of HdResource (GPU resource) representing a buffer object.
@@ -81,7 +79,7 @@ public:
     virtual void CopyData(size_t vboOffset, size_t dataSize, void const *data) = 0;
 
     HD_API
-    virtual HdBufferResourceGPUHandle GetId() const = 0;
+    virtual HdResourceGPUHandle GetId() const = 0;
 
     HD_API
     virtual VtValue ReadBuffer(HdTupleType tupleType,

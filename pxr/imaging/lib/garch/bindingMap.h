@@ -83,7 +83,9 @@ struct GarchProgramGPUHandle {
 
 class GarchBindingMap : public TfRefBase, public TfWeakBase {
 public:
-    typedef TfHashMap<TfToken, int, TfToken::HashFunctor> BindingMap;
+    typedef TfHashMap<TfToken, int, TfToken::HashFunctor> AttribBindingMap;
+    typedef TfHashMap<TfToken, int, TfToken::HashFunctor> SamplerBindingMap;
+    typedef TfHashMap<TfToken, int, TfToken::HashFunctor> UniformBindingMap;
 
     /// Returns a new instance.
     GARCH_API
@@ -123,7 +125,7 @@ public:
         _attribBindings[name] = location;
     }
 
-    virtual BindingMap const &GetAttributeBindings() const {
+    virtual AttribBindingMap const &GetAttributeBindings() const {
         return _attribBindings;
     }
 
@@ -141,9 +143,9 @@ public:
 
 protected:
 
-    BindingMap _attribBindings;
-    BindingMap _samplerBindings;
-    BindingMap _uniformBindings;
+    AttribBindingMap _attribBindings;
+    SamplerBindingMap _samplerBindings;
+    UniformBindingMap _uniformBindings;
 };
 
 

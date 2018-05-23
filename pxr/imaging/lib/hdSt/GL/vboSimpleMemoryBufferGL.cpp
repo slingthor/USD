@@ -104,8 +104,8 @@ HdStVBOSimpleMemoryBufferGL::Reallocate(
 
         if (glGenBuffers) {
             // allocate new one
-            void *newId = NULL;
-            void *oldId = bres->GetId();
+            HdResourceGPUHandle newId;
+            HdResourceGPUHandle oldId(bres->GetId());
 
             GLuint nid = 0;
             glGenBuffers(1, &nid);
@@ -118,7 +118,7 @@ HdStVBOSimpleMemoryBufferGL::Reallocate(
                              bufferSize, NULL, GL_STATIC_DRAW);
                 glBindBuffer(GL_ARRAY_BUFFER, 0);
             }
-            newId = (void*)(uint64_t)nid;
+            newId = nid;
 
             // copy the range. There are three cases:
             //
@@ -142,10 +142,10 @@ HdStVBOSimpleMemoryBufferGL::Reallocate(
 
                 if (caps.copyBufferEnabled) {
                     if (ARCH_LIKELY(caps.directStateAccessEnabled)) {
-                        glNamedCopyBufferSubDataEXT((GLint)(uint64_t)oldId, *(GLuint*)&newId, 0, 0, copySize);
+                        glNamedCopyBufferSubDataEXT(oldId, newId, 0, 0, copySize);
                     } else {
-                        glBindBuffer(GL_COPY_READ_BUFFER, (GLint)(uint64_t)oldId);
-                        glBindBuffer(GL_COPY_WRITE_BUFFER, (GLint)(uint64_t)newId);
+                        glBindBuffer(GL_COPY_READ_BUFFER, oldId);
+                        glBindBuffer(GL_COPY_WRITE_BUFFER, newId);
                         glCopyBufferSubData(GL_COPY_READ_BUFFER,
                                             GL_COPY_WRITE_BUFFER, 0, 0, copySize);
                         glBindBuffer(GL_COPY_READ_BUFFER, 0);
@@ -154,9 +154,9 @@ HdStVBOSimpleMemoryBufferGL::Reallocate(
                 } else {
                     // driver issues workaround
                     std::vector<char> data(copySize);
-                    glBindBuffer(GL_ARRAY_BUFFER, (GLint)(uint64_t)oldId);
+                    glBindBuffer(GL_ARRAY_BUFFER, oldId);
                     glGetBufferSubData(GL_ARRAY_BUFFER, 0, copySize, &data[0]);
-                    glBindBuffer(GL_ARRAY_BUFFER, (GLint)(uint64_t)newId);
+                    glBindBuffer(GL_ARRAY_BUFFER, newId);
                     glBufferSubData(GL_ARRAY_BUFFER, 0, copySize, &data[0]);
                     glBindBuffer(GL_ARRAY_BUFFER, 0);
                 }
@@ -164,15 +164,15 @@ HdStVBOSimpleMemoryBufferGL::Reallocate(
 
             // delete old buffer
             if (oldId) {
-                GLuint oid = (GLint)(uint64_t)oldId;
+                GLuint oid = oldId;
                 glDeleteBuffers(1, &oid);
             }
 
             bres->SetAllocation(newId, bufferSize);
         } else {
             // for unit test
-            static int id = 1;
-            bres->SetAllocation((void*)(uint64_t)id++, bufferSize);
+            static GLuint id = 1;
+            bres->SetAllocation(id++, bufferSize);
         }
     }
 
@@ -187,11 +187,10 @@ void
 HdStVBOSimpleMemoryBufferGL::_DeallocateResources()
 {
     TF_FOR_ALL (it, GetResources()) {
-        void *oldId = it->second->GetId();
+        GLuint oldId = it->second->GetId();
         if (oldId) {
-            GLuint oid = (GLint)(uint64_t)oldId;
-            glDeleteBuffers(1, &oid);
-            it->second->SetAllocation(0, 0);
+            glDeleteBuffers(1, &oldId);
+            it->second->SetAllocation(HdResourceGPUHandle(), 0);
         }
     }
 }

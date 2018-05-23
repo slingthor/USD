@@ -37,7 +37,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 ///
 class HdStBufferRelocatorGL: public HdStBufferRelocator {
 public:
-    HdStBufferRelocatorGL(HdBufferResourceGPUHandle srcBuffer, HdBufferResourceGPUHandle dstBuffer);
+    HdStBufferRelocatorGL(HdResourceGPUHandle srcBuffer, HdResourceGPUHandle dstBuffer);
 
     /// Execute GL buffer copy command to flush all scheduled range copies.
     HDST_API

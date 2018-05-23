@@ -23,14 +23,15 @@
 //
 /// \file simpleLightingContext.cpp
 
-#include "pxr/imaging/mtlf/simpleLightingContext.h"
-#include "pxr/imaging/mtlf/bindingMap.h"
-#include "pxr/imaging/mtlf/diagnostic.h"
-#include "pxr/imaging/mtlf/package.h"
-#include "pxr/imaging/mtlf/uniformBlock.h"
+#include "pxr/imaging/mtlf/mtlDevice.h"
 
+#include "pxr/imaging/garch/bindingMap.h"
+#include "pxr/imaging/garch/resourceFactory.h"
 #include "pxr/imaging/garch/simpleLight.h"
 #include "pxr/imaging/garch/simpleMaterial.h"
+#include "pxr/imaging/garch/uniformBlock.h"
+
+#include "pxr/imaging/mtlf/simpleLightingContext.h"
 
 #include "pxr/base/arch/pragmas.h"
 #include "pxr/base/tf/stringUtils.h"
@@ -96,14 +97,12 @@ setMatrix(float *dst, GfMatrix4d const & mat)
 void
 MtlfSimpleLightingContext::BindUniformBlocks(GarchBindingMapPtr const &bindingMap)
 {
-    TF_FATAL_CODING_ERROR("Not Implemented");
-    /*
     if (!_lightingUniformBlock)
-        _lightingUniformBlock = MtlfUniformBlock::New();
+        _lightingUniformBlock = GarchResourceFactory::GetInstance()->NewUniformBlock();
     if (!_shadowUniformBlock)
-        _shadowUniformBlock = MtlfUniformBlock::New();
+        _shadowUniformBlock = GarchResourceFactory::GetInstance()->NewUniformBlock();
     if (!_materialUniformBlock)
-        _materialUniformBlock = MtlfUniformBlock::New();
+        _materialUniformBlock = GarchResourceFactory::GetInstance()->NewUniformBlock();
 
     bool shadowExists = false;
     if ((!_lightingUniformBlockValid ||
@@ -167,7 +166,7 @@ MtlfSimpleLightingContext::BindUniformBlocks(GarchBindingMapPtr const &bindingMa
         lightingData->useColorMaterialDiffuse = _useColorMaterialDiffuse;
 
         for (int i = 0; _useLighting && i < numLights; ++i) {
-            MtlfSimpleLight const &light = _lights[i];
+            GarchSimpleLight const &light = _lights[i];
 
             setVec4(lightingData->lightSource[i].position,
                     light.GetPosition() * _worldToViewMatrix);
@@ -247,17 +246,22 @@ MtlfSimpleLightingContext::BindUniformBlocks(GarchBindingMapPtr const &bindingMa
     }
 
     _materialUniformBlock->Bind(bindingMap, _tokens->materialUB);
-     */
 }
 
 void
 MtlfSimpleLightingContext::BindSamplers(GarchBindingMapPtr const &bindingMap)
 {
-    TF_FATAL_CODING_ERROR("Not Implemented");
-    /*
+//    TF_FATAL_CODING_ERROR("Not Implemented");
+
     int shadowSampler = bindingMap->GetSamplerUnit(_tokens->shadowSampler);
     int shadowCompareSampler = bindingMap->GetSamplerUnit(_tokens->shadowCompareSampler);
 
+    MtlfMetalContext::GetMetalContext()->SetTexture(shadowSampler, _shadows->GetShadowMapTexture());
+    MtlfMetalContext::GetMetalContext()->SetSampler(shadowSampler, _shadows->GetShadowMapDepthSampler());
+    
+    MtlfMetalContext::GetMetalContext()->SetTexture(shadowCompareSampler, _shadows->GetShadowMapTexture());
+    MtlfMetalContext::GetMetalContext()->SetSampler(shadowCompareSampler, _shadows->GetShadowMapCompareSampler());
+/*
     glActiveTexture(GL_TEXTURE0 + shadowSampler);
     glBindTexture(GL_TEXTURE_2D_ARRAY, _shadows->GetShadowMapTexture());
     glBindSampler(shadowSampler, _shadows->GetShadowMapDepthSampler());
@@ -267,13 +271,13 @@ MtlfSimpleLightingContext::BindSamplers(GarchBindingMapPtr const &bindingMap)
     glBindSampler(shadowCompareSampler, _shadows->GetShadowMapCompareSampler());
 
     glActiveTexture(GL_TEXTURE0);
-     */
+ */
 }
 
 void
 MtlfSimpleLightingContext::UnbindSamplers(GarchBindingMapPtr const &bindingMap)
 {
-    TF_FATAL_CODING_ERROR("Not Implemented");
+    //TF_FATAL_CODING_ERROR("Not Implemented");
     /*
     int shadowSampler = bindingMap->GetSamplerUnit(_tokens->shadowSampler);
     int shadowCompareSampler = bindingMap->GetSamplerUnit(_tokens->shadowCompareSampler);

@@ -52,20 +52,11 @@ public:
 
     /// The graphics API name/identifier for this resource and its size
     HDST_API
-    virtual void SetAllocation(HdBufferResourceGPUHandle id, size_t size) override;
+    virtual void SetAllocation(HdResourceGPUHandle id, size_t size) override;
     
     /// The abstract name/identifier for this resource
     HDST_API
-    virtual HdBufferResourceGPUHandle GetId() const override { return (HdBufferResourceGPUHandle)(uint64_t)_id; }
-    
-    /// The OpenGL name/identifier for this resource
-    HDST_API
-    virtual GLuint GetOpenGLId() const { return _id; }
-    
-    /// The OpenGL name/identifier for this resource and its size
-    HDST_API
-    virtual void SetAllocation(GLuint id, size_t size);
-
+    virtual HdResourceGPUHandle GetId() const override { return _id; }
     
 private:
     GLuint _id;

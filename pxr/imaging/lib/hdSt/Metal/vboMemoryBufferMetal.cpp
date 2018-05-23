@@ -136,13 +136,11 @@ HdStVBOMemoryBufferMetal::Reallocate(
         // allocate new one
         // curId and oldId will be different when we are adopting ranges
         // from another buffer array.
-        void *newId = 0;
-        void *oldId = bres->GetId();
-        void *curId = curRes->GetId();
+        HdResourceGPUHandle newId;
+        HdResourceGPUHandle oldId(bres->GetId());
+        HdResourceGPUHandle curId(curRes->GetId());
 
-        id<MTLBuffer> nid = nil;
-        nid = [MtlfMetalContext::GetMetalContext()->device newBufferWithLength:bufferSize options:MTLResourceStorageModeManaged];
-        newId = (__bridge void*)nid;
+        newId = [MtlfMetalContext::GetMetalContext()->device newBufferWithLength:bufferSize options:MTLResourceStorageModeManaged];
 
         // if old buffer exists, copy unchanged data
         if (curId) {
@@ -150,8 +148,7 @@ HdStVBOMemoryBufferMetal::Reallocate(
 
             // pre-pass to combine consecutive buffer range relocation
             boost::scoped_ptr<HdStBufferRelocator> relocator(
-                 HdStBufferRelocator::New((HdBufferResourceGPUHandle)(uint64_t)curId,
-                                          (HdBufferResourceGPUHandle)(uint64_t)newId));
+                 HdStBufferRelocator::New(curId, newId));
             TF_FOR_ALL (it, ranges) {
                 HdStVBOMemoryManager::_StripedBufferArrayRangeSharedPtr range =
                     boost::static_pointer_cast<HdStVBOMemoryManager::_StripedBufferArrayRange>(*it);
@@ -195,7 +192,7 @@ HdStVBOMemoryBufferMetal::Reallocate(
 
         if (oldId) {
             // delete old buffer
-            id<MTLBuffer> oid = (__bridge id<MTLBuffer>)oldId;
+            id<MTLBuffer> oid = oldId;
             [oid release];
         }
 
@@ -225,11 +222,11 @@ void
 HdStVBOMemoryBufferMetal::_DeallocateResources()
 {
     TF_FOR_ALL (it, GetResources()) {
-        void *oldId = it->second->GetId();
+        HdResourceGPUHandle oldId(it->second->GetId());
         if (oldId) {
-            id<MTLBuffer> buffer = (__bridge id<MTLBuffer>)oldId;
+            id<MTLBuffer> buffer = oldId;
             [buffer release];
-            it->second->SetAllocation(0, 0);
+            it->second->SetAllocation(HdResourceGPUHandle(), 0);
         }
     }
 }

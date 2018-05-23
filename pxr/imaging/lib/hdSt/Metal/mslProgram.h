@@ -85,6 +85,12 @@ public:
     
     HDST_API
     virtual void AddCustomBindings(GarchBindingMapRefPtr bindingMap) const override;
+    
+    HDST_API
+    virtual void BindResources(HdStSurfaceShader* surfaceShader, HdSt_ResourceBinder const &binder) const override;
+    
+    HDST_API
+    virtual void UnbindResources(HdStSurfaceShader* surfaceShader, HdSt_ResourceBinder const &binder) const override;
 
     HDST_API
     virtual void SetProgram() const override;
@@ -130,6 +136,9 @@ public:
     id<MTLFunction> GetComputeFunction() const {
         return _computeFunction;
     }
+protected:
+    HDST_API
+    void BakeState();
 
 private:
     TfToken const _role;
@@ -137,6 +146,8 @@ private:
     id<MTLFunction> _vertexFunction;
     id<MTLFunction> _fragmentFunction;
     id<MTLFunction> _computeFunction;
+    
+    id<MTLRenderPipelineState> _pipelineState;
 
     bool _valid;
     HdStResourceMetal _uniformBuffer;

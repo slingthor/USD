@@ -64,11 +64,11 @@ public:
     /// Sets the OpenGL name/identifier for this resource and its size.
     /// also caches the gpu address of the buffer.
     HDST_API
-    virtual void SetAllocation(HdBufferResourceGPUHandle buffer, size_t size) override;
+    virtual void SetAllocation(HdResourceGPUHandle buffer, size_t size) override;
 
     /// Returns the Metal object for this GPU resource
     HDST_API
-    virtual HdBufferResourceGPUHandle GetId() const { return (__bridge HdBufferResourceGPUHandle)_id; }
+    virtual HdResourceGPUHandle GetId() const { return (__bridge HdResourceGPUHandle)_id; }
 
     /// Returns the gpu address (if available. otherwise returns 0).
     HDST_API

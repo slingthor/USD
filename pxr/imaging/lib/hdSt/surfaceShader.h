@@ -78,9 +78,9 @@ public:
     HDST_API
     virtual TextureDescriptorVector GetTextures() const override;
     HDST_API
-    virtual void BindResources(HdSt_ResourceBinder const &binder, HdStProgram const &program) override;
+    virtual void BindResources(HdSt_ResourceBinder const &binder, HdStProgram const &program);
     HDST_API
-    virtual void UnbindResources(HdSt_ResourceBinder const &binder, HdStProgram const &program) override;
+    virtual void UnbindResources(HdSt_ResourceBinder const &binder, HdStProgram const &program);
     HDST_API
     virtual void AddBindings(HdBindingRequestVector *customBindings) override;
     HDST_API
@@ -99,11 +99,15 @@ public:
     void SetBufferSources(HdBufferSourceVector &bufferSources, 
                           HdResourceRegistrySharedPtr const &resourceRegistry);
 
+    HDST_API
+    TextureDescriptorVector const& GetTextureDescriptors() const { return _textureDescriptors; }
+    
     /// If the prim is based on asset, reload that asset.
     HDST_API
     virtual void Reload();
 
 protected:
+    
     HDST_API
     void _SetSource(TfToken const &shaderStageKey, std::string const &source);
 

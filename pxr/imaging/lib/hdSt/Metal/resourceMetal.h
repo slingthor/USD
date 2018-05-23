@@ -52,23 +52,13 @@ public:
 
     /// The Metal object for this resource and its size
     HD_API
-    virtual void SetAllocation(HdBufferResourceGPUHandle resId, size_t size);
+    virtual void SetAllocation(HdResourceGPUHandle resId, size_t size);
 
     /// Returns the id of the GPU resource
-    virtual HdBufferResourceGPUHandle GetId() const { return _id; }
-    
-    /// The Metal object for this resource
-    HD_API
-    virtual id<NSObject> GetMetalId() const { return _id; }
-    
-    /// The Metal object for this resource and its size
-    HD_API
-    virtual void SetAllocation(id<NSObject> idBuffer, size_t size) {
-        SetAllocation((__bridge HdBufferResourceGPUHandle)idBuffer, size);
-    }
+    virtual HdResourceGPUHandle GetId() const { return _id; }
 
 private:
-    id<NSObject> _id;
+    HdResourceGPUHandle _id;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

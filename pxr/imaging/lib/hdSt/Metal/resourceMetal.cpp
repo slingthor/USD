@@ -29,7 +29,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 HdStResourceMetal::HdStResourceMetal(TfToken const & role)
     : HdResource(role)
-    , _id(0)
+    , _id(nil)
 {
     /*NOTHING*/
 }
@@ -40,9 +40,9 @@ HdStResourceMetal::~HdStResourceMetal()
 }
 
 void
-HdStResourceMetal::SetAllocation(HdBufferResourceGPUHandle resId, size_t size)
+HdStResourceMetal::SetAllocation(HdResourceGPUHandle resId, size_t size)
 {
-    _id = (__bridge id<NSObject>)resId;
+    _id = resId;
     HdResource::SetSize(size);
 }
 

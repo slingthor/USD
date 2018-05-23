@@ -77,7 +77,7 @@ HdStPersistentBufferGL::HdStPersistentBufferGL(
 
 HdStPersistentBufferGL::~HdStPersistentBufferGL()
 {
-    GLuint id = GetOpenGLId();
+    GLuint id = GetId();
     if (id) {
         glDeleteBuffers(1, &id);
     }

@@ -112,11 +112,10 @@ HdStVBOSimpleMemoryBufferMetal::Reallocate(
         GLsizeiptr bufferSize = bytesPerElement * numElements;
 
         // allocate new one
-        void *newId = NULL;
-        void *oldId = bres->GetId();
+        HdResourceGPUHandle newId;
+        HdResourceGPUHandle oldId(bres->GetId());
 
-        id<MTLBuffer> nid = [MtlfMetalContext::GetMetalContext()->device newBufferWithLength:bufferSize options:MTLResourceStorageModeManaged];
-        newId = (__bridge void*)nid;
+        newId = [MtlfMetalContext::GetMetalContext()->device newBufferWithLength:bufferSize options:MTLResourceStorageModeManaged];
 
         // copy the range. There are three cases:
         //
@@ -138,16 +137,16 @@ HdStVBOSimpleMemoryBufferMetal::Reallocate(
         if (copySize > 0) {
             HD_PERF_COUNTER_INCR(HdPerfTokens->glCopyBufferSubData);
 
-            [blitEncoder copyFromBuffer:(__bridge id<MTLBuffer>)oldId
+            [blitEncoder copyFromBuffer:oldId
                            sourceOffset:0
-                               toBuffer:(__bridge id<MTLBuffer>)newId
+                               toBuffer:newId
                       destinationOffset:0
                                    size:copySize];
         }
 
         // delete old buffer
         if (oldId) {
-            id<MTLBuffer> oid = (__bridge id<MTLBuffer>)oldId;
+            id<MTLBuffer> oid = oldId;
             [oid release];
         }
 
@@ -168,11 +167,11 @@ void
 HdStVBOSimpleMemoryBufferMetal::_DeallocateResources()
 {
     TF_FOR_ALL (it, GetResources()) {
-        void *oldId = it->second->GetId();
+        HdResourceGPUHandle oldId(it->second->GetId());
         if (oldId) {
-            id<MTLBuffer> oid = (__bridge id<MTLBuffer>)oldId;
+            id<MTLBuffer> oid = oldId;
             [oid release];
-            it->second->SetAllocation(0, 0);
+            it->second->SetAllocation(HdResourceGPUHandle(), 0);
         }
     }
 }

@@ -110,12 +110,12 @@ HdStStripedInterleavedBufferMetal::Reallocate(
     // from another buffer array.
 
     id<MTLBuffer> newId = nil;
-    id<MTLBuffer> oldId = (__bridge id<MTLBuffer>)GetResources().begin()->second->GetId();
+    id<MTLBuffer> oldId = GetResources().begin()->second->GetId();
     
     HdStInterleavedMemoryManager::_StripedInterleavedBufferSharedPtr curRangeOwner_ =
     boost::static_pointer_cast<_StripedInterleavedBuffer> (curRangeOwner);
     
-    id<MTLBuffer> curId = (__bridge id<MTLBuffer>)curRangeOwner_->GetResources().begin()->second->GetId();
+    id<MTLBuffer> curId = curRangeOwner_->GetResources().begin()->second->GetId();
     id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->device;
     
     newId = [device newBufferWithLength:totalSize options:MTLResourceStorageModeManaged];
@@ -177,7 +177,7 @@ HdStStripedInterleavedBufferMetal::Reallocate(
     
     // update id to all buffer resources
     TF_FOR_ALL(it, GetResources()) {
-        it->second->SetAllocation((__bridge HdBufferResourceGPUHandle)newId, totalSize);
+        it->second->SetAllocation((__bridge HdResourceGPUHandle)newId, totalSize);
     }
 
     _needsReallocation = false;
@@ -192,7 +192,7 @@ HdStStripedInterleavedBufferMetal::_DeallocateResources()
 {
     HdBufferResourceSharedPtr resource = GetResource();
     if (resource) {
-        id<MTLBuffer> _id = (__bridge id<MTLBuffer>)resource->GetId();
+        id<MTLBuffer> _id = resource->GetId();
         if (_id != nil) {
             [_id release];
             resource->SetAllocation(nil, 0);

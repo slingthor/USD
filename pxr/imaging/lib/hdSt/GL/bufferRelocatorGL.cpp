@@ -34,10 +34,10 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-HdStBufferRelocatorGL::HdStBufferRelocatorGL(HdBufferResourceGPUHandle srcBuffer, HdBufferResourceGPUHandle dstBuffer)
+HdStBufferRelocatorGL::HdStBufferRelocatorGL(HdResourceGPUHandle srcBuffer, HdResourceGPUHandle dstBuffer)
 {
-    _srcBuffer = (GLuint)(uint64_t)srcBuffer;
-    _dstBuffer = (GLuint)(uint64_t)dstBuffer;
+    _srcBuffer = srcBuffer;
+    _dstBuffer = dstBuffer;
 }
 
 void
@@ -48,14 +48,14 @@ HdStBufferRelocatorGL::Commit()
     if (caps.copyBufferEnabled) {
         // glCopyBuffer
         if (!caps.directStateAccessEnabled) {
-            glBindBuffer(GL_COPY_READ_BUFFER, (GLint)(uint64_t)_srcBuffer);
-            glBindBuffer(GL_COPY_WRITE_BUFFER, (GLint)(uint64_t)_dstBuffer);
+            glBindBuffer(GL_COPY_READ_BUFFER, _srcBuffer);
+            glBindBuffer(GL_COPY_WRITE_BUFFER, _dstBuffer);
         }
 
         TF_FOR_ALL (it, _queue) {
             if (ARCH_LIKELY(caps.directStateAccessEnabled)) {
-                glNamedCopyBufferSubDataEXT((GLint)(uint64_t)_srcBuffer,
-                                            (GLint)(uint64_t)_dstBuffer,
+                glNamedCopyBufferSubDataEXT(_srcBuffer,
+                                            _dstBuffer,
                                             it->readOffset,
                                             it->writeOffset,
                                             it->copySize);
@@ -79,10 +79,10 @@ HdStBufferRelocatorGL::Commit()
         // (workaround for a driver crash)
         TF_FOR_ALL (it, _queue) {
             std::vector<char> data(it->copySize);
-            glBindBuffer(GL_ARRAY_BUFFER, (GLint)(uint64_t)_srcBuffer);
+            glBindBuffer(GL_ARRAY_BUFFER, _srcBuffer);
             glGetBufferSubData(GL_ARRAY_BUFFER, it->readOffset, it->copySize,
                                &data[0]);
-            glBindBuffer(GL_ARRAY_BUFFER, (GLint)(uint64_t)_dstBuffer);
+            glBindBuffer(GL_ARRAY_BUFFER, _dstBuffer);
             glBufferSubData(GL_ARRAY_BUFFER, it->writeOffset, it->copySize,
                             &data[0]);
         }

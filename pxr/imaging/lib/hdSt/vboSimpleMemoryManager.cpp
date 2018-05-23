@@ -336,7 +336,7 @@ HdStVBOSimpleMemoryManager::_SimpleBufferArrayRange::CopyData(
     HdBufferResourceSharedPtr VBO =
         _bufferArray->GetResource(bufferSource->GetName());
 
-    if (!VBO || VBO->GetId() == NULL) {
+    if (!VBO || !VBO->GetId().IsSet()) {
         TF_CODING_ERROR("VBO doesn't exist for %s",
                         bufferSource->GetName().GetText());
         return;

@@ -50,7 +50,7 @@ HdStPersistentBufferMetal::HdStPersistentBufferMetal(
 
 HdStPersistentBufferMetal::~HdStPersistentBufferMetal()
 {
-    id<MTLBuffer> buffer = id<MTLBuffer>(GetMetalId());
+    id<MTLBuffer> buffer = GetId();
     if (buffer) {
         [buffer release];
     }

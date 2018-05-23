@@ -24,6 +24,7 @@
 #include "pxr/imaging/glf/glew.h"
 #include "pxr/imaging/mtlf/mtlDevice.h"
 
+#include "pxr/imaging/hdSt/Metal/bufferResourceMetal.h"
 #include "pxr/imaging/hdSt/Metal/resourceBinderMetal.h"
 #include "pxr/imaging/hdSt/Metal/mslProgram.h"
 #include "pxr/imaging/hdSt/bufferResource.h"
@@ -130,9 +131,9 @@ HdSt_ResourceBinderMetal::HdSt_ResourceBinderMetal()
 
 void
 HdSt_ResourceBinderMetal::BindBuffer(TfToken const &name,
-                                HdBufferResourceSharedPtr const &buffer,
-                                int offset,
-                                int level) const
+                                     HdBufferResourceSharedPtr const &buffer,
+                                     int offset,
+                                     int level) const
 {
     HD_TRACE_FUNCTION();
 
@@ -142,16 +143,33 @@ HdSt_ResourceBinderMetal::BindBuffer(TfToken const &name,
 
     HdBinding binding = GetBinding(name, level);
     HdBinding::Type type = binding.GetType();
+    HdStBufferResourceMetalSharedPtr const metalBuffer = boost::dynamic_pointer_cast<HdStBufferResourceMetal>(buffer);
     int loc              = binding.GetLocation();
     int textureUnit      = binding.GetTextureUnit();
 
     HdTupleType tupleType = buffer->GetTupleType();
 
-    void const* offsetPtr =
-        reinterpret_cast<const void*>(
-            static_cast<intptr_t>(offset));
-    
-    TF_FATAL_CODING_ERROR("Not Implemented");
+    switch(type) {
+        case HdBinding::VERTEX_ATTR:
+            MtlfMetalContext::GetMetalContext()->SetVertexAttribute(
+                    loc,
+                    _GetNumComponents(tupleType.type),
+                    HdStGLConversions::GetGLAttribType(tupleType.type),
+                    buffer->GetStride(),
+                    offset);
+            break;
+        case HdBinding::SSBO:
+        case HdBinding::UBO:
+            MtlfMetalContext::GetMetalContext()->SetBuffer(
+                    loc,
+                    metalBuffer->GetId());
+            break;
+        case HdBinding::INDEX_ATTR:
+            MtlfMetalContext::GetMetalContext()->SetIndexBuffer(metalBuffer->GetId());
+            break;
+        default:
+            TF_FATAL_CODING_ERROR("Not Implemented");
+    }
 }
 
 void
@@ -160,28 +178,18 @@ HdSt_ResourceBinderMetal::UnbindBuffer(TfToken const &name,
                                   int level) const
 {
     HD_TRACE_FUNCTION();
-
-    // it is possible that the buffer has not been initialized when
-    // the instanceIndex is empty (e.g. FX points)
-    if (buffer->GetId() == 0) return;
-
-    HdBinding binding = GetBinding(name, level);
-    HdBinding::Type type = binding.GetType();
-    int loc = binding.GetLocation();
-
-    TF_FATAL_CODING_ERROR("Not Implemented");
 }
 
 void
 HdSt_ResourceBinderMetal::BindShaderResources(HdStShaderCode const *shader) const
 {
-    TF_FATAL_CODING_ERROR("Not Implemented");
+    // Nothing
 }
 
 void
 HdSt_ResourceBinderMetal::UnbindShaderResources(HdStShaderCode const *shader) const
 {
-    TF_FATAL_CODING_ERROR("Not Implemented");
+    // Nothing
 }
 
 void
@@ -220,7 +228,10 @@ HdSt_ResourceBinderMetal::BindUniformui(TfToken const &name,
     TF_VERIFY(uniformLocation.IsValid());
     TF_VERIFY(uniformLocation.GetType() == HdBinding::UNIFORM);
 
-    TF_FATAL_CODING_ERROR("Not Implemented");
+    int loc = uniformLocation.GetLocation();
+    //MtlfMetalContext::GetMetalContext()->SetAttribute(loc, value);
+
+    //TF_FATAL_CODING_ERROR("Not Implemented");
 }
 
 void

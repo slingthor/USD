@@ -135,9 +135,9 @@ HdStVBOMemoryBufferGL::Reallocate(
         // allocate new one
         // curId and oldId will be different when we are adopting ranges
         // from another buffer array.
-        void *newId = 0;
-        void *oldId = bres->GetId();
-        void *curId = curRes->GetId();
+        HdResourceGPUHandle newId;
+        HdResourceGPUHandle oldId(bres->GetId());
+        HdResourceGPUHandle curId(curRes->GetId());
 
         if(glGenBuffers) {
             GLuint nid = 0;
@@ -153,7 +153,7 @@ HdStVBOMemoryBufferGL::Reallocate(
                 glBindBuffer(GL_ARRAY_BUFFER, 0);
             }
 
-            newId = (void*)(uint64_t)nid;
+            newId = nid;
 
             // if old buffer exists, copy unchanged data
             if (curId) {
@@ -161,8 +161,7 @@ HdStVBOMemoryBufferGL::Reallocate(
 
                 // pre-pass to combine consecutive buffer range relocation
                 boost::scoped_ptr<HdStBufferRelocator> relocator(
-                     HdStBufferRelocator::New((HdBufferResourceGPUHandle)(uint64_t)curId,
-                                              (HdBufferResourceGPUHandle)(uint64_t)newId));
+                     HdStBufferRelocator::New(curId, newId));
                 TF_FOR_ALL (it, ranges) {
                     HdStVBOMemoryManager::_StripedBufferArrayRangeSharedPtr range =
                         boost::static_pointer_cast<HdStVBOMemoryManager::_StripedBufferArrayRange>(*it);
@@ -211,8 +210,8 @@ HdStVBOMemoryBufferGL::Reallocate(
             }
         } else {
             // for unit test
-            static int id = 1;
-            newId = (void*)(uint64_t)id++;
+            static GLuint id = 1;
+            newId = id++;
         }
 
         // update id of buffer resource
@@ -241,13 +240,13 @@ void
 HdStVBOMemoryBufferGL::_DeallocateResources()
 {
     TF_FOR_ALL (it, GetResources()) {
-        void *oldId = it->second->GetId();
+        HdResourceGPUHandle oldId = it->second->GetId();
         if (oldId) {
             if (glDeleteBuffers) {
-                GLuint oid = (GLuint)(uint64_t)oldId;
+                GLuint oid = oldId;
                 glDeleteBuffers(1, &oid);
             }
-            it->second->SetAllocation(0, 0);
+            it->second->SetAllocation(HdResourceGPUHandle(), 0);
         }
     }
 }

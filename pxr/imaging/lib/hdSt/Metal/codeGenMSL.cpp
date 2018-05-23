@@ -566,9 +566,10 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
     glueVS << "};\n";
     
     gluePS << "struct MSLFragOutputs {\n";
+    location = 0;
     TF_FOR_ALL(it, _mslPSOutputParams) {
         HdSt_CodeGenMSL::TParam const &output = *it;
-        gluePS << output.dataType << " " << output.name << output.attribute << ";\n";
+        gluePS << output.dataType << " " << output.name << "[[color(" << location++ << ")]];\n";
         
         copyOutputsFrag << "out." << output.name << "=scope.";
         if (output.accessorStr.IsEmpty()) {
@@ -843,7 +844,7 @@ HdSt_CodeGenMSL::Compile()
                 _mslVSOutputParams,
                 TfToken("gl_ClipDistance"),
                 TfToken("float"),
-                // XXX - Causes an internal error
+                // XXX - Causes an internal error on Lobo - fixed in Liberty 18A281+
                 //TfToken("[[clip_distance]]")).usage |= TParam::VertexShaderOnly;
                 TfToken("")).usage |= TParam::VertexShaderOnly;
 
@@ -2346,6 +2347,69 @@ HdSt_CodeGenMSL::_GenerateElementPrimVar()
         accessors
             << "int GetFVarIndex(int localIndex) {\n"
             << "  return 0;\n"
+            << "}\n";
+    }
+    
+    if (_metaData.edgeIndexBinding.binding.IsValid()) {
+        
+        HdBinding binding = _metaData.edgeIndexBinding.binding;
+        
+        _EmitDeclaration(declarations, _mslPSInputParams, _metaData.edgeIndexBinding);
+        _EmitAccessor(accessors, _metaData.edgeIndexBinding.name,
+                      _metaData.edgeIndexBinding.dataType, binding,
+                      "GetDrawingCoord().primitiveCoord");
+        
+        // Authored EdgeID getter
+        // abs() is needed below, since both branches may get executed, and
+        // we need to guard against array oob indexing.
+        accessors
+            << "int GetAuthoredEdgeId(int primitiveEdgeID) {\n"
+            << "  if (primitiveEdgeID == -1) {\n"
+            << "    return -1;\n"
+            << "  }\n"
+            << "  return HdGet_edgeIndices()[abs(primitiveEdgeID)];\n;"
+            << "}\n";
+        
+        // Primitive EdgeID getter
+        if (_geometricShader->IsPrimTypePoints()) {
+            // we get here only if we're rendering a mesh with the edgeIndices
+            // binding and using a points repr. since there is no GS stage, we
+            // generate fallback versions.
+            // note: this scenario can't be handled in meshShaderKey, since it
+            // doesn't know whether an edgeIndices binding exists.
+            accessors
+                << "int GetPrimitiveEdgeId() {\n"
+                << "  return -1;\n"
+                << "}\n";
+            accessors
+                << "bool IsFragmentOnEdge() {\n"
+                << "  return false;\n"
+                << "}\n";
+        }
+        else if (_geometricShader->IsPrimTypeBasisCurves()) {
+            // basis curves don't have an edge indices buffer bound, so we
+            // shouldn't ever get here.
+            TF_VERIFY(false, "edgeIndexBinding shouldn't be found on a "
+                      "basis curve");
+        }
+        else if (_geometricShader->IsPrimTypeMesh()) {
+            // nothing to do. meshShaderKey takes care of it.
+        }
+    } else {
+        // The functions below are used in picking (id render) and selection
+        // highlighting, and are expected to be defined. Generate fallback
+        // versions when we don't bind an edgeIndices buffer.
+        accessors
+            << "int GetAuthoredEdgeId(int primitiveEdgeID) {\n"
+            << "  return -1;\n"
+            << "}\n";
+        accessors
+            << "int GetPrimitiveEdgeId() {\n"
+            << "  return -1;\n"
+            << "}\n";
+        accessors
+            << "bool IsFragmentOnEdge() {\n"
+            << "return false;\n"
             << "}\n";
     }
 
