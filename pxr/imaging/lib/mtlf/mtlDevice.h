@@ -34,6 +34,8 @@
 #include <boost/noncopyable.hpp>
 #include <boost/shared_ptr.hpp>
 
+#include <map>
+
 PXR_NAMESPACE_OPEN_SCOPE
 
 
@@ -55,24 +57,51 @@ public:
     /// Returns whether this interface has been initialized.
     MTLF_API
     static bool IsInitialized();
+    
+    void SetShadingPrograms(id<MTLFunction> vertexFunction, id<MTLFunction> fragmentFunction);
+    void SetVertexAttribute(uint32_t index,
+                            int size,
+                            int type,
+                            size_t stride,
+                            uint32_t offset);
+    void SetBuffer(int index, id<MTLBuffer> buffer);
+    void SetIndexBuffer(id<MTLBuffer> buffer);
+
+    void SetTexture(int index, id<MTLTexture> texture);
+    void SetSampler(int index, id<MTLSamplerState> sampler);
+
+    void BakeState();
 
     id<MTLDevice> device;
     id<MTLCommandQueue> commandQueue;
     id<MTLCommandBuffer> commandBuffer;
-    
+
     id<MTLLibrary> defaultLibrary;
     id<MTLRenderPipelineState> pipelineState;
     id<MTLDepthStencilState> depthState;
     id<MTLTexture> mtlTexture;
-    
+
     uint32_t glShaderProgram;
     uint32_t glTexture;
     uint32_t glVAO;
     uint32_t glVBO;
-    
+
 protected:
     MTLF_API
     MtlfMetalContext();
+
+    MTLF_API
+    void CheckNewStateGather();
+
+    MTLRenderPipelineDescriptor *pipelineStateDescriptor;
+    MTLVertexDescriptor *vertexDescriptor;
+    uint32_t numVertexComponents;
+    id<MTLRenderCommandEncoder> renderEncoder;
+    
+    std::map<int, id<MTLBuffer>> vertexBuffers;
+    std::map<int, id<MTLTexture>> textures;
+    std::map<int, id<MTLSamplerState>> samplers;
+    id<MTLBuffer> indexBuffer;
 
 private:
     static MtlfMetalContextSharedPtr context;

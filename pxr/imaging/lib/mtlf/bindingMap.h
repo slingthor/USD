@@ -24,7 +24,7 @@
 #ifndef MTLF_BINDING_MAP_H
 #define MTLF_BINDING_MAP_H
 
-/// \file glf/bindingMap.h
+/// \file mtlf/bindingMap.h
 
 #include "pxr/pxr.h"
 #include "pxr/imaging/mtlf/api.h"

@@ -175,7 +175,7 @@ HdStDispatchBuffer::HdStDispatchBuffer(TfToken const &role, int count,
     size_t stride = commandNumUints * sizeof(GLuint);
     size_t dataSize = count * stride;
     
-    HdBufferResourceGPUHandle newId = 0;
+    HdResourceGPUHandle newId;
 
 #if defined(ARCH_GFX_METAL)
     if(HdEngine::GetRenderAPI() == HdEngine::Metal)
@@ -183,7 +183,7 @@ HdStDispatchBuffer::HdStDispatchBuffer(TfToken const &role, int count,
         id<MTLBuffer> nid = nil;
         nid = [MtlfMetalContext::GetMetalContext()->device newBufferWithLength:dataSize options:MTLResourceStorageModeManaged];
         
-        newId = (__bridge HdBufferResourceGPUHandle)nid;
+        newId = nid;
     }
     else
 #endif
@@ -200,7 +200,7 @@ HdStDispatchBuffer::HdStDispatchBuffer(TfToken const &role, int count,
             glBindBuffer(GL_ARRAY_BUFFER, 0);
         }
 
-        newId = (HdBufferResourceGPUHandle)(uint64_t)nid;
+        newId = nid;
     }
     else
     {
@@ -221,18 +221,18 @@ HdStDispatchBuffer::HdStDispatchBuffer(TfToken const &role, int count,
 
 HdStDispatchBuffer::~HdStDispatchBuffer()
 {
-    void *_id = _entireResource->GetId();
+    HdResourceGPUHandle _id = _entireResource->GetId();
 #if defined(ARCH_GFX_METAL)
     if(HdEngine::GetRenderAPI() == HdEngine::Metal)
     {
-        id<MTLBuffer> oid = (__bridge id<MTLBuffer>)_id;
+        id<MTLBuffer> oid = _id;
         [oid release];
     }
     else
 #endif
     if(HdEngine::GetRenderAPI() == HdEngine::OpenGL)
     {
-        GLuint oid = (GLint)(uint64_t)_id;
+        GLuint oid = _id;
         glDeleteBuffers(1, &oid);
     }
     else
@@ -240,7 +240,7 @@ HdStDispatchBuffer::~HdStDispatchBuffer()
         TF_FATAL_CODING_ERROR("No implementation for this API");
     }
     
-    _entireResource->SetAllocation(0, 0);
+    _entireResource->SetAllocation(HdResourceGPUHandle(), 0);
 }
 
 void
@@ -252,7 +252,7 @@ HdStDispatchBuffer::CopyData(std::vector<GLuint> const &data)
 #if defined(ARCH_GFX_METAL)
     if(HdEngine::GetRenderAPI() == HdEngine::Metal)
     {
-        id<MTLBuffer> buffer = (__bridge id<MTLBuffer>)_entireResource->GetId();
+        id<MTLBuffer> buffer = _entireResource->GetId();
         memcpy([buffer contents], &data[0], _entireResource->GetSize());
     }
     else
@@ -262,12 +262,12 @@ HdStDispatchBuffer::CopyData(std::vector<GLuint> const &data)
         HdStRenderContextCaps const &caps = HdStRenderContextCaps::GetInstance();
 
         if (caps.directStateAccessEnabled) {
-            glNamedBufferSubDataEXT((GLuint)(uint64_t)_entireResource->GetId(),
+            glNamedBufferSubDataEXT(_entireResource->GetId(),
                                     0,
                                     _entireResource->GetSize(),
                                     &data[0]);
         } else {
-            glBindBuffer(GL_ARRAY_BUFFER, (GLuint)(uint64_t)_entireResource->GetId());
+            glBindBuffer(GL_ARRAY_BUFFER, _entireResource->GetId());
             glBufferSubData(GL_ARRAY_BUFFER, 0,
                             _entireResource->GetSize(),
                             &data[0]);
@@ -324,7 +324,7 @@ HdStDispatchBuffer::GetResource() const
 
     if (TfDebug::IsEnabled(HD_SAFE_MODE)) {
         // make sure this buffer array has only one resource.
-        void *id = _resourceList.begin()->second->GetId();
+        HdResourceGPUHandle id(_resourceList.begin()->second->GetId());
         TF_FOR_ALL (it, _resourceList) {
             if (it->second->GetId() != id) {
                 TF_CODING_ERROR("GetResource(void) called on"

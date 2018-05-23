@@ -10,7 +10,7 @@
 //    names, trademarks, service marks, or product names of the Licensor
 //    and its affiliates, except as required to comply with Section 4(c) of
 //    the License and to reproduce the content of the NOTICE file.
-//
+
 // You may obtain a copy of the Apache License at
 //
 //     http://www.apache.org/licenses/LICENSE-2.0
@@ -117,17 +117,17 @@ MtlfMetalContext::MtlfMetalContext()
     id <MTLFunction> vertexProgram = [defaultLibrary newFunctionWithName:@"quad_vs"];
     
     // Create the vertex description
-    MTLVertexDescriptor *vertexDescriptor = [MTLVertexDescriptor vertexDescriptor];
-    vertexDescriptor.attributes[0].format = MTLVertexFormatFloat2;
-    vertexDescriptor.attributes[0].bufferIndex = 0;
-    vertexDescriptor.attributes[0].offset = 0;
+    MTLVertexDescriptor *vtxDescriptor = [[MTLVertexDescriptor alloc] init];
+    vtxDescriptor.attributes[0].format = MTLVertexFormatFloat2;
+    vtxDescriptor.attributes[0].bufferIndex = 0;
+    vtxDescriptor.attributes[0].offset = 0;
     
-    vertexDescriptor.attributes[1].format = MTLVertexFormatFloat2;
-    vertexDescriptor.attributes[1].bufferIndex = 0;
-    vertexDescriptor.attributes[1].offset = sizeof(float) * 2;
+    vtxDescriptor.attributes[1].format = MTLVertexFormatFloat2;
+    vtxDescriptor.attributes[1].bufferIndex = 0;
+    vtxDescriptor.attributes[1].offset = sizeof(float) * 2;
     
-    vertexDescriptor.layouts[0].stride = sizeof(Vertex);
-    vertexDescriptor.layouts[0].stepFunction = MTLVertexStepFunctionPerVertex;
+    vtxDescriptor.layouts[0].stride = sizeof(Vertex);
+    vtxDescriptor.layouts[0].stepFunction = MTLVertexStepFunctionPerVertex;
     
     // Create a reusable pipeline state
     MTLRenderPipelineDescriptor *pipelineStateDescriptor = [[MTLRenderPipelineDescriptor alloc] init];
@@ -135,7 +135,7 @@ MtlfMetalContext::MtlfMetalContext()
     pipelineStateDescriptor.sampleCount = 1;
     pipelineStateDescriptor.vertexFunction = vertexProgram;
     pipelineStateDescriptor.fragmentFunction = fragmentProgram;
-    pipelineStateDescriptor.vertexDescriptor = vertexDescriptor;
+    pipelineStateDescriptor.vertexDescriptor = vtxDescriptor;
     pipelineStateDescriptor.colorAttachments[0].blendingEnabled = YES;
     pipelineStateDescriptor.colorAttachments[0].sourceRGBBlendFactor = MTLBlendFactorSourceAlpha;
     pipelineStateDescriptor.colorAttachments[0].sourceAlphaBlendFactor = MTLBlendFactorSourceAlpha;
@@ -282,6 +282,11 @@ MtlfMetalContext::MtlfMetalContext()
                                                                1024, 1024, 0, &cvmtlTexture);
     
     mtlTexture = CVMetalTextureGetTexture(cvmtlTexture);
+    
+    pipelineStateDescriptor = nil;
+    vertexDescriptor = nil;
+    indexBuffer = nil;
+    numVertexComponents = 0;
 }
 
 MtlfMetalContext::~MtlfMetalContext()
@@ -305,6 +310,127 @@ MtlfMetalContext::IsInitialized()
         context = MtlfMetalContextSharedPtr(new MtlfMetalContext());
 
     return context->device != nil;
+}
+
+void MtlfMetalContext::CheckNewStateGather()
+{
+    // Lazily create a new state object
+    if (!pipelineStateDescriptor) {
+        MTLRenderPipelineDescriptor *pipelineStateDescriptor = [[MTLRenderPipelineDescriptor alloc] init];
+        
+        pipelineStateDescriptor.label = @"Gathered State";
+        pipelineStateDescriptor.sampleCount = 1;
+        pipelineStateDescriptor.vertexDescriptor = vertexDescriptor;
+        pipelineStateDescriptor.colorAttachments[0].blendingEnabled = YES;
+        pipelineStateDescriptor.colorAttachments[0].sourceRGBBlendFactor = MTLBlendFactorSourceAlpha;
+        pipelineStateDescriptor.colorAttachments[0].sourceAlphaBlendFactor = MTLBlendFactorSourceAlpha;
+        pipelineStateDescriptor.colorAttachments[0].destinationRGBBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
+        pipelineStateDescriptor.colorAttachments[0].destinationAlphaBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
+        pipelineStateDescriptor.colorAttachments[0].pixelFormat = MTLPixelFormatBGRA8Unorm;
+    }
+}
+
+void MtlfMetalContext::SetShadingPrograms(id<MTLFunction> vertexFunction, id<MTLFunction> fragmentFunction)
+{
+    CheckNewStateGather();
+    
+    pipelineStateDescriptor.vertexFunction = vertexFunction;
+    pipelineStateDescriptor.fragmentFunction = fragmentFunction;
+}
+
+void MtlfMetalContext::SetVertexAttribute(uint32_t index,
+                                          int size,
+                                          int type,
+                                          size_t stride,
+                                          uint32_t offset)
+{
+    if (!vertexDescriptor)
+    {
+        vertexDescriptor = [[MTLVertexDescriptor alloc] init];
+    
+        vertexDescriptor.layouts[0].stepFunction = MTLVertexStepFunctionConstant;
+        vertexDescriptor.layouts[0].stride = stride;
+        vertexDescriptor.attributes[0].format = MTLVertexFormatUInt;
+        numVertexComponents = 1;
+    }
+
+    vertexDescriptor.attributes[index].bufferIndex = index;
+    vertexDescriptor.attributes[index].offset = offset;
+    vertexDescriptor.layouts[index].stepFunction = MTLVertexStepFunctionPerVertex;
+    
+    switch (type) {
+        case GL_INT:
+            vertexDescriptor.attributes[index].format = MTLVertexFormat(MTLVertexFormatInt + (size - 1));
+            break;
+        case GL_UNSIGNED_INT:
+            vertexDescriptor.attributes[index].format = MTLVertexFormat(MTLVertexFormatUInt + (size - 1));
+            break;
+        case GL_FLOAT:
+            vertexDescriptor.attributes[index].format = MTLVertexFormat(MTLVertexFormatFloat + (size - 1));
+            break;
+        case GL_INT_2_10_10_10_REV:
+            vertexDescriptor.attributes[index].format = MTLVertexFormatInt1010102Normalized;
+            break;
+        default:
+            TF_CODING_ERROR("Unsupported data type");
+            break;
+    }
+    
+    if (index + 1 > numVertexComponents) {
+        numVertexComponents = index + 1;
+    }
+
+    vertexDescriptor.layouts[index].stride = stride;
+}
+
+void MtlfMetalContext::SetBuffer(int index, id<MTLBuffer> buffer)
+{
+    vertexBuffers.insert(std::make_pair(index, buffer));
+}
+
+void MtlfMetalContext::SetIndexBuffer(id<MTLBuffer> buffer)
+{
+    indexBuffer = buffer;
+}
+
+void MtlfMetalContext::SetSampler(int index, id<MTLSamplerState> sampler)
+{
+    samplers.insert(std::make_pair(index, sampler));
+}
+
+void MtlfMetalContext::SetTexture(int index, id<MTLTexture> texture)
+{
+    textures.insert(std::make_pair(index, texture));
+}
+
+void MtlfMetalContext::BakeState()
+{
+    NSError *error = NULL;
+    id<MTLRenderPipelineState> _pipelineState = [device newRenderPipelineStateWithDescriptor:pipelineStateDescriptor error:&error];
+    if (!_pipelineState) {
+        NSLog(@"Failed to created pipeline state, error %@", error);
+    }
+    
+    for(auto buffer : vertexBuffers) {
+        [renderEncoder setVertexBuffer:buffer.second offset:0 atIndex:buffer.first];
+    }
+    for(auto texture : textures) {
+        [renderEncoder setFragmentTexture:texture.second atIndex:texture.first];
+    }
+    for(auto sampler : samplers) {
+        [renderEncoder setFragmentSamplerState:sampler.second atIndex:sampler.first];
+    }
+    
+    [renderEncoder endEncoding];
+
+    pipelineStateDescriptor = nil;
+    vertexDescriptor = nil;
+    indexBuffer = nil;
+    numVertexComponents = 0;
+
+    vertexBuffers.clear();
+    textures.clear();
+    samplers.clear();
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

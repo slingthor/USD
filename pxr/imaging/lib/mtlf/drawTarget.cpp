@@ -325,12 +325,12 @@ MtlfDrawTarget::Bind()
     // Create a render command encoder so we can render into something
     TF_VERIFY(MtlfMetalContext::GetMetalContext()->commandBuffer == nil, "A command buffer is already active");
     
-    id<MTLCommandBuffer> commandBuffer = [MtlfMetalContext::GetMetalContext()->commandQueue commandBuffer];
-    id <MTLRenderCommandEncoder> renderEncoder =
-    [commandBuffer renderCommandEncoderWithDescriptor:_mtlRenderPassDescriptor];
-    MtlfMetalContext::GetMetalContext()->commandBuffer = commandBuffer;
+//    id<MTLCommandBuffer> commandBuffer = [MtlfMetalContext::GetMetalContext()->commandQueue commandBuffer];
+//    id <MTLRenderCommandEncoder> renderEncoder =
+//      [commandBuffer renderCommandEncoderWithDescriptor:_mtlRenderPassDescriptor];
+//    MtlfMetalContext::GetMetalContext()->commandBuffer = commandBuffer;
 
-    _renderEncoder = [commandBuffer renderCommandEncoderWithDescriptor:_mtlRenderPassDescriptor];
+//    _renderEncoder = [commandBuffer renderCommandEncoderWithDescriptor:_mtlRenderPassDescriptor];
 }
 
 void
@@ -358,13 +358,13 @@ MtlfDrawTarget::Unbind()
         return;
     }
     
-    [_renderEncoder endEncoding];
+//    [_renderEncoder endEncoding];
     
-    id<MTLCommandBuffer> commandBuffer = MtlfMetalContext::GetMetalContext()->commandBuffer;
-    MtlfMetalContext::GetMetalContext()->commandBuffer = nil;
+//    id<MTLCommandBuffer> commandBuffer = MtlfMetalContext::GetMetalContext()->commandBuffer;
+//    MtlfMetalContext::GetMetalContext()->commandBuffer = nil;
 
-    TF_VERIFY(commandBuffer != nil, "No active command buffer");
-    [commandBuffer commit];
+//    TF_VERIFY(commandBuffer != nil, "No active command buffer");
+//    [commandBuffer commit];
 
     TouchContents();
 }
@@ -592,7 +592,6 @@ MtlfDrawTarget::MtlfAttachment::_GenTexture()
         }
     }
 
-    _bytesPerPixel = (_type == GL_FLOAT) ? 4 : 1;
     int numChannel;
     MTLPixelFormat mtlFormat = MTLPixelFormatInvalid;
 
@@ -625,20 +624,21 @@ MtlfDrawTarget::MtlfAttachment::_GenTexture()
                 mtlFormat = MTLPixelFormatR32Float;
             }
             else if (type == GL_UNSIGNED_INT_24_8) {
-                mtlFormat = MTLPixelFormatR8Uint;
+                mtlFormat = MTLPixelFormatR32Uint;
             }
             else if (type == GL_UNSIGNED_BYTE) {
                 mtlFormat = MTLPixelFormatR8Unorm;
             }
             break;
     }
+    
+    _bytesPerPixel = numChannel * ((_type == GL_FLOAT || _type == GL_UNSIGNED_INT_24_8) ? 4 : 1);
 
     if (mtlFormat == MTLPixelFormatInvalid) {
         TF_FATAL_CODING_ERROR("Unsupported render target format");
     }
 
     size_t baseImageSize = (size_t)(_bytesPerPixel *
-                                    numChannel     *
                                     _size[0]       *
                                     _size[1]);
 
@@ -666,8 +666,6 @@ MtlfDrawTarget::MtlfAttachment::_GenTexture()
 void
 MtlfDrawTarget::MtlfAttachment::_DeleteTexture()
 {
-    TF_FATAL_CODING_ERROR("Not Implemented");
-
     if (_textureName) {
         [_textureName release];
         _textureName = nil;

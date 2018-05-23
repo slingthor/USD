@@ -61,7 +61,7 @@ protected:
     friend class MtlfResourceFactory;
 
 private:
-    GLuint _buffer;
+    id<MTLBuffer> _buffer;
     int _size;
 };
 
