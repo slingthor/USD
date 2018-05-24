@@ -70,8 +70,8 @@ TF_DEFINE_ENV_SETTING(HD_GLSL_VERSION, 0,
                       "GLSL version");
 
 // To enable GPU compute features, OpenSubdiv must be configured to support
-// GLSL compute kernel.
-#if OPENSUBDIV_HAS_GLSL_COMPUTE
+// GLSL or Metal compute kernel.
+#if OPENSUBDIV_HAS_GLSL_COMPUTE || OPENSUBDIV_HAS_METAL_COMPUTE
 // default to GPU
 TF_DEFINE_ENV_SETTING(HD_ENABLE_GPU_COMPUTE, true,
                       "Enable GPU smooth, quadrangulation and refinement");
@@ -157,7 +157,10 @@ HdStRenderContextCaps::_LoadCaps()
         maxShaderStorageBlockSize    = 1*1024*1024*1024;
         maxTextureBufferSize         = 16*1024;
         uniformBufferOffsetAlignment = 256;
+#if OPENSUBDIV_HAS_METAL_COMPUTE
+        // This matches GL behaviour although gpuCompute will always be present on Metal
         gpuComputeEnabled            = true;
+#endif
         return;
     }
 #endif

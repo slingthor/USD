@@ -28,7 +28,7 @@
 #include "pxr/usdImaging/usdImaging/delegate.h"
 #include "pxr/usdImaging/usdImaging/tokens.h"
 
-#include "pxr/imaging/glf/glslfx.h"
+#include "pxr/imaging/garch/glslfx.h"
 #include "pxr/imaging/glf/ptexTexture.h"
 
 #include "pxr/imaging/hd/material.h"

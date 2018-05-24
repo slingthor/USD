@@ -24,6 +24,12 @@
 #ifndef HDST_SUBDIVISION_H
 #define HDST_SUBDIVISION_H
 
+#if 0 // MTL_FIXME - Remove once testing is done
+#undef OPENSUBDIV_HAS_METAL_COMPUTE
+#undef OPENSUBDIV_HAS_GLSL_COMPUTE
+#undef OPENSUBDIV_HAS_GLSL_TRANSFORM_FEEDBACK
+#endif
+
 #include "pxr/pxr.h"
 #include "pxr/imaging/hd/version.h"
 #include "pxr/imaging/hd/bufferResource.h"
@@ -35,6 +41,10 @@
 #include "pxr/imaging/hf/perfLog.h"
 #include "pxr/usd/sdf/path.h"
 #include "pxr/base/tf/token.h"
+#if OPENSUBDIV_HAS_METAL_COMPUTE && defined(ARCH_GFX_METAL)// MTL_CHANGE
+#include <opensubdiv/osd/mtlComputeEvaluator.h>
+#include "pxr/imaging/mtlf/mtlDevice.h"
+#endif
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -217,6 +227,11 @@ public:
         GLuint BindVBO() {
             return (GLuint)(uint64_t)_resource->GetId();
         }
+#if OPENSUBDIV_HAS_METAL_COMPUTE && defined(ARCH_GFX_METAL)
+        id<MTLBuffer> BindMTLBuffer(OpenSubdiv::v3_3_1::Osd::MTLContext* context) {
+            return id<MTLBuffer>(_resource->GetId());
+        }
+#endif
         HdStBufferResourceSharedPtr _resource;
     };
 
@@ -298,11 +313,21 @@ HdSt_OsdRefineComputation<VERTEX_BUFFER>::Resolve()
         return true;
     }
 
+#if OPENSUBDIV_HAS_METAL_COMPUTE && defined(ARCH_GFX_METAL) //MTL_CHANGE
+    OpenSubdiv::Osd::MTLContext deviceContext;
+    OpenSubdiv::Osd::MTLContext *deviceContextPtr = &deviceContext;
+    deviceContext.device       = MtlfMetalContext::GetMetalContext()->device;
+    deviceContext.commandQueue = MtlfMetalContext::GetMetalContext()->commandQueue;
+#else
+    void *deviceContextPtr = NULL;
+#endif
+    
     // prepare cpu vertex buffer including refined vertices
     TF_VERIFY(!_cpuVertexBuffer);
     _cpuVertexBuffer = VERTEX_BUFFER::Create(
         HdGetComponentCount(_source->GetTupleType().type),
-        subdivision->GetNumVertices());
+        subdivision->GetNumVertices(),
+        deviceContextPtr);  // MTL_CHANGE
 
     subdivision->RefineCPU(_source, _varying, _cpuVertexBuffer);
 

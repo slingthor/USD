@@ -49,48 +49,65 @@
 #include <opensubdiv/far/stencilTableFactory.h>
 #include <opensubdiv/osd/cpuVertexBuffer.h>
 #include <opensubdiv/osd/cpuEvaluator.h>
-#include <opensubdiv/osd/glVertexBuffer.h>
 #include <opensubdiv/osd/mesh.h>
 
 #include <boost/scoped_ptr.hpp>
 
-PXR_NAMESPACE_OPEN_SCOPE
+#if OPENSUBDIV_HAS_METAL_COMPUTE && defined(ARCH_GFX_METAL)// MTL_CHANGE
+#include <opensubdiv/osd/mtlVertexBuffer.h>
+#include "pxr/imaging/mtlf/mtlDevice.h"
+#else
+#include <opensubdiv/osd/glVertexBuffer.h>
+#include <opensubdiv/osd/glComputeEvaluator.h>
+#endif
 
-typedef OpenSubdiv::Osd::CpuVertexBuffer HdSt_OsdCpuVertexBuffer;
-
-PXR_NAMESPACE_CLOSE_SCOPE
 
 // There's a buffer synchronization bug in driver 331, and apparently fixed in 334.
 // Don't enable compute shader kernel until driver updates.
 
-#if OPENSUBDIV_HAS_GLSL_COMPUTE
+#if OPENSUBDIV_HAS_GLSL_COMPUTE || OPENSUBDIV_HAS_METAL_COMPUTE // MTL_FIXME change this to GPU_COMPUTE?
 
-#include <opensubdiv/osd/glComputeEvaluator.h>
 #define HDST_ENABLE_GPU_SUBDIVISION 1
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+#if OPENSUBDIV_HAS_METAL_COMPUTE  && defined(ARCH_GFX_METAL) // MTL_CHANGE
+typedef OpenSubdiv::Osd::MTLStencilTable     HdSt_OsdGpuStencilTable;
+typedef OpenSubdiv::Osd::MTLComputeEvaluator HdSt_OsdGpuEvaluator;
+typedef OpenSubdiv::Osd::CPUMTLVertexBuffer  HdSt_OsdCpuVertexBuffer;
+typedef OpenSubdiv::Osd::MTLContext          HdSt_OsdGpuDeviceContext;
+typedef OpenSubdiv::Osd::MTLContext*         HdSt_OsdGpuDeviceContextPtr;
+#pragma message("Building for Metal OpenSubDiv")
+#else
 typedef OpenSubdiv::Osd::GLStencilTableSSBO HdSt_OsdGpuStencilTable;
 typedef OpenSubdiv::Osd::GLComputeEvaluator HdSt_OsdGpuEvaluator;
+typedef OpenSubdiv::Osd::CpuVertexBuffer    HdSt_OsdCpuVertexBuffer;
+typedef void*                               HdSt_OsdGpuDeviceContext;
+typedef void*                               HdSt_OsdGpuDeviceContextPtr;
+#pragma message("Building for OpenGL Compute OpenSubDiv")
+#endif
 
 PXR_NAMESPACE_CLOSE_SCOPE
 
 #elif OPENSUBDIV_HAS_GLSL_TRANSFORM_FEEDBACK
 
 #include <opensubdiv/osd/glXFBEvaluator.h>
+#pragma message("Building for OpenGL Transform Feedback OpenSubDiv")
 
 #define HDST_ENABLE_GPU_SUBDIVISION 1
 
 PXR_NAMESPACE_OPEN_SCOPE
 
 typedef OpenSubdiv::Osd::GLStencilTableTBO HdSt_OsdGpuStencilTable;
-typedef OpenSubdiv::Osd::GLXFBEvaluator HdSt_OsdGpuEvaluator;
+typedef OpenSubdiv::Osd::GLXFBEvaluator    HdSt_OsdGpuEvaluator;
 
 PXR_NAMESPACE_CLOSE_SCOPE
 
 #else
 
 #define HDST_ENABLE_GPU_SUBDIVISION 0
+typedef OpenSubdiv::Osd::CpuVertexBuffer    HdSt_OsdCpuVertexBuffer;
+#pragma message("Building for CPU OpenSubDiv")
 
 #endif
 
@@ -160,6 +177,22 @@ private:
     /// A valid GL context has to be made to current before calling this method.
     HdSt_OsdGpuStencilTable *_GetGpuStencilTable();
     HdSt_OsdGpuStencilTable *_gpuStencilTable;
+    
+    HdSt_OsdGpuDeviceContext     _deviceContext; //MTL_CHANGE
+    
+    HdSt_OsdGpuDeviceContextPtr GetDeviceContextPtr() { //MTL_CHANGE
+ #if OPENSUBDIV_HAS_METAL_COMPUTE && defined(ARCH_GFX_METAL)
+        _deviceContext.device       = MtlfMetalContext::GetMetalContext()->device;
+        _deviceContext.commandQueue = MtlfMetalContext::GetMetalContext()->commandQueue;
+        return &_deviceContext;
+#else
+        return NULL;
+#endif    
+    }
+#else //HDST_ENABLE_GPU_SUBDIVISION
+    void *GetDeviceContextPtr() {
+        return NULL;
+    }
 #endif
 };
 
@@ -293,8 +326,9 @@ HdSt_Osd3Subdivision::RefineCPU(HdBufferSourceSharedPtr const &source,
     }
 
     // filling coarse vertices
-    osdVertexBuffer->UpdateData((const float*)source->GetData(),
-                                /*offset=*/0, numElements);
+     osdVertexBuffer->UpdateData((const float*)source->GetData(),    //MTL_CHANGE
+                                /*offset=*/0, numElements,
+                                 HdSt_Osd3Subdivision::GetDeviceContextPtr());
 
     // if there is no stencil (e.g. torus with adaptive refinement),
     // just return here
@@ -345,12 +379,14 @@ HdSt_Osd3Subdivision::RefineGPU(HdBufferArrayRangeSharedPtr const &range,
     static OpenSubdiv::Osd::EvaluatorCacheT<HdSt_OsdGpuEvaluator> evaluatorCache;
 
     HdSt_OsdGpuEvaluator const *instance =
-        OpenSubdiv::Osd::GetEvaluator<HdSt_OsdGpuEvaluator>(
-            &evaluatorCache, srcDesc, dstDesc, (void*)NULL /*deviceContext*/);
+        OpenSubdiv::Osd::GetEvaluator<HdSt_OsdGpuEvaluator, HdSt_OsdGpuDeviceContextPtr>(
+            &evaluatorCache, srcDesc, dstDesc, HdSt_Osd3Subdivision::GetDeviceContextPtr());
 
-    instance->EvalStencils(&vertexBuffer, srcDesc,
-                           &vertexBuffer, dstDesc,
-                           _GetGpuStencilTable());
+    HdSt_OsdGpuEvaluator::EvalStencils(&vertexBuffer, srcDesc,
+                                       &vertexBuffer, dstDesc,
+                                       _GetGpuStencilTable(),
+                                       instance,
+                                       HdSt_Osd3Subdivision::GetDeviceContextPtr());
 #else
     TF_CODING_ERROR("No GPU kernel available.\n");
 #endif
@@ -406,8 +442,7 @@ HdSt_Osd3Subdivision::_GetGpuStencilTable()
     HF_MALLOC_TAG_FUNCTION();
 
     if (!_gpuStencilTable) {
-        _gpuStencilTable = HdSt_OsdGpuStencilTable::Create(
-            _vertexStencils, NULL);
+        _gpuStencilTable = HdSt_OsdGpuStencilTable::Create(_vertexStencils, HdSt_Osd3Subdivision::GetDeviceContextPtr());
     }
 
     return _gpuStencilTable;
