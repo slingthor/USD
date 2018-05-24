@@ -681,7 +681,7 @@ OPENIMAGEIO = Dependency("OpenImageIO", InstallOpenImageIO,
 ############################################################
 # OpenSubdiv
 
-OPENSUBDIV_URL = "https://github.com/PixarAnimationStudios/OpenSubdiv/archive/v3_1_1.zip"
+OPENSUBDIV_URL = "https://github.com/PixarAnimationStudios/OpenSubdiv/archive/v3_3_1.zip"
 
 def InstallOpenSubdiv(context, force):
     with CurrentWorkingDirectory(DownloadURL(OPENSUBDIV_URL, context, force)):
