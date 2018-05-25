@@ -63,7 +63,7 @@ integrateLightsConstant(vec4 Peye, vec3 Neye, LightingInterfaceProperties props)
 }
 
 -- glsl Fallback.Lighting
-#if !defined(ARCH_GFX_METAL_)
+#if !defined(ARCH_GFX_METAL)
 LightingContribution
 integrateLights(vec4 Peye, vec3 Neye, LightingInterfaceProperties props);
 #endif
