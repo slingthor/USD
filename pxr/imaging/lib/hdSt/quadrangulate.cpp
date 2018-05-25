@@ -32,7 +32,13 @@
 #include "pxr/imaging/hdSt/resourceRegistry.h"
 #include "pxr/imaging/hdSt/tokens.h"
 
+#include "pxr/imaging/hdSt/GL/quadrangulateGL.h"
+#if defined(ARCH_GFX_METAL)
+#include "pxr/imaging/hdSt/Metal/quadrangulateMetal.h"
+#endif
+
 #include "pxr/imaging/hd/bufferArrayRange.h"
+#include "pxr/imaging/hd/engine.h"
 #include "pxr/imaging/hd/meshUtil.h"
 #include "pxr/imaging/hd/perfLog.h"
 #include "pxr/imaging/hd/types.h"
@@ -391,6 +397,35 @@ HdSt_QuadrangulateFaceVaryingComputation::_CheckValid() const
 
 // ---------------------------------------------------------------------------
 
+HdSt_QuadrangulateComputationGPU *HdSt_QuadrangulateComputationGPU::New(HdSt_MeshTopology *topology,
+                                                                        TfToken const &sourceName,
+                                                                        HdType dataType,
+                                                                        SdfPath const &id)
+{
+    HdEngine::RenderAPI api = HdEngine::GetRenderAPI();
+    switch(api)
+    {
+        case HdEngine::OpenGL:
+            return new HdSt_QuadrangulateComputationGPUGL(topology,
+                                                          sourceName,
+                                                          dataType,
+                                                          id);
+#if defined(ARCH_GFX_METAL)
+        case HdEngine::Metal:
+            return new HdSt_QuadrangulateComputationGPUMetal(topology,
+                                                             sourceName,
+                                                             dataType,
+                                                             id);
+#endif
+        default:
+            TF_FATAL_CODING_ERROR("No HdSt_QuadrangulateComputationGPU for this API");
+    }
+    return NULL;
+}
+
+// ---------------------------------------------------------------------------
+
+
 HdSt_QuadrangulateComputationGPU::HdSt_QuadrangulateComputationGPU(
     HdSt_MeshTopology *topology, TfToken const &sourceName, HdType dataType,
     SdfPath const &id)
@@ -401,133 +436,6 @@ HdSt_QuadrangulateComputationGPU::HdSt_QuadrangulateComputationGPU(
         TF_CODING_ERROR("Unsupported primvar type %s for quadrangulation [%s]",
                         TfEnum::GetName(dataType).c_str(), _id.GetText());
     }
-}
-
-void
-HdSt_QuadrangulateComputationGPU::Execute(
-    HdBufferArrayRangeSharedPtr const &range,
-    HdResourceRegistry *resourceRegistry)
-{
-    if (!TF_VERIFY(_topology))
-        return;
-
-    HD_TRACE_FUNCTION();
-    HD_PERF_COUNTER_INCR(HdPerfTokens->quadrangulateGPU);
-
-    // if this topology doesn't contain non-quad faces, quadInfoRange is null.
-    HdBufferArrayRangeSharedPtr const &quadrangulateTableRange =
-        _topology->GetQuadrangulateTableRange();
-    if (!quadrangulateTableRange) return;
-
-    HD_TRACE_FUNCTION();
-    HF_MALLOC_TAG_FUNCTION();
-
-    HdQuadInfo const *quadInfo = _topology->GetQuadInfo();
-    if (!quadInfo) {
-        TF_CODING_ERROR("QuadInfo is null.");
-        return;
-    }
-
-#if defined(ARCH_GFX_METAL)
-    TF_FATAL_CODING_ERROR("Not Implemented");
-#else
-    if (!glDispatchCompute)
-        return;
-
-    // select shader by datatype
-    TfToken shaderToken =
-        (HdGetComponentType(_dataType) == HdTypeFloat) ?
-        HdStGLSLProgramTokens->quadrangulateFloat :
-        HdStGLSLProgramTokens->quadrangulateDouble;
-
-    HdStProgramSharedPtr computeProgram =
-        HdStGLSLProgram::GetComputeProgram(shaderToken,
-            static_cast<HdStResourceRegistry*>(resourceRegistry));
-        
-    if (!computeProgram) return;
-
-    GLuint program = computeProgram->GetProgram().GetId();
-
-    HdBufferArrayRangeGLSharedPtr range_ =
-        boost::static_pointer_cast<HdBufferArrayRangeGL> (range);
-
-    // buffer resources for GPU computation
-    HdBufferResourceSharedPtr primVar_ = range_->GetResource(_name);
-    HdStBufferResourceGLSharedPtr primVar =
-        boost::static_pointer_cast<HdStBufferResourceGL> (primVar_);
-
-    HdBufferArrayRangeGLSharedPtr quadrangulateTableRange_ =
-        boost::static_pointer_cast<HdBufferArrayRangeGL> (quadrangulateTableRange);
-
-    HdBufferResourceSharedPtr quadrangulateTable_ =
-        quadrangulateTableRange_->GetResource();
-    HdStBufferResourceGLSharedPtr quadrangulateTable =
-        boost::static_pointer_cast<HdStBufferResourceGL> (quadrangulateTable_);
-
-    // prepare uniform buffer for GPU computation
-    struct Uniform {
-        int vertexOffset;
-        int quadInfoStride;
-        int quadInfoOffset;
-        int maxNumVert;
-        int primVarOffset;
-        int primVarStride;
-        int numComponents;
-    } uniform;
-
-    int quadInfoStride = quadInfo->maxNumVert + 2;
-
-    // coherent vertex offset in aggregated buffer array
-    uniform.vertexOffset = range->GetOffset();
-    // quadinfo offset/stride in aggregated adjacency table
-    uniform.quadInfoStride = quadInfoStride;
-    uniform.quadInfoOffset = quadrangulateTableRange->GetOffset();
-    uniform.maxNumVert = quadInfo->maxNumVert;
-    // interleaved offset/stride to points
-    // note: this code (and the glsl smooth normal compute shader) assumes
-    // components in interleaved vertex array are always same data type.
-    // i.e. it can't handle an interleaved array which interleaves
-    // float/double, float/int etc.
-    const size_t componentSize =
-        HdDataSizeOfType(HdGetComponentType(primVar->GetTupleType().type));
-    uniform.primVarOffset = primVar->GetOffset() / componentSize;
-    uniform.primVarStride = primVar->GetStride() / componentSize;
-    uniform.numComponents =
-        HdGetComponentCount(primVar->GetTupleType().type);
-
-    // transfer uniform buffer
-    GLuint ubo = computeProgram->GetGlobalUniformBuffer().GetId();
-    HdStRenderContextCaps const &caps = HdStRenderContextCaps::GetInstance();
-    // XXX: workaround for 319.xx driver bug of glNamedBufferDataEXT on UBO
-    // XXX: move this workaround to renderContextCaps
-    if (false && caps.directStateAccessEnabled) {
-        glNamedBufferDataEXT(ubo, sizeof(uniform), &uniform, GL_STATIC_DRAW);
-    } else {
-        glBindBuffer(GL_UNIFORM_BUFFER, ubo);
-        glBufferData(GL_UNIFORM_BUFFER, sizeof(uniform), &uniform, GL_STATIC_DRAW);
-        glBindBuffer(GL_UNIFORM_BUFFER, 0);
-    }
-
-    glBindBufferBase(GL_UNIFORM_BUFFER, 0, ubo);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, (GLuint)(uint64_t)primVar->GetId());
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, (GLuint)(uint64_t)quadrangulateTable->GetId());
-
-    // dispatch compute kernel
-    glUseProgram(program);
-
-    int numNonQuads = (int)quadInfo->numVerts.size();
-
-    glDispatchCompute(numNonQuads, 1, 1);
-
-    glUseProgram(0);
-    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
-
-    glBindBufferBase(GL_UNIFORM_BUFFER, 0, 0);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, 0);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, 0);
-#endif
-    HD_PERF_COUNTER_ADD(HdPerfTokens->quadrangulatedVerts,
-                        quadInfo->numAdditionalPoints);
 }
 
 void

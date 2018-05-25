@@ -29,21 +29,6 @@
 
 #include "pxr/base/tf/stringUtils.h"
 
-
-PXR_NAMESPACE_OPEN_SCOPE
-
-bool MtlfIsSupportedPtexTexture(std::string const & imageFilePath)
-{
-#ifdef PXR_PTEX_SUPPORT_ENABLED
-    return (TfStringEndsWith(imageFilePath, ".ptx") || 
-            TfStringEndsWith(imageFilePath, ".ptex"));
-#else
-    return false;
-#endif
-}
-
-PXR_NAMESPACE_CLOSE_SCOPE
-
 #ifdef PXR_PTEX_SUPPORT_ENABLED
 
 #include "pxr/imaging/mtlf/diagnostic.h"

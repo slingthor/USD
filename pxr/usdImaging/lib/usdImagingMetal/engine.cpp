@@ -183,11 +183,6 @@ UsdImagingMetalEngine::TestIntersection(
     const int width = 128;
     const int height = width;
 
-    if (MtlfHasLegacyGraphics()) {
-        TF_RUNTIME_ERROR("framebuffer object not supported");
-        return false;
-    }
-
     // Use a separate drawTarget (framebuffer object) for each GL context
     // that uses this renderer, but the drawTargets can share attachments.
     
@@ -394,11 +389,6 @@ UsdImagingMetalEngine::TestIntersectionBatch(
     //
     const int width = _pow2roundup(pickResolution);
     const int height = width;
-
-    if (MtlfHasLegacyGraphics()) {
-        TF_RUNTIME_ERROR("framebuffer object not supported");
-        return false;
-    }
 
     // Use a separate drawTarget (framebuffer object) for each GL context
     // that uses this renderer, but the drawTargets can share attachments.

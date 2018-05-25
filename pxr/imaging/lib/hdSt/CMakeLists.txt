@@ -19,6 +19,7 @@ if (APPLE)
                         Metal/mslProgram
                         Metal/mtlUtils
                         Metal/persistentBufferMetal
+                        Metal/quadrangulateMetal
                         Metal/resourceBinderMetal
                         Metal/resourceMetal
                         Metal/textureResourceMetal
@@ -128,6 +129,7 @@ pxr_library(hdSt
         GL/indirectDrawBatchGL
         GL/interleavedMemoryBufferGL
         GL/persistentBufferGL
+        GL/quadrangulateGL
         GL/resourceBinderGL
         GL/resourceGL
         GL/textureResourceGL

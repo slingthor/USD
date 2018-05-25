@@ -139,7 +139,7 @@ HdSt_ResourceBinderMetal::BindBuffer(TfToken const &name,
 
     // it is possible that the buffer has not been initialized when
     // the instanceIndex is empty (e.g. FX points. see bug 120354)
-    if (buffer->GetId() == 0) return;
+    if (!buffer->GetId().IsSet()) return;
 
     HdBinding binding = GetBinding(name, level);
     HdBinding::Type type = binding.GetType();

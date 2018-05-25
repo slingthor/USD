@@ -26,8 +26,9 @@
 
 #include "pxr/imaging/hdSt/codeGen.h"
 #include "pxr/imaging/hdSt/GL/codeGenGLSL.h"
+#if defined(ARCH_GFX_METAL)
 #include "pxr/imaging/hdSt/Metal/codeGenMSL.h"
-
+#endif
 #include "pxr/imaging/hd/engine.h"
 
 PXR_NAMESPACE_OPEN_SCOPE

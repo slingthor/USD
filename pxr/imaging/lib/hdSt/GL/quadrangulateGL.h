@@ -21,21 +21,34 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-// info.cpp
-//
+#ifndef HDST_QUADRANGULATE_GL_H
+#define HDST_QUADRANGULATE_GL_H
 
-#include "pxr/imaging/mtlf/info.h"
-#include "pxr/imaging/mtlf/mtlDevice.h"
+#include "pxr/pxr.h"
+#include "pxr/imaging/hd/version.h"
 
-#include "pxr/base/tf/stringUtils.h"
-
-#include <cstdlib>
-#include <set>
-#include <string>
-#include <vector>
+#include "pxr/imaging/hdSt/quadrangulate.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
+
+/// \class HdSt_QuadrangulateComputationGPUGL
+///
+/// GPU quadrangulation.
+///
+class HdSt_QuadrangulateComputationGPUGL : public HdSt_QuadrangulateComputationGPU {
+public:
+    /// This computaion doesn't generate buffer source (i.e. 2nd phase)
+    HdSt_QuadrangulateComputationGPUGL(HdSt_MeshTopology *topology,
+                               TfToken const &sourceName,
+                               HdType dataType,
+                               SdfPath const &id);
+
+    virtual void Execute(HdBufferArrayRangeSharedPtr const &range,
+                         HdResourceRegistry *resourceRegistry) override;
+};
+
 
 
 PXR_NAMESPACE_CLOSE_SCOPE
 
+#endif  // HDST_QUADRANGULATE_GL_H

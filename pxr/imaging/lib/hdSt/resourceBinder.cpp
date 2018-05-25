@@ -31,7 +31,9 @@
 #include "pxr/imaging/hdSt/GL/glConversions.h"
 
 #include "pxr/imaging/hdSt/GL/resourceBinderGL.h"
+#if defined(ARCH_GFX_METAL)
 #include "pxr/imaging/hdSt/Metal/resourceBinderMetal.h"
+#endif
 
 #include "pxr/imaging/hd/bufferArrayRange.h"
 #include "pxr/imaging/hd/bufferSpec.h"

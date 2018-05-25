@@ -243,17 +243,24 @@ private:
 ///
 class HdSt_QuadrangulateComputationGPU : public HdComputation {
 public:
+    /// Creates a graphics API specific GPU quadrangulate computation
     /// This computaion doesn't generate buffer source (i.e. 2nd phase)
-    HdSt_QuadrangulateComputationGPU(HdSt_MeshTopology *topology,
-                               TfToken const &sourceName,
-                               HdType dataType,
-                               SdfPath const &id);
+    static HdSt_QuadrangulateComputationGPU *New(HdSt_MeshTopology *topology,
+                                                 TfToken const &sourceName,
+                                                 HdType dataType,
+                                                 SdfPath const &id);
+    
     virtual void Execute(HdBufferArrayRangeSharedPtr const &range,
-                         HdResourceRegistry *resourceRegistry) override;
+                         HdResourceRegistry *resourceRegistry) override = 0;
     virtual void AddBufferSpecs(HdBufferSpecVector *specs) const override;
     virtual int GetNumOutputElements() const override;
 
-private:
+protected:
+    HdSt_QuadrangulateComputationGPU(HdSt_MeshTopology *topology,
+                                     TfToken const &sourceName,
+                                     HdType dataType,
+                                     SdfPath const &id);
+
     SdfPath const _id;
     HdSt_MeshTopology *_topology;
     TfToken _name;

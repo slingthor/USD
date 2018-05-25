@@ -39,7 +39,9 @@
 #include "pxr/imaging/hdSt/GL/glConversions.h"
 
 #include "pxr/imaging/hdSt/GL/vboMemoryBufferGL.h"
+#if defined(ARCH_GFX_METAL)
 #include "pxr/imaging/hdSt/Metal/vboMemoryBufferMetal.h"
+#endif
 
 #include "pxr/imaging/hd/engine.h"
 #include "pxr/imaging/hd/perfLog.h"
@@ -123,7 +125,7 @@ HdStVBOMemoryManager::GetResourceAllocation(
     HdBufferArraySharedPtr const &bufferArray, 
     VtDictionary &result) const 
 { 
-    std::set<void*> idSet;
+    std::set<HdResourceGPUHandle> idSet;
     size_t gpuMemoryUsed = 0;
 
     _StripedBufferArraySharedPtr bufferArray_ =
@@ -133,7 +135,7 @@ HdStVBOMemoryManager::GetResourceAllocation(
         HdBufferResourceSharedPtr const & resource = resIt->second;
 
         // XXX avoid double counting of resources shared within a buffer
-        void *id = resource->GetId();
+        HdResourceGPUHandle id = resource->GetId();
         if (idSet.count(id) == 0) {
             idSet.insert(id);
 
@@ -316,7 +318,7 @@ HdStVBOMemoryManager::_StripedBufferArray::GetResource() const
 
     if (TfDebug::IsEnabled(HD_SAFE_MODE)) {
         // make sure this buffer array has only one resource.
-        void *id = _resourceList.begin()->second->GetId();
+        HdResourceGPUHandle id = _resourceList.begin()->second->GetId();
         TF_FOR_ALL (it, _resourceList) {
             if (it->second->GetId() != id) {
                 TF_CODING_ERROR("GetResource(void) called on"
@@ -467,7 +469,7 @@ HdStVBOMemoryManager::_StripedBufferArrayRange::CopyData(
     HdBufferResourceSharedPtr VBO =
         _stripedBufferArray->GetResource(bufferSource->GetName());
 
-    if (!TF_VERIFY((VBO && VBO->GetId()),
+    if (!TF_VERIFY((VBO && VBO->GetId().IsSet()),
                       "VBO doesn't exist for %s",
                       bufferSource->GetName().GetText())) {
         return;
@@ -520,7 +522,7 @@ HdStVBOMemoryManager::_StripedBufferArrayRange::ReadData(TfToken const &name) co
 
     HdBufferResourceSharedPtr VBO = _stripedBufferArray->GetResource(name);
 
-    if (!VBO || (VBO->GetId() == 0 && _numElements > 0)) {
+    if (!VBO || (!VBO->GetId().IsSet() && _numElements > 0)) {
         TF_CODING_ERROR("VBO doesn't exist for %s", name.GetText());
         return result;
     }

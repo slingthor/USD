@@ -34,17 +34,6 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 
-/// Returns true if the file given by \p imageFilePath represents a ptex file,
-/// and false otherwise.
-/// 
-/// This function simply checks the extension of the file name and does not
-/// otherwise guarantee that the file is in any way valid for reading.
-/// 
-/// If ptex support is disabled, this function will always return false.
-///
-MTLF_API bool GlfIsSupportedPtexTexture(std::string const & imageFilePath);
-
-
 PXR_NAMESPACE_CLOSE_SCOPE
 
 

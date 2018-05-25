@@ -34,7 +34,9 @@
 #include "pxr/imaging/hdSt/vboSimpleMemoryManager.h"
 
 #include "pxr/imaging/hdSt/GL/vboSimpleMemoryBufferGL.h"
+#if defined(ARCH_GFX_METAL)
 #include "pxr/imaging/hdSt/Metal/vboSimpleMemoryBufferMetal.h"
+#endif
 
 #include "pxr/imaging/hd/bufferArrayRange.h"
 #include "pxr/imaging/hd/bufferSource.h"
@@ -117,7 +119,7 @@ HdStVBOSimpleMemoryManager::GetResourceAllocation(
     HdBufferArraySharedPtr const &bufferArray, 
     VtDictionary &result) const 
 { 
-    std::set<void*> idSet;
+    std::set<HdResourceGPUHandle> idSet;
     size_t gpuMemoryUsed = 0;
 
     _SimpleBufferArraySharedPtr bufferArray_ =
@@ -127,7 +129,7 @@ HdStVBOSimpleMemoryManager::GetResourceAllocation(
         HdBufferResourceSharedPtr const & resource = resIt->second;
 
         // XXX avoid double counting of resources shared within a buffer
-        void *id = resource->GetId();
+        HdResourceGPUHandle id = resource->GetId();
         if (idSet.count(id) == 0) {
             idSet.insert(id);
 
@@ -268,7 +270,7 @@ HdStVBOSimpleMemoryManager::_SimpleBufferArray::GetResource() const
 
     if (TfDebug::IsEnabled(HD_SAFE_MODE)) {
         // make sure this buffer array has only one resource.
-        void *id = _resourceList.begin()->second->GetId();
+        HdResourceGPUHandle id = _resourceList.begin()->second->GetId();
         TF_FOR_ALL (it, _resourceList) {
             if (it->second->GetId() != id) {
                 TF_CODING_ERROR("GetResource(void) called on"
@@ -375,7 +377,7 @@ HdStVBOSimpleMemoryManager::_SimpleBufferArrayRange::ReadData(TfToken const &nam
 
     HdBufferResourceSharedPtr VBO = _bufferArray->GetResource(name);
 
-    if (!VBO || (VBO->GetId() == 0 && _numElements > 0)) {
+    if (!VBO || (!VBO->GetId().IsSet() && _numElements > 0)) {
         TF_CODING_ERROR("VBO doesn't exist for %s", name.GetText());
         return VtValue();
     }

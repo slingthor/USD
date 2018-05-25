@@ -1,3 +1,5 @@
+if (APPLE)
+
 set(PXR_PREFIX pxr/imaging)
 set(PXR_PACKAGE mtlf)
 
@@ -81,3 +83,5 @@ pxr_library(mtlf
         shaders/interopFrag.glsl
         shaders/interopVtx.glsl
 )
+
+endif()

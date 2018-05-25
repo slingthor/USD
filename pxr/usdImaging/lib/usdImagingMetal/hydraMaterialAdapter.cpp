@@ -30,7 +30,7 @@
 
 #include "pxr/imaging/garch/glslfx.h"
 
-#include "pxr/imaging/mtlf/ptexTexture.h"
+#include "pxr/imaging/glf/ptexTexture.h"
 
 #include "pxr/imaging/hd/material.h"
 #include "pxr/imaging/hd/tokens.h"

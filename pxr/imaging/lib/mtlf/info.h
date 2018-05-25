@@ -33,19 +33,6 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 
-/// Tests for Metal family extension support.
-///
-/// Returns \c true if each extension name listed in \a extensions
-/// is supported by the current GL context.
-MTLF_API
-bool MtlfHasExtensions(std::string const & extensions);
-
-/// Tests whether the current GL context only has minimal graphics support.
-/// This is true for NX clients at least.
-MTLF_API
-bool MtlfHasLegacyGraphics();
-
-
 PXR_NAMESPACE_CLOSE_SCOPE
 
 #endif  // MTLF_INFO_H
