@@ -331,6 +331,7 @@ namespace {
         case HdBinding::UNIFORM:
         case HdBinding::UNIFORM_ARRAY:
         case HdBinding::TBO:
+        case HdBinding::SSBO:
         case HdBinding::BINDLESS_UNIFORM:
         case HdBinding::TEXTURE_2D:
         case HdBinding::BINDLESS_TEXTURE_2D:
@@ -418,9 +419,22 @@ HdSt_CodeGenMSL::_ParseGLSL(std::stringstream &source, InOutParams& inParams, In
                     auto words_end = std::sregex_iterator();
                     int numWords = std::distance(words_begin, words_end);
                     
-                    if (numWords == 2)
+                    if (numWords == 2) // type, name
                     {
                         std::sregex_iterator i = words_begin;
+                        TfToken type((*i).str().c_str());
+                        ++i;
+                        TfToken name((*i).str().c_str());
+                        TfToken accessor((parent + (*i).str()).c_str());
+                        
+                        _EmitStructMemberOutput(tag.params, name, accessor, type);
+                    }
+                    else if (numWords == 3) // type qualifier, type, name
+                    {
+                        std::sregex_iterator i = words_begin;
+                        NSLog(@"HdSt_CodeGenMSL::_ParseGLSL - Ignoring qualifier (for now)"); //MTL_FIXME - Add support for interpolation type (qualifier) here
+                        TfToken qualifier((*i).str().c_str());
+                        ++i;
                         TfToken type((*i).str().c_str());
                         ++i;
                         TfToken name((*i).str().c_str());
@@ -469,6 +483,7 @@ HdSt_CodeGenMSL::_ParseGLSL(std::stringstream &source, InOutParams& inParams, In
 
                     ++i;
                     char const * const nameStr = (*i).str().c_str();
+                    TfToken name(nameStr);
                     if (nameStr[0] == '*') {
                         result.replace(pos, 0, std::string("\ndevice "));
                         usage |= HdSt_CodeGenMSL::TParam::EntryFuncArgument;
@@ -483,7 +498,7 @@ HdSt_CodeGenMSL::_ParseGLSL(std::stringstream &source, InOutParams& inParams, In
                             usage |= HdSt_CodeGenMSL::TParam::ProgramScope;
                         }
                     }
-                    TfToken name(nameStr);
+                    
                     
                     _EmitOutput(dummy, tag.params, name, type, TfToken(pass >= firstFlatIndex?"[[flat]]":""), usage);
                 }
@@ -517,7 +532,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
         HdSt_CodeGenMSL::TParam const &output = *it;
         glueCommon << output.dataType << " " << output.name << output.attribute << ";\n";
         
-        copyOutputsVtx << "out." << output.name << "=scope.";
+        copyOutputsVtx << "vtxOut." << output.name << "=scope.";
         if (output.accessorStr.IsEmpty()) {
             copyOutputsVtx << output.name << ";\n";
         }
@@ -571,7 +586,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
         HdSt_CodeGenMSL::TParam const &output = *it;
         gluePS << output.dataType << " " << output.name << "[[color(" << location++ << ")]];\n";
         
-        copyOutputsFrag << "out." << output.name << "=scope.";
+        copyOutputsFrag << "fragOut." << output.name << "=scope.";
         if (output.accessorStr.IsEmpty()) {
             copyOutputsFrag << output.name << ";\n";
         }
@@ -719,9 +734,9 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
             << "ProgramScope scope;\n"
             << copyInputsVtx.str()
             << "scope.main();\n"
-            << "MSLVtxOutputs out;\n"
+            << "MSLVtxOutputs vtxOut;\n"
             << copyOutputsVtx.str()
-            << "return out;\n"
+            << "return vtxOut;\n"
             << "}\n";
     
     gluePS << "fragment MSLFragOutputs fragmentEntryPoint(MSLVtxOutputs vsInput[[stage_in]]\n"
@@ -769,9 +784,9 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
             << "ProgramScope scope;\n"
             << copyInputsFrag.str()
             << "scope.main();\n"
-            << "MSLFragOutputs out;\n"
+            << "MSLFragOutputs fragOut;\n"
             << copyOutputsFrag.str()
-            << "return out;\n"
+            << "return fragOut;\n"
             << "}\n";
 }
 
@@ -821,9 +836,14 @@ HdSt_CodeGenMSL::Compile()
     // a trick to tightly pack vec3 into SSBO/UBO.
     _genCommon << _GetPackedTypeDefinitions();
     
-    _genCommon << "#define in\n"
+    _genCommon << "#define in /*in*/\n"
+               << "#define out /*out*/\n"
                << "#define discard discard_fragment();\n"
-               << "#define radians(d) (d * 0.01745329252)\n";
+               << "#define radians(d) (d * 0.01745329252)\n"
+               << "#define noperspective /*center_no_perspective MTL_FIXME*/\n"
+               << "#define greaterThan(a,b) (a > b)\n"
+               << "#define lessThan(a,b)    (a < b)\n";
+
     
     _genCommon << "class ProgramScope {\n"
                << "public:\n";
@@ -868,12 +888,17 @@ HdSt_CodeGenMSL::Compile()
             // typeless binding doesn't need declaration nor accessor.
             if (binDecl->dataType.IsEmpty()) continue;
     
+            if(binDecl->binding.GetType() == HdBinding::SSBO) {
+                _EmitDeclarationPtr(_genCommon, _mslVSInputParams, binDecl->name, binDecl->dataType, TfToken(), binDecl->binding, 0, false);
+            }
+            else {
             _EmitDeclaration(_genCommon,
                              _mslVSInputParams,
                              binDecl->name,
                              binDecl->dataType,
                              TfToken(),
                              binDecl->binding);
+            }
             
             _EmitAccessor(_genCommon,
                           binDecl->name,

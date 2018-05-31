@@ -127,10 +127,11 @@ bool IsAnySubprimSelected(SubprimSelection s)
     return (s.elementSelected || s.edgeSelected || s.pointSelected);
 }
 
-
+#if !defined(ARCH_GFX_METAL)
 // Need to forward declare this helper function, since it is defined in
 // pointId.glslfx
 int GetPointId();
+#endif
 
 bool IsPointSelected(int ptMin, int ptMax, int ptRangeStart)
 {
@@ -196,8 +197,11 @@ SubprimSelection GetSubprimSel(int rangeStart)
 {
     int type, smin, smax;
     GetSubprimitiveRangeInfo(rangeStart, /*out*/type, /*out*/smin, /*out*/smax);
-
+#if defined(ARCH_GFX_METAL)
+    SubprimSelection s = {false, false, false};
+#else
     SubprimSelection s = SubprimSelection(false, false, false);
+#endif
     int nextOffset = 0;
 
     if (type == SUBPRIMITIVE_TYPE_ELEMENT) {
@@ -252,7 +256,11 @@ vec4 ApplySelectionColor(vec4 color)
         int smin = hdxSelectionBuffer[modeOffset];
         int smax = hdxSelectionBuffer[modeOffset + 1];
         bool sel = false;
+#if defined(ARCH_GFX_METAL)
+        SubprimSelection subprimSel = {false, false, false};
+#else
         SubprimSelection subprimSel = SubprimSelection(false, false, false);
+#endif
 
         if (primId >= smin && primId < smax) {
             int v = hdxSelectionBuffer[modeOffset + 2 + primId - smin];

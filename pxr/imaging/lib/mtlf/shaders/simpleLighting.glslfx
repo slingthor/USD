@@ -121,18 +121,23 @@ struct LightingInterfaceProperties {
     float shininess;
 };
 
+/*
+    MTL_FIXME - Have moved these outside of the #if NUM_LIGHTS declaration as the Metal parsing
+    of the glslfx files takes no notice of any surrounding #defines and will therefore expect these
+    to be present. This would likely break OpenGL as it would not expect these to be in the uniform
+    block if NUM_LIGHTS == 0.
+*/
+in bool useLighting;
+in bool useColorMaterialDiffuse;
+in LightSource *lightSource;
+in ShadowMatrix *shadow;
+
 // ---------------------------------------------------------------------------
 // uniform blocks
 // ---------------------------------------------------------------------------
 #if NUM_LIGHTS == 0
 
 #else  // NUM_LIGHTS == 0
-
-in bool useLighting;
-in bool useColorMaterialDiffuse;
-in LightSource *lightSource;
-
-in ShadowMatrix *shadow;
 
 vec2
 computeShadowFilterWidth(int index, vec4 Peye)
