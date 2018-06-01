@@ -187,7 +187,11 @@ vec4 ApplyEdgeColor(vec4 Cfill, vec4 patchCoord)
     vec4 wireColor = GetWireframeColor();
     
     // If wireColor is unset (zero), the fill color is just dimmed a bit.
+#if defined(ARCH_GFX_METAL)
+    if (all(wireColor == vec4(0))) wireColor.a = 0.5;
+#else
     if (wireColor == vec4(0)) wireColor.a = 0.5;
+#endif
 
     vec4 Cedge = vec4(mix(Cfill.rgb, wireColor.rgb, wireColor.a), 1);
     Cfill.rgb = mix(Cfill.rgb, Cedge.rgb, p);

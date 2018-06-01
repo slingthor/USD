@@ -78,22 +78,26 @@ HdStMSLProgram::CompileShader(GLenum type,
     
     const char *shaderType = NULL;
     NSString *entryPoint = nil;
-    if (type == GL_VERTEX_SHADER) {
-        shaderType = "Vertx Shader";
-        entryPoint = @"vertexEntryPoint";
-//    } else if (type == GL_TESS_CONTROL_SHADER) {
-//        shaderType = "GL_TESS_CONTROL_SHADER";
-//    } else if (type == GL_TESS_EVALUATION_SHADER) {
-//        shaderType = "GL_TESS_EVALUATION_SHADER";
-//    } else if (type == GL_GEOMETRY_SHADER) {
-//        shaderType = "GL_GEOMETRY_SHADER";
-    } else if (type == GL_FRAGMENT_SHADER) {
-        shaderType = "Fragment Shader";
-        entryPoint = @"fragmentEntryPoint";
-    } else if (type == GL_COMPUTE_SHADER) {
-        shaderType = "Compute Shader";
-        entryPoint = @"computeEntryPoint";
-    } else {
+    switch (type) {
+        case GL_VERTEX_SHADER:
+            shaderType = "Vertex Shader";
+            entryPoint = @"vertexEntryPoint";
+            break;
+        case GL_FRAGMENT_SHADER:
+            shaderType = "Fragment Shader";
+            entryPoint = @"fragmentEntryPoint";
+            break;
+        case GL_COMPUTE_SHADER:
+            shaderType = "Compute Shader";
+            entryPoint = @"computeEntryPoint";
+            break;
+        case GL_TESS_CONTROL_SHADER:
+        case GL_TESS_EVALUATION_SHADER:
+        case GL_GEOMETRY_SHADER:
+            //TF_CODING_ERROR("Unsupported shader type on Metal %d\n", type);
+            NSLog(@"Unsupported shader type on Metal %d\n", type); //MTL_FIXME - remove the above error so it doesn't propogate all the way back but really we should never see these types of shaders
+            return true;
+        default:
         TF_CODING_ERROR("Invalid shader type %d\n", type);
         return false;
     }
