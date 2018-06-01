@@ -74,6 +74,14 @@ struct HdResourceGPUHandle {
         return handle == _handle;
     }
     
+    bool operator <(HdResourceGPUHandle const _handle) const {
+        return handle < _handle;
+    }
+    
+    bool operator >(HdResourceGPUHandle const _handle) const {
+        return handle > _handle;
+    }
+    
 #if defined(ARCH_GFX_METAL)
     // Metal
     HdResourceGPUHandle(id<MTLBuffer> const _handle) {
