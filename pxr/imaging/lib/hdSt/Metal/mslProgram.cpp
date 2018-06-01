@@ -64,6 +64,34 @@ HdStMSLProgram::~HdStMSLProgram()
     }
 }
 
+#if GENERATE_METAL_DEBUG_SOURCE_CODE
+
+NSUInteger dumpedFileCount = 0;
+
+void DumpMetalSource(NSString *metalSrc, NSString *fileSuffix)
+{
+    NSFileManager *fileManager= [NSFileManager defaultManager];
+    
+    NSURL *applicationDocumentsDirectory = [[fileManager URLsForDirectory:NSDocumentDirectory inDomains:NSUserDomainMask] lastObject];
+    
+    NSString *srcDumpLocation = [applicationDocumentsDirectory.path stringByAppendingPathComponent:@"/HydraMetalSourceDumps"];
+    
+    if(![fileManager fileExistsAtPath:srcDumpLocation]) {
+        if(![fileManager createDirectoryAtPath:srcDumpLocation withIntermediateDirectories:YES attributes:nil error:NULL]) {
+            NSLog(@"Error: Create folder failed %@", srcDumpLocation);
+            return;
+        }
+    }
+    
+    NSString *fileName = [NSString stringWithFormat:@"HydraMetalSource_%lu_%@.txt", dumpedFileCount++, fileSuffix];
+    NSString *srcDumpFilePath = [srcDumpLocation stringByAppendingPathComponent:fileName];
+    [metalSrc writeToFile:srcDumpFilePath atomically:YES encoding:NSUTF8StringEncoding error:nil];
+    NSLog(@"Dumping Metal Source to %@", srcDumpFilePath);
+}
+#else
+#define DumpMetalSource(a, b)
+#endif
+
 bool
 HdStMSLProgram::CompileShader(GLenum type,
                               std::string const &shaderSource)
@@ -96,10 +124,11 @@ HdStMSLProgram::CompileShader(GLenum type,
         case GL_GEOMETRY_SHADER:
             //TF_CODING_ERROR("Unsupported shader type on Metal %d\n", type);
             NSLog(@"Unsupported shader type on Metal %d\n", type); //MTL_FIXME - remove the above error so it doesn't propogate all the way back but really we should never see these types of shaders
+            DumpMetalSource([NSString stringWithUTF8String:shaderSource.c_str()], @"InvalidType"); //MTL_FIXME
             return true;
         default:
-        TF_CODING_ERROR("Invalid shader type %d\n", type);
-        return false;
+            TF_CODING_ERROR("Invalid shader type %d\n", type);
+            return false;
     }
 
     if (TfDebug::IsEnabled(HD_DUMP_SHADER_SOURCE)) {
@@ -127,9 +156,12 @@ HdStMSLProgram::CompileShader(GLenum type,
         // XXX:validation
         TF_WARN("Failed to compile shader (%s): \n%s",
                 shaderType, [[error localizedDescription] UTF8String]);
+        DumpMetalSource([NSString stringWithUTF8String:shaderSource.c_str()], @"Fail"); //MTL_FIXME
         
         return false;
     }
+    
+    DumpMetalSource([NSString stringWithUTF8String:shaderSource.c_str()], [NSString stringWithUTF8String:shaderType]); //MTL_FIXME
     
     if (type == GL_VERTEX_SHADER) {
         _vertexFunction = function;

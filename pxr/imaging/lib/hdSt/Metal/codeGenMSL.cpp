@@ -54,6 +54,29 @@
 
 #include <opensubdiv/osd/glslPatchShaderSource.h>
 
+#if GENERATE_METAL_DEBUG_SOURCE_CODE
+template <typename T>
+void METAL_DEBUG_COMMENTfn(std::stringstream *str, T t)
+{
+    *str << t;
+}
+template<typename T, typename... Args>
+void METAL_DEBUG_COMMENTfn(std::stringstream *str, T t, Args... args) // recursive variadic function
+{
+    *str << t;
+    METAL_DEBUG_COMMENTfn(str, args...) ;
+}
+template<typename... Args>
+void METAL_DEBUG_COMMENT(std::stringstream *str, Args... args)
+{
+    *str << "// ";
+    METAL_DEBUG_COMMENTfn(str, args...);
+}
+
+#else
+#define METAL_DEBUG_COMMENT(str, ...)
+#endif
+
 PXR_NAMESPACE_OPEN_SCOPE
 
 
@@ -522,6 +545,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
     std::stringstream copyInputsFrag, copyOutputsFrag;
 
     glueCommon.str("");
+    METAL_DEBUG_COMMENT(&glueCommon, "_GenerateGlue(glueCommon)\n"); //MTL_FIXME
     copyInputsVtx.str("");
     copyInputsFrag.str("");
     copyOutputsVtx.str("");
@@ -544,6 +568,9 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
     
     glueVS << glueCommon.str();
     gluePS << glueCommon.str();
+    
+    METAL_DEBUG_COMMENT(&glueVS, "_GenerateGlue(glueVS)\n"); //MTL_FIXME
+    METAL_DEBUG_COMMENT(&gluePS, "_GenerateGlue(gluePS)\n"); //MTL_FIXME
     
     glueVS << "struct MSLVtxInputs {\n";
     int location = 0;
@@ -788,6 +815,10 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
             << copyOutputsFrag.str()
             << "return fragOut;\n"
             << "}\n";
+    
+    METAL_DEBUG_COMMENT(&glueVS, "End of _GenerateGlue(glueVS)\n"); //MTL_FIXME
+    METAL_DEBUG_COMMENT(&gluePS, "End of _GenerateGlue(gluePS)\n"); //MTL_FIXME
+    
 }
 
 HdStProgramSharedPtr
@@ -806,6 +837,8 @@ HdSt_CodeGenMSL::Compile()
     _procVS.str(""); _procTCS.str(""), _procTES.str(""), _procGS.str("");
 
     HdStRenderContextCaps const &caps = HdStRenderContextCaps::GetInstance();
+    
+    METAL_DEBUG_COMMENT(&_genCommon, "Compile()\n"); //MTL_FIXME
     
     // Used in glslfx files to determine if it is using new/old
     // imaging system. It can also be used as API guards when
@@ -872,6 +905,9 @@ HdSt_CodeGenMSL::Compile()
     // XXX - Hook this up somehow. Output from the vertex shader perhaps?
     _genCommon << "uint gl_PrimitiveID = 0;\n";
     
+    
+    METAL_DEBUG_COMMENT(&_genCommon, "_metaData.customBindings\n"); //MTL_FIXME
+    
     // ------------------
     // Custom Buffer Bindings
     // ----------------------
@@ -889,15 +925,16 @@ HdSt_CodeGenMSL::Compile()
             if (binDecl->dataType.IsEmpty()) continue;
     
             if(binDecl->binding.GetType() == HdBinding::SSBO) {
+                METAL_DEBUG_COMMENT(&_genCommon, "// SSBO!\n"); //MTL_FIXME
                 _EmitDeclarationPtr(_genCommon, _mslVSInputParams, binDecl->name, binDecl->dataType, TfToken(), binDecl->binding, 0, false);
             }
             else {
-            _EmitDeclaration(_genCommon,
-                             _mslVSInputParams,
-                             binDecl->name,
-                             binDecl->dataType,
-                             TfToken(),
-                             binDecl->binding);
+                _EmitDeclaration(_genCommon,
+                                 _mslVSInputParams,
+                                 binDecl->name,
+                                 binDecl->dataType,
+                                 TfToken(),
+                                 binDecl->binding);
             }
             
             _EmitAccessor(_genCommon,
@@ -908,6 +945,8 @@ HdSt_CodeGenMSL::Compile()
                           ? NULL : "localIndex");
         }
     }
+    
+    METAL_DEBUG_COMMENT(&_genCommon, "END OF _metaData.customBindings\n"); //MTL_FIXME
     
     _EmitDeclaration(_genCommon,
                      _mslVSInputParams,
@@ -925,6 +964,8 @@ HdSt_CodeGenMSL::Compile()
     
     std::stringstream declarations;
     std::stringstream accessors;
+    METAL_DEBUG_COMMENT(&_genCommon, "_metaData.customInterleavedBindings\n"); //MTL_FIXME
+    
     TF_FOR_ALL(it, _metaData.customInterleavedBindings) {
         // note: _constantData has been sorted by offset in HdSt_ResourceBinder.
         // XXX: not robust enough, should consider padding and layouting rules
@@ -958,6 +999,8 @@ HdSt_CodeGenMSL::Compile()
         _EmitDeclarationPtr(declarations, _mslVSInputParams, varName, typeName, TfToken(), binding, 0, true);
     }
     _genCommon << declarations.str() << accessors.str();
+    METAL_DEBUG_COMMENT(&_genCommon, "END OF _metaData.customInterleavedBindings\n"); //MTL_FIXME
+    
     
     // HD_NUM_PATCH_VERTS, HD_NUM_PRIMTIIVE_VERTS
     if (_geometricShader->IsPrimTypePatches()) {
@@ -1427,6 +1470,7 @@ static void _EmitStructAccessor(std::stringstream &str,
                                 bool pointerDereference,
                                 const char *index = NULL)
 {
+    METAL_DEBUG_COMMENT(&str, "_EmitStructAccessor\n"); //MTL_FIXME
     // index != NULL  if the struct is an array
     // arraySize > 1  if the struct entry is an array.
     char const* ptrAccessor;
@@ -1471,6 +1515,7 @@ static void _EmitComputeAccessor(
                     HdBinding const &binding,
                     const char *index)
 {
+    METAL_DEBUG_COMMENT(&str,"_EmitComputeAccessor\n"); //MTL_FIXME
     if (index) {
         str << type
             << " HdGet_" << name << "(int localIndex) {\n"
@@ -1533,6 +1578,7 @@ static void _EmitComputeMutator(
                     HdBinding const &binding,
                     const char *index)
 {
+    METAL_DEBUG_COMMENT(&str, "_EmitComputeMutator\n"); //MTL_FIXME
     if (index) {
         str << "void"
             << " HdSet_" << name << "(int localIndex, " << type << " value) {\n"
@@ -1578,6 +1624,7 @@ static void _EmitAccessor(std::stringstream &str,
                           HdBinding const &binding,
                           const char *index)
 {
+    METAL_DEBUG_COMMENT(&str, "_EmitAccessor ", (index == NULL ? "noindex" : index), (std::to_string(binding.GetType()).c_str()), "\n"); // MTL_FIXME
     if (index) {
         str << type
             << " HdGet_" << name << "(int localIndex) {\n"
@@ -1623,6 +1670,7 @@ static HdSt_CodeGenMSL::TParam& _EmitOutput(std::stringstream &str,
                                             TfToken const &attribute,
                                             HdSt_CodeGenMSL::TParam::Usage usage)
 {
+    METAL_DEBUG_COMMENT(&str, "_EmitOutput\n"); //MTL_FIXME
     str << type << " " << name << ";\n";
     HdSt_CodeGenMSL::TParam out(name, type, TfToken(), attribute, usage);
     outputParams.push_back(out);
@@ -1643,6 +1691,7 @@ static HdSt_CodeGenMSL::TParam& _EmitStructMemberOutput(HdSt_CodeGenMSL::InOutPa
 void
 HdSt_CodeGenMSL::_GenerateDrawingCoord()
 {
+    METAL_DEBUG_COMMENT(&_genCommon, "_GenerateDrawingCoord\n"); //MTL_FIXME
     TF_VERIFY(_metaData.drawingCoord0Binding.binding.IsValid());
     TF_VERIFY(_metaData.drawingCoord1Binding.binding.IsValid());
 
@@ -1960,6 +2009,9 @@ HdSt_CodeGenMSL::_GenerateConstantPrimVar()
 
     std::stringstream declarations;
     std::stringstream accessors;
+    METAL_DEBUG_COMMENT(&declarations, "_GenerateConstantPrimVar()\n"); //MTL_FIXME
+    METAL_DEBUG_COMMENT(&accessors,    "_GenerateConstantPrimVar()\n"); //MTL_FIXME
+    
     TF_FOR_ALL (it, _metaData.constantData) {
         // note: _constantData has been sorted by offset in HdSt_ResourceBinder.
         // XXX: not robust enough, should consider padding and layouting rules
@@ -2018,7 +2070,9 @@ HdSt_CodeGenMSL::_GenerateInstancePrimVar()
 
     std::stringstream declarations;
     std::stringstream accessors;
-
+    METAL_DEBUG_COMMENT(&declarations, "_GenerateInstancePrimVar()\n"); //MTL_FIXME
+    METAL_DEBUG_COMMENT(&accessors,    "_GenerateInstancePrimVar()\n"); //MTL_FIXME
+    
     struct LevelEntries {
         TfToken dataType;
         std::vector<int> levels;
@@ -2200,6 +2254,9 @@ HdSt_CodeGenMSL::_GenerateElementPrimVar()
 
     std::stringstream declarations;
     std::stringstream accessors;
+    
+    METAL_DEBUG_COMMENT(&declarations, "_GenerateElementPrimVar()\n"); //MTL_FIXME
+    METAL_DEBUG_COMMENT(&accessors,    "_GenerateElementPrimVar()\n"); //MTL_FIXME
 
     if (_metaData.primitiveParamBinding.binding.IsValid()) {
 
@@ -2506,7 +2563,13 @@ HdSt_CodeGenMSL::_GenerateVertexPrimVar()
     std::stringstream interstageStruct;
     std::stringstream accessorsVS, accessorsTCS, accessorsTES,
         accessorsGS, accessorsFS;
-
+    
+    METAL_DEBUG_COMMENT(&interstageStruct,"_GenerateVertexPrimVar()\n"); //MTL_FIXME
+    METAL_DEBUG_COMMENT(&vertexInputs,    "_GenerateVertexPrimVar()\n"); //MTL_FIXME
+    METAL_DEBUG_COMMENT(&accessorsVS,     "_GenerateVertexPrimVar()\n"); //MTL_FIXME
+    METAL_DEBUG_COMMENT(&accessorsFS,     "_GenerateVertexPrimVar()\n"); //MTL_FIXME
+    
+    
     TfToken structName("PrimVars");
     interstageStruct << "struct " << structName << " {\n";
     
@@ -2772,6 +2835,10 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
     std::stringstream declarations;
     std::stringstream accessors;
 
+    METAL_DEBUG_COMMENT(&_genFS, "_GenerateShaderParameters()\n"); //MTL_FIXME
+    METAL_DEBUG_COMMENT(&_genVS, "_GenerateShaderParameters()\n"); //MTL_FIXME
+
+    
     HdStRenderContextCaps const &caps = HdStRenderContextCaps::GetInstance();
 
     TfToken typeName("ShaderData");
@@ -2974,6 +3041,10 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
 
     _genGS << declarations.str()
            << accessors.str();
+    
+    METAL_DEBUG_COMMENT(&_genFS, "END OF _GenerateShaderParameters()\n"); //MTL_FIXME
+    METAL_DEBUG_COMMENT(&_genVS, "END OF _GenerateShaderParameters()\n"); //MTL_FIXME
+
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE
