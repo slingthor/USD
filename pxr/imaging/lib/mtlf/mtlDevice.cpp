@@ -23,8 +23,11 @@
 //
 
 #include "pxr/imaging/mtlf/mtlDevice.h"
-#include "pxr/imaging/mtlf/package.h"
 #include "pxr/imaging/garch/glPlatformContext.h"
+
+#include "pxr/imaging/mtlf/drawTarget.h"
+#include "pxr/imaging/mtlf/package.h"
+
 
 #import <simd/simd.h>
 #import <Cocoa/Cocoa.h>
@@ -130,20 +133,20 @@ MtlfMetalContext::MtlfMetalContext()
     vtxDescriptor.layouts[0].stepFunction = MTLVertexStepFunctionPerVertex;
     
     // Create a reusable pipeline state
-    MTLRenderPipelineDescriptor *pipelineStateDescriptor = [[MTLRenderPipelineDescriptor alloc] init];
-    pipelineStateDescriptor.label = @"Metal/GL interop";
-    pipelineStateDescriptor.sampleCount = 1;
-    pipelineStateDescriptor.vertexFunction = vertexProgram;
-    pipelineStateDescriptor.fragmentFunction = fragmentProgram;
-    pipelineStateDescriptor.vertexDescriptor = vtxDescriptor;
-    pipelineStateDescriptor.colorAttachments[0].blendingEnabled = YES;
-    pipelineStateDescriptor.colorAttachments[0].sourceRGBBlendFactor = MTLBlendFactorSourceAlpha;
-    pipelineStateDescriptor.colorAttachments[0].sourceAlphaBlendFactor = MTLBlendFactorSourceAlpha;
-    pipelineStateDescriptor.colorAttachments[0].destinationRGBBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
-    pipelineStateDescriptor.colorAttachments[0].destinationAlphaBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
-    pipelineStateDescriptor.colorAttachments[0].pixelFormat = MTLPixelFormatBGRA8Unorm;
+    MTLRenderPipelineDescriptor *pipelineStateDesc = [[MTLRenderPipelineDescriptor alloc] init];
+    pipelineStateDesc.label = @"Metal/GL interop";
+    pipelineStateDesc.sampleCount = 1;
+    pipelineStateDesc.vertexFunction = vertexProgram;
+    pipelineStateDesc.fragmentFunction = fragmentProgram;
+    pipelineStateDesc.vertexDescriptor = vtxDescriptor;
+    pipelineStateDesc.colorAttachments[0].blendingEnabled = YES;
+    pipelineStateDesc.colorAttachments[0].sourceRGBBlendFactor = MTLBlendFactorSourceAlpha;
+    pipelineStateDesc.colorAttachments[0].sourceAlphaBlendFactor = MTLBlendFactorSourceAlpha;
+    pipelineStateDesc.colorAttachments[0].destinationRGBBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
+    pipelineStateDesc.colorAttachments[0].destinationAlphaBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
+    pipelineStateDesc.colorAttachments[0].pixelFormat = MTLPixelFormatBGRA8Unorm;
     
-    pipelineState = [device newRenderPipelineStateWithDescriptor:pipelineStateDescriptor error:&error];
+    pipelineState = [device newRenderPipelineStateWithDescriptor:pipelineStateDesc error:&error];
     if (!pipelineState) {
         NSLog(@"Failed to created pipeline state, error %@", error);
     }
@@ -316,11 +319,10 @@ void MtlfMetalContext::CheckNewStateGather()
 {
     // Lazily create a new state object
     if (!pipelineStateDescriptor) {
-        MTLRenderPipelineDescriptor *pipelineStateDescriptor = [[MTLRenderPipelineDescriptor alloc] init];
+        pipelineStateDescriptor = [[MTLRenderPipelineDescriptor alloc] init];
         
         pipelineStateDescriptor.label = @"Gathered State";
         pipelineStateDescriptor.sampleCount = 1;
-        pipelineStateDescriptor.vertexDescriptor = vertexDescriptor;
         pipelineStateDescriptor.colorAttachments[0].blendingEnabled = YES;
         pipelineStateDescriptor.colorAttachments[0].sourceRGBBlendFactor = MTLBlendFactorSourceAlpha;
         pipelineStateDescriptor.colorAttachments[0].sourceAlphaBlendFactor = MTLBlendFactorSourceAlpha;
@@ -349,6 +351,7 @@ void MtlfMetalContext::SetVertexAttribute(uint32_t index,
         vertexDescriptor = [[MTLVertexDescriptor alloc] init];
     
         vertexDescriptor.layouts[0].stepFunction = MTLVertexStepFunctionConstant;
+        vertexDescriptor.layouts[0].stepRate = 0;
         vertexDescriptor.layouts[0].stride = stride;
         vertexDescriptor.attributes[0].format = MTLVertexFormatUInt;
         numVertexComponents = 1;
@@ -403,14 +406,22 @@ void MtlfMetalContext::SetTexture(int index, id<MTLTexture> texture)
     textures.insert(std::make_pair(index, texture));
 }
 
+void MtlfMetalContext::SetDrawTarget(MtlfDrawTarget *dt)
+{
+    drawTarget = dt;
+}
+
 void MtlfMetalContext::BakeState()
 {
+    pipelineStateDescriptor.vertexDescriptor = vertexDescriptor;
+
     NSError *error = NULL;
     id<MTLRenderPipelineState> _pipelineState = [device newRenderPipelineStateWithDescriptor:pipelineStateDescriptor error:&error];
     if (!_pipelineState) {
         NSLog(@"Failed to created pipeline state, error %@", error);
+        return;
     }
-    
+
     for(auto buffer : vertexBuffers) {
         [renderEncoder setVertexBuffer:buffer.second offset:0 atIndex:buffer.first];
     }
@@ -420,8 +431,6 @@ void MtlfMetalContext::BakeState()
     for(auto sampler : samplers) {
         [renderEncoder setFragmentSamplerState:sampler.second atIndex:sampler.first];
     }
-    
-    [renderEncoder endEncoding];
 
     pipelineStateDescriptor = nil;
     vertexDescriptor = nil;
@@ -432,6 +441,8 @@ void MtlfMetalContext::BakeState()
     textures.clear();
     samplers.clear();
 }
+
+
 
 PXR_NAMESPACE_CLOSE_SCOPE
 

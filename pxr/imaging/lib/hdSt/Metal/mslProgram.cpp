@@ -236,7 +236,7 @@ void HdStMSLProgram::UnbindResources(HdStSurfaceShader* surfaceShader, HdSt_Reso
 }
 
 void HdStMSLProgram::SetProgram() const {
-//    TF_FATAL_CODING_ERROR("Not Implemented");
+    MtlfMetalContext::GetMetalContext()->SetShadingPrograms(_vertexFunction, _fragmentFunction);
 }
 
 void HdStMSLProgram::UnsetProgram() const {
@@ -258,11 +258,17 @@ void HdStMSLProgram::DrawArraysInstanced(GLenum primitiveMode,
                                           GLint vertexCount,
                                           GLint instanceCount) const {
     const_cast<HdStMSLProgram*>(this)->BakeState();
+    
+    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
+    
+//    [context->renderEncoder
 }
 
 void HdStMSLProgram::BakeState()
 {
+    id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->device;
 
+    MtlfMetalContext::GetMetalContext()->BakeState();
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

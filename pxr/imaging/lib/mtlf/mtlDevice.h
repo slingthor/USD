@@ -38,7 +38,7 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-
+class MtlfDrawTarget;
 typedef boost::shared_ptr<class MtlfMetalContext> MtlfMetalContextSharedPtr;
 
 /// \class MtlfMetalContext
@@ -58,23 +58,38 @@ public:
     MTLF_API
     static bool IsInitialized();
     
+    MTLF_API
+    void SetDrawTarget(MtlfDrawTarget *drawTarget);
+    
+    MTLF_API
     void SetShadingPrograms(id<MTLFunction> vertexFunction, id<MTLFunction> fragmentFunction);
+    
+    MTLF_API
     void SetVertexAttribute(uint32_t index,
                             int size,
                             int type,
                             size_t stride,
                             uint32_t offset);
+    
+    MTLF_API
     void SetBuffer(int index, id<MTLBuffer> buffer);
+    
+    MTLF_API
     void SetIndexBuffer(id<MTLBuffer> buffer);
 
+    MTLF_API
     void SetTexture(int index, id<MTLTexture> texture);
+    
+    MTLF_API
     void SetSampler(int index, id<MTLSamplerState> sampler);
 
+    MTLF_API
     void BakeState();
 
     id<MTLDevice> device;
     id<MTLCommandQueue> commandQueue;
     id<MTLCommandBuffer> commandBuffer;
+    id<MTLRenderCommandEncoder> renderEncoder;
 
     id<MTLLibrary> defaultLibrary;
     id<MTLRenderPipelineState> pipelineState;
@@ -96,12 +111,13 @@ protected:
     MTLRenderPipelineDescriptor *pipelineStateDescriptor;
     MTLVertexDescriptor *vertexDescriptor;
     uint32_t numVertexComponents;
-    id<MTLRenderCommandEncoder> renderEncoder;
-    
+
     std::map<int, id<MTLBuffer>> vertexBuffers;
     std::map<int, id<MTLTexture>> textures;
     std::map<int, id<MTLSamplerState>> samplers;
     id<MTLBuffer> indexBuffer;
+    
+    MtlfDrawTarget *drawTarget;
 
 private:
     static MtlfMetalContextSharedPtr context;

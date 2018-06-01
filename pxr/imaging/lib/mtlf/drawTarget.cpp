@@ -322,15 +322,16 @@ MtlfDrawTarget::Bind()
     TF_VERIFY(!GetAttachments().empty(), "No attachments set. Bind() is only valid after a call "
               "to Bind(GarchDrawTarget::AttachmentsMap const &attachments)");
     
-    // Create a render command encoder so we can render into something
-    TF_VERIFY(MtlfMetalContext::GetMetalContext()->commandBuffer == nil, "A command buffer is already active");
-    
-//    id<MTLCommandBuffer> commandBuffer = [MtlfMetalContext::GetMetalContext()->commandQueue commandBuffer];
-//    id <MTLRenderCommandEncoder> renderEncoder =
-//      [commandBuffer renderCommandEncoderWithDescriptor:_mtlRenderPassDescriptor];
-//    MtlfMetalContext::GetMetalContext()->commandBuffer = commandBuffer;
+    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
 
-//    _renderEncoder = [commandBuffer renderCommandEncoderWithDescriptor:_mtlRenderPassDescriptor];
+    // Create a render command encoder so we can render into something
+    TF_VERIFY(context->commandBuffer == nil, "A command buffer is already active");
+  
+    context->SetDrawTarget(this);
+    id<MTLCommandBuffer> commandBuffer = [context->commandQueue commandBuffer];
+    context->renderEncoder =
+        [commandBuffer renderCommandEncoderWithDescriptor:_mtlRenderPassDescriptor];
+    context->commandBuffer = commandBuffer;
 }
 
 void
@@ -358,13 +359,16 @@ MtlfDrawTarget::Unbind()
         return;
     }
     
-//    [_renderEncoder endEncoding];
-    
-//    id<MTLCommandBuffer> commandBuffer = MtlfMetalContext::GetMetalContext()->commandBuffer;
-//    MtlfMetalContext::GetMetalContext()->commandBuffer = nil;
+    MtlfMetalContext::GetMetalContext()->SetDrawTarget(NULL);
 
-//    TF_VERIFY(commandBuffer != nil, "No active command buffer");
-//    [commandBuffer commit];
+    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
+    [context->renderEncoder endEncoding];
+    
+    id<MTLCommandBuffer> commandBuffer = context->commandBuffer;
+    TF_VERIFY(commandBuffer != nil, "No active command buffer");
+    
+    [commandBuffer commit];
+    context->commandBuffer = nil;
 
     TouchContents();
 }

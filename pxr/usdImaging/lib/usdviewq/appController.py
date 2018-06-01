@@ -32,7 +32,6 @@ from collections import deque, OrderedDict
 
 # Usd Library Components
 from pxr import Usd, UsdGeom, UsdShade, UsdUtils, UsdImagingGL, Garch, Sdf, Tf, Ar
-from pxr import UsdImagingMetal
 
 # UI Components
 from ._usdviewq import Utils

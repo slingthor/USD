@@ -696,12 +696,13 @@ UsdImagingMetalHdEngine::Render(RenderParams params)
     
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
 
-    //if (_mtlRenderPassDescriptor == nil)
+    if (_mtlRenderPassDescriptor == nil)
     {
         GLfloat clearColor[4];
         glGetFloatv(GL_COLOR_CLEAR_VALUE, clearColor);
-
-        _mtlRenderPassDescriptor = [MTLRenderPassDescriptor renderPassDescriptor];
+        clearColor[1] = 1.0f;
+        
+        _mtlRenderPassDescriptor = [[MTLRenderPassDescriptor alloc] init];
 
         // create a color attachment every frame since we have to recreate the texture every frame
         MTLRenderPassColorAttachmentDescriptor *colorAttachment = _mtlRenderPassDescriptor.colorAttachments[0];
@@ -720,6 +721,14 @@ UsdImagingMetalHdEngine::Render(RenderParams params)
     // Create a new command buffer for each render pass to the current drawable
     id <MTLCommandBuffer> commandBuffer = [context->commandQueue commandBuffer];
 
+    // Create a render command encoder so we can render into something
+    TF_VERIFY(context->commandBuffer == nil, "A command buffer is already active");
+    
+    id <MTLRenderCommandEncoder> renderEncoder =
+        [commandBuffer renderCommandEncoderWithDescriptor:_mtlRenderPassDescriptor];
+    context->commandBuffer = commandBuffer;
+    context->renderEncoder = renderEncoder;
+    
     VtValue selectionValue(_selTracker);
     _engine.SetTaskContextData(HdxTokens->selectionState, selectionValue);
     VtValue renderTags(_renderTags);
@@ -729,26 +738,14 @@ UsdImagingMetalHdEngine::Render(RenderParams params)
     HdxTaskSetTokens->idRender : HdxTaskSetTokens->colorRender;
     _engine.Execute(*_renderIndex, _taskController->GetTasks(renderMode));
     
-    if(_mtlRenderPassDescriptor != nil) // If we have a valid drawable, begin the commands to render into it
-    {
-        // Create a render command encoder so we can render into something
-        id <MTLRenderCommandEncoder> renderEncoder = [commandBuffer renderCommandEncoderWithDescriptor:_mtlRenderPassDescriptor];
-        [renderEncoder setDepthStencilState:context->depthState];
-       /*
-        // Set context state
-        [renderEncoder setVertexBuffer:vertexBuffer offset:0 atIndex:0];
-        [renderEncoder setFragmentTexture:_logoTexture atIndex: 0];
-        [renderEncoder setRenderPipelineState:context->pipelineState];
-        
-        [renderEncoder drawPrimitives: MTLPrimitiveTypeTriangle vertexStart: 12 vertexCount: 6];
-        [renderEncoder popDebugGroup];
-        */
-        [renderEncoder endEncoding];
-    }
-    
+    [renderEncoder endEncoding];
+
     // Finalize rendering here & push the command buffer to the GPU
     [commandBuffer commit];
     [commandBuffer waitUntilScheduled];
+
+    context->renderEncoder = nil;
+    context->commandBuffer = nil;
     
     glUseProgram(context->glShaderProgram);
     

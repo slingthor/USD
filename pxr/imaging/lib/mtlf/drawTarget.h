@@ -258,7 +258,7 @@ public:
     /// sets \a reason to the reason why not.
     MTLF_API
     virtual bool IsValid(std::string * reason = NULL) override;
-
+    
 protected:
 
     /// Weak/Ref-based container for the the map of texture attachments.
@@ -302,7 +302,6 @@ private:
     void _Resolve();
 
     MTLRenderPassDescriptor *_mtlRenderPassDescriptor;
-    id<MTLRenderCommandEncoder> _renderEncoder;
     
     int _bindDepth;
 
