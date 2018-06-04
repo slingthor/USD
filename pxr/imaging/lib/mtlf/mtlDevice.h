@@ -27,6 +27,7 @@
 #include "pxr/imaging/glf/glew.h"
 
 #include <Metal/Metal.h>
+#import <Cocoa/Cocoa.h>
 
 #include "pxr/pxr.h"
 #include "pxr/imaging/mtlf/api.h"
@@ -47,6 +48,11 @@ typedef boost::shared_ptr<class MtlfMetalContext> MtlfMetalContextSharedPtr;
 ///
 class MtlfMetalContext : public boost::noncopyable {
 public:
+    typedef struct {
+        float position[2];
+        float uv[2];
+    } Vertex;
+
     MTLF_API
     virtual ~MtlfMetalContext();
 
@@ -121,6 +127,9 @@ protected:
 
 private:
     static MtlfMetalContextSharedPtr context;
+    
+    CVOpenGLTextureCacheRef cvglTextureCache = nil;
+    CVMetalTextureCacheRef cvmtlTextureCache = nil;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE
