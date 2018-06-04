@@ -116,8 +116,8 @@ MtlfDrawTarget::_AddAttachment( std::string const & name,
                                 GLenum format, GLenum type,
                                 GLenum internalFormat )
 {
-    if (!IsBound()) {
-        TF_CODING_ERROR("Cannot change the size of an unbound MtlfDrawTarget");
+    if (IsBound()) {
+        TF_CODING_ERROR("Cannot change the size of a bound MtlfDrawTarget");
     }
 
     AttachmentsMap & attachments = _GetAttachments();
