@@ -379,7 +379,7 @@ ZLIB = Dependency("zlib", InstallZlib, "include/zlib.h")
 if Linux():
     BOOST_URL = "http://downloads.sourceforge.net/project/boost/boost/1.55.0/boost_1_55_0.tar.gz"
 elif Windows() or MacOS():
-    BOOST_URL = "http://downloads.sourceforge.net/project/boost/boost/1.61.0/boost_1_61_0.tar.gz"
+    BOOST_URL = "https://downloads.sourceforge.net/project/boost/boost/1.62.0/boost_1_62_0.tar.gz"
 
 def InstallBoost(context, force):
     with CurrentWorkingDirectory(DownloadURL(BOOST_URL, context, force)):
