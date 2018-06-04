@@ -83,7 +83,7 @@ void DumpMetalSource(NSString *metalSrc, NSString *fileSuffix)
         }
     }
     
-    NSString *fileName = [NSString stringWithFormat:@"HydraMetalSource_%lu_%@.txt", dumpedFileCount++, fileSuffix];
+    NSString *fileName = [NSString stringWithFormat:@"HydraMetalSource_%lu_%@.metal", dumpedFileCount++, fileSuffix];
     NSString *srcDumpFilePath = [srcDumpLocation stringByAppendingPathComponent:fileName];
     [metalSrc writeToFile:srcDumpFilePath atomically:YES encoding:NSUTF8StringEncoding error:nil];
     NSLog(@"Dumping Metal Source to %@", srcDumpFilePath);
