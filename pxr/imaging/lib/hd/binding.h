@@ -71,6 +71,7 @@ public:
                 BINDLESS_TEXTURE_PTEX_LAYOUT, // bindless ptex layout
                 PRIMVAR_REDIRECT,    // primvar redirection
                 VERTEX_ID,           // vertex ID
+                FRONT_FACING,           // boolean indicating if fragment belongs to a front-facing primitive
                 SAMPLER              // texture sampler in non-GL APIs
     };
     enum Location {
