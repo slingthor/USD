@@ -418,8 +418,11 @@ void MtlfMetalContext::BakeState()
         return;
     }
 
+    [renderEncoder setRenderPipelineState:_pipelineState];
+
     for(auto buffer : vertexBuffers) {
-        [renderEncoder setVertexBuffer:buffer.second offset:0 atIndex:buffer.first];
+        if (buffer.first != 65535)
+            [renderEncoder setVertexBuffer:buffer.second offset:0 atIndex:buffer.first];
     }
     for(auto texture : textures) {
         [renderEncoder setFragmentTexture:texture.second atIndex:texture.first];
@@ -427,18 +430,20 @@ void MtlfMetalContext::BakeState()
     for(auto sampler : samplers) {
         [renderEncoder setFragmentSamplerState:sampler.second atIndex:sampler.first];
     }
+}
 
+void MtlfMetalContext::ClearState()
+{
     pipelineStateDescriptor = nil;
     vertexDescriptor = nil;
     indexBuffer = nil;
     numVertexComponents = 0;
-
+    
     vertexBuffers.clear();
     textures.clear();
     samplers.clear();
+
 }
-
-
 
 PXR_NAMESPACE_CLOSE_SCOPE
 

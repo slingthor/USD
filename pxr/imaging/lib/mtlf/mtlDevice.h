@@ -65,6 +65,11 @@ public:
     static bool IsInitialized();
     
     MTLF_API
+    id<MTLBuffer> GetIndexBuffer() {
+        return indexBuffer;
+    }
+    
+    MTLF_API
     void SetDrawTarget(MtlfDrawTarget *drawTarget);
     
     MTLF_API
@@ -91,6 +96,9 @@ public:
 
     MTLF_API
     void BakeState();
+
+    MTLF_API
+    void ClearState();
 
     id<MTLDevice> device;
     id<MTLCommandQueue> commandQueue;
