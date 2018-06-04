@@ -627,7 +627,9 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
     bool hasTexturing = false;
     TF_FOR_ALL(it, _mslPSInputParams) {
         HdSt_CodeGenMSL::TParam const &input = *it;
-        if (input.usage != HdSt_CodeGenMSL::TParam::Unspecified) {
+        auto usage = input.usage & HdSt_CodeGenMSL::TParam::maskShaderUsage;
+        if (usage == HdSt_CodeGenMSL::TParam::Texture ||
+            usage == HdSt_CodeGenMSL::TParam::Sampler) {
             hasTexturing = true;
             break;
         }
@@ -785,9 +787,12 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
 //        if (!input.attribute.IsEmpty()) {
 //            attrib = input.attribute;
 //        }
-//        else {
+        if (input.binding.GetType() == HdBinding::FRONT_FACING) {
+            attrib = TfToken("[[front_facing]]");
+        }
+        else {
             attrib = TfToken(TfStringPrintf("[[buffer(%d)]]", location));
-//        }
+        }
         gluePS << ", ";
         
         std::string n;
@@ -960,7 +965,7 @@ HdSt_CodeGenMSL::Compile()
                      TfToken("gl_FrontFacing"),
                      TfToken("bool"),
                      TfToken("[[front_facing]]"),
-                     HdBinding());
+                     HdBinding(HdBinding::FRONT_FACING, 0));
     
     std::stringstream declarations;
     std::stringstream accessors;
@@ -1397,15 +1402,15 @@ static HdSt_CodeGenMSL::TParam& _EmitDeclaration(std::stringstream &str,
                              int arraySize)
 {
     str << type << " " << name << ";\n";
-    HdSt_CodeGenMSL::TParam in(name, type, TfToken(), attribute, HdSt_CodeGenMSL::TParam::Unspecified);
+    HdSt_CodeGenMSL::TParam in(name, type, TfToken(), attribute, HdSt_CodeGenMSL::TParam::Unspecified, binding);
 
-    if(binding.GetType() == HdBinding::VERTEX_ID) {
+    if(binding.GetType() == HdBinding::VERTEX_ID ||
+       binding.GetType() == HdBinding::FRONT_FACING) {
         in.usage |= HdSt_CodeGenMSL::TParam::EntryFuncArgument;
     }
-
+ 
     inputParams.push_back(in);
-
-    return inputParams.back();
+   return inputParams.back();
 }
 
 static HdSt_CodeGenMSL::TParam& _EmitDeclaration(
