@@ -171,7 +171,7 @@ GlfDrawTarget::_AddAttachment( std::string const & name,
         attachments.insert(AttachmentsMap::value_type(name, attachment));
 
 
-        TF_VERIFY( attachment->GetGlTextureName() > 0 ,
+        TF_VERIFY( attachment->GetTextureName().IsSet(),
                    "Attachment \"%s\" was not added "
                        "and cannot be bound in MatDisplayMaterial", name.c_str());
 
@@ -327,8 +327,8 @@ GlfDrawTarget::GetFramebufferMSId() const
 void
 GlfDrawTarget::_BindAttachment( GlfDrawTarget::GlfAttachment::GlfAttachmentRefPtr const & a )
 {
-    GLuint id = a->GetGlTextureName();
-    GLuint idMS = a->GetGlTextureMSName();
+    GLuint id = a->GetTextureName();
+    GLuint idMS = a->GetTextureMSName();
 
     int attach = a->GetAttach();
 
@@ -569,7 +569,7 @@ GlfDrawTarget::WriteToFile(std::string const & name,
         glGetIntegerv( GL_ACTIVE_TEXTURE, & restoreActiveTexture);
 
         glActiveTexture( GL_TEXTURE0 );
-        glBindTexture( GL_TEXTURE_2D, a->GetGlTextureName() );
+        glBindTexture( GL_TEXTURE_2D, a->GetTextureName() );
 
         glGetTexImage(GL_TEXTURE_2D, 0, a->GetFormat(), a->GetType(), buf);
 

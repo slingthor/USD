@@ -43,6 +43,39 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+static MTLPrimitiveType GetMetalPrimType(GLenum glPrimType) {
+    MTLPrimitiveType primType;
+    switch(glPrimType) {
+        case GL_POINTS:
+            primType = MTLPrimitiveTypePoint;
+            break;
+        case GL_LINE_STRIP:
+            primType = MTLPrimitiveTypeLineStrip;
+            break;
+        case GL_LINES:
+            primType = MTLPrimitiveTypeLine;
+            break;
+        case GL_TRIANGLE_STRIP:
+            primType = MTLPrimitiveTypeTriangleStrip;
+            break;
+        case GL_TRIANGLES:
+            primType = MTLPrimitiveTypeTriangle;
+            break;
+        case GL_LINE_LOOP:
+        case GL_LINE_STRIP_ADJACENCY:
+        case GL_LINES_ADJACENCY:
+        case GL_TRIANGLE_FAN:
+        case GL_TRIANGLE_STRIP_ADJACENCY:
+        case GL_TRIANGLES_ADJACENCY:
+        case GL_PATCHES:
+            primType = MTLPrimitiveTypePoint;
+            TF_FATAL_CODING_ERROR("Not Implemented");
+            break;
+    }
+    
+    return primType;
+}
+
 HdStMSLProgram::HdStMSLProgram(TfToken const &role)
 : HdStProgram(role)
 , _role(role)
@@ -83,7 +116,7 @@ void DumpMetalSource(NSString *metalSrc, NSString *fileSuffix)
         }
     }
     
-    NSString *fileName = [NSString stringWithFormat:@"HydraMetalSource_%lu_%@.txt", dumpedFileCount++, fileSuffix];
+    NSString *fileName = [NSString stringWithFormat:@"HydraMetalSource_%lu_%@.metal", dumpedFileCount++, fileSuffix];
     NSString *srcDumpFilePath = [srcDumpLocation stringByAppendingPathComponent:fileName];
     [metalSrc writeToFile:srcDumpFilePath atomically:YES encoding:NSUTF8StringEncoding error:nil];
     NSLog(@"Dumping Metal Source to %@", srcDumpFilePath);
@@ -276,7 +309,7 @@ void HdStMSLProgram::SetProgram() const {
 }
 
 void HdStMSLProgram::UnsetProgram() const {
-//    TF_FATAL_CODING_ERROR("Not Implemented");
+    MtlfMetalContext::GetMetalContext()->ClearState();
 }
 
 
@@ -287,6 +320,28 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
                                                       GLint instanceCount,
                                                       GLint baseVertex) const {
     const_cast<HdStMSLProgram*>(this)->BakeState();
+    
+    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
+    
+    MTLIndexType indexTypeMetal;
+    int indexSize;
+    switch(indexType) {
+        default:
+            TF_FATAL_CODING_ERROR("Not Implemented");
+            return;
+        case GL_UNSIGNED_SHORT:
+            indexTypeMetal = MTLIndexTypeUInt16;
+            indexSize = sizeof(uint16_t);
+            break;
+        case GL_UNSIGNED_INT:
+            indexTypeMetal = MTLIndexTypeUInt32;
+            indexSize = sizeof(uint32_t);
+            break;
+    }
+
+    MTLPrimitiveType primType = GetMetalPrimType(primitiveMode);
+
+    [context->renderEncoder drawIndexedPrimitives:primType indexCount:indexCount indexType:indexTypeMetal indexBuffer:context->GetIndexBuffer() indexBufferOffset:(firstIndex * indexSize) instanceCount:instanceCount baseVertex:baseVertex baseInstance:0];
 }
 
 void HdStMSLProgram::DrawArraysInstanced(GLenum primitiveMode,
@@ -297,7 +352,8 @@ void HdStMSLProgram::DrawArraysInstanced(GLenum primitiveMode,
     
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
     
-//    [context->renderEncoder
+    MTLPrimitiveType primType = GetMetalPrimType(primitiveMode);
+    [context->renderEncoder drawPrimitives:primType vertexStart:baseVertex vertexCount:vertexCount instanceCount:instanceCount];
 }
 
 void HdStMSLProgram::BakeState()

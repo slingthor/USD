@@ -103,13 +103,16 @@ public:
         virtual ~MtlfAttachment();
 
         /// Returns the texture object (can be used as any regular GL texture)
-        virtual GarchTextureGPUHandle GetTextureName() const override { return GarchTextureGPUHandle(_textureName); }
-
-        /// Returns the Metal texture object (can be used as any regular Metal texture object)
-        virtual id<MTLTexture> GetMtlTextureName() const { return _textureName; }
+        virtual GarchTextureGPUHandle GetTextureName() const override { return _textureName; }
 
         /// Returns the GL texture index multisampled of this attachment
-        id<MTLTexture> GetMtlTextureMSName() const { return _textureNameMS; }
+        GarchTextureGPUHandle GetTextureMSName() const { return _textureNameMS; }
+        
+        /// Returns the texture object (can be used as any regular GL texture)
+        GarchTextureGPUHandle GetStencilTextureName() const { return _stencilTextureName; }
+        
+        /// Returns the GL texture index multisampled of this attachment
+        GarchTextureGPUHandle GetStencilTextureMSName() const { return _stencilTextureNameMS; }
 
         /// Returns the GL format of the texture (GL_RGB, GL_DEPTH_COMPONENT...)
         GLenum GetFormat() const { return _format; }
@@ -149,6 +152,9 @@ public:
 
         id<MTLTexture>  _textureName;
         id<MTLTexture>  _textureNameMS;
+        
+        id<MTLTexture>  _stencilTextureName;
+        id<MTLTexture>  _stencilTextureNameMS;
 
         GLenum          _format,
                         _type;

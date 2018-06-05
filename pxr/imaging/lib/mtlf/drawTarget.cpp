@@ -116,8 +116,8 @@ MtlfDrawTarget::_AddAttachment( std::string const & name,
                                 GLenum format, GLenum type,
                                 GLenum internalFormat )
 {
-    if (!IsBound()) {
-        TF_CODING_ERROR("Cannot change the size of an unbound MtlfDrawTarget");
+    if (IsBound()) {
+        TF_CODING_ERROR("Cannot change the size of a bound MtlfDrawTarget");
     }
 
     AttachmentsMap & attachments = _GetAttachments();
@@ -132,7 +132,7 @@ MtlfDrawTarget::_AddAttachment( std::string const & name,
         attachments.insert(AttachmentsMap::value_type(name, attachment));
 
 
-        TF_VERIFY( attachment->GetMtlTextureName() != 0 , "%s", 
+        TF_VERIFY( attachment->GetTextureName().IsSet() , "%s",
                    std::string("Attachment \""+name+"\" was not added "
                        "and cannot be bound in MatDisplayMaterial").c_str());
 
@@ -253,13 +253,13 @@ MtlfDrawTarget::_GenFrameBuffer()
 void
 MtlfDrawTarget::_BindAttachment( MtlfAttachmentRefPtr const & a )
 {
-    id<MTLTexture> tid = a->GetMtlTextureName();
-    id<MTLTexture> tidMS = a->GetMtlTextureMSName();
+    id<MTLTexture> tid = a->GetTextureName();
+    id<MTLTexture> tidMS = a->GetTextureMSName();
 
     int attach = a->GetAttach();
 
     GLenum attachment = GL_COLOR_ATTACHMENT0;
-    if (a->GetFormat()==GL_DEPTH_COMPONENT) {
+    if (a->GetFormat()==GL_DEPTH_COMPONENT || a->GetFormat()==GL_DEPTH_STENCIL) {
         MTLRenderPassDepthAttachmentDescriptor *depthAttachment = _mtlRenderPassDescriptor.depthAttachment;
         if (HasMSAA()) {
             depthAttachment.texture = tidMS;
@@ -273,20 +273,20 @@ MtlfDrawTarget::_BindAttachment( MtlfAttachmentRefPtr const & a )
         
         // store only attachments that will be presented to the screen, as in this case
         depthAttachment.storeAction = MTLStoreActionStore;
-    } else if (a->GetFormat()==GL_DEPTH_STENCIL) {
-        MTLRenderPassStencilAttachmentDescriptor *stencilAttachment = _mtlRenderPassDescriptor.stencilAttachment;
-        if (HasMSAA()) {
-            stencilAttachment.texture = tidMS;
-        } else {
-            stencilAttachment.texture = tid;
+        
+        if (a->GetFormat()==GL_DEPTH_STENCIL) {
+            MTLRenderPassStencilAttachmentDescriptor *stencilAttachment = _mtlRenderPassDescriptor.stencilAttachment;
+            
+            if (HasMSAA()) {
+                stencilAttachment.texture = a->GetStencilTextureName();
+            } else {
+                stencilAttachment.texture = a->GetStencilTextureMSName();
+            }
+            
+            // make sure to clear every frame for best performance
+            stencilAttachment.loadAction = MTLLoadActionClear;
+            stencilAttachment.clearStencil = 0;
         }
-        
-        // make sure to clear every frame for best performance
-        stencilAttachment.loadAction = MTLLoadActionClear;
-        stencilAttachment.clearStencil = 0;
-        
-        // store only attachments that will be presented to the screen, as in this case
-        stencilAttachment.storeAction = MTLStoreActionStore;
     } else {
         if (attach < 0) {
             TF_CODING_ERROR("Attachment index cannot be negative");
@@ -447,11 +447,46 @@ MtlfDrawTarget::GetImage(std::string const & name, void* buffer) const
     int bytesPerPixel = attachment->GetBytesPerPixel();
     int width = [texture width];
     int height = [texture height];
+    MTLPixelFormat mtlFormat = [texture pixelFormat];
+    
+    if (mtlFormat == MTLPixelFormatDepth32Float) {
+        mtlFormat = MTLPixelFormatR32Float;
+    }
+    
+    id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->device;
+    MTLTextureDescriptor* desc =
+        [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:mtlFormat
+                                                           width:width
+                                                          height:height
+                                                       mipmapped:NO];
+    //desc.usage = MTLTextureUsageRead;
+    desc.resourceOptions = MTLResourceStorageModeManaged;
+    id<MTLTexture> cpuTexture = [device newTextureWithDescriptor:desc];
+    
+    id<MTLCommandBuffer> commandBuffer = [MtlfMetalContext::GetMetalContext()->commandQueue commandBuffer];
+    id<MTLBlitCommandEncoder> blitEncoder = [commandBuffer blitCommandEncoder];
+    
+    id<MTLBuffer> cpuBuffer = [device newBufferWithLength:(bytesPerPixel * width * height) options:MTLResourceStorageModeManaged];
+    /*
+    [blitEncoder copyFromTexture:texture
+                     sourceSlice:0
+                     sourceLevel:0
+                    sourceOrigin:MTLOriginMake(0, 0, 0)
+                      sourceSize:MTLSizeMake(width, height, 1)
+                       toTexture:cpuTexture
+                destinationSlice:0
+                destinationLevel:0
+               destinationOrigin:MTLOriginMake(0, 0, 0)];
+*/
+    [blitEncoder copyFromTexture:texture sourceSlice:0 sourceLevel:0 sourceOrigin:MTLOriginMake(0, 0, 0) sourceSize:MTLSizeMake(width, height, 1) toBuffer:cpuBuffer destinationOffset:0 destinationBytesPerRow:(bytesPerPixel * width) destinationBytesPerImage:(bytesPerPixel * width * height)];
+    //[blitEncoder synchronizeTexture:cpuTexture slice:0 level:0];
+    [blitEncoder synchronizeResource:cpuBuffer];
+    [blitEncoder endEncoding];
 
-    [texture getBytes:buffer
-          bytesPerRow:width * bytesPerPixel
-           fromRegion:MTLRegionMake2D(0, 0, width, height)
-          mipmapLevel:0];
+    [commandBuffer commit];
+    [commandBuffer waitUntilCompleted];
+
+    memcpy(buffer, [cpuBuffer contents], bytesPerPixel * width * height);
 }
 
 bool
@@ -564,6 +599,8 @@ MtlfDrawTarget::MtlfAttachment::MtlfAttachment(uint32_t attachmentIndex, GLenum 
                                                uint32_t numSamples) :
     _textureName(0),
     _textureNameMS(0),
+    _stencilTextureName(0),
+    _stencilTextureNameMS(0),
     _format(format),
     _type(type),
     _internalFormat(MTLPixelFormatInvalid),
@@ -625,10 +662,13 @@ MtlfDrawTarget::MtlfAttachment::_GenTexture()
         default:
             numChannel = 1;
             if (type == GL_FLOAT) {
-                mtlFormat = MTLPixelFormatR32Float;
+                if (_format==GL_DEPTH_COMPONENT)
+                    mtlFormat = MTLPixelFormatDepth32Float;
+                else
+                    mtlFormat = MTLPixelFormatR32Float;
             }
             else if (type == GL_UNSIGNED_INT_24_8) {
-                mtlFormat = MTLPixelFormatR32Uint;
+                mtlFormat = MTLPixelFormatStencil8;
             }
             else if (type == GL_UNSIGNED_BYTE) {
                 mtlFormat = MTLPixelFormatR8Unorm;
@@ -636,7 +676,7 @@ MtlfDrawTarget::MtlfAttachment::_GenTexture()
             break;
     }
     
-    _bytesPerPixel = numChannel * ((_type == GL_FLOAT || _type == GL_UNSIGNED_INT_24_8) ? 4 : 1);
+    _bytesPerPixel = numChannel * ((_type == GL_FLOAT) ? 4 : 1);
 
     if (mtlFormat == MTLPixelFormatInvalid) {
         TF_FATAL_CODING_ERROR("Unsupported render target format");
@@ -653,10 +693,10 @@ MtlfDrawTarget::MtlfAttachment::_GenTexture()
                                                           height:_size[1]
                                                        mipmapped:NO];
     desc.usage = MTLTextureUsageRenderTarget;
-    desc.resourceOptions = MTLResourceStorageModeManaged;
+    desc.resourceOptions = MTLResourceStorageModePrivate;
     _textureName = [device newTextureWithDescriptor:desc];
-    
-     memoryUsed += baseImageSize;
+
+    memoryUsed += baseImageSize;
 
     if (_numSamples > 1) {
         desc.sampleCount = _numSamples;
@@ -664,6 +704,33 @@ MtlfDrawTarget::MtlfAttachment::_GenTexture()
         memoryUsed = baseImageSize * _numSamples;
     }
     
+    if (_format == GL_DEPTH_STENCIL) {
+        
+        _stencilTextureName = _textureName;
+        _stencilTextureNameMS = _textureNameMS;
+        
+        _bytesPerPixel <<= 2;
+        baseImageSize <<= 2;
+        mtlFormat = MTLPixelFormatDepth32Float;
+        
+        MTLTextureDescriptor* desc =
+            [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:mtlFormat
+                                                               width:_size[0]
+                                                              height:_size[1]
+                                                           mipmapped:NO];
+        desc.usage = MTLTextureUsageRenderTarget;
+        desc.resourceOptions = MTLResourceStorageModePrivate;
+        _textureName = [device newTextureWithDescriptor:desc];
+        
+        memoryUsed += baseImageSize;
+        
+        if (_numSamples > 1) {
+            desc.sampleCount = _numSamples;
+            _textureNameMS = [device newTextureWithDescriptor:desc];
+            memoryUsed = baseImageSize * _numSamples;
+        }
+    }
+
     _SetMemoryUsed(memoryUsed);
 }
 
@@ -678,6 +745,16 @@ MtlfDrawTarget::MtlfAttachment::_DeleteTexture()
     if (_textureNameMS) {
         [_textureNameMS release];
         _textureNameMS = nil;
+    }
+    
+    if (_stencilTextureName) {
+        [_stencilTextureName release];
+        _stencilTextureName = nil;
+    }
+    
+    if (_stencilTextureNameMS) {
+        [_stencilTextureNameMS release];
+        _stencilTextureNameMS = nil;
     }
 }
 

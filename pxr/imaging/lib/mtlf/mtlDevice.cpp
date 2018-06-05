@@ -30,12 +30,6 @@
 
 
 #import <simd/simd.h>
-#import <Cocoa/Cocoa.h>
-
-typedef struct {
-    float position[2];
-    float uv[2];
-} Vertex;
 
 PXR_NAMESPACE_OPEN_SCOPE
 MtlfMetalContextSharedPtr MtlfMetalContext::context = NULL;
@@ -207,8 +201,8 @@ MtlfMetalContext::MtlfMetalContext()
     glUseProgram(glShaderProgram);
     
     glVAO = 0;
-    glGenVertexArraysAPPLE(1, &glVAO);
-    glBindVertexArrayAPPLE(glVAO);
+    glGenVertexArrays(1, &glVAO);
+    glBindVertexArray(glVAO);
     
     glVBO = 0;
     glGenBuffers(1, &glVBO);
@@ -240,8 +234,8 @@ MtlfMetalContext::MtlfMetalContext()
     };
     glBufferData(GL_ARRAY_BUFFER, sizeof(v), v, GL_STATIC_DRAW);
     
-    
-    
+    glBindVertexArray(0);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
     
     
     
@@ -250,11 +244,8 @@ MtlfMetalContext::MtlfMetalContext()
     CVPixelBufferRef pixelBuffer;
     CVMetalTextureRef cvmtlTexture;
     
-    // OpenGL
-    CVOpenGLTextureCacheRef cvglTextureCache = nil;
-    
-    // Metal
-    CVMetalTextureCacheRef cvmtlTextureCache = nil;
+    cvglTextureCache = nil;
+    cvmtlTextureCache = nil;
 
     NSDictionary* cvBufferProperties = @{
         (__bridge NSString*)kCVPixelBufferOpenGLCompatibilityKey : @(TRUE),
@@ -413,6 +404,11 @@ void MtlfMetalContext::SetDrawTarget(MtlfDrawTarget *dt)
 
 void MtlfMetalContext::BakeState()
 {
+    if (pipelineStateDescriptor == nil) {
+        // This is temporary
+        return;
+    }
+
     pipelineStateDescriptor.vertexDescriptor = vertexDescriptor;
 
     NSError *error = NULL;
@@ -422,8 +418,11 @@ void MtlfMetalContext::BakeState()
         return;
     }
 
+    [renderEncoder setRenderPipelineState:_pipelineState];
+
     for(auto buffer : vertexBuffers) {
-        [renderEncoder setVertexBuffer:buffer.second offset:0 atIndex:buffer.first];
+        if (buffer.first != 65535)
+            [renderEncoder setVertexBuffer:buffer.second offset:0 atIndex:buffer.first];
     }
     for(auto texture : textures) {
         [renderEncoder setFragmentTexture:texture.second atIndex:texture.first];
@@ -431,18 +430,20 @@ void MtlfMetalContext::BakeState()
     for(auto sampler : samplers) {
         [renderEncoder setFragmentSamplerState:sampler.second atIndex:sampler.first];
     }
+}
 
+void MtlfMetalContext::ClearState()
+{
     pipelineStateDescriptor = nil;
     vertexDescriptor = nil;
     indexBuffer = nil;
     numVertexComponents = 0;
-
+    
     vertexBuffers.clear();
     textures.clear();
     samplers.clear();
+
 }
-
-
 
 PXR_NAMESPACE_CLOSE_SCOPE
 

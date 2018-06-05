@@ -23,8 +23,6 @@
 //
 
 #include "pxr/imaging/glf/glew.h"
-#include <OpenGL/gl3.h>
-#include <OpenGL/glext.h>
 
 #include "pxr/usdImaging/usdImagingMetal/hdEngine.h"
 #include "pxr/usdImaging/usdImaging/tokens.h"
@@ -683,30 +681,25 @@ UsdImagingMetalHdEngine::TestIntersectionBatch(
 void
 UsdImagingMetalHdEngine::Render(RenderParams params)
 {
-    // User is responsible for initalizing GL contenxt and glew
+    // User is responsible for initalizing GL context and glew
     if (!HdStRenderContextCaps::GetInstance().SupportsHydra()) {
         TF_CODING_ERROR("Current OS/hardware doesn't support Hydra");
         return;
     }
-    
-    glDisable(GL_DEPTH_TEST);
-    glDepthMask(GL_FALSE);
-    glDisable(GL_CULL_FACE);
-    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-    
+
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
 
     if (_mtlRenderPassDescriptor == nil)
     {
         GLfloat clearColor[4];
         glGetFloatv(GL_COLOR_CLEAR_VALUE, clearColor);
-        clearColor[1] = 1.0f;
+        clearColor[3] = 1.0f;
         
         _mtlRenderPassDescriptor = [[MTLRenderPassDescriptor alloc] init];
 
         // create a color attachment every frame since we have to recreate the texture every frame
         MTLRenderPassColorAttachmentDescriptor *colorAttachment = _mtlRenderPassDescriptor.colorAttachments[0];
-        
+
         // make sure to clear every frame for best performance
         colorAttachment.loadAction = MTLLoadActionClear;
         colorAttachment.clearColor = MTLClearColorMake(clearColor[0], clearColor[1], clearColor[2], clearColor[3]);
@@ -717,27 +710,27 @@ UsdImagingMetalHdEngine::Render(RenderParams params)
 
     MTLRenderPassColorAttachmentDescriptor *colorAttachment = _mtlRenderPassDescriptor.colorAttachments[0];
     colorAttachment.texture = context->mtlTexture;
-    
+
     // Create a new command buffer for each render pass to the current drawable
     id <MTLCommandBuffer> commandBuffer = [context->commandQueue commandBuffer];
 
     // Create a render command encoder so we can render into something
     TF_VERIFY(context->commandBuffer == nil, "A command buffer is already active");
-    
+
     id <MTLRenderCommandEncoder> renderEncoder =
         [commandBuffer renderCommandEncoderWithDescriptor:_mtlRenderPassDescriptor];
     context->commandBuffer = commandBuffer;
     context->renderEncoder = renderEncoder;
-    
+
     VtValue selectionValue(_selTracker);
     _engine.SetTaskContextData(HdxTokens->selectionState, selectionValue);
     VtValue renderTags(_renderTags);
     _engine.SetTaskContextData(HdxTokens->renderTags, renderTags);
-    
+
     TfToken const& renderMode = params.enableIdRender ?
     HdxTaskSetTokens->idRender : HdxTaskSetTokens->colorRender;
     _engine.Execute(*_renderIndex, _taskController->GetTasks(renderMode));
-    
+
     [renderEncoder endEncoding];
 
     // Finalize rendering here & push the command buffer to the GPU
@@ -746,11 +739,27 @@ UsdImagingMetalHdEngine::Render(RenderParams params)
 
     context->renderEncoder = nil;
     context->commandBuffer = nil;
-    
+
+    glPushAttrib(GL_ENABLE_BIT | GL_POLYGON_BIT | GL_DEPTH_BUFFER_BIT);
+
+    glDisable(GL_DEPTH_TEST);
+    glDepthMask(GL_FALSE);
+    glFrontFace(GL_CCW);
+    glDisable(GL_CULL_FACE);
+    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+
     glUseProgram(context->glShaderProgram);
-    
-    glBindVertexArrayAPPLE(context->glVAO);
+
     glBindBuffer(GL_ARRAY_BUFFER, context->glVBO);
+    
+    // Set up the vertex structure description
+    GLint posAttrib = glGetAttribLocation(context->glShaderProgram, "inPosition");
+    GLint texAttrib = glGetAttribLocation(context->glShaderProgram, "inTexCoord");
+    glEnableVertexAttribArray(posAttrib);
+    glVertexAttribPointer(posAttrib, 2, GL_FLOAT, GL_FALSE, sizeof(MtlfMetalContext::Vertex), (void*)(offsetof(Vertex, position)));
+    glEnableVertexAttribArray(texAttrib);
+    glVertexAttribPointer(texAttrib, 2, GL_FLOAT, GL_FALSE, sizeof(MtlfMetalContext::Vertex), (void*)(offsetof(Vertex, uv)));
+
     glBindTexture(GL_TEXTURE_RECTANGLE, context->glTexture);
     GLF_POST_PENDING_GL_ERRORS();
 
@@ -764,11 +773,14 @@ UsdImagingMetalHdEngine::Render(RenderParams params)
     
     glFlush();
 
-    glBindVertexArrayAPPLE(0);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindTexture(GL_TEXTURE_RECTANGLE, 0);
+    glDisableVertexAttribArray(posAttrib);
+    glDisableVertexAttribArray(texAttrib);
     glUseProgram(0);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
     
+    glPopAttrib();
+     
     return;
 /*
     // XXX: HdEngine should do this.

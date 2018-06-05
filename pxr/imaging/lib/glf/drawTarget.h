@@ -89,13 +89,10 @@ public:
         virtual ~GlfAttachment();
         
         /// Returns the GL texture index (can be used as any regular GL texture)
-        virtual GarchTextureGPUHandle GetTextureName() const override { return GarchTextureGPUHandle(_textureName); }
+        virtual GarchTextureGPUHandle GetTextureName() const override { return _textureName; }
 
-        /// Returns the GL texture index (can be used as any regular GL texture)
-        GLuint GetGlTextureName() const { return _textureName; }
-        
         /// Returns the GL texture index multisampled of this attachment
-        GLuint GetGlTextureMSName() const { return _textureNameMS; }
+        GarchTextureGPUHandle GetTextureMSName() const { return _textureNameMS; }
         
         /// Returns the GL format of the texture (GL_RGB, GL_DEPTH_COMPONENT...)
         GLenum GetFormat() const { return _format; }

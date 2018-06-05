@@ -64,22 +64,26 @@ public:
         TParam()
         : usage(Unspecified) {}
 
-        TParam(TfToken const &_name,
-               TfToken const &_dataType,
-               TfToken const &_accessorStr,
-               TfToken const &_attribute,
-               Usage const _usage)
+        TParam(TfToken   const &_name,
+               TfToken   const &_dataType,
+               TfToken   const &_accessorStr,
+               TfToken   const &_attribute,
+               Usage     const _usage,
+               HdBinding const &_binding = HdBinding(HdBinding::UNKNOWN, 0))
         : name(_name)
         , dataType(_dataType)
         , accessorStr(_accessorStr)
         , attribute(_attribute)
-        , usage(_usage) {}
-        
+        , usage(_usage)
+        , binding(_binding)
+        {}
+          
         TfToken const name;
         TfToken const dataType;
         TfToken const accessorStr;
         TfToken const attribute;
         Usage usage;
+        HdBinding const binding;
     };
     
     typedef std::vector<TParam> InOutParams;
