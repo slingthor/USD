@@ -351,6 +351,8 @@ void MtlfMetalContext::SetVertexAttribute(uint32_t index,
     vertexDescriptor.attributes[index].bufferIndex = index;
     vertexDescriptor.attributes[index].offset = offset;
     vertexDescriptor.layouts[index].stepFunction = MTLVertexStepFunctionPerVertex;
+    vertexDescriptor.layouts[index].stepRate = 1;
+    vertexDescriptor.layouts[index].stride = stride;
     
     switch (type) {
         case GL_INT:
@@ -374,7 +376,6 @@ void MtlfMetalContext::SetVertexAttribute(uint32_t index,
         numVertexComponents = index + 1;
     }
 
-    vertexDescriptor.layouts[index].stride = stride;
 }
 
 void MtlfMetalContext::SetBuffer(int index, id<MTLBuffer> buffer)
