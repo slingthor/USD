@@ -134,6 +134,17 @@ protected:
     MtlfDrawTarget *drawTarget;
 
 private:
+    enum PREFERRED_GPU_TYPE {
+        PREFER_INTEGRATED_GPU,
+        PREFER_DISCRETE_GPU,
+        PREFER_EGPU,
+        PREFER_DISPLAY_GPU,
+    };
+    
+    id<MTLDevice> GetMetalDevice(PREFERRED_GPU_TYPE preferredGPUType);
+    void handleDisplayChange();
+    void handleGPUHotPlug(id<MTLDevice> device, MTLDeviceNotificationName notifier);
+    
     static MtlfMetalContextSharedPtr context;
     
     CVOpenGLTextureCacheRef cvglTextureCache = nil;
