@@ -152,6 +152,18 @@ _GetPtexTextureShaderSource()
     return source;
 }
 
+static bool InDeviceMemory(const HdBinding binding)
+{
+    switch (binding.GetType()) {
+        case HdBinding::SSBO:
+        case HdBinding::UBO:
+        case HdBinding::TBO:
+            return true;
+        default:
+            return false;
+    }
+}
+
 // TODO: Shuffle code to remove these declarations.
 static HdSt_CodeGenMSL::TParam& _EmitDeclaration(std::stringstream &str,
                                                  HdSt_CodeGenMSL::InOutParams &inputParams,
@@ -886,6 +898,26 @@ HdSt_CodeGenMSL::Compile()
     _genCommon << "class ProgramScope {\n"
                << "public:\n";
     
+    METAL_DEBUG_COMMENT(&_genCommon, "Start of special inputs\n"); //MTL_FIXME
+    
+    _EmitDeclaration(_genCommon,
+                     _mslVSInputParams,
+                     TfToken("gl_VertexID"),
+                     TfToken("uint"),
+                     TfToken("[[vertex_id]]"),
+                     HdBinding(HdBinding::VERTEX_ID, 0));
+    
+    _EmitDeclaration(_genCommon,
+                     _mslPSInputParams,
+                     TfToken("gl_FrontFacing"),
+                     TfToken("bool"),
+                     TfToken("[[front_facing]]"),
+                     HdBinding(HdBinding::FRONT_FACING, 0));
+    
+    METAL_DEBUG_COMMENT(&_genCommon, "End of special inputs\n"); //MTL_FIXME
+    
+    METAL_DEBUG_COMMENT(&_genCommon, "Start of vertex/fragment interface\n"); //MTL_FIXME
+    
     _EmitOutput(_genCommon,
                 _mslVSOutputParams,
                 TfToken("gl_Position"),
@@ -910,7 +942,8 @@ HdSt_CodeGenMSL::Compile()
     // XXX - Hook this up somehow. Output from the vertex shader perhaps?
     _genCommon << "uint gl_PrimitiveID = 0;\n";
     
-    
+    METAL_DEBUG_COMMENT(&_genCommon, "End of vertex/fragment interface\n"); //MTL_FIXME
+   
     METAL_DEBUG_COMMENT(&_genCommon, "_metaData.customBindings\n"); //MTL_FIXME
     
     // ------------------
@@ -918,6 +951,7 @@ HdSt_CodeGenMSL::Compile()
     // ----------------------
     // For custom buffer bindings, more code can be generated; a full spec is
     // emitted based on the binding declaration.
+    // MTL_IMPROVE - In Metal we're going to end up with a binding per buffer even though these will (all?) effectively be uniforms, perhaps it might be better to pack all into a single struct
     if(_metaData.customBindings.size()) {
 
         TF_FOR_ALL(binDecl, _metaData.customBindings) {
@@ -929,43 +963,25 @@ HdSt_CodeGenMSL::Compile()
             // typeless binding doesn't need declaration nor accessor.
             if (binDecl->dataType.IsEmpty()) continue;
     
-            if(binDecl->binding.GetType() == HdBinding::SSBO) {
-                METAL_DEBUG_COMMENT(&_genCommon, "// SSBO!\n"); //MTL_FIXME
-                _EmitDeclarationPtr(_genCommon, _mslVSInputParams, binDecl->name, binDecl->dataType, TfToken(), binDecl->binding, 0, false);
-            }
-            else {
-                _EmitDeclaration(_genCommon,
-                                 _mslVSInputParams,
-                                 binDecl->name,
-                                 binDecl->dataType,
-                                 TfToken(),
-                                 binDecl->binding);
-            }
-            
+            // All custom bindings in Metal are going to involve a buffer access
+            _EmitDeclarationPtr(_genCommon,
+                                _mslVSInputParams,
+                                binDecl->name,
+                                binDecl->dataType,
+                                TfToken(),
+                                binDecl->binding,
+                                0,
+                                false);
+                
             _EmitAccessor(_genCommon,
                           binDecl->name,
                           binDecl->dataType,
                           binDecl->binding,
-                          (binDecl->binding.GetType() == HdBinding::UNIFORM)
-                          ? NULL : "localIndex");
+                          "localIndex");
         }
     }
     
     METAL_DEBUG_COMMENT(&_genCommon, "END OF _metaData.customBindings\n"); //MTL_FIXME
-    
-    _EmitDeclaration(_genCommon,
-                     _mslVSInputParams,
-                     TfToken("gl_VertexID"),
-                     TfToken("uint"),
-                     TfToken("[[vertex_id]]"),
-                     HdBinding(HdBinding::VERTEX_ID, 0));
-    
-    _EmitDeclaration(_genCommon,
-                     _mslPSInputParams,
-                     TfToken("gl_FrontFacing"),
-                     TfToken("bool"),
-                     TfToken("[[front_facing]]"),
-                     HdBinding(HdBinding::FRONT_FACING, 0));
     
     std::stringstream declarations;
     std::stringstream accessors;
