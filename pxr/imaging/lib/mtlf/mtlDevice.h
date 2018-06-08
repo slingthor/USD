@@ -135,6 +135,7 @@ protected:
 
 private:
     enum PREFERRED_GPU_TYPE {
+        PREFER_DEFAULT_GPU,
         PREFER_INTEGRATED_GPU,
         PREFER_DISCRETE_GPU,
         PREFER_EGPU,

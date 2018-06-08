@@ -133,7 +133,9 @@ id<MTLDevice> MtlfMetalContext::GetMetalDevice(PREFERRED_GPU_TYPE preferredGPUTy
     
     switch (preferredGPUType) {
         case PREFER_DISPLAY_GPU:
-            NSLog(@"Display device selection not supported yet");
+            NSLog(@"Display device selection not supported yet, returning default GPU");
+        case PREFER_DEFAULT_GPU:
+            preferredDeviceList = _deviceList;
             break;
         case PREFER_EGPU:
             preferredDeviceList = _eGPUs;
@@ -155,8 +157,10 @@ id<MTLDevice> MtlfMetalContext::GetMetalDevice(PREFERRED_GPU_TYPE preferredGPUTy
 
 MtlfMetalContext::MtlfMetalContext()
 {
-    device = MtlfMetalContext::GetMetalDevice(PREFER_DISCRETE_GPU);
+    device = MtlfMetalContext::GetMetalDevice(PREFER_DEFAULT_GPU);
 
+    NSLog(@"Selected %@ for Metal Device", device.name);
+    
     // Create a new command queue
     commandQueue = [device newCommandQueue];
     commandBuffer = nil;
@@ -483,7 +487,7 @@ void MtlfMetalContext::BakeState()
         NSLog(@"Failed to created pipeline state, error %@", error);
         return;
     }
-
+    
     [renderEncoder setRenderPipelineState:_pipelineState];
 
     for(auto buffer : vertexBuffers) {
