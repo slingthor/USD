@@ -76,12 +76,31 @@ static MTLPrimitiveType GetMetalPrimType(GLenum glPrimType) {
     return primType;
 }
 
+
+const MSL_ShaderBinding& MSL_FindBinding(const MSL_ShaderBindings& bindings, const std::string& name, bool& outFound, uint bindingTypeMask, uint programStageMask, uint skipCount)
+{
+    outFound = false;
+    auto it = bindings.begin();
+    for(; it != bindings.end(); ++it)
+    {
+        if( (it->_type & bindingTypeMask) == 0 ||
+            (it->_stage & programStageMask) == 0 ||
+            it->_name != name ||
+            skipCount-- != 0)
+            continue;
+        outFound = true;
+        break;
+    }
+    return (*it);
+}
+
 HdStMSLProgram::HdStMSLProgram(TfToken const &role)
 : HdStProgram(role)
 , _role(role)
 , _vertexFunction(nil)
 , _fragmentFunction(nil)
 , _computeFunction(nil)
+, _vertexFunctionIdx(0), _fragmentFunctionIdx(0), _computeFunctionIdx(0)
 , _valid(false)
 , _uniformBuffer(role)
 {
@@ -198,10 +217,13 @@ HdStMSLProgram::CompileShader(GLenum type,
     
     if (type == GL_VERTEX_SHADER) {
         _vertexFunction = function;
+        _vertexFunctionIdx = dumpedFileCount;
     } else if (type == GL_FRAGMENT_SHADER) {
         _fragmentFunction = function;
+        _fragmentFunctionIdx = dumpedFileCount;
     } else if (type == GL_COMPUTE_SHADER) {
         _computeFunction = function;
+        _computeFunctionIdx = dumpedFileCount;
     }
     else {
         TF_FATAL_CODING_ERROR("Not Implemented");
@@ -262,40 +284,78 @@ HdStMSLProgram::Validate() const
 void HdStMSLProgram::AssignUniformBindings(GarchBindingMapRefPtr bindingMap) const
 {
     MtlfBindingMapRefPtr mtlfBindingMap(TfDynamic_cast<MtlfBindingMapRefPtr>(bindingMap));
-
-//    mtlfBindingMap->AssignUniformBindingsToProgram(nil);
+    
+    for (GarchBindingMap::UniformBindingMap::value_type& p : mtlfBindingMap->_uniformBindings) {
+        for(auto it = _bindings.begin(); it != _bindings.end(); ++it) {
+            if((*it)._type != kMSL_BindingType_UniformBuffer || (*it)._name != p.first.GetText())
+                continue;
+            p.second = (*it)._index;
+        }
+    }
 }
 
 void HdStMSLProgram::AssignSamplerUnits(GarchBindingMapRefPtr bindingMap) const
 {
     MtlfBindingMapRefPtr mtlfBindingMap(TfDynamic_cast<MtlfBindingMapRefPtr>(bindingMap));
     
-    mtlfBindingMap->AssignSamplerUnitsToProgram(nil);
+    for (GarchBindingMap::SamplerBindingMap::value_type& p : mtlfBindingMap->_samplerBindings) {
+        for(auto it = _bindings.begin(); it != _bindings.end(); ++it) {
+            if((*it)._name != p.first.GetText())
+                continue;
+            p.second = (*it)._index;
+        }
+    }
 }
 
 void HdStMSLProgram::AddCustomBindings(GarchBindingMapRefPtr bindingMap) const
 {
     MtlfBindingMapRefPtr mtlfBindingMap(TfDynamic_cast<MtlfBindingMapRefPtr>(bindingMap));
     
-    mtlfBindingMap->AddCustomBindings(nil);
+    TF_FATAL_CODING_ERROR("Not Implemented");
 }
 
 void HdStMSLProgram::BindResources(HdStSurfaceShader* surfaceShader, HdSt_ResourceBinder const &binder) const
 {
     // XXX: there's an issue where other shaders try to use textures.
     TF_FOR_ALL(it, surfaceShader->GetTextureDescriptors()) {
-        HdBinding binding = binder.GetBinding(it->name);
-        // XXX: put this into resource binder.
-        if (binding.GetType() == HdBinding::TEXTURE_2D ||
-            binding.GetType() == HdBinding::TEXTURE_PTEX_TEXEL) {
-            MtlfMetalContext::GetMetalContext()->SetTexture(binding.GetLocation(), it->handle);
-            MtlfMetalContext::GetMetalContext()->SetSampler(binding.GetLocation(), it->sampler);
-        } else if (binding.GetType() == HdBinding::TEXTURE_PTEX_LAYOUT) {
-            TF_FATAL_CODING_ERROR("Not Implemented");
-            // glActiveTexture(GL_TEXTURE0 + samplerUnit);
-            // glBindTexture(GL_TEXTURE_BUFFER, it->handle);
-            //glProgramUniform1i(_program, binding.GetLocation(), samplerUnit);
+        uint i = 0;
+        while(1)
+        {
+            //When more types are added to the switch below, don't forget to update the mask too.
+            bool found;
+            const MSL_ShaderBinding& binding = MSL_FindBinding(_bindings, it->name, found, kMSL_BindingType_Sampler | kMSL_BindingType_Texture, 0xFFFFFFFF, i);
+            
+            if(!found)
+                break;
+            
+            switch(binding._type)
+            {
+                case kMSL_BindingType_Texture:
+                    MtlfMetalContext::GetMetalContext()->SetTexture(binding._index, it->handle, it->name, binding._stage);
+                case kMSL_BindingType_Sampler:
+                    MtlfMetalContext::GetMetalContext()->SetSampler(binding._index, it->sampler, it->name, binding._stage);
+                default:
+                    TF_FATAL_CODING_ERROR("Not implemented!");
+            }
+            
+            i++;
         }
+        
+        if(i == 0)
+            TF_FATAL_CODING_ERROR("Could not bind a texture to the shader?!");
+    
+//        HdBinding binding = binder.GetBinding(it->name);
+//        // XXX: put this into resource binder.
+//        if (binding.GetType() == HdBinding::TEXTURE_2D ||
+//            binding.GetType() == HdBinding::TEXTURE_PTEX_TEXEL) {
+//            MtlfMetalContext::GetMetalContext()->SetTexture(binding.GetLocation(), it->handle);
+//            MtlfMetalContext::GetMetalContext()->SetSampler(binding.GetLocation(), it->sampler);
+//        } else if (binding.GetType() == HdBinding::TEXTURE_PTEX_LAYOUT) {
+//            TF_FATAL_CODING_ERROR("Not Implemented");
+//            // glActiveTexture(GL_TEXTURE0 + samplerUnit);
+//            // glBindTexture(GL_TEXTURE_BUFFER, it->handle);
+//            //glProgramUniform1i(_program, binding.GetLocation(), samplerUnit);
+//        }
     }
 }
 
@@ -306,6 +366,25 @@ void HdStMSLProgram::UnbindResources(HdStSurfaceShader* surfaceShader, HdSt_Reso
 
 void HdStMSLProgram::SetProgram() const {
     MtlfMetalContext::GetMetalContext()->SetShadingPrograms(_vertexFunction, _fragmentFunction);
+    
+    //Create defaults for old-style uniforms
+    for(auto it = _bindings.begin(); it != _bindings.end(); ++it) {
+        if(it->_name == "fragUniforms" && it->_stage == kMSL_ProgramStage_Fragment && it->_type == kMSL_BindingType_UniformBuffer)
+        {
+            //Add new default buffer for the default inputs
+            MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
+            id<MTLBuffer> mtlBuffer = [context->device newBufferWithLength:it->_uniformBufferSize options:MTLResourceOptionCPUCacheModeWriteCombined];
+            
+            MtlfMetalContext::GetMetalContext()->SetUniformBuffer(it->_index, mtlBuffer, TfToken(it->_name), kMSL_ProgramStage_Fragment, true);
+        }
+        if(it->_name == "vtxUniforms" && it->_stage == kMSL_ProgramStage_Vertex && it->_type == kMSL_BindingType_UniformBuffer)
+        {
+            MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
+            id<MTLBuffer> mtlBuffer = [context->device newBufferWithLength:it->_uniformBufferSize options:MTLResourceOptionCPUCacheModeWriteCombined];
+            
+            MtlfMetalContext::GetMetalContext()->SetUniformBuffer(it->_index, mtlBuffer, TfToken(it->_name), kMSL_ProgramStage_Vertex, true);
+        }
+    }
 }
 
 void HdStMSLProgram::UnsetProgram() const {

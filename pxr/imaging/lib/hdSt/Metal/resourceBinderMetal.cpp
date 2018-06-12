@@ -136,40 +136,51 @@ HdSt_ResourceBinderMetal::BindBuffer(TfToken const &name,
                                      int level) const
 {
     HD_TRACE_FUNCTION();
-
+    
     // it is possible that the buffer has not been initialized when
     // the instanceIndex is empty (e.g. FX points. see bug 120354)
-    if (!buffer->GetId().IsSet()) return;
+    if (!buffer->GetId().IsSet())
+        return;
 
-    HdBinding binding = GetBinding(name, level);
-    HdBinding::Type type = binding.GetType();
-    HdStBufferResourceMetalSharedPtr const metalBuffer = boost::dynamic_pointer_cast<HdStBufferResourceMetal>(buffer);
-    int loc              = binding.GetLocation();
-    int textureUnit      = binding.GetTextureUnit();
-
-    HdTupleType tupleType = buffer->GetTupleType();
-
-    switch(type) {
-        case HdBinding::VERTEX_ATTR:
+    uint32 typeMask = kMSL_BindingType_VertexAttribute | kMSL_BindingType_UniformBuffer | kMSL_BindingType_IndexBuffer;
+    uint i = 0;
+    while(1)
+    {
+        bool found;
+        const MSL_ShaderBinding& shaderBinding= MSL_FindBinding(_shaderBindings, name, found, typeMask, 0xFFFFFFFF, i);
+        
+        if(!found)
+            break;
+        
+        HdStBufferResourceMetalSharedPtr const metalBuffer = boost::dynamic_pointer_cast<HdStBufferResourceMetal>(buffer);
+        HdTupleType tupleType = buffer->GetTupleType();
+        switch(shaderBinding._type)
+        {
+        case kMSL_BindingType_VertexAttribute:
             MtlfMetalContext::GetMetalContext()->SetVertexAttribute(
-                    loc,
-                    _GetNumComponents(tupleType.type),
-                    HdStGLConversions::GetGLAttribType(tupleType.type),
-                    buffer->GetStride(),
-                    offset);
+                        shaderBinding._index,
+                        _GetNumComponents(tupleType.type),
+                        HdStGLConversions::GetGLAttribType(tupleType.type),  // ??!??!
+                        buffer->GetStride(),
+                        offset,
+                        name);
+                MtlfMetalContext::GetMetalContext()->SetBuffer(shaderBinding._index, metalBuffer->GetId(), name);
             break;
-        case HdBinding::SSBO:
-        case HdBinding::UBO:
-            MtlfMetalContext::GetMetalContext()->SetBuffer(
-                    loc,
-                    metalBuffer->GetId());
+        case kMSL_BindingType_UniformBuffer:
+            MtlfMetalContext::GetMetalContext()->SetUniformBuffer(shaderBinding._index, metalBuffer->GetId(), name, shaderBinding._stage);
             break;
-        case HdBinding::INDEX_ATTR:
+        case kMSL_BindingType_IndexBuffer:
             MtlfMetalContext::GetMetalContext()->SetIndexBuffer(metalBuffer->GetId());
             break;
         default:
-            TF_FATAL_CODING_ERROR("Not Implemented");
+            TF_FATAL_CODING_ERROR("Not allowed!");
+        }
+        
+        i++;
     }
+    
+    if(i == 0)
+        TF_FATAL_CODING_ERROR("Could not find shader binding for buffer!");
 }
 
 void
@@ -196,13 +207,22 @@ void
 HdSt_ResourceBinderMetal::BindUniformi(TfToken const &name,
                                 int count, const int *value) const
 {
-    HdBinding uniformLocation = GetBinding(name);
-    if (uniformLocation.GetLocation() == HdBinding::NOT_EXIST) return;
+    uint i = 0;
+    while(1)
+    {
+        bool found;
+        const MSL_ShaderBinding& binding = MSL_FindBinding(_shaderBindings, name, found, kMSL_BindingType_Uniform, 0xFFFFFFFF, i);
+        
+        if(!found)
+            break;
 
-    TF_VERIFY(uniformLocation.IsValid());
-    TF_VERIFY(uniformLocation.GetType() == HdBinding::UNIFORM);
+        MtlfMetalContext::GetMetalContext()->SetUniform(value, count * sizeof(int), name, binding._offsetWithinResource, binding._stage);
 
-    TF_FATAL_CODING_ERROR("Not Implemented");
+        i++;
+    }
+    
+    if(i == 0)  //If we tried searching but couldn't find a single uniform.
+        TF_FATAL_CODING_ERROR("Could not find uniform!");
 }
 
 void
@@ -222,36 +242,23 @@ void
 HdSt_ResourceBinderMetal::BindUniformui(TfToken const &name,
                                 int count, const unsigned int *value) const
 {
-    HdBinding uniformLocation = GetBinding(name);
-    if (uniformLocation.GetLocation() == HdBinding::NOT_EXIST) return;
-
-    TF_VERIFY(uniformLocation.IsValid());
-    TF_VERIFY(uniformLocation.GetType() == HdBinding::UNIFORM);
-
-    int loc = uniformLocation.GetLocation();
-    //MtlfMetalContext::GetMetalContext()->SetAttribute(loc, value);
-
-    //TF_FATAL_CODING_ERROR("Not Implemented");
+    BindUniformi(name, count, (const int*)value);
 }
 
 void
 HdSt_ResourceBinderMetal::BindUniformf(TfToken const &name,
                                 int count, const float *value) const
 {
-    HdBinding uniformLocation = GetBinding(name);
-    if (uniformLocation.GetLocation() == HdBinding::NOT_EXIST) return;
-
-    if (!TF_VERIFY(uniformLocation.IsValid())) return;
-    if (!TF_VERIFY(uniformLocation.GetType() == HdBinding::UNIFORM)) return;
-
-    TF_FATAL_CODING_ERROR("Not Implemented");
+    BindUniformi(name, count, (const int*)value);
 }
 
 void
 HdSt_ResourceBinderMetal::IntrospectBindings(HdStProgramSharedPtr programResource)
 {
     HdStMSLProgramSharedPtr program(boost::dynamic_pointer_cast<HdStMSLProgram>(programResource));
-    HdStMSLProgram::BindingLocationMap const& locationMap(program->GetBindingLocations());
+    
+    //Copy the all shader bindings from the program.
+    _shaderBindings = program->GetBindings();
 
     TF_FOR_ALL(it, _bindingMap) {
         HdBinding binding = it->second;
@@ -266,9 +273,13 @@ HdSt_ResourceBinderMetal::IntrospectBindings(HdStProgramSharedPtr programResourc
         }
 
         int loc = -1;
-        auto item = locationMap.find(name);
-        if (item != locationMap.end()) {
-            loc = item->second;
+        for(auto item = _shaderBindings.begin(); item != _shaderBindings.end(); ++item)
+        {
+            if ((*item)._name != name)
+                continue;
+            
+            loc = (*item)._index;
+            break;
         }
         // update location in resource binder.
         // some uniforms may be optimized out.

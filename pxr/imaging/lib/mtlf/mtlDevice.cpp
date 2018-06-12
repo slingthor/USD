@@ -404,12 +404,14 @@ void MtlfMetalContext::SetVertexAttribute(uint32_t index,
                                           int size,
                                           int type,
                                           size_t stride,
-                                          uint32_t offset)
+                                          uint32_t offset,
+                                          const TfToken& name)
 {
     if (!vertexDescriptor)
     {
         vertexDescriptor = [[MTLVertexDescriptor alloc] init];
-    
+
+        //cullStyle?
         vertexDescriptor.layouts[0].stepFunction = MTLVertexStepFunctionConstant;
         vertexDescriptor.layouts[0].stepRate = 0;
         vertexDescriptor.layouts[0].stride = stride;
@@ -444,12 +446,32 @@ void MtlfMetalContext::SetVertexAttribute(uint32_t index,
     if (index + 1 > numVertexComponents) {
         numVertexComponents = index + 1;
     }
-
 }
 
-void MtlfMetalContext::SetBuffer(int index, id<MTLBuffer> buffer)
+void MtlfMetalContext::SetUniform(const void* _data, uint32 _dataSize, const TfToken& _name, uint32 index, MSL_ProgramStage stage)
 {
-    vertexBuffers.insert(std::make_pair(index, buffer));
+    OldStyleUniformData newUniform = { index, 0, 0, _name };
+    newUniform.alloc(_data, _dataSize);
+    oldStyleUniforms.push_back(newUniform);
+}
+
+void MtlfMetalContext::SetUniformBuffer(int index, id<MTLBuffer> buffer, const TfToken& name, MSL_ProgramStage stage, bool oldStyleBacker)
+{
+    uniformBuffers.push_back({index, buffer, name, stage});
+    
+    if(oldStyleBacker)
+    {
+        if(stage == kMSL_ProgramStage_Vertex) {
+            
+        }
+        else if(stage == kMSL_ProgramStage_Fragment) {
+        }
+    }
+}
+
+void MtlfMetalContext::SetBuffer(int index, id<MTLBuffer> buffer, const TfToken& name)
+{
+    vertexBuffers.push_back({index, buffer, name});
 }
 
 void MtlfMetalContext::SetIndexBuffer(id<MTLBuffer> buffer)
@@ -457,14 +479,14 @@ void MtlfMetalContext::SetIndexBuffer(id<MTLBuffer> buffer)
     indexBuffer = buffer;
 }
 
-void MtlfMetalContext::SetSampler(int index, id<MTLSamplerState> sampler)
+void MtlfMetalContext::SetSampler(int index, id<MTLSamplerState> sampler, const TfToken& name, MSL_ProgramStage stage)
 {
-    samplers.insert(std::make_pair(index, sampler));
+    samplers.push_back({index, sampler, name, stage});
 }
 
-void MtlfMetalContext::SetTexture(int index, id<MTLTexture> texture)
+void MtlfMetalContext::SetTexture(int index, id<MTLTexture> texture, const TfToken& name, MSL_ProgramStage stage)
 {
-    textures.insert(std::make_pair(index, texture));
+    textures.push_back({index, texture, name, stage});
 }
 
 void MtlfMetalContext::SetDrawTarget(MtlfDrawTarget *dt)
@@ -489,16 +511,40 @@ void MtlfMetalContext::BakeState()
     }
     
     [renderEncoder setRenderPipelineState:_pipelineState];
+    
+    for(auto uniform : oldStyleUniforms)
+    {
+        //Todo, upload old style uniforms to the backing buffers.
+    }
+    
+    for(auto buffer : uniformBuffers)
+    {
+        if(buffer.stage == kMSL_ProgramStage_Vertex)
+            [renderEncoder setVertexBuffer:buffer.buffer offset:0 atIndex:buffer.idx];
+        else if(buffer.stage == kMSL_ProgramStage_Fragment)
+            [renderEncoder setFragmentBuffer:buffer.buffer offset:0 atIndex:buffer.idx];
+        else
+            TF_FATAL_CODING_ERROR("Not implemented!"); //Compute case
+    }
 
     for(auto buffer : vertexBuffers) {
-        if (buffer.first != 65535)
-            [renderEncoder setVertexBuffer:buffer.second offset:0 atIndex:buffer.first];
-    }
+        [renderEncoder setVertexBuffer:buffer.buffer offset:0 atIndex:buffer.idx];
+    } 
     for(auto texture : textures) {
-        [renderEncoder setFragmentTexture:texture.second atIndex:texture.first];
+        if(texture.stage == kMSL_ProgramStage_Vertex)
+            [renderEncoder setVertexTexture:texture.texture atIndex:texture.idx];
+        else if(texture.stage == kMSL_ProgramStage_Fragment)
+            [renderEncoder setFragmentTexture:texture.texture atIndex:texture.idx];
+        else
+            TF_FATAL_CODING_ERROR("Not implemented!"); //Compute case
     }
     for(auto sampler : samplers) {
-        [renderEncoder setFragmentSamplerState:sampler.second atIndex:sampler.first];
+        if(sampler.stage == kMSL_ProgramStage_Vertex)
+            [renderEncoder setVertexSamplerState:sampler.sampler atIndex:sampler.idx];
+        else if(sampler.stage == kMSL_ProgramStage_Fragment)
+            [renderEncoder setFragmentSamplerState:sampler.sampler atIndex:sampler.idx];
+        else
+            TF_FATAL_CODING_ERROR("Not implemented!"); //Compute case
     }
 }
 
@@ -509,10 +555,11 @@ void MtlfMetalContext::ClearState()
     indexBuffer = nil;
     numVertexComponents = 0;
     
+    oldStyleUniforms.clear();
     vertexBuffers.clear();
+    uniformBuffers.clear();
     textures.clear();
     samplers.clear();
-
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

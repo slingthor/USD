@@ -52,7 +52,7 @@ MtlfUniformBlock::Bind(GarchBindingMapPtr const & bindingMap,
         return;
 
     int binding = bindingMap->GetUniformBinding(identifier);
-    MtlfMetalContext::GetMetalContext()->SetBuffer(binding, _buffer);
+    MtlfMetalContext::GetMetalContext()->SetUniformBuffer(binding, _buffer, TfToken(identifier), kMSL_ProgramStage_Vertex);
 }
 
 void
@@ -62,6 +62,9 @@ MtlfUniformBlock::Update(const void *data, int size)
     id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->device;
     _buffer = [device newBufferWithBytes:data length:size options:MTLResourceStorageModeManaged];
     }
+    
+    //METAL TODO
+    
     /*
     glBindBuffer(GL_UNIFORM_BUFFER, _buffer);
     if (_size != size) {

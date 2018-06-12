@@ -86,6 +86,8 @@ private:
     void _AddActiveAttributeBindings(GarchProgramGPUHandle program);
     void _AddActiveUniformBindings(GarchProgramGPUHandle program);
     void _AddActiveUniformBlockBindings(GarchProgramGPUHandle program);
+    
+    friend class HdStMSLProgram;
 };
 
 

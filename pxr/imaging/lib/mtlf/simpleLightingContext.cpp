@@ -256,11 +256,11 @@ MtlfSimpleLightingContext::BindSamplers(GarchBindingMapPtr const &bindingMap)
     int shadowSampler = bindingMap->GetSamplerUnit(_tokens->shadowSampler);
     int shadowCompareSampler = bindingMap->GetSamplerUnit(_tokens->shadowCompareSampler);
 
-    MtlfMetalContext::GetMetalContext()->SetTexture(shadowSampler, _shadows->GetShadowMapTexture());
-    MtlfMetalContext::GetMetalContext()->SetSampler(shadowSampler, _shadows->GetShadowMapDepthSampler());
+    MtlfMetalContext::GetMetalContext()->SetTexture(shadowSampler, _shadows->GetShadowMapTexture(), _tokens->shadowSampler, kMSL_ProgramStage_Fragment);
+    MtlfMetalContext::GetMetalContext()->SetSampler(shadowSampler, _shadows->GetShadowMapDepthSampler(), _tokens->shadowSampler, kMSL_ProgramStage_Fragment);
     
-    MtlfMetalContext::GetMetalContext()->SetTexture(shadowCompareSampler, _shadows->GetShadowMapTexture());
-    MtlfMetalContext::GetMetalContext()->SetSampler(shadowCompareSampler, _shadows->GetShadowMapCompareSampler());
+    MtlfMetalContext::GetMetalContext()->SetTexture(shadowCompareSampler, _shadows->GetShadowMapTexture(), _tokens->shadowCompareSampler, kMSL_ProgramStage_Fragment);
+    MtlfMetalContext::GetMetalContext()->SetSampler(shadowCompareSampler, _shadows->GetShadowMapCompareSampler(), _tokens->shadowCompareSampler, kMSL_ProgramStage_Fragment);
 /*
     glActiveTexture(GL_TEXTURE0 + shadowSampler);
     glBindTexture(GL_TEXTURE_2D_ARRAY, _shadows->GetShadowMapTexture());
