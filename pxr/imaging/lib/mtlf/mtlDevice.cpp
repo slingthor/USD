@@ -82,16 +82,85 @@ static GLuint _compileShader(GLchar const* const shaderSource, GLuint shaderType
     return s;
 }
 
+// Called when the window is dragged to another display
+void MtlfMetalContext::handleDisplayChange()
+{
+    NSLog(@"Detected display change - but not doing about it");
+}
+
+// Called when an eGPU is either removed or added
+void MtlfMetalContext::handleGPUHotPlug(id<MTLDevice> device, MTLDeviceNotificationName notifier)
+{
+    // Device plugged in
+    if (notifier == MTLDeviceWasAddedNotification) {
+        NSLog(@"New Device was added");
+    }
+    // Device Removal Requested. Cleanup and switch to preferred device
+    else if (notifier == MTLDeviceRemovalRequestedNotification) {
+        NSLog(@"Device removal request was notified");
+    }
+    // additional handling of surprise removal
+    else if (notifier == MTLDeviceWasRemovedNotification) {
+        NSLog(@"Device was removed");
+    }
+}
+
+
+id<MTLDevice> MtlfMetalContext::GetMetalDevice(PREFERRED_GPU_TYPE preferredGPUType)
+{
+    // Get a list of all devices and register an obsever for eGPU events
+    id <NSObject> metalDeviceObserver = nil;
+    
+    // Get a list of all devices and register an obsever for eGPU events
+    NSArray<id<MTLDevice>> *_deviceList = MTLCopyAllDevicesWithObserver(&metalDeviceObserver,
+                                                ^(id<MTLDevice> device, MTLDeviceNotificationName name) {
+                                                    MtlfMetalContext::handleGPUHotPlug(device, name);
+                                                });
+    NSMutableArray<id<MTLDevice>> *_eGPUs          = [NSMutableArray array];
+    NSMutableArray<id<MTLDevice>> *_integratedGPUs = [NSMutableArray array];
+    NSMutableArray<id<MTLDevice>> *_discreteGPUs   = [NSMutableArray array];
+    NSArray *preferredDeviceList = _discreteGPUs;
+    
+    // Put the device into the appropriate device list
+    for (id<MTLDevice>dev in _deviceList) {
+        if (dev.removable)
+        [_eGPUs addObject:dev];
+        else if (dev.lowPower)
+        [_integratedGPUs addObject:dev];
+        else
+        [_discreteGPUs addObject:dev];
+    }
+    
+    switch (preferredGPUType) {
+        case PREFER_DISPLAY_GPU:
+            NSLog(@"Display device selection not supported yet, returning default GPU");
+        case PREFER_DEFAULT_GPU:
+            preferredDeviceList = _deviceList;
+            break;
+        case PREFER_EGPU:
+            preferredDeviceList = _eGPUs;
+            break;
+       case PREFER_DISCRETE_GPU:
+            preferredDeviceList = _discreteGPUs;
+            break;
+        case PREFER_INTEGRATED_GPU:
+            preferredDeviceList = _integratedGPUs;
+            break;
+    }
+    return preferredDeviceList.firstObject;
+}
+
+
 //
 // MtlfMetalContext
 //
 
 MtlfMetalContext::MtlfMetalContext()
 {
-    NSArray<id<MTLDevice>> *devices = MTLCopyAllDevices();
-    
-    device = devices.firstObject;
+    device = MtlfMetalContext::GetMetalDevice(PREFER_DEFAULT_GPU);
 
+    NSLog(@"Selected %@ for Metal Device", device.name);
+    
     // Create a new command queue
     commandQueue = [device newCommandQueue];
     commandBuffer = nil;
@@ -440,7 +509,7 @@ void MtlfMetalContext::BakeState()
         NSLog(@"Failed to created pipeline state, error %@", error);
         return;
     }
-
+    
     [renderEncoder setRenderPipelineState:_pipelineState];
     
     for(auto uniform : oldStyleUniforms)
