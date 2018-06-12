@@ -51,7 +51,9 @@ PXR_NAMESPACE_USING_DIRECTIVE
 
 class My_TestGLDrawing : public Hdx_UnitTestGLDrawing {
 public:
-    My_TestGLDrawing() {
+    My_TestGLDrawing():
+        _engine(HdEngine::OpenGL)
+    {
         SetCameraRotate(0, 0);
         SetCameraTranslate(GfVec3f(0));
         _reprName = HdTokens->hull;
@@ -355,18 +357,17 @@ My_TestGLDrawing::PickScene(int pickX, int pickY,
     int width = 128;
     int height = 128;
 
-    GlfDrawTargetRefPtr drawTarget = GlfDrawTarget::New(GfVec2i(width, height));
-    drawTarget->Bind();
-    drawTarget->AddAttachment(
-        "primId", GL_RGBA, GL_UNSIGNED_BYTE, GL_RGBA8);
-    drawTarget->AddAttachment(
-        "instanceId", GL_RGBA, GL_UNSIGNED_BYTE, GL_RGBA8);
-    drawTarget->AddAttachment(
-        "elementId", GL_RGBA, GL_UNSIGNED_BYTE, GL_RGBA8);
-    drawTarget->AddAttachment(
-        "depth", GL_DEPTH_COMPONENT, GL_FLOAT, GL_DEPTH_COMPONENT32F);
-    drawTarget->Unbind();
-
+    GarchDrawTargetRefPtr drawTarget = GarchDrawTarget::New(GfVec2i(width, height));
+    std::vector<GarchDrawTarget::AttachmentDesc> attachmentDesc;
+    attachmentDesc.push_back(
+        GarchDrawTarget::AttachmentDesc("primId", GL_RGBA, GL_UNSIGNED_BYTE, GL_RGBA8));
+    attachmentDesc.push_back(
+        GarchDrawTarget::AttachmentDesc("instanceId", GL_RGBA, GL_UNSIGNED_BYTE, GL_RGBA8));
+    attachmentDesc.push_back(
+        GarchDrawTarget::AttachmentDesc("elementId", GL_RGBA, GL_UNSIGNED_BYTE, GL_RGBA8));
+    attachmentDesc.push_back(
+        GarchDrawTarget::AttachmentDesc("depth", GL_DEPTH_COMPONENT, GL_FLOAT, GL_DEPTH_COMPONENT32F));
+    drawTarget->SetAttachments(attachmentDesc);
     drawTarget->Bind();
 
     GLenum drawBuffers[] = { 
@@ -395,22 +396,22 @@ My_TestGLDrawing::PickScene(int pickX, int pickY,
 
     GLubyte primId[width*height*4];
     glBindTexture(GL_TEXTURE_2D,
-        drawTarget->GetAttachments().at("primId")->GetGlTextureName());
+        drawTarget->GetAttachments().at("primId")->GetTextureName());
     glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, primId);
 
     GLubyte instanceId[width*height*4];
     glBindTexture(GL_TEXTURE_2D,
-        drawTarget->GetAttachments().at("instanceId")->GetGlTextureName());
+        drawTarget->GetAttachments().at("instanceId")->GetTextureName());
     glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, instanceId);
 
     GLubyte elementId[width*height*4];
     glBindTexture(GL_TEXTURE_2D,
-        drawTarget->GetAttachments().at("elementId")->GetGlTextureName());
+        drawTarget->GetAttachments().at("elementId")->GetTextureName());
     glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, elementId);
 
     GLfloat depths[width*height];
     glBindTexture(GL_TEXTURE_2D,
-        drawTarget->GetAttachments().at("depth")->GetGlTextureName());
+        drawTarget->GetAttachments().at("depth")->GetTextureName());
     glGetTexImage(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, GL_FLOAT, depths);
 
     double zMin = 1.0;

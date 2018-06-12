@@ -62,7 +62,9 @@ TF_DEFINE_PRIVATE_TOKENS(
 
 class My_TestGLDrawing : public Hdx_UnitTestGLDrawing {
 public:
-    My_TestGLDrawing() {
+    My_TestGLDrawing():
+        _engine(HdEngine::OpenGL)
+    {
         SetCameraRotate(0, 0);
         SetCameraTranslate(GfVec3f(0));
     }

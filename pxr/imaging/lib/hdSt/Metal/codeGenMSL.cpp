@@ -497,14 +497,19 @@ HdSt_CodeGenMSL::_ParseGLSL(std::stringstream &source, InOutParams& inParams, In
 
                 std::string line = result.substr(pos + 1, endLine - pos - 1);
 
-                auto words_begin = std::sregex_iterator(result.begin() + pos + 1, result.begin() + endLine, regex_word);
+                auto words_begin = std::sregex_iterator(line.begin(), line.end(), regex_word);
                 auto words_end = std::sregex_iterator();
                 
                 if (std::distance(words_begin, words_end) == 2)
                 {
                     std::sregex_iterator i = words_begin;
-                    char const* typeStr = (*i).str().c_str();
+                    std::string t = (*i).str();
+                    std::string n = (*++i).str();
+                    char const* const typeStr = t.c_str();
+                    char const* const nameStr = n.c_str();
+                    
                     TfToken type(typeStr);
+                    TfToken name(nameStr);
                     
                     // detect if this is a texture or a sampler, and mark accordingly
                     HdSt_CodeGenMSL::TParam::Usage usage = HdSt_CodeGenMSL::TParam::Unspecified;
@@ -516,9 +521,6 @@ HdSt_CodeGenMSL::_ParseGLSL(std::stringstream &source, InOutParams& inParams, In
                         usage = HdSt_CodeGenMSL::TParam::Sampler;
                     }
 
-                    ++i;
-                    char const * const nameStr = (*i).str().c_str();
-                    TfToken name(nameStr);
                     if (nameStr[0] == '*') {
                         result.replace(pos, 0, std::string("\ndevice "));
                         usage |= HdSt_CodeGenMSL::TParam::EntryFuncArgument;
@@ -935,8 +937,8 @@ HdSt_CodeGenMSL::Compile()
                 TfToken("gl_ClipDistance"),
                 TfToken("float"),
                 // XXX - Causes an internal error on Lobo - fixed in Liberty 18A281+
-                //TfToken("[[clip_distance]]")).usage |= TParam::VertexShaderOnly;
-                TfToken("")).usage |= TParam::VertexShaderOnly;
+                TfToken("[[clip_distance]]")).usage |= TParam::VertexShaderOnly;
+                //TfToken("")).usage |= TParam::VertexShaderOnly;
 
     // _EmitOutput(_genCommon, _mslVSOutputParams, TfToken("gl_PrimitiveID"), TfToken("uint"), TfToken("[[flat]]"));
     // XXX - Hook this up somehow. Output from the vertex shader perhaps?

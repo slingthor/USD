@@ -99,6 +99,11 @@ UsdImagingMetalHdEngine::UsdImagingMetalHdEngine(
     }
 
     MtlfRegisterDefaultDebugOutputMessageCallback();
+    
+    sharedCaptureManager = [MTLCaptureManager sharedCaptureManager];
+    id<MTLCaptureScope> captureScope = [sharedCaptureManager newCaptureScopeWithDevice:MtlfMetalContext::GetMetalContext()->device];
+    captureScope.label = @"Hydra Capture Scope";
+    sharedCaptureManager.defaultCaptureScope = captureScope;
 }
 
 UsdImagingMetalHdEngine::~UsdImagingMetalHdEngine()
@@ -688,6 +693,11 @@ UsdImagingMetalHdEngine::Render(RenderParams params)
     }
 
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
+    
+    MTLCaptureManager *sharedCaptureManager = [MTLCaptureManager sharedCaptureManager];
+
+    //[sharedCaptureManager startCaptureWithScope:sharedCaptureManager.defaultCaptureScope];
+    [sharedCaptureManager.defaultCaptureScope beginScope];
 
     if (_mtlRenderPassDescriptor == nil)
     {
@@ -713,6 +723,7 @@ UsdImagingMetalHdEngine::Render(RenderParams params)
 
     // Create a new command buffer for each render pass to the current drawable
     id <MTLCommandBuffer> commandBuffer = [context->commandQueue commandBuffer];
+    commandBuffer.label = @"HdEngine CommandBuffer";
 
     // Create a render command encoder so we can render into something
     TF_VERIFY(context->commandBuffer == nil, "A command buffer is already active");
@@ -735,6 +746,8 @@ UsdImagingMetalHdEngine::Render(RenderParams params)
 
     // Finalize rendering here & push the command buffer to the GPU
     [commandBuffer commit];
+    [sharedCaptureManager.defaultCaptureScope endScope];
+    
     [commandBuffer waitUntilScheduled];
 
     context->renderEncoder = nil;

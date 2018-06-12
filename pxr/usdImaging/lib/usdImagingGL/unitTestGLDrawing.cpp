@@ -26,7 +26,7 @@
 
 #include "pxr/usdImaging/usdImagingGL/unitTestGLDrawing.h"
 #include "pxr/imaging/glf/diagnostic.h"
-#include "pxr/imaging/glf/drawTarget.h"
+#include "pxr/imaging/garch/drawTarget.h"
 #include "pxr/imaging/garch/glDebugWindow.h"
 
 #include "pxr/base/arch/attributes.h"
@@ -80,7 +80,7 @@ public:
 
 private:
     UsdImagingGL_UnitTestGLDrawing *_unitTest;
-    GlfDrawTargetRefPtr _drawTarget;
+    GarchDrawTargetRefPtr _drawTarget;
 };
 
 UsdImagingGL_UnitTestWindow::UsdImagingGL_UnitTestWindow(
@@ -105,11 +105,15 @@ UsdImagingGL_UnitTestWindow::OnInitializeGL()
     // Create an offscreen draw target which is the same size as this
     // widget and initialize the unit test with the draw target bound.
     //
-    _drawTarget = GlfDrawTarget::New(GfVec2i(GetWidth(), GetHeight()));
+    _drawTarget = GarchDrawTarget::New(GfVec2i(GetWidth(), GetHeight()));
+    std::vector<GarchDrawTarget::AttachmentDesc> attachmentDesc;
+    attachmentDesc.push_back(
+        GarchDrawTarget::AttachmentDesc("color", GL_RGBA, GL_FLOAT, GL_RGBA));
+    attachmentDesc.push_back(
+        GarchDrawTarget::AttachmentDesc("depth", GL_DEPTH_COMPONENT, GL_FLOAT,
+                             GL_DEPTH_COMPONENT));
+    _drawTarget->SetAttachments(attachmentDesc);
     _drawTarget->Bind();
-    _drawTarget->AddAttachment("color", GL_RGBA, GL_FLOAT, GL_RGBA);
-    _drawTarget->AddAttachment("depth", GL_DEPTH_COMPONENT, GL_FLOAT,
-                                        GL_DEPTH_COMPONENT);
 
     _unitTest->InitTest();
 
@@ -120,7 +124,7 @@ UsdImagingGL_UnitTestWindow::OnInitializeGL()
 void
 UsdImagingGL_UnitTestWindow::OnUninitializeGL()
 {
-    _drawTarget = GlfDrawTargetRefPtr();
+    _drawTarget = GarchDrawTargetRefPtr();
 
     _unitTest->ShutdownTest();
 }

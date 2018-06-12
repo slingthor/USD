@@ -94,7 +94,7 @@ static void CameraAndLightTest()
     HdRenderPassStateSharedPtr renderPassState(new HdStRenderPassState());
     HdRenderPassSharedPtr renderPass(
         new HdSt_RenderPass(index.get(), collection));
-    HdEngine engine;
+    HdEngine engine(HdEngine::OpenGL);
 
     HdTaskSharedPtr drawTask = boost::make_shared<Hd_TestTask>(renderPass,
                                                                renderPassState);
@@ -109,7 +109,7 @@ static void CameraAndLightTest()
     SdfPath light("/light");
 
     delegate->AddCamera(camera);
-    delegate->AddLight(light, GlfSimpleLight());
+    delegate->AddLight(light, GarchSimpleLight());
     delegate->SetLight(light, HdLightTokens->shadowCollection,
                       VtValue(HdRprimCollection(HdTokens->geometry,
                                                 HdTokens->hull)));

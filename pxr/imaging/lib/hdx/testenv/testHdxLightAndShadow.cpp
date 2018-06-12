@@ -25,7 +25,7 @@
 
 #include "pxr/imaging/glf/glew.h"
 #include "pxr/imaging/glf/diagnostic.h"
-#include "pxr/imaging/glf/drawTarget.h"
+#include "pxr/imaging/garch/drawTarget.h"
 #include "pxr/imaging/glf/glContext.h"
 #include "pxr/imaging/garch/glDebugWindow.h"
 #include "pxr/base/gf/frustum.h"
@@ -58,11 +58,15 @@ int main(int argc, char *argv[])
     GlfGLContextSharedPtr ctx = GlfGLContext::GetCurrentGLContext();
 
     // prep draw target
-    GlfDrawTargetRefPtr drawTarget = GlfDrawTarget::New(GfVec2i(512, 512));
+    GarchDrawTargetRefPtr drawTarget = GarchDrawTarget::New(GfVec2i(512, 512));
+    std::vector<GarchDrawTarget::AttachmentDesc> attachmentDesc;
+    attachmentDesc.push_back(
+         GarchDrawTarget::AttachmentDesc("color", GL_RGBA, GL_FLOAT, GL_RGBA));
+    attachmentDesc.push_back(
+         GarchDrawTarget::AttachmentDesc("depth", GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8,
+                                         GL_DEPTH24_STENCIL8));
+    drawTarget->SetAttachments(attachmentDesc);
     drawTarget->Bind();
-    drawTarget->AddAttachment("color", GL_RGBA, GL_FLOAT, GL_RGBA);
-    drawTarget->AddAttachment("depth", GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8,
-                              GL_DEPTH24_STENCIL8);
     drawTarget->Unbind();
 
     GLfloat clearColor[4] = { 0.1f, 0.1f, 0.1f, 1.0f };
@@ -73,7 +77,7 @@ int main(int argc, char *argv[])
     TF_VERIFY(index);
     std::unique_ptr<Hdx_UnitTestDelegate> delegate(
                                          new Hdx_UnitTestDelegate(index.get()));
-    HdEngine engine;
+    HdEngine engine(HdEngine::OpenGL);
 
     // --------------------------------------------------------------------
 
@@ -93,7 +97,7 @@ int main(int argc, char *argv[])
     tasks.push_back(index->GetTask(renderTask));
 
     // prep lights
-    GlfSimpleLight light1;
+    GarchSimpleLight light1;
     light1.SetDiffuse(GfVec4f(0.5, 0.5, 0.5, 1.0));
     light1.SetPosition(GfVec4f(1,0.5,1,0));
     light1.SetHasShadow(true);
@@ -143,7 +147,7 @@ int main(int argc, char *argv[])
 
     // --------------------------------------------------------------------
     // add light
-    GlfSimpleLight light2;
+    GarchSimpleLight light2;
     light2.SetDiffuse(GfVec4f(0.7, 0.5, 0.3, 1.0));
     light2.SetPosition(GfVec4f(0.3,-0.2,1,0));
     light2.SetHasShadow(true);

@@ -26,7 +26,7 @@
 
 #include "pxr/usdImaging/usdImagingMetal/unitTestMetalDrawing.h"
 #include "pxr/imaging/glf/diagnostic.h"
-#include "pxr/imaging/glf/drawTarget.h"
+#include "pxr/imaging/garch/drawTarget.h"
 #include "pxr/imaging/garch/glDebugWindow.h"
 
 #include "pxr/base/arch/attributes.h"
@@ -60,7 +60,7 @@ public:
     typedef UsdImagingMetal_UnitTestWindow This;
 
 public:
-    UsdImagingMetal_UnitTestWindow(UsdImagingMetal_UnitTestGLDrawing * unitTest,
+    UsdImagingMetal_UnitTestWindow(UsdImagingMetal_UnitTestMetalDrawing * unitTest,
                                 int w, int h);
     virtual ~UsdImagingMetal_UnitTestWindow();
 
@@ -79,12 +79,12 @@ public:
     virtual void OnMouseMove(int x, int y, int modKeys);
 
 private:
-    UsdImagingMetal_UnitTestGLDrawing *_unitTest;
-    GlfDrawTargetRefPtr _drawTarget;
+    UsdImagingMetal_UnitTestMetalDrawing *_unitTest;
+    GarchDrawTargetRefPtr _drawTarget;
 };
 
 UsdImagingMetal_UnitTestWindow::UsdImagingMetal_UnitTestWindow(
-    UsdImagingMetal_UnitTestGLDrawing * unitTest, int w, int h)
+    UsdImagingMetal_UnitTestMetalDrawing * unitTest, int w, int h)
     : GarchGLDebugWindow("UsdImagingMetal Test", w, h)
     , _unitTest(unitTest)
 {
@@ -105,11 +105,15 @@ UsdImagingMetal_UnitTestWindow::OnInitializeGL()
     // Create an offscreen draw target which is the same size as this
     // widget and initialize the unit test with the draw target bound.
     //
-    _drawTarget = GlfDrawTarget::New(GfVec2i(GetWidth(), GetHeight()));
+    _drawTarget = GarchDrawTarget::New(GfVec2i(GetWidth(), GetHeight()));
+    std::vector<GarchDrawTarget::AttachmentDesc> attachmentDesc;
+    attachmentDesc.push_back(
+                             GarchDrawTarget::AttachmentDesc("color", GL_RGBA, GL_FLOAT, GL_RGBA));
+    attachmentDesc.push_back(
+                             GarchDrawTarget::AttachmentDesc("depth", GL_DEPTH_COMPONENT, GL_FLOAT,
+                                                             GL_DEPTH_COMPONENT));
+    _drawTarget->SetAttachments(attachmentDesc);
     _drawTarget->Bind();
-    _drawTarget->AddAttachment("color", GL_RGBA, GL_FLOAT, GL_RGBA);
-    _drawTarget->AddAttachment("depth", GL_DEPTH_COMPONENT, GL_FLOAT,
-                                        GL_DEPTH_COMPONENT);
 
     _unitTest->InitTest();
 
@@ -120,7 +124,7 @@ UsdImagingMetal_UnitTestWindow::OnInitializeGL()
 void
 UsdImagingMetal_UnitTestWindow::OnUninitializeGL()
 {
-    _drawTarget = GlfDrawTargetRefPtr();
+    _drawTarget = GarchDrawTargetRefPtr();
 
     _unitTest->ShutdownTest();
 }
@@ -223,7 +227,7 @@ UsdImagingMetal_UnitTestWindow::OnMouseMove(int x, int y, int modKeys)
 
 ////////////////////////////////////////////////////////////
 
-UsdImagingMetal_UnitTestGLDrawing::UsdImagingMetal_UnitTestGLDrawing()
+UsdImagingMetal_UnitTestMetalDrawing::UsdImagingMetal_UnitTestMetalDrawing()
     : _widget(NULL)
     , _testLighting(false)
     , _cameraLight(false)
@@ -235,30 +239,30 @@ UsdImagingMetal_UnitTestGLDrawing::UsdImagingMetal_UnitTestGLDrawing()
 {
 }
 
-UsdImagingMetal_UnitTestGLDrawing::~UsdImagingMetal_UnitTestGLDrawing()
+UsdImagingMetal_UnitTestMetalDrawing::~UsdImagingMetal_UnitTestMetalDrawing()
 {
 }
 
 int
-UsdImagingMetal_UnitTestGLDrawing::GetWidth() const
+UsdImagingMetal_UnitTestMetalDrawing::GetWidth() const
 {
     return _widget->GetWidth();
 }
 
 int
-UsdImagingMetal_UnitTestGLDrawing::GetHeight() const
+UsdImagingMetal_UnitTestMetalDrawing::GetHeight() const
 {
     return _widget->GetHeight();
 }
 
 bool
-UsdImagingMetal_UnitTestGLDrawing::WriteToFile(std::string const & attachment,
+UsdImagingMetal_UnitTestMetalDrawing::WriteToFile(std::string const & attachment,
         std::string const & filename) const
 {
     return _widget->WriteToFile(attachment, filename);
 }
 
-struct UsdImagingMetal_UnitTestGLDrawing::_Args {
+struct UsdImagingMetal_UnitTestMetalDrawing::_Args {
     _Args() : offscreen(false) {
         clearColor[0] = 1.0f;
         clearColor[1] = 0.5f;
@@ -404,7 +408,7 @@ ParseDoubleVector(
 }
 
 void
-UsdImagingMetal_UnitTestGLDrawing::_Parse(int argc, char *argv[], _Args* args)
+UsdImagingMetal_UnitTestMetalDrawing::_Parse(int argc, char *argv[], _Args* args)
 {
     for (int i = 1; i != argc; ++i) {
         if (strcmp(argv[i], "-") == 0) {
@@ -482,29 +486,29 @@ UsdImagingMetal_UnitTestGLDrawing::_Parse(int argc, char *argv[], _Args* args)
 
 /* virtual */
 void
-UsdImagingMetal_UnitTestGLDrawing::MousePress(int button, int x, int y,
+UsdImagingMetal_UnitTestMetalDrawing::MousePress(int button, int x, int y,
                                            int modKeys)
 {
 }
 /* virtual */
 void
-UsdImagingMetal_UnitTestGLDrawing::MouseRelease(int button, int x, int y,
+UsdImagingMetal_UnitTestMetalDrawing::MouseRelease(int button, int x, int y,
                                              int modKeys)
 {
 }
 /* virtual */
 void
-UsdImagingMetal_UnitTestGLDrawing::MouseMove(int x, int y, int modKeys)
+UsdImagingMetal_UnitTestMetalDrawing::MouseMove(int x, int y, int modKeys)
 {
 }
 /* virtual */
 void
-UsdImagingMetal_UnitTestGLDrawing::KeyRelease(int key)
+UsdImagingMetal_UnitTestMetalDrawing::KeyRelease(int key)
 {
 }
 
 void
-UsdImagingMetal_UnitTestGLDrawing::RunTest(int argc, char *argv[])
+UsdImagingMetal_UnitTestMetalDrawing::RunTest(int argc, char *argv[])
 {
     UsdImagingMetal_UnitTestHelper_InitPlugins();
 

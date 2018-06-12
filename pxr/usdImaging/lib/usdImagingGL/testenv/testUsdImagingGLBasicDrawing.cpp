@@ -83,7 +83,7 @@ public:
 private:
     UsdStageRefPtr _stage;
     UsdImagingGLEngineSharedPtr _engine;
-    GlfSimpleLightingContextRefPtr _lightingContext;
+    GarchSimpleLightingContextRefPtr _lightingContext;
 
     float _rotate[2];
     float _translate[3];
@@ -163,8 +163,8 @@ My_TestGLDrawing::InitTest()
         if(UsdImagingGL::IsEnabledHydra()) {
             // set same parameter as GlfSimpleLightingContext::SetStateFromOpenGL
             // OpenGL defaults
-            _lightingContext = GlfSimpleLightingContext::New();
-            GlfSimpleLight light;
+            _lightingContext = GarchSimpleLightingContext::New();
+            GarchSimpleLight light;
             if (IsEnabledCameraLight()) {
                 light.SetPosition(GfVec4f(_translate[0], _translate[2], _translate[1], 0));
             } else {
@@ -173,11 +173,11 @@ My_TestGLDrawing::InitTest()
             light.SetDiffuse(GfVec4f(1,1,1,1));
             light.SetAmbient(GfVec4f(0,0,0,1));
             light.SetSpecular(GfVec4f(1,1,1,1));
-            GlfSimpleLightVector lights;
+            GarchSimpleLightVector lights;
             lights.push_back(light);
             _lightingContext->SetLights(lights);
 
-            GlfSimpleMaterial material;
+            GarchSimpleMaterial material;
             material.SetAmbient(GfVec4f(0.2, 0.2, 0.2, 1.0));
             material.SetDiffuse(GfVec4f(0.8, 0.8, 0.8, 1.0));
             material.SetSpecular(GfVec4f(0,0,0,1));
