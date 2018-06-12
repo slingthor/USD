@@ -590,24 +590,28 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
         HdSt_CodeGenMSL::TParam const &input = *it;
         TfToken attrib;
         
+        std::string _attrib = input.attribute.GetString();
+        std::string _name = input.name.GetString();
+        std::string _type = input.dataType.GetString();
+        std::string _acc = input.accessorStr.GetString();
+        
+        if (input.usage & HdSt_CodeGenMSL::TParam::Uniform)
+            continue;
+        
         if (input.usage & HdSt_CodeGenMSL::TParam::EntryFuncArgument) {
-            if (input.name.GetText()[0] == '*') {
-                std::string n = input.name.GetString().substr(1);
-                copyInputsVtx << "scope." << n << "=" << n << ";\n";
-            }
-            else {
-                copyInputsVtx << "scope." << input.name << "=" << input.name << ";\n";
-            }
+            std::string n = (input.name.GetText()[0] == '*') ? input.name.GetString().substr(1) : input.name;
+            copyInputsVtx << "scope." << n << "=" << n << ";\n";
             continue;
         }
+
         copyInputsVtx << "scope." << input.name << "=input." << input.name << ";\n";
         
         if (input.name.GetText()[0] == '*') {
             glueVS << "device ";
-            mslProgram->AddBinding(input.name.GetText() + 1, location);
+            mslProgram->AddBinding(input.name.GetText() + 1, location, kMSL_BindingType_VertexAttribute, kMSL_ProgramStage_Vertex);
         }
         else {
-            mslProgram->AddBinding(input.name.GetString(), location);
+            mslProgram->AddBinding(input.name.GetString(), location, kMSL_BindingType_VertexAttribute, kMSL_ProgramStage_Vertex);
         }
         
 //        if (!input.attribute.IsEmpty())
@@ -618,6 +622,62 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
         glueVS << input.dataType << " " << input.name << attrib << ";\n";
     }
     glueVS << "};\n";
+    
+    //This binding for indices is not an necessarily a required binding. It's here so that
+    //it propagates to the binding system and can be retrieved there. You don't have to bind it.
+    mslProgram->AddBinding("indices", 0, kMSL_BindingType_IndexBuffer, kMSL_ProgramStage_Vertex);
+    
+    /////////////////////////////////Uniform Buffer///////////////////////////////////
+    
+    int vtxUniformBufferSize = 0;
+    TF_FOR_ALL(it, _mslVSInputParams) {
+        HdSt_CodeGenMSL::TParam const &input = *it;
+        if ((input.usage & HdSt_CodeGenMSL::TParam::Usage::Uniform) == 0)
+            continue;
+        
+        //Apply alignment rules
+        uint32 size = 4;
+        if(input.dataType.GetString().find("vec2") != std::string::npos) size = 8;
+        else if(input.dataType.GetString().find("vec3") != std::string::npos) size = 12;
+        else if(input.dataType.GetString().find("vec4") != std::string::npos) size = 16;
+        uint32 regStart = vtxUniformBufferSize / 16;
+        uint32 regEnd = (vtxUniformBufferSize + size - 1) / 16;
+        if(regStart != regEnd && vtxUniformBufferSize % 16 != 0) vtxUniformBufferSize += 16 - (vtxUniformBufferSize % 16);
+        
+        mslProgram->UpdateUniformBinding(input.name, -1, vtxUniformBufferSize);
+        
+        vtxUniformBufferSize += size;
+    }
+    //Round up size of uniform buffer to next 16 byte boundary.
+    vtxUniformBufferSize = ((vtxUniformBufferSize + 15) / 16) * 16;
+
+#define CODEGENMSL_VTXUNIFORMSTRUCTNAME "MSLVtxUniforms"
+#define CODEGENMSL_VTXUNIFORMINPUTNAME "vtxUniforms"
+
+    if(vtxUniformBufferSize != 0)
+    {
+        glueVS << "struct " CODEGENMSL_VTXUNIFORMSTRUCTNAME " {\n";
+        {
+            TF_FOR_ALL(it, _mslVSInputParams) {
+                HdSt_CodeGenMSL::TParam const &input = *it;
+                if ((input.usage & HdSt_CodeGenMSL::TParam::Usage::Uniform) == 0)
+                    continue;
+
+                glueVS << input.dataType << " " << input.name << ";\n";
+
+                copyInputsVtx << "scope." << input.name << "=" CODEGENMSL_VTXUNIFORMINPUTNAME "->" << input.name << ";\n";
+            }
+        }
+        glueVS << "};\n";
+
+        HdSt_CodeGenMSL::TParam in(TfToken("*" CODEGENMSL_VTXUNIFORMINPUTNAME), TfToken(CODEGENMSL_VTXUNIFORMSTRUCTNAME), TfToken(), TfToken(), HdSt_CodeGenMSL::TParam::Unspecified);
+
+        in.usage |= HdSt_CodeGenMSL::TParam::EntryFuncArgument;
+
+        _mslVSInputParams.push_back(in);
+    }
+    
+    /////////////////////////////////Frag Outputs///////////////////////////////////
     
     gluePS << "struct MSLFragOutputs {\n";
     location = 0;
@@ -681,14 +741,29 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
             else {
                 n = input.name.GetString();
             }
-            mslProgram->AddBinding(n, location);
+            
+            switch (input.usage & HdSt_CodeGenMSL::TParam::maskShaderUsage) {
+                case HdSt_CodeGenMSL::TParam::Texture:
+                    mslProgram->AddBinding(n, location, kMSL_BindingType_Texture, kMSL_ProgramStage_Fragment);
+                    break;
+                case HdSt_CodeGenMSL::TParam::Sampler:
+                    mslProgram->AddBinding(n, location, kMSL_BindingType_Sampler, kMSL_ProgramStage_Fragment);
+                    break;
+                default:
+                    TF_FATAL_CODING_ERROR("Not Implemented");
+            }
+            
             copyInputsFrag << "scope." << n << "=texturing." << n << ";\n";
         }
         gluePS << "};\n";
     }
 
+#define CODEGENMSL_FRAGUNIFORMINPUTNAME "fragUniforms"
+
     gluePS << "struct MSLFragInputs {\n";
     location = 0;
+    uint32 byteOffset = 0;
+    uint32 inputUniformBufferSize = 0;
     TF_FOR_ALL(it, _mslPSInputParams) {
         HdSt_CodeGenMSL::TParam const &input = *it;
         TfToken attrib;
@@ -729,17 +804,35 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
             copyInputsFrag << "scope." << accessor << "=vsInput." << input.name << ";\n";
         }
         else {
-            copyInputsFrag << "scope." << accessor << "=input->" << input.name << ";\n";
+            copyInputsFrag << "scope." << accessor << "=" CODEGENMSL_FRAGUNIFORMINPUTNAME "->" << input.name << ";\n";
         }
 
         attrib = input.attribute;
         gluePS << input.dataType << " " << input.name << attrib << ";\n";
+        
+        //Register these uniforms. They're part of the "input" buffer which is hardcoded to be bound at slot 0
+        
+        //Apply alignment rules
+        uint32 size = 4;
+        if(input.dataType.GetString().find("vec2") != std::string::npos) size = 8;
+        else if(input.dataType.GetString().find("vec3") != std::string::npos) size = 12;
+        else if(input.dataType.GetString().find("vec4") != std::string::npos) size = 16;
+        uint32 regStart = byteOffset / 16;
+        uint32 regEnd = (byteOffset + size - 1) / 16;
+        if(regStart != regEnd && byteOffset % 16 != 0) byteOffset += 16 - (byteOffset % 16);
+        
+        mslProgram->AddBinding(input.name, 0, kMSL_BindingType_Uniform, kMSL_ProgramStage_Fragment, byteOffset);
+        
+        //Size
+         byteOffset += size;
     }
+    inputUniformBufferSize = ((byteOffset + 15) / 16) * 16;
     gluePS << "};\n";
     
     glueVS << "vertex MSLVtxOutputs vertexEntryPoint(MSLVtxInputs input[[stage_in]]\n";
     
     location = 0;
+    int vtxUniformBufferSlot = 0;
     TF_FOR_ALL(it, _mslVSInputParams) {
         HdSt_CodeGenMSL::TParam const &input = *it;
         TfToken attrib;
@@ -757,8 +850,12 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
             else {
                 n = input.name.GetString();
             }
-
-            mslProgram->AddBinding(n, location);
+            int uniformBufferSize = 0;
+            if(n == CODEGENMSL_VTXUNIFORMINPUTNAME) {
+                uniformBufferSize = vtxUniformBufferSize;
+                vtxUniformBufferSlot = location;
+            }
+            mslProgram->AddBinding(n, location, kMSL_BindingType_UniformBuffer, kMSL_ProgramStage_Vertex, 0, uniformBufferSize);
             attrib = TfToken(TfStringPrintf("[[buffer(%d)]]", location++));
         }
         glueVS << ", ";
@@ -771,6 +868,19 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
         glueVS << input.dataType << " " << input.name << attrib << "\n";
     }
     
+    ////////////////////////////FIX UP UNIFORM INDEX///////////////////////////
+    
+    TF_FOR_ALL(it, _mslVSInputParams) {
+        HdSt_CodeGenMSL::TParam const &input = *it;
+        TfToken attrib;
+        if (!(input.usage & HdSt_CodeGenMSL::TParam::Uniform))
+            continue;
+        std::string name = (input.name.GetText()[0] == '*') ? input.name.GetText() + 1 : input.name.GetText();
+        mslProgram->AddBinding(name, vtxUniformBufferSlot, kMSL_BindingType_Uniform, kMSL_ProgramStage_Vertex);
+    }
+
+    ///////////////////////////////////////////////////////////////////////////
+    
     glueVS  << ") {\n"
             << "ProgramScope scope;\n"
             << copyInputsVtx.str()
@@ -781,7 +891,8 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
             << "}\n";
     
     gluePS << "fragment MSLFragOutputs fragmentEntryPoint(MSLVtxOutputs vsInput[[stage_in]]\n"
-           << ", device MSLFragInputs *input[[buffer(0)]]\n";
+           << ", device MSLFragInputs *" CODEGENMSL_FRAGUNIFORMINPUTNAME "[[buffer(0)]]\n";
+    mslProgram->AddBinding(CODEGENMSL_FRAGUNIFORMINPUTNAME, 0, kMSL_BindingType_UniformBuffer, kMSL_ProgramStage_Fragment, 0, inputUniformBufferSize);
 
     location = 1;
 
@@ -816,7 +927,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
             n = input.name.GetString();
         }
 
-        mslProgram->AddBinding(n, location++);
+        mslProgram->AddBinding(n, location++, kMSL_BindingType_UniformBuffer, kMSL_ProgramStage_Fragment);
 
         if (input.usage & HdSt_CodeGenMSL::TParam::ProgramScope) {
             gluePS << " ProgramScope::";
@@ -962,22 +1073,13 @@ HdSt_CodeGenMSL::Compile()
             
             // typeless binding doesn't need declaration nor accessor.
             if (binDecl->dataType.IsEmpty()) continue;
-    
-            // All custom bindings in Metal are going to involve a buffer access
-            _EmitDeclarationPtr(_genCommon,
-                                _mslVSInputParams,
-                                binDecl->name,
-                                binDecl->dataType,
-                                TfToken(),
-                                binDecl->binding,
-                                0,
-                                false);
-                
+
+            _EmitDeclaration(_genCommon, _mslVSInputParams, binDecl->name, binDecl->dataType, TfToken(), binDecl->binding);
+
             _EmitAccessor(_genCommon,
                           binDecl->name,
                           binDecl->dataType,
-                          binDecl->binding,
-                          "localIndex");
+                          binDecl->binding);
         }
     }
     
@@ -1424,6 +1526,9 @@ static HdSt_CodeGenMSL::TParam& _EmitDeclaration(std::stringstream &str,
        binding.GetType() == HdBinding::FRONT_FACING) {
         in.usage |= HdSt_CodeGenMSL::TParam::EntryFuncArgument;
     }
+    
+    if(binding.GetType() == HdBinding::UNIFORM)
+        in.usage |= HdSt_CodeGenMSL::TParam::Uniform;
  
     inputParams.push_back(in);
    return inputParams.back();
@@ -1836,12 +1941,10 @@ HdSt_CodeGenMSL::_GenerateDrawingCoord()
     //   layout (location=x) in ivec4 drawingCoord0
     //   layout (location=y) in ivec3 drawingCoord1
     //   layout (location=z) in int   drawingCoordI[N]
-    
-    _genVS << "ivec4 drawingCoord0;\n"
-           << "ivec4 drawingCoord1;\n";
 
-//    _EmitDeclaration(_genVS, _metaData.drawingCoord0Binding);
-//    _EmitDeclaration(_genVS, _metaData.drawingCoord1Binding);
+    _EmitDeclaration(_genVS, _mslVSInputParams, _metaData.drawingCoord0Binding.name, _metaData.drawingCoord0Binding.dataType, TfToken(), _metaData.drawingCoord0Binding.binding);
+    _EmitDeclaration(_genVS, _mslVSInputParams, _metaData.drawingCoord1Binding.name, _metaData.drawingCoord1Binding.dataType, TfToken(), _metaData.drawingCoord1Binding.binding);
+
 //    if (_metaData.drawingCoordIBinding.binding.IsValid()) {
 //        _EmitDeclaration(_genVS, _metaData.drawingCoordIBinding,
 //                         /*arraySize=*/std::max(1, _metaData.instancerNumLevels));
@@ -2043,6 +2146,15 @@ HdSt_CodeGenMSL::_GenerateConstantPrimVar()
         TfToken typeName(TfStringPrintf("ConstantData%d", binding.GetValue()));
         TfToken varName = it->second.blockName;
 
+        {
+            std::string ptrName = "*";
+            ptrName += it->second.blockName;
+            HdSt_CodeGenMSL::TParam in(TfToken(ptrName), typeName, TfToken(), TfToken(), HdSt_CodeGenMSL::TParam::Unspecified, binding);
+            in.usage |= HdSt_CodeGenMSL::TParam::EntryFuncArgument | HdSt_CodeGenMSL::TParam::ProgramScope;
+            _mslPSInputParams.push_back(in);
+            _mslVSInputParams.push_back(in);
+        }
+
         declarations << "struct " << typeName << " {\n";
 
         TF_FOR_ALL (dbIt, it->second.entries) {
@@ -2117,7 +2229,6 @@ HdSt_CodeGenMSL::_GenerateInstancePrimVar()
         // << layout (location=x) uniform float *translate_0;
         _EmitDeclaration(declarations, _mslVSInputParams, name, dataType, TfToken(), binding);
         _EmitAccessor(accessors, name, dataType, binding, n.str().c_str());
-
     }
 
     /*
@@ -2457,7 +2568,7 @@ HdSt_CodeGenMSL::_GenerateElementPrimVar()
         
         HdBinding binding = _metaData.edgeIndexBinding.binding;
         
-        _EmitDeclaration(declarations, _mslPSInputParams, _metaData.edgeIndexBinding);
+        _EmitDeclarationPtr(declarations, _mslPSInputParams, _metaData.edgeIndexBinding);
         _EmitAccessor(accessors, _metaData.edgeIndexBinding.name,
                       _metaData.edgeIndexBinding.dataType, binding,
                       "GetDrawingCoord().primitiveCoord");

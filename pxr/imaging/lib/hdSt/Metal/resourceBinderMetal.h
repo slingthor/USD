@@ -29,6 +29,8 @@
 
 #include "pxr/imaging/hdSt/resourceBinder.h"
 
+#include "pxr/imaging/hdSt/Metal/mslProgram.h"
+
 PXR_NAMESPACE_OPEN_SCOPE
 
 class HdSt_ResourceBinderMetal : public HdSt_ResourceBinder {
@@ -81,6 +83,9 @@ public:
     /// bind a standalone uniform (float, vec2, vec3, vec4, mat4)
     HDST_API
     virtual void BindUniformf(TfToken const &name, int count, const float *value) const override;
+
+private:
+    MSL_ShaderBindings _shaderBindings;
 };
 
 

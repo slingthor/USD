@@ -1,3 +1,4 @@
+#line 1 "/Volumes/Data/USDMetal/pxr/imaging/lib/mtlf/mtlDevice.h"
 //
 // Copyright 2016 Pixar
 //
@@ -30,6 +31,7 @@
 #import <Cocoa/Cocoa.h>
 
 #include "pxr/pxr.h"
+#include "pxr/base/tf/token.h"
 #include "pxr/imaging/mtlf/api.h"
 #include "pxr/base/arch/threads.h"
 #include <boost/noncopyable.hpp>
@@ -46,6 +48,14 @@ typedef boost::shared_ptr<class MtlfMetalContext> MtlfMetalContextSharedPtr;
 ///
 /// Provides window system independent access to Metal devices.
 ///
+
+enum MSL_ProgramStage
+{
+    kMSL_ProgramStage_Vertex   = (1 << 0),
+    kMSL_ProgramStage_Fragment = (1 << 1),
+    kMSL_ProgramStage_Compute  = (1 << 2),
+};
+
 class MtlfMetalContext : public boost::noncopyable {
 public:
     typedef struct {
@@ -80,19 +90,26 @@ public:
                             int size,
                             int type,
                             size_t stride,
-                            uint32_t offset);
+                            uint32_t offset,
+                            const TfToken& name);
     
     MTLF_API
-    void SetBuffer(int index, id<MTLBuffer> buffer);
+    void SetUniform(const void* _data, uint32 _dataSize, const TfToken& _name, uint32 index, MSL_ProgramStage stage);
+    
+    MTLF_API
+    void SetUniformBuffer(int index, id<MTLBuffer> buffer, const TfToken& name, MSL_ProgramStage stage, bool oldStyleBacker = false);
+    
+    MTLF_API
+    void SetBuffer(int index, id<MTLBuffer> buffer, const TfToken& name);	//Implementation binds this as a vertex buffer!
     
     MTLF_API
     void SetIndexBuffer(id<MTLBuffer> buffer);
 
     MTLF_API
-    void SetTexture(int index, id<MTLTexture> texture);
+    void SetTexture(int index, id<MTLTexture> texture, const TfToken& name, MSL_ProgramStage stage);
     
     MTLF_API
-    void SetSampler(int index, id<MTLSamplerState> sampler);
+    void SetSampler(int index, id<MTLSamplerState> sampler, const TfToken& name, MSL_ProgramStage stage);
 
     MTLF_API
     void BakeState();
@@ -126,9 +143,35 @@ protected:
     MTLVertexDescriptor *vertexDescriptor;
     uint32_t numVertexComponents;
 
-    std::map<int, id<MTLBuffer>> vertexBuffers;
-    std::map<int, id<MTLTexture>> textures;
-    std::map<int, id<MTLSamplerState>> samplers;
+    struct OldStyleUniformData
+    {
+        void alloc(const void* _data, uint32 _size)
+        {
+            dataSize = _size;
+            data = malloc(dataSize);
+            memcpy(data, _data, dataSize);
+        }
+        void release()
+        {
+            free(data);
+            data = 0;
+        }
+        
+        uint32  index;
+        void*   data;
+        uint32  dataSize;
+        TfToken name;
+    };
+	std::vector<OldStyleUniformData> oldStyleUniforms;
+
+    struct VertexBufferBinding { int idx; id<MTLBuffer> buffer; TfToken name; };
+    std::vector<VertexBufferBinding> vertexBuffers;
+    struct UniformBufferBinding { int idx; id<MTLBuffer> buffer; TfToken name; MSL_ProgramStage stage; };
+    std::vector<UniformBufferBinding> uniformBuffers;
+	struct TextureBinding { int idx; id<MTLTexture> texture; TfToken name; MSL_ProgramStage stage; };
+    std::vector<TextureBinding> textures;
+	struct SamplerBinding { int idx; id<MTLSamplerState> sampler; TfToken name; MSL_ProgramStage stage; };
+    std::vector<SamplerBinding> samplers;
     id<MTLBuffer> indexBuffer;
     
     MtlfDrawTarget *drawTarget;

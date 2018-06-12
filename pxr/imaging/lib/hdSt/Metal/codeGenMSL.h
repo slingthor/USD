@@ -57,7 +57,8 @@ public:
             // The following are bit flags | with one of the above
             EntryFuncArgument   = 1 << 4,
             ProgramScope        = 1 << 5,
-            VertexShaderOnly    = 1 << 6
+            VertexShaderOnly    = 1 << 6,
+            Uniform             = 1 << 7,
         };
         static Usage const maskShaderUsage = Usage(EntryFuncArgument - 1);
         

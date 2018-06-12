@@ -1,3 +1,5 @@
+#line 1 "/Volumes/Data/USDMetal/pxr/imaging/lib/hdSt/Metal/mslProgram.h"
+#line 1 "/Volumes/Data/USDMetal/pxr/imaging/lib/hdSt/Metal/mslProgram.h"
 //
 // Copyright 2016 Pixar
 //
@@ -30,6 +32,7 @@
 #include "pxr/imaging/hdSt/api.h"
 #include "pxr/imaging/hdSt/program.h"
 #include "pxr/imaging/hdSt/Metal/resourceMetal.h"
+#include "pxr/imaging/mtlf/mtlDevice.h"
 
 #include <boost/shared_ptr.hpp>
 
@@ -37,6 +40,30 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 class HdResourceRegistry;
 typedef boost::shared_ptr<class HdStMSLProgram> HdStMSLProgramSharedPtr;
+
+enum MSL_BindingType
+{
+    kMSL_BindingType_VertexAttribute = (1 << 0),
+    kMSL_BindingType_IndexBuffer     = (1 << 1),
+    kMSL_BindingType_Texture         = (1 << 2),
+    kMSL_BindingType_Sampler         = (1 << 3),
+    kMSL_BindingType_Uniform         = (1 << 4),
+    kMSL_BindingType_UniformBuffer   = (1 << 5),
+};
+
+struct MSL_ShaderBinding
+{
+    MSL_BindingType  _type;
+    MSL_ProgramStage _stage;
+    int              _index;
+    std::string      _name;
+    int              _offsetWithinResource;
+	int              _uniformBufferSize;
+};
+
+typedef std::vector<MSL_ShaderBinding> MSL_ShaderBindings;
+
+const MSL_ShaderBinding& MSL_FindBinding(const MSL_ShaderBindings& bindings, const std::string& name, bool& outFound, uint bindingTypeMask = 0xFFFFFFFF, uint programStageMask = 0xFFFFFFFF, uint skipCount = 0);
 
 /// \class HdStMSLProgram
 ///
@@ -120,8 +147,27 @@ public:
     }
     
     HDST_API
-    void AddBinding(std::string const &name, int location) {
-        _locationMap.insert(make_pair(name, location));
+    MSL_ShaderBindings const &GetBindings() const {
+        return _bindings;
+    }
+    
+    HDST_API
+    void AddBinding(std::string const &name, int index, MSL_BindingType bindingType, MSL_ProgramStage programStage, int offsetWithinResource = 0, int uniformBufferSize = 0) {
+        _locationMap.insert(make_pair(name, index));
+        _bindings.push_back({ bindingType, programStage, index, name, offsetWithinResource, uniformBufferSize });
+    }
+
+    HDST_API
+    void UpdateUniformBinding(std::string const &name, int index = -1, int offsetWithinResource = -1) {
+        for(auto it = _bindings.begin(); it != _bindings.end(); ++it) {
+            if(it->_name != name || it->_type != kMSL_BindingType_Uniform)
+                continue;
+            if(index != -1)
+                it->_index = index;
+            if(offsetWithinResource != -1)
+                it->_offsetWithinResource = offsetWithinResource;
+            break;
+        }
     }
 
     HDST_API
@@ -150,10 +196,15 @@ private:
     id<MTLFunction> _computeFunction;
     
     id<MTLRenderPipelineState> _pipelineState;
+	
+    uint32 _vertexFunctionIdx;
+    uint32 _fragmentFunctionIdx;
+    uint32 _computeFunctionIdx;
 
     bool _valid;
-    HdStResourceMetal _uniformBuffer;
-    BindingLocationMap  _locationMap;
+    HdStResourceMetal  _uniformBuffer;
+    MSL_ShaderBindings _bindings;
+    BindingLocationMap _locationMap;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE
