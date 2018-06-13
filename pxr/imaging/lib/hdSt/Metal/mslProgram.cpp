@@ -198,7 +198,7 @@ HdStMSLProgram::CompileShader(GLenum type,
     options.fastMathEnabled = YES;
     options.languageVersion = MTLLanguageVersion2_0;
     
-    id<MTLLibrary> library = [device newLibraryWithSource:[NSString stringWithUTF8String:shaderSource.c_str()]
+    id<MTLLibrary> library = [device newLibraryWithSource:@(shaderSource.c_str())
                                                   options:options
                                                     error:&error];
     

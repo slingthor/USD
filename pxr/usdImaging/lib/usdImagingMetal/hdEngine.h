@@ -252,6 +252,8 @@ private:
     TfTokenVector _renderTags;
     
     MTLRenderPassDescriptor* _mtlRenderPassDescriptor;
+    
+    MTLCaptureManager *sharedCaptureManager;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

@@ -25,8 +25,8 @@
 
 #include "pxr/imaging/glf/glew.h"
 #include "pxr/imaging/glf/diagnostic.h"
-#include "pxr/imaging/glf/drawTarget.h"
 #include "pxr/imaging/glf/glContext.h"
+#include "pxr/imaging/garch/drawTarget.h"
 #include "pxr/imaging/garch/glDebugWindow.h"
 
 #include "pxr/imaging/hd/engine.h"
@@ -53,7 +53,7 @@ int main(int argc, char *argv[])
     // wrap into GlfGLContext so that GlfDrawTarget works
     GlfGLContextSharedPtr ctx = GlfGLContext::GetCurrentGLContext();
 
-    HdEngine engine;
+    HdEngine engine(HdEngine::OpenGL);
     HdStRenderDelegate renderDelegate;
     std::unique_ptr<HdRenderIndex> index(HdRenderIndex::New(&renderDelegate));
     TF_VERIFY(index != nullptr);
@@ -73,11 +73,15 @@ int main(int argc, char *argv[])
     delegate->AddGrid(SdfPath("/grid"), GfMatrix4d(1));
 
     // prep draw target
-    GlfDrawTargetRefPtr drawTarget = GlfDrawTarget::New(GfVec2i(512, 512));
+    GarchDrawTargetRefPtr drawTarget = GarchDrawTarget::New(GfVec2i(512, 512));
+    std::vector<GarchDrawTarget::AttachmentDesc> attachmentDesc;
+    attachmentDesc.push_back(
+        GarchDrawTarget::AttachmentDesc("color", GL_RGBA, GL_FLOAT, GL_RGBA));
+    attachmentDesc.push_back(
+        GarchDrawTarget::AttachmentDesc("depth", GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8,
+                                        GL_DEPTH24_STENCIL8));
+    drawTarget->SetAttachments(attachmentDesc);
     drawTarget->Bind();
-    drawTarget->AddAttachment("color", GL_RGBA, GL_FLOAT, GL_RGBA);
-    drawTarget->AddAttachment("depth", GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8,
-                              GL_DEPTH24_STENCIL8);
     drawTarget->Unbind();
 
     GLfloat clearColor[4] = { 0.1f, 0.1f, 0.1f, 1.0f };
