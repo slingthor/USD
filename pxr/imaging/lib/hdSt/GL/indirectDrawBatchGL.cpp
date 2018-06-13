@@ -973,14 +973,10 @@ HdSt_IndirectDrawBatchGL::ExecuteDraw(
                                                    /*indirect=*/true,
                                                    resourceRegistry);
     HdStProgramSharedPtr const &hdStProgram(program.GetProgram());
-    HdStGLSLProgramSharedPtr const &glslProgram(boost::dynamic_pointer_cast<HdStGLSLProgram>(hdStProgram));
-    if (!TF_VERIFY(glslProgram)) return;
-    if (!TF_VERIFY(glslProgram->Validate())) return;
+    if (!TF_VERIFY(hdStProgram)) return;
+    if (!TF_VERIFY(hdStProgram->Validate())) return;
 
-    GLuint programId = glslProgram->GetGLProgram();
-    TF_VERIFY(programId);
-
-    glUseProgram(programId);
+    hdStProgram->SetProgram();
 
     const HdSt_ResourceBinder &binder = program.GetBinder();
     const HdStShaderCodeSharedPtrVector &shaders = program.GetComposedShaders();
@@ -1140,7 +1136,7 @@ HdSt_IndirectDrawBatchGL::ExecuteDraw(
     }
     program.GetGeometricShader()->UnbindResources(binder, *hdStProgram);
 
-    glUseProgram(0);
+    hdStProgram->UnsetProgram();
 }
 
 void
