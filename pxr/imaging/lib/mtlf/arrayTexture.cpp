@@ -38,7 +38,24 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 TF_REGISTRY_FUNCTION(TfType)
 {
-    TfType::Define<MtlfArrayTexture, TfType::Bases<GarchUVTexture> >();
+    TfType::Define<MtlfArrayTexture, TfType::Bases<GarchArrayTexture> >();
+}
+
+MtlfArrayTexture::MtlfArrayTexture(TfTokenVector const &imageFilePaths,
+                                   unsigned int arraySize,
+                                   unsigned int cropTop,
+                                   unsigned int cropBottom,
+                                   unsigned int cropLeft,
+                                   unsigned int cropRight)
+
+: GarchArrayTexture(imageFilePaths,
+                    arraySize,
+                    cropTop,
+                    cropBottom,
+                    cropLeft,
+                    cropRight)
+{
+    // do nothing
 }
 
 /* virtual */

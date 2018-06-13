@@ -54,6 +54,14 @@ public:
     
     // Package Name accessor
     virtual std::string GetPackageName() const override { return "Glf"; }
+    
+    // ArrayTexture creation
+    virtual GarchArrayTextureRefPtr NewArrayTexture(TfTokenVector const &imageFilePaths,
+                                                    unsigned int arraySize,
+                                                    unsigned int cropTop,
+                                                    unsigned int cropBottom,
+                                                    unsigned int cropLeft,
+                                                    unsigned int cropRight) const override;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

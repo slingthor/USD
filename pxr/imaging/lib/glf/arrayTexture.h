@@ -29,7 +29,7 @@
 #include "pxr/pxr.h"
 #include "pxr/imaging/glf/api.h"
 
-#include "pxr/imaging/garch/uvTexture.h"
+#include "pxr/imaging/garch/arrayTexture.h"
 
 #include "pxr/base/tf/declarePtrs.h"
 #include "pxr/base/tf/token.h"
@@ -49,36 +49,11 @@ TF_DECLARE_WEAK_AND_REF_PTRS(GlfArrayTexture);
 /// Currently accepted image formats are png, jpg and bmp.
 ///
 
-class GlfArrayTexture : public GarchUVTexture {
+class GlfArrayTexture : public GarchArrayTexture {
 public:
 
     typedef GarchUVTexture Parent;
     typedef GlfArrayTexture This;
-    
-    /// Creates a new texture instance for the image file at \p imageFilePath.
-    /// If given, \p cropTop, \p cropBottom, \p cropLeft, and \p cropRight
-    /// specifies the number of pixels to crop from the indicated border of
-    /// the source image.
-    GLF_API
-    static GlfArrayTextureRefPtr New(
-        TfTokenVector const &imageFilePaths,
-        unsigned int arraySize     ,
-        unsigned int cropTop    = 0,
-        unsigned int cropBottom = 0,
-        unsigned int cropLeft   = 0,
-        unsigned int cropRight  = 0);
-
-    GLF_API
-    static GlfArrayTextureRefPtr New(
-        std::vector<std::string> const &imageFilePaths,
-        unsigned int arraySize     ,
-        unsigned int cropTop    = 0,
-        unsigned int cropBottom = 0,
-        unsigned int cropLeft   = 0,
-        unsigned int cropRight  = 0);
-
-    GLF_API
-    static bool IsSupportedImageFile(TfToken const &imageFilePath);
 
     // GarchBaseTexture overrides
     GLF_API
@@ -94,12 +69,13 @@ protected:
         unsigned int cropBottom,
         unsigned int cropLeft,
         unsigned int cropRight);
+    
+    friend class GlfResourceFactory;
 
     GLF_API
     virtual void _OnSetMemoryRequested(size_t targetMemory);
     GLF_API
     const TfToken& _GetImageFilePath(size_t index) const;
-    using GarchUVTexture::_GetImageFilePath;
 
     GLF_API
     void _CreateTextures(GarchBaseTextureDataConstRefPtrVector texDataVec,
@@ -115,10 +91,6 @@ protected:
                                 int const unpackCropLeft = 0,
                                 int const unpackCropRight = 0) {}
 
-private:
-
-    TfTokenVector _imageFilePaths;
-    const unsigned int _arraySize;
 };
 
 

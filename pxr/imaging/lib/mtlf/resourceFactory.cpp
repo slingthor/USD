@@ -25,6 +25,7 @@
 //
 #include <pxr/imaging/mtlf/resourceFactory.h>
 
+#include <pxr/imaging/mtlf/arrayTexture.h>
 #include <pxr/imaging/mtlf/bindingMap.h>
 #include <pxr/imaging/mtlf/drawTarget.h>
 #include <pxr/imaging/mtlf/simpleLightingContext.h>
@@ -77,5 +78,17 @@ GarchUniformBlockRefPtr MtlfResourceFactory::NewUniformBlock() const
     return TfCreateRefPtr(new MtlfUniformBlock());
 }
 
+GarchArrayTextureRefPtr MtlfResourceFactory::NewArrayTexture(TfTokenVector const &imageFilePaths,
+                                                             unsigned int arraySize,
+                                                             unsigned int cropTop,
+                                                             unsigned int cropBottom,
+                                                             unsigned int cropLeft,
+                                                             unsigned int cropRight) const
+{
+    return TfCreateRefPtr(new MtlfArrayTexture(imageFilePaths, arraySize,
+                                               cropTop, cropBottom,
+                                               cropLeft, cropRight));
+}
+                          
 PXR_NAMESPACE_CLOSE_SCOPE
 
