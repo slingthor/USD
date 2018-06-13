@@ -157,10 +157,11 @@ protected:
             data = 0;
         }
         
-        uint32  index;
-        void*   data;
-        uint32  dataSize;
-        TfToken name;
+        uint32           index;
+        void*            data;
+        uint32           dataSize;
+        TfToken          name;
+        MSL_ProgramStage stage;
     };
     std::vector<OldStyleUniformData> oldStyleUniforms;
     int vtxUniformBackingBufferIdx;
