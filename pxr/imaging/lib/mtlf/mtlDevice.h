@@ -162,7 +162,9 @@ protected:
         uint32  dataSize;
         TfToken name;
     };
-	std::vector<OldStyleUniformData> oldStyleUniforms;
+    std::vector<OldStyleUniformData> oldStyleUniforms;
+    int vtxUniformBackingBufferIdx;
+    int fragUniformBackingBufferIdx;
 
     struct VertexBufferBinding { int idx; id<MTLBuffer> buffer; TfToken name; };
     std::vector<VertexBufferBinding> vertexBuffers;

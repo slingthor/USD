@@ -448,9 +448,9 @@ void MtlfMetalContext::SetVertexAttribute(uint32_t index,
     }
 }
 
-void MtlfMetalContext::SetUniform(const void* _data, uint32 _dataSize, const TfToken& _name, uint32 index, MSL_ProgramStage stage)
+void MtlfMetalContext::SetUniform(const void* _data, uint32 _dataSize, const TfToken& _name, uint32 _index, MSL_ProgramStage _stage)
 {
-    OldStyleUniformData newUniform = { index, 0, 0, _name };
+    OldStyleUniformData newUniform = { _index, 0, 0, _name, _stage };
     newUniform.alloc(_data, _dataSize);
     oldStyleUniforms.push_back(newUniform);
 }
@@ -514,7 +514,18 @@ void MtlfMetalContext::BakeState()
     
     for(auto uniform : oldStyleUniforms)
     {
-        //Todo, upload old style uniforms to the backing buffers.
+        if(uniform.stage == kMSL_ProgramStage_Vertex) {
+            if(vtxUniformBackingBufferIdx == -1)
+                TF_FATAL_CODING_ERROR("No vertex uniform backing buffer assigned!");
+            //METAL TODO: Upload to uniform buffer
+        }
+        else if(uniform.stage == kMSL_ProgramStage_Fragment) {
+            if(fragUniformBackingBufferIdx == -1)
+                TF_FATAL_CODING_ERROR("No fragment uniform backing buffer assigned!");
+            //METAL TODO: Upload to uniform buffer
+        }
+        else
+            TF_FATAL_CODING_ERROR("Not implemented!"); //Compute case
     }
     
     for(auto buffer : uniformBuffers)
@@ -555,7 +566,12 @@ void MtlfMetalContext::ClearState()
     indexBuffer = nil;
     numVertexComponents = 0;
     
+    for(auto it = oldStyleUniforms.begin(); it != oldStyleUniforms.end(); ++it)
+        it->release();
     oldStyleUniforms.clear();
+    vtxUniformBackingBufferIdx = -1;
+    fragUniformBackingBufferIdx = -1;
+
     vertexBuffers.clear();
     uniformBuffers.clear();
     textures.clear();
