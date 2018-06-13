@@ -25,7 +25,7 @@
 #include "pxr/pxr.h"
 
 #include "pxr/imaging/glf/glew.h"
-#include "pxr/usdImaging/UsdImagingMetal/unitTestMetalDrawing.h"
+#include "pxr/usdImaging/usdImagingMetal/unitTestMetalDrawing.h"
 
 #include "pxr/base/arch/systemInfo.h"
 #include "pxr/base/gf/bbox3d.h"
@@ -48,8 +48,8 @@
 #include "pxr/usdImaging/usdImaging/unitTestHelper.h"
 #include "pxr/usdImaging/usdImaging/tokens.h"
 
-#include "pxr/usdImaging/UsdImagingMetal/metal.h"
-#include "pxr/usdImaging/UsdImagingMetal/hdEngine.h"
+#include "pxr/usdImaging/usdImagingMetal/metal.h"
+#include "pxr/usdImaging/usdImagingMetal/hdEngine.h"
 
 #include <boost/shared_ptr.hpp>
 
