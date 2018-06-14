@@ -32,7 +32,6 @@
 #include "pxr/imaging/hdSt/cullingShaderKey.h"
 #include "pxr/imaging/hdSt/drawItemInstance.h"
 #include "pxr/imaging/hdSt/geometricShader.h"
-#include "pxr/imaging/hdSt/program.h"
 #include "pxr/imaging/hdSt/renderContextCaps.h"
 #include "pxr/imaging/hdSt/renderPassState.h"
 #include "pxr/imaging/hdSt/resourceRegistry.h"
@@ -40,6 +39,7 @@
 #include "pxr/imaging/hdSt/shaderKey.h"
 
 #include "pxr/imaging/hdSt/Metal/indirectDrawBatchMetal.h"
+#include "pxr/imaging/hdSt/Metal/mslProgram.h"
 #include "pxr/imaging/hdSt/Metal/persistentBufferMetal.h"
 
 #include "pxr/imaging/hd/binding.h"
@@ -955,27 +955,23 @@ HdSt_IndirectDrawBatchMetal::ExecuteDraw(
     //
 
     // bind program
-    _DrawingProgram & drawingProgram = _GetDrawingProgram(renderPassState,
+    _DrawingProgram & program = _GetDrawingProgram(renderPassState,
                                                    /*indirect=*/true,
                                                    resourceRegistry);
-    HdStProgramSharedPtr const &program = drawingProgram.GetProgram();
-    if (!TF_VERIFY(program)) return;
-    if (!TF_VERIFY(program->Validate())) return;
+    HdStProgramSharedPtr const &hdStProgram(program.GetProgram());
+    //HdStMSLProgramSharedPtr const &mslProgram(boost::dynamic_pointer_cast<HdStMSLProgram>(hdStProgram));
+    if (!TF_VERIFY(hdStProgram)) return;
+    if (!TF_VERIFY(hdStProgram->Validate())) return;
 
-    TF_FATAL_CODING_ERROR("Not Implemented");
-    /*
-    HdBufferResourceGPUHandle programId = program->GetGLProgram().GetId();
-    TF_VERIFY(programId);
+    hdStProgram->SetProgram();
 
-    glUseProgram(programId);
-
-    const Hd_ResourceBinder &binder = drawingProgram.GetBinder();
-    const HdShaderCodeSharedPtrVector &shaders = drawingProgram.GetComposedShaders();
+    const HdSt_ResourceBinder &binder = program.GetBinder();
+    const HdStShaderCodeSharedPtrVector &shaders = program.GetComposedShaders();
 
     // XXX: for surfaces shader, we need to iterate all drawItems to
     //      make textures resident, instead of just the first batchItem
     TF_FOR_ALL(it, shaders) {
-        (*it)->BindResources(binder, programId);
+        (*it)->BindResources(binder, *hdStProgram);
     }
 
     // constant buffer bind
@@ -1047,8 +1043,8 @@ HdSt_IndirectDrawBatchMetal::ExecuteDraw(
         HdBufferArrayRangeSharedPtr shaderBar_ = (*shader)->GetShaderData();
         shaderBar = boost::static_pointer_cast<HdBufferArrayRange>(shaderBar_);
         if (shaderBar) {
-            binder.BindBuffer(HdTokens->surfaceShaderParams, 
-                              shaderBar->GetResource());
+            binder.BindBuffer(HdTokens->materialParams,
+                              boost::dynamic_pointer_cast<HdStBufferResource>(shaderBar->GetResource()));
         }
     }
 
@@ -1058,27 +1054,28 @@ HdSt_IndirectDrawBatchMetal::ExecuteDraw(
     binder.BindBufferArray(dispatchBar);
 
     // update geometric shader states
-    program.GetGeometricShader()->BindResources(binder, programId);
+    program.GetGeometricShader()->BindResources(binder, *hdStProgram);
 
     GLuint batchCount = _dispatchBuffer->GetCount();
 
     TF_DEBUG(HD_DRAWITEM_DRAWN).Msg("DRAW (indirect): %d\n", batchCount);
-
+    
     if (_useDrawArrays) {
         TF_DEBUG(HD_MDI).Msg("MDI Drawing Arrays:\n"
                 " - primitive mode: %d\n"
                 " - indirect: %d\n"
                 " - drawCount: %d\n"
                 " - stride: %zu\n",
-               drawingProgram.GetGeometricShader()->GetPrimitiveMode(),
+               program.GetGeometricShader()->GetPrimitiveMode(),
                0, batchCount,
                _dispatchBuffer->GetCommandNumUints()*sizeof(GLuint));
 
-        glMultiDrawArraysIndirect(
-            program.GetGeometricShader()->GetPrimitiveMode(),
-            0, // draw command always starts with 0
-            batchCount,
-            _dispatchBuffer->GetCommandNumUints()*sizeof(GLuint));
+        TF_FATAL_CODING_ERROR("Not Implemented");
+//        glMultiDrawArraysIndirect(
+//            program.GetGeometricShader()->GetPrimitiveMode(),
+//            0, // draw command always starts with 0
+//            batchCount,
+//            _dispatchBuffer->GetCommandNumUints()*sizeof(GLuint));
     } else {
         TF_DEBUG(HD_MDI).Msg("MDI Drawing Elements:\n"
                 " - primitive mode: %d\n"
@@ -1086,16 +1083,17 @@ HdSt_IndirectDrawBatchMetal::ExecuteDraw(
                 " - indirect: %d\n"
                 " - drawCount: %d\n"
                 " - stride: %zu\n",
-               drawingProgram.GetGeometricShader()->GetPrimitiveMode(),
+               program.GetGeometricShader()->GetPrimitiveMode(),
                0, batchCount,
                _dispatchBuffer->GetCommandNumUints()*sizeof(GLuint));
 
-        glMultiDrawElementsIndirect(
-            drawingProgram.GetGeometricShader()->GetPrimitiveMode(),
-            GL_UNSIGNED_INT,
-            0, // draw command always starts with 0
-            batchCount,
-            _dispatchBuffer->GetCommandNumUints()*sizeof(GLuint));
+        TF_FATAL_CODING_ERROR("Not Implemented");
+//        glMultiDrawElementsIndirect(
+//            program.GetGeometricShader()->GetPrimitiveMode(),
+//            GL_UNSIGNED_INT,
+//            0, // draw command always starts with 0
+//            batchCount,
+//            _dispatchBuffer->GetCommandNumUints()*sizeof(GLuint));
     }
 
     HD_PERF_COUNTER_INCR(HdPerfTokens->drawCalls);
@@ -1111,8 +1109,8 @@ HdSt_IndirectDrawBatchMetal::ExecuteDraw(
     binder.UnbindBufferArray(vertexBar);
     binder.UnbindBufferArray(dispatchBar);
     if(shaderBar) {
-        binder.UnbindBuffer(HdTokens->surfaceShaderParams, 
-                            shaderBar->GetResource());
+        binder.UnbindBuffer(HdTokens->materialParams,
+                            boost::dynamic_pointer_cast<HdStBufferResource>(shaderBar->GetResource()));
     }
 
     if (instanceIndexBar) {
@@ -1123,12 +1121,11 @@ HdSt_IndirectDrawBatchMetal::ExecuteDraw(
     }
 
     TF_FOR_ALL(it, shaders) {
-        (*it)->UnbindResources(binder, programId);
+        (*it)->UnbindResources(binder, *hdStProgram);
     }
-    program.GetGeometricShader()->UnbindResources(binder, programId);
+    program.GetGeometricShader()->UnbindResources(binder, *hdStProgram);
 
-    glUseProgram(0);
- */
+    hdStProgram->UnsetProgram();
 }
 
 void
@@ -1173,10 +1170,6 @@ HdSt_IndirectDrawBatchMetal::_GPUFrustumCulling(
     // over other elements.
 
     const HdSt_ResourceBinder &binder = cullingProgram.GetBinder();
-
-    TF_FATAL_CODING_ERROR("Not Implemented");
-    //HdBufferResourceGPUHandle programId = program->GetProgram().GetId();
-    //glUseProgram(programId);
 
     // bind buffers
     binder.BindConstantBuffer(constantBar);

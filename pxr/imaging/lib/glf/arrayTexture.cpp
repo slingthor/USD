@@ -40,53 +40,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 TF_REGISTRY_FUNCTION(TfType)
 {
-    TfType::Define<GlfArrayTexture, TfType::Bases<GarchUVTexture> >();
-}
-
-GlfArrayTextureRefPtr 
-GlfArrayTexture::New(
-    TfTokenVector const &imageFilePaths,
-    unsigned int arraySize,
-    unsigned int cropTop,
-    unsigned int cropBottom,
-    unsigned int cropLeft,
-    unsigned int cropRight)
-{
-    if (imageFilePaths.empty()) {
-        // Need atleast one valid image file path.
-        TF_CODING_ERROR("Attempting to create an array texture with 0 texture file paths.");
-        return TfNullPtr;
-    }
-
-    return TfCreateRefPtr(new GlfArrayTexture(
-                              imageFilePaths, arraySize,
-                              cropTop, cropBottom,
-                              cropLeft, cropRight));
-}
-
-GlfArrayTextureRefPtr 
-GlfArrayTexture::New(
-    std::vector<std::string> const &imageFilePaths,
-    unsigned int arraySize,
-    unsigned int cropTop,
-    unsigned int cropBottom,
-    unsigned int cropLeft,
-    unsigned int cropRight)
-{
-    TfTokenVector imageFilePathTokens(imageFilePaths.begin(), imageFilePaths.end());
-    return TfCreateRefPtr(new GlfArrayTexture(
-                              imageFilePathTokens,
-                              arraySize,
-                              cropTop,
-                              cropBottom,
-                              cropLeft,
-                              cropRight));
-}
-
-bool 
-GlfArrayTexture::IsSupportedImageFile(TfToken const &imageFilePath)
-{
-    return GarchUVTexture::IsSupportedImageFile(imageFilePath);
+    TfType::Define<GlfArrayTexture, TfType::Bases<GarchArrayTexture> >();
 }
 
 GlfArrayTexture::GlfArrayTexture(
@@ -97,14 +51,12 @@ GlfArrayTexture::GlfArrayTexture(
     unsigned int cropLeft,
     unsigned int cropRight)
     
-    : GarchUVTexture(imageFilePaths[0],
-                    cropTop,
-                    cropBottom,
-                    cropLeft,
-                    cropRight),
-
-      _imageFilePaths(imageFilePaths),
-    _arraySize(arraySize)
+    : GarchArrayTexture(imageFilePaths,
+                        arraySize,
+                        cropTop,
+                        cropBottom,
+                        cropLeft,
+                        cropRight)
 {
     // do nothing
 }
@@ -116,8 +68,8 @@ GlfArrayTexture::_OnSetMemoryRequested(size_t targetMemory)
     for (size_t i = 0; i < _arraySize; ++i) {
         GarchUVTextureDataRefPtr texData =
             GarchUVTextureData::New(_GetImageFilePath(i), targetMemory,
-                                  _GetCropTop(), _GetCropBottom(),
-                                  _GetCropLeft(), _GetCropRight());
+                                    _GetCropTop(), _GetCropBottom(),
+                                    _GetCropLeft(), _GetCropRight());
         if (texData) {
             texData->Read(0, _GenerateMipmap());
         }

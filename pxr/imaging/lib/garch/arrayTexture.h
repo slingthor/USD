@@ -104,8 +104,6 @@ protected:
     const TfToken& _GetImageFilePath(size_t index) const;
     using GarchUVTexture::_GetImageFilePath;
 
-private:
-
     TfTokenVector _imageFilePaths;
     const unsigned int _arraySize;
 };

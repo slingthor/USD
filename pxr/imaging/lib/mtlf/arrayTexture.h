@@ -29,7 +29,7 @@
 #include "pxr/pxr.h"
 #include "pxr/imaging/mtlf/api.h"
 
-#include "pxr/imaging/garch/uvTexture.h"
+#include "pxr/imaging/garch/arrayTexture.h"
 
 #include "pxr/base/tf/declarePtrs.h"
 #include "pxr/base/tf/token.h"
@@ -49,7 +49,7 @@ TF_DECLARE_WEAK_AND_REF_PTRS(MtlfArrayTexture);
 /// Currently accepted image formats are png, jpg and bmp.
 ///
 
-class MtlfArrayTexture : public GarchUVTexture {
+class MtlfArrayTexture : public GarchArrayTexture {
 public:
 
     typedef GarchUVTexture Parent;
@@ -94,6 +94,8 @@ protected:
         unsigned int cropBottom,
         unsigned int cropLeft,
         unsigned int cropRight);
+    
+    friend class MtlfResourceFactory;
 
     MTLF_API
     const TfToken& _GetImageFilePath(size_t index) const;
@@ -112,11 +114,6 @@ protected:
                                 int const unpackCropBottom = 0,
                                 int const unpackCropLeft = 0,
                                 int const unpackCropRight = 0) {}
-
-private:
-
-    TfTokenVector _imageFilePaths;
-    const unsigned int _arraySize;
 };
 
 

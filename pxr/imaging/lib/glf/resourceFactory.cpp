@@ -25,6 +25,7 @@
 //
 #include <pxr/imaging/glf/resourceFactory.h>
 
+#include <pxr/imaging/glf/arrayTexture.h>
 #include <pxr/imaging/glf/bindingMap.h>
 #include <pxr/imaging/glf/drawTarget.h>
 #include <pxr/imaging/glf/simpleLightingContext.h>
@@ -75,6 +76,18 @@ GarchDrawTarget *GlfResourceFactory::NewDrawTarget(GarchDrawTargetPtr const & dr
 GarchUniformBlockRefPtr GlfResourceFactory::NewUniformBlock() const
 {
     return TfCreateRefPtr(new GlfUniformBlock());
+}
+
+GarchArrayTextureRefPtr GlfResourceFactory::NewArrayTexture(TfTokenVector const &imageFilePaths,
+                                                            unsigned int arraySize,
+                                                            unsigned int cropTop,
+                                                            unsigned int cropBottom,
+                                                            unsigned int cropLeft,
+                                                            unsigned int cropRight) const
+{
+    return TfCreateRefPtr(new GlfArrayTexture(imageFilePaths, arraySize,
+                                              cropTop, cropBottom,
+                                              cropLeft, cropRight));
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

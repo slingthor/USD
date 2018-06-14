@@ -25,6 +25,7 @@
 // 
 
 #include "pxr/imaging/garch/arrayTexture.h"
+#include "pxr/imaging/garch/resourceFactory.h"
 #include "pxr/imaging/garch/uvTextureData.h"
 #include "pxr/imaging/garch/utils.h"
 #include "pxr/base/tf/registryManager.h"
@@ -39,14 +40,12 @@ TF_REGISTRY_FUNCTION(TfType)
     TfType::Define<GarchArrayTexture, TfType::Bases<GarchUVTexture> >();
 }
 
-GarchArrayTextureRefPtr
-GarchArrayTexture::New(
-    TfTokenVector const &imageFilePaths,
-    unsigned int arraySize,
-    unsigned int cropTop,
-    unsigned int cropBottom,
-    unsigned int cropLeft,
-    unsigned int cropRight)
+GarchArrayTextureRefPtr GarchArrayTexture::New(TfTokenVector const &imageFilePaths,
+                                               unsigned int arraySize,
+                                               unsigned int cropTop,
+                                               unsigned int cropBottom,
+                                               unsigned int cropLeft,
+                                               unsigned int cropRight)
 {
     if (imageFilePaths.empty()) {
         // Need atleast one valid image file path.
@@ -54,13 +53,11 @@ GarchArrayTexture::New(
         return TfNullPtr;
     }
 
-    TF_FATAL_CODING_ERROR("Not Implemented");
-    return TfNullPtr;
-//    return TfCreateRefPtr(new GarchArrayTexture(
-//                              imageFilePaths, arraySize,
-//                              cropTop, cropBottom,
-//                              cropLeft, cropRight));
+    return GarchResourceFactory::GetInstance()->NewArrayTexture(imageFilePaths, arraySize,
+                                                                cropTop, cropBottom,
+                                                                cropLeft, cropRight);
 }
+
 
 GarchArrayTextureRefPtr
 GarchArrayTexture::New(
@@ -72,15 +69,10 @@ GarchArrayTexture::New(
     unsigned int cropRight)
 {
     TfTokenVector imageFilePathTokens(imageFilePaths.begin(), imageFilePaths.end());
-    TF_FATAL_CODING_ERROR("Not Implemented");
-    return TfNullPtr;
-//    return TfCreateRefPtr(new GarchArrayTexture(
-//                              imageFilePathTokens,
-//                              arraySize,
-//                              cropTop,
-//                              cropBottom,
-//                              cropLeft,
-//                              cropRight));
+
+    return GarchResourceFactory::GetInstance()->NewArrayTexture(imageFilePathTokens, arraySize,
+                                                                cropTop, cropBottom,
+                                                                cropLeft, cropRight);
 }
 
 bool 

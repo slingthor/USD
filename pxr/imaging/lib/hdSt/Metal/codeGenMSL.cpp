@@ -1048,8 +1048,8 @@ HdSt_CodeGenMSL::Compile()
                 TfToken("gl_ClipDistance"),
                 TfToken("float"),
                 // XXX - Causes an internal error on Lobo - fixed in Liberty 18A281+
-                TfToken("[[clip_distance]]")).usage |= TParam::VertexShaderOnly;
-                //TfToken("")).usage |= TParam::VertexShaderOnly;
+                //TfToken("[[clip_distance]]")).usage |= TParam::VertexShaderOnly;
+                TfToken("")).usage |= TParam::VertexShaderOnly;
 
     // _EmitOutput(_genCommon, _mslVSOutputParams, TfToken("gl_PrimitiveID"), TfToken("uint"), TfToken("[[flat]]"));
     // XXX - Hook this up somehow. Output from the vertex shader perhaps?

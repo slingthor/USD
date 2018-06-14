@@ -29,6 +29,7 @@
 #include "pxr/pxr.h"
 #include "pxr/base/tf/declarePtrs.h"
 #include "pxr/base/tf/singleton.h"
+#include "pxr/base/tf/token.h"
 #include "pxr/base/gf/vec2i.h"
 
 #include <boost/noncopyable.hpp>
@@ -43,6 +44,7 @@ class GarchUniformBlock;
 class GLSLFX;
 class HdSt_CodeGen;
 
+TF_DECLARE_WEAK_AND_REF_PTRS(GarchArrayTexture);
 TF_DECLARE_WEAK_AND_REF_PTRS(GarchDrawTarget);
 TF_DECLARE_WEAK_AND_REF_PTRS(GarchUniformBlock);
 
@@ -51,16 +53,16 @@ class GarchResourceFactoryInterface {
 public:
     virtual ~GarchResourceFactoryInterface() {}
     
-    // GarchSimpleLightingContext creation
+    // SimpleLightingContext creation
     virtual GarchSimpleLightingContext *NewSimpleLightingContext() const = 0;
     
-    // GarchSimpleShadowArray creation
+    // SimpleShadowArray creation
     virtual GarchSimpleShadowArray *NewSimpleShadowArray(GfVec2i const & size, size_t numLayers) const = 0;
     
-    // GarchBindingMap
+    // BindingMap
     virtual GarchBindingMap *NewBindingMap() const = 0;
     
-    // GarchDrawTarget
+    // DrawTarget
     virtual GarchDrawTarget *NewDrawTarget(GfVec2i const & size, bool requestMSAA) const = 0;
     virtual GarchDrawTarget *NewDrawTarget(GarchDrawTargetPtr const & drawtarget) const = 0;
     
@@ -69,6 +71,14 @@ public:
     
     // Package Name accessor
     virtual std::string GetPackageName() const = 0;
+    
+    // ArrayTexture creation
+    virtual GarchArrayTextureRefPtr NewArrayTexture(TfTokenVector const &imageFilePaths,
+                                                    unsigned int arraySize,
+                                                    unsigned int cropTop,
+                                                    unsigned int cropBottom,
+                                                    unsigned int cropLeft,
+                                                    unsigned int cropRight) const = 0;
     
 protected:
     GarchResourceFactoryInterface() {}
