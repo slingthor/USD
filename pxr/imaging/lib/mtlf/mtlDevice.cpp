@@ -462,9 +462,10 @@ void MtlfMetalContext::SetUniformBuffer(int index, id<MTLBuffer> buffer, const T
     if(oldStyleBacker)
     {
         if(stage == kMSL_ProgramStage_Vertex) {
-            
+            vtxUniformBackingBuffer = buffer;
         }
         else if(stage == kMSL_ProgramStage_Fragment) {
+            fragUniformBackingBuffer = buffer;
         }
     }
 }
@@ -515,14 +516,18 @@ void MtlfMetalContext::BakeState()
     for(auto uniform : oldStyleUniforms)
     {
         if(uniform.stage == kMSL_ProgramStage_Vertex) {
-            if(vtxUniformBackingBufferIdx == -1)
+            if(!vtxUniformBackingBuffer)
                 TF_FATAL_CODING_ERROR("No vertex uniform backing buffer assigned!");
-            //METAL TODO: Upload to uniform buffer
+            void * data = vtxUniformBackingBuffer.contents;
+            memcpy(data, uniform.data, uniform.dataSize);
+            [vtxUniformBackingBuffer didModifyRange:NSMakeRange(uniform.index, uniform.dataSize)];
         }
         else if(uniform.stage == kMSL_ProgramStage_Fragment) {
-            if(fragUniformBackingBufferIdx == -1)
+            if(!fragUniformBackingBuffer)
                 TF_FATAL_CODING_ERROR("No fragment uniform backing buffer assigned!");
-            //METAL TODO: Upload to uniform buffer
+            void * data = fragUniformBackingBuffer.contents;
+            memcpy(data, uniform.data, uniform.dataSize);
+            [fragUniformBackingBuffer didModifyRange:NSMakeRange(uniform.index, uniform.dataSize)];
         }
         else
             TF_FATAL_CODING_ERROR("Not implemented!"); //Compute case
@@ -569,8 +574,8 @@ void MtlfMetalContext::ClearState()
     for(auto it = oldStyleUniforms.begin(); it != oldStyleUniforms.end(); ++it)
         it->release();
     oldStyleUniforms.clear();
-    vtxUniformBackingBufferIdx = -1;
-    fragUniformBackingBufferIdx = -1;
+    vtxUniformBackingBuffer = 0;
+    fragUniformBackingBuffer = 0;
 
     vertexBuffers.clear();
     uniformBuffers.clear();
