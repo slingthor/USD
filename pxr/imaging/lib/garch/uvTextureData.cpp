@@ -53,9 +53,7 @@ GarchUVTextureData::New(
 GarchUVTextureDataRefPtr
 GarchUVTextureData::New(std::string const &filePath, Params const &params)
 {
-    TF_FATAL_CODING_ERROR("Not Implemented");
-    return TfNullPtr;
-//    return TfCreateRefPtr(new GarchUVTextureData(filePath, params));
+    return TfCreateRefPtr(new GarchUVTextureData(filePath, params));
 }
 
 GarchUVTextureData::~GarchUVTextureData()
