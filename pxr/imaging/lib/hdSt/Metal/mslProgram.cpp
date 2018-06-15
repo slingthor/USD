@@ -373,14 +373,14 @@ void HdStMSLProgram::SetProgram() const {
         {
             //Add new default buffer for the default inputs
             MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
-            id<MTLBuffer> mtlBuffer = [context->device newBufferWithLength:it->_uniformBufferSize options:MTLResourceOptionCPUCacheModeWriteCombined];
+            id<MTLBuffer> mtlBuffer = [context->device newBufferWithLength:it->_uniformBufferSize options:MTLResourceStorageModeManaged];
             
             MtlfMetalContext::GetMetalContext()->SetUniformBuffer(it->_index, mtlBuffer, TfToken(it->_name), kMSL_ProgramStage_Fragment, true);
         }
         if(it->_name == "vtxUniforms" && it->_stage == kMSL_ProgramStage_Vertex && it->_type == kMSL_BindingType_UniformBuffer)
         {
             MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
-            id<MTLBuffer> mtlBuffer = [context->device newBufferWithLength:it->_uniformBufferSize options:MTLResourceOptionCPUCacheModeWriteCombined];
+            id<MTLBuffer> mtlBuffer = [context->device newBufferWithLength:it->_uniformBufferSize options:MTLResourceStorageModeManaged];
             
             MtlfMetalContext::GetMetalContext()->SetUniformBuffer(it->_index, mtlBuffer, TfToken(it->_name), kMSL_ProgramStage_Vertex, true);
         }

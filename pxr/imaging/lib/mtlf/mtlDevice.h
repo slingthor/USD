@@ -164,8 +164,8 @@ protected:
         MSL_ProgramStage stage;
     };
     std::vector<OldStyleUniformData> oldStyleUniforms;
-    int vtxUniformBackingBufferIdx;
-    int fragUniformBackingBufferIdx;
+    id<MTLBuffer> vtxUniformBackingBuffer;
+    id<MTLBuffer> fragUniformBackingBuffer;
 
     struct VertexBufferBinding { int idx; id<MTLBuffer> buffer; TfToken name; };
     std::vector<VertexBufferBinding> vertexBuffers;
