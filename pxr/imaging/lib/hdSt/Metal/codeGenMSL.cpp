@@ -79,6 +79,16 @@ void METAL_DEBUG_COMMENT(std::stringstream *str, Args... args)
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+std::string replaceStringAll(std::string str, const std::string& old, const std::string& new_s) {
+    if(!old.empty()){
+        size_t pos = str.find(old);
+        while ((pos = str.find(old, pos)) != std::string::npos) {
+            str=str.replace(pos, old.length(), new_s);
+            pos += new_s.length();
+        }
+    }
+    return str;
+}
 
 TF_DEFINE_PRIVATE_TOKENS(
     _tokens,
@@ -272,10 +282,10 @@ _GetPackedTypeDefinitions()
            "#define hd_ivec3_get(v) packed_int3(v)\n"
            "#define hd_vec3_get(v)  packed_float3(v)\n"
            "#define hd_dvec3_get(v) packed_float3(v)\n"
-           "int hd_int_get(int v)          { return v; }\n"
-           "int hd_int_get(ivec2 v)        { return v[0]; }\n"
-           "int hd_int_get(ivec3 v)        { return v[0]; }\n"
-           "int hd_int_get(ivec4 v)        { return v[0]; }\n";
+           "int hd_int_get<st>(int v)          { return v; }\n"
+           "int hd_int_get<st>(ivec2 v)        { return v[0]; }\n"
+           "int hd_int_get<st>(ivec3 v)        { return v[0]; }\n"
+           "int hd_int_get<st>(ivec4 v)        { return v[0]; }\n";
 }
 
 static TfToken const &
@@ -865,7 +875,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
             glueVS << "device ";
         }
         if (input.usage & HdSt_CodeGenMSL::TParam::ProgramScope) {
-            glueVS << "ProgramScope::";
+            glueVS << "ProgramScope<st>::";
         }
         glueVS << input.dataType << " " << input.name << attrib << "\n";
     }
@@ -884,7 +894,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
     ///////////////////////////////////////////////////////////////////////////
     
     glueVS  << ") {\n"
-            << "ProgramScope scope;\n"
+            << "ProgramScope<st> scope;\n"
             << copyInputsVtx.str()
             << "scope.main();\n"
             << "MSLVtxOutputs vtxOut;\n"
@@ -932,13 +942,13 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
         mslProgram->AddBinding(n, location++, kMSL_BindingType_UniformBuffer, kMSL_ProgramStage_Fragment);
 
         if (input.usage & HdSt_CodeGenMSL::TParam::ProgramScope) {
-            gluePS << " ProgramScope::";
+            gluePS << " ProgramScope<st>::";
         }
         gluePS << input.dataType << " " << input.name << attrib << "\n";
     }
 
     gluePS  << ") {\n"
-            << "ProgramScope scope;\n"
+            << "ProgramScope<st> scope;\n"
             << copyInputsFrag.str()
             << "scope.main();\n"
             << "MSLFragOutputs fragOut;\n"
@@ -1008,7 +1018,7 @@ HdSt_CodeGenMSL::Compile()
                << "#define lessThan(a,b)    (a < b)\n";
 
     
-    _genCommon << "class ProgramScope {\n"
+    _genCommon << "class ProgramScope<st> {\n"
                << "public:\n";
     
     METAL_DEBUG_COMMENT(&_genCommon, "Start of special inputs\n"); //MTL_FIXME
@@ -1323,7 +1333,7 @@ HdSt_CodeGenMSL::Compile()
     };
     
     std::stringstream termination;
-    termination << "}; // ProgramScope\n";
+    termination << "}; // ProgramScope<st>\n";
     
     // Externally sourced glslfx translation to MSL
     _ParseGLSL(_genVS, _mslVSInputParams, _mslVSOutputParams);
@@ -1340,6 +1350,8 @@ HdSt_CodeGenMSL::Compile()
     // note: _vsSource, _fsSource etc are used for diagnostics (see header)
     if (hasVS) {
         _vsSource = _genCommon.str() + _genVS.str() + termination.str() + glueVS.str();
+        _vsSource = replaceStringAll(_vsSource, "<st>", "_Vert");
+
         if (!mslProgram->CompileShader(GL_VERTEX_SHADER, _vsSource)) {
             return HdStProgramSharedPtr();
         }
@@ -1347,6 +1359,8 @@ HdSt_CodeGenMSL::Compile()
     }
     if (hasFS) {
         _fsSource = _genCommon.str() + _genFS.str() + termination.str() + gluePS.str();
+        _fsSource = replaceStringAll(_fsSource, "<st>", "_Frag");
+
         if (!mslProgram->CompileShader(GL_FRAGMENT_SHADER, _fsSource)) {
             return HdStProgramSharedPtr();
         }
@@ -1564,7 +1578,7 @@ static HdSt_CodeGenMSL::TParam& _EmitDeclarationPtr(std::stringstream &str,
     TfToken ptrName(std::string("*") + name.GetString());
     str << "device ";
     if (programScope) {
-        str << "ProgramScope::";
+        str << "ProgramScope<st>::";
     }
     HdSt_CodeGenMSL::TParam& result(_EmitDeclaration(str, inputParams, ptrName, type, attribute, binding, arraySize));
     result.usage |= HdSt_CodeGenMSL::TParam::Usage::EntryFuncArgument;
@@ -2413,7 +2427,7 @@ HdSt_CodeGenMSL::_GenerateElementPrimVar()
             // straight-forward indexing to get the segment's curve id
             accessors
                 << "int GetElementID() {\n"
-                << "  return (hd_int_get(HdGet_primitiveParam()));\n"
+                << "  return (hd_int_get<st>(HdGet_primitiveParam()));\n"
                 << "}\n";
             accessors
                 << "int GetAggregatedElementID() {\n"
@@ -2523,7 +2537,7 @@ HdSt_CodeGenMSL::_GenerateElementPrimVar()
             // ElementID getters
             accessors
                 << "int GetElementID() {\n"
-                << "  return (hd_int_get(HdGet_primitiveParam()) >> 2);\n"
+                << "  return (hd_int_get<st>(HdGet_primitiveParam()) >> 2);\n"
                 << "}\n";
 
             accessors
