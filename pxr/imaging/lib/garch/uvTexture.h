@@ -81,10 +81,18 @@ public:
 
     GARCH_API
     virtual bool IsMinFilterSupported(GLenum filter);
+    
+    GARCH_API
+    virtual BindingVector GetBindings(TfToken const & identifier,
+                                      GarchSamplerGPUHandle samplerName) const override
+    {
+        return _baseTexture->GetBindings(identifier, samplerName);
+    }
 
 protected:
     GARCH_API
     GarchUVTexture(
+        GarchBaseTexture *baseTexture,
         TfToken const &imageFilePath,
         unsigned int cropTop,
         unsigned int cropBottom,
@@ -101,8 +109,27 @@ protected:
     unsigned int _GetCropBottom() const {return _cropBottom;}
     unsigned int _GetCropLeft() const {return _cropLeft;}
     unsigned int _GetCropRight() const {return _cropRight;}
+    
+    GARCH_API
+    virtual void _UpdateTexture(GarchBaseTextureDataConstPtr texData) override
+    {
+        _baseTexture->_UpdateTexture(texData);
+    }
+    GARCH_API
+    virtual void _CreateTexture(GarchBaseTextureDataConstPtr texData,
+                                bool const useMipmaps,
+                                int const unpackCropTop = 0,
+                                int const unpackCropBottom = 0,
+                                int const unpackCropLeft = 0,
+                                int const unpackCropRight = 0) override
+    {
+        _baseTexture->_CreateTexture(texData, useMipmaps,
+                                     unpackCropTop, unpackCropBottom,
+                                     unpackCropLeft, unpackCropRight);
+    }
 
 private:
+    GarchBaseTexture *_baseTexture;
     const TfToken _imageFilePath;
     const unsigned int _cropTop;
     const unsigned int _cropBottom;

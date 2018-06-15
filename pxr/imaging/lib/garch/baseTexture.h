@@ -80,6 +80,7 @@ public:
     GARCH_API
     virtual BindingVector GetBindings(TfToken const & identifier,
                                       GarchSamplerGPUHandle samplerName) const override = 0;
+
     GARCH_API
     virtual VtDictionary GetTextureInfo() const override;
 
@@ -97,6 +98,8 @@ protected:
                         int const unpackCropBottom = 0,
                         int const unpackCropLeft = 0,
                         int const unpackCropRight = 0) = 0;
+
+    friend class GarchUVTexture;
 
     // texture object
     GarchTextureGPUHandle _textureName;

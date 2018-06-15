@@ -26,6 +26,7 @@
 #include <pxr/imaging/glf/resourceFactory.h>
 
 #include <pxr/imaging/glf/arrayTexture.h>
+#include <pxr/imaging/glf/baseTexture.h>
 #include <pxr/imaging/glf/bindingMap.h>
 #include <pxr/imaging/glf/drawTarget.h>
 #include <pxr/imaging/glf/simpleLightingContext.h>
@@ -88,6 +89,11 @@ GarchArrayTextureRefPtr GlfResourceFactory::NewArrayTexture(TfTokenVector const 
     return TfCreateRefPtr(new GlfArrayTexture(imageFilePaths, arraySize,
                                               cropTop, cropBottom,
                                               cropLeft, cropRight));
+}
+
+GarchBaseTexture *GlfResourceFactory::NewBaseTexture() const
+{
+    return new GlfBaseTexture();
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

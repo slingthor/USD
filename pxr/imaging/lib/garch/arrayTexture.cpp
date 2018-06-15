@@ -89,11 +89,12 @@ GarchArrayTexture::GarchArrayTexture(
     unsigned int cropLeft,
     unsigned int cropRight)
     
-    : GarchUVTexture(imageFilePaths[0],
-                    cropTop,
-                    cropBottom,
-                    cropLeft,
-                    cropRight),
+    : GarchUVTexture(this,
+                     imageFilePaths[0],
+                     cropTop,
+                     cropBottom,
+                     cropLeft,
+                     cropRight),
 
       _imageFilePaths(imageFilePaths),
     _arraySize(arraySize)

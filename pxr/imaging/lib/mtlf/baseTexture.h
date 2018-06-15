@@ -80,6 +80,8 @@ protected:
     
     MTLF_API
     MtlfBaseTexture();
+    
+    friend class MtlfResourceFactory;
 
     MTLF_API
     virtual void _UpdateTexture(GarchBaseTextureDataConstPtr texData) override;

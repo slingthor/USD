@@ -80,6 +80,8 @@ protected:
     
     GLF_API
     GlfBaseTexture();
+    
+    friend class GlfResourceFactory;
 
     GLF_API
     void _UpdateTexture(GarchBaseTextureDataConstPtr texData);

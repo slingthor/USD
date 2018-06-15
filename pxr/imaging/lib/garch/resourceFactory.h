@@ -36,6 +36,7 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+class GarchBaseTexture;
 class GarchBindingMap;
 class GarchDrawTarget;
 class GarchSimpleLightingContext;
@@ -47,7 +48,6 @@ class HdSt_CodeGen;
 TF_DECLARE_WEAK_AND_REF_PTRS(GarchArrayTexture);
 TF_DECLARE_WEAK_AND_REF_PTRS(GarchDrawTarget);
 TF_DECLARE_WEAK_AND_REF_PTRS(GarchUniformBlock);
-
 
 class GarchResourceFactoryInterface {
 public:
@@ -79,6 +79,9 @@ public:
                                                     unsigned int cropBottom,
                                                     unsigned int cropLeft,
                                                     unsigned int cropRight) const = 0;
+    
+    // BaseTexture
+    virtual GarchBaseTexture *NewBaseTexture() const = 0;
     
 protected:
     GarchResourceFactoryInterface() {}
