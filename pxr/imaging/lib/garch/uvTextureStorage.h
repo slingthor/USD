@@ -40,7 +40,7 @@ TF_DECLARE_WEAK_AND_REF_PTRS(GarchUVTextureStorage);
 
 /// \class GarchUVTextureStorage
 ///
-/// Represents a texture object in Glf initialized from a VtValue.
+/// Represents a texture object in Garch initialized from a VtValue.
 ///
 /// A GarchUVTextureStorage is currently initialized from a float/double, GfVec3d, or GfVec4d.
 ///
@@ -54,20 +54,50 @@ public:
         unsigned int width,
         unsigned int height, 
         const VtValue &storageData);
+    
+    GARCH_API
+    virtual BindingVector GetBindings(TfToken const & identifier,
+                                      GarchSamplerGPUHandle samplerName) const override
+    {
+        return _baseTexture->GetBindings(identifier, samplerName);
+    }
 
 protected:
     GARCH_API
     GarchUVTextureStorage(
+        GarchBaseTexture *baseTexture,
         unsigned int width,
         unsigned int height, 
         const VtValue &storageData);
+    
+    GARCH_API
+    virtual ~GarchUVTextureStorage();
 
     GARCH_API
     virtual void _OnSetMemoryRequested(size_t targetMemory);
     GARCH_API
     virtual bool _GenerateMipmap() const;
     
+    GARCH_API
+    virtual void _UpdateTexture(GarchBaseTextureDataConstPtr texData) override
+    {
+        return _baseTexture->_UpdateTexture(texData);
+    }
+    GARCH_API
+    virtual void _CreateTexture(GarchBaseTextureDataConstPtr texData,
+                                bool const useMipmaps,
+                                int const unpackCropTop = 0,
+                                int const unpackCropBottom = 0,
+                                int const unpackCropLeft = 0,
+                                int const unpackCropRight = 0) override
+    {
+        return _baseTexture->_CreateTexture(texData, useMipmaps,
+                                            unpackCropTop, unpackCropBottom,
+                                            unpackCropLeft, unpackCropRight);
+    }
+    
 private:
+    GarchBaseTexture *_baseTexture;
     unsigned int _width, _height;
     VtValue _storageData;
 };

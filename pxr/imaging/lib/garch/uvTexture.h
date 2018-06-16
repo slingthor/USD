@@ -98,6 +98,9 @@ protected:
         unsigned int cropBottom,
         unsigned int cropLeft,
         unsigned int cropRight);
+    
+    GARCH_API
+    virtual ~GarchUVTexture();
 
     GARCH_API
     virtual void _OnSetMemoryRequested(size_t targetMemory);

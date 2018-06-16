@@ -50,55 +50,55 @@ public:
     virtual ~GarchUVTextureStorageData();
 
    // GarchBaseTextureData overrides
-    virtual int ResizedWidth(int mipLevel = 0) const {
+    virtual int ResizedWidth(int mipLevel = 0) const override {
         return _resizedWidth;
     };
 
-    virtual int ResizedHeight(int mipLevel = 0) const {
+    virtual int ResizedHeight(int mipLevel = 0) const override {
         return _resizedHeight;
     };
 
-    virtual GLenum GLInternalFormat() const {
+    virtual GLenum GLInternalFormat() const override {
         return _glInternalFormat;
     };
 
-    virtual GLenum GARCHormat() const {
+    virtual GLenum GLFormat() const override {
         return _glFormat;
     };
 
-    virtual GLenum GLType() const {
+    virtual GLenum GLType() const override {
         return _glType;
     };
 
-    virtual size_t TargetMemory() const {
+    virtual size_t TargetMemory() const override {
         return _targetMemory;
     };
 
-    virtual WrapInfo GetWrapInfo() const {
+    virtual WrapInfo GetWrapInfo() const override {
         return _wrapInfo;
     };
 
     GARCH_API
-    virtual size_t ComputeBytesUsed() const;
+    virtual size_t ComputeBytesUsed() const override;
 
-    virtual size_t ComputeBytesUsedByMip(int mipLevel = 0) const {
+    virtual size_t ComputeBytesUsedByMip(int mipLevel = 0) const override {
         return ComputeBytesUsed();
     }
 
     GARCH_API
-    virtual bool HasRawBuffer(int mipLevel = 0) const;
+    virtual bool HasRawBuffer(int mipLevel = 0) const override;
 
     GARCH_API
-    virtual unsigned char * GetRawBuffer(int mipLevel = 0) const;
+    virtual unsigned char * GetRawBuffer(int mipLevel = 0) const override;
 
     GARCH_API
-    virtual bool Read(int degradeLevel, bool generateMipmap);
+    virtual bool Read(int degradeLevel, bool generateMipmap) override;
 
     GARCH_API
-    virtual bool IsCompressed() const;
+    virtual bool IsCompressed() const override;
 
     GARCH_API
-    virtual int GetNumMipLevels() const;
+    virtual int GetNumMipLevels() const override;
 
 private:
 

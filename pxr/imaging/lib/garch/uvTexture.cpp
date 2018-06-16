@@ -117,6 +117,13 @@ GarchUVTexture::GarchUVTexture(
     /* nothing */
 }
 
+GarchUVTexture::~GarchUVTexture()
+{
+    if (_baseTexture) {
+        delete _baseTexture;
+    }
+}
+
 VtDictionary
 GarchUVTexture::GetTextureInfo() const
 {

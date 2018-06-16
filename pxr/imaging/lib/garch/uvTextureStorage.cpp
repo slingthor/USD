@@ -24,6 +24,7 @@
 /// \file UVTextureStorage.cpp
 //    
 
+#include "pxr/imaging/garch/resourceFactory.h"
 #include "pxr/imaging/garch/uvTextureStorage.h"
 #include "pxr/imaging/garch/uvTextureStorageData.h"
 
@@ -41,21 +42,29 @@ GarchUVTextureStorage::New(
     unsigned int height, 
     const VtValue &storageData)
 {
-    TF_FATAL_CODING_ERROR("Not Implemented");
-    return TfNullPtr;
-//    return TfCreateRefPtr(new GarchUVTextureStorage(
-//        width, height, storageData));
+    return TfCreateRefPtr(new GarchUVTextureStorage(
+                                    GarchResourceFactory::GetInstance()->NewBaseTexture(),
+                                    width, height, storageData));
 }
 
 GarchUVTextureStorage::GarchUVTextureStorage(
+    GarchBaseTexture *baseTexture,
     unsigned int width,
     unsigned int height, 
     const VtValue &storageData)
-    : _width(width)
+    : _baseTexture(baseTexture)
+    , _width(width)
     , _height(height)
     , _storageData(storageData)
 {
     /* nothing */
+}
+
+GarchUVTextureStorage::~GarchUVTextureStorage()
+{
+    if (_baseTexture) {
+        delete _baseTexture;
+    }
 }
 
 void 
