@@ -655,7 +655,7 @@ MtlfDrawTarget::MtlfAttachment::_GenTexture()
                 mtlFormat = MTLPixelFormatRGBA32Float;
             }
             else if (type == GL_UNSIGNED_BYTE) {
-                mtlFormat = MTLPixelFormatRGBA8Unorm;
+                mtlFormat = MTLPixelFormatBGRA8Unorm;
             }
             break;
 
