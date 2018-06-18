@@ -38,10 +38,12 @@ MtlfSimpleShadowArray::MtlfSimpleShadowArray(GfVec2i const & size,
                                            size_t numLayers) :
     GarchSimpleShadowArray(size, numLayers)
 {
+    _AllocSamplers();
 }
 
 MtlfSimpleShadowArray::~MtlfSimpleShadowArray()
 {
+    _FreeSamplers();
     _FreeTextureArray();
 }
 
@@ -106,9 +108,45 @@ MtlfSimpleShadowArray::EndCapture(size_t)
 }
 
 void
+MtlfSimpleShadowArray::_AllocSamplers()
+{
+    MtlfMetalContextSharedPtr mtlContext = MtlfMetalContext::GetMetalContext()->GetMetalContext();
+    MTLSamplerDescriptor* samplerDescriptor = [MTLSamplerDescriptor new];
+    samplerDescriptor.tAddressMode = MTLSamplerAddressModeClampToBorderColor;
+    samplerDescriptor.sAddressMode = MTLSamplerAddressModeClampToBorderColor;
+    samplerDescriptor.minFilter = MTLSamplerMinMagFilterLinear;
+    samplerDescriptor.magFilter = MTLSamplerMinMagFilterLinear;
+    samplerDescriptor.borderColor = MTLSamplerBorderColorOpaqueWhite;
+    _shadowDepthSampler = [mtlContext->device newSamplerStateWithDescriptor:samplerDescriptor];
+    
+    //METAL TODO: Check whether the sampler below is really going to provide the same functionality as the GL sample in the comments.
+    samplerDescriptor.tAddressMode = MTLSamplerAddressModeClampToBorderColor;
+    samplerDescriptor.sAddressMode = MTLSamplerAddressModeClampToBorderColor;
+    samplerDescriptor.minFilter = MTLSamplerMinMagFilterLinear;
+    samplerDescriptor.magFilter = MTLSamplerMinMagFilterLinear;
+    samplerDescriptor.borderColor = MTLSamplerBorderColorOpaqueWhite;
+    samplerDescriptor.compareFunction = MTLCompareFunctionLessEqual;
+    _shadowCompareSampler = [mtlContext->device newSamplerStateWithDescriptor:samplerDescriptor];
+}
+
+void
+MtlfSimpleShadowArray::_FreeSamplers()
+{
+    if (_shadowDepthSampler.IsSet()) {
+        [_shadowDepthSampler release];
+        _shadowDepthSampler = nil;
+    }
+    if (_shadowCompareSampler.IsSet()) {
+        [_shadowCompareSampler release];
+        _shadowCompareSampler = nil;
+    }
+}
+
+void
 MtlfSimpleShadowArray::_AllocTextureArray()
 {
     TF_FATAL_CODING_ERROR("Not Implemented");
+    
     /*
     glGenTextures(1, &_texture);
     glBindTexture(GL_TEXTURE_2D_ARRAY, _texture);
@@ -158,16 +196,6 @@ MtlfSimpleShadowArray::_FreeTextureArray()
         [_framebuffer release];
         _framebuffer = nil;
     }
-    /*
-    if (_shadowDepthSampler) {
-        [_shadowDepthSampler release];
-        _shadowDepthSampler = nil;
-    }
-    if (_shadowCompareSampler) {
-        [_shadowCompareSampler release];
-        _shadowCompareSampler = nil;
-    }
-     */
 }
 
 void

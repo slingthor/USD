@@ -51,8 +51,10 @@ MtlfUniformBlock::Bind(GarchBindingMapPtr const & bindingMap,
     if (!bindingMap)
         return;
 
-    int binding = bindingMap->GetUniformBinding(identifier);
-    MtlfMetalContext::GetMetalContext()->SetUniformBuffer(binding, _buffer, TfToken(identifier), kMSL_ProgramStage_Vertex);
+    MtlfBindingMap::MTLFBindingIndex mtlfBindingIndex(bindingMap->GetUniformBinding(identifier));
+    if(!mtlfBindingIndex.isLinked)
+        return; //We're trying to bind a buffer that the shader doesn't know about. We should ignore this.
+    MtlfMetalContext::GetMetalContext()->SetUniformBuffer(mtlfBindingIndex.index, _buffer, TfToken(identifier), (MSL_ProgramStage)mtlfBindingIndex.stage);
 }
 
 void

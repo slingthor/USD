@@ -127,14 +127,21 @@ struct LightingInterfaceProperties {
     to be present. This would likely break OpenGL as it would not expect these to be in the uniform
     block if NUM_LIGHTS == 0.
 */
-in bool useLighting;
-in bool useColorMaterialDiffuse;
-in LightSource *lightSource;
-in ShadowMatrix *shadow;
 
 // ---------------------------------------------------------------------------
 // uniform blocks
 // ---------------------------------------------------------------------------
+
+layout(std140) uniform Lighting {
+    bool useLighting;
+    bool useColorMaterialDiffuse;
+    LightSource lightSource[NUM_LIGHTS];
+};
+
+layout(std140) uniform Shadow {
+    ShadowMatrix shadow[NUM_LIGHTS];
+};
+
 #if NUM_LIGHTS == 0
 
 #else  // NUM_LIGHTS == 0

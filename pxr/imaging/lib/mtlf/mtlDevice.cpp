@@ -457,6 +457,9 @@ void MtlfMetalContext::SetUniform(const void* _data, uint32 _dataSize, const TfT
 
 void MtlfMetalContext::SetUniformBuffer(int index, id<MTLBuffer> buffer, const TfToken& name, MSL_ProgramStage stage, bool oldStyleBacker)
 {
+    if(stage == 0)
+        TF_FATAL_CODING_ERROR("Not allowed!");
+        
     uniformBuffers.push_back({index, buffer, name, stage});
     
     if(oldStyleBacker)
@@ -518,15 +521,15 @@ void MtlfMetalContext::BakeState()
         if(uniform.stage == kMSL_ProgramStage_Vertex) {
             if(!vtxUniformBackingBuffer)
                 TF_FATAL_CODING_ERROR("No vertex uniform backing buffer assigned!");
-            void * data = vtxUniformBackingBuffer.contents;
-            memcpy(data, uniform.data, uniform.dataSize);
+            uint8 * data = (uint8*)(vtxUniformBackingBuffer.contents);
+            memcpy(data + uniform.index, uniform.data, uniform.dataSize);
             [vtxUniformBackingBuffer didModifyRange:NSMakeRange(uniform.index, uniform.dataSize)];
         }
         else if(uniform.stage == kMSL_ProgramStage_Fragment) {
             if(!fragUniformBackingBuffer)
                 TF_FATAL_CODING_ERROR("No fragment uniform backing buffer assigned!");
-            void * data = fragUniformBackingBuffer.contents;
-            memcpy(data, uniform.data, uniform.dataSize);
+            uint8 * data = (uint8*)(fragUniformBackingBuffer.contents);
+            memcpy(data + uniform.index, uniform.data, uniform.dataSize);
             [fragUniformBackingBuffer didModifyRange:NSMakeRange(uniform.index, uniform.dataSize)];
         }
         else

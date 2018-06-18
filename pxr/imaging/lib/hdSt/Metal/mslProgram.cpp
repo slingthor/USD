@@ -289,20 +289,26 @@ void HdStMSLProgram::AssignUniformBindings(GarchBindingMapRefPtr bindingMap) con
         for(auto it = _bindings.begin(); it != _bindings.end(); ++it) {
             if((*it)._type != kMSL_BindingType_UniformBuffer || (*it)._name != p.first.GetText())
                 continue;
-            p.second = (*it)._index;
+            MtlfBindingMap::MTLFBindingIndex mtlfIndex(it->_index, (uint32)it->_type, (uint32)it->_stage, true);
+            p.second = mtlfIndex.asInt;
         }
     }
 }
 
 void HdStMSLProgram::AssignSamplerUnits(GarchBindingMapRefPtr bindingMap) const
 {
+    //Samplers really means OpenGL style samplers (ancient style) where a sampler is both a texture and an actual sampler.
+    //For us this means a texture always needs to have an accompanying sampler that is bound to the same slot index.
+    //This way when an index is returned it can be used for both.
+    
     MtlfBindingMapRefPtr mtlfBindingMap(TfDynamic_cast<MtlfBindingMapRefPtr>(bindingMap));
     
     for (GarchBindingMap::SamplerBindingMap::value_type& p : mtlfBindingMap->_samplerBindings) {
         for(auto it = _bindings.begin(); it != _bindings.end(); ++it) {
-            if((*it)._name != p.first.GetText())
+            if(it->_type != kMSL_BindingType_Texture || (*it)._name != p.first.GetText())
                 continue;
-            p.second = (*it)._index;
+            MtlfBindingMap::MTLFBindingIndex mtlfIndex(it->_index, (uint32)it->_type, (uint32)it->_stage, true);
+            p.second = mtlfIndex.asInt;
         }
     }
 }

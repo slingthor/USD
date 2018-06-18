@@ -32,6 +32,7 @@
 #include "pxr/imaging/garch/uniformBlock.h"
 
 #include "pxr/imaging/mtlf/simpleLightingContext.h"
+#include "pxr/imaging/mtlf/bindingMap.h"
 
 #include "pxr/base/arch/pragmas.h"
 #include "pxr/base/tf/stringUtils.h"
@@ -208,7 +209,10 @@ MtlfSimpleLightingContext::BindUniformBlocks(GarchBindingMapPtr const &bindingMa
         _lightingUniformBlock->Update(lightingData, lightingSize);
         _lightingUniformBlockValid = true;
 
-        if (shadowExists) {
+        //METAL TODO: Always enabled due to having to bind the buffer and the only
+        //way to have a valid buffer is to call Update..
+//        if (shadowExists)
+        {
             _shadowUniformBlock->Update(shadowData, shadowSize);
             _shadowUniformBlockValid = true;
         }
@@ -216,9 +220,10 @@ MtlfSimpleLightingContext::BindUniformBlocks(GarchBindingMapPtr const &bindingMa
 
     _lightingUniformBlock->Bind(bindingMap, _tokens->lightingUB);
 
-    if (shadowExists) {
+    //METAL TODO: Always need to bind this buffer or the compiler will complain!
+//    if (shadowExists) {
         _shadowUniformBlock->Bind(bindingMap, _tokens->shadowUB);
-    }
+//    }
 
     if (!_materialUniformBlockValid) {
         // has to be matched with the definition of simpleLightingShader.glslfx
@@ -251,27 +256,14 @@ MtlfSimpleLightingContext::BindUniformBlocks(GarchBindingMapPtr const &bindingMa
 void
 MtlfSimpleLightingContext::BindSamplers(GarchBindingMapPtr const &bindingMap)
 {
-//    TF_FATAL_CODING_ERROR("Not Implemented");
+    MtlfBindingMap::MTLFBindingIndex shadowSampler(bindingMap->GetSamplerUnit(_tokens->shadowSampler));
+    MtlfBindingMap::MTLFBindingIndex shadowCompareSampler(bindingMap->GetSamplerUnit(_tokens->shadowCompareSampler));
 
-    int shadowSampler = bindingMap->GetSamplerUnit(_tokens->shadowSampler);
-    int shadowCompareSampler = bindingMap->GetSamplerUnit(_tokens->shadowCompareSampler);
-
-    MtlfMetalContext::GetMetalContext()->SetTexture(shadowSampler, _shadows->GetShadowMapTexture(), _tokens->shadowSampler, kMSL_ProgramStage_Fragment);
-    MtlfMetalContext::GetMetalContext()->SetSampler(shadowSampler, _shadows->GetShadowMapDepthSampler(), _tokens->shadowSampler, kMSL_ProgramStage_Fragment);
+    MtlfMetalContext::GetMetalContext()->SetTexture(shadowSampler.index, _shadows->GetShadowMapTexture(), _tokens->shadowSampler, (MSL_ProgramStage)shadowSampler.stage);
+    MtlfMetalContext::GetMetalContext()->SetSampler(shadowSampler.index, _shadows->GetShadowMapDepthSampler(), _tokens->shadowSampler, (MSL_ProgramStage)shadowSampler.stage);
     
-    MtlfMetalContext::GetMetalContext()->SetTexture(shadowCompareSampler, _shadows->GetShadowMapTexture(), _tokens->shadowCompareSampler, kMSL_ProgramStage_Fragment);
-    MtlfMetalContext::GetMetalContext()->SetSampler(shadowCompareSampler, _shadows->GetShadowMapCompareSampler(), _tokens->shadowCompareSampler, kMSL_ProgramStage_Fragment);
-/*
-    glActiveTexture(GL_TEXTURE0 + shadowSampler);
-    glBindTexture(GL_TEXTURE_2D_ARRAY, _shadows->GetShadowMapTexture());
-    glBindSampler(shadowSampler, _shadows->GetShadowMapDepthSampler());
-
-    glActiveTexture(GL_TEXTURE0 + shadowCompareSampler);
-    glBindTexture(GL_TEXTURE_2D_ARRAY, _shadows->GetShadowMapTexture());
-    glBindSampler(shadowCompareSampler, _shadows->GetShadowMapCompareSampler());
-
-    glActiveTexture(GL_TEXTURE0);
- */
+    MtlfMetalContext::GetMetalContext()->SetTexture(shadowCompareSampler.index, _shadows->GetShadowMapTexture(), _tokens->shadowCompareSampler, (MSL_ProgramStage)shadowCompareSampler.stage);
+    MtlfMetalContext::GetMetalContext()->SetSampler(shadowCompareSampler.index, _shadows->GetShadowMapCompareSampler(), _tokens->shadowCompareSampler, (MSL_ProgramStage)shadowCompareSampler.stage);
 }
 
 void
