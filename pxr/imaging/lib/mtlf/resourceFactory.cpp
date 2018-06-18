@@ -26,6 +26,7 @@
 #include <pxr/imaging/mtlf/resourceFactory.h>
 
 #include <pxr/imaging/mtlf/arrayTexture.h>
+#include <pxr/imaging/mtlf/baseTexture.h>
 #include <pxr/imaging/mtlf/bindingMap.h>
 #include <pxr/imaging/mtlf/drawTarget.h>
 #include <pxr/imaging/mtlf/simpleLightingContext.h>
@@ -89,6 +90,11 @@ GarchArrayTextureRefPtr MtlfResourceFactory::NewArrayTexture(TfTokenVector const
                                                cropTop, cropBottom,
                                                cropLeft, cropRight));
 }
-                          
+
+GarchBaseTexture *MtlfResourceFactory::NewBaseTexture() const
+{
+    return new MtlfBaseTexture();
+}
+
 PXR_NAMESPACE_CLOSE_SCOPE
 

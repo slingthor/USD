@@ -26,6 +26,7 @@
 
 #include "pxr/imaging/garch/arrayTexture.h"
 #include "pxr/imaging/garch/image.h"
+#include "pxr/imaging/garch/resourceFactory.h"
 #include "pxr/imaging/garch/uvTexture.h"
 #include "pxr/imaging/garch/uvTextureData.h"
 #include "pxr/imaging/garch/utils.h"
@@ -57,7 +58,7 @@ TF_REGISTRY_FUNCTION(TfType)
     t.SetFactory< Garch_UVTextureFactory >();
 }
 
-GarchUVTextureRefPtr 
+GarchUVTextureRefPtr
 GarchUVTexture::New(
     TfToken const &imageFilePath,
     unsigned int cropTop,
@@ -65,10 +66,10 @@ GarchUVTexture::New(
     unsigned int cropLeft,
     unsigned int cropRight)
 {
-    TF_FATAL_CODING_ERROR("Not Implemented");
-    return TfNullPtr;
-//    return TfCreateRefPtr(new GarchUVTexture(
-//            imageFilePath, cropTop, cropBottom, cropLeft, cropRight));
+    return TfCreateRefPtr(new GarchUVTexture(GarchResourceFactory::GetInstance()->NewBaseTexture(),
+                                             imageFilePath,
+                                             cropTop, cropBottom,
+                                             cropLeft, cropRight));
 }
 
 GarchUVTextureRefPtr 
@@ -79,10 +80,12 @@ GarchUVTexture::New(
     unsigned int cropLeft,
     unsigned int cropRight)
 {
-    TF_FATAL_CODING_ERROR("Not Implemented");
-    return TfNullPtr;
-//    return TfCreateRefPtr(new GarchUVTexture(
-//            TfToken(imageFilePath), cropTop, cropBottom, cropLeft, cropRight));
+    GarchUVTexture *uvTexture = new GarchUVTexture(GarchResourceFactory::GetInstance()->NewBaseTexture(),
+                                                   TfToken(imageFilePath),
+                                                   cropTop, cropBottom,
+                                                   cropLeft, cropRight);
+    
+    return TfCreateRefPtr(uvTexture);
 }
 
 bool 
@@ -98,12 +101,14 @@ GarchUVTexture::IsSupportedImageFile(std::string const &imageFilePath)
 }
 
 GarchUVTexture::GarchUVTexture(
+    GarchBaseTexture *baseTexture,
     TfToken const &imageFilePath,
     unsigned int cropTop,
     unsigned int cropBottom,
     unsigned int cropLeft,
     unsigned int cropRight)
-    : _imageFilePath(imageFilePath)
+    : _baseTexture(baseTexture)
+    , _imageFilePath(imageFilePath)
     , _cropTop(cropTop)
     , _cropBottom(cropBottom)
     , _cropLeft(cropLeft)

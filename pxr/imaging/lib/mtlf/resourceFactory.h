@@ -62,6 +62,9 @@ public:
                                                     unsigned int cropBottom,
                                                     unsigned int cropLeft,
                                                     unsigned int cropRight) const override;
+    
+    // BaseTexture
+    virtual GarchBaseTexture *NewBaseTexture() const override;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE
