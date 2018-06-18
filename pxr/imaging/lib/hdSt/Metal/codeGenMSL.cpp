@@ -919,6 +919,8 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
     TF_FOR_ALL(it, _mslPSInputParams) {
         HdSt_CodeGenMSL::TParam const &input = *it;
         TfToken attrib;
+        bool isBuffer = true;
+        
         if (! (input.usage & HdSt_CodeGenMSL::TParam::EntryFuncArgument)) {
             continue;
         }
@@ -927,23 +929,26 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
 //        }
         if (input.binding.GetType() == HdBinding::FRONT_FACING) {
             attrib = TfToken("[[front_facing]]");
+            isBuffer = false;
         }
         else {
             attrib = TfToken(TfStringPrintf("[[buffer(%d)]]", location));
         }
         gluePS << ", ";
         
-        std::string n;
-        if (input.name.GetText()[0] == '*') {
-            gluePS << "device ";
-            n = input.name.GetText() + 1;
+        if (isBuffer) {
+            std::string n;
+            if (input.name.GetText()[0] == '*') {
+                gluePS << "device ";
+                n = input.name.GetText() + 1;
+            }
+            else {
+                n = input.name.GetString();
+            }
+            
+            mslProgram->AddBinding(n, location++, kMSL_BindingType_UniformBuffer, kMSL_ProgramStage_Fragment);
         }
-        else {
-            n = input.name.GetString();
-        }
-
-        mslProgram->AddBinding(n, location++, kMSL_BindingType_UniformBuffer, kMSL_ProgramStage_Fragment);
-
+        
         if (input.usage & HdSt_CodeGenMSL::TParam::ProgramScope) {
             gluePS << " ProgramScope<st>::";
         }
