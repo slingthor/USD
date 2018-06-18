@@ -598,6 +598,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
     
     glueVS << "struct MSLVtxInputs {\n";
     int location = 0;
+    int vertexAttribsLocation = 0;
     TF_FOR_ALL(it, _mslVSInputParams) {
         HdSt_CodeGenMSL::TParam const &input = *it;
         TfToken attrib;
@@ -620,18 +621,19 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
         
         if (input.name.GetText()[0] == '*') {
             glueVS << "device ";
-            mslProgram->AddBinding(input.name.GetText() + 1, location, kMSL_BindingType_VertexAttribute, kMSL_ProgramStage_Vertex);
+            mslProgram->AddBinding(input.name.GetText() + 1, vertexAttribsLocation, kMSL_BindingType_VertexAttribute, kMSL_ProgramStage_Vertex);
         }
         else {
-            mslProgram->AddBinding(input.name.GetString(), location, kMSL_BindingType_VertexAttribute, kMSL_ProgramStage_Vertex);
+            mslProgram->AddBinding(input.name.GetString(), vertexAttribsLocation, kMSL_BindingType_VertexAttribute, kMSL_ProgramStage_Vertex);
         }
-        
+
 //        if (!input.attribute.IsEmpty())
 //            attrib = input.attribute;
 //        else
-            attrib = TfToken(TfStringPrintf("[[attribute(%d)]]", location++));
-        
-        glueVS << input.dataType << " " << input.name << attrib << ";\n";
+            attrib = TfToken(TfStringPrintf("[[attribute(%d)]]", vertexAttribsLocation));
+
+        glueVS << input.dataType << " " << input.name << attrib << ";"  << "// Binding to [[buffer(" << vertexAttribsLocation << ")]]\n";
+        vertexAttribsLocation++;
     }
     glueVS << "};\n";
     
@@ -843,7 +845,8 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
     
     glueVS << "vertex MSLVtxOutputs vertexEntryPoint(MSLVtxInputs input[[stage_in]]\n";
     
-    location = 0;
+    // Uniform buffers must start after any allcoated for vertex attributes
+    location = vertexAttribsLocation;
     int vtxUniformBufferSlot = 0;
     TF_FOR_ALL(it, _mslVSInputParams) {
         HdSt_CodeGenMSL::TParam const &input = *it;
