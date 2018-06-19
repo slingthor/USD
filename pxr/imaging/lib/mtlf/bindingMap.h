@@ -1,4 +1,3 @@
-#line 1 "/Volumes/Data/USDMetal/pxr/imaging/lib/mtlf/bindingMap.h"
 //
 // Copyright 2016 Pixar
 //

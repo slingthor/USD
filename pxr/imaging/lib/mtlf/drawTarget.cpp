@@ -278,9 +278,9 @@ MtlfDrawTarget::_BindAttachment( MtlfAttachmentRefPtr const & a )
             MTLRenderPassStencilAttachmentDescriptor *stencilAttachment = _mtlRenderPassDescriptor.stencilAttachment;
             
             if (HasMSAA()) {
-                stencilAttachment.texture = a->GetStencilTextureName();
-            } else {
                 stencilAttachment.texture = a->GetStencilTextureMSName();
+            } else {
+                stencilAttachment.texture = a->GetStencilTextureName();
             }
             
             // make sure to clear every frame for best performance
@@ -440,9 +440,11 @@ MtlfDrawTarget::GetImage(std::string const & name, void* buffer) const
     int width = [texture width];
     int height = [texture height];
     MTLPixelFormat mtlFormat = [texture pixelFormat];
-    
-    if (mtlFormat == MTLPixelFormatDepth32Float) {
+    MTLBlitOption blitOptions = MTLBlitOptionNone;
+    if (mtlFormat == MTLPixelFormatDepth32Float || mtlFormat == MTLPixelFormatDepth32Float_Stencil8) {
         mtlFormat = MTLPixelFormatR32Float;
+        bytesPerPixel = 4;
+        blitOptions = MTLBlitOptionDepthFromDepthStencil;
     }
     
     id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->device;
@@ -460,7 +462,7 @@ MtlfDrawTarget::GetImage(std::string const & name, void* buffer) const
     
     id<MTLBuffer> cpuBuffer = [device newBufferWithLength:(bytesPerPixel * width * height) options:MTLResourceStorageModeManaged];
 
-    [blitEncoder copyFromTexture:texture sourceSlice:0 sourceLevel:0 sourceOrigin:MTLOriginMake(0, 0, 0) sourceSize:MTLSizeMake(width, height, 1) toBuffer:cpuBuffer destinationOffset:0 destinationBytesPerRow:(bytesPerPixel * width) destinationBytesPerImage:(bytesPerPixel * width * height)];
+    [blitEncoder copyFromTexture:texture sourceSlice:0 sourceLevel:0 sourceOrigin:MTLOriginMake(0, 0, 0) sourceSize:MTLSizeMake(width, height, 1) toBuffer:cpuBuffer destinationOffset:0 destinationBytesPerRow:(bytesPerPixel * width) destinationBytesPerImage:(bytesPerPixel * width * height) options:blitOptions];
     //[blitEncoder synchronizeTexture:cpuTexture slice:0 level:0];
     [blitEncoder synchronizeResource:cpuBuffer];
     [blitEncoder endEncoding];
@@ -590,6 +592,7 @@ MtlfDrawTarget::MtlfAttachment::_GenTexture()
 
     int numChannel;
     MTLPixelFormat mtlFormat = MTLPixelFormatInvalid;
+    id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->device;
 
     switch (_format)
     {
@@ -623,7 +626,10 @@ MtlfDrawTarget::MtlfAttachment::_GenTexture()
                     mtlFormat = MTLPixelFormatR32Float;
             }
             else if (type == GL_UNSIGNED_INT_24_8) {
-                mtlFormat = MTLPixelFormatStencil8;
+                if([device isDepth24Stencil8PixelFormatSupported])
+                    mtlFormat = MTLPixelFormatDepth24Unorm_Stencil8;
+                else
+                    mtlFormat = MTLPixelFormatDepth32Float_Stencil8;
             }
             else if (type == GL_UNSIGNED_BYTE) {
                 mtlFormat = MTLPixelFormatR8Unorm;
@@ -631,7 +637,12 @@ MtlfDrawTarget::MtlfAttachment::_GenTexture()
             break;
     }
     
-    _bytesPerPixel = numChannel * ((_type == GL_FLOAT) ? 4 : 1);
+    uint32 bytesPerValue = 1;
+    if(_type == GL_FLOAT || mtlFormat == MTLPixelFormatDepth24Unorm_Stencil8)
+        bytesPerValue = 4;
+    else if(mtlFormat == MTLPixelFormatDepth32Float_Stencil8)
+        bytesPerValue = 5;
+    _bytesPerPixel = numChannel * bytesPerValue;
 
     if (mtlFormat == MTLPixelFormatInvalid) {
         TF_FATAL_CODING_ERROR("Unsupported render target format");
@@ -641,7 +652,6 @@ MtlfDrawTarget::MtlfAttachment::_GenTexture()
                                     _size[0]       *
                                     _size[1]);
 
-    id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->device;
     MTLTextureDescriptor* desc =
         [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:mtlFormat
                                                            width:_size[0]
@@ -660,30 +670,9 @@ MtlfDrawTarget::MtlfAttachment::_GenTexture()
     }
     
     if (_format == GL_DEPTH_STENCIL) {
-        
+        //Use the same texture for stencil as it's a packed depth/stencil format.
         _stencilTextureName = _textureName;
         _stencilTextureNameMS = _textureNameMS;
-        
-        _bytesPerPixel <<= 2;
-        baseImageSize <<= 2;
-        mtlFormat = MTLPixelFormatDepth32Float;
-        
-        MTLTextureDescriptor* desc =
-            [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:mtlFormat
-                                                               width:_size[0]
-                                                              height:_size[1]
-                                                           mipmapped:NO];
-        desc.usage = MTLTextureUsageRenderTarget;
-        desc.resourceOptions = MTLResourceStorageModePrivate;
-        _textureName = [device newTextureWithDescriptor:desc];
-        
-        memoryUsed += baseImageSize;
-        
-        if (_numSamples > 1) {
-            desc.sampleCount = _numSamples;
-            _textureNameMS = [device newTextureWithDescriptor:desc];
-            memoryUsed = baseImageSize * _numSamples;
-        }
     }
 
     _SetMemoryUsed(memoryUsed);

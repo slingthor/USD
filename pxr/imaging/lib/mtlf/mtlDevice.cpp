@@ -378,18 +378,10 @@ MtlfMetalContext::IsInitialized()
 void MtlfMetalContext::CheckNewStateGather()
 {
     // Lazily create a new state object
-    if (!pipelineStateDescriptor) {
+    if (!pipelineStateDescriptor)
         pipelineStateDescriptor = [[MTLRenderPipelineDescriptor alloc] init];
-        
-        pipelineStateDescriptor.label = @"Gathered State";
-        pipelineStateDescriptor.sampleCount = 1;
-        pipelineStateDescriptor.colorAttachments[0].blendingEnabled = YES;
-        pipelineStateDescriptor.colorAttachments[0].sourceRGBBlendFactor = MTLBlendFactorSourceAlpha;
-        pipelineStateDescriptor.colorAttachments[0].sourceAlphaBlendFactor = MTLBlendFactorSourceAlpha;
-        pipelineStateDescriptor.colorAttachments[0].destinationRGBBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
-        pipelineStateDescriptor.colorAttachments[0].destinationAlphaBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
-        pipelineStateDescriptor.colorAttachments[0].pixelFormat = MTLPixelFormatBGRA8Unorm;
-    }
+    
+    [pipelineStateDescriptor reset];
 }
 
 void MtlfMetalContext::SetShadingPrograms(id<MTLFunction> vertexFunction, id<MTLFunction> fragmentFunction)
@@ -505,10 +497,36 @@ void MtlfMetalContext::BakeState()
         return;
     }
 
+    pipelineStateDescriptor.label = @"Bake State";
+    pipelineStateDescriptor.sampleCount = 1;
     pipelineStateDescriptor.vertexDescriptor = vertexDescriptor;
-
     if (drawTarget) {
-        // TODO: copy the render target pipeline state from the draw target attachments
+        auto& attachments = drawTarget->GetAttachments();
+        for(auto it : attachments) {
+            MtlfDrawTarget::MtlfAttachment* attachment = ((MtlfDrawTarget::MtlfAttachment*)&(*it.second));
+            MTLPixelFormat depthFormat = [attachment->GetTextureName() pixelFormat];
+            if(attachment->GetFormat() == GL_DEPTH_COMPONENT || attachment->GetFormat() == GL_DEPTH_STENCIL) {
+                pipelineStateDescriptor.depthAttachmentPixelFormat = depthFormat;
+                if(attachment->GetFormat() == GL_DEPTH_STENCIL)
+                    pipelineStateDescriptor.stencilAttachmentPixelFormat = depthFormat; //Do not use the stencil pixel format (X32_S8)
+            }
+            else {
+                id<MTLTexture> texture = attachment->GetTextureName();
+                int idx = attachment->GetAttach();
+
+                pipelineStateDescriptor.colorAttachments[idx].blendingEnabled = NO;
+                pipelineStateDescriptor.colorAttachments[idx].pixelFormat = [texture pixelFormat];
+            }
+        }
+    }
+    else {
+        //METAL TODO: Why does this need to be hardcoded? There is no matching drawTarget? Can we get this info from somewhere?
+        pipelineStateDescriptor.colorAttachments[0].blendingEnabled = YES;
+        pipelineStateDescriptor.colorAttachments[0].sourceRGBBlendFactor = MTLBlendFactorSourceAlpha;
+        pipelineStateDescriptor.colorAttachments[0].sourceAlphaBlendFactor = MTLBlendFactorSourceAlpha;
+        pipelineStateDescriptor.colorAttachments[0].destinationRGBBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
+        pipelineStateDescriptor.colorAttachments[0].destinationAlphaBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
+        pipelineStateDescriptor.colorAttachments[0].pixelFormat = MTLPixelFormatBGRA8Unorm;
     }
     
     NSError *error = NULL;
