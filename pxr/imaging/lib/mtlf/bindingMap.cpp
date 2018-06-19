@@ -41,14 +41,15 @@ MtlfBindingMap::GetSamplerUnit(std::string const & name)
 int
 MtlfBindingMap::GetSamplerUnit(TfToken const & name)
 {
-    int samplerUnit = -1;
+    //METAL TODO: I'd really like to make this function assert if it's going to return a non-linked index.
+    //But of course this "Get" function is being used for its side-effects.... so I can't.
+    MTLFBindingIndex samplerUnit;
     if (!TfMapLookup(_samplerBindings, name, &samplerUnit)) {
         // XXX error check < MAX_TEXTURE_IMAGE_UNITS
-        samplerUnit = _samplerBindings.size();
-        _samplerBindings[name] = samplerUnit;
+        samplerUnit.index = _samplerBindings.size();
+        _samplerBindings[name] = samplerUnit.asInt;
     }
-    TF_VERIFY(samplerUnit >= 0);
-    return samplerUnit;
+    return samplerUnit.asInt;
 }
 
 int

@@ -67,6 +67,9 @@ protected:
 private:
     void _AllocTextureArray();
     void _FreeTextureArray();
+	
+    void _AllocSamplers();
+    void _FreeSamplers();
 
     void _BindFramebuffer(size_t index);
     void _UnbindFramebuffer();

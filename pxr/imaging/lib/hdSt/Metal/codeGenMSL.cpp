@@ -414,6 +414,7 @@ HdSt_CodeGenMSL::_ParseGLSL(std::stringstream &source, InOutParams& inParams, In
     tags.push_back(TagSpec("\nout ", outParams));
     tags.push_back(TagSpec("\nin ", inParams));
     tags.push_back(TagSpec("\nuniform ", inParams));
+    tags.push_back(TagSpec("\nlayout(std140) uniform ", inParams));
     
     int firstFlatIndex = tags.size();
     tags.push_back(TagSpec("\nflat out ", outParams));
@@ -432,6 +433,20 @@ HdSt_CodeGenMSL::_ParseGLSL(std::stringstream &source, InOutParams& inParams, In
             std::string::size_type semiColon = result.find_first_of(';', pos + tagSize);
             
             if (newLine < semiColon) {
+                std::string::size_type endOfName = result.find_first_of(" {\n", pos + tag.glslTag.length());
+                std::string structName = result.substr(pos + tag.glslTag.length(), endOfName - (pos + tag.glslTag.length()));
+                TfToken structNameToken(structName.c_str());
+                TfToken bufferNameToken;
+                TfToken bufferNameTokenPtr;
+                {
+                    std::stringstream bufferVarName;
+                    bufferVarName << "___" << structName;
+                    bufferNameToken = TfToken(bufferVarName.str().c_str());
+                    std::stringstream bufferVarNamePtr;
+                    bufferVarNamePtr << "*" << bufferVarName.str();
+                    bufferNameTokenPtr = TfToken(bufferVarNamePtr.str().c_str());
+                }
+            
                 // output structure. Replace the 'out' tag with 'struct'. Search between the {} for lines, and extract a type and name from each one.
                 result.replace(pos, tagSize, std::string("\nstruct"));
                 
@@ -451,9 +466,12 @@ HdSt_CodeGenMSL::_ParseGLSL(std::stringstream &source, InOutParams& inParams, In
                     
                     parent = line.substr(s, count) + ".";
                 }
+                
+                bool instantiatedStruct = !parent.empty();
 
                 pos = lineStart;
                 
+                std::stringstream structAccessors;
                 while ((pos = result.find("\n", pos)) != std::string::npos &&
                     pos < closeParenthesis)
                 {
@@ -472,7 +490,14 @@ HdSt_CodeGenMSL::_ParseGLSL(std::stringstream &source, InOutParams& inParams, In
                         TfToken name((*i).str().c_str());
                         TfToken accessor((parent + (*i).str()).c_str());
                         
-                        _EmitStructMemberOutput(tag.params, name, accessor, type);
+                        if(instantiatedStruct)
+                            _EmitStructMemberOutput(tag.params, name, accessor, type);
+                        else
+                        {
+                            structAccessors << ";\n" << type.GetString() << " " << name.GetString();
+                            HdSt_CodeGenMSL::TParam outParam(name, type, bufferNameToken, TfToken(), HdSt_CodeGenMSL::TParam::Usage::UniformBlockMember);
+                            tag.params.push_back(outParam);
+                        }
                     }
                     else if (numWords == 3) // type qualifier, type, name
                     {
@@ -485,7 +510,14 @@ HdSt_CodeGenMSL::_ParseGLSL(std::stringstream &source, InOutParams& inParams, In
                         TfToken name((*i).str().c_str());
                         TfToken accessor((parent + (*i).str()).c_str());
                         
-                        _EmitStructMemberOutput(tag.params, name, accessor, type);
+                        if(instantiatedStruct)
+                            _EmitStructMemberOutput(tag.params, name, accessor, type);
+                        else
+                        {
+                            structAccessors << ";\n" << type.GetString() << " " << name.GetString();
+                            HdSt_CodeGenMSL::TParam outParam(name, type, bufferNameToken, TfToken(), HdSt_CodeGenMSL::TParam::Usage::UniformBlockMember);
+                            tag.params.push_back(outParam);
+                        }
                     }
                     else if (numWords) { // Allow blank lines
                         TF_CODING_WARNING("Unparsable glslfx line in '%s<type> <name>;' definition. Expecting '%s<type> <name>;'. Got %s",
@@ -496,6 +528,13 @@ HdSt_CodeGenMSL::_ParseGLSL(std::stringstream &source, InOutParams& inParams, In
 
                     lineStart = result.find("\n", endLine) + 1;
                     pos = lineStart;
+                }
+                
+                if(!instantiatedStruct)
+                {
+                    result.replace(closeParenthesis + 1, 0, structAccessors.str());
+                    HdSt_CodeGenMSL::TParam outParam(bufferNameTokenPtr, structNameToken, TfToken(), TfToken(), HdSt_CodeGenMSL::TParam::Usage::ProgramScope | HdSt_CodeGenMSL::TParam::Usage::EntryFuncArgument | HdSt_CodeGenMSL::TParam::Usage::UniformBlock);
+                    tag.params.push_back(outParam);
                 }
                 
                 pos = closeParenthesis + 1;
@@ -598,6 +637,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
     
     glueVS << "struct MSLVtxInputs {\n";
     int location = 0;
+    int vertexAttribsLocation = 0;
     TF_FOR_ALL(it, _mslVSInputParams) {
         HdSt_CodeGenMSL::TParam const &input = *it;
         TfToken attrib;
@@ -620,18 +660,19 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
         
         if (input.name.GetText()[0] == '*') {
             glueVS << "device ";
-            mslProgram->AddBinding(input.name.GetText() + 1, location, kMSL_BindingType_VertexAttribute, kMSL_ProgramStage_Vertex);
+            mslProgram->AddBinding(input.name.GetText() + 1, vertexAttribsLocation, kMSL_BindingType_VertexAttribute, kMSL_ProgramStage_Vertex);
         }
         else {
-            mslProgram->AddBinding(input.name.GetString(), location, kMSL_BindingType_VertexAttribute, kMSL_ProgramStage_Vertex);
+            mslProgram->AddBinding(input.name.GetString(), vertexAttribsLocation, kMSL_BindingType_VertexAttribute, kMSL_ProgramStage_Vertex);
         }
-        
+
 //        if (!input.attribute.IsEmpty())
 //            attrib = input.attribute;
 //        else
-            attrib = TfToken(TfStringPrintf("[[attribute(%d)]]", location++));
-        
-        glueVS << input.dataType << " " << input.name << attrib << ";\n";
+            attrib = TfToken(TfStringPrintf("[[attribute(%d)]]", vertexAttribsLocation));
+
+        glueVS << input.dataType << " " << input.name << attrib << ";"  << "// Binding to [[buffer(" << vertexAttribsLocation << ")]]\n";
+        vertexAttribsLocation++;
     }
     glueVS << "};\n";
     
@@ -780,7 +821,8 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
         HdSt_CodeGenMSL::TParam const &input = *it;
         TfToken attrib;
         
-        if (input.usage & (HdSt_CodeGenMSL::TParam::maskShaderUsage)) {
+        if ((input.usage & HdSt_CodeGenMSL::TParam::maskShaderUsage) != 0 ||
+            (input.usage & HdSt_CodeGenMSL::TParam::UniformBlock) != 0) {
             continue;
         }
         else if (input.usage & HdSt_CodeGenMSL::TParam::EntryFuncArgument) {
@@ -815,6 +857,10 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
             }
             copyInputsFrag << "scope." << accessor << "=vsInput." << input.name << ";\n";
         }
+        else if(input.usage & HdSt_CodeGenMSL::TParam::UniformBlockMember) {
+            copyInputsFrag << "scope." << input.name << "=" << input.accessorStr << "->" << input.name << ";\n";
+            continue;
+        }
         else {
             copyInputsFrag << "scope." << accessor << "=" CODEGENMSL_FRAGUNIFORMINPUTNAME "->" << input.name << ";\n";
         }
@@ -843,7 +889,8 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
     
     glueVS << "vertex MSLVtxOutputs vertexEntryPoint(MSLVtxInputs input[[stage_in]]\n";
     
-    location = 0;
+    // Uniform buffers must start after any allcoated for vertex attributes
+    location = vertexAttribsLocation;
     int vtxUniformBufferSlot = 0;
     TF_FOR_ALL(it, _mslVSInputParams) {
         HdSt_CodeGenMSL::TParam const &input = *it;
@@ -916,6 +963,8 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
     TF_FOR_ALL(it, _mslPSInputParams) {
         HdSt_CodeGenMSL::TParam const &input = *it;
         TfToken attrib;
+        bool isBuffer = true;
+        
         if (! (input.usage & HdSt_CodeGenMSL::TParam::EntryFuncArgument)) {
             continue;
         }
@@ -924,6 +973,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
 //        }
         if (input.binding.GetType() == HdBinding::FRONT_FACING) {
             attrib = TfToken("[[front_facing]]");
+            isBuffer = false;
         }
         else {
             attrib = TfToken(TfStringPrintf("[[buffer(%d)]]", location));
@@ -933,7 +983,10 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
         std::string n;
         if (input.name.GetText()[0] == '*') {
             gluePS << "device ";
-            n = input.name.GetText() + 1;
+            if ((input.usage & HdSt_CodeGenMSL::TParam::UniformBlock) != 0)
+                n = input.name.GetText() + 4; //Because of "*___<NAME>"
+            else
+                n = input.name.GetText() + 1;
         }
         else {
             n = input.name.GetString();
