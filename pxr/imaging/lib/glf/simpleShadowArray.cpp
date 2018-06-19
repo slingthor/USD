@@ -67,6 +67,30 @@ GlfSimpleShadowArray::SetNumLayers(size_t numLayers)
     GarchSimpleShadowArray::SetNumLayers(numLayers);
 }
 
+void GlfSimpleShadowArray::InitCaptureEnvironment(bool   depthBiasEnable,
+                                                  float  depthBiasConstantFactor,
+                                                  float  depthBiasSlopeFactor,
+                                                  GLenum depthFunc)
+{
+    if (depthBiasEnable) {
+        glEnable(GL_POLYGON_OFFSET_FILL);
+        glPolygonOffset(depthBiasSlopeFactor, depthBiasConstantFactor);
+    } else {
+        glDisable(GL_POLYGON_OFFSET_FILL);
+    }
+
+    // XXX: Move conversion to sync time once Task header becomes private.
+    glDepthFunc(depthFunc);
+    glEnable(GL_PROGRAM_POINT_SIZE);
+}
+
+void GlfSimpleShadowArray::DisableCaptureEnvironment()
+{
+    // restore GL states to default
+    glDisable(GL_PROGRAM_POINT_SIZE);
+    glDisable(GL_POLYGON_OFFSET_FILL);
+}
+
 void
 GlfSimpleShadowArray::BeginCapture(size_t index, bool clear)
 {

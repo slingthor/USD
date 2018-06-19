@@ -81,6 +81,14 @@ public:
     virtual GarchSamplerGPUHandle GetShadowMapCompareSampler() const;
 
     GARCH_API
+    virtual void InitCaptureEnvironment(bool   depthBiasEnable,
+                                        float  depthBiasConstantFactor,
+                                        float  depthBiasSlopeFactor,
+                                        GLenum depthFunc) = 0;
+    GARCH_API
+    virtual void DisableCaptureEnvironment() = 0;
+
+    GARCH_API
     virtual void BeginCapture(size_t index, bool clear) = 0;
     GARCH_API
     virtual void EndCapture(size_t index) = 0;
