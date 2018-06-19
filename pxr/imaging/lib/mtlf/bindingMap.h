@@ -1,3 +1,4 @@
+#line 1 "/Volumes/Data/USDMetal/pxr/imaging/lib/mtlf/bindingMap.h"
 //
 // Copyright 2016 Pixar
 //
@@ -42,6 +43,26 @@ TF_DECLARE_WEAK_AND_REF_PTRS(MtlfBindingMap);
 class MtlfBindingMap : public GarchBindingMap {
 public:
     typedef TfHashMap<TfToken, int, TfToken::HashFunctor> BindingMap;
+
+    struct MTLFBindingIndex
+    {
+        union
+        {
+            struct
+            {
+                uint32 index    : 16;
+                uint32 type     : 8;   //MSL_BindingType   (mslProgram.h)
+                uint32 stage    : 3;   //MSL_ProgramStage  (mtlDevice.h)
+                bool   isLinked : 1;
+                uint32 _padding : 4;
+            };
+            int asInt;
+        };
+        
+        MTLFBindingIndex() : index(0), type(0), stage(0), isLinked(false), _padding(0) {}
+        MTLFBindingIndex(int _asInt) : asInt(_asInt) {}
+        MTLFBindingIndex(uint32 _index, uint32 _type, uint32 _stage, bool _isLinked) : index(_index), type(_type), stage(_stage), isLinked(_isLinked), _padding(0) {}
+    };
 
     MTLF_API
     virtual int GetSamplerUnit(std::string const &name) override;
