@@ -52,6 +52,14 @@ public:
     virtual void SetNumLayers(size_t numLayers) override;
 
     MTLF_API
+    virtual void InitCaptureEnvironment(bool   depthBiasEnable,
+                                        float  depthBiasConstantFactor,
+                                        float  depthBiasSlopeFactor,
+                                        GLenum depthFunc) override;
+    MTLF_API
+    virtual void DisableCaptureEnvironment() override;
+
+    MTLF_API
     virtual void BeginCapture(size_t index, bool clear) override;
     MTLF_API
     virtual void EndCapture(size_t index) override;

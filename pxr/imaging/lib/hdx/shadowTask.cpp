@@ -69,19 +69,15 @@ HdxShadowTask::_Execute(HdTaskContext* ctx)
         return;
     }
 
-    if (_depthBiasEnable) {
-        glEnable(GL_POLYGON_OFFSET_FILL);
-        glPolygonOffset(_depthBiasSlopeFactor, _depthBiasConstantFactor);
-    } else {
-        glDisable(GL_POLYGON_OFFSET_FILL);
-    }
-
-    // XXX: Move conversion to sync time once Task header becomes private.
-    glDepthFunc(HdStGLConversions::GetGlDepthFunc(_depthFunc));
-    glEnable(GL_PROGRAM_POINT_SIZE);
+    GarchSimpleShadowArrayRefPtr const shadows = lightingContext->GetShadows();
+    
+    // Enable capture environment
+    shadows->InitCaptureEnvironment(_depthBiasEnable,
+                                    _depthBiasConstantFactor,
+                                    _depthBiasSlopeFactor,
+                                    HdStGLConversions::GetGlDepthFunc(_depthFunc));
 
     // Generate the actual shadow maps
-    GarchSimpleShadowArrayRefPtr const shadows = lightingContext->GetShadows();
     for(size_t shadowId = 0; shadowId < shadows->GetNumLayers(); shadowId++) {
 
         // Bind the framebuffer that will store shadowId shadow map
@@ -93,10 +89,9 @@ HdxShadowTask::_Execute(HdTaskContext* ctx)
         // Unbind the buffer and move on to the next shadow map
         shadows->EndCapture(shadowId);
     }
-
-    // restore GL states to default
-    glDisable(GL_PROGRAM_POINT_SIZE);
-    glDisable(GL_POLYGON_OFFSET_FILL);
+    
+    // restore GPU state to default
+    shadows->DisableCaptureEnvironment();
 }
 
 void
