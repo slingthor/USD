@@ -299,16 +299,18 @@ MtlfDrawTarget::_BindAttachment( MtlfAttachmentRefPtr const & a )
         MTLRenderPassColorAttachmentDescriptor *colorAttachment = _mtlRenderPassDescriptor.colorAttachments[attach];
         if (HasMSAA()) {
             colorAttachment.texture = tidMS;
+            colorAttachment.resolveTexture = tid;
+            
+            colorAttachment.storeAction = MTLStoreActionMultisampleResolve;
         } else {
             colorAttachment.texture = tid;
+            
+            colorAttachment.storeAction = MTLStoreActionStore;
         }
         
         // make sure to clear every frame for best performance
         colorAttachment.loadAction = MTLLoadActionClear;
         colorAttachment.clearColor = MTLClearColorMake(1.0f, 0.25f, 0.25f, 1.0f);
-        
-        // store only attachments that will be presented to the screen, as in this case
-        colorAttachment.storeAction = MTLStoreActionStore;
     }
 }
 
@@ -376,17 +378,7 @@ MtlfDrawTarget::Unbind()
 void 
 MtlfDrawTarget::_Resolve()
 {
-    TF_FATAL_CODING_ERROR("Not Implemented");
-
-    // Resolve MSAA fbo to a regular fbo
-//    glBindFramebuffer(GL_READ_FRAMEBUFFER, _framebufferMS);
-//    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, _framebuffer);
-//    glBlitFramebuffer(0, 0, _size[0], _size[1],
-//                      0, 0, _size[0], _size[1],
-//                      GL_COLOR_BUFFER_BIT |
-//                      GL_DEPTH_BUFFER_BIT |
-//                      GL_STENCIL_BUFFER_BIT ,
-//                      GL_NEAREST);
+    // Do nothing - already resolved
 }
 
 void
@@ -467,17 +459,7 @@ MtlfDrawTarget::GetImage(std::string const & name, void* buffer) const
     id<MTLBlitCommandEncoder> blitEncoder = [commandBuffer blitCommandEncoder];
     
     id<MTLBuffer> cpuBuffer = [device newBufferWithLength:(bytesPerPixel * width * height) options:MTLResourceStorageModeManaged];
-    /*
-    [blitEncoder copyFromTexture:texture
-                     sourceSlice:0
-                     sourceLevel:0
-                    sourceOrigin:MTLOriginMake(0, 0, 0)
-                      sourceSize:MTLSizeMake(width, height, 1)
-                       toTexture:cpuTexture
-                destinationSlice:0
-                destinationLevel:0
-               destinationOrigin:MTLOriginMake(0, 0, 0)];
-*/
+
     [blitEncoder copyFromTexture:texture sourceSlice:0 sourceLevel:0 sourceOrigin:MTLOriginMake(0, 0, 0) sourceSize:MTLSizeMake(width, height, 1) toBuffer:cpuBuffer destinationOffset:0 destinationBytesPerRow:(bytesPerPixel * width) destinationBytesPerImage:(bytesPerPixel * width * height)];
     //[blitEncoder synchronizeTexture:cpuTexture slice:0 level:0];
     [blitEncoder synchronizeResource:cpuBuffer];
@@ -512,34 +494,7 @@ MtlfDrawTarget::WriteToFile(std::string const & name,
         bufsize = _size[1] * stride;
 
     void * buf = malloc( bufsize );
-
-    {
-        TF_FATAL_CODING_ERROR("Not Implemented");
-        /*
-        glPushClientAttrib(GL_CLIENT_PIXEL_STORE_BIT);
-
-        glPixelStorei(GL_PACK_ROW_LENGTH, 0);
-        glPixelStorei(GL_PACK_ALIGNMENT, 1);
-        glPixelStorei(GL_PACK_SKIP_PIXELS, 0);
-        glPixelStorei(GL_PACK_SKIP_ROWS, 0);
-
-        GLint restoreBinding, restoreActiveTexture;
-        glGetIntegerv( GL_TEXTURE_BINDING_2D, &restoreBinding );
-        glGetIntegerv( GL_ACTIVE_TEXTURE, & restoreActiveTexture);
-
-        glActiveTexture( GL_TEXTURE0 );
-        glBindTexture( GL_TEXTURE_2D, a->GetMtlTextureName() );
-
-        glGetTexImage(GL_TEXTURE_2D, 0, a->GetFormat(), a->GetType(), buf);
-
-        glActiveTexture( restoreActiveTexture );
-        glBindTexture( GL_TEXTURE_2D, restoreBinding );
-
-        glPopClientAttrib();
-
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-         */
-    }
+    GetImage(name, buf);
 
     VtDictionary metadata;
 

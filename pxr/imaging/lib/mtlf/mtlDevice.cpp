@@ -504,6 +504,10 @@ void MtlfMetalContext::BakeState()
 
     pipelineStateDescriptor.vertexDescriptor = vertexDescriptor;
 
+    if (drawTarget) {
+        // TODO: copy the render target pipeline state from the draw target attachments
+    }
+    
     NSError *error = NULL;
     id<MTLRenderPipelineState> _pipelineState = [device newRenderPipelineStateWithDescriptor:pipelineStateDescriptor error:&error];
     if (!_pipelineState) {
