@@ -435,7 +435,7 @@ MtlfDrawTarget::IsValid(std::string * reason)
 bool
 MtlfDrawTarget::_Validate(std::string * reason)
 {
-    return MtlfCheckMetalFrameBufferStatus(GL_FRAMEBUFFER, reason);
+    return true;
 }
 
 void

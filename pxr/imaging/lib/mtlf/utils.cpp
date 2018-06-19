@@ -29,45 +29,5 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-bool
-MtlfCheckMetalFrameBufferStatus(GLuint target, std::string * reason)
-{
-    TF_FATAL_CODING_ERROR("Not Implemented");
-    return true;
-}
-
-bool MtlfIsCompressedFormat(GLenum format)
-{
-    TF_FATAL_CODING_ERROR("Not Implemented");
-    /*
-    if (format == GL_COMPRESSED_RGBA_BPTC_UNORM || 
-        format == GL_COMPRESSED_RGB_BPTC_UNSIGNED_FLOAT) {
-        return true;
-    }
-     */
-    return false;
-}
-
-size_t MtlfGetCompressedTextureSize(int width, int height, GLenum format, GLenum type)
-{
-    int blockSize = 0;
-    int tileSize = 1;
-    int alignSize = 0;
-    
-    TF_FATAL_CODING_ERROR("Not Implemented");
-    /*
-    // XXX Only BPTC is supported right now
-    if (format == GL_COMPRESSED_RGBA_BPTC_UNORM || 
-        format == GL_COMPRESSED_RGB_BPTC_UNSIGNED_FLOAT) {
-        blockSize = 16;
-        tileSize = 4;
-        alignSize = 3;
-    }*/
-
-    size_t numPixels = ((width + alignSize)/tileSize) * 
-                       ((height + alignSize)/tileSize);
-    return numPixels * blockSize;
-}
-
 PXR_NAMESPACE_CLOSE_SCOPE
 

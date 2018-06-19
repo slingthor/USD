@@ -33,25 +33,6 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-/// Checks the valitidy of a GL framebuffer
-///
-/// True if the currently bound GL framebuffer is valid and can be bound
-/// or returns the cause of the problem
-bool MtlfCheckMetalFrameBufferStatus(GLuint target, std::string * reason);
-
-/// Check if the format is compressed.
-///
-/// Supported OGL compressed formats : GL_COMPRESSED_RGBA_BPTC_UNORM, 
-/// GL_COMPRESSED_RGB_BPTC_UNSIGNED_FLOAT
-bool MtlfIsCompressedFormat(GLenum format);
-
-/// Calculate the byte size of compressed textures.
-///
-/// Supported OGL compressed formats : GL_COMPRESSED_RGBA_BPTC_UNORM, 
-/// GL_COMPRESSED_RGB_BPTC_UNSIGNED_FLOAT
-size_t MtlfGetCompressedTextureSize(int width, int height, GLenum format, GLenum type);
-
-
 PXR_NAMESPACE_CLOSE_SCOPE
 
 #endif  // MTLF_UTILS_H
