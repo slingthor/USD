@@ -251,8 +251,6 @@ MtlfSimpleLightingContext::BindUniformBlocks(GarchBindingMapPtr const &bindingMa
 void
 MtlfSimpleLightingContext::BindSamplers(GarchBindingMapPtr const &bindingMap)
 {
-//    TF_FATAL_CODING_ERROR("Not Implemented");
-
     int shadowSampler = bindingMap->GetSamplerUnit(_tokens->shadowSampler);
     int shadowCompareSampler = bindingMap->GetSamplerUnit(_tokens->shadowCompareSampler);
 
@@ -277,7 +275,6 @@ MtlfSimpleLightingContext::BindSamplers(GarchBindingMapPtr const &bindingMap)
 void
 MtlfSimpleLightingContext::UnbindSamplers(GarchBindingMapPtr const &bindingMap)
 {
-    //TF_FATAL_CODING_ERROR("Not Implemented");
     /*
     int shadowSampler = bindingMap->GetSamplerUnit(_tokens->shadowSampler);
     int shadowCompareSampler = bindingMap->GetSamplerUnit(_tokens->shadowCompareSampler);
