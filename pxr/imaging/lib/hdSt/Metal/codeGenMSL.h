@@ -59,6 +59,8 @@ public:
             ProgramScope        = 1 << 5,
             VertexShaderOnly    = 1 << 6,
             Uniform             = 1 << 7,
+            UniformBlockMember  = 1 << 8,
+            UniformBlock        = 1 << 9,
         };
         static Usage const maskShaderUsage = Usage(EntryFuncArgument - 1);
         
