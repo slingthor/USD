@@ -482,29 +482,15 @@ HdSt_CodeGenMSL::_ParseGLSL(std::stringstream &source, InOutParams& inParams, In
                     auto words_end = std::sregex_iterator();
                     int numWords = std::distance(words_begin, words_end);
                     
-                    if (numWords == 2) // type, name
+                    if (numWords == 2 || numWords == 3) // qualifier, type, name
                     {
                         std::sregex_iterator i = words_begin;
-                        TfToken type((*i).str().c_str());
-                        ++i;
-                        TfToken name((*i).str().c_str());
-                        TfToken accessor((parent + (*i).str()).c_str());
-                        
-                        if(instantiatedStruct)
-                            _EmitStructMemberOutput(tag.params, name, accessor, type);
-                        else
-                        {
-                            structAccessors << ";\n" << type.GetString() << " " << name.GetString();
-                            HdSt_CodeGenMSL::TParam outParam(name, type, bufferNameToken, TfToken(), HdSt_CodeGenMSL::TParam::Usage::UniformBlockMember);
-                            tag.params.push_back(outParam);
+                        TfToken qualifier;
+                        if(numWords == 3) {
+                            NSLog(@"HdSt_CodeGenMSL::_ParseGLSL - Ignoring qualifier (for now)"); //MTL_FIXME - Add support for interpolation type (qualifier) here
+                            qualifier = TfToken((*i).str().c_str());
+                            ++i;
                         }
-                    }
-                    else if (numWords == 3) // type qualifier, type, name
-                    {
-                        std::sregex_iterator i = words_begin;
-                        NSLog(@"HdSt_CodeGenMSL::_ParseGLSL - Ignoring qualifier (for now)"); //MTL_FIXME - Add support for interpolation type (qualifier) here
-                        TfToken qualifier((*i).str().c_str());
-                        ++i;
                         TfToken type((*i).str().c_str());
                         ++i;
                         TfToken name((*i).str().c_str());
@@ -514,7 +500,14 @@ HdSt_CodeGenMSL::_ParseGLSL(std::stringstream &source, InOutParams& inParams, In
                             _EmitStructMemberOutput(tag.params, name, accessor, type);
                         else
                         {
-                            structAccessors << ";\n" << type.GetString() << " " << name.GetString();
+                            std::string nameStr = name.GetString();
+                            std::string::size_type openingBracket = nameStr.find_first_of("[");
+                            if(openingBracket != std::string::npos) {
+                                nameStr = nameStr.substr(0, openingBracket);
+                                structAccessors << ";\n device " << type.GetString() << "* " << nameStr;
+                            }
+                            else
+                                structAccessors << ";\n" << type.GetString() << " " << name.GetString();
                             HdSt_CodeGenMSL::TParam outParam(name, type, bufferNameToken, TfToken(), HdSt_CodeGenMSL::TParam::Usage::UniformBlockMember);
                             tag.params.push_back(outParam);
                         }
@@ -642,10 +635,6 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
         HdSt_CodeGenMSL::TParam const &input = *it;
         TfToken attrib;
         
-        std::string _attrib = input.attribute.GetString();
-        std::string _name = input.name.GetString();
-        std::string _type = input.dataType.GetString();
-        std::string _acc = input.accessorStr.GetString();
         
         if (input.usage & HdSt_CodeGenMSL::TParam::Uniform)
             continue;
@@ -858,7 +847,12 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
             copyInputsFrag << "scope." << accessor << "=vsInput." << input.name << ";\n";
         }
         else if(input.usage & HdSt_CodeGenMSL::TParam::UniformBlockMember) {
-            copyInputsFrag << "scope." << input.name << "=" << input.accessorStr << "->" << input.name << ";\n";
+            std::string inputName = input.name.GetString();
+            std::string::size_type openingBracket = inputName.find_first_of("[");
+            if(openingBracket != std::string::npos) {
+                inputName = input.name.GetString().substr(0, openingBracket);
+            }
+            copyInputsFrag << "scope." << inputName << "=" << input.accessorStr << "->" << inputName << ";\n";
             continue;
         }
         else {
