@@ -169,7 +169,7 @@ protected:
 
     struct VertexBufferBinding { int idx; id<MTLBuffer> buffer; TfToken name; };
     std::vector<VertexBufferBinding> vertexBuffers;
-    struct UniformBufferBinding { int idx; id<MTLBuffer> buffer; TfToken name; MSL_ProgramStage stage; };
+    struct UniformBufferBinding { int idx; id<MTLBuffer> buffer; TfToken name; MSL_ProgramStage stage; int offset; };
     std::vector<UniformBufferBinding> uniformBuffers;
 	struct TextureBinding { int idx; id<MTLTexture> texture; TfToken name; MSL_ProgramStage stage; };
     std::vector<TextureBinding> textures;
