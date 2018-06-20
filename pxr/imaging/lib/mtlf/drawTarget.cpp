@@ -446,6 +446,11 @@ MtlfDrawTarget::GetImage(std::string const & name, void* buffer) const
         bytesPerPixel = 4;
         blitOptions = MTLBlitOptionDepthFromDepthStencil;
     }
+    else if (mtlFormat == MTLPixelFormatDepth24Unorm_Stencil8) {
+        mtlFormat = MTLPixelFormatR32Uint; //MTL_FIXME - This might not be the right format for this texture 
+        bytesPerPixel = 4;
+        blitOptions = MTLBlitOptionDepthFromDepthStencil;
+    }
     
     id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->device;
     MTLTextureDescriptor* desc =
