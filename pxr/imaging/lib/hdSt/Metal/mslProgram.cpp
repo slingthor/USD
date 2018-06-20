@@ -381,14 +381,14 @@ void HdStMSLProgram::SetProgram() const {
             MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
             id<MTLBuffer> mtlBuffer = [context->device newBufferWithLength:it->_uniformBufferSize options:MTLResourceStorageModeManaged];
             
-            MtlfMetalContext::GetMetalContext()->SetUniformBuffer(it->_index, mtlBuffer, TfToken(it->_name), kMSL_ProgramStage_Fragment, true);
+            MtlfMetalContext::GetMetalContext()->SetUniformBuffer(it->_index, mtlBuffer, TfToken(it->_name), kMSL_ProgramStage_Fragment, 0 /*offset*/, true);
         }
         if(it->_name == "vtxUniforms" && it->_stage == kMSL_ProgramStage_Vertex && it->_type == kMSL_BindingType_UniformBuffer)
         {
             MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
             id<MTLBuffer> mtlBuffer = [context->device newBufferWithLength:it->_uniformBufferSize options:MTLResourceStorageModeManaged];
             
-            MtlfMetalContext::GetMetalContext()->SetUniformBuffer(it->_index, mtlBuffer, TfToken(it->_name), kMSL_ProgramStage_Vertex, true);
+            MtlfMetalContext::GetMetalContext()->SetUniformBuffer(it->_index, mtlBuffer, TfToken(it->_name), kMSL_ProgramStage_Vertex, 0 /*offset*/, true);
         }
     }
 }

@@ -447,12 +447,12 @@ void MtlfMetalContext::SetUniform(const void* _data, uint32 _dataSize, const TfT
     oldStyleUniforms.push_back(newUniform);
 }
 
-void MtlfMetalContext::SetUniformBuffer(int index, id<MTLBuffer> buffer, const TfToken& name, MSL_ProgramStage stage, bool oldStyleBacker)
+void MtlfMetalContext::SetUniformBuffer(int index, id<MTLBuffer> buffer, const TfToken& name, MSL_ProgramStage stage, int offset, bool oldStyleBacker)
 {
     if(stage == 0)
         TF_FATAL_CODING_ERROR("Not allowed!");
         
-    uniformBuffers.push_back({index, buffer, name, stage});
+    uniformBuffers.push_back({index, buffer, name, stage, offset});
     
     if(oldStyleBacker)
     {
@@ -561,9 +561,9 @@ void MtlfMetalContext::BakeState()
     for(auto buffer : uniformBuffers)
     {
         if(buffer.stage == kMSL_ProgramStage_Vertex)
-            [renderEncoder setVertexBuffer:buffer.buffer offset:0 atIndex:buffer.idx];
+            [renderEncoder setVertexBuffer:buffer.buffer offset:buffer.offset atIndex:buffer.idx];
         else if(buffer.stage == kMSL_ProgramStage_Fragment)
-            [renderEncoder setFragmentBuffer:buffer.buffer offset:0 atIndex:buffer.idx];
+            [renderEncoder setFragmentBuffer:buffer.buffer offset:buffer.offset atIndex:buffer.idx];
         else
             TF_FATAL_CODING_ERROR("Not implemented!"); //Compute case
     }

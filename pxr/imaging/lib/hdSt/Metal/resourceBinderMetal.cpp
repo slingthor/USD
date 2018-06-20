@@ -137,6 +137,9 @@ HdSt_ResourceBinderMetal::BindBuffer(TfToken const &name,
 {
     HD_TRACE_FUNCTION();
     
+    if(level != -1)
+        TF_FATAL_CODING_ERROR("Not implemented"); //METAL TODO: We shoud probably support "levels" but we haven't encountered anything other than -1 yet.
+    
     // it is possible that the buffer has not been initialized when
     // the instanceIndex is empty (e.g. FX points. see bug 120354)
     if (!buffer->GetId().IsSet())
@@ -157,6 +160,8 @@ HdSt_ResourceBinderMetal::BindBuffer(TfToken const &name,
         switch(shaderBinding._type)
         {
         case kMSL_BindingType_VertexAttribute:
+            if(offset != 0)
+                TF_FATAL_CODING_ERROR("Not implemented!");
             MtlfMetalContext::GetMetalContext()->SetVertexAttribute(
                         shaderBinding._index,
                         _GetNumComponents(tupleType.type),
@@ -167,9 +172,11 @@ HdSt_ResourceBinderMetal::BindBuffer(TfToken const &name,
                 MtlfMetalContext::GetMetalContext()->SetBuffer(shaderBinding._index, metalBuffer->GetId(), name);
             break;
         case kMSL_BindingType_UniformBuffer:
-            MtlfMetalContext::GetMetalContext()->SetUniformBuffer(shaderBinding._index, metalBuffer->GetId(), name, shaderBinding._stage);
+            MtlfMetalContext::GetMetalContext()->SetUniformBuffer(shaderBinding._index, metalBuffer->GetId(), name, shaderBinding._stage, offset);
             break;
         case kMSL_BindingType_IndexBuffer:
+            if(offset != 0)
+                TF_FATAL_CODING_ERROR("Not implemented!");
             MtlfMetalContext::GetMetalContext()->SetIndexBuffer(metalBuffer->GetId());
             break;
         default:
