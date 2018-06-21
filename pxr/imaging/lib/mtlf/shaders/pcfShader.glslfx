@@ -63,7 +63,7 @@ vec2 jitter[JITTER_NUM_SAMPLES] = {
         vec2( 0.14383161, -0.14100790)
     };
 
-in vec2 FshadowFilterWidth[NUM_LIGHTS];
+in vec2 FshadowFilterWidth[NUM_LIGHTS_ARRAY_SIZE];
 
 float
 shadowFilter(int index, vec4 coord, vec4 Peye)

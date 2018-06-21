@@ -48,9 +48,9 @@ struct ShadowMatrix {
     float padding2;
 };
 
-in ShadowMatrix shadow[NUM_LIGHTS];
+in ShadowMatrix shadow[NUM_LIGHTS_ARRAY_SIZE];
 
-out vec2 FshadowFilterWidth[NUM_LIGHTS];
+out vec2 FshadowFilterWidth[NUM_LIGHTS_ARRAY_SIZE];
 
 void
 computeShadowFilterWidth(vec4 Peye)
@@ -122,11 +122,17 @@ struct LightingInterfaceProperties {
 };
 
 /*
-    MTL_FIXME - Have moved these outside of the #if NUM_LIGHTS declaration as the Metal parsing
-    of the glslfx files takes no notice of any surrounding #defines and will therefore expect these
-    to be present. This would likely break OpenGL as it would not expect these to be in the uniform
-    block if NUM_LIGHTS == 0.
+MTL_FIXME - Have moved these outside of the #if NUM_LIGHTS declaration as the Metal parsing
+of the glslfx files takes no notice of any surrounding #defines and will therefore expect these
+to be present. This would likely break OpenGL as it would not expect these to be in the uniform
+block if NUM_LIGHTS == 0. However a zero sized array will cause a compile error so we will prevent
+thsat by using a seperate define to define the array size.
 */
+#if NUM_LIGHTS == 0
+#define NUM_LIGHTS_ARRAY_SIZE 1
+#else
+#define NUM_LIGHTS_ARRAY_SIZE 1
+#endif
 
 // ---------------------------------------------------------------------------
 // uniform blocks
@@ -135,11 +141,11 @@ struct LightingInterfaceProperties {
 layout(std140) uniform Lighting {
     bool useLighting;
     bool useColorMaterialDiffuse;
-    LightSource lightSource[NUM_LIGHTS];
+    LightSource lightSource[NUM_LIGHTS_ARRAY_SIZE];
 };
 
 layout(std140) uniform Shadow {
-    ShadowMatrix shadow[NUM_LIGHTS];
+    ShadowMatrix shadow[NUM_LIGHTS_ARRAY_SIZE];
 };
 
 #if NUM_LIGHTS == 0
