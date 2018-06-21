@@ -55,7 +55,7 @@ struct Shadow {
     float bias;
 };
 
-uniform Shadow shadow[NUM_LIGHTS];
+uniform Shadow shadow[NUM_LIGHTS_ARRAY_SIZE];
 
 // shadowSample() returns depth value.
 float
@@ -95,7 +95,7 @@ shadowing(int index, vec4 Peye)
 }
 
 #ifdef REQUIRE_SHADOW_FILTER_WIDTH
-out vec2 FshadowFilterWidth[NUM_LIGHTS];
+out vec2 FshadowFilterWidth[NUM_LIGHTS_ARRAY_SIZE];
 #define COMPUTE_SHADOW_FILTER_WIDTH(x) computeShadowFilterWidth(x)
 
 void
