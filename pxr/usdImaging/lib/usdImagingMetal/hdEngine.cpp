@@ -703,7 +703,7 @@ UsdImagingMetalHdEngine::Render(RenderParams params)
     {
         GLfloat clearColor[4];
         glGetFloatv(GL_COLOR_CLEAR_VALUE, clearColor);
-        clearColor[3] = 1.0f;
+        clearColor = { 0.235f, 0.702f, 0.443f, 1.f }; //METAL TODO: This *temporarily* fully overrides whatever clear color was retrieved from OpenGL. Revert when fragment shaders no longer output black.
         
         _mtlRenderPassDescriptor = [[MTLRenderPassDescriptor alloc] init];
 

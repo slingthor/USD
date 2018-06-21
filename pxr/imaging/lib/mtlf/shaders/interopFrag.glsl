@@ -6,6 +6,8 @@
 #if __VERSION__ >= 140
 in vec2         texCoord;
 out vec4        fragColor;
+#else
+varying vec2    texCoord;
 #endif
 
 // A GL_TEXTURE_RECTANGLE
@@ -21,7 +23,7 @@ void main(void)
     vec2 uv = texCoord * texSize;
 	fragColor = texture(interopTexture, uv.st);
 #else
-	vec2 uv = gl_TexCoord[0].st * texSize;
+    vec2 uv = vec2(texCoord.x, 1.0 - texCoord.y) * texSize;
     gl_FragColor = texture2DRect(interopTexture, uv.st);
 #endif
 }
