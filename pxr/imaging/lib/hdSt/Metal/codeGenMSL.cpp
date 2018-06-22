@@ -845,6 +845,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
                 continue;
             }
             copyInputsFrag << "scope." << accessor << "=vsInput." << input.name << ";\n";
+            continue;
         }
         else if(input.usage & HdSt_CodeGenMSL::TParam::UniformBlockMember) {
             std::string inputName = input.name.GetString();
