@@ -898,7 +898,10 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
         else {
             std::string n;
             if (input.name.GetText()[0] == '*') {
-                n = input.name.GetText() + 1;
+                if ((input.usage & HdSt_CodeGenMSL::TParam::UniformBlock) != 0)
+                    n = input.name.GetText() + 4; //Because of "*___<NAME>"
+                else
+                    n = input.name.GetText() + 1;
             }
             else {
                 n = input.name.GetString();
@@ -1134,6 +1137,8 @@ HdSt_CodeGenMSL::Compile()
             if (binDecl->dataType.IsEmpty()) continue;
 
             _EmitDeclaration(_genCommon, _mslVSInputParams, binDecl->name, binDecl->dataType, TfToken(), binDecl->binding);
+            std::stringstream dummy;
+            _EmitDeclaration(dummy, _mslPSInputParams, binDecl->name, binDecl->dataType, TfToken(), binDecl->binding);
 
             _EmitAccessor(_genCommon,
                           binDecl->name,
@@ -1179,6 +1184,9 @@ HdSt_CodeGenMSL::Compile()
         
         declarations << "};\n";
         _EmitDeclarationPtr(declarations, _mslVSInputParams, varName, typeName, TfToken(), binding, 0, true);
+        std::stringstream dummy;
+        _EmitDeclarationPtr(dummy, _mslPSInputParams, varName, typeName, TfToken(), binding, 0, true);
+        
     }
     _genCommon << declarations.str() << accessors.str();
     METAL_DEBUG_COMMENT(&_genCommon, "END OF _metaData.customInterleavedBindings\n"); //MTL_FIXME
