@@ -721,16 +721,13 @@ UsdImagingMetalHdEngine::Render(RenderParams params)
     colorAttachment.texture = context->mtlTexture;
 
     // Create a new command buffer for each render pass to the current drawable
-    id <MTLCommandBuffer> commandBuffer = [context->commandQueue commandBuffer];
+    id <MTLCommandBuffer> commandBuffer = context->CreateCommandBuffer();
     commandBuffer.label = @"HdEngine CommandBuffer";
 
     // Create a render command encoder so we can render into something
-    TF_VERIFY(context->commandBuffer == nil, "A command buffer is already active");
+    TF_VERIFY(context->commandBuffer == nil, "Render: A command buffer is already active");
 
-    id <MTLRenderCommandEncoder> renderEncoder =
-        [commandBuffer renderCommandEncoderWithDescriptor:_mtlRenderPassDescriptor];
-    context->commandBuffer = commandBuffer;
-    context->renderEncoder = renderEncoder;
+    id <MTLRenderCommandEncoder> renderEncoder = context->CreateRenderEncoder(_mtlRenderPassDescriptor);
 
     VtValue selectionValue(_selTracker);
     _engine.SetTaskContextData(HdxTokens->selectionState, selectionValue);

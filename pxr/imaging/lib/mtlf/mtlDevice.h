@@ -36,6 +36,7 @@
 #include "pxr/base/arch/threads.h"
 #include <boost/noncopyable.hpp>
 #include <boost/shared_ptr.hpp>
+#include <boost/unordered_map.hpp>
 
 #include <map>
 
@@ -80,6 +81,12 @@ public:
     }
     
     MTLF_API
+    id<MTLCommandBuffer> CreateCommandBuffer();
+    
+    MTLF_API
+    id<MTLRenderCommandEncoder> CreateRenderEncoder(MTLRenderPassDescriptor *renderPassDescriptor);
+    
+    MTLF_API
     void SetDrawTarget(MtlfDrawTarget *drawTarget);
     
     MTLF_API
@@ -112,6 +119,9 @@ public:
     void SetSampler(int index, id<MTLSamplerState> sampler, const TfToken& name, MSL_ProgramStage stage);
 
     MTLF_API
+    id<MTLRenderPipelineState> GetPipelineState(MTLRenderPipelineDescriptor *pipelineStateDescriptor);
+
+    MTLF_API
     void BakeState();
 
     MTLF_API
@@ -142,6 +152,7 @@ protected:
     MTLRenderPipelineDescriptor *pipelineStateDescriptor;
     MTLVertexDescriptor *vertexDescriptor;
     uint32_t numVertexComponents;
+    uint32_t numColourAttachments;
 
     struct OldStyleUniformData
     {
@@ -196,6 +207,10 @@ private:
     
     CVOpenGLTextureCacheRef cvglTextureCache = nil;
     CVMetalTextureCacheRef cvmtlTextureCache = nil;
+    
+    id<MTLRenderPipelineState> currentPipelineState;
+    boost::unordered_map<size_t, id<MTLRenderPipelineState>> pipelineStateMap;
+    uint32 dirtyState;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

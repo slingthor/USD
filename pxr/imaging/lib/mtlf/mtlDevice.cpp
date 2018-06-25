@@ -28,8 +28,20 @@
 #include "pxr/imaging/mtlf/drawTarget.h"
 #include "pxr/imaging/mtlf/package.h"
 
-
 #import <simd/simd.h>
+
+#define METAL_STATE_OPTIMISATION 1
+
+#define DIRTY_METAL_STATE_OLD_STYLE_UNIFORM        0x01
+#define DIRTY_METAL_STATE_VERTEX_UNIFORM_BUFFER    0x02
+#define DIRTY_METAL_STATE_FRAGMENT_UNIFORM_BUFFER  0x04
+#define DIRTY_METAL_STATE_INDEX_BUFFER             0x08
+#define DIRTY_METAL_STATE_VERTEX_BUFFER            0x10
+#define DIRTY_METAL_STATE_SAMPLER                  0x20
+#define DIRTY_METAL_STATE_TEXTURE                  0x40
+#define DIRTY_METAL_STATE_DRAW_TARGET              0x80
+
+#define DIRTY_METAL_STATE_ALL                      0xFFFFFFFF
 
 PXR_NAMESPACE_OPEN_SCOPE
 MtlfMetalContextSharedPtr MtlfMetalContext::context = NULL;
@@ -81,7 +93,57 @@ static GLuint _compileShader(GLchar const* const shaderSource, GLuint shaderType
     
     return s;
 }
+#if METAL_STATE_OPTIMISATION
+size_t HashVertexDescriptor(MTLVertexDescriptor *vertexDescriptor, unsigned int numVertexComponents)
+{
+    size_t hashVal = 0;
+    for (int i = 0; i < numVertexComponents; i++) {
+        boost::hash_combine(hashVal, vertexDescriptor.layouts[i].stepFunction);
+        boost::hash_combine(hashVal, vertexDescriptor.layouts[i].stepRate);
+        boost::hash_combine(hashVal, vertexDescriptor.layouts[i].stride);
+        boost::hash_combine(hashVal, vertexDescriptor.attributes[i].bufferIndex);
+        boost::hash_combine(hashVal, vertexDescriptor.attributes[i].offset);
+        boost::hash_combine(hashVal, vertexDescriptor.attributes[i].format);
+    }
+    return hashVal;
+}
 
+size_t HashColourAttachments(MTLRenderPipelineColorAttachmentDescriptorArray *colourAttachments, unsigned int numColourAttachments)
+{
+    size_t hashVal = 0;
+    for (int i = 0; i < numColourAttachments; i++) {
+        boost::hash_combine(hashVal, colourAttachments[i].pixelFormat);
+        boost::hash_combine(hashVal, colourAttachments[i].blendingEnabled);
+        boost::hash_combine(hashVal, colourAttachments[i].sourceRGBBlendFactor);
+        boost::hash_combine(hashVal, colourAttachments[i].destinationRGBBlendFactor);
+        boost::hash_combine(hashVal, colourAttachments[i].rgbBlendOperation);
+        boost::hash_combine(hashVal, colourAttachments[i].sourceAlphaBlendFactor);
+        boost::hash_combine(hashVal, colourAttachments[i].destinationAlphaBlendFactor);
+        boost::hash_combine(hashVal, colourAttachments[i].alphaBlendOperation);
+    }
+    return hashVal;
+}
+
+size_t HashPipeLineDescriptor(MTLRenderPipelineDescriptor *pipelineStateDescriptor, unsigned int numColourAttachments, unsigned int numVertexComponents)
+{
+    size_t hashVal = 0;
+    size_t vertexDescriptorHashVal = HashVertexDescriptor(pipelineStateDescriptor.vertexDescriptor, numVertexComponents);
+    size_t colorAttachmentHashVal  = HashColourAttachments(pipelineStateDescriptor.colorAttachments, numColourAttachments);
+    boost::hash_combine(hashVal, pipelineStateDescriptor.vertexFunction);
+    boost::hash_combine(hashVal, pipelineStateDescriptor.fragmentFunction);
+    boost::hash_combine(hashVal, pipelineStateDescriptor.sampleCount);
+    boost::hash_combine(hashVal, pipelineStateDescriptor.rasterSampleCount);
+    boost::hash_combine(hashVal, pipelineStateDescriptor.alphaToCoverageEnabled);
+    boost::hash_combine(hashVal, pipelineStateDescriptor.alphaToOneEnabled);
+    boost::hash_combine(hashVal, pipelineStateDescriptor.rasterizationEnabled);
+    boost::hash_combine(hashVal, pipelineStateDescriptor.depthAttachmentPixelFormat);
+    boost::hash_combine(hashVal, pipelineStateDescriptor.stencilAttachmentPixelFormat);
+    boost::hash_combine(hashVal, vertexDescriptorHashVal);
+    boost::hash_combine(hashVal, colorAttachmentHashVal);
+    
+    return hashVal;
+}
+#endif
 // Called when the window is dragged to another display
 void MtlfMetalContext::handleDisplayChange()
 {
@@ -147,6 +209,11 @@ id<MTLDevice> MtlfMetalContext::GetMetalDevice(PREFERRED_GPU_TYPE preferredGPUTy
             preferredDeviceList = _integratedGPUs;
             break;
     }
+    // If no device matching the requested one was found then get the default device
+    if (preferredDeviceList.count == 0) {
+        NSLog(@"Preferred device not found, returning default GPU");
+        preferredDeviceList = _deviceList;
+    }
     return preferredDeviceList.firstObject;
 }
 
@@ -157,7 +224,8 @@ id<MTLDevice> MtlfMetalContext::GetMetalDevice(PREFERRED_GPU_TYPE preferredGPUTy
 
 MtlfMetalContext::MtlfMetalContext()
 {
-    device = MtlfMetalContext::GetMetalDevice(PREFER_DEFAULT_GPU);
+    // Select Intel GPU if possible due to current issues on AMD. Revert when fixed - MTL_FIXME
+	device = MtlfMetalContext::GetMetalDevice(PREFER_INTEGRATED_GPU);
 
     NSLog(@"Selected %@ for Metal Device", device.name);
     
@@ -217,14 +285,6 @@ MtlfMetalContext::MtlfMetalContext()
     MTLDepthStencilDescriptor *depthStateDesc = [[MTLDepthStencilDescriptor alloc] init];
     depthStateDesc.depthCompareFunction = MTLCompareFunctionAlways;
     depthState = [device newDepthStencilStateWithDescriptor:depthStateDesc];
-    
-    
-    
-    
-    
-    
-    
-    
     
     // Load our common vertex shader. This is used by both the fragment shaders below
     TfToken vtxShaderToken(MtlfPackageInteropVtxShader());
@@ -384,6 +444,20 @@ void MtlfMetalContext::CheckNewStateGather()
     [pipelineStateDescriptor reset];
 }
 
+id<MTLCommandBuffer> MtlfMetalContext::CreateCommandBuffer() {
+    commandBuffer        = [context->commandQueue commandBuffer];
+    currentPipelineState = NULL;
+    dirtyState           = DIRTY_METAL_STATE_ALL;
+    return commandBuffer;
+}
+
+id<MTLRenderCommandEncoder> MtlfMetalContext::CreateRenderEncoder(MTLRenderPassDescriptor *renderPassDescriptor) {
+    renderEncoder = [commandBuffer renderCommandEncoderWithDescriptor:renderPassDescriptor];
+    currentPipelineState = NULL;
+    dirtyState           = DIRTY_METAL_STATE_ALL;
+    return renderEncoder;
+}
+
 void MtlfMetalContext::SetShadingPrograms(id<MTLFunction> vertexFunction, id<MTLFunction> fragmentFunction)
 {
     CheckNewStateGather();
@@ -445,6 +519,7 @@ void MtlfMetalContext::SetUniform(const void* _data, uint32 _dataSize, const TfT
     OldStyleUniformData newUniform = { _index, 0, 0, _name, _stage };
     newUniform.alloc(_data, _dataSize);
     oldStyleUniforms.push_back(newUniform);
+    dirtyState |= DIRTY_METAL_STATE_OLD_STYLE_UNIFORM;
 }
 
 void MtlfMetalContext::SetUniformBuffer(int index, id<MTLBuffer> buffer, const TfToken& name, MSL_ProgramStage stage, int offset, bool oldStyleBacker)
@@ -458,9 +533,11 @@ void MtlfMetalContext::SetUniformBuffer(int index, id<MTLBuffer> buffer, const T
     {
         if(stage == kMSL_ProgramStage_Vertex) {
             vtxUniformBackingBuffer = buffer;
+            dirtyState |= DIRTY_METAL_STATE_VERTEX_UNIFORM_BUFFER;
         }
         else if(stage == kMSL_ProgramStage_Fragment) {
             fragUniformBackingBuffer = buffer;
+            dirtyState |= DIRTY_METAL_STATE_FRAGMENT_UNIFORM_BUFFER;
         }
     }
 }
@@ -468,30 +545,93 @@ void MtlfMetalContext::SetUniformBuffer(int index, id<MTLBuffer> buffer, const T
 void MtlfMetalContext::SetBuffer(int index, id<MTLBuffer> buffer, const TfToken& name)
 {
     vertexBuffers.push_back({index, buffer, name});
+    dirtyState |= DIRTY_METAL_STATE_VERTEX_BUFFER;
 }
 
 void MtlfMetalContext::SetIndexBuffer(id<MTLBuffer> buffer)
 {
     indexBuffer = buffer;
+    dirtyState |= DIRTY_METAL_STATE_INDEX_BUFFER;
 }
 
 void MtlfMetalContext::SetSampler(int index, id<MTLSamplerState> sampler, const TfToken& name, MSL_ProgramStage stage)
 {
     samplers.push_back({index, sampler, name, stage});
+    dirtyState |= DIRTY_METAL_STATE_SAMPLER;
 }
 
 void MtlfMetalContext::SetTexture(int index, id<MTLTexture> texture, const TfToken& name, MSL_ProgramStage stage)
 {
     textures.push_back({index, texture, name, stage});
+    dirtyState |= DIRTY_METAL_STATE_TEXTURE;
 }
 
 void MtlfMetalContext::SetDrawTarget(MtlfDrawTarget *dt)
 {
     drawTarget = dt;
+    dirtyState |= DIRTY_METAL_STATE_DRAW_TARGET;
 }
+
+// I think this can be removed didn't seem to make too much difference to speeds
+void copyUniform(uint8 *dest, uint8 *src, uint32 size)
+{
+    switch (size) {
+        case 4: {
+            *(uint32*)dest = *(uint32*)src;
+            break; }
+        case 8: {
+            *(uint64*)dest = *(uint64*)src;
+            break; }
+        case 12: {
+            *(((uint32*)dest) + 0) = *(((uint32*)src) + 0);
+            *(((uint32*)dest) + 1) = *(((uint32*)src) + 1);
+            *(((uint32*)dest) + 2) = *(((uint32*)src) + 2);
+            break; }
+        case 16: {
+            *(((uint64*)dest) + 0) = *(((uint64*)src) + 0);
+            *(((uint64*)dest) + 1) = *(((uint64*)src) + 1);
+            break; }
+        default:
+            memcpy(dest, src, size);
+    }
+}
+
+id<MTLRenderPipelineState> MtlfMetalContext::GetPipelineState(MTLRenderPipelineDescriptor *pipelineStateDescriptor)
+{
+    id<MTLRenderPipelineState> pipelineState;
+#if METAL_STATE_OPTIMISATION
+    size_t hashVal = HashPipeLineDescriptor(pipelineStateDescriptor, numColourAttachments, numVertexComponents);
+    boost::unordered_map<size_t, id<MTLRenderPipelineState>>::const_iterator pipelineStateIt = pipelineStateMap.find(hashVal);
+ 
+    if (pipelineStateIt != pipelineStateMap.end()) {
+        pipelineState = pipelineStateIt->second;
+    }
+    else
+#endif
+    {
+        NSError *error = NULL;
+        pipelineState = [device newRenderPipelineStateWithDescriptor:pipelineStateDescriptor error:&error];
+        if (!pipelineState) {
+            NSLog(@"Failed to created pipeline state, error %@", error);
+            return NULL;
+        }
+#if METAL_STATE_OPTIMISATION
+        pipelineStateMap.emplace(hashVal, pipelineState);
+        NSLog(@"Unique pipeline states %lu", pipelineStateMap.size());
+#endif
+        
+    }
+    return pipelineState;
+}
+
 
 void MtlfMetalContext::BakeState()
 {
+#if !METAL_STATE_OPTIMISATION
+    dirtyState = DIRTY_METAL_STATE_ALL;
+#endif
+    id<MTLRenderPipelineState> pipelineState;
+    
     if (pipelineStateDescriptor == nil) {
         // This is temporary
         return;
@@ -500,6 +640,7 @@ void MtlfMetalContext::BakeState()
     pipelineStateDescriptor.label = @"Bake State";
     pipelineStateDescriptor.sampleCount = 1;
     pipelineStateDescriptor.vertexDescriptor = vertexDescriptor;
+    numColourAttachments = 0;
     if (drawTarget) {
         auto& attachments = drawTarget->GetAttachments();
         for(auto it : attachments) {
@@ -517,6 +658,7 @@ void MtlfMetalContext::BakeState()
                 pipelineStateDescriptor.colorAttachments[idx].blendingEnabled = NO;
                 pipelineStateDescriptor.colorAttachments[idx].pixelFormat = [texture pixelFormat];
             }
+            numColourAttachments++;
         }
     }
     else {
@@ -527,65 +669,98 @@ void MtlfMetalContext::BakeState()
         pipelineStateDescriptor.colorAttachments[0].destinationRGBBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
         pipelineStateDescriptor.colorAttachments[0].destinationAlphaBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
         pipelineStateDescriptor.colorAttachments[0].pixelFormat = MTLPixelFormatBGRA8Unorm;
+        numColourAttachments++;
     }
     
-    NSError *error = NULL;
-    id<MTLRenderPipelineState> _pipelineState = [device newRenderPipelineStateWithDescriptor:pipelineStateDescriptor error:&error];
-    if (!_pipelineState) {
-        NSLog(@"Failed to created pipeline state, error %@", error);
-        return;
+    pipelineState = GetPipelineState(pipelineStateDescriptor);
+    if (pipelineState != currentPipelineState) {
+        [renderEncoder setRenderPipelineState:pipelineState];
+        currentPipelineState = pipelineState;
     }
     
-    [renderEncoder setRenderPipelineState:_pipelineState];
-    
-    for(auto uniform : oldStyleUniforms)
-    {
-        if(uniform.stage == kMSL_ProgramStage_Vertex) {
-            if(!vtxUniformBackingBuffer)
+    if (dirtyState & DIRTY_METAL_STATE_OLD_STYLE_UNIFORM) {
+        uint32 vertexStart   = UINT32_MAX, vertexEnd   = 0;
+        uint32 fragmentStart = UINT32_MAX, fragmentEnd = 0;
+        uint8* vtxData  = (uint8*)(vtxUniformBackingBuffer.contents);
+        uint8* fragdata = (uint8*)(fragUniformBackingBuffer.contents);
+        
+        for(auto uniform : oldStyleUniforms)
+        {
+            if(uniform.stage == kMSL_ProgramStage_Vertex) {
+                if(!vtxUniformBackingBuffer)
                 TF_FATAL_CODING_ERROR("No vertex uniform backing buffer assigned!");
-            uint8 * data = (uint8*)(vtxUniformBackingBuffer.contents);
-            memcpy(data + uniform.index, uniform.data, uniform.dataSize);
-            [vtxUniformBackingBuffer didModifyRange:NSMakeRange(uniform.index, uniform.dataSize)];
-        }
-        else if(uniform.stage == kMSL_ProgramStage_Fragment) {
-            if(!fragUniformBackingBuffer)
+                copyUniform(vtxData + uniform.index, (uint8*)uniform.data, uniform.dataSize);
+                vertexStart = uniform.index < vertexStart ? uniform.index : vertexStart;
+                vertexEnd   = uniform.index > vertexEnd   ? uniform.index : vertexEnd;
+             }
+            else if(uniform.stage == kMSL_ProgramStage_Fragment) {
+                if(!fragUniformBackingBuffer)
                 TF_FATAL_CODING_ERROR("No fragment uniform backing buffer assigned!");
-            uint8 * data = (uint8*)(fragUniformBackingBuffer.contents);
-            memcpy(data + uniform.index, uniform.data, uniform.dataSize);
-            [fragUniformBackingBuffer didModifyRange:NSMakeRange(uniform.index, uniform.dataSize)];
+                copyUniform(fragdata + uniform.index, (uint8*)uniform.data, uniform.dataSize);
+                fragmentStart = uniform.index < fragmentStart ? uniform.index : fragmentStart;
+                fragmentEnd   = uniform.index > fragmentEnd   ? uniform.index : fragmentEnd;
+            }
+            else {
+                TF_FATAL_CODING_ERROR("Not implemented!"); //Compute case
+            }
         }
-        else
-            TF_FATAL_CODING_ERROR("Not implemented!"); //Compute case
+        if (vertexStart != UINT_MAX) {
+            [vtxUniformBackingBuffer  didModifyRange:NSMakeRange(vertexStart,   vertexEnd   - vertexStart)];
+        }
+        if (fragmentStart != UINT_MAX) {
+            [fragUniformBackingBuffer didModifyRange:NSMakeRange(fragmentStart, fragmentEnd - fragmentStart)];
+        }
+
+#if METAL_STATE_OPTIMISATION
+        // Remove these from the uniform list or we'll just end recopying them every draw call
+        for(auto it = oldStyleUniforms.begin(); it != oldStyleUniforms.end(); ++it){
+            it->release();
+        }
+        oldStyleUniforms.clear();
+#endif
+        
+        dirtyState &= ~DIRTY_METAL_STATE_OLD_STYLE_UNIFORM;
     }
-    
-    for(auto buffer : uniformBuffers)
-    {
-        if(buffer.stage == kMSL_ProgramStage_Vertex)
+    if (dirtyState & (DIRTY_METAL_STATE_VERTEX_UNIFORM_BUFFER | DIRTY_METAL_STATE_FRAGMENT_UNIFORM_BUFFER)) {
+        for(auto buffer : uniformBuffers)
+        {
+            if(buffer.stage == kMSL_ProgramStage_Vertex)
             [renderEncoder setVertexBuffer:buffer.buffer offset:buffer.offset atIndex:buffer.idx];
-        else if(buffer.stage == kMSL_ProgramStage_Fragment)
+            else if(buffer.stage == kMSL_ProgramStage_Fragment)
             [renderEncoder setFragmentBuffer:buffer.buffer offset:buffer.offset atIndex:buffer.idx];
-        else
+            else
             TF_FATAL_CODING_ERROR("Not implemented!"); //Compute case
+        }
+        dirtyState &= ~(DIRTY_METAL_STATE_VERTEX_UNIFORM_BUFFER | DIRTY_METAL_STATE_FRAGMENT_UNIFORM_BUFFER);
     }
 
-    for(auto buffer : vertexBuffers) {
-        [renderEncoder setVertexBuffer:buffer.buffer offset:0 atIndex:buffer.idx];
-    } 
-    for(auto texture : textures) {
-        if(texture.stage == kMSL_ProgramStage_Vertex)
-            [renderEncoder setVertexTexture:texture.texture atIndex:texture.idx];
-        else if(texture.stage == kMSL_ProgramStage_Fragment)
-            [renderEncoder setFragmentTexture:texture.texture atIndex:texture.idx];
-        else
-            TF_FATAL_CODING_ERROR("Not implemented!"); //Compute case
+    if (dirtyState & DIRTY_METAL_STATE_VERTEX_BUFFER) {
+        for(auto buffer : vertexBuffers) {
+            [renderEncoder setVertexBuffer:buffer.buffer offset:0 atIndex:buffer.idx];
+        }
+        dirtyState &= ~DIRTY_METAL_STATE_VERTEX_BUFFER;
     }
-    for(auto sampler : samplers) {
-        if(sampler.stage == kMSL_ProgramStage_Vertex)
-            [renderEncoder setVertexSamplerState:sampler.sampler atIndex:sampler.idx];
-        else if(sampler.stage == kMSL_ProgramStage_Fragment)
-            [renderEncoder setFragmentSamplerState:sampler.sampler atIndex:sampler.idx];
-        else
+    if (dirtyState & DIRTY_METAL_STATE_TEXTURE) {
+        for(auto texture : textures) {
+            if(texture.stage == kMSL_ProgramStage_Vertex)
+            [renderEncoder setVertexTexture:texture.texture atIndex:texture.idx];
+            else if(texture.stage == kMSL_ProgramStage_Fragment)
+            [renderEncoder setFragmentTexture:texture.texture atIndex:texture.idx];
+            else
             TF_FATAL_CODING_ERROR("Not implemented!"); //Compute case
+        }
+        dirtyState &= ~DIRTY_METAL_STATE_TEXTURE;
+    }
+    if (dirtyState & DIRTY_METAL_STATE_SAMPLER) {
+        for(auto sampler : samplers) {
+            if(sampler.stage == kMSL_ProgramStage_Vertex)
+            [renderEncoder setVertexSamplerState:sampler.sampler atIndex:sampler.idx];
+            else if(sampler.stage == kMSL_ProgramStage_Fragment)
+            [renderEncoder setFragmentSamplerState:sampler.sampler atIndex:sampler.idx];
+            else
+            TF_FATAL_CODING_ERROR("Not implemented!"); //Compute case
+        }
+        dirtyState &= ~DIRTY_METAL_STATE_SAMPLER;
     }
 }
 
