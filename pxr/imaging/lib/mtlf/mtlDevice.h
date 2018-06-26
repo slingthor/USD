@@ -119,9 +119,6 @@ public:
     void SetSampler(int index, id<MTLSamplerState> sampler, const TfToken& name, MSL_ProgramStage stage);
 
     MTLF_API
-    id<MTLRenderPipelineState> GetPipelineState(MTLRenderPipelineDescriptor *pipelineStateDescriptor);
-
-    MTLF_API
     void BakeState();
 
     MTLF_API
@@ -208,8 +205,18 @@ private:
     CVOpenGLTextureCacheRef cvglTextureCache = nil;
     CVMetalTextureCacheRef cvmtlTextureCache = nil;
     
+    // Pipeline state functions
+    void SetPipelineState();
+    size_t HashVertexDescriptor();
+    size_t HashColourAttachments();
+    size_t HashPipeLineDescriptor();
+    // Pipeline state
+    size_t currentVertexDescriptorHash;
+    size_t currentColourAttachmentsHash;
+    size_t currentPipelineDescriptorHash;
     id<MTLRenderPipelineState> currentPipelineState;
     boost::unordered_map<size_t, id<MTLRenderPipelineState>> pipelineStateMap;
+    
     uint32 dirtyState;
 };
 

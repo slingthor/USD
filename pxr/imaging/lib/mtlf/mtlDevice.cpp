@@ -32,14 +32,15 @@
 
 #define METAL_STATE_OPTIMISATION 1
 
-#define DIRTY_METAL_STATE_OLD_STYLE_UNIFORM        0x01
-#define DIRTY_METAL_STATE_VERTEX_UNIFORM_BUFFER    0x02
-#define DIRTY_METAL_STATE_FRAGMENT_UNIFORM_BUFFER  0x04
-#define DIRTY_METAL_STATE_INDEX_BUFFER             0x08
-#define DIRTY_METAL_STATE_VERTEX_BUFFER            0x10
-#define DIRTY_METAL_STATE_SAMPLER                  0x20
-#define DIRTY_METAL_STATE_TEXTURE                  0x40
-#define DIRTY_METAL_STATE_DRAW_TARGET              0x80
+#define DIRTY_METAL_STATE_OLD_STYLE_UNIFORM        0x001
+#define DIRTY_METAL_STATE_VERTEX_UNIFORM_BUFFER    0x002
+#define DIRTY_METAL_STATE_FRAGMENT_UNIFORM_BUFFER  0x004
+#define DIRTY_METAL_STATE_INDEX_BUFFER             0x008
+#define DIRTY_METAL_STATE_VERTEX_BUFFER            0x010
+#define DIRTY_METAL_STATE_SAMPLER                  0x020
+#define DIRTY_METAL_STATE_TEXTURE                  0x040
+#define DIRTY_METAL_STATE_DRAW_TARGET              0x080
+#define DIRTY_METAL_STATE_VERTEX_DESCRIPTOR        0x100
 
 #define DIRTY_METAL_STATE_ALL                      0xFFFFFFFF
 
@@ -93,57 +94,7 @@ static GLuint _compileShader(GLchar const* const shaderSource, GLuint shaderType
     
     return s;
 }
-#if METAL_STATE_OPTIMISATION
-size_t HashVertexDescriptor(MTLVertexDescriptor *vertexDescriptor, unsigned int numVertexComponents)
-{
-    size_t hashVal = 0;
-    for (int i = 0; i < numVertexComponents; i++) {
-        boost::hash_combine(hashVal, vertexDescriptor.layouts[i].stepFunction);
-        boost::hash_combine(hashVal, vertexDescriptor.layouts[i].stepRate);
-        boost::hash_combine(hashVal, vertexDescriptor.layouts[i].stride);
-        boost::hash_combine(hashVal, vertexDescriptor.attributes[i].bufferIndex);
-        boost::hash_combine(hashVal, vertexDescriptor.attributes[i].offset);
-        boost::hash_combine(hashVal, vertexDescriptor.attributes[i].format);
-    }
-    return hashVal;
-}
 
-size_t HashColourAttachments(MTLRenderPipelineColorAttachmentDescriptorArray *colourAttachments, unsigned int numColourAttachments)
-{
-    size_t hashVal = 0;
-    for (int i = 0; i < numColourAttachments; i++) {
-        boost::hash_combine(hashVal, colourAttachments[i].pixelFormat);
-        boost::hash_combine(hashVal, colourAttachments[i].blendingEnabled);
-        boost::hash_combine(hashVal, colourAttachments[i].sourceRGBBlendFactor);
-        boost::hash_combine(hashVal, colourAttachments[i].destinationRGBBlendFactor);
-        boost::hash_combine(hashVal, colourAttachments[i].rgbBlendOperation);
-        boost::hash_combine(hashVal, colourAttachments[i].sourceAlphaBlendFactor);
-        boost::hash_combine(hashVal, colourAttachments[i].destinationAlphaBlendFactor);
-        boost::hash_combine(hashVal, colourAttachments[i].alphaBlendOperation);
-    }
-    return hashVal;
-}
-
-size_t HashPipeLineDescriptor(MTLRenderPipelineDescriptor *pipelineStateDescriptor, unsigned int numColourAttachments, unsigned int numVertexComponents)
-{
-    size_t hashVal = 0;
-    size_t vertexDescriptorHashVal = HashVertexDescriptor(pipelineStateDescriptor.vertexDescriptor, numVertexComponents);
-    size_t colorAttachmentHashVal  = HashColourAttachments(pipelineStateDescriptor.colorAttachments, numColourAttachments);
-    boost::hash_combine(hashVal, pipelineStateDescriptor.vertexFunction);
-    boost::hash_combine(hashVal, pipelineStateDescriptor.fragmentFunction);
-    boost::hash_combine(hashVal, pipelineStateDescriptor.sampleCount);
-    boost::hash_combine(hashVal, pipelineStateDescriptor.rasterSampleCount);
-    boost::hash_combine(hashVal, pipelineStateDescriptor.alphaToCoverageEnabled);
-    boost::hash_combine(hashVal, pipelineStateDescriptor.alphaToOneEnabled);
-    boost::hash_combine(hashVal, pipelineStateDescriptor.rasterizationEnabled);
-    boost::hash_combine(hashVal, pipelineStateDescriptor.depthAttachmentPixelFormat);
-    boost::hash_combine(hashVal, pipelineStateDescriptor.stencilAttachmentPixelFormat);
-    boost::hash_combine(hashVal, vertexDescriptorHashVal);
-    boost::hash_combine(hashVal, colorAttachmentHashVal);
-    
-    return hashVal;
-}
-#endif
 // Called when the window is dragged to another display
 void MtlfMetalContext::handleDisplayChange()
 {
@@ -281,6 +232,10 @@ MtlfMetalContext::MtlfMetalContext()
     if (!pipelineState) {
         NSLog(@"Failed to created pipeline state, error %@", error);
     }
+    currentVertexDescriptorHash   = 0;
+    currentColourAttachmentsHash  = 0;
+    currentPipelineDescriptorHash = 0;
+    currentPipelineState          = nil;
     
     MTLDepthStencilDescriptor *depthStateDesc = [[MTLDepthStencilDescriptor alloc] init];
     depthStateDesc.depthCompareFunction = MTLCompareFunctionAlways;
@@ -462,7 +417,7 @@ void MtlfMetalContext::SetShadingPrograms(id<MTLFunction> vertexFunction, id<MTL
 {
     CheckNewStateGather();
     
-    pipelineStateDescriptor.vertexFunction = vertexFunction;
+    pipelineStateDescriptor.vertexFunction   = vertexFunction;
     pipelineStateDescriptor.fragmentFunction = fragmentFunction;
 }
 
@@ -512,6 +467,8 @@ void MtlfMetalContext::SetVertexAttribute(uint32_t index,
     if (index + 1 > numVertexComponents) {
         numVertexComponents = index + 1;
     }
+    
+    dirtyState |= DIRTY_METAL_STATE_VERTEX_DESCRIPTOR;
 }
 
 void MtlfMetalContext::SetUniform(const void* _data, uint32 _dataSize, const TfToken& _name, uint32 _index, MSL_ProgramStage _stage)
@@ -596,13 +553,124 @@ void copyUniform(uint8 *dest, uint8 *src, uint32 size)
     }
 }
 
-id<MTLRenderPipelineState> MtlfMetalContext::GetPipelineState(MTLRenderPipelineDescriptor *pipelineStateDescriptor)
+size_t MtlfMetalContext::HashVertexDescriptor()
+{
+    size_t hashVal = 0;
+    for (int i = 0; i < numVertexComponents; i++) {
+        boost::hash_combine(hashVal, vertexDescriptor.layouts[i].stepFunction);
+        boost::hash_combine(hashVal, vertexDescriptor.layouts[i].stepRate);
+        boost::hash_combine(hashVal, vertexDescriptor.layouts[i].stride);
+        boost::hash_combine(hashVal, vertexDescriptor.attributes[i].bufferIndex);
+        boost::hash_combine(hashVal, vertexDescriptor.attributes[i].offset);
+        boost::hash_combine(hashVal, vertexDescriptor.attributes[i].format);
+    }
+    return hashVal;
+}
+
+size_t MtlfMetalContext::HashColourAttachments()
+{
+    size_t hashVal = 0;
+    MTLRenderPipelineColorAttachmentDescriptorArray *colourAttachments = pipelineStateDescriptor.colorAttachments;
+    for (int i = 0; i < numColourAttachments; i++) {
+        boost::hash_combine(hashVal, colourAttachments[i].pixelFormat);
+        boost::hash_combine(hashVal, colourAttachments[i].blendingEnabled);
+        boost::hash_combine(hashVal, colourAttachments[i].sourceRGBBlendFactor);
+        boost::hash_combine(hashVal, colourAttachments[i].destinationRGBBlendFactor);
+        boost::hash_combine(hashVal, colourAttachments[i].rgbBlendOperation);
+        boost::hash_combine(hashVal, colourAttachments[i].sourceAlphaBlendFactor);
+        boost::hash_combine(hashVal, colourAttachments[i].destinationAlphaBlendFactor);
+        boost::hash_combine(hashVal, colourAttachments[i].alphaBlendOperation);
+    }
+    return hashVal;
+}
+
+size_t MtlfMetalContext::HashPipeLineDescriptor()
+{
+    size_t hashVal = 0;
+    boost::hash_combine(hashVal, pipelineStateDescriptor.vertexFunction);
+    boost::hash_combine(hashVal, pipelineStateDescriptor.fragmentFunction);
+    boost::hash_combine(hashVal, pipelineStateDescriptor.sampleCount);
+    boost::hash_combine(hashVal, pipelineStateDescriptor.rasterSampleCount);
+    boost::hash_combine(hashVal, pipelineStateDescriptor.alphaToCoverageEnabled);
+    boost::hash_combine(hashVal, pipelineStateDescriptor.alphaToOneEnabled);
+    boost::hash_combine(hashVal, pipelineStateDescriptor.rasterizationEnabled);
+    boost::hash_combine(hashVal, pipelineStateDescriptor.depthAttachmentPixelFormat);
+    boost::hash_combine(hashVal, pipelineStateDescriptor.stencilAttachmentPixelFormat);
+    boost::hash_combine(hashVal, currentVertexDescriptorHash);
+    boost::hash_combine(hashVal, currentColourAttachmentsHash);
+    return hashVal;
+}
+
+void MtlfMetalContext::SetPipelineState()
 {
     id<MTLRenderPipelineState> pipelineState;
+    
+    if (pipelineStateDescriptor == nil) {
+         TF_FATAL_CODING_ERROR("No pipeline state descriptor allocated!");
+    }
+    
+    pipelineStateDescriptor.label = @"Bake State";
+    pipelineStateDescriptor.sampleCount = 1;
+    
+    if (dirtyState & DIRTY_METAL_STATE_VERTEX_DESCRIPTOR || pipelineStateDescriptor.vertexDescriptor == NULL) {
+        // This assignment can be expensive as the vertexdescriptor will be copied (due to interface property)
+        pipelineStateDescriptor.vertexDescriptor = vertexDescriptor;
+        // Update vertex descriptor hash
+        currentVertexDescriptorHash = HashVertexDescriptor();
+    }
+    
+    if (dirtyState & DIRTY_METAL_STATE_DRAW_TARGET) {
+        numColourAttachments = 0;
+    
+        if (drawTarget) {
+            auto& attachments = drawTarget->GetAttachments();
+            for(auto it : attachments) {
+                MtlfDrawTarget::MtlfAttachment* attachment = ((MtlfDrawTarget::MtlfAttachment*)&(*it.second));
+                MTLPixelFormat depthFormat = [attachment->GetTextureName() pixelFormat];
+                if(attachment->GetFormat() == GL_DEPTH_COMPONENT || attachment->GetFormat() == GL_DEPTH_STENCIL) {
+                    pipelineStateDescriptor.depthAttachmentPixelFormat = depthFormat;
+                    if(attachment->GetFormat() == GL_DEPTH_STENCIL)
+                        pipelineStateDescriptor.stencilAttachmentPixelFormat = depthFormat; //Do not use the stencil pixel format (X32_S8)
+                }
+                else {
+                    id<MTLTexture> texture = attachment->GetTextureName();
+                    int idx = attachment->GetAttach();
+                    
+                    pipelineStateDescriptor.colorAttachments[idx].blendingEnabled = NO;
+                    pipelineStateDescriptor.colorAttachments[idx].pixelFormat = [texture pixelFormat];
+                }
+                numColourAttachments++;
+            }
+        }
+        else {
+            //METAL TODO: Why does this need to be hardcoded? There is no matching drawTarget? Can we get this info from somewhere?
+            pipelineStateDescriptor.colorAttachments[0].blendingEnabled = YES;
+            pipelineStateDescriptor.colorAttachments[0].sourceRGBBlendFactor = MTLBlendFactorSourceAlpha;
+            pipelineStateDescriptor.colorAttachments[0].sourceAlphaBlendFactor = MTLBlendFactorSourceAlpha;
+            pipelineStateDescriptor.colorAttachments[0].destinationRGBBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
+            pipelineStateDescriptor.colorAttachments[0].destinationAlphaBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
+            pipelineStateDescriptor.colorAttachments[0].pixelFormat = MTLPixelFormatBGRA8Unorm;
+            numColourAttachments++;
+        }
+        // Update colour attachments hash
+        currentColourAttachmentsHash = HashColourAttachments();
+    }
+    
+    // Unset the state tracking flags
+    dirtyState &= ~(DIRTY_METAL_STATE_VERTEX_DESCRIPTOR | DIRTY_METAL_STATE_DRAW_TARGET);
+    
 #if METAL_STATE_OPTIMISATION
-    size_t hashVal = HashPipeLineDescriptor(pipelineStateDescriptor, numColourAttachments, numVertexComponents);
-    boost::unordered_map<size_t, id<MTLRenderPipelineState>>::const_iterator pipelineStateIt = pipelineStateMap.find(hashVal);
- 
+    // Always call this because currently we're not tracking changes to its state
+    size_t hashVal = HashPipeLineDescriptor();
+    
+    // If this matches the current pipeline state then we should already have the correct pipeline bound
+    if (hashVal == currentPipelineDescriptorHash && currentPipelineState != nil) {
+        return;
+    }
+    currentPipelineDescriptorHash = hashVal;
+    
+    boost::unordered_map<size_t, id<MTLRenderPipelineState>>::const_iterator pipelineStateIt = pipelineStateMap.find(currentPipelineDescriptorHash);
+    
     if (pipelineStateIt != pipelineStateMap.end()) {
         pipelineState = pipelineStateIt->second;
     }
@@ -613,70 +681,31 @@ id<MTLRenderPipelineState> MtlfMetalContext::GetPipelineState(MTLRenderPipelineD
         pipelineState = [device newRenderPipelineStateWithDescriptor:pipelineStateDescriptor error:&error];
         if (!pipelineState) {
             NSLog(@"Failed to created pipeline state, error %@", error);
-            return NULL;
+            return;
         }
 #if METAL_STATE_OPTIMISATION
-        pipelineStateMap.emplace(hashVal, pipelineState);
+        pipelineStateMap.emplace(currentPipelineDescriptorHash, pipelineState);
         NSLog(@"Unique pipeline states %lu", pipelineStateMap.size());
 #endif
         
     }
-    return pipelineState;
+  
+#if METAL_STATE_OPTIMISATION
+    if (pipelineState != currentPipelineState)
+#endif
+    {
+        [renderEncoder setRenderPipelineState:pipelineState];
+        currentPipelineState = pipelineState;
+    }
 }
-
 
 void MtlfMetalContext::BakeState()
 {
 #if !METAL_STATE_OPTIMISATION
     dirtyState = DIRTY_METAL_STATE_ALL;
 #endif
-    id<MTLRenderPipelineState> pipelineState;
-    
-    if (pipelineStateDescriptor == nil) {
-        // This is temporary
-        return;
-    }
-
-    pipelineStateDescriptor.label = @"Bake State";
-    pipelineStateDescriptor.sampleCount = 1;
-    pipelineStateDescriptor.vertexDescriptor = vertexDescriptor;
-    numColourAttachments = 0;
-    if (drawTarget) {
-        auto& attachments = drawTarget->GetAttachments();
-        for(auto it : attachments) {
-            MtlfDrawTarget::MtlfAttachment* attachment = ((MtlfDrawTarget::MtlfAttachment*)&(*it.second));
-            MTLPixelFormat depthFormat = [attachment->GetTextureName() pixelFormat];
-            if(attachment->GetFormat() == GL_DEPTH_COMPONENT || attachment->GetFormat() == GL_DEPTH_STENCIL) {
-                pipelineStateDescriptor.depthAttachmentPixelFormat = depthFormat;
-                if(attachment->GetFormat() == GL_DEPTH_STENCIL)
-                    pipelineStateDescriptor.stencilAttachmentPixelFormat = depthFormat; //Do not use the stencil pixel format (X32_S8)
-            }
-            else {
-                id<MTLTexture> texture = attachment->GetTextureName();
-                int idx = attachment->GetAttach();
-
-                pipelineStateDescriptor.colorAttachments[idx].blendingEnabled = NO;
-                pipelineStateDescriptor.colorAttachments[idx].pixelFormat = [texture pixelFormat];
-            }
-            numColourAttachments++;
-        }
-    }
-    else {
-        //METAL TODO: Why does this need to be hardcoded? There is no matching drawTarget? Can we get this info from somewhere?
-        pipelineStateDescriptor.colorAttachments[0].blendingEnabled = YES;
-        pipelineStateDescriptor.colorAttachments[0].sourceRGBBlendFactor = MTLBlendFactorSourceAlpha;
-        pipelineStateDescriptor.colorAttachments[0].sourceAlphaBlendFactor = MTLBlendFactorSourceAlpha;
-        pipelineStateDescriptor.colorAttachments[0].destinationRGBBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
-        pipelineStateDescriptor.colorAttachments[0].destinationAlphaBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
-        pipelineStateDescriptor.colorAttachments[0].pixelFormat = MTLPixelFormatBGRA8Unorm;
-        numColourAttachments++;
-    }
-    
-    pipelineState = GetPipelineState(pipelineStateDescriptor);
-    if (pipelineState != currentPipelineState) {
-        [renderEncoder setRenderPipelineState:pipelineState];
-        currentPipelineState = pipelineState;
-    }
+    // Create and set a new pipelinestate if required
+    SetPipelineState();
     
     if (dirtyState & DIRTY_METAL_STATE_OLD_STYLE_UNIFORM) {
         uint32 vertexStart   = UINT32_MAX, vertexEnd   = 0;
@@ -686,23 +715,32 @@ void MtlfMetalContext::BakeState()
         
         for(auto uniform : oldStyleUniforms)
         {
-            if(uniform.stage == kMSL_ProgramStage_Vertex) {
-                if(!vtxUniformBackingBuffer)
-                TF_FATAL_CODING_ERROR("No vertex uniform backing buffer assigned!");
-                copyUniform(vtxData + uniform.index, (uint8*)uniform.data, uniform.dataSize);
-                vertexStart = uniform.index < vertexStart ? uniform.index : vertexStart;
-                vertexEnd   = uniform.index > vertexEnd   ? uniform.index : vertexEnd;
-             }
-            else if(uniform.stage == kMSL_ProgramStage_Fragment) {
-                if(!fragUniformBackingBuffer)
-                TF_FATAL_CODING_ERROR("No fragment uniform backing buffer assigned!");
-                copyUniform(fragdata + uniform.index, (uint8*)uniform.data, uniform.dataSize);
-                fragmentStart = uniform.index < fragmentStart ? uniform.index : fragmentStart;
-                fragmentEnd   = uniform.index > fragmentEnd   ? uniform.index : fragmentEnd;
+#if METAL_STATE_OPTIMISATION
+            if (uniform.dataSize)
+#endif
+            {
+                if(uniform.stage == kMSL_ProgramStage_Vertex) {
+                    if(!vtxUniformBackingBuffer)
+                        TF_FATAL_CODING_ERROR("No vertex uniform backing buffer assigned!");
+                    copyUniform(vtxData + uniform.index, (uint8*)uniform.data, uniform.dataSize);
+                    vertexStart = uniform.index < vertexStart ? uniform.index : vertexStart;
+                    vertexEnd   = uniform.index > vertexEnd   ? uniform.index : vertexEnd;
+                }
+                else if(uniform.stage == kMSL_ProgramStage_Fragment) {
+                    if(!fragUniformBackingBuffer)
+                        TF_FATAL_CODING_ERROR("No fragment uniform backing buffer assigned!");
+                    copyUniform(fragdata + uniform.index, (uint8*)uniform.data, uniform.dataSize);
+                    fragmentStart = uniform.index < fragmentStart ? uniform.index : fragmentStart;
+                    fragmentEnd   = uniform.index > fragmentEnd   ? uniform.index : fragmentEnd;
+                }
+                else {
+                    TF_FATAL_CODING_ERROR("Not implemented!"); //Compute case
+                }
             }
-            else {
-                TF_FATAL_CODING_ERROR("Not implemented!"); //Compute case
-            }
+#if METAL_STATE_OPTIMISATION
+            // Remove these from the uniform list or we'll just end recopying them every draw call
+            uniform.release();
+#endif
         }
         if (vertexStart != UINT_MAX) {
             [vtxUniformBackingBuffer  didModifyRange:NSMakeRange(vertexStart,   vertexEnd   - vertexStart)];
@@ -712,13 +750,8 @@ void MtlfMetalContext::BakeState()
         }
 
 #if METAL_STATE_OPTIMISATION
-        // Remove these from the uniform list or we'll just end recopying them every draw call
-        for(auto it = oldStyleUniforms.begin(); it != oldStyleUniforms.end(); ++it){
-            it->release();
-        }
         oldStyleUniforms.clear();
 #endif
-        
         dirtyState &= ~DIRTY_METAL_STATE_OLD_STYLE_UNIFORM;
     }
     if (dirtyState & (DIRTY_METAL_STATE_VERTEX_UNIFORM_BUFFER | DIRTY_METAL_STATE_FRAGMENT_UNIFORM_BUFFER)) {
@@ -768,8 +801,10 @@ void MtlfMetalContext::ClearState()
 {
     pipelineStateDescriptor = nil;
     vertexDescriptor = nil;
+    currentPipelineState = nil;
     indexBuffer = nil;
     numVertexComponents = 0;
+    dirtyState = DIRTY_METAL_STATE_ALL;
     
     for(auto it = oldStyleUniforms.begin(); it != oldStyleUniforms.end(); ++it)
         it->release();
