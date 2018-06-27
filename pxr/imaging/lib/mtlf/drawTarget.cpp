@@ -325,15 +325,13 @@ MtlfDrawTarget::Bind()
               "to Bind(GarchDrawTarget::AttachmentsMap const &attachments)");
     
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
-
+    
     // Create a render command encoder so we can render into something
-    TF_VERIFY(context->commandBuffer == nil, "A command buffer is already active");
+    TF_VERIFY(context->commandBuffer == nil, "Bind: A command buffer is already active");
   
     context->SetDrawTarget(this);
-    id<MTLCommandBuffer> commandBuffer = [context->commandQueue commandBuffer];
-    context->renderEncoder =
-        [commandBuffer renderCommandEncoderWithDescriptor:_mtlRenderPassDescriptor];
-    context->commandBuffer = commandBuffer;
+    context->CreateCommandBuffer();
+    context->CreateRenderEncoder(_mtlRenderPassDescriptor);
 }
 
 void
