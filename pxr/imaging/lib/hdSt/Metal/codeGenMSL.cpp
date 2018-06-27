@@ -426,6 +426,8 @@ HdSt_CodeGenMSL::_ParseGLSL(std::stringstream &source, InOutParams& inParams, In
         std::string::size_type pos = 0;
         int tagSize = tag.glslTag.length() - 1;
 
+        bool isUniform = tag.glslTag == "\nuniform" || tag.glslTag == "\nlayout(std140) uniform ";
+
         while ((pos = result.find(tag.glslTag, pos)) != std::string::npos) {
             
             // check for a ';' before the next '\n'
@@ -460,14 +462,16 @@ HdSt_CodeGenMSL::_ParseGLSL(std::stringstream &source, InOutParams& inParams, In
                 
                 std::smatch match;
                 std::string parent;
+                std::string parentAccessor;
                 if (std::regex_search(line, match, regex_word)) {
                     const std::string::size_type s   = match[0].first  - line.begin();
                     const std::string::size_type count = match[0].second - match[0].first;
                     
-                    parent = line.substr(s, count) + ".";
+                    parent = line.substr(s, count);
+                    parentAccessor = parent + ".";
                 }
                 
-                bool instantiatedStruct = !parent.empty();
+                bool instantiatedStruct = !parentAccessor.empty();
 
                 pos = lineStart;
                 
@@ -494,10 +498,16 @@ HdSt_CodeGenMSL::_ParseGLSL(std::stringstream &source, InOutParams& inParams, In
                         TfToken type((*i).str().c_str());
                         ++i;
                         TfToken name((*i).str().c_str());
-                        TfToken accessor((parent + (*i).str()).c_str());
+                        TfToken accessor((parentAccessor + (*i).str()).c_str());
                         
+                        //Only output these as individuals if:
+                        // - the uniform block is unnamed
+                        // - the block is marked "in" or "out"
                         if(instantiatedStruct)
-                            _EmitStructMemberOutput(tag.params, name, accessor, type);
+                        {
+                            if(!isUniform)
+                                _EmitStructMemberOutput(tag.params, name, accessor, type);
+                        }
                         else
                         {
                             std::string nameStr = name.GetString();
@@ -527,6 +537,11 @@ HdSt_CodeGenMSL::_ParseGLSL(std::stringstream &source, InOutParams& inParams, In
                 {
                     result.replace(closeParenthesis + 1, 0, structAccessors.str());
                     HdSt_CodeGenMSL::TParam outParam(bufferNameTokenPtr, structNameToken, TfToken(), TfToken(), HdSt_CodeGenMSL::TParam::Usage::ProgramScope | HdSt_CodeGenMSL::TParam::Usage::EntryFuncArgument | HdSt_CodeGenMSL::TParam::Usage::UniformBlock);
+                    tag.params.push_back(outParam);
+                }
+                else if(isUniform)
+                {
+                    HdSt_CodeGenMSL::TParam outParam(TfToken(parent), structNameToken, TfToken(), TfToken(), HdSt_CodeGenMSL::TParam::Usage::ProgramScope | HdSt_CodeGenMSL::TParam::Usage::EntryFuncArgument | HdSt_CodeGenMSL::TParam::Usage::UniformBlock);
                     tag.params.push_back(outParam);
                 }
                 
@@ -811,11 +826,14 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
         TfToken attrib;
         
         if ((input.usage & HdSt_CodeGenMSL::TParam::maskShaderUsage) != 0 ||
-            (input.usage & HdSt_CodeGenMSL::TParam::UniformBlock) != 0) {
+            ((input.usage & HdSt_CodeGenMSL::TParam::UniformBlock) != 0 && input.name.GetText()[0] == '*')) {
             continue;
         }
         else if (input.usage & HdSt_CodeGenMSL::TParam::EntryFuncArgument) {
-            if (input.name.GetText()[0] == '*') {
+            if(input.usage & HdSt_CodeGenMSL::TParam::UniformBlock) {
+                copyInputsFrag << "scope." << input.name << "=*" << input.name << ";\n";
+            }
+            else if (input.name.GetText()[0] == '*') {
                 std::string n = input.name.GetString().substr(1);
                 copyInputsFrag << "scope." << n << "=" << n << ";\n";
             }
@@ -986,7 +1004,12 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
             else
                 n = input.name.GetText() + 1;
         }
-        else {
+        else if(input.usage & HdSt_CodeGenMSL::TParam::UniformBlock) {
+            gluePS << "device ";
+            n = input.dataType.GetText();
+        }
+        else
+        {
             n = input.name.GetString();
         }
 
@@ -995,7 +1018,10 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
         if (input.usage & HdSt_CodeGenMSL::TParam::ProgramScope) {
             gluePS << " ProgramScope<st>::";
         }
-        gluePS << input.dataType << " " << input.name << attrib << "\n";
+        if (input.name.GetText()[0] != '*' && input.usage & HdSt_CodeGenMSL::TParam::UniformBlock)
+            gluePS << input.dataType << "* " << input.name << attrib << "\n";
+        else
+            gluePS << input.dataType << " " << input.name << attrib << "\n";
     }
 
     gluePS  << ") {\n"
