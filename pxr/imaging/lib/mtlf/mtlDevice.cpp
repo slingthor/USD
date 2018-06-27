@@ -215,16 +215,9 @@ MtlfMetalContext::MtlfMetalContext()
     }
     
     MTLDepthStencilDescriptor *depthStateDesc = [[MTLDepthStencilDescriptor alloc] init];
-    depthStateDesc.depthCompareFunction = MTLCompareFunctionAlways;
+    depthStateDesc.depthWriteEnabled = YES;
+    depthStateDesc.depthCompareFunction = MTLCompareFunctionLessEqual;
     depthState = [device newDepthStencilStateWithDescriptor:depthStateDesc];
-    
-    
-    
-    
-    
-    
-    
-    
     
     // Load our common vertex shader. This is used by both the fragment shaders below
     TfToken vtxShaderToken(MtlfPackageInteropVtxShader());
@@ -346,6 +339,14 @@ MtlfMetalContext::MtlfMetalContext()
     
     mtlTexture = CVMetalTextureGetTexture(cvmtlTexture);
     
+    {
+        MTLTextureDescriptor *depthTexDescriptor = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatDepth32Float
+        width:mtlTexture.width height:mtlTexture.height mipmapped:false];
+        depthTexDescriptor.usage = MTLTextureUsageRenderTarget;
+        depthTexDescriptor.resourceOptions = MTLResourceCPUCacheModeDefaultCache | MTLResourceStorageModePrivate;
+        mtlDepthTexture = [device newTextureWithDescriptor:depthTexDescriptor];
+    }
+    
     pipelineStateDescriptor = nil;
     vertexDescriptor = nil;
     indexBuffer = nil;
@@ -403,7 +404,6 @@ void MtlfMetalContext::SetVertexAttribute(uint32_t index,
     {
         vertexDescriptor = [[MTLVertexDescriptor alloc] init];
 
-        //cullStyle?
         vertexDescriptor.layouts[0].stepFunction = MTLVertexStepFunctionConstant;
         vertexDescriptor.layouts[0].stepRate = 0;
         vertexDescriptor.layouts[0].stride = stride;
@@ -500,6 +500,7 @@ void MtlfMetalContext::BakeState()
     pipelineStateDescriptor.label = @"Bake State";
     pipelineStateDescriptor.sampleCount = 1;
     pipelineStateDescriptor.vertexDescriptor = vertexDescriptor;
+    pipelineStateDescriptor.inputPrimitiveTopology = MTLPrimitiveTopologyClassUnspecified;
     if (drawTarget) {
         auto& attachments = drawTarget->GetAttachments();
         for(auto it : attachments) {
@@ -526,7 +527,10 @@ void MtlfMetalContext::BakeState()
         pipelineStateDescriptor.colorAttachments[0].sourceAlphaBlendFactor = MTLBlendFactorSourceAlpha;
         pipelineStateDescriptor.colorAttachments[0].destinationRGBBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
         pipelineStateDescriptor.colorAttachments[0].destinationAlphaBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
-        pipelineStateDescriptor.colorAttachments[0].pixelFormat = MTLPixelFormatBGRA8Unorm;
+        pipelineStateDescriptor.colorAttachments[0].pixelFormat = mtlTexture.pixelFormat;
+        
+        pipelineStateDescriptor.depthAttachmentPixelFormat = mtlDepthTexture.pixelFormat;
+        [renderEncoder setDepthStencilState:depthState]; 
     }
     
     NSError *error = NULL;
