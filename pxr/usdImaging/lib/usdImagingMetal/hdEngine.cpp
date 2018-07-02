@@ -878,9 +878,23 @@ UsdImagingMetalHdEngine::SetCameraState(const GfMatrix4d& viewMatrix,
         _taskController->ResetImage();
     }
 
+    GfMatrix4d modifiedProjMatrix;
+    static GfMatrix4d zTransform;
+    
+    // Transform from [-1, 1] to [0, 1] clip space
+    static bool _zTransformSet = false;
+    if (!_zTransformSet) {
+        _zTransformSet = true;
+        zTransform.SetIdentity();
+        zTransform.SetScale(GfVec3d(1.0, 1.0, 0.5));
+        zTransform.SetTranslateOnly(GfVec3d(0.0, 0.0, 0.5));
+    }
+    
+    modifiedProjMatrix = projectionMatrix * zTransform;
+    
     // usdview passes these matrices from Metal state.
     // update the camera in the task controller accordingly.
-    _taskController->SetCameraMatrices(viewMatrix, projectionMatrix);
+    _taskController->SetCameraMatrices(viewMatrix, modifiedProjMatrix);
     _taskController->SetCameraViewport(viewport);
 }
 
