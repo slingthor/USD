@@ -101,4 +101,7 @@ pxr_library(garch
 
     PYMODULE_FILES
         __init__.py
+
+    RESOURCE_FILES
+        plugInfo.json
 )
