@@ -53,6 +53,7 @@ static MTLPrimitiveType GetMetalPrimType(GLenum glPrimType) {
             primType = MTLPrimitiveTypeLineStrip;
             break;
         case GL_LINES:
+        case GL_LINES_ADJACENCY:
             primType = MTLPrimitiveTypeLine;
             break;
         case GL_TRIANGLE_STRIP:
@@ -62,7 +63,6 @@ static MTLPrimitiveType GetMetalPrimType(GLenum glPrimType) {
             primType = MTLPrimitiveTypeTriangle;
             break;
         case GL_LINE_STRIP_ADJACENCY:
-        case GL_LINES_ADJACENCY:
         case GL_LINE_LOOP:
             // MTL_FIXME - These do no not directly map but work OK for now.
 			primType = MTLPrimitiveTypeLineStrip;
