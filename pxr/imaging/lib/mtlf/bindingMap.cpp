@@ -89,13 +89,12 @@ MtlfBindingMap::GetUniformBinding(std::string const & name)
 int
 MtlfBindingMap::GetUniformBinding(TfToken const & name)
 {
-    int binding = -1;
+    MTLFBindingIndex binding;
     if (!TfMapLookup(_uniformBindings, name, &binding)) {
-        binding = (int)_uniformBindings.size();
-        _uniformBindings[name] = binding;
+        binding.index = (int)_uniformBindings.size();
+        _uniformBindings[name] = binding.asInt;
     }
-    TF_VERIFY(binding >= 0);
-    return binding;
+    return binding.asInt;
 }
 
 bool

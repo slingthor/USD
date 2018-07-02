@@ -53,6 +53,7 @@ static MTLPrimitiveType GetMetalPrimType(GLenum glPrimType) {
             primType = MTLPrimitiveTypeLineStrip;
             break;
         case GL_LINES:
+        case GL_LINES_ADJACENCY:
             primType = MTLPrimitiveTypeLine;
             break;
         case GL_TRIANGLE_STRIP:
@@ -62,7 +63,6 @@ static MTLPrimitiveType GetMetalPrimType(GLenum glPrimType) {
             primType = MTLPrimitiveTypeTriangle;
             break;
         case GL_LINE_STRIP_ADJACENCY:
-        case GL_LINES_ADJACENCY:
         case GL_LINE_LOOP:
             // MTL_FIXME - These do no not directly map but work OK for now.
 			primType = MTLPrimitiveTypeLineStrip;
@@ -123,7 +123,7 @@ HdStMSLProgram::~HdStMSLProgram()
 
 NSUInteger dumpedFileCount = 0;
 
-void DumpMetalSource(NSString *metalSrc, NSString *fileSuffix)
+void DumpMetalSource(NSString *metalSrc, NSString *fileSuffix, NSString *compilerMessages)
 {
     NSFileManager *fileManager= [NSFileManager defaultManager];
     
@@ -138,9 +138,18 @@ void DumpMetalSource(NSString *metalSrc, NSString *fileSuffix)
         }
     }
     
+    NSString *fileContents = [[NSString alloc] init];
+    if(compilerMessages != nil)
+    {
+        fileContents = [fileContents stringByAppendingString:@"/* BEGIN COMPILER MESSAGES *\\\n"];
+        fileContents = [fileContents stringByAppendingString:compilerMessages];
+        fileContents = [fileContents stringByAppendingString:@"\\* END COMPILER MESSAGES*/\n"];
+    }
+    fileContents = [fileContents stringByAppendingString:metalSrc];
+    
     NSString *fileName = [NSString stringWithFormat:@"HydraMetalSource_%lu_%@.metal", dumpedFileCount++, fileSuffix];
     NSString *srcDumpFilePath = [srcDumpLocation stringByAppendingPathComponent:fileName];
-    [metalSrc writeToFile:srcDumpFilePath atomically:YES encoding:NSUTF8StringEncoding error:nil];
+    [fileContents writeToFile:srcDumpFilePath atomically:YES encoding:NSUTF8StringEncoding error:nil];
     NSLog(@"Dumping Metal Source to %@", srcDumpFilePath);
 }
 #else
@@ -179,7 +188,7 @@ HdStMSLProgram::CompileShader(GLenum type,
         case GL_GEOMETRY_SHADER:
             //TF_CODING_ERROR("Unsupported shader type on Metal %d\n", type);
             NSLog(@"Unsupported shader type on Metal %d\n", type); //MTL_FIXME - remove the above error so it doesn't propogate all the way back but really we should never see these types of shaders
-            DumpMetalSource([NSString stringWithUTF8String:shaderSource.c_str()], @"InvalidType"); //MTL_FIXME
+            DumpMetalSource([NSString stringWithUTF8String:shaderSource.c_str()], @"InvalidType", nil); //MTL_FIXME
             return true;
         default:
             TF_CODING_ERROR("Invalid shader type %d\n", type);
@@ -206,17 +215,17 @@ HdStMSLProgram::CompileShader(GLenum type,
                                                     error:&error];
     
     // Load the function into the library
-    id <MTLFunction> function = [library newFunctionWithName:entryPoint];
+     id <MTLFunction> function = [library newFunctionWithName:entryPoint];
     if (!function) {
         // XXX:validation
         TF_WARN("Failed to compile shader (%s): \n%s",
                 shaderType, [[error localizedDescription] UTF8String]);
-        DumpMetalSource([NSString stringWithUTF8String:shaderSource.c_str()], @"Fail"); //MTL_FIXME
+        DumpMetalSource([NSString stringWithUTF8String:shaderSource.c_str()], @"Fail", error != nil ? [error localizedDescription] : nil); //MTL_FIXME
         
         return false;
     }
     
-    DumpMetalSource([NSString stringWithUTF8String:shaderSource.c_str()], [NSString stringWithUTF8String:shaderType]); //MTL_FIXME
+    DumpMetalSource([NSString stringWithUTF8String:shaderSource.c_str()], [NSString stringWithUTF8String:shaderType], error != nil ? [error localizedDescription] : nil); //MTL_FIXME
     
     if (type == GL_VERTEX_SHADER) {
         _vertexFunction = function;

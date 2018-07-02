@@ -337,7 +337,7 @@ integrateLightsConstant(vec4 Peye, vec3 Neye, LightingInterfaceProperties props)
 // uniform blocks
 // ---------------------------------------------------------------------------
 
-struct Material {
+layout(std140) uniform Material {
     vec4 ambient;
     vec4 diffuse;
     vec4 specular;
