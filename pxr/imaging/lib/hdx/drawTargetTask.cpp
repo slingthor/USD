@@ -129,7 +129,7 @@ HdxDrawTargetTask::_Sync(HdTaskContext* ctx)
                     pass->SetRenderPassState(drawTarget->GetRenderPassState());
 
                     HdStRenderPassStateSharedPtr renderPassState(
-                        new HdStRenderPassState());
+                        HdStRenderPassState::New());
                     HdxSimpleLightingShaderSharedPtr simpleLightingShader(
                         new HdxSimpleLightingShader());
 

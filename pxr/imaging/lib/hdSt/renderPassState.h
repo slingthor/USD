@@ -50,9 +50,11 @@ typedef std::vector<HdStShaderCodeSharedPtr> HdStShaderCodeSharedPtrVector;
 class HdStRenderPassState : public HdRenderPassState {
 public:
     HDST_API
-    HdStRenderPassState();
+    static HdStRenderPassState *New();
+    
     HDST_API
-    HdStRenderPassState(HdStRenderPassShaderSharedPtr const &shader);
+    static HdStRenderPassState *New(HdStRenderPassShaderSharedPtr const &shader);
+
     HDST_API
     virtual ~HdStRenderPassState();
 
@@ -60,18 +62,6 @@ public:
     virtual void
     Sync(HdResourceRegistrySharedPtr const &resourceRegistry) override;
 
-    /// Apply the GL states.
-    /// Following states may be changed and restored to
-    /// the GL default at Unbind().
-    ///   glEnable(GL_POLYGON_OFFSET_FILL)
-    ///   glEnable(GL_SAMPLE_ALPHA_TO_COVERAGE)
-    ///   glEnable(GL_PROGRAM_POINT_SIZE);
-    ///   glEnable(GL_STENCIL_TEST);
-    ///   glPolygonOffset()
-    ///   glDepthFunc()
-    ///   glStencilFunc()
-    ///   glStencilOp()
-    ///   glLineWidth()
     HDST_API
     virtual void Bind() override;
 
@@ -106,7 +96,12 @@ public:
     HDST_API
     size_t GetShaderHash() const;
 
-private:
+protected:
+    HDST_API
+    HdStRenderPassState();
+    HDST_API
+    HdStRenderPassState(HdStRenderPassShaderSharedPtr const &shader);
+
     // ---------------------------------------------------------------------- //
     // Shader Objects
     // ---------------------------------------------------------------------- //

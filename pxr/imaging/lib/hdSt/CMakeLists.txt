@@ -24,6 +24,7 @@ if (APPLE)
                         Metal/mtlUtils
                         Metal/persistentBufferMetal
                         Metal/quadrangulateMetal
+                        Metal/renderPassStateMetal
                         Metal/resourceBinderMetal
                         Metal/resourceMetal
                         Metal/textureResourceMetal
@@ -134,6 +135,7 @@ pxr_library(hdSt
         GL/interleavedMemoryBufferGL
         GL/persistentBufferGL
         GL/quadrangulateGL
+        GL/renderPassStateGL
         GL/resourceBinderGL
         GL/resourceGL
         GL/textureResourceGL

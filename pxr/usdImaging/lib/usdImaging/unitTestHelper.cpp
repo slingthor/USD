@@ -75,7 +75,7 @@ UsdImaging_TestDriver::_Init(UsdStageRefPtr const& usdStage,
     HdRprimCollection col = HdRprimCollection(collectionName, reprName);
     col.SetRenderTags(renderTags);
     _geometryPass = HdRenderPassSharedPtr(new HdSt_RenderPass(_renderIndex, col));
-    _renderPassState = HdRenderPassStateSharedPtr(new HdStRenderPassState());
+    _renderPassState = HdRenderPassStateSharedPtr(HdStRenderPassState::New());
 }
 
 UsdImaging_TestDriver::UsdImaging_TestDriver(std::string const& usdFilePath,

@@ -206,7 +206,7 @@ HdxShadowTask::_Sync(HdTaskContext* ctx)
             HdStRenderPassShaderSharedPtr renderPassShadowShader
                 (new HdStRenderPassShader(HdxPackageRenderPassShadowShader()));
             HdStRenderPassStateSharedPtr renderPassState
-                (new HdStRenderPassState(renderPassShadowShader));
+                (HdStRenderPassState::New(renderPassShadowShader));
 
             // Update the rest of the renderpass state parameters for this pass
             renderPassState->SetOverrideColor(params.overrideColor);

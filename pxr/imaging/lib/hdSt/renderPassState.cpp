@@ -31,8 +31,14 @@
 #include "pxr/imaging/hdSt/shaderCode.h"
 #include "pxr/imaging/hdSt/GL/glConversions.h"
 
+#include "pxr/imaging/hdSt/GL/renderPassStateGL.h"
+#if defined(ARCH_GFX_METAL)
+#include "pxr/imaging/hdSt/Metal/renderPassStateMetal.h"
+#endif
+
 #include "pxr/imaging/hd/bufferArrayRange.h"
 #include "pxr/imaging/hd/changeTracker.h"
+#include "pxr/imaging/hd/engine.h"
 #include "pxr/imaging/hd/tokens.h"
 #include "pxr/imaging/hd/vtBufferSource.h"
 
@@ -49,6 +55,41 @@ TF_DEFINE_PRIVATE_TOKENS(
     _tokens,
     (renderPassState)
 );
+
+HdStRenderPassState *HdStRenderPassState::New()
+{
+    HdEngine::RenderAPI api = HdEngine::GetRenderAPI();
+    switch(api)
+    {
+        case HdEngine::OpenGL:
+            return new HdStRenderPassStateGL();
+#if defined(ARCH_GFX_METAL)
+        case HdEngine::Metal:
+            return new HdStRenderPassStateMetal();
+#endif
+        default:
+            TF_FATAL_CODING_ERROR("No HdStRenderPassState for this API");
+    }
+    return NULL;
+}
+
+HdStRenderPassState *HdStRenderPassState::New(HdStRenderPassShaderSharedPtr const &renderPassShader)
+{
+    HdEngine::RenderAPI api = HdEngine::GetRenderAPI();
+    switch(api)
+    {
+        case HdEngine::OpenGL:
+            return new HdStRenderPassStateGL(renderPassShader);
+#if defined(ARCH_GFX_METAL)
+        case HdEngine::Metal:
+            return new HdStRenderPassStateMetal(renderPassShader);
+#endif
+        default:
+            TF_FATAL_CODING_ERROR("No HdStRenderPassState for this API");
+    }
+    return NULL;
+}
+
 
 HdStRenderPassState::HdStRenderPassState()
     : HdRenderPassState()
@@ -272,91 +313,12 @@ HdStRenderPassState::Bind()
     // with a different view matrix baked in for shadows.
     // SetCamera will no-op if the transforms are the same as before.
     _lightingShader->SetCamera(_worldToViewMatrix, _projectionMatrix);
-
-    // XXX: viewport should be set.
-    // glViewport((GLint)_viewport[0], (GLint)_viewport[1],
-    //            (GLsizei)_viewport[2], (GLsizei)_viewport[3]);
-
-    // when adding another GL state change here, please document
-    // which states to be altered at the comment in the header file
-
-    // Apply polygon offset to whole pass.
-    if (!_depthBiasUseDefault) {
-        if (_depthBiasEnabled) {
-            glEnable(GL_POLYGON_OFFSET_FILL);
-            glPolygonOffset(_depthBiasSlopeFactor, _depthBiasConstantFactor);
-        } else {
-            glDisable(GL_POLYGON_OFFSET_FILL);
-        }
-    }
-
-    glDepthFunc(HdStGLConversions::GetGlDepthFunc(_depthFunc));
-    
-    // Stencil
-    if (_stencilEnabled) {
-        glEnable(GL_STENCIL_TEST);
-        glStencilFunc(HdStGLConversions::GetGlStencilFunc(_stencilFunc),
-                _stencilRef, _stencilMask);
-        glStencilOp(HdStGLConversions::GetGlStencilOp(_stencilFailOp),
-                HdStGLConversions::GetGlStencilOp(_stencilZFailOp),
-                HdStGLConversions::GetGlStencilOp(_stencilZPassOp));
-    } else {
-        glDisable(GL_STENCIL_TEST);
-    }
-    
-    // Line width
-    if (_lineWidth > 0) {
-        glLineWidth(_lineWidth);
-    }
-
-    if (!_alphaToCoverageUseDefault) {
-        if (_alphaToCoverageEnabled) {
-            glEnable(GL_SAMPLE_ALPHA_TO_COVERAGE);
-        } else {
-            glDisable(GL_SAMPLE_ALPHA_TO_COVERAGE);
-        }
-    }
-    glEnable(GL_PROGRAM_POINT_SIZE);
-    for (size_t i = 0; i < _clipPlanes.size(); ++i) {
-        if (i >= GL_MAX_CLIP_PLANES) {
-            break;
-        }
-        glEnable(GL_CLIP_DISTANCE0 + i);
-    }
-
-    if (!_colorMaskUseDefault) {
-        switch(_colorMask) {
-            case HdStRenderPassState::ColorMaskNone:
-                glColorMask(false, false, false, false);
-                break;
-            case HdStRenderPassState::ColorMaskRGB:
-                glColorMask(true, true, true, false);
-                break;
-            case HdStRenderPassState::ColorMaskRGBA:
-                glColorMask(true, true, true, true);
-                break;
-        }
-    }
 }
 
 void
 HdStRenderPassState::Unbind()
 {
-    // restore back to the GL defaults
-
-    glDisable(GL_POLYGON_OFFSET_FILL);
-    glDisable(GL_SAMPLE_ALPHA_TO_COVERAGE);
-    glDisable(GL_PROGRAM_POINT_SIZE);
-    glDisable(GL_STENCIL_TEST);
-    glDepthFunc(GL_LESS);
-    glPolygonOffset(0, 0);
-    glLineWidth(1.0f);
-
-    for (size_t i = 0; i < _clipPlanes.size(); ++i) {
-        glDisable(GL_CLIP_DISTANCE0 + i);
-    }
-
-    glColorMask(true, true, true, true);
+    /*NOTHING*/
 }
 
 size_t
