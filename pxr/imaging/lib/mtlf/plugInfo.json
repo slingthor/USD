@@ -4,6 +4,11 @@
             "Info": {
                 "ShaderResources": "shaders",
                 "Types": {                                                                  
+                    "MtlfPtexTexture" : {
+                        "bases": ["MtlfTexture"],
+                        "textureTypes": ["ptx", "ptex"],
+                        "precedence": 1
+                    },
                     "MtlfUVTexture" : {
                         "bases": ["MtlfBaseTexture"],
                         "textureTypes": ["*"],

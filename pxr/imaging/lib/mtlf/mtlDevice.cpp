@@ -719,19 +719,20 @@ void MtlfMetalContext::BakeState()
             if (uniform.dataSize)
 #endif
             {
+                uint32 uniformEnd = (uniform.index + uniform.dataSize);
                 if(uniform.stage == kMSL_ProgramStage_Vertex) {
                     if(!vtxUniformBackingBuffer)
                         TF_FATAL_CODING_ERROR("No vertex uniform backing buffer assigned!");
                     copyUniform(vtxData + uniform.index, (uint8*)uniform.data, uniform.dataSize);
                     vertexStart = uniform.index < vertexStart ? uniform.index : vertexStart;
-                    vertexEnd   = uniform.index > vertexEnd   ? uniform.index : vertexEnd;
+                    vertexEnd   = uniformEnd    > vertexEnd   ? uniformEnd    : vertexEnd;
                 }
                 else if(uniform.stage == kMSL_ProgramStage_Fragment) {
                     if(!fragUniformBackingBuffer)
                         TF_FATAL_CODING_ERROR("No fragment uniform backing buffer assigned!");
                     copyUniform(fragdata + uniform.index, (uint8*)uniform.data, uniform.dataSize);
                     fragmentStart = uniform.index < fragmentStart ? uniform.index : fragmentStart;
-                    fragmentEnd   = uniform.index > fragmentEnd   ? uniform.index : fragmentEnd;
+                    fragmentEnd   = uniformEnd    > fragmentEnd   ? uniformEnd    : fragmentEnd;
                 }
                 else {
                     TF_FATAL_CODING_ERROR("Not implemented!"); //Compute case

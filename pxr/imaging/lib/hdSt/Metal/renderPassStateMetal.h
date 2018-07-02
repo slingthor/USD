@@ -21,41 +21,37 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-// utils.cpp
-//
-#include <pxr/imaging/garch/resourceFactory.h>
-#include <pxr/base/tf/diagnostic.h>
+#ifndef HDST_RENDER_PASS_STATE_METAL_H
+#define HDST_RENDER_PASS_STATE_METAL_H
 
-#include "pxr/base/tf/instantiateSingleton.h"
+#include "pxr/pxr.h"
+#include "pxr/imaging/hdSt/api.h"
+#include "pxr/imaging/hdSt/renderPassState.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-TF_INSTANTIATE_SINGLETON(GarchResourceFactory);
+/// \class HdStRenderPassStateMetal
+///
+/// A set of rendering parameters used among render passes.
+///
+/// Parameters are expressed as GL states, uniforms or shaders.
+///
+class HdStRenderPassStateMetal : public HdStRenderPassState {
+public:
+    HDST_API
+    HdStRenderPassStateMetal();
+    HDST_API
+    HdStRenderPassStateMetal(HdStRenderPassShaderSharedPtr const &shader);
+    HDST_API
+    virtual ~HdStRenderPassStateMetal();
 
-GarchResourceFactory::GarchResourceFactory():
-    factory(NULL)
-{
-    TfSingleton<GarchResourceFactory>::SetInstanceConstructed(*this);
-}
+    HDST_API
+    virtual void Bind() override;
 
-GarchResourceFactory::~GarchResourceFactory()
-{
-    // Empty
-}
-
-GarchResourceFactoryInterface *GarchResourceFactory::operator -> () const 
-{
-    if (!factory)
-    {
-        TF_FATAL_CODING_ERROR("No resource factory currently set");
-    }
-    return factory;
-}
-
-void GarchResourceFactory::SetResourceFactory(GarchResourceFactoryInterface *_factory)
-{
-    factory = _factory;
-}
+    HDST_API
+    virtual void Unbind() override;
+};
 
 PXR_NAMESPACE_CLOSE_SCOPE
 
+#endif  // HDST_RENDER_PASS_STATE_METAL_H
