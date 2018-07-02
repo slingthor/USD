@@ -35,6 +35,7 @@ TF_INSTANTIATE_SINGLETON(GarchResourceFactory);
 GarchResourceFactory::GarchResourceFactory():
     factory(NULL)
 {
+    TfSingleton<GarchResourceFactory>::SetInstanceConstructed(*this);
 }
 
 GarchResourceFactory::~GarchResourceFactory()
