@@ -45,18 +45,13 @@ TF_REGISTRY_FUNCTION(TfType)
 
 MtlfBaseTexture::MtlfBaseTexture()
 {
-    TF_FATAL_CODING_ERROR("Not Implemented");
-//    _textureName = new texture
 }
 
 MtlfBaseTexture::~MtlfBaseTexture()
 {
-    TF_FATAL_CODING_ERROR("Not Implemented");
-    /*
-    if (glIsTexture(_textureName)) {
-        glDeleteTextures(1, &_textureName);
+    if (_textureName != nil) {
+        [_textureName release];
     }
-     */
 }
 
 /* virtual */
