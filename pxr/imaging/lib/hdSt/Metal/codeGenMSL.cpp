@@ -514,7 +514,7 @@ HdSt_CodeGenMSL::_ParseGLSL(std::stringstream &source, InOutParams& inParams, In
                             std::string::size_type openingBracket = nameStr.find_first_of("[");
                             if(openingBracket != std::string::npos) {
                                 nameStr = nameStr.substr(0, openingBracket);
-                                structAccessors << ";\n device " << type.GetString() << "* " << nameStr;
+                                structAccessors << ";\n device const " << type.GetString() << "* " << nameStr;
                             }
                             else
                                 structAccessors << ";\n" << type.GetString() << " " << name.GetString();
@@ -579,7 +579,7 @@ HdSt_CodeGenMSL::_ParseGLSL(std::stringstream &source, InOutParams& inParams, In
                     }
 
                     if (nameStr[0] == '*') {
-                        result.replace(pos, 0, std::string("\ndevice "));
+                        result.replace(pos, 0, std::string("\ndevice const "));
                         usage |= HdSt_CodeGenMSL::TParam::EntryFuncArgument;
                         
                         // If this is a built-in type, we want to use global scope to access
@@ -663,7 +663,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
         copyInputsVtx << "scope." << input.name << "=input." << input.name << ";\n";
         
         if (input.name.GetText()[0] == '*') {
-            glueVS << "device ";
+            glueVS << "device const ";
             mslProgram->AddBinding(input.name.GetText() + 1, vertexAttribsLocation, kMSL_BindingType_VertexAttribute, kMSL_ProgramStage_Vertex);
         }
         else {
@@ -701,6 +701,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
         uint32 regEnd = (vtxUniformBufferSize + size - 1) / 16;
         if(regStart != regEnd && vtxUniformBufferSize % 16 != 0) vtxUniformBufferSize += 16 - (vtxUniformBufferSize % 16);
         
+        mslProgram->AddBinding(input.name, -1, kMSL_BindingType_Uniform, kMSL_ProgramStage_Vertex);
         mslProgram->UpdateUniformBinding(input.name, -1, vtxUniformBufferSize);
         
         vtxUniformBufferSize += size;
@@ -935,7 +936,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
         }
         glueVS << ", ";
         if (input.name.GetText()[0] == '*') {
-            glueVS << "device ";
+            glueVS << "device const ";
         }
         if (input.usage & HdSt_CodeGenMSL::TParam::ProgramScope) {
             glueVS << "ProgramScope<st>::";
@@ -966,7 +967,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
             << "}\n";
     
     gluePS << "fragment MSLFragOutputs fragmentEntryPoint(MSLVtxOutputs vsInput[[stage_in]]\n"
-           << ", device MSLFragInputs *" CODEGENMSL_FRAGUNIFORMINPUTNAME "[[buffer(0)]]\n";
+           << ", device const MSLFragInputs *" CODEGENMSL_FRAGUNIFORMINPUTNAME "[[buffer(0)]]\n";
     mslProgram->AddBinding(CODEGENMSL_FRAGUNIFORMINPUTNAME, 0, kMSL_BindingType_UniformBuffer, kMSL_ProgramStage_Fragment, 0, inputUniformBufferSize);
 
     location = 1;
@@ -998,14 +999,14 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
         
         std::string n;
         if (input.name.GetText()[0] == '*') {
-            gluePS << "device ";
+            gluePS << "device const ";
             if ((input.usage & HdSt_CodeGenMSL::TParam::UniformBlock) != 0)
                 n = input.name.GetText() + 4; //Because of "*___<NAME>"
             else
                 n = input.name.GetText() + 1;
         }
         else if(input.usage & HdSt_CodeGenMSL::TParam::UniformBlock) {
-            gluePS << "device ";
+            gluePS << "device const ";
             n = input.dataType.GetText();
         }
         else
@@ -1658,7 +1659,7 @@ static HdSt_CodeGenMSL::TParam& _EmitDeclarationPtr(std::stringstream &str,
                                                     bool programScope)
 {
     TfToken ptrName(std::string("*") + name.GetString());
-    str << "device ";
+    str << "device const ";
     if (programScope) {
         str << "ProgramScope<st>::";
     }
@@ -2275,7 +2276,7 @@ HdSt_CodeGenMSL::_GenerateConstantPrimVar()
                                 "GetDrawingCoord().constantCoord");
         }
         declarations << "};\n"
-                     << "device " << typeName << " *" << varName << ";\n";
+                     << "device const " << typeName << " *" << varName << ";\n";
     }
     _genCommon << declarations.str()
                << accessors.str();
