@@ -2110,21 +2110,44 @@ HdSt_CodeGenMSL::_GenerateDrawingCoord()
     _genVS << "hd_drawingCoord vsDrawingCoord;\n";
     _genVS << "hd_drawingCoord gsDrawingCoord;\n";
 
-    _EmitStructMemberOutput(_mslVSOutputParams, TfToken("vsdc_modelCoord"), TfToken("vsDrawingCoord.modelCoord"), intType);
-    _EmitStructMemberOutput(_mslVSOutputParams, TfToken("vsdc_constantCoord"), TfToken("vsDrawingCoord.constantCoord"), intType);
-    _EmitStructMemberOutput(_mslVSOutputParams, TfToken("vsdc_elementCoord"), TfToken("vsDrawingCoord.elementCoord"), intType);
-    _EmitStructMemberOutput(_mslVSOutputParams, TfToken("vsdc_primitiveCoord"), TfToken("vsDrawingCoord.primitiveCoord"), intType);
-    _EmitStructMemberOutput(_mslVSOutputParams, TfToken("vsdc_fvarCoord"), TfToken("vsDrawingCoord.fvarCoord"), intType);
-    _EmitStructMemberOutput(_mslVSOutputParams, TfToken("vsdc_shaderCoord"), TfToken("vsDrawingCoord.shaderCoord"), intType);
+    TfToken tkn_modelCoord("vsdc_modelCoord");
+    TfToken tkn_constantCoord("vsdc_constantCoord");
+    TfToken tkn_elementCoord("vsdc_elementCoord");
+    TfToken tkn_primitiveCoord("vsdc_primitiveCoord");
+    TfToken tkn_fvarCoord("vsdc_fvarCoord");
+    TfToken tkn_shaderCoord("vsdc_shaderCoord");
+    
+    _EmitStructMemberOutput(_mslVSOutputParams, tkn_modelCoord, TfToken("vsDrawingCoord.modelCoord"), intType);
+    _mslPSInputParams.push_back(TParam(tkn_modelCoord, intType, TfToken("gsDrawingCoord.modelCoord"), TfToken(), HdSt_CodeGenMSL::TParam::Unspecified));
+    
+    _EmitStructMemberOutput(_mslVSOutputParams, tkn_constantCoord, TfToken("vsDrawingCoord.constantCoord"), intType);
+    _mslPSInputParams.push_back(TParam(tkn_constantCoord, intType, TfToken("gsDrawingCoord.constantCoord"), TfToken(), HdSt_CodeGenMSL::TParam::Unspecified));
+    
+    _EmitStructMemberOutput(_mslVSOutputParams, tkn_elementCoord, TfToken("vsDrawingCoord.elementCoord"), intType);
+    _mslPSInputParams.push_back(TParam(tkn_elementCoord, intType, TfToken("gsDrawingCoord.elementCoord"), TfToken(), HdSt_CodeGenMSL::TParam::Unspecified));
+    
+    _EmitStructMemberOutput(_mslVSOutputParams, tkn_primitiveCoord, TfToken("vsDrawingCoord.primitiveCoord"), intType);
+    _mslPSInputParams.push_back(TParam(tkn_primitiveCoord, intType, TfToken("gsDrawingCoord.primitiveCoord"), TfToken(), HdSt_CodeGenMSL::TParam::Unspecified));
+    
+    _EmitStructMemberOutput(_mslVSOutputParams, tkn_fvarCoord, TfToken("vsDrawingCoord.fvarCoord"), intType);
+    _mslPSInputParams.push_back(TParam(tkn_fvarCoord, intType, TfToken("gsDrawingCoord.fvarCoord"), TfToken(), HdSt_CodeGenMSL::TParam::Unspecified));
+
+    _EmitStructMemberOutput(_mslVSOutputParams, tkn_shaderCoord, TfToken("vsDrawingCoord.shaderCoord"), intType);
+    _mslPSInputParams.push_back(TParam(tkn_shaderCoord, intType, TfToken("gsDrawingCoord.shaderCoord"), TfToken(), HdSt_CodeGenMSL::TParam::Unspecified));
     
     for(int i = 0; i <= _metaData.instancerNumLevels; i++)
     {
+        TfToken tkn_instanceIndex(TfStringPrintf("vsdc_instanceIndex%d", i));
         _EmitStructMemberOutput(_mslVSOutputParams,
-                                TfToken(TfStringPrintf("vsdc_instanceIndex%d", i)),
+                                tkn_instanceIndex,
                                 TfToken(TfStringPrintf("vsDrawingCoord.instanceIndex[%d]", i)), intType);
+        _mslPSInputParams.push_back(TParam(tkn_instanceIndex, intType, TfToken(TfStringPrintf("gsDrawingCoord.instanceIndex[%d]", i)), TfToken(), HdSt_CodeGenMSL::TParam::Unspecified));
+        
+        TfToken tkn_instanceCoords(TfStringPrintf("vsdc_instanceCoord%d", i));
         _EmitStructMemberOutput(_mslVSOutputParams,
-                                TfToken(TfStringPrintf("vsdc_instanceCoord%d", i)),
+                                tkn_instanceCoords,
                                 TfToken(TfStringPrintf("vsDrawingCoord.instanceCoords[%d]", i)), intType);
+        _mslPSInputParams.push_back(TParam(tkn_instanceCoords, intType, TfToken(TfStringPrintf("gsDrawingCoord.instanceCoords[%d]", i)), TfToken(), HdSt_CodeGenMSL::TParam::Unspecified));
     }
     
     _genVS << "hd_drawingCoord GetDrawingCoord() { hd_drawingCoord dc; \n"
