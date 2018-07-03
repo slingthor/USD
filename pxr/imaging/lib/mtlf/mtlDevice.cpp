@@ -238,7 +238,8 @@ MtlfMetalContext::MtlfMetalContext()
     currentPipelineState          = nil;
     
     MTLDepthStencilDescriptor *depthStateDesc = [[MTLDepthStencilDescriptor alloc] init];
-    depthStateDesc.depthCompareFunction = MTLCompareFunctionAlways;
+    depthStateDesc.depthWriteEnabled = YES;
+    depthStateDesc.depthCompareFunction = MTLCompareFunctionLessEqual;
     depthState = [device newDepthStencilStateWithDescriptor:depthStateDesc];
     
     // Load our common vertex shader. This is used by both the fragment shaders below
@@ -361,6 +362,14 @@ MtlfMetalContext::MtlfMetalContext()
     
     mtlTexture = CVMetalTextureGetTexture(cvmtlTexture);
     
+    {
+        MTLTextureDescriptor *depthTexDescriptor = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatDepth32Float
+        width:mtlTexture.width height:mtlTexture.height mipmapped:false];
+        depthTexDescriptor.usage = MTLTextureUsageRenderTarget;
+        depthTexDescriptor.resourceOptions = MTLResourceCPUCacheModeDefaultCache | MTLResourceStorageModePrivate;
+        mtlDepthTexture = [device newTextureWithDescriptor:depthTexDescriptor];
+    }
+    
     pipelineStateDescriptor = nil;
     vertexDescriptor = nil;
     indexBuffer = nil;
@@ -432,7 +441,6 @@ void MtlfMetalContext::SetVertexAttribute(uint32_t index,
     {
         vertexDescriptor = [[MTLVertexDescriptor alloc] init];
 
-        //cullStyle?
         vertexDescriptor.layouts[0].stepFunction = MTLVertexStepFunctionConstant;
         vertexDescriptor.layouts[0].stepRate = 0;
         vertexDescriptor.layouts[0].stride = stride;
@@ -611,7 +619,8 @@ void MtlfMetalContext::SetPipelineState()
     
     pipelineStateDescriptor.label = @"Bake State";
     pipelineStateDescriptor.sampleCount = 1;
-    
+    pipelineStateDescriptor.inputPrimitiveTopology = MTLPrimitiveTopologyClassUnspecified;
+
     if (dirtyState & DIRTY_METAL_STATE_VERTEX_DESCRIPTOR || pipelineStateDescriptor.vertexDescriptor == NULL) {
         // This assignment can be expensive as the vertexdescriptor will be copied (due to interface property)
         pipelineStateDescriptor.vertexDescriptor = vertexDescriptor;
@@ -649,8 +658,11 @@ void MtlfMetalContext::SetPipelineState()
             pipelineStateDescriptor.colorAttachments[0].sourceAlphaBlendFactor = MTLBlendFactorSourceAlpha;
             pipelineStateDescriptor.colorAttachments[0].destinationRGBBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
             pipelineStateDescriptor.colorAttachments[0].destinationAlphaBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
-            pipelineStateDescriptor.colorAttachments[0].pixelFormat = MTLPixelFormatBGRA8Unorm;
+            pipelineStateDescriptor.colorAttachments[0].pixelFormat = mtlTexture.pixelFormat;
             numColourAttachments++;
+
+            pipelineStateDescriptor.depthAttachmentPixelFormat = mtlDepthTexture.pixelFormat;
+            [renderEncoder setDepthStencilState:depthState];
         }
         // Update colour attachments hash
         currentColourAttachmentsHash = HashColourAttachments();

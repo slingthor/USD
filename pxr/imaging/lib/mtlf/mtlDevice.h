@@ -133,6 +133,7 @@ public:
     id<MTLRenderPipelineState> pipelineState;
     id<MTLDepthStencilState> depthState;
     id<MTLTexture> mtlTexture;
+	id<MTLTexture> mtlDepthTexture;
 
     uint32_t glShaderProgram;
     uint32_t glTexture;

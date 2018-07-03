@@ -719,6 +719,10 @@ UsdImagingMetalHdEngine::Render(RenderParams params)
 
     MTLRenderPassColorAttachmentDescriptor *colorAttachment = _mtlRenderPassDescriptor.colorAttachments[0];
     colorAttachment.texture = context->mtlTexture;
+    
+    MTLRenderPassDepthAttachmentDescriptor *depthAttachment = _mtlRenderPassDescriptor.depthAttachment;
+    depthAttachment.texture = context->mtlDepthTexture;
+
 
     // Create a new command buffer for each render pass to the current drawable
     id <MTLCommandBuffer> commandBuffer = context->CreateCommandBuffer();
