@@ -74,9 +74,9 @@ GarchDrawTarget *GlfResourceFactory::NewDrawTarget(GarchDrawTargetPtr const & dr
     return new GlfDrawTarget(drawtarget);
 }
 
-GarchUniformBlockRefPtr GlfResourceFactory::NewUniformBlock() const
+GarchUniformBlockRefPtr GlfResourceFactory::NewUniformBlock(char const *label) const
 {
-    return TfCreateRefPtr(new GlfUniformBlock());
+    return TfCreateRefPtr(new GlfUniformBlock(label));
 }
 
 GarchArrayTextureRefPtr GlfResourceFactory::NewArrayTexture(TfTokenVector const &imageFilePaths,

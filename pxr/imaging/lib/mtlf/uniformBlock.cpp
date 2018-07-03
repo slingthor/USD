@@ -31,7 +31,7 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 
-MtlfUniformBlock::MtlfUniformBlock() :
+MtlfUniformBlock::MtlfUniformBlock(char const *label) :
     _buffer(nil), _size(0)
 {
 }
@@ -61,8 +61,8 @@ void
 MtlfUniformBlock::Update(const void *data, int size)
 {
     if (_buffer == nil) {
-    id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->device;
-    _buffer = [device newBufferWithBytes:data length:size options:MTLResourceStorageModeManaged];
+        id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->device;
+        _buffer = [device newBufferWithBytes:data length:size options:MTLResourceStorageModeManaged];
     }
     
     //METAL TODO

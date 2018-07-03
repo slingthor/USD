@@ -23,6 +23,7 @@
 //
 
 #include "pxr/imaging/glf/glew.h"
+#include "pxr/imaging/glf/contextCaps.h"
 
 #include "pxr/imaging/hdSt/codeGen.h"
 #include "pxr/imaging/hdSt/GL/codeGenGLSL.h"

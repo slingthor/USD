@@ -74,9 +74,9 @@ GarchDrawTarget *MtlfResourceFactory::NewDrawTarget(GarchDrawTargetPtr const & d
     return new MtlfDrawTarget(drawtarget);
 }
 
-GarchUniformBlockRefPtr MtlfResourceFactory::NewUniformBlock() const
+GarchUniformBlockRefPtr MtlfResourceFactory::NewUniformBlock(char const *label) const
 {
-    return TfCreateRefPtr(new MtlfUniformBlock());
+    return TfCreateRefPtr(new MtlfUniformBlock(label));
 }
 
 GarchArrayTextureRefPtr MtlfResourceFactory::NewArrayTexture(TfTokenVector const &imageFilePaths,

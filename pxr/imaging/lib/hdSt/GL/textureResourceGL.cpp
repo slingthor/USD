@@ -150,13 +150,13 @@ GarchTextureGPUHandle HdStSimpleTextureResourceGL::GetTexelsTextureId()
 
 GarchSamplerGPUHandle HdStSimpleTextureResourceGL::GetTexelsSamplerId()
 {
-    return (GarchSamplerGPUHandle)(uint64_t)_sampler;
+    return _sampler;
 }
 
 GarchTextureGPUHandle HdStSimpleTextureResourceGL::GetTexelsTextureHandle()
 { 
     GLuint textureId = GetTexelsTextureId();
-    GLuint samplerId = (GLuint)(uint64_t)GetTexelsSamplerId();
+    GLuint samplerId = GetTexelsSamplerId();
 
     if (!TF_VERIFY(glGetTextureHandleARB) ||
         !TF_VERIFY(glGetTextureSamplerHandleARB)) {
@@ -203,4 +203,3 @@ size_t HdStSimpleTextureResourceGL::GetMemoryUsed()
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE
-

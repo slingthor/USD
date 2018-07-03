@@ -42,6 +42,10 @@ TF_DECLARE_WEAK_AND_REF_PTRS(GlfUniformBlock);
 class GlfUniformBlock : public GarchUniformBlock {
 public:
 
+    /// Returns a new instance.
+    GLF_API
+    static GlfUniformBlockRefPtr New(char const *label = nullptr);
+
     GLF_API
     virtual ~GlfUniformBlock();
 
@@ -53,11 +57,11 @@ public:
     /// Updates the content of the uniform buffer. If the size
     /// is different, the buffer will be reallocated.
     GLF_API
-    virtual void Update(const void *data, int size) override;
-
+    void Update(const void *data, int size);
+    
 protected:
     GLF_API
-    GlfUniformBlock();
+    GlfUniformBlock(char const *label);
     
     friend class GlfResourceFactory;
 

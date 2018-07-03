@@ -27,7 +27,7 @@
 #include "pxr/imaging/garch/uvTextureData.h"
 
 #include "pxr/base/tf/fileUtils.h"
-#include "pxr/base/tracelite/trace.h"
+#include "pxr/base/trace/trace.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -120,7 +120,8 @@ GarchUVTextureData::_GetNumMipLevelsValid(const GarchImageSharedPtr image) const
     // Count mips since certain formats will not fail when quering mips,
     // in that case 
     for (int mipCounter = 1; mipCounter < 32; mipCounter++) {
-        GarchImageSharedPtr image = GarchImage::OpenForReading(_filePath, mipCounter);
+        GarchImageSharedPtr image = GarchImage::OpenForReading(_filePath,
+            mipCounter, /*suppressErrors=*/ true);
         if (!image) {
             potentialMipLevels = mipCounter;
             break;

@@ -23,7 +23,7 @@ pxr_library(glf
         js
         plug
         tf
-        tracelite
+        trace
         sdf
         ${Boost_PYTHON_LIBRARY}
         ${Boost_SYSTEM_LIBRARY}
@@ -44,6 +44,7 @@ pxr_library(glf
         arrayTexture
         baseTexture
         bindingMap
+        contextCaps
         diagnostic
         drawTarget
         glew

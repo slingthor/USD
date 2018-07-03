@@ -22,6 +22,7 @@
 // language governing permissions and limitations under the Apache License.
 //
 #include "pxr/imaging/glf/glew.h"
+#include "pxr/imaging/glf/diagnostic.h"
 
 #include "pxr/imaging/hdSt/drawItem.h"
 #include "pxr/imaging/hdSt/fallbackLightingShader.h"
@@ -120,6 +121,7 @@ HdStRenderPassState::Sync(HdResourceRegistrySharedPtr const &resourceRegistry)
 {
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
+    GLF_GROUP_FUNCTION();
 
     VtVec4fArray clipPlanes;
     TF_FOR_ALL(it, _clipPlanes) {
@@ -306,6 +308,8 @@ HdStRenderPassState::GetShaders() const
 void
 HdStRenderPassState::Bind()
 {
+    GLF_GROUP_FUNCTION();
+    
     // XXX: this states set will be refactored as hdstream PSO.
     
     // notify view-transform to the lighting shader to update its uniform block

@@ -92,12 +92,14 @@ setMatrix(float *dst, GfMatrix4d const & mat)
 void
 GlfSimpleLightingContext::BindUniformBlocks(GarchBindingMapPtr const &bindingMap)
 {
+    GLF_GROUP_FUNCTION();
+    
     if (!_lightingUniformBlock)
-        _lightingUniformBlock = GarchResourceFactory::GetInstance()->NewUniformBlock();
+        _lightingUniformBlock = GarchResourceFactory::GetInstance()->NewUniformBlock("_lightingUniformBlock");
     if (!_shadowUniformBlock)
-        _shadowUniformBlock = GarchResourceFactory::GetInstance()->NewUniformBlock();
+        _shadowUniformBlock = GarchResourceFactory::GetInstance()->NewUniformBlock("_shadowUniformBlock");
     if (!_materialUniformBlock)
-        _materialUniformBlock = GarchResourceFactory::GetInstance()->NewUniformBlock();
+        _materialUniformBlock = GarchResourceFactory::GetInstance()->NewUniformBlock("_materialUniformBlock");
 
     bool shadowExists = false;
     if ((!_lightingUniformBlockValid ||

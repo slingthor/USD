@@ -37,12 +37,11 @@ endif()
 
 pxr_library(hdSt
     LIBRARIES
-        cameraUtil
         garch
         glf
         hd
         tf
-        tracelite
+        trace
         ${GFX}
         ${GLEW_LIBRARY}
         ${OPENSUBDIV_LIBRARIES}
@@ -55,7 +54,6 @@ pxr_library(hdSt
         basisCurves
         bufferRelocator
         bufferResource
-        camera
         commandBuffer
         computeShader
         copyComputation
@@ -66,9 +64,11 @@ pxr_library(hdSt
         drawTargetAttachmentDesc
         drawTargetAttachmentDescArray
         drawTargetRenderPassState
+        extComputation
         extCompGpuComputation
         extCompGpuComputationBufferSource
         extCompGpuComputationResource
+        extCompGpuPrimvarBufferSource
         fallbackLightingShader
         geometricShader
         glslfxShader
@@ -84,7 +84,6 @@ pxr_library(hdSt
         persistentBuffer
         points
         program
-        renderContextCaps
         renderDelegate
         renderPass
         renderPassShader

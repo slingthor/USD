@@ -27,7 +27,6 @@
 #include "pxr/imaging/hdSt/computeShader.h"
 #include "pxr/imaging/hdSt/extCompGpuComputationBufferSource.h"
 #include "pxr/imaging/hdSt/extCompGpuComputation.h"
-#include "pxr/imaging/hdSt/renderContextCaps.h"
 #include "pxr/imaging/hdSt/resourceBinder.h"
 #include "pxr/imaging/hdSt/shaderCode.h"
 //#include "pxr/imaging/hdSt/GL/glUtils.h"

@@ -48,12 +48,13 @@ GarchImage::IsSupportedImageFile(std::string const & filename)
 
 /* static */
 GarchImageSharedPtr
-GarchImage::OpenForReading(std::string const & filename, int subimage)
+GarchImage::OpenForReading(std::string const & filename, int subimage,
+                           bool suppressErrors)
 {
     GarchImageRegistry & registry = GarchImageRegistry::GetInstance();
 
     GarchImageSharedPtr image = registry._ConstructImage(filename);
-    if (!image || !image->_OpenForReading(filename, subimage)) {
+    if (!image || !image->_OpenForReading(filename, subimage, suppressErrors)) {
         return GarchImageSharedPtr();
     }
 

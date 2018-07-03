@@ -25,8 +25,9 @@
 #include "pxr/imaging/hdSt/renderDelegate.h"
 
 #include "pxr/imaging/hdSt/basisCurves.h"
-#include "pxr/imaging/hdSt/camera.h"
+#include "pxr/imaging/hd/camera.h"
 #include "pxr/imaging/hdSt/drawTarget.h"
+#include "pxr/imaging/hdSt/extComputation.h"
 #include "pxr/imaging/hdSt/glslfxShader.h"
 #include "pxr/imaging/hdSt/instancer.h"
 #include "pxr/imaging/hdSt/light.h"
@@ -40,9 +41,13 @@
 #include "pxr/imaging/hdSt/resourceRegistry.h"
 
 #include "pxr/imaging/hd/engine.h"
+#include "pxr/imaging/hd/extComputation.h"
 #include "pxr/imaging/hd/perfLog.h"
 
-#include "pxr/imaging/garch/glslfx.h"
+#include "pxr/imaging/glf/contextCaps.h"
+#include "pxr/imaging/glf/diagnostic.h"
+#include "pxr/imaging/glf/glslfx.h"
+
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -57,6 +62,7 @@ const TfTokenVector HdStRenderDelegate::SUPPORTED_SPRIM_TYPES =
 {
     HdPrimTypeTokens->camera,
     HdPrimTypeTokens->drawTarget,
+    HdPrimTypeTokens->extComputation,
     HdPrimTypeTokens->material,
     HdPrimTypeTokens->rectLight,
     HdPrimTypeTokens->simpleLight,
@@ -178,7 +184,7 @@ HdStRenderDelegate::CreateSprim(TfToken const& typeId,
                                     SdfPath const& sprimId)
 {
     if (typeId == HdPrimTypeTokens->camera) {
-        return new HdStCamera(sprimId);
+        return new HdCamera(sprimId);
     } else if (typeId == HdPrimTypeTokens->simpleLight) {
         return new HdStLight(sprimId, HdPrimTypeTokens->simpleLight);
     } else if (typeId == HdPrimTypeTokens->sphereLight) {
@@ -187,6 +193,8 @@ HdStRenderDelegate::CreateSprim(TfToken const& typeId,
         return new HdStLight(sprimId, HdPrimTypeTokens->rectLight);
     } else  if (typeId == HdPrimTypeTokens->drawTarget) {
         return new HdStDrawTarget(sprimId);
+    } else  if (typeId == HdPrimTypeTokens->extComputation) {
+        return new HdStExtComputation(sprimId);
     } else  if (typeId == HdPrimTypeTokens->material) {
         return new HdStMaterial(sprimId);
     } else {
@@ -200,7 +208,7 @@ HdSprim *
 HdStRenderDelegate::CreateFallbackSprim(TfToken const& typeId)
 {
     if (typeId == HdPrimTypeTokens->camera) {
-        return new HdStCamera(SdfPath::EmptyPath());
+        return new HdCamera(SdfPath::EmptyPath());
     } else if (typeId == HdPrimTypeTokens->simpleLight) {
         return new HdStLight(SdfPath::EmptyPath(),
                              HdPrimTypeTokens->simpleLight);
@@ -212,6 +220,8 @@ HdStRenderDelegate::CreateFallbackSprim(TfToken const& typeId)
                              HdPrimTypeTokens->rectLight);
     } else  if (typeId == HdPrimTypeTokens->drawTarget) {
         return new HdStDrawTarget(SdfPath::EmptyPath());
+    } else  if (typeId == HdPrimTypeTokens->extComputation) {
+        return new HdStExtComputation(SdfPath::EmptyPath());
     } else  if (typeId == HdPrimTypeTokens->material) {
         return _CreateFallbackMaterialPrim();
     } else {
@@ -274,6 +284,8 @@ HdStRenderDelegate::_CreateFallbackMaterialPrim()
 void
 HdStRenderDelegate::CommitResources(HdChangeTracker *tracker)
 {
+    GLF_GROUP_FUNCTION();
+    
     // --------------------------------------------------------------------- //
     // RESOLVE, COMPUTE & COMMIT PHASE
     // --------------------------------------------------------------------- //
@@ -295,6 +307,12 @@ HdStRenderDelegate::CommitResources(HdChangeTracker *tracker)
     // see bug126621. currently dispatch buffers need to be released
     //                more frequently than we expect.
     _resourceRegistry->GarbageCollectDispatchBuffers();
+}
+
+bool
+HdStRenderDelegate::IsSupported()
+{
+    return (GlfContextCaps::GetInstance().glVersion >= 400);
 }
 
 

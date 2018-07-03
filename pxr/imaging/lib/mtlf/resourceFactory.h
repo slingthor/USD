@@ -50,7 +50,7 @@ public:
     virtual GarchDrawTarget *NewDrawTarget(GarchDrawTargetPtr const & drawtarget) const override;
     
     // UniformBlock creation
-    virtual GarchUniformBlockRefPtr NewUniformBlock() const override;
+    virtual GarchUniformBlockRefPtr NewUniformBlock(char const *label = nullptr) const override;
     
     // Package Name accessor
     virtual std::string GetPackageName() const override { return "mtlf"; }

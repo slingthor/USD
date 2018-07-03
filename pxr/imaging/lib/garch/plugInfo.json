@@ -5,9 +5,9 @@
                 "Types": {                                                                  
                     "Garch_OIIOImage" : {
                         "bases": ["GarchImage"],
-                        "imageTypes": ["bmp", "exr", "jpg", "png", "tif", "zfile"],
+                        "imageTypes": ["bmp", "exr", "jpg", "png", "tif", "zfile", "tx"],
                         "precedence": 0
-                    }
+                    },
                 }
             },
             "LibraryPath": "@PLUG_INFO_LIBRARY_PATH@",

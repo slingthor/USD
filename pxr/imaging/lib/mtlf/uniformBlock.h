@@ -56,7 +56,7 @@ public:
 
 protected:
     MTLF_API
-    MtlfUniformBlock();
+    MtlfUniformBlock(char const *label);
     
     friend class MtlfResourceFactory;
 

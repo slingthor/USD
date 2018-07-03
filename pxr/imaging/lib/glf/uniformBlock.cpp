@@ -26,6 +26,7 @@
 
 #include "pxr/imaging/glf/glew.h"
 
+#include "pxr/imaging/glf/diagnostic.h"
 #include "pxr/imaging/glf/uniformBlock.h"
 #include "pxr/imaging/glf/bindingMap.h"
 #include "pxr/imaging/glf/glContext.h"
@@ -33,10 +34,13 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 
-GlfUniformBlock::GlfUniformBlock() :
+GlfUniformBlock::GlfUniformBlock(char const *label) :
     _buffer(0), _size(0)
 {
     glGenBuffers(1, &_buffer);
+    if (label) {
+        GlfDebugLabelBuffer(_buffer, label);
+    }
 }
 
 GlfUniformBlock::~GlfUniformBlock()
@@ -59,6 +63,8 @@ GlfUniformBlock::Bind(GarchBindingMapPtr const & bindingMap,
 void
 GlfUniformBlock::Update(const void *data, int size)
 {
+    GLF_GROUP_FUNCTION();
+    
     glBindBuffer(GL_UNIFORM_BUFFER, _buffer);
     if (_size != size) {
         glBufferData(GL_UNIFORM_BUFFER, size, NULL, GL_STATIC_DRAW);

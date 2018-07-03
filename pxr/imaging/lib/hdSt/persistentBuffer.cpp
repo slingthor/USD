@@ -22,8 +22,10 @@
 // language governing permissions and limitations under the Apache License.
 //
 #include "pxr/imaging/glf/glew.h"
+#include "pxr/imaging/glf/contextCaps.h"
 
 #include "pxr/imaging/hd/engine.h"
+#include "pxr/imaging/hd/perfLog.h"
 
 #include "pxr/imaging/hdSt/persistentBuffer.h"
 #include "pxr/imaging/hdSt/renderContextCaps.h"
@@ -32,21 +34,42 @@
 #include "pxr/imaging/hdSt/Metal/persistentBufferMetal.h"
 #endif
 
+#include "pxr/imaging/hf/perfLog.h"
+
 PXR_NAMESPACE_OPEN_SCOPE
 
 HdStPersistentBuffer *HdStPersistentBuffer::New(TfToken const &role, size_t dataSize, void* data)
 {
-    HdEngine::RenderAPI api = HdEngine::GetRenderAPI();
-    switch(api)
-    {
-        case HdEngine::OpenGL:
-            return new HdStPersistentBufferGL(role, dataSize, data);
-#if defined(ARCH_GFX_METAL)
-        case HdEngine::Metal:
-            return new HdStPersistentBufferMetal(role, dataSize, data);
-#endif
-        default:
-            TF_FATAL_CODING_ERROR("No HdStBufferResource for this API");
+    HD_TRACE_FUNCTION();
+    HF_MALLOC_TAG_FUNCTION();
+
+    GlfContextCaps const &caps = GlfContextCaps::GetInstance();
+
+    GLuint newId = 0;
+    glGenBuffers(1, &newId);
+
+    if (caps.bufferStorageEnabled) {
+        GLbitfield access = 
+            GL_MAP_READ_BIT | GL_MAP_WRITE_BIT |
+            GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT;
+
+        if (caps.directStateAccessEnabled) {
+            glNamedBufferStorageEXT(newId, dataSize, data, access);
+            _mappedAddress = glMapNamedBufferRangeEXT(newId, 0, dataSize, access);
+        } else {
+            glBindBuffer(GL_ARRAY_BUFFER, newId);
+            glBufferStorage(GL_ARRAY_BUFFER, dataSize, data, access);
+            _mappedAddress = glMapBufferRange(GL_ARRAY_BUFFER, 0, dataSize, access);
+            glBindBuffer(GL_ARRAY_BUFFER, 0);
+        }
+    } else {
+        if (caps.directStateAccessEnabled) {
+            glNamedBufferDataEXT(newId, dataSize, data, GL_DYNAMIC_DRAW);
+        } else {
+            glBindBuffer(GL_ARRAY_BUFFER, newId);
+            glBufferData(GL_ARRAY_BUFFER, dataSize, data, GL_DYNAMIC_DRAW);
+            glBindBuffer(GL_ARRAY_BUFFER, 0);
+        }
     }
     return NULL;
 }

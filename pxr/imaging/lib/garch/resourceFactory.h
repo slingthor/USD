@@ -67,7 +67,7 @@ public:
     virtual GarchDrawTarget *NewDrawTarget(GarchDrawTargetPtr const & drawtarget) const = 0;
     
     // UniformBlock creation
-    virtual GarchUniformBlockRefPtr NewUniformBlock() const = 0;
+    virtual GarchUniformBlockRefPtr NewUniformBlock(char const *label = nullptr) const = 0;
     
     // Package Name accessor
     virtual std::string GetPackageName() const = 0;

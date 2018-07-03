@@ -100,9 +100,9 @@ HdSt_QuadrangulateComputationGPUGL::Execute(
         boost::static_pointer_cast<HdBufferArrayRange> (range);
 
     // buffer resources for GPU computation
-    HdBufferResourceSharedPtr primVar_ = range_->GetResource(_name);
-    HdStBufferResourceSharedPtr primVar =
-        boost::static_pointer_cast<HdStBufferResource> (primVar_);
+    HdBufferResourceSharedPtr primvar_ = range_->GetResource(_name);
+    HdStBufferResourceSharedPtr primvar =
+        boost::static_pointer_cast<HdStBufferResource> (primvar_);
 
     HdBufferArrayRangeSharedPtr quadrangulateTableRange_ =
         boost::static_pointer_cast<HdBufferArrayRange> (quadrangulateTableRange);
@@ -118,8 +118,8 @@ HdSt_QuadrangulateComputationGPUGL::Execute(
         int quadInfoStride;
         int quadInfoOffset;
         int maxNumVert;
-        int primVarOffset;
-        int primVarStride;
+        int primvarOffset;
+        int primvarStride;
         int numComponents;
     } uniform;
 
@@ -137,11 +137,11 @@ HdSt_QuadrangulateComputationGPUGL::Execute(
     // i.e. it can't handle an interleaved array which interleaves
     // float/double, float/int etc.
     const size_t componentSize =
-        HdDataSizeOfType(HdGetComponentType(primVar->GetTupleType().type));
-    uniform.primVarOffset = primVar->GetOffset() / componentSize;
-    uniform.primVarStride = primVar->GetStride() / componentSize;
+        HdDataSizeOfType(HdGetComponentType(primvar->GetTupleType().type));
+    uniform.primvarOffset = primvar->GetOffset() / componentSize;
+    uniform.primvarStride = primvar->GetStride() / componentSize;
     uniform.numComponents =
-        HdGetComponentCount(primVar->GetTupleType().type);
+        HdGetComponentCount(primvar->GetTupleType().type);
 
     // transfer uniform buffer
     GLuint ubo = computeProgram->GetGlobalUniformBuffer().GetId();
@@ -157,7 +157,7 @@ HdSt_QuadrangulateComputationGPUGL::Execute(
     }
 
     glBindBufferBase(GL_UNIFORM_BUFFER, 0, ubo);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, primVar->GetId());
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, primvar->GetId());
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, quadrangulateTable->GetId());
 
     // dispatch compute kernel

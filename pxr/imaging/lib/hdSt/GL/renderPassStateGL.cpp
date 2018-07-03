@@ -144,7 +144,9 @@ HdStRenderPassStateGL::Unbind()
 {
     HdStRenderPassState::Unbind();
 
+    GLF_GROUP_FUNCTION();
     // restore back to the GL defaults
+    
     glDisable(GL_POLYGON_OFFSET_FILL);
     glDisable(GL_SAMPLE_ALPHA_TO_COVERAGE);
     glDisable(GL_PROGRAM_POINT_SIZE);
@@ -152,11 +154,11 @@ HdStRenderPassStateGL::Unbind()
     glDepthFunc(GL_LESS);
     glPolygonOffset(0, 0);
     glLineWidth(1.0f);
-
+    
     for (size_t i = 0; i < _clipPlanes.size(); ++i) {
         glDisable(GL_CLIP_DISTANCE0 + i);
     }
-
+    
     glColorMask(true, true, true, true);
 }
 

@@ -57,10 +57,6 @@ private:
     friend class TfSingleton<GarchImageRegistry>;
     GarchImageRegistry();
 
-    void _RegisterPluginForType(TfToken const & fileExtension,
-                                TfType const & type,
-                                int precedence);
-
     friend class GarchImage;
 
     GarchImageSharedPtr _ConstructImage(std::string const & filename);

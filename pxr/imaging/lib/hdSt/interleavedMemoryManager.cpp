@@ -22,11 +22,12 @@
 // language governing permissions and limitations under the Apache License.
 //
 #include "pxr/imaging/glf/glew.h"
+#include "pxr/imaging/glf/diagnostic.h"
+#include "pxr/imaging/glf/contextCaps.h"
 
 #include "pxr/imaging/hdSt/interleavedMemoryManager.h"
 #include "pxr/imaging/hdSt/bufferResource.h"
 #include "pxr/imaging/hdSt/bufferRelocator.h"
-#include "pxr/imaging/hdSt/renderContextCaps.h"
 #include "pxr/imaging/hdSt/glUtils.h"
 
 #include "pxr/imaging/hdSt/GL/interleavedMemoryBufferGL.h"
@@ -118,7 +119,7 @@ HdStInterleavedUBOMemoryManager::CreateBufferArray(
     TfToken const &role,
     HdBufferSpecVector const &bufferSpecs)
 {
-    HdStRenderContextCaps &caps = HdStRenderContextCaps::GetInstance();
+    GlfContextCaps &caps = GlfContextCaps::GetInstance();
 
     HdEngine::RenderAPI api = HdEngine::GetRenderAPI();
     switch(api)
@@ -175,7 +176,7 @@ HdStInterleavedSSBOMemoryManager::CreateBufferArray(
     TfToken const &role,
     HdBufferSpecVector const &bufferSpecs)
 {
-    HdStRenderContextCaps &caps = HdStRenderContextCaps::GetInstance();
+    GlfContextCaps &caps = GlfContextCaps::GetInstance();
 
     HdEngine::RenderAPI api = HdEngine::GetRenderAPI();
     switch(api)
@@ -549,6 +550,7 @@ HdStInterleavedMemoryManager::_StripedInterleavedBufferRange::CopyData(
                         bufferSource->GetName().GetText());
         return;
     }
+    GLF_GROUP_FUNCTION();
 
     // overrun check
     // XXX:Arrays:  Note that we only check tuple type here, not arity.
@@ -568,7 +570,7 @@ HdStInterleavedMemoryManager::_StripedInterleavedBufferRange::CopyData(
         return;
     }
 
-    HdStRenderContextCaps const &caps = HdStRenderContextCaps::GetInstance();
+    GlfContextCaps const &caps = GlfContextCaps::GetInstance();
     if (glBufferSubData != NULL) {
         int vboStride = VBO->GetStride();
         GLintptr vboOffset = VBO->GetOffset() + vboStride * _index;

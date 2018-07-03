@@ -22,12 +22,12 @@
 // language governing permissions and limitations under the Apache License.
 //
 #include "pxr/imaging/glf/glew.h"
+#include "pxr/imaging/glf/contextCaps.h"
 
 #include "pxr/imaging/garch/glslfx.h"
 
 #include "pxr/imaging/hdSt/geometricShader.h"
 #include "pxr/imaging/hdSt/package.h"
-#include "pxr/imaging/hdSt/renderContextCaps.h"
 #include "pxr/imaging/hdSt/resourceBinder.h"
 #include "pxr/imaging/hdSt/shaderCode.h"
 #include "pxr/imaging/hdSt/GL/codeGenGLSL.h"
@@ -60,21 +60,34 @@ TF_DEFINE_PRIVATE_TOKENS(
     ((_int, "int"))
     (hd_vec3)
     (hd_vec3_get)
+    (hd_vec3_set)
     (hd_ivec3)
     (hd_ivec3_get)
+    (hd_ivec3_set)
     (hd_dvec3)
     (hd_dvec3_get)
-    (inPrimVars)
+    (hd_dvec3_set)
+    (hd_mat3)
+    (hd_mat3_get)
+    (hd_mat3_set)
+    (hd_dmat3)
+    (hd_dmat3_get)
+    (hd_dmat3_set)
+    (inPrimvars)
     (ivec2)
     (ivec3)
     (ivec4)
-    (outPrimVars)
+    (outPrimvars)
     (vec2)
     (vec3)
     (vec4)
     (dvec2)
     (dvec3)
     (dvec4)
+    (mat3)
+    (mat4)
+    (dmat3)
+    (dmat4)
     ((ptexTextureSampler, "ptexTextureSampler"))
     (isamplerBuffer)
     (samplerBuffer)
@@ -195,12 +208,40 @@ _GetPackedTypeDefinitions()
     return "struct hd_ivec3 { int    x, y, z; };\n"
            "struct hd_vec3  { float  x, y, z; };\n"
            "struct hd_dvec3 { double x, y, z; };\n"
+           "struct hd_mat3  { float  m00, m01, m02,\n"
+           "                         m10, m11, m12,\n"
+           "                         m20, m21, m22; };\n"
+           "struct hd_dmat3 { double m00, m01, m02,\n"
+           "                         m10, m11, m12,\n"
+           "                         m20, m21, m22; };\n"
            "ivec3 hd_ivec3_get(hd_ivec3 v) { return ivec3(v.x, v.y, v.z); }\n"
            "ivec3 hd_ivec3_get(ivec3 v)    { return v; }\n"
            "vec3  hd_vec3_get(hd_vec3 v)   { return vec3(v.x, v.y, v.z); }\n"
            "vec3  hd_vec3_get(vec3 v)      { return v; }\n"
            "dvec3 hd_dvec3_get(hd_dvec3 v) { return dvec3(v.x, v.y, v.z); }\n"
            "dvec3 hd_dvec3_get(dvec3 v)    { return v; }\n"
+           "mat3  hd_mat3_get(hd_mat3 v)   { return mat3(v.m00, v.m01, v.m02,\n"
+           "                                             v.m10, v.m11, v.m12,\n"
+           "                                             v.m20, v.m21, v.m22); }\n"
+           "mat3  hd_mat3_get(mat3 v)      { return v; }\n"
+           "dmat3 hd_dmat3_get(hd_dmat3 v) { return dmat3(v.m00, v.m01, v.m02,\n"
+           "                                              v.m10, v.m11, v.m12,\n"
+           "                                              v.m20, v.m21, v.m22); }\n"
+           "dmat3 hd_dmat3_get(dmat3 v)    { return v; }\n"
+           "hd_ivec3 hd_ivec3_set(hd_ivec3 v) { return v; }\n"
+           "hd_ivec3 hd_ivec3_set(ivec3 v)    { return hd_ivec3(v.x, v.y, v.z); }\n"
+           "hd_vec3 hd_vec3_set(hd_vec3 v)    { return v; }\n"
+           "hd_vec3 hd_vec3_set(vec3 v)       { return hd_vec3(v.x, v.y, v.z); }\n"
+           "hd_dvec3 hd_dvec3_set(hd_dvec3 v) { return v; }\n"
+           "hd_dvec3 hd_dvec3_set(dvec3 v)    { return hd_dvec3(v.x, v.y, v.z); }\n"
+           "hd_mat3  hd_mat3_set(hd_mat3 v)   { return v; }\n"
+           "hd_mat3  hd_mat3_set(mat3 v)      { return hd_mat3(v[0][0], v[0][1], v[0][2],\n"
+           "                                                   v[1][0], v[1][1], v[1][2],\n"
+           "                                                   v[2][0], v[2][1], v[2][2]); }\n"
+           "hd_dmat3 hd_dmat3_set(hd_dmat3 v) { return v; }\n"
+           "hd_dmat3 hd_dmat3_set(dmat3 v)    { return hd_dmat3(v[0][0], v[0][1], v[0][2],\n"
+           "                                                    v[1][0], v[1][1], v[1][2],\n"
+           "                                                    v[2][0], v[2][1], v[2][2]); }\n"
         // helper functions for 410 specification
         // applying a swizzle operator on int and float is not allowed in 410.
            "int hd_int_get(int v)          { return v; }\n"
@@ -218,6 +259,10 @@ _GetPackedType(TfToken const &token)
         return _tokens->hd_vec3;
     } else if (token == _tokens->dvec3) {
         return _tokens->hd_dvec3;
+    } else if (token == _tokens->mat3) {
+        return _tokens->hd_mat3;
+    } else if (token == _tokens->dmat3) {
+        return _tokens->hd_dmat3;
     }
     return token;
 }
@@ -231,6 +276,27 @@ _GetPackedTypeAccessor(TfToken const &token)
         return _tokens->hd_vec3_get;
     } else if (token == _tokens->dvec3) {
         return _tokens->hd_dvec3_get;
+    } else if (token == _tokens->mat3) {
+        return _tokens->hd_mat3_get;
+    } else if (token == _tokens->dmat3) {
+        return _tokens->hd_dmat3_get;
+    }
+    return token;
+}
+
+static TfToken const &
+_GetPackedTypeMutator(TfToken const &token)
+{
+    if (token == _tokens->ivec3) {
+        return _tokens->hd_ivec3_set;
+    } else if (token == _tokens->vec3) {
+        return _tokens->hd_vec3_set;
+    } else if (token == _tokens->dvec3) {
+        return _tokens->hd_dvec3_set;
+    } else if (token == _tokens->mat3) {
+        return _tokens->hd_mat3_set;
+    } else if (token == _tokens->dmat3) {
+        return _tokens->hd_dmat3_set;
     }
     return token;
 }
@@ -255,6 +321,14 @@ _GetFlatType(TfToken const &token)
     } else if (token == _tokens->dvec3) {
         return _tokens->_double;
     } else if (token == _tokens->dvec4) {
+        return _tokens->_double;
+    } else if (token == _tokens->mat3) {
+        return _tokens->_float;
+    } else if (token == _tokens->mat4) {
+        return _tokens->_float;
+    } else if (token == _tokens->dmat3) {
+        return _tokens->_double;
+    } else if (token == _tokens->dmat4) {
         return _tokens->_double;
     }
     return token;
@@ -284,7 +358,7 @@ namespace {
     };
     std::ostream & operator << (std::ostream & out, const LayoutQualifier &lq)
     {
-        HdStRenderContextCaps const &caps = HdStRenderContextCaps::GetInstance();
+        GlfContextCaps const &caps = GlfContextCaps::GetInstance();
         int location = lq.binding.GetLocation();
 
         switch (lq.binding.GetType()) {
@@ -299,6 +373,7 @@ namespace {
         case HdBinding::UNIFORM_ARRAY:
         case HdBinding::TBO:
         case HdBinding::BINDLESS_UNIFORM:
+        case HdBinding::BINDLESS_SSBO_RANGE:
         case HdBinding::TEXTURE_2D:
         case HdBinding::BINDLESS_TEXTURE_2D:
         case HdBinding::TEXTURE_PTEX_TEXEL:
@@ -339,7 +414,7 @@ HdSt_CodeGenGLSL::Compile()
     _procVS.str(""); _procTCS.str(""), _procTES.str(""), _procGS.str("");
 
     // GLSL version.
-    HdStRenderContextCaps const &caps = HdStRenderContextCaps::GetInstance();
+    GlfContextCaps const &caps = GlfContextCaps::GetInstance();
     _genCommon << "#version " << caps.glslVersion << "\n";
 
     if (caps.bindlessBufferEnabled) {
@@ -348,6 +423,9 @@ HdSt_CodeGenGLSL::Compile()
     }
     if (caps.bindlessTextureEnabled) {
         _genCommon << "#extension GL_ARB_bindless_texture : require\n";
+    }
+    if (caps.glslVersion < 460 && caps.shaderDrawParametersEnabled) {
+        _genCommon << "#extension GL_ARB_shader_draw_parameters : require\n";
     }
     if (caps.glslVersion < 430 && caps.explicitUniformLocation) {
         _genCommon << "#extension GL_ARB_explicit_uniform_location : require\n";
@@ -379,7 +457,7 @@ HdSt_CodeGenGLSL::Compile()
     } else {
         _genCommon << "#define MAT4 dmat4\n";
     }
-    // a trick to tightly pack vec3 into SSBO/UBO.
+    // a trick to tightly pack unaligned data (vec3, etc) into SSBO/UBO.
     _genCommon << _GetPackedTypeDefinitions();
 
     // ------------------
@@ -506,9 +584,9 @@ HdSt_CodeGenGLSL::Compile()
     }
 
     // prep interstage plumbing function
-    _procVS  << "void ProcessPrimVars() {\n";
-    _procTCS << "void ProcessPrimVars() {\n";
-    _procTES << "void ProcessPrimVars(float u, float v, int i0, int i1, int i2, int i3) {\n";
+    _procVS  << "void ProcessPrimvars() {\n";
+    _procTCS << "void ProcessPrimvars() {\n";
+    _procTES << "void ProcessPrimvars(float u, float v, int i0, int i1, int i2, int i3) {\n";
     // geometry shader plumbing
     switch(_geometricShader->GetPrimitiveType())
     {
@@ -518,7 +596,7 @@ HdSt_CodeGenGLSL::Compile()
         {
             // patch interpolation
             _procGS << "vec4 GetPatchCoord(int index);\n"
-                    << "void ProcessPrimVars(int index) {\n"
+                    << "void ProcessPrimvars(int index) {\n"
                     << "   vec2 localST = GetPatchCoord(index).xy;\n";
             break;            
         }
@@ -526,7 +604,7 @@ HdSt_CodeGenGLSL::Compile()
         case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_COARSE_QUADS:
         {
             // quad interpolation
-            _procGS  << "void ProcessPrimVars(int index) {\n"
+            _procGS  << "void ProcessPrimvars(int index) {\n"
                      << "   vec2 localST = vec2[](vec2(0,0), vec2(1,0), vec2(1,1), vec2(0,1))[index];\n";
             break;            
         }
@@ -534,7 +612,7 @@ HdSt_CodeGenGLSL::Compile()
         case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_COARSE_TRIANGLES:
         {
             // barycentric interpolation
-             _procGS  << "void ProcessPrimVars(int index) {\n"
+             _procGS  << "void ProcessPrimvars(int index) {\n"
                       << "   vec2 localST = vec2[](vec2(0,0), vec2(1,0), vec2(0,1))[index];\n";
             break;            
         }
@@ -548,10 +626,10 @@ HdSt_CodeGenGLSL::Compile()
     _GenerateDrawingCoord();
 
     // generate primvars
-    _GenerateConstantPrimVar();
-    _GenerateInstancePrimVar();
-    _GenerateElementPrimVar();
-    _GenerateVertexPrimVar();
+    _GenerateConstantPrimvar();
+    _GenerateInstancePrimvar();
+    _GenerateElementPrimvar();
+    _GenerateVertexPrimvar();
 
     //generate shader parameters
     _GenerateShaderParameters();
@@ -698,9 +776,24 @@ HdSt_CodeGenGLSL::CompileComputeProgram()
     _procVS.str(""); _procTCS.str(""), _procTES.str(""), _procGS.str("");
     
     // GLSL version.
-    HdStRenderContextCaps const &caps = HdStRenderContextCaps::GetInstance();
+    GlfContextCaps const &caps = GlfContextCaps::GetInstance();
     _genCommon << "#version " << caps.glslVersion << "\n";
-    // default workgroup size
+    
+    if (caps.bindlessBufferEnabled) {
+        _genCommon << "#extension GL_NV_shader_buffer_load : require\n"
+        << "#extension GL_NV_gpu_shader5 : require\n";
+    }
+    if (caps.bindlessTextureEnabled) {
+        _genCommon << "#extension GL_ARB_bindless_texture : require\n";
+    }
+    if (caps.glslVersion < 430 && caps.explicitUniformLocation) {
+        _genCommon << "#extension GL_ARB_explicit_uniform_location : require\n";
+    }
+    if (caps.glslVersion < 420 && caps.shadingLanguage420pack) {
+        _genCommon << "#extension GL_ARB_shading_language_420pack : require\n";
+    }
+    
+    // default workgroup size (must follow #extension directives)
     _genCommon << "layout(local_size_x = 1, local_size_y = 1) in;\n";
 
     if (caps.bindlessBufferEnabled) {
@@ -722,6 +815,9 @@ HdSt_CodeGenGLSL::CompileComputeProgram()
     // we need new versions of Hydra shading. 
     _genCommon << "#define HD_SHADER_API " << HD_SHADER_API << "\n";    
     
+    // a trick to tightly pack unaligned data (vec3, etc) into SSBO/UBO.
+    _genCommon << _GetPackedTypeDefinitions();
+
     std::stringstream uniforms;
     std::stringstream declarations;
     std::stringstream accessors;
@@ -739,13 +835,17 @@ HdSt_CodeGenGLSL::CompileComputeProgram()
         HdBinding const &binding = it->first;
         TfToken const &dataType = it->second.dataType;
         
+        // For now, SSBO bindings use a flat type encoding.
+        TfToken declDataType =
+        (binding.GetType() == HdBinding::SSBO
+         ? _GetFlatType(dataType) : dataType);
+        
         uniforms << "    int " << name << "Offset;\n";
         uniforms << "    int " << name << "Stride;\n";
         
         _EmitDeclaration(declarations,
                 name,
-                //compute shaders need vector types to be flat arrays
-                _GetFlatType(dataType),
+                declDataType,
                 binding, 0);
         // getter & setter
         {
@@ -766,12 +866,17 @@ HdSt_CodeGenGLSL::CompileComputeProgram()
         HdBinding const &binding = it->first;
         TfToken const &dataType = it->second.dataType;
         
+        // For now, SSBO bindings use a flat type encoding.
+        TfToken declDataType =
+        (binding.GetType() == HdBinding::SSBO
+         ? _GetFlatType(dataType) : dataType);
+        
         uniforms << "    int " << name << "Offset;\n";
         uniforms << "    int " << name << "Stride;\n";
+
         _EmitDeclaration(declarations,
                 name,
-                //compute shaders need vector types to be flat arrays
-                _GetFlatType(dataType),
+                declDataType,
                 binding, 0);
         // getter
         {
@@ -854,11 +959,12 @@ static void _EmitDeclaration(std::stringstream &str,
                       name.GetText())) return;
 
     if (arraySize > 0) {
-        if (!TF_VERIFY(bindingType == HdBinding::UNIFORM_ARRAY                 ||
-                          bindingType == HdBinding::DRAW_INDEX_INSTANCE_ARRAY  ||
-                          bindingType == HdBinding::UBO                        ||
-                          bindingType == HdBinding::SSBO                       ||
-                          bindingType == HdBinding::BINDLESS_UNIFORM)) {
+        if (!TF_VERIFY(bindingType == HdBinding::UNIFORM_ARRAY             ||
+                       bindingType == HdBinding::DRAW_INDEX_INSTANCE_ARRAY ||
+                       bindingType == HdBinding::UBO                       ||
+                       bindingType == HdBinding::SSBO                      ||
+                       bindingType == HdBinding::BINDLESS_SSBO_RANGE       ||
+                       bindingType == HdBinding::BINDLESS_UNIFORM)) {
             // XXX: SSBO and BINDLESS_UNIFORM don't need arraySize, but for the
             // workaround of UBO allocation we're passing arraySize = 2
             // for all bindingType.
@@ -904,6 +1010,10 @@ static void _EmitDeclaration(std::stringstream &str,
             << " " << name.GetText() << "[];\n"
             << "};\n";
         break;
+    case HdBinding::BINDLESS_SSBO_RANGE:
+        str << "uniform " << _GetPackedType(type).GetText()
+            << " *" << name.GetText() << ";\n";
+            break;
     case HdBinding::TBO:
         str << "uniform " << _GetSamplerBufferType(type).GetText()
             << " " << name.GetText() << ";\n";
@@ -982,6 +1092,40 @@ static void _EmitStructAccessor(std::stringstream &str,
     }
 }
 
+static std::string _GetSwizzleString(TfToken const& type)
+{
+    std::string swizzle = "";
+    if (type == _tokens->vec4 || type == _tokens->ivec4) {
+        // nothing
+    } else if (type == _tokens->vec3 || type == _tokens->ivec3) {
+        swizzle = ".xyz";
+    } else if (type == _tokens->vec2 || type == _tokens->ivec2) {
+        swizzle = ".xy";
+    } else if (type == _tokens->_float || type == _tokens->_int) {
+        swizzle = ".x";
+    }
+    
+    return swizzle;
+}
+
+static int _GetNumComponents(TfToken const& type)
+{
+    int numComponents = 1;
+    if (type == _tokens->vec2 || type == _tokens->ivec2) {
+        numComponents = 2;
+    } else if (type == _tokens->vec3 || type == _tokens->ivec3) {
+        numComponents = 3;
+    } else if (type == _tokens->vec4 || type == _tokens->ivec4) {
+        numComponents = 4;
+    } else if (type == _tokens->mat3 || type == _tokens->dmat3) {
+        numComponents = 9;
+    } else if (type == _tokens->mat4 || type == _tokens->dmat4) {
+        numComponents = 16;
+    }
+    
+    return numComponents;
+}
+
 static void _EmitComputeAccessor(
                     std::stringstream &str,
                     TfToken const &name,
@@ -991,32 +1135,15 @@ static void _EmitComputeAccessor(
 {
     if (index) {
         str << type
-            << " HdGet_" << name << "(int localIndex) {\n"
-            << "  int index = " << index << ";\n";
+        << " HdGet_" << name << "(int localIndex) {\n";
         if (binding.GetType() == HdBinding::TBO) {
-
-            std::string swizzle = "";
-            if (type == _tokens->vec4 || type == _tokens->ivec4) {
-                // nothing
-            } else if (type == _tokens->vec3 || type == _tokens->ivec3) {
-                swizzle = ".xyz";
-            } else if (type == _tokens->vec2 || type == _tokens->ivec2) {
-                swizzle = ".xy";
-            } else if (type == _tokens->_float || type == _tokens->_int) {
-                swizzle = ".x";
-            }
+            str << "  int index = " << index << ";\n";
             str << "  return texelFetch("
-                << name << ", index)" << swizzle << ";\n}\n";
+            << name << ", index)" << _GetSwizzleString(type) << ";\n}\n";
         } else if (binding.GetType() == HdBinding::SSBO) {
+            str << "  int index = " << index << ";\n";
             str << "  return " << type << "(";
-            int numComponents = 1;
-            if (type == _tokens->vec2 || type == _tokens->ivec2) {
-                numComponents = 2;
-            } else if (type == _tokens->vec3 || type == _tokens->ivec3) {
-                numComponents = 3;
-            } else if (type == _tokens->vec4 || type == _tokens->ivec4) {
-                numComponents = 4;
-            }
+            int numComponents = _GetNumComponents(type);
             for (int c = 0; c < numComponents; ++c) {
                 if (c > 0) {
                     str << ",\n              ";
@@ -1024,60 +1151,60 @@ static void _EmitComputeAccessor(
                 str << name << "[index + " << c << "]";
             }
             str << ");\n}\n";
+        } else if (binding.GetType() == HdBinding::BINDLESS_SSBO_RANGE) {
+            str << "  return " << _GetPackedTypeAccessor(type) << "("
+            << name << "[localIndex]);\n}\n";
         } else {
             str << "  return " << _GetPackedTypeAccessor(type) << "("
-                << name << "[index]);\n}\n";
+            << name << "[localIndex]);\n}\n";
         }
     } else {
         // non-indexed, only makes sense for uniform or vertex.
-        if (binding.GetType() == HdBinding::UNIFORM || 
+        if (binding.GetType() == HdBinding::UNIFORM ||
             binding.GetType() == HdBinding::VERTEX_ATTR) {
             str << type
-                << " HdGet_" << name << "(int localIndex) { return ";
+            << " HdGet_" << name << "(int localIndex) { return ";
             str << _GetPackedTypeAccessor(type) << "(" << name << ");}\n";
         }
     }
     // GLSL spec doesn't allow default parameter. use function overload instead.
     // default to locaIndex=0
     str << type << " HdGet_" << name << "()"
-        << " { return HdGet_" << name << "(0); }\n";
+    << " { return HdGet_" << name << "(0); }\n";
     
 }
 
 static void _EmitComputeMutator(
-                    std::stringstream &str,
-                    TfToken const &name,
-                    TfToken const &type,
-                    HdBinding const &binding,
-                    const char *index)
+                                std::stringstream &str,
+                                TfToken const &name,
+                                TfToken const &type,
+                                HdBinding const &binding,
+                                const char *index)
 {
     if (index) {
         str << "void"
-            << " HdSet_" << name << "(int localIndex, " << type << " value) {\n"
-            << "  int index = " << index << ";\n";
+        << " HdSet_" << name << "(int localIndex, "
+        << type << " value) {\n";
         if (binding.GetType() == HdBinding::SSBO) {
-            int numComponents = 1;
-            if (type == _tokens->vec2 || type == _tokens->ivec2) {
-                numComponents = 2;
-            } else if (type == _tokens->vec3 || type == _tokens->ivec3) {
-                numComponents = 3;
-            } else if (type == _tokens->vec4 || type == _tokens->ivec4) {
-                numComponents = 4;
-            }
+            str << "  int index = " << index << ";\n";
+            int numComponents = _GetNumComponents(type);
             if (numComponents == 1) {
                 str << "  "
-                    << name << "[index] = value;\n";
+                << name << "[index] = value;\n";
             } else {
                 for (int c = 0; c < numComponents; ++c) {
                     str << "  "
-                        << name << "[index + " << c << "] = "
-                        << "value[" << c << "];\n";
+                    << name << "[index + " << c << "] = "
+                    << "value[" << c << "];\n";
                 }
             }
-            str << "}\n";
+        } else if (binding.GetType() == HdBinding::BINDLESS_SSBO_RANGE) {
+            str << name << "[localIndex] = "
+            << _GetPackedTypeMutator(type) << "(value);\n";
         } else {
             TF_WARN("mutating non-SSBO not supported");
         }
+        str << "}\n";
     } else {
         TF_WARN("mutating non-indexed data not supported");
     }
@@ -1098,40 +1225,114 @@ static void _EmitAccessor(std::stringstream &str,
 {
     if (index) {
         str << type
-            << " HdGet_" << name << "(int localIndex) {\n"
-            << "  int index = " << index << ";\n";
+        << " HdGet_" << name << "(int localIndex) {\n"
+        << "  int index = " << index << ";\n";
         if (binding.GetType() == HdBinding::TBO) {
-
-            std::string swizzle = "";
-            if (type == _tokens->vec4 || type == _tokens->ivec4) {
-                // nothing
-            } else if (type == _tokens->vec3 || type == _tokens->ivec3) {
-                swizzle = ".xyz";
-            } else if (type == _tokens->vec2 || type == _tokens->ivec2) {
-                swizzle = ".xy";
-            } else if (type == _tokens->_float || type == _tokens->_int) {
-                swizzle = ".x";
-            }
             str << "  return texelFetch("
-                << name << ", index)" << swizzle << ";\n}\n";
+            << name << ", index)" << _GetSwizzleString(type) << ";\n}\n";
         } else {
             str << "  return " << _GetPackedTypeAccessor(type) << "("
-                << name << "[index]);\n}\n";
+            << name << "[index]);\n}\n";
         }
     } else {
         // non-indexed, only makes sense for uniform or vertex.
-        if (binding.GetType() == HdBinding::UNIFORM || 
+        if (binding.GetType() == HdBinding::UNIFORM ||
             binding.GetType() == HdBinding::VERTEX_ATTR) {
             str << type
-                << " HdGet_" << name << "(int localIndex) { return ";
+            << " HdGet_" << name << "(int localIndex) { return ";
             str << _GetPackedTypeAccessor(type) << "(" << name << ");}\n";
         }
     }
     // GLSL spec doesn't allow default parameter. use function overload instead.
     // default to locaIndex=0
     str << type << " HdGet_" << name << "()"
-        << " { return HdGet_" << name << "(0); }\n";
+    << " { return HdGet_" << name << "(0); }\n";
     
+}
+
+
+// Accessing face varying primvar data of a vertex in the GS requires special
+// case handling for refinement while providing a branchless solution.
+// When dealing with vertices on a refined face, we use the patch coord to get
+// its parametrization on the sanitized (coarse) "ptex" face, and interpolate
+// based on the face primitive type (bilinear for quad faces, barycentric for
+// tri faces)
+static void _EmitFVarGSAccessor(
+                                std::stringstream &str,
+                                TfToken const &name,
+                                TfToken const &type,
+                                HdBinding const &binding,
+                                HdSt_GeometricShader::PrimitiveType const& primType)
+{
+    // emit an internal getter for accessing the coarse fvar data (corresponding
+    // to the refined face, in the case of refinement)
+    str << type
+    << " HdGet_" << name << "_Coarse(int localIndex) {\n"
+    << "  int fvarIndex = GetFVarIndex(localIndex);\n";
+    
+    if (binding.GetType() == HdBinding::TBO) {
+        str << "  return texelFetch("
+        << name << ", fvarIndex)" << _GetSwizzleString(type) << ";\n}\n";
+    } else {
+        str << "  return " << _GetPackedTypeAccessor(type) << "("
+        << name << "[fvarIndex]);\n}\n";
+    }
+    
+    // emit the (public) accessor for the fvar data, accounting for refinement
+    // interpolation
+    str << "vec4 GetPatchCoord(int index);\n"; // forward decl
+    str << type
+    << " HdGet_" << name << "(int localIndex) {\n"
+    << "  vec2 localST = GetPatchCoord(localIndex).xy;\n";
+    
+    switch(primType)
+    {
+        case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_COARSE_QUADS:
+        case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_REFINED_QUADS:
+        case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_PATCHES:
+        {
+            // linear interpolation within a quad.
+            str << "  return mix("
+            << "mix(" << "HdGet_" << name << "_Coarse(0),"
+            <<           "HdGet_" << name << "_Coarse(1), localST.x),"
+            << "mix(" << "HdGet_" << name << "_Coarse(3),"
+            <<           "HdGet_" << name << "_Coarse(2), localST.x), localST.y);\n}\n";
+            break;
+        }
+            
+        case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_REFINED_TRIANGLES:
+        case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_COARSE_TRIANGLES:
+        {
+            // barycentric interpolation within a triangle.
+            str << "  return ("
+            << "HdGet_" << name << "_Coarse(0) * (1-localST.x-localST.y)"
+            << " + HdGet_" << name << "_Coarse(1) * localST.x"
+            << " + HdGet_" << name << "_Coarse(2) * localST.y);\n}\n";
+            break;
+        }
+            
+        case HdSt_GeometricShader::PrimitiveType::PRIM_POINTS:
+        {
+            str << "  return HdGet_" << name << "_Coarse(localIndex);\n}\n";
+            break;
+        }
+            
+        default:
+        {
+            // emit a default version for compilation sake
+            str << "  return HdGet_" << name << "_Coarse(localIndex);\n}\n";
+            
+            TF_CODING_ERROR("Face varing bindings for unexpected for"
+                            " HdSt_GeometricShader::PrimitiveType %d",
+                            primType);
+        }
+    }
+    
+    // XXX: We shouldn't emit the default (argument free) accessor version,
+    // since that doesn't make sense within a GS. Once we fix the XXX in
+    // _GenerateShaderParameters, we should remove this.
+    str << type << " HdGet_" << name << "()"
+    << " { return HdGet_" << name << "(0); }\n";
 }
 
 void
@@ -1147,6 +1348,7 @@ HdSt_CodeGenGLSL::_GenerateDrawingCoord()
        struct hd_drawingCoord {
            int modelCoord;          // (reserved) model parameters
            int constantCoord;       // constant primvars (per object)
+           int vertexCoord;         // vertex primvars   (per vertex)
            int elementCoord;        // element primvars  (per face/curve)
            int primitiveCoord;      // primitive ids     (per tri/quad/line)
            int fvarCoord;           // fvar primvars     (per face-vertex)
@@ -1240,6 +1442,7 @@ HdSt_CodeGenGLSL::_GenerateDrawingCoord()
     _genCommon << "struct hd_drawingCoord {                       \n"
                << "  int modelCoord;                              \n"
                << "  int constantCoord;                           \n"
+               << "  int vertexCoord;                             \n"
                << "  int elementCoord;                            \n"
                << "  int primitiveCoord;                          \n"
                << "  int fvarCoord;                               \n"
@@ -1254,11 +1457,11 @@ HdSt_CodeGenGLSL::_GenerateDrawingCoord()
 
     // [immediate]
     //   layout (location=x) uniform ivec4 drawingCoord0;
-    //   layout (location=y) uniform ivec3 drawingCoord1;
+    //   layout (location=y) uniform ivec4 drawingCoord1;
     //   layout (location=z) uniform int   drawingCoordI[N];
     // [indirect]
     //   layout (location=x) in ivec4 drawingCoord0
-    //   layout (location=y) in ivec3 drawingCoord1
+    //   layout (location=y) in ivec4 drawingCoord1
     //   layout (location=z) in int   drawingCoordI[N]
     _EmitDeclaration(_genVS, _metaData.drawingCoord0Binding);
     _EmitDeclaration(_genVS, _metaData.drawingCoord1Binding);
@@ -1333,6 +1536,7 @@ HdSt_CodeGenGLSL::_GenerateDrawingCoord()
            << "  dc.primitiveCoord = drawingCoord0.w; \n"
            << "  dc.fvarCoord      = drawingCoord1.x; \n"
            << "  dc.shaderCoord    = drawingCoord1.z; \n"
+           << "  dc.vertexCoord    = drawingCoord1.w; \n"
            << "  dc.instanceIndex  = GetInstanceIndex().indices;\n";
 
     if (_metaData.drawingCoordIBinding.binding.IsValid()) {
@@ -1399,7 +1603,7 @@ HdSt_CodeGenGLSL::_GenerateDrawingCoord()
 
 }
 void
-HdSt_CodeGenGLSL::_GenerateConstantPrimVar()
+HdSt_CodeGenGLSL::_GenerateConstantPrimvar()
 {
     /*
       // --------- constant data declaration ----------
@@ -1471,7 +1675,7 @@ HdSt_CodeGenGLSL::_GenerateConstantPrimVar()
 }
 
 void
-HdSt_CodeGenGLSL::_GenerateInstancePrimVar()
+HdSt_CodeGenGLSL::_GenerateInstancePrimvar()
 {
     /*
       // --------- instance data declaration ----------
@@ -1548,7 +1752,7 @@ HdSt_CodeGenGLSL::_GenerateInstancePrimVar()
 }
 
 void
-HdSt_CodeGenGLSL::_GenerateElementPrimVar()
+HdSt_CodeGenGLSL::_GenerateElementPrimvar()
 {
     /*
     Accessing uniform primvar data:
@@ -1581,7 +1785,7 @@ HdSt_CodeGenGLSL::_GenerateElementPrimVar()
       // --------- primitive param declaration ----------
       struct PrimitiveData { int elementID; }
       layout (std430, binding=?) buffer PrimitiveBuffer {
-          PrimtiveData primitiveData[];
+          PrimitiveData primitiveData[];
       };
 
       // --------- indirection accessors ---------
@@ -1772,7 +1976,7 @@ HdSt_CodeGenGLSL::_GenerateElementPrimVar()
                 default:
                 {
                     TF_CODING_ERROR("Hd_GeometricShader::PrimitiveType %d is "
-                      "unexpected in _GenerateElementPrimVar().",
+                      "unexpected in _GenerateElementPrimvar().",
                       _geometricShader->GetPrimitiveType());
                 }
             }
@@ -1813,7 +2017,7 @@ HdSt_CodeGenGLSL::_GenerateElementPrimVar()
         }
         else {
             TF_CODING_ERROR("Hd_GeometricShader::PrimitiveType %d is "
-                  "unexpected in _GenerateElementPrimVar().",
+                  "unexpected in _GenerateElementPrimvar().",
                   _geometricShader->GetPrimitiveType());
         }
     } else {
@@ -1940,53 +2144,53 @@ HdSt_CodeGenGLSL::_GenerateElementPrimVar()
 }
 
 void
-HdSt_CodeGenGLSL::_GenerateVertexPrimVar()
+HdSt_CodeGenGLSL::_GenerateVertexPrimvar()
 {
     /*
       // --------- vertex data declaration (VS) ----------
       layout (location = 0) in vec3 normals;
       layout (location = 1) in vec3 points;
 
-      out PrimVars {
+      out Primvars {
           vec3 normals;
           vec3 points;
-      } outPrimVars;
+      } outPrimvars;
 
-      void ProcessPrimVars() {
-          outPrimVars.normals = normals;
-          outPrimVars.points = points;
+      void ProcessPrimvars() {
+          outPrimvars.normals = normals;
+          outPrimvars.points = points;
       }
 
       // --------- geometry stage plumbing -------
-      in PrimVars {
+      in Primvars {
           vec3 normals;
           vec3 points;
-      } inPrimVars[];
-      out PrimVars {
+      } inPrimvars[];
+      out Primvars {
           vec3 normals;
           vec3 points;
-      } outPrimVars;
+      } outPrimvars;
 
-      void ProcessPrimVars(int index) {
-          outPrimVars = inPrimVars[index];
+      void ProcessPrimvars(int index) {
+          outPrimvars = inPrimvars[index];
       }
 
       // --------- vertex data accessors (used in geometry/fragment shader) ---
-      in PrimVars {
+      in Primvars {
           vec3 normals;
           vec3 points;
-      } inPrimVars;
+      } inPrimvars;
       vec3 HdGet_normals(int localIndex=0) {
-          return inPrimVars.normals;
+          return inPrimvars.normals;
       }
     */
 
     std::stringstream vertexInputs;
-    std::stringstream interstageStruct;
+    std::stringstream interstageVertexData;
     std::stringstream accessorsVS, accessorsTCS, accessorsTES,
         accessorsGS, accessorsFS;
 
-    interstageStruct << "PrimVars {\n";
+    interstageStruct << "Primvars {\n";
 
     // vertex varying
     TF_FOR_ALL (it, _metaData.vertexData) {
@@ -2000,177 +2204,165 @@ HdSt_CodeGenGLSL::_GenerateVertexPrimVar()
         // in interleaved buffer.
         _EmitDeclaration(vertexInputs, name, dataType, binding);
 
-        interstageStruct << "  " << dataType << " " << name << ";\n";
+        interstageVertexData << "  " << dataType << " " << name << ";\n";
 
         // primvar accessors
         _EmitAccessor(accessorsVS, name, dataType, binding);
 
-        _EmitStructAccessor(accessorsTCS, _tokens->inPrimVars,
+        _EmitStructAccessor(accessorsTCS, _tokens->inPrimvars,
                             name, dataType, /*arraySize=*/1, "gl_InvocationID");
-        _EmitStructAccessor(accessorsTES, _tokens->inPrimVars,
+        _EmitStructAccessor(accessorsTES, _tokens->inPrimvars,
                             name, dataType, /*arraySize=*/1, "localIndex");
-        _EmitStructAccessor(accessorsGS,  _tokens->inPrimVars,
+        _EmitStructAccessor(accessorsGS,  _tokens->inPrimvars,
                             name, dataType, /*arraySize=*/1, "localIndex");
-        _EmitStructAccessor(accessorsFS,  _tokens->inPrimVars,
+        _EmitStructAccessor(accessorsFS,  _tokens->inPrimvars,
                             name, dataType, /*arraySize=*/1);
 
         // interstage plumbing
-        _procVS << "  outPrimVars." << name
+        _procVS << "  outPrimvars." << name
                 << " = " << name << ";\n";
-        _procTCS << "  outPrimVars[gl_InvocationID]." << name
-                 << " = inPrimVars[gl_InvocationID]." << name << ";\n";
+        _procTCS << "  outPrimvars[gl_InvocationID]." << name
+                 << " = inPrimvars[gl_InvocationID]." << name << ";\n";
         // procTES linearly interpolate vertex/varying primvars here.
         // XXX: needs smooth interpolation for vertex primvars?
-        _procTES << "  outPrimVars." << name
-                 << " = mix(mix(inPrimVars[i3]." << name
-                 << "         , inPrimVars[i2]." << name << ", u),"
-                 << "       mix(inPrimVars[i1]." << name
-                 << "         , inPrimVars[i0]." << name << ", u), v);\n";
-        _procGS  << "  outPrimVars." << name
-                 << " = inPrimVars[index]." << name << ";\n";
+        _procTES << "  outPrimvars." << name
+                 << " = mix(mix(inPrimvars[i3]." << name
+                 << "         , inPrimvars[i2]." << name << ", u),"
+                 << "       mix(inPrimvars[i1]." << name
+                 << "         , inPrimvars[i0]." << name << ", u), v);\n";
+        _procGS  << "  outPrimvars." << name
+                 << " = inPrimvars[index]." << name << ";\n";
     }
 
     /*
-      // --------- facevarying data declaration ----------------
-      // we use separate structs to avoid std430 padding problem of vec3 array.
-      struct FaceVaryingData0 {
-          vec2 map1;
-      };
-      struct FaceVaryingData1 {
-          float map2_u;
-      };
-      layout (std430, binding=?) buffer buffer0 {
-          FaceVaryingData0 faceVaryingData0[];
-      };
-      layout (std430, binding=?) buffer buffer1 {
-          FaceVaryingData1 faceVaryingData1[];
-      };
+    // --------- facevarying data declaration ----------------
+    layout (std430, binding=?) buffer buffer0 {
+        vec2 map1[];
+    };
+    layout (std430, binding=?) buffer buffer1 {
+        float map2_u[];
+    };
 
-      // --------- geometry stage plumbing -------
-      void ProcessPrimVars(int index) {
-          outPrimVars = inPrimVars[index];
-      }
+    // --------- geometry stage plumbing -------
+    out Primvars {
+        ...
+        vec2 map1;
+        float map2_u;
+    } outPrimvars;
 
-      // --------- facevarying data accessors ----------
-      // in geometry shader
-      vec2 HdGet_map1(int localIndex) {
-          return faceVaryingData0[GetFaceVaryingIndex(localIndex)].map1;
-      }
-      // in fragment shader
-      vec2 HdGet_map1() {
-          return inPrimvars.map1;
-      }
+    void ProcessPrimvars(int index) {
+        outPrimvars.map1 = HdGet_map1(index);
+        outPrimvars.map2_u = HdGet_map2_u(index);
+    }
+
+    // --------- fragment stage plumbing -------
+    in Primvars {
+        ...
+        vec2 map1;
+        float map2_u;
+    } inPrimvars;
+
+    // --------- facevarying data accessors ----------
+    // in geometry shader (internal accessor)
+    vec2 HdGet_map1_Coarse(int localIndex) {
+        int fvarIndex = GetFVarIndex(localIndex);
+        return vec2(map1[fvarIndex]);
+    }
+    // in geometry shader (public accessor)
+    vec2 HdGet_map1(int localIndex) {
+    int fvarIndex = GetFVarIndex(localIndex);
+        return (HdGet_map1_Coarse(0) * ...);
+    }
+    // in fragment shader
+    vec2 HdGet_map1() {
+        return inPrimvars.map1;
+    }
 
     */
 
     // face varying
     std::stringstream fvarDeclarations;
-
+    std::stringstream interstageFVarData;
+    
     TF_FOR_ALL (it, _metaData.fvarData) {
         HdBinding binding = it->first;
         TfToken const &name = it->second.name;
         TfToken const &dataType = it->second.dataType;
-
+        
         _EmitDeclaration(fvarDeclarations, name, dataType, binding);
-
-        interstageStruct << "  " << dataType << " " << name << ";\n";
-
+        
+        interstageFVarData << "  " << dataType << " " << name << ";\n";
+        
         // primvar accessors (only in GS and FS)
-        _EmitAccessor(accessorsGS, name, dataType, binding, "GetFVarIndex(localIndex)");
-        _EmitStructAccessor(accessorsFS, _tokens->inPrimVars, name, dataType,
+        _EmitFVarGSAccessor(accessorsGS, name, dataType, binding,
+                            _geometricShader->GetPrimitiveType());
+        _EmitStructAccessor(accessorsFS, _tokens->inPrimvars, name, dataType,
                             /*arraySize=*/1, NULL);
-
-        // interstage plumbing
-        _procVS << "  outPrimVars." << name
-                << " = " << dataType << "(0);\n";
-        _procTCS << "  outPrimVars[gl_InvocationID]." << name
-                 << " = inPrimVars[gl_InvocationID]." << name << ";\n";
-        // TODO: facevarying tessellation
-        _procTES << "  outPrimVars." << name
-                 << " = mix(mix(inPrimVars[i3]." << name
-                 << "         , inPrimVars[i2]." << name << ", u),"
-                 << "       mix(inPrimVars[i1]." << name
-                 << "         , inPrimVars[i0]." << name << ", u), v);\n";
-
-
-        switch(_geometricShader->GetPrimitiveType())
-        {
-            case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_COARSE_QUADS:
-            case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_REFINED_QUADS:
-            case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_PATCHES:
-            {
-                // linear interpolation within a quad.
-                _procGS << "   outPrimVars." << name
-                    << "  = mix("
-                    << "mix(" << "HdGet_" << name << "(0),"
-                    <<           "HdGet_" << name << "(1), localST.x),"
-                    << "mix(" << "HdGet_" << name << "(3),"
-                    <<           "HdGet_" << name << "(2), localST.x), localST.y);\n";
-                break;
-            }
-
-            case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_REFINED_TRIANGLES:
-            case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_COARSE_TRIANGLES:
-            {
-                // barycentric interpolation within a triangle.
-                _procGS << "   outPrimVars." << name
-                        << "  = HdGet_" << name << "(0) * (1-localST.x-localST.y) "
-                        << "  + HdGet_" << name << "(1) * localST.x "
-                        << "  + HdGet_" << name << "(2) * localST.y;\n";
-                break;  
-            }
-
-            case HdSt_GeometricShader::PrimitiveType::PRIM_POINTS:
-            {
-                // do nothing. 
-                // e.g. if a prim's geomstyle is points and it has valid
-                // fvarData, we don't generate any of the 
-                // accessor methods.
-                break;
-            }
-
-            default:
-                TF_CODING_ERROR("Face varing bindings for unexpected for" 
-                                " Hd_GeometricShader::PrimitiveType %d", 
-                                _geometricShader->GetPrimitiveType());
-        }
+        
+        _procGS << "  outPrimvars." << name
+                                    <<" = HdGet_" << name << "(index);\n";
     }
-
-    interstageStruct << "}";
-
-    _genVS << vertexInputs.str()
-           << "out " << interstageStruct.str()
-           << " outPrimVars;\n"
-           << accessorsVS.str();
-
-    _genTCS << "in " << interstageStruct.str()
-            << " inPrimVars[gl_MaxPatchVertices];\n"
-            << "out " << interstageStruct.str()
-            << " outPrimVars[HD_NUM_PATCH_VERTS];\n"
+    
+    _genVS  << vertexInputs.str()
+            << "out Primvars {\n"
+            << interstageVertexData.str()
+            << "} outPrimvars;\n"
+            << accessorsVS.str();
+    
+    _genTCS << "in Primvars {\n"
+            << interstageVertexData.str()
+            << "} inPrimvars[gl_MaxPatchVertices];\n"
+            << "out Primvars {\n"
+            << interstageVertexData.str()
+            << "} outPrimvars[HD_NUM_PATCH_VERTS];\n"
             << accessorsTCS.str();
-
-    _genTES << "in " << interstageStruct.str()
-            << " inPrimVars[gl_MaxPatchVertices];\n"
-            << "out " << interstageStruct.str()
-            << " outPrimVars;\n"
+    
+    _genTES << "in Primvars {\n"
+            << interstageVertexData.str()
+            << "} inPrimvars[gl_MaxPatchVertices];\n"
+            << "out Primvars {\n"
+            << interstageVertexData.str()
+            << "} outPrimvars;\n"
             << accessorsTES.str();
-
-    _genGS << fvarDeclarations.str()
-           << "in " << interstageStruct.str()
-           << " inPrimVars[HD_NUM_PRIMITIVE_VERTS];\n"
-           << "out " << interstageStruct.str()
-           << " outPrimVars;\n"
-           << accessorsGS.str();
-
-    _genFS << "in " << interstageStruct.str()
-           << " inPrimVars;\n"
-           << accessorsFS.str();
-
+    
+    _genGS  << fvarDeclarations.str()
+            << "in Primvars {\n"
+            << interstageVertexData.str()
+            << "} inPrimvars[HD_NUM_PRIMITIVE_VERTS];\n"
+            << "out Primvars {\n"
+            << interstageVertexData.str()
+            << interstageFVarData.str()
+            << "} outPrimvars;\n"
+            << accessorsGS.str();
+    
+    _genFS  << "in Primvars {\n"
+            << interstageVertexData.str()
+            << interstageFVarData.str()
+            << "} inPrimvars;\n"
+            << accessorsFS.str();
+    
     // ---------
     _genFS << "vec4 GetPatchCoord(int index);\n";
     _genFS << "vec4 GetPatchCoord() { return GetPatchCoord(0); }\n";
 
     _genGS << "vec4 GetPatchCoord(int localIndex);\n";
+
+    // VS specific accessor for the "vertex drawing coordinate"
+    // Even though we currently always plumb vertexCoord as part of the drawing
+    // coordinate, we expect clients to use this accessor when querying the base
+    // vertex offset for a draw call.
+    GlfContextCaps const &caps = GlfContextCaps::GetInstance();
+    _genVS << "int GetBaseVertexOffset() {\n";
+    if (caps.shaderDrawParametersEnabled) {
+        if (caps.glslVersion < 460) { // use ARB extension
+            _genVS << "  return gl_BaseVertexARB;\n";
+        } else {
+            _genVS << "  return gl_BaseVertex;\n";
+        }
+    } else {
+        _genVS << "  return GetDrawingCoord().vertexCoord;\n";
+    }
+    _genVS << "}\n";
 }
 
 void
@@ -2214,12 +2406,12 @@ HdSt_CodeGenGLSL::_GenerateShaderParameters()
 
       * bindless 2D texture
       <type> HdGet_<name>(int localIndex=0) {
-          return texture(sampler2D(shaderData[GetDrawingCoord().shaderCoord].<name>), <inPrimVars>).xxx;
+          return texture(sampler2D(shaderData[GetDrawingCoord().shaderCoord].<name>), <inPrimvars>).xxx;
       }
 
       * non-bindless 2D texture
       <type> HdGet_<name>(int localIndex=0) {
-          return texture(samplers_2d[<offset> + drawIndex * <stride>], <inPrimVars>).xxx;
+          return texture(samplers_2d[<offset> + drawIndex * <stride>], <inPrimvars>).xxx;
       }
 
       * bindless Ptex texture
@@ -2253,7 +2445,7 @@ HdSt_CodeGenGLSL::_GenerateShaderParameters()
     std::stringstream declarations;
     std::stringstream accessors;
 
-    HdStRenderContextCaps const &caps = HdStRenderContextCaps::GetInstance();
+    GlfContextCaps const &caps = GlfContextCaps::GetInstance();
 
     TfToken typeName("ShaderData");
     TfToken varName("shaderData");
@@ -2287,16 +2479,7 @@ HdSt_CodeGenGLSL::_GenerateShaderParameters()
     TF_FOR_ALL (it, _metaData.shaderParameterBinding) {
 
         // adjust datatype
-        std::string swizzle = "";
-        if (it->second.dataType == _tokens->vec4) {
-            // nothing
-        } else if (it->second.dataType == _tokens->vec3) {
-            swizzle = ".xyz";
-        } else if (it->second.dataType == _tokens->vec2) {
-            swizzle = ".xy";
-        } else if (it->second.dataType == _tokens->_float) {
-            swizzle = ".x";
-        }
+        std::string swizzle = _GetSwizzleString(it->second.dataType);
 
         HdBinding::Type bindingType = it->first.GetType();
         if (bindingType == HdBinding::FALLBACK) {
@@ -2322,11 +2505,11 @@ HdSt_CodeGenGLSL::_GenerateShaderParameters()
                 << "  int shaderCoord = GetDrawingCoord().shaderCoord; \n"
                 << "  return texture(sampler2D(shaderData[shaderCoord]." << it->second.name << "), ";
 
-            if (!it->second.inPrimVars.empty()) {
+            if (!it->second.inPrimvars.empty()) {
                 accessors 
                     << "\n"
-                    << "#if defined(HD_HAS_" << it->second.inPrimVars[0] << ")\n"
-                    << " HdGet_" << it->second.inPrimVars[0] << "().xy\n"
+                    << "#if defined(HD_HAS_" << it->second.inPrimvars[0] << ")\n"
+                    << " HdGet_" << it->second.inPrimvars[0] << "().xy\n"
                     << "#else\n"
                     << "vec2(0.0, 0.0)\n"
                     << "#endif\n";
@@ -2361,11 +2544,11 @@ HdSt_CodeGenGLSL::_GenerateShaderParameters()
                 << it->second.dataType
                 << " HdGet_" << it->second.name
                 << "() { return HdGet_" << it->second.name << "(";
-            if (!it->second.inPrimVars.empty()) {
+            if (!it->second.inPrimvars.empty()) {
                 accessors
                     << "\n"
-                    << "#if defined(HD_HAS_" << it->second.inPrimVars[0] << ")\n"
-                    << "HdGet_" << it->second.inPrimVars[0] << "().xy\n"
+                    << "#if defined(HD_HAS_" << it->second.inPrimvars[0] << ")\n"
+                    << "HdGet_" << it->second.inPrimvars[0] << "().xy\n"
                     << "#else\n"
                     << "vec2(0.0, 0.0)\n"
                     << "#endif\n";
@@ -2435,12 +2618,12 @@ HdSt_CodeGenGLSL::_GenerateShaderParameters()
             // If this shader and it's connected primvar have the same name, we
             // are good to go, else we must alias the parameter to the primvar
             // accessor.
-            if (it->second.name != it->second.inPrimVars[0]) {
+            if (it->second.name != it->second.inPrimvars[0]) {
                 accessors
                     << it->second.dataType
                     << " HdGet_" << it->second.name << "() {\n"
-                    << "#if defined(HD_HAS_" << it->second.inPrimVars[0] << ")\n"
-                    << "  return HdGet_" << it->second.inPrimVars[0] << "();\n"
+                    << "#if defined(HD_HAS_" << it->second.inPrimvars[0] << ")\n"
+                    << "  return HdGet_" << it->second.inPrimvars[0] << "();\n"
                     << "#else\n"
                     << "  return " << it->second.dataType << "(0);\n"
                     << "#endif\n"

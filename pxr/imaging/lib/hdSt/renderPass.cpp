@@ -24,18 +24,22 @@
 #include "pxr/imaging/glf/glew.h"
 
 #include "pxr/imaging/hdSt/renderPass.h"
+
+#include "pxr/imaging/glf/contextCaps.h"
+
 #include "pxr/imaging/hdSt/indirectDrawBatch.h"
 #include "pxr/imaging/hdSt/resourceRegistry.h"
 #include "pxr/imaging/hdSt/renderPassShader.h"
 #include "pxr/imaging/hdSt/renderPassState.h"
 #include "pxr/imaging/hdSt/drawItem.h"
-#include "pxr/imaging/hdSt/renderContextCaps.h"
 #include "pxr/imaging/hdSt/shaderCode.h"
 
 #include "pxr/imaging/hd/engine.h"
 #include "pxr/imaging/hd/vtBufferSource.h"
 
 #include "pxr/base/gf/frustum.h"
+
+#include "pxr/imaging/glf/diagnostic.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -59,6 +63,7 @@ HdSt_RenderPass::_Execute(HdRenderPassStateSharedPtr const &renderPassState,
 {
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
+    GLF_GROUP_FUNCTION();
 
     // Downcast render pass state
     HdStRenderPassStateSharedPtr stRenderPassState =
@@ -109,6 +114,8 @@ HdSt_RenderPass::_PrepareCommandBuffer(
     HdStRenderPassStateSharedPtr const &renderPassState)
 {
     HD_TRACE_FUNCTION();
+    GLF_GROUP_FUNCTION();
+    
     // ------------------------------------------------------------------- #
     // SCHEDULE PREPARATION
     // ------------------------------------------------------------------- #
@@ -116,7 +123,7 @@ HdSt_RenderPass::_PrepareCommandBuffer(
     // so iterate over each prim, cull it and schedule it to be drawn.
 
     HdChangeTracker const &tracker = GetRenderIndex()->GetChangeTracker();
-    HdStRenderContextCaps const &caps = HdStRenderContextCaps::GetInstance();
+    GlfContextCaps const &caps = GlfContextCaps::GetInstance();
     HdRprimCollection const &collection = GetRprimCollection();
 
     const int

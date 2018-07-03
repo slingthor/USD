@@ -32,7 +32,7 @@
 #include "pxr/imaging/hdx/debugCodes.h"
 
 #include "pxr/imaging/hdSt/GL/glConversions.h"
-#include "pxr/imaging/hdSt/camera.h"
+#include "pxr/imaging/hd/camera.h"
 #include "pxr/imaging/hdSt/drawTarget.h"
 #include "pxr/imaging/hdSt/renderPassState.h"
 #include "pxr/imaging/garch/drawTarget.h"
@@ -190,7 +190,7 @@ HdxDrawTargetTask::_Sync(HdTaskContext* ctx)
 
         // XXX: Need to detect when camera changes and only update if
         // needed
-        const HdStCamera *camera = static_cast<const HdStCamera *>(
+        const HdCamera *camera = static_cast<const HdCamera *>(
                                   renderIndex.GetSprim(HdPrimTypeTokens->camera,
                                                        cameraId));
 
@@ -203,8 +203,8 @@ HdxDrawTargetTask::_Sync(HdTaskContext* ctx)
 
         GfVec2i const &resolution = drawTarget->GetGarchDrawTarget()->GetSize();
 
-        VtValue viewMatrixVt  = camera->Get(HdStCameraTokens->worldToViewMatrix);
-        VtValue projMatrixVt  = camera->Get(HdStCameraTokens->projectionMatrix);
+        VtValue viewMatrixVt  = camera->Get(HdCameraTokens->worldToViewMatrix);
+        VtValue projMatrixVt  = camera->Get(HdCameraTokens->projectionMatrix);
         GfMatrix4d viewMatrix = viewMatrixVt.Get<GfMatrix4d>();
 
         // XXX : If you need to change the following code that generates a 
@@ -216,7 +216,7 @@ HdxDrawTargetTask::_Sync(HdTaskContext* ctx)
             resolution[1] != 0.0 ? resolution[0] / resolution[1] : 1.0);
         projectionMatrix = projectionMatrix * yflip;
 
-        const VtValue &vClipPlanes = camera->Get(HdStCameraTokens->clipPlanes);
+        const VtValue &vClipPlanes = camera->Get(HdCameraTokens->clipPlanes);
         const HdRenderPassState::ClipPlanesVector &clipPlanes =
                         vClipPlanes.Get<HdRenderPassState::ClipPlanesVector>();
 

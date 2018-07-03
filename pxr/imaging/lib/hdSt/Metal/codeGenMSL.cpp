@@ -32,7 +32,6 @@
 
 #include "pxr/imaging/hdSt/geometricShader.h"
 #include "pxr/imaging/hdSt/package.h"
-#include "pxr/imaging/hdSt/renderContextCaps.h"
 #include "pxr/imaging/hdSt/resourceBinder.h"
 #include "pxr/imaging/hdSt/resourceRegistry.h"
 #include "pxr/imaging/hdSt/shaderCode.h"
@@ -97,21 +96,34 @@ TF_DEFINE_PRIVATE_TOKENS(
     ((_int, "int"))
     (hd_vec3)
     (hd_vec3_get)
+    (hd_vec3_set)
     (hd_ivec3)
     (hd_ivec3_get)
+    (hd_ivec3_set)
     (hd_dvec3)
     (hd_dvec3_get)
-    (inPrimVars)
+    (hd_dvec3_set)
+    (hd_mat3)
+    (hd_mat3_get)
+    (hd_mat3_set)
+    (hd_dmat3)
+    (hd_dmat3_get)
+    (hd_dmat3_set)
+    (inPrimvars)
     (ivec2)
     (ivec3)
     (ivec4)
-    (outPrimVars)
+    (outPrimvars)
     (vec2)
     (vec3)
     (vec4)
     (dvec2)
     (dvec3)
     (dvec4)
+    (mat3)
+    (mat4)
+    (dmat3)
+    (dmat4)
     ((ptexTextureSampler, "ptexTextureSampler"))
     (isamplerBuffer)
     (samplerBuffer)
@@ -279,9 +291,37 @@ _GetPackedTypeDefinitions()
     return "#define hd_ivec3 packed_int3\n"
            "#define hd_vec3 packed_float3\n"
            "#define hd_dvec3 packed_float3\n"
+           "struct hd_mat3  { float  m00, m01, m02,\n"
+           "                         m10, m11, m12,\n"
+           "                         m20, m21, m22; };\n"
+           "struct hd_dmat3 { float  m00, m01, m02,\n"
+           "                         m10, m11, m12,\n"
+           "                         m20, m21, m22; };\n"
            "#define hd_ivec3_get(v) packed_int3(v)\n"
            "#define hd_vec3_get(v)  packed_float3(v)\n"
            "#define hd_dvec3_get(v) packed_float3(v)\n"
+           "mat3  hd_mat3_get(hd_mat3 v)   { return mat3(v.m00, v.m01, v.m02,\n"
+           "                                             v.m10, v.m11, v.m12,\n"
+           "                                             v.m20, v.m21, v.m22); }\n"
+           "mat3  hd_mat3_get(mat3 v)      { return v; }\n"
+           "dmat3 hd_dmat3_get(hd_dmat3 v) { return dmat3(v.m00, v.m01, v.m02,\n"
+           "                                              v.m10, v.m11, v.m12,\n"
+           "                                              v.m20, v.m21, v.m22); }\n"
+           "dmat3 hd_dmat3_get(dmat3 v)    { return v; }\n"
+           "hd_ivec3 hd_ivec3_set(hd_ivec3 v) { return v; }\n"
+           "hd_ivec3 hd_ivec3_set(ivec3 v)    { return hd_ivec3(v.x, v.y, v.z); }\n"
+           "hd_vec3 hd_vec3_set(hd_vec3 v)    { return v; }\n"
+           "hd_vec3 hd_vec3_set(vec3 v)       { return hd_vec3(v.x, v.y, v.z); }\n"
+           "hd_dvec3 hd_dvec3_set(hd_dvec3 v) { return v; }\n"
+           "hd_dvec3 hd_dvec3_set(dvec3 v)    { return hd_dvec3(v.x, v.y, v.z); }\n"
+           "hd_mat3  hd_mat3_set(hd_mat3 v)   { return v; }\n"
+           "hd_mat3  hd_mat3_set(mat3 v)      { return hd_mat3(v[0][0], v[0][1], v[0][2],\n"
+           "                                                   v[1][0], v[1][1], v[1][2],\n"
+           "                                                   v[2][0], v[2][1], v[2][2]); }\n"
+           "hd_dmat3 hd_dmat3_set(hd_dmat3 v) { return v; }\n"
+           "hd_dmat3 hd_dmat3_set(dmat3 v)    { return hd_dmat3(v[0][0], v[0][1], v[0][2],\n"
+           "                                                    v[1][0], v[1][1], v[1][2],\n"
+           "                                                    v[2][0], v[2][1], v[2][2]); }\n"
            "int hd_int_get<st>(int v)          { return v; }\n"
            "int hd_int_get<st>(ivec2 v)        { return v[0]; }\n"
            "int hd_int_get<st>(ivec3 v)        { return v[0]; }\n"
@@ -297,6 +337,10 @@ _GetPackedType(TfToken const &token)
         return _tokens->hd_vec3;
     } else if (token == _tokens->dvec3) {
         return _tokens->hd_dvec3;
+    } else if (token == _tokens->mat3) {
+        return _tokens->hd_mat3;
+    } else if (token == _tokens->dmat3) {
+        return _tokens->hd_dmat3;
     }
     return token;
 }
@@ -310,6 +354,27 @@ _GetPackedTypeAccessor(TfToken const &token)
         return _tokens->hd_vec3_get;
     } else if (token == _tokens->dvec3) {
         return _tokens->hd_dvec3_get;
+    } else if (token == _tokens->mat3) {
+        return _tokens->hd_mat3_get;
+    } else if (token == _tokens->dmat3) {
+        return _tokens->hd_dmat3_get;
+    }
+    return token;
+}
+
+static TfToken const &
+_GetPackedTypeMutator(TfToken const &token)
+{
+    if (token == _tokens->ivec3) {
+        return _tokens->hd_ivec3_set;
+    } else if (token == _tokens->vec3) {
+        return _tokens->hd_vec3_set;
+    } else if (token == _tokens->dvec3) {
+        return _tokens->hd_dvec3_set;
+    } else if (token == _tokens->mat3) {
+        return _tokens->hd_mat3_set;
+    } else if (token == _tokens->dmat3) {
+        return _tokens->hd_dmat3_set;
     }
     return token;
 }
@@ -330,11 +395,19 @@ _GetFlatType(TfToken const &token)
     } else if (token == _tokens->vec4) {
         return _tokens->_float;
     } else if (token == _tokens->dvec2) {
-        return _tokens->_double;
+        return _tokens->_float;
     } else if (token == _tokens->dvec3) {
-        return _tokens->_double;
+        return _tokens->_float;
     } else if (token == _tokens->dvec4) {
-        return _tokens->_double;
+        return _tokens->_float;
+    } else if (token == _tokens->mat3) {
+        return _tokens->_float;
+    } else if (token == _tokens->mat4) {
+        return _tokens->_float;
+    } else if (token == _tokens->dmat3) {
+        return _tokens->_float;
+    } else if (token == _tokens->dmat4) {
+        return _tokens->_float;
     }
     return token;
 }
@@ -1274,9 +1347,9 @@ HdSt_CodeGenMSL::Compile()
     }
     
     // prep interstage plumbing function
-    _procVS  << "void ProcessPrimVars() {\n";
-    _procTCS << "void ProcessPrimVars() {\n";
-    _procTES << "void ProcessPrimVars(float u, float v, int i0, int i1, int i2, int i3) {\n";
+    _procVS  << "void ProcessPrimvars() {\n";
+    _procTCS << "void ProcessPrimvars() {\n";
+    _procTES << "void ProcessPrimvars(float u, float v, int i0, int i1, int i2, int i3) {\n";
     
     // generate drawing coord and accessors
     _GenerateDrawingCoord();
@@ -1295,7 +1368,7 @@ HdSt_CodeGenMSL::Compile()
         {
             // patch interpolation
             _procGS //<< "vec4 GetPatchCoord(int index);\n"
-            << "void ProcessPrimVars(int index) {\n"
+            << "void ProcessPrimvars(int index) {\n"
             << "   vec2 localST = GetPatchCoord(index).xy;\n";
             break;
         }
@@ -1303,7 +1376,7 @@ HdSt_CodeGenMSL::Compile()
         case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_COARSE_QUADS:
         {
             // quad interpolation
-            _procGS  << "void ProcessPrimVars(int index) {\n"
+            _procGS  << "void ProcessPrimvars(int index) {\n"
             << "   vec2 localST = vec2[](vec2(0,0), vec2(1,0), vec2(1,1), vec2(0,1))[index];\n";
             break;
         }
@@ -1312,7 +1385,7 @@ HdSt_CodeGenMSL::Compile()
         case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_REFINED_TRIANGLES:
         {
             // barycentric interpolation
-            _procGS  << "void ProcessPrimVars(int index) {\n"
+            _procGS  << "void ProcessPrimvars(int index) {\n"
             << "   vec2 localST = vec2[](vec2(1,0), vec2(0,1), vec2(0,0))[index];\n";
             break;
         }
@@ -1323,10 +1396,10 @@ HdSt_CodeGenMSL::Compile()
     }
     
     // generate primvars
-    _GenerateConstantPrimVar();
-    _GenerateInstancePrimVar();
-    _GenerateElementPrimVar();
-    _GenerateVertexPrimVar();
+    _GenerateConstantPrimvar();
+    _GenerateInstancePrimvar();
+    _GenerateElementPrimvar();
+    _GenerateVertexPrimvar();
     
     //generate shader parameters
     _GenerateShaderParameters();
@@ -1496,7 +1569,10 @@ HdSt_CodeGenMSL::CompileComputeProgram()
     // imaging system. It can also be used as API guards when
     // we need new versions of Hydra shading. 
     _genCommon << "#define HD_SHADER_API " << HD_SHADER_API << "\n";    
-    
+        
+    // a trick to tightly pack unaligned data (vec3, etc) into SSBO/UBO.
+    _genCommon << _GetPackedTypeDefinitions();
+
     std::stringstream uniforms;
     std::stringstream declarations;
     std::stringstream accessors;
@@ -1926,6 +2002,7 @@ HdSt_CodeGenMSL::_GenerateDrawingCoord()
        struct hd_drawingCoord {
            int modelCoord;          // (reserved) model parameters
            int constantCoord;       // constant primvars (per object)
+           int vertexCoord;         // vertex primvars   (per vertex)
            int elementCoord;        // element primvars  (per face/curve)
            int primitiveCoord;      // primitive ids     (per tri/quad/line)
            int fvarCoord;           // fvar primvars     (per face-vertex)
@@ -2019,6 +2096,7 @@ HdSt_CodeGenMSL::_GenerateDrawingCoord()
     _genCommon << "struct hd_drawingCoord {                       \n"
                << "  int modelCoord;                              \n"
                << "  int constantCoord;                           \n"
+               << "  int vertexCoord;                             \n"
                << "  int elementCoord;                            \n"
                << "  int primitiveCoord;                          \n"
                << "  int fvarCoord;                               \n"
@@ -2033,11 +2111,11 @@ HdSt_CodeGenMSL::_GenerateDrawingCoord()
 
     // [immediate]
     //   layout (location=x) uniform ivec4 drawingCoord0;
-    //   layout (location=y) uniform ivec3 drawingCoord1;
+    //   layout (location=y) uniform ivec4 drawingCoord1;
     //   layout (location=z) uniform int   drawingCoordI[N];
     // [indirect]
     //   layout (location=x) in ivec4 drawingCoord0
-    //   layout (location=y) in ivec3 drawingCoord1
+    //   layout (location=y) in ivec4 drawingCoord1
     //   layout (location=z) in int   drawingCoordI[N]
 
     _EmitDeclaration(_genVS, _mslVSInputParams, _metaData.drawingCoord0Binding.name, _metaData.drawingCoord0Binding.dataType, TfToken(), _metaData.drawingCoord0Binding.binding);
@@ -2133,6 +2211,7 @@ HdSt_CodeGenMSL::_GenerateDrawingCoord()
            << "  dc.primitiveCoord = drawingCoord0.w; \n"
            << "  dc.fvarCoord      = drawingCoord1.x; \n"
            << "  dc.shaderCoord    = drawingCoord1.z; \n"
+           << "  dc.vertexCoord    = drawingCoord1.w; \n"
            << "  hd_instanceIndex r = GetInstanceIndex();\n"
            << "  for(int i = 0; i < HD_INSTANCE_INDEX_WIDTH; i++)\n"
            << "    dc.instanceIndex[i]  = r.indices[i];\n";
@@ -2201,7 +2280,7 @@ HdSt_CodeGenMSL::_GenerateDrawingCoord()
 
 }
 void
-HdSt_CodeGenMSL::_GenerateConstantPrimVar()
+HdSt_CodeGenMSL::_GenerateConstantPrimvar()
 {
     /*
       // --------- constant data declaration ----------
@@ -2231,8 +2310,8 @@ HdSt_CodeGenMSL::_GenerateConstantPrimVar()
 
     std::stringstream declarations;
     std::stringstream accessors;
-    METAL_DEBUG_COMMENT(&declarations, "_GenerateConstantPrimVar()\n"); //MTL_FIXME
-    METAL_DEBUG_COMMENT(&accessors,    "_GenerateConstantPrimVar()\n"); //MTL_FIXME
+    METAL_DEBUG_COMMENT(&declarations, "_GenerateConstantPrimvar()\n"); //MTL_FIXME
+    METAL_DEBUG_COMMENT(&accessors,    "_GenerateConstantPrimvar()\n"); //MTL_FIXME
     
     TF_FOR_ALL (it, _metaData.constantData) {
         // note: _constantData has been sorted by offset in HdSt_ResourceBinder.
@@ -2282,7 +2361,7 @@ HdSt_CodeGenMSL::_GenerateConstantPrimVar()
 }
 
 void
-HdSt_CodeGenMSL::_GenerateInstancePrimVar()
+HdSt_CodeGenMSL::_GenerateInstancePrimvar()
 {
     /*
       // --------- instance data declaration ----------
@@ -2301,8 +2380,8 @@ HdSt_CodeGenMSL::_GenerateInstancePrimVar()
 
     std::stringstream declarations;
     std::stringstream accessors;
-    METAL_DEBUG_COMMENT(&declarations, "_GenerateInstancePrimVar()\n"); //MTL_FIXME
-    METAL_DEBUG_COMMENT(&accessors,    "_GenerateInstancePrimVar()\n"); //MTL_FIXME
+    METAL_DEBUG_COMMENT(&declarations, "_GenerateInstancePrimvar()\n"); //MTL_FIXME
+    METAL_DEBUG_COMMENT(&accessors,    "_GenerateInstancePrimvar()\n"); //MTL_FIXME
     
     struct LevelEntries {
         TfToken dataType;
@@ -2360,7 +2439,7 @@ HdSt_CodeGenMSL::_GenerateInstancePrimVar()
 }
 
 void
-HdSt_CodeGenMSL::_GenerateElementPrimVar()
+HdSt_CodeGenMSL::_GenerateElementPrimvar()
 {
     /*
     Accessing uniform primvar data:
@@ -2393,7 +2472,7 @@ HdSt_CodeGenMSL::_GenerateElementPrimVar()
       // --------- primitive param declaration ----------
       struct PrimitiveData { int elementID; }
       layout (std430, binding=?) buffer PrimitiveBuffer {
-          PrimtiveData primitiveData[];
+          PrimitiveData primitiveData[];
       };
 
       // --------- indirection accessors ---------
@@ -2485,8 +2564,8 @@ HdSt_CodeGenMSL::_GenerateElementPrimVar()
     std::stringstream declarations;
     std::stringstream accessors;
     
-    METAL_DEBUG_COMMENT(&declarations, "_GenerateElementPrimVar()\n"); //MTL_FIXME
-    METAL_DEBUG_COMMENT(&accessors,    "_GenerateElementPrimVar()\n"); //MTL_FIXME
+    METAL_DEBUG_COMMENT(&declarations, "_GenerateElementPrimvar()\n"); //MTL_FIXME
+    METAL_DEBUG_COMMENT(&accessors,    "_GenerateElementPrimvar()\n"); //MTL_FIXME
 
     if (_metaData.primitiveParamBinding.binding.IsValid()) {
 
@@ -2589,7 +2668,7 @@ HdSt_CodeGenMSL::_GenerateElementPrimVar()
                 default:
                 {
                     TF_CODING_ERROR("HdSt_GeometricShader::PrimitiveType %d is "
-                      "unexpected in _GenerateElementPrimVar().",
+                      "unexpected in _GenerateElementPrimvar().",
                       _geometricShader->GetPrimitiveType());
                 }
             }
@@ -2630,7 +2709,7 @@ HdSt_CodeGenMSL::_GenerateElementPrimVar()
         }
         else {
             TF_CODING_ERROR("HdSt_GeometricShader::PrimitiveType %d is "
-                  "unexpected in _GenerateElementPrimVar().",
+                  "unexpected in _GenerateElementPrimvar().",
                   _geometricShader->GetPrimitiveType());
         }
     } else {
@@ -2748,44 +2827,44 @@ HdSt_CodeGenMSL::_GenerateElementPrimVar()
 }
 
 void
-HdSt_CodeGenMSL::_GenerateVertexPrimVar()
+HdSt_CodeGenMSL::_GenerateVertexPrimvar()
 {
     /*
       // --------- vertex data declaration (VS) ----------
       layout (location = 0) in vec3 normals;
       layout (location = 1) in vec3 points;
 
-      struct PrimVars {
+      struct Primvars {
           vec3 normals;
           vec3 points;
       };
 
-      void ProcessPrimVars() {
-          outPrimVars.normals = normals;
-          outPrimVars.points = points;
+      void ProcessPrimvars() {
+          outPrimvars.normals = normals;
+          outPrimvars.points = points;
       }
 
       // --------- geometry stage plumbing -------
-      in PrimVars {
+      in Primvars {
           vec3 normals;
           vec3 points;
-      } inPrimVars[];
-      out PrimVars {
+      } inPrimvars[];
+      out Primvars {
           vec3 normals;
           vec3 points;
-      } outPrimVars;
+      } outPrimvars;
 
-      void ProcessPrimVars(int index) {
-          outPrimVars = inPrimVars[index];
+      void ProcessPrimvars(int index) {
+          outPrimvars = inPrimvars[index];
       }
 
       // --------- vertex data accessors (used in geometry/fragment shader) ---
-      in PrimVars {
+      in Primvars {
           vec3 normals;
           vec3 points;
-      } inPrimVars;
+      } inPrimvars;
       vec3 HdGet_normals(int localIndex=0) {
-          return inPrimVars.normals;
+          return inPrimvars.normals;
       }
     */
 
@@ -2794,13 +2873,13 @@ HdSt_CodeGenMSL::_GenerateVertexPrimVar()
     std::stringstream accessorsVS, accessorsTCS, accessorsTES,
         accessorsGS, accessorsFS;
     
-    METAL_DEBUG_COMMENT(&interstageStruct,"_GenerateVertexPrimVar()\n"); //MTL_FIXME
-    METAL_DEBUG_COMMENT(&vertexInputs,    "_GenerateVertexPrimVar()\n"); //MTL_FIXME
-    METAL_DEBUG_COMMENT(&accessorsVS,     "_GenerateVertexPrimVar()\n"); //MTL_FIXME
-    METAL_DEBUG_COMMENT(&accessorsFS,     "_GenerateVertexPrimVar()\n"); //MTL_FIXME
+    METAL_DEBUG_COMMENT(&interstageStruct,"_GenerateVertexPrimvar()\n"); //MTL_FIXME
+    METAL_DEBUG_COMMENT(&vertexInputs,    "_GenerateVertexPrimvar()\n"); //MTL_FIXME
+    METAL_DEBUG_COMMENT(&accessorsVS,     "_GenerateVertexPrimvar()\n"); //MTL_FIXME
+    METAL_DEBUG_COMMENT(&accessorsFS,     "_GenerateVertexPrimvar()\n"); //MTL_FIXME
     
     
-    TfToken structName("PrimVars");
+    TfToken structName("Primvars");
     interstageStruct << "struct " << structName << " {\n";
     
     // vertex varying
@@ -2827,19 +2906,19 @@ HdSt_CodeGenMSL::_GenerateVertexPrimVar()
                             name, dataType, /*arraySize=*/1, false);
 
         // interstage plumbing
-        _procVS << "  outPrimVars." << name
+        _procVS << "  outPrimvars." << name
                 << " = " << name << ";\n";
-        _procTCS << "  outPrimVars[gl_InvocationID]." << name
-                 << " = inPrimVars[gl_InvocationID]." << name << ";\n";
+        _procTCS << "  outPrimvars[gl_InvocationID]." << name
+                 << " = inPrimvars[gl_InvocationID]." << name << ";\n";
         // procTES linearly interpolate vertex/varying primvars here.
         // XXX: needs smooth interpolation for vertex primvars?
-        _procTES << "  outPrimVars." << name
-                 << " = mix(mix(inPrimVars[i3]." << name
-                 << "         , inPrimVars[i2]." << name << ", u),"
-                 << "       mix(inPrimVars[i1]." << name
-                 << "         , inPrimVars[i0]." << name << ", u), v);\n";
-        _procGS  << "  outPrimVars." << name
-                 << " = inPrimVars[index]." << name << ";\n";
+        _procTES << "  outPrimvars." << name
+                 << " = mix(mix(inPrimvars[i3]." << name
+                 << "         , inPrimvars[i2]." << name << ", u),"
+                 << "       mix(inPrimvars[i1]." << name
+                 << "         , inPrimvars[i0]." << name << ", u), v);\n";
+        _procGS  << "  outPrimvars." << name
+                 << " = inPrimvars[index]." << name << ";\n";
     }
     
     /*
@@ -2859,8 +2938,8 @@ HdSt_CodeGenMSL::_GenerateVertexPrimVar()
       };
 
       // --------- geometry stage plumbing -------
-      void ProcessPrimVars(int index) {
-          outPrimVars = inPrimVars[index];
+      void ProcessPrimvars(int index) {
+          outPrimvars = inPrimvars[index];
       }
 
       // --------- facevarying data accessors ----------
@@ -2893,16 +2972,16 @@ HdSt_CodeGenMSL::_GenerateVertexPrimVar()
                             /*arraySize=*/1, true, NULL);
 
         // interstage plumbing
-        _procVS << "  outPrimVars->" << name
+        _procVS << "  outPrimvars->" << name
                 << " = " << dataType << "(0);\n";
-        _procTCS << "  outPrimVars[gl_InvocationID]." << name
-                 << " = inPrimVars[gl_InvocationID]." << name << ";\n";
+        _procTCS << "  outPrimvars[gl_InvocationID]." << name
+                 << " = inPrimvars[gl_InvocationID]." << name << ";\n";
         // TODO: facevarying tessellation
-        _procTES << "  outPrimVars->" << name
-                 << " = mix(mix(inPrimVars[i3]." << name
-                 << "         , inPrimVars[i2]." << name << ", u),"
-                 << "       mix(inPrimVars[i1]." << name
-                 << "         , inPrimVars[i0]." << name << ", u), v);\n";
+        _procTES << "  outPrimvars->" << name
+                 << " = mix(mix(inPrimvars[i3]." << name
+                 << "         , inPrimvars[i2]." << name << ", u),"
+                 << "       mix(inPrimvars[i1]." << name
+                 << "         , inPrimvars[i0]." << name << ", u), v);\n";
 
 
         switch(_geometricShader->GetPrimitiveType())
@@ -2912,7 +2991,7 @@ HdSt_CodeGenMSL::_GenerateVertexPrimVar()
             case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_PATCHES:
             {
                 // linear interpolation within a quad.
-                _procGS << "   outPrimVars->" << name
+                _procGS << "   outPrimvars->" << name
                     << "  = mix("
                     << "mix(" << "HdGet_" << name << "(0),"
                     <<           "HdGet_" << name << "(1), localST.x),"
@@ -2925,7 +3004,7 @@ HdSt_CodeGenMSL::_GenerateVertexPrimVar()
             case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_COARSE_TRIANGLES:
             {
                 // barycentric interpolation within a triangle.
-                _procGS << "   outPrimVars->" << name
+                _procGS << "   outPrimvars->" << name
                     << "  = HdGet_" << name << "(0) * localST.x "
                     << "  + HdGet_" << name << "(1) * localST.y "
                     << "  + HdGet_" << name << "(2) * (1-localST.x-localST.y);\n";                
@@ -2952,30 +3031,30 @@ HdSt_CodeGenMSL::_GenerateVertexPrimVar()
 
     _genVS << vertexInputs.str()
            << interstageStruct.str()
-           << " outPrimVars;\n"
+           << " outPrimvars;\n"
            << accessorsVS.str();
 
     _genTCS << interstageStruct.str()
-            << " inPrimVars[gl_MaxPatchVertices];\n"
+            << " inPrimvars[gl_MaxPatchVertices];\n"
             << interstageStruct.str()
-            << " outPrimVars[HD_NUM_PATCH_VERTS];\n"
+            << " outPrimvars[HD_NUM_PATCH_VERTS];\n"
             << accessorsTCS.str();
 
     _genTES << interstageStruct.str()
-            << " inPrimVars[gl_MaxPatchVertices];\n"
+            << " inPrimvars[gl_MaxPatchVertices];\n"
             << interstageStruct.str()
-            << " outPrimVars;\n"
+            << " outPrimvars;\n"
             << accessorsTES.str();
 
     _genGS << fvarDeclarations.str()
            << interstageStruct.str()
-           << " inPrimVars[HD_NUM_PRIMITIVE_VERTS];\n"
+           << " inPrimvars[HD_NUM_PRIMITIVE_VERTS];\n"
            << interstageStruct.str()
-           << " outPrimVars;\n"
+           << " outPrimvars;\n"
            << accessorsGS.str();
 
     _genFS << interstageStruct.str()
-           << " inPrimVars;\n"
+           << " inPrimvars;\n"
            << accessorsFS.str();
 
     // ---------
@@ -3026,12 +3105,12 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
 
       * bindless 2D texture
       <type> HdGet_<name>(int localIndex=0) {
-          return texture(sampler2D(shaderData[GetDrawingCoord().shaderCoord].<name>), <inPrimVars>).xxx;
+          return texture(sampler2D(shaderData[GetDrawingCoord().shaderCoord].<name>), <inPrimvars>).xxx;
       }
 
       * non-bindless 2D texture
       <type> HdGet_<name>(int localIndex=0) {
-          return texture(samplers_2d[<offset> + drawIndex * <stride>], <inPrimVars>).xxx;
+          return texture(samplers_2d[<offset> + drawIndex * <stride>], <inPrimvars>).xxx;
       }
 
       * bindless Ptex texture
@@ -3138,11 +3217,11 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
                 << "  int shaderCoord = GetDrawingCoord().shaderCoord; \n"
                 << "  return texture(sampler2D(shaderData[shaderCoord]." << it->second.name << "), ";
 
-            if (!it->second.inPrimVars.empty()) {
+            if (!it->second.inPrimvars.empty()) {
                 accessors 
                     << "\n"
-                    << "#if defined(HD_HAS_" << it->second.inPrimVars[0] << ")\n"
-                    << " HdGet_" << it->second.inPrimVars[0] << "().xy\n"
+                    << "#if defined(HD_HAS_" << it->second.inPrimvars[0] << ")\n"
+                    << " HdGet_" << it->second.inPrimvars[0] << "().xy\n"
                     << "#else\n"
                     << "vec2(0.0, 0.0)\n"
                     << "#endif\n";
@@ -3177,11 +3256,11 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
                 << it->second.dataType
                 << " HdGet_" << it->second.name
                 << "() { return HdGet_" << it->second.name << "(";
-            if (!it->second.inPrimVars.empty()) {
+            if (!it->second.inPrimvars.empty()) {
                 accessors
                     << "\n"
-                    << "#if defined(HD_HAS_" << it->second.inPrimVars[0] << ")\n"
-                    << "HdGet_" << it->second.inPrimVars[0] << "().xy\n"
+                    << "#if defined(HD_HAS_" << it->second.inPrimvars[0] << ")\n"
+                    << "HdGet_" << it->second.inPrimvars[0] << "().xy\n"
                     << "#else\n"
                     << "vec2(0.0, 0.0)\n"
                     << "#endif\n";
@@ -3251,12 +3330,12 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
             // If this shader and it's connected primvar have the same name, we
             // are good to go, else we must alias the parameter to the primvar
             // accessor.
-            if (it->second.name != it->second.inPrimVars[0]) {
+            if (it->second.name != it->second.inPrimvars[0]) {
                 accessors
                     << it->second.dataType
                     << " HdGet_" << it->second.name << "() {\n"
-                    << "#if defined(HD_HAS_" << it->second.inPrimVars[0] << ")\n"
-                    << "  return HdGet_" << it->second.inPrimVars[0] << "();\n"
+                    << "#if defined(HD_HAS_" << it->second.inPrimvars[0] << ")\n"
+                    << "  return HdGet_" << it->second.inPrimvars[0] << "();\n"
                     << "#else\n"
                     << "  return " << it->second.dataType << "(0);\n"
                     << "#endif\n"
