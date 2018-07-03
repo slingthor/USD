@@ -149,8 +149,8 @@ GlfContextCaps::_LoadCaps()
         maxTextureBufferSize         = 16*1024;
         uniformBufferOffsetAlignment = 16;  //This limit isn't an actual thing for Metal. 16 is equal to the alignment rules of std140, which is convenient, nothing more.
 #if OPENSUBDIV_HAS_METAL_COMPUTE
-        // This matches GL behaviour although gpuCompute will always be present on Metal
-        gpuComputeEnabled            = true;
+        //METAL_TODO: Metal always has compute capabilities but this is set to false for as the compute path doesn't work yet.
+        gpuComputeEnabled            = false; /*true*/
 #endif
         return;
     }
