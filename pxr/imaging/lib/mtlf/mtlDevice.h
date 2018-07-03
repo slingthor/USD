@@ -42,6 +42,9 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+// Not a stric size but more how man copies of the uniforms to keep
+#define METAL_OLD_STYLE_UNIFORM_BUFFER_SIZE 5000
+
 class MtlfDrawTarget;
 typedef boost::shared_ptr<class MtlfMetalContext> MtlfMetalContextSharedPtr;
 
@@ -104,7 +107,7 @@ public:
     void SetUniform(const void* _data, uint32 _dataSize, const TfToken& _name, uint32 index, MSL_ProgramStage stage);
     
     MTLF_API
-    void SetUniformBuffer(int index, id<MTLBuffer> buffer, const TfToken& name, MSL_ProgramStage stage, int offset = 0, bool oldStyleBacker = false);
+    void SetUniformBuffer(int index, id<MTLBuffer> buffer, const TfToken& name, MSL_ProgramStage stage, int offset = 0, int oldStyleUniformSize = 0);
     
     MTLF_API
     void SetBuffer(int index, id<MTLBuffer> buffer, const TfToken& name);	//Implementation binds this as a vertex buffer!
@@ -174,8 +177,14 @@ protected:
     };
     std::vector<OldStyleUniformData> oldStyleUniforms;
     id<MTLBuffer> vtxUniformBackingBuffer;
+    uint32 vtxUniformBackingBufferOffset;
+    uint32 vtxUniformBackingBufferBlockSize;
+    uint32 vtxUniformBackingBufferBindingIndex;
     id<MTLBuffer> fragUniformBackingBuffer;
-
+    uint32 fragUniformBackingBufferOffset;
+    uint32 fragUniformBackingBufferBlockSize;
+    uint32 fragUniformBackingBufferBindingIndex;
+    
     struct VertexBufferBinding { int idx; id<MTLBuffer> buffer; TfToken name; };
     std::vector<VertexBufferBinding> vertexBuffers;
     struct UniformBufferBinding { int idx; id<MTLBuffer> buffer; TfToken name; MSL_ProgramStage stage; int offset; };

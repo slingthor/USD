@@ -487,23 +487,35 @@ void MtlfMetalContext::SetUniform(const void* _data, uint32 _dataSize, const TfT
     dirtyState |= DIRTY_METAL_STATE_OLD_STYLE_UNIFORM;
 }
 
-void MtlfMetalContext::SetUniformBuffer(int index, id<MTLBuffer> buffer, const TfToken& name, MSL_ProgramStage stage, int offset, bool oldStyleBacker)
+void MtlfMetalContext::SetUniformBuffer(int index, id<MTLBuffer> buffer, const TfToken& name, MSL_ProgramStage stage, int offset, int oldStyleUniformSize)
 {
     if(stage == 0)
         TF_FATAL_CODING_ERROR("Not allowed!");
         
     uniformBuffers.push_back({index, buffer, name, stage, offset});
     
-    if(oldStyleBacker)
+    if(oldStyleUniformSize)
     {
         if(stage == kMSL_ProgramStage_Vertex) {
-            vtxUniformBackingBuffer = buffer;
-            dirtyState |= DIRTY_METAL_STATE_VERTEX_UNIFORM_BUFFER;
+            vtxUniformBackingBuffer             = buffer;
+            vtxUniformBackingBufferOffset       = 0;
+            vtxUniformBackingBufferBlockSize    = oldStyleUniformSize;
+            vtxUniformBackingBufferBindingIndex = index;
+            
         }
         else if(stage == kMSL_ProgramStage_Fragment) {
-            fragUniformBackingBuffer = buffer;
-            dirtyState |= DIRTY_METAL_STATE_FRAGMENT_UNIFORM_BUFFER;
+            fragUniformBackingBuffer             = buffer;
+            fragUniformBackingBufferOffset       = 0;
+            fragUniformBackingBufferBlockSize    = oldStyleUniformSize;
+            fragUniformBackingBufferBindingIndex = index;
         }
+    }
+    
+    if(stage == kMSL_ProgramStage_Vertex) {
+        dirtyState |= DIRTY_METAL_STATE_VERTEX_UNIFORM_BUFFER;
+    }
+    if(stage == kMSL_ProgramStage_Fragment) {
+        dirtyState |= DIRTY_METAL_STATE_FRAGMENT_UNIFORM_BUFFER;
     }
 }
 
@@ -722,8 +734,8 @@ void MtlfMetalContext::BakeState()
     if (dirtyState & DIRTY_METAL_STATE_OLD_STYLE_UNIFORM) {
         uint32 vertexStart   = UINT32_MAX, vertexEnd   = 0;
         uint32 fragmentStart = UINT32_MAX, fragmentEnd = 0;
-        uint8* vtxData  = (uint8*)(vtxUniformBackingBuffer.contents);
-        uint8* fragdata = (uint8*)(fragUniformBackingBuffer.contents);
+        uint8* vtxData  = (uint8*)(vtxUniformBackingBuffer.contents)  + vtxUniformBackingBufferOffset;
+        uint8* fragdata = (uint8*)(fragUniformBackingBuffer.contents) + fragUniformBackingBufferOffset;
         
         for(auto uniform : oldStyleUniforms)
         {
@@ -756,10 +768,26 @@ void MtlfMetalContext::BakeState()
 #endif
         }
         if (vertexStart != UINT_MAX) {
-            [vtxUniformBackingBuffer  didModifyRange:NSMakeRange(vertexStart,   vertexEnd   - vertexStart)];
+            vertexStart += vtxUniformBackingBufferOffset;
+            vertexEnd   += vtxUniformBackingBufferOffset;
+            [vtxUniformBackingBuffer  didModifyRange:NSMakeRange(vertexStart, vertexEnd - vertexStart)];
+            [renderEncoder setVertexBuffer:vtxUniformBackingBuffer offset:vertexStart atIndex:vtxUniformBackingBufferBindingIndex];
+             vtxUniformBackingBufferOffset += vtxUniformBackingBufferBlockSize;
+            if (vtxUniformBackingBufferOffset > vtxUniformBackingBuffer.allocatedSize) {
+                NSLog(@"Old style uniform buffer wrapped - expect strangeness"); // MTL_FIXME
+                vtxUniformBackingBufferOffset = 0;
+            }
         }
         if (fragmentStart != UINT_MAX) {
+            fragmentStart += fragUniformBackingBufferOffset;
+            fragmentEnd   += fragUniformBackingBufferOffset;
             [fragUniformBackingBuffer didModifyRange:NSMakeRange(fragmentStart, fragmentEnd - fragmentStart)];
+            [renderEncoder setFragmentBuffer:fragUniformBackingBuffer offset:fragmentStart atIndex:fragUniformBackingBufferBindingIndex];
+            fragUniformBackingBufferOffset += fragUniformBackingBufferBlockSize;
+            if (fragUniformBackingBufferOffset > fragUniformBackingBuffer.allocatedSize) {
+                NSLog(@"Old style uniform buffer wrapped - expect strangeness"); // MTL_FIXME
+                fragUniformBackingBufferOffset = 0;
+            }
         }
 
 #if METAL_STATE_OPTIMISATION
@@ -770,14 +798,20 @@ void MtlfMetalContext::BakeState()
     if (dirtyState & (DIRTY_METAL_STATE_VERTEX_UNIFORM_BUFFER | DIRTY_METAL_STATE_FRAGMENT_UNIFORM_BUFFER)) {
         for(auto buffer : uniformBuffers)
         {
-            if(buffer.stage == kMSL_ProgramStage_Vertex)
-            [renderEncoder setVertexBuffer:buffer.buffer offset:buffer.offset atIndex:buffer.idx];
-            else if(buffer.stage == kMSL_ProgramStage_Fragment)
-            [renderEncoder setFragmentBuffer:buffer.buffer offset:buffer.offset atIndex:buffer.idx];
-            else
-            TF_FATAL_CODING_ERROR("Not implemented!"); //Compute case
+             if(buffer.stage == kMSL_ProgramStage_Vertex){
+                [renderEncoder setVertexBuffer:buffer.buffer offset:buffer.offset atIndex:buffer.idx];
+            }
+            else if(buffer.stage == kMSL_ProgramStage_Fragment) {
+                [renderEncoder setFragmentBuffer:buffer.buffer offset:buffer.offset atIndex:buffer.idx];
+            }
+            else{
+                TF_FATAL_CODING_ERROR("Not implemented!"); //Compute case
+            }
         }
         dirtyState &= ~(DIRTY_METAL_STATE_VERTEX_UNIFORM_BUFFER | DIRTY_METAL_STATE_FRAGMENT_UNIFORM_BUFFER);
+#if METAL_STATE_OPTIMISATION
+        uniformBuffers.clear();
+#endif
     }
 
     if (dirtyState & DIRTY_METAL_STATE_VERTEX_BUFFER) {
@@ -822,9 +856,13 @@ void MtlfMetalContext::ClearState()
     for(auto it = oldStyleUniforms.begin(); it != oldStyleUniforms.end(); ++it)
         it->release();
     oldStyleUniforms.clear();
-    vtxUniformBackingBuffer = 0;
-    fragUniformBackingBuffer = 0;
-
+    vtxUniformBackingBuffer              = 0;
+    vtxUniformBackingBufferOffset        = 0;
+    vtxUniformBackingBufferBindingIndex  = -1;
+    fragUniformBackingBuffer             = 0;
+    fragUniformBackingBufferOffset       = 0;
+    fragUniformBackingBufferBindingIndex = -1;
+    
     vertexBuffers.clear();
     uniformBuffers.clear();
     textures.clear();

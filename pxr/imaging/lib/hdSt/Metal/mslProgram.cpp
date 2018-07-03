@@ -391,16 +391,18 @@ void HdStMSLProgram::SetProgram() const {
         {
             //Add new default buffer for the default inputs
             MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
-            id<MTLBuffer> mtlBuffer = [context->device newBufferWithLength:it->_uniformBufferSize options:MTLResourceStorageModeManaged];
+            // Because we want to be able to store multiple copies of the uniforms within the buffer we need to multiply the size
+            id<MTLBuffer> mtlBuffer = [context->device newBufferWithLength:(it->_uniformBufferSize * METAL_OLD_STYLE_UNIFORM_BUFFER_SIZE) options:MTLResourceStorageModeManaged];
             
-            MtlfMetalContext::GetMetalContext()->SetUniformBuffer(it->_index, mtlBuffer, TfToken(it->_name), kMSL_ProgramStage_Fragment, 0 /*offset*/, true);
+            MtlfMetalContext::GetMetalContext()->SetUniformBuffer(it->_index, mtlBuffer, TfToken(it->_name), kMSL_ProgramStage_Fragment, 0 /*offset*/, it->_uniformBufferSize);
         }
         if(it->_name == "vtxUniforms" && it->_stage == kMSL_ProgramStage_Vertex && it->_type == kMSL_BindingType_UniformBuffer)
         {
             MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
-            id<MTLBuffer> mtlBuffer = [context->device newBufferWithLength:it->_uniformBufferSize options:MTLResourceStorageModeManaged];
+            // Because we want to be able to store multiple copies of the uniforms within the buffer we need to multiply the size
+            id<MTLBuffer> mtlBuffer = [context->device newBufferWithLength:(it->_uniformBufferSize * METAL_OLD_STYLE_UNIFORM_BUFFER_SIZE) options:MTLResourceStorageModeManaged];
             
-            MtlfMetalContext::GetMetalContext()->SetUniformBuffer(it->_index, mtlBuffer, TfToken(it->_name), kMSL_ProgramStage_Vertex, 0 /*offset*/, true);
+            MtlfMetalContext::GetMetalContext()->SetUniformBuffer(it->_index, mtlBuffer, TfToken(it->_name), kMSL_ProgramStage_Vertex, 0 /*offset*/, it->_uniformBufferSize);
         }
     }
 }
