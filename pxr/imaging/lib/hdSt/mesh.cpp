@@ -523,7 +523,7 @@ HdStMesh::_PopulateVertexPrimVars(HdSceneDelegate *sceneDelegate,
     int refineLevel = _topology ? _topology->GetRefineLevel() : 0;
 
     bool cpuSmoothNormals =
-        (!HdStRenderContextCaps::GetInstance().gpuComputeEnabled);
+        (!HdStRenderContextCaps::GetInstance().gpuComputeNormals);
 
     // Don't call _GetRefineLevelForDesc(desc) instead of GetRefineLevel(). Why?
     //
@@ -1389,7 +1389,7 @@ HdStMesh::_PropagateDirtyBits(HdDirtyBits bits) const
     // so mark Points as dirty, so that the scene delegate will provide
     // the data.
     if ((bits & DirtySmoothNormals) &&
-        (!HdStRenderContextCaps::GetInstance().gpuComputeEnabled)) {
+        (!HdStRenderContextCaps::GetInstance().gpuComputeNormals)) {
         bits |= HdChangeTracker::DirtyPoints;
     }
 

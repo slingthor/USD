@@ -90,6 +90,7 @@ public:
 
     // GPU compute
     bool gpuComputeEnabled;           // GPU subdivision, smooth normals  (4.3)
+	bool gpuComputeNormals;
 
     /// Returns whether to do frustum culling on the GPU
     bool IsEnabledGPUFrustumCulling() const;
