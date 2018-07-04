@@ -84,6 +84,9 @@ public:
     }
     
     MTLF_API
+    id<MTLBuffer> GetQuadIndexBuffer(MTLIndexType indexTypeMetal);
+     
+    MTLF_API
     id<MTLCommandBuffer> CreateCommandBuffer();
     
     MTLF_API
@@ -173,6 +176,8 @@ protected:
 	struct SamplerBinding { int idx; id<MTLSamplerState> sampler; TfToken name; MSL_ProgramStage stage; };
     std::vector<SamplerBinding> samplers;
     id<MTLBuffer> indexBuffer;
+    id<MTLBuffer> remappedQuadIndexBuffer;
+    id<MTLBuffer> remappedQuadIndexBufferSource;
     
     MtlfDrawTarget *drawTarget;
 

@@ -30,6 +30,7 @@
 
 #import <simd/simd.h>
 
+#define METAL_TESSELLATION_SUPPORT 0
 #define METAL_STATE_OPTIMISATION 1
 
 #define DIRTY_METAL_STATE_OLD_STYLE_UNIFORM        0x001
@@ -373,6 +374,7 @@ MtlfMetalContext::MtlfMetalContext()
     pipelineStateDescriptor = nil;
     vertexDescriptor = nil;
     indexBuffer = nil;
+    remappedQuadIndexBuffer = nil;
     numVertexComponents = 0;
 }
 
@@ -397,6 +399,45 @@ MtlfMetalContext::IsInitialized()
         context = MtlfMetalContextSharedPtr(new MtlfMetalContext());
 
     return context->device != nil;
+}
+
+id<MTLBuffer>
+MtlfMetalContext::GetQuadIndexBuffer(MTLIndexType indexTypeMetal) {
+    // Each 4 vertices will require 6 remapped one
+    uint32 remappedIndexBufferSize = (indexBuffer.length / 4) * 6;
+    
+    // Since remapping is expensive check if the buffer we created this from originally has changed  - MTL_FIXME - these checks are not robust
+    if (remappedQuadIndexBuffer) {
+        if ((remappedQuadIndexBufferSource != indexBuffer) ||
+            (remappedQuadIndexBuffer.length != remappedIndexBufferSize)) {
+            NSLog(@"Recreating quad remapped index buffer");
+            remappedQuadIndexBuffer = nil;
+        }
+    }
+    // Remap the quad indices into two sets of triangle indices
+    if (!remappedQuadIndexBuffer) {
+        if (indexTypeMetal != MTLIndexTypeUInt32) {
+            TF_FATAL_CODING_ERROR("Only 32 bit indices currently supported for quads");
+        }
+
+        remappedQuadIndexBufferSource = indexBuffer;
+        remappedQuadIndexBuffer = [device newBufferWithLength:remappedIndexBufferSize  options:MTLResourceStorageModeManaged];
+        
+        uint32 *srcData =  (uint32 *)indexBuffer.contents;
+        uint32 *destData = (uint32 *)remappedQuadIndexBuffer.contents;
+        for (int i= 0; i < (indexBuffer.length / 4) ; i+=4)
+        {
+            destData[0] = srcData[0];
+            destData[1] = srcData[1];
+            destData[2] = srcData[2];
+            destData[3] = srcData[0];
+            destData[4] = srcData[2];
+            destData[5] = srcData[3];
+            srcData  += 4;
+            destData += 6;
+        }
+    }
+    return remappedQuadIndexBuffer;
 }
 
 void MtlfMetalContext::CheckNewStateGather()
@@ -575,6 +616,7 @@ void MtlfMetalContext::SetBuffer(int index, id<MTLBuffer> buffer, const TfToken&
 void MtlfMetalContext::SetIndexBuffer(id<MTLBuffer> buffer)
 {
     indexBuffer = buffer;
+    remappedQuadIndexBuffer = nil;
     dirtyState |= DIRTY_METAL_STATE_INDEX_BUFFER;
 }
 
@@ -639,6 +681,9 @@ size_t MtlfMetalContext::HashPipeLineDescriptor()
     boost::hash_combine(hashVal, pipelineStateDescriptor.rasterizationEnabled);
     boost::hash_combine(hashVal, pipelineStateDescriptor.depthAttachmentPixelFormat);
     boost::hash_combine(hashVal, pipelineStateDescriptor.stencilAttachmentPixelFormat);
+#if METAL_TESSELLATION_SUPPORT
+    // Add here...
+#endif
     boost::hash_combine(hashVal, currentVertexDescriptorHash);
     boost::hash_combine(hashVal, currentColourAttachmentsHash);
     return hashVal;
@@ -656,6 +701,16 @@ void MtlfMetalContext::SetPipelineState()
     pipelineStateDescriptor.sampleCount = 1;
     pipelineStateDescriptor.inputPrimitiveTopology = MTLPrimitiveTopologyClassUnspecified;
 
+#if METAL_TESSELLATION_SUPPORT
+    pipelineStateDescriptor.maxTessellationFactor             = 1;
+    pipelineStateDescriptor.tessellationFactorScaleEnabled    = NO;
+    pipelineStateDescriptor.tessellationFactorFormat          = MTLTessellationFactorFormatHalf;
+    pipelineStateDescriptor.tessellationControlPointIndexType = MTLTessellationControlPointIndexTypeNone;
+    pipelineStateDescriptor.tessellationFactorStepFunction    = MTLTessellationFactorStepFunctionConstant;
+    pipelineStateDescriptor.tessellationOutputWindingOrder    = MTLWindingClockwise;
+    pipelineStateDescriptor.tessellationPartitionMode         = MTLTessellationPartitionModePow2;
+#endif
+    
     if (dirtyState & DIRTY_METAL_STATE_VERTEX_DESCRIPTOR || pipelineStateDescriptor.vertexDescriptor == NULL) {
         // This assignment can be expensive as the vertexdescriptor will be copied (due to interface property)
         pipelineStateDescriptor.vertexDescriptor = vertexDescriptor;
@@ -763,7 +818,7 @@ void MtlfMetalContext::BakeState()
         [vtxUniformBackingBuffer.buffer  didModifyRange:NSMakeRange(vtxUniformBackingBuffer.currentOffset, vtxUniformBackingBuffer.blockSize)];
         [renderEncoder setVertexBuffer:vtxUniformBackingBuffer.buffer offset:vtxUniformBackingBuffer.currentOffset atIndex:vtxUniformBackingBuffer.bindingIndex];
         vtxUniformBackingBuffer.currentOffset += vtxUniformBackingBuffer.blockSize;
-        if (vtxUniformBackingBuffer.currentOffset > vtxUniformBackingBuffer.buffer.allocatedSize) {
+        if (vtxUniformBackingBuffer.currentOffset > vtxUniformBackingBuffer.buffer.length) {
             NSLog(@"Old style uniform buffer wrapped - expect strangeness"); // MTL_FIXME
             vtxUniformBackingBuffer.currentOffset  = 0;
         }
@@ -772,7 +827,7 @@ void MtlfMetalContext::BakeState()
         [fragUniformBackingBuffer.buffer  didModifyRange:NSMakeRange(fragUniformBackingBuffer.currentOffset, fragUniformBackingBuffer.blockSize)];
         [renderEncoder setFragmentBuffer:fragUniformBackingBuffer.buffer offset:fragUniformBackingBuffer.currentOffset atIndex:fragUniformBackingBuffer.bindingIndex];
         fragUniformBackingBuffer.currentOffset += fragUniformBackingBuffer.blockSize;
-        if (fragUniformBackingBuffer.currentOffset > fragUniformBackingBuffer.buffer.allocatedSize) {
+        if (fragUniformBackingBuffer.currentOffset > fragUniformBackingBuffer.buffer.length) {
             NSLog(@"Old style uniform buffer wrapped - expect strangeness"); // MTL_FIXME
             fragUniformBackingBuffer.currentOffset  = 0;
         }
