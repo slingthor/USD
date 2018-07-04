@@ -155,35 +155,14 @@ protected:
     uint32_t numVertexComponents;
     uint32_t numColourAttachments;
 
-    struct OldStyleUniformData
-    {
-        void alloc(const void* _data, uint32 _size)
-        {
-            dataSize = _size;
-            data = malloc(dataSize);
-            memcpy(data, _data, dataSize);
-        }
-        void release()
-        {
-            free(data);
-            data = 0;
-        }
-        
-        uint32           index;
-        void*            data;
-        uint32           dataSize;
-        TfToken          name;
-        MSL_ProgramStage stage;
+    struct OldStyleUniformBuffer {
+        id<MTLBuffer> buffer;
+        uint32        currentOffset;
+        uint32        blockSize;
+        uint32        bindingIndex;
     };
-    std::vector<OldStyleUniformData> oldStyleUniforms;
-    id<MTLBuffer> vtxUniformBackingBuffer;
-    uint32 vtxUniformBackingBufferOffset;
-    uint32 vtxUniformBackingBufferBlockSize;
-    uint32 vtxUniformBackingBufferBindingIndex;
-    id<MTLBuffer> fragUniformBackingBuffer;
-    uint32 fragUniformBackingBufferOffset;
-    uint32 fragUniformBackingBufferBlockSize;
-    uint32 fragUniformBackingBufferBindingIndex;
+    OldStyleUniformBuffer vtxUniformBackingBuffer;
+    OldStyleUniformBuffer fragUniformBackingBuffer;
     
     struct VertexBufferBinding { int idx; id<MTLBuffer> buffer; TfToken name; };
     std::vector<VertexBufferBinding> vertexBuffers;
