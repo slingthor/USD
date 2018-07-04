@@ -160,7 +160,9 @@ vec3 GetShadingNormal(vec3 N, bool isFlipped)
 {
     // note that negative scaling isn't taken into account in gl_FrontFacing
     // so we have to consider isFlipped here too.
-    return (isFlipped != gl_FrontFacing) ? N : -N;
+	
+	//METAL_TODO: This condition "==" is a hack and should be "!=". Temporary code until a proper fix is found!
+    return (isFlipped == gl_FrontFacing) ? N : -N;
 }
 
 bool ShouldCullFaceAccordingToShading(bool frontFacing, bool isFlipped)
