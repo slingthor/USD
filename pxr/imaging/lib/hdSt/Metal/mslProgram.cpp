@@ -53,13 +53,14 @@ static MTLPrimitiveType GetMetalPrimType(GLenum glPrimType) {
             primType = MTLPrimitiveTypeLineStrip;
             break;
         case GL_LINES:
-        case GL_LINES_ADJACENCY:
             primType = MTLPrimitiveTypeLine;
             break;
         case GL_TRIANGLE_STRIP:
             primType = MTLPrimitiveTypeTriangleStrip;
             break;
         case GL_TRIANGLES:
+        // See comment in the draw function as to why we do this
+        case GL_LINES_ADJACENCY:
             primType = MTLPrimitiveTypeTriangle;
             break;
         case GL_LINE_STRIP_ADJACENCY:
@@ -439,8 +440,21 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
     }
 
     MTLPrimitiveType primType = GetMetalPrimType(primitiveMode);
-
-    [context->renderEncoder drawIndexedPrimitives:primType indexCount:indexCount indexType:indexTypeMetal indexBuffer:context->GetIndexBuffer() indexBufferOffset:(firstIndex * indexSize) instanceCount:instanceCount baseVertex:baseVertex baseInstance:0];
+    
+    /*
+     Currently quads get mapped to GL_LINES_ADJACENCY - presumably this is a bit of a hack as GL_QUADS aren't supported by OpenGL > 3.x and it's been
+     done because they share the same number of vertices per prim (4). This doesn't appear to be a problem for OpenGL as the OpenGL subdiv doesn't genereate
+     PRIM_MESH_COARSE/REFINED_QUADS (at least for the content we've currently seen) but Metal *does* so we need a way of drawing quads. We currently do this by
+     remapping the index buffer and mapping GL_LINES_ADJACENCY to MTLPrimitiveTypeTriangle.
+     */
+    bool bDrawingQuads = (primitiveMode == GL_LINES_ADJACENCY);
+    
+    if (bDrawingQuads) {
+        [context->renderEncoder drawIndexedPrimitives:primType indexCount:((indexCount/4)*6) indexType:indexTypeMetal indexBuffer:context->GetQuadIndexBuffer(indexTypeMetal) indexBufferOffset:(((firstIndex/4)*6) * indexSize) instanceCount:instanceCount baseVertex:baseVertex baseInstance:0];
+    }
+    else  {
+        [context->renderEncoder drawIndexedPrimitives:primType indexCount:indexCount indexType:indexTypeMetal indexBuffer:context->GetIndexBuffer() indexBufferOffset:(firstIndex * indexSize) instanceCount:instanceCount baseVertex:baseVertex baseInstance:0];
+    }
 }
 
 void HdStMSLProgram::DrawArraysInstanced(GLenum primitiveMode,
