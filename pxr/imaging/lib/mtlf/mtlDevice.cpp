@@ -436,6 +436,7 @@ MtlfMetalContext::GetQuadIndexBuffer(MTLIndexType indexTypeMetal) {
             srcData  += 4;
             destData += 6;
         }
+        [remappedQuadIndexBuffer didModifyRange:(NSMakeRange(0, remappedQuadIndexBuffer.length))];
     }
     return remappedQuadIndexBuffer;
 }
@@ -616,7 +617,6 @@ void MtlfMetalContext::SetBuffer(int index, id<MTLBuffer> buffer, const TfToken&
 void MtlfMetalContext::SetIndexBuffer(id<MTLBuffer> buffer)
 {
     indexBuffer = buffer;
-    remappedQuadIndexBuffer = nil;
     dirtyState |= DIRTY_METAL_STATE_INDEX_BUFFER;
 }
 
