@@ -458,6 +458,7 @@ id<MTLCommandBuffer> MtlfMetalContext::CreateCommandBuffer() {
 
 id<MTLRenderCommandEncoder> MtlfMetalContext::CreateRenderEncoder(MTLRenderPassDescriptor *renderPassDescriptor) {
     renderEncoder = [commandBuffer renderCommandEncoderWithDescriptor:renderPassDescriptor];
+    [renderEncoder setFrontFacingWinding:MTLWindingCounterClockwise];
     currentPipelineState = NULL;
     dirtyState           = DIRTY_METAL_STATE_ALL;
     return renderEncoder;
@@ -707,7 +708,7 @@ void MtlfMetalContext::SetPipelineState()
     pipelineStateDescriptor.tessellationFactorFormat          = MTLTessellationFactorFormatHalf;
     pipelineStateDescriptor.tessellationControlPointIndexType = MTLTessellationControlPointIndexTypeNone;
     pipelineStateDescriptor.tessellationFactorStepFunction    = MTLTessellationFactorStepFunctionConstant;
-    pipelineStateDescriptor.tessellationOutputWindingOrder    = MTLWindingClockwise;
+    pipelineStateDescriptor.tessellationOutputWindingOrder    = MTLWindingCounterClockwise;
     pipelineStateDescriptor.tessellationPartitionMode         = MTLTessellationPartitionModePow2;
 #endif
     
