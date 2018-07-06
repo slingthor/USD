@@ -724,13 +724,13 @@ UsdImagingMetalHdEngine::Render(RenderParams params)
     depthAttachment.texture = context->mtlDepthTexture;
 
 
-    // Create a new command buffer for each render pass to the current drawable
-    id <MTLCommandBuffer> commandBuffer = context->CreateCommandBuffer();
-    commandBuffer.label = @"HdEngine CommandBuffer";
-
     // Create a render command encoder so we can render into something
     TF_VERIFY(context->commandBuffer == nil, "Render: A command buffer is already active");
 
+    // Create a new command buffer for each render pass to the current drawable
+    id <MTLCommandBuffer> commandBuffer = context->CreateCommandBuffer();
+    commandBuffer.label = @"HdEngine CommandBuffer";
+ 
     id <MTLRenderCommandEncoder> renderEncoder = context->CreateRenderEncoder(_mtlRenderPassDescriptor);
 
     VtValue selectionValue(_selTracker);
