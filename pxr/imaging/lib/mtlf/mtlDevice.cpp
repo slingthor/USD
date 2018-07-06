@@ -30,17 +30,19 @@
 
 #import <simd/simd.h>
 
+#define METAL_TESSELLATION_SUPPORT 0
 #define METAL_STATE_OPTIMISATION 1
 
-#define DIRTY_METAL_STATE_OLD_STYLE_UNIFORM        0x001
-#define DIRTY_METAL_STATE_VERTEX_UNIFORM_BUFFER    0x002
-#define DIRTY_METAL_STATE_FRAGMENT_UNIFORM_BUFFER  0x004
-#define DIRTY_METAL_STATE_INDEX_BUFFER             0x008
-#define DIRTY_METAL_STATE_VERTEX_BUFFER            0x010
-#define DIRTY_METAL_STATE_SAMPLER                  0x020
-#define DIRTY_METAL_STATE_TEXTURE                  0x040
-#define DIRTY_METAL_STATE_DRAW_TARGET              0x080
-#define DIRTY_METAL_STATE_VERTEX_DESCRIPTOR        0x100
+#define DIRTY_METAL_STATE_OLD_STYLE_VERTEX_UNIFORM   0x001
+#define DIRTY_METAL_STATE_OLD_STYLE_FRAGMENT_UNIFORM 0x002
+#define DIRTY_METAL_STATE_VERTEX_UNIFORM_BUFFER      0x004
+#define DIRTY_METAL_STATE_FRAGMENT_UNIFORM_BUFFER    0x008
+#define DIRTY_METAL_STATE_INDEX_BUFFER               0x010
+#define DIRTY_METAL_STATE_VERTEX_BUFFER              0x020
+#define DIRTY_METAL_STATE_SAMPLER                    0x040
+#define DIRTY_METAL_STATE_TEXTURE                    0x080
+#define DIRTY_METAL_STATE_DRAW_TARGET                0x100
+#define DIRTY_METAL_STATE_VERTEX_DESCRIPTOR          0x200
 
 #define DIRTY_METAL_STATE_ALL                      0xFFFFFFFF
 
@@ -238,7 +240,8 @@ MtlfMetalContext::MtlfMetalContext()
     currentPipelineState          = nil;
     
     MTLDepthStencilDescriptor *depthStateDesc = [[MTLDepthStencilDescriptor alloc] init];
-    depthStateDesc.depthCompareFunction = MTLCompareFunctionAlways;
+    depthStateDesc.depthWriteEnabled = YES;
+    depthStateDesc.depthCompareFunction = MTLCompareFunctionLessEqual;
     depthState = [device newDepthStencilStateWithDescriptor:depthStateDesc];
     
     // Load our common vertex shader. This is used by both the fragment shaders below
@@ -361,9 +364,18 @@ MtlfMetalContext::MtlfMetalContext()
     
     mtlTexture = CVMetalTextureGetTexture(cvmtlTexture);
     
+    {
+        MTLTextureDescriptor *depthTexDescriptor = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatDepth32Float
+        width:mtlTexture.width height:mtlTexture.height mipmapped:false];
+        depthTexDescriptor.usage = MTLTextureUsageRenderTarget;
+        depthTexDescriptor.resourceOptions = MTLResourceCPUCacheModeDefaultCache | MTLResourceStorageModePrivate;
+        mtlDepthTexture = [device newTextureWithDescriptor:depthTexDescriptor];
+    }
+    
     pipelineStateDescriptor = nil;
     vertexDescriptor = nil;
     indexBuffer = nil;
+    remappedQuadIndexBuffer = nil;
     numVertexComponents = 0;
 }
 
@@ -390,6 +402,46 @@ MtlfMetalContext::IsInitialized()
     return context->device != nil;
 }
 
+id<MTLBuffer>
+MtlfMetalContext::GetQuadIndexBuffer(MTLIndexType indexTypeMetal) {
+    // Each 4 vertices will require 6 remapped one
+    uint32 remappedIndexBufferSize = (indexBuffer.length / 4) * 6;
+    
+    // Since remapping is expensive check if the buffer we created this from originally has changed  - MTL_FIXME - these checks are not robust
+    if (remappedQuadIndexBuffer) {
+        if ((remappedQuadIndexBufferSource != indexBuffer) ||
+            (remappedQuadIndexBuffer.length != remappedIndexBufferSize)) {
+            remappedQuadIndexBuffer = nil;
+        }
+    }
+    // Remap the quad indices into two sets of triangle indices
+    if (!remappedQuadIndexBuffer) {
+        if (indexTypeMetal != MTLIndexTypeUInt32) {
+            TF_FATAL_CODING_ERROR("Only 32 bit indices currently supported for quads");
+        }
+        NSLog(@"Recreating quad remapped index buffer");
+        
+        remappedQuadIndexBufferSource = indexBuffer;
+        remappedQuadIndexBuffer = [device newBufferWithLength:remappedIndexBufferSize  options:MTLResourceStorageModeManaged];
+        
+        uint32 *srcData =  (uint32 *)indexBuffer.contents;
+        uint32 *destData = (uint32 *)remappedQuadIndexBuffer.contents;
+        for (int i= 0; i < (indexBuffer.length / 4) ; i+=4)
+        {
+            destData[0] = srcData[0];
+            destData[1] = srcData[1];
+            destData[2] = srcData[2];
+            destData[3] = srcData[0];
+            destData[4] = srcData[2];
+            destData[5] = srcData[3];
+            srcData  += 4;
+            destData += 6;
+        }
+        [remappedQuadIndexBuffer didModifyRange:(NSMakeRange(0, remappedQuadIndexBuffer.length))];
+    }
+    return remappedQuadIndexBuffer;
+}
+
 void MtlfMetalContext::CheckNewStateGather()
 {
     // Lazily create a new state object
@@ -408,6 +460,7 @@ id<MTLCommandBuffer> MtlfMetalContext::CreateCommandBuffer() {
 
 id<MTLRenderCommandEncoder> MtlfMetalContext::CreateRenderEncoder(MTLRenderPassDescriptor *renderPassDescriptor) {
     renderEncoder = [commandBuffer renderCommandEncoderWithDescriptor:renderPassDescriptor];
+    [renderEncoder setFrontFacingWinding:MTLWindingCounterClockwise];
     currentPipelineState = NULL;
     dirtyState           = DIRTY_METAL_STATE_ALL;
     return renderEncoder;
@@ -432,7 +485,6 @@ void MtlfMetalContext::SetVertexAttribute(uint32_t index,
     {
         vertexDescriptor = [[MTLVertexDescriptor alloc] init];
 
-        //cullStyle?
         vertexDescriptor.layouts[0].stepFunction = MTLVertexStepFunctionConstant;
         vertexDescriptor.layouts[0].stepRate = 0;
         vertexDescriptor.layouts[0].stride = stride;
@@ -471,64 +523,6 @@ void MtlfMetalContext::SetVertexAttribute(uint32_t index,
     dirtyState |= DIRTY_METAL_STATE_VERTEX_DESCRIPTOR;
 }
 
-void MtlfMetalContext::SetUniform(const void* _data, uint32 _dataSize, const TfToken& _name, uint32 _index, MSL_ProgramStage _stage)
-{
-    OldStyleUniformData newUniform = { _index, 0, 0, _name, _stage };
-    newUniform.alloc(_data, _dataSize);
-    oldStyleUniforms.push_back(newUniform);
-    dirtyState |= DIRTY_METAL_STATE_OLD_STYLE_UNIFORM;
-}
-
-void MtlfMetalContext::SetUniformBuffer(int index, id<MTLBuffer> buffer, const TfToken& name, MSL_ProgramStage stage, int offset, bool oldStyleBacker)
-{
-    if(stage == 0)
-        TF_FATAL_CODING_ERROR("Not allowed!");
-        
-    uniformBuffers.push_back({index, buffer, name, stage, offset});
-    
-    if(oldStyleBacker)
-    {
-        if(stage == kMSL_ProgramStage_Vertex) {
-            vtxUniformBackingBuffer = buffer;
-            dirtyState |= DIRTY_METAL_STATE_VERTEX_UNIFORM_BUFFER;
-        }
-        else if(stage == kMSL_ProgramStage_Fragment) {
-            fragUniformBackingBuffer = buffer;
-            dirtyState |= DIRTY_METAL_STATE_FRAGMENT_UNIFORM_BUFFER;
-        }
-    }
-}
-
-void MtlfMetalContext::SetBuffer(int index, id<MTLBuffer> buffer, const TfToken& name)
-{
-    vertexBuffers.push_back({index, buffer, name});
-    dirtyState |= DIRTY_METAL_STATE_VERTEX_BUFFER;
-}
-
-void MtlfMetalContext::SetIndexBuffer(id<MTLBuffer> buffer)
-{
-    indexBuffer = buffer;
-    dirtyState |= DIRTY_METAL_STATE_INDEX_BUFFER;
-}
-
-void MtlfMetalContext::SetSampler(int index, id<MTLSamplerState> sampler, const TfToken& name, MSL_ProgramStage stage)
-{
-    samplers.push_back({index, sampler, name, stage});
-    dirtyState |= DIRTY_METAL_STATE_SAMPLER;
-}
-
-void MtlfMetalContext::SetTexture(int index, id<MTLTexture> texture, const TfToken& name, MSL_ProgramStage stage)
-{
-    textures.push_back({index, texture, name, stage});
-    dirtyState |= DIRTY_METAL_STATE_TEXTURE;
-}
-
-void MtlfMetalContext::SetDrawTarget(MtlfDrawTarget *dt)
-{
-    drawTarget = dt;
-    dirtyState |= DIRTY_METAL_STATE_DRAW_TARGET;
-}
-
 // I think this can be removed didn't seem to make too much difference to speeds
 void copyUniform(uint8 *dest, uint8 *src, uint32 size)
 {
@@ -551,6 +545,101 @@ void copyUniform(uint8 *dest, uint8 *src, uint32 size)
         default:
             memcpy(dest, src, size);
     }
+}
+
+void MtlfMetalContext::SetUniform(const void* _data, uint32 _dataSize, const TfToken& _name, uint32 _index, MSL_ProgramStage _stage)
+{
+    OldStyleUniformBuffer *psOSBuffer = NULL;
+    
+    if (!_dataSize) {
+        return;
+    }
+    
+    if(_stage == kMSL_ProgramStage_Vertex) {
+        psOSBuffer = &vtxUniformBackingBuffer;
+        dirtyState |= DIRTY_METAL_STATE_OLD_STYLE_VERTEX_UNIFORM;
+    }
+    else if (_stage == kMSL_ProgramStage_Fragment) {
+        psOSBuffer = &fragUniformBackingBuffer;
+        dirtyState |= DIRTY_METAL_STATE_OLD_STYLE_FRAGMENT_UNIFORM;
+    }
+    else {
+        TF_FATAL_CODING_ERROR("Unsupported stage");
+    }
+    
+    if(!psOSBuffer->buffer) {
+        TF_FATAL_CODING_ERROR("Backing buffer not allocated");
+    }
+    
+    uint8* bufferContents  = (uint8*)(psOSBuffer->buffer.contents)  + psOSBuffer->currentOffset;
+    
+    uint32 uniformEnd = (_index + _dataSize);
+    copyUniform(bufferContents + _index, (uint8*)_data, _dataSize);
+    
+}
+
+void MtlfMetalContext::SetUniformBuffer(int index, id<MTLBuffer> buffer, const TfToken& name, MSL_ProgramStage stage, int offset, int oldStyleUniformSize)
+{
+    if(stage == 0)
+        TF_FATAL_CODING_ERROR("Not allowed!");
+        
+    uniformBuffers.push_back({index, buffer, name, stage, offset});
+    
+    if(oldStyleUniformSize)
+    {
+        OldStyleUniformBuffer *psOSBuffer = NULL;
+        if(stage == kMSL_ProgramStage_Vertex) {
+            psOSBuffer = &vtxUniformBackingBuffer;
+        }
+        else if (stage == kMSL_ProgramStage_Fragment) {
+            psOSBuffer = &fragUniformBackingBuffer;
+        }
+        else {
+            TF_FATAL_CODING_ERROR("Unsupported stage");
+        }
+        psOSBuffer->buffer        = buffer;
+        psOSBuffer->currentOffset = 0;
+        psOSBuffer->blockSize     = oldStyleUniformSize;
+        psOSBuffer->bindingIndex  = index;
+    }
+    
+    if(stage == kMSL_ProgramStage_Vertex) {
+        dirtyState |= DIRTY_METAL_STATE_VERTEX_UNIFORM_BUFFER;
+    }
+    if(stage == kMSL_ProgramStage_Fragment) {
+        dirtyState |= DIRTY_METAL_STATE_FRAGMENT_UNIFORM_BUFFER;
+    }
+}
+
+void MtlfMetalContext::SetBuffer(int index, id<MTLBuffer> buffer, const TfToken& name)
+{
+    vertexBuffers.push_back({index, buffer, name});
+    dirtyState |= DIRTY_METAL_STATE_VERTEX_BUFFER;
+}
+
+void MtlfMetalContext::SetIndexBuffer(id<MTLBuffer> buffer)
+{
+    indexBuffer = buffer;
+    //remappedQuadIndexBuffer = nil;
+    dirtyState |= DIRTY_METAL_STATE_INDEX_BUFFER;
+}
+
+void MtlfMetalContext::SetSampler(int index, id<MTLSamplerState> sampler, const TfToken& name, MSL_ProgramStage stage)
+{
+    samplers.push_back({index, sampler, name, stage});
+    dirtyState |= DIRTY_METAL_STATE_SAMPLER;
+}
+
+void MtlfMetalContext::SetTexture(int index, id<MTLTexture> texture, const TfToken& name, MSL_ProgramStage stage)
+{
+    textures.push_back({index, texture, name, stage});
+    dirtyState |= DIRTY_METAL_STATE_TEXTURE;
+}
+
+void MtlfMetalContext::SetDrawTarget(MtlfDrawTarget *dt)
+{
+    drawTarget = dt;
+    dirtyState |= DIRTY_METAL_STATE_DRAW_TARGET;
 }
 
 size_t MtlfMetalContext::HashVertexDescriptor()
@@ -596,6 +685,9 @@ size_t MtlfMetalContext::HashPipeLineDescriptor()
     boost::hash_combine(hashVal, pipelineStateDescriptor.rasterizationEnabled);
     boost::hash_combine(hashVal, pipelineStateDescriptor.depthAttachmentPixelFormat);
     boost::hash_combine(hashVal, pipelineStateDescriptor.stencilAttachmentPixelFormat);
+#if METAL_TESSELLATION_SUPPORT
+    // Add here...
+#endif
     boost::hash_combine(hashVal, currentVertexDescriptorHash);
     boost::hash_combine(hashVal, currentColourAttachmentsHash);
     return hashVal;
@@ -611,6 +703,17 @@ void MtlfMetalContext::SetPipelineState()
     
     pipelineStateDescriptor.label = @"Bake State";
     pipelineStateDescriptor.sampleCount = 1;
+    pipelineStateDescriptor.inputPrimitiveTopology = MTLPrimitiveTopologyClassUnspecified;
+
+#if METAL_TESSELLATION_SUPPORT
+    pipelineStateDescriptor.maxTessellationFactor             = 1;
+    pipelineStateDescriptor.tessellationFactorScaleEnabled    = NO;
+    pipelineStateDescriptor.tessellationFactorFormat          = MTLTessellationFactorFormatHalf;
+    pipelineStateDescriptor.tessellationControlPointIndexType = MTLTessellationControlPointIndexTypeNone;
+    pipelineStateDescriptor.tessellationFactorStepFunction    = MTLTessellationFactorStepFunctionConstant;
+    pipelineStateDescriptor.tessellationOutputWindingOrder    = MTLWindingCounterClockwise;
+    pipelineStateDescriptor.tessellationPartitionMode         = MTLTessellationPartitionModePow2;
+#endif
     
     if (dirtyState & DIRTY_METAL_STATE_VERTEX_DESCRIPTOR || pipelineStateDescriptor.vertexDescriptor == NULL) {
         // This assignment can be expensive as the vertexdescriptor will be copied (due to interface property)
@@ -649,8 +752,11 @@ void MtlfMetalContext::SetPipelineState()
             pipelineStateDescriptor.colorAttachments[0].sourceAlphaBlendFactor = MTLBlendFactorSourceAlpha;
             pipelineStateDescriptor.colorAttachments[0].destinationRGBBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
             pipelineStateDescriptor.colorAttachments[0].destinationAlphaBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
-            pipelineStateDescriptor.colorAttachments[0].pixelFormat = MTLPixelFormatBGRA8Unorm;
+            pipelineStateDescriptor.colorAttachments[0].pixelFormat = mtlTexture.pixelFormat;
             numColourAttachments++;
+
+            pipelineStateDescriptor.depthAttachmentPixelFormat = mtlDepthTexture.pixelFormat;
+            [renderEncoder setDepthStencilState:depthState];
         }
         // Update colour attachments hash
         currentColourAttachmentsHash = HashColourAttachments();
@@ -699,6 +805,28 @@ void MtlfMetalContext::SetPipelineState()
     }
 }
 
+void MtlfMetalContext::UpdateOldStyleUniformBlock(OldStyleUniformBuffer *uniformBuffer)
+{
+    if(!uniformBuffer->buffer) {
+        TF_FATAL_CODING_ERROR("No vertex uniform backing buffer assigned!");
+    }
+    
+    // Update vertex uniform buffer and move block along
+    [uniformBuffer->buffer  didModifyRange:NSMakeRange(uniformBuffer->currentOffset, uniformBuffer->blockSize)];
+    
+    [renderEncoder setVertexBuffer:uniformBuffer->buffer offset:uniformBuffer->currentOffset atIndex:uniformBuffer->bindingIndex];
+    
+    uint8 *data = (uint8 *)((uint8 *)(uniformBuffer->buffer.contents) + uniformBuffer->currentOffset);
+    copyUniform(data + uniformBuffer->blockSize, data, uniformBuffer->blockSize);
+    
+    uniformBuffer->currentOffset += uniformBuffer->blockSize;
+    
+    if (uniformBuffer->currentOffset > uniformBuffer->buffer.length) {
+        NSLog(@"Old style uniform buffer wrapped - expect strangeness"); // MTL_FIXME
+        uniformBuffer->currentOffset  = 0;
+    }
+}
+
 void MtlfMetalContext::BakeState()
 {
 #if !METAL_STATE_OPTIMISATION
@@ -706,66 +834,32 @@ void MtlfMetalContext::BakeState()
 #endif
     // Create and set a new pipelinestate if required
     SetPipelineState();
-    
-    if (dirtyState & DIRTY_METAL_STATE_OLD_STYLE_UNIFORM) {
-        uint32 vertexStart   = UINT32_MAX, vertexEnd   = 0;
-        uint32 fragmentStart = UINT32_MAX, fragmentEnd = 0;
-        uint8* vtxData  = (uint8*)(vtxUniformBackingBuffer.contents);
-        uint8* fragdata = (uint8*)(fragUniformBackingBuffer.contents);
-        
-        for(auto uniform : oldStyleUniforms)
-        {
-#if METAL_STATE_OPTIMISATION
-            if (uniform.dataSize)
-#endif
-            {
-                uint32 uniformEnd = (uniform.index + uniform.dataSize);
-                if(uniform.stage == kMSL_ProgramStage_Vertex) {
-                    if(!vtxUniformBackingBuffer)
-                        TF_FATAL_CODING_ERROR("No vertex uniform backing buffer assigned!");
-                    copyUniform(vtxData + uniform.index, (uint8*)uniform.data, uniform.dataSize);
-                    vertexStart = uniform.index < vertexStart ? uniform.index : vertexStart;
-                    vertexEnd   = uniformEnd    > vertexEnd   ? uniformEnd    : vertexEnd;
-                }
-                else if(uniform.stage == kMSL_ProgramStage_Fragment) {
-                    if(!fragUniformBackingBuffer)
-                        TF_FATAL_CODING_ERROR("No fragment uniform backing buffer assigned!");
-                    copyUniform(fragdata + uniform.index, (uint8*)uniform.data, uniform.dataSize);
-                    fragmentStart = uniform.index < fragmentStart ? uniform.index : fragmentStart;
-                    fragmentEnd   = uniformEnd    > fragmentEnd   ? uniformEnd    : fragmentEnd;
-                }
-                else {
-                    TF_FATAL_CODING_ERROR("Not implemented!"); //Compute case
-                }
-            }
-#if METAL_STATE_OPTIMISATION
-            // Remove these from the uniform list or we'll just end recopying them every draw call
-            uniform.release();
-#endif
+ 
+    if (dirtyState & DIRTY_METAL_STATE_OLD_STYLE_VERTEX_UNIFORM) {
+        UpdateOldStyleUniformBlock(&vtxUniformBackingBuffer);
+        dirtyState &= ~DIRTY_METAL_STATE_OLD_STYLE_VERTEX_UNIFORM;
         }
-        if (vertexStart != UINT_MAX) {
-            [vtxUniformBackingBuffer  didModifyRange:NSMakeRange(vertexStart,   vertexEnd   - vertexStart)];
-        }
-        if (fragmentStart != UINT_MAX) {
-            [fragUniformBackingBuffer didModifyRange:NSMakeRange(fragmentStart, fragmentEnd - fragmentStart)];
-        }
-
-#if METAL_STATE_OPTIMISATION
-        oldStyleUniforms.clear();
-#endif
-        dirtyState &= ~DIRTY_METAL_STATE_OLD_STYLE_UNIFORM;
+    if (dirtyState & DIRTY_METAL_STATE_OLD_STYLE_FRAGMENT_UNIFORM) {
+        UpdateOldStyleUniformBlock(&fragUniformBackingBuffer);
+        dirtyState &= ~DIRTY_METAL_STATE_OLD_STYLE_FRAGMENT_UNIFORM;
     }
     if (dirtyState & (DIRTY_METAL_STATE_VERTEX_UNIFORM_BUFFER | DIRTY_METAL_STATE_FRAGMENT_UNIFORM_BUFFER)) {
         for(auto buffer : uniformBuffers)
         {
-            if(buffer.stage == kMSL_ProgramStage_Vertex)
-            [renderEncoder setVertexBuffer:buffer.buffer offset:buffer.offset atIndex:buffer.idx];
-            else if(buffer.stage == kMSL_ProgramStage_Fragment)
-            [renderEncoder setFragmentBuffer:buffer.buffer offset:buffer.offset atIndex:buffer.idx];
-            else
-            TF_FATAL_CODING_ERROR("Not implemented!"); //Compute case
+             if(buffer.stage == kMSL_ProgramStage_Vertex){
+                [renderEncoder setVertexBuffer:buffer.buffer offset:buffer.offset atIndex:buffer.idx];
+            }
+            else if(buffer.stage == kMSL_ProgramStage_Fragment) {
+                [renderEncoder setFragmentBuffer:buffer.buffer offset:buffer.offset atIndex:buffer.idx];
+            }
+            else{
+                TF_FATAL_CODING_ERROR("Not implemented!"); //Compute case
+            }
         }
         dirtyState &= ~(DIRTY_METAL_STATE_VERTEX_UNIFORM_BUFFER | DIRTY_METAL_STATE_FRAGMENT_UNIFORM_BUFFER);
+#if METAL_STATE_OPTIMISATION
+        uniformBuffers.clear();
+#endif
     }
 
     if (dirtyState & DIRTY_METAL_STATE_VERTEX_BUFFER) {
@@ -807,12 +901,13 @@ void MtlfMetalContext::ClearState()
     numVertexComponents = 0;
     dirtyState = DIRTY_METAL_STATE_ALL;
     
-    for(auto it = oldStyleUniforms.begin(); it != oldStyleUniforms.end(); ++it)
-        it->release();
-    oldStyleUniforms.clear();
-    vtxUniformBackingBuffer = 0;
-    fragUniformBackingBuffer = 0;
-
+    vtxUniformBackingBuffer.buffer         = nil;
+    vtxUniformBackingBuffer.currentOffset  = 0;
+    vtxUniformBackingBuffer.bindingIndex   = -1;
+    fragUniformBackingBuffer.buffer        = 0;
+    fragUniformBackingBuffer.currentOffset = 0;
+    fragUniformBackingBuffer.bindingIndex  = -1;
+    
     vertexBuffers.clear();
     uniformBuffers.clear();
     textures.clear();

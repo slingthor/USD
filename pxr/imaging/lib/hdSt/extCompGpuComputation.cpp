@@ -24,13 +24,15 @@
 #include "pxr/imaging/glf/glew.h"
 #include "pxr/imaging/glf/diagnostic.h"
 
+#include "pxr/imaging/garch/contextCaps.h"
+#include "pxr/imaging/garch/resourceFactory.h"
+
 #include "pxr/imaging/hdSt/bufferResource.h"
 #include "pxr/imaging/hdSt/extCompGpuComputationBufferSource.h"
 #include "pxr/imaging/hdSt/extCompGpuPrimvarBufferSource.h"
 #include "pxr/imaging/hdSt/extCompGpuComputation.h"
 #include "pxr/imaging/hdSt/extComputation.h"
 #include "pxr/imaging/hdSt/program.h"
-#include "pxr/imaging/hdSt/glUtils.h"
 #include "pxr/imaging/hdSt/resourceRegistry.h"
 #include "pxr/imaging/hd/bufferArrayRange.h"
 #include "pxr/imaging/hd/compExtCompInputSource.h"
@@ -91,6 +93,11 @@ HdStExtCompGpuComputation::Execute(
     TF_DEBUG(HD_EXT_COMPUTATION_UPDATED).Msg(
             "GPU computation '%s' executed for primvars: %s\n",
             _id.GetText(), _GetDebugPrimvarNames(_compPrimvars).c_str());
+
+#if defined(ARCH_GFX_METAL)
+    // Emit error until we support this
+    TF_CODING_ERROR("Metal Compute currently not supported");
+#endif
 
     if (!glDispatchCompute) {
         TF_WARN("glDispatchCompute not available");
@@ -344,6 +351,8 @@ HdSt_GetExtComputationPrimvarsComputations(
         byComputation[compPrimvar.sourceComputationId].push_back(compPrimvar);
     }
 
+    bool gpuComputeEnabled = GarchResourceFactory::GetInstance()->GetContextCaps().gpuComputeEnabled;
+
     // Create computation primvar buffer sources by source computation
     for (CompPrimvarsByComputation::value_type it: byComputation) { 
         SdfPath const &computationId = it.first;
@@ -358,7 +367,7 @@ HdSt_GetExtComputationPrimvarsComputations(
             continue;
         }
 
-        if (HdStGLUtils::IsGpuComputeEnabled() &&
+        if (gpuComputeEnabled &&
             !sourceComp->GetGpuKernelSource().empty()) {
 
             HdStExtCompGpuComputationSharedPtr gpuComputation;

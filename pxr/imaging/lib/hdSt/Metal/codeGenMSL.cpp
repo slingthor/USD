@@ -603,7 +603,7 @@ HdSt_CodeGenMSL::_ParseGLSL(std::stringstream &source, InOutParams& inParams, In
                             std::string::size_type openingBracket = nameStr.find_first_of("[");
                             if(openingBracket != std::string::npos) {
                                 nameStr = nameStr.substr(0, openingBracket);
-                                structAccessors << ";\n device " << type.GetString() << "* " << nameStr;
+                                structAccessors << ";\n device const " << type.GetString() << "* " << nameStr;
                             }
                             else
                                 structAccessors << ";\n" << type.GetString() << " " << name.GetString();
@@ -668,7 +668,7 @@ HdSt_CodeGenMSL::_ParseGLSL(std::stringstream &source, InOutParams& inParams, In
                     }
 
                     if (nameStr[0] == '*') {
-                        result.replace(pos, 0, std::string("\ndevice "));
+                        result.replace(pos, 0, std::string("\ndevice const "));
                         usage |= HdSt_CodeGenMSL::TParam::EntryFuncArgument;
                         
                         // If this is a built-in type, we want to use global scope to access
@@ -752,7 +752,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
         copyInputsVtx << "scope." << input.name << "=input." << input.name << ";\n";
         
         if (input.name.GetText()[0] == '*') {
-            glueVS << "device ";
+            glueVS << "device const ";
             mslProgram->AddBinding(input.name.GetText() + 1, vertexAttribsLocation, kMSL_BindingType_VertexAttribute, kMSL_ProgramStage_Vertex);
         }
         else {
@@ -790,6 +790,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
         uint32 regEnd = (vtxUniformBufferSize + size - 1) / 16;
         if(regStart != regEnd && vtxUniformBufferSize % 16 != 0) vtxUniformBufferSize += 16 - (vtxUniformBufferSize % 16);
         
+        mslProgram->AddBinding(input.name, -1, kMSL_BindingType_Uniform, kMSL_ProgramStage_Vertex);
         mslProgram->UpdateUniformBinding(input.name, -1, vtxUniformBufferSize);
         
         vtxUniformBufferSize += size;
@@ -1024,7 +1025,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
         }
         glueVS << ", ";
         if (input.name.GetText()[0] == '*') {
-            glueVS << "device ";
+            glueVS << "device const ";
         }
         if (input.usage & HdSt_CodeGenMSL::TParam::ProgramScope) {
             glueVS << "ProgramScope<st>::";
@@ -1055,7 +1056,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
             << "}\n";
     
     gluePS << "fragment MSLFragOutputs fragmentEntryPoint(MSLVtxOutputs vsInput[[stage_in]]\n"
-           << ", device MSLFragInputs *" CODEGENMSL_FRAGUNIFORMINPUTNAME "[[buffer(0)]]\n";
+           << ", device const MSLFragInputs *" CODEGENMSL_FRAGUNIFORMINPUTNAME "[[buffer(0)]]\n";
     mslProgram->AddBinding(CODEGENMSL_FRAGUNIFORMINPUTNAME, 0, kMSL_BindingType_UniformBuffer, kMSL_ProgramStage_Fragment, 0, inputUniformBufferSize);
 
     location = 1;
@@ -1087,14 +1088,14 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
         
         std::string n;
         if (input.name.GetText()[0] == '*') {
-            gluePS << "device ";
+            gluePS << "device const ";
             if ((input.usage & HdSt_CodeGenMSL::TParam::UniformBlock) != 0)
                 n = input.name.GetText() + 4; //Because of "*___<NAME>"
             else
                 n = input.name.GetText() + 1;
         }
         else if(input.usage & HdSt_CodeGenMSL::TParam::UniformBlock) {
-            gluePS << "device ";
+            gluePS << "device const ";
             n = input.dataType.GetText();
         }
         else
@@ -1760,7 +1761,7 @@ static HdSt_CodeGenMSL::TParam& _EmitDeclarationPtr(std::stringstream &str,
                                                     bool programScope)
 {
     TfToken ptrName(std::string("*") + name.GetString());
-    str << "device ";
+    str << "device const ";
     if (programScope) {
         str << "ProgramScope<st>::";
     }
@@ -2213,21 +2214,44 @@ HdSt_CodeGenMSL::_GenerateDrawingCoord()
     _genVS << "hd_drawingCoord vsDrawingCoord;\n";
     _genVS << "hd_drawingCoord gsDrawingCoord;\n";
 
-    _EmitStructMemberOutput(_mslVSOutputParams, TfToken("vsdc_modelCoord"), TfToken("vsDrawingCoord.modelCoord"), intType);
-    _EmitStructMemberOutput(_mslVSOutputParams, TfToken("vsdc_constantCoord"), TfToken("vsDrawingCoord.constantCoord"), intType);
-    _EmitStructMemberOutput(_mslVSOutputParams, TfToken("vsdc_elementCoord"), TfToken("vsDrawingCoord.elementCoord"), intType);
-    _EmitStructMemberOutput(_mslVSOutputParams, TfToken("vsdc_primitiveCoord"), TfToken("vsDrawingCoord.primitiveCoord"), intType);
-    _EmitStructMemberOutput(_mslVSOutputParams, TfToken("vsdc_fvarCoord"), TfToken("vsDrawingCoord.fvarCoord"), intType);
-    _EmitStructMemberOutput(_mslVSOutputParams, TfToken("vsdc_shaderCoord"), TfToken("vsDrawingCoord.shaderCoord"), intType);
+    TfToken tkn_modelCoord("vsdc_modelCoord");
+    TfToken tkn_constantCoord("vsdc_constantCoord");
+    TfToken tkn_elementCoord("vsdc_elementCoord");
+    TfToken tkn_primitiveCoord("vsdc_primitiveCoord");
+    TfToken tkn_fvarCoord("vsdc_fvarCoord");
+    TfToken tkn_shaderCoord("vsdc_shaderCoord");
+    
+    _EmitStructMemberOutput(_mslVSOutputParams, tkn_modelCoord, TfToken("vsDrawingCoord.modelCoord"), intType);
+    _mslPSInputParams.push_back(TParam(tkn_modelCoord, intType, TfToken("gsDrawingCoord.modelCoord"), TfToken(), HdSt_CodeGenMSL::TParam::Unspecified));
+    
+    _EmitStructMemberOutput(_mslVSOutputParams, tkn_constantCoord, TfToken("vsDrawingCoord.constantCoord"), intType);
+    _mslPSInputParams.push_back(TParam(tkn_constantCoord, intType, TfToken("gsDrawingCoord.constantCoord"), TfToken(), HdSt_CodeGenMSL::TParam::Unspecified));
+    
+    _EmitStructMemberOutput(_mslVSOutputParams, tkn_elementCoord, TfToken("vsDrawingCoord.elementCoord"), intType);
+    _mslPSInputParams.push_back(TParam(tkn_elementCoord, intType, TfToken("gsDrawingCoord.elementCoord"), TfToken(), HdSt_CodeGenMSL::TParam::Unspecified));
+    
+    _EmitStructMemberOutput(_mslVSOutputParams, tkn_primitiveCoord, TfToken("vsDrawingCoord.primitiveCoord"), intType);
+    _mslPSInputParams.push_back(TParam(tkn_primitiveCoord, intType, TfToken("gsDrawingCoord.primitiveCoord"), TfToken(), HdSt_CodeGenMSL::TParam::Unspecified));
+    
+    _EmitStructMemberOutput(_mslVSOutputParams, tkn_fvarCoord, TfToken("vsDrawingCoord.fvarCoord"), intType);
+    _mslPSInputParams.push_back(TParam(tkn_fvarCoord, intType, TfToken("gsDrawingCoord.fvarCoord"), TfToken(), HdSt_CodeGenMSL::TParam::Unspecified));
+
+    _EmitStructMemberOutput(_mslVSOutputParams, tkn_shaderCoord, TfToken("vsDrawingCoord.shaderCoord"), intType);
+    _mslPSInputParams.push_back(TParam(tkn_shaderCoord, intType, TfToken("gsDrawingCoord.shaderCoord"), TfToken(), HdSt_CodeGenMSL::TParam::Unspecified));
     
     for(int i = 0; i <= _metaData.instancerNumLevels; i++)
     {
+        TfToken tkn_instanceIndex(TfStringPrintf("vsdc_instanceIndex%d", i));
         _EmitStructMemberOutput(_mslVSOutputParams,
-                                TfToken(TfStringPrintf("vsdc_instanceIndex%d", i)),
+                                tkn_instanceIndex,
                                 TfToken(TfStringPrintf("vsDrawingCoord.instanceIndex[%d]", i)), intType);
+        _mslPSInputParams.push_back(TParam(tkn_instanceIndex, intType, TfToken(TfStringPrintf("gsDrawingCoord.instanceIndex[%d]", i)), TfToken(), HdSt_CodeGenMSL::TParam::Unspecified));
+        
+        TfToken tkn_instanceCoords(TfStringPrintf("vsdc_instanceCoord%d", i));
         _EmitStructMemberOutput(_mslVSOutputParams,
-                                TfToken(TfStringPrintf("vsdc_instanceCoord%d", i)),
+                                tkn_instanceCoords,
                                 TfToken(TfStringPrintf("vsDrawingCoord.instanceCoords[%d]", i)), intType);
+        _mslPSInputParams.push_back(TParam(tkn_instanceCoords, intType, TfToken(TfStringPrintf("gsDrawingCoord.instanceCoords[%d]", i)), TfToken(), HdSt_CodeGenMSL::TParam::Unspecified));
     }
     
     _genVS << "hd_drawingCoord GetDrawingCoord() { hd_drawingCoord dc; \n"
@@ -2380,7 +2404,7 @@ HdSt_CodeGenMSL::_GenerateConstantPrimvar()
                                 "GetDrawingCoord().constantCoord");
         }
         declarations << "};\n"
-                     << "device " << typeName << " *" << varName << ";\n";
+                     << "device const " << typeName << " *" << varName << ";\n";
     }
     _genCommon << declarations.str()
                << accessors.str();

@@ -250,6 +250,22 @@ GlfContextCaps::_LoadCaps()
             std::cout << "  CopyBuffer : disabled\n";
         }
     }
+    
+    // GPU Compute
+    if (IsGPUComputeEnabled()) {
+        gpuComputeEnabled = true;
+        gpuComputeNormalsEnabled = true;
+
+#if OPENSUBDIV_HAS_GLSL_COMPUTE
+        if (glslVersion >= 430 && shaderStorageBufferEnabled) {
+            TF_WARN("HD_ENABLE_GPU_COMPUTE can't be enabled "
+                    "(OpenGL 4.3 required).\n");
+        }
+#else
+        TF_WARN("HD_ENABLE_GPU_COMPUTE can't be enabled "
+                "(OpenSubdiv hasn't been configured with GLSL compute).\n");
+#endif
+    }
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

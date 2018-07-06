@@ -60,7 +60,8 @@ MtlfUniformBlock::Bind(GarchBindingMapPtr const & bindingMap,
 void
 MtlfUniformBlock::Update(const void *data, int size)
 {
-    if (_buffer == nil) {
+    // Only recreate buffer if one doesn't already exist or the size has changed
+    if (_buffer == nil || _buffer.length != size) {
         id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->device;
         _buffer = [device newBufferWithBytes:data length:size options:MTLResourceStorageModeManaged];
     }

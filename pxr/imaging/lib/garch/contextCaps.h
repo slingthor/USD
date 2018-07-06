@@ -84,7 +84,8 @@ public:
     bool copyBufferEnabled;
 
     // GPU compute
-    bool gpuComputeEnabled;           // GPU subdivision, smooth normals  (4.3)
+    bool gpuComputeEnabled;           // GPU subdivision                  (4.3)
+	bool gpuComputeNormalsEnabled;    // GPU smooth normals               (4.3)
 
     /// Returns whether to do frustum culling on the GPU
     virtual bool IsEnabledGPUFrustumCulling() const;
@@ -103,6 +104,8 @@ public:
 protected:
     GarchContextCaps();
     virtual ~GarchContextCaps() = default;
+    
+    bool IsGPUComputeEnabled();
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

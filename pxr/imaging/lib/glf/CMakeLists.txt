@@ -14,6 +14,10 @@ if (PXR_ENABLE_PTEX_SUPPORT)
     list(APPEND optionalIncludeDirs ${PTEX_INCLUDE_DIR})
 endif()
 
+if (OPENSUBDIV_HAS_GLSL_COMPUTE)
+    add_definitions(-DOPENSUBDIV_HAS_GLSL_COMPUTE)
+endif()
+
 pxr_library(glf
     LIBRARIES
         arch

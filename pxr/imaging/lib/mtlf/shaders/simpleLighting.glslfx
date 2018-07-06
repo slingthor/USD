@@ -131,7 +131,7 @@ thsat by using a seperate define to define the array size.
 #if NUM_LIGHTS == 0
 #define NUM_LIGHTS_ARRAY_SIZE 1
 #else
-#define NUM_LIGHTS_ARRAY_SIZE 1
+#define NUM_LIGHTS_ARRAY_SIZE NUM_LIGHTS
 #endif
 
 // ---------------------------------------------------------------------------

@@ -18,6 +18,13 @@ elseif(WIN32)
     set(GARCH_SOURCE_EXTENSION        cpp)
 endif()
 
+if (OPENSUBDIV_HAS_GLSL_COMPUTE)
+    add_definitions(-DOPENSUBDIV_HAS_GLSL_COMPUTE)
+endif()
+if (OPENSUBDIV_HAS_METAL_COMPUTE)
+    add_definitions(-DOPENSUBDIV_HAS_METAL_COMPUTE)
+endif()
+
 pxr_library(garch
     LIBRARIES
         arch

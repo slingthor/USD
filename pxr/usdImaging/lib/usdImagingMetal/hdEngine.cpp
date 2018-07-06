@@ -678,14 +678,18 @@ UsdImagingMetalHdEngine::Render(RenderParams params)
 
     MTLRenderPassColorAttachmentDescriptor *colorAttachment = _mtlRenderPassDescriptor.colorAttachments[0];
     colorAttachment.texture = context->mtlTexture;
+    
+    MTLRenderPassDepthAttachmentDescriptor *depthAttachment = _mtlRenderPassDescriptor.depthAttachment;
+    depthAttachment.texture = context->mtlDepthTexture;
 
-    // Create a new command buffer for each render pass to the current drawable
-    id <MTLCommandBuffer> commandBuffer = context->CreateCommandBuffer();
-    commandBuffer.label = @"HdEngine CommandBuffer";
 
     // Create a render command encoder so we can render into something
     TF_VERIFY(context->commandBuffer == nil, "Render: A command buffer is already active");
 
+    // Create a new command buffer for each render pass to the current drawable
+    id <MTLCommandBuffer> commandBuffer = context->CreateCommandBuffer();
+    commandBuffer.label = @"HdEngine CommandBuffer";
+ 
     id <MTLRenderCommandEncoder> renderEncoder = context->CreateRenderEncoder(_mtlRenderPassDescriptor);
 
     VtValue selectionValue(_selTracker);
@@ -829,9 +833,23 @@ UsdImagingMetalHdEngine::SetCameraState(const GfMatrix4d& viewMatrix,
                             const GfMatrix4d& projectionMatrix,
                             const GfVec4d& viewport)
 {
+    GfMatrix4d modifiedProjMatrix;
+    static GfMatrix4d zTransform;
+    
+    // Transform from [-1, 1] to [0, 1] clip space
+    static bool _zTransformSet = false;
+    if (!_zTransformSet) {
+        _zTransformSet = true;
+        zTransform.SetIdentity();
+        zTransform.SetScale(GfVec3d(1.0, 1.0, 0.5));
+        zTransform.SetTranslateOnly(GfVec3d(0.0, 0.0, 0.5));
+    }
+    
+    modifiedProjMatrix = projectionMatrix * zTransform;
+
     // usdview passes these matrices from OpenGL state.
     // update the camera in the task controller accordingly.
-    _taskController->SetCameraMatrices(viewMatrix, projectionMatrix);
+    _taskController->SetCameraMatrices(viewMatrix, modifiedProjMatrix);
     _taskController->SetCameraViewport(viewport);
 }
 

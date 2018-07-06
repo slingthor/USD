@@ -53,10 +53,28 @@ TF_DEFINE_ENV_SETTING(HD_ENABLE_GPU_TINY_PRIM_CULLING, true,
 TF_DEFINE_ENV_SETTING(HD_ENABLE_GPU_INSTANCE_FRUSTUM_CULLING, true,
                       "Enable GPU per-instance frustum culling");
 
+// To enable GPU compute features, OpenSubdiv must be configured to support
+// GLSL compute kernel.
+//
+#if OPENSUBDIV_HAS_GLSL_COMPUTE || OPENSUBDIV_HAS_METAL_COMPUTE
+// default to GPU
+TF_DEFINE_ENV_SETTING(HD_ENABLE_GPU_COMPUTE, true,
+                      "Enable GPU smooth, quadrangulation and refinement");
+#else
+// default to CPU
+TF_DEFINE_ENV_SETTING(HD_ENABLE_GPU_COMPUTE, false,
+                      "Enable GPU smooth, quadrangulation and refinement");
+#endif
+
 
 
 TF_DEFINE_ENV_SETTING(GARCH_GLSL_VERSION, 0,
                       "GLSL version");
+
+bool GarchContextCaps::IsGPUComputeEnabled()
+{
+    return TfGetEnvSetting(HD_ENABLE_GPU_COMPUTE);
+}
 
 // Initialize members to ensure a sane starting state.
 GarchContextCaps::GarchContextCaps()
@@ -81,7 +99,10 @@ GarchContextCaps::GarchContextCaps()
     , shaderDrawParametersEnabled(false)
 
     , copyBufferEnabled(true)
+    , gpuComputeEnabled(false)
+    , gpuComputeNormalsEnabled(false)
 {
+    // Empty
 }
 
 bool

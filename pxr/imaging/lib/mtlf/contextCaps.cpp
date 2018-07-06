@@ -43,6 +43,7 @@ void
 MtlfContextCaps::_LoadCaps()
 {
     apiVersion                   = 450;
+    glslVersion                  = 450;
     shaderStorageBufferEnabled   = true;
     bindlessTextureEnabled       = false;
     bindlessBufferEnabled        = false;
@@ -55,9 +56,12 @@ MtlfContextCaps::_LoadCaps()
     maxShaderStorageBlockSize    = 1*1024*1024*1024;
     maxTextureBufferSize         = 16*1024;
     uniformBufferOffsetAlignment = 16;  //This limit isn't an actual thing for Metal. 16 is equal to the alignment rules of std140, which is convenient, nothing more.
+
 #if OPENSUBDIV_HAS_METAL_COMPUTE
-    //METAL_TODO: Metal always has compute capabilities but this is set to false for as the compute path doesn't work yet.
-    gpuComputeEnabled            = false; /*true*/
+    //METAL_TODO: Metal always has compute capabilities. gpuComputeNormals only affects
+    //            normal generation which currently has some problems for Metal.
+    gpuComputeEnabled            = IsGPUComputeEnabled();
+    gpuComputeNormalsEnabled     = false;
 #endif
 }
 

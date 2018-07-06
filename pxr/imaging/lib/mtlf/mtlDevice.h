@@ -42,6 +42,9 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+// Not a stric size but more how man copies of the uniforms to keep
+#define METAL_OLD_STYLE_UNIFORM_BUFFER_SIZE 5000
+
 class MtlfDrawTarget;
 typedef boost::shared_ptr<class MtlfMetalContext> MtlfMetalContextSharedPtr;
 
@@ -81,6 +84,9 @@ public:
     }
     
     MTLF_API
+    id<MTLBuffer> GetQuadIndexBuffer(MTLIndexType indexTypeMetal);
+     
+    MTLF_API
     id<MTLCommandBuffer> CreateCommandBuffer();
     
     MTLF_API
@@ -104,7 +110,7 @@ public:
     void SetUniform(const void* _data, uint32 _dataSize, const TfToken& _name, uint32 index, MSL_ProgramStage stage);
     
     MTLF_API
-    void SetUniformBuffer(int index, id<MTLBuffer> buffer, const TfToken& name, MSL_ProgramStage stage, int offset = 0, bool oldStyleBacker = false);
+    void SetUniformBuffer(int index, id<MTLBuffer> buffer, const TfToken& name, MSL_ProgramStage stage, int offset = 0, int oldStyleUniformSize = 0);
     
     MTLF_API
     void SetBuffer(int index, id<MTLBuffer> buffer, const TfToken& name);	//Implementation binds this as a vertex buffer!
@@ -133,6 +139,7 @@ public:
     id<MTLRenderPipelineState> pipelineState;
     id<MTLDepthStencilState> depthState;
     id<MTLTexture> mtlTexture;
+	id<MTLTexture> mtlDepthTexture;
 
     uint32_t glShaderProgram;
     uint32_t glTexture;
@@ -151,30 +158,15 @@ protected:
     uint32_t numVertexComponents;
     uint32_t numColourAttachments;
 
-    struct OldStyleUniformData
-    {
-        void alloc(const void* _data, uint32 _size)
-        {
-            dataSize = _size;
-            data = malloc(dataSize);
-            memcpy(data, _data, dataSize);
-        }
-        void release()
-        {
-            free(data);
-            data = 0;
-        }
-        
-        uint32           index;
-        void*            data;
-        uint32           dataSize;
-        TfToken          name;
-        MSL_ProgramStage stage;
+    struct OldStyleUniformBuffer {
+        id<MTLBuffer> buffer;
+        uint32        currentOffset;
+        uint32        blockSize;
+        uint32        bindingIndex;
     };
-    std::vector<OldStyleUniformData> oldStyleUniforms;
-    id<MTLBuffer> vtxUniformBackingBuffer;
-    id<MTLBuffer> fragUniformBackingBuffer;
-
+    OldStyleUniformBuffer vtxUniformBackingBuffer;
+    OldStyleUniformBuffer fragUniformBackingBuffer;
+    
     struct VertexBufferBinding { int idx; id<MTLBuffer> buffer; TfToken name; };
     std::vector<VertexBufferBinding> vertexBuffers;
     struct UniformBufferBinding { int idx; id<MTLBuffer> buffer; TfToken name; MSL_ProgramStage stage; int offset; };
@@ -184,6 +176,8 @@ protected:
 	struct SamplerBinding { int idx; id<MTLSamplerState> sampler; TfToken name; MSL_ProgramStage stage; };
     std::vector<SamplerBinding> samplers;
     id<MTLBuffer> indexBuffer;
+    id<MTLBuffer> remappedQuadIndexBuffer;
+    id<MTLBuffer> remappedQuadIndexBufferSource;
     
     MtlfDrawTarget *drawTarget;
 
@@ -217,6 +211,8 @@ private:
     id<MTLRenderPipelineState> currentPipelineState;
     boost::unordered_map<size_t, id<MTLRenderPipelineState>> pipelineStateMap;
     
+    void UpdateOldStyleUniformBlock(OldStyleUniformBuffer *uniformBuffer);
+
     uint32 dirtyState;
 };
 

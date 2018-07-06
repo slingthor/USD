@@ -13,6 +13,10 @@ if (PXR_ENABLE_PTEX_SUPPORT)
     list(APPEND optionalIncludeDirs ${PTEX_INCLUDE_DIR})
 endif()
 
+if (OPENSUBDIV_HAS_METAL_COMPUTE)
+    add_definitions(-DOPENSUBDIV_HAS_METAL_COMPUTE)
+endif()
+
 pxr_library(mtlf
     LIBRARIES
         arch

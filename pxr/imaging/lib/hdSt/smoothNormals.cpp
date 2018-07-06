@@ -78,6 +78,11 @@ HdSt_SmoothNormalsComputationGPU::Execute(
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
 
+#if defined(ARCH_GFX_METAL)
+    // Emit error until we support this
+    TF_CODING_ERROR("Metal Compute currently not supported - use CPU code to generate normals");
+#endif
+    
     if (!glDispatchCompute)
         return;
     if (_srcDataType == HdTypeInvalid || _dstDataType == HdTypeInvalid)

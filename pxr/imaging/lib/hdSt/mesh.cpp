@@ -24,11 +24,13 @@
 #include "pxr/pxr.h"
 #include "pxr/imaging/glf/glew.h"
 
+#include "pxr/imaging/garch/contextCaps.h"
+#include "pxr/imaging/garch/resourceFactory.h"
+
 #include "pxr/imaging/hdSt/bufferResource.h"
 #include "pxr/imaging/hdSt/drawItem.h"
 #include "pxr/imaging/hdSt/extCompGpuComputation.h"
 #include "pxr/imaging/hdSt/geometricShader.h"
-#include "pxr/imaging/hdSt/glUtils.h"
 #include "pxr/imaging/hdSt/instancer.h"
 #include "pxr/imaging/hdSt/material.h"
 #include "pxr/imaging/hdSt/mesh.h"
@@ -241,7 +243,7 @@ HdStMesh::_PopulateTopology(HdSceneDelegate *sceneDelegate,
                     // Quadrangulate preprocessing
                     HdSt_QuadInfoBuilderComputationSharedPtr quadInfoBuilder =
                         topology->GetQuadInfoBuilderComputation(
-                            HdStGLUtils::IsGpuComputeEnabled(),
+                            GarchResourceFactory::GetInstance()->GetContextCaps().gpuComputeEnabled,
                             id, resourceRegistry.get());
                     resourceRegistry->AddSource(quadInfoBuilder);
                 }
@@ -366,7 +368,7 @@ HdStMesh::_PopulateAdjacency(HdStResourceRegistrySharedPtr const &resourceRegist
 
         resourceRegistry->AddSource(adjacencyComputation);
 
-        if (HdStGLUtils::IsGpuComputeEnabled()) {
+        if (GarchResourceFactory::GetInstance()->GetContextCaps().gpuComputeEnabled) {
             // also send adjacency table to gpu
             HdBufferSourceSharedPtr adjacencyForGpuComputation =
                 adjacency->GetAdjacencyBuilderForGPUComputation();
@@ -397,7 +399,7 @@ _QuadrangulatePrimvar(HdBufferSourceSharedPtr const &source,
 {
     if (!TF_VERIFY(computations)) return source;
 
-    if (!HdStGLUtils::IsGpuComputeEnabled()) {
+    if (!GarchResourceFactory::GetInstance()->GetContextCaps().gpuComputeEnabled) {
         // CPU quadrangulation
         // set quadrangulation as source instead of original source.
         HdBufferSourceSharedPtr quadsource =
@@ -467,7 +469,7 @@ _RefinePrimvar(HdBufferSourceSharedPtr const &source,
 {
     if (!TF_VERIFY(computations)) return source;
 
-    if (!HdStGLUtils::IsGpuComputeEnabled()) {
+    if (!GarchResourceFactory::GetInstance()->GetContextCaps().gpuComputeEnabled) {
         // CPU subdivision
         // note: if the topology is empty, the source will be returned
         //       without change. We still need the type of buffer
@@ -525,7 +527,10 @@ HdStMesh::_PopulateVertexPrimvars(HdSceneDelegate *sceneDelegate,
     int numPoints = _topology ? _topology->GetNumPoints() : 0;
     int refineLevel = _topology ? _topology->GetRefineLevel() : 0;
 
-    bool cpuSmoothNormals = (!HdStGLUtils::IsGpuComputeEnabled());
+    bool cpuSmoothNormals =
+        (!GarchResourceFactory::GetInstance()->GetContextCaps().gpuComputeNormalsEnabled);
+    bool cpuRefinement =
+        (!GarchResourceFactory::GetInstance()->GetContextCaps().gpuComputeEnabled);
 
     // Don't call _GetRefineLevelForDesc(desc) instead of GetRefineLevel(). Why?
     //
@@ -693,7 +698,6 @@ HdStMesh::_PopulateVertexPrimvars(HdSceneDelegate *sceneDelegate,
                                                  HdTokens->normals;
         
         // The smooth normals computation uses the points primvar as a source.
-        //
         if (cpuSmoothNormals) {
             // CPU smooth normals require the points source data
             // So it is expected to be dirty.  So if the
@@ -707,21 +711,27 @@ HdStMesh::_PopulateVertexPrimvars(HdSceneDelegate *sceneDelegate,
                                                               points,
                                                               normalsName,
                                                               usePackedNormals);
-
-                if (doRefine) {
-                    normal = _RefinePrimvar(normal, /*varying=*/false,
-                                                      &computations, _topology);
-                } else if (doQuadrangulate) {
-                    normal = _QuadrangulatePrimvar(normal,
-                                                   &computations,
-                                                   _topology,
-                                                   id,
-                                                   resourceRegistry);
+ 
+                if (cpuRefinement)
+                {
+                    if (doRefine) {
+                        normal = _RefinePrimvar(normal, /*varying=*/false,
+                                                          &computations, _topology);
+                    } else if (doQuadrangulate) {
+                        normal = _QuadrangulatePrimvar(normal,
+                                                       &computations,
+                                                       _topology,
+                                                       id,
+                                                       resourceRegistry);
+                    }
                 }
-
                 sources.push_back(normal);
             }
-        } else {
+        }
+        
+        // It's possible we're going to mix and match CPU normals and GPU refinement
+        if (!cpuSmoothNormals || !cpuRefinement)
+        {
             // GPU smooth normals doesn't need to have an explicit dependency.
             // The adjacency table should be committed before execution.
 
@@ -771,14 +781,17 @@ HdStMesh::_PopulateVertexPrimvars(HdSceneDelegate *sceneDelegate,
                     usePackedNormals ? HdTypeInt32_2_10_10_10_REV
                     : pointsDataType;
 
-                HdComputationSharedPtr smoothNormalsComputation(
-                    new HdSt_SmoothNormalsComputationGPU(
-                        _vertexAdjacency.get(),
-                        HdTokens->points,
-                        normalsName,
-                        pointsDataType,
-                        normalsDataType));
-                computations.push_back(smoothNormalsComputation);
+                // If we didn't calcuate normals on the CPU then need to do it here
+                if (!cpuSmoothNormals) {
+                    HdComputationSharedPtr smoothNormalsComputation(
+                        new HdSt_SmoothNormalsComputationGPU(
+                            _vertexAdjacency.get(),
+                            HdTokens->points,
+                            normalsName,
+                            pointsDataType,
+                            normalsDataType));
+                    computations.push_back(smoothNormalsComputation);
+                }
 
                 // note: we haven't had explicit dependency for GPU
                 // computations just yet. Currently they are executed
@@ -1422,7 +1435,8 @@ HdStMesh::_PropagateDirtyBits(HdDirtyBits bits) const
     // then the smooth normals computation needs the Points primvar
     // so mark Points as dirty, so that the scene delegate will provide
     // the data.
-    if ((bits & DirtySmoothNormals) && !HdStGLUtils::IsGpuComputeEnabled()) {
+    if ((bits & DirtySmoothNormals) &&
+        (!GarchResourceFactory::GetInstance()->GetContextCaps().gpuComputeNormalsEnabled)) {
         bits |= HdChangeTracker::DirtyPoints;
     }
 

@@ -84,14 +84,14 @@ public:
     static GarchDrawTargetRefPtr New(GarchDrawTargetPtr const &drawtarget);
 
     struct AttachmentDesc {
-        AttachmentDesc(std::string const & _name,
+        AttachmentDesc(std::string const &_name,
                        GLenum _format, GLenum _type, GLenum _internalFormat)
             : name(_name)
             , format(_format)
             , type(_type)
             , internalFormat(_internalFormat) {}
 
-        std::string const &name;
+        std::string const name;
         GLenum format;
         GLenum type;
         GLenum internalFormat;
