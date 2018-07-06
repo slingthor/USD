@@ -524,6 +524,8 @@ HdStMesh::_PopulateVertexPrimVars(HdSceneDelegate *sceneDelegate,
 
     bool cpuSmoothNormals =
         (!HdStRenderContextCaps::GetInstance().gpuComputeNormals);
+    bool cpuRefinement =
+        (!HdStRenderContextCaps::GetInstance().gpuComputeEnabled);
 
     // Don't call _GetRefineLevelForDesc(desc) instead of GetRefineLevel(). Why?
     //
@@ -657,7 +659,6 @@ HdStMesh::_PopulateVertexPrimVars(HdSceneDelegate *sceneDelegate,
                                                  HdTokens->normals;
         
         // The smooth normals computation uses the points primvar as a source.
-        //
         if (cpuSmoothNormals) {
             // CPU smooth normals require the points source data
             // So it is expected to be dirty.  So if the
@@ -671,21 +672,27 @@ HdStMesh::_PopulateVertexPrimVars(HdSceneDelegate *sceneDelegate,
                                                               points,
                                                               normalsName,
                                                               usePackedNormals);
-
-                if (doRefine) {
-                    normal = _RefinePrimVar(normal, /*varying=*/false,
-                                                      &computations, _topology);
-                } else if (doQuadrangulate) {
-                    normal = _QuadrangulatePrimVar(normal,
-                                                   &computations,
-                                                   _topology,
-                                                   id,
-                                                   resourceRegistry);
+ 
+                if (cpuRefinement)
+                {
+                    if (doRefine) {
+                        normal = _RefinePrimVar(normal, /*varying=*/false,
+                                                          &computations, _topology);
+                    } else if (doQuadrangulate) {
+                        normal = _QuadrangulatePrimVar(normal,
+                                                       &computations,
+                                                       _topology,
+                                                       id,
+                                                       resourceRegistry);
+                    }
                 }
-
                 sources.push_back(normal);
             }
-        } else {
+        }
+        
+        // It's possible we're going to mix and match CPU normals and GPU refinement
+        if (!cpuSmoothNormals || !cpuRefinement)
+        {
             // GPU smooth normals doesn't need to have an explicit dependency.
             // The adjacency table should be committed before execution.
 
@@ -735,14 +742,17 @@ HdStMesh::_PopulateVertexPrimVars(HdSceneDelegate *sceneDelegate,
                     usePackedNormals ? HdTypeInt32_2_10_10_10_REV
                     : pointsDataType;
 
-                HdComputationSharedPtr smoothNormalsComputation(
-                    new HdSt_SmoothNormalsComputationGPU(
-                        _vertexAdjacency.get(),
-                        HdTokens->points,
-                        normalsName,
-                        pointsDataType,
-                        normalsDataType));
-                computations.push_back(smoothNormalsComputation);
+                // If we didn't calcuate normals on the CPU then need to do it here
+                if (!cpuSmoothNormals) {
+                    HdComputationSharedPtr smoothNormalsComputation(
+                        new HdSt_SmoothNormalsComputationGPU(
+                            _vertexAdjacency.get(),
+                            HdTokens->points,
+                            normalsName,
+                            pointsDataType,
+                            normalsDataType));
+                    computations.push_back(smoothNormalsComputation);
+                }
 
                 // note: we haven't had explicit dependency for GPU
                 // computations just yet. Currently they are executed

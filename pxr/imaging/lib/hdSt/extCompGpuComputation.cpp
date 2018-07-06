@@ -80,6 +80,11 @@ HdStExtCompGpuComputation::Execute(
             "GPU computation '%s' executed for primvar '%s'\n",
             _id.GetText(), _dstName.GetText());
 
+#if defined(ARCH_GFX_METAL)
+    // Emit error until we support this
+    TF_CODING_ERROR("Metal Compute currently not supported");
+#endif
+
     if (!glDispatchCompute) {
         TF_WARN("glDispatchCompute not available");
         return;
