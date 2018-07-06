@@ -22,7 +22,8 @@
 // language governing permissions and limitations under the Apache License.
 //
 #include "pxr/imaging/glf/glew.h"
-#include "pxr/imaging/glf/contextCaps.h"
+#include "pxr/imaging/garch/contextCaps.h"
+#include "pxr/imaging/garch/resourceFactory.h"
 #if defined(ARCH_GFX_METAL)
 #include "pxr/imaging/mtlf/mtlDevice.h"
 #endif
@@ -170,7 +171,7 @@ HdStDispatchBuffer::HdStDispatchBuffer(TfToken const &role, int count,
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
 
-    GlfContextCaps const &caps = GlfContextCaps::GetInstance();
+    GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
 
     size_t stride = commandNumUints * sizeof(GLuint);
     size_t dataSize = count * stride;
@@ -259,7 +260,7 @@ HdStDispatchBuffer::CopyData(std::vector<GLuint> const &data)
 #endif
     if(HdEngine::GetRenderAPI() == HdEngine::OpenGL)
     {
-        GlfContextCaps const &caps = GlfContextCaps::GetInstance();
+        GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
 
         if (caps.directStateAccessEnabled) {
             glNamedBufferSubDataEXT(_entireResource->GetId(),

@@ -22,6 +22,10 @@
 // language governing permissions and limitations under the Apache License.
 //
 #include "pxr/imaging/glf/glew.h"
+
+#include "pxr/imaging/garch/contextCaps.h"
+#include "pxr/imaging/garch/resourceFactory.h"
+
 #include "pxr/imaging/mtlf/mtlDevice.h"
 #include "pxr/imaging/hdSt/Metal/vboSimpleMemoryBufferMetal.h"
 
@@ -30,8 +34,6 @@
 #include "pxr/base/tf/iterator.h"
 
 #include "pxr/imaging/hdSt/bufferResource.h"
-#include "pxr/imaging/hdSt/glUtils.h"
-#include "pxr/imaging/hdSt/renderContextCaps.h"
 #include "pxr/imaging/hdSt/vboSimpleMemoryManager.h"
 
 #include "pxr/imaging/hd/bufferArrayRange.h"
@@ -77,7 +79,7 @@ HdStVBOSimpleMemoryBufferMetal::Reallocate(
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
 
-    HdStRenderContextCaps const &caps = HdStRenderContextCaps::GetInstance();
+    GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
 
     HD_PERF_COUNTER_INCR(HdPerfTokens->vboRelocated);
 

@@ -47,7 +47,13 @@ class HdStBufferResource;
 typedef boost::shared_ptr<HdStBufferResource> HdStBufferResourceSharedPtr;
 
 typedef std::vector<
-    std::pair<TfToken, HdStBufferResourceSharedPtr> > HdStBufferResourceNamedList;
+    std::pair<TfToken, HdBufferResourceSharedPtr> > HdStBufferResourceNamedList;
+
+typedef std::pair<TfToken, HdBufferResourceSharedPtr>
+    HdStBufferResourceNamedPair;
+typedef std::vector<HdStBufferResourceNamedPair>
+    HdStBufferResourceNamedList;
+
 
 /// \class HdStBufferResource
 ///

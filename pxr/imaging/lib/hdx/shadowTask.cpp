@@ -183,16 +183,16 @@ HdxShadowTask::_Sync(HdTaskContext* ctx)
         }
     }
 
-    if (!TF_VERIFY(lights.size() == glfLights.size())) {
+    if (!TF_VERIFY(lights.size() == garchLights.size())) {
         return;
     }
     
     // Iterate through all lights and for those that have shadows enabled
     // and ensure we have enough passes to render the shadows.
     size_t passCount = 0;
-    for (size_t lightId = 0; lightId < glfLights.size(); lightId++) {
+    for (size_t lightId = 0; lightId < garchLights.size(); lightId++) {
 
-        if (!glfLights[lightId].HasShadow()) {
+        if (!garchLights[lightId].HasShadow()) {
             continue;
         }
 

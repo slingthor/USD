@@ -22,10 +22,11 @@
 // language governing permissions and limitations under the Apache License.
 //
 #include "pxr/imaging/glf/glew.h"
-#include "pxr/imaging/glf/contextCaps.h"
+
+#include "pxr/imaging/garch/contextCaps.h"
+#include "pxr/imaging/garch/resourceFactory.h"
 
 #include "pxr/imaging/hdSt/textureResource.h"
-#include "pxr/imaging/hdSt/renderContextCaps.h"
 #include "pxr/imaging/hdSt/GL/glConversions.h"
 #include "pxr/imaging/hdSt/GL/textureResourceGL.h"
 #if defined(ARCH_GFX_METAL)

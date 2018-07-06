@@ -25,11 +25,13 @@
 
 #include "pxr/imaging/hdSt/GL/textureResourceGL.h"
 #include "pxr/imaging/hdSt/GL/glConversions.h"
-#include "pxr/imaging/hdSt/renderContextCaps.h"
 
 #include "pxr/imaging/hd/perfLog.h"
 #include "pxr/imaging/glf/baseTexture.h"
 #include "pxr/imaging/glf/ptexTexture.h"
+
+#include "pxr/imaging/garch/contextCaps.h"
+#include "pxr/imaging/garch/resourceFactory.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -98,7 +100,7 @@ HdStSimpleTextureResourceGL::HdStSimpleTextureResourceGL(
     }
 
     bool bindlessTexture = 
-        HdStRenderContextCaps::GetInstance().bindlessTextureEnabled;
+        GarchResourceFactory::GetInstance()->GetContextCaps().bindlessTextureEnabled;
     if (bindlessTexture) {
         GLuint handle = GetTexelsTextureHandle();
         if (handle) {

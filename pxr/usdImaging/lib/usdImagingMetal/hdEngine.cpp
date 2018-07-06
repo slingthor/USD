@@ -33,8 +33,6 @@
 #include "pxr/imaging/hd/tokens.h"
 #include "pxr/imaging/hd/version.h"
 
-#include "pxr/imaging/hdSt/renderContextCaps.h"
-
 #include "pxr/imaging/hdx/intersector.h"
 #include "pxr/imaging/hdx/rendererPluginRegistry.h"
 #include "pxr/imaging/hdx/tokens.h"
@@ -81,9 +79,6 @@ UsdImagingMetalHdEngine::UsdImagingMetalHdEngine(
     , _delegate(nullptr)
     , _renderPlugin(nullptr)
     , _taskController(nullptr)
-    , _lastViewMatrix(0.0)
-    , _lastViewport(0.0)
-    , _lastRefineLevel(0)
     , _selectionColor(1.0f, 1.0f, 0.0f, 1.0f)
     , _rootPath(rootPath)
     , _excludedPrimPaths(excludedPrimPaths)
@@ -188,23 +183,12 @@ UsdImagingMetalHdEngine::_PreSetTime(const UsdPrim& root, const RenderParams& pa
     // all prim refine levels will be dirtied.
     int refineLevel = _GetRefineLevel(params.complexity);
     _delegate->SetRefineLevelFallback(refineLevel);
-    if (refineLevel != _lastRefineLevel) {
-        _taskController->ResetImage();
-        _lastRefineLevel = refineLevel;
-    }
 }
 
 void
 UsdImagingMetalHdEngine::_PostSetTime(const UsdPrim& root, const RenderParams& params)
 {
     HD_TRACE_FUNCTION();
-    if (_isPopulated)
-        return;
-
-    // The delegate may have been populated from somewhere other than
-    // where we are drawing. This applys a compensating transformation that
-    // cancels out any accumulated transformation from the population root.
-    _delegate->SetRootCompensation(root.GetPath());
 }
 
 /*virtual*/
@@ -212,20 +196,17 @@ void
 UsdImagingMetalHdEngine::PrepareBatch(const UsdPrim& root, RenderParams params)
 {
     HD_TRACE_FUNCTION();
-
+    
     if (_CanPrepareBatch(root, params)) {
         if (!_isPopulated) {
+            _delegate->SetUsdDrawModesEnabled(params.enableUsdDrawModes);
             _delegate->Populate(root.GetStage()->GetPrimAtPath(_rootPath),
-                               _excludedPrimPaths);
+                                _excludedPrimPaths);
             _delegate->SetInvisedPrimPaths(_invisedPrimPaths);
             _isPopulated = true;
         }
-
+        
         _PreSetTime(root, params);
-        // Reset progressive rendering if we're changing the timecode.
-        if (_delegate->GetTime() != params.frame) {
-            _taskController->ResetImage();
-        }
         // SetTime will only react if time actually changes.
         _delegate->SetTime(params.frame);
         _PostSetTime(root, params);
@@ -285,7 +266,7 @@ UsdImagingMetalHdEngine::_PrepareBatch(
 {
     HD_TRACE_FUNCTION();
 
-    _Populate(engines, rootPrims);
+    _Populate(engines, rootPrims, params);
     _SetTimes(engines, rootPrims, times, params);
 }
 
@@ -297,19 +278,17 @@ UsdImagingMetalHdEngine::_SetTimes(const UsdImagingMetalHdEngineSharedPtrVector&
                               const RenderParams& params)
 {
     HD_TRACE_FUNCTION();
-
+    
     std::vector<UsdImagingDelegate*> delegates;
     delegates.reserve(engines.size());
-
+    
     for (size_t i = 0; i < engines.size(); ++i) {
         engines[i]->_PreSetTime(rootPrims[i], params);
         delegates.push_back(engines[i]->_delegate);
-        // Reset progressive rendering in each engine before setting timecode.
-        engines[i]->_taskController->ResetImage();
     }
-
+    
     UsdImagingDelegate::SetTimes(delegates, times);
-
+    
     for (size_t i = 0; i < engines.size(); ++i) {
         engines[i]->_PostSetTime(rootPrims[i], params);
     }
@@ -318,37 +297,40 @@ UsdImagingMetalHdEngine::_SetTimes(const UsdImagingMetalHdEngineSharedPtrVector&
 /* static */
 void 
 UsdImagingMetalHdEngine::_Populate(const UsdImagingMetalHdEngineSharedPtrVector& engines,
-                              const UsdPrimVector& rootPrims)
+                                   const UsdPrimVector& rootPrims,
+                                   const RenderParams& params)
 {
     HD_TRACE_FUNCTION();
-
+    
     std::vector<UsdImagingDelegate*> delegatesToPopulate;
     delegatesToPopulate.reserve(engines.size());
-
+    
     UsdPrimVector primsToPopulate;
     primsToPopulate.reserve(engines.size());
-
+    
     std::vector<SdfPathVector> pathsToExclude, pathsToInvis;
     pathsToExclude.reserve(engines.size());
     pathsToInvis.reserve(engines.size());
-
+    
     for (size_t i = 0; i < engines.size(); ++i) {
         if (!engines[i]->_isPopulated) {
+            engines[i]->_delegate->SetUsdDrawModesEnabled(
+                                                          params.enableUsdDrawModes);
             delegatesToPopulate.push_back(engines[i]->_delegate);
             primsToPopulate.push_back(
-                rootPrims[i].GetStage()->GetPrimAtPath(engines[i]->_rootPath));
+                                      rootPrims[i].GetStage()->GetPrimAtPath(engines[i]->_rootPath));
             pathsToExclude.push_back(engines[i]->_excludedPrimPaths);
             pathsToInvis.push_back(engines[i]->_invisedPrimPaths);
-
+            
             // Set _isPopulated to true immediately to weed out any duplicate
-            // engines. This is equivalent to what would happen if the 
+            // engines. This is equivalent to what would happen if the
             // consumer called the non-vectorized PrepareBatch on each
             // engine individually.
             engines[i]->_isPopulated = true;
         }
     }
-
-    UsdImagingDelegate::Populate(delegatesToPopulate, primsToPopulate, 
+    
+    UsdImagingDelegate::Populate(delegatesToPopulate, primsToPopulate,
                                  pathsToExclude, pathsToInvis);
 }
 
@@ -512,16 +494,13 @@ void
 UsdImagingMetalHdEngine::RenderBatch(const SdfPathVector& paths, RenderParams params)
 {
     _taskController->SetCameraClipPlanes(params.clipPlanes);
-    if (_UpdateHydraCollection(&_renderCollection, paths, params, &_renderTags)) {
-        // If the collection was updated, reset progressive rendering.
-        _taskController->ResetImage();
-    }
+    _UpdateHydraCollection(&_renderCollection, paths, params, &_renderTags);
     _taskController->SetCollection(_renderCollection);
-
+    
     HdxRenderTaskParams hdParams = _MakeHydraRenderParams(params);
     _taskController->SetRenderParams(hdParams);
     _taskController->SetEnableSelection(params.highlight);
-
+    
     Render(params);
 }
 
@@ -530,21 +509,18 @@ void
 UsdImagingMetalHdEngine::Render(const UsdPrim& root, RenderParams params)
 {
     PrepareBatch(root, params);
-
+    
     SdfPath rootPath = _delegate->GetPathForIndex(root.GetPath());
     SdfPathVector roots(1, rootPath);
-
+    
     _taskController->SetCameraClipPlanes(params.clipPlanes);
-    if (_UpdateHydraCollection(&_renderCollection, roots, params, &_renderTags)) {
-        // If the collection was updated, reset progressive rendering.
-        _taskController->ResetImage();
-    }
+    _UpdateHydraCollection(&_renderCollection, roots, params, &_renderTags);
     _taskController->SetCollection(_renderCollection);
-
+    
     HdxRenderTaskParams hdParams = _MakeHydraRenderParams(params);
     _taskController->SetRenderParams(hdParams);
     _taskController->SetEnableSelection(params.highlight);
-
+    
     Render(params);
 }
 
@@ -561,12 +537,6 @@ UsdImagingMetalHdEngine::TestIntersection(
     int *outHitInstanceIndex,
     int *outHitElementIndex)
 {
-    if (!HdStRenderContextCaps::GetInstance().SupportsHydra()) {
-        TF_CODING_ERROR("Current GL context doesn't support Hydra");
-
-       return false;
-    }
-
     SdfPath rootPath = _delegate->GetPathForIndex(root.GetPath());
     SdfPathVector roots(1, rootPath);
     _UpdateHydraCollection(&_intersectCollection, roots, params, &_renderTags);
@@ -626,11 +596,6 @@ UsdImagingMetalHdEngine::TestIntersectionBatch(
     PathTranslatorCallback pathTranslator,
     HitBatch *outHit)
 {
-    if (!HdStRenderContextCaps::GetInstance().SupportsHydra()) {
-        TF_CODING_ERROR("Current machine doesn't support Metal Hydra");
-       return false;
-    }
-
     _UpdateHydraCollection(&_intersectCollection, paths, params, &_renderTags);
 
     static const HdCullStyle USD_2_HD_CULL_STYLE[] =
@@ -686,12 +651,6 @@ UsdImagingMetalHdEngine::TestIntersectionBatch(
 void
 UsdImagingMetalHdEngine::Render(RenderParams params)
 {
-    // User is responsible for initalizing GL context and glew
-    if (!HdStRenderContextCaps::GetInstance().SupportsHydra()) {
-        TF_CODING_ERROR("Current OS/hardware doesn't support Hydra");
-        return;
-    }
-
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
     
     MTLCaptureManager *sharedCaptureManager = [MTLCaptureManager sharedCaptureManager];
@@ -735,7 +694,7 @@ UsdImagingMetalHdEngine::Render(RenderParams params)
     _engine.SetTaskContextData(HdxTokens->renderTags, renderTags);
 
     TfToken const& renderMode = params.enableIdRender ?
-    HdxTaskSetTokens->idRender : HdxTaskSetTokens->colorRender;
+        HdxTaskSetTokens->idRender : HdxTaskSetTokens->colorRender;
     _engine.Execute(*_renderIndex, _taskController->GetTasks(renderMode));
 
     [renderEncoder endEncoding];
@@ -870,31 +829,9 @@ UsdImagingMetalHdEngine::SetCameraState(const GfMatrix4d& viewMatrix,
                             const GfMatrix4d& projectionMatrix,
                             const GfVec4d& viewport)
 {
-    // If the view matrix changes at all, we need to reset the progressive
-    // render.
-    if (viewMatrix != _lastViewMatrix || viewport != _lastViewport) {
-        _lastViewMatrix = viewMatrix;
-        _lastViewport = viewport;
-        _taskController->ResetImage();
-    }
-
-    GfMatrix4d modifiedProjMatrix;
-    static GfMatrix4d zTransform;
-    
-    // Transform from [-1, 1] to [0, 1] clip space
-    static bool _zTransformSet = false;
-    if (!_zTransformSet) {
-        _zTransformSet = true;
-        zTransform.SetIdentity();
-        zTransform.SetScale(GfVec3d(1.0, 1.0, 0.5));
-        zTransform.SetTranslateOnly(GfVec3d(0.0, 0.0, 0.5));
-    }
-    
-    modifiedProjMatrix = projectionMatrix * zTransform;
-    
-    // usdview passes these matrices from Metal state.
+    // usdview passes these matrices from OpenGL state.
     // update the camera in the task controller accordingly.
-    _taskController->SetCameraMatrices(viewMatrix, modifiedProjMatrix);
+    _taskController->SetCameraMatrices(viewMatrix, projectionMatrix);
     _taskController->SetCameraViewport(viewport);
 }
 
@@ -927,9 +864,8 @@ UsdImagingMetalHdEngine::SetLightingStateFromOpenGL()
         _lightingContextForOpenGLState = GarchSimpleLightingContext::New();
     }
     _lightingContextForOpenGLState->SetStateFromOpenGL();
-
-    // Don't use the bypass lighting task.
-    _taskController->SetLightingState(_lightingContextForOpenGLState, false);
+    
+    _taskController->SetLightingState(_lightingContextForOpenGLState);
 }
 
 /* virtual */
@@ -938,7 +874,7 @@ UsdImagingMetalHdEngine::SetLightingState(GarchSimpleLightVector const &lights,
                                           GarchSimpleMaterial const &material,
                                           GfVec4f const &sceneAmbient)
 {
-    // we still use _lightingContextForGLState for convenience, but
+    // we still use _lightingContextForOpenGLState for convenience, but
     // set the values directly.
     if (!_lightingContextForOpenGLState) {
         _lightingContextForOpenGLState = GarchSimpleLightingContext::New();
@@ -947,21 +883,15 @@ UsdImagingMetalHdEngine::SetLightingState(GarchSimpleLightVector const &lights,
     _lightingContextForOpenGLState->SetMaterial(material);
     _lightingContextForOpenGLState->SetSceneAmbient(sceneAmbient);
     _lightingContextForOpenGLState->SetUseLighting(lights.size() > 0);
-
-    // Don't use the bypass lighting task.
-    _taskController->SetLightingState(_lightingContextForOpenGLState, false);
+    
+    _taskController->SetLightingState(_lightingContextForOpenGLState);
 }
 
 /* virtual */
 void
 UsdImagingMetalHdEngine::SetLightingState(GarchSimpleLightingContextPtr const &src)
 {
-    // Use the bypass lighting task; leave all lighting plumbing work to
-    // the incoming lighting context.
-    // XXX: the bypass lighting task will be removed when Phd takes over
-    // all imaging in Presto.
-
-    _taskController->SetLightingState(src, true);
+    _taskController->SetLightingState(src);
 }
 
 /* virtual */
@@ -1066,7 +996,7 @@ UsdImagingMetalHdEngine::IsDefaultPluginAvailable()
 {
     HfPluginDescVector descs;
     HdxRendererPluginRegistry::GetInstance().GetPluginDescs(&descs);
-    return descs.size() > 0;
+    return !descs.empty();
 }
 
 /* virtual */
@@ -1075,15 +1005,15 @@ UsdImagingMetalHdEngine::SetRendererPlugin(TfToken const &id)
 {
     HdxRendererPlugin *plugin = nullptr;
     TfToken actualId = id;
-
+    
     // Special case: TfToken() selects the first plugin in the list.
     if (actualId.IsEmpty()) {
         actualId = HdxRendererPluginRegistry::GetInstance().
-            GetDefaultPluginId();
+        GetDefaultPluginId();
     }
     plugin = HdxRendererPluginRegistry::GetInstance().
         GetRendererPlugin(actualId);
-
+    
     if (plugin == nullptr) {
         TF_CODING_ERROR("Couldn't find plugin for id %s", actualId.GetText());
         return false;
@@ -1091,8 +1021,13 @@ UsdImagingMetalHdEngine::SetRendererPlugin(TfToken const &id)
         // It's a no-op to load the same plugin twice.
         HdxRendererPluginRegistry::GetInstance().ReleasePlugin(plugin);
         return true;
+    } else if (!plugin->IsSupported()) {
+        // Don't do anything if the plugin isn't supported on the running
+        // system, just return that we're not able to set it.
+        HdxRendererPluginRegistry::GetInstance().ReleasePlugin(plugin);
+        return false;
     }
-
+    
     // Pull old delegate/task controller state.
     GfMatrix4d rootTransform = GfMatrix4d(1.0);
     bool isVisible = true;
@@ -1104,31 +1039,31 @@ UsdImagingMetalHdEngine::SetRendererPlugin(TfToken const &id)
     if (!selection) {
         selection.reset(new HdxSelection);
     }
-
+    
     // Delete hydra state.
     _DeleteHydraResources();
-
+    
     // Recreate the render index.
     _renderPlugin = plugin;
     HdRenderDelegate *renderDelegate = _renderPlugin->CreateRenderDelegate();
     _renderIndex = HdRenderIndex::New(renderDelegate);
-
+    
     // Create the new delegate & task controller.
     _delegate = new UsdImagingDelegate(_renderIndex, _delegateID);
     _isPopulated = false;
-
+    
     _taskController = new HdxTaskController(_renderIndex,
         _delegateID.AppendChild(TfToken(TfStringPrintf(
-            "_UsdImaging_%s_%p",
-            TfMakeValidIdentifier(actualId.GetText()).c_str(),
-            this))));
-
+           "_UsdImaging_%s_%p",
+           TfMakeValidIdentifier(actualId.GetText()).c_str(),
+           this))));
+    
     // Rebuild state in the new delegate/task controller.
     _delegate->SetRootVisibility(isVisible);
     _delegate->SetRootTransform(rootTransform);
     _selTracker->SetSelection(selection);
     _taskController->SetSelectionColor(_selectionColor);
-
+    
     return true;
 }
 

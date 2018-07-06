@@ -22,10 +22,11 @@
 // language governing permissions and limitations under the Apache License.
 //
 #include "pxr/imaging/glf/glew.h"
-#include "pxr/imaging/glf/contextCaps.h"
 #include "pxr/imaging/glf/diagnostic.h"
 
+#include "pxr/imaging/garch/contextCaps.h"
 #include "pxr/imaging/garch/glslfx.h"
+#include "pxr/imaging/garch/resourceFactory.h"
 
 #include "pxr/imaging/hdSt/commandBuffer.h"
 #include "pxr/imaging/hdSt/cullingShaderKey.h"
@@ -82,7 +83,7 @@ HdSt_IndirectDrawBatchGL::_Init(HdStDrawItemInstance * drawItemInstance)
     drawItemInstance->SetBatchIndex(0);
     drawItemInstance->SetBatch(this);
     
-    GlfContextCaps const &caps = GlfContextCaps::GetInstance();
+    GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
 
     // remember buffer arrays version for dispatch buffer updating
     HdDrawItem const* drawItem = drawItemInstance->GetDrawItem();
@@ -108,7 +109,7 @@ HdSt_IndirectDrawBatchGL::_CullingProgram &
 HdSt_IndirectDrawBatchGL::_GetCullingProgram(
     HdStResourceRegistrySharedPtr const &resourceRegistry)
 {
-    GlfContextCaps const &caps = GlfContextCaps::GetInstance();
+    GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
 
     if (!_cullingProgram.GetProgram() ||
         _lastTinyPrimCulling != caps.IsEnabledGPUTinyPrimCulling()) {
@@ -891,7 +892,7 @@ HdSt_IndirectDrawBatchGL::PrepareDraw(
         }
     }
 
-    GlfContextCaps const &caps = GlfContextCaps::GetInstance();
+    GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
     
     if (TfDebug::IsEnabled(HD_DRAWITEM_DRAWN)) {
         void const *bufferData = NULL;
@@ -993,7 +994,7 @@ HdSt_IndirectDrawBatchGL::ExecuteDraw(
     if (!TF_VERIFY(hdStProgram)) return;
     if (!TF_VERIFY(hdStProgram->Validate())) return;
 
-    GlfDebugLabelProgram(programId, "DrawingProgram");
+    GlfDebugLabelProgram(boost::dynamic_pointer_cast<HdStGLSLProgram>(hdStProgram)->GetGLProgram(), "DrawingProgram");
     hdStProgram->SetProgram();
 
     const HdSt_ResourceBinder &binder = program.GetBinder();
@@ -1216,7 +1217,7 @@ HdSt_IndirectDrawBatchGL::_GPUFrustumCulling(
         binder.BindBufferArray(instanceIndexBar);
     }
 
-    GlfContextCaps const &caps = GlfContextCaps::GetInstance();
+    GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
     
     if (caps.IsEnabledGPUCountVisibleInstances()) {
         _BeginGPUCountVisibleInstances(resourceRegistry);
@@ -1334,7 +1335,7 @@ HdSt_IndirectDrawBatchGL::_GPUFrustumCullingXFB(
     // dispatch buffer to 0 for primitives that are culled, skipping
     // over other elements.
 
-    glUseProgram(boost::dynamic_pointer_cast<HdStGLSLProgram>(program)->GetGLProgram());
+    program->SetProgram();
 
     const HdSt_ResourceBinder &binder = cullingProgram.GetBinder();
 
@@ -1343,7 +1344,7 @@ HdSt_IndirectDrawBatchGL::_GPUFrustumCullingXFB(
     // bind drawing coord, instance count
     binder.BindBufferArray(cullDispatchBar);
 
-    GlfContextCaps const &caps = GlfContextCaps::GetInstance();
+    GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
     
     if (caps.IsEnabledGPUCountVisibleInstances()) {
         _BeginGPUCountVisibleInstances(resourceRegistry);
@@ -1379,7 +1380,7 @@ HdSt_IndirectDrawBatchGL::_GPUFrustumCullingXFB(
     binder.UnbindConstantBuffer(constantBar);
     binder.UnbindBufferArray(cullDispatchBar);
 
-    glUseProgram(0);
+    program->UnsetProgram();
 }
 
 void
@@ -1444,7 +1445,7 @@ HdSt_IndirectDrawBatchGL::_BeginGPUCountVisibleInstances(
         *((GLint *)_resultBuffer->GetMappedAddress()) = 0;
     } else {
         GLint count = 0;
-        GlfContextCaps const &caps = GlfContextCaps::GetInstance();
+        GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
         if (caps.directStateAccessEnabled) {
             glNamedBufferSubDataEXT(_resultBuffer->GetId(), 0,
                                     sizeof(count), &count);
@@ -1480,7 +1481,7 @@ HdSt_IndirectDrawBatchGL::_EndGPUCountVisibleInstances(GLsync resultSync, size_t
         *result = *((GLint *)_resultBuffer->GetMappedAddress());
     } else {
         GLint count = 0;
-        GlfContextCaps const &caps = GlfContextCaps::GetInstance();
+        GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
         if (caps.directStateAccessEnabled) {
             glGetNamedBufferSubDataEXT(_resultBuffer->GetId(), 0,
                                        sizeof(count), &count);
@@ -1593,7 +1594,7 @@ HdSt_IndirectDrawBatchGL::_CullingProgram::_Link(
             ? drawArraysOutputs
             : drawElementsOutputs;
 
-        const int nOutputs = 5;
+        const int nOutputs = 6;
         static_assert(
             sizeof(drawArraysOutputs)/sizeof(drawArraysOutputs[0])
             == nOutputs,

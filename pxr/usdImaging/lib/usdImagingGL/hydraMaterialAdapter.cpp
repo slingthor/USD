@@ -283,7 +283,7 @@ UsdImagingGLHydraMaterialAdapter::_GetSurfaceShaderPrim(
 {
     // Determine the path to the preview shader and return it.
     if (UsdShadeShader glslfxSurface =  material.ComputeSurfaceSource(
-            /* purpose */GlfGLSLFXTokens->glslfx)) {
+            /* purpose */GarchGLSLFXTokens->glslfx)) {
         TF_DEBUG(USDIMAGING_SHADERS).Msg("\t GLSLFX surface: %s\n", 
             glslfxSurface.GetPath().GetText());            
         return glslfxSurface.GetPrim();

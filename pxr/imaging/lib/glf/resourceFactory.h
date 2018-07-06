@@ -27,14 +27,22 @@
 /// \file glf/resourceFactory.h
 
 #include "pxr/pxr.h"
+#include "pxr/imaging/glf/contextCaps.h"
 #include "pxr/imaging/garch/resourceFactory.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
+
+class GlfContextCaps;
 
 class GlfResourceFactory : public GarchResourceFactoryInterface {
 public:
     GlfResourceFactory();
     virtual ~GlfResourceFactory();
+
+    // GarchContextCaps
+    virtual GarchContextCaps const& GetContextCaps() const override {
+        return contextCaps;
+    }
 
     // GarchSimpleLightingContext creation
     virtual GarchSimpleLightingContext *NewSimpleLightingContext() const override;
@@ -65,6 +73,9 @@ public:
     
     // BaseTexture
     virtual GarchBaseTexture *NewBaseTexture() const override;
+    
+private:
+    GlfContextCaps contextCaps;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

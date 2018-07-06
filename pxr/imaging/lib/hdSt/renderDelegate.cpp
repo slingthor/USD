@@ -44,9 +44,11 @@
 #include "pxr/imaging/hd/extComputation.h"
 #include "pxr/imaging/hd/perfLog.h"
 
-#include "pxr/imaging/glf/contextCaps.h"
+#include "pxr/imaging/garch/contextCaps.h"
+#include "pxr/imaging/garch/resourceFactory.h"
+
 #include "pxr/imaging/glf/diagnostic.h"
-#include "pxr/imaging/glf/glslfx.h"
+#include "pxr/imaging/garch/glslfx.h"
 
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -312,7 +314,7 @@ HdStRenderDelegate::CommitResources(HdChangeTracker *tracker)
 bool
 HdStRenderDelegate::IsSupported()
 {
-    return (GlfContextCaps::GetInstance().glVersion >= 400);
+    return (GarchResourceFactory::GetInstance()->GetContextCaps().apiVersion >= 400);
 }
 
 

@@ -21,17 +21,17 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#include "pxr/usdImaging/usdImagingMetal/textureUtils.h"
+#include "pxr/usdImaging/usdImagingGL/textureUtils.h"
 
 #include "pxr/usdImaging/usdImaging/debugCodes.h"
 #include "pxr/usdImaging/usdImaging/delegate.h"
 #include "pxr/usdImaging/usdImaging/tokens.h"
 
+#include "pxr/imaging/mtlf/ptexTexture.h"
+
 #include "pxr/imaging/garch/glslfx.h"
 #include "pxr/imaging/garch/textureHandle.h"
 #include "pxr/imaging/garch/textureRegistry.h"
-
-#include "pxr/imaging/glf/ptexTexture.h"
 
 #include "pxr/imaging/hd/material.h"
 #include "pxr/imaging/hd/tokens.h"
@@ -39,57 +39,55 @@
 
 #include "pxr/base/tf/fileUtils.h"
 
-#include "pxr/usd/usdHydra/shader.h"
-#include "pxr/usd/usdHydra/uvTexture.h"
-#include "pxr/usd/usdHydra/primvar.h"
 #include "pxr/usd/usdHydra/tokens.h"
+#include "pxr/usd/usdShade/shader.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
 HdTextureResource::ID
 UsdImagingMetal_GetTextureResourceID(UsdPrim const& usdPrim,
-                                  SdfPath const& usdPath,
-                                  UsdTimeCode time,
-                                  size_t salt)
+                                     SdfPath const& usdPath,
+                                     UsdTimeCode time,
+                                     size_t salt)
 {
     // Compute the hash, but we need to validate that the texture exists
     // (in case we need to return a fallback texture).
     size_t hash = usdPath.GetHash();
-
+    
     // Salt the result to prevent collisions in non-shared imaging.
     // Note that this salt is ignored if we end up using a fallback
     // texture below.
     boost::hash_combine(hash, salt);
-
+    
     if (!usdPrim || usdPath == SdfPath())
         return HdTextureResource::ID(hash);
-
+    
     UsdAttribute attr = usdPrim.GetAttribute(usdPath.GetNameToken());
     SdfAssetPath asset;
     if (!attr || !attr.Get(&asset, time))
         return HdTextureResource::ID(hash);
-
+    
     TfToken filePath = TfToken(asset.GetResolvedPath());
     // Fallback to the literal path if it couldn't be resolved.
     if (filePath.IsEmpty())
         filePath = TfToken(asset.GetAssetPath());
-
-    const bool isPtex = GlfIsSupportedPtexTexture(filePath);
-
+    
+    const bool isPtex = MtlfIsSupportedPtexTexture(filePath);
+    
     if (!TfPathExists(filePath)) {
         if (isPtex) {
-            TF_WARN("Unable to find Texture '%s' with path '%s'. Fallback " 
-                    "textures are not supported for ptex", 
+            TF_WARN("Unable to find Texture '%s' with path '%s'. Fallback "
+                    "textures are not supported for ptex",
                     filePath.GetText(), usdPath.GetText());
-            return HdTextureResource::ComputeFallbackPtexHash(); 
+            return HdTextureResource::ComputeFallbackPtexHash();
         } else {
-            TF_WARN("Unable to find Texture '%s' with path '%s'. A black " 
-                    "texture will be substituted in its place.", 
+            TF_WARN("Unable to find Texture '%s' with path '%s'. A black "
+                    "texture will be substituted in its place.",
                     filePath.GetText(), usdPath.GetText());
             return HdTextureResource::ComputeFallbackUVHash();
         }
     }
-
+    
     return HdTextureResource::ID(hash);
 }
 
@@ -102,93 +100,98 @@ UsdImagingMetal_GetTextureResource(UsdPrim const& usdPrim,
         return HdTextureResourceSharedPtr();
     if (!TF_VERIFY(usdPath != SdfPath()))
         return HdTextureResourceSharedPtr();
-
+    
     UsdAttribute attr = usdPrim.GetAttribute(usdPath.GetNameToken());
     SdfAssetPath asset;
     if (!TF_VERIFY(attr) || !TF_VERIFY(attr.Get(&asset, time))) {
         return HdTextureResourceSharedPtr();
     }
-
+    
     TfToken filePath = TfToken(asset.GetResolvedPath());
+    
     // Fallback to the literal path if it couldn't be resolved.
-    if (filePath.IsEmpty())
+    if (filePath.IsEmpty()) {
         filePath = TfToken(asset.GetAssetPath());
-
-    const bool isPtex = GlfIsSupportedPtexTexture(filePath);
-
-    TfToken wrapS = UsdHydraTokens->repeat;
-    TfToken wrapT = UsdHydraTokens->repeat;
-    TfToken minFilter = UsdHydraTokens->linear;
-    TfToken magFilter = UsdHydraTokens->linear;
-    float memoryLimit = 0.0f;
-
-    // Mode overrides for UsdHydraTexture
+    }
+    
+    const bool isPtex = MtlfIsSupportedPtexTexture(filePath);
+    
+    // XXX: This default values should come from the registry
+    TfToken outWrapS("repeat");
+    TfToken outWrapT("repeat");
+    TfToken outMinFilter("linear");
+    TfToken outMagFilter("linear");
+    float outMemoryLimit = 0.0f;
+    
+    // Extract metadata abot the texture node
     UsdShadeShader shader(usdPrim);
     if (shader) {
-        UsdAttribute attr = UsdHydraTexture(shader).GetTextureMemoryAttr();
-        if (attr) attr.Get(&memoryLimit);
+        UsdAttribute attr = shader.GetInput(UsdHydraTokens->textureMemory);
+        if (attr) attr.Get(&outMemoryLimit);
+        
         if (!isPtex) {
-            UsdHydraUvTexture uvt(shader);
-            attr = uvt.GetWrapSAttr();
-            if (attr) attr.Get(&wrapS);
-            attr = uvt.GetWrapTAttr();
-            if (attr) attr.Get(&wrapT);
-            attr = uvt.GetMinFilterAttr();
-            if (attr) attr.Get(&minFilter);
-            attr = uvt.GetMagFilterAttr();
-            if (attr) attr.Get(&magFilter);
+            attr = shader.GetInput(UsdHydraTokens->wrapS);
+            if (attr) attr.Get(&outWrapS);
+            
+            attr = shader.GetInput(UsdHydraTokens->wrapT);
+            if (attr) attr.Get(&outWrapT);
+            
+            attr = shader.GetInput(UsdHydraTokens->minFilter);
+            if (attr) attr.Get(&outMinFilter);
+            
+            attr = shader.GetInput(UsdHydraTokens->magFilter);
+            if (attr) attr.Get(&outMagFilter);
         }
     }
-
+    
     TF_DEBUG(USDIMAGING_TEXTURES).Msg(
-            "Loading texture: id(%s), isPtex(%s)\n",
-            usdPath.GetText(),
-            isPtex ? "true" : "false");
- 
+                                      "Loading texture: id(%s), isPtex(%s)\n",
+                                      usdPath.GetText(),
+                                      isPtex ? "true" : "false");
+    
     if (!TfPathExists(filePath)) {
         TF_DEBUG(USDIMAGING_TEXTURES).Msg(
-                "File does not exist, returning nullptr");
-        TF_WARN("Unable to find Texture '%s' with path '%s'.", 
-            filePath.GetText(), usdPath.GetText());
+                                          "File does not exist, returning nullptr");
+        TF_WARN("Unable to find Texture '%s' with path '%s'.",
+                filePath.GetText(), usdPath.GetText());
         return HdTextureResourceSharedPtr();
     }
-
+    
     HdTextureResourceSharedPtr texResource;
-
     TfStopwatch timer;
     timer.Start();
     GarchTextureHandleRefPtr texture =
-        GarchTextureRegistry::GetInstance().GetTextureHandle(filePath);
-    texture->AddMemoryRequest(memoryLimit);
-    HdWrap wrapShd = (wrapS == UsdHydraTokens->clamp) ? HdWrapClamp
-                 : (wrapS == UsdHydraTokens->repeat) ? HdWrapRepeat
-                 : HdWrapBlack; 
-    HdWrap wrapThd = (wrapT == UsdHydraTokens->clamp) ? HdWrapClamp
-                 : (wrapT == UsdHydraTokens->repeat) ? HdWrapRepeat
-                 : HdWrapBlack; 
-    HdMagFilter magFilterHd = 
-                 (magFilter == UsdHydraTokens->nearest) ? HdMagFilterNearest
-                 : HdMagFilterLinear; 
-    HdMinFilter minFilterHd = 
-                 (minFilter == UsdHydraTokens->nearest) ? HdMinFilterNearest
-                 : (minFilter == UsdHydraTokens->nearestMipmapNearest) 
-                                ? HdMinFilterNearestMipmapNearest
-                 : (minFilter == UsdHydraTokens->nearestMipmapLinear) 
-                                ? HdMinFilterNearestMipmapLinear
-                 : (minFilter == UsdHydraTokens->linearMipmapNearest) 
-                                ? HdMinFilterLinearMipmapNearest
-                 : (minFilter == UsdHydraTokens->linearMipmapLinear) 
-                                ? HdMinFilterLinearMipmapLinear
-                 : HdMinFilterLinear; 
-
+    GarchTextureRegistry::GetInstance().GetTextureHandle(filePath);
+    texture->AddMemoryRequest(outMemoryLimit);
+    HdWrap wrapShd = (outWrapS == UsdHydraTokens->clamp) ? HdWrapClamp
+    : (outWrapS == UsdHydraTokens->repeat) ? HdWrapRepeat
+    : HdWrapBlack;
+    HdWrap wrapThd = (outWrapT == UsdHydraTokens->clamp) ? HdWrapClamp
+    : (outWrapT == UsdHydraTokens->repeat) ? HdWrapRepeat
+    : HdWrapBlack;
+    HdMagFilter magFilterHd =
+    (outMagFilter == UsdHydraTokens->nearest) ? HdMagFilterNearest
+    : HdMagFilterLinear;
+    HdMinFilter minFilterHd =
+    (outMinFilter == UsdHydraTokens->nearest) ? HdMinFilterNearest
+    : (outMinFilter == UsdHydraTokens->nearestMipmapNearest)
+    ? HdMinFilterNearestMipmapNearest
+    : (outMinFilter == UsdHydraTokens->nearestMipmapLinear)
+    ? HdMinFilterNearestMipmapLinear
+    : (outMinFilter == UsdHydraTokens->linearMipmapNearest)
+    ? HdMinFilterLinearMipmapNearest
+    : (outMinFilter == UsdHydraTokens->linearMipmapLinear)
+    ? HdMinFilterLinearMipmapLinear
+    : HdMinFilterLinear;
+    
     texResource = HdTextureResourceSharedPtr(
-                    HdStSimpleTextureResource::New(texture, isPtex, wrapShd, wrapThd,
-                                                   minFilterHd, magFilterHd));
+                                             HdStSimpleTextureResource::New(texture, isPtex, wrapShd, wrapThd,
+                                                                            minFilterHd, magFilterHd));
     timer.Stop();
-
-    TF_DEBUG(USDIMAGING_TEXTURES).Msg("    Load time: %.3f s\n", 
-                                     timer.GetSeconds());
-
+    
+    TF_DEBUG(USDIMAGING_TEXTURES).Msg("    Load time: %.3f s\n",
+                                      timer.GetSeconds());
+    
     return texResource;
 }
 

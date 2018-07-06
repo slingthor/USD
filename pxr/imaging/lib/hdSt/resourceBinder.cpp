@@ -22,7 +22,9 @@
 // language governing permissions and limitations under the Apache License.
 //
 #include "pxr/imaging/glf/glew.h"
-#include "pxr/imaging/glf/contextCaps.h"
+
+#include "pxr/imaging/garch/contextCaps.h"
+#include "pxr/imaging/garch/resourceFactory.h"
 
 #include "pxr/imaging/hdSt/resourceBinder.h"
 #include "pxr/imaging/hdSt/bufferResource.h"
@@ -168,11 +170,11 @@ HdSt_ResourceBinder::ResolveBindings(HdStDrawItem const *drawItem,
 
     // GL context caps
     const bool ssboEnabled
-        = GlfContextCaps::GetInstance().shaderStorageBufferEnabled;
+        = GarchResourceFactory::GetInstance()->GetContextCaps().shaderStorageBufferEnabled;
     const bool bindlessUniformEnabled
-        = GlfContextCaps::GetInstance().bindlessBufferEnabled;
+        = GarchResourceFactory::GetInstance()->GetContextCaps().bindlessBufferEnabled;
     const bool bindlessTextureEnabled
-        = GlfContextCaps::GetInstance().bindlessTextureEnabled;
+        = GarchResourceFactory::GetInstance()->GetContextCaps().bindlessTextureEnabled;
 
     HdBinding::Type arrayBufferBindingType = HdBinding::TBO;  // 3.0
     if (bindlessUniformEnabled) {
@@ -643,7 +645,7 @@ HdSt_ResourceBinder::ResolveComputeBindings(
 
     // GL context caps
     HdBinding::Type bindingType =
-        (GlfContextCaps::GetInstance().bindlessBufferEnabled
+        (GarchResourceFactory::GetInstance()->GetContextCaps().bindlessBufferEnabled
          ? HdBinding::BINDLESS_SSBO_RANGE : HdBinding::SSBO);
 
     // binding assignments
@@ -678,206 +680,6 @@ HdSt_ResourceBinder::BindBuffer(TfToken const &name,
                                 HdBufferResourceSharedPtr const &buffer) const
 {
     BindBuffer(name, buffer, buffer->GetOffset(), /*level=*/-1);
-}
-
-void
-HdSt_ResourceBinder::BindBuffer(TfToken const &name,
-                              HdStBufferResourceGLSharedPtr const &buffer,
-                              int offset,
-                              int level) const
-{
-    HD_TRACE_FUNCTION();
-
-    // it is possible that the buffer has not been initialized when
-    // the instanceIndex is empty (e.g. FX points. see bug 120354)
-    if (buffer->GetId() == 0) return;
-
-    HdBinding binding = GetBinding(name, level);
-    HdBinding::Type type = binding.GetType();
-    int loc              = binding.GetLocation();
-    int textureUnit      = binding.GetTextureUnit();
-
-    HdTupleType tupleType = buffer->GetTupleType();
-
-    void const* offsetPtr =
-        reinterpret_cast<const void*>(
-            static_cast<intptr_t>(offset));
-    switch(type) {
-    case HdBinding::VERTEX_ATTR:
-        glBindBuffer(GL_ARRAY_BUFFER, buffer->GetId());
-        glVertexAttribPointer(loc,
-                  _GetNumComponents(tupleType.type),
-                  HdStGLConversions::GetGLAttribType(tupleType.type),
-                  _ShouldBeNormalized(tupleType.type),
-                              buffer->GetStride(),
-                              offsetPtr);
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
-
-        glEnableVertexAttribArray(loc);
-        break;
-    case HdBinding::DRAW_INDEX:
-        glBindBuffer(GL_ARRAY_BUFFER, buffer->GetId());
-        glVertexAttribIPointer(loc,
-                               HdGetComponentCount(tupleType.type),
-                               GL_INT,
-                               buffer->GetStride(),
-                               offsetPtr);
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
-        glEnableVertexAttribArray(loc);
-        break;
-    case HdBinding::DRAW_INDEX_INSTANCE:
-        glBindBuffer(GL_ARRAY_BUFFER, buffer->GetId());
-        glVertexAttribIPointer(loc,
-                               HdGetComponentCount(tupleType.type),
-                               GL_INT,
-                               buffer->GetStride(),
-                               offsetPtr);
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
-
-        // set the divisor to uint-max so that the same base value is used
-        // for all instances.
-        glVertexAttribDivisor(loc,
-                              std::numeric_limits<GLint>::max());
-        glEnableVertexAttribArray(loc);
-        break;
-    case HdBinding::DRAW_INDEX_INSTANCE_ARRAY:
-        glBindBuffer(GL_ARRAY_BUFFER, buffer->GetId());
-        // instancerNumLevels is represented by the tuple size.
-        // We unroll this to an array of int[1] attributes.
-        for (size_t i = 0; i < buffer->GetTupleType().count; ++i) {
-            offsetPtr = reinterpret_cast<const void*>(offset + i*sizeof(int));
-            glVertexAttribIPointer(loc, 1, GL_INT, buffer->GetStride(),
-                                   offsetPtr);
-            // set the divisor to uint-max so that the same base value is used
-            // for all instances.
-            glVertexAttribDivisor(loc, std::numeric_limits<GLint>::max());
-            glEnableVertexAttribArray(loc);
-            ++loc;
-        }
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
-        break;
-    case HdBinding::INDEX_ATTR:
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, buffer->GetId());
-        break;
-    case HdBinding::BINDLESS_UNIFORM:
-        // at least in nvidia driver 346.59, this query call doesn't show
-        // any pipeline stall.
-        if (!glIsNamedBufferResidentNV(buffer->GetId())) {
-            glMakeNamedBufferResidentNV(buffer->GetId(), GL_READ_WRITE);
-        }
-        glUniformui64NV(loc, buffer->GetGPUAddress());
-        break;
-    case HdBinding::SSBO:
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, loc,
-                         buffer->GetId());
-        break;
-    case HdBinding::BINDLESS_SSBO_RANGE:
-        // at least in nvidia driver 346.59, this query call doesn't show
-        // any pipeline stall.
-        if (!glIsNamedBufferResidentNV(buffer->GetId())) {
-            glMakeNamedBufferResidentNV(buffer->GetId(), GL_READ_WRITE);
-        }
-        glUniformui64NV(loc, buffer->GetGPUAddress()+offset);
-        break;
-    case HdBinding::DISPATCH:
-        glBindBuffer(GL_DRAW_INDIRECT_BUFFER, buffer->GetId());
-        break;
-    case HdBinding::UBO:
-    case HdBinding::UNIFORM:
-        glBindBufferRange(GL_UNIFORM_BUFFER, loc,
-                          buffer->GetId(),
-                          offset,
-                          buffer->GetStride());
-        break;
-    case HdBinding::TBO:
-        if (loc != HdBinding::NOT_EXIST) {
-            glUniform1i(loc, textureUnit);
-            glActiveTexture(GL_TEXTURE0 + textureUnit);
-            glBindSampler(textureUnit, 0);
-            glBindTexture(GL_TEXTURE_BUFFER, buffer->GetTextureBuffer());
-        }
-        break;
-    case HdBinding::TEXTURE_2D:
-        // nothing
-        break;
-    default:
-        TF_CODING_ERROR("binding type %d not found for %s",
-                        type, name.GetText());
-        break;
-    }
-}
-
-void
-HdSt_ResourceBinder::UnbindBuffer(TfToken const &name,
-                                HdStBufferResourceGLSharedPtr const &buffer,
-                                int level) const
-{
-    HD_TRACE_FUNCTION();
-
-    // it is possible that the buffer has not been initialized when
-    // the instanceIndex is empty (e.g. FX points)
-    if (buffer->GetId() == 0) return;
-
-    HdBinding binding = GetBinding(name, level);
-    HdBinding::Type type = binding.GetType();
-    int loc = binding.GetLocation();
-
-    switch(type) {
-    case HdBinding::VERTEX_ATTR:
-        glDisableVertexAttribArray(loc);
-        break;
-    case HdBinding::DRAW_INDEX:
-        glDisableVertexAttribArray(loc);
-        break;
-    case HdBinding::DRAW_INDEX_INSTANCE:
-        glDisableVertexAttribArray(loc);
-        glVertexAttribDivisor(loc, 0);
-        break;
-    case HdBinding::DRAW_INDEX_INSTANCE_ARRAY:
-        // instancerNumLevels is represented by the tuple size.
-        for (size_t i = 0; i < buffer->GetTupleType().count; ++i) {
-            glDisableVertexAttribArray(loc);
-            glVertexAttribDivisor(loc, 0);
-            ++loc;
-        }
-        break;
-    case HdBinding::INDEX_ATTR:
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-        break;
-    case HdBinding::BINDLESS_UNIFORM:
-        if (glIsNamedBufferResidentNV(buffer->GetId())) {
-            glMakeNamedBufferNonResidentNV(buffer->GetId());
-        }
-        break;
-    case HdBinding::SSBO:
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, loc, 0);
-        break;
-    case HdBinding::BINDLESS_SSBO_RANGE:
-        if (glIsNamedBufferResidentNV(buffer->GetId())) {
-            glMakeNamedBufferNonResidentNV(buffer->GetId());
-        }
-        break;
-    case HdBinding::DISPATCH:
-        glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0);
-        break;
-    case HdBinding::UBO:
-    case HdBinding::UNIFORM:
-        glBindBufferBase(GL_UNIFORM_BUFFER, loc, 0);
-        break;
-    case HdBinding::TBO:
-        if (loc != HdBinding::NOT_EXIST) {
-            glActiveTexture(GL_TEXTURE0 + binding.GetTextureUnit());
-            glBindTexture(GL_TEXTURE_BUFFER, 0);
-        }
-        break;
-    case HdBinding::TEXTURE_2D:
-        // nothing
-        break;
-    default:
-        TF_CODING_ERROR("binding type %d not found for %s",
-                        type, name.GetText());
-        break;
-    }
 }
 
 void
@@ -1076,65 +878,6 @@ HdSt_ResourceBinder::BindUniformf(TfToken const &name,
         glUniformMatrix4fv(location, 1, /*transpose=*/false, value);
     } else {
         TF_CODING_ERROR("Invalid count %d.", count);
-    }
-}
-
-void
-HdSt_ResourceBinder::IntrospectBindings(HdStResourceGL const & programResource)
-{
-    GlfContextCaps const &caps = GlfContextCaps::GetInstance();
-
-    GLuint program = programResource.GetId();
-
-    if (ARCH_UNLIKELY(!caps.shadingLanguage420pack)) {
-        GLint numUBO = 0;
-        glGetProgramiv(program, GL_ACTIVE_UNIFORM_BLOCKS, &numUBO);
-
-        const int MAX_NAME = 256;
-        int length = 0;
-        char name[MAX_NAME+1];
-        for (int i = 0; i < numUBO; ++i) {
-            glGetActiveUniformBlockName(program, i, MAX_NAME, &length, name);
-            // note: ubo_ prefix is added in HdCodeGen::_EmitDeclaration()
-            if (strstr(name, "ubo_") == name) {
-                HdBinding binding;
-                if (TfMapLookup(_bindingMap, NameAndLevel(TfToken(name+4)), &binding)) {
-                    // set uniform block binding.
-                    glUniformBlockBinding(program, i, binding.GetLocation());
-                }
-            }
-        }
-    }
-
-    if (ARCH_UNLIKELY(!caps.explicitUniformLocation)) {
-        TF_FOR_ALL(it, _bindingMap) {
-            HdBinding binding = it->second;
-            HdBinding::Type type = binding.GetType();
-            std::string name = it->first.name;
-            int level = it->first.level;
-            if (level >=0) {
-                // follow nested instancing naming convention.
-                std::stringstream n;
-                n << name << "_" << level;
-                name = n.str();
-            }
-            if (type == HdBinding::UNIFORM       ||
-                type == HdBinding::UNIFORM_ARRAY ||
-                type == HdBinding::TBO) {
-                GLint loc = glGetUniformLocation(program, name.c_str());
-                // update location in resource binder.
-                // some uniforms may be optimized out.
-                if (loc < 0) loc = HdBinding::NOT_EXIST;
-                it->second.Set(type, loc, binding.GetTextureUnit());
-            } else if (type == HdBinding::TEXTURE_2D) {
-                // note: sampler2d_ prefix is added in
-                // HdCodeGen::_GenerateShaderParameters()
-                name = "sampler2d_" + name;
-                GLint loc = glGetUniformLocation(program, name.c_str());
-                if (loc < 0) loc = HdBinding::NOT_EXIST;
-                it->second.Set(type, loc, binding.GetTextureUnit());
-            }
-        }
     }
 }
 

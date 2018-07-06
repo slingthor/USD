@@ -38,6 +38,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 class GarchBaseTexture;
 class GarchBindingMap;
+class GarchContextCaps;
 class GarchDrawTarget;
 class GarchSimpleLightingContext;
 class GarchSimpleShadowArray;
@@ -52,6 +53,9 @@ TF_DECLARE_WEAK_AND_REF_PTRS(GarchUniformBlock);
 class GarchResourceFactoryInterface {
 public:
     virtual ~GarchResourceFactoryInterface() {}
+    
+    // GarchContextCaps
+    virtual GarchContextCaps const& GetContextCaps() const = 0;
     
     // SimpleLightingContext creation
     virtual GarchSimpleLightingContext *NewSimpleLightingContext() const = 0;
@@ -95,7 +99,7 @@ public:
 
     GarchResourceFactoryInterface *operator ->() const;
     void SetResourceFactory(GarchResourceFactoryInterface *factory);
-    ;
+
 private:
     GarchResourceFactory();
     ~GarchResourceFactory();

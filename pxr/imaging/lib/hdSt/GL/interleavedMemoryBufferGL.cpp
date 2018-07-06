@@ -22,7 +22,10 @@
 // language governing permissions and limitations under the Apache License.
 //
 #include "pxr/imaging/glf/glew.h"
-#include "pxr/imaging/glf/contextCaps.h"
+#include "pxr/imaging/glf/diagnostic.h"
+
+#include "pxr/imaging/garch/contextCaps.h"
+#include "pxr/imaging/garch/resourceFactory.h"
 
 #include "pxr/imaging/hdSt/GL/interleavedMemoryBufferGL.h"
 #include "pxr/imaging/hdSt/bufferResource.h"
@@ -121,7 +124,7 @@ HdStStripedInterleavedBufferGL::Reallocate(
     if (glGenBuffers) {
         glGenBuffers(1, &newId);
 
-        HdStRenderContextCaps const &caps = HdStRenderContextCaps::GetInstance();
+        GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
         if (caps.directStateAccessEnabled) {
             glNamedBufferDataEXT(newId, totalSize, /*data=*/NULL, GL_STATIC_DRAW);
         } else {

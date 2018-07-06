@@ -25,7 +25,6 @@
 
 #include "pxr/imaging/hdSt/Metal/textureResourceMetal.h"
 #include "pxr/imaging/hdSt/GL/glConversions.h"
-#include "pxr/imaging/hdSt/renderContextCaps.h"
 
 #include "pxr/imaging/hd/perfLog.h"
 

@@ -7,7 +7,7 @@ pxr_library(usdImagingMetal
         gf
         tf
         plug
-        tracelite
+        trace
         vt
         work
         garch

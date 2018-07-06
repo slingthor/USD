@@ -22,7 +22,8 @@
 // language governing permissions and limitations under the Apache License.
 //
 #include "pxr/imaging/glf/glew.h"
-#include "pxr/imaging/glf/contextCaps.h"
+#include "pxr/imaging/garch/contextCaps.h"
+#include "pxr/imaging/garch/resourceFactory.h"
 
 
 #include "pxr/imaging/hdSt/GL/bufferResourceGL.h"
@@ -99,7 +100,7 @@ HdStBufferResourceGL::SetAllocation(HdResourceGPUHandle id, size_t size)
     _id = id;
     HdResource::SetSize(size);
 
-    GlfContextCaps const & caps = GlfContextCaps::GetInstance();
+    GarchContextCaps const & caps = GarchResourceFactory::GetInstance()->GetContextCaps();
 
     // note: gpu address remains valid until the buffer object is deleted,
     // or when the data store is respecified via BufferData/BufferStorage.
@@ -174,7 +175,7 @@ HdStBufferResourceGL::GetTextureBuffer()
 void
 HdStBufferResourceGL::CopyData(size_t vboOffset, size_t dataSize, void const *data)
 {
-    GlfContextCaps const & caps = GlfContextCaps::GetInstance();
+    GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
     if (ARCH_LIKELY(caps.directStateAccessEnabled)) {
         glNamedBufferSubDataEXT(_id,
                                 vboOffset,
@@ -212,7 +213,7 @@ HdStBufferResourceGL::ReadBuffer(HdTupleType tupleType,
     
     GLsizeiptr vboSize = stride * (numElems-1) + bytesPerElement * arraySize;
     
-    GlfContextCaps const & caps = GlfContextCaps::GetInstance();
+    GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
     
     // read data
     std::vector<unsigned char> tmp(vboSize);
@@ -276,7 +277,7 @@ HdStBufferResourceGL::GetBufferContents() const
 {
     void* bufferData;
 
-    GlfContextCaps const & caps = GlfContextCaps::GetInstance();
+    GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
     if (caps.directStateAccessEnabled) {
         bufferData = glMapNamedBufferEXT(_id, GL_READ_ONLY);
     } else {

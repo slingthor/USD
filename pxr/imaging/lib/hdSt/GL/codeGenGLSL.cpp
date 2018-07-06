@@ -22,9 +22,10 @@
 // language governing permissions and limitations under the Apache License.
 //
 #include "pxr/imaging/glf/glew.h"
-#include "pxr/imaging/glf/contextCaps.h"
 
+#include "pxr/imaging/garch/contextCaps.h"
 #include "pxr/imaging/garch/glslfx.h"
+#include "pxr/imaging/garch/resourceFactory.h"
 
 #include "pxr/imaging/hdSt/geometricShader.h"
 #include "pxr/imaging/hdSt/package.h"
@@ -358,7 +359,7 @@ namespace {
     };
     std::ostream & operator << (std::ostream & out, const LayoutQualifier &lq)
     {
-        GlfContextCaps const &caps = GlfContextCaps::GetInstance();
+        GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
         int location = lq.binding.GetLocation();
 
         switch (lq.binding.GetType()) {
@@ -414,7 +415,7 @@ HdSt_CodeGenGLSL::Compile()
     _procVS.str(""); _procTCS.str(""), _procTES.str(""), _procGS.str("");
 
     // GLSL version.
-    GlfContextCaps const &caps = GlfContextCaps::GetInstance();
+    GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
     _genCommon << "#version " << caps.glslVersion << "\n";
 
     if (caps.bindlessBufferEnabled) {
@@ -776,7 +777,7 @@ HdSt_CodeGenGLSL::CompileComputeProgram()
     _procVS.str(""); _procTCS.str(""), _procTES.str(""), _procGS.str("");
     
     // GLSL version.
-    GlfContextCaps const &caps = GlfContextCaps::GetInstance();
+    GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
     _genCommon << "#version " << caps.glslVersion << "\n";
     
     if (caps.bindlessBufferEnabled) {
@@ -2190,7 +2191,7 @@ HdSt_CodeGenGLSL::_GenerateVertexPrimvar()
     std::stringstream accessorsVS, accessorsTCS, accessorsTES,
         accessorsGS, accessorsFS;
 
-    interstageStruct << "Primvars {\n";
+    interstageVertexData << "Primvars {\n";
 
     // vertex varying
     TF_FOR_ALL (it, _metaData.vertexData) {
@@ -2351,7 +2352,7 @@ HdSt_CodeGenGLSL::_GenerateVertexPrimvar()
     // Even though we currently always plumb vertexCoord as part of the drawing
     // coordinate, we expect clients to use this accessor when querying the base
     // vertex offset for a draw call.
-    GlfContextCaps const &caps = GlfContextCaps::GetInstance();
+    GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
     _genVS << "int GetBaseVertexOffset() {\n";
     if (caps.shaderDrawParametersEnabled) {
         if (caps.glslVersion < 460) { // use ARB extension
@@ -2445,7 +2446,7 @@ HdSt_CodeGenGLSL::_GenerateShaderParameters()
     std::stringstream declarations;
     std::stringstream accessors;
 
-    GlfContextCaps const &caps = GlfContextCaps::GetInstance();
+    GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
 
     TfToken typeName("ShaderData");
     TfToken varName("shaderData");

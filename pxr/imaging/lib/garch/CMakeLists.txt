@@ -43,6 +43,7 @@ pxr_library(garch
         bindingMap
         baseTexture
         baseTextureData
+        contextCaps
         drawTarget
         image
         imageRegistry

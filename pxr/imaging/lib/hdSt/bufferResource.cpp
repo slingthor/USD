@@ -23,7 +23,6 @@
 //
 #include "pxr/imaging/glf/glew.h"
 #include "pxr/imaging/hdSt/bufferResource.h"
-#include "pxr/imaging/hdSt/renderContextCaps.h"
 
 #include "pxr/imaging/hdSt/GL/bufferResourceGL.h"
 #if defined(ARCH_GFX_METAL)

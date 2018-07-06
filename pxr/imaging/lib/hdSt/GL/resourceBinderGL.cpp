@@ -23,10 +23,12 @@
 //
 #include "pxr/imaging/glf/glew.h"
 
+#include "pxr/imaging/garch/contextCaps.h"
+#include "pxr/imaging/garch/resourceFactory.h"
+
 #include "pxr/imaging/hdSt/GL/resourceBinderGL.h"
 #include "pxr/imaging/hdSt/GL/glslProgram.h"
 #include "pxr/imaging/hdSt/bufferResource.h"
-#include "pxr/imaging/hdSt/renderContextCaps.h"
 #include "pxr/imaging/hdSt/shaderCode.h"
 #include "pxr/imaging/hdSt/drawItem.h"
 #include "pxr/imaging/hdSt/GL/glConversions.h"
@@ -219,6 +221,14 @@ HdSt_ResourceBinderGL::BindBuffer(TfToken const &name,
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, loc,
                          bufferId);
         break;
+    case HdBinding::BINDLESS_SSBO_RANGE:
+        // at least in nvidia driver 346.59, this query call doesn't show
+        // any pipeline stall.
+        if (!glIsNamedBufferResidentNV(buffer->GetId())) {
+            glMakeNamedBufferResidentNV(buffer->GetId(), GL_READ_WRITE);
+        }
+        glUniformui64NV(loc, buffer->GetGPUAddress()+offset);
+        break;
     case HdBinding::DISPATCH:
         glBindBuffer(GL_DRAW_INDIRECT_BUFFER, bufferId);
         break;
@@ -291,6 +301,11 @@ HdSt_ResourceBinderGL::UnbindBuffer(TfToken const &name,
         break;
     case HdBinding::SSBO:
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, loc, 0);
+        break;
+    case HdBinding::BINDLESS_SSBO_RANGE:
+        if (glIsNamedBufferResidentNV(buffer->GetId())) {
+            glMakeNamedBufferNonResidentNV(buffer->GetId());
+        }
         break;
     case HdBinding::DISPATCH:
         glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0);
@@ -453,7 +468,7 @@ HdSt_ResourceBinderGL::BindUniformf(TfToken const &name,
 void
 HdSt_ResourceBinderGL::IntrospectBindings(HdStProgramSharedPtr programResource)
 {
-    HdStRenderContextCaps const &caps = HdStRenderContextCaps::GetInstance();
+    GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
     GLuint program = boost::dynamic_pointer_cast<HdStGLSLProgram>(programResource)->GetGLProgram();
 
     if (ARCH_UNLIKELY(!caps.shadingLanguage420pack)) {

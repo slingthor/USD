@@ -26,9 +26,7 @@
 
 #include "pxr/pxr.h"
 #include "pxr/imaging/glf/api.h"
-#include "pxr/base/tf/singleton.h"
-
-#include <boost/noncopyable.hpp>
+#include "pxr/imaging/garch/contextCaps.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -51,68 +49,15 @@ PXR_NAMESPACE_OPEN_SCOPE
 ///     subscribe to when the caps changes, so they can
 ///     update and invalidate.
 ///
-class GlfContextCaps : boost::noncopyable {
-public:
-
-    GLF_API
-    static GlfContextCaps &GetInstance();
-
-    // GL version
-    int glVersion;                    // 400 (4.0), 410 (4.1), ...
-
-    // Whether or not we are running with core profile
-    bool coreProfile;
-
-    // Max constants
-    int maxUniformBlockSize;
-    int maxShaderStorageBlockSize;
-    int maxTextureBufferSize;
-    int uniformBufferOffsetAlignment;
-
-    // GL extensions (ordered by version)
-    bool shaderStorageBufferEnabled;  // ARB_shader_storage_buffer_object (4.3)
-    bool bufferStorageEnabled;        // ARB_buffer_storage               (4.4)
-    bool directStateAccessEnabled;    // ARB_direct_state_access          (4.5)
-    bool multiDrawIndirectEnabled;    // ARB_multi_draw_indirect          (4.5)
-
-    bool bindlessTextureEnabled;      // ARB_bindless_texture
-    bool bindlessBufferEnabled;       // NV_shader_buffer_load
-
-    // GLSL version and extensions 
-    int glslVersion;                  // 400, 410, ...
-    bool explicitUniformLocation;     // ARB_explicit_uniform_location    (4.3)
-    bool shadingLanguage420pack;      // ARB_shading_language_420pack     (4.2)
-    bool shaderDrawParametersEnabled; // ARB_shader_draw_parameters       (4.5)
-
-    // workarounds for driver issues
-    bool copyBufferEnabled;
-
-    // GPU compute
-    bool gpuComputeEnabled;           // GPU subdivision, smooth normals  (4.3)
-
-    /// Returns whether to do frustum culling on the GPU
-    bool IsEnabledGPUFrustumCulling() const;
-    
-    /// Returns whether to read back the count of visible items from the GPU
-    /// Disabled by default, since there is some performance penalty.
-    bool IsEnabledGPUCountVisibleInstances() const;
-    
-    /// Returns whether to cull tiny prims (in screen space) during GPU culling
-    /// Enabled by default.
-    bool IsEnabledGPUTinyPrimCulling() const;
-    
-    /// Returns whether to do per-instance culling on the GPU
-    bool IsEnabledGPUInstanceFrustumCulling() const;
-    
-private:
-    void _LoadCaps();
+class GlfContextCaps : public GarchContextCaps {
+protected:
     GlfContextCaps();
-    ~GlfContextCaps() = default;
+    virtual ~GlfContextCaps() {}
+    
+    void _LoadCaps();
 
-    friend class TfSingleton<GlfContextCaps>;
+    friend class GlfResourceFactory;
 };
-
-GLF_API_TEMPLATE_CLASS(TfSingleton<GlfContextCaps>);
 
 PXR_NAMESPACE_CLOSE_SCOPE
 

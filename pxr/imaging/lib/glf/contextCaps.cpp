@@ -24,25 +24,17 @@
 #include "pxr/imaging/glf/glew.h"
 #include "pxr/imaging/glf/contextCaps.h"
 
-#if defined(ARCH_GFX_METAL)
-#include "pxr/imaging/mtlf/mtlDevice.h"
-#endif
-
-
 #include "pxr/imaging/glf/debugCodes.h"
 #include "pxr/imaging/glf/glew.h"
 
 #include "pxr/base/tf/diagnostic.h"
 #include "pxr/base/tf/envSetting.h"
-#include "pxr/base/tf/instantiateSingleton.h"
 
 #include <iostream>
 #include <mutex>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-
-TF_INSTANTIATE_SINGLETON(GlfContextCaps);
 
 TF_DEFINE_ENV_SETTING(GLF_ENABLE_SHADER_STORAGE_BUFFER, true,
                       "Use GL shader storage buffer (OpenGL 4.3)");
@@ -56,105 +48,21 @@ TF_DEFINE_ENV_SETTING(GLF_ENABLE_DIRECT_STATE_ACCESS, true,
                       "Use GL direct state access extention");
 TF_DEFINE_ENV_SETTING(GLF_ENABLE_COPY_BUFFER, true,
                       "Use GL copy buffer data");
-TF_DEFINE_ENV_SETTING(HD_ENABLE_GPU_COUNT_VISIBLE_INSTANCES, false,
-                      "Enable GPU frustum culling visible count query");
-TF_DEFINE_ENV_SETTING(HD_ENABLE_GPU_FRUSTUM_CULLING, true,
-                      "Enable GPU frustum culling");
-TF_DEFINE_ENV_SETTING(HD_ENABLE_GPU_TINY_PRIM_CULLING, true,
-                      "Enable tiny prim culling");
-TF_DEFINE_ENV_SETTING(HD_ENABLE_GPU_INSTANCE_FRUSTUM_CULLING, true,
-                      "Enable GPU per-instance frustum culling");
-
 
 
 TF_DEFINE_ENV_SETTING(GLF_GLSL_VERSION, 0,
                       "GLSL version");
 
-// To enable GPU compute features, OpenSubdiv must be configured to support
-// GLSL or Metal compute kernel.
-#if OPENSUBDIV_HAS_GLSL_COMPUTE || OPENSUBDIV_HAS_METAL_COMPUTE
-// default to GPU
-TF_DEFINE_ENV_SETTING(HD_ENABLE_GPU_COMPUTE, true,
-                      "Enable GPU smooth, quadrangulation and refinement");
-#else
-// default to CPU
-TF_DEFINE_ENV_SETTING(HD_ENABLE_GPU_COMPUTE, false,
-                      "Enable GPU smooth, quadrangulation and refinement");
-#endif
-
 // Initialize members to ensure a sane starting state.
 GlfContextCaps::GlfContextCaps()
-    : glVersion(0)
-    , coreProfile(false)
-
-    , maxUniformBlockSize(0)
-    , maxShaderStorageBlockSize(0)
-    , maxTextureBufferSize(0)
-    , uniformBufferOffsetAlignment(0)
-
-    , shaderStorageBufferEnabled(false)
-    , bufferStorageEnabled(false)
-    , directStateAccessEnabled(false)
-    , multiDrawIndirectEnabled(false)
-    , bindlessTextureEnabled(false)
-    , bindlessBufferEnabled(false)
-
-    , glslVersion(400)
-    , explicitUniformLocation(false)
-    , shadingLanguage420pack(false)
-    , shaderDrawParametersEnabled(false)
-
-    , copyBufferEnabled(true)
 {
-}
-
-/*static*/
-GlfContextCaps&
-GlfContextCaps::GetInstance()
-{
-    // Make sure the render context caps have been populated.
-    // This needs to be called on a thread that has the gl context
-    // bound before we go wide on the cpus.
-    //
-    // Because we have unit tests that side step almost all Hd machinery, we 
-    // must call _LoadCaps() here, so we can ensure the object is in a good 
-    // state for all clients.
-    //
-    // XXX: Move this to an render context change event api. (bug #124971)
-
     static std::once_flag renderContextLoad;
-    GlfContextCaps& caps = TfSingleton<GlfContextCaps>::GetInstance();
-    std::call_once(renderContextLoad, [&caps](){ caps._LoadCaps(); });
-    return caps;
+    std::call_once(renderContextLoad, [this](){ this->_LoadCaps(); });
 }
 
 void
 GlfContextCaps::_LoadCaps()
 {
-    // XXX: consider to move this class into glf
-
-#if defined(ARCH_GFX_METAL)
-    if (HdEngine::GetRenderAPI() == HdEngine::Metal)
-    {
-        shaderStorageBufferEnabled   = true;
-        bindlessTextureEnabled       = false;
-        bindlessBufferEnabled        = false;
-        multiDrawIndirectEnabled     = false;
-        directStateAccessEnabled     = true;
-        bufferStorageEnabled         = true;
-        shadingLanguage420pack       = true;
-        explicitUniformLocation      = true;
-        maxUniformBlockSize          = 64*1024;
-        maxShaderStorageBlockSize    = 1*1024*1024*1024;
-        maxTextureBufferSize         = 16*1024;
-        uniformBufferOffsetAlignment = 16;  //This limit isn't an actual thing for Metal. 16 is equal to the alignment rules of std140, which is convenient, nothing more.
-#if OPENSUBDIV_HAS_METAL_COMPUTE
-        //METAL_TODO: Metal always has compute capabilities but this is set to false for as the compute path doesn't work yet.
-        gpuComputeEnabled            = false; /*true*/
-#endif
-        return;
-    }
-#endif
     // note that this function is called without GL context, in some unit tests.
 
     shaderStorageBufferEnabled   = false;
@@ -184,10 +92,10 @@ GlfContextCaps::_LoadCaps()
         //              "4.1 <vendor-os-ver>"
         int major = std::max(0, std::min(9, *(dot-1) - '0'));
         int minor = std::max(0, std::min(9, *(dot+1) - '0'));
-        glVersion = major * 100 + minor * 10;
+        apiVersion = major * 100 + minor * 10;
     }
 
-    if (glVersion >= 200) {
+    if (apiVersion >= 200) {
         const char *glslVersionStr =
             (const char*)glGetString(GL_SHADING_LANGUAGE_VERSION);
         dot = strchr(glslVersionStr, '.');
@@ -205,7 +113,7 @@ GlfContextCaps::_LoadCaps()
     }
 
     // initialize by Core versions
-    if (glVersion >= 310) {
+    if (apiVersion >= 310) {
         glGetIntegerv(GL_MAX_UNIFORM_BLOCK_SIZE,
                       &maxUniformBlockSize);
         glGetIntegerv(GL_MAX_TEXTURE_BUFFER_SIZE,
@@ -213,28 +121,28 @@ GlfContextCaps::_LoadCaps()
         glGetIntegerv(GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT,
                       &uniformBufferOffsetAlignment);
     }
-    if (glVersion >= 320) {
+    if (apiVersion >= 320) {
         GLint profileMask = 0;
         glGetIntegerv(GL_CONTEXT_PROFILE_MASK, &profileMask);
         coreProfile = (profileMask & GL_CONTEXT_CORE_PROFILE_BIT);
     }
-    if (glVersion >= 420) {
+    if (apiVersion >= 420) {
         shadingLanguage420pack = true;
     }
-    if (glVersion >= 430) {
+    if (apiVersion >= 430) {
         shaderStorageBufferEnabled = true;
         explicitUniformLocation = true;
         glGetIntegerv(GL_MAX_SHADER_STORAGE_BLOCK_SIZE,
                       &maxShaderStorageBlockSize);
     }
-    if (glVersion >= 440) {
+    if (apiVersion >= 440) {
         bufferStorageEnabled = true;
     }
-    if (glVersion >= 450) {
+    if (apiVersion >= 450) {
         multiDrawIndirectEnabled = true;
         directStateAccessEnabled = true;
     }
-    if (glVersion >= 460) {
+    if (apiVersion >= 460) {
         shaderDrawParametersEnabled = true;
     }
 
@@ -306,7 +214,7 @@ GlfContextCaps::_LoadCaps()
         std::cout
             << "GlfContextCaps: \n"
             << "  GL version                         = "
-            <<    glVersion << "\n"
+            <<    apiVersion << "\n"
             << "  GLSL version                       = "
             <<    glslVersion << "\n"
 
@@ -343,87 +251,6 @@ GlfContextCaps::_LoadCaps()
         }
     }
 }
-
-bool
-HdStRenderContextCaps::IsEnabledGPUFrustumCulling() const
-{
-    switch(HdEngine::GetRenderAPI()) {
-        case HdEngine::RenderAPI::OpenGL:
-            // GPU XFB frustum culling should work since GL 4.0, but for now
-            // the shader frustumCull.glslfx requires explicit uniform location
-            static bool isEnabledGPUFrustumCulling =
-                TfGetEnvSetting(HD_ENABLE_GPU_FRUSTUM_CULLING) &&
-                explicitUniformLocation;
-            return isEnabledGPUFrustumCulling &&
-                !TfDebug::IsEnabled(HD_DISABLE_FRUSTUM_CULLING);
-#if defined(ARCH_GFX_METAL)
-        case HdEngine::RenderAPI::Metal:
-            return true;
-#endif
-        default:
-            TF_FATAL_CODING_ERROR("No program for this API");
-    }
-    return false;
-}
-
-bool
-HdStRenderContextCaps::IsEnabledGPUCountVisibleInstances() const
-{
-    switch(HdEngine::GetRenderAPI()) {
-        case HdEngine::RenderAPI::OpenGL:
-            static bool isEnabledGPUCountVisibleInstances =
-                TfGetEnvSetting(HD_ENABLE_GPU_COUNT_VISIBLE_INSTANCES);
-            return isEnabledGPUCountVisibleInstances;
-#if defined(ARCH_GFX_METAL)
-        case HdEngine::RenderAPI::Metal:
-            return true;
-#endif
-        default:
-            TF_FATAL_CODING_ERROR("No program for this API");
-    }
-    return false;
-}
-
-bool
-HdStRenderContextCaps::IsEnabledGPUTinyPrimCulling() const
-{
-    switch(HdEngine::GetRenderAPI()) {
-        case HdEngine::RenderAPI::OpenGL:
-            static bool isEnabledGPUTinyPrimCulling =
-                TfGetEnvSetting(HD_ENABLE_GPU_TINY_PRIM_CULLING);
-            return isEnabledGPUTinyPrimCulling &&
-                !TfDebug::IsEnabled(HD_DISABLE_TINY_PRIM_CULLING);
-#if defined(ARCH_GFX_METAL)
-        case HdEngine::RenderAPI::Metal:
-            return true;
-#endif
-        default:
-            TF_FATAL_CODING_ERROR("No program for this API");
-    }
-    return false;
-}
-
-bool
-HdStRenderContextCaps::IsEnabledGPUInstanceFrustumCulling() const
-{
-    switch(HdEngine::GetRenderAPI()) {
-        case HdEngine::RenderAPI::OpenGL:
-            // GPU instance frustum culling requires SSBO of bindless buffer
-            static bool isEnabledGPUInstanceFrustumCulling =
-                TfGetEnvSetting(HD_ENABLE_GPU_INSTANCE_FRUSTUM_CULLING) &&
-                (shaderStorageBufferEnabled || bindlessBufferEnabled);
-            return isEnabledGPUInstanceFrustumCulling;
-#if defined(ARCH_GFX_METAL)
-        case HdEngine::RenderAPI::Metal:
-            return true;
-#endif
-        default:
-            TF_FATAL_CODING_ERROR("No program for this API");
-    }
-    return false;
-}
-
-
 
 PXR_NAMESPACE_CLOSE_SCOPE
 

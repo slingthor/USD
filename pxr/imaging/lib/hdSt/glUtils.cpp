@@ -24,6 +24,7 @@
 #include "pxr/imaging/hdSt/glUtils.h"
 
 #include "pxr/imaging/glf/contextCaps.h"
+#include "pxr/imaging/glf/resourceFactory.h"
 
 #include "pxr/base/gf/vec2d.h"
 #include "pxr/base/gf/vec2f.h"
@@ -62,7 +63,7 @@ TF_DEFINE_ENV_SETTING(HD_ENABLE_GPU_COMPUTE, false,
 static void
 _InitializeGPUComputeEnabled(bool *gpuComputeEnabled)
 {
-    const GlfContextCaps &caps = GlfContextCaps::GetInstance();
+    GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
     
     // GPU Compute
     if (TfGetEnvSetting(HD_ENABLE_GPU_COMPUTE)) {
@@ -150,7 +151,7 @@ HdStGLUtils::ReadBuffer(GLint vbo,
     //
     const GLsizeiptr vboSize = stride * (numElems-1) + bytesPerElement;
 
-    GlfContextCaps const &caps = GlfContextCaps::GetInstance();
+    GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
 
     // Read data from GL
     std::vector<unsigned char> tmp(vboSize);
@@ -264,7 +265,7 @@ HdStGLBufferRelocator::AddRange(GLintptr readOffset,
 void
 HdStGLBufferRelocator::Commit()
 {
-    GlfContextCaps const &caps = GlfContextCaps::GetInstance();
+    GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
 
     if (caps.copyBufferEnabled) {
         // glCopyBuffer

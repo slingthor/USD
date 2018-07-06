@@ -22,7 +22,9 @@
 // language governing permissions and limitations under the Apache License.
 //
 #include "pxr/imaging/glf/glew.h"
-#include "pxr/imaging/glf/contextCaps.h"
+
+#include "pxr/imaging/garch/contextCaps.h"
+#include "pxr/imaging/garch/resourceFactory.h"
 
 #include "pxr/imaging/hdSt/commandBuffer.h"
 #include "pxr/imaging/hdSt/geometricShader.h"
@@ -64,7 +66,7 @@ static
 HdSt_DrawBatchSharedPtr
 _NewDrawBatch(HdStDrawItemInstance * drawItemInstance)
 {
-    GlfContextCaps const &caps = GlfContextCaps::GetInstance();
+    GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
     HdSt_DrawBatchSharedPtr drawBatch;
 
     if (caps.multiDrawIndirectEnabled) {
@@ -160,7 +162,7 @@ HdStCommandBuffer::_RebuildDrawBatches()
 
     HD_PERF_COUNTER_INCR(HdPerfTokens->rebuildBatches);
 
-    bool bindlessTexture = GlfContextCaps::GetInstance()
+    bool bindlessTexture = GarchResourceFactory::GetInstance()->GetContextCaps()
                                                .bindlessTextureEnabled;
 
     // XXX: Temporary sorting by shader.

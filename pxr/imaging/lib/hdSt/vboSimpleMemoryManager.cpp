@@ -23,7 +23,9 @@
 //
 #include "pxr/imaging/glf/glew.h"
 #include "pxr/imaging/glf/diagnostic.h"
-#include "pxr/imaging/glf/contextCaps.h"
+
+#include "pxr/imaging/garch/contextCaps.h"
+#include "pxr/imaging/garch/resourceFactory.h"
 
 #include "pxr/base/tf/diagnostic.h"
 #include "pxr/base/tf/envSetting.h"
@@ -255,122 +257,6 @@ HdStVBOSimpleMemoryManager::_SimpleBufferArray::Resize(int numElements)
     return false;
 }
 
-void
-HdStVBOSimpleMemoryManager::_SimpleBufferArray::Reallocate(
-    std::vector<HdBufferArrayRangeSharedPtr> const & ranges,
-    HdBufferArraySharedPtr const &curRangeOwner)
-{
-    HD_TRACE_FUNCTION();
-    HF_MALLOC_TAG_FUNCTION();
-
-    // XXX: make sure glcontext
-    GlfContextCaps const &caps = GlfContextCaps::GetInstance();
-
-    HD_PERF_COUNTER_INCR(HdPerfTokens->vboRelocated);
-
-    if (!TF_VERIFY(curRangeOwner == shared_from_this())) {
-        TF_CODING_ERROR("HdStVBOSimpleMemoryManager can't reassign ranges");
-        return;
-    }
-
-    if (ranges.size() > 1) {
-        TF_CODING_ERROR("HdStVBOSimpleMemoryManager can't take multiple ranges");
-        return;
-    }
-    _SetRangeList(ranges);
-
-    _SimpleBufferArrayRangeSharedPtr range = _GetRangeSharedPtr();
-
-    if (!range) {
-        TF_CODING_ERROR("_SimpleBufferArrayRange expired unexpectedly.");
-        return;
-    }
-
-    GLF_GROUP_FUNCTION();
-
-    int numElements = range->GetNumElements();
-
-    TF_FOR_ALL (bresIt, GetResources()) {
-        HdStBufferResourceGLSharedPtr const &bres = bresIt->second;
-
-        // XXX:Arrays: We should use HdDataSizeOfTupleType() here, to
-        // add support for array types.
-        int bytesPerElement = HdDataSizeOfType(bres->GetTupleType().type);
-        GLsizeiptr bufferSize = bytesPerElement * numElements;
-
-        if (glGenBuffers) {
-            // allocate new one
-            GLuint newId = 0;
-            GLuint oldId = bres->GetId();
-
-            glGenBuffers(1, &newId);
-            if (ARCH_LIKELY(caps.directStateAccessEnabled)) {
-                glNamedBufferDataEXT(newId,
-                                     bufferSize, /*data=*/NULL, GL_STATIC_DRAW);
-            } else {
-                glBindBuffer(GL_ARRAY_BUFFER, newId);
-                glBufferData(GL_ARRAY_BUFFER,
-                             bufferSize, /*data=*/NULL, GL_STATIC_DRAW);
-                glBindBuffer(GL_ARRAY_BUFFER, 0);
-            }
-
-            // copy the range. There are three cases:
-            //
-            // 1. src length (capacity) == dst length (numElements)
-            //   Copy the entire range
-            //
-            // 2. src length < dst length
-            //   Enlarging the range. This typically happens when
-            //   applying quadrangulation/subdivision to populate
-            //   additional data at the end of source data.
-            //
-            // 3. src length > dst length
-            //   Shrinking the range. When the garbage collection
-            //   truncates ranges.
-            //
-            int oldSize = range->GetCapacity();
-            int newSize = range->GetNumElements();
-            GLsizeiptr copySize = std::min(oldSize, newSize) * bytesPerElement;
-            if (copySize > 0) {
-                HD_PERF_COUNTER_INCR(HdPerfTokens->glCopyBufferSubData);
-
-                if (caps.copyBufferEnabled) {
-                    if (ARCH_LIKELY(caps.directStateAccessEnabled)) {
-                        glNamedCopyBufferSubDataEXT(oldId, newId, 0, 0, copySize);
-                    } else {
-                        glBindBuffer(GL_COPY_READ_BUFFER, oldId);
-                        glBindBuffer(GL_COPY_WRITE_BUFFER, newId);
-                        glCopyBufferSubData(GL_COPY_READ_BUFFER,
-                                            GL_COPY_WRITE_BUFFER, 0, 0, copySize);
-                        glBindBuffer(GL_COPY_READ_BUFFER, 0);
-                        glBindBuffer(GL_COPY_WRITE_BUFFER, 0);
-                    }
-                } else {
-                    // driver issues workaround
-                    std::vector<char> data(copySize);
-                    glBindBuffer(GL_ARRAY_BUFFER, oldId);
-                    glGetBufferSubData(GL_ARRAY_BUFFER, 0, copySize, &data[0]);
-                    glBindBuffer(GL_ARRAY_BUFFER, newId);
-                    glBufferSubData(GL_ARRAY_BUFFER, 0, copySize, &data[0]);
-                    glBindBuffer(GL_ARRAY_BUFFER, 0);
-                }
-            }
-
-            // delete old buffer
-            if (oldId) {
-                glDeleteBuffers(1, &oldId);
-            }
-
-            bres->SetAllocation(newId, bufferSize);
-        } else {
-            // for unit test
-            static int id = 1;
-            bres->SetAllocation(id++, bufferSize);
-        }
-    }
-    return false;
-}
-
 size_t
 HdStVBOSimpleMemoryManager::_SimpleBufferArray::GetMaxNumElements() const
 {
@@ -462,9 +348,9 @@ HdStVBOSimpleMemoryManager::_SimpleBufferArrayRange::CopyData(
     }
     GLF_GROUP_FUNCTION();
 
-    GlfContextCaps const &caps = GlfContextCaps::GetInstance();
+    GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
 
-    if (glBufferSubData != NULL) {
+//    if (glBufferSubData != NULL) {
         int bytesPerElement = HdDataSizeOfTupleType(VBO->GetTupleType());
         // overrun check. for graceful handling of erroneous assets,
         // issue warning here and continue to copy for the valid range.
@@ -483,7 +369,7 @@ HdStVBOSimpleMemoryManager::_SimpleBufferArrayRange::CopyData(
         HD_PERF_COUNTER_INCR(HdPerfTokens->glBufferSubData);
 
         VBO->CopyData(vboOffset, srcSize, bufferSource->GetData());
-    }
+//    }
 }
 
 VtValue

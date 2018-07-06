@@ -23,8 +23,10 @@
 //
 #include "pxr/imaging/glf/glew.h"
 
+#include "pxr/imaging/garch/contextCaps.h"
+#include "pxr/imaging/garch/resourceFactory.h"
+
 #include "pxr/imaging/hdSt/GL/bufferRelocatorGL.h"
-#include "pxr/imaging/hdSt/renderContextCaps.h"
 
 #include "pxr/imaging/hd/perfLog.h"
 #include "pxr/imaging/hd/tokens.h"
@@ -43,7 +45,7 @@ HdStBufferRelocatorGL::HdStBufferRelocatorGL(HdResourceGPUHandle srcBuffer, HdRe
 void
 HdStBufferRelocatorGL::Commit()
 {
-    HdStRenderContextCaps const &caps = HdStRenderContextCaps::GetInstance();
+    GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
 
     if (caps.copyBufferEnabled) {
         // glCopyBuffer

@@ -25,7 +25,9 @@
 #include "pxr/imaging/glf/glew.h"
 #include "pxr/imaging/mtlf/mtlDevice.h"
 
+#include "pxr/imaging/garch/contextCaps.h"
 #include "pxr/imaging/garch/glslfx.h"
+#include "pxr/imaging/garch/resourceFactory.h"
 
 #include "pxr/imaging/hdSt/Metal/codeGenMSL.h"
 #include "pxr/imaging/hdSt/Metal/mslProgram.h"
@@ -291,12 +293,26 @@ _GetPackedTypeDefinitions()
     return "#define hd_ivec3 packed_int3\n"
            "#define hd_vec3 packed_float3\n"
            "#define hd_dvec3 packed_float3\n"
-           "struct hd_mat3  { float  m00, m01, m02,\n"
+           "struct hd_mat3  { float m00, m01, m02,\n"
+           "                        m10, m11, m12,\n"
+           "                        m20, m21, m22;\n"
+           "                    hd_mat3(float _00, float _01, float _02,\n"
+           "                            float _10, float _11, float _12,\n"
+           "                            float _20, float _21, float _22)\n"
+           "                              : m00(_00), m01(_01), m02(_02)\n"
+           "                              , m10(_10), m11(_11), m12(_12)\n"
+           "                              , m20(_20), m21(_21), m22(_22) {}\n"
+           "                };\n"
+           "struct hd_dmat3  { float m00, m01, m02,\n"
            "                         m10, m11, m12,\n"
-           "                         m20, m21, m22; };\n"
-           "struct hd_dmat3 { float  m00, m01, m02,\n"
-           "                         m10, m11, m12,\n"
-           "                         m20, m21, m22; };\n"
+           "                         m20, m21, m22;\n"
+           "                    hd_dmat3(float _00, float _01, float _02,\n"
+           "                            float _10, float _11, float _12,\n"
+           "                            float _20, float _21, float _22)\n"
+           "                              : m00(_00), m01(_01), m02(_02)\n"
+           "                              , m10(_10), m11(_11), m12(_12)\n"
+           "                              , m20(_20), m21(_21), m22(_22) {}\n"
+           "                };\n"
            "#define hd_ivec3_get(v) packed_int3(v)\n"
            "#define hd_vec3_get(v)  packed_float3(v)\n"
            "#define hd_dvec3_get(v) packed_float3(v)\n"
@@ -309,11 +325,11 @@ _GetPackedTypeDefinitions()
            "                                              v.m20, v.m21, v.m22); }\n"
            "dmat3 hd_dmat3_get(dmat3 v)    { return v; }\n"
            "hd_ivec3 hd_ivec3_set(hd_ivec3 v) { return v; }\n"
-           "hd_ivec3 hd_ivec3_set(ivec3 v)    { return hd_ivec3(v.x, v.y, v.z); }\n"
+           "hd_ivec3 hd_ivec3_set(ivec3 v)    { return v; }\n"
            "hd_vec3 hd_vec3_set(hd_vec3 v)    { return v; }\n"
-           "hd_vec3 hd_vec3_set(vec3 v)       { return hd_vec3(v.x, v.y, v.z); }\n"
+           "hd_vec3 hd_vec3_set(vec3 v)       { return v; }\n"
            "hd_dvec3 hd_dvec3_set(hd_dvec3 v) { return v; }\n"
-           "hd_dvec3 hd_dvec3_set(dvec3 v)    { return hd_dvec3(v.x, v.y, v.z); }\n"
+           "hd_dvec3 hd_dvec3_set(dvec3 v)    { return v; }\n"
            "hd_mat3  hd_mat3_set(hd_mat3 v)   { return v; }\n"
            "hd_mat3  hd_mat3_set(mat3 v)      { return hd_mat3(v[0][0], v[0][1], v[0][2],\n"
            "                                                   v[1][0], v[1][1], v[1][2],\n"
@@ -436,7 +452,7 @@ namespace {
     };
     std::ostream & operator << (std::ostream & out, const AddressSpace &lq)
     {
-        HdStRenderContextCaps const &caps = HdStRenderContextCaps::GetInstance();
+        GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
         int location = lq.binding.GetLocation();
 
         switch (lq.binding.GetType()) {
@@ -1126,7 +1142,7 @@ HdSt_CodeGenMSL::Compile()
     _genGS.str(""); _genFS.str(""); _genCS.str("");
     _procVS.str(""); _procTCS.str(""), _procTES.str(""), _procGS.str("");
 
-    HdStRenderContextCaps const &caps = HdStRenderContextCaps::GetInstance();
+    GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
     
     METAL_DEBUG_COMMENT(&_genCommon, "Compile()\n"); //MTL_FIXME
     
@@ -1144,6 +1160,7 @@ HdSt_CodeGenMSL::Compile()
     << "#define vec2 float2\n"
     << "#define vec3 float3\n"
     << "#define vec4 float4\n"
+    << "#define mat3 float3x3\n"
     << "#define mat4 float4x4\n"
     << "#define ivec2 int2\n"
     << "#define ivec3 int3\n"
@@ -1151,6 +1168,7 @@ HdSt_CodeGenMSL::Compile()
     << "#define dvec2 float2\n"
     << "#define dvec3 float3\n"
     << "#define dvec4 float4\n"
+    << "#define dmat3 float3x3\n"
     << "#define dmat4 float4x4\n";
     
     // XXX: this macro is still used in GlobalUniform.
@@ -1179,6 +1197,13 @@ HdSt_CodeGenMSL::Compile()
                      TfToken("uint"),
                      TfToken("[[vertex_id]]"),
                      HdBinding(HdBinding::VERTEX_ID, 0));
+    
+    _EmitDeclaration(_genCommon,
+                     _mslVSInputParams,
+                     TfToken("gl_BaseVertex"),
+                     TfToken("uint"),
+                     TfToken("[[base_vertex]]"),
+                     HdBinding(HdBinding::BASE_VERTEX_ID, 0));
     
     _EmitDeclaration(_genCommon,
                      _mslPSInputParams,
@@ -1562,7 +1587,7 @@ HdSt_CodeGenMSL::CompileComputeProgram()
     _procVS.str(""); _procTCS.str(""), _procTES.str(""), _procGS.str("");
     
     // GLSL version.
-    HdStRenderContextCaps const &caps = HdStRenderContextCaps::GetInstance();
+    GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
     _genCommon << "#version " << caps.glslVersion << "\n";
 
     // Used in glslfx files to determine if it is using new/old
@@ -1697,6 +1722,7 @@ static HdSt_CodeGenMSL::TParam& _EmitDeclaration(std::stringstream &str,
     HdSt_CodeGenMSL::TParam in(name, type, TfToken(), attribute, HdSt_CodeGenMSL::TParam::Unspecified, binding);
 
     if(binding.GetType() == HdBinding::VERTEX_ID ||
+       binding.GetType() == HdBinding::BASE_VERTEX_ID ||
        binding.GetType() == HdBinding::FRONT_FACING) {
         in.usage |= HdSt_CodeGenMSL::TParam::EntryFuncArgument;
     }
@@ -3062,6 +3088,14 @@ HdSt_CodeGenMSL::_GenerateVertexPrimvar()
     _genFS << "vec4 GetPatchCoord() { return GetPatchCoord(0); }\n";
 
     _genGS << "vec4 GetPatchCoord(int localIndex);\n";
+    
+    // VS specific accessor for the "vertex drawing coordinate"
+    // Even though we currently always plumb vertexCoord as part of the drawing
+    // coordinate, we expect clients to use this accessor when querying the base
+    // vertex offset for a draw call.
+    _genVS << "int GetBaseVertexOffset() {\n";
+    _genVS << "  return gl_BaseVertex;\n";
+    _genVS << "}\n";
 }
 
 void
@@ -3148,7 +3182,7 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
     METAL_DEBUG_COMMENT(&_genVS, "_GenerateShaderParameters()\n"); //MTL_FIXME
 
     
-    HdStRenderContextCaps const &caps = HdStRenderContextCaps::GetInstance();
+    GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
 
     TfToken typeName("ShaderData");
     TfToken varName("shaderData");

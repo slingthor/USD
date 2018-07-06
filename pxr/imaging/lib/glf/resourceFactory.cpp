@@ -28,6 +28,7 @@
 #include <pxr/imaging/glf/arrayTexture.h>
 #include <pxr/imaging/glf/baseTexture.h>
 #include <pxr/imaging/glf/bindingMap.h>
+#include <pxr/imaging/glf/contextCaps.h>
 #include <pxr/imaging/glf/drawTarget.h>
 #include <pxr/imaging/glf/simpleLightingContext.h>
 #include <pxr/imaging/glf/simpleShadowArray.h>

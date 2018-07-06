@@ -97,18 +97,17 @@ HdStExtCompGpuComputation::Execute(
         return;
     }
 
-    HdStGLSLProgramSharedPtr const &computeProgram = _resource->GetProgram();
+    HdStProgramSharedPtr const &computeProgram = _resource->GetProgram();
     HdSt_ResourceBinder const &binder = _resource->GetResourceBinder();
 
     if (!TF_VERIFY(computeProgram)) {
         return;
     }
 
-    GLuint kernel = computeProgram->GetProgram().GetId();
-    glUseProgram(kernel);
+    computeProgram->SetProgram();
 
-    HdStBufferArrayRangeGLSharedPtr outputBar =
-        boost::static_pointer_cast<HdStBufferArrayRangeGL>(outputRange);
+    HdBufferArrayRangeSharedPtr outputBar =
+        boost::static_pointer_cast<HdBufferArrayRange>(outputRange);
     TF_VERIFY(outputBar);
 
     // Prepare uniform buffer for GPU computation
@@ -119,7 +118,7 @@ HdStExtCompGpuComputation::Execute(
     // Bind buffers as SSBOs to the indices matching the layout in the shader
     for (HdExtComputationPrimvarDescriptor const &compPrimvar: _compPrimvars) {
         TfToken const & name = compPrimvar.sourceComputationOutputName;
-        HdStBufferResourceGLSharedPtr const & buffer =
+        HdBufferResourceSharedPtr const & buffer =
                 outputBar->GetResource(compPrimvar.name);
 
         HdBinding const &binding = binder.GetBinding(name);
@@ -135,13 +134,13 @@ HdStExtCompGpuComputation::Execute(
     }
 
     for (HdBufferArrayRangeSharedPtr const & input: _resource->GetInputs()) {
-        HdStBufferArrayRangeGLSharedPtr const & inputBar =
-            boost::static_pointer_cast<HdStBufferArrayRangeGL>(input);
+        HdBufferArrayRangeSharedPtr const & inputBar =
+            boost::static_pointer_cast<HdBufferArrayRange>(input);
 
-        for (HdStBufferResourceGLNamedPair const & it:
+        for (HdStBufferResourceNamedPair const & it:
                         inputBar->GetResources()) {
             TfToken const &name = it.first;
-            HdStBufferResourceGLSharedPtr const &buffer = it.second;
+            HdBufferResourceSharedPtr const &buffer = it.second;
 
             HdBinding const &binding = binder.GetBinding(name);
             // These should all be valid as they are required inputs
@@ -184,9 +183,9 @@ HdStExtCompGpuComputation::Execute(
     // XXX this should go away once we use a graphics abstraction
     // as that would take care of cleaning state.
     glBindBufferBase(GL_UNIFORM_BUFFER, 0, 0);
-    for (HdStBufferResourceGLNamedPair const & it: outputBar->GetResources()) {
+    for (HdStBufferResourceNamedPair const & it: outputBar->GetResources()) {
         TfToken const &name = it.first;
-        HdStBufferResourceGLSharedPtr const &buffer = it.second;
+        HdBufferResourceSharedPtr const &buffer = it.second;
 
         HdBinding const &binding = binder.GetBinding(name);
         // XXX we need a better way than this to pick
@@ -195,16 +194,16 @@ HdStExtCompGpuComputation::Execute(
         // shouldn't be written to for example.
         if (binding.IsValid()) {
             binder.UnbindBuffer(name, buffer);
-        } 
+        }
     }
     for (HdBufferArrayRangeSharedPtr const & input: _resource->GetInputs()) {
-        HdStBufferArrayRangeGLSharedPtr const & inputBar =
-            boost::static_pointer_cast<HdStBufferArrayRangeGL>(input);
+        HdBufferArrayRangeSharedPtr const & inputBar =
+            boost::static_pointer_cast<HdBufferArrayRange>(input);
 
-        for (HdStBufferResourceGLNamedPair const & it:
+        for (HdStBufferResourceNamedPair const & it:
                         inputBar->GetResources()) {
             TfToken const &name = it.first;
-            HdStBufferResourceGLSharedPtr const &buffer = it.second;
+            HdBufferResourceSharedPtr const &buffer = it.second;
 
             HdBinding const &binding = binder.GetBinding(name);
             // These should all be valid as they are required inputs
@@ -214,8 +213,7 @@ HdStExtCompGpuComputation::Execute(
         }
     }
 
-    glUseProgram(0);
-     */
+    computeProgram->UnsetProgram();
 }
 
 void

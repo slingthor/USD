@@ -21,7 +21,7 @@ pxr_library(mtlf
         js
         plug
         tf
-        tracelite
+        trace
         sdf
         ${Boost_PYTHON_LIBRARY}
         ${Boost_SYSTEM_LIBRARY}
@@ -44,6 +44,7 @@ pxr_library(mtlf
         arrayTexture
         baseTexture
         bindingMap
+        contextCaps
         diagnostic
         drawTarget
         info

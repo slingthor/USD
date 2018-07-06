@@ -23,7 +23,8 @@
 //
 #include "pxr/imaging/hdSt/shaderCode.h"
 
-#include "pxr/imaging/glf/contextCaps.h"
+#include "pxr/imaging/garch/contextCaps.h"
+#include "pxr/imaging/garch/resourceFactory.h"
 
 #include "pxr/base/tf/iterator.h"
 
@@ -84,7 +85,7 @@ bool
 HdStShaderCode::CanAggregate(HdStShaderCodeSharedPtr const &shaderA,
                               HdStShaderCodeSharedPtr const &shaderB)
 {
-    bool bindlessTexture = GlfContextCaps::GetInstance()
+    bool bindlessTexture = GarchResourceFactory::GetInstance()->GetContextCaps()
                                                 .bindlessTextureEnabled;
 
     // See if the shaders are same or not. If the bindless texture option

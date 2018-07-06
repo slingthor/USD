@@ -22,7 +22,11 @@
 // language governing permissions and limitations under the Apache License.
 //
 #include "pxr/imaging/glf/glew.h"
+#include "pxr/imaging/glf/diagnostic.h"
 #include "pxr/imaging/hdSt/GL/vboMemoryBufferGL.h"
+
+#include "pxr/imaging/garch/contextCaps.h"
+#include "pxr/imaging/garch/resourceFactory.h"
 
 #include <boost/make_shared.hpp>
 #include <vector>
@@ -36,7 +40,6 @@
 #include "pxr/imaging/hdSt/bufferRelocator.h"
 #include "pxr/imaging/hdSt/bufferResource.h"
 #include "pxr/imaging/hdSt/glUtils.h"
-#include "pxr/imaging/hdSt/renderContextCaps.h"
 #include "pxr/imaging/hdSt/GL/glConversions.h"
 #include "pxr/imaging/hd/engine.h"
 #include "pxr/imaging/hd/perfLog.h"
@@ -66,7 +69,7 @@ HdStVBOMemoryBufferGL::Reallocate(
     HF_MALLOC_TAG_FUNCTION();
 
     // XXX: make sure glcontext
-    HdStRenderContextCaps const &caps = HdStRenderContextCaps::GetInstance();
+    GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
 
     HD_PERF_COUNTER_INCR(HdPerfTokens->vboRelocated);
 
@@ -86,6 +89,8 @@ HdStVBOMemoryBufferGL::Reallocate(
                       curRangeOwner_->GetResource(bresIt->first));
         }
     }
+    
+    GLF_GROUP_FUNCTION();
 
     // count up total elements and update new offsets
     size_t totalNumElements = 0;

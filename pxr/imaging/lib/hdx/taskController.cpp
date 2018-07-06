@@ -373,7 +373,7 @@ HdxTaskController::SetLightingState(GarchSimpleLightingContextPtr const& src)
         return;
     }
 
-    GlfSimpleLightVector const& lights = src->GetLights();
+    GarchSimpleLightVector const& lights = src->GetLights();
 
     // HdxTaskController inserts a set of light prims to represent the lights
     // passed in through the simple lighting context. These are managed by
@@ -401,7 +401,7 @@ HdxTaskController::SetLightingState(GarchSimpleLightingContextPtr const& src)
         _delegate.SetParameter(lightId, HdLightTokens->shadowCollection,
             VtValue());
         _delegate.SetParameter(lightId, HdLightTokens->params,
-            GlfSimpleLight());
+            GarchSimpleLight());
 
         // Note: Marking the shadowCollection as dirty (included in AllDirty)
         // will mark the geometry collection dirty.
@@ -420,7 +420,7 @@ HdxTaskController::SetLightingState(GarchSimpleLightingContextPtr const& src)
     // Update light Sprims to match the lights passed in through the context;
     // hydra simpleLight prims store a GlfSimpleLight as their "params" field.
     for (size_t i = 0; i < lights.size(); ++i) {
-        GlfSimpleLight lt = _delegate.GetParameter<GlfSimpleLight>(
+        GarchSimpleLight lt = _delegate.GetParameter<GarchSimpleLight>(
             _lightIds[i], HdLightTokens->params);
 
         if (lt != lights[i]) {

@@ -40,11 +40,6 @@ PXR_NAMESPACE_OPEN_SCOPE
 typedef boost::shared_ptr<class HdStBufferResourceGL>
                                 HdStBufferResourceGLSharedPtr;
 
-typedef std::pair<TfToken, HdStBufferResourceGLSharedPtr>
-                                HdStBufferResourceGLNamedPair;
-typedef std::vector<HdStBufferResourceGLNamedPair>
-                                HdStBufferResourceGLNamedList;
-
 /// \class HdStBufferResourceGL
 ///
 /// A specific type of HdBufferResource (GPU resource) representing an 

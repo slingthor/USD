@@ -45,7 +45,7 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-TF_DEFINE_PUBLIC_TOKENS(GlfGLSLFXTokens, GLF_GLSLFX_TOKENS);
+TF_DEFINE_PUBLIC_TOKENS(GarchGLSLFXTokens, GARCH_GLSLFX_TOKENS);
 
 #define CURRENT_VERSION 0.1
 
@@ -297,7 +297,7 @@ GLSLFX::_ProcessInput(std::istream * input,
                 context.currentLine.c_str());
 
         } else
-        if (context.currentSectionType == GlfGLSLFXTokens->glslfx && 
+        if (context.currentSectionType == GarchGLSLFXTokens->glslfx &&
                 context.currentLine.find(_tokens->import.GetText()) == 0) {
             if (!_ProcessImport(context)) {
                 return false;
@@ -372,7 +372,7 @@ GLSLFX::_ParseSectionLine(_ParseContext & context)
     context.currentSectionType = tokens[1];
     context.currentSectionId.clear();
 
-    if (context.currentSectionType == GlfGLSLFXTokens->glslfx.GetText()) {
+    if (context.currentSectionType == GarchGLSLFXTokens->glslfx.GetText()) {
         return _ParseVersionLine(tokens, context);
     }
     if (context.currentSectionType == _tokens->configuration.GetText()) {

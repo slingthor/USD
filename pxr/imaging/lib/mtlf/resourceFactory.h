@@ -24,9 +24,10 @@
 #ifndef MTLF_RESOURCEFACTORY_H
 #define MTLF_RESOURCEFACTORY_H
 
-/// \file glf/resourceFactory.h
+/// \file mtlf/resourceFactory.h
 
 #include "pxr/pxr.h"
+#include "pxr/imaging/mtlf/contextCaps.h"
 #include "pxr/imaging/garch/resourceFactory.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -35,6 +36,11 @@ class MtlfResourceFactory : public GarchResourceFactoryInterface {
 public:
     MtlfResourceFactory();
     virtual ~MtlfResourceFactory();
+    
+    // GarchContextCaps
+    virtual GarchContextCaps const& GetContextCaps() const override {
+        return contextCaps;
+    }
 
     // GarchSimpleLightingContext creation
     virtual GarchSimpleLightingContext *NewSimpleLightingContext() const override;
@@ -65,6 +71,9 @@ public:
     
     // BaseTexture
     virtual GarchBaseTexture *NewBaseTexture() const override;
+    
+private:
+    MtlfContextCaps contextCaps;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

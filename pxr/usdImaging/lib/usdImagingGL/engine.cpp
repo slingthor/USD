@@ -317,7 +317,7 @@ UsdImagingGLEngine::TestIntersection(
 	            xMin = x;
 	            yMin = y;
 	            zMin = depths[i];
-                    zMinIndex = i;
+                zMinIndex = i;
             }
         }
     }

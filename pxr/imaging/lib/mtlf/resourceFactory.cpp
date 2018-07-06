@@ -28,6 +28,7 @@
 #include <pxr/imaging/mtlf/arrayTexture.h>
 #include <pxr/imaging/mtlf/baseTexture.h>
 #include <pxr/imaging/mtlf/bindingMap.h>
+#include <pxr/imaging/mtlf/contextCaps.h>
 #include <pxr/imaging/mtlf/drawTarget.h>
 #include <pxr/imaging/mtlf/simpleLightingContext.h>
 #include <pxr/imaging/mtlf/simpleShadowArray.h>

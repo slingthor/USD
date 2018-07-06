@@ -55,7 +55,7 @@ TF_REGISTRY_FUNCTION(TfScriptModuleLoader) {
     reqs.push_back(TfToken("pxOsd"));
     reqs.push_back(TfToken("sdf"));
     reqs.push_back(TfToken("tf"));
-    reqs.push_back(TfToken("tracelite"));
+    reqs.push_back(TfToken("trace"));
     reqs.push_back(TfToken("usd"));
     reqs.push_back(TfToken("usdGeom"));
     reqs.push_back(TfToken("usdHydra"));

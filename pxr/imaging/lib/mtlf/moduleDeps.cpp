@@ -45,7 +45,7 @@ TF_REGISTRY_FUNCTION(TfScriptModuleLoader) {
     reqs.push_back(TfToken("plug"));
     reqs.push_back(TfToken("sdf"));
     reqs.push_back(TfToken("tf"));
-    reqs.push_back(TfToken("tracelite"));
+    reqs.push_back(TfToken("trace"));
     reqs.push_back(TfToken("vt"));
     reqs.push_back(TfToken("work"));
     TfScriptModuleLoader::GetInstance().

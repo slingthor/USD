@@ -1,5 +1,5 @@
 //
-// Copyright 2016 Pixar
+// Copyright 2018 Pixar
 //
 // Licensed under the Apache License, Version 2.0 (the "Apache License")
 // with the following modification; you may not use this file except in
@@ -21,51 +21,48 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#include "pxr/imaging/glf/glew.h"
+#ifndef MTLF_CONTEXT_CAPS_H
+#define MTLF_CONTEXT_CAPS_H
 
+#include "pxr/pxr.h"
+#include "pxr/imaging/mtlf/api.h"
 #include "pxr/imaging/garch/contextCaps.h"
-#include "pxr/imaging/garch/resourceFactory.h"
 
-#include "pxr/imaging/hd/engine.h"
-#include "pxr/imaging/hd/perfLog.h"
 
-#include "pxr/imaging/hdSt/persistentBuffer.h"
-#include "pxr/imaging/hdSt/GL/persistentBufferGL.h"
-#if defined(ARCH_GFX_METAL)
-#include "pxr/imaging/hdSt/Metal/persistentBufferMetal.h"
-#endif
-
-#include "pxr/imaging/hf/perfLog.h"
+#include <boost/noncopyable.hpp>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-HdStPersistentBuffer *HdStPersistentBuffer::New(TfToken const &role, size_t dataSize, void* data)
-{
-    HdEngine::RenderAPI api = HdEngine::GetRenderAPI();
-    switch(api)
-    {
-        case HdEngine::OpenGL:
-            return new HdStPersistentBufferGL(role, dataSize, data);
-#if defined(ARCH_GFX_METAL)
-        case HdEngine::Metal:
-            return new HdStPersistentBufferMetal(role, dataSize, data);
-#endif
-        default:
-            TF_FATAL_CODING_ERROR("No HdStPersistentBuffer for this API");
-    }
-    return NULL;
-}
 
-HdStPersistentBuffer::HdStPersistentBuffer(HdResourceSharedPtr resource):
-    _resource(resource)
-{
-    /*NOTHING*/
-}
+/// \class MtlfContextCaps
+///
+/// This class is intended to be a cache of the capabilites
+/// (resource limits and features) of the underlying
+/// GL context.
+///
+/// It serves two purposes.  Firstly to reduce driver
+/// transition overhead of querying these values.
+/// Secondly to provide access to these values from other
+/// threads that don't have the context bound.
+///
+/// TO DO (bug #124971):
+///   - LoadCaps() should be called whenever the context
+///     changes.
+///   - Provide a mechanism where other Hd systems can
+///     subscribe to when the caps changes, so they can
+///     update and invalidate.
+///
+class MtlfContextCaps : public GarchContextCaps {
+private:
+    MtlfContextCaps();
+    virtual ~MtlfContextCaps() {}
 
-HdStPersistentBuffer::~HdStPersistentBuffer()
-{
-    /*NOTHING*/
-}
+    void _LoadCaps();
+
+    friend class MtlfResourceFactory;
+};
 
 PXR_NAMESPACE_CLOSE_SCOPE
+
+#endif // MTLF_CONTEXT_CAPS_H
 

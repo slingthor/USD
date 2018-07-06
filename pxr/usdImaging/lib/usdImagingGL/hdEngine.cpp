@@ -22,7 +22,10 @@
 // language governing permissions and limitations under the Apache License.
 //
 #include "pxr/imaging/glf/glew.h"
-#include "pxr/imaging/glf/contextCaps.h"
+
+#include "pxr/imaging/garch/contextCaps.h"
+#include "pxr/imaging/garch/resourceFactory.h"
+#include "pxr/imaging/garch/simpleLightingContext.h"
 
 #include "pxr/usdImaging/usdImagingGL/hdEngine.h"
 #include "pxr/usdImaging/usdImaging/tokens.h"
@@ -45,7 +48,6 @@
 
 #include "pxr/imaging/glf/diagnostic.h"
 #include "pxr/imaging/glf/info.h"
-#include "pxr/imaging/glf/simpleLightingContext.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -633,7 +635,7 @@ void
 UsdImagingGLHdEngine::Render(RenderParams params)
 {
     // User is responsible for initializing GL context and glew
-    bool isCoreProfileContext = GlfContextCaps::GetInstance().coreProfile;
+    bool isCoreProfileContext = GarchResourceFactory::GetInstance()->GetContextCaps().coreProfile;
 
     GLuint vao;
     if (isCoreProfileContext) {
@@ -754,7 +756,7 @@ void
 UsdImagingGLHdEngine::SetLightingStateFromOpenGL()
 {
     if (!_lightingContextForOpenGLState) {
-        _lightingContextForOpenGLState = GlfSimpleLightingContext::New();
+        _lightingContextForOpenGLState = GarchSimpleLightingContext::New();
     }
     _lightingContextForOpenGLState->SetStateFromOpenGL();
 
@@ -770,7 +772,7 @@ UsdImagingGLHdEngine::SetLightingState(GarchSimpleLightVector const &lights,
     // we still use _lightingContextForOpenGLState for convenience, but
     // set the values directly.
     if (!_lightingContextForOpenGLState) {
-        _lightingContextForOpenGLState = GlfSimpleLightingContext::New();
+        _lightingContextForOpenGLState = GarchSimpleLightingContext::New();
     }
     _lightingContextForOpenGLState->SetLights(lights);
     _lightingContextForOpenGLState->SetMaterial(material);

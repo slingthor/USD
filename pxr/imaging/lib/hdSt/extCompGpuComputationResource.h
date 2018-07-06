@@ -119,7 +119,7 @@ private:
     HdStResourceRegistrySharedPtr         _registry;
     
     size_t                                _shaderSourceHash;
-    HdBufferArrayRangeSharedPtr           _inputs;
+    HdBufferArrayRangeSharedPtrVector     _inputs;
     HdStProgramSharedPtr                  _computeProgram;
     HdSt_ResourceBinderSharedPtr          _resourceBinder;
     

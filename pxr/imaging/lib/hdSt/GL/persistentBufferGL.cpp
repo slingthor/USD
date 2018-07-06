@@ -23,8 +23,10 @@
 //
 #include "pxr/imaging/glf/glew.h"
 
+#include "pxr/imaging/garch/contextCaps.h"
+#include "pxr/imaging/garch/resourceFactory.h"
+
 #include "pxr/imaging/hdSt/GL/persistentBufferGL.h"
-#include "pxr/imaging/hdSt/renderContextCaps.h"
 #include "pxr/imaging/hd/resource.h"
 
 #include "pxr/imaging/hd/perfLog.h"
@@ -43,7 +45,7 @@ HdStPersistentBufferGL::HdStPersistentBufferGL(
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
 
-    HdStRenderContextCaps const &caps = HdStRenderContextCaps::GetInstance();
+    GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
 
     GLuint newId = 0;
     glGenBuffers(1, &newId);

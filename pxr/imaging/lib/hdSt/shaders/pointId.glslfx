@@ -32,8 +32,10 @@
 
 flat out int vsPointId;
 
+#if !defined(ARCH_GFX_METAL)
 // Forward declare accessor method defined via code gen
 int GetBaseVertexOffset();
+#endif
 
 void ProcessPointId()
 {
