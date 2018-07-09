@@ -35,36 +35,26 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 TF_REGISTRY_FUNCTION(TfScriptModuleLoader) {
-    std::vector<TfToken> reqs;
-    reqs.reserve(28);
-    reqs.push_back(TfToken("ar"));
-    reqs.push_back(TfToken("arch"));
-    reqs.push_back(TfToken("cameraUtil"));
-    reqs.push_back(TfToken("garch"));
-    reqs.push_back(TfToken("gf"));
-    reqs.push_back(TfToken("glf"));
-    reqs.push_back(TfToken("hd"));
-    reqs.push_back(TfToken("hdSt"));
-    reqs.push_back(TfToken("hdx"));
-    reqs.push_back(TfToken("hf"));
-    reqs.push_back(TfToken("js"));
-    reqs.push_back(TfToken("kind"));
-    reqs.push_back(TfToken("mtlf"));
-    reqs.push_back(TfToken("pcp"));
-    reqs.push_back(TfToken("plug"));
-    reqs.push_back(TfToken("pxOsd"));
-    reqs.push_back(TfToken("sdf"));
-    reqs.push_back(TfToken("tf"));
-    reqs.push_back(TfToken("trace"));
-    reqs.push_back(TfToken("usd"));
-    reqs.push_back(TfToken("usdGeom"));
-    reqs.push_back(TfToken("usdHydra"));
-    reqs.push_back(TfToken("usdImaging"));
-    reqs.push_back(TfToken("usdLux"));
-    reqs.push_back(TfToken("usdRi"));
-    reqs.push_back(TfToken("usdShade"));
-    reqs.push_back(TfToken("vt"));
-    reqs.push_back(TfToken("work"));
+    const std::vector<TfToken> reqs = {
+        TfToken("ar"),
+        TfToken("garch"),
+        TfToken("gf"),
+        TfToken("hd"),
+        TfToken("hdx"),
+        TfToken("mtlf"),
+        TfToken("plug"),
+        TfToken("pxOsd"),
+        TfToken("sdf"),
+        TfToken("tf"),
+        TfToken("trace"),
+        TfToken("usd"),
+        TfToken("usdGeom"),
+        TfToken("usdHydra"),
+        TfToken("usdImaging"),
+        TfToken("usdShade"),
+        TfToken("vt"),
+        TfToken("work")
+    };
     TfScriptModuleLoader::GetInstance().
         RegisterLibrary(TfToken("usdImagingMetal"), TfToken("pxr.UsdImagingMetal"), reqs);
 }

@@ -266,7 +266,7 @@ _GetDeprecatedSurfaceShaderPrim(const UsdShadeMaterial &material)
             TF_DEBUG(USDIMAGING_SHADERS).Msg(
                      "\t Deprecated hydraLook:surface binding found: %s\n", 
                      shaderPrim.GetPath().GetText());
-                return shaderPrim;
+            return shaderPrim;
         }
     } else {
         TF_DEBUG(USDIMAGING_SHADERS).Msg("\t Deprecated displayLook:bxdf "

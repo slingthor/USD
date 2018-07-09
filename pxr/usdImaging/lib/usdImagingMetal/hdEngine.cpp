@@ -93,6 +93,12 @@ UsdImagingMetalHdEngine::UsdImagingMetalHdEngine(
         TF_CODING_ERROR("No renderer plugins found! Check before creation.");
     }
 
+    TfDebug::Enable(USDIMAGING_TEXTURES);
+    TfDebug::Enable(USDIMAGING_UPDATES);
+    TfDebug::Enable(USDIMAGING_CHANGES);
+    TfDebug::Enable(USDIMAGING_PLUGINS);
+    TfDebug::Enable(USDIMAGING_SHADERS);
+    
     MtlfRegisterDefaultDebugOutputMessageCallback();
     
     sharedCaptureManager = [MTLCaptureManager sharedCaptureManager];

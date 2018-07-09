@@ -224,7 +224,7 @@ _GetDeprecatedSurfaceShaderPrim(const UsdShadeMaterial &material)
     static const TfToken surfType("HydraPbsSurface");
     
     UsdRelationship displayShaderRel = material.GetPrim().GetRelationship(
-                                                                          displayLookBxdf);
+        displayLookBxdf);
     
     if (!displayShaderRel) {
         displayShaderRel = material.GetPrim().GetRelationship(hdSurf);
@@ -264,13 +264,13 @@ _GetDeprecatedSurfaceShaderPrim(const UsdShadeMaterial &material)
     if (displayShaderRel.GetName() == hdSurf) {
         if (TF_VERIFY(shaderPrim.GetTypeName() == surfType)) {
             TF_DEBUG(USDIMAGING_SHADERS).Msg(
-                                             "\t Deprecated hydraLook:surface binding found: %s\n",
-                                             shaderPrim.GetPath().GetText());
+                     "\t Deprecated hydraLook:surface binding found: %s\n",
+                     shaderPrim.GetPath().GetText());
             return shaderPrim;
         }
     } else {
         TF_DEBUG(USDIMAGING_SHADERS).Msg("\t Deprecated displayLook:bxdf "
-                                         "binding found: %s\n", shaderPrim.GetPath().GetText());
+                    "binding found: %s\n", shaderPrim.GetPath().GetText());
         return shaderPrim;
     }
     

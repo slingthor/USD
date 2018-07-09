@@ -99,9 +99,9 @@ UsdImagingMetalDrawModeAdapter::Populate(UsdPrim const& prim,
                                       instancerContext)
 {
     SdfPath cachePath = UsdImagingGprimAdapter::_ResolveCachePath(
-                                                                  prim.GetPath(), instancerContext);
+        prim.GetPath(), instancerContext);
     SdfPath instancer = instancerContext ?
-    instancerContext->instancerId : SdfPath();
+        instancerContext->instancerId : SdfPath();
     
     // The draw mode adapter only supports models. This is enforced in
     // UsdImagingDelegate::_IsDrawModeApplied.
@@ -126,9 +126,9 @@ UsdImagingMetalDrawModeAdapter::Populate(UsdPrim const& prim,
     // rprim, which will forward to the draw mode adapter but additionally
     // handle instancer attributes like instance index.
     UsdImagingPrimAdapterSharedPtr rprimAdapter =
-    (instancerContext && instancerContext->instancerAdapter) ?
-    instancerContext->instancerAdapter :
-    shared_from_this();
+        (instancerContext && instancerContext->instancerAdapter) ?
+        instancerContext->instancerAdapter :
+        shared_from_this();
     
     // If this prim isn't instanced, cachePrim will be the same as "prim", but
     // if it is instanced the instancer adapters expect us to pass in this
@@ -154,21 +154,21 @@ UsdImagingMetalDrawModeAdapter::Populate(UsdPrim const& prim,
             return SdfPath();
         }
         index->InsertRprim(HdPrimTypeTokens->mesh,
-                           cachePath, instancer, cachePrim, rprimAdapter);
+            cachePath, instancer, cachePrim, rprimAdapter);
         HD_PERF_COUNTER_INCR(UsdImagingTokens->usdPopulatedPrimCount);
     } else {
         TF_CODING_ERROR("Model <%s> has unsupported drawMode '%s'",
-                        prim.GetPath().GetText(), drawMode.GetText());
+            prim.GetPath().GetText(), drawMode.GetText());
         return SdfPath();
     }
     
     // Additionally, insert the material.
     SdfPath materialPath = prim.GetPath().
-    AppendProperty(_tokens->material);
+        AppendProperty(_tokens->material);
     if (index->IsSprimTypeSupported(HdPrimTypeTokens->material) &&
         !index->IsPopulated(materialPath)) {
         index->InsertSprim(HdPrimTypeTokens->material,
-                           materialPath, prim, shared_from_this());
+            materialPath, prim, shared_from_this());
         HD_PERF_COUNTER_INCR(UsdImagingTokens->usdPopulatedPrimCount);
     }
     
@@ -185,9 +185,9 @@ UsdImagingMetalDrawModeAdapter::Populate(UsdPrim const& prim,
     for (int i = 0; i < 6; ++i) {
         UsdAttribute attr = prim.GetAttribute(textureAttrs[i]);
         if (attr && index->IsBprimTypeSupported(HdPrimTypeTokens->texture)
-            && !index->IsPopulated(attr.GetPath())) {
+                 && !index->IsPopulated(attr.GetPath())) {
             index->InsertBprim(HdPrimTypeTokens->texture,
-                               attr.GetPath(), prim, shared_from_this());
+                    attr.GetPath(), prim, shared_from_this());
             HD_PERF_COUNTER_INCR(UsdImagingTokens->usdPopulatedPrimCount);
         }
     }
@@ -212,12 +212,12 @@ UsdImagingMetalDrawModeAdapter::_IsTexturePath(SdfPath const& path) const
     }
     TfToken name = path.GetNameToken();
     return
-    name == UsdGeomTokens->modelCardTextureXPos ||
-    name == UsdGeomTokens->modelCardTextureYPos ||
-    name == UsdGeomTokens->modelCardTextureZPos ||
-    name == UsdGeomTokens->modelCardTextureXNeg ||
-    name == UsdGeomTokens->modelCardTextureYNeg ||
-    name == UsdGeomTokens->modelCardTextureZNeg;
+        name == UsdGeomTokens->modelCardTextureXPos ||
+        name == UsdGeomTokens->modelCardTextureYPos ||
+        name == UsdGeomTokens->modelCardTextureZPos ||
+        name == UsdGeomTokens->modelCardTextureXNeg ||
+        name == UsdGeomTokens->modelCardTextureYNeg ||
+        name == UsdGeomTokens->modelCardTextureZNeg;
 }
 
 void
@@ -295,18 +295,18 @@ UsdImagingMetalDrawModeAdapter::TrackVariability(UsdPrim const& prim,
     
     // Discover time-varying transforms.
     _IsTransformVarying(prim,
-                        HdChangeTracker::DirtyTransform,
-                        UsdImagingTokens->usdVaryingXform,
-                        timeVaryingBits);
+            HdChangeTracker::DirtyTransform,
+            UsdImagingTokens->usdVaryingXform,
+            timeVaryingBits);
     
     valueCache->GetVisible(cachePath) = GetVisible(prim, time);
     // Discover time-varying visibility.
     _IsVarying(prim,
-               UsdGeomTokens->visibility,
-               HdChangeTracker::DirtyVisibility,
-               UsdImagingTokens->usdVaryingVisibility,
-               timeVaryingBits,
-               true);
+           UsdGeomTokens->visibility,
+           HdChangeTracker::DirtyVisibility,
+           UsdImagingTokens->usdVaryingVisibility,
+           timeVaryingBits,
+           true);
     
     TfToken purpose = _GetPurpose(prim, time);
     // Empty purpose means there is no opinion, fall back to geom.
@@ -366,20 +366,20 @@ UsdImagingMetalDrawModeAdapter::UpdateForTime(UsdPrim const& prim,
             
             GfVec3f schemaColor = GfVec3f(0.18f, 0.18f, 0.18f);
             UsdAttribute drawModeColorAttr =
-            model.GetModelDrawModeColorAttr();
+                model.GetModelDrawModeColorAttr();
             if (drawModeColorAttr) {
                 drawModeColorAttr.Get(&schemaColor);
             }
             VtValue fallback = VtValue(GfVec4f(
-                                               schemaColor[0], schemaColor[1], schemaColor[2], 1.0f));
+                schemaColor[0], schemaColor[1], schemaColor[2], 1.0f));
             
             TfTokenVector samplerParams = { _tokens->cardsUv };
             for (int i = 0; i < 6; ++i) {
                 attr = prim.GetAttribute(textureAttrs[i]);
                 if (attr) {
                     params.push_back(HdMaterialParam(
-                                                     textureNames[i], fallback,
-                                                     attr.GetPath(), samplerParams, false));
+                                 textureNames[i], fallback,
+                                 attr.GetPath(), samplerParams, false));
                 }
             }
             valueCache->GetMaterialParams(cachePath) = params;
@@ -409,7 +409,7 @@ UsdImagingMetalDrawModeAdapter::UpdateForTime(UsdPrim const& prim,
     
     if (requestedBits & HdChangeTracker::DirtyMaterialId) {
         SdfPath materialPath = prim.GetPath().
-        AppendProperty(_tokens->material);
+            AppendProperty(_tokens->material);
         valueCache->GetMaterialId(cachePath) = materialPath;
     }
     
@@ -439,9 +439,9 @@ UsdImagingMetalDrawModeAdapter::UpdateForTime(UsdPrim const& prim,
     // We compute all of the below items together, since their derivations
     // aren't easily separable.
     HdDirtyBits geometryBits = HdChangeTracker::DirtyTopology |
-    HdChangeTracker::DirtyPoints |
-    HdChangeTracker::DirtyPrimvar |
-    HdChangeTracker::DirtyExtent;
+                                HdChangeTracker::DirtyPoints |
+                                HdChangeTracker::DirtyPrimvar |
+                                HdChangeTracker::DirtyExtent;
     
     if (requestedBits & geometryBits) {
         TfToken drawMode = UsdGeomTokens->default_;
@@ -499,13 +499,13 @@ UsdImagingMetalDrawModeAdapter::UpdateForTime(UsdPrim const& prim,
                 // Generate geometry based on card type.
                 if (cardGeometry == UsdGeomTokens->cross) {
                     _GenerateCardsCrossGeometry(&topology, &points, extent,
-                                                axes_mask);
+                        axes_mask);
                 } else if (cardGeometry == UsdGeomTokens->box) {
                     _GenerateCardsBoxGeometry(&topology, &points, extent,
-                                              axes_mask);
+                        axes_mask);
                 } else {
                     TF_CODING_ERROR("<%s> Unexpected card geometry mode %s",
-                                    cachePath.GetText(), cardGeometry.GetText());
+                        cachePath.GetText(), cardGeometry.GetText());
                 }
                 
                 // Issue warnings for zero-area faces that we're supposedly
@@ -521,12 +521,12 @@ UsdImagingMetalDrawModeAdapter::UpdateForTime(UsdPrim const& prim,
             
             // XXX: backdoor into the material system.
             valueCache->GetPrimvar(cachePath, _tokens->displayRoughness) =
-            VtValue(1.0f);
+                VtValue(1.0f);
             _MergePrimvar(&primvars, _tokens->displayRoughness,
                           HdInterpolationConstant);
         } else {
             TF_CODING_ERROR("<%s> Unexpected draw mode %s",
-                            cachePath.GetText(), drawMode.GetText());
+                cachePath.GetText(), drawMode.GetText());
         }
         
         // Merge "points" primvar
@@ -553,7 +553,7 @@ UsdImagingMetalDrawModeAdapter::ProcessPropertyChange(UsdPrim const& prim,
     else if (propertyName == UsdGeomTokens->doubleSided)
         return HdChangeTracker::Clean;
     else if (UsdGeomXformable::IsTransformationAffectedByAttrNamed(
-                                                                   propertyName))
+                propertyName))
         return HdChangeTracker::DirtyTransform;
     
     return HdChangeTracker::AllDirty;
@@ -561,7 +561,7 @@ UsdImagingMetalDrawModeAdapter::ProcessPropertyChange(UsdPrim const& prim,
 
 void
 UsdImagingMetalDrawModeAdapter::_GenerateOriginGeometry(
-                                                     VtValue *topo, VtValue *points, GfRange3d const& extents) const
+        VtValue *topo, VtValue *points, GfRange3d const& extents) const
 {
     // Origin: vertices are (0,0,0); (1,0,0); (0,1,0); (0,0,1)
     VtVec3fArray pt = VtVec3fArray(4);
@@ -579,14 +579,14 @@ UsdImagingMetalDrawModeAdapter::_GenerateOriginGeometry(
     for (int i = 0; i < 6; ++i) { curveIndices[i] = indices[i]; }
     
     HdBasisCurvesTopology topology(
-                                   HdTokens->linear, HdTokens->bezier, HdTokens->segmented,
-                                   curveVertexCounts, curveIndices);
+       HdTokens->linear, HdTokens->bezier, HdTokens->segmented,
+       curveVertexCounts, curveIndices);
     *topo = VtValue(topology);
 }
 
 void
 UsdImagingMetalDrawModeAdapter::_GenerateBoundsGeometry(
-                                                     VtValue *topo, VtValue *points, GfRange3d const& extents) const
+        VtValue *topo, VtValue *points, GfRange3d const& extents) const
 {
     // Bounding box: vertices are for(i: 0 -> 7) {
     //   ((i & 1) ? z : -z) +
@@ -594,7 +594,7 @@ UsdImagingMetalDrawModeAdapter::_GenerateBoundsGeometry(
     //   ((i & 4) ? x : -x)
     // } ... where x is extents[1].x, -x is extents[0].x
     GfVec3f min = GfVec3f(extents.GetMin()),
-    max = GfVec3f(extents.GetMax());
+            max = GfVec3f(extents.GetMax());
     VtVec3fArray pt = VtVec3fArray(8);
     for(int i = 0; i < 8; ++i) {
         pt[i] = GfVec3f((i & 4) ? max[0] : min[0],
@@ -610,28 +610,28 @@ UsdImagingMetalDrawModeAdapter::_GenerateBoundsGeometry(
     curveVertexCounts[0] = 24;
     VtIntArray curveIndices = VtIntArray(24);
     const int indices[] = { /* bottom face */ 0, 4, 4, 6, 6, 2, 2, 0,
-        /* top face */    1, 5, 5, 7, 7, 3, 3, 1,
-        /* edge pairs */  0, 1, 4, 5, 6, 7, 2, 3 };
+                            /* top face */    1, 5, 5, 7, 7, 3, 3, 1,
+                            /* edge pairs */  0, 1, 4, 5, 6, 7, 2, 3 };
     for (int i = 0; i < 24; ++i) { curveIndices[i] = indices[i]; }
     
     HdBasisCurvesTopology topology(
-                                   HdTokens->linear, HdTokens->bezier, HdTokens->segmented,
-                                   curveVertexCounts, curveIndices);
+       HdTokens->linear, HdTokens->bezier, HdTokens->segmented,
+       curveVertexCounts, curveIndices);
     *topo = VtValue(topology);
 }
 
 void
 UsdImagingMetalDrawModeAdapter::_GenerateCardsCrossGeometry(
-                                                         VtValue *topo, VtValue *points, GfRange3d const& extents,
-                                                         uint8_t axes_mask) const
+         VtValue *topo, VtValue *points, GfRange3d const& extents,
+         uint8_t axes_mask) const
 {
     // Cards (Cross) vertices:
     // - +/-X vertices (CCW wrt +X)
     // - +/-Y vertices (CCW wrt +Y)
     // - +/-Z vertices (CCW wrt +Z)
     GfVec3f min = GfVec3f(extents.GetMin()),
-    max = GfVec3f(extents.GetMax()),
-    mid = (min+max)/2.0f;
+            max = GfVec3f(extents.GetMax()),
+            mid = (min+max)/2.0f;
     VtVec3fArray pt = VtVec3fArray(24);
     
     // +X
@@ -672,8 +672,8 @@ UsdImagingMetalDrawModeAdapter::_GenerateCardsCrossGeometry(
     
     // Generate one face per axis direction, for included axes.
     int numFaces = ((axes_mask & zAxis) ? 2 : 0) +
-    ((axes_mask & yAxis) ? 2 : 0) +
-    ((axes_mask & xAxis) ? 2 : 0);
+                   ((axes_mask & yAxis) ? 2 : 0) +
+                   ((axes_mask & xAxis) ? 2 : 0);
     
     VtIntArray faceCounts = VtIntArray(numFaces);
     for (int i = 0; i < numFaces; ++i) { faceCounts[i] = 4; }
@@ -699,8 +699,8 @@ UsdImagingMetalDrawModeAdapter::_GenerateCardsCrossGeometry(
     VtIntArray holeIndices(0);
     
     HdMeshTopology topology(
-                            PxOsdOpenSubdivTokens->none, PxOsdOpenSubdivTokens->rightHanded,
-                            faceCounts, faceIndices, holeIndices);
+        PxOsdOpenSubdivTokens->none, PxOsdOpenSubdivTokens->rightHanded,
+        faceCounts, faceIndices, holeIndices);
     
     // Hydra expects the points buffer to be as big as the largest index,
     // so if we suppressed certain faces we may need to resize "points".
@@ -718,10 +718,10 @@ UsdImagingMetalDrawModeAdapter::_GenerateCardsCrossGeometry(
 
 void
 UsdImagingMetalDrawModeAdapter::_SanityCheckFaceSizes(SdfPath const& cachePath,
-                                                   GfRange3d const& extents, uint8_t axes_mask) const
+        GfRange3d const& extents, uint8_t axes_mask) const
 {
     GfVec3d min = extents.GetMin(),
-    max = extents.GetMax();
+            max = extents.GetMax();
     bool zeroX = (min[0] == max[0]);
     bool zeroY = (min[1] == max[1]);
     bool zeroZ = (min[2] == max[2]);
@@ -745,8 +745,8 @@ UsdImagingMetalDrawModeAdapter::_SanityCheckFaceSizes(SdfPath const& cachePath,
 
 void
 UsdImagingMetalDrawModeAdapter::_GenerateCardsBoxGeometry(
-                                                       VtValue *topo, VtValue *points, GfRange3d const& extents,
-                                                       uint8_t axes_mask) const
+       VtValue *topo, VtValue *points, GfRange3d const& extents,
+       uint8_t axes_mask) const
 {
     // Bounding box: vertices are for(i: 0 -> 7) {
     //   ((i & 1) ? z : -z) +
@@ -755,7 +755,7 @@ UsdImagingMetalDrawModeAdapter::_GenerateCardsBoxGeometry(
     // } ... where x is extents[1].x, -x is extents[0].x
     GfVec3f min = GfVec3f(extents.GetMin()),
     max = GfVec3f(extents.GetMax());
-    VtVec3fArray pt = VtVec3fArray(8);
+        VtVec3fArray pt = VtVec3fArray(8);
     for(int i = 0; i < 8; ++i) {
         pt[i] = GfVec3f((i & 4) ? max[0] : min[0],
                         (i & 2) ? max[1] : min[1],
@@ -765,8 +765,8 @@ UsdImagingMetalDrawModeAdapter::_GenerateCardsBoxGeometry(
     
     // Generate one face per axis direction, for included axes.
     int numFaces = ((axes_mask & zAxis) ? 2 : 0) +
-    ((axes_mask & yAxis) ? 2 : 0) +
-    ((axes_mask & xAxis) ? 2 : 0);
+                   ((axes_mask & yAxis) ? 2 : 0) +
+                   ((axes_mask & xAxis) ? 2 : 0);
     
     VtIntArray faceCounts = VtIntArray(numFaces);
     for (int i = 0; i < numFaces; ++i) { faceCounts[i] = 4; }
@@ -792,15 +792,15 @@ UsdImagingMetalDrawModeAdapter::_GenerateCardsBoxGeometry(
     VtIntArray holeIndices(0);
     
     HdMeshTopology topology(
-                            UsdGeomTokens->none, UsdGeomTokens->rightHanded,
-                            faceCounts, faceIndices, holeIndices);
+        UsdGeomTokens->none, UsdGeomTokens->rightHanded,
+        faceCounts, faceIndices, holeIndices);
     *topo = VtValue(topology);
 }
 
 void
 UsdImagingMetalDrawModeAdapter::_GenerateCardsFromTextureGeometry(
-                                                               VtValue *topo, VtValue *points, VtValue *uv, VtValue *assign,
-                                                               GfRange3d *extents, UsdPrim const& prim) const
+       VtValue *topo, VtValue *points, VtValue *uv, VtValue *assign,
+       GfRange3d *extents, UsdPrim const& prim) const
 {
     UsdGeomModelAPI model(prim);
     std::vector<std::pair<GfMatrix4d, int>> faces;
@@ -834,9 +834,9 @@ UsdImagingMetalDrawModeAdapter::_GenerateCardsFromTextureGeometry(
     VtIntArray faceIndices = VtIntArray(faces.size() * 4);
     
     GfVec3f corners[4] = { GfVec3f(-1, -1, 0), GfVec3f(-1, 1, 0),
-        GfVec3f(1, 1, 0), GfVec3f(1, -1, 0) };
+                           GfVec3f(1, 1, 0), GfVec3f(1, -1, 0) };
     GfVec2f std_uvs[4] = { GfVec2f(0,0), GfVec2f(0,1),
-        GfVec2f(1,1), GfVec2f(1,0) };
+                           GfVec2f(1,1), GfVec2f(1,0) };
     
     for(size_t i = 0; i < faces.size(); ++i) {
         GfMatrix4d screenToWorld = faces[i].first.GetInverse();
@@ -852,8 +852,8 @@ UsdImagingMetalDrawModeAdapter::_GenerateCardsFromTextureGeometry(
     // Create the topology object, and put our buffers in the out-values.
     VtIntArray holeIndices(0);
     HdMeshTopology topology(
-                            UsdGeomTokens->none, UsdGeomTokens->rightHanded,
-                            faceCounts, faceIndices, holeIndices);
+        UsdGeomTokens->none, UsdGeomTokens->rightHanded,
+        faceCounts, faceIndices, holeIndices);
     
     *topo = VtValue(topology);
     *points = VtValue(arr_pt);
@@ -869,7 +869,7 @@ UsdImagingMetalDrawModeAdapter::_GenerateCardsFromTextureGeometry(
 
 bool
 UsdImagingMetalDrawModeAdapter::_GetMatrixFromImageMetadata(
-                                                         UsdAttribute const& attr, GfMatrix4d *mat) const
+    UsdAttribute const& attr, GfMatrix4d *mat) const
 {
     // This function expects the input attribute to be an image asset path.
     SdfAssetPath asset;
@@ -904,7 +904,7 @@ UsdImagingMetalDrawModeAdapter::_GetMatrixFromImageMetadata(
 
 void
 UsdImagingMetalDrawModeAdapter::_GenerateTextureCoordinates(
-                                                         VtValue *uv, VtValue *assign, uint8_t axes_mask) const
+        VtValue *uv, VtValue *assign, uint8_t axes_mask) const
 {
     // Note: this function depends on the vertex order of the generated
     // card faces.
@@ -913,13 +913,13 @@ UsdImagingMetalDrawModeAdapter::_GenerateTextureCoordinates(
     // for each face specifying which texture to sample.
     
     const GfVec2f uv_normal[4] =
-    { GfVec2f(1,0), GfVec2f(0,0), GfVec2f(0,1), GfVec2f(1,1) };
+        { GfVec2f(1,0), GfVec2f(0,0), GfVec2f(0,1), GfVec2f(1,1) };
     const GfVec2f uv_flipped_s[4] =
-    { GfVec2f(0,0), GfVec2f(1,0), GfVec2f(1,1), GfVec2f(0,1) };
+        { GfVec2f(0,0), GfVec2f(1,0), GfVec2f(1,1), GfVec2f(0,1) };
     const GfVec2f uv_flipped_t[4] =
-    { GfVec2f(1,1), GfVec2f(0,1), GfVec2f(0,0), GfVec2f(1,0) };
+        { GfVec2f(1,1), GfVec2f(0,1), GfVec2f(0,0), GfVec2f(1,0) };
     const GfVec2f uv_flipped_st[4] =
-    { GfVec2f(0,1), GfVec2f(1,1), GfVec2f(1,0), GfVec2f(0,0) };
+        { GfVec2f(0,1), GfVec2f(1,1), GfVec2f(1,0), GfVec2f(0,0) };
     
     std::vector<const GfVec2f*> uv_faces;
     std::vector<int> face_assign;
