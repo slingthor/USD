@@ -805,7 +805,7 @@ void MtlfMetalContext::SetPipelineState()
     }
 }
 
-void MtlfMetalContext::UpdateOldStyleUniformBlock(OldStyleUniformBuffer *uniformBuffer)
+void MtlfMetalContext::UpdateOldStyleUniformBlock(OldStyleUniformBuffer *uniformBuffer, MSL_ProgramStage stage)
 {
     if(!uniformBuffer->buffer) {
         TF_FATAL_CODING_ERROR("No vertex uniform backing buffer assigned!");
@@ -814,7 +814,12 @@ void MtlfMetalContext::UpdateOldStyleUniformBlock(OldStyleUniformBuffer *uniform
     // Update vertex uniform buffer and move block along
     [uniformBuffer->buffer  didModifyRange:NSMakeRange(uniformBuffer->currentOffset, uniformBuffer->blockSize)];
     
-    [renderEncoder setVertexBuffer:uniformBuffer->buffer offset:uniformBuffer->currentOffset atIndex:uniformBuffer->bindingIndex];
+    if(stage == kMSL_ProgramStage_Vertex){
+        [renderEncoder setVertexBuffer:  uniformBuffer->buffer offset:uniformBuffer->currentOffset atIndex:uniformBuffer->bindingIndex];
+    }
+    else if(stage == kMSL_ProgramStage_Fragment) {
+        [renderEncoder setFragmentBuffer:uniformBuffer->buffer offset:uniformBuffer->currentOffset atIndex:uniformBuffer->bindingIndex];
+    }
     
     uint8 *data = (uint8 *)((uint8 *)(uniformBuffer->buffer.contents) + uniformBuffer->currentOffset);
     copyUniform(data + uniformBuffer->blockSize, data, uniformBuffer->blockSize);
