@@ -841,11 +841,11 @@ void MtlfMetalContext::BakeState()
     SetPipelineState();
  
     if (dirtyState & DIRTY_METAL_STATE_OLD_STYLE_VERTEX_UNIFORM) {
-        UpdateOldStyleUniformBlock(&vtxUniformBackingBuffer);
+        UpdateOldStyleUniformBlock(&vtxUniformBackingBuffer, kMSL_ProgramStage_Vertex);
         dirtyState &= ~DIRTY_METAL_STATE_OLD_STYLE_VERTEX_UNIFORM;
         }
     if (dirtyState & DIRTY_METAL_STATE_OLD_STYLE_FRAGMENT_UNIFORM) {
-        UpdateOldStyleUniformBlock(&fragUniformBackingBuffer);
+        UpdateOldStyleUniformBlock(&fragUniformBackingBuffer, kMSL_ProgramStage_Fragment);
         dirtyState &= ~DIRTY_METAL_STATE_OLD_STYLE_FRAGMENT_UNIFORM;
     }
     if (dirtyState & (DIRTY_METAL_STATE_VERTEX_UNIFORM_BUFFER | DIRTY_METAL_STATE_FRAGMENT_UNIFORM_BUFFER)) {
