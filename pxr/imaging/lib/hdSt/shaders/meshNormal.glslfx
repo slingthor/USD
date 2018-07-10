@@ -32,10 +32,7 @@
 
 vec3 GetVertexNormal()
 {
-    //This code used to return {0, 0, 0}, which is not a normal and results in 
-    //NaNs when normalize()'d. Given that this function is called Get*Normal,
-    //I think it is only logical it actually returns a normal...
-    return vec3(0, 1, 0); //vec3(0); 
+    return vec3(0);
 }
 
 vec3 GetTriGeometryNormal(vec3 vertexNormal,
