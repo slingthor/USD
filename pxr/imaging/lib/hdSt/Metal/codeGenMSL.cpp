@@ -1142,6 +1142,28 @@ HdSt_CodeGenMSL::Compile()
     _genCommon.str(""); _genVS.str(""); _genTCS.str(""); _genTES.str("");
     _genGS.str(""); _genFS.str(""); _genCS.str("");
     _procVS.str(""); _procTCS.str(""), _procTES.str(""), _procGS.str("");
+    
+    // shader sources
+    
+    // geometric shader owns main()
+    std::string vertexShader =
+    _geometricShader->GetSource(HdShaderTokens->vertexShader);
+    std::string tessControlShader =
+    _geometricShader->GetSource(HdShaderTokens->tessControlShader);
+    std::string tessEvalShader =
+    _geometricShader->GetSource(HdShaderTokens->tessEvalShader);
+    std::string geometryShader =
+    _geometricShader->GetSource(HdShaderTokens->geometryShader);
+    std::string fragmentShader =
+    _geometricShader->GetSource(HdShaderTokens->fragmentShader);
+    
+    bool hasVS  = (!vertexShader.empty());
+    bool hasTCS = (!tessControlShader.empty());
+    bool hasTES = (!tessEvalShader.empty());
+    bool hasGS  = (!geometryShader.empty());
+    bool hasFS  = (!fragmentShader.empty());
+    
+    // Metal conversion defines
 
     GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
     
@@ -1185,7 +1207,16 @@ HdSt_CodeGenMSL::Compile()
                << "#define noperspective /*center_no_perspective MTL_FIXME*/\n"
                << "#define greaterThan(a,b) (a > b)\n"
                << "#define lessThan(a,b)    (a < b)\n";
-
+    
+    // Fixes for Geometry shader functionality
+    
+    bool enableFragmentNormalReconstruction = false;
+    std::vector<std::string> geometrySourceKeys = _geometricShader->GetSourceKeys(HdShaderTokens->geometryShader);
+    for(auto key : geometrySourceKeys) {
+        if(key == "MeshNormal.Flat") enableFragmentNormalReconstruction = true;
+    }
+    
+    // Start of Program Scope
     
     _genCommon << "class ProgramScope<st> {\n"
                << "public:\n";
@@ -1442,25 +1473,11 @@ HdSt_CodeGenMSL::Compile()
     _genTES << _procTES.str();
     _genGS  << _procGS.str();
     
-    // shader sources
+    // insert fixes for unsupported functionality
     
-    // geometric shader owns main()
-    std::string vertexShader =
-    _geometricShader->GetSource(HdShaderTokens->vertexShader);
-    std::string tessControlShader =
-    _geometricShader->GetSource(HdShaderTokens->tessControlShader);
-    std::string tessEvalShader =
-    _geometricShader->GetSource(HdShaderTokens->tessEvalShader);
-    std::string geometryShader =
-    _geometricShader->GetSource(HdShaderTokens->geometryShader);
-    std::string fragmentShader =
-    _geometricShader->GetSource(HdShaderTokens->fragmentShader);
-    
-    bool hasVS  = (!vertexShader.empty());
-    bool hasTCS = (!tessControlShader.empty());
-    bool hasTES = (!tessEvalShader.empty());
-    bool hasGS  = (!geometryShader.empty());
-    bool hasFS  = (!fragmentShader.empty());
+    if(enableFragmentNormalReconstruction) {
+        _genFS << "#define __RECONSTRUCT_FLAT_NORMAL 1\n";  //See meshNormal.glslfx
+    }
     
     // other shaders (renderpass, lighting, surface) first
     TF_FOR_ALL(it, _shaders) {

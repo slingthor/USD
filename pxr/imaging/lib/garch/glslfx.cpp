@@ -564,6 +564,7 @@ GLSLFX::_GetSource(const TfToken &shaderStageKey) const
     }
 
     string errors;
+    string shaderStageString = shaderStageKey.GetString();
     vector<string> sourceKeys = _config->GetSourceKeys(shaderStageKey);
 
     string ret;
@@ -579,7 +580,7 @@ GLSLFX::_GetSource(const TfToken &shaderStageKey) const
                              key.c_str());
             return string();
         }
-
+        ret += "///// ShaderStageKey:" + shaderStageString + " SourceKey:" + key + " /////\n\n";
         ret += cit->second + "\n";
     }
 

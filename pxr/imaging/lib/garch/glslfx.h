@@ -214,6 +214,9 @@ public:
     /// Get the shader source associated with given key
     GARCH_API
     virtual std::string GetSource(const TfToken &shaderStageKey) const;
+    
+    GARCH_API
+    virtual std::vector<std::string> GetSourceKeys(const TfToken &shaderStageKey) const { return _config->GetSourceKeys(shaderStageKey); };
 
     /// Get the original file name passed to the constructor
     virtual std::string const& GetFilePath() const { return _globalContext.filename; }
