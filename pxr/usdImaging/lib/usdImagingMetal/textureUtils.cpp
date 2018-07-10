@@ -145,15 +145,15 @@ UsdImagingMetal_GetTextureResource(UsdPrim const& usdPrim,
     }
     
     TF_DEBUG(USDIMAGING_TEXTURES).Msg(
-                                      "Loading texture: id(%s), isPtex(%s)\n",
-                                      usdPath.GetText(),
-                                      isPtex ? "true" : "false");
+          "Loading texture: id(%s), isPtex(%s)\n",
+          usdPath.GetText(),
+          isPtex ? "true" : "false");
     
     if (!TfPathExists(filePath)) {
         TF_DEBUG(USDIMAGING_TEXTURES).Msg(
-                                          "File does not exist, returning nullptr");
+                "File does not exist, returning nullptr");
         TF_WARN("Unable to find Texture '%s' with path '%s'.",
-                filePath.GetText(), usdPath.GetText());
+            filePath.GetText(), usdPath.GetText());
         return HdTextureResourceSharedPtr();
     }
     

@@ -211,7 +211,7 @@ private:
     id<MTLRenderPipelineState> currentPipelineState;
     boost::unordered_map<size_t, id<MTLRenderPipelineState>> pipelineStateMap;
     
-    void UpdateOldStyleUniformBlock(OldStyleUniformBuffer *uniformBuffer);
+    void UpdateOldStyleUniformBlock(OldStyleUniformBuffer *uniformBuffer, MSL_ProgramStage stage);
 
     uint32 dirtyState;
 };
