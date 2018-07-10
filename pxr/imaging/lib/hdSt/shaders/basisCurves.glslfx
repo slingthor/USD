@@ -57,8 +57,10 @@ out CurveVertexData
 // We will either generate a camera facing normal or use the authored normal.
 vec3 getNormal(MAT4 transform);
 // Fwd declare methods defined in pointId.glslfx, that are used below.
+#if !defined(ARCH_GFX_METAL)
 int GetPointId();
 void ProcessPointId(int);
+#endif
 
 void main(void)
 {

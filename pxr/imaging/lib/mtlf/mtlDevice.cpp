@@ -244,6 +244,9 @@ MtlfMetalContext::MtlfMetalContext()
     depthStateDesc.depthCompareFunction = MTLCompareFunctionLessEqual;
     depthState = [device newDepthStencilStateWithDescriptor:depthStateDesc];
     
+    //vtxUniformBackingBuffer  = NULL;
+    //fragUniformBackingBuffer = NULL;
+    
     // Load our common vertex shader. This is used by both the fragment shaders below
     TfToken vtxShaderToken(MtlfPackageInteropVtxShader());
     GLchar const* const vertexShader =
@@ -549,71 +552,73 @@ void copyUniform(uint8 *dest, uint8 *src, uint32 size)
 
 void MtlfMetalContext::SetUniform(const void* _data, uint32 _dataSize, const TfToken& _name, uint32 _index, MSL_ProgramStage _stage)
 {
-    OldStyleUniformBuffer *psOSBuffer = NULL;
+    BufferBinding *OSBuffer = NULL;
     
     if (!_dataSize) {
         return;
     }
     
     if(_stage == kMSL_ProgramStage_Vertex) {
-        psOSBuffer = &vtxUniformBackingBuffer;
+        OSBuffer = vtxUniformBackingBuffer;
         dirtyState |= DIRTY_METAL_STATE_OLD_STYLE_VERTEX_UNIFORM;
     }
     else if (_stage == kMSL_ProgramStage_Fragment) {
-        psOSBuffer = &fragUniformBackingBuffer;
+        OSBuffer = fragUniformBackingBuffer;
         dirtyState |= DIRTY_METAL_STATE_OLD_STYLE_FRAGMENT_UNIFORM;
     }
     else {
         TF_FATAL_CODING_ERROR("Unsupported stage");
     }
     
-    if(!psOSBuffer->buffer) {
-        TF_FATAL_CODING_ERROR("Backing buffer not allocated");
+    if(!OSBuffer || !OSBuffer->buffer) {
+        TF_FATAL_CODING_ERROR("Uniform Backing buffer not allocated");
     }
     
-    uint8* bufferContents  = (uint8*)(psOSBuffer->buffer.contents)  + psOSBuffer->currentOffset;
+    uint8* bufferContents  = (OSBuffer->contents)  + OSBuffer->offset;
     
     uint32 uniformEnd = (_index + _dataSize);
     copyUniform(bufferContents + _index, (uint8*)_data, _dataSize);
     
+    OSBuffer->modified = true;
 }
 
 void MtlfMetalContext::SetUniformBuffer(int index, id<MTLBuffer> buffer, const TfToken& name, MSL_ProgramStage stage, int offset, int oldStyleUniformSize)
 {
     if(stage == 0)
         TF_FATAL_CODING_ERROR("Not allowed!");
-        
-    uniformBuffers.push_back({index, buffer, name, stage, offset});
     
-    if(oldStyleUniformSize)
-    {
-        OldStyleUniformBuffer *psOSBuffer = NULL;
-        if(stage == kMSL_ProgramStage_Vertex) {
-            psOSBuffer = &vtxUniformBackingBuffer;
-        }
-        else if (stage == kMSL_ProgramStage_Fragment) {
-            psOSBuffer = &fragUniformBackingBuffer;
-        }
-        else {
-            TF_FATAL_CODING_ERROR("Unsupported stage");
-        }
-        psOSBuffer->buffer        = buffer;
-        psOSBuffer->currentOffset = 0;
-        psOSBuffer->blockSize     = oldStyleUniformSize;
-        psOSBuffer->bindingIndex  = index;
+    if(oldStyleUniformSize && offset != 0) {
+            TF_FATAL_CODING_ERROR("Expected zero offset!");
     }
+    // Allocate a binding for this buffer
+    BufferBinding *bufferInfo = new BufferBinding{index, buffer, name, stage, offset, true, (uint32)oldStyleUniformSize, (uint8 *)(buffer.contents)};
+
+    boundBuffers.push_back(bufferInfo);
     
     if(stage == kMSL_ProgramStage_Vertex) {
         dirtyState |= DIRTY_METAL_STATE_VERTEX_UNIFORM_BUFFER;
+        if (oldStyleUniformSize) {
+            if (vtxUniformBackingBuffer) {
+                NSLog(@"Overwriting existing backing buffer, possible issue?");
+            }
+            vtxUniformBackingBuffer = bufferInfo;
+        }
     }
     if(stage == kMSL_ProgramStage_Fragment) {
         dirtyState |= DIRTY_METAL_STATE_FRAGMENT_UNIFORM_BUFFER;
+        if (oldStyleUniformSize) {
+            if (fragUniformBackingBuffer) {
+                NSLog(@"Overwriting existing backing buffer, possible issue?");
+            }
+            fragUniformBackingBuffer = bufferInfo;
+        }
     }
 }
 
 void MtlfMetalContext::SetBuffer(int index, id<MTLBuffer> buffer, const TfToken& name)
 {
-    vertexBuffers.push_back({index, buffer, name});
+    BufferBinding *bufferInfo = new BufferBinding{index, buffer, name, kMSL_ProgramStage_Vertex, 0, true};
+    boundBuffers.push_back(bufferInfo);
     dirtyState |= DIRTY_METAL_STATE_VERTEX_BUFFER;
 }
 
@@ -805,30 +810,26 @@ void MtlfMetalContext::SetPipelineState()
     }
 }
 
-void MtlfMetalContext::UpdateOldStyleUniformBlock(OldStyleUniformBuffer *uniformBuffer, MSL_ProgramStage stage)
+void MtlfMetalContext::UpdateOldStyleUniformBlock(BufferBinding *uniformBuffer, MSL_ProgramStage stage)
 {
     if(!uniformBuffer->buffer) {
         TF_FATAL_CODING_ERROR("No vertex uniform backing buffer assigned!");
     }
     
     // Update vertex uniform buffer and move block along
-    [uniformBuffer->buffer  didModifyRange:NSMakeRange(uniformBuffer->currentOffset, uniformBuffer->blockSize)];
+    [uniformBuffer->buffer  didModifyRange:NSMakeRange(uniformBuffer->offset, uniformBuffer->blockSize)];
     
-    if(stage == kMSL_ProgramStage_Vertex){
-        [renderEncoder setVertexBuffer:  uniformBuffer->buffer offset:uniformBuffer->currentOffset atIndex:uniformBuffer->bindingIndex];
-    }
-    else if(stage == kMSL_ProgramStage_Fragment) {
-        [renderEncoder setFragmentBuffer:uniformBuffer->buffer offset:uniformBuffer->currentOffset atIndex:uniformBuffer->bindingIndex];
-    }
-    
-    uint8 *data = (uint8 *)((uint8 *)(uniformBuffer->buffer.contents) + uniformBuffer->currentOffset);
+    // Copy existing data to the new blocks
+    uint8 *data = (uint8 *)((uint8 *)(uniformBuffer->contents) + uniformBuffer->offset);
     copyUniform(data + uniformBuffer->blockSize, data, uniformBuffer->blockSize);
     
-    uniformBuffer->currentOffset += uniformBuffer->blockSize;
+    // Move the offset along
+    uniformBuffer->offset += uniformBuffer->blockSize;
     
-    if (uniformBuffer->currentOffset > uniformBuffer->buffer.length) {
+    // Check for wrapping
+    if (uniformBuffer->offset > uniformBuffer->buffer.length) {
         NSLog(@"Old style uniform buffer wrapped - expect strangeness"); // MTL_FIXME
-        uniformBuffer->currentOffset  = 0;
+        uniformBuffer->offset  = 0;
     }
 }
 
@@ -840,45 +841,51 @@ void MtlfMetalContext::BakeState()
     // Create and set a new pipelinestate if required
     SetPipelineState();
  
-    if (dirtyState & DIRTY_METAL_STATE_OLD_STYLE_VERTEX_UNIFORM) {
-        UpdateOldStyleUniformBlock(&vtxUniformBackingBuffer, kMSL_ProgramStage_Vertex);
-        dirtyState &= ~DIRTY_METAL_STATE_OLD_STYLE_VERTEX_UNIFORM;
-        }
-    if (dirtyState & DIRTY_METAL_STATE_OLD_STYLE_FRAGMENT_UNIFORM) {
-        UpdateOldStyleUniformBlock(&fragUniformBackingBuffer, kMSL_ProgramStage_Fragment);
-        dirtyState &= ~DIRTY_METAL_STATE_OLD_STYLE_FRAGMENT_UNIFORM;
-    }
-    if (dirtyState & (DIRTY_METAL_STATE_VERTEX_UNIFORM_BUFFER | DIRTY_METAL_STATE_FRAGMENT_UNIFORM_BUFFER)) {
-        for(auto buffer : uniformBuffers)
+    // Any buffers modified
+    if (dirtyState & (DIRTY_METAL_STATE_VERTEX_UNIFORM_BUFFER     |
+                       DIRTY_METAL_STATE_FRAGMENT_UNIFORM_BUFFER  |
+                       DIRTY_METAL_STATE_VERTEX_BUFFER            |
+                       DIRTY_METAL_STATE_OLD_STYLE_VERTEX_UNIFORM |
+                       DIRTY_METAL_STATE_OLD_STYLE_FRAGMENT_UNIFORM)) {
+        
+        for(auto buffer : boundBuffers)
         {
-             if(buffer.stage == kMSL_ProgramStage_Vertex){
-                [renderEncoder setVertexBuffer:buffer.buffer offset:buffer.offset atIndex:buffer.idx];
-            }
-            else if(buffer.stage == kMSL_ProgramStage_Fragment) {
-                [renderEncoder setFragmentBuffer:buffer.buffer offset:buffer.offset atIndex:buffer.idx];
-            }
-            else{
-                TF_FATAL_CODING_ERROR("Not implemented!"); //Compute case
+            // Only output if this buffer was modified
+            if (buffer->modified) {
+                if(buffer->stage == kMSL_ProgramStage_Vertex){
+                    [renderEncoder setVertexBuffer:buffer->buffer offset:buffer->offset atIndex:buffer->index];
+                }
+                else if(buffer->stage == kMSL_ProgramStage_Fragment) {
+                    [renderEncoder setFragmentBuffer:buffer->buffer offset:buffer->offset atIndex:buffer->index];
+                }
+                else{
+                    TF_FATAL_CODING_ERROR("Not implemented!"); //Compute case
+                }
+                buffer->modified = false;
             }
         }
-        dirtyState &= ~(DIRTY_METAL_STATE_VERTEX_UNIFORM_BUFFER | DIRTY_METAL_STATE_FRAGMENT_UNIFORM_BUFFER);
-#if METAL_STATE_OPTIMISATION
-        uniformBuffers.clear();
-#endif
+         
+         if (dirtyState & DIRTY_METAL_STATE_OLD_STYLE_VERTEX_UNIFORM) {
+             UpdateOldStyleUniformBlock(vtxUniformBackingBuffer, kMSL_ProgramStage_Vertex);
+         }
+         if (dirtyState & DIRTY_METAL_STATE_OLD_STYLE_FRAGMENT_UNIFORM) {
+             UpdateOldStyleUniformBlock(fragUniformBackingBuffer, kMSL_ProgramStage_Fragment);
+         }
+         
+         dirtyState &= ~(DIRTY_METAL_STATE_VERTEX_UNIFORM_BUFFER    |
+                         DIRTY_METAL_STATE_FRAGMENT_UNIFORM_BUFFER  |
+                         DIRTY_METAL_STATE_VERTEX_BUFFER            |
+                         DIRTY_METAL_STATE_OLD_STYLE_VERTEX_UNIFORM |
+                         DIRTY_METAL_STATE_OLD_STYLE_FRAGMENT_UNIFORM);
     }
 
-    if (dirtyState & DIRTY_METAL_STATE_VERTEX_BUFFER) {
-        for(auto buffer : vertexBuffers) {
-            [renderEncoder setVertexBuffer:buffer.buffer offset:0 atIndex:buffer.idx];
-        }
-        dirtyState &= ~DIRTY_METAL_STATE_VERTEX_BUFFER;
-    }
+ 
     if (dirtyState & DIRTY_METAL_STATE_TEXTURE) {
         for(auto texture : textures) {
             if(texture.stage == kMSL_ProgramStage_Vertex)
-            [renderEncoder setVertexTexture:texture.texture atIndex:texture.idx];
+            [renderEncoder setVertexTexture:texture.texture atIndex:texture.index];
             else if(texture.stage == kMSL_ProgramStage_Fragment)
-            [renderEncoder setFragmentTexture:texture.texture atIndex:texture.idx];
+            [renderEncoder setFragmentTexture:texture.texture atIndex:texture.index];
             else
             TF_FATAL_CODING_ERROR("Not implemented!"); //Compute case
         }
@@ -887,9 +894,9 @@ void MtlfMetalContext::BakeState()
     if (dirtyState & DIRTY_METAL_STATE_SAMPLER) {
         for(auto sampler : samplers) {
             if(sampler.stage == kMSL_ProgramStage_Vertex)
-            [renderEncoder setVertexSamplerState:sampler.sampler atIndex:sampler.idx];
+            [renderEncoder setVertexSamplerState:sampler.sampler atIndex:sampler.index];
             else if(sampler.stage == kMSL_ProgramStage_Fragment)
-            [renderEncoder setFragmentSamplerState:sampler.sampler atIndex:sampler.idx];
+            [renderEncoder setFragmentSamplerState:sampler.sampler atIndex:sampler.index];
             else
             TF_FATAL_CODING_ERROR("Not implemented!"); //Compute case
         }
@@ -906,17 +913,16 @@ void MtlfMetalContext::ClearState()
     numVertexComponents = 0;
     dirtyState = DIRTY_METAL_STATE_ALL;
     
-    vtxUniformBackingBuffer.buffer         = nil;
-    vtxUniformBackingBuffer.currentOffset  = 0;
-    vtxUniformBackingBuffer.bindingIndex   = -1;
-    fragUniformBackingBuffer.buffer        = 0;
-    fragUniformBackingBuffer.currentOffset = 0;
-    fragUniformBackingBuffer.bindingIndex  = -1;
-    
-    vertexBuffers.clear();
-    uniformBuffers.clear();
+    // Free all state associated with the buffers
+    for(auto buffer : boundBuffers) {
+        delete buffer;
+    }
+    boundBuffers.clear();
     textures.clear();
     samplers.clear();
+    
+    vtxUniformBackingBuffer  = NULL;
+    fragUniformBackingBuffer = NULL;
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

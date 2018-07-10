@@ -119,6 +119,8 @@ public:
     HDST_API
     virtual void AddBindings(HdBindingRequestVector *customBindings) override;
 
+    std::vector<std::string> GetSourceKeys(TfToken const &shaderStageKey) const { return _glslfx->GetSourceKeys(shaderStageKey); }
+
     /// Returns true if this geometric shader is used for GPU frustum culling.
     bool IsCullingPass() const {
         return _cullingPass;

@@ -117,7 +117,13 @@ HdStVBOSimpleMemoryBufferMetal::Reallocate(
         HdResourceGPUHandle newId;
         HdResourceGPUHandle oldId(bres->GetId());
 
-        newId = [MtlfMetalContext::GetMetalContext()->device newBufferWithLength:bufferSize options:MTLResourceStorageModeManaged];
+        if (bufferSize) {
+            newId = [MtlfMetalContext::GetMetalContext()->device newBufferWithLength:bufferSize options:MTLResourceStorageModeManaged];
+        }
+        else {
+            // Dummy buffer - 0 byte buffers are invalid
+            newId = [MtlfMetalContext::GetMetalContext()->device newBufferWithLength:256 options:MTLResourceStorageModeManaged];
+        }
 
         // copy the range. There are three cases:
         //

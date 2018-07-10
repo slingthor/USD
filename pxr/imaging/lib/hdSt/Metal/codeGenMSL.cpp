@@ -1161,6 +1161,8 @@ HdSt_CodeGenMSL::Compile()
     _genCommon.str(""); _genVS.str(""); _genTCS.str(""); _genTES.str("");
     _genGS.str(""); _genFS.str(""); _genCS.str("");
     _procVS.str(""); _procTCS.str(""), _procTES.str(""), _procGS.str("");
+    
+    // Metal conversion defines
 
     GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
     
@@ -1204,7 +1206,16 @@ HdSt_CodeGenMSL::Compile()
                 << "#define noperspective /*center_no_perspective MTL_FIXME*/\n"
                 << "#define greaterThan(a,b) (a > b)\n"
                 << "#define lessThan(a,b)    (a < b)\n";
-
+    
+    // Fixes for Geometry shader functionality
+    
+    bool enableFragmentNormalReconstruction = false;
+    std::vector<std::string> geometrySourceKeys = _geometricShader->GetSourceKeys(HdShaderTokens->geometryShader);
+    for(auto key : geometrySourceKeys) {
+        if(key == "MeshNormal.Flat") enableFragmentNormalReconstruction = true;
+    }
+    
+    // Start of Program Scope
     
     _genCommon  << "class ProgramScope<st> {\n"
                 << "public:\n";
@@ -1464,6 +1475,12 @@ HdSt_CodeGenMSL::Compile()
     _genTCS << _procTCS.str();
     _genTES << _procTES.str();
     _genGS  << _procGS.str();
+    
+    // insert fixes for unsupported functionality
+    
+    if(enableFragmentNormalReconstruction) {
+        _genFS << "#define __RECONSTRUCT_FLAT_NORMAL 1\n";  //See meshNormal.glslfx
+    }
     
     // other shaders (renderpass, lighting, surface) first
     TF_FOR_ALL(it, _shaders) {
@@ -3251,10 +3268,14 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
         //      may not work some GPUs.
         // XXX: we only have 1 shaderData entry (interleaved).
         int arraySize = (binding.GetType() == HdBinding::UBO) ? 1 : 0;
-        _EmitDeclaration(declarations, _mslVSInputParams, varName, typeName, TfToken(), binding, arraySize);
+//        _EmitDeclaration(declarations, _mslVSInputParams, varName, typeName, TfToken(), binding, arraySize);
+        _EmitDeclarationPtr(declarations, _mslVSInputParams, varName, typeName, TfToken(), binding, arraySize, true);
 
         break;
     }
+    
+    _genVS << declarations.str()
+           << accessors.str();
 
     // accessors.
     TF_FOR_ALL (it, _metaData.shaderParameterBinding) {

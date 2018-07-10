@@ -158,23 +158,26 @@ protected:
     uint32_t numVertexComponents;
     uint32_t numColourAttachments;
 
-    struct OldStyleUniformBuffer {
-        id<MTLBuffer> buffer;
-        uint32        currentOffset;
-        uint32        blockSize;
-        uint32        bindingIndex;
+    struct BufferBinding {
+        int              index;
+        id<MTLBuffer>    buffer;
+        TfToken          name;
+        MSL_ProgramStage stage;
+        int              offset;
+        bool             modified;
+        uint32           blockSize;
+        uint8           *contents;
     };
-    OldStyleUniformBuffer vtxUniformBackingBuffer;
-    OldStyleUniformBuffer fragUniformBackingBuffer;
+    std::vector<BufferBinding*> boundBuffers;
+	
+    BufferBinding *vtxUniformBackingBuffer;
+    BufferBinding *fragUniformBackingBuffer;
     
-    struct VertexBufferBinding { int idx; id<MTLBuffer> buffer; TfToken name; };
-    std::vector<VertexBufferBinding> vertexBuffers;
-    struct UniformBufferBinding { int idx; id<MTLBuffer> buffer; TfToken name; MSL_ProgramStage stage; int offset; };
-    std::vector<UniformBufferBinding> uniformBuffers;
-	struct TextureBinding { int idx; id<MTLTexture> texture; TfToken name; MSL_ProgramStage stage; };
+    struct TextureBinding { int index; id<MTLTexture> texture; TfToken name; MSL_ProgramStage stage; };
     std::vector<TextureBinding> textures;
-	struct SamplerBinding { int idx; id<MTLSamplerState> sampler; TfToken name; MSL_ProgramStage stage; };
+	struct SamplerBinding { int index; id<MTLSamplerState> sampler; TfToken name; MSL_ProgramStage stage; };
     std::vector<SamplerBinding> samplers;
+    
     id<MTLBuffer> indexBuffer;
     id<MTLBuffer> remappedQuadIndexBuffer;
     id<MTLBuffer> remappedQuadIndexBufferSource;
@@ -211,7 +214,7 @@ private:
     id<MTLRenderPipelineState> currentPipelineState;
     boost::unordered_map<size_t, id<MTLRenderPipelineState>> pipelineStateMap;
     
-    void UpdateOldStyleUniformBlock(OldStyleUniformBuffer *uniformBuffer, MSL_ProgramStage stage);
+    void UpdateOldStyleUniformBlock(BufferBinding *uniformBuffer, MSL_ProgramStage stage);
 
     uint32 dirtyState;
 };
