@@ -29,12 +29,14 @@
 #include "pxr/pxr.h"
 #include "usdMaya/usdTranslatorExport.h"
 
-#include "usdMaya/JobArgs.h"
+#include "usdMaya/jobArgs.h"
 #include "usdMaya/shadingModeRegistry.h"
 #include "usdMaya/usdWriteJob.h"
+#include "usdMaya/writeUtil.h"
 
 #include <maya/MAnimControl.h>
 #include <maya/MFileObject.h>
+#include <maya/MGlobal.h>
 #include <maya/MSelectionList.h>
 #include <maya/MString.h>
 
@@ -61,11 +63,13 @@ usdTranslatorExport::writer(const MFileObject &file,
                  MPxFileTranslator::FileAccessMode mode ) {
 
     std::string fileName(file.fullName().asChar());
-    JobExportArgs jobArgs;
-    double startTime=1, endTime=1;
-    std::set<double> frameSamples;
+    VtDictionary userArgs;
+    bool exportAnimation = false;
+    GfInterval timeInterval(1.0, 1.0);
+    double frameStride = 1.0;
     bool append=false;
     
+    MStringArray filteredTypes;
     // Get the options 
     if ( optionsString.length() > 0 ) {
         MStringArray optionList;
@@ -73,128 +77,47 @@ usdTranslatorExport::writer(const MFileObject &file,
         optionsString.split(';', optionList);
         for(int i=0; i<(int)optionList.length(); ++i) {
             theOption.clear();
-            optionList[i].split('=', theOption);            
-            if (theOption[0] == MString("exportReferencesAsInstanceable")) {
-                jobArgs.exportRefsAsInstanceable = theOption[1].asInt();
+            optionList[i].split('=', theOption);
+            if (theOption.length() != 2) {
+                continue;
             }
-            if (theOption[0] == MString("shadingMode")) {
-                // Set default (most common) options
-                jobArgs.exportDisplayColor = true;
-                jobArgs.shadingMode = PxrUsdMayaShadingModeTokens->none;
-                
-                if (theOption[1] == MString("None")) {
-                    jobArgs.exportDisplayColor = false;
-                } else if (theOption[1] == MString("Material Colors")) {
-                    jobArgs.shadingMode = PxrUsdMayaShadingModeTokens->displayColor;
-                } else if (theOption[1] == MString("RfM Shaders")) {
-                    TfToken shadingMode("pxrRis");
-                    if (PxrUsdMayaShadingModeRegistry::GetInstance().GetExporter(shadingMode)) {
-                        jobArgs.shadingMode = shadingMode;
-                    }
-                } else if (theOption[1] != MString("GPrim Colors")) { 
-                    TfToken modeToken(theOption[1].asChar());
-                    if (PxrUsdMayaShadingModeRegistry::GetInstance().GetExporter(modeToken)) { 
-                        jobArgs.shadingMode = modeToken; 
-                    } else { 
-                        MGlobal::displayError( 
-                            TfStringPrintf("No shadingMode '%s' found. Setting shadingMode='none'", modeToken.GetText()).c_str()); 
-                        jobArgs.shadingMode = PxrUsdMayaShadingModeTokens->none; 
-                    }
-                } 
-            }
-            if (theOption[0] == MString("exportUVs")) {
-                jobArgs.exportMeshUVs = theOption[1].asInt();
-                jobArgs.exportNurbsExplicitUV = theOption[1].asInt();
-            }
-            if (theOption[0] == MString("exportMaterialCollections")) {
-                jobArgs.exportMaterialCollections = theOption[1].asInt();
-            }
-            if (theOption[0] == MString("materialCollectionsPath")) {
-                jobArgs.materialCollectionsPath = theOption[1].asChar();
-            }
-            if (theOption[0] == MString("exportCollectionBasedBindings")) {
-                jobArgs.exportCollectionBasedBindings= theOption[1].asInt();
-            }
-            if (theOption[0] == MString("normalizeUVs")) {
-                jobArgs.normalizeMeshUVs = theOption[1].asInt();
-                jobArgs.nurbsExplicitUVType = PxUsdExportJobArgsTokens->Uniform;
-            }
-            if (theOption[0] == MString("exportColorSets")) {
-                jobArgs.exportColorSets = theOption[1].asInt();
-            }
-            if (theOption[0] == MString("renderableOnly")) {
-                jobArgs.excludeInvisible = theOption[1].asInt();
-            }
-            if (theOption[0] == MString("allCameras")) {
-                jobArgs.exportDefaultCameras = theOption[1].asInt();
-            }
-            if (theOption[0] == MString("renderLayerMode")) {
-                jobArgs.renderLayerMode = PxUsdExportJobArgsTokens->defaultLayer;
 
-                if (theOption[1]=="Use Current Layer") {
-                    jobArgs.renderLayerMode = PxUsdExportJobArgsTokens->currentLayer;
-                } else if (theOption[1]=="Modeling Variant Per Layer") {
-                    jobArgs.renderLayerMode = PxUsdExportJobArgsTokens->modelingVariant;
-                }
+            std::string argName(theOption[0].asChar());
+            if (argName == "animation") {
+                exportAnimation = theOption[1].asInt();
             }
-            if (theOption[0] == MString("mergeXForm")) {
-                jobArgs.mergeTransformAndShape = theOption[1].asInt();
+            else if (argName == "startTime") {
+                timeInterval.SetMin(theOption[1].asDouble());
             }
-            if (theOption[0] == MString("exportInstances")) {
-                jobArgs.exportInstances = theOption[1].asInt();
+            else if (argName == "endTime") {
+                timeInterval.SetMax(theOption[1].asDouble());
             }
-            if (theOption[0] == MString("defaultMeshScheme")) {            
-                if (theOption[1]=="Polygonal Mesh") {
-                    jobArgs.defaultMeshScheme = UsdGeomTokens->none;
-                } else if (theOption[1]=="Bilinear SubDiv") {
-                    jobArgs.defaultMeshScheme = UsdGeomTokens->bilinear;
-                } else if (theOption[1]=="CatmullClark SDiv") {
-                    jobArgs.defaultMeshScheme = UsdGeomTokens->catmullClark;
-                } else if (theOption[1]=="Loop SDiv") {
-                    jobArgs.defaultMeshScheme = UsdGeomTokens->loop;
-                }
+            else if (argName == "frameStride") {
+                frameStride = theOption[1].asDouble();
             }
-            if (theOption[0] == MString("exportVisibility")) {
-                jobArgs.exportVisibility = theOption[1].asInt();
+            else if (argName == "filterTypes") {
+                theOption[1].split(',', filteredTypes);
             }
-            if (theOption[0] == MString("exportSkin")) {
-                if (theOption[1] == "All (Automatically Create SkelRoots)") {
-                    jobArgs.exportSkin = true;
-                    jobArgs.autoSkelRoots = true;
-                } else if (theOption[1] == "Only Under SkelRoots") {
-                    jobArgs.exportSkin = true;
-                    jobArgs.autoSkelRoots = false;
-                } else {
-                    jobArgs.exportSkin = false;
-                }
+            else {
+                userArgs[argName] = PxrUsdMayaUtil::ParseArgumentValue(
+                    argName, theOption[1].asChar(),
+                    PxrUsdMayaJobExportArgs::GetDefaultDictionary());
             }
-            if (theOption[0] == MString("animation")) {
-                jobArgs.exportAnimation = theOption[1].asInt();
-            }
-            if (theOption[0] == MString("startTime")) {
-                startTime = theOption[1].asDouble();
-            }
-            if (theOption[0] == MString("endTime")) {
-                endTime = theOption[1].asDouble();
-            }
-            if (theOption[0] == MString("frameSample")) {
-                frameSamples.insert(theOption[1].asDouble());
-            }
-            if (theOption[0] == MString("parentScope")) {
-                jobArgs.setParentScope(theOption[1].asChar());
-            }            
-        }
-        // Now resync start and end frame based on animation mode
-        if (jobArgs.exportAnimation) {
-            if (endTime<startTime) endTime=startTime;
-        } else {
-            startTime=MAnimControl::currentTime().value();
-            endTime=startTime;
         }
     }
 
-    if (frameSamples.empty()) {
-        frameSamples.insert(0.0);
+
+    // Now resync start and end frame based on export time interval.
+    if (exportAnimation) {
+        if (timeInterval.IsEmpty()) {
+            // If the user accidentally set start > end, resync to the closed
+            // interval with the single start point.
+            timeInterval = GfInterval(timeInterval.GetMin());
+        }
+    }
+    else {
+        // No animation, so empty interval.
+        timeInterval = GfInterval();
     }
 
     MSelectionList objSelList;
@@ -207,24 +130,31 @@ usdTranslatorExport::writer(const MFileObject &file,
     }
 
     // Convert selection list to jobArgs dagPaths
+    PxrUsdMayaUtil::ShapeSet dagPaths;
     for (unsigned int i=0; i < objSelList.length(); i++) {
         MDagPath dagPath;
         if (objSelList.getDagPath(i, dagPath) == MS::kSuccess) {
-            jobArgs.dagPaths.insert(dagPath);
+            dagPaths.insert(dagPath);
         }
     }
     
-    if (jobArgs.dagPaths.size()) {
+    if (dagPaths.size()) {
+        PxrUsdMayaJobExportArgs jobArgs =
+                PxrUsdMayaJobExportArgs::CreateFromDictionary(
+                    userArgs, dagPaths, timeInterval);
+        for (unsigned int i=0; i < filteredTypes.length(); ++i) {
+            jobArgs.AddFilteredTypeName(filteredTypes[i].asChar());
+        }
         usdWriteJob writeJob(jobArgs);
-        if (writeJob.beginJob(fileName, append, startTime, endTime)) {
-            if (jobArgs.exportAnimation) {
+        if (writeJob.beginJob(fileName, append)) {
+            std::vector<double> timeSamples =
+                    PxrUsdMayaWriteUtil::GetTimeSamples(
+                    jobArgs.timeInterval, std::set<double>(), frameStride);
+            if (!timeSamples.empty()) {
                 const MTime oldCurTime = MAnimControl::currentTime();
-                for (double i = startTime; i < (endTime + 1.0); ++i) {
-                    for (double sampleTime : frameSamples) {
-                        const double actualTime = i + sampleTime;
-                        MGlobal::viewFrame(actualTime);
-                        writeJob.evalJob(actualTime);
-                    }
+                for (double t : timeSamples) {
+                    MGlobal::viewFrame(t);
+                    writeJob.evalJob(t);
                 }
 
                 // Set the time back.
@@ -236,7 +166,7 @@ usdTranslatorExport::writer(const MFileObject &file,
             return MS::kFailure;
         }
     } else {
-        MGlobal::displayWarning("No DAG nodes to export. Skipping");
+        TF_WARN("No DAG nodes to export. Skipping.");
     }
     
     return MS::kSuccess;
@@ -266,6 +196,37 @@ usdTranslatorExport::identifyFile(
     }
 
     return retValue;
+}
+
+/* static */
+const std::string&
+usdTranslatorExport::GetDefaultOptions()
+{
+    static std::string defaultOptions;
+    static std::once_flag once;
+    std::call_once(once, []() {
+        std::vector<std::string> entries;
+        for (const std::pair<std::string, VtValue> keyValue :
+                PxrUsdMayaJobExportArgs::GetDefaultDictionary()) {
+            if (keyValue.second.IsHolding<bool>()) {
+                entries.push_back(TfStringPrintf("%s=%d",
+                        keyValue.first.c_str(),
+                        keyValue.second.Get<bool>()));
+            }
+            else if (keyValue.second.IsHolding<std::string>()) {
+                entries.push_back(TfStringPrintf("%s=%s",
+                        keyValue.first.c_str(),
+                        keyValue.second.Get<std::string>().c_str()));
+            }
+        }
+        entries.push_back("animation=0");
+        entries.push_back("startTime=1");
+        entries.push_back("endTime=1");
+        entries.push_back("frameStride=1.0");
+        defaultOptions = TfStringJoin(entries, ";");
+    });
+
+    return defaultOptions;
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

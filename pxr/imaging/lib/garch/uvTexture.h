@@ -59,7 +59,9 @@ public:
         unsigned int cropTop    = 0,
         unsigned int cropBottom = 0,
         unsigned int cropLeft   = 0,
-        unsigned int cropRight  = 0);
+        unsigned int cropRight  = 0,
+        GarchImage::ImageOriginLocation originLocation =
+                           GarchImage::OriginUpperLeft);
 
     GARCH_API
     static GarchUVTextureRefPtr New(
@@ -67,7 +69,9 @@ public:
         unsigned int cropTop    = 0,
         unsigned int cropBottom = 0,
         unsigned int cropLeft   = 0,
-        unsigned int cropRight  = 0);
+        unsigned int cropRight  = 0,
+        GarchImage::ImageOriginLocation originLocation = 
+                           GarchImage::OriginUpperLeft); 
     
     /// Returns true if the file at \p imageFilePath is an image that
     /// can be used with this texture object.
@@ -97,11 +101,13 @@ protected:
         unsigned int cropTop,
         unsigned int cropBottom,
         unsigned int cropLeft,
-        unsigned int cropRight);
-    
+        unsigned int cropRight,
+        GarchImage::ImageOriginLocation originLocation =
+                           GarchImage::OriginUpperLeft);
+
     GARCH_API
     virtual ~GarchUVTexture();
-
+    
     GARCH_API
     virtual void _OnSetMemoryRequested(size_t targetMemory);
     GARCH_API

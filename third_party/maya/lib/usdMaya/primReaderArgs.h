@@ -27,7 +27,11 @@
 /// \file primReaderArgs.h
 
 #include "pxr/pxr.h"
+
 #include "usdMaya/api.h"
+#include "usdMaya/jobArgs.h"
+
+#include "pxr/base/gf/interval.h"
 #include "pxr/usd/usd/prim.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -44,12 +48,7 @@ public:
     PXRUSDMAYA_API
     PxrUsdMayaPrimReaderArgs(
             const UsdPrim& prim,
-            const TfToken& shadingMode,
-            const TfToken& defaultMeshScheme,
-            const bool readAnimData,
-            const bool useCustomFrameRange,
-            const double startTime,
-            const double endTime);
+            const PxrUsdMayaJobImportArgs& jobArgs);
 
     /// \brief return the usd prim that should be read.
     PXRUSDMAYA_API
@@ -58,19 +57,20 @@ public:
     PXRUSDMAYA_API
     const TfToken& GetShadingMode() const;
 
+    /// Returns the time interval over which to import animated data.
+    /// An empty interval (<tt>GfInterval::IsEmpty()</tt>) means that no
+    /// animated (time-sampled) data should be imported.
     PXRUSDMAYA_API
-    const TfToken& GetDefaultMeshScheme() const;
+    GfInterval GetTimeInterval() const;
 
     PXRUSDMAYA_API
-    const bool& GetReadAnimData() const;
+    const TfToken::Set& GetIncludeMetadataKeys() const;
+    PXRUSDMAYA_API
+    const TfToken::Set& GetIncludeAPINames() const;
 
     PXRUSDMAYA_API
-    bool HasCustomFrameRange() const;
-    PXRUSDMAYA_API
-    double GetStartTime() const;
-    PXRUSDMAYA_API
-    double GetEndTime() const;
-    
+    const TfToken::Set& GetExcludePrimvarNames() const;
+
     bool ShouldImportUnboundShaders() const {
         // currently this is disabled.
         return false;
@@ -78,12 +78,7 @@ public:
 
 private:
     const UsdPrim& _prim;
-    const TfToken& _shadingMode;
-    const TfToken& _defaultMeshScheme;
-    const bool _readAnimData;
-    const bool _useCustomFrameRange;
-    const double _startTime;
-    const double _endTime;
+    const PxrUsdMayaJobImportArgs& _jobArgs;
 };
 
 

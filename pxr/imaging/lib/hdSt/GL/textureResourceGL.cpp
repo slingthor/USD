@@ -36,24 +36,26 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 HdStSimpleTextureResourceGL::HdStSimpleTextureResourceGL(
-    GarchTextureHandleRefPtr const &textureHandle, bool isPtex):
+    GarchTextureHandleRefPtr const &textureHandle, bool isPtex, size_t memoryRequest):
         HdStSimpleTextureResourceGL(textureHandle, isPtex,
             /*wrapS*/ HdWrapUseMetaDict, /*wrapT*/ HdWrapUseMetaDict, 
             /*minFilter*/ HdMinFilterNearestMipmapLinear, 
-            /*magFilter*/ HdMagFilterLinear)
+            /*magFilter*/ HdMagFilterLinear, memoryRequest)
 {
 }
 
 HdStSimpleTextureResourceGL::HdStSimpleTextureResourceGL(
     GarchTextureHandleRefPtr const &textureHandle, bool isPtex,
     HdWrap wrapS, HdWrap wrapT,
-    HdMinFilter minFilter, HdMagFilter magFilter)
+    HdMinFilter minFilter, HdMagFilter magFilter,
+    size_t memoryRequest)
         : _textureHandle(textureHandle)
         , _texture(textureHandle->GetTexture())
         , _borderColor(0.0,0.0,0.0,0.0)
         , _maxAnisotropy(16.0)
         , _sampler(0)
         , _isPtex(isPtex)
+        , _memoryRequest(memoryRequest)
 {
     if (!glGenSamplers) { // GL initialization guard for headless unit test
         return;
@@ -121,7 +123,9 @@ HdStSimpleTextureResourceGL::HdStSimpleTextureResourceGL(
 }
 
 HdStSimpleTextureResourceGL::~HdStSimpleTextureResourceGL()
-{ 
+{
+    _textureHandle->DeleteMemoryRequest(_memoryRequest);
+
     if (!_isPtex) {
         if (!glDeleteSamplers) { // GL initialization guard for headless unit test
             return;

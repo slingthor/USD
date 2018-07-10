@@ -55,7 +55,6 @@
 #include <maya/MColor.h>
 #include <maya/MFnDependencyNode.h>
 #include <maya/MFnLambertShader.h>
-#include <maya/MGlobal.h>
 #include <maya/MObject.h>
 #include <maya/MPlug.h>
 #include <maya/MStatus.h>
@@ -109,8 +108,9 @@ private:
         const UsdStageRefPtr& stage = context.GetUsdStage();
         const MColor mayaColor = lambertFn.color();
         const MColor mayaTransparency = lambertFn.transparency();
+        const float diffuseCoeff = lambertFn.diffuseCoeff();
         const GfVec3f color = PxrUsdMayaColorSpace::ConvertMayaToLinear(
-            GfVec3f(mayaColor[0], mayaColor[1], mayaColor[2]));
+            diffuseCoeff*GfVec3f(mayaColor[0], mayaColor[1], mayaColor[2]));
         const GfVec3f transparency = PxrUsdMayaColorSpace::ConvertMayaToLinear(
             GfVec3f(mayaTransparency[0], mayaTransparency[1], mayaTransparency[2]));
 
@@ -139,8 +139,9 @@ private:
 
             UsdPrim boundPrim = stage->GetPrimAtPath(boundPrimPath);
             if (!boundPrim) {
-                MGlobal::displayError("No prim bound to: " +
-                                      MString(boundPrimPath.GetText()));
+                TF_CODING_ERROR(
+                        "Couldn't find bound prim <%s>",
+                        boundPrimPath.GetText());
                 continue;
             }
 
@@ -285,12 +286,12 @@ DEFINE_SHADING_MODE_IMPORTER(displayColor, context)
             }
             gotDisplayColorAndOpacity = true;
         } else {
-            MString warn = MString("Unable to retrieve DisplayColor on Material: ");
-            warn += shadeMaterial ? shadeMaterial.GetPrim().GetPath().GetText() : "<NONE>";
-            warn += " or GPrim: ";
-            warn += primSchema ? primSchema.GetPrim().GetPath().GetText() 
-                               : "<NONE>";
-            MGlobal::displayWarning(warn);
+            TF_WARN("Unable to retrieve displayColor on Material: %s "
+                    "or Gprim: %s",
+                    shadeMaterial ? shadeMaterial.GetPrim().GetPath().GetText()
+                                  : "<NONE>",
+                    primSchema ? primSchema.GetPrim().GetPath().GetText() 
+                               : "<NONE>");
         }
     } else {
         shadeMaterial
@@ -321,6 +322,11 @@ DEFINE_SHADING_MODE_IMPORTER(displayColor, context)
         lambertFn.setName( mShaderName );
         lambertFn.setColor(MColor(displayColor[0], displayColor[1], displayColor[2]));
         lambertFn.setTransparency(MColor(transparencyColor[0], transparencyColor[1], transparencyColor[2]));
+        // we explicitly set diffuse coefficient to 1.0 here since new lambert's
+        // default to 0.8.  This is to make sure the color value visually when
+        // roundtripping since we bake the diffuseCoeff into the diffuse color
+        // at export.
+        lambertFn.setDiffuseCoeff(1.0);
 
         const SdfPath lambertPath = shaderParentPath.AppendChild(
             TfToken(lambertFn.name().asChar()));

@@ -138,7 +138,7 @@ HdStCopyComputationGPU::GetNumOutputElements() const
 }
 
 void
-HdStCopyComputationGPU::AddBufferSpecs(HdBufferSpecVector *specs) const
+HdStCopyComputationGPU::GetBufferSpecs(HdBufferSpecVector *specs) const
 {
     HdBufferArrayRangeSharedPtr srcRange =
         boost::static_pointer_cast<HdBufferArrayRange> (_src);

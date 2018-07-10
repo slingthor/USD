@@ -81,6 +81,9 @@ protected:
     MTLF_API
     MtlfBaseTexture();
     
+    MTLF_API
+    MtlfBaseTexture(GarchImage::ImageOriginLocation originLocation);
+    
     friend class MtlfResourceFactory;
 
     MTLF_API

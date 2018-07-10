@@ -28,6 +28,7 @@
 
 #include "pxr/pxr.h"
 #include "pxr/imaging/garch/api.h"
+#include "pxr/imaging/garch/image.h"
 #include "pxr/imaging/garch/texture.h"
 
 #include "pxr/base/tf/declarePtrs.h"
@@ -88,6 +89,9 @@ protected:
     
     GARCH_API
     GarchBaseTexture();
+    
+    GARCH_API
+    GarchBaseTexture(GarchImage::ImageOriginLocation originLocation);
 
     GARCH_API
     virtual void _UpdateTexture(GarchBaseTextureDataConstPtr texData) = 0;

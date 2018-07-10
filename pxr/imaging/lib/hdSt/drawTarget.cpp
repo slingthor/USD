@@ -74,7 +74,7 @@ HdStDrawTarget::Sync(HdSceneDelegate *sceneDelegate,
 
     TF_UNUSED(renderParam);
 
-    SdfPath const &id = GetID();
+    SdfPath const &id = GetId();
     if (!TF_VERIFY(sceneDelegate != nullptr)) {
         return;
     }
@@ -166,16 +166,6 @@ HdStDrawTarget::Sync(HdSceneDelegate *sceneDelegate,
     }
 
     *dirtyBits = Clean;
-}
-
-// virtual
-VtValue
-HdStDrawTarget::Get(TfToken const &token) const
-{
-    // nothing here, since right now all draw target tasks accessing
-    // HdStDrawTarget perform downcast from Sprim To HdStDrawTarget
-    // and use the C++ interface (e.g. IsEnabled(), GetRenderPassState()).
-    return VtValue();
 }
 
 // virtual
@@ -415,7 +405,7 @@ HdStDrawTarget::_RegisterTextureResource(
         sceneDelegate->GetRenderIndex().GetResourceRegistry();
 
     // Create Path for the texture resource
-    SdfPath resourcePath = GetID().AppendProperty(TfToken(name));
+    SdfPath resourcePath = GetId().AppendProperty(TfToken(name));
 
     // Ask delegate for an ID for this tex
     HdTextureResource::ID texID =

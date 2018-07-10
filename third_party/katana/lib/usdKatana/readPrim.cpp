@@ -454,7 +454,7 @@ _BuildCollections(
             incExcStr << "((";
             for (const SdfPath &p : includes) {
                 TfToken collectionName;
-                if (UsdCollectionAPI::IsCollectionPath(p, &collectionName)) {
+                if (UsdCollectionAPI::IsCollectionAPIPath(p, &collectionName)) {
                     SdfPath collPrimPath= p.GetPrimPath();
                     std::string katCollStr = _GetKatanaCollectionPath(collPrimPath, 
                         collectionName, prim, collection.GetName(), data);
@@ -833,10 +833,17 @@ PxrUsdKatanaGeomGetPrimvarGroup(
         FnKat::GroupBuilder attrBuilder;
         attrBuilder.set("scope", scopeAttr);
         attrBuilder.set("inputType", inputTypeAttr);
+        
+        if (!typeName.GetRole().GetString().empty()) {
+            attrBuilder.set("usd.role", 
+                        FnKat::StringAttribute(typeName.GetRole().GetString()));
+        }
+
         if (elementSizeAttr.isValid()) {
             attrBuilder.set("elementSize", elementSizeAttr);
         }
         attrBuilder.set("value", valueAttr);
+
         // Note that 'varying' vs 'vertex' require special handling, as in
         // Katana they are both expressed as 'point' scope above. To get
         // 'vertex' interpolation we must set an additional

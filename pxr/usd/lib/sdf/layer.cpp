@@ -260,16 +260,25 @@ SdfLayer::CreateAnonymous(const string& tag)
         fileFormat = SdfFileFormat::FindById(TfToken(suffix));
     }
 
-    if (!fileFormat) {
-        fileFormat = SdfFileFormat::FindById(SdfTextFileFormatTokens->Id);
+    return CreateAnonymous(tag, fileFormat);
+}
+
+SdfLayerRefPtr
+SdfLayer::CreateAnonymous(
+    const string &tag, const SdfFileFormatConstPtr &format)
+{
+    SdfFileFormatConstPtr fmt = format;
+    
+    if (!fmt) {
+        fmt = SdfFileFormat::FindById(SdfTextFileFormatTokens->Id);
     }
 
-    if (!fileFormat) {
+    if (!fmt) {
         TF_CODING_ERROR("Cannot determine file format for anonymous SdfLayer");
         return SdfLayerRefPtr();
     }
 
-    return _CreateAnonymousWithFormat(fileFormat, tag);
+    return _CreateAnonymousWithFormat(fmt, tag);
 }
 
 SdfLayerRefPtr
@@ -707,8 +716,13 @@ SdfLayer::FindOrOpen(const string &identifier,
     if (SdfLayerRefPtr layer =
         _TryToFindLayer(layerInfo.identifier, layerInfo.resolvedLayerPath,
                         lock, /*retryAsWriter=*/true)) {
-        return layer->_WaitForInitializationAndCheckIfSuccessful() ?
-            layer : TfNullPtr;
+        // This could be written as a ternary, but we rely on return values 
+        // being implicitly moved to avoid making an unnecessary copy of 
+        // layer and the associated ref-count bump.
+        if (layer->_WaitForInitializationAndCheckIfSuccessful()) {
+            return layer;
+        }
+        return TfNullPtr;
     }
     // At this point _TryToFindLayer has upgraded lock to a writer.
 

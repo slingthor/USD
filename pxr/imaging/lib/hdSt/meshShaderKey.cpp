@@ -55,19 +55,28 @@ TF_DEFINE_PRIVATE_TOKENS(
     ((edgeOnSurfFS,            "MeshWire.Fragment.EdgeOnSurface"))
     ((patchEdgeOnlyFS,         "MeshPatchWire.Fragment.EdgeOnly"))
     ((patchEdgeOnSurfFS,       "MeshPatchWire.Fragment.EdgeOnSurface"))
+    
+    ((edgeNoFilterFS,          "MeshWire.Fragment.NoFilter"))
+    ((edgeSelActiveFilterFS,   "MeshWire.Fragment.FilterElementSelActive"))
+    ((edgeSelRolloverFilterFS, "MeshWire.Fragment.FilterElementSelRollover"))
+
+    // selection decoding
+    ((selDecodeUtils,          "Selection.DecodeUtils"))
+    ((selPointSelVS,           "Selection.Vertex.PointSel"))
+    ((selElementSelFS,         "Selection.Fragment.ElementSel"))
 
     // edge id mixins (for edge picking & selection)
     ((edgeIdNoneGS,            "EdgeId.Geometry.None"))
-    ((edgeIdBaryGS,            "EdgeId.Geometry.Bary"))
-    ((edgeIdRectGS,            "EdgeId.Geometry.Rect"))
-    ((edgeIdBaryFallbackFS,    "EdgeId.Fragment.BaryFallback"))
-    ((edgeIdBaryFS,            "EdgeId.Fragment.Bary"))
-    ((edgeIdRectFS,            "EdgeId.Fragment.Rect"))
+    ((edgeIdEdgeParamGS,       "EdgeId.Geometry.EdgeParam"))
+    ((edgeIdFallbackFS,        "EdgeId.Fragment.Fallback"))
+    ((edgeIdTriangleParamFS,   "EdgeId.Fragment.TriangleParam"))
+    ((edgeIdRectangleParamFS,  "EdgeId.Fragment.RectangleParam"))
 
     // point id mixins (for point picking & selection)
-    ((pointIdVS,               "PointId.Vertex"))
-    ((pointIdFS,               "PointId.Fragment.Points"))
+    ((pointIdNoneVS,           "PointId.Vertex.None"))
+    ((pointIdVS,               "PointId.Vertex.PointParam"))
     ((pointIdFallbackFS,       "PointId.Fragment.Fallback"))
+    ((pointIdFS,               "PointId.Fragment.PointParam"))
 
     // main for all the shader stages
     ((mainVS,                  "Mesh.Vertex"))
@@ -104,7 +113,9 @@ HdSt_MeshShaderKey::HdSt_MeshShaderKey(
     bool blendWireframeColor,
     HdCullStyle cullStyle,
     HdMeshGeomStyle geomStyle,
-    float lineWidth)
+    float lineWidth,
+    bool discardIfNotActiveSelected /*=false*/,
+    bool discardIfNotRolloverSelected /*=false*/)
     : primType(primitiveType)
     , cullStyle(cullStyle)
     , polygonMode(HdPolygonModeFill)
@@ -117,13 +128,27 @@ HdSt_MeshShaderKey::HdSt_MeshShaderKey(
         polygonMode = HdPolygonModeLine;
     }
 
+    bool isPrimTypePoints = HdSt_GeometricShader::IsPrimTypePoints(primType);
+    bool isPrimTypeQuads  = HdSt_GeometricShader::IsPrimTypeQuads(primType);
+    bool isPrimTypeTris   = HdSt_GeometricShader::IsPrimTypeTriangles(primType);
+
     // vertex shader
-    VS[0] = _tokens->instancing;
-    VS[1] = (smoothNormals ? _tokens->smooth
+    uint8_t vsIndex = 0;
+    VS[vsIndex++] = _tokens->instancing;
+    VS[vsIndex++] = (smoothNormals ? _tokens->smooth
                            : _tokens->flat);
-    VS[2] = _tokens->pointIdVS;
-    VS[3] = _tokens->mainVS;
-    VS[4] = TfToken();
+    if (isPrimTypePoints) {
+        // Add mixins that allow for picking and sel highlighting of points.
+        // Even though these are more "render pass-ish", we do this here to
+        // reduce the shader code generated when the points repr isn't used.
+        VS[vsIndex++] = _tokens->pointIdVS;
+        VS[vsIndex++] = _tokens->selDecodeUtils;
+        VS[vsIndex++] = _tokens->selPointSelVS;
+    } else {
+        VS[vsIndex++] =  _tokens->pointIdNoneVS;
+    }
+    VS[vsIndex++] = _tokens->mainVS;
+    VS[vsIndex] = TfToken();
 
     // tessellation control shader
     const bool isPrimTypePatches = 
@@ -148,22 +173,9 @@ HdSt_MeshShaderKey::HdSt_MeshShaderKey(
               geomStyle == HdMeshGeomStyleHullEdgeOnSurf) ? _tokens->edgeOnSurfGS
                                                           : _tokens->edgeNoneGS);
 
-    bool isPrimTypePoints = HdSt_GeometricShader::IsPrimTypePoints(primType);
-    bool isPrimTypeQuads = HdSt_GeometricShader::IsPrimTypeQuads(primType);
-    bool isPrimTypeCoarseTris =
-        primType == HdSt_GeometricShader::PrimitiveType::PRIM_MESH_COARSE_TRIANGLES;
-
-    TfToken gsEdgeIdMixin = _tokens->edgeIdNoneGS;
-    if (isPrimTypeCoarseTris) {
-        // emit bary coord per vertex when we triangulate to help compute the
-        // edgeId
-        gsEdgeIdMixin = _tokens->edgeIdBaryGS;
-    } else if (!isPrimTypePoints) {
-        // emit face uv per vertex if using patches (adaptive subdiv) or
-        // quads (uniform or quadrangulation) or
-        // loop to help compute the edge id.
-        gsEdgeIdMixin = _tokens->edgeIdRectGS;
-    }
+    // emit edge param per vertex to help compute the edgeId
+    TfToken gsEdgeIdMixin = isPrimTypePoints ? _tokens->edgeIdNoneGS
+                                             : _tokens->edgeIdEdgeParamGS;
     GS[3] = gsEdgeIdMixin;
 
     // Displacement shading can be disabled explicitly, or if the entrypoint
@@ -195,28 +207,48 @@ HdSt_MeshShaderKey::HdSt_MeshShaderKey(
     }
 
     // fragment shader
-    FS[0] = _tokens->instancing;
-    FS[1] = (smoothNormals ? _tokens->smooth
+     uint8_t fsIndex = 0;
+    FS[fsIndex++] = _tokens->instancing;
+    FS[fsIndex++] = (smoothNormals ? _tokens->smooth
                            : _tokens->flat);
-    FS[2] = (doubleSided   ? _tokens->doubleSidedFS
+    FS[fsIndex++] = (doubleSided   ? _tokens->doubleSidedFS
                            : _tokens->singleSidedFS);
-    if (isPrimTypePatches) {
-        FS[3] = ((geomStyle == HdMeshGeomStyleEdgeOnly ||
-                  geomStyle == HdMeshGeomStyleHullEdgeOnly)   ? _tokens->patchEdgeOnlyFS
-              : ((geomStyle == HdMeshGeomStyleEdgeOnSurf ||
-                  geomStyle == HdMeshGeomStyleHullEdgeOnSurf) ? _tokens->patchEdgeOnSurfFS
-                                                              : _tokens->edgeNoneFS));
-    } else {
-        if (geomStyle == HdMeshGeomStyleEdgeOnly ||
-            geomStyle == HdMeshGeomStyleHullEdgeOnly) {
-            FS[3] = blendWireframeColor ? _tokens->edgeOnlyBlendFS
-                                        : _tokens->edgeOnlyNoBlendFS;
-        } else if (geomStyle == HdMeshGeomStyleEdgeOnSurf ||
-                   geomStyle == HdMeshGeomStyleHullEdgeOnSurf) {
-            FS[3] = _tokens->edgeOnSurfFS;
+
+    if ((geomStyle == HdMeshGeomStyleEdgeOnly ||
+         geomStyle == HdMeshGeomStyleHullEdgeOnly)) {
+
+        if (discardIfNotActiveSelected) {
+            // We don't add 'selDecodeUtils' because it is part of the
+            // render pass' FS mixin.
+            FS[fsIndex++] = _tokens->selElementSelFS;
+            FS[fsIndex++] = _tokens->edgeSelActiveFilterFS;
+        } else if (discardIfNotRolloverSelected) {
+            // We don't add 'selDecodeUtils' because it is part of the
+            // render pass' FS mixin.
+            FS[fsIndex++] = _tokens->selElementSelFS;
+            FS[fsIndex++] = _tokens->edgeSelRolloverFilterFS;
         } else {
-            FS[3] = _tokens->edgeNoneFS;
+            FS[fsIndex++] = _tokens->edgeNoFilterFS;
         }
+
+        if (isPrimTypePatches) {
+            FS[fsIndex++] = _tokens->patchEdgeOnlyFS;
+        } else {
+            FS[fsIndex++] = blendWireframeColor ? _tokens->edgeOnlyBlendFS
+                                        : _tokens->edgeOnlyNoBlendFS;
+        }
+
+    } else if ((geomStyle == HdMeshGeomStyleEdgeOnSurf ||
+                geomStyle == HdMeshGeomStyleHullEdgeOnSurf)) {
+
+        if (isPrimTypePatches) {
+            FS[fsIndex++] = _tokens->patchEdgeOnSurfFS;
+        } else {
+            FS[fsIndex++] = _tokens->edgeOnSurfFS;
+        }
+
+    } else {
+        FS[fsIndex++] = _tokens->edgeNoneFS;
     }
 
     TfToken terminalFS;
@@ -240,28 +272,26 @@ HdSt_MeshShaderKey::HdSt_MeshShaderKey(
         terminalFS = _tokens->surfaceFS;
     }
 
-    FS[4] = terminalFS;
-    FS[5] = _tokens->commonFS;
+    FS[fsIndex++] = terminalFS;
+    FS[fsIndex++] = _tokens->commonFS;
 
     // edge id
-    uint8_t fsIndex = 6;
     if (!GS[0].IsEmpty()) {
-        if (isPrimTypeCoarseTris) {
-            FS[fsIndex++] = _tokens->edgeIdBaryFS;
-             TF_VERIFY(gsEdgeIdMixin == _tokens->edgeIdBaryGS);
+        TF_VERIFY(gsEdgeIdMixin == _tokens->edgeIdEdgeParamGS);
+        if (isPrimTypeTris) {
+            // coarse and refined triangles and triangular parametric patches
+            FS[fsIndex++] = _tokens->edgeIdTriangleParamFS;
         } else {
-            // XXX: loop uses this path, and we still call it "rectangular
-            // parametrization". need a better name.
-            FS[fsIndex++] = _tokens->edgeIdRectFS;
-            TF_VERIFY(gsEdgeIdMixin == _tokens->edgeIdRectGS);
+            // coarse and refined quads and rectangular parametric patches
+            FS[fsIndex++] = _tokens->edgeIdRectangleParamFS;
         }
     } else {
         // the GS stage is skipped if we're dealing with points or triangles.
         // (see "Optimization" above)
 
         // for triangles, emit the fallback version.
-        if (HdSt_GeometricShader::IsPrimTypeTriangles(primType)) {
-            FS[fsIndex++] = _tokens->edgeIdBaryFallbackFS;
+        if (isPrimTypeTris) {
+            FS[fsIndex++] = _tokens->edgeIdFallbackFS;
         }
 
         // for points, it isn't so simple. we don't know if the 'edgeIndices'

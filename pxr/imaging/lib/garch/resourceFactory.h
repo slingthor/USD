@@ -32,6 +32,8 @@
 #include "pxr/base/tf/token.h"
 #include "pxr/base/gf/vec2i.h"
 
+#include "pxr/imaging/garch/image.h"
+
 #include <boost/noncopyable.hpp>
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -82,7 +84,8 @@ public:
                                                     unsigned int cropTop,
                                                     unsigned int cropBottom,
                                                     unsigned int cropLeft,
-                                                    unsigned int cropRight) const = 0;
+                                                    unsigned int cropRight,
+                                                    GarchImage::ImageOriginLocation originLocation) const = 0;
     
     // BaseTexture
     virtual GarchBaseTexture *NewBaseTexture() const = 0;

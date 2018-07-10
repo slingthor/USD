@@ -146,7 +146,7 @@ public:
     }
 
     /// Sets the bufferSpecs for all resources.
-    virtual void AddBufferSpecs(HdBufferSpecVector *bufferSpecs) const override {}
+    virtual void GetBufferSpecs(HdBufferSpecVector *bufferSpecs) const override {}
     
     /// Make this range invalid
     void Invalidate() {

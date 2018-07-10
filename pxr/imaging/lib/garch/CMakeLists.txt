@@ -1,6 +1,12 @@
 set(PXR_PREFIX pxr/imaging)
 set(PXR_PACKAGE garch)
 
+if (NOT ${PXR_ENABLE_GL_SUPPORT})
+    message(STATUS
+        "Skipping ${PXR_PACKAGE} because PXR_ENABLE_GL_SUPPORT is OFF")
+    return()
+endif()
+
 if(APPLE)
     set(GARCH_GLPLATFORMCONTEXT       glPlatformContextDarwin)
     set(GARCH_GLPLATFORMDEBUGWINDOW   glPlatformDebugWindowDarwin)
@@ -25,6 +31,15 @@ if (OPENSUBDIV_HAS_METAL_COMPUTE)
     add_definitions(-DOPENSUBDIV_HAS_METAL_COMPUTE)
 endif()
 
+set (optionalPublicClasses "")
+set (optionalCppFiles "")
+set (plugInfo plugInfo_NoOIIO.json)
+if (PXR_BUILD_OPENIMAGEIO_PLUGIN)
+    set (plugInfo plugInfo.json)
+    list(APPEND optionalCppFiles oiioImage.cpp)
+    list(APPEND optionalLibs ${OIIO_LIBRARIES})
+    list(APPEND optionalIncludeDirs ${OIIO_INCLUDE_DIRS})
+endif()
 pxr_library(garch
     LIBRARIES
         arch
@@ -36,14 +51,14 @@ pxr_library(garch
         ${Boost_PYTHON_LIBRARY}
         ${Boost_SYSTEM_LIBRARY}
         ${OPENGL_gl_LIBRARY}
-        ${OIIO_LIBRARIES}
         ${APPKIT_LIBRARY}
         ${METAL_LIBRARY}
         ${COREVIDEO_LIBRARY}
+        ${optionalLibs}
 
     INCLUDE_DIRS
         ${Boost_INCLUDE_DIRS}
-        ${OIIO_INCLUDE_DIRS}
+        ${optionalIncludeDirs}
 
     PUBLIC_CLASSES
         arrayTexture
@@ -72,6 +87,7 @@ pxr_library(garch
         uvTextureData
         uvTextureStorage
         uvTextureStorageData
+        ${optionalPublicClasses}
 
     PRIVATE_CLASSES
         debugCodes
@@ -85,6 +101,9 @@ pxr_library(garch
     PRIVATE_HEADERS
         rankedTypeMap.h
         ${GARCH_GLPLATFORMDEBUGWINDOW}.h
+        stb/stb_image.h
+        stb/stb_image_resize.h
+        stb/stb_image_write.h
 
     PYTHON_CPPFILES
         moduleDeps.cpp
@@ -93,7 +112,8 @@ pxr_library(garch
         ${GARCH_GLPLATFORMCONTEXT}.${GARCH_SOURCE_EXTENSION}
         ${GARCH_GLPLATFORMDEBUGWINDOW}.${GARCH_SOURCE_EXTENSION}
         dictionary.cpp
-        oiioImage.cpp
+        ${optionalCppFiles}
+        stbImage.cpp
 
     PYMODULE_CPPFILES
         module.cpp
@@ -111,5 +131,5 @@ pxr_library(garch
         __init__.py
 
     RESOURCE_FILES
-        plugInfo.json
+        ${plugInfo}:plugInfo.json
 )

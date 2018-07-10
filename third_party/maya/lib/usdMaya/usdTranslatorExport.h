@@ -29,7 +29,7 @@
 
 #include "pxr/pxr.h"
 #include "usdMaya/api.h"
-#include "usdMaya/JobArgs.h"
+#include "usdMaya/jobArgs.h"
 
 #include <maya/MFileObject.h>
 #include <maya/MPxFileTranslator.h>
@@ -37,28 +37,6 @@
 #include <maya/MString.h>
 
 PXR_NAMESPACE_OPEN_SCOPE
-
-
-
-const char* const usdTranslatorExportDefaults = 
-        "shadingMode=GPrim Colors;"
-        "exportRefsAsInstanceable=0;"
-        "exportUVs=1;"
-        "exportMaterialCollections=0;"
-        "materialCollectionsPath=/Collections;"
-        "exportCollectionBasedBindings=0;"
-        "normalizeUVs=0;"
-        "exportColorSets=1;"
-        "renderableOnly=0;"
-        "allCameras=0;"
-        "renderLayerMode=Use Default Layer;"
-        "mergeXForm=1;"
-        "exportInstances=1;"
-        "defaultMeshScheme=CatmullClark SDiv;"
-        "exportVisibility=1;"
-        "animation=0;"
-        "startTime=1;"
-        "endTime=1";
 
 
 class usdTranslatorExport : public MPxFileTranslator
@@ -92,6 +70,9 @@ class usdTranslatorExport : public MPxFileTranslator
         MString filter() const {
             return PxrUsdMayaTranslatorTokens->UsdFileFilter.GetText();
         }
+
+        PXRUSDMAYA_API
+        static const std::string& GetDefaultOptions();
 
     private:
 

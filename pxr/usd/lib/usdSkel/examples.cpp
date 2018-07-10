@@ -150,5 +150,4 @@ bool ComputeSkinnedTransform(const UsdGeomXformable& xformable,
 //! [ComputeSkinnedTransform]
 
 
-
 PXR_NAMESPACE_CLOSE_SCOPE

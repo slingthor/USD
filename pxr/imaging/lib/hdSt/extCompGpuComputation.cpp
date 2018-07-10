@@ -224,7 +224,7 @@ HdStExtCompGpuComputation::Execute(
 }
 
 void
-HdStExtCompGpuComputation::AddBufferSpecs(HdBufferSpecVector *specs) const
+HdStExtCompGpuComputation::GetBufferSpecs(HdBufferSpecVector *specs) const
 {
     // nothing
 }
@@ -256,7 +256,7 @@ HdStExtCompGpuComputation::CreateGpuComputation(
 {
     TF_DEBUG(HD_EXT_COMPUTATION_UPDATED).Msg(
             "GPU computation '%s' created for primvars: %s\n",
-            sourceComp->GetID().GetText(),
+            sourceComp->GetId().GetText(),
             _GetDebugPrimvarNames(compPrimvars).c_str());
 
     // Downcast the resource registry
@@ -313,7 +313,7 @@ HdStExtCompGpuComputation::CreateGpuComputation(
 
     return HdStExtCompGpuComputationSharedPtr(
                 new HdStExtCompGpuComputation(
-                        sourceComp->GetID(),
+                        sourceComp->GetId(),
                         resource,
                         compPrimvars,
                         sourceComp->GetDispatchCount(),

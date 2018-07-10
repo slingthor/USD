@@ -57,9 +57,6 @@ public:
     USDSKEL_API
     UsdSkelAnimQuery() {}
 
-    UsdSkelAnimQuery(const UsdSkel_AnimQueryImplRefPtr& impl)
-        :  _impl(impl) {}
-
     /// Return true if this query is valid.
     bool IsValid() const { return (bool)_impl; }
 
@@ -112,6 +109,11 @@ public:
              VtQuatfArray* rotations,
              VtVec3hArray* scales,
              UsdTimeCode time=UsdTimeCode::Default()) const;
+
+    USDSKEL_API
+    bool ComputeBlendShapeWeights(
+             VtFloatArray* weights,
+             UsdTimeCode time=UsdTimeCode::Default()) const;
     
     /// Get the time samples at which values contributing to joint transforms
     /// are set. This only computes the time samples for sampling transforms in
@@ -157,11 +159,21 @@ public:
     USDSKEL_API
     VtTokenArray GetJointOrder() const;
 
+    /// Returns an array of tokens describing the ordering of blend shape
+    /// channels in the animation.
+    USDSKEL_API
+    VtTokenArray GetBlendShapeOrder() const;
+
     USDSKEL_API
     std::string GetDescription() const;
 
 private:
+    UsdSkelAnimQuery(const UsdSkel_AnimQueryImplRefPtr& impl)
+        :  _impl(impl) {}
+
     UsdSkel_AnimQueryImplRefPtr _impl;
+
+    friend class UsdSkel_CacheImpl;
 };
 
 

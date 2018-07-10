@@ -174,7 +174,7 @@ public:
         virtual void SetBufferArray(HdBufferArray *bufferArray) override;
 
         HD_API
-        virtual void AddBufferSpecs(HdBufferSpecVector *bufferSpecs) const override {}
+        virtual void GetBufferSpecs(HdBufferSpecVector *bufferSpecs) const override {}
 
         /// Debug dump
         HDST_API

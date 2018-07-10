@@ -30,6 +30,7 @@
 #include "pxr/usdImaging/usdImaging/instancerContext.h"
 
 #include "pxr/usd/sdf/schema.h"
+#include "pxr/usd/usd/collectionAPI.h"
 #include "pxr/usd/usdGeom/primvarsAPI.h"
 
 #include "pxr/imaging/hd/perfLog.h"
@@ -262,6 +263,15 @@ UsdImagingPrimAdapter::SamplePrimvar(
         }
     }
 
+    // Fallback for adapters that do not read primvars from USD, but
+    // instead synthesize them -- ex: Cube, Cylinder, Capsule.
+    if (maxNumSamples > 0) {
+        times[0] = 0;
+        if (_GetValueCache()->ExtractPrimvar(cachePath, key, &samples[0])) {
+            return samples[0].IsEmpty() ? 0 : 1;
+        }
+    }
+
     return 0;
 }
 
@@ -297,10 +307,10 @@ UsdImagingPrimAdapter::GetPathForInstanceIndex(
 
 /*virtual*/
 bool
-UsdImagingPrimAdapter::PopulateSelection(HdxSelectionHighlightMode const& mode,
+UsdImagingPrimAdapter::PopulateSelection(HdSelection::HighlightMode const& mode,
                                          SdfPath const &usdPath,
                                          VtIntArray const &instanceIndices,
-                                         HdxSelectionSharedPtr const &result)
+                                         HdSelectionSharedPtr const &result)
 {
     const SdfPath indexPath = _delegate->GetPathForIndex(usdPath);
 
@@ -437,11 +447,25 @@ UsdImagingPrimAdapter::_GetRprimSubtree(SdfPath const& indexPath) const
     return _delegate->GetRenderIndex().GetRprimSubtree(indexPath);
 }
 
-bool 
-UsdImagingPrimAdapter::_CanComputeMaterialNetworks() const
+TfToken
+UsdImagingPrimAdapter::_GetMaterialBindingPurpose() const
 {
     return _delegate->GetRenderIndex().GetRenderDelegate()->
-        CanComputeMaterialNetworks();
+        GetMaterialBindingPurpose();
+}
+
+TfToken
+UsdImagingPrimAdapter::_GetMaterialNetworkSelector() const
+{
+    return _delegate->GetRenderIndex().GetRenderDelegate()->
+        GetMaterialNetworkSelector();
+}
+
+TfTokenVector 
+UsdImagingPrimAdapter::_GetShaderSourceTypes() const
+{
+    return _delegate->GetRenderIndex().GetRenderDelegate()->
+            GetShaderSourceTypes();
 }
 
 bool 
@@ -464,6 +488,12 @@ UsdImagingPrimAdapter::_MergePrimvar(
         vec->push_back(primvar);
     else
         *it = primvar;
+}
+
+UsdImaging_CollectionCache&
+UsdImagingPrimAdapter::_GetCollectionCache() const
+{
+    return _delegate->_collectionCache;
 }
 
 bool 

@@ -105,14 +105,15 @@ PxrUsdMayaTranslatorNurbsPatch::Read(
     usdNurbsPatch.GetVRangeAttr().Get(&rangeInV);
     usdNurbsPatch.GetPointWeightsAttr().Get(&weights);
 
-    // Gather points. If args.GetReadAnimData() is TRUE,
-    // pick the first avaiable sample or default
+    // Gather points.
+    // If timeInterval is non-empty, pick the first available sample in the
+    // timeInterval or default.
     UsdTimeCode pointsTimeSample=UsdTimeCode::EarliestTime();
     std::vector<double> pointsTimeSamples;
     size_t numTimeSamples = 0;
-    if (args.GetReadAnimData()) {
-        PxrUsdMayaTranslatorUtil::GetTimeSamples(usdNurbsPatch.GetPointsAttr(),
-                args, &pointsTimeSamples);
+    if (!args.GetTimeInterval().IsEmpty()) {
+        usdNurbsPatch.GetPointsAttr().GetTimeSamplesInInterval(
+                args.GetTimeInterval(), &pointsTimeSamples);
         numTimeSamples = pointsTimeSamples.size();
         if (numTimeSamples>0) {
             pointsTimeSample = pointsTimeSamples[0];
@@ -121,16 +122,17 @@ PxrUsdMayaTranslatorNurbsPatch::Read(
     usdNurbsPatch.GetPointsAttr().Get(&points, pointsTimeSample);
     
     if (points.size() == 0) {
-        MGlobal::displayError(
-            TfStringPrintf("Points arrays is empty on NURBS <%s>. Skipping...", 
-                            usdPrimPath.c_str()).c_str());
+        TF_RUNTIME_ERROR(
+                "points array is empty on NurbsPatch <%s>. Skipping...", 
+                usdPrimPath.c_str());
         return false; // invalid nurbs, so exit
     }
     
     if (points.size() != static_cast<size_t>((numCVsInU * numCVsInV))) {
-        MString err = MString("CV array size not equal to UCount*VCount on NURBS: ") + 
-                                MString(usdPrimPath.c_str());
-        MGlobal::displayError(err);
+        TF_RUNTIME_ERROR(
+                "points array size != uVertexCount * vVertexCount on "
+                "NurbsPatch <%s>. Skipping...",
+                usdPrimPath.c_str());
         return false; // Bad CV data, so exit
     }
 
@@ -191,8 +193,9 @@ PxrUsdMayaTranslatorNurbsPatch::Read(
                                         mayaNode,
                                         &status);
     if (status != MS::kSuccess) {
-        MString err = MString("Unable to create Maya Nurbs for USD NURBS: ") + MString(usdPrimPath.c_str());
-        MGlobal::displayError(err);
+        TF_RUNTIME_ERROR(
+                "Unable to create Maya Nurbs for USD NurbsPatch <%s>",
+                usdPrimPath.c_str());
         return false;
     }
     
@@ -445,8 +448,9 @@ PxrUsdMayaTranslatorNurbsPatch::Read(
         if (isOuterBoundary) {
             status = surfaceFn.trimWithBoundaries(oneRegion, false, 1e-3, 1e-5, true);
             if (status != MS::kSuccess) {
-                MString err = MString("Trimming failed on NURBS: ") + MString(usdPrimPath.c_str());
-                MGlobal::displayError(err);
+                TF_RUNTIME_ERROR(
+                        "Trimming failed on NURBS for <%s>",
+                        usdPrimPath.c_str());
             }
             oneRegion.clear();
         }
@@ -457,8 +461,9 @@ PxrUsdMayaTranslatorNurbsPatch::Read(
         status = surfaceFn.trimWithBoundaries(oneRegion, false, 1e-3, 1e-5, true);
     }
     if (status != MS::kSuccess) {
-        MString err = MString("Trimming failed on NURBS: ") + MString(usdPrimPath.c_str());
-        MGlobal::displayError(err);
+        TF_RUNTIME_ERROR(
+                "Trimming failed on NURBS for <%s>",
+                usdPrimPath.c_str());
     }
     // Deleted collected curves since they are not needed anymore
     unsigned int length = deleteAfterTrim.length();

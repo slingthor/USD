@@ -29,12 +29,13 @@
 #include "pxr/pxr.h"
 #include "pxr/usdImaging/usdImaging/api.h"
 #include "pxr/usdImaging/usdImaging/version.h"
+#include "pxr/usdImaging/usdImaging/collectionCache.h"
 #include "pxr/usdImaging/usdImaging/valueCache.h"
 #include "pxr/usdImaging/usdImaging/inheritedCache.h"
 
 #include "pxr/imaging/hd/changeTracker.h"
 #include "pxr/imaging/hd/texture.h"
-#include "pxr/imaging/hdx/selectionTracker.h"
+#include "pxr/imaging/hd/selection.h"
 #include "pxr/usd/usd/attribute.h"
 #include "pxr/usd/usd/prim.h"
 #include "pxr/usd/usd/timeCode.h"
@@ -303,10 +304,10 @@ public:
     /// \name Selection
     // ---------------------------------------------------------------------- //
     USDIMAGING_API
-    virtual bool PopulateSelection(HdxSelectionHighlightMode const& highlightMode,
+    virtual bool PopulateSelection(HdSelection::HighlightMode const& highlightMode,
                                    SdfPath const &usdPath,
                                    VtIntArray const &instanceIndices,
-                                   HdxSelectionSharedPtr const &result);
+                                   HdSelectionSharedPtr const &result);
 
     // ---------------------------------------------------------------------- //
     /// \name Texture resources
@@ -427,8 +428,14 @@ protected:
     // Returns the rprim paths in the renderIndex rooted at \p indexPath.
     SdfPathVector _GetRprimSubtree(SdfPath const& indexPath) const;
 
-    // Returns whether or not the render delegate can handle material networks.
-    bool _CanComputeMaterialNetworks() const;
+    // Returns the material binding purpose from the renderer delegate.
+    TfToken _GetMaterialBindingPurpose() const;
+
+    // Returns the material context from the renderer delegate.
+    TfToken _GetMaterialNetworkSelector() const;
+
+    // Returns the shader source type from the render delegate.
+    TfTokenVector _GetShaderSourceTypes() const;
 
     // Returns \c true if \p usdPath is included in the scene delegate's
     // invised path list.
@@ -465,6 +472,8 @@ protected:
 
     virtual void _RemovePrim(SdfPath const& cachePath,
                              UsdImagingIndexProxy* index) = 0;
+
+    UsdImaging_CollectionCache& _GetCollectionCache() const;
 
 private:
 

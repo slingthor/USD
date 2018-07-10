@@ -34,10 +34,10 @@ PXR_NAMESPACE_OPEN_SCOPE
 class HdStSimpleTextureResourceGL : public HdStSimpleTextureResource {
 public:
     HDST_API
-    HdStSimpleTextureResourceGL(GarchTextureHandleRefPtr const &textureHandle, bool isPtex);
+    HdStSimpleTextureResourceGL(GarchTextureHandleRefPtr const &textureHandle, bool isPtex, size_t memoryRequest);
     HDST_API
     HdStSimpleTextureResourceGL(GarchTextureHandleRefPtr const &textureHandle, bool isPtex,
-        HdWrap wrapS, HdWrap wrapT, HdMinFilter minFilter, HdMagFilter magFilter);
+        HdWrap wrapS, HdWrap wrapT, HdMinFilter minFilter, HdMagFilter magFilter, size_t memoryRequest);
     HDST_API
     virtual ~HdStSimpleTextureResourceGL();
 
@@ -66,6 +66,7 @@ private:
     float _maxAnisotropy;
     GLuint _sampler;
     bool _isPtex;
+    size_t _memoryRequest;
 };
 
 

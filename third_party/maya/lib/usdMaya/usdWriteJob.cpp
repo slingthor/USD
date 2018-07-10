@@ -24,7 +24,7 @@
 #include "pxr/pxr.h"
 #include "usdMaya/usdWriteJob.h"
 
-#include "usdMaya/JobArgs.h"
+#include "usdMaya/jobArgs.h"
 #include "usdMaya/MayaPrimWriter.h"
 #include "usdMaya/MayaTransformWriter.h"
 
@@ -32,8 +32,8 @@
 #include "usdMaya/primWriterRegistry.h"
 #include "usdMaya/shadingModeExporterContext.h"
 
-#include "usdMaya/Chaser.h"
-#include "usdMaya/ChaserRegistry.h"
+#include "usdMaya/chaser.h"
+#include "usdMaya/chaserRegistry.h"
 
 #include "pxr/usd/ar/resolver.h"
 #include "pxr/usd/usd/modelAPI.h"
@@ -59,6 +59,7 @@
 
 #include <maya/MFnDagNode.h>
 #include <maya/MFnRenderLayer.h>
+#include <maya/MGlobal.h>
 #include <maya/MItDag.h>
 #include <maya/MObjectArray.h>
 #include <maya/MPxNode.h>
@@ -71,7 +72,7 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 
-usdWriteJob::usdWriteJob(const JobExportArgs & iArgs) :
+usdWriteJob::usdWriteJob(const PxrUsdMayaJobExportArgs & iArgs) :
     mModelKindWriter(iArgs), mJobCtx(iArgs)
 {
 }
@@ -81,10 +82,7 @@ usdWriteJob::~usdWriteJob()
 {
 }
 
-bool usdWriteJob::beginJob(const std::string &iFileName,
-                         bool append,
-                         double startTime,
-                         double endTime)
+bool usdWriteJob::beginJob(const std::string &iFileName, bool append)
 {
     // Check for DAG nodes that are a child of an already specified DAG node to export
     // if that's the case, report the issue and skip the export
@@ -95,11 +93,12 @@ bool usdWriteJob::beginJob(const std::string &iFileName,
         for (n = m; n != endPath; n++) {
             MDagPath path2 = *n;
             if (PxrUsdMayaUtil::isAncestorDescendentRelationship(path1,path2)) {
-                MString errorMsg = path1.fullPathName();
-                errorMsg += " and ";
-                errorMsg += path2.fullPathName();
-                errorMsg += " have an ancestor relationship. Skipping USD Export.";
-                MGlobal::displayError(errorMsg);
+                TF_RUNTIME_ERROR(
+                        "%s and %s are ancestors or descendants of each other. "
+                        "Please specify export DAG paths that don't overlap. "
+                        "Exiting.",
+                        path1.fullPathName().asChar(),
+                        path2.fullPathName().asChar());
                 return false;
             }
         }  // for n
@@ -118,9 +117,9 @@ bool usdWriteJob::beginJob(const std::string &iFileName,
                                    PxrUsdMayaTranslatorTokens->UsdFileExtensionDefault.GetText());
     }
 
-    MGlobal::displayInfo("usdWriteJob::beginJob: Create stage file "+MString(mFileName.c_str()));
+    TF_STATUS("Creating stage file '%s'", mFileName.c_str());
 
-    if (mJobCtx.mArgs.renderLayerMode == PxUsdExportJobArgsTokens->modelingVariant) {
+    if (mJobCtx.mArgs.renderLayerMode == PxrUsdExportJobArgsTokens->modelingVariant) {
         // Handle usdModelRootOverridePath for USD Variants
         MFnRenderLayer::listAllRenderLayers(mRenderLayerObjs);
         if (mRenderLayerObjs.length() > 1) {
@@ -132,9 +131,11 @@ bool usdWriteJob::beginJob(const std::string &iFileName,
         return false;
     }
 
-    // Set time range for the USD file
-    mJobCtx.mStage->SetStartTimeCode(startTime);
-    mJobCtx.mStage->SetEndTimeCode(endTime);
+    // Set time range for the USD file if we're exporting animation.
+    if (!mJobCtx.mArgs.timeInterval.IsEmpty()) {
+        mJobCtx.mStage->SetStartTimeCode(mJobCtx.mArgs.timeInterval.GetMin());
+        mJobCtx.mStage->SetEndTimeCode(mJobCtx.mArgs.timeInterval.GetMax());
+    }
 
     mModelKindWriter.Reset();
 
@@ -155,7 +156,7 @@ bool usdWriteJob::beginJob(const std::string &iFileName,
 
     // Switch to the default render layer unless the renderLayerMode is
     // 'currentLayer', or the default layer is already the current layer.
-    if (mJobCtx.mArgs.renderLayerMode != PxUsdExportJobArgsTokens->currentLayer &&
+    if (mJobCtx.mArgs.renderLayerMode != PxrUsdExportJobArgsTokens->currentLayer &&
             MFnRenderLayer::currentLayer() != MFnRenderLayer::defaultRenderLayer()) {
         // Set the RenderLayer to the default render layer
         MFnRenderLayer defaultLayer(MFnRenderLayer::defaultRenderLayer());
@@ -247,10 +248,24 @@ bool usdWriteJob::beginJob(const std::string &iFileName,
                 mJobCtx.mMayaPrimWriterList.push_back(primWriter);
 
                 // Write out data (non-animated/default values).
-                if (const auto& usdPrim = primWriter->getPrim()) {
-                    primWriter->write(UsdTimeCode::Default());
+                if (const auto& usdPrim = primWriter->GetUsdPrim()) {
+                    if (mJobCtx.mArgs.stripNamespaces) {
+                        auto foundPair = mUsdPathToDagPathMap.find(usdPrim.GetPath());
+                        if (foundPair != mUsdPathToDagPathMap.end()){
+                            TF_RUNTIME_ERROR(
+                                    "Multiple dag nodes map to the same prim "
+                                    "path after stripping namespaces: %s - %s",
+                                    foundPair->second.fullPathName().asChar(),
+                                    primWriter->GetDagPath().fullPathName()
+                                        .asChar());
+                            return false;
+                        }
+                        mUsdPathToDagPathMap[usdPrim.GetPath()] = primWriter->GetDagPath();
+                    }
 
-                    MDagPath dag = primWriter->getDagPath();
+                    primWriter->Write(UsdTimeCode::Default());
+
+                    MDagPath dag = primWriter->GetDagPath();
                     mDagPathToUsdPathMap[dag] = usdPrim.GetPath();
 
                     // If we are merging transforms and the object derives from
@@ -260,7 +275,7 @@ bool usdWriteJob::beginJob(const std::string &iFileName,
                         MayaTransformWriterPtr xformWriter =
                             std::dynamic_pointer_cast<MayaTransformWriter>(primWriter);
                         if (xformWriter) {
-                            MDagPath xformDag = xformWriter->getTransformDagPath();
+                            MDagPath xformDag = xformWriter->GetTransformDagPath();
                             mDagPathToUsdPathMap[xformDag] = usdPrim.GetPath();
                         }
                     }
@@ -268,7 +283,7 @@ bool usdWriteJob::beginJob(const std::string &iFileName,
                      mModelKindWriter.OnWritePrim(usdPrim, primWriter);
                 }
 
-                if (primWriter->shouldPruneChildren()) {
+                if (primWriter->ShouldPruneChildren()) {
                     itDag.prune();
                 }
             }
@@ -279,14 +294,15 @@ bool usdWriteJob::beginJob(const std::string &iFileName,
     exportParams.mergeTransformAndShape = mJobCtx.mArgs.mergeTransformAndShape;
     exportParams.exportCollectionBasedBindings =
             mJobCtx.mArgs.exportCollectionBasedBindings;
+    exportParams.stripNamespaces = mJobCtx.mArgs.stripNamespaces;
     exportParams.overrideRootPath = mJobCtx.mArgs.usdModelRootOverridePath;
     exportParams.bindableRoots = mJobCtx.mArgs.dagPaths;
-    exportParams.parentScope = mJobCtx.mArgs.getParentScope();
+    exportParams.parentScope = mJobCtx.mArgs.parentScope;
 
     // Writing Materials/Shading
     exportParams.materialCollectionsPath =
             mJobCtx.mArgs.exportMaterialCollections ?
-            SdfPath(mJobCtx.mArgs.materialCollectionsPath) :
+            mJobCtx.mArgs.materialCollectionsPath :
             SdfPath::EmptyPath();
 
     PxrUsdMayaTranslatorMaterial::ExportShadingEngines(
@@ -303,7 +319,8 @@ bool usdWriteJob::beginJob(const std::string &iFileName,
         return false;
     }
 
-    if (!mJobCtx.getSkelBindingsWriter().WriteSkelBindings(mJobCtx.mStage)) {
+    if (!mJobCtx.getSkelBindingsWriter().PostProcessSkelBindings(
+            mJobCtx.mStage)) {
         return false;
     }
 
@@ -316,9 +333,7 @@ bool usdWriteJob::beginJob(const std::string &iFileName,
             mChasers.push_back(fn);
         }
         else {
-            std::string error = TfStringPrintf("Failed to create chaser: %s",
-                                               chaserName.c_str());
-            MGlobal::displayError(MString(error.c_str()));
+            TF_RUNTIME_ERROR("Failed to create chaser: %s", chaserName.c_str());
         }
     }
 
@@ -336,9 +351,9 @@ void usdWriteJob::evalJob(double iFrame)
     const UsdTimeCode usdTime(iFrame);
 
     for (const MayaPrimWriterPtr& primWriter : mJobCtx.mMayaPrimWriterList) {
-        const UsdPrim& usdPrim = primWriter->getPrim();
+        const UsdPrim& usdPrim = primWriter->GetUsdPrim();
         if (usdPrim) {
-            primWriter->write(usdTime);
+            primWriter->Write(usdTime);
         }
     }
 
@@ -400,14 +415,14 @@ void usdWriteJob::endJob()
     }
     // Running post export function on all the prim writers.
     for (auto& primWriter: mJobCtx.mMayaPrimWriterList) {
-        primWriter->postExport();
+        primWriter->PostExport();
     }
     if (mJobCtx.mStage->GetRootLayer()->PermissionToSave()) {
         mJobCtx.mStage->GetRootLayer()->Save();
     }
     mJobCtx.mStage = UsdStageRefPtr();
     mJobCtx.mMayaPrimWriterList.clear(); // clear this so that no stage references are left around
-    MGlobal::displayInfo("usdWriteJob::endJob Saving Stage");
+    TF_STATUS("Saving stage");
 }
 
 TfToken usdWriteJob::writeVariants(const UsdPrim &usdRootPrim)
@@ -459,7 +474,7 @@ TfToken usdWriteJob::writeVariants(const UsdPrim &usdRootPrim)
     if (mJobCtx.mParentScopePath.IsEmpty()) {
         // Get the usdVariantRootPrimPath (optionally filter by renderLayer prefix)
         MayaPrimWriterPtr firstPrimWriterPtr = *mJobCtx.mMayaPrimWriterList.begin();
-        std::string firstPrimWriterPathStr( firstPrimWriterPtr->getDagPath().fullPathName().asChar() );
+        std::string firstPrimWriterPathStr( firstPrimWriterPtr->GetDagPath().fullPathName().asChar() );
         std::replace( firstPrimWriterPathStr.begin(), firstPrimWriterPathStr.end(), '|', '/');
         std::replace( firstPrimWriterPathStr.begin(), firstPrimWriterPathStr.end(), ':', '_'); // replace namespace ":" with "_"
         usdVariantRootPrimPath = SdfPath(firstPrimWriterPathStr).GetPrefixes()[0];

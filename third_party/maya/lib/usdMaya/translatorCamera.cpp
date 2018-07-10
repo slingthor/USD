@@ -24,7 +24,7 @@
 #include "pxr/pxr.h"
 #include "usdMaya/translatorCamera.h"
 
-#include "usdMaya/JobArgs.h"
+#include "usdMaya/jobArgs.h"
 #include "usdMaya/primReaderArgs.h"
 #include "usdMaya/primReaderContext.h"
 #include "usdMaya/translatorUtil.h"
@@ -79,7 +79,7 @@ bool
 _CheckUsdTypeAndResizeArrays(
         const UsdAttribute& usdAttr,
         const TfType& expectedType,
-        const PxrUsdMayaPrimReaderArgs& args,
+        const GfInterval& timeInterval,
         std::vector<double>* timeSamples,
         MTimeArray* timeArray,
         MDoubleArray* valueArray)
@@ -92,7 +92,7 @@ _CheckUsdTypeAndResizeArrays(
         return false;
     }
 
-    if (!PxrUsdMayaTranslatorUtil::GetTimeSamples(usdAttr, args, timeSamples)) {
+    if (!usdAttr.GetTimeSamplesInInterval(timeInterval, timeSamples)) {
         return false;
     }
 
@@ -111,7 +111,7 @@ static
 bool
 _GetTimeAndValueArrayForUsdAttribute(
         const UsdAttribute& usdAttr,
-        const PxrUsdMayaPrimReaderArgs& args,
+        const GfInterval& timeInterval,
         MTimeArray* timeArray,
         MDoubleArray* valueArray,
         const MDistance::Unit convertToUnit = MDistance::kMillimeters)
@@ -121,7 +121,7 @@ _GetTimeAndValueArrayForUsdAttribute(
 
     if (!_CheckUsdTypeAndResizeArrays(usdAttr,
                                       floatType,
-                                      args,
+                                      timeInterval,
                                       &timeSamples,
                                       timeArray,
                                       valueArray)) {
@@ -163,7 +163,7 @@ static
 bool
 _GetTimeAndValueArraysForUsdAttribute(
         const UsdAttribute& usdAttr,
-        const PxrUsdMayaPrimReaderArgs& args,
+        const GfInterval& timeInterval,
         MTimeArray* timeArray,
         MDoubleArray* valueArray1,
         MDoubleArray* valueArray2)
@@ -173,7 +173,7 @@ _GetTimeAndValueArraysForUsdAttribute(
 
     if (!_CheckUsdTypeAndResizeArrays(usdAttr,
                                       vec2fType,
-                                      args,
+                                      timeInterval,
                                       &timeSamples,
                                       timeArray,
                                       valueArray1)) {
@@ -230,14 +230,14 @@ _TranslateAnimatedUsdAttributeToPlug(
         PxrUsdMayaPrimReaderContext* context,
         const MDistance::Unit convertToUnit = MDistance::kMillimeters)
 {
-    if (!args.GetReadAnimData()) {
+    if (args.GetTimeInterval().IsEmpty()) {
         return false;
     }
 
     MTimeArray timeArray;
     MDoubleArray valueArray;
     if (!_GetTimeAndValueArrayForUsdAttribute(usdAttr,
-                                              args,
+                                              args.GetTimeInterval(),
                                               &timeArray,
                                               &valueArray,
                                               convertToUnit)) {
@@ -260,7 +260,7 @@ _TranslateAnimatedUsdAttributeToPlugs(
         const PxrUsdMayaPrimReaderArgs& args,
         PxrUsdMayaPrimReaderContext* context)
 {
-    if (!args.GetReadAnimData()) {
+    if (args.GetTimeInterval().IsEmpty()) {
         return false;
     }
 
@@ -268,7 +268,7 @@ _TranslateAnimatedUsdAttributeToPlugs(
     MDoubleArray valueArray1;
     MDoubleArray valueArray2;
     if (!_GetTimeAndValueArraysForUsdAttribute(usdAttr,
-                                               args,
+                                               args.GetTimeInterval(),
                                                &timeArray,
                                                &valueArray1,
                                                &valueArray2)) {
@@ -389,16 +389,10 @@ PxrUsdMayaTranslatorCamera::ReadToCamera(
         const UsdGeomCamera& usdCamera,
         MFnCamera& cameraObject)
 {
-    JobImportArgs defaultJobArgs;
-    PxrUsdMayaPrimReaderArgs args(
-            usdCamera.GetPrim(),
-            defaultJobArgs.shadingMode,
-            defaultJobArgs.defaultMeshScheme,
-            defaultJobArgs.readAnimData,
-            defaultJobArgs.useCustomFrameRange,
-            defaultJobArgs.startTime,
-            defaultJobArgs.endTime);
-
+    PxrUsdMayaJobImportArgs defaultJobArgs =
+            PxrUsdMayaJobImportArgs::CreateFromDictionary(
+                PxrUsdMayaJobImportArgs::GetDefaultDictionary());
+    PxrUsdMayaPrimReaderArgs args(usdCamera.GetPrim(), defaultJobArgs);
     return _ReadToCamera(usdCamera, cameraObject, args, NULL);
 }
 

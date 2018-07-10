@@ -33,17 +33,18 @@
 #include "pxr/base/gf/vec4f.h"
 #include "pxr/base/tf/declarePtrs.h"
 #include "pxr/base/tf/refPtr.h"
+#include "pxr/base/vt/dictionary.h"
 #include "pxr/usd/sdf/path.h"
 #include "pxr/usd/usd/attribute.h"
 #include "pxr/usd/usd/timeCode.h"
 
+#include <maya/MArgDatabase.h>
 #include <maya/MDagPath.h>
 #include <maya/MDataHandle.h>
 #include <maya/MFnDagNode.h>
 #include <maya/MFnDependencyNode.h>
 #include <maya/MFnMesh.h>
 #include <maya/MFnNumericData.h>
-#include <maya/MGlobal.h>
 #include <maya/MObject.h>
 #include <maya/MPlug.h>
 #include <maya/MStatus.h>
@@ -55,6 +56,7 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+/// General utilities for working with the Maya API.
 namespace PxrUsdMayaUtil
 {
 
@@ -88,32 +90,6 @@ private:
     MDataHandleHolder(const MPlug& plug, MDataHandle dataHandle);
     ~MDataHandleHolder();
 };
-
-inline MStatus isFloat(MString str, const MString & usage)
-{
-    MStatus status = MS::kSuccess;
-
-    if (!str.isFloat())
-    {
-        MGlobal::displayInfo(usage);
-        status = MS::kFailure;
-    }
-
-    return status;
-}
-
-inline MStatus isUnsigned(MString str, const MString & usage)
-{
-    MStatus status = MS::kSuccess;
-
-    if (!str.isUnsigned())
-    {
-        MGlobal::displayInfo(usage);
-        status = MS::kFailure;
-    }
-
-    return status;
-}
 
 // safely inverse a scale component
 inline double inverseScale(double scale)
@@ -233,10 +209,10 @@ bool isIntermediate(const MObject & object);
 PXRUSDMAYA_API
 bool isRenderable(const MObject & object);
 
-// strip iDepth namespaces from the node name, go from taco:foo:bar to bar
-// for iDepth > 1
+// strip iDepth namespaces from the node name or string path, go from
+// taco:foo:bar to bar for iDepth > 1. If iDepth is -1, strips all namespaces.
 PXRUSDMAYA_API
-MString stripNamespaces(const MString & iNodeName, unsigned int iDepth);
+MString stripNamespaces(const MString & iNodeName, int iDepth = -1);
 
 PXRUSDMAYA_API
 std::string SanitizeName(const std::string& name);
@@ -318,32 +294,15 @@ void CompressFaceVaryingPrimvarIndices(
         PXR_NS::TfToken *interpolation,
         PXR_NS::VtArray<int>* assignmentIndices);
 
-/// If any components in \p assignmentIndices are unassigned (-1), the given
-/// default value will be added to uvData and all of those components will be
-/// assigned that index, which is returned in \p unassignedValueIndex.
-/// Returns true if unassigned values were added and indices were updated, or
-/// false otherwise.
+/// If any of the components in \p assignmentIndices are unassigned (<0), the
+/// \p unassignedValueIndex will be set to zero and all those indices will be
+/// set to -1. Otherwise \p unassignedValueIndices is set to -1.
+/// Returns true if there were any unassigned values and indices were updated,
+/// or false otherwise.
 PXRUSDMAYA_API
-bool AddUnassignedUVIfNeeded(
-        PXR_NS::VtArray<PXR_NS::GfVec2f>* uvData,
+bool SetUnassignedValueIndex(
         PXR_NS::VtArray<int>* assignmentIndices,
-        int* unassignedValueIndex,
-        const PXR_NS::GfVec2f& defaultUV);
-
-/// If any components in \p assignmentIndices are unassigned (-1), the given
-/// default values will be added to RGBData and AlphaData and all of those
-/// components will be assigned that index, which is returned in
-/// \p unassignedValueIndex.
-/// Returns true if unassigned values were added and indices were updated, or
-/// false otherwise.
-PXRUSDMAYA_API
-bool AddUnassignedColorAndAlphaIfNeeded(
-        PXR_NS::VtArray<PXR_NS::GfVec3f>* RGBData,
-        PXR_NS::VtArray<float>* AlphaData,
-        PXR_NS::VtArray<int>* assignmentIndices,
-        int* unassignedValueIndex,
-        const PXR_NS::GfVec3f& defaultRGB,
-        const float defaultAlpha);
+        int* unassignedValueIndex);
 
 /// Get whether \p plug is authored in the Maya scene.
 ///
@@ -378,7 +337,7 @@ MPlug FindChildPlugByName(const MPlug& plug, const MString& name);
 /// Elements of the path will be sanitized such that it is a valid SdfPath.
 /// This means it will replace ':' with '_'.
 PXRUSDMAYA_API
-PXR_NS::SdfPath MDagPathToUsdPath(const MDagPath& dagPath, bool mergeTransformAndShape);
+PXR_NS::SdfPath MDagPathToUsdPath(const MDagPath& dagPath, bool mergeTransformAndShape, bool stripNamespaces);
 
 /// Convenience function to retrieve custom data
 PXRUSDMAYA_API
@@ -480,6 +439,36 @@ bool createNumericAttribute(
         MFnDependencyNode& depNode,
         const MString& attr,
         MFnNumericData::Type type);
+
+/// Reads values from the given \p argData into a VtDictionary, using the
+/// \p guideDict to figure out which keys and what type of values should be read
+/// from \p argData.
+/// Mainly useful for parsing arguments in commands all at once.
+PXRUSDMAYA_API
+VtDictionary GetDictionaryFromArgDatabase(
+    const MArgDatabase& argData,
+    const VtDictionary& guideDict);
+
+/// Parses \p value based on the type of \p key in \p guideDict, returning the
+/// parsed value wrapped in a VtValue.
+/// Raises a coding error if \p key doesn't exist in \p guideDict.
+/// Mainly useful for parsing arguments one-by-one in translators' option
+/// strings. If you have an MArgList/MArgParser/MArgDatabase, it's going to be
+/// way simpler to use GetDictionaryFromArgDatabase() instead.
+PXRUSDMAYA_API
+VtValue ParseArgumentValue(
+    const std::string& key,
+    const std::string& value,
+    const VtDictionary& guideDict);
+
+/// Gets all Maya node types that are ancestors of the given Maya node type
+/// \p ty. If \p ty isn't registered in Maya's type system, issues a runtime
+/// error and returns an empty string.
+/// The returned list is sorted from furthest to closest ancestor. The returned
+/// list will always have the given type \p ty as the last item.
+/// Note that this calls out to MEL.
+PXRUSDMAYA_API
+std::vector<std::string> GetAllAncestorMayaNodeTypes(const std::string& ty);
 
 } // namespace PxrUsdMayaUtil
 

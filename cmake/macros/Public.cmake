@@ -681,6 +681,23 @@ function(pxr_register_test TEST_NAME)
                 set(testWrapperCmd ${testWrapperCmd} --post-path=${path})
             endforeach()
         endif()
+        
+        # If we're building static libraries, the C++ tests that link against
+        # these libraries will look for resource files in the "usd" subdirectory
+        # relative to where the tests are installed. However, the build installs
+        # these files in the "lib" directory where the libraries are installed. 
+        #
+        # We don't want to copy these resource files for each test, so instead
+        # we set the PXR_PLUGINPATH_NAME env var to point to the "lib/usd"
+        # directory where these files are installed.
+        if (NOT TARGET shared_libs)
+            set(_plugSearchPathEnvName "PXR_PLUGINPATH_NAME")
+            if (PXR_OVERRIDE_PLUGINPATH_NAME)
+                set(_plugSearchPathEnvName ${PXR_OVERRIDE_PLUGINPATH_NAME})
+            endif()
+
+            set(testWrapperCmd ${testWrapperCmd} --env-var=${_plugSearchPathEnvName}=${CMAKE_INSTALL_PREFIX}/lib/usd)
+        endif()
 
         # Ensure that Python imports the Python files built by this build.
         # On Windows convert backslash to slash and don't change semicolons
@@ -716,8 +733,6 @@ function(pxr_register_test TEST_NAME)
 endfunction() # pxr_register_test
 
 function(pxr_setup_plugins)
-    set(SHARE_INSTALL_PREFIX "share/usd")
-
     # Install a top-level plugInfo.json in the shared area and into the 
     # top-level plugin area
     _get_resources_dir_name(resourcesDir)
@@ -727,7 +742,7 @@ function(pxr_setup_plugins)
          "${plugInfoContents}")
     install(
         FILES "${CMAKE_CURRENT_BINARY_DIR}/plugins_plugInfo.json"
-        DESTINATION "${SHARE_INSTALL_PREFIX}/plugins"
+        DESTINATION lib/usd
         RENAME "plugInfo.json"
     )
 

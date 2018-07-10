@@ -39,7 +39,6 @@
 #include <maya/MFnAnimCurve.h>
 #include <maya/MFnTransform.h>
 #include <maya/MEulerRotation.h>
-#include <maya/MGlobal.h>
 #include <maya/MPlug.h>
 #include <maya/MTransformationMatrix.h>
 #include <maya/MVector.h>
@@ -149,7 +148,9 @@ static void _setAnimPlugData(MPlug plg, std::vector<double> &value, MTimeArray &
         }
     } else {
         MString mayaPlgName = plg.partialName(true, true, true, false, true, true, &status);
-        MGlobal::displayError("Failed to create animation object for attribute: " + mayaPlgName);
+        TF_RUNTIME_ERROR(
+                "Failed to create animation object for attribute: %s",
+                mayaPlgName.asChar());
     }
 }
 
@@ -212,8 +213,8 @@ static bool _pushUSDXformOpToMayaXform(
     std::vector<double> zValue;
     GfVec3d value;
     std::vector<double> timeSamples;
-    if (args.GetReadAnimData()) {
-        PxrUsdMayaTranslatorUtil::GetTimeSamples(xformop, args, &timeSamples);
+    if (!args.GetTimeInterval().IsEmpty()) {
+        xformop.GetTimeSamplesInInterval(args.GetTimeInterval(), &timeSamples);
     }
     MTimeArray timeArray;
     if (!timeSamples.empty()) {
@@ -228,7 +229,9 @@ static bool _pushUSDXformOpToMayaXform(
                 timeArray.set(MTime(timeSamples[ti]), ti);
             } 
             else {
-                MGlobal::displayError("Missing sampled data on xformOp:" + MString(xformop.GetName().GetText()));
+                TF_RUNTIME_ERROR(
+                        "Missing sampled data on xformOp: %s",
+                        xformop.GetName().GetText());
             }
         }
     } 
@@ -242,7 +245,9 @@ static bool _pushUSDXformOpToMayaXform(
             xValue[0]=value[0]; yValue[0]=value[1]; zValue[0]=value[2];
         } 
         else {
-            MGlobal::displayError("Missing default data on xformOp:" + MString(xformop.GetName().GetText()));
+            TF_RUNTIME_ERROR(
+                    "Missing default data on xformOp: %s",
+                    xformop.GetName().GetText());
         }
     }
     if (xValue.size()) {
@@ -334,7 +339,7 @@ static bool _pushUSDXformToMayaXform(
     GfMatrix4d localXform(1.0);
 
     std::vector<double> tSamples;
-    PxrUsdMayaTranslatorUtil::GetTimeSamples(xformSchema, args, &tSamples);
+    xformSchema.GetTimeSamplesInInterval(args.GetTimeInterval(), &tSamples);
     MTimeArray timeArray;
     if (!tSamples.empty()) {
         timeArray.setLength(tSamples.size());
@@ -348,8 +353,6 @@ static bool _pushUSDXformToMayaXform(
                                                    time)) {
                 xlate=GfVec3d(0); rotate=GfVec3d(0); scale=GfVec3d(1);
                 if (!_isIdentityMatrix(localXform)) {
-                     MGlobal::displayWarning("Decomposing non identity 4X4 matrix at: " 
-                    + MString(xformSchema.GetPath().GetText()) + " At sample: " + tSamples[ti]);
                      PxrUsdMayaTranslatorXformable::ConvertUsdMatrixToComponents(
                              localXform, &xlate, &rotate, &scale);
                 }
@@ -359,7 +362,9 @@ static bool _pushUSDXformToMayaXform(
                 timeArray.set(MTime(tSamples[ti]), ti);
             } 
             else {
-                MGlobal::displayError("Missing sampled xform data on USDPrim:" + MString(xformSchema.GetPath().GetText()));
+                TF_RUNTIME_ERROR(
+                        "Missing sampled xform data on USD prim <%s>",
+                        xformSchema.GetPath().GetText());
             }
         }
     } 
@@ -367,8 +372,6 @@ static bool _pushUSDXformToMayaXform(
         if (xformSchema.GetLocalTransformation(&localXform, &resetsXformStack)) {
             xlate=GfVec3d(0); rotate=GfVec3d(0); scale=GfVec3d(1);
             if (!_isIdentityMatrix(localXform)) {
-                MGlobal::displayWarning("Decomposing non identity 4X4 matrix at: " 
-                    + MString(xformSchema.GetPath().GetText()));
                 // XXX if we want to support the old pivotPosition, we can pass
                 // it into this function..
                 PxrUsdMayaTranslatorXformable::ConvertUsdMatrixToComponents(
@@ -382,7 +385,9 @@ static bool _pushUSDXformToMayaXform(
             SxVal[0]=scale [0]; SyVal[0]=scale [1]; SzVal[0]=scale [2];
         } 
         else {
-            MGlobal::displayError("Missing default xform data on USDPrim:" + MString(xformSchema.GetPath().GetText()));
+            TF_RUNTIME_ERROR(
+                    "Missing default xform data on USD prim <%s>",
+                    xformSchema.GetPath().GetText());
         }
     }
 
@@ -449,9 +454,9 @@ PxrUsdMayaTranslatorXformable::Read(
     } else {
         if (_pushUSDXformToMayaXform(xformSchema, MdagNode, args, context) == 
                 false) {
-            MGlobal::displayError(
-                    "Unable to successfully decompose matrix at USD Prim:" 
-                    + MString(xformSchema.GetPath().GetText()));
+            TF_RUNTIME_ERROR(
+                    "Unable to successfully decompose matrix at USD prim <%s>",
+                    xformSchema.GetPath().GetText());
         }
     }
 

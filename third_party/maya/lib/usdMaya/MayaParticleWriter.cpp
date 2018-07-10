@@ -24,6 +24,9 @@
 
 #include "usdMaya/MayaParticleWriter.h"
 
+#include "usdMaya/adaptor.h"
+#include "usdMaya/primWriterRegistry.h"
+
 #include "pxr/usd/usdGeom/points.h"
 #include "pxr/usd/usd/timeCode.h"
 #include "pxr/base/vt/array.h"
@@ -43,6 +46,12 @@
 #include <set>
 
 PXR_NAMESPACE_OPEN_SCOPE
+
+PXRUSDMAYA_REGISTER_WRITER(particle, MayaParticleWriter);
+PXRUSDMAYA_REGISTER_ADAPTOR_SCHEMA(particle, UsdGeomPoints);
+
+PXRUSDMAYA_REGISTER_WRITER(nParticle, MayaParticleWriter);
+PXRUSDMAYA_REGISTER_ADAPTOR_SCHEMA(nParticle, UsdGeomPoints);
 
 namespace {
     template <typename T>
@@ -177,26 +186,26 @@ MayaParticleWriter::MayaParticleWriter(
     usdWriteJobCtx& jobCtx)
     : MayaTransformWriter(iDag, uPath, instanceSource, jobCtx),
       mInitialFrameDone(false) {
-    auto primSchema = UsdGeomPoints::Define(getUsdStage(), getUsdPath());
+    auto primSchema = UsdGeomPoints::Define(GetUsdStage(), GetUsdPath());
     TF_AXIOM(primSchema);
-    mUsdPrim = primSchema.GetPrim();
-    TF_AXIOM(mUsdPrim);
+    _usdPrim = primSchema.GetPrim();
+    TF_AXIOM(_usdPrim);
 
     initializeUserAttributes();
 }
 
-void MayaParticleWriter::write(const UsdTimeCode &usdTime) {
-    UsdGeomPoints primSchema(mUsdPrim);
-    writeTransformAttrs(usdTime, primSchema);
+void MayaParticleWriter::Write(const UsdTimeCode &usdTime) {
+    UsdGeomPoints primSchema(_usdPrim);
+    _WriteXformableAttrs(usdTime, primSchema);
     writeParams(usdTime, primSchema);
 }
 
 void MayaParticleWriter::writeParams(const UsdTimeCode& usdTime, UsdGeomPoints& points) {
-    if (usdTime.IsDefault() == isShapeAnimated()) {
+    if (usdTime.IsDefault() == _IsShapeAnimated()) {
         return;
     }
 
-    const auto particleNode = getDagPath().node();
+    const auto particleNode = GetDagPath().node();
     MFnParticleSystem particleSys(particleNode);
     MFnParticleSystem deformedParticleSys(particleNode);
 
@@ -334,7 +343,7 @@ void MayaParticleWriter::writeParams(const UsdTimeCode& usdTime, UsdGeomPoints& 
 }
 
 void MayaParticleWriter::initializeUserAttributes() {
-    const auto particleNode = getDagPath().node();
+    const auto particleNode = GetDagPath().node();
     MFnParticleSystem particleSys(particleNode);
 
     const auto attributeCount = particleSys.attributeCount();

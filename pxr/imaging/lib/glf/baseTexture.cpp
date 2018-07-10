@@ -60,6 +60,12 @@ GlfBaseTexture::GlfBaseTexture()
     _textureName = _GenName();
 }
 
+GlfBaseTexture::GlfBaseTexture(GarchImage::ImageOriginLocation originLocation)
+  : GarchBaseTexture(originLocation)
+{
+    _textureName = _GenName();
+}
+
 GlfBaseTexture::~GlfBaseTexture()
 {
     GlfSharedGLContextScopeHolder sharedGLContextScopeHolder;

@@ -317,5 +317,10 @@ HdStRenderDelegate::IsSupported()
     return (GarchResourceFactory::GetInstance()->GetContextCaps().apiVersion >= 400);
 }
 
+TfTokenVector
+HdStRenderDelegate::GetShaderSourceTypes() const
+{
+    return {GarchGLSLFXTokens->glslfx};
+}
 
 PXR_NAMESPACE_CLOSE_SCOPE

@@ -82,6 +82,8 @@ _UsdToHdRole(TfToken const& usdRole)
         return HdPrimvarRoleTokens->vector;
     } else if (usdRole == SdfValueRoleNames->Color) {
         return HdPrimvarRoleTokens->color;
+    } else if (usdRole == SdfValueRoleNames->TextureCoordinate) {
+        return HdPrimvarRoleTokens->textureCoordinate;
     }
     // Empty token means no role specified
     return TfToken();
@@ -290,7 +292,7 @@ UsdImagingGprimAdapter::UpdateForTime(UsdPrim const& prim,
             _UsdToHdInterpolation(interpToken),
             HdPrimvarRoleTokens->color);
 
-        if (_CanComputeMaterialNetworks()) {
+        if (_GetMaterialBindingPurpose() == HdTokens->full) {
             // XXX:HACK: Currently GetMaterialPrimvars() does not return
             // correct results, so in the meantime let's just ask USD
             // for the list of primvars.
@@ -381,6 +383,13 @@ UsdImagingGprimAdapter::ProcessPropertyChange(UsdPrim const& prim,
 
     else if (propertyName == UsdGeomTokens->doubleSided) 
         return HdChangeTracker::DirtyDoubleSided;
+
+    else if (TfStringStartsWith(propertyName.GetString(),
+                               UsdShadeTokens->materialBinding.GetString()) ||
+             TfStringStartsWith(propertyName.GetString(),
+                                UsdTokens->collection.GetString())) {
+        return HdChangeTracker::DirtyMaterialId;
+    }
     
     // TODO: support sparse displayColor updates
 
@@ -401,7 +410,7 @@ UsdImagingGprimAdapter::MarkRefineLevelDirty(UsdPrim const& prim,
                                              SdfPath const& cachePath,
                                              UsdImagingIndexProxy* index)
 {
-    index->MarkRprimDirty(cachePath, HdChangeTracker::DirtyRefineLevel);
+    index->MarkRprimDirty(cachePath, HdChangeTracker::DirtyDisplayStyle);
 }
 
 void

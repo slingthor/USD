@@ -28,12 +28,14 @@
 
 #include "pxr/pxr.h"
 #include "usdMaya/api.h"
-#include "usdMaya/Chaser.h"
+#include "usdMaya/chaser.h"
 
 #include "usdMaya/util.h"
-#include "usdMaya/ModelKindWriter.h"
+#include "usdMaya/modelKindWriter.h"
 
 #include "usdMaya/usdWriteJobCtx.h"
+
+#include "pxr/base/tf/hashmap.h"
 
 #include <maya/MObjectHandle.h>
 
@@ -47,17 +49,14 @@ class usdWriteJob
   public:
 
     PXRUSDMAYA_API
-    usdWriteJob(const JobExportArgs & iArgs);
+    usdWriteJob(const PxrUsdMayaJobExportArgs & iArgs);
 
     PXRUSDMAYA_API
     ~usdWriteJob();
 
     // returns true if the stage can be created successfully
     PXRUSDMAYA_API
-    bool beginJob(const std::string &fileName,
-            bool append, 
-            double startTime,
-            double endTime);
+    bool beginJob(const std::string &fileName, bool append);
     PXRUSDMAYA_API
     void evalJob(double iFrame);
     PXRUSDMAYA_API
@@ -81,6 +80,9 @@ class usdWriteJob
     MObjectArray mRenderLayerObjs;
 
     PxrUsdMayaUtil::MDagPathMap<SdfPath>::Type mDagPathToUsdPathMap;
+
+    // Currently only used if stripNamespaces is on, to ensure we don't have clashes
+    TfHashMap<SdfPath, MDagPath, SdfPath::Hash> mUsdPathToDagPathMap;
 
     PxrUsdMayaChaserRefPtrVector mChasers;
 

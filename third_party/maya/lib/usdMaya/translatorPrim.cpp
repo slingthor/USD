@@ -24,10 +24,9 @@
 #include "pxr/pxr.h"
 #include "usdMaya/translatorPrim.h"
 
+#include "usdMaya/readUtil.h"
 #include "usdMaya/translatorUtil.h"
 #include "usdMaya/util.h"
-#include "usdMaya/AttributeConverter.h"
-#include "usdMaya/AttributeConverterRegistry.h"
 
 #include "pxr/usd/usdGeom/imageable.h"
 
@@ -52,14 +51,14 @@ PxrUsdMayaTranslatorPrim::Read(
     }
 
     // Gather visibility
-    // If args.GetReadAnimData() is TRUE,
-    // pick the first avaiable sample or default
+    // If timeInterval is non-empty, pick the first available sample in the
+    // timeInterval or default.
     UsdTimeCode visTimeSample=UsdTimeCode::EarliestTime();
     std::vector<double> visTimeSamples;
     size_t visNumTimeSamples = 0;
-    if (args.GetReadAnimData()) {
-        PxrUsdMayaTranslatorUtil::GetTimeSamples(primSchema.GetVisibilityAttr(),
-                args, &visTimeSamples);
+    if (!args.GetTimeInterval().IsEmpty()) {
+        primSchema.GetVisibilityAttr().GetTimeSamplesInInterval(
+                args.GetTimeInterval(), &visTimeSamples);
         visNumTimeSamples = visTimeSamples.size();
         if (visNumTimeSamples>0) {
             visTimeSample = visTimeSamples[0];
@@ -109,14 +108,16 @@ PxrUsdMayaTranslatorPrim::Read(
             }
         }
     }
-    
-    // Set "USD_" attributes to store USD-specific info on the Maya node.
-    // XXX: Handle animation properly in attribute converters.
-    std::vector<const AttributeConverter*> converters =
-            AttributeConverterRegistry::GetAllConverters();
-    for (const AttributeConverter* converter : converters) {
-        converter->UsdToMaya(prim, depFn, UsdTimeCode::EarliestTime());
-    }
+
+    // Process UsdGeomImageable typed schema (note that purpose is uniform).
+    PxrUsdMayaReadUtil::ReadSchemaAttributesFromPrim<UsdGeomImageable>(
+            prim, mayaNode, {UsdGeomTokens->purpose});
+
+    // Process API schema attributes and strongly-typed metadata.
+    PxrUsdMayaReadUtil::ReadMetadataFromPrim(
+            args.GetIncludeMetadataKeys(), prim, mayaNode);
+    PxrUsdMayaReadUtil::ReadAPISchemaAttributesFromPrim(
+            args.GetIncludeAPINames(), prim, mayaNode);
 
     // XXX What about all the "user attributes" that PrimWriter exports???
 }

@@ -3,6 +3,12 @@ if (APPLE)
 set(PXR_PREFIX pxr/imaging)
 set(PXR_PACKAGE mtlf)
 
+if (NOT ${PXR_ENABLE_METAL_SUPPORT})
+    message(STATUS
+        "Skipping ${PXR_PACKAGE} because PXR_ENABLE_METAL_SUPPORT is OFF")
+    return()
+endif()
+
 set(optionalPublicClasses "")
 
 set(optionalLibs "")

@@ -52,7 +52,17 @@ typedef boost::shared_ptr<class GarchImage> GarchImageSharedPtr;
 /// The class allows basic access to texture image file data.
 ///
 class GarchImage : public boost::noncopyable {
+    
 public:
+
+    /// Specifies whether to treat the image origin as the upper-left corner
+    /// or the lower left
+    enum ImageOriginLocation
+    {
+        OriginUpperLeft, 
+        OriginLowerLeft
+    }; 
+   
     /// \class StorageSpec
     ///
     /// Describes the memory layout and storage of a texture image

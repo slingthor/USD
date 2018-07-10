@@ -24,10 +24,14 @@
 #include "pxr/pxr.h"
 #include "usdMaya/MayaNurbsCurveWriter.h"
 
+#include "usdMaya/adaptor.h"
+#include "usdMaya/primWriterRegistry.h"
+
 #include "pxr/usd/usdGeom/curves.h"
 #include "pxr/usd/usdGeom/nurbsCurves.h"
 #include "pxr/usd/usd/stage.h"
 
+#include <maya/MDoubleArray.h>
 #include <maya/MFnDependencyNode.h>
 #include <maya/MFnNurbsCurve.h>
 #include <maya/MPointArray.h>
@@ -36,6 +40,8 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+PXRUSDMAYA_REGISTER_WRITER(nurbsCurve, MayaNurbsCurveWriter);
+PXRUSDMAYA_REGISTER_ADAPTOR_SCHEMA(nurbsCurve, UsdGeomNurbsCurves);
 
 MayaNurbsCurveWriter::MayaNurbsCurveWriter(const MDagPath & iDag,
                                            const SdfPath& uPath,
@@ -44,18 +50,18 @@ MayaNurbsCurveWriter::MayaNurbsCurveWriter(const MDagPath & iDag,
     MayaTransformWriter(iDag, uPath, instanceSource, jobCtx)
 {
     UsdGeomNurbsCurves primSchema =
-        UsdGeomNurbsCurves::Define(getUsdStage(), getUsdPath());
+        UsdGeomNurbsCurves::Define(GetUsdStage(), GetUsdPath());
     TF_AXIOM(primSchema);
-    mUsdPrim = primSchema.GetPrim();
-    TF_AXIOM(mUsdPrim);
+    _usdPrim = primSchema.GetPrim();
+    TF_AXIOM(_usdPrim);
 }
 
 
 //virtual 
-void MayaNurbsCurveWriter::write(const UsdTimeCode &usdTime)
+void MayaNurbsCurveWriter::Write(const UsdTimeCode &usdTime)
 {
     // == Write
-    UsdGeomNurbsCurves primSchema(mUsdPrim);
+    UsdGeomNurbsCurves primSchema(_usdPrim);
 
     // Write the attrs
     writeNurbsCurveAttrs(usdTime, primSchema);
@@ -67,22 +73,22 @@ bool MayaNurbsCurveWriter::writeNurbsCurveAttrs(const UsdTimeCode &usdTime, UsdG
     MStatus status = MS::kSuccess;
 
     // Write parent class attrs
-    writeTransformAttrs(usdTime, primSchema);
+    _WriteXformableAttrs(usdTime, primSchema);
 
     // Return if usdTime does not match if shape is animated
-    if (usdTime.IsDefault() == isShapeAnimated() ) {
+    if (usdTime.IsDefault() == _IsShapeAnimated() ) {
         // skip shape as the usdTime does not match if shape isAnimated value
         return true; 
     }
 
-    MFnDependencyNode fnDepNode(getDagPath().node(), &status);
+    MFnDependencyNode fnDepNode(GetDagPath().node(), &status);
     MString name = fnDepNode.name();
 
-    MFnNurbsCurve curveFn(getDagPath(), &status);
+    MFnNurbsCurve curveFn(GetDagPath(), &status);
     if (!status) {
-        MGlobal::displayError(
-            "MayaNurbsCurveWriter: MFnNurbsCurve() failed for curve at dagPath: " +
-            getDagPath().fullPathName());
+        TF_RUNTIME_ERROR(
+                "MFnNurbsCurve() failed for curve at DAG path: %s",
+                GetDagPath().fullPathName().asChar());
         return false;
     }
     
@@ -163,10 +169,10 @@ bool MayaNurbsCurveWriter::writeNurbsCurveAttrs(const UsdTimeCode &usdTime, UsdG
     else if (curveWidths.size() == expectedVaryingSize)
         primSchema.SetWidthsInterpolation(UsdGeomTokens->varying);
     else {
-        MGlobal::displayWarning(
-            "MayaNurbsCurveWriter: MFnNurbsCurve() has unsupported width size "
-            "for standard interpolation metadata: " +
-            getDagPath().fullPathName());
+        TF_WARN(
+            "MFnNurbsCurve has unsupported width size "
+            "for standard interpolation metadata: %s",
+            GetDagPath().fullPathName().asChar());
     }
 
     // Curve
@@ -185,7 +191,7 @@ bool MayaNurbsCurveWriter::writeNurbsCurveAttrs(const UsdTimeCode &usdTime, UsdG
 }
 
 bool
-MayaNurbsCurveWriter::exportsGprims() const
+MayaNurbsCurveWriter::ExportsGprims() const
 {
     return true;
 }

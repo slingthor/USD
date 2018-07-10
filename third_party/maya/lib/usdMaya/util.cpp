@@ -27,10 +27,12 @@
 
 #include "pxr/base/gf/gamma.h"
 #include "pxr/base/tf/hashmap.h"
+#include "pxr/base/tf/staticTokens.h"
 #include "pxr/usd/usdGeom/mesh.h"
 
 #include <maya/MAnimControl.h>
 #include <maya/MAnimUtil.h>
+#include <maya/MArgList.h>
 #include <maya/MColor.h>
 #include <maya/MDGModifier.h>
 #include <maya/MDagPath.h>
@@ -43,6 +45,7 @@
 #include <maya/MFnNumericAttribute.h>
 #include <maya/MFnTypedAttribute.h>
 #include <maya/MFnSet.h>
+#include <maya/MGlobal.h>
 #include <maya/MItDependencyGraph.h>
 #include <maya/MItDependencyNodes.h>
 #include <maya/MItMeshFaceVertex.h>
@@ -189,15 +192,7 @@ bool PxrUsdMayaUtil::isAncestorDescendentRelationship(const MDagPath & path1,
 
     descendent.pop(diff);
 
-    bool ret = (ancestor == descendent);
-
-    if (ret)
-    {
-        MString err = path1.fullPathName() + " and ";
-        err += path2.fullPathName() + " have parenting relationships";
-        MGlobal::displayError(err);
-    }
-    return ret;
+    return ancestor == descendent;
 }
 
 
@@ -386,7 +381,7 @@ bool PxrUsdMayaUtil::isAnimated(MObject & object, bool checkParent)
 
     if (stat!= MS::kSuccess)
     {
-        MGlobal::displayError("Unable to create DG iterator ");
+        TF_RUNTIME_ERROR("Unable to create DG iterator");
     }
 
     // MAnimUtil::isAnimated(node) will search the history of the node
@@ -518,40 +513,37 @@ bool PxrUsdMayaUtil::isRenderable(const MObject & object)
     return true;
 }
 
-MString PxrUsdMayaUtil::stripNamespaces(const MString & iNodeName, unsigned int iDepth)
+MString PxrUsdMayaUtil::stripNamespaces(const MString & iNodeName, int iDepth)
 {
-    if (iDepth == 0)
-    {
+    if (iDepth == 0) {
         return iNodeName;
     }
 
-    MStringArray strArray;
-    if (iNodeName.split(':', strArray) == MS::kSuccess)
-    {
-        unsigned int len = strArray.length();
-
-        // we want to strip off more namespaces than what we have
-        // so we just return the last name
-        if (len == 0)
-        {
-            return iNodeName;
+    std::stringstream ss;
+    MStringArray pathPartsArray;
+    if (iNodeName.split('|', pathPartsArray) == MS::kSuccess) {
+        unsigned int partsLen = pathPartsArray.length();
+        for (unsigned int i = 0; i < partsLen; ++i) {
+            ss << '|';
+            MStringArray strArray;
+            if (pathPartsArray[i].split(':', strArray) == MS::kSuccess) {
+                int len = strArray.length();
+                // if iDepth is -1, we don't keep any namespaces
+                if (iDepth != -1) {
+                    // add any ns beyond iDepth so if name is: "stripped:save1:save2:name" add "save1:save2:",
+                    // but if there aren't any to save like: "stripped:name" then add nothing.
+                    for (int j = iDepth; j < len - 1; ++j) {
+                        ss << strArray[j] << ":";
+                    }
+                }
+                ss << strArray[len - 1];  // add the node name
+            }
         }
-        else if (len <= iDepth + 1)
-        {
-            return strArray[len-1];
-        }
-
-        MString name;
-        for (unsigned int i = iDepth; i < len - 1; ++i)
-        {
-            name += strArray[i];
-            name += ":";
-        }
-        name += strArray[len-1];
-        return name;
+        auto path = ss.str();
+        return MString(path.c_str());
+    } else {
+        return iNodeName;
     }
-
-    return iNodeName;
 }
 
 std::string PxrUsdMayaUtil::SanitizeName(const std::string& name)
@@ -664,6 +656,7 @@ _GetColorAndTransparencyFromLambert(
             for (int j=0;j<3;j++) {
                 displayColor[j] = color[j];
             }
+            displayColor *= lambertFn.diffuseCoeff();
             *rgb = PxrUsdMayaColorSpace::ConvertMayaToLinear(displayColor);
         }
         if (alpha) {
@@ -746,9 +739,10 @@ _getMayaShadersColor(
         }
 
         if (shaderObjs[i].isNull()) {
-            MGlobal::displayError("Invalid Maya Shader Object at index: " +
-                                  MString(TfStringPrintf("%d", i).c_str()) +
-                                  ". Unable to retrieve ShaderBaseColor.");
+            TF_RUNTIME_ERROR(
+                    "Invalid Maya shader object at index %d. "
+                    "Unable to retrieve shader base color.",
+                    i);
             continue;
         }
 
@@ -765,9 +759,10 @@ _getMayaShadersColor(
                 AlphaData ?  &(*AlphaData)[i] : NULL);
 
         if (!gotValues) {
-            MGlobal::displayError("Failed to get shaders colors at index: " +
-                                  MString(TfStringPrintf("%d", i).c_str()) +
-                                  ". Unable to retrieve ShaderBaseColor.");
+            TF_RUNTIME_ERROR(
+                    "Failed to get shaders colors at index %d. "
+                    "Unable to retrieve shader base color.",
+                    i);
         }
     }
 }
@@ -1024,83 +1019,21 @@ PxrUsdMayaUtil::CompressFaceVaryingPrimvarIndices(
 }
 
 bool
-PxrUsdMayaUtil::AddUnassignedUVIfNeeded(
-        VtArray<GfVec2f>* uvData,
-        VtArray<int>* assignmentIndices,
-        int* unassignedValueIndex,
-        const GfVec2f& defaultUV)
-{
-    if (!assignmentIndices || assignmentIndices->empty()) {
+PxrUsdMayaUtil::SetUnassignedValueIndex(
+    VtArray<int>* assignmentIndices,
+    int* unassignedValueIndex) {
+    if (assignmentIndices == nullptr || unassignedValueIndex == nullptr) {
         return false;
     }
 
     *unassignedValueIndex = -1;
-
-    for (size_t i = 0; i < assignmentIndices->size(); ++i) {
-        if ((*assignmentIndices)[i] >= 0) {
-            // This component has an assignment, so skip it.
-            continue;
+    for (auto& index: *assignmentIndices) {
+        if (index < 0) {
+            index = -1;
+            *unassignedValueIndex = 0;
         }
-
-        // We found an unassigned index. Add the unassigned value to uvData
-        // if we haven't already.
-        if (*unassignedValueIndex < 0) {
-            if (uvData) {
-                uvData->push_back(defaultUV);
-            }
-            *unassignedValueIndex = uvData->size() - 1;
-        }
-
-        // Assign the component the unassigned value index.
-        (*assignmentIndices)[i] = *unassignedValueIndex;
     }
-
-    return true;
-}
-
-bool
-PxrUsdMayaUtil::AddUnassignedColorAndAlphaIfNeeded(
-        VtArray<GfVec3f>* RGBData,
-        VtArray<float>* AlphaData,
-        VtArray<int>* assignmentIndices,
-        int* unassignedValueIndex,
-        const GfVec3f& defaultRGB,
-        const float defaultAlpha)
-{
-    if (!assignmentIndices || assignmentIndices->empty()) {
-        return false;
-    }
-
-    if (RGBData && AlphaData && (RGBData->size() != AlphaData->size())) {
-        TF_CODING_ERROR("Unequal sizes for color (%zu) and opacity (%zu)",
-                        RGBData->size(), AlphaData->size());
-    }
-
-    *unassignedValueIndex = -1;
-
-    for (size_t i=0; i < assignmentIndices->size(); ++i) {
-        if ((*assignmentIndices)[i] >= 0) {
-            // This component has an assignment, so skip it.
-            continue;
-        }
-
-        // We found an unassigned index. Add unassigned values to RGBData and
-        // AlphaData if we haven't already.
-        if (*unassignedValueIndex < 0) {
-            if (RGBData) {
-                RGBData->push_back(defaultRGB);
-            }
-            if (AlphaData) {
-                AlphaData->push_back(defaultAlpha);
-            }
-            *unassignedValueIndex = RGBData->size() - 1;
-        }
-
-        // Assign the component the unassigned value index.
-        (*assignmentIndices)[i] = *unassignedValueIndex;
-    }
-
-    return true;
+    return *unassignedValueIndex == 0;
 }
 
 bool
@@ -1210,14 +1143,19 @@ _IsShape(const MDagPath& dagPath) {
 }
 
 SdfPath
-PxrUsdMayaUtil::MDagPathToUsdPath(const MDagPath& dagPath, bool mergeTransformAndShape)
+PxrUsdMayaUtil::MDagPathToUsdPath(const MDagPath& dagPath, bool mergeTransformAndShape, bool stripNamespaces)
 {
-    std::string usdPathStr(dagPath.fullPathName().asChar());
-    std::replace( usdPathStr.begin(), usdPathStr.end(), '|', '/');
+    std::string usdPathStr;
 
-    // We may want to have another option that allows us to drop namespace's
-    // instead of making them part of the path.
-    std::replace( usdPathStr.begin(), usdPathStr.end(), ':', '_'); // replace namespace ":" with "_"
+    if (stripNamespaces) {
+        // drop namespaces instead of making them part of the path
+        MString stripped = PxrUsdMayaUtil::stripNamespaces(dagPath.fullPathName());
+        usdPathStr = stripped.asChar();
+    } else{
+        usdPathStr = dagPath.fullPathName().asChar();
+    }
+    std::replace(usdPathStr.begin(), usdPathStr.end(), '|', '/');
+    std::replace(usdPathStr.begin(), usdPathStr.end(), ':', '_'); // replace namespace ":" with "_"
 
     SdfPath usdPath(usdPathStr);
     if (mergeTransformAndShape && _IsShape(dagPath)) {
@@ -1235,8 +1173,9 @@ bool PxrUsdMayaUtil::GetBoolCustomData(UsdAttribute obj, TfToken key, bool defau
         if (data.IsHolding<bool>()) {
             return data.Get<bool>();
         } else {
-            MGlobal::displayError("Custom Data: " + MString(key.GetText()) +
-                                    " is not of type bool. Skipping...");
+            TF_RUNTIME_ERROR(
+                    "customData at key '%s' is not of type bool. Skipping...",
+                    key.GetText());
         }
     }
     return returnValue;
@@ -1448,4 +1387,176 @@ TfRefPtr<PxrUsdMayaUtil::MDataHandleHolder>
 PxrUsdMayaUtil::GetPlugDataHandle(const MPlug& plug)
 {
     return PxrUsdMayaUtil::MDataHandleHolder::New(plug);
+}
+
+VtDictionary
+PxrUsdMayaUtil::GetDictionaryFromArgDatabase(
+    const MArgDatabase& argData,
+    const VtDictionary& guideDict)
+{
+    // We handle three types of arguments:
+    // 1 - bools: Some bools are actual boolean flags (t/f) in Maya, and others
+    //     are false if omitted, true if present (simple flags).
+    // 2 - strings: Just strings!
+    // 3 - vectors (multi-use args): Try to mimic the way they're passed in the
+    //     Python command API. If single arg per flag, make it a vector of
+    //     strings. Multi arg per flag, vector of vector of strings.
+    VtDictionary args;
+    for (const std::pair<std::string, VtValue>& entry : guideDict) {
+        const std::string& key = entry.first;
+        const VtValue& guideValue = entry.second;
+        if (!argData.isFlagSet(key.c_str())) {
+            continue;
+        }
+
+        // The usdExport command must handle bools, strings, and vectors.
+        if (guideValue.IsHolding<bool>()) {
+            // The flag should be either 0-arg or 1-arg. If 0-arg, it's true by
+            // virtue of being present (getFlagArgument won't change val). If
+            // it's 1-arg, then getFlagArgument will set the appropriate true
+            // or false value.
+            bool val = true;
+            argData.getFlagArgument(key.c_str(), 0, val);
+            args[key] = val;
+        }
+        else if (guideValue.IsHolding<std::string>()) {
+            const std::string val =
+                    argData.flagArgumentString(key.c_str(), 0).asChar();
+            args[key] = val;
+        }
+        else if (guideValue.IsHolding<std::vector<VtValue>>()) {
+            unsigned int count = argData.numberOfFlagUses(entry.first.c_str());
+            if (!TF_VERIFY(count > 0)) {
+                // There should be at least one use if isFlagSet() = true.
+                continue;
+            }
+
+            std::vector<MArgList> argLists(count);
+            for (unsigned int i = 0; i < count; ++i) {
+                argData.getFlagArgumentList(key.c_str(), i, argLists[i]);
+            }
+
+            // The flag is either 1-arg or multi-arg. If it's 1-arg, make this
+            // a 1-d vector [arg, arg, ...]. If it's multi-arg, make this a
+            // 2-d vector [[arg1, arg2, ...], [arg1, arg2, ...], ...].
+            std::vector<VtValue> val;
+            if (argLists[0].length() == 1) {
+                for (const MArgList& argList : argLists) {
+                    const std::string arg = argList.asString(0).asChar();
+                    val.push_back(VtValue(arg));
+                }
+            }
+            else {
+                for (const MArgList& argList : argLists) {
+                    std::vector<VtValue> subList;
+                    for (unsigned int i = 0; i < argList.length(); ++i) {
+                        const std::string arg = argList.asString(i).asChar();
+                        subList.push_back(VtValue(arg));
+                    }
+                    val.push_back(VtValue(subList));
+                }
+            }
+            args[key] = val;
+        }
+        else {
+            TF_CODING_ERROR("Can't handle type '%s'",
+                    guideValue.GetTypeName().c_str());
+        }
+    }
+
+    return args;
+}
+
+VtValue
+PxrUsdMayaUtil::ParseArgumentValue(
+    const std::string& key,
+    const std::string& value,
+    const VtDictionary& guideDict)
+{
+    // We handle two types of arguments:
+    // 1 - bools: Should be encoded by translator UI as a "1" or "0" string.
+    // 2 - strings: Just strings!
+    // We don't handle any vectors because none of the translator UIs currently
+    // pass around any of the vector flags.
+    auto iter = guideDict.find(key);
+    if (iter != guideDict.end()) {
+        const VtValue& guideValue = iter->second;
+        // The export UI only has boolean and string parameters.
+        if (guideValue.IsHolding<bool>()) {
+            return VtValue(TfUnstringify<bool>(value));
+        }
+        else if (guideValue.IsHolding<std::string>()) {
+            return VtValue(value);
+        }
+    }
+    else {
+        TF_CODING_ERROR("Unknown flag '%s'", key.c_str());
+    }
+
+    return VtValue();
+}
+
+std::vector<std::string>
+PxrUsdMayaUtil::GetAllAncestorMayaNodeTypes(const std::string& ty)
+{
+    const MString inheritedTypesMel = TfStringPrintf(
+            "nodeType -isTypeName -inherited %s", ty.c_str()).c_str();
+    MStringArray inheritedTypes;
+    if (!MGlobal::executeCommand(
+            inheritedTypesMel, inheritedTypes, false, false)) {
+        TF_RUNTIME_ERROR(
+                "Failed to query ancestor types of '%s' via MEL (does the type "
+                "exist?)",
+                ty.c_str());
+        return std::vector<std::string>();
+    }
+
+#if MAYA_API_VERSION < 201800
+    // In older versions of Maya, the MEL command
+    // "nodeType -isTypeName -inherited" returns an empty array (but does not
+    // fail) for some built-in types.
+    // The buggy built-in cases from Maya 2016 have been hard-coded below with
+    // the appropriate ancestors list. (The cases below all work with 2018.)
+    if (inheritedTypes.length() == 0) {
+        if (ty == "file") {
+            return {"shadingDependNode", "texture2d", "file"};
+        }
+        else if (ty == "mesh") {
+            return {
+                "containerBase", "entity", "dagNode", "shape", "geometryShape",
+                "deformableShape", "controlPoint", "surfaceShape", "mesh"
+            };
+        }
+        else if (ty == "nurbsCurve") {
+            return {
+                "containerBase", "entity", "dagNode", "shape", "geometryShape",
+                "deformableShape", "controlPoint", "curveShape", "nurbsCurve"
+            };
+        }
+        else if (ty == "nurbsSurface") {
+            return {
+                "containerBase", "entity", "dagNode", "shape", "geometryShape",
+                "deformableShape", "controlPoint", "surfaceShape",
+                "nurbsSurface"
+            };
+        }
+        else if (ty == "time") {
+            return {"time"};
+        }
+        else {
+            TF_RUNTIME_ERROR(
+                    "Type '%s' exists, but MEL returned empty ancestor type "
+                    "information for it",
+                    ty.c_str());
+            return {ty}; // Best that we can do without ancestor type info.
+        }
+    }
+#endif
+
+    std::vector<std::string> inheritedTypesVector;
+    inheritedTypesVector.reserve(inheritedTypes.length());
+    for (unsigned int i = 0; i < inheritedTypes.length(); ++i) {
+        inheritedTypesVector.push_back(inheritedTypes[i].asChar());
+    }
+    return inheritedTypesVector;
 }

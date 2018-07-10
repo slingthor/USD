@@ -7,6 +7,11 @@
                         "bases": ["GarchImage"],
                         "imageTypes": ["bmp", "exr", "jpg", "png", "tif", "zfile", "tx"],
                         "precedence": 0
+                    },
+                    "Garch_StbImage" : {
+                        "bases": ["GarchImage"],
+                        "imageTypes": ["bmp", "jpg", "png", "tga", "hdr"],
+                        "precedence": -1 
                     }
                 }
             },

@@ -49,4 +49,11 @@ UsdImagingMetalPackageDrawModeShader()
     return drawModeShader;
 }
 
+TfToken
+UsdImagingMetalPackagePreviewSurfaceShader()
+{
+    static TfToken previewSurface = _GetShaderPath("previewSurface.glslfx");
+    return previewSurface;
+}
+
 PXR_NAMESPACE_CLOSE_SCOPE

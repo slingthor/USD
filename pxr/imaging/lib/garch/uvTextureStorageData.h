@@ -26,6 +26,7 @@
 
 #include "pxr/pxr.h"
 #include "pxr/imaging/garch/api.h"
+#include "pxr/imaging/garch/image.h"
 #include "pxr/imaging/garch/baseTextureData.h"
 
 #include "pxr/base/vt/value.h"
@@ -92,7 +93,9 @@ public:
     virtual unsigned char * GetRawBuffer(int mipLevel = 0) const override;
 
     GARCH_API
-    virtual bool Read(int degradeLevel, bool generateMipmap) override;
+    virtual bool Read(int degradeLevel, bool generateMipmap,
+                      GarchImage::ImageOriginLocation originLocation =
+                      GarchImage::OriginUpperLeft) override;
 
     GARCH_API
     virtual bool IsCompressed() const override;

@@ -24,7 +24,7 @@
 #include "pxr/pxr.h"
 #include "usdMaya/translatorModelAssembly.h"
 
-#include "usdMaya/JobArgs.h"
+#include "usdMaya/jobArgs.h"
 #include "usdMaya/primReaderArgs.h"
 #include "usdMaya/primReaderContext.h"
 #include "usdMaya/primWriterArgs.h"
@@ -67,6 +67,7 @@
 #include <string>
 #include <vector>
 
+
 PXR_NAMESPACE_OPEN_SCOPE
 
 
@@ -100,9 +101,9 @@ PxrUsdMayaTranslatorModelAssembly::Create(
 
     UsdPrim prim = stage->DefinePrim(authorPath);
     if (!prim) {
-        MString errorMsg("Failed to create prim for USD reference assembly at path: ");
-        errorMsg += MString(authorPath.GetText());
-        MGlobal::displayError(errorMsg);
+        TF_RUNTIME_ERROR(
+                "Failed to create prim for USD reference assembly at path <%s>",
+                authorPath.GetText());
         return false;
     }
 
@@ -160,21 +161,21 @@ PxrUsdMayaTranslatorModelAssembly::Create(
                 if (refPrimPath.IsRootPrimPath()) {
                     refs.AddReference(SdfReference(refAssetPath, refPrimPath));
                 } else {
-                    MString errorMsg("Not creating reference for assembly node '");
-                    errorMsg += assemblyNode.fullPathName();
-                    errorMsg += "' with non-root prim path: ";
-                    errorMsg += refPrimPath.GetText();
-                    MGlobal::displayError(errorMsg);
+                    TF_RUNTIME_ERROR(
+                            "Not creating reference for assembly node '%s' "
+                            "with non-root prim path <%s>",
+                            assemblyNode.fullPathName().asChar(),
+                            refPrimPath.GetText());
                 }
             }
         } else {
-            MString errorMsg("Could not resolve reference '");
-            errorMsg += refAssetPath.c_str();
-            errorMsg += "'; creating placeholder Xform for <";
-            errorMsg += authorPath.GetText();
-            errorMsg += ">";
-            MGlobal::displayWarning(errorMsg);
-            prim.SetDocumentation(std::string(errorMsg.asChar()));
+            const std::string errorMsg = TfStringPrintf(
+                    "Could not resolve reference '%s'; creating placeholder "
+                    "Xform for <%s>",
+                    refAssetPath.c_str(),
+                    authorPath.GetText());
+            TF_RUNTIME_ERROR(errorMsg);
+            prim.SetDocumentation(errorMsg);
         }
     }
 
@@ -204,7 +205,7 @@ PxrUsdMayaTranslatorModelAssembly::Create(
     }
     else {
         // export all that we can.
-        if (UsdMayaReferenceAssembly* usdRefAssem = 
+        if (UsdMayaReferenceAssembly* usdRefAssem =
             dynamic_cast<UsdMayaReferenceAssembly*>(assemblyNode.userNode())) {
             for (const auto& varSels: usdRefAssem->GetVariantSetSelections()) {
                 const std::string& variantSetName = varSels.first;
@@ -234,9 +235,9 @@ PxrUsdMayaTranslatorModelAssembly::Create(
 static
 bool
 _GetAssetInfo(
-    const UsdPrim& prim,
-    std::string* assetIdentifier,
-    SdfPath* assetPrimPath)
+        const UsdPrim& prim,
+        std::string* assetIdentifier,
+        SdfPath* assetPrimPath)
 {
     UsdModelAPI usdModel(prim);
     SdfAssetPath identifier;
@@ -253,9 +254,9 @@ _GetAssetInfo(
 static
 bool
 _GetReferenceInfo(
-    const UsdPrim& prim,
-    std::string* assetIdentifier,
-    SdfPath* assetPrimPath)
+        const UsdPrim& prim,
+        std::string* assetIdentifier,
+        SdfPath* assetPrimPath)
 {
     SdfReferenceListOp refsOp;
     SdfReferenceListOp::ItemVector refs;
@@ -276,10 +277,10 @@ _GetReferenceInfo(
 /* static */
 bool
 PxrUsdMayaTranslatorModelAssembly::ShouldImportAsAssembly(
-    const UsdPrim& usdImportRootPrim,
-    const UsdPrim& prim,
-    std::string* assetIdentifier,
-    SdfPath* assetPrimPath)
+        const UsdPrim& usdImportRootPrim,
+        const UsdPrim& prim,
+        std::string* assetIdentifier,
+        SdfPath* assetPrimPath)
 {
     if (!prim) {
         return false;
@@ -327,25 +328,23 @@ _GetVariantSelections(const UsdPrim& prim)
 /* static */
 bool
 PxrUsdMayaTranslatorModelAssembly::Read(
-    const UsdPrim& prim,
-    const std::string& assetIdentifier,
-    const SdfPath& assetPrimPath,
-    MObject parentNode,
-    const PxrUsdMayaPrimReaderArgs& args,
-    PxrUsdMayaPrimReaderContext* context,
-    const std::string& assemblyTypeName,
-    const TfToken& assemblyRep)
+        const UsdPrim& prim,
+        const std::string& assetIdentifier,
+        const SdfPath& assetPrimPath,
+        MObject parentNode,
+        const PxrUsdMayaPrimReaderArgs& args,
+        PxrUsdMayaPrimReaderContext* context,
+        const TfToken& assemblyRep)
 {
     // This translator does not apply if assemblyRep == "Import".
-    if (assemblyRep == PxrUsdMayaTranslatorTokens->Import) {
+    if (assemblyRep == PxrUsdImportJobArgsTokens->Import) {
         return false;
     }
 
     UsdStageCacheContext stageCacheContext(UsdMayaStageCache::Get());
     UsdStageRefPtr usdStage = UsdStage::Open(assetIdentifier);
     if (!usdStage) {
-        MGlobal::displayError("Cannot open USD file " +
-            MString(assetIdentifier.c_str()));
+        TF_RUNTIME_ERROR("Cannot open USD file %s", assetIdentifier.c_str());
         return false;
     }
 
@@ -359,8 +358,8 @@ PxrUsdMayaTranslatorModelAssembly::Read(
     }
 
     if (!modelPrim) {
-        MGlobal::displayError("Could not find model prim in USD file " +
-            MString(assetIdentifier.c_str()));
+        TF_RUNTIME_ERROR("Could not find model prim in USD file %s",
+                assetIdentifier.c_str());
         return false;
     }
 
@@ -371,7 +370,7 @@ PxrUsdMayaTranslatorModelAssembly::Read(
     const std::string assemblyCmd =
         TfStringPrintf("import maya.cmds; maya.cmds.assembly(name=\'%s\', type=\'%s\')",
                        prim.GetName().GetText(),
-                       assemblyTypeName.c_str());
+                       PxrUsdMayaReferenceAssemblyTokens->MayaTypeName.GetText());
     MString newAssemblyName;
     MStatus status = MGlobal::executePythonCommand(assemblyCmd.c_str(),
                                                    newAssemblyName);
@@ -478,8 +477,7 @@ PxrUsdMayaTranslatorModelAssembly::ReadAsProxy(
     const std::map<std::string, std::string>& variantSetSelections,
     MObject parentNode,
     const PxrUsdMayaPrimReaderArgs& args,
-    PxrUsdMayaPrimReaderContext* context,
-    const std::string& proxyShapeTypeName)
+    PxrUsdMayaPrimReaderContext* context)
 {
     if (!prim) {
         return false;
@@ -502,7 +500,7 @@ PxrUsdMayaTranslatorModelAssembly::ReadAsProxy(
 
     // Create the proxy shape node.
     MDagModifier dagMod;
-    MObject proxyObj = dagMod.createNode(proxyShapeTypeName.c_str(),
+    MObject proxyObj = dagMod.createNode(PxrUsdMayaProxyShapeTokens->MayaTypeName.GetText(),
                                          transformObj,
                                          &status);
     CHECK_MSTATUS_AND_RETURN(status, false);
@@ -559,5 +557,5 @@ PxrUsdMayaTranslatorModelAssembly::ReadAsProxy(
     return true;
 }
 
-PXR_NAMESPACE_CLOSE_SCOPE
 
+PXR_NAMESPACE_CLOSE_SCOPE

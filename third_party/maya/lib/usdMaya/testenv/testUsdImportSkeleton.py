@@ -22,7 +22,6 @@
 # KIND, either express or implied. See the Apache License for the specific
 # language governing permissions and limitations under the Apache License.
 #
-
 import unittest, os
 
 from pxr import Gf, Usd, UsdSkel
@@ -150,7 +149,7 @@ class testUsdImportSkeleton(unittest.TestCase):
             else:
                 self.assertEqual(connections, [u"%s.world"%name])
 
-        self.assertTrue(cmds.getAttr("bindPose.bindPose"))
+        self.assertTrue(cmds.getAttr("%s.bindPose"%name))
 
 
     def _ValidateMeshTransform(self, name, usdSkinningQuery):
@@ -242,7 +241,11 @@ class testUsdImportSkeleton(unittest.TestCase):
         self.assertTrue(bindingSitePrim.IsA(UsdSkel.Root))
         
         skelCache.Populate(UsdSkel.Root(bindingSitePrim))
-        skelQuery = skelCache.GetSkelQuery(bindingSitePrim)
+
+        skel = UsdSkel.Skeleton.Get(stage, "/Root/Skeleton")
+        self.assertTrue(skel)
+
+        skelQuery = skelCache.GetSkelQuery(skel)
         self.assertTrue(skelQuery)
 
         meshPrim = stage.GetPrimAtPath("/Root/Cube")
@@ -259,18 +262,19 @@ class testUsdImportSkeleton(unittest.TestCase):
         self._ValidateJointTransforms(skelQuery, joints)
         self._ValidateJointBindPoses(skelQuery, joints)
 
-        self._ValidateBindPose("bindPose", skelQuery, joints)
+        self._ValidateBindPose("Skeleton_bindPose", skelQuery, joints)
 
         self._ValidateMeshTransform(meshPrim.GetName(), skinningQuery)
 
-        self._ValidateSkinClusterRig(joints=joints,
-                                     skinClusterName="skinCluster1",
-                                     groupPartsName="skinClusterGroupParts",
-                                     groupIdName="skinClusterGroupId",
-                                     bindPoseName="bindPose",
-                                     meshName=meshPrim.GetName(),
-                                     usdSkelQuery=skelQuery,
-                                     usdSkinningQuery=skinningQuery)
+        self._ValidateSkinClusterRig(
+            joints=joints,
+            skinClusterName="skinCluster_{}".format(meshPrim.GetName()),
+            groupPartsName="skinClusterGroupParts",
+            groupIdName="skinClusterGroupId",
+            bindPoseName="Skeleton_bindPose",
+            meshName=meshPrim.GetName(),
+            usdSkelQuery=skelQuery,
+            usdSkinningQuery=skinningQuery)
 
 
 if __name__ == '__main__':

@@ -22,14 +22,15 @@
 // language governing permissions and limitations under the Apache License.
 //
 #include "pxr/pxr.h"
-#include "usdMaya/colorSpace.h"
 #include "usdMaya/writeUtil.h"
+
+#include "usdMaya/colorSpace.h"
 #include "usdMaya/translatorUtil.h"
-#include "usdMaya/UserTaggedAttribute.h"
+#include "usdMaya/adaptor.h"
+#include "usdMaya/userTaggedAttribute.h"
 
 #include "pxr/base/gf/gamma.h"
 #include "pxr/base/gf/rotation.h"
-#include "pxr/base/tf/stringUtils.h"
 #include "pxr/base/tf/token.h"
 #include "pxr/base/vt/types.h"
 #include "pxr/base/tf/envSetting.h"
@@ -61,7 +62,7 @@
 #include <maya/MFnTypedAttribute.h>
 #include <maya/MFnUnitAttribute.h>
 #include <maya/MFnVectorArrayData.h>
-#include <maya/MGlobal.h>
+#include <maya/MFnAttribute.h>
 #include <maya/MMatrix.h>
 #include <maya/MPlug.h>
 #include <maya/MPoint.h>
@@ -172,7 +173,12 @@ PxrUsdMayaWriteUtil::GetUsdTypeName(
     // will fall through to the numericDataType switch below.
     switch (typedDataType) {
         case MFnData::kString:
-            return SdfValueTypeNames->String;
+            // If the attribute is marked as a filename, then return Asset
+            if (MFnAttribute(attrObj).isUsedAsFilename()) {
+                return SdfValueTypeNames->Asset;
+            } else {
+                return SdfValueTypeNames->String;
+            }
             break;
         case MFnData::kMatrix:
             // This must be a Matrix4d even if
@@ -326,10 +332,10 @@ PxrUsdMayaWriteUtil::GetOrCreateUsdAttr(
 
     TfToken usdAttrNameToken(attrName);
     if (usdAttrNameToken.IsEmpty()) {
-        MGlobal::displayError(
-            TfStringPrintf("Invalid USD attribute name '%s' for Maya plug '%s'",
-                           attrName.c_str(),
-                           attrPlug.name().asChar()).c_str());
+        TF_RUNTIME_ERROR(
+                "Invalid USD attribute name '%s' for Maya plug '%s'",
+                attrName.c_str(),
+                attrPlug.name().asChar());
         return usdAttr;
     }
 
@@ -368,10 +374,10 @@ UsdGeomPrimvar PxrUsdMayaWriteUtil::GetOrCreatePrimvar(
 
     TfToken primvarNameToken(primvarName);
     if (primvarNameToken.IsEmpty()) {
-        MGlobal::displayError(
-            TfStringPrintf("Invalid primvar name '%s' for Maya plug '%s'",
-                           primvarName.c_str(),
-                           attrPlug.name().asChar()).c_str());
+        TF_RUNTIME_ERROR(
+                "Invalid primvar name '%s' for Maya plug '%s'",
+                primvarName.c_str(),
+                attrPlug.name().asChar());
         return primvar;
     }
 
@@ -412,10 +418,10 @@ UsdAttribute PxrUsdMayaWriteUtil::GetOrCreateUsdRiAttribute(
 
     TfToken riAttrNameToken(attrName);
     if (riAttrNameToken.IsEmpty()) {
-        MGlobal::displayError(
-            TfStringPrintf("Invalid UsdRi attribute name '%s' for Maya plug '%s'",
-                           attrName.c_str(),
-                           attrPlug.name().asChar()).c_str());
+        TF_RUNTIME_ERROR(
+                "Invalid UsdRi attribute name '%s' for Maya plug '%s'",
+                attrName.c_str(),
+                attrPlug.name().asChar());
         return usdAttr;
     }
 
@@ -463,9 +469,9 @@ _SetAttribute(const UsdAttribute& usdAttr,
 template <typename T>
 static VtValue
 _ConvertVec(
-        const SdfValueTypeName& typeName,
+        const TfToken& role,
         const T& val) {
-    return VtValue(typeName.GetRole() == SdfValueRoleNames->Color
+    return VtValue(role == SdfValueRoleNames->Color
             ? PxrUsdMayaColorSpace::ConvertMayaToLinear(val)
             : val);
 }
@@ -474,6 +480,16 @@ VtValue
 PxrUsdMayaWriteUtil::GetVtValue(
         const MPlug& attrPlug,
         const SdfValueTypeName& typeName)
+{
+    const TfType type = typeName.GetType();
+    const TfToken role = typeName.GetRole();;
+    return GetVtValue(attrPlug, type, role);
+}
+VtValue
+PxrUsdMayaWriteUtil::GetVtValue(
+        const MPlug& attrPlug,
+        const TfType& type,
+        const TfToken& role)
 {
     // We perform a similar set of type-infererence acrobatics here as we do up
     // above in GetUsdTypeName(). See the comments there for more detail on a
@@ -502,8 +518,6 @@ PxrUsdMayaWriteUtil::GetVtValue(
     // the type, e.g. we import normal3f/vector3f/float3 the same.
     // We do care about colors and points because those can be specially-marked
     // in Maya.
-    const TfType type = typeName.GetType();
-
     switch (typedDataType) {
         case MFnData::kString: {
             MFnStringData stringDataFn(attrPlug.asMObject());
@@ -543,6 +557,26 @@ PxrUsdMayaWriteUtil::GetVtValue(
                     usdVal[i] = TfToken(stringArrayDataFn[i].asChar());
                 }
                 return VtValue(usdVal);
+            }
+            else if (type.IsA<SdfStringListOp>()) {
+                MFnStringArrayData stringArrayDataFn(attrPlug.asMObject());
+                std::vector<std::string> prepended(stringArrayDataFn.length());
+                for (unsigned int i = 0; i < stringArrayDataFn.length(); ++i) {
+                    prepended[i] = std::string(stringArrayDataFn[i].asChar());
+                }
+                SdfStringListOp listOp;
+                listOp.SetPrependedItems(prepended);
+                return VtValue(listOp);
+            }
+            else if (type.IsA<SdfTokenListOp>()) {
+                MFnStringArrayData stringArrayDataFn(attrPlug.asMObject());
+                TfTokenVector prepended(stringArrayDataFn.length());
+                for (unsigned int i = 0; i < stringArrayDataFn.length(); ++i) {
+                    prepended[i] = TfToken(stringArrayDataFn[i].asChar());
+                }
+                SdfTokenListOp listOp;
+                listOp.SetPrependedItems(prepended);
+                return VtValue(listOp);
             }
             break;
         }
@@ -728,8 +762,7 @@ PxrUsdMayaWriteUtil::GetVtValue(
                 float tmp1, tmp2, tmp3;
                 MFnNumericData numericDataFn(attrPlug.asMObject());
                 numericDataFn.getData(tmp1, tmp2, tmp3);
-                return _ConvertVec(typeName,
-                        GfVec3f(tmp1, tmp2, tmp3));
+                return _ConvertVec(role, GfVec3f(tmp1, tmp2, tmp3));
             }
             break;
         }
@@ -758,11 +791,10 @@ PxrUsdMayaWriteUtil::GetVtValue(
             MFnNumericData numericDataFn(attrPlug.asMObject());
             numericDataFn.getData(tmp1, tmp2, tmp3);
             if (type.IsA<GfVec3f>()) {
-                return _ConvertVec(typeName,
+                return _ConvertVec(role,
                         GfVec3f((float)tmp1, (float)tmp2, (float)tmp3));
             } else if (type.IsA<GfVec3d>()) {
-                return _ConvertVec(typeName,
-                        GfVec3d(tmp1, tmp2, tmp3));
+                return _ConvertVec(role, GfVec3d(tmp1, tmp2, tmp3));
             }
             break;
         }
@@ -771,14 +803,13 @@ PxrUsdMayaWriteUtil::GetVtValue(
             MFnNumericData numericDataFn(attrPlug.asMObject());
             numericDataFn.getData(tmp1, tmp2, tmp3, tmp4);
             if (type.IsA<GfVec4f>()) {
-                return _ConvertVec(typeName,
+                return _ConvertVec(role,
                         GfVec4f((float)tmp1,
                                 (float)tmp2,
                                 (float)tmp3,
                                 (float)tmp4));
             } else if (type.IsA<GfVec4d>()) {
-                return _ConvertVec(typeName,
-                        GfVec4d(tmp1, tmp2, tmp3, tmp4));
+                return _ConvertVec(role, GfVec4d(tmp1, tmp2, tmp3, tmp4));
             } else if (type.IsA<GfQuatf>()) {
                 float re = tmp1;
                 GfVec3f im(tmp2, tmp3, tmp4);
@@ -895,10 +926,10 @@ PxrUsdMayaWriteUtil::WriteUserExportedAttributes(
                     PxrUsdMayaUserTaggedAttributeTokens->USDAttrTypePrimvar) {
             UsdGeomImageable imageable(usdPrim);
             if (!imageable) {
-                MGlobal::displayError(
-                    TfStringPrintf(
-                        "Cannot create primvar for non-UsdGeomImageable USD prim: '%s'",
-                        usdPrim.GetPath().GetText()).c_str());
+                TF_RUNTIME_ERROR(
+                        "Cannot create primvar for non-UsdGeomImageable USD "
+                        "prim <%s>",
+                        usdPrim.GetPath().GetText());
                 continue;
             }
             UsdGeomPrimvar primvar =
@@ -932,21 +963,137 @@ PxrUsdMayaWriteUtil::WriteUserExportedAttributes(
                                                  usdAttr,
                                                  usdTime,
                                                  valueWriter)) {
-                MGlobal::displayError(
-                    TfStringPrintf("Could not set value for attribute: '%s'",
-                                   usdAttr.GetPath().GetText()).c_str());
+                TF_RUNTIME_ERROR(
+                        "Could not set value for attribute <%s>",
+                        usdAttr.GetPath().GetText());
                 continue;
             }
         } else {
-            MGlobal::displayError(
-                TfStringPrintf("Could not create attribute '%s' for USD prim: '%s'",
-                               usdAttrName.c_str(),
-                               usdPrim.GetPath().GetText()).c_str());
-                continue;
+            TF_RUNTIME_ERROR(
+                    "Could not create attribute '%s' for USD prim <%s>",
+                    usdAttrName.c_str(),
+                    usdPrim.GetPath().GetText());
+            continue;
         }
     }
 
     return true;
+}
+
+/* static */
+bool
+PxrUsdMayaWriteUtil::WriteMetadataToPrim(
+    const MObject& mayaObject,
+    const UsdPrim& prim)
+{
+    PxrUsdMayaAdaptor adaptor(mayaObject);
+    if (!adaptor) {
+        return false;
+    }
+
+    for (const auto& keyValue : adaptor.GetAllAuthoredMetadata()) {
+        prim.SetMetadata(keyValue.first, keyValue.second);
+    }
+    return true;
+}
+
+/* static */
+bool
+PxrUsdMayaWriteUtil::WriteAPISchemaAttributesToPrim(
+    const MObject& mayaObject,
+    const UsdPrim& prim,
+    UsdUtilsSparseValueWriter *valueWriter)    
+{
+    PxrUsdMayaAdaptor adaptor(mayaObject);
+    if (!adaptor) {
+        return false;
+    }
+
+    for (const TfToken& schemaName : adaptor.GetAppliedSchemas()) {
+        if (const PxrUsdMayaAdaptor::SchemaAdaptor schemaAdaptor =
+                adaptor.GetSchemaByName(schemaName)) {
+            for (const TfToken& attrName :
+                    schemaAdaptor.GetAuthoredAttributeNames()) {
+                if (const PxrUsdMayaAdaptor::AttributeAdaptor attrAdaptor =
+                        schemaAdaptor.GetAttribute(attrName)) {
+                    VtValue value;
+                    if (attrAdaptor.Get(&value)) {
+                        const SdfAttributeSpecHandle attrDef =
+                                attrAdaptor.GetAttributeDefinition();
+                        UsdAttribute attr = prim.CreateAttribute(
+                                    attrDef->GetNameToken(),
+                                    attrDef->GetTypeName(),
+                                    /*custom*/ false,
+                                    attrDef->GetVariability());
+                        const UsdTimeCode usdTime = UsdTimeCode::Default();
+                        _SetAttribute(attr, value, usdTime, valueWriter);
+                    }
+                }
+            }
+        }
+    }
+    return true;
+}
+
+/* static */
+size_t
+PxrUsdMayaWriteUtil::WriteSchemaAttributesToPrim(
+    const MObject& shapeObject,
+    const MObject& transformObject,
+    const UsdPrim& prim,
+    const TfType& schemaType,
+    const std::vector<TfToken>& attributeNames,
+    const UsdTimeCode& usdTime,
+    UsdUtilsSparseValueWriter *valueWriter)
+{
+    PxrUsdMayaAdaptor::SchemaAdaptor shapeSchema;
+    if (PxrUsdMayaAdaptor adaptor = PxrUsdMayaAdaptor(shapeObject)) {
+        shapeSchema = adaptor.GetSchemaOrInheritedSchema(schemaType);
+    }
+    PxrUsdMayaAdaptor::SchemaAdaptor transformSchema;
+    if (PxrUsdMayaAdaptor adaptor = PxrUsdMayaAdaptor(transformObject)) {
+        transformSchema = adaptor.GetSchemaOrInheritedSchema(schemaType);
+    }
+    if (!shapeSchema && !transformSchema) {
+        return 0;
+    }
+
+    size_t count = 0;
+    for (const TfToken& attrName : attributeNames) {
+        VtValue value;
+        SdfAttributeSpecHandle attrDef;
+
+        // Prefer value on shape node.
+        if (shapeSchema) {
+            if (PxrUsdMayaAdaptor::AttributeAdaptor attr =
+                    shapeSchema.GetAttribute(attrName)) {
+                attr.Get(&value);
+                attrDef = attr.GetAttributeDefinition();
+            }
+        }
+
+        // If we don't have a value yet, go on to the transform.
+        if (value.IsEmpty() && transformSchema) {
+            if (PxrUsdMayaAdaptor::AttributeAdaptor attr =
+                    transformSchema.GetAttribute(attrName)) {
+                attr.Get(&value);
+                attrDef = attr.GetAttributeDefinition();
+            }
+        }
+
+        if (!value.IsEmpty() && attrDef) {
+            UsdAttribute attr = prim.CreateAttribute(
+                    attrDef->GetNameToken(),
+                    attrDef->GetTypeName(),
+                    /*custom*/ false,
+                    attrDef->GetVariability());
+            if (_SetAttribute(attr, value, usdTime, valueWriter)) {
+                count++;
+            }
+        }
+    }
+
+    return count;
 }
 
 // static
@@ -1001,10 +1148,40 @@ PxrUsdMayaWriteUtil::WriteArrayAttrsToInstancer(
 {
     MStatus status;
 
-    // All Maya instancers should provide id's (though this isn't
-    // required by UsdGeomPointInstancer). We need to know the id's attr
-    // in order to figure out how many instances there are.
-    size_t numInstances = 0;
+    // We need to figure out how many instances there are. Some arrays are
+    // sparse (contain less values than there are instances), so just loop
+    // through all the arrays and assume that there are as many instances as the
+    // size of the largest array.
+    unsigned int numInstances = 0;
+    const MStringArray channels = inputPointsData.list();
+    for (unsigned int i = 0; i < channels.length(); ++i) {
+        MFnArrayAttrsData::Type type;
+        if (inputPointsData.checkArrayExist(channels[i], type)) {
+            switch (type) {
+                case MFnArrayAttrsData::kVectorArray: {
+                    MVectorArray arr = inputPointsData.vectorArray(channels[i]);
+                    numInstances = std::max(numInstances, arr.length());
+                } break;
+                case MFnArrayAttrsData::kDoubleArray: {
+                    MDoubleArray arr = inputPointsData.doubleArray(channels[i]);
+                    numInstances = std::max(numInstances, arr.length());
+                } break;
+                case MFnArrayAttrsData::kIntArray: {
+                    MIntArray arr = inputPointsData.intArray(channels[i]);
+                    numInstances = std::max(numInstances, arr.length());
+                } break;
+                case MFnArrayAttrsData::kStringArray: {
+                    MStringArray arr = inputPointsData.stringArray(channels[i]);
+                    numInstances = std::max(numInstances, arr.length());
+                } break;
+                default: break;
+            }
+        }
+    }
+
+    // Most Maya instancer data sources provide id's. If this once doesn't, then
+    // just skip the id's attr because it's optional in USD, and we don't have
+    // a good way to generate sane id's.
     MFnArrayAttrsData::Type type;
     if (inputPointsData.checkArrayExist("id", type) &&
             type == MFnArrayAttrsData::kDoubleArray) {
@@ -1018,11 +1195,9 @@ PxrUsdMayaWriteUtil::WriteArrayAttrsToInstancer(
                 return (int64_t) x;
             });
         _SetAttribute(instancer.CreateIdsAttr(), vtArray, usdTime, valueWriter);
-        numInstances = vtArray.size();
     }
     else {
-        TF_WARN("Missing 'id' array attribute on instancer");
-        return false;
+        // Skip.
     }
 
     // Export the rest of the per-instance array attrs.
@@ -1280,6 +1455,55 @@ PxrUsdMayaWriteUtil::ReadMayaAttribute(
     }
 
     return false;
+}
+
+std::vector<double>
+PxrUsdMayaWriteUtil::GetTimeSamples(
+        const GfInterval& frameRange,
+        const std::set<double>& subframeOffsets,
+        const double stride)
+{
+    std::vector<double> samples;
+
+    // Error if stride is <= 0.0.
+    if (stride <= 0.0) {
+        TF_RUNTIME_ERROR("stride (%f) is not greater than 0", stride);
+        return samples;
+    }
+
+    // Only warn if subframe offsets are outside the stride. Resulting time
+    // samples are still sane.
+    for (const double t : subframeOffsets) {
+        if (t <= -stride) {
+            TF_WARN("subframe offset (%f) <= -stride (-%f)", t, stride);
+        }
+        else if (t >= stride) {
+            TF_WARN("subframe offset (%f) >= stride (%f)", t, stride);
+        }
+    }
+
+    // Early-out if this is an empty range.
+    if (frameRange.IsEmpty()) {
+        return samples;
+    }
+
+    // Iterate over all possible times and sample offsets.
+    static const std::set<double> zeroOffset = {0.0};
+    const std::set<double>& actualOffsets = subframeOffsets.empty() ?
+            zeroOffset : subframeOffsets;
+    double currentTime = frameRange.GetMin();
+    while (frameRange.Contains(currentTime)) {
+        for (const double offset : actualOffsets) {
+            samples.push_back(currentTime + offset);
+        }
+        currentTime += stride;
+    }
+
+    // Need to sort list before returning to make sure it's in time order.
+    // This is mainly important for if there's a subframe offset outside the
+    // interval (-stride, stride).
+    std::sort(samples.begin(), samples.end());
+    return samples;
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

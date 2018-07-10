@@ -34,6 +34,9 @@ PXR_NAMESPACE_OPEN_SCOPE
 USDIMAGINGMETAL_API
 TfToken UsdImagingMetalPackageDrawModeShader();
 
+USDIMAGINGMETAL_API
+TfToken UsdImagingMetalPackagePreviewSurfaceShader();
+
 PXR_NAMESPACE_CLOSE_SCOPE
 
 #endif // USDIMAGINGMETAL_PACKAGE_H

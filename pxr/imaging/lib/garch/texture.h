@@ -28,6 +28,7 @@
 
 #include "pxr/pxr.h"
 #include "pxr/imaging/garch/api.h"
+#include "pxr/imaging/garch/image.h"
 #include "pxr/base/tf/declarePtrs.h"
 #include "pxr/base/tf/refPtr.h"
 #include "pxr/base/tf/staticTokens.h"
@@ -225,12 +226,22 @@ public:
     GARCH_API
     size_t GetContentsID() const;
 
+    GARCH_API
+    GarchImage::ImageOriginLocation GetOriginLocation() const;
+
+    GARCH_API
+    bool IsOriginLowerLeft() const;
+
 protected:
     GARCH_API
     GarchTexture();
 
     GARCH_API
+    GarchTexture(GarchImage::ImageOriginLocation originLocation);
+
+    GARCH_API
     void _SetMemoryUsed(size_t size);
+    
     GARCH_API
     virtual void _OnSetMemoryRequested(size_t targetMemory);
 
@@ -241,23 +252,30 @@ private:
     size_t _memoryUsed;
     size_t _memoryRequested;
     size_t _contentsID;
+    GarchImage::ImageOriginLocation _originLocation;
 };
 
 class GarchTextureFactoryBase : public TfType::FactoryBase {
 public:
-    virtual GarchTextureRefPtr New(const TfToken& texturePath) const = 0;
-    virtual GarchTextureRefPtr New(const TfTokenVector& texturePaths) const = 0;
+    virtual GarchTextureRefPtr New(const TfToken& texturePath,
+                                   GarchImage::ImageOriginLocation originLocation) const = 0;
+    virtual GarchTextureRefPtr New(const TfTokenVector& texturePaths,
+                                   GarchImage::ImageOriginLocation originLocation) const = 0;
 };
 
 template <class T>
 class GarchTextureFactory : public GarchTextureFactoryBase {
 public:
-    virtual GarchTextureRefPtr New(const TfToken& texturePath) const
+    virtual GarchTextureRefPtr New(const TfToken& texturePath,
+                                   GarchImage::ImageOriginLocation originLocation =
+                                                GarchImage::OriginUpperLeft) const
     {
         return T::New(texturePath);
     }
 
-    virtual GarchTextureRefPtr New(const TfTokenVector& texturePaths) const
+    virtual GarchTextureRefPtr New(const TfTokenVector& texturePaths,
+                                   GarchImage::ImageOriginLocation originLocation =
+                                                GarchImage::OriginUpperLeft) const
     {
         return TfNullPtr;
     }

@@ -85,11 +85,13 @@ GarchArrayTextureRefPtr GlfResourceFactory::NewArrayTexture(TfTokenVector const 
                                                             unsigned int cropTop,
                                                             unsigned int cropBottom,
                                                             unsigned int cropLeft,
-                                                            unsigned int cropRight) const
+                                                            unsigned int cropRight,
+                                                            GarchImage::ImageOriginLocation originLocation) const
 {
     return TfCreateRefPtr(new GlfArrayTexture(imageFilePaths, arraySize,
                                               cropTop, cropBottom,
-                                              cropLeft, cropRight));
+                                              cropLeft, cropRight,
+                                              originLocation));
 }
 
 GarchBaseTexture *GlfResourceFactory::NewBaseTexture() const

@@ -143,7 +143,7 @@ public:
         virtual void DebugDump(std::ostream &out) const override;
         
         HD_API
-        virtual void AddBufferSpecs(HdBufferSpecVector *specs) const override {}
+        virtual void GetBufferSpecs(HdBufferSpecVector *specs) const override {}
 
         /// Set the relative offset for this range.
         void SetIndex(int index) {

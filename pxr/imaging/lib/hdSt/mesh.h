@@ -42,7 +42,6 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 class HdStDrawItem;
 class HdSceneDelegate;
-class HdStMaterial;
 
 typedef boost::shared_ptr<class Hd_VertexAdjacency> Hd_VertexAdjacencySharedPtr;
 typedef boost::shared_ptr<class HdSt_MeshTopology> HdSt_MeshTopologySharedPtr;
@@ -73,6 +72,8 @@ public:
                       TfToken const   &reprName,
                       bool             forcedRepr) override;
 
+    virtual HdDirtyBits GetInitialDirtyBitsMask() const override;
+
     /// Topology (member) getter
     HDST_API
     virtual HdMeshTopologySharedPtr GetTopology() const override;
@@ -96,6 +97,8 @@ protected:
     bool _UseQuadIndices(const HdRenderIndex &renderIndex,
                          HdSt_MeshTopologySharedPtr const & topology) const;
 
+    bool _UseLimitRefinement(const HdRenderIndex &renderIndex) const;
+
     void _UpdateDrawItem(HdSceneDelegate *sceneDelegate,
                          HdStDrawItem *drawItem,
                          HdDirtyBits *dirtyBits,
@@ -104,7 +107,8 @@ protected:
 
     void _UpdateDrawItemGeometricShader(HdSceneDelegate *sceneDelegate,
                                         HdStDrawItem *drawItem,
-                                        const HdMeshReprDesc &desc);
+                                        const HdMeshReprDesc &desc,
+                                        size_t drawItemIdForDesc);
 
     void _PopulateTopology(HdSceneDelegate *sceneDelegate,
                            HdStDrawItem *drawItem,
@@ -129,7 +133,6 @@ protected:
 
     int _GetRefineLevelForDesc(HdMeshReprDesc desc) const;
 
-    virtual HdDirtyBits _GetInitialDirtyBits() const override;
     virtual HdDirtyBits _PropagateDirtyBits(HdDirtyBits bits) const override;
 
     virtual void _InitRepr(TfToken const &reprName,
@@ -157,6 +160,8 @@ private:
     HdDirtyBits _customDirtyBitsInUse;
     bool _doubleSided;
     bool _packedNormals;
+    bool _smoothNormalsEnabled;
+    bool _displacementEnabled;
     HdCullStyle _cullStyle;
 };
 

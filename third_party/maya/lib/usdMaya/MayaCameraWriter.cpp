@@ -24,7 +24,9 @@
 #include "pxr/pxr.h"
 #include "usdMaya/MayaCameraWriter.h"
 
-#include "usdMaya/JobArgs.h"
+#include "usdMaya/adaptor.h"
+#include "usdMaya/jobArgs.h"
+#include "usdMaya/primWriterRegistry.h"
 #include "usdMaya/util.h"
 
 #include "pxr/base/gf/vec2f.h"
@@ -38,26 +40,31 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+PXRUSDMAYA_REGISTER_WRITER(camera, MayaCameraWriter);
+PXRUSDMAYA_REGISTER_ADAPTOR_SCHEMA(camera, UsdGeomCamera);
 
-
-MayaCameraWriter::MayaCameraWriter(const MDagPath & iDag, const SdfPath& uPath, usdWriteJobCtx& jobCtx) :
-    MayaTransformWriter(iDag, uPath, false, jobCtx) // cameras are not instanced
+MayaCameraWriter::MayaCameraWriter(
+    const MDagPath & iDag,
+    const SdfPath& uPath,
+    bool instanceSource,
+    usdWriteJobCtx& jobCtx)
+    : MayaTransformWriter(iDag, uPath, instanceSource, jobCtx) 
 {
     UsdGeomCamera primSchema =
-        UsdGeomCamera::Define(getUsdStage(), getUsdPath());
+        UsdGeomCamera::Define(GetUsdStage(), GetUsdPath());
     TF_AXIOM(primSchema);
-    mUsdPrim = primSchema.GetPrim();
-    TF_AXIOM(mUsdPrim);
+    _usdPrim = primSchema.GetPrim();
+    TF_AXIOM(_usdPrim);
 }
 
 /* virtual */
-void MayaCameraWriter::write(const UsdTimeCode &usdTime)
+void MayaCameraWriter::Write(const UsdTimeCode &usdTime)
 {
     // == Write
-    UsdGeomCamera primSchema(mUsdPrim);
+    UsdGeomCamera primSchema(_usdPrim);
 
     // Write parent class attrs
-    writeTransformAttrs(usdTime, primSchema);
+    _WriteXformableAttrs(usdTime, primSchema);
 
     // Write the attrs
     writeCameraAttrs(usdTime, primSchema);
@@ -71,13 +78,13 @@ bool MayaCameraWriter::writeCameraAttrs(const UsdTimeCode &usdTime, UsdGeomCamer
     // - We are at the default time and NO attributes on the shape are animated.
     //    OR
     // - We are at a non-default time and some attribute on the shape IS animated.
-    if (usdTime.IsDefault() == isShapeAnimated()) {
+    if (usdTime.IsDefault() == _IsShapeAnimated()) {
         return true;
     }
 
     MStatus status;
 
-    MFnCamera camFn(getDagPath(), &status);
+    MFnCamera camFn(GetDagPath(), &status);
     CHECK_MSTATUS_AND_RETURN(status, false);
 
     // NOTE: We do not use a GfCamera and then call SetFromCamera() below
@@ -112,10 +119,12 @@ bool MayaCameraWriter::writeCameraAttrs(const UsdTimeCode &usdTime, UsdGeomCamer
         const double verticalAperture = PxrUsdMayaUtil::ConvertInchesToMM(
             camFn.verticalFilmAperture());
 
+        // Film offset and shake (when enabled) have the same effect on film back
         const double horizontalApertureOffset = PxrUsdMayaUtil::ConvertInchesToMM(
-            camFn.horizontalFilmOffset());
+            (camFn.shakeEnabled() ?
+             camFn.horizontalFilmOffset() + camFn.horizontalShake() : camFn.horizontalFilmOffset()));
         const double verticalApertureOffset = PxrUsdMayaUtil::ConvertInchesToMM(
-            camFn.verticalFilmOffset());
+            (camFn.shakeEnabled() ? camFn.verticalFilmOffset() + camFn.verticalShake() : camFn.verticalFilmOffset()));
 
         _SetAttribute(primSchema.GetHorizontalApertureAttr(), 
                       static_cast<float>(horizontalAperture), usdTime);

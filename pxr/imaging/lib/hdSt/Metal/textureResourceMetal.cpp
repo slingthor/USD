@@ -43,24 +43,26 @@ TF_DEFINE_PRIVATE_TOKENS(
 );
 
 HdStSimpleTextureResourceMetal::HdStSimpleTextureResourceMetal(
-    GarchTextureHandleRefPtr const &textureHandle, bool isPtex):
+    GarchTextureHandleRefPtr const &textureHandle, bool isPtex, size_t memoryRequest):
         HdStSimpleTextureResourceMetal(textureHandle, isPtex,
             /*wrapS*/ HdWrapUseMetaDict, /*wrapT*/ HdWrapUseMetaDict, 
             /*minFilter*/ HdMinFilterNearestMipmapLinear, 
-            /*magFilter*/ HdMagFilterLinear)
+            /*magFilter*/ HdMagFilterLinear, memoryRequest)
 {
 }
 
 HdStSimpleTextureResourceMetal::HdStSimpleTextureResourceMetal(
     GarchTextureHandleRefPtr const &textureHandle, bool isPtex,
         HdWrap wrapS, HdWrap wrapT,
-        HdMinFilter minFilter, HdMagFilter magFilter)
+        HdMinFilter minFilter, HdMagFilter magFilter,
+        size_t memoryRequest)
             : _textureHandle(textureHandle)
             , _texture(textureHandle->GetTexture())
             , _borderColor(0.0,0.0,0.0,0.0)
             , _maxAnisotropy(16.0)
             , _sampler()
             , _isPtex(isPtex)
+            , _memoryRequest(memoryRequest)
 {
     TF_FATAL_CODING_ERROR("Not Implemented");
     /*
@@ -128,6 +130,8 @@ HdStSimpleTextureResourceMetal::HdStSimpleTextureResourceMetal(
 
 HdStSimpleTextureResourceMetal::~HdStSimpleTextureResourceMetal()
 {
+    _textureHandle->DeleteMemoryRequest(_memoryRequest);
+
     if (!_isPtex) {
         [_sampler release];
     }

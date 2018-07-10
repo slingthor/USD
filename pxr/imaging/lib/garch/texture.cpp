@@ -51,6 +51,15 @@ GarchTexture::GarchTexture( )
     : _memoryUsed(0)
     , _memoryRequested(INT_MAX)
     , _contentsID(_GetNewContentsID())
+    , _originLocation(GarchImage::OriginUpperLeft)
+{
+}
+
+GarchTexture::GarchTexture(GarchImage::ImageOriginLocation originLocation)
+    : _memoryUsed(0)
+    , _memoryRequested(INT_MAX)
+    , _contentsID(_GetNewContentsID())
+    , _originLocation(originLocation)
 {
 }
 
@@ -122,6 +131,18 @@ void
 GarchTexture::_UpdateContentsID()
 {
     _contentsID = _GetNewContentsID();
+}
+
+GarchImage::ImageOriginLocation
+GarchTexture::GetOriginLocation() const
+{
+    return _originLocation;
+}
+
+bool
+GarchTexture::IsOriginLowerLeft() const
+{
+    return _originLocation == GarchImage::OriginLowerLeft;
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

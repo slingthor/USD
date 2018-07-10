@@ -25,10 +25,13 @@
 #define PXRUSDMAYA_USDWRITEJOBCTX_H
 
 #include "pxr/pxr.h"
-#include "pxr/usd/sdf/path.h"
+
 #include "usdMaya/api.h"
+#include "usdMaya/jobArgs.h"
+#include "usdMaya/primWriterRegistry.h"
 #include "usdMaya/skelBindingsWriter.h"
-#include "usdMaya/JobArgs.h"
+
+#include "pxr/usd/sdf/path.h"
 
 #include <maya/MDagPath.h>
 #include <maya/MObjectHandle.h>
@@ -46,16 +49,16 @@ class usdWriteJob;
 /// \brief Provides basic functionality and access to shared data for MayaPrimWriters.
 ///
 /// The main purpose of this class is to handle source prim creation for instancing,
-/// and to avoid storing the JobExportArgs and UsdStage on each prim writer.
+/// and to avoid storing the PxrUsdMayaJobExportArgs and UsdStage on each prim writer.
 ///
 class usdWriteJobCtx {
 protected:
     friend class usdWriteJob;
 
     PXRUSDMAYA_API
-    usdWriteJobCtx(const JobExportArgs& args);
+    usdWriteJobCtx(const PxrUsdMayaJobExportArgs& args);
 public:
-    const JobExportArgs& getArgs() const { return mArgs; };
+    const PxrUsdMayaJobExportArgs& getArgs() const { return mArgs; };
     const UsdStageRefPtr& getUsdStage() const { return mStage; };
     // Queries the master path for instancing.
     // This also creates the master shape if it doesn't exist.
@@ -86,7 +89,7 @@ protected:
     PXRUSDMAYA_API
     void processInstances();
 
-    JobExportArgs mArgs;
+    PxrUsdMayaJobExportArgs mArgs;
     // List of the primitive writers to iterate over
     std::vector<MayaPrimWriterPtr> mMayaPrimWriterList;
     // Stage used to write out USD file
@@ -94,6 +97,10 @@ protected:
 private:
     PXRUSDMAYA_API
     SdfPath getUsdPathFromDagPath(const MDagPath& dagPath, bool instanceSource);
+
+    /// Prim writer search with ancestor type resolution behavior.
+    PxrUsdMayaPrimWriterRegistry::WriterFactoryFn _FindWriter(
+            const std::string& mayaNodeType);
 
     struct MObjectHandleComp {
         bool operator()(const MObjectHandle& rhs, const MObjectHandle& lhs) const {
@@ -115,6 +122,12 @@ private:
     SdfPath mParentScopePath;
     bool mNoInstances;
     PxrUsdMaya_SkelBindingsWriter mSkelBindingsWriter;
+    // Cache of node type names mapped to their "resolved" writer factory,
+    // taking into account Maya's type hierarchy (note that this means that
+    // some types not resolved by the PxrUsdMayaPrimWriterRegistry will get
+    // resolved in this map).
+    std::map<std::string, PxrUsdMayaPrimWriterRegistry::WriterFactoryFn>
+            mWriterFactoryCache;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

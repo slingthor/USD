@@ -62,6 +62,7 @@ pxr_library(usdImagingMetal
     RESOURCE_FILES
         plugInfo.json
         shaders/drawMode.glslfx
+        shaders/previewSurface.glslfx
 )
 
 pxr_build_test(testUsdImagingMetalBasicDrawing

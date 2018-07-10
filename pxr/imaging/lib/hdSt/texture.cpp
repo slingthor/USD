@@ -23,20 +23,8 @@
 //
 #include "pxr/imaging/hdSt/texture.h"
 
-#include "pxr/imaging/garch/textureRegistry.h"
-#include "pxr/imaging/garch/textureHandle.h"
-#include "pxr/imaging/garch/uvTextureStorage.h"
-
-#include "pxr/imaging/hd/bufferArrayRange.h"
-#include "pxr/imaging/hd/resource.h"
-#include "pxr/imaging/hd/resourceRegistry.h"
 #include "pxr/imaging/hd/sceneDelegate.h"
 #include "pxr/imaging/hd/textureResource.h"
-#include "pxr/imaging/hdSt/textureResource.h"
-#include "pxr/imaging/hd/tokens.h"
-#include "pxr/imaging/hd/vtBufferSource.h"
-
-#include "pxr/base/gf/vec3d.h"
 
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -56,34 +44,7 @@ HdStTexture::_GetTextureResource( HdSceneDelegate *sceneDelegate,
                                   const SdfPath &sceneID,
                                   HdTextureResource::ID texID) const
 {
-    if (texID == HdTextureResource::ComputeFallbackUVHash()) {
-        GarchUVTextureStorageRefPtr texPtr =
-            GarchUVTextureStorage::New(1,1,VtValue(GfVec3d(0.0, 0.0, 0.0)));
-        GarchTextureHandleRefPtr texture =
-            GarchTextureRegistry::GetInstance().GetTextureHandle(texPtr);
-        texture->AddMemoryRequest(0); 
-        return HdTextureResourceSharedPtr(
-            HdStSimpleTextureResource::New(texture, false));
-    } else if (texID == HdTextureResource::ComputeFallbackPtexHash()) {
-        return sceneDelegate->GetTextureResource(sceneID);
-        // Hacky Ptex Fallback Implementation (nonfunctional)
-        // For future reference
-        /*if (texResource->GetTexelsTextureId() == 0) {
-            // fail to load a texture. use fallback default
-            if (texResource->IsPtex()) {
-                const size_t defaultPtexId = 0x48510398a84ebf94;
-                HdInstance<HdTextureResource::ID, HdStSimpleTextureResourceSharedPtr>
-                    defaultTexInstance = resourceRegistry->RegisterTextureResource(defaultPtexId);
-                if (defaultTexInstance.IsFirstInstance()) {
-                    HdStSimpleTextureResourceSharedPtr defaultTexResource(new Hd_DefaultPtexTextureResource());
-                    defaultTexInstance.SetValue(defaultTexResource);
-                }
-                texResource = defaultTexInstance.GetValue();
-            }
-        }*/
-    } else {
-        return sceneDelegate->GetTextureResource(sceneID);
-    }
+    return sceneDelegate->GetTextureResource(sceneID);
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

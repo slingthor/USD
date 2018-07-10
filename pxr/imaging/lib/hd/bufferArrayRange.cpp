@@ -71,7 +71,7 @@ HdBufferArrayRangeContainer::Get(int index) const
 }
 
 void
-HdBufferArrayRange::AddBufferSpecs(HdBufferSpecVector *specs) const
+HdBufferArrayRange::GetBufferSpecs(HdBufferSpecVector *specs) const
 {
     HD_TRACE_FUNCTION();
     

@@ -94,7 +94,7 @@ HdSt_QuadIndexBuilderComputation::HdSt_QuadIndexBuilderComputation(
 }
 
 void
-HdSt_QuadIndexBuilderComputation::AddBufferSpecs(HdBufferSpecVector *specs) const
+HdSt_QuadIndexBuilderComputation::GetBufferSpecs(HdBufferSpecVector *specs) const
 {
     specs->emplace_back(HdTokens->indices,
                         HdTupleType{HdTypeInt32Vec4, 1});
@@ -234,7 +234,7 @@ HdSt_QuadrangulateTableComputation::Resolve()
 }
 
 void
-HdSt_QuadrangulateTableComputation::AddBufferSpecs(
+HdSt_QuadrangulateTableComputation::GetBufferSpecs(
     HdBufferSpecVector *specs) const
 {
     // quadinfo computation produces an index buffer for quads.
@@ -311,10 +311,10 @@ HdSt_QuadrangulateComputation::Resolve()
 }
 
 void
-HdSt_QuadrangulateComputation::AddBufferSpecs(HdBufferSpecVector *specs) const
+HdSt_QuadrangulateComputation::GetBufferSpecs(HdBufferSpecVector *specs) const
 {
     // produces same spec buffer as source
-    _source->AddBufferSpecs(specs);
+    _source->GetBufferSpecs(specs);
 }
 
 HdTupleType
@@ -384,10 +384,10 @@ HdSt_QuadrangulateFaceVaryingComputation::Resolve()
 }
 
 void
-HdSt_QuadrangulateFaceVaryingComputation::AddBufferSpecs(HdBufferSpecVector *specs) const
+HdSt_QuadrangulateFaceVaryingComputation::GetBufferSpecs(HdBufferSpecVector *specs) const
 {
     // produces same spec buffer as source
-    _source->AddBufferSpecs(specs);
+    _source->GetBufferSpecs(specs);
 }
 
 
@@ -441,7 +441,7 @@ HdSt_QuadrangulateComputationGPU::HdSt_QuadrangulateComputationGPU(
 }
 
 void
-HdSt_QuadrangulateComputationGPU::AddBufferSpecs(HdBufferSpecVector *specs) const
+HdSt_QuadrangulateComputationGPU::GetBufferSpecs(HdBufferSpecVector *specs) const
 {
     // nothing
     //

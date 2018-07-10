@@ -34,7 +34,6 @@
 #include <maya/MFnBlendShapeDeformer.h>
 #include <maya/MFnDagNode.h>
 #include <maya/MFnNurbsCurve.h>
-#include <maya/MGlobal.h>
 #include <maya/MIntArray.h>
 #include <maya/MPlug.h>
 #include <maya/MPointArray.h>
@@ -90,27 +89,26 @@ PxrUsdMayaTranslatorCurves::Create(
     // Only supporting single curve for now.
     // Sanity Checks
     if (curveVertexCounts.size() == 0) {
-        MGlobal::displayError(
-            TfStringPrintf("VertexCount arrays is empty on NURBS curves <%s>. Skipping...", 
-                            prim.GetPath().GetText()).c_str());
+        TF_RUNTIME_ERROR(
+                "vertexCount array is empty on NurbsCurves <%s>. Skipping...",
+                prim.GetPath().GetText());
         return false; // No verts for the curve, so exit
     } else if (curveVertexCounts.size() > 1) {
-        MGlobal::displayWarning(
-            TfStringPrintf("Multiple curves in <%s>. Reading first one...", 
-                            prim.GetPath().GetText()).c_str());
+        TF_WARN("Multiple curves in <%s>. Only reading the first one...", 
+                prim.GetPath().GetText());
     }
 
     int curveIndex = 0;
     curves.GetWidthsAttr().Get(&curveWidths); // not animatable
 
-    // Gather points. If args.GetReadAnimData() is TRUE,
-    // pick the first avaiable sample or default
+    // Gather points. If timeInterval is non-empty, pick the first available
+    // sample in the timeInterval or default.
     UsdTimeCode pointsTimeSample=UsdTimeCode::EarliestTime();
     std::vector<double> pointsTimeSamples;
     size_t numTimeSamples = 0;
-    if (args.GetReadAnimData()) {
-        PxrUsdMayaTranslatorUtil::GetTimeSamples(curves.GetPointsAttr(), args,
-                &pointsTimeSamples);
+    if (!args.GetTimeInterval().IsEmpty()) {
+        curves.GetPointsAttr().GetTimeSamplesInInterval(
+                args.GetTimeInterval(), &pointsTimeSamples);
         numTimeSamples = pointsTimeSamples.size();
         if (numTimeSamples>0) {
             pointsTimeSample = pointsTimeSamples[0];
@@ -119,9 +117,9 @@ PxrUsdMayaTranslatorCurves::Create(
     curves.GetPointsAttr().Get(&points, pointsTimeSample);
     
     if (points.size() == 0) {
-        MGlobal::displayError(
-            TfStringPrintf("Points arrays is empty on NURBS curves <%s>. Skipping...", 
-                            prim.GetPath().GetText()).c_str());
+        TF_RUNTIME_ERROR(
+                "points array is empty on NurbsCurves <%s>. Skipping...",
+                prim.GetPath().GetText());
         return false; // invalid nurbscurves, so exit
     }
 

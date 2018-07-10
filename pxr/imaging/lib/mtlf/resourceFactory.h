@@ -67,7 +67,8 @@ public:
                                                     unsigned int cropTop,
                                                     unsigned int cropBottom,
                                                     unsigned int cropLeft,
-                                                    unsigned int cropRight) const override;
+                                                    unsigned int cropRight,
+                                                    GarchImage::ImageOriginLocation originLocation) const override;
     
     // BaseTexture
     virtual GarchBaseTexture *NewBaseTexture() const override;

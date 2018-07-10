@@ -24,7 +24,10 @@
 #include "usdMaya/MayaLocatorWriter.h"
 
 #include "pxr/pxr.h"
+
 #include "usdMaya/MayaTransformWriter.h"
+#include "usdMaya/adaptor.h"
+#include "usdMaya/primWriterRegistry.h"
 #include "usdMaya/usdWriteJobCtx.h"
 
 #include "pxr/usd/sdf/path.h"
@@ -36,6 +39,8 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+PXRUSDMAYA_REGISTER_WRITER(locator, MayaLocatorWriter);
+PXRUSDMAYA_REGISTER_ADAPTOR_SCHEMA(locator, UsdGeomXform);
 
 MayaLocatorWriter::MayaLocatorWriter(
         const MDagPath& iDag,
@@ -44,27 +49,22 @@ MayaLocatorWriter::MayaLocatorWriter(
         usdWriteJobCtx& jobCtx) :
     MayaTransformWriter(iDag, uPath, instanceSource, jobCtx)
 {
-    UsdGeomXform xformSchema = UsdGeomXform::Define(getUsdStage(),
-                                                    getUsdPath());
+    UsdGeomXform xformSchema = UsdGeomXform::Define(GetUsdStage(),
+                                                    GetUsdPath());
     TF_AXIOM(xformSchema);
 
-    mUsdPrim = xformSchema.GetPrim();
-    TF_AXIOM(mUsdPrim);
-}
-
-/* virtual */
-MayaLocatorWriter::~MayaLocatorWriter()
-{
+    _usdPrim = xformSchema.GetPrim();
+    TF_AXIOM(_usdPrim);
 }
 
 /* virtual */
 void
-MayaLocatorWriter::write(const UsdTimeCode& usdTime)
+MayaLocatorWriter::Write(const UsdTimeCode& usdTime)
 {
-    UsdGeomXform xformSchema(mUsdPrim);
+    UsdGeomXform xformSchema(_usdPrim);
 
     // Write parent class attrs.
-    writeTransformAttrs(usdTime, xformSchema);
+    _WriteXformableAttrs(usdTime, xformSchema);
 }
 
 

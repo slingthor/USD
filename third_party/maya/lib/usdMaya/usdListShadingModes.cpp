@@ -7,7 +7,6 @@
 #include <maya/MStatus.h>
 #include <maya/MArgList.h>
 #include <maya/MArgDatabase.h>
-#include <maya/MGlobal.h>
 #include <maya/MString.h>
 
 #include <mutex>
@@ -28,7 +27,6 @@ usdListShadingModes::doIt(const MArgList& args) {
     MArgDatabase argData(syntax(), args, &status);
 
     if (status != MS::kSuccess) {
-        MGlobal::displayError("Invalid parameters detected. Exiting.");
         return status;
     }
 
@@ -39,19 +37,11 @@ usdListShadingModes::doIt(const MArgList& args) {
         v = PxrUsdMayaShadingModeRegistry::ListImporters();
     }
 
-    // This is remapped in JobArgs.cpp manually
-    appendToResult("None");
+    // Always include the "none" shading mode.
+    appendToResult(PxrUsdMayaShadingModeTokens->none.GetText());
 
     for (const auto& e : v) {
-        // Manual remappings
-        if (e == PxrUsdMayaShadingModeTokens->displayColor) {
-            appendToResult("GPrim Colors");
-            appendToResult("Material Colors");
-        } else if (e == "pxrRis") {
-            appendToResult("RfM Shaders");
-        } else {
-            appendToResult(e.GetString().c_str());
-        }
+        appendToResult(e.GetText());
     }
 
     return MS::kSuccess;

@@ -45,7 +45,8 @@ GarchArrayTextureRefPtr GarchArrayTexture::New(TfTokenVector const &imageFilePat
                                                unsigned int cropTop,
                                                unsigned int cropBottom,
                                                unsigned int cropLeft,
-                                               unsigned int cropRight)
+                                               unsigned int cropRight,
+                                               GarchImage::ImageOriginLocation originLocation)
 {
     if (imageFilePaths.empty()) {
         // Need atleast one valid image file path.
@@ -55,7 +56,8 @@ GarchArrayTextureRefPtr GarchArrayTexture::New(TfTokenVector const &imageFilePat
 
     return GarchResourceFactory::GetInstance()->NewArrayTexture(imageFilePaths, arraySize,
                                                                 cropTop, cropBottom,
-                                                                cropLeft, cropRight);
+                                                                cropLeft, cropRight,
+                                                                originLocation);
 }
 
 
@@ -66,13 +68,15 @@ GarchArrayTexture::New(
     unsigned int cropTop,
     unsigned int cropBottom,
     unsigned int cropLeft,
-    unsigned int cropRight)
+    unsigned int cropRight,
+    GarchImage::ImageOriginLocation originLocation)
 {
     TfTokenVector imageFilePathTokens(imageFilePaths.begin(), imageFilePaths.end());
 
     return GarchResourceFactory::GetInstance()->NewArrayTexture(imageFilePathTokens, arraySize,
                                                                 cropTop, cropBottom,
-                                                                cropLeft, cropRight);
+                                                                cropLeft, cropRight,
+                                                                originLocation);
 }
 
 bool 
@@ -87,14 +91,16 @@ GarchArrayTexture::GarchArrayTexture(
     unsigned int cropTop,
     unsigned int cropBottom,
     unsigned int cropLeft,
-    unsigned int cropRight)
+    unsigned int cropRight,
+    GarchImage::ImageOriginLocation originLocation)
     
     : GarchUVTexture(this,
                      imageFilePaths[0],
                      cropTop,
                      cropBottom,
                      cropLeft,
-                     cropRight),
+                     cropRight,
+                     originLocation),
 
       _imageFilePaths(imageFilePaths),
     _arraySize(arraySize)

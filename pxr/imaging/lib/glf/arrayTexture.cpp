@@ -49,14 +49,18 @@ GlfArrayTexture::GlfArrayTexture(
     unsigned int cropTop,
     unsigned int cropBottom,
     unsigned int cropLeft,
-    unsigned int cropRight)
+    unsigned int cropRight,
+    GarchImage::ImageOriginLocation originLocation)
     
     : GarchArrayTexture(imageFilePaths,
-                        arraySize,
                         cropTop,
                         cropBottom,
                         cropLeft,
-                        cropRight)
+                        cropRight,
+                        originLocation),
+
+      _imageFilePaths(imageFilePaths),
+    _arraySize(arraySize)
 {
     // do nothing
 }
@@ -71,7 +75,7 @@ GlfArrayTexture::_OnSetMemoryRequested(size_t targetMemory)
                                     _GetCropTop(), _GetCropBottom(),
                                     _GetCropLeft(), _GetCropRight());
         if (texData) {
-            texData->Read(0, _GenerateMipmap());
+            texData->Read(0, _GenerateMipmap(), GetOriginLocation());
         }
 
         _UpdateTexture(texData);

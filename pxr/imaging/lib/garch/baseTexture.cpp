@@ -50,6 +50,19 @@ GarchBaseTexture::GarchBaseTexture()
     /* nothing */
 }
 
+GarchBaseTexture::GarchBaseTexture(GarchImage::ImageOriginLocation originLocation)
+: GarchTexture(originLocation),
+_currentWidth(0),
+_currentHeight(0),
+_format(GL_RGBA),
+_hasWrapModeS(false),
+_hasWrapModeT(false),
+_wrapModeS(GL_REPEAT),
+_wrapModeT(GL_REPEAT)
+{
+    /* nothing */
+}
+
 GarchBaseTexture::~GarchBaseTexture()
 {
 }

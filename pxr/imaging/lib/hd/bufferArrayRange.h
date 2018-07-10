@@ -112,7 +112,7 @@ public:
 
     /// Sets the bufferSpecs for all resources.
     HD_API
-    virtual void AddBufferSpecs(HdBufferSpecVector *bufferSpecs) const = 0;
+    virtual void GetBufferSpecs(HdBufferSpecVector *bufferSpecs) const = 0;
     
     /// Returns the GPU resource. If the buffer array contains more than one
     /// resource, this method raises a coding error.

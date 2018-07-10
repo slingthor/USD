@@ -28,6 +28,7 @@
 
 #include "pxr/pxr.h"
 #include "pxr/imaging/garch/api.h"
+#include "pxr/imaging/garch/image.h"
 #include "pxr/base/tf/declarePtrs.h"
 #include "pxr/base/tf/refPtr.h"
 #include "pxr/base/tf/singleton.h"
@@ -56,9 +57,13 @@ public:
     static GarchTextureRegistry & GetInstance();
 
     GARCH_API
-    GarchTextureHandleRefPtr GetTextureHandle(const TfToken &texture);
+    GarchTextureHandleRefPtr GetTextureHandle(const TfToken &texture,
+                                              GarchImage::ImageOriginLocation originLocation =
+                                              GarchImage::OriginUpperLeft);
     GARCH_API
-    GarchTextureHandleRefPtr GetTextureHandle(const TfTokenVector &textures);
+    GarchTextureHandleRefPtr GetTextureHandle(const TfTokenVector &textures,
+                                              GarchImage::ImageOriginLocation originLocation =
+                                              GarchImage::OriginUpperLeft);
     GARCH_API
     GarchTextureHandleRefPtr GetTextureHandle(GarchTextureRefPtr texture);
 
@@ -70,7 +75,9 @@ public:
 
     // Returns true if the registry contains a texture sampler for \a texture;
     GARCH_API
-    bool HasTexture(const TfToken &texture) const;
+    bool HasTexture(const TfToken &texture,
+                    GarchImage::ImageOriginLocation originLocation =
+                                               GarchImage::OriginUpperLeft) const;
 
     // diagnostics
     GARCH_API
@@ -85,9 +92,11 @@ private:
     friend class TfSingleton< GarchTextureRegistry >;
     GarchTextureRegistry();
 
-    GarchTextureHandleRefPtr _CreateTexture(const TfToken &texture);
+    GarchTextureHandleRefPtr _CreateTexture(const TfToken &texture,
+                                            GarchImage::ImageOriginLocation originLocation);
     GarchTextureHandleRefPtr _CreateTexture(const TfTokenVector &textures,
-                                           const size_t numTextures);
+                                            const size_t numTextures,
+                                            GarchImage::ImageOriginLocation originLocation);
     GarchTextureFactoryBase* _GetTextureFactory(const TfToken &filename);
 
     // Metadata for texture files to aid in cache invalidation.
@@ -122,8 +131,10 @@ private:
     };
 
 public:
-    typedef std::map<TfToken, _TextureMetadata> TextureRegistryMap;
-    typedef std::map<GarchTexturePtr, GarchTextureHandlePtr> TextureRegistryNonSharedMap;
+    typedef std::map<std::pair<TfToken, GarchImage::ImageOriginLocation>,
+                     _TextureMetadata> TextureRegistryMap;
+    typedef std::map<GarchTexturePtr, GarchTextureHandlePtr>
+        TextureRegistryNonSharedMap;
 
 private:
 

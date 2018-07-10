@@ -94,7 +94,7 @@ public:
     /// 
     /// \p defaultValue can be unspecified (or left empty) if you don't 
     /// care about authoring a default value. In this case, the sparse authoring
-    /// logic is intialized with the existing authored default value or 
+    /// logic is initialized with the existing authored default value or
     /// the fallback value, if \p attr has one.
     USDUTILS_API
     UsdUtilsSparseAttrValueWriter(const UsdAttribute &attr, 
@@ -106,7 +106,7 @@ public:
     /// the existing default value of \p attr.
     /// 
     /// It \p defaultValue is null or points to an empty VtValue, the sparse
-    /// authoring logic is intialized with the existing authored default value 
+    /// authoring logic is initialized with the existing authored default value 
     /// or the fallback value, if \p attr has one.
     /// 
     /// For efficiency, this function swaps out the given \p defaultValue, 

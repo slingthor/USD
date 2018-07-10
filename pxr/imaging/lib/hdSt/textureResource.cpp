@@ -40,17 +40,17 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-HdStSimpleTextureResource *HdStSimpleTextureResource::New(
-    GarchTextureHandleRefPtr const &textureHandle, bool isPtex)
+HdStSimpleTextureResource *HdStSimpleTextureResource::New(GarchTextureHandleRefPtr const &textureHandle, bool isPtex,
+                                                          size_t memoryRequest)
 {
     HdEngine::RenderAPI api = HdEngine::GetRenderAPI();
     switch(api)
     {
         case HdEngine::OpenGL:
-            return new HdStSimpleTextureResourceGL(textureHandle, isPtex);
+            return new HdStSimpleTextureResourceGL(textureHandle, isPtex, memoryRequest);
 #if defined(ARCH_GFX_METAL)
         case HdEngine::Metal:
-            return new HdStSimpleTextureResourceMetal(textureHandle, isPtex);
+            return new HdStSimpleTextureResourceMetal(textureHandle, isPtex, memoryRequest);
 #endif
         default:
             TF_FATAL_CODING_ERROR("No HdStBufferResource for this API");
@@ -61,16 +61,17 @@ HdStSimpleTextureResource *HdStSimpleTextureResource::New(
 HdStSimpleTextureResource *HdStSimpleTextureResource::New(
     GarchTextureHandleRefPtr const &textureHandle, bool isPtex,
     HdWrap wrapS, HdWrap wrapT,
-    HdMinFilter minFilter, HdMagFilter magFilter)
+    HdMinFilter minFilter, HdMagFilter magFilter,
+    size_t memoryRequest)
 {
     HdEngine::RenderAPI api = HdEngine::GetRenderAPI();
     switch(api)
     {
         case HdEngine::OpenGL:
-            return new HdStSimpleTextureResourceGL(textureHandle, isPtex, wrapS, wrapT, minFilter, magFilter);
+            return new HdStSimpleTextureResourceGL(textureHandle, isPtex, wrapS, wrapT, minFilter, magFilter, memoryRequest);
 #if defined(ARCH_GFX_METAL)
         case HdEngine::Metal:
-            return new HdStSimpleTextureResourceMetal(textureHandle, isPtex, wrapS, wrapT, minFilter, magFilter);
+            return new HdStSimpleTextureResourceMetal(textureHandle, isPtex, wrapS, wrapT, minFilter, magFilter, memoryRequest);
 #endif
         default:
             TF_FATAL_CODING_ERROR("No HdStBufferResource for this API");

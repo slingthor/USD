@@ -66,7 +66,9 @@ public:
         unsigned int cropTop    = 0,
         unsigned int cropBottom = 0,
         unsigned int cropLeft   = 0,
-        unsigned int cropRight  = 0);
+        unsigned int cropRight  = 0,
+        GarchImage::ImageOriginLocation originLocation =
+                            GarchImage::OriginUpperLeft);
 
     MTLF_API
     static MtlfArrayTextureRefPtr New(
@@ -75,7 +77,9 @@ public:
         unsigned int cropTop    = 0,
         unsigned int cropBottom = 0,
         unsigned int cropLeft   = 0,
-        unsigned int cropRight  = 0);
+        unsigned int cropRight  = 0,
+        GarchImage::ImageOriginLocation originLocation =
+                            GarchImage::OriginUpperLeft);
 
     MTLF_API
     static bool IsSupportedImageFile(TfToken const &imageFilePath);
@@ -83,7 +87,7 @@ public:
     // MtlfBaseTexture overrides
     MTLF_API
     virtual BindingVector GetBindings(TfToken const & identifier,
-                                      GarchSamplerGPUHandle samplerName) const;
+                                      GarchSamplerGPUHandle samplerName) const override;
 
 protected:
     MTLF_API
@@ -93,7 +97,9 @@ protected:
         unsigned int cropTop,
         unsigned int cropBottom,
         unsigned int cropLeft,
-        unsigned int cropRight);
+        unsigned int cropRight,
+        GarchImage::ImageOriginLocation originLocation =
+                        GarchImage::OriginUpperLeft);
     
     friend class MtlfResourceFactory;
 
@@ -103,7 +109,7 @@ protected:
 
     MTLF_API
     virtual void _CreateTextures(GarchBaseTextureDataConstRefPtrVector texDataVec,
-                        bool const generateMipmap);
+                        bool const generateMipmap) override;
     
     MTLF_API
     virtual void _UpdateTexture(GarchBaseTextureDataConstPtr texData) {}

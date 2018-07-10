@@ -58,9 +58,6 @@ public:
     /// Create an anim query for \p prim, if the prim is a valid type.
     static UsdSkel_AnimQueryImplRefPtr New(const UsdPrim& prim);
 
-    /// Returns true if \p prim is a valid animation primitive.
-    static bool IsAnimPrim(const UsdPrim& prim);
-
     virtual ~UsdSkel_AnimQueryImpl() {}
 
     virtual UsdPrim GetPrim() const = 0;
@@ -89,10 +86,16 @@ public:
     ComputeTransform(GfMatrix4d* xform,
                      UsdTimeCode time=UsdTimeCode::Default()) const = 0;
 
+    virtual bool
+    ComputeBlendShapeWeights(VtFloatArray* weights,
+                             UsdTimeCode time=UsdTimeCode::Default()) const = 0;
+
     const VtTokenArray& GetJointOrder() const { return _jointOrder; }
 
+    const VtTokenArray& GetBlendShapeOrder() const { return _blendShapeOrder; }
+
 protected:
-    VtTokenArray _jointOrder;
+    VtTokenArray _jointOrder, _blendShapeOrder;
 };
 
 

@@ -102,7 +102,13 @@ HdSt_UnitTestDelegate::GetTextureResource(SdfPath const& textureId)
 #endif
 
     return HdTextureResourceSharedPtr(
-                HdStSimpleTextureResource::New(texture, isPtex));
+        HdStSimpleTextureResource::New(texture,
+                                       isPtex,
+                                       HdWrapUseMetaDict,
+                                       HdWrapUseMetaDict,
+                                       HdMinFilterNearestMipmapLinear,
+                                       HdMagFilterLinear,
+                                       0));
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

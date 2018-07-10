@@ -26,6 +26,7 @@
 
 #include "pxr/pxr.h"
 #include "pxr/imaging/garch/api.h"
+#include "pxr/imaging/garch/image.h"
 #include "pxr/imaging/garch/utils.h"
 #include "pxr/imaging/garch/gl.h"
 #include "pxr/base/tf/declarePtrs.h"
@@ -76,8 +77,11 @@ public:
 
     virtual size_t ComputeBytesUsedByMip(int mipLevel = 0) const = 0;
 
-    virtual bool Read(int degradeLevel, bool generateMipmap) = 0;
-
+    virtual bool Read(int degradeLevel, 
+                      bool generateMipmap, 
+                      GarchImage::ImageOriginLocation originLocation =
+                                                 GarchImage::OriginUpperLeft) = 0;
+    
     virtual bool HasRawBuffer(int mipLevel = 0) const = 0;
 
     virtual unsigned char * GetRawBuffer(int mipLevel = 0) const = 0;   

@@ -40,14 +40,29 @@ PXR_NAMESPACE_OPEN_SCOPE
 // Custom factory to handle UVTexture and ArrayTexture for same types.
 class Garch_UVTextureFactory : public GarchTextureFactoryBase {
 public:
-    virtual GarchTextureRefPtr New(const TfToken& texturePath) const
+    virtual GarchTextureRefPtr New(const TfToken& texturePath,
+                                   GarchImage::ImageOriginLocation originLocation =
+                                                GarchImage::OriginUpperLeft) const
     {
-        return GarchUVTexture::New(texturePath);
+        return GarchUVTexture::New(texturePath,
+                                   /*cropTop*/ 0,
+                                   /*cropBottom*/ 0,
+                                   /*cropLeft*/ 0,
+                                   /*cropRight*/ 0,
+                                   originLocation);
     }
 
-    virtual GarchTextureRefPtr New(const TfTokenVector& texturePaths) const
+    virtual GarchTextureRefPtr New(const TfTokenVector& texturePaths,
+                                   GarchImage::ImageOriginLocation originLocation =
+                                                GarchImage::OriginUpperLeft) const
     {
-        return GarchArrayTexture::New(texturePaths, texturePaths.size());
+        return GarchArrayTexture::New(texturePaths,
+                                      texturePaths.size(),
+                                      /*cropTop*/ 0,
+                                      /*cropBottom*/ 0,
+                                      /*cropLeft*/ 0,
+                                      /*cropRight*/ 0,
+                                      originLocation);
     }
 };
 
@@ -64,12 +79,14 @@ GarchUVTexture::New(
     unsigned int cropTop,
     unsigned int cropBottom,
     unsigned int cropLeft,
-    unsigned int cropRight)
+    unsigned int cropRight,
+    GarchImage::ImageOriginLocation originLocation)
 {
-    return TfCreateRefPtr(new GarchUVTexture(GarchResourceFactory::GetInstance()->NewBaseTexture(),
-                                             imageFilePath,
-                                             cropTop, cropBottom,
-                                             cropLeft, cropRight));
+    return TfCreateRefPtr(new GarchUVTexture(
+            GarchResourceFactory::GetInstance()->NewBaseTexture(),
+            imageFilePath, cropTop,
+            cropBottom, cropLeft, cropRight,
+            originLocation));
 }
 
 GarchUVTextureRefPtr 
@@ -78,14 +95,14 @@ GarchUVTexture::New(
     unsigned int cropTop,
     unsigned int cropBottom,
     unsigned int cropLeft,
-    unsigned int cropRight)
+    unsigned int cropRight,
+    GarchImage::ImageOriginLocation originLocation)
 {
-    GarchUVTexture *uvTexture = new GarchUVTexture(GarchResourceFactory::GetInstance()->NewBaseTexture(),
-                                                   TfToken(imageFilePath),
-                                                   cropTop, cropBottom,
-                                                   cropLeft, cropRight);
-    
-    return TfCreateRefPtr(uvTexture);
+    return TfCreateRefPtr(new GarchUVTexture(
+            GarchResourceFactory::GetInstance()->NewBaseTexture(),
+            TfToken(imageFilePath), cropTop, 
+            cropBottom, cropLeft, cropRight,
+            originLocation));
 }
 
 bool 
@@ -106,8 +123,9 @@ GarchUVTexture::GarchUVTexture(
     unsigned int cropTop,
     unsigned int cropBottom,
     unsigned int cropLeft,
-    unsigned int cropRight)
-    : _baseTexture(baseTexture)
+    unsigned int cropRight,
+    GarchImage::ImageOriginLocation originLocation)
+    : GarchBaseTexture(originLocation)
     , _imageFilePath(imageFilePath)
     , _cropTop(cropTop)
     , _cropBottom(cropBottom)
@@ -148,7 +166,7 @@ GarchUVTexture::_OnSetMemoryRequested(size_t targetMemory)
                               _GetCropTop(), _GetCropBottom(),
                               _GetCropLeft(), _GetCropRight());
     if (texData) {
-        texData->Read(0, _GenerateMipmap());
+        texData->Read(0, _GenerateMipmap(), GetOriginLocation());
     }
     _UpdateTexture(texData);
     _CreateTexture(texData, _GenerateMipmap());

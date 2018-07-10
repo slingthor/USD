@@ -1134,8 +1134,27 @@ HdSt_CodeGenMSL::Compile()
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
     
-    // create GLSL program.
+    // shader sources
+    // geometric shader owns main()
+    std::string vertexShader =
+    _geometricShader->GetSource(HdShaderTokens->vertexShader);
+    std::string tessControlShader =
+    _geometricShader->GetSource(HdShaderTokens->tessControlShader);
+    std::string tessEvalShader =
+    _geometricShader->GetSource(HdShaderTokens->tessEvalShader);
+    std::string geometryShader =
+    _geometricShader->GetSource(HdShaderTokens->geometryShader);
+    std::string fragmentShader =
+    _geometricShader->GetSource(HdShaderTokens->fragmentShader);
     
+    bool hasVS  = (!vertexShader.empty());
+    bool hasTCS = (!tessControlShader.empty());
+    bool hasTES = (!tessEvalShader.empty());
+    bool hasGS  = (!geometryShader.empty());
+    bool hasFS  = (!fragmentShader.empty());
+
+    
+    // create MSL program.
     HdStMSLProgramSharedPtr mslProgram(new HdStMSLProgram(HdTokens->drawingShader));
     
     // initialize autogen source buckets
@@ -1150,45 +1169,45 @@ HdSt_CodeGenMSL::Compile()
     // Used in glslfx files to determine if it is using new/old
     // imaging system. It can also be used as API guards when
     // we need new versions of Hydra shading.
-    _genCommon << "#define HD_SHADER_API " << HD_SHADER_API << "\n";
-    _genCommon << "#define ARCH_GFX_METAL\n";
+    _genCommon  << "#define HD_SHADER_API " << HD_SHADER_API << "\n";
+    _genCommon  << "#define ARCH_GFX_METAL\n";
     
-    _genCommon << "#include <metal_stdlib>\n"
-    << "#include <simd/simd.h>\n"
-    << "using namespace metal;\n";
+    _genCommon  << "#include <metal_stdlib>\n"
+                << "#include <simd/simd.h>\n"
+                << "using namespace metal;\n";
     
-    _genCommon << "#define double float\n"
-    << "#define vec2 float2\n"
-    << "#define vec3 float3\n"
-    << "#define vec4 float4\n"
-    << "#define mat3 float3x3\n"
-    << "#define mat4 float4x4\n"
-    << "#define ivec2 int2\n"
-    << "#define ivec3 int3\n"
-    << "#define ivec4 int4\n"
-    << "#define dvec2 float2\n"
-    << "#define dvec3 float3\n"
-    << "#define dvec4 float4\n"
-    << "#define dmat3 float3x3\n"
-    << "#define dmat4 float4x4\n";
+    _genCommon  << "#define double float\n"
+                << "#define vec2 float2\n"
+                << "#define vec3 float3\n"
+                << "#define vec4 float4\n"
+                << "#define mat3 float3x3\n"
+                << "#define mat4 float4x4\n"
+                << "#define ivec2 int2\n"
+                << "#define ivec3 int3\n"
+                << "#define ivec4 int4\n"
+                << "#define dvec2 float2\n"
+                << "#define dvec3 float3\n"
+                << "#define dvec4 float4\n"
+                << "#define dmat3 float3x3\n"
+                << "#define dmat4 float4x4\n";
     
     // XXX: this macro is still used in GlobalUniform.
-    _genCommon << "#define MAT4 mat4\n";
+    _genCommon  << "#define MAT4 mat4\n";
     
     // a trick to tightly pack vec3 into SSBO/UBO.
-    _genCommon << _GetPackedTypeDefinitions();
+    _genCommon  << _GetPackedTypeDefinitions();
     
-    _genCommon << "#define in /*in*/\n"
-               << "#define out /*out*/\n"
-               << "#define discard discard_fragment();\n"
-               << "#define radians(d) (d * 0.01745329252)\n"
-               << "#define noperspective /*center_no_perspective MTL_FIXME*/\n"
-               << "#define greaterThan(a,b) (a > b)\n"
-               << "#define lessThan(a,b)    (a < b)\n";
+    _genCommon  << "#define in /*in*/\n"
+                << "#define out /*out*/\n"
+                << "#define discard discard_fragment();\n"
+                << "#define radians(d) (d * 0.01745329252)\n"
+                << "#define noperspective /*center_no_perspective MTL_FIXME*/\n"
+                << "#define greaterThan(a,b) (a > b)\n"
+                << "#define lessThan(a,b)    (a < b)\n";
 
     
-    _genCommon << "class ProgramScope<st> {\n"
-               << "public:\n";
+    _genCommon  << "class ProgramScope<st> {\n"
+                << "public:\n";
     
     METAL_DEBUG_COMMENT(&_genCommon, "Start of special inputs\n"); //MTL_FIXME
     
@@ -1356,14 +1375,18 @@ HdSt_CodeGenMSL::Compile()
         << it->second.name << "_" << it->second.level << " 1\n";
     }
     _genCommon << "#define HD_INSTANCER_NUM_LEVELS "
-    << _metaData.instancerNumLevels << "\n"
-    << "#define HD_INSTANCE_INDEX_WIDTH "
-    << (_metaData.instancerNumLevels+1) << "\n";
-    TF_FOR_ALL (it, _metaData.elementData) {
-        _genCommon << "#define HD_HAS_" << it->second.name << " 1\n";
-    }
-    TF_FOR_ALL (it, _metaData.fvarData) {
-        _genCommon << "#define HD_HAS_" << it->second.name << " 1\n";
+               << _metaData.instancerNumLevels << "\n"
+               << "#define HD_INSTANCE_INDEX_WIDTH "
+               << (_metaData.instancerNumLevels+1) << "\n";
+    if (!_geometricShader->IsPrimTypePoints()) {
+        TF_FOR_ALL (it, _metaData.elementData) {
+            _genCommon << "#define HD_HAS_" << it->second.name << " 1\n";
+        }
+        if (hasGS) {
+            TF_FOR_ALL (it, _metaData.fvarData) {
+                _genCommon << "#define HD_HAS_" << it->second.name << " 1\n";
+            }
+        }
     }
     TF_FOR_ALL (it, _metaData.vertexData) {
         _genCommon << "#define HD_HAS_" << it->second.name << " 1\n";
@@ -1425,7 +1448,7 @@ HdSt_CodeGenMSL::Compile()
     _GenerateConstantPrimvar();
     _GenerateInstancePrimvar();
     _GenerateElementPrimvar();
-    _GenerateVertexPrimvar();
+    _GenerateVertexAndFaceVaryingPrimvar(hasGS);
     
     //generate shader parameters
     _GenerateShaderParameters();
@@ -1441,26 +1464,6 @@ HdSt_CodeGenMSL::Compile()
     _genTCS << _procTCS.str();
     _genTES << _procTES.str();
     _genGS  << _procGS.str();
-    
-    // shader sources
-    
-    // geometric shader owns main()
-    std::string vertexShader =
-    _geometricShader->GetSource(HdShaderTokens->vertexShader);
-    std::string tessControlShader =
-    _geometricShader->GetSource(HdShaderTokens->tessControlShader);
-    std::string tessEvalShader =
-    _geometricShader->GetSource(HdShaderTokens->tessEvalShader);
-    std::string geometryShader =
-    _geometricShader->GetSource(HdShaderTokens->geometryShader);
-    std::string fragmentShader =
-    _geometricShader->GetSource(HdShaderTokens->fragmentShader);
-    
-    bool hasVS  = (!vertexShader.empty());
-    bool hasTCS = (!tessControlShader.empty());
-    bool hasTES = (!tessEvalShader.empty());
-    bool hasGS  = (!geometryShader.empty());
-    bool hasFS  = (!fragmentShader.empty());
     
     // other shaders (renderpass, lighting, surface) first
     TF_FOR_ALL(it, _shaders) {
@@ -2769,10 +2772,18 @@ HdSt_CodeGenMSL::_GenerateElementPrimvar()
         // users to call them -- we really should restructure whatever is
         // necessary to avoid having to do this and thus guarantee that users
         // can never call bogus versions of these functions.
-        accessors
+        if (_geometricShader->IsPrimTypePoints()) {
+            accessors
+            << "int GetElementID() {\n"
+            << "  return -1;\n"
+            << "}\n";
+        } else {
+            accessors
             << "int GetElementID() {\n"
             << "  return 0;\n"
             << "}\n";
+        }
+
         accessors
             << "int GetAggregatedElementID() {\n"
             << "  return GetElementID();\n"
@@ -2854,15 +2865,17 @@ HdSt_CodeGenMSL::_GenerateElementPrimvar()
             << "}\n";
     }
 
-    TF_FOR_ALL (it, _metaData.elementData) {
-        HdBinding binding = it->first;
-        TfToken const &name = it->second.name;
-        TfToken const &dataType = it->second.dataType;
-
-        _EmitDeclaration(declarations, _mslVSInputParams, name, dataType, TfToken(), binding);
-        // AggregatedElementID gives us the buffer index post batching, which
-        // is what we need for accessing element (uniform) primvar data.
-        _EmitAccessor(accessors, name, dataType, binding,"GetAggregatedElementID()");
+    if (!_geometricShader->IsPrimTypePoints()) {
+        TF_FOR_ALL (it, _metaData.elementData) {
+            HdBinding binding = it->first;
+            TfToken const &name = it->second.name;
+            TfToken const &dataType = it->second.dataType;
+            
+            _EmitDeclaration(declarations, _mslVSInputParams, name, dataType, TfToken(), binding);
+            // AggregatedElementID gives us the buffer index post batching, which
+            // is what we need for accessing element (uniform) primvar data.
+            _EmitAccessor(accessors, name, dataType, binding,"GetAggregatedElementID()");
+        }
     }
 
     // Emit primvar declarations and accessors.
@@ -2877,8 +2890,13 @@ HdSt_CodeGenMSL::_GenerateElementPrimvar()
 }
 
 void
-HdSt_CodeGenMSL::_GenerateVertexPrimvar()
+HdSt_CodeGenMSL::_GenerateVertexAndFaceVaryingPrimvar(bool hasGS)
 {
+    // Vertex and FVar primvar flow into the fragment shader as per-fragment
+    // attribute data that has been interpolated by the rasterizer, and hence
+    // have similarities for code gen.
+    // While vertex primvar are authored per vertex and require plumbing
+    // through all shader stages, fVar is emitted only in the GS stage.
     /*
       // --------- vertex data declaration (VS) ----------
       layout (location = 0) in vec3 normals;
@@ -3007,73 +3025,75 @@ HdSt_CodeGenMSL::_GenerateVertexPrimvar()
     // face varying
     std::stringstream fvarDeclarations;
 
-    TF_FOR_ALL (it, _metaData.fvarData) {
-        HdBinding binding = it->first;
-        TfToken const &name = it->second.name;
-        TfToken const &dataType = it->second.dataType;
+    if (hasGS) {
+        TF_FOR_ALL (it, _metaData.fvarData) {
+            HdBinding binding = it->first;
+            TfToken const &name = it->second.name;
+            TfToken const &dataType = it->second.dataType;
 
-        _EmitDeclaration(fvarDeclarations, _mslVSInputParams, name, dataType, TfToken(), binding);
+            _EmitDeclaration(fvarDeclarations, _mslVSInputParams, name, dataType, TfToken(), binding);
 
-        interstageStruct << "  " << dataType << " " << name << ";\n";
+            interstageStruct << "  " << dataType << " " << name << ";\n";
 
-        // primvar accessors (only in GS and FS)
-        _EmitAccessor(accessorsGS, name, dataType, binding, "GetFVarIndex(localIndex)");
-        _EmitStructAccessor(accessorsFS, structName, name, dataType,
-                            /*arraySize=*/1, true, NULL);
+            // primvar accessors (only in GS and FS)
+            _EmitAccessor(accessorsGS, name, dataType, binding, "GetFVarIndex(localIndex)");
+            _EmitStructAccessor(accessorsFS, structName, name, dataType,
+                                /*arraySize=*/1, true, NULL);
 
-        // interstage plumbing
-        _procVS << "  outPrimvars->" << name
-                << " = " << dataType << "(0);\n";
-        _procTCS << "  outPrimvars[gl_InvocationID]." << name
-                 << " = inPrimvars[gl_InvocationID]." << name << ";\n";
-        // TODO: facevarying tessellation
-        _procTES << "  outPrimvars->" << name
-                 << " = mix(mix(inPrimvars[i3]." << name
-                 << "         , inPrimvars[i2]." << name << ", u),"
-                 << "       mix(inPrimvars[i1]." << name
-                 << "         , inPrimvars[i0]." << name << ", u), v);\n";
+            // interstage plumbing
+            _procVS << "  outPrimvars->" << name
+                    << " = " << dataType << "(0);\n";
+            _procTCS << "  outPrimvars[gl_InvocationID]." << name
+                     << " = inPrimvars[gl_InvocationID]." << name << ";\n";
+            // TODO: facevarying tessellation
+            _procTES << "  outPrimvars->" << name
+                     << " = mix(mix(inPrimvars[i3]." << name
+                     << "         , inPrimvars[i2]." << name << ", u),"
+                     << "       mix(inPrimvars[i1]." << name
+                     << "         , inPrimvars[i0]." << name << ", u), v);\n";
 
 
-        switch(_geometricShader->GetPrimitiveType())
-        {
-            case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_COARSE_QUADS:
-            case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_REFINED_QUADS:
-            case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_PATCHES:
+            switch(_geometricShader->GetPrimitiveType())
             {
-                // linear interpolation within a quad.
-                _procGS << "   outPrimvars->" << name
-                    << "  = mix("
-                    << "mix(" << "HdGet_" << name << "(0),"
-                    <<           "HdGet_" << name << "(1), localST.x),"
-                    << "mix(" << "HdGet_" << name << "(3),"
-                    <<           "HdGet_" << name << "(2), localST.x), localST.y);\n";
-                break;
-            }
+                case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_COARSE_QUADS:
+                case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_REFINED_QUADS:
+                case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_PATCHES:
+                {
+                    // linear interpolation within a quad.
+                    _procGS << "   outPrimvars->" << name
+                        << "  = mix("
+                        << "mix(" << "HdGet_" << name << "(0),"
+                        <<           "HdGet_" << name << "(1), localST.x),"
+                        << "mix(" << "HdGet_" << name << "(3),"
+                        <<           "HdGet_" << name << "(2), localST.x), localST.y);\n";
+                    break;
+                }
 
-            case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_REFINED_TRIANGLES:
-            case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_COARSE_TRIANGLES:
-            {
-                // barycentric interpolation within a triangle.
-                _procGS << "   outPrimvars->" << name
-                    << "  = HdGet_" << name << "(0) * localST.x "
-                    << "  + HdGet_" << name << "(1) * localST.y "
-                    << "  + HdGet_" << name << "(2) * (1-localST.x-localST.y);\n";                
-                break;  
-            }
+                case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_REFINED_TRIANGLES:
+                case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_COARSE_TRIANGLES:
+                {
+                    // barycentric interpolation within a triangle.
+                    _procGS << "   outPrimvars->" << name
+                        << "  = HdGet_" << name << "(0) * localST.x "
+                        << "  + HdGet_" << name << "(1) * localST.y "
+                        << "  + HdGet_" << name << "(2) * (1-localST.x-localST.y);\n";
+                    break;
+                }
 
-            case HdSt_GeometricShader::PrimitiveType::PRIM_POINTS:
-            {
-                // do nothing. 
-                // e.g. if a prim's geomstyle is points and it has valid
-                // fvarData, we don't generate any of the 
-                // accessor methods.
-                break;
-            }
+                case HdSt_GeometricShader::PrimitiveType::PRIM_POINTS:
+                {
+                    // do nothing.
+                    // e.g. if a prim's geomstyle is points and it has valid
+                    // fvarData, we don't generate any of the
+                    // accessor methods.
+                    break;
+                }
 
-            default:
-                TF_CODING_ERROR("Face varing bindings for unexpected for" 
-                                " HdSt_GeometricShader::PrimitiveType %d",
-                                _geometricShader->GetPrimitiveType());
+                default:
+                    TF_CODING_ERROR("Face varing bindings for unexpected for"
+                                    " HdSt_GeometricShader::PrimitiveType %d",
+                                    _geometricShader->GetPrimitiveType());
+            }
         }
     }
 

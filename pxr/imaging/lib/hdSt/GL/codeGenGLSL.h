@@ -112,7 +112,7 @@ private:
     void _GenerateConstantPrimvar();
     void _GenerateInstancePrimvar();
     void _GenerateElementPrimvar();
-    void _GenerateVertexPrimvar();
+    void _GenerateVertexAndFaceVaryingPrimvar(bool hasGS);
     void _GenerateShaderParameters();
 
     HdSt_ResourceBinder::MetaData _metaData;
