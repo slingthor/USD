@@ -30,6 +30,7 @@
 
 #include <boost/functional/hash.hpp>
 #include <boost/python/object_fwd.hpp>
+#undef check // Avoids compilation error with Xcode 10L177o
 #include <boost/python/object_operators.hpp>
 
 #include <iosfwd>

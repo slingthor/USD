@@ -135,6 +135,12 @@ UsdImagingAdapterRegistry::HasAdapter(TfToken const& adapterKey)
     if (adapterKey == UsdImagingAdapterKeyTokens->instanceAdapterKey) {
         return true;
     }
+    if (adapterKey.GetString() == "HydraPbsSurface" || adapterKey.GetString() == "__drawModeAdapter") {
+        //METAL TODO: Implement a specific system for dealing with the selection of the correct
+        // adapter for the current renderer
+        return _typeMap.find(TfToken(adapterKey.GetString() + "Metal")) != _typeMap.end();
+    }
+
     return _typeMap.find(adapterKey) != _typeMap.end();
 }
 
@@ -150,18 +156,13 @@ UsdImagingAdapterRegistry::ConstructAdapter(TfToken const& adapterKey)
     }
 
     // Lookup the plug-in type name based on the prim type.
+    _TypeMap subTypeMap;
     _TypeMap::iterator typeIt = _typeMap.end();
 
     //METAL TODO: Implement a specific system for dealing with the selection of the correct
     // adapter for the current renderer
-    if (adapterKey.GetString() == "HydraPbsSurface" || adapterKey.GetString() == "__drawModeAdapter")
-    {
-        TF_FOR_ALL(i, _typeMap) {
-            if (i->second.GetTypeName().find("Metal") != std::string::npos) {
-                typeIt = i;
-                break;
-            }
-        }
+    if (adapterKey.GetString() == "HydraPbsSurface" || adapterKey.GetString() == "__drawModeAdapter") {
+        typeIt = _typeMap.find(TfToken(adapterKey.GetString() + "Metal"));
     }
     else {
         typeIt = _typeMap.find(adapterKey);

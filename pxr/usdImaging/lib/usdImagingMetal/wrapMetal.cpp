@@ -135,11 +135,11 @@ void wrapMetal()
             .value("DRAW_POINTS", UsdImagingMetal::DRAW_POINTS)
             .value("DRAW_WIREFRAME", UsdImagingMetal::DRAW_WIREFRAME)
             .value("DRAW_WIREFRAME_ON_SURFACE", UsdImagingMetal::DRAW_WIREFRAME_ON_SURFACE)
-	    .value("DRAW_SHADED_FLAT", UsdImagingMetal::DRAW_SHADED_FLAT)
-	    .value("DRAW_SHADED_SMOOTH", UsdImagingMetal::DRAW_SHADED_SMOOTH)
-	    .value("DRAW_GEOM_ONLY", UsdImagingMetal::DRAW_GEOM_ONLY)
-	    .value("DRAW_GEOM_FLAT", UsdImagingMetal::DRAW_GEOM_FLAT)
-	    .value("DRAW_GEOM_SMOOTH", UsdImagingMetal::DRAW_GEOM_SMOOTH)
+            .value("DRAW_SHADED_FLAT", UsdImagingMetal::DRAW_SHADED_FLAT)
+            .value("DRAW_SHADED_SMOOTH", UsdImagingMetal::DRAW_SHADED_SMOOTH)
+            .value("DRAW_GEOM_ONLY", UsdImagingMetal::DRAW_GEOM_ONLY)
+            .value("DRAW_GEOM_FLAT", UsdImagingMetal::DRAW_GEOM_FLAT)
+            .value("DRAW_GEOM_SMOOTH", UsdImagingMetal::DRAW_GEOM_SMOOTH)
         ;
 
         // Wrap the CullStyle enum. Accessible as UsdImaging.GL.CullStyle
@@ -172,6 +172,7 @@ void wrapMetal()
             .def_readwrite("clipPlanes", &Params::clipPlanes)
             .def_readwrite("highlight", &Params::highlight)
             .def_readwrite("enableHardwareShading", &Params::enableHardwareShading)
+            .def_readwrite("enableUsdDrawModes", &Params::enableUsdDrawModes)
         ;
 
         TfPyContainerConversions::from_python_sequence<

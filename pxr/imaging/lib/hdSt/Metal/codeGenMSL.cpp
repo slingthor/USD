@@ -1233,11 +1233,47 @@ HdSt_CodeGenMSL::Compile()
                 << "};\n";
 
     // Fixes for Geometry shader functionality
-    
+    std::stringstream vsConfigString;
+    std::stringstream fsConfigString;
+    std::stringstream gsConfigString;
     bool enableFragmentNormalReconstruction = false;
-    std::vector<std::string> geometrySourceKeys = _geometricShader->GetSourceKeys(HdShaderTokens->geometryShader);
-    for(auto key : geometrySourceKeys) {
-        if(key == "MeshNormal.Flat") enableFragmentNormalReconstruction = true;
+    {
+        std::vector<std::string> commonSourceKeys = _geometricShader->GetSourceKeys(HdShaderTokens->commonShaderSource);
+        vsConfigString << "\n//\n//\tCommon GLSLFX Config:\n//\n";
+        fsConfigString << "\n//\n//\tCommon GLSLFX Config:\n//\n";
+        gsConfigString << "\n//\n//\tCommon GLSLFX Config:\n//\n";
+        for(auto key : commonSourceKeys) {
+            vsConfigString << "//\t\t" << key << "\n";
+            fsConfigString << "//\t\t" << key << "\n";
+            gsConfigString << "//\t\t" << key << "\n";
+        }
+        
+        { //VS
+            std::vector<std::string> sourceKeys = _geometricShader->GetSourceKeys(HdShaderTokens->vertexShader);
+            vsConfigString << "//\n\n//\n//\tVertex GLSLFX Config:\n//\n";
+            for(auto key : sourceKeys) {
+                vsConfigString << "//\t\t" << key << "\n";
+            }
+            vsConfigString << "//\n\n";
+        }
+        { //FS
+            std::vector<std::string> sourceKeys = _geometricShader->GetSourceKeys(HdShaderTokens->fragmentShader);
+            fsConfigString << "//\n\n//\n//\tFragment GLSLFX Config:\n//\n";
+            for(auto key : sourceKeys) {
+                fsConfigString << "//\t\t" << key << "\n";
+            }
+            fsConfigString << "//\n\n";
+        }
+        { //GS
+            std::vector<std::string> sourceKeys = _geometricShader->GetSourceKeys(HdShaderTokens->geometryShader);
+            gsConfigString << "//\n\n//\n//\tGeometry GLSLFX Config:\n//\n";
+            for(auto key : sourceKeys) {
+                if(key == "MeshNormal.Flat") enableFragmentNormalReconstruction = true;
+                
+                gsConfigString << "//\t\t" << key << "\n";
+            }
+            gsConfigString << "//\n\n";
+        }
     }
     
     // Start of Program Scope
@@ -1317,9 +1353,18 @@ HdSt_CodeGenMSL::Compile()
             // typeless binding doesn't need declaration nor accessor.
             if (binDecl->dataType.IsEmpty()) continue;
 
-            _EmitDeclaration(_genCommon, _mslVSInputParams, binDecl->name, binDecl->dataType, TfToken(), binDecl->binding);
-            std::stringstream dummy;
-            _EmitDeclaration(dummy, _mslPSInputParams, binDecl->name, binDecl->dataType, TfToken(), binDecl->binding);
+            if (binDecl->binding.GetType() == HdBinding::SSBO)
+            {
+                _EmitDeclarationPtr(_genCommon, _mslVSInputParams, binDecl->name, binDecl->dataType, TfToken(), binDecl->binding);
+                std::stringstream dummy;
+                _EmitDeclarationPtr(dummy, _mslPSInputParams, binDecl->name, binDecl->dataType, TfToken(), binDecl->binding);
+            }
+            else
+            {
+                _EmitDeclaration(_genCommon, _mslVSInputParams, binDecl->name, binDecl->dataType, TfToken(), binDecl->binding);
+                std::stringstream dummy;
+                _EmitDeclaration(dummy, _mslPSInputParams, binDecl->name, binDecl->dataType, TfToken(), binDecl->binding);
+            }
 
             _EmitAccessor(_genCommon,
                           binDecl->name,
@@ -1575,7 +1620,7 @@ HdSt_CodeGenMSL::Compile()
     // compile shaders
     // note: _vsSource, _fsSource etc are used for diagnostics (see header)
     if (hasVS) {
-        _vsSource = _genCommon.str() + _genVS.str() + termination.str() + glueVS.str();
+        _vsSource = vsConfigString.str() + _genCommon.str() + _genVS.str() + termination.str() + glueVS.str();
         _vsSource = replaceStringAll(_vsSource, "<st>", "_Vert");
 
         if (!mslProgram->CompileShader(GL_VERTEX_SHADER, _vsSource)) {
@@ -1584,7 +1629,7 @@ HdSt_CodeGenMSL::Compile()
         shaderCompiled = true;
     }
     if (hasFS) {
-        _fsSource = _genCommon.str() + _genFS.str() + termination.str() + gluePS.str();
+        _fsSource = fsConfigString.str() + _genCommon.str() + _genFS.str() + termination.str() + gluePS.str();
         _fsSource = replaceStringAll(_fsSource, "<st>", "_Frag");
 
         if (!mslProgram->CompileShader(GL_FRAGMENT_SHADER, _fsSource)) {
@@ -1607,7 +1652,7 @@ HdSt_CodeGenMSL::Compile()
         shaderCompiled = true;
     }
     if (hasGS) {
-        _gsSource = _genCommon.str() + _genGS.str() + termination.str();
+        _gsSource = gsConfigString.str() + _genCommon.str() + _genGS.str() + termination.str();
         if (!mslProgram->CompileShader(GL_GEOMETRY_SHADER, _gsSource)) {
             return HdStProgramSharedPtr();
         }
@@ -1782,14 +1827,14 @@ static HdSt_CodeGenMSL::TParam& _EmitDeclaration(std::stringstream &str,
 {
     str << type << " " << name << ";\n";
     HdSt_CodeGenMSL::TParam in(name, type, TfToken(), attribute, HdSt_CodeGenMSL::TParam::Unspecified, binding);
-
-    if(binding.GetType() == HdBinding::VERTEX_ID ||
-       binding.GetType() == HdBinding::BASE_VERTEX_ID ||
-       binding.GetType() == HdBinding::FRONT_FACING) {
+    HdBinding::Type bindingType = binding.GetType();
+    if(bindingType == HdBinding::VERTEX_ID ||
+       bindingType == HdBinding::BASE_VERTEX_ID ||
+       bindingType == HdBinding::FRONT_FACING) {
         in.usage |= HdSt_CodeGenMSL::TParam::EntryFuncArgument;
     }
     
-    if(binding.GetType() == HdBinding::UNIFORM)
+    if(bindingType == HdBinding::UNIFORM)
         in.usage |= HdSt_CodeGenMSL::TParam::Uniform;
  
     inputParams.push_back(in);
@@ -2002,7 +2047,9 @@ static void _EmitAccessor(std::stringstream &str,
                           const char *index)
 {
     METAL_DEBUG_COMMENT(&str, "_EmitAccessor ", (index == NULL ? "noindex" : index), (std::to_string(binding.GetType()).c_str()), "\n"); // MTL_FIXME
+    bool emitIndexlessVariant = false;
     if (index) {
+        emitIndexlessVariant = true;
         str << type
             << " HdGet_" << name << "(int localIndex) {\n"
             << "  int index = " << index << ";\n";
@@ -2017,15 +2064,18 @@ static void _EmitAccessor(std::stringstream &str,
         // non-indexed, only makes sense for uniform or vertex.
         if (binding.GetType() == HdBinding::UNIFORM ||
             binding.GetType() == HdBinding::VERTEX_ATTR) {
+            emitIndexlessVariant = true;
             str << type
                 << " HdGet_" << name << "(int localIndex) { return ";
             str << _GetPackedTypeAccessor(type) << "(" << name << ");}\n";
         }
     }
+    
     // GLSL spec doesn't allow default parameter. use function overload instead.
     // default to locaIndex=0
-    str << type << " HdGet_" << name << "()"
-    << " { return HdGet_" << name << "(0); }\n";
+    if(emitIndexlessVariant)
+        str << type << " HdGet_" << name << "()"
+            << " { return HdGet_" << name << "(0); }\n";
     
 }
 

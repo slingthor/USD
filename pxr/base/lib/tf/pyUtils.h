@@ -41,6 +41,7 @@
 #include <vector>
 
 #include <boost/python/dict.hpp>
+#undef check // Avoids compilation error with Xcode 10L177o
 #include <boost/python/extract.hpp>
 #include <boost/python/object.hpp>
 #include <boost/python/type_id.hpp>

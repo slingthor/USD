@@ -24,6 +24,7 @@
 #include "pxr/imaging/garch/baseTexture.h"
 
 #include <boost/python/bases.hpp>
+#undef check // Avoids compilation error with Xcode 10L177o
 #include <boost/python/class.hpp>
 
 using namespace boost::python;

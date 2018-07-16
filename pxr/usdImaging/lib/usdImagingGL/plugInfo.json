@@ -6,12 +6,12 @@
                     "UsdImagingGLDrawModeAdapter" : {
                         "bases": ["UsdImagingPrimAdapter"],
                         "isInternal": true,
-                        "primTypeName": "__drawModeAdapter"
+                        "primTypeName": "__drawModeAdapterGL"
                     },
                     "UsdImagingGLHydraMaterialAdapter" : {
                         "bases": ["UsdImagingPrimAdapter"],
                         "isInternal": true,
-                        "primTypeName": "HydraPbsSurface"
+                        "primTypeName": "HydraPbsSurfaceGL"
                     }
                 }
             },

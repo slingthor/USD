@@ -49,6 +49,8 @@
 #include <boost/python/extract.hpp>
 #include <boost/python/to_python_converter.hpp>
 
+#undef check // Avoids compilation error with Xcode 10L177o
+
 #include <deque>
 #include <list>
 #include <set>

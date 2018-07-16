@@ -6,12 +6,12 @@
                     "UsdImagingMetalDrawModeAdapter" : {
                         "bases": ["UsdImagingPrimAdapter"],
                         "isInternal": true,
-                        "primTypeName": "__drawModeAdapter"
+                        "primTypeName": "__drawModeAdapterMetal"
                     },
                     "UsdImagingMetalHydraMaterialAdapter" : {
                         "bases": ["UsdImagingPrimAdapter"],
                         "isInternal": true,
-                        "primTypeName": "HydraPbsSurface"
+                        "primTypeName": "HydraPbsSurfaceMetal"
                     }
                 }
             },
