@@ -34,7 +34,7 @@
 #include "pxr/imaging/hdSt/bufferRelocator.h"
 #include "pxr/imaging/hdSt/bufferResource.h"
 #include "pxr/imaging/hdSt/GL/glConversions.h"
-#include "pxr/imaging/hdSt/glUtils.h"
+#include "pxr/imaging/hdSt/GL/glUtils.h"
 
 #include "pxr/imaging/hd/bufferArrayRange.h"
 #include "pxr/imaging/hd/bufferSource.h"

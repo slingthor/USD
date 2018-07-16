@@ -30,7 +30,7 @@
 #include "pxr/imaging/hdSt/interleavedMemoryManager.h"
 #include "pxr/imaging/hdSt/bufferResource.h"
 #include "pxr/imaging/hdSt/bufferRelocator.h"
-#include "pxr/imaging/hdSt/glUtils.h"
+#include "pxr/imaging/hdSt/GL/glUtils.h"
 
 #include "pxr/imaging/hdSt/GL/interleavedMemoryBufferGL.h"
 #if defined(ARCH_GFX_METAL)

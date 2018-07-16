@@ -2,11 +2,21 @@
     "Plugins": [
         {
             "Info": {
-                "Types": {                                                                  
+                "Types": {
+                    "GarchPtexTexture" : {
+                        "bases": ["GarchTexture"],
+                        "textureTypes": ["ptx", "ptex"],
+                        "precedence": 2
+                    },
                     "Garch_StbImage" : {
                         "bases": ["GarchImage"],
                         "imageTypes": ["bmp", "jpg", "png", "tga", "hdr"],
                         "precedence": -1 
+                    },
+                    "GarchUVTexture" : {
+                        "bases": ["GarchBaseTexture"],
+                        "textureTypes": ["*"],
+                        "precedence": 0
                     }
                 }
             },

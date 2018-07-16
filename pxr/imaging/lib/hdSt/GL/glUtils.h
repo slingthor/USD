@@ -21,49 +21,87 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#ifndef HD_GL_UTILS_H
-#define HD_GL_UTILS_H
+#ifndef HDST_GL_UTILS_H
+#define HDST_GL_UTILS_H
 
 #include "pxr/pxr.h"
-#include "pxr/imaging/hd/api.h"
-#include "pxr/imaging/hd/version.h"
+#include "pxr/imaging/glf/glew.h"
+#include "pxr/imaging/hdSt/api.h"
+#include "pxr/imaging/hd/types.h"
 #include "pxr/base/vt/value.h"
-
-#include <algorithm>
-#include <cmath>
-#include <cstddef>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-
-
-class HdGLUtils {
+class HdStGLUtils {
 public:
+
     /// Reads the content of VBO back to VtArray.
     /// The \p vboOffset is expressed in bytes.
-    HD_API
+    HDST_API
     static VtValue ReadBuffer(GLint vbo,
-                              int glDataType,
-                              int numComponents,
-                              int arraySize,
+                              HdTupleType tupleType,
                               int vboOffset,
                               int stride,
                               int numElements);
 
     /// Returns true if the shader has been successfully compiled.
     /// if not, returns false and fills the error log into reason.
-    HD_API
+    HDST_API
     static bool GetShaderCompileStatus(GLuint shader,
                                        std::string * reason = NULL);
 
     /// Returns true if the program has been successfully linked.
     /// if not, returns false and fills the error log into reason.
-    HD_API
+    HDST_API
     static bool GetProgramLinkStatus(GLuint program,
                                      std::string * reason = NULL);
-
 };
+
+/// \class HdStGLBufferRelocator
+///
+/// A utility class to perform batched buffer copy.
+///
+class HdStGLBufferRelocator {
+public:
+    HdStGLBufferRelocator(GLint srcBuffer, GLint dstBuffer) :
+        _srcBuffer(srcBuffer), _dstBuffer(dstBuffer) {}
+
+    /// Schedule the range to be copied. The consecutive ranges could be
+    /// aggregated into a single copy where possible.
+    HDST_API
+    void AddRange(ptrdiff_t readOffset,
+                  ptrdiff_t writeOffset,
+                  ptrdiff_t copySize);
+
+    /// Execute GL buffer copy command to flush all scheduled range copies.
+    HDST_API
+    void Commit();
+
+private:
+    struct _CopyUnit {
+        _CopyUnit(ptrdiff_t read, ptrdiff_t write, ptrdiff_t size)
+            : readOffset(read), writeOffset(write), copySize(size) {}
+
+        bool Concat(_CopyUnit const &next) {
+            if (readOffset  + copySize == next.readOffset &&
+                writeOffset + copySize == next.writeOffset) {
+                copySize += next.copySize;
+                return true;
+            }
+            return false;
+        }
+
+        ptrdiff_t readOffset;
+        ptrdiff_t writeOffset;
+        ptrdiff_t copySize;
+    };
+
+    std::vector<_CopyUnit> _queue;
+    GLint _srcBuffer;
+    GLint _dstBuffer;
+};
+
 
 PXR_NAMESPACE_CLOSE_SCOPE
 
-#endif // HD_GL_UTILS_H
+#endif // HDST_GL_UTILS_H

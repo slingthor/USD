@@ -2,19 +2,7 @@
     "Plugins": [
         {
             "Info": {
-                "ShaderResources": "shaders",
-                "Types": {                                                                  
-                    "MtlfPtexTexture" : {
-                        "bases": ["MtlfTexture"],
-                        "textureTypes": ["ptx", "ptex"],
-                        "precedence": 1
-                    },
-                    "MtlfUVTexture" : {
-                        "bases": ["MtlfBaseTexture"],
-                        "textureTypes": ["*"],
-                        "precedence": 0
-                    }
-                }
+                "ShaderResources": "shaders"
             },
             "LibraryPath": "@PLUG_INFO_LIBRARY_PATH@",
             "Name": "mtlf",

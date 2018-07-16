@@ -30,7 +30,7 @@
 #include "pxr/imaging/hdSt/GL/interleavedMemoryBufferGL.h"
 #include "pxr/imaging/hdSt/bufferResource.h"
 #include "pxr/imaging/hdSt/bufferRelocator.h"
-#include "pxr/imaging/hdSt/glUtils.h"
+#include "pxr/imaging/hdSt/GL/glUtils.h"
 #include "pxr/imaging/hdSt/GL/glConversions.h"
 
 #include <boost/make_shared.hpp>

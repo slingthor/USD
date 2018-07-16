@@ -1207,6 +1207,31 @@ HdSt_CodeGenMSL::Compile()
                 << "#define greaterThan(a,b) (a > b)\n"
                 << "#define lessThan(a,b)    (a < b)\n";
     
+    // wrapper for type float and int to deal with .x accessors and the like that are valid in GLSL
+    _genCommon  << "struct wrapped_float {\n"
+                << "    union {\n"
+                << "        float x;\n"
+                << "        float xy;\n"
+                << "        float xyz;\n"
+                << "        float xyzw;\n"
+                << "    };\n"
+                << "    operator float () {\n"
+                << "        return x;\n"
+                << "    }\n"
+                << "};\n";
+    
+    _genCommon  << "struct wrapped_int {\n"
+                << "    union {\n"
+                << "        int x;\n"
+                << "        int xy;\n"
+                << "        int xyz;\n"
+                << "        int xyzw;\n"
+                << "    };\n"
+                << "    operator int () {\n"
+                << "        return x;\n"
+                << "    }\n"
+                << "};\n";
+
     // Fixes for Geometry shader functionality
     
     bool enableFragmentNormalReconstruction = false;
@@ -1720,7 +1745,7 @@ HdSt_CodeGenMSL::CompileComputeProgram()
             glCompileShader(shader);
 
             std::string logString;
-            HdGLUtils::GetShaderCompileStatus(shader, &logString);
+            HdStGLUtils::GetShaderCompileStatus(shader, &logString);
             TF_WARN("Failed to compile compute shader:\n%s\n",
                     logString.c_str());
             glDeleteShader(shader);
@@ -1729,6 +1754,22 @@ HdSt_CodeGenMSL::CompileComputeProgram()
     }
     */
     return program;
+}
+
+static std::string _GetSwizzleString(TfToken const& type)
+{
+    std::string swizzle = "";
+    if (type == _tokens->vec4 || type == _tokens->ivec4) {
+        // nothing
+    } else if (type == _tokens->vec3 || type == _tokens->ivec3) {
+        swizzle = ".xyz";
+    } else if (type == _tokens->vec2 || type == _tokens->ivec2) {
+        swizzle = ".xy";
+    } else if (type == _tokens->_float || type == _tokens->_int) {
+        swizzle = ".x";
+    }
+    
+    return swizzle;
 }
 
 static HdSt_CodeGenMSL::TParam& _EmitDeclaration(std::stringstream &str,
@@ -1868,19 +1909,8 @@ static void _EmitComputeAccessor(
             << " HdGet_" << name << "(int localIndex) {\n"
             << "  int index = " << index << ";\n";
         if (binding.GetType() == HdBinding::TBO) {
-
-            std::string swizzle = "";
-            if (type == _tokens->vec4 || type == _tokens->ivec4) {
-                // nothing
-            } else if (type == _tokens->vec3 || type == _tokens->ivec3) {
-                swizzle = ".xyz";
-            } else if (type == _tokens->vec2 || type == _tokens->ivec2) {
-                swizzle = ".xy";
-            } else if (type == _tokens->_float || type == _tokens->_int) {
-                swizzle = ".x";
-            }
             str << "  return texelFetch("
-                << name << ", index)" << swizzle << ";\n}\n";
+                << name << ", index)" << _GetSwizzleString(type) << ";\n}\n";
         } else if (binding.GetType() == HdBinding::SSBO) {
             str << "  return " << type << "(";
             int numComponents = 1;
@@ -1977,19 +2007,8 @@ static void _EmitAccessor(std::stringstream &str,
             << " HdGet_" << name << "(int localIndex) {\n"
             << "  int index = " << index << ";\n";
         if (binding.GetType() == HdBinding::TBO) {
-            
-            std::string swizzle = "";
-            if (type == _tokens->vec4 || type == _tokens->ivec4) {
-                // nothing
-            } else if (type == _tokens->vec3 || type == _tokens->ivec3) {
-                swizzle = ".xyz";
-            } else if (type == _tokens->vec2 || type == _tokens->ivec2) {
-                swizzle = ".xy";
-            } else if (type == _tokens->_float || type == _tokens->_int) {
-                swizzle = ".x";
-            }
             str << "  return texelFetch("
-                << name << ", index)" << swizzle << ";\n}\n";
+                << name << ", index)" << _GetSwizzleString(type) << ";\n}\n";
         } else {
             str << "  return " << _GetPackedTypeAccessor(type) << "("
                 << name << "[index]);\n}\n";
@@ -3246,12 +3265,16 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
     GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
 
     TfToken typeName("ShaderData");
-    TfToken varName("shaderData");
-
+    TfToken varName("materialParams");
+    
     // for shader parameters, we create declarations and accessors separetely.
     TF_FOR_ALL (it, _metaData.shaderData) {
         HdBinding binding = it->first;
 
+        declarations << "#define float wrapped_float\n";
+        declarations << "#define int wrapped_int\n";
+        declarations << "#undef vec3\n";
+        declarations << "#define vec3 packed_float3\n";
         declarations << "struct " << typeName << " {\n";
 
         TF_FOR_ALL (dbIt, it->second.entries) {
@@ -3261,6 +3284,10 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
 
         }
         declarations << "};\n";
+        declarations << "#undef vec3\n";
+        declarations << "#define vec3 float3\n";
+        declarations << "#undef float\n";
+        declarations << "#undef int\n";
 
         // for array delaration, SSBO and bindless uniform can use [].
         // UBO requires the size [N].
@@ -3268,7 +3295,6 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
         //      may not work some GPUs.
         // XXX: we only have 1 shaderData entry (interleaved).
         int arraySize = (binding.GetType() == HdBinding::UBO) ? 1 : 0;
-//        _EmitDeclaration(declarations, _mslVSInputParams, varName, typeName, TfToken(), binding, arraySize);
         _EmitDeclarationPtr(declarations, _mslVSInputParams, varName, typeName, TfToken(), binding, arraySize, true);
 
         break;
@@ -3281,16 +3307,15 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
     TF_FOR_ALL (it, _metaData.shaderParameterBinding) {
 
         // adjust datatype
-        std::string swizzle = "";
-        if (it->second.dataType == _tokens->vec4) {
-            // nothing
-        } else if (it->second.dataType == _tokens->vec3) {
-            swizzle = ".xyz";
-        } else if (it->second.dataType == _tokens->vec2) {
-            swizzle = ".xy";
-        } else if (it->second.dataType == _tokens->_float) {
+        std::string swizzle = _GetSwizzleString(it->second.dataType);
+        if (swizzle != ".x")
+            swizzle = "";
+        
+        // TEMP: FIXME: THIS IS REALY BAD: Sort something better out here. I think there's a Hydra bug
+        // causing the diffuseColour to be represented as a float rather than a vec3, which doesn't
+        // cause an issue in GLSL but does in MSL
+        if (it->second.name == "diffuseColor")
             swizzle = ".x";
-        }
 
         HdBinding::Type bindingType = it->first.GetType();
         if (bindingType == HdBinding::FALLBACK) {
@@ -3298,23 +3323,23 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
                 << it->second.dataType
                 << " HdGet_" << it->second.name << "() {\n"
                 << "  int shaderCoord = GetDrawingCoord().shaderCoord; \n"
-                << "  return shaderData[shaderCoord]." << it->second.name << swizzle << ";\n"
+                << "  return materialParams[shaderCoord]." << it->second.name << swizzle << ";\n"
                 << "}\n";
         } else if (bindingType == HdBinding::BINDLESS_TEXTURE_2D) {
             // a function returning sampler2D is allowed in 430 or later
             if (caps.glslVersion >= 430) {
                 accessors
-                    << "sampler2D\n"
+                    << "sampler\n"
                     << "HdGetSampler_" << it->second.name << "() {\n"
                     << "  int shaderCoord = GetDrawingCoord().shaderCoord; \n"
-                    << "  return sampler2D(shaderData[shaderCoord]." << it->second.name << ");\n"
+                    << "  return sampler2D(materialParams[shaderCoord]." << it->second.name << ");\n"
                     << "  }\n";
             }
             accessors
                 << it->second.dataType
                 << " HdGet_" << it->second.name << "() {\n"
                 << "  int shaderCoord = GetDrawingCoord().shaderCoord; \n"
-                << "  return texture(sampler2D(shaderData[shaderCoord]." << it->second.name << "), ";
+                << "  return texture(sampler2D(materialParams[shaderCoord]." << it->second.name << "), ";
 
             if (!it->second.inPrimvars.empty()) {
                 accessors 
@@ -3334,12 +3359,12 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
                 << "}\n";
         } else if (bindingType == HdBinding::TEXTURE_2D) {
             declarations
-                << AddressSpace(it->first)
-                << "uniform sampler2D sampler2d_" << it->second.name << ";\n";
+                << "sampler sampler2d_" << it->second.name << ";\n"
+                << "texture2d<float> texture2d_" << it->second.name << ";\n";
             // a function returning sampler2D is allowed in 430 or later
             if (caps.glslVersion >= 430) {
                 accessors
-                    << "sampler2D\n"
+                    << "sampler\n"
                     << "HdGetSampler_" << it->second.name << "() {\n"
                     << "  return sampler2d_" << it->second.name << ";"
                     << "}\n";
@@ -3348,7 +3373,7 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
             accessors
                 << it->second.dataType
                 << " HdGet_" << it->second.name
-                << "(vec2 coord) { return texture(sampler2d_"
+                << "(vec2 coord) { return texture2d_" << it->second.name << ".sample(sampler2d_"
                 << it->second.name << ", coord)" << swizzle << ";}\n";
             // vec4 HdGet_name() { return HdGet_name(HdGet_st().xy); }
             accessors
@@ -3375,8 +3400,8 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
                 << "  int shaderCoord = GetDrawingCoord().shaderCoord; \n"
                 << "  return " << it->second.dataType
                 << "(GlopPtexTextureLookup("
-                << "sampler2DArray(shaderData[shaderCoord]." << it->second.name <<"),"
-                << "isamplerBuffer(shaderData[shaderCoord]." << it->second.name << "_layout), "
+                << "samplerArray(materialParams[shaderCoord]." << it->second.name <<"),"
+                << "isamplerBuffer(materialParams[shaderCoord]." << it->second.name << "_layout), "
                 << "GetPatchCoord(localIndex))" << swizzle << ");\n"
                 << "}\n"
                 << it->second.dataType
@@ -3387,19 +3412,15 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
                 << "  int shaderCoord = GetDrawingCoord().shaderCoord; \n"
                 << "  return " << it->second.dataType
                 << "(GlopPtexTextureLookup("
-                << "sampler2DArray(shaderData[shaderCoord]." << it->second.name <<"),"
-                << "isamplerBuffer(shaderData[shaderCoord]." << it->second.name << "_layout), "
+                << "samplerArray(materialParams[shaderCoord]." << it->second.name <<"),"
+                << "isamplerBuffer(materialParams[shaderCoord]." << it->second.name << "_layout), "
                 << "patchCoord)" << swizzle << ");\n"
                 << "}\n";
         } else if (bindingType == HdBinding::TEXTURE_PTEX_TEXEL) {
             // +1 for layout is by convention.
             declarations
-                << AddressSpace(it->first)
-                << "uniform sampler2DArray sampler2darray_" << it->first.GetLocation() << ";\n"
-                << AddressSpace(HdBinding(it->first.GetType(),
-                                             it->first.GetLocation()+1,
-                                             it->first.GetTextureUnit()))
-                << "uniform isamplerBuffer isamplerbuffer_" << (it->first.GetLocation()+1) << ";\n";
+                << "sampler2DArray sampler2darray_" << it->first.GetLocation() << ";\n"
+                << "isamplerBuffer isamplerbuffer_" << (it->first.GetLocation()+1) << ";\n";
             accessors
                 << it->second.dataType
                 << " HdGet_" << it->second.name << "(int localIndex) {\n"

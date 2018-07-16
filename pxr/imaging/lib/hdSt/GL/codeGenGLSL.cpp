@@ -925,7 +925,7 @@ HdSt_CodeGenGLSL::CompileComputeProgram()
             glCompileShader(shader);
 
             std::string logString;
-            HdGLUtils::GetShaderCompileStatus(shader, &logString);
+            HdStGLUtils::GetShaderCompileStatus(shader, &logString);
             TF_WARN("Failed to compile compute shader: %s",
                     logString.c_str());
             glDeleteShader(shader);

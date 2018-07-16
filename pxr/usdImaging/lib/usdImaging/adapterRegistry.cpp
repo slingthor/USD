@@ -150,8 +150,23 @@ UsdImagingAdapterRegistry::ConstructAdapter(TfToken const& adapterKey)
     }
 
     // Lookup the plug-in type name based on the prim type.
-    _TypeMap::const_iterator typeIt = _typeMap.find(adapterKey);
+    _TypeMap::iterator typeIt = _typeMap.end();
 
+    //METAL TODO: Implement a specific system for dealing with the selection of the correct
+    // adapter for the current renderer
+    if (adapterKey.GetString() == "HydraPbsSurface" || adapterKey.GetString() == "__drawModeAdapter")
+    {
+        TF_FOR_ALL(i, _typeMap) {
+            if (i->second.GetTypeName().find("Metal") != std::string::npos) {
+                typeIt = i;
+                break;
+            }
+        }
+    }
+    else {
+        typeIt = _typeMap.find(adapterKey);
+    }
+    
     if (typeIt == _typeMap.end()) {
         // Unknown prim type.
         TF_DEBUG(USDIMAGING_PLUGINS).Msg("[PluginLoad] Unknown prim "
@@ -162,6 +177,7 @@ UsdImagingAdapterRegistry::ConstructAdapter(TfToken const& adapterKey)
 
     PlugRegistry& plugReg = PlugRegistry::GetInstance();
     PlugPluginPtr plugin = plugReg.GetPluginForType(typeIt->second);
+
     if (!plugin || !plugin->Load()) {
         TF_CODING_ERROR("[PluginLoad] PlugPlugin could not be loaded for "
                 "TfType '%s'\n",

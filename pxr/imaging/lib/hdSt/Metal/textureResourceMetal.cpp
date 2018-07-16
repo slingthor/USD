@@ -24,10 +24,11 @@
 #include "pxr/imaging/glf/glew.h"
 
 #include "pxr/imaging/hdSt/Metal/textureResourceMetal.h"
-#include "pxr/imaging/hdSt/GL/glConversions.h"
+#include "pxr/imaging/hdSt/Metal/metalConversions.h"
 
 #include "pxr/imaging/hd/perfLog.h"
 
+#include "pxr/imaging/mtlf/mtlDevice.h"
 #include "pxr/imaging/mtlf/ptexTexture.h"
 
 #include "pxr/imaging/garch/texture.h"
@@ -41,6 +42,24 @@ TF_DEFINE_PRIVATE_TOKENS(
     ((fallbackPtexPath, "PtExNoNsEnSe"))
     ((fallbackUVPath, "UvNoNsEnSe"))
 );
+
+static MTLSamplerAddressMode
+ConvertWrap(GLuint wrap)
+{
+    switch (wrap) {
+        case GL_CLAMP_TO_EDGE:
+            return MTLSamplerAddressModeClampToEdge;
+        case GL_REPEAT:
+            return MTLSamplerAddressModeRepeat;
+        case GL_CLAMP_TO_BORDER:
+            return MTLSamplerAddressModeClampToBorderColor;
+        case GL_MIRRORED_REPEAT:
+            return MTLSamplerAddressModeMirrorRepeat;
+    }
+    
+    TF_CODING_ERROR("Unexpected GL wrap type %d", wrap);
+    return MTLSamplerAddressModeRepeat;
+}
 
 HdStSimpleTextureResourceMetal::HdStSimpleTextureResourceMetal(
     GarchTextureHandleRefPtr const &textureHandle, bool isPtex, size_t memoryRequest):
@@ -64,67 +83,72 @@ HdStSimpleTextureResourceMetal::HdStSimpleTextureResourceMetal(
             , _isPtex(isPtex)
             , _memoryRequest(memoryRequest)
 {
-    TF_FATAL_CODING_ERROR("Not Implemented");
-    /*
     // When we are not using Ptex we will use samplers,
     // that includes both, bindless textures and no-bindless textures
     if (!_isPtex) {
         // If the HdSimpleTextureResource defines a wrap mode it will 
         // use it, otherwise it gives an opportunity to the texture to define
         // its own wrap mode. The fallback value is always HdWrapRepeat
-        GLenum fwrapS = HdConversions::GetWrap(wrapS);
-        GLenum fwrapT = HdConversions::GetWrap(wrapT);
+        MTLSamplerAddressMode fwrapS = HdStMetalConversions::GetWrap(wrapS);
+        MTLSamplerAddressMode fwrapT = HdStMetalConversions::GetWrap(wrapT);
         VtDictionary txInfo = _texture->GetTextureInfo();
 
         if (wrapS == HdWrapUseMetaDict && 
             VtDictionaryIsHolding<GLuint>(txInfo, "wrapModeS")) {
-            fwrapS = VtDictionaryGet<GLuint>(txInfo, "wrapModeS");
+            fwrapS = ConvertWrap(VtDictionaryGet<GLuint>(txInfo, "wrapModeS"));
         }
 
         if (wrapT == HdWrapUseMetaDict && 
             VtDictionaryIsHolding<GLuint>(txInfo, "wrapModeT")) {
-            fwrapT = VtDictionaryGet<GLuint>(txInfo, "wrapModeT");
+            fwrapT = ConvertWrap(VtDictionaryGet<GLuint>(txInfo, "wrapModeT"));
         }
 
-        GLenum fminFilter = HdConversions::GetMinFilter(minFilter);
-        GLenum fmagFilter = HdConversions::GetMagFilter(magFilter);
+        MTLSamplerMinMagFilter fminFilter = HdStMetalConversions::GetMinFilter(minFilter);
+        MTLSamplerMinMagFilter fmagFilter = HdStMetalConversions::GetMagFilter(magFilter);
+        MTLSamplerMipFilter fmipFilter = HdStMetalConversions::GetMipFilter(minFilter);
         if (!_texture->IsMinFilterSupported(fminFilter)) {
-            fminFilter = GL_NEAREST;
+            fminFilter = MTLSamplerMinMagFilterNearest;
         }
         if (!_texture->IsMagFilterSupported(fmagFilter)) {
-            fmagFilter = GL_NEAREST;
+            fmagFilter = MTLSamplerMinMagFilterNearest;
         }
 
-        glGenSamplers(1, &_sampler);
-        glSamplerParameteri(_sampler, GL_TEXTURE_WRAP_S, fwrapS);
-        glSamplerParameteri(_sampler, GL_TEXTURE_WRAP_T, fwrapT);
-        glSamplerParameteri(_sampler, GL_TEXTURE_MIN_FILTER, fminFilter);
-        glSamplerParameteri(_sampler, GL_TEXTURE_MAG_FILTER, fmagFilter);
-        glSamplerParameterf(_sampler, GL_TEXTURE_MAX_ANISOTROPY_EXT, 
-            _maxAnisotropy);
-        glSamplerParameterfv(_sampler, GL_TEXTURE_BORDER_COLOR, 
-            _borderColor.GetArray());
+        MTLSamplerDescriptor* samplerDesc = [[MTLSamplerDescriptor alloc] init];
+
+        samplerDesc.sAddressMode = fwrapS;
+        samplerDesc.tAddressMode = fwrapT;
+        samplerDesc.minFilter = fminFilter;
+        samplerDesc.magFilter = fmagFilter;
+        samplerDesc.mipFilter = fmipFilter;
+        samplerDesc.maxAnisotropy = _maxAnisotropy;
+        samplerDesc.borderColor = MTLSamplerBorderColorOpaqueBlack;
+        
+        id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->device;
+        _sampler = [device newSamplerStateWithDescriptor:samplerDesc];
+    }
+/*
+    GarchTextureGPUHandle handle = GetTexelsTextureHandle();
+    if (handle) {
+        if (!glIsTextureHandleResidentNV(handle)) {
+            glMakeTextureHandleResidentNV(handle);
+        }
     }
 
-    bool bindlessTexture = 
-        HdStRenderContextCaps::GetInstance().bindlessTextureEnabled;
-    if (bindlessTexture) {
-        GarchTextureGPUHandle handle = GetTexelsTextureHandle();
+    if (_isPtex) {
+        handle = GetLayoutTextureHandle();
         if (handle) {
             if (!glIsTextureHandleResidentNV(handle)) {
                 glMakeTextureHandleResidentNV(handle);
             }
         }
-
-        if (_isPtex) {
-            handle = GetLayoutTextureHandle();
-            if (handle) {
-                if (!glIsTextureHandleResidentNV(handle)) {
-                    glMakeTextureHandleResidentNV(handle);
-                }
-            }
-        }
     }
+
+     MTLTextureDescriptor* texDesc =
+     [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:format
+        width:numPixels
+        height:1
+        mipmapped:NO];
+     _texId = [_id newTextureWithDescriptor:texDesc offset:0 bytesPerRow:pixelSize * numPixels];
      */
 }
 

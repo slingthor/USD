@@ -26,6 +26,7 @@ if (APPLE)
                         Metal/drawTargetTextureResourceMetal
                         Metal/indirectDrawBatchMetal
                         Metal/interleavedMemoryBufferMetal
+                        Metal/metalConversions
                         Metal/mslProgram
                         Metal/mtlUtils
                         Metal/persistentBufferMetal
@@ -78,7 +79,6 @@ pxr_library(hdSt
         fallbackLightingShader
         geometricShader
         glslfxShader
-        glUtils
         instancer
         interleavedMemoryManager
         light      

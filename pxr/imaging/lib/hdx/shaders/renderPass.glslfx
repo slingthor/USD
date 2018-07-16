@@ -55,7 +55,9 @@ void RenderColor(vec4 color)
 -- glsl HdxRenderPass.RenderColorOutputWithSelection
 
 // Forward declare method defined in selection.glslfx
+#if !defined(ARCH_GFX_METAL)
 vec4 ApplySelectionColor(vec4 color);
+#endif
 
 // XXX: Make sure to update hdSt/shaders/renderPass.glslfx when editing these
 // color override methods, since they're currently duplicated. This is because
@@ -90,7 +92,9 @@ vec4 ApplyColorOverrides(vec4 color)
 
 vec3 ApplyMaskColor(vec4 color, float weight, vec4 maskColor)
 {
-    float strength = maskColor.a * clamp(weight, 0, 1);
+    float const clampMin = 0;
+    float const clampMax = 1;
+    float strength = maskColor.a * clamp(weight, clampMin, clampMax);
     return mix(color.rgb, maskColor.rgb, strength);
 }
 
@@ -108,7 +112,10 @@ vec4 ApplyColorOverridesPostLighting(vec4 color)
     #endif
     return color;
 }
-
+#if defined(ARCH_GFX_METAL)
+// Still need to use the 'out' semantic as this is picked up by the glslfx parser
+out vec4 colorOut;
+#else
 layout (location = 0) out vec4 colorOut;
 #endif
 

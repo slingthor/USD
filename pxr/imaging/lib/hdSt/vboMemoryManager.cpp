@@ -37,7 +37,7 @@
 #include "pxr/base/tf/enum.h"
 
 #include "pxr/imaging/hdSt/bufferResource.h"
-#include "pxr/imaging/hdSt/glUtils.h"
+#include "pxr/imaging/hdSt/GL/glUtils.h"
 #include "pxr/imaging/hdSt/vboMemoryManager.h"
 #include "pxr/imaging/hdSt/GL/glConversions.h"
 

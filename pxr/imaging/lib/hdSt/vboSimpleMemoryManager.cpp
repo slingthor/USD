@@ -33,7 +33,7 @@
 
 #include "pxr/imaging/hdSt/bufferResource.h"
 #include "pxr/imaging/hdSt/GL/glConversions.h"
-#include "pxr/imaging/hdSt/glUtils.h"
+#include "pxr/imaging/hdSt/GL/glUtils.h"
 #include "pxr/imaging/hdSt/vboSimpleMemoryManager.h"
 
 #include "pxr/imaging/hdSt/GL/vboSimpleMemoryBufferGL.h"

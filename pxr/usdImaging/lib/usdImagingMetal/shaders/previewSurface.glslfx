@@ -31,14 +31,14 @@ vec4 displacementShader(int index, vec4 Peye, vec3 Neye, vec4 patchCoord)
 
 vec4 surfaceShader(vec4 Peye, vec3 Neye, vec4 color, vec4 patchCoord)
 {
-    vec4 diffColor          = vec4(HdGet_diffuseColor().xyz, HdGet_opacity().x);
-    float roughness         = HdGet_roughness().x;
-    float clearcoat         = HdGet_clearcoat().x;
-    float clearRoughness    = HdGet_clearcoatRoughness().x;
+    vec4 diffColor          = vec4(HdGet_diffuseColor().xyz, HdGet_opacity());
+    float roughness         = HdGet_roughness();
+    float clearcoat         = HdGet_clearcoat();
+    float clearRoughness    = HdGet_clearcoatRoughness();
     vec3 emissiveColor      = HdGet_emissiveColor().xyz;
-    int useSpecularWorkflow = HdGet_useSpecularWorkflow().x;
-    float occlusion         = HdGet_occlusion().x;
-    float ior               = HdGet_ior().x;
+    int useSpecularWorkflow = HdGet_useSpecularWorkflow();
+    float occlusion         = HdGet_occlusion();
+    float ior               = HdGet_ior();
     vec3 normal             = HdGet_normal().xyz;
 
     // Deal with metallic/specular workflow
@@ -46,7 +46,7 @@ vec4 surfaceShader(vec4 Peye, vec3 Neye, vec4 color, vec4 patchCoord)
     if (useSpecularWorkflow == 1) {
         specInfo = HdGet_specularColor().xyz;
     } else {
-        specInfo.x = HdGet_metallic().x;
+        specInfo.x = HdGet_metallic();
     }
 
     // Selection highlighting.

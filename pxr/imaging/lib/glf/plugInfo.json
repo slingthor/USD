@@ -2,19 +2,7 @@
     "Plugins": [
         {
             "Info": {
-                "ShaderResources": "shaders",
-                "Types": {                                                                  
-                    "GlfPtexTexture" : {
-                        "bases": ["GlfTexture"],
-                        "textureTypes": ["ptx", "ptex"],
-                        "precedence": 1
-                    },
-                    "GlfUVTexture" : {
-                        "bases": ["GlfBaseTexture"],
-                        "textureTypes": ["*"],
-                        "precedence": 0
-                    }
-                }
+                "ShaderResources": "shaders"
             },
             "LibraryPath": "@PLUG_INFO_LIBRARY_PATH@",
             "Name": "glf",

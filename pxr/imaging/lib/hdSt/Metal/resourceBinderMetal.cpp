@@ -30,7 +30,7 @@
 #include "pxr/imaging/hdSt/bufferResource.h"
 #include "pxr/imaging/hdSt/shaderCode.h"
 #include "pxr/imaging/hdSt/drawItem.h"
-#include "pxr/imaging/hdSt/GL/glConversions.h"
+#include "pxr/imaging/hdSt/Metal/metalConversions.h"
 
 #include "pxr/imaging/hd/bufferArrayRange.h"
 #include "pxr/imaging/hd/bufferSpec.h"
@@ -164,7 +164,7 @@ HdSt_ResourceBinderMetal::BindBuffer(TfToken const &name,
             MtlfMetalContext::GetMetalContext()->SetVertexAttribute(
                         shaderBinding._index,
                         _GetNumComponents(tupleType.type),
-                        HdStGLConversions::GetGLAttribType(tupleType.type),  // ??!??!
+                        HdStMetalConversions::GetGLAttribType(tupleType.type),  // ??!??!
                         buffer->GetStride(),
                         offset,
                         name);
