@@ -71,6 +71,12 @@ public:
     /// Return the name of the given type as represented in GLSL.
     HDST_API
     static TfToken GetGLSLTypename(HdType type);
+
+    HDST_API
+    static MTLSamplerAddressMode ConvertGLWrap(GLuint wrap);
+    
+    HDST_API
+    static MTLPixelFormat ConvertGLInternalFormat(GLenum inInternalFormat, GLenum inType, size_t *outPixelByteSize);
 };
 
 

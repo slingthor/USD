@@ -37,6 +37,65 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+static MTLPixelFormat GetMetalFormat(GLenum inInternalFormat, GLenum inType, size_t *outPixelByteSize)
+{
+    MTLPixelFormat mtlFormat = MTLPixelFormatInvalid;
+    
+    *outPixelByteSize = 0;
+    
+    switch (inInternalFormat)
+    {
+        case GL_RGB32F:
+        case GL_RGB16F:
+        case GL_RGB16:
+        case GL_SRGB:
+        case GL_RGB:
+            TF_CODING_ERROR("3 channel textures are unsupported on Metal");
+            // Drop through
+            
+        case GL_RGBA:
+            mtlFormat = MTLPixelFormatRGBA8Unorm;
+            *outPixelByteSize = sizeof(char) * 4;
+            break;
+            
+        case GL_SRGB_ALPHA:
+            mtlFormat = MTLPixelFormatRGBA8Unorm_sRGB;
+            *outPixelByteSize = sizeof(char) * 4;
+            break;
+            
+        case GL_RGBA16:
+            mtlFormat = MTLPixelFormatRGBA16Unorm;
+            *outPixelByteSize = sizeof(short) * 4;
+            break;
+            
+        case GL_R16:
+            mtlFormat = MTLPixelFormatRGBA16Unorm;
+            *outPixelByteSize = sizeof(short);
+            break;
+            
+        case GL_RGBA16F:
+            mtlFormat = MTLPixelFormatRGBA16Float;
+            *outPixelByteSize = sizeof(short) * 4;
+            break;
+            
+        case GL_R16F:
+            mtlFormat = MTLPixelFormatR16Float;
+            *outPixelByteSize = sizeof(short);
+            break;
+            
+        case GL_RGBA32F:
+            mtlFormat = MTLPixelFormatRGBA32Float;
+            *outPixelByteSize = sizeof(float) * 4;
+            break;
+            
+        case GL_R32F:
+            mtlFormat = MTLPixelFormatRGBA32Float;
+            *outPixelByteSize = sizeof(float);
+            break;
+    }
+    
+    return mtlFormat;
+}
 
 TF_REGISTRY_FUNCTION(TfType)
 {
@@ -101,13 +160,11 @@ MtlfBaseTexture::_CreateTexture(GarchBaseTextureDataConstPtr texData,
     TRACE_FUNCTION();
     
     if (texData && texData->HasRawBuffer()) {
-        //TF_FATAL_CODING_ERROR("Not Implemented");
-        /*
-        glBindTexture(GL_TEXTURE_2D, _textureName);
 
         // Check if mip maps have been requested, if so, it will either
         // enable automatic generation or use the ones loaded in cpu memory
         int numMipLevels = 1;
+        bool genMips = false;
 
         if (useMipmaps) {
             numMipLevels = texData->GetNumMipLevels();
@@ -119,49 +176,29 @@ MtlfBaseTexture::_CreateTexture(GarchBaseTextureDataConstPtr texData,
                 unpackCropTop || unpackCropBottom)) {
                     numMipLevels = 1;
             }
-            if (numMipLevels > 1) {
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, numMipLevels-1);
-            } else {
-                glTexParameteri(GL_TEXTURE_2D, GL_GENERATE_MIPMAP, GL_TRUE);
+            if (numMipLevels == 1) {
+                genMips = true;
             }
-        } else {
-            glTexParameteri(GL_TEXTURE_2D, GL_GENERATE_MIPMAP, GL_FALSE);
+        }
+        
+        if (_textureName != nil) {
+            [_textureName release];
         }
 
-        if (texData->IsCompressed()) {
-            // Compressed textures don't have as many options, so 
-            // we just need to send the mips to the driver.
-            for (int i = 0 ; i < numMipLevels; i++) {
-                glCompressedTexImage2D( GL_TEXTURE_2D, i,
-                                texData->MtlInternalFormat(),
-                                texData->ResizedWidth(i),
-                                texData->ResizedHeight(i),
-                                0,
-                                texData->ComputeBytesUsedByMip(i),
-                                texData->GetRawBuffer(i));
-            }
-        } else {
-            // Uncompressed textures can have cropping and other special 
-            // behaviours.
-            
-            TF_FATAL_CODING_ERROR("Not Implemented");
-            if (MtlfGetNumElements(texData->GLFormat()) == 1) {
-                GLint swizzleMask[] = {GL_RED, GL_RED, GL_RED, GL_ONE};
-                glTexParameteriv(
-                    GL_TEXTURE_2D,
-                    GL_TEXTURE_SWIZZLE_RGBA, 
-                    swizzleMask);
-            }
+    
+        // Uncompressed textures can have cropping and other special
+        // behaviours.
 
-            // If we are not sending full mipchains to the gpu then we can 
-            // do some extra work in the driver to prepare our textures.
-            if (numMipLevels == 1) {
-                int texDataWidth = texData->ResizedWidth();
-                int texDataHeight = texData->ResizedHeight();
-                int unpackRowLength = texDataWidth;
-                int unpackSkipPixels = 0;
-                int unpackSkipRows = 0;
+        // If we are not sending full mipchains to the gpu then we can
+        // do some extra work in the driver to prepare our textures.
+        if (numMipLevels == 1) {
+            int texDataWidth = texData->ResizedWidth();
+            int texDataHeight = texData->ResizedHeight();
+            int unpackRowLength = texDataWidth;
+            int unpackSkipPixels = 0;
+            int unpackSkipRows = 0;
 
+            if (!texData->IsCompressed()) {
                 if (unpackCropTop < 0 || unpackCropTop > texDataHeight) {
                     return;
                 } else if (unpackCropTop > 0) {
@@ -184,42 +221,70 @@ MtlfBaseTexture::_CreateTexture(GarchBaseTextureDataConstPtr texData,
                 } else if (unpackCropRight > 0) {
                     texDataWidth -= unpackCropRight;
                 }
+            }
 
-                glPushClientAttrib(GL_CLIENT_PIXEL_STORE_BIT);
-                glPixelStorei(GL_UNPACK_ROW_LENGTH, unpackRowLength);
-                glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-                glPixelStorei(GL_UNPACK_SKIP_PIXELS, unpackSkipPixels);
-                glPixelStorei(GL_UNPACK_SKIP_ROWS, unpackSkipRows);
+            size_t pixelByteSize;
+            MTLPixelFormat mtlFormat = GetMetalFormat(texData->GLInternalFormat(), texData->GLType(), &pixelByteSize);
+            
+            if (mtlFormat == MTLPixelFormatInvalid) {
+                TF_FATAL_CODING_ERROR("Unsupported/unimplemented texture format");
+            }
+            
+            id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->device;
+            MTLTextureDescriptor* desc =
+                [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:mtlFormat
+                                                                   width:texDataWidth
+                                                                  height:texDataHeight
+                                                               mipmapped:genMips?YES:NO];
+            //desc.usage = MTLTextureUsageRead;
+            desc.resourceOptions = MTLResourceStorageModeManaged;
+            _textureName = [device newTextureWithDescriptor:desc];
 
-                // Send the mip to the driver now
-                glTexImage2D( GL_TEXTURE_2D, 0,
-                                texData->MtlInternalFormat(),
-                                texDataWidth,
-                                texDataHeight,
-                                0,
-                                texData->MetalFormat(),
-                                texData->MetalType(),
-                                texData->GetRawBuffer(0));
+            char *rawData = (char*)texData->GetRawBuffer(0) + (unpackSkipRows * unpackRowLength * pixelByteSize)
+                                                            + (unpackSkipPixels * pixelByteSize);
+            [_textureName replaceRegion:MTLRegionMake2D(0, 0, texDataWidth, texDataHeight)
+                            mipmapLevel:0
+                              withBytes:rawData
+                            bytesPerRow:pixelByteSize * unpackRowLength];
+            
+            if (genMips) {
+                // Blit command encoder to generate mips
+                id<MTLCommandBuffer> commandBuffer = [MtlfMetalContext::GetMetalContext()->commandQueue commandBuffer];
+                id<MTLBlitCommandEncoder> blitEncoder = [commandBuffer blitCommandEncoder];
+                
+                [blitEncoder generateMipmapsForTexture:_textureName];
+                [blitEncoder endEncoding];
+                
+                [commandBuffer commit];
+            }
 
-                // Reset the OpenGL state if we have modify it previously
-                glPopClientAttrib();
-            } else {
-                // Send the mips to the driver now
-                for (int i = 0 ; i < numMipLevels; i++) {
-                    glTexImage2D( GL_TEXTURE_2D, i,
-                                    texData->MtlInternalFormat(),
-                                    texData->ResizedWidth(i),
-                                    texData->ResizedHeight(i),
-                                    0,
-                                    texData->MetalFormat(),
-                                    texData->MetalType(),
-                                    texData->GetRawBuffer(i));
-                }
+        } else {
+            size_t pixelByteSize;
+            MTLPixelFormat mtlFormat = GetMetalFormat(texData->GLInternalFormat(), texData->GLType(), &pixelByteSize);
+            
+            if (mtlFormat == MTLPixelFormatInvalid) {
+                TF_FATAL_CODING_ERROR("Unsupported/unimplemented texture format");
+            }
+            
+            id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->device;
+            MTLTextureDescriptor* desc =
+                [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:mtlFormat
+                                                                   width:texData->ResizedWidth()
+                                                                  height:texData->ResizedHeight()
+                                                               mipmapped:genMips?YES:NO];
+            
+            desc.resourceOptions = MTLResourceStorageModeManaged;
+            _textureName = [device newTextureWithDescriptor:desc];
+
+            for (int i = 0 ; i < numMipLevels; i++) {
+                size_t mipWidth = texData->ResizedWidth(i);
+                [_textureName replaceRegion:MTLRegionMake2D(0, 0, mipWidth, texData->ResizedHeight(i))
+                                mipmapLevel:i
+                                  withBytes:texData->GetRawBuffer(i)
+                                bytesPerRow:pixelByteSize * mipWidth];
             }
         }
 
-        glBindTexture(GL_TEXTURE_2D, 0);
-         */
         _SetMemoryUsed(texData->ComputeBytesUsed());
     }
 }

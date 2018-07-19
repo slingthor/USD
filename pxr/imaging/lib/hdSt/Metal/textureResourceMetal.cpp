@@ -43,24 +43,6 @@ TF_DEFINE_PRIVATE_TOKENS(
     ((fallbackUVPath, "UvNoNsEnSe"))
 );
 
-static MTLSamplerAddressMode
-ConvertWrap(GLuint wrap)
-{
-    switch (wrap) {
-        case GL_CLAMP_TO_EDGE:
-            return MTLSamplerAddressModeClampToEdge;
-        case GL_REPEAT:
-            return MTLSamplerAddressModeRepeat;
-        case GL_CLAMP_TO_BORDER:
-            return MTLSamplerAddressModeClampToBorderColor;
-        case GL_MIRRORED_REPEAT:
-            return MTLSamplerAddressModeMirrorRepeat;
-    }
-    
-    TF_CODING_ERROR("Unexpected GL wrap type %d", wrap);
-    return MTLSamplerAddressModeRepeat;
-}
-
 HdStSimpleTextureResourceMetal::HdStSimpleTextureResourceMetal(
     GarchTextureHandleRefPtr const &textureHandle, bool isPtex, size_t memoryRequest):
         HdStSimpleTextureResourceMetal(textureHandle, isPtex,
@@ -111,12 +93,12 @@ HdStSimpleTextureResourceMetal::HdStSimpleTextureResourceMetal(
 
             if (wrapS == HdWrapUseMetaDict &&
                 VtDictionaryIsHolding<GLuint>(txInfo, "wrapModeS")) {
-                fwrapS = ConvertWrap(VtDictionaryGet<GLuint>(txInfo, "wrapModeS"));
+                fwrapS = HdStMetalConversions::ConvertGLWrap(VtDictionaryGet<GLuint>(txInfo, "wrapModeS"));
             }
 
             if (wrapT == HdWrapUseMetaDict &&
                 VtDictionaryIsHolding<GLuint>(txInfo, "wrapModeT")) {
-                fwrapT = ConvertWrap(VtDictionaryGet<GLuint>(txInfo, "wrapModeT"));
+                fwrapT = HdStMetalConversions::ConvertGLWrap(VtDictionaryGet<GLuint>(txInfo, "wrapModeT"));
             }
 
             if (!_texture->IsMinFilterSupported(fminFilter)) {
@@ -140,30 +122,6 @@ HdStSimpleTextureResourceMetal::HdStSimpleTextureResourceMetal(
         id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->device;
         _sampler = [device newSamplerStateWithDescriptor:samplerDesc];
     }
-/*
-    GarchTextureGPUHandle handle = GetTexelsTextureHandle();
-    if (handle) {
-        if (!glIsTextureHandleResidentNV(handle)) {
-            glMakeTextureHandleResidentNV(handle);
-        }
-    }
-
-    if (_isPtex) {
-        handle = GetLayoutTextureHandle();
-        if (handle) {
-            if (!glIsTextureHandleResidentNV(handle)) {
-                glMakeTextureHandleResidentNV(handle);
-            }
-        }
-    }
-
-     MTLTextureDescriptor* texDesc =
-     [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:format
-        width:numPixels
-        height:1
-        mipmapped:NO];
-     _texId = [_id newTextureWithDescriptor:texDesc offset:0 bytesPerRow:pixelSize * numPixels];
-     */
 }
 
 HdStSimpleTextureResourceMetal::~HdStSimpleTextureResourceMetal()

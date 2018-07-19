@@ -369,5 +369,84 @@ HdStMetalConversions::GetGLSLTypename(HdType type)
     };
 }
 
+MTLSamplerAddressMode
+HdStMetalConversions::ConvertGLWrap(GLuint wrap)
+{
+    switch (wrap) {
+        case GL_CLAMP_TO_EDGE:
+            return MTLSamplerAddressModeClampToEdge;
+        case GL_REPEAT:
+            return MTLSamplerAddressModeRepeat;
+        case GL_CLAMP_TO_BORDER:
+            return MTLSamplerAddressModeClampToBorderColor;
+        case GL_MIRRORED_REPEAT:
+            return MTLSamplerAddressModeMirrorRepeat;
+    }
+    
+    TF_CODING_ERROR("Unexpected GL wrap type %d", wrap);
+    return MTLSamplerAddressModeRepeat;
+}
+
+MTLPixelFormat
+HdStMetalConversions::ConvertGLInternalFormat(GLenum inInternalFormat, GLenum inType, size_t *outPixelByteSize)
+{
+    MTLPixelFormat mtlFormat = MTLPixelFormatInvalid;
+    
+    *outPixelByteSize = 0;
+    
+    switch (inInternalFormat)
+    {
+        case GL_RGB32F:
+        case GL_RGB16F:
+        case GL_RGB16:
+        case GL_SRGB:
+        case GL_RGB:
+            TF_CODING_ERROR("3 channel textures are unsupported on Metal");
+            // Drop through
+            
+        case GL_RGBA:
+            mtlFormat = MTLPixelFormatRGBA8Unorm;
+            *outPixelByteSize = sizeof(char) * 4;
+            break;
+            
+        case GL_SRGB_ALPHA:
+            mtlFormat = MTLPixelFormatRGBA8Unorm_sRGB;
+            *outPixelByteSize = sizeof(char) * 4;
+            break;
+            
+        case GL_RGBA16:
+            mtlFormat = MTLPixelFormatRGBA16Unorm;
+            *outPixelByteSize = sizeof(short) * 4;
+            break;
+            
+        case GL_R16:
+            mtlFormat = MTLPixelFormatRGBA16Unorm;
+            *outPixelByteSize = sizeof(short);
+            break;
+            
+        case GL_RGBA16F:
+            mtlFormat = MTLPixelFormatRGBA16Float;
+            *outPixelByteSize = sizeof(short) * 4;
+            break;
+            
+        case GL_R16F:
+            mtlFormat = MTLPixelFormatR16Float;
+            *outPixelByteSize = sizeof(short);
+            break;
+            
+        case GL_RGBA32F:
+            mtlFormat = MTLPixelFormatRGBA32Float;
+            *outPixelByteSize = sizeof(float) * 4;
+            break;
+            
+        case GL_R32F:
+            mtlFormat = MTLPixelFormatRGBA32Float;
+            *outPixelByteSize = sizeof(float);
+            break;
+    }
+    
+    return mtlFormat;
+}
+
 PXR_NAMESPACE_CLOSE_SCOPE
 
