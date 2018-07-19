@@ -30,8 +30,11 @@
 
 #include "pxr/usd/usdGeom/xform.h"
 #include "pxr/usd/usdGeom/xformOp.h"
+#include <maya/MEulerRotation.h>
 #include <maya/MFnTransform.h>
 #include <maya/MPlugArray.h>
+
+#include <unordered_map>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -46,13 +49,15 @@ struct AnimChannel
 {
     MPlug plug[3];
     AnimChannelSampleType sampleType[3];
-    // defValue should always be in "usd" space.  that is, if it's a rotation
-    // it should be a degree not radians.
+    // defValue should always be in "maya" space.  that is, if it's a rotation
+    // it should be radians, not degrees. (This is done so we only need to do
+    // conversion in one place, and so that, if we need to do euler filtering,
+    // we don't do conversions, and then undo them to use MEulerRotation).
     GfVec3d defValue; 
     XFormOpType opType;
     UsdGeomXformOp::Type usdOpType;
     UsdGeomXformOp::Precision precision;
-    std::string opName;
+    TfToken opName;
     bool isInverse;
     UsdGeomXformOp op;
 };
@@ -62,56 +67,21 @@ struct AnimChannel
 class MayaTransformWriter : public MayaPrimWriter
 {
 public:
+    typedef std::unordered_map<const TfToken, MEulerRotation, TfToken::HashFunctor> TokenRotationMap;
+
     PXRUSDMAYA_API
     MayaTransformWriter(
             const MDagPath& iDag,
             const SdfPath& uPath,
-            bool instanceSource,
             usdWriteJobCtx& jobCtx);
-    
+
+    /// Main export function that runs when the traversal hits the node.
+    /// This extends MayaPrimWriter::Write() by exporting xform ops for
+    /// UsdGeomXformable if the Maya node has transform data.
     PXRUSDMAYA_API
     void Write(const UsdTimeCode &usdTime) override;
 
-    PXRUSDMAYA_API
-    bool ExportsGprims() const override;
-    
-    PXRUSDMAYA_API
-    bool ExportsReferences() const override;
-
-    /// Gets the DAG path of the source transform node for this prim writer
-    /// if we are merging transforms and shapes. (In that case, the Maya nodes
-    /// given by GetDagPath() and GetTransformDagPath() are merged into one
-    /// USD prim.) If not merging transforms and shapes, the returned DAG path
-    /// is invalid.
-    PXRUSDMAYA_API
-    const MDagPath& GetTransformDagPath();
-
-protected:
-    /// Helper for determining whether the shape is animated, if this prim
-    /// writer's source is a shape node.
-    /// Always \c false if this prim writer's source is a transform.
-    /// The default implementation only considers nodes with animation curve
-    /// inputs as "animated". Prim writers for nodes that have time variation
-    /// but no anim curves (such as particles) may want to override this.
-    PXRUSDMAYA_API
-    bool _IsShapeAnimated() const override;
-
-    /// Writes the attributes that are common to all UsdGeomXformable prims,
-    /// such as xformOps and xformOpOrder.
-    /// Subclasses should almost always invoke _WriteXformableAttrs somewhere
-    /// in their Write() function.
-    PXRUSDMAYA_API
-    bool _WriteXformableAttrs(
-            const UsdTimeCode& usdTime, 
-            UsdGeomXformable& primSchema);
-
 private:
-    /// Whether this is an instance for the purposes of USD export.
-    /// May exclude some "true" Maya instances that aren't treated as such
-    /// during export.
-    /// Does not include instance sources.
-    bool _IsInstance() const;
-
     /// Populates the AnimChannel vector with various ops based on
     /// the Maya
     /// transformation logic. If scale and/or rotate pivot are declared, creates
@@ -121,13 +91,9 @@ private:
             const UsdGeomXformable& usdXForm, 
             bool writeAnim);
 
-    MDagPath _xformDagPath;
     std::vector<AnimChannel> _animChannels;
-    bool _isShapeAnimated;
-    bool _isInstanceSource;
+    TokenRotationMap _previousRotates;
 };
-
-typedef std::shared_ptr<MayaTransformWriter> MayaTransformWriterPtr;
 
 PXR_NAMESPACE_CLOSE_SCOPE
 

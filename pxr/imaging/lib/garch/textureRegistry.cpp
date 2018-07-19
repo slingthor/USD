@@ -124,7 +124,9 @@ GarchTextureRegistry::GetTextureHandle(GarchTextureRefPtr texture)
 {
     GarchTextureHandleRefPtr textureHandle;
 
-    {
+    // Texture maybe null if an error occured, don't
+    // add it to the registry in this case
+    if (texture) {
         std::map<GarchTexturePtr, GarchTextureHandlePtr>::iterator it =
             _textureRegistryNonShared.find(texture);
 
@@ -298,19 +300,37 @@ GarchTextureRegistry::GetTextureInfos() const
 {
     std::vector<VtDictionary> result;
 
+    // In the event of errors, both texture handle or the texture the
+    // handle can point to can be null.
     for (TextureRegistryMap::value_type const& p : _textureRegistry) {
-        GarchTextureHandlePtr texture = p.second.GetHandle();
-        VtDictionary info = texture->GetTexture()->GetTextureInfo();
-        info["uniqueIdentifier"] = (uint64_t)texture.GetUniqueIdentifier();
-        result.push_back(info);
-    }
+        GarchTextureHandlePtr const &textureHandle = p.second.GetHandle();
+        if (textureHandle) {
+            GarchTexturePtr const &texture = textureHandle->GetTexture();
+            VtDictionary info;
+            if (texture) {
+                info = texture->GetTextureInfo();
+            }
 
-    for (TextureRegistryNonSharedMap::value_type const& p : _textureRegistryNonShared) {
+            info["uniqueIdentifier"] =
+                (uint64_t)textureHandle.GetUniqueIdentifier();
+            result.push_back(info);
+        }
+    }
+    for (TextureRegistryNonSharedMap::value_type const& p :
+            _textureRegistryNonShared) {
+        GarchTextureHandlePtr const &textureHandle = p.second;
+
         // note: Since textureRegistryNonShared stores weak ptr, we have to 
         // check whether it still exists here.
-        if (!p.second.IsExpired()) {
-            VtDictionary info = p.second->GetTexture()->GetTextureInfo();
-            info["uniqueIdentifier"] = (uint64_t)p.second->GetUniqueIdentifier();
+        if (!textureHandle.IsExpired()) {
+            GarchTexturePtr const &texture = textureHandle->GetTexture();
+
+            VtDictionary info;
+            if (texture) {
+                info = texture->GetTextureInfo();
+            }
+            info["uniqueIdentifier"] =
+                (uint64_t)textureHandle->GetUniqueIdentifier();
             result.push_back(info);
         }
     }

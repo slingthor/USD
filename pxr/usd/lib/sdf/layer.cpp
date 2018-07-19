@@ -2830,17 +2830,31 @@ SdfLayer::_UpdateReferencePaths(
     if (prim->HasPayload()) {
         SdfPayload payload = prim->GetPayload();
         if (payload.GetAssetPath() == oldLayerPath) {
-            payload.SetAssetPath(newLayerPath);
-            prim->SetPayload(payload);
+            if (newLayerPath.empty()) {
+                prim->ClearPayload();
+            }
+            else {
+                payload.SetAssetPath(newLayerPath);
+                prim->SetPayload(payload);
+            }
         }
     }
 
     // Prim variants
-    // XXX TODO - see bug 29867
+    SdfVariantSetsProxy variantSetMap = prim->GetVariantSets();
+    for (const auto& setNameAndSpec : variantSetMap) {
+        const SdfVariantSetSpecHandle &varSetSpec = setNameAndSpec.second;
+        const SdfVariantSpecHandleVector &variants =
+            varSetSpec->GetVariantList();
+        for (const auto& variantSpec : variants) {
+            _UpdateReferencePaths(
+                variantSpec->GetPrimSpec(), oldLayerPath, newLayerPath);
+        }
+    }
 
     // Recurse on nameChildren
-    TF_FOR_ALL(primIt, prim->GetNameChildren()) {
-        _UpdateReferencePaths(*primIt, oldLayerPath, newLayerPath);
+    for (const auto& primSpec : prim->GetNameChildren()) {
+        _UpdateReferencePaths(primSpec, oldLayerPath, newLayerPath);
     }
 }
 
@@ -4011,9 +4025,9 @@ SdfLayer::Export(const string& newFileName, const string& comment,
 }
 
 bool
-SdfLayer::Save() const
+SdfLayer::Save(bool force) const
 {
-    return _Save(/* force = */ false);
+    return _Save(force);
 }
 
 bool

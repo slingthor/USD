@@ -61,13 +61,8 @@ public:
     MayaLocatorWriter(
             const MDagPath& iDag,
             const SdfPath& uPath,
-            const bool instanceSource,
             usdWriteJobCtx& jobCtx);
-
-    void Write(const UsdTimeCode& usdTime) override;
 };
-
-typedef std::shared_ptr<MayaLocatorWriter> MayaLocatorWriterPtr;
 
 
 PXR_NAMESPACE_CLOSE_SCOPE

@@ -76,13 +76,24 @@ HdStSimpleTextureResourceMetal::HdStSimpleTextureResourceMetal(
         HdMinFilter minFilter, HdMagFilter magFilter,
         size_t memoryRequest)
             : _textureHandle(textureHandle)
-            , _texture(textureHandle->GetTexture())
+            , _texture()
             , _borderColor(0.0,0.0,0.0,0.0)
             , _maxAnisotropy(16.0)
             , _sampler()
             , _isPtex(isPtex)
             , _memoryRequest(memoryRequest)
 {
+    // In cases of upstream errors, texture handle can be null.
+    if (_textureHandle) {
+        _texture = _textureHandle->GetTexture();
+        
+        
+        // Unconditionally add the memory request, before the early function
+        // exit so that the destructor doesn't need to figure out if the request
+        // was added or not.
+        _textureHandle->AddMemoryRequest(_memoryRequest);
+    }
+
     // When we are not using Ptex we will use samplers,
     // that includes both, bindless textures and no-bindless textures
     if (!_isPtex) {
@@ -91,26 +102,29 @@ HdStSimpleTextureResourceMetal::HdStSimpleTextureResourceMetal(
         // its own wrap mode. The fallback value is always HdWrapRepeat
         MTLSamplerAddressMode fwrapS = HdStMetalConversions::GetWrap(wrapS);
         MTLSamplerAddressMode fwrapT = HdStMetalConversions::GetWrap(wrapT);
-        VtDictionary txInfo = _texture->GetTextureInfo();
-
-        if (wrapS == HdWrapUseMetaDict && 
-            VtDictionaryIsHolding<GLuint>(txInfo, "wrapModeS")) {
-            fwrapS = ConvertWrap(VtDictionaryGet<GLuint>(txInfo, "wrapModeS"));
-        }
-
-        if (wrapT == HdWrapUseMetaDict && 
-            VtDictionaryIsHolding<GLuint>(txInfo, "wrapModeT")) {
-            fwrapT = ConvertWrap(VtDictionaryGet<GLuint>(txInfo, "wrapModeT"));
-        }
-
         MTLSamplerMinMagFilter fminFilter = HdStMetalConversions::GetMinFilter(minFilter);
         MTLSamplerMinMagFilter fmagFilter = HdStMetalConversions::GetMagFilter(magFilter);
         MTLSamplerMipFilter fmipFilter = HdStMetalConversions::GetMipFilter(minFilter);
-        if (!_texture->IsMinFilterSupported(fminFilter)) {
-            fminFilter = MTLSamplerMinMagFilterNearest;
-        }
-        if (!_texture->IsMagFilterSupported(fmagFilter)) {
-            fmagFilter = MTLSamplerMinMagFilterNearest;
+        
+        if (_texture) {
+            VtDictionary txInfo = _texture->GetTextureInfo();
+
+            if (wrapS == HdWrapUseMetaDict &&
+                VtDictionaryIsHolding<GLuint>(txInfo, "wrapModeS")) {
+                fwrapS = ConvertWrap(VtDictionaryGet<GLuint>(txInfo, "wrapModeS"));
+            }
+
+            if (wrapT == HdWrapUseMetaDict &&
+                VtDictionaryIsHolding<GLuint>(txInfo, "wrapModeT")) {
+                fwrapT = ConvertWrap(VtDictionaryGet<GLuint>(txInfo, "wrapModeT"));
+            }
+
+            if (!_texture->IsMinFilterSupported(fminFilter)) {
+                fminFilter = MTLSamplerMinMagFilterNearest;
+            }
+            if (!_texture->IsMagFilterSupported(fmagFilter)) {
+                fmagFilter = MTLSamplerMinMagFilterNearest;
+            }
         }
 
         MTLSamplerDescriptor* samplerDesc = [[MTLSamplerDescriptor alloc] init];
@@ -154,7 +168,9 @@ HdStSimpleTextureResourceMetal::HdStSimpleTextureResourceMetal(
 
 HdStSimpleTextureResourceMetal::~HdStSimpleTextureResourceMetal()
 {
-    _textureHandle->DeleteMemoryRequest(_memoryRequest);
+    if (_textureHandle) {
+        _textureHandle->DeleteMemoryRequest(_memoryRequest);
+    }
 
     if (!_isPtex) {
         [_sampler release];
@@ -171,7 +187,13 @@ GarchTextureGPUHandle HdStSimpleTextureResourceMetal::GetTexelsTextureId()
     if (_isPtex) {
 #ifdef PXR_PTEX_SUPPORT_ENABLED
         TF_FATAL_CODING_ERROR("Not Implemented"); // Make this graphics api abstract
-        return TfDynamic_cast<MtlfPtexTextureRefPtr>(_texture)->GetTexelsTextureName();
+        MtlfPtexTextureRefPtr ptexTexture =
+        TfDynamic_cast<MtlfPtexTextureRefPtr>(_texture);
+        
+        if (ptexTexture) {
+            return ptexTexture->GetTexelsTextureName();
+        }
+        return GarchTextureGPUHandle();
 #else
         TF_CODING_ERROR("Ptex support is disabled.  "
             "This code path should be unreachable");
@@ -202,8 +224,13 @@ GarchTextureGPUHandle HdStSimpleTextureResourceMetal::GetTexelsTextureHandle()
 GarchTextureGPUHandle HdStSimpleTextureResourceMetal::GetLayoutTextureId()
 {
 #ifdef PXR_PTEX_SUPPORT_ENABLED
-    TF_FATAL_CODING_ERROR("Not Implemented"); // Make this graphics api abstract
-    return TfDynamic_cast<MtlfPtexTextureRefPtr>(_texture)->GetLayoutTextureName();
+    MtlfPtexTextureRefPtr ptexTexture =
+    TfDynamic_cast<MtlfPtexTextureRefPtr>(_texture);
+    
+    if (ptexTexture) {
+        return ptexTexture->GetLayoutTextureName();
+    }
+    return GarchTextureGPUHandle();
 #else
     TF_CODING_ERROR("Ptex support is disabled.  "
         "This code path should be unreachable");

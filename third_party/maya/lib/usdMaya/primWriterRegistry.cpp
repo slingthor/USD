@@ -21,11 +21,13 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#include "pxr/pxr.h"
 #include "usdMaya/primWriterRegistry.h"
+
 #include "usdMaya/debugCodes.h"
+#include "usdMaya/functorPrimWriter.h"
 #include "usdMaya/registryHelper.h"
 
+#include "pxr/pxr.h"
 #include "pxr/base/tf/staticTokens.h"
 #include "pxr/base/tf/stl.h"
 
@@ -60,6 +62,15 @@ PxrUsdMayaPrimWriterRegistry::Register(
 }
 
 /* static */
+void
+PxrUsdMayaPrimWriterRegistry::RegisterRaw(
+        const std::string& mayaTypeName,
+        PxrUsdMayaPrimWriterRegistry::WriterFn fn)
+{
+    Register(mayaTypeName, PxrUsdMaya_FunctorPrimWriter::CreateFactory(fn));
+}
+
+/* static */
 PxrUsdMayaPrimWriterRegistry::WriterFactoryFn
 PxrUsdMayaPrimWriterRegistry::Find(
         const std::string& mayaTypeName)
@@ -68,7 +79,7 @@ PxrUsdMayaPrimWriterRegistry::Find(
 
     // unfortunately, usdTypeName is diff from the tfTypeName which we use to
     // register.  do the conversion here.
-    WriterFactoryFn ret = NULL;
+    WriterFactoryFn ret = nullptr;
     if (TfMapLookup(_reg, mayaTypeName, &ret)) {
         return ret;
     }
@@ -83,7 +94,7 @@ PxrUsdMayaPrimWriterRegistry::Find(
         TF_DEBUG(PXRUSDMAYA_REGISTRY).Msg(
                 "No usdMaya writer plugin for maya type %s.  No maya plugin found.\n", 
                 mayaTypeName.c_str());
-        _reg[mayaTypeName] = NULL;
+        _reg[mayaTypeName] = nullptr;
     }
     return ret;
 }

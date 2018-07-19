@@ -37,16 +37,9 @@ class MayaParticleWriter : public MayaTransformWriter
 public:
     MayaParticleWriter(const MDagPath & iDag,
                        const SdfPath& uPath,
-                       bool instanceSource,
                        usdWriteJobCtx& jobCtx);
 
     void Write(const UsdTimeCode &usdTime) override;
-
-protected:
-    // TODO: Check this properly, static particles are uncommon, but used.
-    bool _IsShapeAnimated() const override {
-        return true;
-    }
 
 private:
     void writeParams(const UsdTimeCode& usdTime, UsdGeomPoints& points);
@@ -62,8 +55,6 @@ private:
 
     void initializeUserAttributes();
 };
-
-typedef std::shared_ptr<MayaParticleWriter> MayaParticleWriterPtr;
 
 PXR_NAMESPACE_CLOSE_SCOPE
 

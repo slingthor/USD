@@ -98,6 +98,9 @@ MSyntax usdExport::createSyntax()
     syntax.addFlag("-sn",
                    PxrUsdExportJobArgsTokens->stripNamespaces.GetText(),
                    MSyntax::kBoolean);
+    syntax.addFlag("-ef" ,
+                   PxrUsdExportJobArgsTokens->eulerFilter.GetText(),
+                   MSyntax::kBoolean);
     syntax.addFlag("-dms",
                    PxrUsdExportJobArgsTokens->defaultMeshScheme.GetText(),
                    MSyntax::kString);
@@ -284,7 +287,7 @@ try
     }
 
     // Convert selection list to jobArgs dagPaths
-    PxrUsdMayaUtil::ShapeSet dagPaths;
+    PxrUsdMayaUtil::MDagPathSet dagPaths;
     for (unsigned int i=0; i < objSelList.length(); i++) {
         MDagPath dagPath;
         status = objSelList.getDagPath(i, dagPath);

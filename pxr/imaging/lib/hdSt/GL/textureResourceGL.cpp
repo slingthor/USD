@@ -50,13 +50,24 @@ HdStSimpleTextureResourceGL::HdStSimpleTextureResourceGL(
     HdMinFilter minFilter, HdMagFilter magFilter,
     size_t memoryRequest)
         : _textureHandle(textureHandle)
-        , _texture(textureHandle->GetTexture())
+        , _texture()
         , _borderColor(0.0,0.0,0.0,0.0)
         , _maxAnisotropy(16.0)
         , _sampler(0)
         , _isPtex(isPtex)
         , _memoryRequest(memoryRequest)
 {
+    // In cases of upstream errors, texture handle can be null.
+    if (_textureHandle) {
+        _texture = _textureHandle->GetTexture();
+        
+        
+        // Unconditionally add the memory request, before the early function
+        // exit so that the destructor doesn't need to figure out if the request
+        // was added or not.
+        _textureHandle->AddMemoryRequest(_memoryRequest);
+    }
+
     if (!glGenSamplers) { // GL initialization guard for headless unit test
         return;
     }
@@ -69,25 +80,28 @@ HdStSimpleTextureResourceGL::HdStSimpleTextureResourceGL(
         // its own wrap mode. The fallback value is always HdWrapRepeat
         GLenum fwrapS = HdStGLConversions::GetWrap(wrapS);
         GLenum fwrapT = HdStGLConversions::GetWrap(wrapT);
-        VtDictionary txInfo = _texture->GetTextureInfo();
-
-        if (wrapS == HdWrapUseMetaDict && 
-            VtDictionaryIsHolding<GLuint>(txInfo, "wrapModeS")) {
-            fwrapS = VtDictionaryGet<GLuint>(txInfo, "wrapModeS");
-        }
-
-        if (wrapT == HdWrapUseMetaDict && 
-            VtDictionaryIsHolding<GLuint>(txInfo, "wrapModeT")) {
-            fwrapT = VtDictionaryGet<GLuint>(txInfo, "wrapModeT");
-        }
-
         GLenum fminFilter = HdStGLConversions::GetMinFilter(minFilter);
         GLenum fmagFilter = HdStGLConversions::GetMagFilter(magFilter);
-        if (!_texture->IsMinFilterSupported(fminFilter)) {
-            fminFilter = GL_NEAREST;
-        }
-        if (!_texture->IsMagFilterSupported(fmagFilter)) {
-            fmagFilter = GL_NEAREST;
+        
+        if (_texture) {
+            VtDictionary txInfo = _texture->GetTextureInfo();
+
+            if (wrapS == HdWrapUseMetaDict &&
+                VtDictionaryIsHolding<GLuint>(txInfo, "wrapModeS")) {
+                fwrapS = VtDictionaryGet<GLuint>(txInfo, "wrapModeS");
+            }
+
+            if (wrapT == HdWrapUseMetaDict &&
+                VtDictionaryIsHolding<GLuint>(txInfo, "wrapModeT")) {
+                fwrapT = VtDictionaryGet<GLuint>(txInfo, "wrapModeT");
+            }
+
+            if (!_texture->IsMinFilterSupported(fminFilter)) {
+                fminFilter = GL_NEAREST;
+            }
+            if (!_texture->IsMagFilterSupported(fmagFilter)) {
+                fmagFilter = GL_NEAREST;
+            }
         }
 
         glGenSamplers(1, &_sampler);
@@ -124,7 +138,9 @@ HdStSimpleTextureResourceGL::HdStSimpleTextureResourceGL(
 
 HdStSimpleTextureResourceGL::~HdStSimpleTextureResourceGL()
 {
-    _textureHandle->DeleteMemoryRequest(_memoryRequest);
+    if (_textureHandle) {
+        _textureHandle->DeleteMemoryRequest(_memoryRequest);
+    }
 
     if (!_isPtex) {
         if (!glDeleteSamplers) { // GL initialization guard for headless unit test
@@ -143,7 +159,13 @@ GarchTextureGPUHandle HdStSimpleTextureResourceGL::GetTexelsTextureId()
 {
     if (_isPtex) {
 #ifdef PXR_PTEX_SUPPORT_ENABLED
-        return TfDynamic_cast<GlfPtexTextureRefPtr>(_texture)->GetTexelsTextureName();
+        GlfPtexTextureRefPtr ptexTexture =
+        TfDynamic_cast<GlfPtexTextureRefPtr>(_texture);
+        
+        if (ptexTexture) {
+            return ptexTexture->GetTexelsTextureName();
+        }
+        return GarchTextureGPUHandle();
 #else
         TF_CODING_ERROR("Ptex support is disabled.  "
             "This code path should be unreachable");
@@ -180,7 +202,13 @@ GarchTextureGPUHandle HdStSimpleTextureResourceGL::GetLayoutTextureId()
 {
 #ifdef PXR_PTEX_SUPPORT_ENABLED
     TF_FATAL_CODING_ERROR("Not Implemented"); // Make this graphics api abstract
-    return TfDynamic_cast<GarchTextureGPUHandle>(_texture)->GetLayoutTextureName();
+    GlfPtexTextureRefPtr ptexTexture =
+    TfDynamic_cast<GlfPtexTextureRefPtr>(_texture);
+    
+    if (ptexTexture) {
+        return ptexTexture->GetLayoutTextureName();
+    }
+    return GarchTextureGPUHandle();
 #else
     TF_CODING_ERROR("Ptex support is disabled.  "
         "This code path should be unreachable");

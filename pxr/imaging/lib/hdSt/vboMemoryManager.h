@@ -138,7 +138,7 @@ public:
         }
 
         /// Returns the number of elements
-        virtual int GetNumElements() const override {
+        virtual size_t GetNumElements() const override {
             return _numElements;
         }
 
@@ -216,7 +216,7 @@ public:
         // in case if any drawItem still holds this bufferRange.
         _StripedBufferArray *_stripedBufferArray;
         int _offset;
-        int _numElements;
+        size_t _numElements;
         int _capacity;
     };
 

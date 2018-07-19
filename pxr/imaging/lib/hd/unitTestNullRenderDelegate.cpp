@@ -114,7 +114,7 @@ public:
             return 0;
         }
 
-        virtual int GetNumElements() const override {
+        virtual size_t GetNumElements() const override {
             return _numElements;
         }
 
@@ -162,7 +162,7 @@ public:
 
     private:
         _BufferArray * _bufferArray;
-        int _numElements;
+        size_t _numElements;
     };
 
 

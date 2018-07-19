@@ -101,7 +101,7 @@ MtlfBaseTexture::_CreateTexture(GarchBaseTextureDataConstPtr texData,
     TRACE_FUNCTION();
     
     if (texData && texData->HasRawBuffer()) {
-        TF_FATAL_CODING_ERROR("Not Implemented");
+        //TF_FATAL_CODING_ERROR("Not Implemented");
         /*
         glBindTexture(GL_TEXTURE_2D, _textureName);
 

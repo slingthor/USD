@@ -76,7 +76,7 @@ _GetRootPaths(const SdfPathSet &paths) {
 void
 PxrUsdMayaShadingModeExporter::DoExport(
     const UsdStageRefPtr& stage,
-    const PxrUsdMayaUtil::MDagPathMap<SdfPath>::Type& dagPathToUsdMap,
+    const PxrUsdMayaUtil::MDagPathMap<SdfPath>& dagPathToUsdMap,
     const PxrUsdMayaExportParams &exportParams) 
 {
     MItDependencyNodes shadingEngineIter(MFn::kShadingEngine);
@@ -101,7 +101,7 @@ PxrUsdMayaShadingModeExporter::DoExport(
         dagPathToUsdMap, 
         exportParams);
 
-    PreExport(context);
+    PreExport(&context);
 
     using MaterialAssignments = std::vector<std::pair<TfToken, 
         SdfPathSet>>;

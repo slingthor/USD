@@ -88,7 +88,7 @@ PxrUsdMayaTranslatorCurves::Create(
     // XXX:
     // Only supporting single curve for now.
     // Sanity Checks
-    if (curveVertexCounts.size() == 0) {
+    if (curveVertexCounts.empty()) {
         TF_RUNTIME_ERROR(
                 "vertexCount array is empty on NurbsCurves <%s>. Skipping...",
                 prim.GetPath().GetText());
@@ -116,7 +116,7 @@ PxrUsdMayaTranslatorCurves::Create(
     }
     curves.GetPointsAttr().Get(&points, pointsTimeSample);
     
-    if (points.size() == 0) {
+    if (points.empty()) {
         TF_RUNTIME_ERROR(
                 "points array is empty on NurbsCurves <%s>. Skipping...",
                 prim.GetPath().GetText());
@@ -274,7 +274,7 @@ PxrUsdMayaTranslatorCurves::Create(
                 MPlug plg = plgAry.elementByLogicalIndex(ti, &status);
                 MDoubleArray valueArray(numTimeSamples, 0.0);
                 valueArray[ti] = 1.0; // Set the time value where this curve's weight should be 1.0
-                MObject animObj = animFn.create(plg, NULL, &status);
+                MObject animObj = animFn.create(plg, nullptr, &status);
                 animFn.addKeys(&timeArray, &valueArray);
                 if (context) {
                     context->RegisterNewMayaNode(animFn.name().asChar(), animObj ); // used for undo/redo

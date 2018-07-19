@@ -46,9 +46,8 @@ PXRUSDMAYA_REGISTER_ADAPTOR_SCHEMA(camera, UsdGeomCamera);
 MayaCameraWriter::MayaCameraWriter(
     const MDagPath & iDag,
     const SdfPath& uPath,
-    bool instanceSource,
     usdWriteJobCtx& jobCtx)
-    : MayaTransformWriter(iDag, uPath, instanceSource, jobCtx) 
+    : MayaPrimWriter(iDag, uPath, jobCtx) 
 {
     UsdGeomCamera primSchema =
         UsdGeomCamera::Define(GetUsdStage(), GetUsdPath());
@@ -57,20 +56,14 @@ MayaCameraWriter::MayaCameraWriter(
     TF_AXIOM(_usdPrim);
 }
 
-/* virtual */
-void MayaCameraWriter::Write(const UsdTimeCode &usdTime)
+void MayaCameraWriter::Write(const UsdTimeCode& usdTime)
 {
-    // == Write
+    MayaPrimWriter::Write(usdTime);
+
     UsdGeomCamera primSchema(_usdPrim);
-
-    // Write parent class attrs
-    _WriteXformableAttrs(usdTime, primSchema);
-
-    // Write the attrs
     writeCameraAttrs(usdTime, primSchema);
 }
 
-/* virtual */
 bool MayaCameraWriter::writeCameraAttrs(const UsdTimeCode &usdTime, UsdGeomCamera &primSchema)
 {
     // Since write() above will take care of any animation on the camera's
@@ -78,7 +71,7 @@ bool MayaCameraWriter::writeCameraAttrs(const UsdTimeCode &usdTime, UsdGeomCamer
     // - We are at the default time and NO attributes on the shape are animated.
     //    OR
     // - We are at a non-default time and some attribute on the shape IS animated.
-    if (usdTime.IsDefault() == _IsShapeAnimated()) {
+    if (usdTime.IsDefault() == _HasAnimCurves()) {
         return true;
     }
 

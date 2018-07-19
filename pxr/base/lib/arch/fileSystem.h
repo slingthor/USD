@@ -211,7 +211,12 @@ ARCH_API double ArchGetModificationTime(const ArchStatType& st);
 /// This canonicalizes paths, removing any double slashes, and eliminiating
 /// '.', and '..' components of the path.  This emulates the behavior of
 /// os.path.normpath in Python.
-ARCH_API std::string ArchNormPath(const std::string& path);
+///
+/// On Windows, all backslashes are converted to forward slashes and drive
+/// specifiers (e.g., "C:") are lower-cased. If \p stripDriveSpecifier
+/// is \c true, these drive specifiers are removed from the path.
+ARCH_API std::string ArchNormPath(const std::string& path,
+                                  bool stripDriveSpecifier = false);
 
 /// Returns the canonical absolute path of the specified filename.
 ///
@@ -328,6 +333,11 @@ ARCH_API
 ArchConstFileMapping
 ArchMapFileReadOnly(FILE *file, std::string *errMsg=nullptr);
 
+/// \overload
+ARCH_API
+ArchConstFileMapping
+ArchMapFileReadOnly(std::string const& path, std::string *errMsg=nullptr);
+
 /// Privately map the passed \p file into memory and return a unique_ptr to the
 /// copy-on-write mapped contents.  If modified, the affected pages are
 /// dissociated from the underlying file and become backed by the system's swap
@@ -337,6 +347,11 @@ ArchMapFileReadOnly(FILE *file, std::string *errMsg=nullptr);
 ARCH_API
 ArchMutableFileMapping
 ArchMapFileReadWrite(FILE *file, std::string *errMsg=nullptr);
+
+/// \overload
+ARCH_API
+ArchMutableFileMapping
+ArchMapFileReadWrite(std::string const& path, std::string *errMsg=nullptr);
 
 enum ArchMemAdvice {
     ArchMemAdviceNormal,       // Treat range with default behavior.

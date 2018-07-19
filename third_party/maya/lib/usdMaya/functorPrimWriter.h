@@ -24,14 +24,15 @@
 #ifndef PXRUSDMAYA_FUNCTORPRIMWRITER_H
 #define PXRUSDMAYA_FUNCTORPRIMWRITER_H
 
-/// \file FunctorPrimWriter.h
+/// \file functorPrimWriter.h
 
 #include "pxr/pxr.h"
+
 #include "usdMaya/api.h"
 #include "usdMaya/MayaTransformWriter.h"
-
 #include "usdMaya/primWriterArgs.h"
 #include "usdMaya/primWriterContext.h"
+#include "usdMaya/primWriterRegistry.h"
 
 #include "pxr/usd/usd/stage.h"
 
@@ -39,71 +40,42 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-
-/// \class FunctorPrimWriter
-/// \brief This class is scaffolding to hold the writer plugin and to adapt it
-/// to the MayaTransformWriter class.  This allows our writer plugins to be
-/// implemented without caring about the internal MayaTransformWriter interface.
+/// \class PxrUsdMaya_FunctorPrimWriter
+/// \brief This class is scaffolding to hold bare prim writer functions and
+/// adapt them to the MayaPrimWriter or MayaTransformWriter interface
+/// (depending on whether the writer plugin is handling a shape or a transform).
 ///
-/// This class can be used as a base for plugins that write user-defined Maya
-/// shape nodes to a USD prim. For other types of nodes, you may want to
-/// consider creating a custom prim writer.
-class FunctorPrimWriter : public MayaTransformWriter
+/// It is used by the PXRUSDMAYA_DEFINE_WRITER macro.
+class PxrUsdMaya_FunctorPrimWriter final : public MayaTransformWriter
 {
 public:
-    typedef std::function< bool (
-            const PxrUsdMayaPrimWriterArgs&,
-            PxrUsdMayaPrimWriterContext*) > WriterFn;
-
-    PXRUSDMAYA_API
-    FunctorPrimWriter(
+    PxrUsdMaya_FunctorPrimWriter(
             const MDagPath& iDag,
             const SdfPath& uPath,
-            bool instanceSource,
             usdWriteJobCtx& jobCtx,
-            WriterFn plugFn);
+            PxrUsdMayaPrimWriterRegistry::WriterFn plugFn);
 
-    PXRUSDMAYA_API
-    virtual ~FunctorPrimWriter();
+    ~PxrUsdMaya_FunctorPrimWriter() override;
 
-    // Overrides for MayaTransformWriter
-    PXRUSDMAYA_API
-    virtual void Write(const UsdTimeCode &usdTime) override;
-    
-    PXRUSDMAYA_API
-    virtual bool ExportsGprims() const override;
-    
-    PXRUSDMAYA_API
-    virtual bool ExportsReferences() const override;
+    void Write(const UsdTimeCode &usdTime) override;
+    bool ExportsGprims() const override;
+    bool ShouldPruneChildren() const override;    
+    const SdfPathVector& GetModelPaths() const override;
 
-    PXRUSDMAYA_API
-    virtual bool ShouldPruneChildren() const override;    
-
-    PXRUSDMAYA_API
-    virtual bool GetAllAuthoredUsdPaths(SdfPathVector* outPaths) const override;
-
-    PXRUSDMAYA_API
-    static MayaPrimWriterPtr Create(
+    static MayaPrimWriterSharedPtr Create(
             const MDagPath& dag,
             const SdfPath& path,
-            bool instanceSource,
             usdWriteJobCtx& jobCtx,
-            WriterFn plugFn);
+            PxrUsdMayaPrimWriterRegistry::WriterFn plugFn);
 
-    PXRUSDMAYA_API
-    static std::function< MayaPrimWriterPtr(
-            const MDagPath&,
-            const SdfPath&,
-            bool,
-            usdWriteJobCtx&) >
-            CreateFactory(WriterFn plugFn);
+    static PxrUsdMayaPrimWriterRegistry::WriterFactoryFn
+            CreateFactory(PxrUsdMayaPrimWriterRegistry::WriterFn plugFn);
 
 private:
-    WriterFn _plugFn;
+    PxrUsdMayaPrimWriterRegistry::WriterFn _plugFn;
     bool _exportsGprims;
-    bool _exportsReferences;
     bool _pruneChildren;
-    SdfPathVector _authoredPaths;
+    SdfPathVector _modelPaths;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

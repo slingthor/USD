@@ -93,7 +93,7 @@ UsdImagingMetalHdEngine::UsdImagingMetalHdEngine(
         TF_CODING_ERROR("No renderer plugins found! Check before creation.");
     }
 
-#if 1
+#if 0
     TfDebug::Enable(USDIMAGING_TEXTURES);
     TfDebug::Enable(USDIMAGING_UPDATES);
     TfDebug::Enable(USDIMAGING_CHANGES);

@@ -282,7 +282,6 @@ HdStRenderDelegate::_CreateFallbackMaterialPrim()
     return material;
 }
 
-
 void
 HdStRenderDelegate::CommitResources(HdChangeTracker *tracker)
 {
@@ -321,6 +320,12 @@ TfTokenVector
 HdStRenderDelegate::GetShaderSourceTypes() const
 {
     return {GarchGLSLFXTokens->glslfx};
+}
+
+TfToken 
+HdStRenderDelegate::GetMaterialNetworkSelector() const
+{
+    return GarchGLSLFXTokens->glslfx;
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

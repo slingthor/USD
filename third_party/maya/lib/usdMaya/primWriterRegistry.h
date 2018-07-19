@@ -28,13 +28,13 @@
 
 #include "pxr/pxr.h"
 
+#include "usdMaya/MayaPrimWriter.h"
+#include "usdMaya/primWriterArgs.h"
+#include "usdMaya/primWriterContext.h"
+
 #include "usdMaya/api.h"
-#include "usdMaya/FunctorPrimWriter.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
-
-class MayaPrimWriter;
-typedef std::shared_ptr<MayaPrimWriter> MayaPrimWriterPtr;
 
 /// \class PxrUsdMayaPrimWriterRegistry
 /// \brief Provides functionality to register and lookup USD writer plugins
@@ -69,10 +69,19 @@ typedef std::shared_ptr<MayaPrimWriter> MayaPrimWriterPtr;
 /// plugin for that Maya built-in type.
 struct PxrUsdMayaPrimWriterRegistry
 {
-    typedef std::function< MayaPrimWriterPtr (
+    /// Writer factory function, i.e. a function that creates a prim writer
+    /// for the given DAG/USD paths and context.
+    typedef std::function< MayaPrimWriterSharedPtr (
             const MDagPath&,
-            const SdfPath&, bool,
+            const SdfPath&,
             usdWriteJobCtx&) > WriterFactoryFn;
+
+    /// Writer function, i.e. a function that writes a prim. This is the
+    /// signature of the function defined by the PXRUSDMAYA_DEFINE_WRITER
+    /// macro.
+    typedef std::function< bool (
+            const PxrUsdMayaPrimWriterArgs&,
+            PxrUsdMayaPrimWriterContext*) > WriterFn;
 
     /// \brief Register \p fn as a factory function providing a MayaPrimWriter
     /// subclass that can be used to write \p mayaType.
@@ -82,10 +91,9 @@ struct PxrUsdMayaPrimWriterRegistry
     /// Example for registering a writer factory in your custom plugin:
     /// \code{.cpp}
     /// class MyWriter : public MayaPrimWriter {
-    ///     static MayaPrimWriterPtr Create(
+    ///     static MayaPrimWriterSharedPtr Create(
     ///             MDagPath &curDag,
     ///             const SdfPath& uPath,
-    ///             bool instanceSource,
     ///             usdWriteJobCtx& jobCtx);
     /// };
     /// TF_REGISTRY_FUNCTION_WITH_TAG(PxrUsdMayaPrimWriterRegistry, MyWriter) {
@@ -95,6 +103,13 @@ struct PxrUsdMayaPrimWriterRegistry
     /// \endcode
     PXRUSDMAYA_API
     static void Register(const std::string& mayaType, WriterFactoryFn fn);
+
+    /// \brief Wraps \p fn in a WriterFactoryFn and registers the wrapped
+    /// function as a prim writer provider.
+    /// This is a helper method for the macro PXRUSDMAYA_DEFINE_WRITER;
+    /// you probably want to use PXRUSDMAYA_DEFINE_WRITER directly instead.
+    PXRUSDMAYA_API
+    static void RegisterRaw(const std::string& mayaType, WriterFn fn);
 
     /// \brief Finds a writer if one exists for \p mayaTypeName.
     ///
@@ -126,19 +141,17 @@ TF_REGISTRY_FUNCTION_WITH_TAG( \
     PxrUsdMayaPrimWriterRegistry, \
     PxrUsdMayaWriterDummy_##mayaTypeName) \
 { \
-    PxrUsdMayaPrimWriterRegistry::Register(#mayaTypeName, \
-            FunctorPrimWriter::CreateFactory( \
-            PxrUsdMaya_PrimWriter_##mayaTypeName)); \
+    PxrUsdMayaPrimWriterRegistry::RegisterRaw( \
+            #mayaTypeName, PxrUsdMaya_PrimWriter_##mayaTypeName); \
 } \
 bool PxrUsdMaya_PrimWriter_##mayaTypeName( \
     const PxrUsdMayaPrimWriterArgs& argsVarName, \
     PxrUsdMayaPrimWriterContext* ctxVarName)
 
 /// \brief Registers a pre-existing writer class for the given Maya type;
-/// the writer class should be a subclass of MayaPrimWriter with a four-place
+/// the writer class should be a subclass of MayaPrimWriter with a three-place
 /// constructor that takes <tt>(const MDagPath& mayaPath,
-/// const SdfPath& usdPath, bool instanceSource, usdWriteJobCtx& jobCtx)</tt>
-/// as arguments.
+/// const SdfPath& usdPath, usdWriteJobCtx& jobCtx)</tt> as arguments.
 ///
 /// Example:
 /// \code{.cpp}
@@ -146,7 +159,6 @@ bool PxrUsdMaya_PrimWriter_##mayaTypeName( \
 ///     MyWriter(
 ///             const MDagPath& mayaPath,
 ///             const SdfPath& usdPath,
-///             bool instanceSource,
 ///             usdWriteJobCtx& jobCtx) {
 ///         // ...
 ///     }
@@ -160,10 +172,8 @@ TF_REGISTRY_FUNCTION_WITH_TAG( \
 { \
     PxrUsdMayaPrimWriterRegistry::Register(#mayaTypeName, \
         [](const MDagPath& mayaPath, const SdfPath& usdPath, \
-                bool instanceSource, \
                 usdWriteJobCtx& jobCtx) { \
-            return std::make_shared<writerClass>( \
-                mayaPath, usdPath, instanceSource, jobCtx); \
+            return std::make_shared<writerClass>(mayaPath, usdPath, jobCtx); \
         }); \
 }
 

@@ -25,7 +25,7 @@
 #define PXRUSDMAYA_MAYAMESHWRITER_H
 
 #include "pxr/pxr.h"
-#include "usdMaya/MayaTransformWriter.h"
+#include "usdMaya/MayaPrimWriter.h"
 
 #include <maya/MDagPath.h>
 #include <maya/MDagPathArray.h>
@@ -39,19 +39,19 @@ class UsdGeomMesh;
 class UsdGeomGprim;
 
 
-// Writes an MFnMesh as a poly mesh OR a subd mesh
-class MayaMeshWriter : public MayaTransformWriter
+/// Exports Maya mesh objects (MFnMesh)as UsdGeomMesh prims, taking into account
+/// subd/poly, skinning, reference objects, UVs, and color sets.
+class MayaMeshWriter : public MayaPrimWriter
 {
   public:
     MayaMeshWriter(const MDagPath & iDag,
                    const SdfPath& uPath,
-                   bool instanceSource,
                    usdWriteJobCtx& jobCtx);
 
     void Write(const UsdTimeCode &usdTime) override;
     bool ExportsGprims() const override;
 
-    virtual void PostExport() override;
+    void PostExport() override;
 
   protected:
     bool writeMeshAttrs(const UsdTimeCode &usdTime, UsdGeomMesh &primSchema);
@@ -169,8 +169,6 @@ class MayaMeshWriter : public MayaTransformWriter
     /// Intermediate processes may alter this set prior to writeMeshAttrs().
     std::set<std::string> _excludeColorSets;
 };
-
-typedef std::shared_ptr<MayaMeshWriter> MayaMeshWriterPtr;
 
 
 PXR_NAMESPACE_CLOSE_SCOPE

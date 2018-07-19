@@ -41,6 +41,12 @@ PXR_NAMESPACE_OPEN_SCOPE
 GarchTextureHandleRefPtr
 GarchTextureHandle::New(GarchTextureRefPtr texture)
 {
+    if (texture == nullptr)
+    {
+        TF_CODING_ERROR("Texture handle created for a null texture");
+        return GarchTextureHandleRefPtr();
+    }
+
     return TfCreateRefPtr(new GarchTextureHandle(texture));
 }
 

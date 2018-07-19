@@ -1187,6 +1187,9 @@ HdSt_CodeGenMSL::Compile()
                 << "#define ivec2 int2\n"
                 << "#define ivec3 int3\n"
                 << "#define ivec4 int4\n"
+                << "#define bvec2 bool2\n"
+                << "#define bvec3 bool3\n"
+                << "#define bvec4 bool4\n"
                 << "#define dvec2 float2\n"
                 << "#define dvec3 float3\n"
                 << "#define dvec4 float4\n"
@@ -2858,6 +2861,13 @@ HdSt_CodeGenMSL::_GenerateElementPrimvar()
         // users to call them -- we really should restructure whatever is
         // necessary to avoid having to do this and thus guarantee that users
         // can never call bogus versions of these functions.
+        
+        // Use a fallback of -1, so that points aren't selection highlighted
+        // when face 0 is selected. This would be the case if we returned 0,
+        // since the selection highlighting code is repr-agnostic.
+        // It is safe to do this for points, since  we don't generate accessors
+        // for element primvars, and thus don't use it as an index into
+        // elementCoord.
         if (_geometricShader->IsPrimTypePoints()) {
             accessors
             << "int GetElementID() {\n"
@@ -2947,7 +2957,11 @@ HdSt_CodeGenMSL::_GenerateElementPrimvar()
             << "}\n";
         accessors
             << "bool IsFragmentOnEdge() {\n"
-            << "return false;\n"
+            << "  return false;\n"
+            << "}\n";
+            accessors
+            << "float GetSelectedEdgeOpacity() {\n"
+            << "  return 0.0;\n"
             << "}\n";
     }
 

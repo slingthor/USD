@@ -92,7 +92,7 @@ public:
     }
 
     /// Returns the number of elements allocated
-    virtual int GetNumElements() const override {
+    virtual size_t GetNumElements() const override {
         TF_CODING_ERROR("Hd_DispatchBufferArrayRange doesn't support this operation");
         return 0;
     }

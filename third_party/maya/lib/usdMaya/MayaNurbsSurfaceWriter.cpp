@@ -50,9 +50,8 @@ PXRUSDMAYA_REGISTER_ADAPTOR_SCHEMA(nurbsSurface, UsdGeomNurbsPatch);
 MayaNurbsSurfaceWriter::MayaNurbsSurfaceWriter(
         const MDagPath & iDag,
         const SdfPath& uPath,
-        bool instanceSource,
         usdWriteJobCtx& jobCtx) :
-    MayaTransformWriter(iDag, uPath, instanceSource, jobCtx)
+    MayaPrimWriter(iDag, uPath, jobCtx)
 {
     UsdGeomNurbsPatch primSchema =
         UsdGeomNurbsPatch::Define(GetUsdStage(), GetUsdPath());
@@ -94,12 +93,11 @@ _FixNormalizedKnotRange(
 }
 
 //virtual 
-void MayaNurbsSurfaceWriter::Write(const UsdTimeCode &usdTimeCode)
+void MayaNurbsSurfaceWriter::Write(const UsdTimeCode& usdTimeCode)
 {
-    // == Write
-    UsdGeomNurbsPatch primSchema(_usdPrim);
+    MayaPrimWriter::Write(usdTimeCode);
 
-    // Write the attrs
+    UsdGeomNurbsPatch primSchema(_usdPrim);
     writeNurbsSurfaceAttrs(usdTimeCode, primSchema);
 }
 
@@ -110,11 +108,8 @@ bool MayaNurbsSurfaceWriter::writeNurbsSurfaceAttrs(
 {
     MStatus status = MS::kSuccess;
 
-    // Write parent class attrs
-    _WriteXformableAttrs(usdTimeCode, primSchema);
-
     // Return if usdTimeCode does not match if shape is animated
-    if (usdTimeCode.IsDefault() == _IsShapeAnimated() ) {
+    if (usdTimeCode.IsDefault() == _HasAnimCurves() ) {
         // skip shape as the usdTimeCode does not match if shape isAnimated value
         return true; 
     }
@@ -152,7 +147,7 @@ bool MayaNurbsSurfaceWriter::writeNurbsSurfaceAttrs(
                 }
             }
             if (AlphaData.size() > 0 && 
-                GfIsClose(AlphaData[0], 1.0, 1e-9)==false) {
+                !GfIsClose(AlphaData[0], 1.0, 1e-9)) {
                 UsdGeomPrimvar dispOpacity = primSchema.CreateDisplayOpacityPrimvar();
                 if (interpolation != dispOpacity.GetInterpolation()) {
                     dispOpacity.SetInterpolation(interpolation);
@@ -258,7 +253,7 @@ bool MayaNurbsSurfaceWriter::writeNurbsSurfaceAttrs(
             // Extract CV location and weight
             sampPos[cvIndex].Set(cvArray[index].x, cvArray[index].y, cvArray[index].z);
             sampPosWeights[cvIndex] = cvArray[index].w;
-            if (GfIsClose(cvArray[index].w, 1.0, 1e-9)==false) {
+            if (!GfIsClose(cvArray[index].w, 1.0, 1e-9)) {
                 setWeights = true;
             }
             

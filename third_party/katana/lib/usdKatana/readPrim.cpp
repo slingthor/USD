@@ -31,6 +31,7 @@
 
 
 #include "pxr/usd/usd/prim.h"
+#include "pxr/usd/usd/inherits.h"
 
 #include "pxr/base/tf/getenv.h"
 #include "pxr/base/tf/envSetting.h"
@@ -197,35 +198,29 @@ _GatherRibAttributes(
             attrName = nameSpace +
                 riStatements.GetRiAttributeName(prop).GetString();
 
+            // XXX asShaderParam really means:
+            // "For arrays, as a single attr vs a type/value pair group"
+            // The type/value pair group is meaningful for attrs who don't
+            // have a formal type definition -- like a "user" RiAttribute.
+            //
+            // However, other array values (such as two-element shadingrate)
+            // are not expecting the type/value pair form and will not
+            // generate rib correctly. As such, we'll handle the "user"
+            // attribute as a special case.
+            const bool asShaderParam = (nameSpace != "user.");
+
             VtValue vtValue;
             UsdAttribute usdAttr = prim.GetAttribute(prop.GetName());
             if (usdAttr) {
                 if (!usdAttr.Get(&vtValue, currentTime)) 
                     continue;
-
-                // XXX asShaderParam really means:
-                // "For arrays, as a single attr vs a type/value pair group"
-                // The type/value pair group is meaningful for attrs who don't
-                // have a formal type definition -- like a "user" RiAttribute.
-                // 
-                // However, other array values (such as two-element shadingrate)
-                // are not expecting the type/value pair form and will not
-                // generate rib correctly. As such, we'll handle the "user"
-                // attribute as a special case.
-                bool asShaderParam = true;
-                
-                if (nameSpace == "user.")
-                {
-                    asShaderParam = false;
-                }
-
                 attrsBuilder.set(attrName, PxrUsdKatanaUtils::ConvertVtValueToKatAttr(vtValue,
                     asShaderParam) );
             }
             else {
                 UsdRelationship usdRel = prim.GetRelationship(prop.GetName());
                 attrsBuilder.set(attrName, PxrUsdKatanaUtils::ConvertRelTargetsToKatAttr(usdRel,
-                    /* asShaderParam */ false) );
+                    asShaderParam) );
             }
             hasAttrs = true;
         }
@@ -648,7 +643,7 @@ _AddExtraAttributesOrNamespaces(
                 }
                 
                 FnKat::Attribute attr = 
-                    PxrUsdKatanaUtils::ConvertVtValueToKatAttr(vtValue, true);
+                    PxrUsdKatanaUtils::ConvertVtValueToKatAttr(vtValue);
                 
                 if (!attr.isValid())
                 {
@@ -666,8 +661,7 @@ _AddExtraAttributesOrNamespaces(
                 UsdRelationship & usdRelationship = (*I);
                 
                 FnKat::StringAttribute attr = 
-                    PxrUsdKatanaUtils::ConvertRelTargetsToKatAttr(
-                        usdRelationship, true);
+                    PxrUsdKatanaUtils::ConvertRelTargetsToKatAttr(usdRelationship);
                 if (!attr.isValid())
                 {
                     continue;
@@ -739,7 +733,7 @@ _AddCustomProperties(
         }
         
         FnKat::Attribute attr =
-            PxrUsdKatanaUtils::ConvertVtValueToKatAttr(vtValue, true);
+            PxrUsdKatanaUtils::ConvertVtValueToKatAttr(vtValue);
 
         if (!attr.isValid())
         {
@@ -997,6 +991,18 @@ PxrUsdKatanaReadPrim(
             return token.GetString();
         });
         attrs.set("info.usd.apiSchemas", FnKat::StringAttribute(appliedSchemas));
+    }
+
+    // 
+    // Store the composed inherits metadata as a group attribute
+    //
+    SdfPathVector inheritPaths = prim.GetInherits().GetAllDirectInherits();
+    if (!inheritPaths.empty()){
+        FnKat::GroupBuilder inheritPathsBuilder;
+        for (const auto& path : inheritPaths){
+            inheritPathsBuilder.set(path.GetName(), FnKat::IntAttribute(1));
+        }
+        attrs.set("info.usd.inheritPaths", inheritPathsBuilder.build());
     }
 }
 

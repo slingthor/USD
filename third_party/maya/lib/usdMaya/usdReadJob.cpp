@@ -27,6 +27,7 @@
 #include "usdMaya/primReaderRegistry.h"
 #include "usdMaya/shadingModeRegistry.h"
 #include "usdMaya/stageCache.h"
+#include "usdMaya/stageNode.h"
 #include "usdMaya/translatorMaterial.h"
 #include "usdMaya/translatorModelAssembly.h"
 #include "usdMaya/translatorXformable.h"
@@ -46,13 +47,18 @@
 #include "pxr/usd/usdUtils/stageCache.h"
 
 #include <maya/MAnimControl.h>
+#include <maya/MDGModifier.h>
 #include <maya/MDagModifier.h>
+#include <maya/MFnDependencyNode.h>
 #include <maya/MObject.h>
+#include <maya/MPlug.h>
+#include <maya/MStatus.h>
 #include <maya/MTime.h>
 
 #include <map>
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 
@@ -168,8 +174,10 @@ usdReadJob::doIt(std::vector<MDagPath>* addedDagPaths)
     }
 
     // Set the variants on the usdRootPrim
-    for (std::map<std::string, std::string>::iterator it=mVariants.begin(); it!=mVariants.end(); ++it) {
-        usdRootPrim.GetVariantSet(it->first).SetVariantSelection(it->second);
+    for (auto& variant : mVariants) {
+        usdRootPrim
+                .GetVariantSet(variant.first)
+                .SetVariantSelection(variant.second);
     }
 
     bool isSceneAssembly = mMayaRootDagPath.node().hasFn(MFn::kAssembly);
@@ -205,6 +213,34 @@ usdReadJob::doIt(std::vector<MDagPath>* addedDagPaths)
     mNewNodeRegistry.insert(std::make_pair(
                 rootPathToRegister.GetString(),
                 mMayaRootDagPath.node()));
+
+    if (mArgs.useAsAnimationCache) {
+        MDGModifier dgMod;
+        MObject usdStageNode = dgMod.createNode(UsdMayaStageNode::typeId,
+                                                &status);
+        CHECK_MSTATUS_AND_RETURN(status, false);
+
+        // We only ever create a single stage node per usdImport, so we can
+        // simply register it and later look it up in the registry using its
+        // type name.
+        mNewNodeRegistry.insert(
+            std::make_pair(PxrUsdMayaStageNodeTokens->MayaTypeName.GetString(),
+                           usdStageNode));
+
+        MFnDependencyNode depNodeFn(usdStageNode, &status);
+        CHECK_MSTATUS_AND_RETURN(status, false);
+
+        MPlug filePathPlug = depNodeFn.findPlug(UsdMayaStageNode::filePathAttr,
+                                                true,
+                                                &status);
+        CHECK_MSTATUS_AND_RETURN(status, false);
+
+        status = dgMod.newPlugValueString(filePathPlug, mFileName.c_str());
+        CHECK_MSTATUS_AND_RETURN(status, false);
+
+        status = dgMod.doIt();
+        CHECK_MSTATUS_AND_RETURN(status, false);
+    }
 
     if (mArgs.importWithProxyShapes) {
         _DoImportWithProxies(range);
@@ -246,8 +282,8 @@ usdReadJob::_DoImport(UsdPrimRange& rootRange, const UsdPrim& usdRootPrim)
         const UsdPrim& rootPrim = *rootIt;
         rootIt.PruneChildren();
 
-        std::unordered_map<SdfPath, PxrUsdMayaPrimReaderPtr, SdfPath::Hash>
-                primReaders;
+        std::unordered_map<SdfPath, PxrUsdMayaPrimReaderSharedPtr,
+                SdfPath::Hash> primReaders;
         const UsdPrimRange range = UsdPrimRange::PreAndPostVisit(rootPrim);
         for (auto primIt = range.begin(); primIt != range.end(); ++primIt) {
             const UsdPrim& prim = *primIt;
@@ -306,7 +342,7 @@ usdReadJob::_DoImport(UsdPrimRange& rootRange, const UsdPrim& usdRootPrim)
                 TfToken typeName = prim.GetTypeName();
                 if (PxrUsdMayaPrimReaderRegistry::ReaderFactoryFn factoryFn
                         = PxrUsdMayaPrimReaderRegistry::Find(typeName)) {
-                    PxrUsdMayaPrimReaderPtr primReader = factoryFn(args);
+                    PxrUsdMayaPrimReaderSharedPtr primReader = factoryFn(args);
                     if (primReader) {
                         primReader->Read(&readCtx);
                         if (primReader->HasPostReadSubtree()) {
@@ -338,8 +374,7 @@ usdReadJob::redoIt()
 {
     // Undo the undo
     MStatus status = mDagModifierUndo.undoIt();
-    if (status != MS::kSuccess) {
-    }
+
     return (status == MS::kSuccess);
 }
 
@@ -350,9 +385,9 @@ usdReadJob::undoIt()
         mDagModifierSeeded = true;
         MStatus dagStatus;
         // Construct list of top level DAG nodes to delete and any DG nodes
-        for (PathNodeMap::iterator it=mNewNodeRegistry.begin(); it!=mNewNodeRegistry.end(); ++it) {
-            if (it->second != mMayaRootDagPath.node() ) { // if not the parent root node
-                MFnDagNode dagFn(it->second, &dagStatus);
+        for (auto& it : mNewNodeRegistry) {
+            if (it.second != mMayaRootDagPath.node() ) { // if not the parent root node
+                MFnDagNode dagFn(it.second, &dagStatus);
                 if (dagStatus == MS::kSuccess) {
                     if (mMayaRootDagPath.node() != MObject::kNullObj) {
                         if (!dagFn.hasParent(mMayaRootDagPath.node() ))  { // skip if a DAG Node, but not under the root
@@ -365,13 +400,13 @@ usdReadJob::undoIt()
                         }
                     }
                 }
-                mDagModifierUndo.deleteNode(it->second);
+                mDagModifierUndo.deleteNode(it.second);
             }
         }
     }
+
     MStatus status = mDagModifierUndo.doIt();
-    if (status != MS::kSuccess) {
-    }
+
     return (status == MS::kSuccess);
 }
 

@@ -60,21 +60,18 @@ PXR_NAMESPACE_OPEN_SCOPE
 namespace PxrUsdMayaUtil
 {
 
-struct cmpDag
+struct _CmpDag
 {
     bool operator()( const MDagPath& lhs, const MDagPath& rhs ) const
     {
         return strcmp(lhs.fullPathName().asChar(), rhs.fullPathName().asChar()) < 0;
     }
 };
-typedef std::set< MDagPath, cmpDag > ShapeSet;
 
-// can't have a templated typedef.  this is the best we can do.
+using MDagPathSet = std::set<MDagPath, _CmpDag>;
+
 template <typename V>
-struct MDagPathMap
-{
-    typedef std::map<MDagPath, V, cmpDag> Type;
-};
+using MDagPathMap = std::map<MDagPath, V, _CmpDag>;
 
 /// RAII-style helper for destructing an MDataHandle obtained from a plug
 /// once it goes out of scope.
@@ -88,7 +85,7 @@ public:
 
 private:
     MDataHandleHolder(const MPlug& plug, MDataHandle dataHandle);
-    ~MDataHandleHolder();
+    ~MDataHandleHolder() override;
 };
 
 // safely inverse a scale component
@@ -341,7 +338,7 @@ PXR_NS::SdfPath MDagPathToUsdPath(const MDagPath& dagPath, bool mergeTransformAn
 
 /// Convenience function to retrieve custom data
 PXRUSDMAYA_API
-bool GetBoolCustomData(PXR_NS::UsdAttribute obj, PXR_NS::TfToken key, bool defaultValue);
+bool GetBoolCustomData(const PXR_NS::UsdAttribute& obj, const PXR_NS::TfToken& key, bool defaultValue);
 
 // Compute the value of \p attr, returning true upon success.
 //
@@ -352,7 +349,7 @@ template <typename T>
 bool getPlugValue(MFnDependencyNode const &depNode, 
                   MString const &attr, 
                   T *val,
-                  bool *isAnimated = NULL)
+                  bool *isAnimated = nullptr)
 {
     MPlug plg = depNode.findPlug( attr, /* findNetworked = */ true );
     if ( !plg.isNull() ) {

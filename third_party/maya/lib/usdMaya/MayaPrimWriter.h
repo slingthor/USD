@@ -57,7 +57,11 @@ public:
     virtual ~MayaPrimWriter();
 
     /// Main export function that runs when the traversal hits the node.
-    virtual void Write(const UsdTimeCode &usdTime) = 0;
+    /// The default implementation writes attributes for the UsdGeomImageable
+    /// and UsdGeomGprim schemas if the prim conforms to one or both; in most
+    /// cases, subclasses will want to invoke the base class Write() method
+    /// when overriding.
+    virtual void Write(const UsdTimeCode &usdTime);
 
     /// Post export function that runs before saving the stage.
     ///
@@ -74,41 +78,53 @@ public:
     /// gprim (shape) classes should override.
     PXRUSDMAYA_API
     virtual bool ExportsGprims() const;
-    
-    /// Whether this prim writer add references on the USD stage.
-    ///
-    /// Base implementation returns \c false.
-    PXRUSDMAYA_API
-    virtual bool ExportsReferences() const;
 
     /// Whether the traversal routine using this prim writer should skip all of
     /// the Maya node's descendants when continuing traversal.
+    /// If you override this to return \c true, you may also want to override
+    /// GetDagToUsdPathMapping() if you handle export of descendant nodes
+    /// (though that is not required).
     ///
     /// Base implementation returns \c false; prim writers that handle export
     /// for their entire subtree should override.
     PXRUSDMAYA_API
     virtual bool ShouldPruneChildren() const;
 
-    /// Whether visibility can be exported for this prim; overrides settings
-    /// from the export args.
+    /// Whether visibility can be exported for this prim.
+    /// By default, this is based off of the export visibility setting in the
+    /// export args.
     PXRUSDMAYA_API
     bool GetExportVisibility() const;
 
-    /// Sets whether visibility can be exported for this prim. If \c true,
-    /// then uses the setting from the export args. If \c false, then will
-    /// never export visibility on this prim.
+    /// Sets whether visibility can be exported for this prim.
+    /// This will override the export args.
     PXRUSDMAYA_API
     void SetExportVisibility(bool exportVis);
 
-    /// Gets all of the prim paths that this prim writer has created.
-    /// The base implementation just gets the single generated prim's path.
-    /// Prim writers that generate more than one USD prim from a single Maya
-    /// node should override this function to indicate all the prims they
-    /// create.
-    /// Implementations should add to outPaths instead of replacing. The return
-    /// value should indicate whether any items were added to outPaths.
+    /// Gets all of the exported prim paths that are potentially models, i.e.
+    /// the prims on which this prim writer has authored kind metadata or
+    /// otherwise expects kind metadata to exist (e.g. via reference).
+    ///
+    /// The USD export process will attempt to "fix-up" kind metadata to ensure
+    /// contiguous model hierarchy for any potential model prims.
+    ///
+    /// The base implementation returns an empty vector.
     PXRUSDMAYA_API
-    virtual bool GetAllAuthoredUsdPaths(SdfPathVector* outPaths) const;
+    virtual const SdfPathVector& GetModelPaths() const;
+
+    /// Gets a mapping from MDagPaths to exported prim paths.
+    /// Useful only for prim writers that override ShouldPruneChildren() to
+    /// \c true but still want the export process to know about the Maya-to-USD
+    /// correspondence for their descendants, e.g., for material binding
+    /// purposes.
+    /// The result vector should only include paths for which there is a true,
+    /// one-to-one correspondence between the Maya node and USD prim; don't
+    /// include any mappings where the mapped value is an invalid path.
+    ///
+    /// The base implementation simply maps GetDagPath() to GetUsdPath().
+    PXRUSDMAYA_API
+    virtual const PxrUsdMayaUtil::MDagPathMap<SdfPath>&
+            GetDagToUsdPathMapping() const;
 
     /// The source Maya DAG path that we are consuming.
     PXRUSDMAYA_API
@@ -126,40 +142,10 @@ public:
     PXRUSDMAYA_API
     const UsdStageRefPtr& GetUsdStage() const;
 
-    /// Whether this prim writer is valid or not.
-    /// Invalid prim writers shouldn't be used, and they shouldn't do anything.
-    PXRUSDMAYA_API
-    bool IsValid() const;
-
 protected:
-    /// Whether there is shape (not transform) animation.
-    /// XXX This is really a helper method that needs to be moved
-    /// elsewhere.
-    virtual bool _IsShapeAnimated() const = 0;
-
-    /// Sets the path on the USD stage where this prim writer should define its
-    /// output prim.
-    /// \sa GetUsdPath()
-    PXRUSDMAYA_API
-    void _SetUsdPath(const SdfPath& newPath);
-
-    /// Sets whether this prim writer is valid or not.
-    /// \sa IsValid()
-    PXRUSDMAYA_API
-    void _SetValid(bool isValid);
-
-    /// Writes the attributes that are common to all UsdGeomImageable prims.
-    /// Subclasses should almost always invoke _WriteImageableAttrs somewhere
-    /// in their Write() function.
-    /// The \p transformDagPath is useful only if merging shapes and transforms
-    /// and this prim writer's source node is a shape, in which case
-    /// \p transformDagPath should be the parent transform path. Otherwise,
-    /// \p transformDagPath can just be the empty DAG path.
-    PXRUSDMAYA_API
-    bool _WriteImageableAttrs(
-            const MDagPath& transformDagPath,
-            const UsdTimeCode& usdTime,
-            UsdGeomImageable& primSchema);
+    /// Helper function for determining whether the current node has input
+    /// animation curves.
+    virtual bool _HasAnimCurves() const;
 
     /// Gets the current global export args in effect.
     PXRUSDMAYA_API
@@ -199,16 +185,26 @@ protected:
     usdWriteJobCtx& _writeJobCtx;
 
 private:
-    MDagPath _dagPath;
-    SdfPath _usdPath;
+    /// Whether this prim writer represents the transform portion of a merged
+    /// shape and transform.
+    bool _IsMergedTransform() const;
+
+    /// Whether this prim writer represents the shape portion of a merged shape
+    /// and transform.
+    bool _IsMergedShape() const;
+
+    const MDagPath _dagPath;
+    const SdfPath _usdPath;
+    const PxrUsdMayaUtil::MDagPathMap<SdfPath> _baseDagToUsdPaths;
 
     UsdUtilsSparseValueWriter _valueWriter;
 
-    bool _isValid;
     bool _exportVisibility;
+    bool _hasAnimCurves;
+    bool _isShapeAnimated;
 };
 
-typedef std::shared_ptr<MayaPrimWriter> MayaPrimWriterPtr;
+typedef std::shared_ptr<MayaPrimWriter> MayaPrimWriterSharedPtr;
 
 PXR_NAMESPACE_CLOSE_SCOPE
 

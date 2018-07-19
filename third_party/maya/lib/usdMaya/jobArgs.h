@@ -24,7 +24,7 @@
 #ifndef PXRUSDMAYA_JOB_ARGS_H
 #define PXRUSDMAYA_JOB_ARGS_H
 
-/// \file jobArgs.h
+/// \file usdMaya/jobArgs.h
 
 #include "pxr/pxr.h"
 #include "usdMaya/api.h"
@@ -61,6 +61,7 @@ TF_DECLARE_PUBLIC_TOKENS(PxrUsdMayaTranslatorTokens,
     (chaserArgs) \
     (defaultCameras) \
     (defaultMeshScheme) \
+    (eulerFilter) \
     (exportCollectionBasedBindings) \
     (exportColorSets) \
     (exportDisplayColor) \
@@ -104,6 +105,7 @@ TF_DECLARE_PUBLIC_TOKENS(PxrUsdExportJobArgsTokens,
     (excludePrimvar) \
     (metadata) \
     (shadingMode) \
+    (useAsAnimationCache) \
     /* assemblyRep values */ \
     (Collapsed) \
     (Full) \
@@ -116,6 +118,7 @@ TF_DECLARE_PUBLIC_TOKENS(PxrUsdImportJobArgsTokens,
 struct PxrUsdMayaJobExportArgs
 {
     const TfToken defaultMeshScheme;
+    const bool eulerFilter;
     const bool excludeInvisible;
     const bool exportCollectionBasedBindings;
     const bool exportColorSets;
@@ -148,7 +151,7 @@ struct PxrUsdMayaJobExportArgs
     const std::string pythonPerFrameCallback;
     const std::string pythonPostCallback;
 
-    const PxrUsdMayaUtil::ShapeSet dagPaths;
+    const PxrUsdMayaUtil::MDagPathSet dagPaths;
     /// The interval over which to export animated data.
     /// An empty interval (<tt>GfInterval::IsEmpty()</tt>) means that no
     /// animated (time-sampled) data should be exported.
@@ -170,7 +173,7 @@ struct PxrUsdMayaJobExportArgs
     PXRUSDMAYA_API
     static PxrUsdMayaJobExportArgs CreateFromDictionary(
         const VtDictionary& userArgs,
-        const PxrUsdMayaUtil::ShapeSet& dagPaths,
+        const PxrUsdMayaUtil::MDagPathSet& dagPaths,
         const GfInterval& timeInterval = GfInterval());
 
     /// Gets the default arguments dictionary for PxrUsdMayaJobExportArgs.
@@ -195,7 +198,7 @@ private:
     PXRUSDMAYA_API
     PxrUsdMayaJobExportArgs(
         const VtDictionary& userArgs,
-        const PxrUsdMayaUtil::ShapeSet& dagPaths,
+        const PxrUsdMayaUtil::MDagPathSet& dagPaths,
         const GfInterval& timeInterval);
 
     // Maya type ids to avoid exporting; these are
@@ -219,6 +222,7 @@ struct PxrUsdMayaJobImportArgs
     const TfToken::Set includeAPINames;
     const TfToken::Set includeMetadataKeys;
     TfToken shadingMode; // XXX can we make this const?
+    const bool useAsAnimationCache;
 
     const bool importWithProxyShapes;
     /// The interval over which to import animated data.
@@ -257,7 +261,7 @@ private:
 PXRUSDMAYA_API
 std::ostream& operator <<(
     std::ostream& out,
-    const PxrUsdMayaJobImportArgs& exportArgs);
+    const PxrUsdMayaJobImportArgs& importArgs);
 
 
 PXR_NAMESPACE_CLOSE_SCOPE

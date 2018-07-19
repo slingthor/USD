@@ -21,17 +21,16 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#include "pxr/pxr.h"
 #include "usdMaya/primReaderRegistry.h"
+
 #include "usdMaya/debugCodes.h"
+#include "usdMaya/functorPrimReader.h"
 #include "usdMaya/registryHelper.h"
 
 #include "pxr/base/plug/registry.h"
-
-#include "pxr/usd/usd/schemaBase.h"
-
 #include "pxr/base/tf/registryManager.h"
 #include "pxr/base/tf/type.h"
+#include "pxr/usd/usd/schemaBase.h"
 
 #include <boost/assign.hpp>
 
@@ -64,6 +63,15 @@ PxrUsdMayaPrimReaderRegistry::Register(
 }
 
 /* static */
+void
+PxrUsdMayaPrimReaderRegistry::RegisterRaw(
+        const TfType& t,
+        PxrUsdMayaPrimReaderRegistry::ReaderFn fn)
+{
+    Register(t, PxrUsdMaya_FunctorPrimReader::CreateFactory(fn));
+}
+
+/* static */
 PxrUsdMayaPrimReaderRegistry::ReaderFactoryFn
 PxrUsdMayaPrimReaderRegistry::Find(
         const TfToken& usdTypeName)
@@ -75,7 +83,7 @@ PxrUsdMayaPrimReaderRegistry::Find(
     TfType tfType = PlugRegistry::FindDerivedTypeByName<UsdSchemaBase>(usdTypeName);
     std::string typeNameStr = tfType.GetTypeName();
     TfToken typeName(typeNameStr);
-    ReaderFactoryFn ret = NULL;
+    ReaderFactoryFn ret = nullptr;
     if (TfMapLookup(_reg, typeName, &ret)) {
         return ret;
     }
@@ -90,7 +98,7 @@ PxrUsdMayaPrimReaderRegistry::Find(
         TF_DEBUG(PXRUSDMAYA_REGISTRY).Msg(
                 "No usdMaya reader plugin for TfType %s.  No maya plugin.\n", 
                 typeName.GetText());
-        _reg[typeName] = NULL;
+        _reg[typeName] = nullptr;
     }
     return ret;
 }

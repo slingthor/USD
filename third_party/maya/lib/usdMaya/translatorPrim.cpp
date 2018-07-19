@@ -82,7 +82,8 @@ PxrUsdMayaTranslatorPrim::Read(
         // Populate the channel arrays
         for (unsigned int ti=0; ti < visNumTimeSamples; ++ti) {
             primSchema.GetVisibilityAttr().Get(&visibilityTok, visTimeSamples[ti]);
-            valueArray[ti] = (visibilityTok != UsdGeomTokens->invisible);
+            valueArray[ti] =
+                    static_cast<double>(visibilityTok != UsdGeomTokens->invisible);
         }
 
         // == Write to maya node ==
@@ -100,7 +101,7 @@ PxrUsdMayaTranslatorPrim::Read(
         // Add the keys
         plg = depFn.findPlug( "visibility" );
         if ( !plg.isNull() ) {
-            MObject animObj = animFn.create(plg, NULL, &status);
+            MObject animObj = animFn.create(plg, nullptr, &status);
             animFn.addKeys(&timeArray, &valueArray);
             if (context) {
                 context->RegisterNewMayaNode(

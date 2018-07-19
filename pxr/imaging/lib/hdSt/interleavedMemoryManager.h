@@ -103,7 +103,7 @@ public:
         }
 
         /// Returns the number of elements
-        virtual int GetNumElements() const override {
+        virtual size_t GetNumElements() const override {
             return _numElements;
         }
 
@@ -164,7 +164,7 @@ public:
         enum { NOT_ALLOCATED = -1 };
         _StripedInterleavedBuffer *_stripedBuffer;
         int _index;
-        int _numElements;
+        size_t _numElements;
     };
 
     typedef boost::shared_ptr<_StripedInterleavedBuffer>

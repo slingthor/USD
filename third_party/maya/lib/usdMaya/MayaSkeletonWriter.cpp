@@ -133,11 +133,8 @@ _GetJointHierarchyComponents(const MDagPath& dagPath,
 }
 
 
-// Note: we currently don't support instanceSource for joints, but we have to
-// have the argument in order to register the writer plugin.
 MayaSkeletonWriter::MayaSkeletonWriter(const MDagPath& iDag,
                                        const SdfPath& uPath,
-                                       bool /*instanceSource */,
                                        usdWriteJobCtx& jobCtx)
     : MayaPrimWriter(iDag, uPath, jobCtx),
       _valid(false), _animXformIsAnimated(false)
@@ -522,7 +519,7 @@ MayaSkeletonWriter::Write(const UsdTimeCode &usdTime)
     // time code. We do want to run this @ default time also so that any
     // deviations from the rest pose are exported as the default values on the
     // SkelAnimation.
-    if (_animatedJoints.size() > 0) {
+    if (!_animatedJoints.empty()) {
 
         if (!_skelAnim) {
 
@@ -578,32 +575,6 @@ bool
 MayaSkeletonWriter::ShouldPruneChildren() const
 {
     return true;
-}
-
-bool
-MayaSkeletonWriter::_IsShapeAnimated() const
-{
-    // Either the root xform or the SkelAnimation beneath it
-    // may be animated.
-    return _animXformIsAnimated || _animatedJoints.size() > 0;
-}
-
-bool
-MayaSkeletonWriter::GetAllAuthoredUsdPaths(SdfPathVector* outPaths) const
-{
-    bool hasPrims = MayaPrimWriter::GetAllAuthoredUsdPaths(outPaths);
-
-    SdfPath skelPath = GetSkeletonPath(
-        GetDagPath(), _GetExportArgs().stripNamespaces);
-    SdfPath animPath = _GetAnimationPath(skelPath);
-    
-    for (const SdfPath& path : {skelPath, animPath}) {  
-        if (GetUsdStage()->GetPrimAtPath(path)) {
-            outPaths->push_back(path);
-            hasPrims = true;
-        }
-    }
-    return hasPrims;
 }
 
 

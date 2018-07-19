@@ -60,6 +60,9 @@ TF_DEFINE_PRIVATE_TOKENS(
     ((PxrShaderPrefix, "Pxr"))
     ((DefaultShaderOutputName, "out"))
     ((MayaShaderOutputName, "outColor"))
+
+    // in r22, this is "rman__surface", added via extension attribute
+    ((RmanShadingPlug, "surfaceShader")) 
 );
 
 
@@ -68,6 +71,11 @@ class PxrRisShadingModeExporter : public PxrUsdMayaShadingModeExporter {
 public:
     PxrRisShadingModeExporter() {}
 private:
+
+    void PreExport(PxrUsdMayaShadingModeExportContext* context) override {
+        context->SetSurfaceShaderPlugName(_tokens->RmanShadingPlug);
+    }
+
     TfToken
     _GetShaderTypeName(const MFnDependencyNode& depNode)
     {
@@ -75,9 +83,9 @@ private:
 
         // Now look into the RIS TABLE if the typeName doesn't starts with Pxr.
         if (!TfStringStartsWith(mayaTypeName, _tokens->PxrShaderPrefix)) {
-            for (size_t i = 0u; i < _RFM_RISNODE_TABLE.size(); ++i) {
-                if (_RFM_RISNODE_TABLE[i].first == mayaTypeName) {
-                    return _RFM_RISNODE_TABLE[i].second;
+            for (const auto& i : _RFM_RISNODE_TABLE) {
+                if (i.first == mayaTypeName) {
+                    return i.second;
                 }
             }
         }
@@ -351,9 +359,9 @@ _CreateShaderObject(
     TfToken mayaTypeName = shaderId;
 
     // Now remap the mayaTypeName if found in the RIS table.
-    for (size_t i = 0u; i < _RFM_RISNODE_TABLE.size(); ++i) {
-        if (_RFM_RISNODE_TABLE[i].second == mayaTypeName) {
-            mayaTypeName = _RFM_RISNODE_TABLE[i].first;
+    for (const auto & i : _RFM_RISNODE_TABLE) {
+        if (i.second == mayaTypeName) {
+            mayaTypeName = i.first;
             break;
         }
     }
@@ -432,6 +440,10 @@ _CreateShaderObject(
 
 DEFINE_SHADING_MODE_IMPORTER(pxrRis, context)
 {
+    // RenderMan for Maya wants the shader nodes to get hooked into the shading
+    // group via it's own plug.
+    context->SetSurfaceShaderPlugName(_tokens->RmanShadingPlug);
+
     // This expects the renderman for maya plugin is loaded.
     // How do we ensure that it is?
     const UsdShadeMaterial& shadeMaterial = context->GetShadeMaterial();

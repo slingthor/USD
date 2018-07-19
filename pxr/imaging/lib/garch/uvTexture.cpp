@@ -126,6 +126,7 @@ GarchUVTexture::GarchUVTexture(
     unsigned int cropRight,
     GarchImage::ImageOriginLocation originLocation)
     : GarchBaseTexture(originLocation)
+    , _baseTexture(baseTexture)
     , _imageFilePath(imageFilePath)
     , _cropTop(cropTop)
     , _cropBottom(cropBottom)

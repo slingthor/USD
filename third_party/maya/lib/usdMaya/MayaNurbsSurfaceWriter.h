@@ -25,20 +25,20 @@
 #define _usdExport_MayaNurbsSurfaceWriter_h_
 
 #include "pxr/pxr.h"
-#include "usdMaya/MayaTransformWriter.h"
+#include "usdMaya/MayaPrimWriter.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
 
 class UsdGeomNurbsPatch;
 
-// Writes an MFnMesh as a poly mesh OR a subd mesh
-class MayaNurbsSurfaceWriter : public MayaTransformWriter
+/// Exports Maya nurbsSurface objects (MFnNurbsSurface) as UsdGeomNurbsPatch.
+class MayaNurbsSurfaceWriter : public MayaPrimWriter
 {
   public:
-    MayaNurbsSurfaceWriter(const MDagPath & iDag,
+    MayaNurbsSurfaceWriter(
+            const MDagPath & iDag,
             const SdfPath& uPath,
-            bool instanceSource,
             usdWriteJobCtx& jobCtx);
     
     void Write(const UsdTimeCode &usdTime) override;
@@ -48,8 +48,6 @@ class MayaNurbsSurfaceWriter : public MayaTransformWriter
   protected:
     bool writeNurbsSurfaceAttrs(const UsdTimeCode &usdTime, UsdGeomNurbsPatch &primSchema);
 };
-
-typedef std::shared_ptr<MayaNurbsSurfaceWriter> MayaNurbsSurfaceWriterPtr;
 
 
 PXR_NAMESPACE_CLOSE_SCOPE

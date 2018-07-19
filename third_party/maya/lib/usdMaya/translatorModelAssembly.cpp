@@ -96,8 +96,8 @@ PxrUsdMayaTranslatorModelAssembly::Create(
     UsdTimeCode usdTime = context->GetTimeCode();
 
     context->SetExportsGprims(false);
-    context->SetExportsReferences(true);
     context->SetPruneChildren(true);
+    context->SetModelPaths({authorPath});
 
     UsdPrim prim = stage->DefinePrim(authorPath);
     if (!prim) {
@@ -331,7 +331,7 @@ PxrUsdMayaTranslatorModelAssembly::Read(
         const UsdPrim& prim,
         const std::string& assetIdentifier,
         const SdfPath& assetPrimPath,
-        MObject parentNode,
+        const MObject& parentNode,
         const PxrUsdMayaPrimReaderArgs& args,
         PxrUsdMayaPrimReaderContext* context,
         const TfToken& assemblyRep)

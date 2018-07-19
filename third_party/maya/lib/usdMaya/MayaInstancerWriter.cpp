@@ -56,9 +56,8 @@ TF_DEFINE_PRIVATE_TOKENS(
 
 MayaInstancerWriter::MayaInstancerWriter(const MDagPath & iDag,
     const SdfPath& uPath,
-    bool instanceSource,
     usdWriteJobCtx& jobCtx)
-    : MayaTransformWriter(iDag, uPath, instanceSource, jobCtx),
+    : MayaTransformWriter(iDag, uPath, jobCtx),
       _numPrototypes(0)
 {
     UsdGeomPointInstancer primSchema =
@@ -66,15 +65,20 @@ MayaInstancerWriter::MayaInstancerWriter(const MDagPath & iDag,
     TF_AXIOM(primSchema);
     _usdPrim = primSchema.GetPrim();
     TF_AXIOM(_usdPrim);
+
+    // Note that the instancer is a model -- it's an assembly by default, though
+    // the model kind writer is allowed to "fix" this up.
     UsdModelAPI(_usdPrim).SetKind(KindTokens->assembly);
+    _modelPaths.push_back(_usdPrim.GetPath());
 }
 
 /* virtual */
 void
 MayaInstancerWriter::Write(const UsdTimeCode &usdTime)
 {
+    MayaTransformWriter::Write(usdTime);
+
     UsdGeomPointInstancer primSchema(_usdPrim);
-    _WriteXformableAttrs(usdTime, primSchema);
     writeInstancerAttrs(usdTime, primSchema);
 }
 
@@ -100,16 +104,18 @@ _GetTransformedOriginInLocalSpace(
 /// (This function may return false positives, which are OK but will simply
 /// contribute extra data. It should never return false negatives, which
 /// would cause correctness problems.)
-AnimChannelSampleType
-MayaInstancerWriter::_GetInstancerTranslateSampleType(
-    const MDagPath& prototypeDagPath) const
+bool
+MayaInstancerWriter::_NeedsExtraInstancerTranslate(
+    const MDagPath& prototypeDagPath,
+    bool* instancerTranslateAnimated) const
 {
     // XXX: Maybe we could be smarter here and figure out if the animation
     // affects instancerTranslate?
     bool animated = !_GetExportArgs().timeInterval.IsEmpty() &&
             MAnimUtil::isAnimated(prototypeDagPath.node(), false);
     if (animated) {
-        return ANIMATED;
+        *instancerTranslateAnimated = true;
+        return true;
     }
 
     GfVec3d origin;
@@ -117,80 +123,13 @@ MayaInstancerWriter::_GetInstancerTranslateSampleType(
             _GetTransformedOriginInLocalSpace(prototypeDagPath, &origin) &&
             !GfIsClose(origin, GfVec3d(0.0), _EPSILON);
     if (translated) {
-        return STATIC;
+        *instancerTranslateAnimated = false;
+        return true;
     }
 
-    return NO_XFORM;
+    return false;
 }
 
-/// Exports a single prototype whose original Maya location is prototypeDagPath,
-/// and whose exported prototype location is prototypeUsdPath.
-/// validPrimWritersOut needs to be provided; all of the valid prim writers
-/// for this prototype's hierarchy will be appended to the vector.
-void
-MayaInstancerWriter::_ExportPrototype(
-    const MDagPath& prototypeDagPath,
-    const SdfPath& prototypeUsdPath,
-    std::vector<MayaPrimWriterPtr>* validPrimWritersOut)
-{
-    // The USD path of the prototype root if it were exported at its current
-    // Maya location.
-    const SdfPath prototypeComputedUsdPath =
-            PxrUsdMayaUtil::MDagPathToUsdPath(prototypeDagPath, false, 
-                _GetExportArgs().stripNamespaces);
-
-    MItDag itDag(MItDag::kDepthFirst, MFn::kInvalid);
-    itDag.reset(prototypeDagPath);
-    for (; !itDag.isDone(); itDag.next()) {
-        MDagPath curDagPath;
-        itDag.getPath(curDagPath);
-
-        if (!_writeJobCtx.needToTraverse(curDagPath)) {
-            itDag.prune();
-            continue;
-        }
-
-        // The USD path of this prototype descendant prim if it were exported
-        // at its current Maya location.
-        const SdfPath curComputedUsdPath =
-                PxrUsdMayaUtil::MDagPathToUsdPath(curDagPath, false, 
-                    _GetExportArgs().stripNamespaces);
-
-        // Compute the current prim's relative path w/r/t the prototype root,
-        // and use this to re-anchor it under the USD stage location where
-        // we want to write out the prototype.
-        const SdfPath curRelPath = curComputedUsdPath.MakeRelativePath(
-                prototypeComputedUsdPath);
-        const SdfPath curActualUsdPath = prototypeUsdPath
-                .AppendPath(curRelPath);
-
-        MayaPrimWriterPtr writer = _writeJobCtx.createPrimWriter(
-                curDagPath, curActualUsdPath);
-        if (!writer) {
-            continue;
-        }
-
-        if (writer->GetUsdPrim()) {
-            validPrimWritersOut->push_back(writer);
-
-            // The prototype root must be visible to match Maya's behavior,
-            // which always vis'es the prototype root, even if it is marked
-            // hidden.
-            // (This check is somewhat roundabout because we might be merging
-            // transforms and shapes, so it's difficult ahead-of-time to know
-            // which prim writer will write the root prim.)
-            if (writer->GetUsdPrim().GetPath() == prototypeUsdPath) {
-                writer->SetExportVisibility(false);
-            }
-        }
-
-        if (writer->ShouldPruneChildren()) {
-            itDag.prune();
-        }
-    }
-}
-
-/* virtual */
 bool
 MayaInstancerWriter::writeInstancerAttrs(
     const UsdTimeCode& usdTime, const UsdGeomPointInstancer& instancer)
@@ -205,15 +144,22 @@ MayaInstancerWriter::writeInstancerAttrs(
     // they came from. Another reason is that it only provides computed matrices
     // and not separate position, rotation, scale attrs.
 
+    const SdfPath prototypesGroupPath =
+            instancer.GetPrim().GetPath().AppendChild(_tokens->Prototypes);
+
     // At the default time, setup all the prototype instances.
     if (usdTime.IsDefault()) {
         const MPlug inputHierarchy = dagNode.findPlug("inputHierarchy", true,
                 &status);
         CHECK_MSTATUS_AND_RETURN(status, false);
 
+        // Note that the "Prototypes" prim needs to be a model group to ensure
+        // contiguous model hierarchy.
         const UsdPrim prototypesGroupPrim = GetUsdStage()->DefinePrim(
-                instancer.GetPrim().GetPath().AppendChild(_tokens->Prototypes));
+                prototypesGroupPath);
         UsdModelAPI(prototypesGroupPrim).SetKind(KindTokens->group);
+        _modelPaths.push_back(prototypesGroupPath);
+
         UsdRelationship prototypesRel = instancer.CreatePrototypesRel();
 
         const unsigned int numElements = inputHierarchy.numElements();
@@ -240,6 +186,7 @@ MayaInstancerWriter::writeInstancerAttrs(
                     .AppendChild(prototypeName);
             UsdPrim prototypePrim = GetUsdStage()->DefinePrim(
                     prototypeUsdPath);
+            _modelPaths.push_back(prototypeUsdPath);
 
             // Try to be conservative and only create an intermediary xformOp
             // with the instancerTranslate if we can ensure that we don't need
@@ -251,19 +198,30 @@ MayaInstancerWriter::writeInstancerAttrs(
             // behavior in PxrUsdMayaTranslatorModelAssembly. If we fix the
             // behavior there, we need to make sure that this is also
             // fixed to match.
-            const AnimChannelSampleType instancerTranslateSampleType =
-                    _GetInstancerTranslateSampleType(prototypeDagPath);
-            if (instancerTranslateSampleType != NO_XFORM) {
+            bool instancerTranslateAnimated = false;
+            if (_NeedsExtraInstancerTranslate(
+                    prototypeDagPath, &instancerTranslateAnimated)) {
                 UsdGeomXformable xformable(prototypePrim);
                 UsdGeomXformOp newOp = xformable.AddTranslateOp(
                         UsdGeomXformOp::PrecisionDouble,
                         _tokens->instancerTranslate);
-                _instancerTranslateOps.emplace_back(
-                        prototypeDagPath, newOp, instancerTranslateSampleType);
+                _instancerTranslateOps.push_back(
+                        {prototypeDagPath, newOp, instancerTranslateAnimated});
             }
 
-            _ExportPrototype(
-                    prototypeDagPath, prototypeUsdPath, &_prototypeWriters);
+            // Two notes:
+            // (1) We don't un-instance here, because it's OK for the prototype
+            // to just be a reference to an instance master if the prototype
+            // participates in Maya native instancing.
+            // (2) The prototype root must be visible to match Maya's behavior,
+            // which always vis'es the prototype root, even if it is marked
+            // hidden.
+            _writeJobCtx.CreatePrimWriterHierarchy(
+                    prototypeDagPath,
+                    prototypeUsdPath,
+                    /*forceUninstance*/ false,
+                    /*exportRootVisibility*/ false,
+                    &_prototypeWriters);
             prototypesRel.AddTarget(prototypeUsdPath);
         }
 
@@ -277,19 +235,22 @@ MayaInstancerWriter::writeInstancerAttrs(
     }
 
     // Actual write of prototypes (@ both default time and animated time).
-    for (MayaPrimWriterPtr& writer : _prototypeWriters) {
+    for (MayaPrimWriterSharedPtr& writer : _prototypeWriters) {
         writer->Write(usdTime);
 
         if (usdTime.IsDefault()) {
-            // Prototypes should have kind component or derived (don't stomp
-            // over existing component-derived kinds).
+            // Prototype roots should have kind component or derived.
+            // Calling Write() above may have populated kinds, so don't stomp
+            // over existing component-derived kinds.
             // (Note that ModelKindWriter's fix-up stage might change this.)
-            if (const UsdPrim writerPrim = writer->GetUsdPrim()) {
-                UsdModelAPI primModelAPI(writerPrim);
-                TfToken kind;
-                primModelAPI.GetKind(&kind);
-                if (!KindRegistry::IsA(kind, KindTokens->component)) {
-                    primModelAPI.SetKind(KindTokens->component);
+            if (writer->GetUsdPath().GetParentPath() == prototypesGroupPath) {
+                if (const UsdPrim writerPrim = writer->GetUsdPrim()) {
+                    UsdModelAPI primModelAPI(writerPrim);
+                    TfToken kind;
+                    primModelAPI.GetKind(&kind);
+                    if (!KindRegistry::IsA(kind, KindTokens->component)) {
+                        primModelAPI.SetKind(KindTokens->component);
+                    }
                 }
             }
         }
@@ -298,10 +259,8 @@ MayaInstancerWriter::writeInstancerAttrs(
     // Write the instancerTranslate xformOp for all prims that need it.
     // (This should happen @ default time or animated time depending on whether
     // the xform is animated.)
-    for (const MayaInstancerWriter_TranslateOpData& opData :
-                _instancerTranslateOps) {
-        if ((opData.sampleType == STATIC && usdTime.IsDefault()) ||
-                (opData.sampleType == ANIMATED && !usdTime.IsDefault())) {
+    for (const _TranslateOpData& opData : _instancerTranslateOps) {
+        if (opData.isAnimated != usdTime.IsDefault()) {
             GfVec3d origin;
             if (_GetTransformedOriginInLocalSpace(opData.mayaPath, &origin)) {
                 UsdGeomXformOp translateOp = opData.op;
@@ -354,15 +313,9 @@ MayaInstancerWriter::writeInstancerAttrs(
 void
 MayaInstancerWriter::PostExport()
 {
-    for (MayaPrimWriterPtr& writer : _prototypeWriters) {
+    for (MayaPrimWriterSharedPtr& writer : _prototypeWriters) {
         writer->PostExport();
     }
-}
-
-bool
-MayaInstancerWriter::ExportsReferences() const
-{
-    return true;
 }
 
 bool
@@ -371,21 +324,10 @@ MayaInstancerWriter::ShouldPruneChildren() const
     return true;
 }
 
-bool
-MayaInstancerWriter::GetAllAuthoredUsdPaths(SdfPathVector* outPaths) const
+const SdfPathVector&
+MayaInstancerWriter::GetModelPaths() const
 {
-    bool hasPrims = MayaPrimWriter::GetAllAuthoredUsdPaths(outPaths);
-    SdfPath protosPath = GetUsdPath().AppendChild(_tokens->Prototypes);
-    if (GetUsdStage()->GetPrimAtPath(protosPath)) {
-        outPaths->push_back(protosPath);
-        hasPrims = true;
-    }
-    for (const MayaPrimWriterPtr primWriter : _prototypeWriters) {
-        if (primWriter->GetAllAuthoredUsdPaths(outPaths)) {
-            hasPrims = true;
-        }
-    }
-    return hasPrims;
+    return _modelPaths;
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

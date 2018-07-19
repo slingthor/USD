@@ -25,7 +25,7 @@
 #define _usdExport_MayaCameraWriter_h_
 
 #include "pxr/pxr.h"
-#include "usdMaya/MayaTransformWriter.h"
+#include "usdMaya/MayaPrimWriter.h"
 #include "usdMaya/usdWriteJobCtx.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -33,14 +33,13 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 class UsdGeomCamera;
 
-// Writes an MFnMesh as a poly mesh OR a subd mesh
-class MayaCameraWriter : public MayaTransformWriter
+/// Exports Maya cameras to UsdGeomCamera.
+class MayaCameraWriter : public MayaPrimWriter
 {
   public:
     MayaCameraWriter(
         const MDagPath& iDag,
         const SdfPath& uPath,
-        bool instanceSource,
         usdWriteJobCtx& jobCtx);
 
     void Write(const UsdTimeCode &usdTime) override;
@@ -48,8 +47,6 @@ class MayaCameraWriter : public MayaTransformWriter
   protected:
     bool writeCameraAttrs(const UsdTimeCode &usdTime, UsdGeomCamera &primSchema);
 };
-
-typedef std::shared_ptr<MayaCameraWriter> MayaCameraWriterPtr;
 
 
 PXR_NAMESPACE_CLOSE_SCOPE

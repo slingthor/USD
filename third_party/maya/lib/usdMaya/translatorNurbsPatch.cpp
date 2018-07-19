@@ -121,7 +121,7 @@ PxrUsdMayaTranslatorNurbsPatch::Read(
     }
     usdNurbsPatch.GetPointsAttr().Get(&points, pointsTimeSample);
     
-    if (points.size() == 0) {
+    if (points.empty()) {
         TF_RUNTIME_ERROR(
                 "points array is empty on NurbsPatch <%s>. Skipping...", 
                 usdPrimPath.c_str());
@@ -150,7 +150,7 @@ PxrUsdMayaTranslatorNurbsPatch::Read(
         for (int u = 0; u < numCVsInU; u++)
         {
             int index = u * numCVsInV + v;
-            if (hasWeights && GfIsClose(weights[cvIndex], 1.0, 1e-9)==false) {
+            if (hasWeights && !GfIsClose(weights[cvIndex], 1.0, 1e-9)) {
                 rationalSurface=true;
                 mayaPoints.set( index, points[cvIndex][0], points[cvIndex][1], points[cvIndex][2], weights[cvIndex] );
             } else {
@@ -287,7 +287,7 @@ PxrUsdMayaTranslatorNurbsPatch::Read(
                 MPlug plg = plgAry.elementByLogicalIndex(ti, &status);
                 MDoubleArray valueArray(numTimeSamples, 0.0);
                 valueArray[ti] = 1.0; // Set the time value where this curve's weight should be 1.0
-                MObject animObj = animFn.create(plg, NULL, &status);
+                MObject animObj = animFn.create(plg, nullptr, &status);
                 animFn.addKeys(&timeArray, &valueArray);
                 if (context) {
                     context->RegisterNewMayaNode(animFn.name().asChar(), animObj ); // used for undo/redo
