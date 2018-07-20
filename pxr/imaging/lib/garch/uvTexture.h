@@ -92,6 +92,12 @@ public:
     {
         return _baseTexture->GetBindings(identifier, samplerName);
     }
+    
+    /// Returns the GPU API texture object for the texture.
+    GARCH_API
+    virtual GarchTextureGPUHandle GetTextureName() const override {
+        return _baseTexture->GetTextureName();
+    }
 
 protected:
     GARCH_API

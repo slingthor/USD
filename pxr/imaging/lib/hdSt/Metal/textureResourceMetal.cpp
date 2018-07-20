@@ -170,7 +170,6 @@ GarchSamplerGPUHandle HdStSimpleTextureResourceMetal::GetTexelsSamplerId()
 GarchTextureGPUHandle HdStSimpleTextureResourceMetal::GetTexelsTextureHandle()
 { 
     GarchTextureGPUHandle textureId = GetTexelsTextureId();
-    GarchSamplerGPUHandle samplerId = GetTexelsSamplerId();
 
     if (_isPtex) {
         return textureId;

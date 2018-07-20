@@ -3372,17 +3372,18 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
 
         // adjust datatype
         std::string swizzle = _GetSwizzleString(it->second.dataType);
-        if (swizzle != ".x")
-            swizzle = "";
-        
-        // TEMP: FIXME: THIS IS REALY BAD: Sort something better out here. I think there's a Hydra bug
-        // causing the diffuseColour to be represented as a float rather than a vec3, which doesn't
-        // cause an issue in GLSL but does in MSL
-        if (it->second.name == "diffuseColor")
-            swizzle = ".x";
 
         HdBinding::Type bindingType = it->first.GetType();
         if (bindingType == HdBinding::FALLBACK) {
+            if (swizzle != ".x")
+                swizzle = "";
+
+            // TEMP: FIXME: THIS IS REALY BAD: Sort something better out here. I think there's a Hydra bug
+            // causing the diffuseColour to be represented as a float rather than a vec3, which doesn't
+            // cause an issue in GLSL but does in MSL
+            if (it->second.name == "diffuseColor")
+                swizzle = ".x";
+
             accessors
                 << it->second.dataType
                 << " HdGet_" << it->second.name << "() {\n"
@@ -3425,6 +3426,11 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
             declarations
                 << "sampler sampler2d_" << it->second.name << ";\n"
                 << "texture2d<float> texture2d_" << it->second.name << ";\n";
+            
+            std::stringstream dummy;
+            _EmitOutput(dummy, _mslPSInputParams, TfToken("sampler2d_" + it->second.name.GetString()), TfToken("sampler"), TfToken(), HdSt_CodeGenMSL::TParam::Sampler);
+            _EmitOutput(dummy, _mslPSInputParams, TfToken("texture2d_" + it->second.name.GetString()), TfToken("texture2d<float>"), TfToken(), HdSt_CodeGenMSL::TParam::Texture);
+
             // a function returning sampler2D is allowed in 430 or later
             if (caps.glslVersion >= 430) {
                 accessors
