@@ -3360,7 +3360,8 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
         // XXX: we only have 1 shaderData entry (interleaved).
         int arraySize = (binding.GetType() == HdBinding::UBO) ? 1 : 0;
         _EmitDeclarationPtr(declarations, _mslVSInputParams, varName, typeName, TfToken(), binding, arraySize, true);
-
+        std::stringstream dummy;
+        _EmitDeclarationPtr(dummy, _mslPSInputParams, varName, typeName, TfToken(), binding, arraySize, true);
         break;
     }
     
