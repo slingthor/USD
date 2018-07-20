@@ -23,6 +23,8 @@
 //
 
 #include "pxr/imaging/garch/image.h"
+#include "pxr/imaging/garch/contextCaps.h"
+#include "pxr/imaging/garch/resourceFactory.h"
 #include "pxr/imaging/garch/utils.h"
 #include "pxr/imaging/garch/uvTextureData.h"
 
@@ -417,13 +419,15 @@ GarchUVTextureData::Read(int degradeLevel, bool generateMipmap,
             return false;
         }
 
+        bool flipByDefault = GarchResourceFactory::GetInstance()->GetContextCaps().flipTexturesOnLoad;
+        
         Mip & mip  = _rawBufferMips[i];
         GarchImage::StorageSpec storage;
         storage.width = mip.width;
         storage.height = mip.height;
         storage.format = _glFormat;
         storage.flipped = (originLocation == GarchImage::OriginLowerLeft) ?
-                          (true) : (false);
+                          (flipByDefault) : (!flipByDefault);
         storage.type = _glType;
         storage.data = _rawBuffer.get() + mip.offset;
         
