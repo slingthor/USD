@@ -238,7 +238,7 @@ UsdImagingDelegate::_AdapterLookup(UsdPrim const& prim, bool ignoreInstancing)
             GetRenderDelegate()->GetMaterialBindingPurpose();
         if (bindingPurpose == HdTokens->preview &&
             adapterKey == _tokens->Material) {
-            adapterKey = _tokens->HydraPbsSurface;
+            adapterKey = TfToken(_tokens->HydraPbsSurface.GetString() + "Metal");
         }
     }
 

@@ -216,7 +216,7 @@ HdStMSLProgram::CompileShader(GLenum type,
                                                     error:&error];
     
     // Load the function into the library
-     id <MTLFunction> function = [library newFunctionWithName:entryPoint];
+    id <MTLFunction> function = [library newFunctionWithName:entryPoint];
     if (!function) {
         // XXX:validation
         TF_WARN("Failed to compile shader (%s): \n%s",
@@ -342,22 +342,22 @@ void HdStMSLProgram::BindResources(HdStSurfaceShader* surfaceShader, HdSt_Resour
         {
             //When more types are added to the switch below, don't forget to update the mask too.
             bool found;
-            const MSL_ShaderBinding& binding = MSL_FindBinding(_bindings, it->name, found, kMSL_BindingType_Sampler | kMSL_BindingType_Texture, 0xFFFFFFFF, i);
-            
+            std::string textureName = "texture2d_" + it->name.GetString();
+            std::string samplerName = "sampler2d_" + it->name.GetString();
+
+            MSL_ShaderBinding const& textureBinding = MSL_FindBinding(_bindings, textureName, found, kMSL_BindingType_Texture, 0xFFFFFFFF, i);
+            if(!found)
+                break;
+
+            MSL_ShaderBinding const& samplerBinding = MSL_FindBinding(_bindings, samplerName, found, kMSL_BindingType_Sampler, 0xFFFFFFFF, i);
             if(!found)
                 break;
             
-            switch(binding._type)
-            {
-                case kMSL_BindingType_Texture:
-                    MtlfMetalContext::GetMetalContext()->SetTexture(binding._index, it->handle, it->name, binding._stage);
-                case kMSL_BindingType_Sampler:
-                    MtlfMetalContext::GetMetalContext()->SetSampler(binding._index, it->sampler, it->name, binding._stage);
-                default:
-                    TF_FATAL_CODING_ERROR("Not implemented!");
-            }
-            
+            MtlfMetalContext::GetMetalContext()->SetTexture(textureBinding._index, it->handle, TfToken(textureName), textureBinding._stage);
+            MtlfMetalContext::GetMetalContext()->SetSampler(samplerBinding._index, it->sampler, TfToken(samplerName), samplerBinding._stage);
+
             i++;
+            break;
         }
         
         if(i == 0)

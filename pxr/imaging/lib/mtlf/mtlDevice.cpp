@@ -759,7 +759,7 @@ void MtlfMetalContext::SetPipelineState()
             pipelineStateDescriptor.colorAttachments[0].destinationAlphaBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
             pipelineStateDescriptor.colorAttachments[0].pixelFormat = mtlTexture.pixelFormat;
             numColourAttachments++;
-
+            
             pipelineStateDescriptor.depthAttachmentPixelFormat = mtlDepthTexture.pixelFormat;
             [renderEncoder setDepthStencilState:depthState];
         }

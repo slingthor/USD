@@ -673,6 +673,7 @@ UsdImagingMetalHdEngine::Render(RenderParams params)
     {
         GLfloat clearColor[4];
         glGetFloatv(GL_COLOR_CLEAR_VALUE, clearColor);
+        clearColor[3] = 1.0f;
         
         _mtlRenderPassDescriptor = [[MTLRenderPassDescriptor alloc] init];
 
