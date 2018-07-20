@@ -61,6 +61,9 @@ public:
             Uniform             = 1 << 7,
             UniformBlockMember  = 1 << 8,
             UniformBlock        = 1 << 9,
+            
+            //Used in a workaroud for missing geometry shader functionality.
+            PrimVar             = 1 << 10,
         };
         static Usage const maskShaderUsage = Usage(EntryFuncArgument - 1);
         
