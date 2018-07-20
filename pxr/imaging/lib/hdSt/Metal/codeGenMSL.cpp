@@ -55,6 +55,8 @@
 
 #include <opensubdiv/osd/glslPatchShaderSource.h>
 
+#define MTL_PRIMVAR_PREFIX "__primVar_"
+
 #if GENERATE_METAL_DEBUG_SOURCE_CODE
 template <typename T>
 void METAL_DEBUG_COMMENTfn(std::stringstream *str, T t)
@@ -963,6 +965,9 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
             }
             copyInputsFrag << "scope." << inputName << "=" << input.accessorStr << "->" << inputName << ";\n";
             continue;
+        }
+        else if(input.usage & HdSt_CodeGenMSL::TParam::PrimVar) {
+            copyInputsFrag << "scope.inPrimvars." << input.name << "=vsInput." << accessor << ";\n";
         }
         else {
             copyInputsFrag << "scope." << accessor << "=" CODEGENMSL_FRAGUNIFORMINPUTNAME "->" << input.name << ";\n";
@@ -2091,7 +2096,15 @@ static HdSt_CodeGenMSL::TParam& _EmitOutput(std::stringstream &str,
 {
     METAL_DEBUG_COMMENT(&str, "_EmitOutput\n"); //MTL_FIXME
     str << type << " " << name << ";\n";
-    HdSt_CodeGenMSL::TParam out(name, type, TfToken(), attribute, usage);
+    std::string accessorStr = "";
+    if(usage == HdSt_CodeGenMSL::TParam::Usage::PrimVar)
+    {
+        std::string nameStr = name.GetString();
+        size_t prefixLen = strlen(MTL_PRIMVAR_PREFIX);
+        accessorStr = nameStr.substr(prefixLen, nameStr.length() - prefixLen);
+    }
+    TfToken accessorToken(accessorStr);
+    HdSt_CodeGenMSL::TParam out(name, type, accessorToken, attribute, usage);
     outputParams.push_back(out);
     return outputParams.back();
 }
@@ -3087,6 +3100,20 @@ HdSt_CodeGenMSL::_GenerateVertexAndFaceVaryingPrimvar(bool hasGS)
                  << "         , inPrimvars[i0]." << name << ", u), v);\n";
         _procGS  << "  outPrimvars." << name
                  << " = inPrimvars[index]." << name << ";\n";
+        
+        //Pass-through for primvars to cover for missing geometry shaders in Metal
+        {
+            std::stringstream vtxOutName;
+            vtxOutName << MTL_PRIMVAR_PREFIX << name;
+            //Add primvars to vtxOut struct
+            std::stringstream dummy;
+            TfToken vtxOutName_Token(vtxOutName.str());
+            _EmitOutput(dummy, _mslVSOutputParams, vtxOutName_Token, dataType, TfToken(), HdSt_CodeGenMSL::TParam::Usage::PrimVar);
+        
+            //Copy primvars to correct places in PS
+            HdSt_CodeGenMSL::TParam in(name, dataType, vtxOutName_Token, TfToken(), HdSt_CodeGenMSL::TParam::Usage::PrimVar);
+            _mslPSInputParams.push_back(in);
+        }
     }
     
     /*
