@@ -50,6 +50,13 @@ PXR_NAMESPACE_OPEN_SCOPE
 ///     update and invalidate.
 ///
 class GlfContextCaps : public GarchContextCaps {
+    
+    /// Returns a string identifying the renderer, that matches the renderer specific
+    /// part of the adapter names
+    virtual char const* const GetRendererName() const override {
+        return "GL";
+    }
+
 protected:
     GlfContextCaps();
     virtual ~GlfContextCaps() {}

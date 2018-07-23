@@ -107,6 +107,10 @@ public:
     /// Returns whether to do per-instance culling on the GPU
     virtual bool IsEnabledGPUInstanceFrustumCulling() const;
     
+    /// Returns a string identifying the renderer, that matches the renderer specific
+    /// part of the adapter names
+    virtual char const* const GetRendererName() const = 0;
+    
 protected:
     GarchContextCaps();
     virtual ~GarchContextCaps() = default;
