@@ -3163,13 +3163,14 @@ HdSt_CodeGenMSL::_GenerateVertexAndFaceVaryingPrimvar(bool hasGS)
             interstageStruct << "  " << dataType << " " << name << ";\n";
 
             // primvar accessors (only in GS and FS)
+            TfToken readStructName(std::string("in") + structName.GetString());
             _EmitAccessor(accessorsGS, name, dataType, binding, "GetFVarIndex(localIndex)");
-            _EmitStructAccessor(accessorsFS, structName, name, dataType,
-                                /*arraySize=*/1, true, NULL);
+            _EmitStructAccessor(accessorsFS, readStructName, name, dataType,
+                                /*arraySize=*/1, false, NULL);
 
             // interstage plumbing
-            _procVS << "  outPrimvars->" << name
-                    << " = " << dataType << "(0);\n";
+            _procVS << "  outPrimvars." << name
+                    << " = " << name << ";\n";
             _procTCS << "  outPrimvars[gl_InvocationID]." << name
                      << " = inPrimvars[gl_InvocationID]." << name << ";\n";
             // TODO: facevarying tessellation
@@ -3221,12 +3222,27 @@ HdSt_CodeGenMSL::_GenerateVertexAndFaceVaryingPrimvar(bool hasGS)
                                     " HdSt_GeometricShader::PrimitiveType %d",
                                     _geometricShader->GetPrimitiveType());
             }
+            
+            //Pass-through for primvars to cover for missing geometry shaders in Metal
+            {
+                std::stringstream vtxOutName;
+                vtxOutName << MTL_PRIMVAR_PREFIX << name;
+                //Add primvars to vtxOut struct
+                std::stringstream dummy;
+                TfToken vtxOutName_Token(vtxOutName.str());
+                _EmitOutput(dummy, _mslVSOutputParams, vtxOutName_Token, dataType, TfToken(), HdSt_CodeGenMSL::TParam::Usage::PrimVar);
+                
+                //Copy primvars to correct places in PS
+                HdSt_CodeGenMSL::TParam in(name, dataType, vtxOutName_Token, TfToken(), HdSt_CodeGenMSL::TParam::Usage::PrimVar);
+                _mslPSInputParams.push_back(in);
+            }
         }
     }
 
     interstageStruct << "}";
 
-    _genVS << vertexInputs.str()
+    _genVS << fvarDeclarations.str()
+           << vertexInputs.str()
            << interstageStruct.str()
            << " outPrimvars;\n"
            << accessorsVS.str();
@@ -3364,8 +3380,8 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
 
         declarations << "#define float wrapped_float\n";
         declarations << "#define int wrapped_int\n";
-        declarations << "#undef vec3\n";
-        declarations << "#define vec3 packed_float3\n";
+        //declarations << "#undef vec3\n";
+        //declarations << "#define vec3 packed_float3\n";
         declarations << "struct " << typeName << " {\n";
 
         TF_FOR_ALL (dbIt, it->second.entries) {
@@ -3375,8 +3391,8 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
 
         }
         declarations << "};\n";
-        declarations << "#undef vec3\n";
-        declarations << "#define vec3 float3\n";
+        //declarations << "#undef vec3\n";
+        //declarations << "#define vec3 float3\n";
         declarations << "#undef float\n";
         declarations << "#undef int\n";
 

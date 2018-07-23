@@ -79,6 +79,7 @@ GlfContextCaps::_LoadCaps()
     maxTextureBufferSize         = 64*1024;      // GL spec minimum
     uniformBufferOffsetAlignment = 0;
     flipTexturesOnLoad           = true;
+    useCppShaderPadding          = false;
 
     const char *glVersionStr = (const char*)glGetString(GL_VERSION);
 
