@@ -63,6 +63,11 @@ static MTLPixelFormat GetMetalFormat(GLenum inInternalFormat, GLenum inType, siz
             *outPixelByteSize = sizeof(char) * 4;
             break;
             
+        case GL_RED:
+            mtlFormat = MTLPixelFormatR8Unorm;
+            *outPixelByteSize = sizeof(char);
+            break;
+            
         case GL_RGBA16:
             mtlFormat = MTLPixelFormatRGBA16Unorm;
             *outPixelByteSize = sizeof(short) * 4;
