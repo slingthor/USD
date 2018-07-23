@@ -68,20 +68,22 @@ public:
         static Usage const maskShaderUsage = Usage(EntryFuncArgument - 1);
         
         TParam()
-        : usage(Unspecified) {}
+        : usage(Unspecified), arraySize(0) {}
 
         TParam(TfToken   const &_name,
                TfToken   const &_dataType,
                TfToken   const &_accessorStr,
                TfToken   const &_attribute,
                Usage     const _usage,
-               HdBinding const &_binding = HdBinding(HdBinding::UNKNOWN, 0))
+               HdBinding const &_binding = HdBinding(HdBinding::UNKNOWN, 0),
+               int       const _arraySize = 0)
         : name(_name)
         , dataType(_dataType)
         , accessorStr(_accessorStr)
         , attribute(_attribute)
         , usage(_usage)
         , binding(_binding)
+        , arraySize(_arraySize)
         {}
           
         TfToken const name;
@@ -90,6 +92,7 @@ public:
         TfToken const attribute;
         Usage usage;
         HdBinding const binding;
+        int const arraySize;
     };
     
     typedef std::vector<TParam> InOutParams;
