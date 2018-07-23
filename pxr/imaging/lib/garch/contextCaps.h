@@ -89,6 +89,9 @@ public:
     
     // Texture vertical flip
     bool flipTexturesOnLoad;
+    
+    // Shader language padding for structures
+    bool useCppShaderPadding;
 
     /// Returns whether to do frustum culling on the GPU
     virtual bool IsEnabledGPUFrustumCulling() const;
