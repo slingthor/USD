@@ -136,9 +136,7 @@ HdSt_ResourceBinderMetal::BindBuffer(TfToken const &name,
 {
     HD_TRACE_FUNCTION();
     
-    if(level != -1)
-        TF_FATAL_CODING_ERROR("Not implemented"); //METAL TODO: We shoud probably support "levels" but we haven't encountered anything other than -1 yet.
-    
+    //NSLog(@"Binding buffer %s", name.GetText());
     // it is possible that the buffer has not been initialized when
     // the instanceIndex is empty (e.g. FX points. see bug 120354)
     if (!buffer->GetId().IsSet())
@@ -149,7 +147,7 @@ HdSt_ResourceBinderMetal::BindBuffer(TfToken const &name,
     while(1)
     {
         bool found;
-        const MSL_ShaderBinding& shaderBinding= MSL_FindBinding(_shaderBindings, name, found, typeMask, 0xFFFFFFFF, i);
+        const MSL_ShaderBinding& shaderBinding= MSL_FindBinding(_shaderBindings, name, found, typeMask, 0xFFFFFFFF, i, level);
         
         if(!found)
             break;
@@ -240,8 +238,23 @@ HdSt_ResourceBinderMetal::BindUniformArrayi(TfToken const &name,
 
     TF_VERIFY(uniformLocation.IsValid());
     TF_VERIFY(uniformLocation.GetType() == HdBinding::UNIFORM_ARRAY);
-
-    TF_FATAL_CODING_ERROR("Not Implemented");
+    
+    uint i = 0;
+    while(1)
+    {
+        bool found;
+        const MSL_ShaderBinding& binding = MSL_FindBinding(_shaderBindings, name, found, kMSL_BindingType_UniformBuffer, 0xFFFFFFFF, i);
+        
+        if(!found)
+        break;
+        
+        MtlfMetalContext::GetMetalContext()->SetUniform(value, count * sizeof(int), name, binding._offsetWithinResource, binding._stage);
+        
+        i++;
+    }
+    
+    if(i == 0)  //If we tried searching but couldn't find a single uniform.
+    TF_FATAL_CODING_ERROR("Could not find uniform buffer!");
 }
 
 void
