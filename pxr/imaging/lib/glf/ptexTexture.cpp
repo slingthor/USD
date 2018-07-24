@@ -273,19 +273,19 @@ GlfPtexTexture::_FreePtexTextureObject()
 
 /* virtual */
 GarchTexture::BindingVector
-GlfPtexTexture::GetBindings(TfToken const & identifier, GLuint samplerName) const
+GlfPtexTexture::GetBindings(TfToken const & identifier, GarchSamplerGPUHandle samplerId) const
 {
     BindingVector result;
     result.reserve(2);
 
     result.push_back(Binding(
         TfToken(identifier.GetString() + "_Data"), GarchTextureTokens->texels,
-        GL_TEXTURE_2D_ARRAY, _texels, samplerName));
+        GL_TEXTURE_2D_ARRAY, _texels, samplerId));
 
     // packing buffer doesn't need external sampler
     result.push_back(Binding(
         TfToken(identifier.GetString() + "_Packing"), GarchTextureTokens->layout,
-        GL_TEXTURE_BUFFER, _layout, /*samplerId=*/0));
+        GL_TEXTURE_BUFFER, _layout, nil));
 
     return result;
 }

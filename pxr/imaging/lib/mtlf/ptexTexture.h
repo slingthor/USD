@@ -91,7 +91,8 @@ public:
     /// GarchTexture overrides
     MTLF_API
     virtual BindingVector GetBindings(TfToken const & identifier,
-                                      GLuint samplerName) const;
+                                      GarchSamplerGPUHandle samplerId = GarchSamplerGPUHandle()) const;
+    
     MTLF_API
     virtual VtDictionary GetTextureInfo() const;
 
@@ -111,6 +112,9 @@ public:
 
     // return GL texture for texels data texture
     GLuint GetTexelsTextureName() const { return _texels; }
+	
+	MTLF_API
+	virtual GarchTextureGPUHandle GetTextureName() const { return GarchTextureGPUHandle(_texels); }
 
 protected:
     MTLF_API
