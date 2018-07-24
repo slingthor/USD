@@ -27,6 +27,9 @@
 #include "pxr/usdImaging/usdImaging/instanceAdapter.h"
 #include "pxr/usdImaging/usdImaging/primAdapter.h"
 
+#include "pxr/imaging/garch/contextCaps.h"
+#include "pxr/imaging/garch/resourceFactory.h"
+
 #include "pxr/base/plug/plugin.h"
 #include "pxr/base/plug/registry.h"
 
@@ -138,7 +141,8 @@ UsdImagingAdapterRegistry::HasAdapter(TfToken const& adapterKey)
     if (adapterKey.GetString() == "HydraPbsSurface" || adapterKey.GetString() == "__drawModeAdapter") {
         //METAL TODO: Implement a specific system for dealing with the selection of the correct
         // adapter for the current renderer
-        return _typeMap.find(TfToken(adapterKey.GetString() + "Metal")) != _typeMap.end();
+        return _typeMap.find(TfToken(adapterKey.GetString()
+            + GarchResourceFactory::GetInstance()->GetContextCaps().GetRendererName())) != _typeMap.end();
     }
 
     return _typeMap.find(adapterKey) != _typeMap.end();
@@ -162,7 +166,8 @@ UsdImagingAdapterRegistry::ConstructAdapter(TfToken const& adapterKey)
     //METAL TODO: Implement a specific system for dealing with the selection of the correct
     // adapter for the current renderer
     if (adapterKey.GetString() == "HydraPbsSurface" || adapterKey.GetString() == "__drawModeAdapter") {
-        typeIt = _typeMap.find(TfToken(adapterKey.GetString() + "Metal"));
+        typeIt = _typeMap.find(TfToken(adapterKey.GetString()
+            + GarchResourceFactory::GetInstance()->GetContextCaps().GetRendererName()));
     }
     else {
         typeIt = _typeMap.find(adapterKey);

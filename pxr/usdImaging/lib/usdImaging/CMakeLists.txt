@@ -4,6 +4,7 @@ set(PXR_PACKAGE usdImaging)
 # Note: both python include directives are included for compatibility.
 pxr_library(usdImaging
     LIBRARIES
+        garch
         gf
         tf
         plug

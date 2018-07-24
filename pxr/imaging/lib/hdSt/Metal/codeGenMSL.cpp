@@ -343,7 +343,8 @@ _GetPackedTypeDefinitions()
            "int hd_int_get<st>(int v)          { return v; }\n"
            "int hd_int_get<st>(ivec2 v)        { return v[0]; }\n"
            "int hd_int_get<st>(ivec3 v)        { return v[0]; }\n"
-           "int hd_int_get<st>(ivec4 v)        { return v[0]; }\n";
+           "int hd_int_get<st>(ivec4 v)        { return v[0]; }\n"
+           "mat4 inverse(mat4 a) { return a; }  // MTL_FIXME - Required for AlGhadeer scene, need proper implementation of this;\n";
 }
 
 static TfToken const &
@@ -812,7 +813,12 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
                 if ((input.usage & HdSt_CodeGenMSL::TParam::Usage::Uniform) == 0)
                     continue;
 
+                if (input.arraySize) {
+                    glueVS << input.dataType << " " << input.name << "[" << input.arraySize << "]" << ";\n";
+                }
+                else {
                 glueVS << input.dataType << " " << input.name << ";\n";
+                }
 
                 copyInputsVtx << "scope." << input.name << "=" CODEGENMSL_VTXUNIFORMINPUTNAME "->" << input.name << ";\n";
             }
@@ -1311,6 +1317,13 @@ HdSt_CodeGenMSL::Compile()
                      TfToken("bool"),
                      TfToken("[[front_facing]]"),
                      HdBinding(HdBinding::FRONT_FACING, 0));
+    
+    _EmitDeclaration(_genCommon,
+                     _mslVSInputParams,
+                     TfToken("gl_InstanceID"),
+                     TfToken("uint"),
+                     TfToken("[[instance_id]]"),
+                     HdBinding(HdBinding::INSTANCE_ID, 0));
     
     METAL_DEBUG_COMMENT(&_genCommon, "End of special inputs\n"); //MTL_FIXME
     
@@ -1833,11 +1846,17 @@ static HdSt_CodeGenMSL::TParam& _EmitDeclaration(std::stringstream &str,
                              HdBinding const &binding,
                              int arraySize)
 {
-    str << type << " " << name << ";\n";
-    HdSt_CodeGenMSL::TParam in(name, type, TfToken(), attribute, HdSt_CodeGenMSL::TParam::Unspecified, binding);
+    if (!arraySize) {
+          str << type << " " << name << ";\n";
+    }
+    else {
+        str << "device const " << type << " *" << name /* << "[" << arraySize << "]"*/  << ";\n";
+    }
+    HdSt_CodeGenMSL::TParam in(name, type, TfToken(), attribute, HdSt_CodeGenMSL::TParam::Unspecified, binding, arraySize);
     HdBinding::Type bindingType = binding.GetType();
     if(bindingType == HdBinding::VERTEX_ID ||
        bindingType == HdBinding::BASE_VERTEX_ID ||
+       bindingType == HdBinding::INSTANCE_ID ||
        bindingType == HdBinding::FRONT_FACING) {
         in.usage |= HdSt_CodeGenMSL::TParam::EntryFuncArgument;
     }
@@ -1874,12 +1893,19 @@ static HdSt_CodeGenMSL::TParam& _EmitDeclarationPtr(std::stringstream &str,
                                                     int arraySize,
                                                     bool programScope)
 {
+    // MTL_FIXME - we need to map vec3 device pointers to the packed variants as that's how HYDRA presents its buffers
+    // but we should orobably alter type at source not do a last minute fix up here
+    TfToken dataType = type;
+    if (type == _tokens->vec3) {
+        dataType = _tokens->hd_vec3;
+    }
+    
     TfToken ptrName(std::string("*") + name.GetString());
     str << "device const ";
     if (programScope) {
         str << "ProgramScope<st>::";
     }
-    HdSt_CodeGenMSL::TParam& result(_EmitDeclaration(str, inputParams, ptrName, type, attribute, binding, arraySize));
+    HdSt_CodeGenMSL::TParam& result(_EmitDeclaration(str, inputParams, ptrName, dataType, attribute, binding, arraySize));
     result.usage |= HdSt_CodeGenMSL::TParam::Usage::EntryFuncArgument;
     if (programScope) {
         result.usage |= HdSt_CodeGenMSL::TParam::Usage::ProgramScope;
@@ -2123,7 +2149,10 @@ static HdSt_CodeGenMSL::TParam& _EmitStructMemberOutput(HdSt_CodeGenMSL::InOutPa
 void
 HdSt_CodeGenMSL::_GenerateDrawingCoord()
 {
-    METAL_DEBUG_COMMENT(&_genCommon, "_GenerateDrawingCoord\n"); //MTL_FIXME
+    METAL_DEBUG_COMMENT(&_genCommon, "_GenerateDrawingCoord Common\n"); //MTL_FIXME
+    METAL_DEBUG_COMMENT(&_genVS,     "_GenerateDrawingCoord VS\n"); //MTL_FIXME
+    METAL_DEBUG_COMMENT(&_genFS,     "_GenerateDrawingCoord PS\n"); //MTL_FIXME
+    
     TF_VERIFY(_metaData.drawingCoord0Binding.binding.IsValid());
     TF_VERIFY(_metaData.drawingCoord1Binding.binding.IsValid());
 
@@ -2237,7 +2266,7 @@ HdSt_CodeGenMSL::_GenerateDrawingCoord()
                << "  int instanceCoords[HD_INSTANCE_INDEX_WIDTH]; \n"
                << "};\n";
 
-    _genCommon << "struct DrawingCoordBuffer;\n"; // forward declaration
+    //_genCommon << "hd_drawingCoord GetDrawingCoord();\n"; // forward declaration
 
     // vertex shader
 
@@ -2252,21 +2281,20 @@ HdSt_CodeGenMSL::_GenerateDrawingCoord()
 
     _EmitDeclaration(_genVS, _mslVSInputParams, _metaData.drawingCoord0Binding.name, _metaData.drawingCoord0Binding.dataType, TfToken(), _metaData.drawingCoord0Binding.binding);
     _EmitDeclaration(_genVS, _mslVSInputParams, _metaData.drawingCoord1Binding.name, _metaData.drawingCoord1Binding.dataType, TfToken(), _metaData.drawingCoord1Binding.binding);
-
-//    if (_metaData.drawingCoordIBinding.binding.IsValid()) {
-//        _EmitDeclaration(_genVS, _metaData.drawingCoordIBinding,
-//                         /*arraySize=*/std::max(1, _metaData.instancerNumLevels));
-//    }
+    
+    if (_metaData.drawingCoordIBinding.binding.IsValid()) {
+        _EmitDeclaration(_genVS, _mslVSInputParams, _metaData.drawingCoordIBinding.name, _metaData.drawingCoordIBinding.dataType, TfToken(), _metaData.drawingCoord0Binding.binding, /*arraySize=*/std::max(1, _metaData.instancerNumLevels));
+    }
 
     // instance index indirection
     _genCommon << "struct hd_instanceIndex { int indices[HD_INSTANCE_INDEX_WIDTH]; };\n";
 
     if (_metaData.instanceIndexArrayBinding.binding.IsValid()) {
         // << layout (location=x) uniform (int|ivec[234]) *instanceIndices;
-        _EmitDeclaration(_genCommon, _mslVSInputParams, _metaData.instanceIndexArrayBinding);
+        _EmitDeclarationPtr(_genCommon, _mslVSInputParams, _metaData.instanceIndexArrayBinding);
 
         // << layout (location=x) uniform (int|ivec[234]) *culledInstanceIndices;
-        _EmitDeclaration(_genCommon, _mslVSInputParams, _metaData.culledInstanceIndexArrayBinding);
+        _EmitDeclarationPtr(_genCommon, _mslVSInputParams, _metaData.culledInstanceIndexArrayBinding);
 
         /// if \p cullingPass is true, CodeGen generates GetInstanceIndex()
         /// such that it refers instanceIndices buffer (before culling).
@@ -2373,7 +2401,7 @@ HdSt_CodeGenMSL::_GenerateDrawingCoord()
 
     if (_metaData.drawingCoordIBinding.binding.IsValid()) {
         _genVS << "  for (int i = 0; i < HD_INSTANCER_NUM_LEVELS; ++i) {\n"
-               << "    dc.instanceCoords[i] = drawingCoordBuffer->drawingCoordI[i] \n"
+               << "    dc.instanceCoords[i] = drawingCoordI[i] \n"
                << "      + GetInstanceIndex().indices[i+1]; \n"
                << "  }\n";
     }
@@ -2432,7 +2460,10 @@ HdSt_CodeGenMSL::_GenerateDrawingCoord()
     _procTES << "  vsDrawingCoord = tcsDrawingCoord[0];\n"
              << "  gsDrawingCoord = tcsDrawingCoord[0];\n";
     _procGS  << "  gsDrawingCoord = vsDrawingCoord[0];\n";
-
+    
+    METAL_DEBUG_COMMENT(&_genCommon, "End _GenerateDrawingCoord Common\n"); //MTL_FIXME
+    METAL_DEBUG_COMMENT(&_genVS,     "End _GenerateDrawingCoord VS\n"); //MTL_FIXME
+    METAL_DEBUG_COMMENT(&_genFS,     "End _GenerateDrawingCoord FS\n"); //MTL_FIXME
 }
 void
 HdSt_CodeGenMSL::_GenerateConstantPrimvar()
@@ -2535,8 +2566,8 @@ HdSt_CodeGenMSL::_GenerateInstancePrimvar()
 
     std::stringstream declarations;
     std::stringstream accessors;
-    METAL_DEBUG_COMMENT(&declarations, "_GenerateInstancePrimvar()\n"); //MTL_FIXME
-    METAL_DEBUG_COMMENT(&accessors,    "_GenerateInstancePrimvar()\n"); //MTL_FIXME
+    METAL_DEBUG_COMMENT(&declarations, "_GenerateInstancePrimvar() declarations\n"); //MTL_FIXME
+    METAL_DEBUG_COMMENT(&accessors,    "_GenerateInstancePrimvar() accessors\n"); //MTL_FIXME
     
     struct LevelEntries {
         TfToken dataType;
@@ -2559,7 +2590,8 @@ HdSt_CodeGenMSL::_GenerateInstancePrimvar()
         n << "GetDrawingCoord().instanceCoords[" << level << "]";
 
         // << layout (location=x) uniform float *translate_0;
-        _EmitDeclaration(declarations, _mslVSInputParams, name, dataType, TfToken(), binding);
+        // MTL_FIXME - required for AlGhadeer not instancing! (Possibly not a FIXME, this might just be right)
+        _EmitDeclarationPtr(declarations, _mslVSInputParams, name, dataType, TfToken(), binding);
         _EmitAccessor(accessors, name, dataType, binding, n.str().c_str());
     }
 
@@ -2588,6 +2620,10 @@ HdSt_CodeGenMSL::_GenerateInstancePrimvar()
         accessors << "  return defaultValue;\n"
                   << "}\n";
     }
+    
+    METAL_DEBUG_COMMENT(&declarations, "End _GenerateInstancePrimvar() declarations\n"); //MTL_FIXME
+    METAL_DEBUG_COMMENT(&accessors,    "End _GenerateInstancePrimvar() accessors\n"); //MTL_FIXME
+
 
     _genCommon << declarations.str()
                << accessors.str();
@@ -2719,8 +2755,8 @@ HdSt_CodeGenMSL::_GenerateElementPrimvar()
     std::stringstream declarations;
     std::stringstream accessors;
     
-    METAL_DEBUG_COMMENT(&declarations, "_GenerateElementPrimvar()\n"); //MTL_FIXME
-    METAL_DEBUG_COMMENT(&accessors,    "_GenerateElementPrimvar()\n"); //MTL_FIXME
+    METAL_DEBUG_COMMENT(&declarations, "_GenerateElementPrimvar() declarations \n"); //MTL_FIXME
+    METAL_DEBUG_COMMENT(&accessors,    "_GenerateElementPrimvar() accessors\n"); //MTL_FIXME
 
     if (_metaData.primitiveParamBinding.binding.IsValid()) {
 
@@ -2983,13 +3019,17 @@ HdSt_CodeGenMSL::_GenerateElementPrimvar()
             HdBinding binding = it->first;
             TfToken const &name = it->second.name;
             TfToken const &dataType = it->second.dataType;
-            
-            _EmitDeclaration(declarations, _mslVSInputParams, name, dataType, TfToken(), binding);
+
+        // MTL_FIXME - changing from VS Input params to PS because none of this appaears to be associated with vertex shaders at all... (so possibly nothing to fix)
+        _EmitDeclarationPtr(declarations, _mslPSInputParams, name, dataType, TfToken(), binding);
             // AggregatedElementID gives us the buffer index post batching, which
             // is what we need for accessing element (uniform) primvar data.
             _EmitAccessor(accessors, name, dataType, binding,"GetAggregatedElementID()");
         }
     }
+    
+    METAL_DEBUG_COMMENT(&declarations, "End _GenerateElementPrimvar() declarations \n"); //MTL_FIXME
+    METAL_DEBUG_COMMENT(&accessors,    "End _GenerateElementPrimvar() accessors\n"); //MTL_FIXME
 
     // Emit primvar declarations and accessors.
     _genTCS << declarations.str()
@@ -3054,10 +3094,10 @@ HdSt_CodeGenMSL::_GenerateVertexAndFaceVaryingPrimvar(bool hasGS)
     std::stringstream accessorsVS, accessorsTCS, accessorsTES,
         accessorsGS, accessorsFS;
     
-    METAL_DEBUG_COMMENT(&interstageStruct,"_GenerateVertexPrimvar()\n"); //MTL_FIXME
-    METAL_DEBUG_COMMENT(&vertexInputs,    "_GenerateVertexPrimvar()\n"); //MTL_FIXME
-    METAL_DEBUG_COMMENT(&accessorsVS,     "_GenerateVertexPrimvar()\n"); //MTL_FIXME
-    METAL_DEBUG_COMMENT(&accessorsFS,     "_GenerateVertexPrimvar()\n"); //MTL_FIXME
+    METAL_DEBUG_COMMENT(&interstageStruct,"_GenerateVertexPrimvar() interstageStruct\n"); //MTL_FIXME
+    METAL_DEBUG_COMMENT(&vertexInputs,    "_GenerateVertexPrimvar() vertexInputs\n"); //MTL_FIXME
+    METAL_DEBUG_COMMENT(&accessorsVS,     "_GenerateVertexPrimvar() accessorsVS\n"); //MTL_FIXME
+    METAL_DEBUG_COMMENT(&accessorsFS,     "_GenerateVertexPrimvar() accessorsFS\n"); //MTL_FIXME
     
     
     TfToken structName("Primvars");
@@ -3240,6 +3280,12 @@ HdSt_CodeGenMSL::_GenerateVertexAndFaceVaryingPrimvar(bool hasGS)
     }
 
     interstageStruct << "}";
+    
+    METAL_DEBUG_COMMENT(&interstageStruct,"End _GenerateVertexPrimvar() interstageStruct\n"); //MTL_FIXME
+    METAL_DEBUG_COMMENT(&vertexInputs,    "End _GenerateVertexPrimvar() vertexInputs\n"); //MTL_FIXME
+    METAL_DEBUG_COMMENT(&accessorsVS,     "End _GenerateVertexPrimvar() accessorsVS\n"); //MTL_FIXME
+    METAL_DEBUG_COMMENT(&accessorsFS,     "End _GenerateVertexPrimvar() accessorsFS\n"); //MTL_FIXME
+
 
     _genVS << fvarDeclarations.str()
            << vertexInputs.str()

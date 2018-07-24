@@ -37,11 +37,12 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-static MTLPixelFormat GetMetalFormat(GLenum inInternalFormat, GLenum inType, size_t *outPixelByteSize)
+static MTLPixelFormat GetMetalFormat(GLenum inInternalFormat, GLenum inType, size_t *outPixelByteSize, bool *out24BitFormat)
 {
     MTLPixelFormat mtlFormat = MTLPixelFormatInvalid;
     
     *outPixelByteSize = 0;
+    *out24BitFormat = false;
     
     switch (inInternalFormat)
     {
@@ -50,6 +51,7 @@ static MTLPixelFormat GetMetalFormat(GLenum inInternalFormat, GLenum inType, siz
         case GL_RGB16:
         case GL_SRGB:
         case GL_RGB:
+            *out24BitFormat = true;
             TF_CODING_ERROR("3 channel textures are unsupported on Metal");
             // Drop through
             
@@ -100,6 +102,76 @@ static MTLPixelFormat GetMetalFormat(GLenum inInternalFormat, GLenum inType, siz
     }
     
     return mtlFormat;
+}
+
+static void *PadImage(GarchBaseTextureDataConstPtr texData, int mipLevel, size_t pixelByteSize, int numPixels)
+{
+    void* texBuffer;
+    switch (texData->GLInternalFormat())
+    {
+        case GL_RGB32F:
+        {
+            texBuffer = new float[pixelByteSize * numPixels];
+            
+            float *src = (float*)texData->GetRawBuffer(mipLevel);
+            float *dst = (float*)texBuffer;
+            while(numPixels-- > 0) {
+                *dst++ = *src++;
+                *dst++ = *src++;
+                *dst++ = *src++;
+                *dst++ = 1.0f;
+            }
+        }
+        break;
+            
+        case GL_RGB16F:
+        {
+            texBuffer = new uint16_t[pixelByteSize * numPixels];
+            
+            uint16_t *src = (uint16_t*)texData->GetRawBuffer(mipLevel);
+            uint16_t *dst = (uint16_t*)texBuffer;
+            while(numPixels-- > 0) {
+                *dst++ = *src++;
+                *dst++ = *src++;
+                *dst++ = *src++;
+                *dst++ = 0x3C00;
+            }
+        }
+        break;
+            
+        case GL_RGB16:
+        {
+            texBuffer = new uint16_t[pixelByteSize * numPixels];
+            
+            uint16_t *src = (uint16_t*)texData->GetRawBuffer(mipLevel);
+            uint16_t *dst = (uint16_t*)texBuffer;
+            while(numPixels-- > 0) {
+                *dst++ = *src++;
+                *dst++ = *src++;
+                *dst++ = *src++;
+                *dst++ = 0xffff;
+            }
+        }
+        break;
+            
+        case GL_SRGB:
+        case GL_RGB:
+        {
+            texBuffer = new uint8_t[pixelByteSize * numPixels];
+            
+            uint8_t *src = (uint8_t*)texData->GetRawBuffer(mipLevel);
+            uint8_t *dst = (uint8_t*)texBuffer;
+            while(numPixels-- > 0) {
+                *dst++ = *src++;
+                *dst++ = *src++;
+                *dst++ = *src++;
+                *dst++ = 0xff;
+            }
+        }
+        break;
+    }
+    
+    return texBuffer;
 }
 
 TF_REGISTRY_FUNCTION(TfType)
@@ -190,7 +262,6 @@ MtlfBaseTexture::_CreateTexture(GarchBaseTextureDataConstPtr texData,
             [_textureName release];
         }
 
-    
         // Uncompressed textures can have cropping and other special
         // behaviours.
 
@@ -202,7 +273,18 @@ MtlfBaseTexture::_CreateTexture(GarchBaseTextureDataConstPtr texData,
             int unpackRowLength = texDataWidth;
             int unpackSkipPixels = 0;
             int unpackSkipRows = 0;
-
+            
+            size_t pixelByteSize;
+            int numPixels = texDataWidth * texDataHeight;
+            bool b24BitFormat = false;
+            MTLPixelFormat mtlFormat = GetMetalFormat(texData->GLInternalFormat(), texData->GLType(), &pixelByteSize, &b24BitFormat);
+            
+            void *texBuffer = texData->GetRawBuffer(0);
+            if (b24BitFormat) {
+                // Pad out 24bit formats to 32bit
+                texBuffer = PadImage(texData, 0, pixelByteSize, numPixels);
+            }
+            
             if (!texData->IsCompressed()) {
                 if (unpackCropTop < 0 || unpackCropTop > texDataHeight) {
                     return;
@@ -228,9 +310,6 @@ MtlfBaseTexture::_CreateTexture(GarchBaseTextureDataConstPtr texData,
                 }
             }
 
-            size_t pixelByteSize;
-            MTLPixelFormat mtlFormat = GetMetalFormat(texData->GLInternalFormat(), texData->GLType(), &pixelByteSize);
-            
             if (mtlFormat == MTLPixelFormatInvalid) {
                 TF_FATAL_CODING_ERROR("Unsupported/unimplemented texture format");
             }
@@ -241,36 +320,40 @@ MtlfBaseTexture::_CreateTexture(GarchBaseTextureDataConstPtr texData,
                                                                    width:texDataWidth
                                                                   height:texDataHeight
                                                                mipmapped:genMips?YES:NO];
-            //desc.usage = MTLTextureUsageRead;
             desc.resourceOptions = MTLResourceStorageModeManaged;
             _textureName = [device newTextureWithDescriptor:desc];
 
-            char *rawData = (char*)texData->GetRawBuffer(0) + (unpackSkipRows * unpackRowLength * pixelByteSize)
-                                                            + (unpackSkipPixels * pixelByteSize);
+            char *rawData = (char*)texBuffer + (unpackSkipRows * unpackRowLength * pixelByteSize)
+                + (unpackSkipPixels * pixelByteSize);
             [_textureName replaceRegion:MTLRegionMake2D(0, 0, texDataWidth, texDataHeight)
                             mipmapLevel:0
                               withBytes:rawData
                             bytesPerRow:pixelByteSize * unpackRowLength];
-            
+
+            if (b24BitFormat) {
+                delete[] (uint8_t*)texBuffer;
+            }
+
             if (genMips) {
                 // Blit command encoder to generate mips
                 id<MTLCommandBuffer> commandBuffer = [MtlfMetalContext::GetMetalContext()->commandQueue commandBuffer];
                 id<MTLBlitCommandEncoder> blitEncoder = [commandBuffer blitCommandEncoder];
-                
+
                 [blitEncoder generateMipmapsForTexture:_textureName];
                 [blitEncoder endEncoding];
-                
+
                 [commandBuffer commit];
             }
 
         } else {
             size_t pixelByteSize;
-            MTLPixelFormat mtlFormat = GetMetalFormat(texData->GLInternalFormat(), texData->GLType(), &pixelByteSize);
+            bool b24BitFormat;
+            MTLPixelFormat mtlFormat = GetMetalFormat(texData->GLInternalFormat(), texData->GLType(), &pixelByteSize, &b24BitFormat);
             
             if (mtlFormat == MTLPixelFormatInvalid) {
                 TF_FATAL_CODING_ERROR("Unsupported/unimplemented texture format");
             }
-            
+
             id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->device;
             MTLTextureDescriptor* desc =
                 [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:mtlFormat
@@ -283,10 +366,23 @@ MtlfBaseTexture::_CreateTexture(GarchBaseTextureDataConstPtr texData,
 
             for (int i = 0 ; i < numMipLevels; i++) {
                 size_t mipWidth = texData->ResizedWidth(i);
+                size_t mipHeight = texData->ResizedHeight(i);
+                void *texBuffer = texData->GetRawBuffer(i);
+                int numPixels = mipWidth * mipHeight;
+                
+                if (b24BitFormat) {
+                    // Pad out 24bit formats to 32bit
+                    texBuffer = PadImage(texData, i, pixelByteSize, numPixels);
+                }
+
                 [_textureName replaceRegion:MTLRegionMake2D(0, 0, mipWidth, texData->ResizedHeight(i))
                                 mipmapLevel:i
-                                  withBytes:texData->GetRawBuffer(i)
+                                  withBytes:texBuffer
                                 bytesPerRow:pixelByteSize * mipWidth];
+                
+                if (b24BitFormat) {
+                    delete[] (uint8_t*)texBuffer;
+                }
             }
         }
 

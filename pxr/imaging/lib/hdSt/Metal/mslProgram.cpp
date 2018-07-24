@@ -81,15 +81,25 @@ static MTLPrimitiveType GetMetalPrimType(GLenum glPrimType) {
 }
 
 
-const MSL_ShaderBinding& MSL_FindBinding(const MSL_ShaderBindings& bindings, const std::string& name, bool& outFound, uint bindingTypeMask, uint programStageMask, uint skipCount)
+const MSL_ShaderBinding& MSL_FindBinding(const MSL_ShaderBindings& bindings, const std::string& name, bool& outFound, uint bindingTypeMask, uint programStageMask, uint skipCount, int level)
 {
     outFound = false;
     auto it = bindings.begin();
+    std::string nameToFind;
+    if (level < 0) {
+        nameToFind = name;
+    }
+    else {
+        // follow nested instancing naming convention.
+        std::stringstream n;
+        n << name << "_" << level;
+        nameToFind = n.str();
+    }
     for(; it != bindings.end(); ++it)
     {
         if( (it->_type & bindingTypeMask) == 0 ||
             (it->_stage & programStageMask) == 0 ||
-            it->_name != name ||
+            it->_name != nameToFind ||
             skipCount-- != 0)
             continue;
         outFound = true;

@@ -63,7 +63,7 @@ struct MSL_ShaderBinding
 
 typedef std::vector<MSL_ShaderBinding> MSL_ShaderBindings;
 
-const MSL_ShaderBinding& MSL_FindBinding(const MSL_ShaderBindings& bindings, const std::string& name, bool& outFound, uint bindingTypeMask = 0xFFFFFFFF, uint programStageMask = 0xFFFFFFFF, uint skipCount = 0);
+const MSL_ShaderBinding& MSL_FindBinding(const MSL_ShaderBindings& bindings, const std::string& name, bool& outFound, uint bindingTypeMask = 0xFFFFFFFF, uint programStageMask = 0xFFFFFFFF, uint skipCount = 0, int level = -1);
 
 /// \class HdStMSLProgram
 ///
