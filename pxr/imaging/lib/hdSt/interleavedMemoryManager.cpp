@@ -352,9 +352,10 @@ HdStInterleavedMemoryManager::_StripedInterleavedBuffer::_StripedInterleavedBuff
                      "  %s : offset = %d, alignment = %d\n",
                      it->name.GetText(), offset, alignment);
 
-        offset += HdDataSizeOfTupleType(it->tupleType);
+        int thisSize = HdDataSizeOfTupleType(it->tupleType);
+        offset += thisSize;
         if (caps.useCppShaderPadding) {
-            offset += _ComputePadding(alignment, _stride);
+            offset += _ComputePadding(alignment, thisSize);
         }
     }
 
