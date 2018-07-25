@@ -79,6 +79,9 @@ public:
     static bool IsInitialized();
     
     MTLF_API
+    void AllocateAttachments(int width, int height);
+    
+    MTLF_API
     id<MTLBuffer> GetIndexBuffer() {
         return indexBuffer;
     }
@@ -211,9 +214,11 @@ private:
     
     static MtlfMetalContextSharedPtr context;
     
-    CVOpenGLTextureCacheRef cvglTextureCache = nil;
-    CVMetalTextureCacheRef cvmtlTextureCache = nil;
-    
+    CVOpenGLTextureCacheRef cvglTextureCache;
+    CVMetalTextureCacheRef cvmtlTextureCache;
+    CVPixelBufferRef pixelBuffer;
+    CVPixelBufferRef depthBuffer;
+
     // Pipeline state functions
     void SetPipelineState();
     size_t HashVertexDescriptor();

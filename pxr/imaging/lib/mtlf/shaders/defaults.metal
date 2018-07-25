@@ -44,7 +44,7 @@ kernel void copyDepth(texture2d<float, access::read> texIn,
                       texture2d<float, access::write> texOut,
                       ushort2 gid [[thread_position_in_grid]])
 {
-    if(gid.x >= 1024 || gid.y >= 1024) {
+    if(gid.x >= texOut.get_width() || gid.y >= texOut.get_height()) {
         return;
     }
     

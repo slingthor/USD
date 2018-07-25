@@ -663,7 +663,16 @@ void
 UsdImagingMetalHdEngine::Render(RenderParams params)
 {
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
-    
+ 
+    // Make sure the Metal render targets, and GL interop textures match the GL viewport size
+    GLint viewport[4];
+    glGetIntegerv( GL_VIEWPORT, viewport );
+
+    if (context->mtlColorTexture.width != viewport[2] ||
+        context->mtlColorTexture.height != viewport[3]) {
+        context->AllocateAttachments(viewport[2], viewport[3]);
+    }
+
     MTLCaptureManager *sharedCaptureManager = [MTLCaptureManager sharedCaptureManager];
 
     //[sharedCaptureManager startCaptureWithScope:sharedCaptureManager.defaultCaptureScope];
@@ -671,30 +680,34 @@ UsdImagingMetalHdEngine::Render(RenderParams params)
 
     if (_mtlRenderPassDescriptor == nil)
     {
-        GLfloat clearColor[4];
-        glGetFloatv(GL_COLOR_CLEAR_VALUE, clearColor);
-        clearColor[3] = 1.0f;
-        
         _mtlRenderPassDescriptor = [[MTLRenderPassDescriptor alloc] init];
-
+        
         // create a color attachment every frame since we have to recreate the texture every frame
         MTLRenderPassColorAttachmentDescriptor *colorAttachment = _mtlRenderPassDescriptor.colorAttachments[0];
 
         // make sure to clear every frame for best performance
         colorAttachment.loadAction = MTLLoadActionClear;
-        colorAttachment.clearColor = MTLClearColorMake(clearColor[0], clearColor[1], clearColor[2], clearColor[3]);
         
         // store only attachments that will be presented to the screen, as in this case
         colorAttachment.storeAction = MTLStoreActionStore;
+
+        MTLRenderPassDepthAttachmentDescriptor *depthAttachment = _mtlRenderPassDescriptor.depthAttachment;
+        depthAttachment.loadAction = MTLLoadActionClear;
+        depthAttachment.storeAction = MTLStoreActionStore;
+        depthAttachment.clearDepth = 1.0f;
+        
     }
+
+    GLfloat clearColor[4];
+    glGetFloatv(GL_COLOR_CLEAR_VALUE, clearColor);
+    clearColor[3] = 1.0f;
 
     MTLRenderPassColorAttachmentDescriptor *colorAttachment = _mtlRenderPassDescriptor.colorAttachments[0];
     colorAttachment.texture = context->mtlColorTexture;
+    colorAttachment.clearColor = MTLClearColorMake(clearColor[0], clearColor[1], clearColor[2], clearColor[3]);
     
     MTLRenderPassDepthAttachmentDescriptor *depthAttachment = _mtlRenderPassDescriptor.depthAttachment;
     depthAttachment.texture = context->mtlDepthTexture;
-    depthAttachment.loadAction = MTLLoadActionClear;
-    depthAttachment.storeAction = MTLStoreActionStore;
 
     // Create a render command encoder so we can render into something
     TF_VERIFY(context->commandBuffer == nil, "Render: A command buffer is already active");
@@ -732,8 +745,9 @@ UsdImagingMetalHdEngine::Render(RenderParams params)
     
     // Depth texture copy
     NSUInteger exeWidth = [context->computePipelineState threadExecutionWidth];
-    MTLSize threadGroupCount = MTLSizeMake(32, exeWidth / 32, 1);
-    MTLSize threadGroups     = MTLSizeMake(1024 / threadGroupCount.width + 1, 1024 / threadGroupCount.height + 1, 1);
+    MTLSize threadGroupCount = MTLSizeMake(16, exeWidth / 32, 1);
+    MTLSize threadGroups     = MTLSizeMake(context->mtlDepthTexture.width / threadGroupCount.width + 1,
+                                           context->mtlDepthTexture.height / threadGroupCount.height + 1, 1);
 
     id <MTLComputeCommandEncoder> computeEncoder = [commandBuffer computeCommandEncoder];
 
@@ -781,9 +795,8 @@ UsdImagingMetalHdEngine::Render(RenderParams params)
     GLF_POST_PENDING_GL_ERRORS();
 
     GLuint blitTexSizeUniform = glGetUniformLocation(context->glShaderProgram, "texSize");
-    
-    float textureSize = 1024;
-    glUniform2f(blitTexSizeUniform, textureSize, textureSize);
+
+    glUniform2f(blitTexSizeUniform, context->mtlColorTexture.width, context->mtlColorTexture.height);
 
     glDrawArrays(GL_TRIANGLES, 0, 6);
     GLF_POST_PENDING_GL_ERRORS();
