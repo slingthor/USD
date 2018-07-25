@@ -701,9 +701,9 @@ UsdImagingMetalHdEngine::Render(RenderParams params)
     // front faces have ccw winding. We disable culling because culling
     // is handled by fragment shader discard.
     if (params.flipFrontFacing) {
-        context->setFrontFaceWinding(MTLWindingCounterClockwise);
-    } else {
         context->setFrontFaceWinding(MTLWindingClockwise);
+    } else {
+        context->setFrontFaceWinding(MTLWindingCounterClockwise);
     }
     context->setCullMode(MTLCullModeNone);
     

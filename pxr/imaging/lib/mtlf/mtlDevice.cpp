@@ -238,7 +238,7 @@ MtlfMetalContext::MtlfMetalContext()
     currentColourAttachmentsHash  = 0;
     currentPipelineDescriptorHash = 0;
     currentPipelineState          = nil;
-    windingOrder                  = MTLWindingClockwise;
+    windingOrder                  = MTLWindingCounterClockwise;
     cullMode                      = MTLCullModeNone;
     
     MTLDepthStencilDescriptor *depthStateDesc = [[MTLDepthStencilDescriptor alloc] init];
