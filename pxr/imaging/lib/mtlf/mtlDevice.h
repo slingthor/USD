@@ -125,6 +125,12 @@ public:
     void SetSampler(int index, id<MTLSamplerState> sampler, const TfToken& name, MSL_ProgramStage stage);
 
     MTLF_API
+    void setFrontFaceWinding(MTLWinding winding);
+    
+    MTLF_API
+    void setCullMode(MTLCullMode cullMode);
+    
+    MTLF_API
     void BakeState();
 
     MTLF_API
@@ -181,6 +187,9 @@ protected:
     id<MTLBuffer> indexBuffer;
     id<MTLBuffer> remappedQuadIndexBuffer;
     id<MTLBuffer> remappedQuadIndexBufferSource;
+    
+    MTLWinding windingOrder;
+    MTLCullMode cullMode;
     
     MtlfDrawTarget *drawTarget;
 

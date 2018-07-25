@@ -238,6 +238,8 @@ MtlfMetalContext::MtlfMetalContext()
     currentColourAttachmentsHash  = 0;
     currentPipelineDescriptorHash = 0;
     currentPipelineState          = nil;
+    windingOrder                  = MTLWindingClockwise;
+    cullMode                      = MTLCullModeNone;
     
     MTLDepthStencilDescriptor *depthStateDesc = [[MTLDepthStencilDescriptor alloc] init];
     depthStateDesc.depthWriteEnabled = YES;
@@ -463,10 +465,23 @@ id<MTLCommandBuffer> MtlfMetalContext::CreateCommandBuffer() {
 
 id<MTLRenderCommandEncoder> MtlfMetalContext::CreateRenderEncoder(MTLRenderPassDescriptor *renderPassDescriptor) {
     renderEncoder = [commandBuffer renderCommandEncoderWithDescriptor:renderPassDescriptor];
-    [renderEncoder setFrontFacingWinding:MTLWindingCounterClockwise];
+
+    [renderEncoder setFrontFacingWinding:windingOrder];
+    [renderEncoder setCullMode:cullMode];
+
     currentPipelineState = NULL;
     dirtyState           = DIRTY_METAL_STATE_ALL;
     return renderEncoder;
+}
+
+void MtlfMetalContext::setFrontFaceWinding(MTLWinding _windingOrder)
+{
+    windingOrder = _windingOrder;
+}
+
+void MtlfMetalContext::setCullMode(MTLCullMode _cullMode)
+{
+    cullMode = _cullMode;
 }
 
 void MtlfMetalContext::SetShadingPrograms(id<MTLFunction> vertexFunction, id<MTLFunction> fragmentFunction)
