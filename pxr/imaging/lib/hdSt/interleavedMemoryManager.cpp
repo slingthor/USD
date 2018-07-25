@@ -584,7 +584,7 @@ HdStInterleavedMemoryManager::_StripedInterleavedBufferRange::CopyData(
     }
 
     GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
-    if (glBufferSubData != NULL) {
+    if (caps.hasSubDataCopy) {
         int vboStride = VBO->GetStride();
         GLintptr vboOffset = VBO->GetOffset() + vboStride * _index;
         int dataSize = HdDataSizeOfTupleType(VBO->GetTupleType());

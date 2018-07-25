@@ -58,6 +58,7 @@ MtlfContextCaps::_LoadCaps()
     uniformBufferOffsetAlignment = 16;  //This limit isn't an actual thing for Metal. 16 is equal to the alignment rules of std140, which is convenient, nothing more.
     flipTexturesOnLoad           = true;
     useCppShaderPadding          = true;
+    hasSubDataCopy               = glBufferSubData != NULL;
 
 #if OPENSUBDIV_HAS_METAL_COMPUTE
     //METAL_TODO: Metal always has compute capabilities. gpuComputeNormals only affects
