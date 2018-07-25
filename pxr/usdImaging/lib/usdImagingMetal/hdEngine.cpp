@@ -689,10 +689,12 @@ UsdImagingMetalHdEngine::Render(RenderParams params)
     }
 
     MTLRenderPassColorAttachmentDescriptor *colorAttachment = _mtlRenderPassDescriptor.colorAttachments[0];
-    colorAttachment.texture = context->mtlTexture;
+    colorAttachment.texture = context->mtlColorTexture;
     
     MTLRenderPassDepthAttachmentDescriptor *depthAttachment = _mtlRenderPassDescriptor.depthAttachment;
     depthAttachment.texture = context->mtlDepthTexture;
+    depthAttachment.loadAction = MTLLoadActionClear;
+    depthAttachment.storeAction = MTLStoreActionStore;
 
     // Create a render command encoder so we can render into something
     TF_VERIFY(context->commandBuffer == nil, "Render: A command buffer is already active");
@@ -727,7 +729,22 @@ UsdImagingMetalHdEngine::Render(RenderParams params)
     _engine.Execute(*_renderIndex, _taskController->GetTasks(renderMode));
 
     [renderEncoder endEncoding];
+    
+    // Depth texture copy
+    NSUInteger exeWidth = [context->computePipelineState threadExecutionWidth];
+    MTLSize threadGroupCount = MTLSizeMake(32, exeWidth / 32, 1);
+    MTLSize threadGroups     = MTLSizeMake(1024 / threadGroupCount.width + 1, 1024 / threadGroupCount.height + 1, 1);
 
+    id <MTLComputeCommandEncoder> computeEncoder = [commandBuffer computeCommandEncoder];
+
+    [computeEncoder setComputePipelineState:context->computePipelineState];
+    
+    [computeEncoder setTexture:context->mtlDepthTexture atIndex:0];
+    [computeEncoder setTexture:context->mtlDepthRegularFloatTexture atIndex:1];
+    
+    [computeEncoder dispatchThreadgroups:threadGroups threadsPerThreadgroup: threadGroupCount];
+    [computeEncoder endEncoding];
+    
     // Finalize rendering here & push the command buffer to the GPU
     [commandBuffer commit];
     [sharedCaptureManager.defaultCaptureScope endScope];
@@ -739,8 +756,8 @@ UsdImagingMetalHdEngine::Render(RenderParams params)
 
     glPushAttrib(GL_ENABLE_BIT | GL_POLYGON_BIT | GL_DEPTH_BUFFER_BIT);
 
-    glDisable(GL_DEPTH_TEST);
-    glDepthMask(GL_FALSE);
+    glEnable(GL_DEPTH_TEST);
+    glDepthMask(GL_TRUE);
     glFrontFace(GL_CCW);
     glDisable(GL_CULL_FACE);
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
@@ -757,7 +774,10 @@ UsdImagingMetalHdEngine::Render(RenderParams params)
     glEnableVertexAttribArray(texAttrib);
     glVertexAttribPointer(texAttrib, 2, GL_FLOAT, GL_FALSE, sizeof(MtlfMetalContext::Vertex), (void*)(offsetof(Vertex, uv)));
 
-    glBindTexture(GL_TEXTURE_RECTANGLE, context->glTexture);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_RECTANGLE, context->glColorTexture);
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_RECTANGLE, context->glDepthTexture);
     GLF_POST_PENDING_GL_ERRORS();
 
     GLuint blitTexSizeUniform = glGetUniformLocation(context->glShaderProgram, "texSize");
@@ -771,13 +791,16 @@ UsdImagingMetalHdEngine::Render(RenderParams params)
     glFlush();
 
     glBindTexture(GL_TEXTURE_RECTANGLE, 0);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_RECTANGLE, 0);
+
     glDisableVertexAttribArray(posAttrib);
     glDisableVertexAttribArray(texAttrib);
     glUseProgram(0);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     
     glPopAttrib();
-     
+
     return;
 /*
     // XXX: HdEngine should do this.

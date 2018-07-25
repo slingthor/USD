@@ -311,6 +311,7 @@ MtlfDrawTarget::_BindAttachment( MtlfAttachmentRefPtr const & a )
         // make sure to clear every frame for best performance
         colorAttachment.loadAction = MTLLoadActionClear;
         colorAttachment.clearColor = MTLClearColorMake(1.0f, 0.25f, 0.25f, 1.0f);
+        colorAttachment.storeAction = MTLStoreActionStore;
     }
 }
 

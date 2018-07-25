@@ -144,11 +144,14 @@ public:
     id<MTLLibrary> defaultLibrary;
     id<MTLRenderPipelineState> pipelineState;
     id<MTLDepthStencilState> depthState;
-    id<MTLTexture> mtlTexture;
+    id<MTLTexture> mtlColorTexture;
 	id<MTLTexture> mtlDepthTexture;
+    id<MTLTexture> mtlDepthRegularFloatTexture;
+    id<MTLComputePipelineState> computePipelineState;
 
     uint32_t glShaderProgram;
-    uint32_t glTexture;
+    uint32_t glColorTexture;
+    uint32_t glDepthTexture;
     uint32_t glVAO;
     uint32_t glVBO;
 
