@@ -103,8 +103,8 @@ GarchContextCaps::GarchContextCaps()
     , gpuComputeNormalsEnabled(false)
 
     , flipTexturesOnLoad(true)
-    , useCppShaderPadding(false)
     , hasSubDataCopy(false)
+    , useCppShaderPadding(false)
 {
     // Empty
 }

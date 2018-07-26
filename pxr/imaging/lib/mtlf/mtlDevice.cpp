@@ -198,22 +198,18 @@ MtlfMetalContext::MtlfMetalContext()
     options.fastMathEnabled = YES;
 
     defaultLibrary = [device newLibraryWithSource:shaderSource options:options error:&error];
-    
+    if (!defaultLibrary) {
+        NSLog(@"Failed to created pipeline state, error %@", error);
+    }
+
     // Load the fragment program into the library
     id <MTLFunction> fragmentProgram = [defaultLibrary newFunctionWithName:@"tex_fs"];
     id <MTLFunction> vertexProgram = [defaultLibrary newFunctionWithName:@"quad_vs"];
     id <MTLFunction> computeDepthCopyProgram = [defaultLibrary newFunctionWithName:@"copyDepth"];
     
-    if (!computeDepthCopyProgram) {
-        // XXX:validation
-        TF_WARN("Failed to compile function: \n%s", [[error localizedDescription] UTF8String]);
-
-        return false;
-    }
-    
-    if (!(computePipelineState = [device newComputePipelineStateWithFunction:computeDepthCopyProgram error:&error]))
-    {
-        fprintf(stderr, "Unable to compile, %s\n", error.localizedDescription.UTF8String);
+    computePipelineState = [device newComputePipelineStateWithFunction:computeDepthCopyProgram error:&error];
+    if (!computePipelineState) {
+        NSLog(@"Failed to created pipeline state, error %@", error);
     }
 
     // Create the vertex description
