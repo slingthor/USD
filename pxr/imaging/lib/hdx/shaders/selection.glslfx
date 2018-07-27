@@ -357,7 +357,9 @@ vec4 GetSelectionColor(int mode)
 }
 
 // fwd decl fn defined in edgeId.glslfx or generated via codeGen
+#if !defined(ARCH_GFX_METAL)
 float GetSelectedEdgeOpacity();
+#endif
 
 vec4 GetSubprimSelectionColor(int mode, SubprimSelectionResult res)
 {

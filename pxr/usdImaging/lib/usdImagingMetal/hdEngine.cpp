@@ -663,7 +663,16 @@ void
 UsdImagingMetalHdEngine::Render(RenderParams params)
 {
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
-    
+ 
+    // Make sure the Metal render targets, and GL interop textures match the GL viewport size
+    GLint viewport[4];
+    glGetIntegerv( GL_VIEWPORT, viewport );
+
+    if (context->mtlColorTexture.width != viewport[2] ||
+        context->mtlColorTexture.height != viewport[3]) {
+        context->AllocateAttachments(viewport[2], viewport[3]);
+    }
+
     MTLCaptureManager *sharedCaptureManager = [MTLCaptureManager sharedCaptureManager];
 
     //[sharedCaptureManager startCaptureWithScope:sharedCaptureManager.defaultCaptureScope];
@@ -671,33 +680,52 @@ UsdImagingMetalHdEngine::Render(RenderParams params)
 
     if (_mtlRenderPassDescriptor == nil)
     {
-        GLfloat clearColor[4];
-        glGetFloatv(GL_COLOR_CLEAR_VALUE, clearColor);
-        clearColor[3] = 1.0f;
-        
         _mtlRenderPassDescriptor = [[MTLRenderPassDescriptor alloc] init];
-
+        
         // create a color attachment every frame since we have to recreate the texture every frame
         MTLRenderPassColorAttachmentDescriptor *colorAttachment = _mtlRenderPassDescriptor.colorAttachments[0];
 
         // make sure to clear every frame for best performance
         colorAttachment.loadAction = MTLLoadActionClear;
-        colorAttachment.clearColor = MTLClearColorMake(clearColor[0], clearColor[1], clearColor[2], clearColor[3]);
         
         // store only attachments that will be presented to the screen, as in this case
         colorAttachment.storeAction = MTLStoreActionStore;
+
+        MTLRenderPassDepthAttachmentDescriptor *depthAttachment = _mtlRenderPassDescriptor.depthAttachment;
+        depthAttachment.loadAction = MTLLoadActionClear;
+        depthAttachment.storeAction = MTLStoreActionStore;
+        depthAttachment.clearDepth = 1.0f;
+        
     }
 
+    GLfloat clearColor[4];
+    glGetFloatv(GL_COLOR_CLEAR_VALUE, clearColor);
+    clearColor[3] = 1.0f;
+
     MTLRenderPassColorAttachmentDescriptor *colorAttachment = _mtlRenderPassDescriptor.colorAttachments[0];
-    colorAttachment.texture = context->mtlTexture;
+    colorAttachment.texture = context->mtlColorTexture;
+    colorAttachment.clearColor = MTLClearColorMake(clearColor[0], clearColor[1], clearColor[2], clearColor[3]);
     
     MTLRenderPassDepthAttachmentDescriptor *depthAttachment = _mtlRenderPassDescriptor.depthAttachment;
     depthAttachment.texture = context->mtlDepthTexture;
 
-
     // Create a render command encoder so we can render into something
     TF_VERIFY(context->commandBuffer == nil, "Render: A command buffer is already active");
 
+    // hydra orients all geometry during topological processing so that
+    // front faces have ccw winding. We disable culling because culling
+    // is handled by fragment shader discard.
+    if (params.flipFrontFacing) {
+        context->setFrontFaceWinding(MTLWindingClockwise);
+    } else {
+        context->setFrontFaceWinding(MTLWindingCounterClockwise);
+    }
+    context->setCullMode(MTLCullModeNone);
+    
+    if (params.applyRenderState) {
+        glDisable(GL_BLEND);
+    }
+    
     // Create a new command buffer for each render pass to the current drawable
     id <MTLCommandBuffer> commandBuffer = context->CreateCommandBuffer();
     commandBuffer.label = @"HdEngine CommandBuffer";
@@ -714,7 +742,23 @@ UsdImagingMetalHdEngine::Render(RenderParams params)
     _engine.Execute(*_renderIndex, _taskController->GetTasks(renderMode));
 
     [renderEncoder endEncoding];
+    
+    // Depth texture copy
+    NSUInteger exeWidth = [context->computePipelineState threadExecutionWidth];
+    MTLSize threadGroupCount = MTLSizeMake(16, exeWidth / 32, 1);
+    MTLSize threadGroups     = MTLSizeMake(context->mtlDepthTexture.width / threadGroupCount.width + 1,
+                                           context->mtlDepthTexture.height / threadGroupCount.height + 1, 1);
 
+    id <MTLComputeCommandEncoder> computeEncoder = [commandBuffer computeCommandEncoder];
+
+    [computeEncoder setComputePipelineState:context->computePipelineState];
+    
+    [computeEncoder setTexture:context->mtlDepthTexture atIndex:0];
+    [computeEncoder setTexture:context->mtlDepthRegularFloatTexture atIndex:1];
+    
+    [computeEncoder dispatchThreadgroups:threadGroups threadsPerThreadgroup: threadGroupCount];
+    [computeEncoder endEncoding];
+    
     // Finalize rendering here & push the command buffer to the GPU
     [commandBuffer commit];
     [sharedCaptureManager.defaultCaptureScope endScope];
@@ -726,8 +770,8 @@ UsdImagingMetalHdEngine::Render(RenderParams params)
 
     glPushAttrib(GL_ENABLE_BIT | GL_POLYGON_BIT | GL_DEPTH_BUFFER_BIT);
 
-    glDisable(GL_DEPTH_TEST);
-    glDepthMask(GL_FALSE);
+    glEnable(GL_DEPTH_TEST);
+    glDepthMask(GL_TRUE);
     glFrontFace(GL_CCW);
     glDisable(GL_CULL_FACE);
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
@@ -744,13 +788,15 @@ UsdImagingMetalHdEngine::Render(RenderParams params)
     glEnableVertexAttribArray(texAttrib);
     glVertexAttribPointer(texAttrib, 2, GL_FLOAT, GL_FALSE, sizeof(MtlfMetalContext::Vertex), (void*)(offsetof(Vertex, uv)));
 
-    glBindTexture(GL_TEXTURE_RECTANGLE, context->glTexture);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_RECTANGLE, context->glColorTexture);
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_RECTANGLE, context->glDepthTexture);
     GLF_POST_PENDING_GL_ERRORS();
 
     GLuint blitTexSizeUniform = glGetUniformLocation(context->glShaderProgram, "texSize");
-    
-    float textureSize = 1024;
-    glUniform2f(blitTexSizeUniform, textureSize, textureSize);
+
+    glUniform2f(blitTexSizeUniform, context->mtlColorTexture.width, context->mtlColorTexture.height);
 
     glDrawArrays(GL_TRIANGLES, 0, 6);
     GLF_POST_PENDING_GL_ERRORS();
@@ -758,13 +804,16 @@ UsdImagingMetalHdEngine::Render(RenderParams params)
     glFlush();
 
     glBindTexture(GL_TEXTURE_RECTANGLE, 0);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_RECTANGLE, 0);
+
     glDisableVertexAttribArray(posAttrib);
     glDisableVertexAttribArray(texAttrib);
     glUseProgram(0);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     
     glPopAttrib();
-     
+
     return;
 /*
     // XXX: HdEngine should do this.
@@ -774,16 +823,6 @@ UsdImagingMetalHdEngine::Render(RenderParams params)
     glBindVertexArray(0);
 
     glPushAttrib(GL_ENABLE_BIT | GL_POLYGON_BIT | GL_DEPTH_BUFFER_BIT);
-
-    // hydra orients all geometry during topological processing so that
-    // front faces have ccw winding. We disable culling because culling
-    // is handled by fragment shader discard.
-    if (params.flipFrontFacing) {
-        glFrontFace(GL_CW); // < State is pushed via GL_POLYGON_BIT
-    } else {
-        glFrontFace(GL_CCW); // < State is pushed via GL_POLYGON_BIT
-    }
-    glDisable(GL_CULL_FACE);
 
     if (params.applyRenderState) {
         glDisable(GL_BLEND);

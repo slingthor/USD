@@ -79,6 +79,9 @@ public:
     static bool IsInitialized();
     
     MTLF_API
+    void AllocateAttachments(int width, int height);
+    
+    MTLF_API
     id<MTLBuffer> GetIndexBuffer() {
         return indexBuffer;
     }
@@ -125,6 +128,12 @@ public:
     void SetSampler(int index, id<MTLSamplerState> sampler, const TfToken& name, MSL_ProgramStage stage);
 
     MTLF_API
+    void setFrontFaceWinding(MTLWinding winding);
+    
+    MTLF_API
+    void setCullMode(MTLCullMode cullMode);
+    
+    MTLF_API
     void BakeState();
 
     MTLF_API
@@ -138,11 +147,14 @@ public:
     id<MTLLibrary> defaultLibrary;
     id<MTLRenderPipelineState> pipelineState;
     id<MTLDepthStencilState> depthState;
-    id<MTLTexture> mtlTexture;
+    id<MTLTexture> mtlColorTexture;
 	id<MTLTexture> mtlDepthTexture;
+    id<MTLTexture> mtlDepthRegularFloatTexture;
+    id<MTLComputePipelineState> computePipelineState;
 
     uint32_t glShaderProgram;
-    uint32_t glTexture;
+    uint32_t glColorTexture;
+    uint32_t glDepthTexture;
     uint32_t glVAO;
     uint32_t glVBO;
 
@@ -182,6 +194,9 @@ protected:
     id<MTLBuffer> remappedQuadIndexBuffer;
     id<MTLBuffer> remappedQuadIndexBufferSource;
     
+    MTLWinding windingOrder;
+    MTLCullMode cullMode;
+    
     MtlfDrawTarget *drawTarget;
 
 private:
@@ -199,9 +214,11 @@ private:
     
     static MtlfMetalContextSharedPtr context;
     
-    CVOpenGLTextureCacheRef cvglTextureCache = nil;
-    CVMetalTextureCacheRef cvmtlTextureCache = nil;
-    
+    CVOpenGLTextureCacheRef cvglTextureCache;
+    CVMetalTextureCacheRef cvmtlTextureCache;
+    CVPixelBufferRef pixelBuffer;
+    CVPixelBufferRef depthBuffer;
+
     // Pipeline state functions
     void SetPipelineState();
     size_t HashVertexDescriptor();

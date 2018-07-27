@@ -1464,8 +1464,10 @@ HdSt_CodeGenMSL::Compile()
             // typeless binding doesn't need declaration nor accessor.
             if (binDecl->dataType.IsEmpty()) continue;
 
+            char const* indexStr = NULL;
             if (binDecl->binding.GetType() == HdBinding::SSBO)
             {
+                indexStr = "localIndex";
                 _EmitDeclarationPtr(_genCommon, _mslVSInputParams, binDecl->name, binDecl->dataType, TfToken(), binDecl->binding);
                 std::stringstream dummy;
                 _EmitDeclarationPtr(dummy, _mslPSInputParams, binDecl->name, binDecl->dataType, TfToken(), binDecl->binding);
@@ -1480,7 +1482,8 @@ HdSt_CodeGenMSL::Compile()
             _EmitAccessor(_genCommon,
                           binDecl->name,
                           binDecl->dataType,
-                          binDecl->binding);
+                          binDecl->binding,
+                          indexStr);
         }
     }
     
@@ -2182,7 +2185,8 @@ static void _EmitAccessor(std::stringstream &str,
     } else {
         // non-indexed, only makes sense for uniform or vertex.
         if (binding.GetType() == HdBinding::UNIFORM ||
-            binding.GetType() == HdBinding::VERTEX_ATTR) {
+            binding.GetType() == HdBinding::VERTEX_ATTR ||
+            binding.GetType() == HdBinding::SSBO) {
             emitIndexlessVariant = true;
             str << type
                 << " HdGet_" << name << "(int localIndex) { return ";

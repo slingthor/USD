@@ -38,3 +38,15 @@ fragment half4 tex_fs(Interpolated in [[stage_in]], texture2d<half> tex [[textur
 {
     return tex.sample(s, in.texcoord);
 }
+
+// Depth buffer copy function
+kernel void copyDepth(texture2d<float, access::read> texIn,
+                      texture2d<float, access::write> texOut,
+                      ushort2 gid [[thread_position_in_grid]])
+{
+    if(gid.x >= texOut.get_width() || gid.y >= texOut.get_height()) {
+        return;
+    }
+    
+    texOut.write(float4(texIn.read(gid).rgb, 1), gid);
+}

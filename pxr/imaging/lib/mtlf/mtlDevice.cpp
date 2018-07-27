@@ -198,11 +198,20 @@ MtlfMetalContext::MtlfMetalContext()
     options.fastMathEnabled = YES;
 
     defaultLibrary = [device newLibraryWithSource:shaderSource options:options error:&error];
-    
+    if (!defaultLibrary) {
+        NSLog(@"Failed to created pipeline state, error %@", error);
+    }
+
     // Load the fragment program into the library
     id <MTLFunction> fragmentProgram = [defaultLibrary newFunctionWithName:@"tex_fs"];
     id <MTLFunction> vertexProgram = [defaultLibrary newFunctionWithName:@"quad_vs"];
+    id <MTLFunction> computeDepthCopyProgram = [defaultLibrary newFunctionWithName:@"copyDepth"];
     
+    computePipelineState = [device newComputePipelineStateWithFunction:computeDepthCopyProgram error:&error];
+    if (!computePipelineState) {
+        NSLog(@"Failed to created pipeline state, error %@", error);
+    }
+
     // Create the vertex description
     MTLVertexDescriptor *vtxDescriptor = [[MTLVertexDescriptor alloc] init];
     vtxDescriptor.attributes[0].format = MTLVertexFormatFloat2;
@@ -238,6 +247,8 @@ MtlfMetalContext::MtlfMetalContext()
     currentColourAttachmentsHash  = 0;
     currentPipelineDescriptorHash = 0;
     currentPipelineState          = nil;
+    windingOrder                  = MTLWindingCounterClockwise;
+    cullMode                      = MTLCullModeNone;
     
     MTLDepthStencilDescriptor *depthStateDesc = [[MTLDepthStencilDescriptor alloc] init];
     depthStateDesc.depthWriteEnabled = YES;
@@ -307,11 +318,13 @@ MtlfMetalContext::MtlfMetalContext()
     glEnableVertexAttribArray(texAttrib);
     glVertexAttribPointer(texAttrib, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(offsetof(Vertex, uv)));
 
-    GLint samplerLoc = glGetUniformLocation(glShaderProgram, "interopTexture");
+    GLint samplerColorLoc = glGetUniformLocation(glShaderProgram, "interopTexture");
+    GLint samplerDepthLoc = glGetUniformLocation(glShaderProgram, "depthTexture");
     
-    // Indicate that the diffuse texture will be bound to texture unit 0
+    // Indicate that the diffuse texture will be bound to texture unit 0, and depth to unit 1
     GLint unit = 0;
-    glUniform1i(samplerLoc, unit);
+    glUniform1i(samplerColorLoc, unit++);
+    glUniform1i(samplerDepthLoc, unit);
     
     Vertex v[6] = {
         { {-1, -1}, {0, 0} },
@@ -326,55 +339,20 @@ MtlfMetalContext::MtlfMetalContext()
     
     glBindVertexArray(0);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
-    
-    
-    
-    //  allocate a CVPixelBuffer
-    CVOpenGLTextureRef cvglTexture;
-    CVPixelBufferRef pixelBuffer;
-    CVMetalTextureRef cvmtlTexture;
-    
+
     cvglTextureCache = nil;
     cvmtlTextureCache = nil;
 
-    NSDictionary* cvBufferProperties = @{
-        (__bridge NSString*)kCVPixelBufferOpenGLCompatibilityKey : @(TRUE),
-        (__bridge NSString*)kCVPixelBufferMetalCompatibilityKey : @(TRUE),
-    };
-
-    CVPixelBufferCreate(kCFAllocatorDefault, 1024, 1024,
-                                kCVPixelFormatType_32BGRA,
-                                (__bridge CFDictionaryRef)cvBufferProperties,
-                                &pixelBuffer);
-    
     CVReturn cvret = CVMetalTextureCacheCreate(kCFAllocatorDefault, nil, device, nil, &cvmtlTextureCache);
     assert(cvret == kCVReturnSuccess);
     
     CGLContextObj glctx = [[NSOpenGLContext currentContext] CGLContextObj];
     CGLPixelFormatObj glPixelFormat = [[[NSOpenGLContext currentContext] pixelFormat] CGLPixelFormatObj];
     cvret = CVOpenGLTextureCacheCreate(kCFAllocatorDefault, nil, (__bridge CGLContextObj _Nonnull)(glctx), glPixelFormat, nil, &cvglTextureCache);
-
     assert(cvret == kCVReturnSuccess);
+    
+    AllocateAttachments(256, 256);
 
-    cvret = CVOpenGLTextureCacheCreateTextureFromImage(kCFAllocatorDefault, cvglTextureCache,
-                                                                pixelBuffer,
-                                                                nil, &cvglTexture);
-    glTexture = CVOpenGLTextureGetName(cvglTexture);
-    
-    cvret = CVMetalTextureCacheCreateTextureFromImage(kCFAllocatorDefault, cvmtlTextureCache,
-                                                               pixelBuffer, nil, MTLPixelFormatBGRA8Unorm,
-                                                               1024, 1024, 0, &cvmtlTexture);
-    
-    mtlTexture = CVMetalTextureGetTexture(cvmtlTexture);
-    
-    {
-        MTLTextureDescriptor *depthTexDescriptor = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatDepth32Float
-        width:mtlTexture.width height:mtlTexture.height mipmapped:false];
-        depthTexDescriptor.usage = MTLTextureUsageRenderTarget;
-        depthTexDescriptor.resourceOptions = MTLResourceCPUCacheModeDefaultCache | MTLResourceStorageModePrivate;
-        mtlDepthTexture = [device newTextureWithDescriptor:depthTexDescriptor];
-    }
-    
     pipelineStateDescriptor = nil;
     vertexDescriptor = nil;
     indexBuffer = nil;
@@ -386,6 +364,65 @@ MtlfMetalContext::~MtlfMetalContext()
 {
 }
 
+void MtlfMetalContext::AllocateAttachments(int width, int height)
+{
+    CVOpenGLTextureRef cvglTexture;
+    CVMetalTextureRef cvmtlTexture;
+
+    NSDictionary* cvBufferProperties = @{
+        (__bridge NSString*)kCVPixelBufferOpenGLCompatibilityKey : @(TRUE),
+        (__bridge NSString*)kCVPixelBufferMetalCompatibilityKey : @(TRUE),
+    };
+
+    pixelBuffer = nil;
+    depthBuffer = nil;
+    CVPixelBufferCreate(kCFAllocatorDefault, width, height,
+                        kCVPixelFormatType_32BGRA,
+                        (__bridge CFDictionaryRef)cvBufferProperties,
+                        &pixelBuffer);
+    
+    CVPixelBufferCreate(kCFAllocatorDefault, width, height,
+                        kCVPixelFormatType_DepthFloat32,
+                        (__bridge CFDictionaryRef)cvBufferProperties,
+                        &depthBuffer);
+    
+    CVReturn cvret = CVOpenGLTextureCacheCreateTextureFromImage(kCFAllocatorDefault, cvglTextureCache,
+                                                                pixelBuffer,
+                                                                nil, &cvglTexture);
+    assert(cvret == kCVReturnSuccess);
+
+    glColorTexture = CVOpenGLTextureGetName(cvglTexture);
+    
+    cvret = CVOpenGLTextureCacheCreateTextureFromImage(kCFAllocatorDefault, cvglTextureCache,
+                                                       depthBuffer,
+                                                       nil, &cvglTexture);
+    assert(cvret == kCVReturnSuccess);
+    glDepthTexture = CVOpenGLTextureGetName(cvglTexture);
+    
+    cvret = CVMetalTextureCacheCreateTextureFromImage(kCFAllocatorDefault, cvmtlTextureCache,
+                                                      pixelBuffer, nil, MTLPixelFormatBGRA8Unorm,
+                                                      width, height, 0, &cvmtlTexture);
+    assert(cvret == kCVReturnSuccess);
+    
+    mtlColorTexture = CVMetalTextureGetTexture(cvmtlTexture);
+    
+    cvret = CVMetalTextureCacheCreateTextureFromImage(kCFAllocatorDefault, cvmtlTextureCache,
+                                                      depthBuffer, nil, MTLPixelFormatR32Float,
+                                                      width, height, 0, &cvmtlTexture);
+    assert(cvret == kCVReturnSuccess);
+
+    mtlDepthRegularFloatTexture = CVMetalTextureGetTexture(cvmtlTexture);
+    
+    {
+        MTLTextureDescriptor *depthTexDescriptor = [MTLTextureDescriptor
+            texture2DDescriptorWithPixelFormat:MTLPixelFormatDepth32Float
+                                                    width:width height:height
+                                                    mipmapped:false];
+        depthTexDescriptor.usage = MTLTextureUsageRenderTarget|MTLTextureUsageShaderRead;
+        depthTexDescriptor.resourceOptions = MTLResourceCPUCacheModeDefaultCache | MTLResourceStorageModePrivate;
+        mtlDepthTexture = [device newTextureWithDescriptor:depthTexDescriptor];
+    }
+}
 
 MtlfMetalContextSharedPtr
 MtlfMetalContext::GetMetalContext()
@@ -463,10 +500,23 @@ id<MTLCommandBuffer> MtlfMetalContext::CreateCommandBuffer() {
 
 id<MTLRenderCommandEncoder> MtlfMetalContext::CreateRenderEncoder(MTLRenderPassDescriptor *renderPassDescriptor) {
     renderEncoder = [commandBuffer renderCommandEncoderWithDescriptor:renderPassDescriptor];
-    [renderEncoder setFrontFacingWinding:MTLWindingCounterClockwise];
+
+    [renderEncoder setFrontFacingWinding:windingOrder];
+    [renderEncoder setCullMode:cullMode];
+
     currentPipelineState = NULL;
     dirtyState           = DIRTY_METAL_STATE_ALL;
     return renderEncoder;
+}
+
+void MtlfMetalContext::setFrontFaceWinding(MTLWinding _windingOrder)
+{
+    windingOrder = _windingOrder;
+}
+
+void MtlfMetalContext::setCullMode(MTLCullMode _cullMode)
+{
+    cullMode = _cullMode;
 }
 
 void MtlfMetalContext::SetShadingPrograms(id<MTLFunction> vertexFunction, id<MTLFunction> fragmentFunction)
@@ -757,7 +807,7 @@ void MtlfMetalContext::SetPipelineState()
             pipelineStateDescriptor.colorAttachments[0].sourceAlphaBlendFactor = MTLBlendFactorSourceAlpha;
             pipelineStateDescriptor.colorAttachments[0].destinationRGBBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
             pipelineStateDescriptor.colorAttachments[0].destinationAlphaBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
-            pipelineStateDescriptor.colorAttachments[0].pixelFormat = mtlTexture.pixelFormat;
+            pipelineStateDescriptor.colorAttachments[0].pixelFormat = mtlColorTexture.pixelFormat;
             numColourAttachments++;
             
             pipelineStateDescriptor.depthAttachmentPixelFormat = mtlDepthTexture.pixelFormat;

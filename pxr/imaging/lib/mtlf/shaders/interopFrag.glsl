@@ -12,6 +12,7 @@ varying vec2    texCoord;
 
 // A GL_TEXTURE_RECTANGLE
 uniform sampler2DRect interopTexture;
+uniform sampler2DRect depthTexture;
 
 // The dimensions of the source texture. The sampler coordinates for a GL_TEXTURE_RECTANGLE are in pixels,
 // rather than the usual normalised 0..1 range.
@@ -26,4 +27,5 @@ void main(void)
     vec2 uv = vec2(texCoord.x, 1.0 - texCoord.y) * texSize;
     gl_FragColor = texture2DRect(interopTexture, uv.st);
 #endif
+	gl_FragDepth = texture2DRect(depthTexture, uv.st).r;
 }

@@ -80,6 +80,7 @@ GlfContextCaps::_LoadCaps()
     uniformBufferOffsetAlignment = 0;
     flipTexturesOnLoad           = true;
     useCppShaderPadding          = false;
+    hasSubDataCopy               = true;
 
     const char *glVersionStr = (const char*)glGetString(GL_VERSION);
 

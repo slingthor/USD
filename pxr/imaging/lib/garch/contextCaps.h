@@ -90,6 +90,9 @@ public:
     // Texture vertical flip
     bool flipTexturesOnLoad;
     
+    // glBufferSubData functionality
+    bool hasSubDataCopy;
+    
     // Shader language padding for structures
     bool useCppShaderPadding;
 

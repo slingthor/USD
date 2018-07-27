@@ -194,7 +194,9 @@ HdStBufferResourceGL::ReadBuffer(HdTupleType tupleType,
                                  int stride,
                                  int numElems)
 {
-    if (glBufferSubData == NULL) return VtValue();
+    GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
+    
+    if (!caps.hasSubDataCopy) return VtValue();
     
     // HdTupleType represents scalar, vector, matrix, and array types.
     const int bytesPerElement = HdDataSizeOfTupleType(tupleType);
@@ -212,8 +214,6 @@ HdStBufferResourceGL::ReadBuffer(HdTupleType tupleType,
     //                       bytesPerElement
     
     GLsizeiptr vboSize = stride * (numElems-1) + bytesPerElement * arraySize;
-    
-    GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
     
     // read data
     std::vector<unsigned char> tmp(vboSize);

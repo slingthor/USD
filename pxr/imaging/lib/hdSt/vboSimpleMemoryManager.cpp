@@ -350,7 +350,7 @@ HdStVBOSimpleMemoryManager::_SimpleBufferArrayRange::CopyData(
 
     GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
 
-//    if (glBufferSubData != NULL) {
+    if (caps.hasSubDataCopy) {
         int bytesPerElement = HdDataSizeOfTupleType(VBO->GetTupleType());
         // overrun check. for graceful handling of erroneous assets,
         // issue warning here and continue to copy for the valid range.
@@ -369,7 +369,7 @@ HdStVBOSimpleMemoryManager::_SimpleBufferArrayRange::CopyData(
         HD_PERF_COUNTER_INCR(HdPerfTokens->glBufferSubData);
 
         VBO->CopyData(vboOffset, srcSize, bufferSource->GetData());
-//    }
+    }
 }
 
 VtValue
