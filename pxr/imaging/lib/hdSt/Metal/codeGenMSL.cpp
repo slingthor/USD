@@ -748,9 +748,9 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
     std::stringstream glueCompute;
     glueCompute << "kernel void computeEntryPoint(\n"
                 << "uint threadPositionInGrid[[thread_position_in_grid]]\n"
-                << ", uint threadPositionInThreadgroup[[thread_position_in_threadgroup]]\n"
-                << ", uint threadIndexInThreadgroup[[thread_index_in_threadgroup]]\n"
-                << ", uint threadgroupPositionInGrid[[threadgroup_position_in_grid]]\n";
+                << "    , uint threadPositionInThreadgroup[[thread_position_in_threadgroup]]\n"
+                << "    , uint threadIndexInThreadgroup[[thread_index_in_threadgroup]]\n"
+                << "    , uint threadgroupPositionInGrid[[threadgroup_position_in_grid]]";
     
     glueVS << "struct MSLVtxInputs {\n";
     int location = 0;
@@ -795,7 +795,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
             glueVS << "#endif\n";
             
             //Add the attribute as a buffer input to the Compute function definition
-            glueCompute << ", " << input.dataType << " *" << input.name << "[[buffer(" << vertexAttribsLocation << ")]] // " << attrib << "\n";
+            glueCompute << "\n    , device const " << input.dataType << " *" << input.name << "[[buffer(" << vertexAttribsLocation << ")]] // " << attrib;
         }
         copyInputsVtxStruct_Compute << ",   \n            " << input.name << "[__vertexIDs[i]]";
         ////////////////////////////////////////////////////////
@@ -809,7 +809,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
     mslProgram->AddBinding("indices", vertexAttribsLocation, kMSL_BindingType_IndexBuffer, kMSL_ProgramStage_Vertex);
     //Add it for ComputeVS. Increment vertexAttribsLocation (this means that in the VS the buffers are offset by 1,
     //with 1 slot skipped, the indices)
-    glueCompute << ", uint indices[[buffer(" << vertexAttribsLocation++ << ")]]\n";
+    glueCompute << "\n    , device const uint *indices[[buffer(" << vertexAttribsLocation++ << ")]]";
     
     /////////////////////////////////Uniform Buffer///////////////////////////////////
     
@@ -1080,18 +1080,20 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
         }
         glueVS << ", ";
         glueCVS << ", ";
-        if(useInCompute) glueCompute << ", ";
+        if(useInCompute) glueCompute << "\n    , ";
         if (input.name.GetText()[0] == '*') {
             glueVS << "device const ";
             glueCVS << "device const ";
+            if(useInCompute) glueCompute << "device const ";
         }
         if (input.usage & HdSt_CodeGenMSL::TParam::ProgramScope) {
             glueVS << "ProgramScope<st>::";
             glueCVS << "ProgramScope<st>::";
+            if(useInCompute) glueCompute << "ProgramScope<st>::";
         }
         glueVS << input.dataType << " " << input.name << attrib << "\n";
         glueCVS << input.dataType << " " << input.name << " //" << attrib << "\n";
-        if(useInCompute) glueCompute << input.dataType << " " << input.name << attrib << "\n";
+        if(useInCompute) glueCompute << input.dataType << " " << input.name << attrib;
     }
     
     //Create VS Input binding
@@ -1130,28 +1132,64 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
         //  -   Need to dispatch numPrimitives amount of threads.
         //  -   Need to bind the index buffer to appropriate index.
         
-        UInt32 numPointsPerPrimitive = 3;
+        const bool expandVertexData = false;    //Whether to expand vertex data to N unique verts per prim or use the regalur shared vertex approach
+        //NOTE: We don't know exactly which verts are going to be used in the call. We also don't yet have a mechanism to prevent processing the same
+        //vertex multiple times. For now, this means not expanding data is almost as costly as expanding it apart from reduced memory requirements.
+        
+        //Add a binding for the Vertex output generated in compute
+        const UInt32 computeVSOutputSlot = location++;
+        mslProgram->AddBinding("computeVSOutput", computeVSOutputSlot, kMSL_BindingType_ComputeVSOutput, kMSL_ProgramStage_Compute);
+        
+        //Generate the compute shader that calls the vertex shader code and outputs the vertices.
+        UInt32 numVerticesPerThread = 3;
         glueVS  << "#if HD_MTL_COMPUTESHADER\n"
                 << glueCompute.str()
+                << "\n    , device MSLVtxOutputs *computeVSOutput[[buffer(" << computeVSOutputSlot << ")]])\n"
                 << "{\n"
-                << "    uint __baseIndexID = threadPositionInGrid * " << numPointsPerPrimitive << ";\n"
-                << "    uint __instanceID = 0" // <-- MTL_FIXME
-                << "    uint __vertexIDs[" << numPointsPerPrimitive << "];\n"
-                << "    for(uint i = 0; i < " << numPointsPerPrimitive << "; i++) __vertexIDs[i] = __baseVertex + indices[__baseIndexID + i];\n"
-                << "    for(uint i = 0; i < " << numPointsPerPrimitive << "; i++) {\n"
+                << "    uint __baseIndexID = threadPositionInGrid * " << numVerticesPerThread << ";\n"
+                << "    uint __instanceID = 0;\n" // <-- MTL_FIXME
+                << "    uint __baseVertex = 0;\n" // <-- MTL_FIXME
+                << "\n"
+                << "    uint __vertexIDs[" << numVerticesPerThread << "];\n"
+                << "    for(uint i = 0; i < " << numVerticesPerThread << "; i++) {\n"
+                << "        uint __indexID = __baseIndexID + i;\n"
+                << "        __vertexIDs[i] = __baseVertex + indices[__indexID];\n"
+                << "    }\n"
+                << "\n"
+                << "    for(uint i = 0; i < " << numVerticesPerThread << "; i++) {\n"
+                << "        uint __indexID = __baseIndexID + i;\n"
                 << "        uint gl_VertexID = __vertexIDs[i];\n"
                 << "        uint gl_InstanceID = __instanceID;\n"
                 << "        uint gl_BaseVertex = __baseVertex;\n"
-                << "        MSLVtxInputs vtxInputs = {//"
+                << "        MSLVtxInputs vtxInputs = { //"
                 << copyInputsVtxStruct_Compute.str() << "\n"
-                << "        };\n"
-                << "        MSLVtxOutputs vsOutput = compute_vertexEntryPoint(vtxInputs\n"
+                << "        };\n";
+        if(expandVertexData)
+            glueVS << "        computeVSOutput[__indexID] = ";
+        else
+            glueVS << "        computeVSOutput[__vertexIDs[i] - __baseVertex] = ";
+        glueVS  << "compute_vertexEntryPoint(vtxInputs\n"
                 << copyInputsVtx_Compute.str()
                 << "        );\n"
-                << "        //TODO: Write out vsOutput.\n"
                 << "    }\n"
                 << "}\n"
-                << "#endif";
+                << "#endif //HD_MTL_COMPUTESHADER\n";
+        
+        //Add new pass-through Vertex Shader that just reads compute output and passes it on to Rasterizer/FS
+        glueVS  << "#if HD_MTL_VERTEXSHADER\n"
+                << "vertex MSLVtxOutputs vertexPassThroughEntryPoint( uint baseVertex[[base_vertex]],\n"
+                << "                             uint vertexID[[vertex_id]],\n"
+                << "                             uint baseInstance[[base_instance]],\n"
+                << "                             uint instanceID[[instance_id]],\n"
+                << "                             device const uint *indices[[buffer(0)]],\n"
+                << "                             device const MSLVtxOutputs *cvsData[[buffer(1)]]) {\n";
+        if(expandVertexData)
+            glueVS << "    uint cvsDataIndex = indices[vertexID];\n";  //If this path is chosen you can't use indexed draws, need to fetch indices manually. vertex_id is just an incrementing counter in that case.
+        else
+            glueVS << "    uint cvsDataIndex = vertexID;\n"; //Can use regular indexed draws
+        glueVS  << "    return cvsData[cvsDataIndex];\n"
+                << "}\n"
+                << "#endif //HD_MTL_VERTEXSHADER\n";
     }
     
     //Fragment Glue Function

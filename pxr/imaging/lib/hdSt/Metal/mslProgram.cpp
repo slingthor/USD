@@ -180,20 +180,7 @@ HdStMSLProgram::CompileShader(GLenum type,
     if (shaderSource.empty()) return false;
     
     const char *shaderType = NULL;
-    NSString *entryPoint = nil;
     switch (type) {
-        case GL_VERTEX_SHADER:
-            shaderType = "Vertex Shader";
-            entryPoint = @"vertexEntryPoint";
-            break;
-        case GL_FRAGMENT_SHADER:
-            shaderType = "Fragment Shader";
-            entryPoint = @"fragmentEntryPoint";
-            break;
-        case GL_COMPUTE_SHADER:
-            shaderType = "Compute Shader";
-            entryPoint = @"computeEntryPoint";
-            break;
         case GL_TESS_CONTROL_SHADER:
         case GL_TESS_EVALUATION_SHADER:
         case GL_GEOMETRY_SHADER:
@@ -202,15 +189,7 @@ HdStMSLProgram::CompileShader(GLenum type,
             DumpMetalSource([NSString stringWithUTF8String:shaderSource.c_str()], @"InvalidType", nil); //MTL_FIXME
             return true;
         default:
-            TF_CODING_ERROR("Invalid shader type %d\n", type);
-            return false;
-    }
-
-    if (TfDebug::IsEnabled(HD_DUMP_SHADER_SOURCE)) {
-        std::cout << "--------- " << shaderType << " ----------\n";
-        std::cout << shaderSource;
-        std::cout << "---------------------------\n";
-        std::cout << std::flush;
+            break;
     }
 
     // create a shader, compile it
@@ -223,6 +202,21 @@ HdStMSLProgram::CompileShader(GLenum type,
     for(UInt32 i = 0; i < numShaders; i++)
     {
         GLenum compileType = (i == 0) ? type : GL_COMPUTE_SHADER;
+        
+        NSString *entryPoint = nil;
+        switch (compileType) {
+        case GL_VERTEX_SHADER: shaderType = "Vertex Shader"; entryPoint = (enableComputeVS ? @"vertexPassThroughEntryPoint" : @"vertexEntryPoint"); break;
+        case GL_FRAGMENT_SHADER: shaderType = "Fragment Shader"; entryPoint = @"fragmentEntryPoint"; break;
+        case GL_COMPUTE_SHADER: shaderType = "Compute Shader"; entryPoint = @"computeEntryPoint"; break;
+        default: TF_FATAL_CODING_ERROR("Not allowed!");
+        }
+        
+        if (TfDebug::IsEnabled(HD_DUMP_SHADER_SOURCE)) {
+            std::cout   << "--------- " << shaderType << " ----------\n"
+                        << shaderSource
+                        << "---------------------------\n"
+                        << std::flush;
+        }
         
         MTLCompileOptions *options = [[MTLCompileOptions alloc] init];
         options.fastMathEnabled = YES;
