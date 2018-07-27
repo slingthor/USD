@@ -704,12 +704,14 @@ HdSt_CodeGenMSL::_ParseGLSL(std::stringstream &source, InOutParams& inParams, In
 
 void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream& gluePS, HdStMSLProgramSharedPtr mslProgram)
 {
-    std::stringstream glueCommon, copyInputsVtx, copyOutputsVtx;
+    std::stringstream glueCommon, copyInputsVtx, copyOutputsVtx, copyInputsVtxStruct_Compute, copyInputsVtx_Compute;
     std::stringstream copyInputsFrag, copyOutputsFrag;
 
     glueCommon.str("");
     METAL_DEBUG_COMMENT(&glueCommon, "_GenerateGlue(glueCommon)\n"); //MTL_FIXME
     copyInputsVtx.str("");
+    copyInputsVtx_Compute.str("");
+    copyInputsVtxStruct_Compute.str("");
     copyInputsFrag.str("");
     copyOutputsVtx.str("");
     copyOutputsFrag.str("");
@@ -717,7 +719,15 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
     glueCommon << "struct MSLVtxOutputs {\n";
     TF_FOR_ALL(it, _mslVSOutputParams) {
         HdSt_CodeGenMSL::TParam const &output = *it;
+        
+        bool generateCSVersion = !output.attribute.IsEmpty();
+        if(generateCSVersion) glueCommon << "#if HD_MTL_COMPUTESHADER == 0\n";
         glueCommon << output.dataType << " " << output.name << output.attribute << ";\n";
+        if(generateCSVersion) {
+            glueCommon << "#else\n";
+            glueCommon << output.dataType << " " << output.name << "; //" << output.attribute << "\n";
+            glueCommon << "#endif\n";
+        }
         
         copyOutputsVtx << "vtxOut." << output.name << "=scope.";
         if (output.accessorStr.IsEmpty()) {
@@ -735,6 +745,13 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
     METAL_DEBUG_COMMENT(&glueVS, "_GenerateGlue(glueVS)\n"); //MTL_FIXME
     METAL_DEBUG_COMMENT(&gluePS, "_GenerateGlue(gluePS)\n"); //MTL_FIXME
     
+    std::stringstream glueCompute;
+    glueCompute << "kernel void computeEntryPoint(\n"
+                << "uint threadPositionInGrid[[thread_position_in_grid]]\n"
+                << ", uint threadPositionInThreadgroup[[thread_position_in_threadgroup]]\n"
+                << ", uint threadIndexInThreadgroup[[thread_index_in_threadgroup]]\n"
+                << ", uint threadgroupPositionInGrid[[threadgroup_position_in_grid]]\n";
+    
     glueVS << "struct MSLVtxInputs {\n";
     int location = 0;
     int vertexAttribsLocation = 0;
@@ -742,19 +759,20 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
         HdSt_CodeGenMSL::TParam const &input = *it;
         TfToken attrib;
         
-        
         if (input.usage & HdSt_CodeGenMSL::TParam::Uniform)
             continue;
         
         if (input.usage & HdSt_CodeGenMSL::TParam::EntryFuncArgument) {
             std::string n = (input.name.GetText()[0] == '*') ? input.name.GetString().substr(1) : input.name;
             copyInputsVtx << "scope." << n << "=" << n << ";\n";
+            copyInputsVtx_Compute << "            , " << n << "\n";
             continue;
         }
 
         copyInputsVtx << "scope." << input.name << "=input." << input.name << ";\n";
         
         if (input.name.GetText()[0] == '*') {
+            //Does this case ever hit? A pointer as vertexattrib? - jsoet
             glueVS << "device const ";
             mslProgram->AddBinding(input.name.GetText() + 1, vertexAttribsLocation, kMSL_BindingType_VertexAttribute, kMSL_ProgramStage_Vertex);
         }
@@ -767,14 +785,31 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
 //        else
             attrib = TfToken(TfStringPrintf("[[attribute(%d)]]", vertexAttribsLocation));
 
+        ////////////////////////////////////////////////////////
+        bool generateCSVersion = !attrib.IsEmpty();
+        if(generateCSVersion) glueVS << "#if HD_MTL_VERTEXSHADER\n";
         glueVS << input.dataType << " " << input.name << attrib << ";"  << "// Binding to [[buffer(" << vertexAttribsLocation << ")]]\n";
+        if(generateCSVersion) {
+            glueVS << "#else\n";
+            glueVS << input.dataType << " " << input.name << "; // *" << attrib << "* Binding to [[buffer(" << vertexAttribsLocation << ")]]\n";
+            glueVS << "#endif\n";
+            
+            //Add the attribute as a buffer input to the Compute function definition
+            glueCompute << ", " << input.dataType << " *" << input.name << "[[buffer(" << vertexAttribsLocation << ")]] // " << attrib << "\n";
+        }
+        copyInputsVtxStruct_Compute << ",   \n            " << input.name << "[__vertexIDs[i]]";
+        ////////////////////////////////////////////////////////
+        
         vertexAttribsLocation++;
     }
     glueVS << "};\n";
     
     //This binding for indices is not an necessarily a required binding. It's here so that
     //it propagates to the binding system and can be retrieved there. You don't have to bind it.
-    mslProgram->AddBinding("indices", 0, kMSL_BindingType_IndexBuffer, kMSL_ProgramStage_Vertex);
+    mslProgram->AddBinding("indices", vertexAttribsLocation, kMSL_BindingType_IndexBuffer, kMSL_ProgramStage_Vertex);
+    //Add it for ComputeVS. Increment vertexAttribsLocation (this means that in the VS the buffers are offset by 1,
+    //with 1 slot skipped, the indices)
+    glueCompute << ", uint indices[[buffer(" << vertexAttribsLocation++ << ")]]\n";
     
     /////////////////////////////////Uniform Buffer///////////////////////////////////
     
@@ -826,6 +861,8 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
         glueVS << "};\n";
 
         HdSt_CodeGenMSL::TParam in(TfToken("*" CODEGENMSL_VTXUNIFORMINPUTNAME), TfToken(CODEGENMSL_VTXUNIFORMSTRUCTNAME), TfToken(), TfToken(), HdSt_CodeGenMSL::TParam::Unspecified);
+        
+        copyInputsVtx_Compute <<   "            , " << CODEGENMSL_VTXUNIFORMINPUTNAME << "\n";
 
         in.usage |= HdSt_CodeGenMSL::TParam::EntryFuncArgument;
 
@@ -1001,19 +1038,26 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
     inputUniformBufferSize = ((byteOffset + 15) / 16) * 16;
     gluePS << "};\n";
     
-    glueVS << "vertex MSLVtxOutputs vertexEntryPoint(MSLVtxInputs input[[stage_in]]\n";
+    //Vertex Glue Function//
     
+    std::stringstream glueCVS;
+    glueVS << "#if HD_MTL_VERTEXSHADER\n";
+    glueVS << "vertex MSLVtxOutputs vertexEntryPoint(MSLVtxInputs input[[stage_in]]\n";
+    glueCVS << "#else\n";
+    glueCVS << "MSLVtxOutputs compute_vertexEntryPoint(MSLVtxInputs input //[[stage_in]]\n";
     // Uniform buffers must start after any allcoated for vertex attributes
     location = vertexAttribsLocation;
     int vtxUniformBufferSlot = 0;
     TF_FOR_ALL(it, _mslVSInputParams) {
         HdSt_CodeGenMSL::TParam const &input = *it;
         TfToken attrib;
+        bool useInCompute = true; //Used to remove things like vertexID etc.
         if (!(input.usage & HdSt_CodeGenMSL::TParam::EntryFuncArgument)) {
             continue;
         }
         if (!input.attribute.IsEmpty()) {
             attrib = input.attribute;
+            useInCompute = false;    //Any attribute other than [[buffer(X)]] can't be present in CVS sig.
         }
         else {
             std::string n;
@@ -1035,17 +1079,22 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
             attrib = TfToken(TfStringPrintf("[[buffer(%d)]]", location++));
         }
         glueVS << ", ";
+        glueCVS << ", ";
+        if(useInCompute) glueCompute << ", ";
         if (input.name.GetText()[0] == '*') {
             glueVS << "device const ";
+            glueCVS << "device const ";
         }
         if (input.usage & HdSt_CodeGenMSL::TParam::ProgramScope) {
             glueVS << "ProgramScope<st>::";
+            glueCVS << "ProgramScope<st>::";
         }
         glueVS << input.dataType << " " << input.name << attrib << "\n";
+        glueCVS << input.dataType << " " << input.name << " //" << attrib << "\n";
+        if(useInCompute) glueCompute << input.dataType << " " << input.name << attrib << "\n";
     }
     
-    ////////////////////////////FIX UP UNIFORM INDEX///////////////////////////
-    
+    //Create VS Input binding
     TF_FOR_ALL(it, _mslVSInputParams) {
         HdSt_CodeGenMSL::TParam const &input = *it;
         TfToken attrib;
@@ -1055,9 +1104,12 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
         mslProgram->AddBinding(name, vtxUniformBufferSlot, kMSL_BindingType_Uniform, kMSL_ProgramStage_Vertex);
     }
 
-    ///////////////////////////////////////////////////////////////////////////
+    glueCVS << ")\n"
+            << "#endif\n";
+    glueVS  << ")\n"
+            << glueCVS.str();
     
-    glueVS  << ") {\n"
+    glueVS  << "{\n"
             << "ProgramScope<st> scope;\n"
             << copyInputsVtx.str()
             << "scope.main();\n"
@@ -1065,6 +1117,44 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
             << copyOutputsVtx.str()
             << "return vtxOut;\n"
             << "}\n";
+    
+    //Compute Function Body
+    {
+        //TODO:
+        //  -   Add a way to get __baseVertex, this is built in for VS. Can't use setStageInRegion because we want to access more than 1 vertex
+        //  -   Add a way to get __instanceID
+        //  -   Add proper support for quads. Most code allows using N vertices per prim but there is no triangulation for quads etc.
+        //  -   Do we need to handle any additional vertex/index buffer data offsets in-shader? I don't think so?
+        
+        //NOTES:
+        //  -   Need to dispatch numPrimitives amount of threads.
+        //  -   Need to bind the index buffer to appropriate index.
+        
+        UInt32 numPointsPerPrimitive = 3;
+        glueVS  << "#if HD_MTL_COMPUTESHADER\n"
+                << glueCompute.str()
+                << "{\n"
+                << "    uint __baseIndexID = threadPositionInGrid * " << numPointsPerPrimitive << ";\n"
+                << "    uint __instanceID = 0" // <-- MTL_FIXME
+                << "    uint __vertexIDs[" << numPointsPerPrimitive << "];\n"
+                << "    for(uint i = 0; i < " << numPointsPerPrimitive << "; i++) __vertexIDs[i] = __baseVertex + indices[__baseIndexID + i];\n"
+                << "    for(uint i = 0; i < " << numPointsPerPrimitive << "; i++) {\n"
+                << "        uint gl_VertexID = __vertexIDs[i];\n"
+                << "        uint gl_InstanceID = __instanceID;\n"
+                << "        uint gl_BaseVertex = __baseVertex;\n"
+                << "        MSLVtxInputs vtxInputs = {//"
+                << copyInputsVtxStruct_Compute.str() << "\n"
+                << "        };\n"
+                << "        MSLVtxOutputs vsOutput = compute_vertexEntryPoint(vtxInputs\n"
+                << copyInputsVtx_Compute.str()
+                << "        );\n"
+                << "        //TODO: Write out vsOutput.\n"
+                << "    }\n"
+                << "}\n"
+                << "#endif";
+    }
+    
+    //Fragment Glue Function
     
     gluePS << "fragment MSLFragOutputs fragmentEntryPoint(MSLVtxOutputs vsInput[[stage_in]]\n"
            << ", device const MSLFragInputs *" CODEGENMSL_FRAGUNIFORMINPUTNAME "[[buffer(0)]]\n";
@@ -1637,7 +1727,7 @@ HdSt_CodeGenMSL::Compile()
     
     _GenerateGlue(glueVS, gluePS, mslProgram);
 
-    bool shaderCompiled = false;
+    bool shaderCompiled = true;
     // compile shaders
     // note: _vsSource, _fsSource etc are used for diagnostics (see header)
     if (hasVS) {
@@ -1645,39 +1735,34 @@ HdSt_CodeGenMSL::Compile()
         _vsSource = replaceStringAll(_vsSource, "<st>", "_Vert");
 
         if (!mslProgram->CompileShader(GL_VERTEX_SHADER, _vsSource)) {
-            return HdStProgramSharedPtr();
+            shaderCompiled = false;
         }
-        shaderCompiled = true;
     }
     if (hasFS) {
         _fsSource = fsConfigString.str() + _genCommon.str() + _genFS.str() + termination.str() + gluePS.str();
         _fsSource = replaceStringAll(_fsSource, "<st>", "_Frag");
 
         if (!mslProgram->CompileShader(GL_FRAGMENT_SHADER, _fsSource)) {
-            return HdStProgramSharedPtr();
+            shaderCompiled = false;
         }
-        shaderCompiled = true;
     }
     if (hasTCS) {
         _tcsSource = _genCommon.str() + _genTCS.str() + termination.str();
         if (!mslProgram->CompileShader(GL_TESS_CONTROL_SHADER, _tcsSource)) {
-            return HdStProgramSharedPtr();
+            shaderCompiled = false;
         }
-        shaderCompiled = true;
     }
     if (hasTES) {
         _tesSource = _genCommon.str() + _genTES.str() + termination.str();
         if (!mslProgram->CompileShader(GL_TESS_EVALUATION_SHADER, _tesSource)) {
-            return HdStProgramSharedPtr();
+            shaderCompiled = false;
         }
-        shaderCompiled = true;
     }
     if (hasGS) {
         _gsSource = gsConfigString.str() + _genCommon.str() + _genGS.str() + termination.str();
         if (!mslProgram->CompileShader(GL_GEOMETRY_SHADER, _gsSource)) {
-            return HdStProgramSharedPtr();
+            shaderCompiled = false;
         }
-        shaderCompiled = true;
     }
     
     if (!shaderCompiled) {
