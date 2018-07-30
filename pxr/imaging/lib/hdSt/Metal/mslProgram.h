@@ -49,6 +49,7 @@ enum MSL_BindingType
     kMSL_BindingType_Sampler         = (1 << 3),
     kMSL_BindingType_Uniform         = (1 << 4),
     kMSL_BindingType_UniformBuffer   = (1 << 5),
+    kMSL_BindingType_ComputeVSOutput = (1 << 6),
 };
 
 struct MSL_ShaderBinding
@@ -195,11 +196,18 @@ private:
     id<MTLFunction> _fragmentFunction;
     id<MTLFunction> _computeFunction;
     
+    //Compute Path
+    id<MTLFunction> _computeVertexFunction;     //Identical to _vertexFunction, just compiled with different entry-point
+    id<MTLFunction> _vertexPassThroughFunction; //Identical to _vertexFunction, just compiled with different entry-point
+    
     id<MTLRenderPipelineState> _pipelineState;
 	
     uint32 _vertexFunctionIdx;
     uint32 _fragmentFunctionIdx;
     uint32 _computeFunctionIdx;
+    
+    uint32 _computeVertexFunctionIdx;
+    uint32 _vertexPassThroughFunctionIdx;
 
     bool _valid;
     HdStResourceMetal  _uniformBuffer;
