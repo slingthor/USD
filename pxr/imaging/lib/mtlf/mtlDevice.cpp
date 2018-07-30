@@ -826,8 +826,8 @@ void MtlfMetalContext::SetPipelineState()
             numColourAttachments++;
             
             pipelineStateDescriptor.depthAttachmentPixelFormat = mtlDepthTexture.pixelFormat;
-            [renderEncoder setDepthStencilState:depthState];
         }
+        [renderEncoder setDepthStencilState:depthState];
         // Update colour attachments hash
         currentColourAttachmentsHash = HashColourAttachments();
     }

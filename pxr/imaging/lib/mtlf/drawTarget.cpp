@@ -258,7 +258,6 @@ MtlfDrawTarget::_BindAttachment( MtlfAttachmentRefPtr const & a )
 
     int attach = a->GetAttach();
 
-    GLenum attachment = GL_COLOR_ATTACHMENT0;
     if (a->GetFormat()==GL_DEPTH_COMPONENT || a->GetFormat()==GL_DEPTH_STENCIL) {
         MTLRenderPassDepthAttachmentDescriptor *depthAttachment = _mtlRenderPassDescriptor.depthAttachment;
         if (HasMSAA()) {
@@ -269,7 +268,7 @@ MtlfDrawTarget::_BindAttachment( MtlfAttachmentRefPtr const & a )
         
         // make sure to clear every frame for best performance
         depthAttachment.loadAction = MTLLoadActionClear;
-        depthAttachment.clearDepth = 0.0;
+        depthAttachment.clearDepth = 1.0f;
         
         // store only attachments that will be presented to the screen, as in this case
         depthAttachment.storeAction = MTLStoreActionStore;
@@ -286,6 +285,7 @@ MtlfDrawTarget::_BindAttachment( MtlfAttachmentRefPtr const & a )
             // make sure to clear every frame for best performance
             stencilAttachment.loadAction = MTLLoadActionClear;
             stencilAttachment.clearStencil = 0;
+            stencilAttachment.storeAction = MTLStoreActionStore;
         }
     } else {
         if (attach < 0) {
@@ -310,8 +310,7 @@ MtlfDrawTarget::_BindAttachment( MtlfAttachmentRefPtr const & a )
         
         // make sure to clear every frame for best performance
         colorAttachment.loadAction = MTLLoadActionClear;
-        colorAttachment.clearColor = MTLClearColorMake(1.0f, 0.25f, 0.25f, 1.0f);
-        colorAttachment.storeAction = MTLStoreActionStore;
+        colorAttachment.clearColor = MTLClearColorMake(1.0f, 1.0f, 1.0f, 1.0f);
     }
 }
 
@@ -359,10 +358,11 @@ MtlfDrawTarget::Unbind()
     if (--_bindDepth != 0) {
         return;
     }
-    
-    MtlfMetalContext::GetMetalContext()->SetDrawTarget(NULL);
 
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
+
+    context->SetDrawTarget(NULL);
+
     [context->renderEncoder endEncoding];
     
     id<MTLCommandBuffer> commandBuffer = context->commandBuffer;
@@ -370,6 +370,7 @@ MtlfDrawTarget::Unbind()
     
     [commandBuffer commit];
     context->commandBuffer = nil;
+    context->renderEncoder = nil;
 
     TouchContents();
 }
@@ -440,34 +441,27 @@ MtlfDrawTarget::GetImage(std::string const & name, void* buffer) const
     int height = [texture height];
     MTLPixelFormat mtlFormat = [texture pixelFormat];
     MTLBlitOption blitOptions = MTLBlitOptionNone;
-    if (mtlFormat == MTLPixelFormatDepth32Float || mtlFormat == MTLPixelFormatDepth32Float_Stencil8) {
-        mtlFormat = MTLPixelFormatR32Float;
-        bytesPerPixel = 4;
+    if (mtlFormat == MTLPixelFormatDepth32Float_Stencil8) {
+        mtlFormat = MTLPixelFormatDepth32Float;
         blitOptions = MTLBlitOptionDepthFromDepthStencil;
     }
     else if (mtlFormat == MTLPixelFormatDepth24Unorm_Stencil8) {
-        mtlFormat = MTLPixelFormatR32Uint; //MTL_FIXME - This might not be the right format for this texture 
+        mtlFormat = MTLPixelFormatR32Uint; //MTL_FIXME - This might not be the right format for this texture
         bytesPerPixel = 4;
         blitOptions = MTLBlitOptionDepthFromDepthStencil;
     }
+
+    if (mtlFormat == MTLPixelFormatDepth32Float) {
+        bytesPerPixel = 4;
+    }
     
     id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->device;
-    MTLTextureDescriptor* desc =
-        [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:mtlFormat
-                                                           width:width
-                                                          height:height
-                                                       mipmapped:NO];
-    //desc.usage = MTLTextureUsageRead;
-    desc.resourceOptions = MTLResourceStorageModeManaged;
-    id<MTLTexture> cpuTexture = [device newTextureWithDescriptor:desc];
-    
     id<MTLCommandBuffer> commandBuffer = [MtlfMetalContext::GetMetalContext()->commandQueue commandBuffer];
     id<MTLBlitCommandEncoder> blitEncoder = [commandBuffer blitCommandEncoder];
     
     id<MTLBuffer> cpuBuffer = [device newBufferWithLength:(bytesPerPixel * width * height) options:MTLResourceStorageModeManaged];
 
     [blitEncoder copyFromTexture:texture sourceSlice:0 sourceLevel:0 sourceOrigin:MTLOriginMake(0, 0, 0) sourceSize:MTLSizeMake(width, height, 1) toBuffer:cpuBuffer destinationOffset:0 destinationBytesPerRow:(bytesPerPixel * width) destinationBytesPerImage:(bytesPerPixel * width * height) options:blitOptions];
-    //[blitEncoder synchronizeTexture:cpuTexture slice:0 level:0];
     [blitEncoder synchronizeResource:cpuBuffer];
     [blitEncoder endEncoding];
 
@@ -475,6 +469,7 @@ MtlfDrawTarget::GetImage(std::string const & name, void* buffer) const
     [commandBuffer waitUntilCompleted];
 
     memcpy(buffer, [cpuBuffer contents], bytesPerPixel * width * height);
+    [cpuBuffer release];
 }
 
 bool
@@ -617,7 +612,7 @@ MtlfDrawTarget::MtlfAttachment::_GenTexture()
                 mtlFormat = MTLPixelFormatRGBA32Float;
             }
             else if (type == GL_UNSIGNED_BYTE) {
-                mtlFormat = MTLPixelFormatBGRA8Unorm;
+                mtlFormat = MTLPixelFormatRGBA8Unorm;
             }
             break;
 

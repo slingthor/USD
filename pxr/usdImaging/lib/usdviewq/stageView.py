@@ -49,6 +49,12 @@ from selectionDataModel import ALL_INSTANCES, SelectionDataModel
 from viewSettingsDataModel import ViewSettingsDataModel
 from freeCamera import FreeCamera
 
+if hasattr(QtCore.Qt, 'AA_EnableHighDpiScaling'):
+    QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling, True)
+
+if hasattr(QtCore.Qt, 'AA_UseHighDpiPixmaps'):
+    QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_UseHighDpiPixmaps, True)
+
 # A viewport rectangle to be used for GL must be integer values.
 # In order to loose the least amount of precision the viewport
 # is centered and adjusted to initially contain entirely the
@@ -1969,6 +1975,10 @@ class StageView(QtOpenGL.QGLWidget):
         if self._cropImageToCameraViewport:
             viewport = self.computeCameraViewport(cameraAspect)
 
+        # Correct for high DPI displays
+        x = x * self.devicePixelRatio()
+        y = y * self.devicePixelRatio()
+
         # normalize position and pick size by the viewport size
         point = Gf.Vec2d((x - viewport[0]) / float(viewport[2]),
                          (y - viewport[1]) / float(viewport[3]))
@@ -2023,6 +2033,10 @@ class StageView(QtOpenGL.QGLWidget):
                 selectedInstanceIndex = absInstanceIndex
         else:
             selectedInstanceIndex = ALL_INSTANCES
+
+        # Correct for high DPI displays
+        selectedPoint[0] = selectedPoint[0] / self.devicePixelRatio();
+        selectedPoint[1] = selectedPoint[1] / self.devicePixelRatio();
 
         if button:
             self.signalPrimSelected.emit(
