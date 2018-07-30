@@ -196,16 +196,17 @@ HdStMSLProgram::CompileShader(GLenum type,
     NSError *error = NULL;
     id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->device;
     
-    const bool enableComputeVS = false;
-    UInt32 numShaders = (enableComputeVS && type == GL_VERTEX_SHADER) ? 2 : 1;
+    const bool generateComputeVS = true;
+    UInt32 numShaders = (generateComputeVS && type == GL_VERTEX_SHADER) ? 3 : 1;
     bool success = true;
     for(UInt32 i = 0; i < numShaders; i++)
     {
-        GLenum compileType = (i == 0) ? type : GL_COMPUTE_SHADER;
-        
+        const bool buildingForComputeVSPath = i > 0;
+        const bool buildingPassThroughVS = i == 2;
+        GLenum compileType = buildingForComputeVSPath ? (buildingPassThroughVS ? GL_VERTEX_SHADER : GL_COMPUTE_SHADER): type;
         NSString *entryPoint = nil;
         switch (compileType) {
-        case GL_VERTEX_SHADER: shaderType = "Vertex Shader"; entryPoint = (enableComputeVS ? @"vertexPassThroughEntryPoint" : @"vertexEntryPoint"); break;
+        case GL_VERTEX_SHADER: shaderType = "Vertex Shader"; entryPoint = (buildingPassThroughVS ? @"vertexPassThroughEntryPoint" : @"vertexEntryPoint"); break;
         case GL_FRAGMENT_SHADER: shaderType = "Fragment Shader"; entryPoint = @"fragmentEntryPoint"; break;
         case GL_COMPUTE_SHADER: shaderType = "Compute Shader"; entryPoint = @"computeEntryPoint"; break;
         default: TF_FATAL_CODING_ERROR("Not allowed!");
@@ -244,14 +245,26 @@ HdStMSLProgram::CompileShader(GLenum type,
         DumpMetalSource([NSString stringWithUTF8String:shaderSource.c_str()], [NSString stringWithUTF8String:shaderType], error != nil ? [error localizedDescription] : nil); //MTL_FIXME
         
         if (compileType == GL_VERTEX_SHADER) {
-            _vertexFunction = function;
-            _vertexFunctionIdx = dumpedFileCount;
+            if(buildingPassThroughVS) {
+                _vertexPassThroughFunction = function;
+                _vertexPassThroughFunctionIdx = dumpedFileCount;
+            }
+            else {
+                _vertexFunction = function;
+                _vertexFunctionIdx = dumpedFileCount;
+            }
         } else if (compileType == GL_FRAGMENT_SHADER) {
             _fragmentFunction = function;
             _fragmentFunctionIdx = dumpedFileCount;
         } else if (compileType == GL_COMPUTE_SHADER) {
-            _computeFunction = function;
-            _computeFunctionIdx = dumpedFileCount;
+            if(buildingForComputeVSPath) {
+                _computeVertexFunction = function;
+                _computeVertexFunctionIdx = dumpedFileCount;
+            }
+            else {
+                _computeFunction = function;
+                _computeFunctionIdx = dumpedFileCount;
+            }
         }
         else {
             TF_FATAL_CODING_ERROR("Not Implemented");
