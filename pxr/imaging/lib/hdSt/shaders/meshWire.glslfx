@@ -173,9 +173,12 @@ void ApplySelectionFilter()
 -- glsl MeshWire.Fragment.FilterElementSelActive
 
 // Fwd decl methods used (from selection.glslfx)
-int GetActiveSelectionMode();
+#if !defined(ARCH_GFX_METAL)
+int GetRolloverSelectionMode();
 bool IsFaceSelected(int mode, int elementId);
 int GetElementID(); // code gen
+#endif
+
 
 void ApplySelectionFilter()
 {
@@ -188,9 +191,11 @@ void ApplySelectionFilter()
 -- glsl MeshWire.Fragment.FilterElementSelRollover
 
 // Fwd decl methods used (from selection.glslfx)
+#if !defined(ARCH_GFX_METAL)
 int GetRolloverSelectionMode();
 bool IsFaceSelected(int mode, int elementId);
 int GetElementID(); // code gen
+#endif
 
 void ApplySelectionFilter()
 {
@@ -280,8 +285,9 @@ vec4 ApplyEdgeColor(vec4 Cfill, vec4 patchCoord)
 
 --- --------------------------------------------------------------------------
 -- glsl MeshWire.Fragment.EdgeOnlyBlendColor
-
+#if !defined(ARCH_GFX_METAL)
 void ApplySelectionFilter();
+#endif
 
 vec4 ApplyEdgeColor(vec4 Cfill, vec4 patchCoord)
 {
@@ -302,8 +308,9 @@ vec4 ApplyEdgeColor(vec4 Cfill, vec4 patchCoord)
 
 --- --------------------------------------------------------------------------
 -- glsl MeshWire.Fragment.EdgeOnlyNoBlend
-
+#if !defined(ARCH_GFX_METAL)
 void ApplySelectionFilter();
+#endif
 
 vec4 ApplyEdgeColor(vec4 Cfill, vec4 patchCoord)
 {
@@ -338,8 +345,9 @@ vec4 ApplyEdgeColor(vec4 Cfill, vec4 patchCoord)
 
 --- --------------------------------------------------------------------------
 -- glsl MeshPatchWire.Fragment.EdgeOnly
-
+#if !defined(ARCH_GFX_METAL)
 void ApplySelectionFilter();
+#endif
 
 vec4 ApplyEdgeColor(vec4 Cfill, vec4 patchCoord)
 {
