@@ -506,6 +506,11 @@ HdxIntersector::Query(HdxIntersector::Params const& params,
     std::unique_ptr<unsigned char[]> pointId(new unsigned char[len*4]);
     std::unique_ptr<float[]> depths(new float[len]);
 
+    if (!usingOpenGLEngine) {
+        // Metal requires the draw target to be unbinded in order to capture from it
+        drawTarget->Unbind();
+    }
+
     drawTarget->GetImage("primId", &primId[0]);
     drawTarget->GetImage("instanceId", &instanceId[0]);
     drawTarget->GetImage("elementId", &elementId[0]);
@@ -526,14 +531,11 @@ HdxIntersector::Query(HdxIntersector::Params const& params,
             _index, params, viewport);
     }
 
-    drawTarget->Unbind();
+    if (usingOpenGLEngine) {
+        drawTarget->Unbind();
+    }
     GLF_POST_PENDING_GL_ERRORS();
-    /*
-    // Consume GL errors
-    int watchDogCount = 0;
-    GLenum error;
-    while ((watchDogCount++ < 256) && ((error = glGetError()) != GL_NO_ERROR)) {}
-*/
+
     return true;
 }
 
