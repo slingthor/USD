@@ -1812,6 +1812,9 @@ class StageView(QtOpenGL.QGLWidget):
         # initiated by this mouse-press
         self._dragActive = True
 
+        x = event.x() * self.devicePixelRatio()
+        y = event.y() * self.devicePixelRatio()
+
         if (event.modifiers() & QtCore.Qt.AltModifier):
             if event.button() == QtCore.Qt.LeftButton:
                 self.switchToFreeCamera()
@@ -1824,21 +1827,23 @@ class StageView(QtOpenGL.QGLWidget):
                 self._cameraMode = "zoom"
         else:
             self._cameraMode = "pick"
-            self.pickObject(event.x(), event.y(),
-                            event.button(), event.modifiers())
+            self.pickObject(x, y, event.button(), event.modifiers())
 
-        self._lastX = event.x()
-        self._lastY = event.y()
+        self._lastX = x
+        self._lastY = y
 
     def mouseReleaseEvent(self, event):
         self._cameraMode = "none"
         self._dragActive = False
 
-    def mouseMoveEvent(self, event ):
+    def mouseMoveEvent(self, event):
+
+        x = event.x() * self.devicePixelRatio()
+        y = event.y() * self.devicePixelRatio()
 
         if self._dragActive:
-            dx = event.x() - self._lastX
-            dy = event.y() - self._lastY
+            dx = x - self._lastX
+            dy = y - self._lastY
             if dx == 0 and dy == 0:
                 return
 
@@ -1858,8 +1863,8 @@ class StageView(QtOpenGL.QGLWidget):
                         -dx * pixelsToWorld, 
                          dy * pixelsToWorld)
 
-            self._lastX = event.x()
-            self._lastY = event.y()
+            self._lastX = x
+            self._lastY = y
             self.updateGL()
 
             self.signalMouseDrag.emit()
@@ -1867,7 +1872,7 @@ class StageView(QtOpenGL.QGLWidget):
             # Mouse tracking is only enabled when rolloverPicking is enabled,
             # and this function only gets called elsewise when mouse-tracking
             # is enabled
-            self.pickObject(event.x(), event.y(), None, event.modifiers())
+            self.pickObject(x, y, None, event.modifiers())
         else:
             event.ignore()
 
@@ -1975,10 +1980,6 @@ class StageView(QtOpenGL.QGLWidget):
         if self._cropImageToCameraViewport:
             viewport = self.computeCameraViewport(cameraAspect)
 
-        # Correct for high DPI displays
-        x = x * self.devicePixelRatio()
-        y = y * self.devicePixelRatio()
-
         # normalize position and pick size by the viewport size
         point = Gf.Vec2d((x - viewport[0]) / float(viewport[2]),
                          (y - viewport[1]) / float(viewport[3]))
@@ -2020,6 +2021,10 @@ class StageView(QtOpenGL.QGLWidget):
             selectedPoint, selectedPrimPath, selectedInstancerPath, \
             selectedInstanceIndex, selectedElementIndex = None, Sdf.Path.emptyPath, None, None, None
 
+        # Correct for high DPI displays
+        selectedPoint[0] = selectedPoint[0] / self.devicePixelRatio()
+        selectedPoint[1] = selectedPoint[1] / self.devicePixelRatio()
+
         # The call to TestIntersection will return the path to a master prim
         # (selectedPrimPath) and its instancer (selectedInstancerPath) if the prim is
         # instanced.
@@ -2033,10 +2038,6 @@ class StageView(QtOpenGL.QGLWidget):
                 selectedInstanceIndex = absInstanceIndex
         else:
             selectedInstanceIndex = ALL_INSTANCES
-
-        # Correct for high DPI displays
-        selectedPoint[0] = selectedPoint[0] / self.devicePixelRatio();
-        selectedPoint[1] = selectedPoint[1] / self.devicePixelRatio();
 
         if button:
             self.signalPrimSelected.emit(
