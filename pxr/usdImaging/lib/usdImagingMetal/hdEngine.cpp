@@ -538,7 +538,7 @@ UsdImagingMetalHdEngine::Render(const UsdPrim& root, RenderParams params)
 bool
 UsdImagingMetalHdEngine::TestIntersection(
     const GfMatrix4d &viewMatrix,
-    const GfMatrix4d &projectionMatrix,
+    const GfMatrix4d &inProjectionMatrix,
     const GfMatrix4d &worldToLocalSpace,
     const UsdPrim& root, 
     RenderParams params,
@@ -548,6 +548,20 @@ UsdImagingMetalHdEngine::TestIntersection(
     int *outHitInstanceIndex,
     int *outHitElementIndex)
 {
+    GfMatrix4d projectionMatrix;
+    static GfMatrix4d zTransform;
+    
+    // Transform from [-1, 1] to [0, 1] clip space
+    static bool _zTransformSet = false;
+    if (!_zTransformSet) {
+        _zTransformSet = true;
+        zTransform.SetIdentity();
+        zTransform.SetScale(GfVec3d(1.0, 1.0, 0.5));
+        zTransform.SetTranslateOnly(GfVec3d(0.0, 0.0, 0.5));
+    }
+    
+    projectionMatrix = inProjectionMatrix * zTransform;
+
     SdfPath rootPath = _delegate->GetPathForIndex(root.GetPath());
     SdfPathVector roots(1, rootPath);
     _UpdateHydraCollection(&_intersectCollection, roots, params, &_renderTags);
@@ -560,12 +574,22 @@ UsdImagingMetalHdEngine::TestIntersection(
     qparams.renderTags = _renderTags;
     qparams.cullStyle = HdCullStyleNothing;
 
-    if (!_taskController->TestIntersection(
-            &_engine,
-            _intersectCollection,
-            qparams,
-            HdxIntersectionModeTokens->nearest,
-            &allHits)) {
+    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
+    MTLCaptureManager *sharedCaptureManager = [MTLCaptureManager sharedCaptureManager];
+
+    //[sharedCaptureManager startCaptureWithScope:sharedCaptureManager.defaultCaptureScope];
+    [sharedCaptureManager.defaultCaptureScope beginScope];
+
+    bool success = _taskController->TestIntersection(
+         &_engine,
+         _intersectCollection,
+         qparams,
+         HdxIntersectionModeTokens->nearest,
+         &allHits);
+
+    [sharedCaptureManager.defaultCaptureScope endScope];
+
+    if (!success) {
         return false;
     }
 
@@ -599,7 +623,7 @@ UsdImagingMetalHdEngine::TestIntersection(
 bool
 UsdImagingMetalHdEngine::TestIntersectionBatch(
     const GfMatrix4d &viewMatrix,
-    const GfMatrix4d &projectionMatrix,
+    const GfMatrix4d &inProjectionMatrix,
     const GfMatrix4d &worldToLocalSpace,
     const SdfPathVector& paths, 
     RenderParams params,
@@ -607,6 +631,20 @@ UsdImagingMetalHdEngine::TestIntersectionBatch(
     PathTranslatorCallback pathTranslator,
     HitBatch *outHit)
 {
+    GfMatrix4d projectionMatrix;
+    static GfMatrix4d zTransform;
+    
+    // Transform from [-1, 1] to [0, 1] clip space
+    static bool _zTransformSet = false;
+    if (!_zTransformSet) {
+        _zTransformSet = true;
+        zTransform.SetIdentity();
+        zTransform.SetScale(GfVec3d(1.0, 1.0, 0.5));
+        zTransform.SetTranslateOnly(GfVec3d(0.0, 0.0, 0.5));
+    }
+    
+    projectionMatrix = inProjectionMatrix * zTransform;
+
     _UpdateHydraCollection(&_intersectCollection, paths, params, &_renderTags);
 
     static const HdCullStyle USD_2_HD_CULL_STYLE[] =
@@ -629,13 +667,23 @@ UsdImagingMetalHdEngine::TestIntersectionBatch(
     qparams.cullStyle = USD_2_HD_CULL_STYLE[params.cullStyle];
     qparams.renderTags = _renderTags;
 
+    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
+    MTLCaptureManager *sharedCaptureManager = [MTLCaptureManager sharedCaptureManager];
+    
+//    [sharedCaptureManager startCaptureWithScope:sharedCaptureManager.defaultCaptureScope];
+    [sharedCaptureManager.defaultCaptureScope beginScope];
+
     _taskController->SetPickResolution(pickResolution);
-    if (!_taskController->TestIntersection(
-            &_engine,
-            _intersectCollection,
-            qparams,
-            HdxIntersectionModeTokens->unique,
-            &allHits)) {
+    bool success = _taskController->TestIntersection(
+         &_engine,
+         _intersectCollection,
+         qparams,
+         HdxIntersectionModeTokens->unique,
+         &allHits);
+
+    [sharedCaptureManager.defaultCaptureScope endScope];
+
+    if (!success) {
         return false;
     }
 

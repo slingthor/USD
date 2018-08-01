@@ -305,6 +305,8 @@ HdxIntersector::Query(HdxIntersector::Params const& params,
         return false;
     }
 
+    bool usingOpenGLEngine = HdEngine::GetRenderAPI() == HdEngine::OpenGL;
+    
     GfVec2i size(_drawTarget->GetSize());
     GfVec4i viewport(0, 0, size[0], size[1]);
 
@@ -318,42 +320,46 @@ HdxIntersector::Query(HdxIntersector::Params const& params,
     drawTarget->CloneAttachments(_drawTarget);
     drawTarget->Bind();
 
-    //
-    // Setup GL raster state
-    //
-    // XXX: We should use the pickTarget param to bind only the attachments
-    // that are necessary. This should affect the shader code generated as well.
-    GLenum drawBuffers[5] = { GL_COLOR_ATTACHMENT0,
-                              GL_COLOR_ATTACHMENT1,
-                              GL_COLOR_ATTACHMENT2,
-                              GL_COLOR_ATTACHMENT3,
-                              GL_COLOR_ATTACHMENT4};
-    glDrawBuffers(5, drawBuffers);
-    
-    glDisable(GL_SAMPLE_ALPHA_TO_COVERAGE);
-    glDisable(GL_BLEND);
+    if (usingOpenGLEngine) {
+        //
+        // Setup GL raster state
+        //
+        // XXX: We should use the pickTarget param to bind only the attachments
+        // that are necessary. This should affect the shader code generated as well.
+        GLenum drawBuffers[5] = { GL_COLOR_ATTACHMENT0,
+                                  GL_COLOR_ATTACHMENT1,
+                                  GL_COLOR_ATTACHMENT2,
+                                  GL_COLOR_ATTACHMENT3,
+                                  GL_COLOR_ATTACHMENT4};
+        glDrawBuffers(5, drawBuffers);
+        
+        glDisable(GL_SAMPLE_ALPHA_TO_COVERAGE);
+        glDisable(GL_BLEND);
 
-    glEnable(GL_DEPTH_TEST);
-    glDepthMask(GL_TRUE);
-    glDepthFunc(GL_LEQUAL);
+        glEnable(GL_DEPTH_TEST);
+        glDepthMask(GL_TRUE);
+        glDepthFunc(GL_LEQUAL);
 
-    // Clear all color channels to 1, so when cast as int, an unwritten pixel
-    // is encoded as -1.
-    glClearColor(1,1,1,1);
-    glClearStencil(0);
-    glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT|GL_STENCIL_BUFFER_BIT);
+        // Clear all color channels to 1, so when cast as int, an unwritten pixel
+        // is encoded as -1.
+        glClearColor(1,1,1,1);
+        glClearStencil(0);
+        glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT|GL_STENCIL_BUFFER_BIT);
 
-    glViewport(viewport[0], viewport[1], viewport[2], viewport[3]);
+        glViewport(viewport[0], viewport[1], viewport[2], viewport[3]);
 
-    GLF_POST_PENDING_GL_ERRORS();
+        GLF_POST_PENDING_GL_ERRORS();
+    }
     
     //
     // Execute the picking pass
     //
     {
         GLuint vao;
-        glGenVertexArrays(1, &vao);
-        glBindVertexArray(vao);
+        if (usingOpenGLEngine) {
+            glGenVertexArrays(1, &vao);
+            glBindVertexArray(vao);
+        }
 
         bool needStencilConditioning = (params.depthMaskCallback != nullptr);
 
@@ -377,15 +383,18 @@ HdxIntersector::Query(HdxIntersector::Params const& params,
             state->SetLightingEnabled(false);
         }
 
-        //
-        // Enable conservative rasterization, if available.
-        //
-        // XXX: This wont work until it's in the Glew build.
-        bool convRstr = glewIsSupported("GL_NV_conservative_raster");
-        if (convRstr) {
-            // XXX: this should come from Glew
-            #define GL_CONSERVATIVE_RASTERIZATION_NV 0x9346
-            glEnable(GL_CONSERVATIVE_RASTERIZATION_NV);
+        bool convRstr = false;
+        if (usingOpenGLEngine) {
+            //
+            // Enable conservative rasterization, if available.
+            //
+            // XXX: This wont work until it's in the Glew build.
+            convRstr = glewIsSupported("GL_NV_conservative_raster");
+            if (convRstr) {
+                // XXX: this should come from Glew
+                #define GL_CONSERVATIVE_RASTERIZATION_NV 0x9346
+                glEnable(GL_CONSERVATIVE_RASTERIZATION_NV);
+            }
         }
 
         // XXX: Make HdxIntersector a task with multiple passes, instead of the
@@ -469,17 +478,19 @@ HdxIntersector::Query(HdxIntersector::Params const& params,
 
         engine->Execute(*_index, tasks);
 
-        glDisable(GL_STENCIL_TEST);
+        if (usingOpenGLEngine) {
+            glDisable(GL_STENCIL_TEST);
 
-        if (convRstr) {
-            // XXX: this should come from Glew
-            #define GL_CONSERVATIVE_RASTERIZATION_NV 0x9346
-            glDisable(GL_CONSERVATIVE_RASTERIZATION_NV);
+            if (convRstr) {
+                // XXX: this should come from Glew
+                #define GL_CONSERVATIVE_RASTERIZATION_NV 0x9346
+                glDisable(GL_CONSERVATIVE_RASTERIZATION_NV);
+            }
+
+            // Restore
+            glBindVertexArray(0);
+            glDeleteVertexArrays(1, &vao);
         }
-
-        // Restore
-        glBindVertexArray(0);
-        glDeleteVertexArrays(1, &vao);
     }
 
     GLF_POST_PENDING_GL_ERRORS();
@@ -495,6 +506,11 @@ HdxIntersector::Query(HdxIntersector::Params const& params,
     std::unique_ptr<unsigned char[]> pointId(new unsigned char[len*4]);
     std::unique_ptr<float[]> depths(new float[len]);
 
+    if (!usingOpenGLEngine) {
+        // Metal requires the draw target to be unbinded in order to capture from it
+        drawTarget->Unbind();
+    }
+
     drawTarget->GetImage("primId", &primId[0]);
     drawTarget->GetImage("instanceId", &instanceId[0]);
     drawTarget->GetImage("elementId", &elementId[0]);
@@ -502,9 +518,11 @@ HdxIntersector::Query(HdxIntersector::Params const& params,
     drawTarget->GetImage("pointId", &pointId[0]);
     drawTarget->GetImage("depth", &depths[0]);
 
-    glBindTexture(GL_TEXTURE_2D, 0);
+    if (usingOpenGLEngine) {
+        glBindTexture(GL_TEXTURE_2D, 0);
 
-    GLF_POST_PENDING_GL_ERRORS();
+        GLF_POST_PENDING_GL_ERRORS();
+    }
 
     if (result) {
         *result = HdxIntersector::Result(
@@ -513,7 +531,9 @@ HdxIntersector::Query(HdxIntersector::Params const& params,
             _index, params, viewport);
     }
 
-    drawTarget->Unbind();
+    if (usingOpenGLEngine) {
+        drawTarget->Unbind();
+    }
     GLF_POST_PENDING_GL_ERRORS();
 
     return true;

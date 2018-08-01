@@ -51,7 +51,11 @@ int GetNumSelectionHighlightModes()
 // ------  selection offset specifics -------
 // Note: This should match the selection offset encoding in
 // hdx/SelectionTracker.cpp
+#if defined(ARCH_GFX_METAL)
+void DecodeSelOffset(int selOffset, thread bool &isSelected, thread int &nextOffset)
+#else
 void DecodeSelOffset(int selOffset, out bool isSelected, out int nextOffset)
+#endif
 {
     isSelected = bool(selOffset & 0x1); // bit 0
     nextOffset = selOffset >> 1;        // bits 31:1
@@ -75,8 +79,13 @@ SubprimHeader DecodeSubprimHeader(int offset)
     return header;
 }
 
+#if defined(ARCH_GFX_METAL)
+bool IsSubprimSelected(int id, int min, int max, int headerStart,
+                       thread int &nextSubprimOffset)
+#else
 bool IsSubprimSelected(int id, int min, int max, int headerStart,
                        out int nextSubprimOffset)
+#endif
 {
     const int SUBPRIM_SELOFFSETS_HEADER_SIZE  = 3;
 
@@ -181,7 +190,11 @@ SubprimSelectionResult GetSubprimSel(int offset,
 }
 
 // --------- instance decoding ----------
+#if defined(ARCH_GFX_METAL)
+bool IsInstanceSelected(int offset, thread int &nextOffset)
+#else
 bool IsInstanceSelected(int offset, out int nextOffset)
+#endif
 {
     // if the prim doesn't have instances, we still want to check if any
     // subprim is highlighted.

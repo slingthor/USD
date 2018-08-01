@@ -354,6 +354,8 @@ MtlfMetalContext::MtlfMetalContext() : queueSyncEventCounter(0), computeVSOutput
     cvret = CVOpenGLTextureCacheCreate(kCFAllocatorDefault, nil, (__bridge CGLContextObj _Nonnull)(glctx), glPixelFormat, nil, &cvglTextureCache);
     assert(cvret == kCVReturnSuccess);
     
+    glColorTexture = 0;
+    glDepthTexture = 0;
     AllocateAttachments(256, 256);
 
     pipelineStateDescriptor = nil;
@@ -366,6 +368,12 @@ MtlfMetalContext::MtlfMetalContext() : queueSyncEventCounter(0), computeVSOutput
 
 MtlfMetalContext::~MtlfMetalContext()
 {
+    if (glColorTexture) {
+        glDeleteTextures(1, &glColorTexture);
+    }
+    if (glDepthTexture) {
+        glDeleteTextures(1, &glDepthTexture);
+    }
 }
 
 void MtlfMetalContext::AllocateAttachments(int width, int height)
@@ -395,12 +403,19 @@ void MtlfMetalContext::AllocateAttachments(int width, int height)
                                                                 nil, &cvglTexture);
     assert(cvret == kCVReturnSuccess);
 
+    if (glColorTexture) {
+        glDeleteTextures(1, &glColorTexture);
+    }
     glColorTexture = CVOpenGLTextureGetName(cvglTexture);
     
     cvret = CVOpenGLTextureCacheCreateTextureFromImage(kCFAllocatorDefault, cvglTextureCache,
                                                        depthBuffer,
                                                        nil, &cvglTexture);
     assert(cvret == kCVReturnSuccess);
+    
+    if (glDepthTexture) {
+        glDeleteTextures(1, &glDepthTexture);
+    }
     glDepthTexture = CVOpenGLTextureGetName(cvglTexture);
     
     cvret = CVMetalTextureCacheCreateTextureFromImage(kCFAllocatorDefault, cvmtlTextureCache,
@@ -876,8 +891,8 @@ void MtlfMetalContext::SetPipelineState()
             numColourAttachments++;
             
             pipelineStateDescriptor.depthAttachmentPixelFormat = mtlDepthTexture.pixelFormat;
-            [renderEncoder setDepthStencilState:depthState];
         }
+        [renderEncoder setDepthStencilState:depthState];
         // Update colour attachments hash
         currentColourAttachmentsHash = HashColourAttachments();
     }
