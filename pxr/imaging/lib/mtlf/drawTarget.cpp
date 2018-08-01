@@ -363,14 +363,12 @@ MtlfDrawTarget::Unbind()
     MtlfMetalContext::GetMetalContext()->SetDrawTarget(NULL);
 
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
-    [context->renderEncoder endEncoding];
+    context->EndEncoding();
+    context->Commit();
     
-    id<MTLCommandBuffer> commandBuffer = context->commandBuffer;
-    TF_VERIFY(commandBuffer != nil, "No active command buffer");
-    
-    [commandBuffer commit];
     context->commandBuffer = nil;
-
+    context->computeCommandBuffer = nil;
+    
     TouchContents();
 }
 

@@ -145,13 +145,13 @@ HdSt_CodeGenMSL::TParam::Usage operator|=(HdSt_CodeGenMSL::TParam::Usage &lhs,
 
 HdSt_CodeGenMSL::HdSt_CodeGenMSL(HdSt_GeometricShaderPtr const &geometricShader,
                              HdStShaderCodeSharedPtrVector const &shaders)
-    : _geometricShader(geometricShader), _shaders(shaders)
+    : _geometricShader(geometricShader), _shaders(shaders), _mslVSOutputStructSize(0)
 {
     TF_VERIFY(geometricShader);
 }
 
 HdSt_CodeGenMSL::HdSt_CodeGenMSL(HdStShaderCodeSharedPtrVector const &shaders)
-    : _geometricShader(), _shaders(shaders)
+    : _geometricShader(), _shaders(shaders), _mslVSOutputStructSize(0)
 {
 }
 
@@ -717,6 +717,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
     copyOutputsFrag.str("");
     
     glueCommon << "struct MSLVtxOutputs {\n";
+    uint32 vtxOutputStructSize = 0;
     TF_FOR_ALL(it, _mslVSOutputParams) {
         HdSt_CodeGenMSL::TParam const &output = *it;
         
@@ -736,7 +737,23 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
         else {
             copyOutputsVtx << output.accessorStr << ";\n";
         }
+        
+        //Update struct size + apply alignment rules
+        const std::string dataTypeStr = output.dataType.GetString();
+        uint32 size = 4;
+        if(dataTypeStr.find("mat") != std::string::npos) TF_FATAL_CODING_ERROR("Not implemented!");
+        else if(dataTypeStr.find("2") != std::string::npos) size = 8;
+        else if(dataTypeStr.find("3") != std::string::npos) size = 12;
+        else if(dataTypeStr.find("4") != std::string::npos) size = 16;
+        uint32 regStart = vtxOutputStructSize / 16;
+        uint32 regEnd = (vtxOutputStructSize + size - 1) / 16;
+        if(regStart != regEnd && vtxOutputStructSize % 16 != 0) vtxOutputStructSize += 16 - (vtxOutputStructSize % 16);
+
+        vtxOutputStructSize += size;
     }
+    //Round up size of uniform buffer to next 16 byte boundary.
+    vtxOutputStructSize = ((vtxOutputStructSize + 15) / 16) * 16;
+    _mslVSOutputStructSize = vtxOutputStructSize;
     glueCommon << "};\n";
     
     glueVS << glueCommon.str();
@@ -1136,15 +1153,18 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
         //NOTE: We don't know exactly which verts are going to be used in the call. We also don't yet have a mechanism to prevent processing the same
         //vertex multiple times. For now, this means not expanding data is almost as costly as expanding it apart from reduced memory requirements.
         
-        //Add a binding for the Vertex output generated in compute
+        //Add a binding for the Vertex output generated in compute, and a binding for compute argument buffer
+        const UInt32 computeVSArgSlot = location++;
         const UInt32 computeVSOutputSlot = location++;
+        mslProgram->AddBinding("computeVSArg", computeVSArgSlot, kMSL_BindingType_ComputeVSArg, kMSL_ProgramStage_Compute);
         mslProgram->AddBinding("computeVSOutput", computeVSOutputSlot, kMSL_BindingType_ComputeVSOutput, kMSL_ProgramStage_Compute);
-        
         //Generate the compute shader that calls the vertex shader code and outputs the vertices.
         UInt32 numVerticesPerThread = 3;
         glueVS  << "#if HD_MTL_COMPUTESHADER\n"
+                << "struct MSLComputeVSArgs { uint indexCount, firstIndex, baseVertex; };"
                 << glueCompute.str()
-                << "\n    , device MSLVtxOutputs *computeVSOutput[[buffer(" << computeVSOutputSlot << ")]])\n"
+                << "\n    , device MSLComputeVSArgs *computeVSArg[[buffer(" << computeVSArgSlot << ")]]\n"
+                << "    , device MSLVtxOutputs *computeVSOutput[[buffer(" << computeVSOutputSlot << ")]])\n"
                 << "{\n"
                 << "    uint __baseIndexID = threadPositionInGrid * " << numVerticesPerThread << ";\n"
                 << "    uint __instanceID = 0;\n" // <-- MTL_FIXME
@@ -1778,6 +1798,7 @@ HdSt_CodeGenMSL::Compile()
         if (!mslProgram->CompileShader(GL_VERTEX_SHADER, _vsSource)) {
             shaderCompiled = false;
         }
+        mslProgram->SetVertexOutputStructSize(_mslVSOutputStructSize);
     }
     if (hasFS) {
         _fsSource = fsConfigString.str() + _genCommon.str() + _genFS.str() + termination.str() + gluePS.str();
