@@ -824,6 +824,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
     //This binding for indices is not an necessarily a required binding. It's here so that
     //it propagates to the binding system and can be retrieved there. You don't have to bind it.
     mslProgram->AddBinding("indices", vertexAttribsLocation, kMSL_BindingType_IndexBuffer, kMSL_ProgramStage_Vertex);
+    mslProgram->AddBinding("indices", vertexAttribsLocation, kMSL_BindingType_IndexBuffer, kMSL_ProgramStage_Compute);
     //Add it for ComputeVS. Increment vertexAttribsLocation (this means that in the VS the buffers are offset by 1,
     //with 1 slot skipped, the indices)
     glueCompute << "\n    , device const uint *indices[[buffer(" << vertexAttribsLocation++ << ")]]";
@@ -1161,14 +1162,18 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
         //Generate the compute shader that calls the vertex shader code and outputs the vertices.
         UInt32 numVerticesPerThread = 3;
         glueVS  << "#if HD_MTL_COMPUTESHADER\n"
-                << "struct MSLComputeVSArgs { uint indexCount, firstIndex, baseVertex; };"
+                << "#define vec2 packed_float2\n"
+                << "#define vec3 packed_float3\n"
+                << "struct MSLComputeVSArgs { uint indexCount, baseVertex; };"
                 << glueCompute.str()
-                << "\n    , device MSLComputeVSArgs *computeVSArg[[buffer(" << computeVSArgSlot << ")]]\n"
+                << "\n    , device const MSLComputeVSArgs *computeVSArg[[buffer(" << computeVSArgSlot << ")]]\n"
                 << "    , device MSLVtxOutputs *computeVSOutput[[buffer(" << computeVSOutputSlot << ")]])\n"
                 << "{\n"
+                << "#undef vec3\n"
+                << "#undef vec2\n"
                 << "    uint __baseIndexID = threadPositionInGrid * " << numVerticesPerThread << ";\n"
-                << "    uint __instanceID = 0;\n" // <-- MTL_FIXME
-                << "    uint __baseVertex = 0;\n" // <-- MTL_FIXME
+                << "    uint __instanceID = __baseIndexID % computeVSArg[0].indexCount;\n" // <-- MTL_FIXME
+                << "    uint __baseVertex = computeVSArg[0].baseVertex;\n" // <-- MTL_FIXME
                 << "\n"
                 << "    uint __vertexIDs[" << numVerticesPerThread << "];\n"
                 << "    for(uint i = 0; i < " << numVerticesPerThread << "; i++) {\n"
@@ -1204,9 +1209,9 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
                 << "                             device const uint *indices[[buffer(0)]],\n"
                 << "                             device const MSLVtxOutputs *cvsData[[buffer(1)]]) {\n";
         if(expandVertexData)
-            glueVS << "    uint cvsDataIndex = indices[vertexID];\n";  //If this path is chosen you can't use indexed draws, need to fetch indices manually. vertex_id is just an incrementing counter in that case.
+            glueVS << "    uint cvsDataIndex = vertexID;\n";
         else
-            glueVS << "    uint cvsDataIndex = vertexID;\n"; //Can use regular indexed draws
+            glueVS << "    uint cvsDataIndex = indices[vertexID];\n";
         glueVS  << "    return cvsData[cvsDataIndex];\n"
                 << "}\n"
                 << "#endif //HD_MTL_VERTEXSHADER\n";

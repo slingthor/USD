@@ -222,6 +222,7 @@ private:
     bool _enableComputeVSPath;
     int _computeVSOutputSlot;
     int _computeVSArgSlot;
+    int _computeVSIndexSlot;
     int _vtxOutputStructSize;
 };
 

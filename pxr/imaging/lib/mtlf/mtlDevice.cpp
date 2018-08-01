@@ -522,6 +522,7 @@ id<MTLCommandBuffer> MtlfMetalContext::CreateCommandBuffer() {
 }
 
 id<MTLRenderCommandEncoder> MtlfMetalContext::CreateRenderEncoder(MTLRenderPassDescriptor *renderPassDescriptor) {
+    [commandBuffer encodeWaitForEvent:queueSyncEvent value:++queueSyncEventCounter];
     renderEncoder = [commandBuffer renderCommandEncoderWithDescriptor:renderPassDescriptor];
     computeEncoder = [computeCommandBuffer computeCommandEncoderWithDispatchType:MTLDispatchTypeSerial];
 
@@ -544,8 +545,7 @@ void MtlfMetalContext::EndEncoding()
     
     [computeEncoder endEncoding];
     [renderEncoder endEncoding];
-    [computeCommandBuffer encodeSignalEvent:queueSyncEvent value:++queueSyncEventCounter];
-    [commandBuffer encodeWaitForEvent:queueSyncEvent value:queueSyncEventCounter];
+    [computeCommandBuffer encodeSignalEvent:queueSyncEvent value:queueSyncEventCounter];
     
     isEncoding = false;
 }
@@ -631,13 +631,16 @@ void MtlfMetalContext::SetVertexAttribute(uint32_t index,
     dirtyState |= DIRTY_METAL_STATE_VERTEX_DESCRIPTOR;
 }
 
-void MtlfMetalContext::SetupComputeVS(  UInt32 indexCount, UInt32 startIndex, UInt32 baseVertex, UInt32 vertexOutputStructSize,
-                                        UInt32 argumentBufferSlot, UInt32 outputBufferSlot)
+void MtlfMetalContext::SetupComputeVS( UInt32 indexBufferSlot, id<MTLBuffer> indexBuffer, UInt32 indexCount, UInt32 startIndex, UInt32 baseVertex,
+                                       UInt32 vertexOutputStructSize, UInt32 argumentBufferSlot, UInt32 outputBufferSlot)
 {
     if(!usingComputeVS)
         TF_FATAL_CODING_ERROR("SetupComputeVS being called without having supplied a CS");
 
-    struct { UInt32 _indexCount, _startIndex, _baseVertex; } arguments = { indexCount, startIndex, baseVertex };
+    [computeEncoder setBuffer:indexBuffer offset:(startIndex * sizeof(UInt32)) atIndex:indexBufferSlot];
+    computePipelineStateDescriptor.buffers[indexBufferSlot].mutability = MTLMutabilityImmutable;
+
+    struct { UInt32 _indexCount, _baseVertex; } arguments = { indexCount, baseVertex };
     [computeEncoder setBytes:(const void*)&arguments length:sizeof(arguments) atIndex:argumentBufferSlot];
     computePipelineStateDescriptor.buffers[argumentBufferSlot].mutability = MTLMutabilityImmutable;
     
@@ -647,12 +650,15 @@ void MtlfMetalContext::SetupComputeVS(  UInt32 indexCount, UInt32 startIndex, UI
         TF_FATAL_CODING_ERROR("Too large!");
     if(bufferSize - computeVSOutputCurrentOffset < requiredSize) {
         computeVSOutputCurrentIdx++;
-        if(computeVSOutputCurrentIdx >= computeVSOutputBuffers.size())
-            computeVSOutputBuffers.push_back([device newBufferWithLength:bufferSize options:MTLResourceStorageModePrivate|MTLResourceOptionCPUCacheModeDefault]);
+        computeVSOutputCurrentOffset = 0;
     }
+    if(computeVSOutputCurrentIdx >= computeVSOutputBuffers.size())
+        computeVSOutputBuffers.push_back([device newBufferWithLength:bufferSize options:MTLResourceStorageModePrivate|MTLResourceOptionCPUCacheModeDefault]);
     id<MTLBuffer> outputBuffer = computeVSOutputBuffers[computeVSOutputCurrentIdx];
     [computeEncoder setBuffer:outputBuffer offset:computeVSOutputCurrentOffset atIndex:outputBufferSlot];
     computePipelineStateDescriptor.buffers[outputBufferSlot].mutability = MTLMutabilityMutable;
+    [renderEncoder setVertexBuffer:indexBuffer offset:(startIndex * sizeof(UInt32)) atIndex:0];
+    [renderEncoder setVertexBuffer:outputBuffer offset:computeVSOutputCurrentOffset atIndex:1];
     computeVSOutputCurrentOffset += vertexOutputStructSize * indexCount;
 }
 

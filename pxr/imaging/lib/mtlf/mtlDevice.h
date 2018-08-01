@@ -116,7 +116,7 @@ public:
                             const TfToken& name);
     
     MTLF_API
-    void SetupComputeVS(UInt32 indexCount, UInt32 startIndex, UInt32 baseVertex, UInt32 vertexOutputStructSize, UInt32 argumentBufferSlot, UInt32 outputBufferSlot);
+    void SetupComputeVS(UInt32 indexBufferSlot, id<MTLBuffer> indexBuffer, UInt32 indexCount, UInt32 startIndex, UInt32 baseVertex, UInt32 vertexOutputStructSize, UInt32 argumentBufferSlot, UInt32 outputBufferSlot);
     
     MTLF_API
     void SetUniform(const void* _data, uint32 _dataSize, const TfToken& _name, uint32 index, MSL_ProgramStage stage);

@@ -117,9 +117,10 @@ HdStMSLProgram::HdStMSLProgram(TfToken const &role)
 , _vertexFunctionIdx(0), _fragmentFunctionIdx(0), _computeFunctionIdx(0)
 , _valid(false)
 , _uniformBuffer(role)
-, _enableComputeVSPath(false)
+, _enableComputeVSPath(true)
 , _computeVSOutputSlot(-1)
 , _computeVSArgSlot(-1)
+, _computeVSIndexSlot(-1)
 {
 }
 
@@ -312,11 +313,13 @@ HdStMSLProgram::Link()
         _uniformBuffer.SetAllocation(uniformBuffer, defaultLength);
     }
     
-    if(_enableComputeVSPath && (_computeVSOutputSlot == -1 || _computeVSArgSlot == -1)) {
+    if(_enableComputeVSPath && (_computeVSOutputSlot == -1 || _computeVSArgSlot == -1 || _computeVSIndexSlot == -1)) {
         for(UInt32 i = 0; i < _bindings.size(); i++) {
             const MSL_ShaderBinding& binding = _bindings[i];
+            if(binding._stage != kMSL_ProgramStage_Compute) continue;
             if(binding._type == kMSL_BindingType_ComputeVSOutput) _computeVSOutputSlot = binding._index;
             if(binding._type == kMSL_BindingType_ComputeVSArg) _computeVSArgSlot = binding._index;
+            if(binding._type == kMSL_BindingType_IndexBuffer) _computeVSIndexSlot = binding._index;
         }
     }
 
@@ -473,13 +476,6 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
     MTLPrimitiveType primType = GetMetalPrimType(primitiveMode);
     bool bDrawingQuads = (primitiveMode == GL_LINES_ADJACENCY);
     
-    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
-    
-    if(_enableComputeVSPath)
-        context->SetupComputeVS(indexCount, bDrawingQuads ? ((firstIndex/4)*6) : firstIndex, baseVertex, _vtxOutputStructSize, _computeVSArgSlot, _computeVSOutputSlot);
-    
-    const_cast<HdStMSLProgram*>(this)->BakeState();
-    
     MTLIndexType indexTypeMetal;
     int indexSize;
     switch(indexType) {
@@ -495,6 +491,21 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
             indexSize = sizeof(uint32_t);
             break;
     }
+    
+    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
+    
+    if(_enableComputeVSPath) {
+        context->SetupComputeVS(_computeVSIndexSlot,
+                                bDrawingQuads ? context->GetQuadIndexBuffer(indexTypeMetal) : context->GetIndexBuffer(),
+                                indexCount,
+                                bDrawingQuads ? ((firstIndex/4)*6) : firstIndex,
+                                baseVertex,
+                                _vtxOutputStructSize,
+                                _computeVSArgSlot,
+                                _computeVSOutputSlot);
+    }
+
+    const_cast<HdStMSLProgram*>(this)->BakeState();
 
     if (bDrawingQuads) {
         if(_enableComputeVSPath)
