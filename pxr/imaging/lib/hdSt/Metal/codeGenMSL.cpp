@@ -803,6 +803,9 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
             attrib = TfToken(TfStringPrintf("[[attribute(%d)]]", vertexAttribsLocation));
 
         ////////////////////////////////////////////////////////
+        
+        const bool isPackedNormals = input.name == HdTokens->packedNormals; //MTL_FIXME: A horrible hack to fix loading packedNormals, we should consider StageIn but that would mean we can't do VS and GS in a single pass....
+        
         bool generateCSVersion = !attrib.IsEmpty();
         if(generateCSVersion) glueVS << "#if HD_MTL_VERTEXSHADER\n";
         glueVS << input.dataType << " " << input.name << attrib << ";"  << "// Binding to [[buffer(" << vertexAttribsLocation << ")]]\n";
@@ -812,9 +815,17 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
             glueVS << "#endif\n";
             
             //Add the attribute as a buffer input to the Compute function definition
-            glueCompute << "\n    , device const " << input.dataType << " *" << input.name << "[[buffer(" << vertexAttribsLocation << ")]] // " << attrib;
+            glueCompute << "\n    , device const ";
+            if(isPackedNormals)
+                glueCompute << "uint";
+            else
+                glueCompute << input.dataType;
+            glueCompute << " *" << input.name << "[[buffer(" << vertexAttribsLocation << ")]] // " << attrib;
         }
-        copyInputsVtxStruct_Compute << ",   \n            " << input.name << "[__vertexIDs[i]]";
+        if(isPackedNormals)
+            copyInputsVtxStruct_Compute << ",   \n            normalize(unpack_unorm10a2_to_float(" << input.name << "[__vertexIDs[i]]) * 2.0 - 1.0)";
+        else
+            copyInputsVtxStruct_Compute << ",   \n            " << input.name << "[__vertexIDs[i]]";
         ////////////////////////////////////////////////////////
         
         vertexAttribsLocation++;
@@ -1169,7 +1180,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
                 << "\n    , device const MSLComputeVSArgs *computeVSArg[[buffer(" << computeVSArgSlot << ")]]\n"
                 << "    , device MSLVtxOutputs *computeVSOutput[[buffer(" << computeVSOutputSlot << ")]])\n"
                 << "{\n"
-                << "#undef vec3\n"
+                << "#undef vec3\n"  //Need to be a bit careful, vec3 used to be degined as float3 before this.
                 << "#undef vec2\n"
                 << "    uint __baseIndexID = threadPositionInGrid * " << numVerticesPerThread << ";\n"
                 << "    uint __instanceID = __baseIndexID % computeVSArg[0].indexCount;\n" // <-- MTL_FIXME
@@ -1340,6 +1351,7 @@ HdSt_CodeGenMSL::Compile()
     
     _genCommon  << "#include <metal_stdlib>\n"
                 << "#include <simd/simd.h>\n"
+                << "#include <metal_pack>\n"
                 << "using namespace metal;\n";
     
     _genCommon  << "#define double float\n"

@@ -855,12 +855,15 @@ void MtlfMetalContext::SetPipelineState()
     pipelineStateDescriptor.tessellationOutputWindingOrder    = MTLWindingCounterClockwise;
     pipelineStateDescriptor.tessellationPartitionMode         = MTLTessellationPartitionModePow2;
 #endif
-    
-    if (dirtyState & DIRTY_METAL_STATE_VERTEX_DESCRIPTOR || pipelineStateDescriptor.vertexDescriptor == NULL) {
-        // This assignment can be expensive as the vertexdescriptor will be copied (due to interface property)
-        pipelineStateDescriptor.vertexDescriptor = vertexDescriptor;
-        // Update vertex descriptor hash
-        currentVertexDescriptorHash = HashVertexDescriptor();
+    if (usingComputeVS)
+        pipelineStateDescriptor.vertexDescriptor = nil;
+    else {
+        if (dirtyState & DIRTY_METAL_STATE_VERTEX_DESCRIPTOR || pipelineStateDescriptor.vertexDescriptor == NULL) {
+            // This assignment can be expensive as the vertexdescriptor will be copied (due to interface property)
+            pipelineStateDescriptor.vertexDescriptor = vertexDescriptor;
+            // Update vertex descriptor hash
+            currentVertexDescriptorHash = HashVertexDescriptor();
+        }
     }
     
     if (dirtyState & DIRTY_METAL_STATE_DRAW_TARGET) {
