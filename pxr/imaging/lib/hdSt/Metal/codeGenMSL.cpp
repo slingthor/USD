@@ -823,7 +823,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
             glueCompute << " *" << input.name << "[[buffer(" << vertexAttribsLocation << ")]] // " << attrib;
         }
         if(isPackedNormals)
-            copyInputsVtxStruct_Compute << ",   \n            normalize(unpack_unorm10a2_to_float(" << input.name << "[__vertexIDs[i]]) * 2.0 - 1.0)";
+            copyInputsVtxStruct_Compute << ",   \n            float4(Unpack10_10_10_2_ToVec3(" << input.name << "[__vertexIDs[i]]), 0.0)";
         else
             copyInputsVtxStruct_Compute << ",   \n            " << input.name << "[__vertexIDs[i]]";
         ////////////////////////////////////////////////////////
@@ -1173,6 +1173,10 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
         //Generate the compute shader that calls the vertex shader code and outputs the vertices.
         UInt32 numVerticesPerThread = 3;
         glueVS  << "#if HD_MTL_COMPUTESHADER\n"
+                << "vec3 Unpack10_10_10_2_ToVec3(uint u_packedNormal) {\n"
+                << "    int i_packedNormal = *(thread int*)&u_packedNormal;\n"
+                << "    return vec3(i_packedNormal & 0x3FF, (i_packedNormal >> 10) & 0x3FF,(i_packedNormal >> 20) & 0x3FF) / 511.0;\n"
+                << "}\n"
                 << "#define vec2 packed_float2\n"
                 << "#define vec3 packed_float3\n"
                 << "struct MSLComputeVSArgs { uint indexCount, baseVertex; };"
