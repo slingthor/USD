@@ -50,6 +50,7 @@ enum MSL_BindingType
     kMSL_BindingType_Uniform         = (1 << 4),
     kMSL_BindingType_UniformBuffer   = (1 << 5),
     kMSL_BindingType_ComputeVSOutput = (1 << 6),
+    kMSL_BindingType_ComputeVSArg    = (1 << 7),
 };
 
 struct MSL_ShaderBinding
@@ -172,13 +173,18 @@ public:
     id<MTLFunction> GetComputeFunction() const {
         return _computeFunction;
     }
+    
+    HDST_API
+    void SetVertexOutputStructSize(int vertexOutputStructSize) {
+        _vtxOutputStructSize = vertexOutputStructSize;
+    }
 protected:
     HDST_API
     void BakeState();
 
 private:
     TfToken const _role;
-
+    
     id<MTLFunction> _vertexFunction;
     id<MTLFunction> _fragmentFunction;
     id<MTLFunction> _computeFunction;
@@ -200,6 +206,11 @@ private:
     HdStResourceMetal  _uniformBuffer;
     MSL_ShaderBindings _bindings;
     BindingLocationMap _locationMap;
+    bool _enableComputeVSPath;
+    int _computeVSOutputSlot;
+    int _computeVSArgSlot;
+    int _computeVSIndexSlot;
+    int _vtxOutputStructSize;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

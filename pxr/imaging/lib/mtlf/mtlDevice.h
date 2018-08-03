@@ -96,10 +96,16 @@ public:
     id<MTLRenderCommandEncoder> CreateRenderEncoder(MTLRenderPassDescriptor *renderPassDescriptor);
     
     MTLF_API
+    void EndEncoding();
+    
+    MTLF_API
+    void Commit();
+    
+    MTLF_API
     void SetDrawTarget(MtlfDrawTarget *drawTarget);
     
     MTLF_API
-    void SetShadingPrograms(id<MTLFunction> vertexFunction, id<MTLFunction> fragmentFunction);
+    void SetShadingPrograms(id<MTLFunction> vertexFunction, id<MTLFunction> fragmentFunction, id<MTLFunction> computeVSFunction = NULL);
     
     MTLF_API
     void SetVertexAttribute(uint32_t index,
@@ -108,6 +114,9 @@ public:
                             size_t stride,
                             uint32_t offset,
                             const TfToken& name);
+    
+    MTLF_API
+    void SetupComputeVS(UInt32 indexBufferSlot, id<MTLBuffer> indexBuffer, UInt32 indexCount, UInt32 startIndex, UInt32 baseVertex, UInt32 vertexOutputStructSize, UInt32 argumentBufferSlot, UInt32 outputBufferSlot);
     
     MTLF_API
     void SetUniform(const void* _data, uint32 _dataSize, const TfToken& _name, uint32 index, MSL_ProgramStage stage);
@@ -143,6 +152,11 @@ public:
     id<MTLCommandQueue> commandQueue;
     id<MTLCommandBuffer> commandBuffer;
     id<MTLRenderCommandEncoder> renderEncoder;
+    id<MTLCommandQueue> computeCommandQueue;
+    id<MTLCommandBuffer> computeCommandBuffer;
+    id<MTLComputeCommandEncoder> computeEncoder;
+    id<MTLEvent> queueSyncEvent;
+    uint32_t queueSyncEventCounter;
 
     id<MTLLibrary> defaultLibrary;
     id<MTLRenderPipelineState> pipelineState;
@@ -151,6 +165,11 @@ public:
 	id<MTLTexture> mtlDepthTexture;
     id<MTLTexture> mtlDepthRegularFloatTexture;
     id<MTLComputePipelineState> computePipelineState;
+    
+    std::vector<id<MTLBuffer>> computeVSOutputBuffers;
+    uint32_t computeVSOutputCurrentIdx;
+    uint32_t computeVSOutputCurrentOffset;
+    bool usingComputeVS;
 
     uint32_t glShaderProgram;
     uint32_t glColorTexture;
@@ -166,9 +185,11 @@ protected:
     void CheckNewStateGather();
 
     MTLRenderPipelineDescriptor *pipelineStateDescriptor;
+    MTLComputePipelineDescriptor *computePipelineStateDescriptor;
     MTLVertexDescriptor *vertexDescriptor;
     uint32_t numVertexComponents;
     uint32_t numColourAttachments;
+    bool isEncoding;
 
     struct BufferBinding {
         int              index;

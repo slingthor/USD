@@ -789,7 +789,7 @@ UsdImagingMetalHdEngine::Render(RenderParams params)
         HdxTaskSetTokens->idRender : HdxTaskSetTokens->colorRender;
     _engine.Execute(*_renderIndex, _taskController->GetTasks(renderMode));
 
-    [renderEncoder endEncoding];
+    context->EndEncoding();
     
     // Depth texture copy
     NSUInteger exeWidth = [context->computePipelineState threadExecutionWidth];
@@ -808,13 +808,15 @@ UsdImagingMetalHdEngine::Render(RenderParams params)
     [computeEncoder endEncoding];
     
     // Finalize rendering here & push the command buffer to the GPU
-    [commandBuffer commit];
+    context->Commit();
     [sharedCaptureManager.defaultCaptureScope endScope];
     
     [commandBuffer waitUntilScheduled];
 
     context->renderEncoder = nil;
+    context->computeEncoder = nil;
     context->commandBuffer = nil;
+    context->computeCommandBuffer = nil;
 
     glPushAttrib(GL_ENABLE_BIT | GL_POLYGON_BIT | GL_DEPTH_BUFFER_BIT);
 

@@ -145,13 +145,13 @@ HdSt_CodeGenMSL::TParam::Usage operator|=(HdSt_CodeGenMSL::TParam::Usage &lhs,
 
 HdSt_CodeGenMSL::HdSt_CodeGenMSL(HdSt_GeometricShaderPtr const &geometricShader,
                              HdStShaderCodeSharedPtrVector const &shaders)
-    : _geometricShader(geometricShader), _shaders(shaders)
+    : _geometricShader(geometricShader), _shaders(shaders), _mslVSOutputStructSize(0)
 {
     TF_VERIFY(geometricShader);
 }
 
 HdSt_CodeGenMSL::HdSt_CodeGenMSL(HdStShaderCodeSharedPtrVector const &shaders)
-    : _geometricShader(), _shaders(shaders)
+    : _geometricShader(), _shaders(shaders), _mslVSOutputStructSize(0)
 {
 }
 
@@ -718,6 +718,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
     copyOutputsFrag.str("");
     
     glueCommon << "struct MSLVtxOutputs {\n";
+    uint32 vtxOutputStructSize = 0;
     TF_FOR_ALL(it, _mslVSOutputParams) {
         HdSt_CodeGenMSL::TParam const &output = *it;
         
@@ -737,7 +738,23 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
         else {
             copyOutputsVtx << output.accessorStr << ";\n";
         }
+        
+        //Update struct size + apply alignment rules
+        const std::string dataTypeStr = output.dataType.GetString();
+        uint32 size = 4;
+        if(dataTypeStr.find("mat") != std::string::npos) TF_FATAL_CODING_ERROR("Not implemented!");
+        else if(dataTypeStr.find("2") != std::string::npos) size = 8;
+        else if(dataTypeStr.find("3") != std::string::npos) size = 12;
+        else if(dataTypeStr.find("4") != std::string::npos) size = 16;
+        uint32 regStart = vtxOutputStructSize / 16;
+        uint32 regEnd = (vtxOutputStructSize + size - 1) / 16;
+        if(regStart != regEnd && vtxOutputStructSize % 16 != 0) vtxOutputStructSize += 16 - (vtxOutputStructSize % 16);
+
+        vtxOutputStructSize += size;
     }
+    //Round up size of uniform buffer to next 16 byte boundary.
+    vtxOutputStructSize = ((vtxOutputStructSize + 15) / 16) * 16;
+    _mslVSOutputStructSize = vtxOutputStructSize;
     glueCommon << "};\n";
     
     glueVS << glueCommon.str();
@@ -787,6 +804,9 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
             attrib = TfToken(TfStringPrintf("[[attribute(%d)]]", vertexAttribsLocation));
 
         ////////////////////////////////////////////////////////
+        
+        const bool isPackedNormals = input.name == HdTokens->packedNormals; //MTL_FIXME: A horrible hack to fix loading packedNormals, we should consider StageIn but that would mean we can't do VS and GS in a single pass....
+        
         bool generateCSVersion = !attrib.IsEmpty();
         if(generateCSVersion) glueVS << "#if HD_MTL_VERTEXSHADER\n";
         glueVS << input.dataType << " " << input.name << attrib << ";"  << "// Binding to [[buffer(" << vertexAttribsLocation << ")]]\n";
@@ -796,9 +816,17 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
             glueVS << "#endif\n";
             
             //Add the attribute as a buffer input to the Compute function definition
-            glueCompute << "\n    , device const " << input.dataType << " *" << input.name << "[[buffer(" << vertexAttribsLocation << ")]] // " << attrib;
+            glueCompute << "\n    , device const ";
+            if(isPackedNormals)
+                glueCompute << "uint";
+            else
+                glueCompute << input.dataType;
+            glueCompute << " *" << input.name << "[[buffer(" << vertexAttribsLocation << ")]] // " << attrib;
         }
-        copyInputsVtxStruct_Compute << ",   \n            " << input.name << "[__vertexIDs[i]]";
+        if(isPackedNormals)
+            copyInputsVtxStruct_Compute << ",   \n            float4(Unpack10_10_10_2_ToVec3(" << input.name << "[__vertexIDs[i]]), 0.0)";
+        else
+            copyInputsVtxStruct_Compute << ",   \n            " << input.name << "[__vertexIDs[i]]";
         ////////////////////////////////////////////////////////
         
         vertexAttribsLocation++;
@@ -808,6 +836,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
     //This binding for indices is not an necessarily a required binding. It's here so that
     //it propagates to the binding system and can be retrieved there. You don't have to bind it.
     mslProgram->AddBinding("indices", vertexAttribsLocation, kMSL_BindingType_IndexBuffer, kMSL_ProgramStage_Vertex);
+    mslProgram->AddBinding("indices", vertexAttribsLocation, kMSL_BindingType_IndexBuffer, kMSL_ProgramStage_Compute);
     //Add it for ComputeVS. Increment vertexAttribsLocation (this means that in the VS the buffers are offset by 1,
     //with 1 slot skipped, the indices)
     glueCompute << "\n    , device const uint *indices[[buffer(" << vertexAttribsLocation++ << ")]]";
@@ -1138,19 +1167,30 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
         //NOTE: We don't know exactly which verts are going to be used in the call. We also don't yet have a mechanism to prevent processing the same
         //vertex multiple times. For now, this means not expanding data is almost as costly as expanding it apart from reduced memory requirements.
         
-        //Add a binding for the Vertex output generated in compute
+        //Add a binding for the Vertex output generated in compute, and a binding for compute argument buffer
+        const UInt32 computeVSArgSlot = location++;
         const UInt32 computeVSOutputSlot = location++;
+        mslProgram->AddBinding("computeVSArg", computeVSArgSlot, kMSL_BindingType_ComputeVSArg, kMSL_ProgramStage_Compute);
         mslProgram->AddBinding("computeVSOutput", computeVSOutputSlot, kMSL_BindingType_ComputeVSOutput, kMSL_ProgramStage_Compute);
-        
         //Generate the compute shader that calls the vertex shader code and outputs the vertices.
         UInt32 numVerticesPerThread = 3;
         glueVS  << "#if HD_MTL_COMPUTESHADER\n"
+                << "vec3 Unpack10_10_10_2_ToVec3(uint u_packedNormal) {\n"
+                << "    int i_packedNormal = *(thread int*)&u_packedNormal;\n"
+                << "    return vec3(i_packedNormal & 0x3FF, (i_packedNormal >> 10) & 0x3FF,(i_packedNormal >> 20) & 0x3FF) / 511.0;\n"
+                << "}\n"
+                << "#define vec2 packed_float2\n"
+                << "#define vec3 packed_float3\n"
+                << "struct MSLComputeVSArgs { uint indexCount, baseVertex; };"
                 << glueCompute.str()
-                << "\n    , device MSLVtxOutputs *computeVSOutput[[buffer(" << computeVSOutputSlot << ")]])\n"
+                << "\n    , device const MSLComputeVSArgs *computeVSArg[[buffer(" << computeVSArgSlot << ")]]\n"
+                << "    , device MSLVtxOutputs *computeVSOutput[[buffer(" << computeVSOutputSlot << ")]])\n"
                 << "{\n"
+                << "#undef vec3\n"  //Need to be a bit careful, vec3 used to be degined as float3 before this.
+                << "#undef vec2\n"
                 << "    uint __baseIndexID = threadPositionInGrid * " << numVerticesPerThread << ";\n"
-                << "    uint __instanceID = 0;\n" // <-- MTL_FIXME
-                << "    uint __baseVertex = 0;\n" // <-- MTL_FIXME
+                << "    uint __instanceID = __baseIndexID % computeVSArg[0].indexCount;\n" // <-- MTL_FIXME
+                << "    uint __baseVertex = computeVSArg[0].baseVertex;\n" // <-- MTL_FIXME
                 << "\n"
                 << "    uint __vertexIDs[" << numVerticesPerThread << "];\n"
                 << "    for(uint i = 0; i < " << numVerticesPerThread << "; i++) {\n"
@@ -1186,9 +1226,9 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
                 << "                             device const uint *indices[[buffer(0)]],\n"
                 << "                             device const MSLVtxOutputs *cvsData[[buffer(1)]]) {\n";
         if(expandVertexData)
-            glueVS << "    uint cvsDataIndex = indices[vertexID];\n";  //If this path is chosen you can't use indexed draws, need to fetch indices manually. vertex_id is just an incrementing counter in that case.
+            glueVS << "    uint cvsDataIndex = vertexID;\n";
         else
-            glueVS << "    uint cvsDataIndex = vertexID;\n"; //Can use regular indexed draws
+            glueVS << "    uint cvsDataIndex = indices[vertexID];\n";
         glueVS  << "    return cvsData[cvsDataIndex];\n"
                 << "}\n"
                 << "#endif //HD_MTL_VERTEXSHADER\n";
@@ -1317,6 +1357,7 @@ HdSt_CodeGenMSL::Compile()
     
     _genCommon  << "#include <metal_stdlib>\n"
                 << "#include <simd/simd.h>\n"
+                << "#include <metal_pack>\n"
                 << "using namespace metal;\n";
     
     _genCommon  << "#define double float\n"
@@ -1780,6 +1821,7 @@ HdSt_CodeGenMSL::Compile()
         if (!mslProgram->CompileShader(GL_VERTEX_SHADER, _vsSource)) {
             shaderCompiled = false;
         }
+        mslProgram->SetVertexOutputStructSize(_mslVSOutputStructSize);
     }
     if (hasFS) {
         _fsSource = fsConfigString.str() + _genCommon.str() + _genFS.str() + termination.str() + gluePS.str();

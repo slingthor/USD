@@ -118,6 +118,10 @@ HdStMSLProgram::HdStMSLProgram(TfToken const &role)
 , _vertexFunctionIdx(0), _fragmentFunctionIdx(0), _computeFunctionIdx(0)
 , _valid(false)
 , _uniformBuffer(role)
+, _enableComputeVSPath(false)
+, _computeVSOutputSlot(-1)
+, _computeVSArgSlot(-1)
+, _computeVSIndexSlot(-1)
 {
 }
 
@@ -309,6 +313,16 @@ HdStMSLProgram::Link()
         uniformBuffer = [device newBufferWithLength:defaultLength options:MTLResourceStorageModeManaged];
         _uniformBuffer.SetAllocation(uniformBuffer, defaultLength);
     }
+    
+    if(_enableComputeVSPath && (_computeVSOutputSlot == -1 || _computeVSArgSlot == -1 || _computeVSIndexSlot == -1)) {
+        for(UInt32 i = 0; i < _bindings.size(); i++) {
+            const MSL_ShaderBinding& binding = _bindings[i];
+            if(binding._stage != kMSL_ProgramStage_Compute) continue;
+            if(binding._type == kMSL_BindingType_ComputeVSOutput) _computeVSOutputSlot = binding._index;
+            if(binding._type == kMSL_BindingType_ComputeVSArg) _computeVSArgSlot = binding._index;
+            if(binding._type == kMSL_BindingType_IndexBuffer) _computeVSIndexSlot = binding._index;
+        }
+    }
 
     return true;
 }
@@ -431,7 +445,10 @@ void HdStMSLProgram::UnbindResources(HdStSurfaceShader* surfaceShader, HdSt_Reso
 }
 
 void HdStMSLProgram::SetProgram() const {
-    MtlfMetalContext::GetMetalContext()->SetShadingPrograms(_vertexFunction, _fragmentFunction);
+    MtlfMetalContext::GetMetalContext()->SetShadingPrograms(
+        _enableComputeVSPath ? _vertexPassThroughFunction : _vertexFunction,
+        _fragmentFunction,
+        _enableComputeVSPath ? _computeVertexFunction : NULL);
     
     //Create defaults for old-style uniforms
     for(auto it = _bindings.begin(); it != _bindings.end(); ++it) {
@@ -466,9 +483,15 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
                                                       GLint firstIndex,
                                                       GLint instanceCount,
                                                       GLint baseVertex) const {
-    const_cast<HdStMSLProgram*>(this)->BakeState();
     
-    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
+    /*
+     Currently quads get mapped to GL_LINES_ADJACENCY - presumably this is a bit of a hack as GL_QUADS aren't supported by OpenGL > 3.x and it's been
+     done because they share the same number of vertices per prim (4). This doesn't appear to be a problem for OpenGL as the OpenGL subdiv doesn't genereate
+     PRIM_MESH_COARSE/REFINED_QUADS (at least for the content we've currently seen) but Metal *does* so we need a way of drawing quads. We currently do this by
+     remapping the index buffer and mapping GL_LINES_ADJACENCY to MTLPrimitiveTypeTriangle.
+    */
+    MTLPrimitiveType primType = GetMetalPrimType(primitiveMode);
+    bool bDrawingQuads = (primitiveMode == GL_LINES_ADJACENCY);
     
     MTLIndexType indexTypeMetal;
     int indexSize;
@@ -485,22 +508,39 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
             indexSize = sizeof(uint32_t);
             break;
     }
+    
+    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
+    
+    if(_enableComputeVSPath) {
+        context->SetupComputeVS(_computeVSIndexSlot,
+                                bDrawingQuads ? context->GetQuadIndexBuffer(indexTypeMetal) : context->GetIndexBuffer(),
+                                indexCount,
+                                bDrawingQuads ? ((firstIndex/4)*6) : firstIndex,
+                                baseVertex,
+                                _vtxOutputStructSize,
+                                _computeVSArgSlot,
+                                _computeVSOutputSlot);
+    }
 
-    MTLPrimitiveType primType = GetMetalPrimType(primitiveMode);
-    
-    /*
-     Currently quads get mapped to GL_LINES_ADJACENCY - presumably this is a bit of a hack as GL_QUADS aren't supported by OpenGL > 3.x and it's been
-     done because they share the same number of vertices per prim (4). This doesn't appear to be a problem for OpenGL as the OpenGL subdiv doesn't genereate
-     PRIM_MESH_COARSE/REFINED_QUADS (at least for the content we've currently seen) but Metal *does* so we need a way of drawing quads. We currently do this by
-     remapping the index buffer and mapping GL_LINES_ADJACENCY to MTLPrimitiveTypeTriangle.
-     */
-    bool bDrawingQuads = (primitiveMode == GL_LINES_ADJACENCY);
-    
+    const_cast<HdStMSLProgram*>(this)->BakeState();
+
     if (bDrawingQuads) {
-        [context->renderEncoder drawIndexedPrimitives:primType indexCount:((indexCount/4)*6) indexType:indexTypeMetal indexBuffer:context->GetQuadIndexBuffer(indexTypeMetal) indexBufferOffset:(((firstIndex/4)*6) * indexSize) instanceCount:instanceCount baseVertex:baseVertex baseInstance:0];
+        if(_enableComputeVSPath)
+        {
+            [context->computeEncoder dispatchThreads:MTLSizeMake((((indexCount/4)*6) / 3) * instanceCount, 1, 1) threadsPerThreadgroup:MTLSizeMake(64, 1, 1)];
+            [context->renderEncoder drawPrimitives:primType vertexStart:0 vertexCount:((indexCount/4)*6) instanceCount:instanceCount baseInstance:0];
+        }
+        else
+            [context->renderEncoder drawIndexedPrimitives:primType indexCount:((indexCount/4)*6) indexType:indexTypeMetal indexBuffer:context->GetQuadIndexBuffer(indexTypeMetal) indexBufferOffset:(((firstIndex/4)*6) * indexSize) instanceCount:instanceCount baseVertex:baseVertex baseInstance:0];
     }
     else  {
-        [context->renderEncoder drawIndexedPrimitives:primType indexCount:indexCount indexType:indexTypeMetal indexBuffer:context->GetIndexBuffer() indexBufferOffset:(firstIndex * indexSize) instanceCount:instanceCount baseVertex:baseVertex baseInstance:0];
+        if(_enableComputeVSPath)
+        {
+            [context->computeEncoder dispatchThreads:MTLSizeMake(indexCount/3,1,1) threadsPerThreadgroup:MTLSizeMake(64,1,1)];
+            [context->renderEncoder drawPrimitives:primType vertexStart:0 vertexCount:indexCount instanceCount:instanceCount baseInstance:0];
+        }
+        else
+            [context->renderEncoder drawIndexedPrimitives:primType indexCount:indexCount indexType:indexTypeMetal indexBuffer:context->GetIndexBuffer() indexBufferOffset:(firstIndex * indexSize) instanceCount:instanceCount baseVertex:baseVertex baseInstance:0];
     }
 }
 
