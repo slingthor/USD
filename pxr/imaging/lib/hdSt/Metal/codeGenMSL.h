@@ -191,6 +191,8 @@ private:
     InOutParams _mslVSOutputParams;
     InOutParams _mslPSInputParams;
     InOutParams _mslPSOutputParams;
+    
+    int _mslVSOutputStructSize;
 };
 
 
