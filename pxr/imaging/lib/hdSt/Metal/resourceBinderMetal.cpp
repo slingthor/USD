@@ -243,18 +243,19 @@ HdSt_ResourceBinderMetal::BindUniformArrayi(TfToken const &name,
     while(1)
     {
         bool found;
-        const MSL_ShaderBinding& binding = MSL_FindBinding(_shaderBindings, name, found, kMSL_BindingType_UniformBuffer, 0xFFFFFFFF, i);
+        const MSL_ShaderBinding& binding = MSL_FindBinding(_shaderBindings, name, found, kMSL_BindingType_Uniform, 0xFFFFFFFF, i);
         
         if(!found)
-        break;
+            break;
         
         MtlfMetalContext::GetMetalContext()->SetUniform(value, count * sizeof(int), name, binding._offsetWithinResource, binding._stage);
         
         i++;
     }
     
-    if(i == 0)  //If we tried searching but couldn't find a single uniform.
-    TF_FATAL_CODING_ERROR("Could not find uniform buffer!");
+    if(i == 0) { //If we tried searching but couldn't find a single uniform.
+        TF_FATAL_CODING_ERROR("Could not find uniform buffer!");
+    }
 }
 
 void

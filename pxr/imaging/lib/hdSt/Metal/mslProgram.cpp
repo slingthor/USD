@@ -97,9 +97,10 @@ const MSL_ShaderBinding& MSL_FindBinding(const MSL_ShaderBindings& bindings, con
     }
     for(; it != bindings.end(); ++it)
     {
+        std::string const &itName = it->_name;
         if( (it->_type & bindingTypeMask) == 0 ||
             (it->_stage & programStageMask) == 0 ||
-            it->_name != nameToFind ||
+            itName != nameToFind ||
             skipCount-- != 0)
             continue;
         outFound = true;
@@ -354,6 +355,22 @@ void HdStMSLProgram::AssignSamplerUnits(GarchBindingMapRefPtr bindingMap) const
             p.second = mtlfIndex.asInt;
         }
     }
+}
+
+void HdStMSLProgram::AddBinding(std::string const &name, int index, MSL_BindingType bindingType, MSL_ProgramStage programStage, int offsetWithinResource, int uniformBufferSize) {
+    _locationMap.insert(make_pair(name, index));
+    _bindings.push_back({ bindingType, programStage, index, name, offsetWithinResource, uniformBufferSize });
+}
+
+void HdStMSLProgram::UpdateUniformBinding(std::string const &name, int index) {
+    for(auto it = _bindings.begin(); it != _bindings.end(); ++it) {
+        if(it->_type != kMSL_BindingType_Uniform || it->_name != name)
+            continue;
+        it->_index = index;
+        return;
+    }
+    
+    TF_FATAL_CODING_ERROR("Failed to find binding %s", name.c_str());
 }
 
 void HdStMSLProgram::AddCustomBindings(GarchBindingMapRefPtr bindingMap) const

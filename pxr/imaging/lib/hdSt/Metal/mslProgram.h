@@ -153,23 +153,10 @@ public:
     }
     
     HDST_API
-    void AddBinding(std::string const &name, int index, MSL_BindingType bindingType, MSL_ProgramStage programStage, int offsetWithinResource = 0, int uniformBufferSize = 0) {
-        _locationMap.insert(make_pair(name, index));
-        _bindings.push_back({ bindingType, programStage, index, name, offsetWithinResource, uniformBufferSize });
-    }
+    void AddBinding(std::string const &name, int index, MSL_BindingType bindingType, MSL_ProgramStage programStage, int offsetWithinResource = 0, int uniformBufferSize = 0);
 
     HDST_API
-    void UpdateUniformBinding(std::string const &name, int index = -1, int offsetWithinResource = -1) {
-        for(auto it = _bindings.begin(); it != _bindings.end(); ++it) {
-            if(it->_name != name || it->_type != kMSL_BindingType_Uniform)
-                continue;
-            if(index != -1)
-                it->_index = index;
-            if(offsetWithinResource != -1)
-                it->_offsetWithinResource = offsetWithinResource;
-            break;
-        }
-    }
+    void UpdateUniformBinding(std::string const &name, int index);
 
     HDST_API
     id<MTLFunction> GetVertexFunction() const {
