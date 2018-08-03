@@ -814,9 +814,9 @@ UsdImagingMetalHdEngine::Render(RenderParams params)
     [commandBuffer waitUntilScheduled];
 
     context->renderEncoder = nil;
-    context->computeEncoder = nil;
+    //context->computeEncoder = nil;
     context->commandBuffer = nil;
-    context->computeCommandBuffer = nil;
+    //context->computeCommandBuffer = nil;
 
     glPushAttrib(GL_ENABLE_BIT | GL_POLYGON_BIT | GL_DEPTH_BUFFER_BIT);
 

@@ -364,7 +364,7 @@ MtlfDrawTarget::Unbind()
     context->Commit();
     
     context->commandBuffer = nil;
-    context->computeCommandBuffer = nil;
+    //context->computeCommandBuffer = nil;
     
     TouchContents();
 }

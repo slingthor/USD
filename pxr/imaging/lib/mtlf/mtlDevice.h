@@ -153,10 +153,10 @@ public:
     id<MTLCommandBuffer> commandBuffer;
     id<MTLRenderCommandEncoder> renderEncoder;
     id<MTLCommandQueue> computeCommandQueue;
-    id<MTLCommandBuffer> computeCommandBuffer;
-    id<MTLComputeCommandEncoder> computeEncoder;
-    id<MTLEvent> queueSyncEvent;
-    uint32_t queueSyncEventCounter;
+    //id<MTLCommandBuffer> computeCommandBuffer;
+    //id<MTLComputeCommandEncoder> computeEncoder;
+    //id<MTLEvent> queueSyncEvent;
+    //uint32_t queueSyncEventCounter;
 
     id<MTLLibrary> defaultLibrary;
     id<MTLRenderPipelineState> pipelineState;

@@ -527,7 +527,7 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
     if (bDrawingQuads) {
         if(_enableComputeVSPath)
         {
-            [context->computeEncoder dispatchThreads:MTLSizeMake((((indexCount/4)*6) / 3) * instanceCount, 1, 1) threadsPerThreadgroup:MTLSizeMake(64, 1, 1)];
+            //[context->computeEncoder dispatchThreads:MTLSizeMake((((indexCount/4)*6) / 3) * instanceCount, 1, 1) threadsPerThreadgroup:MTLSizeMake(64, 1, 1)];
             [context->renderEncoder drawPrimitives:primType vertexStart:0 vertexCount:((indexCount/4)*6) instanceCount:instanceCount baseInstance:0];
         }
         else
@@ -536,7 +536,7 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
     else  {
         if(_enableComputeVSPath)
         {
-            [context->computeEncoder dispatchThreads:MTLSizeMake(indexCount/3,1,1) threadsPerThreadgroup:MTLSizeMake(64,1,1)];
+            //[context->computeEncoder dispatchThreads:MTLSizeMake(indexCount/3,1,1) threadsPerThreadgroup:MTLSizeMake(64,1,1)];
             [context->renderEncoder drawPrimitives:primType vertexStart:0 vertexCount:indexCount instanceCount:instanceCount baseInstance:0];
         }
         else
