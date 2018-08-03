@@ -684,14 +684,16 @@ MtlfDrawTarget::MtlfAttachment::_DeleteTexture()
         _textureNameMS = nil;
     }
     
-    if (_stencilTextureName) {
-        [_stencilTextureName release];
-        _stencilTextureName = nil;
-    }
+    if (_format != GL_DEPTH_STENCIL) {
+        if (_stencilTextureName) {
+            [_stencilTextureName release];
+            _stencilTextureName = nil;
+        }
     
-    if (_stencilTextureNameMS) {
-        [_stencilTextureNameMS release];
-        _stencilTextureNameMS = nil;
+        if (_stencilTextureNameMS) {
+            [_stencilTextureNameMS release];
+            _stencilTextureNameMS = nil;
+        }
     }
 }
 
