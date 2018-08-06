@@ -54,10 +54,11 @@ out CurveVertexData
     vec3 Neye;
 } outData;
 
+#if !defined(ARCH_GFX_METAL)
 // We will either generate a camera facing normal or use the authored normal.
 vec3 getNormal(MAT4 transform);
+
 // Fwd declare methods defined in pointId.glslfx, that are used below.
-#if !defined(ARCH_GFX_METAL)
 int GetPointId();
 void ProcessPointId(int);
 #endif
@@ -778,7 +779,9 @@ in CurveVertexData
 centroid in float u;
 centroid in float v;
 
+#if !defined(ARCH_GFX_METAL)
 vec3 fragmentNormal(vec3 position, vec3 normal, float v);
+#endif
 void main(void)
 {
 #ifdef HD_HAS_color

@@ -1401,7 +1401,9 @@ HdSt_CodeGenMSL::Compile()
                 << "#define radians(d) (d * 0.01745329252)\n"
                 << "#define noperspective /*center_no_perspective MTL_FIXME*/\n"
                 << "#define greaterThan(a,b) (a > b)\n"
-                << "#define lessThan(a,b)    (a < b)\n";
+                << "#define lessThan(a,b)    (a < b)\n"
+                << "#define dFdx    dfdx\n"
+                << "#define dFdy    dfdy\n";
     
     // wrapper for type float and int to deal with .x accessors and the like that are valid in GLSL
     _genCommon  << "struct wrapped_float {\n"
