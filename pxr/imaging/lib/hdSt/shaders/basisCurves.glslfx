@@ -103,8 +103,10 @@ out CurveVertexData
 } outData;
 
 // Fwd declare methods defined in pointId.glslfx, that are used below.
+#if !defined(ARCH_GFX_METAL)
 int GetPointId();
 void ProcessPointId(int);
+#endif
 
 void main(void)
 {
