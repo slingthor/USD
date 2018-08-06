@@ -178,7 +178,7 @@ id<MTLDevice> MtlfMetalContext::GetMetalDevice(PREFERRED_GPU_TYPE preferredGPUTy
 MtlfMetalContext::MtlfMetalContext() : /*queueSyncEventCounter(0),*/ computeVSOutputCurrentIdx(0), computeVSOutputCurrentOffset(0), usingComputeVS(false), isEncoding(false)
 {
     // Select Intel GPU if possible due to current issues on AMD. Revert when fixed - MTL_FIXME
-	device = MtlfMetalContext::GetMetalDevice(PREFER_INTEGRATED_GPU);
+	device = MtlfMetalContext::GetMetalDevice(PREFER_DISCRETE_GPU);
 
     NSLog(@"Selected %@ for Metal Device", device.name);
     

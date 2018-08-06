@@ -755,8 +755,8 @@ UsdImagingMetalDrawModeAdapter::_GenerateCardsBoxGeometry(
     //   ((i & 4) ? x : -x)
     // } ... where x is extents[1].x, -x is extents[0].x
     GfVec3f min = GfVec3f(extents.GetMin()),
-    max = GfVec3f(extents.GetMax());
-        VtVec3fArray pt = VtVec3fArray(8);
+            max = GfVec3f(extents.GetMax());
+    VtVec3fArray pt = VtVec3fArray(8);
     for(int i = 0; i < 8; ++i) {
         pt[i] = GfVec3f((i & 4) ? max[0] : min[0],
                         (i & 2) ? max[1] : min[1],

@@ -509,9 +509,18 @@ HdSt_CodeGenMSL::_ParseGLSL(std::stringstream &source, InOutParams& inParams, In
     tags.push_back(TagSpec("\nuniform ", inParams));
     tags.push_back(TagSpec("\nlayout(std140) uniform ", inParams));
     
-    int firstFlatIndex = tags.size();
+    TfTokenVector mslAttribute;
+    
+    int firstPerspectiveIndex = tags.size();
     tags.push_back(TagSpec("\nflat out ", outParams));
+    mslAttribute.push_back(TfToken("[[flat]]"));
     tags.push_back(TagSpec("\nflat in ", inParams));
+    mslAttribute.push_back(TfToken("[[flat]]"));
+    
+    tags.push_back(TagSpec("\ncentroid out ", outParams));
+    mslAttribute.push_back(TfToken("[[centroid_perspective]]"));
+    tags.push_back(TagSpec("\ncentroid in ", inParams));
+    mslAttribute.push_back(TfToken("[[centroid_perspective]]"));
 
     int pass = 0;
     for (auto tag : tags) {
@@ -687,7 +696,9 @@ HdSt_CodeGenMSL::_ParseGLSL(std::stringstream &source, InOutParams& inParams, In
                     }
                     
                     
-                    _EmitOutput(dummy, tag.params, name, type, TfToken(pass >= firstFlatIndex?"[[flat]]":""), usage);
+                    _EmitOutput(dummy, tag.params, name, type,
+                        pass >= firstPerspectiveIndex?mslAttribute[pass - firstPerspectiveIndex]:TfToken(""),
+                        usage);
                 }
                 else {
                     TF_CODING_WARNING("Unparsable glslfx line in '%s<type> <name>;' definition. Expecting '%s<type> <name>;'. Got %s",
@@ -1460,7 +1471,7 @@ HdSt_CodeGenMSL::Compile()
             gsConfigString << "//\n\n";
         }
     }
-    
+
     // Start of Program Scope
     
     _genCommon  << "class ProgramScope<st> {\n"
@@ -1689,6 +1700,7 @@ HdSt_CodeGenMSL::Compile()
     switch(_geometricShader->GetPrimitiveType())
     {
         case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_REFINED_QUADS:
+        case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_REFINED_TRIANGLES:
         case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_PATCHES:
         {
             // patch interpolation
@@ -1707,7 +1719,6 @@ HdSt_CodeGenMSL::Compile()
         }
             
         case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_COARSE_TRIANGLES:
-        case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_REFINED_TRIANGLES:
         {
             // barycentric interpolation
             _procGS  << "void ProcessPrimvars(int index) {\n"
@@ -1781,6 +1792,9 @@ HdSt_CodeGenMSL::Compile()
     }
     if (geometryShader.find("OsdInterpolatePatchCoord") != std::string::npos) {
         _genGS <<  OpenSubdiv::Osd::GLSLPatchShaderSource::GetCommonShaderSource();
+    }
+    if (fragmentShader.find("vec4 GetPatchCoord(int ") == std::string::npos) {
+        _genFS << "vec4 GetPatchCoord(int localIndex) { return vec4(1); }\n";
     }
     
     // geometric shader
@@ -3506,7 +3520,6 @@ HdSt_CodeGenMSL::_GenerateVertexAndFaceVaryingPrimvar(bool hasGS)
            << accessorsFS.str();
 
     // ---------
-    //_genFS << "vec4 GetPatchCoord(int index);\n";
     _genFS << "vec4 GetPatchCoord() { return GetPatchCoord(0); }\n";
 
     _genGS << "vec4 GetPatchCoord(int localIndex);\n";
