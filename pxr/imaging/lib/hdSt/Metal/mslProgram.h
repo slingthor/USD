@@ -55,17 +55,20 @@ enum MSL_BindingType
 
 struct MSL_ShaderBinding
 {
+    MSL_ShaderBinding(MSL_BindingType type, MSL_ProgramStage stage, int index, const std::string& name, int offsetWithinResource, int uniformBufferSize) :
+        _type(type), _stage(stage), _index(index), _name(name), _nameToken(name), _offsetWithinResource(offsetWithinResource), _uniformBufferSize(uniformBufferSize) {}
     MSL_BindingType  _type;
     MSL_ProgramStage _stage;
     int              _index;
     std::string      _name;
+    TfToken          _nameToken;
     int              _offsetWithinResource;
 	int              _uniformBufferSize;
 };
 
-typedef std::vector<MSL_ShaderBinding> MSL_ShaderBindings;
+typedef std::multimap<size_t, MSL_ShaderBinding*> MSL_ShaderBindingMap;
 
-const MSL_ShaderBinding& MSL_FindBinding(const MSL_ShaderBindings& bindings, const std::string& name, bool& outFound, uint bindingTypeMask = 0xFFFFFFFF, uint programStageMask = 0xFFFFFFFF, uint skipCount = 0, int level = -1);
+const MSL_ShaderBinding& MSL_FindBinding(const MSL_ShaderBindingMap& bindings, const TfToken& name, bool& outFound, uint bindingTypeMask = 0xFFFFFFFF, uint programStageMask = 0xFFFFFFFF, uint skipCount = 0, int level = -1);
 
 /// \class HdStMSLProgram
 ///
@@ -149,8 +152,8 @@ public:
     }
     
     HDST_API
-    MSL_ShaderBindings const &GetBindings() const {
-        return _bindings;
+    MSL_ShaderBindingMap const &GetBindingMap() const {
+        return _bindingMap;
     }
     
     HDST_API
@@ -204,7 +207,7 @@ private:
 
     bool _valid;
     HdStResourceMetal  _uniformBuffer;
-    MSL_ShaderBindings _bindings;
+    MSL_ShaderBindingMap _bindingMap;
     BindingLocationMap _locationMap;
     bool _enableComputeVSPath;
     int _computeVSOutputSlot;
