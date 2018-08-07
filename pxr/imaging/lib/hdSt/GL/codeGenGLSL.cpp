@@ -2221,8 +2221,6 @@ HdSt_CodeGenGLSL::_GenerateVertexAndFaceVaryingPrimvar(bool hasGS)
     std::stringstream accessorsVS, accessorsTCS, accessorsTES,
         accessorsGS, accessorsFS;
 
-    interstageVertexData << "Primvars {\n";
-
     // vertex varying
     TF_FOR_ALL (it, _metaData.vertexData) {
         HdBinding binding = it->first;

@@ -176,13 +176,11 @@ HdSt_SmoothNormalsComputationGPU::Execute(
 
     int numPoints = std::min(numSrcPoints, numDestPoints);
 
-    TF_FATAL_CODING_ERROR("Not Implemented");
-    /*
-    HdBufferResourceGPUHandle program = computeProgram->GetProgram().GetId();
+#if !defined(ARCH_GFX_METAL)
 
     // transfer uniform buffer
     GLuint ubo = computeProgram->GetGlobalUniformBuffer().GetId();
-    GlfContextCaps const &caps = GlfContextCaps::GetInstance();
+    GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
     // XXX: workaround for 319.xx driver bug of glNamedBufferDataEXT on UBO
     // XXX: move this workaround to renderContextCaps
     if (false && caps.directStateAccessEnabled) {
@@ -199,18 +197,18 @@ HdSt_SmoothNormalsComputationGPU::Execute(
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, adjacency->GetId());
 
     // dispatch compute kernel
-    glUseProgram(program);
+    computeProgram->SetProgram();
 
     glDispatchCompute(numPoints, 1, 1);
 
-    glUseProgram(0);
+    computeProgram->UnsetProgram();
     glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 
     glBindBufferBase(GL_UNIFORM_BUFFER, 0, 0);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, 0);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, 0);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, 0);
-     */
+#endif
 }
 
 void

@@ -92,8 +92,8 @@ vec4 ApplyColorOverrides(vec4 color)
 
 vec3 ApplyMaskColor(vec4 color, float weight, vec4 maskColor)
 {
-    float const clampMin = 0;
-    float const clampMax = 1;
+    const float clampMin = 0;
+    const float clampMax = 1;
     float strength = maskColor.a * clamp(weight, clampMin, clampMax);
     return mix(color.rgb, maskColor.rgb, strength);
 }
