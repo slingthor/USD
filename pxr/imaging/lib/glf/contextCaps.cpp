@@ -64,7 +64,6 @@ void
 GlfContextCaps::_LoadCaps()
 {
     // note that this function is called without GL context, in some unit tests.
-
     shaderStorageBufferEnabled   = false;
     bufferStorageEnabled         = false;
     directStateAccessEnabled     = false;
@@ -97,6 +96,8 @@ GlfContextCaps::_LoadCaps()
         int minor = std::max(0, std::min(9, *(dot+1) - '0'));
         apiVersion = major * 100 + minor * 10;
     }
+
+    printf("%s\napiVersion %d\n", (const char*)glGetString(GL_VERSION), apiVersion);
 
     if (apiVersion >= 200) {
         const char *glslVersionStr =
@@ -260,7 +261,7 @@ GlfContextCaps::_LoadCaps()
         gpuComputeNormalsEnabled = true;
 
 #if OPENSUBDIV_HAS_GLSL_COMPUTE
-        if (glslVersion >= 430 && shaderStorageBufferEnabled) {
+        if (glslVersion < 430) {
             TF_WARN("HD_ENABLE_GPU_COMPUTE can't be enabled "
                     "(OpenGL 4.3 required).\n");
         }
