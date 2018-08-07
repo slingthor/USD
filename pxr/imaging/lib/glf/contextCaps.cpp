@@ -56,8 +56,9 @@ TF_DEFINE_ENV_SETTING(GLF_GLSL_VERSION, 0,
 // Initialize members to ensure a sane starting state.
 GlfContextCaps::GlfContextCaps()
 {
-    static std::once_flag renderContextLoad;
-    std::call_once(renderContextLoad, [this](){ this->_LoadCaps(); });
+    //static std::once_flag renderContextLoad;
+    //std::call_once(renderContextLoad, [this](){ this->_LoadCaps(); });
+    _LoadCaps();
 }
 
 void
@@ -260,7 +261,7 @@ GlfContextCaps::_LoadCaps()
         gpuComputeNormalsEnabled = true;
 
 #if OPENSUBDIV_HAS_GLSL_COMPUTE
-        if (glslVersion >= 430 && shaderStorageBufferEnabled) {
+        if (glslVersion < 430) {
             TF_WARN("HD_ENABLE_GPU_COMPUTE can't be enabled "
                     "(OpenGL 4.3 required).\n");
         }
