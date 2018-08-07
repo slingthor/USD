@@ -1812,8 +1812,8 @@ class StageView(QtOpenGL.QGLWidget):
         # initiated by this mouse-press
         self._dragActive = True
 
-        x = event.x() * self.devicePixelRatio()
-        y = event.y() * self.devicePixelRatio()
+        x = event.x() * QtWidgets.QApplication.instance().devicePixelRatio()
+        y = event.y() * QtWidgets.QApplication.instance().devicePixelRatio()
 
         if (event.modifiers() & QtCore.Qt.AltModifier):
             if event.button() == QtCore.Qt.LeftButton:
@@ -1838,8 +1838,8 @@ class StageView(QtOpenGL.QGLWidget):
 
     def mouseMoveEvent(self, event):
 
-        x = event.x() * self.devicePixelRatio()
-        y = event.y() * self.devicePixelRatio()
+        x = event.x() * QtWidgets.QApplication.instance().devicePixelRatio()
+        y = event.y() * QtWidgets.QApplication.instance().devicePixelRatio()
 
         if self._dragActive:
             dx = x - self._lastX
@@ -2022,8 +2022,8 @@ class StageView(QtOpenGL.QGLWidget):
             selectedInstanceIndex, selectedElementIndex = None, Sdf.Path.emptyPath, None, None, None
 
         # Correct for high DPI displays
-        selectedPoint[0] = selectedPoint[0] / self.devicePixelRatio()
-        selectedPoint[1] = selectedPoint[1] / self.devicePixelRatio()
+        selectedPoint[0] = selectedPoint[0] / QtWidgets.QApplication.instance().devicePixelRatio()
+        selectedPoint[1] = selectedPoint[1] / QtWidgets.QApplication.instance().devicePixelRatio()
 
         # The call to TestIntersection will return the path to a master prim
         # (selectedPrimPath) and its instancer (selectedInstancerPath) if the prim is
