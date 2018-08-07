@@ -80,12 +80,9 @@ static MTLPrimitiveType GetMetalPrimType(GLenum glPrimType) {
     return primType;
 }
 
-
-const MSL_ShaderBinding& MSL_FindBinding(const MSL_ShaderBindings& bindings, const std::string& name, bool& outFound, uint bindingTypeMask, uint programStageMask, uint skipCount, int level)
+const MSL_ShaderBinding& MSL_FindBinding(const MSL_ShaderBindingMap& bindings, const TfToken& name, bool& outFound, uint bindingTypeMask, uint programStageMask, uint skipCount, int level)
 {
-    outFound = false;
-    auto it = bindings.begin();
-    std::string nameToFind;
+    TfToken nameToFind;
     if (level < 0) {
         nameToFind = name;
     }
@@ -93,20 +90,20 @@ const MSL_ShaderBinding& MSL_FindBinding(const MSL_ShaderBindings& bindings, con
         // follow nested instancing naming convention.
         std::stringstream n;
         n << name << "_" << level;
-        nameToFind = n.str();
+        nameToFind = TfToken(n.str());
     }
-    for(; it != bindings.end(); ++it)
-    {
-        std::string const &itName = it->_name;
-        if( (it->_type & bindingTypeMask) == 0 ||
-            (it->_stage & programStageMask) == 0 ||
-            itName != nameToFind ||
+    auto it_range = bindings.equal_range(nameToFind.Hash());
+    auto it = it_range.first;
+    outFound = false;
+    for(; it != it_range.second; ++it) {
+        if( ((*it).second->_type & bindingTypeMask) == 0 ||
+            ((*it).second->_stage & programStageMask) == 0 ||
             skipCount-- != 0)
             continue;
         outFound = true;
         break;
     }
-    return (*it);
+    return *(*it).second;
 }
 
 HdStMSLProgram::HdStMSLProgram(TfToken const &role)
@@ -127,6 +124,10 @@ HdStMSLProgram::HdStMSLProgram(TfToken const &role)
 
 HdStMSLProgram::~HdStMSLProgram()
 {
+    for(auto it = _bindingMap.begin(); it != _bindingMap.end(); ++it)
+        delete (*it).second;
+    _bindingMap.clear();
+
     id<MTLBuffer> uniformBuffer = _uniformBuffer.GetId();
     if (uniformBuffer) {
         [uniformBuffer release];
@@ -315,8 +316,8 @@ HdStMSLProgram::Link()
     }
     
     if(_enableComputeVSPath && (_computeVSOutputSlot == -1 || _computeVSArgSlot == -1 || _computeVSIndexSlot == -1)) {
-        for(UInt32 i = 0; i < _bindings.size(); i++) {
-            const MSL_ShaderBinding& binding = _bindings[i];
+        for(auto it = _bindingMap.begin(); it != _bindingMap.end(); ++it) {
+            const MSL_ShaderBinding& binding = *(*it).second;
             if(binding._stage != kMSL_ProgramStage_Compute) continue;
             if(binding._type == kMSL_BindingType_ComputeVSOutput) _computeVSOutputSlot = binding._index;
             if(binding._type == kMSL_BindingType_ComputeVSArg) _computeVSArgSlot = binding._index;
@@ -344,10 +345,12 @@ void HdStMSLProgram::AssignUniformBindings(GarchBindingMapRefPtr bindingMap) con
     MtlfBindingMapRefPtr mtlfBindingMap(TfDynamic_cast<MtlfBindingMapRefPtr>(bindingMap));
     
     for (GarchBindingMap::UniformBindingMap::value_type& p : mtlfBindingMap->_uniformBindings) {
-        for(auto it = _bindings.begin(); it != _bindings.end(); ++it) {
-            if((*it)._type != kMSL_BindingType_UniformBuffer || (*it)._name != p.first.GetText())
+        auto it_range = _bindingMap.equal_range(p.first.Hash());
+        for(auto it = it_range.first; it != it_range.second; ++it) {
+            const MSL_ShaderBinding& binding = *(*it).second;
+            if(binding._type != kMSL_BindingType_UniformBuffer)
                 continue;
-            MtlfBindingMap::MTLFBindingIndex mtlfIndex(it->_index, (uint32)it->_type, (uint32)it->_stage, true);
+            MtlfBindingMap::MTLFBindingIndex mtlfIndex(binding._index, (uint32)binding._type, (uint32)binding._stage, true);
             p.second = mtlfIndex.asInt;
         }
     }
@@ -362,10 +365,12 @@ void HdStMSLProgram::AssignSamplerUnits(GarchBindingMapRefPtr bindingMap) const
     MtlfBindingMapRefPtr mtlfBindingMap(TfDynamic_cast<MtlfBindingMapRefPtr>(bindingMap));
     
     for (GarchBindingMap::SamplerBindingMap::value_type& p : mtlfBindingMap->_samplerBindings) {
-        for(auto it = _bindings.begin(); it != _bindings.end(); ++it) {
-            if(it->_type != kMSL_BindingType_Texture || (*it)._name != p.first.GetText())
+        auto it_range = _bindingMap.equal_range(p.first.Hash());
+        for(auto it = it_range.first; it != it_range.second; ++it) {
+            const MSL_ShaderBinding& binding = *(*it).second;
+            if(binding._type != kMSL_BindingType_Texture)
                 continue;
-            MtlfBindingMap::MTLFBindingIndex mtlfIndex(it->_index, (uint32)it->_type, (uint32)it->_stage, true);
+            MtlfBindingMap::MTLFBindingIndex mtlfIndex(binding._index, (uint32)binding._type, (uint32)binding._stage, true);
             p.second = mtlfIndex.asInt;
         }
     }
@@ -373,17 +378,20 @@ void HdStMSLProgram::AssignSamplerUnits(GarchBindingMapRefPtr bindingMap) const
 
 void HdStMSLProgram::AddBinding(std::string const &name, int index, MSL_BindingType bindingType, MSL_ProgramStage programStage, int offsetWithinResource, int uniformBufferSize) {
     _locationMap.insert(make_pair(name, index));
-    _bindings.push_back({ bindingType, programStage, index, name, offsetWithinResource, uniformBufferSize });
+    MSL_ShaderBinding* newBinding = new MSL_ShaderBinding(bindingType, programStage, index, name, offsetWithinResource, uniformBufferSize);
+    _bindingMap.insert(std::make_pair(newBinding->_nameToken.Hash(), newBinding));
 }
 
 void HdStMSLProgram::UpdateUniformBinding(std::string const &name, int index) {
-    for(auto it = _bindings.begin(); it != _bindings.end(); ++it) {
-        if(it->_type != kMSL_BindingType_Uniform || it->_name != name)
+    TfToken nameToken(name);
+    auto it_range = _bindingMap.equal_range(nameToken.Hash());
+    for(auto it = it_range.first; it != it_range.second; ++it) {
+        MSL_ShaderBinding& binding = *(*it).second;
+        if(binding._type != kMSL_BindingType_Uniform)
             continue;
-        it->_index = index;
+        binding._index = index;
         return;
     }
-    
     TF_FATAL_CODING_ERROR("Failed to find binding %s", name.c_str());
 }
 
@@ -405,17 +413,19 @@ void HdStMSLProgram::BindResources(HdStSurfaceShader* surfaceShader, HdSt_Resour
             bool found;
             std::string textureName = "texture2d_" + it->name.GetString();
             std::string samplerName = "sampler2d_" + it->name.GetString();
+            TfToken textureNameToken(textureName);
+            TfToken samplerNameToken(samplerName);
 
-            MSL_ShaderBinding const& textureBinding = MSL_FindBinding(_bindings, textureName, found, kMSL_BindingType_Texture, 0xFFFFFFFF, i);
+            MSL_ShaderBinding const& textureBinding = MSL_FindBinding(_bindingMap, textureNameToken, found, kMSL_BindingType_Texture, 0xFFFFFFFF, i);
             if(!found)
                 break;
 
-            MSL_ShaderBinding const& samplerBinding = MSL_FindBinding(_bindings, samplerName, found, kMSL_BindingType_Sampler, 0xFFFFFFFF, i);
+            MSL_ShaderBinding const& samplerBinding = MSL_FindBinding(_bindingMap, samplerNameToken, found, kMSL_BindingType_Sampler, 0xFFFFFFFF, i);
             if(!found)
                 break;
             
-            MtlfMetalContext::GetMetalContext()->SetTexture(textureBinding._index, it->handle, TfToken(textureName), textureBinding._stage);
-            MtlfMetalContext::GetMetalContext()->SetSampler(samplerBinding._index, it->sampler, TfToken(samplerName), samplerBinding._stage);
+            MtlfMetalContext::GetMetalContext()->SetTexture(textureBinding._index, it->handle, textureNameToken, textureBinding._stage);
+            MtlfMetalContext::GetMetalContext()->SetSampler(samplerBinding._index, it->sampler, samplerNameToken, samplerBinding._stage);
 
             i++;
             break;
@@ -451,23 +461,22 @@ void HdStMSLProgram::SetProgram() const {
         _enableComputeVSPath ? _computeVertexFunction : NULL);
     
     //Create defaults for old-style uniforms
-    for(auto it = _bindings.begin(); it != _bindings.end(); ++it) {
-        if(it->_name == "fragUniforms" && it->_stage == kMSL_ProgramStage_Fragment && it->_type == kMSL_BindingType_UniformBuffer)
-        {
-            //Add new default buffer for the default inputs
-            MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
-            // Because we want to be able to store multiple copies of the uniforms within the buffer we need to multiply the size
-            id<MTLBuffer> mtlBuffer = [context->device newBufferWithLength:(it->_uniformBufferSize * METAL_OLD_STYLE_UNIFORM_BUFFER_SIZE) options:MTLResourceStorageModeManaged];
-            
-            MtlfMetalContext::GetMetalContext()->SetUniformBuffer(it->_index, mtlBuffer, TfToken(it->_name), kMSL_ProgramStage_Fragment, 0 /*offset*/, it->_uniformBufferSize);
-        }
-        if(it->_name == "vtxUniforms" && it->_stage == kMSL_ProgramStage_Vertex && it->_type == kMSL_BindingType_UniformBuffer)
-        {
-            MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
-            // Because we want to be able to store multiple copies of the uniforms within the buffer we need to multiply the size
-            id<MTLBuffer> mtlBuffer = [context->device newBufferWithLength:(it->_uniformBufferSize * METAL_OLD_STYLE_UNIFORM_BUFFER_SIZE) options:MTLResourceStorageModeManaged];
-            
-            MtlfMetalContext::GetMetalContext()->SetUniformBuffer(it->_index, mtlBuffer, TfToken(it->_name), kMSL_ProgramStage_Vertex, 0 /*offset*/, it->_uniformBufferSize);
+    struct _LoopParameters {
+        TfToken uniformToken;
+        MSL_ProgramStage stage;
+    } static const loopParams[2] = {
+        { TfToken("fragUniforms"), kMSL_ProgramStage_Fragment },
+        { TfToken("vtxUniforms"), kMSL_ProgramStage_Vertex }
+    };
+    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
+    for(UInt32 i = 0; i < (sizeof(loopParams) / sizeof(loopParams[0])); i++) {
+        auto it_range = _bindingMap.equal_range(loopParams[i].uniformToken.Hash());
+        for(auto it = it_range.first; it != it_range.second; ++it) {
+            const MSL_ShaderBinding& binding = *(*it).second;
+            if(binding._stage != loopParams[i].stage || binding._type != kMSL_BindingType_UniformBuffer)
+                continue;
+            id<MTLBuffer> mtlBuffer = [context->device newBufferWithLength:(binding._uniformBufferSize * METAL_OLD_STYLE_UNIFORM_BUFFER_SIZE) options:MTLResourceStorageModeManaged];
+            context->SetUniformBuffer(binding._index, mtlBuffer, binding._nameToken, loopParams[i].stage, 0 /*offset*/, binding._uniformBufferSize);
         }
     }
 }

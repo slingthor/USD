@@ -85,7 +85,7 @@ public:
     virtual void BindUniformf(TfToken const &name, int count, const float *value) const override;
 
 private:
-    MSL_ShaderBindings _shaderBindings;
+    MSL_ShaderBindingMap _shaderBindingMap;
 };
 
 

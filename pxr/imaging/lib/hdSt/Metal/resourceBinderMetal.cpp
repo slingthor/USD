@@ -147,7 +147,7 @@ HdSt_ResourceBinderMetal::BindBuffer(TfToken const &name,
     while(1)
     {
         bool found;
-        const MSL_ShaderBinding& shaderBinding= MSL_FindBinding(_shaderBindings, name, found, typeMask, 0xFFFFFFFF, i, level);
+        const MSL_ShaderBinding& shaderBinding = MSL_FindBinding(_shaderBindingMap, name, found, typeMask, 0xFFFFFFFF, i, level);
         
         if(!found)
             break;
@@ -215,7 +215,7 @@ HdSt_ResourceBinderMetal::BindUniformi(TfToken const &name,
     while(1)
     {
         bool found;
-        const MSL_ShaderBinding& binding = MSL_FindBinding(_shaderBindings, name, found, kMSL_BindingType_Uniform, 0xFFFFFFFF, i);
+        const MSL_ShaderBinding& binding = MSL_FindBinding(_shaderBindingMap, name, found, kMSL_BindingType_Uniform, 0xFFFFFFFF, i);
         
         if(!found)
             break;
@@ -243,7 +243,7 @@ HdSt_ResourceBinderMetal::BindUniformArrayi(TfToken const &name,
     while(1)
     {
         bool found;
-        const MSL_ShaderBinding& binding = MSL_FindBinding(_shaderBindings, name, found, kMSL_BindingType_Uniform, 0xFFFFFFFF, i);
+        const MSL_ShaderBinding& binding = MSL_FindBinding(_shaderBindingMap, name, found, kMSL_BindingType_Uniform, 0xFFFFFFFF, i);
         
         if(!found)
             break;
@@ -278,29 +278,27 @@ HdSt_ResourceBinderMetal::IntrospectBindings(HdStProgramSharedPtr programResourc
     HdStMSLProgramSharedPtr program(boost::dynamic_pointer_cast<HdStMSLProgram>(programResource));
     
     //Copy the all shader bindings from the program.
-    _shaderBindings = program->GetBindings();
+    _shaderBindingMap = program->GetBindingMap();
 
     TF_FOR_ALL(it, _bindingMap) {
         HdBinding binding = it->second;
         HdBinding::Type type = binding.GetType();
-        std::string name = it->first.name;
+        TfToken name = it->first.name;
         int level = it->first.level;
         if (level >=0) {
             // follow nested instancing naming convention.
             std::stringstream n;
             n << name << "_" << level;
-            name = n.str();
+            name = TfToken(n.str());
         }
 
         int loc = -1;
-        for(auto item = _shaderBindings.begin(); item != _shaderBindings.end(); ++item)
         {
-            if ((*item)._name != name)
-                continue;
-            
-            loc = (*item)._index;
-            break;
+            auto it = _shaderBindingMap.find(name.Hash());
+            if(it != _shaderBindingMap.end())
+                loc = (*it).second->_index; //Multiple entries in the shaderBindingMap ultimately resolve to the same thing.
         }
+
         // update location in resource binder.
         // some uniforms may be optimized out.
         if (loc < 0) loc = HdBinding::NOT_EXIST;
