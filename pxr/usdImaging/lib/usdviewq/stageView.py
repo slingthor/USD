@@ -38,8 +38,10 @@ from pxr import Sdf, Usd, UsdGeom
 from pxr import CameraUtil
 
 if sys.platform != "darwin":
+    from pxr import Glf as _gfxAPI
     from pxr import UsdImagingGL as _usdImaging
 else:
+    from pxr import Mtlf as _gfxAPI
     from pxr import UsdImagingMetal as _usdImaging
 
 from common import (RenderModes, ShadedRenderModes, Timer,
@@ -1479,9 +1481,9 @@ class StageView(QtOpenGL.QGLWidget):
 
         if self._dataModel.viewSettings.showHUD_GPUstats:
             if self._glPrimitiveGeneratedQuery is None:
-                self._glPrimitiveGeneratedQuery = Glf.GLQueryObject()
+                self._glPrimitiveGeneratedQuery = _gfxAPI.GLQueryObject()
             if self._glTimeElapsedQuery is None:
-                self._glTimeElapsedQuery = Glf.GLQueryObject()
+                self._glTimeElapsedQuery = _gfxAPI.GLQueryObject()
             self._glPrimitiveGeneratedQuery.BeginPrimitivesGenerated()
             self._glTimeElapsedQuery.BeginTimeElapsed()
 

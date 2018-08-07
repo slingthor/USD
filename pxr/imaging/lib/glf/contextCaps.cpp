@@ -56,14 +56,16 @@ TF_DEFINE_ENV_SETTING(GLF_GLSL_VERSION, 0,
 // Initialize members to ensure a sane starting state.
 GlfContextCaps::GlfContextCaps()
 {
-    static std::once_flag renderContextLoad;
-    std::call_once(renderContextLoad, [this](){ this->_LoadCaps(); });
+    //static std::once_flag renderContextLoad;
+    //std::call_once(renderContextLoad, [this](){ this->_LoadCaps(); });
+    _LoadCaps();
 }
 
 void
 GlfContextCaps::_LoadCaps()
 {
     // note that this function is called without GL context, in some unit tests.
+
     shaderStorageBufferEnabled   = false;
     bufferStorageEnabled         = false;
     directStateAccessEnabled     = false;
@@ -96,8 +98,6 @@ GlfContextCaps::_LoadCaps()
         int minor = std::max(0, std::min(9, *(dot+1) - '0'));
         apiVersion = major * 100 + minor * 10;
     }
-
-    printf("%s\napiVersion %d\n", (const char*)glGetString(GL_VERSION), apiVersion);
 
     if (apiVersion >= 200) {
         const char *glslVersionStr =

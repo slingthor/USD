@@ -61,7 +61,7 @@ public:
     virtual GarchUniformBlockRefPtr NewUniformBlock(char const *label = nullptr) const override;
     
     // Package Name accessor
-    virtual std::string GetPackageName() const override { return "Glf"; }
+    virtual std::string GetPackageName() const override { return "glf"; }
     
     // ArrayTexture creation
     virtual GarchArrayTextureRefPtr NewArrayTexture(TfTokenVector const &imageFilePaths,
