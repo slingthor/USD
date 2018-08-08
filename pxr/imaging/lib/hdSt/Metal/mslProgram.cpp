@@ -119,6 +119,7 @@ HdStMSLProgram::HdStMSLProgram(TfToken const &role)
 , _computeVSOutputSlot(-1)
 , _computeVSArgSlot(-1)
 , _computeVSIndexSlot(-1)
+, _currentlySet(false)
 {
 }
 
@@ -457,11 +458,16 @@ void HdStMSLProgram::UnbindResources(HdStSurfaceShader* surfaceShader, HdSt_Reso
     // Nothing
 }
 
-void HdStMSLProgram::SetProgram() const {
+void HdStMSLProgram::SetProgram() {
     MtlfMetalContext::GetMetalContext()->SetShadingPrograms(
         _enableComputeVSPath ? _vertexPassThroughFunction : _vertexFunction,
         _fragmentFunction,
         _enableComputeVSPath ? _computeVertexFunction : NULL);
+    
+    if (_currentlySet) {
+        TF_FATAL_CODING_ERROR("HdStProgram is already set");
+    }
+    _currentlySet = true;
     
     //Create defaults for old-style uniforms
     struct _LoopParameters {
@@ -478,14 +484,26 @@ void HdStMSLProgram::SetProgram() const {
             const MSL_ShaderBinding& binding = *(*it).second;
             if(binding._stage != loopParams[i].stage || binding._type != kMSL_BindingType_UniformBuffer)
                 continue;
+
             id<MTLBuffer> mtlBuffer = [context->device newBufferWithLength:(binding._uniformBufferSize * METAL_OLD_STYLE_UNIFORM_BUFFER_SIZE) options:MTLResourceStorageModeManaged];
             context->SetUniformBuffer(binding._index, mtlBuffer, binding._nameToken, loopParams[i].stage, 0 /*offset*/, binding._uniformBufferSize);
+            _buffers.push_back(mtlBuffer);
         }
     }
 }
 
-void HdStMSLProgram::UnsetProgram() const {
+void HdStMSLProgram::UnsetProgram() {
     MtlfMetalContext::GetMetalContext()->ClearState();
+    
+    if (!_currentlySet) {
+        TF_FATAL_CODING_ERROR("HdStProgram wasn't previously set, or has already been unset");
+    }
+    _currentlySet = false;
+
+    for(auto buffer : _buffers) {
+        [buffer release];
+    }
+    _buffers.clear();
 }
 
 

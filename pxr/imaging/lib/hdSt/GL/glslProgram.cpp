@@ -327,11 +327,11 @@ void HdStGLSLProgram::UnbindResources(HdStSurfaceShader* surfaceShader, HdSt_Res
 
 }
 
-void HdStGLSLProgram::SetProgram() const {
+void HdStGLSLProgram::SetProgram() {
     
 }
 
-void HdStGLSLProgram::UnsetProgram() const {
+void HdStGLSLProgram::UnsetProgram() {
     glUseProgram(0);
 }
 

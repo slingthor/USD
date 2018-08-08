@@ -127,10 +127,10 @@ public:
     virtual void UnbindResources(HdStSurfaceShader* surfaceShader, HdSt_ResourceBinder const &binder) const override;
 
     HDST_API
-    virtual void SetProgram() const override;
+    virtual void SetProgram() override;
     
     HDST_API
-    virtual void UnsetProgram() const override;
+    virtual void UnsetProgram() override;
     
     HDST_API
     virtual void DrawElementsInstancedBaseVertex(GLenum primitiveMode,
@@ -214,6 +214,9 @@ private:
     int _computeVSArgSlot;
     int _computeVSIndexSlot;
     int _vtxOutputStructSize;
+    
+    std::vector<id<MTLBuffer>> _buffers;
+    bool _currentlySet;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

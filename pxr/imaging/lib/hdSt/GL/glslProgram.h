@@ -93,10 +93,10 @@ public:
     virtual void UnbindResources(HdStSurfaceShader* surfaceShader, HdSt_ResourceBinder const &binder) const override;
 
     HDST_API
-    virtual void SetProgram() const override;
+    virtual void SetProgram() override;
     
     HDST_API
-    virtual void UnsetProgram() const override;
+    virtual void UnsetProgram() override;
     
     HDST_API
     virtual void DrawElementsInstancedBaseVertex(GLenum primitiveMode,

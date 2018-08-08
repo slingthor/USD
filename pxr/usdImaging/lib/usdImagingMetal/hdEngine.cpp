@@ -798,6 +798,8 @@ UsdImagingMetalHdEngine::Render(RenderParams params)
                                            context->mtlDepthTexture.height / threadGroupCount.height + 1, 1);
 
     id <MTLComputeCommandEncoder> computeEncoder = [commandBuffer computeCommandEncoder];
+    
+    computeEncoder.label = @"Depth buffer copy";
 
     [computeEncoder setComputePipelineState:context->computePipelineState];
     

@@ -484,6 +484,7 @@ MtlfMetalContext::GetQuadIndexBuffer(MTLIndexType indexTypeMetal) {
     if (remappedQuadIndexBuffer) {
         if ((remappedQuadIndexBufferSource != indexBuffer) ||
             (remappedQuadIndexBuffer.length != remappedIndexBufferSize)) {
+            [remappedQuadIndexBuffer release];
             remappedQuadIndexBuffer = nil;
         }
     }
@@ -530,7 +531,7 @@ void MtlfMetalContext::CheckNewStateGather()
 id<MTLCommandBuffer> MtlfMetalContext::CreateCommandBuffer() {
     commandBuffer        = [context->commandQueue commandBuffer];
     //computeCommandBuffer = [context->computeCommandQueue commandBuffer];
-    currentPipelineState = NULL;
+    currentPipelineState = nil;
     dirtyState           = DIRTY_METAL_STATE_ALL;
     return commandBuffer;
 }
@@ -543,7 +544,7 @@ id<MTLRenderCommandEncoder> MtlfMetalContext::CreateRenderEncoder(MTLRenderPassD
     [renderEncoder setFrontFacingWinding:windingOrder];
     [renderEncoder setCullMode:cullMode];
 
-    currentPipelineState = NULL;
+    currentPipelineState = nil;
     dirtyState           = DIRTY_METAL_STATE_ALL;
     isEncoding           = true;
     
