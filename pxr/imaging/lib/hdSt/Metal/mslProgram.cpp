@@ -237,6 +237,9 @@ HdStMSLProgram::CompileShader(GLenum type,
                                                       options:options
                                                         error:&error];
         
+        [options release];
+        options = nil;
+
         // Load the function into the library
         id <MTLFunction> function = [library newFunctionWithName:entryPoint];
         if (!function) {

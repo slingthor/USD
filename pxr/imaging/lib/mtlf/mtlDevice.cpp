@@ -201,6 +201,9 @@ MtlfMetalContext::MtlfMetalContext() : /*queueSyncEventCounter(0),*/ computeVSOu
     options.fastMathEnabled = YES;
 
     defaultLibrary = [device newLibraryWithSource:shaderSource options:options error:&error];
+    [options release];
+    options = nil;
+
     if (!defaultLibrary) {
         NSLog(@"Failed to created pipeline state, error %@", error);
     }
@@ -246,6 +249,13 @@ MtlfMetalContext::MtlfMetalContext() : /*queueSyncEventCounter(0),*/ computeVSOu
     if (!pipelineState) {
         NSLog(@"Failed to created pipeline state, error %@", error);
     }
+    
+//    [pipelineStateDesc release];
+//    pipelineStateDesc = nil;
+
+//    [vtxDescriptor release];
+//    vtxDescriptor = nil;
+    
     currentVertexDescriptorHash   = 0;
     currentColourAttachmentsHash  = 0;
     currentPipelineDescriptorHash = 0;
@@ -257,6 +267,8 @@ MtlfMetalContext::MtlfMetalContext() : /*queueSyncEventCounter(0),*/ computeVSOu
     depthStateDesc.depthWriteEnabled = YES;
     depthStateDesc.depthCompareFunction = MTLCompareFunctionLessEqual;
     depthState = [device newDepthStencilStateWithDescriptor:depthStateDesc];
+//    [depthStateDesc release];
+//    depthStateDesc = nil;
     
     //vtxUniformBackingBuffer  = NULL;
     //fragUniformBackingBuffer = NULL;
@@ -364,6 +376,8 @@ MtlfMetalContext::MtlfMetalContext() : /*queueSyncEventCounter(0),*/ computeVSOu
     indexBuffer = nil;
     remappedQuadIndexBuffer = nil;
     numVertexComponents = 0;
+    
+    drawTarget = NULL;
 }
 
 MtlfMetalContext::~MtlfMetalContext()
@@ -1068,8 +1082,16 @@ void MtlfMetalContext::BakeState()
 
 void MtlfMetalContext::ClearState()
 {
+    // Release owned resources
+    [pipelineStateDescriptor release];
+    [computePipelineStateDescriptor release];
+    [vertexDescriptor release];
+    
     pipelineStateDescriptor = nil;
+    computePipelineStateDescriptor = nil;
     vertexDescriptor = nil;
+
+    // clear referenced resources
     currentPipelineState = nil;
     indexBuffer = nil;
     numVertexComponents = 0;

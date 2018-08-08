@@ -139,7 +139,7 @@ void
 MtlfSimpleShadowArray::_AllocSamplers()
 {
     MtlfMetalContextSharedPtr mtlContext = MtlfMetalContext::GetMetalContext()->GetMetalContext();
-    MTLSamplerDescriptor* samplerDescriptor = [MTLSamplerDescriptor new];
+    MTLSamplerDescriptor* samplerDescriptor = [[MTLSamplerDescriptor alloc] init];
     samplerDescriptor.tAddressMode = MTLSamplerAddressModeClampToBorderColor;
     samplerDescriptor.sAddressMode = MTLSamplerAddressModeClampToBorderColor;
     samplerDescriptor.minFilter = MTLSamplerMinMagFilterLinear;

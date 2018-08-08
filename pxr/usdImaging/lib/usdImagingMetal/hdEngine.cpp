@@ -1214,6 +1214,11 @@ UsdImagingMetalHdEngine::_DeleteHydraResources()
         HdxRendererPluginRegistry::GetInstance().ReleasePlugin(_renderPlugin);
         _renderPlugin = nullptr;
     }
+    
+    if (_mtlRenderPassDescriptor != nil) {
+        [_mtlRenderPassDescriptor release];
+        _mtlRenderPassDescriptor = NULL;
+    }
 }
 
 /* virtual */
