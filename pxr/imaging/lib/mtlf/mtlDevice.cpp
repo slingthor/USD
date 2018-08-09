@@ -178,15 +178,18 @@ id<MTLDevice> MtlfMetalContext::GetMetalDevice(PREFERRED_GPU_TYPE preferredGPUTy
 MtlfMetalContext::MtlfMetalContext() : /*queueSyncEventCounter(0),*/ computeVSOutputCurrentIdx(0), computeVSOutputCurrentOffset(0), usingComputeVS(false), isEncoding(false)
 {
     // Select Intel GPU if possible due to current issues on AMD. Revert when fixed - MTL_FIXME
-	device = MtlfMetalContext::GetMetalDevice(PREFER_DISCRETE_GPU);
+	device = MtlfMetalContext::GetMetalDevice(PREFER_DEFAULT_GPU);
 
     NSLog(@"Selected %@ for Metal Device", device.name);
     
     // Create a new command queue
     commandQueue = [device newCommandQueue];
     commandBuffer = nil;
-    //computeCommandQueue = [device newCommandQueue];
-    //computeCommandBuffer = nil;
+    computeCommandQueue = [device newCommandQueue];
+    computeCommandBuffer = nil;
+    computeEncoder = nil;
+    computeWorkloadsPending = 0;
+    currentComputeWorkloadFunction = nil;
     //queueSyncEvent = [device newEvent];
     
     // Load all the default shader files
@@ -567,6 +570,7 @@ void MtlfMetalContext::EndEncoding()
 
 void MtlfMetalContext::Commit()
 {
+    FlushComputeWork();
     if(isEncoding)
         TF_FATAL_CODING_ERROR("Commit called while encoders are still open!");
     //[computeCommandBuffer commit];
@@ -583,18 +587,22 @@ void MtlfMetalContext::setCullMode(MTLCullMode _cullMode)
     cullMode = _cullMode;
 }
 
-void MtlfMetalContext::SetShadingPrograms(id<MTLFunction> vertexFunction, id<MTLFunction> fragmentFunction, id<MTLFunction> computeVSFunction)
+void MtlfMetalContext::SetShadingPrograms(id<MTLFunction> vertexFunction, id<MTLFunction> fragmentFunction,  id<MTLFunction> computeFunction, id<MTLFunction> computeVSFunction)
 {
     CheckNewStateGather();
     
     pipelineStateDescriptor.vertexFunction   = vertexFunction;
     pipelineStateDescriptor.fragmentFunction = fragmentFunction;
-    if(computeVSFunction != NULL) {
+    
+    usingComputeVS = false;
+    
+    if (computeFunction) {
+        computePipelineStateDescriptor.computeFunction = computeFunction;
+    }
+    else if(computeVSFunction) {
         computePipelineStateDescriptor.computeFunction = computeVSFunction;
         usingComputeVS = true;
     }
-    else
-        usingComputeVS = false;
 }
 
 void MtlfMetalContext::SetVertexAttribute(uint32_t index,
@@ -1109,6 +1117,88 @@ void MtlfMetalContext::ClearState()
     vtxUniformBackingBuffer  = NULL;
     fragUniformBackingBuffer = NULL;
 }
+
+void MtlfMetalContext::FlushComputeWork()
+{
+    if (computeWorkloadsPending) {
+        if (!computeEncoder || !computeCommandBuffer)  {
+            TF_FATAL_CODING_ERROR("Shouldn't be possible to have compute work pending if no Compute objects created!");
+        }
+        [computeEncoder endEncoding];
+        [computeCommandBuffer commit];
+        computeEncoder = nil;
+        computeCommandBuffer = nil;
+        computeWorkloadsPending = 0;
+    }
+}
+
+void MtlfMetalContext::ScheduleComputeWorkload(id<MTLFunction> computeFunction,
+                                               std::vector<id<MTLBuffer>> computeBuffers,
+                                               unsigned long bufferWritableMask,
+                                               const void *uniforms,
+                                               unsigned int uniformsSize,
+                                               MTLSize dispatchThreads,
+                                               MTLSize threadsPerThreadgroup)
+{
+    bool newPipeLineStateRequired = false;
+    
+    if (!computeCommandQueue) {
+        computeCommandQueue  = [device newCommandQueue];
+    }
+    if (!computeCommandBuffer) {
+        computeCommandBuffer = [computeCommandQueue  commandBuffer];
+    }
+    if (!computeEncoder) {
+        computeEncoder = [computeCommandBuffer computeCommandEncoderWithDispatchType:MTLDispatchTypeConcurrent];
+        newPipeLineStateRequired = true;
+    }
+    
+    // Slight assumption here that the same kernel will have the same pipeline state. True for all known use cases in hydra
+    if (computeFunction != currentComputeWorkloadFunction) {
+        newPipeLineStateRequired = true;
+    }
+    
+    if (newPipeLineStateRequired) {
+        MTLComputePipelineDescriptor *computePipelineStateDescriptor = [[MTLComputePipelineDescriptor alloc] init];
+        
+        computePipelineStateDescriptor.computeFunction = computeFunction;
+        
+        int i = 0;
+        while (bufferWritableMask) {
+            if (bufferWritableMask & 0x1) {
+                computePipelineStateDescriptor.buffers[i].mutability = MTLMutabilityMutable;
+            }
+            else {
+                computePipelineStateDescriptor.buffers[i].mutability = MTLMutabilityImmutable;
+            }
+            i++;
+            bufferWritableMask >>= 1;
+        }
+        
+        NSError *error = NULL;
+        MTLAutoreleasedComputePipelineReflection* reflData = 0;
+        id<MTLComputePipelineState> computePipelineState = [device newComputePipelineStateWithDescriptor:computePipelineStateDescriptor options:MTLPipelineOptionNone reflection:reflData error:&error];
+        [computeEncoder setComputePipelineState:computePipelineState];
+    }
+    
+    uint bufferCount = 0;
+    
+    for (auto buffer : computeBuffers) {
+        [computeEncoder setBuffer:buffer    offset:0 atIndex:bufferCount];
+        bufferCount++;
+    }
+    // Uniforms are assumed to be the last buffer
+    if (uniforms) {
+        [computeEncoder setBytes:uniforms length:uniformsSize atIndex:bufferCount];
+    }
+    [computeEncoder dispatchThreads:dispatchThreads threadsPerThreadgroup:threadsPerThreadgroup];
+    
+    // Indicate that there are workloads to process
+    computeWorkloadsPending++;
+}
+ 
+
+
 
 PXR_NAMESPACE_CLOSE_SCOPE
 

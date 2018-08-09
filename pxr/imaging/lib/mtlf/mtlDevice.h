@@ -105,7 +105,7 @@ public:
     void SetDrawTarget(MtlfDrawTarget *drawTarget);
     
     MTLF_API
-    void SetShadingPrograms(id<MTLFunction> vertexFunction, id<MTLFunction> fragmentFunction, id<MTLFunction> computeVSFunction = NULL);
+    void SetShadingPrograms(id<MTLFunction> vertexFunction, id<MTLFunction> fragmentFunction,  id<MTLFunction> computeFunction, id<MTLFunction> computeVSFunction = NULL);
     
     MTLF_API
     void SetVertexAttribute(uint32_t index,
@@ -147,14 +147,24 @@ public:
 
     MTLF_API
     void ClearState();
+    
+    MTLF_API
+    void ScheduleComputeWorkload(id<MTLFunction> computeFunction,
+                                 std::vector<id<MTLBuffer>> computeBuffers,
+                                 unsigned long bufferWriteMask,
+                                 const void *uniforms,
+                                 unsigned int uniformsSize,
+                                 MTLSize dispatchThreads,
+                                 MTLSize threadsPerThreadgroup);
 
     id<MTLDevice> device;
     id<MTLCommandQueue> commandQueue;
     id<MTLCommandBuffer> commandBuffer;
     id<MTLRenderCommandEncoder> renderEncoder;
     id<MTLCommandQueue> computeCommandQueue;
-    //id<MTLCommandBuffer> computeCommandBuffer;
-    //id<MTLComputeCommandEncoder> computeEncoder;
+    id<MTLCommandBuffer> computeCommandBuffer;
+    id<MTLComputeCommandEncoder> computeEncoder;
+    
     //id<MTLEvent> queueSyncEvent;
     //uint32_t queueSyncEventCounter;
 
@@ -253,6 +263,10 @@ private:
     boost::unordered_map<size_t, id<MTLRenderPipelineState>> pipelineStateMap;
     
     void UpdateOldStyleUniformBlock(BufferBinding *uniformBuffer, MSL_ProgramStage stage);
+    
+    unsigned int computeWorkloadsPending;
+    id<MTLFunction> currentComputeWorkloadFunction;
+    void FlushComputeWork();
 
     uint32 dirtyState;
 };

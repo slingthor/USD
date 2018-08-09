@@ -64,7 +64,7 @@ MtlfContextCaps::_LoadCaps()
     //METAL_TODO: Metal always has compute capabilities. gpuComputeNormals only affects
     //            normal generation which currently has some problems for Metal.
     gpuComputeEnabled            = IsGPUComputeEnabled();
-    gpuComputeNormalsEnabled     = false;
+    gpuComputeNormalsEnabled     = true;
 #endif
 }
 

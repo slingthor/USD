@@ -462,6 +462,7 @@ void HdStMSLProgram::SetProgram() {
     MtlfMetalContext::GetMetalContext()->SetShadingPrograms(
         _enableComputeVSPath ? _vertexPassThroughFunction : _vertexFunction,
         _fragmentFunction,
+        _computeFunction,
         _enableComputeVSPath ? _computeVertexFunction : NULL);
     
     if (_currentlySet) {

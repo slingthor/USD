@@ -85,10 +85,6 @@ HdStProgram::GetComputeProgram(
     TfToken const &shaderToken,
     HdStResourceRegistry *resourceRegistry)
 {
-#if defined(ARCH_GFX_METAL)
-    TF_FATAL_CODING_ERROR("Not Implemented");
-#endif
-
     // Find the program from registry
     HdInstance<HdStProgram::ID, HdStProgramSharedPtr> programInstance;
 
@@ -102,9 +98,13 @@ HdStProgram::GetComputeProgram(
         HdStProgramSharedPtr newProgram(HdStProgram::New(HdTokens->computeShader));
         boost::scoped_ptr<GLSLFX> glslfx(new GLSLFX(HdStPackageComputeShader()));
 
-        std::string version = "#version 430\n";
+#if defined(ARCH_GFX_METAL)
+        std::string header = "#include <metal_stdlib>\nusing namespace metal;\n";
+#else
+        std::string header = "#version 430\n";
+#endif
         if (!newProgram->CompileShader(
-                GL_COMPUTE_SHADER, version + glslfx->GetSource(shaderToken))) {
+                GL_COMPUTE_SHADER, header + glslfx->GetSource(shaderToken))) {
             TF_CODING_ERROR("Fail to compile " + shaderToken.GetString());
             return HdStProgramSharedPtr();
         }

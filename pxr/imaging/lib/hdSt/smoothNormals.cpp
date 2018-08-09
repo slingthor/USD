@@ -22,6 +22,9 @@
 // language governing permissions and limitations under the Apache License.
 //
 #include "pxr/imaging/glf/glew.h"
+// MTL_FIXME remove these when smooth normals GPU code calls through abstraction layer properly
+#include "pxr/imaging/mtlf/mtlDevice.h"
+#include "pxr/imaging/hdSt/Metal/mslProgram.h"
 
 #include "pxr/imaging/garch/contextCaps.h"
 #include "pxr/imaging/garch/resourceFactory.h"
@@ -78,13 +81,10 @@ HdSt_SmoothNormalsComputationGPU::Execute(
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
 
-#if defined(ARCH_GFX_METAL)
-    // Emit error until we support this
-    TF_CODING_ERROR("Metal Compute currently not supported - use CPU code to generate normals");
-#endif
-    
+#if !defined(ARCH_GFX_METAL)
     if (!glDispatchCompute)
         return;
+#endif
     if (_srcDataType == HdTypeInvalid || _dstDataType == HdTypeInvalid)
         return;
 
@@ -177,7 +177,6 @@ HdSt_SmoothNormalsComputationGPU::Execute(
     int numPoints = std::min(numSrcPoints, numDestPoints);
 
 #if !defined(ARCH_GFX_METAL)
-
     // transfer uniform buffer
     GLuint ubo = computeProgram->GetGlobalUniformBuffer().GetId();
     GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
@@ -208,6 +207,29 @@ HdSt_SmoothNormalsComputationGPU::Execute(
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, 0);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, 0);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, 0);
+#else
+    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
+    HdStMSLProgramSharedPtr const &mslProgram(boost::dynamic_pointer_cast<HdStMSLProgram>(computeProgram));
+    id<MTLFunction> computeFunction = mslProgram->GetComputeFunction();
+    
+    std::vector<id<MTLBuffer>> computeBuffers;
+    
+    // These need to be pushed in the order they are specifed in the kernel - uniforms will go in the last buffer
+    computeBuffers.push_back(points->GetId());     // buffer 0
+    computeBuffers.push_back(normals->GetId());    // buffer 1
+    computeBuffers.push_back(adjacency->GetId());  // buffer 2
+    
+    // Only the normals are writebale
+    unsigned long bufferWriteableMask = 1 << 1;
+    
+    // These will be scheduled but not executed, they will be deferred until the render is kicked.
+    context->ScheduleComputeWorkload(computeFunction,
+                                     computeBuffers,
+                                     bufferWriteableMask,
+                                     (const void *)&uniform,
+                                     sizeof(uniform),
+                                     MTLSizeMake(numPoints, 1, 1),
+                                     MTLSizeMake(1, 1, 1));
 #endif
 }
 

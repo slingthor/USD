@@ -46,7 +46,11 @@ _GetShaderPath(char const * shader)
 TfToken
 HdStPackageComputeShader()
 {
+#if defined(ARCH_GFX_METAL)
+    static TfToken computeShader = _GetShaderPath("compute.metal");
+#else
     static TfToken computeShader = _GetShaderPath("compute.glslfx");
+#endif
     return computeShader;
 }
 
