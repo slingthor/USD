@@ -1152,7 +1152,7 @@ void MtlfMetalContext::ScheduleComputeWorkload(id<MTLFunction> computeFunction,
         computeCommandBuffer = [computeCommandQueue  commandBuffer];
     }
     if (!computeEncoder) {
-#if __MAC_OS_X_VERSION_MAX_ALLOWED >= __MAC_10_14
+#if __MAC_OS_X_VERSION_MAX_ALLOWED >= 101400 /* __MAC_10_14 */
         if (concurrentDispatchSupported) {
             computeEncoder = [computeCommandBuffer computeCommandEncoderWithDispatchType:MTLDispatchTypeConcurrent];
         }
