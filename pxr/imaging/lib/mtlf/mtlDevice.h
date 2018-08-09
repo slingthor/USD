@@ -267,7 +267,9 @@ private:
     unsigned int computeWorkloadsPending;
     id<MTLFunction> currentComputeWorkloadFunction;
     void FlushComputeWork();
-
+    
+    bool concurrentDispatchSupported;
+    
     uint32 dirtyState;
 };
 

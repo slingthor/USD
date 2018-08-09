@@ -192,6 +192,9 @@ MtlfMetalContext::MtlfMetalContext() : /*queueSyncEventCounter(0),*/ computeVSOu
     currentComputeWorkloadFunction = nil;
     //queueSyncEvent = [device newEvent];
     
+    NSOperatingSystemVersion minimumSupportedOSVersion = { .majorVersion = 10, .minorVersion = 14, .patchVersion = 0 };
+    concurrentDispatchSupported = [NSProcessInfo.processInfo isOperatingSystemAtLeastVersion:minimumSupportedOSVersion];
+
     // Load all the default shader files
     NSError *error = NULL;
     
@@ -1149,7 +1152,15 @@ void MtlfMetalContext::ScheduleComputeWorkload(id<MTLFunction> computeFunction,
         computeCommandBuffer = [computeCommandQueue  commandBuffer];
     }
     if (!computeEncoder) {
-        computeEncoder = [computeCommandBuffer computeCommandEncoderWithDispatchType:MTLDispatchTypeConcurrent];
+#if __MAC_OS_X_VERSION_MAX_ALLOWED >= __MAC_10_14
+        if (concurrentDispatchSupported) {
+            computeEncoder = [computeCommandBuffer computeCommandEncoderWithDispatchType:MTLDispatchTypeConcurrent];
+        }
+        else
+#endif
+        {
+            computeEncoder = [computeCommandBuffer computeCommandEncoder];
+        }
         newPipeLineStateRequired = true;
     }
     
