@@ -1172,36 +1172,24 @@ void MtlfMetalContext::ScheduleComputeWorkload(id<MTLFunction> computeFunction,
     }
     
     if (newPipeLineStateRequired) {
-        MTLComputePipelineDescriptor *computePipelineStateDescriptor = [[MTLComputePipelineDescriptor alloc] init];
+
+        size_t hashVal = reinterpret_cast<size_t>(computeFunction);
+        static boost::unordered_map<size_t, id<MTLComputePipelineState>> computePipelineStateMap;
+        boost::unordered_map<size_t, id<MTLComputePipelineState>>::const_iterator pipelineStateIt = computePipelineStateMap.find(hashVal);
         
-        computePipelineStateDescriptor.computeFunction = computeFunction;
+        id<MTLComputePipelineState> computePipelineState = nil;
         
-        int i = 0;
-        while (bufferWritableMask) {
-            if (bufferWritableMask & 0x1) {
-                computePipelineStateDescriptor.buffers[i].mutability = MTLMutabilityMutable;
-            }
-            else {
-                computePipelineStateDescriptor.buffers[i].mutability = MTLMutabilityImmutable;
-            }
-            i++;
-            bufferWritableMask >>= 1;
+        if (pipelineStateIt != computePipelineStateMap.end()) {
+            computePipelineState = pipelineStateIt->second;
+        }
+
+        if (!computePipelineState) {
+            NSError *error = NULL;
+            computePipelineState = [device newComputePipelineStateWithFunction:computeFunction error:&error];
+            computePipelineStateMap.emplace(hashVal, computePipelineState);
         }
         
-        static id<MTLComputePipelineState> computePipelineState = nil;
-        if (computePipelineState) {
-            [computePipelineState release];
-            computePipelineState = nil;
-        }
-        
-        NSError *error = NULL;
-        MTLAutoreleasedComputePipelineReflection* reflData = 0;
-
-        computePipelineState = [device newComputePipelineStateWithDescriptor:computePipelineStateDescriptor options:MTLPipelineOptionNone reflection:reflData error:&error];
-
         [computeEncoder setComputePipelineState:computePipelineState];
-        [computePipelineStateDescriptor release];
-        computePipelineStateDescriptor = nil;
 
         needSetNewPipelineState = false;
     }
