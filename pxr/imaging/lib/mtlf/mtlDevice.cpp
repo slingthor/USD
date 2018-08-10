@@ -1151,6 +1151,7 @@ void MtlfMetalContext::ScheduleComputeWorkload(id<MTLFunction> computeFunction,
     if (!computeCommandBuffer) {
         computeCommandBuffer = [computeCommandQueue  commandBuffer];
     }
+    bool needSetNewPipelineState = false;
     if (!computeEncoder) {
 #if __MAC_OS_X_VERSION_MAX_ALLOWED >= 101400 /* __MAC_10_14 */
         if (concurrentDispatchSupported) {
@@ -1161,7 +1162,8 @@ void MtlfMetalContext::ScheduleComputeWorkload(id<MTLFunction> computeFunction,
         {
             computeEncoder = [computeCommandBuffer computeCommandEncoder];
         }
-        newPipeLineStateRequired = true;
+        //newPipeLineStateRequired = true;
+        needSetNewPipelineState = true;
     }
     
     // Slight assumption here that the same kernel will have the same pipeline state. True for all known use cases in hydra
@@ -1186,11 +1188,26 @@ void MtlfMetalContext::ScheduleComputeWorkload(id<MTLFunction> computeFunction,
             bufferWritableMask >>= 1;
         }
         
+        static id<MTLComputePipelineState> computePipelineState = nil;
+        if (computePipelineState) {
+            [computePipelineState release];
+            computePipelineState = nil;
+        }
+        
         NSError *error = NULL;
         MTLAutoreleasedComputePipelineReflection* reflData = 0;
-        id<MTLComputePipelineState> computePipelineState = [device newComputePipelineStateWithDescriptor:computePipelineStateDescriptor options:MTLPipelineOptionNone reflection:reflData error:&error];
+
+        computePipelineState = [device newComputePipelineStateWithDescriptor:computePipelineStateDescriptor options:MTLPipelineOptionNone reflection:reflData error:&error];
+
         [computeEncoder setComputePipelineState:computePipelineState];
+        [computePipelineStateDescriptor release];
+        computePipelineStateDescriptor = nil;
+
+        needSetNewPipelineState = false;
     }
+    
+    if (needSetNewPipelineState)
+        [computeEncoder setComputePipelineState:computePipelineState];
     
     uint bufferCount = 0;
     

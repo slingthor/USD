@@ -212,12 +212,12 @@ HdSt_SmoothNormalsComputationGPU::Execute(
     HdStMSLProgramSharedPtr const &mslProgram(boost::dynamic_pointer_cast<HdStMSLProgram>(computeProgram));
     id<MTLFunction> computeFunction = mslProgram->GetComputeFunction();
     
-    std::vector<id<MTLBuffer>> computeBuffers;
+    std::vector<id<MTLBuffer>> computeBuffers(3);
     
     // These need to be pushed in the order they are specifed in the kernel - uniforms will go in the last buffer
-    computeBuffers.push_back(points->GetId());     // buffer 0
-    computeBuffers.push_back(normals->GetId());    // buffer 1
-    computeBuffers.push_back(adjacency->GetId());  // buffer 2
+    computeBuffers[0] = points->GetId();     // buffer 0
+    computeBuffers[1] = normals->GetId();    // buffer 1
+    computeBuffers[2] = adjacency->GetId();  // buffer 2
     
     // Only the normals are writebale
     unsigned long bufferWriteableMask = 1 << 1;
