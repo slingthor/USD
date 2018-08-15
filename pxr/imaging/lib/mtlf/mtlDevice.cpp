@@ -217,12 +217,13 @@ MtlfMetalContext::MtlfMetalContext() : /*queueSyncEventCounter(0),*/ computeVSOu
     // Load the fragment program into the library
     id <MTLFunction> fragmentProgram = [defaultLibrary newFunctionWithName:@"tex_fs"];
     id <MTLFunction> vertexProgram = [defaultLibrary newFunctionWithName:@"quad_vs"];
-    id <MTLFunction> computeDepthCopyProgram = [defaultLibrary newFunctionWithName:@"copyDepth"];
     
-    computePipelineState = [device newComputePipelineStateWithFunction:computeDepthCopyProgram error:&error];
-    if (!computePipelineState) {
+    computeDepthCopyProgram = [defaultLibrary newFunctionWithName:@"copyDepth"];
+    computeDepthCopyPipelineState = [device newComputePipelineStateWithFunction:computeDepthCopyProgram error:&error];
+    if (!computeDepthCopyPipelineState) {
         NSLog(@"Failed to created pipeline state, error %@", error);
     }
+    computeDepthCopyProgramExecutionWidth = [computeDepthCopyPipelineState threadExecutionWidth];
 
     // Create the vertex description
     MTLVertexDescriptor *vtxDescriptor = [[MTLVertexDescriptor alloc] init];
@@ -266,6 +267,9 @@ MtlfMetalContext::MtlfMetalContext() : /*queueSyncEventCounter(0),*/ computeVSOu
     currentColourAttachmentsHash  = 0;
     currentPipelineDescriptorHash = 0;
     currentPipelineState          = nil;
+    currentComputePipelineDescriptorHash = 0;
+    currentComputePipelineState          = nil;
+    
     windingOrder                  = MTLWindingCounterClockwise;
     cullMode                      = MTLCullModeNone;
     
@@ -840,7 +844,7 @@ size_t MtlfMetalContext::HashColourAttachments()
     return hashVal;
 }
 
-size_t MtlfMetalContext::HashPipeLineDescriptor()
+size_t MtlfMetalContext::HashPipelineDescriptor()
 {
     size_t hashVal = 0;
     boost::hash_combine(hashVal, pipelineStateDescriptor.vertexFunction);
@@ -937,7 +941,7 @@ void MtlfMetalContext::SetPipelineState()
     
 #if METAL_STATE_OPTIMISATION
     // Always call this because currently we're not tracking changes to its state
-    size_t hashVal = HashPipeLineDescriptor();
+    size_t hashVal = HashPipelineDescriptor();
     
     // If this matches the current pipeline state then we should already have the correct pipeline bound
     if (hashVal == currentPipelineDescriptorHash && currentPipelineState != nil) {
@@ -1132,26 +1136,103 @@ void MtlfMetalContext::FlushComputeWork()
         computeEncoder = nil;
         computeCommandBuffer = nil;
         computeWorkloadsPending = 0;
+        currentComputePipelineDescriptorHash = 0;
+        currentComputePipelineState          = 0;
+    }
+}
+
+size_t MtlfMetalContext::HashComputePipelineDescriptor(unsigned int bufferCount)
+{
+    size_t hashVal = 0;
+    boost::hash_combine(hashVal, computePipelineStateDescriptor.computeFunction);
+    boost::hash_combine(hashVal, computePipelineStateDescriptor.label);
+    boost::hash_combine(hashVal, computePipelineStateDescriptor.threadGroupSizeIsMultipleOfThreadExecutionWidth);
+    boost::hash_combine(hashVal, computePipelineStateDescriptor.maxTotalThreadsPerThreadgroup);
+    for (int i = 0; i < bufferCount; i++) {
+        boost::hash_combine(hashVal, computePipelineStateDescriptor.buffers[i].mutability);
+    }
+    //boost::hash_combine(hashVal, computePipelineStateDescriptor.stageInputDescriptor); MTL_FIXME
+    return hashVal;
+}
+
+void MtlfMetalContext::SetComputePipelineState(id<MTLFunction> computeFunction, unsigned long bufferWritableMask, NSString *label)
+{
+    id<MTLComputePipelineState> computePipelineState;
+    
+    if (computePipelineStateDescriptor == nil) {
+        computePipelineStateDescriptor = [[MTLComputePipelineDescriptor alloc] init];
+    }
+    
+    [computePipelineStateDescriptor reset];
+    computePipelineStateDescriptor.computeFunction = computeFunction;
+    computePipelineStateDescriptor.label = label;
+    
+    // Setup buffer mutability
+    unsigned int bufferCount = 0;
+    while (bufferWritableMask) {
+        if (bufferWritableMask & 0x1) {
+            computePipelineStateDescriptor.buffers[bufferCount].mutability = MTLMutabilityMutable;
+        }
+        else {
+            computePipelineStateDescriptor.buffers[bufferCount].mutability = MTLMutabilityImmutable;
+        }
+        bufferCount++;
+        bufferWritableMask >>= 1;
+    }
+    
+    // Always call this because currently we're not tracking changes to its state
+    size_t hashVal = HashComputePipelineDescriptor(bufferCount);
+    
+    // If this matches the current pipeline state then we should already have the correct pipeline bound
+    if (hashVal == currentComputePipelineDescriptorHash && currentComputePipelineState != nil) {
+        return;
+    }
+    
+    currentComputePipelineDescriptorHash = hashVal;
+    
+    // Search map to see if we've created a pipeline state object for this already
+    boost::unordered_map<size_t, id<MTLComputePipelineState>>::const_iterator computePipelineStateIt = computePipelineStateMap.find(currentComputePipelineDescriptorHash);
+    
+    if (computePipelineStateIt != computePipelineStateMap.end()) {
+        computePipelineState = computePipelineStateIt->second;
+    }
+    else
+    {
+        NSError *error = NULL;
+        MTLAutoreleasedComputePipelineReflection* reflData = 0;
+        
+        computePipelineState = [device newComputePipelineStateWithDescriptor:computePipelineStateDescriptor options:MTLPipelineOptionNone reflection:reflData error:&error];
+        if (!computePipelineState) {
+            NSLog(@"Failed to create compute pipeline state, error %@", error);
+            return;
+        }
+        computePipelineStateMap.emplace(currentComputePipelineDescriptorHash, computePipelineState);
+        NSLog(@"Unique compute pipeline states %lu", computePipelineStateMap.size());
+    }
+    
+    if (computePipelineState != currentComputePipelineState)
+    {
+        [computeEncoder setComputePipelineState:computePipelineState];
+        currentComputePipelineState = computePipelineState;
     }
 }
 
 void MtlfMetalContext::ScheduleComputeWorkload(id<MTLFunction> computeFunction,
+                                               NSString *label,
                                                std::vector<id<MTLBuffer>> computeBuffers,
                                                unsigned long bufferWritableMask,
                                                const void *uniforms,
                                                unsigned int uniformsSize,
+                                               std::vector<id<MTLTexture>> computeTextures,
                                                MTLSize dispatchThreads,
                                                MTLSize threadsPerThreadgroup)
 {
-    bool newPipeLineStateRequired = false;
-    
     if (!computeCommandQueue) {
         computeCommandQueue  = [device newCommandQueue];
     }
     if (!computeCommandBuffer) {
         computeCommandBuffer = [computeCommandQueue  commandBuffer];
     }
-    bool needSetNewPipelineState = false;
     if (!computeEncoder) {
 #if __MAC_OS_X_VERSION_MAX_ALLOWED >= 101400 /* __MAC_10_14 */
         if (concurrentDispatchSupported) {
@@ -1162,43 +1243,12 @@ void MtlfMetalContext::ScheduleComputeWorkload(id<MTLFunction> computeFunction,
         {
             computeEncoder = [computeCommandBuffer computeCommandEncoder];
         }
-        //newPipeLineStateRequired = true;
-        needSetNewPipelineState = true;
     }
-    
-    // Slight assumption here that the same kernel will have the same pipeline state. True for all known use cases in hydra
-    if (computeFunction != currentComputeWorkloadFunction) {
-        newPipeLineStateRequired = true;
-    }
-    
-    if (newPipeLineStateRequired) {
 
-        size_t hashVal = reinterpret_cast<size_t>(computeFunction);
-        static boost::unordered_map<size_t, id<MTLComputePipelineState>> computePipelineStateMap;
-        boost::unordered_map<size_t, id<MTLComputePipelineState>>::const_iterator pipelineStateIt = computePipelineStateMap.find(hashVal);
-        
-        id<MTLComputePipelineState> computePipelineState = nil;
-        
-        if (pipelineStateIt != computePipelineStateMap.end()) {
-            computePipelineState = pipelineStateIt->second;
-        }
-
-        if (!computePipelineState) {
-            NSError *error = NULL;
-            computePipelineState = [device newComputePipelineStateWithFunction:computeFunction error:&error];
-            computePipelineStateMap.emplace(hashVal, computePipelineState);
-        }
-        
-        [computeEncoder setComputePipelineState:computePipelineState];
-
-        needSetNewPipelineState = false;
-    }
-    
-    if (needSetNewPipelineState)
-        [computeEncoder setComputePipelineState:computePipelineState];
+    // Should add dirty state checking here as this can be an expensive function
+    SetComputePipelineState(computeFunction, bufferWritableMask, label);
     
     uint bufferCount = 0;
-    
     for (auto buffer : computeBuffers) {
         [computeEncoder setBuffer:buffer    offset:0 atIndex:bufferCount];
         bufferCount++;
@@ -1207,6 +1257,12 @@ void MtlfMetalContext::ScheduleComputeWorkload(id<MTLFunction> computeFunction,
     if (uniforms) {
         [computeEncoder setBytes:uniforms length:uniformsSize atIndex:bufferCount];
     }
+    
+    uint textureCount = 0;
+    for (auto texture : computeTextures) {
+        [computeEncoder setTexture:texture atIndex:textureCount];
+    }
+    
     [computeEncoder dispatchThreads:dispatchThreads threadsPerThreadgroup:threadsPerThreadgroup];
     
     // Indicate that there are workloads to process
