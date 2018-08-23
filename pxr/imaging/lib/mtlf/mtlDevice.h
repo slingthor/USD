@@ -176,9 +176,9 @@ public:
     id<MTLTexture> mtlDepthRegularFloatTexture;
     id<MTLComputePipelineState> computePipelineState;
     
-    std::vector<id<MTLBuffer>> computeVSOutputBuffers;
-    uint32_t computeVSOutputCurrentIdx;
-    uint32_t computeVSOutputCurrentOffset;
+    std::vector<id<MTLBuffer>> computeGSOutputBuffers;
+    uint32_t computeGSOutputCurrentIdx;
+    uint32_t computeGSOutputCurrentOffset;
     bool usingComputeVS;
 
     uint32_t glShaderProgram;

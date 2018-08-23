@@ -175,7 +175,7 @@ id<MTLDevice> MtlfMetalContext::GetMetalDevice(PREFERRED_GPU_TYPE preferredGPUTy
 // MtlfMetalContext
 //
 
-MtlfMetalContext::MtlfMetalContext() : /*queueSyncEventCounter(0),*/ computeVSOutputCurrentIdx(0), computeVSOutputCurrentOffset(0), usingComputeVS(false), isEncoding(false)
+MtlfMetalContext::MtlfMetalContext() : /*queueSyncEventCounter(0),*/ computeGSOutputCurrentIdx(0), computeGSOutputCurrentOffset(0), usingComputeVS(false), isEncoding(false)
 {
     // Select Intel GPU if possible due to current issues on AMD. Revert when fixed - MTL_FIXME
 	device = MtlfMetalContext::GetMetalDevice(PREFER_DEFAULT_GPU);
@@ -554,7 +554,7 @@ id<MTLRenderCommandEncoder> MtlfMetalContext::CreateRenderEncoder(MTLRenderPassD
     dirtyState           = DIRTY_METAL_STATE_ALL;
     isEncoding           = true;
     
-    computeVSOutputCurrentIdx = computeVSOutputCurrentOffset = 0;
+    computeGSOutputCurrentIdx = computeGSOutputCurrentOffset = 0;
     
     return renderEncoder;
 }
@@ -674,18 +674,18 @@ void MtlfMetalContext::SetupComputeVS( UInt32 indexBufferSlot, id<MTLBuffer> ind
     UInt32 requiredSize = vertexOutputStructSize * indexCount;
     if(requiredSize > bufferSize)
         TF_FATAL_CODING_ERROR("Too large!");
-    if(bufferSize - computeVSOutputCurrentOffset < requiredSize) {
-        computeVSOutputCurrentIdx++;
-        computeVSOutputCurrentOffset = 0;
+    if(bufferSize - computeGSOutputCurrentOffset < requiredSize) {
+        computeGSOutputCurrentIdx++;
+        computeGSOutputCurrentOffset = 0;
     }
-    if(computeVSOutputCurrentIdx >= computeVSOutputBuffers.size())
-        computeVSOutputBuffers.push_back([device newBufferWithLength:bufferSize options:MTLResourceStorageModePrivate|MTLResourceOptionCPUCacheModeDefault]);
-    id<MTLBuffer> outputBuffer = computeVSOutputBuffers[computeVSOutputCurrentIdx];
+    if(computeGSOutputCurrentIdx >= computeGSOutputBuffers.size())
+        computeGSOutputBuffers.push_back([device newBufferWithLength:bufferSize options:MTLResourceStorageModePrivate|MTLResourceOptionCPUCacheModeDefault]);
+    id<MTLBuffer> outputBuffer = computeGSOutputBuffers[computeGSOutputCurrentIdx];
     //[computeEncoder setBuffer:outputBuffer offset:computeVSOutputCurrentOffset atIndex:outputBufferSlot];
     computePipelineStateDescriptor.buffers[outputBufferSlot].mutability = MTLMutabilityMutable;
     [renderEncoder setVertexBuffer:indexBuffer offset:(startIndex * sizeof(UInt32)) atIndex:0];
-    [renderEncoder setVertexBuffer:outputBuffer offset:computeVSOutputCurrentOffset atIndex:1];
-    computeVSOutputCurrentOffset += vertexOutputStructSize * indexCount;
+    [renderEncoder setVertexBuffer:outputBuffer offset:computeGSOutputCurrentOffset atIndex:1];
+    computeGSOutputCurrentOffset += vertexOutputStructSize * indexCount;
 }
 
 // I think this can be removed didn't seem to make too much difference to speeds

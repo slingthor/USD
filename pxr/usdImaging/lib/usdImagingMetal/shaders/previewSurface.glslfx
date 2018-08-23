@@ -22,7 +22,7 @@
 vec4 displacementShader(int index, vec4 Peye, vec3 Neye, vec4 patchCoord)
 {
     // Calculate scalar displacement.
-    float texDisplacement = HdGet_displacement().x;
+    float texDisplacement = HdGet_displacement();
     return Peye + vec4(Neye*texDisplacement, 0);
 }
 

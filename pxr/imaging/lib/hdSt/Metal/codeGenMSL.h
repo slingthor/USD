@@ -167,15 +167,15 @@ private:
     void _GenerateVertexAndFaceVaryingPrimvar(bool hasGS);
     void _GenerateShaderParameters();
     
-    void _ParseGLSL(std::stringstream &source, InOutParams& inParams, InOutParams& outParams);
-    void _GenerateGlue(std::stringstream& glueVS, std::stringstream& gluePS, HdStMSLProgramSharedPtr mslProgram);
+    void _ParseGLSL(std::stringstream &source, InOutParams& inParams, InOutParams& outParams, bool asComputeGS = false);
+    void _GenerateGlue(std::stringstream& glueVS, std::stringstream& glueGS, std::stringstream& gluePS, HdStMSLProgramSharedPtr mslProgram);
 
     HdSt_ResourceBinder::MetaData _metaData;
     HdSt_GeometricShaderPtr _geometricShader;
     HdStShaderCodeSharedPtrVector _shaders;
 
     // source buckets
-    std::stringstream _genCommon, _genVS, _genTCS, _genTES;
+    std::stringstream _genDefinitions, _genOSDDefinitions, _genCommon, _genVS, _genTCS, _genTES;
     std::stringstream _genGS, _genFS, _genCS;
     std::stringstream _procVS, _procTCS, _procTES, _procGS;
 
@@ -189,10 +189,12 @@ private:
     
     InOutParams _mslVSInputParams;
     InOutParams _mslVSOutputParams;
+    InOutParams _mslGSInputParams;
+    InOutParams _mslGSOutputParams;
     InOutParams _mslPSInputParams;
     InOutParams _mslPSOutputParams;
     
-    int _mslVSOutputStructSize;
+    int _mslGSOutputStructSize;
 };
 
 

@@ -116,7 +116,7 @@ HdStMSLProgram::HdStMSLProgram(TfToken const &role)
 , _valid(false)
 , _uniformBuffer(role)
 , _enableComputeVSPath(false)
-, _computeVSOutputSlot(-1)
+, _computeGSOutputSlot(-1)
 , _computeVSArgSlot(-1)
 , _computeVSIndexSlot(-1)
 , _currentlySet(false)
@@ -190,7 +190,6 @@ HdStMSLProgram::CompileShader(GLenum type,
     switch (type) {
         case GL_TESS_CONTROL_SHADER:
         case GL_TESS_EVALUATION_SHADER:
-        case GL_GEOMETRY_SHADER:
             //TF_CODING_ERROR("Unsupported shader type on Metal %d\n", type);
             NSLog(@"Unsupported shader type on Metal %d\n", type); //MTL_FIXME - remove the above error so it doesn't propogate all the way back but really we should never see these types of shaders
             DumpMetalSource([NSString stringWithUTF8String:shaderSource.c_str()], @"InvalidType", nil); //MTL_FIXME
@@ -203,14 +202,20 @@ HdStMSLProgram::CompileShader(GLenum type,
     NSError *error = NULL;
     id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->device;
     
-    const bool generateComputeVS = true;
-    UInt32 numShaders = (generateComputeVS && type == GL_VERTEX_SHADER) ? 3 : 1;
+    const bool generateComputeGSShaders = (type == GL_GEOMETRY_SHADER);
+    UInt32 numShaders = generateComputeGSShaders ? 3 : 1;
     bool success = true;
     for(UInt32 i = 0; i < numShaders; i++)
     {
-        const bool buildingForComputeVSPath = i > 0;
+        const bool buildingForComputeGSPath = i > 0;
         const bool buildingPassThroughVS = i == 2;
-        GLenum compileType = buildingForComputeVSPath ? (buildingPassThroughVS ? GL_VERTEX_SHADER : GL_COMPUTE_SHADER): type;
+        GLenum compileType = type;
+        if(generateComputeGSShaders) {
+            if(buildingForComputeGSPath)
+                compileType = buildingPassThroughVS ? GL_VERTEX_SHADER : GL_COMPUTE_SHADER;
+            else
+                compileType = GL_VERTEX_SHADER;
+        }
         NSString *entryPoint = nil;
         switch (compileType) {
         case GL_VERTEX_SHADER: shaderType = "Vertex Shader"; entryPoint = (buildingPassThroughVS ? @"vertexPassThroughEntryPoint" : @"vertexEntryPoint"); break;
@@ -232,7 +237,9 @@ HdStMSLProgram::CompileShader(GLenum type,
         options.preprocessorMacros = @{
             @"HD_MTL_VERTEXSHADER":(compileType==GL_VERTEX_SHADER)?@1:@0,
             @"HD_MTL_COMPUTESHADER":(compileType==GL_COMPUTE_SHADER)?@1:@0,
-            @"HD_MTL_FRAGMENTSHADER":(compileType==GL_FRAGMENT_SHADER)?@1:@0 };
+            @"HD_MTL_FRAGMENTSHADER":(compileType==GL_FRAGMENT_SHADER)?@1:@0,
+            @"HD_MTL_COMPUTEGS_VERTEXSHADER":buildingPassThroughVS?@1:@0
+        };
     
         id<MTLLibrary> library = [device newLibraryWithSource:@(shaderSource.c_str())
                                                       options:options
@@ -267,7 +274,7 @@ HdStMSLProgram::CompileShader(GLenum type,
             _fragmentFunction = function;
             _fragmentFunctionIdx = dumpedFileCount;
         } else if (compileType == GL_COMPUTE_SHADER) {
-            if(buildingForComputeVSPath) {
+            if(buildingForComputeGSPath) {
                 _computeVertexFunction = function;
                 _computeVertexFunctionIdx = dumpedFileCount;
             }
@@ -319,11 +326,11 @@ HdStMSLProgram::Link()
         _uniformBuffer.SetAllocation(uniformBuffer, defaultLength);
     }
     
-    if(_enableComputeVSPath && (_computeVSOutputSlot == -1 || _computeVSArgSlot == -1 || _computeVSIndexSlot == -1)) {
+    if(_enableComputeVSPath && (_computeGSOutputSlot == -1 || _computeVSArgSlot == -1 || _computeVSIndexSlot == -1)) {
         for(auto it = _bindingMap.begin(); it != _bindingMap.end(); ++it) {
             const MSL_ShaderBinding& binding = *(*it).second;
             if(binding._stage != kMSL_ProgramStage_Compute) continue;
-            if(binding._type == kMSL_BindingType_ComputeVSOutput) _computeVSOutputSlot = binding._index;
+            if(binding._type == kMSL_BindingType_ComputeGSOutput) _computeGSOutputSlot = binding._index;
             if(binding._type == kMSL_BindingType_ComputeVSArg) _computeVSArgSlot = binding._index;
             if(binding._type == kMSL_BindingType_IndexBuffer) _computeVSIndexSlot = binding._index;
         }
@@ -550,7 +557,7 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
                                 baseVertex,
                                 _vtxOutputStructSize,
                                 _computeVSArgSlot,
-                                _computeVSOutputSlot);
+                                _computeGSOutputSlot);
     }
 
     const_cast<HdStMSLProgram*>(this)->BakeState();

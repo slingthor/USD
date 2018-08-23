@@ -49,7 +49,7 @@ enum MSL_BindingType
     kMSL_BindingType_Sampler         = (1 << 3),
     kMSL_BindingType_Uniform         = (1 << 4),
     kMSL_BindingType_UniformBuffer   = (1 << 5),
-    kMSL_BindingType_ComputeVSOutput = (1 << 6),
+    kMSL_BindingType_ComputeGSOutput = (1 << 6),
     kMSL_BindingType_ComputeVSArg    = (1 << 7),
 };
 
@@ -210,7 +210,7 @@ private:
     MSL_ShaderBindingMap _bindingMap;
     BindingLocationMap _locationMap;
     bool _enableComputeVSPath;
-    int _computeVSOutputSlot;
+    int _computeGSOutputSlot;
     int _computeVSArgSlot;
     int _computeVSIndexSlot;
     int _vtxOutputStructSize;
