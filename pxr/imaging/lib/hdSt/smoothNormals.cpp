@@ -213,6 +213,7 @@ HdSt_SmoothNormalsComputationGPU::Execute(
     id<MTLFunction> computeFunction = mslProgram->GetComputeFunction();
     
     std::vector<id<MTLBuffer>> computeBuffers(3);
+    std::vector<id<MTLTexture>> computeTextures;
     
     // These need to be pushed in the order they are specifed in the kernel - uniforms will go in the last buffer
     computeBuffers[0] = points->GetId();     // buffer 0
@@ -224,10 +225,12 @@ HdSt_SmoothNormalsComputationGPU::Execute(
     
     // These will be scheduled but not executed, they will be deferred until the render is kicked.
     context->ScheduleComputeWorkload(computeFunction,
+                                     @"GPU Smooth Normals",
                                      computeBuffers,
                                      bufferWriteableMask,
                                      (const void *)&uniform,
                                      sizeof(uniform),
+                                     computeTextures,
                                      MTLSizeMake(numPoints, 1, 1),
                                      MTLSizeMake(1, 1, 1));
 #endif

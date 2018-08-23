@@ -150,10 +150,12 @@ public:
     
     MTLF_API
     void ScheduleComputeWorkload(id<MTLFunction> computeFunction,
+                                 NSString *label,
                                  std::vector<id<MTLBuffer>> computeBuffers,
                                  unsigned long bufferWriteMask,
                                  const void *uniforms,
                                  unsigned int uniformsSize,
+                                 std::vector<id<MTLTexture>> computeTextures,
                                  MTLSize dispatchThreads,
                                  MTLSize threadsPerThreadgroup);
 
@@ -174,7 +176,11 @@ public:
     id<MTLTexture> mtlColorTexture;
 	id<MTLTexture> mtlDepthTexture;
     id<MTLTexture> mtlDepthRegularFloatTexture;
-    id<MTLComputePipelineState> computePipelineState;
+    //id<MTLComputePipelineState> computePipelineState;
+    
+    id <MTLFunction> computeDepthCopyProgram;
+    id<MTLComputePipelineState> computeDepthCopyPipelineState;
+    NSUInteger computeDepthCopyProgramExecutionWidth;
     
     std::vector<id<MTLBuffer>> computeGSOutputBuffers;
     uint32_t computeGSOutputCurrentIdx;
@@ -252,15 +258,22 @@ private:
 
     // Pipeline state functions
     void SetPipelineState();
+    void SetComputePipelineState(id<MTLFunction> computeFunction, unsigned long bufferWritableMask, NSString *label);
     size_t HashVertexDescriptor();
     size_t HashColourAttachments();
-    size_t HashPipeLineDescriptor();
+    size_t HashPipelineDescriptor();
+    size_t HashComputePipelineDescriptor(unsigned int bufferCount);
+    
     // Pipeline state
     size_t currentVertexDescriptorHash;
     size_t currentColourAttachmentsHash;
     size_t currentPipelineDescriptorHash;
+    size_t currentComputePipelineDescriptorHash;
     id<MTLRenderPipelineState> currentPipelineState;
+    id<MTLComputePipelineState> currentComputePipelineState;
+    
     boost::unordered_map<size_t, id<MTLRenderPipelineState>> pipelineStateMap;
+    boost::unordered_map<size_t, id<MTLComputePipelineState>> computePipelineStateMap;
     
     void UpdateOldStyleUniformBlock(BufferBinding *uniformBuffer, MSL_ProgramStage stage);
     

@@ -792,7 +792,7 @@ UsdImagingMetalHdEngine::Render(RenderParams params)
     context->EndEncoding();
     
     // Depth texture copy
-    NSUInteger exeWidth = [context->computePipelineState threadExecutionWidth];
+    NSUInteger exeWidth = context->computeDepthCopyProgramExecutionWidth;
     MTLSize threadGroupCount = MTLSizeMake(16, exeWidth / 32, 1);
     MTLSize threadGroups     = MTLSizeMake(context->mtlDepthTexture.width / threadGroupCount.width + 1,
                                            context->mtlDepthTexture.height / threadGroupCount.height + 1, 1);
@@ -801,7 +801,7 @@ UsdImagingMetalHdEngine::Render(RenderParams params)
     
     computeEncoder.label = @"Depth buffer copy";
 
-    [computeEncoder setComputePipelineState:context->computePipelineState];
+    [computeEncoder setComputePipelineState:context->computeDepthCopyPipelineState];
     
     [computeEncoder setTexture:context->mtlDepthTexture atIndex:0];
     [computeEncoder setTexture:context->mtlDepthRegularFloatTexture atIndex:1];
