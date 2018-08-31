@@ -105,7 +105,7 @@ public:
     void SetDrawTarget(MtlfDrawTarget *drawTarget);
     
     MTLF_API
-    void SetShadingPrograms(id<MTLFunction> vertexFunction, id<MTLFunction> fragmentFunction,  id<MTLFunction> computeFunction, id<MTLFunction> computeVSFunction = NULL);
+    void SetShadingPrograms(id<MTLFunction> vertexFunction, id<MTLFunction> fragmentFunction,  id<MTLFunction> computeFunction, id<MTLFunction> computeGSFunction = NULL);
     
     MTLF_API
     void SetVertexAttribute(uint32_t index,
@@ -116,7 +116,7 @@ public:
                             const TfToken& name);
     
     MTLF_API
-    void SetupComputeVS(UInt32 indexBufferSlot, id<MTLBuffer> indexBuffer, UInt32 indexCount, UInt32 startIndex, UInt32 baseVertex, UInt32 vertexOutputStructSize, UInt32 argumentBufferSlot, UInt32 outputBufferSlot);
+    void SetupComputeGS(UInt32 indexBufferSlot, id<MTLBuffer> indexBuffer, UInt32 indexCount, UInt32 startIndex, UInt32 baseVertex, UInt32 geometryOutputStructSize, UInt32 argumentBufferSlot, UInt32 outputBufferSlot);
     
     MTLF_API
     void SetUniform(const void* _data, uint32 _dataSize, const TfToken& _name, uint32 index, MSL_ProgramStage stage);
@@ -167,8 +167,8 @@ public:
     id<MTLCommandBuffer> computeCommandBuffer;
     id<MTLComputeCommandEncoder> computeEncoder;
     
-    //id<MTLEvent> queueSyncEvent;
-    //uint32_t queueSyncEventCounter;
+    id<MTLEvent> queueSyncEvent;
+    uint32_t queueSyncEventCounter;
 
     id<MTLLibrary> defaultLibrary;
     id<MTLRenderPipelineState> pipelineState;
@@ -176,7 +176,7 @@ public:
     id<MTLTexture> mtlColorTexture;
 	id<MTLTexture> mtlDepthTexture;
     id<MTLTexture> mtlDepthRegularFloatTexture;
-    //id<MTLComputePipelineState> computePipelineState;
+    id<MTLComputePipelineState> computePipelineState;
     
     id <MTLFunction> computeDepthCopyProgram;
     id<MTLComputePipelineState> computeDepthCopyPipelineState;
@@ -185,7 +185,7 @@ public:
     std::vector<id<MTLBuffer>> computeGSOutputBuffers;
     uint32_t computeGSOutputCurrentIdx;
     uint32_t computeGSOutputCurrentOffset;
-    bool usingComputeVS;
+    bool usingComputeGS;
 
     uint32_t glShaderProgram;
     uint32_t glColorTexture;

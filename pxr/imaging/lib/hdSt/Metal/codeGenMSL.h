@@ -194,6 +194,7 @@ private:
     InOutParams _mslPSInputParams;
     InOutParams _mslPSOutputParams;
     
+    bool _mslBuildComputeGS;
     int _mslGSOutputStructSize;
 };
 

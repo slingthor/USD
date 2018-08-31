@@ -109,16 +109,11 @@ const MSL_ShaderBinding& MSL_FindBinding(const MSL_ShaderBindingMap& bindings, c
 HdStMSLProgram::HdStMSLProgram(TfToken const &role)
 : HdStProgram(role)
 , _role(role)
-, _vertexFunction(nil)
-, _fragmentFunction(nil)
-, _computeFunction(nil)
-, _vertexFunctionIdx(0), _fragmentFunctionIdx(0), _computeFunctionIdx(0)
+, _vertexFunction(nil), _fragmentFunction(nil), _computeFunction(nil), _computeGeometryFunction(nil), _vertexPassThroughFunction(nil)
+, _vertexFunctionIdx(0), _fragmentFunctionIdx(0), _computeFunctionIdx(0), _computeGeometryFunctionIdx(0), _vertexPassThroughFunctionIdx(0)
 , _valid(false)
 , _uniformBuffer(role)
-, _enableComputeVSPath(false)
-, _computeGSOutputSlot(-1)
-, _computeVSArgSlot(-1)
-, _computeVSIndexSlot(-1)
+, _enableComputeGSPath(false), _computeGSArgSlot(-1), _computeGSIndexSlot(-1), _computeGSOutputSlot(-1)
 , _currentlySet(false)
 {
 }
@@ -275,8 +270,8 @@ HdStMSLProgram::CompileShader(GLenum type,
             _fragmentFunctionIdx = dumpedFileCount;
         } else if (compileType == GL_COMPUTE_SHADER) {
             if(buildingForComputeGSPath) {
-                _computeVertexFunction = function;
-                _computeVertexFunctionIdx = dumpedFileCount;
+                _computeGeometryFunction = function;
+                _computeGeometryFunctionIdx = dumpedFileCount;
             }
             else {
                 _computeFunction = function;
@@ -302,6 +297,7 @@ HdStMSLProgram::Link()
     bool vertexFuncPresent = _vertexFunction != nil;
     bool fragmentFuncPresent = _fragmentFunction != nil;
     bool computeFuncPresent = _computeFunction != nil;
+    bool computeGSFuncPresent = _computeGeometryFunction != nil;
     
     if (computeFuncPresent && (vertexFuncPresent ^ fragmentFuncPresent)) {
         TF_CODING_ERROR("A compute shader can't be set with a vertex shader or fragment shader also set.");
@@ -326,13 +322,15 @@ HdStMSLProgram::Link()
         _uniformBuffer.SetAllocation(uniformBuffer, defaultLength);
     }
     
-    if(_enableComputeVSPath && (_computeGSOutputSlot == -1 || _computeVSArgSlot == -1 || _computeVSIndexSlot == -1)) {
+    _enableComputeGSPath = computeGSFuncPresent;
+    
+    if(_enableComputeGSPath && (_computeGSOutputSlot == -1 || _computeGSArgSlot == -1 || _computeGSIndexSlot == -1)) {
         for(auto it = _bindingMap.begin(); it != _bindingMap.end(); ++it) {
             const MSL_ShaderBinding& binding = *(*it).second;
             if(binding._stage != kMSL_ProgramStage_Compute) continue;
             if(binding._type == kMSL_BindingType_ComputeGSOutput) _computeGSOutputSlot = binding._index;
-            if(binding._type == kMSL_BindingType_ComputeVSArg) _computeVSArgSlot = binding._index;
-            if(binding._type == kMSL_BindingType_IndexBuffer) _computeVSIndexSlot = binding._index;
+            if(binding._type == kMSL_BindingType_ComputeGSArg) _computeGSArgSlot = binding._index;
+            if(binding._type == kMSL_BindingType_IndexBuffer) _computeGSIndexSlot = binding._index;
         }
     }
 
@@ -467,10 +465,10 @@ void HdStMSLProgram::UnbindResources(HdStSurfaceShader* surfaceShader, HdSt_Reso
 
 void HdStMSLProgram::SetProgram() {
     MtlfMetalContext::GetMetalContext()->SetShadingPrograms(
-        _enableComputeVSPath ? _vertexPassThroughFunction : _vertexFunction,
+        _enableComputeGSPath ? _vertexPassThroughFunction : _vertexFunction,
         _fragmentFunction,
         _computeFunction,
-        _enableComputeVSPath ? _computeVertexFunction : NULL);
+        _enableComputeGSPath ? _computeGeometryFunction : NULL);
     
     if (_currentlySet) {
         TF_FATAL_CODING_ERROR("HdStProgram is already set");
@@ -549,32 +547,32 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
     
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
     
-    if(_enableComputeVSPath) {
-        context->SetupComputeVS(_computeVSIndexSlot,
+    if(_enableComputeGSPath) {
+        context->SetupComputeGS(_computeGSIndexSlot,
                                 bDrawingQuads ? context->GetQuadIndexBuffer(indexTypeMetal) : context->GetIndexBuffer(),
                                 indexCount,
                                 bDrawingQuads ? ((firstIndex/4)*6) : firstIndex,
                                 baseVertex,
-                                _vtxOutputStructSize,
-                                _computeVSArgSlot,
+                                _computeGSOutputStructSize,
+                                _computeGSArgSlot,
                                 _computeGSOutputSlot);
     }
 
     const_cast<HdStMSLProgram*>(this)->BakeState();
 
     if (bDrawingQuads) {
-        if(_enableComputeVSPath)
+        if(_enableComputeGSPath)
         {
-            //[context->computeEncoder dispatchThreads:MTLSizeMake((((indexCount/4)*6) / 3) * instanceCount, 1, 1) threadsPerThreadgroup:MTLSizeMake(64, 1, 1)];
+            [context->computeEncoder dispatchThreads:MTLSizeMake((((indexCount/4)*6) / 3) * instanceCount, 1, 1) threadsPerThreadgroup:MTLSizeMake(64, 1, 1)];
             [context->renderEncoder drawPrimitives:primType vertexStart:0 vertexCount:((indexCount/4)*6) instanceCount:instanceCount baseInstance:0];
         }
         else
             [context->renderEncoder drawIndexedPrimitives:primType indexCount:((indexCount/4)*6) indexType:indexTypeMetal indexBuffer:context->GetQuadIndexBuffer(indexTypeMetal) indexBufferOffset:(((firstIndex/4)*6) * indexSize) instanceCount:instanceCount baseVertex:baseVertex baseInstance:0];
     }
     else  {
-        if(_enableComputeVSPath)
+        if(_enableComputeGSPath)
         {
-            //[context->computeEncoder dispatchThreads:MTLSizeMake(indexCount/3,1,1) threadsPerThreadgroup:MTLSizeMake(64,1,1)];
+            [context->computeEncoder dispatchThreads:MTLSizeMake(indexCount/3,1,1) threadsPerThreadgroup:MTLSizeMake(64,1,1)];
             [context->renderEncoder drawPrimitives:primType vertexStart:0 vertexCount:indexCount instanceCount:instanceCount baseInstance:0];
         }
         else

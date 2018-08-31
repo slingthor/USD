@@ -50,7 +50,7 @@ enum MSL_BindingType
     kMSL_BindingType_Uniform         = (1 << 4),
     kMSL_BindingType_UniformBuffer   = (1 << 5),
     kMSL_BindingType_ComputeGSOutput = (1 << 6),
-    kMSL_BindingType_ComputeVSArg    = (1 << 7),
+    kMSL_BindingType_ComputeGSArg    = (1 << 7),
 };
 
 struct MSL_ShaderBinding
@@ -178,8 +178,8 @@ public:
     }
     
     HDST_API
-    void SetVertexOutputStructSize(int vertexOutputStructSize) {
-        _vtxOutputStructSize = vertexOutputStructSize;
+    void SetGSOutputStructSize(int outputStructSize) {
+        _computeGSOutputStructSize = outputStructSize;
     }
 protected:
     HDST_API
@@ -193,7 +193,7 @@ private:
     id<MTLFunction> _computeFunction;
     
     //Compute Path
-    id<MTLFunction> _computeVertexFunction;     //Identical to _vertexFunction, just compiled with different entry-point
+    id<MTLFunction> _computeGeometryFunction;     //Identical to _vertexFunction, just compiled with different entry-point
     id<MTLFunction> _vertexPassThroughFunction; //Identical to _vertexFunction, just compiled with different entry-point
     
     id<MTLRenderPipelineState> _pipelineState;
@@ -202,18 +202,19 @@ private:
     uint32 _fragmentFunctionIdx;
     uint32 _computeFunctionIdx;
     
-    uint32 _computeVertexFunctionIdx;
+    uint32 _computeGeometryFunctionIdx;
     uint32 _vertexPassThroughFunctionIdx;
 
     bool _valid;
     HdStResourceMetal  _uniformBuffer;
     MSL_ShaderBindingMap _bindingMap;
     BindingLocationMap _locationMap;
-    bool _enableComputeVSPath;
+    
+    bool _enableComputeGSPath;
+    int _computeGSArgSlot;
+    int _computeGSIndexSlot;
     int _computeGSOutputSlot;
-    int _computeVSArgSlot;
-    int _computeVSIndexSlot;
-    int _vtxOutputStructSize;
+    int _computeGSOutputStructSize;
     
     std::vector<id<MTLBuffer>> _buffers;
     bool _currentlySet;

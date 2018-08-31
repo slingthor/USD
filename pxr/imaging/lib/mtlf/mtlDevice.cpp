@@ -175,7 +175,7 @@ id<MTLDevice> MtlfMetalContext::GetMetalDevice(PREFERRED_GPU_TYPE preferredGPUTy
 // MtlfMetalContext
 //
 
-MtlfMetalContext::MtlfMetalContext() : /*queueSyncEventCounter(0),*/ computeGSOutputCurrentIdx(0), computeGSOutputCurrentOffset(0), usingComputeVS(false), isEncoding(false)
+MtlfMetalContext::MtlfMetalContext() : queueSyncEventCounter(0), computeGSOutputCurrentIdx(0), computeGSOutputCurrentOffset(0), usingComputeGS(false), isEncoding(false)
 {
     // Select Intel GPU if possible due to current issues on AMD. Revert when fixed - MTL_FIXME
 	device = MtlfMetalContext::GetMetalDevice(PREFER_DEFAULT_GPU);
@@ -190,7 +190,7 @@ MtlfMetalContext::MtlfMetalContext() : /*queueSyncEventCounter(0),*/ computeGSOu
     computeEncoder = nil;
     computeWorkloadsPending = 0;
     currentComputeWorkloadFunction = nil;
-    //queueSyncEvent = [device newEvent];
+    queueSyncEvent = [device newEvent];
     
     NSOperatingSystemVersion minimumSupportedOSVersion = { .majorVersion = 10, .minorVersion = 14, .patchVersion = 0 };
     concurrentDispatchSupported = [NSProcessInfo.processInfo isOperatingSystemAtLeastVersion:minimumSupportedOSVersion];
@@ -540,16 +540,16 @@ void MtlfMetalContext::CheckNewStateGather()
 
 id<MTLCommandBuffer> MtlfMetalContext::CreateCommandBuffer() {
     commandBuffer        = [context->commandQueue commandBuffer];
-    //computeCommandBuffer = [context->computeCommandQueue commandBuffer];
+    computeCommandBuffer = [context->computeCommandQueue commandBuffer];
     currentPipelineState = nil;
     dirtyState           = DIRTY_METAL_STATE_ALL;
     return commandBuffer;
 }
 
 id<MTLRenderCommandEncoder> MtlfMetalContext::CreateRenderEncoder(MTLRenderPassDescriptor *renderPassDescriptor) {
-    //[commandBuffer encodeWaitForEvent:queueSyncEvent value:++queueSyncEventCounter];
+    [commandBuffer encodeWaitForEvent:queueSyncEvent value:++queueSyncEventCounter];
     renderEncoder = [commandBuffer renderCommandEncoderWithDescriptor:renderPassDescriptor];
-    //computeEncoder = [computeCommandBuffer computeCommandEncoderWithDispatchType:MTLDispatchTypeSerial];
+    computeEncoder = [computeCommandBuffer computeCommandEncoderWithDispatchType:MTLDispatchTypeSerial];
 
     [renderEncoder setFrontFacingWinding:windingOrder];
     [renderEncoder setCullMode:cullMode];
@@ -568,9 +568,9 @@ void MtlfMetalContext::EndEncoding()
     if(!isEncoding)
         TF_FATAL_CODING_ERROR("EndEncoding called while not actually encoding!");
     
-    //[computeEncoder endEncoding];
+    [computeEncoder endEncoding];
     [renderEncoder endEncoding];
-    //[computeCommandBuffer encodeSignalEvent:queueSyncEvent value:queueSyncEventCounter];
+    [computeCommandBuffer encodeSignalEvent:queueSyncEvent value:queueSyncEventCounter];
     
     isEncoding = false;
 }
@@ -580,7 +580,7 @@ void MtlfMetalContext::Commit()
     FlushComputeWork();
     if(isEncoding)
         TF_FATAL_CODING_ERROR("Commit called while encoders are still open!");
-    //[computeCommandBuffer commit];
+    [computeCommandBuffer commit];
     [commandBuffer commit];
 }
 
@@ -594,21 +594,21 @@ void MtlfMetalContext::setCullMode(MTLCullMode _cullMode)
     cullMode = _cullMode;
 }
 
-void MtlfMetalContext::SetShadingPrograms(id<MTLFunction> vertexFunction, id<MTLFunction> fragmentFunction,  id<MTLFunction> computeFunction, id<MTLFunction> computeVSFunction)
+void MtlfMetalContext::SetShadingPrograms(id<MTLFunction> vertexFunction, id<MTLFunction> fragmentFunction,  id<MTLFunction> computeFunction, id<MTLFunction> computeGSFunction)
 {
     CheckNewStateGather();
     
     pipelineStateDescriptor.vertexFunction   = vertexFunction;
     pipelineStateDescriptor.fragmentFunction = fragmentFunction;
     
-    usingComputeVS = false;
+    usingComputeGS = false;
     
     if (computeFunction) {
         computePipelineStateDescriptor.computeFunction = computeFunction;
     }
-    else if(computeVSFunction) {
-        computePipelineStateDescriptor.computeFunction = computeVSFunction;
-        usingComputeVS = true;
+    else if(computeGSFunction) {
+        computePipelineStateDescriptor.computeFunction = computeGSFunction;
+        usingComputeGS = true;
     }
 }
 
@@ -661,35 +661,38 @@ void MtlfMetalContext::SetVertexAttribute(uint32_t index,
     dirtyState |= DIRTY_METAL_STATE_VERTEX_DESCRIPTOR;
 }
 
-void MtlfMetalContext::SetupComputeVS( UInt32 indexBufferSlot, id<MTLBuffer> indexBuffer, UInt32 indexCount, UInt32 startIndex, UInt32 baseVertex,
-                                       UInt32 vertexOutputStructSize, UInt32 argumentBufferSlot, UInt32 outputBufferSlot)
+void MtlfMetalContext::SetupComputeGS( UInt32 indexBufferSlot, id<MTLBuffer> indexBuffer, UInt32 indexCount, UInt32 startIndex, UInt32 baseVertex,
+                                       UInt32 geometryOutputStructSize, UInt32 argumentBufferSlot, UInt32 outputBufferSlot)
 {
-    if(!usingComputeVS)
-        TF_FATAL_CODING_ERROR("SetupComputeVS being called without having supplied a CS");
+    if(!usingComputeGS)
+        TF_FATAL_CODING_ERROR("SetupComputeGS being called without having supplied a CS");
 
-    //[computeEncoder setBuffer:indexBuffer offset:(startIndex * sizeof(UInt32)) atIndex:indexBufferSlot];
+    [computeEncoder setBuffer:indexBuffer offset:(startIndex * sizeof(UInt32)) atIndex:indexBufferSlot];
     computePipelineStateDescriptor.buffers[indexBufferSlot].mutability = MTLMutabilityImmutable;
 
     struct { UInt32 _indexCount, _baseVertex; } arguments = { indexCount, baseVertex };
-    //[computeEncoder setBytes:(const void*)&arguments length:sizeof(arguments) atIndex:argumentBufferSlot];
+    [computeEncoder setBytes:(const void*)&arguments length:sizeof(arguments) atIndex:argumentBufferSlot];
     computePipelineStateDescriptor.buffers[argumentBufferSlot].mutability = MTLMutabilityImmutable;
     
     const UInt32 bufferSize = 100 * 1024 * 1024; //100 MiB
-    UInt32 requiredSize = vertexOutputStructSize * indexCount;
-    if(requiredSize > bufferSize)
+    UInt32 geometryDataSize = geometryOutputStructSize * (indexCount / 3);
+    if(geometryDataSize > bufferSize)
         TF_FATAL_CODING_ERROR("Too large!");
-    if(bufferSize - computeGSOutputCurrentOffset < requiredSize) {
+    if(bufferSize - computeGSOutputCurrentOffset < geometryDataSize) {
         computeGSOutputCurrentIdx++;
         computeGSOutputCurrentOffset = 0;
     }
     if(computeGSOutputCurrentIdx >= computeGSOutputBuffers.size())
         computeGSOutputBuffers.push_back([device newBufferWithLength:bufferSize options:MTLResourceStorageModePrivate|MTLResourceOptionCPUCacheModeDefault]);
     id<MTLBuffer> outputBuffer = computeGSOutputBuffers[computeGSOutputCurrentIdx];
-    //[computeEncoder setBuffer:outputBuffer offset:computeVSOutputCurrentOffset atIndex:outputBufferSlot];
+    [computeEncoder setBuffer:outputBuffer offset:computeGSOutputCurrentOffset atIndex:outputBufferSlot];
     computePipelineStateDescriptor.buffers[outputBufferSlot].mutability = MTLMutabilityMutable;
-    [renderEncoder setVertexBuffer:indexBuffer offset:(startIndex * sizeof(UInt32)) atIndex:0];
-    [renderEncoder setVertexBuffer:outputBuffer offset:computeGSOutputCurrentOffset atIndex:1];
-    computeGSOutputCurrentOffset += vertexOutputStructSize * indexCount;
+    
+    [renderEncoder setVertexBuffer:indexBuffer offset:(startIndex * sizeof(UInt32)) atIndex:indexBufferSlot];
+    [renderEncoder setVertexBuffer:outputBuffer offset:computeGSOutputCurrentOffset atIndex:outputBufferSlot];
+    [renderEncoder setFragmentBuffer:outputBuffer offset:computeGSOutputCurrentOffset atIndex:1];
+    
+    computeGSOutputCurrentOffset += geometryDataSize;
 }
 
 // I think this can be removed didn't seem to make too much difference to speeds
@@ -885,7 +888,7 @@ void MtlfMetalContext::SetPipelineState()
     pipelineStateDescriptor.tessellationOutputWindingOrder    = MTLWindingCounterClockwise;
     pipelineStateDescriptor.tessellationPartitionMode         = MTLTessellationPartitionModePow2;
 #endif
-    if (usingComputeVS)
+    if (usingComputeGS)
         pipelineStateDescriptor.vertexDescriptor = nil;
     else {
         if (dirtyState & DIRTY_METAL_STATE_VERTEX_DESCRIPTOR || pipelineStateDescriptor.vertexDescriptor == NULL) {
@@ -1025,12 +1028,12 @@ void MtlfMetalContext::BakeState()
             // Only output if this buffer was modified
             if (buffer->modified) {
                 if(buffer->stage == kMSL_ProgramStage_Vertex){
-                    if(usingComputeVS) {
-                        //[computeEncoder setBuffer:buffer->buffer offset:buffer->offset atIndex:buffer->index];
+                    if(usingComputeGS) {
+                        [computeEncoder setBuffer:buffer->buffer offset:buffer->offset atIndex:buffer->index];
                         computePipelineStateDescriptor.buffers[buffer->index].mutability = MTLMutabilityImmutable;
                     }
-                    else
-                        [renderEncoder setVertexBuffer:buffer->buffer offset:buffer->offset atIndex:buffer->index];
+                    
+                    [renderEncoder setVertexBuffer:buffer->buffer offset:buffer->offset atIndex:buffer->index];
                 }
                 else if(buffer->stage == kMSL_ProgramStage_Fragment) {
                     [renderEncoder setFragmentBuffer:buffer->buffer offset:buffer->offset atIndex:buffer->index];
@@ -1060,9 +1063,9 @@ void MtlfMetalContext::BakeState()
     if (dirtyState & DIRTY_METAL_STATE_TEXTURE) {
         for(auto texture : textures) {
             if(texture.stage == kMSL_ProgramStage_Vertex) {
-                //if(usingComputeVS)
-                //    [computeEncoder setTexture:texture.texture atIndex:texture.index];
-                //else
+                if(usingComputeGS)
+                    [computeEncoder setTexture:texture.texture atIndex:texture.index];
+                else
                     [renderEncoder setVertexTexture:texture.texture atIndex:texture.index];
             }
             else if(texture.stage == kMSL_ProgramStage_Fragment)
@@ -1075,9 +1078,9 @@ void MtlfMetalContext::BakeState()
     if (dirtyState & DIRTY_METAL_STATE_SAMPLER) {
         for(auto sampler : samplers) {
             if(sampler.stage == kMSL_ProgramStage_Vertex) {
-                //if(usingComputeVS)
-                //    [computeEncoder setSamplerState:sampler.sampler atIndex:sampler.index];
-                //else
+                if(usingComputeGS)
+                    [computeEncoder setSamplerState:sampler.sampler atIndex:sampler.index];
+                else
                     [renderEncoder setVertexSamplerState:sampler.sampler atIndex:sampler.index];
             }
             else if(sampler.stage == kMSL_ProgramStage_Fragment)
@@ -1088,11 +1091,11 @@ void MtlfMetalContext::BakeState()
         dirtyState &= ~DIRTY_METAL_STATE_SAMPLER;
     }
     
-    if(usingComputeVS) {
+    if(usingComputeGS) {
         NSError *error = NULL;
         MTLAutoreleasedComputePipelineReflection* reflData = 0;
         computePipelineState = [device newComputePipelineStateWithDescriptor:computePipelineStateDescriptor options:MTLPipelineOptionNone reflection:reflData error:&error];
-        //[computeEncoder setComputePipelineState:computePipelineState];
+        [computeEncoder setComputePipelineState:computePipelineState];
     }
 }
 
@@ -1131,7 +1134,7 @@ void MtlfMetalContext::FlushComputeWork()
         if (!computeEncoder || !computeCommandBuffer)  {
             TF_FATAL_CODING_ERROR("Shouldn't be possible to have compute work pending if no Compute objects created!");
         }
-        [computeEncoder endEncoding];
+        //[computeEncoder endEncoding];
         [computeCommandBuffer commit];
         computeEncoder = nil;
         computeCommandBuffer = nil;
