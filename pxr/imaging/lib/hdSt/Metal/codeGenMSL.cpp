@@ -860,8 +860,8 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
     copyOutputsFrag.str("");
     
     glueCommon << "struct MSLVtxOutputs {\n";
-    if(_mslBuildComputeGS)
-        glueCommon << "int gl_PrimitiveID[[flat]];\n";
+//    if(_mslBuildComputeGS)
+//        glueCommon << "int gl_PrimitiveID[[flat]];\n";
     TF_FOR_ALL(it, _mslVSOutputParams) {
         HdSt_CodeGenMSL::TParam const &output = *it;
         
@@ -1287,8 +1287,8 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
             << copyInputsVtx.str()
             << "scope.main();\n"
             << "MSLVtxOutputs vtxOut;\n";
-    if(_mslBuildComputeGS)
-        glueVS  << "vtxOut.gl_PrimitiveID = gl_VertexID / 3;\n";
+//    if(_mslBuildComputeGS)
+//        glueVS  << "vtxOut.gl_PrimitiveID = gl_VertexID / 3;\n";
     glueVS  << copyOutputsVtx.str()
             << "return vtxOut;\n"
             << "}\n";
