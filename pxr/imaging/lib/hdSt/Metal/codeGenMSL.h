@@ -61,9 +61,8 @@ public:
             Uniform             = 1 << 7,
             UniformBlockMember  = 1 << 8,
             UniformBlock        = 1 << 9,
-            
-            //Used in a workaroud for missing geometry shader functionality.
             PrimVar             = 1 << 10,
+            PointerType         = 1 << 11,
         };
         static Usage const maskShaderUsage = Usage(EntryFuncArgument - 1);
         
@@ -160,6 +159,19 @@ public:
     virtual HdSt_ResourceBinder::MetaData *GetMetaData() { return &_metaData; }
 
 private:
+
+    //The following functions generate source code in the source buckets. The order these functions are called in is important in many cases.
+
+    //Generates comments placed in shader source code that detail which snippets
+    //were used and what type of shader this is. Does not generate any code.
+    void _GenerateConfigComments(std::stringstream& vsCfg, std::stringstream& fsCfg, std::stringstream& gsCfg);
+    //Writes to _genDefinitions.
+    void _GenerateCommonDefinitions();
+    //Writes to _genDefinitions and _genCommon.
+    void _GenerateCommonCode();
+    //Writes to _genDefinitions and _genCommon. Handles customBindings and customInterleavedBindings
+    void _GenerateBindingsCode();
+    //Writes to _procVS, _genVS, _procGS, _genGS, _genFS, _genCommon,
     void _GenerateDrawingCoord();
     void _GenerateConstantPrimvar();
     void _GenerateInstancePrimvar();
@@ -194,7 +206,7 @@ private:
     InOutParams _mslPSInputParams;
     InOutParams _mslPSOutputParams;
     
-    bool _mslBuildComputeGS;
+    bool _hasVS, _hasGS, _hasFS, _mslBuildComputeGS;
     int _mslGSOutputStructSize;
 };
 
