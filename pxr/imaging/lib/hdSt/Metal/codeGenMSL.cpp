@@ -3671,7 +3671,7 @@ HdSt_CodeGenMSL::_GenerateVertexAndFaceVaryingPrimvar(bool hasGS)
                 case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_PATCHES:
                 {
                     // linear interpolation within a quad.
-                    _procGS << "   outPrimvars->" << name
+                    _procGS << "   outPrimvars." << name
                         << "  = mix("
                         << "mix(" << "HdGet_" << name << "(0),"
                         <<           "HdGet_" << name << "(1), localST.x),"
@@ -3684,7 +3684,7 @@ HdSt_CodeGenMSL::_GenerateVertexAndFaceVaryingPrimvar(bool hasGS)
                 case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_COARSE_TRIANGLES:
                 {
                     // barycentric interpolation within a triangle.
-                    _procGS << "   outPrimvars->" << name
+                    _procGS << "   outPrimvars." << name
                         << "  = HdGet_" << name << "(0) * localST.x "
                         << "  + HdGet_" << name << "(1) * localST.y "
                         << "  + HdGet_" << name << "(2) * (1-localST.x-localST.y);\n";
