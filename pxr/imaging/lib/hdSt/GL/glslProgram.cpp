@@ -328,7 +328,7 @@ void HdStGLSLProgram::UnbindResources(HdStSurfaceShader* surfaceShader, HdSt_Res
 }
 
 void HdStGLSLProgram::SetProgram() {
-    
+    glUseProgram(_program);
 }
 
 void HdStGLSLProgram::UnsetProgram() {

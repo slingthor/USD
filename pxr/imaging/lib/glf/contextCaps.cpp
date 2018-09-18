@@ -43,7 +43,7 @@ TF_DEFINE_ENV_SETTING(GLF_ENABLE_BINDLESS_BUFFER, false,
 TF_DEFINE_ENV_SETTING(GLF_ENABLE_BINDLESS_TEXTURE, false,
                       "Use GL bindless texture extention");
 TF_DEFINE_ENV_SETTING(GLF_ENABLE_MULTI_DRAW_INDIRECT, true,
-                      "Use GL mult draw indirect extention");
+                      "Use GL multi draw indirect extention");
 TF_DEFINE_ENV_SETTING(GLF_ENABLE_DIRECT_STATE_ACCESS, true,
                       "Use GL direct state access extention");
 TF_DEFINE_ENV_SETTING(GLF_ENABLE_COPY_BUFFER, true,
@@ -56,8 +56,6 @@ TF_DEFINE_ENV_SETTING(GLF_GLSL_VERSION, 0,
 // Initialize members to ensure a sane starting state.
 GlfContextCaps::GlfContextCaps()
 {
-    //static std::once_flag renderContextLoad;
-    //std::call_once(renderContextLoad, [this](){ this->_LoadCaps(); });
     _LoadCaps();
 }
 
