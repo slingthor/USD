@@ -906,7 +906,16 @@ HdSt_IndirectDrawBatchGL::PrepareDraw(
             _dispatchBuffer->GetEntireResource()->GetStride();
 
         if (gpuCulling) {
-            bufferData = _dispatchBuffer->GetEntireResource()->GetBufferContents();
+            if (caps.directStateAccessEnabled) {
+                bufferData = glMapNamedBufferEXT(
+                     _dispatchBuffer->GetEntireResource()->GetId(),
+                     GL_READ_ONLY);
+            } else {
+                glBindBuffer(GL_ARRAY_BUFFER,
+                             _dispatchBuffer->GetEntireResource()->GetId());
+                bufferData = glMapBuffer(GL_ARRAY_BUFFER, GL_READ_ONLY);
+                glBindBuffer(GL_ARRAY_BUFFER, 0);
+            }
         }
 
         for (size_t item=0; item<_drawItemInstances.size(); ++item) {
@@ -1579,7 +1588,6 @@ HdSt_IndirectDrawBatchGL::_CullingProgram::_Link(
             "gl_SkipComponents4",  // firstIndex - modelDC
                                    // (includes __reserved_0 to match drawElementsOutput)
             "gl_SkipComponents4",  // constantDC - fvarDC
-            "gl_SkipComponents2",  // instanceIndexDC - shaderDC
             "gl_SkipComponents3",  // instanceIndexDC - vertexDC
         };
         const char *drawElementsOutputs[] = {
@@ -1587,14 +1595,13 @@ HdSt_IndirectDrawBatchGL::_CullingProgram::_Link(
             "resultInstanceCount", // instanceCount
             "gl_SkipComponents4",  // firstIndex - modelDC
             "gl_SkipComponents4",  // constantDC - fvarDC
-            "gl_SkipComponents2",  // instanceIndexDC - shaderDC
             "gl_SkipComponents3",  // instanceIndexDC - vertexDC
         };
         const char **outputs = _useDrawArrays
             ? drawArraysOutputs
             : drawElementsOutputs;
 
-        const int nOutputs = 6;
+        const int nOutputs = 5;
         static_assert(
             sizeof(drawArraysOutputs)/sizeof(drawArraysOutputs[0])
             == nOutputs,
