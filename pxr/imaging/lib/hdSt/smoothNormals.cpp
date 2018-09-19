@@ -22,9 +22,11 @@
 // language governing permissions and limitations under the Apache License.
 //
 #include "pxr/imaging/glf/glew.h"
+#if defined(ARCH_GFX_METAL)
 // MTL_FIXME remove these when smooth normals GPU code calls through abstraction layer properly
 #include "pxr/imaging/mtlf/mtlDevice.h"
 #include "pxr/imaging/hdSt/Metal/mslProgram.h"
+#endif
 
 #include "pxr/imaging/garch/contextCaps.h"
 #include "pxr/imaging/garch/resourceFactory.h"
