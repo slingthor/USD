@@ -214,25 +214,23 @@ HdSt_SmoothNormalsComputationGPU::Execute(
     
     std::vector<id<MTLBuffer>> computeBuffers(3);
     std::vector<id<MTLTexture>> computeTextures;
-    
-    // These need to be pushed in the order they are specifed in the kernel - uniforms will go in the last buffer
-    computeBuffers[0] = points->GetId();     // buffer 0
-    computeBuffers[1] = normals->GetId();    // buffer 1
-    computeBuffers[2] = adjacency->GetId();  // buffer 2
-    
+ 
     // Only the normals are writebale
-    unsigned long bufferWriteableMask = 1 << 1;
+    unsigned long bufferWritableMask = 1 << 1;
+
+    id <MTLComputeCommandEncoder> computeEncoder = context->GetComputeEncoder();
+    computeEncoder.label = @"Compute pass for GPU Smooth Normals";
     
-    // These will be scheduled but not executed, they will be deferred until the render is kicked.
-    context->ScheduleComputeWorkload(computeFunction,
-                                     @"GPU Smooth Normals",
-                                     computeBuffers,
-                                     bufferWriteableMask,
-                                     (const void *)&uniform,
-                                     sizeof(uniform),
-                                     computeTextures,
-                                     MTLSizeMake(numPoints, 1, 1),
-                                     MTLSizeMake(1, 1, 1));
+    context->SetComputeEncoderState(computeFunction, bufferWritableMask, @"GPU Smooth Normals pipeline state");
+
+    [computeEncoder setBuffer:points->GetId()    offset:0 atIndex:0];
+    [computeEncoder setBuffer:normals->GetId()   offset:0 atIndex:1];
+    [computeEncoder setBuffer:adjacency->GetId() offset:0 atIndex:2];
+    [computeEncoder setBytes:(const void *)&uniform length:sizeof(uniform) atIndex:3];
+    
+    [computeEncoder dispatchThreads:MTLSizeMake(numPoints, 1, 1) threadsPerThreadgroup:MTLSizeMake(1, 1, 1)];
+    
+    context->ReleaseEncoder(false);
 #endif
 }
 

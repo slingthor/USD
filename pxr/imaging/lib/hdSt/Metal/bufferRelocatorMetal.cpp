@@ -44,9 +44,9 @@ HdStBufferRelocatorMetal::Commit()
     if (_queue.empty())
         return;
 
-    id<MTLCommandBuffer> commandBuffer = [MtlfMetalContext::GetMetalContext()->commandQueue commandBuffer];
-    id<MTLBlitCommandEncoder> blitEncoder = [commandBuffer blitCommandEncoder];
-
+    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
+    id<MTLBlitCommandEncoder> blitEncoder = context->GetBlitEncoder();
+    
     TF_FOR_ALL (it, _queue) {
         [blitEncoder copyFromBuffer:_srcBuffer
                        sourceOffset:it->readOffset
@@ -54,8 +54,8 @@ HdStBufferRelocatorMetal::Commit()
                   destinationOffset:it->writeOffset
                                size:it->copySize];
     }
-    [blitEncoder endEncoding];
-    [commandBuffer commit];
+    context->ReleaseEncoder(true);
+    context->CommitCommandBuffer(false, false);
 
     HD_PERF_COUNTER_ADD(HdPerfTokens->glCopyBufferSubData,
                         (double)_queue.size());

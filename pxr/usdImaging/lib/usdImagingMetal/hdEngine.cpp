@@ -757,9 +757,27 @@ UsdImagingMetalHdEngine::Render(RenderParams params)
     MTLRenderPassDepthAttachmentDescriptor *depthAttachment = _mtlRenderPassDescriptor.depthAttachment;
     depthAttachment.texture = context->mtlDepthTexture;
 
-    // Create a render command encoder so we can render into something
-    TF_VERIFY(context->commandBuffer == nil, "Render: A command buffer is already active");
-
+    if (params.applyRenderState) {
+        glDisable(GL_BLEND);
+    }
+    
+    // Create a new command buffer for each render pass to the current drawable
+    context->CreateCommandBuffer(METALWORKQUEUE_DEFAULT);
+    context->LabelCommandBuffer(@"HdEngine CommandBuffer", METALWORKQUEUE_DEFAULT);
+    
+#pragma message("Disabling GS buffer creation for now")
+    bool bGS = false;
+    
+    if (bGS) {
+        // Create a command buffer for the geometry shaders and make the default/render queue dependent on it completeing
+        context->CreateCommandBuffer(METALWORKQUEUE_GEOMETRY_SHADER);
+        context->LabelCommandBuffer(@"HdEngine CommandBuffer GS", METALWORKQUEUE_GEOMETRY_SHADER);
+        context->SetEventDependency(METALWORKQUEUE_DEFAULT);
+    }
+    
+    // Set the render pass descriptor to use for the render encoders
+    context->SetRenderPassDescriptor(_mtlRenderPassDescriptor);
+    
     // hydra orients all geometry during topological processing so that
     // front faces have ccw winding. We disable culling because culling
     // is handled by fragment shader discard.
@@ -770,16 +788,6 @@ UsdImagingMetalHdEngine::Render(RenderParams params)
     }
     context->setCullMode(MTLCullModeNone);
     
-    if (params.applyRenderState) {
-        glDisable(GL_BLEND);
-    }
-    
-    // Create a new command buffer for each render pass to the current drawable
-    id <MTLCommandBuffer> commandBuffer = context->CreateCommandBuffer();
-    commandBuffer.label = @"HdEngine CommandBuffer";
- 
-    id <MTLRenderCommandEncoder> renderEncoder = context->CreateRenderEncoder(_mtlRenderPassDescriptor);
-
     VtValue selectionValue(_selTracker);
     _engine.SetTaskContextData(HdxTokens->selectionState, selectionValue);
     VtValue renderTags(_renderTags);
@@ -788,38 +796,37 @@ UsdImagingMetalHdEngine::Render(RenderParams params)
     TfToken const& renderMode = params.enableIdRender ?
         HdxTaskSetTokens->idRender : HdxTaskSetTokens->colorRender;
     _engine.Execute(*_renderIndex, _taskController->GetTasks(renderMode));
-
-    context->EndEncoding();
-    
+   
     // Depth texture copy
     NSUInteger exeWidth = context->computeDepthCopyProgramExecutionWidth;
     MTLSize threadGroupCount = MTLSizeMake(16, exeWidth / 32, 1);
     MTLSize threadGroups     = MTLSizeMake(context->mtlDepthTexture.width / threadGroupCount.width + 1,
                                            context->mtlDepthTexture.height / threadGroupCount.height + 1, 1);
 
-    id <MTLComputeCommandEncoder> computeEncoder = [commandBuffer computeCommandEncoder];
+    id <MTLComputeCommandEncoder> computeEncoder = context->GetComputeEncoder();
     
     computeEncoder.label = @"Depth buffer copy";
 
-    [computeEncoder setComputePipelineState:context->computeDepthCopyPipelineState];
+    context->SetComputeEncoderState(context->computeDepthCopyProgram, 0, @"Depth copy pipeline state");
     
     [computeEncoder setTexture:context->mtlDepthTexture atIndex:0];
     [computeEncoder setTexture:context->mtlDepthRegularFloatTexture atIndex:1];
     
     [computeEncoder dispatchThreadgroups:threadGroups threadsPerThreadgroup: threadGroupCount];
-    [computeEncoder endEncoding];
+    
+    context->ReleaseEncoder(true);
+    
+    if (bGS) {
+        // Generate an event to indicate that the GS buffer has completed then commit it
+        context->GenerateEvent(METALWORKQUEUE_GEOMETRY_SHADER);
+        context->CommitCommandBuffer(false, false, METALWORKQUEUE_GEOMETRY_SHADER);
+    }
+    // Commit the render buffer (will wait for GS to complete if present)
+    context->CommitCommandBuffer(false, false);
     
     // Finalize rendering here & push the command buffer to the GPU
-    context->Commit();
     [sharedCaptureManager.defaultCaptureScope endScope];
-    
-    [commandBuffer waitUntilScheduled];
-
-    context->renderEncoder = nil;
-    context->computeEncoder = nil;
-    context->commandBuffer = nil;
-    //context->computeCommandBuffer = nil;
-
+ 
     glPushAttrib(GL_ENABLE_BIT | GL_POLYGON_BIT | GL_DEPTH_BUFFER_BIT);
 
     glEnable(GL_DEPTH_TEST);

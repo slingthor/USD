@@ -336,13 +336,13 @@ MtlfBaseTexture::_CreateTexture(GarchBaseTextureDataConstPtr texData,
 
             if (genMips) {
                 // Blit command encoder to generate mips
-                id<MTLCommandBuffer> commandBuffer = [MtlfMetalContext::GetMetalContext()->commandQueue commandBuffer];
-                id<MTLBlitCommandEncoder> blitEncoder = [commandBuffer blitCommandEncoder];
-
+                MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
+                id<MTLBlitCommandEncoder> blitEncoder = context->GetBlitEncoder();
+             
                 [blitEncoder generateMipmapsForTexture:_textureName];
-                [blitEncoder endEncoding];
-
-                [commandBuffer commit];
+                
+                context->ReleaseEncoder(true);
+                context->CommitCommandBuffer(false, false);
             }
 
         } else {
