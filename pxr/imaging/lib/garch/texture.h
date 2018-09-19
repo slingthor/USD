@@ -37,6 +37,10 @@
 
 #include "pxr/imaging/garch/gl.h"
 
+#if defined(ARCH_OS_WINDOWS)
+typedef uint64_t GLuint64;
+#endif
+
 #if defined(ARCH_GFX_METAL)
 #include <Metal/Metal.h>
 #endif

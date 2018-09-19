@@ -32,6 +32,11 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 TF_INSTANTIATE_SINGLETON(GarchResourceFactory);
 
+GarchResourceFactory&
+GarchResourceFactory::GetInstance() {
+    return TfSingleton<GarchResourceFactory>::GetInstance();
+}
+
 GarchResourceFactory::GarchResourceFactory():
     factory(NULL)
 {

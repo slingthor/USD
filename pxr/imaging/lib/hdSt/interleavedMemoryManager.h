@@ -56,6 +56,7 @@ public:
     class _StripedInterleavedBufferRange : public HdBufferArrayRange {
     public:
         /// Constructor.
+        HDST_API
         _StripedInterleavedBufferRange() :
             _stripedBuffer(nullptr), _index(NOT_ALLOCATED), _numElements(1) {
         }
@@ -65,6 +66,7 @@ public:
         virtual ~_StripedInterleavedBufferRange();
 
         /// Returns true if this range is valid
+        HDST_API
         virtual bool IsValid() const override {
             // note: a range is valid even its index is NOT_ALLOCATED.
             return (bool)_stripedBuffer;
@@ -75,6 +77,7 @@ public:
         virtual bool IsAssigned() const override;
 
         /// Returns true if this range is marked as immutable.
+        HDST_API
         virtual bool IsImmutable() const override;
 
         /// Resize memory area for this range. Returns true if it causes container
@@ -91,6 +94,7 @@ public:
         virtual VtValue ReadData(TfToken const &name) const override;
 
         /// Returns the relative offset in aggregated buffer
+        HDST_API
         virtual int GetOffset() const override {
             if (!TF_VERIFY(_stripedBuffer) ||
                 !TF_VERIFY(_index != NOT_ALLOCATED)) return 0;
@@ -98,21 +102,25 @@ public:
         }
 
         /// Returns the index for this range
+        HDST_API
         virtual int GetIndex() const override {
             return _index;
         }
 
         /// Returns the number of elements
+        HDST_API
         virtual size_t GetNumElements() const override {
             return _numElements;
         }
 
         /// Returns the version of the buffer array.
+        HDST_API
         virtual size_t GetVersion() const override {
             return _stripedBuffer->GetVersion();
         }
 
         /// Increment the version of the buffer array.
+        HDST_API
         virtual void IncrementVersion() override {
             _stripedBuffer->IncrementVersion();
         }
@@ -142,15 +150,17 @@ public:
         HDST_API
         virtual void DebugDump(std::ostream &out) const override;
         
-        HD_API
+        HDST_API
         virtual void GetBufferSpecs(HdBufferSpecVector *specs) const override {}
 
         /// Set the relative offset for this range.
+        HDST_API
         void SetIndex(int index) {
             _index = index;
         }
 
         /// Make this range invalid
+        HDST_API
         void Invalidate() {
             _stripedBuffer = nullptr;
         }
@@ -206,16 +216,19 @@ public:
                 HdBufferArraySharedPtr const &curRangeOwner) override = 0;
 
         /// Mark to perform reallocation on Reallocate()
+        HDST_API
         void SetNeedsReallocation() {
             _needsReallocation = true;
         }
 
         /// Mark to perform compaction on GarbageCollect()
+        HDST_API
         void SetNeedsCompaction() {
             _needsCompaction = true;
         }
 
         /// Returns the stride.
+        HDST_API
         int GetStride() const {
             return _stride;
         }
@@ -238,6 +251,7 @@ public:
         HdStBufferResourceSharedPtr GetResource(TfToken const& name);
 
         /// Returns the list of all named GPU resources for this bufferArray.
+        HDST_API
         HdBufferResourceNamedList const& GetResources() const {return _resourceList;}
 
         /// Reconstructs the bufferspecs and returns it (for buffer splitting)

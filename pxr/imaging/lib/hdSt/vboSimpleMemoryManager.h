@@ -61,10 +61,12 @@ public:
         HdBufferSpecVector const &bufferSpecs) const;
 
     /// Returns the buffer specs from a given buffer array
+    HDST_API
     virtual HdBufferSpecVector GetBufferSpecs(
         HdBufferArraySharedPtr const &bufferArray) const;
 
     /// Returns the size of the GPU memory used by the passed buffer array
+    HDST_API
     virtual size_t GetResourceAllocation(
         HdBufferArraySharedPtr const &bufferArray, 
         VtDictionary &result) const;
@@ -80,11 +82,13 @@ public:
     {
     public:
         /// Constructor.
+        HDST_API
         _SimpleBufferArrayRange() :
             _bufferArray(nullptr), _numElements(0) {
         }
 
         /// Returns true if this range is valid
+        HDST_API
         virtual bool IsValid() const override {
             return (bool)_bufferArray;
         }
@@ -94,10 +98,12 @@ public:
         virtual bool IsAssigned() const override;
 
         /// Returns true if this range is marked as immutable.
+        HDST_API
         virtual bool IsImmutable() const override;
 
         /// Resize memory area for this range. Returns true if it causes container
         /// buffer reallocation.
+        HDST_API
         virtual bool Resize(int numElements) override {
             _numElements = numElements;
             return _bufferArray->Resize(numElements);
@@ -112,31 +118,37 @@ public:
         virtual VtValue ReadData(TfToken const &name) const override;
 
         /// Returns the relative offset in aggregated buffer
+        HDST_API
         virtual int GetOffset() const override {
             return 0;
         }
 
         /// Returns the index in aggregated buffer
+        HDST_API
         virtual int GetIndex() const override {
             return 0;
         }
 
         /// Returns the number of elements allocated
+        HDST_API
         virtual size_t GetNumElements() const override {
             return _numElements;
         }
 
         /// Returns the capacity of allocated area for this range
+        HDST_API
         virtual int GetCapacity() const {
             return _bufferArray->GetCapacity();
         }
 
         /// Returns the version of the buffer array.
+        HDST_API
         virtual size_t GetVersion() const override {
             return _bufferArray->GetVersion();
         }
 
         /// Increment the version of the buffer array.
+        HDST_API
         virtual void IncrementVersion() override {
             _bufferArray->IncrementVersion();
         }
@@ -166,10 +178,11 @@ public:
         HDST_API
         virtual void DebugDump(std::ostream &out) const override;
 
-        HD_API
+        HDST_API
         virtual void GetBufferSpecs(HdBufferSpecVector *bufferSpecs) const override {}
         
         /// Make this range invalid
+        HDST_API
         void Invalidate() {
             _bufferArray = nullptr;
         }
@@ -237,6 +250,7 @@ public:
         virtual size_t GetMaxNumElements() const override;
 
         /// Returns current capacity. It could be different from numElements.
+        HDST_API
         int GetCapacity() const {
             return _capacity;
         }
@@ -259,6 +273,7 @@ public:
         HdBufferResourceSharedPtr GetResource(TfToken const& name);
 
         /// Returns the list of all named GPU resources for this bufferArray.
+        HDST_API
         HdBufferResourceNamedList const& GetResources() const {return _resourceList;}
 
         /// Reconstructs the bufferspecs and returns it (for buffer splitting)
@@ -280,6 +295,7 @@ public:
 
         HdBufferResourceNamedList _resourceList;
 
+        HDST_API
         _SimpleBufferArrayRangeSharedPtr _GetRangeSharedPtr() const {
             return GetRangeCount() > 0
                 ? boost::static_pointer_cast<_SimpleBufferArrayRange>(GetRange(0).lock())

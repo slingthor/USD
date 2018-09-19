@@ -27,6 +27,7 @@
 /// \file glf/resourceFactory.h
 
 #include "pxr/pxr.h"
+#include "pxr/imaging/glf/api.h"
 #include "pxr/imaging/glf/contextCaps.h"
 #include "pxr/imaging/garch/resourceFactory.h"
 
@@ -36,34 +37,46 @@ class GlfContextCaps;
 
 class GlfResourceFactory : public GarchResourceFactoryInterface {
 public:
+    GLF_API
     GlfResourceFactory();
+    
+    GLF_API
     virtual ~GlfResourceFactory();
 
     // GarchContextCaps
+    GLF_API
     virtual GarchContextCaps const& GetContextCaps() const override {
         return contextCaps;
     }
 
     // GarchSimpleLightingContext creation
+    GLF_API
     virtual GarchSimpleLightingContext *NewSimpleLightingContext() const override;
     
     // GarchSimpleShadowArray creation
+    GLF_API
     virtual GarchSimpleShadowArray *NewSimpleShadowArray(GfVec2i const & size, size_t numLayers) const override;
     
     // GarchBindingMap creation
+    GLF_API
     virtual GarchBindingMap *NewBindingMap() const override;
     
     // GarchDrawTarget creation
+    GLF_API
     virtual GarchDrawTarget *NewDrawTarget(GfVec2i const & size, bool requestMSAA) const override;
+    GLF_API
     virtual GarchDrawTarget *NewDrawTarget(GarchDrawTargetPtr const & drawtarget) const override;
     
     // UniformBlock creation
+    GLF_API
     virtual GarchUniformBlockRefPtr NewUniformBlock(char const *label = nullptr) const override;
     
     // Package Name accessor
+    GLF_API
     virtual std::string GetPackageName() const override { return "glf"; }
     
     // ArrayTexture creation
+    GLF_API
     virtual GarchArrayTextureRefPtr NewArrayTexture(TfTokenVector const &imageFilePaths,
                                                     unsigned int arraySize,
                                                     unsigned int cropTop,
@@ -73,6 +86,7 @@ public:
                                                     GarchImage::ImageOriginLocation originLocation) const override;
     
     // BaseTexture
+    GLF_API
     virtual GarchBaseTexture *NewBaseTexture() const override;
     
 private:

@@ -61,4 +61,4 @@ void wrapBaseTexture()
         ;
 }
 
-TF_REFPTR_CONST_VOLATILE_GET(GlfBaseTexture)
+TF_REFPTR_CONST_VOLATILE_GET(GarchBaseTexture)

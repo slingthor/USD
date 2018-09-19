@@ -54,31 +54,41 @@ TF_DECLARE_WEAK_AND_REF_PTRS(GarchUniformBlock);
 
 class GarchResourceFactoryInterface {
 public:
+	GARCH_API
     virtual ~GarchResourceFactoryInterface() {}
     
     // GarchContextCaps
+	GARCH_API
     virtual GarchContextCaps const& GetContextCaps() const = 0;
     
     // SimpleLightingContext creation
+	GARCH_API
     virtual GarchSimpleLightingContext *NewSimpleLightingContext() const = 0;
     
     // SimpleShadowArray creation
+	GARCH_API
     virtual GarchSimpleShadowArray *NewSimpleShadowArray(GfVec2i const & size, size_t numLayers) const = 0;
     
     // BindingMap
+	GARCH_API
     virtual GarchBindingMap *NewBindingMap() const = 0;
     
     // DrawTarget
+	GARCH_API
     virtual GarchDrawTarget *NewDrawTarget(GfVec2i const & size, bool requestMSAA) const = 0;
+	GARCH_API
     virtual GarchDrawTarget *NewDrawTarget(GarchDrawTargetPtr const & drawtarget) const = 0;
     
     // UniformBlock creation
+	GARCH_API
     virtual GarchUniformBlockRefPtr NewUniformBlock(char const *label = nullptr) const = 0;
     
     // Package Name accessor
+	GARCH_API
     virtual std::string GetPackageName() const = 0;
     
     // ArrayTexture creation
+	GARCH_API
     virtual GarchArrayTextureRefPtr NewArrayTexture(TfTokenVector const &imageFilePaths,
                                                     unsigned int arraySize,
                                                     unsigned int cropTop,
@@ -88,23 +98,30 @@ public:
                                                     GarchImage::ImageOriginLocation originLocation) const = 0;
     
     // BaseTexture
+	GARCH_API
     virtual GarchBaseTexture *NewBaseTexture() const = 0;
     
 protected:
+	GARCH_API
     GarchResourceFactoryInterface() {}
 };
 
 class GarchResourceFactory : boost::noncopyable {
 public:
-    static GarchResourceFactory& GetInstance() {
-         return TfSingleton<GarchResourceFactory>::GetInstance();
-    }
+	GARCH_API
+    static GarchResourceFactory& GetInstance();
 
+	GARCH_API
     GarchResourceFactoryInterface *operator ->() const;
+
+	GARCH_API
     void SetResourceFactory(GarchResourceFactoryInterface *factory);
 
 private:
+	GARCH_API
     GarchResourceFactory();
+
+	GARCH_API
     ~GarchResourceFactory();
 
     GarchResourceFactoryInterface *factory;
