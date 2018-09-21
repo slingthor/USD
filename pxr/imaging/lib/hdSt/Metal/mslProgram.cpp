@@ -499,7 +499,7 @@ void HdStMSLProgram::SetProgram() {
 }
 
 void HdStMSLProgram::UnsetProgram() {
-    MtlfMetalContext::GetMetalContext()->ClearState();
+    MtlfMetalContext::GetMetalContext()->ClearRenderEncoderState();
     
     if (!_currentlySet) {
         TF_FATAL_CODING_ERROR("HdStProgram wasn't previously set, or has already been unset");
@@ -544,10 +544,13 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
             indexSize = sizeof(uint32_t);
             break;
     }
-    
+  
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
     
-    if(_enableComputeGSPath) {
+    // Possibly move this outside this function as we shouldn't need to get a render encoder every draw call
+    id <MTLRenderCommandEncoder> renderEncoder = context->GetRenderEncoder();
+
+      if(_enableComputeGSPath) {
         context->SetupComputeGS(_computeGSIndexSlot,
                                 bDrawingQuads ? context->GetQuadIndexBuffer(indexTypeMetal) : context->GetIndexBuffer(),
                                 indexCount,
@@ -558,45 +561,68 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
                                 _computeGSOutputSlot);
     }
 
+    
     const_cast<HdStMSLProgram*>(this)->BakeState();
 
+    id <MTLComputeCommandEncoder> computeEncoder;
+    
+    // Get a compute encoder on the Geometry Shader work queue
+    if(_enableComputeGSPath) {
+        computeEncoder = context->GetComputeEncoder(METALWORKQUEUE_GEOMETRY_SHADER);
+    }
+    
     if (bDrawingQuads) {
         if(_enableComputeGSPath)
         {
-            [context->computeEncoder dispatchThreads:MTLSizeMake((((indexCount/4)*6) / 3) * instanceCount, 1, 1) threadsPerThreadgroup:MTLSizeMake(64, 1, 1)];
-            [context->renderEncoder drawPrimitives:primType vertexStart:0 vertexCount:((indexCount/4)*6) instanceCount:instanceCount baseInstance:0];
+            [computeEncoder dispatchThreads:MTLSizeMake((((indexCount/4)*6) / 3) * instanceCount, 1, 1) threadsPerThreadgroup:MTLSizeMake(64, 1, 1)];
+            [renderEncoder drawPrimitives:primType vertexStart:0 vertexCount:((indexCount/4)*6) instanceCount:instanceCount baseInstance:0];
         }
         else
-            [context->renderEncoder drawIndexedPrimitives:primType indexCount:((indexCount/4)*6) indexType:indexTypeMetal indexBuffer:context->GetQuadIndexBuffer(indexTypeMetal) indexBufferOffset:(((firstIndex/4)*6) * indexSize) instanceCount:instanceCount baseVertex:baseVertex baseInstance:0];
+            [renderEncoder drawIndexedPrimitives:primType indexCount:((indexCount/4)*6) indexType:indexTypeMetal indexBuffer:context->GetQuadIndexBuffer(indexTypeMetal) indexBufferOffset:(((firstIndex/4)*6) * indexSize) instanceCount:instanceCount baseVertex:baseVertex baseInstance:0];
     }
     else  {
         if(_enableComputeGSPath)
         {
-            [context->computeEncoder dispatchThreads:MTLSizeMake(indexCount/3,1,1) threadsPerThreadgroup:MTLSizeMake(64,1,1)];
-            [context->renderEncoder drawPrimitives:primType vertexStart:0 vertexCount:indexCount instanceCount:instanceCount baseInstance:0];
+            [computeEncoder dispatchThreads:MTLSizeMake(indexCount/3,1,1) threadsPerThreadgroup:MTLSizeMake(64,1,1)];
+            [renderEncoder drawPrimitives:primType vertexStart:0 vertexCount:indexCount instanceCount:instanceCount baseInstance:0];
         }
         else
-            [context->renderEncoder drawIndexedPrimitives:primType indexCount:indexCount indexType:indexTypeMetal indexBuffer:context->GetIndexBuffer() indexBufferOffset:(firstIndex * indexSize) instanceCount:instanceCount baseVertex:baseVertex baseInstance:0];
+            [renderEncoder drawIndexedPrimitives:primType indexCount:indexCount indexType:indexTypeMetal indexBuffer:context->GetIndexBuffer() indexBufferOffset:(firstIndex * indexSize) instanceCount:instanceCount baseVertex:baseVertex baseInstance:0];
     }
+    
+    context->ReleaseEncoder(false);
+    
+    if(_enableComputeGSPath)
+    {
+        // Release the geometry shader encoder
+        context->ReleaseEncoder(false, METALWORKQUEUE_GEOMETRY_SHADER);
+    }
+
 }
 
 void HdStMSLProgram::DrawArraysInstanced(GLenum primitiveMode,
                                           GLint baseVertex,
                                           GLint vertexCount,
                                           GLint instanceCount) const {
-    const_cast<HdStMSLProgram*>(this)->BakeState();
     
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
     
     MTLPrimitiveType primType = GetMetalPrimType(primitiveMode);
-    [context->renderEncoder drawPrimitives:primType vertexStart:baseVertex vertexCount:vertexCount instanceCount:instanceCount];
+    
+    // Possibly move this outside this function as we shouldn't need to get a render encoder every draw call
+    id <MTLRenderCommandEncoder> renderEncoder = context->GetRenderEncoder();
+    
+    const_cast<HdStMSLProgram*>(this)->BakeState();
+    
+    
+    [renderEncoder drawPrimitives:primType vertexStart:baseVertex vertexCount:vertexCount instanceCount:instanceCount];
+    
+    context->ReleaseEncoder(false);
 }
 
 void HdStMSLProgram::BakeState()
 {
-    id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->device;
-
-    MtlfMetalContext::GetMetalContext()->BakeState();
+    MtlfMetalContext::GetMetalContext()->SetRenderEncoderState();
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

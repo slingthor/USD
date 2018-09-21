@@ -325,13 +325,11 @@ MtlfDrawTarget::Bind()
               "to Bind(GarchDrawTarget::AttachmentsMap const &attachments)");
     
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
-    
-    // Create a render command encoder so we can render into something
-    TF_VERIFY(context->commandBuffer == nil, "Bind: A command buffer is already active");
-  
+   
     context->SetDrawTarget(this);
     context->CreateCommandBuffer();
-    context->CreateRenderEncoder(_mtlRenderPassDescriptor);
+    context->LabelCommandBuffer(@"DrawTarget:Bind");
+    context->SetRenderPassDescriptor(_mtlRenderPassDescriptor);
 }
 
 void
@@ -360,11 +358,10 @@ MtlfDrawTarget::Unbind()
     }
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
     context->SetDrawTarget(NULL);
-    context->EndEncoding();
-    context->Commit();
-    
-    context->commandBuffer = nil;
-    //context->computeCommandBuffer = nil;
+    // Terminate the render encoder containing all the draw commands
+    context->GetRenderEncoder();
+    context->ReleaseEncoder(true);
+    context->CommitCommandBuffer(false, false);
     
     TouchContents();
 }
@@ -449,18 +446,19 @@ MtlfDrawTarget::GetImage(std::string const & name, void* buffer) const
         bytesPerPixel = 4;
     }
     
-    id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->device;
-    id<MTLCommandBuffer> commandBuffer = [MtlfMetalContext::GetMetalContext()->commandQueue commandBuffer];
-    id<MTLBlitCommandEncoder> blitEncoder = [commandBuffer blitCommandEncoder];
+    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
+    id<MTLDevice> device = context->device;
+    context->CreateCommandBuffer();
+    context->LabelCommandBuffer(@"Get Image");
+    id<MTLBlitCommandEncoder> blitEncoder = context->GetBlitEncoder();
     
     id<MTLBuffer> cpuBuffer = [device newBufferWithLength:(bytesPerPixel * width * height) options:MTLResourceStorageModeManaged];
 
     [blitEncoder copyFromTexture:texture sourceSlice:0 sourceLevel:0 sourceOrigin:MTLOriginMake(0, 0, 0) sourceSize:MTLSizeMake(width, height, 1) toBuffer:cpuBuffer destinationOffset:0 destinationBytesPerRow:(bytesPerPixel * width) destinationBytesPerImage:(bytesPerPixel * width * height) options:blitOptions];
     [blitEncoder synchronizeResource:cpuBuffer];
-    [blitEncoder endEncoding];
-
-    [commandBuffer commit];
-    [commandBuffer waitUntilCompleted];
+   
+    context->ReleaseEncoder(true);
+    context->CommitCommandBuffer(false, true);
 
     memcpy(buffer, [cpuBuffer contents], bytesPerPixel * width * height);
     [cpuBuffer release];
