@@ -24,11 +24,14 @@
 #include "pxr/imaging/glf/glew.h"
 #include "pxr/imaging/garch/contextCaps.h"
 #include "pxr/imaging/garch/resourceFactory.h"
+
 #if defined(ARCH_GFX_METAL)
 #include "pxr/imaging/mtlf/mtlDevice.h"
+#include "pxr/imaging/hdSt/Metal/dispatchBufferMetal.h"
 #endif
 
 #include "pxr/imaging/hdSt/dispatchBuffer.h"
+#include "pxr/imaging/hdSt/GL/dispatchBufferGL.h"
 #include "pxr/imaging/hd/engine.h"
 #include "pxr/imaging/hd/perfLog.h"
 
@@ -163,122 +166,38 @@ private:
     HdStDispatchBuffer *_buffer;
 };
 
+HdStDispatchBuffer *HdStDispatchBuffer::New(TfToken const &role, int count,
+                                            unsigned int commandNumUints)
+{
+    HdEngine::RenderAPI api = HdEngine::GetRenderAPI();
+    switch(api)
+    {
+        case HdEngine::OpenGL:
+            return new HdStDispatchBufferGL(role, count, commandNumUints);
+#if defined(ARCH_GFX_METAL)
+        case HdEngine::Metal:
+            return new HdStDispatchBufferMetal(role, count, commandNumUints);
+#endif
+        default:
+            TF_FATAL_CODING_ERROR("No HdStDispatchBuffer for this API");
+    }
+    return NULL;
+}
 
 HdStDispatchBuffer::HdStDispatchBuffer(TfToken const &role, int count,
-                                   unsigned int commandNumUints)
-    : HdBufferArray(role, TfToken()), _count(count), _commandNumUints(commandNumUints)
+                                       unsigned int commandNumUints)
+: HdBufferArray(role, TfToken()), _count(count), _commandNumUints(commandNumUints)
 {
-    HD_TRACE_FUNCTION();
-    HF_MALLOC_TAG_FUNCTION();
-
-    GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
-
     size_t stride = commandNumUints * sizeof(GLuint);
-    size_t dataSize = count * stride;
-    
-    HdResourceGPUHandle newId;
-
-#if defined(ARCH_GFX_METAL)
-    if(HdEngine::GetRenderAPI() == HdEngine::Metal)
-    {
-        id<MTLBuffer> nid = nil;
-        nid = [MtlfMetalContext::GetMetalContext()->device newBufferWithLength:dataSize options:MTLResourceStorageModeManaged];
-        
-        newId = nid;
-    }
-    else
-#endif
-    if(HdEngine::GetRenderAPI() == HdEngine::OpenGL)
-    {
-        GLuint nid = 0;
-        glGenBuffers(1, &nid);
-        // just allocate uninitialized
-        if (caps.directStateAccessEnabled) {
-            glNamedBufferDataEXT(nid, dataSize, NULL, GL_STATIC_DRAW);
-        } else {
-            glBindBuffer(GL_ARRAY_BUFFER, nid);
-            glBufferData(GL_ARRAY_BUFFER, dataSize, NULL, GL_STATIC_DRAW);
-            glBindBuffer(GL_ARRAY_BUFFER, 0);
-        }
-
-        newId = nid;
-    }
-    else
-    {
-        TF_FATAL_CODING_ERROR("No implementation for this API");
-    }
 
     // monolithic resource
     _entireResource = HdStBufferResourceSharedPtr(
-            HdStBufferResource::New(
-            role, {HdTypeInt32, 1},
-            /*offset=*/0, stride));
-    _entireResource->SetAllocation(newId, dataSize);
+          HdStBufferResource::New(role, {HdTypeInt32, 1},
+                                  /*offset=*/0, stride));
 
     // create a buffer array range, which aggregates all views
     // (will be added by AddBufferResourceView)
     _bar = HdBufferArrayRangeSharedPtr(new Hd_DispatchBufferArrayRange(this));
-}
-
-HdStDispatchBuffer::~HdStDispatchBuffer()
-{
-    HdResourceGPUHandle _id = _entireResource->GetId();
-#if defined(ARCH_GFX_METAL)
-    if(HdEngine::GetRenderAPI() == HdEngine::Metal)
-    {
-        id<MTLBuffer> oid = _id;
-        [oid release];
-    }
-    else
-#endif
-    if(HdEngine::GetRenderAPI() == HdEngine::OpenGL)
-    {
-        GLuint oid = _id;
-        glDeleteBuffers(1, &oid);
-    }
-    else
-    {
-        TF_FATAL_CODING_ERROR("No implementation for this API");
-    }
-    
-    _entireResource->SetAllocation(HdResourceGPUHandle(), 0);
-}
-
-void
-HdStDispatchBuffer::CopyData(std::vector<GLuint> const &data)
-{
-    if (!TF_VERIFY(data.size()*sizeof(GLuint) == static_cast<size_t>(_entireResource->GetSize())))
-        return;
-
-#if defined(ARCH_GFX_METAL)
-    if(HdEngine::GetRenderAPI() == HdEngine::Metal)
-    {
-        id<MTLBuffer> buffer = _entireResource->GetId();
-        memcpy([buffer contents], &data[0], _entireResource->GetSize());
-    }
-    else
-#endif
-    if(HdEngine::GetRenderAPI() == HdEngine::OpenGL)
-    {
-        GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
-
-        if (caps.directStateAccessEnabled) {
-            glNamedBufferSubDataEXT(_entireResource->GetId(),
-                                    0,
-                                    _entireResource->GetSize(),
-                                    &data[0]);
-        } else {
-            glBindBuffer(GL_ARRAY_BUFFER, _entireResource->GetId());
-            glBufferSubData(GL_ARRAY_BUFFER, 0,
-                            _entireResource->GetSize(),
-                            &data[0]);
-            glBindBuffer(GL_ARRAY_BUFFER, 0);
-        }
-    }
-    else
-    {
-        TF_FATAL_CODING_ERROR("No implementation for this API");
-    }
 }
 
 void

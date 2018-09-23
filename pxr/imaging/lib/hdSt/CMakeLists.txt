@@ -23,6 +23,7 @@ if (APPLE)
     set(GFXADDITIONAL   Metal/bufferRelocatorMetal
                         Metal/bufferResourceMetal
                         Metal/codeGenMSL
+                        Metal/dispatchBufferMetal
                         Metal/drawTargetTextureResourceMetal
                         Metal/indirectDrawBatchMetal
                         Metal/interleavedMemoryBufferMetal
@@ -132,6 +133,7 @@ pxr_library(hdSt
         GL/bufferRelocatorGL
         GL/bufferResourceGL
         GL/codeGenGLSL
+        GL/dispatchBufferGL
         GL/glConversions
         GL/drawTargetTextureResourceGL
         GL/glslProgram
