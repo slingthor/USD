@@ -34,34 +34,46 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 class MtlfResourceFactory : public GarchResourceFactoryInterface {
 public:
+    MTLF_API
     MtlfResourceFactory();
+    
+    MTLF_API
     virtual ~MtlfResourceFactory();
     
     // GarchContextCaps
+    MTLF_API
     virtual GarchContextCaps const& GetContextCaps() const override {
         return contextCaps;
     }
 
     // GarchSimpleLightingContext creation
+    MTLF_API
     virtual GarchSimpleLightingContext *NewSimpleLightingContext() const override;
     
     // GarchSimpleShadowArray creation
+    MTLF_API
     virtual GarchSimpleShadowArray *NewSimpleShadowArray(GfVec2i const & size, size_t numLayers) const override;
     
     // GarchBindingMap creation
+    MTLF_API
     virtual GarchBindingMap *NewBindingMap() const override;
     
     // GarchDrawTarget creation
+    MTLF_API
     virtual GarchDrawTarget *NewDrawTarget(GfVec2i const & size, bool requestMSAA) const override;
+    MTLF_API
     virtual GarchDrawTarget *NewDrawTarget(GarchDrawTargetPtr const & drawtarget) const override;
     
     // UniformBlock creation
+    MTLF_API
     virtual GarchUniformBlockRefPtr NewUniformBlock(char const *label = nullptr) const override;
     
     // Package Name accessor
+    MTLF_API
     virtual std::string GetPackageName() const override { return "mtlf"; }
     
     // ArrayTexture creation
+    MTLF_API
     virtual GarchArrayTextureRefPtr NewArrayTexture(TfTokenVector const &imageFilePaths,
                                                     unsigned int arraySize,
                                                     unsigned int cropTop,
@@ -71,7 +83,12 @@ public:
                                                     GarchImage::ImageOriginLocation originLocation) const override;
     
     // BaseTexture
+    MTLF_API
     virtual GarchBaseTexture *NewBaseTexture() const override;
+    
+    // pTex
+    MTLF_API
+    virtual bool IsSupportedPtexTexture(std::string const & imageFilePath) const override;
     
 private:
     MtlfContextCaps contextCaps;

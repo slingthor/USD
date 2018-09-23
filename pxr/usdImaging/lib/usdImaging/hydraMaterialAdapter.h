@@ -21,40 +21,40 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#ifndef USDIMAGINGMETAL_HYDRAMATERIALADAPTER_H
-#define USDIMAGINGMETAL_HYDRAMATERIALADAPTER_H
+#ifndef USDIMAGING_HYDRAMATERIALADAPTER_H
+#define USDIMAGING_HYDRAMATERIALADAPTER_H
 
 #include "pxr/pxr.h"
-#include "pxr/usdImaging/usdImagingMetal/api.h"
+#include "pxr/usdImaging/usdImaging/api.h"
 #include "pxr/usdImaging/usdImaging/primAdapter.h"
 #include "pxr/imaging/hd/materialParam.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-/// \class UsdImagingMetalHydraMaterialAdapter
+/// \class UsdImagingHydraMaterialAdapter
 /// \brief Provides information that can be used to generate a surface shader in
 /// hydra.
-class UsdImagingMetalHydraMaterialAdapter : public UsdImagingPrimAdapter {
+class UsdImagingHydraMaterialAdapter : public UsdImagingPrimAdapter {
 public:
     typedef UsdImagingPrimAdapter BaseAdapter;
 
-    UsdImagingMetalHydraMaterialAdapter()
+    UsdImagingHydraMaterialAdapter()
         : UsdImagingPrimAdapter()
     {}
 
-    USDIMAGINGMETAL_API
-    virtual ~UsdImagingMetalHydraMaterialAdapter();
+    USDIMAGING_API
+    virtual ~UsdImagingHydraMaterialAdapter();
 
-    USDIMAGINGMETAL_API
+    USDIMAGING_API
     virtual SdfPath Populate(
-             UsdPrim const& prim,
-             UsdImagingIndexProxy* index,
-             UsdImagingInstancerContext const* instancerContext = NULL) override;
+            UsdPrim const& prim,
+            UsdImagingIndexProxy* index,
+            UsdImagingInstancerContext const* instancerContext = NULL) override;
 
-    USDIMAGINGMETAL_API
+    USDIMAGING_API
     virtual bool IsSupported(UsdImagingIndexProxy const* index) const override;
 
-    USDIMAGINGMETAL_API
+    USDIMAGING_API
     virtual bool IsPopulatedIndirectly() override;
 
     // ---------------------------------------------------------------------- //
@@ -62,22 +62,22 @@ public:
     // ---------------------------------------------------------------------- //
 
     /// Thread Safe.
-    USDIMAGINGMETAL_API
+    USDIMAGING_API
     virtual void TrackVariability(UsdPrim const& prim,
                                   SdfPath const& cachePath,
                                   HdDirtyBits* timeVaryingBits,
-                                  UsdImagingInstancerContext const*
-                                        instancerContext = NULL) const override;
+                                  UsdImagingInstancerContext const* 
+                                      instancerContext = NULL) const override;
 
 
     /// Thread Safe.
-    USDIMAGINGMETAL_API
+    USDIMAGING_API
     virtual void UpdateForTime(UsdPrim const& prim,
-                               SdfPath const& cachePath,
+                               SdfPath const& cachePath, 
                                UsdTimeCode time,
                                HdDirtyBits requestedBits,
-                               UsdImagingInstancerContext const*
-                                    instancerContext = NULL) const override;
+                               UsdImagingInstancerContext const* 
+                                   instancerContext = NULL) const override;
 
     // ---------------------------------------------------------------------- //
     /// \name Change Processing 
@@ -85,13 +85,13 @@ public:
 
     /// Returns a bit mask of attributes to be udpated, or
     /// HdChangeTracker::AllDirty if the entire prim must be resynchronized.
-    USDIMAGINGMETAL_API
+    USDIMAGING_API
     virtual HdDirtyBits ProcessPropertyChange(
-                          UsdPrim const& prim,
-                          SdfPath const& cachePath,
-                          TfToken const& propertyName) override;
+            UsdPrim const& prim,
+            SdfPath const& cachePath,
+            TfToken const& propertyName) override;
 
-    USDIMAGINGMETAL_API
+    USDIMAGING_API
     virtual void MarkDirty(UsdPrim const& prim,
                            SdfPath const& cachePath,
                            HdDirtyBits dirty,
@@ -100,72 +100,72 @@ public:
     // ---------------------------------------------------------------------- //
     /// \name Texture resources
     // ---------------------------------------------------------------------- //
-    
+
     virtual HdTextureResource::ID
-    GetTextureResourceID(UsdPrim const& usdPrim,
-                         SdfPath const &id,
-                         UsdTimeCode time,
+    GetTextureResourceID(UsdPrim const& usdPrim, 
+                         SdfPath const &id, 
+                         UsdTimeCode time, 
                          size_t salt) const override;
-    
+
     virtual HdTextureResourceSharedPtr
-    GetTextureResource(UsdPrim const& usdPrim,
-                       SdfPath const &id,
+    GetTextureResource(UsdPrim const& usdPrim, 
+                       SdfPath const &id, 
                        UsdTimeCode time) const override;
 
 protected:
-    USDIMAGINGMETAL_API
+    USDIMAGING_API
     virtual void _RemovePrim(SdfPath const& cachePath,
                              UsdImagingIndexProxy* index) final;
 
 private:
     /// \brief Returns the source string for the specified shader
     /// terminal for the shader \p prim.
-    ///
+    /// 
     /// This obtains the shading source.
     std::string _GetShaderSource(UsdPrim const& prim,
                                  TfToken const& shaderType) const;
-    
-    /// \brief Returns the root "surface" shader prim for the material, by
+
+    /// \brief Returns the root "surface" shader prim for the material, by 
     /// traversing which the entire hydra shading network can be discovered.
-    ///
-    /// Returns an invalid prim if the material does not have a 'surface'
+    /// 
+    /// Returns an invalid prim if the material does not have a 'surface' 
     /// shader.
     UsdPrim _GetSurfaceShaderPrim(const UsdShadeMaterial &material) const;
-    
+
     /// \brief Returns the root displacement shader prim for the material.
-    ///
-    /// Returns an invalid prim if the material does not have a 'displacement'
+    /// 
+    /// Returns an invalid prim if the material does not have a 'displacement' 
     /// shader.
     UsdPrim _GetDisplacementShaderPrim(const UsdShadeMaterial &material) const;
-    
+
     /// \brief Populates the information in the material graph
     /// (identified by \c SdfPath objects) that this \p materialPrim uses.
-    ///
+    /// 
     /// Returns false if the material prim has an invalid material graph.
     bool _GatherMaterialData(
-                             UsdPrim const& materialPrim,
-                             UsdPrim *shaderPrim,
-                             UsdPrim *displacementShaderPrim,
-                             SdfPathVector *textureIDs,
-                             TfTokenVector *primvars,
-                             HdMaterialParamVector *materialParams) const;
-    
+        UsdPrim const& materialPrim,
+        UsdPrim *shaderPrim,
+        UsdPrim *displacementShaderPrim,
+        SdfPathVector *textureIDs,
+        TfTokenVector *primvars,
+        HdMaterialParamVector *materialParams) const;
+
     /// \brief Returns the information in the material graph
     /// (identified by \c SdfPath objects) that this \p shaderPrim uses.
     void _WalkShaderNetwork(
-                            UsdPrim const& shaderPrim,
-                            SdfPathVector *textureIDs,
-                            TfTokenVector *primvars,
-                            HdMaterialParamVector *materialParams) const;
-    
+        UsdPrim const& shaderPrim,
+        SdfPathVector *textureIDs,
+        TfTokenVector *primvars,
+        HdMaterialParamVector *materialParams) const;
+
     /// \brief Returns the information in a legacy material graph
     /// (identified by \c SdfPath objects) that this \p shaderPrim uses.
     void _WalkShaderNetworkDeprecated(
-                                      UsdPrim const &shaderPrim,
-                                      SdfPathVector *textureIDs,
-                                      TfTokenVector *primvars,
-                                      HdMaterialParamVector *materialParams) const;
-    
+        UsdPrim const &shaderPrim,
+        SdfPathVector *textureIDs,
+        TfTokenVector *primvars,
+        HdMaterialParamVector *materialParams) const;
+
     /// \brief Returns the value of param \p paramName for \p shaderPrim.
     VtValue _GetMaterialParamValue(UsdPrim const& shaderPrim,
                                    TfToken const& paramName,
@@ -174,4 +174,4 @@ private:
 
 PXR_NAMESPACE_CLOSE_SCOPE
 
-#endif // USDIMAGINGMETAL_HYDRAMATERIALADAPTER_H
+#endif // USDIMAGING_HYDRAMATERIALADAPTER_H

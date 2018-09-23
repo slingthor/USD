@@ -240,8 +240,7 @@ UsdImagingDelegate::_AdapterLookup(UsdPrim const& prim, bool ignoreInstancing)
             GetRenderDelegate()->GetMaterialBindingPurpose();
         if (bindingPurpose == HdTokens->preview &&
             adapterKey == _tokens->Material) {
-            adapterKey = TfToken(_tokens->HydraPbsSurface.GetString()
-                + GarchResourceFactory::GetInstance()->GetContextCaps().GetRendererName());
+            adapterKey = _tokens->HydraPbsSurface;
         }
     }
 

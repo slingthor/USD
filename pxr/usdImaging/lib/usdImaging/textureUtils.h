@@ -21,8 +21,8 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#ifndef USDIMAGINGMETAL_TEXTURE_UTILS_H
-#define USDIMAGINGMETAL_TEXTURE_UTILS_H
+#ifndef USDIMAGING_TEXTURE_UTILS_H
+#define USDIMAGING_TEXTURE_UTILS_H
 
 #include "pxr/pxr.h"
 #include "pxr/usd/sdf/path.h"
@@ -33,16 +33,16 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 HdTextureResource::ID
-UsdImagingMetal_GetTextureResourceID(UsdPrim const& usdPrim,
-                                     SdfPath const& usdPath,
-                                     UsdTimeCode time,
-                                     size_t salt);
+UsdImaging_GetTextureResourceID(UsdPrim const& usdPrim,
+                                SdfPath const& usdPath,
+                                UsdTimeCode time,
+                                size_t salt);
 
 HdTextureResourceSharedPtr
-UsdImagingMetal_GetTextureResource(UsdPrim const& usdPrim,
-                                   SdfPath const& usdPath,
-                                   UsdTimeCode time);
+UsdImaging_GetTextureResource(UsdPrim const& usdPrim,
+                              SdfPath const& usdPath,
+                              UsdTimeCode time);
 
 PXR_NAMESPACE_CLOSE_SCOPE
 
-#endif // USDIMAGINGMETAL_TEXTURE_UTILS_H
+#endif // USDIMAGING_TEXTURE_UTILS_H

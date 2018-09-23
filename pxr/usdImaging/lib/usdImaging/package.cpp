@@ -21,22 +21,39 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#ifndef USDIMAGINGMETAL_PACKAGE_H
-#define USDIMAGINGMETAL_PACKAGE_H
+#include "pxr/usdImaging/usdImagingGL/package.h"
 
-#include "pxr/pxr.h"
-#include "pxr/usdImaging/usdImagingMetal/api.h"
-#include "pxr/usdImaging/usdImagingMetal/version.h"
-#include "pxr/base/tf/token.h"
+#include "pxr/base/plug/plugin.h"
+#include "pxr/base/plug/thisPlugin.h"
+#include "pxr/base/tf/diagnostic.h"
+#include "pxr/base/tf/fileUtils.h"
+#include "pxr/base/tf/stringUtils.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-USDIMAGINGMETAL_API
-TfToken UsdImagingMetalPackageDrawModeShader();
+static TfToken
+_GetShaderPath(char const * shader)
+{
+    static PlugPluginPtr plugin = PLUG_THIS_PLUGIN;
+    const std::string path =
+        PlugFindPluginResource(plugin, TfStringCatPaths("shaders", shader));
+    TF_VERIFY(!path.empty(), "Could not find shader: %s\n", shader);
 
-USDIMAGINGMETAL_API
-TfToken UsdImagingMetalPackagePreviewSurfaceShader();
+    return TfToken(path);
+}
+
+TfToken
+UsdImagingPackageDrawModeShader()
+{
+    static TfToken drawModeShader = _GetShaderPath("drawMode.glslfx");
+    return drawModeShader;
+}
+
+TfToken
+UsdImagingPackagePreviewSurfaceShader()
+{
+    static TfToken previewSurface = _GetShaderPath("previewSurface.glslfx");
+    return previewSurface;
+}
 
 PXR_NAMESPACE_CLOSE_SCOPE
-
-#endif // USDIMAGINGMETAL_PACKAGE_H

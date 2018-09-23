@@ -256,7 +256,7 @@ static void _EmitDeclaration(std::stringstream &str,
     if (!arraySize)
         str << type << " " << name << ";\n";
     else
-        str << "device const " << type << " *" << name /* << "[" << arraySize << "]"*/  << ";\n";
+        str << "device " << type << " *" << name /* << "[" << arraySize << "]"*/  << ";\n";
 }
 
 static void _EmitDeclaration(std::stringstream &str,
@@ -280,7 +280,7 @@ static void _EmitDeclarationPtr(std::stringstream &str,
     }
     
     TfToken ptrName(std::string("*") + name.GetString());
-    str << "device const ";
+    str << "device ";
     if (programScope) {
         str << "ProgramScope<st>::";
     }
@@ -625,6 +625,7 @@ HdSt_CodeGenMSL::_ParseGLSL(std::stringstream &source, InOutParams& inParams, In
     
     tags.push_back(TagSpec("\nout ", outParams, false));
     tags.push_back(TagSpec("\nin ", inParams, true));
+    int uniformIndex = tags.size();
     tags.push_back(TagSpec("\nuniform ", inParams, true));
     tags.push_back(TagSpec("\nlayout(std140) uniform ", inParams, true));
     
@@ -745,7 +746,7 @@ HdSt_CodeGenMSL::_ParseGLSL(std::stringstream &source, InOutParams& inParams, In
                             std::string::size_type openingBracket = nameStr.find_first_of("[");
                             if(openingBracket != std::string::npos) {
                                 nameStr = nameStr.substr(0, openingBracket);
-                                structAccessors << ";\n device const " << type.GetString() << "* " << nameStr;
+                                structAccessors << ";\n device " << type.GetString() << "* " << nameStr;
                             }
                             else
                                 structAccessors << ";\n" << type.GetString() << " " << name.GetString();
@@ -808,9 +809,12 @@ HdSt_CodeGenMSL::_ParseGLSL(std::stringstream &source, InOutParams& inParams, In
                     else if (!strncmp(typeStr, "sampler", 7)) {
                         usage = HdSt_CodeGenMSL::TParam::Sampler;
                     }
+                    else if (pass == uniformIndex) {//if (!strncmp(typeStr, "mat4", 7)) {
+                        usage = HdSt_CodeGenMSL::TParam::Uniform;
+                    }
 
                     if (nameStr[0] == '*') {
-                        result.replace(pos, 0, std::string("\ndevice const "));
+                        result.replace(pos, 0, std::string("\ndevice "));
                         usage |= HdSt_CodeGenMSL::TParam::EntryFuncArgument;
                         
                         // If this is a built-in type, we want to use global scope to access
@@ -913,7 +917,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
         
         if (input.name.GetText()[0] == '*') {
             //Does this case ever hit? A pointer as vertexattrib? - jsoet
-            glueVS << "device const ";
+            glueVS << "device ";
             mslProgram->AddBinding(input.name.GetText() + 1, vertexAttribsLocation, kMSL_BindingType_VertexAttribute, kMSL_ProgramStage_Vertex);
         }
         else {
@@ -938,7 +942,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
             glueVS << "#endif\n";
             
             //Add the attribute as a buffer input to the Compute function definition
-            computeBufferArguments << "\n    , device const ";
+            computeBufferArguments << "\n    , device ";
             if(isPackedNormals)
                 computeBufferArguments << "uint";
             else {
@@ -965,7 +969,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
     mslProgram->AddBinding("indices", vertexAttribsLocation, kMSL_BindingType_IndexBuffer, kMSL_ProgramStage_Compute);
     //Add it for ComputeVS. Increment vertexAttribsLocation (this means that in the VS the buffers are offset by 1,
     //with 1 slot skipped, the indices)
-    computeBufferArguments << "\n    , device const uint *indices[[buffer(" << vertexAttribsLocation++ << ")]]";
+    computeBufferArguments << "\n    , device uint *indices[[buffer(" << vertexAttribsLocation++ << ")]]";
     
     /////////////////////////////////Uniform Buffer///////////////////////////////////
     
@@ -1253,9 +1257,9 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
         glueCVS << ", ";
         if(useInCompute) computeBufferArguments << "\n    , ";
         if (input.name.GetText()[0] == '*') {
-            glueVS << "device const ";
-            glueCVS << "device const ";
-            if(useInCompute) computeBufferArguments << "device const ";
+            glueVS << "device ";
+            glueCVS << "device ";
+            if(useInCompute) computeBufferArguments << "device ";
         }
         if (input.usage & HdSt_CodeGenMSL::TParam::ProgramScope) {
             glueVS << "ProgramScope<st>::";
@@ -1450,7 +1454,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
                 << "    , uint threadIndexInThreadgroup[[thread_index_in_threadgroup]]\n"
                 << "    , uint threadgroupPositionInGrid[[threadgroup_position_in_grid]]"
                 << computeBufferArguments.str()
-                << "\n    , device const MSLComputeGSArgs *computeGSArg[[buffer(" << computeGSArgSlot << ")]]\n"
+                << "\n    , device MSLComputeGSArgs *computeGSArg[[buffer(" << computeGSArgSlot << ")]]\n"
                 << "    , device ProgramScope_Geometry::MSLGeometryOutStruct *computeGSOutput[[buffer(" << computeGSOutputSlot << ")]])\n"
                 << "{\n"
                 << "#undef vec3\n"
@@ -1556,14 +1560,14 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
         
         std::string n;
         if (input.name.GetText()[0] == '*') {
-            gluePS << "device const ";
+            gluePS << "device ";
             if ((input.usage & HdSt_CodeGenMSL::TParam::UniformBlock) != 0)
                 n = input.name.GetText() + 4; //Because of "*___<NAME>"
             else
                 n = input.name.GetText() + 1;
         }
         else if(input.usage & HdSt_CodeGenMSL::TParam::UniformBlock) {
-            gluePS << "device const ";
+            gluePS << "device ";
             n = input.dataType.GetText();
         }
         else
@@ -1584,7 +1588,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
 
     gluePS  << ") {\n";
     if(_mslBuildComputeGS)
-        gluePS  << "int gl_PrimitiveID = vsInput.gl_PrimitiveID;\n";
+        gluePS  << "int gl_PrimitiveID = 0;//vsInput.gl_PrimitiveID;\n";
     gluePS  << "ProgramScope<st> scope;\n"
             << copyInputsFrag.str()
             << "scope.main();\n"
@@ -1845,7 +1849,12 @@ HdSt_CodeGenMSL::Compile()
         _vsSource = replaceStringAll(_vsSource, "<osd_ppbi>", "0");
         _vsSource = replaceStringAll(_vsSource, "<vbi>", "0");
 
-        if (!mslProgram->CompileShader(_mslBuildComputeGS ? GL_GEOMETRY_SHADER : GL_VERTEX_SHADER, _vsSource)) {
+        if (!_hasFS) {
+            if (!mslProgram->CompileShader(GL_COMPUTE_SHADER, _vsSource)) {
+                shaderCompiled = false;
+            }
+        }
+        else if (!mslProgram->CompileShader(_mslBuildComputeGS ? GL_GEOMETRY_SHADER : GL_VERTEX_SHADER, _vsSource)) {
             shaderCompiled = false;
         }
         mslProgram->SetGSOutputStructSize(_mslGSOutputStructSize);
@@ -2670,7 +2679,7 @@ HdSt_CodeGenMSL::_GenerateDrawingCoord()
     
     if (_metaData.drawingCoordIBinding.binding.IsValid()) {
         _EmitDeclaration(_genVS, _metaData.drawingCoordIBinding, TfToken(), /*arraySize=*/std::max(1, _metaData.instancerNumLevels));
-        _AddInputParam(_mslVSInputParams, _metaData.drawingCoordIBinding, TfToken(), /*arraySize=*/std::max(1, _metaData.instancerNumLevels));
+        _AddInputPtrParam(_mslVSInputParams, _metaData.drawingCoordIBinding);
     }
 
     // instance index indirection
@@ -2972,7 +2981,7 @@ HdSt_CodeGenMSL::_GenerateConstantPrimvar()
                                 "GetDrawingCoord().constantCoord");
         }
         declarations << "};\n"
-                     << "device const " << typeName << " *" << varName << ";\n";
+                     << "device " << typeName << " *" << varName << ";\n";
     }
     _genCommon << declarations.str()
                << accessors.str();

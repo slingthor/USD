@@ -63,8 +63,11 @@ FrustumCullIsTinyPrim(vec4 bboxMin, vec4 bboxMax)
 
 --- --------------------------------------------------------------------------
 -- glsl ViewFrustumCull.TinyCull
-
-layout (location = ulocDrawRangeNDC_Binding) uniform vec2 drawRangeNDC;
+#if defined(ARCH_GFX_METAL)
+uniform vec2 ulocDrawRangeNDC;
+#else
+layout (location = ulocDrawRangeNDC_Binding) uniform vec2 ulocDrawRangeNDC;
+#endif
 
 bool
 FrustumCullIsTinyPrim(vec4 bboxMin, vec4 bboxMax)
@@ -77,8 +80,8 @@ FrustumCullIsTinyPrim(vec4 bboxMin, vec4 bboxMax)
     // Cull prims outside the min(x)/max(y) range.
     // When max is negative, do not cull based on max size
 
-    #define isLargeEnough (diag > drawRangeNDC.x)
-    #define isSmallEnough (drawRangeNDC.y < 0 || diag < drawRangeNDC.y)
+    #define isLargeEnough (diag > ulocDrawRangeNDC.x)
+    #define isSmallEnough (ulocDrawRangeNDC.y < 0 || diag < ulocDrawRangeNDC.y)
 
     return !isLargeEnough || !isSmallEnough;
 
@@ -125,20 +128,25 @@ FrustumCullIsVisible(MAT4 toClip, vec4 localMin, vec4 localMax)
         clipFlags |= ivec3(clip0) + 2*ivec3(clip1);
     }
 
-    return clipFlags == ivec3(3);
+    return (clipFlags.x == 3) && (clipFlags.y == 3) && (clipFlags.z == 3);
 }
 
 --- --------------------------------------------------------------------------
 -- glsl ViewFrustumCull.Vertex
 
+#if defined(ARCH_GFX_METAL)
+in int instanceCountInput;
+uniform mat4 ulocCullMatrix;
+#else
 layout (location = instanceCountInput_Binding) in int instanceCountInput;
-layout (location = ulocCullMatrix_Binding) uniform mat4 cullMatrix;
+layout (location = ulocCullMatrix_Binding) uniform mat4 ulocCullMatrix;
+#endif
 
 out int resultInstanceCount;
 
 MAT4 GetCullMatrix()
 {
-    return MAT4(cullMatrix);
+    return MAT4(ulocCullMatrix);
 }
 
 void main()
@@ -206,18 +214,29 @@ void main()
                             x:undefined value
 */
 
+#if defined(ARCH_GFX_METAL)
+in int drawCommandIndex;
+uniform uint ulocDrawCommandNumUints;
+uniform int ulocResetPass;
+uniform mat4 ulocCullMatrix;
+#else
 layout (location = drawCommandIndex_Binding) in int drawCommandIndex;
-layout (location = ulocDrawCommandNumUints_Binding) uniform uint drawCommandNumUints;
-layout (location = ulocResetPass_Binding) uniform int resetPass = 0;
-layout (location = ulocCullMatrix_Binding) uniform mat4 cullMatrix;
+layout (location = ulocDrawCommandNumUints_Binding) uniform uint ulocDrawCommandNumUints;
+layout (location = ulocResetPass_Binding) uniform int ulocResetPass = 0;
+layout (location = ulocCullMatrix_Binding) uniform mat4 ulocCullMatrix;
+#endif
 
+#if defined(ARCH_GFX_METAL)
+device atomic_uint *drawDispatch;
+#else
 layout (std430, binding = dispatchBuffer_Binding) buffer DispatchBuffer {
-    uint drawCommands[];
+    uint drawDispatch[];
 };
+#endif
 
 MAT4 GetCullMatrix()
 {
-    return MAT4(cullMatrix);
+    return MAT4(ulocCullMatrix);
 }
 
 void main()
@@ -227,10 +246,14 @@ void main()
     const int instanceCountOffset = 1;
 
     // reset pass
-    if (resetPass == 1) {
+    if (ulocResetPass == 1) {
         // note: we expect all instance invocations of this draw command is clearing
         // same field to zero, and intentionally chosen to not guard this access as atomic.
-        drawCommands[drawCommandIndex * drawCommandNumUints + instanceCountOffset] = 0;
+#if defined(ARCH_GFX_METAL)
+        atomic_exchange_explicit(&drawDispatch[drawCommandIndex * ulocDrawCommandNumUints + instanceCountOffset], 0, memory_order_relaxed);
+#else
+        drawDispatch[drawCommandIndex * ulocDrawCommandNumUints + instanceCountOffset] = 0;
+#endif
         return;
     }
 
@@ -247,9 +270,13 @@ void main()
 
     if (isVisible) {
         // increment the instance count and store instanceIndex to culledInstanceIndices.
-
-        uint id = atomicAdd(drawCommands[drawCommandIndex * drawCommandNumUints
+#if defined(ARCH_GFX_METAL)
+        uint id = atomic_fetch_add_explicit(&drawDispatch[drawCommandIndex * ulocDrawCommandNumUints
+                                             + instanceCountOffset], 1, memory_order_relaxed);
+#else
+        uint id = atomicAdd(drawDispatch[drawCommandIndex * ulocDrawCommandNumUints
                                          + instanceCountOffset], 1);
+#endif
         SetCulledInstanceIndex(id);
         FrustumCullCountVisibleInstances(1);
     }

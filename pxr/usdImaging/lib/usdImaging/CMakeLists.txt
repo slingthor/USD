@@ -12,10 +12,12 @@ pxr_library(usdImaging
         vt
         work
         hd
+        hdx
         pxOsd
         sdf
         usd
         usdGeom
+        usdHydra
         usdLux
         usdShade
         ar
@@ -33,9 +35,12 @@ pxr_library(usdImaging
         collectionCache
         debugCodes
         delegate
+        drawModeAdapter
         indexProxy
         inheritedCache
         instancerContext
+        hydraMaterialAdapter
+        package
         tokens
         valueCache
         basisCurvesAdapter
@@ -65,7 +70,12 @@ pxr_library(usdImaging
         unitTestHelper.h
         version.h
 
+    PRIVATE_CLASSES
+        textureUtils
+
     RESOURCE_FILES
         plugInfo.json
+        shaders/drawMode.glslfx
+        shaders/previewSurface.glslfx
 )
 

@@ -89,6 +89,10 @@ public:
     GLF_API
     virtual GarchBaseTexture *NewBaseTexture() const override;
     
+    // pTex
+    GLF_API
+    virtual bool IsSupportedPtexTexture(std::string const & imageFilePath) const override;
+    
 private:
     GlfContextCaps contextCaps;
 };

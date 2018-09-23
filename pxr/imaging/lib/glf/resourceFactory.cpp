@@ -99,5 +99,15 @@ GarchBaseTexture *GlfResourceFactory::NewBaseTexture() const
     return new GlfBaseTexture();
 }
 
+bool GlfResourceFactory::IsSupportedPtexTexture(std::string const & imageFilePath) const
+{
+#ifdef PXR_PTEX_SUPPORT_ENABLED
+    return (TfStringEndsWith(imageFilePath, ".ptx") ||
+            TfStringEndsWith(imageFilePath, ".ptex"));
+#else
+    return false;
+#endif
+}
+
 PXR_NAMESPACE_CLOSE_SCOPE
 

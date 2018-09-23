@@ -142,6 +142,10 @@ HdSt_ResourceBinderMetal::BindBuffer(TfToken const &name,
     if (!buffer->GetId().IsSet())
         return;
 
+    HdBinding uniformLocation = GetBinding(name);
+    if (uniformLocation.GetLocation() == HdBinding::NOT_EXIST)
+        return;
+    
     uint32 typeMask = kMSL_BindingType_VertexAttribute | kMSL_BindingType_UniformBuffer | kMSL_BindingType_IndexBuffer;
     uint i = 0;
     while(1)
@@ -157,8 +161,6 @@ HdSt_ResourceBinderMetal::BindBuffer(TfToken const &name,
         switch(shaderBinding._type)
         {
         case kMSL_BindingType_VertexAttribute:
-            if(offset != 0)
-                TF_FATAL_CODING_ERROR("Not implemented!");
             MtlfMetalContext::GetMetalContext()->SetVertexAttribute(
                         shaderBinding._index,
                         _GetNumComponents(tupleType.type),
@@ -166,7 +168,7 @@ HdSt_ResourceBinderMetal::BindBuffer(TfToken const &name,
                         buffer->GetStride(),
                         offset,
                         name);
-                MtlfMetalContext::GetMetalContext()->SetBuffer(shaderBinding._index, metalBuffer->GetId(), name);
+            MtlfMetalContext::GetMetalContext()->SetBuffer(shaderBinding._index, metalBuffer->GetId(), name);
             break;
         case kMSL_BindingType_UniformBuffer:
             MtlfMetalContext::GetMetalContext()->SetUniformBuffer(shaderBinding._index, metalBuffer->GetId(), name, shaderBinding._stage, offset);

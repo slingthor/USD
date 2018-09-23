@@ -101,6 +101,18 @@ public:
 	GARCH_API
     virtual GarchBaseTexture *NewBaseTexture() const = 0;
     
+    /// Returns true if the file given by \p imageFilePath represents a ptex file,
+    /// and false otherwise.
+    ///
+    /// This function simply checks the extension of the file name and does not
+    /// otherwise guarantee that the file is in any way valid for reading.
+    ///
+    /// If ptex support is disabled, this function will always return false.
+    ///
+    GARCH_API
+    virtual bool IsSupportedPtexTexture(std::string const & imageFilePath) const = 0;
+
+    
 protected:
 	GARCH_API
     GarchResourceFactoryInterface() {}

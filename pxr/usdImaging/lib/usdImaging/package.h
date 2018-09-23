@@ -1,5 +1,5 @@
 //
-// Copyright 2018 Pixar
+// Copyright 2017 Pixar
 //
 // Licensed under the Apache License, Version 2.0 (the "Apache License")
 // with the following modification; you may not use this file except in
@@ -21,28 +21,22 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#ifndef USDIMAGINGGL_TEXTURE_UTILS_H
-#define USDIMAGINGGL_TEXTURE_UTILS_H
+#ifndef USDIMAGINGGL_PACKAGE_H
+#define USDIMAGINGGL_PACKAGE_H
 
 #include "pxr/pxr.h"
-#include "pxr/usd/sdf/path.h"
-#include "pxr/usd/usd/prim.h"
-#include "pxr/usd/usd/timeCode.h"
-#include "pxr/imaging/hd/texture.h"
+#include "pxr/usdImaging/usdImagingGL/api.h"
+#include "pxr/usdImaging/usdImagingGL/version.h"
+#include "pxr/base/tf/token.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-HdTextureResource::ID
-UsdImagingGL_GetTextureResourceID(UsdPrim const& usdPrim,
-                                  SdfPath const& usdPath,
-                                  UsdTimeCode time,
-                                  size_t salt);
+USDIMAGINGGL_API
+TfToken UsdImagingPackageDrawModeShader();
 
-HdTextureResourceSharedPtr
-UsdImagingGL_GetTextureResource(UsdPrim const& usdPrim,
-                                SdfPath const& usdPath,
-                                UsdTimeCode time);
+USDIMAGINGGL_API
+TfToken UsdImagingPackagePreviewSurfaceShader();
 
 PXR_NAMESPACE_CLOSE_SCOPE
 
-#endif // USDIMAGINGGL_TEXTURE_UTILS_H
+#endif // USDIMAGINGGL_PACKAGE_H

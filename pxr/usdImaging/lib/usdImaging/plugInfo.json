@@ -29,6 +29,16 @@
                     }
                 },
                 "Types": {
+                    "UsdImagingMetalDrawModeAdapter" : {
+                        "bases": ["UsdImagingPrimAdapter"],
+                        "isInternal": true,
+                        "primTypeName": "__drawModeAdapter"
+                    },
+                    "UsdImagingMetalHydraMaterialAdapter" : {
+                        "bases": ["UsdImagingPrimAdapter"],
+                        "isInternal": true,
+                        "primTypeName": "HydraPbsSurface"
+                    },
                     "UsdImagingBasisCurvesAdapter": {
                         "bases": [
                             "UsdImagingGprimAdapter"

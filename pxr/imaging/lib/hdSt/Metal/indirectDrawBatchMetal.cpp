@@ -1101,7 +1101,7 @@ HdSt_IndirectDrawBatchMetal::ExecuteDraw(
                0, batchCount,
                _dispatchBuffer->GetCommandNumUints()*sizeof(GLuint));
 
-        TF_FATAL_CODING_ERROR("Not Implemented");
+//        TF_FATAL_CODING_ERROR("Not Implemented");
 //        glMultiDrawElementsIndirect(
 //            program.GetGeometricShader()->GetPrimitiveMode(),
 //            GL_UNSIGNED_INT,
@@ -1182,6 +1182,7 @@ HdSt_IndirectDrawBatchMetal::_GPUFrustumCulling(
     // stomping the instanceCount of each drawing command in the
     // dispatch buffer to 0 for primitives that are culled, skipping
     // over other elements.
+    program->SetProgram();
 
     const HdSt_ResourceBinder &binder = cullingProgram.GetBinder();
 
@@ -1230,13 +1231,11 @@ HdSt_IndirectDrawBatchMetal::_GPUFrustumCulling(
     }
 
     if (validProgram) {
-        TF_FATAL_CODING_ERROR("Not Implemented");
-        /*
-        glEnable(GL_RASTERIZER_DISCARD);
-
+        //TF_FATAL_CODING_ERROR("Not Implemented");
+        
         int resetPass = 1;
         binder.BindUniformi(HdTokens->ulocResetPass, 1, &resetPass);
-        glMultiDrawArraysIndirect(
+        /*glMultiDrawArraysIndirect(
             GL_POINTS,
             reinterpret_cast<const GLvoid*>(
                 static_cast<intptr_t>(cullCommandBuffer->GetOffset())),
@@ -1246,18 +1245,16 @@ HdSt_IndirectDrawBatchMetal::_GPUFrustumCulling(
         // dispatch buffer is bound via SSBO
         // (see _CullingProgram::_GetCustomBindings)
         glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
-
+*/
         resetPass = 0;
         binder.BindUniformi(HdTokens->ulocResetPass, 1, &resetPass);
-        glMultiDrawArraysIndirect(
+/*        glMultiDrawArraysIndirect(
             GL_POINTS,
             reinterpret_cast<const GLvoid*>(
                 static_cast<intptr_t>(cullCommandBuffer->GetOffset())),
             _dispatchBufferCullInput->GetCount(),
             cullCommandBuffer->GetStride());
-
-        glDisable(GL_RASTERIZER_DISCARD);
-         */
+*/
     }
 
     // Reset all vertex attribs and their divisors. Note that the drawing
@@ -1277,14 +1274,14 @@ HdSt_IndirectDrawBatchMetal::_GPUFrustumCulling(
     // unbind destination dispatch buffer
     binder.UnbindBuffer(HdTokens->dispatchBuffer,
                         _dispatchBuffer->GetEntireResource());
-
+/*
     // make sure the culling results (instanceIndices and instanceCount)
     // are synchronized for the next drawing.
     glMemoryBarrier(
         GL_COMMAND_BARRIER_BIT |         // instanceCount for MDI
         GL_SHADER_STORAGE_BARRIER_BIT |  // instanceCount for shader
         GL_UNIFORM_BARRIER_BIT);         // instanceIndices
-
+*/
     // a fence has to be added after the memory barrier.
     if (caps.IsEnabledGPUCountVisibleInstances()) {
         _cullResultSync = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
@@ -1292,6 +1289,7 @@ HdSt_IndirectDrawBatchMetal::_GPUFrustumCulling(
         _cullResultSync = 0;
     }
 
+    program->UnsetProgram();
 }
 
 void
@@ -1319,19 +1317,17 @@ HdSt_IndirectDrawBatchMetal::_GPUFrustumCullingXFB(
     // stomping the instanceCount of each drawing command in the
     // dispatch buffer to 0 for primitives that are culled, skipping
     // over other elements.
-    TF_FATAL_CODING_ERROR("Not Implemented");
-/*
-    GLuint programId = program->GetProgram().GetId();
-    glUseProgram(programId);
+    program->SetProgram();
 
-    const Hd_ResourceBinder &binder = cullingProgram.GetBinder();
+    GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
+    HdSt_ResourceBinder const &binder = cullingProgram.GetBinder();
 
     // bind constant
     binder.BindConstantBuffer(constantBar);
     // bind drawing coord, instance count
     binder.BindBufferArray(cullDispatchBar);
 
-    if (IsEnabledGPUCountVisibleInstances()) {
+    if (caps.IsEnabledGPUCountVisibleInstances()) {
         _BeginGPUCountVisibleInstances(resourceRegistry);
     }
 
@@ -1339,34 +1335,33 @@ HdSt_IndirectDrawBatchMetal::_GPUFrustumCullingXFB(
     GfMatrix4f cullMatrix(renderPassState->GetCullMatrix());
     GfVec2f drawRangeNDC(renderPassState->GetDrawingRangeNDC());
     binder.BindUniformf(HdTokens->ulocCullMatrix, 16, cullMatrix.GetArray());
-    if (IsEnabledGPUTinyPrimCulling()) {
+    if (caps.IsEnabledGPUTinyPrimCulling()) {
         binder.BindUniformf(HdTokens->ulocDrawRangeNDC, 2, drawRangeNDC.GetArray());
     }
 
-    glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0,
-                     _dispatchBuffer->GetEntireResource()->GetId());
-    glBeginTransformFeedback(GL_POINTS);
+//    glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0,
+//                     _dispatchBuffer->GetEntireResource()->GetId());
+//    glBeginTransformFeedback(GL_POINTS);
 
-    glEnable(GL_RASTERIZER_DISCARD);
-    glDrawArrays(GL_POINTS, 0, _dispatchBufferCullInput->GetCount());
-    glDisable(GL_RASTERIZER_DISCARD);
+//    glEnable(GL_RASTERIZER_DISCARD);
+//    glDrawArrays(GL_POINTS, 0, _dispatchBufferCullInput->GetCount());
+//    glDisable(GL_RASTERIZER_DISCARD);
 
-    if (IsEnabledGPUCountVisibleInstances()) {
-        glMemoryBarrier(GL_TRANSFORM_FEEDBACK_BARRIER_BIT);
-        _cullResultSync = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
-    } else {
-        _cullResultSync = 0;
-    }
+//    if (caps.IsEnabledGPUCountVisibleInstances()) {
+//        glMemoryBarrier(GL_TRANSFORM_FEEDBACK_BARRIER_BIT);
+//        _cullResultSync = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+//    } else {
+//        _cullResultSync = 0;
+//    }
 
-    glEndTransformFeedback();
-    glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0, 0);
+//    glEndTransformFeedback();
+//    glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0, 0);
 
     // unbind all
     binder.UnbindConstantBuffer(constantBar);
     binder.UnbindBufferArray(cullDispatchBar);
 
-    glUseProgram(0);
- */
+    program->UnsetProgram();
 }
 
 void
@@ -1555,7 +1550,7 @@ HdSt_IndirectDrawBatchMetal::_CullingProgram::_Link(
             sizeof(drawElementsOutputs)/sizeof(drawElementsOutputs[0])
             == nOutputs,
             "Size of drawElementsOutputs element must equal nOutputs.");
-        TF_FATAL_CODING_ERROR("Not Implemented");
+        //TF_FATAL_CODING_ERROR("Not Implemented");
 //        glTransformFeedbackVaryings(program->GetProgram().GetId(),
 //                                    nOutputs,
 //                                    outputs, GL_INTERLEAVED_ATTRIBS);
