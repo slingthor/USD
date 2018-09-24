@@ -1454,7 +1454,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
                 << "    , uint threadIndexInThreadgroup[[thread_index_in_threadgroup]]\n"
                 << "    , uint threadgroupPositionInGrid[[threadgroup_position_in_grid]]"
                 << computeBufferArguments.str()
-                << "\n    , device MSLComputeGSArgs *computeGSArg[[buffer(" << computeGSArgSlot << ")]]\n"
+                << "\n    , device const MSLComputeGSArgs *computeGSArg[[buffer(" << computeGSArgSlot << ")]]\n"
                 << "    , device ProgramScope_Geometry::MSLGeometryOutStruct *computeGSOutput[[buffer(" << computeGSOutputSlot << ")]])\n"
                 << "{\n"
                 << "#undef vec3\n"
