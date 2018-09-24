@@ -180,7 +180,7 @@ public:
     void ReleaseEncoder(bool endEncoding, MetalWorkQueueType workQueueType = METALWORKQUEUE_DEFAULT);
     
     MTLF_API
-    void SetActiveWorkQueue(MetalWorkQueueType workQueueType) { currentWorkQueue = &workQueues[workQueueType];};
+    void SetActiveWorkQueue(MetalWorkQueueType workQueueType) { currentWorkQueue = &workQueues[workQueueType]; currentWorkQueueType = workQueueType;};
     
     MTLF_API
     void  SetEventDependency(MetalWorkQueueType workQueueType);
@@ -294,11 +294,12 @@ private:
         id<MTLComputePipelineState> currentComputePipelineState;
     };
     
-    MetalWorkQueue workQueues[METALWORKQUEUE_MAX];
-    MetalWorkQueue *currentWorkQueue;
+    MetalWorkQueue      workQueues[METALWORKQUEUE_MAX];
+    MetalWorkQueue     *currentWorkQueue;
+    MetalWorkQueueType  currentWorkQueueType;
     
     // Internal encoder functions
-    void SetCurrentEncoder(MetalEncoderType encoderType, MetalWorkQueue *wq = NULL);
+    void SetCurrentEncoder(MetalEncoderType encoderType, MetalWorkQueueType workQueueType);
     void ResetEncoders(MetalWorkQueueType workQueueType);
 
     // Pipeline state functions

@@ -765,8 +765,8 @@ UsdImagingMetalHdEngine::Render(RenderParams params)
     context->CreateCommandBuffer(METALWORKQUEUE_DEFAULT);
     context->LabelCommandBuffer(@"HdEngine CommandBuffer", METALWORKQUEUE_DEFAULT);
     
-#pragma message("Disabling GS buffer creation for now")
-    bool bGS = false;
+#pragma message("Unconditionally enabling GS buffer creation for now")
+    bool bGS = true;
     
     if (bGS) {
         // Create a command buffer for the geometry shaders and make the default/render queue dependent on it completeing
