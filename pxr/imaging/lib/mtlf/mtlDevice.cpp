@@ -341,7 +341,8 @@ MtlfMetalContext::MtlfMetalContext()
     
     drawTarget = NULL;
     
-    currentWorkQueue = &workQueues[METALWORKQUEUE_DEFAULT];
+    currentWorkQueueType = METALWORKQUEUE_DEFAULT;
+    currentWorkQueue     = &workQueues[METALWORKQUEUE_DEFAULT];
     
     for (int i = 0; i < METALWORKQUEUE_MAX; i ++) {
         ResetEncoders((MetalWorkQueueType)i);
@@ -526,8 +527,19 @@ void MtlfMetalContext::SetEventDependency(MetalWorkQueueType workQueueType)
     if (outstandingDependency != METALWORKQUEUE_INVALID) {
         TF_FATAL_CODING_ERROR("Currently only support one outstanding dependency");
     }
-    // Issue at create time
-    [wq->commandBuffer encodeWaitForEvent:queueSyncEvent value:++queueSyncEventCounter];
+    
+    if (wq->encoderHasWork) {
+        if (wq->encoderInUse) {
+            TF_FATAL_CODING_ERROR("Can't set an event dependency if encoder is still in use");
+        }
+        // If the last used encoder wasn't ended then we need to end it now
+        if (!wq->encoderEnded) {
+            wq->encoderInUse = true;
+            ReleaseEncoder(true, workQueueType);
+        }
+    }
+    // Make this command buffer wait for the event to be resolved
+    [wq->commandBuffer encodeWaitForEvent:queueSyncEvent value:queueSyncEventCounter];
     
     // Record that we have an oustanding dependency on this work queue
     outstandingDependency = workQueueType;
@@ -543,9 +555,19 @@ void MtlfMetalContext::GenerateEvent(MetalWorkQueueType workQueueType)
     if (outstandingDependency == workQueueType) {
         TF_FATAL_CODING_ERROR("Cicrular event dependency - can't resolve event on same queue that is waiting for it");
     }
-    
-    // Issue at command time
+     if (wq->encoderHasWork) {
+        if (wq->encoderInUse) {
+            TF_FATAL_CODING_ERROR("Can't generate an event if encoder is still in use");
+        }
+        // If the last used encoder wasn't ended then we need to end it now
+        if (!wq->encoderEnded) {
+            wq->encoderInUse = true;
+            ReleaseEncoder(true, workQueueType);
+        }
+    }
+    // Generate event
     [wq->commandBuffer encodeSignalEvent:queueSyncEvent value:queueSyncEventCounter];
+    queueSyncEventCounter++;
     
     // Remove the indication of an outstanding event
     outstandingDependency = METALWORKQUEUE_INVALID;
@@ -1309,7 +1331,7 @@ void MtlfMetalContext::SetRenderPassDescriptor(MTLRenderPassDescriptor *renderPa
 }
 
 
-void MtlfMetalContext::ReleaseEncoder(bool endEncoding, MetalWorkQueueType workQueueType/*MetalEncoderReleaseFlag releaseFlag*/)
+void MtlfMetalContext::ReleaseEncoder(bool endEncoding, MetalWorkQueueType workQueueType)
 {
     MetalWorkQueue *wq = &workQueues[workQueueType];
     
@@ -1355,18 +1377,16 @@ void MtlfMetalContext::ReleaseEncoder(bool endEncoding, MetalWorkQueueType workQ
     wq->encoderInUse       = false;
 }
 
-void MtlfMetalContext::SetCurrentEncoder(MetalEncoderType encoderType, MetalWorkQueue *wq)
+void MtlfMetalContext::SetCurrentEncoder(MetalEncoderType encoderType, MetalWorkQueueType workQueueType)
 {
-    if (!wq) {
-        wq = currentWorkQueue;
-    }
+    MetalWorkQueue *wq = &workQueues[workQueueType];
     
     if (wq->encoderInUse) {
         TF_FATAL_CODING_ERROR("Need to release the current encoder before getting a new one");
     }
     if (!wq->commandBuffer) {
         NSLog(@"Creating a command buffer on demand, try and avoid this!");
-        CreateCommandBuffer();
+        CreateCommandBuffer(workQueueType);
         LabelCommandBuffer(@"Default lable - fix!");
         //TF_FATAL_CODING_ERROR("Shouldn't be able to get here without having a command buffer created");
     }
@@ -1431,14 +1451,14 @@ void MtlfMetalContext::SetCurrentEncoder(MetalEncoderType encoderType, MetalWork
 id<MTLBlitCommandEncoder> MtlfMetalContext::GetBlitEncoder()
 {
     MetalWorkQueue *wq = currentWorkQueue;
-    SetCurrentEncoder(MTLENCODERTYPE_BLIT, wq);
+    SetCurrentEncoder(MTLENCODERTYPE_BLIT, currentWorkQueueType);
     return wq->currentBlitEncoder;
 }
 
 id<MTLComputeCommandEncoder> MtlfMetalContext::GetComputeEncoder(MetalWorkQueueType workQueueType)
 {
     MetalWorkQueue *wq = &workQueues[workQueueType];
-    SetCurrentEncoder(MTLENCODERTYPE_COMPUTE, wq);
+    SetCurrentEncoder(MTLENCODERTYPE_COMPUTE, workQueueType);
     return wq->currentComputeEncoder;
     
 }
@@ -1447,8 +1467,8 @@ id<MTLComputeCommandEncoder> MtlfMetalContext::GetComputeEncoder(MetalWorkQueueT
 id<MTLRenderCommandEncoder>  MtlfMetalContext::GetRenderEncoder()
 {
     MetalWorkQueue *wq = currentWorkQueue;
-    SetCurrentEncoder(MTLENCODERTYPE_RENDER, wq);
-    return wq->currentRenderEncoder;
+    SetCurrentEncoder(MTLENCODERTYPE_RENDER, currentWorkQueueType);
+    return currentWorkQueue->currentRenderEncoder;
 }
 
 
