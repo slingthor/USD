@@ -22,11 +22,6 @@
 // language governing permissions and limitations under the Apache License.
 //
 #include "pxr/imaging/glf/glew.h"
-#if defined(ARCH_GFX_METAL)
-// MTL_FIXME remove these when smooth normals GPU code calls through abstraction layer properly
-#include "pxr/imaging/mtlf/mtlDevice.h"
-#include "pxr/imaging/hdSt/Metal/mslProgram.h"
-#endif
 
 #include "pxr/imaging/garch/contextCaps.h"
 #include "pxr/imaging/garch/resourceFactory.h"
@@ -34,10 +29,15 @@
 #include "pxr/imaging/hdSt/bufferResource.h"
 #include "pxr/imaging/hdSt/program.h"
 #include "pxr/imaging/hdSt/resourceRegistry.h"
-#include "pxr/imaging/hdSt/smoothNormals.h"
 #include "pxr/imaging/hdSt/tokens.h"
 
+#include "pxr/imaging/hdSt/GL/smoothNormalsGL.h"
+#if defined(ARCH_GFX_METAL)
+#include "pxr/imaging/hdSt/Metal/smoothNormalsMetal.h"
+#endif
+
 #include "pxr/imaging/hd/bufferArrayRange.h"
+#include "pxr/imaging/hd/engine.h"
 #include "pxr/imaging/hd/perfLog.h"
 #include "pxr/imaging/hd/vertexAdjacency.h"
 #include "pxr/imaging/hd/vtBufferSource.h"
@@ -52,6 +52,26 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+
+HdSt_SmoothNormalsComputationGPU *HdSt_SmoothNormalsComputationGPU::New(
+    Hd_VertexAdjacency const *adjacency,
+    TfToken const &srcName, TfToken const &dstName,
+    HdType srcDataType, HdType dstDataType)
+{
+    HdEngine::RenderAPI api = HdEngine::GetRenderAPI();
+    switch(api)
+    {
+        case HdEngine::OpenGL:
+            return new HdSt_SmoothNormalsComputationGL(adjacency, srcName, dstName, srcDataType, dstDataType);
+#if defined(ARCH_GFX_METAL)
+        case HdEngine::Metal:
+            return new HdSt_SmoothNormalsComputationMetal(adjacency, srcName, dstName, srcDataType, dstDataType);
+#endif
+        default:
+            TF_FATAL_CODING_ERROR("No HdSt_SmoothNormalsComputationGPU for this API");
+    }
+    return NULL;
+}
 
 HdSt_SmoothNormalsComputationGPU::HdSt_SmoothNormalsComputationGPU(
     Hd_VertexAdjacency const *adjacency,
@@ -83,10 +103,6 @@ HdSt_SmoothNormalsComputationGPU::Execute(
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
 
-#if !defined(ARCH_GFX_METAL)
-    if (!glDispatchCompute)
-        return;
-#endif
     if (_srcDataType == HdTypeInvalid || _dstDataType == HdTypeInvalid)
         return;
 
@@ -133,14 +149,7 @@ HdSt_SmoothNormalsComputationGPU::Execute(
     HdBufferResourceSharedPtr adjacency = adjacencyRange->GetResource();
 
     // prepare uniform buffer for GPU computation
-    struct Uniform {
-        int vertexOffset;
-        int adjacencyOffset;
-        int pointsOffset;
-        int pointsStride;
-        int normalsOffset;
-        int normalsStride;
-    } uniform;
+    Uniform uniform;
 
     // coherent vertex offset in aggregated buffer array
     uniform.vertexOffset = range->GetOffset();
@@ -177,63 +186,8 @@ HdSt_SmoothNormalsComputationGPU::Execute(
     int numSrcPoints = _adjacency->GetNumPoints();
 
     int numPoints = std::min(numSrcPoints, numDestPoints);
-
-#if !defined(ARCH_GFX_METAL)
-    // transfer uniform buffer
-    GLuint ubo = computeProgram->GetGlobalUniformBuffer().GetId();
-    GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
-    // XXX: workaround for 319.xx driver bug of glNamedBufferDataEXT on UBO
-    // XXX: move this workaround to renderContextCaps
-    if (false && caps.directStateAccessEnabled) {
-        glNamedBufferDataEXT(ubo, sizeof(uniform), &uniform, GL_STATIC_DRAW);
-    } else {
-        glBindBuffer(GL_UNIFORM_BUFFER, ubo);
-        glBufferData(GL_UNIFORM_BUFFER, sizeof(uniform), &uniform, GL_STATIC_DRAW);
-        glBindBuffer(GL_UNIFORM_BUFFER, 0);
-    }
-
-    glBindBufferBase(GL_UNIFORM_BUFFER, 0, ubo);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, points->GetId());
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, normals->GetId());
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, adjacency->GetId());
-
-    // dispatch compute kernel
-    computeProgram->SetProgram();
-
-    glDispatchCompute(numPoints, 1, 1);
-
-    computeProgram->UnsetProgram();
-    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
-
-    glBindBufferBase(GL_UNIFORM_BUFFER, 0, 0);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, 0);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, 0);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, 0);
-#else
-    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
-    HdStMSLProgramSharedPtr const &mslProgram(boost::dynamic_pointer_cast<HdStMSLProgram>(computeProgram));
-    id<MTLFunction> computeFunction = mslProgram->GetComputeFunction();
     
-    std::vector<id<MTLBuffer>> computeBuffers(3);
-    std::vector<id<MTLTexture>> computeTextures;
- 
-    // Only the normals are writebale
-    unsigned long bufferWritableMask = 1 << 1;
-
-    id <MTLComputeCommandEncoder> computeEncoder = context->GetComputeEncoder();
-    computeEncoder.label = @"Compute pass for GPU Smooth Normals";
-    
-    context->SetComputeEncoderState(computeFunction, bufferWritableMask, @"GPU Smooth Normals pipeline state");
-
-    [computeEncoder setBuffer:points->GetId()    offset:0 atIndex:0];
-    [computeEncoder setBuffer:normals->GetId()   offset:0 atIndex:1];
-    [computeEncoder setBuffer:adjacency->GetId() offset:0 atIndex:2];
-    [computeEncoder setBytes:(const void *)&uniform length:sizeof(uniform) atIndex:3];
-    
-    [computeEncoder dispatchThreads:MTLSizeMake(numPoints, 1, 1) threadsPerThreadgroup:MTLSizeMake(1, 1, 1)];
-    
-    context->ReleaseEncoder(false);
-#endif
+    _Execute(computeProgram, uniform, points, normals, adjacency, numPoints);
 }
 
 void

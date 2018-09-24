@@ -48,12 +48,12 @@ class HdSt_SmoothNormalsComputationGPU : public HdComputation {
 public:
     /// Constructor
     /// @param topology 
-    HDST_API
-    HdSt_SmoothNormalsComputationGPU(Hd_VertexAdjacency const *adjacency,
-                                 TfToken const &srcName,
-                                 TfToken const &dstName,
-                                 HdType srcDataType,
-                                 HdType dstDataType);
+    static HDST_API
+    HdSt_SmoothNormalsComputationGPU *New(Hd_VertexAdjacency const *adjacency,
+                                          TfToken const &srcName,
+                                          TfToken const &dstName,
+                                          HdType srcDataType,
+                                          HdType dstDataType);
 
     HDST_API
     virtual void GetBufferSpecs(HdBufferSpecVector *specs) const override;
@@ -66,7 +66,32 @@ public:
     /// since it belongs the same range as src buffer.
     virtual int GetNumOutputElements() const override { return 0; }
 
-private:
+protected:
+    HDST_API
+    HdSt_SmoothNormalsComputationGPU(Hd_VertexAdjacency const *adjacency,
+                                     TfToken const &srcName,
+                                     TfToken const &dstName,
+                                     HdType srcDataType,
+                                     HdType dstDataType);
+
+    // prepare uniform buffer for GPU computation
+    struct Uniform {
+        int vertexOffset;
+        int adjacencyOffset;
+        int pointsOffset;
+        int pointsStride;
+        int normalsOffset;
+        int normalsStride;
+    };
+
+    HDST_API
+    virtual void _Execute(HdStProgramSharedPtr computeProgram,
+                          Uniform const &uniform,
+                          HdBufferResourceSharedPtr points,
+                          HdBufferResourceSharedPtr normals,
+                          HdBufferResourceSharedPtr adjacency,
+                          int numPoints) = 0;
+
     Hd_VertexAdjacency const *_adjacency;
     TfToken _srcName;
     TfToken _dstName;

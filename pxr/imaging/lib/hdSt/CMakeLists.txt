@@ -35,6 +35,7 @@ if (APPLE)
                         Metal/renderPassStateMetal
                         Metal/resourceBinderMetal
                         Metal/resourceMetal
+                        Metal/smoothNormalsMetal
                         Metal/textureResourceMetal
                         Metal/vboMemoryBufferMetal
                         Metal/vboSimpleMemoryBufferMetal)
@@ -145,6 +146,7 @@ pxr_library(hdSt
         GL/renderPassStateGL
         GL/resourceBinderGL
         GL/resourceGL
+        GL/smoothNormalsGL
         GL/textureResourceGL
         GL/vboMemoryBufferGL
         GL/vboSimpleMemoryBufferGL
