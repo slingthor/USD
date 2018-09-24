@@ -101,7 +101,7 @@ public:
     virtual void UnbindResources(HdStSurfaceShader* surfaceShader, HdSt_ResourceBinder const &binder) const = 0;
     
     HDST_API
-    virtual void SetProgram() = 0;
+    virtual void SetProgram(char const* const label = NULL) = 0;
     
     HDST_API
     virtual void UnsetProgram() = 0;

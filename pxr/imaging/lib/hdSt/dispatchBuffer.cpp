@@ -26,7 +26,6 @@
 #include "pxr/imaging/garch/resourceFactory.h"
 
 #if defined(ARCH_GFX_METAL)
-#include "pxr/imaging/mtlf/mtlDevice.h"
 #include "pxr/imaging/hdSt/Metal/dispatchBufferMetal.h"
 #endif
 

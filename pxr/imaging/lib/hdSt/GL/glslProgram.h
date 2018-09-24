@@ -93,7 +93,7 @@ public:
     virtual void UnbindResources(HdStSurfaceShader* surfaceShader, HdSt_ResourceBinder const &binder) const override;
 
     HDST_API
-    virtual void SetProgram() override;
+    virtual void SetProgram(char const* const label) override;
     
     HDST_API
     virtual void UnsetProgram() override;

@@ -463,7 +463,7 @@ void HdStMSLProgram::UnbindResources(HdStSurfaceShader* surfaceShader, HdSt_Reso
     // Nothing
 }
 
-void HdStMSLProgram::SetProgram() {
+void HdStMSLProgram::SetProgram(char const* const label) {
     MtlfMetalContext::GetMetalContext()->SetShadingPrograms(
         _enableComputeGSPath ? _vertexPassThroughFunction : _vertexFunction,
         _fragmentFunction,

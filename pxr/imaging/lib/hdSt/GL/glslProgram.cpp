@@ -33,6 +33,7 @@
 #include "pxr/imaging/hd/tokens.h"
 
 #include "pxr/imaging/glf/bindingMap.h"
+#include "pxr/imaging/glf/diagnostic.h"
 
 #include "pxr/imaging/garch/glslfx.h"
 
@@ -327,7 +328,10 @@ void HdStGLSLProgram::UnbindResources(HdStSurfaceShader* surfaceShader, HdSt_Res
 
 }
 
-void HdStGLSLProgram::SetProgram() {
+void HdStGLSLProgram::SetProgram(char const* const label) {
+    if (label) {
+        GlfDebugLabelProgram(_program, label);
+    }
     glUseProgram(_program);
 }
 
