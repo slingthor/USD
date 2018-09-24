@@ -30,10 +30,6 @@
 #include "pxr/usdImaging/usdImaging/primAdapter.h"
 #include "pxr/usdImaging/usdImaging/tokens.h"
 
-#if defined(ARCH_GFX_METAL)
-//#include "pxr/imaging/mtlf/ptexTexture.h"
-#endif
-//#include "pxr/imaging/glf/ptexTexture.h"
 #include "pxr/imaging/garch/contextCaps.h"
 #include "pxr/imaging/garch/resourceFactory.h"
 #include "pxr/imaging/garch/textureHandle.h"
