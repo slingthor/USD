@@ -184,6 +184,9 @@ public:
 protected:
     HDST_API
     void BakeState();
+    
+    HDST_API
+    virtual std::string GetComputeHeader() const override;
 
 private:
     TfToken const _role;

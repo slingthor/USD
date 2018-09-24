@@ -115,6 +115,10 @@ public:
     /// Returns the GL program object.
     HDST_API
     GLuint GetGLProgram() const { return _program; }
+    
+protected:
+    HDST_API
+    virtual std::string GetComputeHeader() const override;
 
 private:
     GLuint _program;

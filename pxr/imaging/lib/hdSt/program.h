@@ -133,6 +133,8 @@ protected:
     HDST_API
     HdStProgram(TfToken const &role);
 
+    HDST_API
+    virtual std::string GetComputeHeader() const = 0;
 };
 
 

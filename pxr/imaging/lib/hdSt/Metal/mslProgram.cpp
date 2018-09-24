@@ -625,5 +625,10 @@ void HdStMSLProgram::BakeState()
     MtlfMetalContext::GetMetalContext()->SetRenderEncoderState();
 }
 
+std::string HdStMSLProgram::GetComputeHeader() const
+{
+    return "#include <metal_stdlib>\nusing namespace metal;\n";
+}
+
 PXR_NAMESPACE_CLOSE_SCOPE
 

@@ -373,5 +373,10 @@ void HdStGLSLProgram::DrawArraysInstanced(GLenum primitiveMode,
     glDrawArraysInstanced(primitiveMode, baseVertex, vertexCount, instanceCount);
 }
 
+std::string HdStGLSLProgram::GetComputeHeader() const
+{
+    return "#version 430\n";
+}
+
 PXR_NAMESPACE_CLOSE_SCOPE
 
