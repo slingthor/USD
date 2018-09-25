@@ -96,6 +96,13 @@ public:
     MTLF_API
     void AllocateAttachments(int width, int height);
     
+    /// Blit the current render target contents to the OpenGL FBO
+    MTLF_API
+    void BlitColorTargetToOpenGL();
+    
+    MTLF_API
+    void CopyDepthTextureToOpenGL();
+    
     MTLF_API
     id<MTLBuffer> GetIndexBuffer() {
         return indexBuffer;
@@ -192,21 +199,8 @@ public:
     id<MTLCommandQueue> commandQueue;
     
     id<MTLTexture> mtlColorTexture;
-	id<MTLTexture> mtlDepthTexture;
-    id<MTLTexture> mtlDepthRegularFloatTexture;
-    id<MTLComputePipelineState> computePipelineState;
+    id<MTLTexture> mtlDepthTexture;
     
-    // Depth copy program state
-    id <MTLFunction>            computeDepthCopyProgram;
-    id<MTLComputePipelineState> computeDepthCopyPipelineState;
-    NSUInteger                  computeDepthCopyProgramExecutionWidth;
-    
-    uint32_t glShaderProgram;
-    uint32_t glColorTexture;
-    uint32_t glDepthTexture;
-    uint32_t glVAO;
-    uint32_t glVBO;
-
 protected:
     MTLF_API
     MtlfMetalContext();
@@ -244,6 +238,14 @@ protected:
 private:
     id<MTLLibrary>           defaultLibrary;
     id<MTLDepthStencilState> depthState;
+    
+    id<MTLTexture> mtlDepthRegularFloatTexture;
+    id<MTLComputePipelineState> computePipelineState;
+    
+    // Depth copy program state
+    id <MTLFunction>            computeDepthCopyProgram;
+    id<MTLComputePipelineState> computeDepthCopyPipelineState;
+    NSUInteger                  computeDepthCopyProgramExecutionWidth;
         
     enum PREFERRED_GPU_TYPE {
         PREFER_DEFAULT_GPU,
@@ -273,6 +275,12 @@ private:
     CVMetalTextureCacheRef cvmtlTextureCache;
     CVPixelBufferRef pixelBuffer;
     CVPixelBufferRef depthBuffer;
+    
+    uint32_t glShaderProgram;
+    uint32_t glColorTexture;
+    uint32_t glDepthTexture;
+    uint32_t glVAO;
+    uint32_t glVBO;
     
     struct MetalWorkQueue {
         id<MTLCommandBuffer>         commandBuffer;

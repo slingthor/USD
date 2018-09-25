@@ -798,23 +798,7 @@ UsdImagingMetalHdEngine::Render(RenderParams params)
     _engine.Execute(*_renderIndex, _taskController->GetTasks(renderMode));
    
     // Depth texture copy
-    NSUInteger exeWidth = context->computeDepthCopyProgramExecutionWidth;
-    MTLSize threadGroupCount = MTLSizeMake(16, exeWidth / 32, 1);
-    MTLSize threadGroups     = MTLSizeMake(context->mtlDepthTexture.width / threadGroupCount.width + 1,
-                                           context->mtlDepthTexture.height / threadGroupCount.height + 1, 1);
-
-    id <MTLComputeCommandEncoder> computeEncoder = context->GetComputeEncoder();
-    
-    computeEncoder.label = @"Depth buffer copy";
-
-    context->SetComputeEncoderState(context->computeDepthCopyProgram, 0, @"Depth copy pipeline state");
-    
-    [computeEncoder setTexture:context->mtlDepthTexture atIndex:0];
-    [computeEncoder setTexture:context->mtlDepthRegularFloatTexture atIndex:1];
-    
-    [computeEncoder dispatchThreadgroups:threadGroups threadsPerThreadgroup: threadGroupCount];
-    
-    context->ReleaseEncoder(true);
+    context->CopyDepthTextureToOpenGL();
     
     if (bGS) {
         // Generate an event to indicate that the GS buffer has completed then commit it
@@ -827,114 +811,10 @@ UsdImagingMetalHdEngine::Render(RenderParams params)
     // Finalize rendering here & push the command buffer to the GPU
     [sharedCaptureManager.defaultCaptureScope endScope];
  
-    glPushAttrib(GL_ENABLE_BIT | GL_POLYGON_BIT | GL_DEPTH_BUFFER_BIT);
-
-    glEnable(GL_DEPTH_TEST);
-    glDepthMask(GL_TRUE);
-    glFrontFace(GL_CCW);
-    glDisable(GL_CULL_FACE);
-    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-
-    glUseProgram(context->glShaderProgram);
-
-    glBindBuffer(GL_ARRAY_BUFFER, context->glVBO);
-    
-    // Set up the vertex structure description
-    GLint posAttrib = glGetAttribLocation(context->glShaderProgram, "inPosition");
-    GLint texAttrib = glGetAttribLocation(context->glShaderProgram, "inTexCoord");
-    glEnableVertexAttribArray(posAttrib);
-    glVertexAttribPointer(posAttrib, 2, GL_FLOAT, GL_FALSE, sizeof(MtlfMetalContext::Vertex), (void*)(offsetof(Vertex, position)));
-    glEnableVertexAttribArray(texAttrib);
-    glVertexAttribPointer(texAttrib, 2, GL_FLOAT, GL_FALSE, sizeof(MtlfMetalContext::Vertex), (void*)(offsetof(Vertex, uv)));
-
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_RECTANGLE, context->glColorTexture);
-    glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_RECTANGLE, context->glDepthTexture);
+    context->BlitColorTargetToOpenGL();
     GLF_POST_PENDING_GL_ERRORS();
-
-    GLuint blitTexSizeUniform = glGetUniformLocation(context->glShaderProgram, "texSize");
-
-    glUniform2f(blitTexSizeUniform, context->mtlColorTexture.width, context->mtlColorTexture.height);
-
-    glDrawArrays(GL_TRIANGLES, 0, 6);
-    GLF_POST_PENDING_GL_ERRORS();
-    
-    glFlush();
-
-    glBindTexture(GL_TEXTURE_RECTANGLE, 0);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_RECTANGLE, 0);
-
-    glDisableVertexAttribArray(posAttrib);
-    glDisableVertexAttribArray(texAttrib);
-    glUseProgram(0);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-    
-    glPopAttrib();
 
     return;
-/*
-    // XXX: HdEngine should do this.
-    GLuint vao;
-    glGenVertexArrays(1, &vao);
-    glBindVertexArray(vao);
-    glBindVertexArray(0);
-
-    glPushAttrib(GL_ENABLE_BIT | GL_POLYGON_BIT | GL_DEPTH_BUFFER_BIT);
-
-    if (params.applyRenderState) {
-        glDisable(GL_BLEND);
-    }
-
-    // note: to get benefit of alpha-to-coverage, the target framebuffer
-    // has to be a MSAA buffer.
-    if (params.enableIdRender) {
-        glDisable(GL_SAMPLE_ALPHA_TO_COVERAGE);
-    } else if (params.enableSampleAlphaToCoverage) {
-        glEnable(GL_SAMPLE_ALPHA_TO_COVERAGE);
-    }
-
-    // for points width
-    glEnable(GL_PROGRAM_POINT_SIZE);
-
-    // TODO:
-    //  * forceRefresh
-    //  * showGuides, showRender, showProxy
-    //  * gammaCorrectColors
-
-    if (params.applyRenderState) {
-        // drawmode.
-        // XXX: Temporary solution until shader-based styling implemented.
-        switch (params.drawMode) {
-        case DRAW_POINTS:
-            glPolygonMode(GL_FRONT_AND_BACK, GL_POINT);
-            break;
-        default:
-            glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-            break;
-        }
-    }
-
-    glBindVertexArray(vao);
-
-    VtValue selectionValue(_selTracker);
-    _engine.SetTaskContextData(HdxTokens->selectionState, selectionValue);
-    VtValue renderTags(_renderTags);
-    _engine.SetTaskContextData(HdxTokens->renderTags, renderTags);
-
-    TfToken const& renderMode = params.enableIdRender ?
-        HdxTaskSetTokens->idRender : HdxTaskSetTokens->colorRender;
-    _engine.Execute(*_renderIndex, _taskController->GetTasks(renderMode));
-
-    glBindVertexArray(0);
-
-    glPopAttrib(); // GL_ENABLE_BIT | GL_POLYGON_BIT | GL_DEPTH_BUFFER_BIT
-
-    // XXX: We should not delete the VAO on every draw call, but we currently
-    // must because it is GL Context state and we do not control the context.
-    glDeleteVertexArrays(1, &vao);
-    */
 }
 
 /*virtual*/

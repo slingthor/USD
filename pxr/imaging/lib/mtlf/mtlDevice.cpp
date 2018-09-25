@@ -444,6 +444,75 @@ MtlfMetalContext::IsInitialized()
     return context->device != nil;
 }
 
+void
+MtlfMetalContext::BlitColorTargetToOpenGL()
+{
+    glPushAttrib(GL_ENABLE_BIT | GL_POLYGON_BIT | GL_DEPTH_BUFFER_BIT);
+    
+    glEnable(GL_DEPTH_TEST);
+    glDepthMask(GL_TRUE);
+    glFrontFace(GL_CCW);
+    glDisable(GL_CULL_FACE);
+    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+    
+    glUseProgram(glShaderProgram);
+    
+    glBindBuffer(GL_ARRAY_BUFFER, glVBO);
+    
+    // Set up the vertex structure description
+    GLint posAttrib = glGetAttribLocation(glShaderProgram, "inPosition");
+    GLint texAttrib = glGetAttribLocation(glShaderProgram, "inTexCoord");
+    glEnableVertexAttribArray(posAttrib);
+    glVertexAttribPointer(posAttrib, 2, GL_FLOAT, GL_FALSE, sizeof(MtlfMetalContext::Vertex), (void*)(offsetof(Vertex, position)));
+    glEnableVertexAttribArray(texAttrib);
+    glVertexAttribPointer(texAttrib, 2, GL_FLOAT, GL_FALSE, sizeof(MtlfMetalContext::Vertex), (void*)(offsetof(Vertex, uv)));
+    
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_RECTANGLE, glColorTexture);
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_RECTANGLE, glDepthTexture);
+    
+    GLuint blitTexSizeUniform = glGetUniformLocation(glShaderProgram, "texSize");
+    
+    glUniform2f(blitTexSizeUniform, mtlColorTexture.width, mtlColorTexture.height);
+    
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+    
+    glFlush();
+    
+    glBindTexture(GL_TEXTURE_RECTANGLE, 0);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_RECTANGLE, 0);
+    
+    glDisableVertexAttribArray(posAttrib);
+    glDisableVertexAttribArray(texAttrib);
+    glUseProgram(0);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    
+    glPopAttrib();
+}
+
+void
+MtlfMetalContext::CopyDepthTextureToOpenGL()
+{
+    NSUInteger exeWidth = computeDepthCopyProgramExecutionWidth;
+    MTLSize threadGroupCount = MTLSizeMake(16, exeWidth / 32, 1);
+    MTLSize threadGroups     = MTLSizeMake(mtlDepthTexture.width / threadGroupCount.width + 1,
+                                           mtlDepthTexture.height / threadGroupCount.height + 1, 1);
+    id <MTLComputeCommandEncoder> computeEncoder = GetComputeEncoder();
+    
+    computeEncoder.label = @"Depth buffer copy";
+    
+    context->SetComputeEncoderState(computeDepthCopyProgram, 0, @"Depth copy pipeline state");
+    
+    [computeEncoder setTexture:mtlDepthTexture atIndex:0];
+    [computeEncoder setTexture:mtlDepthRegularFloatTexture atIndex:1];
+    
+    [computeEncoder dispatchThreadgroups:threadGroups threadsPerThreadgroup: threadGroupCount];
+    
+    ReleaseEncoder(true);
+}
+
 id<MTLBuffer>
 MtlfMetalContext::GetQuadIndexBuffer(MTLIndexType indexTypeMetal) {
     // Each 4 vertices will require 6 remapped one
