@@ -1058,8 +1058,7 @@ void MtlfMetalContext::SetRenderEncoderState()
                         [computeEncoder setBuffer:buffer->buffer offset:buffer->offset atIndex:buffer->index];
                         computePipelineStateDescriptor.buffers[buffer->index].mutability = MTLMutabilityImmutable;
                     }
-                    else
-                        [wq->currentRenderEncoder setVertexBuffer:buffer->buffer offset:buffer->offset atIndex:buffer->index];
+                    [wq->currentRenderEncoder setVertexBuffer:buffer->buffer offset:buffer->offset atIndex:buffer->index];
                 }
                 else if(buffer->stage == kMSL_ProgramStage_Fragment) {
                     [wq->currentRenderEncoder setFragmentBuffer:buffer->buffer offset:buffer->offset atIndex:buffer->index];
@@ -1089,10 +1088,10 @@ void MtlfMetalContext::SetRenderEncoderState()
     if (dirtyRenderState & DIRTY_METALRENDERSTATE_TEXTURE) {
         for(auto texture : textures) {
             if(texture.stage == kMSL_ProgramStage_Vertex) {
-                if(usingComputeGS)
+                if(usingComputeGS) {
                     [computeEncoder setTexture:texture.texture atIndex:texture.index];
-                else
-                    [wq->currentRenderEncoder setVertexTexture:texture.texture atIndex:texture.index];
+                }
+                [wq->currentRenderEncoder setVertexTexture:texture.texture atIndex:texture.index];
             }
             else if(texture.stage == kMSL_ProgramStage_Fragment)
                 [wq->currentRenderEncoder setFragmentTexture:texture.texture atIndex:texture.index];
@@ -1104,10 +1103,10 @@ void MtlfMetalContext::SetRenderEncoderState()
     if (dirtyRenderState & DIRTY_METALRENDERSTATE_SAMPLER) {
         for(auto sampler : samplers) {
             if(sampler.stage == kMSL_ProgramStage_Vertex) {
-                if(usingComputeGS)
+                if(usingComputeGS) {
                     [computeEncoder setSamplerState:sampler.sampler atIndex:sampler.index];
-                else
-                    [wq->currentRenderEncoder setVertexSamplerState:sampler.sampler atIndex:sampler.index];
+                }
+                [wq->currentRenderEncoder setVertexSamplerState:sampler.sampler atIndex:sampler.index];
             }
             else if(sampler.stage == kMSL_ProgramStage_Fragment)
                 [wq->currentRenderEncoder setFragmentSamplerState:sampler.sampler atIndex:sampler.index];
