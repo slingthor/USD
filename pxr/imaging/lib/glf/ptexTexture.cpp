@@ -270,7 +270,7 @@ GlfPtexTexture::GetBindings(TfToken const & identifier, GarchSamplerGPUHandle sa
     // packing buffer doesn't need external sampler
     result.push_back(Binding(
         TfToken(identifier.GetString() + "_Packing"), GarchTextureTokens->layout,
-        GL_TEXTURE_BUFFER, _layout, nil));
+        GL_TEXTURE_BUFFER, _layout, GarchSamplerGPUHandle()));
 
     return result;
 }
