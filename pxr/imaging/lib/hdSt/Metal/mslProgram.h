@@ -49,8 +49,16 @@ enum MSL_BindingType
     kMSL_BindingType_Sampler         = (1 << 3),
     kMSL_BindingType_Uniform         = (1 << 4),
     kMSL_BindingType_UniformBuffer   = (1 << 5),
-    kMSL_BindingType_ComputeGSOutput = (1 << 6),
-    kMSL_BindingType_ComputeGSArg    = (1 << 7),
+    kMSL_BindingType_GSVertOutput    = (1 << 6),
+    kMSL_BindingType_GSPrimOutput    = (1 << 7),
+    kMSL_BindingType_DrawArgs        = (1 << 8),
+};
+
+enum MSL_BuildTarget
+{
+    kMSL_BuildTarget_Regular = 0,
+    kMSL_BuildTarget_MVA,               //Where MVA stands for: Manual Vertex Assembly. Vertex assembly is not done by the hardware, it is done in the vertex shader.
+    kMSL_BuildTarget_MVA_ComputeGS,     //Adds a seperate Geometry Shader pass that is executed in Compute. Required for Geometry Shader support, requires MVA.
 };
 
 struct MSL_ShaderBinding
@@ -178,8 +186,9 @@ public:
     }
     
     HDST_API
-    void SetGSOutputStructSize(int outputStructSize) {
-        _computeGSOutputStructSize = outputStructSize;
+    void SetGSOutStructsSize(int vertOutStructSize, int primOutStructSize) {
+        _gsVertOutStructSize = vertOutStructSize;
+        _gsPrimOutStructSize = primOutStructSize;
     }
 protected:
     HDST_API
@@ -191,30 +200,27 @@ private:
     id<MTLFunction> _vertexFunction;
     id<MTLFunction> _fragmentFunction;
     id<MTLFunction> _computeFunction;
-    
-    //Compute Path
-    id<MTLFunction> _computeGeometryFunction;     //Identical to _vertexFunction, just compiled with different entry-point
-    id<MTLFunction> _vertexPassThroughFunction; //Identical to _vertexFunction, just compiled with different entry-point
+    id<MTLFunction> _computeGeometryFunction;
     
     id<MTLRenderPipelineState> _pipelineState;
 	
     uint32 _vertexFunctionIdx;
     uint32 _fragmentFunctionIdx;
     uint32 _computeFunctionIdx;
-    
     uint32 _computeGeometryFunctionIdx;
-    uint32 _vertexPassThroughFunctionIdx;
 
     bool _valid;
     HdStResourceMetal  _uniformBuffer;
     MSL_ShaderBindingMap _bindingMap;
     BindingLocationMap _locationMap;
     
-    bool _enableComputeGSPath;
-    int _computeGSArgSlot;
-    int _computeGSIndexSlot;
-    int _computeGSOutputSlot;
-    int _computeGSOutputStructSize;
+    MSL_BuildTarget _buildTarget;
+    int _gsVertOutBufferSlot;
+    int _gsPrimOutBufferSlot;
+    int _gsVertOutStructSize;
+    int _gsPrimOutStructSize;
+    int _drawArgsSlot;
+    int _indicesSlot;
     
     std::vector<id<MTLBuffer>> _buffers;
     bool _currentlySet;

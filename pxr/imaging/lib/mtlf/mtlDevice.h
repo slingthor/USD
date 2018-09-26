@@ -105,7 +105,7 @@ public:
     void SetDrawTarget(MtlfDrawTarget *drawTarget);
     
     MTLF_API
-    void SetShadingPrograms(id<MTLFunction> vertexFunction, id<MTLFunction> fragmentFunction,  id<MTLFunction> computeFunction, id<MTLFunction> computeGSFunction = NULL);
+    void SetShadingPrograms(id<MTLFunction> vertexFunction, id<MTLFunction> fragmentFunction,  id<MTLFunction> computeFunction, bool _enableMVA, bool _enableComputeGS);
     
     MTLF_API
     void SetVertexAttribute(uint32_t index,
@@ -116,7 +116,10 @@ public:
                             const TfToken& name);
     
     MTLF_API
-    void SetupComputeGS(UInt32 indexBufferSlot, id<MTLBuffer> indexBuffer, UInt32 indexCount, UInt32 startIndex, UInt32 baseVertex, UInt32 geometryOutputStructSize, UInt32 argumentBufferSlot, UInt32 outputBufferSlot);
+    void SetDrawArgsBuffer(int indexCount, int startIndex, int baseVertex, int drawArgBufferSlot, bool setupForCompute);
+    
+    MTLF_API
+    void SetComputeGSOutputBuffers(int indexCount, int preVertStructSize, int perPrimStructSize, int perVertBufferSlot, int perPrimBufferSlot);
     
     MTLF_API
     void SetUniform(const void* _data, uint32 _dataSize, const TfToken& _name, uint32 index, MSL_ProgramStage stage);
@@ -182,10 +185,8 @@ public:
     id<MTLComputePipelineState> computeDepthCopyPipelineState;
     NSUInteger computeDepthCopyProgramExecutionWidth;
     
-    std::vector<id<MTLBuffer>> computeGSOutputBuffers;
-    uint32_t computeGSOutputCurrentIdx;
-    uint32_t computeGSOutputCurrentOffset;
-    bool usingComputeGS;
+    bool enableMVA;
+    bool enableComputeGS;
 
     uint32_t glShaderProgram;
     uint32_t glColorTexture;

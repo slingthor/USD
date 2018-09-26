@@ -145,13 +145,13 @@ HdSt_CodeGenMSL::TParam::Usage operator|=(HdSt_CodeGenMSL::TParam::Usage &lhs,
 
 HdSt_CodeGenMSL::HdSt_CodeGenMSL(HdSt_GeometricShaderPtr const &geometricShader,
                              HdStShaderCodeSharedPtrVector const &shaders)
-    : _geometricShader(geometricShader), _shaders(shaders), _mslGSOutputStructSize(0)
+    : _geometricShader(geometricShader), _shaders(shaders)
 {
     TF_VERIFY(geometricShader);
 }
 
 HdSt_CodeGenMSL::HdSt_CodeGenMSL(HdStShaderCodeSharedPtrVector const &shaders)
-    : _geometricShader(), _shaders(shaders), _mslGSOutputStructSize(0)
+    : _geometricShader(), _shaders(shaders)
 {
 }
 
@@ -847,756 +847,1093 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
 {
     std::stringstream   glueCommon, copyInputsVtx, copyOutputsVtx, copyInputsVtxStruct_Compute,
                         copyInputsVtx_Compute, copyGSOutputsIntoVSOutputs;
-    std::stringstream copyInputsFrag, copyOutputsFrag;
+    std::stringstream   copyInputsFrag, copyOutputsFrag;
 
-    glueCommon.str("");
+    std::stringstream   vsInputStruct, vsOutputStruct, vsAttributeDefineEnabled, vsAttributeDefineDisabled, vsAttributeDefineUndef,
+                        vsFuncDef, vsMI_FuncDef, vsUnpack1010102Snippet,
+                        vsMI_EP_FuncDef, vsMI_EP_FuncDefParams, vsMI_EP_CallCode, vsMI_EP_InputCode,
+                        vsCode, vsEntryPointCode, vsInputCode, vsOutputCode, vsGsOutputMergeCode,
+                        vsUniformStruct, drawArgsStruct;
+
     METAL_DEBUG_COMMENT(&glueCommon, "_GenerateGlue(glueCommon)\n"); //MTL_FIXME
-    copyInputsVtx.str("");
-    copyInputsVtx_Compute.str("");
-    copyInputsVtxStruct_Compute.str("");
-    copyGSOutputsIntoVSOutputs.str("");
-    copyInputsFrag.str("");
-    copyOutputsVtx.str("");
-    copyOutputsFrag.str("");
-    
-    glueCommon << "struct MSLVtxOutputs {\n";
-//    if(_mslBuildComputeGS)
-//        glueCommon << "int gl_PrimitiveID[[flat]];\n";
-    TF_FOR_ALL(it, _mslVSOutputParams) {
-        HdSt_CodeGenMSL::TParam const &output = *it;
-        
-        bool generateCSVersion = !output.attribute.IsEmpty();
-        if(generateCSVersion) glueCommon << "#if HD_MTL_COMPUTESHADER == 0\n";
-        glueCommon << output.dataType << " " << output.name << output.attribute << ";\n";
-        if(generateCSVersion) {
-            glueCommon << "#else\n";
-            glueCommon << output.dataType << " " << output.name << "; //" << output.attribute << "\n";
-            glueCommon << "#endif\n";
-        }
-        
-        copyOutputsVtx << "vtxOut." << output.name << "=scope.";
-        if (output.accessorStr.IsEmpty()) {
-            copyOutputsVtx << output.name << ";\n";
-        }
-        else {
-            copyOutputsVtx << output.accessorStr << ";\n";
-        }
-    }
-    glueCommon << "};\n";
-    
-    glueVS << glueCommon.str();
-    gluePS << glueCommon.str();
-    
     METAL_DEBUG_COMMENT(&glueVS, "_GenerateGlue(glueVS)\n"); //MTL_FIXME
     METAL_DEBUG_COMMENT(&gluePS, "_GenerateGlue(gluePS)\n"); //MTL_FIXME
     
-    std::stringstream computeBufferArguments;
+    vsAttributeDefineEnabled    << "/****** Vertex Attributes Specifiers are ENABLED ******/\n"
+                                << "#define HD_MTL_VS_ATTRIBUTE(t,n,a) t n a\n\n";
+    vsAttributeDefineDisabled   << "/****** Vertex Attributes Specifiers are DISABLED ******/\n"
+                                << "#define HD_MTL_VS_ATTRIBUTE(t,n,a) t n\n\n";
+    vsAttributeDefineUndef      << "#undef HD_MTL_VS_ATTRIBUTE\n\n";
     
-    glueVS << "struct MSLVtxInputs {\n";
-    int location = 0;
-    int vertexAttribsLocation = 0;
+    vsUnpack1010102Snippet      << "////////////////////////////////////////////////////////////////////////////////////////////////////////////////////\n"
+                                << "// MSL Helper Code /////////////////////////////////////////////////////////////////////////////////////////////////\n\n"
+                                << "struct packedint { int x:10, y:10, z:10, w:2; };\n"
+                                << "vec4 Unpack10_10_10_2(uint u_packedNormal) {\n"
+                                << "    packedint pi = *(thread packedint*)&u_packedNormal;\n"
+                                << "    return vec4(vec3(pi.x, pi.y, pi.z) / 511.0f, pi.w);\n"
+                                << "}\n";
+    
+    drawArgsStruct              << "////////////////////////////////////////////////////////////////////////////////////////////////////////////////////\n"
+                                << "// MSL Draw Args Struct ////////////////////////////////////////////////////////////////////////////////////////////\n\n"
+                                << "struct MSLDrawArgs { int indexCount, startIndex, baseVertex; };\n";
+    
+    //Do an initial pass over _mslVSInputParams and _mslFSInputParams to count the number of vertexAttributes that will needs
+    // slots. This allows us to do the rest of the VS/PS generation in a single pass.
+    
+    int vsNumVertexAttributes = 0;
+    bool hasVSUniformBuffer(false), hasFSUniformBuffer(false);
+    
     TF_FOR_ALL(it, _mslVSInputParams) {
         HdSt_CodeGenMSL::TParam const &input = *it;
-        TfToken attrib;
-        
-        if (input.usage & HdSt_CodeGenMSL::TParam::Uniform)
+        if(input.usage & HdSt_CodeGenMSL::TParam::EntryFuncArgument)
             continue;
-        
-        if (input.usage & HdSt_CodeGenMSL::TParam::EntryFuncArgument) {
-            std::string n = (input.name.GetText()[0] == '*') ? input.name.GetString().substr(1) : input.name;
-            copyInputsVtx << "scope." << n << "=" << n << ";\n";
-            copyInputsVtx_Compute << "            , " << n << "\n";
+        else if(input.usage & HdSt_CodeGenMSL::TParam::Uniform) {
+            hasVSUniformBuffer = true;
             continue;
         }
-
-        copyInputsVtx << "scope." << input.name << "=input." << input.name << ";\n";
         
-        if (input.name.GetText()[0] == '*') {
-            //Does this case ever hit? A pointer as vertexattrib? - jsoet
-            glueVS << "device const ";
-            mslProgram->AddBinding(input.name.GetText() + 1, vertexAttribsLocation, kMSL_BindingType_VertexAttribute, kMSL_ProgramStage_Vertex);
-        }
-        else {
-            mslProgram->AddBinding(input.name.GetString(), vertexAttribsLocation, kMSL_BindingType_VertexAttribute, kMSL_ProgramStage_Vertex);
-        }
-
-//        if (!input.attribute.IsEmpty())
-//            attrib = input.attribute;
-//        else
-            attrib = TfToken(TfStringPrintf("[[attribute(%d)]]", vertexAttribsLocation));
-
-        ////////////////////////////////////////////////////////
-        
-        const bool isPackedNormals = input.name == HdTokens->packedNormals; //MTL_FIXME: A horrible hack to fix loading packedNormals, we should consider StageIn but that would mean we can't do VS and GS in a single pass....
-        
-        bool generateCSVersion = !attrib.IsEmpty();
-        if(generateCSVersion) glueVS << "#if HD_MTL_VERTEXSHADER\n";
-        glueVS << input.dataType << " " << input.name << attrib << ";"  << "// Binding to [[buffer(" << vertexAttribsLocation << ")]]\n";
-        if(generateCSVersion) {
-            glueVS << "#else\n";
-            glueVS << input.dataType << " " << input.name << "; // *" << attrib << "* Binding to [[buffer(" << vertexAttribsLocation << ")]]\n";
-            glueVS << "#endif\n";
-            
-            //Add the attribute as a buffer input to the Compute function definition
-            computeBufferArguments << "\n    , device const ";
-            if(isPackedNormals)
-                computeBufferArguments << "uint";
-            else {
-                TfToken dataType = input.dataType;
-                if(dataType == TfToken("vec2")) dataType = TfToken("packed_float2");
-                if(dataType == TfToken("vec3")) dataType = TfToken("packed_float3");
-                computeBufferArguments << dataType;
-            }
-            computeBufferArguments << " *" << input.name << "[[buffer(" << vertexAttribsLocation << ")]] // " << attrib;
-        }
-        if(isPackedNormals)
-            copyInputsVtxStruct_Compute << ",   \n            float4(Unpack10_10_10_2_ToVec3(" << input.name << "[gl_VertexID]), 0.0)";
-        else
-            copyInputsVtxStruct_Compute << ",   \n            " << input.name << "[gl_VertexID]";
-        ////////////////////////////////////////////////////////
-        
-        vertexAttribsLocation++;
-    }
-    glueVS << "};\n";
-    
-    //This binding for indices is not an necessarily a required binding. It's here so that
-    //it propagates to the binding system and can be retrieved there. You don't have to bind it.
-    mslProgram->AddBinding("indices", vertexAttribsLocation, kMSL_BindingType_IndexBuffer, kMSL_ProgramStage_Vertex);
-    mslProgram->AddBinding("indices", vertexAttribsLocation, kMSL_BindingType_IndexBuffer, kMSL_ProgramStage_Compute);
-    //Add it for ComputeVS. Increment vertexAttribsLocation (this means that in the VS the buffers are offset by 1,
-    //with 1 slot skipped, the indices)
-    computeBufferArguments << "\n    , device const uint *indices[[buffer(" << vertexAttribsLocation++ << ")]]";
-    
-    /////////////////////////////////Uniform Buffer///////////////////////////////////
-    
-    int vtxUniformBufferSize = 0;
-    TF_FOR_ALL(it, _mslVSInputParams) {
-        HdSt_CodeGenMSL::TParam const &input = *it;
-        if ((input.usage & HdSt_CodeGenMSL::TParam::Usage::Uniform) == 0)
-            continue;
-        
-        //Apply alignment rules
-        uint32 size = 4;
-        if(input.dataType.GetString().find("vec2") != std::string::npos) size = 8;
-        else if(input.dataType.GetString().find("vec3") != std::string::npos) size = 12;
-        else if(input.dataType.GetString().find("vec4") != std::string::npos) size = 16;
-        uint32 regStart = vtxUniformBufferSize / 16;
-        uint32 regEnd = (vtxUniformBufferSize + size - 1) / 16;
-        if(regStart != regEnd && vtxUniformBufferSize % 16 != 0)
-            vtxUniformBufferSize += 16 - (vtxUniformBufferSize % 16);
-        
-        mslProgram->AddBinding(input.name, -1, kMSL_BindingType_Uniform, kMSL_ProgramStage_Vertex, vtxUniformBufferSize);
-
-        vtxUniformBufferSize += size;
+        vsNumVertexAttributes++;
     }
 
-    //Round up size of uniform buffer to next 16 byte boundary.
-    vtxUniformBufferSize = ((vtxUniformBufferSize + 15) / 16) * 16;
-
-#define CODEGENMSL_VTXUNIFORMSTRUCTNAME "MSLVtxUniforms"
-#define CODEGENMSL_VTXUNIFORMINPUTNAME "vtxUniforms"
-
-    if(vtxUniformBufferSize != 0)
-    {
-        glueVS << "struct " CODEGENMSL_VTXUNIFORMSTRUCTNAME " {\n";
-        {
-            TF_FOR_ALL(it, _mslVSInputParams) {
-                HdSt_CodeGenMSL::TParam const &input = *it;
-                if ((input.usage & HdSt_CodeGenMSL::TParam::Usage::Uniform) == 0)
-                    continue;
-
-                if (input.arraySize) {
-                    glueVS << input.dataType << " " << input.name << "[" << input.arraySize << "]" << ";\n";
-                }
-                else {
-                glueVS << input.dataType << " " << input.name << ";\n";
-                }
-
-                copyInputsVtx << "scope." << input.name << "=" CODEGENMSL_VTXUNIFORMINPUTNAME "->" << input.name << ";\n";
-            }
-        }
-        glueVS << "};\n";
-
-        HdSt_CodeGenMSL::TParam in(TfToken("*" CODEGENMSL_VTXUNIFORMINPUTNAME), TfToken(CODEGENMSL_VTXUNIFORMSTRUCTNAME), TfToken(), TfToken(), HdSt_CodeGenMSL::TParam::Unspecified);
-        
-        copyInputsVtx_Compute <<   "            , " << CODEGENMSL_VTXUNIFORMINPUTNAME << "\n";
-
-        in.usage |= HdSt_CodeGenMSL::TParam::EntryFuncArgument;
-
-        _mslVSInputParams.push_back(in);
-    }
-    
-    /////////////////////////////////Frag Outputs///////////////////////////////////
-    
-    gluePS << "struct MSLFragOutputs {\n";
-    location = 0;
-    TF_FOR_ALL(it, _mslPSOutputParams) {
-        HdSt_CodeGenMSL::TParam const &output = *it;
-        gluePS << output.dataType << " " << output.name << "[[color(" << location++ << ")]];\n";
-        
-        copyOutputsFrag << "fragOut." << output.name << "=scope.";
-        if (output.accessorStr.IsEmpty()) {
-            copyOutputsFrag << output.name << ";\n";
-        }
-        else {
-            copyOutputsFrag << output.accessorStr << ";\n";
-        }
-    }
-    gluePS << "};\n";
-    
-    // Check if there's any texturing parameters
-    bool hasTexturing = false;
     TF_FOR_ALL(it, _mslPSInputParams) {
         HdSt_CodeGenMSL::TParam const &input = *it;
-        auto usage = input.usage & HdSt_CodeGenMSL::TParam::maskShaderUsage;
-        if (usage == HdSt_CodeGenMSL::TParam::Texture ||
-            usage == HdSt_CodeGenMSL::TParam::Sampler) {
-            hasTexturing = true;
+        if((input.usage & HdSt_CodeGenMSL::TParam::EntryFuncArgument) || (input.usage & HdSt_CodeGenMSL::TParam::VertexShaderOnly))
+            continue;
+        else if(input.usage & HdSt_CodeGenMSL::TParam::Uniform) {
+            hasFSUniformBuffer = true;
             break;
         }
     }
-    if (hasTexturing) {
-        gluePS << "struct MSLTexturing {\n";
-        int textureLocation = 0;
-        int samplerLocation = 0;
-        std::stringstream attribute;
+    
+    //////////////////////////// Additional Buffer Binding /////////////////////////////////
+    
+    int vsUniformsBufferSlot(-1), fsUniformsBufferSlot(-1), drawArgsSlot(-1), currentUniformBufferSlot(-1), indexBufferSlot(-1);
 
-        TF_FOR_ALL(it, _mslPSInputParams) {
+    mslProgram->AddBinding("indices", -1, kMSL_BindingType_IndexBuffer, kMSL_ProgramStage_Vertex);
+    
+    //Add an index buffer for CSGS/vsMI. Increment vertexAttribsLocation (this means that in the VS
+    //the buffers are offset by 1, with 1 slot skipped, the indices). You must bind it if you're
+    //running vsMI or CSGS, not required otherwise.
+    if(_buildTarget != kMSL_BuildTarget_Regular) {
+        indexBufferSlot = vsNumVertexAttributes;
+        //Instead of using BindingType IndexBuffer we use UniformBuffer as that is how we use the indexBuffer in this case.
+        mslProgram->AddBinding("indices", indexBufferSlot, kMSL_BindingType_UniformBuffer, kMSL_ProgramStage_Vertex);
+        mslProgram->AddBinding("indices", indexBufferSlot, kMSL_BindingType_UniformBuffer, kMSL_ProgramStage_Compute);
+    }
+    vsNumVertexAttributes++;
+
+    //The uniform buffers are placed right after the vertex attribute slots.
+    currentUniformBufferSlot = vsNumVertexAttributes;
+
+    //Add the DrawArgs buffer for MI calls. The index increase it causes is visible for all versions, this is intended
+    //in an effort to keep the slot mapping the same between MI/GS and regular calls. The drawArgs buffer is only
+    //present for MI calls. The drawArgs buffer is not known to Hydra, it is kept internal to the Metal code.
+    drawArgsSlot = currentUniformBufferSlot;
+    if(_buildTarget != kMSL_BuildTarget_Regular) {
+        mslProgram->AddBinding("drawArgs", drawArgsSlot, kMSL_BindingType_DrawArgs, kMSL_ProgramStage_Vertex);
+        mslProgram->AddBinding("drawArgs", drawArgsSlot, kMSL_BindingType_DrawArgs, kMSL_ProgramStage_Compute);
+    }
+    currentUniformBufferSlot++;
+    
+    //Add a binding for the Vertex output generated in compute, and a binding for compute argument buffer
+    const UInt32 gsVertOutputSlot = currentUniformBufferSlot++;
+    const UInt32 gsPrimOutputSlot = currentUniformBufferSlot++;
+    if(_buildTarget == kMSL_BuildTarget_MVA_ComputeGS) {
+        mslProgram->AddBinding("gsVertOutput", gsVertOutputSlot, kMSL_BindingType_GSVertOutput, kMSL_ProgramStage_Compute);
+        mslProgram->AddBinding("gsVertOutput", gsVertOutputSlot, kMSL_BindingType_GSVertOutput, kMSL_ProgramStage_Vertex);      //As input
+        mslProgram->AddBinding("gsVertOutput", gsVertOutputSlot, kMSL_BindingType_GSVertOutput, kMSL_ProgramStage_Fragment);    //As input
+        mslProgram->AddBinding("gsPrimOutput", gsPrimOutputSlot, kMSL_BindingType_GSPrimOutput, kMSL_ProgramStage_Compute);
+        mslProgram->AddBinding("gsPrimOutput", gsPrimOutputSlot, kMSL_BindingType_GSPrimOutput, kMSL_ProgramStage_Vertex);      //As input
+        mslProgram->AddBinding("gsPrimOutput", gsPrimOutputSlot, kMSL_BindingType_GSPrimOutput, kMSL_ProgramStage_Fragment);    //As input
+    }
+
+    //Add our (to be) generated uniform buffer as input param for VS.
+    if(hasVSUniformBuffer) {
+        _AddInputParam(_mslVSInputParams, TfToken("*vsUniforms"), TfToken("MSLVsUniforms"), TfToken()).usage
+            |= HdSt_CodeGenMSL::TParam::EntryFuncArgument;
+    }
+    
+    //Add our (to be) generated uniform buffer as input param for FS.
+    if(hasFSUniformBuffer) {
+        _AddInputParam(_mslPSInputParams, TfToken("*fsUniforms"), TfToken("MSLFsUniforms"), TfToken()).usage
+            |= HdSt_CodeGenMSL::TParam::EntryFuncArgument;
+    }
+    
+    ///////////////////////// Vertex Input ////////////////////////////
+    
+    std::stringstream computeBufferArguments;
+    
+    int vsCurrentVertexAttributeSlot(0), vsUniformStructSize(0);
+    
+    vsFuncDef       << "vertex MSLVsOutputs vertexEntryPoint(MSLVsInputs input[[stage_in]]";
+    vsMI_FuncDef    << "/****** Manually Indexed Wrapper Function (MI) ******/\n"
+                    << "MSLVsOutputs vertexShader_MI("
+                    << "\n    MSLVsInputs input //[[stage_in]]";
+    vsMI_EP_FuncDef << "vertex MSLVsOutputs vertexEntryPoint("
+                    << "\n      uint _vertexID[[vertex_id]]"
+                    << "\n    , uint _instanceID[[instance_id]]";
+    
+    if(_buildTarget != kMSL_BuildTarget_Regular) {
+        vsMI_EP_FuncDefParams   << "\n    , device const uint *indices[[buffer(" << indexBufferSlot << ")]]"
+                                << "\n    , device const MSLDrawArgs *drawArgs[[buffer(" << drawArgsSlot << ")]]";
+    }
+    if(_buildTarget == kMSL_BuildTarget_MVA_ComputeGS) {
+        vsMI_EP_FuncDef         << "\n    , const device MSLGsVertOutStruct* gsVertOutBuffer[[buffer(" << gsVertOutputSlot << ")]]"
+                                << "\n    , const device MSLGsPrimOutStruct* gsPrimOutBuffer[[buffer(" << gsPrimOutputSlot << ")]]";
+    }
+    
+    vsMI_EP_InputCode   << "    MSLVsInputs vsInput = {//";
+    vsMI_EP_CallCode    << "    vsOutput = vertexShader_MI("
+                        << "\n            vsInput";
+    
+    vsInputStruct   << "struct MSLVsInputs {\n";
+    vsUniformStruct << "////////////////////////////////////////////////////////////////////////////////////////////////////////////////////\n"
+                    << "// MSL VS Uniforms Struct //////////////////////////////////////////////////////////////////////////////////////////\n\n"
+                    << "struct MSLVsUniforms {\n";
+    
+    {
+        TF_FOR_ALL(it, _mslVSInputParams) {
             HdSt_CodeGenMSL::TParam const &input = *it;
-
-            attribute.str("");
-
-            switch (input.usage & HdSt_CodeGenMSL::TParam::maskShaderUsage) {
-                case HdSt_CodeGenMSL::TParam::Unspecified:
-                    continue;
-                case HdSt_CodeGenMSL::TParam::Texture:
-                    location = textureLocation++;
-                    attribute << "[[texture(" << location << ")]]";
-                    break;
-                case HdSt_CodeGenMSL::TParam::Sampler:
-                    location = samplerLocation++;
-                    attribute << "[[sampler(" << location << ")]]";
-                    break;
-                default:
-                    TF_FATAL_CODING_ERROR("Not Implemented");
-            }
-
-            gluePS << input.dataType << " " << input.name << attribute.str() << ";\n";
-
-            std::string n;
-            if (input.name.GetText()[0] == '*') {
-                n = input.name.GetString().substr(1);
-            }
-            else {
-                n = input.name.GetString();
-            }
             
-            switch (input.usage & HdSt_CodeGenMSL::TParam::maskShaderUsage) {
-                case HdSt_CodeGenMSL::TParam::Texture:
-                    mslProgram->AddBinding(n, location, kMSL_BindingType_Texture, kMSL_ProgramStage_Fragment);
-                    break;
-                case HdSt_CodeGenMSL::TParam::Sampler:
-                    mslProgram->AddBinding(n, location, kMSL_BindingType_Sampler, kMSL_ProgramStage_Fragment);
-                    break;
-                default:
-                    TF_FATAL_CODING_ERROR("Not Implemented");
-            }
+            std::string name(input.name), dataType(input.dataType);
+            bool isVertexAttribute = true;
+            bool usesPackedNormals = (input.name == HdTokens->packedNormals);
             
-            copyInputsFrag << "scope." << n << "=texturing." << n << ";\n";
-        }
-        gluePS << "};\n";
-    }
+            if (input.usage & HdSt_CodeGenMSL::TParam::Uniform) {
+                //This input param is a uniform
+                
+                vsUniformStruct << dataType << " " << name;
+                if (input.arraySize) vsUniformStruct << "[" << input.arraySize << "]";
+                vsUniformStruct << ";\n";
 
-#define CODEGENMSL_FRAGUNIFORMINPUTNAME "fragUniforms"
-
-    gluePS << "struct MSLFragInputs {\n";
-    location = 0;
-    uint32 byteOffset = 0;
-    uint32 inputUniformBufferSize = 0;
-    TF_FOR_ALL(it, _mslPSInputParams) {
-        HdSt_CodeGenMSL::TParam const &input = *it;
-        TfToken attrib;
-        
-        if ((input.usage & HdSt_CodeGenMSL::TParam::maskShaderUsage) != 0 ||
-            ((input.usage & HdSt_CodeGenMSL::TParam::UniformBlock) != 0 && input.name.GetText()[0] == '*')) {
-            continue;
-        }
-        else if (input.usage & HdSt_CodeGenMSL::TParam::EntryFuncArgument) {
-            if(input.usage & HdSt_CodeGenMSL::TParam::UniformBlock) {
-                copyInputsFrag << "scope." << input.name << "=*" << input.name << ";\n";
+                vsInputCode << "    scope." << name << " = vsUniforms->" << name << ";\n";
+                
+                //Update the vsUniformStructSize, taking into account alignment and member sizes and create a binding for the uniform.
+                uint32 size = 4;
+                if(input.dataType.GetString().find("vec2") != std::string::npos) size = 8;
+                else if(input.dataType.GetString().find("vec3") != std::string::npos) size = 12;
+                else if(input.dataType.GetString().find("vec4") != std::string::npos) size = 16;
+                uint32 regStart = vsUniformStructSize / 16;
+                uint32 regEnd = (vsUniformStructSize + size - 1) / 16;
+                if(regStart != regEnd && vsUniformStructSize % 16 != 0)
+                    vsUniformStructSize += 16 - (vsUniformStructSize % 16);
+                //Add a binding for each uniform. They are currently all bound to slot -1 which is "patched" a little further down, once
+                //the actual slot is known (depends on other elements of _mslVSInputParams which may not have been processed yet)
+                mslProgram->AddBinding(input.name, -1, kMSL_BindingType_Uniform, kMSL_ProgramStage_Vertex, vsUniformStructSize);
+                vsUniformStructSize += size;
             }
-            else if (input.name.GetText()[0] == '*') {
-                std::string n = input.name.GetString().substr(1);
-                copyInputsFrag << "scope." << n << "=" << n << ";\n";
+            else if(input.usage & HdSt_CodeGenMSL::TParam::UniformBlockMember) {
+                //This parameter is a uniform block member
+                
+                TF_FATAL_CODING_ERROR("Not implemented!");
             }
-            else {
-                copyInputsFrag << "scope." << input.name << "=" << input.name << ";\n";
-            }
-            continue;
-        }
-
-        // Look for the input name in the vertex outputs and if so, wire it up to the [[stage_in]]
-        bool isVtxOutParam = false;
-        for (auto output : _mslVSOutputParams) {
-            if (input.name == output.name) {
-                isVtxOutParam = true;
-                break;
-            }
-        }
-        TfToken accessor;
-        if (input.accessorStr.IsEmpty()) {
-            accessor = input.name;
-        }
-        else {
-            accessor = input.accessorStr;
-        }
-        if (isVtxOutParam) {
-            if (input.usage & HdSt_CodeGenMSL::TParam::VertexShaderOnly) {
-                continue;
-            }
-            
-            //Look for this input name in the geometry outputs, take it from there if it exists. This is how geometry output is piped in from compute.
-            bool isGeoOutParam = false;
-            for (auto gsOutput : _mslGSOutputParams) {
-                if(input.name == gsOutput.name) {
-                    isGeoOutParam = true;
-                    break;
+            else if (input.usage & HdSt_CodeGenMSL::TParam::EntryFuncArgument) {
+                //This input param is either a built-in variable or a uniform buffer.
+                
+                bool availableInMI_EP = true;
+                bool isPtrParam = false;
+                bool inProgramScope = (input.usage & HdSt_CodeGenMSL::TParam::ProgramScope);
+                std::string attrib = input.attribute.GetString();
+                if (input.attribute.IsEmpty()) {
+                    //This input param is a uniform buffer
+                    
+                    if (input.name.GetText()[0] == '*') {
+                        int prefixSize = (input.usage & HdSt_CodeGenMSL::TParam::UniformBlock) ? strlen("*___") : strlen("*");
+                        name = input.name.GetText() + prefixSize;
+                        isPtrParam = true;
+                    }
+                    attrib = TfStringPrintf("[[buffer(%d)]]", currentUniformBufferSlot);
+                    
+                    //Check whether it is the uniform buffer we made
+                    if(name == "vsUniforms")
+                        vsUniformsBufferSlot = currentUniformBufferSlot;
+                    else
+                        mslProgram->AddBinding(name, currentUniformBufferSlot, kMSL_BindingType_UniformBuffer, kMSL_ProgramStage_Vertex, 0, 0);
+                    
+                    currentUniformBufferSlot++;
                 }
-            }
-            
-            copyInputsFrag << "scope." << accessor;
-            if(isGeoOutParam)
-                copyInputsFrag << "=gsOutput[gl_PrimitiveID]." << input.name << ";\n";
-            else
-                copyInputsFrag << "=vsInput." << input.name << ";\n";
-            continue;
-        }
-        else if(input.usage & HdSt_CodeGenMSL::TParam::UniformBlockMember) {
-            std::string inputName = input.name.GetString();
-            std::string::size_type openingBracket = inputName.find_first_of("[");
-            if(openingBracket != std::string::npos) {
-                inputName = input.name.GetString().substr(0, openingBracket);
-            }
-            copyInputsFrag << "scope." << inputName << "=" << input.accessorStr << "->" << inputName << ";\n";
-            continue;
-        }
-        else if(input.usage & HdSt_CodeGenMSL::TParam::PrimVar) {
-            copyInputsFrag << "scope.inPrimvars." << input.name << "=vsInput." << accessor << ";\n";
-        }
-        else {
-            copyInputsFrag << "scope." << accessor << "=" CODEGENMSL_FRAGUNIFORMINPUTNAME "->" << input.name << ";\n";
-        }
-
-        attrib = input.attribute;
-        gluePS << input.dataType << " " << input.name << attrib << ";\n";
-        
-        //Register these uniforms. They're part of the "input" buffer which is hardcoded to be bound at slot 0
-        
-        //Apply alignment rules
-        uint32 size = 4;
-        if(input.dataType.GetString().find("vec2") != std::string::npos) size = 8;
-        else if(input.dataType.GetString().find("vec3") != std::string::npos) size = 12;
-        else if(input.dataType.GetString().find("vec4") != std::string::npos) size = 16;
-        uint32 regStart = byteOffset / 16;
-        uint32 regEnd = (byteOffset + size - 1) / 16;
-        if(regStart != regEnd && byteOffset % 16 != 0) byteOffset += 16 - (byteOffset % 16);
-        
-        mslProgram->AddBinding(input.name, 0, kMSL_BindingType_Uniform, kMSL_ProgramStage_Fragment, byteOffset);
-        
-        //Size
-         byteOffset += size;
-    }
-    inputUniformBufferSize = ((byteOffset + 15) / 16) * 16;
-    gluePS << "};\n";
-    
-    //Vertex Glue Function//
-    
-    std::stringstream glueCVS;
-    glueVS << "#if HD_MTL_VERTEXSHADER && !HD_MTL_COMPUTEGS_VERTEXSHADER\n";
-    glueVS << "vertex MSLVtxOutputs vertexEntryPoint(MSLVtxInputs input[[stage_in]]\n";
-    glueCVS << "#else\n";
-    glueCVS << "MSLVtxOutputs compute_vertexEntryPoint(MSLVtxInputs input //[[stage_in]]\n";
-    // Uniform buffers must start after any allcoated for vertex attributes
-    location = vertexAttribsLocation;
-    int vtxUniformBufferSlot = 0;
-    TF_FOR_ALL(it, _mslVSInputParams) {
-        HdSt_CodeGenMSL::TParam const &input = *it;
-        TfToken attrib;
-        bool useInCompute = true; //Used to remove things like vertexID etc.
-        if (!(input.usage & HdSt_CodeGenMSL::TParam::EntryFuncArgument)) {
-            continue;
-        }
-        if (!input.attribute.IsEmpty()) {
-            attrib = input.attribute;
-            useInCompute = false;    //Any attribute other than [[buffer(X)]] can't be present in CVS sig.
-        }
-        else {
-            std::string n;
-            if (input.name.GetText()[0] == '*') {
-                if ((input.usage & HdSt_CodeGenMSL::TParam::UniformBlock) != 0)
-                    n = input.name.GetText() + 4; //Because of "*___<NAME>"
-                else
-                    n = input.name.GetText() + 1;
+                else {
+                    //This input param is a built-in variable of some kind
+                    
+                    availableInMI_EP = false;   //Built-in variables like gl_VertexID are _always_ supplied to the MI wrapper but are passed in
+                                                //via a different mechanism because of required special behavior
+                }
+                
+                //Don't treat our own uniform buffer as a regular input parameter. It's members will be copied over individually instead.
+                if(name != "vsUniforms")
+                    vsInputCode << "    scope." << name << " = " << name << ";\n";
+                    
+                vsFuncDef   << "\n    , " << (isPtrParam ? "device const " : "")
+                            << (inProgramScope ? "ProgramScope_Vert::" : "")
+                            << dataType << (isPtrParam ? "* " : " ")
+                            << name << attrib;
+                
+                if(availableInMI_EP) {
+                    //The MI entry point needs these too in identical form.
+                    vsMI_EP_FuncDefParams << "\n    , " << (isPtrParam ? "device const " : "")
+                                    << (inProgramScope ? "ProgramScope_Vert::" : "")
+                                    << dataType << (isPtrParam ? "* " : " ")
+                                    << name << attrib;
+                }
+                
+                //MI wrapper code can't use "attrib" attribute specifier.
+                vsMI_FuncDef    << "\n    , " << (isPtrParam ? "device const " : "")
+                                << (inProgramScope ? "ProgramScope_Vert::" : "")
+                                << dataType << (isPtrParam ? "* " : " ")
+                                << name;
+                
+                //Add as a parameter to the call to the vertex wrapper function
+                vsMI_EP_CallCode    << ",\n            " << name;
             }
             else {
-                n = input.name.GetString();
+                //This input param is a vertex attribute
+                
+                vsInputStruct << "HD_MTL_VS_ATTRIBUTE(" << dataType << ", " << name << ", [[attribute(" << vsCurrentVertexAttributeSlot << ")]]);\n";
+                
+                vsInputCode << "    scope." << name << " = input." << name << ";\n";
+                
+                //MI Entry Point needs these as buffers instead of vertex attributes. And to full the MSLVsInput struct
+                //we add them to the InputCode as well.
+                
+                //We need to replace some of the dataTypes here to account for changes in
+                //packing/alignment/unpacking
+                if(usesPackedNormals) dataType = "uint";
+                else if(dataType == "vec2") dataType = "packed_float2";
+                else if(dataType == "vec3") dataType = "packed_float3";
+                
+                vsMI_EP_FuncDefParams   << "\n    , device const " << dataType
+                                        << " *" << name << "[[buffer(" << vsCurrentVertexAttributeSlot << ")]]";
+                vsMI_EP_InputCode   << ",\n            " << (usesPackedNormals ? "Unpack10_10_10_2(" : "")
+                                    << name << "[gl_VertexID]" << (usesPackedNormals ? ")" : "");
+                
+                mslProgram->AddBinding(name, vsCurrentVertexAttributeSlot++, kMSL_BindingType_VertexAttribute, kMSL_ProgramStage_Vertex);
             }
-            int uniformBufferSize = 0;
-            if(n == CODEGENMSL_VTXUNIFORMINPUTNAME) {
-                uniformBufferSize = vtxUniformBufferSize;
-                vtxUniformBufferSlot = location;
-            }
-            mslProgram->AddBinding(n, location, kMSL_BindingType_UniformBuffer, kMSL_ProgramStage_Vertex, 0, uniformBufferSize);
-            attrib = TfToken(TfStringPrintf("[[buffer(%d)]]", location++));
         }
-        glueVS << ", ";
-        glueCVS << ", ";
-        if(useInCompute) computeBufferArguments << "\n    , ";
-        if (input.name.GetText()[0] == '*') {
-            glueVS << "device const ";
-            glueCVS << "device const ";
-            if(useInCompute) computeBufferArguments << "device const ";
-        }
-        if (input.usage & HdSt_CodeGenMSL::TParam::ProgramScope) {
-            glueVS << "ProgramScope<st>::";
-            glueCVS << "ProgramScope<st>::";
-            if(useInCompute) computeBufferArguments << "ProgramScope<st>::";
-        }
-        glueVS << input.dataType << " " << input.name << attrib << "\n";
-        glueCVS << input.dataType << " " << input.name << " //" << attrib << "\n";
-        if(useInCompute) computeBufferArguments << input.dataType << " " << input.name << attrib;
     }
+    vsInputStruct << "};\n\n";
+    vsUniformStruct << "};\n\n";
     
-    //Create VS Input binding
+    //Close function definition
+    vsFuncDef       << ")\n{\n";
+    vsMI_FuncDef    << ")\n{\n";
+    vsMI_EP_FuncDef << vsMI_EP_FuncDefParams.str() << ")\n{\n";
+    
+    vsMI_EP_CallCode    << ");\n";
+    vsMI_EP_InputCode   << "\n        };\n";
+    
+    //Round up size of uniform buffer to next 16 byte boundary.
+    vsUniformStructSize = ((vsUniformStructSize + 15) / 16) * 16;
+    if(hasVSUniformBuffer)
+        mslProgram->AddBinding("vsUniforms", vsUniformsBufferSlot, kMSL_BindingType_UniformBuffer, kMSL_ProgramStage_Vertex, 0, vsUniformStructSize);
+
+    ///////////////////////// Vertex Output ////////////////////////////
+
+    vsOutputStruct  << "struct MSLVsOutputs {\n";
+    {
+        if(_buildTarget != kMSL_BuildTarget_Regular) {
+            vsOutputStruct  << "    uint gl_PrimitiveID[[flat]];\n"
+                            << "    vec2 _barycentricCoords[[center_perspective]];\n";
+        }
+        TF_FOR_ALL(it, _mslVSOutputParams) {
+            HdSt_CodeGenMSL::TParam const &output = *it;
+            vsOutputStruct  << "    HD_MTL_VS_ATTRIBUTE(" << output.dataType
+                            << ", " << output.name
+                            << ", " << (output.attribute.IsEmpty() ? "[[center_perspective]]" : output.attribute.GetString()) << ");\n";
+            vsOutputCode << "    vsOut." << output.name << " = scope." << (output.accessorStr.IsEmpty() ? output.name : output.accessorStr) << ";\n";
+        }
+    }
+    vsOutputStruct << "};\n\n";
+    
+    //Update indiviual uniforms with the assigned uniform buffer slot.
     TF_FOR_ALL(it, _mslVSInputParams) {
         HdSt_CodeGenMSL::TParam const &input = *it;
         TfToken attrib;
         if (!(input.usage & HdSt_CodeGenMSL::TParam::Uniform))
             continue;
         std::string name = (input.name.GetText()[0] == '*') ? input.name.GetText() + 1 : input.name.GetText();
-        mslProgram->UpdateUniformBinding(name, vtxUniformBufferSlot);
+        mslProgram->UpdateUniformBinding(name, vsUniformsBufferSlot);
     }
+    
+    ///////////////////////////////// Compute Geometry Shader ///////////////////////
+    
+    std::stringstream   gsCode, gsFuncDef, cs_EP_FuncDef, gs_VSInputCode, gs_GSInputCode,
+                        gs_GSCallCode, gs_VSCallCode, gs_GSVertEmitCode, gs_GSPrimEmitCode,
+                        gsVertOutStruct, gsPrimOutStruct, gsEmitCode;
 
-    glueCVS << ")\n"
-            << "#endif\n";
-    glueVS  << ")\n"
-            << glueCVS.str();
-    
-    glueVS  << "{\n"
-            << "ProgramScope<st> scope;\n"
-            << copyInputsVtx.str()
-            << "scope.main();\n"
-            << "MSLVtxOutputs vtxOut;\n";
-//    if(_mslBuildComputeGS)
-//        glueVS  << "vtxOut.gl_PrimitiveID = gl_VertexID / 3;\n";
-    glueVS  << copyOutputsVtx.str()
-            << "return vtxOut;\n"
-            << "}\n";
-    
-    UInt32 numVerticesPerPrimitive = 3;
-    std::stringstream gsFuncSigCode, gsFuncCallCode, gsVertexInputParamCode, gsInputParamCode, gsVertexOutputParamCode, gsPrimitiveOutputParamCode, gsOutStructCode;
-    gsVertexInputParamCode <<    "\n    // Vertex Input Param Code ///////////////\n";
-    gsInputParamCode << "\n    // Input Param Code ////////////\n";
-    if(_mslGSInputParams.size() != 0) {
-        gsVertexInputParamCode  << "    for(uint i = 0; i < " << numVerticesPerPrimitive << "; i++) {\n";
+    int numVerticesPerPrimitive = -1;
+
+    if(_buildTarget == kMSL_BuildTarget_MVA_ComputeGS) {
+        int                 gsVertOutStructSize(0), gsPrimOutStructSize(0);
+        
+        //Determine geometry type
+        for(auto key : _geometricShader->GetSourceKeys(HdShaderTokens->geometryShader)) {
+            if(key == "Mesh.Geometry.Triangle") { numVerticesPerPrimitive = 3; break; }
+        }
+        if(numVerticesPerPrimitive == -1)
+            TF_FATAL_ERROR("Unsupported Primitive Type encountered during Geometry Shader generation!");
+        
+        ////////////////////////////////// Geometry Input ////////////////////////////////
+
+        cs_EP_FuncDef   << "kernel void computeEntryPoint(\n"
+                        << "    uint _threadPositionInGrid[[thread_position_in_grid]]\n"
+                        << "    , device ProgramScope_Geometry::MSLGsVertOutStruct* gsVertOutBuffer[[buffer(" << gsVertOutputSlot << ")]]\n"
+                        << "    , device ProgramScope_Geometry::MSLGsPrimOutStruct* gsPrimOutBuffer[[buffer(" << gsPrimOutputSlot << ")]]";
+        
+        //Since we are calling the vertex function too we'll need all of these.
+        cs_EP_FuncDef   << vsMI_EP_FuncDefParams.str();
+        
         TF_FOR_ALL(it, _mslGSInputParams) {
-            std::string name = it->name.GetString();
-            std::string accessor = it->accessorStr.GetString();
-            std::string dataType = it->dataType.GetString();
-            std::string attribute = it->attribute.GetString();
+            std::string name(it->name.GetString()), accessor(it->accessorStr.GetString()),
+                        dataType(it->dataType.GetString()), attribute(it->attribute.GetString());
             
             bool isVertexParam = false;
-            bool isEntryFuncArgument = (it->usage & TParam::Usage::EntryFuncArgument);
-            bool prefixProgramScope = (it->usage & TParam::Usage::ProgramScope);
-            if(!isEntryFuncArgument)
+            bool isPrimVar = (it->usage & TParam::Usage::PrimVar);
+            bool prefixScope = (it->usage & TParam::Usage::ProgramScope);
+            if(!(it->usage & TParam::Usage::EntryFuncArgument))    //MTL_FIXME: Can this be done in a more robust way?
             {   //Check for struct array, there has to be one if this is a vertex param. If there isn't one, likely a primitive input param instead.
-                std::string::size_type arrayStart = accessor.find_first_of("[");
-                std::string::size_type arrayEnd = accessor.find_first_of("]");
+                std::string::size_type  arrayStart(accessor.find_first_of("[")),
+                                        arrayEnd(accessor.find_first_of("]"));
                 if(arrayStart != std::string::npos && arrayEnd != std::string::npos) {
                     isVertexParam = true;
                     accessor.replace(arrayStart + 1, arrayEnd - (arrayStart + 1), "i");
                 }
             }
             
-            bool isPointer = false;
-            if(name.at(0) == '*') { name = name.substr(1, name.length() - 1); isPointer = true; }
+            bool isPtr = false;
+            if(name.at(0) == '*') { name = name.substr(1, name.length() - 1); isPtr = true; }
             
             if(isVertexParam)
-                gsVertexInputParamCode << "        scope." << accessor << " = vtxOutput[i]." << name << ";\n";
+                gs_VSInputCode << "            scope." << accessor << " = vsOutput." << name << ";\n";
             else {
-                gsInputParamCode << "        scope." << (accessor.empty() ? name : accessor) << " = " << name << ";\n";
-                if(isPointer)
-                    gsFuncSigCode << "    , const device " << (prefixProgramScope ? "ProgramScope_Geometry::" : "") << dataType << "* " << name << "\n";
+                gs_GSInputCode << "        scope." << (accessor.empty() ? name : accessor) << " = ";
+                if(prefixScope && isPtr)
+                    gs_GSInputCode << "(const device ProgramScope_Geometry::" << dataType << "*)" << name << ";\n";
                 else
-                    gsFuncSigCode << "    , " << dataType << " " << name << "\n";
-                if(prefixProgramScope)
-                    gsFuncCallCode << "\n        , " << "(const device ProgramScope_Geometry::" << dataType << "*)" << name;
-                else
-                    gsFuncCallCode << "\n        , " << name;
+                    gs_GSInputCode << name << ";\n";
+                
+                //If this parameter is already present in the VS we shouldn't include it in our function definition as it will be a duplicate.
+                bool isPresentInVS = false;
+                TF_FOR_ALL(it_vs, _mslVSInputParams) {
+                    //If the name matches but for example type is different we have a problem. We're assuming this doesn't happen. Cumbersome to design around.
+                    if(it_vs->name != it->name)
+                        continue;
+                    isPresentInVS = true;
+                }
+                if(!isPresentInVS) {
+                    cs_EP_FuncDef   << "\n    , " << (isPtr ? "const device " : "")
+                                    << (prefixScope ? "ProgramScope_Geometry::" : "")
+                                    << dataType << (isPtr ? "* " : " ") << name;
+                }
             }
         }
-        gsVertexInputParamCode  << "    }\n";
-    }
-    gsVertexInputParamCode <<    "    // End Vertex Input Param Code ///////////\n";
-    gsInputParamCode << "    // End Input Param Code ////////\n";
+        cs_EP_FuncDef << ")\n{\n";
+        
+        ////////////////////////////////// Geometry Output ///////////////////////////////
+        
+        gsVertOutStruct << "struct MSLGsVertOutStruct {\n";
+        gsPrimOutStruct << "struct MSLGsPrimOutStruct {\n";
     
-    gsOutStructCode << "\nstruct MSLGeometryOutStruct {\n";
-    
-    int gsOutputStructSize = 0;
-    TF_FOR_ALL(it, _mslGSOutputParams) {
-        std::string name = it->name.GetString();
-        std::string accessor = it->accessorStr.GetString();
-        std::string dataType = it->dataType.GetString();
-        std::string attribute = it->attribute.GetString();
+        std::stringstream vertBufferAccessor, primBufferAccessor, vsVertBufferAccessor, vsPrimBufferAccessor;
+        vertBufferAccessor << "gsVertOutBuffer[gl_PrimitiveIDIn * " << numVerticesPerPrimitive << " + gsVertexCounter].";
+        primBufferAccessor << "gsPrimOutBuffer[gl_PrimitiveIDIn].";
+        vsVertBufferAccessor << "gsVertOutBuffer[_vertexID].";
+        vsPrimBufferAccessor << "gsPrimOutBuffer[gl_PrimitiveIDIn].";
+        TF_FOR_ALL(it, _mslGSOutputParams) {
+            std::string name(it->name.GetString()), accessor(it->accessorStr.GetString()),
+                        dataType(it->dataType.GetString()), attribute(it->attribute.GetString());
         
-        gsVertexOutputParamCode << "    " << "gsOutputBuffer[gl_PrimitiveIDIn * " << numVerticesPerPrimitive << " + _vertexCounter]." << name << " = "
-                                << (accessor.empty() ? name : accessor) << ";\n";
-        
-        gsOutStructCode << "    " << dataType << " " << name << ";\n";
-        
-        //Generate code for merging GS results into pass-through VS, only export those that have a matching VSOut member.
-        TF_FOR_ALL(itVS, _mslVSOutputParams) {
-            if(itVS->name != it->name)
-                continue;
-            //MTL_TODO: Make this optional per member, we want to read/export as little GS data as possible. If it's
-            //          not being touched in the GS, we shouldn't read it here as the VS will already have the re-
-            //          calculated results.
-            //NOTE: Accessing the GS output buffer needs to happen on the bare vertexID, not offset with anything or indexed.
-            copyGSOutputsIntoVSOutputs << "    output." << name << " = computeGSOutput[vertexID]." << name << ";\n";
-            break;
+            bool isPerPrim = (attribute == "[[flat]]");
+            std::stringstream& structStream = (isPerPrim ? gsPrimOutStruct : gsVertOutStruct);
+            std::stringstream& emitStream = (isPerPrim ? gs_GSPrimEmitCode : gs_GSVertEmitCode);
+            
+            structStream << "    " << dataType << " " << name << ";\n";
+            
+            emitStream  << "    " << (isPerPrim ? primBufferAccessor.str() : vertBufferAccessor.str())
+                        << name << " = " << (accessor.empty() ? name : accessor) << ";\n";
+            
+            //Generate code for merging GS results into pass-through VS, only export those that have a matching VSOut member.
+            TF_FOR_ALL(itVS, _mslVSOutputParams) {
+                if(itVS->name != it->name)
+                    continue;
+                //MTL_TODO: Make this optional per member, we want to read/export as little GS data as possible. If it's
+                //          not being touched in the GS, we shouldn't read it here as the VS will already have the re-
+                //          calculated results.
+                //NOTE: Accessing the GS output buffer needs to happen on the bare vertexID, not offset with anything or indexed.
+                vsGsOutputMergeCode << "    vsOutput." << name << " = " << (isPerPrim ? vsPrimBufferAccessor.str() : vsVertBufferAccessor.str()) << name << ";\n";
+                break;
+            }
+            
+            //MTL_FIXME: Find size of dataTypes by using existing Hd functionality.
+            int& structSize = (isPerPrim ? gsPrimOutStructSize : gsVertOutStructSize);
+            uint32 memberSize(4), memberAlignment(4); //Alignment would be 16 if not using packed_vecs
+            if(dataType.find("mat") != std::string::npos) TF_FATAL_CODING_ERROR("Not implemented!");
+            else if(dataType.find("2") != std::string::npos) memberSize = 8;
+            else if(dataType.find("3") != std::string::npos) memberSize = 12;
+            else if(dataType.find("4") != std::string::npos) memberSize = 16;
+            uint32 regStart = structSize / memberAlignment;
+            uint32 regEnd = (structSize + memberSize - 1) / memberAlignment;
+            if(regStart != regEnd && structSize % memberAlignment != 0)
+                structSize += memberAlignment - (structSize % memberAlignment);
+            structSize += memberSize;
         }
         
-        uint32 size = 4;
-        uint32 alignment = 4; //16 if not using packed_vecs
-        if(dataType.find("mat") != std::string::npos) TF_FATAL_CODING_ERROR("Not implemented!");
-        else if(dataType.find("2") != std::string::npos) size = 8;
-        else if(dataType.find("3") != std::string::npos) size = 12;
-        else if(dataType.find("4") != std::string::npos) size = 16;
-        uint32 regStart = gsOutputStructSize / alignment;
-        uint32 regEnd = (gsOutputStructSize + size - 1) / alignment;
-        if(regStart != regEnd && gsOutputStructSize % alignment != 0)
-            gsOutputStructSize += alignment - (gsOutputStructSize % alignment);
-        gsOutputStructSize += size;
-    }
-    _mslGSOutputStructSize = gsOutputStructSize;
-    gsOutStructCode << "};\n";
-    
-    glueGS  << gsOutStructCode.str()
-            << "device MSLGeometryOutStruct* gsOutputBuffer;\n"
-            << "\n"
-            << "uint _vertexCounter = 0;\n"
-            << "void EmitVertex() {\n"
-            << gsVertexOutputParamCode.str()
-            << "    _vertexCounter++;\n"
-            << "}\n"
-            << "\n"
-            << "void EndPrimitive() {\n"
-            << gsPrimitiveOutputParamCode.str()
-            << "}\n"
-            << "\n"
-            << "}; //Close ProgramScope\n";
-    
-    //Compute Function Body
-    {
-        //TODO:
-        //  -   Add a way to get __baseVertex, this is built in for VS. Can't use setStageInRegion because we want to access more than 1 vertex
-        //  -   Add a way to get __instanceID
-        //  -   Add proper support for quads. Most code allows using N vertices per prim but there is no triangulation for quads etc.
-        //  -   Do we need to handle any additional vertex/index buffer data offsets in-shader? I don't think so?
+        gsVertOutStruct << "};\n\n";
+        gsPrimOutStruct << "};\n\n";
         
-        //NOTES:
-        //  -   Need to dispatch numPrimitives amount of threads.
-        //  -   Need to bind the index buffer to appropriate index.
-        
-        const bool expandVertexData = false;    //Whether to expand vertex data to N unique verts per prim or use the regalur shared vertex approach
-        //NOTE: We don't know exactly which verts are going to be used in the call. We also don't yet have a mechanism to prevent processing the same
-        //vertex multiple times. For now, this means not expanding data is almost as costly as expanding it apart from reduced memory requirements.
-        
-        //Add unpacking function
-        glueVS  << "struct packedint { int x:10, y:10, z:10, w:2; };\n"
-                << "vec3 Unpack10_10_10_2_ToVec3(uint u_packedNormal) {\n"
-                << "    packedint pi = *(thread packedint*)&u_packedNormal;\n"
-                << "    return vec3(pi.x, pi.y, pi.z) / 511.0f;\n"
-                << "}\n";
+        _mslGSPrimOutStructSize = gsPrimOutStructSize;
+        _mslGSVertOutStructSize = gsVertOutStructSize;
 
-        //Add in the geometry entry point
-        glueVS  << "#if HD_MTL_COMPUTESHADER\n\n"
-                << "void compute_geometryEntryPoint(int gl_PrimitiveIDIn, thread MSLVtxOutputs (&vtxOutput)[3], device ProgramScope_Geometry::MSLGeometryOutStruct *gsOutputBuffer\n"
-                << gsFuncSigCode.str() << ") {\n"
-                << "    ProgramScope_Geometry scope;\n\n"
-                << "    scope.gl_PrimitiveIDIn = gl_PrimitiveIDIn;\n"
-                << "    scope.gsOutputBuffer = gsOutputBuffer;\n"
-                << gsVertexInputParamCode.str()
-                << gsInputParamCode.str()
+        gsEmitCode  << "////////////////////////////////////////////////////////////////////////////////////////////////////////////////////\n"
+                    << "// MSL GS Emit Code ////////////////////////////////////////////////////////////////////////////////////////////////\n\n"
+                    << "device MSLGsVertOutStruct* gsVertOutBuffer;\n"
+                    << "device MSLGsPrimOutStruct* gsPrimOutBuffer;\n"
+                    << "\n"
+                    << "uint gsVertexCounter = 0;\n"
+                    << "void EmitVertex() {\n"
+                    << gs_GSVertEmitCode.str()
+                    << "    gsVertexCounter++;\n"
+                    << "}\n"
+                    << "\n"
+                    << "void EndPrimitive() {\n"
+                    << gs_GSPrimEmitCode.str()
+                    << "}\n"
+                    << "\n"
+                    << "}; //Close ProgramScope_Geometry\n\n";
+    }
+    
+    ///////////////////////////////// VS Code Concatenation ////////////////////////////////////////
+    
+    //Start concatenating the generated code snippets into glueVS
+    {
+        bool useMI = (_buildTarget != kMSL_BuildTarget_Regular);
+        
+        vsCode  << drawArgsStruct.str()
+                << vsUnpack1010102Snippet.str()
+                << vsUniformStruct.str();
+        
+        vsCode  << "////////////////////////////////////////////////////////////////////////////////////////////////////////////////////\n"
+                << "// MSL Vertex Input Struct /////////////////////////////////////////////////////////////////////////////////////////\n\n"
+                << (_buildTarget == kMSL_BuildTarget_Regular ? vsAttributeDefineEnabled.str() : vsAttributeDefineDisabled.str())
+                << vsInputStruct.str() << vsAttributeDefineUndef.str();
+        
+        vsCode  << "////////////////////////////////////////////////////////////////////////////////////////////////////////////////////\n"
+                << "// MSL Vertex Output Struct ////////////////////////////////////////////////////////////////////////////////////////\n\n"
+                << vsAttributeDefineEnabled.str() << vsOutputStruct.str() << vsAttributeDefineUndef.str();
+        
+        vsCode      << "////////////////////////////////////////////////////////////////////////////////////////////////////////////////////\n";
+        if(useMI)
+            vsCode  << "// MSL Vertex Wrapper Function /////////////////////////////////////////////////////////////////////////////////////\n\n";
+        else
+            vsCode  << "// MSL Vertex Entry Point //////////////////////////////////////////////////////////////////////////////////////////\n\n";
+        vsCode  << (useMI ? vsMI_FuncDef.str() : vsFuncDef.str())
+                << "    ProgramScope_Vert scope;\n"
+                << vsInputCode.str()
+                << "\n"
                 << "    scope.main();\n"
+                << "\n"
+                << "    MSLVsOutputs vsOut;\n"
+                << vsOutputCode.str()
+                << "    return vsOut;\n"
                 << "}\n\n";
         
-        //Add a binding for the Vertex output generated in compute, and a binding for compute argument buffer
-        const UInt32 computeGSArgSlot = location++;
-        const UInt32 computeGSOutputSlot = location++;
-        mslProgram->AddBinding("computeGSArg", computeGSArgSlot, kMSL_BindingType_ComputeGSArg, kMSL_ProgramStage_Compute);
-        mslProgram->AddBinding("computeGSOutput", computeGSOutputSlot, kMSL_BindingType_ComputeGSOutput, kMSL_ProgramStage_Compute);
-        mslProgram->AddBinding("computeGSOutput", computeGSOutputSlot, kMSL_BindingType_ComputeGSOutput, kMSL_ProgramStage_Vertex);     //As input
-        //Generate the compute shader that calls the vertex shader code and outputs the vertices.
-        glueVS  << "\n//Compute Entry Point\n"
-                << "#undef vec2\n"
-                << "#define vec2 packed_float2\n"
-                << "#undef vec3\n"
-                << "#define vec3 packed_float3\n"
-                << "struct MSLComputeGSArgs { uint indexCount, baseVertex; };\n"
-                << "kernel void computeEntryPoint(\n"
-                << "uint threadPositionInGrid[[thread_position_in_grid]]\n"
-                << "    , uint threadPositionInThreadgroup[[thread_position_in_threadgroup]]\n"
-                << "    , uint threadIndexInThreadgroup[[thread_index_in_threadgroup]]\n"
-                << "    , uint threadgroupPositionInGrid[[threadgroup_position_in_grid]]"
-                << computeBufferArguments.str()
-                << "\n    , device const MSLComputeGSArgs *computeGSArg[[buffer(" << computeGSArgSlot << ")]]\n"
-                << "    , device ProgramScope_Geometry::MSLGeometryOutStruct *computeGSOutput[[buffer(" << computeGSOutputSlot << ")]])\n"
-                << "{\n"
-                << "#undef vec3\n"
-                << "#define vec3 float3\n"
-                << "#undef vec2\n"
-                << "#define vec2 float2\n"
-                << "    uint __baseIndexID = threadPositionInGrid * " << numVerticesPerPrimitive << ";\n"
-                << "    uint __instanceID = __baseIndexID % computeGSArg[0].indexCount;\n"
-                << "    uint __baseVertex = computeGSArg[0].baseVertex;\n"
-                << "\n"
-                << "    uint __vertexIDs[" << numVerticesPerPrimitive << "];\n"
-                << "    for(uint i = 0; i < " << numVerticesPerPrimitive << "; i++) {\n"
-                << "        uint __indexID = __baseIndexID + i;\n"
-                << "        __vertexIDs[i] = __baseVertex + indices[__indexID];\n"
-                << "    }\n"
+        //If we are building for anything else than the regular setup we create a separate entry point.
+        if(useMI) {
+            vsEntryPointCode    << "////////////////////////////////////////////////////////////////////////////////////////////////////////////////////\n"
+                                << "// MSL Geometry Output Structs /////////////////////////////////////////////////////////////////////////////////////\n\n"
+                                << gsVertOutStruct.str()
+                                << gsPrimOutStruct.str()
+                                << "////////////////////////////////////////////////////////////////////////////////////////////////////////////////////\n"
+                                << "// MSL Vertex Entry Point //////////////////////////////////////////////////////////////////////////////////////////\n\n"
+                                << vsMI_EP_FuncDef.str()
+                                << "    uint gl_InstanceID = _instanceID;\n"
+                                << "    uint gl_BaseVertex = drawArgs->baseVertex;\n"
+                                << "    uint gl_VertexID = indices[_vertexID + drawArgs->startIndex] + gl_BaseVertex;\n"
+                                << "    uint gl_PrimitiveIDIn = _vertexID / " << numVerticesPerPrimitive << ";\n"
+                                << "    uint _corner = _vertexID % " << numVerticesPerPrimitive << ";\n"
+                                << "\n"
+                                << vsMI_EP_InputCode.str()
+                                << "\n"
+                                << "    MSLVsOutputs vsOutput;\n"
+                                << vsMI_EP_CallCode.str()
+                                << "\n    vsOutput.gl_PrimitiveID = gl_PrimitiveIDIn;\n"
+                                << "\n    vsOutput._barycentricCoords = vec2(_corner == 1 ? 1.0 : 0.0, _corner == 2 ? 1.0 : 0.0);\n\n"
+                                << vsGsOutputMergeCode.str()
+                                << "\n"
+                                << "    return vsOutput;\n"
+                                << "}\n";
+        }
+    }
+    
+    ////////////////////////////////// GS Code Concatenation ////////////////////////////
+    
+    if(_buildTarget == kMSL_BuildTarget_MVA_ComputeGS) {
+        //Placing these struct here means they reside *inside* of the ProgramScope_Geometry class. This is required because of usage in the Emit functions.
+        gsCode  << "////////////////////////////////////////////////////////////////////////////////////////////////////////////////////\n"
+                << "// MSL GS Output Structs ///////////////////////////////////////////////////////////////////////////////////////////\n\n"
+                << gsVertOutStruct.str()
+                << gsPrimOutStruct.str();
+
+        gsCode  << gsEmitCode.str()
+                << vsCode.str();        //Include vertex shader code into our gsCode, note that this does not include the VS Entry Point.
+    
+        gsCode  << "////////////////////////////////////////////////////////////////////////////////////////////////////////////////////\n"
+                << "// MSL Compute Entry Point /////////////////////////////////////////////////////////////////////////////////////////\n\n"
+                << cs_EP_FuncDef.str()
+                << "    uint _baseIndex = _threadPositionInGrid * " << numVerticesPerPrimitive << ";\n"
+                << "    uint gl_InstanceID = _baseIndex % drawArgs->indexCount;\n"
+                << "    uint gl_BaseVertex = drawArgs->baseVertex;\n"
+                << "    uint gl_PrimitiveIDIn = _threadPositionInGrid;\n"
                 << "\n"
                 << "    //Vertex Shader\n"
-                << "    MSLVtxOutputs vtxOutputs[" << numVerticesPerPrimitive << "];\n"
+                << "    MSLVsOutputs vsOutputs[" << numVerticesPerPrimitive << "];\n"
                 << "    for(uint i = 0; i < " << numVerticesPerPrimitive << "; i++) {\n"
-                << "        uint __indexID = __baseIndexID + i;\n"
-                << "        uint gl_VertexID = __vertexIDs[i];\n"
-                << "        uint gl_InstanceID = __instanceID;\n"
-                << "        uint gl_BaseVertex = __baseVertex;\n"
-                << "        MSLVtxInputs vtxInputs = { //"
-                << copyInputsVtxStruct_Compute.str() << "\n"
-                << "        };\n"
-                << "        vtxOutputs[i] = compute_vertexEntryPoint(vtxInputs\n"
-                << copyInputsVtx_Compute.str()
-                << "        );\n"
+                << "        uint gl_VertexID = gl_BaseVertex + indices[_baseIndex + i];\n"
+                << "        thread MSLVsOutputs& vsOutput = vsOutputs[i];\n"
+                << "\n"
+                << "    " << vsMI_EP_InputCode.str()
+                << "\n"
+                << "    " << vsMI_EP_CallCode.str()
                 << "    }\n"
                 << "\n"
                 << "    //Geometry Shader\n"
-                << "    int gl_PrimitiveIDIn = threadPositionInGrid;\n"
-                << "    compute_geometryEntryPoint(gl_PrimitiveIDIn, vtxOutputs, computeGSOutput"
-                <<          gsFuncCallCode.str() << ");\n"
-                << "}\n"
-                << "#endif //HD_MTL_COMPUTESHADER\n";
-
-        glueVS  << "#if HD_MTL_COMPUTEGS_VERTEXSHADER\n"
-                << gsOutStructCode.str()
-                << "vertex MSLVtxOutputs vertexPassThroughEntryPoint( uint baseVertex[[base_vertex]],\n"
-                << "                             uint vertexID[[vertex_id]],\n"
-                << "                             uint baseInstance[[base_instance]],\n"
-                << "                             uint instanceID[[instance_id]]"
-                << computeBufferArguments.str()
-                << "\n    , device ProgramScope_Geometry::MSLGeometryOutStruct *computeGSOutput[[buffer(" << computeGSOutputSlot << ")]])\n"
-                << "{\n"
-                << "    uint gl_VertexID = baseVertex + indices[vertexID];\n"
-                << "    uint gl_InstanceID = instanceID;\n"
-                << "    uint gl_BaseVertex = baseVertex;\n"
-                << "    MSLVtxInputs vtxInputs = { //"
-                <<      copyInputsVtxStruct_Compute.str() << "\n"
-                << "    };\n"
-                << "    MSLVtxOutputs output = compute_vertexEntryPoint(vtxInputs\n"
-                <<      copyInputsVtx_Compute.str()
-                << "    );\n"
+                << "    {\n"
+                << "        ProgramScope_Geometry scope;\n\n"
+                << "        for(uint i = 0; i < " << numVerticesPerPrimitive << "; i++){\n"
+                << "            thread MSLVsOutputs& vsOutput = vsOutputs[i];\n"
+                << gs_VSInputCode.str()
+                << "        }\n\n"
+                << "        scope.gl_PrimitiveIDIn = gl_PrimitiveIDIn;\n"
+                << "        scope.gsVertOutBuffer = gsVertOutBuffer;\n"
+                << "        scope.gsPrimOutBuffer = gsPrimOutBuffer;\n"
                 << "\n"
-                << "    //Merging of Geometry Shader output\n"
-                <<      copyGSOutputsIntoVSOutputs.str()
-                << "    return output;\n"
-                << "}\n"
-                << "#endif //HD_MTL_VERTEXSHADER\n";
+                << gs_GSInputCode.str()
+                << "\n"
+                << "        scope.main();\n"
+                << "    }\n"
+                << "}\n";
     }
     
-    //Fragment Glue Function
+    ////////////////////////////////// Fragment Shader //////////////////////////////
+    std::stringstream   fsCode, fsFuncDef, fsInputCode, fsOutputCode, fsOutputStruct, fsTexturingStruct, fsUniformStruct, fsInterpolationCode;
+    int                 fsUniformStructSize(0);
     
-    location = 0;
-    if(_mslBuildComputeGS) {
-        gluePS  << gsOutStructCode.str() << "\n";
+    fsInterpolationCode << "////////////////////////////////////////////////////////////////////////////////////////////////////////////////////\n"
+                        << "// MSL FS Interpolation Code ///////////////////////////////////////////////////////////////////////////////////////\n\n"
+                        << "vec2 Interpolate_CenterPerspective(vec2 in1, vec2 in2, vec2 in3, vec2 bary) { return in1 * (1 - (bary.x + bary.y)) + in2 * bary.x + in3 * bary.y; }\n"
+                        << "vec3 Interpolate_CenterPerspective(vec3 in1, vec3 in2, vec3 in3, vec2 bary) { return in1 * (1 - (bary.x + bary.y)) + in2 * bary.x + in3 * bary.y; }\n"
+                        << "vec4 Interpolate_CenterPerspective(vec4 in1, vec4 in2, vec4 in3, vec2 bary) { return in1 * (1 - (bary.x + bary.y)) + in2 * bary.x + in3 * bary.y; }\n\n";
+    
+    if(_buildTarget == kMSL_BuildTarget_MVA_ComputeGS) {
+        fsFuncDef   << "\n    , const device MSLGsVertOutStruct* gsVertOutBuffer[[buffer(" << gsVertOutputSlot << ")]]"
+                    << "\n    , const device MSLGsPrimOutStruct* gsPrimOutBuffer[[buffer(" << gsPrimOutputSlot << ")]]";
     }
-    gluePS      << "fragment MSLFragOutputs fragmentEntryPoint(MSLVtxOutputs vsInput[[stage_in]]\n"
-                << ", device const MSLFragInputs *" CODEGENMSL_FRAGUNIFORMINPUTNAME "[[buffer(0)]]\n";
-    mslProgram->AddBinding(CODEGENMSL_FRAGUNIFORMINPUTNAME, location++, kMSL_BindingType_UniformBuffer, kMSL_ProgramStage_Fragment, 0, inputUniformBufferSize);
-    if(_mslBuildComputeGS) {
-        gluePS  << ", device const MSLGeometryOutStruct *gsOutput[[buffer(1)]]\n";
-        mslProgram->AddBinding("computeGSOutput", location++, kMSL_BindingType_ComputeGSOutput, kMSL_ProgramStage_Fragment);
-    }
-
-    if (hasTexturing) {
-        gluePS << ", MSLTexturing texturing\n";
-    }
-
-    // This is the fragment entry point argument list. This takes all inputs that are individual bound buffers
+    
+    ////////////////////////////////// Fragment Inputs //////////////////////////////
+    
+    fsTexturingStruct   << "////////////////////////////////////////////////////////////////////////////////////////////////////////////////////\n"
+                        << "// MSL FS Texturing Struct /////////////////////////////////////////////////////////////////////////////////////////\n\n"
+                        << "struct MSLFsTexturing {\n";
+    
+    fsUniformStruct << "////////////////////////////////////////////////////////////////////////////////////////////////////////////////////\n"
+                    << "// MSL FS Uniform Struct ///////////////////////////////////////////////////////////////////////////////////////////\n\n"
+                    << "struct MSLFsUniforms {\n";
+    
+    int fsCurrentSamplerSlot(0), fsCurrentTextureSlot(0);
     TF_FOR_ALL(it, _mslPSInputParams) {
-        HdSt_CodeGenMSL::TParam const &input = *it;
-        TfToken attrib;
-        bool isBuffer = true;
+        std::string name(it->name.GetString()), accessor(it->accessorStr.GetString()),
+                    dataType(it->dataType.GetString());
+        std::stringstream attribute;
         
-        if (! (input.usage & HdSt_CodeGenMSL::TParam::EntryFuncArgument)) {
+        if (it->usage & HdSt_CodeGenMSL::TParam::VertexShaderOnly)
             continue;
-        }
-//        if (!input.attribute.IsEmpty()) {
-//            attrib = input.attribute;
-//        }
-        if (input.binding.GetType() == HdBinding::FRONT_FACING) {
-            attrib = TfToken("[[front_facing]]");
-            isBuffer = false;
-        }
-        else {
-            attrib = TfToken(TfStringPrintf("[[buffer(%d)]]", location));
-        }
-        gluePS << ", ";
         
-        std::string n;
-        if (input.name.GetText()[0] == '*') {
-            gluePS << "device const ";
-            if ((input.usage & HdSt_CodeGenMSL::TParam::UniformBlock) != 0)
-                n = input.name.GetText() + 4; //Because of "*___<NAME>"
-            else
-                n = input.name.GetText() + 1;
+        bool                isPtr(false), isScopeMember(true);
+        std::stringstream   sourcePrefix, destPrefix, sourcePostfix;
+        if((it->usage & HdSt_CodeGenMSL::TParam::maskShaderUsage) == HdSt_CodeGenMSL::TParam::Sampler) {
+            //This parameter is a sampler
+            
+            fsTexturingStruct << "    " << dataType << " " << name << "[[sampler(" << fsCurrentSamplerSlot << ")]]" << ";\n";
+            mslProgram->AddBinding(name, fsCurrentSamplerSlot, kMSL_BindingType_Sampler, kMSL_ProgramStage_Fragment);
+            sourcePrefix << "fsTexturing.";
+            fsCurrentSamplerSlot++;
         }
-        else if(input.usage & HdSt_CodeGenMSL::TParam::UniformBlock) {
-            gluePS << "device const ";
-            n = input.dataType.GetText();
+        else if((it->usage & HdSt_CodeGenMSL::TParam::maskShaderUsage) == HdSt_CodeGenMSL::TParam::Texture) {
+            //This parameter is a texture
+            
+            fsTexturingStruct << "    " << dataType << " " << name << "[[texture(" << fsCurrentTextureSlot << ")]]" << ";\n";
+            mslProgram->AddBinding(name, fsCurrentTextureSlot, kMSL_BindingType_Texture, kMSL_ProgramStage_Fragment);
+            sourcePrefix << "fsTexturing.";
+            fsCurrentTextureSlot++;
+        }
+        else if (it->usage & HdSt_CodeGenMSL::TParam::EntryFuncArgument) {
+            //This parameter is either a uniform buffer or a built-in variable
+            
+            if (it->attribute.IsEmpty()) {
+                //This parameter is a uniform buffer
+                
+                if(name.at(0) == '*') {
+                    name = name.substr(1, name.length() - 1);
+                    isPtr = true;
+                }
+                else
+                    sourcePrefix << "*";
+                
+                //Uniform Blocks need a different name as a binding to stay matching with Hydra
+                std::string bindingName = name;
+                if(it->usage & HdSt_CodeGenMSL::TParam::UniformBlock) {
+                    bindingName = dataType;
+                    //MTL_FIXME: Should centralize this prefix and make it more descriptive e.g.: "_flatUB_" for a flat uniform block.
+                    //           Should also deal with these blocks in a cleaner manner instead of checking for the prefix.
+                    if(name.find("___") == 0) {
+                        isScopeMember = false;
+                    }
+                }
+                
+                //We can't add our own uniform buffer as a binding yet because we don't know it's size
+                int assignedSlot = currentUniformBufferSlot;
+                if(bindingName == "fsUniforms") {
+                    fsUniformsBufferSlot = assignedSlot;
+                    isScopeMember = false;
+                    currentUniformBufferSlot++;
+                }
+                else {
+                    //Attempt to find the same buffer in the VS inputs. If found, assign this buffer to the same slot.
+                    bool found = false;
+                    const MSL_ShaderBinding& binding = MSL_FindBinding(mslProgram->GetBindingMap(), TfToken(bindingName), found, kMSL_BindingType_UniformBuffer, kMSL_ProgramStage_Vertex);
+                    if(found)
+                        assignedSlot = binding._index;
+                    else
+                        currentUniformBufferSlot++;
+                    mslProgram->AddBinding(bindingName, assignedSlot, kMSL_BindingType_UniformBuffer, kMSL_ProgramStage_Fragment);
+                }
+                
+                fsFuncDef << "\n    , const device " << ((it->usage & TParam::Usage::ProgramScope) ? "ProgramScope_Frag::" : "")
+                          << dataType << "* " << name << "[[buffer(" << assignedSlot << ")]]";
+            }
+            //else
+                //This parameter is a built-in variable and we won't add it to the function definition as built-ins get added regardless in a different way.
         }
         else
         {
-            n = input.name.GetString();
-        }
+            if(it->usage & HdSt_CodeGenMSL::TParam::UniformBlockMember) {
+                //This parameter is a uniform block member
+                
+                //Strip the array brackets from the name if they exist
+                std::string::size_type bracketPos = name.find_first_of("[");
+                if(bracketPos != std::string::npos)
+                    name = name.substr(0, bracketPos);
+                
+                //"name" contains the variable name while "accessor" contains the structure name in this case.
+                sourcePrefix << accessor << "->";
+                accessor = name;
+            }
+            else if(it->usage & HdSt_CodeGenMSL::TParam::Uniform) {
+                //This parameter is a uniform
+                
+                sourcePrefix << "fsUniforms->";
+                
+                fsUniformStruct << "    " << dataType << " " << name << ";\n";
 
-        mslProgram->AddBinding(n, location++, kMSL_BindingType_UniformBuffer, kMSL_ProgramStage_Fragment);
-
-        if (input.usage & HdSt_CodeGenMSL::TParam::ProgramScope) {
-            gluePS << " ProgramScope<st>::";
+                uint32 memberSize(4), memberAlignment(4); //Alignment would be 16 if not using packed_vecs
+                if(dataType.find("mat") != std::string::npos) TF_FATAL_CODING_ERROR("Not implemented!");
+                else if(dataType.find("2") != std::string::npos) memberSize = 8;
+                else if(dataType.find("3") != std::string::npos) memberSize = 12;
+                else if(dataType.find("4") != std::string::npos) memberSize = 16;
+                uint32 regStart = fsUniformStructSize / memberAlignment;
+                uint32 regEnd = (fsUniformStructSize + memberSize - 1) / memberAlignment;
+                if(regStart != regEnd && fsUniformStructSize % memberAlignment != 0)
+                    fsUniformStructSize += memberAlignment - (fsUniformStructSize % memberAlignment);
+                //Add a binding for each uniform. They are currently all bound to slot -1 which is "patched" a little further down, once
+                //the actual slot is known (depends on other elements of _mslVSInputParams which may not have been processed yet)
+                mslProgram->AddBinding(name, -1, kMSL_BindingType_Uniform, kMSL_ProgramStage_Fragment, fsUniformStructSize);
+                fsUniformStructSize += memberSize;
+            }
+            else {
+                //This parameter is a Vertex output member
+                
+                
+                if(it->usage & HdSt_CodeGenMSL::TParam::PrimVar) {
+                    std::string cpy = name;
+                    name = accessor;
+                    accessor = cpy;
+                    destPrefix << "inPrimvars.";
+                }
+                
+                //Check the Geometry outputs for this parameter so that we may get those results instead of the VS output
+                bool takenFromGS = false;
+                if(_buildTarget == kMSL_BuildTarget_MVA_ComputeGS) {
+                    for (auto gsOutput : _mslGSOutputParams) {
+                        if(gsOutput.name != it->name)
+                            continue;
+                        if(gsOutput.attribute.GetString() == "[[flat]]")
+                            sourcePrefix << "gsPrimOutBuffer[gl_PrimitiveID].";
+                        else {
+                            //MTL_TODO: Investigate interpolating gsOutput manually in this cases, would remove this var from the vertexstruct which tends to be large for hydra.
+                            std::string interpolation = "CenterPerspective";
+                            sourcePrefix << "Interpolate_" << interpolation << "(gsVertOutBuffer[_provokingVertex + 0]." << name << ", "
+                                                                            <<  "gsVertOutBuffer[_provokingVertex + 1]." << name << ", "
+                                                                            <<  "gsVertOutBuffer[_provokingVertex + 2]." << name << ", _barycentricCoords)";
+                            if(accessor.empty())
+                                accessor = name;
+                            name = "";
+                        }
+                        takenFromGS = true;
+                        break;
+                    }
+                }
+                if(!takenFromGS)
+                    sourcePrefix << "vsOutput.";
+            }
         }
-        if (input.name.GetText()[0] != '*' && input.usage & HdSt_CodeGenMSL::TParam::UniformBlock)
-            gluePS << input.dataType << "* " << input.name << attrib << "\n";
-        else
-            gluePS << input.dataType << " " << input.name << attrib << "\n";
+        
+        if(isScopeMember)
+            fsInputCode << "    scope." << destPrefix.str() << (accessor.empty() ? name : accessor) << " = " << sourcePrefix.str() << name << ";\n";
+    }
+    fsTexturingStruct << "};\n\n";
+    fsUniformStruct << "};\n\n";
+    fsFuncDef << ")\n{\n";
+    
+    //Round up size of uniform buffer to next 16 byte boundary.
+    fsUniformStructSize = ((fsUniformStructSize + 15) / 16) * 16;
+    if(hasFSUniformBuffer)
+        mslProgram->AddBinding("fsUniforms", fsUniformsBufferSlot, kMSL_BindingType_UniformBuffer, kMSL_ProgramStage_Fragment, 0, fsUniformStructSize);
+    
+    bool usesTexturingStruct = (fsCurrentSamplerSlot != 0 || fsCurrentTextureSlot != 0);
+    
+    ////////////////////////////////// Fragment Outputs //////////////////////////////
+    
+    int fsCurrentOutputSlot = 0;
+    fsOutputStruct  << "////////////////////////////////////////////////////////////////////////////////////////////////////////////////////\n"
+                    << "// MSL FS Output Struct ////////////////////////////////////////////////////////////////////////////////////////////\n\n"
+                    << "struct MSLFsOutputs {\n";
+    TF_FOR_ALL(it, _mslPSOutputParams) {
+        std::string name(it->name.GetString()), accessor(it->accessorStr.GetString()),
+                    dataType(it->dataType.GetString()), attribute(it->attribute.GetString());
+        fsOutputStruct << "    " << dataType << " " << name << "[[color(" << fsCurrentOutputSlot << ")]];\n";
+        fsOutputCode << "    fsOutput." << name << " = scope." << (accessor.empty() ? name : accessor) << ";\n";
+        fsCurrentOutputSlot++;
+    }
+    fsOutputStruct  << "};\n\n";
+    
+    ////////////////////////////////// FS Code Concatenation ////////////////////////
+    
+    if(hasFSUniformBuffer)
+        fsCode << fsUniformStruct.str();
+    
+    fsCode  << (usesTexturingStruct ? fsTexturingStruct.str() : "");
+    
+    fsCode  << "////////////////////////////////////////////////////////////////////////////////////////////////////////////////////\n"
+            << "// MSL Vertex Output Struct ////////////////////////////////////////////////////////////////////////////////////////\n\n"
+            << vsAttributeDefineEnabled.str() << vsOutputStruct.str() << vsAttributeDefineUndef.str();
+    
+    if(_buildTarget == kMSL_BuildTarget_MVA_ComputeGS) {
+        fsCode  << fsInterpolationCode.str()
+                << "////////////////////////////////////////////////////////////////////////////////////////////////////////////////////\n"
+                << "// MSL Geometry Output Structs /////////////////////////////////////////////////////////////////////////////////////\n\n"
+                << gsVertOutStruct.str()
+                << gsPrimOutStruct.str();
     }
 
-    gluePS  << ") {\n";
-    if(_mslBuildComputeGS)
-        gluePS  << "int gl_PrimitiveID = vsInput.gl_PrimitiveID;\n";
-    gluePS  << "ProgramScope<st> scope;\n"
-            << copyInputsFrag.str()
-            << "scope.main();\n"
-            << "MSLFragOutputs fragOut;\n"
-            << copyOutputsFrag.str()
-            << "return fragOut;\n"
+    fsCode  << fsOutputStruct.str();
+    
+    fsCode  << "////////////////////////////////////////////////////////////////////////////////////////////////////////////////////\n"
+            << "// MSL Fragment Entry Point ////////////////////////////////////////////////////////////////////////////////////////\n\n"
+            << "fragment MSLFsOutputs fragmentEntryPoint("
+            << "\n      bool gl_FrontFacing[[front_facing]]"
+            << "\n    , MSLVsOutputs vsOutput[[stage_in]]"
+            << (usesTexturingStruct ? "\n    , MSLFsTexturing fsTexturing" : "")
+            << fsFuncDef.str();
+    
+    if(_buildTarget != kMSL_BuildTarget_Regular) {
+        fsCode  << "    uint gl_PrimitiveID = vsOutput.gl_PrimitiveID;\n"
+                << "    uint _provokingVertex = gl_PrimitiveID * 3;\n"
+                << "    vec2 _barycentricCoords = vsOutput._barycentricCoords;\n";
+    }
+    
+    fsCode  << "\n"
+            << "    ProgramScope_Frag scope;\n"
+            << "\n"
+            << (_buildTarget != kMSL_BuildTarget_Regular ? "    scope.gl_PrimitiveID = gl_PrimitiveID;\n" : "")
+            << fsInputCode.str()
+            << "\n"
+            << "    scope.main();\n"
+            << "\n"
+            << "    MSLFsOutputs fsOutput;\n"
+            << "\n"
+            << fsOutputCode.str()
+            << "\n"
+            << "    return fsOutput;\n"
             << "}\n";
     
-    METAL_DEBUG_COMMENT(&glueVS, "End of _GenerateGlue(glueVS)\n"); //MTL_FIXME
-    METAL_DEBUG_COMMENT(&gluePS, "End of _GenerateGlue(gluePS)\n"); //MTL_FIXME
+    ////////////////////////////////// Write Out Shaders ////////////////////////////
+    
+    glueVS << vsCode.str() << (_buildTarget != kMSL_BuildTarget_Regular ? vsEntryPointCode.str() : "");
+    glueGS << gsCode.str();
+    gluePS << fsCode.str();
+    
+//    /////////////////////////////////Frag Outputs///////////////////////////////////
+//
+//#define CODEGENMSL_FRAGUNIFORMINPUTNAME "fragUniforms"
+//
+//    gluePS << "struct MSLFragInputs {\n";
+//    location = 0;
+//    uint32 byteOffset = 0;
+//    uint32 inputUniformBufferSize = 0;
+//    TF_FOR_ALL(it, _mslPSInputParams) {
+//        HdSt_CodeGenMSL::TParam const &input = *it;
+//        TfToken attrib;
+//
+//        if ((input.usage & HdSt_CodeGenMSL::TParam::maskShaderUsage) != 0 ||
+//            ((input.usage & HdSt_CodeGenMSL::TParam::UniformBlock) != 0 && input.name.GetText()[0] == '*')) {
+//            continue;
+//        }
+//        else if (input.usage & HdSt_CodeGenMSL::TParam::EntryFuncArgument) {
+//            if(input.usage & HdSt_CodeGenMSL::TParam::UniformBlock) {
+//                copyInputsFrag << "scope." << input.name << "=*" << input.name << ";\n";
+//            }
+//            else if (input.name.GetText()[0] == '*') {
+//                std::string n = input.name.GetString().substr(1);
+//                copyInputsFrag << "scope." << n << "=" << n << ";\n";
+//            }
+//            else {
+//                copyInputsFrag << "scope." << input.name << "=" << input.name << ";\n";
+//            }
+//            continue;
+//        }
+//
+//        // Look for the input name in the vertex outputs and if so, wire it up to the [[stage_in]]
+//        bool isVtxOutParam = false;
+//        for (auto output : _mslVSOutputParams) {
+//            if (input.name == output.name) {
+//                isVtxOutParam = true;
+//                break;
+//            }
+//        }
+//        TfToken accessor;
+//        if (input.accessorStr.IsEmpty()) {
+//            accessor = input.name;
+//        }
+//        else {
+//            accessor = input.accessorStr;
+//        }
+//        if (isVtxOutParam) {
+//            if (input.usage & HdSt_CodeGenMSL::TParam::VertexShaderOnly) {
+//                continue;
+//            }
+//
+//            //Look for this input name in the geometry outputs, take it from there if it exists. This is how geometry output is piped in from compute.
+//            bool isGeoOutParam = false;
+//            for (auto gsOutput : _mslGSOutputParams) {
+//                if(input.name == gsOutput.name) {
+//                    isGeoOutParam = true;
+//                    break;
+//                }
+//            }
+//
+//            copyInputsFrag << "scope." << accessor;
+//            if(isGeoOutParam)
+//                copyInputsFrag << "=gsOutput[gl_PrimitiveID]." << input.name << ";\n";
+//            else
+//                copyInputsFrag << "=vsInput." << input.name << ";\n";
+//            continue;
+//        }
+//        else if(input.usage & HdSt_CodeGenMSL::TParam::UniformBlockMember) {
+//            std::string inputName = input.name.GetString();
+//            std::string::size_type openingBracket = inputName.find_first_of("[");
+//            if(openingBracket != std::string::npos) {
+//                inputName = input.name.GetString().substr(0, openingBracket);
+//            }
+//            copyInputsFrag << "scope." << inputName << "=" << input.accessorStr << "->" << inputName << ";\n";
+//            continue;
+//        }
+//        else if(input.usage & HdSt_CodeGenMSL::TParam::PrimVar) {
+//            copyInputsFrag << "scope.inPrimvars." << input.name << "=vsInput." << accessor << ";\n";
+//        }
+//        else {
+//            copyInputsFrag << "scope." << accessor << "=" CODEGENMSL_FRAGUNIFORMINPUTNAME "->" << input.name << ";\n";
+//        }
+//
+//        attrib = input.attribute;
+//        gluePS << input.dataType << " " << input.name << attrib << ";\n";
+//
+//        //Register these uniforms. They're part of the "input" buffer which is hardcoded to be bound at slot 0
+//
+//        //Apply alignment rules
+//        uint32 size = 4;
+//        if(input.dataType.GetString().find("vec2") != std::string::npos) size = 8;
+//        else if(input.dataType.GetString().find("vec3") != std::string::npos) size = 12;
+//        else if(input.dataType.GetString().find("vec4") != std::string::npos) size = 16;
+//        uint32 regStart = byteOffset / 16;
+//        uint32 regEnd = (byteOffset + size - 1) / 16;
+//        if(regStart != regEnd && byteOffset % 16 != 0) byteOffset += 16 - (byteOffset % 16);
+//
+//        mslProgram->AddBinding(input.name, 0, kMSL_BindingType_Uniform, kMSL_ProgramStage_Fragment, byteOffset);
+//
+//        //Size
+//         byteOffset += size;
+//    }
+//    inputUniformBufferSize = ((byteOffset + 15) / 16) * 16;
+//    gluePS << "};\n";
+//
+//
+//
+//
+//    //Fragment Glue Function
+//    bool _mslBuildComputeGS = _buildTarget == kMSL_BuildTarget_MVA_ComputeGS;
+//
+//    location = 0;
+////    if(_mslBuildComputeGS) {
+////        gluePS  << gsOutStructCode.str() << "\n";
+////    }
+//    gluePS      << "fragment MSLFragOutputs fragmentEntryPoint(MSLVsOutputs vsInput[[stage_in]]\n"
+//                << ", device const MSLFragInputs *" CODEGENMSL_FRAGUNIFORMINPUTNAME "[[buffer(0)]]\n";
+//    mslProgram->AddBinding(CODEGENMSL_FRAGUNIFORMINPUTNAME, location++, kMSL_BindingType_UniformBuffer, kMSL_ProgramStage_Fragment, 0, inputUniformBufferSize);
+////    if(_mslBuildComputeGS) {
+////        gluePS  << ", device const MSLGeometryOutStruct *gsOutput[[buffer(1)]]\n";
+////        mslProgram->AddBinding("computeGSOutput", location++, kMSL_BindingType_ComputeGSOutput, kMSL_ProgramStage_Fragment);
+////    }
+//
+//    if (hasTexturing) {
+//        gluePS << ", MSLTexturing texturing\n";
+//    }
+//
+//    // This is the fragment entry point argument list. This takes all inputs that are individual bound buffers
+//    TF_FOR_ALL(it, _mslPSInputParams) {
+//        HdSt_CodeGenMSL::TParam const &input = *it;
+//        TfToken attrib;
+//        bool isBuffer = true;
+//
+//        if (! (input.usage & HdSt_CodeGenMSL::TParam::EntryFuncArgument)) {
+//            continue;
+//        }
+////        if (!input.attribute.IsEmpty()) {
+////            attrib = input.attribute;
+////        }
+//        if (input.binding.GetType() == HdBinding::FRONT_FACING) {
+//            attrib = TfToken("[[front_facing]]");
+//            isBuffer = false;
+//        }
+//        else {
+//            attrib = TfToken(TfStringPrintf("[[buffer(%d)]]", location));
+//        }
+//        gluePS << ", ";
+//
+//        std::string n;
+//        if (input.name.GetText()[0] == '*') {
+//            gluePS << "device const ";
+//            if ((input.usage & HdSt_CodeGenMSL::TParam::UniformBlock) != 0)
+//                n = input.name.GetText() + 4; //Because of "*___<NAME>"
+//            else
+//                n = input.name.GetText() + 1;
+//        }
+//        else if(input.usage & HdSt_CodeGenMSL::TParam::UniformBlock) {
+//            gluePS << "device const ";
+//            n = input.dataType.GetText();
+//        }
+//        else
+//        {
+//            n = input.name.GetString();
+//        }
+//
+//        mslProgram->AddBinding(n, location++, kMSL_BindingType_UniformBuffer, kMSL_ProgramStage_Fragment);
+//
+//        if (input.usage & HdSt_CodeGenMSL::TParam::ProgramScope) {
+//            gluePS << " ProgramScope<st>::";
+//        }
+//        if (input.name.GetText()[0] != '*' && input.usage & HdSt_CodeGenMSL::TParam::UniformBlock)
+//            gluePS << input.dataType << "* " << input.name << attrib << "\n";
+//        else
+//            gluePS << input.dataType << " " << input.name << attrib << "\n";
+//    }
+//
+//    gluePS  << ") {\n";
+//    if(_mslExportPrimitiveID)
+//        gluePS  << "int gl_PrimitiveID = vsInput.gl_PrimitiveID;\n";
+//    gluePS  << "ProgramScope<st> scope;\n"
+//            << copyInputsFrag.str()
+//            << "scope.main();\n"
+//            << "MSLFragOutputs fragOut;\n"
+//            << copyOutputsFrag.str()
+//            << "return fragOut;\n"
+//            << "}\n";
+    
+    METAL_DEBUG_COMMENT(&glueVS, "End of _GenerateGlue(glueVS)\n\n"); //MTL_FIXME
+    METAL_DEBUG_COMMENT(&gluePS, "End of _GenerateGlue(gluePS)\n\n"); //MTL_FIXME
     
 }
+
+//HdSt_CodeGenMSL::_MSL_GenerateVSWrapper(HdStMSLProgramSharedPtr mslProgram, UInt32& inout_slotIndex, UInt32 vtxUniformBufferSize, UInt32& inout_vtxUniformBufferSlot, std::stringstream& shader, std::stringstream& inout_ComputeGSArguments)
+//{
+//    std::stringstream vs, vs_MI;        //glueVS for Manually-Indexed rendering: using drawPrimitives resolving the indices ourselves
+//    vs      << "////////////////////////////////////////////////////////////////////////////////////////////////////////////////////\n"
+//            << "// GLUE VS /////////////////////////////////////////////////////////////////////////////////////////////////////////\n\n";
+//    vs_MI   << "////////////////////////////////////////////////////////////////////////////////////////////////////////////////////\n"
+//            << "// GLUE VS MANUALLY-INDEXED ////////////////////////////////////////////////////////////////////////////////////////\n\n";
+//
+//    vs      << "vertex MSLVtxOutputs vertexEntryPoint(MSLVtxInputs input[[stage_in]]\n";
+//    vs_MI   << "MSLVtxOutputs vertexShader_MI(MSLVtxInputs input //[[stage_in]]\n";
+//
+//    // Uniform buffers must start after any allcoated for vertex attributes
+//    inout_vtxUniformBufferSlot = 0;
+//    TF_FOR_ALL(it, _mslVSInputParams) {
+//        HdSt_CodeGenMSL::TParam const &input = *it;
+//        TfToken attrib;
+//        bool useInCompute = true; //Used to remove things like vertexID etc.
+//        if (!(input.usage & HdSt_CodeGenMSL::TParam::EntryFuncArgument)) {
+//            continue;
+//        }
+//        if (!input.attribute.IsEmpty()) {
+//            attrib = input.attribute;
+//            useInCompute = false;    //Any attribute other than [[buffer(X)]] can't be present in CVS sig.
+//        }
+//        else {
+//            std::string n;
+//            if (input.name.GetText()[0] == '*') {
+//                if ((input.usage & HdSt_CodeGenMSL::TParam::UniformBlock) != 0)
+//                    n = input.name.GetText() + 4; //Because of "*___<NAME>"
+//                else
+//                    n = input.name.GetText() + 1;
+//            }
+//            else {
+//                n = input.name.GetString();
+//            }
+//            int uniformBufferSize = 0;
+//            if(n == CODEGENMSL_VTXUNIFORMINPUTNAME) {
+//                uniformBufferSize = vtxUniformBufferSize;
+//                inout_vtxUniformBufferSlot = inout_slotIndex;
+//            }
+//            mslProgram->AddBinding(n, inout_slotIndex, kMSL_BindingType_UniformBuffer, kMSL_ProgramStage_Vertex, 0, uniformBufferSize);
+//            attrib = TfToken(TfStringPrintf("[[buffer(%d)]]", inout_slotIndex++));
+//        }
+//        vs << ", ";
+//        vs_MI << ", ";
+//        if(useInCompute) inout_ComputeGSArguments << "\n    , ";
+//        if (input.name.GetText()[0] == '*') {
+//            vs << "device const ";
+//            vs_MI << "device const ";
+//            if(useInCompute) inout_ComputeGSArguments << "device const ";
+//        }
+//        if (input.usage & HdSt_CodeGenMSL::TParam::ProgramScope) {
+//            vs << "ProgramScope<st>::";
+//            vs_MI << "ProgramScope<st>::";
+//            if(useInCompute) inout_ComputeGSArguments << "ProgramScope<st>::";
+//        }
+//        vs << input.dataType << " " << input.name << attrib << "\n";
+//        vs_MI << input.dataType << " " << input.name << " //" << attrib << "\n";
+//        if(useInCompute) inout_ComputeGSArguments << input.dataType << " " << input.name << attrib;
+//    }
+//
+//    vs_MI   << ")\n" << "{\n";
+//    vs      << ")\n" << "{\n";
+//
+//    vs      << "ProgramScope<st> scope;\n" << copyInputsVtx.str() << "scope.main();\n" << "MSLVtxOutputs vtxOut;\n";
+//    vs_MI   << "ProgramScope<st> scope;\n" << copyInputsVtx.str() << "scope.main();\n" << "MSLVtxOutputs vtxOut;\n"
+//                << "vtxOut.gl_PrimitiveID = (gl_VertexID - gl_BaseVertex) / 3;\n";
+//    vs      << copyOutputsVtx.str() << "return vtxOut;\n" << "}\n";
+//    vs_MI   << copyOutputsVtx.str() << "return vtxOut;\n" << "}\n";
+//
+//    shader << vs.str() << "\n" << vs_MI.str() << "\n";
+//}
 
 HdStProgramSharedPtr
 HdSt_CodeGenMSL::Compile()
@@ -1625,7 +1962,8 @@ HdSt_CodeGenMSL::Compile()
     _hasFS  = (!fragmentShader.empty());
 
     // decide to build shaders that use a compute GS or not
-    _mslBuildComputeGS = _hasGS;
+    //_mslBuildComputeGS = _hasGS;
+    _buildTarget = (_hasGS ? kMSL_BuildTarget_MVA_ComputeGS : kMSL_BuildTarget_Regular);
     
     // create MSL program.
     HdStMSLProgramSharedPtr mslProgram(new HdStMSLProgram(HdTokens->drawingShader));
@@ -1648,14 +1986,14 @@ HdSt_CodeGenMSL::Compile()
     std::stringstream vsConfigString, fsConfigString, gsConfigString;
     _GenerateConfigComments(vsConfigString, fsConfigString, gsConfigString);
     
-    bool enableFragmentNormalReconstruction = false; // Fixes for Geometry shader functionality MTL_FIXME: Remove once GS is stable enough
-    {
-        std::vector<std::string> sourceKeys = _geometricShader->GetSourceKeys(HdShaderTokens->geometryShader);
-        for(auto key : sourceKeys) {
-            if(key == "MeshNormal.Flat")
-                enableFragmentNormalReconstruction = true;
-        }
-    }
+//    bool enableFragmentNormalReconstruction = false; // Fixes for Geometry shader functionality MTL_FIXME: Remove once GS is stable enough
+//    {
+//        std::vector<std::string> sourceKeys = _geometricShader->GetSourceKeys(HdShaderTokens->geometryShader);
+//        for(auto key : sourceKeys) {
+//            if(key == "MeshNormal.Flat")
+//                enableFragmentNormalReconstruction = true;
+//        }
+//    }
 
     // Start of Program Scope
 
@@ -1745,9 +2083,9 @@ HdSt_CodeGenMSL::Compile()
     
     // insert fixes for unsupported functionality
     
-    if(enableFragmentNormalReconstruction) {
-        _genFS << "#define __RECONSTRUCT_FLAT_NORMAL 1\n";  //See meshNormal.glslfx
-    }
+//    if(enableFragmentNormalReconstruction) {
+//        _genFS << "#define __RECONSTRUCT_FLAT_NORMAL 1\n";  //See meshNormal.glslfx
+//    }
     
     // other shaders (renderpass, lighting, surface) first
     TF_FOR_ALL(it, _shaders) {
@@ -1811,6 +2149,7 @@ HdSt_CodeGenMSL::Compile()
     _ParseGLSL(_genVS, _mslVSInputParams, _mslVSOutputParams);
     _ParseGLSL(_genFS, _mslPSInputParams, _mslPSOutputParams);
     
+    bool _mslBuildComputeGS = _buildTarget == kMSL_BuildTarget_MVA_ComputeGS;
     if(_mslBuildComputeGS) {
         _ParseGLSL(_genOSDDefinitions, _mslGSInputParams, _mslGSOutputParams, true);
         _ParseGLSL(_genGS, _mslGSInputParams, _mslGSOutputParams, true);
@@ -1826,29 +2165,34 @@ HdSt_CodeGenMSL::Compile()
     // compile shaders
     // note: _vsSource, _fsSource etc are used for diagnostics (see header)
     if (_hasVS) {
-        _vsSource = vsConfigString.str() + _genDefinitions.str() + _genOSDDefinitions.str() +
-                    _genCommon.str() + _genVS.str() + termination.str();
+        _vsSource = vsConfigString.str() + _genDefinitions.str() +
+                    _genCommon.str() + _genVS.str() + termination.str() + glueVS.str();
         _vsSource = replaceStringAll(_vsSource, "<st>", "_Vert");
-        glueVS.str(replaceStringAll(glueVS.str(), "<st>", "_Vert"));
-        if(_mslBuildComputeGS) {
-            _vsSource += _genCommon.str() + _genGS.str() + /*termination.str() +*/ glueGS.str();    //Termination is done in glueCS
-            _vsSource = replaceStringAll(_vsSource, "<st>", "_Geometry");
-        }
-        _vsSource += glueVS.str();
         
-        //MTL_FIXME: These need to point to actual buffers if Osd is actively used.
-        _vsSource = replaceStringAll(_vsSource, "<cibi>", "0");
-        _vsSource = replaceStringAll(_vsSource, "<osd_ppbi>", "0");
-        _vsSource = replaceStringAll(_vsSource, "<osd_ppvbbi>", "0");
-        _vsSource = replaceStringAll(_vsSource, "<osd_pptfbi>", "0");
-        _vsSource = replaceStringAll(_vsSource, "<osd_klbi>", "0");
-        _vsSource = replaceStringAll(_vsSource, "<osd_ppbi>", "0");
-        _vsSource = replaceStringAll(_vsSource, "<vbi>", "0");
-
-        if (!mslProgram->CompileShader(_mslBuildComputeGS ? GL_GEOMETRY_SHADER : GL_VERTEX_SHADER, _vsSource)) {
+        if (!mslProgram->CompileShader(GL_VERTEX_SHADER, _vsSource)) {
             shaderCompiled = false;
         }
-        mslProgram->SetGSOutputStructSize(_mslGSOutputStructSize);
+    }
+    if (_buildTarget == kMSL_BuildTarget_MVA_ComputeGS) {
+        _gsSource = vsConfigString.str() + gsConfigString.str() + _genDefinitions.str() +
+                    _genOSDDefinitions.str() + _genCommon.str() + _genVS.str() + termination.str();
+        _gsSource = replaceStringAll(_gsSource, "<st>", "_Vert");
+        _gsSource += _genCommon.str() + _genGS.str() + glueGS.str();    //Termination of Geometry ProgramScope is done in glueCS due to addition of EmitVertex/Primitive
+        _gsSource = replaceStringAll(_gsSource, "<st>", "_Geometry");
+        
+        //MTL_FIXME: These need to point to actual buffers if Osd is actively used.
+        _gsSource = replaceStringAll(_gsSource, "<cibi>", "0");
+        _gsSource = replaceStringAll(_gsSource, "<osd_ppbi>", "0");
+        _gsSource = replaceStringAll(_gsSource, "<osd_ppvbbi>", "0");
+        _gsSource = replaceStringAll(_gsSource, "<osd_pptfbi>", "0");
+        _gsSource = replaceStringAll(_gsSource, "<osd_klbi>", "0");
+        _gsSource = replaceStringAll(_gsSource, "<osd_ppbi>", "0");
+        _gsSource = replaceStringAll(_gsSource, "<vbi>", "0");
+        
+        if (!mslProgram->CompileShader(GL_GEOMETRY_SHADER, _gsSource))
+            shaderCompiled = false;
+        
+        mslProgram->SetGSOutStructsSize(_mslGSVertOutStructSize, _mslGSPrimOutStructSize);
     }
     if (_hasFS) {
         _fsSource = fsConfigString.str() + _genDefinitions.str() + _genCommon.str() + _genFS.str() + termination.str() + gluePS.str();
@@ -2748,6 +3092,7 @@ HdSt_CodeGenMSL::_GenerateDrawingCoord()
     TfToken tkn_shaderCoord("__dc_shaderCoord");
     
     //We add the input/output params here. Glue code is generated from these.
+    bool _mslBuildComputeGS = _buildTarget == kMSL_BuildTarget_MVA_ComputeGS;
     
     _EmitStructMemberOutput(_mslVSOutputParams, tkn_modelCoord,
         TfToken("vsDrawingCoord.modelCoord"), intType, tkn_flat);
@@ -3671,7 +4016,7 @@ HdSt_CodeGenMSL::_GenerateVertexAndFaceVaryingPrimvar(bool hasGS)
                 case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_PATCHES:
                 {
                     // linear interpolation within a quad.
-                    _procGS << "   outPrimvars->" << name
+                    _procGS << "   outPrimvars." << name
                         << "  = mix("
                         << "mix(" << "HdGet_" << name << "(0),"
                         <<           "HdGet_" << name << "(1), localST.x),"
@@ -3684,7 +4029,7 @@ HdSt_CodeGenMSL::_GenerateVertexAndFaceVaryingPrimvar(bool hasGS)
                 case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_COARSE_TRIANGLES:
                 {
                     // barycentric interpolation within a triangle.
-                    _procGS << "   outPrimvars->" << name
+                    _procGS << "   outPrimvars." << name
                         << "  = HdGet_" << name << "(0) * localST.x "
                         << "  + HdGet_" << name << "(1) * localST.y "
                         << "  + HdGet_" << name << "(2) * (1-localST.x-localST.y);\n";
@@ -3706,6 +4051,7 @@ HdSt_CodeGenMSL::_GenerateVertexAndFaceVaryingPrimvar(bool hasGS)
                                     _geometricShader->GetPrimitiveType());
             }
             
+            //MTL_FIXME: Outdated comment?
             //Pass-through for primvars to cover for missing geometry shaders in Metal
             {
                 std::stringstream vtxOutName;
@@ -3714,9 +4060,18 @@ HdSt_CodeGenMSL::_GenerateVertexAndFaceVaryingPrimvar(bool hasGS)
                 TfToken vtxOutName_Token(vtxOutName.str());
                 _AddOutputParam(_mslVSOutputParams, vtxOutName_Token, dataType, TfToken(), name).usage |= HdSt_CodeGenMSL::TParam::Usage::PrimVar;
                 
-                _AddInputParam(_mslGSInputParams, name, dataType, TfToken(), HdBinding(HdBinding::UNKNOWN, 0), 0, vtxOutName_Token).usage
+                std::string inAccessorGS = "inPrimvars[HD_NUM_PRIMITIVE_VERTS].";
+                inAccessorGS += name.GetString();
+                _AddInputParam(_mslGSInputParams, vtxOutName_Token, dataType, TfToken(), HdBinding(HdBinding::UNKNOWN, 0), 0, TfToken(inAccessorGS)).usage
                     |= HdSt_CodeGenMSL::TParam::Usage::PrimVar;
-                _AddOutputParam(_mslGSOutputParams, vtxOutName_Token, dataType, TfToken(), name).usage |= HdSt_CodeGenMSL::TParam::Usage::PrimVar;
+                std::string outAccessorGS = "outPrimvars.";
+                outAccessorGS += name.GetString();
+                _AddOutputParam(_mslGSOutputParams, vtxOutName_Token, dataType, TfToken(), TfToken(outAccessorGS)).usage
+                    |= HdSt_CodeGenMSL::TParam::Usage::PrimVar;
+                
+//                _AddInputParam(_mslGSInputParams, name, dataType, TfToken(), HdBinding(HdBinding::UNKNOWN, 0), 0, vtxOutName_Token).usage
+//                    |= HdSt_CodeGenMSL::TParam::Usage::PrimVar;
+//                _AddOutputParam(_mslGSOutputParams, vtxOutName_Token, dataType, TfToken(), name).usage |= HdSt_CodeGenMSL::TParam::Usage::PrimVar;
                 
                 _AddInputParam(_mslPSInputParams, name, dataType, TfToken(), HdBinding(HdBinding::UNKNOWN, 0), 0, vtxOutName_Token).usage
                     |= HdSt_CodeGenMSL::TParam::Usage::PrimVar;
