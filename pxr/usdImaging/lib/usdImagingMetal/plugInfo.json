@@ -1,20 +1,7 @@
 {
     "Plugins": [
         {
-            "Info": {
-                "Types": {
-                    "UsdImagingMetalDrawModeAdapter" : {
-                        "bases": ["UsdImagingPrimAdapter"],
-                        "isInternal": true,
-                        "primTypeName": "__drawModeAdapterMetal"
-                    },
-                    "UsdImagingMetalHydraMaterialAdapter" : {
-                        "bases": ["UsdImagingPrimAdapter"],
-                        "isInternal": true,
-                        "primTypeName": "HydraPbsSurfaceMetal"
-                    }
-                }
-            },
+        	"Info": {},
             "LibraryPath": "@PLUG_INFO_LIBRARY_PATH@",
             "Name": "usdImagingMetal",
             "ResourcePath": "@PLUG_INFO_RESOURCE_PATH@",

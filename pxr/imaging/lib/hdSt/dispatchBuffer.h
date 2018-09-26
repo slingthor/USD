@@ -91,16 +91,16 @@ class HdStDispatchBuffer : public HdBufferArray {
 public:
     /// Constructor. commandNumUints is given in how many integers.
     HDST_API
-    HdStDispatchBuffer(TfToken const &role, int count,
-                     unsigned int commandNumUints);
+    static HdStDispatchBuffer *New(TfToken const &role, int count,
+                                   unsigned int commandNumUints);
 
     /// Destructor.
     HDST_API
-    ~HdStDispatchBuffer();
+    virtual ~HdStDispatchBuffer() {}
 
     /// Update entire buffer data
     HDST_API
-    void CopyData(std::vector<GLuint> const &data);
+    virtual void CopyData(std::vector<GLuint> const &data) = 0;
 
     /// Add an interleaved view to this buffer.
     HDST_API
@@ -151,6 +151,10 @@ public:
     HdBufferResourceNamedList const& GetResources() const {return _resourceList;}
 
 protected:
+    HDST_API
+    HdStDispatchBuffer(TfToken const &role, int count,
+                       unsigned int commandNumUints);
+
     /// Adds a new, named GPU resource and returns it.
     HDST_API
     HdStBufferResourceSharedPtr _AddResource(TfToken const& name,
@@ -158,7 +162,6 @@ protected:
                                              int offset,
                                              int stride);
 
-private:
     int _count;
     unsigned int _commandNumUints;
     HdBufferResourceNamedList _resourceList;

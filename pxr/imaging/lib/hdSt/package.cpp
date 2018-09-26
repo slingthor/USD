@@ -23,6 +23,8 @@
 //
 #include "pxr/imaging/hdSt/package.h"
 
+#include "pxr/imaging/hd/engine.h"
+
 #include "pxr/base/plug/plugin.h"
 #include "pxr/base/plug/thisPlugin.h"
 #include "pxr/base/tf/diagnostic.h"
@@ -46,12 +48,19 @@ _GetShaderPath(char const * shader)
 TfToken
 HdStPackageComputeShader()
 {
+    HdEngine::RenderAPI api = HdEngine::GetRenderAPI();
+    switch(api) {
 #if defined(ARCH_GFX_METAL)
-    static TfToken computeShader = _GetShaderPath("compute.metal");
-#else
-    static TfToken computeShader = _GetShaderPath("compute.glslfx");
+        case HdEngine::Metal:
+            static TfToken computeShaderMetal = _GetShaderPath("compute.metal");
+            return computeShaderMetal;
 #endif
-    return computeShader;
+        case HdEngine::OpenGL:
+        default:
+            static TfToken computeShader = _GetShaderPath("compute.glslfx");
+            return computeShader;
+    }
+    return TfToken();
 }
 
 TfToken

@@ -45,9 +45,9 @@ typedef boost::shared_ptr<class HdStResourceGL> HdStResourceGLSharedPtr;
 ///
 class HdStResourceGL : public HdResource {
 public:
-    HD_API
+    HDST_API
     HdStResourceGL(TfToken const & role);
-    HD_API
+    HDST_API
     virtual ~HdStResourceGL();
 
     /// The graphics API name/identifier for this resource and its size

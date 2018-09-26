@@ -29,7 +29,6 @@
 #include "pxr/imaging/hdSt/api.h"
 #include "pxr/imaging/hdSt/dispatchBuffer.h"
 #include "pxr/imaging/hdSt/drawBatch.h"
-#include "pxr/imaging/hdSt/persistentBuffer.h"
 
 #include <vector>
 
@@ -56,28 +55,117 @@ public:
 
     // HdSt_DrawBatch overrides
     HDST_API
-    virtual bool Validate(bool deepValidation) = 0;
+    bool Validate(bool deepValidation);
 
     /// Prepare draw commands and apply view frustum culling for this batch.
     HDST_API
     virtual void PrepareDraw(
         HdStRenderPassStateSharedPtr const &renderPassState,
-        HdStResourceRegistrySharedPtr const &resourceRegistry) override = 0;
+        HdStResourceRegistrySharedPtr const &resourceRegistry) override;
 
     /// Executes the drawing commands for this batch.
     HDST_API
     virtual void ExecuteDraw(
         HdStRenderPassStateSharedPtr const &renderPassState,
-        HdStResourceRegistrySharedPtr const &resourceRegistry) override = 0;
+        HdStResourceRegistrySharedPtr const &resourceRegistry) override;
 
     HDST_API
-    virtual void DrawItemInstanceChanged(HdStDrawItemInstance const* instance) = 0;
+    void DrawItemInstanceChanged(HdStDrawItemInstance const* instance);
 
 protected:
     HDST_API
     HdSt_IndirectDrawBatch(HdStDrawItemInstance * drawItemInstance);
+
     HDST_API
-    virtual void _Init(HdStDrawItemInstance * drawItemInstance) override = 0;
+    void _Init(HdStDrawItemInstance * drawItemInstance);
+    
+protected:
+    void _ValidateCompatibility(HdBufferArrayRangeSharedPtr const& constantBar,
+                                HdBufferArrayRangeSharedPtr const& indexBar,
+                                HdBufferArrayRangeSharedPtr const& elementBar,
+                                HdBufferArrayRangeSharedPtr const& fvarBar,
+                                HdBufferArrayRangeSharedPtr const& vertexBar,
+                                int instancerNumLevels,
+                                HdBufferArrayRangeSharedPtr const& instanceIndexBar,
+                                std::vector<HdBufferArrayRangeSharedPtr> const& instanceBars) const;
+    
+    HDST_API
+    virtual void _PrepareDraw(bool gpuCulling, bool freezeCulling) = 0;
+    
+    HDST_API
+    virtual void _ExecuteDraw(_DrawingProgram &program, int batchCount) = 0;
+
+    HDST_API
+    virtual void _SyncFence() = 0;
+    
+    HDST_API
+    virtual void _GPUFrustumCullingExecute(
+                       HdStResourceRegistrySharedPtr const &resourceRegistry,
+                       HdStProgramSharedPtr const &program,
+                       HdSt_ResourceBinder const &binder,
+                       HdBufferResourceSharedPtr cullCommandBuffer) = 0;
+    
+    HDST_API
+    virtual void _GPUFrustumCullingXFBExecute(HdStResourceRegistrySharedPtr const &resourceRegistry) = 0;
+
+    // Culling requires custom resource binding.
+    class _CullingProgram : public _DrawingProgram {
+    public:
+        static _CullingProgram *New();
+
+        void Initialize(bool useDrawArrays, bool useInstanceCulling,
+                        size_t bufferArrayHash);
+    protected:
+        _CullingProgram()
+            : _useDrawArrays(false)
+            , _useInstanceCulling(false)
+            , _bufferArrayHash(0) { }
+        
+        virtual ~_CullingProgram() {}
+        
+        // _DrawingProgram overrides
+        virtual void _GetCustomBindings(HdBindingRequestVector *customBindings,
+                                        bool *enableInstanceDraw) const;
+        virtual bool _Link(HdStProgramSharedPtr const & program) = 0;
+
+        bool _useDrawArrays;
+        bool _useInstanceCulling;
+        size_t _bufferArrayHash;
+    };
+    
+    _CullingProgram &_GetCullingProgram(HdStResourceRegistrySharedPtr const &resourceRegistry);
+    
+    void _CompileBatch(HdStResourceRegistrySharedPtr const &resourceRegistry);
+    
+    void _GPUFrustumCulling(HdStDrawItem const *item,
+                            HdStRenderPassStateSharedPtr const &renderPassState,
+                            HdStResourceRegistrySharedPtr const &resourceRegistry);
+    
+    void _GPUFrustumCullingXFB(HdStDrawItem const *item,
+                               HdStRenderPassStateSharedPtr const &renderPassState,
+                               HdStResourceRegistrySharedPtr const &resourceRegistry);
+    
+    HdStDispatchBufferSharedPtr _dispatchBuffer;
+    HdStDispatchBufferSharedPtr _dispatchBufferCullInput;
+    
+    std::vector<GLuint> _drawCommandBuffer;
+    bool _drawCommandBufferDirty;
+    size_t _bufferArraysHash;
+
+    size_t _numVisibleItems;
+    size_t _numTotalVertices;
+    size_t _numTotalElements;
+    
+    _CullingProgram *_cullingProgram;
+    bool _lastTinyPrimCulling;
+    
+    bool _useDrawArrays;
+    bool _useInstancing;
+    bool _useGpuCulling;
+    bool _useGpuInstanceCulling;
+    
+    int _instanceCountOffset;
+    int _cullInstanceCountOffset;
 };
 
 

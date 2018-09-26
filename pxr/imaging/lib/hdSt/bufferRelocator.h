@@ -39,19 +39,21 @@ PXR_NAMESPACE_OPEN_SCOPE
 class HdStBufferRelocator {
 public:
     /// Creates a graphics API specific buffer relocator
+    HDST_API
     static HdStBufferRelocator *New(HdResourceGPUHandle srcBuffer, HdResourceGPUHandle dstBuffer);
     
+    HDST_API
     virtual ~HdStBufferRelocator() {};
 
     /// Schedule the range to be copied. The consecutive ranges could be
     /// aggregated into a single copy where possible.
-    HD_API
+    HDST_API
     void AddRange(ptrdiff_t readOffset,
                   ptrdiff_t writeOffset,
                   ptrdiff_t copySize);
 
     /// Execute GL buffer copy command to flush all scheduled range copies.
-    HD_API
+    HDST_API
     virtual void Commit() = 0;
 
 protected:

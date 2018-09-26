@@ -21,46 +21,43 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-// utils.cpp
-//
-#include <pxr/imaging/garch/resourceFactory.h>
-#include <pxr/base/tf/diagnostic.h>
+#ifndef HDST_SMOOTH_NORMALS_GL_H
+#define HDST_SMOOTH_NORMALS_GL_H
 
-#include "pxr/base/tf/instantiateSingleton.h"
+#include "pxr/imaging/hdSt/smoothNormals.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-TF_INSTANTIATE_SINGLETON(GarchResourceFactory);
 
-GarchResourceFactory&
-GarchResourceFactory::GetInstance() {
-    return TfSingleton<GarchResourceFactory>::GetInstance();
-}
+typedef boost::shared_ptr<class HdResourceRegistry> HdResourceRegistrySharedPtr;
 
-GarchResourceFactory::GarchResourceFactory():
-    factory(NULL)
-{
-    TfSingleton<GarchResourceFactory>::SetInstanceConstructed(*this);
-}
+class Hd_VertexAdjacency;
 
-GarchResourceFactory::~GarchResourceFactory()
-{
-    // Empty
-}
+/// smooth normal computation GPU
+///
+///
+class HdSt_SmoothNormalsComputationGL : public HdSt_SmoothNormalsComputationGPU {
+public:
+    /// Constructor
+    /// @param topology 
+    HDST_API
+    HdSt_SmoothNormalsComputationGL(Hd_VertexAdjacency const *adjacency,
+                                    TfToken const &srcName,
+                                    TfToken const &dstName,
+                                    HdType srcDataType,
+                                    HdType dstDataType);
 
-GarchResourceFactoryInterface *GarchResourceFactory::operator -> () const 
-{
-    if (!factory)
-    {
-        TF_FATAL_CODING_ERROR("No resource factory currently set");
-    }
-    return factory;
-}
+protected:
+    HDST_API
+    virtual void _Execute(HdStProgramSharedPtr computeProgram,
+                          Uniform const &uniform,
+                          HdBufferResourceSharedPtr points,
+                          HdBufferResourceSharedPtr normals,
+                          HdBufferResourceSharedPtr adjacency,
+                          int numPoints) override;
+};
 
-void GarchResourceFactory::SetResourceFactory(GarchResourceFactoryInterface *_factory)
-{
-    factory = _factory;
-}
 
 PXR_NAMESPACE_CLOSE_SCOPE
 
+#endif // HDST_SMOOTH_NORMALS_GL_H

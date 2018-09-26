@@ -38,6 +38,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 ///
 class HdStBufferRelocatorMetal : public HdStBufferRelocator {
 public:
+    HDST_API
     HdStBufferRelocatorMetal(HdResourceGPUHandle srcBuffer, HdResourceGPUHandle dstBuffer);
 
     /// Execute Metal buffer copy command to flush all scheduled range copies.

@@ -102,8 +102,18 @@ HdStVBOSimpleMemoryBufferMetal::Reallocate(
     }
     int numElements = range->GetNumElements();
 
-    id<MTLCommandBuffer> commandBuffer = [MtlfMetalContext::GetMetalContext()->commandQueue commandBuffer];
-    id<MTLBlitCommandEncoder> blitEncoder = [commandBuffer blitCommandEncoder];
+    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
+    
+    id<MTLDevice> device = context->device;
+    
+    /*
+        MTL_FIXE - Ideally we wouldn't be creating and committing a command buffer here but we'd need some extra call
+        to know when all reallocates had been performed so could commit them. However, if this is only an initialisation step it's probably OK.
+     */
+    context->CreateCommandBuffer();
+    context->LabelCommandBuffer(@"HdStVBOSimpleMemoryBufferMetal::Reallocate()");
+ 
+    id<MTLBlitCommandEncoder> blitEncoder = context->GetBlitEncoder();
     
     TF_FOR_ALL (bresIt, GetResources()) {
         HdBufferResourceSharedPtr const &bres = bresIt->second;
@@ -118,11 +128,11 @@ HdStVBOSimpleMemoryBufferMetal::Reallocate(
         HdResourceGPUHandle oldId(bres->GetId());
 
         if (bufferSize) {
-            newId = [MtlfMetalContext::GetMetalContext()->device newBufferWithLength:bufferSize options:MTLResourceStorageModeManaged];
+            newId = [device newBufferWithLength:bufferSize options:MTLResourceStorageModeManaged];
         }
         else {
             // Dummy buffer - 0 byte buffers are invalid
-            newId = [MtlfMetalContext::GetMetalContext()->device newBufferWithLength:256 options:MTLResourceStorageModeManaged];
+            newId = [device newBufferWithLength:256 options:MTLResourceStorageModeManaged];
         }
 
         // copy the range. There are three cases:
@@ -161,8 +171,8 @@ HdStVBOSimpleMemoryBufferMetal::Reallocate(
         bres->SetAllocation(newId, bufferSize);
     }
 
-    [blitEncoder endEncoding];
-    [commandBuffer commit];
+    context->ReleaseEncoder(true);
+    context->CommitCommandBuffer(false, false);
 
     _capacity = numElements;
     _needsReallocation = false;

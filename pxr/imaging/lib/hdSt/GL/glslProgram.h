@@ -93,7 +93,7 @@ public:
     virtual void UnbindResources(HdStSurfaceShader* surfaceShader, HdSt_ResourceBinder const &binder) const override;
 
     HDST_API
-    virtual void SetProgram() override;
+    virtual void SetProgram(char const* const label) override;
     
     HDST_API
     virtual void UnsetProgram() override;
@@ -115,6 +115,10 @@ public:
     /// Returns the GL program object.
     HDST_API
     GLuint GetGLProgram() const { return _program; }
+    
+protected:
+    HDST_API
+    virtual std::string GetComputeHeader() const override;
 
 private:
     GLuint _program;

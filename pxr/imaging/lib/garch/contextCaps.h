@@ -97,27 +97,37 @@ public:
     bool useCppShaderPadding;
 
     /// Returns whether to do frustum culling on the GPU
+	GARCH_API
     virtual bool IsEnabledGPUFrustumCulling() const;
     
     /// Returns whether to read back the count of visible items from the GPU
     /// Disabled by default, since there is some performance penalty.
+	GARCH_API
     virtual bool IsEnabledGPUCountVisibleInstances() const;
     
     /// Returns whether to cull tiny prims (in screen space) during GPU culling
     /// Enabled by default.
+	GARCH_API
     virtual bool IsEnabledGPUTinyPrimCulling() const;
     
     /// Returns whether to do per-instance culling on the GPU
+	GARCH_API
     virtual bool IsEnabledGPUInstanceFrustumCulling() const;
     
     /// Returns a string identifying the renderer, that matches the renderer specific
     /// part of the adapter names
+	GARCH_API
     virtual char const* const GetRendererName() const = 0;
     
 protected:
+
+	GARCH_API
     GarchContextCaps();
+
+	GARCH_API
     virtual ~GarchContextCaps() = default;
     
+	GARCH_API
     bool IsGPUComputeEnabled();
 };
 

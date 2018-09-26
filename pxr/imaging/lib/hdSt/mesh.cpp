@@ -802,7 +802,7 @@ HdStMesh::_PopulateVertexPrimvars(HdSceneDelegate *sceneDelegate,
                 // If we didn't calcuate normals on the CPU then need to do it here
                 if (!cpuSmoothNormals) {
                     HdComputationSharedPtr smoothNormalsComputation(
-                        new HdSt_SmoothNormalsComputationGPU(
+                        HdSt_SmoothNormalsComputationGPU::New(
                             _vertexAdjacency.get(),
                             HdTokens->points,
                             normalsName,

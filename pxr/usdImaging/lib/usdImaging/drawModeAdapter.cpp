@@ -21,9 +21,9 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#include "pxr/usdImaging/usdImagingGL/drawModeAdapter.h"
-#include "pxr/usdImaging/usdImagingGL/package.h"
-#include "pxr/usdImaging/usdImagingGL/textureUtils.h"
+#include "pxr/usdImaging/usdImaging/drawModeAdapter.h"
+#include "pxr/usdImaging/usdImaging/package.h"
+#include "pxr/usdImaging/usdImaging/textureUtils.h"
 
 #include "pxr/usdImaging/usdImaging/debugCodes.h"
 #include "pxr/usdImaging/usdImaging/delegate.h"
@@ -83,17 +83,17 @@ namespace {
 
 TF_REGISTRY_FUNCTION(TfType)
 {
-    typedef UsdImagingGLDrawModeAdapter Adapter;
+    typedef UsdImagingDrawModeAdapter Adapter;
     TfType t = TfType::Define<Adapter, TfType::Bases<Adapter::BaseAdapter> >();
     t.SetFactory< UsdImagingPrimAdapterFactory<Adapter> >();
 }
 
-UsdImagingGLDrawModeAdapter::~UsdImagingGLDrawModeAdapter()
+UsdImagingDrawModeAdapter::~UsdImagingDrawModeAdapter()
 {
 }
 
 SdfPath
-UsdImagingGLDrawModeAdapter::Populate(UsdPrim const& prim,
+UsdImagingDrawModeAdapter::Populate(UsdPrim const& prim,
                                     UsdImagingIndexProxy* index,
                                     UsdImagingInstancerContext const*
                                        instancerContext)
@@ -199,13 +199,13 @@ UsdImagingGLDrawModeAdapter::Populate(UsdPrim const& prim,
 }
 
 bool
-UsdImagingGLDrawModeAdapter::_IsMaterialPath(SdfPath const& path) const
+UsdImagingDrawModeAdapter::_IsMaterialPath(SdfPath const& path) const
 {
     return IsChildPath(path) && path.GetNameToken() == _tokens->material;
 }
 
 bool
-UsdImagingGLDrawModeAdapter::_IsTexturePath(SdfPath const& path) const
+UsdImagingDrawModeAdapter::_IsTexturePath(SdfPath const& path) const
 {
     if (!IsChildPath(path)) {
         return false;
@@ -221,7 +221,7 @@ UsdImagingGLDrawModeAdapter::_IsTexturePath(SdfPath const& path) const
 }
 
 void
-UsdImagingGLDrawModeAdapter::_RemovePrim(SdfPath const& cachePath,
+UsdImagingDrawModeAdapter::_RemovePrim(SdfPath const& cachePath,
                                        UsdImagingIndexProxy* index)
 {
     if (_IsMaterialPath(cachePath)) {
@@ -235,7 +235,7 @@ UsdImagingGLDrawModeAdapter::_RemovePrim(SdfPath const& cachePath,
 }
 
 void
-UsdImagingGLDrawModeAdapter::MarkDirty(UsdPrim const& prim,
+UsdImagingDrawModeAdapter::MarkDirty(UsdPrim const& prim,
                                      SdfPath const& cachePath,
                                      HdDirtyBits dirty,
                                      UsdImagingIndexProxy* index)
@@ -250,7 +250,7 @@ UsdImagingGLDrawModeAdapter::MarkDirty(UsdPrim const& prim,
 }
 
 void
-UsdImagingGLDrawModeAdapter::MarkTransformDirty(UsdPrim const& prim,
+UsdImagingDrawModeAdapter::MarkTransformDirty(UsdPrim const& prim,
                                               SdfPath const& cachePath,
                                               UsdImagingIndexProxy* index)
 {
@@ -260,7 +260,7 @@ UsdImagingGLDrawModeAdapter::MarkTransformDirty(UsdPrim const& prim,
 }
 
 void
-UsdImagingGLDrawModeAdapter::MarkVisibilityDirty(UsdPrim const& prim,
+UsdImagingDrawModeAdapter::MarkVisibilityDirty(UsdPrim const& prim,
                                                SdfPath const& cachePath,
                                                UsdImagingIndexProxy* index)
 {
@@ -270,7 +270,7 @@ UsdImagingGLDrawModeAdapter::MarkVisibilityDirty(UsdPrim const& prim,
 }
 
 void
-UsdImagingGLDrawModeAdapter::TrackVariability(UsdPrim const& prim,
+UsdImagingDrawModeAdapter::TrackVariability(UsdPrim const& prim,
                                             SdfPath const& cachePath,
                                             HdDirtyBits* timeVaryingBits,
                                             UsdImagingInstancerContext const*
@@ -316,7 +316,7 @@ UsdImagingGLDrawModeAdapter::TrackVariability(UsdPrim const& prim,
 }
 
 void
-UsdImagingGLDrawModeAdapter::UpdateForTime(UsdPrim const& prim,
+UsdImagingDrawModeAdapter::UpdateForTime(UsdPrim const& prim,
                                          SdfPath const& cachePath,
                                          UsdTimeCode time,
                                          HdDirtyBits requestedBits,
@@ -538,7 +538,7 @@ UsdImagingGLDrawModeAdapter::UpdateForTime(UsdPrim const& prim,
 }
 
 HdDirtyBits
-UsdImagingGLDrawModeAdapter::ProcessPropertyChange(UsdPrim const& prim,
+UsdImagingDrawModeAdapter::ProcessPropertyChange(UsdPrim const& prim,
                                                  SdfPath const& cachePath,
                                                  TfToken const& propertyName)
 {
@@ -561,7 +561,7 @@ UsdImagingGLDrawModeAdapter::ProcessPropertyChange(UsdPrim const& prim,
 }
 
 void
-UsdImagingGLDrawModeAdapter::_GenerateOriginGeometry(
+UsdImagingDrawModeAdapter::_GenerateOriginGeometry(
         VtValue *topo, VtValue *points, GfRange3d const& extents) const
 {
     // Origin: vertices are (0,0,0); (1,0,0); (0,1,0); (0,0,1)
@@ -586,7 +586,7 @@ UsdImagingGLDrawModeAdapter::_GenerateOriginGeometry(
 }
 
 void
-UsdImagingGLDrawModeAdapter::_GenerateBoundsGeometry(
+UsdImagingDrawModeAdapter::_GenerateBoundsGeometry(
         VtValue *topo, VtValue *points, GfRange3d const& extents) const
 {
     // Bounding box: vertices are for(i: 0 -> 7) {
@@ -622,7 +622,7 @@ UsdImagingGLDrawModeAdapter::_GenerateBoundsGeometry(
 }
 
 void
-UsdImagingGLDrawModeAdapter::_GenerateCardsCrossGeometry(
+UsdImagingDrawModeAdapter::_GenerateCardsCrossGeometry(
         VtValue *topo, VtValue *points, GfRange3d const& extents,
         uint8_t axes_mask) const
 {
@@ -718,7 +718,7 @@ UsdImagingGLDrawModeAdapter::_GenerateCardsCrossGeometry(
 }
 
 void
-UsdImagingGLDrawModeAdapter::_SanityCheckFaceSizes(SdfPath const& cachePath,
+UsdImagingDrawModeAdapter::_SanityCheckFaceSizes(SdfPath const& cachePath,
         GfRange3d const& extents, uint8_t axes_mask) const
 {
     GfVec3d min = extents.GetMin(),
@@ -745,7 +745,7 @@ UsdImagingGLDrawModeAdapter::_SanityCheckFaceSizes(SdfPath const& cachePath,
 }
 
 void
-UsdImagingGLDrawModeAdapter::_GenerateCardsBoxGeometry(
+UsdImagingDrawModeAdapter::_GenerateCardsBoxGeometry(
         VtValue *topo, VtValue *points, GfRange3d const& extents,
         uint8_t axes_mask) const
 {
@@ -799,7 +799,7 @@ UsdImagingGLDrawModeAdapter::_GenerateCardsBoxGeometry(
 }
 
 void
-UsdImagingGLDrawModeAdapter::_GenerateCardsFromTextureGeometry(
+UsdImagingDrawModeAdapter::_GenerateCardsFromTextureGeometry(
         VtValue *topo, VtValue *points, VtValue *uv, VtValue *assign,
         GfRange3d *extents, UsdPrim const& prim) const
 {
@@ -869,7 +869,7 @@ UsdImagingGLDrawModeAdapter::_GenerateCardsFromTextureGeometry(
 }
 
 bool
-UsdImagingGLDrawModeAdapter::_GetMatrixFromImageMetadata(
+UsdImagingDrawModeAdapter::_GetMatrixFromImageMetadata(
     UsdAttribute const& attr, GfMatrix4d *mat) const
 {
     // This function expects the input attribute to be an image asset path.
@@ -904,7 +904,7 @@ UsdImagingGLDrawModeAdapter::_GetMatrixFromImageMetadata(
 }
 
 void
-UsdImagingGLDrawModeAdapter::_GenerateTextureCoordinates(
+UsdImagingDrawModeAdapter::_GenerateTextureCoordinates(
         VtValue *uv, VtValue *assign, uint8_t axes_mask) const
 {
     // Note: this function depends on the vertex order of the generated
@@ -959,9 +959,9 @@ UsdImagingGLDrawModeAdapter::_GenerateTextureCoordinates(
 }
 
 std::string
-UsdImagingGLDrawModeAdapter::_GetSurfaceShaderSource() const
+UsdImagingDrawModeAdapter::_GetSurfaceShaderSource() const
 {
-    boost::scoped_ptr<GLSLFX> gfx(new GLSLFX(UsdImagingGLPackageDrawModeShader()));
+    boost::scoped_ptr<GLSLFX> gfx(new GLSLFX(UsdImagingPackageDrawModeShader()));
     if (!gfx->IsValid()) {
         TF_CODING_ERROR("Couldn't load UsdImagingPackageDrawModeShader");
         return std::string();
@@ -970,7 +970,7 @@ UsdImagingGLDrawModeAdapter::_GetSurfaceShaderSource() const
 }
 
 GfRange3d
-UsdImagingGLDrawModeAdapter::_ComputeExtent(UsdPrim const& prim) const
+UsdImagingDrawModeAdapter::_ComputeExtent(UsdPrim const& prim) const
 {
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
@@ -982,7 +982,7 @@ UsdImagingGLDrawModeAdapter::_ComputeExtent(UsdPrim const& prim) const
 }
 
 TfToken
-UsdImagingGLDrawModeAdapter::_GetPurpose(UsdPrim const& prim, UsdTimeCode time)
+UsdImagingDrawModeAdapter::_GetPurpose(UsdPrim const& prim, UsdTimeCode time)
     const
 {
     HD_TRACE_FUNCTION();
@@ -991,20 +991,20 @@ UsdImagingGLDrawModeAdapter::_GetPurpose(UsdPrim const& prim, UsdTimeCode time)
 }
 
 HdTextureResource::ID
-UsdImagingGLDrawModeAdapter::GetTextureResourceID(UsdPrim const& usdPrim,
+UsdImagingDrawModeAdapter::GetTextureResourceID(UsdPrim const& usdPrim,
                                                        SdfPath const &id,
                                                        UsdTimeCode time,
                                                        size_t salt) const
 {
-    return UsdImagingGL_GetTextureResourceID(usdPrim, id, time, salt);
+    return UsdImaging_GetTextureResourceID(usdPrim, id, time, salt);
 }
 
 HdTextureResourceSharedPtr
-UsdImagingGLDrawModeAdapter::GetTextureResource(UsdPrim const& usdPrim,
+UsdImagingDrawModeAdapter::GetTextureResource(UsdPrim const& usdPrim,
                                                      SdfPath const &id,
                                                      UsdTimeCode time) const
 {
-    return UsdImagingGL_GetTextureResource(usdPrim, id, time);
+    return UsdImaging_GetTextureResource(usdPrim, id, time);
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

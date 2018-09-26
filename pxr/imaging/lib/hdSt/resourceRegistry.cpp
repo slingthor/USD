@@ -152,7 +152,7 @@ HdStResourceRegistry::RegisterDispatchBuffer(
     TfToken const &role, int count, int commandNumUints)
 {
     HdStDispatchBufferSharedPtr result(
-        new HdStDispatchBuffer(role, count, commandNumUints));
+        HdStDispatchBuffer::New(role, count, commandNumUints));
 
     _dispatchBufferRegistry.push_back(result);
 

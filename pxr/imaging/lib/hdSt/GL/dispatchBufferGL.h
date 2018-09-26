@@ -1,5 +1,5 @@
 //
-// Copyright 2018 Pixar
+// Copyright 2016 Pixar
 //
 // Licensed under the Apache License, Version 2.0 (the "Apache License")
 // with the following modification; you may not use this file except in
@@ -21,28 +21,31 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#ifndef USDIMAGINGMETAL_TEXTURE_UTILS_H
-#define USDIMAGINGMETAL_TEXTURE_UTILS_H
+#ifndef HDST_DISPATCH_BUFFER_GL_H
+#define HDST_DISPATCH_BUFFER_GL_H
 
-#include "pxr/pxr.h"
-#include "pxr/usd/sdf/path.h"
-#include "pxr/usd/usd/prim.h"
-#include "pxr/usd/usd/timeCode.h"
-#include "pxr/imaging/hd/texture.h"
+#include "pxr/imaging/hdSt/dispatchBuffer.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-HdTextureResource::ID
-UsdImagingMetal_GetTextureResourceID(UsdPrim const& usdPrim,
-                                     SdfPath const& usdPath,
-                                     UsdTimeCode time,
-                                     size_t salt);
 
-HdTextureResourceSharedPtr
-UsdImagingMetal_GetTextureResource(UsdPrim const& usdPrim,
-                                   SdfPath const& usdPath,
-                                   UsdTimeCode time);
+class HdStDispatchBufferGL : public HdStDispatchBuffer {
+public:
+    /// Constructor. commandNumUints is given in how many integers.
+    HDST_API
+    HdStDispatchBufferGL(TfToken const &role, int count,
+                         unsigned int commandNumUints);
+
+    /// Destructor.
+    HDST_API
+    virtual ~HdStDispatchBufferGL();
+
+    /// Update entire buffer data
+    HDST_API
+    virtual void CopyData(std::vector<GLuint> const &data);
+};
+
 
 PXR_NAMESPACE_CLOSE_SCOPE
 
-#endif // USDIMAGINGMETAL_TEXTURE_UTILS_H
+#endif  // HDST_DISPATCH_BUFFER_GL_H

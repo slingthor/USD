@@ -19,12 +19,10 @@ pxr_library(usdImagingGL
         garch
         glf
         hd
-        hdx
         pxOsd
         sdf
         usd
         usdGeom
-        usdHydra
         usdShade
         usdImaging
         ar
@@ -43,20 +41,14 @@ pxr_library(usdImagingGL
         ${TBB_INCLUDE_DIRS}
 
     PUBLIC_CLASSES
-        drawModeAdapter
         engine
         gl
         hdEngine
-        hydraMaterialAdapter
-        package
         refEngine
 
     PUBLIC_HEADERS
         api.h
         version.h
-
-    PRIVATE_CLASSES
-        textureUtils
 
     PRIVATE_HEADERS
         unitTestGLDrawing.h
@@ -73,8 +65,6 @@ pxr_library(usdImagingGL
 
     RESOURCE_FILES
         plugInfo.json
-        shaders/drawMode.glslfx
-        shaders/previewSurface.glslfx
 )
 
 if (X11_FOUND OR APPLE)

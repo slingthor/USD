@@ -30,10 +30,6 @@
 #include "pxr/usdImaging/usdImaging/primAdapter.h"
 #include "pxr/usdImaging/usdImaging/tokens.h"
 
-#if defined(ARCH_GFX_METAL)
-//#include "pxr/imaging/mtlf/ptexTexture.h"
-#endif
-//#include "pxr/imaging/glf/ptexTexture.h"
 #include "pxr/imaging/garch/contextCaps.h"
 #include "pxr/imaging/garch/resourceFactory.h"
 #include "pxr/imaging/garch/textureHandle.h"
@@ -240,8 +236,7 @@ UsdImagingDelegate::_AdapterLookup(UsdPrim const& prim, bool ignoreInstancing)
             GetRenderDelegate()->GetMaterialBindingPurpose();
         if (bindingPurpose == HdTokens->preview &&
             adapterKey == _tokens->Material) {
-            adapterKey = TfToken(_tokens->HydraPbsSurface.GetString()
-                + GarchResourceFactory::GetInstance()->GetContextCaps().GetRendererName());
+            adapterKey = _tokens->HydraPbsSurface;
         }
     }
 

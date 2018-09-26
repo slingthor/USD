@@ -21,11 +21,11 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#ifndef USDIMAGINGMETAL_DRAW_MODE_ADAPTER_H
-#define USDIMAGINGMETAL_DRAW_MODE_ADAPTER_H
+#ifndef USDIMAGING_DRAW_MODE_ADAPTER_H
+#define USDIMAGING_DRAW_MODE_ADAPTER_H
 
 #include "pxr/pxr.h"
-#include "pxr/usdImaging/usdImagingMetal/api.h"
+#include "pxr/usdImaging/usdImaging/api.h"
 #include "pxr/usdImaging/usdImaging/primAdapter.h"
 
 #include "pxr/usd/usdGeom/xformCache.h"
@@ -33,20 +33,20 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 
-/// \class UsdImagingMetalDrawModeAdapter
+/// \class UsdImagingDrawModeAdapter
 ///
 /// Delegate support for the drawMode attribute on UsdGeomModelAPI.
 ///
-class UsdImagingMetalDrawModeAdapter : public UsdImagingPrimAdapter {
+class UsdImagingDrawModeAdapter : public UsdImagingPrimAdapter {
 public:
     typedef UsdImagingPrimAdapter BaseAdapter;
 
-    UsdImagingMetalDrawModeAdapter()
+    UsdImagingDrawModeAdapter()
         : UsdImagingPrimAdapter()
     {}
 
-    USDIMAGINGMETAL_API
-    virtual ~UsdImagingMetalDrawModeAdapter();
+    USDIMAGING_API
+    virtual ~UsdImagingDrawModeAdapter();
 
     /// Called to populate the RenderIndex for this UsdPrim. The adapter is
     /// expected to create one or more Rprims in the render index using the
@@ -74,14 +74,14 @@ public:
     /// \name Parallel Setup and Resolve
     // ---------------------------------------------------------------------- //
     
-    USDIMAGINGMETAL_API
+    USDIMAGING_API
     virtual void TrackVariability(UsdPrim const& prim,
                                   SdfPath const& cachePath,
                                   HdDirtyBits* timeVaryingBits,
                                   UsdImagingInstancerContext const* 
                                       instancerContext = NULL) const override;
 
-    USDIMAGINGMETAL_API
+    USDIMAGING_API
     virtual void UpdateForTime(UsdPrim const& prim,
                                SdfPath const& cachePath, 
                                UsdTimeCode time,
@@ -93,23 +93,23 @@ public:
     /// \name Change Processing 
     // ---------------------------------------------------------------------- //
 
-    USDIMAGINGMETAL_API
+    USDIMAGING_API
     virtual HdDirtyBits ProcessPropertyChange(UsdPrim const& prim,
                                               SdfPath const& cachePath, 
                                               TfToken const& property) override;
 
-    USDIMAGINGMETAL_API
+    USDIMAGING_API
     virtual void MarkDirty(UsdPrim const& prim,
                            SdfPath const& cachePath,
                            HdDirtyBits dirty,
                            UsdImagingIndexProxy* index) override;
 
-    USDIMAGINGMETAL_API
+    USDIMAGING_API
     virtual void MarkTransformDirty(UsdPrim const& prim,
                                     SdfPath const& cachePath,
                                     UsdImagingIndexProxy* index) override;
 
-    USDIMAGINGMETAL_API
+    USDIMAGING_API
     virtual void MarkVisibilityDirty(UsdPrim const& prim,
                                      SdfPath const& cachePath,
                                      UsdImagingIndexProxy* index) override;
@@ -125,7 +125,7 @@ public:
     GetTextureResource(UsdPrim const& usdPrim, SdfPath const &id, UsdTimeCode time) const override;
 
 protected:
-    USDIMAGINGMETAL_API
+    USDIMAGING_API
     virtual void _RemovePrim(SdfPath const& cachePath,
                              UsdImagingIndexProxy* index) override;
 
@@ -133,63 +133,63 @@ private:
     // For cards rendering, check if we're rendering any faces with 0 area;
     // if so, issue a warning.
     void _SanityCheckFaceSizes(SdfPath const& cachePath,
-                               GfRange3d const& extents, uint8_t axes_mask)
-    const;
-    
+                               GfRange3d const& extents, uint8_t axes_mask) 
+        const;
+
     // Check whether the given cachePath is a path to the draw mode material.
     bool _IsMaterialPath(SdfPath const& path) const;
     // Check whether the given cachePath is a path to a draw mode texture.
-    
+
     bool _IsTexturePath(SdfPath const& path) const;
     // Computes the extents of the given prim, using UsdGeomBBoxCache.
     // The extents are computed at UsdTimeCode::EarliestTime() (and are not
     // animated), and they are computed for purposes default/proxy/render.
     GfRange3d _ComputeExtent(UsdPrim const& prim) const;
-    
+
     // Returns the UsdGeomImagable "purpose" for this prim, including any
     // inherited purpose. Inherited values are strongest.
     TfToken _GetPurpose(UsdPrim const& prim, UsdTimeCode time) const;
-    
+
     // Returns the draw mode surface shader.
     std::string _GetSurfaceShaderSource() const;
-    
+
     // Generate geometry for "origin" draw mode.
     void _GenerateOriginGeometry(VtValue* topo, VtValue* points,
                                  GfRange3d const& extents) const;
-    
+
     // Generate geometry for "bounds" draw mode.
     void _GenerateBoundsGeometry(VtValue* topo, VtValue* points,
                                  GfRange3d const& extents) const;
-    
+
     // Generate geometry for "cards" draw mode, with cardGeometry "cross".
     void _GenerateCardsCrossGeometry(VtValue* topo, VtValue* points,
-                                     GfRange3d const& extents, uint8_t axes_mask) const;
-    
+            GfRange3d const& extents, uint8_t axes_mask) const;
+
     // Generate geometry for "cards" draw mode, with cardGeometry "box".
     void _GenerateCardsBoxGeometry(VtValue* topo, VtValue* points,
-                                   GfRange3d const& extents, uint8_t axes_mask) const;
-    
+            GfRange3d const& extents, uint8_t axes_mask) const;
+
     // Generate geometry for "cards" draw mode, with cardGeometry "fromTexture".
     void _GenerateCardsFromTextureGeometry(VtValue* topo, VtValue* points,
-                                           VtValue* uv, VtValue* assign, GfRange3d* extents,
-                                           UsdPrim const& prim) const;
-    
+            VtValue* uv, VtValue* assign, GfRange3d* extents,
+            UsdPrim const& prim) const;
+
     // Given an asset attribute pointing to a texture, pull the "worldtoscreen"
     // matrix out of image metadata.
     bool _GetMatrixFromImageMetadata(UsdAttribute const& attr, GfMatrix4d* mat)
-    const;
-    
+        const;
+
     // Generate texture coordinates for cards "cross"/"box" mode.
     void _GenerateTextureCoordinates(VtValue* uv, VtValue* assign,
                                      uint8_t axes_mask) const;
-    
+
     // Map from cachePath to what drawMode it was populated as.
     typedef TfHashMap<SdfPath, TfToken, SdfPath::Hash>
-    _DrawModeMap;
+        _DrawModeMap;
     _DrawModeMap _drawModeMap;
 };
 
 
 PXR_NAMESPACE_CLOSE_SCOPE
 
-#endif // USDIMAGINGMETAL_DRAW_MODE_ADAPTER_H
+#endif // USDIMAGING_DRAW_MODE_ADAPTER_H

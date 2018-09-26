@@ -21,15 +21,14 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#include "pxr/usdImaging/usdImagingGL/textureUtils.h"
+#include "pxr/usdImaging/usdImaging/textureUtils.h"
 
 #include "pxr/usdImaging/usdImaging/debugCodes.h"
 #include "pxr/usdImaging/usdImaging/delegate.h"
 #include "pxr/usdImaging/usdImaging/tokens.h"
 
-#include "pxr/imaging/glf/ptexTexture.h"
-
-#include "pxr/imaging/garch/glslfx.h"
+//#include "pxr/imaging/garch/glslfx.h"
+#include "pxr/imaging/garch/resourceFactory.h"
 #include "pxr/imaging/garch/textureHandle.h"
 #include "pxr/imaging/garch/textureRegistry.h"
 
@@ -127,7 +126,7 @@ static float _GetMemoryLimit(UsdPrim const &usdPrim)
 }
 
 HdTextureResource::ID
-UsdImagingGL_GetTextureResourceID(UsdPrim const& usdPrim,
+UsdImaging_GetTextureResourceID(UsdPrim const& usdPrim,
                                   SdfPath const& usdPath,
                                   UsdTimeCode time,
                                   size_t salt)
@@ -153,7 +152,7 @@ UsdImagingGL_GetTextureResourceID(UsdPrim const& usdPrim,
         filePath = TfToken(asset.GetAssetPath());
     }
 
-    const bool isPtex = GlfIsSupportedPtexTexture(filePath);
+    const bool isPtex = GarchResourceFactory::GetInstance()->IsSupportedPtexTexture(filePath);
 
     if (!TfPathExists(filePath)) {
         if (isPtex) {
@@ -193,7 +192,7 @@ UsdImagingGL_GetTextureResourceID(UsdPrim const& usdPrim,
 }
 
 HdTextureResourceSharedPtr
-UsdImagingGL_GetTextureResource(UsdPrim const& usdPrim,
+UsdImaging_GetTextureResource(UsdPrim const& usdPrim,
                                 SdfPath const& usdPath,
                                 UsdTimeCode time)
 {
@@ -228,7 +227,7 @@ UsdImagingGL_GetTextureResource(UsdPrim const& usdPrim,
         origin = GarchImage::ImageOriginLocation::OriginLowerLeft;
     }
 
-    const bool isPtex = GlfIsSupportedPtexTexture(filePath);
+    const bool isPtex = GarchResourceFactory::GetInstance()->IsSupportedPtexTexture(filePath);
 
     HdWrap wrapS = _GetWrapS(usdPrim);
     HdWrap wrapT = _GetWrapT(usdPrim);

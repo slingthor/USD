@@ -43,14 +43,14 @@ _GetShaderPath(char const * shader)
 }
 
 TfToken
-UsdImagingGLPackageDrawModeShader()
+UsdImagingPackageDrawModeShader()
 {
     static TfToken drawModeShader = _GetShaderPath("drawMode.glslfx");
     return drawModeShader;
 }
 
 TfToken
-UsdImagingGLPackagePreviewSurfaceShader()
+UsdImagingPackagePreviewSurfaceShader()
 {
     static TfToken previewSurface = _GetShaderPath("previewSurface.glslfx");
     return previewSurface;

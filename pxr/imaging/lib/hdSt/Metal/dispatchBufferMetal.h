@@ -1,5 +1,5 @@
 //
-// Copyright 2017 Pixar
+// Copyright 2016 Pixar
 //
 // Licensed under the Apache License, Version 2.0 (the "Apache License")
 // with the following modification; you may not use this file except in
@@ -21,22 +21,32 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#ifndef USDIMAGINGGL_PACKAGE_H
-#define USDIMAGINGGL_PACKAGE_H
+#ifndef HDST_DISPATCH_BUFFER_METAL_H
+#define HDST_DISPATCH_BUFFER_METAL_H
 
-#include "pxr/pxr.h"
-#include "pxr/usdImaging/usdImagingGL/api.h"
-#include "pxr/usdImaging/usdImagingGL/version.h"
-#include "pxr/base/tf/token.h"
+#include "pxr/imaging/hdSt/dispatchBuffer.h"
+
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-USDIMAGINGGL_API
-TfToken UsdImagingGLPackageDrawModeShader();
 
-USDIMAGINGGL_API
-TfToken UsdImagingGLPackagePreviewSurfaceShader();
+class HdStDispatchBufferMetal : public HdStDispatchBuffer {
+public:
+    /// Constructor. commandNumUints is given in how many integers.
+    HDST_API
+    HdStDispatchBufferMetal(TfToken const &role, int count,
+                            unsigned int commandNumUints);
+
+    /// Destructor.
+    HDST_API
+    virtual ~HdStDispatchBufferMetal();
+
+    /// Update entire buffer data
+    HDST_API
+    virtual void CopyData(std::vector<GLuint> const &data);
+};
+
 
 PXR_NAMESPACE_CLOSE_SCOPE
 
-#endif // USDIMAGINGGL_PACKAGE_H
+#endif  // HDST_DISPATCH_BUFFER_GL_H

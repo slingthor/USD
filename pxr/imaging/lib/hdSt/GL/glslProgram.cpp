@@ -33,6 +33,7 @@
 #include "pxr/imaging/hd/tokens.h"
 
 #include "pxr/imaging/glf/bindingMap.h"
+#include "pxr/imaging/glf/diagnostic.h"
 
 #include "pxr/imaging/garch/glslfx.h"
 
@@ -327,8 +328,11 @@ void HdStGLSLProgram::UnbindResources(HdStSurfaceShader* surfaceShader, HdSt_Res
 
 }
 
-void HdStGLSLProgram::SetProgram() {
-    
+void HdStGLSLProgram::SetProgram(char const* const label) {
+    if (label) {
+        GlfDebugLabelProgram(_program, label);
+    }
+    glUseProgram(_program);
 }
 
 void HdStGLSLProgram::UnsetProgram() {
@@ -367,6 +371,11 @@ void HdStGLSLProgram::DrawArraysInstanced(GLenum primitiveMode,
                                           GLint vertexCount,
                                           GLint instanceCount) const {
     glDrawArraysInstanced(primitiveMode, baseVertex, vertexCount, instanceCount);
+}
+
+std::string HdStGLSLProgram::GetComputeHeader() const
+{
+    return "#version 430\n";
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

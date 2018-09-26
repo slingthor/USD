@@ -1,5 +1,5 @@
 //
-// Copyright 2017 Pixar
+// Copyright 2016 Pixar
 //
 // Licensed under the Apache License, Version 2.0 (the "Apache License")
 // with the following modification; you may not use this file except in
@@ -21,39 +21,39 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#include "pxr/usdImaging/usdImagingMetal/package.h"
+#ifndef HDST_SMOOTH_NORMALS_METAL_H
+#define HDST_SMOOTH_NORMALS_METAL_H
 
-#include "pxr/base/plug/plugin.h"
-#include "pxr/base/plug/thisPlugin.h"
-#include "pxr/base/tf/diagnostic.h"
-#include "pxr/base/tf/fileUtils.h"
-#include "pxr/base/tf/stringUtils.h"
+#include "pxr/imaging/hdSt/smoothNormals.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-static TfToken
-_GetShaderPath(char const * shader)
-{
-    static PlugPluginPtr plugin = PLUG_THIS_PLUGIN;
-    const std::string path =
-        PlugFindPluginResource(plugin, TfStringCatPaths("shaders", shader));
-    TF_VERIFY(!path.empty(), "Could not find shader: %s\n", shader);
 
-    return TfToken(path);
-}
+/// smooth normal computation GPU
+///
+///
+class HdSt_SmoothNormalsComputationMetal : public HdSt_SmoothNormalsComputationGPU {
+public:
+    /// Constructor
+    /// @param topology 
+    HDST_API
+    HdSt_SmoothNormalsComputationMetal(Hd_VertexAdjacency const *adjacency,
+                                       TfToken const &srcName,
+                                       TfToken const &dstName,
+                                       HdType srcDataType,
+                                       HdType dstDataType);
 
-TfToken
-UsdImagingMetalPackageDrawModeShader()
-{
-    static TfToken drawModeShader = _GetShaderPath("drawMode.glslfx");
-    return drawModeShader;
-}
+protected:
+    HDST_API
+    virtual void _Execute(HdStProgramSharedPtr computeProgram,
+                          Uniform const &uniform,
+                          HdBufferResourceSharedPtr points,
+                          HdBufferResourceSharedPtr normals,
+                          HdBufferResourceSharedPtr adjacency,
+                          int numPoints) override;
+};
 
-TfToken
-UsdImagingMetalPackagePreviewSurfaceShader()
-{
-    static TfToken previewSurface = _GetShaderPath("previewSurface.glslfx");
-    return previewSurface;
-}
 
 PXR_NAMESPACE_CLOSE_SCOPE
+
+#endif // HDST_SMOOTH_NORMALS_METAL_H

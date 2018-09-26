@@ -625,6 +625,7 @@ HdSt_CodeGenMSL::_ParseGLSL(std::stringstream &source, InOutParams& inParams, In
     
     tags.push_back(TagSpec("\nout ", outParams, false));
     tags.push_back(TagSpec("\nin ", inParams, true));
+    int uniformIndex = tags.size();
     tags.push_back(TagSpec("\nuniform ", inParams, true));
     tags.push_back(TagSpec("\nlayout(std140) uniform ", inParams, true));
     
@@ -808,9 +809,12 @@ HdSt_CodeGenMSL::_ParseGLSL(std::stringstream &source, InOutParams& inParams, In
                     else if (!strncmp(typeStr, "sampler", 7)) {
                         usage = HdSt_CodeGenMSL::TParam::Sampler;
                     }
+                    else if (pass == uniformIndex) {//if (!strncmp(typeStr, "mat4", 7)) {
+                        usage = HdSt_CodeGenMSL::TParam::Uniform;
+                    }
 
                     if (nameStr[0] == '*') {
-                        result.replace(pos, 0, std::string("\ndevice const "));
+                        result.replace(pos, 0, std::string("\ndevice "));
                         usage |= HdSt_CodeGenMSL::TParam::EntryFuncArgument;
                         
                         // If this is a built-in type, we want to use global scope to access
@@ -3014,7 +3018,7 @@ HdSt_CodeGenMSL::_GenerateDrawingCoord()
     
     if (_metaData.drawingCoordIBinding.binding.IsValid()) {
         _EmitDeclaration(_genVS, _metaData.drawingCoordIBinding, TfToken(), /*arraySize=*/std::max(1, _metaData.instancerNumLevels));
-        _AddInputParam(_mslVSInputParams, _metaData.drawingCoordIBinding, TfToken(), /*arraySize=*/std::max(1, _metaData.instancerNumLevels));
+        _AddInputPtrParam(_mslVSInputParams, _metaData.drawingCoordIBinding);
     }
 
     // instance index indirection

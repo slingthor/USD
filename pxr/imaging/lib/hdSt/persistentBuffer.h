@@ -51,9 +51,11 @@ public:
     virtual ~HdStPersistentBuffer();
 
     /// Returns the mapped address
+    HDST_API
     virtual void * GetMappedAddress() const { return _mappedAddress; }
 
     /// Returns the GPU resource.
+    HDST_API
     HdResourceSharedPtr GetResource() const { return _resource; }
     
 protected:

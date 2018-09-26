@@ -12,14 +12,12 @@ pxr_library(usdImagingMetal
         work
         garch
         hd
-        hdx
         mtlf
         pxOsd
         sdf
         usd
         usdGeom
         usdShade
-        usdHydra
         usdImaging
         ar
         ${Boost_PYTHON_LIBRARY}
@@ -32,19 +30,13 @@ pxr_library(usdImagingMetal
         ${TBB_INCLUDE_DIRS}
 
     PUBLIC_CLASSES
-        drawModeAdapter
         engine
         metal
         hdEngine
-        hydraMaterialAdapter
-        package
 
     PUBLIC_HEADERS
         api.h
         version.h
-
-    PRIVATE_CLASSES
-        textureUtils
 
     PRIVATE_HEADERS
         unitTestMetalDrawing.h
@@ -61,8 +53,6 @@ pxr_library(usdImagingMetal
 
     RESOURCE_FILES
         plugInfo.json
-        shaders/drawMode.glslfx
-        shaders/previewSurface.glslfx
 )
 
 pxr_build_test(testUsdImagingMetalBasicDrawing

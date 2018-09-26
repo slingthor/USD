@@ -757,9 +757,27 @@ UsdImagingMetalHdEngine::Render(RenderParams params)
     MTLRenderPassDepthAttachmentDescriptor *depthAttachment = _mtlRenderPassDescriptor.depthAttachment;
     depthAttachment.texture = context->mtlDepthTexture;
 
-    // Create a render command encoder so we can render into something
-    TF_VERIFY(context->commandBuffer == nil, "Render: A command buffer is already active");
-
+    if (params.applyRenderState) {
+        glDisable(GL_BLEND);
+    }
+    
+    // Create a new command buffer for each render pass to the current drawable
+    context->CreateCommandBuffer(METALWORKQUEUE_DEFAULT);
+    context->LabelCommandBuffer(@"HdEngine CommandBuffer", METALWORKQUEUE_DEFAULT);
+    
+#pragma message("Unconditionally enabling GS buffer creation for now")
+    bool bGS = true;
+    
+    if (bGS) {
+        // Create a command buffer for the geometry shaders and make the default/render queue dependent on it completeing
+        context->CreateCommandBuffer(METALWORKQUEUE_GEOMETRY_SHADER);
+        context->LabelCommandBuffer(@"HdEngine CommandBuffer GS", METALWORKQUEUE_GEOMETRY_SHADER);
+        context->SetEventDependency(METALWORKQUEUE_DEFAULT);
+    }
+    
+    // Set the render pass descriptor to use for the render encoders
+    context->SetRenderPassDescriptor(_mtlRenderPassDescriptor);
+    
     // hydra orients all geometry during topological processing so that
     // front faces have ccw winding. We disable culling because culling
     // is handled by fragment shader discard.
@@ -770,16 +788,6 @@ UsdImagingMetalHdEngine::Render(RenderParams params)
     }
     context->setCullMode(MTLCullModeNone);
     
-    if (params.applyRenderState) {
-        glDisable(GL_BLEND);
-    }
-    
-    // Create a new command buffer for each render pass to the current drawable
-    id <MTLCommandBuffer> commandBuffer = context->CreateCommandBuffer();
-    commandBuffer.label = @"HdEngine CommandBuffer";
- 
-    id <MTLRenderCommandEncoder> renderEncoder = context->CreateRenderEncoder(_mtlRenderPassDescriptor);
-
     VtValue selectionValue(_selTracker);
     _engine.SetTaskContextData(HdxTokens->selectionState, selectionValue);
     VtValue renderTags(_renderTags);
@@ -788,146 +796,25 @@ UsdImagingMetalHdEngine::Render(RenderParams params)
     TfToken const& renderMode = params.enableIdRender ?
         HdxTaskSetTokens->idRender : HdxTaskSetTokens->colorRender;
     _engine.Execute(*_renderIndex, _taskController->GetTasks(renderMode));
-
-    context->EndEncoding();
-    
+   
     // Depth texture copy
-    NSUInteger exeWidth = context->computeDepthCopyProgramExecutionWidth;
-    MTLSize threadGroupCount = MTLSizeMake(16, exeWidth / 32, 1);
-    MTLSize threadGroups     = MTLSizeMake(context->mtlDepthTexture.width / threadGroupCount.width + 1,
-                                           context->mtlDepthTexture.height / threadGroupCount.height + 1, 1);
-
-    id <MTLComputeCommandEncoder> computeEncoder = [commandBuffer computeCommandEncoder];
+    context->CopyDepthTextureToOpenGL();
     
-    computeEncoder.label = @"Depth buffer copy";
-
-    [computeEncoder setComputePipelineState:context->computeDepthCopyPipelineState];
-    
-    [computeEncoder setTexture:context->mtlDepthTexture atIndex:0];
-    [computeEncoder setTexture:context->mtlDepthRegularFloatTexture atIndex:1];
-    
-    [computeEncoder dispatchThreadgroups:threadGroups threadsPerThreadgroup: threadGroupCount];
-    [computeEncoder endEncoding];
+    if (bGS) {
+        // Generate an event to indicate that the GS buffer has completed then commit it
+        context->GenerateEvent(METALWORKQUEUE_GEOMETRY_SHADER);
+        context->CommitCommandBuffer(false, false, METALWORKQUEUE_GEOMETRY_SHADER);
+    }
+    // Commit the render buffer (will wait for GS to complete if present)
+    context->CommitCommandBuffer(false, false);
     
     // Finalize rendering here & push the command buffer to the GPU
-    context->Commit();
     [sharedCaptureManager.defaultCaptureScope endScope];
-    
-    [commandBuffer waitUntilScheduled];
-
-    context->renderEncoder = nil;
-    context->computeEncoder = nil;
-    context->commandBuffer = nil;
-    //context->computeCommandBuffer = nil;
-
-    glPushAttrib(GL_ENABLE_BIT | GL_POLYGON_BIT | GL_DEPTH_BUFFER_BIT);
-
-    glEnable(GL_DEPTH_TEST);
-    glDepthMask(GL_TRUE);
-    glFrontFace(GL_CCW);
-    glDisable(GL_CULL_FACE);
-    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-
-    glUseProgram(context->glShaderProgram);
-
-    glBindBuffer(GL_ARRAY_BUFFER, context->glVBO);
-    
-    // Set up the vertex structure description
-    GLint posAttrib = glGetAttribLocation(context->glShaderProgram, "inPosition");
-    GLint texAttrib = glGetAttribLocation(context->glShaderProgram, "inTexCoord");
-    glEnableVertexAttribArray(posAttrib);
-    glVertexAttribPointer(posAttrib, 2, GL_FLOAT, GL_FALSE, sizeof(MtlfMetalContext::Vertex), (void*)(offsetof(Vertex, position)));
-    glEnableVertexAttribArray(texAttrib);
-    glVertexAttribPointer(texAttrib, 2, GL_FLOAT, GL_FALSE, sizeof(MtlfMetalContext::Vertex), (void*)(offsetof(Vertex, uv)));
-
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_RECTANGLE, context->glColorTexture);
-    glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_RECTANGLE, context->glDepthTexture);
+ 
+    context->BlitColorTargetToOpenGL();
     GLF_POST_PENDING_GL_ERRORS();
-
-    GLuint blitTexSizeUniform = glGetUniformLocation(context->glShaderProgram, "texSize");
-
-    glUniform2f(blitTexSizeUniform, context->mtlColorTexture.width, context->mtlColorTexture.height);
-
-    glDrawArrays(GL_TRIANGLES, 0, 6);
-    GLF_POST_PENDING_GL_ERRORS();
-    
-    glFlush();
-
-    glBindTexture(GL_TEXTURE_RECTANGLE, 0);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_RECTANGLE, 0);
-
-    glDisableVertexAttribArray(posAttrib);
-    glDisableVertexAttribArray(texAttrib);
-    glUseProgram(0);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-    
-    glPopAttrib();
 
     return;
-/*
-    // XXX: HdEngine should do this.
-    GLuint vao;
-    glGenVertexArrays(1, &vao);
-    glBindVertexArray(vao);
-    glBindVertexArray(0);
-
-    glPushAttrib(GL_ENABLE_BIT | GL_POLYGON_BIT | GL_DEPTH_BUFFER_BIT);
-
-    if (params.applyRenderState) {
-        glDisable(GL_BLEND);
-    }
-
-    // note: to get benefit of alpha-to-coverage, the target framebuffer
-    // has to be a MSAA buffer.
-    if (params.enableIdRender) {
-        glDisable(GL_SAMPLE_ALPHA_TO_COVERAGE);
-    } else if (params.enableSampleAlphaToCoverage) {
-        glEnable(GL_SAMPLE_ALPHA_TO_COVERAGE);
-    }
-
-    // for points width
-    glEnable(GL_PROGRAM_POINT_SIZE);
-
-    // TODO:
-    //  * forceRefresh
-    //  * showGuides, showRender, showProxy
-    //  * gammaCorrectColors
-
-    if (params.applyRenderState) {
-        // drawmode.
-        // XXX: Temporary solution until shader-based styling implemented.
-        switch (params.drawMode) {
-        case DRAW_POINTS:
-            glPolygonMode(GL_FRONT_AND_BACK, GL_POINT);
-            break;
-        default:
-            glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-            break;
-        }
-    }
-
-    glBindVertexArray(vao);
-
-    VtValue selectionValue(_selTracker);
-    _engine.SetTaskContextData(HdxTokens->selectionState, selectionValue);
-    VtValue renderTags(_renderTags);
-    _engine.SetTaskContextData(HdxTokens->renderTags, renderTags);
-
-    TfToken const& renderMode = params.enableIdRender ?
-        HdxTaskSetTokens->idRender : HdxTaskSetTokens->colorRender;
-    _engine.Execute(*_renderIndex, _taskController->GetTasks(renderMode));
-
-    glBindVertexArray(0);
-
-    glPopAttrib(); // GL_ENABLE_BIT | GL_POLYGON_BIT | GL_DEPTH_BUFFER_BIT
-
-    // XXX: We should not delete the VAO on every draw call, but we currently
-    // must because it is GL Context state and we do not control the context.
-    glDeleteVertexArrays(1, &vao);
-    */
 }
 
 /*virtual*/

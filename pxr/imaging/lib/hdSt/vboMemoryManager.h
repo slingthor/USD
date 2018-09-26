@@ -68,10 +68,12 @@ public:
         HdBufferSpecVector const &bufferSpecs) const;
 
     /// Returns the buffer specs from a given buffer array
+    HDST_API
     virtual HdBufferSpecVector GetBufferSpecs(
         HdBufferArraySharedPtr const &bufferArray) const;
 
     /// Returns the size of the GPU memory used by the passed buffer array
+    HDST_API
     virtual size_t GetResourceAllocation(
         HdBufferArraySharedPtr const &bufferArray, 
         VtDictionary &result) const;
@@ -86,6 +88,7 @@ public:
     class _StripedBufferArrayRange : public HdBufferArrayRange {
     public:
         /// Constructor.
+        HDST_API
         _StripedBufferArrayRange()
          : _stripedBufferArray(nullptr),
            _offset(0),
@@ -99,6 +102,7 @@ public:
         virtual ~_StripedBufferArrayRange();
 
         /// Returns true if this range is valid
+        HDST_API
         virtual bool IsValid() const override {
             return (bool)_stripedBufferArray;
         }
@@ -108,6 +112,7 @@ public:
         virtual bool IsAssigned() const override;
 
         /// Returns true if this bar is marked as immutable.
+        HDST_API
         virtual bool IsImmutable() const override;
 
         /// Resize memory area for this range. Returns true if it causes container
@@ -124,11 +129,13 @@ public:
         virtual VtValue ReadData(TfToken const &name) const override;
 
         /// Returns the relative offset in aggregated buffer
+        HDST_API
         virtual int GetOffset() const override {
             return _offset;
         }
 
         /// Returns the index for this range
+        HDST_API
         virtual int GetIndex() const override {
             // note: range doesn't store index, so we need to sweep rangeLists
             // to find the index of this range.
@@ -138,16 +145,19 @@ public:
         }
 
         /// Returns the number of elements
+        HDST_API
         virtual size_t GetNumElements() const override {
             return _numElements;
         }
 
         /// Returns the version of the buffer array.
+        HDST_API
         virtual size_t GetVersion() const override {
             return _stripedBufferArray->GetVersion();
         }
 
         /// Increment the version of the buffer array.
+        HDST_API
         virtual void IncrementVersion() override {
             _stripedBufferArray->IncrementVersion();
         }
@@ -173,7 +183,7 @@ public:
         HDST_API
         virtual void SetBufferArray(HdBufferArray *bufferArray) override;
 
-        HD_API
+        HDST_API
         virtual void GetBufferSpecs(HdBufferSpecVector *bufferSpecs) const override {}
 
         /// Debug dump
@@ -181,26 +191,31 @@ public:
         virtual void DebugDump(std::ostream &out) const override;
 
         /// Set the relative offset for this range.
+        HDST_API
         void SetOffset(int offset) {
             _offset = offset;
         }
 
         /// Set the number of elements for this range.
+        HDST_API
         void SetNumElements(int numElements) {
             _numElements = numElements;
         }
 
         /// Returns the capacity of allocated area
+        HDST_API
         int GetCapacity() const {
             return _capacity;
         }
 
         /// Set the capacity of allocated area for this range.
+        HDST_API
         void SetCapacity(int capacity) {
             _capacity = capacity;
         }
 
         /// Make this range invalid
+        HDST_API
         void Invalidate() {
             _stripedBufferArray = NULL;
         }
@@ -261,11 +276,13 @@ public:
         virtual size_t GetMaxNumElements() const;
 
         /// Mark to perform reallocation on Reallocate()
+        HDST_API
         void SetNeedsReallocation() {
             _needsReallocation = true;
         }
 
         /// Mark to perform compaction on GarbageCollect()
+        HDST_API
         void SetNeedsCompaction() {
             _needsCompaction = true;
         }
@@ -288,6 +305,7 @@ public:
         HdBufferResourceSharedPtr GetResource(TfToken const& name);
 
         /// Returns the list of all named GPU resources for this bufferArray.
+        HDST_API
         HdBufferResourceNamedList const& GetResources() const
             {return _resourceList;}
 

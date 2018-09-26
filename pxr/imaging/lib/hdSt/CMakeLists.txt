@@ -23,6 +23,7 @@ if (APPLE)
     set(GFXADDITIONAL   Metal/bufferRelocatorMetal
                         Metal/bufferResourceMetal
                         Metal/codeGenMSL
+                        Metal/dispatchBufferMetal
                         Metal/drawTargetTextureResourceMetal
                         Metal/indirectDrawBatchMetal
                         Metal/interleavedMemoryBufferMetal
@@ -34,6 +35,7 @@ if (APPLE)
                         Metal/renderPassStateMetal
                         Metal/resourceBinderMetal
                         Metal/resourceMetal
+                        Metal/smoothNormalsMetal
                         Metal/textureResourceMetal
                         Metal/vboMemoryBufferMetal
                         Metal/vboSimpleMemoryBufferMetal)
@@ -132,6 +134,7 @@ pxr_library(hdSt
         GL/bufferRelocatorGL
         GL/bufferResourceGL
         GL/codeGenGLSL
+        GL/dispatchBufferGL
         GL/glConversions
         GL/drawTargetTextureResourceGL
         GL/glslProgram
@@ -143,6 +146,7 @@ pxr_library(hdSt
         GL/renderPassStateGL
         GL/resourceBinderGL
         GL/resourceGL
+        GL/smoothNormalsGL
         GL/textureResourceGL
         GL/vboMemoryBufferGL
         GL/vboSimpleMemoryBufferGL

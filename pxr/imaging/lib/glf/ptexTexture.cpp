@@ -31,21 +31,6 @@
 
 #include "pxr/base/tf/stringUtils.h"
 
-
-PXR_NAMESPACE_OPEN_SCOPE
-
-bool GlfIsSupportedPtexTexture(std::string const & imageFilePath)
-{
-#ifdef PXR_PTEX_SUPPORT_ENABLED
-    return (TfStringEndsWith(imageFilePath, ".ptx") || 
-            TfStringEndsWith(imageFilePath, ".ptex"));
-#else
-    return false;
-#endif
-}
-
-PXR_NAMESPACE_CLOSE_SCOPE
-
 #ifdef PXR_PTEX_SUPPORT_ENABLED
 
 #include "pxr/imaging/glf/diagnostic.h"
@@ -285,7 +270,7 @@ GlfPtexTexture::GetBindings(TfToken const & identifier, GarchSamplerGPUHandle sa
     // packing buffer doesn't need external sampler
     result.push_back(Binding(
         TfToken(identifier.GetString() + "_Packing"), GarchTextureTokens->layout,
-        GL_TEXTURE_BUFFER, _layout, nil));
+        GL_TEXTURE_BUFFER, _layout, GarchSamplerGPUHandle()));
 
     return result;
 }

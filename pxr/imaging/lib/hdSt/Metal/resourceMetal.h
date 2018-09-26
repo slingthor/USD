@@ -45,16 +45,17 @@ typedef boost::shared_ptr<class HdStResourceMetal> HdStResourceMetalSharedPtr;
 ///
 class HdStResourceMetal : public HdResource {
 public:
-    HD_API
+    HDST_API
     HdStResourceMetal(TfToken const & role);
-    HD_API
+    HDST_API
     virtual ~HdStResourceMetal();
 
     /// The Metal object for this resource and its size
-    HD_API
+    HDST_API
     virtual void SetAllocation(HdResourceGPUHandle resId, size_t size);
 
     /// Returns the id of the GPU resource
+    HDST_API
     virtual HdResourceGPUHandle GetId() const { return _id; }
 
 private:

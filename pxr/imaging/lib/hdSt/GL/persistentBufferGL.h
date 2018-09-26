@@ -43,12 +43,13 @@ typedef boost::shared_ptr<class HdStPersistentBufferGL> HdStPersistentBufferGLSh
 ///
 class HdStPersistentBufferGL : public HdStResourceGL, public HdStPersistentBuffer {
 public:
-    HD_API
+    HDST_API
     HdStPersistentBufferGL(TfToken const &role, size_t dataSize, void* data);
-    HD_API
+    HDST_API
     virtual ~HdStPersistentBufferGL();
 
     /// Returns the mapped address
+    HDST_API
     virtual void * GetMappedAddress() const override { return _mappedAddress; }
 
 private:

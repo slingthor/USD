@@ -98,11 +98,7 @@ HdStProgram::GetComputeProgram(
         HdStProgramSharedPtr newProgram(HdStProgram::New(HdTokens->computeShader));
         boost::scoped_ptr<GLSLFX> glslfx(new GLSLFX(HdStPackageComputeShader()));
 
-#if defined(ARCH_GFX_METAL)
-        std::string header = "#include <metal_stdlib>\nusing namespace metal;\n";
-#else
-        std::string header = "#version 430\n";
-#endif
+        std::string header = newProgram->GetComputeHeader();
         if (!newProgram->CompileShader(
                 GL_COMPUTE_SHADER, header + glslfx->GetSource(shaderToken))) {
             TF_CODING_ERROR("Fail to compile " + shaderToken.GetString());

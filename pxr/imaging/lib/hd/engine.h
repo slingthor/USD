@@ -83,6 +83,7 @@ public:
     void ReloadAllShaders(HdRenderIndex& index);
 
     /// Returns the current renderAPI in use
+    HD_API
     static RenderAPI GetRenderAPI() { return _renderAPI; }
 
 private:
