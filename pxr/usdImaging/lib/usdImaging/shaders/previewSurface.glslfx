@@ -19,10 +19,18 @@
 
 -- glsl Preview.Displacement
 
+#ifndef GETVALUE
+ #if defined(ARCH_GFX_METAL)
+  #define GETVALUE(val)   val
+ #else
+  #define GETVALUE(val)   val.x
+ #endif
+#endif
+
 vec4 displacementShader(int index, vec4 Peye, vec3 Neye, vec4 patchCoord)
 {
     // Calculate scalar displacement.
-    float texDisplacement = HdGet_displacement().x;
+    float texDisplacement = GETVALUE(HdGet_displacement());
     return Peye + vec4(Neye*texDisplacement, 0);
 }
 
@@ -30,9 +38,9 @@ vec4 displacementShader(int index, vec4 Peye, vec3 Neye, vec4 patchCoord)
 -- glsl Preview.Surface
 
 #if defined(ARCH_GFX_METAL)
-#define GETVALUE(val)   val.x
-#else
 #define GETVALUE(val)   val
+#else
+#define GETVALUE(val)   val.x
 #endif
 
 vec4 surfaceShader(vec4 Peye, vec3 Neye, vec4 color, vec4 patchCoord)
