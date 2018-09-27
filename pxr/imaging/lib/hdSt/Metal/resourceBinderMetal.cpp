@@ -141,10 +141,6 @@ HdSt_ResourceBinderMetal::BindBuffer(TfToken const &name,
     // the instanceIndex is empty (e.g. FX points. see bug 120354)
     if (!buffer->GetId().IsSet())
         return;
-
-    HdBinding uniformLocation = GetBinding(name);
-    if (uniformLocation.GetLocation() == HdBinding::NOT_EXIST)
-        return;
     
     uint32 typeMask = kMSL_BindingType_VertexAttribute | kMSL_BindingType_UniformBuffer | kMSL_BindingType_IndexBuffer;
     uint i = 0;

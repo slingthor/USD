@@ -176,10 +176,10 @@ id<MTLDevice> MtlfMetalContext::GetMetalDevice(PREFERRED_GPU_TYPE preferredGPUTy
 // MtlfMetalContext
 //
 
-MtlfMetalContext::MtlfMetalContext()
+MtlfMetalContext::MtlfMetalContext() : enableMVA(false), enableComputeGS(false)
 {
     // Select Intel GPU if possible due to current issues on AMD. Revert when fixed - MTL_FIXME
-	device = MtlfMetalContext::GetMetalDevice(PREFER_DEFAULT_GPU);
+	device = MtlfMetalContext::GetMetalDevice(PREFER_INTEGRATED_GPU);
 
     NSLog(@"Selected %@ for Metal Device", device.name);
     
@@ -194,8 +194,6 @@ MtlfMetalContext::MtlfMetalContext()
     // Reset GS state
     computeGSOutputCurrentIdx    = 0;
     computeGSOutputCurrentOffset = 0;
-    usingComputeGS               = false;
-    
     
     NSOperatingSystemVersion minimumSupportedOSVersion = { .majorVersion = 10, .minorVersion = 14, .patchVersion = 0 };
     concurrentDispatchSupported = [NSProcessInfo.processInfo isOperatingSystemAtLeastVersion:minimumSupportedOSVersion];
@@ -654,29 +652,30 @@ void MtlfMetalContext::setCullMode(MTLCullMode _cullMode)
     dirtyRenderState |= DIRTY_METALRENDERSTATE_CULLMODE_WINDINGORDER;
 }
 
-void MtlfMetalContext::SetShadingPrograms(id<MTLFunction> vertexFunction, id<MTLFunction> fragmentFunction,  id<MTLFunction> computeFunction, id<MTLFunction> computeGSFunction)
+void MtlfMetalContext::SetShadingPrograms(id<MTLFunction> vertexFunction, id<MTLFunction> fragmentFunction,  id<MTLFunction> computeFunction, bool _enableMVA, bool _enableComputeGS)
 {
     CheckNewStateGather();
     
     renderPipelineStateDescriptor.vertexFunction   = vertexFunction;
     renderPipelineStateDescriptor.fragmentFunction = fragmentFunction;
     
-    if (fragmentFunction == nil) {
+    if (computeFunction) {
+        computePipelineStateDescriptor.computeFunction = computeFunction;
+    }
+    else if (fragmentFunction == nil) {
         renderPipelineStateDescriptor.rasterizationEnabled = false;
     }
     else {
         renderPipelineStateDescriptor.rasterizationEnabled = true;
     }
+
+    enableMVA = _enableMVA;
+    enableComputeGS = _enableComputeGS;
     
-    usingComputeGS = false;
-    
-    if (computeFunction) {
-        computePipelineStateDescriptor.computeFunction = computeFunction;
-    }
-    else if(computeGSFunction) {
-        computePipelineStateDescriptor.computeFunction = computeGSFunction;
-        usingComputeGS = true;
-    }
+    if(enableComputeGS && !enableMVA)
+        TF_FATAL_CODING_ERROR("Manual Vertex Assembly must be enabled when using a Compute Geometry Shader!");
+    if(enableComputeGS && (!computeFunction || !vertexFunction))
+        TF_FATAL_CODING_ERROR("Compute and Vertex functions must be set when using a Compute Geometry Shader!");
 }
 
 void MtlfMetalContext::SetVertexAttribute(uint32_t index,
@@ -686,6 +685,9 @@ void MtlfMetalContext::SetVertexAttribute(uint32_t index,
                                           uint32_t offset,
                                           const TfToken& name)
 {
+    if (enableMVA)  //Setting vertex attributes means nothing when Manual Vertex Assembly is enabled.
+        return;
+
     if (!vertexDescriptor)
     {
         vertexDescriptor = [[MTLVertexDescriptor alloc] init];
@@ -728,48 +730,38 @@ void MtlfMetalContext::SetVertexAttribute(uint32_t index,
     dirtyRenderState |= DIRTY_METALRENDERSTATE_VERTEX_DESCRIPTOR;
 }
 
-void MtlfMetalContext::SetupComputeGS( UInt32 indexBufferSlot, id<MTLBuffer> indexBuffer, UInt32 indexCount, UInt32 startIndex, UInt32 baseVertex,
-                                       UInt32 geometryOutputStructSize, UInt32 argumentBufferSlot, UInt32 outputBufferSlot)
-{
-    MetalWorkQueue *wq   = currentWorkQueue;
-    MetalWorkQueue *gswq = &workQueues[METALWORKQUEUE_GEOMETRY_SHADER];
-    
-    // Get a compute encoder on the Geometry Shader work queue
-    id <MTLComputeCommandEncoder> computeEncoder = GetComputeEncoder(METALWORKQUEUE_GEOMETRY_SHADER);
-    
-    if(!usingComputeGS)
-        TF_FATAL_CODING_ERROR("SetupComputeGS being called without having supplied a CS");
-
-    [computeEncoder setBuffer:indexBuffer offset:(startIndex * sizeof(UInt32)) atIndex:indexBufferSlot];
-    computePipelineStateDescriptor.buffers[indexBufferSlot].mutability = MTLMutabilityImmutable;
-
-    struct { UInt32 _indexCount, _baseVertex; } arguments = { indexCount, baseVertex };
-    [computeEncoder setBytes:(const void*)&arguments length:sizeof(arguments) atIndex:argumentBufferSlot];
-    computePipelineStateDescriptor.buffers[argumentBufferSlot].mutability = MTLMutabilityImmutable;
-    
-    const UInt32 bufferSize = 100 * 1024 * 1024; //100 MiB
-    UInt32 geometryDataSize = geometryOutputStructSize * (indexCount / 3);
-    if(geometryDataSize > bufferSize)
-        TF_FATAL_CODING_ERROR("Too large!");
-    if(bufferSize - computeGSOutputCurrentOffset < geometryDataSize) {
-        computeGSOutputCurrentIdx++;
-        computeGSOutputCurrentOffset = 0;
-    }
-    if(computeGSOutputCurrentIdx >= computeGSOutputBuffers.size())
-        computeGSOutputBuffers.push_back([device newBufferWithLength:bufferSize options:MTLResourceStorageModePrivate|MTLResourceOptionCPUCacheModeDefault]);
-    id<MTLBuffer> outputBuffer = computeGSOutputBuffers[computeGSOutputCurrentIdx];
-    [computeEncoder setBuffer:outputBuffer offset:computeGSOutputCurrentOffset atIndex:outputBufferSlot];
-    computePipelineStateDescriptor.buffers[outputBufferSlot].mutability = MTLMutabilityMutable;
-    
-    [wq->currentRenderEncoder setVertexBuffer:indexBuffer offset:(startIndex * sizeof(UInt32)) atIndex:indexBufferSlot];
-    [wq->currentRenderEncoder setVertexBuffer:outputBuffer offset:computeGSOutputCurrentOffset atIndex:outputBufferSlot];
-    [wq->currentRenderEncoder setFragmentBuffer:outputBuffer offset:computeGSOutputCurrentOffset atIndex:1];
-    
-    computeGSOutputCurrentOffset += geometryDataSize;
-    
-    // Release the geometry shader encoder 
-    ReleaseEncoder(false, METALWORKQUEUE_GEOMETRY_SHADER);
-}
+//void MtlfMetalContext::SetDrawArgsBuffer(int indexCount, int startIndex, int baseVertex, int drawArgBufferSlot, bool setupForCompute) {
+//    struct { int _indexCount, _startIndex, _baseVertex; } drawArgs = { indexCount, startIndex, baseVertex };
+//    [renderEncoder setVertexBytes:(const void*)&drawArgs length:sizeof(drawArgs) atIndex:drawArgBufferSlot];
+//    if(setupForCompute) {
+//        [computeEncoder setBytes:(const void*)&drawArgs length:sizeof(drawArgs) atIndex:drawArgBufferSlot];
+//        computePipelineStateDescriptor.buffers[drawArgBufferSlot].mutability = MTLMutabilityImmutable;
+//    }
+//    
+//    //MTL_FIXME: MERGE
+//}
+//
+//void MtlfMetalContext::SetComputeGSOutputBuffers(int indexCount, int perVertStructSize, int perPrimStructSize, int perVertBufferSlot, int perPrimBufferSlot) {
+//    //MTL_FIXME: Would like to prevent re-creating the buffers each draw-call. Would be better to add a cache of old buffers.
+//    //           Would be even better if alternate compute/render is implemented with cut up draws to keep GS output in L2. Re-
+//    //           -use would then be possible with a single constant size buffer (sized to whatever is favorable for L2).
+//    
+//    const int vertDataSize(perVertStructSize * indexCount),
+//              primDataSize(perPrimStructSize * (indexCount / 3));
+//    id<MTLBuffer> vertBuffer = [device newBufferWithLength:vertDataSize options:MTLResourceStorageModePrivate|MTLResourceOptionCPUCacheModeDefault];
+//    id<MTLBuffer> primBuffer = [device newBufferWithLength:primDataSize options:MTLResourceStorageModePrivate|MTLResourceOptionCPUCacheModeDefault];
+//    
+//    [computeEncoder setBuffer:vertBuffer offset:0 atIndex:perVertBufferSlot];
+//    computePipelineStateDescriptor.buffers[perVertBufferSlot].mutability = MTLMutabilityMutable;
+//    [computeEncoder setBuffer:primBuffer offset:0 atIndex:perPrimBufferSlot];
+//    computePipelineStateDescriptor.buffers[perPrimBufferSlot].mutability = MTLMutabilityMutable;
+//    [renderEncoder setVertexBuffer:vertBuffer offset:0 atIndex:perVertBufferSlot];
+//    [renderEncoder setVertexBuffer:primBuffer offset:0 atIndex:perPrimBufferSlot];
+//    [renderEncoder setFragmentBuffer:vertBuffer offset:0 atIndex:perVertBufferSlot];
+//    [renderEncoder setFragmentBuffer:primBuffer offset:0 atIndex:perPrimBufferSlot];
+//    
+//    //MTL_FIXME: MERGE
+//}
 
 // I think this can be removed didn't seem to make too much difference to speeds
 void copyUniform(uint8 *dest, uint8 *src, uint32 size)
@@ -972,7 +964,7 @@ void MtlfMetalContext::SetPipelineState()
     renderPipelineStateDescriptor.tessellationOutputWindingOrder    = MTLWindingCounterClockwise;
     renderPipelineStateDescriptor.tessellationPartitionMode         = MTLTessellationPartitionModePow2;
 #endif
-    if (usingComputeGS)
+    if (enableMVA)
         renderPipelineStateDescriptor.vertexDescriptor = nil;
     else {
         if (dirtyRenderState & DIRTY_METALRENDERSTATE_VERTEX_DESCRIPTOR || renderPipelineStateDescriptor.vertexDescriptor == NULL) {
@@ -1099,7 +1091,7 @@ void MtlfMetalContext::SetRenderEncoderState()
     id <MTLComputeCommandEncoder> computeEncoder;
     
     // Get a compute encoder on the Geometry Shader work queue
-    if(usingComputeGS) {
+    if(enableComputeGS) {
         computeEncoder = GetComputeEncoder(METALWORKQUEUE_GEOMETRY_SHADER);
     }
     
@@ -1130,7 +1122,7 @@ void MtlfMetalContext::SetRenderEncoderState()
             // Only output if this buffer was modified
             if (buffer->modified) {
                 if(buffer->stage == kMSL_ProgramStage_Vertex){
-                    if(usingComputeGS) {
+                    if(enableComputeGS) {
                         [computeEncoder setBuffer:buffer->buffer offset:buffer->offset atIndex:buffer->index];
                         computePipelineStateDescriptor.buffers[buffer->index].mutability = MTLMutabilityImmutable;
                     }
@@ -1140,7 +1132,12 @@ void MtlfMetalContext::SetRenderEncoderState()
                     [wq->currentRenderEncoder setFragmentBuffer:buffer->buffer offset:buffer->offset atIndex:buffer->index];
                 }
                 else{
-                    TF_FATAL_CODING_ERROR("Not implemented!"); //Compute case
+                    if(enableComputeGS) {
+                        [computeEncoder setBuffer:buffer->buffer offset:buffer->offset atIndex:buffer->index];
+                        computePipelineStateDescriptor.buffers[buffer->index].mutability = MTLMutabilityImmutable;
+                    }
+                    else
+                        TF_FATAL_CODING_ERROR("Compute Geometry Shader should be enabled when modifying Compute buffers!");
                 }
                 buffer->modified = false;
             }
@@ -1164,7 +1161,7 @@ void MtlfMetalContext::SetRenderEncoderState()
     if (dirtyRenderState & DIRTY_METALRENDERSTATE_TEXTURE) {
         for(auto texture : textures) {
             if(texture.stage == kMSL_ProgramStage_Vertex) {
-                if(usingComputeGS) {
+                if(enableComputeGS) {
                     [computeEncoder setTexture:texture.texture atIndex:texture.index];
                 }
                 [wq->currentRenderEncoder setVertexTexture:texture.texture atIndex:texture.index];
@@ -1179,7 +1176,7 @@ void MtlfMetalContext::SetRenderEncoderState()
     if (dirtyRenderState & DIRTY_METALRENDERSTATE_SAMPLER) {
         for(auto sampler : samplers) {
             if(sampler.stage == kMSL_ProgramStage_Vertex) {
-                if(usingComputeGS) {
+                if(enableComputeGS) {
                     [computeEncoder setSamplerState:sampler.sampler atIndex:sampler.index];
                 }
                 [wq->currentRenderEncoder setVertexSamplerState:sampler.sampler atIndex:sampler.index];
@@ -1192,7 +1189,8 @@ void MtlfMetalContext::SetRenderEncoderState()
         dirtyRenderState &= ~DIRTY_METALRENDERSTATE_SAMPLER;
     }
     
-    if(usingComputeGS) {
+    //MTL_FIXME: We should cache compute pipelines like we cache render pipelines.
+    if(enableComputeGS) {
         NSError *error = NULL;
         MTLAutoreleasedComputePipelineReflection* reflData = 0;
         computePipelineState = [device newComputePipelineStateWithDescriptor:computePipelineStateDescriptor options:MTLPipelineOptionNone reflection:reflData error:&error];
@@ -1318,6 +1316,11 @@ void MtlfMetalContext::SetComputeEncoderState(id<MTLFunction> computeFunction, u
         [wq->currentComputeEncoder setComputePipelineState:computePipelineState];
         wq->currentComputePipelineState = computePipelineState;
     }
+}
+
+void MtlfMetalContext::SetComputeBufferMutability(int index, bool isMutable)
+{
+    computePipelineStateDescriptor.buffers[index].mutability = isMutable ? MTLMutabilityMutable : MTLMutabilityImmutable;
 }
 
 void MtlfMetalContext::ResetEncoders(MetalWorkQueueType workQueueType)

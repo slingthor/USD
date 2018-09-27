@@ -109,11 +109,13 @@ const MSL_ShaderBinding& MSL_FindBinding(const MSL_ShaderBindingMap& bindings, c
 HdStMSLProgram::HdStMSLProgram(TfToken const &role)
 : HdStProgram(role)
 , _role(role)
-, _vertexFunction(nil), _fragmentFunction(nil), _computeFunction(nil), _computeGeometryFunction(nil), _vertexPassThroughFunction(nil)
-, _vertexFunctionIdx(0), _fragmentFunctionIdx(0), _computeFunctionIdx(0), _computeGeometryFunctionIdx(0), _vertexPassThroughFunctionIdx(0)
+, _vertexFunction(nil), _fragmentFunction(nil), _computeFunction(nil), _computeGeometryFunction(nil)
+, _vertexFunctionIdx(0), _fragmentFunctionIdx(0), _computeFunctionIdx(0), _computeGeometryFunctionIdx(0)
 , _valid(false)
 , _uniformBuffer(role)
-, _enableComputeGSPath(false), _computeGSArgSlot(-1), _computeGSIndexSlot(-1), _computeGSOutputSlot(-1)
+, _buildTarget(kMSL_BuildTarget_Regular)
+, _gsVertOutBufferSlot(-1), _gsPrimOutBufferSlot(-1), _gsVertOutStructSize(-1), _gsPrimOutStructSize(-1)
+, _drawArgsSlot(-1), _indicesSlot(-1)
 , _currentlySet(false)
 {
 }
@@ -136,8 +138,16 @@ HdStMSLProgram::~HdStMSLProgram()
 
 NSUInteger dumpedFileCount = 0;
 
-void DumpMetalSource(NSString *metalSrc, NSString *fileSuffix, NSString *compilerMessages)
+const HdStProgram* previousProgram = 0;
+NSUInteger totalPrograms = 0;
+
+void DumpMetalSource(const HdStProgram* program, NSString *metalSrc, NSString *fileSuffix, NSString *compilerMessages)
 {
+    if(program != previousProgram) {
+        previousProgram = program;
+        totalPrograms++;
+    }
+
     NSFileManager *fileManager= [NSFileManager defaultManager];
     
     NSURL *applicationDocumentsDirectory = [[fileManager URLsForDirectory:NSDocumentDirectory inDomains:NSUserDomainMask] lastObject];
@@ -160,13 +170,13 @@ void DumpMetalSource(NSString *metalSrc, NSString *fileSuffix, NSString *compile
     }
     fileContents = [fileContents stringByAppendingString:metalSrc];
     
-    NSString *fileName = [NSString stringWithFormat:@"HydraMetalSource_%lu_%@.metal", dumpedFileCount++, fileSuffix];
+    NSString *fileName = [NSString stringWithFormat:@"HydraMetalSource_%lu_%lu_%@.metal", totalPrograms, dumpedFileCount++, fileSuffix];
     NSString *srcDumpFilePath = [srcDumpLocation stringByAppendingPathComponent:fileName];
     [fileContents writeToFile:srcDumpFilePath atomically:YES encoding:NSUTF8StringEncoding error:nil];
     NSLog(@"Dumping Metal Source to %@", srcDumpFilePath);
 }
 #else
-#define DumpMetalSource(a, b)
+#define DumpMetalSource(a, b, c, d)
 #endif
 
 bool
@@ -187,7 +197,7 @@ HdStMSLProgram::CompileShader(GLenum type,
         case GL_TESS_EVALUATION_SHADER:
             //TF_CODING_ERROR("Unsupported shader type on Metal %d\n", type);
             NSLog(@"Unsupported shader type on Metal %d\n", type); //MTL_FIXME - remove the above error so it doesn't propogate all the way back but really we should never see these types of shaders
-            DumpMetalSource([NSString stringWithUTF8String:shaderSource.c_str()], @"InvalidType", nil); //MTL_FIXME
+            DumpMetalSource(this, [NSString stringWithUTF8String:shaderSource.c_str()], @"InvalidType", nil); //MTL_FIXME
             return true;
         default:
             break;
@@ -197,92 +207,66 @@ HdStMSLProgram::CompileShader(GLenum type,
     NSError *error = NULL;
     id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->device;
     
-    const bool generateComputeGSShaders = (type == GL_GEOMETRY_SHADER);
-    UInt32 numShaders = generateComputeGSShaders ? 3 : 1;
     bool success = true;
-    for(UInt32 i = 0; i < numShaders; i++)
-    {
-        const bool buildingForComputeGSPath = i > 0;
-        const bool buildingPassThroughVS = i == 2;
-        GLenum compileType = type;
-        if(generateComputeGSShaders) {
-            if(buildingForComputeGSPath)
-                compileType = buildingPassThroughVS ? GL_VERTEX_SHADER : GL_COMPUTE_SHADER;
-            else
-                compileType = GL_VERTEX_SHADER;
-        }
-        NSString *entryPoint = nil;
-        switch (compileType) {
-        case GL_VERTEX_SHADER: shaderType = "Vertex Shader"; entryPoint = (buildingPassThroughVS ? @"vertexPassThroughEntryPoint" : @"vertexEntryPoint"); break;
-        case GL_FRAGMENT_SHADER: shaderType = "Fragment Shader"; entryPoint = @"fragmentEntryPoint"; break;
-        case GL_COMPUTE_SHADER: shaderType = "Compute Shader"; entryPoint = @"computeEntryPoint"; break;
-        default: TF_FATAL_CODING_ERROR("Not allowed!");
-        }
-        
-        if (TfDebug::IsEnabled(HD_DUMP_SHADER_SOURCE)) {
-            std::cout   << "--------- " << shaderType << " ----------\n"
-                        << shaderSource
-                        << "---------------------------\n"
-                        << std::flush;
-        }
-        
-        MTLCompileOptions *options = [[MTLCompileOptions alloc] init];
-        options.fastMathEnabled = YES;
-        options.languageVersion = MTLLanguageVersion2_0;
-        options.preprocessorMacros = @{
-            @"HD_MTL_VERTEXSHADER":(compileType==GL_VERTEX_SHADER)?@1:@0,
-            @"HD_MTL_COMPUTESHADER":(compileType==GL_COMPUTE_SHADER)?@1:@0,
-            @"HD_MTL_FRAGMENTSHADER":(compileType==GL_FRAGMENT_SHADER)?@1:@0,
-            @"HD_MTL_COMPUTEGS_VERTEXSHADER":buildingPassThroughVS?@1:@0
-        };
+    NSString *entryPoint = nil;
+    switch (type) {
+    case GL_VERTEX_SHADER: shaderType = "VS"; entryPoint = @"vertexEntryPoint"; break;
+    case GL_FRAGMENT_SHADER: shaderType = "FS"; entryPoint = @"fragmentEntryPoint"; break;
+    case GL_GEOMETRY_SHADER: shaderType = "Compute_GS"; entryPoint = @"computeEntryPoint"; break;
+    case GL_COMPUTE_SHADER: shaderType = "CS"; entryPoint = @"computeEntryPoint"; break;
+    default: TF_FATAL_CODING_ERROR("Not allowed!");
+    }
     
-        id<MTLLibrary> library = [device newLibraryWithSource:@(shaderSource.c_str())
-                                                      options:options
-                                                        error:&error];
-        
-        [options release];
-        options = nil;
+    if (TfDebug::IsEnabled(HD_DUMP_SHADER_SOURCE)) {
+        std::cout   << "--------- " << shaderType << " ----------\n"
+                    << shaderSource
+                    << "---------------------------\n"
+                    << std::flush;
+    }
+    
+    MTLCompileOptions *options = [[MTLCompileOptions alloc] init];
+    options.fastMathEnabled = YES;
+    options.languageVersion = MTLLanguageVersion2_0;
+    options.preprocessorMacros = @{
+        @"HD_MTL_VERTEXSHADER":(type==GL_VERTEX_SHADER)?@1:@0,
+        @"HD_MTL_COMPUTESHADER":(type==GL_GEOMETRY_SHADER || type==GL_COMPUTE_SHADER)?@1:@0,
+        @"HD_MTL_FRAGMENTSHADER":(type==GL_FRAGMENT_SHADER)?@1:@0,
+    };
 
-        // Load the function into the library
-        id <MTLFunction> function = [library newFunctionWithName:entryPoint];
-        if (!function) {
-            // XXX:validation
-            TF_WARN("Failed to compile shader (%s): \n%s",
-                    shaderType, [[error localizedDescription] UTF8String]);
-            DumpMetalSource([NSString stringWithUTF8String:shaderSource.c_str()], @"Fail", error != nil ? [error localizedDescription] : nil); //MTL_FIXME
-            success = false;
-            break;
-        }
-        
-        DumpMetalSource([NSString stringWithUTF8String:shaderSource.c_str()], [NSString stringWithUTF8String:shaderType], error != nil ? [error localizedDescription] : nil); //MTL_FIXME
-        
-        if (compileType == GL_VERTEX_SHADER) {
-            if(buildingPassThroughVS) {
-                _vertexPassThroughFunction = function;
-                _vertexPassThroughFunctionIdx = dumpedFileCount;
-            }
-            else {
-                _vertexFunction = function;
-                _vertexFunctionIdx = dumpedFileCount;
-            }
-        } else if (compileType == GL_FRAGMENT_SHADER) {
-            _fragmentFunction = function;
-            _fragmentFunctionIdx = dumpedFileCount;
-        } else if (compileType == GL_COMPUTE_SHADER) {
-            if(buildingForComputeGSPath) {
-                _computeGeometryFunction = function;
-                _computeGeometryFunctionIdx = dumpedFileCount;
-            }
-            else {
-                _computeFunction = function;
-                _computeFunctionIdx = dumpedFileCount;
-            }
-        }
-        else {
-            TF_FATAL_CODING_ERROR("Not Implemented");
-            success = false;
-            break;
-        }
+    id<MTLLibrary> library = [device newLibraryWithSource:@(shaderSource.c_str())
+                                                  options:options
+                                                    error:&error];
+    
+    [options release];
+    options = nil;
+
+    // Load the function into the library
+    id <MTLFunction> function = [library newFunctionWithName:entryPoint];
+    std::string filePostFix = shaderType;
+    if (!function) {
+        // XXX:validation
+        TF_WARN("Failed to compile shader (%s): \n%s",
+                shaderType, [[error localizedDescription] UTF8String]);
+        filePostFix += "_Fail";
+        success = false;
+    }
+    
+    //MTL_FIXME: Remove this debug line once done.
+    DumpMetalSource(this, [NSString stringWithUTF8String:shaderSource.c_str()], [NSString stringWithUTF8String:filePostFix.c_str()], error != nil ? [error localizedDescription] : nil);
+    
+    if (type == GL_VERTEX_SHADER) {
+        _vertexFunction = function;
+        _vertexFunctionIdx = dumpedFileCount;
+    } else if (type == GL_FRAGMENT_SHADER) {
+        _fragmentFunction = function;
+        _fragmentFunctionIdx = dumpedFileCount;
+    } else if (type == GL_COMPUTE_SHADER) {
+        _computeFunction = function;
+        _computeFunctionIdx = dumpedFileCount;
+    } else if (type == GL_GEOMETRY_SHADER) {
+        _computeGeometryFunction = function;
+        _computeGeometryFunctionIdx = dumpedFileCount;
+        _buildTarget = kMSL_BuildTarget_MVA_ComputeGS;
     }
 
     return success;
@@ -297,13 +281,19 @@ HdStMSLProgram::Link()
     bool vertexFuncPresent = _vertexFunction != nil;
     bool fragmentFuncPresent = _fragmentFunction != nil;
     bool computeFuncPresent = _computeFunction != nil;
-    bool computeGSFuncPresent = _computeGeometryFunction != nil;
+    bool computeGeometryFuncPresent = _computeGeometryFunction != nil;
     
     if (computeFuncPresent && (vertexFuncPresent ^ fragmentFuncPresent)) {
         TF_CODING_ERROR("A compute shader can't be set with a vertex shader or fragment shader also set.");
         return false;
     }
-
+    
+    if(_buildTarget == kMSL_BuildTarget_MVA_ComputeGS && !computeGeometryFuncPresent) {
+        TF_CODING_ERROR("Missing Compute Geometry shader while linking.");
+        return false;
+    }
+        
+    
     id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->device;
 
     // update the program resource allocation
@@ -317,15 +307,13 @@ HdStMSLProgram::Link()
         _uniformBuffer.SetAllocation(uniformBuffer, defaultLength);
     }
     
-    _enableComputeGSPath = computeGSFuncPresent;
-    
-    if(_enableComputeGSPath && (_computeGSOutputSlot == -1 || _computeGSArgSlot == -1 || _computeGSIndexSlot == -1)) {
-        for(auto it = _bindingMap.begin(); it != _bindingMap.end(); ++it) {
-            const MSL_ShaderBinding& binding = *(*it).second;
-            if(binding._stage != kMSL_ProgramStage_Compute) continue;
-            if(binding._type == kMSL_BindingType_ComputeGSOutput) _computeGSOutputSlot = binding._index;
-            if(binding._type == kMSL_BindingType_ComputeGSArg) _computeGSArgSlot = binding._index;
-            if(binding._type == kMSL_BindingType_IndexBuffer) _computeGSIndexSlot = binding._index;
+    for(auto it = _bindingMap.begin(); it != _bindingMap.end(); ++it) {
+        const MSL_ShaderBinding& binding = *(*it).second;
+        if(binding._stage == kMSL_ProgramStage_Vertex || binding._stage == kMSL_ProgramStage_Compute) {
+            if(binding._type == kMSL_BindingType_DrawArgs) _drawArgsSlot = binding._index;
+            if(binding._type == kMSL_BindingType_IndexBuffer) _indicesSlot = binding._index;
+            if(binding._type == kMSL_BindingType_GSVertOutput) _gsVertOutBufferSlot = binding._index;
+            if(binding._type == kMSL_BindingType_GSPrimOutput) _gsPrimOutBufferSlot = binding._index;
         }
     }
 
@@ -460,10 +448,11 @@ void HdStMSLProgram::UnbindResources(HdStSurfaceShader* surfaceShader, HdSt_Reso
 
 void HdStMSLProgram::SetProgram(char const* const label) {
     MtlfMetalContext::GetMetalContext()->SetShadingPrograms(
-        _enableComputeGSPath ? _vertexPassThroughFunction : _vertexFunction,
+        _vertexFunction,
         _fragmentFunction,
-        _computeFunction,
-        _enableComputeGSPath ? _computeGeometryFunction : NULL);
+        (_buildTarget == kMSL_BuildTarget_MVA_ComputeGS ? _computeGeometryFunction : _computeFunction),
+        (_buildTarget == kMSL_BuildTarget_MVA || _buildTarget == kMSL_BuildTarget_MVA_ComputeGS),
+        (_buildTarget == kMSL_BuildTarget_MVA_ComputeGS));
     
     if (_currentlySet) {
         TF_FATAL_CODING_ERROR("HdStProgram is already set");
@@ -475,8 +464,8 @@ void HdStMSLProgram::SetProgram(char const* const label) {
         TfToken uniformToken;
         MSL_ProgramStage stage;
     } static const loopParams[2] = {
-        { TfToken("fragUniforms"), kMSL_ProgramStage_Fragment },
-        { TfToken("vtxUniforms"), kMSL_ProgramStage_Vertex }
+        { TfToken("fsUniforms"), kMSL_ProgramStage_Fragment },
+        { TfToken("vsUniforms"), kMSL_ProgramStage_Vertex }
     };
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
     for(UInt32 i = 0; i < (sizeof(loopParams) / sizeof(loopParams[0])); i++) {
@@ -522,7 +511,9 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
      remapping the index buffer and mapping GL_LINES_ADJACENCY to MTLPrimitiveTypeTriangle.
     */
     MTLPrimitiveType primType = GetMetalPrimType(primitiveMode);
-    bool bDrawingQuads = (primitiveMode == GL_LINES_ADJACENCY);
+    const bool bDrawingQuads = (primitiveMode == GL_LINES_ADJACENCY);
+    const bool doMVAComputeGS = _buildTarget == kMSL_BuildTarget_MVA_ComputeGS;
+    const bool doMVA = doMVAComputeGS || _buildTarget == kMSL_BuildTarget_MVA;
     
     MTLIndexType indexTypeMetal;
     int indexSize;
@@ -531,6 +522,8 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
             TF_FATAL_CODING_ERROR("Not Implemented");
             return;
         case GL_UNSIGNED_SHORT:
+            if(doMVA)   //MTL_FIXME: We should probably find a way to support this at some point.
+                TF_FATAL_CODING_ERROR("Not Implemented");
             indexTypeMetal = MTLIndexTypeUInt16;
             indexSize = sizeof(uint16_t);
             break;
@@ -543,51 +536,78 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
     
     // Possibly move this outside this function as we shouldn't need to get a render encoder every draw call
-    id <MTLRenderCommandEncoder> renderEncoder = context->GetRenderEncoder();
-
-      if(_enableComputeGSPath) {
-        context->SetupComputeGS(_computeGSIndexSlot,
-                                bDrawingQuads ? context->GetQuadIndexBuffer(indexTypeMetal) : context->GetIndexBuffer(),
-                                indexCount,
-                                bDrawingQuads ? ((firstIndex/4)*6) : firstIndex,
-                                baseVertex,
-                                _computeGSOutputStructSize,
-                                _computeGSArgSlot,
-                                _computeGSOutputSlot);
+    id <MTLRenderCommandEncoder>    renderEncoder = context->GetRenderEncoder();
+    id <MTLComputeCommandEncoder>   computeEncoder;
+    
+    id<MTLBuffer> indexBuffer = context->GetIndexBuffer();
+    if(bDrawingQuads) {
+        indexCount = (indexCount / 4) * 6;
+        firstIndex = (firstIndex / 4) * 6;
+        indexBuffer = context->GetQuadIndexBuffer(indexTypeMetal);
     }
-
     
     const_cast<HdStMSLProgram*>(this)->BakeState();
-
-    id <MTLComputeCommandEncoder> computeEncoder;
     
-    // Get a compute encoder on the Geometry Shader work queue
-    if(_enableComputeGSPath) {
-        computeEncoder = context->GetComputeEncoder(METALWORKQUEUE_GEOMETRY_SHADER);
+    if(doMVA) {
+        //Setup Draw Args on the render context
+        struct { int _indexCount, _startIndex, _baseVertex; } drawArgs = { indexCount, firstIndex, baseVertex };
+        [renderEncoder setVertexBytes:(const void*)&drawArgs length:sizeof(drawArgs) atIndex:_drawArgsSlot];
+        //context->SetDrawArgsBuffer(indexCount, firstIndex, baseVertex, _drawArgsSlot, doMVAComputeGS);
+        
+        if(doMVAComputeGS) {
+            // Get a compute encoder on the Geometry Shader work queue
+            computeEncoder = context->GetComputeEncoder(METALWORKQUEUE_GEOMETRY_SHADER);
+            
+            //Setup Draw Args on the compute context
+            [computeEncoder setBytes:(const void*)&drawArgs length:sizeof(drawArgs) atIndex:_drawArgsSlot];
+            context->SetComputeBufferMutability(_drawArgsSlot, false);
+            
+            //context->SetComputeGSOutputBuffers(indexCount, _gsVertOutStructSize, _gsPrimOutStructSize, _gsVertOutBufferSlot, _gsPrimOutBufferSlot);
+            
+            //MTL_FIXME: Would like to prevent re-creating the buffers each draw-call. Would be better to add a cache of old buffers.
+            //           Would be even better if alternate compute/render is implemented with cut up draws to keep GS output in L2. Re-
+            //           -use would then be possible with a single constant size buffer (sized to whatever is favorable for L2).
+            id<MTLDevice> device = context->device;
+            const int vertDataSize(_gsVertOutStructSize * indexCount),
+                      primDataSize(_gsPrimOutStructSize * (indexCount / 3));
+            id<MTLBuffer> vertBuffer = [device newBufferWithLength:vertDataSize options:MTLResourceStorageModePrivate|MTLResourceOptionCPUCacheModeDefault];
+            id<MTLBuffer> primBuffer = [device newBufferWithLength:primDataSize options:MTLResourceStorageModePrivate|MTLResourceOptionCPUCacheModeDefault];
+            
+            [computeEncoder setBuffer:vertBuffer offset:0 atIndex:_gsVertOutBufferSlot];
+            context->SetComputeBufferMutability(_gsVertOutBufferSlot, true);
+            //computePipelineStateDescriptor.buffers[perVertBufferSlot].mutability = MTLMutabilityMutable;
+            [computeEncoder setBuffer:primBuffer offset:0 atIndex:_gsPrimOutBufferSlot];
+            context->SetComputeBufferMutability(_gsPrimOutBufferSlot, true);
+            //computePipelineStateDescriptor.buffers[perPrimBufferSlot].mutability = MTLMutabilityMutable;
+            [renderEncoder setVertexBuffer:vertBuffer offset:0 atIndex:_gsVertOutBufferSlot];
+            [renderEncoder setVertexBuffer:primBuffer offset:0 atIndex:_gsPrimOutBufferSlot];
+            [renderEncoder setFragmentBuffer:vertBuffer offset:0 atIndex:_gsVertOutBufferSlot];
+            [renderEncoder setFragmentBuffer:primBuffer offset:0 atIndex:_gsPrimOutBufferSlot];
+        }
     }
     
     if (bDrawingQuads) {
-        if(_enableComputeGSPath)
+        if(doMVAComputeGS)
         {
-            [computeEncoder dispatchThreads:MTLSizeMake((((indexCount/4)*6) / 3) * instanceCount, 1, 1) threadsPerThreadgroup:MTLSizeMake(64, 1, 1)];
-            [renderEncoder drawPrimitives:primType vertexStart:0 vertexCount:((indexCount/4)*6) instanceCount:instanceCount baseInstance:0];
-        }
-        else
-            [renderEncoder drawIndexedPrimitives:primType indexCount:((indexCount/4)*6) indexType:indexTypeMetal indexBuffer:context->GetQuadIndexBuffer(indexTypeMetal) indexBufferOffset:(((firstIndex/4)*6) * indexSize) instanceCount:instanceCount baseVertex:baseVertex baseInstance:0];
-    }
-    else  {
-        if(_enableComputeGSPath)
-        {
-            [computeEncoder dispatchThreads:MTLSizeMake(indexCount/3,1,1) threadsPerThreadgroup:MTLSizeMake(64,1,1)];
+            [computeEncoder dispatchThreads:MTLSizeMake((indexCount / 3) * instanceCount, 1, 1) threadsPerThreadgroup:MTLSizeMake(64, 1, 1)];
             [renderEncoder drawPrimitives:primType vertexStart:0 vertexCount:indexCount instanceCount:instanceCount baseInstance:0];
         }
         else
-            [renderEncoder drawIndexedPrimitives:primType indexCount:indexCount indexType:indexTypeMetal indexBuffer:context->GetIndexBuffer() indexBufferOffset:(firstIndex * indexSize) instanceCount:instanceCount baseVertex:baseVertex baseInstance:0];
+            [renderEncoder drawIndexedPrimitives:primType indexCount:indexCount indexType:indexTypeMetal indexBuffer:indexBuffer indexBufferOffset:(firstIndex * indexSize) instanceCount:instanceCount baseVertex:baseVertex baseInstance:0];
+    }
+    else  {
+        if(doMVAComputeGS)
+        {
+            [computeEncoder dispatchThreads:MTLSizeMake(indexCount / 3,1,1) threadsPerThreadgroup:MTLSizeMake(64,1,1)];
+            [renderEncoder drawPrimitives:primType vertexStart:0 vertexCount:indexCount instanceCount:instanceCount baseInstance:0];
+        }
+        else
+            [renderEncoder drawIndexedPrimitives:primType indexCount:indexCount indexType:indexTypeMetal indexBuffer:indexBuffer indexBufferOffset:(firstIndex * indexSize) instanceCount:instanceCount baseVertex:baseVertex baseInstance:0];
     }
     
     context->ReleaseEncoder(false);
     
-    if(_enableComputeGSPath)
+    if(doMVAComputeGS)
     {
         // Release the geometry shader encoder
         context->ReleaseEncoder(false, METALWORKQUEUE_GEOMETRY_SHADER);

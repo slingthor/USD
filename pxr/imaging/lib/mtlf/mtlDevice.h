@@ -125,7 +125,7 @@ public:
     void SetDrawTarget(MtlfDrawTarget *drawTarget);
     
     MTLF_API
-    void SetShadingPrograms(id<MTLFunction> vertexFunction, id<MTLFunction> fragmentFunction,  id<MTLFunction> computeFunction, id<MTLFunction> computeGSFunction = NULL);
+    void SetShadingPrograms(id<MTLFunction> vertexFunction, id<MTLFunction> fragmentFunction,  id<MTLFunction> computeFunction, bool _enableMVA, bool _enableComputeGS);
     
     MTLF_API
     void SetVertexAttribute(uint32_t index,
@@ -134,9 +134,6 @@ public:
                             size_t stride,
                             uint32_t offset,
                             const TfToken& name);
-    
-    MTLF_API
-    void SetupComputeGS(UInt32 indexBufferSlot, id<MTLBuffer> indexBuffer, UInt32 indexCount, UInt32 startIndex, UInt32 baseVertex, UInt32 geometryOutputStructSize, UInt32 argumentBufferSlot, UInt32 outputBufferSlot);
     
     MTLF_API
     void SetUniform(const void* _data, uint32 _dataSize, const TfToken& _name, uint32 index, MSL_ProgramStage stage);
@@ -173,6 +170,10 @@ public:
     
     MTLF_API
     void SetComputeEncoderState(id<MTLFunction> computeFunction, unsigned long bufferWritableMask, NSString *label);
+    
+    //Consider using SetComputeEncoderState instead.
+    MTLF_API
+    void SetComputeBufferMutability(int index, bool isMutable);
 
     MTLF_API
     id<MTLBlitCommandEncoder>    GetBlitEncoder();
@@ -201,6 +202,8 @@ public:
     id<MTLTexture> mtlColorTexture;
     id<MTLTexture> mtlDepthTexture;
     
+    bool enableMVA;
+    bool enableComputeGS;
 protected:
     MTLF_API
     MtlfMetalContext();
@@ -263,7 +266,6 @@ private:
     std::vector<id<MTLBuffer>> computeGSOutputBuffers;
     uint32_t computeGSOutputCurrentIdx;
     uint32_t computeGSOutputCurrentOffset;
-    bool usingComputeGS;
     
     id<MTLDevice> GetMetalDevice(PREFERRED_GPU_TYPE preferredGPUType);
     void handleDisplayChange();
