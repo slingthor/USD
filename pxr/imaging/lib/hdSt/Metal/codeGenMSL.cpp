@@ -1351,7 +1351,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
                                 << vsMI_EP_FuncDef.str()
                                 << "    uint gl_InstanceID = _instanceID;\n"
                                 << "    uint gl_BaseVertex = drawArgs->baseVertex;\n"
-                                << "    uint gl_VertexID = indices[_vertexID + drawArgs->startIndex] + gl_BaseVertex;\n"
+                                << "    uint gl_VertexID = indices[drawArgs->startIndex + _vertexID] + gl_BaseVertex;\n"
                                 << "    uint gl_PrimitiveIDIn = _vertexID / " << numVerticesPerPrimitive << ";\n"
                                 << "    uint _corner = _vertexID % " << numVerticesPerPrimitive << ";\n"
                                 << "\n"
@@ -1391,7 +1391,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
                 << "    //Vertex Shader\n"
                 << "    MSLVsOutputs vsOutputs[" << numVerticesPerPrimitive << "];\n"
                 << "    for(uint i = 0; i < " << numVerticesPerPrimitive << "; i++) {\n"
-                << "        uint gl_VertexID = gl_BaseVertex + indices[_baseIndex + i];\n"
+                << "        uint gl_VertexID = gl_BaseVertex + indices[drawArgs->startIndex + _baseIndex + i];\n"
                 << "        thread MSLVsOutputs& vsOutput = vsOutputs[i];\n"
                 << "\n"
                 << "    " << vsMI_EP_InputCode.str()
