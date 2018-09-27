@@ -540,6 +540,10 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
   
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
     
+    // Possibly move this outside this function as we shouldn't need to get a render encoder every draw call
+    id <MTLRenderCommandEncoder>    renderEncoder = context->GetRenderEncoder();
+    id <MTLComputeCommandEncoder>   computeEncoder;
+    
     id<MTLBuffer> indexBuffer = context->GetIndexBuffer();
     if(bDrawingQuads) {
         indexCount = (indexCount / 4) * 6;
@@ -547,20 +551,44 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
         indexBuffer = context->GetQuadIndexBuffer(indexTypeMetal);
     }
     
-    if(doMVA) {
-        context->SetDrawArgsBuffer(indexCount, firstIndex, baseVertex, _drawArgsSlot, doMVAComputeGS);
-        if(doMVAComputeGS)
-            context->SetComputeGSOutputBuffers(indexCount, _gsVertOutStructSize, _gsPrimOutStructSize, _gsVertOutBufferSlot, _gsPrimOutBufferSlot);
-    }
-
-    
     const_cast<HdStMSLProgram*>(this)->BakeState();
-
-    id <MTLComputeCommandEncoder> computeEncoder;
     
-    // Get a compute encoder on the Geometry Shader work queue
-    if(_enableComputeGSPath) {
-        computeEncoder = context->GetComputeEncoder(METALWORKQUEUE_GEOMETRY_SHADER);
+    if(doMVA) {
+        //Setup Draw Args on the render context
+        struct { int _indexCount, _startIndex, _baseVertex; } drawArgs = { indexCount, firstIndex, baseVertex };
+        [renderEncoder setVertexBytes:(const void*)&drawArgs length:sizeof(drawArgs) atIndex:_drawArgsSlot];
+        //context->SetDrawArgsBuffer(indexCount, firstIndex, baseVertex, _drawArgsSlot, doMVAComputeGS);
+        
+        if(doMVAComputeGS) {
+            // Get a compute encoder on the Geometry Shader work queue
+            computeEncoder = context->GetComputeEncoder(METALWORKQUEUE_GEOMETRY_SHADER);
+            
+            //Setup Draw Args on the compute context
+            [computeEncoder setBytes:(const void*)&drawArgs length:sizeof(drawArgs) atIndex:_drawArgsSlot];
+            context->SetComputeBufferMutability(_drawArgsSlot, false);
+            
+            //context->SetComputeGSOutputBuffers(indexCount, _gsVertOutStructSize, _gsPrimOutStructSize, _gsVertOutBufferSlot, _gsPrimOutBufferSlot);
+            
+            //MTL_FIXME: Would like to prevent re-creating the buffers each draw-call. Would be better to add a cache of old buffers.
+            //           Would be even better if alternate compute/render is implemented with cut up draws to keep GS output in L2. Re-
+            //           -use would then be possible with a single constant size buffer (sized to whatever is favorable for L2).
+            id<MTLDevice> device = context->device;
+            const int vertDataSize(_gsVertOutStructSize * indexCount),
+                      primDataSize(_gsPrimOutStructSize * (indexCount / 3));
+            id<MTLBuffer> vertBuffer = [device newBufferWithLength:vertDataSize options:MTLResourceStorageModePrivate|MTLResourceOptionCPUCacheModeDefault];
+            id<MTLBuffer> primBuffer = [device newBufferWithLength:primDataSize options:MTLResourceStorageModePrivate|MTLResourceOptionCPUCacheModeDefault];
+            
+            [computeEncoder setBuffer:vertBuffer offset:0 atIndex:_gsVertOutBufferSlot];
+            context->SetComputeBufferMutability(_gsVertOutBufferSlot, true);
+            //computePipelineStateDescriptor.buffers[perVertBufferSlot].mutability = MTLMutabilityMutable;
+            [computeEncoder setBuffer:primBuffer offset:0 atIndex:_gsPrimOutBufferSlot];
+            context->SetComputeBufferMutability(_gsPrimOutBufferSlot, true);
+            //computePipelineStateDescriptor.buffers[perPrimBufferSlot].mutability = MTLMutabilityMutable;
+            [renderEncoder setVertexBuffer:vertBuffer offset:0 atIndex:_gsVertOutBufferSlot];
+            [renderEncoder setVertexBuffer:primBuffer offset:0 atIndex:_gsPrimOutBufferSlot];
+            [renderEncoder setFragmentBuffer:vertBuffer offset:0 atIndex:_gsVertOutBufferSlot];
+            [renderEncoder setFragmentBuffer:primBuffer offset:0 atIndex:_gsPrimOutBufferSlot];
+        }
     }
     
     if (bDrawingQuads) {
@@ -584,7 +612,7 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
     
     context->ReleaseEncoder(false);
     
-    if(_enableComputeGSPath)
+    if(doMVAComputeGS)
     {
         // Release the geometry shader encoder
         context->ReleaseEncoder(false, METALWORKQUEUE_GEOMETRY_SHADER);

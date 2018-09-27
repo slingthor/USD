@@ -2522,9 +2522,8 @@ HdSt_CodeGenMSL::_GenerateCommonCode()
                 TfToken("" /*[[clip_distance]]*/ )).usage // XXX - Causes an internal error on Lobo - fixed in Liberty 18A281+
                 |= TParam::VertexShaderOnly;
 
-    // _EmitOutput(_genCommon, _mslVSOutputParams, TfToken("gl_PrimitiveID"), TfToken("uint"), TfToken("[[flat]]"));
     _genCommon << "uint gl_PrimitiveID = 0;\n"
-               << "uint gl_PrimitiveIDIn = 0;\n" //MTL_FIXME: Fill this in for GS
+               << "uint gl_PrimitiveIDIn = 0;\n"
                << "int gl_MaxTessGenLevel = 64;\n";
     
     METAL_DEBUG_COMMENT(&_genCommon, "End of vertex/fragment interface\n"); //MTL_FIXME
@@ -3796,8 +3795,6 @@ HdSt_CodeGenMSL::_GenerateVertexAndFaceVaryingPrimvar(bool hasGS)
                                     _geometricShader->GetPrimitiveType());
             }
             
-            //MTL_FIXME: Outdated comment?
-            //Pass-through for primvars to cover for missing geometry shaders in Metal
             {
                 std::stringstream vtxOutName;
                 vtxOutName << MTL_PRIMVAR_PREFIX << name;
@@ -3813,10 +3810,6 @@ HdSt_CodeGenMSL::_GenerateVertexAndFaceVaryingPrimvar(bool hasGS)
                 outAccessorGS += name.GetString();
                 _AddOutputParam(_mslGSOutputParams, vtxOutName_Token, dataType, TfToken(), TfToken(outAccessorGS)).usage
                     |= HdSt_CodeGenMSL::TParam::Usage::PrimVar;
-                
-//                _AddInputParam(_mslGSInputParams, name, dataType, TfToken(), HdBinding(HdBinding::UNKNOWN, 0), 0, vtxOutName_Token).usage
-//                    |= HdSt_CodeGenMSL::TParam::Usage::PrimVar;
-//                _AddOutputParam(_mslGSOutputParams, vtxOutName_Token, dataType, TfToken(), name).usage |= HdSt_CodeGenMSL::TParam::Usage::PrimVar;
                 
                 _AddInputParam(_mslPSInputParams, name, dataType, TfToken(), HdBinding(HdBinding::UNKNOWN, 0), 0, vtxOutName_Token).usage
                     |= HdSt_CodeGenMSL::TParam::Usage::PrimVar;

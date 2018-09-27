@@ -136,12 +136,6 @@ public:
                             const TfToken& name);
     
     MTLF_API
-    void SetDrawArgsBuffer(int indexCount, int startIndex, int baseVertex, int drawArgBufferSlot, bool setupForCompute);
-    
-    MTLF_API
-    void SetComputeGSOutputBuffers(int indexCount, int preVertStructSize, int perPrimStructSize, int perVertBufferSlot, int perPrimBufferSlot);
-    
-    MTLF_API
     void SetUniform(const void* _data, uint32 _dataSize, const TfToken& _name, uint32 index, MSL_ProgramStage stage);
     
     MTLF_API
@@ -176,6 +170,10 @@ public:
     
     MTLF_API
     void SetComputeEncoderState(id<MTLFunction> computeFunction, unsigned long bufferWritableMask, NSString *label);
+    
+    //Consider using SetComputeEncoderState instead.
+    MTLF_API
+    void SetComputeBufferMutability(int index, bool isMutable);
 
     MTLF_API
     id<MTLBlitCommandEncoder>    GetBlitEncoder();
@@ -268,7 +266,6 @@ private:
     std::vector<id<MTLBuffer>> computeGSOutputBuffers;
     uint32_t computeGSOutputCurrentIdx;
     uint32_t computeGSOutputCurrentOffset;
-    bool usingComputeGS;
     
     id<MTLDevice> GetMetalDevice(PREFERRED_GPU_TYPE preferredGPUType);
     void handleDisplayChange();
