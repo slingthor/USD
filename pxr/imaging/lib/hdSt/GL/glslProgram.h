@@ -112,6 +112,11 @@ public:
                                      GLint vertexCount,
                                      GLint instanceCount) const override;
     
+    HDST_API
+    virtual void DrawArrays(GLenum primitiveMode,
+                            GLint baseVertex,
+                            GLint vertexCount) const override;
+    
     /// Returns the GL program object.
     HDST_API
     GLuint GetGLProgram() const { return _program; }

@@ -661,6 +661,13 @@ void MtlfMetalContext::SetShadingPrograms(id<MTLFunction> vertexFunction, id<MTL
     renderPipelineStateDescriptor.vertexFunction   = vertexFunction;
     renderPipelineStateDescriptor.fragmentFunction = fragmentFunction;
     
+    if (fragmentFunction == nil) {
+        renderPipelineStateDescriptor.rasterizationEnabled = false;
+    }
+    else {
+        renderPipelineStateDescriptor.rasterizationEnabled = true;
+    }
+    
     usingComputeGS = false;
     
     if (computeFunction) {

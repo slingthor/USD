@@ -62,7 +62,9 @@ public:
                        HdBufferResourceSharedPtr cullCommandBuffer) override;
     
     HDST_API
-    virtual void _GPUFrustumCullingXFBExecute(HdStResourceRegistrySharedPtr const &resourceRegistry) override;
+    virtual void _GPUFrustumCullingXFBExecute(
+                      HdStResourceRegistrySharedPtr const &resourceRegistry,
+                      HdStProgramSharedPtr const &program) override;
     
 protected:
     HDST_API

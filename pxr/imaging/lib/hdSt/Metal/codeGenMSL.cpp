@@ -1849,12 +1849,7 @@ HdSt_CodeGenMSL::Compile()
         _vsSource = replaceStringAll(_vsSource, "<osd_ppbi>", "0");
         _vsSource = replaceStringAll(_vsSource, "<vbi>", "0");
 
-        if (!_hasFS) {
-            if (!mslProgram->CompileShader(GL_COMPUTE_SHADER, _vsSource)) {
-                shaderCompiled = false;
-            }
-        }
-        else if (!mslProgram->CompileShader(_mslBuildComputeGS ? GL_GEOMETRY_SHADER : GL_VERTEX_SHADER, _vsSource)) {
+        if (!mslProgram->CompileShader(_mslBuildComputeGS ? GL_GEOMETRY_SHADER : GL_VERTEX_SHADER, _vsSource)) {
             shaderCompiled = false;
         }
         mslProgram->SetGSOutputStructSize(_mslGSOutputStructSize);

@@ -1251,7 +1251,7 @@ HdSt_IndirectDrawBatch::_GPUFrustumCullingXFB(
         binder.BindUniformf(HdTokens->ulocDrawRangeNDC, 2, drawRangeNDC.GetArray());
     }
     
-    _GPUFrustumCullingXFBExecute(resourceRegistry);
+    _GPUFrustumCullingXFBExecute(resourceRegistry, program);
 
     // unbind all
     binder.UnbindConstantBuffer(constantBar);
