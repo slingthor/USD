@@ -71,8 +71,9 @@ enum MetalWorkQueueType {
     METALWORKQUEUE_INVALID          = -1,
     METALWORKQUEUE_DEFAULT          =  0,
     METALWORKQUEUE_GEOMETRY_SHADER  =  1,
+    METALWORKQUEUE_RESOURCE         =  2,
     
-    METALWORKQUEUE_MAX              =  2,       // This should always be last
+    METALWORKQUEUE_MAX              =  3,       // This should always be last
 };
 
 class MtlfMetalContext : public boost::noncopyable {
@@ -176,13 +177,13 @@ public:
     void SetComputeBufferMutability(int index, bool isMutable);
 
     MTLF_API
-    id<MTLBlitCommandEncoder>    GetBlitEncoder();
+    id<MTLBlitCommandEncoder>    GetBlitEncoder(MetalWorkQueueType workQueueType = METALWORKQUEUE_DEFAULT);
 
     MTLF_API
     id<MTLComputeCommandEncoder> GetComputeEncoder(MetalWorkQueueType workQueueType = METALWORKQUEUE_DEFAULT);
 
     MTLF_API
-    id<MTLRenderCommandEncoder>  GetRenderEncoder();
+    id<MTLRenderCommandEncoder>  GetRenderEncoder(MetalWorkQueueType workQueueType = METALWORKQUEUE_DEFAULT);
 
     MTLF_API
     void ReleaseEncoder(bool endEncoding, MetalWorkQueueType workQueueType = METALWORKQUEUE_DEFAULT);
