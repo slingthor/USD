@@ -110,10 +110,10 @@ HdStVBOSimpleMemoryBufferMetal::Reallocate(
         MTL_FIXE - Ideally we wouldn't be creating and committing a command buffer here but we'd need some extra call
         to know when all reallocates had been performed so could commit them. However, if this is only an initialisation step it's probably OK.
      */
-    context->CreateCommandBuffer();
-    context->LabelCommandBuffer(@"HdStVBOSimpleMemoryBufferMetal::Reallocate()");
+    context->CreateCommandBuffer(METALWORKQUEUE_RESOURCE);
+    context->LabelCommandBuffer(@"HdStVBOSimpleMemoryBufferMetal::Reallocate()", METALWORKQUEUE_RESOURCE);
  
-    id<MTLBlitCommandEncoder> blitEncoder = context->GetBlitEncoder();
+    id<MTLBlitCommandEncoder> blitEncoder = context->GetBlitEncoder(METALWORKQUEUE_RESOURCE);
     
     TF_FOR_ALL (bresIt, GetResources()) {
         HdBufferResourceSharedPtr const &bres = bresIt->second;
@@ -171,8 +171,8 @@ HdStVBOSimpleMemoryBufferMetal::Reallocate(
         bres->SetAllocation(newId, bufferSize);
     }
 
-    context->ReleaseEncoder(true);
-    context->CommitCommandBuffer(false, false);
+    context->ReleaseEncoder(true, METALWORKQUEUE_RESOURCE);
+    context->CommitCommandBuffer(false, false, METALWORKQUEUE_RESOURCE);
 
     _capacity = numElements;
     _needsReallocation = false;

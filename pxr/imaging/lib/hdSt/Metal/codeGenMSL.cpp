@@ -879,7 +879,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
     
     drawArgsStruct              << "////////////////////////////////////////////////////////////////////////////////////////////////////////////////////\n"
                                 << "// MSL Draw Args Struct ////////////////////////////////////////////////////////////////////////////////////////////\n\n"
-                                << "struct MSLDrawArgs { int indexCount, startIndex, baseVertex; };\n";
+                                << "struct MSLDrawArgs { int indexCount, startIndex, baseVertex, instanceCount; };\n";
     
     //Do an initial pass over _mslVSInputParams and _mslFSInputParams to count the number of vertexAttributes that will needs
     // slots. This allows us to do the rest of the VS/PS generation in a single pass.
@@ -1234,8 +1234,8 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
         
         ////////////////////////////////// Geometry Output ///////////////////////////////
         
-        gsVertOutStruct << "struct MSLGsVertOutStruct {\n";
-        gsPrimOutStruct << "struct MSLGsPrimOutStruct {\n";
+        gsVertOutStruct << "struct alignas(4) MSLGsVertOutStruct {\n";
+        gsPrimOutStruct << "struct alignas(4) MSLGsPrimOutStruct {\n";
     
         std::stringstream vertBufferAccessor, primBufferAccessor, vsVertBufferAccessor, vsPrimBufferAccessor;
         vertBufferAccessor << "gsVertOutBuffer[gl_PrimitiveIDIn * " << numVerticesPerPrimitive << " + gsVertexCounter].";
@@ -1245,6 +1245,17 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
         TF_FOR_ALL(it, _mslGSOutputParams) {
             std::string name(it->name.GetString()), accessor(it->accessorStr.GetString()),
                         dataType(it->dataType.GetString()), attribute(it->attribute.GetString());
+        
+            //Replace vector data type with their packed variants to save space
+            if(dataType == "vec2")  dataType = "packed_float2";
+            else if(dataType == "vec3")  dataType = "packed_float3";
+            else if(dataType == "vec4")  dataType = "packed_float4";
+            else if(dataType == "int2")  dataType = "packed_int2";
+            else if(dataType == "int3")  dataType = "packed_int3";
+            else if(dataType == "int4")  dataType = "packed_int4";
+            else if(dataType == "uint2")  dataType = "packed_uint2";
+            else if(dataType == "uint3")  dataType = "packed_uint3";
+            else if(dataType == "uint4")  dataType = "packed_uint4";
         
             bool isPerPrim = (attribute == "[[flat]]");
             std::stringstream& structStream = (isPerPrim ? gsPrimOutStruct : gsVertOutStruct);
@@ -1351,7 +1362,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
                                 << vsMI_EP_FuncDef.str()
                                 << "    uint gl_InstanceID = _instanceID;\n"
                                 << "    uint gl_BaseVertex = drawArgs->baseVertex;\n"
-                                << "    uint gl_VertexID = indices[_vertexID + drawArgs->startIndex] + gl_BaseVertex;\n"
+                                << "    uint gl_VertexID = indices[drawArgs->startIndex + _vertexID] + gl_BaseVertex;\n"
                                 << "    uint gl_PrimitiveIDIn = _vertexID / " << numVerticesPerPrimitive << ";\n"
                                 << "    uint _corner = _vertexID % " << numVerticesPerPrimitive << ";\n"
                                 << "\n"
@@ -1383,15 +1394,18 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
         gsCode  << "////////////////////////////////////////////////////////////////////////////////////////////////////////////////////\n"
                 << "// MSL Compute Entry Point /////////////////////////////////////////////////////////////////////////////////////////\n\n"
                 << cs_EP_FuncDef.str()
-                << "    uint _baseIndex = _threadPositionInGrid * " << numVerticesPerPrimitive << ";\n"
-                << "    uint gl_InstanceID = _baseIndex % drawArgs->indexCount;\n"
+                << "    uint _rawIndex = _threadPositionInGrid * " << numVerticesPerPrimitive << ";\n"
+                << "    uint _baseIndex = _rawIndex % drawArgs->indexCount;\n"
+                << "    uint gl_InstanceID = _rawIndex / drawArgs->indexCount;\n"
                 << "    uint gl_BaseVertex = drawArgs->baseVertex;\n"
                 << "    uint gl_PrimitiveIDIn = _threadPositionInGrid;\n"
                 << "\n"
+                << "    if(gl_InstanceID >= drawArgs->instanceCount) return;\n"
+                << "    \n"
                 << "    //Vertex Shader\n"
                 << "    MSLVsOutputs vsOutputs[" << numVerticesPerPrimitive << "];\n"
                 << "    for(uint i = 0; i < " << numVerticesPerPrimitive << "; i++) {\n"
-                << "        uint gl_VertexID = gl_BaseVertex + indices[_baseIndex + i];\n"
+                << "        uint gl_VertexID = gl_BaseVertex + indices[drawArgs->startIndex + _baseIndex + i];\n"
                 << "        thread MSLVsOutputs& vsOutput = vsOutputs[i];\n"
                 << "\n"
                 << "    " << vsMI_EP_InputCode.str()
@@ -1407,6 +1421,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
                 << gs_VSInputCode.str()
                 << "        }\n\n"
                 << "        scope.gl_PrimitiveIDIn = gl_PrimitiveIDIn;\n"
+                << "        scope.gl_InstanceID = gl_InstanceID;\n"
                 << "        scope.gsVertOutBuffer = gsVertOutBuffer;\n"
                 << "        scope.gsPrimOutBuffer = gsPrimOutBuffer;\n"
                 << "\n"
@@ -2612,6 +2627,7 @@ HdSt_CodeGenMSL::_GenerateBindingsCode()
         declarations << "};\n";
         _EmitDeclarationPtr(declarations, varName, typeName, TfToken(), binding, 0, true);
         _AddInputPtrParam(_mslVSInputParams, varName, typeName, TfToken(), binding, 0, true);
+        _AddInputPtrParam(_mslGSInputParams, varName, typeName, TfToken(), binding, 0, true);
         _AddInputPtrParam(_mslPSInputParams, varName, typeName, TfToken(), binding, 0, true);
     }
     _genCommon << declarations.str() << accessors.str();
@@ -3035,8 +3051,10 @@ HdSt_CodeGenMSL::_GenerateConstantPrimvar()
             HdSt_CodeGenMSL::TParam in(TfToken(ptrName), typeName,
                 TfToken(), TfToken(), HdSt_CodeGenMSL::TParam::Unspecified, binding);
             in.usage |= HdSt_CodeGenMSL::TParam::EntryFuncArgument | HdSt_CodeGenMSL::TParam::ProgramScope;
-            _mslPSInputParams.push_back(in);
+            
             _mslVSInputParams.push_back(in);
+            _mslGSInputParams.push_back(in);
+            _mslPSInputParams.push_back(in);
         }
 
         declarations << "struct " << typeName << " {\n";
@@ -3113,6 +3131,7 @@ HdSt_CodeGenMSL::_GenerateInstancePrimvar()
         // << layout (location=x) uniform float *translate_0;
         _EmitDeclarationPtr(declarations, name, dataType, TfToken(), binding);
         _AddInputPtrParam(_mslVSInputParams, name, dataType, TfToken(), binding);
+        _AddInputPtrParam(_mslGSInputParams, name, dataType, TfToken(), binding);
         _EmitAccessor(accessors, name, dataType, binding, n.str().c_str());
     }
 
