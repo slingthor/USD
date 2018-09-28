@@ -120,6 +120,11 @@ public:
                                      GLint vertexCount,
                                      GLint instanceCount) const = 0;
     
+    HDST_API
+    virtual void DrawArrays(GLenum primitiveMode,
+                            GLint baseVertex,
+                            GLint vertexCount) const = 0;
+    
     /// Returns the hash value of the program for \a sourceFile
     HDST_API
     static ID ComputeHash(TfToken const & sourceFile);

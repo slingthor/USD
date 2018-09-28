@@ -171,22 +171,26 @@ HdSt_IndirectDrawBatchMetal::_SyncFence() {
 }
 
 void
-HdSt_IndirectDrawBatchMetal::_GPUFrustumCullingXFBExecute(HdStResourceRegistrySharedPtr const &resourceRegistry)
+HdSt_IndirectDrawBatchMetal::_GPUFrustumCullingXFBExecute(
+      HdStResourceRegistrySharedPtr const &resourceRegistry,
+      HdStProgramSharedPtr const &program)
 {
     GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
     if (caps.IsEnabledGPUCountVisibleInstances()) {
         _BeginGPUCountVisibleInstances(resourceRegistry);
     }
 
-    TF_FATAL_CODING_ERROR("Not Implemented");
+//    TF_FATAL_CODING_ERROR("Not Implemented");
+
+    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
+
+//    context->SetBuffer(1, _dispatchBuffer->GetEntireResource()->GetId(), TfToken("drawingCoord1"));
 
 //    glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0,
 //                     _dispatchBuffer->GetEntireResource()->GetId());
 //    glBeginTransformFeedback(GL_POINTS);
 
-//    glEnable(GL_RASTERIZER_DISCARD);
-//    glDrawArrays(GL_POINTS, 0, _dispatchBufferCullInput->GetCount());
-//    glDisable(GL_RASTERIZER_DISCARD);
+    program->DrawArrays(GL_POINTS, 0, _dispatchBufferCullInput->GetCount());
 
 //    if (caps.IsEnabledGPUCountVisibleInstances()) {
 //        glMemoryBarrier(GL_TRANSFORM_FEEDBACK_BARRIER_BIT);

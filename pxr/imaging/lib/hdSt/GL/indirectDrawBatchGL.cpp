@@ -259,7 +259,9 @@ HdSt_IndirectDrawBatchGL::_SyncFence() {
 }
 
 void
-HdSt_IndirectDrawBatchGL::_GPUFrustumCullingXFBExecute(HdStResourceRegistrySharedPtr const &resourceRegistry)
+HdSt_IndirectDrawBatchGL::_GPUFrustumCullingXFBExecute(
+    HdStResourceRegistrySharedPtr const &resourceRegistry,
+    HdStProgramSharedPtr const &program)
 {
     GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
     if (caps.IsEnabledGPUCountVisibleInstances()) {

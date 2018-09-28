@@ -155,6 +155,11 @@ public:
                                      GLint instanceCount) const override;
     
     HDST_API
+    virtual void DrawArrays(GLenum primitiveMode,
+                            GLint baseVertex,
+                            GLint vertexCount) const override;
+    
+    HDST_API
     BindingLocationMap const &GetBindingLocations() const {
         return _locationMap;
     }

@@ -288,11 +288,6 @@ HdStMSLProgram::Link()
         return false;
     }
     
-    if (vertexFuncPresent ^ fragmentFuncPresent) {
-        TF_CODING_ERROR("Both a vertex shader and a fragment shader must be compiled before linking.");
-        return false;
-    }
-    
     if(_buildTarget == kMSL_BuildTarget_MVA_ComputeGS && !computeGeometryFuncPresent) {
         TF_CODING_ERROR("Missing Compute Geometry shader while linking.");
         return false;
@@ -636,6 +631,24 @@ void HdStMSLProgram::DrawArraysInstanced(GLenum primitiveMode,
     
     
     [renderEncoder drawPrimitives:primType vertexStart:baseVertex vertexCount:vertexCount instanceCount:instanceCount];
+    
+    context->ReleaseEncoder(false);
+}
+
+void HdStMSLProgram::DrawArrays(GLenum primitiveMode,
+                                GLint baseVertex,
+                                GLint vertexCount) const {
+    
+    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
+    
+    MTLPrimitiveType primType = GetMetalPrimType(primitiveMode);
+    
+    // Possibly move this outside this function as we shouldn't need to get a render encoder every draw call
+    id <MTLRenderCommandEncoder> renderEncoder = context->GetRenderEncoder();
+    
+    const_cast<HdStMSLProgram*>(this)->BakeState();
+    
+    [renderEncoder drawPrimitives:primType vertexStart:baseVertex vertexCount:vertexCount];
     
     context->ReleaseEncoder(false);
 }

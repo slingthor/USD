@@ -106,7 +106,9 @@ protected:
                        HdBufferResourceSharedPtr cullCommandBuffer) = 0;
     
     HDST_API
-    virtual void _GPUFrustumCullingXFBExecute(HdStResourceRegistrySharedPtr const &resourceRegistry) = 0;
+    virtual void _GPUFrustumCullingXFBExecute(
+                        HdStResourceRegistrySharedPtr const &resourceRegistry,
+                        HdStProgramSharedPtr const &program) = 0;
 
     // Culling requires custom resource binding.
     class _CullingProgram : public _DrawingProgram {

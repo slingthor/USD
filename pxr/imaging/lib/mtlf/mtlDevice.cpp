@@ -567,6 +567,8 @@ void MtlfMetalContext::CheckNewStateGather()
 void MtlfMetalContext::CreateCommandBuffer(MetalWorkQueueType workQueueType) {
     MetalWorkQueue *wq = &workQueues[workQueueType];
     
+    //NSLog(@"Creating command buffer %d", (int)workQueueType);
+
     if (wq->commandBuffer == nil) {
         wq->commandBuffer = [context->commandQueue commandBuffer];
     } else {
@@ -659,9 +661,16 @@ void MtlfMetalContext::SetShadingPrograms(id<MTLFunction> vertexFunction, id<MTL
     renderPipelineStateDescriptor.vertexFunction   = vertexFunction;
     renderPipelineStateDescriptor.fragmentFunction = fragmentFunction;
     
-    if (computeFunction)
+    if (computeFunction) {
         computePipelineStateDescriptor.computeFunction = computeFunction;
-    
+    }
+    else if (fragmentFunction == nil) {
+        renderPipelineStateDescriptor.rasterizationEnabled = false;
+    }
+    else {
+        renderPipelineStateDescriptor.rasterizationEnabled = true;
+    }
+
     enableMVA = _enableMVA;
     enableComputeGS = _enableComputeGS;
     
@@ -1342,6 +1351,8 @@ void MtlfMetalContext::CommitCommandBuffer(bool waituntilScheduled, bool waitUnt
 {
     MetalWorkQueue *wq = &workQueues[workQueueType];
     
+    //NSLog(@"Comitting command buffer %d %@", (int)workQueueType, wq->commandBuffer.label);
+    
     if (waituntilScheduled && waitUntilCompleted) {
         TF_FATAL_CODING_ERROR("Just pick one please!");
     }
@@ -1519,10 +1530,10 @@ void MtlfMetalContext::SetCurrentEncoder(MetalEncoderType encoderType, MetalWork
     wq->encoderHasWork     = true;
 }
 
-id<MTLBlitCommandEncoder> MtlfMetalContext::GetBlitEncoder()
+id<MTLBlitCommandEncoder> MtlfMetalContext::GetBlitEncoder(MetalWorkQueueType workQueueType)
 {
-    MetalWorkQueue *wq = currentWorkQueue;
-    SetCurrentEncoder(MTLENCODERTYPE_BLIT, currentWorkQueueType);
+    MetalWorkQueue *wq = &workQueues[workQueueType];
+    SetCurrentEncoder(MTLENCODERTYPE_BLIT, workQueueType);
     return wq->currentBlitEncoder;
 }
 
@@ -1535,10 +1546,10 @@ id<MTLComputeCommandEncoder> MtlfMetalContext::GetComputeEncoder(MetalWorkQueueT
 }
 
 // If a renderpass descriptor is provided a new render encoder will be created otherwise we'll use the current one
-id<MTLRenderCommandEncoder>  MtlfMetalContext::GetRenderEncoder()
+id<MTLRenderCommandEncoder>  MtlfMetalContext::GetRenderEncoder(MetalWorkQueueType workQueueType)
 {
-    MetalWorkQueue *wq = currentWorkQueue;
-    SetCurrentEncoder(MTLENCODERTYPE_RENDER, currentWorkQueueType);
+    MetalWorkQueue *wq = &workQueues[workQueueType];
+    SetCurrentEncoder(MTLENCODERTYPE_RENDER, workQueueType);
     return currentWorkQueue->currentRenderEncoder;
 }
 

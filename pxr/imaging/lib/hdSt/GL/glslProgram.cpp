@@ -373,6 +373,12 @@ void HdStGLSLProgram::DrawArraysInstanced(GLenum primitiveMode,
     glDrawArraysInstanced(primitiveMode, baseVertex, vertexCount, instanceCount);
 }
 
+void HdStGLSLProgram::DrawArrays(GLenum primitiveMode,
+                                 GLint baseVertex,
+                                 GLint vertexCount) const {
+    glDrawArrays(primitiveMode, baseVertex, vertexCount);
+}
+
 std::string HdStGLSLProgram::GetComputeHeader() const
 {
     return "#version 430\n";

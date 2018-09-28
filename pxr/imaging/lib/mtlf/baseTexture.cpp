@@ -52,7 +52,6 @@ static MTLPixelFormat GetMetalFormat(GLenum inInternalFormat, GLenum inType, siz
         case GL_SRGB:
         case GL_RGB:
             *out24BitFormat = true;
-            TF_CODING_ERROR("3 channel textures are unsupported on Metal");
             // Drop through
             
         case GL_RGBA:
