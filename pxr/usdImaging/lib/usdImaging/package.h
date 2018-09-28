@@ -25,16 +25,16 @@
 #define USDIMAGINGGL_PACKAGE_H
 
 #include "pxr/pxr.h"
-#include "pxr/usdImaging/usdImagingGL/api.h"
-#include "pxr/usdImaging/usdImagingGL/version.h"
+#include "pxr/usdImaging/usdImaging/api.h"
+#include "pxr/usdImaging/usdImaging/version.h"
 #include "pxr/base/tf/token.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-USDIMAGINGGL_API
+USDIMAGING_API
 TfToken UsdImagingPackageDrawModeShader();
 
-USDIMAGINGGL_API
+USDIMAGING_API
 TfToken UsdImagingPackagePreviewSurfaceShader();
 
 PXR_NAMESPACE_CLOSE_SCOPE
