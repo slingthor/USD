@@ -583,6 +583,9 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
             [renderEncoder setVertexBuffer:primBuffer offset:0 atIndex:_gsPrimOutBufferSlot];
             [renderEncoder setFragmentBuffer:vertBuffer offset:0 atIndex:_gsVertOutBufferSlot];
             [renderEncoder setFragmentBuffer:primBuffer offset:0 atIndex:_gsPrimOutBufferSlot];
+            
+            [vertBuffer release];
+            [primBuffer release];
         }
     }
     
