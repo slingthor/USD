@@ -879,7 +879,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
     
     drawArgsStruct              << "////////////////////////////////////////////////////////////////////////////////////////////////////////////////////\n"
                                 << "// MSL Draw Args Struct ////////////////////////////////////////////////////////////////////////////////////////////\n\n"
-                                << "struct MSLDrawArgs { int indexCount, startIndex, baseVertex; };\n";
+                                << "struct MSLDrawArgs { int indexCount, startIndex, baseVertex, instanceCount; };\n";
     
     //Do an initial pass over _mslVSInputParams and _mslFSInputParams to count the number of vertexAttributes that will needs
     // slots. This allows us to do the rest of the VS/PS generation in a single pass.
@@ -1383,11 +1383,14 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
         gsCode  << "////////////////////////////////////////////////////////////////////////////////////////////////////////////////////\n"
                 << "// MSL Compute Entry Point /////////////////////////////////////////////////////////////////////////////////////////\n\n"
                 << cs_EP_FuncDef.str()
-                << "    uint _baseIndex = _threadPositionInGrid * " << numVerticesPerPrimitive << ";\n"
-                << "    uint gl_InstanceID = _baseIndex % drawArgs->indexCount;\n"
+                << "    uint _rawIndex = _threadPositionInGrid * " << numVerticesPerPrimitive << ";\n"
+                << "    uint _baseIndex = _rawIndex % drawArgs->indexCount;\n"
+                << "    uint gl_InstanceID = _rawIndex / drawArgs->indexCount;\n"
                 << "    uint gl_BaseVertex = drawArgs->baseVertex;\n"
                 << "    uint gl_PrimitiveIDIn = _threadPositionInGrid;\n"
                 << "\n"
+                << "    if(gl_InstanceID >= drawArgs->instanceCount) return;\n"
+                << "    \n"
                 << "    //Vertex Shader\n"
                 << "    MSLVsOutputs vsOutputs[" << numVerticesPerPrimitive << "];\n"
                 << "    for(uint i = 0; i < " << numVerticesPerPrimitive << "; i++) {\n"
@@ -1407,6 +1410,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
                 << gs_VSInputCode.str()
                 << "        }\n\n"
                 << "        scope.gl_PrimitiveIDIn = gl_PrimitiveIDIn;\n"
+                << "        scope.gl_InstanceID = gl_InstanceID;\n"
                 << "        scope.gsVertOutBuffer = gsVertOutBuffer;\n"
                 << "        scope.gsPrimOutBuffer = gsPrimOutBuffer;\n"
                 << "\n"
@@ -2612,6 +2616,7 @@ HdSt_CodeGenMSL::_GenerateBindingsCode()
         declarations << "};\n";
         _EmitDeclarationPtr(declarations, varName, typeName, TfToken(), binding, 0, true);
         _AddInputPtrParam(_mslVSInputParams, varName, typeName, TfToken(), binding, 0, true);
+        _AddInputPtrParam(_mslGSInputParams, varName, typeName, TfToken(), binding, 0, true);
         _AddInputPtrParam(_mslPSInputParams, varName, typeName, TfToken(), binding, 0, true);
     }
     _genCommon << declarations.str() << accessors.str();
@@ -3035,8 +3040,10 @@ HdSt_CodeGenMSL::_GenerateConstantPrimvar()
             HdSt_CodeGenMSL::TParam in(TfToken(ptrName), typeName,
                 TfToken(), TfToken(), HdSt_CodeGenMSL::TParam::Unspecified, binding);
             in.usage |= HdSt_CodeGenMSL::TParam::EntryFuncArgument | HdSt_CodeGenMSL::TParam::ProgramScope;
-            _mslPSInputParams.push_back(in);
+            
             _mslVSInputParams.push_back(in);
+            _mslGSInputParams.push_back(in);
+            _mslPSInputParams.push_back(in);
         }
 
         declarations << "struct " << typeName << " {\n";
@@ -3113,6 +3120,7 @@ HdSt_CodeGenMSL::_GenerateInstancePrimvar()
         // << layout (location=x) uniform float *translate_0;
         _EmitDeclarationPtr(declarations, name, dataType, TfToken(), binding);
         _AddInputPtrParam(_mslVSInputParams, name, dataType, TfToken(), binding);
+        _AddInputPtrParam(_mslGSInputParams, name, dataType, TfToken(), binding);
         _EmitAccessor(accessors, name, dataType, binding, n.str().c_str());
     }
 

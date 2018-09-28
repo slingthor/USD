@@ -555,7 +555,7 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
     
     if(doMVA) {
         //Setup Draw Args on the render context
-        struct { int _indexCount, _startIndex, _baseVertex; } drawArgs = { indexCount, firstIndex, baseVertex };
+        struct { int _indexCount, _startIndex, _baseVertex, _instanceCount; } drawArgs = { indexCount, firstIndex, baseVertex, instanceCount };
         [renderEncoder setVertexBytes:(const void*)&drawArgs length:sizeof(drawArgs) atIndex:_drawArgsSlot];
         //context->SetDrawArgsBuffer(indexCount, firstIndex, baseVertex, _drawArgsSlot, doMVAComputeGS);
         
@@ -603,7 +603,7 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
     else  {
         if(doMVAComputeGS)
         {
-            [computeEncoder dispatchThreads:MTLSizeMake(indexCount / 3,1,1) threadsPerThreadgroup:MTLSizeMake(64,1,1)];
+            [computeEncoder dispatchThreads:MTLSizeMake((indexCount / 3) * instanceCount, 1, 1) threadsPerThreadgroup:MTLSizeMake(64,1,1)];
             [renderEncoder drawPrimitives:primType vertexStart:0 vertexCount:indexCount instanceCount:instanceCount baseInstance:0];
         }
         else
