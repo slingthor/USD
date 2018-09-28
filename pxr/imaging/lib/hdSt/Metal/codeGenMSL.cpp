@@ -1234,8 +1234,8 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
         
         ////////////////////////////////// Geometry Output ///////////////////////////////
         
-        gsVertOutStruct << "struct MSLGsVertOutStruct {\n";
-        gsPrimOutStruct << "struct MSLGsPrimOutStruct {\n";
+        gsVertOutStruct << "struct alignas(4) MSLGsVertOutStruct {\n";
+        gsPrimOutStruct << "struct alignas(4) MSLGsPrimOutStruct {\n";
     
         std::stringstream vertBufferAccessor, primBufferAccessor, vsVertBufferAccessor, vsPrimBufferAccessor;
         vertBufferAccessor << "gsVertOutBuffer[gl_PrimitiveIDIn * " << numVerticesPerPrimitive << " + gsVertexCounter].";
@@ -1245,6 +1245,17 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
         TF_FOR_ALL(it, _mslGSOutputParams) {
             std::string name(it->name.GetString()), accessor(it->accessorStr.GetString()),
                         dataType(it->dataType.GetString()), attribute(it->attribute.GetString());
+        
+            //Replace vector data type with their packed variants to save space
+            if(dataType == "vec2")  dataType = "packed_float2";
+            else if(dataType == "vec3")  dataType = "packed_float3";
+            else if(dataType == "vec4")  dataType = "packed_float4";
+            else if(dataType == "int2")  dataType = "packed_int2";
+            else if(dataType == "int3")  dataType = "packed_int3";
+            else if(dataType == "int4")  dataType = "packed_int4";
+            else if(dataType == "uint2")  dataType = "packed_uint2";
+            else if(dataType == "uint3")  dataType = "packed_uint3";
+            else if(dataType == "uint4")  dataType = "packed_uint4";
         
             bool isPerPrim = (attribute == "[[flat]]");
             std::stringstream& structStream = (isPerPrim ? gsPrimOutStruct : gsVertOutStruct);
