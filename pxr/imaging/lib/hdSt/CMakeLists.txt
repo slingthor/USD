@@ -25,6 +25,7 @@ if (APPLE)
                         Metal/codeGenMSL
                         Metal/dispatchBufferMetal
                         Metal/drawTargetTextureResourceMetal
+                        Metal/flatNormalsMetal
                         Metal/indirectDrawBatchMetal
                         Metal/interleavedMemoryBufferMetal
                         Metal/metalConversions
@@ -79,6 +80,7 @@ pxr_library(hdSt
         extCompGpuComputationResource
         extCompGpuPrimvarBufferSource
         fallbackLightingShader
+        flatNormals
         geometricShader
         glslfxShader
         instancer
@@ -137,6 +139,7 @@ pxr_library(hdSt
         GL/dispatchBufferGL
         GL/glConversions
         GL/drawTargetTextureResourceGL
+        GL/flatNormalsGL
         GL/glslProgram
         GL/glUtils
         GL/indirectDrawBatchGL
@@ -174,6 +177,7 @@ pxr_library(hdSt
         shaders/renderPass.glslfx
         shaders/renderPassShader.glslfx
         shaders/terminals.glslfx
+        shaders/visibility.glslfx
 )
 
 if (X11_FOUND OR APPLE)

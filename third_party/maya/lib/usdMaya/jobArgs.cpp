@@ -21,7 +21,6 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#include "pxr/pxr.h"
 #include "usdMaya/jobArgs.h"
 
 #include "usdMaya/registryHelper.h"
@@ -29,6 +28,7 @@
 
 #include "pxr/base/tf/staticTokens.h"
 #include "pxr/base/vt/dictionary.h"
+
 #include "pxr/usd/sdf/schema.h"
 #include "pxr/usd/usdGeom/tokens.h"
 
@@ -45,14 +45,14 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 
 
-TF_DEFINE_PUBLIC_TOKENS(PxrUsdMayaTranslatorTokens,
+TF_DEFINE_PUBLIC_TOKENS(UsdMayaTranslatorTokens,
         PXRUSDMAYA_TRANSLATOR_TOKENS);
 
-TF_DEFINE_PUBLIC_TOKENS(PxrUsdExportJobArgsTokens, 
-        PXRUSDMAYA_JOBEXPORTARGS_TOKENS);
+TF_DEFINE_PUBLIC_TOKENS(UsdMayaJobExportArgsTokens, 
+        PXRUSDMAYA_JOB_EXPORT_ARGS_TOKENS);
 
-TF_DEFINE_PUBLIC_TOKENS(PxrUsdImportJobArgsTokens, 
-        PXRUSDMAYA_JOBIMPORTARGS_TOKENS);
+TF_DEFINE_PUBLIC_TOKENS(UsdMayaJobImportArgsTokens, 
+        PXRUSDMAYA_JOB_IMPORT_ARGS_TOKENS);
 
 TF_DEFINE_PRIVATE_TOKENS(
     _usdExportInfoScope,
@@ -187,18 +187,18 @@ _TokenSet(const VtDictionary& userArgs, const TfToken& key)
 // The chaser args are stored as vectors of vectors (since this is how you
 // would need to pass them in the Maya Python command API). Convert this to a
 // map of maps.
-static std::map<std::string, PxrUsdMayaJobExportArgs::ChaserArgs>
+static std::map<std::string, UsdMayaJobExportArgs::ChaserArgs>
 _ChaserArgs(const VtDictionary& userArgs, const TfToken& key)
 {
     const std::vector<std::vector<VtValue>> chaserArgs =
             _Vector<std::vector<VtValue>>(userArgs, key);
 
-    std::map<std::string, PxrUsdMayaJobExportArgs::ChaserArgs> result;
+    std::map<std::string, UsdMayaJobExportArgs::ChaserArgs> result;
     for (const std::vector<VtValue>& argTriple : chaserArgs) {
         if (argTriple.size() != 3) {
             TF_CODING_ERROR(
                     "Each chaser arg must be a triple (chaser, arg, value)");
-            return std::map<std::string, PxrUsdMayaJobExportArgs::ChaserArgs>();
+            return std::map<std::string, UsdMayaJobExportArgs::ChaserArgs>();
         }
 
         const std::string& chaser = argTriple[0].Get<std::string>();
@@ -209,13 +209,20 @@ _ChaserArgs(const VtDictionary& userArgs, const TfToken& key)
     return result;
 }
 
-PxrUsdMayaJobExportArgs::PxrUsdMayaJobExportArgs(
+UsdMayaJobExportArgs::UsdMayaJobExportArgs(
     const VtDictionary& userArgs,
-    const PxrUsdMayaUtil::MDagPathSet& dagPaths,
-    const GfInterval& timeInterval) :
+    const UsdMayaUtil::MDagPathSet& dagPaths,
+    const std::vector<double>& timeSamples) :
+        compatibility(
+            _Token(userArgs,
+                UsdMayaJobExportArgsTokens->compatibility,
+                UsdMayaJobExportArgsTokens->none,
+                {
+                    UsdMayaJobExportArgsTokens->appleArKit
+                })),
         defaultMeshScheme(
             _Token(userArgs,
-                PxrUsdExportJobArgsTokens->defaultMeshScheme,
+                UsdMayaJobExportArgsTokens->defaultMeshScheme,
                 UsdGeomTokens->catmullClark,
                 {
                     UsdGeomTokens->loop,
@@ -223,126 +230,131 @@ PxrUsdMayaJobExportArgs::PxrUsdMayaJobExportArgs(
                     UsdGeomTokens->none
                 })),
         eulerFilter(
-            _Boolean(userArgs, PxrUsdExportJobArgsTokens->eulerFilter)),
+            _Boolean(userArgs, UsdMayaJobExportArgsTokens->eulerFilter)),
         excludeInvisible(
-            _Boolean(userArgs, PxrUsdExportJobArgsTokens->renderableOnly)),
+            _Boolean(userArgs, UsdMayaJobExportArgsTokens->renderableOnly)),
         exportCollectionBasedBindings(
             _Boolean(userArgs,
-                PxrUsdExportJobArgsTokens->exportCollectionBasedBindings)),
+                UsdMayaJobExportArgsTokens->exportCollectionBasedBindings)),
         exportColorSets(
-            _Boolean(userArgs, PxrUsdExportJobArgsTokens->exportColorSets)),
+            _Boolean(userArgs, UsdMayaJobExportArgsTokens->exportColorSets)),
         exportDefaultCameras(
-            _Boolean(userArgs, PxrUsdExportJobArgsTokens->defaultCameras)),
+            _Boolean(userArgs, UsdMayaJobExportArgsTokens->defaultCameras)),
         exportDisplayColor(
-            _Boolean(userArgs, PxrUsdExportJobArgsTokens->exportDisplayColor)),
+            _Boolean(userArgs, UsdMayaJobExportArgsTokens->exportDisplayColor)),
         exportInstances(
-            _Boolean(userArgs, PxrUsdExportJobArgsTokens->exportInstances)),
+            _Boolean(userArgs, UsdMayaJobExportArgsTokens->exportInstances)),
         exportMaterialCollections(
             _Boolean(userArgs,
-                PxrUsdExportJobArgsTokens->exportMaterialCollections)),
+                UsdMayaJobExportArgsTokens->exportMaterialCollections)),
         exportMeshUVs(
-            _Boolean(userArgs, PxrUsdExportJobArgsTokens->exportUVs)),
+            _Boolean(userArgs, UsdMayaJobExportArgsTokens->exportUVs)),
         exportNurbsExplicitUV(
-            _Boolean(userArgs, PxrUsdExportJobArgsTokens->exportUVs)),
+            _Boolean(userArgs, UsdMayaJobExportArgsTokens->exportUVs)),
         exportReferenceObjects(
             _Boolean(userArgs,
-                PxrUsdExportJobArgsTokens->exportReferenceObjects)),
+                UsdMayaJobExportArgsTokens->exportReferenceObjects)),
         exportRefsAsInstanceable(
             _Boolean(userArgs,
-                PxrUsdExportJobArgsTokens->exportRefsAsInstanceable)),
+                UsdMayaJobExportArgsTokens->exportRefsAsInstanceable)),
         exportSkels(
             _Token(userArgs,
-                PxrUsdExportJobArgsTokens->exportSkels,
-                PxrUsdExportJobArgsTokens->none,
+                UsdMayaJobExportArgsTokens->exportSkels,
+                UsdMayaJobExportArgsTokens->none,
                 {
-                    PxrUsdExportJobArgsTokens->auto_,
-                    PxrUsdExportJobArgsTokens->explicit_
+                    UsdMayaJobExportArgsTokens->auto_,
+                    UsdMayaJobExportArgsTokens->explicit_
                 })),
         exportSkin(
             _Token(userArgs,
-                PxrUsdExportJobArgsTokens->exportSkin,
-                PxrUsdExportJobArgsTokens->none,
+                UsdMayaJobExportArgsTokens->exportSkin,
+                UsdMayaJobExportArgsTokens->none,
                 {
-                    PxrUsdExportJobArgsTokens->auto_,
-                    PxrUsdExportJobArgsTokens->explicit_
+                    UsdMayaJobExportArgsTokens->auto_,
+                    UsdMayaJobExportArgsTokens->explicit_
                 })),
         exportVisibility(
-            _Boolean(userArgs, PxrUsdExportJobArgsTokens->exportVisibility)),
+            _Boolean(userArgs, UsdMayaJobExportArgsTokens->exportVisibility)),
         materialCollectionsPath(
             _AbsolutePath(userArgs,
-                PxrUsdExportJobArgsTokens->materialCollectionsPath)),
+                UsdMayaJobExportArgsTokens->materialCollectionsPath)),
         mergeTransformAndShape(
             _Boolean(userArgs,
-                PxrUsdExportJobArgsTokens->mergeTransformAndShape)),
+                UsdMayaJobExportArgsTokens->mergeTransformAndShape)),
         normalizeNurbs(
-            _Boolean(userArgs, PxrUsdExportJobArgsTokens->normalizeNurbs)),
+            _Boolean(userArgs, UsdMayaJobExportArgsTokens->normalizeNurbs)),
         stripNamespaces(
             _Boolean(userArgs,
-                PxrUsdExportJobArgsTokens->stripNamespaces)),
+                UsdMayaJobExportArgsTokens->stripNamespaces)),
         parentScope(
-            _AbsolutePath(userArgs, PxrUsdExportJobArgsTokens->parentScope)),
+            _AbsolutePath(userArgs, UsdMayaJobExportArgsTokens->parentScope)),
         renderLayerMode(
             _Token(userArgs,
-                PxrUsdExportJobArgsTokens->renderLayerMode,
-                PxrUsdExportJobArgsTokens->defaultLayer,
+                UsdMayaJobExportArgsTokens->renderLayerMode,
+                UsdMayaJobExportArgsTokens->defaultLayer,
                 {
-                    PxrUsdExportJobArgsTokens->currentLayer,
-                    PxrUsdExportJobArgsTokens->modelingVariant
+                    UsdMayaJobExportArgsTokens->currentLayer,
+                    UsdMayaJobExportArgsTokens->modelingVariant
                 })),
         rootKind(
-            _String(userArgs, PxrUsdExportJobArgsTokens->kind)),
+            _String(userArgs, UsdMayaJobExportArgsTokens->kind)),
         shadingMode(
             _Token(userArgs,
-                PxrUsdExportJobArgsTokens->shadingMode,
-                PxrUsdMayaShadingModeTokens->none,
-                PxrUsdMayaShadingModeRegistry::ListExporters())),
+                UsdMayaJobExportArgsTokens->shadingMode,
+                UsdMayaShadingModeTokens->none,
+                UsdMayaShadingModeRegistry::ListExporters())),
+        verbose(
+            _Boolean(userArgs, UsdMayaJobExportArgsTokens->verbose)),
 
         chaserNames(
-            _Vector<std::string>(userArgs, PxrUsdExportJobArgsTokens->chaser)),
+            _Vector<std::string>(userArgs, UsdMayaJobExportArgsTokens->chaser)),
         allChaserArgs(
-            _ChaserArgs(userArgs, PxrUsdExportJobArgsTokens->chaserArgs)),
+            _ChaserArgs(userArgs, UsdMayaJobExportArgsTokens->chaserArgs)),
 
         melPerFrameCallback(
-            _String(userArgs, PxrUsdExportJobArgsTokens->melPerFrameCallback)),
+            _String(userArgs, UsdMayaJobExportArgsTokens->melPerFrameCallback)),
         melPostCallback(
-            _String(userArgs, PxrUsdExportJobArgsTokens->melPostCallback)),
+            _String(userArgs, UsdMayaJobExportArgsTokens->melPostCallback)),
         pythonPerFrameCallback(
             _String(userArgs,
-                PxrUsdExportJobArgsTokens->pythonPerFrameCallback)),
+                UsdMayaJobExportArgsTokens->pythonPerFrameCallback)),
         pythonPostCallback(
-            _String(userArgs, PxrUsdExportJobArgsTokens->pythonPostCallback)),
+            _String(userArgs, UsdMayaJobExportArgsTokens->pythonPostCallback)),
 
         dagPaths(dagPaths),
-        timeInterval(timeInterval)
+        timeSamples(timeSamples)
 {
 }
 
 std::ostream&
-operator <<(std::ostream& out, const PxrUsdMayaJobExportArgs& exportArgs)
+operator <<(std::ostream& out, const UsdMayaJobExportArgs& exportArgs)
 {
-    out << "exportRefsAsInstanceable: " << TfStringify(exportArgs.exportRefsAsInstanceable) << std::endl
-        << "exportDisplayColor: " << TfStringify(exportArgs.exportDisplayColor) << std::endl
-        << "shadingMode: " << exportArgs.shadingMode << std::endl
-        << "mergeTransformAndShape: " << TfStringify(exportArgs.mergeTransformAndShape) << std::endl
-        << "exportInstances: " << TfStringify(exportArgs.exportInstances) << std::endl
-        << "timeInterval: " << exportArgs.timeInterval << std::endl
+    out << "compatibility: " << exportArgs.compatibility << std::endl
+        << "defaultMeshScheme: " << exportArgs.defaultMeshScheme << std::endl
         << "eulerFilter: " << TfStringify(exportArgs.eulerFilter) << std::endl
         << "excludeInvisible: " << TfStringify(exportArgs.excludeInvisible) << std::endl
+        << "exportCollectionBasedBindings: " << TfStringify(exportArgs.exportCollectionBasedBindings) << std::endl
+        << "exportColorSets: " << TfStringify(exportArgs.exportColorSets) << std::endl
         << "exportDefaultCameras: " << TfStringify(exportArgs.exportDefaultCameras) << std::endl
+        << "exportDisplayColor: " << TfStringify(exportArgs.exportDisplayColor) << std::endl
+        << "exportInstances: " << TfStringify(exportArgs.exportInstances) << std::endl
+        << "exportMaterialCollections: " << TfStringify(exportArgs.exportMaterialCollections) << std::endl
+        << "exportMeshUVs: " << TfStringify(exportArgs.exportMeshUVs) << std::endl
+        << "exportNurbsExplicitUV: " << TfStringify(exportArgs.exportNurbsExplicitUV) << std::endl
+        << "exportRefsAsInstanceable: " << TfStringify(exportArgs.exportRefsAsInstanceable) << std::endl
         << "exportSkels: " << TfStringify(exportArgs.exportSkels) << std::endl
         << "exportSkin: " << TfStringify(exportArgs.exportSkin) << std::endl
-        << "exportMeshUVs: " << TfStringify(exportArgs.exportMeshUVs) << std::endl
-        << "exportMaterialCollections: " << TfStringify(exportArgs.exportMaterialCollections) << std::endl
-        << "materialCollectionsPath: " << exportArgs.materialCollectionsPath << std::endl
-        << "exportCollectionBasedBindings: " << TfStringify(exportArgs.exportCollectionBasedBindings) << std::endl
-        << "normalizeNurbs: " << TfStringify(exportArgs.normalizeNurbs) << std::endl
-        << "exportNurbsExplicitUV: " << TfStringify(exportArgs.exportNurbsExplicitUV) << std::endl
-        << "exportColorSets: " << TfStringify(exportArgs.exportColorSets) << std::endl
-        << "renderLayerMode: " << exportArgs.renderLayerMode << std::endl
-        << "defaultMeshScheme: " << exportArgs.defaultMeshScheme << std::endl
         << "exportVisibility: " << TfStringify(exportArgs.exportVisibility) << std::endl
+        << "materialCollectionsPath: " << exportArgs.materialCollectionsPath << std::endl
+        << "mergeTransformAndShape: " << TfStringify(exportArgs.mergeTransformAndShape) << std::endl
+        << "normalizeNurbs: " << TfStringify(exportArgs.normalizeNurbs) << std::endl
+        << "parentScope: " << exportArgs.parentScope << std::endl
+        << "renderLayerMode: " << exportArgs.renderLayerMode << std::endl
+        << "rootKind: " << exportArgs.rootKind << std::endl
+        << "shadingMode: " << exportArgs.shadingMode << std::endl
         << "stripNamespaces: " << TfStringify(exportArgs.stripNamespaces) << std::endl
-        << "parentScope: " << exportArgs.parentScope << std::endl;
+        << "timeSamples: " << exportArgs.timeSamples.size() << " sample(s)" << std::endl
+        << "usdModelRootOverridePath: " << exportArgs.usdModelRootOverridePath << std::endl;
 
     out << "melPerFrameCallback: " << exportArgs.melPerFrameCallback << std::endl
         << "melPostCallback: " << exportArgs.melPostCallback << std::endl
@@ -353,6 +365,7 @@ operator <<(std::ostream& out, const PxrUsdMayaJobExportArgs& exportArgs)
     for (const MDagPath& dagPath : exportArgs.dagPaths) {
         out << "    " << dagPath.fullPathName().asChar() << std::endl;
     }
+
     out << "_filteredTypeIds (" << exportArgs.GetFilteredTypeIds().size() << ")" << std::endl;
     for (unsigned int id : exportArgs.GetFilteredTypeIds()) {
         out << "    " << id << ": " << MNodeClass(MTypeId(id)).className() << std::endl;
@@ -374,72 +387,71 @@ operator <<(std::ostream& out, const PxrUsdMayaJobExportArgs& exportArgs)
         }
     }
 
-    out << "usdModelRootOverridePath: " << exportArgs.usdModelRootOverridePath << std::endl
-        << "rootKind: " << exportArgs.rootKind << std::endl;
-
     return out;
 }
 
 /* static */
-PxrUsdMayaJobExportArgs PxrUsdMayaJobExportArgs::CreateFromDictionary(
+UsdMayaJobExportArgs UsdMayaJobExportArgs::CreateFromDictionary(
     const VtDictionary& userArgs,
-    const PxrUsdMayaUtil::MDagPathSet& dagPaths,
-    const GfInterval& timeInterval)
+    const UsdMayaUtil::MDagPathSet& dagPaths,
+    const std::vector<double>& timeSamples)
 {
-    return PxrUsdMayaJobExportArgs(
+    return UsdMayaJobExportArgs(
             VtDictionaryOver(userArgs, GetDefaultDictionary()),
             dagPaths,
-            timeInterval);
+            timeSamples);
 }
 
 /* static */
-const VtDictionary& PxrUsdMayaJobExportArgs::GetDefaultDictionary()
+const VtDictionary& UsdMayaJobExportArgs::GetDefaultDictionary()
 {
     static VtDictionary d;
     static std::once_flag once;
     std::call_once(once, []() {
         // Base defaults.
-        d[PxrUsdExportJobArgsTokens->chaser] = std::vector<VtValue>();
-        d[PxrUsdExportJobArgsTokens->chaserArgs] = std::vector<VtValue>();
-        d[PxrUsdExportJobArgsTokens->defaultCameras] = false;
-        d[PxrUsdExportJobArgsTokens->defaultMeshScheme] = 
+        d[UsdMayaJobExportArgsTokens->chaser] = std::vector<VtValue>();
+        d[UsdMayaJobExportArgsTokens->chaserArgs] = std::vector<VtValue>();
+        d[UsdMayaJobExportArgsTokens->compatibility] =
+                UsdMayaJobExportArgsTokens->none.GetString();
+        d[UsdMayaJobExportArgsTokens->defaultCameras] = false;
+        d[UsdMayaJobExportArgsTokens->defaultMeshScheme] = 
                 UsdGeomTokens->catmullClark.GetString();
-        d[PxrUsdExportJobArgsTokens->exportCollectionBasedBindings] = false;
-        d[PxrUsdExportJobArgsTokens->exportColorSets] = true;
-        d[PxrUsdExportJobArgsTokens->exportDisplayColor] = true;
-        d[PxrUsdExportJobArgsTokens->exportInstances] = true;
-        d[PxrUsdExportJobArgsTokens->exportMaterialCollections] = false;
-        d[PxrUsdExportJobArgsTokens->exportReferenceObjects] = false;
-        d[PxrUsdExportJobArgsTokens->exportRefsAsInstanceable] = false;
-        d[PxrUsdExportJobArgsTokens->exportSkin] =
-                PxrUsdExportJobArgsTokens->none.GetString();
-        d[PxrUsdExportJobArgsTokens->exportSkels] =
-                PxrUsdExportJobArgsTokens->none.GetString();
-        
-        d[PxrUsdExportJobArgsTokens->exportUVs] = true;
-        d[PxrUsdExportJobArgsTokens->exportVisibility] = true;
-        d[PxrUsdExportJobArgsTokens->kind] = std::string();
-        d[PxrUsdExportJobArgsTokens->materialCollectionsPath] = std::string();
-        d[PxrUsdExportJobArgsTokens->melPerFrameCallback] = std::string();
-        d[PxrUsdExportJobArgsTokens->melPostCallback] = std::string();
-        d[PxrUsdExportJobArgsTokens->mergeTransformAndShape] = true;
-        d[PxrUsdExportJobArgsTokens->normalizeNurbs] = false;
-        d[PxrUsdExportJobArgsTokens->parentScope] = std::string();
-        d[PxrUsdExportJobArgsTokens->pythonPerFrameCallback] = std::string();
-        d[PxrUsdExportJobArgsTokens->pythonPostCallback] = std::string();
-        d[PxrUsdExportJobArgsTokens->renderableOnly] = false;
-        d[PxrUsdExportJobArgsTokens->renderLayerMode] =
-                PxrUsdExportJobArgsTokens->defaultLayer.GetString();
-        d[PxrUsdExportJobArgsTokens->shadingMode] =
-                PxrUsdMayaShadingModeTokens->displayColor.GetString();
-        d[PxrUsdExportJobArgsTokens->stripNamespaces] = false;
-        d[PxrUsdExportJobArgsTokens->eulerFilter] = false;
+        d[UsdMayaJobExportArgsTokens->eulerFilter] = false;
+        d[UsdMayaJobExportArgsTokens->exportCollectionBasedBindings] = false;
+        d[UsdMayaJobExportArgsTokens->exportColorSets] = true;
+        d[UsdMayaJobExportArgsTokens->exportDisplayColor] = true;
+        d[UsdMayaJobExportArgsTokens->exportInstances] = true;
+        d[UsdMayaJobExportArgsTokens->exportMaterialCollections] = false;
+        d[UsdMayaJobExportArgsTokens->exportReferenceObjects] = false;
+        d[UsdMayaJobExportArgsTokens->exportRefsAsInstanceable] = false;
+        d[UsdMayaJobExportArgsTokens->exportSkin] =
+                UsdMayaJobExportArgsTokens->none.GetString();
+        d[UsdMayaJobExportArgsTokens->exportSkels] =
+                UsdMayaJobExportArgsTokens->none.GetString();
+        d[UsdMayaJobExportArgsTokens->exportUVs] = true;
+        d[UsdMayaJobExportArgsTokens->exportVisibility] = true;
+        d[UsdMayaJobExportArgsTokens->kind] = std::string();
+        d[UsdMayaJobExportArgsTokens->materialCollectionsPath] = std::string();
+        d[UsdMayaJobExportArgsTokens->melPerFrameCallback] = std::string();
+        d[UsdMayaJobExportArgsTokens->melPostCallback] = std::string();
+        d[UsdMayaJobExportArgsTokens->mergeTransformAndShape] = true;
+        d[UsdMayaJobExportArgsTokens->normalizeNurbs] = false;
+        d[UsdMayaJobExportArgsTokens->parentScope] = std::string();
+        d[UsdMayaJobExportArgsTokens->pythonPerFrameCallback] = std::string();
+        d[UsdMayaJobExportArgsTokens->pythonPostCallback] = std::string();
+        d[UsdMayaJobExportArgsTokens->renderableOnly] = false;
+        d[UsdMayaJobExportArgsTokens->renderLayerMode] =
+                UsdMayaJobExportArgsTokens->defaultLayer.GetString();
+        d[UsdMayaJobExportArgsTokens->shadingMode] =
+                UsdMayaShadingModeTokens->displayColor.GetString();
+        d[UsdMayaJobExportArgsTokens->stripNamespaces] = false;
+        d[UsdMayaJobExportArgsTokens->verbose] = false;
 
         // plugInfo.json site defaults.
         // The defaults dict should be correctly-typed, so enable
         // coerceToWeakerOpinionType.
         const VtDictionary site =
-                PxrUsdMaya_RegistryHelper::GetComposedInfoDictionary(
+                UsdMaya_RegistryHelper::GetComposedInfoDictionary(
                 _usdExportInfoScope->allTokens);
         VtDictionaryOver(site, &d, /*coerceToWeakerOpinionType*/ true);
     });
@@ -447,7 +459,7 @@ const VtDictionary& PxrUsdMayaJobExportArgs::GetDefaultDictionary()
     return d;
 }
 
-void PxrUsdMayaJobExportArgs::AddFilteredTypeName(const MString& typeName)
+void UsdMayaJobExportArgs::AddFilteredTypeName(const MString& typeName)
 {
     MNodeClass cls(typeName);
     unsigned int id = cls.typeId().id();
@@ -483,33 +495,33 @@ void PxrUsdMayaJobExportArgs::AddFilteredTypeName(const MString& typeName)
     }
 }
 
-PxrUsdMayaJobImportArgs::PxrUsdMayaJobImportArgs(
+UsdMayaJobImportArgs::UsdMayaJobImportArgs(
     const VtDictionary& userArgs,
     const bool importWithProxyShapes,
     const GfInterval& timeInterval) :
         assemblyRep(
             _Token(userArgs,
-                PxrUsdImportJobArgsTokens->assemblyRep,
-                PxrUsdImportJobArgsTokens->Collapsed,
+                UsdMayaJobImportArgsTokens->assemblyRep,
+                UsdMayaJobImportArgsTokens->Collapsed,
                 {
-                    PxrUsdImportJobArgsTokens->Full,
-                    PxrUsdImportJobArgsTokens->Import,
-                    PxrUsdImportJobArgsTokens->Unloaded
+                    UsdMayaJobImportArgsTokens->Full,
+                    UsdMayaJobImportArgsTokens->Import,
+                    UsdMayaJobImportArgsTokens->Unloaded
                 })),
         excludePrimvarNames(
-            _TokenSet(userArgs, PxrUsdImportJobArgsTokens->excludePrimvar)),
+            _TokenSet(userArgs, UsdMayaJobImportArgsTokens->excludePrimvar)),
         includeAPINames(
-            _TokenSet(userArgs, PxrUsdImportJobArgsTokens->apiSchema)),
+            _TokenSet(userArgs, UsdMayaJobImportArgsTokens->apiSchema)),
         includeMetadataKeys(
-            _TokenSet(userArgs, PxrUsdImportJobArgsTokens->metadata)),
+            _TokenSet(userArgs, UsdMayaJobImportArgsTokens->metadata)),
         shadingMode(
             _Token(userArgs,
-                PxrUsdImportJobArgsTokens->shadingMode,
-                PxrUsdMayaShadingModeTokens->none,
-                PxrUsdMayaShadingModeRegistry::ListImporters())),
+                UsdMayaJobImportArgsTokens->shadingMode,
+                UsdMayaShadingModeTokens->none,
+                UsdMayaShadingModeRegistry::ListImporters())),
         useAsAnimationCache(
             _Boolean(userArgs,
-                PxrUsdImportJobArgsTokens->useAsAnimationCache)),
+                UsdMayaJobImportArgsTokens->useAsAnimationCache)),
 
         importWithProxyShapes(importWithProxyShapes),
         timeInterval(timeInterval)
@@ -517,43 +529,43 @@ PxrUsdMayaJobImportArgs::PxrUsdMayaJobImportArgs(
 }
 
 /* static */
-PxrUsdMayaJobImportArgs PxrUsdMayaJobImportArgs::CreateFromDictionary(
+UsdMayaJobImportArgs UsdMayaJobImportArgs::CreateFromDictionary(
     const VtDictionary& userArgs,
     const bool importWithProxyShapes,
     const GfInterval& timeInterval)
 {
-    return PxrUsdMayaJobImportArgs(
+    return UsdMayaJobImportArgs(
             VtDictionaryOver(userArgs, GetDefaultDictionary()),
             importWithProxyShapes,
             timeInterval);
 }
 
 /* static */
-const VtDictionary& PxrUsdMayaJobImportArgs::GetDefaultDictionary()
+const VtDictionary& UsdMayaJobImportArgs::GetDefaultDictionary()
 {
     static VtDictionary d;
     static std::once_flag once;
     std::call_once(once, []() {
         // Base defaults.
-        d[PxrUsdImportJobArgsTokens->assemblyRep] =
-                PxrUsdImportJobArgsTokens->Collapsed.GetString();
-        d[PxrUsdImportJobArgsTokens->apiSchema] = std::vector<VtValue>();
-        d[PxrUsdImportJobArgsTokens->excludePrimvar] = std::vector<VtValue>();
-        d[PxrUsdImportJobArgsTokens->metadata] =
+        d[UsdMayaJobImportArgsTokens->assemblyRep] =
+                UsdMayaJobImportArgsTokens->Collapsed.GetString();
+        d[UsdMayaJobImportArgsTokens->apiSchema] = std::vector<VtValue>();
+        d[UsdMayaJobImportArgsTokens->excludePrimvar] = std::vector<VtValue>();
+        d[UsdMayaJobImportArgsTokens->metadata] =
                 std::vector<VtValue>({
                     VtValue(SdfFieldKeys->Hidden.GetString()),
                     VtValue(SdfFieldKeys->Instanceable.GetString()),
                     VtValue(SdfFieldKeys->Kind.GetString())
                 });
-        d[PxrUsdImportJobArgsTokens->shadingMode] =
-                PxrUsdMayaShadingModeTokens->displayColor.GetString();
-        d[PxrUsdImportJobArgsTokens->useAsAnimationCache] = false;
+        d[UsdMayaJobImportArgsTokens->shadingMode] =
+                UsdMayaShadingModeTokens->displayColor.GetString();
+        d[UsdMayaJobImportArgsTokens->useAsAnimationCache] = false;
 
         // plugInfo.json site defaults.
         // The defaults dict should be correctly-typed, so enable
         // coerceToWeakerOpinionType.
         const VtDictionary site =
-                PxrUsdMaya_RegistryHelper::GetComposedInfoDictionary(
+                UsdMaya_RegistryHelper::GetComposedInfoDictionary(
                 _usdImportInfoScope->allTokens);
         VtDictionaryOver(site, &d, /*coerceToWeakerOpinionType*/ true);
     });
@@ -562,7 +574,7 @@ const VtDictionary& PxrUsdMayaJobImportArgs::GetDefaultDictionary()
 }
 
 std::ostream&
-operator <<(std::ostream& out, const PxrUsdMayaJobImportArgs& importArgs)
+operator <<(std::ostream& out, const UsdMayaJobImportArgs& importArgs)
 {
     out << "shadingMode: " << importArgs.shadingMode << std::endl
         << "assemblyRep: " << importArgs.assemblyRep << std::endl

@@ -24,27 +24,31 @@
 #ifndef PXRUSDMAYA_EDITUTIL_H
 #define PXRUSDMAYA_EDITUTIL_H
 
-#include "pxr/pxr.h"
+/// \file usdMaya/editUtil.h
+
 #include "usdMaya/api.h"
 
+#include "pxr/pxr.h"
+
 #include "pxr/base/vt/value.h"
+
 #include "pxr/usd/sdf/path.h"
 #include "pxr/usd/usd/stage.h"
 #include "pxr/usd/usd/prim.h"
 
-#include <maya/MObject.h>
 #include <maya/MFnAssembly.h>
+#include <maya/MObject.h>
 
+#include <map>
 #include <string>
 #include <vector>
-#include <map>
 
 
 PXR_NAMESPACE_OPEN_SCOPE
 
 /// \brief Utility class for handling edits on Assemblies in Maya.
 ///
-class PxrUsdMayaEditUtil
+class UsdMayaEditUtil
 {
 public:
         
@@ -145,4 +149,4 @@ private:
 
 PXR_NAMESPACE_CLOSE_SCOPE
 
-#endif // PXRUSDMAYA_EDITUTIL_H
+#endif

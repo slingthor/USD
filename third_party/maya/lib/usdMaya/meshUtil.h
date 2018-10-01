@@ -22,13 +22,14 @@
 // language governing permissions and limitations under the Apache License.
 //
 
-/// \file meshUtil.h
+/// \file usdMaya/meshUtil.h
 
 #ifndef PXRUSDMAYA_MESH_UTIL_H
 #define PXRUSDMAYA_MESH_UTIL_H
 
-#include "pxr/pxr.h"
 #include "usdMaya/api.h"
+
+#include "pxr/pxr.h"
 #include "pxr/base/gf/vec3f.h"
 #include "pxr/base/tf/staticTokens.h"
 #include "pxr/base/tf/token.h"
@@ -45,11 +46,12 @@ class UsdGeomMesh;
     ((DisplayColorColorSetName, "displayColor")) \
     ((DisplayOpacityColorSetName, "displayOpacity"))
 
-TF_DECLARE_PUBLIC_TOKENS(PxrUsdMayaMeshColorSetTokens,
+TF_DECLARE_PUBLIC_TOKENS(UsdMayaMeshColorSetTokens,
+    PXRUSDMAYA_API,
     PXRUSDMAYA_MESH_COLOR_SET_TOKENS);
 
 /// Utilities for dealing with USD and RenderMan for Maya mesh/subdiv tags.
-namespace PxrUsdMayaMeshUtil
+namespace UsdMayaMeshUtil
 {
     /// Gets the internal emit-normals tag on the Maya \p mesh, placing it in
     /// \p value. Returns true if the tag exists on the mesh, and false if not.
@@ -88,9 +90,9 @@ namespace PxrUsdMayaMeshUtil
     PXRUSDMAYA_API
     TfToken GetSubdivFVLinearInterpolation(const MFnMesh& mesh);
 
-} // namespace PxrUsdMayaMeshUtil
+} // namespace UsdMayaMeshUtil
 
 
 PXR_NAMESPACE_CLOSE_SCOPE
 
-#endif // PXRUSDMAYA_MESH_UTIL_H
+#endif

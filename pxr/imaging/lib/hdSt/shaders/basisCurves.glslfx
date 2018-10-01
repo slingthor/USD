@@ -44,6 +44,10 @@
 // * We might want to explore using fractional_even_spacing to better preserve
 // the shape of cubic curves.
 //
+// * We've realized that u appears to be 'backwards' in many cases, and so we
+//   have updated many of the functions to use
+//   mix(endPointValue, startPointValue, u) when intuitively it should be
+//   the other way around.
 
 --- --------------------------------------------------------------------------
 -- glsl Curves.Vertex.Patch
@@ -467,8 +471,13 @@ out float v;
 // Predefine so that we can later swap in the correct one depending
 // on what type of curve we have
 
+#if defined(ARCH_GFX_METAL)
+void evaluate(float u, float v, thread vec4 &position, thread vec4 &tangent, 
+              thread float &width, thread vec3 &normal);
+#else
 void evaluate(float u, float v, out vec4 position, out vec4 tangent, 
               out float width, out vec3 normal);
+#endif
 // it's the responsibility of orient to store Neye, usually with either
 // the computed normal or the tangent (from which the normal will be computed
 // in the fragment shader.)
@@ -508,20 +517,25 @@ vec3 evaluateNormal(float u)
 {
     // XXX: This clamp is a hack to mask some odd orientation flipping issues 
     u = clamp(u, 1e-3, 1.0 - 1e-3);
-    return mix(inData[0].Neye, inData[1].Neye, u);
+    return mix(inData[1].Neye, inData[0].Neye, u);
 }
 
+#if defined(ARCH_GFX_METAL)
+void evaluate(float u, float v, thread vec4 &position, thread vec4 &tangent, 
+              thread float &width, thread vec3 &normal){
+#else
 void evaluate(float u, float v, out vec4 position, out vec4 tangent, 
               out float width, out vec3 normal){
+#endif
     vec4 p0 = inData[0].Peye;
     vec4 p1 = inData[1].Peye;
 
     float w0 = HdGet_widths(0);
     float w1 = HdGet_widths(1);
 
-    position = p0 * (1.0 - u) + p1 * u;
+    position = mix(p1, p0, u);
     tangent = normalize(p1 - p0);
-    width = w0 * (1.0 - u) + w1 * u;
+    width = mix(w1, w0, u);
     normal = normalize(evaluateNormal(u));
 }
 
@@ -537,8 +551,13 @@ Coeffs evaluateBasis(float u, float u2, float u3);
 float evaluateWidths(vec4 basis, float u);
 vec3 evaluateNormal(vec4 basis, float u);
 
+#if defined(ARCH_GFX_METAL)
+void evaluate(float u, float v, thread vec4 &position, thread vec4 &tangent, 
+              thread float &width, thread vec3 &normal){
+#else
 void evaluate(float u, float v, out vec4 position, out vec4 tangent, 
               out float width, out vec3 normal){
+#endif
     vec4 p0 = inData[0].Peye;
     vec4 p1 = inData[1].Peye;
     vec4 p2 = inData[2].Peye;
@@ -624,11 +643,8 @@ vec3 evaluateNormal(vec4 basis, float u)
     // XXX: This clamp is a hack to mask some odd orientation flipping issues 
     // for oriented bezier curves.
     u = clamp(u, 1e-3, 1.0 - 1e-3);
-    return mix(inData[1].Neye, inData[2].Neye, u);
+    return mix(inData[2].Neye, inData[1].Neye, u);
 }
-
-#endif
-
 
 --- --------------------------------------------------------------------------
 -- glsl Curves.Cubic.Widths.Basis
@@ -657,7 +673,7 @@ float evaluateWidths(vec4 basis, float u)
 {
     float w0 = HdGet_widths(1);
     float w1 = HdGet_widths(2);
-    return mix(w0, w1, u);
+    return mix(w1, w0, u);
 }
 
 --- --------------------------------------------------------------------------

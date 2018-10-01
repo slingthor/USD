@@ -190,7 +190,7 @@ public:
     /// named \a identifier. If \a samplerId is specified, the bindings
     /// returned will use this samplerId for resources which can be sampled.
     virtual BindingVector GetBindings(TfToken const & identifier,
-                                      GarchSamplerGPUHandle samplerId = GarchSamplerGPUHandle()) const = 0;
+                                      GarchSamplerGPUHandle samplerId = GarchSamplerGPUHandle()) = 0;
 
     /// Amount of memory used to store the texture
     GARCH_API
@@ -202,13 +202,13 @@ public:
     
     /// Returns the graphics API texture object for the texture.
     GARCH_API
-    virtual GarchTextureGPUHandle GetTextureName() const = 0;
+    virtual GarchTextureGPUHandle GetTextureName() = 0;
 
     /// Specify the amount of memory the user wishes to allocate to the texture
     GARCH_API
     void SetMemoryRequested(size_t targetMemory);
 
-    virtual VtDictionary GetTextureInfo() const = 0;
+    virtual VtDictionary GetTextureInfo(bool forceLoad) = 0;
 
     GARCH_API
     virtual bool IsMinFilterSupported(GLenum filter);
@@ -247,7 +247,10 @@ protected:
     void _SetMemoryUsed(size_t size);
     
     GARCH_API
-    virtual void _OnSetMemoryRequested(size_t targetMemory);
+    virtual void _OnMemoryRequestedDirty();
+    
+    GARCH_API
+    virtual void _ReadTexture() = 0;
 
     GARCH_API
     void _UpdateContentsID();

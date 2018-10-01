@@ -87,7 +87,7 @@ public:
     // GarchBaseTexture overrides
     GLF_API
     virtual BindingVector GetBindings(TfToken const & identifier,
-                                      GarchSamplerGPUHandle samplerName) const override;
+                                      GarchSamplerGPUHandle samplerName) override;
 
 protected:
     GLF_API
@@ -103,8 +103,6 @@ protected:
 
     friend class GlfResourceFactory;
 
-    GLF_API
-    virtual void _OnSetMemoryRequested(size_t targetMemory);
     GLF_API
     const TfToken& _GetImageFilePath(size_t index) const;
     using GarchUVTexture::_GetImageFilePath;

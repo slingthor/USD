@@ -122,21 +122,6 @@ public:
     USDSKEL_API
     VtTokenArray GetJointOrder() const;
 
-    /// Compute a root animation transform. If no animation source is bound,
-    /// an identity matrix is returned.
-    USDSKEL_API
-    bool ComputeAnimTransform(GfMatrix4d* xform,
-                              UsdTimeCode time=UsdTimeCode::Default()) const;
-
-    /// Compute the local-to-world transform of the skeleton.
-    /// A Skeleton's complete local to world transform is:
-    /// \code
-    ///     animTransform * skelPrimLocalToWorld
-    /// \endcode
-    USDSKEL_API
-    bool ComputeLocalToWorldTransform(GfMatrix4d* xform,
-                                      UsdGeomXformCache* xfCache) const;
-    
     /// Compute joint transforms in joint-local space, at \p time.
     /// This returns transforms in joint order of the skeleton.
     /// If \p atRest is false and an animation source is bound, local transforms
@@ -160,18 +145,34 @@ public:
                                     UsdTimeCode time,
                                     bool atRest=false) const;
 
+    /// Compute joint transforms in world space, at whatever time is configured
+    /// on \p xfCache.
+    /// This is equivalent to computing skel-space joint transforms with
+    /// CmoputeJointSkelTransforms(), and then concatenating all transforms
+    /// by the local-to-world transform of the Skeleton prim.
+    /// If \p atRest is true, any bound animation source is ignored, and
+    /// transforms are computed from the rest pose.
+    USDSKEL_API
+    bool ComputeJointWorldTransforms(VtMatrix4dArray* xforms,
+                                     UsdGeomXformCache* xfCache,
+                                     bool atRest=false) const;
+
     /// Compute transforms representing the change in transformation
     /// of a joint from its rest pose, in skeleton space.
     ///
     /// I.e.,
     /// \code
-    ///     inverse(restTransform)*jointTransform
+    ///     inverse(bindTransform)*jointTransform
     /// \endcode
     ///
     /// These are the transforms usually required for skinning.
     USDSKEL_API
     bool ComputeSkinningTransforms(VtMatrix4dArray* xforms,
                                    UsdTimeCode time) const;
+
+    /// Returns the world space joint transforms at bind time.
+    USDSKEL_API
+    bool GetJointWorldBindTransforms(VtMatrix4dArray* xforms) const;
 
     USDSKEL_API
     std::string GetDescription() const;

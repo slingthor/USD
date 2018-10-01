@@ -21,11 +21,11 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#include "pxr/pxr.h"
 #include "usdMaya/stageData.h"
 
 #include "pxr/base/gf/bbox3d.h"
 #include "pxr/base/tf/staticTokens.h"
+
 #include "pxr/usd/sdf/path.h"
 #include "pxr/usd/usd/stage.h"
 
@@ -38,13 +38,13 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 
-TF_DEFINE_PUBLIC_TOKENS(PxrUsdMayaStageDataTokens,
+TF_DEFINE_PUBLIC_TOKENS(UsdMayaStageDataTokens,
                         PXRUSDMAYA_STAGE_DATA_TOKENS);
 
 
 const MTypeId UsdMayaStageData::mayaTypeId(0x0010A257);
 const MString UsdMayaStageData::typeName(
-    PxrUsdMayaStageDataTokens->MayaTypeName.GetText());
+    UsdMayaStageDataTokens->MayaTypeName.GetText());
 
 
 /* This exists solely to make sure that the usdStage instance

@@ -49,11 +49,4 @@ UsdImagingPackageDrawModeShader()
     return drawModeShader;
 }
 
-TfToken
-UsdImagingPackagePreviewSurfaceShader()
-{
-    static TfToken previewSurface = _GetShaderPath("previewSurface.glslfx");
-    return previewSurface;
-}
-
 PXR_NAMESPACE_CLOSE_SCOPE

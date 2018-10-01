@@ -76,11 +76,52 @@ GlfBaseTexture::~GlfBaseTexture()
     }
 }
 
+
+GarchTextureGPUHandle GlfBaseTexture::GetAPITextureName()
+{
+    if (!_loaded) {
+        _ReadTexture();
+    }
+    
+    return _textureName;
+}
+
+int GlfBaseTexture::GetWidth()
+{
+    if (!_loaded) {
+        _ReadTexture();
+    }
+    
+    return _currentWidth;
+}
+
+int GlfBaseTexture::GetHeight()
+{
+    if (!_loaded) {
+        _ReadTexture();
+    }
+    
+    return _currentHeight;
+}
+
+int GlfBaseTexture::GetFormat()
+{
+    if (!_loaded) {
+        _ReadTexture();
+    }
+    
+    return _format;
+}
+
 /* virtual */
 GarchTexture::BindingVector
 GlfBaseTexture::GetBindings(TfToken const & identifier,
-                            GarchSamplerGPUHandle samplerName) const
+                            GarchSamplerGPUHandle samplerName)
 {
+    if (!_loaded) {
+        _ReadTexture();
+    }
+
     return BindingVector(1,
                 Binding(identifier, GarchTextureTokens->texels,
                         GL_TEXTURE_2D, _textureName, samplerName));

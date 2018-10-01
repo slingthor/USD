@@ -29,7 +29,7 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 
-/// smooth normal computation GPU
+/// smooth normal computation GPU for Metal
 ///
 ///
 class HdSt_SmoothNormalsComputationMetal : public HdSt_SmoothNormalsComputationGPU {
@@ -41,7 +41,7 @@ public:
                                        TfToken const &srcName,
                                        TfToken const &dstName,
                                        HdType srcDataType,
-                                       HdType dstDataType);
+                                       bool packed);
 
 protected:
     HDST_API

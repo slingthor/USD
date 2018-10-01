@@ -124,6 +124,9 @@ void wrapMetal()
                  return_value_policy< TfPySequenceToTuple >())
             .def("GetRendererPluginDesc", &UsdImagingMetal::GetRendererPluginDesc)
             .def("SetRendererPlugin", &UsdImagingMetal::SetRendererPlugin)
+            .def("GetRendererAovs", &UsdImagingMetal::GetRendererAovs,
+                 return_value_policy< TfPySequenceToTuple >())
+            .def ("SetRendererAov", &UsdImagingMetal::SetRendererAov)
             .def("GetResourceAllocation", &UsdImagingMetal::GetResourceAllocation)
         ;
 
@@ -164,14 +167,16 @@ void wrapMetal()
             .def_readwrite("cullStyle", &Params::cullStyle)
             .def_readwrite("enableIdRender", &Params::enableIdRender)
             .def_readwrite("enableLighting", &Params::enableLighting)
-            .def_readwrite("enableSampleAlphaToCoverage", &Params::enableSampleAlphaToCoverage)
+            .def_readwrite("enableSampleAlphaToCoverage",
+                &Params::enableSampleAlphaToCoverage)
             .def_readwrite("applyRenderState", &Params::applyRenderState)
             .def_readwrite("gammaCorrectColors", &Params::gammaCorrectColors)
             .def_readwrite("overrideColor", &Params::overrideColor)
             .def_readwrite("wireframeColor", &Params::wireframeColor)
             .def_readwrite("clipPlanes", &Params::clipPlanes)
             .def_readwrite("highlight", &Params::highlight)
-            .def_readwrite("enableHardwareShading", &Params::enableHardwareShading)
+            .def_readwrite("enableSceneMaterials",
+                &Params::enableSceneMaterials)
             .def_readwrite("enableUsdDrawModes", &Params::enableUsdDrawModes)
         ;
 

@@ -675,6 +675,20 @@ UsdImagingMetalEngine::SetRendererPlugin(TfToken const &id)
 }
 
 /* virtual */
+TfTokenVector
+UsdImagingMetalEngine::GetRendererAovs() const
+{
+    return std::vector<TfToken>();
+}
+
+/* virtual */
+bool
+UsdImagingMetalEngine::SetRendererAov(TfToken const &id)
+{
+    return false;
+}
+
+/* virtual */
 VtDictionary
 UsdImagingMetalEngine::GetResourceAllocation() const
 {

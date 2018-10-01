@@ -105,7 +105,7 @@ public:
         virtual ~Attachment() {}
         
         /// Returns the texture handle (can be used as any regular native graphics API texture)
-        virtual GarchTextureGPUHandle GetTextureName() const = 0;
+        virtual GarchTextureGPUHandle GetTextureName() override = 0;
 
         /// Resize the attachment recreating the texture
         GARCH_API
@@ -114,9 +114,9 @@ public:
         // GarchTexture overrides
         GARCH_API
         virtual BindingVector GetBindings(TfToken const & identifier,
-                                          GarchSamplerGPUHandle samplerName) const = 0;
+                                          GarchSamplerGPUHandle samplerName) override = 0;
         GARCH_API
-        virtual VtDictionary GetTextureInfo() const = 0;
+        virtual VtDictionary GetTextureInfo(bool forceLoad) override  = 0;
 
         /// Updates the contents signature for the underlying texture
         /// to allow downstream consumers to know that the texture image
@@ -126,6 +126,9 @@ public:
 
     protected:
         Attachment() {}
+        
+        GARCH_API
+        virtual void _ReadTexture() override final {}
     };
 
     typedef TfDeclarePtrs<class Attachment>::RefPtr AttachmentRefPtr;

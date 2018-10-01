@@ -54,36 +54,30 @@ public:
     GARCH_API
     virtual ~GarchBaseTexture();
 
-    /// Returns the OpenGl texture name for the texture. 
-    GarchTextureGPUHandle GetGlTextureName() const {
-        return _textureName;
-    }
-
-    int	GetWidth() const {
-        return _currentWidth;
-    }
-
-    int GetHeight() const {
-        return _currentHeight;
-    }
-
-    int GetFormat() const {
-        return _format;
-    }
+    /// Returns the GPU API texture handle for the texture.
+    GARCH_API
+    GarchTextureGPUHandle GetAPITextureName();
+    
+    GARCH_API
+    int GetWidth();
+    
+    GARCH_API
+    int GetHeight();
+    
+    GARCH_API
+    int GetFormat();
 
     // GarchTexture overrides
     /// Returns the GPU API texture object for the texture.
     GARCH_API
-    virtual GarchTextureGPUHandle GetTextureName() const override {
-        return _textureName;
-    }
+    virtual GarchTextureGPUHandle GetTextureName() override;
 
     GARCH_API
     virtual BindingVector GetBindings(TfToken const & identifier,
-                                      GarchSamplerGPUHandle samplerName) const override = 0;
+                                      GarchSamplerGPUHandle samplerName) override = 0;
 
     GARCH_API
-    virtual VtDictionary GetTextureInfo() const override;
+    virtual VtDictionary GetTextureInfo(bool forceLoad) override;
 
 protected:
     
@@ -92,6 +86,12 @@ protected:
     
     GARCH_API
     GarchBaseTexture(GarchImage::ImageOriginLocation originLocation);
+    
+    GARCH_API
+    virtual void _OnMemoryRequestedDirty() override final;
+    
+    GARCH_API
+    virtual void _ReadTexture() override = 0;
 
     GARCH_API
     virtual void _UpdateTexture(GarchBaseTextureDataConstPtr texData) = 0;
@@ -103,6 +103,9 @@ protected:
                                 int const unpackCropLeft = 0,
                                 int const unpackCropRight = 0) = 0;
 
+    GARCH_API
+    virtual void _SetLoaded();
+
     friend class GarchUVTexture;
     friend class GarchUVTextureStorage;
 
@@ -110,6 +113,7 @@ protected:
     GarchTextureGPUHandle _textureName;
 
     // required for stats/tracking
+    bool    _loaded;
     int     _currentWidth, _currentHeight;
     int     _format;
     bool    _hasWrapModeS;

@@ -978,7 +978,7 @@ UsdSkelSkinPointsLBS(const GfMatrix4d& geomBindTransform,
                                     numInfluencesPerPoint,
                                     points->data(), points->size());
     } else {
-        TF_WARN("jointIndices.size() [%zu]! = jointWeights.size() [%zu].",
+        TF_WARN("jointIndices.size() [%zu] != jointWeights.size() [%zu].",
                 jointIndices.size(), jointWeights.size());
     }
     return false;
@@ -1019,17 +1019,16 @@ UsdSkelSkinTransformLBS(const GfMatrix4d& geomBindTransform,
     // apply normal point deformations, and then derive a skinned transform
     // from the deformed frame points.
 
-    // Scaling factor for how far to offset each basis vector.
-    // This should be a small number, but not so small that
-    // that the inversion (end of this function) has too much float error.
-    float size = 1e-3;
-
     GfVec3f pivot(geomBindTransform.ExtractTranslation());
 
+    // XXX: Note that if precision becomes an issue, the offset applied to
+    // produce the points that represent each of the basis vectors can be scaled
+    // up to improve precision, provided that the inverse scale is applied when
+    // constructing the final matrix.
     GfVec3f framePoints[4] = {
-        pivot + GfVec3f(geomBindTransform.GetRow3(0))*size, // i basis
-        pivot + GfVec3f(geomBindTransform.GetRow3(1))*size, // j basis
-        pivot + GfVec3f(geomBindTransform.GetRow3(2))*size, // k basis
+        pivot + GfVec3f(geomBindTransform.GetRow3(0)), // i basis
+        pivot + GfVec3f(geomBindTransform.GetRow3(1)), // j basis
+        pivot + GfVec3f(geomBindTransform.GetRow3(2)), // k basis
         pivot, // translate
     };
 
@@ -1059,9 +1058,8 @@ UsdSkelSkinTransformLBS(const GfMatrix4d& geomBindTransform,
 
     GfVec3f skinnedPivot = framePoints[3];
     xform->SetTranslate(skinnedPivot);
-    float sizeInv = 1/size;
     for(int i = 0; i < 3; ++i) {
-        xform->SetRow3(i, (framePoints[i]-skinnedPivot)*sizeInv);
+        xform->SetRow3(i, (framePoints[i]-skinnedPivot));
     }
     return true;
 }
@@ -1139,6 +1137,57 @@ _GetWorldTransformTimeSamples(const UsdPrim& prim,
 }
 
 
+/// Populate \p times with time samples in the range (rangeStart, rangeEnd).
+/// The samples are added based on the expected sampling rate for playback;
+/// I.e., the exact set of time codes that we expect to be queried when
+/// the stage is played back at its configured
+/// timeCodesPerSecond/framesPerSecond.
+bool
+_GetScenePlaybackTimeCodesInRange(const UsdStagePtr& stage,
+                                  double rangeStart,
+                                  double rangeEnd,
+                                  std::vector<double>* times)
+{
+    if (!stage->HasAuthoredTimeCodeRange())
+        return false;
+
+    if (rangeStart > rangeEnd)
+        return false;
+
+    double timeCodesPerSecond = stage->GetTimeCodesPerSecond();
+    double framesPerSecond = stage->GetFramesPerSecond();
+    if (GfIsClose(timeCodesPerSecond, 0.0, 1e-6) ||
+        GfIsClose(framesPerSecond, 0.0, 1e-6)) {
+        return false;
+    }
+    
+    // Compute the expected per-frame time step for playback.
+    double playbackTimeStep = std::abs(timeCodesPerSecond/framesPerSecond);
+
+    double stageStart = stage->GetStartTimeCode();  
+    double stageEnd = stage->GetEndTimeCode();
+
+    double start = std::min(rangeStart, std::min(stageStart, stageEnd));
+    double end = std::max(rangeEnd, std::max(stageEnd, stageStart));
+
+    // Fit the bounding time codes t of this start,end region,
+    // where t = start+playbackTimeStep*I, I being an integer.
+    int64_t frameOffsetToStart = std::floor((stageStart-start)/playbackTimeStep);
+    start = stageStart + playbackTimeStep*frameOffsetToStart;
+    int64_t frameOffsetToEnd = std::floor((stageEnd-end)/playbackTimeStep);
+    end = stageEnd + playbackTimeStep*frameOffsetToEnd;
+
+    size_t numTimeCodeSamples =
+        (end-start)/playbackTimeStep + 1; // +1 for an inclusive range.
+    times->resize(numTimeCodeSamples);
+    // Add samples based on integer multiples of the time step to reduce error.
+    for (size_t i = 0; i < numTimeCodeSamples; ++i) {
+        (*times)[i] = start + playbackTimeStep*i;
+    }
+    return true;
+}
+
+
 /// Get the time samples for skinning a primitive.
 void
 _GetSkinningTimeSamples(const UsdPrim& prim,
@@ -1160,7 +1209,7 @@ _GetSkinningTimeSamples(const UsdPrim& prim,
 
     // Include time samples that affect the local-to-world transform
     // (necessary because world space transforms are used to push
-    //  defomrations in skeleton-space back into normal prim space.
+    //  deformations in skeleton-space back into normal prim space.
     //  See the notes in the deformation methods for more on why.
     if(_GetWorldTransformTimeSamples(prim, interval, &propertyTimes)) {
         _MergeTimeSamples(times, propertyTimes, &tmpTimes);
@@ -1173,12 +1222,38 @@ _GetSkinningTimeSamples(const UsdPrim& prim,
         }
     }
 
-    // TODO? This includes the time samples at which the input data was
-    // authored. The resulting deformations will be linearly sampled on
-    // in-betweens. This may cause a skeleton to not quite match its joint
-    // animation, if the animation is authored sparsely.
-    // May be good to consider a form of this that works in terms of the
-    // stage's authored timeCodesPerSecond.
+    // XXX: Skinned meshes are baked at each time sample at which joint
+    // transforms are authored. If the joint transforms are authored at sparse
+    // time samples, then the resulting skinned meshes will be linearly
+    // interpolated on sub-frames. But linearly interpolating skinned meshes is
+    // not equivalent to linearly interpolating the driving joints prior to
+    // skinning: parts of meshes will undergo smooth rotations in the latter,
+    // but never in the former.
+    // It's impossible to get a perfect match at every possible sub-frame,
+    // but we can at least make sure that the samples are correct when
+    // not inspecting sub-frames. In other words, we wish to bake skinned
+    // meshes at every time ordinate at which the unbaked meshes would have
+    // been viewed.
+
+    // Joint transforms only interpolate in between different time samples
+    // at which they're authored, so we can limit our sampling range to
+    // the min,max range of the samples queried above.
+    if (times->size() < 2) {
+        // No values to interpolate, so we're done.
+        return;
+    }
+    double rangeStart = times->front();
+    double rangeEnd = times->back();
+    
+    if (_GetScenePlaybackTimeCodesInRange(prim.GetStage(),
+                                          rangeStart, rangeEnd,
+                                          &propertyTimes)) {
+        // Merge these with the time samples of the related properties.
+        // The result is to bake deformations both at the sampling rate
+        // of the stage, and at any additional sub-frame times that
+        // joint transforms are authored at.
+        _MergeTimeSamples(times, propertyTimes, &tmpTimes);
+    }
 }
 
 
@@ -1259,14 +1334,8 @@ _BakeSkinnedPoints(const UsdPrim& prim,
             GfMatrix4d gprimLocalToWorld =
                 xfCache->GetLocalToWorldTransform(prim);
 
-            GfMatrix4d skelLocalToWorld;
-            if(!skelQuery.ComputeLocalToWorldTransform(
-                   &skelLocalToWorld, xfCache)) {
-                TF_DEBUG(USDSKEL_BAKESKINNING).Msg(
-                    "[UsdSkelBakeSkinning]   Failed computing "
-                    "skel local-to-world transform\n");
-                return false;
-            }
+            GfMatrix4d skelLocalToWorld =
+                xfCache->GetLocalToWorldTransform(skelQuery.GetPrim());
 
             GfMatrix4d skelToGprimXf =
                 skelLocalToWorld*gprimLocalToWorld.GetInverse();
@@ -1352,14 +1421,8 @@ _BakeSkinnedTransform(const UsdPrim& prim,
 
             xfCache->SetTime(time);
 
-            GfMatrix4d skelLocalToWorld;
-            if(!skelQuery.ComputeLocalToWorldTransform(
-                   &skelLocalToWorld, xfCache)) {
-                TF_DEBUG(USDSKEL_BAKESKINNING).Msg(
-                    "[UsdSkelBakeSkinning]   Failed computing "
-                    "skel local-to-world transform\n");
-                return false;
-            }
+            GfMatrix4d skelLocalToWorld =
+                xfCache->GetLocalToWorldTransform(skelQuery.GetPrim());
 
             GfMatrix4d newLocalXform;
             

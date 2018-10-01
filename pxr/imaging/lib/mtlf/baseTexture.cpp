@@ -192,12 +192,51 @@ MtlfBaseTexture::~MtlfBaseTexture()
 /* virtual */
 GarchTexture::BindingVector
 MtlfBaseTexture::GetBindings(TfToken const & identifier,
-                             GarchSamplerGPUHandle samplerName) const
+                             GarchSamplerGPUHandle samplerName)
 {
-    TF_FATAL_CODING_ERROR("Not Implemented");
+    if (!_loaded) {
+        _ReadTexture();
+    }
+
     return BindingVector(1,
                 Binding(identifier, GarchTextureTokens->texels,
                         0, _textureName, samplerName));
+}
+
+GarchTextureGPUHandle MtlfBaseTexture::GetAPITextureName()
+{
+    if (!_loaded) {
+        _ReadTexture();
+    }
+    
+    return _textureName;
+}
+
+int MtlfBaseTexture::GetWidth()
+{
+    if (!_loaded) {
+        _ReadTexture();
+    }
+
+    return _currentWidth;
+}
+
+int MtlfBaseTexture::GetHeight()
+{
+    if (!_loaded) {
+        _ReadTexture();
+    }
+
+    return _currentHeight;
+}
+
+int MtlfBaseTexture::GetFormat()
+{
+    if (!_loaded) {
+        _ReadTexture();
+    }
+    
+    return _format;
 }
 
 void 

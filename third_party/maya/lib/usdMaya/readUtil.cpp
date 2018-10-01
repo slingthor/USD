@@ -21,20 +21,23 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-
 #include "usdMaya/readUtil.h"
-#include "usdMaya/colorSpace.h"
+
 #include "usdMaya/adaptor.h"
+#include "usdMaya/colorSpace.h"
 #include "usdMaya/util.h"
 
 #include "pxr/base/gf/gamma.h"
 #include "pxr/base/gf/matrix4d.h"
-#include "pxr/base/vt/array.h"
 #include "pxr/base/tf/envSetting.h"
+#include "pxr/base/vt/array.h"
+
 #include "pxr/usd/sdf/assetPath.h"
 #include "pxr/usd/sdf/listOp.h"
 #include "pxr/usd/usd/tokens.h"
 
+#include <maya/MDoubleArray.h>
+#include <maya/MFloatArray.h>
 #include <maya/MFnAttribute.h>
 #include <maya/MFnDoubleArrayData.h>
 #include <maya/MFnEnumAttribute.h>
@@ -46,8 +49,6 @@
 #include <maya/MFnStringArrayData.h>
 #include <maya/MFnTypedAttribute.h>
 #include <maya/MFnVectorArrayData.h>
-#include <maya/MDoubleArray.h>
-#include <maya/MFloatArray.h>
 #include <maya/MIntArray.h>
 #include <maya/MMatrix.h>
 #include <maya/MPointArray.h>
@@ -62,7 +63,7 @@ TF_DEFINE_ENV_SETTING(
         "Set to false to disable ability to read Float2 type as a UV set");
 
 bool
-PxrUsdMayaReadUtil::ReadFloat2AsUV()
+UsdMayaReadUtil::ReadFloat2AsUV()
 {
     static const bool readFloat2AsUV = 
         TfGetEnvSetting(PIXMAYA_READ_FLOAT2_AS_UV);
@@ -70,7 +71,7 @@ PxrUsdMayaReadUtil::ReadFloat2AsUV()
 }
 
 MObject
-PxrUsdMayaReadUtil::FindOrCreateMayaAttr(
+UsdMayaReadUtil::FindOrCreateMayaAttr(
         const SdfValueTypeName& typeName,
         const SdfVariability variability,
         MFnDependencyNode& depNode,
@@ -106,6 +107,13 @@ _HasNumericType(const MPlug& plug, MFnNumericData::Type type)
 
     MFnNumericAttribute attr(object);
     return attr.unitType() == type;
+}
+
+static bool
+_HasEnumType(const MPlug& plug)
+{
+    MObject object = plug.attribute();
+    return object.hasFn(MFn::kEnumAttribute);
 }
 
 static MObject
@@ -187,7 +195,9 @@ _FindOrCreateMayaNumericAttr(
     }
     else {
         // Found -- verify.
-        if (_HasNumericType(plug, type)) {
+        if (_HasNumericType(plug, type)
+            || (type == MFnNumericData::kInt && _HasEnumType(plug)))
+        {
             return plug.attribute();
         }
         else {
@@ -199,7 +209,7 @@ _FindOrCreateMayaNumericAttr(
 }
 
 MObject
-PxrUsdMayaReadUtil::FindOrCreateMayaAttr(
+UsdMayaReadUtil::FindOrCreateMayaAttr(
         const SdfValueTypeName& typeName,
         const SdfVariability variability,
         MFnDependencyNode& depNode,
@@ -218,7 +228,7 @@ PxrUsdMayaReadUtil::FindOrCreateMayaAttr(
 }
 
 MObject
-PxrUsdMayaReadUtil::FindOrCreateMayaAttr(
+UsdMayaReadUtil::FindOrCreateMayaAttr(
         const TfType& type,
         const TfToken& role,
         const SdfVariability variability,
@@ -249,9 +259,13 @@ PxrUsdMayaReadUtil::FindOrCreateMayaAttr(
                 /*usedAsFilename*/ false, depNode, modifier);
     }
     else if (type.IsA<SdfAssetPath>()) {
+        // XXX We're not setting usedAsFilename right now because we can't
+        // figure out how to opt-out of Maya's internal path resolution.
+        // This is still OK when we round-trip because we'll still generate
+        // SdfAssetPaths when we check the schema attribute's value type name.
         return _FindOrCreateMayaTypedAttr(attrName, attrNiceName,
                 MFnData::kString, keyable, usedAsColor,
-                /*usedAsFilename*/ true, depNode, modifier);
+                /*usedAsFilename*/ false, depNode, modifier);
     }
     else if (type.IsA<GfMatrix4d>()) {
         return _FindOrCreateMayaTypedAttr(attrName, attrNiceName,
@@ -383,14 +397,14 @@ _ConvertVec(
         const MPlug& plug,
         const T& val) {
     if (MFnAttribute(plug.attribute()).isUsedAsColor()) {
-        return PxrUsdMayaColorSpace::ConvertLinearToMaya(val);
+        return UsdMayaColorSpace::ConvertLinearToMaya(val);
     }
     else {
         return val;
     }
 }
 
-bool PxrUsdMayaReadUtil::SetMayaAttr(
+bool UsdMayaReadUtil::SetMayaAttr(
         MPlug& attrPlug,
         const UsdAttribute& usdAttr)
 {
@@ -405,7 +419,7 @@ bool PxrUsdMayaReadUtil::SetMayaAttr(
     return false;
 }
 
-bool PxrUsdMayaReadUtil::SetMayaAttr(
+bool UsdMayaReadUtil::SetMayaAttr(
         MPlug& attrPlug,
         const VtValue& newValue)
 {
@@ -413,7 +427,7 @@ bool PxrUsdMayaReadUtil::SetMayaAttr(
     return SetMayaAttr(attrPlug, newValue, modifier);
 }
 
-bool PxrUsdMayaReadUtil::SetMayaAttr(
+bool UsdMayaReadUtil::SetMayaAttr(
         MPlug& attrPlug,
         const VtValue& newValue,
         MDGModifier& modifier)
@@ -624,6 +638,10 @@ bool PxrUsdMayaReadUtil::SetMayaAttr(
             double d = VtValue::Cast<double>(newValue).Get<double>();
             modifier.newPlugValueDouble(attrPlug, d);
             ok = true;
+        } else if (newValue.IsHolding<int>() && _HasEnumType(attrPlug)) {
+            int i = VtValue::Cast<int>(newValue).Get<int>();
+            modifier.newPlugValueInt(attrPlug, i);
+            ok = true;
         }
     }
     else if (newValue.IsHolding<GfVec2i>()) {
@@ -731,7 +749,7 @@ bool PxrUsdMayaReadUtil::SetMayaAttr(
 }
 
 void
-PxrUsdMayaReadUtil::SetMayaAttrKeyableState(
+UsdMayaReadUtil::SetMayaAttrKeyableState(
         MPlug& attrPlug,
         const SdfVariability variability)
 {
@@ -740,7 +758,7 @@ PxrUsdMayaReadUtil::SetMayaAttrKeyableState(
 }
 
 void
-PxrUsdMayaReadUtil::SetMayaAttrKeyableState(
+UsdMayaReadUtil::SetMayaAttrKeyableState(
         MPlug& attrPlug,
         const SdfVariability variability,
         MDGModifier& modifier)
@@ -752,12 +770,12 @@ PxrUsdMayaReadUtil::SetMayaAttrKeyableState(
 }
 
 bool
-PxrUsdMayaReadUtil::ReadMetadataFromPrim(
+UsdMayaReadUtil::ReadMetadataFromPrim(
     const TfToken::Set& includeMetadataKeys,
     const UsdPrim& prim,
     const MObject& mayaObject)
 {
-    PxrUsdMayaAdaptor adaptor(mayaObject);
+    UsdMayaAdaptor adaptor(mayaObject);
     if (!adaptor) {
         return false;
     }
@@ -765,8 +783,8 @@ PxrUsdMayaReadUtil::ReadMetadataFromPrim(
     for (const TfToken& key : includeMetadataKeys) {
         if (key == UsdTokens->apiSchemas) {
             // Never import apiSchemas from metadata. It has a meaning in the
-            // PxrUsdMayaAdaptor system, so it should only be added to the
-            // Maya node by PxrUsdMayaAdaptor::ApplySchema().
+            // UsdMayaAdaptor system, so it should only be added to the
+            // Maya node by UsdMayaAdaptor::ApplySchema().
             continue;
         }
         if (!prim.HasAuthoredMetadata(key)) {
@@ -780,12 +798,12 @@ PxrUsdMayaReadUtil::ReadMetadataFromPrim(
 }
 
 bool
-PxrUsdMayaReadUtil::ReadAPISchemaAttributesFromPrim(
+UsdMayaReadUtil::ReadAPISchemaAttributesFromPrim(
     const TfToken::Set& includeAPINames,
     const UsdPrim& prim,
     const MObject& mayaObject)
 {
-    PxrUsdMayaAdaptor adaptor(mayaObject);
+    UsdMayaAdaptor adaptor(mayaObject);
     if (!adaptor) {
         return false;
     }
@@ -794,7 +812,7 @@ PxrUsdMayaReadUtil::ReadAPISchemaAttributesFromPrim(
         if (includeAPINames.count(schemaName) == 0) {
             continue;
         }
-        if (PxrUsdMayaAdaptor::SchemaAdaptor schemaAdaptor =
+        if (UsdMayaAdaptor::SchemaAdaptor schemaAdaptor =
                 adaptor.ApplySchemaByName(schemaName)) {
             for (const TfToken& attrName : schemaAdaptor.GetAttributeNames()) {
                 if (UsdAttribute attr = prim.GetAttribute(attrName)) {
@@ -812,20 +830,20 @@ PxrUsdMayaReadUtil::ReadAPISchemaAttributesFromPrim(
 
 /* static */
 size_t
-PxrUsdMayaReadUtil::ReadSchemaAttributesFromPrim(
+UsdMayaReadUtil::ReadSchemaAttributesFromPrim(
     const UsdPrim& prim,
     const MObject& mayaObject,
     const TfType& schemaType,
     const std::vector<TfToken>& attributeNames,
     const UsdTimeCode& usdTime)
 {
-    PxrUsdMayaAdaptor adaptor(mayaObject);
+    UsdMayaAdaptor adaptor(mayaObject);
     if (!adaptor) {
         return 0;
     }
 
     size_t count = 0;
-    if (PxrUsdMayaAdaptor::SchemaAdaptor schemaAdaptor =
+    if (UsdMayaAdaptor::SchemaAdaptor schemaAdaptor =
             adaptor.GetSchemaOrInheritedSchema(schemaType)) {
         for (const TfToken& attrName : attributeNames) {
             if (UsdAttribute attr = prim.GetAttribute(attrName)) {

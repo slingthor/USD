@@ -21,6 +21,7 @@ pxr_library(usdImagingGL
         hd
         pxOsd
         sdf
+        sdr
         usd
         usdGeom
         usdShade

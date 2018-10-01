@@ -27,6 +27,7 @@
 #include "pxr/imaging/garch/resourceFactory.h"
 
 #include "pxr/imaging/hdSt/material.h"
+#include "pxr/imaging/hdSt/package.h"
 #include "pxr/imaging/hdSt/resourceRegistry.h"
 #include "pxr/imaging/hdSt/shaderCode.h"
 #include "pxr/imaging/hdSt/surfaceShader.h"
@@ -38,6 +39,7 @@
 #include "pxr/imaging/garch/textureHandle.h"
 #include "pxr/imaging/garch/textureRegistry.h"
 #include "pxr/imaging/garch/uvTextureStorage.h"
+#include "pxr/imaging/garch/glslfx.h"
 
 #include "pxr/base/tf/staticTokens.h"
 
@@ -50,6 +52,8 @@ TF_DEFINE_PRIVATE_TOKENS(
     _tokens,
     (limitSurfaceEvaluation)
 );
+
+GLSLFX *HdStMaterial::_fallbackSurfaceShader = nullptr;
 
 // A bindless GL sampler buffer.
 // This identifies a texture as a 64-bit handle, passed to GLSL as "uvec2".
@@ -118,6 +122,7 @@ HdStMaterial::HdStMaterial(SdfPath const &id)
  , _surfaceShader(new HdStSurfaceShader)
  , _hasPtex(false)
  , _hasLimitSurfaceEvaluation(false)
+ , _hasDisplacement(false)
 {
 }
 
@@ -145,22 +150,38 @@ HdStMaterial::Sync(HdSceneDelegate *sceneDelegate,
     if(bits & DirtySurfaceShader) {
         const std::string &fragmentSource =
                 GetSurfaceShaderSource(sceneDelegate);
-
-        _surfaceShader->SetFragmentSource(fragmentSource);
-
-        const std::string &geometrySource = 
+        const std::string &geometrySource =
                 GetDisplacementShaderSource(sceneDelegate);
+        VtDictionary materialMetadata = GetMaterialMetadata(sceneDelegate);
 
-        _surfaceShader->SetGeometrySource(geometrySource);
-        
-        // XXX Forcing collections to be dirty to reload everything
-        //     Something more efficient can be done here
-        HdChangeTracker& changeTracker =
-                             sceneDelegate->GetRenderIndex().GetChangeTracker();
-        changeTracker.MarkAllCollectionsDirty();
+        if (fragmentSource.empty() && geometrySource.empty()) {
+            _InitFallbackShader();
+            _surfaceShader->SetFragmentSource(
+                                   _fallbackSurfaceShader->GetFragmentSource());
+            _surfaceShader->SetGeometrySource(
+                                   _fallbackSurfaceShader->GetGeometrySource());
+
+            materialMetadata = _fallbackSurfaceShader->GetMetadata();
+
+        } else {
+            _surfaceShader->SetFragmentSource(fragmentSource);
+            _surfaceShader->SetGeometrySource(geometrySource);
+        }
+
+
+        // Mark batches dirty to force batch validation/rebuild.
+        sceneDelegate->GetRenderIndex().GetChangeTracker().
+            MarkBatchesDirty();
+
+        bool hasDisplacement = !(geometrySource.empty());
+
+        if (_hasDisplacement != hasDisplacement) {
+            _hasDisplacement = hasDisplacement;
+            needsRprimMaterialStateUpdate = true;
+        }
 
         bool hasLimitSurfaceEvaluation =
-            _GetHasLimitSurfaceEvaluation(GetMaterialMetadata(sceneDelegate));
+            _GetHasLimitSurfaceEvaluation(materialMetadata);
 
         if (_hasLimitSurfaceEvaluation != hasLimitSurfaceEvaluation) {
             _hasLimitSurfaceEvaluation = hasLimitSurfaceEvaluation;
@@ -181,8 +202,10 @@ HdStMaterial::Sync(HdSceneDelegate *sceneDelegate,
         bool hasPtex = false;
         for (HdMaterialParam const & param: params) {
             if (param.IsPrimvar()) {
-                // skip -- maybe not necessary, but more memory efficient
-                continue;
+                HdBufferSourceSharedPtr source(
+                    new HdVtBufferSource(param.GetName(), 
+                        param.GetFallbackValue()));
+                sources.push_back(source);
             } else if (param.IsFallback()) {
                 VtValue paramVt = GetMaterialParamValue(sceneDelegate,
                                                         param.GetName());
@@ -303,13 +326,20 @@ HdStMaterial::_GetTextureResource(
             GetTextureResourceID(sceneDelegate, connection);
 
         if (texID != HdTextureResource::ID(-1)) {
-            HdInstance<HdTextureResource::ID,
+
+            // Use render index to convert local texture id into global
+            // texture key
+            HdRenderIndex &renderIndex = sceneDelegate->GetRenderIndex();
+            HdResourceRegistry::TextureKey texKey =
+                                               renderIndex.GetTextureKey(texID);
+
+            HdInstance<HdResourceRegistry::TextureKey,
                         HdTextureResourceSharedPtr> texInstance;
 
             bool textureResourceFound = false;
             std::unique_lock<std::mutex> regLock =
                 resourceRegistry->FindTextureResource
-                (texID, &texInstance, &textureResourceFound);
+                                  (texKey, &texInstance, &textureResourceFound);
 
             // A bad asset can cause the texture resource to not
             // be found. Hence, issue a warning and continue onto the
@@ -387,6 +417,24 @@ void
 HdStMaterial::SetSurfaceShader(HdStSurfaceShaderSharedPtr &shaderCode)
 {
     _surfaceShader = shaderCode;
+}
+
+void
+HdStMaterial::_InitFallbackShader()
+{
+    if (_fallbackSurfaceShader != nullptr) {
+        return;
+    }
+
+    const TfToken &filePath = HdStPackageFallbackSurfaceShader();
+
+    _fallbackSurfaceShader = new GLSLFX(filePath);
+
+    // Check fallback shader loaded, if not continue with the invalid shader
+    // this would mean the shader compilation fails and the prim would not
+    // be drawn.
+    TF_VERIFY(_fallbackSurfaceShader->IsValid(),
+              "Failed to load fallback surface shader!");
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

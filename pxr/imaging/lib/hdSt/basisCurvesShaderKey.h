@@ -80,6 +80,7 @@ struct HdSt_BasisCurvesShaderKey
     TfToken const *GetTES() const { return TES; }
     TfToken const *GetGS() const  { return NULL; }
     TfToken const *GetFS() const  { return FS; }
+
     bool IsCullingPass() const { return false; }
     HdCullStyle GetCullStyle() const { return HdCullStyleDontCare; }
     HdPolygonMode GetPolygonMode() const { return HdPolygonModeFill; }
@@ -87,14 +88,13 @@ struct HdSt_BasisCurvesShaderKey
     HdSt_GeometricShader::PrimitiveType GetPrimitiveType() const { 
         return primType; 
     }
-    bool IsFaceVarying() const { return false; }
 
     HdSt_GeometricShader::PrimitiveType primType;
     TfToken glslfx;
     TfToken VS[7];
     TfToken TCS[4];
     TfToken TES[8];
-    TfToken FS[6];
+    TfToken FS[7];
 };
 
 

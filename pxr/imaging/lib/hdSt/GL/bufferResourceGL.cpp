@@ -161,6 +161,9 @@ HdStBufferResourceGL::GetTextureBuffer()
             case HdTypeInt32Vec4:
                 format = GL_RGBA32I;
                 break;
+            case HdTypeInt32_2_10_10_10_REV:
+                format = GL_R32I;
+                break;
             default:
                 TF_CODING_ERROR("unsupported type: 0x%x\n", _tupleType.type);
         }

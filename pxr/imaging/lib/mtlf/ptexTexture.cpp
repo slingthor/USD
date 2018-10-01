@@ -48,7 +48,8 @@ PXR_NAMESPACE_CLOSE_SCOPE
 #ifdef PXR_PTEX_SUPPORT_ENABLED
 
 #include "pxr/imaging/mtlf/diagnostic.h"
-#include "pxr/imaging/mtlf/ptexMipmapTextureLoader.h"
+
+#include "pxr/imaging/garch/ptexMipmapTextureLoader.h"
 
 #include "pxr/base/tf/diagnostic.h"
 #include "pxr/base/tf/registryManager.h"
@@ -84,10 +85,11 @@ MtlfPtexTexture::New(const TfToken &imageFilePath)
 
 //------------------------------------------------------------------------------
 MtlfPtexTexture::MtlfPtexTexture(const TfToken &imageFilePath) :
+    _loaded(false),
     _layout(0), _texels(0),
     _width(0), _height(0), _depth(0),
     _imageFilePath(imageFilePath)
-{ 
+{
 }
 
 //------------------------------------------------------------------------------
@@ -98,117 +100,119 @@ MtlfPtexTexture::~MtlfPtexTexture()
 
 //------------------------------------------------------------------------------
 void
-MtlfPtexTexture::_OnSetMemoryRequested(size_t targetMemory)
+MtlfPtexTexture::_OnMemoryRequestedDirty()
 {
-    _ReadImage(targetMemory);
+    _loaded = false;
 }
 
 //------------------------------------------------------------------------------
 bool 
-MtlfPtexTexture::_ReadImage(size_t targetMemory)
+MtlfPtexTexture::_ReadImage()
 {
-    TF_FATAL_CODING_ERROR("Not Implemented!"); //MTL_FIXME
-    return false;
+    TRACE_FUNCTION();
+
+    _FreePtexTextureObject( );
+
+    const std::string & filename = _imageFilePath;
+
+    GLint maxNumPages = 0;
+    glGetIntegerv(GL_MAX_ARRAY_TEXTURE_LAYERS, &maxNumPages);
+
+
+    TRACE_SCOPE("MtlfPtexTexture::_ReadImage() (read ptex)");
+
+    // create a temporary ptex cache
+    // (required to build guttering pixels efficiently)
+    static const int PTEX_MAX_CACHE_SIZE = 128*1024*1024;
+    PtexCache *cache = PtexCache::create(1, PTEX_MAX_CACHE_SIZE);
+    if (!cache) {
+        TF_WARN("Unable to create PtexCache");
+        return false;
+    }
+
+    // load
+    Ptex::String ptexError;
+    PtexTexture *reader = cache->get(filename.c_str(), ptexError);
+    //PtexTexture *reader = PtexTexture::open(filename.c_str(), ptexError, true);
+    if (!reader) {
+        TF_WARN("Unable to open ptex %s : %s",
+                filename.c_str(), ptexError.c_str());
+        cache->release();
+        return false;
+    }
+
+    // Read the ptexture data and pack the texels
+
+    TRACE_SCOPE("MtlfPtexTexture::_ReadImage() (generate texture)");
+    size_t targetMemory = GetMemoryRequested();
+
     
-//    TRACE_FUNCTION();
-//
-//    _FreePtexTextureObject( );
-//
-//    const std::string & filename = _imageFilePath;
-//
-//    GLint maxNumPages = 0;
-//    glGetIntegerv(GL_MAX_ARRAY_TEXTURE_LAYERS, &maxNumPages);
-//
-//
-//    TRACE_SCOPE("MtlfPtexTexture::_ReadImage() (read ptex)");
-//
-//    // create a temporary ptex cache
-//    // (required to build guttering pixels efficiently)
-//    static const int PTEX_MAX_CACHE_SIZE = 128*1024*1024;
-//    PtexCache *cache = PtexCache::create(1, PTEX_MAX_CACHE_SIZE);
-//    if (!cache) {
-//        TF_WARN("Unable to create PtexCache");
-//        return false;
-//    }
-//
-//    // load
-//    Ptex::String ptexError;
-//    PtexTexture *reader = cache->get(filename.c_str(), ptexError);
-//    //PtexTexture *reader = PtexTexture::open(filename.c_str(), ptexError, true);
-//    if (!reader) {
-//        TF_WARN("Unable to open ptex %s : %s",
-//                filename.c_str(), ptexError.c_str());
-//        cache->release();
-//        return false;
-//    }
-//
-//    // Read the ptexture data and pack the texels
-//
-//    TRACE_SCOPE("MtlfPtexTexture::_ReadImage() (generate texture)");
-//
-//    // maxLevels = -1 : load all mip levels
-//    // maxLevels = 0  : load only the highest resolution
-//    int maxLevels = -1;
-//    MtlfPtexMipmapTextureLoader loader(reader,
-//                                      maxNumPages,
-//                                      maxLevels,
-//                                      targetMemory);
-//
-//    {   // create & bind the GL texture array
-//        GLenum format, type;
-//        switch (reader->dataType())
-//        {
-//            case Ptex::dt_uint16 : type = GL_UNSIGNED_SHORT; break;
-//            case Ptex::dt_float  : type = GL_FLOAT; break;
-//            case Ptex::dt_half   : type = GL_HALF_FLOAT_ARB; break;
-//            default              : type = GL_UNSIGNED_BYTE; break;
-//        }
-//
-//        int numChannels = reader->numChannels();
-//        switch (numChannels)
-//        {
-//            case 1 : format = GL_LUMINANCE; break;
-//            case 2 : format = GL_LUMINANCE_ALPHA; break;
-//            case 3 : format = GL_RGB; break;
-//            case 4 : format = GL_RGBA; break;
-//            default: format = GL_LUMINANCE; break;
-//        }
-//        // 'type' and 'format' are texel format in the source ptex data (input)
-//        // '_format' is an internal format (GPU)
-//
-//        _format = GL_RGBA8;
-//        if (type == GL_FLOAT) {
-//            static GLenum floatFormats[] =
-//                { GL_R32F, GL_RG32F, GL_RGB32F, GL_RGBA32F };
-//            _format = floatFormats[numChannels-1];
-//        } else if (type == GL_UNSIGNED_SHORT) {
-//            static GLenum uint16Formats[] =
-//                { GL_R16, GL_RG16, GL_RGB16, GL_RGBA16 };
-//            _format = uint16Formats[numChannels-1];
-//        } else if (type == GL_HALF_FLOAT_ARB) {
-//            static GLenum halfFormats[] =
-//                { GL_R16F, GL_RG16F, GL_RGB16F, GL_RGBA16F };
-//            _format = halfFormats[numChannels-1];
-//        } else {
-//            static GLenum uint8Formats[] =
-//                { GL_R8, GL_RG8, GL_RGB8, GL_RGBA8 };
-//            _format = uint8Formats[numChannels-1];
-//        }
-//
-//        int numFaces = loader.GetNumFaces();
-//
-//        // layout texture buffer
-//
-//        // ptex layout struct (6 * uint16)
-//        // struct Layout {
-//        //     uint16_t page;
-//        //     uint16_t nMipmap;
-//        //     uint16_t u;
-//        //     uint16_t v;
-//        //     uint16_t adjSizeDiffs; //(4:4:4:4)
-//        //     uint8_t  width log2;
-//        //     uint8_t  height log2;
-//        // };
+    // maxLevels = -1 : load all mip levels
+    // maxLevels = 0  : load only the highest resolution
+    int maxLevels = -1;
+    GarchPtexMipmapTextureLoader loader(reader,
+                                        maxNumPages,
+                                        maxLevels,
+                                        targetMemory);
+
+    {   // create & bind the GL texture array
+        GLenum format, type;
+        switch (reader->dataType())
+        {
+            case Ptex::dt_uint16 : type = GL_UNSIGNED_SHORT; break;
+            case Ptex::dt_float  : type = GL_FLOAT; break;
+            case Ptex::dt_half   : type = GL_HALF_FLOAT_ARB; break;
+            default              : type = GL_UNSIGNED_BYTE; break;
+        }
+
+        int numChannels = reader->numChannels();
+        switch (numChannels)
+        {
+            case 1 : format = GL_LUMINANCE; break;
+            case 2 : format = GL_LUMINANCE_ALPHA; break;
+            case 3 : format = GL_RGB; break;
+            case 4 : format = GL_RGBA; break;
+            default: format = GL_LUMINANCE; break;
+        }
+        // 'type' and 'format' are texel format in the source ptex data (input)
+        // '_format' is an internal format (GPU)
+
+        _format = GL_RGBA8;
+        if (type == GL_FLOAT) {
+            static GLenum floatFormats[] =
+                { GL_R32F, GL_RG32F, GL_RGB32F, GL_RGBA32F };
+            _format = floatFormats[numChannels-1];
+        } else if (type == GL_UNSIGNED_SHORT) {
+            static GLenum uint16Formats[] =
+                { GL_R16, GL_RG16, GL_RGB16, GL_RGBA16 };
+            _format = uint16Formats[numChannels-1];
+        } else if (type == GL_HALF_FLOAT_ARB) {
+            static GLenum halfFormats[] =
+                { GL_R16F, GL_RG16F, GL_RGB16F, GL_RGBA16F };
+            _format = halfFormats[numChannels-1];
+        } else {
+            static GLenum uint8Formats[] =
+                { GL_R8, GL_RG8, GL_RGB8, GL_RGBA8 };
+            _format = uint8Formats[numChannels-1];
+        }
+
+        int numFaces = loader.GetNumFaces();
+
+        // layout texture buffer
+
+        // ptex layout struct (6 * uint16)
+        // struct Layout {
+        //     uint16_t page;
+        //     uint16_t nMipmap;
+        //     uint16_t u;
+        //     uint16_t v;
+        //     uint16_t adjSizeDiffs; //(4:4:4:4)
+        //     uint8_t  width log2;
+        //     uint8_t  height log2;
+        // };
+        
+        TF_FATAL_CODING_ERROR("Not Implemented!"); //MTL_FIXME
+
 //
 //        glGenTextures(1, & _layout);
 //        GLuint layoutBuffer;
@@ -241,18 +245,16 @@ MtlfPtexTexture::_ReadImage(size_t targetMemory)
 //                     loader.GetNumPages(),
 //                     0, format, type,
 //                     loader.GetTexelBuffer());
-//
-//        MTLF_POST_PENDING_GL_ERRORS();
-//    }
-//
-//    reader->release();
-//
-//    _SetMemoryUsed(loader.GetMemoryUsage());
-//
-//    // also releases PtexCache
-//    cache->release();
-//
-//    return true;
+    }
+
+    reader->release();
+
+    _SetMemoryUsed(loader.GetMemoryUsage());
+
+    // also releases PtexCache
+    cache->release();
+
+    return true;
 }
 
 //------------------------------------------------------------------------------
@@ -260,8 +262,8 @@ void
 MtlfPtexTexture::_FreePtexTextureObject()
 {
     TF_FATAL_CODING_ERROR("Not Implemented!"); //MTL_FIXME
-//    MtlfSharedGLContextScopeHolder sharedGLContextScopeHolder;
-//
+
+    //
 //    // delete layout lookup --------------------------------
 //    if (glIsTexture(_layout))
 //       glDeleteTextures(1,&_layout);
@@ -275,8 +277,12 @@ MtlfPtexTexture::_FreePtexTextureObject()
 
 /* virtual */
 GarchTexture::BindingVector
-MtlfPtexTexture::GetBindings(TfToken const & identifier, GarchSamplerGPUHandle samplerId) const
+MtlfPtexTexture::GetBindings(TfToken const & identifier, GarchSamplerGPUHandle samplerId)
 {
+    if (!_loaded) {
+        _ReadImage();
+    }
+
     BindingVector result;
     result.reserve(2);
 
@@ -295,8 +301,12 @@ MtlfPtexTexture::GetBindings(TfToken const & identifier, GarchSamplerGPUHandle s
 //------------------------------------------------------------------------------
 
 VtDictionary
-MtlfPtexTexture::GetTextureInfo() const
+MtlfPtexTexture::GetTextureInfo(bool forceLoad)
 {
+    if (!_loaded && forceLoad) {
+        _ReadImage();
+    }
+
     VtDictionary info;
 
     info["memoryUsed"] = GetMemoryUsed();
@@ -332,6 +342,42 @@ MtlfPtexTexture::IsMagFilterSupported(GLenum filter)
     default:
         return false;
     }
+}
+    
+GLuint
+MtlfPtexTexture::GetLayoutTextureName()
+{
+    if (!_loaded) {
+        _ReadImage();
+    }
+    
+    return _layout;
+}
+
+GLuint
+MtlfPtexTexture::GetTexelsTextureName()
+{
+    if (!_loaded) {
+        _ReadImage();
+    }
+    
+    return _texels;
+}
+
+GarchTextureGPUHandle
+MtlfPtexTexture::GetTextureName()
+{
+    if (!_loaded) {
+        _ReadImage();
+    }
+
+    return GarchTextureGPUHandle(_texels);    
+}
+
+void
+MtlfPtexTexture::_ReadTexture()
+{
+    TF_FATAL_CODING_ERROR("Not Implemented!"); //MTL_FIXME
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

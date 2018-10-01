@@ -23,6 +23,8 @@
 //
 #include "pxr/pxr.h"
 #include "pxr/usd/usd/zipFile.h"
+#include "pxr/usd/ar/asset.h"
+#include "pxr/usd/ar/resolver.h"
 
 #include "pxr/base/arch/fileSystem.h"
 #include "pxr/base/tf/diagnostic.h"
@@ -496,6 +498,68 @@ _WriteEndOfCentralDirectoryRecord(
     out.Write(r.commentStart, r.f.commentLength);
 }
 
+// ------------------------------------------------------------
+
+// Per usdz specifications, file data must be aligned to 64 byte boundaries.
+// UsdZipFileWriter adds padding bytes to the 'extra' extensible data field
+// described in section 4.5 of the zip specification to achieve this. This
+// is complicated by the requirement that each entry in the 'extra' field
+// be preceded by a 4 byte header.
+
+struct _ExtraFieldHeader
+{
+    uint16_t headerId;
+    uint16_t dataSize;
+};
+
+constexpr size_t _HeaderSize = sizeof(uint16_t) * 2;
+constexpr size_t _DataAlignment = 64;
+
+// Maximum size of buffer needed for padding bytes.
+constexpr size_t _PaddingBufferSize = _HeaderSize + _DataAlignment;
+
+// Compute the number of padding bytes (including header) needed to align
+// data at the given offset to the required alignment.
+uint16_t
+_ComputeExtraFieldPaddingSize(size_t offset)
+{
+    uint16_t requiredPadding = _DataAlignment - (offset % _DataAlignment);
+    if (requiredPadding == _DataAlignment) {
+        requiredPadding = 0;
+    }
+    else if (requiredPadding < _HeaderSize) {
+        // If the amount of padding needed is too small to contain the header,
+        // bump the size up while maintaining the required alignment. 
+        requiredPadding += _DataAlignment;
+    }
+    return requiredPadding;
+}
+
+// Fill the given extraFieldBuffer to accommodate the specified number of
+// padding bytes. For convenience, returns extraFieldBuffer.
+const char*
+_PrepareExtraFieldPadding(
+    char (&extraFieldBuffer)[_PaddingBufferSize],
+    uint16_t numPaddingBytes)
+{
+    if (numPaddingBytes == 0) {
+        return nullptr;
+    }
+
+    TF_VERIFY(numPaddingBytes >= _HeaderSize);
+    TF_VERIFY(numPaddingBytes <= sizeof(extraFieldBuffer));
+
+    _ExtraFieldHeader header;
+    header.headerId = 0x1986; // Arbitrarily chosen, unreserved ID.
+    header.dataSize = numPaddingBytes - _HeaderSize;
+    
+    memcpy(extraFieldBuffer, &header.headerId, sizeof(header.headerId)) ;
+    memcpy(extraFieldBuffer + sizeof(header.headerId), 
+        &header.dataSize, sizeof(header.dataSize));
+
+    return extraFieldBuffer;
+}
+
 } // end anonymous namespace
 
 // ------------------------------------------------------------
@@ -503,25 +567,16 @@ _WriteEndOfCentralDirectoryRecord(
 class UsdZipFile::_Impl
 {
 public:
-    _Impl(ArchConstFileMapping&& mapping_)
-        : mapping(std::move(mapping_))
-        , buffer(mapping.get())
-        , size(ArchGetFileMappingLength(mapping))
+    _Impl(std::shared_ptr<const char>&& buffer_, size_t size_)
+        : storage(std::move(buffer_))
+        , buffer(storage.get())
+        , size(size_)
     { }
 
-    _Impl(ArchConstFileMapping&& mapping_, size_t offset, size_t size)
-        : mapping(std::move(mapping_))
-        , buffer(mapping.get() + offset)
-        , size(size)
-    { }
+    std::shared_ptr<const char> storage;
 
-    _Impl(const char* buffer_, size_t size)
-        : buffer(buffer_)
-        , size(size)
-    { }
-
-    ArchConstFileMapping mapping;
-
+    // This is the same as storage.get(), but saved separately to simplify
+    // code so they don't have to call storage.get() all the time.
     const char* buffer;
     size_t size;
 };
@@ -529,42 +584,30 @@ public:
 UsdZipFile
 UsdZipFile::Open(const std::string& filePath)
 {
-    struct _Fcloser {
-        void operator()(FILE *f) const { 
-            if (f) {
-                fclose(f);
-            }
-        }
-    };
-
-    std::unique_ptr<FILE, _Fcloser> file(ArchOpenFile(filePath.c_str(), "rb"));
-    if (!file) {
+    std::shared_ptr<ArAsset> asset = ArGetResolver().OpenAsset(filePath);
+    if (!asset) {
         return UsdZipFile();
     }
 
-    return Open(file.get(), 
-        /* offset = */ 0, /* size = */ ArchGetFileLength(file.get()));
+    return Open(asset);
 }
 
 UsdZipFile
-UsdZipFile::Open(FILE* file, size_t offset, size_t size)
+UsdZipFile::Open(const std::shared_ptr<ArAsset>& asset)
 {
-    std::string errMsg;
-    ArchConstFileMapping zipMap = ArchMapFileReadOnly(file, &errMsg);
-    if (!zipMap) {
-        TF_RUNTIME_ERROR("Failed to map file: %s", errMsg.c_str());
+    if (!asset) {
+        TF_CODING_ERROR("Invalid asset");
+        return UsdZipFile();
+    }
+
+    std::shared_ptr<const char> buffer = asset->GetBuffer();
+    if (!buffer) {
+        TF_RUNTIME_ERROR("Could not retrieve buffer from asset");
         return UsdZipFile();
     }
 
     return UsdZipFile(std::shared_ptr<_Impl>(
-        new _Impl(std::move(zipMap), offset, size)));
-}
-
-UsdZipFile
-UsdZipFile::Open(const char* buffer, size_t size)
-{
-    return UsdZipFile(std::shared_ptr<_Impl>(
-        new _Impl(buffer, size)));
+        new _Impl(std::move(buffer), asset->GetSize())));
 }
 
 UsdZipFile::UsdZipFile(std::shared_ptr<_Impl>&& impl)
@@ -888,19 +931,17 @@ UsdZipFileWriter::AddFile(
     h.f.uncompressedSize = ArchGetFileMappingLength(mapping);
     h.f.filenameLength = zipFilePath.length();
     
-    // Per specifications, files must be aligned to 64 byte boundaries.
-    // Add padding to the extraField to ensure that the file is written
-    // with the desired alignment.
-    constexpr size_t align = 64;
-    char paddingBuffer[align] = { 0 };
-
     const uint32_t offset = outStream.Tell();
     const size_t dataOffset = 
         offset + _LocalFileHeader::FixedSize + h.f.filenameLength;
-    h.f.extraFieldLength = align - (dataOffset % align);
+    h.f.extraFieldLength = _ComputeExtraFieldPaddingSize(dataOffset);
 
     h.filenameStart = zipFilePath.data();
-    h.extraFieldStart = &paddingBuffer[0];
+
+    char extraFieldBuffer[_PaddingBufferSize] = { 0 };
+    h.extraFieldStart = _PrepareExtraFieldPadding(
+        extraFieldBuffer, h.f.extraFieldLength);
+
     h.dataStart = mapping.get();
 
     _WriteLocalFileHeader(outStream, h);
@@ -939,14 +980,18 @@ UsdZipFileWriter::Save()
         h.f.compressedSize = localHeader.compressedSize;
         h.f.uncompressedSize = localHeader.uncompressedSize;
         h.f.filenameLength = localHeader.filenameLength;
-        h.f.extraFieldLength = 0;
+        h.f.extraFieldLength = localHeader.extraFieldLength;
         h.f.commentLength = 0;
         h.f.diskNumberStart = 0;
         h.f.internalAttrs = 0;
         h.f.externalAttrs = 0;
         h.f.localHeaderOffset = offset;
         h.filenameStart = fileToZip.data();
-        h.extraFieldStart = nullptr;
+
+        char extraFieldBuffer[_PaddingBufferSize] = { 0 };
+        h.extraFieldStart = _PrepareExtraFieldPadding(
+            extraFieldBuffer, h.f.extraFieldLength);
+
         h.commentStart = nullptr;
 
         _WriteCentralDirectoryHeader(outStream, h);

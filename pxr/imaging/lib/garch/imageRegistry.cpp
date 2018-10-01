@@ -27,6 +27,8 @@
 #include "pxr/imaging/garch/image.h"
 #include "pxr/imaging/garch/rankedTypeMap.h"
 
+#include "pxr/usd/ar/resolver.h"
+
 #include "pxr/base/plug/plugin.h"
 #include "pxr/base/plug/registry.h"
 
@@ -65,8 +67,8 @@ GarchImageRegistry::_ConstructImage(std::string const & filename)
 {
     static GarchImageSharedPtr NULL_IMAGE;
 
-    // Lookup the plug-in type name based on the prim type.
-    TfToken fileExtension(TfStringGetSuffix(filename));
+    // Lookup the plug-in type name based on the filename.
+    TfToken fileExtension(ArGetResolver().GetExtension(filename));
 
     TfType const & pluginType = _typeMap->Find(fileExtension);
 

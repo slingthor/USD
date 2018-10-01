@@ -24,37 +24,40 @@
 #ifndef PXRUSDMAYA_INSTANCED_NODE_WRITER_H
 #define PXRUSDMAYA_INSTANCED_NODE_WRITER_H
 
-#include "usdMaya/MayaPrimWriter.h"
-#include "usdMaya/usdWriteJobCtx.h"
+/// \file usdMaya/instancedNodeWriter.h
+
+#include "usdMaya/primWriter.h"
+#include "usdMaya/writeJobContext.h"
 
 #include "pxr/pxr.h"
+
 #include "pxr/usd/usd/references.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-/// This is a "helper" prim writer used internally by usdWriteJobCtx to
+/// This is a "helper" prim writer used internally by UsdMayaWriteJobContext to
 /// author nodes that are directly instanced in Maya.
-class PxrUsdMaya_InstancedNodeWriter : public MayaPrimWriter {
+class UsdMaya_InstancedNodeWriter : public UsdMayaPrimWriter {
 public:
-    PxrUsdMaya_InstancedNodeWriter(
+    UsdMaya_InstancedNodeWriter(
         const MDagPath& mayaInstancePath,
         const SdfPath& usdInstancePath,
-        usdWriteJobCtx& ctx);
+        UsdMayaWriteJobContext& ctx);
 
     bool ExportsGprims() const override;
     bool ShouldPruneChildren() const override;
     const SdfPathVector& GetModelPaths() const override;
-    const PxrUsdMayaUtil::MDagPathMap<SdfPath>&
+    const UsdMayaUtil::MDagPathMap<SdfPath>&
             GetDagToUsdPathMapping() const override;
     void Write(const UsdTimeCode& usdTime) override;
 
 private:
-    usdWriteJobCtx::_ExportAndRefPaths _masterPaths;
+    UsdMayaWriteJobContext::_ExportAndRefPaths _masterPaths;
 
     // All of the data below is cached when we construct/obtain prim writers.
     bool _exportsGprims;
     std::vector<SdfPath> _modelPaths;
-    PxrUsdMayaUtil::MDagPathMap<SdfPath> _dagToUsdPaths;
+    UsdMayaUtil::MDagPathMap<SdfPath> _dagToUsdPaths;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

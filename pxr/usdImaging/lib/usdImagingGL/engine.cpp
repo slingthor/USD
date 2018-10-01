@@ -695,6 +695,20 @@ UsdImagingGLEngine::SetRendererPlugin(TfToken const &id)
 }
 
 /* virtual */
+TfTokenVector
+UsdImagingGLEngine::GetRendererAovs() const
+{
+    return std::vector<TfToken>();
+}
+
+/* virtual */
+bool
+UsdImagingGLEngine::SetRendererAov(TfToken const &id)
+{
+    return false;
+}
+
+/* virtual */
 VtDictionary
 UsdImagingGLEngine::GetResourceAllocation() const
 {

@@ -45,12 +45,13 @@ HdChangeTracker::HdChangeTracker()
     , _generalState()
     , _collectionState()
     , _needsGarbageCollection(false)
+    , _needsBprimGarbageCollection(false)
     , _instancerRprimMap()
     , _varyingStateVersion(1)
     , _indexVersion(0)
     , _changeCount(1)       // changeCount in DirtyList starts from 0.
     , _visChangeCount(1)    // Clients (commandBuffer) start from 0.
-    , _shaderBindingsVersion(1)
+    , _batchVersion(1)
 {
     /*NOTHING*/
 }
@@ -323,6 +324,8 @@ HdChangeTracker::SprimRemoved(SdfPath const& id)
 {
     TF_DEBUG(HD_SPRIM_REMOVED).Msg("Sprim Removed: %s\n", id.GetText());
     _sprimState.erase(id);
+    // Make sure sprim resources are reclaimed.
+    _needsGarbageCollection = true;
 }
 
 HdDirtyBits
@@ -373,6 +376,7 @@ HdChangeTracker::BprimRemoved(SdfPath const& id)
 {
     TF_DEBUG(HD_BPRIM_REMOVED).Msg("Bprim Removed: %s\n", id.GetText());
     _bprimState.erase(id);
+    _needsBprimGarbageCollection = true;
 }
 
 HdDirtyBits
@@ -636,15 +640,28 @@ HdChangeTracker::MarkAllRprimsDirty(HdDirtyBits bits)
 {
     HD_TRACE_FUNCTION();
 
+    if (ARCH_UNLIKELY(bits == HdChangeTracker::Clean)) {
+        TF_CODING_ERROR("MarkAllRprimsDirty called with bits == clean!");
+        return;
+    }
+
+    // As an optimization, assume we're always changing the varying state.
+    bits |= HdChangeTracker::Varying;
+    ++_varyingStateVersion;
+
     for (_IDStateMap::iterator it  = _rprimState.begin();
                                it != _rprimState.end(); ++it) {
         it->second |= bits;
     }
 
     ++_changeCount;
-
     if (bits & DirtyVisibility) {
         ++_visChangeCount;
+    }
+    if (bits & DirtyRenderTag) {
+        // Render tags affect dirty lists and batching, so they need to be
+        // treated like a scene edit: see comment in MarkRprimDirty.
+        ++_indexVersion;
     }
 }
 
@@ -746,15 +763,15 @@ HdChangeTracker::GetVisibilityChangeCount() const
 }
 
 void
-HdChangeTracker::MarkShaderBindingsDirty()
+HdChangeTracker::MarkBatchesDirty()
 {
-    ++_shaderBindingsVersion;
+    ++_batchVersion;
 }
 
 unsigned
-HdChangeTracker::GetShaderBindingsVersion() const
+HdChangeTracker::GetBatchVersion() const
 {
-    return _shaderBindingsVersion;
+    return _batchVersion;
 }
 
 unsigned

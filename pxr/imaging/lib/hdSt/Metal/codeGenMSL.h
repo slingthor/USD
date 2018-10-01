@@ -178,6 +178,7 @@ private:
     void _GenerateElementPrimvar();
     void _GenerateVertexAndFaceVaryingPrimvar(bool hasGS);
     void _GenerateShaderParameters();
+    void _GenerateTopologyVisibilityParameters();
     
     void _ParseGLSL(std::stringstream &source, InOutParams& inParams, InOutParams& outParams, bool asComputeGS = false);
     void _GenerateGlue(std::stringstream& glueVS, std::stringstream& glueGS, std::stringstream& gluePS, HdStMSLProgramSharedPtr mslProgram);

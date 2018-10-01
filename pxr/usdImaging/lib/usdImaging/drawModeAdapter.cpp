@@ -270,6 +270,23 @@ UsdImagingDrawModeAdapter::MarkVisibilityDirty(UsdPrim const& prim,
 }
 
 void
+UsdImagingDrawModeAdapter::MarkMaterialDirty(UsdPrim const& prim,
+											 SdfPath const& cachePath,
+                                             UsdImagingIndexProxy* index)
+{
+    if (_IsMaterialPath(cachePath)) {
+        index->MarkSprimDirty(cachePath, HdMaterial::DirtySurfaceShader |
+                                         HdMaterial::DirtyParams);
+    } else if (!_IsTexturePath(cachePath)) {
+        // If the Usd material changed, it could mean the primvar set also
+        // changed Hydra doesn't currently manage detection and propagation of
+        // these changes, so we must mark the rprim dirty.
+        index->MarkRprimDirty(cachePath, HdChangeTracker::DirtyMaterialId);
+    }
+}
+
+
+void
 UsdImagingDrawModeAdapter::TrackVariability(UsdPrim const& prim,
                                             SdfPath const& cachePath,
                                             HdDirtyBits* timeVaryingBits,
