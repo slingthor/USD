@@ -82,6 +82,7 @@ protected:
 protected:
     void _ValidateCompatibility(HdBufferArrayRangeSharedPtr const& constantBar,
                                 HdBufferArrayRangeSharedPtr const& indexBar,
+								HdBufferArrayRangeSharedPtr const& topologyVisibilityBar,
                                 HdBufferArrayRangeSharedPtr const& elementBar,
                                 HdBufferArrayRangeSharedPtr const& fvarBar,
                                 HdBufferArrayRangeSharedPtr const& vertexBar,

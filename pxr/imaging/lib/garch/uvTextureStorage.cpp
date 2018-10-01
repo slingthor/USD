@@ -68,7 +68,7 @@ GarchUVTextureStorage::~GarchUVTextureStorage()
 }
 
 void 
-GarchUVTextureStorage::_OnSetMemoryRequested(size_t targetMemory)
+GarchUVTextureStorage::_ReadTexture()
 {
     GarchUVTextureStorageDataRefPtr texData =
         GarchUVTextureStorageData::New(
@@ -78,6 +78,8 @@ GarchUVTextureStorage::_OnSetMemoryRequested(size_t targetMemory)
     texData->Read(0, false); 
     _UpdateTexture(texData);
     _CreateTexture(texData, _GenerateMipmap()); 
+
+    _SetLoaded();
 }
 
 bool

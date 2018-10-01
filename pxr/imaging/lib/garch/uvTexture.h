@@ -81,21 +81,24 @@ public:
     static bool IsSupportedImageFile(std::string const &imageFilePath);
 
     GARCH_API
-    virtual VtDictionary GetTextureInfo() const;
+    virtual VtDictionary GetTextureInfo(bool forceLoad);
 
     GARCH_API
     virtual bool IsMinFilterSupported(GLenum filter);
     
     GARCH_API
     virtual BindingVector GetBindings(TfToken const & identifier,
-                                      GarchSamplerGPUHandle samplerName) const override
+                                      GarchSamplerGPUHandle samplerName) override
     {
         return _baseTexture->GetBindings(identifier, samplerName);
     }
     
     /// Returns the GPU API texture object for the texture.
     GARCH_API
-    virtual GarchTextureGPUHandle GetTextureName() const override {
+    virtual GarchTextureGPUHandle GetTextureName() override {
+        if (!_baseTexture->_loaded) {
+            _ReadTexture();
+        }
         return _baseTexture->GetTextureName();
     }
 
@@ -115,7 +118,7 @@ protected:
     virtual ~GarchUVTexture();
     
     GARCH_API
-    virtual void _OnSetMemoryRequested(size_t targetMemory);
+    virtual void _ReadTexture() override;
     GARCH_API
     virtual bool _GenerateMipmap() const;
     GARCH_API
@@ -141,6 +144,13 @@ protected:
         _baseTexture->_CreateTexture(texData, useMipmaps,
                                      unpackCropTop, unpackCropBottom,
                                      unpackCropLeft, unpackCropRight);
+    }
+    
+    GARCH_API
+    virtual void _SetLoaded() override
+    {
+        _baseTexture->_SetLoaded();
+        GarchBaseTexture::_SetLoaded();
     }
 
 private:

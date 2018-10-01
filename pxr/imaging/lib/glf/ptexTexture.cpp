@@ -35,7 +35,8 @@
 
 #include "pxr/imaging/glf/diagnostic.h"
 #include "pxr/imaging/glf/glContext.h"
-#include "pxr/imaging/glf/ptexMipmapTextureLoader.h"
+
+#include "pxr/imaging/garch/ptexMipmapTextureLoader.h"
 
 #include "pxr/base/tf/diagnostic.h"
 #include "pxr/base/tf/registryManager.h"
@@ -71,6 +72,7 @@ GlfPtexTexture::New(const TfToken &imageFilePath)
 
 //------------------------------------------------------------------------------
 GlfPtexTexture::GlfPtexTexture(const TfToken &imageFilePath) :
+    _loaded(false),
     _layout(0), _texels(0),
     _width(0), _height(0), _depth(0),
     _imageFilePath(imageFilePath)
@@ -85,14 +87,14 @@ GlfPtexTexture::~GlfPtexTexture()
 
 //------------------------------------------------------------------------------
 void
-GlfPtexTexture::_OnSetMemoryRequested(size_t targetMemory)
+GlfPtexTexture::_OnMemoryRequestedDirty()
 {
-    _ReadImage(targetMemory);
+    _loaded = false;
 }
 
 //------------------------------------------------------------------------------
 bool 
-GlfPtexTexture::_ReadImage(size_t targetMemory)
+GlfPtexTexture::_ReadImage()
 {
     TRACE_FUNCTION();
     
@@ -129,14 +131,16 @@ GlfPtexTexture::_ReadImage(size_t targetMemory)
     // Read the ptexture data and pack the texels
 
     TRACE_SCOPE("GlfPtexTexture::_ReadImage() (generate texture)");
+    size_t targetMemory = GetMemoryRequested();
+
 
     // maxLevels = -1 : load all mip levels
     // maxLevels = 0  : load only the highest resolution
     int maxLevels = -1;
-    GlfPtexMipmapTextureLoader loader(reader,
-                                      maxNumPages,
-                                      maxLevels,
-                                      targetMemory);
+    GarchPtexMipmapTextureLoader loader(reader,
+                                        maxNumPages,
+                                        maxLevels,
+                                        targetMemory);
 
     {   // create & bind the GL texture array
         GLenum format, type;
@@ -236,6 +240,8 @@ GlfPtexTexture::_ReadImage(size_t targetMemory)
     // also releases PtexCache
     cache->release();
 
+    _loaded = true;
+
     return true;
 }
 
@@ -258,8 +264,12 @@ GlfPtexTexture::_FreePtexTextureObject()
 
 /* virtual */
 GarchTexture::BindingVector
-GlfPtexTexture::GetBindings(TfToken const & identifier, GarchSamplerGPUHandle samplerId) const
+GlfPtexTexture::GetBindings(TfToken const & identifier, GarchSamplerGPUHandle samplerId)
 {
+    if (!_loaded) {
+        _ReadImage();
+    }
+
     BindingVector result;
     result.reserve(2);
 
@@ -278,8 +288,12 @@ GlfPtexTexture::GetBindings(TfToken const & identifier, GarchSamplerGPUHandle sa
 //------------------------------------------------------------------------------
 
 VtDictionary
-GlfPtexTexture::GetTextureInfo() const
+GlfPtexTexture::GetTextureInfo(bool forceLoad)
 {
+    if (!_loaded && forceLoad) {
+        _ReadImage();
+    }
+
     VtDictionary info;
 
     info["memoryUsed"] = GetMemoryUsed();
@@ -315,6 +329,42 @@ GlfPtexTexture::IsMagFilterSupported(GLenum filter)
     default:
         return false;
     }
+}
+
+GLuint
+GlfPtexTexture::GetLayoutTextureName()
+{
+    if (!_loaded) {
+        _ReadImage();
+    }
+
+    return _layout;
+}
+
+GLuint
+GlfPtexTexture::GetTexelsTextureName()
+{
+    if (!_loaded) {
+        _ReadImage();
+    }
+
+    return _texels;
+}
+
+GarchTextureGPUHandle
+GlfPtexTexture::GetTextureName()
+{
+    if (!_loaded) {
+        _ReadImage();
+    }
+
+    return GarchTextureGPUHandle(_texels);    
+}
+
+void
+GlfPtexTexture::_ReadTexture()
+{
+    TF_FATAL_CODING_ERROR("Not Implemented!"); //MTL_FIXME
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

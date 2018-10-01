@@ -38,7 +38,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 HdStSimpleTextureResourceGL::HdStSimpleTextureResourceGL(
     GarchTextureHandleRefPtr const &textureHandle, bool isPtex, size_t memoryRequest):
         HdStSimpleTextureResourceGL(textureHandle, isPtex,
-            /*wrapS*/ HdWrapUseMetaDict, /*wrapT*/ HdWrapUseMetaDict, 
+            /*wrapS*/ HdWrapUseMetadata, /*wrapT*/ HdWrapUseMetadata,
             /*minFilter*/ HdMinFilterNearestMipmapLinear, 
             /*magFilter*/ HdMagFilterLinear, memoryRequest)
 {
@@ -56,6 +56,10 @@ HdStSimpleTextureResourceGL::HdStSimpleTextureResourceGL(
         , _sampler(0)
         , _isPtex(isPtex)
         , _memoryRequest(memoryRequest)
+        , _wrapS(wrapS)
+        , _wrapT(wrapT)
+        , _minFilter(minFilter)
+        , _magFilter(magFilter)
 {
     // In cases of upstream errors, texture handle can be null.
     if (_textureHandle) {
@@ -66,73 +70,6 @@ HdStSimpleTextureResourceGL::HdStSimpleTextureResourceGL(
         // exit so that the destructor doesn't need to figure out if the request
         // was added or not.
         _textureHandle->AddMemoryRequest(_memoryRequest);
-    }
-
-    if (!glGenSamplers) { // GL initialization guard for headless unit test
-        return;
-    }
-
-    // When we are not using Ptex we will use samplers,
-    // that includes both, bindless textures and no-bindless textures
-    if (!_isPtex) {
-        // If the HdSimpleTextureResource defines a wrap mode it will 
-        // use it, otherwise it gives an opportunity to the texture to define
-        // its own wrap mode. The fallback value is always HdWrapRepeat
-        GLenum fwrapS = HdStGLConversions::GetWrap(wrapS);
-        GLenum fwrapT = HdStGLConversions::GetWrap(wrapT);
-        GLenum fminFilter = HdStGLConversions::GetMinFilter(minFilter);
-        GLenum fmagFilter = HdStGLConversions::GetMagFilter(magFilter);
-        
-        if (_texture) {
-            VtDictionary txInfo = _texture->GetTextureInfo();
-
-            if (wrapS == HdWrapUseMetaDict &&
-                VtDictionaryIsHolding<GLuint>(txInfo, "wrapModeS")) {
-                fwrapS = VtDictionaryGet<GLuint>(txInfo, "wrapModeS");
-            }
-
-            if (wrapT == HdWrapUseMetaDict &&
-                VtDictionaryIsHolding<GLuint>(txInfo, "wrapModeT")) {
-                fwrapT = VtDictionaryGet<GLuint>(txInfo, "wrapModeT");
-            }
-
-            if (!_texture->IsMinFilterSupported(fminFilter)) {
-                fminFilter = GL_NEAREST;
-            }
-            if (!_texture->IsMagFilterSupported(fmagFilter)) {
-                fmagFilter = GL_NEAREST;
-            }
-        }
-
-        glGenSamplers(1, &_sampler);
-        glSamplerParameteri(_sampler, GL_TEXTURE_WRAP_S, fwrapS);
-        glSamplerParameteri(_sampler, GL_TEXTURE_WRAP_T, fwrapT);
-        glSamplerParameteri(_sampler, GL_TEXTURE_MIN_FILTER, fminFilter);
-        glSamplerParameteri(_sampler, GL_TEXTURE_MAG_FILTER, fmagFilter);
-        glSamplerParameterf(_sampler, GL_TEXTURE_MAX_ANISOTROPY_EXT, 
-            _maxAnisotropy);
-        glSamplerParameterfv(_sampler, GL_TEXTURE_BORDER_COLOR, 
-            _borderColor.GetArray());
-    }
-
-    bool bindlessTexture = 
-        GarchResourceFactory::GetInstance()->GetContextCaps().bindlessTextureEnabled;
-    if (bindlessTexture) {
-        GLuint handle = GetTexelsTextureHandle();
-        if (handle) {
-            if (!glIsTextureHandleResidentNV(handle)) {
-                glMakeTextureHandleResidentNV(handle);
-            }
-        }
-
-        if (_isPtex) {
-            handle = GetLayoutTextureHandle();
-            if (handle) {
-                if (!glIsTextureHandleResidentNV(handle)) {
-                    glMakeTextureHandleResidentNV(handle);
-                }
-            }
-        }
     }
 }
 
@@ -178,24 +115,95 @@ GarchTextureGPUHandle HdStSimpleTextureResourceGL::GetTexelsTextureId()
 
 GarchSamplerGPUHandle HdStSimpleTextureResourceGL::GetTexelsSamplerId()
 {
+    if (!TF_VERIFY(!_isPtex)) {
+        return GarchSamplerGPUHandle();
+    }
+    
+    // Check for headless test
+    if (glGenSamplers == nullptr) {
+        return GarchSamplerGPUHandle();
+    }
+    
+    // Lazy sampler creation.
+    if (_sampler == 0) {
+        // If the HdStSimpleTextureResource defines a wrap mode it will
+        // use it, otherwise it gives an opportunity to the texture to define
+        // its own wrap mode. The fallback value is always HdWrapRepeat
+        GLenum fwrapS = HdStGLConversions::GetWrap(_wrapS);
+        GLenum fwrapT = HdStGLConversions::GetWrap(_wrapT);
+        GLenum fminFilter = HdStGLConversions::GetMinFilter(_minFilter);
+        GLenum fmagFilter = HdStGLConversions::GetMagFilter(_magFilter);
+        
+        if (_texture) {
+            VtDictionary txInfo = _texture->GetTextureInfo(true);
+            
+            if ((_wrapS == HdWrapUseMetadata || _wrapS == HdWrapLegacy) &&
+                VtDictionaryIsHolding<GLuint>(txInfo, "wrapModeS")) {
+                fwrapS = VtDictionaryGet<GLuint>(txInfo, "wrapModeS");
+            }
+            
+            if ((_wrapT == HdWrapUseMetadata || _wrapT == HdWrapLegacy) &&
+                VtDictionaryIsHolding<GLuint>(txInfo, "wrapModeT")) {
+                fwrapT = VtDictionaryGet<GLuint>(txInfo, "wrapModeT");
+            }
+            
+            if (!_texture->IsMinFilterSupported(fminFilter)) {
+                fminFilter = GL_NEAREST;
+            }
+            
+            if (!_texture->IsMagFilterSupported(fmagFilter)) {
+                fmagFilter = GL_NEAREST;
+            }
+        }
+        
+        glGenSamplers(1, &_sampler);
+        glSamplerParameteri(_sampler, GL_TEXTURE_WRAP_S, fwrapS);
+        glSamplerParameteri(_sampler, GL_TEXTURE_WRAP_T, fwrapT);
+        glSamplerParameteri(_sampler, GL_TEXTURE_MIN_FILTER, fminFilter);
+        glSamplerParameteri(_sampler, GL_TEXTURE_MAG_FILTER, fmagFilter);
+        glSamplerParameterf(_sampler, GL_TEXTURE_MAX_ANISOTROPY_EXT,
+                            _maxAnisotropy);
+        glSamplerParameterfv(_sampler, GL_TEXTURE_BORDER_COLOR,
+                             _borderColor.GetArray());
+    }
+
     return _sampler;
 }
 
 GarchTextureGPUHandle HdStSimpleTextureResourceGL::GetTexelsTextureHandle()
 { 
     GLuint textureId = GetTexelsTextureId();
-    GLuint samplerId = GetTexelsSamplerId();
-
+    
     if (!TF_VERIFY(glGetTextureHandleARB) ||
         !TF_VERIFY(glGetTextureSamplerHandleARB)) {
         return GarchTextureGPUHandle();
     }
-
+    
+    if (textureId == 0) {
+        return GarchTextureGPUHandle();
+    }
+    
+    GLuint64EXT handle = 0;
     if (_isPtex) {
-        return GarchTextureGPUHandle(textureId ? glGetTextureHandleARB(textureId) : 0);
-    } 
-
-    return GarchTextureGPUHandle(textureId ? glGetTextureSamplerHandleARB(textureId, samplerId) : 0);
+        handle = glGetTextureHandleARB(textureId);
+    } else {
+        GLuint samplerId = GetTexelsSamplerId();
+        handle = glGetTextureSamplerHandleARB(textureId, samplerId);
+    }
+    
+    if (handle == 0) {
+        return GarchTextureGPUHandle();
+    }
+    
+    bool bindlessTexture =
+        GarchResourceFactory::GetInstance()->GetContextCaps().bindlessTextureEnabled;
+    if (bindlessTexture) {
+        if (!glIsTextureHandleResidentNV(handle)) {
+            glMakeTextureHandleResidentNV(handle);
+        }
+    }
+    
+    return handle;
 }
 
 GarchTextureGPUHandle HdStSimpleTextureResourceGL::GetLayoutTextureId()
@@ -203,7 +211,7 @@ GarchTextureGPUHandle HdStSimpleTextureResourceGL::GetLayoutTextureId()
 #ifdef PXR_PTEX_SUPPORT_ENABLED
     TF_FATAL_CODING_ERROR("Not Implemented"); // Make this graphics api abstract
     GlfPtexTextureRefPtr ptexTexture =
-    TfDynamic_cast<GlfPtexTextureRefPtr>(_texture);
+        TfDynamic_cast<GlfPtexTextureRefPtr>(_texture);
     
     if (ptexTexture) {
         return ptexTexture->GetLayoutTextureName();
@@ -225,10 +233,26 @@ GarchTextureGPUHandle HdStSimpleTextureResourceGL::GetLayoutTextureHandle()
     if (!TF_VERIFY(glGetTextureHandleARB)) {
         return GarchTextureGPUHandle();
     }
-
-    GLuint textureId = GetLayoutTextureId();
-
-    return GarchTextureGPUHandle(textureId ? glGetTextureHandleARB(textureId) : 0);
+    
+    GarchTextureGPUHandle textureId = GetLayoutTextureId();
+    if (!textureId.IsSet()) {
+        return GarchTextureGPUHandle();
+    }
+    
+    GLuint64EXT handle = glGetTextureHandleARB(textureId);
+    if (handle == 0) {
+        return GarchTextureGPUHandle();
+    }
+    
+    bool bindlessTexture =
+        GarchResourceFactory::GetInstance()->GetContextCaps().bindlessTextureEnabled;
+    if (bindlessTexture) {
+        if (!glIsTextureHandleResidentNV(handle)) {
+            glMakeTextureHandleResidentNV(handle);
+        }
+    }
+    
+    return handle;
 }
 
 size_t HdStSimpleTextureResourceGL::GetMemoryUsed()

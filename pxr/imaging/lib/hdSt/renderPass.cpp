@@ -130,7 +130,7 @@ HdSt_RenderPass::_PrepareCommandBuffer(
     const int
        collectionVersion = tracker.GetCollectionVersion(collection.GetName());
 
-    const int shaderBindingsVersion = tracker.GetShaderBindingsVersion();
+    const int batchVersion = tracker.GetBatchVersion();
 
     const bool 
        skipCulling = TfDebug::IsEnabled(HD_DISABLE_FRUSTUM_CULLING) ||
@@ -163,7 +163,7 @@ HdSt_RenderPass::_PrepareCommandBuffer(
                                             "(repr = %s)"
                                             "version: %d -> %d\n", 
                                              collection.GetName().GetText(),
-                                             collection.GetReprName().GetText(),
+                                             collection.GetReprSelector().GetText(),
                                              _collectionVersion,
                                              collectionVersion);
 
@@ -179,7 +179,7 @@ HdSt_RenderPass::_PrepareCommandBuffer(
             _cmdBuffers[it->first].SwapDrawItems(
                 // Downcast the HdDrawItem entries to HdStDrawItems:
                 reinterpret_cast<std::vector<HdStDrawItem const*>*>(&it->second),
-                shaderBindingsVersion);
+                batchVersion);
             itemCount += _cmdBuffers[it->first].GetTotalSize();
         }
 
@@ -191,7 +191,7 @@ HdSt_RenderPass::_PrepareCommandBuffer(
         // which could be produced by migrating BARs at the new repr creation.
         for (_HdStCommandBufferMap::iterator it  = _cmdBuffers.begin(); 
                                            it != _cmdBuffers.end(); it++) {
-            it->second.RebuildDrawBatchesIfNeeded(shaderBindingsVersion);
+            it->second.RebuildDrawBatchesIfNeeded(batchVersion);
         }
     }
 

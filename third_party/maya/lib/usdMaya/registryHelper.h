@@ -24,7 +24,10 @@
 #ifndef PXRUSDMAYA_REGISTRYHELPER_H
 #define PXRUSDMAYA_REGISTRYHELPER_H
 
+/// \file usdMaya/registryHelper.h
+
 #include "pxr/pxr.h"
+
 #include "pxr/base/tf/token.h"
 #include "pxr/base/vt/dictionary.h"
 
@@ -33,7 +36,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 /// private helper so that both reader/writer registries can share the same
 /// plugin discovery/load mechanism.
-struct PxrUsdMaya_RegistryHelper 
+struct UsdMaya_RegistryHelper 
 {
     /// searches plugInfo's for \p value at the specified \p scope.  
     ///
@@ -88,4 +91,4 @@ struct PxrUsdMaya_RegistryHelper
 
 PXR_NAMESPACE_CLOSE_SCOPE
 
-#endif // PXRUSDMAYA_REGISTRYHELPER_H
+#endif

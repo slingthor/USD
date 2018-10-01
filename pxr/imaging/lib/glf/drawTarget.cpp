@@ -788,7 +788,7 @@ GlfDrawTarget::GlfAttachment::ResizeTexture(const GfVec2i &size)
 /* virtual */
 GarchTexture::BindingVector
 GlfDrawTarget::GlfAttachment::GetBindings(TfToken const & identifier,
-                                          GarchSamplerGPUHandle samplerName) const
+                                          GarchSamplerGPUHandle samplerName)
 {
     return BindingVector(1,
                 Binding(identifier, GarchTextureTokens->texels,
@@ -797,8 +797,10 @@ GlfDrawTarget::GlfAttachment::GetBindings(TfToken const & identifier,
 
 /* virtual */
 VtDictionary
-GlfDrawTarget::GlfAttachment::GetTextureInfo() const
+GlfDrawTarget::GlfAttachment::GetTextureInfo(bool forceLoad)
 {
+    TF_UNUSED(forceLoad);
+
     VtDictionary info;
 
     info["width"] = (int)_size[0];

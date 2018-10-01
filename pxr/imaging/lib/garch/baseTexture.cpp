@@ -39,7 +39,8 @@ TF_REGISTRY_FUNCTION(TfType)
 }
 
 GarchBaseTexture::GarchBaseTexture()
-  : _currentWidth(0),
+  : _loaded(false),
+    _currentWidth(0),
     _currentHeight(0),
     _format(GL_RGBA),
     _hasWrapModeS(false),
@@ -51,14 +52,15 @@ GarchBaseTexture::GarchBaseTexture()
 }
 
 GarchBaseTexture::GarchBaseTexture(GarchImage::ImageOriginLocation originLocation)
-: GarchTexture(originLocation),
-_currentWidth(0),
-_currentHeight(0),
-_format(GL_RGBA),
-_hasWrapModeS(false),
-_hasWrapModeT(false),
-_wrapModeS(GL_REPEAT),
-_wrapModeT(GL_REPEAT)
+  : GarchTexture(originLocation),
+    _loaded(false),
+    _currentWidth(0),
+    _currentHeight(0),
+    _format(GL_RGBA),
+    _hasWrapModeS(false),
+    _hasWrapModeT(false),
+    _wrapModeS(GL_REPEAT),
+    _wrapModeT(GL_REPEAT)
 {
     /* nothing */
 }
@@ -67,24 +69,101 @@ GarchBaseTexture::~GarchBaseTexture()
 {
 }
 
+
+GarchTextureGPUHandle
+GarchBaseTexture::GetAPITextureName()
+{
+    if (!_loaded) {
+        _ReadTexture();
+    }
+    
+    return _textureName;
+}
+
+int
+GarchBaseTexture::GetWidth()
+{
+    if (!_loaded) {
+        _ReadTexture();
+    }
+    
+    return _currentWidth;
+}
+
+int
+GarchBaseTexture::GetHeight()
+{
+    if (!_loaded) {
+        _ReadTexture();
+    }
+    
+    return _currentHeight;
+}
+
+int
+GarchBaseTexture::GetFormat()
+{
+    if (!_loaded) {
+        _ReadTexture();
+    }
+    
+    return _format;
+}
+
+GarchTextureGPUHandle GarchBaseTexture::GetTextureName()
+{
+    if (!_loaded) {
+        _ReadTexture();
+    }
+    
+    return _textureName;
+}
+
 VtDictionary
-GarchBaseTexture::GetTextureInfo() const
+GarchBaseTexture::GetTextureInfo(bool forceLoad)
 {
     VtDictionary info;
-    info["memoryUsed"] = GetMemoryUsed();
-    info["width"] = _currentWidth;
-    info["height"] = _currentHeight;
-    info["depth"] = 1;
-    info["format"] = _format;
+    
+    if (!_loaded && forceLoad) {
+        _ReadTexture();
+    }
+    
+    if (_loaded) {
+        info["memoryUsed"] = GetMemoryUsed();
+        info["width"] = _currentWidth;
+        info["height"] = _currentHeight;
+        info["depth"] = 1;
+        info["format"] = _format;
+        
+        if (_hasWrapModeS) {
+            info["wrapModeS"] = _wrapModeS;
+        }
+        
+        if (_hasWrapModeT) {
+            info["wrapModeT"] = _wrapModeT;
+        }
+    } else {
+        info["memoryUsed"] = (size_t)0;
+        info["width"] = 0;
+        info["height"] = 0;
+        info["depth"] = 1;
+        info["format"] = _format;
+    }
     info["referenceCount"] = GetRefCount().Get();
     
-    if (_hasWrapModeS)
-        info["wrapModeS"] = _wrapModeS;
-    
-    if (_hasWrapModeT)
-        info["wrapModeT"] = _wrapModeT;
-    
     return info;
+}
+
+void
+GarchBaseTexture::_OnMemoryRequestedDirty()
+{
+    _loaded = false;
+}
+
+GARCH_API
+void GarchBaseTexture::_SetLoaded()
+{
+    _loaded = true;
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

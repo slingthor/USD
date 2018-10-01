@@ -24,18 +24,21 @@
 #ifndef PXRUSDMAYA_CHASER_H
 #define PXRUSDMAYA_CHASER_H
 
-/// \file chaser.h
+/// \file usdMaya/chaser.h
+
+#include "usdMaya/api.h"
 
 #include "pxr/pxr.h"
-#include "usdMaya/api.h"
-#include "pxr/usd/usd/timeCode.h"
+
 #include "pxr/base/tf/declarePtrs.h"
 #include "pxr/base/tf/refPtr.h"
+
+#include "pxr/usd/usd/timeCode.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
 
-TF_DECLARE_REF_PTRS(PxrUsdMayaChaser);
+TF_DECLARE_REF_PTRS(UsdMayaChaser);
 
 /// \brief base class for plugin chasers which are plugins that run after the
 /// core usdExport out of maya.
@@ -52,18 +55,33 @@ TF_DECLARE_REF_PTRS(PxrUsdMayaChaser);
 /// Chasers need to be very careful as to not modify the structure of the usd
 /// file.  This should ideally be used to make small changes or to add
 /// attributes in a non-destructive way.
-class PxrUsdMayaChaser : public TfRefBase
+class UsdMayaChaser : public TfRefBase
 {
 public:
-    ~PxrUsdMayaChaser() override { }
+    ~UsdMayaChaser() override { }
 
-    /// \brief Export the default data.
-    ///
+    /// Do custom processing after UsdMaya has exported data at the default
+    /// time.
+    /// The stage will be incomplete; any animated data will not have
+    /// been exported yet.
     /// Returning false will terminate the whole export.
-    virtual bool ExportDefault() = 0;
+    PXRUSDMAYA_API
+    virtual bool ExportDefault();
 
-    /// \brief Export the data at \p time.
-    virtual bool ExportFrame(const UsdTimeCode& time) = 0;
+    /// Do custom processing after UsdMaya has exported data at \p time.
+    /// The stage will be incomplete; any future animated frames will not
+    /// have been exported yet.
+    /// Returning false will terminate the whole export.
+    PXRUSDMAYA_API
+    virtual bool ExportFrame(const UsdTimeCode& time);
+
+    /// Do custom post-processing that needs to run after the main UsdMaya
+    /// export loop.
+    /// At this point, all data has been authored to the stage (except for
+    /// any custom data that you'll author in this step).
+    /// Returning false will terminate the whole export.
+    PXRUSDMAYA_API
+    virtual bool PostExport();
 };
 
 

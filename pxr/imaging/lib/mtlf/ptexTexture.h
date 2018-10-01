@@ -91,16 +91,16 @@ public:
     /// GarchTexture overrides
     MTLF_API
     virtual BindingVector GetBindings(TfToken const & identifier,
-                                      GarchSamplerGPUHandle samplerId = GarchSamplerGPUHandle()) const;
+                                      GarchSamplerGPUHandle samplerId = GarchSamplerGPUHandle()) override;
     
     MTLF_API
-    virtual VtDictionary GetTextureInfo() const;
+    virtual VtDictionary GetTextureInfo(bool forceLoad) override;
 
     MTLF_API
-    virtual bool IsMinFilterSupported(GLenum filter);
+    virtual bool IsMinFilterSupported(GLenum filter) override;
 
     MTLF_API
-    virtual bool IsMagFilterSupported(GLenum filter);
+    virtual bool IsMagFilterSupported(GLenum filter) override;
 
     // get/set guttering control variables
     static int GetGutterWidth() { return _gutterWidth; }
@@ -108,13 +108,13 @@ public:
     static int GetPageMargin() { return _pageMargin; }
 
     // return GL texture for layout texture buffer
-    GLuint GetLayoutTextureName() const { return _layout; }
+    GLuint GetLayoutTextureName();
 
     // return GL texture for texels data texture
-    GLuint GetTexelsTextureName() const { return _texels; }
+    GLuint GetTexelsTextureName();
 	
 	MTLF_API
-	virtual GarchTextureGPUHandle GetTextureName() const { return GarchTextureGPUHandle(_texels); }
+    virtual GarchTextureGPUHandle GetTextureName() override;
 
 protected:
     MTLF_API
@@ -122,13 +122,18 @@ protected:
 
     MTLF_API
     void _FreePtexTextureObject();
+    
+    MTLF_API
+    virtual void _ReadTexture() override;
 
     MTLF_API
-    virtual void _OnSetMemoryRequested(size_t targetMemory);
+    virtual void _OnMemoryRequestedDirty();
 
 private:
-    bool _ReadImage(size_t targetMemory);
+    bool _ReadImage();
 
+    bool _loaded;
+    
     GLuint _layout;   // per-face lookup table
     GLuint _texels;   // texel data
 

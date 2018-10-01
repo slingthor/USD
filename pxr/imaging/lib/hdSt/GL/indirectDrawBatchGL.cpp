@@ -58,6 +58,14 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+TF_DEFINE_PRIVATE_TOKENS(
+    _tokens,
+                         
+    (drawIndirectResult)
+
+    (ulocResetPass)
+);
+
 
 static const GLuint64 HD_CULL_RESULT_TIMEOUT_NS = 5e9; // XXX how long to wait?
 
@@ -215,7 +223,7 @@ HdSt_IndirectDrawBatchGL::_GPUFrustumCullingExecute(
     glEnable(GL_RASTERIZER_DISCARD);
 
     int resetPass = 1;
-    binder.BindUniformi(HdTokens->ulocResetPass, 1, &resetPass);
+    binder.BindUniformi(_tokens->ulocResetPass, 1, &resetPass);
     glMultiDrawArraysIndirect(
         GL_POINTS,
         reinterpret_cast<const GLvoid*>(
@@ -228,7 +236,7 @@ HdSt_IndirectDrawBatchGL::_GPUFrustumCullingExecute(
     glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 
     resetPass = 0;
-    binder.BindUniformi(HdTokens->ulocResetPass, 1, &resetPass);
+    binder.BindUniformi(_tokens->ulocResetPass, 1, &resetPass);
     glMultiDrawArraysIndirect(
         GL_POINTS,
         reinterpret_cast<const GLvoid*>(
@@ -294,7 +302,7 @@ HdSt_IndirectDrawBatchGL::_BeginGPUCountVisibleInstances(
     if (!_resultBuffer) {
         _resultBuffer = boost::dynamic_pointer_cast<HdStPersistentBufferGL>(
             resourceRegistry->RegisterPersistentBuffer(
-                HdTokens->drawIndirectResult, sizeof(GLint), 0));
+                _tokens->drawIndirectResult, sizeof(GLint), 0));
     }
 
     // Reset visible item count
@@ -316,7 +324,7 @@ HdSt_IndirectDrawBatchGL::_BeginGPUCountVisibleInstances(
     // XXX: temporarily hack during refactoring.
     // we'd like to use the same API as other buffers.
     int binding = _cullingProgram->GetBinder().GetBinding(
-        HdTokens->drawIndirectResult).GetLocation();
+        _tokens->drawIndirectResult).GetLocation();
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, binding, _resultBuffer->GetId());
 }
 
@@ -353,7 +361,7 @@ HdSt_IndirectDrawBatchGL::_EndGPUCountVisibleInstances(GLsync resultSync, size_t
     // XXX: temporarily hack during refactoring.
     // we'd like to use the same API as other buffers.
     int binding = _cullingProgram->GetBinder().GetBinding(
-        HdTokens->drawIndirectResult).GetLocation();
+        _tokens->drawIndirectResult).GetLocation();
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, binding, 0);
 }
 
@@ -379,14 +387,14 @@ HdSt_IndirectDrawBatchGL::_CullingProgramGL::_Link(
             "gl_SkipComponents4",  // firstIndex - modelDC
             // (includes __reserved_0 to match drawElementsOutput)
             "gl_SkipComponents4",  // constantDC - fvarDC
-            "gl_SkipComponents3",  // instanceIndexDC - vertexDC
+            "gl_SkipComponents4",  // instanceIndexDC - topologyVisibilityDC
         };
         const char *drawElementsOutputs[] = {
             "gl_SkipComponents1",  // count
             "resultInstanceCount", // instanceCount
             "gl_SkipComponents4",  // firstIndex - modelDC
             "gl_SkipComponents4",  // constantDC - fvarDC
-            "gl_SkipComponents3",  // instanceIndexDC - vertexDC
+            "gl_SkipComponents4",  // instanceIndexDC - topologyVisibilityDC
         };
         const char **outputs = _useDrawArrays
             ? drawArraysOutputs

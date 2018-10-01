@@ -26,16 +26,18 @@
 
 /// \file usdMaya/stageData.h
 
-#include "pxr/pxr.h"
 #include "usdMaya/api.h"
 
+#include "pxr/pxr.h"
+
 #include "pxr/base/tf/staticTokens.h"
+
 #include "pxr/usd/sdf/path.h"
 #include "pxr/usd/usd/stage.h"
 
+#include <maya/MMessage.h>
 #include <maya/MPxData.h>
 #include <maya/MPxGeometryData.h>
-#include <maya/MMessage.h>
 #include <maya/MString.h>
 #include <maya/MTypeId.h>
 
@@ -46,7 +48,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 #define PXRUSDMAYA_STAGE_DATA_TOKENS \
     ((MayaTypeName, "pxrUsdStageData"))
 
-TF_DECLARE_PUBLIC_TOKENS(PxrUsdMayaStageDataTokens,
+TF_DECLARE_PUBLIC_TOKENS(UsdMayaStageDataTokens,
                          PXRUSDMAYA_API,
                          PXRUSDMAYA_STAGE_DATA_TOKENS);
 

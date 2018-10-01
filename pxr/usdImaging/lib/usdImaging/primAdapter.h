@@ -218,6 +218,10 @@ public:
                                      SdfPath const& cachePath,
                                      UsdImagingIndexProxy* index);
 
+    USDIMAGING_API
+    virtual void MarkMaterialDirty(UsdPrim const& prim,
+                                   SdfPath const& cachePath,
+                                   UsdImagingIndexProxy* index);
 
     // ---------------------------------------------------------------------- //
     /// \name Instancing
@@ -322,6 +326,15 @@ public:
     virtual HdTextureResourceSharedPtr
     GetTextureResource(UsdPrim const& usdPrim, SdfPath const &id,
                        UsdTimeCode time) const;
+
+    // ---------------------------------------------------------------------- //
+    /// \name Volume field information
+    // ---------------------------------------------------------------------- //
+
+    USDIMAGING_API
+    virtual HdVolumeFieldDescriptorVector
+    GetVolumeFieldDescriptors(UsdPrim const& usdPrim, SdfPath const &id,
+                              UsdTimeCode time) const;
 
     // ---------------------------------------------------------------------- //
     /// \name Utilities 
@@ -451,10 +464,14 @@ protected:
     // Determines if an attribute is varying and if so, sets the given
     // \p dirtyFlag in the \p dirtyFlags and increments a perf counter. Returns
     // true if the attribute is varying.
+    //
+    // If \p exists is non-null, _IsVarying will store whether the attribute
+    // was found.  If the attribute is not found, it counts as non-varying.
     USDIMAGING_API
     bool _IsVarying(UsdPrim prim, TfToken const& attrName, 
            HdDirtyBits dirtyFlag, TfToken const& perfToken,
-           HdDirtyBits* dirtyFlags, bool isInherited) const;
+           HdDirtyBits* dirtyFlags, bool isInherited,
+           bool* exists = nullptr) const;
 
     // Returns whether or not the rprim at \p cachePath is refined.
     USDIMAGING_API
@@ -478,11 +495,27 @@ protected:
         HdInterpolation interp,
         TfToken const& role = TfToken()) const;
 
+    // Convenience method for computing a primvar.
+    USDIMAGING_API
+    void _ComputeAndMergePrimvar(UsdPrim const& prim,
+                                 SdfPath const& cachePath,
+                                 UsdGeomPrimvar const& primvar,
+                                 UsdTimeCode time,
+                                 UsdImagingValueCache* valueCache,
+                                 HdInterpolation *interpOverride = nullptr)
+                                 const;
+
     virtual void _RemovePrim(SdfPath const& cachePath,
                              UsdImagingIndexProxy* index) = 0;
 
     USDIMAGING_API
     UsdImaging_CollectionCache& _GetCollectionCache() const;
+
+    // Conversion functions between usd and hydra enums.
+    USDIMAGING_API
+    static HdInterpolation _UsdToHdInterpolation(TfToken const& usdInterp);
+    USDIMAGING_API
+    static TfToken _UsdToHdRole(TfToken const& usdRole);
 
 private:
 

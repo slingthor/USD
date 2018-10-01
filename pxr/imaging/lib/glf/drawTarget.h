@@ -80,16 +80,16 @@ public:
     public:
         typedef TfDeclarePtrs<class GlfAttachment>::RefPtr GlfAttachmentRefPtr;
         
-        GARCH_API
+        GLF_API
         static GlfAttachmentRefPtr New(int glIndex, GLenum format, GLenum type,
                                     GLenum internalFormat, GfVec2i size,
                                     unsigned int numSamples);
         
-        GARCH_API
+        GLF_API
         virtual ~GlfAttachment();
         
         /// Returns the GL texture index (can be used as any regular GL texture)
-        virtual GarchTextureGPUHandle GetTextureName() const override { return _textureName; }
+        virtual GarchTextureGPUHandle GetTextureName() override { return _textureName; }
 
         /// Returns the GL texture index multisampled of this attachment
         GarchTextureGPUHandle GetTextureMSName() const { return _textureNameMS; }
@@ -104,20 +104,20 @@ public:
         int GetAttach() const { return _glIndex; }
 
         /// Resize the attachment recreating the texture
-        GARCH_API
-        virtual void ResizeTexture(const GfVec2i &size);
+        GLF_API
+        virtual void ResizeTexture(const GfVec2i &size) override;
         
         // GarchTexture overrides
-        GARCH_API
+        GLF_API
         virtual BindingVector GetBindings(TfToken const & identifier,
-                                          GarchSamplerGPUHandle samplerName) const override;
-        GARCH_API
-        virtual VtDictionary GetTextureInfo() const override;
+                                          GarchSamplerGPUHandle samplerName) override;
+        GLF_API
+        virtual VtDictionary GetTextureInfo(bool forceLoad) override;
         
         /// Updates the contents signature for the underlying texture
         /// to allow downstream consumers to know that the texture image
         /// data may have changed.
-        GARCH_API
+        GLF_API
         virtual void TouchContents();
         
     private:

@@ -24,21 +24,21 @@
 #ifndef PXRUSDMAYA_PRIMREADERREGISTRY_H
 #define PXRUSDMAYA_PRIMREADERREGISTRY_H
 
-/// \file primReaderRegistry.h
-
-#include "pxr/pxr.h"
+/// \file usdMaya/primReaderRegistry.h
 
 #include "usdMaya/api.h"
 #include "usdMaya/primReader.h"
 #include "usdMaya/primReaderArgs.h"
 #include "usdMaya/primReaderContext.h"
 
+#include "pxr/pxr.h"
+
 #include "pxr/base/tf/registryManager.h" 
 
 PXR_NAMESPACE_OPEN_SCOPE
 
 
-/// \class PxrUsdMayaPrimReaderRegistry
+/// \class UsdMayaPrimReaderRegistry
 /// \brief Provides functionality to register and lookup usd Maya reader
 /// plugins.
 ///
@@ -59,19 +59,19 @@ PXR_NAMESPACE_OPEN_SCOPE
 ///     }
 /// } 
 /// \endcode
-struct PxrUsdMayaPrimReaderRegistry
+struct UsdMayaPrimReaderRegistry
 {
     /// Reader factory function, i.e. a function that creates a prim reader
     /// for the given prim reader args.
-    typedef std::function< PxrUsdMayaPrimReaderSharedPtr (
-            const PxrUsdMayaPrimReaderArgs&) > ReaderFactoryFn;
+    typedef std::function< UsdMayaPrimReaderSharedPtr (
+            const UsdMayaPrimReaderArgs&) > ReaderFactoryFn;
 
     /// Reader function, i.e. a function that reads a prim. This is the
     /// signature of the function declared in the PXRUSDMAYA_DEFINE_READER
     /// macro.
     typedef std::function< bool (
-            const PxrUsdMayaPrimReaderArgs&,
-            PxrUsdMayaPrimReaderContext*) > ReaderFn;
+            const UsdMayaPrimReaderArgs&,
+            UsdMayaPrimReaderContext*) > ReaderFn;
 
     /// \brief Register \p fn as a reader provider for \p type.
     PXRUSDMAYA_API
@@ -82,12 +82,12 @@ struct PxrUsdMayaPrimReaderRegistry
     /// Example for registering a reader factory in your custom plugin, assuming
     /// that MyType is registered with the TfType system:
     /// \code{.cpp}
-    /// class MyReader : public PxrUsdMayaPrimReader {
-    ///     static PxrUsdMayaPrimReaderSharedPtr Create(
-    ///             const PxrUsdMayaPrimReaderArgs&);
+    /// class MyReader : public UsdMayaPrimReader {
+    ///     static UsdMayaPrimReaderSharedPtr Create(
+    ///             const UsdMayaPrimReaderArgs&);
     /// };
-    /// TF_REGISTRY_FUNCTION_WITH_TAG(PxrUsdMayaPrimReaderRegistry, MyType) {
-    ///     PxrUsdMayaPrimReaderRegistry::Register<MyType>(MyReader::Create);
+    /// TF_REGISTRY_FUNCTION_WITH_TAG(UsdMayaPrimReaderRegistry, MyType) {
+    ///     UsdMayaPrimReaderRegistry::Register<MyType>(MyReader::Create);
     /// }
     /// \endcode
     template <typename T>
@@ -135,17 +135,23 @@ struct PxrUsdMayaPrimReaderRegistry
     PXRUSDMAYA_API
     static ReaderFactoryFn Find(
             const TfToken& usdTypeName);
+
+    /// Similar to Find(), but returns a "fallback" prim reader factory if none
+    /// can be found for \p usdTypeName. Thus, this always returns a valid
+    /// reader factory.
+    PXRUSDMAYA_API
+    static ReaderFactoryFn FindOrFallback(const TfToken& usdTypeName);
 };
 
 #define PXRUSDMAYA_DEFINE_READER(T, argsVarName, ctxVarName)\
-static bool PxrUsdMaya_PrimReader_##T(const PxrUsdMayaPrimReaderArgs&, PxrUsdMayaPrimReaderContext*); \
-TF_REGISTRY_FUNCTION_WITH_TAG(PxrUsdMayaPrimReaderRegistry, T) \
+static bool UsdMaya_PrimReader_##T(const UsdMayaPrimReaderArgs&, UsdMayaPrimReaderContext*); \
+TF_REGISTRY_FUNCTION_WITH_TAG(UsdMayaPrimReaderRegistry, T) \
 {\
-    PxrUsdMayaPrimReaderRegistry::RegisterRaw<T>(PxrUsdMaya_PrimReader_##T);\
+    UsdMayaPrimReaderRegistry::RegisterRaw<T>(UsdMaya_PrimReader_##T);\
 }\
-bool PxrUsdMaya_PrimReader_##T(const PxrUsdMayaPrimReaderArgs& argsVarName, PxrUsdMayaPrimReaderContext* ctxVarName)
+bool UsdMaya_PrimReader_##T(const UsdMayaPrimReaderArgs& argsVarName, UsdMayaPrimReaderContext* ctxVarName)
 
 
 PXR_NAMESPACE_CLOSE_SCOPE
 
-#endif // PXRUSDMAYA_PRIMREADERREGISTRY_H
+#endif

@@ -46,7 +46,7 @@ TF_DEFINE_PRIVATE_TOKENS(
 HdStSimpleTextureResourceMetal::HdStSimpleTextureResourceMetal(
     GarchTextureHandleRefPtr const &textureHandle, bool isPtex, size_t memoryRequest):
         HdStSimpleTextureResourceMetal(textureHandle, isPtex,
-            /*wrapS*/ HdWrapUseMetaDict, /*wrapT*/ HdWrapUseMetaDict, 
+            /*wrapS*/ HdWrapUseMetadata, /*wrapT*/ HdWrapUseMetadata,
             /*minFilter*/ HdMinFilterNearestMipmapLinear, 
             /*magFilter*/ HdMagFilterLinear, memoryRequest)
 {
@@ -58,12 +58,16 @@ HdStSimpleTextureResourceMetal::HdStSimpleTextureResourceMetal(
         HdMinFilter minFilter, HdMagFilter magFilter,
         size_t memoryRequest)
             : _textureHandle(textureHandle)
-            , _texture()
+            , _texture(nil)
             , _borderColor(0.0,0.0,0.0,0.0)
             , _maxAnisotropy(16.0)
-            , _sampler()
+            , _sampler(nil)
             , _isPtex(isPtex)
             , _memoryRequest(memoryRequest)
+            , _wrapS(wrapS)
+            , _wrapT(wrapT)
+            , _minFilter(minFilter)
+            , _magFilter(magFilter)
 {
     // In cases of upstream errors, texture handle can be null.
     if (_textureHandle) {
@@ -74,53 +78,6 @@ HdStSimpleTextureResourceMetal::HdStSimpleTextureResourceMetal(
         // exit so that the destructor doesn't need to figure out if the request
         // was added or not.
         _textureHandle->AddMemoryRequest(_memoryRequest);
-    }
-
-    // When we are not using Ptex we will use samplers,
-    // that includes both, bindless textures and no-bindless textures
-    if (!_isPtex) {
-        // If the HdSimpleTextureResource defines a wrap mode it will 
-        // use it, otherwise it gives an opportunity to the texture to define
-        // its own wrap mode. The fallback value is always HdWrapRepeat
-        MTLSamplerAddressMode fwrapS = HdStMetalConversions::GetWrap(wrapS);
-        MTLSamplerAddressMode fwrapT = HdStMetalConversions::GetWrap(wrapT);
-        MTLSamplerMinMagFilter fminFilter = HdStMetalConversions::GetMinFilter(minFilter);
-        MTLSamplerMinMagFilter fmagFilter = HdStMetalConversions::GetMagFilter(magFilter);
-        MTLSamplerMipFilter fmipFilter = HdStMetalConversions::GetMipFilter(minFilter);
-        
-        if (_texture) {
-            VtDictionary txInfo = _texture->GetTextureInfo();
-
-            if (wrapS == HdWrapUseMetaDict &&
-                VtDictionaryIsHolding<GLuint>(txInfo, "wrapModeS")) {
-                fwrapS = HdStMetalConversions::ConvertGLWrap(VtDictionaryGet<GLuint>(txInfo, "wrapModeS"));
-            }
-
-            if (wrapT == HdWrapUseMetaDict &&
-                VtDictionaryIsHolding<GLuint>(txInfo, "wrapModeT")) {
-                fwrapT = HdStMetalConversions::ConvertGLWrap(VtDictionaryGet<GLuint>(txInfo, "wrapModeT"));
-            }
-
-            if (!_texture->IsMinFilterSupported(fminFilter)) {
-                fminFilter = MTLSamplerMinMagFilterNearest;
-            }
-            if (!_texture->IsMagFilterSupported(fmagFilter)) {
-                fmagFilter = MTLSamplerMinMagFilterNearest;
-            }
-        }
-
-        MTLSamplerDescriptor* samplerDesc = [[MTLSamplerDescriptor alloc] init];
-
-        samplerDesc.sAddressMode = fwrapS;
-        samplerDesc.tAddressMode = fwrapT;
-        samplerDesc.minFilter = fminFilter;
-        samplerDesc.magFilter = fmagFilter;
-        samplerDesc.mipFilter = fmipFilter;
-        samplerDesc.maxAnisotropy = _maxAnisotropy;
-        samplerDesc.borderColor = MTLSamplerBorderColorOpaqueBlack;
-        
-        id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->device;
-        _sampler = [device newSamplerStateWithDescriptor:samplerDesc];
     }
 }
 
@@ -164,6 +121,54 @@ GarchTextureGPUHandle HdStSimpleTextureResourceMetal::GetTexelsTextureId()
 
 GarchSamplerGPUHandle HdStSimpleTextureResourceMetal::GetTexelsSamplerId()
 {
+    if (!TF_VERIFY(!_isPtex)) {
+        return GarchSamplerGPUHandle();
+    }
+
+    if (_sampler == nil) {
+        // If the HdSimpleTextureResource defines a wrap mode it will
+        // use it, otherwise it gives an opportunity to the texture to define
+        // its own wrap mode. The fallback value is always HdWrapRepeat
+        MTLSamplerAddressMode fwrapS = HdStMetalConversions::GetWrap(_wrapS);
+        MTLSamplerAddressMode fwrapT = HdStMetalConversions::GetWrap(_wrapT);
+        MTLSamplerMinMagFilter fminFilter = HdStMetalConversions::GetMinFilter(_minFilter);
+        MTLSamplerMinMagFilter fmagFilter = HdStMetalConversions::GetMagFilter(_magFilter);
+        MTLSamplerMipFilter fmipFilter = HdStMetalConversions::GetMipFilter(_minFilter);
+        
+        if (_texture) {
+            VtDictionary txInfo = _texture->GetTextureInfo(true);
+            
+            if (_wrapS == HdWrapUseMetadata &&
+                VtDictionaryIsHolding<GLuint>(txInfo, "wrapModeS")) {
+                fwrapS = HdStMetalConversions::ConvertGLWrap(VtDictionaryGet<GLuint>(txInfo, "wrapModeS"));
+            }
+            
+            if (_wrapT == HdWrapUseMetadata &&
+                VtDictionaryIsHolding<GLuint>(txInfo, "wrapModeT")) {
+                fwrapT = HdStMetalConversions::ConvertGLWrap(VtDictionaryGet<GLuint>(txInfo, "wrapModeT"));
+            }
+            
+            if (!_texture->IsMinFilterSupported(fminFilter)) {
+                fminFilter = MTLSamplerMinMagFilterNearest;
+            }
+            if (!_texture->IsMagFilterSupported(fmagFilter)) {
+                fmagFilter = MTLSamplerMinMagFilterNearest;
+            }
+        }
+        
+        MTLSamplerDescriptor* samplerDesc = [[MTLSamplerDescriptor alloc] init];
+        
+        samplerDesc.sAddressMode = fwrapS;
+        samplerDesc.tAddressMode = fwrapT;
+        samplerDesc.minFilter = fminFilter;
+        samplerDesc.magFilter = fmagFilter;
+        samplerDesc.mipFilter = fmipFilter;
+        samplerDesc.maxAnisotropy = _maxAnisotropy;
+        samplerDesc.borderColor = MTLSamplerBorderColorOpaqueBlack;
+        
+        id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->device;
+        _sampler = [device newSamplerStateWithDescriptor:samplerDesc];
+    }
     return _sampler;
 }
 

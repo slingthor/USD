@@ -63,13 +63,13 @@ MtlfArrayTexture::MtlfArrayTexture(TfTokenVector const &imageFilePaths,
 /* virtual */
 GarchTexture::BindingVector
 MtlfArrayTexture::GetBindings(TfToken const & identifier,
-                              GarchSamplerGPUHandle samplerName) const
+                              GarchSamplerGPUHandle samplerName)
 {
     TF_FATAL_CODING_ERROR("Not Implemented");
 
     return BindingVector(1,
                 Binding(identifier, GarchTextureTokens->texels,
-                        /*GL_TEXTURE_2D_ARRAY*/ 0, GetGlTextureName(), samplerName));
+                        /*GL_TEXTURE_2D_ARRAY*/ 0, GetAPITextureName(), samplerName));
 }
 
 void
@@ -89,7 +89,7 @@ MtlfArrayTexture::_CreateTextures(
     /*
     glBindTexture(
         GL_TEXTURE_2D_ARRAY,
-        GetGlTextureName());
+        GetAPITextureName());
     
     glTexParameteri(
         GL_TEXTURE_2D_ARRAY,

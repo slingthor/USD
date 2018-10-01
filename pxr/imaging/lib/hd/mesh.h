@@ -49,26 +49,32 @@ TF_DECLARE_PUBLIC_TOKENS(HdMeshReprDescTokens, HD_API,
 
 /// \class HdMeshReprDesc
 ///
-/// descriptor to configure a drawItem for a repr
+/// Descriptor to configure the drawItem(s) for a repr
 ///
 struct HdMeshReprDesc {
     HdMeshReprDesc(HdMeshGeomStyle geomStyle = HdMeshGeomStyleInvalid,
                    HdCullStyle cullStyle = HdCullStyleDontCare,
                    TfToken shadingTerminal = HdMeshReprDescTokens->surfaceShader,
-                   bool smoothNormals = false,
+                   bool flatShadingEnabled = true,
                    bool blendWireframeColor = true,
                    bool doubleSided = false,
                    float lineWidth = 0,
-                   bool useCustomDisplacement = true)
+                   bool useCustomDisplacement = true,
+                   bool enableScalarOverride = true)
         : geomStyle(geomStyle)
         , cullStyle(cullStyle)
         , shadingTerminal(shadingTerminal)
-        , smoothNormals(smoothNormals)
+        , flatShadingEnabled(flatShadingEnabled)
         , blendWireframeColor(blendWireframeColor)
         , doubleSided(doubleSided)
         , lineWidth(lineWidth)
         , useCustomDisplacement(useCustomDisplacement)
+        , enableScalarOverride(enableScalarOverride)
         {}
+    
+    bool IsEmpty() const {
+        return geomStyle == HdMeshGeomStyleInvalid;
+    }
 
     /// The rendering style: draw refined/unrefined, edge, points, etc.
     HdMeshGeomStyle geomStyle;
@@ -77,8 +83,8 @@ struct HdMeshReprDesc {
     /// Specifies how the fragment color should be computed from surfaceShader;
     /// this can be used to render a mesh lit, unlit, unshaded, etc.
     TfToken         shadingTerminal;
-    /// Does this mesh need to generate smooth normals?
-    bool            smoothNormals;
+    /// Does this mesh want flat shading?
+    bool            flatShadingEnabled;
     /// Should the wireframe color be blended into the color primvar?
     bool            blendWireframeColor;
     /// Should this mesh be treated as double-sided? The resolved value is
@@ -88,6 +94,10 @@ struct HdMeshReprDesc {
     float           lineWidth;
     /// Should this mesh use displacementShader() to displace points?
     bool            useCustomDisplacement;
+    /// Should scalar override be allowed on this drawItem.
+    /// scalar override allows for visualization of a single float value
+    /// across a prim.
+    bool            enableScalarOverride;
 };
 
 /// Hydra Schema for a subdivision surface or poly-mesh object.
@@ -120,9 +130,10 @@ public:
     inline VtValue GetPoints(HdSceneDelegate* delegate)  const;
     inline VtValue GetNormals(HdSceneDelegate* delegate) const;
 
-    /// Configure geometric style of drawItems for \p reprName
-    /// HdMesh can have up to 2 descriptors for some complex styling
-    /// (FeyRay, Outline)
+    /// Configure the geometric style of the mesh for a given representation.
+    /// We currently allow up to 2 descriptors for a representation.
+    /// Example of when this may be useful:
+    ///     Drawing the outline in addition to the surface for a mesh.
     HD_API
     static void ConfigureRepr(TfToken const &reprName,
                               HdMeshReprDesc desc1,
@@ -135,11 +146,16 @@ protected:
     HdMesh(SdfPath const& id,
            SdfPath const& instancerId = SdfPath());
 
-    typedef _ReprDescConfigs<HdMeshReprDesc, /*max drawitems=*/2>
+    // We allow up to 2 repr descs per repr for meshes (see ConfigureRepr above)
+    // We can have up to 3 topology reprs for the rprim (see
+    //      HdRprim::_GetReprSelector)
+    // So, a repr selector can generate at most 2*3=6 mesh repr descs.
+    typedef _ReprDescConfigs<HdMeshReprDesc, /*max repr descs=*/6>
         _MeshReprConfig;
 
     HD_API
-    static _MeshReprConfig::DescArray _GetReprDesc(TfToken const &reprName);
+    static _MeshReprConfig::DescArray _GetReprDesc(
+        HdReprSelector const &reprSelector);
 
 private:
 

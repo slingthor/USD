@@ -40,7 +40,7 @@ void wrapBaseTexture()
         "BaseTexture", no_init)
 
     	.add_property( "GlTextureName", make_function(
-                &This::GetGlTextureName,
+                &This::GetAPITextureName,
                 return_value_policy<return_by_value>()))
 
         .add_property( "width", make_function(

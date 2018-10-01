@@ -52,22 +52,17 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 HdSt_SmoothNormalsComputationMetal::HdSt_SmoothNormalsComputationMetal(
     Hd_VertexAdjacency const *adjacency,
-    TfToken const &srcName, TfToken const &dstName,
-    HdType srcDataType, HdType dstDataType)
-    : HdSt_SmoothNormalsComputationGPU(adjacency, srcName, dstName, srcDataType, dstDataType)
+    TfToken const &srcName,
+    TfToken const &dstName,
+    HdType srcDataType,
+    bool packed)
+    : HdSt_SmoothNormalsComputationGPU(adjacency, srcName, dstName, srcDataType, packed)
 {
     if (srcDataType != HdTypeFloatVec3 && srcDataType != HdTypeDoubleVec3) {
         TF_CODING_ERROR(
             "Unsupported points type %s for computing smooth normals",
             TfEnum::GetName(srcDataType).c_str());
         _srcDataType = HdTypeInvalid;
-    }
-    if (dstDataType != HdTypeFloatVec3 && dstDataType != HdTypeDoubleVec3 &&
-        dstDataType != HdTypeInt32_2_10_10_10_REV) {
-        TF_CODING_ERROR(
-            "Unsupported normals type %s for computing smooth normals",
-            TfEnum::GetName(dstDataType).c_str());
-        _dstDataType = HdTypeInvalid;
     }
 }
 
@@ -84,9 +79,6 @@ HdSt_SmoothNormalsComputationMetal::_Execute(
     HdStMSLProgramSharedPtr const &mslProgram(boost::dynamic_pointer_cast<HdStMSLProgram>(computeProgram));
     id<MTLFunction> computeFunction = mslProgram->GetComputeFunction();
     
-    std::vector<id<MTLBuffer>> computeBuffers(3);
-    std::vector<id<MTLTexture>> computeTextures;
- 
     // Only the normals are writebale
     unsigned long bufferWritableMask = 1 << 1;
 

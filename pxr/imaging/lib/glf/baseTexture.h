@@ -55,36 +55,35 @@ public:
     virtual ~GlfBaseTexture();
 
     /// Returns the OpenGl texture name for the texture. 
-    GarchTextureGPUHandle GetGlTextureName() const {
-        return _textureName;
-    }
+    GLF_API
+    GarchTextureGPUHandle GetAPITextureName();
 
-    int	GetWidth() const {
-        return _currentWidth;
-    }
+    GLF_API
+    int	GetWidth();
 
-    int GetHeight() const {
-        return _currentHeight;
-    }
+    GLF_API
+    int GetHeight();
 
-    int GetFormat() const {
-        return _format;
-    }
+    GLF_API
+    int GetFormat();
 
     // GarchTexture overrides
     GLF_API
     virtual BindingVector GetBindings(TfToken const & identifier,
-                                      GarchSamplerGPUHandle samplerName) const override;
+                                      GarchSamplerGPUHandle samplerName) override;
 
 protected:
     
     GLF_API
     GlfBaseTexture();
-    
+
     GLF_API
     GlfBaseTexture(GarchImage::ImageOriginLocation originLocation);
 
     friend class GlfResourceFactory;
+    
+    GLF_API
+    virtual void _ReadTexture() override { TF_FATAL_CODING_ERROR("Not Implemented!"); } //MTL_FIXME
 
     GLF_API
     void _UpdateTexture(GarchBaseTextureDataConstPtr texData);

@@ -26,9 +26,9 @@
 
 /// \file usdMaya/stageCache.h
 
-#include "pxr/pxr.h"
-
 #include "usdMaya/api.h"
+
+#include "pxr/pxr.h"
 
 #include "pxr/usd/sdf/path.h"
 #include "pxr/usd/usd/stageCache.h"
@@ -74,4 +74,4 @@ public:
 PXR_NAMESPACE_CLOSE_SCOPE
 
 
-#endif // PXRUSDMAYA_STAGECACHE_H
+#endif

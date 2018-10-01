@@ -28,15 +28,15 @@
 
 #include "pxr/pxr.h"
 #include "pxr/usd/ar/api.h"
-#include <boost/noncopyable.hpp>
 #include <memory>
 #include <string>
 #include <vector>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-class ArResolverContext;
+class ArAsset;
 class ArAssetInfo;
+class ArResolverContext;
 class TfType;
 class VtValue;
 
@@ -51,11 +51,14 @@ class VtValue;
 /// Clients may use #ArGetResolver to access the configured asset resolver.
 ///
 class ArResolver 
-    : public boost::noncopyable
 {
 public:
     AR_API
     virtual ~ArResolver();
+
+    // Disallow copies
+    ArResolver(const ArResolver&) = delete;
+    ArResolver& operator=(const ArResolver&) = delete;
 
     // --------------------------------------------------------------------- //
     /// \anchor ArResolver_resolution
@@ -246,6 +249,21 @@ public:
         const std::string& path,
         const std::string& resolvedPath) = 0;
 
+    /// Returns an ArAsset object for the asset located at \p resolvedPath. 
+    /// Returns an invalid std::shared_ptr if object could not be created.
+    ///
+    /// The returned ArAsset object provides functions for accessing the
+    /// contents of the specified asset. 
+    ///
+    /// Note that clients may still be using the data associated with 
+    /// this object even after the last shared_ptr has been destroyed. For 
+    /// example, a client may have created a memory mapping using the FILE* 
+    /// presented in the ArAsset object; this would preclude truncating or
+    /// overwriting any of the contents of that file.
+    AR_API
+    virtual std::shared_ptr<ArAsset> OpenAsset(
+        const std::string& resolvedPath) = 0;
+
     /// Returns true if a file may be written to the given \p path, false
     /// otherwise. 
     /// 
@@ -348,12 +366,16 @@ protected:
 ///   selected. 
 ///
 /// - The plugin for the selected subclass will be loaded and an instance
-///   of the subclass will be constructed and returned.
+///   of the subclass will be constructed.
 ///
-/// - If an error occurs, an ArDefaultResolver will be constructed and returned.
+/// - If an error occurs, an ArDefaultResolver will be constructed.
 ///
-/// The constructed ArResolver subclass will be cached and returned by all
-/// subsequent calls to this function.
+/// The constructed ArResolver subclass will be cached and used to service
+/// function calls made on the returned resolver.
+///
+/// Note that this function may not return the constructed subclass itself, 
+/// meaning that dynamic casts to the subclass type may fail. See
+/// ArGetUnderlyingResolver if access to this object is needed.
 AR_API
 ArResolver& ArGetResolver();
 
@@ -377,10 +399,18 @@ void ArSetPreferredResolver(const std::string& resolverTypeName);
 /// in very specific cases. Consumers who want to retrieve an ArResolver to
 /// perform asset resolution should use \ref ArGetResolver.
 /// 
-/// These special-purpose functions are intended to help with the creation
-/// of ArResolver subclasses that wrap around other ArResolver subclasses.
-/// 
 /// @{
+
+/// Returns the underlying ArResolver instance used by ArGetResolver.
+///
+/// This function returns the instance of the ArResolver subclass used by 
+/// ArGetResolver and can be dynamic_cast to that type.
+///
+/// \warning This functions should typically not be used by consumers except
+/// in very specific cases. Consumers who want to retrieve an ArResolver to
+/// perform asset resolution should use \ref ArGetResolver.
+AR_API
+ArResolver& ArGetUnderlyingResolver();
 
 /// Returns list of TfTypes for available ArResolver subclasses.
 ///
@@ -409,7 +439,7 @@ std::vector<TfType> ArGetAvailableResolvers();
 /// If an error occurs, coding errors will be emitted and this function
 /// will return an ArDefaultResolver instance.
 ///
-/// Note that this function *does not* change the resolver returned by 
+/// Note that this function *does not* change the resolver used by 
 /// \ref ArGetResolver to an instance of \p resolverType.
 ///
 /// This function is not safe to call concurrently with itself or 

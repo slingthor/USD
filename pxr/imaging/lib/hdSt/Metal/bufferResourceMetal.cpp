@@ -135,6 +135,9 @@ HdStBufferResourceMetal::GetTextureBuffer()
             case HdTypeInt32Vec4:
                 format = MTLPixelFormatRGBA32Sint;
                 break;
+            case HdTypeInt32_2_10_10_10_REV:
+                format = MTLPixelFormatRGB10A2Uint;
+                break;
             default:
                 TF_CODING_ERROR("unsupported type: 0x%x\n", _tupleType.type);
         }

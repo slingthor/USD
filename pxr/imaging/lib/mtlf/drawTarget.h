@@ -103,7 +103,7 @@ public:
         virtual ~MtlfAttachment();
 
         /// Returns the texture object (can be used as any regular GL texture)
-        virtual GarchTextureGPUHandle GetTextureName() const override { return _textureName; }
+        virtual GarchTextureGPUHandle GetTextureName() override { return _textureName; }
 
         /// Returns the GL texture index multisampled of this attachment
         GarchTextureGPUHandle GetTextureMSName() const { return _textureNameMS; }
@@ -133,9 +133,9 @@ public:
         // GarchTexture overrides
         MTLF_API
         virtual BindingVector GetBindings(TfToken const & identifier,
-                                          GarchSamplerGPUHandle samplerName) const override;
+                                          GarchSamplerGPUHandle samplerName) override;
         MTLF_API
-        virtual VtDictionary GetTextureInfo() const override;
+        virtual VtDictionary GetTextureInfo(bool forceLoad) override;
 
         /// Updates the contents signature for the underlying texture
         /// to allow downstream consumers to know that the texture image

@@ -144,9 +144,9 @@ GarchUVTexture::~GarchUVTexture()
 }
 
 VtDictionary
-GarchUVTexture::GetTextureInfo() const
+GarchUVTexture::GetTextureInfo(bool forceLoad)
 {
-    VtDictionary info = GarchBaseTexture::GetTextureInfo();
+    VtDictionary info = GarchBaseTexture::GetTextureInfo(forceLoad);
 
     info["imageFilePath"] = _imageFilePath;
 
@@ -160,10 +160,10 @@ GarchUVTexture::IsMinFilterSupported(GLenum filter)
 }
 
 void
-GarchUVTexture::_OnSetMemoryRequested(size_t targetMemory)
+GarchUVTexture::_ReadTexture()
 {
     GarchUVTextureDataRefPtr texData =
-        GarchUVTextureData::New(_GetImageFilePath(), targetMemory,
+        GarchUVTextureData::New(_GetImageFilePath(), GetMemoryRequested(),
                               _GetCropTop(), _GetCropBottom(),
                               _GetCropLeft(), _GetCropRight());
     if (texData) {
@@ -171,6 +171,7 @@ GarchUVTexture::_OnSetMemoryRequested(size_t targetMemory)
     }
     _UpdateTexture(texData);
     _CreateTexture(texData, _GenerateMipmap());
+    _SetLoaded();
 }
 
 bool

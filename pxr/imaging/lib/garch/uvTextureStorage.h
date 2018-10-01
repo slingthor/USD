@@ -57,7 +57,7 @@ public:
     
     GARCH_API
     virtual BindingVector GetBindings(TfToken const & identifier,
-                                      GarchSamplerGPUHandle samplerName) const override
+                                      GarchSamplerGPUHandle samplerName) override
     {
         return _baseTexture->GetBindings(identifier, samplerName);
     }
@@ -72,9 +72,9 @@ protected:
     
     GARCH_API
     virtual ~GarchUVTextureStorage();
-
+    
     GARCH_API
-    virtual void _OnSetMemoryRequested(size_t targetMemory);
+    virtual void _ReadTexture();
     GARCH_API
     virtual bool _GenerateMipmap() const;
     

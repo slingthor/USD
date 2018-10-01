@@ -183,6 +183,12 @@ public:
     virtual bool SetRendererPlugin(TfToken const &id);
 
     USDIMAGINGMETAL_API
+    virtual TfTokenVector GetRendererAovs() const;
+    
+    USDIMAGINGMETAL_API
+    virtual bool SetRendererAov(TfToken const &id);
+
+    USDIMAGINGMETAL_API
     virtual bool TestIntersection(
         const GfMatrix4d &viewMatrix,
         const GfMatrix4d &projectionMatrix,
