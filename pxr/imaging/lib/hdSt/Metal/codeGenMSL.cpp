@@ -922,7 +922,9 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
         indexBufferSlot = vsNumVertexAttributes;
         //Instead of using BindingType IndexBuffer we use UniformBuffer as that is how we use the indexBuffer in this case.
         mslProgram->AddBinding("indices", indexBufferSlot, kMSL_BindingType_UniformBuffer, kMSL_ProgramStage_Vertex);
-        mslProgram->AddBinding("indices", indexBufferSlot, kMSL_BindingType_UniformBuffer, kMSL_ProgramStage_Compute);
+        
+        if(_buildTarget == kMSL_BuildTarget_MVA_ComputeGS)
+            mslProgram->AddBinding("indices", indexBufferSlot, kMSL_BindingType_UniformBuffer, kMSL_ProgramStage_Compute);
     }
     vsNumVertexAttributes++;
 
@@ -1166,15 +1168,18 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
 
     int numVerticesPerPrimitive = -1;
 
+    if(_buildTarget == kMSL_BuildTarget_MVA || _buildTarget == kMSL_BuildTarget_MVA_ComputeGS) {
+        numVerticesPerPrimitive = 3;    //MTL_FIXME: Code belows isn't robust enough, need a better way to determine verts per primitive
+//        //Determine geometry type
+//        for(auto key : _geometricShader->GetSourceKeys(HdShaderTokens->geometryShader)) {
+//            if(key == "Mesh.Geometry.Triangle") { numVerticesPerPrimitive = 3; break; }
+//        }
+//        if(numVerticesPerPrimitive == -1)
+//            TF_FATAL_ERROR("Unsupported Primitive Type encountered during Geometry Shader generation!");
+    }
+
     if(_buildTarget == kMSL_BuildTarget_MVA_ComputeGS) {
         int                 gsVertOutStructSize(0), gsPrimOutStructSize(0);
-        
-        //Determine geometry type
-        for(auto key : _geometricShader->GetSourceKeys(HdShaderTokens->geometryShader)) {
-            if(key == "Mesh.Geometry.Triangle") { numVerticesPerPrimitive = 3; break; }
-        }
-        if(numVerticesPerPrimitive == -1)
-            TF_FATAL_ERROR("Unsupported Primitive Type encountered during Geometry Shader generation!");
         
         ////////////////////////////////// Geometry Input ////////////////////////////////
 
@@ -1722,8 +1727,8 @@ HdSt_CodeGenMSL::Compile()
     _hasFS  = (!fragmentShader.empty());
 
     // decide to build shaders that use a compute GS or not
-    //_mslBuildComputeGS = _hasGS;
-    _buildTarget = (_hasGS ? kMSL_BuildTarget_MVA_ComputeGS : kMSL_BuildTarget_Regular);
+    // MTL_TODO: We are using MVA (Manual Vertex Assembly) in all cases currently. This may not be what we want due to performance concerns.
+    _buildTarget = (_hasGS ? kMSL_BuildTarget_MVA_ComputeGS : kMSL_BuildTarget_MVA);
     
     // create MSL program.
     HdStMSLProgramSharedPtr mslProgram(new HdStMSLProgram(HdTokens->drawingShader));
@@ -1924,6 +1929,9 @@ HdSt_CodeGenMSL::Compile()
     bool shaderCompiled = true;
     // compile shaders
     // note: _vsSource, _fsSource etc are used for diagnostics (see header)
+    
+    mslProgram->SetBuildTarget(_buildTarget);
+    
     if (_hasVS) {
         _vsSource = vsConfigString.str() + _genDefinitions.str() +
                     _genCommon.str() + _genVS.str() + termination.str() + glueVS.str();
