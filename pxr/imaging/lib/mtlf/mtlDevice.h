@@ -192,10 +192,13 @@ public:
     void SetActiveWorkQueue(MetalWorkQueueType workQueueType) { currentWorkQueue = &workQueues[workQueueType]; currentWorkQueueType = workQueueType;};
     
     MTLF_API
-    void  SetEventDependency(MetalWorkQueueType workQueueType);
+    void  SetEventDependency(MetalWorkQueueType workQueueType, uint32_t eventValue = 0);
     
     MTLF_API
-    void GenerateEvent(MetalWorkQueueType workQueueType);
+    uint32_t GenerateEvent(MetalWorkQueueType workQueueType);
+    
+    MTLF_API
+    uint32_t GetEventCounter();
    
     id<MTLDevice> device;
     id<MTLCommandQueue> commandQueue;
@@ -263,10 +266,6 @@ private:
     id<MTLEvent> queueSyncEvent;
     uint32_t queueSyncEventCounter;
     MetalWorkQueueType outstandingDependency;
-    
-    std::vector<id<MTLBuffer>> computeGSOutputBuffers;
-    uint32_t computeGSOutputCurrentIdx;
-    uint32_t computeGSOutputCurrentOffset;
     
     id<MTLDevice> GetMetalDevice(PREFERRED_GPU_TYPE preferredGPUType);
     void handleDisplayChange();
