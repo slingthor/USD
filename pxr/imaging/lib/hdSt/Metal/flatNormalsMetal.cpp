@@ -78,9 +78,7 @@ HdSt_FlatNormalsComputationMetal::_Execute(
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
     HdStMSLProgramSharedPtr const &mslProgram(boost::dynamic_pointer_cast<HdStMSLProgram>(computeProgram));
     id<MTLFunction> computeFunction = mslProgram->GetComputeFunction();
-    
-    std::vector<id<MTLBuffer>> computeBuffers(4);
-    
+
     // Only the normals are writebale
     unsigned long bufferWritableMask = 1 << 1;
     
