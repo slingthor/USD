@@ -191,6 +191,9 @@ public:
     }
     
     HDST_API
+    void SetBuildTarget(MSL_BuildTarget buildTarget) { _buildTarget = buildTarget; }
+    
+    HDST_API
     void SetGSOutStructsSize(int vertOutStructSize, int primOutStructSize) {
         _gsVertOutStructSize = vertOutStructSize;
         _gsPrimOutStructSize = primOutStructSize;

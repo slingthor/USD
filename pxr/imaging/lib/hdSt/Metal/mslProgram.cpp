@@ -266,7 +266,6 @@ HdStMSLProgram::CompileShader(GLenum type,
     } else if (type == GL_GEOMETRY_SHADER) {
         _computeGeometryFunction = function;
         _computeGeometryFunctionIdx = dumpedFileCount;
-        _buildTarget = kMSL_BuildTarget_MVA_ComputeGS;
     }
 
     return success;
@@ -534,17 +533,21 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
     }
   
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
-    
-    // Possibly move this outside this function as we shouldn't need to get a render encoder every draw call
-    id <MTLRenderCommandEncoder>    renderEncoder = context->GetRenderEncoder();
-    id <MTLComputeCommandEncoder>   computeEncoder;
-    
+
     id<MTLBuffer> indexBuffer = context->GetIndexBuffer();
     if(bDrawingQuads) {
         indexCount = (indexCount / 4) * 6;
         firstIndex = (firstIndex / 4) * 6;
         indexBuffer = context->GetQuadIndexBuffer(indexTypeMetal);
     }
+
+    uint32_t eventValue = context->GetEventCounter();
+    //if(doMVAComputeGS)
+    //    context->SetEventDependency(METALWORKQUEUE_DEFAULT, eventValue);
+
+    // Possibly move this outside this function as we shouldn't need to get a render encoder every draw call
+    id <MTLRenderCommandEncoder>    renderEncoder = context->GetRenderEncoder();
+    id <MTLComputeCommandEncoder>   computeEncoder;
     
     const_cast<HdStMSLProgram*>(this)->BakeState();
     
@@ -552,7 +555,6 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
         //Setup Draw Args on the render context
         struct { int _indexCount, _startIndex, _baseVertex, _instanceCount; } drawArgs = { indexCount, firstIndex, baseVertex, instanceCount };
         [renderEncoder setVertexBytes:(const void*)&drawArgs length:sizeof(drawArgs) atIndex:_drawArgsSlot];
-        //context->SetDrawArgsBuffer(indexCount, firstIndex, baseVertex, _drawArgsSlot, doMVAComputeGS);
         
         if(doMVAComputeGS) {
             // Get a compute encoder on the Geometry Shader work queue
@@ -561,8 +563,6 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
             //Setup Draw Args on the compute context
             [computeEncoder setBytes:(const void*)&drawArgs length:sizeof(drawArgs) atIndex:_drawArgsSlot];
             context->SetComputeBufferMutability(_drawArgsSlot, false);
-            
-            //context->SetComputeGSOutputBuffers(indexCount, _gsVertOutStructSize, _gsPrimOutStructSize, _gsVertOutBufferSlot, _gsPrimOutBufferSlot);
             
             //MTL_FIXME: Would like to prevent re-creating the buffers each draw-call. Would be better to add a cache of old buffers.
             //           Would be even better if alternate compute/render is implemented with cut up draws to keep GS output in L2. Re-
@@ -575,10 +575,8 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
             
             [computeEncoder setBuffer:vertBuffer offset:0 atIndex:_gsVertOutBufferSlot];
             context->SetComputeBufferMutability(_gsVertOutBufferSlot, true);
-            //computePipelineStateDescriptor.buffers[perVertBufferSlot].mutability = MTLMutabilityMutable;
             [computeEncoder setBuffer:primBuffer offset:0 atIndex:_gsPrimOutBufferSlot];
             context->SetComputeBufferMutability(_gsPrimOutBufferSlot, true);
-            //computePipelineStateDescriptor.buffers[perPrimBufferSlot].mutability = MTLMutabilityMutable;
             [renderEncoder setVertexBuffer:vertBuffer offset:0 atIndex:_gsVertOutBufferSlot];
             [renderEncoder setVertexBuffer:primBuffer offset:0 atIndex:_gsPrimOutBufferSlot];
             [renderEncoder setFragmentBuffer:vertBuffer offset:0 atIndex:_gsVertOutBufferSlot];
@@ -589,33 +587,25 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
         }
     }
     
-    if (bDrawingQuads) {
-        if(doMVAComputeGS)
-        {
-            [computeEncoder dispatchThreads:MTLSizeMake((indexCount / 3) * instanceCount, 1, 1) threadsPerThreadgroup:MTLSizeMake(64, 1, 1)];
-            [renderEncoder drawPrimitives:primType vertexStart:0 vertexCount:indexCount instanceCount:instanceCount baseInstance:0];
-        }
-        else
-            [renderEncoder drawIndexedPrimitives:primType indexCount:indexCount indexType:indexTypeMetal indexBuffer:indexBuffer indexBufferOffset:(firstIndex * indexSize) instanceCount:instanceCount baseVertex:baseVertex baseInstance:0];
+    if(doMVAComputeGS)
+    {
+        [computeEncoder dispatchThreads:MTLSizeMake((indexCount / 3) * instanceCount, 1, 1) threadsPerThreadgroup:MTLSizeMake(64, 1, 1)];
+
+        [renderEncoder drawPrimitives:primType vertexStart:0 vertexCount:indexCount instanceCount:instanceCount baseInstance:0];
     }
-    else  {
-        if(doMVAComputeGS)
-        {
-            [computeEncoder dispatchThreads:MTLSizeMake((indexCount / 3) * instanceCount, 1, 1) threadsPerThreadgroup:MTLSizeMake(64,1,1)];
-            [renderEncoder drawPrimitives:primType vertexStart:0 vertexCount:indexCount instanceCount:instanceCount baseInstance:0];
-        }
-        else
-            [renderEncoder drawIndexedPrimitives:primType indexCount:indexCount indexType:indexTypeMetal indexBuffer:indexBuffer indexBufferOffset:(firstIndex * indexSize) instanceCount:instanceCount baseVertex:baseVertex baseInstance:0];
-    }
-    
+    else if(doMVA)
+        [renderEncoder drawPrimitives:primType vertexStart:0 vertexCount:indexCount instanceCount:instanceCount baseInstance:0];
+    else
+        [renderEncoder drawIndexedPrimitives:primType indexCount:indexCount indexType:indexTypeMetal indexBuffer:indexBuffer indexBufferOffset:(firstIndex * indexSize) instanceCount:instanceCount baseVertex:baseVertex baseInstance:0];
+
     context->ReleaseEncoder(false);
     
     if(doMVAComputeGS)
     {
-        // Release the geometry shader encoder
+        // Release the geometry shader encoder and encode the event
         context->ReleaseEncoder(false, METALWORKQUEUE_GEOMETRY_SHADER);
+        //context->GenerateEvent(METALWORKQUEUE_GEOMETRY_SHADER);
     }
-
 }
 
 void HdStMSLProgram::DrawArraysInstanced(GLenum primitiveMode,
