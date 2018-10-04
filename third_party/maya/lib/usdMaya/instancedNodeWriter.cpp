@@ -96,11 +96,11 @@ _ReplaceInstancePrefix(
     return curPath;
 }
 
-PxrUsdMaya_InstancedNodeWriter::PxrUsdMaya_InstancedNodeWriter(
+UsdMaya_InstancedNodeWriter::UsdMaya_InstancedNodeWriter(
     const MDagPath& mayaInstancePath,
     const SdfPath& usdInstancePath,
-    usdWriteJobCtx& ctx)
-    : MayaPrimWriter(mayaInstancePath, usdInstancePath, ctx),
+    UsdMayaWriteJobContext& ctx)
+    : UsdMayaPrimWriter(mayaInstancePath, usdInstancePath, ctx),
       _masterPaths(ctx._FindOrCreateInstanceMaster(mayaInstancePath)),
       _exportsGprims(false)
 {
@@ -132,12 +132,12 @@ PxrUsdMaya_InstancedNodeWriter::PxrUsdMaya_InstancedNodeWriter(
     const MDagPath dagMasterRootPath = allInstances[0];
 
     // Loop through our prim writers and compute cached data.
-    std::vector<MayaPrimWriterSharedPtr>::const_iterator begin;
-    std::vector<MayaPrimWriterSharedPtr>::const_iterator end;
+    std::vector<UsdMayaPrimWriterSharedPtr>::const_iterator begin;
+    std::vector<UsdMayaPrimWriterSharedPtr>::const_iterator end;
     const MDagPath path = GetDagPath();
     if (_writeJobCtx._GetInstanceMasterPrimWriters(path, &begin, &end)) {
         for (auto it = begin; it != end; ++it) {
-            const MayaPrimWriterSharedPtr writer = *it;
+            const UsdMayaPrimWriterSharedPtr writer = *it;
 
             // We export gprims if any of the subtree writers does.
             if (writer->ExportsGprims()) {
@@ -152,7 +152,7 @@ PxrUsdMaya_InstancedNodeWriter::PxrUsdMaya_InstancedNodeWriter(
                     writerModelPaths.end());
 
             // Replace prefixes to obtain DAG-USD path mapping.
-            const PxrUsdMayaUtil::MDagPathMap<SdfPath>& writerMapping =
+            const UsdMayaUtil::MDagPathMap<SdfPath>& writerMapping =
                     writer->GetDagToUsdPathMapping();
             for (const std::pair<MDagPath, SdfPath>& pair : writerMapping) {
                 const MDagPath& dagPathInMaster = pair.first;
@@ -169,31 +169,31 @@ PxrUsdMaya_InstancedNodeWriter::PxrUsdMaya_InstancedNodeWriter(
 }
 
 bool
-PxrUsdMaya_InstancedNodeWriter::ExportsGprims() const
+UsdMaya_InstancedNodeWriter::ExportsGprims() const
 {
     return _exportsGprims;
 }
 
 bool
-PxrUsdMaya_InstancedNodeWriter::ShouldPruneChildren() const
+UsdMaya_InstancedNodeWriter::ShouldPruneChildren() const
 {
     return true;
 }
 
 const SdfPathVector&
-PxrUsdMaya_InstancedNodeWriter::GetModelPaths() const
+UsdMaya_InstancedNodeWriter::GetModelPaths() const
 {
     return _modelPaths;
 }
 
-const PxrUsdMayaUtil::MDagPathMap<SdfPath>&
-PxrUsdMaya_InstancedNodeWriter::GetDagToUsdPathMapping() const
+const UsdMayaUtil::MDagPathMap<SdfPath>&
+UsdMaya_InstancedNodeWriter::GetDagToUsdPathMapping() const
 {
     return _dagToUsdPaths;
 }
 
 void
-PxrUsdMaya_InstancedNodeWriter::Write(const UsdTimeCode&  /*usdTime*/)
+UsdMaya_InstancedNodeWriter::Write(const UsdTimeCode&  /*usdTime*/)
 {
 }
 

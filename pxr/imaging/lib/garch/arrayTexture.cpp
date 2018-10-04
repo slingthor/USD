@@ -109,6 +109,35 @@ GarchArrayTexture::GarchArrayTexture(
 }
 
 void
+GarchArrayTexture::_ReadTexture()
+{
+    GarchBaseTextureDataConstRefPtrVector texDataVec(_arraySize, 0);
+    size_t targetMemory = GetMemoryRequested();
+    
+    for (size_t i = 0; i < _arraySize; ++i) {
+        GarchUVTextureDataRefPtr texData =
+        GarchUVTextureData::New(_GetImageFilePath(i), targetMemory,
+                                _GetCropTop(), _GetCropBottom(),
+                                _GetCropLeft(), _GetCropRight());
+        if (texData) {
+            texData->Read(0, _GenerateMipmap(), GetOriginLocation());
+        }
+        
+        _UpdateTexture(texData);
+        
+        if (texData && texData->HasRawBuffer()) {
+            texDataVec[i] = texData;
+        } else {
+            TF_WARN("Invalid texture data for texture file: %s",
+                    _GetImageFilePath(i).GetString().c_str());
+        }
+    }
+    
+    _CreateTextures(texDataVec, _GenerateMipmap());
+    _SetLoaded();
+}
+
+void
 GarchArrayTexture::_OnSetMemoryRequested(size_t targetMemory)
 {
     GarchBaseTextureDataConstRefPtrVector texDataVec(_arraySize, 0);

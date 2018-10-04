@@ -6,7 +6,7 @@
                     "GarchPtexTexture" : {
                         "bases": ["GarchTexture"],
                         "textureTypes": ["ptx", "ptex"],
-                        "precedence": 2
+                        "precedence": 1
                     },
                     "Garch_OIIOImage" : {
                         "bases": ["GarchImage"],
@@ -16,7 +16,7 @@
                     "Garch_StbImage" : {
                         "bases": ["GarchImage"],
                         "imageTypes": ["bmp", "jpg", "png", "tga", "hdr"],
-                        "precedence": -1 
+                        "precedence": 2
                     },
                     "GarchUVTexture" : {
                         "bases": ["GarchBaseTexture"],

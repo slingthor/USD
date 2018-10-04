@@ -113,7 +113,7 @@ public:
         GfVec4f wireframeColor;
         float alphaThreshold; // threshold < 0 implies automatic
         ClipPlanesVector clipPlanes;
-        bool enableHardwareShading;
+        bool enableSceneMaterials;
         // Respect USD's model:drawMode attribute...
         bool enableUsdDrawModes;
 
@@ -137,7 +137,7 @@ public:
             wireframeColor(.0f, .0f, .0f, .0f),
             alphaThreshold(-1),
             clipPlanes(),
-            enableHardwareShading(true),
+            enableSceneMaterials(true),
             enableUsdDrawModes(true)
         {
         }
@@ -162,7 +162,7 @@ public:
                 && wireframeColor              == other.wireframeColor
                 && alphaThreshold              == other.alphaThreshold
                 && clipPlanes                  == other.clipPlanes
-                && enableHardwareShading       == other.enableHardwareShading
+                && enableSceneMaterials        == other.enableSceneMaterials
                 && enableUsdDrawModes          == other.enableUsdDrawModes;
         }
         bool operator!=(const RenderParams &other) const {
@@ -246,14 +246,14 @@ public:
     USDIMAGINGMETAL_API
     virtual void SetSelectionColor(GfVec4f const& color);
 
-    /// Finds closest point of interesection with a frustum by rendering.
+    /// Finds closest point of intersection with a frustum by rendering.
     ///	
     /// This method uses a PickRender and a customized depth buffer to find an
     /// approximate point of intersection by rendering. This is less accurate
     /// than implicit methods or rendering with GL_SELECT, but leverages any data
     /// already cached in the renderer.
     ///
-    /// Returns whether a hit occured and if so, \p outHitPoint will contain the
+    /// Returns whether a hit occurred and if so, \p outHitPoint will contain the
     /// intersection point in world space (i.e. \p projectionMatrix and
     /// \p viewMatrix factored back out of the result).
     ///
@@ -274,7 +274,7 @@ public:
     /// See the documentation for TestIntersectionBatch() below for more detail.
     typedef std::function< SdfPath(const SdfPath&, const SdfPath&, const int) > PathTranslatorCallback;
 
-    /// Finds closest point of interesection with a frustum by rendering a batch.
+    /// Finds closest point of intersection with a frustum by rendering a batch.
     ///
     /// This method uses a PickRender and a customized depth buffer to find an
     /// approximate point of intersection by rendering. This is less accurate
@@ -380,6 +380,14 @@ public:
     USDIMAGINGMETAL_API
     virtual bool SetRendererPlugin(TfToken const &id);
 
+    /// Return the vector of available renderer AOV settings.
+    USDIMAGINGMETAL_API
+    virtual TfTokenVector GetRendererAovs() const;
+    
+    /// Set the current renderer AOV to \p id.
+    USDIMAGINGMETAL_API
+    virtual bool SetRendererAov(TfToken const& id);
+    
     /// Returns GPU resource allocation info
     USDIMAGINGMETAL_API
     virtual VtDictionary GetResourceAllocation() const;

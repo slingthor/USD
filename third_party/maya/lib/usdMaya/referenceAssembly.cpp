@@ -21,40 +21,36 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#include "pxr/pxr.h"
 #include "usdMaya/referenceAssembly.h"
 
 #include "usdMaya/editUtil.h"
 #include "usdMaya/jobArgs.h"
 #include "usdMaya/proxyShape.h"
 #include "usdMaya/query.h"
+#include "usdMaya/readJob.h"
 #include "usdMaya/stageCache.h"
 #include "usdMaya/stageData.h"
-#include "usdMaya/usdReadJob.h"
 
 #include "pxr/base/tf/fileUtils.h"
 #include "pxr/base/tf/stringUtils.h"
+
 #include "pxr/usd/ar/resolver.h"
 #include "pxr/usd/usd/editContext.h"
 #include "pxr/usd/usd/editTarget.h"
 #include "pxr/usd/usd/stageCacheContext.h"
-#include "pxr/usd/usd/primRange.h"
 #include "pxr/usd/usd/variantSets.h"
 #include "pxr/usd/usdGeom/modelAPI.h"
-#include "pxr/usd/usdGeom/xformable.h"
-#include "pxr/usd/usdGeom/xformCommonAPI.h"
 #include "pxr/usd/usdUtils/stageCache.h"
 #include "pxr/usd/usdUtils/pipeline.h"
 
-#include <maya/MDGModifier.h>
 #include <maya/MDagModifier.h>
 #include <maya/MDagPath.h>
+#include <maya/MDGModifier.h>
 #include <maya/MEdit.h>
 #include <maya/MFileIO.h>
 #include <maya/MFnAssembly.h>
 #include <maya/MFnCompoundAttribute.h>
 #include <maya/MFnDependencyNode.h>
-#include <maya/MFnEnumAttribute.h>
 #include <maya/MFnNumericAttribute.h>
 #include <maya/MFnPluginData.h>
 #include <maya/MFnStringData.h>
@@ -67,7 +63,6 @@
 #include <maya/MPlugArray.h>
 #include <maya/MSelectionList.h>
 #include <maya/MString.h>
-#include <maya/MTime.h>
 
 #include <map>
 #include <string>
@@ -77,10 +72,10 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 
-TF_DEFINE_PUBLIC_TOKENS(PxrUsdMayaReferenceAssemblyTokens,
+TF_DEFINE_PUBLIC_TOKENS(UsdMayaReferenceAssemblyTokens,
                         PXRUSDMAYA_REFERENCE_ASSEMBLY_TOKENS);
 
-TF_DEFINE_PUBLIC_TOKENS(PxrUsdMayaVariantSetTokens,
+TF_DEFINE_PUBLIC_TOKENS(UsdMayaVariantSetTokens,
                         PXRUSDMAYA_VARIANT_SET_TOKENS);
 
 TF_DEFINE_ENV_SETTING(PIXMAYA_USE_USD_ASSEM_NAMESPACE,
@@ -97,7 +92,7 @@ UsdMayaUseUsdAssemblyNamespace()
 // == Statics ==
 const MTypeId UsdMayaReferenceAssembly::typeId(0x0010A251);
 const MString UsdMayaReferenceAssembly::typeName(
-    PxrUsdMayaReferenceAssemblyTokens->MayaTypeName.GetText());
+    UsdMayaReferenceAssemblyTokens->MayaTypeName.GetText());
 const MString UsdMayaReferenceAssembly::_classification("drawdb/geometry/transform");
 
 // Attributes
@@ -106,8 +101,6 @@ MObject UsdMayaReferenceAssembly::primPathAttr;
 MObject UsdMayaReferenceAssembly::excludePrimPathsAttr;
 MObject UsdMayaReferenceAssembly::timeAttr;
 MObject UsdMayaReferenceAssembly::complexityAttr;
-MObject UsdMayaReferenceAssembly::tintAttr;
-MObject UsdMayaReferenceAssembly::tintColorAttr;
 MObject UsdMayaReferenceAssembly::kindAttr;
 MObject UsdMayaReferenceAssembly::initialRepAttr;
 MObject UsdMayaReferenceAssembly::repNamespaceAttr;
@@ -165,27 +158,6 @@ UsdMayaReferenceAssembly::initialize()
     numericAttrFn.setMax(8);
     numericAttrFn.setStorable(false); // not written to the file
     status = addAttribute(complexityAttr);
-    CHECK_MSTATUS_AND_RETURN_IT(status);
-
-    tintAttr = numericAttrFn.create(
-        "tint",
-        "tn",
-        MFnNumericData::kBoolean,
-        0,
-        &status);
-    numericAttrFn.setInternal(true);
-    numericAttrFn.setAffectsAppearance(true);
-    CHECK_MSTATUS_AND_RETURN_IT(status);
-    status = addAttribute(tintAttr);
-    CHECK_MSTATUS_AND_RETURN_IT(status);
-
-    tintColorAttr = numericAttrFn.createColor(
-        "tintColor",
-        "tcol",
-        &status);
-    numericAttrFn.setAffectsAppearance(true);
-    CHECK_MSTATUS_AND_RETURN_IT(status);
-    status = addAttribute(tintColorAttr);
     CHECK_MSTATUS_AND_RETURN_IT(status);
 
     MFnStringData defaultKind;
@@ -309,19 +281,19 @@ UsdMayaReferenceAssembly::UsdMayaReferenceAssembly() :
     //           if adding a new Representation
     //
     _representations[std::string(UsdMayaRepresentationCollapsed::_assemblyType.asChar())] =
-        boost::shared_ptr<MPxRepresentation>( new UsdMayaRepresentationCollapsed(this, UsdMayaRepresentationCollapsed::_assemblyType) );
+        std::make_shared<UsdMayaRepresentationCollapsed>(this, UsdMayaRepresentationCollapsed::_assemblyType);
 
     _representations[std::string(UsdMayaRepresentationCards::_assemblyType.asChar())] =
-        boost::shared_ptr<MPxRepresentation>( new UsdMayaRepresentationCards(this, UsdMayaRepresentationCards::_assemblyType) );
+        std::make_shared<UsdMayaRepresentationCards>(this, UsdMayaRepresentationCards::_assemblyType);
 
     _representations[std::string(UsdMayaRepresentationPlayback::_assemblyType.asChar())] =
-        boost::shared_ptr<MPxRepresentation>( new UsdMayaRepresentationPlayback(this, UsdMayaRepresentationPlayback::_assemblyType) );
+        std::make_shared<UsdMayaRepresentationPlayback>(this, UsdMayaRepresentationPlayback::_assemblyType);
 
     _representations[std::string(UsdMayaRepresentationExpanded::_assemblyType.asChar())] =
-        boost::shared_ptr<MPxRepresentation>( new UsdMayaRepresentationExpanded(this, UsdMayaRepresentationExpanded::_assemblyType) );
+        std::make_shared<UsdMayaRepresentationExpanded>(this, UsdMayaRepresentationExpanded::_assemblyType);
 
     _representations[std::string(UsdMayaRepresentationFull::_assemblyType.asChar())] =
-        boost::shared_ptr<MPxRepresentation>( new UsdMayaRepresentationFull(this, UsdMayaRepresentationFull::_assemblyType) );
+        std::make_shared<UsdMayaRepresentationFull>(this, UsdMayaRepresentationFull::_assemblyType);
 }
 
 
@@ -357,7 +329,7 @@ MString UsdMayaReferenceAssembly::getActive() const
 MStringArray UsdMayaReferenceAssembly::getRepresentations(MStatus*  /*status*/) const
 {
     MStringArray repTypes;
-    std::map<std::string, boost::shared_ptr<MPxRepresentation> >::const_iterator it;
+    std::map<std::string, std::shared_ptr<MPxRepresentation> >::const_iterator it;
     for (it=_representations.begin(); it != _representations.end(); ++it) {
         repTypes.append(MString(it->first.c_str()));
     }
@@ -367,7 +339,7 @@ MStringArray UsdMayaReferenceAssembly::getRepresentations(MStatus*  /*status*/) 
 MString UsdMayaReferenceAssembly::getRepType(const MString& rep) const
 {
     std::string tmpRep(rep.asChar());
-    std::map<std::string, boost::shared_ptr<MPxRepresentation> >::const_iterator repIt;
+    std::map<std::string, std::shared_ptr<MPxRepresentation> >::const_iterator repIt;
     repIt = _representations.find(tmpRep);
     if (repIt != _representations.end()) {
         return repIt->second->getType();
@@ -385,7 +357,7 @@ MString UsdMayaReferenceAssembly::getRepLabel(const MString& rep) const
 MStringArray UsdMayaReferenceAssembly::repTypes() const
 {
     MStringArray repTypes;
-    std::map<std::string, boost::shared_ptr<MPxRepresentation> >::const_iterator it;
+    std::map<std::string, std::shared_ptr<MPxRepresentation> >::const_iterator it;
     for (it=_representations.begin(); it != _representations.end(); ++it) {
         repTypes.append(MString(it->first.c_str()));
     }
@@ -423,7 +395,7 @@ bool UsdMayaReferenceAssembly::activateRep(const MString& repMStr)
     }
     std::string rep(std::string(repMStr.asChar()));
 
-    std::map<std::string, boost::shared_ptr<MPxRepresentation> >::const_iterator repIt;
+    std::map<std::string, std::shared_ptr<MPxRepresentation> >::const_iterator repIt;
     repIt = _representations.find(rep);
     if (repIt == _representations.end()) {
         return false;
@@ -547,7 +519,7 @@ MStatus UsdMayaReferenceAssembly::setDependentsDirty( const MPlug& dirtiedPlug, 
     // Hardcoded dynamic attr naming: usdVariantSet_*
     // If an attr starts with "usdVariantSet_", then dirty the stage
     MString dirtiedPlugName = dirtiedPlug.partialName();
-    const MString variantSetPrefix(PxrUsdMayaVariantSetTokens->PlugNamePrefix.GetText());
+    const MString variantSetPrefix(UsdMayaVariantSetTokens->PlugNamePrefix.GetText());
     if ((dirtiedPlugName.length() > variantSetPrefix.length()) &&
         (dirtiedPlugName.substring(0, variantSetPrefix.length()-1) == variantSetPrefix))
     {
@@ -624,12 +596,12 @@ std::set<std::string> _GetVariantSetNamesForStageCache(
         }
 
         std::string attrName(attrPlug.partialName().asChar());
-        if (!TfStringStartsWith(attrName, PxrUsdMayaVariantSetTokens->PlugNamePrefix)) {
+        if (!TfStringStartsWith(attrName, UsdMayaVariantSetTokens->PlugNamePrefix)) {
             continue;
         }
 
         std::string variantSet = attrName.substr(
-            PxrUsdMayaVariantSetTokens->PlugNamePrefix.GetString().size());
+            UsdMayaVariantSetTokens->PlugNamePrefix.GetString().size());
         varSetNames.insert(variantSet);
     }
     return varSetNames;
@@ -680,7 +652,7 @@ MStatus UsdMayaReferenceAssembly::computeInStageDataCached(MDataBlock& dataBlock
             TfToken modelName = UsdUtilsGetModelNameFromRootLayer(rootLayer);
             const std::set<std::string> varSetNamesForCache = _GetVariantSetNamesForStageCache(depNodeFn);
             TF_FOR_ALL(variantSet, varSetNamesForCache) {
-                MString variantSetPlugName(PxrUsdMayaVariantSetTokens->PlugNamePrefix.GetText());
+                MString variantSetPlugName(UsdMayaVariantSetTokens->PlugNamePrefix.GetText());
                 variantSetPlugName += variantSet->c_str();
                 MPlug varSetPlg = depNodeFn.findPlug(variantSetPlugName, true);
                 if (!varSetPlg.isNull()) {
@@ -846,7 +818,7 @@ MStatus UsdMayaReferenceAssembly::computeOutStageData(MDataBlock& dataBlock)
         std::vector<std::string> variantSetNames = usdPrim.GetVariantSets().GetNames();
         std::map<std::string, std::string> varSets;
         TF_FOR_ALL(variantSet, variantSetNames) {
-            MString variantSetPlugName(PxrUsdMayaVariantSetTokens->PlugNamePrefix.GetText());
+            MString variantSetPlugName(UsdMayaVariantSetTokens->PlugNamePrefix.GetText());
             variantSetPlugName += variantSet->c_str();
             MPlug varSetPlg = depNodeFn.findPlug(variantSetPlugName, true);
             if (!varSetPlg.isNull()) {
@@ -1005,7 +977,7 @@ bool UsdMayaReferenceAssembly::setInternalValueInContext( const MPlug& plug,
 
     bool setAttrSuccess = MPxAssembly::setInternalValueInContext(plug, dataHandle, ctx);
 
-    bool varSelChanged = TfStringStartsWith(plug.partialName().asChar(), PxrUsdMayaVariantSetTokens->PlugNamePrefix);
+    bool varSelChanged = TfStringStartsWith(plug.partialName().asChar(), UsdMayaVariantSetTokens->PlugNamePrefix);
 
     if (varSelChanged ||
             (std::find(attrsAffectingRepresentation.begin(),
@@ -1086,7 +1058,7 @@ std::map<std::string, std::string> UsdMayaReferenceAssembly::GetVariantSetSelect
 
     std::vector<std::string> variantSetNames = usdPrim.GetVariantSets().GetNames();
     for (std::string variantSetName : variantSetNames) {
-        MString variantSetPlugName(PxrUsdMayaVariantSetTokens->PlugNamePrefix.GetText());
+        MString variantSetPlugName(UsdMayaVariantSetTokens->PlugNamePrefix.GetText());
         variantSetPlugName += variantSetName.c_str();
         MPlug variantSetPlg = depNodeFn.findPlug(variantSetPlugName, true);
         if (!variantSetPlg.isNull()) {
@@ -1110,7 +1082,7 @@ UsdMayaReferenceAssembly::ConnectMayaTimeToAssemblyTime()
         return;
     }
 
-    const MPlug mayaTimePlug = PxrUsdMayaUtil::GetMayaTimePlug();
+    const MPlug mayaTimePlug = UsdMayaUtil::GetMayaTimePlug();
     if (mayaTimePlug.isNull()) {
         return;
     }
@@ -1131,7 +1103,7 @@ UsdMayaReferenceAssembly::DisconnectAssemblyTimeFromMayaTime()
         return;
     }
 
-    const MPlug mayaTimePlug = PxrUsdMayaUtil::GetMayaTimePlug();
+    const MPlug mayaTimePlug = UsdMayaUtil::GetMayaTimePlug();
     if (mayaTimePlug.isNull()) {
         return;
     }
@@ -1219,12 +1191,6 @@ bool UsdMayaRepresentationProxyBase::activate()
         assemblyFn.findPlug(UsdMayaReferenceAssembly::complexityAttr, true),
         shapeFn.findPlug(UsdMayaProxyShape::complexityAttr, true));
     dgMod.connect(
-        assemblyFn.findPlug(UsdMayaReferenceAssembly::tintAttr, true),
-        shapeFn.findPlug(UsdMayaProxyShape::tintAttr, true));
-    dgMod.connect(
-        assemblyFn.findPlug(UsdMayaReferenceAssembly::tintColorAttr, true),
-        shapeFn.findPlug(UsdMayaProxyShape::tintColorAttr, true));
-    dgMod.connect(
         assemblyFn.findPlug(UsdMayaReferenceAssembly::outStageDataAttr, true),
         shapeFn.findPlug(UsdMayaProxyShape::inStageDataAttr, true));
 
@@ -1274,10 +1240,10 @@ UsdMayaRepresentationProxyBase::_PushEditsToProxy()
     }
     UsdStagePtr stage = proxyRootPrim.GetStage();
 
-    PxrUsdMayaEditUtil::PathEditMap refEdits;
+    UsdMayaEditUtil::PathEditMap refEdits;
     std::vector< std::string > invalidEdits, failedEdits;
 
-    PxrUsdMayaEditUtil::GetEditsForAssembly( assemObj, &refEdits, &invalidEdits );
+    UsdMayaEditUtil::GetEditsForAssembly( assemObj, &refEdits, &invalidEdits );
 
     if( !refEdits.empty() )
     {
@@ -1293,7 +1259,7 @@ UsdMayaRepresentationProxyBase::_PushEditsToProxy()
         // same layer(s).
         UsdEditContext editContext(stage, _sessionSublayer);
 
-        PxrUsdMayaEditUtil::ApplyEditsToProxy( refEdits, stage, proxyRootPrim, &failedEdits );
+        UsdMayaEditUtil::ApplyEditsToProxy( refEdits, stage, proxyRootPrim, &failedEdits );
     }
 
     if( !invalidEdits.empty() )
@@ -1508,15 +1474,15 @@ bool UsdMayaRepresentationHierBase::activate()
     bool shouldImportWithProxies = _ShouldImportWithProxies();
     if (shouldImportWithProxies) {
         // In this mode, sub-assembly nodes we create should come in unloaded.
-        userArgs[PxrUsdImportJobArgsTokens->assemblyRep] =
-                PxrUsdImportJobArgsTokens->Unloaded.GetString();
+        userArgs[UsdMayaJobImportArgsTokens->assemblyRep] =
+                UsdMayaJobImportArgsTokens->Unloaded.GetString();
     }
 
-    PxrUsdMayaJobImportArgs importArgs =
-            PxrUsdMayaJobImportArgs::CreateFromDictionary(
+    UsdMayaJobImportArgs importArgs =
+            UsdMayaJobImportArgs::CreateFromDictionary(
                 userArgs, shouldImportWithProxies,
                 GfInterval::GetFullInterval());
-    usdReadJob readJob(usdFilePath.asChar(),
+    UsdMaya_ReadJob readJob(usdFilePath.asChar(),
                        usdPrimPath.asChar(),
                        variantSetSelections,
                        importArgs);
@@ -1525,10 +1491,10 @@ bool UsdMayaRepresentationHierBase::activate()
     MDagPath assemblyDagPath;
     status = assemblyFn.getPath(assemblyDagPath);
     CHECK_MSTATUS_AND_RETURN(status, false);
-    readJob.setMayaRootDagPath(assemblyDagPath);
+    readJob.SetMayaRootDagPath(assemblyDagPath);
 
     std::vector<MDagPath> addedDagPaths;
-    if (!readJob.doIt(&addedDagPaths)) {
+    if (!readJob.Read(&addedDagPaths)) {
         return false;
     }
 

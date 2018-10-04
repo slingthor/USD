@@ -21,7 +21,6 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#include "pxr/pxr.h"
 #include "usdMaya/stageNode.h"
 
 #include "usdMaya/stageCache.h"
@@ -30,6 +29,7 @@
 #include "pxr/base/tf/staticTokens.h"
 #include "pxr/base/tf/stringUtils.h"
 #include "pxr/base/tf/token.h"
+
 #include "pxr/usd/ar/resolver.h"
 #include "pxr/usd/sdf/layer.h"
 #include "pxr/usd/sdf/path.h"
@@ -55,13 +55,13 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 
-TF_DEFINE_PUBLIC_TOKENS(PxrUsdMayaStageNodeTokens,
+TF_DEFINE_PUBLIC_TOKENS(UsdMayaStageNodeTokens,
                         PXRUSDMAYA_STAGE_NODE_TOKENS);
 
 
 const MTypeId UsdMayaStageNode::typeId(0x00126400);
 const MString UsdMayaStageNode::typeName(
-    PxrUsdMayaStageNodeTokens->MayaTypeName.GetText());
+    UsdMayaStageNodeTokens->MayaTypeName.GetText());
 
 // Attributes
 MObject UsdMayaStageNode::filePathAttr;

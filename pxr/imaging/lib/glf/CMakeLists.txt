@@ -15,7 +15,6 @@ endif()
 set(optionalLibs "")
 set(optionalIncludeDirs "")
 if (PXR_ENABLE_PTEX_SUPPORT)
-    list(APPEND optionalPublicClasses ptexMipmapTextureLoader)
     list(APPEND optionalLibs ${PTEX_LIBRARY})
     list(APPEND optionalIncludeDirs ${PTEX_INCLUDE_DIR})
 endif()
@@ -26,6 +25,7 @@ endif()
 
 pxr_library(glf
     LIBRARIES
+        ar
         arch
         garch
         gf

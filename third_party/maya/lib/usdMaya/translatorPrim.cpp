@@ -21,7 +21,6 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#include "pxr/pxr.h"
 #include "usdMaya/translatorPrim.h"
 
 #include "usdMaya/readUtil.h"
@@ -37,11 +36,11 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 
 void
-PxrUsdMayaTranslatorPrim::Read(
+UsdMayaTranslatorPrim::Read(
         const UsdPrim& prim,
         MObject mayaNode,
-        const PxrUsdMayaPrimReaderArgs& args,
-        PxrUsdMayaPrimReaderContext* context)
+        const UsdMayaPrimReaderArgs& args,
+        UsdMayaPrimReaderContext* context)
 {
     UsdGeomImageable primSchema(prim);
     if (!primSchema) {
@@ -70,7 +69,7 @@ PxrUsdMayaTranslatorPrim::Read(
     TfToken visibilityTok;
 
     if (primSchema.GetVisibilityAttr().Get(&visibilityTok, visTimeSample)){
-        PxrUsdMayaUtil::setPlugValue(depFn, "visibility",
+        UsdMayaUtil::setPlugValue(depFn, "visibility",
                            visibilityTok != UsdGeomTokens->invisible);
     }
 
@@ -111,13 +110,13 @@ PxrUsdMayaTranslatorPrim::Read(
     }
 
     // Process UsdGeomImageable typed schema (note that purpose is uniform).
-    PxrUsdMayaReadUtil::ReadSchemaAttributesFromPrim<UsdGeomImageable>(
+    UsdMayaReadUtil::ReadSchemaAttributesFromPrim<UsdGeomImageable>(
             prim, mayaNode, {UsdGeomTokens->purpose});
 
     // Process API schema attributes and strongly-typed metadata.
-    PxrUsdMayaReadUtil::ReadMetadataFromPrim(
+    UsdMayaReadUtil::ReadMetadataFromPrim(
             args.GetIncludeMetadataKeys(), prim, mayaNode);
-    PxrUsdMayaReadUtil::ReadAPISchemaAttributesFromPrim(
+    UsdMayaReadUtil::ReadAPISchemaAttributesFromPrim(
             args.GetIncludeAPINames(), prim, mayaNode);
 
     // XXX What about all the "user attributes" that PrimWriter exports???

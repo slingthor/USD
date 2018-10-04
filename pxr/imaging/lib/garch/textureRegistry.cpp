@@ -30,6 +30,8 @@
 #include "pxr/imaging/garch/textureHandle.h"
 #include "pxr/imaging/garch/image.h"
 
+#include "pxr/usd/ar/resolver.h"
+
 #include "pxr/base/arch/fileSystem.h"
 #include "pxr/base/tf/instantiateSingleton.h"
 #include "pxr/base/tf/stl.h"
@@ -195,7 +197,7 @@ GarchTextureFactoryBase*
 GarchTextureRegistry::_GetTextureFactory(const TfToken &filename)
 {
     // Lookup the plug-in type name based on the file extension.
-    TfToken fileExtension(TfStringGetSuffix(filename));
+    TfToken fileExtension(ArGetResolver().GetExtension(filename));
 
     TfType pluginType = _typeMap->Find(fileExtension);
     if (!pluginType) {
@@ -308,7 +310,7 @@ GarchTextureRegistry::GetTextureInfos() const
             GarchTexturePtr const &texture = textureHandle->GetTexture();
             VtDictionary info;
             if (texture) {
-                info = texture->GetTextureInfo();
+                info = texture->GetTextureInfo(false);
             }
 
             info["uniqueIdentifier"] =
@@ -327,7 +329,7 @@ GarchTextureRegistry::GetTextureInfos() const
 
             VtDictionary info;
             if (texture) {
-                info = texture->GetTextureInfo();
+                info = texture->GetTextureInfo(false);
             }
             info["uniqueIdentifier"] =
                 (uint64_t)textureHandle->GetUniqueIdentifier();

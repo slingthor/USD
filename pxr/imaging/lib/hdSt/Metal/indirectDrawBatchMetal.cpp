@@ -57,6 +57,14 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+TF_DEFINE_PRIVATE_TOKENS(
+    _tokens,
+
+    (drawIndirectResult)
+
+    (ulocResetPass)
+);
+
 
 static const GLuint64 HD_CULL_RESULT_TIMEOUT_NS = 5e9; // XXX how long to wait?
 
@@ -142,7 +150,7 @@ HdSt_IndirectDrawBatchMetal::_GPUFrustumCullingExecute(
     TF_FATAL_CODING_ERROR("Not Implemented");
         
     int resetPass = 1;
-    binder.BindUniformi(HdTokens->ulocResetPass, 1, &resetPass);
+    binder.BindUniformi(_tokens->ulocResetPass, 1, &resetPass);
 /*  glMultiDrawArraysIndirect(
         GL_POINTS,
         reinterpret_cast<const GLvoid*>(
@@ -155,7 +163,7 @@ HdSt_IndirectDrawBatchMetal::_GPUFrustumCullingExecute(
     glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 */
     resetPass = 0;
-    binder.BindUniformi(HdTokens->ulocResetPass, 1, &resetPass);
+    binder.BindUniformi(_tokens->ulocResetPass, 1, &resetPass);
 /*  glMultiDrawArraysIndirect(
         GL_POINTS,
         reinterpret_cast<const GLvoid*>(
@@ -210,7 +218,7 @@ HdSt_IndirectDrawBatchMetal::_BeginGPUCountVisibleInstances(
     if (!_resultBuffer) {
         _resultBuffer = boost::dynamic_pointer_cast<HdStPersistentBufferMetal>(
             resourceRegistry->RegisterPersistentBuffer(
-                HdTokens->drawIndirectResult, sizeof(GLint), 0));
+                _tokens->drawIndirectResult, sizeof(GLint), 0));
     }
 
     // Reset visible item count

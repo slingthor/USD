@@ -21,7 +21,6 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#include "pxr/pxr.h"
 #include "usdMaya/chaserRegistry.h"
 
 #include "usdMaya/debugCodes.h"
@@ -33,10 +32,10 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 
-PxrUsdMayaChaserRegistry::FactoryContext::FactoryContext(
+UsdMayaChaserRegistry::FactoryContext::FactoryContext(
         const UsdStagePtr& stage,
         const DagToUsdMap& dagToUsdMap,
-        const PxrUsdMayaJobExportArgs& jobArgs)
+        const UsdMayaJobExportArgs& jobArgs)
     : _stage(stage)
     , _dagToUsdMap(dagToUsdMap)
     , _jobArgs(jobArgs)
@@ -44,29 +43,29 @@ PxrUsdMayaChaserRegistry::FactoryContext::FactoryContext(
 }
 
 UsdStagePtr
-PxrUsdMayaChaserRegistry::FactoryContext::GetStage() const
+UsdMayaChaserRegistry::FactoryContext::GetStage() const
 {
     return _stage;
 }
 
-const PxrUsdMayaChaserRegistry::FactoryContext::DagToUsdMap&
-PxrUsdMayaChaserRegistry::FactoryContext::GetDagToUsdMap() const
+const UsdMayaChaserRegistry::FactoryContext::DagToUsdMap&
+UsdMayaChaserRegistry::FactoryContext::GetDagToUsdMap() const
 {
     return _dagToUsdMap;
 }
 
-const PxrUsdMayaJobExportArgs&
-PxrUsdMayaChaserRegistry::FactoryContext::GetJobArgs() const
+const UsdMayaJobExportArgs&
+UsdMayaChaserRegistry::FactoryContext::GetJobArgs() const
 {
     return _jobArgs;
 }
 
-TF_INSTANTIATE_SINGLETON(PxrUsdMayaChaserRegistry);
+TF_INSTANTIATE_SINGLETON(UsdMayaChaserRegistry);
 
-std::map<std::string, PxrUsdMayaChaserRegistry::FactoryFn> _factoryRegistry;
+std::map<std::string, UsdMayaChaserRegistry::FactoryFn> _factoryRegistry;
 
 bool
-PxrUsdMayaChaserRegistry::RegisterFactory(
+UsdMayaChaserRegistry::RegisterFactory(
         const std::string& name,
         FactoryFn fn)
 {
@@ -75,13 +74,13 @@ PxrUsdMayaChaserRegistry::RegisterFactory(
     return ret.second;
 }
 
-PxrUsdMayaChaserRefPtr
-PxrUsdMayaChaserRegistry::Create(
+UsdMayaChaserRefPtr
+UsdMayaChaserRegistry::Create(
         const std::string& name,
         const FactoryContext& context) const
 {
-    TfRegistryManager::GetInstance().SubscribeTo<PxrUsdMayaChaserRegistry>();
-    if (PxrUsdMayaChaserRegistry::FactoryFn fn = _factoryRegistry[name]) {
+    TfRegistryManager::GetInstance().SubscribeTo<UsdMayaChaserRegistry>();
+    if (UsdMayaChaserRegistry::FactoryFn fn = _factoryRegistry[name]) {
         return TfCreateRefPtr(fn(context));
     }
     else {
@@ -90,7 +89,7 @@ PxrUsdMayaChaserRegistry::Create(
 }
 
 std::vector<std::string>
-PxrUsdMayaChaserRegistry::GetAllRegisteredChasers() const 
+UsdMayaChaserRegistry::GetAllRegisteredChasers() const 
 {
     std::vector<std::string> ret;
     for (const auto& p : _factoryRegistry) {
@@ -100,17 +99,17 @@ PxrUsdMayaChaserRegistry::GetAllRegisteredChasers() const
 }
 
 // static
-PxrUsdMayaChaserRegistry& 
-PxrUsdMayaChaserRegistry::GetInstance()
+UsdMayaChaserRegistry& 
+UsdMayaChaserRegistry::GetInstance()
 {
-    return TfSingleton<PxrUsdMayaChaserRegistry>::GetInstance();
+    return TfSingleton<UsdMayaChaserRegistry>::GetInstance();
 }
 
-PxrUsdMayaChaserRegistry::PxrUsdMayaChaserRegistry()
+UsdMayaChaserRegistry::UsdMayaChaserRegistry()
 {
 }
 
-PxrUsdMayaChaserRegistry::~PxrUsdMayaChaserRegistry()
+UsdMayaChaserRegistry::~UsdMayaChaserRegistry()
 {
 }
 

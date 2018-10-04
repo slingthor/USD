@@ -228,7 +228,8 @@ Hdx_UnitTestDelegate::AddLight(SdfPath const &id, GarchSimpleLight const &light)
     cache[HdLightTokens->params] = light;
     cache[HdLightTokens->shadowParams] = shadowParams;
     cache[HdLightTokens->shadowCollection]
-        = HdRprimCollection(HdTokens->geometry, HdTokens->refined);
+        = HdRprimCollection(HdTokens->geometry, 
+                HdReprSelector(HdReprTokens->refined));
 }
 
 void
@@ -278,7 +279,8 @@ Hdx_UnitTestDelegate::AddDrawTarget(SdfPath const &id)
     cache[HdStDrawTargetTokens->attachments]     = VtValue(attachments);
     cache[HdStDrawTargetTokens->depthClearValue] = VtValue(1.0f);
     cache[HdStDrawTargetTokens->collection]      =
-        VtValue(HdRprimCollection(HdTokens->geometry, HdTokens->hull));
+        VtValue(HdRprimCollection(HdTokens->geometry, 
+            HdReprSelector(HdReprTokens->hull)));
 
     GetRenderIndex().InsertBprim(HdPrimTypeTokens->texture, this, id);
     _drawTargets[id] = _DrawTarget();
@@ -321,7 +323,8 @@ Hdx_UnitTestDelegate::AddRenderTask(SdfPath const &id)
     _ValueCache &cache = _valueCacheMap[id];
     cache[HdTokens->children] = VtValue(SdfPathVector());
     cache[HdTokens->collection]
-        = HdRprimCollection(HdTokens->geometry, HdTokens->smoothHull);
+        = HdRprimCollection(HdTokens->geometry, 
+            HdReprSelector(HdReprTokens->smoothHull));
 }
 
 void
@@ -652,14 +655,14 @@ Hdx_UnitTestDelegate::SetRefineLevel(SdfPath const &id, int level)
         id, HdChangeTracker::DirtyDisplayStyle);
 }
 
-TfToken
-Hdx_UnitTestDelegate::GetReprName(SdfPath const &id)
+HdReprSelector
+Hdx_UnitTestDelegate::GetReprSelector(SdfPath const &id)
 {
     if (_meshes.find(id) != _meshes.end()) {
-        return _meshes[id].reprName;
+        return HdReprSelector(_meshes[id].reprName);
     }
 
-    return TfToken();
+    return HdReprSelector();
 }
 
 void

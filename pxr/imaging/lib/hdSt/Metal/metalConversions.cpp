@@ -220,7 +220,8 @@ HdStMetalConversions::GetWrap(HdWrap wrap)
         case HdWrapRepeat : return MTLSamplerAddressModeRepeat;
         case HdWrapBlack : return MTLSamplerAddressModeClampToBorderColor;
         case HdWrapMirror : return MTLSamplerAddressModeMirrorRepeat;
-        case HdWrapUseMetaDict : return MTLSamplerAddressModeRepeat;
+        case HdWrapUseMetadata : return MTLSamplerAddressModeRepeat;
+        case HdWrapLegacy : return MTLSamplerAddressModeRepeat;
     }
 
     TF_CODING_ERROR("Unexpected HdWrap type %d", wrap);

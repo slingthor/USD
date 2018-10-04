@@ -63,8 +63,14 @@ find_path(MATERIALX_INCLUDE_DIRS
         "MaterialX Header Path"
 )
 
+if (WIN32)
+    set(MATERIALX_CORE_LIB_NAME MaterialXCore.lib)
+else()
+    set(MATERIALX_CORE_LIB_NAME libMaterialXCore.a)
+endif()
+
 find_path(MATERIALX_LIB_DIRS 
-    libMaterialXCore.a
+    "${MATERIALX_CORE_LIB_NAME}"
     HINTS
         "${MATERIALX_ROOT}"
         "$ENV{MATERIALX_ROOT}"        
@@ -76,7 +82,7 @@ find_path(MATERIALX_LIB_DIRS
 )
 
 find_path(MATERIALX_STDLIB_DIR 
-    mx_stdlib_defs.mtlx
+    stdlib_defs.mtlx
     HINTS
         "${MATERIALX_ROOT}"
         "$ENV{MATERIALX_ROOT}"        
@@ -110,4 +116,5 @@ find_package_handle_standard_args(MaterialX
         MATERIALX_BASE_DIR
         MATERIALX_INCLUDE_DIRS
         MATERIALX_LIB_DIRS
+        MATERIALX_STDLIB_DIR
 )

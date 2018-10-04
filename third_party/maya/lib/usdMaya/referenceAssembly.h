@@ -26,24 +26,24 @@
 
 /// \file usdMaya/referenceAssembly.h
 
-#include "pxr/pxr.h"
 #include "usdMaya/api.h"
 #include "usdMaya/proxyShape.h"
 #include "usdMaya/usdPrimProvider.h"
 
+#include "pxr/pxr.h"
+
 #include "pxr/base/tf/envSetting.h"
 #include "pxr/base/tf/staticTokens.h"
+
 #include "pxr/usd/sdf/layer.h"
 #include "pxr/usd/usd/stage.h"
 
-#include <maya/MDGModifier.h>
 #include <maya/MDagModifier.h>
+#include <maya/MDGModifier.h>
 #include <maya/MPxAssembly.h>
 #include <maya/MPxRepresentation.h>
 #include <maya/MString.h>
 #include <maya/MTypeId.h>
-
-#include <boost/shared_ptr.hpp>
 
 #include <map>
 #include <string>
@@ -56,7 +56,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 #define PXRUSDMAYA_REFERENCE_ASSEMBLY_TOKENS \
     ((MayaTypeName, "pxrUsdReferenceAssembly"))
 
-TF_DECLARE_PUBLIC_TOKENS(PxrUsdMayaReferenceAssemblyTokens,
+TF_DECLARE_PUBLIC_TOKENS(UsdMayaReferenceAssemblyTokens,
                          PXRUSDMAYA_API,
                          PXRUSDMAYA_REFERENCE_ASSEMBLY_TOKENS);
 
@@ -64,7 +64,7 @@ TF_DECLARE_PUBLIC_TOKENS(PxrUsdMayaReferenceAssemblyTokens,
 #define PXRUSDMAYA_VARIANT_SET_TOKENS \
     ((PlugNamePrefix, "usdVariantSet_"))
 
-TF_DECLARE_PUBLIC_TOKENS(PxrUsdMayaVariantSetTokens,
+TF_DECLARE_PUBLIC_TOKENS(UsdMayaVariantSetTokens,
                          PXRUSDMAYA_API,
                          PXRUSDMAYA_VARIANT_SET_TOKENS);
 
@@ -75,7 +75,7 @@ bool UsdMayaUseUsdAssemblyNamespace();
 
 
 class UsdMayaReferenceAssembly : public MPxAssembly,
-                                 public PxrUsdMayaUsdPrimProvider
+                                 public UsdMayaUsdPrimProvider
 {
 public:
     PXRUSDMAYA_API
@@ -96,10 +96,6 @@ public:
     static MObject timeAttr;
     PXRUSDMAYA_API
     static MObject complexityAttr;
-    PXRUSDMAYA_API
-    static MObject tintAttr;
-    PXRUSDMAYA_API
-    static MObject tintColorAttr;
     PXRUSDMAYA_API
     static MObject kindAttr;
     PXRUSDMAYA_API
@@ -194,7 +190,7 @@ public:
             const MPlug& plug,
             MPlugArray& plugArray) override;
 
-    // PxrUsdMayaUsdPrimProvider overrides:
+    // UsdMayaUsdPrimProvider overrides:
     PXRUSDMAYA_API
     UsdPrim usdPrim() const override;
 
@@ -265,9 +261,9 @@ public:
     // was edited directly (in which case _updatingRepNamespace == false).
     bool _updatingRepNamespace;
 
-    std::map<std::string, boost::shared_ptr<MPxRepresentation> > _representations;
+    std::map<std::string, std::shared_ptr<MPxRepresentation> > _representations;
     bool _activateRepOnFileLoad;
-    boost::shared_ptr<MPxRepresentation> _activeRep;
+    std::shared_ptr<MPxRepresentation> _activeRep;
     bool _inSetInternalValue;
     bool _hasEdits;
 };

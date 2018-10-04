@@ -228,6 +228,7 @@ public:
 
         StructBlockBinding constantData;
         StructBlockBinding shaderData;
+        StructBlockBinding topologyVisibilityData;
         PrimvarBinding elementData;
         PrimvarBinding vertexData;
         PrimvarBinding fvarData;
@@ -240,6 +241,7 @@ public:
 
         BindingDeclaration drawingCoord0Binding;
         BindingDeclaration drawingCoord1Binding;
+        BindingDeclaration drawingCoord2Binding;
         BindingDeclaration drawingCoordIBinding;
         BindingDeclaration instanceIndexArrayBinding;
         BindingDeclaration culledInstanceIndexArrayBinding;
@@ -301,6 +303,16 @@ public:
     HDST_API
     void UnbindConstantBuffer(
         HdBufferArrayRangeSharedPtr const &constantBar) const;
+
+    /// bind/unbind interleaved buffer
+    HDST_API
+    void BindInterleavedBuffer(
+        HdBufferArrayRangeSharedPtr const & constantBar,
+        TfToken const &name) const;
+    HDST_API
+    void UnbindInterleavedBuffer(
+        HdBufferArrayRangeSharedPtr const &constantBar,
+        TfToken const &name) const;
 
     /// bind/unbind nested instance BufferArray
     HDST_API

@@ -30,10 +30,14 @@
 #include "pxr/imaging/hdx/intersector.h"
 #include "pxr/imaging/hdx/selectionTracker.h"
 #include "pxr/imaging/hdx/renderSetupTask.h"
+#include "pxr/imaging/hdx/shadowTask.h"
 
+#include "pxr/imaging/hd/aov.h"
 #include "pxr/imaging/hd/renderIndex.h"
 #include "pxr/imaging/hd/sceneDelegate.h"
 #include "pxr/imaging/hd/task.h"
+
+#include "pxr/imaging/cameraUtil/conformWindow.h"
 
 #include "pxr/imaging/garch/simpleLightingContext.h"
 
@@ -70,6 +74,8 @@ TF_DECLARE_PUBLIC_TOKENS(HdxTaskSetTokens, HDX_API, HDX_TASK_SET_TOKENS);
 
 TF_DECLARE_PUBLIC_TOKENS(HdxIntersectionModeTokens, HDX_API, \
     HDX_INTERSECTION_MODE_TOKENS);
+
+class HdRenderBuffer;
 
 class HdxTaskController {
 public:
@@ -114,6 +120,31 @@ public:
     void SetRenderParams(HdxRenderTaskParams const& params);
 
     /// -------------------------------------------------------
+    /// AOV API
+
+    /// Set the list of outputs to be rendered. If outputs.size() == 1,
+    /// this will send that output to the viewport via a colorizer task.
+    /// Note: names should come from HdAovTokens.
+    HDX_API
+    void SetRenderOutputs(TfTokenVector const& names);
+
+    /// Set which output should be rendered to the viewport. The empty token
+    /// disables viewport rendering.
+    HDX_API
+    void SetViewportRenderOutput(TfToken const& name);
+
+    /// Get the buffer for a rendered output. Note: the caller should call
+    /// Resolve(), as HdxTaskController doesn't guarantee the buffer will
+    /// be resolved.
+    HDX_API
+    HdRenderBuffer* GetRenderOutput(TfToken const& name);
+
+    /// Set custom parameters for an AOV.
+    HDX_API
+    void SetRenderOutputSettings(TfToken const& name,
+                                 HdAovDescriptor const& desc);
+
+    /// -------------------------------------------------------
     /// Lighting API
 
     /// Set the lighting state for the scene.  HdxTaskController maintains
@@ -137,6 +168,10 @@ public:
     /// Set the camera clip planes.
     HDX_API
     void SetCameraClipPlanes(std::vector<GfVec4d> const& clipPlanes);
+
+    /// Set the camera window policy.
+    HDX_API
+    void SetCameraWindowPolicy(CameraUtilConformWindowPolicy windowPolicy);
 
     /// -------------------------------------------------------
     /// Picking API
@@ -168,6 +203,13 @@ public:
     void SetSelectionColor(GfVec4f const& color);
 
     /// -------------------------------------------------------
+    /// Shadow API
+
+    /// Turns the shadow task on or off.
+    HDX_API
+    void SetEnableShadows(bool enable);
+
+    /// -------------------------------------------------------
     /// Progressive Image Generation
     
     /// Return whether the image has converged.
@@ -193,6 +235,10 @@ private:
     void _CreateRenderTasks();
     void _CreateSelectionTask();
     void _CreateLightingTask();
+    void _CreateShadowTask();
+    void _CreateColorizeTask();
+
+    SdfPath _GetAovPath(TfToken const& aov);
 
     // A private scene delegate member variable backs the tasks this
     // controller generates. To keep _Delegate simple, the containing class
@@ -213,16 +259,30 @@ private:
             _valueCacheMap[id][key] = value;
         }
         template <typename T>
-        T const& GetParameter(SdfPath const& id, TfToken const& key) {
-            VtValue vParams = _valueCacheMap[id][key];
-            TF_VERIFY(vParams.IsHolding<T>());
+        T const& GetParameter(SdfPath const& id, TfToken const& key) const {
+            VtValue vParams;
+            _ValueCache vCache;
+            TF_VERIFY(
+                TfMapLookup(_valueCacheMap, id, &vCache) &&
+                TfMapLookup(vCache, key, &vParams) &&
+                vParams.IsHolding<T>());
             return vParams.Get<T>();
+        }
+        bool HasParameter(SdfPath const& id, TfToken const& key) const {
+            _ValueCache vCache;
+            if (TfMapLookup(_valueCacheMap, id, &vCache) &&
+                vCache.count(key) > 0) {
+                return true;
+            }
+            return false;
         }
 
         // HdSceneDelegate interface
         virtual VtValue Get(SdfPath const& id, TfToken const& key);
         virtual bool IsEnabled(TfToken const& option) const;
         virtual std::vector<GfVec4d> GetClipPlanes(SdfPath const& cameraId);
+        virtual HdRenderBufferDescriptor
+            GetRenderBufferDescriptor(SdfPath const& id);
 
     private:
         typedef TfHashMap<TfToken, VtValue, TfToken::HashFunctor> _ValueCache;
@@ -241,12 +301,17 @@ private:
     SdfPath _idRenderTaskId;
     SdfPath _selectionTaskId;
     SdfPath _simpleLightTaskId;
+    SdfPath _shadowTaskId;
+    SdfPath _colorizeTaskId;
 
     // Generated cameras
     SdfPath _cameraId;
 
     // Generated lights
     SdfPathVector _lightIds;
+
+    // Generated renderbuffers
+    SdfPathVector _renderBufferIds;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

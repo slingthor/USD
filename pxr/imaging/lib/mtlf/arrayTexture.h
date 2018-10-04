@@ -87,7 +87,7 @@ public:
     // MtlfBaseTexture overrides
     MTLF_API
     virtual BindingVector GetBindings(TfToken const & identifier,
-                                      GarchSamplerGPUHandle samplerName) const override;
+                                      GarchSamplerGPUHandle samplerName) override;
 
 protected:
     MTLF_API

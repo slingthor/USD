@@ -26,8 +26,9 @@
 
 /// \file usdMaya/stageNode.h
 
-#include "pxr/pxr.h"
 #include "usdMaya/api.h"
+
+#include "pxr/pxr.h"
 
 #include "pxr/base/tf/staticTokens.h"
 
@@ -46,7 +47,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 #define PXRUSDMAYA_STAGE_NODE_TOKENS \
     ((MayaTypeName, "pxrUsdStageNode"))
 
-TF_DECLARE_PUBLIC_TOKENS(PxrUsdMayaStageNodeTokens,
+TF_DECLARE_PUBLIC_TOKENS(UsdMayaStageNodeTokens,
                          PXRUSDMAYA_API,
                          PXRUSDMAYA_STAGE_NODE_TOKENS);
 

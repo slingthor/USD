@@ -279,11 +279,6 @@ GarchUVTextureData::Read(int degradeLevel, bool generateMipmap,
 {   
     TRACE_FUNCTION();
 
-    if (!TfPathExists(_filePath)) {
-        TF_WARN("Unable to find Texture '%s'.", _filePath.c_str());
-        return false;
-    }
-
     // Read the image from a file, if possible and necessary, a down-sampled
     // version
     const _DegradedImageInput degradedImage = _ReadDegradedImageInput(

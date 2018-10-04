@@ -53,10 +53,11 @@ class SdfAssetPath;
 /// \class UsdGeomCurves
 ///
 /// Base class for BasisCurves and NurbsCurves.  The BasisCurves
-/// schema is designed to be analagous to RenderMan's RiCurves 
-/// and RiBasis, while the NurbsCurve schema is designed to be 
-/// analgous to  the NURBS curves found in packages like Maya 
-/// and Houdini while retaining their consistency with the 
+/// schema is designed to be analagous to offline renderers' notion
+/// of batched curves (such as the classical RIB definition via
+/// Basis and Curves statements), while the NurbsCurve schema
+/// is designed to be analgous to the NURBS curves found in packages
+/// like Maya and Houdini while retaining their consistency with the 
 /// RenderMan specification for NURBS Patches.
 ///
 class UsdGeomCurves : public UsdGeomPointBased
@@ -161,7 +162,8 @@ public:
     /// it), in which case widths are "ribbon width", or unoriented, in which
     /// case widths are cylinder width.  'widths' is not a generic Primvar,
     /// but the number of elements in this attribute will be determined by
-    /// its 'interpolation'.  See \ref SetWidthsInterpolation()
+    /// its 'interpolation'.  See \ref SetWidthsInterpolation() .  If 'widths'
+    /// and 'primvars:widths' are both specified, the latter has precedence.
     ///
     /// \n  C++ Type: VtArray<float>
     /// \n  Usd Type: SdfValueTypeNames->FloatArray
@@ -196,7 +198,7 @@ public:
     /// Although 'widths' is not classified as a generic UsdGeomPrimvar (and
     /// will not be included in the results of UsdGeomImageable::GetPrimvars() )
     /// it does require an interpolation specification.  The fallback
-    /// interpolation, if left unspecified, is UsdGeomTokens->varying , 
+    /// interpolation, if left unspecified, is UsdGeomTokens->vertex , 
     /// which means a width value is specified at the end of each curve segment.
     USDGEOM_API
     TfToken GetWidthsInterpolation() const;

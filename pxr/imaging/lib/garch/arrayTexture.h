@@ -87,9 +87,12 @@ public:
     // GarchBaseTexture overrides
     GARCH_API
     virtual BindingVector GetBindings(TfToken const & identifier,
-                                      GarchSamplerGPUHandle samplerName) const = 0;
+                                      GarchSamplerGPUHandle samplerName) override = 0;
 
 protected:
+    GARCH_API
+    virtual void _ReadTexture() override;
+
     GARCH_API
     virtual void _CreateTextures(GarchBaseTextureDataConstRefPtrVector texDataVec,
                                  bool const generateMipmap) = 0;

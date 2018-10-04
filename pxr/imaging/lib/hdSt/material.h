@@ -39,6 +39,8 @@ typedef boost::shared_ptr<class HdStTextureResource> HdStTextureResourceSharedPt
 typedef std::vector<HdStTextureResourceSharedPtr>
                                 HdStTextureResourceSharedPtrVector;
 
+class GLSLFX;
+
 class HdStMaterial final: public HdMaterial {
 public:
     HF_MALLOC_TAG_NEW("new HdStMaterial");
@@ -107,6 +109,9 @@ public:
     /// Returns true if the material specifies limit surface evaluation.
     inline bool HasLimitSurfaceEvaluation() const;
 
+    // Returns true if the material has a displacement terminal.
+    inline bool HasDisplacement() const;
+
     /// Replaces the shader code object with an externally created one
     /// Used to set the fallback shader for prim.
     /// This class takes ownership of the passed in object.
@@ -121,10 +126,16 @@ private:
     bool
     _GetHasLimitSurfaceEvaluation(VtDictionary const & metadata) const;
 
+    void _InitFallbackShader();
+
+    static GLSLFX                      *_fallbackSurfaceShader;
+
     HdStSurfaceShaderSharedPtr         _surfaceShader;
     HdStTextureResourceSharedPtrVector _fallbackTextureResources;
-    bool                               _hasPtex;
-    bool                               _hasLimitSurfaceEvaluation;
+
+    bool                               _hasPtex : 1;
+    bool                               _hasLimitSurfaceEvaluation : 1;
+    bool                               _hasDisplacement : 1;
 };
 
 inline std::string
@@ -173,6 +184,11 @@ inline bool HdStMaterial::HasPtex() const
 inline bool HdStMaterial::HasLimitSurfaceEvaluation() const
 {
     return _hasLimitSurfaceEvaluation;
+}
+
+inline bool HdStMaterial::HasDisplacement() const
+{
+    return _hasDisplacement;
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

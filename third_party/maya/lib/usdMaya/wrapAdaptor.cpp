@@ -24,7 +24,7 @@
 
 #include "pxr/pxr.h"
 #include "usdMaya/adaptor.h"
-#include "usdMaya/undoHelperCmd.h"
+#include "usdMaya/undoHelperCommand.h"
 #include "usdMaya/util.h"
 
 #include "pxr/base/tf/pyResultConversions.h"
@@ -40,20 +40,20 @@ using namespace boost::python;
 
 PXR_NAMESPACE_USING_DIRECTIVE;
 
-static PxrUsdMayaAdaptor*
+static UsdMayaAdaptor*
 _Adaptor__init__(const std::string& dagPath)
 {
     MObject object;
-    MStatus status = PxrUsdMayaUtil::GetMObjectByName(dagPath, object);
+    MStatus status = UsdMayaUtil::GetMObjectByName(dagPath, object);
     if (!status) {
-        return new PxrUsdMayaAdaptor(MObject::kNullObj);
+        return new UsdMayaAdaptor(MObject::kNullObj);
     }
 
-    return new PxrUsdMayaAdaptor(object);
+    return new UsdMayaAdaptor(object);
 }
 
 static boost::python::object
-_Adaptor_GetMetadata(const PxrUsdMayaAdaptor& self, const TfToken& key)
+_Adaptor_GetMetadata(const UsdMayaAdaptor& self, const TfToken& key)
 {
     VtValue value;
     if (self.GetMetadata(key, &value)) {
@@ -64,11 +64,11 @@ _Adaptor_GetMetadata(const PxrUsdMayaAdaptor& self, const TfToken& key)
 
 static bool
 _Adaptor_SetMetadata(
-    PxrUsdMayaAdaptor& self,
+    UsdMayaAdaptor& self,
     const TfToken& key,
     const VtValue& value)
 {
-    return PxrUsdMayaUndoHelperCmd::ExecuteWithUndo<bool>(
+    return UsdMayaUndoHelperCommand::ExecuteWithUndo<bool>(
             [&self, &key, &value](MDGModifier& modifier) {
                 return self.SetMetadata(key, value, modifier);
             });
@@ -76,34 +76,34 @@ _Adaptor_SetMetadata(
 
 static void
 _Adaptor_ClearMetadata(
-    PxrUsdMayaAdaptor& self,
+    UsdMayaAdaptor& self,
     const TfToken& key)
 {
-    PxrUsdMayaUndoHelperCmd::ExecuteWithUndo(
+    UsdMayaUndoHelperCommand::ExecuteWithUndo(
             [&self, &key](MDGModifier& modifier) {
                 self.ClearMetadata(key, modifier);
             });
 }
 
-static PxrUsdMayaAdaptor::SchemaAdaptor
+static UsdMayaAdaptor::SchemaAdaptor
 _Adaptor_ApplySchema(
-    PxrUsdMayaAdaptor& self,
+    UsdMayaAdaptor& self,
     const TfType& ty)
 {
-    typedef PxrUsdMayaAdaptor::SchemaAdaptor Result;
-    return PxrUsdMayaUndoHelperCmd::ExecuteWithUndo<Result>(
+    typedef UsdMayaAdaptor::SchemaAdaptor Result;
+    return UsdMayaUndoHelperCommand::ExecuteWithUndo<Result>(
             [&self, &ty](MDGModifier& modifier) {
                 return self.ApplySchema(ty, modifier);
             });
 }
 
-static PxrUsdMayaAdaptor::SchemaAdaptor
+static UsdMayaAdaptor::SchemaAdaptor
 _Adaptor_ApplySchemaByName(
-    PxrUsdMayaAdaptor& self,
+    UsdMayaAdaptor& self,
     const TfToken& schemaName)
 {
-    typedef PxrUsdMayaAdaptor::SchemaAdaptor Result;
-    return PxrUsdMayaUndoHelperCmd::ExecuteWithUndo<Result>(
+    typedef UsdMayaAdaptor::SchemaAdaptor Result;
+    return UsdMayaUndoHelperCommand::ExecuteWithUndo<Result>(
             [&self, &schemaName](MDGModifier& modifier) {
                 return self.ApplySchemaByName(schemaName, modifier);
             });
@@ -111,10 +111,10 @@ _Adaptor_ApplySchemaByName(
 
 static void
 _Adaptor_UnapplySchema(
-    PxrUsdMayaAdaptor& self,
+    UsdMayaAdaptor& self,
     const TfType& ty)
 {
-    PxrUsdMayaUndoHelperCmd::ExecuteWithUndo(
+    UsdMayaUndoHelperCommand::ExecuteWithUndo(
             [&self, &ty](MDGModifier& modifier) {
                 self.UnapplySchema(ty, modifier);
             });
@@ -122,17 +122,17 @@ _Adaptor_UnapplySchema(
 
 static void
 _Adaptor_UnapplySchemaByName(
-    PxrUsdMayaAdaptor& self,
+    UsdMayaAdaptor& self,
     const TfToken& schemaName)
 {
-    PxrUsdMayaUndoHelperCmd::ExecuteWithUndo(
+    UsdMayaUndoHelperCommand::ExecuteWithUndo(
             [&self, &schemaName](MDGModifier& modifier) {
                 self.UnapplySchemaByName(schemaName, modifier);
             });
 }
 
 static std::string
-_Adaptor__repr__(const PxrUsdMayaAdaptor& self)
+_Adaptor__repr__(const UsdMayaAdaptor& self)
 {
     if (self) {
         return TfStringPrintf("%sAdaptor('%s')",
@@ -144,13 +144,13 @@ _Adaptor__repr__(const PxrUsdMayaAdaptor& self)
     }
 }
 
-static PxrUsdMayaAdaptor::AttributeAdaptor
+static UsdMayaAdaptor::AttributeAdaptor
 _SchemaAdaptor_CreateAttribute(
-    PxrUsdMayaAdaptor::SchemaAdaptor& self,
+    UsdMayaAdaptor::SchemaAdaptor& self,
     const TfToken& attrName)
 {
-    typedef PxrUsdMayaAdaptor::AttributeAdaptor Result;
-    return PxrUsdMayaUndoHelperCmd::ExecuteWithUndo<Result>(
+    typedef UsdMayaAdaptor::AttributeAdaptor Result;
+    return UsdMayaUndoHelperCommand::ExecuteWithUndo<Result>(
             [&self, &attrName](MDGModifier& modifier) {
                 return self.CreateAttribute(attrName, modifier);
             });
@@ -158,17 +158,17 @@ _SchemaAdaptor_CreateAttribute(
 
 static void
 _SchemaAdaptor_RemoveAttribute(
-    PxrUsdMayaAdaptor::SchemaAdaptor& self,
+    UsdMayaAdaptor::SchemaAdaptor& self,
     const TfToken& attrName)
 {
-    PxrUsdMayaUndoHelperCmd::ExecuteWithUndo(
+    UsdMayaUndoHelperCommand::ExecuteWithUndo(
             [&self, &attrName](MDGModifier& modifier) {
                 return self.RemoveAttribute(attrName, modifier);
             });
 }
 
 static std::string
-_SchemaAdaptor__repr__(const PxrUsdMayaAdaptor::SchemaAdaptor& self)
+_SchemaAdaptor__repr__(const UsdMayaAdaptor::SchemaAdaptor& self)
 {
     if (self) {
         return TfStringPrintf("%s.GetSchemaByName('%s')",
@@ -181,7 +181,7 @@ _SchemaAdaptor__repr__(const PxrUsdMayaAdaptor::SchemaAdaptor& self)
 }
 
 static boost::python::object
-_AttributeAdaptor_Get(const PxrUsdMayaAdaptor::AttributeAdaptor& self)
+_AttributeAdaptor_Get(const UsdMayaAdaptor::AttributeAdaptor& self)
 {
     VtValue value;
     if (self.Get(&value)) {
@@ -192,17 +192,17 @@ _AttributeAdaptor_Get(const PxrUsdMayaAdaptor::AttributeAdaptor& self)
 
 static bool
 _AttributeAdaptor_Set(
-    PxrUsdMayaAdaptor::AttributeAdaptor& self,
+    UsdMayaAdaptor::AttributeAdaptor& self,
     const VtValue& value)
 {
-    return PxrUsdMayaUndoHelperCmd::ExecuteWithUndo<bool>(
+    return UsdMayaUndoHelperCommand::ExecuteWithUndo<bool>(
             [&self, &value](MDGModifier& modifier) {
                 return self.Set(value, modifier);
             });
 }
 
 static std::string
-_AttributeAdaptor__repr__(const PxrUsdMayaAdaptor::AttributeAdaptor& self)
+_AttributeAdaptor__repr__(const UsdMayaAdaptor::AttributeAdaptor& self)
 {
     std::string schemaName;
     const SdfAttributeSpecHandle attrDef = self.GetAttributeDefinition();
@@ -227,7 +227,7 @@ _AttributeAdaptor__repr__(const PxrUsdMayaAdaptor::AttributeAdaptor& self)
 
 void wrapAdaptor()
 {
-    typedef PxrUsdMayaAdaptor This;
+    typedef UsdMayaAdaptor This;
     scope Adaptor = class_<This>("Adaptor", no_init)
         .def(!self)
         .def("__init__", make_constructor(_Adaptor__init__))

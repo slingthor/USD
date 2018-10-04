@@ -81,6 +81,10 @@ private:
     GarchSamplerGPUHandle _sampler;
     bool _isPtex;
     size_t _memoryRequest;
+    HdWrap _wrapS;
+    HdWrap _wrapT;
+    HdMinFilter _minFilter;
+    HdMagFilter _magFilter;
 };
 
 

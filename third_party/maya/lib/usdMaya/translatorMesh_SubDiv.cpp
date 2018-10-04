@@ -21,7 +21,6 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#include "pxr/pxr.h"
 #include "usdMaya/translatorMesh.h"
 
 #include "usdMaya/util.h"
@@ -36,8 +35,8 @@
 #include <maya/MFnStringData.h>
 #include <maya/MFnTypedAttribute.h>
 #include <maya/MGlobal.h>
-#include <maya/MItMeshVertex.h>
 #include <maya/MItMeshEdge.h>
+#include <maya/MItMeshVertex.h>
 #include <maya/MObject.h>
 #include <maya/MPlug.h>
 #include <maya/MSelectionList.h>
@@ -65,7 +64,7 @@ _AddCreaseSet(
     // .../lib/python2.7/site-packages/maya/app/general/creaseSetEditor.py
 
     MObject creasePartitionObj;
-    *statusOK = PxrUsdMayaUtil::GetMObjectByName(":creasePartition",
+    *statusOK = UsdMayaUtil::GetMObjectByName(":creasePartition",
                                                  creasePartitionObj);
 
     if (creasePartitionObj.isNull()) {
@@ -75,7 +74,7 @@ _AddCreaseSet(
         const std::string partitionName = MGlobal::executeCommandStringResult(
             "createNode \"partition\" -shared -name \":creasePartition\"").asChar();
 
-        *statusOK = PxrUsdMayaUtil::GetMObjectByName(partitionName,
+        *statusOK = UsdMayaUtil::GetMObjectByName(partitionName,
                                                      creasePartitionObj);
         if (!*statusOK) {
             return false;
@@ -113,7 +112,7 @@ _AddCreaseSet(
 
 /* static */
 bool 
-PxrUsdMayaTranslatorMesh::_AssignSubDivTagsToMesh( const UsdGeomMesh &primSchema, MObject &meshObj, MFnMesh &meshFn)
+UsdMayaTranslatorMesh::_AssignSubDivTagsToMesh( const UsdGeomMesh &primSchema, MObject &meshObj, MFnMesh &meshFn)
 {
     // We may want to provide the option in the future, but for now, we
     // default to using crease sets when setting crease data.

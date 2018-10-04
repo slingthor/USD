@@ -496,9 +496,6 @@ HdResourceRegistry::GarbageCollect()
     _uniformSsboBufferArrayRegistry.GarbageCollect();
     _singleBufferArrayRegistry.GarbageCollect();
 
-    // Cleanup texture registries
-    _textureResourceRegistry.GarbageCollect();
-
     // Prompt derived registries to collect their garbage.
     _GarbageCollect();
 }
@@ -507,6 +504,13 @@ void
 HdResourceRegistry::_GarbageCollect()
 {
     /* NOTHING */
+}
+
+void
+HdResourceRegistry::GarbageCollectBprims()
+{
+    // Cleanup texture registries
+    _textureResourceRegistry.GarbageCollect();
 }
 
 VtDictionary
@@ -547,11 +551,11 @@ HdResourceRegistry::GetResourceAllocation() const
 
     TF_FOR_ALL (textureResourceIt, _textureResourceRegistry) {
         HdTextureResourceSharedPtr textureResource = textureResourceIt->second;
-        if (!TF_VERIFY(textureResource)) {
-            continue;
-        }
 
-        hydraTexturesMemory += textureResource->GetMemoryUsed();
+        // In the event of an asset error, texture resources can be null
+        if (textureResource) {
+            hydraTexturesMemory += textureResource->GetMemoryUsed();
+        }
     }
     result[HdPerfTokens->textureResourceMemory] = VtValue(hydraTexturesMemory);
     gpuMemoryUsed += hydraTexturesMemory;
@@ -662,16 +666,18 @@ HdResourceRegistry::RegisterExtComputationDataRange(HdTopology::ID id,
 }
 
 std::unique_lock<std::mutex>
-HdResourceRegistry::RegisterTextureResource(HdTextureResource::ID id,
-        HdInstance<HdTextureResource::ID, HdTextureResourceSharedPtr> *instance)
+HdResourceRegistry::RegisterTextureResource(
+        TextureKey id,
+        HdInstance<TextureKey, HdTextureResourceSharedPtr> *instance)
 {
     return _textureResourceRegistry.GetInstance(id, instance);
 }
 
 std::unique_lock<std::mutex>
-HdResourceRegistry::FindTextureResource(HdTextureResource::ID id,
-        HdInstance<HdTextureResource::ID, HdTextureResourceSharedPtr> *instance,
-                        bool *found)
+HdResourceRegistry::FindTextureResource(
+        TextureKey id,
+        HdInstance<TextureKey, HdTextureResourceSharedPtr> *instance,
+        bool *found)
 {
     return _textureResourceRegistry.FindInstance(id, instance, found);
 }

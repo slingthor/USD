@@ -59,7 +59,7 @@ protected:
     GLF_API
     virtual void _MakeCurrent();
     GLF_API
-    virtual bool _IsSharing(const GlfGLContextSharedPtr& rhs) const;
+    virtual void _ReadTexture();
     GLF_API
     virtual bool _IsEqual(const GlfGLContextSharedPtr& rhs) const;
 

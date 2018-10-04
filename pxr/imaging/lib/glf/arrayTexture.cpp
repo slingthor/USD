@@ -65,32 +65,6 @@ GlfArrayTexture::GlfArrayTexture(
     // do nothing
 }
 
-void
-GlfArrayTexture::_OnSetMemoryRequested(size_t targetMemory)
-{
-    GarchBaseTextureDataConstRefPtrVector texDataVec(_arraySize, 0);
-    for (size_t i = 0; i < _arraySize; ++i) {
-        GarchUVTextureDataRefPtr texData =
-            GarchUVTextureData::New(_GetImageFilePath(i), targetMemory,
-                                    _GetCropTop(), _GetCropBottom(),
-                                    _GetCropLeft(), _GetCropRight());
-        if (texData) {
-            texData->Read(0, _GenerateMipmap(), GetOriginLocation());
-        }
-
-        _UpdateTexture(texData);
-
-        if (texData && texData->HasRawBuffer()) {
-            texDataVec[i] = texData;
-        } else {
-            TF_WARN("Invalid texture data for texture file: %s",
-                    _GetImageFilePath(i).GetString().c_str());
-        }
-    }
-
-    _CreateTextures(texDataVec, _GenerateMipmap());
-}
-
 /* virtual */
 const TfToken&
 GlfArrayTexture::_GetImageFilePath(size_t index) const
@@ -106,11 +80,11 @@ GlfArrayTexture::_GetImageFilePath(size_t index) const
 /* virtual */
 GarchTexture::BindingVector
 GlfArrayTexture::GetBindings(TfToken const & identifier,
-                              GarchSamplerGPUHandle samplerName) const
+                              GarchSamplerGPUHandle samplerName)
 {
     return BindingVector(1,
                 Binding(identifier, GarchTextureTokens->texels,
-                        GL_TEXTURE_2D_ARRAY, GetGlTextureName(), samplerName));
+                        GL_TEXTURE_2D_ARRAY, GetAPITextureName(), samplerName));
 }
 
 void
@@ -128,7 +102,7 @@ GlfArrayTexture::_CreateTextures(
     
     glBindTexture(
         GL_TEXTURE_2D_ARRAY,
-        GetGlTextureName());
+        GetAPITextureName());
     
     glTexParameteri(
         GL_TEXTURE_2D_ARRAY,

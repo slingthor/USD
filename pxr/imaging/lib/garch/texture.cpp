@@ -79,12 +79,12 @@ GarchTexture::SetMemoryRequested(size_t targetMemory)
 {
     if (_memoryRequested != targetMemory) {
         _memoryRequested = targetMemory;
-        _OnSetMemoryRequested(targetMemory);
+        _OnMemoryRequestedDirty();
     }
 }
 
 void
-GarchTexture::_OnSetMemoryRequested(size_t targetMemory)
+GarchTexture::_OnMemoryRequestedDirty()
 {
     // do nothing in base class
 }

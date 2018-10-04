@@ -32,16 +32,30 @@ PXR_NAMESPACE_OPEN_SCOPE
             
 #define HDST_GLSL_PROGRAM_TOKENS                \
     (smoothNormalsFloatToFloat)                 \
-    (smoothNormalsFloatToDouble)                \
     (smoothNormalsFloatToPacked)                \
-    (smoothNormalsDoubleToFloat)                \
     (smoothNormalsDoubleToDouble)               \
     (smoothNormalsDoubleToPacked)               \
+    (flatNormalsTriFloatToFloat)                \
+    (flatNormalsTriFloatToPacked)               \
+    (flatNormalsTriDoubleToDouble)              \
+    (flatNormalsTriDoubleToPacked)              \
+    (flatNormalsQuadFloatToFloat)               \
+    (flatNormalsQuadFloatToPacked)              \
+    (flatNormalsQuadDoubleToDouble)             \
+    (flatNormalsQuadDoubleToPacked)             \
     (quadrangulateFloat)                        \
     (quadrangulateDouble)
 
+#define HDST_TOKENS                             \
+    (packedSmoothNormals)                       \
+    (smoothNormals)                             \
+    (packedFlatNormals)                         \
+    (flatNormals)
+
 TF_DECLARE_PUBLIC_TOKENS(HdStGLSLProgramTokens, HDST_API,
                          HDST_GLSL_PROGRAM_TOKENS);
+
+TF_DECLARE_PUBLIC_TOKENS(HdStTokens, HDST_API, HDST_TOKENS);
 
 PXR_NAMESPACE_CLOSE_SCOPE
 

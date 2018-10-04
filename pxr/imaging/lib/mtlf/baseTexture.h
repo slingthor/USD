@@ -54,27 +54,23 @@ public:
     virtual ~MtlfBaseTexture();
 
     /// Returns the OpenGl texture name for the texture. 
-    GarchTextureGPUHandle GetGlTextureName() const {
-        return _textureName;
-    }
+    MTLF_API
+    GarchTextureGPUHandle GetAPITextureName();
 
-    int	GetWidth() const {
-        return _currentWidth;
-    }
+    MTLF_API
+    int	GetWidth();
 
-    int GetHeight() const {
-        return _currentHeight;
-    }
+    MTLF_API
+    int GetHeight();
 
-    int GetFormat() const {
-        return _format;
-    }
+    MTLF_API
+    int GetFormat();
 
     // GarchTexture overrides
     /// Returns the Metal texture object for the texture.
     MTLF_API
     virtual BindingVector GetBindings(TfToken const & identifier,
-                                      GarchSamplerGPUHandle samplerName) const override;
+                                      GarchSamplerGPUHandle samplerName) override;
     
 protected:
     
@@ -85,6 +81,9 @@ protected:
     MtlfBaseTexture(GarchImage::ImageOriginLocation originLocation);
     
     friend class MtlfResourceFactory;
+    
+    MTLF_API
+    virtual void _ReadTexture() override { TF_FATAL_CODING_ERROR("Not Implemented!"); }//MTL_FIXME
 
     MTLF_API
     virtual void _UpdateTexture(GarchBaseTextureDataConstPtr texData) override;

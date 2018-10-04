@@ -36,6 +36,7 @@
 #include "pxr/imaging/pxOsd/tokens.h"
 
 #include "pxr/usd/usdGeom/mesh.h"
+#include "pxr/usd/usdGeom/primvarsAPI.h"
 #include "pxr/usd/usdGeom/subset.h"
 #include "pxr/usd/usdGeom/xformCache.h"
 
@@ -74,6 +75,16 @@ UsdImagingMeshAdapter::Populate(UsdPrim const& prim,
             index->AddPrimInfo(subset.GetPath(),
                                subset.GetPrim().GetParent(),
                                shared_from_this());
+            // Ensure the bound material has been populated.
+            if (UsdPrim materialPrim =
+                prim.GetStage()->GetPrimAtPath(
+                GetMaterialId(subset.GetPrim()))) {
+                UsdImagingPrimAdapterSharedPtr materialAdapter =
+                    index->GetMaterialAdapter(materialPrim);
+                if (materialAdapter) {
+                    materialAdapter->Populate(materialPrim, index, nullptr);
+                }
+            }
         }
     }
     return _AddRprim(HdPrimTypeTokens->mesh,
@@ -107,6 +118,25 @@ UsdImagingMeshAdapter::TrackVariability(UsdPrim const& prim,
                UsdImagingTokens->usdVaryingPrimvar,
                timeVaryingBits,
                /*isInherited*/false);
+
+    // Discover time-varying primvars:normals, and if that attribute
+    // doesn't exist also check for time-varying normals.
+    bool normalsExists = false;
+    _IsVarying(prim,
+               UsdImagingTokens->primvarsNormals,
+               HdChangeTracker::DirtyNormals,
+               UsdImagingTokens->usdVaryingNormals,
+               timeVaryingBits,
+               /*isInherited*/false,
+               &normalsExists);
+    if (!normalsExists) {
+        _IsVarying(prim,
+                UsdGeomTokens->normals,
+                HdChangeTracker::DirtyNormals,
+                UsdImagingTokens->usdVaryingNormals,
+                timeVaryingBits,
+                /*isInherited*/false);
+    }
 
     // Discover time-varying topology.
     if (!_IsVarying(prim,
@@ -170,6 +200,20 @@ UsdImagingMeshAdapter::MarkDirty(UsdPrim const& prim,
 }
 
 void
+UsdImagingMeshAdapter::MarkRefineLevelDirty(UsdPrim const& prim,
+                                            SdfPath const& cachePath,
+                                            UsdImagingIndexProxy* index)
+{
+    // Check if this is invoked on behalf of a UsdGeomSubset of
+    // a parent mesh; if so, there's nothing to do.
+    if (cachePath.IsPrimPath() && cachePath.GetParentPath() == prim.GetPath()) {
+        return;
+    }
+    index->MarkRprimDirty(cachePath, HdChangeTracker::DirtyDisplayStyle);
+}
+
+
+void
 UsdImagingMeshAdapter::_RemovePrim(SdfPath const& cachePath,
                                    UsdImagingIndexProxy* index)
 {
@@ -182,6 +226,12 @@ UsdImagingMeshAdapter::_RemovePrim(SdfPath const& cachePath,
         index->MarkRprimDirty(cachePath.GetParentPath(),
                               HdChangeTracker::DirtyTopology);
     }
+}
+
+bool
+UsdImagingMeshAdapter::_IsBuiltinPrimvar(TfToken const& primvarName) const
+{
+    return (primvarName == UsdImagingTokens->primvarsNormals);
 }
 
 void
@@ -219,6 +269,26 @@ UsdImagingMeshAdapter::UpdateForTime(UsdPrim const& prim,
             HdTokens->points,
             HdInterpolationVertex,
             HdPrimvarRoleTokens->point);
+    }
+
+    if (requestedBits & HdChangeTracker::DirtyNormals) {
+        // First check for "primvars:normals"
+        UsdGeomPrimvarsAPI primvarsApi(prim);
+        UsdGeomPrimvar pv = primvarsApi.GetPrimvar(
+            UsdImagingTokens->primvarsNormals);
+        if (pv) {
+            _ComputeAndMergePrimvar(prim, cachePath, pv, time, valueCache);
+        } else {
+            UsdGeomMesh mesh(prim);
+            VtVec3fArray normals;
+            if (mesh.GetNormalsAttr().Get(&normals, time)) {
+                _MergePrimvar(&primvars,
+                    UsdGeomTokens->normals,
+                    _UsdToHdInterpolation(mesh.GetNormalsInterpolation()),
+                    HdPrimvarRoleTokens->normal);
+                valueCache->GetNormals(cachePath) = VtValue(normals);
+            }
+        }
     }
 
     // Subdiv tags are only needed if the mesh is refined.  So

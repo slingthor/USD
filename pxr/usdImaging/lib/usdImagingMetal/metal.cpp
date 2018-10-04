@@ -290,6 +290,21 @@ UsdImagingMetal::SetRendererPlugin(TfToken const &id)
     return _engine->SetRendererPlugin(id);
 }
 
+/* virtual */
+TfTokenVector
+UsdImagingMetal::GetRendererAovs() const
+{
+    return _engine->GetRendererAovs();
+}
+
+/* virtual */
+bool
+UsdImagingMetal::SetRendererAov(TfToken const &id)
+{
+    return _engine->SetRendererAov(id);
+}
+
+
 bool
 UsdImagingMetal::TestIntersection(
     const GfMatrix4d &viewMatrix,

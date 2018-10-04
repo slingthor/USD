@@ -326,10 +326,10 @@ UsdImagingMetalHdEngine::_Populate(const UsdImagingMetalHdEngineSharedPtrVector&
     for (size_t i = 0; i < engines.size(); ++i) {
         if (!engines[i]->_isPopulated) {
             engines[i]->_delegate->SetUsdDrawModesEnabled(
-                                                          params.enableUsdDrawModes);
+                params.enableUsdDrawModes);
             delegatesToPopulate.push_back(engines[i]->_delegate);
             primsToPopulate.push_back(
-                                      rootPrims[i].GetStage()->GetPrimAtPath(engines[i]->_rootPath));
+                rootPrims[i].GetStage()->GetPrimAtPath(engines[i]->_rootPath));
             pathsToExclude.push_back(engines[i]->_excludedPrimPaths);
             pathsToInvis.push_back(engines[i]->_invisedPrimPaths);
             
@@ -356,27 +356,30 @@ UsdImagingMetalHdEngine::_UpdateHydraCollection(HdRprimCollection *collection,
         TF_CODING_ERROR("Null passed to _UpdateHydraCollection");
         return false;
     }
-
+    
     // choose repr
-    TfToken reprName = HdTokens->smoothHull;
+    HdReprSelector reprSelector = HdReprSelector(HdReprTokens->smoothHull);
     bool refined = params.complexity > 1.0;
-
+    
     if (params.drawMode == UsdImagingMetalEngine::DRAW_GEOM_FLAT ||
         params.drawMode == UsdImagingMetalEngine::DRAW_SHADED_FLAT) {
         // Flat shading
-        reprName = HdTokens->hull;
+        reprSelector = HdReprSelector(HdReprTokens->hull);
     } else if (
         params.drawMode == UsdImagingMetalEngine::DRAW_WIREFRAME_ON_SURFACE) {
         // Wireframe on surface
-        reprName = refined ? HdTokens->refinedWireOnSurf : HdTokens->wireOnSurf;
+        reprSelector = HdReprSelector(refined ?
+                                      HdReprTokens->refinedWireOnSurf : HdReprTokens->wireOnSurf);
     } else if (params.drawMode == UsdImagingMetalEngine::DRAW_WIREFRAME) {
         // Wireframe
-        reprName = refined ? HdTokens->refinedWire : HdTokens->wire;
+        reprSelector = HdReprSelector(refined ?
+                                      HdReprTokens->refinedWire : HdReprTokens->wire);
     } else {
         // Smooth shading
-        reprName = refined ? HdTokens->refined : HdTokens->smoothHull;
+        reprSelector = HdReprSelector(refined ?
+                                      HdReprTokens->refined : HdReprTokens->smoothHull);
     }
-
+    
     // Calculate the rendertags needed based on the parameters passed by
     // the application
     renderTags->clear();
@@ -389,20 +392,20 @@ UsdImagingMetalHdEngine::_UpdateHydraCollection(HdRprimCollection *collection,
     }
     if (params.showRender) {
         renderTags->push_back(_tokens->render);
-    } 
-
+    }
+    
     // By default our main collection will be called geometry
     TfToken colName = HdTokens->geometry;
-
+    
     // Check if the collection needs to be updated (so we can avoid the sort).
     SdfPathVector const& oldRoots = collection->GetRootPaths();
-
+    
     // inexpensive comparison first
     bool match = collection->GetName() == colName &&
-                 oldRoots.size() == roots.size() &&
-                 collection->GetReprName() == reprName &&
-                 collection->GetRenderTags().size() == renderTags->size();
-
+        oldRoots.size() == roots.size() &&
+        collection->GetReprSelector() == reprSelector &&
+        collection->GetRenderTags().size() == renderTags->size();
+    
     // Only take the time to compare root paths if everything else matches.
     if (match) {
         // Note that oldRoots is guaranteed to be sorted.
@@ -411,27 +414,27 @@ UsdImagingMetalHdEngine::_UpdateHydraCollection(HdRprimCollection *collection,
             if (oldRoots[i] == roots[i])
                 continue;
             // Binary search to find the current root.
-            if (!std::binary_search(oldRoots.begin(), oldRoots.end(), roots[i])) 
+            if (!std::binary_search(oldRoots.begin(), oldRoots.end(), roots[i]))
             {
                 match = false;
                 break;
             }
         }
-
+        
         // Compare if rendertags match
         if (*renderTags != collection->GetRenderTags()) {
             match = false;
         }
-
+        
         // if everything matches, do nothing.
         if (match) return false;
     }
-
+    
     // Recreate the collection.
-    *collection = HdRprimCollection(colName, reprName);
+    *collection = HdRprimCollection(colName, reprSelector);
     collection->SetRootPaths(roots);
     collection->SetRenderTags(*renderTags);
-
+    
     return true;
 }
 
@@ -448,33 +451,33 @@ UsdImagingMetalHdEngine::_MakeHydraRenderParams(
         HdCullStyleFront,                 // CULL_STYLE_FRONT,
         HdCullStyleBackUnlessDoubleSided, // CULL_STYLE_BACK_UNLESS_DOUBLE_SIDED
     };
-    static_assert(((sizeof(USD_2_HD_CULL_STYLE) / 
-                    sizeof(USD_2_HD_CULL_STYLE[0])) 
-                == UsdImagingMetalEngine::CULL_STYLE_COUNT),"enum size mismatch");
-
+    static_assert(((sizeof(USD_2_HD_CULL_STYLE) /
+                    sizeof(USD_2_HD_CULL_STYLE[0]))
+                   == UsdImagingMetalEngine::CULL_STYLE_COUNT),"enum size mismatch");
+    
     HdxRenderTaskParams params;
-
+    
     params.overrideColor       = renderParams.overrideColor;
     params.wireframeColor      = renderParams.wireframeColor;
-
+    
     if (renderParams.drawMode == UsdImagingMetalEngine::DRAW_GEOM_ONLY ||
         renderParams.drawMode == UsdImagingMetalEngine::DRAW_POINTS) {
         params.enableLighting = false;
     } else {
         params.enableLighting =  renderParams.enableLighting &&
-                                !renderParams.enableIdRender;
+            !renderParams.enableIdRender;
     }
-
+    
     params.enableIdRender      = renderParams.enableIdRender;
     params.depthBiasUseDefault = true;
     params.depthFunc           = HdCmpFuncLess;
     params.cullStyle           = USD_2_HD_CULL_STYLE[renderParams.cullStyle];
     // 32.0 is the default tessLevel of HdRasterState. we can change if we like.
     params.tessLevel           = 32.0;
-
+    
     const float tinyThreshold = 0.9f;
     params.drawingRange = GfVec2f(tinyThreshold, -1.0f);
-
+    
     // Decrease the alpha threshold if we are using sample alpha to
     // coverage.
     if (renderParams.alphaThreshold < 0.0) {
@@ -484,19 +487,19 @@ UsdImagingMetalHdEngine::_MakeHydraRenderParams(
         params.alphaThreshold =
             renderParams.alphaThreshold;
     }
-
-    params.enableHardwareShading = renderParams.enableHardwareShading;
-
+    
+    params.enableSceneMaterials = renderParams.enableSceneMaterials;
+    
     // Leave default values for:
     // - params.geomStyle
     // - params.complexity
     // - params.hullVisibility
     // - params.surfaceVisibility
-
+    
     // We don't provide the following because task controller ignores them:
     // - params.camera
     // - params.viewport
-
+    
     return params;
 }
 
@@ -573,6 +576,7 @@ UsdImagingMetalHdEngine::TestIntersection(
     qparams.alphaThreshold = params.alphaThreshold;
     qparams.renderTags = _renderTags;
     qparams.cullStyle = HdCullStyleNothing;
+    qparams.enableSceneMaterials = params.enableSceneMaterials;
 
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
     MTLCaptureManager *sharedCaptureManager = [MTLCaptureManager sharedCaptureManager];
@@ -666,6 +670,7 @@ UsdImagingMetalHdEngine::TestIntersectionBatch(
     qparams.alphaThreshold = params.alphaThreshold;
     qparams.cullStyle = USD_2_HD_CULL_STYLE[params.cullStyle];
     qparams.renderTags = _renderTags;
+    qparams.enableSceneMaterials = params.enableSceneMaterials;
 
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
     MTLCaptureManager *sharedCaptureManager = [MTLCaptureManager sharedCaptureManager];
@@ -710,6 +715,9 @@ UsdImagingMetalHdEngine::TestIntersectionBatch(
 void
 UsdImagingMetalHdEngine::Render(RenderParams params)
 {
+    // Forward scene materials enable option to delegate
+    _delegate->SetSceneMaterialsEnabled(params.enableSceneMaterials);
+
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
  
     // Make sure the Metal render targets, and GL interop textures match the GL viewport size
@@ -1108,6 +1116,39 @@ UsdImagingMetalHdEngine::_DeleteHydraResources()
         [_mtlRenderPassDescriptor release];
         _mtlRenderPassDescriptor = NULL;
     }
+}
+
+/* virtual */
+TfTokenVector
+UsdImagingMetalHdEngine::GetRendererAovs() const
+{
+    if (_renderIndex->IsBprimTypeSupported(HdPrimTypeTokens->renderBuffer)) {
+        return TfTokenVector(
+             { HdAovTokens->color,
+                 HdAovTokens->primId,
+                 HdAovTokens->depth,
+                 HdAovTokens->normal,
+                 HdAovTokensMakePrimvar(TfToken("st")) }
+             );
+    }
+    return TfTokenVector();
+}
+
+/* virtual */
+bool
+UsdImagingMetalHdEngine::SetRendererAov(TfToken const& id)
+{
+    if (_renderIndex->IsBprimTypeSupported(HdPrimTypeTokens->renderBuffer)) {
+        // For color, render straight to the viewport instead of rendering
+        // to an AOV and colorizing (which is the same, but more work).
+        if (id == HdAovTokens->color) {
+            _taskController->SetRenderOutputs(TfTokenVector());
+        } else {
+            _taskController->SetRenderOutputs({id});
+        }
+        return true;
+    }
+    return false;
 }
 
 /* virtual */

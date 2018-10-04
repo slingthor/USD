@@ -113,6 +113,8 @@ TF_DEFINE_PRIVATE_TOKENS(
     (hd_dmat3)
     (hd_dmat3_get)
     (hd_dmat3_set)
+    (hd_vec4_2_10_10_10_get)
+    (hd_vec4_2_10_10_10_set)
     (inPrimvars)
     (ivec2)
     (ivec3)
@@ -128,9 +130,11 @@ TF_DEFINE_PRIVATE_TOKENS(
     (mat4)
     (dmat3)
     (dmat4)
+    (packed_2_10_10_10)
     ((ptexTextureSampler, "ptexTextureSampler"))
     (isamplerBuffer)
     (samplerBuffer)
+    (packedNormals)
 );
 
 HdSt_CodeGenMSL::TParam::Usage operator|(HdSt_CodeGenMSL::TParam::Usage const &lhs,
@@ -188,6 +192,187 @@ static bool InDeviceMemory(const HdBinding binding)
         default:
             return false;
     }
+}
+
+static const char *
+_GetPackedTypeDefinitions()
+{
+    return "#define hd_ivec3 packed_int3\n"
+    "#define hd_vec3 packed_float3\n"
+    "#define hd_dvec3 packed_float3\n"
+    "struct hd_mat3  { float m00, m01, m02,\n"
+    "                        m10, m11, m12,\n"
+    "                        m20, m21, m22;\n"
+    "                    hd_mat3(float _00, float _01, float _02,\n"
+    "                            float _10, float _11, float _12,\n"
+    "                            float _20, float _21, float _22)\n"
+    "                              : m00(_00), m01(_01), m02(_02)\n"
+    "                              , m10(_10), m11(_11), m12(_12)\n"
+    "                              , m20(_20), m21(_21), m22(_22) {}\n"
+    "                };\n"
+    "struct hd_dmat3  { float m00, m01, m02,\n"
+    "                         m10, m11, m12,\n"
+    "                         m20, m21, m22;\n"
+    "                    hd_dmat3(float _00, float _01, float _02,\n"
+    "                            float _10, float _11, float _12,\n"
+    "                            float _20, float _21, float _22)\n"
+    "                              : m00(_00), m01(_01), m02(_02)\n"
+    "                              , m10(_10), m11(_11), m12(_12)\n"
+    "                              , m20(_20), m21(_21), m22(_22) {}\n"
+    "                };\n"
+    "#define hd_ivec3_get(v) packed_int3(v)\n"
+    "#define hd_vec3_get(v)  packed_float3(v)\n"
+    "#define hd_dvec3_get(v) packed_float3(v)\n"
+    "mat3  hd_mat3_get(hd_mat3 v)   { return mat3(v.m00, v.m01, v.m02,\n"
+    "                                             v.m10, v.m11, v.m12,\n"
+    "                                             v.m20, v.m21, v.m22); }\n"
+    "mat3  hd_mat3_get(mat3 v)      { return v; }\n"
+    "dmat3 hd_dmat3_get(hd_dmat3 v) { return dmat3(v.m00, v.m01, v.m02,\n"
+    "                                              v.m10, v.m11, v.m12,\n"
+    "                                              v.m20, v.m21, v.m22); }\n"
+    "dmat3 hd_dmat3_get(dmat3 v)    { return v; }\n"
+    "hd_ivec3 hd_ivec3_set(hd_ivec3 v) { return v; }\n"
+    "hd_ivec3 hd_ivec3_set(ivec3 v)    { return v; }\n"
+    "hd_vec3 hd_vec3_set(hd_vec3 v)    { return v; }\n"
+    "hd_vec3 hd_vec3_set(vec3 v)       { return v; }\n"
+    "hd_dvec3 hd_dvec3_set(hd_dvec3 v) { return v; }\n"
+    "hd_dvec3 hd_dvec3_set(dvec3 v)    { return v; }\n"
+    "hd_mat3  hd_mat3_set(hd_mat3 v)   { return v; }\n"
+    "hd_mat3  hd_mat3_set(mat3 v)      { return hd_mat3(v[0][0], v[0][1], v[0][2],\n"
+    "                                                   v[1][0], v[1][1], v[1][2],\n"
+    "                                                   v[2][0], v[2][1], v[2][2]); }\n"
+    "hd_dmat3 hd_dmat3_set(hd_dmat3 v) { return v; }\n"
+    "hd_dmat3 hd_dmat3_set(dmat3 v)    { return hd_dmat3(v[0][0], v[0][1], v[0][2],\n"
+    "                                                    v[1][0], v[1][1], v[1][2],\n"
+    "                                                    v[2][0], v[2][1], v[2][2]); }\n"
+    "int hd_int_get(int v)          { return v; }\n" //MTL_FIXME: What are these functions really for? Why are the "templatized" for VertFrag shaders?
+    "int hd_int_get(ivec2 v)        { return v[0]; }\n"
+    "int hd_int_get(ivec3 v)        { return v[0]; }\n"
+    "int hd_int_get(ivec4 v)        { return v[0]; }\n"
+    
+    // -------------------------------------------------------------------
+    // Packed HdType implementation.
+    
+    // XXX: this could be improved!
+    "vec4 hd_vec4_2_10_10_10_get(int v) {\n"
+    "    ivec4 unpacked = ivec4((v & 0x3ff) << 22, (v & 0xffc00) << 12,\n"
+    "                           (v & 0x3ff00000) << 2, (v & 0xc0000000));\n"
+    "    return vec4(unpacked) / 2147483647.0; }\n"
+    "int hd_vec4_2_10_10_10_set(vec4 v) {\n"
+    "    return ( (int(v.x * 511.0) & 0x3ff) |\n"
+    "            ((int(v.y * 511.0) & 0x3ff) << 10) |\n"
+    "            ((int(v.z * 511.0) & 0x3ff) << 20) |\n"
+    "            ((int(v.w) & 0x1) << 30)); }\n"
+    
+    "mat4 inverse(mat4 a) { return transpose(a); }  // MTL_FIXME - Required for AlGhadeer scene, need proper implementation of this;\n";
+}
+
+static TfToken const &
+_GetPackedType(TfToken const &token, bool packedAlignment)
+{
+    if (packedAlignment) {
+        if (token == _tokens->ivec3) {
+            return _tokens->hd_ivec3;
+        } else if (token == _tokens->vec3) {
+            return _tokens->hd_vec3;
+        } else if (token == _tokens->dvec3) {
+            return _tokens->hd_dvec3;
+        } else if (token == _tokens->mat3) {
+            return _tokens->hd_mat3;
+        } else if (token == _tokens->dmat3) {
+            return _tokens->hd_dmat3;
+        }
+    }
+    if (token == _tokens->packed_2_10_10_10) {
+        return _tokens->_int;
+    }
+    return token;
+}
+
+static TfToken const &
+_GetUnpackedType(TfToken const &token, bool packedAlignment)
+{
+    if (token == _tokens->packed_2_10_10_10) {
+        return _tokens->vec4;
+    }
+    return token;
+}
+
+static TfToken const &
+_GetPackedTypeAccessor(TfToken const &token, bool packedAlignment)
+{
+    if (packedAlignment) {
+        if (token == _tokens->ivec3) {
+            return _tokens->hd_ivec3_get;
+        } else if (token == _tokens->vec3) {
+            return _tokens->hd_vec3_get;
+        } else if (token == _tokens->dvec3) {
+            return _tokens->hd_dvec3_get;
+        } else if (token == _tokens->mat3) {
+            return _tokens->hd_mat3_get;
+        } else if (token == _tokens->dmat3) {
+            return _tokens->hd_dmat3_get;
+        }
+    }
+    if (token == _tokens->packed_2_10_10_10) {
+        return _tokens->hd_vec4_2_10_10_10_get;
+    }
+    return token;
+}
+
+static TfToken const &
+_GetPackedTypeMutator(TfToken const &token, bool packedAlignment)
+{
+    if (packedAlignment) {
+        if (token == _tokens->ivec3) {
+            return _tokens->hd_ivec3_set;
+        } else if (token == _tokens->vec3) {
+            return _tokens->hd_vec3_set;
+        } else if (token == _tokens->dvec3) {
+            return _tokens->hd_dvec3_set;
+        } else if (token == _tokens->mat3) {
+            return _tokens->hd_mat3_set;
+        } else if (token == _tokens->dmat3) {
+            return _tokens->hd_dmat3_set;
+        }
+    }
+    if (token == _tokens->packed_2_10_10_10) {
+        return _tokens->hd_vec4_2_10_10_10_set;
+    }
+    return token;
+}
+
+static TfToken const &
+_GetFlatType(TfToken const &token)
+{
+    if (token == _tokens->ivec2) {
+        return _tokens->_int;
+    } else if (token == _tokens->ivec3) {
+        return _tokens->_int;
+    } else if (token == _tokens->ivec4) {
+        return _tokens->_int;
+    } else if (token == _tokens->vec2) {
+        return _tokens->_float;
+    } else if (token == _tokens->vec3) {
+        return _tokens->_float;
+    } else if (token == _tokens->vec4) {
+        return _tokens->_float;
+    } else if (token == _tokens->dvec2) {
+        return _tokens->_float;
+    } else if (token == _tokens->dvec3) {
+        return _tokens->_float;
+    } else if (token == _tokens->dvec4) {
+        return _tokens->_float;
+    } else if (token == _tokens->mat3) {
+        return _tokens->_float;
+    } else if (token == _tokens->mat4) {
+        return _tokens->_float;
+    } else if (token == _tokens->dmat3) {
+        return _tokens->_float;
+    } else if (token == _tokens->dmat4) {
+        return _tokens->_float;
+    }
+    return token;
 }
 
 static HdSt_CodeGenMSL::TParam& _AddInputParam(  HdSt_CodeGenMSL::InOutParams &inputParams,
@@ -254,9 +439,9 @@ static void _EmitDeclaration(std::stringstream &str,
                              int arraySize = 0)
 {
     if (!arraySize)
-        str << type << " " << name << ";\n";
+        str << _GetPackedType(type, true) << " " << name << ";\n";
     else
-        str << "device const " << type << " *" << name /* << "[" << arraySize << "]"*/  << ";\n";
+        str << "device const " << _GetPackedType(type, true) << " *" << name /* << "[" << arraySize << "]"*/  << ";\n";
 }
 
 static void _EmitDeclaration(std::stringstream &str,
@@ -272,20 +457,13 @@ static void _EmitDeclarationPtr(std::stringstream &str,
                                 TfToken const &name, TfToken const &type, TfToken const &attribute,
                                 HdBinding const &binding, int arraySize = 0, bool programScope = false)
 {
-    // MTL_FIXME - we need to map vec3 device pointers to the packed variants as that's how HYDRA presents its buffers
-    // but we should orobably alter type at source not do a last minute fix up here
-    TfToken dataType = type;
-    if (type == _tokens->vec3) {
-        dataType = _tokens->hd_vec3;
-    }
-    
     TfToken ptrName(std::string("*") + name.GetString());
     str << "device const ";
     if (programScope) {
         str << "ProgramScope<st>::";
     }
     
-    _EmitDeclaration(str, ptrName, dataType, attribute, binding, arraySize);
+    _EmitDeclaration(str, ptrName, type, attribute, binding, arraySize);
 }
 
 static void _EmitDeclarationPtr(std::stringstream &str,
@@ -397,155 +575,14 @@ static HdSt_CodeGenMSL::TParam& _EmitStructMemberOutput(HdSt_CodeGenMSL::InOutPa
   };
 */
 
-static const char *
-_GetPackedTypeDefinitions()
-{
-    return "#define hd_ivec3 packed_int3\n"
-           "#define hd_vec3 packed_float3\n"
-           "#define hd_dvec3 packed_float3\n"
-           "struct hd_mat3  { float m00, m01, m02,\n"
-           "                        m10, m11, m12,\n"
-           "                        m20, m21, m22;\n"
-           "                    hd_mat3(float _00, float _01, float _02,\n"
-           "                            float _10, float _11, float _12,\n"
-           "                            float _20, float _21, float _22)\n"
-           "                              : m00(_00), m01(_01), m02(_02)\n"
-           "                              , m10(_10), m11(_11), m12(_12)\n"
-           "                              , m20(_20), m21(_21), m22(_22) {}\n"
-           "                };\n"
-           "struct hd_dmat3  { float m00, m01, m02,\n"
-           "                         m10, m11, m12,\n"
-           "                         m20, m21, m22;\n"
-           "                    hd_dmat3(float _00, float _01, float _02,\n"
-           "                            float _10, float _11, float _12,\n"
-           "                            float _20, float _21, float _22)\n"
-           "                              : m00(_00), m01(_01), m02(_02)\n"
-           "                              , m10(_10), m11(_11), m12(_12)\n"
-           "                              , m20(_20), m21(_21), m22(_22) {}\n"
-           "                };\n"
-           "#define hd_ivec3_get(v) packed_int3(v)\n"
-           "#define hd_vec3_get(v)  packed_float3(v)\n"
-           "#define hd_dvec3_get(v) packed_float3(v)\n"
-           "mat3  hd_mat3_get(hd_mat3 v)   { return mat3(v.m00, v.m01, v.m02,\n"
-           "                                             v.m10, v.m11, v.m12,\n"
-           "                                             v.m20, v.m21, v.m22); }\n"
-           "mat3  hd_mat3_get(mat3 v)      { return v; }\n"
-           "dmat3 hd_dmat3_get(hd_dmat3 v) { return dmat3(v.m00, v.m01, v.m02,\n"
-           "                                              v.m10, v.m11, v.m12,\n"
-           "                                              v.m20, v.m21, v.m22); }\n"
-           "dmat3 hd_dmat3_get(dmat3 v)    { return v; }\n"
-           "hd_ivec3 hd_ivec3_set(hd_ivec3 v) { return v; }\n"
-           "hd_ivec3 hd_ivec3_set(ivec3 v)    { return v; }\n"
-           "hd_vec3 hd_vec3_set(hd_vec3 v)    { return v; }\n"
-           "hd_vec3 hd_vec3_set(vec3 v)       { return v; }\n"
-           "hd_dvec3 hd_dvec3_set(hd_dvec3 v) { return v; }\n"
-           "hd_dvec3 hd_dvec3_set(dvec3 v)    { return v; }\n"
-           "hd_mat3  hd_mat3_set(hd_mat3 v)   { return v; }\n"
-           "hd_mat3  hd_mat3_set(mat3 v)      { return hd_mat3(v[0][0], v[0][1], v[0][2],\n"
-           "                                                   v[1][0], v[1][1], v[1][2],\n"
-           "                                                   v[2][0], v[2][1], v[2][2]); }\n"
-           "hd_dmat3 hd_dmat3_set(hd_dmat3 v) { return v; }\n"
-           "hd_dmat3 hd_dmat3_set(dmat3 v)    { return hd_dmat3(v[0][0], v[0][1], v[0][2],\n"
-           "                                                    v[1][0], v[1][1], v[1][2],\n"
-           "                                                    v[2][0], v[2][1], v[2][2]); }\n"
-           "int hd_int_get(int v)          { return v; }\n" //MTL_FIXME: What are these functions really for? Why are the "templatized" for VertFrag shaders?
-           "int hd_int_get(ivec2 v)        { return v[0]; }\n"
-           "int hd_int_get(ivec3 v)        { return v[0]; }\n"
-           "int hd_int_get(ivec4 v)        { return v[0]; }\n"
-           "mat4 inverse(mat4 a) { return transpose(a); }  // MTL_FIXME - Required for AlGhadeer scene, need proper implementation of this;\n";
-}
-
-static TfToken const &
-_GetPackedType(TfToken const &token)
-{
-    if (token == _tokens->ivec3) {
-        return _tokens->hd_ivec3;
-    } else if (token == _tokens->vec3) {
-        return _tokens->hd_vec3;
-    } else if (token == _tokens->dvec3) {
-        return _tokens->hd_dvec3;
-    } else if (token == _tokens->mat3) {
-        return _tokens->hd_mat3;
-    } else if (token == _tokens->dmat3) {
-        return _tokens->hd_dmat3;
-    }
-    return token;
-}
-
-static TfToken const &
-_GetPackedTypeAccessor(TfToken const &token)
-{
-    if (token == _tokens->ivec3) {
-        return _tokens->hd_ivec3_get;
-    } else if (token == _tokens->vec3) {
-        return _tokens->hd_vec3_get;
-    } else if (token == _tokens->dvec3) {
-        return _tokens->hd_dvec3_get;
-    } else if (token == _tokens->mat3) {
-        return _tokens->hd_mat3_get;
-    } else if (token == _tokens->dmat3) {
-        return _tokens->hd_dmat3_get;
-    }
-    return token;
-}
-
-static TfToken const &
-_GetPackedTypeMutator(TfToken const &token)
-{
-    if (token == _tokens->ivec3) {
-        return _tokens->hd_ivec3_set;
-    } else if (token == _tokens->vec3) {
-        return _tokens->hd_vec3_set;
-    } else if (token == _tokens->dvec3) {
-        return _tokens->hd_dvec3_set;
-    } else if (token == _tokens->mat3) {
-        return _tokens->hd_mat3_set;
-    } else if (token == _tokens->dmat3) {
-        return _tokens->hd_dmat3_set;
-    }
-    return token;
-}
-
-static TfToken const &
-_GetFlatType(TfToken const &token)
-{
-    if (token == _tokens->ivec2) {
-        return _tokens->_int;
-    } else if (token == _tokens->ivec3) {
-        return _tokens->_int;
-    } else if (token == _tokens->ivec4) {
-        return _tokens->_int;
-    } else if (token == _tokens->vec2) {
-        return _tokens->_float;
-    } else if (token == _tokens->vec3) {
-        return _tokens->_float;
-    } else if (token == _tokens->vec4) {
-        return _tokens->_float;
-    } else if (token == _tokens->dvec2) {
-        return _tokens->_float;
-    } else if (token == _tokens->dvec3) {
-        return _tokens->_float;
-    } else if (token == _tokens->dvec4) {
-        return _tokens->_float;
-    } else if (token == _tokens->mat3) {
-        return _tokens->_float;
-    } else if (token == _tokens->mat4) {
-        return _tokens->_float;
-    } else if (token == _tokens->dmat3) {
-        return _tokens->_float;
-    } else if (token == _tokens->dmat4) {
-        return _tokens->_float;
-    }
-    return token;
-}
-
 static TfToken const &
 _GetSamplerBufferType(TfToken const &token)
 {
     if (token == _tokens->_int  ||
         token == _tokens->ivec2 ||
         token == _tokens->ivec3 ||
-        token == _tokens->ivec4) {
+        token == _tokens->ivec4 ||
+        token == _tokens->packed_2_10_10_10) {
         return _tokens->isamplerBuffer;
     } else {
         return _tokens->samplerBuffer;
@@ -1009,7 +1046,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
             
             std::string name(input.name), dataType(input.dataType);
             bool isVertexAttribute = true;
-            bool usesPackedNormals = (input.name == HdTokens->packedNormals);
+            bool usesPackedNormals = (input.name == _tokens->packedNormals);
             
             if (input.usage & HdSt_CodeGenMSL::TParam::Uniform) {
                 //This input param is a uniform
@@ -1536,7 +1573,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
                 }
                 
                 fsFuncDef << "\n    , const device " << ((it->usage & TParam::Usage::ProgramScope) ? "ProgramScope_Frag::" : "")
-                          << dataType << "* " << name << "[[buffer(" << assignedSlot << ")]]";
+                          << _GetPackedType(it->dataType, true) << "* " << name << "[[buffer(" << assignedSlot << ")]]";
             }
             //else
                 //This parameter is a built-in variable and we won't add it to the function definition as built-ins get added regardless in a different way.
@@ -1784,6 +1821,12 @@ HdSt_CodeGenMSL::Compile()
         }
     }
     
+    TF_FOR_ALL (it, _metaData.topologyVisibilityData) {
+        TF_FOR_ALL (pIt, it->second.entries) {
+            _genCommon << "#define HD_HAS_" << pIt->name  << " 1\n";
+        }
+    }
+    
     // prep interstage plumbing function
     _procVS  << "void ProcessPrimvars() {\n";
 //    _procTCS << "void ProcessPrimvars() {\n";
@@ -1841,6 +1884,8 @@ HdSt_CodeGenMSL::Compile()
     
     //generate shader parameters
     _GenerateShaderParameters();
+    
+    _GenerateTopologyVisibilityParameters();
     
     // finalize buckets
     _procVS  << "}\n";
@@ -2149,8 +2194,10 @@ static std::string _GetSwizzleString(TfToken const& type)
         swizzle = ".xy";
     } else if (type == _tokens->_float || type == _tokens->_int) {
         swizzle = ".x";
+    } else if (type == _tokens->packed_2_10_10_10) {
+        swizzle = ".x";
     }
-    
+
     return swizzle;
 }
 
@@ -2175,29 +2222,59 @@ static void _EmitStructAccessor(std::stringstream &str,
 
     if (index) {
         if (arraySize > 1) {
-            str << type << " HdGet_" << name << "(" << "int arrayIndex, int localIndex) {\n"
-                << "  return " << structMemberName << "[" << index << "]." << name << "[arrayIndex];\n}\n";
+            str << _GetUnpackedType(type, false) << " HdGet_" << name
+                << "(int arrayIndex, int localIndex) {\n"
+                << "  return "
+                << _GetPackedTypeAccessor(type, false) << "("
+                << structMemberName << "[" << index << "]." << name << "[arrayIndex]);\n}\n";
         } else {
-            str << type << " HdGet_" << name << "(" << "int localIndex) {\n"
-                << "  return " << structMemberName << "[" << index << "]." << name << ";\n}\n";
+            str << _GetUnpackedType(type, false) << " HdGet_" << name
+                << "(int localIndex) {\n"
+                << "  return "
+                << _GetPackedTypeAccessor(type, false) << "("
+                << structMemberName << "[" << index << "]." << name << ");\n}\n";
         }
     } else {
         if (arraySize > 1) {
-            str << type << " HdGet_" << name << "(" << "int arrayIndex, int localIndex) { return "
-                << structMemberName << ptrAccessor << name << "[arrayIndex];}\n";
+            str << _GetUnpackedType(type, false) << " HdGet_" << name
+                << "(int arrayIndex, int localIndex) { return "
+                << _GetPackedTypeAccessor(type, false) << "("
+                << structMemberName << ptrAccessor << name << "[arrayIndex]);}\n";
         } else {
-            str << type << " HdGet_" << name << "(" << "int localIndex) { return "
-                << structMemberName << ptrAccessor << name << ";}\n";
+            str << _GetUnpackedType(type, false) << " HdGet_" << name
+                << "(int localIndex) { return "
+                << _GetPackedTypeAccessor(type, false) << "("
+                << structMemberName << ptrAccessor << name << ");}\n";
         }
     }
     // GLSL spec doesn't allow default parameter. use function overload instead.
     // default to localIndex=0
     if (arraySize > 1) {
-        str << type << " HdGet_" << name << "(" << "int arrayIndex)"
+        str << _GetUnpackedType(type, false) << " HdGet_" << name
+            << "(" << "int arrayIndex)"
             << " { return HdGet_" << name << "(arrayIndex, 0); }\n";
     } else {
-        str << type << " HdGet_" << name << "()" << " { return HdGet_" << name << "(0); }\n";
+        str << _GetUnpackedType(type, false) << " HdGet_" << name
+            << "()" << " { return HdGet_" << name << "(0); }\n";
     }
+}
+
+static int _GetNumComponents(TfToken const& type)
+{
+    int numComponents = 1;
+    if (type == _tokens->vec2 || type == _tokens->ivec2) {
+        numComponents = 2;
+    } else if (type == _tokens->vec3 || type == _tokens->ivec3) {
+        numComponents = 3;
+    } else if (type == _tokens->vec4 || type == _tokens->ivec4) {
+        numComponents = 4;
+    } else if (type == _tokens->mat3 || type == _tokens->dmat3) {
+        numComponents = 9;
+    } else if (type == _tokens->mat4 || type == _tokens->dmat4) {
+        numComponents = 16;
+    }
+    
+    return numComponents;
 }
 
 static void _EmitComputeAccessor(
@@ -2209,22 +2286,15 @@ static void _EmitComputeAccessor(
 {
     METAL_DEBUG_COMMENT(&str,"_EmitComputeAccessor\n"); //MTL_FIXME
     if (index) {
-        str << type
+        str << _GetUnpackedType(type, false)
             << " HdGet_" << name << "(int localIndex) {\n"
             << "  int index = " << index << ";\n";
         if (binding.GetType() == HdBinding::TBO) {
             str << "  return texelFetch("
-                << name << ", index)" << _GetSwizzleString(type) << ";\n}\n";
+                << name << ", index)" << _GetPackedTypeAccessor(type, false) << ";\n}\n";
         } else if (binding.GetType() == HdBinding::SSBO) {
-            str << "  return " << type << "(";
-            int numComponents = 1;
-            if (type == _tokens->vec2 || type == _tokens->ivec2) {
-                numComponents = 2;
-            } else if (type == _tokens->vec3 || type == _tokens->ivec3) {
-                numComponents = 3;
-            } else if (type == _tokens->vec4 || type == _tokens->ivec4) {
-                numComponents = 4;
-            }
+            str << "  return " << _GetPackedTypeAccessor(type, false) << "(";
+            int numComponents = _GetNumComponents(type);
             for (int c = 0; c < numComponents; ++c) {
                 if (c > 0) {
                     str << ",\n              ";
@@ -2233,21 +2303,21 @@ static void _EmitComputeAccessor(
             }
             str << ");\n}\n";
         } else {
-            str << "  return " << _GetPackedTypeAccessor(type) << "("
+            str << "  return " << _GetPackedTypeAccessor(type, false) << "("
                 << name << "[index]);\n}\n";
         }
     } else {
         // non-indexed, only makes sense for uniform or vertex.
         if (binding.GetType() == HdBinding::UNIFORM || 
             binding.GetType() == HdBinding::VERTEX_ATTR) {
-            str << type
+            str << _GetUnpackedType(type, false)
                 << " HdGet_" << name << "(int localIndex) { return ";
-            str << _GetPackedTypeAccessor(type) << "(" << name << ");}\n";
+            str << _GetPackedTypeAccessor(type, true) << "(" << name << ");}\n";
         }
     }
     // GLSL spec doesn't allow default parameter. use function overload instead.
     // default to locaIndex=0
-    str << type << " HdGet_" << name << "()"
+    str << _GetUnpackedType(type, false) << " HdGet_" << name << "()"
         << " { return HdGet_" << name << "(0); }\n";
     
 }
@@ -2262,25 +2332,21 @@ static void _EmitComputeMutator(
     METAL_DEBUG_COMMENT(&str, "_EmitComputeMutator\n"); //MTL_FIXME
     if (index) {
         str << "void"
-            << " HdSet_" << name << "(int localIndex, " << type << " value) {\n"
+            << " HdSet_" << name << "(int localIndex, "
+            << _GetUnpackedType(type, false) << " value) {\n"
             << "  int index = " << index << ";\n";
         if (binding.GetType() == HdBinding::SSBO) {
-            int numComponents = 1;
-            if (type == _tokens->vec2 || type == _tokens->ivec2) {
-                numComponents = 2;
-            } else if (type == _tokens->vec3 || type == _tokens->ivec3) {
-                numComponents = 3;
-            } else if (type == _tokens->vec4 || type == _tokens->ivec4) {
-                numComponents = 4;
-            }
+            str << "  " << _GetPackedType(type, false) << " packedValue = "
+                << _GetPackedTypeMutator(type, false) << "(value);\n";
+            int numComponents = _GetNumComponents(_GetPackedType(type, false));
             if (numComponents == 1) {
                 str << "  "
-                    << name << "[index] = value;\n";
+                    << name << "[index] = packedValue;\n";
             } else {
                 for (int c = 0; c < numComponents; ++c) {
                     str << "  "
                         << name << "[index + " << c << "] = "
-                        << "value[" << c << "];\n";
+                        << "packedValue[" << c << "];\n";
                 }
             }
             str << "}\n";
@@ -2309,14 +2375,16 @@ static void _EmitAccessor(std::stringstream &str,
     bool emitIndexlessVariant = false;
     if (index) {
         emitIndexlessVariant = true;
-        str << type
+        str << _GetUnpackedType(type, false)
             << " HdGet_" << name << "(int localIndex) {\n"
             << "  int index = " << index << ";\n";
         if (binding.GetType() == HdBinding::TBO) {
-            str << "  return texelFetch("
-                << name << ", index)" << _GetSwizzleString(type) << ";\n}\n";
+            str << "  return "
+                << _GetPackedTypeAccessor(type, false)
+                << "(texelFetch(" << name << ", index)"
+                << _GetSwizzleString(type) << ");\n}\n";
         } else {
-            str << "  return " << _GetPackedTypeAccessor(type) << "("
+            str << "  return " << _GetPackedTypeAccessor(type, true) << "("
                 << name << "[index]);\n}\n";
         }
     } else {
@@ -2325,16 +2393,16 @@ static void _EmitAccessor(std::stringstream &str,
             binding.GetType() == HdBinding::VERTEX_ATTR ||
             binding.GetType() == HdBinding::SSBO) {
             emitIndexlessVariant = true;
-            str << type
+            str << _GetUnpackedType(type, false)
                 << " HdGet_" << name << "(int localIndex) { return ";
-            str << _GetPackedTypeAccessor(type) << "(" << name << ");}\n";
+            str << _GetPackedTypeAccessor(type, true) << "(" << name << ");}\n";
         }
     }
     
     // GLSL spec doesn't allow default parameter. use function overload instead.
     // default to locaIndex=0
     if(emitIndexlessVariant)
-        str << type << " HdGet_" << name << "()"
+        str << _GetUnpackedType(type, false) << " HdGet_" << name << "()"
             << " { return HdGet_" << name << "(0); }\n";
     
 }
@@ -2626,7 +2694,7 @@ HdSt_CodeGenMSL::_GenerateBindingsCode()
         // dbIt is StructEntry { name, dataType, offset, numElements }
         TF_FOR_ALL (dbIt, it->second.entries) {
             _genDefinitions << "#define HD_HAS_" << dbIt->name << " 1\n";
-            declarations << "  " << dbIt->dataType
+            declarations << "  " << _GetPackedType(dbIt->dataType, false)
             << " " << dbIt->name;
             if (dbIt->arraySize > 1) {
                 _genDefinitions << "#define HD_NUM_" << dbIt->name
@@ -2659,6 +2727,7 @@ HdSt_CodeGenMSL::_GenerateDrawingCoord()
     
     TF_VERIFY(_metaData.drawingCoord0Binding.binding.IsValid());
     TF_VERIFY(_metaData.drawingCoord1Binding.binding.IsValid());
+    TF_VERIFY(_metaData.drawingCoord2Binding.binding.IsValid());
 
     /*
        hd_drawingCoord is a struct of integer offsets to locate the primvars
@@ -2766,6 +2835,7 @@ HdSt_CodeGenMSL::_GenerateDrawingCoord()
                << "  int primitiveCoord;                          \n"
                << "  int fvarCoord;                               \n"
                << "  int shaderCoord;                             \n"
+               << "  int topologyVisibilityCoord;                 \n"
                << "  int instanceIndex[HD_INSTANCE_INDEX_WIDTH];  \n"
                << "  int instanceCoords[HD_INSTANCE_INDEX_WIDTH]; \n"
                << "};\n";
@@ -2787,6 +2857,8 @@ HdSt_CodeGenMSL::_GenerateDrawingCoord()
     _AddInputParam(_mslVSInputParams, _metaData.drawingCoord0Binding);
     _EmitDeclaration(_genVS, _metaData.drawingCoord1Binding);
     _AddInputParam(_mslVSInputParams, _metaData.drawingCoord1Binding);
+    _EmitDeclaration(_genVS, _metaData.drawingCoord2Binding);
+    _AddInputParam(_mslVSInputParams, _metaData.drawingCoord2Binding);
     
     if (_metaData.drawingCoordIBinding.binding.IsValid()) {
         _EmitDeclaration(_genVS, _metaData.drawingCoordIBinding, TfToken(), /*arraySize=*/std::max(1, _metaData.instancerNumLevels));
@@ -2949,6 +3021,7 @@ HdSt_CodeGenMSL::_GenerateDrawingCoord()
            << "  dc.fvarCoord      = drawingCoord1.x; \n"
            << "  dc.shaderCoord    = drawingCoord1.z; \n"
            << "  dc.vertexCoord    = drawingCoord1.w; \n"
+           << "  dc.topologyVisibilityCoord = drawingCoord2; \n"
            << "  hd_instanceIndex r = GetInstanceIndex();\n"
            << "  for(int i = 0; i < HD_INSTANCER_NUM_LEVELS; ++i)\n"
            << "    dc.instanceIndex[i]  = r.indices[i];\n";
@@ -3082,7 +3155,7 @@ HdSt_CodeGenMSL::_GenerateConstantPrimvar()
                 continue;
             }
 
-            declarations << "  " << dbIt->dataType
+            declarations << "  " << _GetPackedType(dbIt->dataType, false)
                          << " " << dbIt->name;
             if (dbIt->arraySize > 1) {
                 declarations << "[" << dbIt->arraySize << "]";
@@ -3165,14 +3238,15 @@ HdSt_CodeGenMSL::_GenerateInstancePrimvar()
       }
     */
     TF_FOR_ALL (it, nameAndLevels) {
-        accessors << it->second.dataType
+        accessors << _GetUnpackedType(it->second.dataType, false)
                   << " HdGetInstance_" << it->first << "(int level, "
-                  << it->second.dataType << " defaultValue) {\n";
+                  << _GetUnpackedType(it->second.dataType, false)
+                  << " defaultValue) {\n";
         TF_FOR_ALL (levelIt, it->second.levels) {
             accessors << "  if (level == " << *levelIt << ") "
                       << "return HdGet_" << it->first << "_" << *levelIt << "();\n";
         }
-
+        
         accessors << "  return defaultValue;\n"
                   << "}\n";
     }
@@ -3676,7 +3750,7 @@ HdSt_CodeGenMSL::_GenerateVertexAndFaceVaryingPrimvar(bool hasGS)
             vtxOutName << MTL_PRIMVAR_PREFIX << name;
             TfToken vtxOutName_Token(vtxOutName.str());
             
-            _AddInputParam(_mslVSInputParams, name, dataType, TfToken(), binding);
+            _AddInputParam(_mslVSInputParams, name, _GetPackedType(dataType, false), TfToken(), binding);
             _AddOutputParam(_mslVSOutputParams, vtxOutName_Token, dataType, TfToken(), name).usage |= HdSt_CodeGenMSL::TParam::Usage::VPrimVar;
             
             std::string inAccessorGS = "inPrimvars[i].";
@@ -3764,7 +3838,7 @@ HdSt_CodeGenMSL::_GenerateVertexAndFaceVaryingPrimvar(bool hasGS)
             TfToken const &name = it->second.name;
             std::string dataType = it->second.dataType.GetString();
 
-            interstageStruct << "  " << dataType << " " << name << ";\n";
+            interstageStruct << "  " << _GetPackedType(dataType, false) << " " << name << ";\n";
             
             // primvar accessors (only in GS and FS)
             TfToken readStructName(std::string("in") + structName.GetString());
@@ -4010,10 +4084,10 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
         declarations << "struct " << typeName << " {\n";
 
         TF_FOR_ALL (dbIt, it->second.entries) {
-            declarations << "  " << dbIt->dataType
+            declarations << "  " << _GetPackedType(dbIt->dataType, false)
                          << " " << dbIt->name
                          << ";\n";
-
+            
         }
         declarations << "};\n";
         //declarations << "#undef vec3\n";
@@ -4055,10 +4129,13 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
                 swizzle = ".x";
 
             accessors
-                << it->second.dataType
+                << _GetUnpackedType(it->second.dataType, false)
                 << " HdGet_" << it->second.name << "() {\n"
                 << "  int shaderCoord = GetDrawingCoord().shaderCoord; \n"
-                << "  return materialParams[shaderCoord]." << it->second.name << swizzle << ";\n"
+                << "  return "
+                << _GetPackedTypeAccessor(it->second.dataType, false)
+                << "(materialParams[shaderCoord]." << it->second.name << swizzle
+                << ");\n"
                 << "}\n";
         } else if (bindingType == HdBinding::BINDLESS_TEXTURE_2D) {
             // a function returning sampler2D is allowed in 430 or later
@@ -4071,10 +4148,12 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
                     << "  }\n";
             }
             accessors
-                << it->second.dataType
+                << _GetUnpackedType(it->second.dataType, false)
                 << " HdGet_" << it->second.name << "() {\n"
                 << "  int shaderCoord = GetDrawingCoord().shaderCoord; \n"
-                << "  return texture(sampler2D(materialParams[shaderCoord]." << it->second.name << "), ";
+                << "  return "
+                << _GetPackedTypeAccessor(it->second.dataType, false) << "("
+                << "  texture(sampler2D(materialParams[shaderCoord]." << it->second.name << "), ";
 
             if (!it->second.inPrimvars.empty()) {
                 accessors 
@@ -4090,7 +4169,7 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
                     << " vec2(0.0, 0.0)";
             }
             accessors
-                << ")" << swizzle << ";\n"
+                << ")" << swizzle << ");\n"
                 << "}\n";
         } else if (bindingType == HdBinding::TEXTURE_2D) {
             declarations
@@ -4112,13 +4191,15 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
             }
             // vec4 HdGet_name(vec2 coord) { return texture(sampler2d_name, coord).xyz; }
             accessors
-                << it->second.dataType
+                << _GetUnpackedType(it->second.dataType, false)
                 << " HdGet_" << it->second.name
-                << "(vec2 coord) { return texture2d_" << it->second.name << ".sample(sampler2d_"
-                << it->second.name << ", coord)" << swizzle << ";}\n";
+                << "(vec2 coord) { return "
+                << _GetPackedTypeAccessor(it->second.dataType, false)
+                << "(texture2d_" << it->second.name << ".sample(sampler2d_"
+                << it->second.name << ", coord)" << swizzle << ");}\n";
             // vec4 HdGet_name() { return HdGet_name(HdGet_st().xy); }
             accessors
-                << it->second.dataType
+                << _GetUnpackedType(it->second.dataType, false)
                 << " HdGet_" << it->second.name
                 << "() { return HdGet_" << it->second.name << "(";
             if (!it->second.inPrimvars.empty()) {
@@ -4136,22 +4217,22 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
             accessors << "); }\n";
         } else if (bindingType == HdBinding::BINDLESS_TEXTURE_PTEX_TEXEL) {
             accessors
-                << it->second.dataType
+                << _GetUnpackedType(it->second.dataType, false)
                 << " HdGet_" << it->second.name << "(int localIndex) {\n"
                 << "  int shaderCoord = GetDrawingCoord().shaderCoord; \n"
-                << "  return " << it->second.dataType
+                << "  return " << _GetPackedTypeAccessor(it->second.dataType, false)
                 << "(GlopPtexTextureLookup("
                 << "samplerArray(materialParams[shaderCoord]." << it->second.name <<"),"
                 << "isamplerBuffer(materialParams[shaderCoord]." << it->second.name << "_layout), "
                 << "GetPatchCoord(localIndex))" << swizzle << ");\n"
                 << "}\n"
-                << it->second.dataType
+                << _GetUnpackedType(it->second.dataType, false)
                 << " HdGet_" << it->second.name << "()"
                 << "{ return HdGet_" << it->second.name << "(0); }\n"
-                << it->second.dataType
+                << _GetUnpackedType(it->second.dataType, false)
                 << " HdGet_" << it->second.name << "(vec4 patchCoord) {\n"
                 << "  int shaderCoord = GetDrawingCoord().shaderCoord; \n"
-                << "  return " << it->second.dataType
+                << "  return " << _GetPackedTypeAccessor(it->second.dataType, false)
                 << "(GlopPtexTextureLookup("
                 << "samplerArray(materialParams[shaderCoord]." << it->second.name <<"),"
                 << "isamplerBuffer(materialParams[shaderCoord]." << it->second.name << "_layout), "
@@ -4163,29 +4244,29 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
                 << "sampler2DArray sampler2darray_" << it->first.GetLocation() << ";\n"
                 << "isamplerBuffer isamplerbuffer_" << (it->first.GetLocation()+1) << ";\n";
             accessors
-                << it->second.dataType
+                << _GetUnpackedType(it->second.dataType, false)
                 << " HdGet_" << it->second.name << "(int localIndex) {\n"
-                << "  return " << it->second.dataType
+                << "  return " << _GetPackedTypeAccessor(it->second.dataType, false)
                 << "(GlopPtexTextureLookup("
                 << "sampler2darray_" << it->first.GetLocation() << ","
                 << "isamplerbuffer_" << (it->first.GetLocation()+1) << ","
                 << "GetPatchCoord(localIndex))" << swizzle << ");\n"
                 << "}\n"
-                << it->second.dataType
+                << _GetUnpackedType(it->second.dataType, false)
                 << " HdGet_" << it->second.name << "()"
                 << "{ return HdGet_" << it->second.name << "(0); }\n"
-                << it->second.dataType
+                << _GetUnpackedType(it->second.dataType, false)
                 << " HdGet_" << it->second.name << "(vec4 patchCoord) {\n"
-                << "  return " << it->second.dataType
+                << "  return " << _GetPackedTypeAccessor(it->second.dataType, false)
                 << "(GlopPtexTextureLookup("
                 << "sampler2darray_" << it->first.GetLocation() << ","
                 << "isamplerbuffer_" << (it->first.GetLocation()+1) << ","
                 << "patchCoord)" << swizzle << ");\n"
                 << "}\n";
         } else if (bindingType == HdBinding::BINDLESS_TEXTURE_PTEX_LAYOUT) {
-            //accessors << it->second.dataType << "(0)";
+            //accessors << _GetUnpackedType(it->second.dataType) << "(0)";
         } else if (bindingType == HdBinding::TEXTURE_PTEX_LAYOUT) {
-            //accessors << it->second.dataType << "(0)";
+            //accessors << _GetUnpackedType(it->second.dataType) << "(0)";
         } else if (bindingType == HdBinding::PRIMVAR_REDIRECT) {
             // XXX: shader and primvar name collisions are a problem!
             // If this shader and it's connected primvar have the same name, we
@@ -4193,12 +4274,16 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
             // accessor.
             if (it->second.name != it->second.inPrimvars[0]) {
                 accessors
-                    << it->second.dataType
+                    << _GetUnpackedType(it->second.dataType, false)
                     << " HdGet_" << it->second.name << "() {\n"
                     << "#if defined(HD_HAS_" << it->second.inPrimvars[0] << ")\n"
                     << "  return HdGet_" << it->second.inPrimvars[0] << "();\n"
                     << "#else\n"
-                    << "  return " << it->second.dataType << "(0);\n"
+                    << "  int shaderCoord = GetDrawingCoord().shaderCoord;\n"
+                    << "  return "
+                    << _GetPackedTypeAccessor(it->second.dataType, false)
+                    << "(shaderData[shaderCoord]." << it->second.name
+                    << swizzle <<  ");\n"
                     << "#endif\n"
                     << "\n}\n"
                     ;
@@ -4215,6 +4300,55 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
     METAL_DEBUG_COMMENT(&_genFS, "END OF _GenerateShaderParameters()\n"); //MTL_FIXME
     METAL_DEBUG_COMMENT(&_genVS, "END OF _GenerateShaderParameters()\n"); //MTL_FIXME
 
+}
+
+void
+HdSt_CodeGenMSL::_GenerateTopologyVisibilityParameters()
+{
+    std::stringstream declarations;
+    std::stringstream accessors;
+    
+    METAL_DEBUG_COMMENT(&_genFS, "_GenerateTopologyVisibilityParameters()\n"); //MTL_FIXME
+    METAL_DEBUG_COMMENT(&_genVS, "_GenerateTopologyVisibilityParameters()\n"); //MTL_FIXME
+
+    TF_FOR_ALL (it, _metaData.topologyVisibilityData) {
+        // See note in _GenerateConstantPrimvar re: padding.
+        HdBinding binding = it->first;
+        TfToken typeName(TfStringPrintf("TopologyVisibilityData%d",
+                                        binding.GetValue()));
+        TfToken varName = it->second.blockName;
+        
+        declarations << "struct " << typeName << " {\n";
+        
+        TF_FOR_ALL (dbIt, it->second.entries) {
+            if (!TF_VERIFY(!dbIt->dataType.IsEmpty(),
+                           "Unknown dataType for %s",
+                           dbIt->name.GetText())) {
+                continue;
+            }
+            
+            declarations << "  " << _GetPackedType(dbIt->dataType, false)
+                         << " " << dbIt->name;
+            if (dbIt->arraySize > 1) {
+                declarations << "[" << dbIt->arraySize << "]";
+            }
+            
+            declarations << ";\n";
+            
+            _EmitStructAccessor(accessors, varName, dbIt->name, dbIt->dataType,
+                                dbIt->arraySize,
+                                "GetDrawingCoord().topologyVisibilityCoord");
+        }
+        declarations << "};\n";
+        
+        _EmitDeclaration(declarations, varName, typeName, TfToken(), binding,
+                         /*arraySize=*/1);
+    }
+    _genCommon << declarations.str()
+               << accessors.str();
+    
+    METAL_DEBUG_COMMENT(&_genFS, "END OF _GenerateTopologyVisibilityParameters()\n"); //MTL_FIXME
+    METAL_DEBUG_COMMENT(&_genVS, "END OF _GenerateTopologyVisibilityParameters()\n"); //MTL_FIXME
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE
