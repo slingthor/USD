@@ -135,6 +135,7 @@ TF_DEFINE_PRIVATE_TOKENS(
     (isamplerBuffer)
     (samplerBuffer)
     (packedNormals)
+    (packedSmoothNormals)
 );
 
 HdSt_CodeGenMSL::TParam::Usage operator|(HdSt_CodeGenMSL::TParam::Usage const &lhs,
@@ -1046,7 +1047,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
             
             std::string name(input.name), dataType(input.dataType);
             bool isVertexAttribute = true;
-            bool usesPackedNormals = (input.name == _tokens->packedNormals);
+            bool usesPackedNormals = (input.name == _tokens->packedNormals || input.name == _tokens->packedSmoothNormals);
             
             if (input.usage & HdSt_CodeGenMSL::TParam::Uniform) {
                 //This input param is a uniform
@@ -3836,9 +3837,9 @@ HdSt_CodeGenMSL::_GenerateVertexAndFaceVaryingPrimvar(bool hasGS)
         TF_FOR_ALL (it, _metaData.fvarData) {
             HdBinding binding = it->first;
             TfToken const &name = it->second.name;
-            std::string dataType = it->second.dataType.GetString();
+            std::string dataType = _GetPackedType(it->second.dataType, false).GetString();
 
-            interstageStruct << "  " << _GetPackedType(dataType, false) << " " << name << ";\n";
+            interstageStruct << "  " << dataType << " " << name << ";\n";
             
             // primvar accessors (only in GS and FS)
             TfToken readStructName(std::string("in") + structName.GetString());
