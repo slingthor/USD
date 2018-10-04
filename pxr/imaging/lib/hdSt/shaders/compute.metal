@@ -282,7 +282,7 @@ int getFaceIndex(int pParam)
     return pParam >> 2;
 }
 
-float3 computeNormalForPrimIndex(device int *indices, device const Uniforms *uniforms, int primIndex);
+float3 computeNormalForPrimIndex(device const POINTS_INPUT_TYPE* points, device const int *indices, device const Uniforms *uniforms, int primIndex);
 
 kernel void computeEntryPoint(device const POINTS_INPUT_TYPE    *points             [[buffer(0)]],
                               device       NORMAL_OUTPUT_TYPE   *normals            [[buffer(1)]],
@@ -292,14 +292,14 @@ kernel void computeEntryPoint(device const POINTS_INPUT_TYPE    *points         
                               uint2        GlobalInvocationID                       [[ thread_position_in_grid ]])
 {
     int primIndex = int(GlobalInvocationID.x);
-    int pParam = primitiveParam[getPrimitiveParamIndex(primIndex)];
+    int pParam = primitiveParam[getPrimitiveParamIndex(uniforms, primIndex)];
     int edgeFlag = getEdgeFlag(pParam);
     int faceIndex = getFaceIndex(pParam);
-    vec3 normal = vec3(0);
+    float3 normal = float3(0);
 
     if (getEdgeFlag(pParam) == 0) {
         // 0 indicates an unsplit face (as authored)
-        normal += computeNormalForPrimIndex(indices, uniforms, primIndex);
+        normal += computeNormalForPrimIndex(points, indices, uniforms, primIndex);
 
     } else if (getEdgeFlag(pParam) == 1) {
         // A subdivided face will have a run of prims with
@@ -308,9 +308,9 @@ kernel void computeEntryPoint(device const POINTS_INPUT_TYPE    *points         
 
         int primCounter = 0;
         do {
-            pParam = primitiveParam[getPrimitiveParamIndex(
+            pParam = primitiveParam[getPrimitiveParamIndex(uniforms,
                                            primIndex + primCounter)];
-            normal += computeNormalForPrimIndex(indices, uniforms, primIndex+primCounter);
+            normal += computeNormalForPrimIndex(points, indices, uniforms, primIndex+primCounter);
             primCounter++;
         } while(getEdgeFlag(pParam) != 2);
 
@@ -325,14 +325,14 @@ kernel void computeEntryPoint(device const POINTS_INPUT_TYPE    *points         
 --- --------------------------------------------------------------------------
 -- glsl Compute.FlatNormalsTri
 
-int3 getIndices(device int *indices, int idx)
+int3 getIndices(device const int *indices, int idx)
 {
     return int3(indices[idx],
                 indices[idx+1],
                 indices[idx+2]);
 }
 
-float3 computeNormalForPrimIndex(device int *indices, device const Uniforms *uniforms, int primIndex)
+float3 computeNormalForPrimIndex(device const POINTS_INPUT_TYPE* points, device const int *indices, device const Uniforms *uniforms, int primIndex)
 {
     int3 primIndices = getIndices(indices, getIndicesIndex(uniforms, primIndex));
 
@@ -346,7 +346,7 @@ float3 computeNormalForPrimIndex(device int *indices, device const Uniforms *uni
 --- --------------------------------------------------------------------------
 -- glsl Compute.FlatNormalsQuad
 
-int4 getIndices(device int *indices, int idx)
+int4 getIndices(device const int *indices, int idx)
 {
     return int4(indices[idx],
                 indices[idx+1],
@@ -354,7 +354,7 @@ int4 getIndices(device int *indices, int idx)
                 indices[idx+3]);
 }
 
-float3 computeNormalForPrimIndex(device int *indices, device const Uniforms *uniforms, int primIndex)
+float3 computeNormalForPrimIndex(device const POINTS_INPUT_TYPE* points, device const int *indices, device const Uniforms *uniforms, int primIndex)
 {
     int4 primIndices = getIndices(getIndicesIndex(primIndex));
 
