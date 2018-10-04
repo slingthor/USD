@@ -291,6 +291,24 @@ _GetPackedType(TfToken const &token, bool packedAlignment)
 }
 
 static TfToken const &
+_GetComponentType(TfToken const &token)
+{
+    if (token == _tokens->ivec2|| token == _tokens->ivec3
+        || token == _tokens->ivec4 ) {
+        return _tokens->_int;
+    } else if (token == _tokens->vec2 || token == _tokens->vec3 ||
+               token == _tokens->vec4) {
+        return _tokens->_float;
+    } else if (token == _tokens->dvec2 || token == _tokens->dvec3 ||
+               token == _tokens->dvec4) {
+        return _tokens->_double;
+    } else if (token == _tokens->packed_2_10_10_10) {
+        return _tokens->_int;
+    }
+    return token;
+}
+
+static TfToken const &
 _GetUnpackedType(TfToken const &token, bool packedAlignment)
 {
     if (token == _tokens->packed_2_10_10_10) {
@@ -4289,6 +4307,22 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
                     << "\n}\n"
                     ;
             }
+        }
+        
+        // Scalar accessor - to work around GLSL allowing .x to access a float
+        TfToken componentType = _GetComponentType(it->second.dataType);
+        if (componentType == it->second.dataType) {
+            accessors
+                << it->second.dataType
+                << " HdGet_" << it->second.name << "_Scalar() {\n"
+                << "  return HdGet_" << it->second.name << "(); \n"
+                << "}\n";
+        } else {
+            accessors
+                << _GetComponentType(it->second.dataType)
+                << " HdGet_" << it->second.name << "_Scalar() {\n"
+                << "  return HdGet_" << it->second.name << "().x; \n"
+                << "}\n";
         }
     }
     
