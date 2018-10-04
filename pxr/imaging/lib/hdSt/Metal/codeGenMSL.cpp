@@ -134,7 +134,8 @@ TF_DEFINE_PRIVATE_TOKENS(
     ((ptexTextureSampler, "ptexTextureSampler"))
     (isamplerBuffer)
     (samplerBuffer)
-    (packedNormals)
+    (packedSmoothNormals)
+    (packedFlatNormals)
 );
 
 HdSt_CodeGenMSL::TParam::Usage operator|(HdSt_CodeGenMSL::TParam::Usage const &lhs,
@@ -1038,7 +1039,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
             
             std::string name(input.name), dataType(input.dataType);
             bool isVertexAttribute = true;
-            bool usesPackedNormals = (input.name == _tokens->packedNormals);
+            bool usesPackedNormals = (input.name == _tokens->packedSmoothNormals) || (input.name == _tokens->packedFlatNormals);
             
             if (input.usage & HdSt_CodeGenMSL::TParam::Uniform) {
                 //This input param is a uniform
