@@ -814,7 +814,9 @@ UsdImagingMetalHdEngine::Render(RenderParams params)
         context->CommitCommandBuffer(false, false, METALWORKQUEUE_GEOMETRY_SHADER);
     }
     // Commit the render buffer (will wait for GS to complete if present)
-    context->CommitCommandBuffer(false, false);
+    // We wait until scheduled, because we're about to consume the Metal
+    // generated textures in an OpenGL blit
+    context->CommitCommandBuffer(true, false);
     
     // Finalize rendering here & push the command buffer to the GPU
     [sharedCaptureManager.defaultCaptureScope endScope];
