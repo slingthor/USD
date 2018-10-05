@@ -372,7 +372,9 @@ integrateLights(vec4 Peye, vec3 Neye, LightingInterfaceProperties props)
 #endif // HD_HAS_definedIntegrateLights
 #endif
 
+#if !defined(ARCH_GFX_METAL)
 int GetPointId(); // pointId.glslfx
+#endif
 
 ReprStyle GetReprStyle()
 {
