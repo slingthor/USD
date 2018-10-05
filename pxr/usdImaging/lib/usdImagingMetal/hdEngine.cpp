@@ -811,7 +811,7 @@ UsdImagingMetalHdEngine::Render(RenderParams params)
     if (bGS) {
         // Generate an event to indicate that the GS buffer has completed then commit it
         context->GenerateEvent(METALWORKQUEUE_GEOMETRY_SHADER);
-        context->CommitCommandBuffer(false, false, METALWORKQUEUE_GEOMETRY_SHADER);
+        context->CommitCommandBuffer(true, false, METALWORKQUEUE_GEOMETRY_SHADER);
     }
     // Commit the render buffer (will wait for GS to complete if present)
     // We wait until scheduled, because we're about to consume the Metal

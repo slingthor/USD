@@ -1320,7 +1320,7 @@ void MtlfMetalContext::CommitCommandBuffer(bool waituntilScheduled, bool waitUnt
 {
     MetalWorkQueue *wq = &workQueues[workQueueType];
     
-    //NSLog(@"Comitting command buffer %d %@", (int)workQueueType, wq->commandBuffer.label);
+    //NSLog(@"Committing command buffer %d %@", (int)workQueueType, wq->commandBuffer.label);
     
     if (waituntilScheduled && waitUntilCompleted) {
         TF_FATAL_CODING_ERROR("Just pick one please!");
