@@ -42,16 +42,18 @@
 
 -- glsl Preview.Displacement
 
-#if defined(ARCH_GFX_METAL)
-#define GETVALUE(_val) _val
-#else
-#define GETVALUE(_val) _val.x
+#ifndef GETVALUE
+ #if defined(ARCH_GFX_METAL)
+  #define GETVALUE(_val) _val##_Scalar()
+ #else
+  #define GETVALUE(_val) _val##().x
+ #endif
 #endif
 
 vec4 displacementShader(int index, vec4 Peye, vec3 Neye, vec4 patchCoord)
 {
     // Calculate scalar displacement.
-    float texDisplacement = GETVALUE(HdGet_displacement());
+    float texDisplacement = GETVALUE(HdGet_displacement);
     return Peye + vec4(Neye*texDisplacement, 0);
 }
 

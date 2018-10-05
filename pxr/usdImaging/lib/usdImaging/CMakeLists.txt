@@ -79,6 +79,5 @@ pxr_library(usdImaging
     RESOURCE_FILES
         plugInfo.json
         shaders/drawMode.glslfx
-        shaders/previewSurface.glslfx
 )
 

@@ -254,16 +254,16 @@ _GetPackedTypeDefinitions()
     // -------------------------------------------------------------------
     // Packed HdType implementation.
     
-    // XXX: this could be improved!
+    "struct packedint1010102 { int x:10, y:10, z:10, w:2; };\n"
+    "#define packed_2_10_10_10 int\n"
     "vec4 hd_vec4_2_10_10_10_get(int v) {\n"
-    "    ivec4 unpacked = ivec4((v & 0x3ff) << 22, (v & 0xffc00) << 12,\n"
-    "                           (v & 0x3ff00000) << 2, (v & 0xc0000000));\n"
-    "    return vec4(unpacked) / 2147483647.0; }\n"
+    "    packedint1010102 pi = *(thread packedint1010102*)&v;\n"
+    "    return vec4(vec3(pi.x, pi.y, pi.z) / 511.0f, pi.w); }\n"
     "int hd_vec4_2_10_10_10_set(vec4 v) {\n"
-    "    return ( (int(v.x * 511.0) & 0x3ff) |\n"
-    "            ((int(v.y * 511.0) & 0x3ff) << 10) |\n"
-    "            ((int(v.z * 511.0) & 0x3ff) << 20) |\n"
-    "            ((int(v.w) & 0x1) << 30)); }\n"
+    "    packedint1010102 pi;\n"
+    "    pi.x = v.x * 511.0; pi.y = v.y * 511.0; pi.z = v.z * 511.0; pi.w = 0;\n"
+    "    return *(thread int*)&pi;\n"
+    "}\n"
     
     "mat4 inverse(mat4 a) { return transpose(a); }  // MTL_FIXME - Required for AlGhadeer scene, need proper implementation of this;\n";
 }
@@ -916,7 +916,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
     std::stringstream   copyInputsFrag, copyOutputsFrag;
 
     std::stringstream   vsInputStruct, vsOutputStruct, vsAttributeDefineEnabled, vsAttributeDefineDisabled, vsAttributeDefineUndef,
-                        vsFuncDef, vsMI_FuncDef, vsUnpack1010102Snippet,
+                        vsFuncDef, vsMI_FuncDef,
                         vsMI_EP_FuncDef, vsMI_EP_FuncDefParams, vsMI_EP_CallCode, vsMI_EP_InputCode,
                         vsCode, vsEntryPointCode, vsInputCode, vsOutputCode, vsGsOutputMergeCode,
                         vsUniformStruct, drawArgsStruct;
@@ -930,15 +930,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
     vsAttributeDefineDisabled   << "/****** Vertex Attributes Specifiers are DISABLED ******/\n"
                                 << "#define HD_MTL_VS_ATTRIBUTE(t,n,a) t n\n\n";
     vsAttributeDefineUndef      << "#undef HD_MTL_VS_ATTRIBUTE\n\n";
-    
-    vsUnpack1010102Snippet      << "////////////////////////////////////////////////////////////////////////////////////////////////////////////////////\n"
-                                << "// MSL Helper Code /////////////////////////////////////////////////////////////////////////////////////////////////\n\n"
-                                << "struct packedint { int x:10, y:10, z:10, w:2; };\n"
-                                << "vec4 Unpack10_10_10_2(uint u_packedNormal) {\n"
-                                << "    packedint pi = *(thread packedint*)&u_packedNormal;\n"
-                                << "    return vec4(vec3(pi.x, pi.y, pi.z) / 511.0f, pi.w);\n"
-                                << "}\n";
-    
+
     drawArgsStruct              << "////////////////////////////////////////////////////////////////////////////////////////////////////////////////////\n"
                                 << "// MSL Draw Args Struct ////////////////////////////////////////////////////////////////////////////////////////////\n\n"
                                 << "struct MSLDrawArgs { int indexCount, startIndex, baseVertex, instanceCount; };\n";
@@ -1165,13 +1157,15 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
                 
                 //We need to replace some of the dataTypes here to account for changes in
                 //packing/alignment/unpacking
-                if(usesPackedNormals) dataType = "uint";
+                if(usesPackedNormals) dataType = _tokens->_int;
                 else if(dataType == "vec2") dataType = "packed_float2";
                 else if(dataType == "vec3") dataType = "packed_float3";
+                else if(dataType == "int2") dataType = "packed_int2";
+                else if(dataType == "int3") dataType = "packed_int3";
                 
                 vsMI_EP_FuncDefParams   << "\n    , device const " << dataType
                                         << " *" << name << "[[buffer(" << vsCurrentVertexAttributeSlot << ")]]";
-                vsMI_EP_InputCode   << ",\n            " << (usesPackedNormals ? "Unpack10_10_10_2(" : "")
+                vsMI_EP_InputCode   << ",\n            " << (usesPackedNormals ? "hd_vec4_2_10_10_10_get(" : "")
                                     << name << "[gl_VertexID]" << (usesPackedNormals ? ")" : "");
                 
                 mslProgram->AddBinding(name, vsCurrentVertexAttributeSlot++, kMSL_BindingType_VertexAttribute, kMSL_ProgramStage_Vertex);
@@ -1271,6 +1265,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
                 gs_VSInputCode << "            scope." << accessor << " = vsOutput." << name << ";\n";
             else {
                 gs_GSInputCode << "        scope." << (accessor.empty() ? name : accessor) << " = ";
+                
                 if(prefixScope && isPtr)
                     gs_GSInputCode << "(const device ProgramScope_Geometry::" << dataType << "*)" << name << ";\n";
                 else
@@ -1289,7 +1284,8 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
                 if(!isPresentInVS) {
                     cs_EP_FuncDef   << "\n    , " << (isPtr ? "device const " : "")
                                     << (prefixScope ? "ProgramScope_Geometry::" : "")
-                                    << dataType << (isPtr ? "* " : " ") << name << "[[buffer(" << currentUniformBufferSlot << ")]]";
+                                    << _GetPackedType(it->dataType, true) << (isPtr ? "* " : " ")
+                                    << name << "[[buffer(" << currentUniformBufferSlot << ")]]";
                     mslProgram->AddBinding(name, currentUniformBufferSlot++, kMSL_BindingType_UniformBuffer, kMSL_ProgramStage_Compute);
                 }
             }
@@ -1387,7 +1383,6 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
         bool useMI = (_buildTarget != kMSL_BuildTarget_Regular);
         
         vsCode  << drawArgsStruct.str()
-                << vsUnpack1010102Snippet.str()
                 << vsUniformStruct.str();
         
         vsCode  << "////////////////////////////////////////////////////////////////////////////////////////////////////////////////////\n"
@@ -1864,20 +1859,22 @@ HdSt_CodeGenMSL::Compile()
             << "   vec2 localST = GetPatchCoord(index).xy;\n";
             break;
         }
-            
+
         case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_COARSE_QUADS:
         {
             // quad interpolation
             _procGS  << "void ProcessPrimvars(int index) {\n"
-            << "   vec2 localST = vec2[](vec2(0,0), vec2(1,0), vec2(1,1), vec2(0,1))[index];\n";
+                     << "   vec2 bc_lookup[] = { vec2(0,0), vec2(1,0), vec2(1,1), vec2(0,1) };\n"
+                     << "   vec2 localST = bc_lookup[index];\n";
             break;
         }
-            
+
         case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_COARSE_TRIANGLES:
         {
             // barycentric interpolation
             _procGS  << "void ProcessPrimvars(int index) {\n"
-            << "   vec2 localST = (index == 0) ? vec2(1,0) : ((index == 1) ? vec2(0,1) : vec2(0,0));\n";
+                     << "   vec2 bc_lookup[] = { vec2(0,0), vec2(1,0), vec2(0,1) };\n"
+                     << "   vec2 localST = bc_lookup[index];\n";
             break;
         }
             
@@ -3410,8 +3407,10 @@ HdSt_CodeGenMSL::_GenerateElementPrimvar()
     if (_metaData.primitiveParamBinding.binding.IsValid()) {
         const HdSt_ResourceBinder::MetaData::BindingDeclaration& primParamBinding = _metaData.primitiveParamBinding;
         _EmitDeclarationPtr(declarations, primParamBinding);
-        TParam& entry(_AddInputPtrParam(_mslPSInputParams, primParamBinding));
-        entry.usage |= TParam::EntryFuncArgument;
+        TParam& entryPS(_AddInputPtrParam(_mslPSInputParams, primParamBinding));
+        entryPS.usage |= TParam::EntryFuncArgument;
+        TParam& entryGS(_AddInputPtrParam(_mslGSInputParams, primParamBinding));
+        entryGS.usage |= TParam::EntryFuncArgument;
 
         _EmitAccessor(  accessors,
                         primParamBinding.name, primParamBinding.dataType, primParamBinding.binding,
@@ -3602,6 +3601,8 @@ HdSt_CodeGenMSL::_GenerateElementPrimvar()
         
         _EmitDeclarationPtr(declarations, _metaData.edgeIndexBinding);
         _AddInputPtrParam(_mslPSInputParams, _metaData.edgeIndexBinding);
+        TParam& entryGS(_AddInputPtrParam(_mslGSInputParams, _metaData.edgeIndexBinding));
+        entryGS.usage |= TParam::EntryFuncArgument;
         
         _EmitAccessor(accessors, _metaData.edgeIndexBinding.name,
                       _metaData.edgeIndexBinding.dataType, binding,
@@ -3674,6 +3675,8 @@ HdSt_CodeGenMSL::_GenerateElementPrimvar()
             // MTL_FIXME - changing from VS Input params to PS because none of this appaears to be associated with vertex shaders at all... (so possibly nothing to fix)
             _EmitDeclarationPtr(declarations, name, dataType, TfToken(), binding);
             _AddInputPtrParam(_mslPSInputParams, name, dataType, TfToken(), binding);
+            TParam& entryGS(_AddInputPtrParam(_mslGSInputParams, name, dataType, TfToken(), binding));
+            entryGS.usage |= TParam::EntryFuncArgument;
             
             // AggregatedElementID gives us the buffer index post batching, which
             // is what we need for accessing element (uniform) primvar data.
@@ -3912,9 +3915,9 @@ HdSt_CodeGenMSL::_GenerateVertexAndFaceVaryingPrimvar(bool hasGS)
                 {
                     // barycentric interpolation within a triangle.
                     _procGS << "   outPrimvars." << name
-                        << "  = HdGet_" << name << "(0) * localST.x "
-                        << "  + HdGet_" << name << "(1) * localST.y "
-                        << "  + HdGet_" << name << "(2) * (1-localST.x-localST.y);\n";
+                        << "  = HdGet_" << name << "(0) * (1-localST.x-localST.y) "
+                        << "  + HdGet_" << name << "(1) * localST.x "
+                        << "  + HdGet_" << name << "(2) * localST.y;\n";
                     break;
                 }
 
