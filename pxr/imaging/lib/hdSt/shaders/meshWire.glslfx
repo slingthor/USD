@@ -56,7 +56,7 @@ ProcessQuadEdgeDistance(vec4 Peye0, vec4 Peye1, vec4 Peye2, vec4 Peye3,
 
 out EdgeData
 {
-    noperspective out vec3 edgeDistance;
+    noperspective vec3 edgeDistance;
 } outEdgeData;
 
 vec3 edgeDistance(vec2 p, vec2 p0, vec2 p1, vec2 p2)
