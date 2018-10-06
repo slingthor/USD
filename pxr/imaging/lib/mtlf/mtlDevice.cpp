@@ -180,6 +180,7 @@ MtlfMetalContext::MtlfMetalContext() : enableMVA(false), enableComputeGS(false)
 {
     // Select Intel GPU if possible due to current issues on AMD. Revert when fixed - MTL_FIXME
 	device = MtlfMetalContext::GetMetalDevice(PREFER_INTEGRATED_GPU);
+    //device = MtlfMetalContext::GetMetalDevice(PREFER_DEFAULT_GPU);
 
     NSLog(@"Selected %@ for Metal Device", device.name);
     
@@ -336,7 +337,7 @@ MtlfMetalContext::MtlfMetalContext() : enableMVA(false), enableComputeGS(false)
     drawTarget = NULL;
     
     currentWorkQueueType = METALWORKQUEUE_DEFAULT;
-    currentWorkQueue     = &workQueues[METALWORKQUEUE_DEFAULT];
+    currentWorkQueue     = &workQueues[currentWorkQueueType];
     
     for (int i = 0; i < METALWORKQUEUE_MAX; i ++) {
         ResetEncoders((MetalWorkQueueType)i);
@@ -441,6 +442,9 @@ MtlfMetalContext::IsInitialized()
 void
 MtlfMetalContext::BlitColorTargetToOpenGL()
 {
+    currentWorkQueueType = METALWORKQUEUE_DEFAULT;
+    currentWorkQueue     = &workQueues[currentWorkQueueType];
+    
     glPushAttrib(GL_ENABLE_BIT | GL_POLYGON_BIT | GL_DEPTH_BUFFER_BIT);
     
     glEnable(GL_DEPTH_TEST);
@@ -1063,7 +1067,10 @@ void MtlfMetalContext::SetRenderEncoderState()
     
     // Get a compute encoder on the Geometry Shader work queue
     if(enableComputeGS) {
+        MetalWorkQueueType oldWorkQueueType = currentWorkQueueType;
         computeEncoder = GetComputeEncoder(METALWORKQUEUE_GEOMETRY_SHADER);
+        currentWorkQueueType = oldWorkQueueType;
+        currentWorkQueue     = &workQueues[currentWorkQueueType];
     }
     
     id<MTLComputePipelineState> computePipelineState;
@@ -1438,7 +1445,7 @@ void MtlfMetalContext::SetCurrentEncoder(MetalEncoderType encoderType, MetalWork
     if (!wq->commandBuffer) {
         NSLog(@"Creating a command buffer on demand, try and avoid this!");
         CreateCommandBuffer(workQueueType);
-        LabelCommandBuffer(@"Default lable - fix!");
+        LabelCommandBuffer(@"Default label - fix!");
         //TF_FATAL_CODING_ERROR("Shouldn't be able to get here without having a command buffer created");
     }
 
@@ -1500,6 +1507,9 @@ void MtlfMetalContext::SetCurrentEncoder(MetalEncoderType encoderType, MetalWork
     wq->encoderInUse       = true;
     wq->encoderEnded       = false;
     wq->encoderHasWork     = true;
+    
+    currentWorkQueueType = workQueueType;
+    currentWorkQueue     = &workQueues[currentWorkQueueType];
 }
 
 id<MTLBlitCommandEncoder> MtlfMetalContext::GetBlitEncoder(MetalWorkQueueType workQueueType)

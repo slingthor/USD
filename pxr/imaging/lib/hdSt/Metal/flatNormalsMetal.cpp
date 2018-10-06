@@ -82,7 +82,8 @@ HdSt_FlatNormalsComputationMetal::_Execute(
     // Only the normals are writebale
     unsigned long bufferWritableMask = 1 << 1;
     
-    id <MTLComputeCommandEncoder> computeEncoder = context->GetComputeEncoder();
+    // The output of this work is consumed by the GS, so we need to ensure it's executed before the GS
+    id <MTLComputeCommandEncoder> computeEncoder = context->GetComputeEncoder(METALWORKQUEUE_GEOMETRY_SHADER);
     computeEncoder.label = @"Compute pass for GPU Flat Normals";
     
     context->SetComputeEncoderState(computeFunction, bufferWritableMask, @"GPU Flat Normals pipeline state");
@@ -95,7 +96,7 @@ HdSt_FlatNormalsComputationMetal::_Execute(
     
     [computeEncoder dispatchThreads:MTLSizeMake(numPrims, 1, 1) threadsPerThreadgroup:MTLSizeMake(1, 1, 1)];
     
-    context->ReleaseEncoder(false);
+    context->ReleaseEncoder(false, METALWORKQUEUE_GEOMETRY_SHADER);
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE
