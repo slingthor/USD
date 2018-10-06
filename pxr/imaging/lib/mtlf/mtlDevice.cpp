@@ -179,8 +179,8 @@ id<MTLDevice> MtlfMetalContext::GetMetalDevice(PREFERRED_GPU_TYPE preferredGPUTy
 MtlfMetalContext::MtlfMetalContext() : enableMVA(false), enableComputeGS(false)
 {
     // Select Intel GPU if possible due to current issues on AMD. Revert when fixed - MTL_FIXME
-	device = MtlfMetalContext::GetMetalDevice(PREFER_INTEGRATED_GPU);
-    //device = MtlfMetalContext::GetMetalDevice(PREFER_DEFAULT_GPU);
+	//device = MtlfMetalContext::GetMetalDevice(PREFER_INTEGRATED_GPU);
+    device = MtlfMetalContext::GetMetalDevice(PREFER_DEFAULT_GPU);
 
     NSLog(@"Selected %@ for Metal Device", device.name);
     
@@ -193,7 +193,9 @@ MtlfMetalContext::MtlfMetalContext() : enableMVA(false), enableComputeGS(false)
     outstandingDependency = METALWORKQUEUE_INVALID;
     
     NSOperatingSystemVersion minimumSupportedOSVersion = { .majorVersion = 10, .minorVersion = 14, .patchVersion = 0 };
-    concurrentDispatchSupported = [NSProcessInfo.processInfo isOperatingSystemAtLeastVersion:minimumSupportedOSVersion];
+    
+    // MTL_FIXME - Disabling concurrent dispatch until appropriate fencing is in place
+    concurrentDispatchSupported = false && [NSProcessInfo.processInfo isOperatingSystemAtLeastVersion:minimumSupportedOSVersion];
 
     // Load all the default shader files
     NSError *error = NULL;
