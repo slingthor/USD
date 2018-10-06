@@ -751,7 +751,6 @@ UsdImagingMetalHdEngine::Render(RenderParams params)
         depthAttachment.loadAction = MTLLoadActionClear;
         depthAttachment.storeAction = MTLStoreActionStore;
         depthAttachment.clearDepth = 1.0f;
-        
     }
 
     GLfloat clearColor[4];

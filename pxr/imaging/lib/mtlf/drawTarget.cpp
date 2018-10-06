@@ -329,6 +329,14 @@ MtlfDrawTarget::Bind()
     context->SetDrawTarget(this);
     context->CreateCommandBuffer();
     context->LabelCommandBuffer(@"DrawTarget:Bind");
+    
+#pragma message("Unconditionally enabling GS buffer creation for now")
+
+    // Create a command buffer for the geometry shaders and make the default/render queue dependent on it completeing
+    context->CreateCommandBuffer(METALWORKQUEUE_GEOMETRY_SHADER);
+    context->LabelCommandBuffer(@"DrawTarget CommandBuffer GS", METALWORKQUEUE_GEOMETRY_SHADER);
+    context->SetEventDependency(METALWORKQUEUE_DEFAULT);
+
     context->SetRenderPassDescriptor(_mtlRenderPassDescriptor);
 }
 
@@ -361,6 +369,11 @@ MtlfDrawTarget::Unbind()
     // Terminate the render encoder containing all the draw commands
     context->GetRenderEncoder();
     context->ReleaseEncoder(true);
+    
+    // Generate an event to indicate that the GS buffer has completed then commit it
+    context->GenerateEvent(METALWORKQUEUE_GEOMETRY_SHADER);
+    context->CommitCommandBuffer(true, false, METALWORKQUEUE_GEOMETRY_SHADER);
+    
     context->CommitCommandBuffer(false, false);
     
     TouchContents();
@@ -456,7 +469,7 @@ MtlfDrawTarget::GetImage(std::string const & name, void* buffer) const
 
     [blitEncoder copyFromTexture:texture sourceSlice:0 sourceLevel:0 sourceOrigin:MTLOriginMake(0, 0, 0) sourceSize:MTLSizeMake(width, height, 1) toBuffer:cpuBuffer destinationOffset:0 destinationBytesPerRow:(bytesPerPixel * width) destinationBytesPerImage:(bytesPerPixel * width * height) options:blitOptions];
     [blitEncoder synchronizeResource:cpuBuffer];
-   
+
     context->ReleaseEncoder(true);
     context->CommitCommandBuffer(false, true);
 

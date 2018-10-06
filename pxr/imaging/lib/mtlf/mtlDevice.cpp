@@ -449,7 +449,6 @@ MtlfMetalContext::BlitColorTargetToOpenGL()
     
     glPushAttrib(GL_ENABLE_BIT | GL_POLYGON_BIT | GL_DEPTH_BUFFER_BIT);
     
-    glEnable(GL_DEPTH_TEST);
     glDepthMask(GL_TRUE);
     glFrontFace(GL_CCW);
     glDisable(GL_CULL_FACE);
@@ -1363,10 +1362,10 @@ void MtlfMetalContext::CommitCommandBuffer(bool waituntilScheduled, bool waitUnt
     if (waitUntilCompleted) {
         [wq->commandBuffer waitUntilCompleted];
     }
-    else if (waituntilScheduled) {
+    else if (waituntilScheduled && wq->encoderHasWork) {
         [wq->commandBuffer waitUntilScheduled];
     }
-  
+
     ResetEncoders(workQueueType);
 }
 
