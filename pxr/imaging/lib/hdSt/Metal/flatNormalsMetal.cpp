@@ -79,15 +79,14 @@ HdSt_FlatNormalsComputationMetal::_Execute(
     HdStMSLProgramSharedPtr const &mslProgram(boost::dynamic_pointer_cast<HdStMSLProgram>(computeProgram));
     id<MTLFunction> computeFunction = mslProgram->GetComputeFunction();
     
-    std::vector<id<MTLBuffer>> computeBuffers(4);
-    
     //  All but the normals are immutable
     unsigned long immutableBufferMask = (1 << 0) | (1 << 2) | (1 << 3) | (1 << 4);
     
-    id <MTLComputeCommandEncoder> computeEncoder = context->GetComputeEncoder();
+    // The output of this work is consumed by the GS, so we need to ensure it's executed before the GS
+    id <MTLComputeCommandEncoder> computeEncoder = context->GetComputeEncoder(METALWORKQUEUE_GEOMETRY_SHADER);
     computeEncoder.label = @"Compute pass for GPU Flat Normals";
     
-    context->SetComputeEncoderState(computeFunction, 5, immutableBufferMask, @"GPU Flat Normals pipeline state");
+    context->SetComputeEncoderState(computeFunction, 5, immutableBufferMask, @"GPU Flat Normals pipeline state", METALWORKQUEUE_GEOMETRY_SHADER);
     
     [computeEncoder setBuffer:points->GetId()    offset:0 atIndex:0];
     [computeEncoder setBuffer:normals->GetId()   offset:0 atIndex:1];
@@ -97,7 +96,7 @@ HdSt_FlatNormalsComputationMetal::_Execute(
     
     [computeEncoder dispatchThreads:MTLSizeMake(numPrims, 1, 1) threadsPerThreadgroup:MTLSizeMake(1, 1, 1)];
     
-    context->ReleaseEncoder(false);
+    context->ReleaseEncoder(false, METALWORKQUEUE_GEOMETRY_SHADER);
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE
