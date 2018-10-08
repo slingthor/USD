@@ -83,12 +83,12 @@ HdSt_SmoothNormalsComputationMetal::_Execute(
     std::vector<id<MTLTexture>> computeTextures;
  
     // Only the normals are writebale
-    unsigned long bufferWritableMask = 1 << 1;
-
+    unsigned long immutableBufferMask = (1 << 0) | (1 << 2) | (1 << 3);
+    
     id <MTLComputeCommandEncoder> computeEncoder = context->GetComputeEncoder();
     computeEncoder.label = @"Compute pass for GPU Smooth Normals";
     
-    context->SetComputeEncoderState(computeFunction, bufferWritableMask, @"GPU Smooth Normals pipeline state");
+    context->SetComputeEncoderState(computeFunction, 4, immutableBufferMask, @"GPU Smooth Normals pipeline state");
 
     [computeEncoder setBuffer:points->GetId()    offset:0 atIndex:0];
     [computeEncoder setBuffer:normals->GetId()   offset:0 atIndex:1];

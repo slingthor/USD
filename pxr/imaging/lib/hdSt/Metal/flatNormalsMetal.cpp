@@ -81,13 +81,13 @@ HdSt_FlatNormalsComputationMetal::_Execute(
     
     std::vector<id<MTLBuffer>> computeBuffers(4);
     
-    // Only the normals are writebale
-    unsigned long bufferWritableMask = 1 << 1;
+    //  All but the normals are immutable
+    unsigned long immutableBufferMask = (1 << 0) | (1 << 2) | (1 << 3) | (1 << 4);
     
     id <MTLComputeCommandEncoder> computeEncoder = context->GetComputeEncoder();
     computeEncoder.label = @"Compute pass for GPU Flat Normals";
     
-    context->SetComputeEncoderState(computeFunction, bufferWritableMask, @"GPU Flat Normals pipeline state");
+    context->SetComputeEncoderState(computeFunction, 5, immutableBufferMask, @"GPU Flat Normals pipeline state");
     
     [computeEncoder setBuffer:points->GetId()    offset:0 atIndex:0];
     [computeEncoder setBuffer:normals->GetId()   offset:0 atIndex:1];

@@ -32,6 +32,7 @@
 
 #define METAL_TESSELLATION_SUPPORT 0
 #define METAL_STATE_OPTIMISATION 1
+#define CACHE_GSCOMPUTE 1
 
 #define DIRTY_METALRENDERSTATE_OLD_STYLE_VERTEX_UNIFORM   0x001
 #define DIRTY_METALRENDERSTATE_OLD_STYLE_FRAGMENT_UNIFORM 0x002
@@ -222,12 +223,7 @@ MtlfMetalContext::MtlfMetalContext() : enableMVA(false), enableComputeGS(false)
     id <MTLFunction> vertexProgram = [defaultLibrary newFunctionWithName:@"quad_vs"];
     
     computeDepthCopyProgram = [defaultLibrary newFunctionWithName:@"copyDepth"];
-    computeDepthCopyPipelineState = [device newComputePipelineStateWithFunction:computeDepthCopyProgram error:&error];
-    if (!computeDepthCopyPipelineState) {
-        NSLog(@"Failed to created pipeline state, error %@", error);
-    }
-    computeDepthCopyProgramExecutionWidth = [computeDepthCopyPipelineState threadExecutionWidth];
-    
+ 
     MTLDepthStencilDescriptor *depthStateDesc = [[MTLDepthStencilDescriptor alloc] init];
     depthStateDesc.depthWriteEnabled = YES;
     depthStateDesc.depthCompareFunction = MTLCompareFunctionLessEqual;
@@ -493,19 +489,17 @@ MtlfMetalContext::BlitColorTargetToOpenGL()
 void
 MtlfMetalContext::CopyDepthTextureToOpenGL()
 {
-    NSUInteger exeWidth = computeDepthCopyProgramExecutionWidth;
+    id <MTLComputeCommandEncoder> computeEncoder = GetComputeEncoder();
+    computeEncoder.label = @"Depth buffer copy";
+    
+    NSUInteger exeWidth = context->SetComputeEncoderState(computeDepthCopyProgram, 0, 0, @"Depth copy pipeline state");
+    
     MTLSize threadGroupCount = MTLSizeMake(16, exeWidth / 32, 1);
     MTLSize threadGroups     = MTLSizeMake(mtlDepthTexture.width / threadGroupCount.width + 1,
                                            mtlDepthTexture.height / threadGroupCount.height + 1, 1);
-    id <MTLComputeCommandEncoder> computeEncoder = GetComputeEncoder();
-    
-    computeEncoder.label = @"Depth buffer copy";
-    
-    context->SetComputeEncoderState(computeDepthCopyProgram, 0, @"Depth copy pipeline state");
     
     [computeEncoder setTexture:mtlDepthTexture atIndex:0];
     [computeEncoder setTexture:mtlDepthRegularFloatTexture atIndex:1];
-    
     [computeEncoder dispatchThreadgroups:threadGroups threadsPerThreadgroup: threadGroupCount];
     
     ReleaseEncoder(true);
@@ -654,31 +648,43 @@ void MtlfMetalContext::setCullMode(MTLCullMode _cullMode)
     dirtyRenderState |= DIRTY_METALRENDERSTATE_CULLMODE_WINDINGORDER;
 }
 
-void MtlfMetalContext::SetShadingPrograms(id<MTLFunction> vertexFunction, id<MTLFunction> fragmentFunction,  id<MTLFunction> computeFunction, bool _enableMVA, bool _enableComputeGS)
+void MtlfMetalContext::SetShadingPrograms(id<MTLFunction> vertexFunction, id<MTLFunction> fragmentFunction, bool _enableMVA)
 {
     CheckNewStateGather();
     
+#if CACHE_GSCOMPUTE
+    renderVertexFunction     = vertexFunction;
+    renderFragmentFunction   = fragmentFunction;
+    enableMVA                = _enableMVA;
+    // Assume there is no GS associated with these shaders, they must be linked by calling SetGSPrograms after this
+    renderComputeGSFunction  = nil;
+    enableComputeGS          = false;
+#else
     renderPipelineStateDescriptor.vertexFunction   = vertexFunction;
     renderPipelineStateDescriptor.fragmentFunction = fragmentFunction;
     
-    if (computeFunction) {
-        computePipelineStateDescriptor.computeFunction = computeFunction;
-    }
-    else if (fragmentFunction == nil) {
+    if (fragmentFunction == nil) {
         renderPipelineStateDescriptor.rasterizationEnabled = false;
     }
     else {
         renderPipelineStateDescriptor.rasterizationEnabled = true;
     }
-
-    enableMVA = _enableMVA;
-    enableComputeGS = _enableComputeGS;
+#endif
     
-    if(enableComputeGS && !enableMVA)
-        TF_FATAL_CODING_ERROR("Manual Vertex Assembly must be enabled when using a Compute Geometry Shader!");
-    if(enableComputeGS && (!computeFunction || !vertexFunction))
-        TF_FATAL_CODING_ERROR("Compute and Vertex functions must be set when using a Compute Geometry Shader!");
 }
+
+void MtlfMetalContext::SetGSProgram(id<MTLFunction> computeFunction)
+{
+    if (!computeFunction || !renderVertexFunction) {
+         TF_FATAL_CODING_ERROR("Compute and Vertex functions must be set when using a Compute Geometry Shader!");
+    }
+    if(!enableMVA)
+    {
+        TF_FATAL_CODING_ERROR("Manual Vertex Assembly must be enabled when using a Compute Geometry Shader!");
+    }
+    renderComputeGSFunction = computeFunction;
+    enableComputeGS = true;
+ }
 
 void MtlfMetalContext::SetVertexAttribute(uint32_t index,
                                           int size,
@@ -939,7 +945,7 @@ size_t MtlfMetalContext::HashPipelineDescriptor()
     return hashVal;
 }
 
-void MtlfMetalContext::SetPipelineState()
+void MtlfMetalContext::SetRenderPipelineState()
 {
     MetalWorkQueue *wq = currentWorkQueue;
     
@@ -953,9 +959,21 @@ void MtlfMetalContext::SetPipelineState()
         TF_FATAL_CODING_ERROR("Not valid to call SetPipelineState() without an active render encoder");
     }
     
-    renderPipelineStateDescriptor.label = @"Bake State";
+    renderPipelineStateDescriptor.label = @"SetRenderEncoderState";
     renderPipelineStateDescriptor.sampleCount = 1;
     renderPipelineStateDescriptor.inputPrimitiveTopology = MTLPrimitiveTopologyClassUnspecified;
+    
+#if CACHE_GSCOMPUTE
+    renderPipelineStateDescriptor.vertexFunction   = renderVertexFunction;
+    renderPipelineStateDescriptor.fragmentFunction = renderFragmentFunction;
+    
+    if (renderFragmentFunction == nil) {
+        renderPipelineStateDescriptor.rasterizationEnabled = false;
+    }
+    else {
+        renderPipelineStateDescriptor.rasterizationEnabled = true;
+    }
+#endif
 
 #if METAL_TESSELLATION_SUPPORT
     renderPipelineStateDescriptor.maxTessellationFactor             = 1;
@@ -1046,7 +1064,7 @@ void MtlfMetalContext::SetPipelineState()
         }
 #if METAL_STATE_OPTIMISATION
         renderPipelineStateMap.emplace(wq->currentRenderPipelineDescriptorHash, pipelineState);
-        NSLog(@"Unique pipeline states %lu", renderPipelineStateMap.size());
+        NSLog(@"Unique render pipeline states %lu", renderPipelineStateMap.size());
 #endif
         
     }
@@ -1092,19 +1110,24 @@ void MtlfMetalContext::SetRenderEncoderState()
     MetalWorkQueue *gswq = &workQueues[METALWORKQUEUE_GEOMETRY_SHADER];
     id <MTLComputeCommandEncoder> computeEncoder;
     
+#if CACHE_GSCOMPUTE
+    // Default is all buffers writable
+    unsigned long immutableBufferMask = 0;
+#else
+    id<MTLComputePipelineState> computePipelineState;
+#endif
+    
     // Get a compute encoder on the Geometry Shader work queue
     if(enableComputeGS) {
         computeEncoder = GetComputeEncoder(METALWORKQUEUE_GEOMETRY_SHADER);
     }
     
-    id<MTLComputePipelineState> computePipelineState;
-
     if (wq->currentEncoderType != MTLENCODERTYPE_RENDER || !wq->encoderInUse || !wq->currentRenderEncoder) {
-        TF_FATAL_CODING_ERROR("Not valid to call BakeState() without an active render encoder");
+        TF_FATAL_CODING_ERROR("Not valid to call SetRenderEncoderState() without an active render encoder");
     }
     
     // Create and set a new pipelinestate if required
-    SetPipelineState();
+    SetRenderPipelineState();
     
     if (dirtyRenderState & DIRTY_METALRENDERSTATE_CULLMODE_WINDINGORDER) {
         [wq->currentRenderEncoder setFrontFacingWinding:windingOrder];
@@ -1126,7 +1149,12 @@ void MtlfMetalContext::SetRenderEncoderState()
                 if(buffer->stage == kMSL_ProgramStage_Vertex){
                     if(enableComputeGS) {
                         [computeEncoder setBuffer:buffer->buffer offset:buffer->offset atIndex:buffer->index];
+#if CACHE_GSCOMPUTE
+                        // Remove writable status
+                        immutableBufferMask |= (1 << buffer->index);
+#else
                         computePipelineStateDescriptor.buffers[buffer->index].mutability = MTLMutabilityImmutable;
+#endif
                     }
                     [wq->currentRenderEncoder setVertexBuffer:buffer->buffer offset:buffer->offset atIndex:buffer->index];
                 }
@@ -1136,7 +1164,12 @@ void MtlfMetalContext::SetRenderEncoderState()
                 else{
                     if(enableComputeGS) {
                         [computeEncoder setBuffer:buffer->buffer offset:buffer->offset atIndex:buffer->index];
+#if CACHE_GSCOMPUTE
+                        // Remove writable status
+                        immutableBufferMask |= (1 << buffer->index);
+#else
                         computePipelineStateDescriptor.buffers[buffer->index].mutability = MTLMutabilityImmutable;
+#endif
                     }
                     else
                         TF_FATAL_CODING_ERROR("Compute Geometry Shader should be enabled when modifying Compute buffers!");
@@ -1191,12 +1224,16 @@ void MtlfMetalContext::SetRenderEncoderState()
         dirtyRenderState &= ~DIRTY_METALRENDERSTATE_SAMPLER;
     }
     
-    //MTL_FIXME: We should cache compute pipelines like we cache render pipelines.
     if(enableComputeGS) {
+#if CACHE_GSCOMPUTE
+        SetComputeEncoderState(renderComputeGSFunction, boundBuffers.size(), immutableBufferMask, @"GS Compute phase", METALWORKQUEUE_GEOMETRY_SHADER);
+#else
+        //MTL_FIXME: We should cache compute pipelines like we cache render pipelines.
         NSError *error = NULL;
         MTLAutoreleasedComputePipelineReflection* reflData = 0;
         computePipelineState = [device newComputePipelineStateWithDescriptor:computePipelineStateDescriptor options:MTLPipelineOptionNone reflection:reflData error:&error];
         [computeEncoder setComputePipelineState:computePipelineState];
+#endif
         // Release the geometry shader encoder
         ReleaseEncoder(false, METALWORKQUEUE_GEOMETRY_SHADER);
     }
@@ -1250,9 +1287,13 @@ size_t MtlfMetalContext::HashComputePipelineDescriptor(unsigned int bufferCount)
 }
 
 // Using this function instead of setting the pipeline state directly allows caching
-void MtlfMetalContext::SetComputeEncoderState(id<MTLFunction> computeFunction, unsigned long bufferWritableMask, NSString *label)
+NSUInteger MtlfMetalContext::SetComputeEncoderState(id<MTLFunction>     computeFunction,
+                                                    unsigned int        bufferCount,
+                                                    unsigned long       immutableBufferMask,
+                                                    NSString           *label,
+                                                    MetalWorkQueueType  workQueueType)
 {
-    MetalWorkQueue *wq = currentWorkQueue;
+    MetalWorkQueue *wq = &workQueues[workQueueType];
     
     id<MTLComputePipelineState> computePipelineState;
     
@@ -1269,16 +1310,11 @@ void MtlfMetalContext::SetComputeEncoderState(id<MTLFunction> computeFunction, u
     computePipelineStateDescriptor.label = label;
     
     // Setup buffer mutability
-    unsigned int bufferCount = 0;
-    while (bufferWritableMask) {
-        if (bufferWritableMask & 0x1) {
-            computePipelineStateDescriptor.buffers[bufferCount].mutability = MTLMutabilityMutable;
-        }
-        else {
+    while (immutableBufferMask) {
+        if (immutableBufferMask & 0x1) {
             computePipelineStateDescriptor.buffers[bufferCount].mutability = MTLMutabilityImmutable;
         }
-        bufferCount++;
-        bufferWritableMask >>= 1;
+        immutableBufferMask >>= 1;
     }
     
     // Always call this because currently we're not tracking changes to its state
@@ -1286,7 +1322,7 @@ void MtlfMetalContext::SetComputeEncoderState(id<MTLFunction> computeFunction, u
     
     // If this matches the currently bound pipeline state (assuming one is bound) then carry on using it
     if (wq->currentComputePipelineState != nil && hashVal == wq->currentComputePipelineDescriptorHash) {
-        return;
+        return wq->currentComputeThreadExecutionWidth;
     }
     // Update the hash
     wq->currentComputePipelineDescriptorHash = hashVal;
@@ -1307,7 +1343,7 @@ void MtlfMetalContext::SetComputeEncoderState(id<MTLFunction> computeFunction, u
         computePipelineState = [device newComputePipelineStateWithDescriptor:computePipelineStateDescriptor options:MTLPipelineOptionNone reflection:reflData error:&error];
         if (!computePipelineState) {
             NSLog(@"Failed to create compute pipeline state, error %@", error);
-            return;
+            return 0;
         }
         computePipelineStateMap.emplace(wq->currentComputePipelineDescriptorHash, computePipelineState);
         NSLog(@"Unique compute pipeline states %lu", computePipelineStateMap.size());
@@ -1317,12 +1353,10 @@ void MtlfMetalContext::SetComputeEncoderState(id<MTLFunction> computeFunction, u
     {
         [wq->currentComputeEncoder setComputePipelineState:computePipelineState];
         wq->currentComputePipelineState = computePipelineState;
+        wq->currentComputeThreadExecutionWidth = [wq->currentComputePipelineState threadExecutionWidth];
     }
-}
-
-void MtlfMetalContext::SetComputeBufferMutability(int index, bool isMutable)
-{
-    computePipelineStateDescriptor.buffers[index].mutability = isMutable ? MTLMutabilityMutable : MTLMutabilityImmutable;
+    
+    return wq->currentComputeThreadExecutionWidth;
 }
 
 void MtlfMetalContext::ResetEncoders(MetalWorkQueueType workQueueType)
