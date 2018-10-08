@@ -61,8 +61,11 @@ public:
             Uniform             = 1 << 7,
             UniformBlockMember  = 1 << 8,
             UniformBlock        = 1 << 9,
-            PrimVar             = 1 << 10,
-            PointerType         = 1 << 11,
+            VPrimVar            = 1 << 10,
+            FPrimVar            = 1 << 11,
+            VertexData          = 1 << 12,
+            DrawingCoord        = 1 << 13,
+            PointerType         = 1 << 14,
         };
         static Usage const maskShaderUsage = Usage(EntryFuncArgument - 1);
         

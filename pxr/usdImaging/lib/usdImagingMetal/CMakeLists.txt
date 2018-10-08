@@ -15,6 +15,7 @@ pxr_library(usdImagingMetal
         mtlf
         pxOsd
         sdf
+        sdr
         usd
         usdGeom
         usdShade

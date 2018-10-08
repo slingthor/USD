@@ -46,7 +46,6 @@
 #include "pxr/base/gf/vec4i.h"
 #include "pxr/base/vt/dictionary.h"
 
-#include <boost/noncopyable.hpp>
 #include <boost/unordered_map.hpp>
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -62,8 +61,12 @@ TF_DECLARE_WEAK_PTRS(GarchSimpleLightingContext);
 ///
 /// Interface class for render engines.
 ///
-class UsdImagingMetalEngine : private boost::noncopyable {
+class UsdImagingMetalEngine {
 public:
+    // Disallow copies
+    UsdImagingMetalEngine(const UsdImagingMetalEngine&) = delete;
+    UsdImagingMetalEngine& operator=(const UsdImagingMetalEngine&) = delete;
+
     USDIMAGINGMETAL_API
     UsdImagingMetalEngine();
 

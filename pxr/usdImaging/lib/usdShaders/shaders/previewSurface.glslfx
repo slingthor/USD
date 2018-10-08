@@ -42,16 +42,18 @@
 
 -- glsl Preview.Displacement
 
-#if defined(ARCH_GFX_METAL)
-#define GETVALUE(_val) _val
-#else
-#define GETVALUE(_val) _val.x
+#ifndef GETVALUE
+ #if defined(ARCH_GFX_METAL)
+  #define GETVALUE(_val) _val##_Scalar()
+ #else
+  #define GETVALUE(_val) _val##().x
+ #endif
 #endif
 
 vec4 displacementShader(int index, vec4 Peye, vec3 Neye, vec4 patchCoord)
 {
     // Calculate scalar displacement.
-    float texDisplacement = GETVALUE(HdGet_displacement());
+    float texDisplacement = GETVALUE(HdGet_displacement);
     return Peye + vec4(Neye*texDisplacement, 0);
 }
 
@@ -59,21 +61,21 @@ vec4 displacementShader(int index, vec4 Peye, vec3 Neye, vec4 patchCoord)
 -- glsl Preview.Surface
 
 #if defined(ARCH_GFX_METAL)
-#define GETVALUE(_val) _val
+#define GETVALUE(_val) _val##_Scalar()
 #else
-#define GETVALUE(_val) (_val).x
+#define GETVALUE(_val) _val##().x
 #endif
 
 vec4 surfaceShader(vec4 Peye, vec3 Neye, vec4 color, vec4 patchCoord)
 {
-    vec4 diffColor          = vec4(HdGet_diffuseColor().xyz, GETVALUE(HdGet_opacity()));
-    float roughness         = GETVALUE(HdGet_roughness());
-    float clearcoat         = GETVALUE(HdGet_clearcoat());
-    float clearRoughness    = GETVALUE(HdGet_clearcoatRoughness());
+    vec4 diffColor          = vec4(HdGet_diffuseColor().xyz, GETVALUE(HdGet_opacity));
+    float roughness         = GETVALUE(HdGet_roughness);
+    float clearcoat         = GETVALUE(HdGet_clearcoat);
+    float clearRoughness    = GETVALUE(HdGet_clearcoatRoughness);
     vec3 emissiveColor      = HdGet_emissiveColor().xyz;
-    int useSpecularWorkflow = GETVALUE(HdGet_useSpecularWorkflow());
-    float occlusion         = GETVALUE(HdGet_occlusion());
-    float ior               = GETVALUE(HdGet_ior());
+    int useSpecularWorkflow = GETVALUE(HdGet_useSpecularWorkflow);
+    float occlusion         = GETVALUE(HdGet_occlusion);
+    float ior               = GETVALUE(HdGet_ior);
     vec3 normal             = HdGet_normal().xyz;
 
     // Deal with metallic/specular workflow
@@ -81,7 +83,7 @@ vec4 surfaceShader(vec4 Peye, vec3 Neye, vec4 color, vec4 patchCoord)
     if (useSpecularWorkflow == 1) {
         specInfo = HdGet_specularColor().xyz;
     } else {
-        specInfo.x = GETVALUE(HdGet_metallic());
+        specInfo.x = GETVALUE(HdGet_metallic);
     }
 
     // Selection highlighting.

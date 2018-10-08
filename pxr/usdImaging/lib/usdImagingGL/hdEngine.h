@@ -47,7 +47,7 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 
-TF_DECLARE_WEAK_AND_REF_PTRS(GlfSimpleLightingContext);
+TF_DECLARE_WEAK_AND_REF_PTRS(GarchSimpleLightingContext);
 
 class HdRenderIndex;
 typedef boost::shared_ptr<class UsdImagingGLHdEngine> 
@@ -125,7 +125,7 @@ public:
     virtual void SetSelected(SdfPathVector const& paths) override;
 
     USDIMAGINGGL_API
-    virtual void ClearSelected();
+    virtual void ClearSelected() override;
     USDIMAGINGGL_API
     virtual void AddSelected(SdfPath const &path, int instanceIndex) override;
 

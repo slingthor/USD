@@ -180,7 +180,8 @@ id<MTLDevice> MtlfMetalContext::GetMetalDevice(PREFERRED_GPU_TYPE preferredGPUTy
 MtlfMetalContext::MtlfMetalContext() : enableMVA(false), enableComputeGS(false)
 {
     // Select Intel GPU if possible due to current issues on AMD. Revert when fixed - MTL_FIXME
-	device = MtlfMetalContext::GetMetalDevice(PREFER_INTEGRATED_GPU);
+	//device = MtlfMetalContext::GetMetalDevice(PREFER_INTEGRATED_GPU);
+    device = MtlfMetalContext::GetMetalDevice(PREFER_DEFAULT_GPU);
 
     NSLog(@"Selected %@ for Metal Device", device.name);
     
@@ -189,15 +190,13 @@ MtlfMetalContext::MtlfMetalContext() : enableMVA(false), enableComputeGS(false)
 
     // Reset dependency tracking state
     queueSyncEvent        = [device newEvent];
-    queueSyncEventCounter = 0;
+    queueSyncEventCounter = 1;
     outstandingDependency = METALWORKQUEUE_INVALID;
     
-    // Reset GS state
-    computeGSOutputCurrentIdx    = 0;
-    computeGSOutputCurrentOffset = 0;
-    
     NSOperatingSystemVersion minimumSupportedOSVersion = { .majorVersion = 10, .minorVersion = 14, .patchVersion = 0 };
-    concurrentDispatchSupported = [NSProcessInfo.processInfo isOperatingSystemAtLeastVersion:minimumSupportedOSVersion];
+    
+    // MTL_FIXME - Disabling concurrent dispatch until appropriate fencing is in place
+    concurrentDispatchSupported = false && [NSProcessInfo.processInfo isOperatingSystemAtLeastVersion:minimumSupportedOSVersion];
 
     // Load all the default shader files
     NSError *error = NULL;
@@ -336,7 +335,7 @@ MtlfMetalContext::MtlfMetalContext() : enableMVA(false), enableComputeGS(false)
     drawTarget = NULL;
     
     currentWorkQueueType = METALWORKQUEUE_DEFAULT;
-    currentWorkQueue     = &workQueues[METALWORKQUEUE_DEFAULT];
+    currentWorkQueue     = &workQueues[currentWorkQueueType];
     
     for (int i = 0; i < METALWORKQUEUE_MAX; i ++) {
         ResetEncoders((MetalWorkQueueType)i);
@@ -441,9 +440,11 @@ MtlfMetalContext::IsInitialized()
 void
 MtlfMetalContext::BlitColorTargetToOpenGL()
 {
+    currentWorkQueueType = METALWORKQUEUE_DEFAULT;
+    currentWorkQueue     = &workQueues[currentWorkQueueType];
+    
     glPushAttrib(GL_ENABLE_BIT | GL_POLYGON_BIT | GL_DEPTH_BUFFER_BIT);
     
-    glEnable(GL_DEPTH_TEST);
     glDepthMask(GL_TRUE);
     glFrontFace(GL_CCW);
     glDisable(GL_CULL_FACE);
@@ -583,7 +584,7 @@ void MtlfMetalContext::LabelCommandBuffer(NSString *label, MetalWorkQueueType wo
 }
 
 
-void MtlfMetalContext::SetEventDependency(MetalWorkQueueType workQueueType)
+void MtlfMetalContext::SetEventDependency(MetalWorkQueueType workQueueType, uint32_t eventValue)
 {
     MetalWorkQueue *wq = &workQueues[workQueueType];
     
@@ -602,13 +603,13 @@ void MtlfMetalContext::SetEventDependency(MetalWorkQueueType workQueueType)
         }
     }
     // Make this command buffer wait for the event to be resolved
-    [wq->commandBuffer encodeWaitForEvent:queueSyncEvent value:queueSyncEventCounter];
+    [wq->commandBuffer encodeWaitForEvent:queueSyncEvent value:((eventValue == 0) ? queueSyncEventCounter : eventValue)];
     
     // Record that we have an oustanding dependency on this work queue
     outstandingDependency = workQueueType;
 }
 
-void MtlfMetalContext::GenerateEvent(MetalWorkQueueType workQueueType)
+uint32_t MtlfMetalContext::GenerateEvent(MetalWorkQueueType workQueueType)
 {
     MetalWorkQueue *wq = &workQueues[workQueueType];
     
@@ -630,10 +631,16 @@ void MtlfMetalContext::GenerateEvent(MetalWorkQueueType workQueueType)
     }
     // Generate event
     [wq->commandBuffer encodeSignalEvent:queueSyncEvent value:queueSyncEventCounter];
-    queueSyncEventCounter++;
     
     // Remove the indication of an outstanding event
     outstandingDependency = METALWORKQUEUE_INVALID;
+    
+    return queueSyncEventCounter++;
+}
+
+uint32_t MtlfMetalContext::GetEventCounter()
+{
+    return queueSyncEventCounter;
 }
 
 void MtlfMetalContext::setFrontFaceWinding(MTLWinding _windingOrder)
@@ -737,39 +744,6 @@ void MtlfMetalContext::SetVertexAttribute(uint32_t index,
     
     dirtyRenderState |= DIRTY_METALRENDERSTATE_VERTEX_DESCRIPTOR;
 }
-
-//void MtlfMetalContext::SetDrawArgsBuffer(int indexCount, int startIndex, int baseVertex, int drawArgBufferSlot, bool setupForCompute) {
-//    struct { int _indexCount, _startIndex, _baseVertex; } drawArgs = { indexCount, startIndex, baseVertex };
-//    [renderEncoder setVertexBytes:(const void*)&drawArgs length:sizeof(drawArgs) atIndex:drawArgBufferSlot];
-//    if(setupForCompute) {
-//        [computeEncoder setBytes:(const void*)&drawArgs length:sizeof(drawArgs) atIndex:drawArgBufferSlot];
-//        computePipelineStateDescriptor.buffers[drawArgBufferSlot].mutability = MTLMutabilityImmutable;
-//    }
-//    
-//    //MTL_FIXME: MERGE
-//}
-//
-//void MtlfMetalContext::SetComputeGSOutputBuffers(int indexCount, int perVertStructSize, int perPrimStructSize, int perVertBufferSlot, int perPrimBufferSlot) {
-//    //MTL_FIXME: Would like to prevent re-creating the buffers each draw-call. Would be better to add a cache of old buffers.
-//    //           Would be even better if alternate compute/render is implemented with cut up draws to keep GS output in L2. Re-
-//    //           -use would then be possible with a single constant size buffer (sized to whatever is favorable for L2).
-//    
-//    const int vertDataSize(perVertStructSize * indexCount),
-//              primDataSize(perPrimStructSize * (indexCount / 3));
-//    id<MTLBuffer> vertBuffer = [device newBufferWithLength:vertDataSize options:MTLResourceStorageModePrivate|MTLResourceOptionCPUCacheModeDefault];
-//    id<MTLBuffer> primBuffer = [device newBufferWithLength:primDataSize options:MTLResourceStorageModePrivate|MTLResourceOptionCPUCacheModeDefault];
-//    
-//    [computeEncoder setBuffer:vertBuffer offset:0 atIndex:perVertBufferSlot];
-//    computePipelineStateDescriptor.buffers[perVertBufferSlot].mutability = MTLMutabilityMutable;
-//    [computeEncoder setBuffer:primBuffer offset:0 atIndex:perPrimBufferSlot];
-//    computePipelineStateDescriptor.buffers[perPrimBufferSlot].mutability = MTLMutabilityMutable;
-//    [renderEncoder setVertexBuffer:vertBuffer offset:0 atIndex:perVertBufferSlot];
-//    [renderEncoder setVertexBuffer:primBuffer offset:0 atIndex:perPrimBufferSlot];
-//    [renderEncoder setFragmentBuffer:vertBuffer offset:0 atIndex:perVertBufferSlot];
-//    [renderEncoder setFragmentBuffer:primBuffer offset:0 atIndex:perPrimBufferSlot];
-//    
-//    //MTL_FIXME: MERGE
-//}
 
 // I think this can be removed didn't seem to make too much difference to speeds
 void copyUniform(uint8 *dest, uint8 *src, uint32 size)
@@ -1119,7 +1093,10 @@ void MtlfMetalContext::SetRenderEncoderState()
     
     // Get a compute encoder on the Geometry Shader work queue
     if(enableComputeGS) {
+        MetalWorkQueueType oldWorkQueueType = currentWorkQueueType;
         computeEncoder = GetComputeEncoder(METALWORKQUEUE_GEOMETRY_SHADER);
+        currentWorkQueueType = oldWorkQueueType;
+        currentWorkQueue     = &workQueues[currentWorkQueueType];
     }
     
     if (wq->currentEncoderType != MTLENCODERTYPE_RENDER || !wq->encoderInUse || !wq->currentRenderEncoder) {
@@ -1385,7 +1362,7 @@ void MtlfMetalContext::CommitCommandBuffer(bool waituntilScheduled, bool waitUnt
 {
     MetalWorkQueue *wq = &workQueues[workQueueType];
     
-    //NSLog(@"Comitting command buffer %d %@", (int)workQueueType, wq->commandBuffer.label);
+    //NSLog(@"Committing command buffer %d %@", (int)workQueueType, wq->commandBuffer.label);
     
     if (waituntilScheduled && waitUntilCompleted) {
         TF_FATAL_CODING_ERROR("Just pick one please!");
@@ -1419,10 +1396,10 @@ void MtlfMetalContext::CommitCommandBuffer(bool waituntilScheduled, bool waitUnt
     if (waitUntilCompleted) {
         [wq->commandBuffer waitUntilCompleted];
     }
-    else if (waituntilScheduled) {
+    else if (waituntilScheduled && wq->encoderHasWork) {
         [wq->commandBuffer waitUntilScheduled];
     }
-  
+
     ResetEncoders(workQueueType);
 }
 
@@ -1463,8 +1440,8 @@ void MtlfMetalContext::ReleaseEncoder(bool endEncoding, MetalWorkQueueType workQ
             case MTLENCODERTYPE_RENDER:
             {
                 [wq->currentRenderEncoder endEncoding];
-                computeGSOutputCurrentIdx = computeGSOutputCurrentOffset = 0;
                 wq->currentRenderEncoder      = nil;
+                wq->currentRenderPipelineState = nil;
                 break;
             }
             case MTLENCODERTYPE_COMPUTE:
@@ -1503,7 +1480,7 @@ void MtlfMetalContext::SetCurrentEncoder(MetalEncoderType encoderType, MetalWork
     if (!wq->commandBuffer) {
         NSLog(@"Creating a command buffer on demand, try and avoid this!");
         CreateCommandBuffer(workQueueType);
-        LabelCommandBuffer(@"Default lable - fix!");
+        LabelCommandBuffer(@"Default label - fix!");
         //TF_FATAL_CODING_ERROR("Shouldn't be able to get here without having a command buffer created");
     }
 
@@ -1533,8 +1510,8 @@ void MtlfMetalContext::SetCurrentEncoder(MetalEncoderType encoderType, MetalWork
             wq->currentRenderEncoder = [wq->commandBuffer renderCommandEncoderWithDescriptor: wq->currentRenderPassDescriptor];
             // Since the encoder is new we'll need to emit all the state again
             dirtyRenderState     = DIRTY_METALRENDERSTATE_ALL;
-            computeGSOutputCurrentIdx = computeGSOutputCurrentOffset = 0; //MLT_FIXME_GS
-			break;
+            for(auto buffer : boundBuffers) { buffer->modified = true; }
+            break;
         }
         case MTLENCODERTYPE_COMPUTE: {
 #if __MAC_OS_X_VERSION_MAX_ALLOWED >= 101400 /* __MAC_10_14 */
@@ -1546,6 +1523,9 @@ void MtlfMetalContext::SetCurrentEncoder(MetalEncoderType encoderType, MetalWork
             {
                 wq->currentComputeEncoder = [wq->commandBuffer computeCommandEncoder];
             }
+            
+            dirtyRenderState     = DIRTY_METALRENDERSTATE_ALL;
+            for(auto buffer : boundBuffers) { buffer->modified = true; }
             break;
         }
         case MTLENCODERTYPE_BLIT: {
@@ -1562,6 +1542,9 @@ void MtlfMetalContext::SetCurrentEncoder(MetalEncoderType encoderType, MetalWork
     wq->encoderInUse       = true;
     wq->encoderEnded       = false;
     wq->encoderHasWork     = true;
+    
+    currentWorkQueueType = workQueueType;
+    currentWorkQueue     = &workQueues[currentWorkQueueType];
 }
 
 id<MTLBlitCommandEncoder> MtlfMetalContext::GetBlitEncoder(MetalWorkQueueType workQueueType)

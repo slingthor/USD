@@ -220,12 +220,12 @@ HdStMetalConversions::GetWrap(HdWrap wrap)
         case HdWrapRepeat : return MTLSamplerAddressModeRepeat;
         case HdWrapBlack : return MTLSamplerAddressModeClampToBorderColor;
         case HdWrapMirror : return MTLSamplerAddressModeMirrorRepeat;
-        case HdWrapUseMetadata : return MTLSamplerAddressModeRepeat;
+        case HdWrapUseMetadata : return MTLSamplerAddressModeClampToBorderColor;
         case HdWrapLegacy : return MTLSamplerAddressModeRepeat;
     }
 
     TF_CODING_ERROR("Unexpected HdWrap type %d", wrap);
-    return MTLSamplerAddressModeRepeat;
+    return MTLSamplerAddressModeClampToBorderColor;
 }
 
 void
@@ -310,6 +310,8 @@ TF_DEFINE_PRIVATE_TOKENS(
     (uvec2)
     (uvec3)
     (uvec4)
+                         
+    (packed_2_10_10_10)
 );
 
 TfToken
@@ -319,6 +321,11 @@ HdStMetalConversions::GetGLSLTypename(HdType type)
     case HdTypeInvalid:
     default:
         return TfToken();
+            
+    // Packed types (require special handling in codegen)...
+    case HdTypeInt32_2_10_10_10_REV:
+        return _glTypeNames->packed_2_10_10_10;
+        
     case HdTypeBool:
         return _glTypeNames->_bool;
 
@@ -346,8 +353,6 @@ HdStMetalConversions::GetGLSLTypename(HdType type)
         return _glTypeNames->vec2;
     case HdTypeFloatVec3:
         return _glTypeNames->vec3;
-    case HdTypeInt32_2_10_10_10_REV:
-        // Special case: treat as a vec4.
     case HdTypeFloatVec4:
         return _glTypeNames->vec4;
     case HdTypeFloatMat3:

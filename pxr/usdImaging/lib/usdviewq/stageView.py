@@ -2199,3 +2199,7 @@ class StageView(QtOpenGL.QGLWidget):
         # set highlighted paths to renderer
         self.updateSelection()
         self.update()
+        if sys.platform != "darwin":
+            # MTL_FIXME - This shouldn't be necessary, but a Render call
+            # doesn't appear after a selection change without this
+            self.updateGL()

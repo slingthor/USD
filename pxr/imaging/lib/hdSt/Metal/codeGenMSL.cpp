@@ -134,7 +134,8 @@ TF_DEFINE_PRIVATE_TOKENS(
     ((ptexTextureSampler, "ptexTextureSampler"))
     (isamplerBuffer)
     (samplerBuffer)
-    (packedNormals)
+    (packedSmoothNormals)
+    (packedFlatNormals)
 );
 
 HdSt_CodeGenMSL::TParam::Usage operator|(HdSt_CodeGenMSL::TParam::Usage const &lhs,
@@ -253,16 +254,16 @@ _GetPackedTypeDefinitions()
     // -------------------------------------------------------------------
     // Packed HdType implementation.
     
-    // XXX: this could be improved!
+    "struct packedint1010102 { int x:10, y:10, z:10, w:2; };\n"
+    "#define packed_2_10_10_10 int\n"
     "vec4 hd_vec4_2_10_10_10_get(int v) {\n"
-    "    ivec4 unpacked = ivec4((v & 0x3ff) << 22, (v & 0xffc00) << 12,\n"
-    "                           (v & 0x3ff00000) << 2, (v & 0xc0000000));\n"
-    "    return vec4(unpacked) / 2147483647.0; }\n"
+    "    packedint1010102 pi = *(thread packedint1010102*)&v;\n"
+    "    return vec4(vec3(pi.x, pi.y, pi.z) / 511.0f, pi.w); }\n"
     "int hd_vec4_2_10_10_10_set(vec4 v) {\n"
-    "    return ( (int(v.x * 511.0) & 0x3ff) |\n"
-    "            ((int(v.y * 511.0) & 0x3ff) << 10) |\n"
-    "            ((int(v.z * 511.0) & 0x3ff) << 20) |\n"
-    "            ((int(v.w) & 0x1) << 30)); }\n"
+    "    packedint1010102 pi;\n"
+    "    pi.x = v.x * 511.0; pi.y = v.y * 511.0; pi.z = v.z * 511.0; pi.w = 0;\n"
+    "    return *(thread int*)&pi;\n"
+    "}\n"
     
     "mat4 inverse(mat4 a) { return transpose(a); }  // MTL_FIXME - Required for AlGhadeer scene, need proper implementation of this;\n";
 }
@@ -284,6 +285,24 @@ _GetPackedType(TfToken const &token, bool packedAlignment)
         }
     }
     if (token == _tokens->packed_2_10_10_10) {
+        return _tokens->_int;
+    }
+    return token;
+}
+
+static TfToken const &
+_GetComponentType(TfToken const &token)
+{
+    if (token == _tokens->ivec2|| token == _tokens->ivec3
+        || token == _tokens->ivec4 ) {
+        return _tokens->_int;
+    } else if (token == _tokens->vec2 || token == _tokens->vec3 ||
+               token == _tokens->vec4) {
+        return _tokens->_float;
+    } else if (token == _tokens->dvec2 || token == _tokens->dvec3 ||
+               token == _tokens->dvec4) {
+        return _tokens->_double;
+    } else if (token == _tokens->packed_2_10_10_10) {
         return _tokens->_int;
     }
     return token;
@@ -774,8 +793,14 @@ HdSt_CodeGenMSL::_ParseGLSL(std::stringstream &source, InOutParams& inParams, In
                         // - the block is marked "in" or "out"
                         if(instantiatedStruct)
                         {
-                            if(!isUniform)
-                                _EmitStructMemberOutput(tag.params, name, accessor, type);
+                            if(!isUniform) {
+                                std::string accessor_str = accessor.GetString();
+                                size_t posOpen = accessor_str.find_first_of("[");
+                                size_t posClose = accessor_str.find_first_of("]");
+                                if(posOpen != std::string::npos && posClose != std::string::npos)
+                                    accessor_str.replace(posOpen + 1, posClose - (posOpen+1), "i");
+                                _EmitStructMemberOutput(tag.params, name, TfToken(accessor_str), type).usage |= TParam::Usage::VertexData;
+                            }
                         }
                         else
                         {
@@ -891,7 +916,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
     std::stringstream   copyInputsFrag, copyOutputsFrag;
 
     std::stringstream   vsInputStruct, vsOutputStruct, vsAttributeDefineEnabled, vsAttributeDefineDisabled, vsAttributeDefineUndef,
-                        vsFuncDef, vsMI_FuncDef, vsUnpack1010102Snippet,
+                        vsFuncDef, vsMI_FuncDef,
                         vsMI_EP_FuncDef, vsMI_EP_FuncDefParams, vsMI_EP_CallCode, vsMI_EP_InputCode,
                         vsCode, vsEntryPointCode, vsInputCode, vsOutputCode, vsGsOutputMergeCode,
                         vsUniformStruct, drawArgsStruct;
@@ -905,15 +930,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
     vsAttributeDefineDisabled   << "/****** Vertex Attributes Specifiers are DISABLED ******/\n"
                                 << "#define HD_MTL_VS_ATTRIBUTE(t,n,a) t n\n\n";
     vsAttributeDefineUndef      << "#undef HD_MTL_VS_ATTRIBUTE\n\n";
-    
-    vsUnpack1010102Snippet      << "////////////////////////////////////////////////////////////////////////////////////////////////////////////////////\n"
-                                << "// MSL Helper Code /////////////////////////////////////////////////////////////////////////////////////////////////\n\n"
-                                << "struct packedint { int x:10, y:10, z:10, w:2; };\n"
-                                << "vec4 Unpack10_10_10_2(uint u_packedNormal) {\n"
-                                << "    packedint pi = *(thread packedint*)&u_packedNormal;\n"
-                                << "    return vec4(vec3(pi.x, pi.y, pi.z) / 511.0f, pi.w);\n"
-                                << "}\n";
-    
+
     drawArgsStruct              << "////////////////////////////////////////////////////////////////////////////////////////////////////////////////////\n"
                                 << "// MSL Draw Args Struct ////////////////////////////////////////////////////////////////////////////////////////////\n\n"
                                 << "struct MSLDrawArgs { int indexCount, startIndex, baseVertex, instanceCount; };\n";
@@ -959,7 +976,9 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
         indexBufferSlot = vsNumVertexAttributes;
         //Instead of using BindingType IndexBuffer we use UniformBuffer as that is how we use the indexBuffer in this case.
         mslProgram->AddBinding("indices", indexBufferSlot, kMSL_BindingType_UniformBuffer, kMSL_ProgramStage_Vertex);
-        mslProgram->AddBinding("indices", indexBufferSlot, kMSL_BindingType_UniformBuffer, kMSL_ProgramStage_Compute);
+        
+        if(_buildTarget == kMSL_BuildTarget_MVA_ComputeGS)
+            mslProgram->AddBinding("indices", indexBufferSlot, kMSL_BindingType_UniformBuffer, kMSL_ProgramStage_Compute);
     }
     vsNumVertexAttributes++;
 
@@ -1038,7 +1057,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
             
             std::string name(input.name), dataType(input.dataType);
             bool isVertexAttribute = true;
-            bool usesPackedNormals = (input.name == _tokens->packedNormals);
+            bool usesPackedNormals = (input.name == _tokens->packedSmoothNormals) || (input.name == _tokens->packedFlatNormals);
             
             if (input.usage & HdSt_CodeGenMSL::TParam::Uniform) {
                 //This input param is a uniform
@@ -1138,13 +1157,15 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
                 
                 //We need to replace some of the dataTypes here to account for changes in
                 //packing/alignment/unpacking
-                if(usesPackedNormals) dataType = "uint";
+                if(usesPackedNormals) dataType = _tokens->_int;
                 else if(dataType == "vec2") dataType = "packed_float2";
                 else if(dataType == "vec3") dataType = "packed_float3";
+                else if(dataType == "int2") dataType = "packed_int2";
+                else if(dataType == "int3") dataType = "packed_int3";
                 
                 vsMI_EP_FuncDefParams   << "\n    , device const " << dataType
                                         << " *" << name << "[[buffer(" << vsCurrentVertexAttributeSlot << ")]]";
-                vsMI_EP_InputCode   << ",\n            " << (usesPackedNormals ? "Unpack10_10_10_2(" : "")
+                vsMI_EP_InputCode   << ",\n            " << (usesPackedNormals ? "hd_vec4_2_10_10_10_get(" : "")
                                     << name << "[gl_VertexID]" << (usesPackedNormals ? ")" : "");
                 
                 mslProgram->AddBinding(name, vsCurrentVertexAttributeSlot++, kMSL_BindingType_VertexAttribute, kMSL_ProgramStage_Vertex);
@@ -1203,15 +1224,18 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
 
     int numVerticesPerPrimitive = -1;
 
+    if(_buildTarget == kMSL_BuildTarget_MVA || _buildTarget == kMSL_BuildTarget_MVA_ComputeGS) {
+        numVerticesPerPrimitive = 3;    //MTL_FIXME: Code belows isn't robust enough, need a better way to determine verts per primitive
+//        //Determine geometry type
+//        for(auto key : _geometricShader->GetSourceKeys(HdShaderTokens->geometryShader)) {
+//            if(key == "Mesh.Geometry.Triangle") { numVerticesPerPrimitive = 3; break; }
+//        }
+//        if(numVerticesPerPrimitive == -1)
+//            TF_FATAL_ERROR("Unsupported Primitive Type encountered during Geometry Shader generation!");
+    }
+
     if(_buildTarget == kMSL_BuildTarget_MVA_ComputeGS) {
         int                 gsVertOutStructSize(0), gsPrimOutStructSize(0);
-        
-        //Determine geometry type
-        for(auto key : _geometricShader->GetSourceKeys(HdShaderTokens->geometryShader)) {
-            if(key == "Mesh.Geometry.Triangle") { numVerticesPerPrimitive = 3; break; }
-        }
-        if(numVerticesPerPrimitive == -1)
-            TF_FATAL_ERROR("Unsupported Primitive Type encountered during Geometry Shader generation!");
         
         ////////////////////////////////// Geometry Input ////////////////////////////////
 
@@ -1227,26 +1251,21 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
             std::string name(it->name.GetString()), accessor(it->accessorStr.GetString()),
                         dataType(it->dataType.GetString()), attribute(it->attribute.GetString());
             
-            bool isVertexParam = false;
-            bool isPrimVar = (it->usage & TParam::Usage::PrimVar);
+            bool isVPrimVar = (it->usage & TParam::Usage::VPrimVar);
+            bool isFPrimVar = (it->usage & TParam::Usage::FPrimVar);
+            bool isDrawingCoord = (it->usage & TParam::Usage::DrawingCoord);
+            bool isVertexData = (it->usage & TParam::Usage::VertexData);
+            
             bool prefixScope = (it->usage & TParam::Usage::ProgramScope);
-            if(!(it->usage & TParam::Usage::EntryFuncArgument))    //MTL_FIXME: Can this be done in a more robust way?
-            {   //Check for struct array, there has to be one if this is a vertex param. If there isn't one, likely a primitive input param instead.
-                std::string::size_type  arrayStart(accessor.find_first_of("[")),
-                                        arrayEnd(accessor.find_first_of("]"));
-                if(arrayStart != std::string::npos && arrayEnd != std::string::npos) {
-                    isVertexParam = true;
-                    accessor.replace(arrayStart + 1, arrayEnd - (arrayStart + 1), "i");
-                }
-            }
             
             bool isPtr = false;
             if(name.at(0) == '*') { name = name.substr(1, name.length() - 1); isPtr = true; }
             
-            if(isVertexParam)
+            if(isVPrimVar || isDrawingCoord || isVertexData)
                 gs_VSInputCode << "            scope." << accessor << " = vsOutput." << name << ";\n";
             else {
                 gs_GSInputCode << "        scope." << (accessor.empty() ? name : accessor) << " = ";
+                
                 if(prefixScope && isPtr)
                     gs_GSInputCode << "(const device ProgramScope_Geometry::" << dataType << "*)" << name << ";\n";
                 else
@@ -1255,15 +1274,19 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
                 //If this parameter is already present in the VS we shouldn't include it in our function definition as it will be a duplicate.
                 bool isPresentInVS = false;
                 TF_FOR_ALL(it_vs, _mslVSInputParams) {
+                    std::string vs_name = it_vs->name.GetString();
+                    if(vs_name.at(0) == '*') vs_name = vs_name.substr(1,vs_name.length()-1);
                     //If the name matches but for example type is different we have a problem. We're assuming this doesn't happen. Cumbersome to design around.
-                    if(it_vs->name != it->name)
+                    if(vs_name != name)
                         continue;
                     isPresentInVS = true;
                 }
                 if(!isPresentInVS) {
-                    cs_EP_FuncDef   << "\n    , " << (isPtr ? "const device " : "")
+                    cs_EP_FuncDef   << "\n    , " << (isPtr ? "device const " : "")
                                     << (prefixScope ? "ProgramScope_Geometry::" : "")
-                                    << dataType << (isPtr ? "* " : " ") << name;
+                                    << _GetPackedType(it->dataType, true) << (isPtr ? "* " : " ")
+                                    << name << "[[buffer(" << currentUniformBufferSlot << ")]]";
+                    mslProgram->AddBinding(name, currentUniformBufferSlot++, kMSL_BindingType_UniformBuffer, kMSL_ProgramStage_Compute);
                 }
             }
         }
@@ -1360,7 +1383,6 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
         bool useMI = (_buildTarget != kMSL_BuildTarget_Regular);
         
         vsCode  << drawArgsStruct.str()
-                << vsUnpack1010102Snippet.str()
                 << vsUniformStruct.str();
         
         vsCode  << "////////////////////////////////////////////////////////////////////////////////////////////////////////////////////\n"
@@ -1397,9 +1419,10 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
                                 << "////////////////////////////////////////////////////////////////////////////////////////////////////////////////////\n"
                                 << "// MSL Vertex Entry Point //////////////////////////////////////////////////////////////////////////////////////////\n\n"
                                 << vsMI_EP_FuncDef.str()
+                                << "    uint _baseIndex = _vertexID;\n"
                                 << "    uint gl_InstanceID = _instanceID;\n"
                                 << "    uint gl_BaseVertex = drawArgs->baseVertex;\n"
-                                << "    uint gl_VertexID = indices[drawArgs->startIndex + _vertexID] + gl_BaseVertex;\n"
+                                << "    uint gl_VertexID = indices[drawArgs->startIndex + _baseIndex] + gl_BaseVertex;\n"
                                 << "    uint gl_PrimitiveIDIn = _vertexID / " << numVerticesPerPrimitive << ";\n"
                                 << "    uint _corner = _vertexID % " << numVerticesPerPrimitive << ";\n"
                                 << "\n"
@@ -1607,8 +1630,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
             else {
                 //This parameter is a Vertex output member
                 
-                
-                if(it->usage & HdSt_CodeGenMSL::TParam::PrimVar) {
+                if(it->usage & HdSt_CodeGenMSL::TParam::VPrimVar) {
                     std::string cpy = name;
                     name = accessor;
                     accessor = cpy;
@@ -1619,16 +1641,21 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
                 bool takenFromGS = false;
                 if(_buildTarget == kMSL_BuildTarget_MVA_ComputeGS) {
                     for (auto gsOutput : _mslGSOutputParams) {
-                        if(gsOutput.name != it->name)
+                        std::string gs_name = gsOutput.name.GetString();
+                        
+                        if(gsOutput.usage & TParam::Usage::FPrimVar) gs_name = gs_name.substr(strlen(MTL_PRIMVAR_PREFIX), gs_name.length() - strlen(MTL_PRIMVAR_PREFIX));
+                        else if(gs_name.at(0) == '*') gs_name = gs_name.substr(1, gs_name.length()-1);
+                        
+                        if(gs_name != name)
                             continue;
                         if(gsOutput.attribute.GetString() == "[[flat]]")
                             sourcePrefix << "gsPrimOutBuffer[gl_PrimitiveID].";
                         else {
                             //MTL_TODO: Investigate interpolating gsOutput manually in this cases, would remove this var from the vertexstruct which tends to be large for hydra.
                             std::string interpolation = "CenterPerspective";
-                            sourcePrefix << "Interpolate_" << interpolation << "(gsVertOutBuffer[_provokingVertex + 0]." << name << ", "
-                                                                            <<  "gsVertOutBuffer[_provokingVertex + 1]." << name << ", "
-                                                                            <<  "gsVertOutBuffer[_provokingVertex + 2]." << name << ", _barycentricCoords)";
+                            sourcePrefix << "Interpolate_" << interpolation << "(gsVertOutBuffer[_provokingVertex + 0]." << gsOutput.name << ", "
+                                                                            <<  "gsVertOutBuffer[_provokingVertex + 1]." << gsOutput.name << ", "
+                                                                            <<  "gsVertOutBuffer[_provokingVertex + 2]." << gsOutput.name << ", _barycentricCoords)";
                             if(accessor.empty())
                                 accessor = name;
                             name = "";
@@ -1759,8 +1786,8 @@ HdSt_CodeGenMSL::Compile()
     _hasFS  = (!fragmentShader.empty());
 
     // decide to build shaders that use a compute GS or not
-    //_mslBuildComputeGS = _hasGS;
-    _buildTarget = (_hasGS ? kMSL_BuildTarget_MVA_ComputeGS : kMSL_BuildTarget_Regular);
+    // MTL_TODO: We are using MVA (Manual Vertex Assembly) in all cases currently. This may not be what we want due to performance concerns.
+    _buildTarget = (_hasGS ? kMSL_BuildTarget_MVA_ComputeGS : kMSL_BuildTarget_MVA);
     
     // create MSL program.
     HdStMSLProgramSharedPtr mslProgram(new HdStMSLProgram(HdTokens->drawingShader));
@@ -1832,20 +1859,22 @@ HdSt_CodeGenMSL::Compile()
             << "   vec2 localST = GetPatchCoord(index).xy;\n";
             break;
         }
-            
+
         case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_COARSE_QUADS:
         {
             // quad interpolation
             _procGS  << "void ProcessPrimvars(int index) {\n"
-            << "   vec2 localST = vec2[](vec2(0,0), vec2(1,0), vec2(1,1), vec2(0,1))[index];\n";
+                     << "   vec2 bc_lookup[] = { vec2(0,0), vec2(1,0), vec2(1,1), vec2(0,1) };\n"
+                     << "   vec2 localST = bc_lookup[index];\n";
             break;
         }
-            
+
         case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_COARSE_TRIANGLES:
         {
             // barycentric interpolation
             _procGS  << "void ProcessPrimvars(int index) {\n"
-            << "   vec2 localST = (index == 0) ? vec2(1,0) : ((index == 1) ? vec2(0,1) : vec2(0,0));\n";
+                     << "   vec2 bc_lookup[] = { vec2(0,0), vec2(1,0), vec2(0,1) };\n"
+                     << "   vec2 localST = bc_lookup[index];\n";
             break;
         }
             
@@ -1969,6 +1998,9 @@ HdSt_CodeGenMSL::Compile()
     bool shaderCompiled = true;
     // compile shaders
     // note: _vsSource, _fsSource etc are used for diagnostics (see header)
+    
+    mslProgram->SetBuildTarget(_buildTarget);
+    
     if (_hasVS) {
         _vsSource = vsConfigString.str() + _genDefinitions.str() +
                     _genCommon.str() + _genVS.str() + termination.str() + glueVS.str();
@@ -2927,74 +2959,74 @@ HdSt_CodeGenMSL::_GenerateDrawingCoord()
     bool _mslBuildComputeGS = _buildTarget == kMSL_BuildTarget_MVA_ComputeGS;
     
     _EmitStructMemberOutput(_mslVSOutputParams, tkn_modelCoord,
-        TfToken("vsDrawingCoord.modelCoord"), intType, tkn_flat);
+        TfToken("vsDrawingCoord.modelCoord"), intType, tkn_flat).usage |= HdSt_CodeGenMSL::TParam::DrawingCoord;
     if(_mslBuildComputeGS) {
-        _AddInputParam(_mslGSInputParams, tkn_modelCoord, intType, tkn_flat, HdBinding(HdBinding::UNKNOWN, 0), 0, TfToken("vsDrawingCoord[i].modelCoord"));
-        _AddOutputParam(_mslGSOutputParams, tkn_modelCoord, intType, tkn_flat, TfToken("gsDrawingCoord.modelCoord"));
+        _AddInputParam(_mslGSInputParams, tkn_modelCoord, intType, tkn_flat, HdBinding(HdBinding::UNKNOWN, 0), 0, TfToken("vsDrawingCoord[i].modelCoord")).usage |= HdSt_CodeGenMSL::TParam::DrawingCoord;
+        _AddOutputParam(_mslGSOutputParams, tkn_modelCoord, intType, tkn_flat, TfToken("gsDrawingCoord.modelCoord")).usage |= HdSt_CodeGenMSL::TParam::DrawingCoord;
     }
-    _AddInputParam(_mslPSInputParams, tkn_modelCoord, intType, tkn_flat, HdBinding(HdBinding::UNKNOWN, 0), 0, TfToken("gsDrawingCoord.modelCoord"));
+    _AddInputParam(_mslPSInputParams, tkn_modelCoord, intType, tkn_flat, HdBinding(HdBinding::UNKNOWN, 0), 0, TfToken("gsDrawingCoord.modelCoord")).usage |= HdSt_CodeGenMSL::TParam::DrawingCoord;
 
     _EmitStructMemberOutput(_mslVSOutputParams, tkn_constantCoord,
-        TfToken("vsDrawingCoord.constantCoord"), intType, tkn_flat);
+        TfToken("vsDrawingCoord.constantCoord"), intType, tkn_flat).usage |= HdSt_CodeGenMSL::TParam::DrawingCoord;
     if(_mslBuildComputeGS) {
-        _AddInputParam(_mslGSInputParams, tkn_constantCoord, intType, tkn_flat, HdBinding(HdBinding::UNKNOWN, 0), 0, TfToken("vsDrawingCoord[i].constantCoord"));
-        _AddOutputParam(_mslGSOutputParams, tkn_constantCoord, intType, tkn_flat, TfToken("gsDrawingCoord.constantCoord"));
+        _AddInputParam(_mslGSInputParams, tkn_constantCoord, intType, tkn_flat, HdBinding(HdBinding::UNKNOWN, 0), 0, TfToken("vsDrawingCoord[i].constantCoord")).usage |= HdSt_CodeGenMSL::TParam::DrawingCoord;
+        _AddOutputParam(_mslGSOutputParams, tkn_constantCoord, intType, tkn_flat, TfToken("gsDrawingCoord.constantCoord")).usage |= HdSt_CodeGenMSL::TParam::DrawingCoord;
     }
-    _AddInputParam(_mslPSInputParams, tkn_constantCoord, intType, tkn_flat, HdBinding(HdBinding::UNKNOWN, 0), 0, TfToken("gsDrawingCoord.constantCoord"));
+    _AddInputParam(_mslPSInputParams, tkn_constantCoord, intType, tkn_flat, HdBinding(HdBinding::UNKNOWN, 0), 0, TfToken("gsDrawingCoord.constantCoord")).usage |= HdSt_CodeGenMSL::TParam::DrawingCoord;
     
     _EmitStructMemberOutput(_mslVSOutputParams, tkn_elementCoord,
-        TfToken("vsDrawingCoord.elementCoord"), intType, tkn_flat);
+        TfToken("vsDrawingCoord.elementCoord"), intType, tkn_flat).usage |= HdSt_CodeGenMSL::TParam::DrawingCoord;
     if(_mslBuildComputeGS) {
-        _AddInputParam(_mslGSInputParams, tkn_elementCoord, intType, tkn_flat, HdBinding(HdBinding::UNKNOWN, 0), 0, TfToken("vsDrawingCoord[i].elementCoord"));
-        _AddOutputParam(_mslGSOutputParams, tkn_elementCoord, intType, tkn_flat, TfToken("gsDrawingCoord.elementCoord"));
+        _AddInputParam(_mslGSInputParams, tkn_elementCoord, intType, tkn_flat, HdBinding(HdBinding::UNKNOWN, 0), 0, TfToken("vsDrawingCoord[i].elementCoord")).usage |= HdSt_CodeGenMSL::TParam::DrawingCoord;
+        _AddOutputParam(_mslGSOutputParams, tkn_elementCoord, intType, tkn_flat, TfToken("gsDrawingCoord.elementCoord")).usage |= HdSt_CodeGenMSL::TParam::DrawingCoord;
     }
-    _AddInputParam(_mslPSInputParams, tkn_elementCoord, intType, tkn_flat, HdBinding(HdBinding::UNKNOWN, 0), 0, TfToken("gsDrawingCoord.elementCoord"));
+    _AddInputParam(_mslPSInputParams, tkn_elementCoord, intType, tkn_flat, HdBinding(HdBinding::UNKNOWN, 0), 0, TfToken("gsDrawingCoord.elementCoord")).usage |= HdSt_CodeGenMSL::TParam::DrawingCoord;
     
     _EmitStructMemberOutput(_mslVSOutputParams, tkn_primitiveCoord,
-        TfToken("vsDrawingCoord.primitiveCoord"), intType, tkn_flat);
+        TfToken("vsDrawingCoord.primitiveCoord"), intType, tkn_flat).usage |= HdSt_CodeGenMSL::TParam::DrawingCoord;
     if(_mslBuildComputeGS) {
-        _AddInputParam(_mslGSInputParams, tkn_primitiveCoord, intType, tkn_flat, HdBinding(HdBinding::UNKNOWN, 0), 0, TfToken("vsDrawingCoord[i].primitiveCoord"));
-        _AddOutputParam(_mslGSOutputParams, tkn_primitiveCoord, intType, tkn_flat, TfToken("gsDrawingCoord.primitiveCoord"));
+        _AddInputParam(_mslGSInputParams, tkn_primitiveCoord, intType, tkn_flat, HdBinding(HdBinding::UNKNOWN, 0), 0, TfToken("vsDrawingCoord[i].primitiveCoord")).usage |= HdSt_CodeGenMSL::TParam::DrawingCoord;
+        _AddOutputParam(_mslGSOutputParams, tkn_primitiveCoord, intType, tkn_flat, TfToken("gsDrawingCoord.primitiveCoord")).usage |= HdSt_CodeGenMSL::TParam::DrawingCoord;
     }
-    _AddInputParam(_mslPSInputParams, tkn_primitiveCoord, intType, tkn_flat, HdBinding(HdBinding::UNKNOWN, 0), 0, TfToken("gsDrawingCoord.primitiveCoord"));
+    _AddInputParam(_mslPSInputParams, tkn_primitiveCoord, intType, tkn_flat, HdBinding(HdBinding::UNKNOWN, 0), 0, TfToken("gsDrawingCoord.primitiveCoord")).usage |= HdSt_CodeGenMSL::TParam::DrawingCoord;
     
     _EmitStructMemberOutput(_mslVSOutputParams, tkn_fvarCoord,
-        TfToken("vsDrawingCoord.fvarCoord"), intType, tkn_flat);
+        TfToken("vsDrawingCoord.fvarCoord"), intType, tkn_flat).usage |= HdSt_CodeGenMSL::TParam::DrawingCoord;
     if(_mslBuildComputeGS) {
-        _AddInputParam(_mslGSInputParams, tkn_fvarCoord, intType, tkn_flat, HdBinding(HdBinding::UNKNOWN, 0), 0, TfToken("vsDrawingCoord[i].fvarCoord"));
-        _AddOutputParam(_mslGSOutputParams, tkn_fvarCoord, intType, tkn_flat, TfToken("gsDrawingCoord.fvarCoord"));
+        _AddInputParam(_mslGSInputParams, tkn_fvarCoord, intType, tkn_flat, HdBinding(HdBinding::UNKNOWN, 0), 0, TfToken("vsDrawingCoord[i].fvarCoord")).usage |= HdSt_CodeGenMSL::TParam::DrawingCoord;
+        _AddOutputParam(_mslGSOutputParams, tkn_fvarCoord, intType, tkn_flat, TfToken("gsDrawingCoord.fvarCoord")).usage |= HdSt_CodeGenMSL::TParam::DrawingCoord;
     }
-    _AddInputParam(_mslPSInputParams, tkn_fvarCoord, intType, tkn_flat, HdBinding(HdBinding::UNKNOWN, 0), 0, TfToken("gsDrawingCoord.fvarCoord"));
+    _AddInputParam(_mslPSInputParams, tkn_fvarCoord, intType, tkn_flat, HdBinding(HdBinding::UNKNOWN, 0), 0, TfToken("gsDrawingCoord.fvarCoord")).usage |= HdSt_CodeGenMSL::TParam::DrawingCoord;
     
     _EmitStructMemberOutput(_mslVSOutputParams, tkn_shaderCoord,
-        TfToken("vsDrawingCoord.shaderCoord"), intType, tkn_flat);
+        TfToken("vsDrawingCoord.shaderCoord"), intType, tkn_flat).usage |= HdSt_CodeGenMSL::TParam::DrawingCoord;
     if(_mslBuildComputeGS) {
-        _AddInputParam(_mslGSInputParams, tkn_shaderCoord, intType, tkn_flat, HdBinding(HdBinding::UNKNOWN, 0), 0, TfToken("vsDrawingCoord[i].shaderCoord"));
-        _AddOutputParam(_mslGSOutputParams, tkn_shaderCoord, intType, tkn_flat, TfToken("gsDrawingCoord.shaderCoord"));
+        _AddInputParam(_mslGSInputParams, tkn_shaderCoord, intType, tkn_flat, HdBinding(HdBinding::UNKNOWN, 0), 0, TfToken("vsDrawingCoord[i].shaderCoord")).usage |= HdSt_CodeGenMSL::TParam::DrawingCoord;
+        _AddOutputParam(_mslGSOutputParams, tkn_shaderCoord, intType, tkn_flat, TfToken("gsDrawingCoord.shaderCoord")).usage |= HdSt_CodeGenMSL::TParam::DrawingCoord;
     }
-    _AddInputParam(_mslPSInputParams, tkn_shaderCoord, intType, tkn_flat, HdBinding(HdBinding::UNKNOWN, 0), 0, TfToken("gsDrawingCoord.shaderCoord"));
+    _AddInputParam(_mslPSInputParams, tkn_shaderCoord, intType, tkn_flat, HdBinding(HdBinding::UNKNOWN, 0), 0, TfToken("gsDrawingCoord.shaderCoord")).usage |= HdSt_CodeGenMSL::TParam::DrawingCoord;
     
     for(int i = 0; i <= _metaData.instancerNumLevels; i++)
     {
         TfToken tkn___dc_instanceIndex(TfStringPrintf("__dc_instanceIndex%d", i));
         TfToken tkn_vs_instanceIndex(TfStringPrintf("vsDrawingCoord.instanceIndex[%d]", i));
         TfToken tkn_gs_instanceIndex(TfStringPrintf("gsDrawingCoord.instanceIndex[%d]", i));
-        _EmitStructMemberOutput(_mslVSOutputParams, tkn___dc_instanceIndex, tkn_vs_instanceIndex, intType, tkn_flat);
+        _EmitStructMemberOutput(_mslVSOutputParams, tkn___dc_instanceIndex, tkn_vs_instanceIndex, intType, tkn_flat).usage |= HdSt_CodeGenMSL::TParam::DrawingCoord;
         if(_mslBuildComputeGS) {
-            _AddInputParam(_mslGSInputParams, tkn___dc_instanceIndex, intType, tkn_flat, HdBinding(HdBinding::UNKNOWN, 0), 0, TfToken(TfStringPrintf("vsDrawingCoord[i].instanceIndex[%d]", i)));
-            _AddOutputParam(_mslGSOutputParams, tkn___dc_instanceIndex, intType, tkn_flat, tkn_gs_instanceIndex);
+            _AddInputParam(_mslGSInputParams, tkn___dc_instanceIndex, intType, tkn_flat, HdBinding(HdBinding::UNKNOWN, 0), 0, TfToken(TfStringPrintf("vsDrawingCoord[i].instanceIndex[%d]", i))).usage |= HdSt_CodeGenMSL::TParam::DrawingCoord;
+            _AddOutputParam(_mslGSOutputParams, tkn___dc_instanceIndex, intType, tkn_flat, tkn_gs_instanceIndex).usage |= HdSt_CodeGenMSL::TParam::DrawingCoord;
         }
-        _AddInputParam(_mslPSInputParams, tkn___dc_instanceIndex, intType, tkn_flat, HdBinding(HdBinding::UNKNOWN, 0), 0, tkn_gs_instanceIndex);
+        _AddInputParam(_mslPSInputParams, tkn___dc_instanceIndex, intType, tkn_flat, HdBinding(HdBinding::UNKNOWN, 0), 0, tkn_gs_instanceIndex).usage |= HdSt_CodeGenMSL::TParam::DrawingCoord;
         
         TfToken tkn___dc_instanceCoords(TfStringPrintf("__dc_instanceCoords%d", i));
         TfToken tkn_vs_instanceCoords(TfStringPrintf("vsDrawingCoord.instanceCoords[%d]", i));
         TfToken tkn_gs_instanceCoords(TfStringPrintf("gsDrawingCoord.instanceCoords[%d]", i));
-        _EmitStructMemberOutput(_mslVSOutputParams, tkn___dc_instanceCoords, tkn_vs_instanceCoords, intType, tkn_flat);
+        _EmitStructMemberOutput(_mslVSOutputParams, tkn___dc_instanceCoords, tkn_vs_instanceCoords, intType, tkn_flat).usage |= HdSt_CodeGenMSL::TParam::DrawingCoord;
         if(_mslBuildComputeGS) {
-            _AddInputParam(_mslGSInputParams, tkn___dc_instanceCoords, intType, tkn_flat, HdBinding(HdBinding::UNKNOWN, 0), 0, TfToken(TfStringPrintf("vsDrawingCoord[i].instanceCoords[%d]", i)));
-            _AddOutputParam(_mslGSOutputParams, tkn___dc_instanceCoords, intType, tkn_flat, tkn_gs_instanceCoords);
+            _AddInputParam(_mslGSInputParams, tkn___dc_instanceCoords, intType, tkn_flat, HdBinding(HdBinding::UNKNOWN, 0), 0, TfToken(TfStringPrintf("vsDrawingCoord[i].instanceCoords[%d]", i))).usage |= HdSt_CodeGenMSL::TParam::DrawingCoord;
+            _AddOutputParam(_mslGSOutputParams, tkn___dc_instanceCoords, intType, tkn_flat, tkn_gs_instanceCoords).usage |= HdSt_CodeGenMSL::TParam::DrawingCoord;
         }
-        _AddInputParam(_mslPSInputParams, tkn___dc_instanceCoords, intType, tkn_flat, HdBinding(HdBinding::UNKNOWN, 0), 0, tkn_gs_instanceCoords);
+        _AddInputParam(_mslPSInputParams, tkn___dc_instanceCoords, intType, tkn_flat, HdBinding(HdBinding::UNKNOWN, 0), 0, tkn_gs_instanceCoords).usage |= HdSt_CodeGenMSL::TParam::DrawingCoord;
     }
     
     _genVS << "hd_drawingCoord GetDrawingCoord() { hd_drawingCoord dc; \n"
@@ -3375,8 +3407,10 @@ HdSt_CodeGenMSL::_GenerateElementPrimvar()
     if (_metaData.primitiveParamBinding.binding.IsValid()) {
         const HdSt_ResourceBinder::MetaData::BindingDeclaration& primParamBinding = _metaData.primitiveParamBinding;
         _EmitDeclarationPtr(declarations, primParamBinding);
-        TParam& entry(_AddInputPtrParam(_mslPSInputParams, primParamBinding));
-        entry.usage |= TParam::EntryFuncArgument;
+        TParam& entryPS(_AddInputPtrParam(_mslPSInputParams, primParamBinding));
+        entryPS.usage |= TParam::EntryFuncArgument;
+        TParam& entryGS(_AddInputPtrParam(_mslGSInputParams, primParamBinding));
+        entryGS.usage |= TParam::EntryFuncArgument;
 
         _EmitAccessor(  accessors,
                         primParamBinding.name, primParamBinding.dataType, primParamBinding.binding,
@@ -3567,6 +3601,8 @@ HdSt_CodeGenMSL::_GenerateElementPrimvar()
         
         _EmitDeclarationPtr(declarations, _metaData.edgeIndexBinding);
         _AddInputPtrParam(_mslPSInputParams, _metaData.edgeIndexBinding);
+        TParam& entryGS(_AddInputPtrParam(_mslGSInputParams, _metaData.edgeIndexBinding));
+        entryGS.usage |= TParam::EntryFuncArgument;
         
         _EmitAccessor(accessors, _metaData.edgeIndexBinding.name,
                       _metaData.edgeIndexBinding.dataType, binding,
@@ -3639,6 +3675,8 @@ HdSt_CodeGenMSL::_GenerateElementPrimvar()
             // MTL_FIXME - changing from VS Input params to PS because none of this appaears to be associated with vertex shaders at all... (so possibly nothing to fix)
             _EmitDeclarationPtr(declarations, name, dataType, TfToken(), binding);
             _AddInputPtrParam(_mslPSInputParams, name, dataType, TfToken(), binding);
+            TParam& entryGS(_AddInputPtrParam(_mslGSInputParams, name, dataType, TfToken(), binding));
+            entryGS.usage |= TParam::EntryFuncArgument;
             
             // AggregatedElementID gives us the buffer index post batching, which
             // is what we need for accessing element (uniform) primvar data.
@@ -3735,18 +3773,18 @@ HdSt_CodeGenMSL::_GenerateVertexAndFaceVaryingPrimvar(bool hasGS)
             TfToken vtxOutName_Token(vtxOutName.str());
             
             _AddInputParam(_mslVSInputParams, name, _GetPackedType(dataType, false), TfToken(), binding);
-            _AddOutputParam(_mslVSOutputParams, vtxOutName_Token, dataType, TfToken(), name).usage |= HdSt_CodeGenMSL::TParam::Usage::PrimVar;
+            _AddOutputParam(_mslVSOutputParams, vtxOutName_Token, dataType, TfToken(), name).usage |= HdSt_CodeGenMSL::TParam::Usage::VPrimVar;
             
-            std::string inAccessorGS = "inPrimvars[HD_NUM_PRIMITIVE_VERTS].";
+            std::string inAccessorGS = "inPrimvars[i].";
             inAccessorGS += name.GetString();
             _AddInputParam(_mslGSInputParams, vtxOutName_Token, dataType, TfToken(), HdBinding(HdBinding::UNKNOWN, 0), 0, TfToken(inAccessorGS)).usage
-                |= HdSt_CodeGenMSL::TParam::Usage::PrimVar;
+                |= HdSt_CodeGenMSL::TParam::Usage::VPrimVar;
             std::string outAccessorGS = "outPrimvars.";
             outAccessorGS += name.GetString();
             _AddOutputParam(_mslGSOutputParams, vtxOutName_Token, dataType, TfToken(), TfToken(outAccessorGS)).usage
-                |= HdSt_CodeGenMSL::TParam::Usage::PrimVar;
+                |= HdSt_CodeGenMSL::TParam::Usage::VPrimVar;
             
-            _AddInputParam(_mslPSInputParams, name, dataType, TfToken(), HdBinding(HdBinding::UNKNOWN, 0), 0, vtxOutName_Token).usage |= HdSt_CodeGenMSL::TParam::Usage::PrimVar;
+            _AddInputParam(_mslPSInputParams, name, dataType, TfToken(), HdBinding(HdBinding::UNKNOWN, 0), 0, vtxOutName_Token).usage |= HdSt_CodeGenMSL::TParam::Usage::VPrimVar;
         }
 
         interstageStruct << "  " << dataType << " " << name << ";\n";
@@ -3820,30 +3858,40 @@ HdSt_CodeGenMSL::_GenerateVertexAndFaceVaryingPrimvar(bool hasGS)
         TF_FOR_ALL (it, _metaData.fvarData) {
             HdBinding binding = it->first;
             TfToken const &name = it->second.name;
-            TfToken const &dataType = it->second.dataType;
+            std::string dataType = _GetPackedType(it->second.dataType, false).GetString();
 
-            _EmitDeclaration(fvarDeclarations, name, dataType, TfToken(), binding);
-            _AddInputParam(_mslVSInputParams, name, dataType, TfToken(), binding);
-
-            interstageStruct << "  " << _GetPackedType(dataType, false) << " " << name << ";\n";
-
+            interstageStruct << "  " << dataType << " " << name << ";\n";
+            
             // primvar accessors (only in GS and FS)
             TfToken readStructName(std::string("in") + structName.GetString());
-            _EmitAccessor(accessorsGS, name, dataType, binding, "GetFVarIndex(localIndex)");
-            _EmitStructAccessor(accessorsFS, readStructName, name, dataType,
+            _EmitAccessor(accessorsGS, name, TfToken(dataType), binding, "GetFVarIndex(localIndex)");
+            _EmitStructAccessor(accessorsFS, readStructName, name, TfToken(dataType),
                                 /*arraySize=*/1, false, NULL);
+            
+            //Replace vector data type with their packed variants to save space
+            if(dataType == "vec2")  dataType = "packed_float2";
+            else if(dataType == "vec3")  dataType = "packed_float3";
+            else if(dataType == "vec4")  dataType = "packed_float4";
+            else if(dataType == "int2")  dataType = "packed_int2";
+            else if(dataType == "int3")  dataType = "packed_int3";
+            else if(dataType == "int4")  dataType = "packed_int4";
+            else if(dataType == "uint2")  dataType = "packed_uint2";
+            else if(dataType == "uint3")  dataType = "packed_uint3";
+            else if(dataType == "uint4")  dataType = "packed_uint4";
+            
+            _EmitDeclarationPtr(fvarDeclarations, name, TfToken(dataType), TfToken(), binding);
 
-            // interstage plumbing
-            _procVS << "  outPrimvars." << name
-                    << " = " << name << ";\n";
-            _procTCS << "  outPrimvars[gl_InvocationID]." << name
-                     << " = inPrimvars[gl_InvocationID]." << name << ";\n";
-            // TODO: facevarying tessellation
-            _procTES << "  outPrimvars->" << name
-                     << " = mix(mix(inPrimvars[i3]." << name
-                     << "         , inPrimvars[i2]." << name << ", u),"
-                     << "       mix(inPrimvars[i1]." << name
-                     << "         , inPrimvars[i0]." << name << ", u), v);\n";
+//            // interstage plumbing
+//            _procVS << "  outPrimvars." << name
+//                    << " = " << name << ";\n";
+//            _procTCS << "  outPrimvars[gl_InvocationID]." << name
+//                     << " = inPrimvars[gl_InvocationID]." << name << ";\n";
+//            // TODO: facevarying tessellation
+//            _procTES << "  outPrimvars->" << name
+//                     << " = mix(mix(inPrimvars[i3]." << name
+//                     << "         , inPrimvars[i2]." << name << ", u),"
+//                     << "       mix(inPrimvars[i1]." << name
+//                     << "         , inPrimvars[i0]." << name << ", u), v);\n";
 
 
             switch(_geometricShader->GetPrimitiveType())
@@ -3867,9 +3915,9 @@ HdSt_CodeGenMSL::_GenerateVertexAndFaceVaryingPrimvar(bool hasGS)
                 {
                     // barycentric interpolation within a triangle.
                     _procGS << "   outPrimvars." << name
-                        << "  = HdGet_" << name << "(0) * localST.x "
-                        << "  + HdGet_" << name << "(1) * localST.y "
-                        << "  + HdGet_" << name << "(2) * (1-localST.x-localST.y);\n";
+                        << "  = HdGet_" << name << "(0) * (1-localST.x-localST.y) "
+                        << "  + HdGet_" << name << "(1) * localST.x "
+                        << "  + HdGet_" << name << "(2) * localST.y;\n";
                     break;
                 }
 
@@ -3891,21 +3939,19 @@ HdSt_CodeGenMSL::_GenerateVertexAndFaceVaryingPrimvar(bool hasGS)
             {
                 std::stringstream vtxOutName;
                 vtxOutName << MTL_PRIMVAR_PREFIX << name;
-                //Add primvars to vtxOut struct
+
                 TfToken vtxOutName_Token(vtxOutName.str());
-                _AddOutputParam(_mslVSOutputParams, vtxOutName_Token, dataType, TfToken(), name).usage |= HdSt_CodeGenMSL::TParam::Usage::PrimVar;
-                
-                std::string inAccessorGS = "inPrimvars[HD_NUM_PRIMITIVE_VERTS].";
-                inAccessorGS += name.GetString();
-                _AddInputParam(_mslGSInputParams, vtxOutName_Token, dataType, TfToken(), HdBinding(HdBinding::UNKNOWN, 0), 0, TfToken(inAccessorGS)).usage
-                    |= HdSt_CodeGenMSL::TParam::Usage::PrimVar;
                 std::string outAccessorGS = "outPrimvars.";
                 outAccessorGS += name.GetString();
-                _AddOutputParam(_mslGSOutputParams, vtxOutName_Token, dataType, TfToken(), TfToken(outAccessorGS)).usage
-                    |= HdSt_CodeGenMSL::TParam::Usage::PrimVar;
+                std::string inAccessorPS = "inPrimvars.";
+                inAccessorPS += name.GetString();
                 
-                _AddInputParam(_mslPSInputParams, name, dataType, TfToken(), HdBinding(HdBinding::UNKNOWN, 0), 0, vtxOutName_Token).usage
-                    |= HdSt_CodeGenMSL::TParam::Usage::PrimVar;
+                _AddInputPtrParam(_mslGSInputParams, name, TfToken(dataType), TfToken(), HdBinding(HdBinding::UNKNOWN, 0)).usage |= HdSt_CodeGenMSL::TParam::Usage::FPrimVar;
+                _AddOutputParam(_mslGSOutputParams, vtxOutName_Token, TfToken(dataType), TfToken(), TfToken(outAccessorGS)).usage
+                    |= HdSt_CodeGenMSL::TParam::Usage::FPrimVar;
+                
+                _AddInputParam(_mslPSInputParams, name, TfToken(dataType), TfToken(), HdBinding(HdBinding::UNKNOWN, 0), 0, TfToken(inAccessorPS)).usage
+                    |= HdSt_CodeGenMSL::TParam::Usage::FPrimVar;
             }
         }
     }
@@ -4264,6 +4310,22 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
                     << "\n}\n"
                     ;
             }
+        }
+        
+        // Scalar accessor - to work around GLSL allowing .x to access a float
+        TfToken componentType = _GetComponentType(it->second.dataType);
+        if (componentType == it->second.dataType) {
+            accessors
+                << it->second.dataType
+                << " HdGet_" << it->second.name << "_Scalar() {\n"
+                << "  return HdGet_" << it->second.name << "(); \n"
+                << "}\n";
+        } else {
+            accessors
+                << _GetComponentType(it->second.dataType)
+                << " HdGet_" << it->second.name << "_Scalar() {\n"
+                << "  return HdGet_" << it->second.name << "().x; \n"
+                << "}\n";
         }
     }
     
