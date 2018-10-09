@@ -446,7 +446,9 @@ void HdStMSLProgram::UnbindResources(HdStSurfaceShader* surfaceShader, HdSt_Reso
 }
 
 void HdStMSLProgram::SetProgram(char const* const label) {
+    
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
+    
     context->SetShadingPrograms(_vertexFunction,
                                 _fragmentFunction,
                                 (_buildTarget == kMSL_BuildTarget_MVA || _buildTarget == kMSL_BuildTarget_MVA_ComputeGS));
@@ -455,14 +457,15 @@ void HdStMSLProgram::SetProgram(char const* const label) {
          context->SetGSProgram(_computeGeometryFunction);
     }
     
-    if (_computeFunction) {
-        TF_FATAL_CODING_ERROR("Can't handle compute program here");
-    }
-    
     if (_currentlySet) {
         TF_FATAL_CODING_ERROR("HdStProgram is already set");
     }
     _currentlySet = true;
+    
+    // Ignore a compute program being set as it will be provided directly to SetComputeEncoderState (may revisit later)
+    if (_computeFunction) {
+        return;
+    }
     
     //Create defaults for old-style uniforms
     struct _LoopParameters {

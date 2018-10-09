@@ -566,11 +566,11 @@ void MtlfMetalContext::CreateCommandBuffer(MetalWorkQueueType workQueueType) {
 
     if (wq->commandBuffer == nil) {
         wq->commandBuffer = [context->commandQueue commandBuffer];
-    } else {
+    }
+    // We'll reuse an existing buffer silently if it's empty, otherwise emit warning
+    else if (wq->encoderHasWork) {
         TF_CODING_WARNING("Command buffer already exists");
     }
-    
-    wq->currentRenderPipelineState = nil;
 }
 
 void MtlfMetalContext::LabelCommandBuffer(NSString *label, MetalWorkQueueType workQueueType)
@@ -634,6 +634,8 @@ uint32_t MtlfMetalContext::GenerateEvent(MetalWorkQueueType workQueueType)
     
     // Remove the indication of an outstanding event
     outstandingDependency = METALWORKQUEUE_INVALID;
+    
+    wq->generatesEvent = true;
     
     return queueSyncEventCounter++;
 }
@@ -1345,6 +1347,7 @@ void MtlfMetalContext::ResetEncoders(MetalWorkQueueType workQueueType)
     wq->encoderInUse          = false;
     wq->encoderEnded          = false;
     wq->encoderHasWork        = false;
+    wq->generatesEvent        = false;
     wq->currentEncoderType    = MTLENCODERTYPE_NONE;
     wq->currentBlitEncoder    = nil;
     wq->currentRenderEncoder  = nil;
@@ -1387,9 +1390,17 @@ void MtlfMetalContext::CommitCommandBuffer(bool waituntilScheduled, bool waitUnt
         //NSLog(@"Committing command buffer: %@",  wq->commandBuffer.label);
     }
     else {
-        // Raise a warning if there's no work here, still need to commit command buffer to free it though (check out why this is) MTL_FIXME
-        NSLog(@"No work in this command buffer: %@", wq->commandBuffer.label);
-    }
+        /*
+         There may be cases where we speculatively create a command buffer (geometry shaders) but dont
+         actually use it. In this case we've nothing to commit so we'll return but not destroy the buffer
+         so we don't have the overhead of recreating it every time. If it's required to generate an event
+         we have to kick it regardless
+         */
+        if (!wq->generatesEvent) {
+            NSLog(@"No work in this command buffer: %@", wq->commandBuffer.label);
+            return;
+        }
+     }
     
     [wq->commandBuffer commit];
     

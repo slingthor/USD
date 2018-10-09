@@ -297,6 +297,7 @@ private:
         bool encoderInUse;
         bool encoderEnded;
         bool encoderHasWork;
+        bool generatesEvent;
         
         size_t currentVertexDescriptorHash;
         size_t currentColourAttachmentsHash;
