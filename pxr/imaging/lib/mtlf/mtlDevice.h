@@ -195,13 +195,14 @@ public:
     void SetActiveWorkQueue(MetalWorkQueueType workQueueType) { currentWorkQueue = &workQueues[workQueueType]; currentWorkQueueType = workQueueType;};
     
     MTLF_API
-    void  SetEventDependency(MetalWorkQueueType workQueueType, uint32_t eventValue = 0);
+    void EncodeWaitForEvent(MetalWorkQueueType waitingQueue, MetalWorkQueueType signalQueue, uint64_t eventValue = 0);
+    
+    //Signals the event, increments the event value afterwards.
+    MTLF_API
+    uint64_t EncodeSignalEvent(MetalWorkQueueType signalQueue);
     
     MTLF_API
-    uint32_t GenerateEvent(MetalWorkQueueType workQueueType);
-    
-    MTLF_API
-    uint32_t GetEventCounter();
+    uint64_t GetEventValue(MetalWorkQueueType signalQueue) const { return workQueues[signalQueue].currentEventValue; }
    
     id<MTLDevice> device;
     id<MTLCommandQueue> commandQueue;
@@ -291,6 +292,7 @@ private:
     
     struct MetalWorkQueue {
         id<MTLCommandBuffer>         commandBuffer;
+        id<MTLEvent>                 event;
         
         MetalEncoderType             currentEncoderType;
         id<MTLBlitCommandEncoder>    currentBlitEncoder;
@@ -301,6 +303,7 @@ private:
         bool encoderEnded;
         bool encoderHasWork;
         
+        uint64_t currentEventValue;
         size_t currentVertexDescriptorHash;
         size_t currentColourAttachmentsHash;
         size_t currentRenderPipelineDescriptorHash;

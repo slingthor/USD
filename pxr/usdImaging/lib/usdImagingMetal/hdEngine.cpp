@@ -778,7 +778,7 @@ UsdImagingMetalHdEngine::Render(RenderParams params)
         // Create a command buffer for the geometry shaders and make the default/render queue dependent on it completeing
         context->CreateCommandBuffer(METALWORKQUEUE_GEOMETRY_SHADER);
         context->LabelCommandBuffer(@"HdEngine CommandBuffer GS", METALWORKQUEUE_GEOMETRY_SHADER);
-        context->SetEventDependency(METALWORKQUEUE_DEFAULT);
+        context->EncodeWaitForEvent(METALWORKQUEUE_DEFAULT, METALWORKQUEUE_GEOMETRY_SHADER);
     }
     
     // Set the render pass descriptor to use for the render encoders
@@ -808,7 +808,7 @@ UsdImagingMetalHdEngine::Render(RenderParams params)
     
     if (bGS) {
         // Generate an event to indicate that the GS buffer has completed then commit it
-        context->GenerateEvent(METALWORKQUEUE_GEOMETRY_SHADER);
+        context->EncodeSignalEvent(METALWORKQUEUE_GEOMETRY_SHADER);
         context->CommitCommandBuffer(true, false, METALWORKQUEUE_GEOMETRY_SHADER);
     }
     // Commit the render buffer (will wait for GS to complete if present)

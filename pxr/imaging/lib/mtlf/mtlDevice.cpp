@@ -601,42 +601,29 @@ void MtlfMetalContext::LabelCommandBuffer(NSString *label, MetalWorkQueueType wo
     wq->commandBuffer.label = label;
 }
 
-
-void MtlfMetalContext::SetEventDependency(MetalWorkQueueType workQueueType, uint32_t eventValue)
+void MtlfMetalContext::EncodeWaitForEvent(MetalWorkQueueType waitQueue, MetalWorkQueueType signalQueue, uint64_t eventValue)
 {
-    MetalWorkQueue *wq = &workQueues[workQueueType];
+    MetalWorkQueue *wait_wq = &workQueues[waitQueue];
+    MetalWorkQueue *signal_wq = &workQueues[signalQueue];
     
-    if (outstandingDependency != METALWORKQUEUE_INVALID) {
-        TF_FATAL_CODING_ERROR("Currently only support one outstanding dependency");
-    }
-    
-    if (wq->encoderHasWork) {
-        if (wq->encoderInUse) {
+    if (wait_wq->encoderHasWork) {
+        if (wait_wq->encoderInUse) {
             TF_FATAL_CODING_ERROR("Can't set an event dependency if encoder is still in use");
         }
         // If the last used encoder wasn't ended then we need to end it now
-        if (!wq->encoderEnded) {
-            wq->encoderInUse = true;
-            ReleaseEncoder(true, workQueueType);
+        if (!wait_wq->encoderEnded) {
+            wait_wq->encoderInUse = true;
+            ReleaseEncoder(true, waitQueue);
         }
     }
     // Make this command buffer wait for the event to be resolved
-    [wq->commandBuffer encodeWaitForEvent:queueSyncEvent value:((eventValue == 0) ? queueSyncEventCounter : eventValue)];
-    
-    // Record that we have an oustanding dependency on this work queue
-    outstandingDependency = workQueueType;
+    [wait_wq->commandBuffer encodeWaitForEvent:signal_wq->event value:eventValue];
 }
 
-uint32_t MtlfMetalContext::GenerateEvent(MetalWorkQueueType workQueueType)
+uint64_t MtlfMetalContext::EncodeSignalEvent(MetalWorkQueueType signalQueue)
 {
-    MetalWorkQueue *wq = &workQueues[workQueueType];
-    
-    if (outstandingDependency == METALWORKQUEUE_INVALID) {
-        TF_FATAL_CODING_ERROR("No outstanding dependency to generate event for");
-    }
-    if (outstandingDependency == workQueueType) {
-        TF_FATAL_CODING_ERROR("Cicrular event dependency - can't resolve event on same queue that is waiting for it");
-    }
+    MetalWorkQueue *wq = &workQueues[signalQueue];
+
      if (wq->encoderHasWork) {
         if (wq->encoderInUse) {
             TF_FATAL_CODING_ERROR("Can't generate an event if encoder is still in use");
@@ -644,27 +631,20 @@ uint32_t MtlfMetalContext::GenerateEvent(MetalWorkQueueType workQueueType)
         // If the last used encoder wasn't ended then we need to end it now
         if (!wq->encoderEnded) {
             wq->encoderInUse = true;
-            ReleaseEncoder(true, workQueueType);
+            ReleaseEncoder(true, signalQueue);
         }
     }
+    
     // Generate event
-    [wq->commandBuffer encodeSignalEvent:queueSyncEvent value:queueSyncEventCounter];
+    [wq->commandBuffer encodeSignalEvent:wq->event value:wq->currentEventValue];
     
-    // Remove the indication of an outstanding event
-    outstandingDependency = METALWORKQUEUE_INVALID;
-    
-    return queueSyncEventCounter++;
+    return wq->currentEventValue++;
 }
 
 MTLRenderPassDescriptor* MtlfMetalContext::GetRenderPassDescriptor()
 {
     MetalWorkQueue *wq = &workQueues[METALWORKQUEUE_DEFAULT];
     return (wq == nil) ? nil : wq->currentRenderPassDescriptor;
-}
-
-uint32_t MtlfMetalContext::GetEventCounter()
-{
-    return queueSyncEventCounter;
 }
 
 void MtlfMetalContext::setFrontFaceWinding(MTLWinding _windingOrder)
@@ -1324,7 +1304,11 @@ void MtlfMetalContext::ResetEncoders(MetalWorkQueueType workQueueType)
 {
     MetalWorkQueue *wq = &workQueues[workQueueType];
  
+    [wq->commandBuffer release];
     wq->commandBuffer         = nil;
+    
+    [wq->event release];
+    wq->event                 = nil;
     
     wq->encoderInUse          = false;
     wq->encoderEnded          = false;
@@ -1334,6 +1318,7 @@ void MtlfMetalContext::ResetEncoders(MetalWorkQueueType workQueueType)
     wq->currentRenderEncoder  = nil;
     wq->currentComputeEncoder = nil;
     
+    wq->currentEventValue                    = 1;
     wq->currentVertexDescriptorHash          = 0;
     wq->currentColourAttachmentsHash         = 0;
     wq->currentRenderPipelineDescriptorHash  = 0;

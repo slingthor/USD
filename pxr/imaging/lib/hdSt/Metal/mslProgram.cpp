@@ -540,11 +540,6 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
         firstIndex = (firstIndex / 4) * 6;
         indexBuffer = context->GetQuadIndexBuffer(indexTypeMetal);
     }
-
-    uint32_t eventValue = context->GetEventCounter();
-    //if(doMVAComputeGS)
-    //    context->SetEventDependency(METALWORKQUEUE_DEFAULT, eventValue);
-
     // Possibly move this outside this function as we shouldn't need to get a render encoder every draw call
     id <MTLRenderCommandEncoder>    renderEncoder = context->GetRenderEncoder();
     id <MTLComputeCommandEncoder>   computeEncoder;
@@ -604,7 +599,6 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
     {
         // Release the geometry shader encoder and encode the event
         context->ReleaseEncoder(false, METALWORKQUEUE_GEOMETRY_SHADER);
-        //context->GenerateEvent(METALWORKQUEUE_GEOMETRY_SHADER);
     }
 }
 
