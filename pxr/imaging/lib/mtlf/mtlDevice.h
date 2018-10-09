@@ -205,10 +205,12 @@ public:
    
     id<MTLDevice> device;
     id<MTLCommandQueue> commandQueue;
+    id<MTLCommandQueue> commandQueueGS;
     
     id<MTLTexture> mtlColorTexture;
     id<MTLTexture> mtlDepthTexture;
     
+    bool enableMultiQueue;
     bool enableMVA;
     bool enableComputeGS;
 protected:

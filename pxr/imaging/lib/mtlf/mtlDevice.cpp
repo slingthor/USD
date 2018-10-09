@@ -184,13 +184,17 @@ MtlfMetalContext::MtlfMetalContext() : enableMVA(false), enableComputeGS(false)
 
     NSLog(@"Selected %@ for Metal Device", device.name);
     
+    enableMultiQueue = [device supportsFeatureSet:MTLFeatureSet_macOS_GPUFamily2_v1];
+    
     // Create a new command queue
     commandQueue = [device newCommandQueue];
-
-    // Reset dependency tracking state
-    queueSyncEvent        = [device newEvent];
-    queueSyncEventCounter = 1;
-    outstandingDependency = METALWORKQUEUE_INVALID;
+    if(enableMultiQueue) {
+        NSLog(@"Device %@ supports Metal 2, enabling multi-queue codepath.", device.name);
+        commandQueueGS = [device newCommandQueue];
+    }
+    else {
+        NSLog(@"Device %@ does not support Metal 2, using fallback path, performance may be sub-optimal.", device.name);
+    }
     
     NSOperatingSystemVersion minimumSupportedOSVersion = { .majorVersion = 10, .minorVersion = 14, .patchVersion = 0 };
     
@@ -348,6 +352,10 @@ MtlfMetalContext::MtlfMetalContext() : enableMVA(false), enableComputeGS(false)
 
 MtlfMetalContext::~MtlfMetalContext()
 {
+    [commandQueue release];
+    if(enableMultiQueue)
+        [commandQueue release];
+
     if (glColorTexture) {
         glDeleteTextures(1, &glColorTexture);
     }
@@ -571,7 +579,11 @@ void MtlfMetalContext::CreateCommandBuffer(MetalWorkQueueType workQueueType) {
     //NSLog(@"Creating command buffer %d", (int)workQueueType);
 
     if (wq->commandBuffer == nil) {
-        wq->commandBuffer = [context->commandQueue commandBuffer];
+        if (enableMultiQueue && workQueueType == METALWORKQUEUE_GEOMETRY_SHADER)
+            wq->commandBuffer = [context->commandQueueGS commandBuffer];
+        else
+            wq->commandBuffer = [context->commandQueue commandBuffer];
+        wq->event = [device newEvent];
     } else {
         TF_CODING_WARNING("Command buffer already exists");
     }
