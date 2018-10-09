@@ -126,7 +126,10 @@ public:
     void SetDrawTarget(MtlfDrawTarget *drawTarget);
     
     MTLF_API
-    void SetShadingPrograms(id<MTLFunction> vertexFunction, id<MTLFunction> fragmentFunction,  id<MTLFunction> computeFunction, bool _enableMVA, bool _enableComputeGS);
+    void SetShadingPrograms(id<MTLFunction> vertexFunction, id<MTLFunction> fragmentFunction, bool _enableMVA);
+    
+    MTLF_API
+    void SetGSProgram(id<MTLFunction> computeFunction);
     
     MTLF_API
     void SetVertexAttribute(uint32_t index,
@@ -173,12 +176,13 @@ public:
     void ClearRenderEncoderState();
     
     MTLF_API
-    void SetComputeEncoderState(id<MTLFunction> computeFunction, unsigned long bufferWritableMask, NSString *label);
+    // Returns optimmum thread execution width for this kernel
+    NSUInteger SetComputeEncoderState(id<MTLFunction>     computeFunction,
+                                      unsigned int        bufferCount,
+                                      unsigned long       immutableBufferMask,
+                                      NSString           *label,
+                                      MetalWorkQueueType  workQueueType = METALWORKQUEUE_DEFAULT);
     
-    //Consider using SetComputeEncoderState instead.
-    MTLF_API
-    void SetComputeBufferMutability(int index, bool isMutable);
-
     MTLF_API
     id<MTLBlitCommandEncoder>    GetBlitEncoder(MetalWorkQueueType workQueueType = METALWORKQUEUE_DEFAULT);
 
@@ -255,11 +259,9 @@ private:
     id<MTLTexture> mtlDepthRegularFloatTexture;
     id<MTLComputePipelineState> computePipelineState;
     
-    // Depth copy program state
+    // Depth copy program 
     id <MTLFunction>            computeDepthCopyProgram;
-    id<MTLComputePipelineState> computeDepthCopyPipelineState;
-    NSUInteger                  computeDepthCopyProgramExecutionWidth;
-        
+    
     enum PREFERRED_GPU_TYPE {
         PREFER_DEFAULT_GPU,
         PREFER_INTEGRATED_GPU,
@@ -302,6 +304,7 @@ private:
         bool encoderInUse;
         bool encoderEnded;
         bool encoderHasWork;
+        bool generatesEvent;
         
         uint64_t currentEventValue;
         uint64_t currentHighestWaitValue;
@@ -311,6 +314,7 @@ private:
         size_t currentComputePipelineDescriptorHash;
         id<MTLRenderPipelineState>  currentRenderPipelineState;
         id<MTLComputePipelineState> currentComputePipelineState;
+        NSUInteger                  currentComputeThreadExecutionWidth;
     };
     
     MetalWorkQueue      workQueues[METALWORKQUEUE_MAX];
@@ -322,7 +326,7 @@ private:
     void ResetEncoders(MetalWorkQueueType workQueueType, bool releaseObjects = true);
 
     // Pipeline state functions
-    void SetPipelineState();
+    void SetRenderPipelineState();
     size_t HashVertexDescriptor();
     size_t HashColourAttachments(uint32_t numColourAttachments);
     size_t HashPipelineDescriptor();
@@ -335,6 +339,10 @@ private:
     uint32_t numVertexComponents;
     boost::unordered_map<size_t, id<MTLRenderPipelineState>>  renderPipelineStateMap;
     boost::unordered_map<size_t, id<MTLComputePipelineState>> computePipelineStateMap;
+    id<MTLFunction> renderVertexFunction;
+    id<MTLFunction> renderFragmentFunction;
+    id<MTLFunction> renderComputeGSFunction;
+ 
     
     void UpdateOldStyleUniformBlock(BufferBinding *uniformBuffer, MSL_ProgramStage stage);
     

@@ -156,10 +156,15 @@ HdStGLSLProgram::Link()
         return false;
     }
 
-    // set RETRIEVABLE_HINT to true for getting program binary length.
-    // note: Actually the GL driver may recompile the program dynamically on
-    // some state changes, so the size of program could be inaccurate.
-    glProgramParameteri(_program, GL_PROGRAM_BINARY_RETRIEVABLE_HINT, GL_TRUE);
+    bool dumpShaderBinary = TfDebug::IsEnabled(HD_DUMP_SHADER_BINARY);
+    
+    if (dumpShaderBinary) {
+        // set RETRIEVABLE_HINT to true for getting program binary length.
+        // note: Actually the GL driver may recompile the program dynamically on
+        // some state changes, so the size of program could be inaccurate.
+        glProgramParameteri(_program, GL_PROGRAM_BINARY_RETRIEVABLE_HINT,
+                            GL_TRUE);
+    }
 
     // link
     glLinkProgram(_program);
@@ -187,7 +192,7 @@ HdStGLSLProgram::Link()
     }
 
     // binary dump out
-    if (TfDebug::IsEnabled(HD_DUMP_SHADER_BINARY)) {
+    if (dumpShaderBinary) {
         std::vector<char> bin(size);
         GLsizei len;
         GLenum format;

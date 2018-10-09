@@ -446,17 +446,26 @@ void HdStMSLProgram::UnbindResources(HdStSurfaceShader* surfaceShader, HdSt_Reso
 }
 
 void HdStMSLProgram::SetProgram(char const* const label) {
-    MtlfMetalContext::GetMetalContext()->SetShadingPrograms(
-        _vertexFunction,
-        _fragmentFunction,
-        (_buildTarget == kMSL_BuildTarget_MVA_ComputeGS ? _computeGeometryFunction : _computeFunction),
-        (_buildTarget == kMSL_BuildTarget_MVA || _buildTarget == kMSL_BuildTarget_MVA_ComputeGS),
-        (_buildTarget == kMSL_BuildTarget_MVA_ComputeGS));
+    
+    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
+    
+    context->SetShadingPrograms(_vertexFunction,
+                                _fragmentFunction,
+                                (_buildTarget == kMSL_BuildTarget_MVA || _buildTarget == kMSL_BuildTarget_MVA_ComputeGS));
+    
+    if (_buildTarget == kMSL_BuildTarget_MVA_ComputeGS) {
+         context->SetGSProgram(_computeGeometryFunction);
+    }
     
     if (_currentlySet) {
         TF_FATAL_CODING_ERROR("HdStProgram is already set");
     }
     _currentlySet = true;
+    
+    // Ignore a compute program being set as it will be provided directly to SetComputeEncoderState (may revisit later)
+    if (_computeFunction) {
+        return;
+    }
     
     //Create defaults for old-style uniforms
     struct _LoopParameters {
@@ -466,7 +475,7 @@ void HdStMSLProgram::SetProgram(char const* const label) {
         { TfToken("fsUniforms"), kMSL_ProgramStage_Fragment },
         { TfToken("vsUniforms"), kMSL_ProgramStage_Vertex }
     };
-    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
+    
     for(UInt32 i = 0; i < (sizeof(loopParams) / sizeof(loopParams[0])); i++) {
         auto it_range = _bindingMap.equal_range(loopParams[i].uniformToken.Hash());
         for(auto it = it_range.first; it != it_range.second; ++it) {
@@ -550,6 +559,7 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
         //Setup Draw Args on the render context
         struct { int _indexCount, _startIndex, _baseVertex, _instanceCount; } drawArgs = { indexCount, firstIndex, baseVertex, instanceCount };
         [renderEncoder setVertexBytes:(const void*)&drawArgs length:sizeof(drawArgs) atIndex:_drawArgsSlot];
+        //context->SetDrawArgsBuffer(indexCount, firstIndex, baseVertex, _drawArgsSlot, doMVAComputeGS);
         
         if(doMVAComputeGS) {
             // Get a compute encoder on the Geometry Shader work queue
@@ -557,7 +567,6 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
             
             //Setup Draw Args on the compute context
             [computeEncoder setBytes:(const void*)&drawArgs length:sizeof(drawArgs) atIndex:_drawArgsSlot];
-            context->SetComputeBufferMutability(_drawArgsSlot, false);
             
             //MTL_FIXME: Would like to prevent re-creating the buffers each draw-call. Would be better to add a cache of old buffers.
             //           Would be even better if alternate compute/render is implemented with cut up draws to keep GS output in L2. Re-
@@ -569,9 +578,8 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
             id<MTLBuffer> primBuffer = [device newBufferWithLength:primDataSize options:MTLResourceStorageModePrivate|MTLResourceOptionCPUCacheModeDefault];
             
             [computeEncoder setBuffer:vertBuffer offset:0 atIndex:_gsVertOutBufferSlot];
-            context->SetComputeBufferMutability(_gsVertOutBufferSlot, true);
             [computeEncoder setBuffer:primBuffer offset:0 atIndex:_gsPrimOutBufferSlot];
-            context->SetComputeBufferMutability(_gsPrimOutBufferSlot, true);
+            
             [renderEncoder setVertexBuffer:vertBuffer offset:0 atIndex:_gsVertOutBufferSlot];
             [renderEncoder setVertexBuffer:primBuffer offset:0 atIndex:_gsPrimOutBufferSlot];
             [renderEncoder setFragmentBuffer:vertBuffer offset:0 atIndex:_gsVertOutBufferSlot];
