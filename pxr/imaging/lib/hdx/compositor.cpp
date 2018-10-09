@@ -13,7 +13,7 @@
 //
 // You may obtain a copy of the Apache License at
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+//     http://www.apache.org/licenses/LICENSE-2.0„
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the Apache License with the above modification is
@@ -32,6 +32,8 @@
 #include "pxr/imaging/garch/glslfx.h"
 #include "pxr/base/tf/staticTokens.h"
 
+#include "pxr/imaging/hdSt/GL/glslProgram.h"
+
 PXR_NAMESPACE_OPEN_SCOPE
 
 TF_DEFINE_PRIVATE_TOKENS(
@@ -42,10 +44,19 @@ TF_DEFINE_PRIVATE_TOKENS(
     (fullscreenShader)
 );
 
+namespace {
+    enum {
+        colorIn = 0,
+        depthIn = 1,
+        position = 2,
+        uvIn = 3,
+    };
+}
+
 HdxCompositor::HdxCompositor()
     : _colorTexture(0), _colorSize(0)
     , _depthTexture(0), _depthSize(0)
-    , _compositorProgram()
+    , _compositorProgram(), _vertexBuffer(0)
     , _useDepthProgram(false)
 {
 }
@@ -59,31 +70,76 @@ HdxCompositor::~HdxCompositor()
     if (_depthTexture != 0) {
         glDeleteTextures(1, &_depthTexture);
     }
-    GLF_POST_PENDING_GL_ERRORS();
-
+    if (_vertexBuffer != 0) {
+        glDeleteBuffers(1, &_vertexBuffer);
+    }
     if (_compositorProgram) {
         _compositorProgram.reset();
     }
+    GLF_POST_PENDING_GL_ERRORS();
 }
 
 void
 HdxCompositor::_CreateShaderResources(bool useDepthProgram)
 {
-
     _compositorProgram.reset(HdStProgram::New(_tokens->fullscreenShader));
     GLSLFX glslfx(HdxPackageFullscreenShader());
-    std::string version = "#version 430\n";
     TfToken fsToken = useDepthProgram ? _tokens->compositeFragmentWithDepth
                                       : _tokens->compositeFragmentNoDepth;
     if (!_compositorProgram->CompileShader(GL_VERTEX_SHADER,
-            version + glslfx.GetSource(_tokens->fullscreenVertex)) ||
+            glslfx.GetSource(_tokens->fullscreenVertex)) ||
         !_compositorProgram->CompileShader(GL_FRAGMENT_SHADER,
-            version + glslfx.GetSource(fsToken)) ||
+            glslfx.GetSource(fsToken)) ||
         !_compositorProgram->Link()) {
         TF_CODING_ERROR("Failed to load compositing shader");
         _compositorProgram.reset();
         return;
     }
+    GLuint programId = boost::dynamic_pointer_cast<HdStGLSLProgram>(_compositorProgram)->GetGLProgram();
+    _locations[colorIn]  = glGetUniformLocation(programId, "colorIn");
+    _locations[depthIn]  = glGetUniformLocation(programId, "depthIn");
+    _locations[position] = glGetAttribLocation(programId, "position");
+    _locations[uvIn]     = glGetAttribLocation(programId, "uvIn");
+}
+
+void
+HdxCompositor::_CreateBufferResources()
+{
+    /* For the fullscreen pass, we draw a triangle:
+     *
+     * |\
+     * |_\
+     * | |\
+     * |_|_\
+     *
+     * The vertices are at (-1, 3) [top left]; (-1, -1) [bottom left];
+     * and (3, -1) [bottom right]; UVs are assigned so that the bottom left
+     * is (0,0) and the clipped vertices are 2 on their axis, so that:
+     * x=-1 => s = 0; x = 3 => s = 2, which means x = 1 => s = 1.
+     *
+     * This maps the texture space [0,1]^2 to the clip space XY [-1,1]^2.
+     * The parts of the triangle extending past NDC space are clipped before
+     * rasterization.
+     *
+     * This has the advantage (over rendering a quad) that we don't render
+     * the diagonal twice.
+     *
+     * Note that we're passing in NDC positions, and we don't expect the vertex
+     * shader to transform them.  Also note: the fragment shader can optionally
+     * read depth from a texture, but otherwise the depth is -1, meaning near
+     * plane.
+     */
+    //                                 positions          |   uvs
+    static const float vertices[] = { -1,  3, -1, 1,        0, 2,
+                                      -1, -1, -1, 1,        0, 0,
+                                       3, -1, -1, 1,        2, 0 };
+
+    glGenBuffers(1, &_vertexBuffer);
+    glBindBuffer(GL_ARRAY_BUFFER, _vertexBuffer);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices),
+                 &vertices[0], GL_STATIC_DRAW);
+
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
 void
@@ -180,8 +236,14 @@ HdxCompositor::Draw()
         return;
     }
 
+    // Create draw buffers if they haven't been created yet.
+    if (_vertexBuffer == 0) {
+        _CreateBufferResources();
+    }
+
     bool useDepthProgram = (_depthTexture != 0);
 
+    // Load the shader if it hasn't been loaded, or we're changing modes.
     if (!_compositorProgram || _useDepthProgram != useDepthProgram) {
         _CreateShaderResources(useDepthProgram);
         _useDepthProgram = useDepthProgram;
@@ -191,24 +253,41 @@ HdxCompositor::Draw()
     if (!_compositorProgram) {
         return;
     }
+
+	TF_FATAL_CODING_ERROR("Not Implemented!"); //MTL_FIXME
     
-    TF_FATAL_CODING_ERROR("Not Implemented!"); //MTL_FIXME
-/*
-    GLuint programId = _compositorProgram->GetProgram().GetId();
+	// A note here: HdxCompositor is used for all of our plugins and has to be
+    // robust to poor GL support.  OSX compatibility profile provides a
+    // GL 2.1 API, slightly restricting our choice of API and heavily
+    // restricting our shader syntax.
+
+    _compositorProgram->SetProgram();
 
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, _colorTexture);
-    glProgramUniform1i(programId, 0, 0);
+    glUniform1i(_locations[colorIn], 0);
 
     if (_depthTexture != 0) {
         glActiveTexture(GL_TEXTURE1);
         glBindTexture(GL_TEXTURE_2D, _depthTexture);
-        glProgramUniform1i(programId, 1, 1);
+        glUniform1i(_locations[depthIn], 1);
     }
 
-    glUseProgram(programId);
+    glBindBuffer(GL_ARRAY_BUFFER, _vertexBuffer);
+    glVertexAttribPointer(_locations[position], 4, GL_FLOAT, GL_FALSE,
+            sizeof(float)*6, 0);
+    glEnableVertexAttribArray(_locations[position]);
+    glVertexAttribPointer(_locations[uvIn], 2, GL_FLOAT, GL_FALSE,
+            sizeof(float)*6, reinterpret_cast<void*>(sizeof(float)*4));
+    glEnableVertexAttribArray(_locations[uvIn]);
+
     glDrawArrays(GL_TRIANGLES, 0, 3);
-    glUseProgram(0);
+
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glDisableVertexAttribArray(_locations[position]);
+    glDisableVertexAttribArray(_locations[uvIn]);
+
+    _compositorProgram->UnsetProgram();
 
     if (_depthTexture != 0) {
         glActiveTexture(GL_TEXTURE1);
@@ -219,7 +298,6 @@ HdxCompositor::Draw()
     glBindTexture(GL_TEXTURE_2D, 0);
 
     GLF_POST_PENDING_GL_ERRORS();
- */
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE
