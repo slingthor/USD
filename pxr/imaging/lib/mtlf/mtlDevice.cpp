@@ -617,7 +617,8 @@ void MtlfMetalContext::EncodeWaitForEvent(MetalWorkQueueType waitQueue, MetalWor
         }
     }
     // Make this command buffer wait for the event to be resolved
-    [wait_wq->commandBuffer encodeWaitForEvent:signal_wq->event value:eventValue];
+    signal_wq->currentHighestWaitValue = (eventValue != 0) ? eventValue : signal_wq->currentEventValue;
+    [wait_wq->commandBuffer encodeWaitForEvent:signal_wq->event value:signal_wq->currentHighestWaitValue];
 }
 
 uint64_t MtlfMetalContext::EncodeSignalEvent(MetalWorkQueueType signalQueue)
@@ -1304,10 +1305,10 @@ void MtlfMetalContext::ResetEncoders(MetalWorkQueueType workQueueType, bool rele
 {
     MetalWorkQueue *wq = &workQueues[workQueueType];
  
-    if(releaseObjects && wq->commandBuffer != nil)
-        [wq->commandBuffer release];
     wq->commandBuffer         = nil;
     
+    if(wq->currentHighestWaitValue >= wq->currentEventValue)
+        TF_FATAL_CODING_ERROR("There is a WaitForEvent which is never going to get Signalled!");
     if(releaseObjects && wq->event != nil)
         [wq->event release];
     wq->event                 = nil;
@@ -1321,6 +1322,7 @@ void MtlfMetalContext::ResetEncoders(MetalWorkQueueType workQueueType, bool rele
     wq->currentComputeEncoder = nil;
     
     wq->currentEventValue                    = 1;
+    wq->currentHighestWaitValue              = 0;
     wq->currentVertexDescriptorHash          = 0;
     wq->currentColourAttachmentsHash         = 0;
     wq->currentRenderPipelineDescriptorHash  = 0;

@@ -335,7 +335,7 @@ MtlfDrawTarget::Bind()
     // Create a command buffer for the geometry shaders and make the default/render queue dependent on it completeing
     context->CreateCommandBuffer(METALWORKQUEUE_GEOMETRY_SHADER);
     context->LabelCommandBuffer(@"DrawTarget CommandBuffer GS", METALWORKQUEUE_GEOMETRY_SHADER);
-    context->EncodeWaitForEvent(METALWORKQUEUE_DEFAULT, METALWORKQUEUE_GEOMETRY_SHADER, context->GetEventValue(METALWORKQUEUE_GEOMETRY_SHADER) + 1);
+    context->EncodeWaitForEvent(METALWORKQUEUE_DEFAULT, METALWORKQUEUE_GEOMETRY_SHADER);
 
     context->SetRenderPassDescriptor(_mtlRenderPassDescriptor);
 }

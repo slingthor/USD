@@ -304,6 +304,7 @@ private:
         bool encoderHasWork;
         
         uint64_t currentEventValue;
+        uint64_t currentHighestWaitValue;
         size_t currentVertexDescriptorHash;
         size_t currentColourAttachmentsHash;
         size_t currentRenderPipelineDescriptorHash;
