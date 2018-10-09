@@ -644,6 +644,12 @@ uint32_t MtlfMetalContext::GenerateEvent(MetalWorkQueueType workQueueType)
     return queueSyncEventCounter++;
 }
 
+MTLRenderPassDescriptor* MtlfMetalContext::GetRenderPassDescriptor()
+{
+    MetalWorkQueue *wq = &workQueues[METALWORKQUEUE_DEFAULT];
+    return (wq == nil) ? nil : wq->currentRenderPassDescriptor;
+}
+
 uint32_t MtlfMetalContext::GetEventCounter()
 {
     return queueSyncEventCounter;

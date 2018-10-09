@@ -164,6 +164,9 @@ public:
     void SetRenderPassDescriptor(MTLRenderPassDescriptor *renderPassDescriptor);
     
     MTLF_API
+    MTLRenderPassDescriptor* GetRenderPassDescriptor();
+    
+    MTLF_API
     void SetRenderEncoderState();
 
     MTLF_API
