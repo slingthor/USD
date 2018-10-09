@@ -346,7 +346,7 @@ MtlfMetalContext::MtlfMetalContext() : enableMVA(false), enableComputeGS(false)
     currentWorkQueue     = &workQueues[currentWorkQueueType];
     
     for (int i = 0; i < METALWORKQUEUE_MAX; i ++) {
-        ResetEncoders((MetalWorkQueueType)i);
+        ResetEncoders((MetalWorkQueueType)i, false);
     }
 }
 
@@ -1300,14 +1300,16 @@ void MtlfMetalContext::SetComputeBufferMutability(int index, bool isMutable)
     computePipelineStateDescriptor.buffers[index].mutability = isMutable ? MTLMutabilityMutable : MTLMutabilityImmutable;
 }
 
-void MtlfMetalContext::ResetEncoders(MetalWorkQueueType workQueueType)
+void MtlfMetalContext::ResetEncoders(MetalWorkQueueType workQueueType, bool releaseObjects)
 {
     MetalWorkQueue *wq = &workQueues[workQueueType];
  
-    [wq->commandBuffer release];
+    if(releaseObjects && wq->commandBuffer != nil)
+        [wq->commandBuffer release];
     wq->commandBuffer         = nil;
     
-    [wq->event release];
+    if(releaseObjects && wq->event != nil)
+        [wq->event release];
     wq->event                 = nil;
     
     wq->encoderInUse          = false;

@@ -318,7 +318,7 @@ private:
     
     // Internal encoder functions
     void SetCurrentEncoder(MetalEncoderType encoderType, MetalWorkQueueType workQueueType);
-    void ResetEncoders(MetalWorkQueueType workQueueType);
+    void ResetEncoders(MetalWorkQueueType workQueueType, bool releaseObjects = true);
 
     // Pipeline state functions
     void SetPipelineState();
