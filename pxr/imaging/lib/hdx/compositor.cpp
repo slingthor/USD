@@ -63,7 +63,6 @@ HdxCompositor::HdxCompositor()
 
 HdxCompositor::~HdxCompositor()
 {
-    
     if (_colorTexture != 0) {
         glDeleteTextures(1, &_colorTexture);
     }
@@ -82,6 +81,8 @@ HdxCompositor::~HdxCompositor()
 void
 HdxCompositor::_CreateShaderResources(bool useDepthProgram)
 {
+    TF_FATAL_CODING_ERROR("Not Implemented!"); //MTL_FIXME
+
     _compositorProgram.reset(HdStProgram::New(_tokens->fullscreenShader));
     GLSLFX glslfx(HdxPackageFullscreenShader());
     TfToken fsToken = useDepthProgram ? _tokens->compositeFragmentWithDepth

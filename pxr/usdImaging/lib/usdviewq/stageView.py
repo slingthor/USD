@@ -848,7 +848,7 @@ class StageView(QtOpenGL.QGLWidget):
         # prep HUD regions
         self._hud = HUD()
         self._hud.addGroup("TopLeft",     250, 160)  # subtree
-        self._hud.addGroup("TopRight",    140, 32)   # Hydra: Enabled
+        self._hud.addGroup("TopRight",    180, 32)   # Hydra: Enabled
         self._hud.addGroup("BottomLeft",  250, 160)  # GPU stats
         self._hud.addGroup("BottomRight", 200, 32)   # Camera, Complexity
 

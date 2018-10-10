@@ -46,6 +46,8 @@
 
 #include "pxr/imaging/garch/contextCaps.h"
 #include "pxr/imaging/garch/resourceFactory.h"
+#include "pxr/imaging/garch/textureRegistry.h"
+
 
 #include "pxr/imaging/glf/diagnostic.h"
 #include "pxr/imaging/garch/glslfx.h"
@@ -98,6 +100,14 @@ HdStRenderDelegate::~HdStRenderDelegate()
     // Here we could destroy the resource registry when the last render
     // delegate HdSt is destroyed, however we prefer to keep the resources
     // around to match previous singleton behaviour (for now).
+    
+    // ... and now freeing resources
+    if (_counterResourceRegistry.fetch_sub(1) == 1) {
+        HdPerfLog::GetInstance().RemoveResourceRegistry(_resourceRegistry);
+        _resourceRegistry.reset();
+    }
+    
+    GarchTextureRegistry::GetInstance().GarbageCollectIfNeeded();
 }
 
 const TfTokenVector &

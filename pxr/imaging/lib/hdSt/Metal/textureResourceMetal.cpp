@@ -103,7 +103,7 @@ GarchTextureGPUHandle HdStSimpleTextureResourceMetal::GetTexelsTextureId()
 #ifdef PXR_PTEX_SUPPORT_ENABLED
         TF_FATAL_CODING_ERROR("Not Implemented"); // Make this graphics api abstract
         MtlfPtexTextureRefPtr ptexTexture =
-        TfDynamic_cast<MtlfPtexTextureRefPtr>(_texture);
+            TfDynamic_cast<MtlfPtexTextureRefPtr>(_texture);
         
         if (ptexTexture) {
             return ptexTexture->GetTexelsTextureName();

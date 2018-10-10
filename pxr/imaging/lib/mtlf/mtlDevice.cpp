@@ -177,14 +177,17 @@ id<MTLDevice> MtlfMetalContext::GetMetalDevice(PREFERRED_GPU_TYPE preferredGPUTy
 // MtlfMetalContext
 //
 
-MtlfMetalContext::MtlfMetalContext()
+MtlfMetalContext::MtlfMetalContext(id<MTLDevice> _device)
 : enableMVA(false)
 , enableComputeGS(false)
 {
-    // Select Intel GPU if possible due to current issues on AMD. Revert when fixed - MTL_FIXME
-	//device = MtlfMetalContext::GetMetalDevice(PREFER_INTEGRATED_GPU);
-    device = MtlfMetalContext::GetMetalDevice(PREFER_DEFAULT_GPU);
-
+    if (_device == nil) {
+        // Select Intel GPU if possible due to current issues on AMD. Revert when fixed - MTL_FIXME
+        //device = MtlfMetalContext::GetMetalDevice(PREFER_INTEGRATED_GPU);
+        device = MtlfMetalContext::GetMetalDevice(PREFER_DEFAULT_GPU);
+    }
+    else
+        device = _device;
     NSLog(@"Selected %@ for Metal Device", device.name);
     
     enableMultiQueue = [device supportsFeatureSet:MTLFeatureSet_macOS_GPUFamily2_v1];
@@ -370,7 +373,13 @@ MtlfMetalContext::~MtlfMetalContext()
 
     [commandQueue release];
     if(enableMultiQueue)
-        [commandQueue release];
+        [commandQueueGS release];
+}
+
+void MtlfMetalContext::RecreateInstance(id<MTLDevice> device)
+{
+    context = NULL;
+    context = MtlfMetalContextSharedPtr(new MtlfMetalContext(device));
 }
 
 void MtlfMetalContext::_FreeTransientTextureCacheRefs()
@@ -505,7 +514,7 @@ MtlfMetalContextSharedPtr
 MtlfMetalContext::GetMetalContext()
 {
     if (!context)
-        context = MtlfMetalContextSharedPtr(new MtlfMetalContext());
+        context = MtlfMetalContextSharedPtr(new MtlfMetalContext(nil));
 
     return context;
 }
@@ -514,7 +523,7 @@ bool
 MtlfMetalContext::IsInitialized()
 {
     if (!context)
-        context = MtlfMetalContextSharedPtr(new MtlfMetalContext());
+        context = MtlfMetalContextSharedPtr(new MtlfMetalContext(nil));
 
     return context->device != nil;
 }

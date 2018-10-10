@@ -76,7 +76,7 @@ UsdImagingMetalEngine* _InitEngine(const SdfPath& rootPath,
 {
     if (UsdImagingMetal::IsEnabledHydra()) {
         return new UsdImagingMetalHdEngine(rootPath, excludedPaths,
-                                        invisedPaths, delegateID);
+                                           invisedPaths, delegateID);
     } else {
         return nullptr;
     }

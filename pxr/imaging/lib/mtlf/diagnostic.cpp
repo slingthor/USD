@@ -60,12 +60,12 @@ MtlfPostPendingGLErrors(std::string const & where)
         
         TF_DEBUG(MTLF_DEBUG_ERROR_STACKTRACE).Msg(errorMessage.str() + "\n");
         
-        TF_RUNTIME_ERROR(errorMessage.str());
+//        TF_RUNTIME_ERROR(errorMessage.str());
     }
-    if (foundError) {
+    if (false && foundError) {
         TF_DEBUG(MTLF_DEBUG_ERROR_STACKTRACE).Msg(
-                                                 TfStringPrintf("==== GL Error Stack ====\n%s\n",
-                                                                TfGetStackTrace().c_str()));
+            TfStringPrintf("==== GL Error Stack ====\n%s\n",
+            TfGetStackTrace().c_str()));
     }
 }
 

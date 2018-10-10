@@ -94,6 +94,10 @@ public:
     MTLF_API
     static bool IsInitialized();
     
+    /// Returns a reset instance for the current Metal device.
+    MTLF_API
+    static void RecreateInstance(id<MTLDevice> device);
+
     MTLF_API
     void AllocateAttachments(int width, int height);
     
@@ -222,7 +226,7 @@ public:
     bool enableComputeGS;
 protected:
     MTLF_API
-    MtlfMetalContext();
+    MtlfMetalContext(id<MTLDevice> device);
 
     MTLF_API
     void CheckNewStateGather();

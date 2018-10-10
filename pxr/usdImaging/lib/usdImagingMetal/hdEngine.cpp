@@ -66,6 +66,11 @@ TF_DEFINE_PRIVATE_TOKENS(
     (render)
 );
 
+static std::string _MetalPluginDescriptor(id<MTLDevice> device)
+{
+    return std::string("Metal - ") + [[device name] UTF8String];
+}
+
 UsdImagingMetalHdEngine::UsdImagingMetalHdEngine(
         const SdfPath& rootPath,
         const SdfPathVector& excludedPrimPaths,
@@ -990,18 +995,26 @@ UsdImagingMetalHdEngine::GetRendererPlugins() const
     HfPluginDescVector pluginDescriptors;
     HdxRendererPluginRegistry::GetInstance().GetPluginDescs(&pluginDescriptors);
 
+    NSArray<id<MTLDevice>> *_deviceList = MTLCopyAllDevices();
+    
     TfTokenVector plugins;
-    for(size_t i = 0; i < pluginDescriptors.size(); ++i) {
-        plugins.push_back(pluginDescriptors[i].id);
+    
+    if (pluginDescriptors.size() != 1) {
+        TF_FATAL_CODING_ERROR("There should only be one plugin!");
     }
+
+    for (id<MTLDevice> dev in _deviceList) {
+        plugins.push_back(TfToken(_MetalPluginDescriptor(dev)));
+    }
+
     return plugins;
 }
 
 /* virtual */
 std::string
-UsdImagingMetalHdEngine::GetRendererPluginDesc(TfToken const &id) const
+UsdImagingMetalHdEngine::GetRendererPluginDesc(TfToken const &pluginId) const
 {
-    return "Metal";
+    return pluginId;
 }
 
 /* static */
@@ -1015,15 +1028,35 @@ UsdImagingMetalHdEngine::IsDefaultPluginAvailable()
 
 /* virtual */
 bool
-UsdImagingMetalHdEngine::SetRendererPlugin(TfToken const &id)
+UsdImagingMetalHdEngine::SetRendererPlugin(TfToken const &pluginId)
 {
     HdxRendererPlugin *plugin = nullptr;
-    TfToken actualId = id;
+    TfToken actualId = pluginId;
+    bool forceReload = false;
     
     // Special case: TfToken() selects the first plugin in the list.
     if (actualId.IsEmpty()) {
         actualId = HdxRendererPluginRegistry::GetInstance().
             GetDefaultPluginId();
+    }
+    else {
+        NSArray<id<MTLDevice>> *_deviceList = MTLCopyAllDevices();
+        for (id<MTLDevice> dev in _deviceList) {
+            if (pluginId == _MetalPluginDescriptor(dev))
+            {
+                actualId = HdxRendererPluginRegistry::GetInstance().
+                    GetDefaultPluginId();
+
+                if (dev != MtlfMetalContext::GetMetalContext()->device) {
+                    // Tear it down and bring it back up with the new Metal device
+                    forceReload = true;
+                    
+                    // Recreate the underlying Metal context
+                    MtlfMetalContext::RecreateInstance(dev);
+                }
+                break;
+            }
+        }
     }
     plugin = HdxRendererPluginRegistry::GetInstance().
         GetRendererPlugin(actualId);
@@ -1032,9 +1065,11 @@ UsdImagingMetalHdEngine::SetRendererPlugin(TfToken const &id)
         TF_CODING_ERROR("Couldn't find plugin for id %s", actualId.GetText());
         return false;
     } else if (plugin == _renderPlugin) {
-        // It's a no-op to load the same plugin twice.
-        HdxRendererPluginRegistry::GetInstance().ReleasePlugin(plugin);
-        return true;
+        if (!forceReload) {
+            // It's a no-op to load the same plugin twice.
+            HdxRendererPluginRegistry::GetInstance().ReleasePlugin(plugin);
+            return true;
+        }
     } else if (!plugin->IsSupported()) {
         // Don't do anything if the plugin isn't supported on the running
         // system, just return that we're not able to set it.
