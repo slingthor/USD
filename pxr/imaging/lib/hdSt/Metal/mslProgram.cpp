@@ -553,6 +553,27 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
     id <MTLRenderCommandEncoder>    renderEncoder = context->GetRenderEncoder();
     id <MTLComputeCommandEncoder>   computeEncoder;
     
+    //Encode a dependency on the Geometry Shader queue to ensure the GS data is there.
+    if(doMVAComputeGS) {
+        renderEncoder = nil;
+        context->ReleaseEncoder(true);
+        context->EncodeWaitForQueue(METALWORKQUEUE_DEFAULT, METALWORKQUEUE_GEOMETRY_SHADER);
+        
+        //Patch the drescriptor to prevent clearing attachments we just rendered to.
+        MTLRenderPassDescriptor* rpd = context->GetRenderPassDescriptor();
+        if(rpd.depthAttachment != nil)
+            rpd.depthAttachment.loadAction = MTLLoadActionLoad;
+        if(rpd.stencilAttachment != nil)
+            rpd.stencilAttachment.loadAction = MTLLoadActionLoad;
+        for(int i = 0; i < 8; i++) {
+            if(rpd.colorAttachments[i] != nil)
+                rpd.colorAttachments[i].loadAction = MTLLoadActionLoad;
+        }
+        context->SetRenderPassDescriptor(rpd);
+        
+        renderEncoder = context->GetRenderEncoder();
+    }
+    
     const_cast<HdStMSLProgram*>(this)->BakeState();
     
     if(doMVA) {
@@ -606,6 +627,7 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
     if(doMVAComputeGS)
     {
         // Release the geometry shader encoder and encode the event
+        computeEncoder = nil;
         context->ReleaseEncoder(false, METALWORKQUEUE_GEOMETRY_SHADER);
     }
 }

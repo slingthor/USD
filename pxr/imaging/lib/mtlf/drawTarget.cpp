@@ -335,7 +335,6 @@ MtlfDrawTarget::Bind()
     // Create a command buffer for the geometry shaders and make the default/render queue dependent on it completeing
     context->CreateCommandBuffer(METALWORKQUEUE_GEOMETRY_SHADER);
     context->LabelCommandBuffer(@"DrawTarget CommandBuffer GS", METALWORKQUEUE_GEOMETRY_SHADER);
-    context->EncodeWaitForEvent(METALWORKQUEUE_DEFAULT, METALWORKQUEUE_GEOMETRY_SHADER);
 
     context->SetRenderPassDescriptor(_mtlRenderPassDescriptor);
 }
@@ -371,7 +370,6 @@ MtlfDrawTarget::Unbind()
     context->ReleaseEncoder(true);
     
     // Generate an event to indicate that the GS buffer has completed then commit it
-    context->EncodeSignalEvent(METALWORKQUEUE_GEOMETRY_SHADER);
     context->CommitCommandBuffer(true, false, METALWORKQUEUE_GEOMETRY_SHADER);
     
     context->CommitCommandBuffer(false, false);

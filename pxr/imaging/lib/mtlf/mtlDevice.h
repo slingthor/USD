@@ -201,6 +201,9 @@ public:
     MTLF_API
     void EncodeWaitForEvent(MetalWorkQueueType waitingQueue, MetalWorkQueueType signalQueue, uint64_t eventValue = 0);
     
+    MTLF_API
+    void EncodeWaitForQueue(MetalWorkQueueType waitingQueue, MetalWorkQueueType signalQueue);
+    
     //Signals the event, increments the event value afterwards.
     MTLF_API
     uint64_t EncodeSignalEvent(MetalWorkQueueType signalQueue);
@@ -253,6 +256,8 @@ protected:
     MtlfDrawTarget *drawTarget;
 
 private:
+    const static uint64_t endOfQueueEventValue = 0xFFFFFFFFFFFFFFFF;
+
     id<MTLLibrary>           defaultLibrary;
     id<MTLDepthStencilState> depthState;
     
@@ -304,7 +309,7 @@ private:
         bool encoderInUse;
         bool encoderEnded;
         bool encoderHasWork;
-        bool generatesEvent;
+        bool generatesEndOfQueueEvent;
         
         uint64_t currentEventValue;
         uint64_t currentHighestWaitValue;
@@ -323,7 +328,7 @@ private:
     
     // Internal encoder functions
     void SetCurrentEncoder(MetalEncoderType encoderType, MetalWorkQueueType workQueueType);
-    void ResetEncoders(MetalWorkQueueType workQueueType, bool releaseObjects = true);
+    void ResetEncoders(MetalWorkQueueType workQueueType, bool isInitializing = false);
 
     // Pipeline state functions
     void SetRenderPipelineState();

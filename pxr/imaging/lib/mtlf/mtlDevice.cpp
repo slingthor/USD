@@ -342,7 +342,7 @@ MtlfMetalContext::MtlfMetalContext() : enableMVA(false), enableComputeGS(false)
     currentWorkQueue     = &workQueues[currentWorkQueueType];
     
     for (int i = 0; i < METALWORKQUEUE_MAX; i ++) {
-        ResetEncoders((MetalWorkQueueType)i, false);
+        ResetEncoders((MetalWorkQueueType)i, true);
     }
 }
 
@@ -613,6 +613,14 @@ void MtlfMetalContext::EncodeWaitForEvent(MetalWorkQueueType waitQueue, MetalWor
     // Make this command buffer wait for the event to be resolved
     signal_wq->currentHighestWaitValue = (eventValue != 0) ? eventValue : signal_wq->currentEventValue;
     [wait_wq->commandBuffer encodeWaitForEvent:signal_wq->event value:signal_wq->currentHighestWaitValue];
+}
+
+void MtlfMetalContext::EncodeWaitForQueue(MetalWorkQueueType waitQueue, MetalWorkQueueType signalQueue)
+{
+    MetalWorkQueue *signal_wq = &workQueues[signalQueue];
+    signal_wq->generatesEndOfQueueEvent = true;
+
+    EncodeWaitForEvent(waitQueue, signalQueue, endOfQueueEventValue);
 }
 
 uint64_t MtlfMetalContext::EncodeSignalEvent(MetalWorkQueueType signalQueue)
@@ -1335,26 +1343,28 @@ NSUInteger MtlfMetalContext::SetComputeEncoderState(id<MTLFunction>     computeF
     return wq->currentComputeThreadExecutionWidth;
 }
 
-void MtlfMetalContext::ResetEncoders(MetalWorkQueueType workQueueType, bool releaseObjects)
+void MtlfMetalContext::ResetEncoders(MetalWorkQueueType workQueueType, bool isInitializing)
 {
     MetalWorkQueue *wq = &workQueues[workQueueType];
  
     wq->commandBuffer         = nil;
     
-    if(wq->currentHighestWaitValue >= wq->currentEventValue)
-        TF_FATAL_CODING_ERROR("There is a WaitForEvent which is never going to get Signalled!");
-    if(releaseObjects && wq->event != nil)
-        [wq->event release];
+    if(!isInitializing) {
+        if(wq->currentHighestWaitValue != endOfQueueEventValue && wq->currentHighestWaitValue >= wq->currentEventValue)
+            TF_FATAL_CODING_ERROR("There is a WaitForEvent which is never going to get Signalled!");
+        if(wq->event != nil)
+            [wq->event release];
+    }
     wq->event                 = nil;
     
-    wq->encoderInUse          = false;
-    wq->encoderEnded          = false;
-    wq->encoderHasWork        = false;
-    wq->generatesEvent        = false;
-    wq->currentEncoderType    = MTLENCODERTYPE_NONE;
-    wq->currentBlitEncoder    = nil;
-    wq->currentRenderEncoder  = nil;
-    wq->currentComputeEncoder = nil;
+    wq->encoderInUse             = false;
+    wq->encoderEnded             = false;
+    wq->encoderHasWork           = false;
+    wq->generatesEndOfQueueEvent = false;
+    wq->currentEncoderType       = MTLENCODERTYPE_NONE;
+    wq->currentBlitEncoder       = nil;
+    wq->currentRenderEncoder     = nil;
+    wq->currentComputeEncoder    = nil;
     
     wq->currentEventValue                    = 1;
     wq->currentHighestWaitValue              = 0;
@@ -1401,11 +1411,16 @@ void MtlfMetalContext::CommitCommandBuffer(bool waituntilScheduled, bool waitUnt
          so we don't have the overhead of recreating it every time. If it's required to generate an event
          we have to kick it regardless
          */
-        if (!wq->generatesEvent) {
+        if (!wq->generatesEndOfQueueEvent) {
             NSLog(@"No work in this command buffer: %@", wq->commandBuffer.label);
             return;
         }
      }
+    
+    if(wq->generatesEndOfQueueEvent) {
+        wq->currentEventValue = endOfQueueEventValue;
+        [wq->commandBuffer encodeSignalEvent:wq->event value:wq->currentEventValue];
+    }
     
     [wq->commandBuffer commit];
     
