@@ -206,7 +206,6 @@ public:
    
     id<MTLDevice> device;
     id<MTLCommandQueue> commandQueue;
-    
     id<MTLTexture> mtlColorTexture;
     id<MTLTexture> mtlDepthTexture;
     
@@ -250,7 +249,6 @@ private:
     id<MTLLibrary>           defaultLibrary;
     id<MTLDepthStencilState> depthState;
     
-    id<MTLTexture> mtlDepthRegularFloatTexture;
     id<MTLComputePipelineState> computePipelineState;
     
     // Depth copy program 
@@ -275,14 +273,21 @@ private:
     
     static MtlfMetalContextSharedPtr context;
     
-    CVOpenGLTextureCacheRef cvglTextureCache;
-    CVMetalTextureCacheRef cvmtlTextureCache;
     CVPixelBufferRef pixelBuffer;
     CVPixelBufferRef depthBuffer;
-    
-    uint32_t glShaderProgram;
+    CVOpenGLTextureCacheRef cvglTextureCache;
+    CVMetalTextureCacheRef cvmtlTextureCache;
+    CVOpenGLTextureRef cvglColorTexture;
+    CVOpenGLTextureRef cvglDepthTexture;
+    CVMetalTextureRef cvmtlColorTexture;
+    CVMetalTextureRef cvmtlDepthTexture;
     uint32_t glColorTexture;
     uint32_t glDepthTexture;
+    id<MTLTexture> mtlDepthRegularFloatTexture;
+    
+    void _FreeTransientTextureCacheRefs();
+    
+    uint32_t glShaderProgram;
     uint32_t glVAO;
     uint32_t glVBO;
     

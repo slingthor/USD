@@ -141,11 +141,11 @@ id<MTLDevice> MtlfMetalContext::GetMetalDevice(PREFERRED_GPU_TYPE preferredGPUTy
     // Put the device into the appropriate device list
     for (id<MTLDevice>dev in _deviceList) {
         if (dev.removable)
-        [_eGPUs addObject:dev];
+            [_eGPUs addObject:dev];
         else if (dev.lowPower)
-        [_integratedGPUs addObject:dev];
+            [_integratedGPUs addObject:dev];
         else
-        [_discreteGPUs addObject:dev];
+            [_discreteGPUs addObject:dev];
     }
     
     switch (preferredGPUType) {
@@ -177,11 +177,13 @@ id<MTLDevice> MtlfMetalContext::GetMetalDevice(PREFERRED_GPU_TYPE preferredGPUTy
 // MtlfMetalContext
 //
 
-MtlfMetalContext::MtlfMetalContext() : enableMVA(false), enableComputeGS(false)
+MtlfMetalContext::MtlfMetalContext()
+: enableMVA(false)
+, enableComputeGS(false)
 {
     // Select Intel GPU if possible due to current issues on AMD. Revert when fixed - MTL_FIXME
-	//device = MtlfMetalContext::GetMetalDevice(PREFER_INTEGRATED_GPU);
-    device = MtlfMetalContext::GetMetalDevice(PREFER_DEFAULT_GPU);
+	device = MtlfMetalContext::GetMetalDevice(PREFER_INTEGRATED_GPU);
+    //device = MtlfMetalContext::GetMetalDevice(PREFER_DEFAULT_GPU);
 
     NSLog(@"Selected %@ for Metal Device", device.name);
     
@@ -312,17 +314,17 @@ MtlfMetalContext::MtlfMetalContext() : enableMVA(false), enableComputeGS(false)
 
     cvglTextureCache = nil;
     cvmtlTextureCache = nil;
-
-    CVReturn cvret = CVMetalTextureCacheCreate(kCFAllocatorDefault, nil, device, nil, &cvmtlTextureCache);
-    assert(cvret == kCVReturnSuccess);
-    
-    CGLContextObj glctx = [[NSOpenGLContext currentContext] CGLContextObj];
-    CGLPixelFormatObj glPixelFormat = [[[NSOpenGLContext currentContext] pixelFormat] CGLPixelFormatObj];
-    cvret = CVOpenGLTextureCacheCreate(kCFAllocatorDefault, nil, (__bridge CGLContextObj _Nonnull)(glctx), glPixelFormat, nil, &cvglTextureCache);
-    assert(cvret == kCVReturnSuccess);
-    
+    pixelBuffer = nil;
+    depthBuffer = nil;
+    cvglColorTexture = nil;
+    cvglDepthTexture = nil;
+    cvmtlColorTexture = nil;
+    cvmtlDepthTexture = nil;
     glColorTexture = 0;
     glDepthTexture = 0;
+    mtlColorTexture = nil;
+    mtlDepthTexture = nil;
+    mtlDepthRegularFloatTexture = nil;
     AllocateAttachments(256, 256);
 
     renderPipelineStateDescriptor = nil;
@@ -344,79 +346,153 @@ MtlfMetalContext::MtlfMetalContext() : enableMVA(false), enableComputeGS(false)
 
 MtlfMetalContext::~MtlfMetalContext()
 {
-    if (glColorTexture) {
+    _FreeTransientTextureCacheRefs();
+}
+
+void MtlfMetalContext::_FreeTransientTextureCacheRefs()
+{
+    if (0 && glColorTexture) {
         glDeleteTextures(1, &glColorTexture);
+        glColorTexture = 0;
     }
-    if (glDepthTexture) {
+    if (0 && glDepthTexture) {
         glDeleteTextures(1, &glDepthTexture);
+        glDepthTexture = 0;
+    }
+
+    if (mtlColorTexture) {
+        [mtlColorTexture release];
+        mtlColorTexture = nil;
+    }
+    if (mtlDepthRegularFloatTexture) {
+        [mtlDepthRegularFloatTexture release];
+        mtlDepthRegularFloatTexture = nil;
+    }
+    if (mtlDepthTexture) {
+        [mtlDepthTexture release];
+        mtlDepthTexture = nil;
+    }
+    
+    cvglColorTexture = nil;
+    cvglDepthTexture = nil;
+    cvmtlColorTexture = nil;
+    cvmtlDepthTexture = nil;
+
+    if (pixelBuffer) {
+        CFRelease(pixelBuffer);
+        pixelBuffer = nil;
+    }
+    if (depthBuffer) {
+        CFRelease(depthBuffer);
+        depthBuffer = nil;
+    }
+    
+    if (cvglTextureCache) {
+        CFRelease(cvglTextureCache);
+        cvglTextureCache = nil;
+    }
+    if (cvmtlTextureCache) {
+        CFRelease(cvmtlTextureCache);
+        cvmtlTextureCache = nil;
     }
 }
 
 void MtlfMetalContext::AllocateAttachments(int width, int height)
 {
-    CVOpenGLTextureRef cvglTexture;
-    CVMetalTextureRef cvmtlTexture;
-
     NSDictionary* cvBufferProperties = @{
         (__bridge NSString*)kCVPixelBufferOpenGLCompatibilityKey : @(TRUE),
         (__bridge NSString*)kCVPixelBufferMetalCompatibilityKey : @(TRUE),
     };
 
-    pixelBuffer = nil;
-    depthBuffer = nil;
-    CVPixelBufferCreate(kCFAllocatorDefault, width, height,
+    _FreeTransientTextureCacheRefs();
+    
+    CVReturn cvret;
+
+    //  Create the IOSurface backed pixel buffers to hold the color and depth data in Open
+    CVPixelBufferCreate(kCFAllocatorDefault,
+                        width,
+                        height,
                         kCVPixelFormatType_32BGRA,
                         (__bridge CFDictionaryRef)cvBufferProperties,
                         &pixelBuffer);
     
-    CVPixelBufferCreate(kCFAllocatorDefault, width, height,
+    CVPixelBufferCreate(kCFAllocatorDefault,
+                        width,
+                        height,
                         kCVPixelFormatType_DepthFloat32,
                         (__bridge CFDictionaryRef)cvBufferProperties,
                         &depthBuffer);
     
-    CVReturn cvret = CVOpenGLTextureCacheCreateTextureFromImage(kCFAllocatorDefault, cvglTextureCache,
-                                                                pixelBuffer,
-                                                                nil, &cvglTexture);
+    // Create the texture caches
+    cvret = CVMetalTextureCacheCreate(kCFAllocatorDefault, nil, device, nil, &cvmtlTextureCache);
     assert(cvret == kCVReturnSuccess);
-
-    if (glColorTexture) {
-        glDeleteTextures(1, &glColorTexture);
-    }
-    glColorTexture = CVOpenGLTextureGetName(cvglTexture);
     
-    cvret = CVOpenGLTextureCacheCreateTextureFromImage(kCFAllocatorDefault, cvglTextureCache,
+    CGLContextObj glctx = [[NSOpenGLContext currentContext] CGLContextObj];
+    CGLPixelFormatObj glPixelFormat = [[[NSOpenGLContext currentContext] pixelFormat] CGLPixelFormatObj];
+    cvret = CVOpenGLTextureCacheCreate(kCFAllocatorDefault, nil, (__bridge CGLContextObj _Nonnull)(glctx), glPixelFormat, nil, &cvglTextureCache);
+    assert(cvret == kCVReturnSuccess);
+    
+    // Create the OpenGL texture for the color buffer
+    cvret = CVOpenGLTextureCacheCreateTextureFromImage(kCFAllocatorDefault,
+                                                       cvglTextureCache,
+                                                       pixelBuffer,
+                                                       nil,
+                                                       &cvglColorTexture);
+    assert(cvret == kCVReturnSuccess);
+    glColorTexture = CVOpenGLTextureGetName(cvglColorTexture);
+    
+    // Create the OpenGL texture for the depth buffer
+    cvret = CVOpenGLTextureCacheCreateTextureFromImage(kCFAllocatorDefault,
+                                                       cvglTextureCache,
                                                        depthBuffer,
-                                                       nil, &cvglTexture);
+                                                       nil,
+                                                       &cvglDepthTexture);
     assert(cvret == kCVReturnSuccess);
+    glDepthTexture = CVOpenGLTextureGetName(cvglDepthTexture);
     
-    if (glDepthTexture) {
-        glDeleteTextures(1, &glDepthTexture);
-    }
-    glDepthTexture = CVOpenGLTextureGetName(cvglTexture);
-    
-    cvret = CVMetalTextureCacheCreateTextureFromImage(kCFAllocatorDefault, cvmtlTextureCache,
-                                                      pixelBuffer, nil, MTLPixelFormatBGRA8Unorm,
-                                                      width, height, 0, &cvmtlTexture);
+    // Create the metal texture for the color buffer
+    NSDictionary* metalTextureProperties = @{
+        (__bridge NSString*)kCVMetalTextureCacheMaximumTextureAgeKey : @0,
+    };
+    cvret = CVMetalTextureCacheCreateTextureFromImage(kCFAllocatorDefault,
+                                                      cvmtlTextureCache,
+                                                      pixelBuffer,
+                                                      (__bridge CFDictionaryRef)metalTextureProperties,
+                                                      MTLPixelFormatBGRA8Unorm,
+                                                      width,
+                                                      height,
+                                                      0,
+                                                      &cvmtlColorTexture);
     assert(cvret == kCVReturnSuccess);
+    mtlColorTexture = CVMetalTextureGetTexture(cvmtlColorTexture);
     
-    mtlColorTexture = CVMetalTextureGetTexture(cvmtlTexture);
-    
-    cvret = CVMetalTextureCacheCreateTextureFromImage(kCFAllocatorDefault, cvmtlTextureCache,
-                                                      depthBuffer, nil, MTLPixelFormatR32Float,
-                                                      width, height, 0, &cvmtlTexture);
+    // Create the Metal texture for the depth buffer
+    cvret = CVMetalTextureCacheCreateTextureFromImage(kCFAllocatorDefault,
+                                                      cvmtlTextureCache,
+                                                      depthBuffer,
+                                                      (__bridge CFDictionaryRef)metalTextureProperties,
+                                                      MTLPixelFormatR32Float,
+                                                      width,
+                                                      height,
+                                                      0,
+                                                      &cvmtlDepthTexture);
     assert(cvret == kCVReturnSuccess);
-
-    mtlDepthRegularFloatTexture = CVMetalTextureGetTexture(cvmtlTexture);
+    mtlDepthRegularFloatTexture = CVMetalTextureGetTexture(cvmtlDepthTexture);
     
-    {
-        MTLTextureDescriptor *depthTexDescriptor = [MTLTextureDescriptor
-            texture2DDescriptorWithPixelFormat:MTLPixelFormatDepth32Float
-                                                    width:width height:height
-                                                    mipmapped:false];
-        depthTexDescriptor.usage = MTLTextureUsageRenderTarget|MTLTextureUsageShaderRead;
-        depthTexDescriptor.resourceOptions = MTLResourceCPUCacheModeDefaultCache | MTLResourceStorageModePrivate;
-        mtlDepthTexture = [device newTextureWithDescriptor:depthTexDescriptor];
-    }
+    // Create a Metal texture of type Depth32Float that we can actually use as a depth attachment
+    MTLTextureDescriptor *depthTexDescriptor =
+                            [MTLTextureDescriptor
+                             texture2DDescriptorWithPixelFormat:MTLPixelFormatDepth32Float
+                             width:width
+                             height:height
+                             mipmapped:false];
+    depthTexDescriptor.usage = MTLTextureUsageRenderTarget|MTLTextureUsageShaderRead;
+    depthTexDescriptor.resourceOptions = MTLResourceCPUCacheModeDefaultCache | MTLResourceStorageModePrivate;
+    mtlDepthTexture = [device newTextureWithDescriptor:depthTexDescriptor];
+    
+    // Flush the caches
+    CVOpenGLTextureCacheFlush(cvglTextureCache, 0);
+    CVMetalTextureCacheFlush(cvmtlTextureCache, 0);
 }
 
 MtlfMetalContextSharedPtr
@@ -425,7 +501,7 @@ MtlfMetalContext::GetMetalContext()
     if (!context)
         context = MtlfMetalContextSharedPtr(new MtlfMetalContext());
 
-    return MtlfMetalContextSharedPtr(context);
+    return context;
 }
 
 bool
