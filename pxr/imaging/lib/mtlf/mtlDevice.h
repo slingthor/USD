@@ -167,6 +167,9 @@ public:
     void SetRenderPassDescriptor(MTLRenderPassDescriptor *renderPassDescriptor);
     
     MTLF_API
+    MTLRenderPassDescriptor* GetRenderPassDescriptor();
+    
+    MTLF_API
     void SetRenderEncoderState();
 
     MTLF_API
@@ -196,19 +199,25 @@ public:
     void SetActiveWorkQueue(MetalWorkQueueType workQueueType) { currentWorkQueue = &workQueues[workQueueType]; currentWorkQueueType = workQueueType;};
     
     MTLF_API
-    void  SetEventDependency(MetalWorkQueueType workQueueType, uint32_t eventValue = 0);
+    void EncodeWaitForEvent(MetalWorkQueueType waitingQueue, MetalWorkQueueType signalQueue, uint64_t eventValue = 0);
     
     MTLF_API
-    uint32_t GenerateEvent(MetalWorkQueueType workQueueType);
+    void EncodeWaitForQueue(MetalWorkQueueType waitingQueue, MetalWorkQueueType signalQueue);
+    
+    //Signals the event, increments the event value afterwards.
+    MTLF_API
+    uint64_t EncodeSignalEvent(MetalWorkQueueType signalQueue);
     
     MTLF_API
-    uint32_t GetEventCounter();
+    uint64_t GetEventValue(MetalWorkQueueType signalQueue) const { return workQueues[signalQueue].currentEventValue; }
    
     id<MTLDevice> device;
     id<MTLCommandQueue> commandQueue;
+    id<MTLCommandQueue> commandQueueGS;
     id<MTLTexture> mtlColorTexture;
     id<MTLTexture> mtlDepthTexture;
     
+    bool enableMultiQueue;
     bool enableMVA;
     bool enableComputeGS;
 protected:
@@ -246,6 +255,8 @@ protected:
     MtlfDrawTarget *drawTarget;
 
 private:
+    const static uint64_t endOfQueueEventValue = 0xFFFFFFFFFFFFFFFF;
+
     id<MTLLibrary>           defaultLibrary;
     id<MTLDepthStencilState> depthState;
     
@@ -293,6 +304,7 @@ private:
     
     struct MetalWorkQueue {
         id<MTLCommandBuffer>         commandBuffer;
+        id<MTLEvent>                 event;
         
         MetalEncoderType             currentEncoderType;
         id<MTLBlitCommandEncoder>    currentBlitEncoder;
@@ -302,7 +314,10 @@ private:
         bool encoderInUse;
         bool encoderEnded;
         bool encoderHasWork;
+        bool generatesEndOfQueueEvent;
         
+        uint64_t currentEventValue;
+        uint64_t currentHighestWaitValue;
         size_t currentVertexDescriptorHash;
         size_t currentColourAttachmentsHash;
         size_t currentRenderPipelineDescriptorHash;
@@ -318,7 +333,7 @@ private:
     
     // Internal encoder functions
     void SetCurrentEncoder(MetalEncoderType encoderType, MetalWorkQueueType workQueueType);
-    void ResetEncoders(MetalWorkQueueType workQueueType);
+    void ResetEncoders(MetalWorkQueueType workQueueType, bool isInitializing = false);
 
     // Pipeline state functions
     void SetRenderPipelineState();

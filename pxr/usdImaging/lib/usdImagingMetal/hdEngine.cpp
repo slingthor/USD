@@ -735,15 +735,16 @@ UsdImagingMetalHdEngine::Render(RenderParams params)
     [sharedCaptureManager.defaultCaptureScope beginScope];
 
     if (_mtlRenderPassDescriptor == nil)
-    {
         _mtlRenderPassDescriptor = [[MTLRenderPassDescriptor alloc] init];
-        
+    
+    //Set this state every frame because it may have changed during rendering.
+    {
         // create a color attachment every frame since we have to recreate the texture every frame
         MTLRenderPassColorAttachmentDescriptor *colorAttachment = _mtlRenderPassDescriptor.colorAttachments[0];
 
         // make sure to clear every frame for best performance
         colorAttachment.loadAction = MTLLoadActionClear;
-        
+    
         // store only attachments that will be presented to the screen, as in this case
         colorAttachment.storeAction = MTLStoreActionStore;
 
@@ -751,18 +752,16 @@ UsdImagingMetalHdEngine::Render(RenderParams params)
         depthAttachment.loadAction = MTLLoadActionClear;
         depthAttachment.storeAction = MTLStoreActionStore;
         depthAttachment.clearDepth = 1.0f;
-    }
-
-    GLfloat clearColor[4];
-    glGetFloatv(GL_COLOR_CLEAR_VALUE, clearColor);
-    clearColor[3] = 1.0f;
-
-    MTLRenderPassColorAttachmentDescriptor *colorAttachment = _mtlRenderPassDescriptor.colorAttachments[0];
-    colorAttachment.texture = context->mtlColorTexture;
-    colorAttachment.clearColor = MTLClearColorMake(clearColor[0], clearColor[1], clearColor[2], clearColor[3]);
+        
+        GLfloat clearColor[4];
+        glGetFloatv(GL_COLOR_CLEAR_VALUE, clearColor);
+        clearColor[3] = 1.0f;
     
-    MTLRenderPassDepthAttachmentDescriptor *depthAttachment = _mtlRenderPassDescriptor.depthAttachment;
-    depthAttachment.texture = context->mtlDepthTexture;
+        colorAttachment.texture = context->mtlColorTexture;
+        colorAttachment.clearColor = MTLClearColorMake(clearColor[0], clearColor[1], clearColor[2], clearColor[3]);
+        
+        depthAttachment.texture = context->mtlDepthTexture;
+    }
 
     if (params.applyRenderState) {
         glDisable(GL_BLEND);
@@ -779,7 +778,6 @@ UsdImagingMetalHdEngine::Render(RenderParams params)
         // Create a command buffer for the geometry shaders and make the default/render queue dependent on it completeing
         context->CreateCommandBuffer(METALWORKQUEUE_GEOMETRY_SHADER);
         context->LabelCommandBuffer(@"HdEngine CommandBuffer GS", METALWORKQUEUE_GEOMETRY_SHADER);
-        context->SetEventDependency(METALWORKQUEUE_DEFAULT);
     }
     
     // Set the render pass descriptor to use for the render encoders
@@ -809,7 +807,6 @@ UsdImagingMetalHdEngine::Render(RenderParams params)
     
     if (bGS) {
         // Generate an event to indicate that the GS buffer has completed then commit it
-        context->GenerateEvent(METALWORKQUEUE_GEOMETRY_SHADER);
         context->CommitCommandBuffer(true, false, METALWORKQUEUE_GEOMETRY_SHADER);
     }
     // Commit the render buffer (will wait for GS to complete if present)

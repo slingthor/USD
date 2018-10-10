@@ -182,18 +182,22 @@ MtlfMetalContext::MtlfMetalContext()
 , enableComputeGS(false)
 {
     // Select Intel GPU if possible due to current issues on AMD. Revert when fixed - MTL_FIXME
-	device = MtlfMetalContext::GetMetalDevice(PREFER_INTEGRATED_GPU);
-    //device = MtlfMetalContext::GetMetalDevice(PREFER_DEFAULT_GPU);
+	//device = MtlfMetalContext::GetMetalDevice(PREFER_INTEGRATED_GPU);
+    device = MtlfMetalContext::GetMetalDevice(PREFER_DEFAULT_GPU);
 
     NSLog(@"Selected %@ for Metal Device", device.name);
     
+    enableMultiQueue = [device supportsFeatureSet:MTLFeatureSet_macOS_GPUFamily2_v1];
+    
     // Create a new command queue
     commandQueue = [device newCommandQueue];
-
-    // Reset dependency tracking state
-    queueSyncEvent        = [device newEvent];
-    queueSyncEventCounter = 1;
-    outstandingDependency = METALWORKQUEUE_INVALID;
+    if(enableMultiQueue) {
+        NSLog(@"Device %@ supports Metal 2, enabling multi-queue codepath.", device.name);
+        commandQueueGS = [device newCommandQueue];
+    }
+    else {
+        NSLog(@"Device %@ does not support Metal 2, using fallback path, performance may be sub-optimal.", device.name);
+    }
     
     NSOperatingSystemVersion minimumSupportedOSVersion = { .majorVersion = 10, .minorVersion = 14, .patchVersion = 0 };
     
@@ -312,8 +316,15 @@ MtlfMetalContext::MtlfMetalContext()
     glBindVertexArray(0);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 
-    cvglTextureCache = nil;
-    cvmtlTextureCache = nil;
+    // Create the texture caches
+    CVReturn cvret = CVMetalTextureCacheCreate(kCFAllocatorDefault, nil, device, nil, &cvmtlTextureCache);
+    assert(cvret == kCVReturnSuccess);
+    
+    CGLContextObj glctx = [[NSOpenGLContext currentContext] CGLContextObj];
+    CGLPixelFormatObj glPixelFormat = [[[NSOpenGLContext currentContext] pixelFormat] CGLPixelFormatObj];
+    cvret = CVOpenGLTextureCacheCreate(kCFAllocatorDefault, nil, (__bridge CGLContextObj _Nonnull)(glctx), glPixelFormat, nil, &cvglTextureCache);
+    assert(cvret == kCVReturnSuccess);
+
     pixelBuffer = nil;
     depthBuffer = nil;
     cvglColorTexture = nil;
@@ -340,22 +351,35 @@ MtlfMetalContext::MtlfMetalContext()
     currentWorkQueue     = &workQueues[currentWorkQueueType];
     
     for (int i = 0; i < METALWORKQUEUE_MAX; i ++) {
-        ResetEncoders((MetalWorkQueueType)i);
+        ResetEncoders((MetalWorkQueueType)i, true);
     }
 }
 
 MtlfMetalContext::~MtlfMetalContext()
 {
-    _FreeTransientTextureCacheRefs();
+	_FreeTransientTextureCacheRefs();
+
+    if (cvglTextureCache) {
+        CFRelease(cvglTextureCache);
+        cvglTextureCache = nil;
+    }
+    if (cvmtlTextureCache) {
+        CFRelease(cvmtlTextureCache);
+        cvmtlTextureCache = nil;
+    }
+
+    [commandQueue release];
+    if(enableMultiQueue)
+        [commandQueue release];
 }
 
 void MtlfMetalContext::_FreeTransientTextureCacheRefs()
 {
-    if (0 && glColorTexture) {
+    if (glColorTexture) {
         glDeleteTextures(1, &glColorTexture);
         glColorTexture = 0;
     }
-    if (0 && glDepthTexture) {
+    if (glDepthTexture) {
         glDeleteTextures(1, &glDepthTexture);
         glDepthTexture = 0;
     }
@@ -386,15 +410,6 @@ void MtlfMetalContext::_FreeTransientTextureCacheRefs()
         CFRelease(depthBuffer);
         depthBuffer = nil;
     }
-    
-    if (cvglTextureCache) {
-        CFRelease(cvglTextureCache);
-        cvglTextureCache = nil;
-    }
-    if (cvmtlTextureCache) {
-        CFRelease(cvmtlTextureCache);
-        cvmtlTextureCache = nil;
-    }
 }
 
 void MtlfMetalContext::AllocateAttachments(int width, int height)
@@ -422,15 +437,6 @@ void MtlfMetalContext::AllocateAttachments(int width, int height)
                         kCVPixelFormatType_DepthFloat32,
                         (__bridge CFDictionaryRef)cvBufferProperties,
                         &depthBuffer);
-    
-    // Create the texture caches
-    cvret = CVMetalTextureCacheCreate(kCFAllocatorDefault, nil, device, nil, &cvmtlTextureCache);
-    assert(cvret == kCVReturnSuccess);
-    
-    CGLContextObj glctx = [[NSOpenGLContext currentContext] CGLContextObj];
-    CGLPixelFormatObj glPixelFormat = [[[NSOpenGLContext currentContext] pixelFormat] CGLPixelFormatObj];
-    cvret = CVOpenGLTextureCacheCreate(kCFAllocatorDefault, nil, (__bridge CGLContextObj _Nonnull)(glctx), glPixelFormat, nil, &cvglTextureCache);
-    assert(cvret == kCVReturnSuccess);
     
     // Create the OpenGL texture for the color buffer
     cvret = CVOpenGLTextureCacheCreateTextureFromImage(kCFAllocatorDefault,
@@ -641,12 +647,16 @@ void MtlfMetalContext::CreateCommandBuffer(MetalWorkQueueType workQueueType) {
     //NSLog(@"Creating command buffer %d", (int)workQueueType);
 
     if (wq->commandBuffer == nil) {
-        wq->commandBuffer = [context->commandQueue commandBuffer];
-    } else {
+        if (enableMultiQueue && workQueueType == METALWORKQUEUE_GEOMETRY_SHADER)
+            wq->commandBuffer = [context->commandQueueGS commandBuffer];
+        else
+            wq->commandBuffer = [context->commandQueue commandBuffer];
+        wq->event = [device newEvent];
+    }
+    // We'll reuse an existing buffer silently if it's empty, otherwise emit warning
+    else if (wq->encoderHasWork) {
         TF_CODING_WARNING("Command buffer already exists");
     }
-    
-    wq->currentRenderPipelineState = nil;
 }
 
 void MtlfMetalContext::LabelCommandBuffer(NSString *label, MetalWorkQueueType workQueueType)
@@ -659,42 +669,38 @@ void MtlfMetalContext::LabelCommandBuffer(NSString *label, MetalWorkQueueType wo
     wq->commandBuffer.label = label;
 }
 
-
-void MtlfMetalContext::SetEventDependency(MetalWorkQueueType workQueueType, uint32_t eventValue)
+void MtlfMetalContext::EncodeWaitForEvent(MetalWorkQueueType waitQueue, MetalWorkQueueType signalQueue, uint64_t eventValue)
 {
-    MetalWorkQueue *wq = &workQueues[workQueueType];
+    MetalWorkQueue *wait_wq = &workQueues[waitQueue];
+    MetalWorkQueue *signal_wq = &workQueues[signalQueue];
     
-    if (outstandingDependency != METALWORKQUEUE_INVALID) {
-        TF_FATAL_CODING_ERROR("Currently only support one outstanding dependency");
-    }
-    
-    if (wq->encoderHasWork) {
-        if (wq->encoderInUse) {
+    if (wait_wq->encoderHasWork) {
+        if (wait_wq->encoderInUse) {
             TF_FATAL_CODING_ERROR("Can't set an event dependency if encoder is still in use");
         }
         // If the last used encoder wasn't ended then we need to end it now
-        if (!wq->encoderEnded) {
-            wq->encoderInUse = true;
-            ReleaseEncoder(true, workQueueType);
+        if (!wait_wq->encoderEnded) {
+            wait_wq->encoderInUse = true;
+            ReleaseEncoder(true, waitQueue);
         }
     }
     // Make this command buffer wait for the event to be resolved
-    [wq->commandBuffer encodeWaitForEvent:queueSyncEvent value:((eventValue == 0) ? queueSyncEventCounter : eventValue)];
-    
-    // Record that we have an oustanding dependency on this work queue
-    outstandingDependency = workQueueType;
+    signal_wq->currentHighestWaitValue = (eventValue != 0) ? eventValue : signal_wq->currentEventValue;
+    [wait_wq->commandBuffer encodeWaitForEvent:signal_wq->event value:signal_wq->currentHighestWaitValue];
 }
 
-uint32_t MtlfMetalContext::GenerateEvent(MetalWorkQueueType workQueueType)
+void MtlfMetalContext::EncodeWaitForQueue(MetalWorkQueueType waitQueue, MetalWorkQueueType signalQueue)
 {
-    MetalWorkQueue *wq = &workQueues[workQueueType];
-    
-    if (outstandingDependency == METALWORKQUEUE_INVALID) {
-        TF_FATAL_CODING_ERROR("No outstanding dependency to generate event for");
-    }
-    if (outstandingDependency == workQueueType) {
-        TF_FATAL_CODING_ERROR("Cicrular event dependency - can't resolve event on same queue that is waiting for it");
-    }
+    MetalWorkQueue *signal_wq = &workQueues[signalQueue];
+    signal_wq->generatesEndOfQueueEvent = true;
+
+    EncodeWaitForEvent(waitQueue, signalQueue, endOfQueueEventValue);
+}
+
+uint64_t MtlfMetalContext::EncodeSignalEvent(MetalWorkQueueType signalQueue)
+{
+    MetalWorkQueue *wq = &workQueues[signalQueue];
+
      if (wq->encoderHasWork) {
         if (wq->encoderInUse) {
             TF_FATAL_CODING_ERROR("Can't generate an event if encoder is still in use");
@@ -702,21 +708,20 @@ uint32_t MtlfMetalContext::GenerateEvent(MetalWorkQueueType workQueueType)
         // If the last used encoder wasn't ended then we need to end it now
         if (!wq->encoderEnded) {
             wq->encoderInUse = true;
-            ReleaseEncoder(true, workQueueType);
+            ReleaseEncoder(true, signalQueue);
         }
     }
+    
     // Generate event
-    [wq->commandBuffer encodeSignalEvent:queueSyncEvent value:queueSyncEventCounter];
+    [wq->commandBuffer encodeSignalEvent:wq->event value:wq->currentEventValue];
     
-    // Remove the indication of an outstanding event
-    outstandingDependency = METALWORKQUEUE_INVALID;
-    
-    return queueSyncEventCounter++;
+    return wq->currentEventValue++;
 }
 
-uint32_t MtlfMetalContext::GetEventCounter()
+MTLRenderPassDescriptor* MtlfMetalContext::GetRenderPassDescriptor()
 {
-    return queueSyncEventCounter;
+    MetalWorkQueue *wq = &workQueues[METALWORKQUEUE_DEFAULT];
+    return (wq == nil) ? nil : wq->currentRenderPassDescriptor;
 }
 
 void MtlfMetalContext::setFrontFaceWinding(MTLWinding _windingOrder)
@@ -1412,20 +1417,31 @@ NSUInteger MtlfMetalContext::SetComputeEncoderState(id<MTLFunction>     computeF
     return wq->currentComputeThreadExecutionWidth;
 }
 
-void MtlfMetalContext::ResetEncoders(MetalWorkQueueType workQueueType)
+void MtlfMetalContext::ResetEncoders(MetalWorkQueueType workQueueType, bool isInitializing)
 {
     MetalWorkQueue *wq = &workQueues[workQueueType];
  
     wq->commandBuffer         = nil;
     
-    wq->encoderInUse          = false;
-    wq->encoderEnded          = false;
-    wq->encoderHasWork        = false;
-    wq->currentEncoderType    = MTLENCODERTYPE_NONE;
-    wq->currentBlitEncoder    = nil;
-    wq->currentRenderEncoder  = nil;
-    wq->currentComputeEncoder = nil;
+    if(!isInitializing) {
+        if(wq->currentHighestWaitValue != endOfQueueEventValue && wq->currentHighestWaitValue >= wq->currentEventValue)
+            TF_FATAL_CODING_ERROR("There is a WaitForEvent which is never going to get Signalled!");
+        if(wq->event != nil)
+            [wq->event release];
+    }
+    wq->event                 = nil;
     
+    wq->encoderInUse             = false;
+    wq->encoderEnded             = false;
+    wq->encoderHasWork           = false;
+    wq->generatesEndOfQueueEvent = false;
+    wq->currentEncoderType       = MTLENCODERTYPE_NONE;
+    wq->currentBlitEncoder       = nil;
+    wq->currentRenderEncoder     = nil;
+    wq->currentComputeEncoder    = nil;
+    
+    wq->currentEventValue                    = 1;
+    wq->currentHighestWaitValue              = 0;
     wq->currentVertexDescriptorHash          = 0;
     wq->currentColourAttachmentsHash         = 0;
     wq->currentRenderPipelineDescriptorHash  = 0;
@@ -1463,8 +1479,21 @@ void MtlfMetalContext::CommitCommandBuffer(bool waituntilScheduled, bool waitUnt
         //NSLog(@"Committing command buffer: %@",  wq->commandBuffer.label);
     }
     else {
-        // Raise a warning if there's no work here, still need to commit command buffer to free it though (check out why this is) MTL_FIXME
-        NSLog(@"No work in this command buffer: %@", wq->commandBuffer.label);
+        /*
+         There may be cases where we speculatively create a command buffer (geometry shaders) but dont
+         actually use it. In this case we've nothing to commit so we'll return but not destroy the buffer
+         so we don't have the overhead of recreating it every time. If it's required to generate an event
+         we have to kick it regardless
+         */
+        if (!wq->generatesEndOfQueueEvent) {
+            NSLog(@"No work in this command buffer: %@", wq->commandBuffer.label);
+            return;
+        }
+     }
+    
+    if(wq->generatesEndOfQueueEvent) {
+        wq->currentEventValue = endOfQueueEventValue;
+        [wq->commandBuffer encodeSignalEvent:wq->event value:wq->currentEventValue];
     }
     
     [wq->commandBuffer commit];
