@@ -136,23 +136,27 @@ id<MTLDevice> MtlfMetalContext::GetMetalDevice(PREFERRED_GPU_TYPE preferredGPUTy
     NSMutableArray<id<MTLDevice>> *_eGPUs          = [NSMutableArray array];
     NSMutableArray<id<MTLDevice>> *_integratedGPUs = [NSMutableArray array];
     NSMutableArray<id<MTLDevice>> *_discreteGPUs   = [NSMutableArray array];
+    id<MTLDevice>                  _defaultDevice  = MTLCreateSystemDefaultDevice();
     NSArray *preferredDeviceList = _discreteGPUs;
+    
+    if (preferredGPUType == PREFER_DEFAULT_GPU) {
+        return _defaultDevice;
+    }
     
     // Put the device into the appropriate device list
     for (id<MTLDevice>dev in _deviceList) {
         if (dev.removable)
-            [_eGPUs addObject:dev];
+        	[_eGPUs addObject:dev];
         else if (dev.lowPower)
-            [_integratedGPUs addObject:dev];
+        	[_integratedGPUs addObject:dev];
         else
-            [_discreteGPUs addObject:dev];
+        	[_discreteGPUs addObject:dev];
     }
     
     switch (preferredGPUType) {
         case PREFER_DISPLAY_GPU:
             NSLog(@"Display device selection not supported yet, returning default GPU");
         case PREFER_DEFAULT_GPU:
-            preferredDeviceList = _deviceList;
             break;
         case PREFER_EGPU:
             preferredDeviceList = _eGPUs;
@@ -165,13 +169,14 @@ id<MTLDevice> MtlfMetalContext::GetMetalDevice(PREFERRED_GPU_TYPE preferredGPUTy
             break;
     }
     // If no device matching the requested one was found then get the default device
-    if (preferredDeviceList.count == 0) {
-        NSLog(@"Preferred device not found, returning default GPU");
-        preferredDeviceList = _deviceList;
+    if (preferredDeviceList.count != 0) {
+        return preferredDeviceList.firstObject;
     }
-    return preferredDeviceList.firstObject;
+    else {
+        NSLog(@"Preferred device not found, returning default GPU");
+        return _defaultDevice;
+    }
 }
-
 
 //
 // MtlfMetalContext
@@ -1430,14 +1435,14 @@ void MtlfMetalContext::ResetEncoders(MetalWorkQueueType workQueueType, bool isIn
 {
     MetalWorkQueue *wq = &workQueues[workQueueType];
  
-    wq->commandBuffer         = nil;
-    
     if(!isInitializing) {
         if(wq->currentHighestWaitValue != endOfQueueEventValue && wq->currentHighestWaitValue >= wq->currentEventValue)
             TF_FATAL_CODING_ERROR("There is a WaitForEvent which is never going to get Signalled!");
         if(wq->event != nil)
             [wq->event release];
     }
+   
+    wq->commandBuffer         = nil;
     wq->event                 = nil;
     
     wq->encoderInUse             = false;
@@ -1495,7 +1500,10 @@ void MtlfMetalContext::CommitCommandBuffer(bool waituntilScheduled, bool waitUnt
          we have to kick it regardless
          */
         if (!wq->generatesEndOfQueueEvent) {
-            NSLog(@"No work in this command buffer: %@", wq->commandBuffer.label);
+            //NSLog(@"No work in this command buffer: %@", wq->commandBuffer.label);
+            // Have to disable reuse as the command buffer seems to dissapear if not used (garbage collected?), need to investigate
+            // Just reset it for now so a new one will get created.
+            ResetEncoders(workQueueType);
             return;
         }
      }
