@@ -1744,28 +1744,32 @@ id<MTLBuffer> MtlfMetalContext::GetMetalBuffer(NSUInteger length, MTLResourceOpt
     id<MTLBuffer> buffer;
     
 #if METAL_REUSE_BUFFERS
-    if (!pointer) {
-        for (auto entry = bufferFreeList.begin(); entry != bufferFreeList.end(); entry++) {
-            MetalBufferListEntry bufferEntry = *entry;
-            buffer = bufferEntry.buffer;
-            MTLStorageMode  storageMode  =  MTLStorageMode((options & MTLResourceStorageModeMask)  >> MTLResourceStorageModeShift);
-            MTLCPUCacheMode cpuCacheMode = MTLCPUCacheMode((options & MTLResourceCPUCacheModeMask) >> MTLResourceCPUCacheModeShift);
+    for (auto entry = bufferFreeList.begin(); entry != bufferFreeList.end(); entry++) {
+        MetalBufferListEntry bufferEntry = *entry;
+        buffer = bufferEntry.buffer;
+        MTLStorageMode  storageMode  =  MTLStorageMode((options & MTLResourceStorageModeMask)  >> MTLResourceStorageModeShift);
+        MTLCPUCacheMode cpuCacheMode = MTLCPUCacheMode((options & MTLResourceCPUCacheModeMask) >> MTLResourceCPUCacheModeShift);
+        
+        // Check if buffer matches size and storage mode and is old enough to reuse
+        if (buffer.length == length              &&
+            storageMode   == buffer.storageMode  &&
+            cpuCacheMode  == buffer.cpuCacheMode &&
+            frameCount > (bufferEntry.releasedOnFrame + METAL_SAFE_BUFFER_AGE_IN_FRAMES) ) {
+            //NSLog(@"Reusing buffer of length %lu", length);
             
-            // Check if buffer matches size and storage mode and is old enough to reuse
-            if (buffer.length == length              &&
-                storageMode   == buffer.storageMode  &&
-                cpuCacheMode  == buffer.cpuCacheMode &&
-                frameCount > (bufferEntry.releasedOnFrame + METAL_SAFE_BUFFER_AGE_IN_FRAMES) ) {
-                //NSLog(@"Reusing buffer of length %lu", length);
-                bufferFreeList.erase(entry);
-                METAL_INC_STAT(resourceStats.buffersReused);
-                return buffer;
+            // Copy over data
+            if (pointer) {
+                memcpy(buffer.contents, pointer, length);
+                [buffer didModifyRange:(NSMakeRange(0, length))];
             }
+            
+            bufferFreeList.erase(entry);
+            METAL_INC_STAT(resourceStats.buffersReused);
+            return buffer;
         }
     }
-    //NSLog(@"Creating buffer of length %lu", length);
 #endif
-   
+    //NSLog(@"Creating buffer of length %lu", length);
     if (pointer) {
         buffer  =  [device newBufferWithBytes:pointer length:length options:options];
     } else {
