@@ -233,7 +233,7 @@ public:
     MTLF_API
     uint64_t GetEventValue(MetalWorkQueueType signalQueue) const { return workQueues[signalQueue].currentEventValue; }
 	
-	MTLF_API
+    MTLF_API
     id<MTLBuffer> GetMetalBuffer(NSUInteger length, MTLResourceOptions options = MTLResourceStorageModeManaged, const void *pointer = NULL);
     
     MTLF_API
@@ -244,6 +244,9 @@ public:
     
     MTLF_API
     void EndFrame();
+    
+    MTLF_API
+    bool GeometryShadersActive() { return workQueues[METALWORKQUEUE_GEOMETRY_SHADER].commandBuffer != nil; }
    
     id<MTLDevice> device;
     id<MTLCommandQueue> commandQueue;
