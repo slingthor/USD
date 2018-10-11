@@ -463,8 +463,8 @@ MtlfDrawTarget::GetImage(std::string const & name, void* buffer) const
     context->LabelCommandBuffer(@"Get Image");
     id<MTLBlitCommandEncoder> blitEncoder = context->GetBlitEncoder();
     
-    id<MTLBuffer> cpuBuffer = [device newBufferWithLength:(bytesPerPixel * width * height) options:MTLResourceStorageModeManaged];
-
+    id<MTLBuffer> cpuBuffer = context->GetMetalBuffer((bytesPerPixel * width * height), MTLResourceStorageModeManaged);
+    
     [blitEncoder copyFromTexture:texture sourceSlice:0 sourceLevel:0 sourceOrigin:MTLOriginMake(0, 0, 0) sourceSize:MTLSizeMake(width, height, 1) toBuffer:cpuBuffer destinationOffset:0 destinationBytesPerRow:(bytesPerPixel * width) destinationBytesPerImage:(bytesPerPixel * width * height) options:blitOptions];
     [blitEncoder synchronizeResource:cpuBuffer];
 
@@ -472,7 +472,7 @@ MtlfDrawTarget::GetImage(std::string const & name, void* buffer) const
     context->CommitCommandBuffer(false, true);
 
     memcpy(buffer, [cpuBuffer contents], bytesPerPixel * width * height);
-    [cpuBuffer release];
+	context->ReleaseMetalBuffer(cpuBuffer);
 }
 
 bool

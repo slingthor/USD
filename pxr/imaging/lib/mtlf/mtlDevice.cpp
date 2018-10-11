@@ -365,6 +365,8 @@ MtlfMetalContext::MtlfMetalContext(id<MTLDevice> _device)
     indexBuffer = nil;
     remappedQuadIndexBuffer = nil;
     numVertexComponents = 0;
+    vtxUniformBackingBuffer  = NULL;
+    fragUniformBackingBuffer = NULL;
     
     drawTarget = NULL;
     
@@ -374,6 +376,23 @@ MtlfMetalContext::MtlfMetalContext(id<MTLDevice> _device)
     for (int i = 0; i < METALWORKQUEUE_MAX; i ++) {
         ResetEncoders((MetalWorkQueueType)i, true);
     }
+    
+#if METAL_ENABLE_STATS
+    resourceStats.commandBuffersCreated   = 0;
+    resourceStats.commandBuffersCommitted = 0;
+    resourceStats.buffersCreated          = 0;
+    resourceStats.buffersReused           = 0;
+    resourceStats.renderEncodersCreated   = 0;
+    resourceStats.computeEncodersCreated  = 0;
+    resourceStats.blitEncodersCreated     = 0;
+    resourceStats.renderEncodersRequested = 0;
+    resourceStats.computeEncodersRequested= 0;
+    resourceStats.blitEncodersRequested   = 0;
+    resourceStats.renderPipelineStates    = 0;
+    resourceStats.computePipelineStates   = 0;
+#endif
+    
+    frameCount = 0;
 }
 
 MtlfMetalContext::~MtlfMetalContext()
@@ -392,6 +411,26 @@ MtlfMetalContext::~MtlfMetalContext()
     [commandQueue release];
     if(enableMultiQueue)
         [commandQueueGS release];
+
+	CleanupUnusedBuffers();
+	bufferFreeList.clear();
+   
+#if METAL_ENABLE_STATS
+    NSLog(@"--- METAL Resource Stats (average per frame / total) ----");
+    NSLog(@"Frame count:                %7u", frameCount);
+    NSLog(@"Command Buffers created:    %7u / %7u", resourceStats.commandBuffersCreated   / frameCount, resourceStats.commandBuffersCreated);
+    NSLog(@"Command Buffers committed:  %7u / %7u", resourceStats.commandBuffersCommitted / frameCount, resourceStats.commandBuffersCommitted);
+    NSLog(@"Metal   Buffers created:    %7u / %7u", resourceStats.buffersCreated          / frameCount, resourceStats.buffersCreated);
+    NSLog(@"Metal   Buffers reused:     %7u / %7u", resourceStats.buffersReused           / frameCount, resourceStats.buffersReused);
+    NSLog(@"Render  Encoders requested: %7u / %7u", resourceStats.renderEncodersRequested / frameCount, resourceStats.renderEncodersRequested);
+    NSLog(@"Render  Encoders created:   %7u / %7u", resourceStats.renderEncodersCreated   / frameCount, resourceStats.renderEncodersCreated);
+    NSLog(@"Render  Pipeline States:    %7u / %7u", resourceStats.renderPipelineStates    / frameCount, resourceStats.renderPipelineStates);
+    NSLog(@"Compute Encoders requested: %7u / %7u", resourceStats.computeEncodersRequested/ frameCount, resourceStats.computeEncodersRequested);
+    NSLog(@"Compute Encoders created:   %7u / %7u", resourceStats.computeEncodersCreated  / frameCount, resourceStats.computeEncodersCreated);
+    NSLog(@"Compute Pipeline States:    %7u / %7u", resourceStats.computePipelineStates   / frameCount, resourceStats.computePipelineStates);
+    NSLog(@"Blit    Encoders requested: %7u / %7u", resourceStats.blitEncodersRequested   / frameCount, resourceStats.blitEncodersRequested);
+    NSLog(@"Blit    Encoders created:   %7u / %7u", resourceStats.blitEncodersCreated     / frameCount, resourceStats.blitEncodersCreated);
+#endif
 }
 
 void MtlfMetalContext::RecreateInstance(id<MTLDevice> device)
@@ -680,6 +719,7 @@ void MtlfMetalContext::CreateCommandBuffer(MetalWorkQueueType workQueueType) {
     else if (wq->encoderHasWork) {
         TF_CODING_WARNING("Command buffer already exists");
     }
+    METAL_INC_STAT(resourceStats.commandBuffersCreated);
 }
 
 void MtlfMetalContext::LabelCommandBuffer(NSString *label, MetalWorkQueueType workQueueType)
@@ -1142,7 +1182,7 @@ void MtlfMetalContext::SetRenderPipelineState()
         }
 #if METAL_STATE_OPTIMISATION
         renderPipelineStateMap.emplace(wq->currentRenderPipelineDescriptorHash, pipelineState);
-        NSLog(@"Unique render pipeline states %lu", renderPipelineStateMap.size());
+        METAL_INC_STAT(resourceStats.renderPipelineStates);
 #endif
         
     }
@@ -1427,7 +1467,7 @@ NSUInteger MtlfMetalContext::SetComputeEncoderState(id<MTLFunction>     computeF
             return 0;
         }
         computePipelineStateMap.emplace(wq->currentComputePipelineDescriptorHash, computePipelineState);
-        NSLog(@"Unique compute pipeline states %lu", computePipelineStateMap.size());
+        METAL_INC_STAT(resourceStats.computePipelineStates);
     }
     
     if (computePipelineState != wq->currentComputePipelineState)
@@ -1532,6 +1572,7 @@ void MtlfMetalContext::CommitCommandBuffer(bool waituntilScheduled, bool waitUnt
     }
 
     ResetEncoders(workQueueType);
+    METAL_INC_STAT(resourceStats.commandBuffersCommitted);
 }
 
 
@@ -1642,6 +1683,7 @@ void MtlfMetalContext::SetCurrentEncoder(MetalEncoderType encoderType, MetalWork
             // Since the encoder is new we'll need to emit all the state again
             dirtyRenderState     = DIRTY_METALRENDERSTATE_ALL;
             for(auto buffer : boundBuffers) { buffer->modified = true; }
+            METAL_INC_STAT(resourceStats.renderEncodersCreated);
             break;
         }
         case MTLENCODERTYPE_COMPUTE: {
@@ -1657,10 +1699,12 @@ void MtlfMetalContext::SetCurrentEncoder(MetalEncoderType encoderType, MetalWork
             
             dirtyRenderState     = DIRTY_METALRENDERSTATE_ALL;
             for(auto buffer : boundBuffers) { buffer->modified = true; }
+            METAL_INC_STAT(resourceStats.computeEncodersCreated);
             break;
         }
         case MTLENCODERTYPE_BLIT: {
             wq->currentBlitEncoder = [wq->commandBuffer blitCommandEncoder];
+            METAL_INC_STAT(resourceStats.blitEncodersCreated);
             break;
         }
         case MTLENCODERTYPE_NONE:
@@ -1682,6 +1726,7 @@ id<MTLBlitCommandEncoder> MtlfMetalContext::GetBlitEncoder(MetalWorkQueueType wo
 {
     MetalWorkQueue *wq = &workQueues[workQueueType];
     SetCurrentEncoder(MTLENCODERTYPE_BLIT, workQueueType);
+    METAL_INC_STAT(resourceStats.blitEncodersRequested);
     return wq->currentBlitEncoder;
 }
 
@@ -1689,6 +1734,7 @@ id<MTLComputeCommandEncoder> MtlfMetalContext::GetComputeEncoder(MetalWorkQueueT
 {
     MetalWorkQueue *wq = &workQueues[workQueueType];
     SetCurrentEncoder(MTLENCODERTYPE_COMPUTE, workQueueType);
+    METAL_INC_STAT(resourceStats.computeEncodersRequested);
     return wq->currentComputeEncoder;
     
 }
@@ -1698,7 +1744,85 @@ id<MTLRenderCommandEncoder>  MtlfMetalContext::GetRenderEncoder(MetalWorkQueueTy
 {
     MetalWorkQueue *wq = &workQueues[workQueueType];
     SetCurrentEncoder(MTLENCODERTYPE_RENDER, workQueueType);
+    METAL_INC_STAT(resourceStats.renderEncodersRequested);
     return currentWorkQueue->currentRenderEncoder;
+}
+
+id<MTLBuffer> MtlfMetalContext::GetMetalBuffer(NSUInteger length, MTLResourceOptions options, const void *pointer)
+{
+    id<MTLBuffer> buffer;
+    
+#if METAL_REUSE_BUFFERS
+    for (auto entry = bufferFreeList.begin(); entry != bufferFreeList.end(); entry++) {
+        MetalBufferListEntry bufferEntry = *entry;
+        buffer = bufferEntry.buffer;
+        MTLStorageMode  storageMode  =  MTLStorageMode((options & MTLResourceStorageModeMask)  >> MTLResourceStorageModeShift);
+        MTLCPUCacheMode cpuCacheMode = MTLCPUCacheMode((options & MTLResourceCPUCacheModeMask) >> MTLResourceCPUCacheModeShift);
+        
+        // Check if buffer matches size and storage mode and is old enough to reuse
+        if (buffer.length == length              &&
+            storageMode   == buffer.storageMode  &&
+            cpuCacheMode  == buffer.cpuCacheMode &&
+            frameCount > (bufferEntry.releasedOnFrame + METAL_SAFE_BUFFER_AGE_IN_FRAMES) ) {
+            //NSLog(@"Reusing buffer of length %lu", length);
+            
+            // Copy over data
+            if (pointer) {
+                memcpy(buffer.contents, pointer, length);
+                [buffer didModifyRange:(NSMakeRange(0, length))];
+            }
+            
+            bufferFreeList.erase(entry);
+            METAL_INC_STAT(resourceStats.buffersReused);
+            return buffer;
+        }
+    }
+#endif
+    //NSLog(@"Creating buffer of length %lu", length);
+    if (pointer) {
+        buffer  =  [device newBufferWithBytes:pointer length:length options:options];
+    } else {
+        buffer  =  [device newBufferWithLength:length options:options];
+    }
+    METAL_INC_STAT(resourceStats.buffersCreated);
+    return buffer;
+}
+
+void MtlfMetalContext::ReleaseMetalBuffer(id<MTLBuffer> buffer)
+{
+ #if METAL_REUSE_BUFFERS
+    MetalBufferListEntry bufferEntry;
+    bufferEntry.buffer = buffer;
+    bufferEntry.releasedOnFrame = frameCount;
+    bufferFreeList.push_back(bufferEntry);
+#else
+    [buffer release];
+#endif
+}
+
+void MtlfMetalContext::CleanupUnusedBuffers()
+{
+    id<MTLBuffer> buffer;
+    
+    for (auto entry = bufferFreeList.begin(); entry != bufferFreeList.end(); entry++) {
+        MetalBufferListEntry bufferEntry = *entry;
+        buffer = bufferEntry.buffer;
+        
+        if (frameCount > (bufferEntry.releasedOnFrame + METAL_MAX_BUFFER_AGE_IN_FRAMES) ) {
+            [buffer release];
+            bufferFreeList.erase(entry);
+        }
+    }
+}
+
+void MtlfMetalContext::StartFrame() {
+    
+}
+
+void MtlfMetalContext::EndFrame() {
+    //NSLog(@"Frame: %u", frameCount);
+    frameCount++;
+    CleanupUnusedBuffers();
 }
 
 

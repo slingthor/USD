@@ -39,7 +39,7 @@ MtlfUniformBlock::MtlfUniformBlock(char const *label) :
 MtlfUniformBlock::~MtlfUniformBlock()
 {
     if (_buffer) {
-        [_buffer release];
+        MtlfMetalContext::GetMetalContext()->ReleaseMetalBuffer(_buffer);
         _buffer = nil;
     }
 }
@@ -63,7 +63,7 @@ MtlfUniformBlock::Update(const void *data, int size)
     // Only recreate buffer if one doesn't already exist or the size has changed
     if (_buffer == nil || _buffer.length != size) {
         id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->device;
-        _buffer = [device newBufferWithBytes:data length:size options:MTLResourceStorageModeManaged];
+        _buffer = MtlfMetalContext::GetMetalContext()->GetMetalBuffer(size, MTLResourceStorageModeManaged, data);
     }
     
     //METAL TODO

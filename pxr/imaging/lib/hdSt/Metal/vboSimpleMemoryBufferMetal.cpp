@@ -128,11 +128,11 @@ HdStVBOSimpleMemoryBufferMetal::Reallocate(
         HdResourceGPUHandle oldId(bres->GetId());
 
         if (bufferSize) {
-            newId = [device newBufferWithLength:bufferSize options:MTLResourceStorageModeManaged];
+            newId = context->GetMetalBuffer(bufferSize, MTLResourceStorageModeManaged);
         }
         else {
             // Dummy buffer - 0 byte buffers are invalid
-            newId = [device newBufferWithLength:256 options:MTLResourceStorageModeManaged];
+            newId = context->GetMetalBuffer(256, MTLResourceStorageModeManaged);
         }
 
         // copy the range. There are three cases:
@@ -165,7 +165,7 @@ HdStVBOSimpleMemoryBufferMetal::Reallocate(
         // delete old buffer
         if (oldId) {
             id<MTLBuffer> oid = oldId;
-            [oid release];
+            context->ReleaseMetalBuffer(oldId);
         }
 
         bres->SetAllocation(newId, bufferSize);
@@ -188,7 +188,7 @@ HdStVBOSimpleMemoryBufferMetal::_DeallocateResources()
         HdResourceGPUHandle oldId(it->second->GetId());
         if (oldId) {
             id<MTLBuffer> oid = oldId;
-            [oid release];
+            MtlfMetalContext::GetMetalContext()->ReleaseMetalBuffer(oid);
             it->second->SetAllocation(HdResourceGPUHandle(), 0);
         }
     }
