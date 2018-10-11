@@ -83,6 +83,11 @@ HdSt_SmoothNormalsComputationMetal::_Execute(
     unsigned long immutableBufferMask = (1 << 0) | (1 << 2) | (1 << 3);
     
     // The output of this work is consumed by the GS, so we need to ensure it's executed before the GS
+    if (!context->GeometryShadersActive()) {
+        context->CreateCommandBuffer(METALWORKQUEUE_GEOMETRY_SHADER);
+        context->LabelCommandBuffer(@"Geometry Shaders (Smooth Normals)", METALWORKQUEUE_GEOMETRY_SHADER);
+    }
+    
     id <MTLComputeCommandEncoder> computeEncoder = context->GetComputeEncoder(METALWORKQUEUE_GEOMETRY_SHADER);
     computeEncoder.label = @"Compute pass for GPU Smooth Normals";
     

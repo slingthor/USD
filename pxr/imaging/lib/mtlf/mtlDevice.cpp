@@ -734,8 +734,13 @@ void MtlfMetalContext::LabelCommandBuffer(NSString *label, MetalWorkQueueType wo
 
 void MtlfMetalContext::EncodeWaitForEvent(MetalWorkQueueType waitQueue, MetalWorkQueueType signalQueue, uint64_t eventValue)
 {
-    MetalWorkQueue *wait_wq = &workQueues[waitQueue];
+    MetalWorkQueue *wait_wq   = &workQueues[waitQueue];
     MetalWorkQueue *signal_wq = &workQueues[signalQueue];
+    
+    // Check both work queues have been set up 
+    if (!wait_wq->commandBuffer || !signal_wq->commandBuffer) {
+        TF_FATAL_CODING_ERROR("One of the work queue has no command buffer associated with it");
+    }
     
     if (wait_wq->encoderHasWork) {
         if (wait_wq->encoderInUse) {
@@ -764,6 +769,10 @@ uint64_t MtlfMetalContext::EncodeSignalEvent(MetalWorkQueueType signalQueue)
 {
     MetalWorkQueue *wq = &workQueues[signalQueue];
 
+    if (!wq->commandBuffer) {
+        TF_FATAL_CODING_ERROR("Signal work queue has no command buffer associated with it");
+    }
+    
      if (wq->encoderHasWork) {
         if (wq->encoderInUse) {
             TF_FATAL_CODING_ERROR("Can't generate an event if encoder is still in use");
@@ -1485,10 +1494,12 @@ void MtlfMetalContext::ResetEncoders(MetalWorkQueueType workQueueType, bool isIn
     MetalWorkQueue *wq = &workQueues[workQueueType];
  
     if(!isInitializing) {
-        if(wq->currentHighestWaitValue != endOfQueueEventValue && wq->currentHighestWaitValue >= wq->currentEventValue)
+        if(wq->currentHighestWaitValue != endOfQueueEventValue && wq->currentHighestWaitValue >= wq->currentEventValue) {
             TF_FATAL_CODING_ERROR("There is a WaitForEvent which is never going to get Signalled!");
-        if(wq->event != nil)
+        }
+        if(wq->event != nil) {
             [wq->event release];
+        }
     }
    
     wq->commandBuffer         = nil;

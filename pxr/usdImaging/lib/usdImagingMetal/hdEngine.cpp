@@ -776,16 +776,7 @@ UsdImagingMetalHdEngine::Render(RenderParams params)
     
     // Create a new command buffer for each render pass to the current drawable
     context->CreateCommandBuffer(METALWORKQUEUE_DEFAULT);
-    context->LabelCommandBuffer(@"HdEngine CommandBuffer", METALWORKQUEUE_DEFAULT);
-    
-#pragma message("Unconditionally enabling GS buffer creation for now")
-    bool bGS = true;
-    
-    if (bGS) {
-        // Create a command buffer for the geometry shaders and make the default/render queue dependent on it completeing
-        context->CreateCommandBuffer(METALWORKQUEUE_GEOMETRY_SHADER);
-        context->LabelCommandBuffer(@"HdEngine CommandBuffer GS", METALWORKQUEUE_GEOMETRY_SHADER);
-    }
+    context->LabelCommandBuffer(@"HdEngine::Render", METALWORKQUEUE_DEFAULT);
     
     // Set the render pass descriptor to use for the render encoders
     context->SetRenderPassDescriptor(_mtlRenderPassDescriptor);
@@ -812,10 +803,11 @@ UsdImagingMetalHdEngine::Render(RenderParams params)
     // Depth texture copy
     context->CopyDepthTextureToOpenGL();
     
-    if (bGS) {
-        // Generate an event to indicate that the GS buffer has completed then commit it
+    if (context->GeometryShadersActive()) {
+        // Complete the GS command buffer if we have one
         context->CommitCommandBuffer(true, false, METALWORKQUEUE_GEOMETRY_SHADER);
     }
+
     // Commit the render buffer (will wait for GS to complete if present)
     // We wait until scheduled, because we're about to consume the Metal
     // generated textures in an OpenGL blit

@@ -605,6 +605,12 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
     
     //Encode a dependency on the Geometry Shader queue to ensure the GS data is there.
     if(doMVAComputeGS) {
+        
+        if (!context->GeometryShadersActive()) {
+            context->CreateCommandBuffer(METALWORKQUEUE_GEOMETRY_SHADER);
+            context->LabelCommandBuffer(@"Geometry Shaders", METALWORKQUEUE_GEOMETRY_SHADER);
+        }
+        
         renderEncoder = nil;
         context->ReleaseEncoder(true);
         context->EncodeWaitForQueue(METALWORKQUEUE_DEFAULT, METALWORKQUEUE_GEOMETRY_SHADER);
