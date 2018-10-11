@@ -287,9 +287,9 @@ MtlfMetalContext::MtlfMetalContext(id<MTLDevice> _device)
     else
         device = _device;
     NSLog(@"Selected %@ for Metal Device", device.name);
-    
+#if defined(METAL_EVENTS_AVAILABLE)
     enableMultiQueue = [device supportsFeatureSet:MTLFeatureSet_macOS_GPUFamily2_v1];
-    
+#endif
     // Create a new command queue
     commandQueue = [device newCommandQueue];
     if(enableMultiQueue) {
@@ -713,7 +713,9 @@ void MtlfMetalContext::CreateCommandBuffer(MetalWorkQueueType workQueueType) {
             wq->commandBuffer = [context->commandQueueGS commandBuffer];
         else
             wq->commandBuffer = [context->commandQueue commandBuffer];
+#if defined(METAL_EVENTS_AVAILABLE)
         wq->event = [device newEvent];
+#endif
     }
     // We'll reuse an existing buffer silently if it's empty, otherwise emit warning
     else if (wq->encoderHasWork) {
@@ -749,7 +751,9 @@ void MtlfMetalContext::EncodeWaitForEvent(MetalWorkQueueType waitQueue, MetalWor
     }
     // Make this command buffer wait for the event to be resolved
     signal_wq->currentHighestWaitValue = (eventValue != 0) ? eventValue : signal_wq->currentEventValue;
+#if defined(METAL_EVENTS_AVAILABLE)
     [wait_wq->commandBuffer encodeWaitForEvent:signal_wq->event value:signal_wq->currentHighestWaitValue];
+#endif
 }
 
 void MtlfMetalContext::EncodeWaitForQueue(MetalWorkQueueType waitQueue, MetalWorkQueueType signalQueue)
@@ -774,10 +778,10 @@ uint64_t MtlfMetalContext::EncodeSignalEvent(MetalWorkQueueType signalQueue)
             ReleaseEncoder(true, signalQueue);
         }
     }
-    
+#if defined(METAL_EVENTS_AVAILABLE)
     // Generate event
     [wq->commandBuffer encodeSignalEvent:wq->event value:wq->currentEventValue];
-    
+#endif
     return wq->currentEventValue++;
 }
 
@@ -1399,7 +1403,9 @@ size_t MtlfMetalContext::HashComputePipelineDescriptor(unsigned int bufferCount)
     boost::hash_combine(hashVal, computePipelineStateDescriptor.computeFunction);
     boost::hash_combine(hashVal, computePipelineStateDescriptor.label);
     boost::hash_combine(hashVal, computePipelineStateDescriptor.threadGroupSizeIsMultipleOfThreadExecutionWidth);
+#if __MAC_OS_X_VERSION_MAX_ALLOWED >= 101400 /* __MAC_10_14 */
     boost::hash_combine(hashVal, computePipelineStateDescriptor.maxTotalThreadsPerThreadgroup);
+#endif
     for (int i = 0; i < bufferCount; i++) {
         boost::hash_combine(hashVal, computePipelineStateDescriptor.buffers[i].mutability);
     }
@@ -1418,7 +1424,8 @@ NSUInteger MtlfMetalContext::SetComputeEncoderState(id<MTLFunction>     computeF
     
     id<MTLComputePipelineState> computePipelineState;
     
-    if (wq->currentComputeEncoder == nil || wq->currentEncoderType != MTLENCODERTYPE_COMPUTE || !wq->encoderInUse) {
+    if (wq->currentComputeEncoder == nil || wq->currentEncoderType != MTLENCODERTYPE_COMPUTE
+        || !wq->encoderInUse) {
         TF_FATAL_CODING_ERROR("Compute encoder must be set and active to set the pipeline state");
     }
     
@@ -1487,12 +1494,16 @@ void MtlfMetalContext::ResetEncoders(MetalWorkQueueType workQueueType, bool isIn
     if(!isInitializing) {
         if(wq->currentHighestWaitValue != endOfQueueEventValue && wq->currentHighestWaitValue >= wq->currentEventValue)
             TF_FATAL_CODING_ERROR("There is a WaitForEvent which is never going to get Signalled!");
+#if defined(METAL_EVENTS_AVAILABLE)
         if(wq->event != nil)
             [wq->event release];
+#endif
     }
    
     wq->commandBuffer         = nil;
+#if defined(METAL_EVENTS_AVAILABLE)
     wq->event                 = nil;
+#endif
     
     wq->encoderInUse             = false;
     wq->encoderEnded             = false;
@@ -1559,7 +1570,9 @@ void MtlfMetalContext::CommitCommandBuffer(bool waituntilScheduled, bool waitUnt
     
     if(wq->generatesEndOfQueueEvent) {
         wq->currentEventValue = endOfQueueEventValue;
+#if defined(METAL_EVENTS_AVAILABLE)
         [wq->commandBuffer encodeSignalEvent:wq->event value:wq->currentEventValue];
+#endif
     }
     
     [wq->commandBuffer commit];
@@ -1687,7 +1700,7 @@ void MtlfMetalContext::SetCurrentEncoder(MetalEncoderType encoderType, MetalWork
             break;
         }
         case MTLENCODERTYPE_COMPUTE: {
-#if __MAC_OS_X_VERSION_MAX_ALLOWED >= 101400 /* __MAC_10_14 */
+#if defined(METAL_EVENTS_AVAILABLE)
             if (concurrentDispatchSupported) {
                 wq->currentComputeEncoder = [wq->commandBuffer computeCommandEncoderWithDispatchType:MTLDispatchTypeConcurrent];
             }

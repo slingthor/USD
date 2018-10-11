@@ -308,7 +308,9 @@ private:
     };
     
     // State for tracking dependencies between work queues
+#if defined(METAL_EVENTS_AVAILABLE)
     id<MTLEvent> queueSyncEvent;
+#endif
     uint32_t queueSyncEventCounter;
     MetalWorkQueueType outstandingDependency;
     
@@ -354,13 +356,15 @@ private:
     
     struct MetalWorkQueue {
         id<MTLCommandBuffer>         commandBuffer;
+#if defined(METAL_EVENTS_AVAILABLE)
         id<MTLEvent>                 event;
-        
+#endif
+
         MetalEncoderType             currentEncoderType;
         id<MTLBlitCommandEncoder>    currentBlitEncoder;
         id<MTLRenderCommandEncoder>  currentRenderEncoder;
         id<MTLComputeCommandEncoder> currentComputeEncoder;
-        MTLRenderPassDescriptor     *currentRenderPassDescriptor;
+        MTLRenderPassDescriptor      *currentRenderPassDescriptor;
         bool encoderInUse;
         bool encoderEnded;
         bool encoderHasWork;
@@ -378,7 +382,7 @@ private:
     };
     
     MetalWorkQueue      workQueues[METALWORKQUEUE_MAX];
-    MetalWorkQueue     *currentWorkQueue;
+    MetalWorkQueue      *currentWorkQueue;
     MetalWorkQueueType  currentWorkQueueType;
     
     // Internal encoder functions
