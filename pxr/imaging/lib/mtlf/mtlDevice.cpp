@@ -352,6 +352,8 @@ MtlfMetalContext::MtlfMetalContext(id<MTLDevice> _device)
     indexBuffer = nil;
     remappedQuadIndexBuffer = nil;
     numVertexComponents = 0;
+    vtxUniformBackingBuffer  = NULL;
+    fragUniformBackingBuffer = NULL;
     
     drawTarget = NULL;
     
