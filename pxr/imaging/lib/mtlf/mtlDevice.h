@@ -302,9 +302,25 @@ private:
     
     void _FreeTransientTextureCacheRefs();
     
-    uint32_t glShaderProgram;
-    uint32_t glVAO;
-    uint32_t glVBO;
+    struct GLInterop {
+        GLInterop()
+        : glShaderProgram(0)
+        , glVAO(0)
+        , glVBO(0)
+        , posAttrib(0)
+        , texAttrib(0)
+        , blitTexSizeUniform(0) {}
+
+        uint32_t glShaderProgram;
+        uint32_t glVAO;
+        uint32_t glVBO;
+        int32_t posAttrib;
+        int32_t texAttrib;
+        uint32_t blitTexSizeUniform;
+    };
+    
+    static GLInterop staticGlInterop;
+    static void _InitialiseGL();
     
     struct MetalWorkQueue {
         id<MTLCommandBuffer>         commandBuffer;

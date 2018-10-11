@@ -178,6 +178,99 @@ id<MTLDevice> MtlfMetalContext::GetMetalDevice(PREFERRED_GPU_TYPE preferredGPUTy
     }
 }
 
+MtlfMetalContext::GLInterop MtlfMetalContext::staticGlInterop;
+
+void MtlfMetalContext::_InitialiseGL()
+{
+    if (staticGlInterop.glShaderProgram != 0) {
+        return;
+    }
+    
+    NSError *error = NULL;
+
+    // Load our common vertex shader. This is used by both the fragment shaders below
+    TfToken vtxShaderToken(MtlfPackageInteropVtxShader());
+    GLchar const* const vertexShader =
+    (GLchar const*)[[NSString stringWithContentsOfFile:[NSString stringWithUTF8String:vtxShaderToken.GetText()]
+                                              encoding:NSUTF8StringEncoding
+                                                 error:&error] cStringUsingEncoding:NSUTF8StringEncoding];
+    
+    GLuint vs = _compileShader(vertexShader, GL_VERTEX_SHADER);
+    
+    TfToken fragShaderToken(MtlfPackageInteropFragShader());
+    GLchar const* const fragmentShader =
+    (GLchar const*)[[NSString stringWithContentsOfFile:[NSString stringWithUTF8String:fragShaderToken.GetText()]
+                                              encoding:NSUTF8StringEncoding
+                                                 error:&error] cStringUsingEncoding:NSUTF8StringEncoding];
+    
+    GLuint fs = _compileShader(fragmentShader, GL_FRAGMENT_SHADER);
+    
+    // Create and link our GL_TEXTURE_2D compatible program
+    staticGlInterop.glShaderProgram = glCreateProgram();
+    glAttachShader(staticGlInterop.glShaderProgram, fs);
+    glAttachShader(staticGlInterop.glShaderProgram, vs);
+    glBindFragDataLocation(staticGlInterop.glShaderProgram, 0, "fragColour");
+    glLinkProgram(staticGlInterop.glShaderProgram);
+    
+    // Release the local instance of the fragment shader. The shader program maintains a reference.
+    glDeleteShader(vs);
+    glDeleteShader(fs);
+    
+    GLint maxLength = 0;
+    if (maxLength)
+    {
+        glGetProgramiv(staticGlInterop.glShaderProgram, GL_INFO_LOG_LENGTH, &maxLength);
+        
+        // The maxLength includes the NULL character
+        GLchar *errorLog = (GLchar*)malloc(maxLength);
+        glGetProgramInfoLog(staticGlInterop.glShaderProgram, maxLength, &maxLength, errorLog);
+        
+        NSLog(@"%s", errorLog);
+        free(errorLog);
+    }
+    
+    glUseProgram(staticGlInterop.glShaderProgram);
+    
+    glGenVertexArrays(1, &staticGlInterop.glVAO);
+    glBindVertexArray(staticGlInterop.glVAO);
+    
+    glGenBuffers(1, &staticGlInterop.glVBO);
+    
+    glBindBuffer(GL_ARRAY_BUFFER, staticGlInterop.glVBO);
+    
+    // Set up the vertex structure description
+    staticGlInterop.posAttrib = glGetAttribLocation(staticGlInterop.glShaderProgram, "inPosition");
+    staticGlInterop.texAttrib = glGetAttribLocation(staticGlInterop.glShaderProgram, "inTexCoord");
+    glEnableVertexAttribArray(staticGlInterop.posAttrib);
+    glVertexAttribPointer(staticGlInterop.posAttrib, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(offsetof(Vertex, position)));
+    glEnableVertexAttribArray(staticGlInterop.texAttrib);
+    glVertexAttribPointer(staticGlInterop.texAttrib, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(offsetof(Vertex, uv)));
+    
+    GLint samplerColorLoc = glGetUniformLocation(staticGlInterop.glShaderProgram, "interopTexture");
+    GLint samplerDepthLoc = glGetUniformLocation(staticGlInterop.glShaderProgram, "depthTexture");
+
+    staticGlInterop.blitTexSizeUniform = glGetUniformLocation(staticGlInterop.glShaderProgram, "texSize");
+    
+    // Indicate that the diffuse texture will be bound to texture unit 0, and depth to unit 1
+    GLint unit = 0;
+    glUniform1i(samplerColorLoc, unit++);
+    glUniform1i(samplerDepthLoc, unit);
+    
+    Vertex v[6] = {
+        { {-1, -1}, {0, 0} },
+        { { 1, -1}, {1, 0} },
+        { {-1,  1}, {0, 1} },
+        
+        { {-1, 1}, {0, 1} },
+        { {1, -1}, {1, 0} },
+        { {1,  1}, {1, 1} }
+    };
+    glBufferData(GL_ARRAY_BUFFER, sizeof(v), v, GL_STATIC_DRAW);
+    
+    glBindVertexArray(0);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+}
+
 //
 // MtlfMetalContext
 //
@@ -210,7 +303,7 @@ MtlfMetalContext::MtlfMetalContext(id<MTLDevice> _device)
     NSOperatingSystemVersion minimumSupportedOSVersion = { .majorVersion = 10, .minorVersion = 14, .patchVersion = 0 };
     
     // MTL_FIXME - Disabling concurrent dispatch until appropriate fencing is in place
-    concurrentDispatchSupported = false && [NSProcessInfo.processInfo isOperatingSystemAtLeastVersion:minimumSupportedOSVersion];
+    concurrentDispatchSupported = [NSProcessInfo.processInfo isOperatingSystemAtLeastVersion:minimumSupportedOSVersion];
 
     // Load all the default shader files
     NSError *error = NULL;
@@ -242,87 +335,7 @@ MtlfMetalContext::MtlfMetalContext(id<MTLDevice> _device)
     depthStateDesc.depthCompareFunction = MTLCompareFunctionLessEqual;
     depthState = [device newDepthStencilStateWithDescriptor:depthStateDesc];
    
-    // Load our common vertex shader. This is used by both the fragment shaders below
-    TfToken vtxShaderToken(MtlfPackageInteropVtxShader());
-    GLchar const* const vertexShader =
-        (GLchar const*)[[NSString stringWithContentsOfFile:[NSString stringWithUTF8String:vtxShaderToken.GetText()]
-                                                  encoding:NSUTF8StringEncoding
-                                                     error:&error] cStringUsingEncoding:NSUTF8StringEncoding];
-
-    GLuint vs = _compileShader(vertexShader, GL_VERTEX_SHADER);
-    
-    TfToken fragShaderToken(MtlfPackageInteropFragShader());
-    GLchar const* const fragmentShader =
-        (GLchar const*)[[NSString stringWithContentsOfFile:[NSString stringWithUTF8String:fragShaderToken.GetText()]
-                                                  encoding:NSUTF8StringEncoding
-                                                     error:&error] cStringUsingEncoding:NSUTF8StringEncoding];
-    
-    GLuint fs = _compileShader(fragmentShader, GL_FRAGMENT_SHADER);
-    
-    // Create and link our GL_TEXTURE_2D compatible program
-    glShaderProgram = glCreateProgram();
-    glAttachShader(glShaderProgram, fs);
-    glAttachShader(glShaderProgram, vs);
-    glBindFragDataLocation(glShaderProgram, 0, "fragColour");
-    glLinkProgram(glShaderProgram);
-    
-    // Release the local instance of the fragment shader. The shader program maintains a reference.
-    glDeleteShader(vs);
-    glDeleteShader(fs);
-    
-    GLint maxLength = 0;
-    if (maxLength)
-    {
-        glGetProgramiv(glShaderProgram, GL_INFO_LOG_LENGTH, &maxLength);
-        
-        // The maxLength includes the NULL character
-        GLchar *errorLog = (GLchar*)malloc(maxLength);
-        glGetProgramInfoLog(glShaderProgram, maxLength, &maxLength, errorLog);
-        
-        NSLog(@"%s", errorLog);
-        free(errorLog);
-    }
-    
-    glUseProgram(glShaderProgram);
-    
-    glVAO = 0;
-    glGenVertexArrays(1, &glVAO);
-    glBindVertexArray(glVAO);
-    
-    glVBO = 0;
-    glGenBuffers(1, &glVBO);
-    
-    glBindBuffer(GL_ARRAY_BUFFER, glVBO);
-
-    // Set up the vertex structure description
-    GLint posAttrib = glGetAttribLocation(glShaderProgram, "inPosition");
-    GLint texAttrib = glGetAttribLocation(glShaderProgram, "inTexCoord");
-    glEnableVertexAttribArray(posAttrib);
-    glVertexAttribPointer(posAttrib, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(offsetof(Vertex, position)));
-    glEnableVertexAttribArray(texAttrib);
-    glVertexAttribPointer(texAttrib, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(offsetof(Vertex, uv)));
-
-    GLint samplerColorLoc = glGetUniformLocation(glShaderProgram, "interopTexture");
-    GLint samplerDepthLoc = glGetUniformLocation(glShaderProgram, "depthTexture");
-    
-    // Indicate that the diffuse texture will be bound to texture unit 0, and depth to unit 1
-    GLint unit = 0;
-    glUniform1i(samplerColorLoc, unit++);
-    glUniform1i(samplerDepthLoc, unit);
-    
-    Vertex v[6] = {
-        { {-1, -1}, {0, 0} },
-        { { 1, -1}, {1, 0} },
-        { {-1,  1}, {0, 1} },
-
-        { {-1, 1}, {0, 1} },
-        { {1, -1}, {1, 0} },
-        { {1,  1}, {1, 1} }
-    };
-    glBufferData(GL_ARRAY_BUFFER, sizeof(v), v, GL_STATIC_DRAW);
-    
-    glBindVertexArray(0);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    _InitialiseGL();
 
     // Create the texture caches
     CVReturn cvret = CVMetalTextureCacheCreate(kCFAllocatorDefault, nil, device, nil, &cvmtlTextureCache);
@@ -546,26 +559,22 @@ MtlfMetalContext::BlitColorTargetToOpenGL()
     glDisable(GL_CULL_FACE);
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
     
-    glUseProgram(glShaderProgram);
+    glUseProgram(staticGlInterop.glShaderProgram);
     
-    glBindBuffer(GL_ARRAY_BUFFER, glVBO);
+    glBindBuffer(GL_ARRAY_BUFFER, staticGlInterop.glVBO);
     
     // Set up the vertex structure description
-    GLint posAttrib = glGetAttribLocation(glShaderProgram, "inPosition");
-    GLint texAttrib = glGetAttribLocation(glShaderProgram, "inTexCoord");
-    glEnableVertexAttribArray(posAttrib);
-    glVertexAttribPointer(posAttrib, 2, GL_FLOAT, GL_FALSE, sizeof(MtlfMetalContext::Vertex), (void*)(offsetof(Vertex, position)));
-    glEnableVertexAttribArray(texAttrib);
-    glVertexAttribPointer(texAttrib, 2, GL_FLOAT, GL_FALSE, sizeof(MtlfMetalContext::Vertex), (void*)(offsetof(Vertex, uv)));
+    glEnableVertexAttribArray(staticGlInterop.posAttrib);
+    glVertexAttribPointer(staticGlInterop.posAttrib, 2, GL_FLOAT, GL_FALSE, sizeof(MtlfMetalContext::Vertex), (void*)(offsetof(Vertex, position)));
+    glEnableVertexAttribArray(staticGlInterop.texAttrib);
+    glVertexAttribPointer(staticGlInterop.texAttrib, 2, GL_FLOAT, GL_FALSE, sizeof(MtlfMetalContext::Vertex), (void*)(offsetof(Vertex, uv)));
     
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_RECTANGLE, glColorTexture);
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_RECTANGLE, glDepthTexture);
-    
-    GLuint blitTexSizeUniform = glGetUniformLocation(glShaderProgram, "texSize");
-    
-    glUniform2f(blitTexSizeUniform, mtlColorTexture.width, mtlColorTexture.height);
+
+    glUniform2f(staticGlInterop.blitTexSizeUniform, mtlColorTexture.width, mtlColorTexture.height);
     
     glDrawArrays(GL_TRIANGLES, 0, 6);
     
@@ -575,8 +584,8 @@ MtlfMetalContext::BlitColorTargetToOpenGL()
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_RECTANGLE, 0);
     
-    glDisableVertexAttribArray(posAttrib);
-    glDisableVertexAttribArray(texAttrib);
+    glDisableVertexAttribArray(staticGlInterop.posAttrib);
+    glDisableVertexAttribArray(staticGlInterop.texAttrib);
     glUseProgram(0);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     
