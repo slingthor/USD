@@ -175,13 +175,44 @@ void DumpMetalSource(const HdStProgram* program, NSString *metalSrc, NSString *f
     [fileContents writeToFile:srcDumpFilePath atomically:YES encoding:NSUTF8StringEncoding error:nil];
     NSLog(@"Dumping Metal Source to %@", srcDumpFilePath);
 }
+
+NSString *LoadPreviousMetalSource(const HdStProgram* program, NSString *metalSrc, NSString *fileSuffix)
+{
+    NSUInteger programIndex = totalPrograms;
+    if (program != previousProgram) {
+        programIndex++;
+    }
+    NSString *fileName = [NSString stringWithFormat:@"HydraMetalSource_%lu_%lu_%@.metal", programIndex, dumpedFileCount, fileSuffix];
+    
+    NSFileManager *fileManager= [NSFileManager defaultManager];
+    
+    NSURL *applicationDocumentsDirectory = [[fileManager URLsForDirectory:NSDocumentDirectory inDomains:NSUserDomainMask] lastObject];
+    
+    NSString *srcDumpLocation = [applicationDocumentsDirectory.path stringByAppendingPathComponent:@"/HydraMetalSourceDumps"];
+    
+    NSError *error = NULL;
+    
+    NSString *srcDumpFilePath = [srcDumpLocation stringByAppendingPathComponent:fileName];
+    NSString *fileContents = [NSString stringWithContentsOfFile:srcDumpFilePath
+                                                       encoding:NSUTF8StringEncoding
+                                                          error:&error];
+
+    if (fileContents && !error) {
+        NSLog(@"Loading shader from %@", srcDumpFilePath);
+        return fileContents;
+    }
+    
+    NSLog(@"Failed loading shader from %@", srcDumpFilePath);
+    return metalSrc;
+}
 #else
 #define DumpMetalSource(a, b, c, d)
+#define LoadPreviousMetalSource(program, metalSrc, fileSuffix) metalSrc
 #endif
 
 bool
 HdStMSLProgram::CompileShader(GLenum type,
-                              std::string const &shaderSource)
+                              std::string const &shaderSourceOriginal)
 {
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
@@ -189,7 +220,7 @@ HdStMSLProgram::CompileShader(GLenum type,
     // early out for empty source.
     // this may not be an error, since glslfx gives empty string
     // for undefined shader stages (i.e. null geometry shader)
-    if (shaderSource.empty()) return false;
+    if (shaderSourceOriginal.empty()) return false;
     
     const char *shaderType = NULL;
     switch (type) {
@@ -197,7 +228,7 @@ HdStMSLProgram::CompileShader(GLenum type,
         case GL_TESS_EVALUATION_SHADER:
             //TF_CODING_ERROR("Unsupported shader type on Metal %d\n", type);
             NSLog(@"Unsupported shader type on Metal %d\n", type); //MTL_FIXME - remove the above error so it doesn't propogate all the way back but really we should never see these types of shaders
-            DumpMetalSource(this, [NSString stringWithUTF8String:shaderSource.c_str()], @"InvalidType", nil); //MTL_FIXME
+            DumpMetalSource(this, [NSString stringWithUTF8String:shaderSourceOriginal.c_str()], @"InvalidType", nil); //MTL_FIXME
             return true;
         default:
             break;
@@ -219,11 +250,29 @@ HdStMSLProgram::CompileShader(GLenum type,
     
     if (TfDebug::IsEnabled(HD_DUMP_SHADER_SOURCE)) {
         std::cout   << "--------- " << shaderType << " ----------\n"
-                    << shaderSource
+                    << shaderSourceOriginal
                     << "---------------------------\n"
                     << std::flush;
     }
     
+    std::string filePostFix = shaderType;
+    std::string shaderSource;
+    
+    // Metal Debug. Set this to true to overwrite the shaders being compiled from the dump
+    // files of the last run. Useful for running experiements during debug.
+    bool loadShadersFromDump = false;
+
+    if (loadShadersFromDump) {
+        shaderSource =
+            [[NSString stringWithString:LoadPreviousMetalSource(this,
+                                                                [NSString stringWithUTF8String:shaderSourceOriginal.c_str()],
+                                                                [NSString stringWithUTF8String:filePostFix.c_str()])]
+             cStringUsingEncoding:NSUTF8StringEncoding];
+    }
+    else {
+        shaderSource = shaderSourceOriginal;
+    }
+
     MTLCompileOptions *options = [[MTLCompileOptions alloc] init];
     options.fastMathEnabled = YES;
     options.languageVersion = MTLLanguageVersion2_0;
@@ -242,7 +291,6 @@ HdStMSLProgram::CompileShader(GLenum type,
 
     // Load the function into the library
     id <MTLFunction> function = [library newFunctionWithName:entryPoint];
-    std::string filePostFix = shaderType;
     if (!function) {
         // XXX:validation
         TF_WARN("Failed to compile shader (%s): \n%s",

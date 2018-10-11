@@ -391,7 +391,8 @@ class Prim2DDrawTask():
 
         GL.glBindBuffer(GL.GL_ARRAY_BUFFER, 0)
         GL.glDisableVertexAttribArray(0)
-        GL.glBindVertexArray(0)
+        if (bool(GL.glBindVertexArray)):
+            GL.glBindVertexArray(0)
         GL.glUseProgram(0)
 
 class Outline(Prim2DDrawTask):
@@ -848,7 +849,7 @@ class StageView(QtOpenGL.QGLWidget):
         # prep HUD regions
         self._hud = HUD()
         self._hud.addGroup("TopLeft",     250, 160)  # subtree
-        self._hud.addGroup("TopRight",    180, 32)   # Hydra: Enabled
+        self._hud.addGroup("TopRight",    200, 32)   # Hydra: Enabled
         self._hud.addGroup("BottomLeft",  250, 160)  # GPU stats
         self._hud.addGroup("BottomRight", 200, 32)   # Camera, Complexity
 
@@ -1786,7 +1787,7 @@ class StageView(QtOpenGL.QGLWidget):
         toPrint = {"Hydra": hydraMode}
         if self._rendererAovName != "color":
             toPrint["  AOV"] = self._rendererAovName
-        self._hud.updateGroup("TopRight", self.width()-160, 14, col,
+        self._hud.updateGroup("TopRight", self.width()-200, 14, col,
                               toPrint, toPrint.keys())
 
         # bottom left
