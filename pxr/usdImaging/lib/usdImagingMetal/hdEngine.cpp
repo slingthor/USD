@@ -772,6 +772,8 @@ UsdImagingMetalHdEngine::Render(RenderParams params)
         glDisable(GL_BLEND);
     }
     
+    context->StartFrame();
+    
     // Create a new command buffer for each render pass to the current drawable
     context->CreateCommandBuffer(METALWORKQUEUE_DEFAULT);
     context->LabelCommandBuffer(@"HdEngine CommandBuffer", METALWORKQUEUE_DEFAULT);
@@ -818,6 +820,8 @@ UsdImagingMetalHdEngine::Render(RenderParams params)
     // We wait until scheduled, because we're about to consume the Metal
     // generated textures in an OpenGL blit
     context->CommitCommandBuffer(true, false);
+    
+    context->EndFrame();
     
     // Finalize rendering here & push the command buffer to the GPU
     [sharedCaptureManager.defaultCaptureScope endScope];

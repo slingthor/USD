@@ -42,8 +42,26 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-// Not a stric size but more how man copies of the uniforms to keep
+// Not a strict size but how many copies of the uniforms to keep
 #define METAL_OLD_STYLE_UNIFORM_BUFFER_SIZE 5000
+
+// Enable reuse of metal buffers - should increase perforamance but may also increase memory footprint
+#define METAL_REUSE_BUFFERS 1
+
+#if METAL_REUSE_BUFFERS
+// How old a buffer must be before it can be reused
+#define METAL_SAFE_BUFFER_AGE_IN_FRAMES 2
+// How old a buffer can be before it's freed
+#define METAL_MAX_BUFFER_AGE_IN_FRAMES 6
+#endif
+
+// Enable stats gathering
+#define METAL_ENABLE_STATS 1
+#if METAL_ENABLE_STATS
+#define METAL_INC_STAT(STAT) STAT++
+#else
+#define METAL_INC_STAT(STAT)
+#endif
 
 class MtlfDrawTarget;
 typedef boost::shared_ptr<class MtlfMetalContext> MtlfMetalContextSharedPtr;
@@ -214,6 +232,18 @@ public:
     
     MTLF_API
     uint64_t GetEventValue(MetalWorkQueueType signalQueue) const { return workQueues[signalQueue].currentEventValue; }
+	
+	MTLF_API
+    id<MTLBuffer> GetMetalBuffer(NSUInteger length, MTLResourceOptions options = MTLResourceStorageModeManaged, const void *pointer = NULL);
+    
+    MTLF_API
+    void ReleaseMetalBuffer(id<MTLBuffer> buffer);
+
+    MTLF_API
+    void StartFrame();
+    
+    MTLF_API
+    void EndFrame();
    
     id<MTLDevice> device;
     id<MTLCommandQueue> commandQueue;
@@ -357,7 +387,6 @@ private:
     id<MTLFunction> renderFragmentFunction;
     id<MTLFunction> renderComputeGSFunction;
  
-    
     void UpdateOldStyleUniformBlock(BufferBinding *uniformBuffer, MSL_ProgramStage stage);
     
     bool concurrentDispatchSupported;
@@ -366,6 +395,35 @@ private:
     MTLWinding windingOrder;
     MTLCullMode cullMode;
     uint32 dirtyRenderState;
+    
+    void CleanupUnusedBuffers();
+   
+    struct MetalBufferListEntry {
+        id<MTLBuffer> buffer;
+        unsigned int releasedOnFrame;
+    };
+    std::vector<MetalBufferListEntry> bufferFreeList;
+    
+    unsigned int frameCount;
+
+#if METAL_ENABLE_STATS
+    struct ResourceStats {
+        unsigned int commandBuffersCreated;
+        unsigned int commandBuffersCommitted;
+        unsigned int buffersCreated;
+        unsigned int buffersReused;
+        unsigned int renderEncodersCreated;
+        unsigned int computeEncodersCreated;
+        unsigned int blitEncodersCreated;
+        unsigned int renderEncodersRequested;
+        unsigned int computeEncodersRequested;
+        unsigned int blitEncodersRequested;
+        unsigned int renderPipelineStates;
+        unsigned int computePipelineStates;
+
+    } resourceStats;
+#endif
+    
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

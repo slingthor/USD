@@ -128,7 +128,8 @@ HdStMSLProgram::~HdStMSLProgram()
 
     id<MTLBuffer> uniformBuffer = _uniformBuffer.GetId();
     if (uniformBuffer) {
-        [uniformBuffer release];
+        MtlfMetalContext::GetMetalContext()->ReleaseMetalBuffer(uniformBuffer);
+        
         uniformBuffer = nil;
         _uniformBuffer.SetAllocation(HdResourceGPUHandle(), 0);
     }
@@ -173,7 +174,7 @@ void DumpMetalSource(const HdStProgram* program, NSString *metalSrc, NSString *f
     NSString *fileName = [NSString stringWithFormat:@"HydraMetalSource_%lu_%lu_%@.metal", totalPrograms, dumpedFileCount++, fileSuffix];
     NSString *srcDumpFilePath = [srcDumpLocation stringByAppendingPathComponent:fileName];
     [fileContents writeToFile:srcDumpFilePath atomically:YES encoding:NSUTF8StringEncoding error:nil];
-    NSLog(@"Dumping Metal Source to %@", srcDumpFilePath);
+    //NSLog(@"Dumping Metal Source to %@", srcDumpFilePath);
 }
 #else
 #define DumpMetalSource(a, b, c, d)
@@ -302,7 +303,7 @@ HdStMSLProgram::Link()
     id<MTLBuffer> uniformBuffer = _uniformBuffer.GetId();
     if (uniformBuffer == 0) {
         int const defaultLength = 1024;
-        uniformBuffer = [device newBufferWithLength:defaultLength options:MTLResourceStorageModeManaged];
+        uniformBuffer =  MtlfMetalContext::GetMetalContext()->GetMetalBuffer(defaultLength, MTLResourceStorageModeManaged);
         _uniformBuffer.SetAllocation(uniformBuffer, defaultLength);
     }
     
@@ -483,7 +484,8 @@ void HdStMSLProgram::SetProgram(char const* const label) {
             if(binding._stage != loopParams[i].stage || binding._type != kMSL_BindingType_UniformBuffer)
                 continue;
 
-            id<MTLBuffer> mtlBuffer = [context->device newBufferWithLength:(binding._uniformBufferSize * METAL_OLD_STYLE_UNIFORM_BUFFER_SIZE) options:MTLResourceStorageModeManaged];
+            id<MTLBuffer> mtlBuffer = context->GetMetalBuffer((binding._uniformBufferSize * METAL_OLD_STYLE_UNIFORM_BUFFER_SIZE), MTLResourceStorageModeManaged);
+            
             context->SetUniformBuffer(binding._index, mtlBuffer, binding._nameToken, loopParams[i].stage, 0 /*offset*/, binding._uniformBufferSize);
             _buffers.push_back(mtlBuffer);
         }
@@ -499,7 +501,7 @@ void HdStMSLProgram::UnsetProgram() {
     _currentlySet = false;
 
     for(auto buffer : _buffers) {
-        [buffer release];
+        MtlfMetalContext::GetMetalContext()->ReleaseMetalBuffer(buffer);
     }
     _buffers.clear();
 }
@@ -595,8 +597,9 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
             id<MTLDevice> device = context->device;
             const int vertDataSize(_gsVertOutStructSize * indexCount),
                       primDataSize(_gsPrimOutStructSize * (indexCount / 3));
-            id<MTLBuffer> vertBuffer = [device newBufferWithLength:vertDataSize options:MTLResourceStorageModePrivate|MTLResourceOptionCPUCacheModeDefault];
-            id<MTLBuffer> primBuffer = [device newBufferWithLength:primDataSize options:MTLResourceStorageModePrivate|MTLResourceOptionCPUCacheModeDefault];
+            id<MTLBuffer> vertBuffer = context->GetMetalBuffer(vertDataSize, MTLResourceStorageModePrivate|MTLResourceOptionCPUCacheModeDefault);
+            id<MTLBuffer> primBuffer = context->GetMetalBuffer(primDataSize, MTLResourceStorageModePrivate|MTLResourceOptionCPUCacheModeDefault);
+            
             
             [computeEncoder setBuffer:vertBuffer offset:0 atIndex:_gsVertOutBufferSlot];
             [computeEncoder setBuffer:primBuffer offset:0 atIndex:_gsPrimOutBufferSlot];
@@ -606,8 +609,9 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
             [renderEncoder setFragmentBuffer:vertBuffer offset:0 atIndex:_gsVertOutBufferSlot];
             [renderEncoder setFragmentBuffer:primBuffer offset:0 atIndex:_gsPrimOutBufferSlot];
             
-            [vertBuffer release];
-            [primBuffer release];
+            context->ReleaseMetalBuffer(vertBuffer);
+            context->ReleaseMetalBuffer(primBuffer);
+            
         }
     }
     

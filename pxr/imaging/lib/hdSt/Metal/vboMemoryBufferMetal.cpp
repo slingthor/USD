@@ -143,8 +143,8 @@ HdStVBOMemoryBufferMetal::Reallocate(
         HdResourceGPUHandle oldId(bres->GetId());
         HdResourceGPUHandle curId(curRes->GetId());
 
-        newId = [MtlfMetalContext::GetMetalContext()->device newBufferWithLength:bufferSize options:MTLResourceStorageModeManaged];
-
+        newId = MtlfMetalContext::GetMetalContext()->GetMetalBuffer(bufferSize, MTLResourceStorageModeManaged);
+        
         // if old buffer exists, copy unchanged data
         if (curId) {
             std::vector<size_t>::iterator newOffsetIt = newOffsets.begin();
@@ -196,7 +196,7 @@ HdStVBOMemoryBufferMetal::Reallocate(
         if (oldId) {
             // delete old buffer
             id<MTLBuffer> oid = oldId;
-            [oid release];
+            MtlfMetalContext::GetMetalContext()->ReleaseMetalBuffer(oid);
         }
 
         // update id of buffer resource
@@ -228,7 +228,7 @@ HdStVBOMemoryBufferMetal::_DeallocateResources()
         HdResourceGPUHandle oldId(it->second->GetId());
         if (oldId) {
             id<MTLBuffer> buffer = oldId;
-            [buffer release];
+            MtlfMetalContext::GetMetalContext()->ReleaseMetalBuffer(buffer);
             it->second->SetAllocation(HdResourceGPUHandle(), 0);
         }
     }

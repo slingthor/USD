@@ -49,8 +49,8 @@ HdStDispatchBufferMetal::HdStDispatchBufferMetal(TfToken const &role, int count,
     size_t dataSize = count * stride;
     
     HdResourceGPUHandle newId;
-    newId = [MtlfMetalContext::GetMetalContext()->device newBufferWithLength:dataSize options:MTLResourceStorageModeManaged];
-
+    newId = MtlfMetalContext::GetMetalContext()->GetMetalBuffer(dataSize, MTLResourceStorageModeManaged);
+    
     _entireResource->SetAllocation(newId, dataSize);
 }
 
@@ -58,7 +58,7 @@ HdStDispatchBufferMetal::~HdStDispatchBufferMetal()
 {
     HdResourceGPUHandle _id = _entireResource->GetId();
     id<MTLBuffer> oid = _id;
-    [oid release];
+    MtlfMetalContext::GetMetalContext()->ReleaseMetalBuffer(oid);
     _entireResource->SetAllocation(HdResourceGPUHandle(), 0);
 }
 

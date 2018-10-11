@@ -115,9 +115,7 @@ HdStStripedInterleavedBufferMetal::Reallocate(
     boost::static_pointer_cast<_StripedInterleavedBuffer> (curRangeOwner);
     
     id<MTLBuffer> curId = curRangeOwner_->GetResources().begin()->second->GetId();
-    id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->device;
-    
-    newId = [device newBufferWithLength:totalSize options:MTLResourceStorageModeManaged];
+    newId = MtlfMetalContext::GetMetalContext()->GetMetalBuffer(totalSize, MTLResourceStorageModeManaged);
     
     // if old buffer exists, copy unchanged data
     if (curId) {
@@ -171,7 +169,7 @@ HdStStripedInterleavedBufferMetal::Reallocate(
     }
     // delete old buffer
     if(oldId != nil) {
-        [oldId release];
+        MtlfMetalContext::GetMetalContext()->ReleaseMetalBuffer(oldId);
     }
     
     // update id to all buffer resources
@@ -193,7 +191,7 @@ HdStStripedInterleavedBufferMetal::_DeallocateResources()
     if (resource) {
         id<MTLBuffer> _id = resource->GetId();
         if (_id != nil) {
-            [_id release];
+            MtlfMetalContext::GetMetalContext()->ReleaseMetalBuffer(_id);
             resource->SetAllocation(nil, 0);
         }
     }
