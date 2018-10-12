@@ -407,7 +407,7 @@ static HdSt_CodeGenMSL::TParam& _AddInputParam(  HdSt_CodeGenMSL::InOutParams &i
         in.usage |= HdSt_CodeGenMSL::TParam::EntryFuncArgument;
     }
     
-    if(bindingType == HdBinding::UNIFORM)
+    if(bindingType == HdBinding::UNIFORM || bindingType == HdBinding::UNIFORM_ARRAY)
         in.usage |= HdSt_CodeGenMSL::TParam::Uniform;
  
     inputParams.push_back(in);
@@ -2878,7 +2878,7 @@ HdSt_CodeGenMSL::_GenerateDrawingCoord()
     
     if (_metaData.drawingCoordIBinding.binding.IsValid()) {
         _EmitDeclaration(_genVS, _metaData.drawingCoordIBinding, TfToken(), /*arraySize=*/std::max(1, _metaData.instancerNumLevels));
-        _AddInputPtrParam(_mslVSInputParams, _metaData.drawingCoordIBinding);
+        _AddInputParam(_mslVSInputParams, _metaData.drawingCoordIBinding, TfToken(), /*arraySize=*/std::max(1, _metaData.instancerNumLevels));
     }
 
     // instance index indirection
