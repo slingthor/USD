@@ -63,6 +63,8 @@ PXR_NAMESPACE_OPEN_SCOPE
 #define METAL_INC_STAT(STAT)
 #endif
 
+#define METAL_NUM_GPU_FRAME_TIMES 5
+
 class MtlfDrawTarget;
 typedef boost::shared_ptr<class MtlfMetalContext> MtlfMetalContextSharedPtr;
 
@@ -248,6 +250,12 @@ public:
     MTLF_API
     bool GeometryShadersActive() { return workQueues[METALWORKQUEUE_GEOMETRY_SHADER].commandBuffer != nil; }
    
+    MTLF_API
+    unsigned long IncNumberPrimsDrawn(unsigned long numPrims, bool init) { numPrimsDrawn = init ? numPrims : (numPrimsDrawn += numPrims); return numPrimsDrawn; }
+    
+    MTLF_API
+    float GetGPUTimeInMs();
+    
     id<MTLDevice> device;
     id<MTLCommandQueue> commandQueue;
     id<MTLCommandQueue> commandQueueGS;
@@ -257,6 +265,7 @@ public:
     bool enableMultiQueue;
     bool enableMVA;
     bool enableComputeGS;
+    
 protected:
     MTLF_API
     MtlfMetalContext(id<MTLDevice> device);
@@ -362,7 +371,7 @@ private:
 #if defined(METAL_EVENTS_AVAILABLE)
         id<MTLEvent>                 event;
 #endif
-
+ 
         MetalEncoderType             currentEncoderType;
         id<MTLBlitCommandEncoder>    currentBlitEncoder;
         id<MTLRenderCommandEncoder>  currentRenderEncoder;
@@ -427,26 +436,45 @@ private:
     };
     std::vector<MetalBufferListEntry> bufferFreeList;
     
-    unsigned int frameCount;
+    unsigned long frameCount;
 
 #if METAL_ENABLE_STATS
     struct ResourceStats {
-        unsigned int commandBuffersCreated;
-        unsigned int commandBuffersCommitted;
-        unsigned int buffersCreated;
-        unsigned int buffersReused;
-        unsigned int renderEncodersCreated;
-        unsigned int computeEncodersCreated;
-        unsigned int blitEncodersCreated;
-        unsigned int renderEncodersRequested;
-        unsigned int computeEncodersRequested;
-        unsigned int blitEncodersRequested;
-        unsigned int renderPipelineStates;
-        unsigned int computePipelineStates;
+        unsigned long commandBuffersCreated;
+        unsigned long commandBuffersCommitted;
+        unsigned long buffersCreated;
+        unsigned long buffersReused;
+        unsigned long renderEncodersCreated;
+        unsigned long computeEncodersCreated;
+        unsigned long blitEncodersCreated;
+        unsigned long renderEncodersRequested;
+        unsigned long computeEncodersRequested;
+        unsigned long blitEncodersRequested;
+        unsigned long renderPipelineStates;
+        unsigned long computePipelineStates;
 
     } resourceStats;
 #endif
     
+
+    struct GPUFrameTime {
+        unsigned long  startingFrame;
+        struct timeval frameStartTime;
+        struct timeval frameEndTime;
+        unsigned int   timingEventsIssued;
+        unsigned int   timingEventsReceived;
+        bool timingCompleted;
+        
+    } gpuFrameTimes[METAL_NUM_GPU_FRAME_TIMES];
+    
+    float lastGPUFrameTime;
+    
+    void  GPUTimerStartTimer(unsigned long frameNumber);
+    void  GPUTimerEndTimer(unsigned long frameNumber);
+    void  GPUTimerFinish(unsigned long frameNumber);
+    void  GPUTImerResetTimer(unsigned long frameNumber);
+    
+    unsigned long numPrimsDrawn;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

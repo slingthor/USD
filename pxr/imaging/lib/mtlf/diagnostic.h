@@ -138,8 +138,8 @@ public:
     MtlfMetalQueryObject(MtlfMetalQueryObject const&) = delete;
     MtlfMetalQueryObject& operator =(MtlfMetalQueryObject const&) = delete;
 private:
-    GLuint _id;
-    GLenum _target;
+    GLenum  _target;
+    int64_t _value;
 };
 
 

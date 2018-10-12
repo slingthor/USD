@@ -688,6 +688,8 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
         computeEncoder = nil;
         context->ReleaseEncoder(false, METALWORKQUEUE_GEOMETRY_SHADER);
     }
+    
+    context->IncNumberPrimsDrawn((indexCount / 3) * instanceCount, false);
 }
 
 void HdStMSLProgram::DrawArraysInstanced(GLenum primitiveMode,

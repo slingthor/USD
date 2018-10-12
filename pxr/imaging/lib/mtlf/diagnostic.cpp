@@ -186,18 +186,18 @@ MtlfDebugGroup::~MtlfDebugGroup()
 }
 
 MtlfMetalQueryObject::MtlfMetalQueryObject()
-    : _id(0), _target(0)
+    : _target(0), _value(0)
 {
-    if (glGenQueries) {
-        glGenQueries(1, &_id);
-    }
+    //if (glGenQueries) {
+    //    glGenQueries(1, &_id);
+    //}
 }
 
 MtlfMetalQueryObject::~MtlfMetalQueryObject()
 {
-    if (glDeleteQueries && _id) {
-        glDeleteQueries(1, &_id);
-    }
+    //if (glDeleteQueries && _id) {
+    //    glDeleteQueries(1, &_id);
+    //}
 }
 
 void
@@ -209,57 +209,58 @@ MtlfMetalQueryObject::BeginSamplesPassed()
 void
 MtlfMetalQueryObject::BeginPrimitivesGenerated()
 {
-    //Begin(GL_PRIMITIVES_GENERATED);
-    TF_FATAL_CODING_ERROR("Not Implemented");
-}
+    Begin(GL_PRIMITIVES_GENERATED);
+    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
+    context->IncNumberPrimsDrawn(0, true);
+ }
 void
 MtlfMetalQueryObject::BeginTimeElapsed()
 {
-    //Begin(GL_TIME_ELAPSED);
-    TF_FATAL_CODING_ERROR("Not Implemented");
+    Begin(GL_TIME_ELAPSED);
 }
 
 void
 MtlfMetalQueryObject::Begin(GLenum target)
 {
     _target = target;
-    if (glBeginQuery && _id) {
-        glBeginQuery(_target, _id);
-    }
+    //if (glBeginQuery && _id) {
+    //    glBeginQuery(_target, _id);
+    //}
 }
 
 void
 MtlfMetalQueryObject::End()
 {
-    if (glEndQuery && _target) {
-        glEndQuery(_target);
+    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
+    
+    switch (_target) {
+        case GL_PRIMITIVES_GENERATED: {
+            _value = context->IncNumberPrimsDrawn(0, false);
+            break;
+        }
+        case GL_SAMPLES_PASSED: {
+            _value = 0;
+            break;
+        }
+        case GL_TIME_ELAPSED: {
+            _value = (int64_t)(context->GetGPUTimeInMs() * (1000.0f * 1000.0f));
+            break;
+        }
+        default:
+            _value = 0;
     }
-    _target = 0;
 }
 
 GLint64
 MtlfMetalQueryObject::GetResult()
 {
-    GLint64 value = 0;
-    //if (glGetQueryObjecti64v && _id) {
-    //    glGetQueryObjecti64v(_id, GL_QUERY_RESULT, &value);
-    //}
-    TF_FATAL_CODING_ERROR("Not Implemented");
-    return value;
+    return _value;
 }
 
 GLint64
 MtlfMetalQueryObject::GetResultNoWait()
 {
-    GLint64 value = 0;
-    //if (glGetQueryObjecti64v && _id) {
-    //    glGetQueryObjecti64v(_id, GL_QUERY_RESULT_AVAILABLE, &value);
-    //    if (value == GL_TRUE) {
-    //        glGetQueryObjecti64v(_id, GL_QUERY_RESULT, &value);
-    //    }
-    //}
-    TF_FATAL_CODING_ERROR("Not Implemented");
-    return value;
+    return _value;
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

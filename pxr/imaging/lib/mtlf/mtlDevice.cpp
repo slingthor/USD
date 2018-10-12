@@ -417,19 +417,19 @@ MtlfMetalContext::~MtlfMetalContext()
    
 #if METAL_ENABLE_STATS
     NSLog(@"--- METAL Resource Stats (average per frame / total) ----");
-    NSLog(@"Frame count:                %7u", frameCount);
-    NSLog(@"Command Buffers created:    %7u / %7u", resourceStats.commandBuffersCreated   / frameCount, resourceStats.commandBuffersCreated);
-    NSLog(@"Command Buffers committed:  %7u / %7u", resourceStats.commandBuffersCommitted / frameCount, resourceStats.commandBuffersCommitted);
-    NSLog(@"Metal   Buffers created:    %7u / %7u", resourceStats.buffersCreated          / frameCount, resourceStats.buffersCreated);
-    NSLog(@"Metal   Buffers reused:     %7u / %7u", resourceStats.buffersReused           / frameCount, resourceStats.buffersReused);
-    NSLog(@"Render  Encoders requested: %7u / %7u", resourceStats.renderEncodersRequested / frameCount, resourceStats.renderEncodersRequested);
-    NSLog(@"Render  Encoders created:   %7u / %7u", resourceStats.renderEncodersCreated   / frameCount, resourceStats.renderEncodersCreated);
-    NSLog(@"Render  Pipeline States:    %7u / %7u", resourceStats.renderPipelineStates    / frameCount, resourceStats.renderPipelineStates);
-    NSLog(@"Compute Encoders requested: %7u / %7u", resourceStats.computeEncodersRequested/ frameCount, resourceStats.computeEncodersRequested);
-    NSLog(@"Compute Encoders created:   %7u / %7u", resourceStats.computeEncodersCreated  / frameCount, resourceStats.computeEncodersCreated);
-    NSLog(@"Compute Pipeline States:    %7u / %7u", resourceStats.computePipelineStates   / frameCount, resourceStats.computePipelineStates);
-    NSLog(@"Blit    Encoders requested: %7u / %7u", resourceStats.blitEncodersRequested   / frameCount, resourceStats.blitEncodersRequested);
-    NSLog(@"Blit    Encoders created:   %7u / %7u", resourceStats.blitEncodersCreated     / frameCount, resourceStats.blitEncodersCreated);
+    NSLog(@"Frame count:                %7lu", frameCount);
+    NSLog(@"Command Buffers created:    %7lu / %7lu", resourceStats.commandBuffersCreated   / frameCount, resourceStats.commandBuffersCreated);
+    NSLog(@"Command Buffers committed:  %7lu / %7lu", resourceStats.commandBuffersCommitted / frameCount, resourceStats.commandBuffersCommitted);
+    NSLog(@"Metal   Buffers created:    %7lu / %7lu", resourceStats.buffersCreated          / frameCount, resourceStats.buffersCreated);
+    NSLog(@"Metal   Buffers reused:     %7lu / %7lu", resourceStats.buffersReused           / frameCount, resourceStats.buffersReused);
+    NSLog(@"Render  Encoders requested: %7lu / %7lu", resourceStats.renderEncodersRequested / frameCount, resourceStats.renderEncodersRequested);
+    NSLog(@"Render  Encoders created:   %7lu / %7lu", resourceStats.renderEncodersCreated   / frameCount, resourceStats.renderEncodersCreated);
+    NSLog(@"Render  Pipeline States:    %7lu / %7lu", resourceStats.renderPipelineStates    / frameCount, resourceStats.renderPipelineStates);
+    NSLog(@"Compute Encoders requested: %7lu / %7lu", resourceStats.computeEncodersRequested/ frameCount, resourceStats.computeEncodersRequested);
+    NSLog(@"Compute Encoders created:   %7lu / %7lu", resourceStats.computeEncodersCreated  / frameCount, resourceStats.computeEncodersCreated);
+    NSLog(@"Compute Pipeline States:    %7lu / %7lu", resourceStats.computePipelineStates   / frameCount, resourceStats.computePipelineStates);
+    NSLog(@"Blit    Encoders requested: %7lu / %7lu", resourceStats.blitEncodersRequested   / frameCount, resourceStats.blitEncodersRequested);
+    NSLog(@"Blit    Encoders created:   %7lu / %7lu", resourceStats.blitEncodersCreated     / frameCount, resourceStats.blitEncodersCreated);
 #endif
 }
 
@@ -1586,6 +1586,14 @@ void MtlfMetalContext::CommitCommandBuffer(bool waituntilScheduled, bool waitUnt
 #endif
     }
     
+    __block unsigned long thisFrameNumber = frameCount;
+
+     [wq->commandBuffer addCompletedHandler:^(id<MTLCommandBuffer> commandBuffer) {
+        GPUTimerEndTimer(thisFrameNumber);
+      }];
+
+    GPUTimerStartTimer(thisFrameNumber);
+
     [wq->commandBuffer commit];
     
     if (waitUntilCompleted) {
@@ -1840,13 +1848,76 @@ void MtlfMetalContext::CleanupUnusedBuffers()
 }
 
 void MtlfMetalContext::StartFrame() {
-    
+    numPrimsDrawn = 0;
+    GPUTImerResetTimer(frameCount);
 }
 
 void MtlfMetalContext::EndFrame() {
-    //NSLog(@"Frame: %u", frameCount);
+    GPUTimerFinish(frameCount);
+    
+    //NSLog(@"Time: %3.3f (%lu)", GetGPUTimeInMs(), frameCount);
+    
     frameCount++;
     CleanupUnusedBuffers();
+}
+
+void  MtlfMetalContext::GPUTImerResetTimer(unsigned long frameNumber) {
+    GPUFrameTime *timer = &gpuFrameTimes[frameNumber % METAL_NUM_GPU_FRAME_TIMES];
+    
+    timer->startingFrame        = frameNumber;
+    timer->timingEventsIssued   = 0;
+    timer->timingEventsReceived = 0;
+    timer->timingCompleted      = false;
+}
+
+
+// Starts the GPU frame timer, only the first call per frame will start the timer
+void MtlfMetalContext::GPUTimerStartTimer(unsigned long frameNumber)
+{
+    GPUFrameTime *timer = &gpuFrameTimes[frameNumber % METAL_NUM_GPU_FRAME_TIMES];
+    // Just start the timer on the first call
+    if (!timer->timingEventsIssued) {
+        gettimeofday(&timer->frameStartTime, 0);
+    }
+    timer->timingEventsIssued++;
+}
+
+// Records a GPU end of frame timer, if multiple are received only the last is recorded
+void MtlfMetalContext::GPUTimerEndTimer(unsigned long frameNumber)
+{
+    GPUFrameTime *timer = &gpuFrameTimes[frameNumber % METAL_NUM_GPU_FRAME_TIMES];
+    gettimeofday(&timer->frameEndTime, 0);
+    timer->timingEventsReceived++;
+}
+
+// Indicates that a timer has finished receiving all of the events to be issued
+void  MtlfMetalContext::GPUTimerFinish(unsigned long frameNumber) {
+    GPUFrameTime *timer = &gpuFrameTimes[frameNumber % METAL_NUM_GPU_FRAME_TIMES];
+    timer->timingCompleted = true;
+}
+
+// Returns the most recently valid frame time
+float MtlfMetalContext::GetGPUTimeInMs() {
+    GPUFrameTime *validTimer = NULL;
+    unsigned long highestFrameNumber = 0;
+    
+    for (int i = 0; i < METAL_NUM_GPU_FRAME_TIMES; i++) {
+        GPUFrameTime *timer = &gpuFrameTimes[i];
+        // To be a valid time it must have received all timing events back and have it's frame marked as finished
+        if (timer->startingFrame >= highestFrameNumber &&
+            timer->timingCompleted                   &&
+            timer->timingEventsIssued == timer->timingEventsReceived) {
+            validTimer = timer;
+            highestFrameNumber = timer->startingFrame;
+        }
+    }
+    if (!validTimer) {
+        return 0.0f;
+    }
+    
+    struct timeval diff;
+    timersub(&validTimer->frameEndTime, &validTimer->frameStartTime, &diff);
+    return (float) ((diff.tv_sec + diff.tv_usec) / 1000.0f);
 }
 
 
