@@ -99,7 +99,11 @@ HdSt_FlatNormalsComputationMetal::_Execute(
     [computeEncoder setBuffer:primitiveParam->GetId() offset:0 atIndex:3];
     [computeEncoder setBytes:(const void *)&uniform length:sizeof(uniform) atIndex:4];
     
-    [computeEncoder dispatchThreads:MTLSizeMake(numPrims, 1, 1) threadsPerThreadgroup:MTLSizeMake(1, 1, 1)];
+    int exeWidth = context->GetCurrentComputeThreadExecutionWidth(METALWORKQUEUE_GEOMETRY_SHADER);
+    int maxThreadsPerThreadgroup = context->GetMaxThreadsPerThreadgroup(METALWORKQUEUE_GEOMETRY_SHADER);
+    MTLSize threadGroupcount = MTLSizeMake(fmin(maxThreadsPerThreadgroup, numPrims), 1, 1);
+    
+    [computeEncoder dispatchThreads:MTLSizeMake(numPrims, 1, 1) threadsPerThreadgroup:threadGroupcount];
     
     context->ReleaseEncoder(false, METALWORKQUEUE_GEOMETRY_SHADER);
 }

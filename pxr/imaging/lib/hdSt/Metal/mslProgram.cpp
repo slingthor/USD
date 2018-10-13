@@ -671,7 +671,10 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
     
     if(doMVAComputeGS)
     {
-        [computeEncoder dispatchThreads:MTLSizeMake((indexCount / 3) * instanceCount, 1, 1) threadsPerThreadgroup:MTLSizeMake(64, 1, 1)];
+        NSInteger maxThreadsPerThreadgroup = context->GetMaxThreadsPerThreadgroup(METALWORKQUEUE_GEOMETRY_SHADER);
+        NSInteger primCount = (indexCount / 3) * instanceCount;
+        MTLSize threadGroupcount = MTLSizeMake(fmin(maxThreadsPerThreadgroup, primCount), 1, 1);
+        [computeEncoder dispatchThreads:MTLSizeMake(primCount, 1, 1) threadsPerThreadgroup:threadGroupcount];
 
         [renderEncoder drawPrimitives:primType vertexStart:0 vertexCount:indexCount instanceCount:instanceCount baseInstance:0];
     }

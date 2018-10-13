@@ -638,14 +638,16 @@ MtlfMetalContext::CopyDepthTextureToOpenGL()
     computeEncoder.label = @"Depth buffer copy";
     
     NSUInteger exeWidth = context->SetComputeEncoderState(computeDepthCopyProgram, 0, 0, @"Depth copy pipeline state");
+    NSUInteger maxThreadsPerThreadgroup = context->GetMaxThreadsPerThreadgroup();
     
-    MTLSize threadGroupCount = MTLSizeMake(16, exeWidth / 32, 1);
-    MTLSize threadGroups     = MTLSizeMake(mtlDepthTexture.width / threadGroupCount.width + 1,
-                                           mtlDepthTexture.height / threadGroupCount.height + 1, 1);
-    
+    MTLSize threadgroupCount = MTLSizeMake(exeWidth, maxThreadsPerThreadgroup / exeWidth, 1);
+    MTLSize threadsPerGrid   = MTLSizeMake(mtlDepthTexture.width,
+                                           mtlDepthTexture.height,
+                                           1);
+
     [computeEncoder setTexture:mtlDepthTexture atIndex:0];
     [computeEncoder setTexture:mtlDepthRegularFloatTexture atIndex:1];
-    [computeEncoder dispatchThreadgroups:threadGroups threadsPerThreadgroup: threadGroupCount];
+    [computeEncoder dispatchThreads:threadsPerGrid threadsPerThreadgroup: threadgroupCount];
     
     ReleaseEncoder(true);
 }
@@ -1494,6 +1496,20 @@ NSUInteger MtlfMetalContext::SetComputeEncoderState(id<MTLFunction>     computeF
     }
     
     return wq->currentComputeThreadExecutionWidth;
+}
+
+int MtlfMetalContext::GetCurrentComputeThreadExecutionWidth(MetalWorkQueueType workQueueType)
+{
+    MetalWorkQueue const* const wq = &workQueues[workQueueType];
+    
+    return wq->currentComputeThreadExecutionWidth;
+}
+
+int MtlfMetalContext::GetMaxThreadsPerThreadgroup(MetalWorkQueueType workQueueType)
+{
+    MetalWorkQueue const* const wq = &workQueues[workQueueType];
+    
+    return [wq->currentComputePipelineState maxTotalThreadsPerThreadgroup];
 }
 
 void MtlfMetalContext::ResetEncoders(MetalWorkQueueType workQueueType, bool isInitializing)
