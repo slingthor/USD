@@ -94,7 +94,7 @@ private:
 class UsdImaging_TestDriver final {
 public:
     UsdImaging_TestDriver(std::string const& usdFilePath)
-        : _engine()
+        : _engine(UNITTEST_GFX_ARCH)
         , _renderDelegate()
         , _renderIndex(nullptr)
         , _delegate(nullptr)
@@ -112,7 +112,7 @@ public:
                           TfToken const &collectionName,
                           TfToken const &reprName,
                           TfTokenVector const &renderTags)
-        : _engine()
+        : _engine(UNITTEST_GFX_ARCH)
         , _renderDelegate()
         , _renderIndex(nullptr)
         , _delegate(nullptr)
@@ -125,7 +125,7 @@ public:
     }
 
     UsdImaging_TestDriver(UsdStageRefPtr const& usdStage)
-        : _engine()
+        : _engine(UNITTEST_GFX_ARCH)
         , _renderDelegate()
         , _renderIndex(nullptr)
         , _delegate(nullptr)
@@ -142,7 +142,7 @@ public:
                           TfToken const &collectionName,
                           TfToken const &reprName,
                           TfTokenVector const &renderTags)
-        : _engine()
+        : _engine(UNITTEST_GFX_ARCH)
         , _renderDelegate()
         , _renderIndex(nullptr)
         , _delegate(nullptr)
@@ -226,7 +226,7 @@ private:
         HdRprimCollection col = HdRprimCollection(collectionName, HdReprSelector(reprName));
         col.SetRenderTags(renderTags);
         _geometryPass = HdRenderPassSharedPtr(new HdSt_RenderPass(_renderIndex, col));
-        _renderPassState = HdRenderPassStateSharedPtr(new HdStRenderPassState());
+        _renderPassState = HdRenderPassStateSharedPtr(HdStRenderPassState::New());
     }
 };
 

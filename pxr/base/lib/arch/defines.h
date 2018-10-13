@@ -111,9 +111,14 @@ PXR_NAMESPACE_OPEN_SCOPE
 // Metal API present
 #if defined(ARCH_OS_DARWIN)
 #define ARCH_GFX_METAL
+#define UNITTEST_GFX_ARCH HdEngine::Metal
 #if __MAC_OS_X_VERSION_MAX_ALLOWED >= 101400 /* __MAC_10_14 */
 #define METAL_EVENTS_AVAILABLE
 #endif
+#endif
+
+#if !defined(UNITTEST_GFX_ARCH)
+#define UNITTEST_GFX_ARCH HdEngine::OpenGL
 #endif
 
 PXR_NAMESPACE_CLOSE_SCOPE

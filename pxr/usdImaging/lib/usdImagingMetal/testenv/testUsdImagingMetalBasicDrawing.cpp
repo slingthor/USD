@@ -211,7 +211,7 @@ My_TestMetalDrawing::DrawTest(bool offscreen)
     perfLog.ResetCache(HdTokens->topology);
     perfLog.ResetCache(HdTokens->transform);
     perfLog.SetCounter(UsdImagingTokens->usdVaryingExtent, 0);
-    perfLog.SetCounter(UsdImagingTokens->usdVaryingPrimVar, 0);
+    perfLog.SetCounter(UsdImagingTokens->usdVaryingPrimvar, 0);
     perfLog.SetCounter(UsdImagingTokens->usdVaryingTopology, 0);
     perfLog.SetCounter(UsdImagingTokens->usdVaryingVisibility, 0);
     perfLog.SetCounter(UsdImagingTokens->usdVaryingXform, 0);

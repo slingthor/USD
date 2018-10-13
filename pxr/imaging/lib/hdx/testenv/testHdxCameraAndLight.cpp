@@ -92,7 +92,7 @@ static void CameraAndLightTest()
     perfLog.Enable();
     HdRprimCollection collection(HdTokens->geometry, 
         HdReprSelector(HdReprTokens->hull));
-    HdRenderPassStateSharedPtr renderPassState(new HdStRenderPassState());
+    HdRenderPassStateSharedPtr renderPassState(HdStRenderPassState::New());
     HdRenderPassSharedPtr renderPass(
         new HdSt_RenderPass(index.get(), collection));
     HdEngine engine(HdEngine::OpenGL);
