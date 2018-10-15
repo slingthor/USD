@@ -59,6 +59,7 @@ MtlfContextCaps::_LoadCaps()
     flipTexturesOnLoad           = true;
     useCppShaderPadding          = true;
     hasSubDataCopy               = true;
+    alwaysNeedsBinding           = true;
 
 #if OPENSUBDIV_HAS_METAL_COMPUTE
     //METAL_TODO: Metal always has compute capabilities. gpuComputeNormals only affects

@@ -105,6 +105,7 @@ GarchContextCaps::GarchContextCaps()
     , flipTexturesOnLoad(true)
     , hasSubDataCopy(false)
     , useCppShaderPadding(false)
+    , alwaysNeedsBinding(false)
 {
     // Empty
 }

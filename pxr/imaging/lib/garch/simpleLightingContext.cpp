@@ -25,6 +25,7 @@
 
 #include "pxr/imaging/garch/simpleLightingContext.h"
 #include "pxr/imaging/garch/bindingMap.h"
+#include "pxr/imaging/garch/contextCaps.h"
 #include "pxr/imaging/garch/resourceFactory.h"
 #include "pxr/imaging/garch/simpleLight.h"
 #include "pxr/imaging/garch/simpleMaterial.h"
@@ -251,15 +252,17 @@ void
 GarchSimpleLightingContext::BindUniformBlocks(GarchBindingMapPtr const &bindingMap)
 {
     if (!_lightingUniformBlock)
-        _lightingUniformBlock = GarchResourceFactory::GetInstance()->NewUniformBlock();
+        _lightingUniformBlock = GarchResourceFactory::GetInstance()->NewUniformBlock("_lightingUniformBlock");
     if (!_shadowUniformBlock)
-        _shadowUniformBlock = GarchResourceFactory::GetInstance()->NewUniformBlock();
+        _shadowUniformBlock = GarchResourceFactory::GetInstance()->NewUniformBlock("_shadowUniformBlock");
     if (!_materialUniformBlock)
-        _materialUniformBlock = GarchResourceFactory::GetInstance()->NewUniformBlock();
+        _materialUniformBlock = GarchResourceFactory::GetInstance()->NewUniformBlock("_materialUniformBlock");
 
+    bool bAlwaysNeedsBinding = GarchResourceFactory::GetInstance()->GetContextCaps().alwaysNeedsBinding;
+    
     bool shadowExists = false;
-    if ((!_lightingUniformBlockValid ||
-         !_shadowUniformBlockValid) && _lights.size() > 0) {
+    if ((!_lightingUniformBlockValid || !_shadowUniformBlockValid) &&
+        ((_lights.size() > 0) || bAlwaysNeedsBinding)) {
         int numLights = GetNumLightsUsed();
 
         // 16byte aligned
@@ -305,8 +308,18 @@ GarchSimpleLightingContext::BindUniformBlocks(GarchBindingMapPtr const &bindingM
             ARCH_PRAGMA_POP
         };
 
-        size_t lightingSize = sizeof(Lighting) + sizeof(LightSource) * numLights;
-        size_t shadowSize = sizeof(ShadowMatrix) * numLights;
+        size_t lightingSize;
+        size_t shadowSize;
+
+        if (numLights == 0) {
+            lightingSize = sizeof(Lighting) + sizeof(LightSource);
+            shadowSize = sizeof(ShadowMatrix);
+        }
+        else {
+            lightingSize = sizeof(Lighting) + sizeof(LightSource) * numLights;
+            shadowSize = sizeof(ShadowMatrix) * numLights;
+        }
+        
         Lighting *lightingData = (Lighting *)alloca(lightingSize);
         Shadow *shadowData = (Shadow *)alloca(shadowSize);
 
@@ -361,7 +374,7 @@ GarchSimpleLightingContext::BindUniformBlocks(GarchBindingMapPtr const &bindingM
         _lightingUniformBlock->Update(lightingData, lightingSize);
         _lightingUniformBlockValid = true;
 
-        if (shadowExists) {
+        if (shadowExists || bAlwaysNeedsBinding) {
             _shadowUniformBlock->Update(shadowData, shadowSize);
             _shadowUniformBlockValid = true;
         }
@@ -369,7 +382,7 @@ GarchSimpleLightingContext::BindUniformBlocks(GarchBindingMapPtr const &bindingM
 
     _lightingUniformBlock->Bind(bindingMap, _tokens->lightingUB);
 
-    if (shadowExists) {
+    if (shadowExists || bAlwaysNeedsBinding) {
         _shadowUniformBlock->Bind(bindingMap, _tokens->shadowUB);
     }
 

@@ -44,8 +44,6 @@ class GlfSimpleLightingContext : public GarchSimpleLightingContext {
 public:
 
     GLF_API
-    virtual void BindUniformBlocks(GarchBindingMapPtr const &bindingMap) override;
-    GLF_API
     virtual void BindSamplers(GarchBindingMapPtr const &bindingMap) override;
 
     GLF_API
