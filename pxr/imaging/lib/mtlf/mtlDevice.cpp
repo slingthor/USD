@@ -588,9 +588,6 @@ MtlfMetalContext::IsInitialized()
 void
 MtlfMetalContext::BlitColorTargetToOpenGL()
 {
-    currentWorkQueueType = METALWORKQUEUE_DEFAULT;
-    currentWorkQueue     = &workQueues[currentWorkQueueType];
-    
     glPushAttrib(GL_ENABLE_BIT | GL_POLYGON_BIT | GL_DEPTH_BUFFER_BIT);
     
     glDepthMask(GL_TRUE);
@@ -1875,6 +1872,9 @@ void MtlfMetalContext::EndFrame() {
     
     frameCount++;
     CleanupUnusedBuffers();
+    
+    currentWorkQueueType = METALWORKQUEUE_DEFAULT;
+    currentWorkQueue     = &workQueues[currentWorkQueueType];
 }
 
 void  MtlfMetalContext::GPUTImerResetTimer(unsigned long frameNumber) {

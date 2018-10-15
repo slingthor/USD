@@ -255,7 +255,7 @@ private:
     
     MTLRenderPassDescriptor* _mtlRenderPassDescriptor;
     
-    MTLCaptureManager *sharedCaptureManager;
+    MTLCaptureManager *_sharedCaptureManager;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

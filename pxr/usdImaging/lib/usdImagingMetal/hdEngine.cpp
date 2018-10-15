@@ -91,6 +91,7 @@ UsdImagingMetalHdEngine::UsdImagingMetalHdEngine(
     , _isPopulated(false)
     , _renderTags()
     , _mtlRenderPassDescriptor(nil)
+    , _sharedCaptureManager(nil)
 {
     // _renderIndex, _taskController, and _delegate are initialized
     // by the plugin system.
@@ -1115,14 +1116,14 @@ UsdImagingMetalHdEngine::SetRendererPlugin(TfToken const &pluginId)
 void
 UsdImagingMetalHdEngine::_InitializeCapturing()
 {
-    if(sharedCaptureManager == nil)
-        sharedCaptureManager = [MTLCaptureManager sharedCaptureManager];
+    if(_sharedCaptureManager == nil)
+        _sharedCaptureManager = [MTLCaptureManager sharedCaptureManager];
     else
-        [sharedCaptureManager.defaultCaptureScope release];
+        [_sharedCaptureManager.defaultCaptureScope release];
         
-    id<MTLCaptureScope> captureScope = [sharedCaptureManager newCaptureScopeWithDevice:MtlfMetalContext::GetMetalContext()->device];
+    id<MTLCaptureScope> captureScope = [_sharedCaptureManager newCaptureScopeWithDevice:MtlfMetalContext::GetMetalContext()->device];
     captureScope.label = @"Hydra Capture Scope";
-    sharedCaptureManager.defaultCaptureScope = captureScope;
+    _sharedCaptureManager.defaultCaptureScope = captureScope;
 }
 
 void
