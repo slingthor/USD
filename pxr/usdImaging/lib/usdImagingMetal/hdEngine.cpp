@@ -108,10 +108,7 @@ UsdImagingMetalHdEngine::UsdImagingMetalHdEngine(
     
     MtlfRegisterDefaultDebugOutputMessageCallback();
     
-    sharedCaptureManager = [MTLCaptureManager sharedCaptureManager];
-    id<MTLCaptureScope> captureScope = [sharedCaptureManager newCaptureScopeWithDevice:MtlfMetalContext::GetMetalContext()->device];
-    captureScope.label = @"Hydra Capture Scope";
-    sharedCaptureManager.defaultCaptureScope = captureScope;
+    _InitializeCapturing();
 }
 
 UsdImagingMetalHdEngine::~UsdImagingMetalHdEngine()
@@ -1049,6 +1046,9 @@ UsdImagingMetalHdEngine::SetRendererPlugin(TfToken const &pluginId)
                     
                     // Recreate the underlying Metal context
                     MtlfMetalContext::RecreateInstance(dev);
+                    
+                    //Also recreate a capture scope with the new device
+                    _InitializeCapturing();
                 }
                 break;
             }
@@ -1110,6 +1110,19 @@ UsdImagingMetalHdEngine::SetRendererPlugin(TfToken const &pluginId)
     _taskController->SetSelectionColor(_selectionColor);
     
     return true;
+}
+
+void
+UsdImagingMetalHdEngine::_InitializeCapturing()
+{
+    if(sharedCaptureManager == nil)
+        sharedCaptureManager = [MTLCaptureManager sharedCaptureManager];
+    else
+        [sharedCaptureManager.defaultCaptureScope release];
+        
+    id<MTLCaptureScope> captureScope = [sharedCaptureManager newCaptureScopeWithDevice:MtlfMetalContext::GetMetalContext()->device];
+    captureScope.label = @"Hydra Capture Scope";
+    sharedCaptureManager.defaultCaptureScope = captureScope;
 }
 
 void

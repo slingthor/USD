@@ -220,6 +220,8 @@ private:
                           TfTokenVector *renderTags);
     static HdxRenderTaskParams _MakeHydraRenderParams(
                           UsdImagingMetalEngine::RenderParams const& params);
+    
+    void _InitializeCapturing();
 
     // This function disposes of: the render index, the render plugin,
     // the task controller, and the usd imaging delegate.
