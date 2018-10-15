@@ -103,7 +103,7 @@ public:
     virtual void InitSamplerUnitBindings(GarchBindingMapPtr const &bindingMap) const;
 
     GARCH_API
-    virtual void BindUniformBlocks(GarchBindingMapPtr const &bindingMap) = 0;
+    virtual void BindUniformBlocks(GarchBindingMapPtr const &bindingMap);
     GARCH_API
     virtual void BindSamplers(GarchBindingMapPtr const &bindingMap) = 0;
 

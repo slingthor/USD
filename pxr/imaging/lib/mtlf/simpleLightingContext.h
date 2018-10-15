@@ -44,8 +44,6 @@ class MtlfSimpleLightingContext : public GarchSimpleLightingContext {
 public:
 
     MTLF_API
-    virtual void BindUniformBlocks(GarchBindingMapPtr const &bindingMap) override;
-    MTLF_API
     virtual void BindSamplers(GarchBindingMapPtr const &bindingMap) override;
 
     MTLF_API

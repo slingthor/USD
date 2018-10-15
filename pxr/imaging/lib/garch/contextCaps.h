@@ -95,6 +95,9 @@ public:
     
     // Shader language padding for structures
     bool useCppShaderPadding;
+    
+    // Shaders always need a buffer binding, even when unused
+    bool alwaysNeedsBinding;
 
     /// Returns whether to do frustum culling on the GPU
 	GARCH_API
