@@ -275,7 +275,7 @@ void MtlfMetalContext::_InitialiseGL()
 // MtlfMetalContext
 //
 
-MtlfMetalContext::MtlfMetalContext(id<MTLDevice> _device)
+MtlfMetalContext::MtlfMetalContext(id<MTLDevice> _device, int width, int height)
 : enableMVA(false)
 , enableComputeGS(false)
 {
@@ -286,6 +286,7 @@ MtlfMetalContext::MtlfMetalContext(id<MTLDevice> _device)
     }
     else
         device = _device;
+
     NSLog(@"Selected %@ for Metal Device", device.name);
 #if defined(METAL_EVENTS_AVAILABLE)
     enableMultiQueue = [device supportsFeatureSet:MTLFeatureSet_macOS_GPUFamily2_v1];
@@ -357,7 +358,8 @@ MtlfMetalContext::MtlfMetalContext(id<MTLDevice> _device)
     mtlColorTexture = nil;
     mtlDepthTexture = nil;
     mtlDepthRegularFloatTexture = nil;
-    AllocateAttachments(256, 256);
+    
+    AllocateAttachments(width, height);
 
     renderPipelineStateDescriptor = nil;
     computePipelineStateDescriptor = nil;
@@ -433,10 +435,10 @@ MtlfMetalContext::~MtlfMetalContext()
 #endif
 }
 
-void MtlfMetalContext::RecreateInstance(id<MTLDevice> device)
+void MtlfMetalContext::RecreateInstance(id<MTLDevice> device, int width, int height)
 {
     context = NULL;
-    context = MtlfMetalContextSharedPtr(new MtlfMetalContext(device));
+    context = MtlfMetalContextSharedPtr(new MtlfMetalContext(device, width, height));
 }
 
 void MtlfMetalContext::_FreeTransientTextureCacheRefs()
@@ -571,7 +573,7 @@ MtlfMetalContextSharedPtr
 MtlfMetalContext::GetMetalContext()
 {
     if (!context)
-        context = MtlfMetalContextSharedPtr(new MtlfMetalContext(nil));
+        context = MtlfMetalContextSharedPtr(new MtlfMetalContext(nil, 256, 256));
 
     return context;
 }
@@ -580,7 +582,7 @@ bool
 MtlfMetalContext::IsInitialized()
 {
     if (!context)
-        context = MtlfMetalContextSharedPtr(new MtlfMetalContext(nil));
+        context = MtlfMetalContextSharedPtr(new MtlfMetalContext(nil, 256, 256));
 
     return context->device != nil;
 }

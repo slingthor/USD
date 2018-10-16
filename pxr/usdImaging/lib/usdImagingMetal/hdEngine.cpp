@@ -1045,8 +1045,11 @@ UsdImagingMetalHdEngine::SetRendererPlugin(TfToken const &pluginId)
                     // Tear it down and bring it back up with the new Metal device
                     forceReload = true;
                     
+                    GLint viewport[4];
+                    glGetIntegerv( GL_VIEWPORT, viewport );
+
                     // Recreate the underlying Metal context
-                    MtlfMetalContext::RecreateInstance(dev);
+                    MtlfMetalContext::RecreateInstance(dev, viewport[2], viewport[3]);
                     
                     //Also recreate a capture scope with the new device
                     _InitializeCapturing();
