@@ -372,15 +372,15 @@ UsdImagingMetalHdEngine::_UpdateHydraCollection(HdRprimCollection *collection,
         params.drawMode == UsdImagingMetalEngine::DRAW_WIREFRAME_ON_SURFACE) {
         // Wireframe on surface
         reprSelector = HdReprSelector(refined ?
-                                      HdReprTokens->refinedWireOnSurf : HdReprTokens->wireOnSurf);
+            HdReprTokens->refinedWireOnSurf : HdReprTokens->wireOnSurf);
     } else if (params.drawMode == UsdImagingMetalEngine::DRAW_WIREFRAME) {
         // Wireframe
         reprSelector = HdReprSelector(refined ?
-                                      HdReprTokens->refinedWire : HdReprTokens->wire);
+            HdReprTokens->refinedWire : HdReprTokens->wire);
     } else {
         // Smooth shading
         reprSelector = HdReprSelector(refined ?
-                                      HdReprTokens->refined : HdReprTokens->smoothHull);
+            HdReprTokens->refined : HdReprTokens->smoothHull);
     }
     
     // Calculate the rendertags needed based on the parameters passed by
@@ -468,7 +468,7 @@ UsdImagingMetalHdEngine::_MakeHydraRenderParams(
         params.enableLighting = false;
     } else {
         params.enableLighting =  renderParams.enableLighting &&
-            !renderParams.enableIdRender;
+                                !renderParams.enableIdRender;
     }
     
     params.enableIdRender      = renderParams.enableIdRender;
