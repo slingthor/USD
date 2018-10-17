@@ -379,11 +379,17 @@ MtlfMetalContext::MtlfMetalContext(id<MTLDevice> _device, int width, int height)
         ResetEncoders((MetalWorkQueueType)i, true);
     }
     
+    perFrameBuffer           = nil;
+    perFrameBufferSize       = 5*1024*1024;
+    perFrameBufferOffset     = 0;
+    perFrameBufferAlignment  = 16;
+    
 #if METAL_ENABLE_STATS
     resourceStats.commandBuffersCreated   = 0;
     resourceStats.commandBuffersCommitted = 0;
     resourceStats.buffersCreated          = 0;
     resourceStats.buffersReused           = 0;
+    resourceStats.bufferSearches          = 0;
     resourceStats.renderEncodersCreated   = 0;
     resourceStats.computeEncodersCreated  = 0;
     resourceStats.blitEncodersCreated     = 0;
@@ -424,6 +430,7 @@ MtlfMetalContext::~MtlfMetalContext()
     NSLog(@"Command Buffers committed:  %7lu / %7lu", resourceStats.commandBuffersCommitted / frameCount, resourceStats.commandBuffersCommitted);
     NSLog(@"Metal   Buffers created:    %7lu / %7lu", resourceStats.buffersCreated          / frameCount, resourceStats.buffersCreated);
     NSLog(@"Metal   Buffers reused:     %7lu / %7lu", resourceStats.buffersReused           / frameCount, resourceStats.buffersReused);
+    NSLog(@"Metal   Av buf search depth:%7lu"       , resourceStats.bufferSearches          / (resourceStats.buffersCreated + resourceStats.buffersReused));
     NSLog(@"Render  Encoders requested: %7lu / %7lu", resourceStats.renderEncodersRequested / frameCount, resourceStats.renderEncodersRequested);
     NSLog(@"Render  Encoders created:   %7lu / %7lu", resourceStats.renderEncodersCreated   / frameCount, resourceStats.renderEncodersCreated);
     NSLog(@"Render  Pipeline States:    %7lu / %7lu", resourceStats.renderPipelineStates    / frameCount, resourceStats.renderPipelineStates);
@@ -1805,7 +1812,7 @@ id<MTLBuffer> MtlfMetalContext::GetMetalBuffer(NSUInteger length, MTLResourceOpt
         buffer = bufferEntry.buffer;
         MTLStorageMode  storageMode  =  MTLStorageMode((options & MTLResourceStorageModeMask)  >> MTLResourceStorageModeShift);
         MTLCPUCacheMode cpuCacheMode = MTLCPUCacheMode((options & MTLResourceCPUCacheModeMask) >> MTLResourceCPUCacheModeShift);
-        
+        METAL_INC_STAT(resourceStats.bufferSearches);
         // Check if buffer matches size and storage mode and is old enough to reuse
         if (buffer.length == length              &&
             storageMode   == buffer.storageMode  &&
@@ -1835,6 +1842,34 @@ id<MTLBuffer> MtlfMetalContext::GetMetalBuffer(NSUInteger length, MTLResourceOpt
     return buffer;
 }
 
+// Gets space inside a buffer that has a lifetime of the current frame only - to be used for temporary data such as uniforms, the offset *must* be used
+id<MTLBuffer> MtlfMetalContext::GetMetalBufferAllocation(NSUInteger length, const void *pointer, NSUInteger *offset)
+{
+    // If there's no existing buffer or we're about to overflow the current one then create one
+    if (perFrameBuffer == nil ||
+        (length + perFrameBufferOffset > perFrameBufferSize)) {
+        
+        // Release the current buffer
+        if (perFrameBuffer != nil) {
+             ReleaseMetalBuffer(perFrameBuffer);
+        }
+        // This allows the buffer to grow from its initial size
+        perFrameBufferSize = MAX(length, perFrameBufferSize);
+        
+        // Get a new buffer
+        perFrameBuffer = GetMetalBuffer(perFrameBufferSize, MTLResourceStorageModePrivate|MTLResourceOptionCPUCacheModeDefault);
+        perFrameBufferOffset = 0;
+    }
+    
+    // Set the current offset
+    *offset = perFrameBufferOffset;
+    
+    // Move the offset to the next aligned position
+    perFrameBufferOffset += (perFrameBufferAlignment - (perFrameBufferOffset % perFrameBufferAlignment));
+    
+    return perFrameBuffer;
+}
+
 void MtlfMetalContext::ReleaseMetalBuffer(id<MTLBuffer> buffer)
 {
  #if METAL_REUSE_BUFFERS
@@ -1851,6 +1886,7 @@ void MtlfMetalContext::CleanupUnusedBuffers()
 {
     id<MTLBuffer> buffer;
     
+    // Release all buffers that have not been recently reused
     for (auto entry = bufferFreeList.begin(); entry != bufferFreeList.end(); entry++) {
         MetalBufferListEntry bufferEntry = *entry;
         buffer = bufferEntry.buffer;
@@ -1860,6 +1896,11 @@ void MtlfMetalContext::CleanupUnusedBuffers()
             bufferFreeList.erase(entry);
         }
     }
+    
+    // Release resources associated with the per frame buffer
+    ReleaseMetalBuffer(perFrameBuffer);
+    perFrameBuffer       = nil;
+    perFrameBufferOffset = 0;
 }
 
 void MtlfMetalContext::StartFrame() {
