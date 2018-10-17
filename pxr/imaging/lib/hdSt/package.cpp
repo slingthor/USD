@@ -57,8 +57,8 @@ HdStPackageComputeShader()
 #endif
         case HdEngine::OpenGL:
         default:
-            static TfToken computeShader = _GetShaderPath("compute.glslfx");
-            return computeShader;
+            static TfToken computeShaderGL = _GetShaderPath("compute.glslfx");
+            return computeShaderGL;
     }
     return TfToken();
 }
@@ -66,8 +66,19 @@ HdStPackageComputeShader()
 TfToken
 HdStPackagePtexTextureShader()
 {
-    static TfToken s = _GetShaderPath("ptexTexture.glslfx");
-    return s;
+    HdEngine::RenderAPI api = HdEngine::GetRenderAPI();
+    switch(api) {
+#if defined(ARCH_GFX_METAL)
+        case HdEngine::Metal:
+            static TfToken ptexShaderMetal = _GetShaderPath("ptexTextureMetal.glslfx");
+            return ptexShaderMetal;
+#endif
+        case HdEngine::OpenGL:
+        default:
+            static TfToken ptexShaderGL = _GetShaderPath("ptexTextureGL.glslfx");
+            return ptexShaderGL;
+    }
+    return TfToken();
 }
 
 TfToken

@@ -24,10 +24,27 @@
 // language governing permissions and limitations under the Apache License.
 //
 
+-- configuration
+{
+    "techniques": {
+        "default": {
+            "ptexTextureSampler" : {
+                "source": [
+                    "GlopTexture.PtexTextureSampler"
+                ]
+            }
+        }
+    }
+}
+
 -- glsl GlopTexture.PtexTextureSampler
 
+struct PtexData {
+    texture2d_array<float> data;
+    sampler s;
+};
+
 // ----- following code comes from OpenSubdiv/examples/common
-#ifndef HD_SHADER_API
 
 struct PtexPacking {
     int page;
@@ -55,11 +72,7 @@ int computeMipmapOffsetV(int h, int level)
     return (m & x) + (level&~1);
 }
 
-#if defined(ARCH_GFX_METAL)
 void evalQuadraticBSpline(float u, thread float *B, thread float *BU)
-#else
-void evalQuadraticBSpline(float u, out float B[3], out float BU[3])
-#endif
 {
     B[0] = 0.5 * (u*u - 2.0*u + 1);
     B[1] = 0.5 + u - u*u;
@@ -70,18 +83,18 @@ void evalQuadraticBSpline(float u, out float B[3], out float BU[3])
     BU[2] = u;
 }
 
-PtexPacking getPtexPacking(isamplerBuffer packings, int faceID)
+PtexPacking getPtexPacking(texture1d<int> packings, uint faceID)
 {
     PtexPacking packing;
-    packing.page    = texelFetch(packings, faceID*6).x;
-    packing.nMipmap = texelFetch(packings, faceID*6+1).x;
-    packing.uOffset = texelFetch(packings, faceID*6+2).x;
-    packing.vOffset = texelFetch(packings, faceID*6+3).x;
-    int wh          = texelFetch(packings, faceID*6+5).x;
+    packing.page    = packings.read(faceID*6).x;
+    packing.nMipmap = packings.read(faceID*6+1).x;
+    packing.uOffset = packings.read(faceID*6+2).x;
+    packing.vOffset = packings.read(faceID*6+3).x;
+    int wh          = packings.read(faceID*6+5).x;
     packing.width   = 1 << (wh >> 8);
     packing.height  = 1 << (wh & 0xff);
 
-    int adjSizeDiffs = texelFetch(packings, faceID*6+4).x;
+    int adjSizeDiffs = packings.read(faceID*6+4).x;
     packing.adjSizeDiffs[0] = (adjSizeDiffs >> 12) & 0xf;
     packing.adjSizeDiffs[1] = (adjSizeDiffs >> 8) & 0xf;
     packing.adjSizeDiffs[2] = (adjSizeDiffs >> 4) & 0xf;
@@ -90,15 +103,15 @@ PtexPacking getPtexPacking(isamplerBuffer packings, int faceID)
     return packing;
 }
 
-PtexPacking getPtexPacking(isamplerBuffer packings, int faceID, int level)
+PtexPacking getPtexPacking(texture1d<int> packings, uint faceID, int level)
 {
     PtexPacking packing;
-    packing.page    = texelFetch(packings, faceID*6).x;
-    packing.nMipmap = texelFetch(packings, faceID*6+1).x;
-    packing.uOffset = texelFetch(packings, faceID*6+2).x;
-    packing.vOffset = texelFetch(packings, faceID*6+3).x;
-    int sizeDiffs   = texelFetch(packings, faceID*6+4).x;
-    int wh          = texelFetch(packings, faceID*6+5).x;
+    packing.page    = packings.read(faceID*6).x;
+    packing.nMipmap = packings.read(faceID*6+1).x;
+    packing.uOffset = packings.read(faceID*6+2).x;
+    packing.vOffset = packings.read(faceID*6+3).x;
+    int sizeDiffs   = packings.read(faceID*6+4).x;
+    int wh          = packings.read(faceID*6+5).x;
     int w = wh >> 8;
     int h = wh & 0xff;
 
@@ -118,63 +131,63 @@ PtexPacking getPtexPacking(isamplerBuffer packings, int faceID, int level)
 // ----------------------------------------------------------------------------
 
 vec4 PtexLookupNearest(vec4 patchCoord,
-                       sampler2DArray data,
-                       isamplerBuffer packings)
+                       texture2d_array<float> data,
+                       texture1d<int>  packings)
 {
     vec2 uv = clamp(patchCoord.xy, vec2(0), vec2(1));
     int faceID = int(patchCoord.w);
     PtexPacking ppack = getPtexPacking(packings, faceID);
     vec2 coords = vec2(uv.x * ppack.width + ppack.uOffset,
                        uv.y * ppack.height + ppack.vOffset);
-    return texelFetch(data, ivec3(int(coords.x), int(coords.y), ppack.page), 0);
+    return data.read(uint2(coords.x, coords.y), ppack.page, 0);
 }
 
 vec4 PtexLookupNearest(vec4 patchCoord,
                        int level,
-                       sampler2DArray data,
-                       isamplerBuffer packings)
+                       texture2d_array<float> data,
+                       texture1d<int>  packings)
 {
     vec2 uv = clamp(patchCoord.xy, vec2(0), vec2(1));
     int faceID = int(patchCoord.w);
     PtexPacking ppack = getPtexPacking(packings, faceID, level);
     vec2 coords = vec2(uv.x * ppack.width + ppack.uOffset,
                        uv.y * ppack.height + ppack.vOffset);
-    return texelFetch(data, ivec3(int(coords.x), int(coords.y), ppack.page), 0);
+    return data.read(uint2(coords.x, coords.y), ppack.page);
 }
 
 vec4 PtexLookupFast(vec4 patchCoord,
-                    sampler2DArray data,
-                    isamplerBuffer packings)
+                    device PtexData const &data,
+                    texture1d<int>  packings)
 {
     vec2 uv = clamp(patchCoord.xy, vec2(0), vec2(1));
     int faceID = int(patchCoord.w);
     PtexPacking ppack = getPtexPacking(packings, faceID);
 
-    ivec3 size = textureSize(data, 0);
+    ivec2 size = ivec2(data.data.get_width(0), data.data.get_height(0));
     vec2 coords = vec2((uv.x * ppack.width + ppack.uOffset)/size.x,
                        (uv.y * ppack.height + ppack.vOffset)/size.y);
-    return texture(data, vec3(coords.x, coords.y, ppack.page));
+    return data.data.sample(data.s, vec2(coords.x, coords.y), ppack.page);
 }
 
 vec4 PtexLookupFast(vec4 patchCoord,
                     int level,
-                    sampler2DArray data,
-                    isamplerBuffer packings)
+                    device PtexData const &data,
+                    texture1d<int>  packings)
 {
     vec2 uv = clamp(patchCoord.xy, vec2(0), vec2(1));
     int faceID = int(patchCoord.w);
     PtexPacking ppack = getPtexPacking(packings, faceID, level);
 
-    ivec3 size = textureSize(data, 0);
+    ivec2 size = ivec2(data.data.get_width(0), data.data.get_height(0));
     vec2 coords = vec2((uv.x * ppack.width + ppack.uOffset)/size.x,
                        (uv.y * ppack.height + ppack.vOffset)/size.y);
-    return texture(data, vec3(coords.x, coords.y, ppack.page));
+    return data.data.sample(data.s, vec2(coords.x, coords.y), ppack.page);
 }
 
 vec4 PtexLookup(vec4 patchCoord,
                 int level,
-                sampler2DArray data,
-                isamplerBuffer packings)
+                texture2d_array<float> data,
+                texture1d<int>  packings)
 {
     vec2 uv = clamp(patchCoord.xy, vec2(0), vec2(1));
     int faceID = int(patchCoord.w);
@@ -185,39 +198,30 @@ vec4 PtexLookup(vec4 patchCoord,
 
     coords -= vec2(0.5, 0.5);
 
-    int c0X = int(floor(coords.x));
-    int c1X = int(ceil(coords.x));
-    int c0Y = int(floor(coords.y));
-    int c1Y = int(ceil(coords.y));
+    uint c0X = uint(floor(coords.x));
+    uint c1X = uint(ceil(coords.x));
+    uint c0Y = uint(floor(coords.y));
+    uint c1Y = uint(ceil(coords.y));
 
     float t = coords.x - float(c0X);
     float s = coords.y - float(c0Y);
 
-    vec4 d0 = texelFetch(data, ivec3(c0X, c0Y, ppack.page), 0);
-    vec4 d1 = texelFetch(data, ivec3(c0X, c1Y, ppack.page), 0);
-    vec4 d2 = texelFetch(data, ivec3(c1X, c0Y, ppack.page), 0);
-    vec4 d3 = texelFetch(data, ivec3(c1X, c1Y, ppack.page), 0);
+    vec4 d0 = data.read(uint2(c0X, c0Y), ppack.page, 0);
+    vec4 d1 = data.read(uint2(c0X, c1Y), ppack.page, 0);
+    vec4 d2 = data.read(uint2(c1X, c0Y), ppack.page, 0);
+    vec4 d3 = data.read(uint2(c1X, c1Y), ppack.page, 0);
 
     vec4 result = (1-t) * ((1-s)*d0 + s*d1) + t * ((1-s)*d2 + s*d3);
 
     return result;
 }
 
-#if defined(ARCH_GFX_METAL)
 vec4 PtexLookupQuadratic(thread vec4 &du,
                          thread vec4 &dv,
                          vec4 patchCoord,
                          int level,
-                         sampler2DArray data,
-                         isamplerBuffer packings)
-#else
-vec4 PtexLookupQuadratic(out vec4 du,
-                         out vec4 dv,
-                         vec4 patchCoord,
-                         int level,
-                         sampler2DArray data,
-                         isamplerBuffer packings)
-#endif
+                         texture2d_array<float> data,
+                         texture1d<int>  packings)
 {
     vec2 uv = clamp(patchCoord.xy, vec2(0), vec2(1));
     int faceID = int(patchCoord.w);
@@ -228,26 +232,26 @@ vec4 PtexLookupQuadratic(out vec4 du,
 
     coords -= vec2(0.5, 0.5);
 
-    int cX = int(round(coords.x));
-    int cY = int(round(coords.y));
-
+    uint cX = uint(round(coords.x));
+    uint cY = uint(round(coords.y));
+        
     float x = 0.5 - (float(cX) - coords.x);
     float y = 0.5 - (float(cY) - coords.y);
-
+        
     vec4 d[9];
-    d[0] = texelFetch(data, ivec3(cX-1, cY-1, ppack.page), 0);
-    d[1] = texelFetch(data, ivec3(cX-1, cY-0, ppack.page), 0);
-    d[2] = texelFetch(data, ivec3(cX-1, cY+1, ppack.page), 0);
-    d[3] = texelFetch(data, ivec3(cX-0, cY-1, ppack.page), 0);
-    d[4] = texelFetch(data, ivec3(cX-0, cY-0, ppack.page), 0);
-    d[5] = texelFetch(data, ivec3(cX-0, cY+1, ppack.page), 0);
-    d[6] = texelFetch(data, ivec3(cX+1, cY-1, ppack.page), 0);
-    d[7] = texelFetch(data, ivec3(cX+1, cY-0, ppack.page), 0);
-    d[8] = texelFetch(data, ivec3(cX+1, cY+1, ppack.page), 0);
+    d[0] = data.read(uint2(cX-1, cY-1), ppack.page, 0);
+    d[1] = data.read(uint2(cX-1, cY-0), ppack.page, 0);
+    d[2] = data.read(uint2(cX-1, cY+1), ppack.page, 0);
+    d[3] = data.read(uint2(cX-0, cY-1), ppack.page, 0);
+    d[4] = data.read(uint2(cX-0, cY-0), ppack.page, 0);
+    d[5] = data.read(uint2(cX-0, cY+1), ppack.page, 0);
+    d[6] = data.read(uint2(cX+1, cY-1), ppack.page, 0);
+    d[7] = data.read(uint2(cX+1, cY-0), ppack.page, 0);
+    d[8] = data.read(uint2(cX+1, cY+1), ppack.page, 0);
 
     float B[3], D[3];
-    vec4 BUCP[3] = vec4[3](vec4(0,0,0,0), vec4(0,0,0,0), vec4(0,0,0,0)),
-         DUCP[3] = vec4[3](vec4(0,0,0,0), vec4(0,0,0,0), vec4(0,0,0,0));
+    vec4 BUCP[3] = { vec4(0,0,0,0), vec4(0,0,0,0), vec4(0,0,0,0) };
+    vec4 DUCP[3] = { vec4(0,0,0,0), vec4(0,0,0,0), vec4(0,0,0,0) };
     evalQuadraticBSpline(y, B, D);
 
     for (int i = 0; i < 3; ++i) {
@@ -280,8 +284,8 @@ vec4 PtexLookupQuadratic(out vec4 du,
 // ----------------------------------------------------------------------------
 vec4 PtexMipmapLookupNearest(vec4 patchCoord,
                              float level,
-                             sampler2DArray data,
-                             isamplerBuffer packings)
+                             texture2d_array<float> data,
+                             texture1d<int> packings)
 {
 #if defined(SEAMLESS_MIPMAP)
     // diff level
@@ -305,8 +309,8 @@ vec4 PtexMipmapLookupNearest(vec4 patchCoord,
 
 vec4 PtexMipmapLookup(vec4 patchCoord,
                       float level,
-                      sampler2DArray data,
-                      isamplerBuffer packings)
+                      texture2d_array<float> data,
+                      texture1d<int> packings)
 {
 #if defined(SEAMLESS_MIPMAP)
     // diff level
@@ -327,21 +331,12 @@ vec4 PtexMipmapLookup(vec4 patchCoord,
     return result;
 }
 
-#if defined(ARCH_GFX_METAL)
 vec4 PtexMipmapLookupQuadratic(thread vec4 &du,
                                thread vec4 &dv,
                                vec4 patchCoord,
                                float level,
-                               sampler2DArray data,
-                               isamplerBuffer packings)
-#else
-vec4 PtexMipmapLookupQuadratic(out vec4 du,
-                               out vec4 dv,
-                               vec4 patchCoord,
-                               float level,
-                               sampler2DArray data,
-                               isamplerBuffer packings)
-#endif
+                               texture2d_array<float> data,
+                               texture1d<int> packings)
 {
 #if defined(SEAMLESS_MIPMAP)
     // diff level
@@ -370,8 +365,8 @@ vec4 PtexMipmapLookupQuadratic(out vec4 du,
 
 vec4 PtexMipmapLookupQuadratic(vec4 patchCoord,
                                float level,
-                               sampler2DArray data,
-                               isamplerBuffer packings)
+                               texture2d_array<float> data,
+                               texture1d<int> packings)
 {
     vec4 du, dv;
     return PtexMipmapLookupQuadratic(du, dv, patchCoord, level, data, packings);
@@ -381,14 +376,11 @@ vec4 PtexMipmapLookupQuadratic(vec4 patchCoord,
 
 // ----------------------------------------------------------------------------
 
-#ifndef GLOP_PTEX_TEXTURE_FACEOFFSET
-#define GLOP_PTEX_TEXTURE_FACEOFFSET
 uniform int ptexFaceOffset;
-#endif
 
 #define GLOP_PTEX_TEXTURE_DECLARE(textureName) \
-    uniform sampler2DArray textureName##_Data;      \
-    uniform isamplerBuffer textureName##_Packing;
+    uniform texture2d_array<float> textureName##_Data;      \
+    uniform texture1d<int> textureName##_Packing;
 
 #define GLOP_PTEX_TEXTURE_LOOKUP(textureName, patchCoord) \
     GlopPtexTextureLookup(textureName##_Data,             \
@@ -396,8 +388,8 @@ uniform int ptexFaceOffset;
                           patchCoord)
 
 vec4
-GlopPtexTextureLookup(sampler2DArray data,
-                      isamplerBuffer packings,
+GlopPtexTextureLookup(texture2d_array<float> data,
+                      texture1d<int> packings,
                       vec4 patchCoord)
 {
     patchCoord.w += ptexFaceOffset;
@@ -406,4 +398,3 @@ GlopPtexTextureLookup(sampler2DArray data,
                       data,
                       packings);
 }
-#endif

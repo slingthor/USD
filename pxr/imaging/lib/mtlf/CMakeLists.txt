@@ -85,7 +85,6 @@ pxr_library(mtlf
 
     RESOURCE_FILES
         plugInfo.json
-        shaders/ptexTexture.glslfx
         shaders/pcfShader.glslfx
         shaders/simpleLighting.glslfx
         shaders/simpleShadowMapShader.glslfx

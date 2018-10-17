@@ -97,7 +97,7 @@ GarchTextureGPUHandle HdStSimpleTextureResourceGL::GetTexelsTextureId()
     if (_isPtex) {
 #ifdef PXR_PTEX_SUPPORT_ENABLED
         GlfPtexTextureRefPtr ptexTexture =
-        TfDynamic_cast<GlfPtexTextureRefPtr>(_texture);
+            TfDynamic_cast<GlfPtexTextureRefPtr>(_texture);
         
         if (ptexTexture) {
             return ptexTexture->GetTexelsTextureName();

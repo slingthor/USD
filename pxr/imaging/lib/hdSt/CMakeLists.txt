@@ -173,7 +173,8 @@ pxr_library(hdSt
         shaders/meshWire.glslfx
         shaders/points.glslfx
         shaders/pointId.glslfx
-        shaders/ptexTexture.glslfx
+        shaders/ptexTextureGL.glslfx
+        shaders/ptexTextureMetal.glslfx
         shaders/renderPass.glslfx
         shaders/renderPassShader.glslfx
         shaders/terminals.glslfx

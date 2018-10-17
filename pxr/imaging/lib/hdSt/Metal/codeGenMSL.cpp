@@ -132,8 +132,8 @@ TF_DEFINE_PRIVATE_TOKENS(
     (dmat4)
     (packed_2_10_10_10)
     ((ptexTextureSampler, "ptexTextureSampler"))
-    (isamplerBuffer)
-    (samplerBuffer)
+    ((isamplerBuffer, "texture2d<int>"))
+    ((samplerBuffer, "texture2d<float>"))
     (packedSmoothNormals)
     (packedFlatNormals)
 );
@@ -658,9 +658,14 @@ HdSt_CodeGenMSL::_ParseGLSL(std::stringstream &source, InOutParams& inParams, In
     if(asComputeGS) {
         //For now these are the only types we understand. Should get a proper treatment that accepts any types/number.
         std::string::size_type inLayoutPos = result.find("layout(triangles) in;");
+        if(inLayoutPos == std::string::npos)
+            inLayoutPos = result.find("layout(lines_adjacency) in;");
         if(inLayoutPos != std::string::npos)
             result.insert(inLayoutPos, "//");
+        
         std::string::size_type outLayoutPos = result.find("layout(triangle_strip, max_vertices = 3) out;");
+        if(outLayoutPos == std::string::npos)
+            outLayoutPos = result.find("layout(triangle_strip, max_vertices = 6) out;");
         if(outLayoutPos != std::string::npos)
             result.insert(outLayoutPos, "//");
     }
@@ -1226,6 +1231,12 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
 
     if(_buildTarget == kMSL_BuildTarget_MVA || _buildTarget == kMSL_BuildTarget_MVA_ComputeGS) {
         numVerticesPerPrimitive = 3;    //MTL_FIXME: Code belows isn't robust enough, need a better way to determine verts per primitive
+        
+        std::string result = _genGS.str();
+        std::string::size_type inLayoutPos = result.find("layout(lines_adjacency) in;");
+        if(inLayoutPos != std::string::npos)
+            numVerticesPerPrimitive = 4;
+
 //        //Determine geometry type
 //        for(auto key : _geometricShader->GetSourceKeys(HdShaderTokens->geometryShader)) {
 //            if(key == "Mesh.Geometry.Triangle") { numVerticesPerPrimitive = 3; break; }
@@ -1268,8 +1279,9 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
                 
                 if(prefixScope && isPtr)
                     gs_GSInputCode << "(const device ProgramScope_Geometry::" << dataType << "*)" << name << ";\n";
-                else
-                    gs_GSInputCode << name << ";\n";
+                else if (it->usage & HdSt_CodeGenMSL::TParam::Uniform)
+                    gs_GSInputCode << "vsUniforms->";
+                gs_GSInputCode << name << ";\n";
                 
                 //If this parameter is already present in the VS we shouldn't include it in our function definition as it will be a duplicate.
                 bool isPresentInVS = false;
@@ -1980,14 +1992,19 @@ HdSt_CodeGenMSL::Compile()
     termination << "}; // ProgramScope<st>\n";
     
     // Externally sourced glslfx translation to MSL
-    _ParseGLSL(_genVS, _mslVSInputParams, _mslVSOutputParams);
-    _ParseGLSL(_genFS, _mslPSInputParams, _mslPSOutputParams);
-    
     bool _mslBuildComputeGS = _buildTarget == kMSL_BuildTarget_MVA_ComputeGS;
     if(_mslBuildComputeGS) {
         _ParseGLSL(_genOSDDefinitions, _mslGSInputParams, _mslGSOutputParams, true);
         _ParseGLSL(_genGS, _mslGSInputParams, _mslGSOutputParams, true);
+        
+        std::stringstream _temp;
+        _temp << _genCommon.str();
+        _ParseGLSL(_temp, _mslGSInputParams, _mslGSOutputParams, true);
     }
+
+    _ParseGLSL(_genVS, _mslVSInputParams, _mslVSOutputParams);
+    _ParseGLSL(_genFS, _mslPSInputParams, _mslPSOutputParams);
+    _ParseGLSL(_genCommon, _mslVSInputParams, _mslVSOutputParams);
 
     // MSL<->Metal API plumbing
     std::stringstream glueVS, gluePS, glueGS;
@@ -3983,7 +4000,7 @@ HdSt_CodeGenMSL::_GenerateVertexAndFaceVaryingPrimvar(bool hasGS)
             << accessorsTES.str();
 
     _genGS << fvarDeclarations.str()
-           << interstageStruct.str() << ";"
+           << interstageStruct.str() << ";\n"
            << structName << " inPrimvars[HD_NUM_PRIMITIVE_VERTS];\n"
            << structName << " outPrimvars;\n"
            << accessorsGS.str();
@@ -4138,6 +4155,7 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
 
         // adjust datatype
         std::string swizzle = _GetSwizzleString(it->second.dataType);
+        bool addScalarAccessor = true;
 
         HdBinding::Type bindingType = it->first.GetType();
         if (bindingType == HdBinding::FALLBACK) {
@@ -4244,8 +4262,8 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
                 << "  int shaderCoord = GetDrawingCoord().shaderCoord; \n"
                 << "  return " << _GetPackedTypeAccessor(it->second.dataType, false)
                 << "(GlopPtexTextureLookup("
-                << "samplerArray(materialParams[shaderCoord]." << it->second.name <<"),"
-                << "isamplerBuffer(materialParams[shaderCoord]." << it->second.name << "_layout), "
+                << "texture2d_array<float>(materialParams[shaderCoord]." << it->second.name <<"),"
+                << "texture1d<int>(materialParams[shaderCoord]." << it->second.name << "_layout), "
                 << "GetPatchCoord(localIndex))" << swizzle << ");\n"
                 << "}\n"
                 << _GetUnpackedType(it->second.dataType, false)
@@ -4263,8 +4281,8 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
         } else if (bindingType == HdBinding::TEXTURE_PTEX_TEXEL) {
             // +1 for layout is by convention.
             declarations
-                << "sampler2DArray sampler2darray_" << it->first.GetLocation() << ";\n"
-                << "isamplerBuffer isamplerbuffer_" << (it->first.GetLocation()+1) << ";\n";
+                << "texture2d_array<float> sampler2darray_" << it->first.GetLocation() << ";\n"
+                << "texture1d<int> isamplerbuffer_" << (it->first.GetLocation()+1) << ";\n";
             accessors
                 << _GetUnpackedType(it->second.dataType, false)
                 << " HdGet_" << it->second.name << "(int localIndex) {\n"
@@ -4285,9 +4303,12 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
                 << "isamplerbuffer_" << (it->first.GetLocation()+1) << ","
                 << "patchCoord)" << swizzle << ");\n"
                 << "}\n";
+            addScalarAccessor = false;
         } else if (bindingType == HdBinding::BINDLESS_TEXTURE_PTEX_LAYOUT) {
+            addScalarAccessor = false;
             //accessors << _GetUnpackedType(it->second.dataType) << "(0)";
         } else if (bindingType == HdBinding::TEXTURE_PTEX_LAYOUT) {
+            addScalarAccessor = false;
             //accessors << _GetUnpackedType(it->second.dataType) << "(0)";
         } else if (bindingType == HdBinding::PRIMVAR_REDIRECT) {
             // XXX: shader and primvar name collisions are a problem!
@@ -4312,20 +4333,22 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
             }
         }
         
-        // Scalar accessor - to work around GLSL allowing .x to access a float
-        TfToken componentType = _GetComponentType(it->second.dataType);
-        if (componentType == it->second.dataType) {
-            accessors
-                << it->second.dataType
-                << " HdGet_" << it->second.name << "_Scalar() {\n"
-                << "  return HdGet_" << it->second.name << "(); \n"
-                << "}\n";
-        } else {
-            accessors
-                << _GetComponentType(it->second.dataType)
-                << " HdGet_" << it->second.name << "_Scalar() {\n"
-                << "  return HdGet_" << it->second.name << "().x; \n"
-                << "}\n";
+        if (addScalarAccessor) {
+            // Scalar accessor - to work around GLSL allowing .x to access a float
+            TfToken componentType = _GetComponentType(it->second.dataType);
+            if (componentType == it->second.dataType) {
+                accessors
+                    << it->second.dataType
+                    << " HdGet_" << it->second.name << "_Scalar() {\n"
+                    << "  return HdGet_" << it->second.name << "(); \n"
+                    << "}\n";
+            } else {
+                accessors
+                    << _GetComponentType(it->second.dataType)
+                    << " HdGet_" << it->second.name << "_Scalar() {\n"
+                    << "  return HdGet_" << it->second.name << "().x; \n"
+                    << "}\n";
+            }
         }
     }
     
