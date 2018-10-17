@@ -246,6 +246,11 @@ public:
     MTLF_API
     void ReleaseMetalBuffer(id<MTLBuffer> buffer);
 
+    // Gets space inside a buffer that has a lifetime of the current frame only - to be used for temporary data such as uniforms, the offset *must* be used
+    // Resource options are MTLResourceStorageModeManaged | MTLResourceOptionCPUCacheModeDefault
+    MTLF_API
+    id<MTLBuffer> GetMetalBufferAllocation(NSUInteger length, const void *pointer, NSUInteger *offset);
+    
     MTLF_API
     void StartFrame();
     
@@ -441,6 +446,12 @@ private:
     };
     std::vector<MetalBufferListEntry> bufferFreeList;
     
+    // Metal buffer for per frame data
+    id<MTLBuffer> perFrameBuffer;
+    NSUInteger    perFrameBufferSize;
+    NSUInteger    perFrameBufferOffset;
+    NSUInteger    perFrameBufferAlignment;
+    
     unsigned long frameCount;
 
 #if METAL_ENABLE_STATS
@@ -449,6 +460,7 @@ private:
         unsigned long commandBuffersCommitted;
         unsigned long buffersCreated;
         unsigned long buffersReused;
+        unsigned long bufferSearches;
         unsigned long renderEncodersCreated;
         unsigned long computeEncodersCreated;
         unsigned long blitEncodersCreated;
