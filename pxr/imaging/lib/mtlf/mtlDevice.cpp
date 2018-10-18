@@ -398,15 +398,21 @@ MtlfMetalContext::MtlfMetalContext(id<MTLDevice> _device, int width, int height)
     resourceStats.blitEncodersRequested   = 0;
     resourceStats.renderPipelineStates    = 0;
     resourceStats.computePipelineStates   = 0;
+    resourceStats.currentBufferAllocation = 0;
+    resourceStats.peakBufferAllocation    = 0;
 #endif
     
     frameCount = 0;
+    lastCompletedFrame = -1;
 }
 
 MtlfMetalContext::~MtlfMetalContext()
 {
 	_FreeTransientTextureCacheRefs();
 
+    CleanupUnusedBuffers(true);
+    bufferFreeList.clear();
+    
     if (cvglTextureCache) {
         CFRelease(cvglTextureCache);
         cvglTextureCache = nil;
@@ -420,8 +426,6 @@ MtlfMetalContext::~MtlfMetalContext()
     if(enableMultiQueue)
         [commandQueueGS release];
 
-	CleanupUnusedBuffers();
-	bufferFreeList.clear();
    
 #if METAL_ENABLE_STATS
     NSLog(@"--- METAL Resource Stats (average per frame / total) ----");
@@ -439,7 +443,8 @@ MtlfMetalContext::~MtlfMetalContext()
     NSLog(@"Compute Pipeline States:    %7lu / %7lu", resourceStats.computePipelineStates   / frameCount, resourceStats.computePipelineStates);
     NSLog(@"Blit    Encoders requested: %7lu / %7lu", resourceStats.blitEncodersRequested   / frameCount, resourceStats.blitEncodersRequested);
     NSLog(@"Blit    Encoders created:   %7lu / %7lu", resourceStats.blitEncodersCreated     / frameCount, resourceStats.blitEncodersCreated);
-#endif
+    NSLog(@"Peak    Buffer Allocation:  %7luMbs",     resourceStats.peakBufferAllocation    / (1024*1024));
+ #endif
 }
 
 void MtlfMetalContext::RecreateInstance(id<MTLDevice> device, int width, int height)
@@ -1817,8 +1822,8 @@ id<MTLBuffer> MtlfMetalContext::GetMetalBuffer(NSUInteger length, MTLResourceOpt
         if (buffer.length == length              &&
             storageMode   == buffer.storageMode  &&
             cpuCacheMode  == buffer.cpuCacheMode &&
-            frameCount > (bufferEntry.releasedOnFrame + METAL_SAFE_BUFFER_AGE_IN_FRAMES) ) {
-            //NSLog(@"Reusing buffer of length %lu", length);
+            lastCompletedFrame >= (bufferEntry.releasedOnFrame + METAL_SAFE_BUFFER_AGE_IN_FRAMES) ) {
+            //NSLog(@"Reusing buffer of length %lu (%lu)", length, frameCount);
             
             // Copy over data
             if (pointer) {
@@ -1832,13 +1837,15 @@ id<MTLBuffer> MtlfMetalContext::GetMetalBuffer(NSUInteger length, MTLResourceOpt
         }
     }
 #endif
-    //NSLog(@"Creating buffer of length %lu", length);
+    //NSLog(@"Creating buffer of length %lu (%lu)", length, frameCount);
     if (pointer) {
         buffer  =  [device newBufferWithBytes:pointer length:length options:options];
     } else {
         buffer  =  [device newBufferWithLength:length options:options];
     }
     METAL_INC_STAT(resourceStats.buffersCreated);
+    METAL_INC_STAT_VAL(resourceStats.currentBufferAllocation, length);
+    METAL_MAX_STAT_VAL(resourceStats.peakBufferAllocation, resourceStats.currentBufferAllocation);
     return buffer;
 }
 
@@ -1877,30 +1884,42 @@ void MtlfMetalContext::ReleaseMetalBuffer(id<MTLBuffer> buffer)
     bufferEntry.buffer = buffer;
     bufferEntry.releasedOnFrame = frameCount;
     bufferFreeList.push_back(bufferEntry);
+    //NSLog(@"Adding buffer to free list of length %lu (%lu)", buffer.length, frameCount);
 #else
     [buffer release];
 #endif
 }
 
-void MtlfMetalContext::CleanupUnusedBuffers()
+void MtlfMetalContext::CleanupUnusedBuffers(bool forceClean)
 {
-    id<MTLBuffer> buffer;
+     // Release resources associated with the per frame buffer
+    if (perFrameBuffer) {
+        ReleaseMetalBuffer(perFrameBuffer);
+        perFrameBuffer       = nil;
+        perFrameBufferOffset = 0;
+    }
     
     // Release all buffers that have not been recently reused
-    for (auto entry = bufferFreeList.begin(); entry != bufferFreeList.end(); entry++) {
+    for (auto entry = bufferFreeList.begin(); entry != bufferFreeList.end();) {
         MetalBufferListEntry bufferEntry = *entry;
-        buffer = bufferEntry.buffer;
+        id<MTLBuffer>  buffer = bufferEntry.buffer;
         
-        if (frameCount > (bufferEntry.releasedOnFrame + METAL_MAX_BUFFER_AGE_IN_FRAMES) ) {
+        if ((frameCount > (bufferEntry.releasedOnFrame + METAL_MAX_BUFFER_AGE_IN_FRAMES))  || forceClean) {
+            //NSLog(@"Releasing buffer of length %lu (%lu) (%lu outstanding)", buffer.length, frameCount, bufferFreeList.size());
+            METAL_INC_STAT_VAL(resourceStats.currentBufferAllocation, -buffer.length);
             [buffer release];
-            bufferFreeList.erase(entry);
+            entry = bufferFreeList.erase(entry);
+        }
+        else {
+            entry++;
         }
     }
     
-    // Release resources associated with the per frame buffer
-    ReleaseMetalBuffer(perFrameBuffer);
-    perFrameBuffer       = nil;
-    perFrameBufferOffset = 0;
+    if (forceClean && (bufferFreeList.size() != 0)) {
+        TF_FATAL_CODING_ERROR("Failed to release all Metal buffers");
+    }
+    
+
 }
 
 void MtlfMetalContext::StartFrame() {
@@ -1914,7 +1933,7 @@ void MtlfMetalContext::EndFrame() {
     //NSLog(@"Time: %3.3f (%lu)", GetGPUTimeInMs(), frameCount);
     
     frameCount++;
-    CleanupUnusedBuffers();
+    CleanupUnusedBuffers(false);
     
     currentWorkQueueType = METALWORKQUEUE_DEFAULT;
     currentWorkQueue     = &workQueues[currentWorkQueueType];
@@ -1947,6 +1966,14 @@ void MtlfMetalContext::GPUTimerEndTimer(unsigned long frameNumber)
     GPUFrameTime *timer = &gpuFrameTimes[frameNumber % METAL_NUM_GPU_FRAME_TIMES];
     gettimeofday(&timer->frameEndTime, 0);
     timer->timingEventsReceived++;
+    
+    // If this is the last end timer call from the current frame then update the last completed frame value.
+    // Note there is potentially a race condition here that means if this command buffer completes before EndOfFrame marks
+    // the timer as complete we won't update. But this would only result in less efficient resource resusage.
+    // We update again in the GPUGetTime call so it will get set eventually
+    if (timer->timingCompleted && timer->timingEventsIssued == timer->timingEventsReceived) {
+        lastCompletedFrame = frameNumber;
+    }
 }
 
 // Indicates that a timer has finished receiving all of the events to be issued
@@ -1973,6 +2000,8 @@ float MtlfMetalContext::GetGPUTimeInMs() {
     if (!validTimer) {
         return 0.0f;
     }
+    // Store this in the context as it can be used for tracking resource usage
+    lastCompletedFrame = highestFrameNumber;
     
     struct timeval diff;
     timersub(&validTimer->frameEndTime, &validTimer->frameStartTime, &diff);

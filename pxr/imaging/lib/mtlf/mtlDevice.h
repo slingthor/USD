@@ -49,18 +49,22 @@ PXR_NAMESPACE_OPEN_SCOPE
 #define METAL_REUSE_BUFFERS 1
 
 #if METAL_REUSE_BUFFERS
-// How old a buffer must be before it can be reused
-#define METAL_SAFE_BUFFER_AGE_IN_FRAMES 2
+// How old a buffer must be before it can be reused - 0 should allow for most optimal memory footprint, higher values can be used for debugging issues
+#define METAL_SAFE_BUFFER_AGE_IN_FRAMES 0
 // How old a buffer can be before it's freed
-#define METAL_MAX_BUFFER_AGE_IN_FRAMES 6
+#define METAL_MAX_BUFFER_AGE_IN_FRAMES 3
 #endif
 
 // Enable stats gathering
 #define METAL_ENABLE_STATS 1
 #if METAL_ENABLE_STATS
 #define METAL_INC_STAT(STAT) STAT++
+#define METAL_INC_STAT_VAL(STAT, VAL) STAT+=VAL
+#define METAL_MAX_STAT_VAL(ORIG, NEWVAL) ORIG = MAX(ORIG, NEWVAL)
 #else
 #define METAL_INC_STAT(STAT)
+#define METAL_INC_STAT_VAL(STAT, VAL)
+#define METAL_MAX_STAT_VAL(ORIG, NEWVAL)
 #endif
 
 #define METAL_NUM_GPU_FRAME_TIMES 5
@@ -438,7 +442,7 @@ private:
     MTLCullMode cullMode;
     uint32 dirtyRenderState;
     
-    void CleanupUnusedBuffers();
+    void CleanupUnusedBuffers(bool forceClean);
    
     struct MetalBufferListEntry {
         id<MTLBuffer> buffer;
@@ -452,7 +456,8 @@ private:
     NSUInteger    perFrameBufferOffset;
     NSUInteger    perFrameBufferAlignment;
     
-    unsigned long frameCount;
+    long frameCount;
+    long lastCompletedFrame;
 
 #if METAL_ENABLE_STATS
     struct ResourceStats {
@@ -461,6 +466,8 @@ private:
         unsigned long buffersCreated;
         unsigned long buffersReused;
         unsigned long bufferSearches;
+        unsigned long currentBufferAllocation;
+        unsigned long peakBufferAllocation;
         unsigned long renderEncodersCreated;
         unsigned long computeEncodersCreated;
         unsigned long blitEncodersCreated;
