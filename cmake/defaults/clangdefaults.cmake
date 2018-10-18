@@ -40,3 +40,5 @@ _disable_warning("unused-private-field")
 _disable_warning("inconsistent-missing-override")
 _disable_warning("expansion-to-defined")
 _disable_warning("unused-lambda-capture")
+_disable_warning("reinterpret-base-class")
+

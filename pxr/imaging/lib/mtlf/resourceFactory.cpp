@@ -30,6 +30,7 @@
 #include <pxr/imaging/mtlf/bindingMap.h>
 #include <pxr/imaging/mtlf/contextCaps.h>
 #include <pxr/imaging/mtlf/drawTarget.h>
+#include <pxr/imaging/mtlf/ptexTexture.h>
 #include <pxr/imaging/mtlf/simpleLightingContext.h>
 #include <pxr/imaging/mtlf/simpleShadowArray.h>
 #include <pxr/imaging/mtlf/uniformBlock.h>
@@ -99,14 +100,10 @@ GarchBaseTexture *MtlfResourceFactory::NewBaseTexture() const
     return new MtlfBaseTexture();
 }
 
-bool MtlfResourceFactory::IsSupportedPtexTexture(std::string const & imageFilePath) const
+GarchPtexTextureRefPtr MtlfResourceFactory::NewPtexTexture(
+                            const TfToken &imageFilePath) const
 {
-#ifdef PXR_PTEX_SUPPORT_ENABLED
-    return (TfStringEndsWith(imageFilePath, ".ptx") ||
-            TfStringEndsWith(imageFilePath, ".ptex"));
-#else
-    return false;
-#endif
+    return TfCreateRefPtr(new MtlfPtexTexture(imageFilePath));
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

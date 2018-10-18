@@ -42,6 +42,7 @@ class GarchBaseTexture;
 class GarchBindingMap;
 class GarchContextCaps;
 class GarchDrawTarget;
+class GarchPtexTexture;
 class GarchSimpleLightingContext;
 class GarchSimpleShadowArray;
 class GarchUniformBlock;
@@ -49,6 +50,7 @@ class HdSt_CodeGen;
 
 TF_DECLARE_WEAK_AND_REF_PTRS(GarchArrayTexture);
 TF_DECLARE_WEAK_AND_REF_PTRS(GarchDrawTarget);
+TF_DECLARE_WEAK_AND_REF_PTRS(GarchPtexTexture);
 TF_DECLARE_WEAK_AND_REF_PTRS(GarchUniformBlock);
 
 class GarchResourceFactoryInterface {
@@ -99,19 +101,11 @@ public:
     // BaseTexture
 	GARCH_API
     virtual GarchBaseTexture *NewBaseTexture() const = 0;
-    
-    /// Returns true if the file given by \p imageFilePath represents a ptex file,
-    /// and false otherwise.
-    ///
-    /// This function simply checks the extension of the file name and does not
-    /// otherwise guarantee that the file is in any way valid for reading.
-    ///
-    /// If ptex support is disabled, this function will always return false.
-    ///
-    GARCH_API
-    virtual bool IsSupportedPtexTexture(std::string const & imageFilePath) const = 0;
 
-    
+    // Ptex Texture
+    GARCH_API
+    virtual GarchPtexTextureRefPtr NewPtexTexture(const TfToken &imageFilePath) const = 0;
+
 protected:
 	GARCH_API
     GarchResourceFactoryInterface() {}

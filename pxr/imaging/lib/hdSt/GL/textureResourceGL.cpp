@@ -49,17 +49,7 @@ HdStSimpleTextureResourceGL::HdStSimpleTextureResourceGL(
     HdWrap wrapS, HdWrap wrapT,
     HdMinFilter minFilter, HdMagFilter magFilter,
     size_t memoryRequest)
-        : _textureHandle(textureHandle)
-        , _texture()
-        , _borderColor(0.0,0.0,0.0,0.0)
-        , _maxAnisotropy(16.0)
-        , _sampler(0)
-        , _isPtex(isPtex)
-        , _memoryRequest(memoryRequest)
-        , _wrapS(wrapS)
-        , _wrapT(wrapT)
-        , _minFilter(minFilter)
-        , _magFilter(magFilter)
+: HdStSimpleTextureResource(textureHandle, isPtex, wrapS, wrapT, minFilter, magFilter, memoryRequest)
 {
     // In cases of upstream errors, texture handle can be null.
     if (_textureHandle) {
@@ -83,34 +73,14 @@ HdStSimpleTextureResourceGL::~HdStSimpleTextureResourceGL()
         if (!glDeleteSamplers) { // GL initialization guard for headless unit test
             return;
         }
-        glDeleteSamplers(1, &_sampler);
+        GLuint s = _sampler;
+        glDeleteSamplers(1, &s);
     }
 }
 
 bool HdStSimpleTextureResourceGL::IsPtex() const
 { 
     return _isPtex; 
-}
-
-GarchTextureGPUHandle HdStSimpleTextureResourceGL::GetTexelsTextureId()
-{
-    if (_isPtex) {
-#ifdef PXR_PTEX_SUPPORT_ENABLED
-        GlfPtexTextureRefPtr ptexTexture =
-            TfDynamic_cast<GlfPtexTextureRefPtr>(_texture);
-        
-        if (ptexTexture) {
-            return ptexTexture->GetTexelsTextureName();
-        }
-        return GarchTextureGPUHandle();
-#else
-        TF_CODING_ERROR("Ptex support is disabled.  "
-            "This code path should be unreachable");
-        return GarchTextureGPUHandle();
-#endif
-    }
-    
-    return _texture->GetTextureName();
 }
 
 GarchSamplerGPUHandle HdStSimpleTextureResourceGL::GetTexelsSamplerId()
@@ -125,7 +95,7 @@ GarchSamplerGPUHandle HdStSimpleTextureResourceGL::GetTexelsSamplerId()
     }
     
     // Lazy sampler creation.
-    if (_sampler == 0) {
+    if (!_sampler.IsSet()) {
         // If the HdStSimpleTextureResource defines a wrap mode it will
         // use it, otherwise it gives an opportunity to the texture to define
         // its own wrap mode. The fallback value is always HdWrapRepeat
@@ -156,7 +126,9 @@ GarchSamplerGPUHandle HdStSimpleTextureResourceGL::GetTexelsSamplerId()
             }
         }
         
-        glGenSamplers(1, &_sampler);
+        GLuint s;
+        glGenSamplers(1, &s);
+        _sampler = s;
         glSamplerParameteri(_sampler, GL_TEXTURE_WRAP_S, fwrapS);
         glSamplerParameteri(_sampler, GL_TEXTURE_WRAP_T, fwrapT);
         glSamplerParameteri(_sampler, GL_TEXTURE_MIN_FILTER, fminFilter);
@@ -204,24 +176,6 @@ GarchTextureGPUHandle HdStSimpleTextureResourceGL::GetTexelsTextureHandle()
     }
     
     return handle;
-}
-
-GarchTextureGPUHandle HdStSimpleTextureResourceGL::GetLayoutTextureId()
-{
-#ifdef PXR_PTEX_SUPPORT_ENABLED
-    TF_FATAL_CODING_ERROR("Not Implemented"); // Make this graphics api abstract
-    GlfPtexTextureRefPtr ptexTexture =
-        TfDynamic_cast<GlfPtexTextureRefPtr>(_texture);
-    
-    if (ptexTexture) {
-        return ptexTexture->GetLayoutTextureName();
-    }
-    return GarchTextureGPUHandle();
-#else
-    TF_CODING_ERROR("Ptex support is disabled.  "
-        "This code path should be unreachable");
-    return GarchTextureGPUHandle();
-#endif
 }
 
 GarchTextureGPUHandle HdStSimpleTextureResourceGL::GetLayoutTextureHandle()

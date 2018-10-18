@@ -28,7 +28,7 @@
 #include "pxr/usdImaging/usdImaging/tokens.h"
 
 #include "pxr/imaging/garch/glslfx.h"
-#include "pxr/imaging/garch/resourceFactory.h"
+#include "pxr/imaging/garch/ptexTexture.h"
 #include "pxr/imaging/garch/textureHandle.h"
 #include "pxr/imaging/garch/textureRegistry.h"
 
@@ -222,7 +222,7 @@ UsdImaging_GetTextureResourceID(UsdPrim const& usdPrim,
         filePath = TfToken(asset.GetAssetPath());
     }
 
-    const bool isPtex = GarchResourceFactory::GetInstance()->IsSupportedPtexTexture(filePath);
+    const bool isPtex = GarchIsSupportedPtexTexture(filePath);
 
     if (asset.GetResolvedPath().empty()) {
         if (isPtex) {
@@ -290,7 +290,7 @@ UsdImaging_GetTextureResource(UsdPrim const& usdPrim,
     GarchImage::ImageOriginLocation origin =
             UsdImaging_ComputeTextureOrigin(usdPrim);
 
-    const bool isPtex = GarchResourceFactory::GetInstance()->IsSupportedPtexTexture(filePath);
+    const bool isPtex = GarchIsSupportedPtexTexture(filePath);
 
     HdWrap wrapS = _GetWrapS(usdPrim);
     HdWrap wrapT = _GetWrapT(usdPrim);

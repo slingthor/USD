@@ -31,31 +31,9 @@
 
 #include <string>
 
-PXR_NAMESPACE_OPEN_SCOPE
-
-
-/// Returns true if the file given by \p imageFilePath represents a ptex file,
-/// and false otherwise.
-///
-/// This function simply checks the extension of the file name and does not
-/// otherwise guarantee that the file is in any way valid for reading.
-///
-/// If ptex support is disabled, this function will always return false.
-///
-MTLF_API bool MtlfIsSupportedPtexTexture(std::string const & imageFilePath);
-
-
-PXR_NAMESPACE_CLOSE_SCOPE
-
-
 #ifdef PXR_PTEX_SUPPORT_ENABLED
 
-#include "pxr/imaging/garch/texture.h"
-
-#include "pxr/base/tf/declarePtrs.h"
-#include "pxr/base/tf/token.h"
-#include "pxr/base/tf/refPtr.h"
-#include "pxr/base/tf/weakPtr.h"
+#include "pxr/imaging/garch/ptexTexture.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -79,70 +57,22 @@ TF_DECLARE_WEAK_AND_REF_PTRS(MtlfPtexTexture);
 /// the _texels texture array.
 ///
 
-class MtlfPtexTexture : public GarchTexture {
+class MtlfPtexTexture : public GarchPtexTexture {
 public:
     MTLF_API
     virtual ~MtlfPtexTexture();
 
-    /// Creates a new instance.
-    MTLF_API
-    static MtlfPtexTextureRefPtr New(const TfToken &imageFilePath);
-
-    /// GarchTexture overrides
-    MTLF_API
-    virtual BindingVector GetBindings(TfToken const & identifier,
-                                      GarchSamplerGPUHandle samplerId = GarchSamplerGPUHandle()) override;
-    
-    MTLF_API
-    virtual VtDictionary GetTextureInfo(bool forceLoad) override;
-
-    MTLF_API
-    virtual bool IsMinFilterSupported(GLenum filter) override;
-
-    MTLF_API
-    virtual bool IsMagFilterSupported(GLenum filter) override;
-
-    // get/set guttering control variables
-    static int GetGutterWidth() { return _gutterWidth; }
-
-    static int GetPageMargin() { return _pageMargin; }
-
-    // return GL texture for layout texture buffer
-    GLuint GetLayoutTextureName();
-
-    // return GL texture for texels data texture
-    GLuint GetTexelsTextureName();
-	
-	MTLF_API
-    virtual GarchTextureGPUHandle GetTextureName() override;
-
 protected:
     MTLF_API
     MtlfPtexTexture(const TfToken &imageFilePath);
-
-    MTLF_API
-    void _FreePtexTextureObject();
     
-    MTLF_API
-    virtual void _ReadTexture() override;
+    friend class MtlfResourceFactory;
 
     MTLF_API
-    virtual void _OnMemoryRequestedDirty();
+    virtual void _FreePtexTextureObject() override;
 
-private:
-    bool _ReadImage();
-
-    bool _loaded;
-    
-    GLuint _layout;   // per-face lookup table
-    GLuint _texels;   // texel data
-
-    GLsizei _width, _height, _depth;
-    GLint _format;
-
-    static int _gutterWidth, _pageMargin;
-
-    const TfToken	_imageFilePath;
+    MTLF_API
+    virtual bool _ReadImage() override;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

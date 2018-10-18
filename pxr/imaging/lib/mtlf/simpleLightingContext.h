@@ -52,6 +52,9 @@ public:
     MTLF_API
     virtual void SetStateFromOpenGL() override;
 
+    MTLF_API
+    virtual void InitSamplerUnitBindings(GarchBindingMapPtr const &bindingMap) const override;
+    
 protected:
     MTLF_API
     MtlfSimpleLightingContext();

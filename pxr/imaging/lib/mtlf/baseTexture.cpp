@@ -103,16 +103,16 @@ static MTLPixelFormat GetMetalFormat(GLenum inInternalFormat, GLenum inType, siz
     return mtlFormat;
 }
 
-static void *PadImage(GarchBaseTextureDataConstPtr texData, int mipLevel, size_t pixelByteSize, int numPixels)
+void *MtlfBaseTexture::PadImage(uint32_t glFormat, void const* rawData, size_t pixelByteSize, int numPixels)
 {
     void* texBuffer;
-    switch (texData->GLInternalFormat())
+    switch (glFormat)
     {
         case GL_RGB32F:
         {
             texBuffer = new float[pixelByteSize * numPixels];
             
-            float *src = (float*)texData->GetRawBuffer(mipLevel);
+            float *src = (float*)rawData;
             float *dst = (float*)texBuffer;
             while(numPixels-- > 0) {
                 *dst++ = *src++;
@@ -127,7 +127,7 @@ static void *PadImage(GarchBaseTextureDataConstPtr texData, int mipLevel, size_t
         {
             texBuffer = new uint16_t[pixelByteSize * numPixels];
             
-            uint16_t *src = (uint16_t*)texData->GetRawBuffer(mipLevel);
+            uint16_t *src = (uint16_t*)rawData;
             uint16_t *dst = (uint16_t*)texBuffer;
             while(numPixels-- > 0) {
                 *dst++ = *src++;
@@ -142,7 +142,7 @@ static void *PadImage(GarchBaseTextureDataConstPtr texData, int mipLevel, size_t
         {
             texBuffer = new uint16_t[pixelByteSize * numPixels];
             
-            uint16_t *src = (uint16_t*)texData->GetRawBuffer(mipLevel);
+            uint16_t *src = (uint16_t*)rawData;
             uint16_t *dst = (uint16_t*)texBuffer;
             while(numPixels-- > 0) {
                 *dst++ = *src++;
@@ -158,7 +158,7 @@ static void *PadImage(GarchBaseTextureDataConstPtr texData, int mipLevel, size_t
         {
             texBuffer = new uint8_t[pixelByteSize * numPixels];
             
-            uint8_t *src = (uint8_t*)texData->GetRawBuffer(mipLevel);
+            uint8_t *src = (uint8_t*)rawData;
             uint8_t *dst = (uint8_t*)texBuffer;
             while(numPixels-- > 0) {
                 *dst++ = *src++;
@@ -320,7 +320,7 @@ MtlfBaseTexture::_CreateTexture(GarchBaseTextureDataConstPtr texData,
             void *texBuffer = texData->GetRawBuffer(0);
             if (b24BitFormat) {
                 // Pad out 24bit formats to 32bit
-                texBuffer = PadImage(texData, 0, pixelByteSize, numPixels);
+                texBuffer = PadImage(texData->GLInternalFormat(), texData->GetRawBuffer(0), pixelByteSize, numPixels);
             }
             
             if (!texData->IsCompressed()) {
@@ -410,7 +410,7 @@ MtlfBaseTexture::_CreateTexture(GarchBaseTextureDataConstPtr texData,
                 
                 if (b24BitFormat) {
                     // Pad out 24bit formats to 32bit
-                    texBuffer = PadImage(texData, i, pixelByteSize, numPixels);
+                    texBuffer = PadImage(texData->GLInternalFormat(), texData->GetRawBuffer(1), pixelByteSize, numPixels);
                 }
 
                 [_textureName replaceRegion:MTLRegionMake2D(0, 0, mipWidth, texData->ResizedHeight(i))

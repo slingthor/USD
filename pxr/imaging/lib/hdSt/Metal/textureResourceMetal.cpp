@@ -57,17 +57,7 @@ HdStSimpleTextureResourceMetal::HdStSimpleTextureResourceMetal(
         HdWrap wrapS, HdWrap wrapT,
         HdMinFilter minFilter, HdMagFilter magFilter,
         size_t memoryRequest)
-            : _textureHandle(textureHandle)
-            , _texture(nil)
-            , _borderColor(0.0,0.0,0.0,0.0)
-            , _maxAnisotropy(16.0)
-            , _sampler(nil)
-            , _isPtex(isPtex)
-            , _memoryRequest(memoryRequest)
-            , _wrapS(wrapS)
-            , _wrapT(wrapT)
-            , _minFilter(minFilter)
-            , _magFilter(magFilter)
+: HdStSimpleTextureResource(textureHandle, isPtex, wrapS, wrapT, minFilter, magFilter, memoryRequest)
 {
     // In cases of upstream errors, texture handle can be null.
     if (_textureHandle) {
@@ -95,27 +85,6 @@ HdStSimpleTextureResourceMetal::~HdStSimpleTextureResourceMetal()
 bool HdStSimpleTextureResourceMetal::IsPtex() const
 { 
     return _isPtex; 
-}
-
-GarchTextureGPUHandle HdStSimpleTextureResourceMetal::GetTexelsTextureId()
-{
-    if (_isPtex) {
-#ifdef PXR_PTEX_SUPPORT_ENABLED
-        MtlfPtexTextureRefPtr ptexTexture =
-            TfDynamic_cast<MtlfPtexTextureRefPtr>(_texture);
-        
-        if (ptexTexture) {
-            return ptexTexture->GetTexelsTextureName();
-        }
-        return GarchTextureGPUHandle();
-#else
-        TF_CODING_ERROR("Ptex support is disabled.  "
-            "This code path should be unreachable");
-        return GarchTextureGPUHandle();
-#endif
-    }
-    
-    return _texture->GetTextureName();
 }
 
 GarchSamplerGPUHandle HdStSimpleTextureResourceMetal::GetTexelsSamplerId()
@@ -182,23 +151,6 @@ GarchTextureGPUHandle HdStSimpleTextureResourceMetal::GetTexelsTextureHandle()
     return textureId;
 }
 
-GarchTextureGPUHandle HdStSimpleTextureResourceMetal::GetLayoutTextureId()
-{
-#ifdef PXR_PTEX_SUPPORT_ENABLED
-    MtlfPtexTextureRefPtr ptexTexture =
-        TfDynamic_cast<MtlfPtexTextureRefPtr>(_texture);
-    
-    if (ptexTexture) {
-        return ptexTexture->GetLayoutTextureName();
-    }
-    return GarchTextureGPUHandle();
-#else
-    TF_CODING_ERROR("Ptex support is disabled.  "
-        "This code path should be unreachable");
-    return GarchTextureGPUHandle();
-#endif
-}
-
 GarchTextureGPUHandle HdStSimpleTextureResourceMetal::GetLayoutTextureHandle()
 {
     if (!TF_VERIFY(_isPtex)) {
@@ -207,7 +159,6 @@ GarchTextureGPUHandle HdStSimpleTextureResourceMetal::GetLayoutTextureHandle()
 
     GarchTextureGPUHandle textureId = GetLayoutTextureId();
 
-    TF_FATAL_CODING_ERROR("Not Implemented");
     return textureId;
 }
 

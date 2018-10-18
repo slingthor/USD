@@ -72,6 +72,9 @@ public:
     virtual BindingVector GetBindings(TfToken const & identifier,
                                       GarchSamplerGPUHandle samplerName) override;
     
+    MTLF_API
+    static void *PadImage(uint32_t glFormat, void const* rawData, size_t pixelByteSize, int numPixels);
+
 protected:
     
     MTLF_API

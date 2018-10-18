@@ -30,6 +30,7 @@
 #include <pxr/imaging/glf/bindingMap.h>
 #include <pxr/imaging/glf/contextCaps.h>
 #include <pxr/imaging/glf/drawTarget.h>
+#include <pxr/imaging/glf/ptexTexture.h>
 #include <pxr/imaging/glf/simpleLightingContext.h>
 #include <pxr/imaging/glf/simpleShadowArray.h>
 #include <pxr/imaging/glf/uniformBlock.h>
@@ -99,14 +100,10 @@ GarchBaseTexture *GlfResourceFactory::NewBaseTexture() const
     return new GlfBaseTexture();
 }
 
-bool GlfResourceFactory::IsSupportedPtexTexture(std::string const & imageFilePath) const
+GarchPtexTextureRefPtr GlfResourceFactory::NewPtexTexture(
+                            const TfToken &imageFilePath) const
 {
-#ifdef PXR_PTEX_SUPPORT_ENABLED
-    return (TfStringEndsWith(imageFilePath, ".ptx") ||
-            TfStringEndsWith(imageFilePath, ".ptex"));
-#else
-    return false;
-#endif
+    return TfCreateRefPtr(new GlfPtexTexture(imageFilePath));
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE
