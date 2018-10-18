@@ -86,9 +86,11 @@ public:
     MTLF_API
     virtual GarchBaseTexture *NewBaseTexture() const override;
 
+#ifdef PXR_PTEX_SUPPORT_ENABLED
     // Ptex Texture
     MTLF_API
     virtual GarchPtexTextureRefPtr NewPtexTexture(const TfToken &imageFilePath) const override;
+#endif
     
 private:
     MtlfContextCaps contextCaps;

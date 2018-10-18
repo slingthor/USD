@@ -102,9 +102,11 @@ public:
 	GARCH_API
     virtual GarchBaseTexture *NewBaseTexture() const = 0;
 
+#ifdef PXR_PTEX_SUPPORT_ENABLED
     // Ptex Texture
     GARCH_API
     virtual GarchPtexTextureRefPtr NewPtexTexture(const TfToken &imageFilePath) const = 0;
+#endif    
 
 protected:
 	GARCH_API

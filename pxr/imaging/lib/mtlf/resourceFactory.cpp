@@ -100,11 +100,13 @@ GarchBaseTexture *MtlfResourceFactory::NewBaseTexture() const
     return new MtlfBaseTexture();
 }
 
+#ifdef PXR_PTEX_SUPPORT_ENABLED
 GarchPtexTextureRefPtr MtlfResourceFactory::NewPtexTexture(
                             const TfToken &imageFilePath) const
 {
     return TfCreateRefPtr(new MtlfPtexTexture(imageFilePath));
 }
+#endif
 
 PXR_NAMESPACE_CLOSE_SCOPE
 
