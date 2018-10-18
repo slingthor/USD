@@ -89,9 +89,11 @@ public:
     GLF_API
     virtual GarchBaseTexture *NewBaseTexture() const override;
 
+#ifdef PXR_PTEX_SUPPORT_ENABLED
     // Ptex Texture
     GLF_API
     virtual GarchPtexTextureRefPtr NewPtexTexture(const TfToken &imageFilePath) const override;
+#endif
     
 private:
     GlfContextCaps contextCaps;
