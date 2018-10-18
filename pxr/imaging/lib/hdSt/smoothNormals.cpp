@@ -91,7 +91,7 @@ HdSt_SmoothNormalsComputationGPU::HdSt_SmoothNormalsComputationGPU(
 
 void
 HdSt_SmoothNormalsComputationGPU::Execute(
-    HdBufferArrayRangeSharedPtr const &range_,
+    HdBufferArrayRangeSharedPtr const &range,
     HdResourceRegistry *resourceRegistry)
 {
     HD_TRACE_FUNCTION();
@@ -101,12 +101,9 @@ HdSt_SmoothNormalsComputationGPU::Execute(
         return;
 
     TF_VERIFY(_adjacency);
-    HdBufferArrayRangeSharedPtr const &adjacencyRange_ = 
+    HdBufferArrayRangeSharedPtr const &adjacencyRange =
         _adjacency->GetAdjacencyRange();
-    TF_VERIFY(adjacencyRange_);
-
-    HdBufferArrayRangeSharedPtr adjacencyRange =
-        boost::static_pointer_cast<HdBufferArrayRange> (adjacencyRange_);
+    TF_VERIFY(adjacencyRange);
 
     // select shader by datatype
     TfToken shaderToken;
@@ -129,9 +126,6 @@ HdSt_SmoothNormalsComputationGPU::Execute(
         = HdStProgram::GetComputeProgram(shaderToken,
             static_cast<HdStResourceRegistry*>(resourceRegistry));
     if (!computeProgram) return;
-
-    HdBufferArrayRangeSharedPtr range =
-        boost::static_pointer_cast<HdBufferArrayRange> (range_);
 
     // buffer resources for GPU computation
     HdBufferResourceSharedPtr points = range->GetResource(_srcName);

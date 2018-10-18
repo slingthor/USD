@@ -579,10 +579,12 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
 
     id<MTLBuffer> indexBuffer = context->GetIndexBuffer();
     int quadIndexCount = 0;
-    if(bDrawingQuads) {
+    int quadFirstIndex = 0;
+    if (bDrawingQuads) {
         quadIndexCount = indexCount;
-        indexCount = (indexCount / 4) * 6;
-        firstIndex = (firstIndex / 4) * 6;
+        quadFirstIndex = firstIndex;
+        indexCount = (indexCount * 6) / 4;
+        firstIndex = (firstIndex * 6) / 4;
         indexBuffer = context->GetQuadIndexBuffer(indexTypeMetal);
     }
     // Possibly move this outside this function as we shouldn't need to get a render encoder every draw call
@@ -621,6 +623,10 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
     if(doMVA) {
         //Setup Draw Args on the render context
         struct { int _indexCount, _startIndex, _baseVertex, _instanceCount; } drawArgs = { indexCount, firstIndex, baseVertex, instanceCount };
+        if (bDrawingQuads) {
+            drawArgs._startIndex = quadFirstIndex;
+        }
+
         [renderEncoder setVertexBytes:(const void*)&drawArgs length:sizeof(drawArgs) atIndex:_drawArgsSlot];
         //context->SetDrawArgsBuffer(indexCount, firstIndex, baseVertex, _drawArgsSlot, doMVAComputeGS);
         
