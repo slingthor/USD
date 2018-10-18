@@ -117,9 +117,9 @@ MtlfPtexTexture::_ReadImage()
 
     {   // create the Metal texture array
         int numChannels = reader->numChannels();
-        int pixelByteSize;
+        size_t pixelByteSize;
 
-        int glFormat;
+        GLint glFormat;
         switch (reader->dataType())
         {
             case Ptex::dt_float:
@@ -163,7 +163,7 @@ MtlfPtexTexture::_ReadImage()
             pixelByteSize += pixelByteSize / 3;
             numChannels++;
 
-            texelData = MtlfBaseTexture::PadImage(glFormat, texelData, pixelByteSize, _width * _height);
+            texelData = MtlfBaseTexture::PadImage(glFormat, texelData, pixelByteSize, _width * _height * _depth);
         }
 
         int numFaces = loader.GetNumFaces();
@@ -209,12 +209,17 @@ MtlfPtexTexture::_ReadImage()
         descTexels.resourceOptions = MTLResourceStorageModeManaged;
         _texels = [device newTextureWithDescriptor:descTexels];
 
-        [_texels replaceRegion:MTLRegionMake2D(0, 0, _width, _height)
-                   mipmapLevel:0
-                         slice:0
-                     withBytes:texelData
-                   bytesPerRow:pixelByteSize * _width
-                 bytesPerImage:0];
+        size_t pageSize = pixelByteSize * _width * _height;
+        for (int i = 0; i < _depth; i++) {
+            uint8_t const *pageBase = static_cast<uint8_t const*>(texelData)
+                                        + (pageSize * i);
+            [_texels replaceRegion:MTLRegionMake2D(0, 0, _width, _height)
+                       mipmapLevel:0
+                             slice:i
+                         withBytes:pageBase
+                       bytesPerRow:pixelByteSize * _width
+                     bytesPerImage:0];
+        }
     }
 
     reader->release();
