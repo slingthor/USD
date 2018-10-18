@@ -64,31 +64,6 @@ GlfSimpleLightingContext::~GlfSimpleLightingContext()
 {
 }
 
-inline void
-setVec3(float *dst, GfVec3f const & vec)
-{
-    dst[0] = vec[0];
-    dst[1] = vec[1];
-    dst[2] = vec[2];
-}
-
-inline static void
-setVec4(float *dst, GfVec4f const &vec)
-{
-    dst[0] = vec[0];
-    dst[1] = vec[1];
-    dst[2] = vec[2];
-    dst[3] = vec[3];
-}
-
-inline static void
-setMatrix(float *dst, GfMatrix4d const & mat)
-{
-    for (int i = 0; i < 4; ++i)
-        for (int j = 0; j < 4; ++j)
-            dst[i*4+j] = (float)mat[i][j];
-}
-
 void
 GlfSimpleLightingContext::BindSamplers(GarchBindingMapPtr const &bindingMap)
 {

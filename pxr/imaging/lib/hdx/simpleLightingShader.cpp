@@ -109,7 +109,7 @@ void
 HdxSimpleLightingShader::BindResources(HdSt_ResourceBinder const &binder,
                                        HdStProgram const &program)
 {
-    // XXX: we'd like to use HdSt_ResourceBinder instead of GlfBindingMap.
+    // XXX: we'd like to use HdSt_ResourceBinder instead of GarchBindingMap.
     //
     program.AssignUniformBindings(_bindingMap);
     _lightingContext->BindUniformBlocks(_bindingMap);

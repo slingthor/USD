@@ -474,10 +474,10 @@ private:
 // ---------------------------------------------------------------------------
 
 GarchPtexMipmapTextureLoader::GarchPtexMipmapTextureLoader(PtexTexture *ptex,
-                                                       int maxNumPages,
-                                                       int maxLevels,
-                                                       size_t targetMemory,
-                                                       bool seamlessMipmap) :
+                                                           int maxNumPages,
+                                                           int maxLevels,
+                                                           size_t targetMemory,
+                                                           bool seamlessMipmap) :
     _ptex(ptex), _maxLevels(maxLevels), _bpp(0),
     _pageWidth(0), _pageHeight(0), _texelBuffer(NULL), _layoutBuffer(NULL),
     _memoryUsage(0)

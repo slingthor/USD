@@ -33,12 +33,7 @@
 
 #ifdef PXR_PTEX_SUPPORT_ENABLED
 
-#include "pxr/imaging/garch/texture.h"
-
-#include "pxr/base/tf/declarePtrs.h"
-#include "pxr/base/tf/token.h"
-#include "pxr/base/tf/refPtr.h"
-#include "pxr/base/tf/weakPtr.h"
+#include "pxr/imaging/garch/ptexTexture.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -62,71 +57,22 @@ TF_DECLARE_WEAK_AND_REF_PTRS(GlfPtexTexture);
 /// the _texels texture array.
 ///
 
-class GlfPtexTexture : public GarchTexture {
+class GlfPtexTexture : public GarchPtexTexture {
 public:
     GLF_API
     virtual ~GlfPtexTexture();
 
-    /// Creates a new instance.
-    GLF_API
-    static GlfPtexTextureRefPtr New(const TfToken &imageFilePath);
-
-    /// GarchTexture overrides
-    GLF_API
-    virtual BindingVector GetBindings(TfToken const & identifier,
-                                      GarchSamplerGPUHandle samplerId) override;
-    GLF_API
-    virtual VtDictionary GetTextureInfo(bool forceLoad) override;
-
-    GLF_API
-    virtual bool IsMinFilterSupported(GLenum filter) override;
-
-    GLF_API
-    virtual bool IsMagFilterSupported(GLenum filter) override;
-
-    // get/set guttering control variables
-    static int GetGutterWidth() { return _gutterWidth; }
-
-    static int GetPageMargin() { return _pageMargin; }
-
-    // return GL texture for layout texture buffer
-    GLF_API
-    GLuint GetLayoutTextureName();
-
-    // return GL texture for texels data texture
-    GLF_API
-    GLuint GetTexelsTextureName();
-	
-	GLF_API
-    virtual GarchTextureGPUHandle GetTextureName() override;
-
 protected:
     GLF_API
     GlfPtexTexture(const TfToken &imageFilePath);
-
-    GLF_API
-    void _FreePtexTextureObject();
     
-    GLF_API
-    virtual void _ReadTexture() override;
+    friend class GlfResourceFactory;
 
     GLF_API
-    virtual void _OnMemoryRequestedDirty();
+    virtual void _FreePtexTextureObject() override;
 
-private:
-    bool _ReadImage();
-
-    bool _loaded;
-
-    GLuint _layout;   // per-face lookup table
-    GLuint _texels;   // texel data
-
-    GLsizei _width, _height, _depth;
-    GLint _format;
-
-    static int _gutterWidth, _pageMargin;
-
-    const TfToken	_imageFilePath;
+    GLF_API
+    virtual bool _ReadImage() override;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

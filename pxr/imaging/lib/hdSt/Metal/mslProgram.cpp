@@ -408,7 +408,7 @@ void HdStMSLProgram::AssignSamplerUnits(GarchBindingMapRefPtr bindingMap) const
         auto it_range = _bindingMap.equal_range(p.first.Hash());
         for(auto it = it_range.first; it != it_range.second; ++it) {
             const MSL_ShaderBinding& binding = *(*it).second;
-            if(binding._type != kMSL_BindingType_Texture)
+            if(binding._type != kMSL_BindingType_Texture && binding._type != kMSL_BindingType_Sampler)
                 continue;
             MtlfBindingMap::MTLFBindingIndex mtlfIndex(binding._index, (uint32)binding._type, (uint32)binding._stage, true);
             p.second = mtlfIndex.asInt;
@@ -445,47 +445,31 @@ void HdStMSLProgram::AddCustomBindings(GarchBindingMapRefPtr bindingMap) const
 void HdStMSLProgram::BindResources(HdStSurfaceShader* surfaceShader, HdSt_ResourceBinder const &binder) const
 {
     // XXX: there's an issue where other shaders try to use textures.
+    std::string textureName;
+    std::string samplerName;
+
     TF_FOR_ALL(it, surfaceShader->GetTextureDescriptors()) {
-        uint i = 0;
-        while(1)
+        //When more types are added to the switch below, don't forget to update the mask too.
+        bool found;
+
+        textureName = "textureBind_" + it->name.GetString();
+        TfToken textureNameToken(textureName);
+
+        MSL_ShaderBinding const& textureBinding = MSL_FindBinding(_bindingMap, textureNameToken, found, kMSL_BindingType_Texture, 0xFFFFFFFF, 0);
+        if(!found)
         {
-            //When more types are added to the switch below, don't forget to update the mask too.
-            bool found;
-            std::string textureName = "texture2d_" + it->name.GetString();
-            std::string samplerName = "sampler2d_" + it->name.GetString();
-            TfToken textureNameToken(textureName);
-            TfToken samplerNameToken(samplerName);
-
-            MSL_ShaderBinding const& textureBinding = MSL_FindBinding(_bindingMap, textureNameToken, found, kMSL_BindingType_Texture, 0xFFFFFFFF, i);
-            if(!found)
-                break;
-
-            MSL_ShaderBinding const& samplerBinding = MSL_FindBinding(_bindingMap, samplerNameToken, found, kMSL_BindingType_Sampler, 0xFFFFFFFF, i);
-            if(!found)
-                break;
-            
-            MtlfMetalContext::GetMetalContext()->SetTexture(textureBinding._index, it->handle, textureNameToken, textureBinding._stage);
-            MtlfMetalContext::GetMetalContext()->SetSampler(samplerBinding._index, it->sampler, samplerNameToken, samplerBinding._stage);
-
-            i++;
-            break;
-        }
-        
-        if(i == 0)
             TF_FATAL_CODING_ERROR("Could not bind a texture to the shader?!");
-    
-//        HdBinding binding = binder.GetBinding(it->name);
-//        // XXX: put this into resource binder.
-//        if (binding.GetType() == HdBinding::TEXTURE_2D ||
-//            binding.GetType() == HdBinding::TEXTURE_PTEX_TEXEL) {
-//            MtlfMetalContext::GetMetalContext()->SetTexture(binding.GetLocation(), it->handle);
-//            MtlfMetalContext::GetMetalContext()->SetSampler(binding.GetLocation(), it->sampler);
-//        } else if (binding.GetType() == HdBinding::TEXTURE_PTEX_LAYOUT) {
-//            TF_FATAL_CODING_ERROR("Not Implemented");
-//            // glActiveTexture(GL_TEXTURE0 + samplerUnit);
-//            // glBindTexture(GL_TEXTURE_BUFFER, it->handle);
-//            //glProgramUniform1i(_program, binding.GetLocation(), samplerUnit);
-//        }
+        }
+
+        MtlfMetalContext::GetMetalContext()->SetTexture(textureBinding._index, it->handle, textureNameToken, textureBinding._stage);
+
+        samplerName = "samplerBind_" + it->name.GetString();
+        TfToken samplerNameToken(samplerName);
+
+        MSL_ShaderBinding const& samplerBinding = MSL_FindBinding(_bindingMap, samplerNameToken, found, kMSL_BindingType_Sampler, 0xFFFFFFFF, 0);
+        if(found) {
+            MtlfMetalContext::GetMetalContext()->SetSampler(samplerBinding._index, it->sampler, samplerNameToken, samplerBinding._stage);
+        }
     }
 }
 

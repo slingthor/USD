@@ -31,7 +31,7 @@
 #include "pxr/usdImaging/usdImaging/tokens.h"
 
 #include "pxr/imaging/garch/glslfx.h"
-#include "pxr/imaging/garch/resourceFactory.h"
+#include "pxr/imaging/garch/ptexTexture.h"
 
 #include "pxr/imaging/hd/material.h"
 #include "pxr/imaging/hd/tokens.h"
@@ -654,8 +654,6 @@ UsdImagingHydraMaterialAdapter::_WalkShaderNetworkDeprecated(
 {
     UsdShadeShader shader(shaderPrim);
     
-    GarchResourceFactory const& resourceFactory = GarchResourceFactory::GetInstance();
-
     for (const UsdShadeInput &shaderInput : shader.GetInputs()) {
         if (_IsLegacyTextureOrPrimvarInput(shaderInput)) {
             continue;
@@ -697,7 +695,7 @@ UsdImagingHydraMaterialAdapter::_WalkShaderNetworkDeprecated(
             texAttr.Get(&ap, UsdTimeCode::Default());
 
                                             
-            isPtex = resourceFactory->IsSupportedPtexTexture(TfToken(ap.GetAssetPath()));
+            isPtex = GarchIsSupportedPtexTexture(TfToken(ap.GetAssetPath()));
             if (isPtex) {
                 t = UsdImagingTokens->ptexFaceIndex;
                 // Allow the client to override this name

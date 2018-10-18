@@ -394,9 +394,14 @@ _GetFlatType(TfToken const &token)
     return token;
 }
 
-static HdSt_CodeGenMSL::TParam& _AddInputParam(  HdSt_CodeGenMSL::InOutParams &inputParams,
-                                            TfToken const &name, TfToken const& type, TfToken const &attribute,
-                                            HdBinding const &binding = HdBinding(HdBinding::UNKNOWN, 0), int arraySize = 0, TfToken const &accessor = TfToken())
+static HdSt_CodeGenMSL::TParam& _AddInputParam(
+                            HdSt_CodeGenMSL::InOutParams &inputParams,
+                            TfToken const &name,
+                            TfToken const& type,
+                            TfToken const &attribute,
+                            HdBinding const &binding =
+                                HdBinding(HdBinding::UNKNOWN, 0),
+                                          int arraySize = 0, TfToken const &accessor = TfToken())
 {
     HdSt_CodeGenMSL::TParam in(name, type, accessor, attribute, HdSt_CodeGenMSL::TParam::Unspecified, binding, arraySize);
     HdBinding::Type bindingType = binding.GetType();
@@ -4213,12 +4218,12 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
                 << "}\n";
         } else if (bindingType == HdBinding::TEXTURE_2D) {
             declarations
-                << "sampler sampler2d_" << it->second.name << ";\n"
-                << "texture2d<float> texture2d_" << it->second.name << ";\n";
+                << "sampler samplerBind_" << it->second.name << ";\n"
+                << "texture2d<float> textureBind_" << it->second.name << ";\n";
             
-            _AddInputParam(_mslPSInputParams, TfToken("sampler2d_" + it->second.name.GetString()), TfToken("sampler"), TfToken()).usage
+            _AddInputParam(_mslPSInputParams, TfToken("samplerBind_" + it->second.name.GetString()), TfToken("sampler"), TfToken()).usage
                 |= HdSt_CodeGenMSL::TParam::Sampler;
-            _AddInputParam(_mslPSInputParams, TfToken("texture2d_" + it->second.name.GetString()), TfToken("texture2d<float>"), TfToken()).usage
+            _AddInputParam(_mslPSInputParams, TfToken("textureBind_" + it->second.name.GetString()), TfToken("texture2d<float>"), TfToken()).usage
                 |= HdSt_CodeGenMSL::TParam::Texture;
 
             // a function returning sampler2D is allowed in 430 or later
@@ -4226,16 +4231,16 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
                 accessors
                     << "sampler\n"
                     << "HdGetSampler_" << it->second.name << "() {\n"
-                    << "  return sampler2d_" << it->second.name << ";"
+                    << "  return samplerBind_" << it->second.name << ";"
                     << "}\n";
             }
-            // vec4 HdGet_name(vec2 coord) { return texture(sampler2d_name, coord).xyz; }
+            // vec4 HdGet_name(vec2 coord) { return texture(samplerBind_name, coord).xyz; }
             accessors
                 << _GetUnpackedType(it->second.dataType, false)
                 << " HdGet_" << it->second.name
                 << "(vec2 coord) { return "
                 << _GetPackedTypeAccessor(it->second.dataType, false)
-                << "(texture2d_" << it->second.name << ".sample(sampler2d_"
+                << "(textureBind_" << it->second.name << ".sample(samplerBind_"
                 << it->second.name << ", coord)" << swizzle << ");}\n";
             // vec4 HdGet_name() { return HdGet_name(HdGet_st().xy); }
             accessors
@@ -4274,22 +4279,33 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
                 << "  int shaderCoord = GetDrawingCoord().shaderCoord; \n"
                 << "  return " << _GetPackedTypeAccessor(it->second.dataType, false)
                 << "(GlopPtexTextureLookup("
-                << "samplerArray(materialParams[shaderCoord]." << it->second.name <<"),"
-                << "isamplerBuffer(materialParams[shaderCoord]." << it->second.name << "_layout), "
+                << "texture2d_array<float>(materialParams[shaderCoord]." << it->second.name <<"),"
+                << "texture1d<int>(materialParams[shaderCoord]." << it->second.name << "_layout), "
                 << "patchCoord)" << swizzle << ");\n"
                 << "}\n";
         } else if (bindingType == HdBinding::TEXTURE_PTEX_TEXEL) {
-            // +1 for layout is by convention.
+            // appending '_layout' for layout is by convention.
+            std::string texelBindName("textureBind_" + it->second.name.GetString());
+            std::string layoutBindName("textureBind_" + it->second.name.GetString() + "_layout");
+            
             declarations
-                << "texture2d_array<float> sampler2darray_" << it->first.GetLocation() << ";\n"
-                << "texture1d<int> isamplerbuffer_" << (it->first.GetLocation()+1) << ";\n";
+                << "texture2d_array<float> " << texelBindName << ";\n"
+                << "texture1d<int> " << layoutBindName << ";\n";
+            
+            _AddInputParam(_mslPSInputParams, TfToken(texelBindName),
+                           TfToken("texture2d_array<float>"), TfToken(), it->first).usage
+                |= HdSt_CodeGenMSL::TParam::Texture;
+            _AddInputParam(_mslPSInputParams, TfToken(layoutBindName),
+                           TfToken("texture1d<int>"), TfToken(), it->first).usage
+                |= HdSt_CodeGenMSL::TParam::Texture;
+
             accessors
                 << _GetUnpackedType(it->second.dataType, false)
                 << " HdGet_" << it->second.name << "(int localIndex) {\n"
                 << "  return " << _GetPackedTypeAccessor(it->second.dataType, false)
                 << "(GlopPtexTextureLookup("
-                << "sampler2darray_" << it->first.GetLocation() << ","
-                << "isamplerbuffer_" << (it->first.GetLocation()+1) << ","
+                << texelBindName << ","
+                << layoutBindName << ","
                 << "GetPatchCoord(localIndex))" << swizzle << ");\n"
                 << "}\n"
                 << _GetUnpackedType(it->second.dataType, false)
@@ -4299,8 +4315,8 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
                 << " HdGet_" << it->second.name << "(vec4 patchCoord) {\n"
                 << "  return " << _GetPackedTypeAccessor(it->second.dataType, false)
                 << "(GlopPtexTextureLookup("
-                << "sampler2darray_" << it->first.GetLocation() << ","
-                << "isamplerbuffer_" << (it->first.GetLocation()+1) << ","
+                << texelBindName<< ","
+                << layoutBindName << ","
                 << "patchCoord)" << swizzle << ");\n"
                 << "}\n";
             addScalarAccessor = false;

@@ -56,26 +56,9 @@ using namespace boost;
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-TF_REGISTRY_FUNCTION(TfType)
-{
-    typedef GlfPtexTexture Type;
-    TfType t = TfType::Define<Type, TfType::Bases<GarchTexture> >();
-    t.SetFactory< GarchTextureFactory<Type> >();
-}
-
 //------------------------------------------------------------------------------
-GlfPtexTextureRefPtr
-GlfPtexTexture::New(const TfToken &imageFilePath)
-{
-    return TfCreateRefPtr(new GlfPtexTexture(imageFilePath));
-}
-
-//------------------------------------------------------------------------------
-GlfPtexTexture::GlfPtexTexture(const TfToken &imageFilePath) :
-    _loaded(false),
-    _layout(0), _texels(0),
-    _width(0), _height(0), _depth(0),
-    _imageFilePath(imageFilePath)
+GlfPtexTexture::GlfPtexTexture(const TfToken &imageFilePath)
+: GarchPtexTexture(imageFilePath)
 { 
 }
 
@@ -83,13 +66,6 @@ GlfPtexTexture::GlfPtexTexture(const TfToken &imageFilePath) :
 GlfPtexTexture::~GlfPtexTexture()
 { 
     _FreePtexTextureObject();
-}
-
-//------------------------------------------------------------------------------
-void
-GlfPtexTexture::_OnMemoryRequestedDirty()
-{
-    _loaded = false;
 }
 
 //------------------------------------------------------------------------------
@@ -198,7 +174,10 @@ GlfPtexTexture::_ReadImage()
         //     uint8_t  height log2;
         // };
 
-        glGenTextures(1, & _layout);
+        GLuint gpuName;
+        glGenTextures(1, &gpuName);
+        _layout = gpuName;
+
         GLuint layoutBuffer;
         glGenBuffers(1, & layoutBuffer );
         glBindBuffer( GL_TEXTURE_BUFFER, layoutBuffer );
@@ -211,7 +190,9 @@ GlfPtexTexture::_ReadImage()
 
 
         // actual texels texture array
-        glGenTextures(1,&_texels);
+        glGenTextures(1, &gpuName);
+        _texels = gpuName;
+
         glBindTexture(GL_TEXTURE_2D_ARRAY,_texels);
         glTexParameteri(GL_TEXTURE_2D_ARRAY,GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D_ARRAY,GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -252,120 +233,21 @@ GlfPtexTexture::_FreePtexTextureObject()
     GlfSharedGLContextScopeHolder sharedGLContextScopeHolder;
 
     // delete layout lookup --------------------------------
-    if (glIsTexture(_layout))
-       glDeleteTextures(1,&_layout);
+    if (glIsTexture(_layout)) {
+        GLuint gpuName = _layout;
+        glDeleteTextures(1, &gpuName);
+        _layout.Clear();
+    }
        
     // delete textures lookup ------------------------------
-    if (glIsTexture(_texels))
-       glDeleteTextures(1,&_texels);
+    if (glIsTexture(_texels)) {
+        GLuint gpuName = _texels;
+        glDeleteTextures(1, &gpuName);
+        _texels.Clear();
+    }
 }
 
 //------------------------------------------------------------------------------
-
-/* virtual */
-GarchTexture::BindingVector
-GlfPtexTexture::GetBindings(TfToken const & identifier, GarchSamplerGPUHandle samplerId)
-{
-    if (!_loaded) {
-        _ReadImage();
-    }
-
-    BindingVector result;
-    result.reserve(2);
-
-    result.push_back(Binding(
-        TfToken(identifier.GetString() + "_Data"), GarchTextureTokens->texels,
-        GL_TEXTURE_2D_ARRAY, _texels, samplerId));
-
-    // packing buffer doesn't need external sampler
-    result.push_back(Binding(
-        TfToken(identifier.GetString() + "_Packing"), GarchTextureTokens->layout,
-        GL_TEXTURE_BUFFER, _layout, GarchSamplerGPUHandle()));
-
-    return result;
-}
-
-//------------------------------------------------------------------------------
-
-VtDictionary
-GlfPtexTexture::GetTextureInfo(bool forceLoad)
-{
-    if (!_loaded && forceLoad) {
-        _ReadImage();
-    }
-
-    VtDictionary info;
-
-    info["memoryUsed"] = GetMemoryUsed();
-    info["width"] = (int)_width;
-    info["height"] = (int)_height;
-    info["depth"] = (int)_depth;
-    info["format"] = (int)_format;
-    info["imageFilePath"] = _imageFilePath;
-    info["referenceCount"] = GetRefCount().Get();
-
-    return info;
-}
-
-bool
-GlfPtexTexture::IsMinFilterSupported(GLenum filter)
-{
-    switch(filter) {
-    case GL_NEAREST:
-    case GL_LINEAR:
-        return true;
-    default:
-        return false;
-    }
-}
-
-bool
-GlfPtexTexture::IsMagFilterSupported(GLenum filter)
-{
-    switch(filter) {
-    case GL_NEAREST:
-    case GL_LINEAR:
-        return true;
-    default:
-        return false;
-    }
-}
-
-GLuint
-GlfPtexTexture::GetLayoutTextureName()
-{
-    if (!_loaded) {
-        _ReadImage();
-    }
-
-    return _layout;
-}
-
-GLuint
-GlfPtexTexture::GetTexelsTextureName()
-{
-    if (!_loaded) {
-        _ReadImage();
-    }
-
-    return _texels;
-}
-
-GarchTextureGPUHandle
-GlfPtexTexture::GetTextureName()
-{
-    if (!_loaded) {
-        _ReadImage();
-    }
-
-    return GarchTextureGPUHandle(_texels);    
-}
-
-void
-GlfPtexTexture::_ReadTexture()
-{
-    TF_FATAL_CODING_ERROR("Not Implemented!"); //MTL_FIXME
-}
 
 PXR_NAMESPACE_CLOSE_SCOPE
 

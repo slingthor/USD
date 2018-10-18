@@ -53,6 +53,8 @@ TF_DEFINE_PRIVATE_TOKENS(
     ((materialUB, "Material"))
     ((shadowSampler, "shadowTexture"))
     ((shadowCompareSampler, "shadowCompareTexture"))
+    ((shadowSamplerMetalSampler, "shadowTextureSampler"))
+    ((shadowCompareSamplerMetalSampler, "shadowCompareTextureSampler"))
 );
 
 // XXX:
@@ -70,154 +72,52 @@ MtlfSimpleLightingContext::~MtlfSimpleLightingContext()
 {
 }
 
-inline void
-setVec3(float *dst, GfVec3f const & vec)
+void
+MtlfSimpleLightingContext::InitSamplerUnitBindings(GarchBindingMapPtr const &bindingMap) const
 {
-    dst[0] = vec[0];
-    dst[1] = vec[1];
-    dst[2] = vec[2];
-}
+    GarchSimpleLightingContext::InitSamplerUnitBindings(bindingMap);
 
-inline static void
-setVec4(float *dst, GfVec4f const &vec)
-{
-    dst[0] = vec[0];
-    dst[1] = vec[1];
-    dst[2] = vec[2];
-    dst[3] = vec[3];
-}
-
-inline static void
-setMatrix(float *dst, GfMatrix4d const & mat)
-{
-    for (int i = 0; i < 4; ++i)
-        for (int j = 0; j < 4; ++j)
-            dst[i*4+j] = (float)mat[i][j];
+    bindingMap->GetSamplerUnit(_tokens->shadowSamplerMetalSampler);
+    bindingMap->GetSamplerUnit(_tokens->shadowCompareSamplerMetalSampler);
 }
 
 void
 MtlfSimpleLightingContext::BindSamplers(GarchBindingMapPtr const &bindingMap)
 {
-    MtlfBindingMap::MTLFBindingIndex shadowSampler(bindingMap->GetSamplerUnit(_tokens->shadowSampler));
-    MtlfBindingMap::MTLFBindingIndex shadowCompareSampler(bindingMap->GetSamplerUnit(_tokens->shadowCompareSampler));
+    MtlfBindingMap::MTLFBindingIndex shadowTexture(bindingMap->GetSamplerUnit(_tokens->shadowSampler));
+    MtlfBindingMap::MTLFBindingIndex shadowCompareTexture(bindingMap->GetSamplerUnit(_tokens->shadowCompareSampler));
+    MtlfBindingMap::MTLFBindingIndex shadowSampler(bindingMap->GetSamplerUnit(_tokens->shadowSamplerMetalSampler));
+    MtlfBindingMap::MTLFBindingIndex shadowCompareSampler(bindingMap->GetSamplerUnit(_tokens->shadowCompareSamplerMetalSampler));
 
-    MtlfMetalContext::GetMetalContext()->SetTexture(shadowSampler.index, _shadows->GetShadowMapTexture(), _tokens->shadowSampler, (MSL_ProgramStage)shadowSampler.stage);
-    MtlfMetalContext::GetMetalContext()->SetSampler(shadowSampler.index, _shadows->GetShadowMapDepthSampler(), _tokens->shadowSampler, (MSL_ProgramStage)shadowSampler.stage);
+    MtlfMetalContext::GetMetalContext()->SetTexture(shadowTexture.index,
+                                                    _shadows->GetShadowMapTexture(),
+                                                    _tokens->shadowSampler,
+                                                    MSL_ProgramStage(shadowTexture.stage));
+    MtlfMetalContext::GetMetalContext()->SetSampler(shadowSampler.index,
+                                                    _shadows->GetShadowMapDepthSampler(),
+                                                    _tokens->shadowSampler,
+                                                    MSL_ProgramStage(shadowSampler.stage));
     
-    MtlfMetalContext::GetMetalContext()->SetTexture(shadowCompareSampler.index, _shadows->GetShadowMapTexture(), _tokens->shadowCompareSampler, (MSL_ProgramStage)shadowCompareSampler.stage);
-    MtlfMetalContext::GetMetalContext()->SetSampler(shadowCompareSampler.index, _shadows->GetShadowMapCompareSampler(), _tokens->shadowCompareSampler, (MSL_ProgramStage)shadowCompareSampler.stage);
+    MtlfMetalContext::GetMetalContext()->SetTexture(shadowCompareTexture.index,
+                                                    _shadows->GetShadowMapTexture(),
+                                                    _tokens->shadowCompareSampler,
+                                                    MSL_ProgramStage(shadowCompareTexture.stage));
+    
+    MtlfMetalContext::GetMetalContext()->SetSampler(shadowCompareSampler.index,
+                                                    _shadows->GetShadowMapCompareSampler(),
+                                                    _tokens->shadowCompareSampler,
+                                                    MSL_ProgramStage(shadowCompareSampler.stage));
 }
 
 void
 MtlfSimpleLightingContext::UnbindSamplers(GarchBindingMapPtr const &bindingMap)
 {
-    //TF_FATAL_CODING_ERROR("Not Implemented");
-    /*
-    int shadowSampler = bindingMap->GetSamplerUnit(_tokens->shadowSampler);
-    int shadowCompareSampler = bindingMap->GetSamplerUnit(_tokens->shadowCompareSampler);
-
-    glActiveTexture(GL_TEXTURE0 + shadowSampler);
-    glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
-    glBindSampler(shadowSampler, 0);
-
-    glActiveTexture(GL_TEXTURE0 + shadowCompareSampler);
-    glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
-    glBindSampler(shadowCompareSampler, 0);
-
-    glActiveTexture(GL_TEXTURE0);
-     */
 }
 
 void
 MtlfSimpleLightingContext::SetStateFromOpenGL()
 {
     TF_FATAL_CODING_ERROR("Not Implemented");
-    /*
-    // import classic GL light's parameters into shaded lights
-    SetUseLighting(glIsEnabled(GL_LIGHTING) == GL_TRUE);
-
-    GfMatrix4d worldToViewMatrix;
-    glGetDoublev(GL_MODELVIEW_MATRIX, worldToViewMatrix.GetArray());
-    GfMatrix4d viewToWorldMatrix = worldToViewMatrix.GetInverse();
-
-    GLint nLights = 0;
-    glGetIntegerv(GL_MAX_LIGHTS, &nLights);
-
-    MtlfSimpleLightVector lights;
-    lights.reserve(nLights);
-
-    MtlfSimpleLight light;
-    for(int i = 0; i < nLights; ++i)
-    {
-        int lightName = GL_LIGHT0 + i;
-        if (glIsEnabled(lightName)) {
-            GLfloat position[4], color[4];
-
-            glGetLightfv(lightName, GL_POSITION, position);
-            light.SetPosition(GfVec4f(position)*viewToWorldMatrix);
-            
-            glGetLightfv(lightName, GL_AMBIENT, color);
-            light.SetAmbient(GfVec4f(color));
-            
-            glGetLightfv(lightName, GL_DIFFUSE, color);
-            light.SetDiffuse(GfVec4f(color));
-            
-            glGetLightfv(lightName, GL_SPECULAR, color);
-            light.SetSpecular(GfVec4f(color));
-
-            GLfloat spotDirection[3];
-            glGetLightfv(lightName, GL_SPOT_DIRECTION, spotDirection);
-            light.SetSpotDirection(
-                viewToWorldMatrix.TransformDir(GfVec3f(spotDirection)));
-
-            GLfloat floatValue;
-
-            glGetLightfv(lightName, GL_SPOT_CUTOFF, &floatValue);
-            light.SetSpotCutoff(floatValue);
-
-            glGetLightfv(lightName, GL_SPOT_EXPONENT, &floatValue);
-            light.SetSpotFalloff(floatValue);
-
-            GfVec3f attenuation;
-            glGetLightfv(lightName, GL_CONSTANT_ATTENUATION, &floatValue);
-            attenuation[0] = floatValue;
-
-            glGetLightfv(lightName, GL_LINEAR_ATTENUATION, &floatValue);
-            attenuation[1] = floatValue;
-
-            glGetLightfv(lightName, GL_QUADRATIC_ATTENUATION, &floatValue);
-            attenuation[2] = floatValue;
-
-            light.SetAttenuation(attenuation);
-
-            lights.push_back(light);
-        }
-    }
-
-    SetLights(lights);
-
-    MtlfSimpleMaterial material;
-
-    GLfloat color[4], shininess;
-    glGetMaterialfv(GL_FRONT, GL_AMBIENT, color);
-    material.SetAmbient(GfVec4f(color));
-    glGetMaterialfv(GL_FRONT, GL_DIFFUSE, color);
-    material.SetDiffuse(GfVec4f(color));
-    glGetMaterialfv(GL_FRONT, GL_SPECULAR, color);
-    material.SetSpecular(GfVec4f(color));
-    glGetMaterialfv(GL_FRONT, GL_EMISSION, color);
-    material.SetEmission(GfVec4f(color));
-    glGetMaterialfv(GL_FRONT, GL_SHININESS, &shininess);
-    // clamp to 0.0001, since pow(0,0) is undefined in GLSL.
-    shininess = std::max(0.0001f, shininess);
-    material.SetShininess(shininess);
-
-    SetMaterial(material);
-
-    GfVec4f sceneAmbient;
-    glGetFloatv(GL_LIGHT_MODEL_AMBIENT, &sceneAmbient[0]);
-    SetSceneAmbient(sceneAmbient);
-     */
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

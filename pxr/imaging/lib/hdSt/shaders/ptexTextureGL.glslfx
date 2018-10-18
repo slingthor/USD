@@ -418,4 +418,3 @@ GlopPtexTextureLookup(sampler2DArray data,
                       data,
                       packings);
 }
-#endif

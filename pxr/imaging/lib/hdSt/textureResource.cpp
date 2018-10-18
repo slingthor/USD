@@ -23,7 +23,9 @@
 //
 #include "pxr/imaging/glf/glew.h"
 
+#include "pxr/imaging/garch/baseTexture.h"
 #include "pxr/imaging/garch/contextCaps.h"
+#include "pxr/imaging/garch/ptexTexture.h"
 #include "pxr/imaging/garch/resourceFactory.h"
 
 #include "pxr/imaging/hdSt/textureResource.h"
@@ -35,8 +37,6 @@
 
 #include "pxr/imaging/hd/engine.h"
 #include "pxr/imaging/hd/perfLog.h"
-
-#include "pxr/imaging/garch/baseTexture.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -84,7 +84,22 @@ HdStTextureResource::~HdStTextureResource()
     /*Nothing*/
 }
 
-HdStSimpleTextureResource::HdStSimpleTextureResource()
+HdStSimpleTextureResource::HdStSimpleTextureResource(
+     GarchTextureHandleRefPtr const &textureHandle, bool isPtex,
+     HdWrap wrapS, HdWrap wrapT,
+     HdMinFilter minFilter, HdMagFilter magFilter,
+     size_t memoryRequest)
+: _textureHandle(textureHandle)
+, _texture()
+, _borderColor(0.0,0.0,0.0,0.0)
+, _maxAnisotropy(16.0)
+, _sampler()
+, _isPtex(isPtex)
+, _memoryRequest(memoryRequest)
+, _wrapS(wrapS)
+, _wrapT(wrapT)
+, _minFilter(minFilter)
+, _magFilter(magFilter)
 {
     /*Nothing*/
 }
@@ -92,6 +107,44 @@ HdStSimpleTextureResource::HdStSimpleTextureResource()
 HdStSimpleTextureResource::~HdStSimpleTextureResource()
 {
     /*Nothing*/
+}
+
+GarchTextureGPUHandle HdStSimpleTextureResource::GetTexelsTextureId()
+{
+    if (_isPtex) {
+#ifdef PXR_PTEX_SUPPORT_ENABLED
+        GarchPtexTextureRefPtr ptexTexture =
+            TfDynamic_cast<GarchPtexTextureRefPtr>(_texture);
+        
+        if (ptexTexture) {
+            return ptexTexture->GetTexelsTextureName();
+        }
+        return GarchTextureGPUHandle();
+#else
+        TF_CODING_ERROR("Ptex support is disabled.  "
+                        "This code path should be unreachable");
+        return GarchTextureGPUHandle();
+#endif
+    }
+    
+    return _texture->GetTextureName();
+}
+
+GarchTextureGPUHandle HdStSimpleTextureResource::GetLayoutTextureId()
+{
+#ifdef PXR_PTEX_SUPPORT_ENABLED
+    GarchPtexTextureRefPtr ptexTexture =
+        TfDynamic_cast<GarchPtexTextureRefPtr>(_texture);
+    
+    if (ptexTexture) {
+        return ptexTexture->GetLayoutTextureName();
+    }
+    return GarchTextureGPUHandle();
+#else
+    TF_CODING_ERROR("Ptex support is disabled.  "
+                    "This code path should be unreachable");
+    return GarchTextureGPUHandle();
+#endif
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

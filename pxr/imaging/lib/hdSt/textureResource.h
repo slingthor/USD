@@ -83,20 +83,37 @@ public:
     
     HDST_API
     virtual ~HdStSimpleTextureResource();
+    
+    HDST_API virtual GarchTextureGPUHandle GetTexelsTextureId() override;
+    HDST_API virtual GarchTextureGPUHandle GetLayoutTextureId() override;
 
+    HDST_API virtual GarchSamplerGPUHandle GetTexelsSamplerId() override = 0;
+    HDST_API virtual GarchTextureGPUHandle GetTexelsTextureHandle() override = 0;
+    HDST_API virtual GarchTextureGPUHandle GetLayoutTextureHandle() override = 0;
 
     virtual bool IsPtex() const override = 0;
     virtual size_t GetMemoryUsed() override = 0;
 
-    HDST_API virtual GarchTextureGPUHandle GetTexelsTextureId() override = 0;
-    HDST_API virtual GarchSamplerGPUHandle GetTexelsSamplerId() override = 0;
-    HDST_API virtual GarchTextureGPUHandle GetTexelsTextureHandle() override = 0;
-    HDST_API virtual GarchTextureGPUHandle GetLayoutTextureId() override = 0;
-    HDST_API virtual GarchTextureGPUHandle GetLayoutTextureHandle() override = 0;
+protected:
+    GarchTextureHandleRefPtr _textureHandle;
+    GarchTextureRefPtr _texture;
+    GfVec4f _borderColor;
+    float _maxAnisotropy;
+    GarchSamplerGPUHandle _sampler;
+    bool _isPtex;
+    size_t _memoryRequest;
+    HdWrap _wrapS;
+    HdWrap _wrapT;
+    HdMinFilter _minFilter;
+    HdMagFilter _magFilter;
 
+    
 protected:
     HDST_API
-    HdStSimpleTextureResource();
+    HdStSimpleTextureResource(GarchTextureHandleRefPtr const &textureHandle, bool isPtex,
+                              HdWrap wrapS, HdWrap wrapT,
+                              HdMinFilter minFilter, HdMagFilter magFilter,
+                              size_t memoryRequest);
 };
 
 

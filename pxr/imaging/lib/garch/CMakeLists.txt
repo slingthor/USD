@@ -78,6 +78,7 @@ pxr_library(garch
         glPlatformDebugContext
         glslfx
         glslfxConfig
+        ptexTexture
         resourceFactory
         texture
         textureHandle

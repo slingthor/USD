@@ -45,32 +45,15 @@ public:
     virtual bool IsPtex() const override;
 
     HDST_API
-    virtual GarchTextureGPUHandle GetTexelsTextureId() override;
-    HDST_API
     virtual GarchSamplerGPUHandle GetTexelsSamplerId() override;
     HDST_API
     virtual GarchTextureGPUHandle GetTexelsTextureHandle() override;
 
     HDST_API
-    virtual GarchTextureGPUHandle GetLayoutTextureId() override;
-    HDST_API
     virtual GarchTextureGPUHandle GetLayoutTextureHandle() override;
 
     HDST_API
     virtual size_t GetMemoryUsed() override;
-
-private:
-    GarchTextureHandleRefPtr _textureHandle;
-    GarchTextureRefPtr _texture;
-    GfVec4f _borderColor;
-    float _maxAnisotropy;
-    GLuint _sampler;
-    bool _isPtex;
-    size_t _memoryRequest;
-    HdWrap _wrapS;
-    HdWrap _wrapT;
-    HdMinFilter _minFilter;
-    HdMagFilter _magFilter;
 };
 
 
