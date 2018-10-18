@@ -578,7 +578,9 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
 
     id<MTLBuffer> indexBuffer = context->GetIndexBuffer();
+    int quadIndexCount = 0;
     if(bDrawingQuads) {
+        quadIndexCount = indexCount;
         indexCount = (indexCount / 4) * 6;
         firstIndex = (firstIndex / 4) * 6;
         indexBuffer = context->GetQuadIndexBuffer(indexTypeMetal);
@@ -655,9 +657,17 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
     
     if(doMVAComputeGS)
     {
+        NSInteger primCount;
+        
+        if (bDrawingQuads)
+            primCount = quadIndexCount / 4;
+        else
+            primCount = indexCount / 3;
+        primCount *= instanceCount;
+
         NSInteger maxThreadsPerThreadgroup = context->GetMaxThreadsPerThreadgroup(METALWORKQUEUE_GEOMETRY_SHADER);
-        NSInteger primCount = (indexCount / 3) * instanceCount;
         MTLSize threadGroupcount = MTLSizeMake(fmin(maxThreadsPerThreadgroup, primCount), 1, 1);
+
         [computeEncoder dispatchThreads:MTLSizeMake(primCount, 1, 1) threadsPerThreadgroup:threadGroupcount];
 
         [renderEncoder drawPrimitives:primType vertexStart:0 vertexCount:indexCount instanceCount:instanceCount baseInstance:0];
