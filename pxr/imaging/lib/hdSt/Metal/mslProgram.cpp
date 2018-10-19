@@ -576,6 +576,11 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
     }
   
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
+    
+    if (!context->GeometryShadersActive()) {
+        context->CreateCommandBuffer(METALWORKQUEUE_GEOMETRY_SHADER);
+        context->LabelCommandBuffer(@"Geometry Shaders", METALWORKQUEUE_GEOMETRY_SHADER);
+    }
 
     id<MTLBuffer> indexBuffer = context->GetIndexBuffer();
     int quadIndexCount = 0;
@@ -587,109 +592,63 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
         firstIndex = (firstIndex * 6) / 4;
         indexBuffer = context->GetQuadIndexBuffer(indexTypeMetal);
     }
-    // Possibly move this outside this function as we shouldn't need to get a render encoder every draw call
-    id <MTLRenderCommandEncoder>    renderEncoder = context->GetRenderEncoder();
-    id <MTLComputeCommandEncoder>   computeEncoder;
-    
-    //Encode a dependency on the Geometry Shader queue to ensure the GS data is there.
-    if(doMVAComputeGS) {
-        
-        if (!context->GeometryShadersActive()) {
-            context->CreateCommandBuffer(METALWORKQUEUE_GEOMETRY_SHADER);
-            context->LabelCommandBuffer(@"Geometry Shaders", METALWORKQUEUE_GEOMETRY_SHADER);
-        }
-        
-        renderEncoder = nil;
-        context->ReleaseEncoder(true);
-        context->EncodeWaitForQueue(METALWORKQUEUE_DEFAULT, METALWORKQUEUE_GEOMETRY_SHADER);
-        
-        //Patch the drescriptor to prevent clearing attachments we just rendered to.
-        MTLRenderPassDescriptor* rpd = context->GetRenderPassDescriptor();
-        if(rpd.depthAttachment != nil)
-            rpd.depthAttachment.loadAction = MTLLoadActionLoad;
-        if(rpd.stencilAttachment != nil)
-            rpd.stencilAttachment.loadAction = MTLLoadActionLoad;
-        for(int i = 0; i < 8; i++) {
-            if(rpd.colorAttachments[i] != nil)
-                rpd.colorAttachments[i].loadAction = MTLLoadActionLoad;
-        }
-        context->SetRenderPassDescriptor(rpd);
-        
-        renderEncoder = context->GetRenderEncoder();
-    }
-    
-    const_cast<HdStMSLProgram*>(this)->BakeState();
-    
-    if(doMVA) {
-        //Setup Draw Args on the render context
-        struct { int _indexCount, _startIndex, _baseVertex, _instanceCount; } drawArgs = { indexCount, firstIndex, baseVertex, instanceCount };
-        if (bDrawingQuads) {
-            drawArgs._startIndex = quadFirstIndex;
-        }
 
-        [renderEncoder setVertexBytes:(const void*)&drawArgs length:sizeof(drawArgs) atIndex:_drawArgsSlot];
-        //context->SetDrawArgsBuffer(indexCount, firstIndex, baseVertex, _drawArgsSlot, doMVAComputeGS);
+    const uint32_t vertsPerPrimitive = 3;
+    uint32_t numPrimitives = indexCount / vertsPerPrimitive;
+    const uint32_t maxPrimitivesPerPart = doMVAComputeGS ? context->GetMaxComputeGSPartSize(vertsPerPrimitive, _gsVertOutStructSize, _gsPrimOutStructSize) : numPrimitives;
+    
+    uint32_t partIndexOffset = 0;
+    while(numPrimitives > 0) {
+        const uint32_t numPrimitivesInPart = MIN(numPrimitives, maxPrimitivesPerPart);
+        const uint32_t numIndicesInPart = numPrimitivesInPart * vertsPerPrimitive;
+        
+        const uint32_t gsVertDataSize = numIndicesInPart * _gsVertOutStructSize;
+        const uint32_t gsPrimDataSize = numPrimitivesInPart * _gsPrimOutStructSize;
+        id<MTLBuffer> gsDataBuffer = nil;
+        uint32_t gsVertDataOffset(0), gsPrimDataOffset(0);
+        if(doMVAComputeGS)
+            context->PrepareForComputeGSPart(gsVertDataSize, gsPrimDataSize, gsDataBuffer, gsVertDataOffset, gsPrimDataOffset);
+        
+        id<MTLRenderCommandEncoder>  renderEncoder = context->GetRenderEncoder(METALWORKQUEUE_DEFAULT);
+    
+        const_cast<HdStMSLProgram*>(this)->BakeState();
+    
+        id<MTLComputeCommandEncoder> computeEncoder = doMVAComputeGS ? context->GetComputeEncoder(METALWORKQUEUE_GEOMETRY_SHADER) : nil;
+        
+        if(doMVA) {
+            //Setup Draw Args on the render context
+            struct { uint32_t _indexCount, _startIndex, _baseVertex, _instanceCount, _batchIndexOffset; }
+            drawArgs = { (uint32_t)indexCount, (uint32_t)firstIndex, (uint32_t)baseVertex, (uint32_t)instanceCount, partIndexOffset };
+            [renderEncoder setVertexBytes:(const void*)&drawArgs length:sizeof(drawArgs) atIndex:_drawArgsSlot];
+            
+            if(doMVAComputeGS) {
+                //Setup Draw Args on the compute context
+                [computeEncoder setBytes:(const void*)&drawArgs length:sizeof(drawArgs) atIndex:_drawArgsSlot];
+
+                [computeEncoder setBuffer:gsDataBuffer offset:gsVertDataOffset atIndex:_gsVertOutBufferSlot];
+                [computeEncoder setBuffer:gsDataBuffer offset:gsPrimDataOffset atIndex:_gsPrimOutBufferSlot];
+                [renderEncoder setVertexBuffer:gsDataBuffer offset:gsVertDataOffset atIndex:_gsVertOutBufferSlot];
+                [renderEncoder setVertexBuffer:gsDataBuffer offset:gsPrimDataOffset atIndex:_gsPrimOutBufferSlot];
+                [renderEncoder setFragmentBuffer:gsDataBuffer offset:gsVertDataOffset atIndex:_gsVertOutBufferSlot];
+                [renderEncoder setFragmentBuffer:gsDataBuffer offset:gsPrimDataOffset atIndex:_gsPrimOutBufferSlot];
+            }
+        }
         
         if(doMVAComputeGS) {
-            // Get a compute encoder on the Geometry Shader work queue
-            computeEncoder = context->GetComputeEncoder(METALWORKQUEUE_GEOMETRY_SHADER);
-            
-            //Setup Draw Args on the compute context
-            [computeEncoder setBytes:(const void*)&drawArgs length:sizeof(drawArgs) atIndex:_drawArgsSlot];
-            
-            //MTL_FIXME: Would like to prevent re-creating the buffers each draw-call. Would be better to add a cache of old buffers.
-            //           Would be even better if alternate compute/render is implemented with cut up draws to keep GS output in L2. Re-
-            //           -use would then be possible with a single constant size buffer (sized to whatever is favorable for L2).
-            id<MTLDevice> device = context->device;
-            const int vertDataSize(_gsVertOutStructSize * indexCount),
-                      primDataSize(_gsPrimOutStructSize * (indexCount / 3));
-            id<MTLBuffer> vertBuffer = context->GetMetalBuffer(vertDataSize, MTLResourceStorageModePrivate|MTLResourceOptionCPUCacheModeDefault);
-            id<MTLBuffer> primBuffer = context->GetMetalBuffer(primDataSize, MTLResourceStorageModePrivate|MTLResourceOptionCPUCacheModeDefault);
-            
-            
-            [computeEncoder setBuffer:vertBuffer offset:0 atIndex:_gsVertOutBufferSlot];
-            [computeEncoder setBuffer:primBuffer offset:0 atIndex:_gsPrimOutBufferSlot];
-            
-            [renderEncoder setVertexBuffer:vertBuffer offset:0 atIndex:_gsVertOutBufferSlot];
-            [renderEncoder setVertexBuffer:primBuffer offset:0 atIndex:_gsPrimOutBufferSlot];
-            [renderEncoder setFragmentBuffer:vertBuffer offset:0 atIndex:_gsVertOutBufferSlot];
-            [renderEncoder setFragmentBuffer:primBuffer offset:0 atIndex:_gsPrimOutBufferSlot];
-            
-            context->ReleaseMetalBuffer(vertBuffer);
-            context->ReleaseMetalBuffer(primBuffer);
-            
+            [computeEncoder dispatchThreads:MTLSizeMake(numPrimitivesInPart, 1, 1) threadsPerThreadgroup:MTLSizeMake(MIN(numPrimitivesInPart, 64), 1, 1)];
+            [renderEncoder drawPrimitives:primType vertexStart:0 vertexCount:numIndicesInPart instanceCount:1 baseInstance:0];
         }
-    }
-    
-    if(doMVAComputeGS)
-    {
-        NSInteger primCount;
-        
-        if (bDrawingQuads)
-            primCount = quadIndexCount / 4;
+        else if(doMVA)
+            [renderEncoder drawPrimitives:primType vertexStart:0 vertexCount:numIndicesInPart instanceCount:instanceCount baseInstance:0];
         else
-            primCount = indexCount / 3;
-        primCount *= instanceCount;
+            [renderEncoder drawIndexedPrimitives:primType indexCount:numIndicesInPart indexType:indexTypeMetal indexBuffer:indexBuffer indexBufferOffset:(firstIndex * indexSize) instanceCount:instanceCount baseVertex:baseVertex baseInstance:0];
 
-        NSInteger maxThreadsPerThreadgroup = context->GetMaxThreadsPerThreadgroup(METALWORKQUEUE_GEOMETRY_SHADER);
-        MTLSize threadGroupcount = MTLSizeMake(fmin(maxThreadsPerThreadgroup, primCount), 1, 1);
-
-        [computeEncoder dispatchThreads:MTLSizeMake(primCount, 1, 1) threadsPerThreadgroup:threadGroupcount];
-
-        [renderEncoder drawPrimitives:primType vertexStart:0 vertexCount:indexCount instanceCount:instanceCount baseInstance:0];
-    }
-    else if(doMVA)
-        [renderEncoder drawPrimitives:primType vertexStart:0 vertexCount:indexCount instanceCount:instanceCount baseInstance:0];
-    else
-        [renderEncoder drawIndexedPrimitives:primType indexCount:indexCount indexType:indexTypeMetal indexBuffer:indexBuffer indexBufferOffset:(firstIndex * indexSize) instanceCount:instanceCount baseVertex:baseVertex baseInstance:0];
-
-    context->ReleaseEncoder(false);
-    
-    if(doMVAComputeGS)
-    {
-        // Release the geometry shader encoder and encode the event
-        computeEncoder = nil;
-        context->ReleaseEncoder(false, METALWORKQUEUE_GEOMETRY_SHADER);
+        if (doMVAComputeGS)
+            context->ReleaseEncoder(false, METALWORKQUEUE_GEOMETRY_SHADER);
+        context->ReleaseEncoder(false, METALWORKQUEUE_DEFAULT);
+        
+        numPrimitives -= numPrimitivesInPart;
+        partIndexOffset += numIndicesInPart;
     }
     
     context->IncNumberPrimsDrawn((indexCount / 3) * instanceCount, false);

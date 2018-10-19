@@ -48,6 +48,10 @@
 
 #define DIRTY_METALRENDERSTATE_ALL                      0xFFFFFFFF
 
+#define METAL_COMPUTEGS_BUFFER_SHARING                    1
+#define METAL_COMPUTEGS_MANUAL_HAZARD_TRACKING            1
+#define METAL_COMPUTEGS_ALLOW_ASYNCHRONOUS_COMPUTE        0
+
 PXR_NAMESPACE_OPEN_SCOPE
 MtlfMetalContextSharedPtr MtlfMetalContext::context = NULL;
 
@@ -278,22 +282,24 @@ void MtlfMetalContext::_InitialiseGL()
 MtlfMetalContext::MtlfMetalContext(id<MTLDevice> _device, int width, int height)
 : enableMVA(false)
 , enableComputeGS(false)
-, gsDataOffset(0), gsDataBufferIndex(0), gsMaxConcurrentBatches(0), gsMaxDataPerBatch(0), gsFence(nil)
+, gsDataOffset(0), gsBufferIndex(0), gsMaxConcurrentBatches(0), gsMaxDataPerBatch(0), gsCurrentBuffer(nil), gsFence(nil)
 {
     if (_device == nil) {
         // Select Intel GPU if possible due to current issues on AMD. Revert when fixed - MTL_FIXME
         //device = MtlfMetalContext::GetMetalDevice(PREFER_INTEGRATED_GPU);
-        device = MtlfMetalContext::GetMetalDevice(PREFER_DEFAULT_GPU);
+        device = MtlfMetalContext::GetMetalDevice(PREFER_INTEGRATED_GPU);
     }
     else
         device = _device;
 
     NSLog(@"Selected %@ for Metal Device", device.name);
-#if defined(METAL_EVENTS_AVAILABLE)
-    enableMultiQueue = false; //[device supportsFeatureSet:MTLFeatureSet_macOS_GPUFamily2_v1]; //Currently deadlocks.
+    
+#if METAL_COMPUTEGS_ALLOW_ASYNCHRONOUS_COMPUTE
+    enableMultiQueue = [device supportsFeatureSet:MTLFeatureSet_macOS_GPUFamily2_v1];
 #else
     enableMultiQueue = false;
 #endif
+    
     // Create a new command queue
     commandQueue = [device newCommandQueue];
     if(enableMultiQueue) {
@@ -310,8 +316,9 @@ MtlfMetalContext::MtlfMetalContext(id<MTLDevice> _device, int width, int height)
     
     NSOperatingSystemVersion minimumSupportedOSVersion = { .majorVersion = 10, .minorVersion = 14, .patchVersion = 0 };
     
-    // MTL_FIXME - Disabling concurrent dispatch until appropriate fencing is in place
-    concurrentDispatchSupported = [NSProcessInfo.processInfo isOperatingSystemAtLeastVersion:minimumSupportedOSVersion];
+    // MTL_FIXME - Disabling concurrent dispatch because it completely breaks Compute GS hazard tracking causing polygon soup on AMD hardware.
+    //concurrentDispatchSupported = [NSProcessInfo.processInfo isOperatingSystemAtLeastVersion:minimumSupportedOSVersion];
+    concurrentDispatchSupported = false;
 
     // Load all the default shader files
     NSError *error = NULL;
@@ -381,10 +388,19 @@ MtlfMetalContext::MtlfMetalContext(id<MTLDevice> _device, int width, int height)
     
     currentWorkQueueType = METALWORKQUEUE_DEFAULT;
     currentWorkQueue     = &workQueues[currentWorkQueueType];
-    
-    MTLResourceOptions resourceOptions = MTLResourceStorageModePrivate|MTLResourceCPUCacheModeDefaultCache|MTLResourceHazardTrackingModeUntracked;
+
+#if METAL_COMPUTEGS_BUFFER_REUSE
+    MTLResourceOptions resourceOptions = MTLResourceStorageModePrivate|MTLResourceCPUCacheModeDefaultCache;
+ #if METAL_COMPUTEGS_MANUAL_HAZARD_TRACKING
+    resourceOptions |= MTLResourceHazardTrackingModeUntracked;
+ #endif
     for(int i = 0; i < gsMaxConcurrentBatches; i++)
         gsBuffers.push_back([device newBufferWithLength:gsMaxDataPerBatch options:resourceOptions]);
+    gsCurrentBuffer = gsBuffers.at(0);
+#else
+    _gsAdvanceBuffer();
+#endif
+
     gsFence = [device newFence];
     
     for (int i = 0; i < METALWORKQUEUE_MAX; i ++) {
@@ -1962,6 +1978,18 @@ void MtlfMetalContext::EndFrame() {
     _gsAdvanceBuffer();
 }
 
+void MtlfMetalContext::_gsAdvanceBuffer() {
+#if METAL_COMPUTEGS_BUFFER_REUSE
+    gsBufferIndex = (gsBufferIndex + 1) % gsMaxConcurrentBatches;
+    gsCurrentBuffer = gsBuffers.at(gsBufferIndex);
+#else
+    if(gsCurrentBuffer != nil)
+        ReleaseMetalBuffer(gsCurrentBuffer);
+    gsCurrentBuffer = GetMetalBuffer(gsMaxDataPerBatch);
+#endif
+    gsDataOffset = 0;
+}
+
 uint32_t MtlfMetalContext::GetMaxComputeGSPartSize(uint32_t numVertsPerPrim, uint32_t dataPerVert, uint32_t dataPerPrim) {
     const uint32_t maxAlignmentOffset = 15; //Reserve some space for a possible alignment taking up some.
     uint32_t sizePerPrimitive = numVertsPerPrim * dataPerVert + dataPerPrim;
@@ -1969,21 +1997,24 @@ uint32_t MtlfMetalContext::GetMaxComputeGSPartSize(uint32_t numVertsPerPrim, uin
 }
 
 void MtlfMetalContext::PrepareForComputeGSPart(uint32_t vertData, uint32_t primData, id<MTLBuffer>& dataBuffer, uint32_t& vertOffset, uint32_t& primOffset) {
+
     //Pad data to 16byte boundaries
     const uint32_t alignment = 16;
     vertData = ((vertData + (alignment - 1)) / alignment) * alignment;
     primData = ((primData + (alignment - 1)) / alignment) * alignment;
-    bool useNewBuffer = (gsDataOffset + vertData + primData) > gsMaxDataPerBatch;
-    if(useNewBuffer)
+    
+    bool useNextBuffer = (gsDataOffset + vertData + primData) > gsMaxDataPerBatch;
+    bool startingNewBatch = useNextBuffer || (gsBufferIndex == 0 && gsDataOffset == 0);
+    if(useNextBuffer)
         _gsAdvanceBuffer();
-    dataBuffer = gsBuffers.at(gsDataBufferIndex);
+    dataBuffer = gsCurrentBuffer;
     vertOffset = gsDataOffset;
     gsDataOffset += vertData;
     primOffset = gsDataOffset;
     gsDataOffset += primData;
-    
+
     //If we are using a new buffer we've started a new batch. That means some synching/committing may need to happen before we can continue.
-    if(useNewBuffer) {
+    if(startingNewBatch) {
         if(enableMultiQueue) {
             //Using multiple queues means the synching happens using events as the queues are executed in parallel.
         }
@@ -1996,12 +2027,12 @@ void MtlfMetalContext::PrepareForComputeGSPart(uint32_t vertData, uint32_t primD
                 TF_FATAL_CODING_ERROR("Default and Geometry Shader encoder must not be active before calling PrepareForComputeGSPart!");
 
             //Commit the geometry shader queue ahead of the rendering queue. But only if there has been work before it.
-            if(wq_gs->encoderEnded) {
+            if(wq_gs->encoderHasWork) {
                 CommitCommandBuffer(false, false, METALWORKQUEUE_GEOMETRY_SHADER);
                 
                 CreateCommandBuffer(METALWORKQUEUE_GEOMETRY_SHADER);
             }
-            if(wq_def->encoderEnded) {
+            if(wq_def->encoderHasWork) {
                 CommitCommandBuffer(false, false, METALWORKQUEUE_DEFAULT);
                 
                 CreateCommandBuffer(METALWORKQUEUE_DEFAULT);
@@ -2019,6 +2050,7 @@ void MtlfMetalContext::PrepareForComputeGSPart(uint32_t vertData, uint32_t primD
                 context->SetRenderPassDescriptor(rpd);
             }
             
+ #if METAL_COMPUTEGS_MANUAL_HAZARD_TRACKING
             GetComputeEncoder(METALWORKQUEUE_GEOMETRY_SHADER);
             GetRenderEncoder(METALWORKQUEUE_DEFAULT);
             
@@ -2028,6 +2060,7 @@ void MtlfMetalContext::PrepareForComputeGSPart(uint32_t vertData, uint32_t primD
             
             ReleaseEncoder(false, METALWORKQUEUE_GEOMETRY_SHADER);
             ReleaseEncoder(false, METALWORKQUEUE_DEFAULT);
+ #endif
         }
     }
 }

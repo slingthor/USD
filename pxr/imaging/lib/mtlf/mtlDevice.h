@@ -453,16 +453,14 @@ private:
     
     //Geometry Shader Related
     int                        gsDataOffset;
-    int                        gsDataBufferIndex;
+    int                        gsBufferIndex;
     int                        gsMaxConcurrentBatches;
     int                        gsMaxDataPerBatch;
+    id<MTLBuffer>              gsCurrentBuffer;
     std::vector<id<MTLBuffer>> gsBuffers;
     id<MTLFence>               gsFence;
-    
-    void _gsAdvanceBuffer() {
-        gsDataBufferIndex = (gsDataBufferIndex + 1) % gsMaxConcurrentBatches;
-        gsDataOffset = 0;
-    }
+
+    void _gsAdvanceBuffer();
     
     void CleanupUnusedBuffers(bool forceClean);
    
