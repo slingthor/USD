@@ -184,6 +184,7 @@ private:
  #if OPENSUBDIV_HAS_METAL_COMPUTE && defined(ARCH_GFX_METAL)
         _deviceContext.device       = MtlfMetalContext::GetMetalContext()->device;
         _deviceContext.commandQueue = MtlfMetalContext::GetMetalContext()->commandQueue;
+        NSLog(@"OSD device is %@", _deviceContext.device.name);
         return &_deviceContext;
 #else
         return NULL;
@@ -377,12 +378,29 @@ HdSt_Osd3Subdivision::RefineGPU(HdBufferArrayRangeSharedPtr const &range,
         /*stride=*/stride);
 
     // GPU evaluator can be static, as long as it's called sequentially.
-    static OpenSubdiv::Osd::EvaluatorCacheT<HdSt_OsdGpuEvaluator> evaluatorCache;
+    static OpenSubdiv::Osd::EvaluatorCacheT<HdSt_OsdGpuEvaluator> *evaluatorCache = nil;
+    static HdSt_OsdGpuDeviceContextPtr evaluatorCacheDevicePtr = nil;
+   
+    // The OSD evaluator cache check does not guard against devices changing so we'll need to wipe the cache if we detect it.
+    // Really  we should move this into the class and recreate when we detect a device change from the UI but we'll do it here
+    // to minimise changes for now.
+    if (evaluatorCacheDevicePtr != GetDeviceContextPtr()) {
+         if (evaluatorCache) {
+             delete evaluatorCache;
+             evaluatorCache = nil;
+        }
+    }
+    
+    if (!evaluatorCache) {
+        evaluatorCache = new(OpenSubdiv::Osd::EvaluatorCacheT<HdSt_OsdGpuEvaluator>);
+        // Store a ptr to the device we created the cache on 
+        evaluatorCacheDevicePtr = GetDeviceContextPtr();
+    }
 
     HdSt_OsdGpuEvaluator const *instance =
-        OpenSubdiv::Osd::GetEvaluator<HdSt_OsdGpuEvaluator, HdSt_OsdGpuDeviceContextPtr>(
-            &evaluatorCache, srcDesc, dstDesc, HdSt_Osd3Subdivision::GetDeviceContextPtr());
+    OpenSubdiv::Osd::GetEvaluator<HdSt_OsdGpuEvaluator, HdSt_OsdGpuDeviceContextPtr>(evaluatorCache, srcDesc, dstDesc, HdSt_Osd3Subdivision::GetDeviceContextPtr());
 
+   
     HdSt_OsdGpuEvaluator::EvalStencils(&vertexBuffer, srcDesc,
                                        &vertexBuffer, dstDesc,
                                        _GetGpuStencilTable(),
