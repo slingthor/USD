@@ -584,26 +584,30 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
 
     id<MTLBuffer> indexBuffer = context->GetIndexBuffer();
     int quadIndexCount = 0;
-    int quadFirstIndex = 0;
+    uint32_t numOutVertsPerInPrim(3), numOutPrimsPerInPrim(1);
     if (bDrawingQuads) {
-        quadIndexCount = indexCount;
-        quadFirstIndex = firstIndex;
-        indexCount = (indexCount * 6) / 4;
-        firstIndex = (firstIndex * 6) / 4;
-        indexBuffer = context->GetQuadIndexBuffer(indexTypeMetal);
+        if (!doMVA) {
+            indexCount = (indexCount * 6) / 4;
+            firstIndex = (firstIndex * 6) / 4;
+            indexBuffer = context->GetQuadIndexBuffer(indexTypeMetal);
+        }
+        else if(doMVAComputeGS) {
+            numOutVertsPerInPrim = 6;
+            numOutPrimsPerInPrim = 2;
+        }
     }
 
-    const uint32_t vertsPerPrimitive = 3;
-    uint32_t numPrimitives = indexCount / vertsPerPrimitive;
-    const uint32_t maxPrimitivesPerPart = doMVAComputeGS ? context->GetMaxComputeGSPartSize(vertsPerPrimitive, _gsVertOutStructSize, _gsPrimOutStructSize) : numPrimitives;
+    const uint32_t vertsPerPrimitive = (bDrawingQuads && doMVAComputeGS) ? 4 : 3;
+    uint32_t numPrimitives = (indexCount / vertsPerPrimitive) * instanceCount;
+    const uint32_t maxPrimitivesPerPart = doMVAComputeGS ? context->GetMaxComputeGSPartSize(numOutVertsPerInPrim, numOutPrimsPerInPrim, _gsVertOutStructSize, _gsPrimOutStructSize) : numPrimitives;
     
     uint32_t partIndexOffset = 0;
     while(numPrimitives > 0) {
         const uint32_t numPrimitivesInPart = MIN(numPrimitives, maxPrimitivesPerPart);
         const uint32_t numIndicesInPart = numPrimitivesInPart * vertsPerPrimitive;
         
-        const uint32_t gsVertDataSize = numIndicesInPart * _gsVertOutStructSize;
-        const uint32_t gsPrimDataSize = numPrimitivesInPart * _gsPrimOutStructSize;
+        const uint32_t gsVertDataSize = numPrimitivesInPart * numOutVertsPerInPrim * _gsVertOutStructSize;
+        const uint32_t gsPrimDataSize = numPrimitivesInPart * numOutPrimsPerInPrim * _gsPrimOutStructSize;
         id<MTLBuffer> gsDataBuffer = nil;
         uint32_t gsVertDataOffset(0), gsPrimDataOffset(0);
         if(doMVAComputeGS)
@@ -636,7 +640,7 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
         
         if(doMVAComputeGS) {
             [computeEncoder dispatchThreads:MTLSizeMake(numPrimitivesInPart, 1, 1) threadsPerThreadgroup:MTLSizeMake(MIN(numPrimitivesInPart, 64), 1, 1)];
-            [renderEncoder drawPrimitives:primType vertexStart:0 vertexCount:numIndicesInPart instanceCount:1 baseInstance:0];
+            [renderEncoder drawPrimitives:primType vertexStart:0 vertexCount:(numPrimitivesInPart * numOutVertsPerInPrim) instanceCount:1 baseInstance:0];
         }
         else if(doMVA)
             [renderEncoder drawPrimitives:primType vertexStart:0 vertexCount:numIndicesInPart instanceCount:instanceCount baseInstance:0];

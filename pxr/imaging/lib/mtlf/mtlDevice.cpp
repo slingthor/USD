@@ -1990,10 +1990,10 @@ void MtlfMetalContext::_gsAdvanceBuffer() {
     gsDataOffset = 0;
 }
 
-uint32_t MtlfMetalContext::GetMaxComputeGSPartSize(uint32_t numVertsPerPrim, uint32_t dataPerVert, uint32_t dataPerPrim) {
+uint32_t MtlfMetalContext::GetMaxComputeGSPartSize(uint32_t numOutVertsPerInPrim, uint32_t numOutPrimsPerInPrim, uint32_t dataPerVert, uint32_t dataPerPrim) {
     const uint32_t maxAlignmentOffset = 15; //Reserve some space for a possible alignment taking up some.
-    uint32_t sizePerPrimitive = numVertsPerPrim * dataPerVert + dataPerPrim;
-    return (gsMaxDataPerBatch - maxAlignmentOffset) / sizePerPrimitive;
+    uint32_t sizePerPrimitive = numOutVertsPerInPrim * dataPerVert + numOutPrimsPerInPrim * dataPerPrim;
+    return (gsMaxDataPerBatch - maxAlignmentOffset * 2) / sizePerPrimitive;
 }
 
 void MtlfMetalContext::PrepareForComputeGSPart(uint32_t vertData, uint32_t primData, id<MTLBuffer>& dataBuffer, uint32_t& vertOffset, uint32_t& primOffset) {
