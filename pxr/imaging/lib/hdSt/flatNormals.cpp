@@ -100,7 +100,7 @@ HdSt_FlatNormalsComputationGPU::GetNumOutputElements() const
 
 void
 HdSt_FlatNormalsComputationGPU::Execute(
-    HdBufferArrayRangeSharedPtr const &range_,
+    HdBufferArrayRangeSharedPtr const &range,
     HdResourceRegistry *resourceRegistry)
 {
     HD_TRACE_FUNCTION();
@@ -109,19 +109,12 @@ HdSt_FlatNormalsComputationGPU::Execute(
     if (_srcDataType == HdTypeInvalid)
         return;
 
-    HdBufferArrayRangeSharedPtr range =
-        boost::static_pointer_cast<HdBufferArrayRange> (range_);
-    HdBufferArrayRangeSharedPtr vertexRange =
-        boost::static_pointer_cast<HdBufferArrayRange> (_vertexRange);
-    HdBufferArrayRangeSharedPtr topologyRange =
-        boost::static_pointer_cast<HdBufferArrayRange> (_topologyRange);
-
     // buffer resources for GPU computation
-    HdBufferResourceSharedPtr points = vertexRange->GetResource(_srcName);
+    HdBufferResourceSharedPtr points = _vertexRange->GetResource(_srcName);
     HdBufferResourceSharedPtr normals = range->GetResource(_dstName);
-    HdBufferResourceSharedPtr indices = topologyRange->GetResource(
+    HdBufferResourceSharedPtr indices = _topologyRange->GetResource(
         HdTokens->indices);
-    HdBufferResourceSharedPtr primitiveParam = topologyRange->GetResource(
+    HdBufferResourceSharedPtr primitiveParam = _topologyRange->GetResource(
         HdTokens->primitiveParam);
 
     // select shader by datatype
@@ -169,11 +162,11 @@ HdSt_FlatNormalsComputationGPU::Execute(
     Uniform uniform;
 
     // coherent vertex offset in aggregated buffer array
-    uniform.vertexOffset = vertexRange->GetOffset();
+    uniform.vertexOffset = _vertexRange->GetOffset();
     // coherent element offset in aggregated buffer array
     uniform.elementOffset = range->GetOffset();
     // coherent topology offset in aggregated buffer array
-    uniform.topologyOffset = topologyRange->GetOffset();
+    uniform.topologyOffset = _topologyRange->GetOffset();
     // interleaved offset/stride to points
     // note: this code (and the glsl flat normal compute shader) assumes
     // components in interleaved vertex array are always same data type.
@@ -205,7 +198,7 @@ HdSt_FlatNormalsComputationGPU::Execute(
     uniform.pParamStride = primitiveParam->GetStride() / pParamComponentSize;
 
     _Execute(computeProgram, uniform, points,
-             normals, indices, primitiveParam, topologyRange->GetNumElements());
+             normals, indices, primitiveParam, _topologyRange->GetNumElements());
 
     computeProgram->UnsetProgram();
 }

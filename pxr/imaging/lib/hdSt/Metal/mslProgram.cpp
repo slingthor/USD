@@ -578,9 +578,13 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
 
     id<MTLBuffer> indexBuffer = context->GetIndexBuffer();
-    if(bDrawingQuads) {
-        indexCount = (indexCount / 4) * 6;
-        firstIndex = (firstIndex / 4) * 6;
+    int quadIndexCount = 0;
+    int quadFirstIndex = 0;
+    if (bDrawingQuads) {
+        quadIndexCount = indexCount;
+        quadFirstIndex = firstIndex;
+        indexCount = (indexCount * 6) / 4;
+        firstIndex = (firstIndex * 6) / 4;
         indexBuffer = context->GetQuadIndexBuffer(indexTypeMetal);
     }
     // Possibly move this outside this function as we shouldn't need to get a render encoder every draw call
@@ -619,6 +623,10 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
     if(doMVA) {
         //Setup Draw Args on the render context
         struct { int _indexCount, _startIndex, _baseVertex, _instanceCount; } drawArgs = { indexCount, firstIndex, baseVertex, instanceCount };
+        if (bDrawingQuads) {
+            drawArgs._startIndex = quadFirstIndex;
+        }
+
         [renderEncoder setVertexBytes:(const void*)&drawArgs length:sizeof(drawArgs) atIndex:_drawArgsSlot];
         //context->SetDrawArgsBuffer(indexCount, firstIndex, baseVertex, _drawArgsSlot, doMVAComputeGS);
         
@@ -655,9 +663,17 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
     
     if(doMVAComputeGS)
     {
+        NSInteger primCount;
+        
+        if (bDrawingQuads)
+            primCount = quadIndexCount / 4;
+        else
+            primCount = indexCount / 3;
+        primCount *= instanceCount;
+
         NSInteger maxThreadsPerThreadgroup = context->GetMaxThreadsPerThreadgroup(METALWORKQUEUE_GEOMETRY_SHADER);
-        NSInteger primCount = (indexCount / 3) * instanceCount;
         MTLSize threadGroupcount = MTLSizeMake(fmin(maxThreadsPerThreadgroup, primCount), 1, 1);
+
         [computeEncoder dispatchThreads:MTLSizeMake(primCount, 1, 1) threadsPerThreadgroup:threadGroupcount];
 
         [renderEncoder drawPrimitives:primType vertexStart:0 vertexCount:indexCount instanceCount:instanceCount baseInstance:0];

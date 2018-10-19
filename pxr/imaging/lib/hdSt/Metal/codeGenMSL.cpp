@@ -1232,16 +1232,28 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
                         gs_GSCallCode, gs_VSCallCode, gs_GSVertEmitCode, gs_GSPrimEmitCode,
                         gsVertOutStruct, gsPrimOutStruct, gsEmitCode;
 
-    int numVerticesPerPrimitive = -1;
+    int numVerticesInPerPrimitive = -1;
+    int numVerticesOutPerPrimitive = 3;
+    int numPrimitivesOutPerPrimitive = 1;
+    bool quadIndexRemap = false;
 
     if(_buildTarget == kMSL_BuildTarget_MVA || _buildTarget == kMSL_BuildTarget_MVA_ComputeGS) {
-        numVerticesPerPrimitive = 3;    //MTL_FIXME: Code belows isn't robust enough, need a better way to determine verts per primitive
+        numVerticesInPerPrimitive = 3;    //MTL_FIXME: Code belows isn't robust enough, need a better way to determine verts per primitive
         
         std::string result = _genGS.str();
         std::string::size_type inLayoutPos = result.find("layout(lines_adjacency) in;");
-        if(inLayoutPos != std::string::npos)
-            numVerticesPerPrimitive = 4;
+        if(inLayoutPos != std::string::npos) {
+            numVerticesInPerPrimitive = 4;
+            quadIndexRemap = true;
+        }
 
+        std::string::size_type outLayoutPos = result.find("layout(triangle_strip, max_vertices = 6) out;");
+        if(outLayoutPos != std::string::npos)
+        {
+            numVerticesOutPerPrimitive = 6;
+            numPrimitivesOutPerPrimitive = numVerticesOutPerPrimitive / 3;
+        }
+        
 //        //Determine geometry type
 //        for(auto key : _geometricShader->GetSourceKeys(HdShaderTokens->geometryShader)) {
 //            if(key == "Mesh.Geometry.Triangle") { numVerticesPerPrimitive = 3; break; }
@@ -1315,8 +1327,9 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
         gsPrimOutStruct << "struct alignas(4) MSLGsPrimOutStruct {\n";
     
         std::stringstream vertBufferAccessor, primBufferAccessor, vsVertBufferAccessor, vsPrimBufferAccessor;
-        vertBufferAccessor << "gsVertOutBuffer[gl_PrimitiveIDIn * " << numVerticesPerPrimitive << " + gsVertexCounter].";
-        primBufferAccessor << "gsPrimOutBuffer[gl_PrimitiveIDIn].";
+        vertBufferAccessor << "gsVertOutBuffer[gl_PrimitiveIDIn * " << numVerticesOutPerPrimitive << " + gsVertexCounter].";
+        primBufferAccessor << "gsPrimOutBuffer[gl_PrimitiveIDIn * " <<
+            numPrimitivesOutPerPrimitive << " + gsPrimCounter].";
         vsVertBufferAccessor << "gsVertOutBuffer[_vertexID].";
         vsPrimBufferAccessor << "gsPrimOutBuffer[gl_PrimitiveIDIn].";
         TF_FOR_ALL(it, _mslGSOutputParams) {
@@ -1386,8 +1399,10 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
                     << "    gsVertexCounter++;\n"
                     << "}\n"
                     << "\n"
+                    << "uint gsPrimCounter = 0;\n"
                     << "void EndPrimitive() {\n"
                     << gs_GSPrimEmitCode.str()
+                    << "    gsPrimCounter++;\n"
                     << "}\n"
                     << "\n"
                     << "}; //Close ProgramScope_Geometry\n\n";
@@ -1438,10 +1453,18 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
                                 << vsMI_EP_FuncDef.str()
                                 << "    uint _baseIndex = _vertexID;\n"
                                 << "    uint gl_InstanceID = _instanceID;\n"
-                                << "    uint gl_BaseVertex = drawArgs->baseVertex;\n"
-                                << "    uint gl_VertexID = indices[drawArgs->startIndex + _baseIndex] + gl_BaseVertex;\n"
-                                << "    uint gl_PrimitiveIDIn = _vertexID / " << numVerticesPerPrimitive << ";\n"
-                                << "    uint _corner = _vertexID % " << numVerticesPerPrimitive << ";\n"
+                                << "    uint gl_BaseVertex = drawArgs->baseVertex;\n";
+            
+            if (quadIndexRemap) {
+                vsEntryPointCode << "    uint quadRemap[] = { 3, 0, 2, 2, 0, 1 };\n"
+                                 << "    uint gl_VertexID = indices[drawArgs->startIndex + (_baseIndex / 6) * 4 + quadRemap[_baseIndex % 6]] + gl_BaseVertex;\n";
+            }
+            else {
+                vsEntryPointCode << "    uint gl_VertexID = indices[drawArgs->startIndex + _baseIndex] + gl_BaseVertex;\n";
+            }
+
+            vsEntryPointCode    << "    uint gl_PrimitiveIDIn = _vertexID / 3;\n"
+                                << "    uint _corner = _vertexID % 3 ;\n"
                                 << "\n"
                                 << vsMI_EP_InputCode.str()
                                 << "\n"
@@ -1471,7 +1494,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
         gsCode  << "////////////////////////////////////////////////////////////////////////////////////////////////////////////////////\n"
                 << "// MSL Compute Entry Point /////////////////////////////////////////////////////////////////////////////////////////\n\n"
                 << cs_EP_FuncDef.str()
-                << "    uint _rawIndex = _threadPositionInGrid * " << numVerticesPerPrimitive << ";\n"
+                << "    uint _rawIndex = _threadPositionInGrid * " << numVerticesInPerPrimitive << ";\n"
                 << "    uint _baseIndex = _rawIndex % drawArgs->indexCount;\n"
                 << "    uint gl_InstanceID = _rawIndex / drawArgs->indexCount;\n"
                 << "    uint gl_BaseVertex = drawArgs->baseVertex;\n"
@@ -1480,8 +1503,8 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
                 << "    if(gl_InstanceID >= drawArgs->instanceCount) return;\n"
                 << "    \n"
                 << "    //Vertex Shader\n"
-                << "    MSLVsOutputs vsOutputs[" << numVerticesPerPrimitive << "];\n"
-                << "    for(uint i = 0; i < " << numVerticesPerPrimitive << "; i++) {\n"
+                << "    MSLVsOutputs vsOutputs[" << numVerticesInPerPrimitive << "];\n"
+                << "    for(uint i = 0; i < " << numVerticesInPerPrimitive << "; i++) {\n"
                 << "        uint gl_VertexID = gl_BaseVertex + indices[drawArgs->startIndex + _baseIndex + i];\n"
                 << "        thread MSLVsOutputs& vsOutput = vsOutputs[i];\n"
                 << "\n"
@@ -1493,7 +1516,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
                 << "    //Geometry Shader\n"
                 << "    {\n"
                 << "        ProgramScope_Geometry scope;\n\n"
-                << "        for(uint i = 0; i < " << numVerticesPerPrimitive << "; i++){\n"
+                << "        for(uint i = 0; i < " << numVerticesInPerPrimitive << "; i++){\n"
                 << "            thread MSLVsOutputs& vsOutput = vsOutputs[i];\n"
                 << gs_VSInputCode.str()
                 << "        }\n\n"
