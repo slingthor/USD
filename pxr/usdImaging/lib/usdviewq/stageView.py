@@ -567,6 +567,8 @@ class HUD():
             painter.setPen(color)
             painter.drawText(1, yy+1, line)
 
+            print(line)
+
             # Colored text
             color.setRgbF(col[0], col[1], col[2])
             painter.setPen(color)
