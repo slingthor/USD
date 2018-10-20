@@ -51,6 +51,23 @@ TF_DECLARE_WEAK_AND_REF_PTRS(GarchUdimTexture);
 
 class GarchUdimTexture : public GarchTexture {
 public:
+    struct _TextureSize {
+        _TextureSize(unsigned int w, unsigned int h) : width(w), height(h) { }
+        unsigned int width;
+        unsigned int height;
+    };
+    
+    struct _MipDesc {
+        _MipDesc(const _TextureSize& s, GarchImageSharedPtr&& i) :
+        size(s), image(std::move(i)) { }
+        _TextureSize size;
+        GarchImageSharedPtr image;
+    };
+    
+    using _MipDescArray = std::vector<_MipDesc>;
+    
+    _MipDescArray _GetMipLevels(const TfToken& filePath);
+
     GARCH_API
     virtual ~GarchUdimTexture();
 
@@ -91,16 +108,26 @@ protected:
     virtual void _ReadTexture() override;
 
     GARCH_API
-    virtual void _ReadImage() = 0;
+    virtual void _ReadImage();
+
+    GARCH_API
+    virtual void _FreeTextureObject() = 0;
+
+    GARCH_API
+    virtual void _CreateGPUResources(unsigned int numChannels,
+                                     GLenum const type,
+                                     std::vector<_TextureSize> &mips,
+                                     std::vector<std::vector<uint8_t>> &mipData,
+                                     std::vector<float> &layoutData) = 0;
 
     GARCH_API
     virtual void _OnMemoryRequestedDirty() override;
 
     std::vector<std::tuple<int, TfToken>> _tiles;
-    int _width = 0;
-    int _height = 0;
-    int _depth = 0;
-    int _format = 0;
+    unsigned int _width = 0;
+    unsigned int _height = 0;
+    unsigned int _depth = 0;
+    unsigned int _format = 0;
     GarchTextureGPUHandle _imageArray;
     GarchTextureGPUHandle _layout;
     bool _loaded = false;

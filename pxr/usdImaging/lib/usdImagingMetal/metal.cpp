@@ -38,46 +38,14 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-
-namespace {
-
 static
-bool
-_IsEnabledHydra()
+UsdImagingMetalEngine*
+_InitEngine(const SdfPath& rootPath,
+            const SdfPathVector& excludedPaths,
+            const SdfPathVector& invisedPaths,
+            const SdfPath& delegateID = SdfPath::AbsoluteRootPath())
 {
-    // Make sure there is a Metal context when
-    // trying to initialize Hydra
-    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
-    if (!context) {
-        TF_CODING_ERROR("Metal context required. Crashing");
-        return false;
-    }
-    
-    // Check to see if we have a default plugin for the renderer
-    TfToken defaultPlugin =
-    HdxRendererPluginRegistry::GetInstance().GetDefaultPluginId();
-    
-    return !defaultPlugin.IsEmpty();
-}
-
-}
-
-/*static*/
-bool
-UsdImagingMetal::IsEnabledHydra()
-{
-    static bool isEnabledHydra = _IsEnabledHydra();
-    return isEnabledHydra;
-}
-
-static
-UsdImagingMetalEngine* _InitEngine(const SdfPath& rootPath,
-                              const SdfPathVector& excludedPaths,
-                              const SdfPathVector& invisedPaths,
-                              const SdfPath& delegateID =
-                                        SdfPath::AbsoluteRootPath())
-{
-    if (UsdImagingMetal::IsEnabledHydra()) {
+    if (UsdImagingMetalEngine::IsHydraEnabled()) {
         return new UsdImagingMetalHdEngine(rootPath, excludedPaths,
                                            invisedPaths, delegateID);
     } else {
@@ -111,30 +79,25 @@ UsdImagingMetal::InvalidateBuffers()
     _engine->InvalidateBuffers();
 }
 
-/* static */
-bool
-UsdImagingMetal::IsBatchingSupported()
-{
-    // Currently, batch drawing is supported only by the Hydra engine.
-    return IsEnabledHydra();
-}
-
 /*virtual*/
 void
-UsdImagingMetal::PrepareBatch(const UsdPrim& root, RenderParams params)
+UsdImagingMetal::PrepareBatch(const UsdPrim& root,
+                              const UsdImagingMetalRenderParams& params)
 {
     _engine->PrepareBatch(root, params);
 }
 
 /*virtual*/
 void
-UsdImagingMetal::RenderBatch(const SdfPathVector& paths, RenderParams params) {
+UsdImagingMetal::RenderBatch(const SdfPathVector& paths,
+                             const UsdImagingMetalRenderParams& params) {
     _engine->RenderBatch(paths, params);
 }
 
 /*virtual*/
 void
-UsdImagingMetal::Render(const UsdPrim& root, RenderParams params)
+UsdImagingMetal::Render(const UsdPrim& root,
+                        const UsdImagingMetalRenderParams& params)
 {
     _engine->Render(root, params);
 }
@@ -149,8 +112,8 @@ UsdImagingMetal::SetSelectionColor(GfVec4f const& color)
 /*virtual*/
 void 
 UsdImagingMetal::SetCameraState(const GfMatrix4d& viewMatrix,
-                            const GfMatrix4d& projectionMatrix,
-                            const GfVec4d& viewport)
+                                const GfMatrix4d& projectionMatrix,
+                                const GfVec4d& viewport)
 {
     _engine->SetCameraState(
         viewMatrix, projectionMatrix,
@@ -287,6 +250,28 @@ UsdImagingMetal::SetRendererAov(TfToken const &id)
     return _engine->SetRendererAov(id);
 }
 
+/* virtual */
+UsdImagingMetalRendererSettingsList
+UsdImagingMetal::GetRendererSettingsList() const
+{
+    return _engine->GetRendererSettingsList();
+}
+
+/* virtual */
+VtValue
+UsdImagingMetal::GetRendererSetting(TfToken const& id) const
+{
+    return _engine->GetRendererSetting(id);
+}
+
+/* virtual */
+void
+UsdImagingMetal::SetRendererSetting(TfToken const& id,
+                                    VtValue const& value)
+{
+    _engine->SetRendererSetting(id, value);
+}
+
 
 bool
 UsdImagingMetal::TestIntersection(
@@ -294,7 +279,7 @@ UsdImagingMetal::TestIntersection(
     const GfMatrix4d &projectionMatrix,
     const GfMatrix4d &worldToLocalSpace,
     const UsdPrim& root, 
-    RenderParams params,
+    const UsdImagingMetalRenderParams& params,
     GfVec3d *outHitPoint,
     SdfPath *outHitPrimPath,
     SdfPath *outHitInstancerPath,
@@ -313,7 +298,7 @@ UsdImagingMetal::TestIntersectionBatch(
     const GfMatrix4d &projectionMatrix,
     const GfMatrix4d &worldToLocalSpace,
     const SdfPathVector& paths, 
-    RenderParams params,
+    const UsdImagingMetalRenderParams& params,
     unsigned int pickResolution,
     PathTranslatorCallback pathTranslator,
     HitBatch *outHit)
@@ -327,23 +312,7 @@ UsdImagingMetal::TestIntersectionBatch(
 VtDictionary
 UsdImagingMetal::GetResourceAllocation() const
 {
-    VtDictionary dict;
-    dict = _engine->GetResourceAllocation();
-
-    // append texture usage
-    size_t texMem = 0;
-    for (auto const &texInfo :
-             GarchTextureRegistry::GetInstance().GetTextureInfos()) {
-        VtDictionary::const_iterator it = texInfo.find("memoryUsed");
-        if (it != texInfo.end()) {
-            VtValue mem = it->second;
-            if (mem.IsHolding<size_t>()) {
-                texMem += mem.Get<size_t>();
-            }
-        }
-    }
-    dict["textureMemoryUsed"] = texMem;
-    return dict;
+    return _engine->GetResourceAllocation();
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

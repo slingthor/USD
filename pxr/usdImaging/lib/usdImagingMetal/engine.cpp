@@ -31,7 +31,9 @@
 #include "pxr/imaging/mtlf/info.h"
 
 #include "pxr/imaging/hdx/intersector.h"
+#include "pxr/imaging/hdx/rendererPluginRegistry.h"
 
+#include "pxr/base/tf/getenv.h"
 #include "pxr/base/tf/stl.h"
 
 #include "pxr/base/gf/matrix4d.h"
@@ -39,7 +41,7 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-
+namespace {
 
 struct _HitData {
     int xMin;
@@ -49,6 +51,24 @@ struct _HitData {
 };
 typedef TfHashMap< int32_t, _HitData > _HitDataById;
 
+    
+static
+bool
+_IsHydraEnabled()
+{
+    if (TfGetenv("HD_ENABLED", "1") != "1") {
+        return false;
+    }
+    
+    // Check to see if we have a default plugin for the renderer
+    TfToken defaultPlugin =
+        HdxRendererPluginRegistry::GetInstance().GetDefaultPluginId();
+    
+    return !defaultPlugin.IsEmpty();
+}
+
+} // annonymous namespace
+
 UsdImagingMetalEngine::UsdImagingMetalEngine()
 {
     GarchResourceFactory::GetInstance().SetResourceFactory(&resourceFactory);
@@ -57,6 +77,14 @@ UsdImagingMetalEngine::UsdImagingMetalEngine()
 UsdImagingMetalEngine::~UsdImagingMetalEngine()
 {
     GarchResourceFactory::GetInstance().SetResourceFactory(NULL);
+}
+
+/*static*/
+bool
+UsdImagingMetalEngine::IsHydraEnabled()
+{    
+    static bool isHydraEnabled = _IsHydraEnabled();
+    return isHydraEnabled;
 }
 
 /*virtual*/
@@ -148,14 +176,16 @@ UsdImagingMetalEngine::SetSelectionColor(GfVec4f const& color)
 
 /* virtual */
 void
-UsdImagingMetalEngine::PrepareBatch(const UsdPrim& root, RenderParams params)
+UsdImagingMetalEngine::PrepareBatch(const UsdPrim& root,
+                                    const UsdImagingMetalRenderParams& params)
 {
     // By default, do nothing.
 }
 
 /* virtual */
 void
-UsdImagingMetalEngine::RenderBatch(const SdfPathVector& paths, RenderParams params)
+UsdImagingMetalEngine::RenderBatch(const SdfPathVector& paths,
+                                   const UsdImagingMetalRenderParams& params)
 {
     // By default, do nothing.
 }
@@ -166,7 +196,7 @@ UsdImagingMetalEngine::TestIntersection(
     const GfMatrix4d &projectionMatrix,
     const GfMatrix4d &worldToLocalSpace,
     const UsdPrim& root, 
-    RenderParams params,
+    const UsdImagingMetalRenderParams& params,
     GfVec3d *outHitPoint,
     SdfPath *outHitPrimPath,
     SdfPath *outHitInstancerPath,
@@ -370,7 +400,7 @@ UsdImagingMetalEngine::TestIntersectionBatch(
     const GfMatrix4d &projectionMatrix,
     const GfMatrix4d &worldToLocalSpace,
     const SdfPathVector& paths, 
-    RenderParams params,
+    const UsdImagingMetalRenderParams& params,
     unsigned int pickResolution,
     PathTranslatorCallback pathTranslator,
     HitBatch *outHit)
@@ -700,6 +730,27 @@ VtDictionary
 UsdImagingMetalEngine::GetResourceAllocation() const
 {
     return VtDictionary();
+}
+
+/* virtual */
+UsdImagingMetalRendererSettingsList
+UsdImagingMetalEngine::GetRendererSettingsList() const
+{
+    return UsdImagingMetalRendererSettingsList();
+}
+
+/* virtual */
+VtValue
+UsdImagingMetalEngine::GetRendererSetting(TfToken const& id) const
+{
+    return VtValue();
+}
+
+/* virtual */
+void
+UsdImagingMetalEngine::SetRendererSetting(TfToken const& id,
+                                          VtValue const& value)
+{
 }
 
 

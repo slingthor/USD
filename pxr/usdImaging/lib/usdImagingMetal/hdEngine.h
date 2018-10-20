@@ -86,16 +86,19 @@ public:
     virtual void InvalidateBuffers() override;
 
     USDIMAGINGMETAL_API
-    virtual void PrepareBatch(const UsdPrim& root, RenderParams params) override;
+    virtual void PrepareBatch(const UsdPrim& root,
+                              const UsdImagingMetalRenderParams& params) override;
     USDIMAGINGMETAL_API
-    virtual void RenderBatch(const SdfPathVector& paths, RenderParams params) override;
+    virtual void RenderBatch(const SdfPathVector& paths,
+                             const UsdImagingMetalRenderParams& params) override;
 
     USDIMAGINGMETAL_API
-    virtual void Render(const UsdPrim& root, RenderParams params) override;
+    virtual void Render(const UsdPrim& root,
+                        const UsdImagingMetalRenderParams& params) override;
 
     // Core rendering function: just draw, don't update anything.
     USDIMAGINGMETAL_API
-    void Render(RenderParams params);
+    void Render(const UsdImagingMetalRenderParams& params);
 
     USDIMAGINGMETAL_API
     virtual void SetCameraState(const GfMatrix4d& viewMatrix,
@@ -168,7 +171,7 @@ public:
         const GfMatrix4d &projectionMatrix,
         const GfMatrix4d &worldToLocalSpace,
         const UsdPrim& root, 
-        RenderParams params,
+        const UsdImagingMetalRenderParams& params,
         GfVec3d *outHitPoint,
         SdfPath *outHitPrimPath = NULL,
         SdfPath *outHitInstancerPath = NULL,
@@ -181,7 +184,7 @@ public:
         const GfMatrix4d &projectionMatrix,
         const GfMatrix4d &worldToLocalSpace,
         const SdfPathVector& paths, 
-        RenderParams params,
+        const UsdImagingMetalRenderParams& params,
         unsigned int pickResolution,
         PathTranslatorCallback pathTranslator,
         HitBatch *outHit) override;
@@ -189,22 +192,34 @@ public:
     USDIMAGINGMETAL_API
     virtual VtDictionary GetResourceAllocation() const override;
 
+    USDIMAGINGMETAL_API
+    virtual UsdImagingMetalRendererSettingsList GetRendererSettingsList() const;
+    
+    USDIMAGINGMETAL_API
+    virtual VtValue GetRendererSetting(TfToken const& id) const;
+    
+    USDIMAGINGMETAL_API
+    virtual void SetRendererSetting(TfToken const& id,
+                                    VtValue const& value);
 private:
 
     // These functions factor batch preparation into separate steps so they
     // can be reused by both the vectorized and non-vectorized API.
-    bool _CanPrepareBatch(const UsdPrim& root, const RenderParams& params);
-    void _PreSetTime(const UsdPrim& root, const RenderParams& params);
-    void _PostSetTime(const UsdPrim& root, const RenderParams& params);
+    bool _CanPrepareBatch(const UsdPrim& root,
+                          const UsdImagingMetalRenderParams& params);
+    void _PreSetTime(const UsdPrim& root,
+                     const UsdImagingMetalRenderParams& params);
+    void _PostSetTime(const UsdPrim& root,
+                      const UsdImagingMetalRenderParams& params);
 
     // Create a hydra collection given root paths and render params.
     // Returns true if the collection was updated.
     static bool _UpdateHydraCollection(HdRprimCollection *collection,
                           SdfPathVector const& roots,
-                          UsdImagingMetalEngine::RenderParams const& params,
+                          const UsdImagingMetalRenderParams& params,
                           TfTokenVector *renderTags);
-    static HdxRenderTaskParams _MakeHydraRenderParams(
-                          UsdImagingMetalEngine::RenderParams const& params);
+    static HdxRenderTaskParams _MakeHydraUsdImagingMetalRenderParams(
+                          const UsdImagingMetalRenderParams& params);
     
     void _InitializeCapturing();
 

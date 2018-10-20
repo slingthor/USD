@@ -34,9 +34,11 @@ pxr_library(usdImagingMetal
         engine
         metal
         hdEngine
+        renderParams
 
     PUBLIC_HEADERS
         api.h
+        rendererSettings.h
         version.h
 
     PRIVATE_HEADERS

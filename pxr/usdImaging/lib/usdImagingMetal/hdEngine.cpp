@@ -168,7 +168,7 @@ _GetRefineLevel(float c)
 
 bool 
 UsdImagingMetalHdEngine::_CanPrepareBatch(const UsdPrim& root,
-                                     const RenderParams& params)
+                                          const UsdImagingMetalRenderParams& params)
 {
     HD_TRACE_FUNCTION();
 
@@ -187,7 +187,8 @@ UsdImagingMetalHdEngine::_CanPrepareBatch(const UsdPrim& root,
 }
 
 void
-UsdImagingMetalHdEngine::_PreSetTime(const UsdPrim& root, const RenderParams& params)
+UsdImagingMetalHdEngine::_PreSetTime(const UsdPrim& root,
+                                     const UsdImagingMetalRenderParams& params)
 {
     HD_TRACE_FUNCTION();
 
@@ -201,14 +202,16 @@ UsdImagingMetalHdEngine::_PreSetTime(const UsdPrim& root, const RenderParams& pa
 }
 
 void
-UsdImagingMetalHdEngine::_PostSetTime(const UsdPrim& root, const RenderParams& params)
+UsdImagingMetalHdEngine::_PostSetTime(const UsdPrim& root,
+                                      const UsdImagingMetalRenderParams& params)
 {
     HD_TRACE_FUNCTION();
 }
 
 /*virtual*/
 void
-UsdImagingMetalHdEngine::PrepareBatch(const UsdPrim& root, RenderParams params)
+UsdImagingMetalHdEngine::PrepareBatch(const UsdPrim& root,
+                                      const UsdImagingMetalRenderParams& params)
 {
     HD_TRACE_FUNCTION();
     
@@ -232,7 +235,7 @@ UsdImagingMetalHdEngine::PrepareBatch(const UsdPrim& root, RenderParams params)
 bool
 UsdImagingMetalHdEngine::_UpdateHydraCollection(HdRprimCollection *collection,
                           SdfPathVector const& roots,
-                          UsdImagingMetalEngine::RenderParams const& params,
+                          UsdImagingMetalRenderParams const& params,
                           TfTokenVector *renderTags)
 {
     if (collection == nullptr) {
@@ -244,16 +247,16 @@ UsdImagingMetalHdEngine::_UpdateHydraCollection(HdRprimCollection *collection,
     HdReprSelector reprSelector = HdReprSelector(HdReprTokens->smoothHull);
     bool refined = params.complexity > 1.0;
     
-    if (params.drawMode == UsdImagingMetalEngine::DRAW_GEOM_FLAT ||
-        params.drawMode == UsdImagingMetalEngine::DRAW_SHADED_FLAT) {
+    if (params.drawMode == UsdImagingMetalDrawMode::DRAW_GEOM_FLAT ||
+        params.drawMode == UsdImagingMetalDrawMode::DRAW_SHADED_FLAT) {
         // Flat shading
         reprSelector = HdReprSelector(HdReprTokens->hull);
     } else if (
-        params.drawMode == UsdImagingMetalEngine::DRAW_WIREFRAME_ON_SURFACE) {
+        params.drawMode == UsdImagingMetalDrawMode::DRAW_WIREFRAME_ON_SURFACE) {
         // Wireframe on surface
         reprSelector = HdReprSelector(refined ?
             HdReprTokens->refinedWireOnSurf : HdReprTokens->wireOnSurf);
-    } else if (params.drawMode == UsdImagingMetalEngine::DRAW_WIREFRAME) {
+    } else if (params.drawMode == UsdImagingMetalDrawMode::DRAW_WIREFRAME) {
         // Wireframe
         reprSelector = HdReprSelector(refined ?
             HdReprTokens->refinedWire : HdReprTokens->wire);
@@ -323,8 +326,8 @@ UsdImagingMetalHdEngine::_UpdateHydraCollection(HdRprimCollection *collection,
 
 /* static */
 HdxRenderTaskParams
-UsdImagingMetalHdEngine::_MakeHydraRenderParams(
-                  UsdImagingMetalHdEngine::RenderParams const& renderParams)
+UsdImagingMetalHdEngine::_MakeHydraUsdImagingMetalRenderParams(
+                  const UsdImagingMetalRenderParams& renderParams)
 {
     static const HdCullStyle USD_2_HD_CULL_STYLE[] =
     {
@@ -336,15 +339,15 @@ UsdImagingMetalHdEngine::_MakeHydraRenderParams(
     };
     static_assert(((sizeof(USD_2_HD_CULL_STYLE) /
                     sizeof(USD_2_HD_CULL_STYLE[0]))
-                   == UsdImagingMetalEngine::CULL_STYLE_COUNT),"enum size mismatch");
+                   == (size_t)UsdImagingMetalCullStyle::CULL_STYLE_COUNT),"enum size mismatch");
     
     HdxRenderTaskParams params;
     
     params.overrideColor       = renderParams.overrideColor;
     params.wireframeColor      = renderParams.wireframeColor;
     
-    if (renderParams.drawMode == UsdImagingMetalEngine::DRAW_GEOM_ONLY ||
-        renderParams.drawMode == UsdImagingMetalEngine::DRAW_POINTS) {
+    if (renderParams.drawMode == UsdImagingMetalDrawMode::DRAW_GEOM_ONLY ||
+        renderParams.drawMode == UsdImagingMetalDrawMode::DRAW_POINTS) {
         params.enableLighting = false;
     } else {
         params.enableLighting =  renderParams.enableLighting &&
@@ -354,7 +357,8 @@ UsdImagingMetalHdEngine::_MakeHydraRenderParams(
     params.enableIdRender      = renderParams.enableIdRender;
     params.depthBiasUseDefault = true;
     params.depthFunc           = HdCmpFuncLess;
-    params.cullStyle           = USD_2_HD_CULL_STYLE[renderParams.cullStyle];
+    params.cullStyle           = USD_2_HD_CULL_STYLE[
+        (size_t)renderParams.cullStyle];
     // 32.0 is the default tessLevel of HdRasterState. we can change if we like.
     params.tessLevel           = 32.0;
     
@@ -388,13 +392,14 @@ UsdImagingMetalHdEngine::_MakeHydraRenderParams(
 
 /*virtual*/
 void
-UsdImagingMetalHdEngine::RenderBatch(const SdfPathVector& paths, RenderParams params)
+UsdImagingMetalHdEngine::RenderBatch(const SdfPathVector& paths,
+                                     const UsdImagingMetalRenderParams& params)
 {
     _taskController->SetCameraClipPlanes(params.clipPlanes);
     _UpdateHydraCollection(&_renderCollection, paths, params, &_renderTags);
     _taskController->SetCollection(_renderCollection);
     
-    HdxRenderTaskParams hdParams = _MakeHydraRenderParams(params);
+    HdxRenderTaskParams hdParams = _MakeHydraUsdImagingMetalRenderParams(params);
     _taskController->SetRenderParams(hdParams);
     _taskController->SetEnableSelection(params.highlight);
     
@@ -403,7 +408,8 @@ UsdImagingMetalHdEngine::RenderBatch(const SdfPathVector& paths, RenderParams pa
 
 /*virtual*/
 void
-UsdImagingMetalHdEngine::Render(const UsdPrim& root, RenderParams params)
+UsdImagingMetalHdEngine::Render(const UsdPrim& root,
+                                const UsdImagingMetalRenderParams& params)
 {
     PrepareBatch(root, params);
     
@@ -414,7 +420,7 @@ UsdImagingMetalHdEngine::Render(const UsdPrim& root, RenderParams params)
     _UpdateHydraCollection(&_renderCollection, roots, params, &_renderTags);
     _taskController->SetCollection(_renderCollection);
     
-    HdxRenderTaskParams hdParams = _MakeHydraRenderParams(params);
+    HdxRenderTaskParams hdParams = _MakeHydraUsdImagingMetalRenderParams(params);
     _taskController->SetRenderParams(hdParams);
     _taskController->SetEnableSelection(params.highlight);
     
@@ -427,7 +433,7 @@ UsdImagingMetalHdEngine::TestIntersection(
     const GfMatrix4d &inProjectionMatrix,
     const GfMatrix4d &worldToLocalSpace,
     const UsdPrim& root, 
-    RenderParams params,
+    const UsdImagingMetalRenderParams& params,
     GfVec3d *outHitPoint,
     SdfPath *outHitPrimPath,
     SdfPath *outHitInstancerPath,
@@ -513,7 +519,7 @@ UsdImagingMetalHdEngine::TestIntersectionBatch(
     const GfMatrix4d &inProjectionMatrix,
     const GfMatrix4d &worldToLocalSpace,
     const SdfPathVector& paths, 
-    RenderParams params,
+    const UsdImagingMetalRenderParams& params,
     unsigned int pickResolution,
     PathTranslatorCallback pathTranslator,
     HitBatch *outHit)
@@ -544,14 +550,15 @@ UsdImagingMetalHdEngine::TestIntersectionBatch(
     };
     static_assert(((sizeof(USD_2_HD_CULL_STYLE) / 
                     sizeof(USD_2_HD_CULL_STYLE[0])) 
-                == UsdImagingMetalEngine::CULL_STYLE_COUNT),"enum size mismatch");
+                == (size_t)UsdImagingMetalCullStyle::CULL_STYLE_COUNT),"enum size mismatch");
 
     HdxIntersector::HitVector allHits;
     HdxIntersector::Params qparams;
     qparams.viewMatrix = worldToLocalSpace * viewMatrix;
     qparams.projectionMatrix = projectionMatrix;
     qparams.alphaThreshold = params.alphaThreshold;
-    qparams.cullStyle = USD_2_HD_CULL_STYLE[params.cullStyle];
+    qparams.cullStyle = USD_2_HD_CULL_STYLE[
+        (size_t)params.cullStyle];
     qparams.renderTags = _renderTags;
     qparams.enableSceneMaterials = params.enableSceneMaterials;
 
@@ -617,7 +624,7 @@ class _DebugGroupTaskWrapper : public HdTask {
 };
 
 void
-UsdImagingMetalHdEngine::Render(RenderParams params)
+UsdImagingMetalHdEngine::Render(const UsdImagingMetalRenderParams& params)
 {
     // Forward scene materials enable option to delegate
     _delegate->SetSceneMaterialsEnabled(params.enableSceneMaterials);
@@ -1147,6 +1154,60 @@ UsdImagingMetalHdEngine::GetResourceAllocation() const
 {
     return _renderIndex->GetResourceRegistry()->GetResourceAllocation();
 }
+
+/* virtual */
+UsdImagingMetalRendererSettingsList
+UsdImagingMetalHdEngine::GetRendererSettingsList() const
+{
+    HdRenderSettingDescriptorList descriptors =
+    _renderIndex->GetRenderDelegate()->GetRenderSettingDescriptors();
+    UsdImagingMetalRendererSettingsList ret;
+    
+    for (auto const& desc : descriptors) {
+        UsdImagingMetalRendererSetting r;
+        r.key = desc.key;
+        r.name = desc.name;
+        r.defValue = desc.defaultValue;
+        
+        // Use the type of the default value to tell us what kind of
+        // widget to create...
+        if (r.defValue.IsHolding<bool>()) {
+            r.type = UsdImagingMetalRendererSetting::TYPE_FLAG;
+        } else if (r.defValue.IsHolding<int>() ||
+                   r.defValue.IsHolding<unsigned int>()) {
+            r.type = UsdImagingMetalRendererSetting::TYPE_INT;
+        } else if (r.defValue.IsHolding<float>()) {
+            r.type = UsdImagingMetalRendererSetting::TYPE_FLOAT;
+        } else if (r.defValue.IsHolding<std::string>()) {
+            r.type = UsdImagingMetalRendererSetting::TYPE_STRING;
+        } else {
+            TF_WARN("Setting '%s' with type '%s' doesn't have a UI"
+                    " implementation...",
+                    r.name.c_str(),
+                    r.defValue.GetTypeName().c_str());
+            continue;
+        }
+        ret.push_back(r);
+    }
+    
+    return ret;
+}
+
+/* virtual */
+VtValue
+UsdImagingMetalHdEngine::GetRendererSetting(TfToken const& id) const
+{
+    return _renderIndex->GetRenderDelegate()->GetRenderSetting(id);
+}
+
+/* virtual */
+void
+UsdImagingMetalHdEngine::SetRendererSetting(TfToken const& id,
+                                            VtValue const& value)
+{
+    _renderIndex->GetRenderDelegate()->SetRenderSetting(id, value);
+}
+
 
 PXR_NAMESPACE_CLOSE_SCOPE
 

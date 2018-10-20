@@ -55,10 +55,14 @@ protected:
     friend class GlfResourceFactory;
 
     GLF_API
-    virtual void _FreeTextureObject();
+    virtual void _FreeTextureObject() override;
 
     GLF_API
-    virtual void _ReadImage() override;
+    virtual void _CreateGPUResources(unsigned int numChannels,
+                                     GLenum const type,
+                                     std::vector<_TextureSize> &mips,
+                                     std::vector<std::vector<uint8_t>> &mipData,
+                                     std::vector<float> &layoutData) override;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

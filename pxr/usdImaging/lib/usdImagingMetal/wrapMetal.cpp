@@ -53,7 +53,7 @@ _TestIntersection(
     const GfMatrix4d &projectionMatrix,
     const GfMatrix4d &worldToLocalSpace,
     const UsdPrim& root, 
-    UsdImagingMetal::RenderParams params)
+    UsdImagingMetalRenderParams params)
 {
     GfVec3d hitPoint;
     SdfPath hitPrimPath;
@@ -115,7 +115,8 @@ _GetRegisteredRendererPluginsDisplayNames()
 void wrapMetal()
 {
     { 
-        // Start a new scope so that DrawMode, CullStyle and RenderParams are under Metal.
+        // Start a new scope so that DrawMode, CullStyle and
+        // UsdImagingMetalRenderParams are under GL.
         scope Metal = class_<UsdImagingMetal, boost::noncopyable>("GL",
                                         "UsdImaging Metal Renderer class")
             .def( init<>() )
@@ -133,50 +134,54 @@ void wrapMetal()
             .def("GetRprimPathFromPrimId", &UsdImagingMetal::GetRprimPathFromPrimId)
             .def("GetPrimPathFromInstanceIndex", &_GetPrimPathFromInstanceIndex)
             .def("TestIntersection", &_TestIntersection)
-            .def("IsEnabledHydra", &UsdImagingMetal::IsEnabledHydra)
-                .staticmethod("IsEnabledHydra")
+            .def("IsHydraEnabled", &UsdImagingMetal::IsHydraEnabled)
+                .staticmethod("IsHydraEnabled")
             .def("IsConverged", &UsdImagingMetal::IsConverged)
             .def("GetRendererPlugins", &UsdImagingMetal::GetRendererPlugins,
                  return_value_policy< TfPySequenceToTuple >())
             .def("GetRendererDisplayName",
-                 &UsdImagingMetal::GetRendererDisplayName)
+                    &UsdImagingMetal::GetRendererDisplayName)
             .def("GetCurrentRendererId", &UsdImagingMetal::GetCurrentRendererId)
             .def("SetRendererPlugin", &UsdImagingMetal::SetRendererPlugin)
             .def("GetRendererAovs", &UsdImagingMetal::GetRendererAovs,
-                 return_value_policy< TfPySequenceToTuple >())
-            .def ("SetRendererAov", &UsdImagingMetal::SetRendererAov)
+                 return_value_policy< TfPySequenceToList >())
+            .def("SetRendererAov", &UsdImagingMetal::SetRendererAov)
             .def("GetResourceAllocation", &UsdImagingMetal::GetResourceAllocation)
             .def("GetRegisteredRendererPluginsDisplayNames",
                  &_GetRegisteredRendererPluginsDisplayNames)
             .staticmethod("GetRegisteredRendererPluginsDisplayNames")
+            .def("GetRendererSettingsList", &UsdImagingMetal::GetRendererSettingsList,
+                return_value_policy< TfPySequenceToList >())
+            .def("GetRendererSetting", &UsdImagingMetal::GetRendererSetting)
+            .def("SetRendererSetting", &UsdImagingMetal::SetRendererSetting)
         ;
 
         // Wrap the constants.
         Metal.attr("ALL_INSTANCES") = UsdImagingDelegate::ALL_INSTANCES;
 
         // Wrap the DrawMode enum. Accessible as UsdImaging.GL.DrawMode
-        enum_<UsdImagingMetal::DrawMode>("DrawMode")
-            .value("DRAW_POINTS", UsdImagingMetal::DRAW_POINTS)
-            .value("DRAW_WIREFRAME", UsdImagingMetal::DRAW_WIREFRAME)
-            .value("DRAW_WIREFRAME_ON_SURFACE", UsdImagingMetal::DRAW_WIREFRAME_ON_SURFACE)
-            .value("DRAW_SHADED_FLAT", UsdImagingMetal::DRAW_SHADED_FLAT)
-            .value("DRAW_SHADED_SMOOTH", UsdImagingMetal::DRAW_SHADED_SMOOTH)
-            .value("DRAW_GEOM_ONLY", UsdImagingMetal::DRAW_GEOM_ONLY)
-            .value("DRAW_GEOM_FLAT", UsdImagingMetal::DRAW_GEOM_FLAT)
-            .value("DRAW_GEOM_SMOOTH", UsdImagingMetal::DRAW_GEOM_SMOOTH)
+        enum_<UsdImagingMetalDrawMode>("DrawMode")
+            .value("DRAW_POINTS", UsdImagingMetalDrawMode::DRAW_POINTS)
+            .value("DRAW_WIREFRAME", UsdImagingMetalDrawMode::DRAW_WIREFRAME)
+            .value("DRAW_WIREFRAME_ON_SURFACE", UsdImagingMetalDrawMode::DRAW_WIREFRAME_ON_SURFACE)
+            .value("DRAW_SHADED_FLAT", UsdImagingMetalDrawMode::DRAW_SHADED_FLAT)
+            .value("DRAW_SHADED_SMOOTH", UsdImagingMetalDrawMode::DRAW_SHADED_SMOOTH)
+            .value("DRAW_GEOM_ONLY", UsdImagingMetalDrawMode::DRAW_GEOM_ONLY)
+            .value("DRAW_GEOM_FLAT", UsdImagingMetalDrawMode::DRAW_GEOM_FLAT)
+            .value("DRAW_GEOM_SMOOTH", UsdImagingMetalDrawMode::DRAW_GEOM_SMOOTH)
         ;
 
         // Wrap the CullStyle enum. Accessible as UsdImaging.GL.CullStyle
-        enum_<UsdImagingMetal::CullStyle>("CullStyle")
-                .value("CULL_STYLE_NOTHING", UsdImagingMetal::CULL_STYLE_NOTHING)
-                .value("CULL_STYLE_BACK", UsdImagingMetal::CULL_STYLE_BACK)
-                .value("CULL_STYLE_FRONT", UsdImagingMetal::CULL_STYLE_FRONT)
-                .value("CULL_STYLE_BACK_UNLESS_DOUBLE_SIDED", UsdImagingMetal::CULL_STYLE_BACK_UNLESS_DOUBLE_SIDED)
+        enum_<UsdImagingMetalCullStyle>("CullStyle")
+                .value("CULL_STYLE_NOTHING", UsdImagingMetalCullStyle::CULL_STYLE_NOTHING)
+                .value("CULL_STYLE_BACK", UsdImagingMetalCullStyle::CULL_STYLE_BACK)
+                .value("CULL_STYLE_FRONT", UsdImagingMetalCullStyle::CULL_STYLE_FRONT)
+                .value("CULL_STYLE_BACK_UNLESS_DOUBLE_SIDED", UsdImagingMetalCullStyle::CULL_STYLE_BACK_UNLESS_DOUBLE_SIDED)
          ;
 
         // Wrap the RenderParams struct. Accessible as UsdImaging.GL.RenderParams
-        typedef UsdImagingMetal::RenderParams Params;
-        class_<UsdImagingMetal::RenderParams>("RenderParams",
+        typedef UsdImagingMetalRenderParams Params;
+        class_<UsdImagingMetalRenderParams>("RenderParams",
                                         "Metal Renderer parameters")
             .def_readwrite("frame", &Params::frame)
             .def_readwrite("complexity", &Params::complexity)

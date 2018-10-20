@@ -37,36 +37,20 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-namespace {
-
-struct _TextureSize {
-    _TextureSize(int w, int h) : width(w), height(h) { }
-    int width, height;
-};
-
-struct _MipDesc {
-    _MipDesc(const _TextureSize& s, GarchImageSharedPtr&& i) :
-        size(s), image(std::move(i)) { }
-    _TextureSize size;
-    GarchImageSharedPtr image;
-};
-
-using _MipDescArray = std::vector<_MipDesc>;
-
-_MipDescArray _GetMipLevels(const TfToken& filePath)
+GarchUdimTexture::_MipDescArray GarchUdimTexture::_GetMipLevels(const TfToken& filePath)
 {
     constexpr int maxMipReads = 32;
     _MipDescArray ret {};
     ret.reserve(maxMipReads);
-    int prevWidth = std::numeric_limits<int>::max();
-    int prevHeight = std::numeric_limits<int>::max();
+    unsigned int prevWidth = std::numeric_limits<unsigned int>::max();
+    unsigned int prevHeight = std::numeric_limits<unsigned int>::max();
     for (int mip = 0; mip < maxMipReads; ++mip) {
         GarchImageSharedPtr image = GarchImage::OpenForReading(filePath, 0, mip);
         if (image == nullptr) {
             break;
         }
-        const int currHeight = image->GetWidth();
-        const int currWidth = image->GetHeight();
+        const unsigned int currHeight = image->GetWidth();
+        const unsigned int currWidth = image->GetHeight();
         if (currWidth < prevWidth &&
             currHeight < prevHeight) {
             prevWidth = currWidth;
@@ -76,8 +60,6 @@ _MipDescArray _GetMipLevels(const TfToken& filePath)
     }
     return ret;
 };
-
-}
 
 bool GarchIsSupportedUdimTexture(std::string const& imageFilePath)
 {
@@ -163,6 +145,165 @@ GarchUdimTexture::_OnMemoryRequestedDirty()
     _loaded = false;
 }
 
+void
+GarchUdimTexture::_ReadImage()
+{
+    TRACE_FUNCTION();
+    
+    if (_loaded) {
+        return;
+    }
+    _loaded = true;
+    _FreeTextureObject();
+    
+    if (_tiles.empty()) {
+        return;
+    }
+    
+    const _MipDescArray firstImageMips = _GetMipLevels(std::get<1>(_tiles[0]));
+    
+    if (firstImageMips.empty()) {
+        return;
+    }
+    
+    _format = firstImageMips[0].image->GetFormat();
+    const GLenum type = firstImageMips[0].image->GetType();
+    unsigned int numChannels;
+    if (_format == GL_RED || _format == GL_LUMINANCE) {
+        numChannels = 1;
+    } else if (_format == GL_RG) {
+        numChannels = 2;
+    } else if (_format == GL_RGB) {
+        numChannels = 3;
+    } else if (_format == GL_RGBA) {
+        numChannels = 4;
+    } else {
+        return;
+    }
+    
+    unsigned int sizePerElem = 1;
+    if (type == GL_FLOAT) {
+        sizePerElem = 4;
+    } else if (type == GL_UNSIGNED_SHORT) {
+        sizePerElem = 2;
+    } else if (type == GL_HALF_FLOAT_ARB) {
+        sizePerElem = 2;
+    } else if (type == GL_UNSIGNED_BYTE) {
+        sizePerElem = 1;
+    }
+    
+    const unsigned int maxTileCount =
+    std::get<0>(_tiles.back()) + 1;
+    _depth = static_cast<int>(_tiles.size());
+    const unsigned int numBytesPerPixel = sizePerElem * numChannels;
+    const unsigned int numBytesPerPixelLayer = numBytesPerPixel * _depth;
+    
+    unsigned int targetPixelCount =
+    static_cast<unsigned int>(GetMemoryRequested());
+    const bool loadAllTiles = targetPixelCount == 0;
+    targetPixelCount /= _depth * numBytesPerPixel;
+    
+    std::vector<_TextureSize> mips {};
+    mips.reserve(firstImageMips.size());
+    if (firstImageMips.size() == 1) {
+        unsigned int width = firstImageMips[0].size.width;
+        unsigned int height = firstImageMips[0].size.height;
+        while (true) {
+            mips.emplace_back(width, height);
+            if (width == 1 && height == 1) {
+                break;
+            }
+            width = std::max(1u, width / 2u);
+            height = std::max(1u, height / 2u);
+        }
+        if (!loadAllTiles) {
+            std::reverse(mips.begin(), mips.end());
+        }
+    } else {
+        if (loadAllTiles) {
+            for (_MipDesc const& mip: firstImageMips) {
+                mips.emplace_back(mip.size);
+            }
+        } else {
+            for (auto it = firstImageMips.crbegin();
+                 it != firstImageMips.crend(); ++it) {
+                mips.emplace_back(it->size);
+            }
+        }
+    }
+    
+    unsigned int mipCount = mips.size();
+    if (!loadAllTiles) {
+        mipCount = 0;
+        for (auto const& mip: mips) {
+            const unsigned int currentPixelCount = mip.width * mip.height;
+            if (targetPixelCount <= currentPixelCount) {
+                break;
+            }
+            ++mipCount;
+            targetPixelCount -= currentPixelCount;
+        }
+        
+        if (mipCount == 0) {
+            mips.clear();
+            mips.emplace_back(1, 1);
+            mipCount = 1;
+        } else {
+            mips.resize(mipCount, {0, 0});
+            std::reverse(mips.begin(), mips.end());
+        }
+    }
+    
+    std::vector<std::vector<uint8_t>> mipData;
+    mipData.resize(mipCount);
+    
+    _width = mips[0].width;
+    _height = mips[0].height;
+    
+    // Texture array queries will use a float as the array specifier.
+    std::vector<float> layoutData;
+    layoutData.resize(maxTileCount, 0);
+
+    size_t totalTextureMemory = 0;
+    for (unsigned int mip = 0; mip < mipCount; ++mip) {
+        _TextureSize const& mipSize = mips[mip];
+        const unsigned int currentMipMemory =
+        mipSize.width * mipSize.height * numBytesPerPixelLayer;
+        mipData[mip].resize(currentMipMemory, 0);
+        totalTextureMemory += currentMipMemory;
+    }
+    
+    WorkParallelForN(_tiles.size(), [&](size_t begin, size_t end) {
+        for (size_t tileId = begin; tileId < end; ++tileId) {
+            std::tuple<int, TfToken> const& tile = _tiles[tileId];
+            layoutData[std::get<0>(tile)] = tileId + 1;
+            _MipDescArray images = _GetMipLevels(std::get<1>(tile));
+            if (images.empty()) { continue; }
+            for (unsigned int mip = 0; mip < mipCount; ++mip) {
+                _TextureSize const& mipSize = mips[mip];
+                const unsigned int numBytesPerLayer =
+                mipSize.width * mipSize.height * numBytesPerPixel;
+                GarchImage::StorageSpec spec;
+                spec.width = mipSize.width;
+                spec.height = mipSize.height;
+                spec.format = _format;
+                spec.type = type;
+                spec.flipped = true;
+                spec.data = mipData[mip].data()
+                + (tileId * numBytesPerLayer);
+                const auto it = std::find_if(images.rbegin(), images.rend(),
+                                             [&mipSize](_MipDesc const& i)
+                                             { return mipSize.width <= i.size.width &&
+                                                 mipSize.height <= i.size.height;});
+                (it == images.rend() ? images.front() : *it).image->Read(spec);
+            }
+        }
+    }, 1);
+    
+    _CreateGPUResources(numChannels, type, mips, mipData, layoutData);
+    
+    _SetMemoryUsed(totalTextureMemory + _tiles.size() * sizeof(float));
+}
 void
 GarchUdimTexture::_ReadTexture()
 {

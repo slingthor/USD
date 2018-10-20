@@ -62,10 +62,6 @@ typedef std::vector<UsdImagingMetalSharedPtr> UsdImagingMetalSharedPtrVector;
 class UsdImagingMetal : public UsdImagingMetalEngine {
 public:
 
-    /// Returns true if Hydra is enabled for GL drawing.
-    USDIMAGINGMETAL_API
-    static bool IsEnabledHydra();
-
     USDIMAGINGMETAL_API
     UsdImagingMetal();
     USDIMAGINGMETAL_API
@@ -77,24 +73,21 @@ public:
     USDIMAGINGMETAL_API
     virtual ~UsdImagingMetal();
 
-    // Support for batched rendering
-    // Currently, supported only when Hydra is enabled
-    USDIMAGINGMETAL_API
-    static bool IsBatchingSupported();
-
     /// Prepares a sub-index delegate for drawing.
     ///
     /// This can be called many times for different sub-indexes (prim paths)
     /// over the stage, and then all rendered together with a call to
     /// RenderBatch()
     USDIMAGINGMETAL_API
-    virtual void PrepareBatch(const UsdPrim& root, RenderParams params);
+    virtual void PrepareBatch(const UsdPrim& root,
+                              const UsdImagingMetalRenderParams& params) override;
 
     /// Draws all sub-indices indentified by \p paths.  Presumes that each
     /// sub-index has already been prepared for drawing by calling
     /// PrepareBatch()
     USDIMAGINGMETAL_API
-    virtual void RenderBatch(const SdfPathVector& paths, RenderParams params);
+    virtual void RenderBatch(const SdfPathVector& paths,
+                             const UsdImagingMetalRenderParams& params) override;
 
     /// Render everything at and beneath \p root, using the configuration in
     /// \p params
@@ -104,7 +97,8 @@ public:
     /// again on \p root or any descendant of \p root, but not on any parent,
     /// sibling, or cousin of \p root.
     USDIMAGINGMETAL_API
-    virtual void Render(const UsdPrim& root, RenderParams params);
+    virtual void Render(const UsdPrim& root,
+                        const UsdImagingMetalRenderParams& params) override;
 
     USDIMAGINGMETAL_API
     virtual void InvalidateBuffers();
@@ -187,12 +181,12 @@ public:
         const GfMatrix4d &projectionMatrix,
         const GfMatrix4d &worldToLocalSpace,
         const UsdPrim& root, 
-        RenderParams params,
+        const UsdImagingMetalRenderParams& params,
         GfVec3d *outHitPoint,
         SdfPath *outHitPrimPath = NULL,
         SdfPath *outHitInstancerPath = NULL,
         int *outHitInstanceIndex = NULL,
-        int *outHitElementIndex = NULL);
+        int *outHitElementIndex = NULL) override;
 
     USDIMAGINGMETAL_API
     virtual bool TestIntersectionBatch(
@@ -200,13 +194,27 @@ public:
         const GfMatrix4d &projectionMatrix,
         const GfMatrix4d &worldToLocalSpace,
         const SdfPathVector& paths, 
-        RenderParams params,
+        const UsdImagingMetalRenderParams& params,
         unsigned int pickResolution,
         PathTranslatorCallback pathTranslator,
-        HitBatch *outHit);
+        HitBatch *outHit) override;
 
     USDIMAGINGMETAL_API
     virtual VtDictionary GetResourceAllocation() const;
+
+    /// Returns the list of renderer settings.
+    USDIMAGINGMETAL_API
+    virtual UsdImagingMetalRendererSettingsList GetRendererSettingsList() const;
+    
+    /// Gets a renderer setting's current value.
+    USDIMAGINGMETAL_API
+    virtual VtValue GetRendererSetting(TfToken const& id) const;
+    
+    /// Sets a renderer setting's value.
+    USDIMAGINGMETAL_API
+    virtual void SetRendererSetting(TfToken const& id,
+                                    VtValue const& value);
+    
 
 private:
     UsdImagingMetalEngineSharedPtr _engine;
