@@ -220,6 +220,11 @@ MtlfPtexTexture::_ReadImage()
                        bytesPerRow:pixelByteSize * _width
                      bytesPerImage:0];
         }
+        
+        if (needFreeTexelData) {
+            delete[] (uint8_t*)texelData;
+            texelData = nullptr;
+        }
     }
 
     reader->release();

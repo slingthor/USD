@@ -46,9 +46,11 @@ pxr_library(usdImagingGL
         gl
         hdEngine
         refEngine
+        renderParams
 
     PUBLIC_HEADERS
         api.h
+        rendererSettings.h
         version.h
 
     PRIVATE_HEADERS

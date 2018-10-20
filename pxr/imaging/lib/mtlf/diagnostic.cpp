@@ -251,13 +251,13 @@ MtlfMetalQueryObject::End()
     }
 }
 
-GLint64
+int64_t
 MtlfMetalQueryObject::GetResult()
 {
     return _value;
 }
 
-GLint64
+int64_t
 MtlfMetalQueryObject::GetResultNoWait()
 {
     return _value;

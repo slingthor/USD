@@ -48,8 +48,9 @@
 #include "pxr/usdImaging/usdImaging/unitTestHelper.h"
 #include "pxr/usdImaging/usdImaging/tokens.h"
 
-#include "pxr/usdImaging/usdImagingMetal/metal.h"
 #include "pxr/usdImaging/usdImagingMetal/hdEngine.h"
+#include "pxr/usdImaging/usdImagingMetal/metal.h"
+#include "pxr/usdImaging/usdImagingMetal/renderParams.h"
 
 #include <boost/shared_ptr.hpp>
 
@@ -159,7 +160,7 @@ My_TestMetalDrawing::InitTest()
     }
 
     if(IsEnabledTestLighting()) {
-        if(UsdImagingMetal::IsEnabledHydra()) {
+        if(UsdImagingMetal::IsHydraEnabled()) {
             // set same parameter as GarchSimpleLightingContext::SetStateFromOpenGL
             // OpenGL defaults
             _lightingContext = GarchSimpleLightingContext::New();
@@ -247,15 +248,15 @@ My_TestMetalDrawing::DrawTest(bool offscreen)
         if (*timeIt == -999) {
             time = UsdTimeCode::Default();
         }
-        UsdImagingMetalEngine::RenderParams params;
+        UsdImagingMetalRenderParams params;
         params.drawMode = GetDrawMode();
         params.enableLighting = IsEnabledTestLighting();
         params.enableIdRender = IsEnabledIdRender();
         params.frame = time;
         params.complexity = _GetComplexity();
         params.cullStyle = IsEnabledCullBackfaces() ?
-                            UsdImagingMetalEngine::CULL_STYLE_BACK :
-                            UsdImagingMetalEngine::CULL_STYLE_NOTHING;
+                            UsdImagingMetalCullStyle::CULL_STYLE_BACK :
+                            UsdImagingMetalCullStyle::CULL_STYLE_NOTHING;
 
         glViewport(0, 0, width, height);
 
@@ -269,7 +270,7 @@ My_TestMetalDrawing::DrawTest(bool offscreen)
 
 
         if(IsEnabledTestLighting()) {
-            if(UsdImagingMetal::IsEnabledHydra()) {
+            if(UsdImagingMetal::IsHydraEnabled()) {
                 _engine->SetLightingState(_lightingContext);
             } else {
                 _engine->SetLightingStateFromOpenGL();

@@ -233,7 +233,7 @@ UsdImagingMetal_UnitTestMetalDrawing::UsdImagingMetal_UnitTestMetalDrawing()
     , _cameraLight(false)
     , _testIdRender(false)
     , _complexity(1.0f)
-    , _drawMode(UsdImagingMetalEngine::DRAW_SHADED_SMOOTH)
+    , _drawMode(UsdImagingMetalDrawMode::DRAW_SHADED_SMOOTH)
     , _shouldFrameAll(false)
     , _cullBackfaces(false)
 {
@@ -521,14 +521,14 @@ UsdImagingMetal_UnitTestMetalDrawing::RunTest(int argc, char *argv[])
     _clearColor = GfVec4f(args.clearColor);
     _translate = GfVec3f(args.translate);
 
-    _drawMode = UsdImagingMetalEngine::DRAW_SHADED_SMOOTH;
+    _drawMode = UsdImagingMetalDrawMode::DRAW_SHADED_SMOOTH;
 
     if (args.shading.compare("wireOnSurface") == 0) {
-        _drawMode = UsdImagingMetalEngine::DRAW_WIREFRAME_ON_SURFACE;
+        _drawMode = UsdImagingMetalDrawMode::DRAW_WIREFRAME_ON_SURFACE;
     } else if (args.shading.compare("flat") == 0 ) {
-        _drawMode = UsdImagingMetalEngine::DRAW_SHADED_FLAT;
+        _drawMode = UsdImagingMetalDrawMode::DRAW_SHADED_FLAT;
     }else if (args.shading.compare("wire") == 0 ) {
-        _drawMode = UsdImagingMetalEngine::DRAW_WIREFRAME;
+        _drawMode = UsdImagingMetalDrawMode::DRAW_WIREFRAME;
     } 
 
     if (!args.unresolvedStageFilePath.empty()) {
