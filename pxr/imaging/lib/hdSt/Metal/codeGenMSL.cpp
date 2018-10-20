@@ -957,8 +957,8 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
 
     drawArgsStruct              << "////////////////////////////////////////////////////////////////////////////////////////////////////////////////////\n"
                                 << "// MSL Draw Args Struct ////////////////////////////////////////////////////////////////////////////////////////////\n\n"
-                                << "struct MSLDrawArgs { int indexCount, startIndex, baseVertex, instanceCount; };\n";
-    
+                                << "struct MSLDrawArgs { int indexCount, startIndex, baseVertex, instanceCount, batchIndexOffset; };\n";
+
     //Do an initial pass over _mslVSInputParams and _mslFSInputParams to count the number of vertexAttributes that will needs
     // slots. This allows us to do the rest of the VS/PS generation in a single pass.
     
@@ -1049,13 +1049,14 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
     
     int vsCurrentVertexAttributeSlot(0), vsUniformStructSize(0);
     
-    vsFuncDef       << "vertex MSLVsOutputs vertexEntryPoint(MSLVsInputs input[[stage_in]]";
-    vsMI_FuncDef    << "/****** Manually Indexed Wrapper Function (MI) ******/\n"
-                    << "MSLVsOutputs vertexShader_MI("
-                    << "\n    MSLVsInputs input //[[stage_in]]";
-    vsMI_EP_FuncDef << "vertex MSLVsOutputs vertexEntryPoint("
-                    << "\n      uint _vertexID[[vertex_id]]"
-                    << "\n    , uint _instanceID[[instance_id]]";
+    vsFuncDef           << "vertex MSLVsOutputs vertexEntryPoint(MSLVsInputs input[[stage_in]]";
+    vsMI_FuncDef        << "/****** Manually Indexed Wrapper Function (MI) ******/\n"
+                        << "MSLVsOutputs vertexShader_MI("
+                        << "\n    MSLVsInputs input //[[stage_in]]";
+    vsMI_EP_FuncDef     << "vertex MSLVsOutputs vertexEntryPoint("
+                        << "\n      uint _vertexID[[vertex_id]]";
+    if (_buildTarget != kMSL_BuildTarget_MVA_ComputeGS)
+        vsMI_EP_FuncDef << "\n    , uint _instanceID[[instance_id]]";
     
     if(_buildTarget != kMSL_BuildTarget_Regular) {
         vsMI_EP_FuncDefParams   << "\n    , device const uint *indices[[buffer(" << indexBufferSlot << ")]]"
@@ -1218,6 +1219,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
     {
         if(_buildTarget != kMSL_BuildTarget_Regular) {
             vsOutputStruct  << "    uint gl_PrimitiveID[[flat]];\n"
+                            << "    uint _gsPrimitiveID[[flat]];\n"
                             << "    vec2 _barycentricCoords[[center_perspective]];\n";
         }
         TF_FOR_ALL(it, _mslVSOutputParams) {
@@ -1304,7 +1306,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
             if(name.at(0) == '*') { name = name.substr(1, name.length() - 1); isPtr = true; }
             
             if(isVPrimVar || isDrawingCoord || isVertexData)
-                gs_VSInputCode << "            scope." << accessor << " = vsOutput." << name << ";\n";
+                gs_VSInputCode << "            scope." << (accessor.empty() ? name : accessor) << " = vsOutput." << name << ";\n";
             else {
                 gs_GSInputCode << "        scope." << (accessor.empty() ? name : accessor) << " = ";
                 
@@ -1341,11 +1343,11 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
         gsPrimOutStruct << "struct alignas(4) MSLGsPrimOutStruct {\n";
     
         std::stringstream vertBufferAccessor, primBufferAccessor, vsVertBufferAccessor, vsPrimBufferAccessor;
-        vertBufferAccessor << "gsVertOutBuffer[gl_PrimitiveIDIn * " << numVerticesOutPerPrimitive << " + gsVertexCounter].";
-        primBufferAccessor << "gsPrimOutBuffer[gl_PrimitiveIDIn * " <<
+        vertBufferAccessor << "gsVertOutBuffer[gsOutputOffset * " << numVerticesOutPerPrimitive << " + gsVertexCounter].";
+        primBufferAccessor << "gsPrimOutBuffer[gsOutputOffset * " <<
             numPrimitivesOutPerPrimitive << " + gsPrimCounter].";
-        vsVertBufferAccessor << "gsVertOutBuffer[_vertexID].";
-        vsPrimBufferAccessor << "gsPrimOutBuffer[gl_PrimitiveIDIn].";
+        vsVertBufferAccessor << "gsVertOutBuffer[_gsVertexID].";
+        vsPrimBufferAccessor << "gsPrimOutBuffer[_gsPrimitiveID].";
         TF_FOR_ALL(it, _mslGSOutputParams) {
             std::string name(it->name.GetString()), accessor(it->accessorStr.GetString()),
                         dataType(it->dataType.GetString()), attribute(it->attribute.GetString());
@@ -1408,6 +1410,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
                     << "device MSLGsPrimOutStruct* gsPrimOutBuffer;\n"
                     << "\n"
                     << "uint gsVertexCounter = 0;\n"
+                    << "uint gsOutputOffset = 0;\n"
                     << "void EmitVertex() {\n"
                     << gs_GSVertEmitCode.str()
                     << "    gsVertexCounter++;\n"
@@ -1465,27 +1468,32 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
                                 << "////////////////////////////////////////////////////////////////////////////////////////////////////////////////////\n"
                                 << "// MSL Vertex Entry Point //////////////////////////////////////////////////////////////////////////////////////////\n\n"
                                 << vsMI_EP_FuncDef.str()
-                                << "    uint _baseIndex = _vertexID;\n"
-                                << "    uint gl_InstanceID = _instanceID;\n"
-                                << "    uint gl_BaseVertex = drawArgs->baseVertex;\n";
-            
+                                << "    uint _gsVertexID = _vertexID;\n";
             if (quadIndexRemap) {
                 vsEntryPointCode << "    uint quadRemap[] = { 3, 0, 2, 2, 0, 1 };\n"
-                                 << "    uint gl_VertexID = indices[drawArgs->startIndex + (_baseIndex / 6) * 4 + quadRemap[_baseIndex % 6]] + gl_BaseVertex;\n";
+                                 << "    uint _index = drawArgs->batchIndexOffset + (_vertexID / 6) * 4 + quadRemap[_vertexID % 6];\n"
+                                 << "    uint _primitiveID = drawArgs->batchIndexOffset + (_vertexID / 6);\n";
             }
             else {
-                vsEntryPointCode << "    uint gl_VertexID = indices[drawArgs->startIndex + _baseIndex] + gl_BaseVertex;\n";
+                vsEntryPointCode << "    uint _index = drawArgs->batchIndexOffset + _gsVertexID;\n"
+                                 << "    uint _primitiveID = drawArgs->batchIndexOffset + (_vertexID / 3);\n";
             }
-
-            vsEntryPointCode    << "    uint gl_PrimitiveIDIn = _vertexID / 3;\n"
-                                << "    uint _corner = _vertexID % 3 ;\n"
+            if (_buildTarget == kMSL_BuildTarget_MVA_ComputeGS) //_instanceID is the real Metal instance ID if not using ComputeGS
+                vsEntryPointCode << "    uint _instanceID = _index / drawArgs->indexCount;\n";
+            vsEntryPointCode    << "    uint _gsPrimitiveID = _gsVertexID / " << (numVerticesOutPerPrimitive / numPrimitivesOutPerPrimitive) << ";\n"
+                                << "    _index = _index % drawArgs->indexCount;\n"
+                                << "    uint gl_InstanceID = _instanceID;\n"
+                                << "    uint gl_BaseVertex = drawArgs->baseVertex;\n"
+                                << "    uint gl_VertexID = indices[drawArgs->startIndex + _index] + gl_BaseVertex;\n"
+                                << "    uint gl_PrimitiveIDIn = _primitiveID;\n"
                                 << "\n"
                                 << vsMI_EP_InputCode.str()
                                 << "\n"
                                 << "    MSLVsOutputs vsOutput;\n"
                                 << vsMI_EP_CallCode.str()
                                 << "\n    vsOutput.gl_PrimitiveID = gl_PrimitiveIDIn;\n"
-                                << "\n    vsOutput._barycentricCoords = vec2(_corner == 1 ? 1.0 : 0.0, _corner == 2 ? 1.0 : 0.0);\n\n"
+                                << "    vsOutput._gsPrimitiveID = _gsPrimitiveID;\n"
+                                << "    vsOutput._barycentricCoords = vec2((_vertexID % 3 == 1)? 1.0 : 0.0, (_vertexID % 3 == 2) ? 1.0 : 0.0);\n\n"
                                 << vsGsOutputMergeCode.str()
                                 << "\n"
                                 << "    return vsOutput;\n"
@@ -1508,18 +1516,20 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
         gsCode  << "////////////////////////////////////////////////////////////////////////////////////////////////////////////////////\n"
                 << "// MSL Compute Entry Point /////////////////////////////////////////////////////////////////////////////////////////\n\n"
                 << cs_EP_FuncDef.str()
-                << "    uint _rawIndex = _threadPositionInGrid * " << numVerticesInPerPrimitive << ";\n"
-                << "    uint _baseIndex = _rawIndex % drawArgs->indexCount;\n"
-                << "    uint gl_InstanceID = _rawIndex / drawArgs->indexCount;\n"
+                << "    uint _vertexID = drawArgs->batchIndexOffset + _threadPositionInGrid * " << numVerticesInPerPrimitive << ";\n"
+                << "    uint _primitiveID = drawArgs->batchIndexOffset / " << numVerticesInPerPrimitive << " + _threadPositionInGrid;\n"
+                << "    uint _instanceID = _vertexID / drawArgs->indexCount;\n"
+                << "    _vertexID = _vertexID % drawArgs->indexCount;\n"
                 << "    uint gl_BaseVertex = drawArgs->baseVertex;\n"
-                << "    uint gl_PrimitiveIDIn = _threadPositionInGrid;\n"
+                << "    uint gl_InstanceID = _instanceID;\n"
+                << "    uint gl_PrimitiveIDIn = _primitiveID;\n"
                 << "\n"
                 << "    if(gl_InstanceID >= drawArgs->instanceCount) return;\n"
                 << "    \n"
                 << "    //Vertex Shader\n"
                 << "    MSLVsOutputs vsOutputs[" << numVerticesInPerPrimitive << "];\n"
                 << "    for(uint i = 0; i < " << numVerticesInPerPrimitive << "; i++) {\n"
-                << "        uint gl_VertexID = gl_BaseVertex + indices[drawArgs->startIndex + _baseIndex + i];\n"
+                << "        uint gl_VertexID = gl_BaseVertex + indices[drawArgs->startIndex + _vertexID + i];\n"
                 << "        thread MSLVsOutputs& vsOutput = vsOutputs[i];\n"
                 << "\n"
                 << "    " << vsMI_EP_InputCode.str()
@@ -1538,6 +1548,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
                 << "        scope.gl_InstanceID = gl_InstanceID;\n"
                 << "        scope.gsVertOutBuffer = gsVertOutBuffer;\n"
                 << "        scope.gsPrimOutBuffer = gsPrimOutBuffer;\n"
+                << "        scope.gsOutputOffset = _threadPositionInGrid;\n"
                 << "\n"
                 << gs_GSInputCode.str()
                 << "\n"
@@ -1703,7 +1714,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
                         if(gs_name != name)
                             continue;
                         if(gsOutput.attribute.GetString() == "[[flat]]")
-                            sourcePrefix << "gsPrimOutBuffer[gl_PrimitiveID].";
+                            sourcePrefix << "gsPrimOutBuffer[vsOutput._gsPrimitiveID].";
                         else {
                             //MTL_TODO: Investigate interpolating gsOutput manually in this cases, would remove this var from the vertexstruct which tends to be large for hydra.
                             std::string interpolation = "CenterPerspective";
@@ -1783,7 +1794,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
     
     if(_buildTarget != kMSL_BuildTarget_Regular) {
         fsCode  << "    uint gl_PrimitiveID = vsOutput.gl_PrimitiveID;\n"
-                << "    uint _provokingVertex = gl_PrimitiveID * 3;\n"
+                << "    uint _provokingVertex = vsOutput._gsPrimitiveID * " << (numVerticesOutPerPrimitive / numPrimitivesOutPerPrimitive) << ";\n"
                 << "    vec2 _barycentricCoords = vsOutput._barycentricCoords;\n";
     }
     
@@ -2683,6 +2694,10 @@ HdSt_CodeGenMSL::_GenerateCommonCode()
     _EmitOutput(_genCommon, TfToken("gl_Position"), TfToken("vec4"), TfToken("[[position]]"));
     _AddOutputParam(_mslVSOutputParams, TfToken("gl_Position"), TfToken("vec4"), TfToken("[[position]]")).usage
         |= TParam::VertexShaderOnly;
+    _AddInputParam(_mslGSInputParams, TfToken("gl_Position"), TfToken("vec4"), TfToken("[[position]]")).usage
+        |= TParam::VertexData;
+    _AddOutputParam(_mslGSOutputParams, TfToken("gl_Position"), TfToken("vec4"), TfToken("[[position]]")).usage
+        |= TParam::VertexData;
     
     _EmitOutput(_genCommon, TfToken("gl_PointSize"), TfToken("float"), TfToken("[[point_size]]"));
     _AddOutputParam(_mslVSOutputParams, TfToken("gl_PointSize"), TfToken("float"), TfToken("[[point_size]]")).usage

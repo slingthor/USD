@@ -263,6 +263,15 @@ public:
     
     MTLF_API
     bool GeometryShadersActive() { return workQueues[METALWORKQUEUE_GEOMETRY_SHADER].commandBuffer != nil; }
+    
+    //Returns the maximum number of _primitives_ to process per ComputeGS part.
+    MTLF_API
+    uint32_t GetMaxComputeGSPartSize(uint32_t numOutVertsPerInPrim, uint32_t numOutPrimsPerInPrim, uint32_t dataPerVert, uint32_t dataPerPrim);
+    
+    //Sets up all state for a new ComputeGS part, including any buffer allocations, syncs, encoders and commandbuffers.
+    //Be careful when encoding commands around this as it may start a new encoder.
+    MTLF_API
+    void PrepareForComputeGSPart(uint32_t vertData, uint32_t primData, id<MTLBuffer>& dataBuffer, uint32_t& vertOffset, uint32_t& primOffset);
    
     MTLF_API
     unsigned long IncNumberPrimsDrawn(unsigned long numPrims, bool init) { numPrimsDrawn = init ? numPrims : (numPrimsDrawn += numPrims); return numPrimsDrawn; }
@@ -441,6 +450,17 @@ private:
     MTLWinding windingOrder;
     MTLCullMode cullMode;
     uint32 dirtyRenderState;
+    
+    //Geometry Shader Related
+    int                        gsDataOffset;
+    int                        gsBufferIndex;
+    int                        gsMaxConcurrentBatches;
+    int                        gsMaxDataPerBatch;
+    id<MTLBuffer>              gsCurrentBuffer;
+    std::vector<id<MTLBuffer>> gsBuffers;
+    id<MTLFence>               gsFence;
+
+    void _gsAdvanceBuffer();
     
     void CleanupUnusedBuffers(bool forceClean);
    

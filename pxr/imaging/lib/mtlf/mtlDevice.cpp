@@ -48,6 +48,10 @@
 
 #define DIRTY_METALRENDERSTATE_ALL                      0xFFFFFFFF
 
+#define METAL_COMPUTEGS_BUFFER_SHARING                    1
+#define METAL_COMPUTEGS_MANUAL_HAZARD_TRACKING            1
+#define METAL_COMPUTEGS_ALLOW_ASYNCHRONOUS_COMPUTE        0
+
 PXR_NAMESPACE_OPEN_SCOPE
 MtlfMetalContextSharedPtr MtlfMetalContext::context = NULL;
 
@@ -278,33 +282,43 @@ void MtlfMetalContext::_InitialiseGL()
 MtlfMetalContext::MtlfMetalContext(id<MTLDevice> _device, int width, int height)
 : enableMVA(false)
 , enableComputeGS(false)
+, gsDataOffset(0), gsBufferIndex(0), gsMaxConcurrentBatches(0), gsMaxDataPerBatch(0), gsCurrentBuffer(nil), gsFence(nil)
 {
     if (_device == nil) {
         // Select Intel GPU if possible due to current issues on AMD. Revert when fixed - MTL_FIXME
         //device = MtlfMetalContext::GetMetalDevice(PREFER_INTEGRATED_GPU);
-        device = MtlfMetalContext::GetMetalDevice(PREFER_DEFAULT_GPU);
+        device = MtlfMetalContext::GetMetalDevice(PREFER_INTEGRATED_GPU);
     }
     else
         device = _device;
 
     NSLog(@"Selected %@ for Metal Device", device.name);
-#if defined(METAL_EVENTS_AVAILABLE)
+    
+#if METAL_COMPUTEGS_ALLOW_ASYNCHRONOUS_COMPUTE
     enableMultiQueue = [device supportsFeatureSet:MTLFeatureSet_macOS_GPUFamily2_v1];
+#else
+    enableMultiQueue = false;
 #endif
+    
     // Create a new command queue
     commandQueue = [device newCommandQueue];
     if(enableMultiQueue) {
         NSLog(@"Device %@ supports Metal 2, enabling multi-queue codepath.", device.name);
         commandQueueGS = [device newCommandQueue];
+        gsMaxDataPerBatch = 1024 * 1024 * 2;
+        gsMaxConcurrentBatches = 3;
     }
     else {
         NSLog(@"Device %@ does not support Metal 2, using fallback path, performance may be sub-optimal.", device.name);
+        gsMaxDataPerBatch = 1024 * 1024 * 32;
+        gsMaxConcurrentBatches = 2;
     }
     
     NSOperatingSystemVersion minimumSupportedOSVersion = { .majorVersion = 10, .minorVersion = 14, .patchVersion = 0 };
     
-    // MTL_FIXME - Disabling concurrent dispatch until appropriate fencing is in place
-    concurrentDispatchSupported = [NSProcessInfo.processInfo isOperatingSystemAtLeastVersion:minimumSupportedOSVersion];
+    // MTL_FIXME - Disabling concurrent dispatch because it completely breaks Compute GS hazard tracking causing polygon soup on AMD hardware.
+    //concurrentDispatchSupported = [NSProcessInfo.processInfo isOperatingSystemAtLeastVersion:minimumSupportedOSVersion];
+    concurrentDispatchSupported = false;
 
     // Load all the default shader files
     NSError *error = NULL;
@@ -374,6 +388,20 @@ MtlfMetalContext::MtlfMetalContext(id<MTLDevice> _device, int width, int height)
     
     currentWorkQueueType = METALWORKQUEUE_DEFAULT;
     currentWorkQueue     = &workQueues[currentWorkQueueType];
+
+#if METAL_COMPUTEGS_BUFFER_REUSE
+    MTLResourceOptions resourceOptions = MTLResourceStorageModePrivate|MTLResourceCPUCacheModeDefaultCache;
+ #if METAL_COMPUTEGS_MANUAL_HAZARD_TRACKING
+    resourceOptions |= MTLResourceHazardTrackingModeUntracked;
+ #endif
+    for(int i = 0; i < gsMaxConcurrentBatches; i++)
+        gsBuffers.push_back([device newBufferWithLength:gsMaxDataPerBatch options:resourceOptions]);
+    gsCurrentBuffer = gsBuffers.at(0);
+#else
+    _gsAdvanceBuffer();
+#endif
+
+    gsFence = [device newFence];
     
     for (int i = 0; i < METALWORKQUEUE_MAX; i ++) {
         ResetEncoders((MetalWorkQueueType)i, true);
@@ -426,24 +454,30 @@ MtlfMetalContext::~MtlfMetalContext()
     if(enableMultiQueue)
         [commandQueueGS release];
 
+    [gsFence release];
+    for(int i = 0; i < gsBuffers.size(); i++)
+        [gsBuffers.at(i) release];
+    gsBuffers.clear();
    
 #if METAL_ENABLE_STATS
-    NSLog(@"--- METAL Resource Stats (average per frame / total) ----");
-    NSLog(@"Frame count:                %7lu", frameCount);
-    NSLog(@"Command Buffers created:    %7lu / %7lu", resourceStats.commandBuffersCreated   / frameCount, resourceStats.commandBuffersCreated);
-    NSLog(@"Command Buffers committed:  %7lu / %7lu", resourceStats.commandBuffersCommitted / frameCount, resourceStats.commandBuffersCommitted);
-    NSLog(@"Metal   Buffers created:    %7lu / %7lu", resourceStats.buffersCreated          / frameCount, resourceStats.buffersCreated);
-    NSLog(@"Metal   Buffers reused:     %7lu / %7lu", resourceStats.buffersReused           / frameCount, resourceStats.buffersReused);
-    NSLog(@"Metal   Av buf search depth:%7lu"       , resourceStats.bufferSearches          / (resourceStats.buffersCreated + resourceStats.buffersReused));
-    NSLog(@"Render  Encoders requested: %7lu / %7lu", resourceStats.renderEncodersRequested / frameCount, resourceStats.renderEncodersRequested);
-    NSLog(@"Render  Encoders created:   %7lu / %7lu", resourceStats.renderEncodersCreated   / frameCount, resourceStats.renderEncodersCreated);
-    NSLog(@"Render  Pipeline States:    %7lu / %7lu", resourceStats.renderPipelineStates    / frameCount, resourceStats.renderPipelineStates);
-    NSLog(@"Compute Encoders requested: %7lu / %7lu", resourceStats.computeEncodersRequested/ frameCount, resourceStats.computeEncodersRequested);
-    NSLog(@"Compute Encoders created:   %7lu / %7lu", resourceStats.computeEncodersCreated  / frameCount, resourceStats.computeEncodersCreated);
-    NSLog(@"Compute Pipeline States:    %7lu / %7lu", resourceStats.computePipelineStates   / frameCount, resourceStats.computePipelineStates);
-    NSLog(@"Blit    Encoders requested: %7lu / %7lu", resourceStats.blitEncodersRequested   / frameCount, resourceStats.blitEncodersRequested);
-    NSLog(@"Blit    Encoders created:   %7lu / %7lu", resourceStats.blitEncodersCreated     / frameCount, resourceStats.blitEncodersCreated);
-    NSLog(@"Peak    Buffer Allocation:  %7luMbs",     resourceStats.peakBufferAllocation    / (1024*1024));
+    if(frameCount > 0) {
+        NSLog(@"--- METAL Resource Stats (average per frame / total) ----");
+        NSLog(@"Frame count:                %7lu", frameCount);
+        NSLog(@"Command Buffers created:    %7lu / %7lu", resourceStats.commandBuffersCreated   / frameCount, resourceStats.commandBuffersCreated);
+        NSLog(@"Command Buffers committed:  %7lu / %7lu", resourceStats.commandBuffersCommitted / frameCount, resourceStats.commandBuffersCommitted);
+        NSLog(@"Metal   Buffers created:    %7lu / %7lu", resourceStats.buffersCreated          / frameCount, resourceStats.buffersCreated);
+        NSLog(@"Metal   Buffers reused:     %7lu / %7lu", resourceStats.buffersReused           / frameCount, resourceStats.buffersReused);
+        NSLog(@"Metal   Av buf search depth:%7lu"       , resourceStats.bufferSearches          / (resourceStats.buffersCreated + resourceStats.buffersReused));
+        NSLog(@"Render  Encoders requested: %7lu / %7lu", resourceStats.renderEncodersRequested / frameCount, resourceStats.renderEncodersRequested);
+        NSLog(@"Render  Encoders created:   %7lu / %7lu", resourceStats.renderEncodersCreated   / frameCount, resourceStats.renderEncodersCreated);
+        NSLog(@"Render  Pipeline States:    %7lu / %7lu", resourceStats.renderPipelineStates    / frameCount, resourceStats.renderPipelineStates);
+        NSLog(@"Compute Encoders requested: %7lu / %7lu", resourceStats.computeEncodersRequested/ frameCount, resourceStats.computeEncodersRequested);
+        NSLog(@"Compute Encoders created:   %7lu / %7lu", resourceStats.computeEncodersCreated  / frameCount, resourceStats.computeEncodersCreated);
+        NSLog(@"Compute Pipeline States:    %7lu / %7lu", resourceStats.computePipelineStates   / frameCount, resourceStats.computePipelineStates);
+        NSLog(@"Blit    Encoders requested: %7lu / %7lu", resourceStats.blitEncodersRequested   / frameCount, resourceStats.blitEncodersRequested);
+        NSLog(@"Blit    Encoders created:   %7lu / %7lu", resourceStats.blitEncodersCreated     / frameCount, resourceStats.blitEncodersCreated);
+	    NSLog(@"Peak    Buffer Allocation:  %7luMbs",     resourceStats.peakBufferAllocation    / (1024*1024));
+    }
  #endif
 }
 
@@ -768,9 +802,11 @@ void MtlfMetalContext::EncodeWaitForEvent(MetalWorkQueueType waitQueue, MetalWor
         }
     }
     // Make this command buffer wait for the event to be resolved
-    signal_wq->currentHighestWaitValue = (eventValue != 0) ? eventValue : signal_wq->currentEventValue;
+    eventValue = (eventValue != 0) ? eventValue : signal_wq->currentEventValue;
+    if(eventValue > signal_wq->currentHighestWaitValue)
+        signal_wq->currentHighestWaitValue = eventValue;
 #if defined(METAL_EVENTS_AVAILABLE)
-    [wait_wq->commandBuffer encodeWaitForEvent:signal_wq->event value:signal_wq->currentHighestWaitValue];
+    [wait_wq->commandBuffer encodeWaitForEvent:signal_wq->event value:eventValue];
 #endif
 }
 
@@ -1546,7 +1582,6 @@ void MtlfMetalContext::ResetEncoders(MetalWorkQueueType workQueueType, bool isIn
     wq->encoderInUse             = false;
     wq->encoderEnded             = false;
     wq->encoderHasWork           = false;
-    wq->generatesEndOfQueueEvent = false;
     wq->currentEncoderType       = MTLENCODERTYPE_NONE;
     wq->currentBlitEncoder       = nil;
     wq->currentRenderEncoder     = nil;
@@ -1611,6 +1646,7 @@ void MtlfMetalContext::CommitCommandBuffer(bool waituntilScheduled, bool waitUnt
 #if defined(METAL_EVENTS_AVAILABLE)
         [wq->commandBuffer encodeSignalEvent:wq->event value:wq->currentEventValue];
 #endif
+        wq->generatesEndOfQueueEvent = false;
     }
     
     __block unsigned long thisFrameNumber = frameCount;
@@ -1937,6 +1973,96 @@ void MtlfMetalContext::EndFrame() {
     
     currentWorkQueueType = METALWORKQUEUE_DEFAULT;
     currentWorkQueue     = &workQueues[currentWorkQueueType];
+
+    //Reset the Compute GS intermediate buffer offset
+    _gsAdvanceBuffer();
+}
+
+void MtlfMetalContext::_gsAdvanceBuffer() {
+#if METAL_COMPUTEGS_BUFFER_REUSE
+    gsBufferIndex = (gsBufferIndex + 1) % gsMaxConcurrentBatches;
+    gsCurrentBuffer = gsBuffers.at(gsBufferIndex);
+#else
+    if(gsCurrentBuffer != nil)
+        ReleaseMetalBuffer(gsCurrentBuffer);
+    gsCurrentBuffer = GetMetalBuffer(gsMaxDataPerBatch);
+#endif
+    gsDataOffset = 0;
+}
+
+uint32_t MtlfMetalContext::GetMaxComputeGSPartSize(uint32_t numOutVertsPerInPrim, uint32_t numOutPrimsPerInPrim, uint32_t dataPerVert, uint32_t dataPerPrim) {
+    const uint32_t maxAlignmentOffset = 15; //Reserve some space for a possible alignment taking up some.
+    uint32_t sizePerPrimitive = numOutVertsPerInPrim * dataPerVert + numOutPrimsPerInPrim * dataPerPrim;
+    return (gsMaxDataPerBatch - maxAlignmentOffset * 2) / sizePerPrimitive;
+}
+
+void MtlfMetalContext::PrepareForComputeGSPart(uint32_t vertData, uint32_t primData, id<MTLBuffer>& dataBuffer, uint32_t& vertOffset, uint32_t& primOffset) {
+
+    //Pad data to 16byte boundaries
+    const uint32_t alignment = 16;
+    vertData = ((vertData + (alignment - 1)) / alignment) * alignment;
+    primData = ((primData + (alignment - 1)) / alignment) * alignment;
+    
+    bool useNextBuffer = (gsDataOffset + vertData + primData) > gsMaxDataPerBatch;
+    bool startingNewBatch = useNextBuffer || (gsBufferIndex == 0 && gsDataOffset == 0);
+    if(useNextBuffer)
+        _gsAdvanceBuffer();
+    dataBuffer = gsCurrentBuffer;
+    vertOffset = gsDataOffset;
+    gsDataOffset += vertData;
+    primOffset = gsDataOffset;
+    gsDataOffset += primData;
+
+    //If we are using a new buffer we've started a new batch. That means some synching/committing may need to happen before we can continue.
+    if(startingNewBatch) {
+        if(enableMultiQueue) {
+            //Using multiple queues means the synching happens using events as the queues are executed in parallel.
+        }
+        else {
+            //When not using multiple queues we rely on the order in the commandbuffer combined with a fence for synching.
+            MetalWorkQueue* wq_def = &workQueues[METALWORKQUEUE_DEFAULT];
+            MetalWorkQueue* wq_gs = &workQueues[METALWORKQUEUE_GEOMETRY_SHADER];
+            
+            if(wq_def->encoderInUse || wq_gs->encoderInUse)
+                TF_FATAL_CODING_ERROR("Default and Geometry Shader encoder must not be active before calling PrepareForComputeGSPart!");
+
+            //Commit the geometry shader queue ahead of the rendering queue. But only if there has been work before it.
+            if(wq_gs->encoderHasWork) {
+                CommitCommandBuffer(false, false, METALWORKQUEUE_GEOMETRY_SHADER);
+                
+                CreateCommandBuffer(METALWORKQUEUE_GEOMETRY_SHADER);
+            }
+            if(wq_def->encoderHasWork) {
+                CommitCommandBuffer(false, false, METALWORKQUEUE_DEFAULT);
+                
+                CreateCommandBuffer(METALWORKQUEUE_DEFAULT);
+                
+                //Patch the drescriptor to prevent clearing attachments we just rendered to.
+                MTLRenderPassDescriptor* rpd = context->GetRenderPassDescriptor();
+                if(rpd.depthAttachment != nil)
+                    rpd.depthAttachment.loadAction = MTLLoadActionLoad;
+                if(rpd.stencilAttachment != nil)
+                    rpd.stencilAttachment.loadAction = MTLLoadActionLoad;
+                for(int i = 0; i < 8; i++) {
+                    if(rpd.colorAttachments[i] != nil)
+                        rpd.colorAttachments[i].loadAction = MTLLoadActionLoad;
+                }
+                context->SetRenderPassDescriptor(rpd);
+            }
+            
+ #if METAL_COMPUTEGS_MANUAL_HAZARD_TRACKING
+            GetComputeEncoder(METALWORKQUEUE_GEOMETRY_SHADER);
+            GetRenderEncoder(METALWORKQUEUE_DEFAULT);
+            
+            //Insert a fence in the two commandBuffers to ensure all writes are finished before we start rendering
+            [wq_gs->currentComputeEncoder updateFence:gsFence];
+            [wq_def->currentRenderEncoder waitForFence:gsFence beforeStages:MTLRenderStageVertex];
+            
+            ReleaseEncoder(false, METALWORKQUEUE_GEOMETRY_SHADER);
+            ReleaseEncoder(false, METALWORKQUEUE_DEFAULT);
+ #endif
+        }
+    }
 }
 
 void  MtlfMetalContext::GPUTImerResetTimer(unsigned long frameNumber) {
