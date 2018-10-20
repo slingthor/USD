@@ -40,7 +40,9 @@ class HdStVBOSimpleMemoryBufferGL : public HdStVBOSimpleMemoryManager::_SimpleBu
 public:
     /// Constructor.
     HDST_API
-    HdStVBOSimpleMemoryBufferGL(TfToken const &role, HdBufferSpecVector const &bufferSpecs);
+    HdStVBOSimpleMemoryBufferGL(TfToken const &role,
+                                HdBufferSpecVector const &bufferSpecs,
+                                HdBufferArrayUsageHint usageHint);
 
     /// Destructor. It invalidates _range
     HDST_API

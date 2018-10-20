@@ -69,18 +69,19 @@ extern TfEnvSetting<int> HD_MAX_VBO_SIZE;
 HdBufferArraySharedPtr
 HdStVBOSimpleMemoryManager::CreateBufferArray(
     TfToken const &role,
-    HdBufferSpecVector const &bufferSpecs)
+    HdBufferSpecVector const &bufferSpecs,
+    HdBufferArrayUsageHint usageHint)
 {
     HdEngine::RenderAPI api = HdEngine::GetRenderAPI();
     switch(api)
     {
         case HdEngine::OpenGL:
             return boost::make_shared<HdStVBOSimpleMemoryBufferGL>(
-                role, bufferSpecs);
+                role, bufferSpecs, usageHint);
 #if defined(ARCH_GFX_METAL)
         case HdEngine::Metal:
             return boost::make_shared<HdStVBOSimpleMemoryBufferMetal>(
-                role, bufferSpecs);
+                role, bufferSpecs, usageHint);
 #endif
         default:
             TF_FATAL_CODING_ERROR("No HdStVBOSimpleMemoryBuffer for this API");
@@ -96,7 +97,8 @@ HdStVBOSimpleMemoryManager::CreateBufferArrayRange()
 
 HdAggregationStrategy::AggregationId
 HdStVBOSimpleMemoryManager::ComputeAggregationId(
-    HdBufferSpecVector const &bufferSpecs) const
+    HdBufferSpecVector const &bufferSpecs,
+    HdBufferArrayUsageHint usageHint) const
 {
     // Always returns different value
     static std::atomic_uint id(0);
@@ -158,8 +160,11 @@ HdStVBOSimpleMemoryManager::GetResourceAllocation(
 // ---------------------------------------------------------------------------
 HdStVBOSimpleMemoryManager::_SimpleBufferArray::_SimpleBufferArray(
     TfToken const &role,
-    HdBufferSpecVector const &bufferSpecs)
-    : HdBufferArray(role, TfToken()), _capacity(0), _maxBytesPerElement(0)
+    HdBufferSpecVector const &bufferSpecs,
+    HdBufferArrayUsageHint usageHint)
+ : HdBufferArray(role, TfToken(), usageHint)
+ , _capacity(0)
+ , _maxBytesPerElement(0)
 {
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
@@ -397,6 +402,16 @@ size_t
 HdStVBOSimpleMemoryManager::_SimpleBufferArrayRange::GetMaxNumElements() const
 {
     return _bufferArray->GetMaxNumElements();
+}
+
+HdBufferArrayUsageHint
+HdStVBOSimpleMemoryManager::_SimpleBufferArrayRange::GetUsageHint() const
+{
+    if (!TF_VERIFY(_bufferArray)) {
+        return HdBufferArrayUsageHint();
+    }
+
+    return _bufferArray->GetUsageHint();
 }
 
 HdBufferResourceSharedPtr

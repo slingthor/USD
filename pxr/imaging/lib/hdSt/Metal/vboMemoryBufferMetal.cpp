@@ -55,9 +55,9 @@ PXR_NAMESPACE_OPEN_SCOPE
 HdStVBOMemoryBufferMetal::HdStVBOMemoryBufferMetal(
     TfToken const &role,
     HdBufferSpecVector const &bufferSpecs,
-    bool isImmutable)
+    HdBufferArrayUsageHint usageHint)
     : HdStVBOMemoryManager::_StripedBufferArray(
-        role, bufferSpecs, isImmutable)
+        role, bufferSpecs, usageHint)
 {
 }
 

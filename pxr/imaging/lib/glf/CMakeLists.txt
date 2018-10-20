@@ -66,6 +66,7 @@ pxr_library(glf
         resourceFactory
         simpleLightingContext
         simpleShadowArray
+        udimTexture
         uniformBlock
         utils
         ${optionalPublicClasses}

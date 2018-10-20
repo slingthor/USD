@@ -28,6 +28,8 @@
 #include "pxr/usdImaging/usdImagingMetal/metal.h"
 #include "pxr/usdImaging/usdImagingMetal/hdEngine.h"
 
+#include "pxr/imaging/hdx/rendererPluginRegistry.h"
+
 #include "pxr/base/tf/getenv.h"
 #include "pxr/base/tf/diagnostic.h"
 
@@ -50,11 +52,12 @@ _IsEnabledHydra()
         TF_CODING_ERROR("Metal context required. Crashing");
         return false;
     }
-    if (!UsdImagingMetalHdEngine::IsDefaultPluginAvailable()) {
-        return false;
-    }
-
-    return true;
+    
+    // Check to see if we have a default plugin for the renderer
+    TfToken defaultPlugin =
+    HdxRendererPluginRegistry::GetInstance().GetDefaultPluginId();
+    
+    return !defaultPlugin.IsEmpty();
 }
 
 }
@@ -114,33 +117,6 @@ UsdImagingMetal::IsBatchingSupported()
 {
     // Currently, batch drawing is supported only by the Hydra engine.
     return IsEnabledHydra();
-}
-
-/* static */
-void
-UsdImagingMetal::PrepareBatch(
-    const UsdImagingMetalSharedPtrVector& renderers,
-    const UsdPrimVector& rootPrims,
-    const std::vector<UsdTimeCode>& times,
-    RenderParams params)
-{
-    if (!IsBatchingSupported()) {
-        return;
-    }
-
-    // Batching is only supported if the Hydra engine is enabled, and if
-    // it is then all of the UsdImagingMetal instances we've been given
-    // must use a UsdImagingMetalHdEngine engine. So we explicitly call the
-    // the static method on that class.
-    UsdImagingMetalHdEngineSharedPtrVector hdEngines;
-    hdEngines.reserve(renderers.size());
-    TF_FOR_ALL(it, renderers) {
-        hdEngines.push_back(
-            boost::dynamic_pointer_cast<UsdImagingMetalHdEngine>(
-                (*it)->_engine));
-    }
-
-    UsdImagingMetalHdEngine::PrepareBatch(hdEngines, rootPrims, times, params);
 }
 
 /*virtual*/
@@ -278,9 +254,16 @@ UsdImagingMetal::GetRendererPlugins() const
 
 /* virtual */
 std::string
-UsdImagingMetal::GetRendererPluginDesc(TfToken const &id) const
+UsdImagingMetal::GetRendererDisplayName(TfToken const &id) const
 {
-    return _engine->GetRendererPluginDesc(id);
+    return _engine->GetRendererDisplayName(id);
+}
+
+/* virtual */
+TfToken
+UsdImagingMetal::GetCurrentRendererId() const
+{
+    return _engine->GetCurrentRendererId();
 }
 
 /* virtual */

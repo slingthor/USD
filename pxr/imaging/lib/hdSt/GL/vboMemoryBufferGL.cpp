@@ -55,8 +55,8 @@ PXR_NAMESPACE_OPEN_SCOPE
 HdStVBOMemoryBufferGL::HdStVBOMemoryBufferGL(
     TfToken const &role,
     HdBufferSpecVector const &bufferSpecs,
-    bool isImmutable)
-    : HdStVBOMemoryManager::_StripedBufferArray(role, bufferSpecs, isImmutable)
+    HdBufferArrayUsageHint usageHint)
+    : HdStVBOMemoryManager::_StripedBufferArray(role, bufferSpecs, usageHint)
 {
 }
 

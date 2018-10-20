@@ -40,7 +40,7 @@ public:
     HDST_API
     HdStVBOMemoryBufferGL(TfToken const &role,
                           HdBufferSpecVector const &bufferSpecs,
-                          bool isImmutable);
+                          HdBufferArrayUsageHint usageHint);
 
     /// Destructor. It invalidates _rangeList
     HDST_API

@@ -81,11 +81,13 @@ GarchContextCaps::GarchContextCaps()
     : apiVersion(0)
     , coreProfile(false)
 
+    , maxArrayTextureLayers(0)
     , maxUniformBlockSize(0)
     , maxShaderStorageBlockSize(0)
     , maxTextureBufferSize(0)
     , uniformBufferOffsetAlignment(0)
 
+    , arrayTexturesEnabled(false)
     , shaderStorageBufferEnabled(false)
     , bufferStorageEnabled(false)
     , directStateAccessEnabled(false)

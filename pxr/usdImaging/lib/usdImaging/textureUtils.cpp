@@ -25,12 +25,16 @@
 
 #include "pxr/usdImaging/usdImaging/debugCodes.h"
 #include "pxr/usdImaging/usdImaging/delegate.h"
+#include "pxr/usdImaging/usdImaging/textureUtils.h"
 #include "pxr/usdImaging/usdImaging/tokens.h"
 
+#include "pxr/imaging/garch/contextCaps.h"
 #include "pxr/imaging/garch/glslfx.h"
 #include "pxr/imaging/garch/ptexTexture.h"
+#include "pxr/imaging/garch/resourceFactory.h"
 #include "pxr/imaging/garch/textureHandle.h"
 #include "pxr/imaging/garch/textureRegistry.h"
+#include "pxr/imaging/garch/udimTexture.h"
 
 #include "pxr/imaging/hd/material.h"
 #include "pxr/imaging/hd/tokens.h"
@@ -45,11 +49,25 @@
 #include "pxr/usd/usdHydra/tokens.h"
 #include "pxr/usd/usdShade/shader.h"
 
+#include "pxr/usd/ar/resolver.h"
+#include "pxr/usd/ar/resolverScopedCache.h"
+
+#include "pxr/usd/sdf/layerUtils.h"
+
 PXR_NAMESPACE_OPEN_SCOPE
 
+namespace {
 
-static HdWrap _GetWrap(UsdPrim const &usdPrim, const TfToken &wrapAttr)
+HdWrap 
+_GetWrap(UsdPrim const &usdPrim, 
+    HdTextureType textureType, 
+    const TfToken &wrapAttr)
 {
+    // A Udim always uses black wrap
+    if (textureType == HdTextureType::Udim) {
+        return HdWrapBlack;
+    }
+
     // The fallback, when the prim has no opinion is to use the metadata on
     // the texture.
     TfToken usdWrap = UsdHydraTokens->useMetadata;
@@ -114,17 +132,20 @@ static HdWrap _GetWrap(UsdPrim const &usdPrim, const TfToken &wrapAttr)
     return hdWrap;
 }
 
-static HdWrap _GetWrapS(UsdPrim const &usdPrim)
+HdWrap
+_GetWrapS(UsdPrim const &usdPrim, HdTextureType textureType)
 {
-    return _GetWrap(usdPrim, UsdHydraTokens->wrapS);
+    return _GetWrap(usdPrim, textureType, UsdHydraTokens->wrapS);
 }
 
-static HdWrap _GetWrapT(UsdPrim const &usdPrim)
+HdWrap
+_GetWrapT(UsdPrim const &usdPrim, HdTextureType textureType)
 {
-    return _GetWrap(usdPrim, UsdHydraTokens->wrapT);
+    return _GetWrap(usdPrim, textureType, UsdHydraTokens->wrapT);
 }
 
-static HdMinFilter _GetMinFilter(UsdPrim const &usdPrim)
+HdMinFilter
+_GetMinFilter(UsdPrim const &usdPrim)
 {
     // XXX: This default value should come from the registry
     TfToken minFilter("linear");
@@ -147,7 +168,8 @@ static HdMinFilter _GetMinFilter(UsdPrim const &usdPrim)
     return minFilterHd;
 }
 
-static HdMagFilter _GetMagFilter(UsdPrim const &usdPrim)
+HdMagFilter
+_GetMagFilter(UsdPrim const &usdPrim)
 {
     // XXX: This default value should come from the registry
     TfToken magFilter("linear");
@@ -162,7 +184,8 @@ static HdMagFilter _GetMagFilter(UsdPrim const &usdPrim)
     return magFilterHd;
 }
 
-static float _GetMemoryLimit(UsdPrim const &usdPrim)
+float
+_GetMemoryLimit(UsdPrim const &usdPrim)
 {
     // XXX: This default value should come from the registry
     float memoryLimit = 0.0f;
@@ -174,7 +197,6 @@ static float _GetMemoryLimit(UsdPrim const &usdPrim)
     return memoryLimit;
 }
 
-static
 GarchImage::ImageOriginLocation
 UsdImaging_ComputeTextureOrigin(UsdPrim const& usdPrim)
 {
@@ -195,16 +217,60 @@ UsdImaging_ComputeTextureOrigin(UsdPrim const& usdPrim)
     return origin;
 }
 
+class UdimTextureFactory : public GarchTextureFactoryBase {
+public:
+    UdimTextureFactory(
+        const SdfLayerHandle& layerHandle)
+        : _layerHandle(layerHandle) { }
+
+    virtual GarchTextureRefPtr New(
+        TfToken const& texturePath,
+        GarchImage::ImageOriginLocation originLocation =
+        GarchImage::OriginUpperLeft) const override {
+        const GarchContextCaps& caps = GarchResourceFactory::GetInstance()->GetContextCaps();
+        return GarchUdimTexture::New(
+            texturePath, originLocation, UsdImaging_GetUdimTiles(
+                texturePath, caps.maxArrayTextureLayers, _layerHandle));
+    }
+
+    virtual GarchTextureRefPtr New(
+        TfTokenVector const& texturePaths,
+        GarchImage::ImageOriginLocation originLocation =
+        GarchImage::OriginUpperLeft) const override {
+        return nullptr;
+    }
+private:
+    const SdfLayerHandle& _layerHandle;
+};
+
+// We need to find the first layer that changes the value
+// of the parameter and anchor relative paths to that.
+SdfLayerHandle 
+_FindLayerHandle(const UsdAttribute& attr, const UsdTimeCode& time) {
+    for (const auto& spec: attr.GetPropertyStack(time)) {
+        if (spec->HasDefaultValue() ||
+            spec->GetLayer()->GetNumTimeSamplesForPath(
+                spec->GetPath()) > 0) {
+            return spec->GetLayer();
+        }
+    }
+    return {};
+}
+
+}
+
 HdTextureResource::ID
 UsdImaging_GetTextureResourceID(UsdPrim const& usdPrim,
 								SdfPath const& usdPath,
                                 UsdTimeCode time,
                                 size_t salt)
 {
-    if (!TF_VERIFY(usdPrim))
+    if (!TF_VERIFY(usdPrim)) {
         return HdTextureResource::ID(-1);
-    if (!TF_VERIFY(usdPath != SdfPath()))
+    }
+    if (!TF_VERIFY(usdPath != SdfPath())) {
         return HdTextureResource::ID(-1);
+    }
 
     // If the texture name attribute doesn't exist, it might be badly specified
     // in scene data.
@@ -216,23 +282,47 @@ UsdImaging_GetTextureResourceID(UsdPrim const& usdPrim,
         return HdTextureResource::ID(-1);
     }
 
+    HdTextureType textureType = HdTextureType::Uv;
     TfToken filePath = TfToken(asset.GetResolvedPath());
-    // Fallback to the literal path if it couldn't be resolved.
-    if (filePath.IsEmpty()) {
+
+    if (!filePath.IsEmpty()) {
+        // If the resolved path contains a correct path, then we are 
+        // dealing with a ptex or uv textures.
+        if (GarchIsSupportedPtexTexture(filePath)) {
+            textureType = HdTextureType::Ptex;
+        } else {
+            textureType = HdTextureType::Uv;
+        }
+    } else {
+        // If the path couldn't be resolved, then it might be a Udim as they 
+        // contain special characters in the path to identify them <Udim>.
+        // Another option is that the path is just wrong and it can not be
+        // resolved.
         filePath = TfToken(asset.GetAssetPath());
-    }
-
-    const bool isPtex = GarchIsSupportedPtexTexture(filePath);
-
-    if (asset.GetResolvedPath().empty()) {
-        if (isPtex) {
-            TF_WARN("Unable to find Texture '%s' with path '%s'. Fallback " 
-                    "textures are not supported for ptex", 
+        if (GarchIsSupportedUdimTexture(filePath)) {
+            GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
+            if (!UsdImaging_UdimTilesExist(filePath, caps.maxArrayTextureLayers,
+                _FindLayerHandle(attr, time))) {
+                TF_WARN("Unable to find Texture '%s' with path '%s'. Fallback "
+                        "textures are not supported for udim",
+                        filePath.GetText(), usdPath.GetText());
+                return HdTextureResource::ID(-1);
+            }
+            if (!caps.arrayTexturesEnabled) {
+                TF_WARN("OpenGL context does not support array textures, "
+                        "skipping UDIM Texture %s with path %s.",
+                        filePath.GetText(), usdPath.GetText());
+                return HdTextureResource::ID(-1);
+            }
+            textureType = HdTextureType::Udim;
+        } else if (GarchIsSupportedPtexTexture(filePath)) {
+            TF_WARN("Unable to find Texture '%s' with path '%s'. Fallback "
+                    "textures are not supported for ptex",
                     filePath.GetText(), usdPath.GetText());
             return HdTextureResource::ID(-1);
         } else {
-            TF_WARN("Unable to find Texture '%s' with path '%s'. A black " 
-                    "texture will be substituted in its place.", 
+            TF_WARN("Unable to find Texture '%s' with path '%s'. A black "
+                    "texture will be substituted in its place.",
                     filePath.GetText(), usdPath.GetText());
             return HdTextureResource::ID(-1);
         }
@@ -245,8 +335,8 @@ UsdImaging_GetTextureResourceID(UsdPrim const& usdPrim,
     size_t hash = asset.GetHash();
 
     // Hash in wrapping and filtering metadata.
-    HdWrap wrapS = _GetWrapS(usdPrim);
-    HdWrap wrapT = _GetWrapT(usdPrim);
+    HdWrap wrapS = _GetWrapS(usdPrim, textureType);
+    HdWrap wrapT = _GetWrapT(usdPrim, textureType);
     HdMinFilter minFilter = _GetMinFilter(usdPrim);
     HdMagFilter magFilter = _GetMagFilter(usdPrim);
     float memoryLimit = _GetMemoryLimit(usdPrim);
@@ -267,8 +357,8 @@ UsdImaging_GetTextureResourceID(UsdPrim const& usdPrim,
 
 HdTextureResourceSharedPtr
 UsdImaging_GetTextureResource(UsdPrim const& usdPrim,
-                                SdfPath const& usdPath,
-                                UsdTimeCode time)
+							  SdfPath const& usdPath,
+                              UsdTimeCode time)
 {
     if (!TF_VERIFY(usdPrim))
         return HdTextureResourceSharedPtr();
@@ -281,44 +371,61 @@ UsdImaging_GetTextureResource(UsdPrim const& usdPrim,
         return HdTextureResourceSharedPtr();
     }
 
+    HdTextureType textureType = HdTextureType::Uv;
+
     TfToken filePath = TfToken(asset.GetResolvedPath());
-    // Fallback to the literal path if it couldn't be resolved.
+    // If the path can't be resolved, it's either an UDIM texture
+    // or the texture doesn't exists and we can to exit early.
     if (filePath.IsEmpty()) {
         filePath = TfToken(asset.GetAssetPath());
+        if (GarchIsSupportedUdimTexture(filePath)) {
+            textureType = HdTextureType::Udim;
+        } else {
+            TF_DEBUG(USDIMAGING_TEXTURES).Msg(
+                "File does not exist, returning nullptr");
+            TF_WARN("Unable to find Texture '%s' with path '%s'.",
+                    filePath.GetText(), usdPath.GetText());
+            return {};
+        }
+    } else {
+        if (GarchIsSupportedPtexTexture(filePath)) {
+            textureType = HdTextureType::Ptex;
+        }
     }
 
     GarchImage::ImageOriginLocation origin =
             UsdImaging_ComputeTextureOrigin(usdPrim);
 
-    const bool isPtex = GarchIsSupportedPtexTexture(filePath);
-
-    HdWrap wrapS = _GetWrapS(usdPrim);
-    HdWrap wrapT = _GetWrapT(usdPrim);
+    HdWrap wrapS = _GetWrapS(usdPrim, textureType);
+    HdWrap wrapT = _GetWrapT(usdPrim, textureType);
     HdMinFilter minFilter = _GetMinFilter(usdPrim);
     HdMagFilter magFilter = _GetMagFilter(usdPrim);
     float memoryLimit = _GetMemoryLimit(usdPrim);
 
     TF_DEBUG(USDIMAGING_TEXTURES).Msg(
-            "Loading texture: id(%s), isPtex(%s)\n",
+            "Loading texture: id(%s), type(%s)\n",
             usdPath.GetText(),
-            isPtex ? "true" : "false");
+            textureType == HdTextureType::Uv ? "Uv" :
+            textureType == HdTextureType::Ptex ? "Ptex" : "Udim");
  
-    if (asset.GetResolvedPath().empty()) {
-        TF_DEBUG(USDIMAGING_TEXTURES).Msg(
-                "File does not exist, returning nullptr");
-        TF_WARN("Unable to find Texture '%s' with path '%s'.", 
-            filePath.GetText(), usdPath.GetText());
-        return HdTextureResourceSharedPtr();
-    }
-
     HdTextureResourceSharedPtr texResource;
     TfStopwatch timer;
     timer.Start();
-    GarchTextureHandleRefPtr texture =
-        GarchTextureRegistry::GetInstance().GetTextureHandle(filePath, origin);
+    // Udim's can't be loaded through like other textures, because
+    // we can't select the right factory based on the file type.
+    // We also need to pass the layer context to the factory,
+    // so each file gets resolved properly.
+    GarchTextureHandleRefPtr texture;
+    if (textureType == HdTextureType::Udim) {
+        UdimTextureFactory factory(_FindLayerHandle(attr, time));
+        GarchTextureRegistry::GetInstance().GetTextureHandle(filePath, origin, &factory);
+    } else {
+        texture = GarchTextureRegistry::GetInstance().GetTextureHandle(
+            filePath, origin);
+    }
 
     texResource = HdTextureResourceSharedPtr(
-        HdStSimpleTextureResource::New(texture, isPtex, wrapS, wrapT,
+        HdStSimpleTextureResource::New(texture, textureType, wrapS, wrapT,
                                        minFilter, magFilter, memoryLimit));
     timer.Stop();
 
@@ -326,6 +433,71 @@ UsdImaging_GetTextureResource(UsdPrim const& usdPrim,
                                      timer.GetSeconds());
 
     return texResource;
+}
+
+std::vector<std::tuple<int, TfToken>>
+UsdImaging_GetUdimTiles(
+    std::string const& basePath,
+    int tileLimit,
+    SdfLayerHandle const& layerHandle)
+{
+    const std::string::size_type pos = basePath.find("<UDIM>");
+    if (pos == std::string::npos) {
+        return {};
+    }
+    std::string formatString = basePath;
+    formatString.replace(pos, 6, "%i");
+    
+    ArResolverScopedCache resolverCache;
+    ArResolver& resolver = ArGetResolver();
+    
+    constexpr int startTile = 1001;
+    const int endTile = startTile + tileLimit;
+    std::vector<std::tuple<int, TfToken>> ret;
+    ret.reserve(tileLimit);
+    for (int t = startTile; t <= endTile; ++t) {
+        const std::string path =
+        layerHandle
+        ? SdfComputeAssetPathRelativeToLayer(
+                                             layerHandle, TfStringPrintf(formatString.c_str(), t))
+        : TfStringPrintf(formatString.c_str(), t);
+        if (!resolver.Resolve(path).empty()) {
+            ret.emplace_back(t - startTile, TfToken(path));
+        }
+    }
+    ret.shrink_to_fit();
+    return ret;
+}
+
+bool
+UsdImaging_UdimTilesExist(
+    std::string const& basePath,
+    int tileLimit,
+    SdfLayerHandle const& layerHandle)
+{
+    const std::string::size_type pos = basePath.find("<UDIM>");
+    if (pos == std::string::npos) {
+        return false;
+    }
+    std::string formatString = basePath;
+    formatString.replace(pos, 6, "%i");
+    
+    ArResolverScopedCache resolverCache;
+    ArResolver& resolver = ArGetResolver();
+    
+    constexpr int startTile = 1001;
+    const int endTile = startTile + tileLimit;
+    for (int t = startTile; t <= endTile; ++t) {
+        const std::string path =
+        layerHandle
+        ? SdfComputeAssetPathRelativeToLayer(
+                                             layerHandle, TfStringPrintf(formatString.c_str(), t))
+        : TfStringPrintf(formatString.c_str(), t);
+        if (!resolver.Resolve(path).empty()) {
+            return true;
+        }
+    }
+    return false;
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

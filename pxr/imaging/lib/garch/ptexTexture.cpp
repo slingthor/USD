@@ -92,8 +92,7 @@ GarchPtexTexture::GarchPtexTexture(const TfToken &imageFilePath) :
 
 //------------------------------------------------------------------------------
 GarchPtexTexture::~GarchPtexTexture()
-{ 
-    _FreePtexTextureObject();
+{
 }
 
 //------------------------------------------------------------------------------
@@ -101,12 +100,6 @@ void
 GarchPtexTexture::_OnMemoryRequestedDirty()
 {
     _loaded = false;
-}
-
-//------------------------------------------------------------------------------
-void
-GarchPtexTexture::_FreePtexTextureObject()
-{
 }
 
 //------------------------------------------------------------------------------
@@ -214,7 +207,7 @@ GarchPtexTexture::GetTextureName()
 void
 GarchPtexTexture::_ReadTexture()
 {
-    TF_FATAL_CODING_ERROR("Not Implemented!"); //MTL_FIXME
+    TF_FATAL_CODING_ERROR("Should not get here!"); //MTL_FIXME
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

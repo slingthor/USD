@@ -31,6 +31,8 @@
 
 #include "pxr/usdImaging/usdImaging/delegate.h"
 
+#include "pxr/imaging/hdx/rendererPluginRegistry.h"
+
 #include "pxr/usd/usd/prim.h"
 #include "pxr/base/tf/pyContainerConversions.h"
 #include "pxr/base/tf/pyEnum.h"
@@ -94,6 +96,20 @@ _SetLightingState(UsdImagingMetal &self, GarchSimpleLightVector const &lights,
     self.SetLightingState(lights, material, sceneAmbient);
 }
 
+    
+static std::vector<std::string>
+_GetRegisteredRendererPluginsDisplayNames()
+{
+    HfPluginDescVector pluginDescriptors;
+    HdxRendererPluginRegistry::GetInstance().GetPluginDescs(&pluginDescriptors);
+    
+    std::vector<std::string> displayNames;
+    for(size_t i = 0; i < pluginDescriptors.size(); ++i) {
+        displayNames.push_back(pluginDescriptors[i].displayName);
+    }
+    return displayNames;
+}
+
 } // anonymous namespace 
 
 void wrapMetal()
@@ -122,12 +138,17 @@ void wrapMetal()
             .def("IsConverged", &UsdImagingMetal::IsConverged)
             .def("GetRendererPlugins", &UsdImagingMetal::GetRendererPlugins,
                  return_value_policy< TfPySequenceToTuple >())
-            .def("GetRendererPluginDesc", &UsdImagingMetal::GetRendererPluginDesc)
+            .def("GetRendererDisplayName",
+                 &UsdImagingMetal::GetRendererDisplayName)
+            .def("GetCurrentRendererId", &UsdImagingMetal::GetCurrentRendererId)
             .def("SetRendererPlugin", &UsdImagingMetal::SetRendererPlugin)
             .def("GetRendererAovs", &UsdImagingMetal::GetRendererAovs,
                  return_value_policy< TfPySequenceToTuple >())
             .def ("SetRendererAov", &UsdImagingMetal::SetRendererAov)
             .def("GetResourceAllocation", &UsdImagingMetal::GetResourceAllocation)
+            .def("GetRegisteredRendererPluginsDisplayNames",
+                 &_GetRegisteredRendererPluginsDisplayNames)
+            .staticmethod("GetRegisteredRendererPluginsDisplayNames")
         ;
 
         // Wrap the constants.

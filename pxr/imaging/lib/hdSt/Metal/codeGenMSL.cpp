@@ -251,6 +251,12 @@ _GetPackedTypeDefinitions()
     "int hd_int_get(ivec3 v)        { return v[0]; }\n"
     "int hd_int_get(ivec4 v)        { return v[0]; }\n"
     
+    // udim helper function
+    "vec3 hd_sample_udim(vec2 v) {\n"
+    "vec2 vf = floor(v);\n"
+    "return vec3(v.x - vf.x, v.y - vf.y, clamp(vf.x, 0.0, 10.0) + 10.0 * vf.y);\n"
+    "}\n"
+    
     // -------------------------------------------------------------------
     // Packed HdType implementation.
     
@@ -265,7 +271,11 @@ _GetPackedTypeDefinitions()
     "    return *(thread int*)&pi;\n"
     "}\n"
     
-    "mat4 inverse(mat4 a) { return transpose(a); }  // MTL_FIXME - Required for AlGhadeer scene, need proper implementation of this;\n";
+    "mat4 inverse(mat4 a) { return transpose(a); }  // MTL_FIXME - Required for AlGhadeer scene, need proper implementation of this;\n"
+    
+    "constexpr sampler texelSampler(address::clamp_to_edge,\n"
+    "                               filter::linear);\n";
+
 }
 
 static TfToken const &
@@ -641,6 +651,10 @@ namespace {
         case HdBinding::BINDLESS_UNIFORM:
         case HdBinding::TEXTURE_2D:
         case HdBinding::BINDLESS_TEXTURE_2D:
+        case HdBinding::TEXTURE_UDIM_ARRAY:
+        case HdBinding::BINDLESS_TEXTURE_UDIM_ARRAY:
+        case HdBinding::TEXTURE_UDIM_LAYOUT:
+        case HdBinding::BINDLESS_TEXTURE_UDIM_LAYOUT:
         case HdBinding::TEXTURE_PTEX_TEXEL:
         case HdBinding::TEXTURE_PTEX_LAYOUT:
             out << "device ";
@@ -4283,6 +4297,98 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
                     << "vec2(0.0, 0.0)";
             }
             accessors << "); }\n";
+        } else if (bindingType == HdBinding::BINDLESS_TEXTURE_UDIM_ARRAY) {
+            // a function returning sampler2DArray is allowed in 430 or later
+            if (caps.glslVersion >= 430) {
+                accessors
+                    << "sampler2DArray\n"
+                    << "HdGetSampler_" << it->second.name << "() {\n"
+                    << "  int shaderCoord = GetDrawingCoord().shaderCoord; \n"
+                    << "  return sampler2DArray(shaderData[shaderCoord]."
+                    << it->second.name << ");\n"
+                    << "  }\n";
+            }
+            accessors
+                << it->second.dataType
+                << " HdGet_" << it->second.name << "()" << " {\n"
+                << "  int shaderCoord = GetDrawingCoord().shaderCoord;\n";
+            
+            if (!it->second.inPrimvars.empty()) {
+                accessors
+                    << "#if defined(HD_HAS_"
+                    << it->second.inPrimvars[0] << ")\n"
+                    << "  vec3 c = hd_sample_udim(HdGet_"
+                    << it->second.inPrimvars[0] << "().xy);\n"
+                    << "  c.z = texelFetch(sampler1D(shaderData[shaderCoord]."
+                    << it->second.name << "_layout), int(c.z), 0).x - 1;\n"
+                    << "#else\n"
+                    << "  vec3 c = vec3(0.0, 0.0, 0.0);\n"
+                    << "#endif\n";
+            } else {
+                accessors
+                    << "  vec3 c = vec3(0.0, 0.0, 0.0);\n";
+            }
+            accessors
+                << "if (c.z < -0.5) { return vec4(0, 0, 0, 0)" << swizzle
+                << "; } else { \n"
+                << "  return texture(sampler2DArray(shaderData[shaderCoord]."
+                << it->second.name << "), c)" << swizzle << ";}\n}\n";
+        } else if (bindingType == HdBinding::TEXTURE_UDIM_ARRAY) {
+            declarations
+                << "sampler samplerBind_" << it->second.name << ";\n"
+                << "texture2d<float> textureBind_" << it->second.name << ";\n";
+            
+            _AddInputParam(_mslPSInputParams, TfToken("samplerBind_" + it->second.name.GetString()), TfToken("sampler"), TfToken()).usage
+                |= HdSt_CodeGenMSL::TParam::Sampler;
+            _AddInputParam(_mslPSInputParams, TfToken("textureBind_" + it->second.name.GetString()), TfToken("texture2d<float>"), TfToken()).usage
+                |= HdSt_CodeGenMSL::TParam::Texture;
+            
+            if (caps.glslVersion >= 430) {
+                accessors
+                    << "sampler2DArray\n"
+                    << "HdGetSampler_" << it->second.name << "() {\n"
+                    << "  return sampler2dArray_" << it->second.name << ";"
+                    << "}\n";
+            }
+            // vec4 HdGet_name(vec2 coord) { vec3 c = hd_sample_udim(coord);
+            // c.z = texelFetch(sampler1d_name_layout, int(c.z), 0).x - 1;
+            // if (c.z < -0.5) { return vec4(0, 0, 0, 0).xyz; } else {
+            // return texture(sampler2dArray_name, hd_sample_udim(coord)).xyz;}}
+            accessors
+                << it->second.dataType
+                << " HdGet_" << it->second.name
+                << "(vec2 coord) { vec3 c = hd_sample_udim(coord);\n"
+                << "  c.z = sampler1d_" << it->second.name << "_layout"
+                << ".read(uint(c.z), 0).x - 1;\n"
+                << "if (c.z < -0.5) { return vec4(0, 0, 0, 0)"
+                << swizzle << "; } else {\n"
+                << "  return texture(sampler2dArray_"
+                << it->second.name << ", c)" << swizzle << ";}}\n";
+                // vec4 HdGet_name() { return HdGet_name(HdGet_st().xy); }
+            accessors
+                << it->second.dataType
+                << " HdGet_" << it->second.name
+                << "() { return HdGet_" << it->second.name << "(";
+                if (!it->second.inPrimvars.empty()) {
+                    accessors
+                        << "\n"
+                        << "#if defined(HD_HAS_"
+                        << it->second.inPrimvars[0] << ")\n"
+                        << "HdGet_" << it->second.inPrimvars[0] << "().xy\n"
+                        << "#else\n"
+                        << "vec2(0.0, 0.0)\n"
+                        << "#endif\n";
+                } else {
+                    accessors
+                        << "vec2(0.0, 0.0)";
+            }
+            accessors << "); }\n";
+        } else if (bindingType == HdBinding::TEXTURE_UDIM_LAYOUT) {
+            declarations
+                << "texture1d<float> textureBind_" << it->second.name << ";\n";
+            _AddInputParam(_mslPSInputParams, TfToken("textureBind_" + it->second.name.GetString()), TfToken("texture1d<float>"), TfToken()).usage
+                |= HdSt_CodeGenMSL::TParam::Texture;
+
         } else if (bindingType == HdBinding::BINDLESS_TEXTURE_PTEX_TEXEL) {
             accessors
                 << _GetUnpackedType(it->second.dataType, false)

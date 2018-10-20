@@ -49,7 +49,8 @@ public:
     HDST_API
     virtual HdBufferArraySharedPtr CreateBufferArray(
         TfToken const &role,
-        HdBufferSpecVector const &bufferSpecs);
+        HdBufferSpecVector const &bufferSpecs,
+        HdBufferArrayUsageHint usageHint);
 
     /// Factory for creating HdBufferArrayRange
     HDST_API
@@ -58,7 +59,8 @@ public:
     /// Returns id for given bufferSpecs to be used for aggregation
     HDST_API
     virtual HdAggregationStrategy::AggregationId ComputeAggregationId(
-        HdBufferSpecVector const &bufferSpecs) const;
+        HdBufferSpecVector const &bufferSpecs,
+        HdBufferArrayUsageHint usageHint) const;
 
     /// Returns the buffer specs from a given buffer array
     HDST_API
@@ -157,6 +159,10 @@ public:
         HDST_API
         virtual size_t GetMaxNumElements() const override;
 
+        /// Returns the usage hint from the underlying buffer array
+        HDST_API
+        virtual HdBufferArrayUsageHint GetUsageHint() const override;
+
         /// Returns the GPU resource. If the buffer array contains more than one
         /// resource, this method raises a coding error.
         HDST_API
@@ -220,7 +226,9 @@ public:
     public:
         /// Constructor.
         HDST_API
-        _SimpleBufferArray(TfToken const &role, HdBufferSpecVector const &bufferSpecs);
+        _SimpleBufferArray(TfToken const &role,
+                           HdBufferSpecVector const &bufferSpecs,
+                           HdBufferArrayUsageHint usageHint);
 
         /// Destructor. It invalidates _range
         HDST_API

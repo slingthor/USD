@@ -38,6 +38,7 @@
 
 #include <boost/noncopyable.hpp>
 #include <boost/scoped_ptr.hpp>
+#include <functional>
 #include <map>
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -66,6 +67,11 @@ public:
                                               GarchImage::OriginUpperLeft);
     GARCH_API
     GarchTextureHandleRefPtr GetTextureHandle(GarchTextureRefPtr texture);
+    GARCH_API
+    GarchTextureHandleRefPtr GetTextureHandle(
+        const TfToken& texture,
+        GarchImage::ImageOriginLocation originLocation,
+        const GarchTextureFactoryBase* textureFactory);
 
     // garbage collection methods
     GARCH_API
@@ -93,10 +99,14 @@ private:
     GarchTextureRegistry();
 
     GarchTextureHandleRefPtr _CreateTexture(const TfToken &texture,
-                                            GarchImage::ImageOriginLocation originLocation);
+                                  GarchImage::ImageOriginLocation originLocation);
     GarchTextureHandleRefPtr _CreateTexture(const TfTokenVector &textures,
-                                            const size_t numTextures,
-                                            GarchImage::ImageOriginLocation originLocation);
+                                  const size_t numTextures,
+    							  GarchImage::ImageOriginLocation originLocation);
+    GarchTextureHandleRefPtr _CreateTexture(const TfToken &texture,
+                                  GarchImage::ImageOriginLocation originLocation,
+                                  const GarchTextureFactoryBase *textureFactory);
+
     GarchTextureFactoryBase* _GetTextureFactory(const TfToken &filename);
 
     // Metadata for texture files to aid in cache invalidation.

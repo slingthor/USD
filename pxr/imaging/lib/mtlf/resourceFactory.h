@@ -92,6 +92,12 @@ public:
     virtual GarchPtexTextureRefPtr NewPtexTexture(const TfToken &imageFilePath) const override;
 #endif
     
+    // UDIM Texture
+    MTLF_API
+    virtual GarchUdimTextureRefPtr NewUdimTexture(TfToken const& imageFilePath,
+                                                  GarchImage::ImageOriginLocation originLocation,
+                                                  std::vector<std::tuple<int, TfToken>>&& tiles) const override;
+    
 private:
     MtlfContextCaps contextCaps;
 };

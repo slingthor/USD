@@ -83,12 +83,13 @@ public:
 
 protected:
     virtual bool _OpenForReading(std::string const & filename, int subimage,
-                                 bool suppressErrors);
+                                 int mip, bool suppressErrors);
     virtual bool _OpenForWriting(std::string const & filename);
 
 private:
     std::string _filename;
     int _subimage;
+    int _miplevel;
     ImageBuf _imagebuf;
 };
 
@@ -271,7 +272,7 @@ _SetAttribute(ImageSpec * spec,
 }
 
 Garch_OIIOImage::Garch_OIIOImage()
-    : _subimage(0)
+    : _subimage(0), _miplevel(0)
 {
 }
 
@@ -393,13 +394,15 @@ Garch_OIIOImage::GetNumMipLevels() const
 /* virtual */
 bool
 Garch_OIIOImage::_OpenForReading(std::string const & filename, int subimage,
-                                 bool suppressErrors)
+                               int mip, bool suppressErrors)
 {
     _filename = filename;
     _subimage = subimage;
+    _miplevel = mip;
     _imagebuf.clear();
-    return _imagebuf.init_spec(_filename, subimage, /*mipmap*/0)
-           && (_imagebuf.nsubimages() > subimage);
+    return _imagebuf.init_spec(_filename, subimage, mip)
+           && (_imagebuf.nsubimages() > subimage)
+           && _imagebuf.nmiplevels() > mip;
 }
 
 /* virtual */
@@ -423,7 +426,7 @@ Garch_OIIOImage::ReadCropped(int const cropTop,
 
     //// seek subimage
     ImageSpec spec = imageInput->spec();
-    if (!imageInput->seek_subimage(_subimage, 0, spec)){
+    if (!imageInput->seek_subimage(_subimage, _miplevel, spec)){
         imageInput->close();
         TF_CODING_ERROR("Unable to seek subimage");
         return false;

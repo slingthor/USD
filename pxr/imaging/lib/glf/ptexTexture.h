@@ -69,7 +69,7 @@ protected:
     friend class GlfResourceFactory;
 
     GLF_API
-    virtual void _FreePtexTextureObject() override;
+    virtual void _FreePtexTextureObject();
 
     GLF_API
     virtual bool _ReadImage() override;

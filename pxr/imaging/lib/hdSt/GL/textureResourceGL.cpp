@@ -36,8 +36,10 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 HdStSimpleTextureResourceGL::HdStSimpleTextureResourceGL(
-    GarchTextureHandleRefPtr const &textureHandle, bool isPtex, size_t memoryRequest):
-        HdStSimpleTextureResourceGL(textureHandle, isPtex,
+    GarchTextureHandleRefPtr const &textureHandle,
+         HdTextureType textureType,
+         size_t memoryRequest):
+        HdStSimpleTextureResourceGL(textureHandle, textureType,
             /*wrapS*/ HdWrapUseMetadata, /*wrapT*/ HdWrapUseMetadata,
             /*minFilter*/ HdMinFilterNearestMipmapLinear, 
             /*magFilter*/ HdMagFilterLinear, memoryRequest)
@@ -45,11 +47,12 @@ HdStSimpleTextureResourceGL::HdStSimpleTextureResourceGL(
 }
 
 HdStSimpleTextureResourceGL::HdStSimpleTextureResourceGL(
-    GarchTextureHandleRefPtr const &textureHandle, bool isPtex,
+    GarchTextureHandleRefPtr const &textureHandle,
+    HdTextureType textureType,
     HdWrap wrapS, HdWrap wrapT,
     HdMinFilter minFilter, HdMagFilter magFilter,
     size_t memoryRequest)
-: HdStSimpleTextureResource(textureHandle, isPtex, wrapS, wrapT, minFilter, magFilter, memoryRequest)
+: HdStSimpleTextureResource(textureHandle, textureType, wrapS, wrapT, minFilter, magFilter, memoryRequest)
 {
     // In cases of upstream errors, texture handle can be null.
     if (_textureHandle) {
@@ -69,7 +72,7 @@ HdStSimpleTextureResourceGL::~HdStSimpleTextureResourceGL()
         _textureHandle->DeleteMemoryRequest(_memoryRequest);
     }
 
-    if (!_isPtex) {
+    if (_textureType != HdTextureType::Ptex) {
         if (!glDeleteSamplers) { // GL initialization guard for headless unit test
             return;
         }
@@ -78,14 +81,9 @@ HdStSimpleTextureResourceGL::~HdStSimpleTextureResourceGL()
     }
 }
 
-bool HdStSimpleTextureResourceGL::IsPtex() const
-{ 
-    return _isPtex; 
-}
-
 GarchSamplerGPUHandle HdStSimpleTextureResourceGL::GetTexelsSamplerId()
 {
-    if (!TF_VERIFY(!_isPtex)) {
+    if (!TF_VERIFY(_textureType != HdTextureType::Ptex)) {
         return GarchSamplerGPUHandle();
     }
     
@@ -156,7 +154,7 @@ GarchTextureGPUHandle HdStSimpleTextureResourceGL::GetTexelsTextureHandle()
     }
     
     GLuint64EXT handle = 0;
-    if (_isPtex) {
+    if (_textureType != HdTextureType::Uv) {
         handle = glGetTextureHandleARB(textureId);
     } else {
         GLuint samplerId = GetTexelsSamplerId();
@@ -180,7 +178,7 @@ GarchTextureGPUHandle HdStSimpleTextureResourceGL::GetTexelsTextureHandle()
 
 GarchTextureGPUHandle HdStSimpleTextureResourceGL::GetLayoutTextureHandle()
 {
-    if (!TF_VERIFY(_isPtex)) {
+    if (!TF_VERIFY(_textureType != HdTextureType::Uv)) {
         return GarchTextureGPUHandle();
     }
     

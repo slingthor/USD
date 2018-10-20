@@ -73,10 +73,13 @@ public:
     /// The memory request can be used to limit, the amount of texture memory
     /// this reference requires of the texture.  Set to 0 for unrestricted.
     HDST_API
-    static HdStSimpleTextureResource *New(GarchTextureHandleRefPtr const &textureHandle, bool isPtex,
-                                          size_t memoryRequest = 0);
+    static HdStSimpleTextureResource *New(GarchTextureHandleRefPtr const &textureHandle,
+                                          HdTextureType textureType,
+                                          size_t memoryRequest);
+
     HDST_API
-    static HdStSimpleTextureResource *New(GarchTextureHandleRefPtr const &textureHandle, bool isPtex,
+    static HdStSimpleTextureResource *New(GarchTextureHandleRefPtr const &textureHandle,
+                                          HdTextureType textureType,
                                           HdWrap wrapS, HdWrap wrapT,
                                           HdMinFilter minFilter, HdMagFilter magFilter,
                                           size_t memoryRequest = 0);
@@ -84,6 +87,7 @@ public:
     HDST_API
     virtual ~HdStSimpleTextureResource();
     
+    virtual HdTextureType GetTextureType() const override;
     HDST_API virtual GarchTextureGPUHandle GetTexelsTextureId() override;
     HDST_API virtual GarchTextureGPUHandle GetLayoutTextureId() override;
 
@@ -91,7 +95,6 @@ public:
     HDST_API virtual GarchTextureGPUHandle GetTexelsTextureHandle() override = 0;
     HDST_API virtual GarchTextureGPUHandle GetLayoutTextureHandle() override = 0;
 
-    virtual bool IsPtex() const override = 0;
     virtual size_t GetMemoryUsed() override = 0;
 
 protected:
@@ -100,7 +103,7 @@ protected:
     GfVec4f _borderColor;
     float _maxAnisotropy;
     GarchSamplerGPUHandle _sampler;
-    bool _isPtex;
+    HdTextureType _textureType;
     size_t _memoryRequest;
     HdWrap _wrapS;
     HdWrap _wrapT;
@@ -110,7 +113,8 @@ protected:
     
 protected:
     HDST_API
-    HdStSimpleTextureResource(GarchTextureHandleRefPtr const &textureHandle, bool isPtex,
+    HdStSimpleTextureResource(GarchTextureHandleRefPtr const &textureHandle,
+                              HdTextureType textureType,
                               HdWrap wrapS, HdWrap wrapT,
                               HdMinFilter minFilter, HdMagFilter magFilter,
                               size_t memoryRequest);

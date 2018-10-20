@@ -87,6 +87,7 @@ pxr_library(garch
         simpleLightingContext
         simpleMaterial
         simpleShadowArray
+        udimTexture
         uniformBlock
         utils
         uvTexture

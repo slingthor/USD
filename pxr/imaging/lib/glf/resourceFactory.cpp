@@ -33,6 +33,7 @@
 #include <pxr/imaging/glf/ptexTexture.h>
 #include <pxr/imaging/glf/simpleLightingContext.h>
 #include <pxr/imaging/glf/simpleShadowArray.h>
+#include <pxr/imaging/glf/udimTexture.h>
 #include <pxr/imaging/glf/uniformBlock.h>
 
 #include <pxr/imaging/garch/glslfx.h>
@@ -107,6 +108,14 @@ GarchPtexTextureRefPtr GlfResourceFactory::NewPtexTexture(
     return TfCreateRefPtr(new GlfPtexTexture(imageFilePath));
 }
 #endif
+
+GarchUdimTextureRefPtr GlfResourceFactory::NewUdimTexture(
+                            TfToken const& imageFilePath,
+                            GarchImage::ImageOriginLocation originLocation,
+                            std::vector<std::tuple<int, TfToken>>&& tiles) const
+{
+    return TfCreateRefPtr(new GlfUdimTexture(imageFilePath, originLocation, std::move(tiles)));
+}
 
 PXR_NAMESPACE_CLOSE_SCOPE
 

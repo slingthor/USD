@@ -71,7 +71,10 @@ public:
                             const SdfPath& delegateID = SdfPath::AbsoluteRootPath());
 
     USDIMAGINGMETAL_API
-    static bool IsDefaultPluginAvailable();
+    static bool IsDefaultRendererPluginAvailable();
+    
+    USDIMAGINGMETAL_API
+    static TfToken GetDefaultRendererPluginId();
 
     USDIMAGINGMETAL_API
     virtual ~UsdImagingMetalHdEngine();
@@ -81,13 +84,6 @@ public:
 
     USDIMAGINGMETAL_API
     virtual void InvalidateBuffers() override;
-
-    USDIMAGINGMETAL_API
-    static void PrepareBatch(
-        const UsdImagingMetalHdEngineSharedPtrVector& engines,
-        const UsdPrimVector& rootPrims,
-        const std::vector<UsdTimeCode>& times,
-        RenderParams params);
 
     USDIMAGINGMETAL_API
     virtual void PrepareBatch(const UsdPrim& root, RenderParams params) override;
@@ -152,7 +148,10 @@ public:
     virtual TfTokenVector GetRendererPlugins() const override;
 
     USDIMAGINGMETAL_API
-    virtual std::string GetRendererPluginDesc(TfToken const &id) const override;
+    virtual std::string GetRendererDisplayName(TfToken const &id) const override;
+    
+    USDIMAGINGMETAL_API
+    virtual TfToken GetCurrentRendererId() const override;
 
     USDIMAGINGMETAL_API
     virtual bool SetRendererPlugin(TfToken const &id) override;
@@ -191,20 +190,6 @@ public:
     virtual VtDictionary GetResourceAllocation() const override;
 
 private:
-    // Helper functions for preparing multiple engines for
-    // batched drawing.
-    static void _PrepareBatch(const UsdImagingMetalHdEngineSharedPtrVector& engines,
-                              const UsdPrimVector& rootPrims,
-                              const std::vector<UsdTimeCode>& times,
-                              const RenderParams& params);
-
-    static void _Populate(const UsdImagingMetalHdEngineSharedPtrVector& engines,
-                          const UsdPrimVector& rootPrims,
-                          const RenderParams& params);
-    static void _SetTimes(const UsdImagingMetalHdEngineSharedPtrVector& engines,
-                          const UsdPrimVector& rootPrims,
-                          const std::vector<UsdTimeCode>& times,
-                          const RenderParams& params);
 
     // These functions factor batch preparation into separate steps so they
     // can be reused by both the vectorized and non-vectorized API.
@@ -238,7 +223,8 @@ private:
     SdfPath const _delegateID;
     UsdImagingDelegate *_delegate;
     
-    HdxRendererPlugin *_renderPlugin;
+    HdxRendererPlugin *_rendererPlugin;
+    TfToken _rendererId;
     HdxTaskController *_taskController;
     
     GarchSimpleLightingContextRefPtr _lightingContextForOpenGLState;

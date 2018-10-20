@@ -26,6 +26,7 @@
 
 #include "pxr/pxr.h"
 #include "pxr/imaging/hd/api.h"
+#include "pxr/imaging/hd/enums.h"
 
 #include "pxr/imaging/garch/texture.h"
 #include "pxr/imaging/garch/textureHandle.h"
@@ -53,7 +54,7 @@ public:
     HD_API
     virtual ~HdTextureResource();
 
-    virtual bool IsPtex() const = 0;
+    virtual HdTextureType GetTextureType() const = 0;
 
     virtual size_t GetMemoryUsed() = 0;
 };

@@ -287,7 +287,20 @@ void HdStGLSLProgram::BindResources(HdStSurfaceShader* surfaceShader, HdSt_Resou
         if (binding.GetType() == HdBinding::TEXTURE_2D) {
             glActiveTexture(GL_TEXTURE0 + samplerUnit);
             glBindTexture(GL_TEXTURE_2D, it->handle);
-            glBindSampler(samplerUnit, (GLuint)(uint64_t)it->sampler);
+            glBindSampler(samplerUnit, it->sampler);
+            
+            glProgramUniform1i(_program, binding.GetLocation(), samplerUnit);
+            samplerUnit++;
+        } else if (binding.GetType() == HdBinding::TEXTURE_UDIM_ARRAY) {
+            glActiveTexture(GL_TEXTURE0 + samplerUnit);
+            glBindTexture(GL_TEXTURE_2D_ARRAY, (GLuint)it->handle);
+            glBindSampler(samplerUnit, it->sampler);
+            
+            glProgramUniform1i(_program, binding.GetLocation(), samplerUnit);
+            samplerUnit++;
+        } else if (binding.GetType() == HdBinding::TEXTURE_UDIM_LAYOUT) {
+            glActiveTexture(GL_TEXTURE0 + samplerUnit);
+            glBindTexture(GL_TEXTURE_1D, it->handle);
             
             glProgramUniform1i(_program, binding.GetLocation(), samplerUnit);
             samplerUnit++;
@@ -318,6 +331,15 @@ void HdStGLSLProgram::UnbindResources(HdStSurfaceShader* surfaceShader, HdSt_Res
             glActiveTexture(GL_TEXTURE0 + samplerUnit);
             glBindTexture(GL_TEXTURE_2D, 0);
             glBindSampler(samplerUnit, 0);
+            samplerUnit++;
+        } else if (binding.GetType() == HdBinding::TEXTURE_UDIM_ARRAY) {
+            glActiveTexture(GL_TEXTURE0 + samplerUnit);
+            glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
+            glBindSampler(samplerUnit, 0);
+            samplerUnit++;
+        } else if (binding.GetType() == HdBinding::TEXTURE_UDIM_LAYOUT) {
+            glActiveTexture(GL_TEXTURE0 + samplerUnit);
+            glBindTexture(GL_TEXTURE_1D, 0);
             samplerUnit++;
         } else if (binding.GetType() == HdBinding::TEXTURE_PTEX_TEXEL) {
             glActiveTexture(GL_TEXTURE0 + samplerUnit);

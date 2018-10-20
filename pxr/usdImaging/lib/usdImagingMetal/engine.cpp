@@ -662,9 +662,16 @@ UsdImagingMetalEngine::GetRendererPlugins() const
 
 /* virtual */
 std::string
-UsdImagingMetalEngine::GetRendererPluginDesc(TfToken const &id) const
+UsdImagingMetalEngine::GetRendererDisplayName(TfToken const &id) const
 {
     return std::string();
+}
+
+/* virtual */
+TfToken
+UsdImagingMetalEngine::GetCurrentRendererId() const
+{
+    return TfToken();
 }
 
 /* virtual */

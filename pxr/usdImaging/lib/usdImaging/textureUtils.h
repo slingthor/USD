@@ -43,6 +43,18 @@ UsdImaging_GetTextureResource(UsdPrim const& usdPrim,
                               SdfPath const& usdPath,
                               UsdTimeCode time);
 
+std::vector<std::tuple<int, TfToken>>
+UsdImaging_GetUdimTiles(
+    std::string const& basePath,
+    int tileLimit,
+    SdfLayerHandle const& layerHandle = SdfLayerHandle());
+
+bool
+UsdImaging_UdimTilesExist(
+    std::string const& basePath,
+    int tileLimit,
+    SdfLayerHandle const& layerHandle = SdfLayerHandle());
+
 PXR_NAMESPACE_CLOSE_SCOPE
 
 #endif // USDIMAGING_TEXTURE_UTILS_H

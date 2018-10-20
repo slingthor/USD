@@ -63,6 +63,7 @@ pxr_library(mtlf
         resourceFactory
         simpleLightingContext
         simpleShadowArray
+        udimTexture
         uniformBlock
         utils
         ${optionalPublicClasses}

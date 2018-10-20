@@ -87,6 +87,7 @@ public:
         HdBufferArrayRegistry &bufferArrayRegistry,
         TfToken const &role,
         HdBufferSpecVector const &newBufferSpecs,
+        HdBufferArrayUsageHint newUsageHint,
         HdBufferArrayRangeSharedPtr const &range);
 
     /// MergeBufferArrayRange of non uniform buffer.
@@ -94,6 +95,7 @@ public:
     HdBufferArrayRangeSharedPtr MergeNonUniformBufferArrayRange(
         TfToken const &role,
         HdBufferSpecVector const &newBufferSpecs,
+        HdBufferArrayUsageHint newUsageHint,
         HdBufferArrayRangeSharedPtr const &range);
 
     /// MergeBufferArrayRange of non uniform immutable buffer.
@@ -101,6 +103,7 @@ public:
     HdBufferArrayRangeSharedPtr MergeNonUniformImmutableBufferArrayRange(
         TfToken const &role,
         HdBufferSpecVector const &newBufferSpecs,
+        HdBufferArrayUsageHint newUsageHint,
         HdBufferArrayRangeSharedPtr const &range);
 
     /// MergeBufferArrayRange of uniform buffer.
@@ -108,6 +111,7 @@ public:
     HdBufferArrayRangeSharedPtr MergeUniformBufferArrayRange(
         TfToken const &role,
         HdBufferSpecVector const &newBufferSpecs,
+        HdBufferArrayUsageHint newUsageHint,
         HdBufferArrayRangeSharedPtr const &range);
 
     /// MergeBufferArrayRange of shader storage buffer.
@@ -115,6 +119,7 @@ public:
     HdBufferArrayRangeSharedPtr MergeShaderStorageBufferArrayRange(
         TfToken const &role,
         HdBufferSpecVector const &newBufferSpecs,
+        HdBufferArrayUsageHint newUsageHint,
         HdBufferArrayRangeSharedPtr const &range);
 
     /// Register a geometric shader.

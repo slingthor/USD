@@ -122,13 +122,10 @@ protected:
     GarchPtexTexture(const TfToken &imageFilePath);
 
     GARCH_API
-    virtual void _FreePtexTextureObject();
-    
-    GARCH_API
     virtual void _ReadTexture() override;
 
     GARCH_API
-    virtual void _OnMemoryRequestedDirty();
+    virtual void _OnMemoryRequestedDirty() override;
 
     GARCH_API
     virtual bool _ReadImage() = 0;

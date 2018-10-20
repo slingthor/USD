@@ -103,6 +103,7 @@ HdStSurfaceShader::BindResources(HdSt_ResourceBinder const &binder,
                                  HdStProgram const &program)
 {
     program.BindResources(this, binder);
+
     binder.BindShaderResources(this);
 }
 /*virtual*/
@@ -192,7 +193,8 @@ HdStSurfaceShader::SetBufferSources(HdBufferSourceVector &bufferSources,
             HdBufferArrayRangeSharedPtr range =
                     resourceRegistry->AllocateShaderStorageBufferArrayRange(
                                                   HdTokens->materialParams,
-                                                  bufferSpecs);
+                                                  bufferSpecs,
+                                                  HdBufferArrayUsageHint());
 
             if (!TF_VERIFY(range->IsValid())) {
                 _paramArray.reset();

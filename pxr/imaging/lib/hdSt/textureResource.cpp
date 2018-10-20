@@ -27,6 +27,7 @@
 #include "pxr/imaging/garch/contextCaps.h"
 #include "pxr/imaging/garch/ptexTexture.h"
 #include "pxr/imaging/garch/resourceFactory.h"
+#include "pxr/imaging/garch/udimTexture.h"
 
 #include "pxr/imaging/hdSt/textureResource.h"
 #include "pxr/imaging/hdSt/GL/glConversions.h"
@@ -40,17 +41,18 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-HdStSimpleTextureResource *HdStSimpleTextureResource::New(GarchTextureHandleRefPtr const &textureHandle, bool isPtex,
+HdStSimpleTextureResource *HdStSimpleTextureResource::New(GarchTextureHandleRefPtr const &textureHandle,
+                                                          HdTextureType textureType,
                                                           size_t memoryRequest)
 {
     HdEngine::RenderAPI api = HdEngine::GetRenderAPI();
     switch(api)
     {
         case HdEngine::OpenGL:
-            return new HdStSimpleTextureResourceGL(textureHandle, isPtex, memoryRequest);
+            return new HdStSimpleTextureResourceGL(textureHandle, textureType, memoryRequest);
 #if defined(ARCH_GFX_METAL)
         case HdEngine::Metal:
-            return new HdStSimpleTextureResourceMetal(textureHandle, isPtex, memoryRequest);
+            return new HdStSimpleTextureResourceMetal(textureHandle, textureType, memoryRequest);
 #endif
         default:
             TF_FATAL_CODING_ERROR("No HdStBufferResource for this API");
@@ -59,7 +61,8 @@ HdStSimpleTextureResource *HdStSimpleTextureResource::New(GarchTextureHandleRefP
 }
 
 HdStSimpleTextureResource *HdStSimpleTextureResource::New(
-    GarchTextureHandleRefPtr const &textureHandle, bool isPtex,
+    GarchTextureHandleRefPtr const &textureHandle,
+    HdTextureType textureType,
     HdWrap wrapS, HdWrap wrapT,
     HdMinFilter minFilter, HdMagFilter magFilter,
     size_t memoryRequest)
@@ -68,10 +71,14 @@ HdStSimpleTextureResource *HdStSimpleTextureResource::New(
     switch(api)
     {
         case HdEngine::OpenGL:
-            return new HdStSimpleTextureResourceGL(textureHandle, isPtex, wrapS, wrapT, minFilter, magFilter, memoryRequest);
+            return new HdStSimpleTextureResourceGL(textureHandle, textureType,
+                                                   wrapS, wrapT, minFilter, magFilter,
+                                                   memoryRequest);
 #if defined(ARCH_GFX_METAL)
         case HdEngine::Metal:
-            return new HdStSimpleTextureResourceMetal(textureHandle, isPtex, wrapS, wrapT, minFilter, magFilter, memoryRequest);
+            return new HdStSimpleTextureResourceMetal(textureHandle, textureType,
+                                                      wrapS, wrapT, minFilter, magFilter,
+                                                      memoryRequest);
 #endif
         default:
             TF_FATAL_CODING_ERROR("No HdStBufferResource for this API");
@@ -85,16 +92,18 @@ HdStTextureResource::~HdStTextureResource()
 }
 
 HdStSimpleTextureResource::HdStSimpleTextureResource(
-     GarchTextureHandleRefPtr const &textureHandle, bool isPtex,
-     HdWrap wrapS, HdWrap wrapT,
-     HdMinFilter minFilter, HdMagFilter magFilter,
-     size_t memoryRequest)
+     								GarchTextureHandleRefPtr const &textureHandle,
+                                    HdTextureType textureType,
+     								HdWrap wrapS, HdWrap wrapT,
+     								HdMinFilter minFilter,
+									HdMagFilter magFilter,
+     								size_t memoryRequest)
 : _textureHandle(textureHandle)
 , _texture()
 , _borderColor(0.0,0.0,0.0,0.0)
 , _maxAnisotropy(16.0)
 , _sampler()
-, _isPtex(isPtex)
+, _textureType(textureType)
 , _memoryRequest(memoryRequest)
 , _wrapS(wrapS)
 , _wrapT(wrapT)
@@ -106,12 +115,16 @@ HdStSimpleTextureResource::HdStSimpleTextureResource(
 
 HdStSimpleTextureResource::~HdStSimpleTextureResource()
 {
-    /*Nothing*/
+}
+
+HdTextureType HdStSimpleTextureResource::GetTextureType() const
+{
+    return _textureType;
 }
 
 GarchTextureGPUHandle HdStSimpleTextureResource::GetTexelsTextureId()
 {
-    if (_isPtex) {
+    if (_textureType == HdTextureType::Ptex) {
 #ifdef PXR_PTEX_SUPPORT_ENABLED
         GarchPtexTextureRefPtr ptexTexture =
             TfDynamic_cast<GarchPtexTextureRefPtr>(_texture);
@@ -127,24 +140,47 @@ GarchTextureGPUHandle HdStSimpleTextureResource::GetTexelsTextureId()
 #endif
     }
     
-    return _texture->GetTextureName();
+    if (_textureType == HdTextureType::Udim) {
+        GarchUdimTextureRefPtr udimTexture =
+            TfDynamic_cast<GarchUdimTextureRefPtr>(_texture);
+        if (udimTexture) {
+            return udimTexture->GetTextureName();
+        }
+
+        return GarchTextureGPUHandle();
+    }
+
+    if (_texture) {
+        return _texture->GetTextureName();
+    }
+    return GarchTextureGPUHandle();
 }
 
 GarchTextureGPUHandle HdStSimpleTextureResource::GetLayoutTextureId()
 {
+    if (_textureType == HdTextureType::Udim) {
+        GarchUdimTextureRefPtr udimTexture =
+            TfDynamic_cast<GarchUdimTextureRefPtr>(_texture);
+        if (udimTexture) {
+            return udimTexture->GetLayoutName();
+        }
+    } else if (_textureType == HdTextureType::Ptex) {
 #ifdef PXR_PTEX_SUPPORT_ENABLED
-    GarchPtexTextureRefPtr ptexTexture =
-        TfDynamic_cast<GarchPtexTextureRefPtr>(_texture);
-    
-    if (ptexTexture) {
-        return ptexTexture->GetLayoutTextureName();
+        GarchPtexTextureRefPtr ptexTexture =
+            TfDynamic_cast<GarchPtexTextureRefPtr>(_texture);
+
+        if (ptexTexture) {
+            return ptexTexture->GetLayoutTextureName();
+        }
+#else
+        TF_CODING_ERROR("Ptex support is disabled.  "
+                        "This code path should be unreachable");
+#endif
+    } else {
+        TF_CODING_ERROR(
+            "Using GetLayoutTextureId in a Uv texture is incorrect");
     }
     return GarchTextureGPUHandle();
-#else
-    TF_CODING_ERROR("Ptex support is disabled.  "
-                    "This code path should be unreachable");
-    return GarchTextureGPUHandle();
-#endif
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

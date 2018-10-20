@@ -69,7 +69,7 @@ protected:
     friend class MtlfResourceFactory;
 
     MTLF_API
-    virtual void _FreePtexTextureObject() override;
+    virtual void _FreePtexTextureObject();
 
     MTLF_API
     virtual bool _ReadImage() override;

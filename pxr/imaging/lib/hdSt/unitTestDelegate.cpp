@@ -83,27 +83,18 @@ HdSt_UnitTestDelegate::GetTextureResource(SdfPath const& textureId)
         GarchTextureRegistry::GetInstance().GetTextureHandle(_textures[textureId].texture);
 
     // Simple way to detect if the glf texture is ptex or not
-    bool isPtex = false;
+    HdTextureType textureType = HdTextureType::Uv;
 #ifdef PXR_PTEX_SUPPORT_ENABLED
-    GlfPtexTextureRefPtr pTex = 
-        TfDynamic_cast<GlfPtexTextureRefPtr>(_textures[textureId].texture);
+    GarchPtexTextureRefPtr pTex = 
+        TfDynamic_cast<GarchPtexTextureRefPtr>(_textures[textureId].texture);
     if (pTex) {
-        isPtex = true;
+        textureType = HdTextureType::Ptex;
     }
-#if defined(ARCH_GFX_METAL)
-    else {
-        MtlfPtexTextureRefPtr pTex =
-            TfDynamic_cast<MtlfPtexTextureRefPtr>(_textures[textureId].texture);
-        if (pTex) {
-            isPtex = true;
-        }
-    }
-#endif
 #endif
 
     return HdTextureResourceSharedPtr(
         HdStSimpleTextureResource::New(texture,
-                                       isPtex,
+                                       textureType,
                                        HdWrapUseMetadata,
                                        HdWrapUseMetadata,
                                        HdMinFilterNearestMipmapLinear,

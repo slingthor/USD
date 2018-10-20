@@ -43,9 +43,9 @@ HdStResourceRegistry::HdStResourceRegistry()
 {
     // default aggregation strategies for varying (vertex, varying) primvars
     SetNonUniformAggregationStrategy(
-        new HdStVBOMemoryManager(/*isImmutable=*/false));
+        new HdStVBOMemoryManager());
     SetNonUniformImmutableAggregationStrategy(
-        new HdStVBOMemoryManager(/*isImmutable=*/true));
+        new HdStVBOMemoryManager());
 
     // default aggregation strategy for uniform on SSBO (for primvars)
     SetShaderStorageAggregationStrategy(
@@ -203,6 +203,7 @@ HdStResourceRegistry::MergeBufferArrayRange(
     HdBufferArrayRegistry &bufferArrayRegistry,
     TfToken const &role,
     HdBufferSpecVector const &newBufferSpecs,
+    HdBufferArrayUsageHint newUsageHint,
     HdBufferArrayRangeSharedPtr const &range)
 {
     HD_TRACE_FUNCTION();
@@ -213,8 +214,12 @@ HdStResourceRegistry::MergeBufferArrayRange(
     HdBufferSpecVector oldBufferSpecs;
     range->GetBufferSpecs(&oldBufferSpecs);
 
+    HdBufferArrayUsageHint oldUsageHint = range->GetUsageHint();
+
     // immutable ranges should always be migrated, otherwise compare bufferspec
-    if (range->IsImmutable() || !HdBufferSpec::IsSubset(newBufferSpecs, oldBufferSpecs)) {
+    if (range->IsImmutable() ||
+        !HdBufferSpec::IsSubset(newBufferSpecs, oldBufferSpecs) ||
+        newUsageHint.value != oldUsageHint.value) {
         // create / moveto the new buffer array.
 
         HdComputationVector computations;
@@ -237,7 +242,7 @@ HdStResourceRegistry::MergeBufferArrayRange(
 
         // allocate new range.
         HdBufferArrayRangeSharedPtr result = bufferArrayRegistry.AllocateRange(
-            strategy, role, bufferSpecs);
+            strategy, role, bufferSpecs, newUsageHint);
 
         // register copy computation.
         if (!computations.empty()) {
@@ -269,43 +274,49 @@ HdBufferArrayRangeSharedPtr
 HdStResourceRegistry::MergeNonUniformBufferArrayRange(
     TfToken const &role,
     HdBufferSpecVector const &newBufferSpecs,
+    HdBufferArrayUsageHint newUsageHint,
     HdBufferArrayRangeSharedPtr const &range)
 {
     return MergeBufferArrayRange(_nonUniformAggregationStrategy.get(),
                                  _nonUniformBufferArrayRegistry,
-                                 role, newBufferSpecs, range);
+                                 role, newBufferSpecs, newUsageHint, range);
 }
 
 HdBufferArrayRangeSharedPtr
 HdStResourceRegistry::MergeNonUniformImmutableBufferArrayRange(
     TfToken const &role,
     HdBufferSpecVector const &newBufferSpecs,
+    HdBufferArrayUsageHint newUsageHint,
     HdBufferArrayRangeSharedPtr const &range)
 {
+    newUsageHint.bits.immutable = 1;
+
     return MergeBufferArrayRange(_nonUniformImmutableAggregationStrategy.get(),
                                  _nonUniformImmutableBufferArrayRegistry,
-                                 role, newBufferSpecs, range);
+                                 role, newBufferSpecs, newUsageHint, range);
 }
 HdBufferArrayRangeSharedPtr
 HdStResourceRegistry::MergeUniformBufferArrayRange(
     TfToken const &role,
     HdBufferSpecVector const &newBufferSpecs,
+    HdBufferArrayUsageHint newUsageHint,
     HdBufferArrayRangeSharedPtr const &range)
 {
     return MergeBufferArrayRange(_uniformUboAggregationStrategy.get(),
                                  _uniformUboBufferArrayRegistry,
-                                 role, newBufferSpecs, range);
+                                 role, newBufferSpecs, newUsageHint, range);
 }
 
 HdBufferArrayRangeSharedPtr
 HdStResourceRegistry::MergeShaderStorageBufferArrayRange(
     TfToken const &role,
     HdBufferSpecVector const &newBufferSpecs,
+    HdBufferArrayUsageHint newUsageHint,
     HdBufferArrayRangeSharedPtr const &range)
 {
     return MergeBufferArrayRange(_uniformSsboAggregationStrategy.get(),
                                  _uniformSsboBufferArrayRegistry,
-                                 role, newBufferSpecs, range);
+                                 role, newBufferSpecs, newUsageHint, range);
 }
 
 std::unique_lock<std::mutex>

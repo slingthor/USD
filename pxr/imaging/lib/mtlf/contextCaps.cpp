@@ -44,6 +44,7 @@ MtlfContextCaps::_LoadCaps()
 {
     apiVersion                   = 450;
     glslVersion                  = 450;
+    arrayTexturesEnabled         = false;
     shaderStorageBufferEnabled   = true;
     bindlessTextureEnabled       = false;
     bindlessBufferEnabled        = false;
@@ -52,6 +53,7 @@ MtlfContextCaps::_LoadCaps()
     bufferStorageEnabled         = true;
     shadingLanguage420pack       = true;
     explicitUniformLocation      = true;
+    maxArrayTextureLayers        = 2048;
     maxUniformBlockSize          = 64*1024;
     maxShaderStorageBlockSize    = 1*1024*1024*1024;
     maxTextureBufferSize         = 16*1024;

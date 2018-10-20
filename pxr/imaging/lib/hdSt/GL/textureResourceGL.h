@@ -34,15 +34,17 @@ PXR_NAMESPACE_OPEN_SCOPE
 class HdStSimpleTextureResourceGL : public HdStSimpleTextureResource {
 public:
     HDST_API
-    HdStSimpleTextureResourceGL(GarchTextureHandleRefPtr const &textureHandle, bool isPtex, size_t memoryRequest);
+    HdStSimpleTextureResourceGL(GarchTextureHandleRefPtr const &textureHandle,
+                                HdTextureType textureType,
+                                size_t memoryRequest);
     HDST_API
-    HdStSimpleTextureResourceGL(GarchTextureHandleRefPtr const &textureHandle, bool isPtex,
-        HdWrap wrapS, HdWrap wrapT, HdMinFilter minFilter, HdMagFilter magFilter, size_t memoryRequest);
+    HdStSimpleTextureResourceGL(GarchTextureHandleRefPtr const &textureHandle,
+                                HdTextureType textureType,
+                                HdWrap wrapS, HdWrap wrapT,
+                                HdMinFilter minFilter, HdMagFilter magFilter,
+                                size_t memoryRequest);
     HDST_API
     virtual ~HdStSimpleTextureResourceGL();
-
-    HDST_API
-    virtual bool IsPtex() const override;
 
     HDST_API
     virtual GarchSamplerGPUHandle GetTexelsSamplerId() override;

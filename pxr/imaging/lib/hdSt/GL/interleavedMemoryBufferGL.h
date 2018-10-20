@@ -41,6 +41,7 @@ public:
     HDST_API
     HdStStripedInterleavedBufferGL(TfToken const &role,
                                    HdBufferSpecVector const &bufferSpecs,
+                                   HdBufferArrayUsageHint usageHint,
                                    int bufferOffsetAlignment,
                                    int structAlignment,
                                    size_t maxSize,

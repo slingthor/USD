@@ -44,8 +44,10 @@ TF_DEFINE_PRIVATE_TOKENS(
 );
 
 HdStSimpleTextureResourceMetal::HdStSimpleTextureResourceMetal(
-    GarchTextureHandleRefPtr const &textureHandle, bool isPtex, size_t memoryRequest):
-        HdStSimpleTextureResourceMetal(textureHandle, isPtex,
+    GarchTextureHandleRefPtr const &textureHandle,
+    HdTextureType textureType,
+    size_t memoryRequest):
+        HdStSimpleTextureResourceMetal(textureHandle, textureType,
             /*wrapS*/ HdWrapUseMetadata, /*wrapT*/ HdWrapUseMetadata,
             /*minFilter*/ HdMinFilterNearestMipmapLinear, 
             /*magFilter*/ HdMagFilterLinear, memoryRequest)
@@ -53,11 +55,12 @@ HdStSimpleTextureResourceMetal::HdStSimpleTextureResourceMetal(
 }
 
 HdStSimpleTextureResourceMetal::HdStSimpleTextureResourceMetal(
-    GarchTextureHandleRefPtr const &textureHandle, bool isPtex,
+    GarchTextureHandleRefPtr const &textureHandle,
+        HdTextureType textureType,
         HdWrap wrapS, HdWrap wrapT,
         HdMinFilter minFilter, HdMagFilter magFilter,
         size_t memoryRequest)
-: HdStSimpleTextureResource(textureHandle, isPtex, wrapS, wrapT, minFilter, magFilter, memoryRequest)
+: HdStSimpleTextureResource(textureHandle, textureType, wrapS, wrapT, minFilter, magFilter, memoryRequest)
 {
     // In cases of upstream errors, texture handle can be null.
     if (_textureHandle) {
@@ -77,23 +80,18 @@ HdStSimpleTextureResourceMetal::~HdStSimpleTextureResourceMetal()
         _textureHandle->DeleteMemoryRequest(_memoryRequest);
     }
 
-    if (!_isPtex) {
+    if (_textureType != HdTextureType::Ptex) {
         [_sampler release];
     }
 }
 
-bool HdStSimpleTextureResourceMetal::IsPtex() const
-{ 
-    return _isPtex; 
-}
-
 GarchSamplerGPUHandle HdStSimpleTextureResourceMetal::GetTexelsSamplerId()
 {
-    if (!TF_VERIFY(!_isPtex)) {
+    if (!TF_VERIFY(_textureType != HdTextureType::Ptex)) {
         return GarchSamplerGPUHandle();
     }
 
-    if (_sampler == nil) {
+    if (!_sampler.IsSet()) {
         // If the HdSimpleTextureResource defines a wrap mode it will
         // use it, otherwise it gives an opportunity to the texture to define
         // its own wrap mode. The fallback value is always HdWrapRepeat
@@ -143,17 +141,12 @@ GarchSamplerGPUHandle HdStSimpleTextureResourceMetal::GetTexelsSamplerId()
 GarchTextureGPUHandle HdStSimpleTextureResourceMetal::GetTexelsTextureHandle()
 { 
     GarchTextureGPUHandle textureId = GetTexelsTextureId();
-
-    if (_isPtex) {
-        return textureId;
-    } 
-
     return textureId;
 }
 
 GarchTextureGPUHandle HdStSimpleTextureResourceMetal::GetLayoutTextureHandle()
 {
-    if (!TF_VERIFY(_isPtex)) {
+    if (!TF_VERIFY(_textureType != HdTextureType::Uv)) {
         return GarchTextureGPUHandle();
     }
 

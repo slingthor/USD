@@ -98,6 +98,7 @@ HdStMesh::HdStMesh(SdfPath const& id,
     , _sceneNormals(false)
     , _flatNormals(false)
     , _pointsVisibilityAuthored(false)
+    , _hasVaryingTopology(false)
 {
     /*NOTHING*/
 }
@@ -371,10 +372,17 @@ HdStMesh::_PopulateTopology(HdSceneDelegate *sceneDelegate,
             HdBufferSpecVector bufferSpecs;
             HdBufferSpec::GetBufferSpecs(sources, &bufferSpecs);
 
+            // Set up the usage hints to mark topology as varying if
+            // there is a previously set range
+            HdBufferArrayUsageHint usageHint;
+            usageHint.value = 0;
+            usageHint.bits.sizeVarying =
+                                 ((bool)(drawItem->GetTopologyRange())) ? 1 : 0;
+
             // allocate new range
             HdBufferArrayRangeSharedPtr range =
                 resourceRegistry->AllocateNonUniformBufferArrayRange(
-                    HdTokens->topology, bufferSpecs);
+                    HdTokens->topology, bufferSpecs, usageHint);
 
             // add sources to update queue
             resourceRegistry->AddSources(range, sources);
@@ -392,6 +400,9 @@ HdStMesh::_PopulateTopology(HdSceneDelegate *sceneDelegate,
                 .SetGarbageCollectionNeeded();
             sceneDelegate->GetRenderIndex().GetChangeTracker()
                 .MarkBatchesDirty();
+
+            // Setup a flag to say this prims.
+            _hasVaryingTopology = true;
         }
 
         // TODO: reuse same range for varying topology
@@ -483,7 +494,9 @@ HdStMesh::_PopulateTopologyVisibility(
     if (!tvBAR || barNeedsReallocation) {
         HdBufferArrayRangeSharedPtr range =
             resourceRegistry->AllocateShaderStorageBufferArrayRange(
-                HdTokens->topologyVisibility, bufferSpecs);
+                HdTokens->topologyVisibility,
+                bufferSpecs,
+                HdBufferArrayUsageHint());
         _sharedData.barContainer.Set(
             drawItem->GetDrawingCoord()->GetTopologyVisibilityIndex(), range);
 
@@ -536,7 +549,7 @@ HdStMesh::_PopulateAdjacency(HdStResourceRegistrySharedPtr const &resourceRegist
 
             HdBufferArrayRangeSharedPtr adjRange =
                 resourceRegistry->AllocateNonUniformBufferArrayRange(
-                    HdTokens->topology, bufferSpecs);
+                    HdTokens->topology, bufferSpecs, HdBufferArrayUsageHint());
 
             adjacency->SetAdjacencyRange(adjRange);
             resourceRegistry->AddSource(adjRange,
@@ -1009,24 +1022,50 @@ HdStMesh::_PopulateVertexPrimvars(HdSceneDelegate *sceneDelegate,
 
         } else {
             range = resourceRegistry->AllocateNonUniformBufferArrayRange(
-                                              HdTokens->primvar, bufferSpecs);
+                      HdTokens->primvar, bufferSpecs, HdBufferArrayUsageHint());
         }
 
         _sharedData.barContainer.Set(
             drawItem->GetDrawingCoord()->GetVertexPrimvarIndex(), range);
 
     } else {
+        HdBufferArrayRangeSharedPtr range = bar;
+
+        // Get the hint for the previous range
+        HdBufferArrayUsageHint orgHint = range->GetUsageHint();
+
+        //
+        // Compute the new usage hints for the range, using the
+        // the  original hints to prevent ping-ponging between states.
+        HdBufferArrayUsageHint usageHint;
+        usageHint.value = orgHint.value;
+
+
+        // Set up the usage hints to mark the primvars as size varying if
+        // there is a varying topology and it will contain a differing number
+        // of elements.
+        //
+        // We can't compare the points size as computations such as refinement
+        // may expand the number of elements in the BAR from the topologies
+        // number of points.
+        //
+        // If the primvars are size varying, it also doesn't make sense for
+        // them to be immutable anymore, so clear the immutable flag.
+        if (_hasVaryingTopology) {
+            usageHint.bits.immutable   = 0;
+            usageHint.bits.sizeVarying = 1;
+        }
+
         // already have a valid range, but the new repr may have
         // added additional items (smooth normals) or we may be transitioning
         // to unpacked normals
         bool isNew = (*dirtyBits & HdChangeTracker::NewRepr) ||
                      (useSmoothNormals != _smoothNormals) ||
-                     (usePackedSmoothNormals != _packedSmoothNormals);
-
-        HdBufferArrayRangeSharedPtr range = bar;
+                     (usePackedSmoothNormals != _packedSmoothNormals) ||
+                     (orgHint.value != usageHint.value);
 
         if (bar->IsImmutable() && _IsEnabledSharedVertexPrimvar()) {
-            if (isNew) {
+            if (isNew && usageHint.bits.immutable) {
                 // see if we can share an immutable buffer primvar range
                 // include our existing sharing id so that we can take
                 // into account previously committed sources along
@@ -1051,14 +1090,21 @@ HdStMesh::_PopulateVertexPrimvars(HdSceneDelegate *sceneDelegate,
             } else {
                 // something is going to change and the existing bar
                 // is immutable, migrate to a mutable buffer array
+                usageHint.bits.immutable = 0;
                 _vertexPrimvarId = 0;
                 range = resourceRegistry->MergeNonUniformBufferArrayRange(
-                            HdTokens->primvar, bufferSpecs, bar);
+                            HdTokens->primvar,
+                            bufferSpecs,
+                            usageHint,
+                            bar);
             }
         } else if (isNew) {
             // the range was created by other repr. check compatibility.
             range = resourceRegistry->MergeNonUniformBufferArrayRange(
-                                           HdTokens->primvar, bufferSpecs, bar);
+                                           HdTokens->primvar,
+                                           bufferSpecs,
+                                           usageHint,
+                                           bar);
         }
 
         if (range != bar) {
@@ -1188,7 +1234,7 @@ HdStMesh::_PopulateFaceVaryingPrimvars(HdSceneDelegate *sceneDelegate,
 
         HdBufferArrayRangeSharedPtr range =
             resourceRegistry->AllocateNonUniformBufferArrayRange(
-                HdTokens->primvar, bufferSpecs);
+                HdTokens->primvar, bufferSpecs, HdBufferArrayUsageHint());
         _sharedData.barContainer.Set(
             drawItem->GetDrawingCoord()->GetFaceVaryingPrimvarIndex(), range);
     }
@@ -1315,7 +1361,7 @@ HdStMesh::_PopulateElementPrimvars(HdSceneDelegate *sceneDelegate,
     if ((!bar) || (!bar->IsValid())) {
         HdBufferArrayRangeSharedPtr range =
             resourceRegistry->AllocateNonUniformBufferArrayRange(
-                HdTokens->primvar, bufferSpecs);
+                HdTokens->primvar, bufferSpecs, HdBufferArrayUsageHint());
         _sharedData.barContainer.Set(
             drawItem->GetDrawingCoord()->GetElementPrimvarIndex(), range);
     } else {
@@ -1327,7 +1373,10 @@ HdStMesh::_PopulateElementPrimvars(HdSceneDelegate *sceneDelegate,
         if (isNew) {
             HdBufferArrayRangeSharedPtr range =
                 resourceRegistry->MergeNonUniformBufferArrayRange(
-                    HdTokens->primvar, bufferSpecs, bar);
+                    HdTokens->primvar,
+                    bufferSpecs,
+                    HdBufferArrayUsageHint(),
+                    bar);
 
             if (range != bar) {
                 _sharedData.barContainer.Set(
@@ -1489,11 +1538,14 @@ HdStMesh::_GetSharedPrimvarRange(uint64_t primvarId,
         if (existing) {
             range = resourceRegistry->
                 MergeNonUniformImmutableBufferArrayRange(
-                    HdTokens->primvar, bufferSpecs, existing);
+                    HdTokens->primvar,
+                    bufferSpecs,
+                    HdBufferArrayUsageHint(),
+                    existing);
         } else {
             range = resourceRegistry->
                 AllocateNonUniformImmutableBufferArrayRange(
-                    HdTokens->primvar, bufferSpecs);
+                    HdTokens->primvar, bufferSpecs, HdBufferArrayUsageHint());
         }
         barInstance.SetValue(range);
     } else {

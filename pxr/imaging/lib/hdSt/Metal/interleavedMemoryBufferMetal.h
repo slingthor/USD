@@ -40,6 +40,7 @@ public:
     HDST_API
     HdStStripedInterleavedBufferMetal(TfToken const &role,
                                       HdBufferSpecVector const &bufferSpecs,
+                                      HdBufferArrayUsageHint usageHint,
                                       int bufferOffsetAlignment,
                                       int structAlignment,
                                       size_t maxSize,

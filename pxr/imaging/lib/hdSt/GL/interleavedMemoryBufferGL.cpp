@@ -60,12 +60,13 @@ PXR_NAMESPACE_OPEN_SCOPE
 HdStStripedInterleavedBufferGL::HdStStripedInterleavedBufferGL(
     TfToken const &role,
     HdBufferSpecVector const &bufferSpecs,
+    HdBufferArrayUsageHint usageHint,
     int bufferOffsetAlignment = 0,
     int structAlignment = 0,
     size_t maxSize = 0,
     TfToken const &garbageCollectionPerfToken = HdPerfTokens->garbageCollectedUbo)
     : HdStInterleavedMemoryManager::_StripedInterleavedBuffer(
-        role, bufferSpecs, bufferOffsetAlignment, structAlignment, maxSize, garbageCollectionPerfToken)
+        role, bufferSpecs, usageHint, bufferOffsetAlignment, structAlignment, maxSize, garbageCollectionPerfToken)
 {
 }
 

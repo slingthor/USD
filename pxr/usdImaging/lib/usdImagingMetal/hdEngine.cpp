@@ -42,6 +42,7 @@
 #include "pxr/base/gf/rotation.h"
 #include "pxr/base/gf/vec3d.h"
 
+#include "pxr/base/tf/getenv.h"
 #include "pxr/base/tf/stringUtils.h"
 
 #include "pxr/imaging/mtlf/mtlDevice.h"
@@ -68,7 +69,7 @@ TF_DEFINE_PRIVATE_TOKENS(
 
 static std::string _MetalPluginDescriptor(id<MTLDevice> device)
 {
-    return std::string("Metal - ") + [[device name] UTF8String];
+    return std::string("Hydra Metal - ") + [[device name] UTF8String];
 }
 
 UsdImagingMetalHdEngine::UsdImagingMetalHdEngine(
@@ -82,7 +83,7 @@ UsdImagingMetalHdEngine::UsdImagingMetalHdEngine(
     , _selTracker(new HdxSelectionTracker)
     , _delegateID(delegateID)
     , _delegate(nullptr)
-    , _renderPlugin(nullptr)
+    , _rendererPlugin(nullptr)
     , _taskController(nullptr)
     , _selectionColor(1.0f, 1.0f, 0.0f, 1.0f)
     , _rootPath(rootPath)
@@ -95,7 +96,7 @@ UsdImagingMetalHdEngine::UsdImagingMetalHdEngine(
 {
     // _renderIndex, _taskController, and _delegate are initialized
     // by the plugin system.
-    if (!SetRendererPlugin(TfToken())) {
+    if (!SetRendererPlugin(GetDefaultRendererPluginId())) {
         TF_CODING_ERROR("No renderer plugins found! Check before creation.");
     }
 
@@ -225,127 +226,6 @@ UsdImagingMetalHdEngine::PrepareBatch(const UsdPrim& root, RenderParams params)
         _delegate->SetTime(params.frame);
         _PostSetTime(root, params);
     }
-}
-
-/* static */ 
-void 
-UsdImagingMetalHdEngine::PrepareBatch(
-    const UsdImagingMetalHdEngineSharedPtrVector& engines,
-    const UsdPrimVector& rootPrims,
-    const std::vector<UsdTimeCode>& times,
-    RenderParams params)
-{
-    HD_TRACE_FUNCTION();
-
-    if (!(engines.size() == rootPrims.size() &&
-             engines.size() == times.size())) {
-        TF_CODING_ERROR("Mismatched parameters");
-        return;
-    }
-
-    // Do some initial error checking.
-    std::set<size_t> skipped;
-    for (size_t i = 0; i < engines.size(); ++i) {
-        if (!engines[i]->_CanPrepareBatch(rootPrims[i], params)) {
-            skipped.insert(i);
-        }
-    }
-
-    if (skipped.empty()) {
-        _PrepareBatch(engines, rootPrims, times, params);
-    }
-    else {
-        // Filter out all the engines that fail the error check.
-        UsdImagingMetalHdEngineSharedPtrVector tmpEngines = engines;
-        UsdPrimVector tmpRootPrims = rootPrims;
-        std::vector<UsdTimeCode> tmpTimes = times;
-
-        TF_REVERSE_FOR_ALL(it, skipped) {
-            tmpEngines.erase(tmpEngines.begin() + *it);
-            tmpRootPrims.erase(tmpRootPrims.begin() + *it);
-            tmpTimes.erase(tmpTimes.begin() + *it);
-        }
-
-        _PrepareBatch(tmpEngines, tmpRootPrims, tmpTimes, params);
-    }
-}
-
-/* static */ 
-void 
-UsdImagingMetalHdEngine::_PrepareBatch(
-    const UsdImagingMetalHdEngineSharedPtrVector& engines,
-    const UsdPrimVector& rootPrims,
-    const std::vector<UsdTimeCode>& times,
-    const RenderParams& params)
-{
-    HD_TRACE_FUNCTION();
-
-    _Populate(engines, rootPrims, params);
-    _SetTimes(engines, rootPrims, times, params);
-}
-
-/*static */
-void
-UsdImagingMetalHdEngine::_SetTimes(const UsdImagingMetalHdEngineSharedPtrVector& engines,
-                              const UsdPrimVector& rootPrims,
-                              const std::vector<UsdTimeCode>& times,
-                              const RenderParams& params)
-{
-    HD_TRACE_FUNCTION();
-    
-    std::vector<UsdImagingDelegate*> delegates;
-    delegates.reserve(engines.size());
-    
-    for (size_t i = 0; i < engines.size(); ++i) {
-        engines[i]->_PreSetTime(rootPrims[i], params);
-        delegates.push_back(engines[i]->_delegate);
-    }
-    
-    UsdImagingDelegate::SetTimes(delegates, times);
-    
-    for (size_t i = 0; i < engines.size(); ++i) {
-        engines[i]->_PostSetTime(rootPrims[i], params);
-    }
-}
-
-/* static */
-void 
-UsdImagingMetalHdEngine::_Populate(const UsdImagingMetalHdEngineSharedPtrVector& engines,
-                                   const UsdPrimVector& rootPrims,
-                                   const RenderParams& params)
-{
-    HD_TRACE_FUNCTION();
-    
-    std::vector<UsdImagingDelegate*> delegatesToPopulate;
-    delegatesToPopulate.reserve(engines.size());
-    
-    UsdPrimVector primsToPopulate;
-    primsToPopulate.reserve(engines.size());
-    
-    std::vector<SdfPathVector> pathsToExclude, pathsToInvis;
-    pathsToExclude.reserve(engines.size());
-    pathsToInvis.reserve(engines.size());
-    
-    for (size_t i = 0; i < engines.size(); ++i) {
-        if (!engines[i]->_isPopulated) {
-            engines[i]->_delegate->SetUsdDrawModesEnabled(
-                params.enableUsdDrawModes);
-            delegatesToPopulate.push_back(engines[i]->_delegate);
-            primsToPopulate.push_back(
-                rootPrims[i].GetStage()->GetPrimAtPath(engines[i]->_rootPath));
-            pathsToExclude.push_back(engines[i]->_excludedPrimPaths);
-            pathsToInvis.push_back(engines[i]->_invisedPrimPaths);
-            
-            // Set _isPopulated to true immediately to weed out any duplicate
-            // engines. This is equivalent to what would happen if the
-            // consumer called the non-vectorized PrepareBatch on each
-            // engine individually.
-            engines[i]->_isPopulated = true;
-        }
-    }
-    
-    UsdImagingDelegate::Populate(delegatesToPopulate, primsToPopulate,
-                                 pathsToExclude, pathsToInvis);
 }
 
 /* static */
@@ -715,6 +595,27 @@ UsdImagingMetalHdEngine::TestIntersectionBatch(
     return true;
 }
 
+class _DebugGroupTaskWrapper : public HdTask {
+    const HdTaskSharedPtr _task;
+    public:
+    _DebugGroupTaskWrapper(const HdTaskSharedPtr task)
+    : _task(task)
+    {
+    }
+    
+    void
+    _Execute(HdTaskContext* ctx) override
+    {
+        _task->Execute(ctx);
+    }
+    
+    void
+    _Sync(HdTaskContext* ctx) override
+    {
+        _task->Sync(ctx);
+    }
+};
+
 void
 UsdImagingMetalHdEngine::Render(RenderParams params)
 {
@@ -788,15 +689,22 @@ UsdImagingMetalHdEngine::Render(RenderParams params)
         context->setFrontFaceWinding(MTLWindingCounterClockwise);
     }
     context->setCullMode(MTLCullModeNone);
-    
+
     VtValue selectionValue(_selTracker);
     _engine.SetTaskContextData(HdxTokens->selectionState, selectionValue);
     VtValue renderTags(_renderTags);
     _engine.SetTaskContextData(HdxTokens->renderTags, renderTags);
-
-    TfToken const& renderMode = params.enableIdRender ?
-        HdxTaskSetTokens->idRender : HdxTaskSetTokens->colorRender;
-    _engine.Execute(*_renderIndex, _taskController->GetTasks(renderMode));
+    
+    HdTaskSharedPtrVector tasks;
+    
+    if (false) {
+        tasks = _taskController->GetTasks();
+    } else {
+        TF_FOR_ALL(it, _taskController->GetTasks()) {
+            tasks.push_back(boost::make_shared<_DebugGroupTaskWrapper>(*it));
+        }
+    }
+    _engine.Execute(*_renderIndex, tasks);
    
     // Depth texture copy
     context->CopyDepthTextureToOpenGL();
@@ -1006,14 +914,47 @@ UsdImagingMetalHdEngine::GetRendererPlugins() const
 
 /* virtual */
 std::string
-UsdImagingMetalHdEngine::GetRendererPluginDesc(TfToken const &pluginId) const
+UsdImagingMetalHdEngine::GetRendererDisplayName(TfToken const &pluginId) const
 {
     return pluginId;
 }
 
+/* virtual */
+TfToken
+UsdImagingMetalHdEngine::GetCurrentRendererId() const
+{
+    return _rendererId;
+}
+
+TfToken
+UsdImagingMetalHdEngine::GetDefaultRendererPluginId()
+{
+    std::string defaultRendererDisplayName =
+        TfGetenv("HD_DEFAULT_RENDERER", "");
+    
+    if (defaultRendererDisplayName.empty()) {
+        return TfToken();
+    }
+    
+    HfPluginDescVector pluginDescs;
+    HdxRendererPluginRegistry::GetInstance().GetPluginDescs(&pluginDescs);
+    
+    // Look for the one with the matching display name
+    for (size_t i = 0; i < pluginDescs.size(); ++i) {
+        if (pluginDescs[i].displayName == defaultRendererDisplayName) {
+            return pluginDescs[i].id;
+        }
+    }
+    
+    TF_WARN("Failed to find default renderer with display name '%s'.",
+            defaultRendererDisplayName.c_str());
+    
+    return TfToken();
+}
+
 /* static */
 bool
-UsdImagingMetalHdEngine::IsDefaultPluginAvailable()
+UsdImagingMetalHdEngine::IsDefaultRendererPluginAvailable()
 {
     HfPluginDescVector descs;
     HdxRendererPluginRegistry::GetInstance().GetPluginDescs(&descs);
@@ -1064,7 +1005,7 @@ UsdImagingMetalHdEngine::SetRendererPlugin(TfToken const &pluginId)
     if (plugin == nullptr) {
         TF_CODING_ERROR("Couldn't find plugin for id %s", actualId.GetText());
         return false;
-    } else if (plugin == _renderPlugin) {
+    } else if (plugin == _rendererPlugin) {
         if (!forceReload) {
             // It's a no-op to load the same plugin twice.
             HdxRendererPluginRegistry::GetInstance().ReleasePlugin(plugin);
@@ -1093,8 +1034,10 @@ UsdImagingMetalHdEngine::SetRendererPlugin(TfToken const &pluginId)
     _DeleteHydraResources();
     
     // Recreate the render index.
-    _renderPlugin = plugin;
-    HdRenderDelegate *renderDelegate = _renderPlugin->CreateRenderDelegate();
+    _rendererPlugin = plugin;
+    _rendererId = TfToken(_MetalPluginDescriptor(MtlfMetalContext::GetMetalContext()->device));
+    
+    HdRenderDelegate *renderDelegate = _rendererPlugin->CreateRenderDelegate();
     _renderIndex = HdRenderIndex::New(renderDelegate);
     
     // Create the new delegate & task controller.
@@ -1150,12 +1093,13 @@ UsdImagingMetalHdEngine::_DeleteHydraResources()
         delete _renderIndex;
         _renderIndex = nullptr;
     }
-    if (_renderPlugin != nullptr) {
+    if (_rendererPlugin != nullptr) {
         if (renderDelegate != nullptr) {
-            _renderPlugin->DeleteRenderDelegate(renderDelegate);
+            _rendererPlugin->DeleteRenderDelegate(renderDelegate);
         }
-        HdxRendererPluginRegistry::GetInstance().ReleasePlugin(_renderPlugin);
-        _renderPlugin = nullptr;
+        HdxRendererPluginRegistry::GetInstance().ReleasePlugin(_rendererPlugin);
+        _rendererPlugin = nullptr;
+        _rendererId = TfToken();
     }
     
     if (_mtlRenderPassDescriptor != nil) {

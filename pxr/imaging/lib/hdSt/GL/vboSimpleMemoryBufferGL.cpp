@@ -59,8 +59,9 @@ PXR_NAMESPACE_OPEN_SCOPE
 // ---------------------------------------------------------------------------
 HdStVBOSimpleMemoryBufferGL::HdStVBOSimpleMemoryBufferGL(
     TfToken const &role,
-    HdBufferSpecVector const &bufferSpecs)
-    : HdStVBOSimpleMemoryManager::_SimpleBufferArray(role, bufferSpecs)
+    HdBufferSpecVector const &bufferSpecs,
+    HdBufferArrayUsageHint usageHint)
+    : HdStVBOSimpleMemoryManager::_SimpleBufferArray(role, bufferSpecs, usageHint)
 {
 }
 
