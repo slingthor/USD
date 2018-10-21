@@ -822,6 +822,11 @@ class StageView(QtOpenGL.QGLWidget):
         # glFormat.setProfile(QtOpenGL.QGLFormat.CoreProfile)
         super(StageView, self).__init__(glFormat, parent)
 
+        if sys.platform != "darwin":
+            self.frameDelay = 5
+        else:
+            self.frameDelay = 1
+
         self._dataModel = dataModel or StageView.DefaultDataModel()
         self._printTiming = printTiming
 
@@ -1745,7 +1750,7 @@ class StageView(QtOpenGL.QGLWidget):
             GL.glDisable(GL_FRAMEBUFFER_SRGB_EXT)
 
             if (not self._dataModel.playing) & (not renderer.IsConverged()):
-                QtCore.QTimer.singleShot(5, self.update)
+                QtCore.QTimer.singleShot(self.frameDelay, self.update)
         
         except Tf.ErrorException as e:
             # If we encounter an error during a render, we want to continue 
