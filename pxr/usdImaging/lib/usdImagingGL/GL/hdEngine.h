@@ -29,6 +29,8 @@
 
 #include "pxr/pxr.h"
 
+#include "pxr/imaging/glf/resourceFactory.h"
+
 #include "pxr/usdImaging/usdImagingGL/api.h"
 #include "pxr/usdImaging/usdImagingGL/engine.h"
 #include "pxr/usdImaging/usdImaging/delegate.h"
@@ -251,6 +253,9 @@ private:
     bool _isPopulated;
 
     TfTokenVector _renderTags;
+    
+    // Our base GPU resources are provided by Glf
+    GlfResourceFactory resourceFactory;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

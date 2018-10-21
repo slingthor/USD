@@ -39,10 +39,22 @@ MtlfContextCaps::MtlfContextCaps()
     _LoadCaps();
 }
 
+int MtlfContextCaps::GetAPIVersion()
+{
+#if __MAC_OS_X_VERSION_MAX_ALLOWED >= 101300 /* __MAC_10_13 */
+    return 450;
+#endif
+    return 0;
+}
+
 void
 MtlfContextCaps::_LoadCaps()
 {
-    apiVersion                   = 450;
+    apiVersion                   = GetAPIVersion();
+    
+    if (apiVersion == 0)
+        return;
+
     glslVersion                  = 450;
     arrayTexturesEnabled         = false;
     shaderStorageBufferEnabled   = true;

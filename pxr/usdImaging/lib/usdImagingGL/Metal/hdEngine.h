@@ -24,15 +24,16 @@
 
 /// \file hdEngine.h
 
-#ifndef USDIMAGINGMETAL_HDENGINE_H
-#define USDIMAGINGMETAL_HDENGINE_H
+#ifndef USDIMAGINGGLMETAL_HDENGINE_H
+#define USDIMAGINGGLMETAL_HDENGINE_H
 
 #include "pxr/pxr.h"
 
 #include "pxr/imaging/mtlf/mtlDevice.h"
+#include "pxr/imaging/mtlf/resourceFactory.h"
 
-#include "pxr/usdImaging/usdImagingMetal/api.h"
-#include "pxr/usdImaging/usdImagingMetal/engine.h"
+#include "pxr/usdImaging/usdImagingGL/api.h"
+#include "pxr/usdImaging/usdImagingGL/engine.h"
 #include "pxr/usdImaging/usdImaging/delegate.h"
 
 #include "pxr/imaging/hd/version.h"
@@ -52,91 +53,91 @@ PXR_NAMESPACE_OPEN_SCOPE
 TF_DECLARE_WEAK_AND_REF_PTRS(GarchSimpleLightingContext);
 
 class HdRenderIndex;
-typedef boost::shared_ptr<class UsdImagingMetalHdEngine>
-                                        UsdImagingMetalHdEngineSharedPtr;
-typedef std::vector<UsdImagingMetalHdEngineSharedPtr>
-                                        UsdImagingMetalHdEngineSharedPtrVector;
+typedef boost::shared_ptr<class UsdImagingGLMetalHdEngine>
+                                        UsdImagingGLMetalHdEngineSharedPtr;
+typedef std::vector<UsdImagingGLMetalHdEngineSharedPtr>
+                                        UsdImagingGLMetalHdEngineSharedPtrVector;
 typedef std::vector<UsdPrim> UsdPrimVector;
 
-class UsdImagingMetalHdEngine : public UsdImagingMetalEngine
+class UsdImagingGLMetalHdEngine : public UsdImagingGLEngine
 {
 public:
-    // Important! Call UsdImagingMetalHdEngine::IsDefaultPluginAvailable() before
+    // Important! Call UsdImagingGLMetalHdEngine::IsDefaultPluginAvailable() before
     // construction; if no plugins are available, the class will only
     // get halfway constructed.
-    USDIMAGINGMETAL_API
-    UsdImagingMetalHdEngine(const SdfPath& rootPath,
+    USDIMAGINGGL_API
+    UsdImagingGLMetalHdEngine(const SdfPath& rootPath,
                             const SdfPathVector& excludedPaths,
                             const SdfPathVector& invisedPaths=SdfPathVector(),
                             const SdfPath& delegateID = SdfPath::AbsoluteRootPath());
 
-    USDIMAGINGMETAL_API
+    USDIMAGINGGL_API
     static bool IsDefaultRendererPluginAvailable();
     
-    USDIMAGINGMETAL_API
+    USDIMAGINGGL_API
     static TfToken GetDefaultRendererPluginId();
 
-    USDIMAGINGMETAL_API
-    virtual ~UsdImagingMetalHdEngine();
+    USDIMAGINGGL_API
+    virtual ~UsdImagingGLMetalHdEngine();
 
-    USDIMAGINGMETAL_API
+    USDIMAGINGGL_API
     HdRenderIndex *GetRenderIndex() const;
 
-    USDIMAGINGMETAL_API
+    USDIMAGINGGL_API
     virtual void InvalidateBuffers() override;
 
-    USDIMAGINGMETAL_API
+    USDIMAGINGGL_API
     virtual void PrepareBatch(const UsdPrim& root,
-                              const UsdImagingMetalRenderParams& params) override;
-    USDIMAGINGMETAL_API
+                              const UsdImagingGLRenderParams& params) override;
+    USDIMAGINGGL_API
     virtual void RenderBatch(const SdfPathVector& paths,
-                             const UsdImagingMetalRenderParams& params) override;
+                             const UsdImagingGLRenderParams& params) override;
 
-    USDIMAGINGMETAL_API
+    USDIMAGINGGL_API
     virtual void Render(const UsdPrim& root,
-                        const UsdImagingMetalRenderParams& params) override;
+                        const UsdImagingGLRenderParams& params) override;
 
     // Core rendering function: just draw, don't update anything.
-    USDIMAGINGMETAL_API
-    void Render(const UsdImagingMetalRenderParams& params);
+    USDIMAGINGGL_API
+    void Render(const UsdImagingGLRenderParams& params);
 
-    USDIMAGINGMETAL_API
+    USDIMAGINGGL_API
     virtual void SetCameraState(const GfMatrix4d& viewMatrix,
                                 const GfMatrix4d& projectionMatrix,
                                 const GfVec4d& viewport) override;
 
-    USDIMAGINGMETAL_API
+    USDIMAGINGGL_API
     virtual void SetLightingStateFromOpenGL() override;
 
-    USDIMAGINGMETAL_API
+    USDIMAGINGGL_API
     virtual void SetLightingState(GarchSimpleLightingContextPtr const &src) override;
 
-    USDIMAGINGMETAL_API
+    USDIMAGINGGL_API
     virtual void SetLightingState(GarchSimpleLightVector const &lights,
                                   GarchSimpleMaterial const &material,
                                   GfVec4f const &sceneAmbient) override;
 
-    USDIMAGINGMETAL_API
+    USDIMAGINGGL_API
     virtual void SetRootTransform(GfMatrix4d const& xf) override;
 
-    USDIMAGINGMETAL_API
+    USDIMAGINGGL_API
     virtual void SetRootVisibility(bool isVisible) override;
 
-    USDIMAGINGMETAL_API
+    USDIMAGINGGL_API
     virtual void SetSelected(SdfPathVector const& paths) override;
 
-    USDIMAGINGMETAL_API
+    USDIMAGINGGL_API
     virtual void ClearSelected() override;
-    USDIMAGINGMETAL_API
+    USDIMAGINGGL_API
     virtual void AddSelected(SdfPath const &path, int instanceIndex) override;
 
-    USDIMAGINGMETAL_API
+    USDIMAGINGGL_API
     virtual void SetSelectionColor(GfVec4f const& color) override;
 
-    USDIMAGINGMETAL_API
+    USDIMAGINGGL_API
     virtual SdfPath GetRprimPathFromPrimId(int primId) const override;
 
-    USDIMAGINGMETAL_API
+    USDIMAGINGGL_API
     virtual SdfPath GetPrimPathFromInstanceIndex(
         SdfPath const& protoPrimPath,
         int instanceIndex,
@@ -144,61 +145,61 @@ public:
         SdfPath * rprimPath=NULL,
         SdfPathVector *instanceContext=NULL) override;
 
-    USDIMAGINGMETAL_API
+    USDIMAGINGGL_API
     virtual bool IsConverged() const override;
 
-    USDIMAGINGMETAL_API
+    USDIMAGINGGL_API
     virtual TfTokenVector GetRendererPlugins() const override;
 
-    USDIMAGINGMETAL_API
+    USDIMAGINGGL_API
     virtual std::string GetRendererDisplayName(TfToken const &id) const override;
     
-    USDIMAGINGMETAL_API
+    USDIMAGINGGL_API
     virtual TfToken GetCurrentRendererId() const override;
 
-    USDIMAGINGMETAL_API
+    USDIMAGINGGL_API
     virtual bool SetRendererPlugin(TfToken const &id) override;
 
-    USDIMAGINGMETAL_API
+    USDIMAGINGGL_API
     virtual TfTokenVector GetRendererAovs() const;
     
-    USDIMAGINGMETAL_API
+    USDIMAGINGGL_API
     virtual bool SetRendererAov(TfToken const& id);
     
-    USDIMAGINGMETAL_API
+    USDIMAGINGGL_API
     virtual bool TestIntersection(
         const GfMatrix4d &viewMatrix,
         const GfMatrix4d &projectionMatrix,
         const GfMatrix4d &worldToLocalSpace,
         const UsdPrim& root, 
-        const UsdImagingMetalRenderParams& params,
+        const UsdImagingGLRenderParams& params,
         GfVec3d *outHitPoint,
         SdfPath *outHitPrimPath = NULL,
         SdfPath *outHitInstancerPath = NULL,
         int *outHitInstanceIndex = NULL,
         int *outHitElementIndex = NULL) override;
 
-    USDIMAGINGMETAL_API
+    USDIMAGINGGL_API
     virtual bool TestIntersectionBatch(
         const GfMatrix4d &viewMatrix,
         const GfMatrix4d &projectionMatrix,
         const GfMatrix4d &worldToLocalSpace,
         const SdfPathVector& paths, 
-        const UsdImagingMetalRenderParams& params,
+        const UsdImagingGLRenderParams& params,
         unsigned int pickResolution,
         PathTranslatorCallback pathTranslator,
         HitBatch *outHit) override;
 
-    USDIMAGINGMETAL_API
+    USDIMAGINGGL_API
     virtual VtDictionary GetResourceAllocation() const override;
 
-    USDIMAGINGMETAL_API
-    virtual UsdImagingMetalRendererSettingsList GetRendererSettingsList() const;
+    USDIMAGINGGL_API
+    virtual UsdImagingGLRendererSettingsList GetRendererSettingsList() const;
     
-    USDIMAGINGMETAL_API
+    USDIMAGINGGL_API
     virtual VtValue GetRendererSetting(TfToken const& id) const;
     
-    USDIMAGINGMETAL_API
+    USDIMAGINGGL_API
     virtual void SetRendererSetting(TfToken const& id,
                                     VtValue const& value);
 private:
@@ -206,20 +207,20 @@ private:
     // These functions factor batch preparation into separate steps so they
     // can be reused by both the vectorized and non-vectorized API.
     bool _CanPrepareBatch(const UsdPrim& root,
-                          const UsdImagingMetalRenderParams& params);
+                          const UsdImagingGLRenderParams& params);
     void _PreSetTime(const UsdPrim& root,
-                     const UsdImagingMetalRenderParams& params);
+                     const UsdImagingGLRenderParams& params);
     void _PostSetTime(const UsdPrim& root,
-                      const UsdImagingMetalRenderParams& params);
+                      const UsdImagingGLRenderParams& params);
 
     // Create a hydra collection given root paths and render params.
     // Returns true if the collection was updated.
     static bool _UpdateHydraCollection(HdRprimCollection *collection,
                           SdfPathVector const& roots,
-                          const UsdImagingMetalRenderParams& params,
+                          const UsdImagingGLRenderParams& params,
                           TfTokenVector *renderTags);
-    static HdxRenderTaskParams _MakeHydraUsdImagingMetalRenderParams(
-                          const UsdImagingMetalRenderParams& params);
+    static HdxRenderTaskParams _MakeHydraUsdImagingGLRenderParams(
+                          const UsdImagingGLRenderParams& params);
     
     void _InitializeCapturing();
 
@@ -257,8 +258,11 @@ private:
     MTLRenderPassDescriptor* _mtlRenderPassDescriptor;
     
     MTLCaptureManager *_sharedCaptureManager;
+
+    // Our base GPU resources are provided by Mtlf
+    MtlfResourceFactory resourceFactory;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE
 
-#endif // USDIMAGINGMETAL_HDENGINE_H
+#endif // USDIMAGINGGLMETAL_HDENGINE_H

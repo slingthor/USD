@@ -44,14 +44,16 @@
 #include "pxr/imaging/hd/extComputation.h"
 #include "pxr/imaging/hd/perfLog.h"
 
-#include "pxr/imaging/garch/contextCaps.h"
+#include "pxr/imaging/garch/glslfx.h"
 #include "pxr/imaging/garch/resourceFactory.h"
 #include "pxr/imaging/garch/textureRegistry.h"
 
-
+#include "pxr/imaging/glf/contextCaps.h"
 #include "pxr/imaging/glf/diagnostic.h"
-#include "pxr/imaging/garch/glslfx.h"
 
+#if defined(ARCH_GFX_METAL)
+#include "pxr/imaging/mtlf/contextCaps.h"
+#endif
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -322,7 +324,10 @@ HdStRenderDelegate::CommitResources(HdChangeTracker *tracker)
 bool
 HdStRenderDelegate::IsSupported()
 {
-    return (GarchResourceFactory::GetInstance()->GetContextCaps().apiVersion >= 400);
+#if defined(ARCH_GFX_METAL)
+    return (MtlfContextCaps::GetAPIVersion() >= 400);
+#endif
+    return (GlfContextCaps::GetAPIVersion() >= 400);
 }
 
 TfTokenVector

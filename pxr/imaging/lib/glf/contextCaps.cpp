@@ -61,6 +61,29 @@ GlfContextCaps::GlfContextCaps()
     _LoadCaps();
 }
 
+int
+GlfContextCaps::GetAPIVersion()
+{
+    const char *glVersionStr = (const char*)glGetString(GL_VERSION);
+    
+    // GL hasn't been initialized yet.
+    if (glVersionStr == NULL) {
+        return 0;
+    }
+    
+    const char *dot = strchr(glVersionStr, '.');
+    if (TF_VERIFY((dot && dot != glVersionStr),
+                  "Can't parse GL_VERSION %s", glVersionStr)) {
+        // GL_VERSION = "4.5.0 <vendor> <version>"
+        //              "4.1 <vendor-os-ver> <version>"
+        //              "4.1 <vendor-os-ver>"
+        int major = std::max(0, std::min(9, *(dot-1) - '0'));
+        int minor = std::max(0, std::min(9, *(dot+1) - '0'));
+        return major * 100 + minor * 10;
+    }
+    return 0;
+}
+
 void
 GlfContextCaps::_LoadCaps()
 {
@@ -90,16 +113,9 @@ GlfContextCaps::_LoadCaps()
     // GL hasn't been initialized yet.
     if (glVersionStr == NULL) return;
 
+    apiVersion = GetAPIVersion();
+
     const char *dot = strchr(glVersionStr, '.');
-    if (TF_VERIFY((dot && dot != glVersionStr),
-                  "Can't parse GL_VERSION %s", glVersionStr)) {
-        // GL_VERSION = "4.5.0 <vendor> <version>"
-        //              "4.1 <vendor-os-ver> <version>"
-        //              "4.1 <vendor-os-ver>"
-        int major = std::max(0, std::min(9, *(dot-1) - '0'));
-        int minor = std::max(0, std::min(9, *(dot+1) - '0'));
-        apiVersion = major * 100 + minor * 10;
-    }
 
     if (apiVersion >= 200) {
         const char *glslVersionStr =

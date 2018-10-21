@@ -7,6 +7,11 @@ if (NOT ${PXR_ENABLE_GL_SUPPORT})
     return()
 endif()
 
+if (APPLE)
+    set(METAL_LIBRARY               mtlf)
+    set(METAL_PUBLIC_CLASSES        Metal/hdEngine)
+endif()
+
 # Note: both python include directives are included for compatibility.
 pxr_library(usdImagingGL
     LIBRARIES
@@ -28,6 +33,7 @@ pxr_library(usdImagingGL
         usdImaging
         ar
         ${Boost_PYTHON_LIBRARY}
+        ${METAL_LIBRARY}
         ${PYTHON_LIBRARY}
         ${OPENGL_gl_LIBRARY}
         ${OPENGL_glu_LIBRARY}
@@ -44,14 +50,15 @@ pxr_library(usdImagingGL
     PUBLIC_CLASSES
         engine
         gl
-        hdEngine
-        refEngine
         renderParams
+        GL/hdEngine
+        GL/refEngine
+        ${METAL_PUBLIC_CLASSES}
 
     PUBLIC_HEADERS
         api.h
-        rendererSettings.h
         version.h
+        rendererSettings.h
 
     PRIVATE_HEADERS
         unitTestGLDrawing.h

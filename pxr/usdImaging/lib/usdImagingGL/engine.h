@@ -36,7 +36,6 @@
 
 #include "pxr/imaging/garch/simpleLight.h"
 #include "pxr/imaging/garch/simpleMaterial.h"
-#include "pxr/imaging/glf/resourceFactory.h"
 
 #include "pxr/base/tf/declarePtrs.h"
 
@@ -327,10 +326,6 @@ protected:
     // Once refEngine goes away and we only have hdEngine, it may be best to move this to private
     typedef boost::unordered_map<GlfGLContextSharedPtr, GarchDrawTargetRefPtr> _DrawTargetPerContextMap;
     _DrawTargetPerContextMap _drawTargets;
-    
-private:
-    // Our base GPU resources are provided by Glf
-    GlfResourceFactory resourceFactory;
 };
 
 

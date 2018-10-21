@@ -49,8 +49,8 @@
 #include "pxr/usdImaging/usdImaging/tokens.h"
 
 #include "pxr/usdImaging/usdImagingGL/gl.h"
-#include "pxr/usdImaging/usdImagingGL/hdEngine.h"
-#include "pxr/usdImaging/usdImagingGL/refEngine.h"
+#include "pxr/usdImaging/usdImagingGL/GL/hdEngine.h"
+#include "pxr/usdImaging/usdImagingGL/GL/refEngine.h"
 
 #include <boost/shared_ptr.hpp>
 

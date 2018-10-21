@@ -79,7 +79,6 @@ _IsHydraEnabled()
 
 UsdImagingGLEngine::~UsdImagingGLEngine()
 {
-    GarchResourceFactory::GetInstance().SetResourceFactory(NULL);
 }
 
 /*static*/

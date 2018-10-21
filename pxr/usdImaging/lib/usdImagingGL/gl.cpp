@@ -22,10 +22,14 @@
 // language governing permissions and limitations under the Apache License.
 //
 #include "pxr/pxr.h"
+#include "pxr/imaging/glf/glew.h"
 
 #include "pxr/usdImaging/usdImagingGL/gl.h"
-#include "pxr/usdImaging/usdImagingGL/hdEngine.h"
-#include "pxr/usdImaging/usdImagingGL/refEngine.h"
+#include "pxr/usdImaging/usdImagingGL/GL/hdEngine.h"
+#include "pxr/usdImaging/usdImagingGL/GL/refEngine.h"
+#if defined(ARCH_GFX_METAL)
+#include "pxr/usdImaging/usdImagingGL/Metal/hdEngine.h"
+#endif
 
 #include "pxr/base/tf/diagnostic.h"
 
@@ -43,8 +47,13 @@ _InitEngine(const SdfPath& rootPath,
             const SdfPath& delegateID = SdfPath::AbsoluteRootPath())
 {
     if (UsdImagingGLEngine::IsHydraEnabled()) {
+#if defined(ARCH_GFX_METAL)
+        return new UsdImagingGLMetalHdEngine(rootPath, excludedPaths,
+                                             invisedPaths, delegateID);
+#else
         return new UsdImagingGLHdEngine(rootPath, excludedPaths,
                                         invisedPaths, delegateID);
+#endif
     } else {
         // In the refEngine, both excluded paths and invised paths are treated
         // the same way.

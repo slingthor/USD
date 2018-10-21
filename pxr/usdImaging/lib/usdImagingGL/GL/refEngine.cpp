@@ -24,7 +24,7 @@
 #include "pxr/pxr.h"
 #include "pxr/imaging/glf/glew.h"
 
-#include "pxr/usdImaging/usdImagingGL/refEngine.h"
+#include "pxr/usdImaging/usdImagingGL/GL/refEngine.h"
 
 #include "pxr/usdImaging/usdImaging/cubeAdapter.h"
 #include "pxr/usdImaging/usdImaging/sphereAdapter.h"

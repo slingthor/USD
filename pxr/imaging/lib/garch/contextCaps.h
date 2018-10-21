@@ -118,12 +118,7 @@ public:
     /// Returns whether to do per-instance culling on the GPU
 	GARCH_API
     virtual bool IsEnabledGPUInstanceFrustumCulling() const;
-    
-    /// Returns a string identifying the renderer, that matches the renderer specific
-    /// part of the adapter names
-	GARCH_API
-    virtual char const* const GetRendererName() const = 0;
-    
+
 protected:
 
 	GARCH_API

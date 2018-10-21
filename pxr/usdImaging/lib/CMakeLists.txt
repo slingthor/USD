@@ -10,7 +10,3 @@ set(DIRS
 foreach(d ${DIRS})
     add_subdirectory(${d})
 endforeach()
-
-if (APPLE)
-    add_subdirectory(usdImagingMetal)
-endif()

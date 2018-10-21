@@ -27,7 +27,7 @@
 #include <boost/python.hpp>
 #include <boost/python/converter/from_python.hpp>
 
-#include "pxr/usdImaging/usdImagingMetal/metal.h"
+#include "pxr/usdImaging/usdImagingGL/metal.h"
 
 #include "pxr/usdImaging/usdImaging/delegate.h"
 
@@ -117,7 +117,7 @@ void wrapMetal()
     { 
         // Start a new scope so that DrawMode, CullStyle and
         // UsdImagingMetalRenderParams are under GL.
-        scope Metal = class_<UsdImagingMetal, boost::noncopyable>("GL",
+        scope Metal = class_<UsdImagingGLMetal, boost::noncopyable>("GL",
                                         "UsdImaging Metal Renderer class")
             .def( init<>() )
             .def( init<const SdfPath &, const SdfPathVector&, const SdfPathVector& >() )
@@ -172,7 +172,7 @@ void wrapMetal()
         ;
 
         // Wrap the CullStyle enum. Accessible as UsdImaging.GL.CullStyle
-        enum_<UsdImagingMetalCullStyle>("CullStyle")
+        enum_<UsdImagingGLCullStyle>("CullStyle")
                 .value("CULL_STYLE_NOTHING", UsdImagingMetalCullStyle::CULL_STYLE_NOTHING)
                 .value("CULL_STYLE_BACK", UsdImagingMetalCullStyle::CULL_STYLE_BACK)
                 .value("CULL_STYLE_FRONT", UsdImagingMetalCullStyle::CULL_STYLE_FRONT)
@@ -180,8 +180,8 @@ void wrapMetal()
          ;
 
         // Wrap the RenderParams struct. Accessible as UsdImaging.GL.RenderParams
-        typedef UsdImagingMetalRenderParams Params;
-        class_<UsdImagingMetalRenderParams>("RenderParams",
+        typedef UsdImagingGLRenderParams Params;
+        class_<UsdImagingGLRenderParams>("RenderParams",
                                         "Metal Renderer parameters")
             .def_readwrite("frame", &Params::frame)
             .def_readwrite("complexity", &Params::complexity)

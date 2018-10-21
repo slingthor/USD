@@ -53,14 +53,13 @@ PXR_NAMESPACE_OPEN_SCOPE
 ///     update and invalidate.
 ///
 class MtlfContextCaps : public GarchContextCaps {
-    
-    /// Returns a string identifying the renderer, that matches the renderer specific
-    /// part of the adapter names
-    virtual char const* const GetRendererName() const override {
-        return "Metal";
-    }
+
+public:
+    MTLF_API
+    static int GetAPIVersion();
 
 private:
+
     MtlfContextCaps();
     virtual ~MtlfContextCaps() {}
 
