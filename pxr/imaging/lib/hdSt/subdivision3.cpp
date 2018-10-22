@@ -184,7 +184,6 @@ private:
  #if OPENSUBDIV_HAS_METAL_COMPUTE && defined(ARCH_GFX_METAL)
         _deviceContext.device       = MtlfMetalContext::GetMetalContext()->device;
         _deviceContext.commandQueue = MtlfMetalContext::GetMetalContext()->commandQueue;
-        NSLog(@"OSD device is %@", _deviceContext.device.name);
         return &_deviceContext;
 #else
         return NULL;
