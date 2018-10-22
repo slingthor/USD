@@ -459,8 +459,12 @@ private:
     id<MTLBuffer>              gsCurrentBuffer;
     std::vector<id<MTLBuffer>> gsBuffers;
     id<MTLFence>               gsFence;
+    bool                       gsOpenBatch;
+    bool                       isRenderPassDescriptorPatched;
 
     void _gsAdvanceBuffer();
+    void _gsEncodeSync();
+    void _PatchRenderPassDescriptor();
     
     void CleanupUnusedBuffers(bool forceClean);
    
