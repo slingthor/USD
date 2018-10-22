@@ -23,7 +23,7 @@
 //
 /// \file garch/udimTexture.cpp
 
-#include "pxr/imaging/glf/glew.h"
+#include <GL/glew.h>
 
 #include "pxr/imaging/garch/udimTexture.h"
 
