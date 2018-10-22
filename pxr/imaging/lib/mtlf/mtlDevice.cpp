@@ -432,6 +432,9 @@ MtlfMetalContext::MtlfMetalContext(id<MTLDevice> _device, int width, int height)
     
     frameCount = 0;
     lastCompletedFrame = -1;
+    lastCompletedCommandBuffer = -1;
+    committedCommandBufferCount = 0;
+    
 }
 
 MtlfMetalContext::~MtlfMetalContext()
@@ -1653,6 +1656,7 @@ void MtlfMetalContext::CommitCommandBuffer(bool waituntilScheduled, bool waitUnt
 
      [wq->commandBuffer addCompletedHandler:^(id<MTLCommandBuffer> commandBuffer) {
         GPUTimerEndTimer(thisFrameNumber);
+        lastCompletedCommandBuffer++;
       }];
 
     GPUTimerStartTimer(thisFrameNumber);
@@ -1667,7 +1671,9 @@ void MtlfMetalContext::CommitCommandBuffer(bool waituntilScheduled, bool waitUnt
     }
 
     ResetEncoders(workQueueType);
+    committedCommandBufferCount++;
     METAL_INC_STAT(resourceStats.commandBuffersCommitted);
+    CleanupUnusedBuffers(false);
 }
 
 
@@ -1858,7 +1864,7 @@ id<MTLBuffer> MtlfMetalContext::GetMetalBuffer(NSUInteger length, MTLResourceOpt
         if (buffer.length == length              &&
             storageMode   == buffer.storageMode  &&
             cpuCacheMode  == buffer.cpuCacheMode &&
-            lastCompletedFrame >= (bufferEntry.releasedOnFrame + METAL_SAFE_BUFFER_AGE_IN_FRAMES) ) {
+            lastCompletedCommandBuffer >= (bufferEntry.releasedOnCommandBuffer + METAL_SAFE_BUFFER_REUSE_AGE)) {
             //NSLog(@"Reusing buffer of length %lu (%lu)", length, frameCount);
             
             // Copy over data
@@ -1919,6 +1925,7 @@ void MtlfMetalContext::ReleaseMetalBuffer(id<MTLBuffer> buffer)
     MetalBufferListEntry bufferEntry;
     bufferEntry.buffer = buffer;
     bufferEntry.releasedOnFrame = frameCount;
+    bufferEntry.releasedOnCommandBuffer = committedCommandBufferCount;
     bufferFreeList.push_back(bufferEntry);
     //NSLog(@"Adding buffer to free list of length %lu (%lu)", buffer.length, frameCount);
 #else
@@ -1940,7 +1947,16 @@ void MtlfMetalContext::CleanupUnusedBuffers(bool forceClean)
         MetalBufferListEntry bufferEntry = *entry;
         id<MTLBuffer>  buffer = bufferEntry.buffer;
         
-        if ((frameCount > (bufferEntry.releasedOnFrame + METAL_MAX_BUFFER_AGE_IN_FRAMES))  || forceClean) {
+        // Criteria for non forced releasing buffers:
+        // a) Older than x number of frames
+        // b) Older than y number of command buffers
+        // c) Memory threshold higher than z
+        bool bReleaseBuffer = (frameCount > (bufferEntry.releasedOnFrame + METAL_MAX_BUFFER_AGE_IN_FRAMES)  ||
+                               lastCompletedCommandBuffer > (bufferEntry.releasedOnCommandBuffer +  METAL_MAX_BUFFER_AGE_IN_COMMAND_BUFFERS) ||
+                               resourceStats.currentBufferAllocation > METAL_HIGH_MEMORY_THRESHOLD ||
+                               forceClean);
+                               
+        if (bReleaseBuffer) {
             //NSLog(@"Releasing buffer of length %lu (%lu) (%lu outstanding)", buffer.length, frameCount, bufferFreeList.size());
             METAL_INC_STAT_VAL(resourceStats.currentBufferAllocation, -buffer.length);
             [buffer release];
@@ -1969,7 +1985,6 @@ void MtlfMetalContext::EndFrame() {
     //NSLog(@"Time: %3.3f (%lu)", GetGPUTimeInMs(), frameCount);
     
     frameCount++;
-    CleanupUnusedBuffers(false);
     
     currentWorkQueueType = METALWORKQUEUE_DEFAULT;
     currentWorkQueue     = &workQueues[currentWorkQueueType];
