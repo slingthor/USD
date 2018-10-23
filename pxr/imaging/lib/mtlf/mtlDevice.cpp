@@ -48,9 +48,10 @@
 
 #define DIRTY_METALRENDERSTATE_ALL                      0xFFFFFFFF
 
+//Be careful with these when using Concurrent Dispatch. Also; you can't enable asynchronous compute without also enabling METAL_EVENTS_AVAILABLE.
 #define METAL_COMPUTEGS_BUFFER_SHARING                    1
 #define METAL_COMPUTEGS_MANUAL_HAZARD_TRACKING            1
-#define METAL_COMPUTEGS_ALLOW_ASYNCHRONOUS_COMPUTE        0
+#define METAL_COMPUTEGS_ALLOW_ASYNCHRONOUS_COMPUTE        0     //Currently disabled due to additional overhead of using events to synchronize. 
 
 PXR_NAMESPACE_OPEN_SCOPE
 MtlfMetalContextSharedPtr MtlfMetalContext::context = NULL;
@@ -282,7 +283,8 @@ void MtlfMetalContext::_InitialiseGL()
 MtlfMetalContext::MtlfMetalContext(id<MTLDevice> _device, int width, int height)
 : enableMVA(false)
 , enableComputeGS(false)
-, gsDataOffset(0), gsBufferIndex(0), gsMaxConcurrentBatches(0), gsMaxDataPerBatch(0), gsCurrentBuffer(nil), gsFence(nil)
+, gsDataOffset(0), gsBufferIndex(0), gsMaxConcurrentBatches(0), gsMaxDataPerBatch(0), gsCurrentBuffer(nil), gsFence(nil), gsOpenBatch(false)
+, isRenderPassDescriptorPatched(false)
 {
     if (_device == nil) {
         // Select Intel GPU if possible due to current issues on AMD. Revert when fixed - MTL_FIXME
@@ -305,7 +307,7 @@ MtlfMetalContext::MtlfMetalContext(id<MTLDevice> _device, int width, int height)
     if(enableMultiQueue) {
         NSLog(@"Device %@ supports Metal 2, enabling multi-queue codepath.", device.name);
         commandQueueGS = [device newCommandQueue];
-        gsMaxDataPerBatch = 1024 * 1024 * 2;
+        gsMaxDataPerBatch = 1024 * 1024 * 32;
         gsMaxConcurrentBatches = 3;
     }
     else {
@@ -432,6 +434,9 @@ MtlfMetalContext::MtlfMetalContext(id<MTLDevice> _device, int width, int height)
     
     frameCount = 0;
     lastCompletedFrame = -1;
+    lastCompletedCommandBuffer = -1;
+    committedCommandBufferCount = 0;
+    
 }
 
 MtlfMetalContext::~MtlfMetalContext()
@@ -1572,6 +1577,8 @@ void MtlfMetalContext::ResetEncoders(MetalWorkQueueType workQueueType, bool isIn
             [wq->event release];
 		}
 #endif
+        if(gsOpenBatch)
+            TF_FATAL_CODING_ERROR("A Compute Geometry Shader batch is left open!");
     }
    
     wq->commandBuffer         = nil;
@@ -1641,6 +1648,9 @@ void MtlfMetalContext::CommitCommandBuffer(bool waituntilScheduled, bool waitUnt
         }
      }
     
+    if(gsOpenBatch)
+        _gsEncodeSync();
+    
     if(wq->generatesEndOfQueueEvent) {
         wq->currentEventValue = endOfQueueEventValue;
 #if defined(METAL_EVENTS_AVAILABLE)
@@ -1653,6 +1663,7 @@ void MtlfMetalContext::CommitCommandBuffer(bool waituntilScheduled, bool waitUnt
 
      [wq->commandBuffer addCompletedHandler:^(id<MTLCommandBuffer> commandBuffer) {
         GPUTimerEndTimer(thisFrameNumber);
+        lastCompletedCommandBuffer++;
       }];
 
     GPUTimerStartTimer(thisFrameNumber);
@@ -1667,7 +1678,9 @@ void MtlfMetalContext::CommitCommandBuffer(bool waituntilScheduled, bool waitUnt
     }
 
     ResetEncoders(workQueueType);
+    committedCommandBufferCount++;
     METAL_INC_STAT(resourceStats.commandBuffersCommitted);
+    CleanupUnusedBuffers(false);
 }
 
 
@@ -1688,6 +1701,7 @@ void MtlfMetalContext::SetRenderPassDescriptor(MTLRenderPassDescriptor *renderPa
     }
     
     wq->currentRenderPassDescriptor = renderPassDescriptor;
+    isRenderPassDescriptorPatched = false;
 }
 
 
@@ -1858,7 +1872,7 @@ id<MTLBuffer> MtlfMetalContext::GetMetalBuffer(NSUInteger length, MTLResourceOpt
         if (buffer.length == length              &&
             storageMode   == buffer.storageMode  &&
             cpuCacheMode  == buffer.cpuCacheMode &&
-            lastCompletedFrame >= (bufferEntry.releasedOnFrame + METAL_SAFE_BUFFER_AGE_IN_FRAMES) ) {
+            lastCompletedCommandBuffer >= (bufferEntry.releasedOnCommandBuffer + METAL_SAFE_BUFFER_REUSE_AGE)) {
             //NSLog(@"Reusing buffer of length %lu (%lu)", length, frameCount);
             
             // Copy over data
@@ -1919,6 +1933,7 @@ void MtlfMetalContext::ReleaseMetalBuffer(id<MTLBuffer> buffer)
     MetalBufferListEntry bufferEntry;
     bufferEntry.buffer = buffer;
     bufferEntry.releasedOnFrame = frameCount;
+    bufferEntry.releasedOnCommandBuffer = committedCommandBufferCount;
     bufferFreeList.push_back(bufferEntry);
     //NSLog(@"Adding buffer to free list of length %lu (%lu)", buffer.length, frameCount);
 #else
@@ -1940,7 +1955,16 @@ void MtlfMetalContext::CleanupUnusedBuffers(bool forceClean)
         MetalBufferListEntry bufferEntry = *entry;
         id<MTLBuffer>  buffer = bufferEntry.buffer;
         
-        if ((frameCount > (bufferEntry.releasedOnFrame + METAL_MAX_BUFFER_AGE_IN_FRAMES))  || forceClean) {
+        // Criteria for non forced releasing buffers:
+        // a) Older than x number of frames
+        // b) Older than y number of command buffers
+        // c) Memory threshold higher than z
+        bool bReleaseBuffer = (frameCount > (bufferEntry.releasedOnFrame + METAL_MAX_BUFFER_AGE_IN_FRAMES)  ||
+                               lastCompletedCommandBuffer > (bufferEntry.releasedOnCommandBuffer +  METAL_MAX_BUFFER_AGE_IN_COMMAND_BUFFERS) ||
+                               resourceStats.currentBufferAllocation > METAL_HIGH_MEMORY_THRESHOLD ||
+                               forceClean);
+                               
+        if (bReleaseBuffer) {
             //NSLog(@"Releasing buffer of length %lu (%lu) (%lu outstanding)", buffer.length, frameCount, bufferFreeList.size());
             METAL_INC_STAT_VAL(resourceStats.currentBufferAllocation, -buffer.length);
             [buffer release];
@@ -1969,13 +1993,14 @@ void MtlfMetalContext::EndFrame() {
     //NSLog(@"Time: %3.3f (%lu)", GetGPUTimeInMs(), frameCount);
     
     frameCount++;
-    CleanupUnusedBuffers(false);
     
     currentWorkQueueType = METALWORKQUEUE_DEFAULT;
     currentWorkQueue     = &workQueues[currentWorkQueueType];
 
     //Reset the Compute GS intermediate buffer offset
     _gsAdvanceBuffer();
+    
+    isRenderPassDescriptorPatched = false;
 }
 
 void MtlfMetalContext::_gsAdvanceBuffer() {
@@ -2016,7 +2041,8 @@ void MtlfMetalContext::PrepareForComputeGSPart(uint32_t vertData, uint32_t primD
     //If we are using a new buffer we've started a new batch. That means some synching/committing may need to happen before we can continue.
     if(startingNewBatch) {
         if(enableMultiQueue) {
-            //Using multiple queues means the synching happens using events as the queues are executed in parallel.
+            _gsEncodeSync();
+            gsOpenBatch = true;
         }
         else {
             //When not using multiple queues we rely on the order in the commandbuffer combined with a fence for synching.
@@ -2038,16 +2064,7 @@ void MtlfMetalContext::PrepareForComputeGSPart(uint32_t vertData, uint32_t primD
                 CreateCommandBuffer(METALWORKQUEUE_DEFAULT);
                 
                 //Patch the drescriptor to prevent clearing attachments we just rendered to.
-                MTLRenderPassDescriptor* rpd = context->GetRenderPassDescriptor();
-                if(rpd.depthAttachment != nil)
-                    rpd.depthAttachment.loadAction = MTLLoadActionLoad;
-                if(rpd.stencilAttachment != nil)
-                    rpd.stencilAttachment.loadAction = MTLLoadActionLoad;
-                for(int i = 0; i < 8; i++) {
-                    if(rpd.colorAttachments[i] != nil)
-                        rpd.colorAttachments[i].loadAction = MTLLoadActionLoad;
-                }
-                context->SetRenderPassDescriptor(rpd);
+                _PatchRenderPassDescriptor();
             }
             
  #if METAL_COMPUTEGS_MANUAL_HAZARD_TRACKING
@@ -2063,6 +2080,45 @@ void MtlfMetalContext::PrepareForComputeGSPart(uint32_t vertData, uint32_t primD
  #endif
         }
     }
+}
+
+void MtlfMetalContext::_gsEncodeSync() {
+    //Using multiple queues means the synching happens using events as the queues are executed in parallel.
+    EncodeWaitForEvent(METALWORKQUEUE_DEFAULT, METALWORKQUEUE_GEOMETRY_SHADER);
+    
+    if(gsOpenBatch) {
+        EncodeSignalEvent(METALWORKQUEUE_GEOMETRY_SHADER);
+     
+        uint64_t value_gs = GetEventValue(METALWORKQUEUE_DEFAULT);
+        uint64_t offset = gsMaxConcurrentBatches;
+        if(value_gs > offset) {
+            EncodeWaitForEvent(METALWORKQUEUE_GEOMETRY_SHADER, METALWORKQUEUE_DEFAULT, value_gs - offset);
+            EncodeSignalEvent(METALWORKQUEUE_DEFAULT);
+        }
+        
+        //By using events we triggered ending of the encoders. Need to patch up the render descriptor to prevent previous results from being wiped.
+        _PatchRenderPassDescriptor();
+    }
+    
+    gsOpenBatch = false;
+}
+
+void MtlfMetalContext::_PatchRenderPassDescriptor() {
+    if(isRenderPassDescriptorPatched)
+        return;
+    
+    MTLRenderPassDescriptor* rpd = context->GetRenderPassDescriptor();
+    if(rpd.depthAttachment != nil)
+        rpd.depthAttachment.loadAction = MTLLoadActionLoad;
+    if(rpd.stencilAttachment != nil)
+        rpd.stencilAttachment.loadAction = MTLLoadActionLoad;
+    for(int i = 0; i < 8; i++) {
+        if(rpd.colorAttachments[i] != nil)
+            rpd.colorAttachments[i].loadAction = MTLLoadActionLoad;
+    }
+    context->SetRenderPassDescriptor(rpd);
+    
+    isRenderPassDescriptorPatched = true;
 }
 
 void  MtlfMetalContext::GPUTImerResetTimer(unsigned long frameNumber) {

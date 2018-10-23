@@ -50,9 +50,11 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 #if METAL_REUSE_BUFFERS
 // How old a buffer must be before it can be reused - 0 should allow for most optimal memory footprint, higher values can be used for debugging issues
-#define METAL_SAFE_BUFFER_AGE_IN_FRAMES 0
+#define METAL_SAFE_BUFFER_REUSE_AGE 0
 // How old a buffer can be before it's freed
 #define METAL_MAX_BUFFER_AGE_IN_FRAMES 3
+#define METAL_MAX_BUFFER_AGE_IN_COMMAND_BUFFERS 10
+#define METAL_HIGH_MEMORY_THRESHOLD (2UL * 1024UL * 1024UL * 1024UL)
 #endif
 
 // Enable stats gathering
@@ -459,14 +461,19 @@ private:
     id<MTLBuffer>              gsCurrentBuffer;
     std::vector<id<MTLBuffer>> gsBuffers;
     id<MTLFence>               gsFence;
+    bool                       gsOpenBatch;
+    bool                       isRenderPassDescriptorPatched;
 
     void _gsAdvanceBuffer();
+    void _gsEncodeSync();
+    void _PatchRenderPassDescriptor();
     
     void CleanupUnusedBuffers(bool forceClean);
    
     struct MetalBufferListEntry {
         id<MTLBuffer> buffer;
         unsigned int releasedOnFrame;
+        unsigned int releasedOnCommandBuffer;
     };
     std::vector<MetalBufferListEntry> bufferFreeList;
     
@@ -478,6 +485,8 @@ private:
     
     long frameCount;
     long lastCompletedFrame;
+    long committedCommandBufferCount;
+    long lastCompletedCommandBuffer;
 
 #if METAL_ENABLE_STATS
     struct ResourceStats {

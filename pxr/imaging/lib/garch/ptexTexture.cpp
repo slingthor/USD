@@ -25,7 +25,7 @@
 
 // 
 
-#include "pxr/imaging/glf/glew.h"
+#include <GL/glew.h>
 
 #include "pxr/imaging/garch/ptexTexture.h"
 
