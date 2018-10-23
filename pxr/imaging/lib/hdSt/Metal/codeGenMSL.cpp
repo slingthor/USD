@@ -1746,8 +1746,12 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
                         break;
                     }
                 }
-                if(!takenFromGS)
-                    sourcePrefix << "vsOutput.";
+                if(!takenFromGS) {
+                    if(IsIgnoredVSAttribute(it->name))
+                        sourcePrefix << "0; // ";
+                    else
+                        sourcePrefix << "vsOutput.";
+                }
             }
         }
         
