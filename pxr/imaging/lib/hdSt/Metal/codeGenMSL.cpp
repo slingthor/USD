@@ -933,6 +933,16 @@ HdSt_CodeGenMSL::_ParseGLSL(std::stringstream &source, InOutParams& inParams, In
     source.seekp(0, std::stringstream::end);
 }
 
+static bool IsIgnoredVSAttribute(const TfToken& name) {
+    const static TfToken ignoreList[] = { TfToken("tesPatchCoord"), TfToken("tesTessCoord"), TfToken("gsPatchCoord"), TfToken("gsTessCoord") };
+    for(uint i = 0; i < (sizeof(ignoreList) / sizeof(ignoreList[0])); i++) {
+        if(ignoreList[i] != name)
+            continue;
+        return true;
+    }
+    return false;
+}
+
 void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream& glueGS, std::stringstream& gluePS, HdStMSLProgramSharedPtr mslProgram)
 {
     std::stringstream   glueCommon, copyInputsVtx, copyOutputsVtx, copyInputsVtxStruct_Compute,
@@ -1224,6 +1234,11 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
         }
         TF_FOR_ALL(it, _mslVSOutputParams) {
             HdSt_CodeGenMSL::TParam const &output = *it;
+            
+            //Ignore these because they serve no purpose as output of the VS. Just a symptom of how Hydra was setup.
+            if(IsIgnoredVSAttribute(output.name))
+                continue;
+            
             vsOutputStruct  << "    HD_MTL_VS_ATTRIBUTE(" << output.dataType
                             << ", " << output.name
                             << ", " << (output.attribute.IsEmpty() ? "[[center_perspective]]" : output.attribute.GetString()) << ");\n";
@@ -1373,15 +1388,17 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
                         << name << " = " << (accessor.empty() ? name : accessor) << ";\n";
             
             //Generate code for merging GS results into pass-through VS, only export those that have a matching VSOut member.
-            TF_FOR_ALL(itVS, _mslVSOutputParams) {
-                if(itVS->name != it->name)
-                    continue;
-                //MTL_TODO: Make this optional per member, we want to read/export as little GS data as possible. If it's
-                //          not being touched in the GS, we shouldn't read it here as the VS will already have the re-
-                //          calculated results.
-                //NOTE: Accessing the GS output buffer needs to happen on the bare vertexID, not offset with anything or indexed.
-                vsGsOutputMergeCode << "    vsOutput." << name << " = " << (isPerPrim ? vsPrimBufferAccessor.str() : vsVertBufferAccessor.str()) << name << ";\n";
-                break;
+            if(!IsIgnoredVSAttribute(it->name)) {
+                TF_FOR_ALL(itVS, _mslVSOutputParams) {
+                    if(itVS->name != it->name)
+                        continue;
+                    //MTL_TODO: Make this optional per member, we want to read/export as little GS data as possible. If it's
+                    //          not being touched in the GS, we shouldn't read it here as the VS will already have the re-
+                    //          calculated results.
+                    //NOTE: Accessing the GS output buffer needs to happen on the bare vertexID, not offset with anything or indexed.
+                    vsGsOutputMergeCode << "    vsOutput." << name << " = " << (isPerPrim ? vsPrimBufferAccessor.str() : vsVertBufferAccessor.str()) << name << ";\n";
+                    break;
+                }
             }
             
             //MTL_FIXME: Find size of dataTypes by using existing Hd functionality.
@@ -1729,8 +1746,12 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
                         break;
                     }
                 }
-                if(!takenFromGS)
-                    sourcePrefix << "vsOutput.";
+                if(!takenFromGS) {
+                    if(IsIgnoredVSAttribute(it->name))
+                        sourcePrefix << "0; // ";
+                    else
+                        sourcePrefix << "vsOutput.";
+                }
             }
         }
         
