@@ -1729,8 +1729,35 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
                         break;
                     }
                 }
-                if(!takenFromGS)
-                    sourcePrefix << "vsOutput.";
+                if (!takenFromGS) {
+                    bool takenFromVS = false;
+                    for (auto vsOutput : _mslVSOutputParams) {
+                        std::string vs_name = vsOutput.name.GetString();
+                        
+                        if(vs_name != name)
+                            continue;
+                        
+                        takenFromVS = true;
+                        break;
+                    }
+                    
+                    if (takenFromVS) {
+                        sourcePrefix << "vsOutput.";
+                    }
+                    else {
+                        // Special case some stuff!
+                        if (name == "u") {
+                            fsInputCode << "    scope." << destPrefix.str() << (accessor.empty() ? name : accessor) << " = "
+                                        << "_barycentricCoords.y;\n";
+                            continue;
+                        }
+                        else if (name == "v") {
+                            fsInputCode << "    scope." << destPrefix.str() << (accessor.empty() ? name : accessor) << " = "
+                                        << "_barycentricCoords.x;\n";
+                            continue;
+                        }
+                    }
+                }
             }
         }
         
