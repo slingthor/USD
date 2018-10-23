@@ -44,10 +44,12 @@ out VertexData
     vec3 Neye;
 } outData;
 
+#if !defined(ARCH_GFX_METAL)
 out vec4 tesPatchCoord;
 out vec2 tesTessCoord;
 out vec4 gsPatchCoord;
 out vec2 gsTessCoord;
+#endif
 
 // Fwd declare methods defined in pointId.glslfx, that are used below.
 #if !defined(ARCH_GFX_METAL)
@@ -66,12 +68,14 @@ void main(void)
 
     outData.Neye = GetNormal(vec3(0), 0); // normalized
 
+#if !defined(ARCH_GFX_METAL)
     // Fill out redundantly, since at this point we don't know
     // the following stages include tessellation or geometry shader.
     // we rely on that compiler (linker) optimizes out these redundant
     // assignment and attribute plumbing.
     tesPatchCoord = gsPatchCoord = vec4(0);
     tesTessCoord = gsTessCoord = vec2(0);
+#endif
 
     int pointId = GetPointId();
     gl_PointSize = GetPointRasterSize(pointId);
