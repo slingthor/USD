@@ -83,11 +83,6 @@ HdSt_QuadrangulateComputationGPUGL::Execute(
         return;
     }
     
-#if defined(ARCH_GFX_METAL)
-    // Emit error until we support this
-    TF_CODING_ERROR("Metal Compute currently not supported");
-#endif
-
     if (!glDispatchCompute)
         return;
 

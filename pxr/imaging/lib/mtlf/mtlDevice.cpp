@@ -45,6 +45,7 @@
 #define DIRTY_METALRENDERSTATE_DRAW_TARGET                0x100
 #define DIRTY_METALRENDERSTATE_VERTEX_DESCRIPTOR          0x200
 #define DIRTY_METALRENDERSTATE_CULLMODE_WINDINGORDER      0x400
+#define DIRTY_METALRENDERSTATE_FILL_MODE                  0x800
 
 #define DIRTY_METALRENDERSTATE_ALL                      0xFFFFFFFF
 
@@ -381,7 +382,9 @@ MtlfMetalContext::MtlfMetalContext(id<MTLDevice> _device, int width, int height)
     computePipelineStateDescriptor = nil;
     vertexDescriptor = nil;
     indexBuffer = nil;
+    vertexPositionBuffer = nil;
     remappedQuadIndexBuffer = nil;
+    pointIndexBuffer = nil;
     numVertexComponents = 0;
     vtxUniformBackingBuffer  = NULL;
     fragUniformBackingBuffer = NULL;
@@ -404,6 +407,10 @@ MtlfMetalContext::MtlfMetalContext(id<MTLDevice> _device, int width, int height)
 #endif
 
     gsFence = [device newFence];
+    
+    windingOrder = MTLWindingClockwise;
+    cullMode = MTLCullModeBack;
+    fillMode = MTLTriangleFillModeFill;
     
     for (int i = 0; i < METALWORKQUEUE_MAX; i ++) {
         ResetEncoders((MetalWorkQueueType)i, true);
@@ -646,6 +653,7 @@ MtlfMetalContext::BlitColorTargetToOpenGL()
     glDepthMask(GL_TRUE);
     glFrontFace(GL_CCW);
     glDisable(GL_CULL_FACE);
+    glDisable(GL_BLEND);
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
     
     glUseProgram(staticGlInterop.glShaderProgram);
@@ -741,6 +749,54 @@ MtlfMetalContext::GetQuadIndexBuffer(MTLIndexType indexTypeMetal) {
         [remappedQuadIndexBuffer didModifyRange:(NSMakeRange(0, remappedQuadIndexBuffer.length))];
     }
     return remappedQuadIndexBuffer;
+}
+
+id<MTLBuffer>
+MtlfMetalContext::GetPointIndexBuffer(MTLIndexType indexTypeMetal, int numIndicesNeeded, bool usingQuads) {
+    // infer the size from a 3 component vector of floats
+    uint32 pointBufferSize = numIndicesNeeded * sizeof(int);
+    
+    // Since remapping is expensive check if the buffer we created this from originally has changed  - MTL_FIXME - these checks are not robust
+    if (pointIndexBuffer) {
+        if ((pointIndexBuffer.length < pointBufferSize)) {
+            [pointIndexBuffer release];
+            pointIndexBuffer = nil;
+        }
+    }
+    // Remap the quad indices into two sets of triangle indices
+    if (!pointIndexBuffer) {
+        if (indexTypeMetal != MTLIndexTypeUInt32) {
+            TF_FATAL_CODING_ERROR("Only 32 bit indices currently supported for quads");
+        }
+        NSLog(@"Recreating quad remapped index buffer");
+        
+        pointIndexBuffer = [device newBufferWithLength:pointBufferSize options:MTLResourceStorageModeManaged];
+        
+        uint32_t *destData = (uint32 *)pointIndexBuffer.contents;
+        uint32_t arraySize = numIndicesNeeded;
+        
+        if (usingQuads) {
+            for (int i = 0; i < arraySize; i+=6) {
+                int base = i;
+                *destData++ = base + 0;
+                *destData++ = base + 1;
+                *destData++ = base + 2;
+                *destData++ = base + 1;
+                *destData++ = base + 2;
+                *destData++ = base + 3;
+            }
+        }
+        else {
+            for (int i = 0; i < arraySize; i+=3) {
+                int base = i;
+                *destData++ = base + 0;
+                *destData++ = base + 1;
+                *destData++ = base + 2;
+            }
+        }
+        [pointIndexBuffer didModifyRange:(NSMakeRange(0, pointIndexBuffer.length))];
+    }
+    return pointIndexBuffer;
 }
 
 void MtlfMetalContext::CheckNewStateGather()
@@ -854,16 +910,22 @@ MTLRenderPassDescriptor* MtlfMetalContext::GetRenderPassDescriptor()
     return (wq == nil) ? nil : wq->currentRenderPassDescriptor;
 }
 
-void MtlfMetalContext::setFrontFaceWinding(MTLWinding _windingOrder)
+void MtlfMetalContext::SetFrontFaceWinding(MTLWinding _windingOrder)
 {
     windingOrder = _windingOrder;
     dirtyRenderState |= DIRTY_METALRENDERSTATE_CULLMODE_WINDINGORDER;
 }
 
-void MtlfMetalContext::setCullMode(MTLCullMode _cullMode)
+void MtlfMetalContext::SetCullMode(MTLCullMode _cullMode)
 {
     cullMode = _cullMode;
     dirtyRenderState |= DIRTY_METALRENDERSTATE_CULLMODE_WINDINGORDER;
+}
+
+void MtlfMetalContext::SetPolygonFillMode(MTLTriangleFillMode _fillMode)
+{
+    fillMode = _fillMode;
+    dirtyRenderState |= DIRTY_METALRENDERSTATE_FILL_MODE;
 }
 
 void MtlfMetalContext::SetShadingPrograms(id<MTLFunction> vertexFunction, id<MTLFunction> fragmentFunction, bool _enableMVA)
@@ -1049,6 +1111,11 @@ void MtlfMetalContext::SetBuffer(int index, id<MTLBuffer> buffer, const TfToken&
 {
     BufferBinding *bufferInfo = new BufferBinding{index, buffer, name, kMSL_ProgramStage_Vertex, 0, true};
     boundBuffers.push_back(bufferInfo);
+    
+    if (name == TfToken("points")) {
+        vertexPositionBuffer = buffer;
+    }
+    
     dirtyRenderState |= DIRTY_METALRENDERSTATE_VERTEX_BUFFER;
 }
 
@@ -1322,13 +1389,18 @@ void MtlfMetalContext::SetRenderEncoderState()
         [wq->currentRenderEncoder setCullMode:cullMode];
         dirtyRenderState &= ~DIRTY_METALRENDERSTATE_CULLMODE_WINDINGORDER;
     }
- 
+
+    if (dirtyRenderState & DIRTY_METALRENDERSTATE_FILL_MODE) {
+        [wq->currentRenderEncoder setTriangleFillMode:fillMode];
+        dirtyRenderState &= ~DIRTY_METALRENDERSTATE_FILL_MODE;
+    }
+
     // Any buffers modified
     if (dirtyRenderState & (DIRTY_METALRENDERSTATE_VERTEX_UNIFORM_BUFFER     |
-                       DIRTY_METALRENDERSTATE_FRAGMENT_UNIFORM_BUFFER  |
-                       DIRTY_METALRENDERSTATE_VERTEX_BUFFER            |
-                       DIRTY_METALRENDERSTATE_OLD_STYLE_VERTEX_UNIFORM |
-                       DIRTY_METALRENDERSTATE_OLD_STYLE_FRAGMENT_UNIFORM)) {
+                            DIRTY_METALRENDERSTATE_FRAGMENT_UNIFORM_BUFFER   |
+                            DIRTY_METALRENDERSTATE_VERTEX_BUFFER             |
+                            DIRTY_METALRENDERSTATE_OLD_STYLE_VERTEX_UNIFORM  |
+                            DIRTY_METALRENDERSTATE_OLD_STYLE_FRAGMENT_UNIFORM)) {
         
         for(auto buffer : boundBuffers)
         {
@@ -1444,9 +1516,10 @@ void MtlfMetalContext::ClearRenderEncoderState()
     wq->currentRenderPipelineState           = nil;
     
     // clear referenced resources
-    indexBuffer         = nil;
-    numVertexComponents = 0;
-    dirtyRenderState    = DIRTY_METALRENDERSTATE_ALL;
+    indexBuffer          = nil;
+    vertexPositionBuffer = nil;
+    numVertexComponents  = 0;
+    dirtyRenderState     = DIRTY_METALRENDERSTATE_ALL;
     
     // Free all state associated with the buffers
     for(auto buffer : boundBuffers) {

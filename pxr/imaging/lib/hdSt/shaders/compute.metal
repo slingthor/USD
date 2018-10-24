@@ -356,7 +356,7 @@ int4 getIndices(device const int *indices, int idx)
 
 float3 computeNormalForPrimIndex(device const POINTS_INPUT_TYPE* points, device const int *indices, device const Uniforms *uniforms, int primIndex)
 {
-    int4 primIndices = getIndices(getIndicesIndex(primIndex));
+    int4 primIndices = getIndices(getIndicesIndex(uniforms, primIndex));
 
     float3 p0 = getPoint(points, getPointsIndex(uniforms, primIndices.x));
     float3 p1 = getPoint(points, getPointsIndex(uniforms, primIndices.y));
