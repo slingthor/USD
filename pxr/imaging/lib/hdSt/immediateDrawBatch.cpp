@@ -280,22 +280,20 @@ HdSt_ImmediateDrawBatch::ExecuteDraw(
         int instancerNumLevels = drawItem->GetInstancePrimvarNumLevels();
         int instanceIndexWidth = instancerNumLevels + 1;
         for (int i = 0; i < instancerNumLevels; ++i) {
-            HdBufferArrayRangeSharedPtr const & instanceBar_ =
+            HdBufferArrayRangeSharedPtr const & instanceBar =
                 drawItem->GetInstancePrimvarRange(i);
-
-            HdBufferArrayRangeSharedPtr instanceBar =
-                boost::static_pointer_cast<HdBufferArrayRange>(instanceBar_);
 
             if (instanceBar) {
                 if (static_cast<size_t>(i) >= instanceBarCurrents.size()) {
                     instanceBarCurrents.push_back(instanceBar);
                     binder.BindInstanceBufferArray(instanceBar, i);
+                    continue;
                 } else if (!instanceBar->IsAggregatedWith(
                                instanceBarCurrents[i])) {
                     binder.UnbindInstanceBufferArray(instanceBarCurrents[i], i);
                     binder.BindInstanceBufferArray(instanceBar, i);
-                    instanceBarCurrents[i] = instanceBar;
                 }
+                instanceBarCurrents[i] = instanceBar;
             }
         }
 
