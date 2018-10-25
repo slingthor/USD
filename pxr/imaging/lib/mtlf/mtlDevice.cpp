@@ -2157,6 +2157,12 @@ void MtlfMetalContext::PrepareForComputeGSPart(uint32_t vertData, uint32_t primD
 
 void MtlfMetalContext::_gsEncodeSync() {
     //Using multiple queues means the synching happens using events as the queues are executed in parallel.
+    
+    //There are cases where we don't have a command buffer yet to push the wait onto.
+    MetalWorkQueue *wait_wq   = &workQueues[METALWORKQUEUE_DEFAULT];
+    if(wait_wq->commandBuffer == nil)
+        CreateCommandBuffer(METALWORKQUEUE_DEFAULT);
+    
     EncodeWaitForEvent(METALWORKQUEUE_DEFAULT, METALWORKQUEUE_GEOMETRY_SHADER);
     
     if(gsOpenBatch) {
