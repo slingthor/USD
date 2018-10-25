@@ -105,6 +105,9 @@ HdSt_SmoothNormalsComputationMetal::_Execute(
     [computeEncoder dispatchThreads:MTLSizeMake(numPoints, 1, 1) threadsPerThreadgroup:threadGroupcount];
     
     context->ReleaseEncoder(false, METALWORKQUEUE_GEOMETRY_SHADER);
+    
+    // Temp fix
+    context->CommitCommandBuffer(false, false, METALWORKQUEUE_GEOMETRY_SHADER);
 }
 
 

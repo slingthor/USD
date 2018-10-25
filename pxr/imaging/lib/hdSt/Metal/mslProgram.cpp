@@ -359,9 +359,10 @@ HdStMSLProgram::Link()
         const MSL_ShaderBinding& binding = *(*it).second;
         if(binding._stage == kMSL_ProgramStage_Vertex || binding._stage == kMSL_ProgramStage_Compute) {
             if(binding._type == kMSL_BindingType_DrawArgs) _drawArgsSlot = binding._index;
-            if(binding._type == kMSL_BindingType_IndexBuffer) _indicesSlot = binding._index;
-            if(binding._type == kMSL_BindingType_GSVertOutput) _gsVertOutBufferSlot = binding._index;
-            if(binding._type == kMSL_BindingType_GSPrimOutput) _gsPrimOutBufferSlot = binding._index;
+            else if(binding._type == kMSL_BindingType_GSVertOutput) _gsVertOutBufferSlot = binding._index;
+            else if(binding._type == kMSL_BindingType_GSPrimOutput) _gsPrimOutBufferSlot = binding._index;
+            else if(binding._type == kMSL_BindingType_UniformBuffer &&
+                    binding._name == "indices") _indicesSlot = binding._index;
         }
     }
 
@@ -545,15 +546,8 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
                                                       GLint firstIndex,
                                                       GLint instanceCount,
                                                       GLint baseVertex) const {
-    
-    /*
-     Currently quads get mapped to GL_LINES_ADJACENCY - presumably this is a bit of a hack as GL_QUADS aren't supported by OpenGL > 3.x and it's been
-     done because they share the same number of vertices per prim (4). This doesn't appear to be a problem for OpenGL as the OpenGL subdiv doesn't genereate
-     PRIM_MESH_COARSE/REFINED_QUADS (at least for the content we've currently seen) but Metal *does* so we need a way of drawing quads. We currently do this by
-     remapping the index buffer and mapping GL_LINES_ADJACENCY to MTLPrimitiveTypeTriangle.
-    */
-    MTLPrimitiveType primType = GetMetalPrimType(primitiveMode);
-    const bool bDrawingQuads = (primitiveMode == GL_LINES_ADJACENCY);
+    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
+    id<MTLBuffer> indexBuffer = context->GetIndexBuffer();
     const bool doMVAComputeGS = _buildTarget == kMSL_BuildTarget_MVA_ComputeGS;
     const bool doMVA = doMVAComputeGS || _buildTarget == kMSL_BuildTarget_MVA;
     
@@ -574,30 +568,40 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
             indexSize = sizeof(uint32_t);
             break;
     }
-  
-    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
+
+    MTLPrimitiveType primType = GetMetalPrimType(primitiveMode);
+    bool const drawingQuads = (primitiveMode == GL_LINES_ADJACENCY);
+    bool const tempPointsWorkaround = context->IsTempPointWorkaroundActive();
     
     if (!context->GeometryShadersActive()) {
         context->CreateCommandBuffer(METALWORKQUEUE_GEOMETRY_SHADER);
         context->LabelCommandBuffer(@"Geometry Shaders", METALWORKQUEUE_GEOMETRY_SHADER);
     }
-
-    id<MTLBuffer> indexBuffer = context->GetIndexBuffer();
-    int quadIndexCount = 0;
+    
     uint32_t numOutVertsPerInPrim(3), numOutPrimsPerInPrim(1);
-    if (bDrawingQuads) {
+    if (drawingQuads) {
         if (!doMVA) {
             indexCount = (indexCount * 6) / 4;
             firstIndex = (firstIndex * 6) / 4;
-            indexBuffer = context->GetQuadIndexBuffer(indexTypeMetal);
+            if (!tempPointsWorkaround) {
+                indexBuffer = context->GetQuadIndexBuffer(indexTypeMetal);
+            }
         }
         else if(doMVAComputeGS) {
             numOutVertsPerInPrim = 6;
             numOutPrimsPerInPrim = 2;
         }
     }
+    
+    if (tempPointsWorkaround) {
+        primType = MTLPrimitiveTypePoint;
+        if (indexBuffer == nil) {
+            firstIndex = 0;
+            indexBuffer = context->GetPointIndexBuffer(indexTypeMetal, indexCount, drawingQuads);
+        }
+    }
 
-    const uint32_t vertsPerPrimitive = (bDrawingQuads && doMVAComputeGS) ? 4 : 3;
+    const uint32_t vertsPerPrimitive = (drawingQuads && doMVAComputeGS) ? 4 : 3;
     uint32_t numPrimitives = (indexCount / vertsPerPrimitive) * instanceCount;
     const uint32_t maxPrimitivesPerPart = doMVAComputeGS ? context->GetMaxComputeGSPartSize(numOutVertsPerInPrim, numOutPrimsPerInPrim, _gsVertOutStructSize, _gsPrimOutStructSize) : numPrimitives;
     
@@ -625,6 +629,10 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
             drawArgs = { (uint32_t)indexCount, (uint32_t)firstIndex, (uint32_t)baseVertex, (uint32_t)instanceCount, partIndexOffset };
             [renderEncoder setVertexBytes:(const void*)&drawArgs length:sizeof(drawArgs) atIndex:_drawArgsSlot];
             
+            if (tempPointsWorkaround && _indicesSlot >= 0) {
+                [renderEncoder setVertexBuffer:indexBuffer offset:0 atIndex:_indicesSlot];
+            }
+    
             if(doMVAComputeGS) {
                 //Setup Draw Args on the compute context
                 [computeEncoder setBytes:(const void*)&drawArgs length:sizeof(drawArgs) atIndex:_drawArgsSlot];
@@ -635,6 +643,10 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
                 [renderEncoder setVertexBuffer:gsDataBuffer offset:gsPrimDataOffset atIndex:_gsPrimOutBufferSlot];
                 [renderEncoder setFragmentBuffer:gsDataBuffer offset:gsVertDataOffset atIndex:_gsVertOutBufferSlot];
                 [renderEncoder setFragmentBuffer:gsDataBuffer offset:gsPrimDataOffset atIndex:_gsPrimOutBufferSlot];
+                
+                if (tempPointsWorkaround && _indicesSlot >= 0) {
+                    [computeEncoder setBuffer:indexBuffer offset:0 atIndex:_indicesSlot];
+                }
             }
         }
         

@@ -677,10 +677,6 @@ UsdImagingGLMetalHdEngine::Render(const UsdImagingGLRenderParams& params)
         depthAttachment.texture = context->mtlDepthTexture;
     }
 
-    if (params.applyRenderState) {
-        glDisable(GL_BLEND);
-    }
-    
     context->StartFrame();
     
     // Create a new command buffer for each render pass to the current drawable
@@ -694,11 +690,25 @@ UsdImagingGLMetalHdEngine::Render(const UsdImagingGLRenderParams& params)
     // front faces have ccw winding. We disable culling because culling
     // is handled by fragment shader discard.
     if (params.flipFrontFacing) {
-        context->setFrontFaceWinding(MTLWindingClockwise);
+        context->SetFrontFaceWinding(MTLWindingClockwise);
     } else {
-        context->setFrontFaceWinding(MTLWindingCounterClockwise);
+        context->SetFrontFaceWinding(MTLWindingCounterClockwise);
     }
-    context->setCullMode(MTLCullModeNone);
+    context->SetCullMode(MTLCullModeNone);
+
+    if (params.applyRenderState) {
+        // drawmode.
+        // XXX: Temporary solution until shader-based styling implemented.
+        switch (params.drawMode) {
+            case UsdImagingGLDrawMode::DRAW_POINTS:
+                context->SetTempPointWorkaround(true);
+                break;
+            default:
+                context->SetPolygonFillMode(MTLTriangleFillModeFill);
+                context->SetTempPointWorkaround(false);
+                break;
+        }
+    }
 
     VtValue selectionValue(_selTracker);
     _engine.SetTaskContextData(HdxTokens->selectionState, selectionValue);
@@ -733,7 +743,7 @@ UsdImagingGLMetalHdEngine::Render(const UsdImagingGLRenderParams& params)
     
     // Finalize rendering here & push the command buffer to the GPU
     [sharedCaptureManager.defaultCaptureScope endScope];
- 
+
     context->BlitColorTargetToOpenGL();
     GLF_POST_PENDING_GL_ERRORS();
 

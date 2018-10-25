@@ -377,8 +377,8 @@ HdSt_Osd3Subdivision::RefineGPU(HdBufferArrayRangeSharedPtr const &range,
         /*stride=*/stride);
 
     // GPU evaluator can be static, as long as it's called sequentially.
-    static OpenSubdiv::Osd::EvaluatorCacheT<HdSt_OsdGpuEvaluator> *evaluatorCache = nil;
-    static HdSt_OsdGpuDeviceContextPtr evaluatorCacheDevicePtr = nil;
+    static OpenSubdiv::Osd::EvaluatorCacheT<HdSt_OsdGpuEvaluator> *evaluatorCache = NULL;
+    static HdSt_OsdGpuDeviceContextPtr evaluatorCacheDevicePtr = NULL;
    
     // The OSD evaluator cache check does not guard against devices changing so we'll need to wipe the cache if we detect it.
     // Really  we should move this into the class and recreate when we detect a device change from the UI but we'll do it here
@@ -386,7 +386,7 @@ HdSt_Osd3Subdivision::RefineGPU(HdBufferArrayRangeSharedPtr const &range,
     if (evaluatorCacheDevicePtr != GetDeviceContextPtr()) {
          if (evaluatorCache) {
              delete evaluatorCache;
-             evaluatorCache = nil;
+             evaluatorCache = NULL;
         }
     }
     

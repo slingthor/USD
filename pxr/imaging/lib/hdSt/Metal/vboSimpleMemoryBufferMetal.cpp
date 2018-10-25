@@ -133,7 +133,7 @@ HdStVBOSimpleMemoryBufferMetal::Reallocate(
         }
         else {
             // Dummy buffer - 0 byte buffers are invalid
-            newId = context->GetMetalBuffer(256, MTLResourceStorageModeManaged);
+            newId = context->GetMetalBuffer(256, MTLResourceStorageModePrivate);
         }
 
         // copy the range. There are three cases:

@@ -141,6 +141,9 @@ public:
     
     MTLF_API
     id<MTLBuffer> GetQuadIndexBuffer(MTLIndexType indexTypeMetal);
+    
+    MTLF_API
+    id<MTLBuffer> GetPointIndexBuffer(MTLIndexType indexTypeMetal, int numIndicesNeeded, bool usingQuads);
      
     MTLF_API
     void CreateCommandBuffer(MetalWorkQueueType workQueueType = METALWORKQUEUE_DEFAULT);
@@ -188,11 +191,14 @@ public:
     void SetSampler(int index, id<MTLSamplerState> sampler, const TfToken& name, MSL_ProgramStage stage);
 
     MTLF_API
-    void setFrontFaceWinding(MTLWinding winding);
+    void SetFrontFaceWinding(MTLWinding winding);
     
     MTLF_API
-    void setCullMode(MTLCullMode cullMode);
+    void SetCullMode(MTLCullMode cullMode);
 	
+    MTLF_API
+    void SetPolygonFillMode(MTLTriangleFillMode fillMode);
+    
     MTLF_API
     void SetRenderPassDescriptor(MTLRenderPassDescriptor *renderPassDescriptor);
     
@@ -279,6 +285,12 @@ public:
     unsigned long IncNumberPrimsDrawn(unsigned long numPrims, bool init) { numPrimsDrawn = init ? numPrims : (numPrimsDrawn += numPrims); return numPrimsDrawn; }
     
     MTLF_API
+    bool IsTempPointWorkaroundActive() { return tempPointsWorkaroundActive; }
+
+    MTLF_API
+    bool SetTempPointWorkaround(bool activate) { tempPointsWorkaroundActive = activate; }
+
+    MTLF_API
     float GetGPUTimeInMs();
     
     id<MTLDevice> device;
@@ -320,8 +332,10 @@ protected:
     std::vector<SamplerBinding> samplers;
     
     id<MTLBuffer> indexBuffer;
+    id<MTLBuffer> vertexPositionBuffer;
     id<MTLBuffer> remappedQuadIndexBuffer;
     id<MTLBuffer> remappedQuadIndexBufferSource;
+    id<MTLBuffer> pointIndexBuffer;
     
     MtlfDrawTarget *drawTarget;
 
@@ -451,6 +465,7 @@ private:
     // Internal state which gets applied to the render encoder
     MTLWinding windingOrder;
     MTLCullMode cullMode;
+    MTLTriangleFillMode fillMode;
     uint32 dirtyRenderState;
     
     //Geometry Shader Related
@@ -528,6 +543,8 @@ private:
     void  GPUTImerResetTimer(unsigned long frameNumber);
     
     unsigned long numPrimsDrawn;
+    
+    bool tempPointsWorkaroundActive = false;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE
