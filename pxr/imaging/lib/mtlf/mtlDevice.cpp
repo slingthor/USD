@@ -49,7 +49,7 @@
 #define DIRTY_METALRENDERSTATE_ALL                      0xFFFFFFFF
 
 //Be careful with these when using Concurrent Dispatch. Also; you can't enable asynchronous compute without also enabling METAL_EVENTS_AVAILABLE.
-#define METAL_COMPUTEGS_BUFFER_SHARING                    1
+#define METAL_COMPUTEGS_BUFFER_REUSE                      1
 #define METAL_COMPUTEGS_MANUAL_HAZARD_TRACKING            1
 #define METAL_COMPUTEGS_ALLOW_ASYNCHRONOUS_COMPUTE        0     //Currently disabled due to additional overhead of using events to synchronize. 
 
