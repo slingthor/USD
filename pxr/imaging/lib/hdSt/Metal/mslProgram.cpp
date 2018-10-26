@@ -654,10 +654,12 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
             [computeEncoder dispatchThreads:MTLSizeMake(numPrimitivesInPart, 1, 1) threadsPerThreadgroup:MTLSizeMake(MIN(numPrimitivesInPart, 64), 1, 1)];
             [renderEncoder drawPrimitives:primType vertexStart:0 vertexCount:(numPrimitivesInPart * numOutVertsPerInPrim) instanceCount:1 baseInstance:0];
         }
-        else if(doMVA)
-            [renderEncoder drawPrimitives:primType vertexStart:0 vertexCount:numIndicesInPart instanceCount:instanceCount baseInstance:0];
-        else
-            [renderEncoder drawIndexedPrimitives:primType indexCount:numIndicesInPart indexType:indexTypeMetal indexBuffer:indexBuffer indexBufferOffset:(firstIndex * indexSize) instanceCount:instanceCount baseVertex:baseVertex baseInstance:0];
+        else if(doMVA) {
+            [renderEncoder drawPrimitives:primType vertexStart:0 vertexCount:indexCount instanceCount:instanceCount baseInstance:0];
+        }
+        else {
+            [renderEncoder drawIndexedPrimitives:primType indexCount:indexCount indexType:indexTypeMetal indexBuffer:indexBuffer indexBufferOffset:(firstIndex * indexSize) instanceCount:instanceCount baseVertex:baseVertex baseInstance:0];
+        }
 
         if (doMVAComputeGS)
             context->ReleaseEncoder(false, METALWORKQUEUE_GEOMETRY_SHADER);
@@ -683,7 +685,6 @@ void HdStMSLProgram::DrawArraysInstanced(GLenum primitiveMode,
     id <MTLRenderCommandEncoder> renderEncoder = context->GetRenderEncoder();
     
     const_cast<HdStMSLProgram*>(this)->BakeState();
-    
     
     [renderEncoder drawPrimitives:primType vertexStart:baseVertex vertexCount:vertexCount instanceCount:instanceCount];
     
