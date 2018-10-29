@@ -1921,15 +1921,6 @@ HdSt_CodeGenMSL::Compile()
 
     std::stringstream vsConfigString, fsConfigString, gsConfigString;
     _GenerateConfigComments(vsConfigString, fsConfigString, gsConfigString);
-    
-//    bool enableFragmentNormalReconstruction = false; // Fixes for Geometry shader functionality MTL_FIXME: Remove once GS is stable enough
-//    {
-//        std::vector<std::string> sourceKeys = _geometricShader->GetSourceKeys(HdShaderTokens->geometryShader);
-//        for(auto key : sourceKeys) {
-//            if(key == "MeshNormal.Flat")
-//                enableFragmentNormalReconstruction = true;
-//        }
-//    }
 
     // Start of Program Scope
 
