@@ -3074,7 +3074,7 @@ HdSt_CodeGenMSL::_GenerateDrawingCoord()
         TfToken("vsDrawingCoord.modelCoord"), intType, tkn_flat).usage |= HdSt_CodeGenMSL::TParam::DrawingCoord;
     if(_mslBuildComputeGS) {
         _AddInputParam(_mslGSInputParams, tkn_modelCoord, intType, tkn_flat, HdBinding(HdBinding::UNKNOWN, 0), 0, TfToken("vsDrawingCoord[i].modelCoord")).usage |= HdSt_CodeGenMSL::TParam::DrawingCoord;
-        _AddOutputParam(_mslGSOutputParams, tkn_modelCoord, intType, tkn_flat, TfToken("gsDrawingCoord.modelCoord")).usage |= HdSt_CodeGenMSL::TParam::DrawingCoord;
+        //_AddOutputParam(_mslGSOutputParams, tkn_modelCoord, intType, tkn_flat, TfToken("gsDrawingCoord.modelCoord")).usage |= HdSt_CodeGenMSL::TParam::DrawingCoord;
     }
     _AddInputParam(_mslPSInputParams, tkn_modelCoord, intType, tkn_flat, HdBinding(HdBinding::UNKNOWN, 0), 0, TfToken("gsDrawingCoord.modelCoord")).usage |= HdSt_CodeGenMSL::TParam::DrawingCoord;
 
@@ -3082,7 +3082,7 @@ HdSt_CodeGenMSL::_GenerateDrawingCoord()
         TfToken("vsDrawingCoord.constantCoord"), intType, tkn_flat).usage |= HdSt_CodeGenMSL::TParam::DrawingCoord;
     if(_mslBuildComputeGS) {
         _AddInputParam(_mslGSInputParams, tkn_constantCoord, intType, tkn_flat, HdBinding(HdBinding::UNKNOWN, 0), 0, TfToken("vsDrawingCoord[i].constantCoord")).usage |= HdSt_CodeGenMSL::TParam::DrawingCoord;
-        _AddOutputParam(_mslGSOutputParams, tkn_constantCoord, intType, tkn_flat, TfToken("gsDrawingCoord.constantCoord")).usage |= HdSt_CodeGenMSL::TParam::DrawingCoord;
+        //_AddOutputParam(_mslGSOutputParams, tkn_constantCoord, intType, tkn_flat, TfToken("gsDrawingCoord.constantCoord")).usage |= HdSt_CodeGenMSL::TParam::DrawingCoord;
     }
     _AddInputParam(_mslPSInputParams, tkn_constantCoord, intType, tkn_flat, HdBinding(HdBinding::UNKNOWN, 0), 0, TfToken("gsDrawingCoord.constantCoord")).usage |= HdSt_CodeGenMSL::TParam::DrawingCoord;
     
@@ -3090,7 +3090,7 @@ HdSt_CodeGenMSL::_GenerateDrawingCoord()
         TfToken("vsDrawingCoord.elementCoord"), intType, tkn_flat).usage |= HdSt_CodeGenMSL::TParam::DrawingCoord;
     if(_mslBuildComputeGS) {
         _AddInputParam(_mslGSInputParams, tkn_elementCoord, intType, tkn_flat, HdBinding(HdBinding::UNKNOWN, 0), 0, TfToken("vsDrawingCoord[i].elementCoord")).usage |= HdSt_CodeGenMSL::TParam::DrawingCoord;
-        _AddOutputParam(_mslGSOutputParams, tkn_elementCoord, intType, tkn_flat, TfToken("gsDrawingCoord.elementCoord")).usage |= HdSt_CodeGenMSL::TParam::DrawingCoord;
+        //_AddOutputParam(_mslGSOutputParams, tkn_elementCoord, intType, tkn_flat, TfToken("gsDrawingCoord.elementCoord")).usage |= HdSt_CodeGenMSL::TParam::DrawingCoord;
     }
     _AddInputParam(_mslPSInputParams, tkn_elementCoord, intType, tkn_flat, HdBinding(HdBinding::UNKNOWN, 0), 0, TfToken("gsDrawingCoord.elementCoord")).usage |= HdSt_CodeGenMSL::TParam::DrawingCoord;
     
@@ -3098,7 +3098,7 @@ HdSt_CodeGenMSL::_GenerateDrawingCoord()
         TfToken("vsDrawingCoord.primitiveCoord"), intType, tkn_flat).usage |= HdSt_CodeGenMSL::TParam::DrawingCoord;
     if(_mslBuildComputeGS) {
         _AddInputParam(_mslGSInputParams, tkn_primitiveCoord, intType, tkn_flat, HdBinding(HdBinding::UNKNOWN, 0), 0, TfToken("vsDrawingCoord[i].primitiveCoord")).usage |= HdSt_CodeGenMSL::TParam::DrawingCoord;
-        _AddOutputParam(_mslGSOutputParams, tkn_primitiveCoord, intType, tkn_flat, TfToken("gsDrawingCoord.primitiveCoord")).usage |= HdSt_CodeGenMSL::TParam::DrawingCoord;
+        //_AddOutputParam(_mslGSOutputParams, tkn_primitiveCoord, intType, tkn_flat, TfToken("gsDrawingCoord.primitiveCoord")).usage |= HdSt_CodeGenMSL::TParam::DrawingCoord;
     }
     _AddInputParam(_mslPSInputParams, tkn_primitiveCoord, intType, tkn_flat, HdBinding(HdBinding::UNKNOWN, 0), 0, TfToken("gsDrawingCoord.primitiveCoord")).usage |= HdSt_CodeGenMSL::TParam::DrawingCoord;
     
@@ -3106,7 +3106,7 @@ HdSt_CodeGenMSL::_GenerateDrawingCoord()
         TfToken("vsDrawingCoord.fvarCoord"), intType, tkn_flat).usage |= HdSt_CodeGenMSL::TParam::DrawingCoord;
     if(_mslBuildComputeGS) {
         _AddInputParam(_mslGSInputParams, tkn_fvarCoord, intType, tkn_flat, HdBinding(HdBinding::UNKNOWN, 0), 0, TfToken("vsDrawingCoord[i].fvarCoord")).usage |= HdSt_CodeGenMSL::TParam::DrawingCoord;
-        _AddOutputParam(_mslGSOutputParams, tkn_fvarCoord, intType, tkn_flat, TfToken("gsDrawingCoord.fvarCoord")).usage |= HdSt_CodeGenMSL::TParam::DrawingCoord;
+        //_AddOutputParam(_mslGSOutputParams, tkn_fvarCoord, intType, tkn_flat, TfToken("gsDrawingCoord.fvarCoord")).usage |= HdSt_CodeGenMSL::TParam::DrawingCoord;
     }
     _AddInputParam(_mslPSInputParams, tkn_fvarCoord, intType, tkn_flat, HdBinding(HdBinding::UNKNOWN, 0), 0, TfToken("gsDrawingCoord.fvarCoord")).usage |= HdSt_CodeGenMSL::TParam::DrawingCoord;
     
@@ -3114,7 +3114,7 @@ HdSt_CodeGenMSL::_GenerateDrawingCoord()
         TfToken("vsDrawingCoord.shaderCoord"), intType, tkn_flat).usage |= HdSt_CodeGenMSL::TParam::DrawingCoord;
     if(_mslBuildComputeGS) {
         _AddInputParam(_mslGSInputParams, tkn_shaderCoord, intType, tkn_flat, HdBinding(HdBinding::UNKNOWN, 0), 0, TfToken("vsDrawingCoord[i].shaderCoord")).usage |= HdSt_CodeGenMSL::TParam::DrawingCoord;
-        _AddOutputParam(_mslGSOutputParams, tkn_shaderCoord, intType, tkn_flat, TfToken("gsDrawingCoord.shaderCoord")).usage |= HdSt_CodeGenMSL::TParam::DrawingCoord;
+        //_AddOutputParam(_mslGSOutputParams, tkn_shaderCoord, intType, tkn_flat, TfToken("gsDrawingCoord.shaderCoord")).usage |= HdSt_CodeGenMSL::TParam::DrawingCoord;
     }
     _AddInputParam(_mslPSInputParams, tkn_shaderCoord, intType, tkn_flat, HdBinding(HdBinding::UNKNOWN, 0), 0, TfToken("gsDrawingCoord.shaderCoord")).usage |= HdSt_CodeGenMSL::TParam::DrawingCoord;
     
@@ -3126,7 +3126,7 @@ HdSt_CodeGenMSL::_GenerateDrawingCoord()
         _EmitStructMemberOutput(_mslVSOutputParams, tkn___dc_instanceIndex, tkn_vs_instanceIndex, intType, tkn_flat).usage |= HdSt_CodeGenMSL::TParam::DrawingCoord;
         if(_mslBuildComputeGS) {
             _AddInputParam(_mslGSInputParams, tkn___dc_instanceIndex, intType, tkn_flat, HdBinding(HdBinding::UNKNOWN, 0), 0, TfToken(TfStringPrintf("vsDrawingCoord[i].instanceIndex[%d]", i))).usage |= HdSt_CodeGenMSL::TParam::DrawingCoord;
-            _AddOutputParam(_mslGSOutputParams, tkn___dc_instanceIndex, intType, tkn_flat, tkn_gs_instanceIndex).usage |= HdSt_CodeGenMSL::TParam::DrawingCoord;
+            //_AddOutputParam(_mslGSOutputParams, tkn___dc_instanceIndex, intType, tkn_flat, tkn_gs_instanceIndex).usage |= HdSt_CodeGenMSL::TParam::DrawingCoord;
         }
         _AddInputParam(_mslPSInputParams, tkn___dc_instanceIndex, intType, tkn_flat, HdBinding(HdBinding::UNKNOWN, 0), 0, tkn_gs_instanceIndex).usage |= HdSt_CodeGenMSL::TParam::DrawingCoord;
         
@@ -3136,7 +3136,7 @@ HdSt_CodeGenMSL::_GenerateDrawingCoord()
         _EmitStructMemberOutput(_mslVSOutputParams, tkn___dc_instanceCoords, tkn_vs_instanceCoords, intType, tkn_flat).usage |= HdSt_CodeGenMSL::TParam::DrawingCoord;
         if(_mslBuildComputeGS) {
             _AddInputParam(_mslGSInputParams, tkn___dc_instanceCoords, intType, tkn_flat, HdBinding(HdBinding::UNKNOWN, 0), 0, TfToken(TfStringPrintf("vsDrawingCoord[i].instanceCoords[%d]", i))).usage |= HdSt_CodeGenMSL::TParam::DrawingCoord;
-            _AddOutputParam(_mslGSOutputParams, tkn___dc_instanceCoords, intType, tkn_flat, tkn_gs_instanceCoords).usage |= HdSt_CodeGenMSL::TParam::DrawingCoord;
+            //_AddOutputParam(_mslGSOutputParams, tkn___dc_instanceCoords, intType, tkn_flat, tkn_gs_instanceCoords).usage |= HdSt_CodeGenMSL::TParam::DrawingCoord;
         }
         _AddInputParam(_mslPSInputParams, tkn___dc_instanceCoords, intType, tkn_flat, HdBinding(HdBinding::UNKNOWN, 0), 0, tkn_gs_instanceCoords).usage |= HdSt_CodeGenMSL::TParam::DrawingCoord;
     }
