@@ -477,6 +477,7 @@ private:
     std::vector<id<MTLBuffer>> gsBuffers;
     id<MTLFence>               gsFence;
     bool                       gsOpenBatch;
+    bool                       gsFirstBatch;
     bool                       isRenderPassDescriptorPatched;
 
     void _gsAdvanceBuffer();

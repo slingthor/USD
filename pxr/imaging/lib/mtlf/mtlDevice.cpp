@@ -2058,6 +2058,8 @@ void MtlfMetalContext::CleanupUnusedBuffers(bool forceClean)
 void MtlfMetalContext::StartFrame() {
     numPrimsDrawn = 0;
     GPUTImerResetTimer(frameCount);
+    
+    gsFirstBatch = true;
 }
 
 void MtlfMetalContext::EndFrame() {
@@ -2143,6 +2145,14 @@ void MtlfMetalContext::PrepareForComputeGSPart(uint32_t vertData, uint32_t primD
  #if METAL_COMPUTEGS_MANUAL_HAZARD_TRACKING
             GetComputeEncoder(METALWORKQUEUE_GEOMETRY_SHADER);
             GetRenderEncoder(METALWORKQUEUE_DEFAULT);
+            
+            if(gsFirstBatch) {
+                [wq_def->currentRenderEncoder updateFence:gsFence];
+                [wq_gs->currentComputeEncoder waitForFence:gsFence];
+                
+                ReleaseEncoder(true, METALWORKQUEUE_DEFAULT);
+                GetRenderEncoder(METALWORKQUEUE_DEFAULT);
+            }
             
             //Insert a fence in the two commandBuffers to ensure all writes are finished before we start rendering
             [wq_gs->currentComputeEncoder updateFence:gsFence];
