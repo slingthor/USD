@@ -223,10 +223,14 @@ vec4 GetPatchCoord(int index)
 void emit(int index, vec4 Peye, vec3 Neye,
           vec4 triPeye0, vec4 triPeye1, vec4 triPeye2)
 {
+    // MTL_HINT:GEOM_PRIMITIVE USES:Peye EXPORTS:outData.Peye
     outData.Peye = Peye;
+    // MTL_HINT:GEOM_PRIMITIVE USES:Neye EXPORTS:outData.Neye
     outData.Neye = Neye;
+    // MTL_HINT:GEOM_PRIMITIVE EXPORTS:gsPatchCoord
     gsPatchCoord = GetPatchCoord(index);
     gsTessCoord = vec2(0);
+    // MTL_HINT:GEOM_PRIMITIVE USES:Peye EXPORTS:gl_Position
     gl_Position = vec4(GetProjectionMatrix() * outData.Peye);
     ApplyClipPlanes(outData.Peye);
 
@@ -238,10 +242,13 @@ void emit(int index, vec4 Peye, vec3 Neye,
     if (min(dt12.x, dt12.y) > 0.03) inEdgeFlag |= 4;
     if (min(dt20.x, dt20.y) > 0.03) inEdgeFlag |= 1;
 
+    // MTL_HINT:GEOM_PRIMITIVE USES:GEOM_EDGE
     ProcessTriEdgeDistance(Peye, triPeye0, triPeye1, triPeye2, inEdgeFlag);
 
+    // MTL_HINT:GEOM_PRIMITIVE USES:GEOM_EDGE_ID
     ProcessEdgeId(index, gsPatchCoord.xy);
 
+    // MTL_HINT:GEOM_PRIMITIVE USES:GEOM_PRIMVARS
     ProcessPrimvars(index);
 
     EmitVertex();
@@ -249,11 +256,13 @@ void emit(int index, vec4 Peye, vec3 Neye,
 
 void main(void)
 {
+    // MTL_HINT:GEOM_PRIMITIVE EXPORTS:gl_PrimitiveID
     gl_PrimitiveID = gl_PrimitiveIDIn;
 
     bool isFlipped = IsFlipped(); // consider handedness AND negative-scale
 
     vec3 Neye0 = isFlipped ? -inData[0].Neye : inData[0].Neye;
+    // MTL_HINT:GEOM_PRIMITIVE USES:GEOM_NORMAL AFFECTS:Neye
     Neye0 = GetNormal(Neye0, 0);
     Neye0 = GetTriGeometryNormal(Neye0, inData[0].Peye, inData[1].Peye,
         inData[2].Peye, isFlipped);
@@ -266,6 +275,7 @@ void main(void)
     Neye2 = GetTriGeometryNormal(Neye2, inData[0].Peye, inData[1].Peye,
         inData[2].Peye, isFlipped);
 
+    // MTL_HINT:GEOM_PRIMITIVE USES:GEOM_DISPLACEMENT,Neye AFFECTS:Peye
     vec4 Peye0 = DisplacementTerminal(
         0, inData[0].Peye, Neye0, GetPatchCoord(0));
     vec4 Peye1 = DisplacementTerminal(
@@ -337,20 +347,27 @@ vec4 GetPatchCoord(int index)
 void emit(int index, vec4 Peye, vec3 Neye,
           vec4 triPeye0, vec4 triPeye1, vec4 triPeye2)
 {
+    // MTL_HINT:GEOM_PRIMITIVE USES:Peye EXPORTS:outData.Peye
     outData.Peye = Peye;
+    // MTL_HINT:GEOM_PRIMITIVE USES:Neye EXPORTS:outData.Neye
     outData.Neye = Neye;
 
+    // MTL_HINT:GEOM_PRIMITIVE EXPORTS:gsPatchCoord
     gsPatchCoord = GetPatchCoord(index);
     gsTessCoord = vec2(0);
 
+    // MTL_HINT:GEOM_PRIMITIVE USES:Peye EXPORTS:gl_Position
     gl_Position = vec4(GetProjectionMatrix() * outData.Peye);
     ApplyClipPlanes(outData.Peye);
 
+    // MTL_HINT:GEOM_PRIMITIVE USES:GEOM_EDGE,Peye
     int inEdgeFlag = 0;
     ProcessTriEdgeDistance(Peye, triPeye0, triPeye1, triPeye2, inEdgeFlag);
 
+    // MTL_HINT:GEOM_PRIMITIVE USES:GEOM_EDGE_ID
     ProcessEdgeId(index, gsPatchCoord.xy);
 
+    // MTL_HINT:GEOM_PRIMITIVE USES:GEOM_PRIMVARS
     ProcessPrimvars(index);
 
     EmitVertex();
@@ -358,10 +375,12 @@ void emit(int index, vec4 Peye, vec3 Neye,
 
 void main(void)
 {
+    // MTL_HINT:GEOM_PRIMITIVE EXPORTS:gl_PrimitiveID
     gl_PrimitiveID = gl_PrimitiveIDIn;
 
     bool isFlipped = IsFlipped(); // consider handedness AND negative-scale
 
+    // MTL_HINT:GEOM_PRIMITIVE USES:GEOM_NORMAL AFFECTS:Neye
     vec3 Neye0 = GetNormal(inData[0].Neye, 0);
     Neye0 = GetTriGeometryNormal(Neye0, inData[0].Peye, inData[1].Peye,
         inData[2].Peye, isFlipped);
@@ -372,6 +391,7 @@ void main(void)
     Neye2 = GetTriGeometryNormal(Neye2, inData[0].Peye, inData[1].Peye,
         inData[2].Peye, isFlipped);
 
+    // MTL_HINT:GEOM_PRIMITIVE USES:GEOM_DISPLACEMENT,Neye AFFECTS:Peye
     vec4 Peye0 = DisplacementTerminal(
         0, inData[0].Peye, Neye0, GetPatchCoord(0));
     vec4 Peye1 = DisplacementTerminal(
@@ -423,19 +443,26 @@ vec4 GetPatchCoord(int index)
 void emit(int triCounter, int index, vec4 Peye, vec3 Neye,
           vec4 triPeye0, vec4 triPeye1, vec4 triPeye2)
 {
+    // MTL_HINT:GEOM_PRIMITIVE USES:Peye EXPORTS:outData.Peye
     outData.Peye = Peye;
+    // MTL_HINT:GEOM_PRIMITIVE USES:Neye EXPORTS:outData.Neye
     outData.Neye = Neye;
 
+    // MTL_HINT:GEOM_PRIMITIVE EXPORTS:gsPatchCoord
     gsPatchCoord = GetPatchCoord(index);
     gsTessCoord = vec2(0);
 
+    // MTL_HINT:GEOM_PRIMITIVE USES:Peye EXPORTS:gl_Position
     gl_Position = vec4(GetProjectionMatrix() * outData.Peye);
     ApplyClipPlanes(outData.Peye);
 
+    // MTL_HINT:GEOM_PRIMITIVE USES:Peye,GEOM_EDGE
     ProcessQuadEdgeDistance(Peye, triPeye0, triPeye1, triPeye2, triCounter);
 
+    // MTL_HINT:GEOM_PRIMITIVE USES:GEOM_EDGE_ID
     ProcessEdgeId(index, gsPatchCoord.xy);
 
+    // MTL_HINT:GEOM_PRIMITIVE USES:GEOM_PRIMVARS
     ProcessPrimvars(index);
 
     EmitVertex();
@@ -443,10 +470,12 @@ void emit(int triCounter, int index, vec4 Peye, vec3 Neye,
 
 void main(void)
 {
+    // MTL_HINT:GEOM_PRIMITIVE EXPORTS:gl_PrimitiveID
     gl_PrimitiveID = gl_PrimitiveIDIn;
 
     bool isFlipped = IsFlipped(); // consider handedness AND negative-scale
 
+    // MTL_HINT:GEOM_PRIMITIVE USES:GEOM_NORMAL AFFECTS:Neye
     vec3 Neye0 = GetNormal(inData[0].Neye, 0);
     Neye0 = GetQuadGeometryNormal(Neye0, inData[0].Peye, inData[1].Peye,
         inData[2].Peye, inData[3].Peye, isFlipped);
@@ -460,6 +489,7 @@ void main(void)
     Neye3 = GetQuadGeometryNormal(Neye3, inData[0].Peye, inData[1].Peye,
         inData[2].Peye, inData[3].Peye, isFlipped);
 
+    // MTL_HINT:GEOM_PRIMITIVE USES:GEOM_DISPLACEMENT,Neye AFFECTS:Peye
     vec4 Peye0 = DisplacementTerminal(
         0, inData[0].Peye, Neye0, GetPatchCoord(0));
     vec4 Peye1 = DisplacementTerminal(

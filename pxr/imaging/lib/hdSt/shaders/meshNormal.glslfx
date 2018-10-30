@@ -130,6 +130,8 @@ vec3 GetQuadGeometryNormal(vec3 Neye,
 --- --------------------------------------------------------------------------
 -- glsl MeshNormal.Geometry.NoFlat
 
+// MTL_HINT:GEOM_NORMAL PASSTHROUGH
+
 vec3 GetTriGeometryNormal(vec3 Neye, vec4 Peye0, vec4 Peye1, vec4 Peye2,
                           bool isFlipped)
 {

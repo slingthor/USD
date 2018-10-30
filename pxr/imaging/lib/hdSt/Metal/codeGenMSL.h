@@ -183,6 +183,7 @@ private:
     void _GenerateShaderParameters();
     void _GenerateTopologyVisibilityParameters();
     
+    void _ParseHints(std::stringstream &source);
     void _ParseGLSL(std::stringstream &source, InOutParams& inParams, InOutParams& outParams, bool asComputeGS = false);
     void _GenerateGlue(std::stringstream& glueVS, std::stringstream& glueGS, std::stringstream& gluePS, HdStMSLProgramSharedPtr mslProgram);
 //    void _MSL_GenerateVSWrapper(UInt32& inout_slotIndex, UInt32 vtxUniformBufferSize, std::stringstream& shader, std::stringstream& inout_ComputeGSArguments);
@@ -214,6 +215,7 @@ private:
     bool _hasVS, _hasGS, _hasFS, _mslExportPrimitiveID;
     MSL_BuildTarget _buildTarget;
     int _mslGSPrimOutStructSize, _mslGSVertOutStructSize;
+    std::set<std::string> _gsIgnoredExports;
 };
 
 
