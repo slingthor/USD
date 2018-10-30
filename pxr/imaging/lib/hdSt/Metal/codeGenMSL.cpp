@@ -1058,7 +1058,8 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
                         vsFuncDef, vsMI_FuncDef,
                         vsMI_EP_FuncDef, vsMI_EP_FuncDefParams, vsMI_EP_CallCode, vsMI_EP_InputCode,
                         vsCode, vsEntryPointCode, vsInputCode, vsOutputCode, vsGsOutputMergeCode,
-                        vsUniformStruct, drawArgsStruct;
+                        vsUniformStruct, drawArgsStruct,
+                        gsVertIntermediateStruct, gsVertIntermediateFlatStruct, gs_IntermediateVSOutput, gs_IntermediateVSOutput_Flat;
 
     METAL_DEBUG_COMMENT(&glueCommon, "_GenerateGlue(glueCommon)\n"); //MTL_FIXME
     METAL_DEBUG_COMMENT(&glueVS, "_GenerateGlue(glueVS)\n"); //MTL_FIXME
@@ -1329,6 +1330,11 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
         mslProgram->AddBinding("vsUniforms", vsUniformsBufferSlot, kMSL_BindingType_UniformBuffer, kMSL_ProgramStage_Vertex, 0, vsUniformStructSize);
 
     ///////////////////////// Vertex Output ////////////////////////////
+    
+    if(_buildTarget == kMSL_BuildTarget_MVA_ComputeGS) {
+        gsVertIntermediateStruct << "struct MSLGsVertIntermediateStruct {\n";
+        gsVertIntermediateFlatStruct << "struct MSLGsVertIntermediateStruct_Flat {\n";
+    }
 
     vsOutputStruct  << "struct MSLVsOutputs {\n";
     {
@@ -1348,9 +1354,25 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
                             << ", " << output.name
                             << ", " << (output.attribute.IsEmpty() ? "[[center_perspective]]" : output.attribute.GetString()) << ");\n";
             vsOutputCode << "    vsOut." << output.name << " = scope." << (output.accessorStr.IsEmpty() ? output.name : output.accessorStr) << ";\n";
+            
+            //Build additional intermediate struct for the GS later as an optimization.
+            if(_buildTarget == kMSL_BuildTarget_MVA_ComputeGS) {
+                bool isFlat = (output.attribute == "[[flat]]");
+                std::stringstream& intermStructStream = (isFlat ? gsVertIntermediateFlatStruct : gsVertIntermediateStruct);
+                intermStructStream << "    " << output.dataType << " " << output.name << ";\n";
+                if(isFlat)
+                    gs_IntermediateVSOutput_Flat << "            vsData_Flat." << output.name << " = vsOutput." << output.name << ";\n";
+                else
+                    gs_IntermediateVSOutput << "        vsData[i]." << output.name << " = vsOutput." << output.name << ";\n";
+            }
         }
     }
     vsOutputStruct << "};\n\n";
+    
+    if(_buildTarget == kMSL_BuildTarget_MVA_ComputeGS) {
+        gsVertIntermediateStruct << "};\n\n";
+        gsVertIntermediateFlatStruct << "};\n\n";
+    }
     
     //Update indiviual uniforms with the assigned uniform buffer slot.
     TF_FOR_ALL(it, _mslVSInputParams) {
@@ -1425,9 +1447,10 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
             bool isPtr = false;
             if(name.at(0) == '*') { name = name.substr(1, name.length() - 1); isPtr = true; }
             
-            if(isVPrimVar || isDrawingCoord || isVertexData)
-                gs_VSInputCode << "            scope." << (accessor.empty() ? name : accessor) << " = vsOutput." << name << ";\n";
-            else {
+            if(isVPrimVar || isDrawingCoord || isVertexData) {
+                bool isFlat = attribute == "[[flat]]";
+                gs_VSInputCode << "            scope." << (accessor.empty() ? name : accessor) << (isFlat ? " = vsData_Flat." : " = vsData[i].") << name << ";\n";
+            } else {
                 gs_GSInputCode << "        scope." << (accessor.empty() ? name : accessor) << " = ";
                 
                 if(prefixScope && isPtr)
@@ -1636,9 +1659,14 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
                 << "// MSL GS Output Structs ///////////////////////////////////////////////////////////////////////////////////////////\n\n"
                 << gsVertOutStruct.str()
                 << gsPrimOutStruct.str();
-
-        gsCode  << gsEmitCode.str()
+        
+        gsCode  << gsEmitCode.str()     //This is where the ProgramScope_Geometry ends.
                 << vsCode.str();        //Include vertex shader code into our gsCode, note that this does not include the VS Entry Point.
+    
+        gsCode  << "////////////////////////////////////////////////////////////////////////////////////////////////////////////////////\n"
+                << "// MSL VS Intermediate Output Structs //////////////////////////////////////////////////////////////////////////////\n\n"
+                << gsVertIntermediateStruct.str()
+                << gsVertIntermediateFlatStruct.str();
     
         gsCode  << "////////////////////////////////////////////////////////////////////////////////////////////////////////////////////\n"
                 << "// MSL Compute Entry Point /////////////////////////////////////////////////////////////////////////////////////////\n\n"
@@ -1654,21 +1682,27 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
                 << "    if(gl_InstanceID >= drawArgs->instanceCount) return;\n"
                 << "    \n"
                 << "    //Vertex Shader\n"
-                << "    MSLVsOutputs vsOutputs[" << numVerticesInPerPrimitive << "];\n"
+                << "    MSLGsVertIntermediateStruct vsData[" << numVerticesInPerPrimitive << "];\n"
+                << "    MSLGsVertIntermediateStruct_Flat vsData_Flat;\n"
                 << "    for(uint i = 0; i < " << numVerticesInPerPrimitive << "; i++) {\n"
                 << "        uint gl_VertexID = gl_BaseVertex + indices[drawArgs->startIndex + _vertexID + i];\n"
-                << "        thread MSLVsOutputs& vsOutput = vsOutputs[i];\n"
                 << "\n"
                 << "    " << vsMI_EP_InputCode.str()
                 << "\n"
+                << "        MSLVsOutputs vsOutput;\n"
                 << "    " << vsMI_EP_CallCode.str()
+                << "\n"
+                << gs_IntermediateVSOutput.str()
+                << "\n\n"
+                << "        if(i == 0) {\n"
+                << gs_IntermediateVSOutput_Flat.str()
+                << "        }\n"
                 << "    }\n"
                 << "\n"
                 << "    //Geometry Shader\n"
                 << "    {\n"
                 << "        ProgramScope_Geometry scope;\n\n"
                 << "        for(uint i = 0; i < " << numVerticesInPerPrimitive << "; i++){\n"
-                << "            thread MSLVsOutputs& vsOutput = vsOutputs[i];\n"
                 << gs_VSInputCode.str()
                 << "        }\n\n"
                 << "        scope.gl_PrimitiveIDIn = gl_PrimitiveIDIn;\n"
