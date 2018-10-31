@@ -30,8 +30,6 @@
 --- --------------------------------------------------------------------------
 -- glsl EdgeId.Geometry.None
 
-// MTL_HINT:GEOM_EDGE_ID PASSTHROUGH
-
 // called from Mesh.Geometry.*
 void ProcessEdgeId(int index, vec2 faceUV)
 {
@@ -40,8 +38,6 @@ void ProcessEdgeId(int index, vec2 faceUV)
 
 --- --------------------------------------------------------------------------
 -- glsl EdgeId.Geometry.EdgeParam
-
-// MTL_HINT:GEOM_EDGE_ID EXPORTS:gsEdgeParam
 
 // Interpolate linearly since we want to be able to
 // reason about the distance from the edge in fragment space.

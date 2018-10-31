@@ -673,7 +673,7 @@ HdSt_CodeGenMSL::_ParseHints(std::stringstream &source) {
     //Scan for MTL_HINTs
     std::string::size_type cursor = 0;
     bool hintError = false;
-    const static std::string    strHint("// MTL_HINT:"),
+    const static std::string    strHint("// MTL_HINT"),
                                 strPassthrough("PASSTHROUGH"),
                                 strUses("USES:"),
                                 strAffects("AFFECTS:"),
@@ -682,11 +682,10 @@ HdSt_CodeGenMSL::_ParseHints(std::stringstream &source) {
                                 strNewline("\n\r"),
                                 strSeparator(", \t\n\r");
     struct MSL_CodeGen_Hint {
-        std::string label;
         std::set<std::string> uses;
         std::set<std::string> affects;
-        std::set<std::string> exports;
-        bool isPassthrough;
+        std::string           _export;
+        bool                  isPassthrough;
         MSL_CodeGen_Hint() : isPassthrough(false) {}
     };
     std::vector<MSL_CodeGen_Hint> hints;
@@ -695,8 +694,6 @@ HdSt_CodeGenMSL::_ParseHints(std::stringstream &source) {
         cursor += strHint.length();
         std::string::size_type endOfHint = result.find_first_of(strNewline, cursor);
         std::string::size_type nextWhitespace = result.find_first_of(strWhitespace, cursor);
-        if(nextWhitespace > endOfHint){ hintError = true; break; }
-        hint.label = result.substr(cursor, nextWhitespace - cursor);
         while((cursor = result.find_first_not_of(strWhitespace, nextWhitespace)) < endOfHint) {
             nextWhitespace = result.find_first_of(strWhitespace, cursor);
             if(result.compare(cursor, strUses.length(), strUses) == 0) {
@@ -717,7 +714,8 @@ HdSt_CodeGenMSL::_ParseHints(std::stringstream &source) {
                 cursor += strExports.length();
                 std::string::size_type labelEnd;
                 while((labelEnd = result.find_first_of(strSeparator, cursor)) <= nextWhitespace) {
-                    hint.exports.insert(result.substr(cursor, labelEnd - cursor));
+                    if(!hint._export.empty()) { hintError = true; break; }
+                    hint._export = result.substr(cursor, labelEnd - cursor);
                     cursor = labelEnd + 1;
                 }
             } else if(result.compare(cursor, strPassthrough.length(), strPassthrough) == 0) {
@@ -736,21 +734,18 @@ HdSt_CodeGenMSL::_ParseHints(std::stringstream &source) {
         bool changed = true;
         while(changed) {
             changed = false;
-            for(int i = 0; i < hints.size(); i++) {
-                MSL_CodeGen_Hint& hint = hints[i];
-                if(hint.isPassthrough)
+            for(auto& hint : hints) {
+                if(hint.isPassthrough || hint.uses.empty())
                     continue;
                 
-                bool canPassthrough = !hint.uses.empty();
-                for(auto uses_it = hint.uses.begin(); uses_it != hint.uses.end() && canPassthrough; uses_it++) {
-                    const std::string& usesLabel(*uses_it);
-                    for(int k = 0; k < hints.size(); k++) {
-                        MSL_CodeGen_Hint& checkHint = hints[k];
-                        if(    (checkHint.label == usesLabel && !checkHint.isPassthrough)
-                            || (checkHint.affects.count(usesLabel) == 0 && !checkHint.isPassthrough)) {
-                            canPassthrough = false;
-                            break;
-                        }
+                bool canPassthrough = true;
+                //For every dependency check if it prohibits passthrough
+                for(const auto& usesLabel : hint.uses) {
+                    for(const auto& _hint : hints) {
+                        if(_hint.affects.count(usesLabel) == 0 || _hint.isPassthrough)
+                            continue;
+                        canPassthrough = false;
+                        break;
                     }
                 }
                 
@@ -762,12 +757,10 @@ HdSt_CodeGenMSL::_ParseHints(std::stringstream &source) {
         }
     
         //Set ignored GS exports
-        for(int i = 0; i < hints.size(); i++) {
-            MSL_CodeGen_Hint& hint = hints[i];
-            if(!hint.isPassthrough)
+        for(const auto& hint : hints) {
+            if(hint._export.empty() || !hint.isPassthrough)
                 continue;
-            for(auto export_it = hint.exports.begin(); export_it != hint.exports.end(); export_it++)
-                _gsIgnoredExports.insert(*export_it);
+            _gsIgnoredExports.insert(hint._export);
         }
     }
 }
@@ -2254,14 +2247,14 @@ HdSt_CodeGenMSL::Compile()
     // Externally sourced glslfx translation to MSL
     bool _mslBuildComputeGS = _buildTarget == kMSL_BuildTarget_MVA_ComputeGS;
     if(_mslBuildComputeGS) {
-        _ParseHints(_genGS);
-        
         _ParseGLSL(_genOSDDefinitions, _mslGSInputParams, _mslGSOutputParams, true);
         _ParseGLSL(_genGS, _mslGSInputParams, _mslGSOutputParams, true);
         
-        std::stringstream _temp;
-        _temp << _genCommon.str();
-        _ParseGLSL(_temp, _mslGSInputParams, _mslGSOutputParams, true);
+        std::stringstream temp;
+        temp << _genCommon.str();
+        _ParseGLSL(temp, _mslGSInputParams, _mslGSOutputParams, true);
+        temp << _genGS.str();
+        _ParseHints(temp);
     }
 
     _ParseGLSL(_genVS, _mslVSInputParams, _mslVSOutputParams);
@@ -4104,7 +4097,7 @@ HdSt_CodeGenMSL::_GenerateVertexAndFaceVaryingPrimvar(bool hasGS)
                  << "       mix(inPrimvars[i1]." << name
                  << "         , inPrimvars[i0]." << name << ", u), v);\n";
         
-        _procGS  << "    // MTL_HINT:GEOM_PRIMVARS EXPORTS:outPrimvars." << name << " USES:" << name << "\n"
+        _procGS  << "    // MTL_HINT EXPORTS:outPrimvars." << name << " PASSTHROUGH\n"
                  << "    outPrimvars." << name
                  << " = inPrimvars[index]." << name << ";\n";
     }
@@ -4192,7 +4185,7 @@ HdSt_CodeGenMSL::_GenerateVertexAndFaceVaryingPrimvar(bool hasGS)
                 case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_PATCHES:
                 {
                     // linear interpolation within a quad.
-                    _procGS << "    // MTL_HINT:GEOM_PRIMVARS EXPORTS:outPrimvars." << name << "\n"
+                    _procGS << "    // MTL_HINT EXPORTS:outPrimvars." << name << "\n"
                             << "    outPrimvars." << name
                             << "  = mix("
                             << "mix(" << "HdGet_" << name << "(0),"
@@ -4206,7 +4199,7 @@ HdSt_CodeGenMSL::_GenerateVertexAndFaceVaryingPrimvar(bool hasGS)
                 case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_COARSE_TRIANGLES:
                 {
                     // barycentric interpolation within a triangle.
-                    _procGS << "    // MTL_HINT:GEOM_PRIMVARS EXPORTS:outPrimvars." << name << "\n"
+                    _procGS << "    // MTL_HINT EXPORTS:outPrimvars." << name << "\n"
                             << "    outPrimvars." << name
                             << "  = HdGet_" << name << "(0) * (1-localST.x-localST.y) "
                             << "  + HdGet_" << name << "(1) * localST.x "
