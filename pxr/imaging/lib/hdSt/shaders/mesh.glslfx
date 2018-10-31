@@ -223,11 +223,13 @@ vec4 GetPatchCoord(int index)
 void emit(int index, vec4 Peye, vec3 Neye,
           vec4 triPeye0, vec4 triPeye1, vec4 triPeye2)
 {
-    outData.Peye = Peye;
-    outData.Neye = Neye;
-    gsPatchCoord = GetPatchCoord(index);
-    gsTessCoord = vec2(0);
-    gl_Position = vec4(GetProjectionMatrix() * outData.Peye);
+    outData.Peye = Peye;                                        // MTL_HINT USES:Peye EXPORTS:outData.Peye
+    outData.Neye = Neye;                                        // MTL_HINT USES:Neye EXPORTS:outData.Neye
+	
+    gsPatchCoord = GetPatchCoord(index);                        // MTL_HINT EXPORTS:gsPatchCoord
+    gsTessCoord = vec2(0);                                      // MTL_HINT EXPORTS:gsTessCoord PASSTHROUGH
+	
+    gl_Position = vec4(GetProjectionMatrix() * outData.Peye);   // MTL_HINT USES:Peye EXPORTS:gl_Position
     ApplyClipPlanes(outData.Peye);
 
     int inEdgeFlag = 0;
@@ -249,12 +251,12 @@ void emit(int index, vec4 Peye, vec3 Neye,
 
 void main(void)
 {
-    gl_PrimitiveID = gl_PrimitiveIDIn;
+    gl_PrimitiveID = gl_PrimitiveIDIn;                          // MTL_HINT USES:gl_PrimitiveIDIn EXPORTS:gl_PrimitiveID
 
     bool isFlipped = IsFlipped(); // consider handedness AND negative-scale
 
     vec3 Neye0 = isFlipped ? -inData[0].Neye : inData[0].Neye;
-    Neye0 = GetNormal(Neye0, 0);
+    Neye0 = GetNormal(Neye0, 0);                                // MTL_HINT USES:GEOM_NORMAL AFFECTS:Neye
     Neye0 = GetTriGeometryNormal(Neye0, inData[0].Peye, inData[1].Peye,
         inData[2].Peye, isFlipped);
     vec3 Neye1 = isFlipped ? -inData[1].Neye : inData[1].Neye;
@@ -266,7 +268,7 @@ void main(void)
     Neye2 = GetTriGeometryNormal(Neye2, inData[0].Peye, inData[1].Peye,
         inData[2].Peye, isFlipped);
 
-    vec4 Peye0 = DisplacementTerminal(
+    vec4 Peye0 = DisplacementTerminal(                          // MTL_HINT USES:GEOM_DISPLACEMENT AFFECTS:Peye
         0, inData[0].Peye, Neye0, GetPatchCoord(0));
     vec4 Peye1 = DisplacementTerminal(
         1, inData[1].Peye, Neye1, GetPatchCoord(1));
@@ -337,15 +339,15 @@ vec4 GetPatchCoord(int index)
 void emit(int index, vec4 Peye, vec3 Neye,
           vec4 triPeye0, vec4 triPeye1, vec4 triPeye2)
 {
-    outData.Peye = Peye;
-    outData.Neye = Neye;
+    outData.Peye = Peye;                                        // MTL_HINT USES:Peye EXPORTS:outData.Peye
+    outData.Neye = Neye;                                        // MTL_HINT USES:Neye EXPORTS:outData.Neye
 
-    gsPatchCoord = GetPatchCoord(index);
-    gsTessCoord = vec2(0);
+    gsPatchCoord = GetPatchCoord(index);                        // MTL_HINT EXPORTS:gsPatchCoord
+    gsTessCoord = vec2(0);                                      // MTL_HINT EXPORTS:gsTessCoord PASSTHROUGH
 
-    gl_Position = vec4(GetProjectionMatrix() * outData.Peye);
+    gl_Position = vec4(GetProjectionMatrix() * outData.Peye);   // MTL_HINT USES:Peye EXPORTS:gl_Position
     ApplyClipPlanes(outData.Peye);
-
+	
     int inEdgeFlag = 0;
     ProcessTriEdgeDistance(Peye, triPeye0, triPeye1, triPeye2, inEdgeFlag);
 
@@ -358,11 +360,11 @@ void emit(int index, vec4 Peye, vec3 Neye,
 
 void main(void)
 {
-    gl_PrimitiveID = gl_PrimitiveIDIn;
+    gl_PrimitiveID = gl_PrimitiveIDIn;                          // MTL_HINT USES:gl_PrimitiveIDIn EXPORTS:gl_PrimitiveID
 
     bool isFlipped = IsFlipped(); // consider handedness AND negative-scale
 
-    vec3 Neye0 = GetNormal(inData[0].Neye, 0);
+    vec3 Neye0 = GetNormal(inData[0].Neye, 0);                  // MTL_HINT USES:GEOM_NORMAL AFFECTS:Neye
     Neye0 = GetTriGeometryNormal(Neye0, inData[0].Peye, inData[1].Peye,
         inData[2].Peye, isFlipped);
     vec3 Neye1 = GetNormal(inData[1].Neye, 1);
@@ -372,7 +374,7 @@ void main(void)
     Neye2 = GetTriGeometryNormal(Neye2, inData[0].Peye, inData[1].Peye,
         inData[2].Peye, isFlipped);
 
-    vec4 Peye0 = DisplacementTerminal(
+    vec4 Peye0 = DisplacementTerminal(                          // MTL_HINT USES:GEOM_DISPLACEMENT AFFECTS:Peye
         0, inData[0].Peye, Neye0, GetPatchCoord(0));
     vec4 Peye1 = DisplacementTerminal(
         1, inData[1].Peye, Neye1, GetPatchCoord(1));
@@ -423,15 +425,15 @@ vec4 GetPatchCoord(int index)
 void emit(int triCounter, int index, vec4 Peye, vec3 Neye,
           vec4 triPeye0, vec4 triPeye1, vec4 triPeye2)
 {
-    outData.Peye = Peye;
-    outData.Neye = Neye;
+    outData.Peye = Peye;                                        // MTL_HINT USES:Peye EXPORTS:outData.Peye
+    outData.Neye = Neye;                                        // MTL_HINT USES:Neye EXPORTS:outData.Neye
 
-    gsPatchCoord = GetPatchCoord(index);
-    gsTessCoord = vec2(0);
+    gsPatchCoord = GetPatchCoord(index);                        // MTL_HINT EXPORTS:gsPatchCoord
+    gsTessCoord = vec2(0);                                      // MTL_HINT EXPORTS:gsTessCoord PASSTHROUGH
 
-    gl_Position = vec4(GetProjectionMatrix() * outData.Peye);
+    gl_Position = vec4(GetProjectionMatrix() * outData.Peye);   // MTL_HINT USES:Peye EXPORTS:gl_Position
     ApplyClipPlanes(outData.Peye);
-
+	
     ProcessQuadEdgeDistance(Peye, triPeye0, triPeye1, triPeye2, triCounter);
 
     ProcessEdgeId(index, gsPatchCoord.xy);
@@ -443,11 +445,11 @@ void emit(int triCounter, int index, vec4 Peye, vec3 Neye,
 
 void main(void)
 {
-    gl_PrimitiveID = gl_PrimitiveIDIn;
+    gl_PrimitiveID = gl_PrimitiveIDIn;                          // MTL_HINT USES:gl_PrimitiveIDIn EXPORTS:gl_PrimitiveID
 
     bool isFlipped = IsFlipped(); // consider handedness AND negative-scale
 
-    vec3 Neye0 = GetNormal(inData[0].Neye, 0);
+    vec3 Neye0 = GetNormal(inData[0].Neye, 0);                  // MTL_HINT USES:GEOM_NORMAL AFFECTS:Neye
     Neye0 = GetQuadGeometryNormal(Neye0, inData[0].Peye, inData[1].Peye,
         inData[2].Peye, inData[3].Peye, isFlipped);
     vec3 Neye1 = GetNormal(inData[1].Neye, 1);
@@ -460,7 +462,7 @@ void main(void)
     Neye3 = GetQuadGeometryNormal(Neye3, inData[0].Peye, inData[1].Peye,
         inData[2].Peye, inData[3].Peye, isFlipped);
 
-    vec4 Peye0 = DisplacementTerminal(
+    vec4 Peye0 = DisplacementTerminal(                          // MTL_HINT USES:GEOM_DISPLACEMENT AFFECTS:Peye
         0, inData[0].Peye, Neye0, GetPatchCoord(0));
     vec4 Peye1 = DisplacementTerminal(
         1, inData[1].Peye, Neye1, GetPatchCoord(1));

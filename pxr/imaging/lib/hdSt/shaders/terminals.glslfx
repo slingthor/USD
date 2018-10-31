@@ -30,6 +30,8 @@
 --- --------------------------------------------------------------------------
 -- glsl Geometry.CustomDisplacement
 
+// MTL_HINT AFFECTS:GEOM_DISPLACEMENT
+
 //Remove forward declaration if using Metal
 #ifndef ARCH_GFX_METAL
 vec4 displacementShader(int index, vec4 Peye, vec3 Neye, vec4 patchCoord);

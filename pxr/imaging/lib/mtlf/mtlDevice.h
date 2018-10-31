@@ -71,6 +71,8 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 #define METAL_NUM_GPU_FRAME_TIMES 5
 
+#define METAL_GS_THREADGROUP_SIZE 64
+
 class MtlfDrawTarget;
 typedef boost::shared_ptr<class MtlfMetalContext> MtlfMetalContextSharedPtr;
 
@@ -477,6 +479,7 @@ private:
     std::vector<id<MTLBuffer>> gsBuffers;
     id<MTLFence>               gsFence;
     bool                       gsOpenBatch;
+    bool                       gsFirstBatch;
     bool                       isRenderPassDescriptorPatched;
 
     void _gsAdvanceBuffer();

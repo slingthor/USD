@@ -100,6 +100,8 @@ vec3 GetNormal(vec3 Neye, int index)
 --- --------------------------------------------------------------------------
 -- glsl MeshNormal.Geometry.Flat
 
+// MTL_HINT AFFECTS:GEOM_NORMAL
+
 vec3 GetTriGeometryNormal(vec3 Neye, vec4 Peye0, vec4 Peye1, vec4 Peye2,
                           bool isFlipped)
 {
