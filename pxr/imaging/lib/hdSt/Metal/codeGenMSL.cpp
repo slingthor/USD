@@ -746,10 +746,11 @@ HdSt_CodeGenMSL::_ParseHints(std::stringstream &source) {
                     const std::string& usesLabel(*uses_it);
                     for(int k = 0; k < hints.size(); k++) {
                         MSL_CodeGen_Hint& checkHint = hints[k];
-                        if(checkHint.affects.count(usesLabel) == 0 || checkHint.isPassthrough)
-                            continue;
-                        canPassthrough = false;
-                        break;
+                        if(    (checkHint.label == usesLabel && !checkHint.isPassthrough)
+                            || (checkHint.affects.count(usesLabel) == 0 && !checkHint.isPassthrough)) {
+                            canPassthrough = false;
+                            break;
+                        }
                     }
                 }
                 
