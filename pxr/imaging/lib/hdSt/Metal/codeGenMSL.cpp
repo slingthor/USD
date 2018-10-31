@@ -1329,66 +1329,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
     if(hasVSUniformBuffer)
         mslProgram->AddBinding("vsUniforms", vsUniformsBufferSlot, kMSL_BindingType_UniformBuffer, kMSL_ProgramStage_Vertex, 0, vsUniformStructSize);
 
-    ///////////////////////// Vertex Output ////////////////////////////
-    
-    if(_buildTarget == kMSL_BuildTarget_MVA_ComputeGS) {
-        gsVertIntermediateStruct << "struct MSLGsVertIntermediateStruct {\n";
-        gsVertIntermediateFlatStruct << "struct MSLGsVertIntermediateStruct_Flat {\n";
-    }
-
-    vsOutputStruct  << "struct MSLVsOutputs {\n";
-    {
-        if(_buildTarget != kMSL_BuildTarget_Regular) {
-            vsOutputStruct  << "    uint gl_PrimitiveID[[flat]];\n"
-                            << "    uint _gsPrimitiveID[[flat]];\n"
-                            << "    vec2 _barycentricCoords[[center_perspective]];\n";
-        }
-        TF_FOR_ALL(it, _mslVSOutputParams) {
-            HdSt_CodeGenMSL::TParam const &output = *it;
-            
-            //Ignore these because they serve no purpose as output of the VS. Just a symptom of how Hydra was setup.
-            if(IsIgnoredVSAttribute(output.name))
-                continue;
-            
-            vsOutputStruct  << "    HD_MTL_VS_ATTRIBUTE(" << output.dataType
-                            << ", " << output.name
-                            << ", " << (output.attribute.IsEmpty() ? "[[center_perspective]]" : output.attribute.GetString()) << ");\n";
-            vsOutputCode << "    vsOut." << output.name << " = scope." << (output.accessorStr.IsEmpty() ? output.name : output.accessorStr) << ";\n";
-            
-            //Build additional intermediate struct for the GS later as an optimization.
-            if(_buildTarget == kMSL_BuildTarget_MVA_ComputeGS) {
-                bool isFlat = (output.attribute == "[[flat]]");
-                std::stringstream& intermStructStream = (isFlat ? gsVertIntermediateFlatStruct : gsVertIntermediateStruct);
-                intermStructStream << "    " << output.dataType << " " << output.name << ";\n";
-                if(isFlat)
-                    gs_IntermediateVSOutput_Flat << "            vsData_Flat." << output.name << " = vsOutput." << output.name << ";\n";
-                else
-                    gs_IntermediateVSOutput << "        vsData[i]." << output.name << " = vsOutput." << output.name << ";\n";
-            }
-        }
-    }
-    vsOutputStruct << "};\n\n";
-    
-    if(_buildTarget == kMSL_BuildTarget_MVA_ComputeGS) {
-        gsVertIntermediateStruct << "};\n\n";
-        gsVertIntermediateFlatStruct << "};\n\n";
-    }
-    
-    //Update indiviual uniforms with the assigned uniform buffer slot.
-    TF_FOR_ALL(it, _mslVSInputParams) {
-        HdSt_CodeGenMSL::TParam const &input = *it;
-        TfToken attrib;
-        if (!(input.usage & HdSt_CodeGenMSL::TParam::Uniform))
-            continue;
-        std::string name = (input.name.GetText()[0] == '*') ? input.name.GetText() + 1 : input.name.GetText();
-        mslProgram->UpdateUniformBinding(name, vsUniformsBufferSlot);
-    }
-    
-    ///////////////////////////////// Compute Geometry Shader ///////////////////////
-    
-    std::stringstream   gsCode, gsFuncDef, cs_EP_FuncDef, gs_VSInputCode, gs_GSInputCode,
-                        gs_GSCallCode, gs_VSCallCode, gs_GSVertEmitCode, gs_GSPrimEmitCode,
-                        gsVertOutStruct, gsPrimOutStruct, gsEmitCode;
+    ///////////////////////// Setup Geometry Shader Attributes ////////////////////////////
 
     int numVerticesInPerPrimitive = -1;
     int numVerticesOutPerPrimitive = 3;
@@ -1420,6 +1361,79 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
 //            TF_FATAL_ERROR("Unsupported Primitive Type encountered during Geometry Shader generation!");
     }
 
+    ///////////////////////// Vertex Output ////////////////////////////
+    
+    if(_buildTarget == kMSL_BuildTarget_MVA_ComputeGS) {
+        gsVertIntermediateStruct << "struct MSLGsVertIntermediateStruct {\n";
+        gsVertIntermediateFlatStruct << "struct MSLGsVertIntermediateStruct_Flat {\n";
+    }
+
+    vsOutputStruct  << "struct MSLVsOutputs {\n";
+    {
+        if(_buildTarget != kMSL_BuildTarget_Regular) {
+            vsOutputStruct  << "    uint gl_PrimitiveID[[flat]];\n"
+                            << "    uint _gsPrimitiveID[[flat]];\n"
+                            << "    vec2 _barycentricCoords[[center_perspective]];\n";
+        }
+        TF_FOR_ALL(it, _mslVSOutputParams) {
+            HdSt_CodeGenMSL::TParam const &output = *it;
+            
+            //Ignore these because they serve no purpose as output of the VS. Just a symptom of how Hydra was setup.
+            if(IsIgnoredVSAttribute(output.name))
+                continue;
+            
+            vsOutputStruct  << "    HD_MTL_VS_ATTRIBUTE(" << output.dataType
+                            << ", " << output.name
+                            << ", " << (output.attribute.IsEmpty() ? "[[center_perspective]]" : output.attribute.GetString()) << ");\n";
+            vsOutputCode << "    vsOut." << output.name << " = scope." << (output.accessorStr.IsEmpty() ? output.name : output.accessorStr) << ";\n";
+            
+            //Build additional intermediate struct for the GS later as an optimization.
+            if(_buildTarget == kMSL_BuildTarget_MVA_ComputeGS) {
+                bool isFlat = (output.attribute == "[[flat]]");
+                std::stringstream& intermStructStream = (isFlat ? gsVertIntermediateFlatStruct : gsVertIntermediateStruct);
+                
+                std::string dataType = output.dataType.GetString();
+                if(dataType == "vec2")  dataType = "packed_float2";
+                else if(dataType == "vec3")  dataType = "packed_float3";
+                else if(dataType == "vec4")  dataType = "packed_float4";
+                else if(dataType == "int2")  dataType = "packed_int2";
+                else if(dataType == "int3")  dataType = "packed_int3";
+                else if(dataType == "int4")  dataType = "packed_int4";
+                else if(dataType == "uint2")  dataType = "packed_uint2";
+                else if(dataType == "uint3")  dataType = "packed_uint3";
+                else if(dataType == "uint4")  dataType = "packed_uint4";
+                
+                intermStructStream << "    " << dataType << " " << output.name << ";\n";
+                if(isFlat)
+                    gs_IntermediateVSOutput_Flat << "            vsData_Flat." << output.name << " = vsOutput." << output.name << ";\n";
+                else
+                    gs_IntermediateVSOutput << "        vsData[_threadIndexInThreadgroup * " << numVerticesInPerPrimitive << " + i]." << output.name << " = vsOutput." << output.name << ";\n";
+            }
+        }
+    }
+    vsOutputStruct << "};\n\n";
+    
+    if(_buildTarget == kMSL_BuildTarget_MVA_ComputeGS) {
+        gsVertIntermediateStruct << "};\n\n";
+        gsVertIntermediateFlatStruct << "};\n\n";
+    }
+    
+    //Update indiviual uniforms with the assigned uniform buffer slot.
+    TF_FOR_ALL(it, _mslVSInputParams) {
+        HdSt_CodeGenMSL::TParam const &input = *it;
+        TfToken attrib;
+        if (!(input.usage & HdSt_CodeGenMSL::TParam::Uniform))
+            continue;
+        std::string name = (input.name.GetText()[0] == '*') ? input.name.GetText() + 1 : input.name.GetText();
+        mslProgram->UpdateUniformBinding(name, vsUniformsBufferSlot);
+    }
+    
+    ///////////////////////////////// Compute Geometry Shader ///////////////////////
+    
+    std::stringstream   gsCode, gsFuncDef, cs_EP_FuncDef, gs_VSInputCode, gs_GSInputCode,
+                        gs_GSCallCode, gs_VSCallCode, gs_GSVertEmitCode, gs_GSPrimEmitCode,
+                        gsVertOutStruct, gsPrimOutStruct, gsEmitCode;
+
     if(_buildTarget == kMSL_BuildTarget_MVA_ComputeGS) {
         int                 gsVertOutStructSize(0), gsPrimOutStructSize(0);
         
@@ -1427,6 +1441,8 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
 
         cs_EP_FuncDef   << "kernel void computeEntryPoint(\n"
                         << "    uint _threadPositionInGrid[[thread_position_in_grid]]\n"
+                        << "    , uint _threadIndexInThreadgroup[[thread_position_in_threadgroup]]\n"
+                        << "    , uint _threadsInThreadgroup[[threads_per_threadgroup]]\n"
                         << "    , device ProgramScope_Geometry::MSLGsVertOutStruct* gsVertOutBuffer[[buffer(" << gsVertOutputSlot << ")]]\n"
                         << "    , device ProgramScope_Geometry::MSLGsPrimOutStruct* gsPrimOutBuffer[[buffer(" << gsPrimOutputSlot << ")]]";
         
@@ -1449,7 +1465,11 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
             
             if(isVPrimVar || isDrawingCoord || isVertexData) {
                 bool isFlat = attribute == "[[flat]]";
-                gs_VSInputCode << "            scope." << (accessor.empty() ? name : accessor) << (isFlat ? " = vsData_Flat." : " = vsData[i].") << name << ";\n";
+                gs_VSInputCode  << "            scope." << (accessor.empty() ? name : accessor);
+                if(isFlat)
+                    gs_VSInputCode << " = vsData_Flat." << name << ";\n";
+                else
+                    gs_VSInputCode << " = vsData[_threadIndexInThreadgroup * " << numVerticesInPerPrimitive << " + i]." << name << ";\n";
             } else {
                 gs_GSInputCode << "        scope." << (accessor.empty() ? name : accessor) << " = ";
                 
@@ -1682,7 +1702,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
                 << "    if(gl_InstanceID >= drawArgs->instanceCount) return;\n"
                 << "    \n"
                 << "    //Vertex Shader\n"
-                << "    MSLGsVertIntermediateStruct vsData[" << numVerticesInPerPrimitive << "];\n"
+                << "    threadgroup MSLGsVertIntermediateStruct vsData[" << numVerticesInPerPrimitive << " * " << METAL_GS_THREADGROUP_SIZE << "];\n"
                 << "    MSLGsVertIntermediateStruct_Flat vsData_Flat;\n"
                 << "    for(uint i = 0; i < " << numVerticesInPerPrimitive << "; i++) {\n"
                 << "        uint gl_VertexID = gl_BaseVertex + indices[drawArgs->startIndex + _vertexID + i];\n"
@@ -3213,7 +3233,7 @@ HdSt_CodeGenMSL::_GenerateDrawingCoord()
     _genVS  << "hd_drawingCoord vsDrawingCoord;\n"
             << "hd_drawingCoord gsDrawingCoord;\n";
     
-    _genGS  << "hd_drawingCoord vsDrawingCoord[HD_NUM_PRIMITIVE_VERTS];\n"
+    _genGS  << "hd_drawingCoord vsDrawingCoord[1];\n"
             << "hd_drawingCoord gsDrawingCoord;\n";
 
     TfToken tkn_modelCoord("__dc_modelCoord");

@@ -651,7 +651,7 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
         }
         
         if(doMVAComputeGS) {
-            [computeEncoder dispatchThreads:MTLSizeMake(numPrimitivesInPart, 1, 1) threadsPerThreadgroup:MTLSizeMake(MIN(numPrimitivesInPart, 64), 1, 1)];
+            [computeEncoder dispatchThreads:MTLSizeMake(numPrimitivesInPart, 1, 1) threadsPerThreadgroup:MTLSizeMake(MIN(numPrimitivesInPart, METAL_GS_THREADGROUP_SIZE), 1, 1)];
             [renderEncoder drawPrimitives:primType vertexStart:0 vertexCount:(numPrimitivesInPart * numOutVertsPerInPrim) instanceCount:1 baseInstance:0];
         }
         else if(doMVA) {
