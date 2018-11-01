@@ -523,7 +523,7 @@ private:
         unsigned long blitEncodersRequested;
         unsigned long renderPipelineStates;
         unsigned long computePipelineStates;
-
+        unsigned long GSBatchesStarted;
     } resourceStats;
 #endif
     

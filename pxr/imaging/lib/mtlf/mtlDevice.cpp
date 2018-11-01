@@ -437,6 +437,7 @@ MtlfMetalContext::MtlfMetalContext(id<MTLDevice> _device, int width, int height)
     resourceStats.computePipelineStates   = 0;
     resourceStats.currentBufferAllocation = 0;
     resourceStats.peakBufferAllocation    = 0;
+    resourceStats.GSBatchesStarted        = 0;
 #endif
     
     frameCount = 0;
@@ -488,7 +489,8 @@ MtlfMetalContext::~MtlfMetalContext()
         NSLog(@"Compute Pipeline States:    %7lu / %7lu", resourceStats.computePipelineStates   / frameCount, resourceStats.computePipelineStates);
         NSLog(@"Blit    Encoders requested: %7lu / %7lu", resourceStats.blitEncodersRequested   / frameCount, resourceStats.blitEncodersRequested);
         NSLog(@"Blit    Encoders created:   %7lu / %7lu", resourceStats.blitEncodersCreated     / frameCount, resourceStats.blitEncodersCreated);
-	    NSLog(@"Peak    Buffer Allocation:  %7luMbs",     resourceStats.peakBufferAllocation    / (1024*1024));
+        NSLog(@"GS Batches started:         %7lu / %7lu", resourceStats.GSBatchesStarted        / frameCount, resourceStats.GSBatchesStarted);
+        NSLog(@"Peak    Buffer Allocation:  %7luMbs",     resourceStats.peakBufferAllocation    / (1024*1024));
     }
  #endif
 }
@@ -2115,6 +2117,7 @@ void MtlfMetalContext::PrepareForComputeGSPart(uint32_t vertData, uint32_t primD
 
     //If we are using a new buffer we've started a new batch. That means some synching/committing may need to happen before we can continue.
     if(startingNewBatch) {
+        METAL_INC_STAT(resourceStats.GSBatchesStarted);
         if(enableMultiQueue) {
             _gsEncodeSync();
             gsOpenBatch = true;
