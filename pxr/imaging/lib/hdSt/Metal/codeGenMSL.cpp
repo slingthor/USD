@@ -414,6 +414,7 @@ static std::string _GetPackedMSLType(const std::string& dataType) {
     if(dataType == "uint2")                         return "packed_uint2";
     if(dataType == "uint3")                         return "packed_uint3";
     if(dataType == "uint4")                         return "packed_uint4";
+    return dataType;
 }
 
 static HdSt_CodeGenMSL::TParam& _AddInputParam(
