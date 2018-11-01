@@ -405,6 +405,12 @@ HdSt_Osd3Subdivision::RefineGPU(HdBufferArrayRangeSharedPtr const &range,
                                        _GetGpuStencilTable(),
                                        instance,
                                        HdSt_Osd3Subdivision::GetDeviceContextPtr());
+
+#if OPENSUBDIV_HAS_METAL_COMPUTE && defined(ARCH_GFX_METAL)
+    // The Metal layer needs to know whether to generate data that might be required by OSD immediately or if it can be deferred (more performance)
+    MtlfMetalContext::GetMetalContext()->SetOSDEnabledThisFrame(true);
+#endif
+    
 #else
     TF_CODING_ERROR("No GPU kernel available.\n");
 #endif

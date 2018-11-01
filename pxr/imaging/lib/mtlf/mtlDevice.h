@@ -290,7 +290,14 @@ public:
     bool IsTempPointWorkaroundActive() { return tempPointsWorkaroundActive; }
 
     MTLF_API
-    bool SetTempPointWorkaround(bool activate) { tempPointsWorkaroundActive = activate; }
+    void SetTempPointWorkaround(bool activate) { tempPointsWorkaroundActive = activate; }
+    
+    MTLF_API
+    void SetOSDEnabledThisFrame(bool OSDStatus) { OSDEnabledThisFrame = OSDStatus; }
+    
+    MTLF_API
+    bool IsOSDEnabledThisFrame() { return OSDEnabledThisFrame; }
+    
 
     MTLF_API
     float GetGPUTimeInMs();
@@ -548,6 +555,7 @@ private:
     unsigned long numPrimsDrawn;
     
     bool tempPointsWorkaroundActive = false;
+    bool OSDEnabledThisFrame = false;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

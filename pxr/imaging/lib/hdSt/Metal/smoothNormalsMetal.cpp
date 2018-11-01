@@ -106,8 +106,10 @@ HdSt_SmoothNormalsComputationMetal::_Execute(
     
     context->ReleaseEncoder(false, METALWORKQUEUE_GEOMETRY_SHADER);
     
-    // Temp fix
-    context->CommitCommandBuffer(false, false, METALWORKQUEUE_GEOMETRY_SHADER);
+    // If OSD is enabled then it might require the data generated here. Would be better to do this per object if possible.
+    if (context->IsOSDEnabledThisFrame()) {
+        context->CommitCommandBuffer(false, false, METALWORKQUEUE_GEOMETRY_SHADER);
+    }
 }
 
 

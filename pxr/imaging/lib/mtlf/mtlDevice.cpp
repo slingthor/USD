@@ -2077,6 +2077,8 @@ void MtlfMetalContext::EndFrame() {
     //Reset the Compute GS intermediate buffer offset
     _gsAdvanceBuffer();
     
+    // Reset it here as OSD may get invoked before StartFrame() is called.
+    OSDEnabledThisFrame = false;
     isRenderPassDescriptorPatched = false;
 }
 
