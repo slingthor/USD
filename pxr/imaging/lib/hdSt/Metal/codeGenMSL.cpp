@@ -404,6 +404,18 @@ _GetFlatType(TfToken const &token)
     return token;
 }
 
+static std::string _GetPackedMSLType(const std::string& dataType) {
+    if(dataType == "vec2" || dataType == "float2")  return "packed_float2";
+    if(dataType == "vec3" || dataType == "float3")  return "packed_float3";
+    if(dataType == "vec4" || dataType == "float4")  return "packed_float4";
+    if(dataType == "int2")                          return "packed_int2";
+    if(dataType == "int3")                          return "packed_int3";
+    if(dataType == "int4")                          return "packed_int4";
+    if(dataType == "uint2")                         return "packed_uint2";
+    if(dataType == "uint3")                         return "packed_uint3";
+    if(dataType == "uint4")                         return "packed_uint4";
+}
+
 static HdSt_CodeGenMSL::TParam& _AddInputParam(
                             HdSt_CodeGenMSL::InOutParams &inputParams,
                             TfToken const &name,
@@ -1292,11 +1304,10 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
                 
                 //We need to replace some of the dataTypes here to account for changes in
                 //packing/alignment/unpacking
-                if(usesPackedNormals) dataType = _tokens->_int;
-                else if(dataType == "vec2") dataType = "packed_float2";
-                else if(dataType == "vec3") dataType = "packed_float3";
-                else if(dataType == "int2") dataType = "packed_int2";
-                else if(dataType == "int3") dataType = "packed_int3";
+                if(usesPackedNormals)
+                    dataType = _tokens->_int;
+                else
+                    dataType = _GetPackedMSLType(dataType);
                 
                 vsMI_EP_FuncDefParams   << "\n    , device const " << dataType
                                         << " *" << name << "[[buffer(" << vsCurrentVertexAttributeSlot << ")]]";
@@ -1386,16 +1397,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
                 bool isFlat = (output.attribute == "[[flat]]");
                 std::stringstream& intermStructStream = (isFlat ? gsVertIntermediateFlatStruct : gsVertIntermediateStruct);
                 
-                std::string dataType = output.dataType.GetString();
-                if(dataType == "vec2")  dataType = "packed_float2";
-                else if(dataType == "vec3")  dataType = "packed_float3";
-                else if(dataType == "vec4")  dataType = "packed_float4";
-                else if(dataType == "int2")  dataType = "packed_int2";
-                else if(dataType == "int3")  dataType = "packed_int3";
-                else if(dataType == "int4")  dataType = "packed_int4";
-                else if(dataType == "uint2")  dataType = "packed_uint2";
-                else if(dataType == "uint3")  dataType = "packed_uint3";
-                else if(dataType == "uint4")  dataType = "packed_uint4";
+                std::string dataType = _GetPackedMSLType(output.dataType.GetString());
                 
                 intermStructStream << "    " << dataType << " " << output.name << ";\n";
                 if(isFlat)
@@ -1507,23 +1509,12 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
         vsPrimBufferAccessor << "gsPrimOutBuffer[_gsPrimitiveID].";
         TF_FOR_ALL(it, _mslGSOutputParams) {
             std::string name(it->name.GetString()), accessor(it->accessorStr.GetString()),
-                        dataType(it->dataType.GetString()), attribute(it->attribute.GetString());
+                        dataType(_GetPackedMSLType(it->dataType.GetString())), attribute(it->attribute.GetString());
         
             //Check whether the hints say this shouldn't be exported.
             bool requiresExport = (_gsIgnoredExports.count(name) + _gsIgnoredExports.count(accessor)) == 0;
             if(!requiresExport)
                 continue;
-            
-            //Replace vector data type with their packed variants to save space
-            if(dataType == "vec2")  dataType = "packed_float2";
-            else if(dataType == "vec3")  dataType = "packed_float3";
-            else if(dataType == "vec4")  dataType = "packed_float4";
-            else if(dataType == "int2")  dataType = "packed_int2";
-            else if(dataType == "int3")  dataType = "packed_int3";
-            else if(dataType == "int4")  dataType = "packed_int4";
-            else if(dataType == "uint2")  dataType = "packed_uint2";
-            else if(dataType == "uint3")  dataType = "packed_uint3";
-            else if(dataType == "uint4")  dataType = "packed_uint4";
         
             bool isPerPrim = (attribute == "[[flat]]");
             std::stringstream& structStream = (isPerPrim ? gsPrimOutStruct : gsVertOutStruct);
@@ -4151,19 +4142,8 @@ HdSt_CodeGenMSL::_GenerateVertexAndFaceVaryingPrimvar(bool hasGS)
             _EmitAccessor(accessorsGS, name, TfToken(dataType), binding, "GetFVarIndex(localIndex)");
             _EmitStructAccessor(accessorsFS, readStructName, name, TfToken(dataType),
                                 /*arraySize=*/1, false, NULL);
-            
-            //Replace vector data type with their packed variants to save space
-            if(dataType == "vec2")  dataType = "packed_float2";
-            else if(dataType == "vec3")  dataType = "packed_float3";
-            else if(dataType == "vec4")  dataType = "packed_float4";
-            else if(dataType == "int2")  dataType = "packed_int2";
-            else if(dataType == "int3")  dataType = "packed_int3";
-            else if(dataType == "int4")  dataType = "packed_int4";
-            else if(dataType == "uint2")  dataType = "packed_uint2";
-            else if(dataType == "uint3")  dataType = "packed_uint3";
-            else if(dataType == "uint4")  dataType = "packed_uint4";
-            
-            _EmitDeclarationPtr(fvarDeclarations, name, TfToken(dataType), TfToken(), binding);
+
+            _EmitDeclarationPtr(fvarDeclarations, name, TfToken(_GetPackedMSLType(dataType)), TfToken(), binding);
 
 //            // interstage plumbing
 //            _procVS << "  outPrimvars." << name
