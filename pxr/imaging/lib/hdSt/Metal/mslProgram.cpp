@@ -655,7 +655,7 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
             [renderEncoder drawPrimitives:primType vertexStart:0 vertexCount:(numPrimitivesInPart * numOutVertsPerInPrim) instanceCount:1 baseInstance:0];
         }
         else if(doMVA) {
-            [renderEncoder drawPrimitives:primType vertexStart:0 vertexCount:indexCount instanceCount:instanceCount baseInstance:0];
+           [renderEncoder drawPrimitives:primType vertexStart:0 vertexCount:indexCount instanceCount:instanceCount baseInstance:0];
         }
         else {
             [renderEncoder drawIndexedPrimitives:primType indexCount:indexCount indexType:indexTypeMetal indexBuffer:indexBuffer indexBufferOffset:(firstIndex * indexSize) instanceCount:instanceCount baseVertex:baseVertex baseInstance:0];

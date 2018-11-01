@@ -1067,7 +1067,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
 
     drawArgsStruct              << "////////////////////////////////////////////////////////////////////////////////////////////////////////////////////\n"
                                 << "// MSL Draw Args Struct ////////////////////////////////////////////////////////////////////////////////////////////\n\n"
-                                << "struct MSLDrawArgs { int indexCount, startIndex, baseVertex, instanceCount, batchIndexOffset; };\n";
+                                << "struct MSLDrawArgs { uint indexCount, startIndex, baseVertex, instanceCount, batchIndexOffset; };\n";
 
     //Do an initial pass over _mslVSInputParams and _mslFSInputParams to count the number of vertexAttributes that will needs
     // slots. This allows us to do the rest of the VS/PS generation in a single pass.
@@ -1655,7 +1655,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
                                 << "\n"
                                 << "    MSLVsOutputs vsOutput;\n"
                                 << vsMI_EP_CallCode.str()
-                                << "\n    vsOutput.gl_PrimitiveID = gl_PrimitiveIDIn;\n"
+                                << "\n    vsOutput.gl_PrimitiveID = _gsPrimitiveID;\n"
                                 << "    vsOutput._gsPrimitiveID = _gsPrimitiveID;\n"
                                 << "    vsOutput._barycentricCoords = vec2((_vertexID % 3 == 1)? 1.0 : 0.0, (_vertexID % 3 == 2) ? 1.0 : 0.0);\n\n"
                                 << vsGsOutputMergeCode.str()
