@@ -40,8 +40,8 @@
 #include "pxr/base/tf/token.h"
 #include "pxr/base/vt/value.h"
 #include "pxr/imaging/cameraUtil/conformWindow.h"
-#include "pxr/imaging/glf/simpleLight.h"
-#include "pxr/imaging/glf/simpleLightingContext.h"
+#include "pxr/imaging/garch/simpleLight.h"
+#include "pxr/imaging/garch/simpleLightingContext.h"
 #include "pxr/imaging/hd/renderIndex.h"
 #include "pxr/imaging/hd/repr.h"
 #include "pxr/imaging/hd/rprimCollection.h"
@@ -76,7 +76,7 @@ namespace {
     class PxrMayaHdShadowMatrix : public HdxShadowMatrixComputation
     {
         public:
-            PxrMayaHdShadowMatrix(const GlfSimpleLight& light)
+            PxrMayaHdShadowMatrix(const GarchSimpleLight& light)
             {
                 // We use the shadow matrix as provided by Maya directly.
                 _shadowMatrix = light.GetShadowMatrix();
@@ -100,7 +100,7 @@ PxrMayaHdSceneDelegate::PxrMayaHdSceneDelegate(
         const SdfPath& delegateID) :
     HdSceneDelegate(renderIndex, delegateID)
 {
-    _lightingContext = GlfSimpleLightingContext::New();
+    _lightingContext = GarchSimpleLightingContext::New();
 
     // populate tasks in renderindex
 
@@ -262,7 +262,7 @@ PxrMayaHdSceneDelegate::SetLightingStateFromMayaDrawContext(
 void
 PxrMayaHdSceneDelegate::_SetLightingStateFromLightingContext()
 {
-    const GlfSimpleLightVector& lights = _lightingContext->GetLights();
+    const GarchSimpleLightVector& lights = _lightingContext->GetLights();
 
     bool hasLightingChanged = false;
 
@@ -295,9 +295,9 @@ PxrMayaHdSceneDelegate::_SetLightingStateFromLightingContext()
         _ValueCache& cache = _valueCacheMap[_lightIds[i]];
 
         const VtValue& currLightValue = cache[HdLightTokens->params];
-        if (currLightValue.IsHolding<GlfSimpleLight>()) {
-            const GlfSimpleLight& currLight =
-                currLightValue.Get<GlfSimpleLight>();
+        if (currLightValue.IsHolding<GarchSimpleLight>()) {
+            const GarchSimpleLight& currLight =
+                currLightValue.Get<GarchSimpleLight>();
 
             if (lights[i] == currLight) {
                 // This light hasn't changed since the last time it was stored
@@ -308,7 +308,7 @@ PxrMayaHdSceneDelegate::_SetLightingStateFromLightingContext()
 
         hasLightingChanged = true;
 
-        // Store GlfSimpleLight directly.
+        // Store GarchSimpleLight directly.
         cache[HdLightTokens->params] = VtValue(lights[i]);
         cache[HdLightTokens->transform] = VtValue();
 

@@ -115,7 +115,7 @@ class PxrMayaHdSceneDelegate : public HdSceneDelegate
 
         SdfPath _simpleLightTaskId;
         SdfPathVector _lightIds;
-        GlfSimpleLightingContextRefPtr _lightingContext;
+        GarchSimpleLightingContextRefPtr _lightingContext;
 
         SdfPath _shadowTaskId;
 

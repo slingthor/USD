@@ -32,7 +32,7 @@
 #include "pxr/base/gf/matrix4d.h"
 #include "pxr/base/gf/matrix4f.h"
 #include "pxr/base/gf/vec4f.h"
-#include "pxr/imaging/glf/simpleLightingContext.h"
+#include "pxr/imaging/garch/simpleLightingContext.h"
 
 #include <maya/M3dView.h>
 #include <maya/MBoundingBox.h>
@@ -56,9 +56,9 @@ class px_vp20Utils
         PX_VP20_API
         static void unsetLightingGL(const MHWRender::MDrawContext& context);
 
-        /// Translate a Maya MDrawContext into a GlfSimpleLightingContext.
+        /// Translate a Maya MDrawContext into a GarchSimpleLightingContext.
         PX_VP20_API
-        static GlfSimpleLightingContextRefPtr GetLightingContextFromDrawContext(
+        static GarchSimpleLightingContextRefPtr GetLightingContextFromDrawContext(
                 const MHWRender::MDrawContext& context);
 
         /// Tries to get the viewport for the given draw context.

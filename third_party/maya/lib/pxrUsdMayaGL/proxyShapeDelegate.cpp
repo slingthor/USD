@@ -37,7 +37,7 @@
 
 #include "pxr/base/tf/registryManager.h"
 
-#include "pxr/imaging/glf/drawTarget.h"
+#include "pxr/imaging/garch/drawTarget.h"
 #include "pxr/imaging/glf/glContext.h"
 
 #include "pxr/imaging/hdx/intersector.h"
@@ -47,7 +47,7 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 static constexpr size_t ISECT_RESOLUTION = 256;
-static GlfDrawTargetRefPtr _sharedDrawTarget = nullptr;
+static GarchDrawTargetRefPtr _sharedDrawTarget = nullptr;
 static HdRprimCollection _sharedRprimCollection(
         TfToken("UsdMayaGL_ClosestPointOnProxyShape"),
         HdReprSelector(HdReprTokens->refined));
@@ -99,20 +99,25 @@ UsdMayaGL_ClosestPointOnProxyShape(
     // Similar to what the HdxIntersector does.
     if (!_sharedDrawTarget) {
         GlfSharedGLContextScopeHolder sharedContextHolder;
-        _sharedDrawTarget = GlfDrawTarget::New(
+        _sharedDrawTarget = GarchDrawTarget::New(
                 GfVec2i(ISECT_RESOLUTION, ISECT_RESOLUTION));
+
+        std::vector<GarchDrawTarget::AttachmentDesc> attachmentDesc;
+        attachmentDesc.push_back(
+            GarchDrawTarget::AttachmentDesc("color", GL_RGBA, GL_FLOAT, GL_RGBA));
+
+        attachmentDesc.push_back(
+            GarchDrawTarget::AttachmentDesc("depth", GL_DEPTH_STENCIL,
+                GL_UNSIGNED_INT_24_8, GL_DEPTH24_STENCIL8));
+        _sharedDrawTarget->SetAttachments(attachmentDesc);
         _sharedDrawTarget->Bind();
-        _sharedDrawTarget->AddAttachment("color",
-                GL_RGBA, GL_FLOAT, GL_RGBA);
-        _sharedDrawTarget->AddAttachment("depth",
-                GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8, GL_DEPTH24_STENCIL8);
         _sharedDrawTarget->Unbind();
     }
 
     // Use a separate drawTarget (framebuffer object) for each GL context
     // that uses this renderer, but the drawTargets share attachments/textures.
     // This ensures that things don't go haywire when changing the GL context.
-    GlfDrawTargetRefPtr drawTarget = GlfDrawTarget::New(
+    GarchDrawTargetRefPtr drawTarget = GarchDrawTarget::New(
             GfVec2i(ISECT_RESOLUTION, ISECT_RESOLUTION));
     drawTarget->Bind();
     drawTarget->CloneAttachments(_sharedDrawTarget);

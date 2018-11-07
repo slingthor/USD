@@ -35,9 +35,9 @@
 #include "pxr/base/gf/vec3f.h"
 #include "pxr/base/gf/vec4f.h"
 #include "pxr/base/tf/stringUtils.h"
-#include "pxr/imaging/glf/simpleLight.h"
-#include "pxr/imaging/glf/simpleLightingContext.h"
-#include "pxr/imaging/glf/simpleMaterial.h"
+#include "pxr/imaging/garch/simpleLight.h"
+#include "pxr/imaging/garch/simpleLightingContext.h"
+#include "pxr/imaging/garch/simpleMaterial.h"
 
 #include <maya/M3dView.h>
 #include <maya/MBoundingBox.h>
@@ -421,15 +421,15 @@ _GetLightingParam(
 }
 
 /* static */
-GlfSimpleLightingContextRefPtr
+GarchSimpleLightingContextRefPtr
 px_vp20Utils::GetLightingContextFromDrawContext(
         const MHWRender::MDrawContext& context)
 {
     const GfVec4f blackColor(0.0f, 0.0f, 0.0f, 1.0f);
     const GfVec4f whiteColor(1.0f, 1.0f, 1.0f, 1.0f);
 
-    GlfSimpleLightingContextRefPtr lightingContext =
-        GlfSimpleLightingContext::New();
+    GarchSimpleLightingContextRefPtr lightingContext =
+        GarchSimpleLightingContext::New();
 
     MStatus status;
 
@@ -459,7 +459,7 @@ px_vp20Utils::GetLightingContextFromDrawContext(
     lightingContext->SetCamera(GfMatrix4d(worldToViewMat.matrix),
                                GfMatrix4d(projectionMat.matrix));
 
-    GlfSimpleLightVector lights;
+    GarchSimpleLightVector lights;
 
     for (unsigned int i = 0u; i < numMayaLights; ++i) {
         MHWRender::MLightParameterInformation* mayaLightParamInfo =
@@ -634,21 +634,21 @@ px_vp20Utils::GetLightingContextFromDrawContext(
         lightColor[1u] *= lightIntensity;
         lightColor[2u] *= lightIntensity;
 
-        // Populate a GlfSimpleLight from the light information from Maya.
-        GlfSimpleLight light;
+        // Populate a GarchSimpleLight from the light information from Maya.
+        GarchSimpleLight light;
 
         GfVec4f lightAmbient = blackColor;
         GfVec4f lightDiffuse = blackColor;
         GfVec4f lightSpecular = blackColor;
 
         // We receive the cone angle from Maya as a pair of floats which
-        // includes the penumbra, but GlfSimpleLights don't currently support
+        // includes the penumbra, but GarchSimpleLights don't currently support
         // that, so we only use the primary cone angle value.
         float lightCutoff = GfRadiansToDegrees(std::acos(lightCosineConeAngle[0u]));
         float lightFalloff = lightDropoff;
 
         // Maya's decayRate is effectively the attenuation exponent, so we
-        // convert that into the three floats the GlfSimpleLight uses:
+        // convert that into the three floats the GarchSimpleLight uses:
         // - 0.0 = no attenuation
         // - 1.0 = linear attenuation
         // - 2.0 = quadratic attenuation
@@ -719,7 +719,7 @@ px_vp20Utils::GetLightingContextFromDrawContext(
     // XXX: These material settings match what we used to get when we read the
     // material from OpenGL. This should probably eventually be something more
     // sophisticated.
-    GlfSimpleMaterial material;
+    GarchSimpleMaterial material;
     material.SetAmbient(whiteColor);
     material.SetDiffuse(whiteColor);
     material.SetSpecular(blackColor);
