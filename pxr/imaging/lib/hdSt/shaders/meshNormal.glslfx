@@ -31,6 +31,8 @@
 --- --------------------------------------------------------------------------
 -- glsl MeshNormal.Scene
 
+// MTL_HINT AFFECTS:GEOM_NORMAL
+
 vec3 GetNormal(vec3 Neye, int index)
 {
     vec3 normal = vec3(0);
@@ -49,6 +51,8 @@ vec3 GetNormal(vec3 Neye, int index)
 
 --- --------------------------------------------------------------------------
 -- glsl MeshNormal.Smooth
+
+// MTL_HINT AFFECTS:GEOM_NORMAL
 
 vec3 GetNormal(vec3 Neye, int index)
 {
@@ -70,6 +74,8 @@ vec3 GetNormal(vec3 Neye, int index)
 
 --- --------------------------------------------------------------------------
 -- glsl MeshNormal.Flat
+
+// MTL_HINT AFFECTS:GEOM_NORMAL
 
 vec3 GetNormal(vec3 Neye, int index)
 {
