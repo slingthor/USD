@@ -347,6 +347,10 @@ MtlfBaseTexture::_CreateTexture(GarchBaseTextureDataConstPtr texData,
                     texDataWidth -= unpackCropRight;
                 }
             }
+            
+            if (texDataWidth == 1 || texDataHeight == 1) {
+                genMips = false;
+            }
 
             if (mtlFormat == MTLPixelFormatInvalid) {
                 TF_FATAL_CODING_ERROR("Unsupported/unimplemented texture format");
