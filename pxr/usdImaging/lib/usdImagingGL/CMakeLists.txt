@@ -88,6 +88,7 @@ if (X11_FOUND OR APPLE)
             usdImaging
             usdImagingGL
             sdf
+            ${METAL_LIBRARY}
         CPPFILES
             unitTestGLDrawing.cpp
             testenv/testUsdImagingGLBasicDrawing.cpp

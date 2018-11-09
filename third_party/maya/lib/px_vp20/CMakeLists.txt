@@ -6,6 +6,10 @@ if (NOT ${PXR_ENABLE_GL_SUPPORT})
     return()
 endif()
 
+if (APPLE)
+    set(METAL_LIBRARY               mtlf)
+endif()
+
 pxr_shared_library(${PXR_PACKAGE}
     LIBRARIES
         garch
@@ -13,6 +17,7 @@ pxr_shared_library(${PXR_PACKAGE}
         glf
         tf
         ${GLEW_LIBRARY}
+        ${METAL_LIBRARY}
         ${MAYA_OpenMaya_LIBRARY}
         ${MAYA_OpenMayaUI_LIBRARY}
         ${MAYA_OpenMayaRender_LIBRARY}

@@ -6,6 +6,10 @@ if (NOT ${PXR_ENABLE_GL_SUPPORT})
     return()
 endif()
 
+if (APPLE)
+    set(METAL_LIBRARY               mtlf)
+endif()
+
 pxr_shared_library(${PXR_PACKAGE}
     LIBRARIES
         arch
@@ -25,6 +29,7 @@ pxr_shared_library(${PXR_PACKAGE}
         vt
         ${Boost_LIBRARIES}
         ${MAYA_LIBRARIES}
+        ${METAL_LIBRARY}
 
     INCLUDE_DIRS
         ${Boost_INCLUDE_DIRS}
