@@ -98,12 +98,15 @@ TF_DEFINE_PRIVATE_TOKENS(
     ((_double, "double"))
     ((_float, "float"))
     ((_int, "int"))
+    (hd_vec2)
     (hd_vec3)
     (hd_vec3_get)
     (hd_vec3_set)
+    (hd_ivec2)
     (hd_ivec3)
     (hd_ivec3_get)
     (hd_ivec3_set)
+    (hd_dvec2)
     (hd_dvec3)
     (hd_dvec3_get)
     (hd_dvec3_set)
@@ -198,7 +201,11 @@ static bool InDeviceMemory(const HdBinding binding)
 static const char *
 _GetPackedTypeDefinitions()
 {
-    return "#define hd_ivec3 packed_int3\n"
+    return
+    "#define hd_ivec2 packed_int2\n"
+    "#define hd_ivec3 packed_int3\n"
+    "#define hd_vec2 packed_float2\n"
+    "#define hd_dvec2 packed_float2\n"
     "#define hd_vec3 packed_float3\n"
     "#define hd_dvec3 packed_float3\n"
     "struct hd_mat3  { float m00, m01, m02,\n"
@@ -282,7 +289,13 @@ static TfToken const &
 _GetPackedType(TfToken const &token, bool packedAlignment)
 {
     if (packedAlignment) {
-        if (token == _tokens->ivec3) {
+        if (token == _tokens->ivec2) {
+            return _tokens->hd_ivec2;
+        } else if (token == _tokens->vec2) {
+            return _tokens->hd_vec2;
+        } else if (token == _tokens->dvec2) {
+            return _tokens->hd_dvec2;
+        } if (token == _tokens->ivec3) {
             return _tokens->hd_ivec3;
         } else if (token == _tokens->vec3) {
             return _tokens->hd_vec3;
