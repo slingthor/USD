@@ -993,6 +993,14 @@ def InstallUSD(context, force, buildArgs):
                 extraArgs.append('-DMAYA_LOCATION="{mayaLocation}"'
                                  .format(mayaLocation=context.mayaLocation))
             extraArgs.append('-DPXR_BUILD_MAYA_PLUGIN=ON')
+            if MacOS():
+                # On macOS the Maya plugin needs to be linked against PySide2, as this is what's use by Maya internally
+                # extraArgs.append('-DPYSIDE_USE_PYSIDE2=ON')
+                if context.mayaLocation:
+                    extraArgs.append('-DPYTHON_LIBRARY="{mayaLocation}"/Maya.app/Contents/Frameworks/Python.framework/Versions/2.7/lib/libpython2.7.dylib'
+                                     .format(mayaLocation=context.mayaLocation))
+                    extraArgs.append('-DDPYTHON_INCLUDE_DIR="{mayaLocation}"/Maya.app/Contents/Frameworks/Python.framework/Versions/2.7/include/python2.7'
+                                     .format(mayaLocation=context.mayaLocation))
         else:
             extraArgs.append('-DPXR_BUILD_MAYA_PLUGIN=OFF')
 
