@@ -410,6 +410,8 @@ UsdMayaGLBatchRenderer::UsdMayaGLBatchRenderer() :
         _selectResultsKey(GfMatrix4d(0.0), GfMatrix4d(0.0), false),
         _hdEngine(HdEngine::OpenGL)
 {
+    GarchResourceFactory::GetInstance().SetResourceFactory(&resourceFactory);
+
     _viewport2UsesLegacySelection = TfGetenvBool("MAYA_VP2_USE_VP1_SELECTION",
                                                  false);
 

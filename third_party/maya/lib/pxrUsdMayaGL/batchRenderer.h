@@ -41,6 +41,7 @@
 #include "pxr/base/gf/vec4d.h"
 #include "pxr/base/tf/singleton.h"
 #include "pxr/base/tf/weakBase.h"
+#include "pxr/imaging/glf/resourceFactory.h"
 #include "pxr/imaging/hd/engine.h"
 #include "pxr/imaging/hd/renderIndex.h"
 #include "pxr/imaging/hd/rprimCollection.h"
@@ -465,6 +466,8 @@ private:
     /// Sync() diagnostics across all prepareForDraw() callbacks in a single
     /// frame.
     std::unique_ptr<UsdMayaDiagnosticBatchContext> _sharedDiagBatchCtx;
+    
+    GlfResourceFactory resourceFactory;
 };
 
 PXRUSDMAYAGL_API_TEMPLATE_CLASS(TfSingleton<UsdMayaGLBatchRenderer>);
