@@ -20,12 +20,12 @@ uniform vec2 texSize;
 
 void main(void)
 {
+	vec2 uv = vec2(texCoord.x, 1.0 - texCoord.y) * texSize;
 #if __VERSION__ >= 140
-    vec2 uv = texCoord * texSize;
-	fragColor = texture(interopTexture, uv.st);
+    fragColor = texture(interopTexture, uv.st);
+	gl_FragDepth = texture(depthTexture, uv.st).r;
 #else
-    vec2 uv = vec2(texCoord.x, 1.0 - texCoord.y) * texSize;
     gl_FragColor = texture2DRect(interopTexture, uv.st);
+    gl_FragDepth = texture2DRect(depthTexture, uv.st).r;
 #endif
-	gl_FragDepth = texture2DRect(depthTexture, uv.st).r;
 }

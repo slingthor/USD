@@ -215,14 +215,10 @@ void MtlfMetalContext::_InitialiseGL()
     staticGlInterop.glShaderProgram = glCreateProgram();
     glAttachShader(staticGlInterop.glShaderProgram, fs);
     glAttachShader(staticGlInterop.glShaderProgram, vs);
-    glBindFragDataLocation(staticGlInterop.glShaderProgram, 0, "fragColour");
+    glBindFragDataLocation(staticGlInterop.glShaderProgram, 0, "fragColor");
     glLinkProgram(staticGlInterop.glShaderProgram);
-    
-    // Release the local instance of the fragment shader. The shader program maintains a reference.
-    glDeleteShader(vs);
-    glDeleteShader(fs);
-    
-    GLint maxLength = 0;
+
+    GLint maxLength = 2048;
     if (maxLength)
     {
         glGetProgramiv(staticGlInterop.glShaderProgram, GL_INFO_LOG_LENGTH, &maxLength);
@@ -235,18 +231,22 @@ void MtlfMetalContext::_InitialiseGL()
         free(errorLog);
     }
     
+    // Release the local instance of the fragment shader. The shader program maintains a reference.
+    glDeleteShader(vs);
+    glDeleteShader(fs);
+    
     glUseProgram(staticGlInterop.glShaderProgram);
     
     glGenVertexArrays(1, &staticGlInterop.glVAO);
     glBindVertexArray(staticGlInterop.glVAO);
     
     glGenBuffers(1, &staticGlInterop.glVBO);
-    
     glBindBuffer(GL_ARRAY_BUFFER, staticGlInterop.glVBO);
     
     // Set up the vertex structure description
     staticGlInterop.posAttrib = glGetAttribLocation(staticGlInterop.glShaderProgram, "inPosition");
     staticGlInterop.texAttrib = glGetAttribLocation(staticGlInterop.glShaderProgram, "inTexCoord");
+
     glEnableVertexAttribArray(staticGlInterop.posAttrib);
     glVertexAttribPointer(staticGlInterop.posAttrib, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(offsetof(Vertex, position)));
     glEnableVertexAttribArray(staticGlInterop.texAttrib);
@@ -290,7 +290,7 @@ MtlfMetalContext::MtlfMetalContext(id<MTLDevice> _device, int width, int height)
     if (_device == nil) {
         // Select Intel GPU if possible due to current issues on AMD. Revert when fixed - MTL_FIXME
         //device = MtlfMetalContext::GetMetalDevice(PREFER_INTEGRATED_GPU);
-        device = MtlfMetalContext::GetMetalDevice(PREFER_INTEGRATED_GPU);
+        device = MtlfMetalContext::GetMetalDevice(PREFER_DISCRETE_GPU);
     }
     else
         device = _device;
@@ -650,9 +650,17 @@ MtlfMetalContext::IsInitialized()
 void
 MtlfMetalContext::BlitColorTargetToOpenGL()
 {
-    glPushAttrib(GL_ENABLE_BIT | GL_POLYGON_BIT | GL_DEPTH_BUFFER_BIT);
-    
+    GLint core;
+    glGetIntegerv(GL_CONTEXT_PROFILE_MASK, &core);
+    core &= GL_CONTEXT_CORE_PROFILE_BIT;
+
+    if (!core) {
+        glPushAttrib(GL_ENABLE_BIT | GL_POLYGON_BIT | GL_DEPTH_BUFFER_BIT);
+    }
+
+    glDepthFunc(GL_LEQUAL);
     glDepthMask(GL_TRUE);
+    glEnable(GL_DEPTH_TEST);
     glFrontFace(GL_CCW);
     glDisable(GL_CULL_FACE);
     glDisable(GL_BLEND);
@@ -663,11 +671,14 @@ MtlfMetalContext::BlitColorTargetToOpenGL()
     glBindBuffer(GL_ARRAY_BUFFER, staticGlInterop.glVBO);
     
     // Set up the vertex structure description
+    if (core) {
+        glBindVertexArray(staticGlInterop.glVAO);
+    }
     glEnableVertexAttribArray(staticGlInterop.posAttrib);
     glVertexAttribPointer(staticGlInterop.posAttrib, 2, GL_FLOAT, GL_FALSE, sizeof(MtlfMetalContext::Vertex), (void*)(offsetof(Vertex, position)));
     glEnableVertexAttribArray(staticGlInterop.texAttrib);
     glVertexAttribPointer(staticGlInterop.texAttrib, 2, GL_FLOAT, GL_FALSE, sizeof(MtlfMetalContext::Vertex), (void*)(offsetof(Vertex, uv)));
-    
+
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_RECTANGLE, glColorTexture);
     glActiveTexture(GL_TEXTURE1);
@@ -688,7 +699,12 @@ MtlfMetalContext::BlitColorTargetToOpenGL()
     glUseProgram(0);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     
-    glPopAttrib();
+    if (core) {
+        glBindVertexArray(0);
+    }
+    else {
+        glPopAttrib();
+    }
 }
 
 void
