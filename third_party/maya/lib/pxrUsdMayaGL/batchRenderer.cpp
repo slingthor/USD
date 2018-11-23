@@ -34,6 +34,11 @@
 #include "pxrUsdMayaGL/softSelectHelper.h"
 #include "pxrUsdMayaGL/userData.h"
 
+#include "pxrUsdMayaGL/GL/batchRendererGL.h"
+#if defined(ARCH_GFX_METAL)
+#include "pxrUsdMayaGL/Metal/batchRendererMetal.h"
+#endif
+
 #include "px_vp20/utils.h"
 #include "px_vp20/utils_legacy.h"
 
@@ -125,7 +130,33 @@ UsdMayaGLBatchRenderer::Init()
 UsdMayaGLBatchRenderer&
 UsdMayaGLBatchRenderer::GetInstance()
 {
-    return TfSingleton<UsdMayaGLBatchRenderer>::GetInstance();
+#if defined(ARCH_GFX_METAL)
+    UsdMayaGLBatchRenderer& instance = TfSingleton<UsdMayaGLBatchRendererMetal>::GetInstance();
+#else
+    UsdMayaGLBatchRenderer& instance = TfSingleton<UsdMayaGLBatchRendererGL>::GetInstance();
+#endif
+    
+    static std::once_flag once;
+    std::call_once(once, [&instance](){
+        instance._Init();
+    });
+
+    return instance;
+}
+
+HdEngine& UsdMayaGLBatchRenderer::_GetEngine()
+{
+    TF_FATAL_CODING_ERROR("This should be overridden!");
+    abort();
+}
+
+void UsdMayaGLBatchRenderer::_Render(
+         const GfMatrix4d& worldToViewMatrix,
+         const GfMatrix4d& projectionMatrix,
+         const GfVec4d& viewport,
+         const std::vector<_RenderItem>& items)
+{
+    TF_FATAL_CODING_ERROR("This should be overridden!");
 }
 
 HdRenderIndex*
@@ -407,11 +438,12 @@ UsdMayaGLBatchRenderer::UsdMayaGLBatchRenderer() :
         _isSelectionPending(false),
         _objectSoftSelectEnabled(false),
         _softSelectOptionsCallbackId(0),
-        _selectResultsKey(GfMatrix4d(0.0), GfMatrix4d(0.0), false),
-        _hdEngine(HdEngine::OpenGL)
+        _selectResultsKey(GfMatrix4d(0.0), GfMatrix4d(0.0), false)
 {
-    GarchResourceFactory::GetInstance().SetResourceFactory(&resourceFactory);
+}
 
+void UsdMayaGLBatchRenderer::_Init()
+{
     _viewport2UsesLegacySelection = TfGetenvBool("MAYA_VP2_USE_VP1_SELECTION",
                                                  false);
 
@@ -1046,7 +1078,7 @@ UsdMayaGLBatchRenderer::_TestIntersection(
                  GL_POLYGON_BIT);
     const bool r = _intersector->Query(queryParams,
                                        rprimCollection,
-                                       &_hdEngine,
+                                       &_GetEngine(),
                                        result);
     glPopAttrib();
     return r;
@@ -1158,106 +1190,6 @@ UsdMayaGLBatchRenderer::_ComputeSelection(
 
     TF_DEBUG(PXRUSDMAYAGL_BATCHED_SELECTION).Msg(
         "    ^^^^^^^^^^^^ SELECTION STAGE FINISH ^^^^^^^^^^^^^\n");
-}
-
-void
-UsdMayaGLBatchRenderer::_Render(
-        const GfMatrix4d& worldToViewMatrix,
-        const GfMatrix4d& projectionMatrix,
-        const GfVec4d& viewport,
-        const std::vector<_RenderItem>& items)
-{
-    _taskDelegate->SetCameraState(worldToViewMatrix,
-                                  projectionMatrix,
-                                  viewport);
-
-    // save the current GL states which hydra may reset to default
-    glPushAttrib(GL_LIGHTING_BIT |
-                 GL_ENABLE_BIT |
-                 GL_POLYGON_BIT |
-                 GL_DEPTH_BUFFER_BIT |
-                 GL_VIEWPORT_BIT);
-
-    // XXX: When Maya is using OpenGL Core Profile as the rendering engine (in
-    // either compatibility or strict mode), batch renders like those done in
-    // the "Render View" window or through the ogsRender command do not
-    // properly track uniform buffer binding state. This was causing issues
-    // where the first batch render performed would look correct, but then all
-    // subsequent renders done in that Maya session would be completely black
-    // (no alpha), even if the frame contained only Maya-native geometry or if
-    // a new scene was created/opened.
-    //
-    // To avoid this problem, we need to save and restore Maya's bindings
-    // across Hydra calls. We try not to bog down performance by saving and
-    // restoring *all* GL_MAX_UNIFORM_BUFFER_BINDINGS possible bindings, so
-    // instead we only do just enough to avoid issues. Empirically, the
-    // problematic binding has been the material binding at index 4.
-    static constexpr size_t _UNIFORM_BINDINGS_TO_SAVE = 5u;
-    std::vector<GLint> uniformBufferBindings(_UNIFORM_BINDINGS_TO_SAVE, 0);
-    for (size_t i = 0u; i < uniformBufferBindings.size(); ++i) {
-        glGetIntegeri_v(GL_UNIFORM_BUFFER_BINDING,
-                        (GLuint)i,
-                        &uniformBufferBindings[i]);
-    }
-
-    // hydra orients all geometry during topological processing so that
-    // front faces have ccw winding. We disable culling because culling
-    // is handled by fragment shader discard.
-    glFrontFace(GL_CCW); // < State is pushed via GL_POLYGON_BIT
-    glDisable(GL_CULL_FACE);
-
-    // note: to get benefit of alpha-to-coverage, the target framebuffer
-    // has to be a MSAA buffer.
-    glDisable(GL_BLEND);
-    glEnable(GL_SAMPLE_ALPHA_TO_COVERAGE);
-
-    // In all cases, we can should enable gamma correction:
-    // - in viewport 1.0, we're expected to do it
-    // - in viewport 2.0 without color correction, we're expected to do it
-    // - in viewport 2.0 with color correction, the render target ignores this
-    //   bit meaning we properly are blending linear colors in the render
-    //   target.  The color management pipeline is responsible for the final
-    //   correction.
-    glEnable(GL_FRAMEBUFFER_SRGB_EXT);
-
-    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-
-    // render task setup
-    HdTaskSharedPtrVector tasks = _taskDelegate->GetSetupTasks(); // lighting etc
-
-    for (const auto& iter : items) {
-        const PxrMayaHdRenderParams& params = iter.first;
-        const size_t paramsHash = params.Hash();
-
-        const HdRprimCollectionVector& rprimCollections = iter.second;
-
-        TF_DEBUG(PXRUSDMAYAGL_BATCHED_DRAWING).Msg(
-            "    *** renderBucket, parameters hash: %zu, bucket size %zu\n",
-            paramsHash,
-            rprimCollections.size());
-
-        HdTaskSharedPtrVector renderTasks =
-            _taskDelegate->GetRenderTasks(paramsHash, params, rprimCollections);
-        tasks.insert(tasks.end(), renderTasks.begin(), renderTasks.end());
-    }
-
-    VtValue selectionTrackerValue(_selectionTracker);
-    _hdEngine.SetTaskContextData(HdxTokens->selectionState,
-                                 selectionTrackerValue);
-
-    _hdEngine.Execute(*_renderIndex, tasks);
-
-    glDisable(GL_FRAMEBUFFER_SRGB_EXT);
-
-    // XXX: Restore Maya's uniform buffer binding state. See above for details.
-    for (size_t i = 0u; i < uniformBufferBindings.size(); ++i) {
-        glBindBufferBase(GL_UNIFORM_BUFFER,
-                         (GLuint)i,
-                         uniformBufferBindings[i]);
-    }
-
-    glPopAttrib(); // GL_LIGHTING_BIT | GL_ENABLE_BIT | GL_POLYGON_BIT |
-                   // GL_DEPTH_BUFFER_BIT | GL_VIEWPORT_BIT
 }
 
 void

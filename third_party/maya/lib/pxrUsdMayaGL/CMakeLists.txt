@@ -8,6 +8,7 @@ endif()
 
 if (APPLE)
     set(METAL_LIBRARY               mtlf)
+    set(METAL_PUBLIC_CLASSES        Metal/batchRendererMetal)
 endif()
 
 pxr_shared_library(${PXR_PACKAGE}
@@ -52,6 +53,8 @@ pxr_shared_library(${PXR_PACKAGE}
         softSelectHelper
         usdProxyShapeAdapter
         userData
+        GL/batchRendererGL
+        ${METAL_PUBLIC_CLASSES}
 
     PRIVATE_CLASSES
         instancerImager

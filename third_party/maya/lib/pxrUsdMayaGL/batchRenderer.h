@@ -41,7 +41,6 @@
 #include "pxr/base/gf/vec4d.h"
 #include "pxr/base/tf/singleton.h"
 #include "pxr/base/tf/weakBase.h"
-#include "pxr/imaging/glf/resourceFactory.h"
 #include "pxr/imaging/hd/engine.h"
 #include "pxr/imaging/hd/renderIndex.h"
 #include "pxr/imaging/hd/rprimCollection.h"
@@ -67,7 +66,6 @@
 
 
 PXR_NAMESPACE_OPEN_SCOPE
-
 
 /// UsdMayaGLBatchRenderer is a singleton that shapes can use to get consistent
 /// batched drawing via Hydra in Maya, regardless of legacy viewport or
@@ -254,15 +252,40 @@ public:
     PXRUSDMAYAGL_API
     void StartBatchingFrameDiagnostics();
 
+protected:
+    
+    typedef std::pair<PxrMayaHdRenderParams, HdRprimCollectionVector>
+            _RenderItem;
+    
+    PXRUSDMAYAGL_API
+    virtual HdEngine& _GetEngine();
+
+    /// Protected helper function to render the given list of render items.
+    /// Note that this doesn't set lighting, so if you need to update the
+    /// lighting from the scene, you need to do that beforehand.
+    PXRUSDMAYAGL_API
+    virtual void _Render(
+                 const GfMatrix4d& worldToViewMatrix,
+                 const GfMatrix4d& projectionMatrix,
+                 const GfVec4d& viewport,
+                 const std::vector<_RenderItem>& items);
+    
 private:
 
     friend class TfSingleton<UsdMayaGLBatchRenderer>;
+    friend class UsdMayaGLBatchRendererGL;
+#if defined(ARCH_GFX_METAL)
+    friend class UsdMayaGLBatchRendererMetal;
+#endif
 
     PXRUSDMAYAGL_API
     UsdMayaGLBatchRenderer();
 
     PXRUSDMAYAGL_API
     virtual ~UsdMayaGLBatchRenderer();
+    
+    PXRUSDMAYAGL_API
+    void _Init();
 
     /// Gets the UsdMayaGLSoftSelectHelper that this batchRenderer maintains.
     ///
@@ -272,18 +295,6 @@ private:
 
     /// Allow shape adapters access to the soft selection helper.
     friend PxrMayaHdShapeAdapter;
-
-    typedef std::pair<PxrMayaHdRenderParams, HdRprimCollectionVector>
-            _RenderItem;
-
-    /// Private helper function to render the given list of render items.
-    /// Note that this doesn't set lighting, so if you need to update the
-    /// lighting from the scene, you need to do that beforehand.
-    void _Render(
-            const GfMatrix4d& worldToViewMatrix,
-            const GfMatrix4d& projectionMatrix,
-            const GfVec4d& viewport,
-            const std::vector<_RenderItem>& items);
 
     /// Call to render all queued batches. May be called safely without
     /// performance hit when no batches are queued.
@@ -438,7 +449,6 @@ private:
     /// *after* the render index. We enforce that ordering by declaring the
     /// render delegate *before* the render index, since class members are
     /// destructed in reverse declaration order.
-    HdEngine _hdEngine;
     HdStRenderDelegate _renderDelegate;
     std::unique_ptr<HdRenderIndex> _renderIndex;
 
@@ -466,8 +476,6 @@ private:
     /// Sync() diagnostics across all prepareForDraw() callbacks in a single
     /// frame.
     std::unique_ptr<UsdMayaDiagnosticBatchContext> _sharedDiagBatchCtx;
-    
-    GlfResourceFactory resourceFactory;
 };
 
 PXRUSDMAYAGL_API_TEMPLATE_CLASS(TfSingleton<UsdMayaGLBatchRenderer>);
