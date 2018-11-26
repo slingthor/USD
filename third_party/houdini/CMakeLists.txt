@@ -1,7 +1,6 @@
-if (APPLE)   
-    message(WARNING "Skipping third_party/houdini because the Houdini plugin is not supported on MacOS")
-    return()
-elif (WIN32)
+if (APPLE)
+    message(WARNING "The Houdini plugin is not supported on macOS")
+elseif (WIN32)
     message(WARNING "The Houdini plugin is not supported on Windows")
 endif()
 
@@ -12,7 +11,11 @@ add_definitions(
     -DVERSION="${HOUDINI_VERSION}"
     -DHOUDINI_DOT_VERSION=${HOUDINI_BUILD_VERSION} )
 
-if (UNIX)
+if (APPLE)
+
+    add_definitions(-D_GNU_SOURCE -DMBSD -DMBSD_COCOA -DMBSD_INTEL -DAMD64 -DSIZEOF_VOID_P=8 -DFBX_ENABLED=1 -DOPENCL_ENABLED=1 -DOPENVDB_ENABLED=1 -DSESI_LITTLE_ENDIAN -DENABLE_THREADS -DUSE_PTHREADS -D_REENTRANT -D_FILE_OFFSET_BITS=64 -c -DMAKING_DSO -mmacosx-version-min=10.9 -DGCC4 -DGCC3 -Wno-deprecated -std=c++11 -Wall -W -Wno-parentheses -Wno-sign-compare -Wno-reorder -Wno-uninitialized -Wunused -Wno-unused-parameter -O2)
+
+elseif (UNIX)
 
     add_definitions(  -fpermissive -D_GNU_SOURCE -DLINUX -DAMD64 -DSIZEOF_VOID_P=8 -DFBX_ENABLED=1 -DOPENCL_ENABLED=1 -DOPENVDB_ENABLED=1 -DMAKING_DSO -DSESI_LITTLE_ENDIAN -DENABLE_THREADS -DUSE_PTHREADS -D_REENTRANT -D_FILE_OFFSET_BITS=64 -DGCC4 -DGCC3 -Wall -Wno-parentheses -Wno-sign-compare -Wno-reorder -Wno-uninitialized -Wunused -Wno-unused-parameter -Wno-unused-local-typedefs -Wno-empty-body -fno-strict-aliasing )
 

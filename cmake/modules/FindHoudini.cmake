@@ -81,7 +81,10 @@ find_path(HOUDINI_INCLUDE_DIRS
         "Houdini Development Kit Header Path"
 )
 
-if (UNIX)
+if (APPLE)
+    set(HOUDINI_LIB_NAME "libHoudiniGEO.dylib")
+    set(HOUDINI_LIB_PATH_SUFFIX "Libraries/")
+elseif (UNIX)
     set(HOUDINI_LIB_NAME "libHoudiniGEO.so")
     set(HOUDINI_LIB_PATH_SUFFIX "dsolib/")
 elseif(WIN32)
@@ -129,6 +132,17 @@ foreach(HOUDINI_LIB
         list(APPEND HOUDINI_LIBRARIES ${HOUDINI_${HOUDINI_LIB}_LIBRARY})
     endif ()
 endforeach()
+
+if(APPLE)
+    find_library(HOUDINI_HBOOSTSYSTEM_LIBRARY
+            libhboost_system.dylib
+        HINTS
+            "${HOUDINI_LIB_DIRS}"
+        DOC
+            "Houdini's hboost syetem library path"
+        NO_CMAKE_SYSTEM_PATH
+    )
+endif()
 
 if(HOUDINI_INCLUDE_DIRS AND EXISTS "${HOUDINI_INCLUDE_DIRS}/SYS/SYS_Version.h")
     foreach(comp FULL MAJOR MINOR BUILD)
