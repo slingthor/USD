@@ -77,6 +77,7 @@ find_path(HOUDINI_INCLUDE_DIRS
         "${HOUDINI_BASE_DIR}"
     PATH_SUFFIXES
         toolkit/include/
+        Resources/toolkit/include/
     DOC
         "Houdini Development Kit Header Path"
 )
