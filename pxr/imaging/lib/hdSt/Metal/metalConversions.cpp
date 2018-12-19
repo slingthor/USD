@@ -22,6 +22,8 @@
 // language governing permissions and limitations under the Apache License.
 //
 #include "pxr/imaging/glf/glew.h"
+#include "pxr/imaging/garch/gl.h"
+
 #include "pxr/imaging/hdSt/Metal/metalConversions.h"
 #include "pxr/base/tf/iterator.h"
 #include "pxr/base/tf/staticTokens.h"
@@ -223,14 +225,19 @@ HdStMetalConversions::GetWrap(HdWrap wrap)
     switch (wrap) {
         case HdWrapClamp : return MTLSamplerAddressModeClampToEdge;
         case HdWrapRepeat : return MTLSamplerAddressModeRepeat;
-        case HdWrapBlack : return MTLSamplerAddressModeClampToBorderColor;
         case HdWrapMirror : return MTLSamplerAddressModeMirrorRepeat;
+#if defined(ARCH_OS_OSX)
+        case HdWrapBlack : return MTLSamplerAddressModeClampToBorderColor;
         case HdWrapUseMetadata : return MTLSamplerAddressModeClampToBorderColor;
+#else
+        case HdWrapBlack : return MTLSamplerAddressModeClampToEdge;
+        case HdWrapUseMetadata : return MTLSamplerAddressModeClampToEdge;
+#endif
         case HdWrapLegacy : return MTLSamplerAddressModeRepeat;
     }
 
     TF_CODING_ERROR("Unexpected HdWrap type %d", wrap);
-    return MTLSamplerAddressModeClampToBorderColor;
+    return MTLSamplerAddressModeClampToEdge;
 }
 
 void
@@ -389,7 +396,9 @@ HdStMetalConversions::ConvertGLWrap(GLuint wrap)
         case GL_REPEAT:
             return MTLSamplerAddressModeRepeat;
         case GL_CLAMP_TO_BORDER:
+#if defined(ARCH_OS_MACOS)
             return MTLSamplerAddressModeClampToBorderColor;
+#endif
         case GL_MIRRORED_REPEAT:
             return MTLSamplerAddressModeMirrorRepeat;
     }

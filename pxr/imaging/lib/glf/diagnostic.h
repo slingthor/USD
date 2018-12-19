@@ -36,6 +36,15 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+#if !defined(ARCH_GFX_OPENGL)
+
+// Define the debug defines, to remove the need to protect these in API
+// agnostic code
+#define GLF_POST_PENDING_GL_ERRORS()
+#define GLF_GROUP_FUNCTION()
+#define GLF_GROUP_SCOPE(str)
+
+#else
 
 /// Posts diagnostic errors for all GL errors in the current context.
 /// This macro tags the diagnostic errors with the name of the calling
@@ -166,7 +175,7 @@ private:
     GLuint _id;
     GLenum _target;
 };
-
+#endif
 
 PXR_NAMESPACE_CLOSE_SCOPE
 

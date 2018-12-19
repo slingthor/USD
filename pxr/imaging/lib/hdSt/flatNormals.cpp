@@ -27,11 +27,6 @@
 #include "pxr/imaging/hdSt/flatNormals.h"
 #include "pxr/imaging/hdSt/tokens.h"
 
-#include "pxr/imaging/hdSt/GL/flatNormalsGL.h"
-#if defined(ARCH_GFX_METAL)
-#include "pxr/imaging/hdSt/Metal/flatNormalsMetal.h"
-#endif
-
 #include "pxr/imaging/hd/bufferArrayRange.h"
 #include "pxr/imaging/hd/bufferResource.h"
 #include "pxr/imaging/hd/engine.h"
@@ -48,31 +43,6 @@
 #include "pxr/base/tf/token.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
-
-HdSt_FlatNormalsComputationGPU *HdSt_FlatNormalsComputationGPU::New(
-    HdBufferArrayRangeSharedPtr const &topologyRange,
-    HdBufferArrayRangeSharedPtr const &vertexRange,
-    int numFaces, TfToken const &srcName, TfToken const &dstName,
-    HdType srcDataType, bool packed)
-{
-    HdEngine::RenderAPI api = HdEngine::GetRenderAPI();
-    switch(api)
-    {
-        case HdEngine::OpenGL:
-            return new HdSt_FlatNormalsComputationGL(
-                            topologyRange, vertexRange, numFaces,
-                            srcName, dstName, srcDataType, packed);
-#if defined(ARCH_GFX_METAL)
-        case HdEngine::Metal:
-            return new HdSt_FlatNormalsComputationMetal(
-                            topologyRange, vertexRange, numFaces,
-                            srcName, dstName, srcDataType, packed);
-#endif
-        default:
-            TF_FATAL_CODING_ERROR("No HdSt_FlatNormalsComputationGPU for this API");
-    }
-    return NULL;
-}
 
 HdSt_FlatNormalsComputationGPU::HdSt_FlatNormalsComputationGPU(
     HdBufferArrayRangeSharedPtr const &topologyRange,

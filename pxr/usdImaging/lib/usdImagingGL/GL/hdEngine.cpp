@@ -24,8 +24,9 @@
 #include "pxr/imaging/glf/glew.h"
 
 #include "pxr/imaging/garch/contextCaps.h"
-#include "pxr/imaging/garch/resourceFactory.h"
 #include "pxr/imaging/garch/simpleLightingContext.h"
+
+#include "pxr/imaging/hdSt/GL/resourceFactoryGL.h"
 
 #include "pxr/usdImaging/usdImagingGL/GL/hdEngine.h"
 #include "pxr/usdImaging/usdImaging/tokens.h"
@@ -80,7 +81,10 @@ UsdImagingGLHdEngine::UsdImagingGLHdEngine(
     , _isPopulated(false)
     , _renderTags()
 {
-    GarchResourceFactory::GetInstance().SetResourceFactory(&resourceFactory);
+    _resourceFactory = new HdStResourceFactoryGL();
+
+    GarchResourceFactory::GetInstance().SetResourceFactory(dynamic_cast<GarchResourceFactoryInterface*>(_resourceFactory));
+    HdStResourceFactory::GetInstance().SetResourceFactory(_resourceFactory);
 
     // _renderIndex, _taskController, and _delegate are initialized
     // by the plugin system.
@@ -92,7 +96,11 @@ UsdImagingGLHdEngine::UsdImagingGLHdEngine(
 UsdImagingGLHdEngine::~UsdImagingGLHdEngine() 
 {
     _DeleteHydraResources();
+    HdStResourceFactory::GetInstance().SetResourceFactory(NULL);
     GarchResourceFactory::GetInstance().SetResourceFactory(NULL);
+    
+    delete _resourceFactory;
+    _resourceFactory = NULL;
 }
 
 HdRenderIndex *

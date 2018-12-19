@@ -24,8 +24,6 @@
 #ifndef HDST_BUFFER_RESOURCE_H
 #define HDST_BUFFER_RESOURCE_H
 
-#include "pxr/imaging/glf/glew.h"
-
 #include "pxr/pxr.h"
 #include "pxr/imaging/hdSt/api.h"
 #include "pxr/imaging/hd/version.h"
@@ -62,11 +60,6 @@ typedef std::vector<HdStBufferResourceNamedPair>
 ///
 class HdStBufferResource : public HdBufferResource {
 public:
-    HDST_API
-    static HdStBufferResource *New(TfToken const &role,
-                                   HdTupleType tupleType,
-                                   int offset,
-                                   int stride);
     
     HDST_API
     virtual ~HdStBufferResource();

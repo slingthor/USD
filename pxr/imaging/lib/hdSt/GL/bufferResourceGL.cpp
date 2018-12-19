@@ -27,8 +27,7 @@
 
 
 #include "pxr/imaging/hdSt/GL/bufferResourceGL.h"
-#include "pxr/imaging/hdSt/GL/glConversions.h"
-
+#include "pxr/imaging/hdSt/glConversions.h"
 
 #include "pxr/base/gf/vec2d.h"
 #include "pxr/base/gf/vec2f.h"

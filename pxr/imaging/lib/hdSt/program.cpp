@@ -34,7 +34,9 @@
 
 #include "pxr/imaging/garch/glslfx.h"
 
+#if defined(ARCH_GFX_OPENGL)
 #include "pxr/imaging/hdSt/GL/glslProgram.h"
+#endif
 #if defined(ARCH_GFX_METAL)
 #include "pxr/imaging/hdSt/Metal/mslProgram.h"
 #endif
@@ -47,8 +49,10 @@ HdStProgram *HdStProgram::New(TfToken const &role)
     HdEngine::RenderAPI api = HdEngine::GetRenderAPI();
     switch(api)
     {
+#if defined(ARCH_GFX_OPENGL)
         case HdEngine::OpenGL:
             return new HdStGLSLProgram(role);
+#endif
 #if defined(ARCH_GFX_METAL)
         case HdEngine::Metal:
             return new HdStMSLProgram(role);

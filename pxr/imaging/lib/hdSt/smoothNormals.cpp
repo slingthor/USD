@@ -26,15 +26,12 @@
 #include "pxr/imaging/garch/contextCaps.h"
 #include "pxr/imaging/garch/resourceFactory.h"
 
+#include "pxr/imaging/hdSt/smoothNormals.h"
+
 #include "pxr/imaging/hdSt/bufferResource.h"
 #include "pxr/imaging/hdSt/program.h"
 #include "pxr/imaging/hdSt/resourceRegistry.h"
 #include "pxr/imaging/hdSt/tokens.h"
-
-#include "pxr/imaging/hdSt/GL/smoothNormalsGL.h"
-#if defined(ARCH_GFX_METAL)
-#include "pxr/imaging/hdSt/Metal/smoothNormalsMetal.h"
-#endif
 
 #include "pxr/imaging/hd/bufferArrayRange.h"
 #include "pxr/imaging/hd/engine.h"
@@ -51,27 +48,6 @@
 #include "pxr/base/tf/token.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
-
-
-HdSt_SmoothNormalsComputationGPU *HdSt_SmoothNormalsComputationGPU::New(
-    Hd_VertexAdjacency const *adjacency,
-    TfToken const &srcName, TfToken const &dstName,
-    HdType srcDataType, bool packed)
-{
-    HdEngine::RenderAPI api = HdEngine::GetRenderAPI();
-    switch(api)
-    {
-        case HdEngine::OpenGL:
-            return new HdSt_SmoothNormalsComputationGL(adjacency, srcName, dstName, srcDataType, packed);
-#if defined(ARCH_GFX_METAL)
-        case HdEngine::Metal:
-            return new HdSt_SmoothNormalsComputationMetal(adjacency, srcName, dstName, srcDataType, packed);
-#endif
-        default:
-            TF_FATAL_CODING_ERROR("No HdSt_SmoothNormalsComputationGPU for this API");
-    }
-    return NULL;
-}
 
 HdSt_SmoothNormalsComputationGPU::HdSt_SmoothNormalsComputationGPU(
     Hd_VertexAdjacency const *adjacency,

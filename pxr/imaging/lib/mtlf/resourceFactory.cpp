@@ -21,24 +21,24 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-// utils.cpp
+// resourceFactory.cpp
 //
-#include <pxr/imaging/mtlf/resourceFactory.h>
+#include "pxr/imaging/mtlf/resourceFactory.h"
 
-#include <pxr/imaging/mtlf/arrayTexture.h>
-#include <pxr/imaging/mtlf/baseTexture.h>
-#include <pxr/imaging/mtlf/bindingMap.h>
-#include <pxr/imaging/mtlf/contextCaps.h>
-#include <pxr/imaging/mtlf/drawTarget.h>
-#include <pxr/imaging/mtlf/ptexTexture.h>
-#include <pxr/imaging/mtlf/simpleLightingContext.h>
-#include <pxr/imaging/mtlf/simpleShadowArray.h>
-#include <pxr/imaging/mtlf/udimTexture.h>
-#include <pxr/imaging/mtlf/uniformBlock.h>
+#include "pxr/imaging/mtlf/arrayTexture.h"
+#include "pxr/imaging/mtlf/baseTexture.h"
+#include "pxr/imaging/mtlf/bindingMap.h"
+#include "pxr/imaging/mtlf/contextCaps.h"
+#include "pxr/imaging/mtlf/drawTarget.h"
+#include "pxr/imaging/mtlf/ptexTexture.h"
+#include "pxr/imaging/mtlf/simpleLightingContext.h"
+#include "pxr/imaging/mtlf/simpleShadowArray.h"
+#include "pxr/imaging/mtlf/udimTexture.h"
+#include "pxr/imaging/mtlf/uniformBlock.h"
 
-#include <pxr/imaging/garch/glslfx.h>
+#include "pxr/imaging/garch/glslfx.h"
 
-#include <pxr/base/tf/diagnostic.h>
+#include "pxr/base/tf/diagnostic.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 

@@ -24,7 +24,7 @@
 #include "pxr/imaging/glf/glew.h"
 
 #include "pxr/imaging/hdSt/GL/drawTargetTextureResourceGL.h"
-#include "pxr/imaging/hdSt/GL/glConversions.h"
+#include "pxr/imaging/hdSt/glConversions.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 

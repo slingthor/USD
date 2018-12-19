@@ -111,9 +111,16 @@ if (PXR_BUILD_IMAGING)
     if (PXR_ENABLE_GL_SUPPORT)
         find_package(OpenGL REQUIRED)
         find_package(GLEW REQUIRED)
+        add_definitions(-DPXR_OPENGL_SUPPORT_ENABLED)
+    endif()
+    # --Metal
+    if (PXR_ENABLE_METAL_SUPPORT)
+        FIND_LIBRARY(METAL_LIBRARY Metal)
+        FIND_LIBRARY(COREVIDEO_LIBRARY CoreVideo)
+        add_definitions(-DPXR_METAL_SUPPORT_ENABLED)
     endif()
     # --Opensubdiv
-    set(OPENSUBDIV_USE_GPU ${PXR_ENABLE_GL_SUPPORT})
+    set(OPENSUBDIV_USE_GPU ${PXR_ENABLE_GL_SUPPORT} OR ${PXR_ENABLE_METAL_SUPPORT})
     find_package(OpenSubdiv 3 REQUIRED)
     # --Ptex
     if (PXR_ENABLE_PTEX_SUPPORT)
@@ -127,6 +134,14 @@ if (PXR_BUILD_IMAGING)
     # --Embree
     if (PXR_BUILD_EMBREE_PLUGIN)
         find_package(Embree REQUIRED)
+    endif()
+    # --Apple
+    if (CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+        if (APPLEIOS)
+            FIND_LIBRARY(UIKIT_LIBRARY UIKit)
+        else()
+            FIND_LIBRARY(APPKIT_LIBRARY AppKit)
+        endif()
     endif()
 endif()
 

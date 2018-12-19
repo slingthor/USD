@@ -1,15 +1,25 @@
 set(PXR_PREFIX pxr/usdImaging)
 set(PXR_PACKAGE usdImagingGL)
 
-if (NOT ${PXR_ENABLE_GL_SUPPORT})
+if ((NOT ${PXR_ENABLE_GL_SUPPORT}) AND (NOT ${PXR_ENABLE_METAL_SUPPORT}))
     message(STATUS
-        "Skipping ${PXR_PACKAGE} because PXR_ENABLE_GL_SUPPORT is OFF")
+        "Skipping ${PXR_PACKAGE} because PXR_ENABLE_GL_SUPPORT and PXR_ENABLE_METAL_SUPPORT is OFF")
     return()
 endif()
 
-if (APPLE)
+if (${PXR_ENABLE_METAL_SUPPORT})
     set(METAL_LIBRARY               mtlf)
     set(METAL_PUBLIC_CLASSES        Metal/hdEngine)
+endif()
+
+if (${PXR_ENABLE_GL_SUPPORT})
+    set(OPENGL_LIBRARY              glf
+                                    ${OPENGL_gl_LIBRARY}
+                                    ${OPENGL_glu_LIBRARY})
+    set(OPENGL_PUBLIC_CLASSES       GL/hdEngine
+                                    GL/refEngine)
+else()
+    set(OPENGL_INCLUDE_DIR          "")
 endif()
 
 # Note: both python include directives are included for compatibility.
@@ -22,7 +32,6 @@ pxr_library(usdImagingGL
         vt
         work
         garch
-        glf
         hd
         pxOsd
         sdf
@@ -33,10 +42,9 @@ pxr_library(usdImagingGL
         usdImaging
         ar
         ${Boost_PYTHON_LIBRARY}
+        ${OPENGL_LIBRARY}
         ${METAL_LIBRARY}
         ${PYTHON_LIBRARY}
-        ${OPENGL_gl_LIBRARY}
-        ${OPENGL_glu_LIBRARY}
         ${GLEW_LIBRARY}
         ${TBB_tbb_LIBRARY}
 
@@ -51,8 +59,7 @@ pxr_library(usdImagingGL
         engine
         gl
         renderParams
-        GL/hdEngine
-        GL/refEngine
+        ${OPENGL_PUBLIC_CLASSES}
         ${METAL_PUBLIC_CLASSES}
 
     PUBLIC_HEADERS
@@ -88,6 +95,7 @@ if (X11_FOUND OR APPLE)
             usdImaging
             usdImagingGL
             sdf
+            ${OPENGL_LIBRARY}
             ${METAL_LIBRARY}
         CPPFILES
             unitTestGLDrawing.cpp

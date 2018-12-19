@@ -23,10 +23,8 @@
 //
 #include "pxr/imaging/mtlf/mtlDevice.h"
 
-#include "pxr/imaging/glf/glew.h"
-
 #include "pxr/imaging/hdSt/Metal/bufferResourceMetal.h"
-#include "pxr/imaging/hdSt/GL/glConversions.h"
+#include "pxr/imaging/hdSt/glConversions.h"
 
 #include "pxr/base/gf/vec2d.h"
 #include "pxr/base/gf/vec2f.h"
@@ -163,8 +161,10 @@ HdStBufferResourceMetal::GetTextureBuffer()
 void
 HdStBufferResourceMetal::CopyData(size_t vboOffset, size_t dataSize, void const *data)
 {
-    memcpy((uint8*)[_id contents] + vboOffset, data, dataSize);
+    memcpy((uint8_t*)[_id contents] + vboOffset, data, dataSize);
+#if defined(ARCH_OS_OSX)
     [_id didModifyRange:NSMakeRange(vboOffset, dataSize)];
+#endif
 }
 
 VtValue

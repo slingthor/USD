@@ -24,7 +24,6 @@
 #include "pxr/imaging/mtlf/contextCaps.h"
 #include "pxr/imaging/mtlf/mtlDevice.h"
 
-
 #include "pxr/base/tf/diagnostic.h"
 #include "pxr/base/tf/envSetting.h"
 
@@ -42,6 +41,8 @@ MtlfContextCaps::MtlfContextCaps()
 int MtlfContextCaps::GetAPIVersion()
 {
 #if __MAC_OS_X_VERSION_MAX_ALLOWED >= 101300 /* __MAC_10_13 */
+    return 450;
+#elif __IPHONE_OS_VERSION_MAX_ALLOWED >= 120000 /* __IOS_11_00 */
     return 450;
 #endif
     return 0;

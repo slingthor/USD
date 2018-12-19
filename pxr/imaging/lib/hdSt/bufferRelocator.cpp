@@ -24,31 +24,10 @@
 #include "pxr/imaging/glf/glew.h"
 
 #include "pxr/imaging/hdSt/bufferRelocator.h"
-#include "pxr/imaging/hdSt/GL/bufferRelocatorGL.h"
-#if defined(ARCH_GFX_METAL)
-#include "pxr/imaging/hdSt/Metal/bufferRelocatorMetal.h"
-#endif
 
 #include "pxr/imaging/hd/engine.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
-
-HdStBufferRelocator *HdStBufferRelocator::New(HdResourceGPUHandle srcBuffer, HdResourceGPUHandle dstBuffer)
-{
-    HdEngine::RenderAPI api = HdEngine::GetRenderAPI();
-    switch(api)
-    {
-        case HdEngine::OpenGL:
-            return new HdStBufferRelocatorGL(srcBuffer, dstBuffer);
-#if defined(ARCH_GFX_METAL)
-        case HdEngine::Metal:
-            return new HdStBufferRelocatorMetal(srcBuffer, dstBuffer);
-#endif
-        default:
-            TF_FATAL_CODING_ERROR("No HdStBufferResource for this API");
-    }
-    return NULL;
-}
 
 // ---------------------------------------------------------------------------
 

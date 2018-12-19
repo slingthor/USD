@@ -109,7 +109,7 @@ HdSt_GeometricShader::BindResources(HdSt_ResourceBinder const &binder, HdStProgr
     } else {
         // don't care -- use renderPass's fallback
     }
-
+#if defined(ARCH_GFX_OPENGL)
     if (GetPrimitiveMode() == GL_PATCHES) {
         glPatchParameteri(GL_PATCH_VERTICES, GetPrimitiveIndexSize());
     }
@@ -120,14 +120,21 @@ HdSt_GeometricShader::BindResources(HdSt_ResourceBinder const &binder, HdStProgr
             glLineWidth(_lineWidth);
         }
     }
+#else
+//    TF_FATAL_CODING_ERROR("Not Implemented!"); //MTL_FIXME
+#endif
 }
 
 void
 HdSt_GeometricShader::UnbindResources(HdSt_ResourceBinder const &binder, HdStProgram const &program)
 {
+#if defined(ARCH_GFX_OPENGL)
     if (_polygonMode == HdPolygonModeLine) {
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
     }
+#else
+//    TF_FATAL_CODING_ERROR("Not Implemented!"); //MTL_FIXME
+#endif
 }
 
 /*virtual*/

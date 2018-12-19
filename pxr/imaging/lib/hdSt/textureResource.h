@@ -65,25 +65,7 @@ public:
 /// HdStSimpleTextureResource is a simple (non-drawtarget) texture.
 class HdStSimpleTextureResource : public HdStTextureResource {
 public:
-    /// Create a texture resource around a Garch handle.
-    /// While the texture handle maybe shared between many references to a
-    /// texture.
-    /// The texture resource represents a single texture binding.
-    ///
-    /// The memory request can be used to limit, the amount of texture memory
-    /// this reference requires of the texture.  Set to 0 for unrestricted.
-    HDST_API
-    static HdStSimpleTextureResource *New(GarchTextureHandleRefPtr const &textureHandle,
-                                          HdTextureType textureType,
-                                          size_t memoryRequest);
 
-    HDST_API
-    static HdStSimpleTextureResource *New(GarchTextureHandleRefPtr const &textureHandle,
-                                          HdTextureType textureType,
-                                          HdWrap wrapS, HdWrap wrapT,
-                                          HdMinFilter minFilter, HdMagFilter magFilter,
-                                          size_t memoryRequest = 0);
-    
     HDST_API
     virtual ~HdStSimpleTextureResource();
     

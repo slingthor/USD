@@ -21,10 +21,10 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-// utils.cpp
+// resourceFactory.cpp
 //
-#include <pxr/imaging/garch/resourceFactory.h>
-#include <pxr/base/tf/diagnostic.h>
+#include "pxr/imaging/garch/resourceFactory.h"
+#include "pxr/base/tf/diagnostic.h"
 
 #include "pxr/base/tf/instantiateSingleton.h"
 

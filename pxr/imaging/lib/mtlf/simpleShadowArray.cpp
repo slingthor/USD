@@ -140,19 +140,29 @@ MtlfSimpleShadowArray::_AllocSamplers()
 {
     MtlfMetalContextSharedPtr mtlContext = MtlfMetalContext::GetMetalContext()->GetMetalContext();
     MTLSamplerDescriptor* samplerDescriptor = [[MTLSamplerDescriptor alloc] init];
+#if defined(ARCH_OS_IOS)
+    samplerDescriptor.tAddressMode = MTLSamplerAddressModeClampToZero;
+    samplerDescriptor.sAddressMode = MTLSamplerAddressModeClampToZero;
+#else
     samplerDescriptor.tAddressMode = MTLSamplerAddressModeClampToBorderColor;
     samplerDescriptor.sAddressMode = MTLSamplerAddressModeClampToBorderColor;
+    samplerDescriptor.borderColor = MTLSamplerBorderColorOpaqueWhite;
+#endif
     samplerDescriptor.minFilter = MTLSamplerMinMagFilterLinear;
     samplerDescriptor.magFilter = MTLSamplerMinMagFilterLinear;
-    samplerDescriptor.borderColor = MTLSamplerBorderColorOpaqueWhite;
     _shadowDepthSampler = [mtlContext->device newSamplerStateWithDescriptor:samplerDescriptor];
     
     //METAL TODO: Check whether the sampler below is really going to provide the same functionality as the GL sample in the comments.
+#if defined(ARCH_OS_IOS)
+    samplerDescriptor.tAddressMode = MTLSamplerAddressModeClampToZero;
+    samplerDescriptor.sAddressMode = MTLSamplerAddressModeClampToZero;
+#else
     samplerDescriptor.tAddressMode = MTLSamplerAddressModeClampToBorderColor;
     samplerDescriptor.sAddressMode = MTLSamplerAddressModeClampToBorderColor;
+    samplerDescriptor.borderColor = MTLSamplerBorderColorOpaqueWhite;
+#endif
     samplerDescriptor.minFilter = MTLSamplerMinMagFilterLinear;
     samplerDescriptor.magFilter = MTLSamplerMinMagFilterLinear;
-    samplerDescriptor.borderColor = MTLSamplerBorderColorOpaqueWhite;
     samplerDescriptor.compareFunction = MTLCompareFunctionLessEqual;
     _shadowCompareSampler = [mtlContext->device newSamplerStateWithDescriptor:samplerDescriptor];
 }

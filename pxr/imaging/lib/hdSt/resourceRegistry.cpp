@@ -30,6 +30,7 @@
 #include "pxr/imaging/hdSt/dispatchBuffer.h"
 #include "pxr/imaging/hdSt/persistentBuffer.h"
 #include "pxr/imaging/hdSt/interleavedMemoryManager.h"
+#include "pxr/imaging/hdSt/resourceFactory.h"
 #include "pxr/imaging/hdSt/vboMemoryManager.h"
 #include "pxr/imaging/hdSt/vboSimpleMemoryManager.h"
 
@@ -152,7 +153,7 @@ HdStResourceRegistry::RegisterDispatchBuffer(
     TfToken const &role, int count, int commandNumUints)
 {
     HdStDispatchBufferSharedPtr result(
-        HdStDispatchBuffer::New(role, count, commandNumUints));
+        HdStResourceFactory::GetInstance()->NewDispatchBuffer(role, count, commandNumUints));
 
     _dispatchBufferRegistry.push_back(result);
 
@@ -177,7 +178,7 @@ HdStResourceRegistry::RegisterPersistentBuffer(
         TfToken const &role, size_t dataSize, void *data)
 {
     HdStPersistentBufferSharedPtr result(
-        HdStPersistentBuffer::New(role, dataSize, data));
+        HdStResourceFactory::GetInstance()->NewPersistentBuffer(role, dataSize, data));
 
     _persistentBufferRegistry.push_back(result);
 

@@ -32,7 +32,9 @@
 #include "pxr/imaging/garch/glslfx.h"
 #include "pxr/base/tf/staticTokens.h"
 
+#if defined(ARCH_GFX_OPENGL)
 #include "pxr/imaging/hdSt/GL/glslProgram.h"
+#endif
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -63,6 +65,7 @@ HdxCompositor::HdxCompositor()
 
 HdxCompositor::~HdxCompositor()
 {
+#if defined(ARCH_GFX_OPENGL)
     if (_colorTexture != 0) {
         glDeleteTextures(1, &_colorTexture);
     }
@@ -76,13 +79,14 @@ HdxCompositor::~HdxCompositor()
         _compositorProgram.reset();
     }
     GLF_POST_PENDING_GL_ERRORS();
+#else
+    TF_FATAL_CODING_ERROR("Not Implemented!"); //MTL_FIXME
+#endif
 }
 
 void
 HdxCompositor::_CreateShaderResources(bool useDepthProgram)
 {
-    TF_FATAL_CODING_ERROR("Not Implemented!"); //MTL_FIXME
-
     _compositorProgram.reset(HdStProgram::New(_tokens->fullscreenShader));
     GLSLFX glslfx(HdxPackageFullscreenShader());
     TfToken fsToken = useDepthProgram ? _tokens->compositeFragmentWithDepth
@@ -96,11 +100,16 @@ HdxCompositor::_CreateShaderResources(bool useDepthProgram)
         _compositorProgram.reset();
         return;
     }
+
+    TF_FATAL_CODING_ERROR("Not Implemented!"); //MTL_FIXME
+
+#if defined(ARCH_GFX_OPENGL)
     GLuint programId = boost::dynamic_pointer_cast<HdStGLSLProgram>(_compositorProgram)->GetGLProgram();
     _locations[colorIn]  = glGetUniformLocation(programId, "colorIn");
     _locations[depthIn]  = glGetUniformLocation(programId, "depthIn");
     _locations[position] = glGetAttribLocation(programId, "position");
     _locations[uvIn]     = glGetAttribLocation(programId, "uvIn");
+#endif
 }
 
 void
@@ -134,26 +143,28 @@ HdxCompositor::_CreateBufferResources()
     static const float vertices[] = { -1,  3, -1, 1,        0, 2,
                                       -1, -1, -1, 1,        0, 0,
                                        3, -1, -1, 1,        2, 0 };
-
+#if defined(ARCH_GFX_OPENGL)
     glGenBuffers(1, &_vertexBuffer);
     glBindBuffer(GL_ARRAY_BUFFER, _vertexBuffer);
     glBufferData(GL_ARRAY_BUFFER, sizeof(vertices),
                  &vertices[0], GL_STATIC_DRAW);
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
+#endif
 }
 
 void
 HdxCompositor::_CreateTextureResources(GLuint *texture)
 {
     TF_FATAL_CODING_ERROR("Not Implemented!"); //MTL_FIXME
-    
+#if defined(ARCH_GFX_OPENGL)
     glGenTextures(1, texture);
     glBindTexture(GL_TEXTURE_2D, *texture);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+#endif
 }
 
 void
@@ -163,7 +174,7 @@ HdxCompositor::UpdateColor(int width, int height, uint8_t *data)
     HF_MALLOC_TAG_FUNCTION();
     
     TF_FATAL_CODING_ERROR("Not Implemented!"); //MTL_FIXME
-
+#if defined(ARCH_GFX_OPENGL)
     if (width == 0 && height == 0) {
         if (_colorTexture != 0) {
             glDeleteTextures(1, &_colorTexture);
@@ -188,7 +199,7 @@ HdxCompositor::UpdateColor(int width, int height, uint8_t *data)
     }
     _colorSize = size;
     glBindTexture(GL_TEXTURE_2D, 0);
-
+#endif
     GLF_POST_PENDING_GL_ERRORS();
 }
 
@@ -199,7 +210,7 @@ HdxCompositor::UpdateDepth(int width, int height, uint8_t *data)
     HF_MALLOC_TAG_FUNCTION();
     
     TF_FATAL_CODING_ERROR("Not Implemented!"); //MTL_FIXME
-
+#if defined(ARCH_GFX_OPENGL)
     if (width == 0 && height == 0) {
         if (_depthTexture != 0) {
             glDeleteTextures(1, &_depthTexture);
@@ -225,7 +236,7 @@ HdxCompositor::UpdateDepth(int width, int height, uint8_t *data)
     _depthSize = size;
 
     glBindTexture(GL_TEXTURE_2D, 0);
-
+#endif
     GLF_POST_PENDING_GL_ERRORS();
 }
 
@@ -263,7 +274,7 @@ HdxCompositor::Draw()
     // restricting our shader syntax.
 
     _compositorProgram->SetProgram();
-
+#if defined(ARCH_GFX_OPENGL)
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, _colorTexture);
     glUniform1i(_locations[colorIn], 0);
@@ -297,7 +308,7 @@ HdxCompositor::Draw()
 
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, 0);
-
+#endif
     GLF_POST_PENDING_GL_ERRORS();
 }
 

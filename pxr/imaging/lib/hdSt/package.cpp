@@ -22,6 +22,7 @@
 // language governing permissions and limitations under the Apache License.
 //
 #include "pxr/imaging/hdSt/package.h"
+#include "pxr/imaging/hdSt/resourceFactory.h"
 
 #include "pxr/imaging/hd/engine.h"
 
@@ -34,7 +35,7 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 
-static TfToken
+TfToken
 _GetShaderPath(char const * shader)
 {
     static PlugPluginPtr plugin = PLUG_THIS_PLUGIN;
@@ -48,37 +49,13 @@ _GetShaderPath(char const * shader)
 TfToken
 HdStPackageComputeShader()
 {
-    HdEngine::RenderAPI api = HdEngine::GetRenderAPI();
-    switch(api) {
-#if defined(ARCH_GFX_METAL)
-        case HdEngine::Metal:
-            static TfToken computeShaderMetal = _GetShaderPath("compute.metal");
-            return computeShaderMetal;
-#endif
-        case HdEngine::OpenGL:
-        default:
-            static TfToken computeShaderGL = _GetShaderPath("compute.glslfx");
-            return computeShaderGL;
-    }
-    return TfToken();
+    return _GetShaderPath(HdStResourceFactory::GetInstance()->GetComputeShaderFilename());
 }
 
 TfToken
 HdStPackagePtexTextureShader()
 {
-    HdEngine::RenderAPI api = HdEngine::GetRenderAPI();
-    switch(api) {
-#if defined(ARCH_GFX_METAL)
-        case HdEngine::Metal:
-            static TfToken ptexShaderMetal = _GetShaderPath("ptexTextureMetal.glslfx");
-            return ptexShaderMetal;
-#endif
-        case HdEngine::OpenGL:
-        default:
-            static TfToken ptexShaderGL = _GetShaderPath("ptexTextureGL.glslfx");
-            return ptexShaderGL;
-    }
-    return TfToken();
+    return _GetShaderPath(HdStResourceFactory::GetInstance()->GetPtexTextureShaderFilename());
 }
 
 TfToken

@@ -257,10 +257,6 @@ public:
     HDST_API
     virtual ~HdSt_ResourceBinder() {}
 
-    /// Create a new resouce binder
-    HDST_API
-    static HdSt_ResourceBinder* New();
-
     /// Assign all binding points used in drawitem and custom bindings.
     /// Returns metadata to be used for codegen.
     HDST_API

@@ -1,9 +1,9 @@
 set(PXR_PREFIX pxr/imaging)
 set(PXR_PACKAGE garch)
 
-if (NOT ${PXR_ENABLE_GL_SUPPORT})
+if ((NOT ${PXR_ENABLE_GL_SUPPORT}) AND (NOT ${PXR_ENABLE_METAL_SUPPORT}))
     message(STATUS
-        "Skipping ${PXR_PACKAGE} because PXR_ENABLE_GL_SUPPORT is OFF")
+        "Skipping ${PXR_PACKAGE} because PXR_ENABLE_GL_SUPPORT and PXR_ENABLE_METAL_SUPPORT is OFF")
     return()
 endif()
 
@@ -11,9 +11,14 @@ if(APPLE)
     set(GARCH_GLPLATFORMCONTEXT       glPlatformContextDarwin)
     set(GARCH_GLPLATFORMDEBUGWINDOW   glPlatformDebugWindowDarwin)
     set(GARCH_SOURCE_EXTENSION        mm)
-    FIND_LIBRARY(APPKIT_LIBRARY AppKit)
-    FIND_LIBRARY(METAL_LIBRARY Metal)
-    FIND_LIBRARY(COREVIDEO_LIBRARY CoreVideo)
+    
+    if (APPLEIOS)
+        list(APPEND optionalLibs      ${UIKIT_LIBRARY})
+    else()
+        list(APPEND optionalLibs      ${APPKIT_LIBRARY})
+    endif()
+
+    list(APPEND optionalLibs          ${COREVIDEO_LIBRARY})
 elseif(X11_FOUND)
     set(GARCH_GLPLATFORMCONTEXT       glPlatformContextGLX)
     set(GARCH_GLPLATFORMDEBUGWINDOW   glPlatformDebugWindowGLX)
@@ -29,6 +34,16 @@ if (OPENSUBDIV_HAS_GLSL_COMPUTE)
 endif()
 if (OPENSUBDIV_HAS_METAL_COMPUTE)
     add_definitions(-DOPENSUBDIV_HAS_METAL_COMPUTE)
+endif()
+if (${PXR_ENABLE_GL_SUPPORT})
+    list(APPEND optionalLibs      ${OPENGL_gl_LIBRARY})
+endif()
+if (${PXR_ENABLE_METAL_SUPPORT})
+    # On Apple, we add the gl framework anyway, to ensure the header files
+    # are available for include. This is due to Hydra's dependence on GL enums
+    # and types. Remove this once Hydra is fully GL free
+#    list(APPEND optionalLibs      ${OPENGL_gl_LIBRARY})
+    list(APPEND optionalLibs      ${METAL_LIBRARY})
 endif()
 
 set (optionalPublicClasses "")
@@ -55,10 +70,6 @@ pxr_library(garch
         vt
         ${Boost_PYTHON_LIBRARY}
         ${Boost_SYSTEM_LIBRARY}
-        ${OPENGL_gl_LIBRARY}
-        ${APPKIT_LIBRARY}
-        ${METAL_LIBRARY}
-        ${COREVIDEO_LIBRARY}
         ${optionalLibs}
 
     INCLUDE_DIRS

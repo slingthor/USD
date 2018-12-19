@@ -30,7 +30,9 @@
 #include "pxr/imaging/hd/points.h"
 #include "pxr/imaging/hd/renderDelegate.h"
 #include "pxr/imaging/hd/texture.h"
+
 #include "pxr/imaging/hdSt/textureResource.h"
+#include "pxr/imaging/hdSt/resourceFactory.h"
 
 #include "pxr/base/tf/staticTokens.h"
 #include "pxr/base/gf/matrix4f.h"
@@ -40,10 +42,7 @@
 #include "pxr/imaging/garch/baseTexture.h"
 #include "pxr/imaging/garch/textureRegistry.h"
 
-#include "pxr/imaging/glf/ptexTexture.h"
-#if defined(ARCH_GFX_METAL)
-#include "pxr/imaging/mtlf/ptexTexture.h"
-#endif
+#include "pxr/imaging/garch/ptexTexture.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -93,13 +92,14 @@ HdSt_UnitTestDelegate::GetTextureResource(SdfPath const& textureId)
 #endif
 
     return HdTextureResourceSharedPtr(
-        HdStSimpleTextureResource::New(texture,
-                                       textureType,
-                                       HdWrapUseMetadata,
-                                       HdWrapUseMetadata,
-                                       HdMinFilterNearestMipmapLinear,
-                                       HdMagFilterLinear,
-                                       0));
+                HdStResourceFactory::GetInstance()->NewSimpleTextureResource(
+                        texture,
+                        textureType,
+                        HdWrapUseMetadata,
+                        HdWrapUseMetadata,
+                        HdMinFilterNearestMipmapLinear,
+                        HdMagFilterLinear,
+                        0));
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

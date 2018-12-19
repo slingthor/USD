@@ -21,7 +21,7 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#include <GL/glew.h>
+#include "pxr/imaging/garch/gl.h"
 
 #include "pxr/imaging/garch/image.h"
 #include "pxr/imaging/garch/utils.h"

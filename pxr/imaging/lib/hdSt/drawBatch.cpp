@@ -33,6 +33,7 @@
 #include "pxr/imaging/hdSt/program.h"
 #include "pxr/imaging/hdSt/renderPassShader.h"
 #include "pxr/imaging/hdSt/renderPassState.h"
+#include "pxr/imaging/hdSt/resourceFactory.h"
 #include "pxr/imaging/hdSt/resourceRegistry.h"
 #include "pxr/imaging/hdSt/surfaceShader.h"
 
@@ -295,7 +296,8 @@ HdSt_DrawBatch::_DrawingProgram::CompileShader(
         (*it)->AddBindings(&customBindings);
     }
 
-    HdSt_CodeGen *codeGen = HdSt_CodeGen::New(_geometricShader, shaders);
+    HdSt_CodeGen *codeGen = HdStResourceFactory::GetInstance()->NewCodeGen(
+                                _geometricShader, shaders);
 
     // let resourcebinder resolve bindings and populate metadata
     // which is owned by codegen.

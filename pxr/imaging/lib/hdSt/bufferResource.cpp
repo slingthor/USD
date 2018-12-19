@@ -24,37 +24,12 @@
 #include "pxr/imaging/glf/glew.h"
 #include "pxr/imaging/hdSt/bufferResource.h"
 
-#include "pxr/imaging/hdSt/GL/bufferResourceGL.h"
-#if defined(ARCH_GFX_METAL)
-#include "pxr/imaging/hdSt/Metal/bufferResourceMetal.h"
-#endif
-
 #include "pxr/imaging/hd/engine.h"
 
 #include "pxr/base/tf/diagnostic.h"
 #include "pxr/base/tf/staticTokens.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
-
-HdStBufferResource *HdStBufferResource::New(TfToken const &role,
-                                            HdTupleType tupleType,
-                                            int offset,
-                                            int stride)
-{
-    HdEngine::RenderAPI api = HdEngine::GetRenderAPI();
-    switch(api)
-    {
-        case HdEngine::OpenGL:
-            return new HdStBufferResourceGL(role, tupleType, offset, stride);
-#if defined(ARCH_GFX_METAL)
-        case HdEngine::Metal:
-            return new HdStBufferResourceMetal(role, tupleType, offset, stride);
-#endif
-        default:
-            TF_FATAL_CODING_ERROR("No HdStBufferResource for this API");
-    }
-    return NULL;
-}
 
 HdStBufferResource::HdStBufferResource(TfToken const &role,
                                        HdTupleType tupleType,

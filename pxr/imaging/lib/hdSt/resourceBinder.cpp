@@ -26,16 +26,11 @@
 #include "pxr/imaging/garch/contextCaps.h"
 #include "pxr/imaging/garch/resourceFactory.h"
 
-#include "pxr/imaging/hdSt/resourceBinder.h"
 #include "pxr/imaging/hdSt/bufferResource.h"
-#include "pxr/imaging/hdSt/shaderCode.h"
 #include "pxr/imaging/hdSt/drawItem.h"
-#include "pxr/imaging/hdSt/GL/glConversions.h"
-
-#include "pxr/imaging/hdSt/GL/resourceBinderGL.h"
-#if defined(ARCH_GFX_METAL)
-#include "pxr/imaging/hdSt/Metal/resourceBinderMetal.h"
-#endif
+#include "pxr/imaging/hdSt/glConversions.h"
+#include "pxr/imaging/hdSt/resourceBinder.h"
+#include "pxr/imaging/hdSt/shaderCode.h"
 
 #include "pxr/imaging/hd/bufferArrayRange.h"
 #include "pxr/imaging/hd/bufferSpec.h"
@@ -135,23 +130,6 @@ namespace {
     }
 }
 
-HdSt_ResourceBinder *HdSt_ResourceBinder::New()
-{
-    HdEngine::RenderAPI api = HdEngine::GetRenderAPI();
-    switch(api)
-    {
-        case HdEngine::OpenGL:
-            return new HdSt_ResourceBinderGL();
-#if defined(ARCH_GFX_METAL)
-        case HdEngine::Metal:
-            return new HdSt_ResourceBinderMetal();
-#endif
-        default:
-            TF_FATAL_CODING_ERROR("No HdSt_ResourceBinder for this API");
-    }
-    return NULL;
-}
-
 HdSt_ResourceBinder::HdSt_ResourceBinder()
     : _numReservedTextureUnits(0)
 {
@@ -231,7 +209,7 @@ HdSt_ResourceBinder::ResolveBindings(HdStDrawItem const *drawItem,
         TF_FOR_ALL (it, constantBar->GetResources()) {
             HdTupleType valueType = it->second->GetTupleType();
             TfToken glType = HdStGLConversions::GetGLSLTypename(valueType.type);
-            TfToken glName =  HdStGLConversions::GetGLSLIdentifier(it->first);
+            TfToken glName = HdStGLConversions::GetGLSLIdentifier(it->first);
             sblock.entries.emplace_back(
                 /*name=*/glName,
                 /*type=*/glType,
@@ -921,91 +899,6 @@ HdSt_ResourceBinder::UnbindBufferArray(
 
     TF_FOR_ALL(it, bar->GetResources()) {
         UnbindBuffer(it->first, it->second);
-    }
-}
-
-void
-HdSt_ResourceBinder::BindUniformi(TfToken const &name,
-                                int count, const int *value) const
-{
-    HdBinding uniformLocation = GetBinding(name);
-    if (uniformLocation.GetLocation() == HdBinding::NOT_EXIST) return;
-
-    TF_VERIFY(uniformLocation.IsValid());
-    TF_VERIFY(uniformLocation.GetType() == HdBinding::UNIFORM);
-
-    if (count == 1) {
-        glUniform1iv(uniformLocation.GetLocation(), 1, value);
-    } else if (count == 2) {
-        glUniform2iv(uniformLocation.GetLocation(), 1, value);
-    } else if (count == 3) {
-        glUniform3iv(uniformLocation.GetLocation(), 1, value);
-    } else if (count == 4) {
-        glUniform4iv(uniformLocation.GetLocation(), 1, value);
-    } else {
-        TF_CODING_ERROR("Invalid count %d.\n", count);
-    }
-}
-
-void
-HdSt_ResourceBinder::BindUniformArrayi(TfToken const &name,
-                                 int count, const int *value) const
-{
-    HdBinding uniformLocation = GetBinding(name);
-    if (uniformLocation.GetLocation() == HdBinding::NOT_EXIST) return;
-
-    TF_VERIFY(uniformLocation.IsValid());
-    TF_VERIFY(uniformLocation.GetType() == HdBinding::UNIFORM_ARRAY);
-
-    glUniform1iv(uniformLocation.GetLocation(), count, value);
-}
-
-void
-HdSt_ResourceBinder::BindUniformui(TfToken const &name,
-                                int count, const unsigned int *value) const
-{
-    HdBinding uniformLocation = GetBinding(name);
-    if (uniformLocation.GetLocation() == HdBinding::NOT_EXIST) return;
-
-    TF_VERIFY(uniformLocation.IsValid());
-    TF_VERIFY(uniformLocation.GetType() == HdBinding::UNIFORM);
-
-    if (count == 1) {
-        glUniform1uiv(uniformLocation.GetLocation(), 1, value);
-    } else if (count == 2) {
-        glUniform2uiv(uniformLocation.GetLocation(), 1, value);
-    } else if (count == 3) {
-        glUniform3uiv(uniformLocation.GetLocation(), 1, value);
-    } else if (count == 4) {
-        glUniform4uiv(uniformLocation.GetLocation(), 1, value);
-    } else {
-        TF_CODING_ERROR("Invalid count %d.", count);
-    }
-}
-
-void
-HdSt_ResourceBinder::BindUniformf(TfToken const &name,
-                                int count, const float *value) const
-{
-    HdBinding uniformLocation = GetBinding(name);
-    if (uniformLocation.GetLocation() == HdBinding::NOT_EXIST) return;
-
-    if (!TF_VERIFY(uniformLocation.IsValid())) return;
-    if (!TF_VERIFY(uniformLocation.GetType() == HdBinding::UNIFORM)) return;
-    GLint location = uniformLocation.GetLocation();
-
-    if (count == 1) {
-        glUniform1fv(location, 1, value);
-    } else if (count == 2) {
-        glUniform2fv(location, 1, value);
-    } else if (count == 3) {
-        glUniform3fv(location, 1, value);
-    } else if (count == 4) {
-        glUniform4fv(location, 1, value);
-    } else if (count == 16) {
-        glUniformMatrix4fv(location, 1, /*transpose=*/false, value);
-    } else {
-        TF_CODING_ERROR("Invalid count %d.", count);
     }
 }
 

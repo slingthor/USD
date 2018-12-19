@@ -41,7 +41,7 @@ HdStPersistentBufferMetal::HdStPersistentBufferMetal(
 
     id<MTLBuffer> newId = nil;
     
-    newId = MtlfMetalContext::GetMetalContext()->GetMetalBuffer(dataSize, MTLResourceStorageModeManaged, data);
+    newId = MtlfMetalContext::GetMetalContext()->GetMetalBuffer(dataSize, MTLResourceStorageModeDefault, data);
     _mappedAddress = [newId contents];
 
     SetAllocation(newId, dataSize);

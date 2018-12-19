@@ -29,7 +29,7 @@
 
 #include "pxr/imaging/hdSt/drawTarget.h"
 
-#include "pxr/imaging/glf/drawTarget.h"
+#include "pxr/imaging/garch/drawTarget.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -100,7 +100,7 @@ HdxDrawTargetResolveTask::_Execute(HdTaskContext* ctx)
     }
 
     if (!drawTargets.empty()) {
-        GlfDrawTarget::Resolve(drawTargets);
+        drawTargets[0]->Resolve(drawTargets);
     }
 }
 

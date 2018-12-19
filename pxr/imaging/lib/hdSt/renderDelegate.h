@@ -25,6 +25,7 @@
 
 #include "pxr/pxr.h"
 #include "pxr/imaging/hdSt/api.h"
+#include "pxr/imaging/hd/engine.h"
 #include "pxr/imaging/hd/renderDelegate.h"
 
 #include <mutex>

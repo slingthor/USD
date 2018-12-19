@@ -29,62 +29,13 @@
 #include "pxr/imaging/garch/resourceFactory.h"
 #include "pxr/imaging/garch/udimTexture.h"
 
+#include "pxr/imaging/hdSt/glConversions.h"
 #include "pxr/imaging/hdSt/textureResource.h"
-#include "pxr/imaging/hdSt/GL/glConversions.h"
-#include "pxr/imaging/hdSt/GL/textureResourceGL.h"
-#if defined(ARCH_GFX_METAL)
-#include "pxr/imaging/hdSt/Metal/textureResourceMetal.h"
-#endif
 
 #include "pxr/imaging/hd/engine.h"
 #include "pxr/imaging/hd/perfLog.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
-
-HdStSimpleTextureResource *HdStSimpleTextureResource::New(GarchTextureHandleRefPtr const &textureHandle,
-                                                          HdTextureType textureType,
-                                                          size_t memoryRequest)
-{
-    HdEngine::RenderAPI api = HdEngine::GetRenderAPI();
-    switch(api)
-    {
-        case HdEngine::OpenGL:
-            return new HdStSimpleTextureResourceGL(textureHandle, textureType, memoryRequest);
-#if defined(ARCH_GFX_METAL)
-        case HdEngine::Metal:
-            return new HdStSimpleTextureResourceMetal(textureHandle, textureType, memoryRequest);
-#endif
-        default:
-            TF_FATAL_CODING_ERROR("No HdStBufferResource for this API");
-    }
-    return NULL;
-}
-
-HdStSimpleTextureResource *HdStSimpleTextureResource::New(
-    GarchTextureHandleRefPtr const &textureHandle,
-    HdTextureType textureType,
-    HdWrap wrapS, HdWrap wrapT,
-    HdMinFilter minFilter, HdMagFilter magFilter,
-    size_t memoryRequest)
-{
-    HdEngine::RenderAPI api = HdEngine::GetRenderAPI();
-    switch(api)
-    {
-        case HdEngine::OpenGL:
-            return new HdStSimpleTextureResourceGL(textureHandle, textureType,
-                                                   wrapS, wrapT, minFilter, magFilter,
-                                                   memoryRequest);
-#if defined(ARCH_GFX_METAL)
-        case HdEngine::Metal:
-            return new HdStSimpleTextureResourceMetal(textureHandle, textureType,
-                                                      wrapS, wrapT, minFilter, magFilter,
-                                                      memoryRequest);
-#endif
-        default:
-            TF_FATAL_CODING_ERROR("No HdStBufferResource for this API");
-    }
-    return NULL;
-}
 
 HdStTextureResource::~HdStTextureResource()
 {

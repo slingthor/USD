@@ -22,10 +22,11 @@
 // language governing permissions and limitations under the Apache License.
 //
 
-#include "pxr/imaging/glf/glew.h"
-
 #include "pxr/usdImaging/usdImagingGL/Metal/hdEngine.h"
 #include "pxr/usdImaging/usdImaging/tokens.h"
+
+#include "pxr/imaging/hdSt/resourceRegistry.h"
+#include "pxr/imaging/hdSt/Metal/resourceFactoryMetal.h"
 
 #include "pxr/imaging/hd/debugCodes.h"
 #include "pxr/imaging/hd/renderDelegate.h"
@@ -73,6 +74,7 @@ static std::string _MetalPluginDescriptor(id<MTLDevice> device)
 }
 
 UsdImagingGLMetalHdEngine::UsdImagingGLMetalHdEngine(
+        RenderOutput outputTarget,
         const SdfPath& rootPath,
         const SdfPathVector& excludedPrimPaths,
         const SdfPathVector& invisedPrimPaths,
@@ -91,10 +93,16 @@ UsdImagingGLMetalHdEngine::UsdImagingGLMetalHdEngine(
     , _invisedPrimPaths(invisedPrimPaths)
     , _isPopulated(false)
     , _renderTags()
+    , _renderOutput(outputTarget)
+    , _mtlRenderPassDescriptorForInterop(nil)
     , _mtlRenderPassDescriptor(nil)
     , _sharedCaptureManager(nil)
+    , _resourceFactory(nil)
 {
-    GarchResourceFactory::GetInstance().SetResourceFactory(&resourceFactory);
+    _resourceFactory = new HdStResourceFactoryMetal();
+
+    GarchResourceFactory::GetInstance().SetResourceFactory(dynamic_cast<GarchResourceFactoryInterface*>(_resourceFactory));
+    HdStResourceFactory::GetInstance().SetResourceFactory(_resourceFactory);
 
     // _renderIndex, _taskController, and _delegate are initialized
     // by the plugin system.
@@ -110,7 +118,11 @@ UsdImagingGLMetalHdEngine::UsdImagingGLMetalHdEngine(
 UsdImagingGLMetalHdEngine::~UsdImagingGLMetalHdEngine()
 {
     _DeleteHydraResources();
+    HdStResourceFactory::GetInstance().SetResourceFactory(NULL);
     GarchResourceFactory::GetInstance().SetResourceFactory(NULL);
+    
+    delete _resourceFactory;
+    _resourceFactory = nil;
 }
 
 HdRenderIndex *
@@ -625,7 +637,13 @@ UsdImagingGLMetalHdEngine::Render(const UsdImagingGLRenderParams& params)
     _delegate->SetSceneMaterialsEnabled(params.enableSceneMaterials);
 
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
- 
+
+    MTLCaptureManager *sharedCaptureManager = [MTLCaptureManager sharedCaptureManager];
+    
+    //[sharedCaptureManager startCaptureWithScope:sharedCaptureManager.defaultCaptureScope];
+    [sharedCaptureManager.defaultCaptureScope beginScope];
+
+#if defined(ARCH_GFX_OPENGL)
     // Make sure the Metal render targets, and GL interop textures match the GL viewport size
     GLint viewport[4];
     glGetIntegerv( GL_VIEWPORT, viewport );
@@ -635,38 +653,51 @@ UsdImagingGLMetalHdEngine::Render(const UsdImagingGLRenderParams& params)
         context->AllocateAttachments(viewport[2], viewport[3]);
     }
 
-    MTLCaptureManager *sharedCaptureManager = [MTLCaptureManager sharedCaptureManager];
+    if (_renderOutput == RenderOutput::OpenGL) {
+        if (_mtlRenderPassDescriptorForInterop == nil)
+            _mtlRenderPassDescriptorForInterop = [[MTLRenderPassDescriptor alloc] init];
+        
+        //Set this state every frame because it may have changed during rendering.
+        {
+            // create a color attachment every frame since we have to recreate the texture every frame
+            MTLRenderPassColorAttachmentDescriptor *colorAttachment = _mtlRenderPassDescriptorForInterop.colorAttachments[0];
 
-    //[sharedCaptureManager startCaptureWithScope:sharedCaptureManager.defaultCaptureScope];
-    [sharedCaptureManager.defaultCaptureScope beginScope];
+            // make sure to clear every frame for best performance
+            colorAttachment.loadAction = MTLLoadActionClear;
+        
+            // store only attachments that will be presented to the screen, as in this case
+            colorAttachment.storeAction = MTLStoreActionStore;
 
-    if (_mtlRenderPassDescriptor == nil)
-        _mtlRenderPassDescriptor = [[MTLRenderPassDescriptor alloc] init];
-    
-    //Set this state every frame because it may have changed during rendering.
+            MTLRenderPassDepthAttachmentDescriptor *depthAttachment = _mtlRenderPassDescriptorForInterop.depthAttachment;
+            depthAttachment.loadAction = MTLLoadActionClear;
+            depthAttachment.storeAction = MTLStoreActionStore;
+            depthAttachment.clearDepth = 1.0f;
+            
+            colorAttachment.texture = context->mtlColorTexture;
+
+            GLfloat clearColor[4];
+            glGetFloatv(GL_COLOR_CLEAR_VALUE, clearColor);
+            clearColor[3] = 1.0f;
+        
+            colorAttachment.clearColor = MTLClearColorMake(clearColor[0],
+                                                           clearColor[1],
+                                                           clearColor[2],
+                                                           clearColor[3]);
+            depthAttachment.texture = context->mtlDepthTexture;
+        }
+        
+        _mtlRenderPassDescriptor = _mtlRenderPassDescriptorForInterop;
+    }
+    else
+#else
+    if (false) {}
+    else
+#endif
     {
-        // create a color attachment every frame since we have to recreate the texture every frame
-        MTLRenderPassColorAttachmentDescriptor *colorAttachment = _mtlRenderPassDescriptor.colorAttachments[0];
-
-        // make sure to clear every frame for best performance
-        colorAttachment.loadAction = MTLLoadActionClear;
-    
-        // store only attachments that will be presented to the screen, as in this case
-        colorAttachment.storeAction = MTLStoreActionStore;
-
-        MTLRenderPassDepthAttachmentDescriptor *depthAttachment = _mtlRenderPassDescriptor.depthAttachment;
-        depthAttachment.loadAction = MTLLoadActionClear;
-        depthAttachment.storeAction = MTLStoreActionStore;
-        depthAttachment.clearDepth = 1.0f;
-        
-        GLfloat clearColor[4];
-        glGetFloatv(GL_COLOR_CLEAR_VALUE, clearColor);
-        clearColor[3] = 1.0f;
-    
-        colorAttachment.texture = context->mtlColorTexture;
-        colorAttachment.clearColor = MTLClearColorMake(clearColor[0], clearColor[1], clearColor[2], clearColor[3]);
-        
-        depthAttachment.texture = context->mtlDepthTexture;
+        if (_mtlRenderPassDescriptor == nil) {
+            TF_FATAL_CODING_ERROR("SetMetalRenderPassDescriptor must be called prior "
+                                  "to rendering when render output is set to Metal");
+        }
     }
 
     context->StartFrame();
@@ -677,7 +708,9 @@ UsdImagingGLMetalHdEngine::Render(const UsdImagingGLRenderParams& params)
     
     // Set the render pass descriptor to use for the render encoders
     context->SetRenderPassDescriptor(_mtlRenderPassDescriptor);
-    
+    if (_renderOutput == RenderOutput::Metal) {
+        _mtlRenderPassDescriptor = nil;
+    }
     // hydra orients all geometry during topological processing so that
     // front faces have ccw winding. We disable culling because culling
     // is handled by fragment shader discard.
@@ -718,9 +751,11 @@ UsdImagingGLMetalHdEngine::Render(const UsdImagingGLRenderParams& params)
     }
     _engine.Execute(*_renderIndex, tasks);
    
-    // Depth texture copy
-    context->CopyDepthTextureToOpenGL();
-    
+    if (_renderOutput == RenderOutput::OpenGL) {
+        // Depth texture copy
+        context->CopyDepthTextureToOpenGL();
+    }
+
     if (context->GeometryShadersActive()) {
         // Complete the GS command buffer if we have one
         context->CommitCommandBuffer(true, false, METALWORKQUEUE_GEOMETRY_SHADER);
@@ -736,8 +771,10 @@ UsdImagingGLMetalHdEngine::Render(const UsdImagingGLRenderParams& params)
     // Finalize rendering here & push the command buffer to the GPU
     [sharedCaptureManager.defaultCaptureScope endScope];
 
-    context->BlitColorTargetToOpenGL();
-    GLF_POST_PENDING_GL_ERRORS();
+    if (_renderOutput == RenderOutput::OpenGL) {
+        context->BlitColorTargetToOpenGL();
+        GLF_POST_PENDING_GL_ERRORS();
+    }
 
     return;
 }
@@ -909,8 +946,13 @@ UsdImagingGLMetalHdEngine::GetRendererPlugins() const
     HfPluginDescVector pluginDescriptors;
     HdxRendererPluginRegistry::GetInstance().GetPluginDescs(&pluginDescriptors);
 
+#if defined(ARCH_OS_OSX)
     NSArray<id<MTLDevice>> *_deviceList = MTLCopyAllDevices();
-    
+#else
+    NSMutableArray<id<MTLDevice>> *_deviceList = [[NSMutableArray alloc] init];
+    [_deviceList addObject:MTLCreateSystemDefaultDevice()];
+#endif
+
     TfTokenVector plugins;
     
     if (pluginDescriptors.size() != 1) {
@@ -987,7 +1029,13 @@ UsdImagingGLMetalHdEngine::SetRendererPlugin(TfToken const &pluginId)
             GetDefaultPluginId();
     }
     else {
+#if defined(ARCH_OS_OSX)
         NSArray<id<MTLDevice>> *_deviceList = MTLCopyAllDevices();
+#else
+        NSMutableArray<id<MTLDevice>> *_deviceList = [[NSMutableArray alloc] init];
+        [_deviceList addObject:MTLCreateSystemDefaultDevice()];
+#endif
+
         for (id<MTLDevice> dev in _deviceList) {
             if (pluginId == _MetalPluginDescriptor(dev))
             {
@@ -998,11 +1046,9 @@ UsdImagingGLMetalHdEngine::SetRendererPlugin(TfToken const &pluginId)
                     // Tear it down and bring it back up with the new Metal device
                     forceReload = true;
                     
-                    GLint viewport[4];
-                    glGetIntegerv( GL_VIEWPORT, viewport );
-
                     // Recreate the underlying Metal context
-                    MtlfMetalContext::RecreateInstance(dev, viewport[2], viewport[3]);
+                    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
+                    MtlfMetalContext::RecreateInstance(dev, context->mtlColorTexture.width, context->mtlColorTexture.height);
                     
                     //Also recreate a capture scope with the new device
                     _InitializeCapturing();
@@ -1114,9 +1160,9 @@ UsdImagingGLMetalHdEngine::_DeleteHydraResources()
         _rendererId = TfToken();
     }
     
-    if (_mtlRenderPassDescriptor != nil) {
-        [_mtlRenderPassDescriptor release];
-        _mtlRenderPassDescriptor = NULL;
+    if (_mtlRenderPassDescriptorForInterop != nil) {
+        [_mtlRenderPassDescriptorForInterop release];
+        _mtlRenderPassDescriptorForInterop = NULL;
     }
 }
 
@@ -1213,6 +1259,17 @@ UsdImagingGLMetalHdEngine::SetRendererSetting(TfToken const& id,
     _renderIndex->GetRenderDelegate()->SetRenderSetting(id, value);
 }
 
+void
+UsdImagingGLMetalHdEngine::SetMetalRenderPassDescriptor(
+    MTLRenderPassDescriptor *renderPassDescriptor)
+{
+    if (_renderOutput == RenderOutput::OpenGL) {
+        TF_CODING_ERROR("SetMetalRenderPassDescriptor isn't valid to call "
+                        "when using OpenGL as the output target");
+        return;
+    }
+    _mtlRenderPassDescriptor = renderPassDescriptor;
+}
 
 PXR_NAMESPACE_CLOSE_SCOPE
 

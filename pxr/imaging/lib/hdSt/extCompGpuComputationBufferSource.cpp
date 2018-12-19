@@ -37,7 +37,7 @@
 #include "pxr/imaging/hd/sceneDelegate.h"
 #include "pxr/imaging/hd/tokens.h"
 #include "pxr/imaging/hd/vtBufferSource.h"
-#include "pxr/imaging/glf/diagnostic.h"
+//#include "pxr/imaging/glf/diagnostic.h"
 
 #include <limits>
 

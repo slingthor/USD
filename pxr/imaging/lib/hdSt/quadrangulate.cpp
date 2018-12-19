@@ -34,11 +34,6 @@
 #include "pxr/imaging/hdSt/resourceRegistry.h"
 #include "pxr/imaging/hdSt/tokens.h"
 
-#include "pxr/imaging/hdSt/GL/quadrangulateGL.h"
-#if defined(ARCH_GFX_METAL)
-#include "pxr/imaging/hdSt/Metal/quadrangulateMetal.h"
-#endif
-
 #include "pxr/imaging/hd/bufferArrayRange.h"
 #include "pxr/imaging/hd/engine.h"
 #include "pxr/imaging/hd/meshUtil.h"
@@ -395,34 +390,6 @@ bool
 HdSt_QuadrangulateFaceVaryingComputation::_CheckValid() const
 {
     return (_source->IsValid());
-}
-
-// ---------------------------------------------------------------------------
-
-HdSt_QuadrangulateComputationGPU *HdSt_QuadrangulateComputationGPU::New(HdSt_MeshTopology *topology,
-                                                                        TfToken const &sourceName,
-                                                                        HdType dataType,
-                                                                        SdfPath const &id)
-{
-    HdEngine::RenderAPI api = HdEngine::GetRenderAPI();
-    switch(api)
-    {
-        case HdEngine::OpenGL:
-            return new HdSt_QuadrangulateComputationGPUGL(topology,
-                                                          sourceName,
-                                                          dataType,
-                                                          id);
-#if defined(ARCH_GFX_METAL)
-        case HdEngine::Metal:
-            return new HdSt_QuadrangulateComputationGPUMetal(topology,
-                                                             sourceName,
-                                                             dataType,
-                                                             id);
-#endif
-        default:
-            TF_FATAL_CODING_ERROR("No HdSt_QuadrangulateComputationGPU for this API");
-    }
-    return NULL;
 }
 
 // ---------------------------------------------------------------------------

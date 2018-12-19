@@ -54,11 +54,6 @@ class HdSt_CodeGen
 public:
     typedef size_t ID;
     
-    static HdSt_CodeGen *New(HdSt_GeometricShaderPtr const &geometricShader,
-                                       HdStShaderCodeSharedPtrVector const &shaders);
-    static HdSt_CodeGen *New(HdStShaderCodeSharedPtrVector const &shaders);
-    
-    
     HDST_API
     virtual ~HdSt_CodeGen() {};
 

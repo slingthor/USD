@@ -29,14 +29,14 @@
 
 #include "pxr/pxr.h"
 
-#include "pxr/imaging/glf/resourceFactory.h"
-
 #include "pxr/usdImaging/usdImagingGL/api.h"
 #include "pxr/usdImaging/usdImagingGL/engine.h"
 #include "pxr/usdImaging/usdImaging/delegate.h"
 
 #include "pxr/imaging/hd/version.h"
 #include "pxr/imaging/hd/engine.h"
+
+#include "pxr/imaging/hdSt/resourceFactory.h"
 
 #include "pxr/imaging/hdx/rendererPlugin.h"
 #include "pxr/imaging/hdx/selectionTracker.h"
@@ -255,7 +255,7 @@ private:
     TfTokenVector _renderTags;
     
     // Our base GPU resources are provided by Glf
-    GlfResourceFactory resourceFactory;
+    HdStResourceFactoryInterface *_resourceFactory;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

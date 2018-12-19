@@ -22,9 +22,6 @@
 // language governing permissions and limitations under the Apache License.
 //
 /// \file garch/udimTexture.cpp
-
-#include <GL/glew.h>
-
 #include "pxr/imaging/garch/udimTexture.h"
 
 #include "pxr/imaging/garch/image.h"

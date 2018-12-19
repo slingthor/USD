@@ -26,8 +26,7 @@
 #include "pxr/imaging/hdSt/Metal/interleavedMemoryBufferMetal.h"
 #include "pxr/imaging/hdSt/bufferResource.h"
 #include "pxr/imaging/hdSt/bufferRelocator.h"
-#include "pxr/imaging/hdSt/GL/glUtils.h"
-#include "pxr/imaging/hdSt/GL/glConversions.h"
+#include "pxr/imaging/hdSt/resourceFactory.h"
 
 #include <boost/make_shared.hpp>
 #include <boost/scoped_ptr.hpp>
@@ -116,7 +115,7 @@ HdStStripedInterleavedBufferMetal::Reallocate(
     boost::static_pointer_cast<_StripedInterleavedBuffer> (curRangeOwner);
     
     id<MTLBuffer> curId = curRangeOwner_->GetResources().begin()->second->GetId();
-    newId = MtlfMetalContext::GetMetalContext()->GetMetalBuffer(totalSize, MTLResourceStorageModeManaged);
+    newId = MtlfMetalContext::GetMetalContext()->GetMetalBuffer(totalSize, MTLResourceStorageModeDefault);
     
     // if old buffer exists, copy unchanged data
     if (curId) {
@@ -125,7 +124,8 @@ HdStStripedInterleavedBufferMetal::Reallocate(
         size_t rangeCount = GetRangeCount();
         
         // pre-pass to combine consecutive buffer range relocation
-        boost::scoped_ptr<HdStBufferRelocator> relocator(HdStBufferRelocator::New(curId, newId));
+        boost::scoped_ptr<HdStBufferRelocator> relocator(
+            HdStResourceFactory::GetInstance()->NewBufferRelocator(curId, newId));
         for (size_t rangeIdx = 0; rangeIdx < rangeCount; ++rangeIdx) {
             HdStInterleavedMemoryManager::_StripedInterleavedBufferRangeSharedPtr range = _GetRangeSharedPtr(rangeIdx);
             

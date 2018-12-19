@@ -34,7 +34,7 @@
 #include <stdlib.h>
 #endif
 
-#if defined(ARCH_OS_DARWIN)
+#if defined(ARCH_OS_OSX)
 #include <crt_externs.h>
 #else
 extern "C" char** environ;
@@ -127,8 +127,11 @@ ArchExpandEnvironmentVariables(const std::string& value)
 }
 
 char** ArchEnviron() {
-#if defined(ARCH_OS_DARWIN)
+#if defined(ARCH_OS_OSX)
     return *_NSGetEnviron();
+#elif defined(ARCH_OS_IOS)
+    static char** environ = nullptr;
+    return environ;
 #else
     return environ;
 #endif

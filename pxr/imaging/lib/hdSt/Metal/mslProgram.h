@@ -76,7 +76,14 @@ struct MSL_ShaderBinding
 
 typedef std::multimap<size_t, MSL_ShaderBinding*> MSL_ShaderBindingMap;
 
-const MSL_ShaderBinding& MSL_FindBinding(const MSL_ShaderBindingMap& bindings, const TfToken& name, bool& outFound, uint bindingTypeMask = 0xFFFFFFFF, uint programStageMask = 0xFFFFFFFF, uint skipCount = 0, int level = -1);
+const MSL_ShaderBinding& MSL_FindBinding(
+    const MSL_ShaderBindingMap& bindings,
+    const TfToken& name,
+    bool& outFound,
+    uint32_t bindingTypeMask = 0xFFFFFFFF,
+    uint32_t programStageMask = 0xFFFFFFFF,
+    uint32_t skipCount = 0,
+    int32_t level = -1);
 
 /// \class HdStMSLProgram
 ///
@@ -215,10 +222,10 @@ private:
     
     id<MTLRenderPipelineState> _pipelineState;
 	
-    uint32 _vertexFunctionIdx;
-    uint32 _fragmentFunctionIdx;
-    uint32 _computeFunctionIdx;
-    uint32 _computeGeometryFunctionIdx;
+    uint32_t _vertexFunctionIdx;
+    uint32_t _fragmentFunctionIdx;
+    uint32_t _computeFunctionIdx;
+    uint32_t _computeGeometryFunctionIdx;
 
     bool _valid;
     HdStResourceMetal  _uniformBuffer;

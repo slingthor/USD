@@ -37,6 +37,7 @@
 #include "pxr/imaging/hdSt/points.h"
 #include "pxr/imaging/hdSt/renderPass.h"
 #include "pxr/imaging/hdSt/renderPassState.h"
+#include "pxr/imaging/hdSt/resourceFactory.h"
 #include "pxr/imaging/hdSt/texture.h"
 #include "pxr/imaging/hdSt/resourceRegistry.h"
 
@@ -48,9 +49,11 @@
 #include "pxr/imaging/garch/resourceFactory.h"
 #include "pxr/imaging/garch/textureRegistry.h"
 
-#include "pxr/imaging/glf/contextCaps.h"
 #include "pxr/imaging/glf/diagnostic.h"
 
+#if defined(ARCH_GFX_OPENGL)
+#include "pxr/imaging/glf/contextCaps.h"
+#endif
 #if defined(ARCH_GFX_METAL)
 #include "pxr/imaging/mtlf/contextCaps.h"
 #endif
@@ -152,7 +155,7 @@ HdStRenderDelegate::CreateRenderPass(HdRenderIndex *index,
 HdRenderPassStateSharedPtr
 HdStRenderDelegate::CreateRenderPassState() const
 {
-    return HdStRenderPassStateSharedPtr(HdStRenderPassState::New());
+    return HdStRenderPassStateSharedPtr(HdStResourceFactory::GetInstance()->NewRenderPassState());
 }
 
 HdInstancer *
@@ -325,9 +328,14 @@ bool
 HdStRenderDelegate::IsSupported()
 {
 #if defined(ARCH_GFX_METAL)
-    return (MtlfContextCaps::GetAPIVersion() >= 400);
+    if (MtlfContextCaps::GetAPIVersion() >= 400)
+        return true;
 #endif
-    return (GlfContextCaps::GetAPIVersion() >= 400);
+#if defined(ARCH_GFX_OPENGL)
+    if (GlfContextCaps::GetAPIVersion() >= 400)
+        return true;
+#endif
+    return false;
 }
 
 TfTokenVector

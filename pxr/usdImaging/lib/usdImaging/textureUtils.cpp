@@ -38,6 +38,8 @@
 
 #include "pxr/imaging/hd/material.h"
 #include "pxr/imaging/hd/tokens.h"
+
+#include "pxr/imaging/hdSt/resourceFactory.h"
 #include "pxr/imaging/hdSt/textureResource.h"
 
 #include "pxr/base/tf/fileUtils.h"
@@ -455,8 +457,9 @@ UsdImaging_GetTextureResource(UsdPrim const& usdPrim,
     }
 
     texResource = HdTextureResourceSharedPtr(
-        HdStSimpleTextureResource::New(texture, textureType, wrapS, wrapT,
-                                       minFilter, magFilter, memoryLimit));
+        HdStResourceFactory::GetInstance()->NewSimpleTextureResource(
+            texture, textureType, wrapS, wrapT,
+            minFilter, magFilter, memoryLimit));
     timer.Stop();
 
     TF_DEBUG(USDIMAGING_TEXTURES).Msg("    Load time: %.3f s\n", 

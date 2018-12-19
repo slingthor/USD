@@ -89,11 +89,7 @@ typedef boost::shared_ptr<class HdStDispatchBuffer> HdStDispatchBufferSharedPtr;
 ///
 class HdStDispatchBuffer : public HdBufferArray {
 public:
-    /// Constructor. commandNumUints is given in how many integers.
-    HDST_API
-    static HdStDispatchBuffer *New(TfToken const &role, int count,
-                                   unsigned int commandNumUints);
-
+    
     /// Destructor.
     HDST_API
     virtual ~HdStDispatchBuffer() {}

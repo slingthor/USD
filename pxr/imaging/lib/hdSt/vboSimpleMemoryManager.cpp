@@ -32,14 +32,9 @@
 #include "pxr/base/tf/iterator.h"
 
 #include "pxr/imaging/hdSt/bufferResource.h"
-#include "pxr/imaging/hdSt/GL/glConversions.h"
-#include "pxr/imaging/hdSt/GL/glUtils.h"
+#include "pxr/imaging/hdSt/glConversions.h"
+#include "pxr/imaging/hdSt/resourceFactory.h"
 #include "pxr/imaging/hdSt/vboSimpleMemoryManager.h"
-
-#include "pxr/imaging/hdSt/GL/vboSimpleMemoryBufferGL.h"
-#if defined(ARCH_GFX_METAL)
-#include "pxr/imaging/hdSt/Metal/vboSimpleMemoryBufferMetal.h"
-#endif
 
 #include "pxr/imaging/hd/bufferArrayRange.h"
 #include "pxr/imaging/hd/bufferSource.h"
@@ -72,21 +67,8 @@ HdStVBOSimpleMemoryManager::CreateBufferArray(
     HdBufferSpecVector const &bufferSpecs,
     HdBufferArrayUsageHint usageHint)
 {
-    HdEngine::RenderAPI api = HdEngine::GetRenderAPI();
-    switch(api)
-    {
-        case HdEngine::OpenGL:
-            return boost::make_shared<HdStVBOSimpleMemoryBufferGL>(
+    return HdStResourceFactory::GetInstance()->NewVBOSimpleMemoryBuffer(
                 role, bufferSpecs, usageHint);
-#if defined(ARCH_GFX_METAL)
-        case HdEngine::Metal:
-            return boost::make_shared<HdStVBOSimpleMemoryBufferMetal>(
-                role, bufferSpecs, usageHint);
-#endif
-        default:
-            TF_FATAL_CODING_ERROR("No HdStVBOSimpleMemoryBuffer for this API");
-    }
-    return NULL;
 }
 
 HdBufferArrayRangeSharedPtr
@@ -203,7 +185,8 @@ HdStVBOSimpleMemoryManager::_SimpleBufferArray::_AddResource(
     }
 
     HdBufferResourceSharedPtr bufferRes = HdBufferResourceSharedPtr(
-        HdStBufferResource::New(GetRole(), tupleType, offset, stride));
+        HdStResourceFactory::GetInstance()->NewBufferResource(
+            GetRole(), tupleType, offset, stride));
     _resourceList.emplace_back(name, bufferRes);
     return bufferRes;
 }

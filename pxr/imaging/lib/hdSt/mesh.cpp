@@ -40,6 +40,7 @@
 #include "pxr/imaging/hdSt/package.h"
 #include "pxr/imaging/hdSt/quadrangulate.h"
 #include "pxr/imaging/hdSt/resourceRegistry.h"
+#include "pxr/imaging/hdSt/resourceFactory.h"
 #include "pxr/imaging/hdSt/smoothNormals.h"
 #include "pxr/imaging/hdSt/surfaceShader.h"
 #include "pxr/imaging/hdSt/tokens.h"
@@ -952,7 +953,7 @@ HdStMesh::_PopulateVertexPrimvars(HdSceneDelegate *sceneDelegate,
 				// If we didn't calcuate normals on the CPU then need to do it here
                 if (!cpuSmoothNormals) {
                 	HdComputationSharedPtr smoothNormalsComputation(
-                        HdSt_SmoothNormalsComputationGPU::New(
+                        HdStResourceFactory::GetInstance()->NewSmoothNormalsComputationGPU(
                         	_vertexAdjacency.get(),
                         	HdTokens->points,
                         	normalsName,
@@ -1350,7 +1351,7 @@ HdStMesh::_PopulateElementPrimvars(HdSceneDelegate *sceneDelegate,
                 // as points, unless we ask for packed normals.
                 // This is unfortunate; can we force them to be float?
                 HdComputationSharedPtr flatNormalsComputation(
-                    HdSt_FlatNormalsComputationGPU::New(
+                    HdStResourceFactory::GetInstance()->NewFlatNormalsComputationGPU(
                         drawItem->GetTopologyRange(),
                         drawItem->GetVertexPrimvarRange(),
                         numFaces,

@@ -44,9 +44,7 @@ typedef boost::shared_ptr<class HdResource> HdResourceSharedPtr;
 ///
 class HdStPersistentBuffer {
 public:
-    HDST_API
-    static HdStPersistentBuffer *New(TfToken const &role, size_t dataSize, void* data);
-    
+
     HDST_API
     virtual ~HdStPersistentBuffer();
 

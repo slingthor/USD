@@ -25,6 +25,7 @@
 #include "pxr/imaging/hdSt/codeGen.h"
 #include "pxr/imaging/hdSt/extCompGpuComputationResource.h"
 #include "pxr/imaging/hdSt/program.h"
+#include "pxr/imaging/hdSt/resourceFactory.h"
 #include "pxr/imaging/hd/bufferArrayRange.h"
 #include "pxr/imaging/hd/engine.h"
 #include "pxr/imaging/hd/tokens.h"
@@ -56,7 +57,7 @@ HdStExtCompGpuComputationResource::HdStExtCompGpuComputationResource(
  , _shaderSourceHash()
  , _inputs(inputs)
  , _computeProgram()
- , _resourceBinder(HdSt_ResourceBinder::New())
+ , _resourceBinder(HdStResourceFactory::GetInstance()->NewResourceBinder())
 {
 }
 
@@ -98,7 +99,8 @@ HdStExtCompGpuComputationResource::Resolve()
     if (!_computeProgram || _shaderSourceHash != shaderSourceHash) {
         HdStShaderCodeSharedPtrVector shaders;
         shaders.push_back(_kernel);
-        boost::scoped_ptr<HdSt_CodeGen> codeGen(HdSt_CodeGen::New(shaders));
+        boost::scoped_ptr<HdSt_CodeGen> codeGen(
+            HdStResourceFactory::GetInstance()->NewCodeGen(shaders));
         // let resourcebinder resolve bindings and populate metadata
         // which is owned by codegen.
         _resourceBinder->ResolveComputeBindings(_outputBufferSpecs,

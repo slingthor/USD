@@ -28,10 +28,12 @@
 #include "pxr/imaging/garch/resourceFactory.h"
 
 #include "pxr/imaging/hdSt/GL/interleavedMemoryBufferGL.h"
+#include "pxr/imaging/hdSt/GL/glUtils.h"
+#include "pxr/imaging/hdSt/glConversions.h"
+
 #include "pxr/imaging/hdSt/bufferResource.h"
 #include "pxr/imaging/hdSt/bufferRelocator.h"
-#include "pxr/imaging/hdSt/GL/glUtils.h"
-#include "pxr/imaging/hdSt/GL/glConversions.h"
+#include "pxr/imaging/hdSt/resourceFactory.h"
 
 #include <boost/make_shared.hpp>
 #include <boost/scoped_ptr.hpp>
@@ -142,7 +144,7 @@ HdStStripedInterleavedBufferGL::Reallocate(
 
             // pre-pass to combine consecutive buffer range relocation
             boost::scoped_ptr<HdStBufferRelocator> relocator(
-                HdStBufferRelocator::New(curId, newId));
+                HdStResourceFactory::GetInstance()->NewBufferRelocator(curId, newId));
             for (size_t rangeIdx = 0; rangeIdx < rangeCount; ++rangeIdx) {
                 HdStInterleavedMemoryManager::_StripedInterleavedBufferRangeSharedPtr range = _GetRangeSharedPtr(rangeIdx);
 

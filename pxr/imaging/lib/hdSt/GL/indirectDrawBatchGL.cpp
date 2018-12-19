@@ -83,6 +83,11 @@ HdSt_IndirectDrawBatchGL::~HdSt_IndirectDrawBatchGL()
     /* empty */
 }
 
+HdSt_IndirectDrawBatch::_CullingProgram *HdSt_IndirectDrawBatchGL::NewCullingProgram() const
+{
+    return new HdSt_IndirectDrawBatchGL::_CullingProgramGL();
+}
+
 void
 HdSt_IndirectDrawBatchGL::_PrepareDraw(bool gpuCulling, bool freezeCulling)
 {

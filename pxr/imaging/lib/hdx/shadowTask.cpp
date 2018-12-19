@@ -36,7 +36,7 @@
 #include "pxr/imaging/hd/sceneDelegate.h"
 
 
-#include "pxr/imaging/hdSt/GL/glConversions.h"
+#include "pxr/imaging/hdSt/glConversions.h"
 #include "pxr/imaging/hdSt/glslfxShader.h"
 #include "pxr/imaging/hdSt/light.h"
 #include "pxr/imaging/hdSt/lightingShader.h"
@@ -44,6 +44,7 @@
 #include "pxr/imaging/hdSt/renderPass.h"
 #include "pxr/imaging/hdSt/renderPassShader.h"
 #include "pxr/imaging/hdSt/renderPassState.h"
+#include "pxr/imaging/hdSt/resourceFactory.h"
 
 #include "pxr/imaging/garch/simpleLightingContext.h"
 
@@ -79,6 +80,7 @@ HdxShadowTask::_Execute(HdTaskContext* ctx)
         return;
     }
 
+#if defined(ARCH_GFX_OPENGL)
     if (_params.depthBiasEnable) {
         glEnable(GL_POLYGON_OFFSET_FILL);
         glPolygonOffset(_params.depthBiasSlopeFactor, 
@@ -90,6 +92,9 @@ HdxShadowTask::_Execute(HdTaskContext* ctx)
     // XXX: Move conversion to sync time once Task header becomes private.
     glDepthFunc(HdStGLConversions::GetGlDepthFunc(_params.depthFunc));
     glEnable(GL_PROGRAM_POINT_SIZE);
+#else
+    TF_FATAL_CODING_ERROR("Not Implemented!"); //MTL_FIXME
+#endif
 
     // Generate the actual shadow maps
     GarchSimpleShadowArrayRefPtr const shadows = lightingContext->GetShadows();
@@ -263,7 +268,7 @@ HdxShadowTask::_Sync(HdTaskContext* ctx)
             HdStRenderPassShaderSharedPtr renderPassShadowShader
                 (new HdStRenderPassShader(HdxPackageRenderPassShadowShader()));
             HdRenderPassStateSharedPtr renderPassState
-                (HdStRenderPassState::New(renderPassShadowShader));
+                (HdStResourceFactory::GetInstance()->NewRenderPassState(renderPassShadowShader));
 
             // This state is invariant of parameter changes so set it
             // once.

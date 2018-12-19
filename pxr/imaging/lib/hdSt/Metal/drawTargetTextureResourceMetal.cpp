@@ -22,7 +22,7 @@
 // language governing permissions and limitations under the Apache License.
 //
 #include "pxr/imaging/hdSt/Metal/drawTargetTextureResourceMetal.h"
-#include "pxr/imaging/hdSt/GL/glConversions.h"
+#include "pxr/imaging/hdSt/glConversions.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -39,9 +39,9 @@ HdSt_DrawTargetTextureResourceMetal::~HdSt_DrawTargetTextureResourceMetal()
 
 void
 HdSt_DrawTargetTextureResourceMetal::SetSampler(HdWrap wrapS,
-                                          HdWrap wrapT,
-                                          HdMinFilter minFilter,
-                                          HdMagFilter magFilter)
+                                                HdWrap wrapT,
+                                                HdMinFilter minFilter,
+                                                HdMagFilter magFilter)
 {
     static const float borderColor[4] = {0.0f, 0.0f, 0.0f, 0.0f};
 

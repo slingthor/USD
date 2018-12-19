@@ -29,6 +29,8 @@
 #include "pxr/imaging/glf/info.h"
 #include "pxr/imaging/glf/glContext.h"
 
+#include "pxr/imaging/garch/gl.h"
+
 #include "pxr/base/tf/stringUtils.h"
 
 #include <cstdlib>
@@ -49,7 +51,7 @@ Glf_BuildAvailableExtensions()
     GlfSharedGLContextScopeHolder sharedContextScopeHolder;
 
     static set<string> availableExtensions;
-
+#if defined(ARCH_GFX_OPENGL)
     // Get the available extensions from OpenGL if we haven't yet.
     const char *extensions = (const char*) glGetString(GL_EXTENSIONS);
     if ( extensions ) {
@@ -58,6 +60,7 @@ Glf_BuildAvailableExtensions()
             availableExtensions.insert(extension);
         }
     }
+#endif
     return &availableExtensions;
 }
 
@@ -90,7 +93,11 @@ GlfHasLegacyGraphics()
     // then we must have very limited graphics.  In
     // common usage, this should only be true for NX
     // clients.
+#if defined(ARCH_GFX_OPENGL)
     return !GLEW_VERSION_2_0;
+#else
+    return true;
+#endif
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

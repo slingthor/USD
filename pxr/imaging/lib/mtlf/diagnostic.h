@@ -36,7 +36,6 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-
 /// Posts diagnostic errors for all GL errors in the current context.
 /// This macro tags the diagnostic errors with the name of the calling
 /// function.

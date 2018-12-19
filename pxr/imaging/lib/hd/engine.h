@@ -45,10 +45,13 @@ public:
     
     enum RenderAPI {
         Unset = -1,
+#if defined(ARCH_GFX_OPENGL)
         OpenGL,
+#endif
 #if defined(ARCH_GFX_METAL)
         Metal,
 #endif
+        NumRenderers
     };
 
     HD_API

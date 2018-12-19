@@ -447,12 +447,13 @@ MtlfDrawTarget::GetImage(std::string const & name, void* buffer) const
         mtlFormat = MTLPixelFormatDepth32Float;
         blitOptions = MTLBlitOptionDepthFromDepthStencil;
     }
+#if defined(ARCH_OS_OSX)
     else if (mtlFormat == MTLPixelFormatDepth24Unorm_Stencil8) {
         mtlFormat = MTLPixelFormatR32Uint; //MTL_FIXME - This might not be the right format for this texture
         bytesPerPixel = 4;
         blitOptions = MTLBlitOptionDepthFromDepthStencil;
     }
-
+#endif
     if (mtlFormat == MTLPixelFormatDepth32Float) {
         bytesPerPixel = 4;
     }
@@ -463,10 +464,12 @@ MtlfDrawTarget::GetImage(std::string const & name, void* buffer) const
     context->LabelCommandBuffer(@"Get Image");
     id<MTLBlitCommandEncoder> blitEncoder = context->GetBlitEncoder();
     
-    id<MTLBuffer> cpuBuffer = context->GetMetalBuffer((bytesPerPixel * width * height), MTLResourceStorageModeManaged);
+    id<MTLBuffer> cpuBuffer = context->GetMetalBuffer((bytesPerPixel * width * height), MTLResourceStorageModeDefault);
     
     [blitEncoder copyFromTexture:texture sourceSlice:0 sourceLevel:0 sourceOrigin:MTLOriginMake(0, 0, 0) sourceSize:MTLSizeMake(width, height, 1) toBuffer:cpuBuffer destinationOffset:0 destinationBytesPerRow:(bytesPerPixel * width) destinationBytesPerImage:(bytesPerPixel * width * height) options:blitOptions];
+#if defined(ARCH_OS_OSX)
     [blitEncoder synchronizeResource:cpuBuffer];
+#endif
 
     context->ReleaseEncoder(true);
     context->CommitCommandBuffer(false, true);
@@ -593,6 +596,7 @@ MtlfDrawTarget::MtlfAttachment::_GenTexture()
     }
 
     int numChannel;
+    bool depth24stencil8 = false;
     MTLPixelFormat mtlFormat = MTLPixelFormatInvalid;
     id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->device;
 
@@ -628,9 +632,13 @@ MtlfDrawTarget::MtlfAttachment::_GenTexture()
                     mtlFormat = MTLPixelFormatR32Float;
             }
             else if (type == GL_UNSIGNED_INT_24_8) {
-                if([device isDepth24Stencil8PixelFormatSupported])
+#if defined(ARCH_OS_OSX)
+                if([device isDepth24Stencil8PixelFormatSupported]) {
                     mtlFormat = MTLPixelFormatDepth24Unorm_Stencil8;
+                    depth24stencil8 = true;
+                }
                 else
+#endif
                     mtlFormat = MTLPixelFormatDepth32Float_Stencil8;
             }
             else if (type == GL_UNSIGNED_BYTE) {
@@ -639,8 +647,8 @@ MtlfDrawTarget::MtlfAttachment::_GenTexture()
             break;
     }
     
-    uint32 bytesPerValue = 1;
-    if(_type == GL_FLOAT || mtlFormat == MTLPixelFormatDepth24Unorm_Stencil8)
+    uint32_t bytesPerValue = 1;
+    if(_type == GL_FLOAT || depth24stencil8)
         bytesPerValue = 4;
     else if(mtlFormat == MTLPixelFormatDepth32Float_Stencil8)
         bytesPerValue = 5;

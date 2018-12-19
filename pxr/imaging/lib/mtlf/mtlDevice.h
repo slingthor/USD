@@ -25,15 +25,31 @@
 #ifndef MTLF_METALCONTEXT_H
 #define MTLF_METALCONTEXT_H
 
-#include "pxr/imaging/glf/glew.h"
+#include "pxr/pxr.h"
+#include "pxr/base/arch/defines.h"
+
+#if defined(ARCH_GFX_OPENGL)
+#include <GL/glew.h>
+#else // ARCH_GFX_OPENGL
+// MTL_FIXME: These GL constants shouldn't be referenced by Hydra.
+//            Create a Hydra enum to represent instead
+#define GL_UNSIGNED_INT_2_10_10_10_REV  0x8368
+#define GL_INT_2_10_10_10_REV           0x8D9F
+#define GL_PRIMITIVES_GENERATED         0x8C87
+#define GL_TIME_ELAPSED                 0x88BF
+#endif // ARCH_GFX_OPENGL
 
 #include <Metal/Metal.h>
+#if defined(ARCH_OS_OSX)
 #import <Cocoa/Cocoa.h>
+#else
+#import <UIKit/UIKit.h>
+#endif // ARCH_OS_OSX
 
-#include "pxr/pxr.h"
-#include "pxr/base/tf/token.h"
 #include "pxr/imaging/mtlf/api.h"
 #include "pxr/base/arch/threads.h"
+#include "pxr/base/tf/token.h"
+
 #include <boost/noncopyable.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/unordered_map.hpp>
@@ -41,6 +57,8 @@
 #include <map>
 
 PXR_NAMESPACE_OPEN_SCOPE
+
+class MtlfGlInterop;
 
 // Not a strict size but how many copies of the uniforms to keep
 #define METAL_OLD_STYLE_UNIFORM_BUFFER_SIZE 5000
@@ -104,6 +122,12 @@ enum MetalWorkQueueType {
     METALWORKQUEUE_MAX              =  3,       // This should always be last
 };
 
+#if defined(ARCH_OS_OSX)
+#define MTLResourceStorageModeDefault MTLResourceStorageModeManaged
+#else
+#define MTLResourceStorageModeDefault MTLResourceStorageModeShared
+#endif
+
 class MtlfMetalContext : public boost::noncopyable {
 public:
     typedef struct {
@@ -156,6 +180,8 @@ public:
     MTLF_API
     void CommitCommandBuffer(bool waituntilScheduled, bool waitUntilCompleted, MetalWorkQueueType workQueueType = METALWORKQUEUE_DEFAULT);
     
+    MTLF_API
+    void SetOutputPixelFormats(MTLPixelFormat pixelFormat, MTLPixelFormat depthFormat);
     
     MTLF_API
     void SetDrawTarget(MtlfDrawTarget *drawTarget);
@@ -175,7 +201,7 @@ public:
                             const TfToken& name);
     
     MTLF_API
-    void SetUniform(const void* _data, uint32 _dataSize, const TfToken& _name, uint32 index, MSL_ProgramStage stage);
+    void SetUniform(const void* _data, uint32_t _dataSize, const TfToken& _name, uint32_t index, MSL_ProgramStage stage);
     
     MTLF_API
     void SetUniformBuffer(int index, id<MTLBuffer> buffer, const TfToken& name, MSL_ProgramStage stage, int offset = 0, int oldStyleUniformSize = 0);
@@ -255,7 +281,7 @@ public:
     uint64_t GetEventValue(MetalWorkQueueType signalQueue) const { return workQueues[signalQueue].currentEventValue; }
 	
     MTLF_API
-    id<MTLBuffer> GetMetalBuffer(NSUInteger length, MTLResourceOptions options = MTLResourceStorageModeManaged, const void *pointer = NULL);
+    id<MTLBuffer> GetMetalBuffer(NSUInteger length, MTLResourceOptions options = MTLResourceStorageModeDefault, const void *pointer = NULL);
     
     MTLF_API
     void ReleaseMetalBuffer(id<MTLBuffer> buffer);
@@ -327,8 +353,8 @@ protected:
         MSL_ProgramStage stage;
         int              offset;
         bool             modified;
-        uint32           blockSize;
-        uint8           *contents;
+        uint32_t         blockSize;
+        uint8_t          *contents;
     };
     std::vector<BufferBinding*> boundBuffers;
 	
@@ -351,13 +377,13 @@ protected:
 private:
     const static uint64_t endOfQueueEventValue = 0xFFFFFFFFFFFFFFFF;
 
-    id<MTLLibrary>           defaultLibrary;
     id<MTLDepthStencilState> depthState;
-    
     id<MTLComputePipelineState> computePipelineState;
     
-    // Depth copy program 
-    id <MTLFunction>            computeDepthCopyProgram;
+    // These are used when rendering from within a native Metal application, and
+    // are set by the application
+    MTLPixelFormat outputPixelFormat;
+    MTLPixelFormat outputDepthFormat;
     
     enum PREFERRED_GPU_TYPE {
         PREFER_DEFAULT_GPU,
@@ -368,55 +394,24 @@ private:
     };
     
     // State for tracking dependencies between work queues
-#if defined(METAL_EVENTS_AVAILABLE)
+#if defined(METAL_EVENTS_API_PRESENT)
     id<MTLEvent> queueSyncEvent;
+    bool         eventsAvailable;
 #endif
     uint32_t queueSyncEventCounter;
     MetalWorkQueueType outstandingDependency;
     
     id<MTLDevice> GetMetalDevice(PREFERRED_GPU_TYPE preferredGPUType);
+#if defined(ARCH_OS_OSX)
     void handleDisplayChange();
     void handleGPUHotPlug(id<MTLDevice> device, MTLDeviceNotificationName notifier);
-    
-    static MtlfMetalContextSharedPtr context;
-    
-    CVPixelBufferRef pixelBuffer;
-    CVPixelBufferRef depthBuffer;
-    CVOpenGLTextureCacheRef cvglTextureCache;
-    CVMetalTextureCacheRef cvmtlTextureCache;
-    CVOpenGLTextureRef cvglColorTexture;
-    CVOpenGLTextureRef cvglDepthTexture;
-    CVMetalTextureRef cvmtlColorTexture;
-    CVMetalTextureRef cvmtlDepthTexture;
-    uint32_t glColorTexture;
-    uint32_t glDepthTexture;
-    id<MTLTexture> mtlDepthRegularFloatTexture;
-    
-    void _FreeTransientTextureCacheRefs();
-    
-    struct GLInterop {
-        GLInterop()
-        : glShaderProgram(0)
-        , glVAO(0)
-        , glVBO(0)
-        , posAttrib(0)
-        , texAttrib(0)
-        , blitTexSizeUniform(0) {}
+#endif
 
-        uint32_t glShaderProgram;
-        uint32_t glVAO;
-        uint32_t glVBO;
-        int32_t posAttrib;
-        int32_t texAttrib;
-        uint32_t blitTexSizeUniform;
-    };
-    
-    static GLInterop staticGlInterop;
-    static void _InitialiseGL();
+    static MtlfMetalContextSharedPtr context;
     
     struct MetalWorkQueue {
         id<MTLCommandBuffer>         commandBuffer;
-#if defined(METAL_EVENTS_AVAILABLE)
+#if defined(METAL_EVENTS_API_PRESENT)
         id<MTLEvent>                 event;
 #endif
  
@@ -475,7 +470,7 @@ private:
     MTLWinding windingOrder;
     MTLCullMode cullMode;
     MTLTriangleFillMode fillMode;
-    uint32 dirtyRenderState;
+    uint32_t dirtyRenderState;
     
     //Geometry Shader Related
     int                        gsDataOffset;
@@ -534,7 +529,6 @@ private:
     } resourceStats;
 #endif
     
-
     struct GPUFrameTime {
         unsigned long  startingFrame;
         struct timeval frameStartTime;
@@ -556,6 +550,10 @@ private:
     
     bool tempPointsWorkaroundActive = false;
     bool OSDEnabledThisFrame = false;
+    
+#if defined(ARCH_GFX_OPENGL)
+    MtlfGlInterop *glInterop;
+#endif
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

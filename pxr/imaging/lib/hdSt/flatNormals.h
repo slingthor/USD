@@ -42,18 +42,6 @@ class Hd_FaceCoords;
 class HdSt_FlatNormalsComputationGPU : public HdComputation {
 public:
 
-    /// Constructor
-    static HDST_API
-    HdSt_FlatNormalsComputationGPU *New(HdBufferArrayRangeSharedPtr const
-                                            &topologyRange,
-                                        HdBufferArrayRangeSharedPtr const
-                                            &vertexRange,
-                                        int numFaces,
-                                        TfToken const &srcName,
-                                        TfToken const &dstName,
-                                        HdType srcDataType,
-                                        bool packed);
-
     HDST_API
     virtual void GetBufferSpecs(HdBufferSpecVector *specs) const override;
     HDST_API

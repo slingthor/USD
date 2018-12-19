@@ -50,12 +50,6 @@ typedef std::vector<HdStShaderCodeSharedPtr> HdStShaderCodeSharedPtrVector;
 class HdStRenderPassState : public HdRenderPassState {
 public:
     HDST_API
-    static HdStRenderPassState *New();
-    
-    HDST_API
-    static HdStRenderPassState *New(HdStRenderPassShaderSharedPtr const &shader);
-
-    HDST_API
     virtual ~HdStRenderPassState();
 
     HDST_API

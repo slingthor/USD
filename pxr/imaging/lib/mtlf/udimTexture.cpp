@@ -113,7 +113,7 @@ MtlfUdimTexture::_CreateGPUResources(unsigned int numChannels,
     descImage.textureType = MTLTextureType2DArray;
     descImage.arrayLength = _depth;
     descImage.mipmapLevelCount = mipCount;
-    descImage.resourceOptions = MTLResourceStorageModeManaged;
+    descImage.resourceOptions = MTLResourceStorageModeDefault;
     _imageArray = [device newTextureWithDescriptor:descImage];
     
     for (int mip = 0; mip < mipCount; ++mip) {
@@ -138,7 +138,7 @@ MtlfUdimTexture::_CreateGPUResources(unsigned int numChannels,
                                                           height:1
                                                        mipmapped:NO];
     descLayout.textureType = MTLTextureType1D;
-    descLayout.resourceOptions = MTLResourceStorageModeManaged;
+    descLayout.resourceOptions = MTLResourceStorageModeDefault;
     _layout = [device newTextureWithDescriptor:descLayout];
 
     [_layout replaceRegion:MTLRegionMake1D(0, layoutData.size())

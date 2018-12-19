@@ -33,19 +33,17 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-
 class Hd_VertexAdjacency;
+
+typedef boost::shared_ptr<class HdStProgram> HdStProgramSharedPtr;
+typedef boost::shared_ptr<class HdBufferResource> HdBufferResourceSharedPtr;
+
 
 /// smooth normal computation GPU
 ///
 ///
 class HdSt_SmoothNormalsComputationGPU : public HdComputation {
 public:
-    /// Constructor
-    static HDST_API
-    HdSt_SmoothNormalsComputationGPU *New(Hd_VertexAdjacency const *adjacency,
-                                          TfToken const &srcName, TfToken const &dstName,
-                                          HdType srcDataType, bool packed);
 
     HDST_API
     virtual void GetBufferSpecs(HdBufferSpecVector *specs) const override;

@@ -37,14 +37,9 @@
 #include "pxr/base/tf/enum.h"
 
 #include "pxr/imaging/hdSt/bufferResource.h"
-#include "pxr/imaging/hdSt/GL/glUtils.h"
+#include "pxr/imaging/hdSt/glConversions.h"
+#include "pxr/imaging/hdSt/resourceFactory.h"
 #include "pxr/imaging/hdSt/vboMemoryManager.h"
-#include "pxr/imaging/hdSt/GL/glConversions.h"
-
-#include "pxr/imaging/hdSt/GL/vboMemoryBufferGL.h"
-#if defined(ARCH_GFX_METAL)
-#include "pxr/imaging/hdSt/Metal/vboMemoryBufferMetal.h"
-#endif
 
 #include "pxr/imaging/hd/engine.h"
 #include "pxr/imaging/hd/perfLog.h"
@@ -67,22 +62,8 @@ HdStVBOMemoryManager::CreateBufferArray(
     HdBufferSpecVector const &bufferSpecs,
     HdBufferArrayUsageHint usageHint)
 {
-    HdEngine::RenderAPI api = HdEngine::GetRenderAPI();
-    switch(api)
-    {
-        case HdEngine::OpenGL:
-            return boost::make_shared<HdStVBOMemoryBufferGL>(
+    return HdStResourceFactory::GetInstance()->NewVBOMemoryBuffer(
                             role, bufferSpecs, usageHint);
-#if defined(ARCH_GFX_METAL)
-        case HdEngine::Metal:
-            return boost::make_shared<HdStVBOMemoryBufferMetal>(
-                            role, bufferSpecs, usageHint);
-#endif
-        default:
-            TF_FATAL_CODING_ERROR("No HdStVBOMemoryBuffer for this API");
-    }
-    
-    return NULL;
 }
 
 
@@ -244,7 +225,8 @@ HdStVBOMemoryManager::_StripedBufferArray::_AddResource(TfToken const& name,
     }
 
     HdBufferResourceSharedPtr bufferRes = HdStBufferResourceSharedPtr(
-        HdStBufferResource::New(GetRole(), tupleType, offset, stride));
+        HdStResourceFactory::GetInstance()->NewBufferResource(
+            GetRole(), tupleType, offset, stride));
     _resourceList.emplace_back(name, bufferRes);
     return bufferRes;
 }

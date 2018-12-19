@@ -71,13 +71,7 @@ MtlfBindingMap::GetAttributeIndex(TfToken const & name)
 void
 MtlfBindingMap::AssignSamplerUnitsToProgram(GarchProgramGPUHandle program)
 {
-    for (BindingMap::value_type const& p : _samplerBindings) {
-        GLint loc = 0;//glGetUniformLocation(program, p.first.GetText());
-        if (loc != -1) {
-            //glProgramUniform1i(program, loc, p.second);
-            //MtlfMetalContext::GetMetalContext()->SetSamplerState(loc, p.second);
-        }
-    }
+    TF_FATAL_CODING_ERROR("Not Implemented");
 }
 
 int
@@ -113,138 +107,12 @@ void
 MtlfBindingMap::AssignUniformBindingsToProgram(GarchProgramGPUHandle program)
 {
     TF_FATAL_CODING_ERROR("Not Implemented");
-/*
-    for (BindingMap::value_type const& p : _uniformBindings) {
-        GLuint uboIndex = glGetUniformBlockIndex(program, p.first.GetText());
-        if (uboIndex != GL_INVALID_INDEX) {
-            glUniformBlockBinding(program, uboIndex, p.second);
-        }
-    }
- */
 }
 
 void
 MtlfBindingMap::AddCustomBindings(GarchProgramGPUHandle program)
 {
-    _AddActiveAttributeBindings(program);
-    _AddActiveUniformBindings(program);
-    _AddActiveUniformBlockBindings(program);
-
-    // assign uniform bindings / texture samplers
-    AssignUniformBindingsToProgram(program);
-    AssignSamplerUnitsToProgram(program);
-}
-
-void
-MtlfBindingMap::_AddActiveAttributeBindings(GarchProgramGPUHandle program)
-{
-    GLint numAttributes = 0;
-    glGetProgramiv(program, GL_ACTIVE_ATTRIBUTES, &numAttributes);
-    if (numAttributes == 0) return;
-
-    GLint maxNameLength = 0;
-    glGetProgramiv(program, GL_ACTIVE_ATTRIBUTE_MAX_LENGTH, &maxNameLength);
-    maxNameLength = std::max(maxNameLength, 100);
-    GLint size;
-    GLenum type;
-    char * name = new char[maxNameLength];
-
-    for (int i = 0; i < numAttributes; ++i) {
-        glGetActiveAttrib(program, i, maxNameLength, NULL, &size, &type, name);
-        GLint location = glGetAttribLocation(program, name);
-        TfToken token(name);
-
-        BindingMap::iterator it = _attribBindings.find(token);
-        if (it == _attribBindings.end()) {
-            _attribBindings[token] = location;
-        } else if (it->second != location) {
-            TF_RUNTIME_ERROR("Inconsistent attribute binding detected.");
-        }
-    }
-
-    delete[] name;
-}
-
-void
-MtlfBindingMap::_AddActiveUniformBindings(GarchProgramGPUHandle program)
-{
     TF_FATAL_CODING_ERROR("Not Implemented");
-/*
-    GLint numUniforms = 0;
-    glGetProgramiv(program, GL_ACTIVE_UNIFORMS, &numUniforms);
-    if (numUniforms == 0) return;
-
-    GLint maxNameLength = 0;
-    glGetProgramiv(program, GL_ACTIVE_UNIFORM_MAX_LENGTH, &maxNameLength);
-    char * name = new char[maxNameLength];
-    
-    for (int i = 0; i < numUniforms; ++i) {
-        glGetActiveUniform(program, i, maxNameLength, NULL, &size, &type, name);
-        switch(type) {
-        case GL_SAMPLER_1D:
-        case GL_SAMPLER_2D:
-        case GL_SAMPLER_3D:
-        case GL_SAMPLER_CUBE:
-        case GL_SAMPLER_1D_SHADOW:
-        case GL_SAMPLER_2D_SHADOW:
-        case GL_SAMPLER_1D_ARRAY:
-        case GL_SAMPLER_2D_ARRAY:
-        case GL_SAMPLER_1D_ARRAY_SHADOW:
-        case GL_SAMPLER_2D_ARRAY_SHADOW:
-        case GL_SAMPLER_2D_MULTISAMPLE:
-        case GL_SAMPLER_2D_MULTISAMPLE_ARRAY:
-        case GL_SAMPLER_CUBE_SHADOW:
-        case GL_SAMPLER_BUFFER:
-        case GL_SAMPLER_2D_RECT:
-        case GL_SAMPLER_2D_RECT_SHADOW:
-        case GL_INT_SAMPLER_1D:
-        case GL_INT_SAMPLER_2D:
-        case GL_INT_SAMPLER_3D:
-        case GL_INT_SAMPLER_CUBE:
-        case GL_INT_SAMPLER_1D_ARRAY:
-        case GL_INT_SAMPLER_2D_ARRAY:
-        case GL_INT_SAMPLER_2D_MULTISAMPLE:
-        case GL_INT_SAMPLER_2D_MULTISAMPLE_ARRAY:
-        case GL_INT_SAMPLER_BUFFER:
-        case GL_INT_SAMPLER_2D_RECT:
-        case GL_UNSIGNED_INT_SAMPLER_1D:
-        case GL_UNSIGNED_INT_SAMPLER_2D:
-        case GL_UNSIGNED_INT_SAMPLER_3D:
-        case GL_UNSIGNED_INT_SAMPLER_CUBE:
-        case GL_UNSIGNED_INT_SAMPLER_1D_ARRAY:
-        case GL_UNSIGNED_INT_SAMPLER_2D_ARRAY:
-        case GL_UNSIGNED_INT_SAMPLER_2D_MULTISAMPLE:
-        case GL_UNSIGNED_INT_SAMPLER_2D_MULTISAMPLE_ARRAY:
-        case GL_UNSIGNED_INT_SAMPLER_BUFFER:
-        case GL_UNSIGNED_INT_SAMPLER_2D_RECT:
-            GetSamplerUnit(name);
-            break;
-        }
-    }
-
-    delete[] name;
- */
-}
-
-void
-MtlfBindingMap::_AddActiveUniformBlockBindings(GarchProgramGPUHandle program)
-{
-    TF_FATAL_CODING_ERROR("Not Implemented");
-/*
-    GLint numUniformBlocks = 0;
-    glGetProgramiv(program, GL_ACTIVE_UNIFORM_BLOCKS, &numUniformBlocks);
-    if (numUniformBlocks == 0) return;
-
-    GLint maxNameLength = 0;
-    glGetProgramiv(program, GL_ACTIVE_UNIFORM_BLOCK_MAX_NAME_LENGTH, &maxNameLength);
-    char *name = new char[maxNameLength];
-
-    for (int i = 0; i < numUniformBlocks; ++i) {
-        glGetActiveUniformBlockName(program, i, maxNameLength, NULL, name);
-        GetUniformBinding(name);
-    }
-    delete[] name;
- */
 }
 
 void

@@ -26,6 +26,7 @@
 
 #include "pxr/imaging/hdSt/meshTopology.h"
 #include "pxr/imaging/hdSt/quadrangulate.h"
+#include "pxr/imaging/hdSt/resourceFactory.h"
 #include "pxr/imaging/hdSt/subdivision.h"
 #include "pxr/imaging/hdSt/subdivision3.h"
 #include "pxr/imaging/hdSt/triangulate.h"
@@ -186,7 +187,8 @@ HdSt_MeshTopology::GetQuadrangulateComputationGPU(
         return HdComputationSharedPtr();
     }
     return HdComputationSharedPtr(
-            HdSt_QuadrangulateComputationGPU::New(this, name, dataType, id));
+            HdStResourceFactory::GetInstance()->NewQuadrangulateComputationGPU(
+                this, name, dataType, id));
 }
 
 HdBufferSourceSharedPtr

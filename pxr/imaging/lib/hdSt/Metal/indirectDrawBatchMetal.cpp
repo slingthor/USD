@@ -81,6 +81,11 @@ HdSt_IndirectDrawBatchMetal::~HdSt_IndirectDrawBatchMetal()
     /* empty */
 }
 
+HdSt_IndirectDrawBatch::_CullingProgram *HdSt_IndirectDrawBatchMetal::NewCullingProgram() const
+{
+    return new HdSt_IndirectDrawBatchMetal::_CullingProgramMetal();
+}
+
 void
 HdSt_IndirectDrawBatchMetal::_PrepareDraw(bool gpuCulling, bool freezeCulling)
 {

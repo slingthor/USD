@@ -38,10 +38,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 ///
 class HdStBufferRelocator {
 public:
-    /// Creates a graphics API specific buffer relocator
-    HDST_API
-    static HdStBufferRelocator *New(HdResourceGPUHandle srcBuffer, HdResourceGPUHandle dstBuffer);
-    
+
     HDST_API
     virtual ~HdStBufferRelocator() {};
 

@@ -80,9 +80,12 @@ protected:
         
         friend class HdSt_IndirectDrawBatch::_CullingProgram;
     };
-    
-    friend class HdSt_IndirectDrawBatch;
-    
+
+    HDST_API
+    virtual HdSt_IndirectDrawBatch::_CullingProgram *NewCullingProgram() const override;
+
+    friend class HdStResourceFactoryGL;
+
 private:
     void _BeginGPUCountVisibleInstances(HdStResourceRegistrySharedPtr const &resourceRegistry);
 

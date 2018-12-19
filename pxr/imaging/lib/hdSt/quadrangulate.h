@@ -243,13 +243,7 @@ private:
 ///
 class HdSt_QuadrangulateComputationGPU : public HdComputation {
 public:
-    /// Creates a graphics API specific GPU quadrangulate computation
-    /// This computaion doesn't generate buffer source (i.e. 2nd phase)
-    static HdSt_QuadrangulateComputationGPU *New(HdSt_MeshTopology *topology,
-                                                 TfToken const &sourceName,
-                                                 HdType dataType,
-                                                 SdfPath const &id);
-    
+
     virtual void Execute(HdBufferArrayRangeSharedPtr const &range,
                          HdResourceRegistry *resourceRegistry) override = 0;
     virtual void GetBufferSpecs(HdBufferSpecVector *specs) const override;

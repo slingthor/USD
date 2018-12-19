@@ -251,7 +251,7 @@ public:
     /// Resolve several MSAA framebuffers at once. If any framebuffers don't
     /// have MSAA enabled, nothing happens to them.
     MTLF_API
-    static void Resolve(const std::vector<GarchDrawTarget*>& drawTargets);
+    virtual void Resolve(const std::vector<GarchDrawTarget*>& drawTargets) override;
 
     /// Updates the contents signature for attached textures
     /// to allow downstream consumers to know that the texture image

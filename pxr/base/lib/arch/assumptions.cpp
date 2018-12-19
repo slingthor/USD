@@ -105,8 +105,7 @@ Arch_ValidateAssumptions()
      * Verify that the exponent and significand of float and double are
      * IEEE-754 compliant.
      */
-    if (sizeof(float) != sizeof(uint32_t) ||
-        ArchFloatToBitPattern(5.6904566e-28f) != 0x12345678 ||
+    if (sizeof(float) != sizeof(uint32_t) ||        ArchFloatToBitPattern(5.6904566e-28f) != 0x12345678 ||
         ArchBitPatternToFloat(0x12345678) != 5.6904566e-28f)
     {
         // CODE_COVERAGE_OFF
@@ -149,12 +148,14 @@ Arch_ValidateAssumptions()
     /*
      * Make sure that the ARCH_CACHE_LINE_SIZE constant is set as expected
      * on the current hardware architecture.
-     */ 
+     */
+#if !defined(ARCH_OS_IOS)
     if (ARCH_CACHE_LINE_SIZE != Arch_ObtainCacheLineSize()) {
         // CODE_COVERAGE_OFF
         ARCH_ERROR("ARCH_CACHE_LINE_SIZE is not set correctly.");
         // CODE_COVERAGE_ON  
     }
+#endif
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

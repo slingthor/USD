@@ -35,8 +35,6 @@ class HdSt_DrawTargetTextureResource : public HdStTextureResource {
 public:
     virtual ~HdSt_DrawTargetTextureResource();
 
-    static HdTextureResourceSharedPtr New();
-    
     virtual void SetAttachment(const GarchDrawTarget::AttachmentRefPtr &attachment);
     virtual void SetSampler(HdWrap wrapS, HdWrap wrapT,
                             HdMinFilter minFilter, HdMagFilter magFilter) = 0;

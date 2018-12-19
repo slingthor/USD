@@ -40,6 +40,7 @@ static
 void
 _ClearBuffer(GLenum buffer, GLint drawBuffer, const VtValue &value)
 {
+#if defined(ARCH_GFX_OPENGL)
     // XXX: There has to be a better way to handle the different formats.
     if (value.IsHolding<int>()) {
         glClearBufferiv(buffer, drawBuffer, &value.UncheckedGet<int>());
@@ -61,6 +62,7 @@ _ClearBuffer(GLenum buffer, GLint drawBuffer, const VtValue &value)
       TF_CODING_ERROR("Unsupported clear value type: %s",
                       value.GetTypeName().c_str());
     }
+#endif
 }
 
 // _renderPass's collection is populated after build time, during Sync().
@@ -134,28 +136,29 @@ HdxDrawTargetRenderPass::Execute(
     _ClearBuffers();
 
     GfVec2i const &resolution = _drawTarget->GetSize();
-
+#if defined(ARCH_GFX_OPENGL)
     // XXX: Should the Raster State or Renderpass set and restore this?
     // save the current viewport
     GLint viewport[4];
     glGetIntegerv(GL_VIEWPORT, viewport);
     glViewport(0, 0, resolution[0], resolution[1]);
-
+#endif
     // Perform actual draw
     _renderPass.Execute(renderPassState, TfTokenVector());
-
+#if defined(ARCH_GFX_OPENGL)
     // restore viewport
     glViewport(viewport[0], viewport[1], viewport[2], viewport[3]);
-
+#endif
     _drawTarget->Unbind();
 }
 
 void 
 HdxDrawTargetRenderPass::_ClearBuffers()
 {
+#if defined(ARCH_GFX_OPENGL)
     float depthValue = _drawTargetRenderPassState->GetDepthClearValue();
     glClearBufferfv(GL_DEPTH, 0, &depthValue);
-
+#endif
     size_t numAttachments = _drawTargetRenderPassState->GetNumColorAttachments();
     for (size_t attachmentNum = 0;
          attachmentNum < numAttachments;

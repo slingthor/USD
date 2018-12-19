@@ -41,4 +41,5 @@ _disable_warning("inconsistent-missing-override")
 _disable_warning("expansion-to-defined")
 _disable_warning("unused-lambda-capture")
 _disable_warning("reinterpret-base-class")
-
+_disable_warning("shorten-64-to-32")
+_disable_warning("unguarded-availability-new")

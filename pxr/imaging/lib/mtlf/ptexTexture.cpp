@@ -190,7 +190,7 @@ MtlfPtexTexture::_ReadImage()
                                                               height:1
                                                            mipmapped:NO];
         descLayout.textureType = MTLTextureType1D;
-        descLayout.resourceOptions = MTLResourceStorageModeManaged;
+        descLayout.resourceOptions = MTLResourceStorageModeDefault;
         _layout = [device newTextureWithDescriptor:descLayout];
 
         [_layout replaceRegion:MTLRegionMake1D(0, numFaces * 6)
@@ -206,7 +206,7 @@ MtlfPtexTexture::_ReadImage()
                                                            mipmapped:NO];
         descTexels.textureType = MTLTextureType2DArray;
         descTexels.arrayLength = _depth;
-        descTexels.resourceOptions = MTLResourceStorageModeManaged;
+        descTexels.resourceOptions = MTLResourceStorageModeDefault;
         _texels = [device newTextureWithDescriptor:descTexels];
 
         size_t pageSize = pixelByteSize * _width * _height;

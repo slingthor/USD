@@ -27,6 +27,7 @@
 #include "pxr/imaging/garch/resourceFactory.h"
 
 #include "pxr/imaging/hdSt/Metal/vboMemoryBufferMetal.h"
+#include "pxr/imaging/hdSt/resourceFactory.h"
 #include "pxr/imaging/mtlf/mtlDevice.h"
 
 #include <boost/make_shared.hpp>
@@ -40,7 +41,7 @@
 
 #include "pxr/imaging/hdSt/bufferRelocator.h"
 #include "pxr/imaging/hdSt/bufferResource.h"
-#include "pxr/imaging/hdSt/GL/glUtils.h"
+//#include "pxr/imaging/hdSt/GL/glUtils.h"
 #include "pxr/imaging/hd/engine.h"
 #include "pxr/imaging/hd/perfLog.h"
 #include "pxr/imaging/hd/tokens.h"
@@ -143,7 +144,7 @@ HdStVBOMemoryBufferMetal::Reallocate(
         HdResourceGPUHandle oldId(bres->GetId());
         HdResourceGPUHandle curId(curRes->GetId());
 
-        newId = MtlfMetalContext::GetMetalContext()->GetMetalBuffer(bufferSize, MTLResourceStorageModeManaged);
+        newId = MtlfMetalContext::GetMetalContext()->GetMetalBuffer(bufferSize, MTLResourceStorageModeDefault);
         
         // if old buffer exists, copy unchanged data
         if (curId) {
@@ -151,7 +152,7 @@ HdStVBOMemoryBufferMetal::Reallocate(
 
             // pre-pass to combine consecutive buffer range relocation
             boost::scoped_ptr<HdStBufferRelocator> relocator(
-                 HdStBufferRelocator::New(curId, newId));
+                 HdStResourceFactory::GetInstance()->NewBufferRelocator(curId, newId));
             TF_FOR_ALL (it, ranges) {
                 HdStVBOMemoryManager::_StripedBufferArrayRangeSharedPtr range =
                     boost::static_pointer_cast<HdStVBOMemoryManager::_StripedBufferArrayRange>(*it);

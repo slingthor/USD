@@ -23,7 +23,6 @@
 //
 // utils.cpp
 //
-#include <GL/glew.h>
 
 #include "pxr/imaging/garch/gl.h"
 #include "pxr/imaging/garch/utils.h"

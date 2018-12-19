@@ -1,9 +1,9 @@
 set(PXR_PREFIX pxr/imaging)
 set(PXR_PACKAGE hdSt)
 
-if (NOT ${PXR_ENABLE_GL_SUPPORT})
+if ((NOT ${PXR_ENABLE_GL_SUPPORT}) AND (NOT ${PXR_ENABLE_METAL_SUPPORT}))
     message(STATUS
-        "Skipping ${PXR_PACKAGE} because PXR_ENABLE_GL_SUPPORT is OFF")
+        "Skipping ${PXR_PACKAGE} because PXR_ENABLE_GL_SUPPORT and PXR_ENABLE_METAL_SUPPORT is OFF")
     return()
 endif()
 
@@ -17,10 +17,36 @@ if (OPENSUBDIV_HAS_METAL_COMPUTE)
     add_definitions(-DOPENSUBDIV_HAS_METAL_COMPUTE)
 endif()
 
+if (PXR_ENABLE_GL_SUPPORT)
+    set(GFX             glf)
+    set(GFXADDITIONAL   GL/bufferRelocatorGL
+                        GL/bufferResourceGL
+                        GL/codeGenGLSL
+                        GL/dispatchBufferGL
+                        GL/drawTargetTextureResourceGL
+                        GL/flatNormalsGL
+                        GL/glslProgram
+                        GL/glUtils
+                        GL/indirectDrawBatchGL
+                        GL/interleavedMemoryBufferGL
+                        GL/persistentBufferGL
+                        GL/quadrangulateGL
+                        GL/renderPassStateGL
+                        GL/resourceBinderGL
+                        GL/resourceFactoryGL
+                        GL/resourceGL
+                        GL/smoothNormalsGL
+                        GL/textureResourceGL
+                        GL/vboMemoryBufferGL
+                        GL/vboSimpleMemoryBufferGL
+                        unitTestGLDrawing)
+endif()
 
-if (APPLE)
-    set(GFX    mtlf)
-    set(GFXADDITIONAL   Metal/bufferRelocatorMetal
+if (PXR_ENABLE_METAL_SUPPORT)
+    set(GFX             ${GFX}
+                        mtlf)
+    set(GFXADDITIONAL   ${GFXADDITIONAL}
+                        Metal/bufferRelocatorMetal
                         Metal/bufferResourceMetal
                         Metal/codeGenMSL
                         Metal/dispatchBufferMetal
@@ -35,20 +61,17 @@ if (APPLE)
                         Metal/quadrangulateMetal
                         Metal/renderPassStateMetal
                         Metal/resourceBinderMetal
+                        Metal/resourceFactoryMetal
                         Metal/resourceMetal
                         Metal/smoothNormalsMetal
                         Metal/textureResourceMetal
                         Metal/vboMemoryBufferMetal
                         Metal/vboSimpleMemoryBufferMetal)
-else()
-    set(GFX)
-    set(GFXADDITIONAL)
 endif()
 
 pxr_library(hdSt
     LIBRARIES
         garch
-        glf
         hd
         tf
         trace
@@ -82,6 +105,7 @@ pxr_library(hdSt
         fallbackLightingShader
         flatNormals
         geometricShader
+        glConversions
         glslfxShader
         instancer
         interleavedMemoryManager
@@ -99,6 +123,7 @@ pxr_library(hdSt
         renderPassShader
         renderPassState
         resourceBinder
+        resourceFactory
         resourceRegistry
         shaderCode
         shaderKey
@@ -107,7 +132,6 @@ pxr_library(hdSt
         texture
         textureResource
         tokens
-        unitTestGLDrawing
         vboMemoryManager
         vboSimpleMemoryManager
 
@@ -133,26 +157,6 @@ pxr_library(hdSt
         triangulate
         unitTestDelegate
         unitTestHelper
-        GL/bufferRelocatorGL
-        GL/bufferResourceGL
-        GL/codeGenGLSL
-        GL/dispatchBufferGL
-        GL/glConversions
-        GL/drawTargetTextureResourceGL
-        GL/flatNormalsGL
-        GL/glslProgram
-        GL/glUtils
-        GL/indirectDrawBatchGL
-        GL/interleavedMemoryBufferGL
-        GL/persistentBufferGL
-        GL/quadrangulateGL
-        GL/renderPassStateGL
-        GL/resourceBinderGL
-        GL/resourceGL
-        GL/smoothNormalsGL
-        GL/textureResourceGL
-        GL/vboMemoryBufferGL
-        GL/vboSimpleMemoryBufferGL
         ${GFXADDITIONAL}
 
     RESOURCE_FILES
@@ -187,7 +191,6 @@ pxr_build_test(testHdStBasicDrawing
         hdSt
         hd
         garch
-        glf
         ${GFX}
     CPPFILES
         testenv/testHdStBasicDrawing.cpp

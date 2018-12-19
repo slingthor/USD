@@ -26,6 +26,7 @@
 #include "pxr/imaging/mtlf/mtlDevice.h"
 
 #include "pxr/imaging/garch/contextCaps.h"
+#include "pxr/imaging/garch/gl.h"
 #include "pxr/imaging/garch/glslfx.h"
 #include "pxr/imaging/garch/resourceFactory.h"
 
@@ -1230,12 +1231,12 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
                 vsInputCode << "    scope." << name << " = vsUniforms->" << name << ";\n";
                 
                 //Update the vsUniformStructSize, taking into account alignment and member sizes and create a binding for the uniform.
-                uint32 size = 4;
+                uint32_t size = 4;
                 if(input.dataType.GetString().find("vec2") != std::string::npos) size = 8;
                 else if(input.dataType.GetString().find("vec3") != std::string::npos) size = 12;
                 else if(input.dataType.GetString().find("vec4") != std::string::npos) size = 16;
-                uint32 regStart = vsUniformStructSize / 16;
-                uint32 regEnd = (vsUniformStructSize + size - 1) / 16;
+                uint32_t regStart = vsUniformStructSize / 16;
+                uint32_t regEnd = (vsUniformStructSize + size - 1) / 16;
                 if(regStart != regEnd && vsUniformStructSize % 16 != 0)
                     vsUniformStructSize += 16 - (vsUniformStructSize % 16);
                 //Add a binding for each uniform. They are currently all bound to slot -1 which is "patched" a little further down, once
@@ -1555,13 +1556,13 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
             
             //MTL_FIXME: Find size of dataTypes by using existing Hd functionality.
             int& structSize = (isPerPrim ? gsPrimOutStructSize : gsVertOutStructSize);
-            uint32 memberSize(4), memberAlignment(4); //Alignment would be 16 if not using packed_vecs
+            uint32_t memberSize(4), memberAlignment(4); //Alignment would be 16 if not using packed_vecs
             if(dataType.find("mat") != std::string::npos) TF_FATAL_CODING_ERROR("Not implemented!");
             else if(dataType.find("2") != std::string::npos) memberSize = 8;
             else if(dataType.find("3") != std::string::npos) memberSize = 12;
             else if(dataType.find("4") != std::string::npos) memberSize = 16;
-            uint32 regStart = structSize / memberAlignment;
-            uint32 regEnd = (structSize + memberSize - 1) / memberAlignment;
+            uint32_t regStart = structSize / memberAlignment;
+            uint32_t regEnd = (structSize + memberSize - 1) / memberAlignment;
             if(regStart != regEnd && structSize % memberAlignment != 0)
                 structSize += memberAlignment - (structSize % memberAlignment);
             structSize += memberSize;
@@ -1858,13 +1859,13 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
                 
                 fsUniformStruct << "    " << dataType << " " << name << ";\n";
 
-                uint32 memberSize(4), memberAlignment(4); //Alignment would be 16 if not using packed_vecs
+                uint32_t memberSize(4), memberAlignment(4); //Alignment would be 16 if not using packed_vecs
                 if(dataType.find("mat") != std::string::npos) TF_FATAL_CODING_ERROR("Not implemented!");
                 else if(dataType.find("2") != std::string::npos) memberSize = 8;
                 else if(dataType.find("3") != std::string::npos) memberSize = 12;
                 else if(dataType.find("4") != std::string::npos) memberSize = 16;
-                uint32 regStart = fsUniformStructSize / memberAlignment;
-                uint32 regEnd = (fsUniformStructSize + memberSize - 1) / memberAlignment;
+                uint32_t regStart = fsUniformStructSize / memberAlignment;
+                uint32_t regEnd = (fsUniformStructSize + memberSize - 1) / memberAlignment;
                 if(regStart != regEnd && fsUniformStructSize % memberAlignment != 0)
                     fsUniformStructSize += memberAlignment - (fsUniformStructSize % memberAlignment);
                 //Add a binding for each uniform. They are currently all bound to slot -1 which is "patched" a little further down, once

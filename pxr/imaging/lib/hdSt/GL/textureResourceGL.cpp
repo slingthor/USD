@@ -24,7 +24,7 @@
 #include "pxr/imaging/glf/glew.h"
 
 #include "pxr/imaging/hdSt/GL/textureResourceGL.h"
-#include "pxr/imaging/hdSt/GL/glConversions.h"
+#include "pxr/imaging/hdSt/glConversions.h"
 
 #include "pxr/imaging/hd/perfLog.h"
 #include "pxr/imaging/glf/baseTexture.h"

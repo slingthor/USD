@@ -362,7 +362,7 @@ MtlfBaseTexture::_CreateTexture(GarchBaseTextureDataConstPtr texData,
                                                                    width:texDataWidth
                                                                   height:texDataHeight
                                                                mipmapped:genMips?YES:NO];
-            desc.resourceOptions = MTLResourceStorageModeManaged;
+            desc.resourceOptions = MTLResourceStorageModeDefault;
             _textureName = [device newTextureWithDescriptor:desc];
 
             char *rawData = (char*)texBuffer + (unpackSkipRows * unpackRowLength * pixelByteSize)
@@ -403,7 +403,7 @@ MtlfBaseTexture::_CreateTexture(GarchBaseTextureDataConstPtr texData,
                                                                   height:texData->ResizedHeight()
                                                                mipmapped:genMips?YES:NO];
             
-            desc.resourceOptions = MTLResourceStorageModeManaged;
+            desc.resourceOptions = MTLResourceStorageModeDefault;
             _textureName = [device newTextureWithDescriptor:desc];
 
             for (int i = 0 ; i < numMipLevels; i++) {

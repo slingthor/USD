@@ -26,7 +26,11 @@
 
 /// \file glf/glew.h
 
+#include "pxr/base/arch/defines.h"
+
+#if defined(ARCH_GFX_OPENGL)
 #include <GL/glew.h>
+#endif
 
 #include "pxr/pxr.h"
 #include "pxr/imaging/glf/api.h"

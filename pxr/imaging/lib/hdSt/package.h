@@ -30,7 +30,6 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-
 HDST_API
 TfToken HdStPackageComputeShader();
 

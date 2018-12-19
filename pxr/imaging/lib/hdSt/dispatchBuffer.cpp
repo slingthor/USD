@@ -25,12 +25,8 @@
 #include "pxr/imaging/garch/contextCaps.h"
 #include "pxr/imaging/garch/resourceFactory.h"
 
-#if defined(ARCH_GFX_METAL)
-#include "pxr/imaging/hdSt/Metal/dispatchBufferMetal.h"
-#endif
-
 #include "pxr/imaging/hdSt/dispatchBuffer.h"
-#include "pxr/imaging/hdSt/GL/dispatchBufferGL.h"
+#include "pxr/imaging/hdSt/resourceFactory.h"
 #include "pxr/imaging/hd/engine.h"
 #include "pxr/imaging/hd/perfLog.h"
 
@@ -170,24 +166,6 @@ private:
     HdStDispatchBuffer *_buffer;
 };
 
-HdStDispatchBuffer *HdStDispatchBuffer::New(TfToken const &role, int count,
-                                            unsigned int commandNumUints)
-{
-    HdEngine::RenderAPI api = HdEngine::GetRenderAPI();
-    switch(api)
-    {
-        case HdEngine::OpenGL:
-            return new HdStDispatchBufferGL(role, count, commandNumUints);
-#if defined(ARCH_GFX_METAL)
-        case HdEngine::Metal:
-            return new HdStDispatchBufferMetal(role, count, commandNumUints);
-#endif
-        default:
-            TF_FATAL_CODING_ERROR("No HdStDispatchBuffer for this API");
-    }
-    return NULL;
-}
-
 HdStDispatchBuffer::HdStDispatchBuffer(TfToken const &role, int count,
                                        unsigned int commandNumUints)
  : HdBufferArray(role, TfToken(), HdBufferArrayUsageHint())
@@ -198,7 +176,7 @@ HdStDispatchBuffer::HdStDispatchBuffer(TfToken const &role, int count,
 
     // monolithic resource
     _entireResource = HdStBufferResourceSharedPtr(
-          HdStBufferResource::New(role, {HdTypeInt32, 1},
+        HdStResourceFactory::GetInstance()->NewBufferResource(role, {HdTypeInt32, 1},
                                   /*offset=*/0, stride));
 
     // create a buffer array range, which aggregates all views
@@ -295,8 +273,8 @@ HdStDispatchBuffer::_AddResource(TfToken const& name,
     }
 
     HdStBufferResourceSharedPtr bufferRes = HdStBufferResourceSharedPtr(
-        HdStBufferResource::New(GetRole(), tupleType,
-                                offset, stride));
+        HdStResourceFactory::GetInstance()->NewBufferResource(GetRole(), tupleType,
+                                                              offset, stride));
 
     _resourceList.emplace_back(name, bufferRes);
     return bufferRes;

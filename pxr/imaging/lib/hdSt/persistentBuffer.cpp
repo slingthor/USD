@@ -30,31 +30,10 @@
 #include "pxr/imaging/hd/perfLog.h"
 
 #include "pxr/imaging/hdSt/persistentBuffer.h"
-#include "pxr/imaging/hdSt/GL/persistentBufferGL.h"
-#if defined(ARCH_GFX_METAL)
-#include "pxr/imaging/hdSt/Metal/persistentBufferMetal.h"
-#endif
 
 #include "pxr/imaging/hf/perfLog.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
-
-HdStPersistentBuffer *HdStPersistentBuffer::New(TfToken const &role, size_t dataSize, void* data)
-{
-    HdEngine::RenderAPI api = HdEngine::GetRenderAPI();
-    switch(api)
-    {
-        case HdEngine::OpenGL:
-            return new HdStPersistentBufferGL(role, dataSize, data);
-#if defined(ARCH_GFX_METAL)
-        case HdEngine::Metal:
-            return new HdStPersistentBufferMetal(role, dataSize, data);
-#endif
-        default:
-            TF_FATAL_CODING_ERROR("No HdStPersistentBuffer for this API");
-    }
-    return NULL;
-}
 
 HdStPersistentBuffer::HdStPersistentBuffer(HdResourceSharedPtr resource):
     _resource(resource)

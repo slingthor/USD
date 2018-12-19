@@ -23,10 +23,11 @@
 //
 
 #include "pxr/imaging/mtlf/mtlDevice.h"
-#include "pxr/imaging/garch/glPlatformContext.h"
-
 #include "pxr/imaging/mtlf/drawTarget.h"
-#include "pxr/imaging/mtlf/package.h"
+
+#if defined(ARCH_GFX_OPENGL)
+#include "pxr/imaging/mtlf/glInterop.h"
+#endif
 
 #import <simd/simd.h>
 
@@ -49,7 +50,7 @@
 
 #define DIRTY_METALRENDERSTATE_ALL                      0xFFFFFFFF
 
-//Be careful with these when using Concurrent Dispatch. Also; you can't enable asynchronous compute without also enabling METAL_EVENTS_AVAILABLE.
+//Be careful with these when using Concurrent Dispatch. Also; you can't enable asynchronous compute without also enabling METAL_EVENTS_API_PRESENT.
 #define METAL_COMPUTEGS_BUFFER_REUSE                      1
 #define METAL_COMPUTEGS_MANUAL_HAZARD_TRACKING            0
 #define METAL_COMPUTEGS_ALLOW_ASYNCHRONOUS_COMPUTE        0     //Currently disabled due to additional overhead of using events to synchronize. 
@@ -57,54 +58,7 @@
 PXR_NAMESPACE_OPEN_SCOPE
 MtlfMetalContextSharedPtr MtlfMetalContext::context = NULL;
 
-static GLuint _compileShader(GLchar const* const shaderSource, GLuint shaderType)
-{
-    GLint status;
-    
-    // Determine if GLSL version 140 is supported by this context.
-    //  We'll use this info to generate a GLSL shader source string
-    //  with the proper version preprocessor string prepended
-    float  glLanguageVersion;
-    
-    sscanf((char *)glGetString(GL_SHADING_LANGUAGE_VERSION), "%f", &glLanguageVersion);
-    GLchar const * const versionTemplate = "#version %d\n";
-    
-    // GL_SHADING_LANGUAGE_VERSION returns the version standard version form
-    //  with decimals, but the GLSL version preprocessor directive simply
-    //  uses integers (thus 1.10 should 110 and 1.40 should be 140, etc.)
-    //  We multiply the floating point number by 100 to get a proper
-    //  number for the GLSL preprocessor directive
-    GLuint version = 100 * glLanguageVersion;
-    
-    // Prepend our vertex shader source string with the supported GLSL version so
-    //  the shader will work on ES, Legacy, and OpenGL 3.2 Core Profile contexts
-    GLchar versionString[sizeof(versionTemplate) + 8];
-    snprintf(versionString, sizeof(versionString), versionTemplate, version);
-    
-    GLuint s = glCreateShader(shaderType);
-    GLchar const* const sourceArray[2] = { versionString, shaderSource };
-    glShaderSource(s, 2, sourceArray, NULL);
-    glCompileShader(s);
-    
-    glGetShaderiv(s, GL_COMPILE_STATUS, &status);
-    if (status != GL_TRUE) {
-        GLint maxLength = 0;
-        
-        glGetShaderiv(s, GL_INFO_LOG_LENGTH, &maxLength);
-        
-        // The maxLength includes the NULL character
-        GLchar *errorLog = (GLchar*)malloc(maxLength);
-        glGetShaderInfoLog(s, maxLength, &maxLength, errorLog);
-        
-        NSLog(@"%s", errorLog);
-        free(errorLog);
-        
-        assert(0);
-    }
-    
-    return s;
-}
-
+#if defined(ARCH_OS_OSX)
 // Called when the window is dragged to another display
 void MtlfMetalContext::handleDisplayChange()
 {
@@ -127,10 +81,11 @@ void MtlfMetalContext::handleGPUHotPlug(id<MTLDevice> device, MTLDeviceNotificat
         NSLog(@"Device was removed");
     }
 }
-
+#endif // ARCH_OS_OSX
 
 id<MTLDevice> MtlfMetalContext::GetMetalDevice(PREFERRED_GPU_TYPE preferredGPUType)
 {
+#if defined(ARCH_OS_OSX)
     // Get a list of all devices and register an obsever for eGPU events
     id <NSObject> metalDeviceObserver = nil;
     
@@ -182,99 +137,9 @@ id<MTLDevice> MtlfMetalContext::GetMetalDevice(PREFERRED_GPU_TYPE preferredGPUTy
         NSLog(@"Preferred device not found, returning default GPU");
         return _defaultDevice;
     }
-}
-
-MtlfMetalContext::GLInterop MtlfMetalContext::staticGlInterop;
-
-void MtlfMetalContext::_InitialiseGL()
-{
-    if (staticGlInterop.glShaderProgram != 0) {
-        return;
-    }
-    
-    NSError *error = NULL;
-
-    // Load our common vertex shader. This is used by both the fragment shaders below
-    TfToken vtxShaderToken(MtlfPackageInteropVtxShader());
-    GLchar const* const vertexShader =
-    (GLchar const*)[[NSString stringWithContentsOfFile:[NSString stringWithUTF8String:vtxShaderToken.GetText()]
-                                              encoding:NSUTF8StringEncoding
-                                                 error:&error] cStringUsingEncoding:NSUTF8StringEncoding];
-    
-    GLuint vs = _compileShader(vertexShader, GL_VERTEX_SHADER);
-    
-    TfToken fragShaderToken(MtlfPackageInteropFragShader());
-    GLchar const* const fragmentShader =
-    (GLchar const*)[[NSString stringWithContentsOfFile:[NSString stringWithUTF8String:fragShaderToken.GetText()]
-                                              encoding:NSUTF8StringEncoding
-                                                 error:&error] cStringUsingEncoding:NSUTF8StringEncoding];
-    
-    GLuint fs = _compileShader(fragmentShader, GL_FRAGMENT_SHADER);
-    
-    // Create and link our GL_TEXTURE_2D compatible program
-    staticGlInterop.glShaderProgram = glCreateProgram();
-    glAttachShader(staticGlInterop.glShaderProgram, fs);
-    glAttachShader(staticGlInterop.glShaderProgram, vs);
-    glBindFragDataLocation(staticGlInterop.glShaderProgram, 0, "fragColor");
-    glLinkProgram(staticGlInterop.glShaderProgram);
-
-    GLint maxLength = 2048;
-    if (maxLength)
-    {
-        glGetProgramiv(staticGlInterop.glShaderProgram, GL_INFO_LOG_LENGTH, &maxLength);
-        
-        // The maxLength includes the NULL character
-        GLchar *errorLog = (GLchar*)malloc(maxLength);
-        glGetProgramInfoLog(staticGlInterop.glShaderProgram, maxLength, &maxLength, errorLog);
-        
-        NSLog(@"%s", errorLog);
-        free(errorLog);
-    }
-    
-    // Release the local instance of the fragment shader. The shader program maintains a reference.
-    glDeleteShader(vs);
-    glDeleteShader(fs);
-    
-    glUseProgram(staticGlInterop.glShaderProgram);
-    
-    glGenVertexArrays(1, &staticGlInterop.glVAO);
-    glBindVertexArray(staticGlInterop.glVAO);
-    
-    glGenBuffers(1, &staticGlInterop.glVBO);
-    glBindBuffer(GL_ARRAY_BUFFER, staticGlInterop.glVBO);
-    
-    // Set up the vertex structure description
-    staticGlInterop.posAttrib = glGetAttribLocation(staticGlInterop.glShaderProgram, "inPosition");
-    staticGlInterop.texAttrib = glGetAttribLocation(staticGlInterop.glShaderProgram, "inTexCoord");
-
-    glEnableVertexAttribArray(staticGlInterop.posAttrib);
-    glVertexAttribPointer(staticGlInterop.posAttrib, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(offsetof(Vertex, position)));
-    glEnableVertexAttribArray(staticGlInterop.texAttrib);
-    glVertexAttribPointer(staticGlInterop.texAttrib, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(offsetof(Vertex, uv)));
-    
-    GLint samplerColorLoc = glGetUniformLocation(staticGlInterop.glShaderProgram, "interopTexture");
-    GLint samplerDepthLoc = glGetUniformLocation(staticGlInterop.glShaderProgram, "depthTexture");
-
-    staticGlInterop.blitTexSizeUniform = glGetUniformLocation(staticGlInterop.glShaderProgram, "texSize");
-    
-    // Indicate that the diffuse texture will be bound to texture unit 0, and depth to unit 1
-    GLint unit = 0;
-    glUniform1i(samplerColorLoc, unit++);
-    glUniform1i(samplerDepthLoc, unit);
-    
-    Vertex v[6] = {
-        { {-1, -1}, {0, 0} },
-        { { 1, -1}, {1, 0} },
-        { {-1,  1}, {0, 1} },
-        
-        { {-1, 1}, {0, 1} },
-        { {1, -1}, {1, 0} },
-        { {1,  1}, {1, 1} }
-    };
-    glBufferData(GL_ARRAY_BUFFER, sizeof(v), v, GL_STATIC_DRAW);
-    
-    glBindVertexArray(0);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
+#else
+    return MTLCreateSystemDefaultDevice();
+#endif
 }
 
 //
@@ -302,7 +167,7 @@ MtlfMetalContext::MtlfMetalContext(id<MTLDevice> _device, int width, int height)
 #else
     enableMultiQueue = false;
 #endif
-    
+
     // Create a new command queue
     commandQueue = [device newCommandQueue];
     if(enableMultiQueue) {
@@ -317,65 +182,41 @@ MtlfMetalContext::MtlfMetalContext(id<MTLDevice> _device, int width, int height)
         gsMaxConcurrentBatches = 2;
     }
     
+#if defined(ARCH_OS_IOS)
+    #define SYSTEM_VERSION_GREATER_THAN_OR_EQUAL_TO(v) ([[[UIDevice currentDevice] systemVersion] compare:v options:NSNumericSearch] != NSOrderedAscending)
+    
+    if (SYSTEM_VERSION_GREATER_THAN_OR_EQUAL_TO(@"12.0")) {
+#if defined(METAL_EVENTS_API_PRESENT)
+        eventsAvailable = true;
+#endif
+        concurrentDispatchSupported = false; // Test enabling this
+    }
+    else {
+#if defined(METAL_EVENTS_API_PRESENT)
+        eventsAvailable = false;
+#endif
+        concurrentDispatchSupported = false;
+    }
+#else // ARCH_OS_IOS
     NSOperatingSystemVersion minimumSupportedOSVersion = { .majorVersion = 10, .minorVersion = 14, .patchVersion = 0 };
     
     // MTL_FIXME - Disabling concurrent dispatch because it completely breaks Compute GS hazard tracking causing polygon soup on AMD hardware.
     //concurrentDispatchSupported = [NSProcessInfo.processInfo isOperatingSystemAtLeastVersion:minimumSupportedOSVersion];
     concurrentDispatchSupported = false;
+#if defined(METAL_EVENTS_API_PRESENT)
+    eventsAvailable = [NSProcessInfo.processInfo isOperatingSystemAtLeastVersion:minimumSupportedOSVersion];
+#endif
+#endif // ARCH_OS_IOS
 
-    // Load all the default shader files
-    NSError *error = NULL;
-    
-    // Load our common vertex shader. This is used by both the fragment shaders below
-    TfToken shaderToken(MtlfPackageDefaultMetalShaders());
-    NSString *shaderSource = [NSString stringWithContentsOfFile:[NSString stringWithUTF8String:shaderToken.GetText()]
-                                                       encoding:NSUTF8StringEncoding
-                                                          error:&error];
-    MTLCompileOptions *options = [[MTLCompileOptions alloc] init];
-    options.fastMathEnabled = YES;
-
-    defaultLibrary = [device newLibraryWithSource:shaderSource options:options error:&error];
-    [options release];
-    options = nil;
-
-    if (!defaultLibrary) {
-        NSLog(@"Failed to created pipeline state, error %@", error);
-    }
-
-    // Load the fragment program into the library
-    id <MTLFunction> fragmentProgram = [defaultLibrary newFunctionWithName:@"tex_fs"];
-    id <MTLFunction> vertexProgram = [defaultLibrary newFunctionWithName:@"quad_vs"];
-    
-    computeDepthCopyProgram = [defaultLibrary newFunctionWithName:@"copyDepth"];
- 
     MTLDepthStencilDescriptor *depthStateDesc = [[MTLDepthStencilDescriptor alloc] init];
     depthStateDesc.depthWriteEnabled = YES;
     depthStateDesc.depthCompareFunction = MTLCompareFunctionLessEqual;
     depthState = [device newDepthStencilStateWithDescriptor:depthStateDesc];
-   
-    _InitialiseGL();
 
-    // Create the texture caches
-    CVReturn cvret = CVMetalTextureCacheCreate(kCFAllocatorDefault, nil, device, nil, &cvmtlTextureCache);
-    assert(cvret == kCVReturnSuccess);
-    
-    CGLContextObj glctx = [[NSOpenGLContext currentContext] CGLContextObj];
-    CGLPixelFormatObj glPixelFormat = [[[NSOpenGLContext currentContext] pixelFormat] CGLPixelFormatObj];
-    cvret = CVOpenGLTextureCacheCreate(kCFAllocatorDefault, nil, (__bridge CGLContextObj _Nonnull)(glctx), glPixelFormat, nil, &cvglTextureCache);
-    assert(cvret == kCVReturnSuccess);
+#if defined(ARCH_GFX_OPENGL)
+    glInterop = new MtlfGlInterop(device);
+#endif
 
-    pixelBuffer = nil;
-    depthBuffer = nil;
-    cvglColorTexture = nil;
-    cvglDepthTexture = nil;
-    cvmtlColorTexture = nil;
-    cvmtlDepthTexture = nil;
-    glColorTexture = 0;
-    glDepthTexture = 0;
-    mtlColorTexture = nil;
-    mtlDepthTexture = nil;
-    mtlDepthRegularFloatTexture = nil;
-    
     AllocateAttachments(width, height);
 
     renderPipelineStateDescriptor = nil;
@@ -390,6 +231,10 @@ MtlfMetalContext::MtlfMetalContext(id<MTLDevice> _device, int width, int height)
     fragUniformBackingBuffer = NULL;
     
     drawTarget = NULL;
+    mtlColorTexture = nil;
+    mtlDepthTexture = nil;
+    outputPixelFormat = MTLPixelFormatInvalid;
+    outputDepthFormat = MTLPixelFormatInvalid;
     
     currentWorkQueueType = METALWORKQUEUE_DEFAULT;
     currentWorkQueue     = &workQueues[currentWorkQueueType];
@@ -449,19 +294,13 @@ MtlfMetalContext::MtlfMetalContext(id<MTLDevice> _device, int width, int height)
 
 MtlfMetalContext::~MtlfMetalContext()
 {
-	_FreeTransientTextureCacheRefs();
+#if defined(ARCH_GFX_OPENGL)
+    delete glInterop;
+    glInterop = NULL;
+#endif
 
     CleanupUnusedBuffers(true);
     bufferFreeList.clear();
-    
-    if (cvglTextureCache) {
-        CFRelease(cvglTextureCache);
-        cvglTextureCache = nil;
-    }
-    if (cvmtlTextureCache) {
-        CFRelease(cvmtlTextureCache);
-        cvmtlTextureCache = nil;
-    }
 
     [commandQueue release];
     if(enableMultiQueue)
@@ -501,132 +340,14 @@ void MtlfMetalContext::RecreateInstance(id<MTLDevice> device, int width, int hei
     context = MtlfMetalContextSharedPtr(new MtlfMetalContext(device, width, height));
 }
 
-void MtlfMetalContext::_FreeTransientTextureCacheRefs()
-{
-    if (glColorTexture) {
-        glDeleteTextures(1, &glColorTexture);
-        glColorTexture = 0;
-    }
-    if (glDepthTexture) {
-        glDeleteTextures(1, &glDepthTexture);
-        glDepthTexture = 0;
-    }
-
-    if (mtlColorTexture) {
-        [mtlColorTexture release];
-        mtlColorTexture = nil;
-    }
-    if (mtlDepthRegularFloatTexture) {
-        [mtlDepthRegularFloatTexture release];
-        mtlDepthRegularFloatTexture = nil;
-    }
-    if (mtlDepthTexture) {
-        [mtlDepthTexture release];
-        mtlDepthTexture = nil;
-    }
-    
-    cvglColorTexture = nil;
-    cvglDepthTexture = nil;
-    cvmtlColorTexture = nil;
-    cvmtlDepthTexture = nil;
-
-    if (pixelBuffer) {
-        CFRelease(pixelBuffer);
-        pixelBuffer = nil;
-    }
-    if (depthBuffer) {
-        CFRelease(depthBuffer);
-        depthBuffer = nil;
-    }
-}
-
 void MtlfMetalContext::AllocateAttachments(int width, int height)
 {
-    NSDictionary* cvBufferProperties = @{
-        (__bridge NSString*)kCVPixelBufferOpenGLCompatibilityKey : @(TRUE),
-        (__bridge NSString*)kCVPixelBufferMetalCompatibilityKey : @(TRUE),
-    };
+#if defined(ARCH_GFX_OPENGL)
+    glInterop->AllocateAttachments(width, height);
 
-    _FreeTransientTextureCacheRefs();
-    
-    CVReturn cvret;
-
-    //  Create the IOSurface backed pixel buffers to hold the color and depth data in Open
-    CVPixelBufferCreate(kCFAllocatorDefault,
-                        width,
-                        height,
-                        kCVPixelFormatType_32BGRA,
-                        (__bridge CFDictionaryRef)cvBufferProperties,
-                        &pixelBuffer);
-    
-    CVPixelBufferCreate(kCFAllocatorDefault,
-                        width,
-                        height,
-                        kCVPixelFormatType_DepthFloat32,
-                        (__bridge CFDictionaryRef)cvBufferProperties,
-                        &depthBuffer);
-    
-    // Create the OpenGL texture for the color buffer
-    cvret = CVOpenGLTextureCacheCreateTextureFromImage(kCFAllocatorDefault,
-                                                       cvglTextureCache,
-                                                       pixelBuffer,
-                                                       nil,
-                                                       &cvglColorTexture);
-    assert(cvret == kCVReturnSuccess);
-    glColorTexture = CVOpenGLTextureGetName(cvglColorTexture);
-    
-    // Create the OpenGL texture for the depth buffer
-    cvret = CVOpenGLTextureCacheCreateTextureFromImage(kCFAllocatorDefault,
-                                                       cvglTextureCache,
-                                                       depthBuffer,
-                                                       nil,
-                                                       &cvglDepthTexture);
-    assert(cvret == kCVReturnSuccess);
-    glDepthTexture = CVOpenGLTextureGetName(cvglDepthTexture);
-    
-    // Create the metal texture for the color buffer
-    NSDictionary* metalTextureProperties = @{
-        (__bridge NSString*)kCVMetalTextureCacheMaximumTextureAgeKey : @0,
-    };
-    cvret = CVMetalTextureCacheCreateTextureFromImage(kCFAllocatorDefault,
-                                                      cvmtlTextureCache,
-                                                      pixelBuffer,
-                                                      (__bridge CFDictionaryRef)metalTextureProperties,
-                                                      MTLPixelFormatBGRA8Unorm,
-                                                      width,
-                                                      height,
-                                                      0,
-                                                      &cvmtlColorTexture);
-    assert(cvret == kCVReturnSuccess);
-    mtlColorTexture = CVMetalTextureGetTexture(cvmtlColorTexture);
-    
-    // Create the Metal texture for the depth buffer
-    cvret = CVMetalTextureCacheCreateTextureFromImage(kCFAllocatorDefault,
-                                                      cvmtlTextureCache,
-                                                      depthBuffer,
-                                                      (__bridge CFDictionaryRef)metalTextureProperties,
-                                                      MTLPixelFormatR32Float,
-                                                      width,
-                                                      height,
-                                                      0,
-                                                      &cvmtlDepthTexture);
-    assert(cvret == kCVReturnSuccess);
-    mtlDepthRegularFloatTexture = CVMetalTextureGetTexture(cvmtlDepthTexture);
-    
-    // Create a Metal texture of type Depth32Float that we can actually use as a depth attachment
-    MTLTextureDescriptor *depthTexDescriptor =
-                            [MTLTextureDescriptor
-                             texture2DDescriptorWithPixelFormat:MTLPixelFormatDepth32Float
-                             width:width
-                             height:height
-                             mipmapped:false];
-    depthTexDescriptor.usage = MTLTextureUsageRenderTarget|MTLTextureUsageShaderRead;
-    depthTexDescriptor.resourceOptions = MTLResourceCPUCacheModeDefaultCache | MTLResourceStorageModePrivate;
-    mtlDepthTexture = [device newTextureWithDescriptor:depthTexDescriptor];
-    
-    // Flush the caches
-    CVOpenGLTextureCacheFlush(cvglTextureCache, 0);
-    CVMetalTextureCacheFlush(cvmtlTextureCache, 0);
+    mtlColorTexture = glInterop->mtlColorTexture;
+    mtlDepthTexture = glInterop->mtlDepthTexture;
+#endif
 }
 
 MtlfMetalContextSharedPtr
@@ -650,88 +371,32 @@ MtlfMetalContext::IsInitialized()
 void
 MtlfMetalContext::BlitColorTargetToOpenGL()
 {
-    GLint core;
-    glGetIntegerv(GL_CONTEXT_PROFILE_MASK, &core);
-    core &= GL_CONTEXT_CORE_PROFILE_BIT;
-
-    if (!core) {
-        glPushAttrib(GL_ENABLE_BIT | GL_POLYGON_BIT | GL_DEPTH_BUFFER_BIT);
-    }
-
-    glDepthFunc(GL_LEQUAL);
-    glDepthMask(GL_TRUE);
-    glEnable(GL_DEPTH_TEST);
-    glFrontFace(GL_CCW);
-    glDisable(GL_CULL_FACE);
-    glDisable(GL_BLEND);
-    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-    
-    glUseProgram(staticGlInterop.glShaderProgram);
-    
-    glBindBuffer(GL_ARRAY_BUFFER, staticGlInterop.glVBO);
-    
-    // Set up the vertex structure description
-    if (core) {
-        glBindVertexArray(staticGlInterop.glVAO);
-    }
-    glEnableVertexAttribArray(staticGlInterop.posAttrib);
-    glVertexAttribPointer(staticGlInterop.posAttrib, 2, GL_FLOAT, GL_FALSE, sizeof(MtlfMetalContext::Vertex), (void*)(offsetof(Vertex, position)));
-    glEnableVertexAttribArray(staticGlInterop.texAttrib);
-    glVertexAttribPointer(staticGlInterop.texAttrib, 2, GL_FLOAT, GL_FALSE, sizeof(MtlfMetalContext::Vertex), (void*)(offsetof(Vertex, uv)));
-
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_RECTANGLE, glColorTexture);
-    glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_RECTANGLE, glDepthTexture);
-
-    glUniform2f(staticGlInterop.blitTexSizeUniform, mtlColorTexture.width, mtlColorTexture.height);
-    
-    glDrawArrays(GL_TRIANGLES, 0, 6);
-    
-    glFlush();
-    
-    glBindTexture(GL_TEXTURE_RECTANGLE, 0);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_RECTANGLE, 0);
-    
-    glDisableVertexAttribArray(staticGlInterop.posAttrib);
-    glDisableVertexAttribArray(staticGlInterop.texAttrib);
-    glUseProgram(0);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-    
-    if (core) {
-        glBindVertexArray(0);
-    }
-    else {
-        glPopAttrib();
-    }
+#if defined(ARCH_GFX_OPENGL)
+    glInterop->BlitColorTargetToOpenGL();
+#else
+    TF_FATAL_CODING_ERROR("Gl interop is disabled, because OpenGL is disabled");
+#endif
 }
 
 void
 MtlfMetalContext::CopyDepthTextureToOpenGL()
 {
+#if defined(ARCH_GFX_OPENGL)
     id <MTLComputeCommandEncoder> computeEncoder = GetComputeEncoder();
     computeEncoder.label = @"Depth buffer copy";
-    
-    NSUInteger exeWidth = context->SetComputeEncoderState(computeDepthCopyProgram, 0, 0, @"Depth copy pipeline state");
-    NSUInteger maxThreadsPerThreadgroup = context->GetMaxThreadsPerThreadgroup();
-    
-    MTLSize threadgroupCount = MTLSizeMake(exeWidth, maxThreadsPerThreadgroup / exeWidth, 1);
-    MTLSize threadsPerGrid   = MTLSizeMake(mtlDepthTexture.width,
-                                           mtlDepthTexture.height,
-                                           1);
 
-    [computeEncoder setTexture:mtlDepthTexture atIndex:0];
-    [computeEncoder setTexture:mtlDepthRegularFloatTexture atIndex:1];
-    [computeEncoder dispatchThreads:threadsPerGrid threadsPerThreadgroup: threadgroupCount];
-    
+    glInterop->CopyDepthTextureToOpenGL(computeEncoder);
+
     ReleaseEncoder(true);
+#else
+    TF_FATAL_CODING_ERROR("Gl interop is disabled, because OpenGL is disabled");
+#endif
 }
 
 id<MTLBuffer>
 MtlfMetalContext::GetQuadIndexBuffer(MTLIndexType indexTypeMetal) {
     // Each 4 vertices will require 6 remapped one
-    uint32 remappedIndexBufferSize = (indexBuffer.length / 4) * 6;
+    uint32_t remappedIndexBufferSize = (indexBuffer.length / 4) * 6;
     
     // Since remapping is expensive check if the buffer we created this from originally has changed  - MTL_FIXME - these checks are not robust
     if (remappedQuadIndexBuffer) {
@@ -749,10 +414,10 @@ MtlfMetalContext::GetQuadIndexBuffer(MTLIndexType indexTypeMetal) {
         NSLog(@"Recreating quad remapped index buffer");
         
         remappedQuadIndexBufferSource = indexBuffer;
-        remappedQuadIndexBuffer = [device newBufferWithLength:remappedIndexBufferSize  options:MTLResourceStorageModeManaged];
+        remappedQuadIndexBuffer = [device newBufferWithLength:remappedIndexBufferSize  options:MTLResourceStorageModeDefault];
         
-        uint32 *srcData =  (uint32 *)indexBuffer.contents;
-        uint32 *destData = (uint32 *)remappedQuadIndexBuffer.contents;
+        uint32_t *srcData =  (uint32_t *)indexBuffer.contents;
+        uint32_t *destData = (uint32_t *)remappedQuadIndexBuffer.contents;
         for (int i= 0; i < (indexBuffer.length / 4) ; i+=4)
         {
             destData[0] = srcData[0];
@@ -764,7 +429,9 @@ MtlfMetalContext::GetQuadIndexBuffer(MTLIndexType indexTypeMetal) {
             srcData  += 4;
             destData += 6;
         }
+#if defined(ARCH_OS_OSX)
         [remappedQuadIndexBuffer didModifyRange:(NSMakeRange(0, remappedQuadIndexBuffer.length))];
+#endif
     }
     return remappedQuadIndexBuffer;
 }
@@ -772,7 +439,7 @@ MtlfMetalContext::GetQuadIndexBuffer(MTLIndexType indexTypeMetal) {
 id<MTLBuffer>
 MtlfMetalContext::GetPointIndexBuffer(MTLIndexType indexTypeMetal, int numIndicesNeeded, bool usingQuads) {
     // infer the size from a 3 component vector of floats
-    uint32 pointBufferSize = numIndicesNeeded * sizeof(int);
+    uint32_t pointBufferSize = numIndicesNeeded * sizeof(int);
     
     // Since remapping is expensive check if the buffer we created this from originally has changed  - MTL_FIXME - these checks are not robust
     if (pointIndexBuffer) {
@@ -788,9 +455,9 @@ MtlfMetalContext::GetPointIndexBuffer(MTLIndexType indexTypeMetal, int numIndice
         }
         NSLog(@"Recreating quad remapped index buffer");
         
-        pointIndexBuffer = [device newBufferWithLength:pointBufferSize options:MTLResourceStorageModeManaged];
+        pointIndexBuffer = [device newBufferWithLength:pointBufferSize options:MTLResourceStorageModeDefault];
         
-        uint32_t *destData = (uint32 *)pointIndexBuffer.contents;
+        uint32_t *destData = (uint32_t *)pointIndexBuffer.contents;
         uint32_t arraySize = numIndicesNeeded;
         
         if (usingQuads) {
@@ -812,7 +479,9 @@ MtlfMetalContext::GetPointIndexBuffer(MTLIndexType indexTypeMetal, int numIndice
                 *destData++ = base + 2;
             }
         }
+#if defined(ARCH_OS_OSX)
         [pointIndexBuffer didModifyRange:(NSMakeRange(0, pointIndexBuffer.length))];
+#endif
     }
     return pointIndexBuffer;
 }
@@ -840,7 +509,9 @@ void MtlfMetalContext::CreateCommandBuffer(MetalWorkQueueType workQueueType) {
         else
             wq->commandBuffer = [context->commandQueue commandBuffer];
 #if defined(METAL_EVENTS_AVAILABLE)
-        wq->event = [device newEvent];
+        if (eventsAvailable) {
+            wq->event = [device newEvent];
+        }
 #endif
     }
     // We'll reuse an existing buffer silently if it's empty, otherwise emit warning
@@ -885,7 +556,9 @@ void MtlfMetalContext::EncodeWaitForEvent(MetalWorkQueueType waitQueue, MetalWor
     if(eventValue > signal_wq->currentHighestWaitValue)
         signal_wq->currentHighestWaitValue = eventValue;
 #if defined(METAL_EVENTS_AVAILABLE)
-    [wait_wq->commandBuffer encodeWaitForEvent:signal_wq->event value:eventValue];
+    if (eventsAvailable) {
+        [wait_wq->commandBuffer encodeWaitForEvent:signal_wq->event value:eventValue];
+    }
 #endif
 }
 
@@ -916,8 +589,10 @@ uint64_t MtlfMetalContext::EncodeSignalEvent(MetalWorkQueueType signalQueue)
         }
     }
 #if defined(METAL_EVENTS_AVAILABLE)
-    // Generate event
-    [wq->commandBuffer encodeSignalEvent:wq->event value:wq->currentEventValue];
+    if (eventsAvailable) {
+        // Generate event
+        [wq->commandBuffer encodeSignalEvent:wq->event value:wq->currentEventValue];
+    }
 #endif
     return wq->currentEventValue++;
 }
@@ -1037,30 +712,35 @@ void MtlfMetalContext::SetVertexAttribute(uint32_t index,
 }
 
 // I think this can be removed didn't seem to make too much difference to speeds
-void copyUniform(uint8 *dest, uint8 *src, uint32 size)
+void copyUniform(uint8_t *dest, uint8_t *src, uint32_t size)
 {
     switch (size) {
         case 4: {
-            *(uint32*)dest = *(uint32*)src;
+            *(uint32_t*)dest = *(uint32_t*)src;
             break; }
         case 8: {
-            *(uint64*)dest = *(uint64*)src;
+            *(uint64_t*)dest = *(uint64_t*)src;
             break; }
         case 12: {
-            *(((uint32*)dest) + 0) = *(((uint32*)src) + 0);
-            *(((uint32*)dest) + 1) = *(((uint32*)src) + 1);
-            *(((uint32*)dest) + 2) = *(((uint32*)src) + 2);
+            *(((uint32_t*)dest) + 0) = *(((uint32_t*)src) + 0);
+            *(((uint32_t*)dest) + 1) = *(((uint32_t*)src) + 1);
+            *(((uint32_t*)dest) + 2) = *(((uint32_t*)src) + 2);
             break; }
         case 16: {
-            *(((uint64*)dest) + 0) = *(((uint64*)src) + 0);
-            *(((uint64*)dest) + 1) = *(((uint64*)src) + 1);
+            *(((uint64_t*)dest) + 0) = *(((uint64_t*)src) + 0);
+            *(((uint64_t*)dest) + 1) = *(((uint64_t*)src) + 1);
             break; }
         default:
             memcpy(dest, src, size);
     }
 }
 
-void MtlfMetalContext::SetUniform(const void* _data, uint32 _dataSize, const TfToken& _name, uint32 _index, MSL_ProgramStage _stage)
+void MtlfMetalContext::SetUniform(
+        const void* _data,
+        uint32_t _dataSize,
+        const TfToken& _name,
+        uint32_t _index,
+        MSL_ProgramStage _stage)
 {
     BufferBinding *OSBuffer = NULL;
     
@@ -1084,15 +764,21 @@ void MtlfMetalContext::SetUniform(const void* _data, uint32 _dataSize, const TfT
         TF_FATAL_CODING_ERROR("Uniform Backing buffer not allocated");
     }
     
-    uint8* bufferContents  = (OSBuffer->contents)  + OSBuffer->offset;
+    uint8_t* bufferContents  = (OSBuffer->contents)  + OSBuffer->offset;
     
-    uint32 uniformEnd = (_index + _dataSize);
-    copyUniform(bufferContents + _index, (uint8*)_data, _dataSize);
+    uint32_t uniformEnd = (_index + _dataSize);
+    copyUniform(bufferContents + _index, (uint8_t*)_data, _dataSize);
     
     OSBuffer->modified = true;
 }
 
-void MtlfMetalContext::SetUniformBuffer(int index, id<MTLBuffer> buffer, const TfToken& name, MSL_ProgramStage stage, int offset, int oldStyleUniformSize)
+void MtlfMetalContext::SetUniformBuffer(
+        int index,
+        id<MTLBuffer> buffer,
+        const TfToken& name,
+        MSL_ProgramStage stage,
+        int offset,
+        int oldStyleUniformSize)
 {
     if(stage == 0)
         TF_FATAL_CODING_ERROR("Not allowed!");
@@ -1101,7 +787,9 @@ void MtlfMetalContext::SetUniformBuffer(int index, id<MTLBuffer> buffer, const T
             TF_FATAL_CODING_ERROR("Expected zero offset!");
     }
     // Allocate a binding for this buffer
-    BufferBinding *bufferInfo = new BufferBinding{index, buffer, name, stage, offset, true, (uint32)oldStyleUniformSize, (uint8 *)(buffer.contents)};
+    BufferBinding *bufferInfo = new BufferBinding{
+        index, buffer, name, stage, offset, true,
+        (uint32_t)oldStyleUniformSize, (uint8_t *)(buffer.contents)};
 
     boundBuffers.push_back(bufferInfo);
     
@@ -1295,10 +983,22 @@ void MtlfMetalContext::SetRenderPipelineState()
             renderPipelineStateDescriptor.colorAttachments[0].sourceAlphaBlendFactor = MTLBlendFactorSourceAlpha;
             renderPipelineStateDescriptor.colorAttachments[0].destinationRGBBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
             renderPipelineStateDescriptor.colorAttachments[0].destinationAlphaBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
-            renderPipelineStateDescriptor.colorAttachments[0].pixelFormat = mtlColorTexture.pixelFormat;
+            
+            if (mtlColorTexture != nil) {
+                renderPipelineStateDescriptor.colorAttachments[0].pixelFormat = mtlColorTexture.pixelFormat;
+            }
+            else {
+                renderPipelineStateDescriptor.colorAttachments[0].pixelFormat = outputPixelFormat;
+            }
             numColourAttachments++;
             
-            renderPipelineStateDescriptor.depthAttachmentPixelFormat = mtlDepthTexture.pixelFormat;
+            if (mtlDepthTexture != nil) {
+                renderPipelineStateDescriptor.depthAttachmentPixelFormat = mtlDepthTexture.pixelFormat;
+            }
+            else {
+                renderPipelineStateDescriptor.depthAttachmentPixelFormat = outputDepthFormat;
+                renderPipelineStateDescriptor.stencilAttachmentPixelFormat = outputDepthFormat;
+            }
         }
         [wq->currentRenderEncoder setDepthStencilState:depthState];
         // Update colour attachments hash
@@ -1353,12 +1053,12 @@ void MtlfMetalContext::UpdateOldStyleUniformBlock(BufferBinding *uniformBuffer, 
     if(!uniformBuffer->buffer) {
         TF_FATAL_CODING_ERROR("No vertex uniform backing buffer assigned!");
     }
-    
+#if defined(ARCH_OS_OSX)
     // Update vertex uniform buffer and move block along
     [uniformBuffer->buffer  didModifyRange:NSMakeRange(uniformBuffer->offset, uniformBuffer->blockSize)];
-    
+#endif
     // Copy existing data to the new blocks
-    uint8 *data = (uint8 *)((uint8 *)(uniformBuffer->contents) + uniformBuffer->offset);
+    uint8_t *data = (uint8_t *)((uint8_t *)(uniformBuffer->contents) + uniformBuffer->offset);
     copyUniform(data + uniformBuffer->blockSize, data, uniformBuffer->blockSize);
     
     // Move the offset along
@@ -1557,8 +1257,10 @@ size_t MtlfMetalContext::HashComputePipelineDescriptor(unsigned int bufferCount)
     boost::hash_combine(hashVal, computePipelineStateDescriptor.computeFunction);
     boost::hash_combine(hashVal, computePipelineStateDescriptor.label);
     boost::hash_combine(hashVal, computePipelineStateDescriptor.threadGroupSizeIsMultipleOfThreadExecutionWidth);
-#if __MAC_OS_X_VERSION_MAX_ALLOWED >= 101400 /* __MAC_10_14 */
-    boost::hash_combine(hashVal, computePipelineStateDescriptor.maxTotalThreadsPerThreadgroup);
+#if defined(METAL_EVENTS_API_PRESENT)
+    if (eventsAvailable) {
+        boost::hash_combine(hashVal, computePipelineStateDescriptor.maxTotalThreadsPerThreadgroup);
+    }
 #endif
     for (int i = 0; i < bufferCount; i++) {
         boost::hash_combine(hashVal, computePipelineStateDescriptor.buffers[i].mutability);
@@ -1745,7 +1447,9 @@ void MtlfMetalContext::CommitCommandBuffer(bool waituntilScheduled, bool waitUnt
     if(wq->generatesEndOfQueueEvent) {
         wq->currentEventValue = endOfQueueEventValue;
 #if defined(METAL_EVENTS_AVAILABLE)
-        [wq->commandBuffer encodeSignalEvent:wq->event value:wq->currentEventValue];
+        if (eventsAvailable) {
+            [wq->commandBuffer encodeSignalEvent:wq->event value:wq->currentEventValue];
+        }
 #endif
         wq->generatesEndOfQueueEvent = false;
     }
@@ -1774,6 +1478,11 @@ void MtlfMetalContext::CommitCommandBuffer(bool waituntilScheduled, bool waitUnt
     CleanupUnusedBuffers(false);
 }
 
+void MtlfMetalContext::SetOutputPixelFormats(MTLPixelFormat pixelFormat, MTLPixelFormat depthFormat)
+{
+    outputPixelFormat = pixelFormat;
+    outputDepthFormat = depthFormat;
+}
 
 void MtlfMetalContext::SetRenderPassDescriptor(MTLRenderPassDescriptor *renderPassDescriptor)
 {
@@ -1888,7 +1597,7 @@ void MtlfMetalContext::SetCurrentEncoder(MetalEncoderType encoderType, MetalWork
         }
         case MTLENCODERTYPE_COMPUTE: {
 #if defined(METAL_EVENTS_AVAILABLE)
-            if (concurrentDispatchSupported) {
+            if (concurrentDispatchSupported && eventsAvailable) {
                 wq->currentComputeEncoder = [wq->commandBuffer computeCommandEncoderWithDispatchType:MTLDispatchTypeConcurrent];
             }
             else
@@ -1969,7 +1678,9 @@ id<MTLBuffer> MtlfMetalContext::GetMetalBuffer(NSUInteger length, MTLResourceOpt
             // Copy over data
             if (pointer) {
                 memcpy(buffer.contents, pointer, length);
+#if defined(ARCH_OS_OSX)
                 [buffer didModifyRange:(NSMakeRange(0, length))];
+#endif
             }
             
             bufferFreeList.erase(entry);

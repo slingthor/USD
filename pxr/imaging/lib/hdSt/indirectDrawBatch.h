@@ -47,8 +47,6 @@ typedef std::vector<HdBindingRequest> HdBindingRequestVector;
 ///
 class HdSt_IndirectDrawBatch : public HdSt_DrawBatch {
 public:
-    static HDST_API
-    HdSt_DrawBatchSharedPtr New(HdStDrawItemInstance * drawItemInstance);
 
     HDST_API
     virtual ~HdSt_IndirectDrawBatch();
@@ -114,8 +112,6 @@ protected:
     // Culling requires custom resource binding.
     class _CullingProgram : public _DrawingProgram {
     public:
-        static _CullingProgram *New();
-
         void Initialize(bool useDrawArrays, bool useInstanceCulling,
                         size_t bufferArrayHash);
     protected:
@@ -135,6 +131,9 @@ protected:
         bool _useInstanceCulling;
         size_t _bufferArrayHash;
     };
+    
+    HDST_API
+    virtual HdSt_IndirectDrawBatch::_CullingProgram *NewCullingProgram() const = 0;
     
     _CullingProgram &_GetCullingProgram(HdStResourceRegistrySharedPtr const &resourceRegistry);
     

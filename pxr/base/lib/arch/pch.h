@@ -27,7 +27,9 @@
 #include "pxr/pxr.h"
 #include "pxr/base/arch/defines.h"
 #if defined(ARCH_OS_DARWIN)
+#if !defined(ARCH_OS_IOS)
 #include <crt_externs.h>
+#endif
 #include <dlfcn.h>
 #include <execinfo.h>
 #include <glob.h>

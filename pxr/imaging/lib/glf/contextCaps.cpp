@@ -23,9 +23,9 @@
 //
 #include "pxr/imaging/glf/glew.h"
 #include "pxr/imaging/glf/contextCaps.h"
-
 #include "pxr/imaging/glf/debugCodes.h"
-#include "pxr/imaging/glf/glew.h"
+
+#include "pxr/imaging/garch/gl.h"
 
 #include "pxr/base/tf/diagnostic.h"
 #include "pxr/base/tf/envSetting.h"

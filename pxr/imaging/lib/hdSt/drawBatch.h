@@ -29,6 +29,7 @@
 #include "pxr/imaging/hd/version.h"
 
 #include "pxr/imaging/hdSt/resourceBinder.h"
+#include "pxr/imaging/hdSt/resourceFactory.h"
 #include "pxr/imaging/hd/repr.h"
 #include "pxr/imaging/hdSt/shaderCode.h"
 
@@ -109,7 +110,8 @@ protected:
     class _DrawingProgram {
     public:
         _DrawingProgram() {
-            _resourceBinder = HdSt_ResourceBinderSharedPtr(HdSt_ResourceBinder::New());
+            _resourceBinder = HdSt_ResourceBinderSharedPtr(
+                HdStResourceFactory::GetInstance()->NewResourceBinder());
         }
 
         HDST_API
@@ -132,7 +134,8 @@ protected:
             _program.reset();
             _surfaceShader.reset();
             _geometricShader.reset();
-            _resourceBinder = HdSt_ResourceBinderSharedPtr(HdSt_ResourceBinder::New());
+            _resourceBinder = HdSt_ResourceBinderSharedPtr(
+                    HdStResourceFactory::GetInstance()->NewResourceBinder());
             _shaders.clear();
         }
         

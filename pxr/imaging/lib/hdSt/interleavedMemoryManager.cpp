@@ -21,21 +21,17 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#include "pxr/imaging/glf/glew.h"
-#include "pxr/imaging/glf/diagnostic.h"
 
 #include "pxr/imaging/garch/contextCaps.h"
 #include "pxr/imaging/garch/resourceFactory.h"
 
+#include "pxr/imaging/glf/diagnostic.h"
+
 #include "pxr/imaging/hdSt/interleavedMemoryManager.h"
 #include "pxr/imaging/hdSt/bufferResource.h"
 #include "pxr/imaging/hdSt/bufferRelocator.h"
-#include "pxr/imaging/hdSt/GL/glUtils.h"
-
-#include "pxr/imaging/hdSt/GL/interleavedMemoryBufferGL.h"
-#if defined(ARCH_GFX_METAL)
-#include "pxr/imaging/hdSt/Metal/interleavedMemoryBufferMetal.h"
-#endif
+#include "pxr/imaging/hdSt/resourceFactory.h"
+//#include "pxr/imaging/hdSt/GL/glUtils.h"
 
 #include <boost/make_shared.hpp>
 #include <boost/scoped_ptr.hpp>
@@ -124,24 +120,7 @@ HdStInterleavedUBOMemoryManager::CreateBufferArray(
 {
     GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
 
-    HdEngine::RenderAPI api = HdEngine::GetRenderAPI();
-    switch(api)
-    {
-        case HdEngine::OpenGL:
-            return boost::make_shared<
-                HdStStripedInterleavedBufferGL>(
-                     role,
-					 bufferSpecs,
-					 usageHint,
-                     caps.uniformBufferOffsetAlignment,
-                     /*structAlignment=*/sizeof(float)*4,
-                     caps.maxUniformBlockSize,
-                     HdPerfTokens->garbageCollectedUbo);
-
-#if defined(ARCH_GFX_METAL)
-        case HdEngine::Metal:
-            return boost::make_shared<
-                HdStStripedInterleavedBufferMetal>(
+    return HdStResourceFactory::GetInstance()->NewStripedInterleavedBuffer(
             		 role,
             		 bufferSpecs,
             		 usageHint,
@@ -149,11 +128,6 @@ HdStInterleavedUBOMemoryManager::CreateBufferArray(
                      /*structAlignment=*/sizeof(float)*4,
                      caps.maxUniformBlockSize,
                      HdPerfTokens->garbageCollectedUbo);
-#endif
-        default:
-            TF_FATAL_CODING_ERROR("No HdStInterleavedMemoryBuffer for this API");
-    }
-    return NULL;
 }
 
 HdAggregationStrategy::AggregationId
@@ -189,37 +163,14 @@ HdStInterleavedSSBOMemoryManager::CreateBufferArray(
 {
     GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
 
-    HdEngine::RenderAPI api = HdEngine::GetRenderAPI();
-    switch(api)
-    {
-        case HdEngine::OpenGL:
-            return boost::make_shared<
-                HdStStripedInterleavedBufferGL>(
-                     role,
-            		 bufferSpecs,
-            		 usageHint,
-                     /*bufferOffsetAlignment=*/0,
-                     /*structAlignment=*/0,
-                     caps.maxShaderStorageBlockSize,
-                     HdPerfTokens->garbageCollectedSsbo);
-
-#if defined(ARCH_GFX_METAL)
-        case HdEngine::Metal:
-            return boost::make_shared<
-                HdStStripedInterleavedBufferMetal>(
-            		 role,
-            		 bufferSpecs,
-            		 usageHint,
-                     /*bufferOffsetAlignment=*/0,
-                     /*structAlignment=*/0,
-                     caps.maxShaderStorageBlockSize,
-                     HdPerfTokens->garbageCollectedSsbo);
-#endif
-        default:
-            TF_FATAL_CODING_ERROR("No HdStInterleavedMemoryBuffer for this API");
-    }
-
-    return NULL;
+    return HdStResourceFactory::GetInstance()->NewStripedInterleavedBuffer(
+                    role,
+            		bufferSpecs,
+            		usageHint,
+                    /*bufferOffsetAlignment=*/0,
+                    /*structAlignment=*/0,
+                    caps.maxShaderStorageBlockSize,
+                    HdPerfTokens->garbageCollectedSsbo);
 }
 
 HdAggregationStrategy::AggregationId
@@ -399,7 +350,7 @@ HdStInterleavedMemoryManager::_StripedInterleavedBuffer::_AddResource(
     }
 
     HdStBufferResourceSharedPtr bufferRes = HdStBufferResourceSharedPtr(
-        HdStBufferResource::New(GetRole(), tupleType, offset, stride));
+        HdStResourceFactory::GetInstance()->NewBufferResource(GetRole(), tupleType, offset, stride));
 
     _resourceList.emplace_back(name, bufferRes);
     return bufferRes;

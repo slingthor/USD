@@ -129,11 +129,11 @@ HdStVBOSimpleMemoryBufferMetal::Reallocate(
         HdResourceGPUHandle oldId(bres->GetId());
 
         if (bufferSize) {
-            newId = context->GetMetalBuffer(bufferSize, MTLResourceStorageModeManaged);
+            newId = context->GetMetalBuffer(bufferSize, MTLResourceStorageModeDefault);
         }
         else {
             // Dummy buffer - 0 byte buffers are invalid
-            newId = context->GetMetalBuffer(256, MTLResourceStorageModeManaged);
+            newId = context->GetMetalBuffer(256, MTLResourceStorageModeDefault);
         }
 
         // copy the range. There are three cases:

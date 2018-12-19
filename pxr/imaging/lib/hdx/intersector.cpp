@@ -197,6 +197,7 @@ HdxIntersector::SetResolution(GfVec2i const& widthHeight)
 void
 HdxIntersector::_ConditionStencilWithGLCallback(DepthMaskCallback maskCallback)
 {
+#if defined(ARCH_GFX_OPENGL)
     // Setup stencil state and prevent writes to color buffer.
     // We don't use the pickable/unpickable render pass state below, since
     // the callback uses immediate mode GL, and doesn't conform to Hydra's
@@ -209,12 +210,16 @@ HdxIntersector::_ConditionStencilWithGLCallback(DepthMaskCallback maskCallback)
                     GL_KEEP,     // stencil passed, depth failed
                     GL_REPLACE); // stencil passed, depth passed
     }
+#else
+    TF_FATAL_CODING_ERROR("Not Implemented!"); //MTL_FIXME
+#endif
     
     //
     // Condition the stencil buffer.
     //
     maskCallback();
 
+#if defined(ARCH_GFX_OPENGL)
     // We expect any GL state changes are restored.
     {
         // Clear depth incase the depthMaskCallback pollutes the depth buffer.
@@ -225,7 +230,10 @@ HdxIntersector::_ConditionStencilWithGLCallback(DepthMaskCallback maskCallback)
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
         glFrontFace(GL_CCW);
     }
-    
+#else
+    TF_FATAL_CODING_ERROR("Not Implemented!"); //MTL_FIXME
+#endif
+
     // Update the stencil state for the render passes
     {
         HdRenderPassStateSharedPtr states[] = {_pickableRenderPassState,
@@ -325,7 +333,10 @@ HdxIntersector::Query(HdxIntersector::Params const& params,
         return false;
     }
 
-    bool usingOpenGLEngine = HdEngine::GetRenderAPI() == HdEngine::OpenGL;
+    bool usingOpenGLEngine = false;
+#if defined(ARCH_GFX_OPENGL)
+    usingOpenGLEngine |= HdEngine::GetRenderAPI() == HdEngine::OpenGL;
+#endif
     
     GfVec2i size(_drawTarget->GetSize());
     GfVec4i viewport(0, 0, size[0], size[1]);
@@ -341,6 +352,7 @@ HdxIntersector::Query(HdxIntersector::Params const& params,
     drawTarget->Bind();
 
     if (usingOpenGLEngine) {
+#if defined(ARCH_GFX_OPENGL)
         //
         // Setup GL raster state
         //
@@ -369,6 +381,7 @@ HdxIntersector::Query(HdxIntersector::Params const& params,
         glViewport(viewport[0], viewport[1], viewport[2], viewport[3]);
 
         GLF_POST_PENDING_GL_ERRORS();
+#endif
     }
     
     //
@@ -377,8 +390,10 @@ HdxIntersector::Query(HdxIntersector::Params const& params,
     {
         GLuint vao;
         if (usingOpenGLEngine) {
+#if defined(ARCH_GFX_OPENGL)
             glGenVertexArrays(1, &vao);
             glBindVertexArray(vao);
+#endif
         }
 
         bool needStencilConditioning = (params.depthMaskCallback != nullptr);
@@ -411,6 +426,7 @@ HdxIntersector::Query(HdxIntersector::Params const& params,
         }
 
         bool convRstr = false;
+#if defined(ARCH_GFX_OPENGL)
         if (usingOpenGLEngine) {
             //
             // Enable conservative rasterization, if available.
@@ -423,7 +439,7 @@ HdxIntersector::Query(HdxIntersector::Params const& params,
                 glEnable(GL_CONSERVATIVE_RASTERIZATION_NV);
             }
         }
-
+#endif
         // XXX: Make HdxIntersector a task with multiple passes, instead of the
         // multi-task usage below.
         HdTaskSharedPtrVector tasks;
@@ -509,6 +525,7 @@ HdxIntersector::Query(HdxIntersector::Params const& params,
         engine->Execute(*_index, tasks);
 
         if (usingOpenGLEngine) {
+#if defined(ARCH_GFX_OPENGL)
             glDisable(GL_STENCIL_TEST);
 
             if (convRstr) {
@@ -520,6 +537,7 @@ HdxIntersector::Query(HdxIntersector::Params const& params,
             // Restore
             glBindVertexArray(0);
             glDeleteVertexArrays(1, &vao);
+#endif
         }
     }
 
@@ -549,9 +567,11 @@ HdxIntersector::Query(HdxIntersector::Params const& params,
     drawTarget->GetImage("depth", &depths[0]);
 
     if (usingOpenGLEngine) {
+#if defined(ARCH_GFX_OPENGL)
         glBindTexture(GL_TEXTURE_2D, 0);
 
         GLF_POST_PENDING_GL_ERRORS();
+#endif
     }
 
     if (result) {
@@ -618,6 +638,7 @@ HdxIntersector::Result::_ResolveHit(int index, int x, int y, float z,
     unsigned char const* pointIds = _pointIds.get();
 
     GfVec3d hitPoint(0,0,0);
+#if defined(ARCH_GFX_OPENGL)
     gluUnProject(x, y, z,
                  _params.viewMatrix.GetArray(),
                  _params.projectionMatrix.GetArray(),
@@ -625,7 +646,9 @@ HdxIntersector::Result::_ResolveHit(int index, int x, int y, float z,
                  &((hitPoint)[0]),
                  &((hitPoint)[1]),
                  &((hitPoint)[2]));
-
+#else
+    TF_FATAL_CODING_ERROR("Not Implemented!"); //MTL_FIXME
+#endif
     int idIndex = index*4;
 
     int primId = HdxIntersector::DecodeIDRenderColor(&primIds[idIndex]);

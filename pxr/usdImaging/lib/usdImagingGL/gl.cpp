@@ -22,14 +22,18 @@
 // language governing permissions and limitations under the Apache License.
 //
 #include "pxr/pxr.h"
-#include "pxr/imaging/glf/glew.h"
+#include "pxr/base/arch/defines.h"
 
-#include "pxr/usdImaging/usdImagingGL/gl.h"
+#if defined(ARCH_GFX_OPENGL)
+#include "pxr/imaging/glf/glew.h"
 #include "pxr/usdImaging/usdImagingGL/GL/hdEngine.h"
 #include "pxr/usdImaging/usdImagingGL/GL/refEngine.h"
+#endif
 #if defined(ARCH_GFX_METAL)
 #include "pxr/usdImaging/usdImagingGL/Metal/hdEngine.h"
 #endif
+
+#include "pxr/usdImaging/usdImagingGL/gl.h"
 
 #include "pxr/base/tf/diagnostic.h"
 
@@ -48,11 +52,15 @@ _InitEngine(const SdfPath& rootPath,
 {
     if (UsdImagingGLEngine::IsHydraEnabled()) {
 #if defined(ARCH_GFX_METAL)
-        return new UsdImagingGLMetalHdEngine(rootPath, excludedPaths,
+        return new UsdImagingGLMetalHdEngine(UsdImagingGLMetalHdEngine::OpenGL,
+                                             rootPath, excludedPaths,
                                              invisedPaths, delegateID);
-#else
+#elif defined(ARCH_GFX_OPENGL)
         return new UsdImagingGLHdEngine(rootPath, excludedPaths,
                                         invisedPaths, delegateID);
+#else
+        TF_FATAL_CODING_ERROR(
+            "No supported graphics APIs enabled, yet Hydra support has been advertised");
 #endif
     } else {
         // In the refEngine, both excluded paths and invised paths are treated
@@ -60,8 +68,14 @@ _InitEngine(const SdfPath& rootPath,
         SdfPathVector pathsToExclude = excludedPaths;
         pathsToExclude.insert(pathsToExclude.end(), 
             invisedPaths.begin(), invisedPaths.end());
+#if defined(ARCH_GFX_OPENGL)
         return new UsdImagingGLRefEngine(pathsToExclude);
+#else
+        TF_FATAL_CODING_ERROR(
+            "No supported graphics APIs enabled, and no fallback path available");
+#endif
     }
+    return NULL;
 }
 
 UsdImagingGL::UsdImagingGL()

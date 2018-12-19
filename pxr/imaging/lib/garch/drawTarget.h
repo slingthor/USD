@@ -206,6 +206,11 @@ public:
     /// is no MSAA enabled, this function does nothing.
     GARCH_API
     virtual void Resolve() = 0;
+    
+    /// Resolve several MSAA framebuffers at once. If any framebuffers don't
+    /// have MSAA enabled, nothing happens to them.
+    GARCH_API
+    virtual void Resolve(const std::vector<GarchDrawTarget*>& drawTargets) = 0;
 
     /// Updates the contents signature for attached textures
     /// to allow downstream consumers to know that the texture image

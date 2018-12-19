@@ -31,10 +31,12 @@
 #include "pxr/imaging/hdx/tokens.h"
 #include "pxr/imaging/hdx/debugCodes.h"
 
-#include "pxr/imaging/hdSt/GL/glConversions.h"
+#include "pxr/imaging/hdSt/glConversions.h"
+
 #include "pxr/imaging/hd/camera.h"
 #include "pxr/imaging/hdSt/drawTarget.h"
 #include "pxr/imaging/hdSt/renderPassState.h"
+#include "pxr/imaging/hdSt/resourceFactory.h"
 #include "pxr/imaging/garch/drawTarget.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -164,7 +166,7 @@ HdxDrawTargetTask::_Sync(HdTaskContext* ctx)
                     pass->SetRenderPassState(drawTarget->GetRenderPassState());
 
                     HdStRenderPassStateSharedPtr renderPassState(
-                        HdStRenderPassState::New());
+                        HdStResourceFactory::GetInstance()->NewRenderPassState());
                     HdxSimpleLightingShaderSharedPtr simpleLightingShader(
                         new HdxSimpleLightingShader());
 
@@ -308,6 +310,7 @@ HdxDrawTargetTask::_Execute(HdTaskContext* ctx)
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
 
+#if defined(ARCH_GFX_OPENGL)
     // Apply polygon offset to whole pass.
     // XXX TODO: Move to an appropriate home
     if (!_depthBiasUseDefault) {
@@ -341,6 +344,9 @@ HdxDrawTargetTask::_Execute(HdTaskContext* ctx)
     // which we need to flip.  This is a hack for now, but belongs in Hydra's
     // PSO.
     glFrontFace(GL_CW);
+#else
+    TF_FATAL_CODING_ERROR("Not Implemented!"); //MTL_FIXME
+#endif
 
     size_t numRenderPasses = _renderPassesInfo.size();
     for (size_t renderPassIdx = 0;
@@ -356,11 +362,15 @@ HdxDrawTargetTask::_Execute(HdTaskContext* ctx)
         renderPassState->Unbind();
     }
 
+#if defined(ARCH_GFX_OPENGL)
     // Restore to GL defaults
     glDisable(GL_SAMPLE_ALPHA_TO_COVERAGE);
     glDisable(GL_PROGRAM_POINT_SIZE);
     glDisable(GL_POLYGON_OFFSET_FILL);
     glFrontFace(GL_CCW);
+#else
+    TF_FATAL_CODING_ERROR("Not Implemented!"); //MTL_FIXME
+#endif
 }
 
 // --------------------------------------------------------------------------- //

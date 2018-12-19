@@ -23,12 +23,10 @@
 //
 // Diagnostic.cpp
 //
-
-#include "pxr/imaging/glf/glew.h"
+#include "pxr/imaging/mtlf/mtlDevice.h"
 
 #include "pxr/imaging/mtlf/diagnostic.h"
 #include "pxr/imaging/mtlf/debugCodes.h"
-#include "pxr/imaging/mtlf/mtlDevice.h"
 
 #include "pxr/base/tf/diagnostic.h"
 #include "pxr/base/tf/stackTrace.h"
@@ -41,70 +39,24 @@ PXR_NAMESPACE_OPEN_SCOPE
 void
 MtlfPostPendingGLErrors(std::string const & where)
 {
-    bool foundError = false;
-    GLenum error;
-    // Protect from doing infinite looping when glGetError
-    // is called from an invalid context.
-    int watchDogCount = 0;
-    while ((watchDogCount++ < 256) &&
-           ((error = glGetError()) != GL_NO_ERROR)) {
-        foundError = true;
-        const GLubyte *errorString = gluErrorString(error);
-        
-        std::ostringstream errorMessage;
-        errorMessage << "GL error: " << errorString;
-        
-        if (!where.empty()) {
-            errorMessage << ", reported from " << where;
-        }
-        
-        TF_DEBUG(MTLF_DEBUG_ERROR_STACKTRACE).Msg(errorMessage.str() + "\n");
-        
-//        TF_RUNTIME_ERROR(errorMessage.str());
-    }
-    if (false && foundError) {
-        TF_DEBUG(MTLF_DEBUG_ERROR_STACKTRACE).Msg(
-            TfStringPrintf("==== GL Error Stack ====\n%s\n",
-            TfGetStackTrace().c_str()));
-    }
 }
 
 void
 MtlfRegisterDefaultDebugOutputMessageCallback()
 {
-    if (glDebugMessageCallbackARB) {
-        glDebugMessageCallbackARB((GLDEBUGPROCARB)MtlfDefaultDebugOutputMessageCallback, 0);
-        glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS_ARB);
-    }
 }
 
 void
 MtlfDefaultDebugOutputMessageCallback(
-                                     GLenum source, GLenum type, GLuint id, GLenum severity,
-                                     GLsizei length, GLchar const * message, GLvoid const * userParam)
+    GLenum source, GLenum type, GLuint id, GLenum severity,
+    GLsizei length, GLchar const * message, GLvoid const * userParam)
 {
-#if defined(GL_ARB_debug_output) || defined(GL_VERSION_4_3)
-    if (type == GL_DEBUG_TYPE_ERROR_ARB) {
-        TF_RUNTIME_ERROR("GL debug output: "
-                         "source: %s type: %s id: %d severity: %s message: %s",
-                         MtlfDebugEnumToString(source),
-                         MtlfDebugEnumToString(type),
-                         id,
-                         MtlfDebugEnumToString(severity),
-                         message);
-        
-        TF_DEBUG(MTLF_DEBUG_ERROR_STACKTRACE).Msg(
-         TfStringPrintf("==== GL Error Stack ====\n%s\n",
-                        TfGetStackTrace().c_str()));
-    } else {
-        TF_WARN("GL debug output: %s", message);
-    }
-#endif
 }
 
 char const *
 MtlfDebugEnumToString(GLenum debugEnum)
 {
+#if defined(ARCH_GFX_OPENGL)
 #if defined(GL_ARB_debug_output) || defined(GL_VERSION_4_3)
     switch (debugEnum) {
     case GL_DEBUG_SOURCE_API_ARB:
@@ -154,12 +106,13 @@ MtlfDebugEnumToString(GLenum debugEnum)
     }
 #endif
     TF_CODING_ERROR("unknown debug enum");
+#endif
     return "unknown";
 }
 
 static void _MtlfPushDebugGroup(char const * message)
 {
-#if defined(GL_KHR_debug)
+#if defined(ARCH_GFX_OPENGL) && defined(GL_KHR_debug)
     if (GLEW_KHR_debug) {
         glPushDebugGroup(GL_DEBUG_SOURCE_THIRD_PARTY, 0, -1, message);
     }
@@ -168,7 +121,7 @@ static void _MtlfPushDebugGroup(char const * message)
 
 static void _MtlfPopDebugGroup()
 {
-#if defined(GL_KHR_debug)
+#if defined(ARCH_GFX_OPENGL) && defined(GL_KHR_debug)
     if (GLEW_KHR_debug) {
         glPopDebugGroup();
     }

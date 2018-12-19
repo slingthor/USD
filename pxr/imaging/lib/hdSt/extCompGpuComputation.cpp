@@ -21,8 +21,12 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
+#include "pxr/base/arch/defines.h"
+
+#if defined(ARCH_GFX_OPENGL)
 #include "pxr/imaging/glf/glew.h"
 #include "pxr/imaging/glf/diagnostic.h"
+#endif
 
 #include "pxr/imaging/garch/contextCaps.h"
 #include "pxr/imaging/garch/resourceFactory.h"
@@ -97,7 +101,7 @@ HdStExtCompGpuComputation::Execute(
 #if defined(ARCH_GFX_METAL)
     // Emit error until we support this
     TF_CODING_ERROR("Metal Compute currently not supported");
-#endif
+#else
 
     if (!glDispatchCompute) {
         TF_WARN("glDispatchCompute not available");
@@ -221,6 +225,7 @@ HdStExtCompGpuComputation::Execute(
     }
 
     computeProgram->UnsetProgram();
+#endif
 }
 
 void

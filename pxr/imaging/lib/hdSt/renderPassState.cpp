@@ -26,16 +26,11 @@
 
 #include "pxr/imaging/hdSt/drawItem.h"
 #include "pxr/imaging/hdSt/fallbackLightingShader.h"
+#include "pxr/imaging/hdSt/glConversions.h"
 #include "pxr/imaging/hdSt/renderPassShader.h"
 #include "pxr/imaging/hdSt/renderPassState.h"
 #include "pxr/imaging/hdSt/resourceRegistry.h"
 #include "pxr/imaging/hdSt/shaderCode.h"
-#include "pxr/imaging/hdSt/GL/glConversions.h"
-
-#include "pxr/imaging/hdSt/GL/renderPassStateGL.h"
-#if defined(ARCH_GFX_METAL)
-#include "pxr/imaging/hdSt/Metal/renderPassStateMetal.h"
-#endif
 
 #include "pxr/imaging/hd/bufferArrayRange.h"
 #include "pxr/imaging/hd/changeTracker.h"
@@ -56,41 +51,6 @@ TF_DEFINE_PRIVATE_TOKENS(
     _tokens,
     (renderPassState)
 );
-
-HdStRenderPassState *HdStRenderPassState::New()
-{
-    HdEngine::RenderAPI api = HdEngine::GetRenderAPI();
-    switch(api)
-    {
-        case HdEngine::OpenGL:
-            return new HdStRenderPassStateGL();
-#if defined(ARCH_GFX_METAL)
-        case HdEngine::Metal:
-            return new HdStRenderPassStateMetal();
-#endif
-        default:
-            TF_FATAL_CODING_ERROR("No HdStRenderPassState for this API");
-    }
-    return NULL;
-}
-
-HdStRenderPassState *HdStRenderPassState::New(HdStRenderPassShaderSharedPtr const &renderPassShader)
-{
-    HdEngine::RenderAPI api = HdEngine::GetRenderAPI();
-    switch(api)
-    {
-        case HdEngine::OpenGL:
-            return new HdStRenderPassStateGL(renderPassShader);
-#if defined(ARCH_GFX_METAL)
-        case HdEngine::Metal:
-            return new HdStRenderPassStateMetal(renderPassShader);
-#endif
-        default:
-            TF_FATAL_CODING_ERROR("No HdStRenderPassState for this API");
-    }
-    return NULL;
-}
-
 
 HdStRenderPassState::HdStRenderPassState()
     : HdRenderPassState()
@@ -127,10 +87,12 @@ HdStRenderPassState::Sync(HdResourceRegistrySharedPtr const &resourceRegistry)
     TF_FOR_ALL(it, _clipPlanes) {
         clipPlanes.push_back(GfVec4f(*it));
     }
+#if defined(ARCH_GFX_OPENGL)
+    // Is this suppose to use GL_MAX_CLIP_PLANES directly, or fetch it from OpenGL?
     if (clipPlanes.size() >= GL_MAX_CLIP_PLANES) {
         clipPlanes.resize(GL_MAX_CLIP_PLANES);
     }
-
+#endif
     // allocate bar if not exists
     if (!_renderPassStateBar || (_clipPlanesBufferSize != clipPlanes.size())) {
         HdBufferSpecVector bufferSpecs;

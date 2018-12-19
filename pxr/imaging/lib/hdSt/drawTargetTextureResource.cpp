@@ -24,31 +24,11 @@
 #include "pxr/imaging/glf/glew.h"
 
 #include "pxr/imaging/hdSt/drawTargetTextureResource.h"
-#include "pxr/imaging/hdSt/GL/glConversions.h"
+#include "pxr/imaging/hdSt/glConversions.h"
 
 #include "pxr/imaging/hd/engine.h"
 
-#include "pxr/imaging/hdSt/GL/drawTargetTextureResourceGL.h"
-#if defined(ARCH_GFX_METAL)
-#include "pxr/imaging/hdSt/Metal/drawTargetTextureResourceMetal.h"
-#endif
-
 PXR_NAMESPACE_OPEN_SCOPE
-
-HdTextureResourceSharedPtr HdSt_DrawTargetTextureResource::New()
-{
-    switch(HdEngine::GetRenderAPI()) {
-        case HdEngine::OpenGL:
-            return HdTextureResourceSharedPtr(new HdSt_DrawTargetTextureResourceGL());
-#if defined(ARCH_GFX_METAL)
-        case HdEngine::Metal:
-            return HdTextureResourceSharedPtr(new HdSt_DrawTargetTextureResourceMetal());
-#endif
-        default:
-            TF_FATAL_CODING_ERROR("No program for this API");
-    }
-    return HdTextureResourceSharedPtr();
-}
 
 HdSt_DrawTargetTextureResource::HdSt_DrawTargetTextureResource()
  : HdStTextureResource()
@@ -68,29 +48,6 @@ HdSt_DrawTargetTextureResource::SetAttachment(
                               const GarchDrawTarget::AttachmentRefPtr &attachment)
 {
     _attachment = attachment;
-}
-
-void
-HdSt_DrawTargetTextureResource::SetSampler(HdWrap wrapS,
-                                           HdWrap wrapT,
-                                           HdMinFilter minFilter,
-                                           HdMagFilter magFilter)
-{
-    // Convert params to Gl
-    GLenum glWrapS = HdStGLConversions::GetWrap(wrapS);
-    GLenum glWrapT = HdStGLConversions::GetWrap(wrapT);
-    GLenum glMinFilter = HdStGLConversions::GetMinFilter(minFilter);
-    GLenum glMagFilter = HdStGLConversions::GetMagFilter(magFilter);
-    GLuint s = (GLuint)(uint64_t)_sampler;
-
-    glSamplerParameteri(s, GL_TEXTURE_WRAP_S, glWrapS);
-    glSamplerParameteri(s, GL_TEXTURE_WRAP_T, glWrapT);
-    glSamplerParameteri(s, GL_TEXTURE_MIN_FILTER, glMinFilter);
-    glSamplerParameteri(s, GL_TEXTURE_MAG_FILTER, glMagFilter);
-    glSamplerParameterf(s, GL_TEXTURE_MAX_ANISOTROPY_EXT,
-                        _maxAnisotropy);
-    glSamplerParameterfv(s, GL_TEXTURE_BORDER_COLOR,
-                         _borderColor.GetArray());
 }
 
 HdTextureType

@@ -30,7 +30,6 @@
 #include "pxr/pxr.h"
 
 #include "pxr/imaging/mtlf/mtlDevice.h"
-#include "pxr/imaging/mtlf/resourceFactory.h"
 
 #include "pxr/usdImaging/usdImagingGL/api.h"
 #include "pxr/usdImaging/usdImagingGL/engine.h"
@@ -38,6 +37,8 @@
 
 #include "pxr/imaging/hd/version.h"
 #include "pxr/imaging/hd/engine.h"
+
+#include "pxr/imaging/hdSt/resourceFactory.h"
 
 #include "pxr/imaging/hdx/rendererPlugin.h"
 #include "pxr/imaging/hdx/selectionTracker.h"
@@ -62,14 +63,23 @@ typedef std::vector<UsdPrim> UsdPrimVector;
 class UsdImagingGLMetalHdEngine : public UsdImagingGLEngine
 {
 public:
+    
+    enum RenderOutput {
+        /// Use output of the render will be blitted from Metal into the
+        /// currently bound OpenGL FBO
+        OpenGL,
+        /// The output will be rendered using the application supplied MTLRenderPassDescriptor
+        Metal,
+    };
     // Important! Call UsdImagingGLMetalHdEngine::IsDefaultPluginAvailable() before
     // construction; if no plugins are available, the class will only
     // get halfway constructed.
     USDIMAGINGGL_API
-    UsdImagingGLMetalHdEngine(const SdfPath& rootPath,
-                            const SdfPathVector& excludedPaths,
-                            const SdfPathVector& invisedPaths=SdfPathVector(),
-                            const SdfPath& delegateID = SdfPath::AbsoluteRootPath());
+    UsdImagingGLMetalHdEngine(RenderOutput outputTarget,
+                              const SdfPath& rootPath,
+                              const SdfPathVector& excludedPaths,
+                              const SdfPathVector& invisedPaths=SdfPathVector(),
+                              const SdfPath& delegateID = SdfPath::AbsoluteRootPath());
 
     USDIMAGINGGL_API
     static bool IsDefaultRendererPluginAvailable();
@@ -202,6 +212,13 @@ public:
     USDIMAGINGGL_API
     virtual void SetRendererSetting(TfToken const& id,
                                     VtValue const& value);
+    
+    /// When using Metal as the render output target for Hydra, call this
+    /// method before Render() every frame to set the render pass descriptor
+    /// that should be used for output
+    USDIMAGINGGL_API
+    void SetMetalRenderPassDescriptor(MTLRenderPassDescriptor *renderPassDescriptor);
+    
 private:
 
     // These functions factor batch preparation into separate steps so they
@@ -255,12 +272,13 @@ private:
     
     TfTokenVector _renderTags;
     
-    MTLRenderPassDescriptor* _mtlRenderPassDescriptor;
+    RenderOutput _renderOutput;
+    MTLRenderPassDescriptor *_mtlRenderPassDescriptorForInterop;
+    MTLRenderPassDescriptor *_mtlRenderPassDescriptor;
     
     MTLCaptureManager *_sharedCaptureManager;
 
-    // Our base GPU resources are provided by Mtlf
-    MtlfResourceFactory resourceFactory;
+    HdStResourceFactoryInterface *_resourceFactory;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

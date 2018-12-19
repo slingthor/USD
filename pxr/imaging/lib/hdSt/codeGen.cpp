@@ -22,53 +22,10 @@
 // language governing permissions and limitations under the Apache License.
 //
 
-#include "pxr/imaging/glf/glew.h"
-#include "pxr/imaging/glf/contextCaps.h"
 
 #include "pxr/imaging/hdSt/codeGen.h"
-#include "pxr/imaging/hdSt/GL/codeGenGLSL.h"
-#if defined(ARCH_GFX_METAL)
-#include "pxr/imaging/hdSt/Metal/codeGenMSL.h"
-#endif
 #include "pxr/imaging/hd/engine.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-HdSt_CodeGen *HdSt_CodeGen::New(HdSt_GeometricShaderPtr const &geometricShader,
-                                   HdStShaderCodeSharedPtrVector const &shaders)
-{
-    
-    HdEngine::RenderAPI api = HdEngine::GetRenderAPI();
-    switch(api)
-    {
-        case HdEngine::OpenGL:
-            return new HdSt_CodeGenGLSL(geometricShader, shaders);
-#if defined(ARCH_GFX_METAL)
-        case HdEngine::Metal:
-            return new HdSt_CodeGenMSL(geometricShader, shaders);
-#endif
-        default:
-            TF_FATAL_CODING_ERROR("No HdStBufferResource for this API");
-    }
-    return NULL;
-}
-
-HdSt_CodeGen *HdSt_CodeGen::New(HdStShaderCodeSharedPtrVector const &shaders)
-{
-    HdEngine::RenderAPI api = HdEngine::GetRenderAPI();
-    switch(api)
-    {
-        case HdEngine::OpenGL:
-            return new HdSt_CodeGenGLSL(shaders);
-#if defined(ARCH_GFX_METAL)
-        case HdEngine::Metal:
-            return new HdSt_CodeGenMSL(shaders);
-#endif
-        default:
-            TF_FATAL_CODING_ERROR("No HdStBufferResource for this API");
-    }
-    return NULL;
-}
-
 PXR_NAMESPACE_CLOSE_SCOPE
-

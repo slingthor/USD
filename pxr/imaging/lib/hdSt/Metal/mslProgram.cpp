@@ -174,7 +174,7 @@ void DumpMetalSource(const HdStProgram* program, NSString *metalSrc, NSString *f
     NSString *fileName = [NSString stringWithFormat:@"HydraMetalSource_%lu_%lu_%@.metal", totalPrograms, dumpedFileCount++, fileSuffix];
     NSString *srcDumpFilePath = [srcDumpLocation stringByAppendingPathComponent:fileName];
     [fileContents writeToFile:srcDumpFilePath atomically:YES encoding:NSUTF8StringEncoding error:nil];
-    //NSLog(@"Dumping Metal Source to %@", srcDumpFilePath);
+    NSLog(@"Dumping Metal Source to %@", srcDumpFilePath);
 }
 
 NSString *LoadPreviousMetalSource(const HdStProgram* program, NSString *metalSrc, NSString *fileSuffix)
@@ -351,7 +351,7 @@ HdStMSLProgram::Link()
     id<MTLBuffer> uniformBuffer = _uniformBuffer.GetId();
     if (uniformBuffer == 0) {
         int const defaultLength = 1024;
-        uniformBuffer =  MtlfMetalContext::GetMetalContext()->GetMetalBuffer(defaultLength, MTLResourceStorageModeManaged);
+        uniformBuffer =  MtlfMetalContext::GetMetalContext()->GetMetalBuffer(defaultLength, MTLResourceStorageModeDefault);
         _uniformBuffer.SetAllocation(uniformBuffer, defaultLength);
     }
     
@@ -391,7 +391,8 @@ void HdStMSLProgram::AssignUniformBindings(GarchBindingMapRefPtr bindingMap) con
             const MSL_ShaderBinding& binding = *(*it).second;
             if(binding._type != kMSL_BindingType_UniformBuffer)
                 continue;
-            MtlfBindingMap::MTLFBindingIndex mtlfIndex(binding._index, (uint32)binding._type, (uint32)binding._stage, true);
+            MtlfBindingMap::MTLFBindingIndex mtlfIndex(
+                binding._index, (uint32_t)binding._type, (uint32_t)binding._stage, true);
             p.second = mtlfIndex.asInt;
         }
     }
@@ -411,7 +412,8 @@ void HdStMSLProgram::AssignSamplerUnits(GarchBindingMapRefPtr bindingMap) const
             const MSL_ShaderBinding& binding = *(*it).second;
             if(binding._type != kMSL_BindingType_Texture && binding._type != kMSL_BindingType_Sampler)
                 continue;
-            MtlfBindingMap::MTLFBindingIndex mtlfIndex(binding._index, (uint32)binding._type, (uint32)binding._stage, true);
+            MtlfBindingMap::MTLFBindingIndex mtlfIndex(
+                binding._index, (uint32_t)binding._type, (uint32_t)binding._stage, true);
             p.second = mtlfIndex.asInt;
         }
     }
@@ -419,7 +421,8 @@ void HdStMSLProgram::AssignSamplerUnits(GarchBindingMapRefPtr bindingMap) const
 
 void HdStMSLProgram::AddBinding(std::string const &name, int index, MSL_BindingType bindingType, MSL_ProgramStage programStage, int offsetWithinResource, int uniformBufferSize) {
     _locationMap.insert(make_pair(name, index));
-    MSL_ShaderBinding* newBinding = new MSL_ShaderBinding(bindingType, programStage, index, name, offsetWithinResource, uniformBufferSize);
+    MSL_ShaderBinding* newBinding = new MSL_ShaderBinding(
+        bindingType, programStage, index, name, offsetWithinResource, uniformBufferSize);
     _bindingMap.insert(std::make_pair(newBinding->_nameToken.Hash(), newBinding));
 }
 
@@ -517,7 +520,7 @@ void HdStMSLProgram::SetProgram(char const* const label) {
             if(binding._stage != loopParams[i].stage || binding._type != kMSL_BindingType_UniformBuffer)
                 continue;
 
-            id<MTLBuffer> mtlBuffer = context->GetMetalBuffer((binding._uniformBufferSize * METAL_OLD_STYLE_UNIFORM_BUFFER_SIZE), MTLResourceStorageModeManaged);
+            id<MTLBuffer> mtlBuffer = context->GetMetalBuffer((binding._uniformBufferSize * METAL_OLD_STYLE_UNIFORM_BUFFER_SIZE), MTLResourceStorageModeDefault);
             
             context->SetUniformBuffer(binding._index, mtlBuffer, binding._nameToken, loopParams[i].stage, 0 /*offset*/, binding._uniformBufferSize);
             _buffers.push_back(mtlBuffer);

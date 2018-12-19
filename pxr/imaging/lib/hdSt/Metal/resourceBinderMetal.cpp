@@ -142,7 +142,7 @@ HdSt_ResourceBinderMetal::BindBuffer(TfToken const &name,
     if (!buffer->GetId().IsSet())
         return;
     
-    uint32 typeMask = kMSL_BindingType_VertexAttribute | kMSL_BindingType_UniformBuffer | kMSL_BindingType_IndexBuffer;
+    uint32_t typeMask = kMSL_BindingType_VertexAttribute | kMSL_BindingType_UniformBuffer | kMSL_BindingType_IndexBuffer;
     uint i = 0;
     while(1)
     {

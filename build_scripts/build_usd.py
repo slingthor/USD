@@ -25,6 +25,7 @@ from distutils.spawn import find_executable
 
 import argparse
 import contextlib
+import copy
 import datetime
 import fnmatch
 import glob
@@ -66,18 +67,24 @@ def PrintCommandOutput(output):
 def PrintError(error):
     print "ERROR:", error
 
+# cross platform defaults
+# macOS can target macOS and iOS platforms
+crossPlatform = None;
+
 # Helpers for determining platform
 def Windows():
     return platform.system() == "Windows"
 def Linux():
     return platform.system() == "Linux"
 def MacOS():
-    return platform.system() == "Darwin"
+    return (platform.system() == "Darwin") and crossPlatform is None
+def iOS():
+    return (platform.system() == "Darwin") and crossPlatform is "iOS"
 
 def GetXcodeDeveloperDirectory():
     """Returns the active developer directory as reported by 'xcode-select -p'.
     Returns None if none is set."""
-    if not MacOS():
+    if not MacOS() and not iOS():
         return None
 
     try:
@@ -184,11 +191,22 @@ def CopyDirectory(context, srcDir, destDir):
                        .format(srcDir=srcDir, destDir=instDestDir))
     shutil.copytree(srcDir, instDestDir)
 
-def RunCMake(context, force, extraArgs = None):
+def FormatMultiProcs(numJobs):
+    if Windows():
+        return "/M:{procs}".format(procs=numJobs)
+    elif Linux():
+        return "-j{procs}".format(procs=numJobs)
+    
+    return "-j {procs}".format(procs=numJobs)
+
+def RunCMake(context, force, extraArgs = None, hostPlatform = False):
     """Invoke CMake to configure, build, and install a library whose 
     source code is located in the current working directory."""
     # Create a directory for out-of-source builds in the build directory
     # using the name of the current working directory.
+    targetIOS = (not hostPlatform) and iOS()
+    targetMacOS = MacOS() or hostPlatform
+
     srcDir = os.getcwd()
     instDir = (context.usdInstDir if srcDir == context.usdSrcDir
                else context.instDir)
@@ -203,19 +221,38 @@ def RunCMake(context, force, extraArgs = None):
 
     # On Windows, we need to explicitly specify the generator to ensure we're
     # building a 64-bit project. (Surely there is a better way to do this?)
-    if generator is None and Windows():
-        if IsVisualStudio2017OrGreater():
-            generator = "Visual Studio 15 2017 Win64"
-        else:
-            generator = "Visual Studio 14 2015 Win64"
+    if generator is None:
+        if Windows():
+            if IsVisualStudio2017OrGreater():
+                generator = "Visual Studio 15 2017 Win64"
+            else:
+                generator = "Visual Studio 14 2015 Win64"
+        elif targetMacOS:
+            generator = "Xcode"
 
     if generator is not None:
-        generator = '-G "{gen}"'.format(gen=generator)
+        generator = '-G {gen}'.format(gen=generator)
                 
     # On MacOS, enable the use of @rpath for relocatable builds.
     osx_rpath = None
-    if MacOS():
+    if targetMacOS or targetIOS:
         osx_rpath = "-DCMAKE_MACOSX_RPATH=ON"
+
+    if targetIOS:
+        # Add the default iOS toolchain file if one isn't aready specified
+        if not any("-DCMAKE_TOOLCHAIN_FILE=" in s for s in extraArgs):
+            extraArgs.append(
+                '-DCMAKE_TOOLCHAIN_FILE={usdSrcDir}/cmake/toolchains/ios.toolchain.cmake '
+                .format(usdSrcDir=context.usdSrcDir))
+
+        extraArgs.append(
+                '-DIOS_PLATFORM=OS ' 
+                '-DENABLE_VISIBILITY=1 '
+                '-DAPPLEIOS=1 '
+                '-DENABLE_ARC=0 '
+                '-DPYTHON_INCLUDE_DIR=/System/Library/Frameworks/Python.framework/Versions/2.7/include/python2.7  '
+                '-DPYTHON_LIBRARY=/System/Library/Frameworks/Python.framework/Versions/2.7/lib '
+                '-DPYTHON_EXECUTABLE:FILEPATH=/usr/bin/python ')
 
     with CurrentWorkingDirectory(buildDir):
         Run('cmake '
@@ -231,9 +268,9 @@ def RunCMake(context, force, extraArgs = None):
                     osx_rpath=(osx_rpath or ""),
                     generator=(generator or ""),
                     extraArgs=(" ".join(extraArgs) if extraArgs else "")))
-        Run("cmake --build . --config Release --target install -- {multiproc}"
-            .format(multiproc=("/M:{procs}" if Windows() else "-j {procs}")
-                               .format(procs=context.numJobs)))
+
+        Run("cmake --build . --config Debug --target install -- {multiproc}"
+            .format(multiproc=FormatMultiProcs(context.numJobs)))
 
 def PatchFile(filename, patches):
     """Applies patches to the specified file. patches is a list of tuples
@@ -448,7 +485,7 @@ ZLIB = Dependency("zlib", InstallZlib, "include/zlib.h")
 if Linux():
     BOOST_URL = "http://downloads.sourceforge.net/project/boost/boost/1.55.0/boost_1_55_0.tar.gz"
     BOOST_VERSION_FILE = "include/boost/version.hpp"
-elif MacOS():
+elif MacOS() or iOS():
     BOOST_URL = "http://downloads.sourceforge.net/project/boost/boost/1.61.0/boost_1_61_0.tar.gz"
     BOOST_VERSION_FILE = "include/boost/version.hpp"
 elif Windows():
@@ -489,8 +526,6 @@ def InstallBoost(context, force, buildArgs):
             '--build-dir="{buildDir}"'.format(buildDir=context.buildDir),
             '-j{procs}'.format(procs=num_procs),
             'address-model=64',
-            'link=shared',
-            'runtime-link=shared',
             'threading=multi', 
             'variant=release',
             '--with-atomic',
@@ -520,12 +555,55 @@ def InstallBoost(context, force, buildArgs):
             # libraries includes @rpath
             b2_settings.append("toolset=clang")
 
+        if iOS():
+            xcodeRoot = subprocess.check_output(['xcode-select', '--print-path']).strip()
+            iOSSDK = subprocess.check_output(['xcrun', '--sdk', 'iphoneos', '--show-sdk-path']).strip()
+            iOSVersion = subprocess.check_output(['xcodebuild', '-sdk', iOSSDK, '-version', 'SDKVersion']).strip()
+
+            b2_settings.append("toolset=darwin-{IOS_SDK_VERSION}~iphone".format(IOS_SDK_VERSION=iOSVersion))
+            b2_settings.append("architecture=arm")
+            b2_settings.append("target-os=iphone")
+            b2_settings.append("define=_LITTLE_ENDIAN")
+            b2_settings.append("cxxflags=\"-std=c++14 -stdlib=libc++ -arch=arm64\"")
+            b2_settings.append("linkflags=\"-stdlib=libc++\"");
+            b2_settings.append("link=static")
+
+            newLines = [
+                'using darwin : {IOS_SDK_VERSION}~iphone\n'.format(IOS_SDK_VERSION=iOSVersion),
+                ': {XCODE_ROOT}/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang++'
+                    .format(XCODE_ROOT=xcodeRoot),
+                ' -arch arm64 -mios-version-min=10.0 -fembed-bitcode -Wno-unused-local-typedef -Wno-nullability-completeness -DBOOST_AC_USE_PTHREADS -DBOOST_SP_USE_PTHREADS -g -DNDEBUG\n',
+                ': <striper> <root>{XCODE_ROOT}/Platforms/iPhoneOS.platform/Developer\n'
+                    .format(XCODE_ROOT=xcodeRoot),
+                ': <architecture>arm <target-os>iphone <address-model>64\n',
+                ';'
+            ]
+            b2_settings.append("macosx-version=iphone-{IOS_SDK_VERSION}".format(IOS_SDK_VERSION=iOSVersion))
+
+            open(context.instDir + '/src/boost_1_61_0/tools/build/src/user-config.jam', 'w').writelines(newLines)
+        else:
+            b2_settings.append("link=shared")
+            b2_settings.append("runtime-link=shared")
+
         # Add on any user-specified extra arguments.
         b2_settings += buildArgs
 
         b2 = "b2" if Windows() else "./b2"
         Run('{b2} {options} install'
             .format(b2=b2, options=" ".join(b2_settings)))
+
+        if iOS():
+            for filename in os.listdir(context.instDir + "/lib"):
+                if filename.startswith("libboost_"):
+                    oldFilename = context.instDir + "/lib/" + filename
+                    head, _sep, tail = filename.rpartition(".a")
+
+                    newFilename = context.instDir + "/lib/" + head + ".dylib"
+
+                    if os.path.exists(newFilename): 
+                        os.remove(newFilename)
+                    os.rename(oldFilename, newFilename)
+
 
 BOOST = Dependency("boost", InstallBoost, BOOST_VERSION_FILE)
 
@@ -534,7 +612,7 @@ BOOST = Dependency("boost", InstallBoost, BOOST_VERSION_FILE)
 
 if Windows():
     TBB_URL = "https://github.com/01org/tbb/releases/download/2017_U5/tbb2017_20170226oss_win.zip"
-elif MacOS():
+elif MacOS() or iOS():
     TBB_URL = "https://github.com/01org/tbb/archive/2017_U2.tar.gz"
 else:
     TBB_URL = "https://github.com/01org/tbb/archive/4.4.6.tar.gz"
@@ -542,7 +620,7 @@ else:
 def InstallTBB(context, force, buildArgs):
     if Windows():
         InstallTBB_Windows(context, force, buildArgs)
-    elif Linux() or MacOS():
+    elif Linux() or MacOS() or iOS():
         InstallTBB_LinuxOrMacOS(context, force, buildArgs)
 
 def InstallTBB_Windows(context, force, buildArgs):
@@ -563,6 +641,9 @@ def InstallTBB_Windows(context, force, buildArgs):
 def InstallTBB_LinuxOrMacOS(context, force, buildArgs):
     with CurrentWorkingDirectory(DownloadURL(TBB_URL, context, force)):
         # TBB does not support out-of-source builds in a custom location.
+        if iOS():
+            updateTBBIOS(context)
+            buildArgs.append('compiler=clang target=ios arch=arm64 extra_inc=big_iron.inc ')
         Run('make -j{procs} {buildArgs}'
             .format(procs=context.numJobs, 
                     buildArgs=" ".join(buildArgs)))
@@ -571,28 +652,58 @@ def InstallTBB_LinuxOrMacOS(context, force, buildArgs):
         CopyDirectory(context, "include/serial", "include/serial")
         CopyDirectory(context, "include/tbb", "include/tbb")
 
+def updateTBBIOS(context):
+    filename = context.instDir + '/src/tbb-2017_U2/build/macos.clang.inc'
+    if os.path.isfile(filename):
+        f = open(filename, 'r')
+        lines = f.readlines()
+        f.close()   
+        i = lines.index("ifeq ($(arch),$(filter $(arch),armv7 armv7s arm64))\n")    
+        lines.insert(i+1, "    CPLUS_FLAGS += -fembed-bitcode\n")
+        f = open(filename,'w')
+        for line in lines:
+            f.write(line)
+        f.close()
+
+    PatchFile(context.instDir + "/src/tbb-2017_U2/build/ios.macos.inc", 
+            [("export SDKROOT:=$(shell xcodebuild -sdk -version | grep -o -E '/.*SDKs/iPhoneOS.*' 2>/dev/null)",
+              "export SDKROOT:=$(shell xcodebuild -sdk -version | grep -o -E '/.*SDKs/iPhoneOS.*' 2>/dev/null | head -1)")])
+
 TBB = Dependency("TBB", InstallTBB, "include/tbb/tbb.h")
 
 ############################################################
 # JPEG
 
-if Windows():
-    JPEG_URL = "https://github.com/libjpeg-turbo/libjpeg-turbo/archive/1.5.1.zip"
-else:
-    JPEG_URL = "http://www.ijg.org/files/jpegsrc.v9b.tar.gz"
-
 def InstallJPEG(context, force, buildArgs):
     if Windows():
-        InstallJPEG_Turbo(context, force, buildArgs)
+        InstallJPEG_Turbo("https://github.com/libjpeg-turbo/libjpeg-turbo/archive/1.5.1.zip",
+            context, force, buildArgs)
+    elif iOS():
+        InstallJPEG_Turbo("https://github.com/libjpeg-turbo/libjpeg-turbo/archive/2.0.1.zip",
+            context, force, buildArgs)
     else:
-        InstallJPEG_Lib(context, force, buildArgs)
+        InstallJPEG_Lib("http://www.ijg.org/files/jpegsrc.v9b.tar.gz",
+            context, force, buildArgs)
 
-def InstallJPEG_Turbo(context, force, buildArgs):
-    with CurrentWorkingDirectory(DownloadURL(JPEG_URL, context, force)):
-        RunCMake(context, force, buildArgs)
+def InstallJPEG_Turbo(jpeg_url, context, force, buildArgs):
+    with CurrentWorkingDirectory(DownloadURL(jpeg_url, context, force)):
+        if iOS():
+            #buildArgs.append('-DCMAKE_SYSTEM_NAME=Darwin');
+            extraArgs.append('-DCMAKE_SYSTEM_PROCESSOR=aarch64');
+            #buildArgs.append('-DCMAKE_C_COMPILER=aarch64');
+            #buildArgs.append('-DCMAKE_TOOLCHAIN_FILE=toolchain.cmake');
+            #export CFLAGS="-Wall -arch arm64 -miphoneos-version-min=7.0 -funwind-tables"
+            #context.cmakeGenerator = "\"Unix Makefiles\"";
 
-def InstallJPEG_Lib(context, force, buildArgs):
-    with CurrentWorkingDirectory(DownloadURL(JPEG_URL, context, force)):
+        extraArgs += buildArgs
+
+        RunCMake(context, force, extraArgs)
+
+        if iOS():
+            context.cmakeGenerator = None;
+
+def InstallJPEG_Lib(jpeg_url, context, force, buildArgs):
+    with CurrentWorkingDirectory(DownloadURL(jpeg_url, context, force)):
         Run('./configure --prefix="{instDir}" '
             '--disable-static --enable-shared '
             '{buildArgs}'
@@ -621,6 +732,11 @@ def InstallTIFF(context, force, buildArgs):
         PatchFile("CMakeLists.txt", 
                    [("add_subdirectory(tools)", "# add_subdirectory(tools)"),
                     ("add_subdirectory(test)", "# add_subdirectory(test)")])
+
+        if iOS():
+            PatchFile("CMakeLists.txt", 
+                   [("option(ld-version-script \"Enable linker version script\" ON)", 
+                     "option(ld-version-script \"Enable linker version script\" OFF)")])
         RunCMake(context, force, buildArgs)
 
 TIFF = Dependency("TIFF", InstallTIFF, "include/tiff.h")
@@ -632,7 +748,16 @@ PNG_URL = "http://downloads.sourceforge.net/project/libpng/libpng16/older-releas
 
 def InstallPNG(context, force, buildArgs):
     with CurrentWorkingDirectory(DownloadURL(PNG_URL, context, force)):
-        RunCMake(context, force, buildArgs)
+        if iOS():
+            extraArgs.append('-DCMAKE_SYSTEM_PROCESSOR=aarch64');
+            extraArgs.append('-DPNG_ARM_NEON=off');
+
+            PatchFile("src/libutil/sysutil.cpp", 
+                   [("if (system (newcmd.c_str()) != -1)", "if (true)")])
+
+        extraArgs += buildArgs;
+
+        RunCMake(context, force, extraArgs)
 
 PNG = Dependency("PNG", InstallPNG, "include/png.h")
 
@@ -644,6 +769,9 @@ OPENEXR_URL = "https://github.com/openexr/openexr/archive/v2.2.0.zip"
 def InstallOpenEXR(context, force, buildArgs):
     srcDir = DownloadURL(OPENEXR_URL, context, force)
 
+    if iOS():
+        updateOpenEXRIOS(context, srcDir)
+
     ilmbaseSrcDir = os.path.join(srcDir, "IlmBase")
     with CurrentWorkingDirectory(ilmbaseSrcDir):
         RunCMake(context, force, buildArgs)
@@ -653,6 +781,45 @@ def InstallOpenEXR(context, force, buildArgs):
         RunCMake(context, force,
                  ['-DILMBASE_PACKAGE_PREFIX="{instDir}"'
                   .format(instDir=context.instDir)] + buildArgs)
+
+def updateOpenEXRIOS(context, srcDir):
+    # IlmBase
+    destDir = srcDir + "/IlmBase/Half"
+
+    f = context.usdSrcDir + "/third_party/IlmBase/eLut.h"
+    PrintCommandOutput("Copying {file} to {destDir}\n"
+                           .format(file=f, destDir=destDir))
+    shutil.copy(f, destDir)
+
+    f = context.usdSrcDir + "/third_party/IlmBase/toFloat.h"
+    PrintCommandOutput("Copying {file} to {destDir}\n"
+                           .format(file=f, destDir=destDir))
+    shutil.copy(f, destDir)
+
+    PatchFile(destDir + "/CMakeLists.txt", 
+              [("eLut >",
+                "cp ${CMAKE_CURRENT_SOURCE_DIR}/eLut.h"),
+               ("toFloat >",
+                "cp ${CMAKE_CURRENT_SOURCE_DIR}/toFloat.h")])
+
+    # OpenEXR
+    destDir = srcDir + "/OpenEXR/IlmImf"
+
+    f = context.usdSrcDir + "/third_party/OpenEXR/b44ExpLogTable.h"
+    PrintCommandOutput("Copying {file} to {destDir}\n"
+                           .format(file=f, destDir=destDir))
+    shutil.copy(f, destDir)
+
+    f = context.usdSrcDir + "/third_party/OpenEXR/dwaLookups.h"
+    PrintCommandOutput("Copying {file} to {destDir}\n"
+                           .format(file=f, destDir=destDir))
+    shutil.copy(f, destDir)
+
+    PatchFile(destDir + "/CMakeLists.txt", 
+              [("${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/b44ExpLogTable >",
+                "cp ${CMAKE_CURRENT_SOURCE_DIR}/b44ExpLogTable.h"),
+               ("${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_CFG_INTDIR}/dwaLookups >",
+                "cp ${CMAKE_CURRENT_SOURCE_DIR}/dwaLookups.h")])
 
 OPENEXR = Dependency("OpenEXR", InstallOpenEXR, "include/OpenEXR/ImfVersion.h")
 
@@ -771,7 +938,8 @@ OPENIMAGEIO = Dependency("OpenImageIO", InstallOpenImageIO,
 OPENSUBDIV_URL = "https://github.com/PixarAnimationStudios/OpenSubdiv/archive/v3_3_1.zip"
 
 def InstallOpenSubdiv(context, force, buildArgs):
-    with CurrentWorkingDirectory(DownloadURL(OPENSUBDIV_URL, context, force)):
+    srcOSDDir = DownloadURL(OPENSUBDIV_URL, context, force)
+    with CurrentWorkingDirectory(srcOSDDir):
         extraArgs = [
             '-DNO_EXAMPLES=ON',
             '-DNO_TUTORIALS=ON',
@@ -805,8 +973,41 @@ def InstallOpenSubdiv(context, force, buildArgs):
 
         # Add on any user-specified extra arguments.
         extraArgs += buildArgs
+        sdkroot = os.environ.get('SDKROOT')
+
+        if iOS():
+            # We build for macOS in order to leverage the STRINGIFY binary built
+            srcOSDmacOSDir = srcOSDDir + "_macOS"
+            if os.path.isdir(srcOSDmacOSDir):
+                shutil.rmtree(srcOSDmacOSDir)
+            shutil.copytree(srcOSDDir, srcOSDmacOSDir)
+
+            # Install macOS dependencies into a temporary directory, to avoid iOS space polution
+            tempContext = copy.copy(context)
+            tempContext.instDir = tempContext.instDir + "/macOS"
+            with CurrentWorkingDirectory(srcOSDmacOSDir):
+                RunCMake(tempContext, force, extraArgs, True)
+
+            shutil.rmtree(tempContext.instDir)
+
+            buildDirmacOS = os.path.join(context.buildDir, os.path.split(srcOSDmacOSDir)[1])
+
+            extraArgs.append('-G Xcode')
+            extraArgs.append('-DNO_CLEW=ON')
+            extraArgs.append('-DNO_OPENGL=ON')
+            extraArgs.append('-DSTRINGIFY_LOCATION={buildDirmacOS}/bin/Release/stringify'
+                             .format(buildDirmacOS=buildDirmacOS))
+            extraArgs.append('-DCMAKE_TOOLCHAIN_FILE={srcOSDDir}/cmake/iOSToolchain.cmake'
+                             .format(srcOSDDir=srcOSDDir))
+
+            os.environ['SDKROOT'] = subprocess.check_output(['xcrun', '--sdk', 'iphoneos', '--show-sdk-path']).strip()
 
         RunCMake(context, force, extraArgs)
+
+        if sdkroot is None:
+            os.unsetenv('SDKROOT')
+        else:
+            os.environ['SDKROOT'] = sdkroot
 
 OPENSUBDIV = Dependency("OpenSubdiv", InstallOpenSubdiv, 
                         "include/opensubdiv/version.h")
@@ -1024,10 +1225,14 @@ def InstallUSD(context, force, buildArgs):
             # Increase the precompiled header buffer limit.
             extraArgs.append('-DCMAKE_CXX_FLAGS="/Zm150"')
 
-        if MacOS():
-            # Increase the precompiled header buffer limit.
-            extraArgs.append('-G "Xcode"')
+        if MacOS() or iOS():
             extraArgs.append('-DCMAKE_CXX_FLAGS="-x objective-c++"')
+            extraArgs.append('-DPXR_ENABLE_METAL_SUPPORT=ON')
+
+        if iOS():
+            # some build options are implicit with this
+            extraArgs.append('-DPXR_ENABLE_GL_SUPPORT=OFF')
+            extraArgs.append('-G Xcode')
 
         extraArgs += buildArgs
 
@@ -1087,6 +1292,14 @@ group.add_argument("-v", "--verbose", action="count", default=1,
 group.add_argument("-q", "--quiet", action="store_const", const=0,
                    dest="verbosity",
                    help="Suppress all output except for error messages")
+
+group = parser.add_mutually_exclusive_group()
+group.add_argument("--macOS", action="store_const", default=None, const=None,
+                   dest="crossPlatform",
+                   help="Target macOS platform")
+group.add_argument("--iOS", action="store_const", const="iOS",
+                   dest="crossPlatform",
+                   help="Target iOS platform")
 
 group = parser.add_argument_group(title="Build Options")
 group.add_argument("-j", "--jobs", type=int, default=GetCPUCount(),
@@ -1370,6 +1583,9 @@ except Exception as e:
     PrintError(str(e))
     sys.exit(1)
 
+# Build target platform
+crossPlatform = args.crossPlatform
+
 verbosity = args.verbosity
 
 # Augment PATH on Windows so that 3rd-party dependencies can find libraries
@@ -1404,8 +1620,10 @@ if context.buildImaging:
     if context.enablePtex:
         requiredDependencies += [PTEX]
 
-    requiredDependencies += [OPENEXR, GLEW, 
-                             OPENSUBDIV]
+    if not iOS:
+        requiredDependencies += [GLEW]
+
+    requiredDependencies += [OPENEXR, OPENSUBDIV]
     
     if context.buildOIIO:
         requiredDependencies += [JPEG, TIFF, PNG, OPENIMAGEIO]
@@ -1525,6 +1743,7 @@ Building with settings:
   Downloader                    {downloader}
 
   Building                      {buildType}
+    Cross Platform              {targetPlatform}
     Imaging                     {buildImaging}
       Ptex support:             {enablePtex}
       OpenImageIO support:      {buildOIIO} 
@@ -1571,6 +1790,7 @@ summaryMsg = summaryMsg.format(
     buildType=("Shared libraries" if context.buildShared
                else "Monolithic shared library" if context.buildMonolithic
                else ""),
+    targetPlatform=("Off" if not iOS() else "On - iOS"),
     buildImaging=("On" if context.buildImaging else "Off"),
     enablePtex=("On" if context.enablePtex else "Off"),
     buildOIIO=("On" if context.buildOIIO else "Off"),

@@ -50,19 +50,29 @@ PXR_NAMESPACE_OPEN_SCOPE
 // Processor
 //
 
-#if defined(i386) || defined(__i386__) || defined(__x86_64__) || \
-    defined(_M_IX86) || defined(_M_X64)
-#define ARCH_CPU_INTEL
-#elif defined(__arm__) || defined(__aarch64__) || defined(_M_ARM)
-#define ARCH_CPU_ARM
+#if defined(ARCH_OS_IOS)
+# if defined(__i386__)
+#  define ARCH_CPU_INTEL
+# else
+#  define ARCH_CPU_ARM
+# endif
+#else
+#   if defined(i386) || defined(__i386__) || defined(__x86_64__) || \
+defined(_M_IX86) || defined(_M_X64)
+#       define ARCH_CPU_INTEL
+#   elif defined(__arm__) || defined(__aarch64__) || defined(_M_ARM)
+#       define ARCH_CPU_ARM
+#   endif
 #endif
 
 //
 // Bits
 //
 
-#if defined(__x86_64__) || defined(__aarch64__) || defined(_M_X64)
+#if defined(__x86_64__) || defined(__aarch64__) || defined(_M_X64) || defined(ARCH_CPU_ARM)
 #define ARCH_BITS_64
+#elif defined(ARCH_OS_IOS) && defined(ARCH_CPU_INTEL)
+#define ARCH_BITS_32
 #else
 #error "Unsupported architecture.  x86_64 or ARM64 required."
 #endif
@@ -108,12 +118,17 @@ PXR_NAMESPACE_OPEN_SCOPE
 #define ARCH_HAS_MMAP_MAP_POPULATE
 #endif
 
+// OpenGL API present
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
+#define ARCH_GFX_OPENGL
+#endif
+
 // Metal API present
-#if defined(ARCH_OS_DARWIN)
+#if defined(PXR_METAL_SUPPORT_ENABLED)
 #define ARCH_GFX_METAL
 #define UNITTEST_GFX_ARCH HdEngine::Metal
-#if __MAC_OS_X_VERSION_MAX_ALLOWED >= 101400 /* __MAC_10_14 */
-#define METAL_EVENTS_AVAILABLE
+#if (__MAC_OS_X_VERSION_MAX_ALLOWED >= 101400) || (__IPHONE_OS_VERSION_MAX_ALLOWED >= 120000) /* __MAC_10_14 __IOS_12_00 */
+#define METAL_EVENTS_API_PRESENT
 #endif
 #endif
 

@@ -24,6 +24,7 @@
 #include "pxr/imaging/glf/glew.h"
 
 #include "pxr/imaging/garch/contextCaps.h"
+#include "pxr/imaging/garch/glslfx.h"
 #include "pxr/imaging/garch/resourceFactory.h"
 
 #include "pxr/imaging/hdSt/commandBuffer.h"
@@ -36,11 +37,6 @@
 #include "pxr/imaging/hdSt/shaderCode.h"
 #include "pxr/imaging/hdSt/shaderKey.h"
 
-#include "pxr/imaging/hdSt/GL/indirectDrawBatchGL.h"
-#if defined(ARCH_GFX_METAL)
-#include "pxr/imaging/hdSt/Metal/indirectDrawBatchMetal.h"
-#endif
-
 #include "pxr/imaging/hd/binding.h"
 #include "pxr/imaging/hd/bufferArrayRange.h"
 
@@ -48,10 +44,6 @@
 #include "pxr/imaging/hd/engine.h"
 #include "pxr/imaging/hd/perfLog.h"
 #include "pxr/imaging/hd/tokens.h"
-
-#include "pxr/imaging/glf/diagnostic.h"
-
-#include "pxr/imaging/garch/glslfx.h"
 
 #include "pxr/base/tf/diagnostic.h"
 #include "pxr/base/tf/envSetting.h"
@@ -81,24 +73,6 @@ TF_DEFINE_PRIVATE_TOKENS(
     (ulocDrawRangeNDC)
 
 );
-
-
-HdSt_DrawBatchSharedPtr HdSt_IndirectDrawBatch::New(HdStDrawItemInstance * drawItemInstance)
-{
-    HdEngine::RenderAPI api = HdEngine::GetRenderAPI();
-    switch(api)
-    {
-        case HdEngine::OpenGL:
-            return HdSt_DrawBatchSharedPtr(new HdSt_IndirectDrawBatchGL(drawItemInstance));
-#if defined(ARCH_GFX_METAL)
-        case HdEngine::Metal:
-            return HdSt_DrawBatchSharedPtr(new HdSt_IndirectDrawBatchMetal(drawItemInstance));
-#endif
-        default:
-            TF_FATAL_CODING_ERROR("No program for this API");
-    }
-    return HdSt_DrawBatchSharedPtr();
-}
 
 HdSt_IndirectDrawBatch::HdSt_IndirectDrawBatch(
     HdStDrawItemInstance * drawItemInstance)
@@ -142,29 +116,10 @@ HdSt_IndirectDrawBatch::_Init(HdStDrawItemInstance * drawItemInstance)
     _useGpuCulling && caps.IsEnabledGPUInstanceFrustumCulling();
     
     if (_useGpuCulling) {
-        _cullingProgram = _CullingProgram::New();
+        _cullingProgram = NewCullingProgram();
         _cullingProgram->Initialize(
             _useDrawArrays, _useGpuInstanceCulling, _bufferArraysHash);
     }
-}
-
-HdSt_IndirectDrawBatch::_CullingProgram *
-HdSt_IndirectDrawBatch::_CullingProgram::New()
-{
-    HdEngine::RenderAPI api = HdEngine::GetRenderAPI();
-    switch(api)
-    {
-        case HdEngine::OpenGL:
-            return new HdSt_IndirectDrawBatchGL::_CullingProgramGL();
-#if defined(ARCH_GFX_METAL)
-        case HdEngine::Metal:
-            return new HdSt_IndirectDrawBatchMetal::_CullingProgramMetal();
-#endif
-        default:
-            TF_FATAL_CODING_ERROR("No program for this API");
-    }
-    
-    return NULL;
 }
 
 HdSt_IndirectDrawBatch::_CullingProgram &

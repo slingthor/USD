@@ -93,7 +93,7 @@ _BuildArray(T values[], int numValues)
 }
 
 HdSt_TestDriver::HdSt_TestDriver()
- : _engine(HdEngine::OpenGL)
+ : _engine(UNITTEST_GFX_ARCH)
  , _renderDelegate()
  , _renderIndex(nullptr)
  , _sceneDelegate(nullptr)
@@ -113,7 +113,7 @@ HdSt_TestDriver::HdSt_TestDriver()
 }
 
 HdSt_TestDriver::HdSt_TestDriver(TfToken const &reprName)
- : _engine(HdEngine::OpenGL)
+ : _engine(UNITTEST_GFX_ARCH)
  , _renderDelegate()
  , _renderIndex(nullptr)
  , _sceneDelegate(nullptr)
@@ -128,7 +128,7 @@ HdSt_TestDriver::HdSt_TestDriver(TfToken const &reprName)
 }
 
 HdSt_TestDriver::HdSt_TestDriver(HdReprSelector const &reprToken)
- : _engine(HdEngine::OpenGL)
+ : _engine(UNITTEST_GFX_ARCH)
  , _renderDelegate()
  , _renderIndex(nullptr)
  , _sceneDelegate(nullptr)

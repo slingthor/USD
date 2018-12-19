@@ -30,6 +30,7 @@
 #include "pxr/imaging/hdSt/geometricShader.h"
 #include "pxr/imaging/hdSt/immediateDrawBatch.h"
 #include "pxr/imaging/hdSt/indirectDrawBatch.h"
+#include "pxr/imaging/hdSt/resourceFactory.h"
 #include "pxr/imaging/hdSt/resourceRegistry.h"
 
 #include "pxr/imaging/hd/bufferArrayRange.h"
@@ -70,8 +71,7 @@ _NewDrawBatch(HdStDrawItemInstance * drawItemInstance)
     HdSt_DrawBatchSharedPtr drawBatch;
 
     if (caps.multiDrawIndirectEnabled) {
-        // TODO: Move into a factory class
-        drawBatch = HdSt_IndirectDrawBatch::New(drawItemInstance);
+        drawBatch = HdStResourceFactory::GetInstance()->NewIndirectDrawBatch(drawItemInstance);
     } else {
         drawBatch = HdSt_DrawBatchSharedPtr(
             new HdSt_ImmediateDrawBatch(drawItemInstance));

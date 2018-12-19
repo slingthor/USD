@@ -26,7 +26,7 @@
 
 #include "pxr/imaging/glf/diagnostic.h"
 #include "pxr/imaging/glf/glContext.h"
-#include "pxr/imaging/glf/drawTarget.h"
+#include "pxr/imaging/garch/drawTarget.h"
 #include "pxr/imaging/glf/info.h"
 
 #include "pxr/imaging/hdx/intersector.h"
@@ -103,6 +103,7 @@ UsdImagingGLEngine::SetCameraState(const GfMatrix4d& viewMatrix,
 void
 UsdImagingGLEngine::SetCameraStateFromOpenGL()
 {
+#if defined(ARCH_GFX_OPENGL)
     GfMatrix4d viewMatrix, projectionMatrix;
     GfVec4d viewport;
     glGetDoublev(GL_MODELVIEW_MATRIX, viewMatrix.GetArray());
@@ -110,6 +111,9 @@ UsdImagingGLEngine::SetCameraStateFromOpenGL()
     glGetDoublev(GL_VIEWPORT, &viewport[0]);
 
     SetCameraState(viewMatrix, projectionMatrix, viewport);
+#else
+    TF_FATAL_CODING_ERROR("No OpenGL support available");
+#endif
 }
 
 /* virtual */
@@ -272,7 +276,7 @@ UsdImagingGLEngine::TestIntersection(
     }
 
     drawTarget->Bind();
-
+#if defined(ARCH_GFX_OPENGL)
     glPushAttrib( GL_VIEWPORT_BIT |
                   GL_ENABLE_BIT |
                   GL_COLOR_BUFFER_BIT |
@@ -286,10 +290,11 @@ UsdImagingGLEngine::TestIntersection(
     glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
 
     glEnable(GL_DEPTH_TEST);
-
+#endif
     // Setup the modelview matrix
     const GfMatrix4d modelViewMatrix = worldToLocalSpace * viewMatrix;
 
+#if defined(ARCH_GFX_OPENGL)
     // Set up camera matrices and viewport. At some point in the future,
     // this may be handled by Hydra itself since we are calling SetCameraState
     // with all of this information so we can support culling
@@ -302,6 +307,7 @@ UsdImagingGLEngine::TestIntersection(
     glLoadMatrixd(modelViewMatrix.GetArray());
    
     glViewport(0, 0, width, height);
+#endif
 
     SetCameraState(modelViewMatrix, projectionMatrix, GfVec4d(0,0,width, height) );
 
@@ -313,12 +319,14 @@ UsdImagingGLEngine::TestIntersection(
     
     GLF_POST_PENDING_GL_ERRORS();
 
+#if defined(ARCH_GFX_OPENGL)
     // Restore all gl state
     glMatrixMode(GL_PROJECTION);
     glPopMatrix();
     
     glMatrixMode(GL_MODELVIEW);
     glPopMatrix();
+#endif
 
     int xMin = 0;
     int yMin = 0;
@@ -337,11 +345,13 @@ UsdImagingGLEngine::TestIntersection(
     GLfloat depths[width*height];
     drawTarget->GetImage("depth", depths);
 
+#if defined(ARCH_GFX_OPENGL)
     glPopAttrib(); /* GL_VIEWPORT_BIT |
                       GL_ENABLE_BIT |
                       GL_COLOR_BUFFER_BIT
                       GL_DEPTH_BUFFER_BIT
                       GL_TEXTURE_BIT */
+#endif
 
     GLF_POST_PENDING_GL_ERRORS();
     
@@ -362,7 +372,7 @@ UsdImagingGLEngine::TestIntersection(
     if (didHit) {
         GLint viewport[4] = { 0, 0, width, height };
         GfVec3d hitPoint;
-
+#if defined(ARCH_GFX_OPENGL)
         gluUnProject( xMin, yMin, zMin,
                       viewMatrix.GetArray(),
                       projectionMatrix.GetArray(),
@@ -370,7 +380,9 @@ UsdImagingGLEngine::TestIntersection(
                       &((*outHitPoint)[0]),
                       &((*outHitPoint)[1]),
                       &((*outHitPoint)[2]));
-
+#else
+        TF_FATAL_CODING_ERROR("Not Implemented!"); //MTL_FIXME
+#endif
         if (outHitPrimPath) {
             int idIndex = zMinIndex*4;
 
@@ -489,7 +501,7 @@ UsdImagingGLEngine::TestIntersectionBatch(
     }
 
     drawTarget->Bind();
-
+#if defined(ARCH_GFX_OPENGL)
     glPushAttrib( GL_VIEWPORT_BIT |
                   GL_ENABLE_BIT |
                   GL_COLOR_BUFFER_BIT |
@@ -503,10 +515,10 @@ UsdImagingGLEngine::TestIntersectionBatch(
     glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
 
     glEnable(GL_DEPTH_TEST);
-
+#endif
     // Setup the modelview matrix
     const GfMatrix4d modelViewMatrix = worldToLocalSpace * viewMatrix;
-
+#if defined(ARCH_GFX_OPENGL)
     // Set up camera matrices and viewport. At some point in the future,
     // this may be handled by Hydra itself since we are calling SetCameraState
     // with all of this information so we can support culling
@@ -519,7 +531,7 @@ UsdImagingGLEngine::TestIntersectionBatch(
     glLoadMatrixd(modelViewMatrix.GetArray());
    
     glViewport(0, 0, width, height);
-
+#endif
     SetCameraState(modelViewMatrix, projectionMatrix, GfVec4d(0,0,width, height) );
 
     GLF_POST_PENDING_GL_ERRORS();
@@ -529,14 +541,14 @@ UsdImagingGLEngine::TestIntersectionBatch(
     RenderBatch(paths, params);
     
     GLF_POST_PENDING_GL_ERRORS();
-
+#if defined(ARCH_GFX_OPENGL)
     // Restore all gl state
     glMatrixMode(GL_PROJECTION);
     glPopMatrix();
     
     glMatrixMode(GL_MODELVIEW);
     glPopMatrix();
-
+#endif
     std::vector<GLubyte> primId(width*height*4);
     drawTarget->GetImage("primId", primId.data());
 
@@ -545,13 +557,13 @@ UsdImagingGLEngine::TestIntersectionBatch(
 
     std::vector<GLfloat> depths(width*height);
     drawTarget->GetImage("depth", depths.data());
-
+#if defined(ARCH_GFX_OPENGL)
     glPopAttrib(); /* GL_VIEWPORT_BIT |
                       GL_ENABLE_BIT |
                       GL_COLOR_BUFFER_BIT
                       GL_DEPTH_BUFFER_BIT
                       GL_TEXTURE_BIT */
-
+#endif
     GLF_POST_PENDING_GL_ERRORS();
 
     _HitDataById hitResults;
@@ -626,6 +638,7 @@ UsdImagingGLEngine::TestIntersectionBatch(
                 if( !exists || primHitData.zMin < minDist ) {
 
                     GfVec3d hitPoint;
+#if defined(ARCH_GFX_OPENGL)
                     gluUnProject( primHitData.xMin, primHitData.yMin, primHitData.zMin,
                                   viewMatrix.GetArray(),
                                   projectionMatrix.GetArray(),
@@ -633,6 +646,9 @@ UsdImagingGLEngine::TestIntersectionBatch(
                                   &(hitPoint[0]),
                                   &(hitPoint[1]),
                                   &(hitPoint[2]));
+#else
+                    TF_FATAL_CODING_ERROR("Not Implemented!"); //MTL_FIXME
+#endif
 
                     HitInfo &hitInfo = (*outHit)[hitPath];
 

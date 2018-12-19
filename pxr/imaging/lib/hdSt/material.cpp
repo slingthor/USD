@@ -24,22 +24,23 @@
 #include "pxr/imaging/glf/glew.h"
 
 #include "pxr/imaging/garch/contextCaps.h"
+#include "pxr/imaging/garch/gl.h"
+#include "pxr/imaging/garch/glslfx.h"
 #include "pxr/imaging/garch/resourceFactory.h"
+#include "pxr/imaging/garch/textureHandle.h"
+#include "pxr/imaging/garch/textureRegistry.h"
+#include "pxr/imaging/garch/uvTextureStorage.h"
 
 #include "pxr/imaging/hdSt/material.h"
 #include "pxr/imaging/hdSt/package.h"
 #include "pxr/imaging/hdSt/resourceRegistry.h"
+#include "pxr/imaging/hdSt/resourceFactory.h"
 #include "pxr/imaging/hdSt/shaderCode.h"
 #include "pxr/imaging/hdSt/surfaceShader.h"
 #include "pxr/imaging/hdSt/textureResource.h"
 
 #include "pxr/imaging/hd/changeTracker.h"
 #include "pxr/imaging/hd/vtBufferSource.h"
-
-#include "pxr/imaging/garch/textureHandle.h"
-#include "pxr/imaging/garch/textureRegistry.h"
-#include "pxr/imaging/garch/uvTextureStorage.h"
-#include "pxr/imaging/garch/glslfx.h"
 
 #include "pxr/base/tf/staticTokens.h"
 
@@ -410,13 +411,13 @@ HdStMaterial::_GetTextureResource(
         GarchTextureHandleRefPtr texture =
             GarchTextureRegistry::GetInstance().GetTextureHandle(texPtr);
         texResource.reset(
-                          HdStSimpleTextureResource::New(texture,
-                                          HdTextureType::Uv,
-                                          HdWrapClamp,
-                                          HdWrapClamp,
-                                          HdMinFilterNearest,
-                                          HdMagFilterNearest,
-                                          0));
+            HdStResourceFactory::GetInstance()->NewSimpleTextureResource(texture,
+                  HdTextureType::Uv,
+                  HdWrapClamp,
+                  HdWrapClamp,
+                  HdMinFilterNearest,
+                  HdMagFilterNearest,
+                  0));
         _fallbackTextureResources.push_back(texResource);
     }
 
