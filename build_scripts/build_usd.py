@@ -1620,7 +1620,7 @@ if context.buildImaging:
     if context.enablePtex:
         requiredDependencies += [PTEX]
 
-    if not iOS:
+    if not iOS():
         requiredDependencies += [GLEW]
 
     requiredDependencies += [OPENEXR, OPENSUBDIV]
