@@ -27,6 +27,8 @@
 /// \file pxrUsdMayaGL/batchRenderer.h
 
 #include "pxr/pxr.h"
+#include "pxr/imaging/garch/gl.h"
+
 #include "pxrUsdMayaGL/api.h"
 #include "pxrUsdMayaGL/renderParams.h"
 #include "pxrUsdMayaGL/sceneDelegate.h"

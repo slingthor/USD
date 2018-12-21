@@ -29,6 +29,8 @@
 #include "pxr/pxr.h"
 #include "pxrUsdMayaGL/api.h"
 
+#include "pxr/imaging/garch/gl.h"
+
 // XXX: On Linux, some Maya headers (notably M3dView.h) end up indirectly
 //      including X11/Xlib.h, which #define's "Bool" as int. This can cause
 //      compilation issues if sdf/types.h is included afterwards, so to fix
