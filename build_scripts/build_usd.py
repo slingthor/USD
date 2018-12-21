@@ -269,7 +269,7 @@ def RunCMake(context, force, extraArgs = None, hostPlatform = False):
                     generator=(generator or ""),
                     extraArgs=(" ".join(extraArgs) if extraArgs else "")))
 
-        Run("cmake --build . --config Debug --target install -- {multiproc}"
+        Run("cmake --build . --config Release --target install -- {multiproc}"
             .format(multiproc=FormatMultiProcs(context.numJobs)))
 
 def PatchFile(filename, patches):
@@ -687,20 +687,11 @@ def InstallJPEG(context, force, buildArgs):
 
 def InstallJPEG_Turbo(jpeg_url, context, force, buildArgs):
     with CurrentWorkingDirectory(DownloadURL(jpeg_url, context, force)):
+        extraArgs = buildArgs;
         if iOS():
-            #buildArgs.append('-DCMAKE_SYSTEM_NAME=Darwin');
             extraArgs.append('-DCMAKE_SYSTEM_PROCESSOR=aarch64');
-            #buildArgs.append('-DCMAKE_C_COMPILER=aarch64');
-            #buildArgs.append('-DCMAKE_TOOLCHAIN_FILE=toolchain.cmake');
-            #export CFLAGS="-Wall -arch arm64 -miphoneos-version-min=7.0 -funwind-tables"
-            #context.cmakeGenerator = "\"Unix Makefiles\"";
-
-        extraArgs += buildArgs
 
         RunCMake(context, force, extraArgs)
-
-        if iOS():
-            context.cmakeGenerator = None;
 
 def InstallJPEG_Lib(jpeg_url, context, force, buildArgs):
     with CurrentWorkingDirectory(DownloadURL(jpeg_url, context, force)):
@@ -748,14 +739,11 @@ PNG_URL = "http://downloads.sourceforge.net/project/libpng/libpng16/older-releas
 
 def InstallPNG(context, force, buildArgs):
     with CurrentWorkingDirectory(DownloadURL(PNG_URL, context, force)):
+        extraArgs = buildArgs;
+        
         if iOS():
             extraArgs.append('-DCMAKE_SYSTEM_PROCESSOR=aarch64');
             extraArgs.append('-DPNG_ARM_NEON=off');
-
-            PatchFile("src/libutil/sysutil.cpp", 
-                   [("if (system (newcmd.c_str()) != -1)", "if (true)")])
-
-        extraArgs += buildArgs;
 
         RunCMake(context, force, extraArgs)
 
@@ -923,6 +911,10 @@ def InstallOpenImageIO(context, force, buildArgs):
         # library outside of our build.
         if not context.enablePtex:
             extraArgs.append('-DUSE_PTEX=OFF')
+
+        if iOS():
+            PatchFile("src/libutil/sysutil.cpp", 
+                   [("if (system (newcmd.c_str()) != -1)", "if (true)")])
 
         # Add on any user-specified extra arguments.
         extraArgs += buildArgs
