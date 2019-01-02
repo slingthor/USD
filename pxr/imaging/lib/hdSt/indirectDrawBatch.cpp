@@ -85,7 +85,6 @@ HdSt_IndirectDrawBatch::HdSt_IndirectDrawBatch(
 , _instanceCountOffset(0)
 , _cullInstanceCountOffset(0)
 {
-    _Init(drawItemInstance);
 }
 
 HdSt_IndirectDrawBatch::~HdSt_IndirectDrawBatch()

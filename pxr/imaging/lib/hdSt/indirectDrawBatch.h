@@ -75,7 +75,7 @@ protected:
     HdSt_IndirectDrawBatch(HdStDrawItemInstance * drawItemInstance);
 
     HDST_API
-    void _Init(HdStDrawItemInstance * drawItemInstance);
+    void _Init(HdStDrawItemInstance * drawItemInstance) override;
     
 protected:
     void _ValidateCompatibility(HdBufferArrayRangeSharedPtr const& constantBar,

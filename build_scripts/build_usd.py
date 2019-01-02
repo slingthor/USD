@@ -258,6 +258,7 @@ def RunCMake(context, force, extraArgs = None, hostPlatform = False):
         Run('cmake '
             '-DCMAKE_INSTALL_PREFIX="{instDir}" '
             '-DCMAKE_PREFIX_PATH="{depsInstDir}" '
+            '-DCMAKE_BUILD_TYPE=Debug '
             '{osx_rpath} '
             '{generator} '
             '{extraArgs} '
@@ -1220,11 +1221,15 @@ def InstallUSD(context, force, buildArgs):
         if MacOS() or iOS():
             extraArgs.append('-DCMAKE_CXX_FLAGS="-x objective-c++"')
             extraArgs.append('-DPXR_ENABLE_METAL_SUPPORT=ON')
+        else:
+            extraArgs.append('-DPXR_ENABLE_METAL_SUPPORT=OFF')
 
         if iOS():
             # some build options are implicit with this
             extraArgs.append('-DPXR_ENABLE_GL_SUPPORT=OFF')
             extraArgs.append('-G Xcode')
+        else:
+            extraArgs.append('-DPXR_ENABLE_GL_SUPPORT=ON')
 
         extraArgs += buildArgs
 
