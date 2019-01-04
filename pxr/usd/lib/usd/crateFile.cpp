@@ -22,6 +22,8 @@
 // language governing permissions and limitations under the Apache License.
 //
 #include "pxr/pxr.h"
+#include "pxr/base/arch/defines.h"
+
 #include "crateFile.h"
 #include "integerCoding.h"
 
@@ -128,6 +130,12 @@ TF_DEFINE_ENV_SETTING(
     "representation matches the in-memory representation.  With this "
     "optimization, we create VtArrays that point directly into the memory "
     "mapped region rather than copying the data to heap buffers.");
+
+#if defined(ARCH_HAS_MMAP)
+#define USE_PREAD_DEFAULT   false
+#else
+#define USE_PREAD_DEFAULT   true
+#endif
 
 static int _GetMMapPrefetchKB()
 {
@@ -1928,7 +1936,7 @@ CrateFile::CanRead(string const &assetPath) {
 std::unique_ptr<CrateFile>
 CrateFile::CreateNew()
 {
-    bool useMmap = !TfGetenvBool("USDC_USE_PREAD", false);
+    bool useMmap = !TfGetenvBool("USDC_USE_PREAD", USE_PREAD_DEFAULT);
     return std::unique_ptr<CrateFile>(new CrateFile(useMmap));
 }
 
@@ -1980,7 +1988,9 @@ CrateFile::Open(string const &assetPath)
     std::tie(file, offset) = asset->GetFileUnsafe();
     if (file) {
         // If so, then we'll either mmap it or use pread() on it.
-        if (!TfGetenvBool("USDC_USE_PREAD", false)) {
+        bool useMmap = !TfGetenvBool("USDC_USE_PREAD", USE_PREAD_DEFAULT);
+
+        if (useMmap) {
             // Try to memory-map the file.
             auto mapping = _MmapAsset(assetPath.c_str(), asset);
             result.reset(new CrateFile(assetPath, ArchGetFileName(file),

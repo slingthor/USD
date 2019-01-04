@@ -109,8 +109,14 @@ defined(_M_IX86) || defined(_M_X64)
 
 // The current version of Apple clang does not support the thread_local
 // keyword.
-#if !(defined(ARCH_OS_DARWIN) && defined(ARCH_COMPILER_CLANG))
+//#if !(defined(ARCH_OS_DARWIN) && defined(ARCH_COMPILER_CLANG))
 #define ARCH_HAS_THREAD_LOCAL
+//#endif
+
+// Memmap usage - iOS has constraints on the size that can be mapped.
+// Disable for now as it's currently all or nothing
+#if !defined(ARCH_OS_IOS)
+#define ARCH_HAS_MMAP
 #endif
 
 // The MAP_POPULATE flag for mmap calls only exists on Linux platforms.

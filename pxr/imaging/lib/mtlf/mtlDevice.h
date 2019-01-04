@@ -68,11 +68,17 @@ class MtlfGlInterop;
 
 #if METAL_REUSE_BUFFERS
 // How old a buffer must be before it can be reused - 0 should allow for most optimal memory footprint, higher values can be used for debugging issues
-#define METAL_SAFE_BUFFER_REUSE_AGE 0
-// How old a buffer can be before it's freed
+#if defined(ARCH_OS_IOS)
+#define METAL_SAFE_BUFFER_REUSE_AGE 5
+#define METAL_HIGH_MEMORY_THRESHOLD (1UL * 1024UL * 1024UL * 1024UL)
 #define METAL_MAX_BUFFER_AGE_IN_FRAMES 3
-#define METAL_MAX_BUFFER_AGE_IN_COMMAND_BUFFERS 10
+#else
+#define METAL_SAFE_BUFFER_REUSE_AGE 0
 #define METAL_HIGH_MEMORY_THRESHOLD (2UL * 1024UL * 1024UL * 1024UL)
+#define METAL_MAX_BUFFER_AGE_IN_FRAMES 3
+#endif
+// How old a buffer can be before it's freed
+#define METAL_MAX_BUFFER_AGE_IN_COMMAND_BUFFERS 10
 #endif
 
 // Enable stats gathering
