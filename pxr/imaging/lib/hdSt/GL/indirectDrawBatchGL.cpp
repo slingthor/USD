@@ -75,7 +75,7 @@ HdSt_IndirectDrawBatchGL::HdSt_IndirectDrawBatchGL(
 , _resultBuffer(0)
 , _cullResultSync(0)
 {
-    /* empty */
+    _Init(drawItemInstance);
 }
 
 HdSt_IndirectDrawBatchGL::~HdSt_IndirectDrawBatchGL()

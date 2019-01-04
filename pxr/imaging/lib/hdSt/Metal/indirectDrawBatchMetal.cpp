@@ -73,7 +73,7 @@ HdSt_IndirectDrawBatchMetal::HdSt_IndirectDrawBatchMetal(
     : HdSt_IndirectDrawBatch(drawItemInstance)
     , _resultBuffer(0)
 {
-    /* empty */
+    _Init(drawItemInstance);
 }
 
 HdSt_IndirectDrawBatchMetal::~HdSt_IndirectDrawBatchMetal()
