@@ -80,7 +80,12 @@ static MTLPrimitiveType GetMetalPrimType(GLenum glPrimType) {
     return primType;
 }
 
-const MSL_ShaderBinding& MSL_FindBinding(const MSL_ShaderBindingMap& bindings, const TfToken& name, bool& outFound, uint bindingTypeMask, uint programStageMask, uint skipCount, int level)
+MSL_ShaderBinding const* MSL_FindBinding(MSL_ShaderBindingMap const& bindings,
+                                         TfToken const& name,
+                                         uint bindingTypeMask,
+                                         uint programStageMask,
+                                         uint skipCount,
+                                         int level)
 {
     TfToken nameToFind;
     if (level < 0) {
@@ -90,20 +95,19 @@ const MSL_ShaderBinding& MSL_FindBinding(const MSL_ShaderBindingMap& bindings, c
         // follow nested instancing naming convention.
         std::stringstream n;
         n << name << "_" << level;
-        nameToFind = TfToken(n.str());
+        nameToFind = TfToken(n.str(), TfToken::Immortal);
     }
     auto it_range = bindings.equal_range(nameToFind.Hash());
     auto it = it_range.first;
-    outFound = false;
+
     for(; it != it_range.second; ++it) {
         if( ((*it).second->_type & bindingTypeMask) == 0 ||
             ((*it).second->_stage & programStageMask) == 0 ||
             skipCount-- != 0)
             continue;
-        outFound = true;
-        break;
+        return (*it).second;
     }
-    return *(*it).second;
+    return NULL;
 }
 
 HdStMSLProgram::HdStMSLProgram(TfToken const &role)
@@ -454,25 +458,23 @@ void HdStMSLProgram::BindResources(HdStSurfaceShader* surfaceShader, HdSt_Resour
 
     TF_FOR_ALL(it, surfaceShader->GetTextureDescriptors()) {
         //When more types are added to the switch below, don't forget to update the mask too.
-        bool found;
-
         textureName = "textureBind_" + it->name.GetString();
-        TfToken textureNameToken(textureName);
+        TfToken textureNameToken(textureName, TfToken::Immortal);
 
-        MSL_ShaderBinding const& textureBinding = MSL_FindBinding(_bindingMap, textureNameToken, found, kMSL_BindingType_Texture, 0xFFFFFFFF, 0);
-        if(!found)
+        MSL_ShaderBinding const* const textureBinding = MSL_FindBinding(_bindingMap, textureNameToken, kMSL_BindingType_Texture, 0xFFFFFFFF, 0);
+        if(!textureBinding)
         {
             TF_FATAL_CODING_ERROR("Could not bind a texture to the shader?!");
         }
 
-        MtlfMetalContext::GetMetalContext()->SetTexture(textureBinding._index, it->handle, textureNameToken, textureBinding._stage);
+        MtlfMetalContext::GetMetalContext()->SetTexture(textureBinding->_index, it->handle, textureNameToken, textureBinding->_stage);
 
         samplerName = "samplerBind_" + it->name.GetString();
-        TfToken samplerNameToken(samplerName);
+        TfToken samplerNameToken(samplerName, TfToken::Immortal);
 
-        MSL_ShaderBinding const& samplerBinding = MSL_FindBinding(_bindingMap, samplerNameToken, found, kMSL_BindingType_Sampler, 0xFFFFFFFF, 0);
-        if(found) {
-            MtlfMetalContext::GetMetalContext()->SetSampler(samplerBinding._index, it->sampler, samplerNameToken, samplerBinding._stage);
+        MSL_ShaderBinding const* const samplerBinding = MSL_FindBinding(_bindingMap, samplerNameToken, kMSL_BindingType_Sampler, 0xFFFFFFFF, 0);
+        if(samplerBinding) {
+            MtlfMetalContext::GetMetalContext()->SetSampler(samplerBinding->_index, it->sampler, samplerNameToken, samplerBinding->_stage);
         }
     }
 }

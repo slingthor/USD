@@ -76,10 +76,9 @@ struct MSL_ShaderBinding
 
 typedef std::multimap<size_t, MSL_ShaderBinding*> MSL_ShaderBindingMap;
 
-const MSL_ShaderBinding& MSL_FindBinding(
-    const MSL_ShaderBindingMap& bindings,
-    const TfToken& name,
-    bool& outFound,
+MSL_ShaderBinding const *MSL_FindBinding(
+    MSL_ShaderBindingMap const& bindings,
+    TfToken const& name,
     uint32_t bindingTypeMask = 0xFFFFFFFF,
     uint32_t programStageMask = 0xFFFFFFFF,
     uint32_t skipCount = 0,

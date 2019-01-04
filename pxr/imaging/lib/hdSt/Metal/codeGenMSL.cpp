@@ -432,13 +432,13 @@ static std::string _GetPackedMSLType(const std::string& dataType) {
 }
 
 static HdSt_CodeGenMSL::TParam& _AddInputParam(
-                            HdSt_CodeGenMSL::InOutParams &inputParams,
-                            TfToken const &name,
-                            TfToken const& type,
-                            TfToken const &attribute,
-                            HdBinding const &binding =
-                                HdBinding(HdBinding::UNKNOWN, 0),
-                                          int arraySize = 0, TfToken const &accessor = TfToken())
+        HdSt_CodeGenMSL::InOutParams &inputParams,
+        TfToken const &name,
+        TfToken const& type,
+        TfToken const &attribute,
+        HdBinding const &binding =
+        HdBinding(HdBinding::UNKNOWN, 0),
+        int arraySize = 0, TfToken const &accessor = TfToken())
 {
     HdSt_CodeGenMSL::TParam in(name, type, accessor, attribute, HdSt_CodeGenMSL::TParam::Unspecified, binding, arraySize);
     HdBinding::Type bindingType = binding.GetType();
@@ -465,9 +465,10 @@ static HdSt_CodeGenMSL::TParam& _AddInputParam(  HdSt_CodeGenMSL::InOutParams &i
                      bd.binding, arraySize);
 }
 
-static HdSt_CodeGenMSL::TParam& _AddInputPtrParam(   HdSt_CodeGenMSL::InOutParams &inputParams,
-                                                TfToken const &name, TfToken const& type, TfToken const &attribute,
-                                                HdBinding const &binding, int arraySize = 0, bool programScope = false)
+static HdSt_CodeGenMSL::TParam& _AddInputPtrParam(
+        HdSt_CodeGenMSL::InOutParams &inputParams,
+        TfToken const &name, TfToken const& type, TfToken const &attribute,
+        HdBinding const &binding, int arraySize = 0, bool programScope = false)
 {
     // MTL_FIXME - we need to map vec3 device pointers to the packed variants as that's how HYDRA presents its buffers
     // but we should orobably alter type at source not do a last minute fix up here
@@ -483,9 +484,10 @@ static HdSt_CodeGenMSL::TParam& _AddInputPtrParam(   HdSt_CodeGenMSL::InOutParam
     return result;
 }
 
-static HdSt_CodeGenMSL::TParam& _AddInputPtrParam(   HdSt_CodeGenMSL::InOutParams &inputParams,
-                                                HdSt_ResourceBinder::MetaData::BindingDeclaration const &bd,
-                                                TfToken const &attribute = TfToken(), int arraySize = 0, bool programScope = false)
+static HdSt_CodeGenMSL::TParam& _AddInputPtrParam(
+        HdSt_CodeGenMSL::InOutParams &inputParams,
+        HdSt_ResourceBinder::MetaData::BindingDeclaration const &bd,
+        TfToken const &attribute = TfToken(), int arraySize = 0, bool programScope = false)
 {
     return _AddInputPtrParam(inputParams,
                         bd.name, bd.dataType, attribute,
@@ -1823,10 +1825,11 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
                 }
                 else {
                     //Attempt to find the same buffer in the VS inputs. If found, assign this buffer to the same slot.
-                    bool found = false;
-                    const MSL_ShaderBinding& binding = MSL_FindBinding(mslProgram->GetBindingMap(), TfToken(bindingName), found, kMSL_BindingType_UniformBuffer, kMSL_ProgramStage_Vertex);
-                    if(found)
-                        assignedSlot = binding._index;
+                    TfToken bindingNameToken(bindingName);
+                    MSL_ShaderBinding const * const binding = MSL_FindBinding(mslProgram->GetBindingMap(), bindingNameToken, kMSL_BindingType_UniformBuffer, kMSL_ProgramStage_Vertex);
+                    
+                    if(binding)
+                        assignedSlot = binding->_index;
                     else
                         currentUniformBufferSlot++;
                     mslProgram->AddBinding(bindingName, assignedSlot, kMSL_BindingType_UniformBuffer, kMSL_ProgramStage_Fragment);
