@@ -53,7 +53,11 @@
 //Be careful with these when using Concurrent Dispatch. Also; you can't enable asynchronous compute without also enabling METAL_EVENTS_API_PRESENT.
 #define METAL_COMPUTEGS_BUFFER_REUSE                      1
 #define METAL_COMPUTEGS_MANUAL_HAZARD_TRACKING            0
-#define METAL_COMPUTEGS_ALLOW_ASYNCHRONOUS_COMPUTE        0     //Currently disabled due to additional overhead of using events to synchronize. 
+#if defined(ARCH_OS_OSX)
+#define METAL_COMPUTEGS_ALLOW_ASYNCHRONOUS_COMPUTE        0     //Currently disabled due to additional overhead of using events to synchronize.
+#else
+#define METAL_COMPUTEGS_ALLOW_ASYNCHRONOUS_COMPUTE        0     //Currently disabled due to additional overhead of using events to synchronize.
+#endif
 
 PXR_NAMESPACE_OPEN_SCOPE
 MtlfMetalContextSharedPtr MtlfMetalContext::context = NULL;
@@ -163,10 +167,14 @@ MtlfMetalContext::MtlfMetalContext(id<MTLDevice> _device, int width, int height)
     NSLog(@"Selected %@ for Metal Device", device.name);
     
 #if METAL_COMPUTEGS_ALLOW_ASYNCHRONOUS_COMPUTE
+#if defined(ARCH_OS_OSX)
     enableMultiQueue = [device supportsFeatureSet:MTLFeatureSet_macOS_GPUFamily2_v1];
+#else // ARCH_OS_OSX
+    enableMultiQueue = [device supportsFeatureSet:MTLFeatureSet_iOS_GPUFamily1_v5];
+#endif // ARCH_OS_OSX
 #else
     enableMultiQueue = false;
-#endif
+#endif // METAL_COMPUTEGS_ALLOW_ASYNCHRONOUS_COMPUTE
 
     // Create a new command queue
     commandQueue = [device newCommandQueue];
@@ -189,7 +197,7 @@ MtlfMetalContext::MtlfMetalContext(id<MTLDevice> _device, int width, int height)
 #if defined(METAL_EVENTS_API_PRESENT)
         eventsAvailable = true;
 #endif
-        concurrentDispatchSupported = false; // Test enabling this
+        concurrentDispatchSupported = true;
     }
     else {
 #if defined(METAL_EVENTS_API_PRESENT)
@@ -1181,8 +1189,8 @@ void MtlfMetalContext::SetRenderEncoderState()
             }
             else if(texture.stage == kMSL_ProgramStage_Fragment)
                 [wq->currentRenderEncoder setFragmentTexture:texture.texture atIndex:texture.index];
-            else
-                TF_FATAL_CODING_ERROR("Not implemented!"); //Compute case
+            //else
+            //    TF_FATAL_CODING_ERROR("Not implemented!"); //Compute case
         }
         dirtyRenderState &= ~DIRTY_METALRENDERSTATE_TEXTURE;
     }
@@ -1196,8 +1204,8 @@ void MtlfMetalContext::SetRenderEncoderState()
             }
             else if(sampler.stage == kMSL_ProgramStage_Fragment)
                 [wq->currentRenderEncoder setFragmentSamplerState:sampler.sampler atIndex:sampler.index];
-            else
-                TF_FATAL_CODING_ERROR("Not implemented!"); //Compute case
+            //else
+            //    TF_FATAL_CODING_ERROR("Not implemented!"); //Compute case
         }
         dirtyRenderState &= ~DIRTY_METALRENDERSTATE_SAMPLER;
     }
