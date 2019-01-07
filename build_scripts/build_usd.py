@@ -199,7 +199,7 @@ def FormatMultiProcs(numJobs):
     
     return "-j {procs}".format(procs=numJobs)
 
-def RunCMake(context, force, extraArgs = None, hostPlatform = False):
+def RunCMake(context, force, buildArgs = None, hostPlatform = False):
     """Invoke CMake to configure, build, and install a library whose 
     source code is located in the current working directory."""
     # Create a directory for out-of-source builds in the build directory
@@ -238,6 +238,7 @@ def RunCMake(context, force, extraArgs = None, hostPlatform = False):
     if targetMacOS or targetIOS:
         osx_rpath = "-DCMAKE_MACOSX_RPATH=ON"
 
+    extraArgs = buildArgs
     if targetIOS:
         # Add the default iOS toolchain file if one isn't aready specified
         if not any("-DCMAKE_TOOLCHAIN_FILE=" in s for s in extraArgs):
@@ -258,7 +259,6 @@ def RunCMake(context, force, extraArgs = None, hostPlatform = False):
         Run('cmake '
             '-DCMAKE_INSTALL_PREFIX="{instDir}" '
             '-DCMAKE_PREFIX_PATH="{depsInstDir}" '
-            '-DCMAKE_BUILD_TYPE=Debug '
             '{osx_rpath} '
             '{generator} '
             '{extraArgs} '
@@ -725,7 +725,7 @@ def InstallTIFF(context, force, buildArgs):
                    [("add_subdirectory(tools)", "# add_subdirectory(tools)"),
                     ("add_subdirectory(test)", "# add_subdirectory(test)")])
 
-        if iOS():
+        if MacOS() or iOS():
             PatchFile("CMakeLists.txt", 
                    [("option(ld-version-script \"Enable linker version script\" ON)", 
                      "option(ld-version-script \"Enable linker version script\" OFF)")])

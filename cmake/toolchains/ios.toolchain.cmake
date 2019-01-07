@@ -364,6 +364,18 @@ set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS} -DNDEBUG -O3 -ffast-math ${BITCO
 set(CMAKE_C_LINK_FLAGS "${XCODE_IOS_PLATFORM_VERSION_FLAGS} -Wl,-search_paths_first ${CMAKE_C_LINK_FLAGS}")
 set(CMAKE_CXX_LINK_FLAGS "${XCODE_IOS_PLATFORM_VERSION_FLAGS}  -Wl,-search_paths_first ${CMAKE_CXX_LINK_FLAGS}")
 
+cmake_policy(PUSH)
+cmake_policy(SET CMP0007 NEW)
+function(REMOVE_DUPES ARG_STR OUTPUT)
+  set(ARG_LIST ${ARG_STR})
+  separate_arguments(ARG_LIST)
+  list(REMOVE_DUPLICATES ARG_LIST)
+  string (REGEX REPLACE "([^\\]|^);" "\\1 " _TMP_STR "${ARG_LIST}")
+  string (REGEX REPLACE "[\\](.)" "\\1" _TMP_STR "${_TMP_STR}") #fixes escaping
+  set (${OUTPUT} "${_TMP_STR}" PARENT_SCOPE)
+endfunction()
+cmake_policy(POP)
+
 # In order to ensure that the updated compiler flags are used in try_compile()
 # tests, we have to forcibly set them in the CMake cache, not merely set them
 # in the local scope.
@@ -376,11 +388,12 @@ list(APPEND VARS_TO_FORCE_IN_CACHE
   CMAKE_C_LINK_FLAGS
   CMAKE_CXX_LINK_FLAGS)
 foreach(VAR_TO_FORCE ${VARS_TO_FORCE_IN_CACHE})
+  REMOVE_DUPES(${${VAR_TO_FORCE}} ${VAR_TO_FORCE})
   set(${VAR_TO_FORCE} "${${VAR_TO_FORCE}}" CACHE STRING "" FORCE)
 endforeach()
 
 set(CMAKE_PLATFORM_HAS_INSTALLNAME 1)
-set (CMAKE_SHARED_LINKER_FLAGS "-rpath @executable_path/Frameworks -rpath @loader_path/Frameworks")
+set(CMAKE_SHARED_LINKER_FLAGS "-rpath @executable_path/Frameworks -rpath @loader_path/Frameworks")
 set(CMAKE_SHARED_LIBRARY_CREATE_C_FLAGS "-dynamiclib ${HEADER_PAD}")
 set(CMAKE_SHARED_MODULE_CREATE_C_FLAGS "-bundle ${HEADER_PAD}")
 set(CMAKE_SHARED_MODULE_LOADER_C_FLAG "-Wl,-bundle_loader,")
