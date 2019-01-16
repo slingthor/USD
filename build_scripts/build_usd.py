@@ -614,7 +614,7 @@ BOOST = Dependency("boost", InstallBoost, BOOST_VERSION_FILE)
 if Windows():
     TBB_URL = "https://github.com/01org/tbb/releases/download/2017_U5/tbb2017_20170226oss_win.zip"
 elif MacOS() or iOS():
-    TBB_URL = "https://github.com/01org/tbb/archive/2017_U2.tar.gz"
+    TBB_URL = "https://github.com/01org/tbb/archive/2019_U3.tar.gz"
 else:
     TBB_URL = "https://github.com/01org/tbb/archive/4.4.6.tar.gz"
 
@@ -654,19 +654,19 @@ def InstallTBB_LinuxOrMacOS(context, force, buildArgs):
         CopyDirectory(context, "include/tbb", "include/tbb")
 
 def updateTBBIOS(context):
-    filename = context.instDir + '/src/tbb-2017_U2/build/macos.clang.inc'
+    filename = context.instDir + '/src/tbb-2019_U3/build/macos.clang.inc'
     if os.path.isfile(filename):
         f = open(filename, 'r')
         lines = f.readlines()
         f.close()   
         i = lines.index("ifeq ($(arch),$(filter $(arch),armv7 armv7s arm64))\n")    
-        lines.insert(i+1, "    CPLUS_FLAGS += -fembed-bitcode\n")
+        lines.insert(i+1, "    CPLUS_FLAGS += -mios-version-min=10.0 -fembed-bitcode\n")
         f = open(filename,'w')
         for line in lines:
             f.write(line)
         f.close()
 
-    PatchFile(context.instDir + "/src/tbb-2017_U2/build/ios.macos.inc", 
+    PatchFile(context.instDir + "/src/tbb-2019_U3/build/ios.macos.inc", 
             [("export SDKROOT:=$(shell xcodebuild -sdk -version | grep -o -E '/.*SDKs/iPhoneOS.*' 2>/dev/null)",
               "export SDKROOT:=$(shell xcodebuild -sdk -version | grep -o -E '/.*SDKs/iPhoneOS.*' 2>/dev/null | head -1)")])
 
