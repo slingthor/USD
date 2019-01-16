@@ -42,7 +42,7 @@ public:
 
     /// Execute GL buffer copy command to flush all scheduled range copies.
     HDST_API
-    virtual void Commit();
+    virtual void Commit() override;
 
 private:
 

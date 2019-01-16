@@ -196,8 +196,7 @@ HdStVBOMemoryBufferMetal::Reallocate(
 
         if (oldId) {
             // delete old buffer
-            id<MTLBuffer> oid = oldId;
-            MtlfMetalContext::GetMetalContext()->ReleaseMetalBuffer(oid);
+            MtlfMetalContext::GetMetalContext()->ReleaseMetalBuffer(oldId);
         }
 
         // update id of buffer resource
@@ -228,8 +227,7 @@ HdStVBOMemoryBufferMetal::_DeallocateResources()
     TF_FOR_ALL (it, GetResources()) {
         HdResourceGPUHandle oldId(it->second->GetId());
         if (oldId) {
-            id<MTLBuffer> buffer = oldId;
-            MtlfMetalContext::GetMetalContext()->ReleaseMetalBuffer(buffer);
+            MtlfMetalContext::GetMetalContext()->ReleaseMetalBuffer(oldId);
             it->second->SetAllocation(HdResourceGPUHandle(), 0);
         }
     }
