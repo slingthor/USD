@@ -43,7 +43,7 @@ bool GlfGlewInit()
         result = glewInit() == GLEW_OK;
 #else
         result = true;
-#endif // ARCH_GGX_OPENGL
+#endif // ARCH_GFX_OPENGL
     });
 
     return result;

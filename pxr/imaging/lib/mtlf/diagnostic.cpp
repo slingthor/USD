@@ -39,6 +39,32 @@ PXR_NAMESPACE_OPEN_SCOPE
 void
 MtlfPostPendingGLErrors(std::string const & where)
 {
+#if defined(ARCH_GFX_OPENGL)
+    bool foundError = false;
+    GLenum error;
+    // Protect from doing infinite looping when glGetError
+    // is called from an invalid context.
+    int watchDogCount = 0;
+    while ((watchDogCount++ < 256) &&
+           ((error = glGetError()) != GL_NO_ERROR)) {
+        foundError = true;
+        const GLubyte *errorString = gluErrorString(error);
+        
+        std::ostringstream errorMessage;
+        errorMessage << "GL error: " << errorString;
+        
+        if (!where.empty()) {
+            errorMessage << ", reported from " << where;
+        }
+        
+        TF_DEBUG(MTLF_DEBUG_ERROR_STACKTRACE).Msg(errorMessage.str() + "\n");
+    }
+    if (false && foundError) {
+        TF_DEBUG(MTLF_DEBUG_ERROR_STACKTRACE).Msg(
+            TfStringPrintf("==== GL Error Stack ====\n%s\n",
+            TfGetStackTrace().c_str()));
+    }
+#endif
 }
 
 void
