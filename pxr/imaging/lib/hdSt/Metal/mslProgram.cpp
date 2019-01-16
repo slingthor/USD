@@ -129,14 +129,6 @@ HdStMSLProgram::~HdStMSLProgram()
     for(auto it = _bindingMap.begin(); it != _bindingMap.end(); ++it)
         delete (*it).second;
     _bindingMap.clear();
-
-    id<MTLBuffer> uniformBuffer = _uniformBuffer.GetId();
-    if (uniformBuffer) {
-        MtlfMetalContext::GetMetalContext()->ReleaseMetalBuffer(uniformBuffer);
-        
-        uniformBuffer = nil;
-        _uniformBuffer.SetAllocation(HdResourceGPUHandle(), 0);
-    }
 }
 
 #if GENERATE_METAL_DEBUG_SOURCE_CODE
@@ -350,15 +342,7 @@ HdStMSLProgram::Link()
 
     // update the program resource allocation
     _valid = true;
-    
-    // create an uniform buffer
-    id<MTLBuffer> uniformBuffer = _uniformBuffer.GetId();
-    if (uniformBuffer == 0) {
-        int const defaultLength = 1024;
-        uniformBuffer =  MtlfMetalContext::GetMetalContext()->GetMetalBuffer(defaultLength, MTLResourceStorageModeDefault);
-        _uniformBuffer.SetAllocation(uniformBuffer, defaultLength);
-    }
-    
+
     for(auto it = _bindingMap.begin(); it != _bindingMap.end(); ++it) {
         const MSL_ShaderBinding& binding = *(*it).second;
         if(binding._stage == kMSL_ProgramStage_Vertex || binding._stage == kMSL_ProgramStage_Compute) {

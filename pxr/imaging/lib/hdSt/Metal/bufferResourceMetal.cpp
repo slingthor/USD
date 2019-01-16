@@ -104,7 +104,7 @@ HdStBufferResourceMetal::SetAllocation(HdResourceGPUHandle idBuffer, size_t size
     _id = idBuffer;
     HdResource::SetSize(size);
 
-    _gpuAddr = 0;
+    _gpuAddr = (uint64_t)[_id contents];
 }
 
 GarchTextureGPUHandle

@@ -54,6 +54,7 @@ MtlfUniformBlock::Bind(GarchBindingMapPtr const & bindingMap,
     MtlfBindingMap::MTLFBindingIndex mtlfBindingIndex(bindingMap->GetUniformBinding(identifier));
     if(!mtlfBindingIndex.isLinked)
         return; //We're trying to bind a buffer that the shader doesn't know about. We should ignore this.
+
     MtlfMetalContext::GetMetalContext()->SetUniformBuffer(mtlfBindingIndex.index, _buffer, TfToken(identifier), (MSL_ProgramStage)mtlfBindingIndex.stage);
 }
 
@@ -67,20 +68,14 @@ MtlfUniformBlock::Update(const void *data, int size)
     }
     
     //METAL TODO
-    
-    /*
-    glBindBuffer(GL_UNIFORM_BUFFER, _buffer);
+//    glBindBuffer(GL_UNIFORM_BUFFER, _buffer);
     if (_size != size) {
-        glBufferData(GL_UNIFORM_BUFFER, size, NULL, GL_STATIC_DRAW);
+//        glBufferData(GL_UNIFORM_BUFFER, size, NULL, GL_STATIC_DRAW);
         _size = size;
     }
     if (size > 0) {
-        // Bug 95969 BufferSubData w/ size == 0 should be a noop but
-        // raises errors on some NVIDIA drivers.
-        glBufferSubData(GL_UNIFORM_BUFFER, 0, size, data);
+//        glBufferSubData(GL_UNIFORM_BUFFER, 0, size, data);
     }
-    glBindBuffer(GL_UNIFORM_BUFFER, 0);
-     */
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE
