@@ -32,26 +32,26 @@
 #import <simd/simd.h>
 
 #define METAL_TESSELLATION_SUPPORT 0
-#define METAL_STATE_OPTIMISATION 1
 #define CACHE_GSCOMPUTE 1
 
-#define DIRTY_METALRENDERSTATE_OLD_STYLE_VERTEX_UNIFORM   0x001
-#define DIRTY_METALRENDERSTATE_OLD_STYLE_FRAGMENT_UNIFORM 0x002
-#define DIRTY_METALRENDERSTATE_VERTEX_UNIFORM_BUFFER      0x004
-#define DIRTY_METALRENDERSTATE_FRAGMENT_UNIFORM_BUFFER    0x008
-#define DIRTY_METALRENDERSTATE_INDEX_BUFFER               0x010
-#define DIRTY_METALRENDERSTATE_VERTEX_BUFFER              0x020
-#define DIRTY_METALRENDERSTATE_SAMPLER                    0x040
-#define DIRTY_METALRENDERSTATE_TEXTURE                    0x080
-#define DIRTY_METALRENDERSTATE_DRAW_TARGET                0x100
-#define DIRTY_METALRENDERSTATE_VERTEX_DESCRIPTOR          0x200
-#define DIRTY_METALRENDERSTATE_CULLMODE_WINDINGORDER      0x400
-#define DIRTY_METALRENDERSTATE_FILL_MODE                  0x800
+enum {
+    DIRTY_METALRENDERSTATE_OLD_STYLE_VERTEX_UNIFORM   = 1 << 0,
+    DIRTY_METALRENDERSTATE_OLD_STYLE_FRAGMENT_UNIFORM = 1 << 1,
+    DIRTY_METALRENDERSTATE_VERTEX_UNIFORM_BUFFER      = 1 << 2,
+    DIRTY_METALRENDERSTATE_FRAGMENT_UNIFORM_BUFFER    = 1 << 3,
+    DIRTY_METALRENDERSTATE_INDEX_BUFFER               = 1 << 4,
+    DIRTY_METALRENDERSTATE_VERTEX_BUFFER              = 1 << 5,
+    DIRTY_METALRENDERSTATE_SAMPLER                    = 1 << 6,
+    DIRTY_METALRENDERSTATE_TEXTURE                    = 1 << 7,
+    DIRTY_METALRENDERSTATE_DRAW_TARGET                = 1 << 8,
+    DIRTY_METALRENDERSTATE_VERTEX_DESCRIPTOR          = 1 << 9,
+    DIRTY_METALRENDERSTATE_CULLMODE_WINDINGORDER      = 1 << 10,
+    DIRTY_METALRENDERSTATE_FILL_MODE                  = 1 << 11,
 
-#define DIRTY_METALRENDERSTATE_ALL                      0xFFFFFFFF
+    DIRTY_METALRENDERSTATE_ALL                      = 0xFFFFFFFF
+};
 
 //Be careful with these when using Concurrent Dispatch. Also; you can't enable asynchronous compute without also enabling METAL_EVENTS_API_PRESENT.
-#define METAL_COMPUTEGS_BUFFER_REUSE                      1
 #define METAL_COMPUTEGS_MANUAL_HAZARD_TRACKING            0
 #if defined(ARCH_OS_OSX)
 #define METAL_COMPUTEGS_ALLOW_ASYNCHRONOUS_COMPUTE        0     //Currently disabled due to additional overhead of using events to synchronize.
@@ -192,28 +192,23 @@ MtlfMetalContext::MtlfMetalContext(id<MTLDevice> _device, int width, int height)
     
 #if defined(ARCH_OS_IOS)
     #define SYSTEM_VERSION_GREATER_THAN_OR_EQUAL_TO(v) ([[[UIDevice currentDevice] systemVersion] compare:v options:NSNumericSearch] != NSOrderedAscending)
-    
-    if (SYSTEM_VERSION_GREATER_THAN_OR_EQUAL_TO(@"12.0")) {
+
+    static bool sysVerGreaterThanOrEqualTo12_0 = SYSTEM_VERSION_GREATER_THAN_OR_EQUAL_TO(@"12.0");
+    concurrentDispatchSupported = sysVerGreaterThanOrEqualTo12_0;
 #if defined(METAL_EVENTS_API_PRESENT)
-        eventsAvailable = true;
+    eventsAvailable = sysVerGreaterThanOrEqualTo12_0;
 #endif
-        concurrentDispatchSupported = true;
-    }
-    else {
-#if defined(METAL_EVENTS_API_PRESENT)
-        eventsAvailable = false;
-#endif
-        concurrentDispatchSupported = false;
-    }
+
 #else // ARCH_OS_IOS
-    NSOperatingSystemVersion minimumSupportedOSVersion = { .majorVersion = 10, .minorVersion = 14, .patchVersion = 0 };
-    
+    static NSOperatingSystemVersion minimumSupportedOSVersion = { .majorVersion = 10, .minorVersion = 14, .patchVersion = 5 };
+    static bool sysVerGreaterOrEqualTo10_14_5 = [NSProcessInfo.processInfo isOperatingSystemAtLeastVersion:minimumSupportedOSVersion];
+
     // MTL_FIXME - Disabling concurrent dispatch because it completely breaks Compute GS hazard tracking causing polygon soup on AMD hardware.
-    //concurrentDispatchSupported = [NSProcessInfo.processInfo isOperatingSystemAtLeastVersion:minimumSupportedOSVersion];
-    concurrentDispatchSupported = false;
+    concurrentDispatchSupported = sysVerGreaterOrEqualTo10_14_5;
 #if defined(METAL_EVENTS_API_PRESENT)
-    eventsAvailable = [NSProcessInfo.processInfo isOperatingSystemAtLeastVersion:minimumSupportedOSVersion];
+    eventsAvailable = sysVerGreaterOrEqualTo10_14_5;
 #endif
+    
 #endif // ARCH_OS_IOS
 
     MTLDepthStencilDescriptor *depthStateDesc = [[MTLDepthStencilDescriptor alloc] init];
@@ -235,8 +230,6 @@ MtlfMetalContext::MtlfMetalContext(id<MTLDevice> _device, int width, int height)
     remappedQuadIndexBuffer = nil;
     pointIndexBuffer = nil;
     numVertexComponents = 0;
-    vtxUniformBackingBuffer  = NULL;
-    fragUniformBackingBuffer = NULL;
     
     drawTarget = NULL;
     mtlColorTexture = nil;
@@ -247,17 +240,13 @@ MtlfMetalContext::MtlfMetalContext(id<MTLDevice> _device, int width, int height)
     currentWorkQueueType = METALWORKQUEUE_DEFAULT;
     currentWorkQueue     = &workQueues[currentWorkQueueType];
 
-#if METAL_COMPUTEGS_BUFFER_REUSE
     MTLResourceOptions resourceOptions = MTLResourceStorageModePrivate|MTLResourceCPUCacheModeDefaultCache;
- #if METAL_COMPUTEGS_MANUAL_HAZARD_TRACKING
+#if METAL_COMPUTEGS_MANUAL_HAZARD_TRACKING
     resourceOptions |= MTLResourceHazardTrackingModeUntracked;
- #endif
+#endif
     for(int i = 0; i < gsMaxConcurrentBatches; i++)
         gsBuffers.push_back([device newBufferWithLength:gsMaxDataPerBatch options:resourceOptions]);
     gsCurrentBuffer = gsBuffers.at(0);
-#else
-    _gsAdvanceBuffer();
-#endif
 
     gsFence = [device newFence];
     
@@ -274,7 +263,7 @@ MtlfMetalContext::MtlfMetalContext(id<MTLDevice> _device, int width, int height)
     perFrameBufferOffset     = 0;
     perFrameBufferAlignment  = 16;
     
-#if METAL_ENABLE_STATS
+#if defined(METAL_ENABLE_STATS)
     resourceStats.commandBuffersCreated   = 0;
     resourceStats.commandBuffersCommitted = 0;
     resourceStats.buffersCreated          = 0;
@@ -298,17 +287,31 @@ MtlfMetalContext::MtlfMetalContext(id<MTLDevice> _device, int width, int height)
     lastCompletedCommandBuffer = -1;
     committedCommandBufferCount = 0;
     
+    size_t const defaultBufferSize = 1024;
+
+    for(int i = 0; i < kMSL_ProgramStage_NumStages; i++) {
+        oldStyleUniformBufferSize[i] = 0;
+        oldStyleUniformBufferAllocatedSize[i] = defaultBufferSize;
+        oldStyleUniformBuffer[i] = new uint8_t[defaultBufferSize];
+        memset(oldStyleUniformBuffer[i], 0x00, defaultBufferSize);
+    }
 }
 
 MtlfMetalContext::~MtlfMetalContext()
 {
+    for(int i = 0; i < kMSL_ProgramStage_NumStages; i++) {
+        delete[] oldStyleUniformBuffer[i];
+    }
+
 #if defined(ARCH_GFX_OPENGL)
     delete glInterop;
     glInterop = NULL;
 #endif
 
     CleanupUnusedBuffers(true);
+#if defined(METAL_REUSE_BUFFERS)
     bufferFreeList.clear();
+#endif
 
     [commandQueue release];
     if(enableMultiQueue)
@@ -319,25 +322,25 @@ MtlfMetalContext::~MtlfMetalContext()
         [gsBuffers.at(i) release];
     gsBuffers.clear();
    
-#if METAL_ENABLE_STATS
+#if defined(METAL_ENABLE_STATS)
     if(frameCount > 0) {
         NSLog(@"--- METAL Resource Stats (average per frame / total) ----");
-        NSLog(@"Frame count:                %7lu", frameCount);
-        NSLog(@"Command Buffers created:    %7lu / %7lu", resourceStats.commandBuffersCreated   / frameCount, resourceStats.commandBuffersCreated);
-        NSLog(@"Command Buffers committed:  %7lu / %7lu", resourceStats.commandBuffersCommitted / frameCount, resourceStats.commandBuffersCommitted);
-        NSLog(@"Metal   Buffers created:    %7lu / %7lu", resourceStats.buffersCreated          / frameCount, resourceStats.buffersCreated);
-        NSLog(@"Metal   Buffers reused:     %7lu / %7lu", resourceStats.buffersReused           / frameCount, resourceStats.buffersReused);
-        NSLog(@"Metal   Av buf search depth:%7lu"       , resourceStats.bufferSearches          / (resourceStats.buffersCreated + resourceStats.buffersReused));
-        NSLog(@"Render  Encoders requested: %7lu / %7lu", resourceStats.renderEncodersRequested / frameCount, resourceStats.renderEncodersRequested);
-        NSLog(@"Render  Encoders created:   %7lu / %7lu", resourceStats.renderEncodersCreated   / frameCount, resourceStats.renderEncodersCreated);
-        NSLog(@"Render  Pipeline States:    %7lu / %7lu", resourceStats.renderPipelineStates    / frameCount, resourceStats.renderPipelineStates);
-        NSLog(@"Compute Encoders requested: %7lu / %7lu", resourceStats.computeEncodersRequested/ frameCount, resourceStats.computeEncodersRequested);
-        NSLog(@"Compute Encoders created:   %7lu / %7lu", resourceStats.computeEncodersCreated  / frameCount, resourceStats.computeEncodersCreated);
-        NSLog(@"Compute Pipeline States:    %7lu / %7lu", resourceStats.computePipelineStates   / frameCount, resourceStats.computePipelineStates);
-        NSLog(@"Blit    Encoders requested: %7lu / %7lu", resourceStats.blitEncodersRequested   / frameCount, resourceStats.blitEncodersRequested);
-        NSLog(@"Blit    Encoders created:   %7lu / %7lu", resourceStats.blitEncodersCreated     / frameCount, resourceStats.blitEncodersCreated);
-        NSLog(@"GS Batches started:         %7lu / %7lu", resourceStats.GSBatchesStarted        / frameCount, resourceStats.GSBatchesStarted);
-        NSLog(@"Peak    Buffer Allocation:  %7luMbs",     resourceStats.peakBufferAllocation    / (1024*1024));
+        NSLog(@"Frame count:                %7lld", frameCount);
+        NSLog(@"Command Buffers created:    %7llu / %7lu", resourceStats.commandBuffersCreated   / frameCount, resourceStats.commandBuffersCreated);
+        NSLog(@"Command Buffers committed:  %7llu / %7lu", resourceStats.commandBuffersCommitted / frameCount, resourceStats.commandBuffersCommitted);
+        NSLog(@"Metal   Buffers created:    %7llu / %7lu", resourceStats.buffersCreated          / frameCount, resourceStats.buffersCreated);
+        NSLog(@"Metal   Buffers reused:     %7llu / %7lu", resourceStats.buffersReused           / frameCount, resourceStats.buffersReused);
+        NSLog(@"Metal   Av buf search depth:%7lu"       , resourceStats.bufferSearches           / (resourceStats.buffersCreated + resourceStats.buffersReused));
+        NSLog(@"Render  Encoders requested: %7llu / %7lu", resourceStats.renderEncodersRequested / frameCount, resourceStats.renderEncodersRequested);
+        NSLog(@"Render  Encoders created:   %7llu / %7lu", resourceStats.renderEncodersCreated   / frameCount, resourceStats.renderEncodersCreated);
+        NSLog(@"Render  Pipeline States:    %7llu / %7lu", resourceStats.renderPipelineStates    / frameCount, resourceStats.renderPipelineStates);
+        NSLog(@"Compute Encoders requested: %7llu / %7lu", resourceStats.computeEncodersRequested/ frameCount, resourceStats.computeEncodersRequested);
+        NSLog(@"Compute Encoders created:   %7llu / %7lu", resourceStats.computeEncodersCreated  / frameCount, resourceStats.computeEncodersCreated);
+        NSLog(@"Compute Pipeline States:    %7llu / %7lu", resourceStats.computePipelineStates   / frameCount, resourceStats.computePipelineStates);
+        NSLog(@"Blit    Encoders requested: %7llu / %7lu", resourceStats.blitEncodersRequested   / frameCount, resourceStats.blitEncodersRequested);
+        NSLog(@"Blit    Encoders created:   %7llu / %7lu", resourceStats.blitEncodersCreated     / frameCount, resourceStats.blitEncodersCreated);
+        NSLog(@"GS Batches started:         %7llu / %7lu", resourceStats.GSBatchesStarted        / frameCount, resourceStats.GSBatchesStarted);
+        NSLog(@"Peak    Buffer Allocation:  %7luMbs",     resourceStats.peakBufferAllocation     / (1024*1024));
     }
  #endif
 }
@@ -356,15 +359,6 @@ void MtlfMetalContext::AllocateAttachments(int width, int height)
     mtlColorTexture = glInterop->mtlColorTexture;
     mtlDepthTexture = glInterop->mtlDepthTexture;
 #endif
-}
-
-MtlfMetalContextSharedPtr
-MtlfMetalContext::GetMetalContext()
-{
-    if (!context)
-        context = MtlfMetalContextSharedPtr(new MtlfMetalContext(nil, 256, 256));
-
-    return context;
 }
 
 bool
@@ -516,7 +510,7 @@ void MtlfMetalContext::CreateCommandBuffer(MetalWorkQueueType workQueueType) {
             wq->commandBuffer = [context->commandQueueGS commandBuffer];
         else
             wq->commandBuffer = [context->commandQueue commandBuffer];
-#if defined(METAL_EVENTS_AVAILABLE)
+#if defined(METAL_EVENTS_API_PRESENT)
         if (eventsAvailable) {
             wq->event = [device newEvent];
         }
@@ -563,7 +557,7 @@ void MtlfMetalContext::EncodeWaitForEvent(MetalWorkQueueType waitQueue, MetalWor
     eventValue = (eventValue != 0) ? eventValue : signal_wq->currentEventValue;
     if(eventValue > signal_wq->currentHighestWaitValue)
         signal_wq->currentHighestWaitValue = eventValue;
-#if defined(METAL_EVENTS_AVAILABLE)
+#if defined(METAL_EVENTS_API_PRESENT)
     if (eventsAvailable) {
         [wait_wq->commandBuffer encodeWaitForEvent:signal_wq->event value:eventValue];
     }
@@ -596,7 +590,7 @@ uint64_t MtlfMetalContext::EncodeSignalEvent(MetalWorkQueueType signalQueue)
             ReleaseEncoder(true, signalQueue);
         }
     }
-#if defined(METAL_EVENTS_AVAILABLE)
+#if defined(METAL_EVENTS_API_PRESENT)
     if (eventsAvailable) {
         // Generate event
         [wq->commandBuffer encodeSignalEvent:wq->event value:wq->currentEventValue];
@@ -750,34 +744,43 @@ void MtlfMetalContext::SetUniform(
         uint32_t _index,
         MSL_ProgramStage _stage)
 {
-    BufferBinding *OSBuffer = NULL;
-    
     if (!_dataSize) {
         return;
     }
-    
-    if(_stage == kMSL_ProgramStage_Vertex) {
-        OSBuffer = vtxUniformBackingBuffer;
-        dirtyRenderState |= DIRTY_METALRENDERSTATE_OLD_STYLE_VERTEX_UNIFORM;
-    }
-    else if (_stage == kMSL_ProgramStage_Fragment) {
-        OSBuffer = fragUniformBackingBuffer;
-        dirtyRenderState |= DIRTY_METALRENDERSTATE_OLD_STYLE_FRAGMENT_UNIFORM;
-    }
-    else {
-        TF_FATAL_CODING_ERROR("Unsupported stage");
-    }
-    
-    if(!OSBuffer || !OSBuffer->buffer) {
-        TF_FATAL_CODING_ERROR("Uniform Backing buffer not allocated");
-    }
-    
-    uint8_t* bufferContents  = (OSBuffer->contents)  + OSBuffer->offset;
-    
+
+    uint8_t* bufferContents  = oldStyleUniformBuffer[_stage];
+
     uint32_t uniformEnd = (_index + _dataSize);
     copyUniform(bufferContents + _index, (uint8_t*)_data, _dataSize);
+}
+
+void MtlfMetalContext::SetOldStyleUniformBuffer(
+    int index,
+    MSL_ProgramStage stage,
+    int oldStyleUniformSize)
+{
+    if(stage == 0)
+        TF_FATAL_CODING_ERROR("Not allowed!");
     
-    OSBuffer->modified = true;
+    oldStyleUniformBufferSize[stage] = oldStyleUniformSize;
+
+    if (oldStyleUniformSize > oldStyleUniformBufferAllocatedSize[stage]) {
+        oldStyleUniformBufferAllocatedSize[stage] = oldStyleUniformSize;
+
+        uint8_t *newBuffer = new uint8_t[oldStyleUniformSize];
+        memcpy(newBuffer, oldStyleUniformBuffer[stage], oldStyleUniformSize);
+        delete[] oldStyleUniformBuffer[stage];
+        oldStyleUniformBuffer[stage] = newBuffer;
+    }
+
+    oldStyleUniformBufferIndex[stage] = index;
+    
+    if(stage == kMSL_ProgramStage_Vertex) {
+        dirtyRenderState |= DIRTY_METALRENDERSTATE_VERTEX_UNIFORM_BUFFER;
+    }
+    if(stage == kMSL_ProgramStage_Fragment) {
+        dirtyRenderState |= DIRTY_METALRENDERSTATE_FRAGMENT_UNIFORM_BUFFER;
+    }
 }
 
 void MtlfMetalContext::SetUniformBuffer(
@@ -785,40 +788,17 @@ void MtlfMetalContext::SetUniformBuffer(
         id<MTLBuffer> buffer,
         const TfToken& name,
         MSL_ProgramStage stage,
-        int offset,
-        int oldStyleUniformSize)
+        int offset)
 {
     if(stage == 0)
         TF_FATAL_CODING_ERROR("Not allowed!");
     
-    if(oldStyleUniformSize && offset != 0) {
-            TF_FATAL_CODING_ERROR("Expected zero offset!");
-    }
     // Allocate a binding for this buffer
     BufferBinding *bufferInfo = new BufferBinding{
         index, buffer, name, stage, offset, true,
-        (uint32_t)oldStyleUniformSize, (uint8_t *)(buffer.contents)};
+        (uint8_t *)(buffer.contents)};
 
     boundBuffers.push_back(bufferInfo);
-    
-    if(stage == kMSL_ProgramStage_Vertex) {
-        dirtyRenderState |= DIRTY_METALRENDERSTATE_VERTEX_UNIFORM_BUFFER;
-        if (oldStyleUniformSize) {
-            if (vtxUniformBackingBuffer) {
-                NSLog(@"Overwriting existing backing buffer, possible issue?");
-            }
-            vtxUniformBackingBuffer = bufferInfo;
-        }
-    }
-    if(stage == kMSL_ProgramStage_Fragment) {
-        dirtyRenderState |= DIRTY_METALRENDERSTATE_FRAGMENT_UNIFORM_BUFFER;
-        if (oldStyleUniformSize) {
-            if (fragUniformBackingBuffer) {
-                NSLog(@"Overwriting existing backing buffer, possible issue?");
-            }
-            fragUniformBackingBuffer = bufferInfo;
-        }
-    }
 }
 
 void MtlfMetalContext::SetBuffer(int index, id<MTLBuffer> buffer, const TfToken& name)
@@ -1016,7 +996,6 @@ void MtlfMetalContext::SetRenderPipelineState()
     // Unset the state tracking flags
     dirtyRenderState &= ~(DIRTY_METALRENDERSTATE_VERTEX_DESCRIPTOR | DIRTY_METALRENDERSTATE_DRAW_TARGET);
     
-#if METAL_STATE_OPTIMISATION
     // Always call this because currently we're not tracking changes to its state
     size_t hashVal = HashPipelineDescriptor();
     
@@ -1032,7 +1011,6 @@ void MtlfMetalContext::SetRenderPipelineState()
         pipelineState = pipelineStateIt->second;
     }
     else
-#endif
     {
         NSError *error = NULL;
         pipelineState = [device newRenderPipelineStateWithDescriptor:renderPipelineStateDescriptor error:&error];
@@ -1040,50 +1018,21 @@ void MtlfMetalContext::SetRenderPipelineState()
             NSLog(@"Failed to created pipeline state, error %@", error);
             return;
         }
-#if METAL_STATE_OPTIMISATION
         renderPipelineStateMap.emplace(wq->currentRenderPipelineDescriptorHash, pipelineState);
         METAL_INC_STAT(resourceStats.renderPipelineStates);
-#endif
-        
     }
   
-#if METAL_STATE_OPTIMISATION
     if (pipelineState != wq->currentRenderPipelineState)
-#endif
     {
         [wq->currentRenderEncoder setRenderPipelineState:pipelineState];
         wq->currentRenderPipelineState = pipelineState;
     }
 }
 
-void MtlfMetalContext::UpdateOldStyleUniformBlock(BufferBinding *uniformBuffer, MSL_ProgramStage stage)
-{
-    if(!uniformBuffer->buffer) {
-        TF_FATAL_CODING_ERROR("No vertex uniform backing buffer assigned!");
-    }
-#if defined(ARCH_OS_OSX)
-    // Update vertex uniform buffer and move block along
-    [uniformBuffer->buffer  didModifyRange:NSMakeRange(uniformBuffer->offset, uniformBuffer->blockSize)];
-#endif
-    // Copy existing data to the new blocks
-    uint8_t *data = (uint8_t *)((uint8_t *)(uniformBuffer->contents) + uniformBuffer->offset);
-    copyUniform(data + uniformBuffer->blockSize, data, uniformBuffer->blockSize);
-    
-    // Move the offset along
-    uniformBuffer->offset += uniformBuffer->blockSize;
-    
-    // Check for wrapping
-    if (uniformBuffer->offset > uniformBuffer->buffer.length) {
-        NSLog(@"Old style uniform buffer wrapped - expect strangeness"); // MTL_FIXME
-        uniformBuffer->offset  = 0;
-    }
-}
-
 void MtlfMetalContext::SetRenderEncoderState()
 {
-#if !METAL_STATE_OPTIMISATION
     dirtyRenderState = DIRTY_METALRENDERSTATE_ALL;
-#endif
+
     MetalWorkQueue *wq = currentWorkQueue;
     MetalWorkQueue *gswq = &workQueues[METALWORKQUEUE_GEOMETRY_SHADER];
     id <MTLComputeCommandEncoder> computeEncoder;
@@ -1165,10 +1114,26 @@ void MtlfMetalContext::SetRenderEncoderState()
         }
          
          if (dirtyRenderState & DIRTY_METALRENDERSTATE_OLD_STYLE_VERTEX_UNIFORM) {
-             UpdateOldStyleUniformBlock(vtxUniformBackingBuffer, kMSL_ProgramStage_Vertex);
+             uint32_t index = oldStyleUniformBufferIndex[kMSL_ProgramStage_Vertex];
+             if(enableComputeGS) {
+                 [computeEncoder setBytes:oldStyleUniformBuffer[kMSL_ProgramStage_Vertex]
+                                   length:oldStyleUniformBufferSize[kMSL_ProgramStage_Vertex]
+                                  atIndex:index];
+#if CACHE_GSCOMPUTE
+                 // Remove writable status
+                 immutableBufferMask |= (1 << index);
+#else
+                 computePipelineStateDescriptor.buffers[index].mutability = MTLMutabilityImmutable;
+#endif
+             }
+             [wq->currentRenderEncoder setVertexBytes:oldStyleUniformBuffer[kMSL_ProgramStage_Vertex]
+                                               length:oldStyleUniformBufferSize[kMSL_ProgramStage_Vertex]
+                                              atIndex:index];
          }
          if (dirtyRenderState & DIRTY_METALRENDERSTATE_OLD_STYLE_FRAGMENT_UNIFORM) {
-             UpdateOldStyleUniformBlock(fragUniformBackingBuffer, kMSL_ProgramStage_Fragment);
+             [wq->currentRenderEncoder setFragmentBytes:oldStyleUniformBuffer[kMSL_ProgramStage_Fragment]
+                                                 length:oldStyleUniformBufferSize[kMSL_ProgramStage_Fragment]
+                                                atIndex:oldStyleUniformBufferIndex[kMSL_ProgramStage_Fragment]];
          }
          
          dirtyRenderState &= ~(DIRTY_METALRENDERSTATE_VERTEX_UNIFORM_BUFFER    |
@@ -1254,9 +1219,6 @@ void MtlfMetalContext::ClearRenderEncoderState()
     boundBuffers.clear();
     textures.clear();
     samplers.clear();
-    
-    vtxUniformBackingBuffer  = NULL;
-    fragUniformBackingBuffer = NULL;
 }
 
 size_t MtlfMetalContext::HashComputePipelineDescriptor(unsigned int bufferCount)
@@ -1373,7 +1335,7 @@ void MtlfMetalContext::ResetEncoders(MetalWorkQueueType workQueueType, bool isIn
         if(wq->currentHighestWaitValue != endOfQueueEventValue && wq->currentHighestWaitValue >= wq->currentEventValue) {
             TF_FATAL_CODING_ERROR("There is a WaitForEvent which is never going to get Signalled!");
 		}
-#if defined(METAL_EVENTS_AVAILABLE)
+#if defined(METAL_EVENTS_API_PRESENT)
         if(wq->event != nil) {
             [wq->event release];
 		}
@@ -1383,7 +1345,7 @@ void MtlfMetalContext::ResetEncoders(MetalWorkQueueType workQueueType, bool isIn
     }
    
     wq->commandBuffer         = nil;
-#if defined(METAL_EVENTS_AVAILABLE)
+#if defined(METAL_EVENTS_API_PRESENT)
     wq->event                 = nil;
 #endif
     
@@ -1454,7 +1416,7 @@ void MtlfMetalContext::CommitCommandBuffer(bool waituntilScheduled, bool waitUnt
     
     if(wq->generatesEndOfQueueEvent) {
         wq->currentEventValue = endOfQueueEventValue;
-#if defined(METAL_EVENTS_AVAILABLE)
+#if defined(METAL_EVENTS_API_PRESENT)
         if (eventsAvailable) {
             [wq->commandBuffer encodeSignalEvent:wq->event value:wq->currentEventValue];
         }
@@ -1604,7 +1566,7 @@ void MtlfMetalContext::SetCurrentEncoder(MetalEncoderType encoderType, MetalWork
             break;
         }
         case MTLENCODERTYPE_COMPUTE: {
-#if defined(METAL_EVENTS_AVAILABLE)
+#if defined(METAL_EVENTS_API_PRESENT)
             if (concurrentDispatchSupported && eventsAvailable) {
                 wq->currentComputeEncoder = [wq->commandBuffer computeCommandEncoderWithDispatchType:MTLDispatchTypeConcurrent];
             }
@@ -1669,7 +1631,7 @@ id<MTLBuffer> MtlfMetalContext::GetMetalBuffer(NSUInteger length, MTLResourceOpt
 {
     id<MTLBuffer> buffer;
     
-#if METAL_REUSE_BUFFERS
+#if defined(METAL_REUSE_BUFFERS)
     for (auto entry = bufferFreeList.begin(); entry != bufferFreeList.end(); entry++) {
         MetalBufferListEntry bufferEntry = *entry;
         buffer = bufferEntry.buffer;
@@ -1681,8 +1643,7 @@ id<MTLBuffer> MtlfMetalContext::GetMetalBuffer(NSUInteger length, MTLResourceOpt
             storageMode   == buffer.storageMode  &&
             cpuCacheMode  == buffer.cpuCacheMode &&
             lastCompletedCommandBuffer >= (bufferEntry.releasedOnCommandBuffer + METAL_SAFE_BUFFER_REUSE_AGE)) {
-            //NSLog(@"Reusing buffer of length %lu (%lu)", length, frameCount);
-            
+
             // Copy over data
             if (pointer) {
                 memcpy(buffer.contents, pointer, length);
@@ -1739,7 +1700,7 @@ id<MTLBuffer> MtlfMetalContext::GetMetalBufferAllocation(NSUInteger length, cons
 
 void MtlfMetalContext::ReleaseMetalBuffer(id<MTLBuffer> buffer)
 {
- #if METAL_REUSE_BUFFERS
+ #if defined(METAL_REUSE_BUFFERS)
     MetalBufferListEntry bufferEntry;
     bufferEntry.buffer = buffer;
     bufferEntry.releasedOnFrame = frameCount;
@@ -1760,6 +1721,7 @@ void MtlfMetalContext::CleanupUnusedBuffers(bool forceClean)
         perFrameBufferOffset = 0;
     }
     
+#if defined(METAL_REUSE_BUFFERS)
     // Release all buffers that have not been recently reused
     for (auto entry = bufferFreeList.begin(); entry != bufferFreeList.end();) {
         MetalBufferListEntry bufferEntry = *entry;
@@ -1788,7 +1750,7 @@ void MtlfMetalContext::CleanupUnusedBuffers(bool forceClean)
     if (forceClean && (bufferFreeList.size() != 0)) {
         TF_FATAL_CODING_ERROR("Failed to release all Metal buffers");
     }
-    
+#endif
 
 }
 
@@ -1818,24 +1780,30 @@ void MtlfMetalContext::EndFrame() {
 }
 
 void MtlfMetalContext::_gsAdvanceBuffer() {
-#if METAL_COMPUTEGS_BUFFER_REUSE
     gsBufferIndex = (gsBufferIndex + 1) % gsMaxConcurrentBatches;
     gsCurrentBuffer = gsBuffers.at(gsBufferIndex);
-#else
-    if(gsCurrentBuffer != nil)
-        ReleaseMetalBuffer(gsCurrentBuffer);
-    gsCurrentBuffer = GetMetalBuffer(gsMaxDataPerBatch);
-#endif
+
     gsDataOffset = 0;
 }
 
-uint32_t MtlfMetalContext::GetMaxComputeGSPartSize(uint32_t numOutVertsPerInPrim, uint32_t numOutPrimsPerInPrim, uint32_t dataPerVert, uint32_t dataPerPrim) {
+uint32_t MtlfMetalContext::GetMaxComputeGSPartSize(
+        uint32_t numOutVertsPerInPrim,
+        uint32_t numOutPrimsPerInPrim,
+        uint32_t dataPerVert,
+        uint32_t dataPerPrim) const
+{
     const uint32_t maxAlignmentOffset = 15; //Reserve some space for a possible alignment taking up some.
     uint32_t sizePerPrimitive = numOutVertsPerInPrim * dataPerVert + numOutPrimsPerInPrim * dataPerPrim;
     return (gsMaxDataPerBatch - maxAlignmentOffset * 2) / sizePerPrimitive;
 }
 
-void MtlfMetalContext::PrepareForComputeGSPart(uint32_t vertData, uint32_t primData, id<MTLBuffer>& dataBuffer, uint32_t& vertOffset, uint32_t& primOffset) {
+void MtlfMetalContext::PrepareForComputeGSPart(
+       uint32_t vertData,
+       uint32_t primData,
+       id<MTLBuffer>& dataBuffer,
+       uint32_t& vertOffset,
+       uint32_t& primOffset)
+{
 
     //Pad data to 16byte boundaries
     const uint32_t alignment = 16;

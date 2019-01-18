@@ -60,30 +60,26 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 class MtlfGlInterop;
 
-// Not a strict size but how many copies of the uniforms to keep
-#define METAL_OLD_STYLE_UNIFORM_BUFFER_SIZE 5000
-
 // Enable reuse of metal buffers - should increase perforamance but may also increase memory footprint
-#define METAL_REUSE_BUFFERS 1
+#define METAL_REUSE_BUFFERS
 
-#if METAL_REUSE_BUFFERS
+#if defined(METAL_REUSE_BUFFERS)
 // How old a buffer must be before it can be reused - 0 should allow for most optimal memory footprint, higher values can be used for debugging issues
-#if defined(ARCH_OS_IOS)
-#define METAL_SAFE_BUFFER_REUSE_AGE 5
-#define METAL_HIGH_MEMORY_THRESHOLD (1UL * 1024UL * 1024UL * 1024UL)
-#define METAL_MAX_BUFFER_AGE_IN_FRAMES 3
-#else
-#define METAL_SAFE_BUFFER_REUSE_AGE 0
-#define METAL_HIGH_MEMORY_THRESHOLD (2UL * 1024UL * 1024UL * 1024UL)
-#define METAL_MAX_BUFFER_AGE_IN_FRAMES 3
-#endif
+#define METAL_SAFE_BUFFER_REUSE_AGE 1
 // How old a buffer can be before it's freed
-#define METAL_MAX_BUFFER_AGE_IN_COMMAND_BUFFERS 10
+#define METAL_MAX_BUFFER_AGE_IN_COMMAND_BUFFERS 20
+#define METAL_MAX_BUFFER_AGE_IN_FRAMES 3
+
+#if defined(ARCH_OS_IOS)
+#define METAL_HIGH_MEMORY_THRESHOLD (1UL * 1024UL * 1024UL * 1024UL)
+#else
+#define METAL_HIGH_MEMORY_THRESHOLD (2UL * 1024UL * 1024UL * 1024UL)
+#endif
 #endif
 
 // Enable stats gathering
-#define METAL_ENABLE_STATS 1
-#if METAL_ENABLE_STATS
+#define METAL_ENABLE_STATS
+#if defined(METAL_ENABLE_STATS)
 #define METAL_INC_STAT(STAT) STAT++
 #define METAL_INC_STAT_VAL(STAT, VAL) STAT+=VAL
 #define METAL_MAX_STAT_VAL(ORIG, NEWVAL) ORIG = MAX(ORIG, NEWVAL)
@@ -110,6 +106,8 @@ enum MSL_ProgramStage
     kMSL_ProgramStage_Vertex   = (1 << 0),
     kMSL_ProgramStage_Fragment = (1 << 1),
     kMSL_ProgramStage_Compute  = (1 << 2),
+    
+    kMSL_ProgramStage_NumStages = 3
 };
 
 enum MetalEncoderType {
@@ -128,12 +126,6 @@ enum MetalWorkQueueType {
     METALWORKQUEUE_MAX              =  3,       // This should always be last
 };
 
-#if defined(ARCH_OS_OSX)
-#define MTLResourceStorageModeDefault MTLResourceStorageModeManaged
-#else
-#define MTLResourceStorageModeDefault MTLResourceStorageModeShared
-#endif
-
 class MtlfMetalContext : public boost::noncopyable {
 public:
     typedef struct {
@@ -146,7 +138,12 @@ public:
 
     /// Returns an instance for the current Metal device.
     MTLF_API
-    static MtlfMetalContextSharedPtr GetMetalContext();
+    static MtlfMetalContextSharedPtr GetMetalContext() {
+        if (!context)
+            context = MtlfMetalContextSharedPtr(new MtlfMetalContext(nil, 256, 256));
+        
+        return context;
+    }
 
     /// Returns whether this interface has been initialized.
     MTLF_API
@@ -210,8 +207,14 @@ public:
     void SetUniform(const void* _data, uint32_t _dataSize, const TfToken& _name, uint32_t index, MSL_ProgramStage stage);
     
     MTLF_API
-    void SetUniformBuffer(int index, id<MTLBuffer> buffer, const TfToken& name, MSL_ProgramStage stage, int offset = 0, int oldStyleUniformSize = 0);
+    void SetUniformBuffer(int index, id<MTLBuffer> buffer, const TfToken& name, MSL_ProgramStage stage, int offset = 0);
     
+    MTLF_API
+    void SetOldStyleUniformBuffer(
+             int index,
+             MSL_ProgramStage stage,
+             int oldStyleUniformSize);
+
     MTLF_API
     void SetBuffer(int index, id<MTLBuffer> buffer, const TfToken& name);	//Implementation binds this as a vertex buffer!
     
@@ -293,7 +296,7 @@ public:
     void ReleaseMetalBuffer(id<MTLBuffer> buffer);
 
     // Gets space inside a buffer that has a lifetime of the current frame only - to be used for temporary data such as uniforms, the offset *must* be used
-    // Resource options are MTLResourceStorageModeManaged | MTLResourceOptionCPUCacheModeDefault
+    // Resource options are MTLResourceStorageModeShared | MTLResourceStorageModeManaged | MTLResourceOptionCPUCacheModeDefault
     MTLF_API
     id<MTLBuffer> GetMetalBufferAllocation(NSUInteger length, const void *pointer, NSUInteger *offset);
     
@@ -304,11 +307,11 @@ public:
     void EndFrame();
     
     MTLF_API
-    bool GeometryShadersActive() { return workQueues[METALWORKQUEUE_GEOMETRY_SHADER].commandBuffer != nil; }
+    bool GeometryShadersActive() const { return workQueues[METALWORKQUEUE_GEOMETRY_SHADER].commandBuffer != nil; }
     
     //Returns the maximum number of _primitives_ to process per ComputeGS part.
     MTLF_API
-    uint32_t GetMaxComputeGSPartSize(uint32_t numOutVertsPerInPrim, uint32_t numOutPrimsPerInPrim, uint32_t dataPerVert, uint32_t dataPerPrim);
+    uint32_t GetMaxComputeGSPartSize(uint32_t numOutVertsPerInPrim, uint32_t numOutPrimsPerInPrim, uint32_t dataPerVert, uint32_t dataPerPrim) const;
     
     //Sets up all state for a new ComputeGS part, including any buffer allocations, syncs, encoders and commandbuffers.
     //Be careful when encoding commands around this as it may start a new encoder.
@@ -319,7 +322,7 @@ public:
     unsigned long IncNumberPrimsDrawn(unsigned long numPrims, bool init) { numPrimsDrawn = init ? numPrims : (numPrimsDrawn += numPrims); return numPrimsDrawn; }
     
     MTLF_API
-    bool IsTempPointWorkaroundActive() { return tempPointsWorkaroundActive; }
+    bool IsTempPointWorkaroundActive() const { return tempPointsWorkaroundActive; }
 
     MTLF_API
     void SetTempPointWorkaround(bool activate) { tempPointsWorkaroundActive = activate; }
@@ -328,8 +331,10 @@ public:
     void SetOSDEnabledThisFrame(bool OSDStatus) { OSDEnabledThisFrame = OSDStatus; }
     
     MTLF_API
-    bool IsOSDEnabledThisFrame() { return OSDEnabledThisFrame; }
-    
+    bool IsOSDEnabledThisFrame() const { return OSDEnabledThisFrame; }
+
+    MTLF_API
+    int64_t GetCurrentFrame() const { return frameCount; }
 
     MTLF_API
     float GetGPUTimeInMs();
@@ -359,13 +364,14 @@ protected:
         MSL_ProgramStage stage;
         int              offset;
         bool             modified;
-        uint32_t         blockSize;
         uint8_t          *contents;
     };
     std::vector<BufferBinding*> boundBuffers;
 	
-    BufferBinding *vtxUniformBackingBuffer;
-    BufferBinding *fragUniformBackingBuffer;
+    size_t oldStyleUniformBufferSize[kMSL_ProgramStage_NumStages];
+    size_t oldStyleUniformBufferAllocatedSize[kMSL_ProgramStage_NumStages];
+    uint8_t *oldStyleUniformBuffer[kMSL_ProgramStage_NumStages];
+    uint32_t oldStyleUniformBufferIndex[kMSL_ProgramStage_NumStages];
     
     struct TextureBinding { int index; id<MTLTexture> texture; TfToken name; MSL_ProgramStage stage; };
     std::vector<TextureBinding> textures;
@@ -468,8 +474,6 @@ private:
     id<MTLFunction> renderFragmentFunction;
     id<MTLFunction> renderComputeGSFunction;
  
-    void UpdateOldStyleUniformBlock(BufferBinding *uniformBuffer, MSL_ProgramStage stage);
-    
     bool concurrentDispatchSupported;
     
     // Internal state which gets applied to the render encoder
@@ -495,26 +499,27 @@ private:
     void _PatchRenderPassDescriptor();
     
     void CleanupUnusedBuffers(bool forceClean);
-   
+#if defined(METAL_REUSE_BUFFERS)
     struct MetalBufferListEntry {
         id<MTLBuffer> buffer;
         unsigned int releasedOnFrame;
         unsigned int releasedOnCommandBuffer;
     };
     std::vector<MetalBufferListEntry> bufferFreeList;
-    
+#endif
+
     // Metal buffer for per frame data
     id<MTLBuffer> perFrameBuffer;
     NSUInteger    perFrameBufferSize;
     NSUInteger    perFrameBufferOffset;
     NSUInteger    perFrameBufferAlignment;
     
-    long frameCount;
-    long lastCompletedFrame;
-    long committedCommandBufferCount;
-    long lastCompletedCommandBuffer;
+    int64_t frameCount;
+    int64_t lastCompletedFrame;
+    int64_t committedCommandBufferCount;
+    int64_t lastCompletedCommandBuffer;
 
-#if METAL_ENABLE_STATS
+#if defined(METAL_ENABLE_STATS)
     struct ResourceStats {
         unsigned long commandBuffersCreated;
         unsigned long commandBuffersCommitted;

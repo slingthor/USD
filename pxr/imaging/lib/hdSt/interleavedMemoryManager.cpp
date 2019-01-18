@@ -538,16 +538,15 @@ HdStInterleavedMemoryManager::_StripedInterleavedBufferRange::CopyData(
     // This code allows N-tuples and N-element arrays to be interchanged.
     // It would seem better to have upstream buffers adjust their tuple
     // arity as needed.
-    if (!TF_VERIFY(
-        bufferSource->GetTupleType().type == VBO->GetTupleType().type,
-        "'%s': (%s (%i) x %zu) != (%s (%i) x %zu)\n",
-        bufferSource->GetName().GetText(),
-        TfEnum::GetName(bufferSource->GetTupleType().type).c_str(),
-        bufferSource->GetTupleType().type,
-        bufferSource->GetTupleType().count,
-        TfEnum::GetName(VBO->GetTupleType().type).c_str(),
-        VBO->GetTupleType().type,
-        VBO->GetTupleType().count)) {
+    if (!TF_VERIFY(bufferSource->GetTupleType().type == VBO->GetTupleType().type,
+                        "'%s': (%s (%i) x %zu) != (%s (%i) x %zu)\n",
+                        bufferSource->GetName().GetText(),
+                        TfEnum::GetName(bufferSource->GetTupleType().type).c_str(),
+                        bufferSource->GetTupleType().type,
+                        bufferSource->GetTupleType().count,
+                        TfEnum::GetName(VBO->GetTupleType().type).c_str(),
+                        VBO->GetTupleType().type,
+                        VBO->GetTupleType().count)) {
         return;
     }
 

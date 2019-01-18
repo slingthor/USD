@@ -24,7 +24,7 @@
 #include "pxr/imaging/mtlf/mtlDevice.h"
 
 #include "pxr/imaging/hdSt/Metal/interleavedMemoryBufferMetal.h"
-#include "pxr/imaging/hdSt/bufferResource.h"
+#include "pxr/imaging/hdSt/Metal/bufferResourceMetal.h"
 #include "pxr/imaging/hdSt/bufferRelocator.h"
 #include "pxr/imaging/hdSt/resourceFactory.h"
 
@@ -86,7 +86,7 @@ HdStStripedInterleavedBufferMetal::Reallocate(
         }
         elementCount += (*it)->GetNumElements();
     }
-    size_t totalSize = elementCount * _stride;
+    size_t const totalSize = elementCount * _stride;
 
     // update range list (should be done before early exit)
     _SetRangeList(ranges);
@@ -108,24 +108,39 @@ HdStStripedInterleavedBufferMetal::Reallocate(
     // curId and oldId will be different when we are adopting ranges
     // from another buffer array.
 
-    id<MTLBuffer> newId = nil;
-    id<MTLBuffer> oldId = GetResources().begin()->second->GetId();
-    
     HdStInterleavedMemoryManager::_StripedInterleavedBufferSharedPtr curRangeOwner_ =
-    boost::static_pointer_cast<_StripedInterleavedBuffer> (curRangeOwner);
-    
-    id<MTLBuffer> curId = curRangeOwner_->GetResources().begin()->second->GetId();
-    newId = MtlfMetalContext::GetMetalContext()->GetMetalBuffer(totalSize, MTLResourceStorageModeDefault);
-    
+        boost::static_pointer_cast<_StripedInterleavedBuffer> (curRangeOwner);
+
+    int const numBuffers = HdResourceGPUHandle::numHandles;
+
+    HdResourceGPUHandle newId;
+    HdResourceGPUHandle oldId = boost::static_pointer_cast<HdStBufferResourceMetal>(
+                                    GetResources().begin()->second)->GetAllIds();
+    HdResourceGPUHandle curId = boost::static_pointer_cast<HdStBufferResourceMetal>(
+                                    curRangeOwner_->GetResources().begin()->second)->GetAllIds();
+
+    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
+#if defined(ARCH_GFX_USE_TRIPLE_BUFFERING)
+    newId = HdResourceGPUHandle(context->GetMetalBuffer(totalSize, MTLResourceStorageModeDefault),
+                                context->GetMetalBuffer(totalSize, MTLResourceStorageModeDefault),
+                                context->GetMetalBuffer(totalSize, MTLResourceStorageModeDefault));
+#else
+    newId = context->GetMetalBuffer(totalSize, MTLResourceStorageModeDefault);
+#endif
+
     // if old buffer exists, copy unchanged data
-    if (curId) {
+    if (curId.IsSet()) {
         int index = 0;
         
-        size_t rangeCount = GetRangeCount();
+        size_t const rangeCount = GetRangeCount();
         
         // pre-pass to combine consecutive buffer range relocation
-        boost::scoped_ptr<HdStBufferRelocator> relocator(
-            HdStResourceFactory::GetInstance()->NewBufferRelocator(curId, newId));
+        HdStBufferRelocator* relocator[numBuffers];
+        for(int i = 0; i < numBuffers; i++) {
+            int const curIndex = curId[i] ? i : 0;
+            relocator[i] = HdStResourceFactory::GetInstance()->NewBufferRelocator(curId[curIndex], newId[i]);
+        }
+
         for (size_t rangeIdx = 0; rangeIdx < rangeCount; ++rangeIdx) {
             HdStInterleavedMemoryManager::_StripedInterleavedBufferRangeSharedPtr range = _GetRangeSharedPtr(rangeIdx);
             
@@ -134,28 +149,32 @@ HdStStripedInterleavedBufferMetal::Reallocate(
                                 "unexpectedly.");
                 continue;
             }
-            int oldIndex = range->GetIndex();
+            int const oldIndex = range->GetIndex();
             if (oldIndex >= 0) {
                 // copy old data
-                GLintptr readOffset = oldIndex * _stride;
-                GLintptr writeOffset = index * _stride;
-                GLsizeiptr copySize = _stride * range->GetNumElements();
+                ptrdiff_t const readOffset = oldIndex * _stride;
+                ptrdiff_t const writeOffset = index * _stride;
+                size_t const copySize = _stride * range->GetNumElements();
                 
-                relocator->AddRange(readOffset, writeOffset, copySize);
+                for(int i = 0; i < numBuffers; i++) {
+                    relocator[i]->AddRange(readOffset, writeOffset, copySize);
+                }
             }
             
             range->SetIndex(index);
             index += range->GetNumElements();
         }
-        
+
         // buffer copy
-        relocator->Commit();
-        
+        for(int i = 0; i < numBuffers; i++) {
+            relocator[i]->Commit();
+            delete relocator[i];
+        }
     } else {
         // just set index
         int index = 0;
         
-        size_t rangeCount = GetRangeCount();
+        size_t const rangeCount = GetRangeCount();
         for (size_t rangeIdx = 0; rangeIdx < rangeCount; ++rangeIdx) {
             HdStInterleavedMemoryManager::_StripedInterleavedBufferRangeSharedPtr range = _GetRangeSharedPtr(rangeIdx);
             if (!range) {
@@ -169,13 +188,15 @@ HdStStripedInterleavedBufferMetal::Reallocate(
         }
     }
     // delete old buffer
-    if(oldId != nil) {
-        MtlfMetalContext::GetMetalContext()->ReleaseMetalBuffer(oldId);
+    for(int i = 0; i < numBuffers; i++) {
+        if(oldId[i] != nil) {
+            context->ReleaseMetalBuffer(oldId[i]);
+        }
     }
-    
+
     // update id to all buffer resources
     TF_FOR_ALL(it, GetResources()) {
-        it->second->SetAllocation((__bridge HdResourceGPUHandle)newId, totalSize);
+        it->second->SetAllocation(newId, totalSize);
     }
 
     _needsReallocation = false;

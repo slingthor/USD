@@ -224,12 +224,12 @@ public:
         size_t GetNumElements() const {
             return HdGetComponentCount(_resource->GetTupleType().type);
         }
-        GLuint BindVBO() {
-            return (GLuint)(uint64_t)_resource->GetId();
+        HdResourceGPUHandle BindVBO() {
+            return _resource->GetId();
         }
 #if OPENSUBDIV_HAS_METAL_COMPUTE && defined(ARCH_GFX_METAL)
         id<MTLBuffer> BindMTLBuffer(OpenSubdiv::v3_3_1::Osd::MTLContext* context) {
-            return id<MTLBuffer>(_resource->GetId());
+            return _resource->GetId();
         }
 #endif
         HdStBufferResourceSharedPtr _resource;

@@ -42,7 +42,7 @@ int MtlfContextCaps::GetAPIVersion()
 {
 #if __MAC_OS_X_VERSION_MAX_ALLOWED >= 101300 /* __MAC_10_13 */
     return 450;
-#elif __IPHONE_OS_VERSION_MAX_ALLOWED >= 120000 /* __IOS_11_00 */
+#elif __IPHONE_OS_VERSION_MAX_ALLOWED >= 110000 /* __IOS_11_00 */
     return 450;
 #endif
     return 0;

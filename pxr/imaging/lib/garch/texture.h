@@ -63,90 +63,94 @@ TF_DECLARE_WEAK_AND_REF_PTRS(GarchTexture);
 
 struct GarchTextureGPUHandle {
     GarchTextureGPUHandle() {
-        handle = 0;
+        handle = NULL;
     }
     GarchTextureGPUHandle(GarchTextureGPUHandle const & _gpuHandle) {
         handle = _gpuHandle.handle;
     }
     
-    void Clear() { handle = 0; }
-    bool IsSet() const { return handle != 0; }
+    void Clear() { handle = NULL; }
+    bool IsSet() const { return handle != NULL; }
 
     // OpenGL
+#if defined(ARCH_GFX_OPENGL)
     GarchTextureGPUHandle(GLuint const _handle) {
-        handle = _handle;
+        handle = (void*)uint64_t(_handle);
     }
     GarchTextureGPUHandle(GLuint64 const _handle) {
-        handle = _handle;
+        handle = (void*)uint64_t(_handle);
     }
     GarchTextureGPUHandle& operator =(GLuint const _handle) {
-        handle = _handle;
+        handle = (void*)uint64_t(_handle);
         return *this;
     }
     GarchTextureGPUHandle& operator =(GLuint64 const _handle) {
-        handle = _handle;
+        handle = (void*)_handle;
         return *this;
     }
-    operator GLuint() const { return (GLuint)handle; }
-    operator GLuint64() const { return handle; }
-
+    operator GLuint() const { return (GLuint)uint64_t(handle); }
+    operator GLuint64() const { return (GLuint64)uint64_t(handle); }
+#endif
+    
 #if defined(ARCH_GFX_METAL)
     // Metal
     GarchTextureGPUHandle(id<MTLTexture> const _handle) {
-        handle = (__bridge uint64_t)_handle;
+        handle = (__bridge void*)_handle;
     }
     GarchTextureGPUHandle& operator =(id<MTLTexture> const _handle) {
-        handle = (__bridge uint64_t)_handle;
+        handle = (__bridge void*)_handle;
         return *this;
     }
     operator id<MTLTexture>() const { return (__bridge id<MTLTexture>)handle; }
 #endif
     
-    uint64_t handle;
+    void* handle;
 };
 
 struct GarchSamplerGPUHandle {
     GarchSamplerGPUHandle() {
-        handle = 0;
+        handle = NULL;
     }
     GarchSamplerGPUHandle(GarchSamplerGPUHandle const & _gpuHandle) {
         handle = _gpuHandle.handle;
     }
     
-    void Clear() { handle = 0; }
-    bool IsSet() const { return handle != 0; }
+    void Clear() { handle = NULL; }
+    bool IsSet() const { return handle != NULL; }
     
     // OpenGL
+#if defined(ARCH_GFX_OPENGL)
     GarchSamplerGPUHandle(GLuint const _handle) {
-        handle = _handle;
+        handle = (void*)uint64_t(_handle);
     }
     GarchSamplerGPUHandle(GLuint64 const _handle) {
-        handle = _handle;
+        handle = (void*)_handle;
     }
     GarchSamplerGPUHandle& operator =(GLuint const _handle) {
-        handle = _handle;
+        handle = (void*)uint64_t(_handle);
         return *this;
     }
     GarchSamplerGPUHandle& operator =(GLuint64 const _handle) {
-        handle = _handle;
+        handle = (void*)_handle;
         return *this;
     }
-    operator GLuint() const { return (GLuint)handle; }
-    operator GLuint64() const { return handle; }
-    
+    operator GLuint() const { return (GLuint)uint64_t(handle); }
+    operator GLuint64() const { return (GLuint64)handle; }
+#endif
+
 #if defined(ARCH_GFX_METAL)
     // Metal
     GarchSamplerGPUHandle(id<MTLSamplerState> const _handle) {
-        handle = (__bridge uint64_t)_handle;
+        handle = (__bridge void*)_handle;
     }
     GarchSamplerGPUHandle& operator =(id<MTLSamplerState> const _handle) {
-        handle = (__bridge uint64_t)_handle;
+        handle = (__bridge void*)_handle;
         return *this;
     }
     operator id<MTLSamplerState>() const { return (__bridge id<MTLSamplerState>)handle; }
 #endif
     
-    uint64_t handle;
+    void* handle;
 };
 
 /// \class GarchTexture

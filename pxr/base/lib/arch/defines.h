@@ -36,6 +36,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 #define ARCH_OS_LINUX
 #elif defined(__APPLE__)
 #include "TargetConditionals.h"
+#include <Availability.h>
 #define ARCH_OS_DARWIN
 #if TARGET_OS_IPHONE
 #define ARCH_OS_IOS
@@ -109,12 +110,10 @@ defined(_M_IX86) || defined(_M_X64)
 
 // The current version of Apple clang does not support the thread_local
 // keyword.
-//#if !(defined(ARCH_OS_DARWIN) && defined(ARCH_COMPILER_CLANG))
 #define ARCH_HAS_THREAD_LOCAL
-//#endif
 
 // Memmap usage - iOS has constraints on the size that can be mapped.
-// Disable for now as it's currently all or nothing
+// Disable for now as it's currently always or never
 #if !defined(ARCH_OS_IOS)
 #define ARCH_HAS_MMAP
 #endif
@@ -132,14 +131,20 @@ defined(_M_IX86) || defined(_M_X64)
 // Metal API present
 #if defined(PXR_METAL_SUPPORT_ENABLED)
 #define ARCH_GFX_METAL
-#define UNITTEST_GFX_ARCH HdEngine::Metal
+#define PXR_UNITTEST_GFX_ARCH HdEngine::Metal
 #if (__MAC_OS_X_VERSION_MAX_ALLOWED >= 101400) || (__IPHONE_OS_VERSION_MAX_ALLOWED >= 120000) /* __MAC_10_14 __IOS_12_00 */
 #define METAL_EVENTS_API_PRESENT
 #endif
+#if defined(ARCH_OS_OSX)
+#define MTLResourceStorageModeDefault MTLResourceStorageModeManaged
+#else
+#define MTLResourceStorageModeDefault MTLResourceStorageModeShared
+#endif
+#define ARCH_GFX_USE_TRIPLE_BUFFERING
 #endif
 
-#if !defined(UNITTEST_GFX_ARCH)
-#define UNITTEST_GFX_ARCH HdEngine::OpenGL
+#if !defined(PXR_UNITTEST_GFX_ARCH)
+#define PXR_UNITTEST_GFX_ARCH HdEngine::OpenGL
 #endif
 
 PXR_NAMESPACE_CLOSE_SCOPE

@@ -26,6 +26,7 @@
 #include "pxr/imaging/garch/contextCaps.h"
 #include "pxr/imaging/garch/resourceFactory.h"
 
+#include "pxr/imaging/hdSt/Metal/bufferResourceMetal.h"
 #include "pxr/imaging/hdSt/Metal/vboMemoryBufferMetal.h"
 #include "pxr/imaging/hdSt/resourceFactory.h"
 #include "pxr/imaging/mtlf/mtlDevice.h"
@@ -40,8 +41,6 @@
 #include "pxr/base/tf/enum.h"
 
 #include "pxr/imaging/hdSt/bufferRelocator.h"
-#include "pxr/imaging/hdSt/bufferResource.h"
-//#include "pxr/imaging/hdSt/GL/glUtils.h"
 #include "pxr/imaging/hd/engine.h"
 #include "pxr/imaging/hd/perfLog.h"
 #include "pxr/imaging/hd/tokens.h"
@@ -129,13 +128,16 @@ HdStVBOMemoryBufferMetal::Reallocate(
     // resize each BufferResource
     HdBufferResourceNamedList const& resources = GetResources();
     for (size_t bresIdx=0; bresIdx<resources.size(); ++bresIdx) {
-        HdBufferResourceSharedPtr const &bres = resources[bresIdx].second;
-        HdBufferResourceSharedPtr const &curRes =
-                curRangeOwner_->GetResources()[bresIdx].second;
+        HdStBufferResourceMetalSharedPtr const &bres =
+            boost::static_pointer_cast<HdStBufferResourceMetal>(resources[bresIdx].second);
+        HdStBufferResourceMetalSharedPtr const &curRes =
+            boost::static_pointer_cast<HdStBufferResourceMetal>(curRangeOwner_->GetResources()[bresIdx].second);
 
-        int bytesPerElement = HdDataSizeOfTupleType(bres->GetTupleType());
+        int const bytesPerElement = HdDataSizeOfTupleType(bres->GetTupleType());
         TF_VERIFY(bytesPerElement > 0);
-        GLsizeiptr bufferSize = bytesPerElement * _totalCapacity;
+        size_t const bufferSize = bytesPerElement * _totalCapacity;
+
+        int const numBuffers = HdResourceGPUHandle::numHandles;
 
         // allocate new one
         // curId and oldId will be different when we are adopting ranges
@@ -144,15 +146,26 @@ HdStVBOMemoryBufferMetal::Reallocate(
         HdResourceGPUHandle oldId(bres->GetId());
         HdResourceGPUHandle curId(curRes->GetId());
 
-        newId = MtlfMetalContext::GetMetalContext()->GetMetalBuffer(bufferSize, MTLResourceStorageModeDefault);
-        
+        MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
+#if defined(ARCH_GFX_USE_TRIPLE_BUFFERING)
+        newId = HdResourceGPUHandle(context->GetMetalBuffer(bufferSize, MTLResourceStorageModeDefault),
+                                    context->GetMetalBuffer(bufferSize, MTLResourceStorageModeDefault),
+                                    context->GetMetalBuffer(bufferSize, MTLResourceStorageModeDefault));
+#else
+        newId = context->GetMetalBuffer(bufferSize, MTLResourceStorageModeDefault);
+#endif
         // if old buffer exists, copy unchanged data
-        if (curId) {
+        if (curId.IsSet()) {
             std::vector<size_t>::iterator newOffsetIt = newOffsets.begin();
 
             // pre-pass to combine consecutive buffer range relocation
-            boost::scoped_ptr<HdStBufferRelocator> relocator(
-                 HdStResourceFactory::GetInstance()->NewBufferRelocator(curId, newId));
+            HdStBufferRelocator* relocator[numBuffers];
+            
+            for (int i = 0; i < numBuffers; i++) {
+                int const curIndex = curId[i] ? i : 0;
+                relocator[i] = HdStResourceFactory::GetInstance()->NewBufferRelocator(curId[curIndex], newId[i]);
+            }
+
             TF_FOR_ALL (it, ranges) {
                 HdStVBOMemoryManager::_StripedBufferArrayRangeSharedPtr range =
                     boost::static_pointer_cast<HdStVBOMemoryManager::_StripedBufferArrayRange>(*it);
@@ -176,27 +189,36 @@ HdStVBOMemoryBufferMetal::Reallocate(
                 //   Shrinking the range. When the garbage collection
                 //   truncates ranges.
                 //
-                int oldSize = range->GetCapacity();
-                int newSize = range->GetNumElements();
-                GLsizeiptr copySize =
+                int const oldSize = range->GetCapacity();
+                int const newSize = range->GetNumElements();
+                size_t const copySize =
                     std::min(oldSize, newSize) * bytesPerElement;
-                int oldOffset = range->GetOffset();
+                int const oldOffset = range->GetOffset();
                 if (copySize > 0) {
-                    GLintptr readOffset = oldOffset * bytesPerElement;
-                    GLintptr writeOffset = *newOffsetIt * bytesPerElement;
+                    ptrdiff_t const readOffset = oldOffset * bytesPerElement;
+                    ptrdiff_t const writeOffset = *newOffsetIt * bytesPerElement;
 
-                    relocator->AddRange(readOffset, writeOffset, copySize);
+                    for (int i = 0; i < numBuffers; i++) {
+                        if (relocator[i]) {
+                            relocator[i]->AddRange(readOffset, writeOffset, copySize);
+                        }
+                    }
                 }
                 ++newOffsetIt;
             }
 
             // buffer copy
-            relocator->Commit();
+            for (int i = 0; i < numBuffers; i++) {
+                relocator[i]->Commit();
+                delete relocator[i];
+            }
         }
 
-        if (oldId) {
-            // delete old buffer
-            MtlfMetalContext::GetMetalContext()->ReleaseMetalBuffer(oldId);
+        for (int i = 0; i < numBuffers; i++) {
+            if (oldId[i]) {
+                // delete old buffer
+                MtlfMetalContext::GetMetalContext()->ReleaseMetalBuffer(oldId[i]);
+            }
         }
 
         // update id of buffer resource

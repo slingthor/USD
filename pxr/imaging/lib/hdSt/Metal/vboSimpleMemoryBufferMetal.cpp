@@ -27,13 +27,13 @@
 #include "pxr/imaging/garch/resourceFactory.h"
 
 #include "pxr/imaging/mtlf/mtlDevice.h"
+#include "pxr/imaging/hdSt/Metal/bufferResourceMetal.h"
 #include "pxr/imaging/hdSt/Metal/vboSimpleMemoryBufferMetal.h"
 
 #include "pxr/base/tf/diagnostic.h"
 #include "pxr/base/tf/envSetting.h"
 #include "pxr/base/tf/iterator.h"
 
-#include "pxr/imaging/hdSt/bufferResource.h"
 #include "pxr/imaging/hdSt/vboSimpleMemoryManager.h"
 
 #include "pxr/imaging/hd/bufferArrayRange.h"
@@ -117,19 +117,29 @@ HdStVBOSimpleMemoryBufferMetal::Reallocate(
     id<MTLBlitCommandEncoder> blitEncoder = context->GetBlitEncoder(METALWORKQUEUE_RESOURCE);
     
     TF_FOR_ALL (bresIt, GetResources()) {
-        HdBufferResourceSharedPtr const &bres = bresIt->second;
+        HdStBufferResourceMetalSharedPtr const &bres =
+            boost::static_pointer_cast<HdStBufferResourceMetal>(bresIt->second);
 
         // XXX:Arrays: We should use HdDataSizeOfTupleType() here, to
         // add support for array types.
-        int bytesPerElement = HdDataSizeOfType(bres->GetTupleType().type);
-        GLsizeiptr bufferSize = bytesPerElement * numElements;
+        int const bytesPerElement = HdDataSizeOfType(bres->GetTupleType().type);
+        size_t const bufferSize = bytesPerElement * numElements;
+
+        int const numBuffers = HdResourceGPUHandle::numHandles;
 
         // allocate new one
         HdResourceGPUHandle newId;
         HdResourceGPUHandle oldId(bres->GetId());
 
         if (bufferSize) {
+#if defined(ARCH_GFX_USE_TRIPLE_BUFFERING)
+            newId = HdResourceGPUHandle(
+                                        context->GetMetalBuffer(bufferSize, MTLResourceStorageModeDefault),
+                                        context->GetMetalBuffer(bufferSize, MTLResourceStorageModeDefault),
+                                        context->GetMetalBuffer(bufferSize, MTLResourceStorageModeDefault));
+#else
             newId = context->GetMetalBuffer(bufferSize, MTLResourceStorageModeDefault);
+#endif
         }
         else {
             // Dummy buffer - 0 byte buffers are invalid
@@ -150,23 +160,28 @@ HdStVBOSimpleMemoryBufferMetal::Reallocate(
         //   Shrinking the range. When the garbage collection
         //   truncates ranges.
         //
-        int oldSize = range->GetCapacity();
-        int newSize = range->GetNumElements();
-        GLsizeiptr copySize = std::min(oldSize, newSize) * bytesPerElement;
+        int const oldSize = range->GetCapacity();
+        int const newSize = range->GetNumElements();
+        size_t const copySize = std::min(oldSize, newSize) * bytesPerElement;
         if (copySize > 0) {
             HD_PERF_COUNTER_INCR(HdPerfTokens->glCopyBufferSubData);
 
-            [blitEncoder copyFromBuffer:oldId
-                           sourceOffset:0
-                               toBuffer:newId
-                      destinationOffset:0
-                                   size:copySize];
+            for (int i = 0; i < numBuffers; i++) {
+                [blitEncoder copyFromBuffer:oldId[i]
+                               sourceOffset:0
+                                   toBuffer:newId[i]
+                          destinationOffset:0
+                                       size:copySize];
+            }
         }
 
         // delete old buffer
-        if (oldId) {
-            id<MTLBuffer> oid = oldId;
-            context->ReleaseMetalBuffer(oldId);
+        if (oldId.IsSet()) {
+            for (int i = 0; i < numBuffers; i++) {
+                if (oldId[i]) {
+                    context->ReleaseMetalBuffer(oldId[i]);
+                }
+            }
         }
 
         bres->SetAllocation(newId, bufferSize);
@@ -188,8 +203,7 @@ HdStVBOSimpleMemoryBufferMetal::_DeallocateResources()
     TF_FOR_ALL (it, GetResources()) {
         HdResourceGPUHandle oldId(it->second->GetId());
         if (oldId) {
-            id<MTLBuffer> oid = oldId;
-            MtlfMetalContext::GetMetalContext()->ReleaseMetalBuffer(oid);
+            MtlfMetalContext::GetMetalContext()->ReleaseMetalBuffer(oldId);
             it->second->SetAllocation(HdResourceGPUHandle(), 0);
         }
     }

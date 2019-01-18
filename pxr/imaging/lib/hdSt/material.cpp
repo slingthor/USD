@@ -71,7 +71,7 @@ public:
     {
         if (!_value.IsSet()) {
             TF_CODING_ERROR("Invalid texture handle: %s: %llu\n",
-                            name.GetText(), (uint64_t)value);
+                            name.GetText(), uint64_t((void*)value));
         }
     }
 
