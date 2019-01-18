@@ -113,7 +113,6 @@ endforeach()
 include(FindPackageHandleStandardArgs)
 find_package_handle_standard_args(MaterialX
     REQUIRED_VARS
-        MATERIALX_BASE_DIR
         MATERIALX_INCLUDE_DIRS
         MATERIALX_LIB_DIRS
         MATERIALX_STDLIB_DIR
