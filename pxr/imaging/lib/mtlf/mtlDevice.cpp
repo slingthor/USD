@@ -203,7 +203,6 @@ MtlfMetalContext::MtlfMetalContext(id<MTLDevice> _device, int width, int height)
     static NSOperatingSystemVersion minimumSupportedOSVersion = { .majorVersion = 10, .minorVersion = 14, .patchVersion = 5 };
     static bool sysVerGreaterOrEqualTo10_14_5 = [NSProcessInfo.processInfo isOperatingSystemAtLeastVersion:minimumSupportedOSVersion];
 
-    // MTL_FIXME - Disabling concurrent dispatch because it completely breaks Compute GS hazard tracking causing polygon soup on AMD hardware.
     concurrentDispatchSupported = sysVerGreaterOrEqualTo10_14_5;
 #if defined(METAL_EVENTS_API_PRESENT)
     eventsAvailable = sysVerGreaterOrEqualTo10_14_5;

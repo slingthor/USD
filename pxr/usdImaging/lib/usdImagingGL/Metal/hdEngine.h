@@ -274,9 +274,11 @@ private:
     
     RenderOutput _renderOutput;
     MTLRenderPassDescriptor *_mtlRenderPassDescriptorForInterop;
+    MTLRenderPassDescriptor *_mtlRenderPassDescriptorForNativeMetal;
     MTLRenderPassDescriptor *_mtlRenderPassDescriptor;
     
     MTLCaptureManager *_sharedCaptureManager;
+    id<MTLCaptureScope> _captureScope;
 
     HdStResourceFactoryInterface *_resourceFactory;
 };

@@ -129,12 +129,11 @@ HdStVBOSimpleMemoryBufferMetal::Reallocate(
 
         // allocate new one
         HdResourceGPUHandle newId;
-        HdResourceGPUHandle oldId(bres->GetId());
+        HdResourceGPUHandle oldId(bres->GetAllIds());
 
         if (bufferSize) {
 #if defined(ARCH_GFX_USE_TRIPLE_BUFFERING)
-            newId = HdResourceGPUHandle(
-                                        context->GetMetalBuffer(bufferSize, MTLResourceStorageModeDefault),
+            newId = HdResourceGPUHandle(context->GetMetalBuffer(bufferSize, MTLResourceStorageModeDefault),
                                         context->GetMetalBuffer(bufferSize, MTLResourceStorageModeDefault),
                                         context->GetMetalBuffer(bufferSize, MTLResourceStorageModeDefault));
 #else

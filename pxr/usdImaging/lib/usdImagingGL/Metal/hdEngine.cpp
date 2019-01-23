@@ -97,6 +97,7 @@ UsdImagingGLMetalHdEngine::UsdImagingGLMetalHdEngine(
     , _mtlRenderPassDescriptorForInterop(nil)
     , _mtlRenderPassDescriptor(nil)
     , _sharedCaptureManager(nil)
+    , _captureScope(nil)
     , _resourceFactory(nil)
 {
     _resourceFactory = new HdStResourceFactoryMetal();
@@ -112,6 +113,8 @@ UsdImagingGLMetalHdEngine::UsdImagingGLMetalHdEngine(
 
     MtlfRegisterDefaultDebugOutputMessageCallback();
     
+    _mtlRenderPassDescriptorForNativeMetal = [[MTLRenderPassDescriptor alloc] init];
+
     _InitializeCapturing();
 }
 
@@ -120,6 +123,9 @@ UsdImagingGLMetalHdEngine::~UsdImagingGLMetalHdEngine()
     _DeleteHydraResources();
     HdStResourceFactory::GetInstance().SetResourceFactory(NULL);
     GarchResourceFactory::GetInstance().SetResourceFactory(NULL);
+    
+    [_mtlRenderPassDescriptorForNativeMetal release];
+    _mtlRenderPassDescriptorForNativeMetal = nil;
     
     delete _resourceFactory;
     _resourceFactory = nil;
@@ -475,10 +481,10 @@ UsdImagingGLMetalHdEngine::TestIntersection(
     qparams.enableSceneMaterials = params.enableSceneMaterials;
 
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
-    MTLCaptureManager *sharedCaptureManager = [MTLCaptureManager sharedCaptureManager];
-
-    //[sharedCaptureManager startCaptureWithScope:sharedCaptureManager.defaultCaptureScope];
-    [sharedCaptureManager.defaultCaptureScope beginScope];
+    
+    //MTLCaptureManager *sharedCaptureManager = [MTLCaptureManager sharedCaptureManager];
+    //[sharedCaptureManager startCaptureWithScope:_captureScope];
+    [_captureScope beginScope];
 
     bool success = _taskController->TestIntersection(
          &_engine,
@@ -487,7 +493,7 @@ UsdImagingGLMetalHdEngine::TestIntersection(
          HdxIntersectionModeTokens->nearest,
          &allHits);
 
-    [sharedCaptureManager.defaultCaptureScope endScope];
+    [_captureScope endScope];
 
     if (!success) {
         return false;
@@ -570,10 +576,9 @@ UsdImagingGLMetalHdEngine::TestIntersectionBatch(
     qparams.enableSceneMaterials = params.enableSceneMaterials;
 
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
-    MTLCaptureManager *sharedCaptureManager = [MTLCaptureManager sharedCaptureManager];
-    
-//    [sharedCaptureManager startCaptureWithScope:sharedCaptureManager.defaultCaptureScope];
-    [sharedCaptureManager.defaultCaptureScope beginScope];
+//    MTLCaptureManager *sharedCaptureManager = [MTLCaptureManager sharedCaptureManager];
+//    [sharedCaptureManager startCaptureWithScope:_captureScope];
+    [_captureScope beginScope];
 
     _taskController->SetPickResolution(pickResolution);
     bool success = _taskController->TestIntersection(
@@ -583,7 +588,7 @@ UsdImagingGLMetalHdEngine::TestIntersectionBatch(
          HdxIntersectionModeTokens->unique,
          &allHits);
 
-    [sharedCaptureManager.defaultCaptureScope endScope];
+    [_captureScope endScope];
 
     if (!success) {
         return false;
@@ -638,10 +643,9 @@ UsdImagingGLMetalHdEngine::Render(const UsdImagingGLRenderParams& params)
 
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
 
-    MTLCaptureManager *sharedCaptureManager = [MTLCaptureManager sharedCaptureManager];
-    
-    //[sharedCaptureManager startCaptureWithScope:sharedCaptureManager.defaultCaptureScope];
-    [sharedCaptureManager.defaultCaptureScope beginScope];
+    //MTLCaptureManager *sharedCaptureManager = [MTLCaptureManager sharedCaptureManager];
+    //[sharedCaptureManager startCaptureWithScope:_captureScope];
+    [_captureScope beginScope];
 
 #if defined(ARCH_GFX_OPENGL)
     // Make sure the Metal render targets, and GL interop textures match the GL viewport size
@@ -658,33 +662,32 @@ UsdImagingGLMetalHdEngine::Render(const UsdImagingGLRenderParams& params)
             _mtlRenderPassDescriptorForInterop = [[MTLRenderPassDescriptor alloc] init];
         
         //Set this state every frame because it may have changed during rendering.
-        {
-            // create a color attachment every frame since we have to recreate the texture every frame
-            MTLRenderPassColorAttachmentDescriptor *colorAttachment = _mtlRenderPassDescriptorForInterop.colorAttachments[0];
-
-            // make sure to clear every frame for best performance
-            colorAttachment.loadAction = MTLLoadActionClear;
         
-            // store only attachments that will be presented to the screen, as in this case
-            colorAttachment.storeAction = MTLStoreActionStore;
+        // create a color attachment every frame since we have to recreate the texture every frame
+        MTLRenderPassColorAttachmentDescriptor *colorAttachment = _mtlRenderPassDescriptorForInterop.colorAttachments[0];
 
-            MTLRenderPassDepthAttachmentDescriptor *depthAttachment = _mtlRenderPassDescriptorForInterop.depthAttachment;
-            depthAttachment.loadAction = MTLLoadActionClear;
-            depthAttachment.storeAction = MTLStoreActionStore;
-            depthAttachment.clearDepth = 1.0f;
-            
-            colorAttachment.texture = context->mtlColorTexture;
+        // make sure to clear every frame for best performance
+        colorAttachment.loadAction = MTLLoadActionClear;
+    
+        // store only attachments that will be presented to the screen, as in this case
+        colorAttachment.storeAction = MTLStoreActionStore;
 
-            GLfloat clearColor[4];
-            glGetFloatv(GL_COLOR_CLEAR_VALUE, clearColor);
-            clearColor[3] = 1.0f;
+        MTLRenderPassDepthAttachmentDescriptor *depthAttachment = _mtlRenderPassDescriptorForInterop.depthAttachment;
+        depthAttachment.loadAction = MTLLoadActionClear;
+        depthAttachment.storeAction = MTLStoreActionStore;
+        depthAttachment.clearDepth = 1.0f;
         
-            colorAttachment.clearColor = MTLClearColorMake(clearColor[0],
-                                                           clearColor[1],
-                                                           clearColor[2],
-                                                           clearColor[3]);
-            depthAttachment.texture = context->mtlDepthTexture;
-        }
+        colorAttachment.texture = context->mtlColorTexture;
+
+        GLfloat clearColor[4];
+        glGetFloatv(GL_COLOR_CLEAR_VALUE, clearColor);
+        clearColor[3] = 1.0f;
+    
+        colorAttachment.clearColor = MTLClearColorMake(clearColor[0],
+                                                       clearColor[1],
+                                                       clearColor[2],
+                                                       clearColor[3]);
+        depthAttachment.texture = context->mtlDepthTexture;
         
         _mtlRenderPassDescriptor = _mtlRenderPassDescriptorForInterop;
     }
@@ -764,12 +767,12 @@ UsdImagingGLMetalHdEngine::Render(const UsdImagingGLRenderParams& params)
     // Commit the render buffer (will wait for GS to complete if present)
     // We wait until scheduled, because we're about to consume the Metal
     // generated textures in an OpenGL blit
-    context->CommitCommandBuffer(true, false);
+    context->CommitCommandBuffer(_renderOutput == RenderOutput::OpenGL, false);
     
     context->EndFrame();
     
     // Finalize rendering here & push the command buffer to the GPU
-    [sharedCaptureManager.defaultCaptureScope endScope];
+    [_captureScope endScope];
 
     if (_renderOutput == RenderOutput::OpenGL) {
         context->BlitColorTargetToOpenGL();
@@ -1124,10 +1127,15 @@ UsdImagingGLMetalHdEngine::_InitializeCapturing()
         _sharedCaptureManager = [MTLCaptureManager sharedCaptureManager];
     else
         [_sharedCaptureManager.defaultCaptureScope release];
-        
-    id<MTLCaptureScope> captureScope = [_sharedCaptureManager newCaptureScopeWithDevice:MtlfMetalContext::GetMetalContext()->device];
-    captureScope.label = @"Hydra Capture Scope";
-    _sharedCaptureManager.defaultCaptureScope = captureScope;
+    
+    if (_captureScope) {
+        [_captureScope release];
+    }
+    _captureScope = [_sharedCaptureManager newCaptureScopeWithDevice:MtlfMetalContext::GetMetalContext()->device];
+    _captureScope.label = @"Hydra Capture Scope";
+    if (_renderOutput == RenderOutput::OpenGL) {
+        _sharedCaptureManager.defaultCaptureScope = _captureScope;
+    }
 }
 
 void
@@ -1268,7 +1276,8 @@ UsdImagingGLMetalHdEngine::SetMetalRenderPassDescriptor(
                         "when using OpenGL as the output target");
         return;
     }
-    _mtlRenderPassDescriptor = renderPassDescriptor;
+    _mtlRenderPassDescriptorForNativeMetal = [renderPassDescriptor copy];
+    _mtlRenderPassDescriptor = _mtlRenderPassDescriptorForNativeMetal;
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE
