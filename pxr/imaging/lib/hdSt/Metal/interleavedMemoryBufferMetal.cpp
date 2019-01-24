@@ -111,32 +111,34 @@ HdStStripedInterleavedBufferMetal::Reallocate(
     HdStInterleavedMemoryManager::_StripedInterleavedBufferSharedPtr curRangeOwner_ =
         boost::static_pointer_cast<_StripedInterleavedBuffer> (curRangeOwner);
 
-    int const numBuffers = HdResourceGPUHandle::numHandles;
-
-    HdResourceGPUHandle newId;
-    HdResourceGPUHandle oldId = boost::static_pointer_cast<HdStBufferResourceMetal>(
-                                    GetResources().begin()->second)->GetAllIds();
-    HdResourceGPUHandle curId = boost::static_pointer_cast<HdStBufferResourceMetal>(
-                                    curRangeOwner_->GetResources().begin()->second)->GetAllIds();
+    HdStBufferResourceMetalSharedPtr oldBuffer =
+        boost::static_pointer_cast<HdStBufferResourceMetal>(
+            GetResources().begin()->second);
+    HdStBufferResourceMetalSharedPtr currentBuffer =
+        boost::static_pointer_cast<HdStBufferResourceMetal>(
+            curRangeOwner_->GetResources().begin()->second);
 
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
-#if defined(ARCH_GFX_USE_TRIPLE_BUFFERING)
-    newId = HdResourceGPUHandle(context->GetMetalBuffer(totalSize, MTLResourceStorageModeDefault),
-                                context->GetMetalBuffer(totalSize, MTLResourceStorageModeDefault),
-                                context->GetMetalBuffer(totalSize, MTLResourceStorageModeDefault));
-#else
-    newId = context->GetMetalBuffer(totalSize, MTLResourceStorageModeDefault);
-#endif
 
+    HdResourceGPUHandle newId[3];
+    HdResourceGPUHandle oldId[3];
+    HdResourceGPUHandle curId[3];
+
+    for(int i = 0; i < 3; i++) {
+        oldId[i] = oldBuffer->GetIdAtIndex(i);
+        curId[i] = currentBuffer->GetIdAtIndex(i);
+        newId[i] = context->GetMetalBuffer(totalSize, MTLResourceStorageModeDefault);
+    }
+    
     // if old buffer exists, copy unchanged data
-    if (curId.IsSet()) {
+    if (curId[0].IsSet()) {
         int index = 0;
         
         size_t const rangeCount = GetRangeCount();
         
         // pre-pass to combine consecutive buffer range relocation
-        HdStBufferRelocator* relocator[numBuffers];
-        for(int i = 0; i < numBuffers; i++) {
+        HdStBufferRelocator* relocator[3];
+        for(int i = 0; i < 3; i++) {
             int const curIndex = curId[i] ? i : 0;
             relocator[i] = HdStResourceFactory::GetInstance()->NewBufferRelocator(curId[curIndex], newId[i]);
         }
@@ -156,7 +158,7 @@ HdStStripedInterleavedBufferMetal::Reallocate(
                 ptrdiff_t const writeOffset = index * _stride;
                 size_t const copySize = _stride * range->GetNumElements();
                 
-                for(int i = 0; i < numBuffers; i++) {
+                for(int i = 0; i < 3; i++) {
                     relocator[i]->AddRange(readOffset, writeOffset, copySize);
                 }
             }
@@ -166,7 +168,7 @@ HdStStripedInterleavedBufferMetal::Reallocate(
         }
 
         // buffer copy
-        for(int i = 0; i < numBuffers; i++) {
+        for(int i = 0; i < 3; i++) {
             relocator[i]->Commit();
             delete relocator[i];
         }
@@ -188,15 +190,17 @@ HdStStripedInterleavedBufferMetal::Reallocate(
         }
     }
     // delete old buffer
-    for(int i = 0; i < numBuffers; i++) {
-        if(oldId[i] != nil) {
+    for(int i = 0; i < 3; i++) {
+        if(oldId[i].IsSet()) {
             context->ReleaseMetalBuffer(oldId[i]);
         }
     }
 
     // update id to all buffer resources
     TF_FOR_ALL(it, GetResources()) {
-        it->second->SetAllocation(newId, totalSize);
+        HdStBufferResourceMetalSharedPtr resource =
+            boost::static_pointer_cast<HdStBufferResourceMetal>(it->second);
+        resource->SetAllocations(newId[0], newId[1], newId[2], totalSize);
     }
 
     _needsReallocation = false;
@@ -209,13 +213,16 @@ HdStStripedInterleavedBufferMetal::Reallocate(
 void
 HdStStripedInterleavedBufferMetal::_DeallocateResources()
 {
-    HdBufferResourceSharedPtr resource = GetResource();
+    HdStBufferResourceMetalSharedPtr resource =
+        boost::static_pointer_cast<HdStBufferResourceMetal>(GetResource());
     if (resource) {
-        id<MTLBuffer> _id = resource->GetId();
-        if (_id != nil) {
-            MtlfMetalContext::GetMetalContext()->ReleaseMetalBuffer(_id);
-            resource->SetAllocation(nil, 0);
+        for(int i = 0; i < 3; i++) {
+            id<MTLBuffer> _id = resource->GetIdAtIndex(i);
+            if (_id != nil) {
+                MtlfMetalContext::GetMetalContext()->ReleaseMetalBuffer(_id);
+            }
         }
+        resource->SetAllocations(nil, nil, nil, 0);
     }
 }
 

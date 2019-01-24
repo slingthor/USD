@@ -137,32 +137,29 @@ HdStVBOMemoryBufferMetal::Reallocate(
         TF_VERIFY(bytesPerElement > 0);
         size_t const bufferSize = bytesPerElement * _totalCapacity;
 
-        int const numBuffers = HdResourceGPUHandle::numHandles;
-
         // allocate new one
         // curId and oldId will be different when we are adopting ranges
         // from another buffer array.
-        HdResourceGPUHandle newId;
-        HdResourceGPUHandle oldId(bres->GetId());
-        HdResourceGPUHandle curId(curRes->GetId());
+        HdResourceGPUHandle newId[3];
+        HdResourceGPUHandle oldId[3];
+        HdResourceGPUHandle curId[3];
 
         MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
-#if defined(ARCH_GFX_USE_TRIPLE_BUFFERING)
-        newId = HdResourceGPUHandle(context->GetMetalBuffer(bufferSize, MTLResourceStorageModeDefault),
-                                    context->GetMetalBuffer(bufferSize, MTLResourceStorageModeDefault),
-                                    context->GetMetalBuffer(bufferSize, MTLResourceStorageModeDefault));
-#else
-        newId = context->GetMetalBuffer(bufferSize, MTLResourceStorageModeDefault);
-#endif
+        
+        for (int i = 0; i < 3; i++) {
+            newId[i] = context->GetMetalBuffer(bufferSize, MTLResourceStorageModeDefault);
+            oldId[i] = bres->GetIdAtIndex(i);
+            curId[i] = curRes->GetIdAtIndex(i);
+        }
         // if old buffer exists, copy unchanged data
-        if (curId.IsSet()) {
+        if (curId[0].IsSet()) {
             std::vector<size_t>::iterator newOffsetIt = newOffsets.begin();
 
             // pre-pass to combine consecutive buffer range relocation
-            HdStBufferRelocator* relocator[numBuffers];
+            HdStBufferRelocator* relocator[3];
             
-            for (int i = 0; i < numBuffers; i++) {
-                int const curIndex = curId[i] ? i : 0;
+            for (int i = 0; i < 3; i++) {
+                int const curIndex = curId[i].IsSet() ? i : 0;
                 relocator[i] = HdStResourceFactory::GetInstance()->NewBufferRelocator(curId[curIndex], newId[i]);
             }
 
@@ -198,7 +195,7 @@ HdStVBOMemoryBufferMetal::Reallocate(
                     ptrdiff_t const readOffset = oldOffset * bytesPerElement;
                     ptrdiff_t const writeOffset = *newOffsetIt * bytesPerElement;
 
-                    for (int i = 0; i < numBuffers; i++) {
+                    for (int i = 0; i < 3; i++) {
                         if (relocator[i]) {
                             relocator[i]->AddRange(readOffset, writeOffset, copySize);
                         }
@@ -208,21 +205,21 @@ HdStVBOMemoryBufferMetal::Reallocate(
             }
 
             // buffer copy
-            for (int i = 0; i < numBuffers; i++) {
+            for (int i = 0; i < 3; i++) {
                 relocator[i]->Commit();
                 delete relocator[i];
             }
         }
 
-        for (int i = 0; i < numBuffers; i++) {
-            if (oldId[i]) {
+        for (int i = 0; i < 3; i++) {
+            if (oldId[i].IsSet()) {
                 // delete old buffer
                 MtlfMetalContext::GetMetalContext()->ReleaseMetalBuffer(oldId[i]);
             }
         }
-
+    
         // update id of buffer resource
-        bres->SetAllocation(newId, bufferSize);
+        bres->SetAllocations(newId[0], newId[1], newId[2], bufferSize);
     }
 
     // update ranges
@@ -247,11 +244,17 @@ void
 HdStVBOMemoryBufferMetal::_DeallocateResources()
 {
     TF_FOR_ALL (it, GetResources()) {
-        HdResourceGPUHandle oldId(it->second->GetId());
-        if (oldId) {
-            MtlfMetalContext::GetMetalContext()->ReleaseMetalBuffer(oldId);
-            it->second->SetAllocation(HdResourceGPUHandle(), 0);
+        HdStBufferResourceMetalSharedPtr const &bres =
+            boost::static_pointer_cast<HdStBufferResourceMetal>(it->second);
+
+        for (int i = 0; i < 3; i++) {
+            HdResourceGPUHandle oldId(bres->GetIdAtIndex(i));
+            
+            if (oldId.IsSet()) {
+                MtlfMetalContext::GetMetalContext()->ReleaseMetalBuffer(oldId);
+            }
         }
+        bres->SetAllocations(HdResourceGPUHandle(), HdResourceGPUHandle(), HdResourceGPUHandle(), 0);
     }
 }
 

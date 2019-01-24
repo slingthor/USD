@@ -83,7 +83,7 @@ HdStBufferResourceMetal::HdStBufferResourceMetal(TfToken const &role,
       _activeBuffer(0),
       _firstFrameBeingFilled(true)
 {
-    for (int i = 0; i < HdResourceGPUHandle::numHandles; i++) {
+    for (int i = 0; i < 3; i++) {
         _id[i] = nil;
         _texId[i] = nil;
         _gpuAddr[i] = 0;
@@ -98,29 +98,42 @@ HdStBufferResourceMetal::~HdStBufferResourceMetal()
 void
 HdStBufferResourceMetal::SetAllocation(HdResourceGPUHandle idBuffer, size_t size)
 {
+    TF_FATAL_CODING_ERROR("SetAllocation isn't supported on Metal, due to a "
+                          "requiremnt for triple buffering. Call SetAllocations "
+                          " instead");
+}
+
+void
+HdStBufferResourceMetal::SetAllocations(HdResourceGPUHandle idBuffer0,
+                                        HdResourceGPUHandle idBuffer1,
+                                        HdResourceGPUHandle idBuffer2,
+                                        size_t size)
+{
+    _id[0] = idBuffer0;
+    _id[1] = idBuffer1;
+    _id[2] = idBuffer2;
+
     // release texid if exist. SetAllocation is guaranteed to be called
     // at the destruction of the hosting buffer array.
-    for (int i = 0; i < HdResourceGPUHandle::numHandles; i++) {
+    for (int i = 0; i < 3; i++) {
         if (_texId[i]) {
             [_texId[i] release];
             _texId[i] = nil;
         }
 
-        _id[i] = idBuffer[i];
         _gpuAddr[i] = (uint64_t)[_id[i] contents];
     }
     HdResource::SetSize(size);
 
     _lastFrameModified = MtlfMetalContext::GetMetalContext()->GetCurrentFrame();
     _activeBuffer = 0;
-    _firstFrameBeingFilled = HdResourceGPUHandle::numHandles > 1 && _id[1];
+    _firstFrameBeingFilled = _id[1] != nil;
 }
 
 GarchTextureGPUHandle
 HdStBufferResourceMetal::GetTextureBuffer()
 {
     // XXX: need change tracking.
-
     if (_texId[_activeBuffer] == nil) {
         MTLPixelFormat format = MTLPixelFormatInvalid;
         switch(_tupleType.type) {
@@ -170,14 +183,14 @@ HdStBufferResourceMetal::GetTextureBuffer()
 void
 HdStBufferResourceMetal::CopyData(size_t vboOffset, size_t dataSize, void const *data)
 {
-    if (HdResourceGPUHandle::numHandles > 1 && _id[1]) {
+    if (_id[1] != nil) {
         MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
         int64_t currentFrame = context->GetCurrentFrame();
         
         if (currentFrame != _lastFrameModified) {
             _firstFrameBeingFilled = false;
             _activeBuffer++;
-            if (_activeBuffer >= HdResourceGPUHandle::numHandles) {
+            if (_activeBuffer >= 3) {
                 _activeBuffer = 0;
             }
         }
@@ -186,7 +199,7 @@ HdStBufferResourceMetal::CopyData(size_t vboOffset, size_t dataSize, void const 
 
     if (_firstFrameBeingFilled) {
         // populate all the buffers
-        for (int i = 0; i < HdResourceGPUHandle::numHandles; i++) {
+        for (int i = 0; i < 3; i++) {
             memcpy((uint8_t*)_gpuAddr[i] + vboOffset, data, dataSize);
 #if defined(ARCH_OS_OSX)
             [_id[i] didModifyRange:NSMakeRange(vboOffset, dataSize)];

@@ -140,7 +140,6 @@ defined(_M_IX86) || defined(_M_X64)
 #else
 #define MTLResourceStorageModeDefault MTLResourceStorageModeShared
 #endif
-#define ARCH_GFX_USE_TRIPLE_BUFFERING
 #endif
 
 #if !defined(PXR_UNITTEST_GFX_ARCH)

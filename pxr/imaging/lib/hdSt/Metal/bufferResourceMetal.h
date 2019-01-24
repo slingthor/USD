@@ -61,23 +61,28 @@ public:
     HDST_API
     virtual ~HdStBufferResourceMetal();
 
-    /// Sets the OpenGL name/identifier for this resource and its size.
-    /// also caches the gpu address of the buffer.
+    /// Sets the Metal object for this resource and its size.
+    /// also caches the gpu address of the buffer. Invalid on Metal - use
+    /// SetAllocations instead
     HDST_API
     virtual void SetAllocation(HdResourceGPUHandle buffer, size_t size) override;
+    
+    /// Sets the Metal objects for this resource and its size.
+    /// also caches the gpu address of the buffer.
+    HDST_API
+    virtual void SetAllocations(HdResourceGPUHandle buffer0,
+                                HdResourceGPUHandle buffer1,
+                                HdResourceGPUHandle buffer2,
+                                size_t size);
 
     /// Returns the active Metal object for this GPU resource and this frame
     HDST_API
     virtual HdResourceGPUHandle GetId() const { return _id[_activeBuffer]; }
     
-    /// Returns the all the Metal objects for this GPU resource
+    /// Returns the Metal object at the triple buffer index for this GPU resource
     HDST_API
-    virtual HdResourceGPUHandle GetAllIds() const {
-#if defined(ARCH_GFX_USE_TRIPLE_BUFFERING)
-        return HdResourceGPUHandle(_id[0], _id[1], _id[2]);
-#else
-        return _id[0];
-#endif
+    virtual HdResourceGPUHandle GetIdAtIndex(int const index) const {
+        return _id[index];
     }
 
     /// Returns the gpu address (if available. otherwise returns 0).
@@ -101,9 +106,9 @@ public:
     virtual uint8_t const* GetBufferContents() const override;
     
 private:
-    uint64_t        _gpuAddr[HdResourceGPUHandle::numHandles];
-    id<MTLTexture>  _texId[HdResourceGPUHandle::numHandles];
-    id<MTLBuffer>   _id[HdResourceGPUHandle::numHandles];
+    uint64_t        _gpuAddr[3];
+    id<MTLTexture>  _texId[3];
+    id<MTLBuffer>   _id[3];
     int64_t         _lastFrameModified;
     int64_t         _activeBuffer;
     bool            _firstFrameBeingFilled;

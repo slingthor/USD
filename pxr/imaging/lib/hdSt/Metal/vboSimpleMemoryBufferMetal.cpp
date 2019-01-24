@@ -125,24 +125,19 @@ HdStVBOSimpleMemoryBufferMetal::Reallocate(
         int const bytesPerElement = HdDataSizeOfType(bres->GetTupleType().type);
         size_t const bufferSize = bytesPerElement * numElements;
 
-        int const numBuffers = HdResourceGPUHandle::numHandles;
-
         // allocate new one
-        HdResourceGPUHandle newId;
-        HdResourceGPUHandle oldId(bres->GetAllIds());
+        HdResourceGPUHandle newId[3];
+        HdResourceGPUHandle oldId[3];
 
-        if (bufferSize) {
-#if defined(ARCH_GFX_USE_TRIPLE_BUFFERING)
-            newId = HdResourceGPUHandle(context->GetMetalBuffer(bufferSize, MTLResourceStorageModeDefault),
-                                        context->GetMetalBuffer(bufferSize, MTLResourceStorageModeDefault),
-                                        context->GetMetalBuffer(bufferSize, MTLResourceStorageModeDefault));
-#else
-            newId = context->GetMetalBuffer(bufferSize, MTLResourceStorageModeDefault);
-#endif
-        }
-        else {
-            // Dummy buffer - 0 byte buffers are invalid
-            newId = context->GetMetalBuffer(256, MTLResourceStorageModeDefault);
+        for (int i = 0; i < 3; i++) {
+            oldId[i] = bres->GetIdAtIndex(i);
+            if (bufferSize) {
+                newId[i] = context->GetMetalBuffer(bufferSize, MTLResourceStorageModeDefault);
+            }
+            else {
+                // Dummy buffer - 0 byte buffers are invalid
+                newId[i] = context->GetMetalBuffer(256, MTLResourceStorageModeDefault);
+            }
         }
 
         // copy the range. There are three cases:
@@ -165,7 +160,7 @@ HdStVBOSimpleMemoryBufferMetal::Reallocate(
         if (copySize > 0) {
             HD_PERF_COUNTER_INCR(HdPerfTokens->glCopyBufferSubData);
 
-            for (int i = 0; i < numBuffers; i++) {
+            for (int i = 0; i < 3; i++) {
                 [blitEncoder copyFromBuffer:oldId[i]
                                sourceOffset:0
                                    toBuffer:newId[i]
@@ -175,15 +170,13 @@ HdStVBOSimpleMemoryBufferMetal::Reallocate(
         }
 
         // delete old buffer
-        if (oldId.IsSet()) {
-            for (int i = 0; i < numBuffers; i++) {
-                if (oldId[i]) {
-                    context->ReleaseMetalBuffer(oldId[i]);
-                }
+        for (int i = 0; i < 3; i++) {
+            if (oldId[i].IsSet()) {
+                context->ReleaseMetalBuffer(oldId[i]);
             }
         }
 
-        bres->SetAllocation(newId, bufferSize);
+        bres->SetAllocations(newId[0], newId[1], newId[2], bufferSize);
     }
 
     context->ReleaseEncoder(true, METALWORKQUEUE_RESOURCE);
@@ -200,11 +193,16 @@ void
 HdStVBOSimpleMemoryBufferMetal::_DeallocateResources()
 {
     TF_FOR_ALL (it, GetResources()) {
-        HdResourceGPUHandle oldId(it->second->GetId());
-        if (oldId) {
-            MtlfMetalContext::GetMetalContext()->ReleaseMetalBuffer(oldId);
-            it->second->SetAllocation(HdResourceGPUHandle(), 0);
+        HdStBufferResourceMetalSharedPtr const &bres =
+            boost::static_pointer_cast<HdStBufferResourceMetal>(it->second);
+
+        for (int i = 0; i < 3; i++) {
+            HdResourceGPUHandle oldId(bres->GetIdAtIndex(i));
+            if (oldId.IsSet()) {
+                MtlfMetalContext::GetMetalContext()->ReleaseMetalBuffer(oldId);
+            }
         }
+        bres->SetAllocations(HdResourceGPUHandle(), HdResourceGPUHandle(), HdResourceGPUHandle(), 0);
     }
 }
 

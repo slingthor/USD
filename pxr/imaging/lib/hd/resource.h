@@ -49,101 +49,60 @@ typedef boost::shared_ptr<class HdResource> HdResourceSharedPtr;
 
 struct HdResourceGPUHandle {
 
-#if defined(ARCH_GFX_USE_TRIPLE_BUFFERING)
-    static int const numHandles = 3;
-#else
-    static int const numHandles = 1;
-#endif
-
     HdResourceGPUHandle() {
-        for (int i = 0; i < numHandles; i++) {
-            handle[i] = 0;
-        }
+        handle = 0;
     }
     HdResourceGPUHandle(HdResourceGPUHandle const & _gpuHandle) {
-        for (int i = 0; i < numHandles; i++) {
-            handle[i] = _gpuHandle.handle[i];
-        }
+        handle = _gpuHandle.handle;
     }
     
     void Clear() {
-        for (int i = 0; i < numHandles; i++) {
-            handle[i] = 0;
-        }
+        handle = 0;
     }
-    bool IsSet() const { return handle[0] != 0; }
+    bool IsSet() const { return handle != 0; }
 
 #if defined(ARCH_GFX_OPENGL)
     // OpenGL
     HdResourceGPUHandle(GLuint const _handle) {
-        handle[0] = (void*)uint64_t(_handle);
-#if defined(ARCH_GFX_USE_TRIPLE_BUFFERING)
-        handle[1] = NULL;
-        handle[2] = NULL;
-#endif
+        handle = (void*)uint64_t(_handle);
     }
     HdResourceGPUHandle& operator =(GLuint const _handle) {
-        handle[0] = (void*)uint64_t(_handle);
-#if defined(ARCH_GFX_USE_TRIPLE_BUFFERING)
-        handle[1] = NULL;
-        handle[2] = NULL;
-#endif
+        handle = (void*)uint64_t(_handle);
         return *this;
     }
-    operator GLuint() const { return (GLuint)uint64_t(handle[0]); }
+    operator GLuint() const { return (GLuint)uint64_t(handle); }
     
     bool operator !=(HdResourceGPUHandle const _handle) const {
-        return handle[0] != _handle;
+        return handle != _handle;
     }
     
     bool operator ==(HdResourceGPUHandle const _handle) const {
-        return handle[0] == _handle;
+        return handle == _handle;
     }
     
     bool operator <(HdResourceGPUHandle const _handle) const {
-        return handle[0] < _handle;
+        return handle < _handle;
     }
     
     bool operator >(HdResourceGPUHandle const _handle) const {
-        return handle[0] > _handle;
+        return handle > _handle;
     }
 #endif // ARCH_GFX_OPENGL
 
 #if defined(ARCH_GFX_METAL)
     // Metal
     HdResourceGPUHandle(id<MTLBuffer> const _handle) {
-        handle[0] = (__bridge void*)_handle;
-#if defined(ARCH_GFX_USE_TRIPLE_BUFFERING)
-        handle[1] = NULL;
-        handle[2] = NULL;
-#endif
+        handle = (__bridge void*)_handle;
     }
     HdResourceGPUHandle& operator =(id<MTLBuffer> const _handle) {
-        handle[0] = (__bridge void*)_handle;
-#if defined(ARCH_GFX_USE_TRIPLE_BUFFERING)
-        handle[1] = NULL;
-        handle[2] = NULL;
-#endif
+        handle = (__bridge void*)_handle;
         return *this;
     }
-    operator id<MTLBuffer>() const { return (__bridge id<MTLBuffer>)handle[0]; }
-
-#if defined(ARCH_GFX_USE_TRIPLE_BUFFERING)
-    // Metal - triple buffered
-    HdResourceGPUHandle(id<MTLBuffer> const _handle0,
-                        id<MTLBuffer> const _handle1,
-                        id<MTLBuffer> const _handle2) {
-        handle[0] = (__bridge void*)_handle0;
-        handle[1] = (__bridge void*)_handle1;
-        handle[2] = (__bridge void*)_handle2;
-    }
-#endif // ARCH_GFX_TRIPLE_BUFFER
-    id<MTLBuffer> operator[](const int index) const { return (__bridge id<MTLBuffer>)handle[index]; }
-
+    operator id<MTLBuffer>() const { return (__bridge id<MTLBuffer>)handle; }
 #endif // ARCH_GFX_METAL
     
     // Storage
-    void* handle[numHandles];
+    void* handle;
 };
 /// \class HdResource
 ///
