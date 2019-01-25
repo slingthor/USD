@@ -93,6 +93,12 @@ class MtlfGlInterop;
 
 #define METAL_GS_THREADGROUP_SIZE 64
 
+#if defined(ARCH_OS_IOS)
+#define METAL_FEATURESET_FOR_DISPATCHTHREADS MTLFeatureSet_iOS_GPUFamily4_v1
+#else
+#define METAL_FEATURESET_FOR_DISPATCHTHREADS MTLFeatureSet_macOS_GPUFamily1_v1
+#endif
+
 class MtlfDrawTarget;
 typedef boost::shared_ptr<class MtlfMetalContext> MtlfMetalContextSharedPtr;
 

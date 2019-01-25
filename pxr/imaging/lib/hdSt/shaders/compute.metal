@@ -188,6 +188,7 @@ struct Uniforms {
     int pointsStride;       // interleave stride
     int normalsOffset;      // interleave offset
     int normalsStride;      // interleave stride
+    int invocationOffset;
 };
 
 int getPointsIndex(device const Uniforms *uniform, int idx)
@@ -206,7 +207,7 @@ kernel void computeEntryPoint(   device const POINTS_INPUT_TYPE     *points  [[b
                                  device const Uniforms              *uniforms[[buffer(3)]],
                                  uint2        GlobalInvocationID             [[ thread_position_in_grid ]])
 {
-    int index = int(GlobalInvocationID.x);
+    int index = int(GlobalInvocationID.x) + uniforms->invocationOffset;
 
     int offIndex = index * 2 + uniforms->adjacencyOffset;
 
@@ -250,6 +251,7 @@ struct Uniforms {
     int indexStride;        // interleave stride
     int pParamOffset;       // interleave offset
     int pParamStride;       // interleave stride
+    int invocationOffset;
 };
 
 int getPointsIndex(device const Uniforms *uniforms, int idx)
@@ -291,7 +293,7 @@ kernel void computeEntryPoint(device const POINTS_INPUT_TYPE    *points         
                               device const Uniforms             *uniforms           [[buffer(4)]],
                               uint2        GlobalInvocationID                       [[ thread_position_in_grid ]])
 {
-    int primIndex = int(GlobalInvocationID.x);
+    int primIndex = int(GlobalInvocationID.x) + uniforms->invocationOffset;
     int pParam = primitiveParam[getPrimitiveParamIndex(uniforms, primIndex)];
     int edgeFlag = getEdgeFlag(pParam);
     int faceIndex = getFaceIndex(pParam);
@@ -393,6 +395,7 @@ struct Uniform {
     int primvarOffset;     // interleave offset
     int primvarStride;     // interleave stride
     int numComponents;     // interleave datasize
+    int invocationOffset;
 };
 
 kernel void computeEntryPoint(device const DATATYPE    *primvar             [[buffer(0)]],
@@ -400,7 +403,7 @@ kernel void computeEntryPoint(device const DATATYPE    *primvar             [[bu
                               device const Uniforms    *uniforms            [[buffer(2)]],
                               uint2        GlobalInvocationID               [[ thread_position_in_grid ]])
 {
-    int index = int(gl_GlobalInvocationID.x);
+    int index = int(gl_GlobalInvocationID.x) + uniforms->invocationOffset;
 
     int quadInfoIndex = index * uniforms->quadInfoStride + uniforms->quadInfoOffset;
     int numVert = quadInfo[quadInfoIndex];

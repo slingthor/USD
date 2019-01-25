@@ -531,11 +531,11 @@ void HdStMSLProgram::UnsetProgram() {
 
 
 void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
-                                                      int indexCount,
-                                                      GLint indexType,
-                                                      GLint firstIndex,
-                                                      GLint instanceCount,
-                                                      GLint baseVertex) const {
+                                                     int indexCount,
+                                                     GLint indexType,
+                                                     GLint firstIndex,
+                                                     GLint instanceCount,
+                                                     GLint baseVertex) const {
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
     id<MTLBuffer> indexBuffer = context->GetIndexBuffer();
     const bool doMVAComputeGS = _buildTarget == kMSL_BuildTarget_MVA_ComputeGS;
@@ -548,8 +548,9 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
             TF_FATAL_CODING_ERROR("Not Implemented");
             return;
         case GL_UNSIGNED_SHORT:
-            if(doMVA)   //MTL_FIXME: We should probably find a way to support this at some point.
+            if(doMVA) {  //MTL_FIXME: We should probably find a way to support this at some point.
                 TF_FATAL_CODING_ERROR("Not Implemented");
+            }
             indexTypeMetal = MTLIndexTypeUInt16;
             indexSize = sizeof(uint16_t);
             break;
@@ -594,14 +595,25 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
     const uint32_t vertsPerPrimitive = (drawingQuads && doMVAComputeGS) ? 4 : 3;
     uint32_t numPrimitives = (indexCount / vertsPerPrimitive) * instanceCount;
     const uint32_t maxPrimitivesPerPart = doMVAComputeGS ? context->GetMaxComputeGSPartSize(numOutVertsPerInPrim, numOutPrimsPerInPrim, _gsVertOutStructSize, _gsPrimOutStructSize) : numPrimitives;
-    
+
+    int maxThreadsPerThreadgroup = 0;
+    bool useDispatchThreads = [context->device supportsFeatureSet:METAL_FEATURESET_FOR_DISPATCHTHREADS];
+    if (doMVAComputeGS && !useDispatchThreads) {
+        maxThreadsPerThreadgroup = METAL_GS_THREADGROUP_SIZE;
+    }
+
     uint32_t partIndexOffset = 0;
     while(numPrimitives > 0) {
-        const uint32_t numPrimitivesInPart = MIN(numPrimitives, maxPrimitivesPerPart);
-        const uint32_t numIndicesInPart = numPrimitivesInPart * vertsPerPrimitive;
+        uint32_t numPrimitivesInPart = MIN(numPrimitives, maxPrimitivesPerPart);
+
+        if (!useDispatchThreads && (numPrimitivesInPart > maxThreadsPerThreadgroup)) {
+            numPrimitivesInPart = numPrimitivesInPart / maxThreadsPerThreadgroup * maxThreadsPerThreadgroup;
+        }
         
-        const uint32_t gsVertDataSize = numPrimitivesInPart * numOutVertsPerInPrim * _gsVertOutStructSize;
-        const uint32_t gsPrimDataSize = numPrimitivesInPart * numOutPrimsPerInPrim * _gsPrimOutStructSize;
+        uint32_t const numIndicesInPart = numPrimitivesInPart * vertsPerPrimitive;
+        
+        uint32_t const gsVertDataSize = numPrimitivesInPart * numOutVertsPerInPrim * _gsVertOutStructSize;
+        uint32_t const gsPrimDataSize = numPrimitivesInPart * numOutPrimsPerInPrim * _gsPrimOutStructSize;
         id<MTLBuffer> gsDataBuffer = nil;
         uint32_t gsVertDataOffset(0), gsPrimDataOffset(0);
         if(doMVAComputeGS)
@@ -616,8 +628,14 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
         if(doMVA) {
             //Setup Draw Args on the render context
             struct { uint32_t _indexCount, _startIndex, _baseVertex, _instanceCount, _batchIndexOffset; }
-            drawArgs = { (uint32_t)indexCount, (uint32_t)firstIndex, (uint32_t)baseVertex, (uint32_t)instanceCount, partIndexOffset };
-            [renderEncoder setVertexBytes:(const void*)&drawArgs length:sizeof(drawArgs) atIndex:_drawArgsSlot];
+            drawArgs = { (uint32_t)indexCount,
+                         (uint32_t)firstIndex,
+                         (uint32_t)baseVertex,
+                         (uint32_t)instanceCount,
+                         partIndexOffset };
+            [renderEncoder setVertexBytes:(const void*)&drawArgs
+                                   length:sizeof(drawArgs)
+                                  atIndex:_drawArgsSlot];
             
             if (tempPointsWorkaround && _indicesSlot >= 0) {
                 [renderEncoder setVertexBuffer:indexBuffer offset:0 atIndex:_indicesSlot];
@@ -641,18 +659,41 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
         }
         
         if(doMVAComputeGS) {
-            [computeEncoder dispatchThreads:MTLSizeMake(numPrimitivesInPart, 1, 1) threadsPerThreadgroup:MTLSizeMake(MIN(numPrimitivesInPart, METAL_GS_THREADGROUP_SIZE), 1, 1)];
-            [renderEncoder drawPrimitives:primType vertexStart:0 vertexCount:(numPrimitivesInPart * numOutVertsPerInPrim) instanceCount:1 baseInstance:0];
+            if (useDispatchThreads) {
+                [computeEncoder dispatchThreads:MTLSizeMake(numPrimitivesInPart, 1, 1)
+                          threadsPerThreadgroup:MTLSizeMake(MIN(numPrimitivesInPart, METAL_GS_THREADGROUP_SIZE), 1, 1)];
+            }
+            else {
+                MTLSize threadgroupCount = MTLSizeMake(fmin(maxThreadsPerThreadgroup, numPrimitivesInPart), 1, 1);
+                MTLSize threadsPerGrid   = MTLSizeMake(numPrimitivesInPart / threadgroupCount.width, 1, 1);
+
+                [computeEncoder dispatchThreadgroups:threadsPerGrid threadsPerThreadgroup:threadgroupCount];
+            }
+            
+            [renderEncoder drawPrimitives:primType
+                              vertexStart:0
+                              vertexCount:(numPrimitivesInPart * numOutVertsPerInPrim)
+                            instanceCount:1 baseInstance:0];
         }
         else if(doMVA) {
-           [renderEncoder drawPrimitives:primType vertexStart:0 vertexCount:indexCount instanceCount:instanceCount baseInstance:0];
+           [renderEncoder drawPrimitives:primType
+                             vertexStart:0 vertexCount:indexCount
+                           instanceCount:instanceCount
+                            baseInstance:0];
         }
         else {
-            [renderEncoder drawIndexedPrimitives:primType indexCount:indexCount indexType:indexTypeMetal indexBuffer:indexBuffer indexBufferOffset:(firstIndex * indexSize) instanceCount:instanceCount baseVertex:baseVertex baseInstance:0];
+            [renderEncoder drawIndexedPrimitives:primType
+                                      indexCount:indexCount
+                                       indexType:indexTypeMetal
+                                     indexBuffer:indexBuffer
+                               indexBufferOffset:(firstIndex * indexSize)
+                                   instanceCount:instanceCount
+                                      baseVertex:baseVertex baseInstance:0];
         }
 
-        if (doMVAComputeGS)
+        if (doMVAComputeGS) {
             context->ReleaseEncoder(false, METALWORKQUEUE_GEOMETRY_SHADER);
+        }
         context->ReleaseEncoder(false, METALWORKQUEUE_DEFAULT);
         
         numPrimitives -= numPrimitivesInPart;

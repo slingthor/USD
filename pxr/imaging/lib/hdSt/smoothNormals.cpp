@@ -134,6 +134,8 @@ HdSt_SmoothNormalsComputationGPU::Execute(
         HdDataSizeOfType(HdGetComponentType(normals->GetTupleType().type));
     uniform.normalsOffset = normals->GetOffset() / normalComponentSize;
     uniform.normalsStride = normals->GetStride() / normalComponentSize;
+    
+    uniform.invocationOffset = 0;
 
     // The number of points is based off the size of the output,
     // However, the number of points in the adjacency table

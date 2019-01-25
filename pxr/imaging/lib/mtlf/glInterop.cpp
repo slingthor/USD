@@ -431,15 +431,16 @@ MtlfGlInterop::CopyDepthTextureToOpenGL(id<MTLComputeCommandEncoder> computeEnco
 
     NSUInteger exeWidth = context->SetComputeEncoderState(computeDepthCopyProgram, 0, 0, @"Depth copy pipeline state");
     NSUInteger maxThreadsPerThreadgroup = context->GetMaxThreadsPerThreadgroup();
-    
+
     MTLSize threadgroupCount = MTLSizeMake(exeWidth, maxThreadsPerThreadgroup / exeWidth, 1);
-    MTLSize threadsPerGrid   = MTLSizeMake(mtlDepthTexture.width,
-                                           mtlDepthTexture.height,
+    MTLSize threadsPerGrid   = MTLSizeMake((mtlDepthTexture.width + (threadgroupCount.width - 1)) / threadgroupCount.width,
+                                           (mtlDepthTexture.height + (threadgroupCount.height - 1)) / threadgroupCount.height,
                                            1);
 
     [computeEncoder setTexture:mtlDepthTexture atIndex:0];
     [computeEncoder setTexture:mtlDepthRegularFloatTexture atIndex:1];
-    [computeEncoder dispatchThreads:threadsPerGrid threadsPerThreadgroup: threadgroupCount];
+    
+    [computeEncoder dispatchThreadgroups:threadsPerGrid threadsPerThreadgroup:threadgroupCount];
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

@@ -72,6 +72,7 @@ protected:
         int pointsStride;
         int normalsOffset;
         int normalsStride;
+        int invocationOffset;
     };
 
     HDST_API

@@ -75,6 +75,7 @@ protected:
         int indexStride;
         int pParamOffset;
         int pParamStride;
+        int invocationOffset;
     };
 
     HDST_API

@@ -166,6 +166,8 @@ HdSt_FlatNormalsComputationGPU::Execute(
         HdDataSizeOfType(HdGetComponentType(primitiveParam->GetTupleType().type));
     uniform.pParamOffset = primitiveParam->GetOffset() / pParamComponentSize;
     uniform.pParamStride = primitiveParam->GetStride() / pParamComponentSize;
+    
+    uniform.invocationOffset = 0;
 
     _Execute(computeProgram, uniform, points,
              normals, indices, primitiveParam, _topologyRange->GetNumElements());
