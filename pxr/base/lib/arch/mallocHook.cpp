@@ -33,7 +33,7 @@
 #endif
 #include <cstring>
 
-#if defined(ARCH_OS_OSX)
+#if defined(ARCH_OS_MACOS)
 #   include <sys/malloc.h>
 #elif !defined(ARCH_OS_IOS)
 #   include <malloc.h>

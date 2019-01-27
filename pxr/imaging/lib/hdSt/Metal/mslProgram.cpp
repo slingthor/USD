@@ -670,25 +670,51 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
                 [computeEncoder dispatchThreadgroups:threadsPerGrid threadsPerThreadgroup:threadgroupCount];
             }
             
-            [renderEncoder drawPrimitives:primType
-                              vertexStart:0
-                              vertexCount:(numPrimitivesInPart * numOutVertsPerInPrim)
-                            instanceCount:1 baseInstance:0];
+            if (instanceCount == 1) {
+                [renderEncoder drawPrimitives:primType
+                                  vertexStart:0
+                                  vertexCount:(numPrimitivesInPart * numOutVertsPerInPrim)];
+            }
+            else {
+                [renderEncoder drawPrimitives:primType
+                                  vertexStart:0
+                                  vertexCount:(numPrimitivesInPart * numOutVertsPerInPrim)
+                                instanceCount:1
+                                 baseInstance:0];
+            }
         }
         else if(doMVA) {
-           [renderEncoder drawPrimitives:primType
-                             vertexStart:0 vertexCount:indexCount
-                           instanceCount:instanceCount
-                            baseInstance:0];
+            if (instanceCount == 1) {
+                [renderEncoder drawPrimitives:primType
+                                  vertexStart:0
+                                  vertexCount:indexCount];
+            }
+            else {
+                [renderEncoder drawPrimitives:primType
+                                  vertexStart:0
+                                  vertexCount:indexCount
+                                instanceCount:instanceCount
+                                 baseInstance:0];
+            }
         }
         else {
-            [renderEncoder drawIndexedPrimitives:primType
-                                      indexCount:indexCount
-                                       indexType:indexTypeMetal
-                                     indexBuffer:indexBuffer
-                               indexBufferOffset:(firstIndex * indexSize)
-                                   instanceCount:instanceCount
-                                      baseVertex:baseVertex baseInstance:0];
+            if (instanceCount == 1) {
+                [renderEncoder drawIndexedPrimitives:primType
+                                          indexCount:indexCount
+                                           indexType:indexTypeMetal
+                                         indexBuffer:indexBuffer
+                                   indexBufferOffset:(firstIndex * indexSize)];
+            }
+            else {
+                [renderEncoder drawIndexedPrimitives:primType
+                                          indexCount:indexCount
+                                           indexType:indexTypeMetal
+                                         indexBuffer:indexBuffer
+                                   indexBufferOffset:(firstIndex * indexSize)
+                                       instanceCount:instanceCount
+                                          baseVertex:baseVertex
+                                        baseInstance:0];
+            }
         }
 
         if (doMVAComputeGS) {
@@ -717,8 +743,17 @@ void HdStMSLProgram::DrawArraysInstanced(GLenum primitiveMode,
     
     const_cast<HdStMSLProgram*>(this)->BakeState();
     
-    [renderEncoder drawPrimitives:primType vertexStart:baseVertex vertexCount:vertexCount instanceCount:instanceCount];
-    
+    if (instanceCount == 1) {
+        [renderEncoder drawPrimitives:primType
+                          vertexStart:baseVertex
+                          vertexCount:vertexCount];
+    }
+    else {
+        [renderEncoder drawPrimitives:primType
+                          vertexStart:baseVertex
+                          vertexCount:vertexCount
+                        instanceCount:instanceCount];
+    }
     context->ReleaseEncoder(false);
 }
 

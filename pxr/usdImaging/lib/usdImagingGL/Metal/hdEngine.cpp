@@ -949,7 +949,7 @@ UsdImagingGLMetalHdEngine::GetRendererPlugins() const
     HfPluginDescVector pluginDescriptors;
     HdxRendererPluginRegistry::GetInstance().GetPluginDescs(&pluginDescriptors);
 
-#if defined(ARCH_OS_OSX)
+#if defined(ARCH_OS_MACOS)
     NSArray<id<MTLDevice>> *_deviceList = MTLCopyAllDevices();
 #else
     NSMutableArray<id<MTLDevice>> *_deviceList = [[NSMutableArray alloc] init];
@@ -1032,7 +1032,7 @@ UsdImagingGLMetalHdEngine::SetRendererPlugin(TfToken const &pluginId)
             GetDefaultPluginId();
     }
     else {
-#if defined(ARCH_OS_OSX)
+#if defined(ARCH_OS_MACOS)
         NSArray<id<MTLDevice>> *_deviceList = MTLCopyAllDevices();
 #else
         NSMutableArray<id<MTLDevice>> *_deviceList = [[NSMutableArray alloc] init];

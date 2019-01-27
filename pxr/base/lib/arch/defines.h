@@ -41,7 +41,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 #if TARGET_OS_IPHONE
 #define ARCH_OS_IOS
 #else
-#define ARCH_OS_OSX
+#define ARCH_OS_MACOS
 #endif
 #elif defined(_WIN32) || defined(_WIN64)
 #define ARCH_OS_WINDOWS
@@ -135,7 +135,7 @@ defined(_M_IX86) || defined(_M_X64)
 #if (__MAC_OS_X_VERSION_MAX_ALLOWED >= 101400) || (__IPHONE_OS_VERSION_MAX_ALLOWED >= 120000) /* __MAC_10_14 __IOS_12_00 */
 #define METAL_EVENTS_API_PRESENT
 #endif
-#if defined(ARCH_OS_OSX)
+#if defined(ARCH_OS_MACOS)
 #define MTLResourceStorageModeDefault MTLResourceStorageModeManaged
 #else
 #define MTLResourceStorageModeDefault MTLResourceStorageModeShared

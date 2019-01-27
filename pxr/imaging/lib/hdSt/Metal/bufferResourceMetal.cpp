@@ -201,14 +201,14 @@ HdStBufferResourceMetal::CopyData(size_t vboOffset, size_t dataSize, void const 
         // populate all the buffers
         for (int i = 0; i < 3; i++) {
             memcpy((uint8_t*)_gpuAddr[i] + vboOffset, data, dataSize);
-#if defined(ARCH_OS_OSX)
+#if defined(ARCH_OS_MACOS)
             [_id[i] didModifyRange:NSMakeRange(vboOffset, dataSize)];
 #endif
         }
     }
     else {
         memcpy((uint8_t*)_gpuAddr[_activeBuffer] + vboOffset, data, dataSize);
-#if defined(ARCH_OS_OSX)
+#if defined(ARCH_OS_MACOS)
         [_id[_activeBuffer] didModifyRange:NSMakeRange(vboOffset, dataSize)];
 #endif
     }

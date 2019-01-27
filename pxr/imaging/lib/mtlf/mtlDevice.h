@@ -40,11 +40,11 @@
 #endif // ARCH_GFX_OPENGL
 
 #include <Metal/Metal.h>
-#if defined(ARCH_OS_OSX)
+#if defined(ARCH_OS_MACOS)
 #import <Cocoa/Cocoa.h>
 #else
 #import <UIKit/UIKit.h>
-#endif // ARCH_OS_OSX
+#endif // ARCH_OS_MACOS
 
 #include "pxr/imaging/mtlf/api.h"
 #include "pxr/base/arch/threads.h"
@@ -420,7 +420,7 @@ private:
     MetalWorkQueueType outstandingDependency;
     
     id<MTLDevice> GetMetalDevice(PREFERRED_GPU_TYPE preferredGPUType);
-#if defined(ARCH_OS_OSX)
+#if defined(ARCH_OS_MACOS)
     void handleDisplayChange();
     void handleGPUHotPlug(id<MTLDevice> device, MTLDeviceNotificationName notifier);
 #endif

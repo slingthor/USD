@@ -130,7 +130,7 @@ GarchSamplerGPUHandle HdStSimpleTextureResourceMetal::GetTexelsSamplerId()
         samplerDesc.magFilter = fmagFilter;
         samplerDesc.mipFilter = fmipFilter;
         samplerDesc.maxAnisotropy = _maxAnisotropy;
-#if defined(ARCH_OS_OSX)
+#if defined(ARCH_OS_MACOS)
         samplerDesc.borderColor = MTLSamplerBorderColorOpaqueBlack;
 #endif
         id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->device;

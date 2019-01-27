@@ -156,14 +156,17 @@ MtlfSimpleShadowArray::_AllocSamplers()
 #if defined(ARCH_OS_IOS)
     samplerDescriptor.tAddressMode = MTLSamplerAddressModeClampToZero;
     samplerDescriptor.sAddressMode = MTLSamplerAddressModeClampToZero;
+    if ([mtlContext->device supportsFeatureSet:MTLFeatureSet_iOS_GPUFamily3_v1]) {
+        samplerDescriptor.compareFunction = MTLCompareFunctionLessEqual;
+    }
 #else
     samplerDescriptor.tAddressMode = MTLSamplerAddressModeClampToBorderColor;
     samplerDescriptor.sAddressMode = MTLSamplerAddressModeClampToBorderColor;
     samplerDescriptor.borderColor = MTLSamplerBorderColorOpaqueWhite;
+    samplerDescriptor.compareFunction = MTLCompareFunctionLessEqual;
 #endif
     samplerDescriptor.minFilter = MTLSamplerMinMagFilterLinear;
     samplerDescriptor.magFilter = MTLSamplerMinMagFilterLinear;
-    samplerDescriptor.compareFunction = MTLCompareFunctionLessEqual;
     _shadowCompareSampler = [mtlContext->device newSamplerStateWithDescriptor:samplerDescriptor];
 }
 

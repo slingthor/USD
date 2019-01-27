@@ -226,7 +226,7 @@ HdStMetalConversions::GetWrap(HdWrap wrap)
         case HdWrapClamp : return MTLSamplerAddressModeClampToEdge;
         case HdWrapRepeat : return MTLSamplerAddressModeRepeat;
         case HdWrapMirror : return MTLSamplerAddressModeMirrorRepeat;
-#if defined(ARCH_OS_OSX)
+#if defined(ARCH_OS_MACOS)
         case HdWrapBlack : return MTLSamplerAddressModeClampToBorderColor;
         case HdWrapUseMetadata : return MTLSamplerAddressModeClampToBorderColor;
 #else

@@ -31,7 +31,7 @@
 #include <GL/glew.h>
 #endif
 
-#if defined(ARCH_OS_OSX)
+#if defined(ARCH_OS_MACOS)
 // Apple installs OpenGL headers in a non-standard location.
 #include <OpenGL/gl.h>
 #elif defined(ARCH_OS_IOS)
@@ -70,7 +70,7 @@ typedef GLvoid (*ArchGLCallbackType)(...);
 #define GL_TESS_CONTROL_SHADER 0x8E88
 
 
-#if defined(ARCH_OS_OSX)
+#if defined(ARCH_OS_MACOS)
 #define GL_R8_SNORM 0x8F94
 #define GL_RG8_SNORM 0x8F95
 #define GL_RGB8_SNORM 0x8F96

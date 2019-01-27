@@ -28,7 +28,7 @@
 #import <Foundation/Foundation.h>
 
 #if defined(ARCH_GFX_OPENGL)
-#ifdef ARCH_OS_OSX
+#ifdef ARCH_OS_MACOS
 #import <AppKit/NSOpenGL.h>
 typedef NSOpenGLContext NSGLContext;
 #elif defined ARCH_OS_IOS
@@ -132,7 +132,7 @@ void *
 GarchSelectCoreProfileMacVisual()
 {
 #if defined(ARCH_GFX_OPENGL)
-#if defined(ARCH_OS_OSX)
+#if defined(ARCH_OS_MACOS)
     NSOpenGLPixelFormatAttribute attribs[10];
     int c = 0;
 
@@ -142,7 +142,7 @@ GarchSelectCoreProfileMacVisual()
     attribs[c++] = 0;
 
     return [[NSOpenGLPixelFormat alloc] initWithAttributes:attribs];
-#else // ARCH_OS_OSX
+#else // ARCH_OS_MACOS
     return NULL;
 #endif
 #else // ARCH_GFX_OPENGL

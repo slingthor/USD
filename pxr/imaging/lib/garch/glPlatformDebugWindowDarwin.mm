@@ -26,7 +26,7 @@
 #include "pxr/imaging/garch/glDebugWindow.h"
 #include "pxr/imaging/garch/glPlatformDebugWindowDarwin.h"
 
-#if defined(ARCH_OS_OSX)
+#if defined(ARCH_OS_MACOS)
 #import <Cocoa/Cocoa.h>
 #import <OpenGL/OpenGL.h>
 #import <OpenGL/gl.h>
@@ -34,7 +34,7 @@
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
-#if defined(ARCH_OS_OSX)
+#if defined(ARCH_OS_MACOS)
 
 static int
 Garch_GetModifierKeys(NSUInteger flags)

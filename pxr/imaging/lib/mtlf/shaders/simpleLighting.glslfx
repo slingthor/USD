@@ -205,8 +205,12 @@ integrateLightsDefault(vec4 Peye, vec3 Neye, LightingInterfaceProperties props)
 float
 shadowCompare(int index, vec4 coord)
 {
+#if defined(ARCH_OS_MACOS)
     return shadowCompareTexture.sample_compare(shadowCompareTextureSampler,
                    vec2(coord.x/coord.w, coord.y/coord.w), index, coord.z);
+#else
+    return 0.0f;
+#endif
 }
 
 #ifndef SHADOW_FILTER

@@ -2755,6 +2755,31 @@ HdSt_CodeGenMSL::_GenerateCommonDefinitions()
     _genDefinitions  << "#define HD_SHADER_API " << HD_SHADER_API << "\n"
                 << "#define ARCH_GFX_METAL\n";
     
+    // Metal feature set defines
+    id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->device;
+#if defined(ARCH_OS_MACOS)
+    _genDefinitions  << "#define ARCH_OS_MACOS\n";
+    // Define all macOS 10.13 feature set enums onwards
+    if ([device supportsFeatureSet:MTLFeatureSet_macOS_GPUFamily1_v3])
+        _genDefinitions << "#define METAL_FEATURESET_MACOS_GPUFAMILY1_v3\n";
+    if ([device supportsFeatureSet:MTLFeatureSet_macOS_GPUFamily1_v4])
+        _genDefinitions << "#define METAL_FEATURESET_MACOS_GPUFAMILY1_v4\n";
+    if ([device supportsFeatureSet:MTLFeatureSet_macOS_GPUFamily2_v1])
+        _genDefinitions << "#define METAL_FEATURESET_MACOS_GPUFAMILY2_v1\n";
+
+#else // ARCH_OS_MACOS
+    _genDefinitions  << "#define ARCH_OS_IOS\n";
+    // Define all iOS 12 feature set enums onwards
+    if ([device supportsFeatureSet:MTLFeatureSet_iOS_GPUFamily1_v5])
+        _genDefinitions << "#define METAL_FEATURESET_IOS_GPUFAMILY1_v5\n";
+    if ([device supportsFeatureSet:MTLFeatureSet_iOS_GPUFamily2_v5])
+        _genDefinitions << "#define METAL_FEATURESET_IOS_GPUFAMILY2_v5\n";
+    if ([device supportsFeatureSet:MTLFeatureSet_iOS_GPUFamily3_v4])
+        _genDefinitions << "#define METAL_FEATURESET_IOS_GPUFAMILY3_v4\n";
+    if ([device supportsFeatureSet:MTLFeatureSet_iOS_GPUFamily4_v2])
+        _genDefinitions << "#define METAL_FEATURESET_IOS_GPUFAMILY4_v2\n";
+#endif // ARCH_OS_MACOS
+    
     _genDefinitions  << "#include <metal_stdlib>\n"
                 << "#include <simd/simd.h>\n"
                 << "#include <metal_pack>\n"

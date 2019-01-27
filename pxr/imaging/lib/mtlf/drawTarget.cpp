@@ -447,7 +447,7 @@ MtlfDrawTarget::GetImage(std::string const & name, void* buffer) const
         mtlFormat = MTLPixelFormatDepth32Float;
         blitOptions = MTLBlitOptionDepthFromDepthStencil;
     }
-#if defined(ARCH_OS_OSX)
+#if defined(ARCH_OS_MACOS)
     else if (mtlFormat == MTLPixelFormatDepth24Unorm_Stencil8) {
         mtlFormat = MTLPixelFormatR32Uint; //MTL_FIXME - This might not be the right format for this texture
         bytesPerPixel = 4;
@@ -467,7 +467,7 @@ MtlfDrawTarget::GetImage(std::string const & name, void* buffer) const
     id<MTLBuffer> cpuBuffer = context->GetMetalBuffer((bytesPerPixel * width * height), MTLResourceStorageModeDefault);
     
     [blitEncoder copyFromTexture:texture sourceSlice:0 sourceLevel:0 sourceOrigin:MTLOriginMake(0, 0, 0) sourceSize:MTLSizeMake(width, height, 1) toBuffer:cpuBuffer destinationOffset:0 destinationBytesPerRow:(bytesPerPixel * width) destinationBytesPerImage:(bytesPerPixel * width * height) options:blitOptions];
-#if defined(ARCH_OS_OSX)
+#if defined(ARCH_OS_MACOS)
     [blitEncoder synchronizeResource:cpuBuffer];
 #endif
 
@@ -632,7 +632,7 @@ MtlfDrawTarget::MtlfAttachment::_GenTexture()
                     mtlFormat = MTLPixelFormatR32Float;
             }
             else if (type == GL_UNSIGNED_INT_24_8) {
-#if defined(ARCH_OS_OSX)
+#if defined(ARCH_OS_MACOS)
                 if([device isDepth24Stencil8PixelFormatSupported]) {
                     mtlFormat = MTLPixelFormatDepth24Unorm_Stencil8;
                     depth24stencil8 = true;

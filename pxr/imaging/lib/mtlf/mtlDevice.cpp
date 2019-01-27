@@ -53,7 +53,7 @@ enum {
 
 //Be careful with these when using Concurrent Dispatch. Also; you can't enable asynchronous compute without also enabling METAL_EVENTS_API_PRESENT.
 #define METAL_COMPUTEGS_MANUAL_HAZARD_TRACKING            0
-#if defined(ARCH_OS_OSX)
+#if defined(ARCH_OS_MACOS)
 #define METAL_COMPUTEGS_ALLOW_ASYNCHRONOUS_COMPUTE        0     //Currently disabled due to additional overhead of using events to synchronize.
 #else
 #define METAL_COMPUTEGS_ALLOW_ASYNCHRONOUS_COMPUTE        0     //Currently disabled due to additional overhead of using events to synchronize.
@@ -62,7 +62,7 @@ enum {
 PXR_NAMESPACE_OPEN_SCOPE
 MtlfMetalContextSharedPtr MtlfMetalContext::context = NULL;
 
-#if defined(ARCH_OS_OSX)
+#if defined(ARCH_OS_MACOS)
 // Called when the window is dragged to another display
 void MtlfMetalContext::handleDisplayChange()
 {
@@ -85,11 +85,11 @@ void MtlfMetalContext::handleGPUHotPlug(id<MTLDevice> device, MTLDeviceNotificat
         NSLog(@"Device was removed");
     }
 }
-#endif // ARCH_OS_OSX
+#endif // ARCH_OS_MACOS
 
 id<MTLDevice> MtlfMetalContext::GetMetalDevice(PREFERRED_GPU_TYPE preferredGPUType)
 {
-#if defined(ARCH_OS_OSX)
+#if defined(ARCH_OS_MACOS)
     // Get a list of all devices and register an obsever for eGPU events
     id <NSObject> metalDeviceObserver = nil;
     
@@ -167,11 +167,11 @@ MtlfMetalContext::MtlfMetalContext(id<MTLDevice> _device, int width, int height)
     NSLog(@"Selected %@ for Metal Device", device.name);
     
 #if METAL_COMPUTEGS_ALLOW_ASYNCHRONOUS_COMPUTE
-#if defined(ARCH_OS_OSX)
+#if defined(ARCH_OS_MACOS)
     enableMultiQueue = [device supportsFeatureSet:MTLFeatureSet_macOS_GPUFamily2_v1];
-#else // ARCH_OS_OSX
+#else // ARCH_OS_MACOS
     enableMultiQueue = [device supportsFeatureSet:MTLFeatureSet_iOS_GPUFamily1_v5];
-#endif // ARCH_OS_OSX
+#endif // ARCH_OS_MACOS
 #else
     enableMultiQueue = false;
 #endif // METAL_COMPUTEGS_ALLOW_ASYNCHRONOUS_COMPUTE
@@ -430,7 +430,7 @@ MtlfMetalContext::GetQuadIndexBuffer(MTLIndexType indexTypeMetal) {
             srcData  += 4;
             destData += 6;
         }
-#if defined(ARCH_OS_OSX)
+#if defined(ARCH_OS_MACOS)
         [remappedQuadIndexBuffer didModifyRange:(NSMakeRange(0, remappedQuadIndexBuffer.length))];
 #endif
     }
@@ -480,7 +480,7 @@ MtlfMetalContext::GetPointIndexBuffer(MTLIndexType indexTypeMetal, int numIndice
                 *destData++ = base + 2;
             }
         }
-#if defined(ARCH_OS_OSX)
+#if defined(ARCH_OS_MACOS)
         [pointIndexBuffer didModifyRange:(NSMakeRange(0, pointIndexBuffer.length))];
 #endif
     }
@@ -1646,7 +1646,7 @@ id<MTLBuffer> MtlfMetalContext::GetMetalBuffer(NSUInteger length, MTLResourceOpt
             // Copy over data
             if (pointer) {
                 memcpy(buffer.contents, pointer, length);
-#if defined(ARCH_OS_OSX)
+#if defined(ARCH_OS_MACOS)
                 [buffer didModifyRange:(NSMakeRange(0, length))];
 #endif
             }
