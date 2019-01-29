@@ -21,21 +21,19 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#include "pxr/imaging/glf/glew.h"
 
-#include "pxr/imaging/garch/contextCaps.h"
-#include "pxr/imaging/garch/simpleLightingContext.h"
-
-#include "pxr/imaging/hdSt/GL/resourceFactoryGL.h"
-
-#include "pxr/usdImaging/usdImagingGL/GL/hdEngine.h"
+#include "pxr/usdImaging/usdImagingGL/Metal/hdEngineMetal.h"
 #include "pxr/usdImaging/usdImaging/tokens.h"
+
+#include "pxr/imaging/hdSt/resourceRegistry.h"
+#include "pxr/imaging/hdSt/Metal/resourceFactoryMetal.h"
 
 #include "pxr/imaging/hd/debugCodes.h"
 #include "pxr/imaging/hd/renderDelegate.h"
 #include "pxr/imaging/hd/resourceRegistry.h"
 #include "pxr/imaging/hd/tokens.h"
 #include "pxr/imaging/hd/version.h"
+
 #include "pxr/imaging/hdx/intersector.h"
 #include "pxr/imaging/hdx/rendererPluginRegistry.h"
 #include "pxr/imaging/hdx/tokens.h"
@@ -48,10 +46,19 @@
 #include "pxr/base/tf/getenv.h"
 #include "pxr/base/tf/stringUtils.h"
 
-#include "pxr/base/arch/demangle.h"
+#include "pxr/imaging/mtlf/mtlDevice.h"
+#include "pxr/imaging/mtlf/diagnostic.h"
+#include "pxr/imaging/mtlf/info.h"
+#include "pxr/imaging/mtlf/utils.h"
 
-#include "pxr/imaging/glf/diagnostic.h"
-#include "pxr/imaging/glf/info.h"
+#include "pxr/imaging/garch/simpleLightingContext.h"
+
+#import <simd/simd.h>
+
+typedef struct {
+    vector_float2 position;
+    vector_float2 uv;
+} Vertex;
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -61,13 +68,19 @@ TF_DEFINE_PRIVATE_TOKENS(
     (render)
 );
 
-UsdImagingGLHdEngine::UsdImagingGLHdEngine(
+static std::string _MetalPluginDescriptor(id<MTLDevice> device)
+{
+    return std::string("Hydra Metal - ") + [[device name] UTF8String];
+}
+
+UsdImagingGLMetalHdEngine::UsdImagingGLMetalHdEngine(
+        RenderOutput outputTarget,
         const SdfPath& rootPath,
         const SdfPathVector& excludedPrimPaths,
         const SdfPathVector& invisedPrimPaths,
         const SdfPath& delegateID)
     : UsdImagingGLEngine()
-    , _engine(HdEngine::OpenGL)
+    , _engine(HdEngine::Metal)
     , _renderIndex(nullptr)
     , _selTracker(new HdxSelectionTracker)
     , _delegateID(delegateID)
@@ -80,8 +93,14 @@ UsdImagingGLHdEngine::UsdImagingGLHdEngine(
     , _invisedPrimPaths(invisedPrimPaths)
     , _isPopulated(false)
     , _renderTags()
+    , _renderOutput(outputTarget)
+    , _mtlRenderPassDescriptorForInterop(nil)
+    , _mtlRenderPassDescriptor(nil)
+    , _sharedCaptureManager(nil)
+    , _captureScope(nil)
+    , _resourceFactory(nil)
 {
-    _resourceFactory = new HdStResourceFactoryGL();
+    _resourceFactory = new HdStResourceFactoryMetal();
 
     GarchResourceFactory::GetInstance().SetResourceFactory(dynamic_cast<GarchResourceFactoryInterface*>(_resourceFactory));
     HdStResourceFactory::GetInstance().SetResourceFactory(_resourceFactory);
@@ -91,26 +110,35 @@ UsdImagingGLHdEngine::UsdImagingGLHdEngine(
     if (!SetRendererPlugin(GetDefaultRendererPluginId())) {
         TF_CODING_ERROR("No renderer plugins found! Check before creation.");
     }
+
+    MtlfRegisterDefaultDebugOutputMessageCallback();
+    
+    _mtlRenderPassDescriptorForNativeMetal = [[MTLRenderPassDescriptor alloc] init];
+
+    _InitializeCapturing();
 }
 
-UsdImagingGLHdEngine::~UsdImagingGLHdEngine() 
+UsdImagingGLMetalHdEngine::~UsdImagingGLMetalHdEngine()
 {
     _DeleteHydraResources();
     HdStResourceFactory::GetInstance().SetResourceFactory(NULL);
     GarchResourceFactory::GetInstance().SetResourceFactory(NULL);
     
+    [_mtlRenderPassDescriptorForNativeMetal release];
+    _mtlRenderPassDescriptorForNativeMetal = nil;
+    
     delete _resourceFactory;
-    _resourceFactory = NULL;
+    _resourceFactory = nil;
 }
 
 HdRenderIndex *
-UsdImagingGLHdEngine::GetRenderIndex() const
+UsdImagingGLMetalHdEngine::GetRenderIndex() const
 {
     return _renderIndex;
 }
 
 void
-UsdImagingGLHdEngine::InvalidateBuffers()
+UsdImagingGLMetalHdEngine::InvalidateBuffers()
 {
     //_delegate->GetRenderIndex().GetChangeTracker().MarkPrimDirty(path, flag);
 }
@@ -152,8 +180,8 @@ _GetRefineLevel(float c)
 }
 
 bool 
-UsdImagingGLHdEngine::_CanPrepareBatch(const UsdPrim& root, 
-                                       const UsdImagingGLRenderParams& params)
+UsdImagingGLMetalHdEngine::_CanPrepareBatch(const UsdPrim& root,
+                                            const UsdImagingGLRenderParams& params)
 {
     HD_TRACE_FUNCTION();
 
@@ -172,8 +200,8 @@ UsdImagingGLHdEngine::_CanPrepareBatch(const UsdPrim& root,
 }
 
 void
-UsdImagingGLHdEngine::_PreSetTime(const UsdPrim& root, 
-    const UsdImagingGLRenderParams& params)
+UsdImagingGLMetalHdEngine::_PreSetTime(const UsdPrim& root,
+                                       const UsdImagingGLRenderParams& params)
 {
     HD_TRACE_FUNCTION();
 
@@ -181,34 +209,34 @@ UsdImagingGLHdEngine::_PreSetTime(const UsdPrim& root,
     // all prim refine levels will be dirtied.
     int refineLevel = _GetRefineLevel(params.complexity);
     _delegate->SetRefineLevelFallback(refineLevel);
-
+    
     // Apply any queued up scene edits.
     _delegate->ApplyPendingUpdates();
 }
 
 void
-UsdImagingGLHdEngine::_PostSetTime(const UsdPrim& root, 
-    const UsdImagingGLRenderParams& params)
+UsdImagingGLMetalHdEngine::_PostSetTime(const UsdPrim& root,
+                                        const UsdImagingGLRenderParams& params)
 {
     HD_TRACE_FUNCTION();
 }
 
 /*virtual*/
 void
-UsdImagingGLHdEngine::PrepareBatch(const UsdPrim& root, 
-    const UsdImagingGLRenderParams &params)
+UsdImagingGLMetalHdEngine::PrepareBatch(const UsdPrim& root,
+                                        const UsdImagingGLRenderParams& params)
 {
     HD_TRACE_FUNCTION();
-
+    
     if (_CanPrepareBatch(root, params)) {
         if (!_isPopulated) {
             _delegate->SetUsdDrawModesEnabled(params.enableUsdDrawModes);
             _delegate->Populate(root.GetStage()->GetPrimAtPath(_rootPath),
-                               _excludedPrimPaths);
+                                _excludedPrimPaths);
             _delegate->SetInvisedPrimPaths(_invisedPrimPaths);
             _isPopulated = true;
         }
-
+        
         _PreSetTime(root, params);
         // SetTime will only react if time actually changes.
         _delegate->SetTime(params.frame);
@@ -218,7 +246,7 @@ UsdImagingGLHdEngine::PrepareBatch(const UsdPrim& root,
 
 /* static */
 bool
-UsdImagingGLHdEngine::_UpdateHydraCollection(HdRprimCollection *collection,
+UsdImagingGLMetalHdEngine::_UpdateHydraCollection(HdRprimCollection *collection,
                           SdfPathVector const& roots,
                           UsdImagingGLRenderParams const& params,
                           TfTokenVector *renderTags)
@@ -227,11 +255,11 @@ UsdImagingGLHdEngine::_UpdateHydraCollection(HdRprimCollection *collection,
         TF_CODING_ERROR("Null passed to _UpdateHydraCollection");
         return false;
     }
-
+    
     // choose repr
     HdReprSelector reprSelector = HdReprSelector(HdReprTokens->smoothHull);
     bool refined = params.complexity > 1.0;
-
+    
     if (params.drawMode == UsdImagingGLDrawMode::DRAW_GEOM_FLAT ||
         params.drawMode == UsdImagingGLDrawMode::DRAW_SHADED_FLAT) {
         // Flat shading
@@ -250,7 +278,7 @@ UsdImagingGLHdEngine::_UpdateHydraCollection(HdRprimCollection *collection,
         reprSelector = HdReprSelector(refined ?
             HdReprTokens->refined : HdReprTokens->smoothHull);
     }
-
+    
     // Calculate the rendertags needed based on the parameters passed by
     // the application
     renderTags->clear();
@@ -263,20 +291,20 @@ UsdImagingGLHdEngine::_UpdateHydraCollection(HdRprimCollection *collection,
     }
     if (params.showRender) {
         renderTags->push_back(_tokens->render);
-    } 
-
+    }
+    
     // By default our main collection will be called geometry
     TfToken colName = HdTokens->geometry;
-
+    
     // Check if the collection needs to be updated (so we can avoid the sort).
     SdfPathVector const& oldRoots = collection->GetRootPaths();
-
+    
     // inexpensive comparison first
     bool match = collection->GetName() == colName &&
-                 oldRoots.size() == roots.size() &&
-                 collection->GetReprSelector() == reprSelector &&
-                 collection->GetRenderTags().size() == renderTags->size();
-
+        oldRoots.size() == roots.size() &&
+        collection->GetReprSelector() == reprSelector &&
+        collection->GetRenderTags().size() == renderTags->size();
+    
     // Only take the time to compare root paths if everything else matches.
     if (match) {
         // Note that oldRoots is guaranteed to be sorted.
@@ -285,37 +313,35 @@ UsdImagingGLHdEngine::_UpdateHydraCollection(HdRprimCollection *collection,
             if (oldRoots[i] == roots[i])
                 continue;
             // Binary search to find the current root.
-            if (!std::binary_search(oldRoots.begin(), oldRoots.end(), roots[i])) 
+            if (!std::binary_search(oldRoots.begin(), oldRoots.end(), roots[i]))
             {
                 match = false;
                 break;
             }
         }
-
+        
         // Compare if rendertags match
         if (*renderTags != collection->GetRenderTags()) {
             match = false;
         }
-
+        
         // if everything matches, do nothing.
         if (match) return false;
     }
-
+    
     // Recreate the collection.
     *collection = HdRprimCollection(colName, reprSelector);
     collection->SetRootPaths(roots);
     collection->SetRenderTags(*renderTags);
-
+    
     return true;
 }
 
 /* static */
 HdxRenderTaskParams
-UsdImagingGLHdEngine::_MakeHydraUsdImagingGLRenderParams(
-    UsdImagingGLRenderParams const& renderParams)
+UsdImagingGLMetalHdEngine::_MakeHydraUsdImagingGLRenderParams(
+                  const UsdImagingGLRenderParams& renderParams)
 {
-    // Note this table is dangerous and making changes to the order of the 
-    // enums in UsdImagingGLCullStyle, will affect this with no compiler help.
     static const HdCullStyle USD_2_HD_CULL_STYLE[] =
     {
         HdCullStyleDontCare,              // Cull No Opinion (unused)
@@ -324,16 +350,15 @@ UsdImagingGLHdEngine::_MakeHydraUsdImagingGLRenderParams(
         HdCullStyleFront,                 // CULL_STYLE_FRONT,
         HdCullStyleBackUnlessDoubleSided, // CULL_STYLE_BACK_UNLESS_DOUBLE_SIDED
     };
-    static_assert(((sizeof(USD_2_HD_CULL_STYLE) / 
-                    sizeof(USD_2_HD_CULL_STYLE[0])) 
-              == (size_t)UsdImagingGLCullStyle::CULL_STYLE_COUNT),
-        "enum size mismatch");
-
+    static_assert(((sizeof(USD_2_HD_CULL_STYLE) /
+                    sizeof(USD_2_HD_CULL_STYLE[0]))
+                   == (size_t)UsdImagingGLCullStyle::CULL_STYLE_COUNT),"enum size mismatch");
+    
     HdxRenderTaskParams params;
-
+    
     params.overrideColor       = renderParams.overrideColor;
     params.wireframeColor      = renderParams.wireframeColor;
-
+    
     if (renderParams.drawMode == UsdImagingGLDrawMode::DRAW_GEOM_ONLY ||
         renderParams.drawMode == UsdImagingGLDrawMode::DRAW_POINTS) {
         params.enableLighting = false;
@@ -341,7 +366,7 @@ UsdImagingGLHdEngine::_MakeHydraUsdImagingGLRenderParams(
         params.enableLighting =  renderParams.enableLighting &&
                                 !renderParams.enableIdRender;
     }
-
+    
     params.enableIdRender      = renderParams.enableIdRender;
     params.depthBiasUseDefault = true;
     params.depthFunc           = HdCmpFuncLess;
@@ -349,10 +374,10 @@ UsdImagingGLHdEngine::_MakeHydraUsdImagingGLRenderParams(
         (size_t)renderParams.cullStyle];
     // 32.0 is the default tessLevel of HdRasterState. we can change if we like.
     params.tessLevel           = 32.0;
-
+    
     const float tinyThreshold = 0.9f;
     params.drawingRange = GfVec2f(tinyThreshold, -1.0f);
-
+    
     // Decrease the alpha threshold if we are using sample alpha to
     // coverage.
     if (renderParams.alphaThreshold < 0.0) {
@@ -362,63 +387,63 @@ UsdImagingGLHdEngine::_MakeHydraUsdImagingGLRenderParams(
         params.alphaThreshold =
             renderParams.alphaThreshold;
     }
-
+    
     params.enableSceneMaterials = renderParams.enableSceneMaterials;
-
+    
     // Leave default values for:
     // - params.geomStyle
     // - params.complexity
     // - params.hullVisibility
     // - params.surfaceVisibility
-
+    
     // We don't provide the following because task controller ignores them:
     // - params.camera
     // - params.viewport
-
+    
     return params;
 }
 
 /*virtual*/
 void
-UsdImagingGLHdEngine::RenderBatch(const SdfPathVector& paths, 
-    const UsdImagingGLRenderParams& params)
+UsdImagingGLMetalHdEngine::RenderBatch(const SdfPathVector& paths,
+                                       const UsdImagingGLRenderParams& params)
 {
     _taskController->SetCameraClipPlanes(params.clipPlanes);
     _UpdateHydraCollection(&_renderCollection, paths, params, &_renderTags);
     _taskController->SetCollection(_renderCollection);
-
+    
     HdxRenderTaskParams hdParams = _MakeHydraUsdImagingGLRenderParams(params);
     _taskController->SetRenderParams(hdParams);
     _taskController->SetEnableSelection(params.highlight);
-
+    
     Render(params);
 }
 
 /*virtual*/
 void
-UsdImagingGLHdEngine::Render(const UsdPrim& root, 
-    const UsdImagingGLRenderParams& params)
+UsdImagingGLMetalHdEngine::Render(const UsdPrim& root,
+                                const UsdImagingGLRenderParams& params)
 {
     PrepareBatch(root, params);
-
+    
     SdfPath rootPath = _delegate->GetPathForIndex(root.GetPath());
     SdfPathVector roots(1, rootPath);
-
+    
     _taskController->SetCameraClipPlanes(params.clipPlanes);
     _UpdateHydraCollection(&_renderCollection, roots, params, &_renderTags);
     _taskController->SetCollection(_renderCollection);
-
+    
     HdxRenderTaskParams hdParams = _MakeHydraUsdImagingGLRenderParams(params);
     _taskController->SetRenderParams(hdParams);
     _taskController->SetEnableSelection(params.highlight);
-
+    
     Render(params);
 }
 
 bool
-UsdImagingGLHdEngine::TestIntersection(
+UsdImagingGLMetalHdEngine::TestIntersection(
     const GfMatrix4d &viewMatrix,
-    const GfMatrix4d &projectionMatrix,
+    const GfMatrix4d &inProjectionMatrix,
     const GfMatrix4d &worldToLocalSpace,
     const UsdPrim& root, 
     const UsdImagingGLRenderParams& params,
@@ -428,6 +453,20 @@ UsdImagingGLHdEngine::TestIntersection(
     int *outHitInstanceIndex,
     int *outHitElementIndex)
 {
+    GfMatrix4d projectionMatrix;
+    static GfMatrix4d zTransform;
+    
+    // Transform from [-1, 1] to [0, 1] clip space
+    static bool _zTransformSet = false;
+    if (!_zTransformSet) {
+        _zTransformSet = true;
+        zTransform.SetIdentity();
+        zTransform.SetScale(GfVec3d(1.0, 1.0, 0.5));
+        zTransform.SetTranslateOnly(GfVec3d(0.0, 0.0, 0.5));
+    }
+    
+    projectionMatrix = inProjectionMatrix * zTransform;
+
     SdfPath rootPath = _delegate->GetPathForIndex(root.GetPath());
     SdfPathVector roots(1, rootPath);
     _UpdateHydraCollection(&_intersectCollection, roots, params, &_renderTags);
@@ -441,12 +480,22 @@ UsdImagingGLHdEngine::TestIntersection(
     qparams.cullStyle = HdCullStyleNothing;
     qparams.enableSceneMaterials = params.enableSceneMaterials;
 
-    if (!_taskController->TestIntersection(
-            &_engine,
-            _intersectCollection,
-            qparams,
-            HdxIntersectionModeTokens->nearest,
-            &allHits)) {
+    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
+    
+    //MTLCaptureManager *sharedCaptureManager = [MTLCaptureManager sharedCaptureManager];
+    //[sharedCaptureManager startCaptureWithScope:_captureScope];
+    [_captureScope beginScope];
+
+    bool success = _taskController->TestIntersection(
+         &_engine,
+         _intersectCollection,
+         qparams,
+         HdxIntersectionModeTokens->nearest,
+         &allHits);
+
+    [_captureScope endScope];
+
+    if (!success) {
         return false;
     }
 
@@ -478,9 +527,9 @@ UsdImagingGLHdEngine::TestIntersection(
 }
 
 bool
-UsdImagingGLHdEngine::TestIntersectionBatch(
+UsdImagingGLMetalHdEngine::TestIntersectionBatch(
     const GfMatrix4d &viewMatrix,
-    const GfMatrix4d &projectionMatrix,
+    const GfMatrix4d &inProjectionMatrix,
     const GfMatrix4d &worldToLocalSpace,
     const SdfPathVector& paths, 
     const UsdImagingGLRenderParams& params,
@@ -488,6 +537,20 @@ UsdImagingGLHdEngine::TestIntersectionBatch(
     PathTranslatorCallback pathTranslator,
     HitBatch *outHit)
 {
+    GfMatrix4d projectionMatrix;
+    static GfMatrix4d zTransform;
+    
+    // Transform from [-1, 1] to [0, 1] clip space
+    static bool _zTransformSet = false;
+    if (!_zTransformSet) {
+        _zTransformSet = true;
+        zTransform.SetIdentity();
+        zTransform.SetScale(GfVec3d(1.0, 1.0, 0.5));
+        zTransform.SetTranslateOnly(GfVec3d(0.0, 0.0, 0.5));
+    }
+    
+    projectionMatrix = inProjectionMatrix * zTransform;
+
     _UpdateHydraCollection(&_intersectCollection, paths, params, &_renderTags);
 
     static const HdCullStyle USD_2_HD_CULL_STYLE[] =
@@ -500,25 +563,34 @@ UsdImagingGLHdEngine::TestIntersectionBatch(
     };
     static_assert(((sizeof(USD_2_HD_CULL_STYLE) / 
                     sizeof(USD_2_HD_CULL_STYLE[0])) 
-                    == (size_t)UsdImagingGLCullStyle::CULL_STYLE_COUNT),
-            "enum size mismatch");
+                == (size_t)UsdImagingGLCullStyle::CULL_STYLE_COUNT),"enum size mismatch");
 
     HdxIntersector::HitVector allHits;
     HdxIntersector::Params qparams;
     qparams.viewMatrix = worldToLocalSpace * viewMatrix;
     qparams.projectionMatrix = projectionMatrix;
     qparams.alphaThreshold = params.alphaThreshold;
-    qparams.cullStyle = USD_2_HD_CULL_STYLE[(size_t)params.cullStyle];
+    qparams.cullStyle = USD_2_HD_CULL_STYLE[
+        (size_t)params.cullStyle];
     qparams.renderTags = _renderTags;
     qparams.enableSceneMaterials = params.enableSceneMaterials;
 
+    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
+//    MTLCaptureManager *sharedCaptureManager = [MTLCaptureManager sharedCaptureManager];
+//    [sharedCaptureManager startCaptureWithScope:_captureScope];
+    [_captureScope beginScope];
+
     _taskController->SetPickResolution(pickResolution);
-    if (!_taskController->TestIntersection(
-            &_engine,
-            _intersectCollection,
-            qparams,
-            HdxIntersectionModeTokens->unique,
-            &allHits)) {
+    bool success = _taskController->TestIntersection(
+         &_engine,
+         _intersectCollection,
+         qparams,
+         HdxIntersectionModeTokens->unique,
+         &allHits);
+
+    [_captureScope endScope];
+
+    if (!success) {
         return false;
     }
 
@@ -546,93 +618,123 @@ class _DebugGroupTaskWrapper : public HdTask {
     const HdTaskSharedPtr _task;
     public:
     _DebugGroupTaskWrapper(const HdTaskSharedPtr task)
-        : _task(task)
+    : _task(task)
     {
-
     }
-
+    
     void
     _Execute(HdTaskContext* ctx) override
     {
-        GlfDebugGroup dbgGroup((ArchGetDemangled(typeid(*_task.get())) +
-                "::Execute").c_str());
         _task->Execute(ctx);
     }
-
+    
     void
     _Sync(HdTaskContext* ctx) override
     {
-        GlfDebugGroup dbgGroup((ArchGetDemangled(typeid(*_task.get())) +
-                "::Sync").c_str());
         _task->Sync(ctx);
     }
 };
 
 void
-UsdImagingGLHdEngine::Render(const UsdImagingGLRenderParams& params)
+UsdImagingGLMetalHdEngine::Render(const UsdImagingGLRenderParams& params)
 {
     // Forward scene materials enable option to delegate
     _delegate->SetSceneMaterialsEnabled(params.enableSceneMaterials);
 
+    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
 
-    // User is responsible for initializing GL context and glew
-    bool isCoreProfileContext = GarchResourceFactory::GetInstance()->GetContextCaps().coreProfile;
+    //MTLCaptureManager *sharedCaptureManager = [MTLCaptureManager sharedCaptureManager];
+    //[sharedCaptureManager startCaptureWithScope:_captureScope];
+    [_captureScope beginScope];
 
-    GLF_GROUP_FUNCTION();
+#if defined(ARCH_GFX_OPENGL)
+    // Make sure the Metal render targets, and GL interop textures match the GL viewport size
+    GLint viewport[4];
+    glGetIntegerv( GL_VIEWPORT, viewport );
 
-    GLuint vao;
-    if (isCoreProfileContext) {
-        // We must bind a VAO (Vertex Array Object) because core profile 
-        // contexts do not have a default vertex array object. VAO objects are 
-        // container objects which are not shared between contexts, so we create
-        // and bind a VAO here so that core rendering code does not have to 
-        // explicitly manage per-GL context state.
-        glGenVertexArrays(1, &vao);
-        glBindVertexArray(vao);
-    } else {
-        glPushAttrib(GL_ENABLE_BIT | GL_POLYGON_BIT | GL_DEPTH_BUFFER_BIT);
+    if (context->mtlColorTexture.width != viewport[2] ||
+        context->mtlColorTexture.height != viewport[3]) {
+        context->AllocateAttachments(viewport[2], viewport[3]);
     }
 
+    if (_renderOutput == RenderOutput::OpenGL) {
+        if (_mtlRenderPassDescriptorForInterop == nil)
+            _mtlRenderPassDescriptorForInterop = [[MTLRenderPassDescriptor alloc] init];
+        
+        //Set this state every frame because it may have changed during rendering.
+        
+        // create a color attachment every frame since we have to recreate the texture every frame
+        MTLRenderPassColorAttachmentDescriptor *colorAttachment = _mtlRenderPassDescriptorForInterop.colorAttachments[0];
+
+        // make sure to clear every frame for best performance
+        colorAttachment.loadAction = MTLLoadActionClear;
+    
+        // store only attachments that will be presented to the screen, as in this case
+        colorAttachment.storeAction = MTLStoreActionStore;
+
+        MTLRenderPassDepthAttachmentDescriptor *depthAttachment = _mtlRenderPassDescriptorForInterop.depthAttachment;
+        depthAttachment.loadAction = MTLLoadActionClear;
+        depthAttachment.storeAction = MTLStoreActionStore;
+        depthAttachment.clearDepth = 1.0f;
+        
+        colorAttachment.texture = context->mtlColorTexture;
+
+        GLfloat clearColor[4];
+        glGetFloatv(GL_COLOR_CLEAR_VALUE, clearColor);
+        clearColor[3] = 1.0f;
+    
+        colorAttachment.clearColor = MTLClearColorMake(clearColor[0],
+                                                       clearColor[1],
+                                                       clearColor[2],
+                                                       clearColor[3]);
+        depthAttachment.texture = context->mtlDepthTexture;
+        
+        _mtlRenderPassDescriptor = _mtlRenderPassDescriptorForInterop;
+    }
+    else
+#else
+    if (false) {}
+    else
+#endif
+    {
+        if (_mtlRenderPassDescriptor == nil) {
+            TF_FATAL_CODING_ERROR("SetMetalRenderPassDescriptor must be called prior "
+                                  "to rendering when render output is set to Metal");
+        }
+    }
+
+    context->StartFrame();
+    
+    // Create a new command buffer for each render pass to the current drawable
+    context->CreateCommandBuffer(METALWORKQUEUE_DEFAULT);
+    context->LabelCommandBuffer(@"HdEngine::Render", METALWORKQUEUE_DEFAULT);
+    
+    // Set the render pass descriptor to use for the render encoders
+    context->SetRenderPassDescriptor(_mtlRenderPassDescriptor);
+    if (_renderOutput == RenderOutput::Metal) {
+        _mtlRenderPassDescriptor = nil;
+    }
     // hydra orients all geometry during topological processing so that
     // front faces have ccw winding. We disable culling because culling
     // is handled by fragment shader discard.
     if (params.flipFrontFacing) {
-        glFrontFace(GL_CW); // < State is pushed via GL_POLYGON_BIT
+        context->SetFrontFaceWinding(MTLWindingClockwise);
     } else {
-        glFrontFace(GL_CCW); // < State is pushed via GL_POLYGON_BIT
+        context->SetFrontFaceWinding(MTLWindingCounterClockwise);
     }
-    glDisable(GL_CULL_FACE);
-
-    if (params.applyRenderState) {
-        glDisable(GL_BLEND);
-    }
-
-    // note: to get benefit of alpha-to-coverage, the target framebuffer
-    // has to be a MSAA buffer.
-    if (params.enableIdRender) {
-        glDisable(GL_SAMPLE_ALPHA_TO_COVERAGE);
-    } else if (params.enableSampleAlphaToCoverage) {
-        glEnable(GL_SAMPLE_ALPHA_TO_COVERAGE);
-    }
-
-    // for points width
-    glEnable(GL_PROGRAM_POINT_SIZE);
-
-    // TODO:
-    //  * forceRefresh
-    //  * showGuides, showRender, showProxy
-    //  * gammaCorrectColors
+    context->SetCullMode(MTLCullModeNone);
 
     if (params.applyRenderState) {
         // drawmode.
         // XXX: Temporary solution until shader-based styling implemented.
         switch (params.drawMode) {
-        case UsdImagingGLDrawMode::DRAW_POINTS:
-            glPolygonMode(GL_FRONT_AND_BACK, GL_POINT);
-            break;
-        default:
-            glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-            break;
+            case UsdImagingGLDrawMode::DRAW_POINTS:
+                context->SetTempPointWorkaround(true);
+                break;
+            default:
+                context->SetPolygonFillMode(MTLTriangleFillModeFill);
+                context->SetTempPointWorkaround(false);
+                break;
         }
     }
 
@@ -640,7 +742,7 @@ UsdImagingGLHdEngine::Render(const UsdImagingGLRenderParams& params)
     _engine.SetTaskContextData(HdxTokens->selectionState, selectionValue);
     VtValue renderTags(_renderTags);
     _engine.SetTaskContextData(HdxTokens->renderTags, renderTags);
-
+    
     HdTaskSharedPtrVector tasks;
     
     if (false) {
@@ -651,42 +753,71 @@ UsdImagingGLHdEngine::Render(const UsdImagingGLRenderParams& params)
         }
     }
     _engine.Execute(*_renderIndex, tasks);
-
-    if (isCoreProfileContext) {
-
-        glBindVertexArray(0);
-        // XXX: We should not delete the VAO on every draw call, but we 
-        // currently must because it is GL Context state and we do not control 
-        // the context.
-        glDeleteVertexArrays(1, &vao);
-
-    } else {
-        glPopAttrib(); // GL_ENABLE_BIT | GL_POLYGON_BIT | GL_DEPTH_BUFFER_BIT
+   
+    if (_renderOutput == RenderOutput::OpenGL) {
+        // Depth texture copy
+        context->CopyDepthTextureToOpenGL();
     }
+
+    if (context->GeometryShadersActive()) {
+        // Complete the GS command buffer if we have one
+        context->CommitCommandBuffer(true, false, METALWORKQUEUE_GEOMETRY_SHADER);
+    }
+
+    // Commit the render buffer (will wait for GS to complete if present)
+    // We wait until scheduled, because we're about to consume the Metal
+    // generated textures in an OpenGL blit
+    context->CommitCommandBuffer(_renderOutput == RenderOutput::OpenGL, false);
+    
+    context->EndFrame();
+    
+    // Finalize rendering here & push the command buffer to the GPU
+    [_captureScope endScope];
+
+    if (_renderOutput == RenderOutput::OpenGL) {
+        context->BlitColorTargetToOpenGL();
+        GLF_POST_PENDING_GL_ERRORS();
+    }
+
+    return;
 }
 
 /*virtual*/
 void 
-UsdImagingGLHdEngine::SetCameraState(const GfMatrix4d& viewMatrix,
+UsdImagingGLMetalHdEngine::SetCameraState(const GfMatrix4d& viewMatrix,
                             const GfMatrix4d& projectionMatrix,
                             const GfVec4d& viewport)
 {
+    GfMatrix4d modifiedProjMatrix;
+    static GfMatrix4d zTransform;
+    
+    // Transform from [-1, 1] to [0, 1] clip space
+    static bool _zTransformSet = false;
+    if (!_zTransformSet) {
+        _zTransformSet = true;
+        zTransform.SetIdentity();
+        zTransform.SetScale(GfVec3d(1.0, 1.0, 0.5));
+        zTransform.SetTranslateOnly(GfVec3d(0.0, 0.0, 0.5));
+    }
+    
+    modifiedProjMatrix = projectionMatrix * zTransform;
+
     // usdview passes these matrices from OpenGL state.
     // update the camera in the task controller accordingly.
-    _taskController->SetCameraMatrices(viewMatrix, projectionMatrix);
+    _taskController->SetCameraMatrices(viewMatrix, modifiedProjMatrix);
     _taskController->SetCameraViewport(viewport);
 }
 
 /*virtual*/
 SdfPath
-UsdImagingGLHdEngine::GetRprimPathFromPrimId(int primId) const 
+UsdImagingGLMetalHdEngine::GetRprimPathFromPrimId(int primId) const
 {
     return _delegate->GetRenderIndex().GetRprimPathFromPrimId(primId);
 }
 
 /* virtual */
 SdfPath
-UsdImagingGLHdEngine::GetPrimPathFromInstanceIndex(
+UsdImagingGLMetalHdEngine::GetPrimPathFromInstanceIndex(
     SdfPath const& protoPrimPath,
     int instanceIndex,
     int *absoluteInstanceIndex,
@@ -700,21 +831,21 @@ UsdImagingGLHdEngine::GetPrimPathFromInstanceIndex(
 
 /* virtual */
 void
-UsdImagingGLHdEngine::SetLightingStateFromOpenGL()
+UsdImagingGLMetalHdEngine::SetLightingStateFromOpenGL()
 {
     if (!_lightingContextForOpenGLState) {
         _lightingContextForOpenGLState = GarchSimpleLightingContext::New();
     }
     _lightingContextForOpenGLState->SetStateFromOpenGL();
-
+    
     _taskController->SetLightingState(_lightingContextForOpenGLState);
 }
 
 /* virtual */
 void
-UsdImagingGLHdEngine::SetLightingState(GarchSimpleLightVector const &lights,
-                                       GarchSimpleMaterial const &material,
-                                       GfVec4f const &sceneAmbient)
+UsdImagingGLMetalHdEngine::SetLightingState(GarchSimpleLightVector const &lights,
+                                          GarchSimpleMaterial const &material,
+                                          GfVec4f const &sceneAmbient)
 {
     // we still use _lightingContextForOpenGLState for convenience, but
     // set the values directly.
@@ -725,27 +856,27 @@ UsdImagingGLHdEngine::SetLightingState(GarchSimpleLightVector const &lights,
     _lightingContextForOpenGLState->SetMaterial(material);
     _lightingContextForOpenGLState->SetSceneAmbient(sceneAmbient);
     _lightingContextForOpenGLState->SetUseLighting(lights.size() > 0);
-
+    
     _taskController->SetLightingState(_lightingContextForOpenGLState);
 }
 
 /* virtual */
 void
-UsdImagingGLHdEngine::SetLightingState(GarchSimpleLightingContextPtr const &src)
+UsdImagingGLMetalHdEngine::SetLightingState(GarchSimpleLightingContextPtr const &src)
 {
     _taskController->SetLightingState(src);
 }
 
 /* virtual */
 void
-UsdImagingGLHdEngine::SetRootTransform(GfMatrix4d const& xf)
+UsdImagingGLMetalHdEngine::SetRootTransform(GfMatrix4d const& xf)
 {
     _delegate->SetRootTransform(xf);
 }
 
 /* virtual */
 void
-UsdImagingGLHdEngine::SetRootVisibility(bool isVisible)
+UsdImagingGLMetalHdEngine::SetRootVisibility(bool isVisible)
 {
     _delegate->SetRootVisibility(isVisible);
 }
@@ -753,7 +884,7 @@ UsdImagingGLHdEngine::SetRootVisibility(bool isVisible)
 
 /*virtual*/
 void
-UsdImagingGLHdEngine::SetSelected(SdfPathVector const& paths)
+UsdImagingGLMetalHdEngine::SetSelected(SdfPathVector const& paths)
 {
     // populate new selection
     HdSelectionSharedPtr selection(new HdSelection);
@@ -773,7 +904,7 @@ UsdImagingGLHdEngine::SetSelected(SdfPathVector const& paths)
 
 /*virtual*/
 void
-UsdImagingGLHdEngine::ClearSelected()
+UsdImagingGLMetalHdEngine::ClearSelected()
 {
     HdSelectionSharedPtr selection(new HdSelection);
     _selTracker->SetSelection(selection);
@@ -781,7 +912,7 @@ UsdImagingGLHdEngine::ClearSelected()
 
 /* virtual */
 void
-UsdImagingGLHdEngine::AddSelected(SdfPath const &path, int instanceIndex)
+UsdImagingGLMetalHdEngine::AddSelected(SdfPath const &path, int instanceIndex)
 {
     HdSelectionSharedPtr selection = _selTracker->GetSelectionMap();
     if (!selection) {
@@ -798,7 +929,7 @@ UsdImagingGLHdEngine::AddSelected(SdfPath const &path, int instanceIndex)
 
 /*virtual*/
 void
-UsdImagingGLHdEngine::SetSelectionColor(GfVec4f const& color)
+UsdImagingGLMetalHdEngine::SetSelectionColor(GfVec4f const& color)
 {
     _selectionColor = color;
     _taskController->SetSelectionColor(_selectionColor);
@@ -806,109 +937,148 @@ UsdImagingGLHdEngine::SetSelectionColor(GfVec4f const& color)
 
 /* virtual */
 bool
-UsdImagingGLHdEngine::IsConverged() const
+UsdImagingGLMetalHdEngine::IsConverged() const
 {
     return _taskController->IsConverged();
 }
 
 /* virtual */
 TfTokenVector
-UsdImagingGLHdEngine::GetRendererPlugins() const
+UsdImagingGLMetalHdEngine::GetRendererPlugins() const
 {
     HfPluginDescVector pluginDescriptors;
     HdxRendererPluginRegistry::GetInstance().GetPluginDescs(&pluginDescriptors);
 
+#if defined(ARCH_OS_MACOS)
+    NSArray<id<MTLDevice>> *_deviceList = MTLCopyAllDevices();
+#else
+    NSMutableArray<id<MTLDevice>> *_deviceList = [[NSMutableArray alloc] init];
+    [_deviceList addObject:MTLCreateSystemDefaultDevice()];
+#endif
+
     TfTokenVector plugins;
-    for(size_t i = 0; i < pluginDescriptors.size(); ++i) {
-        plugins.push_back(pluginDescriptors[i].id);
+    
+    if (pluginDescriptors.size() != 1) {
+        TF_FATAL_CODING_ERROR("There should only be one plugin!");
     }
+
+    for (id<MTLDevice> dev in _deviceList) {
+        plugins.push_back(TfToken(_MetalPluginDescriptor(dev)));
+    }
+
     return plugins;
 }
 
 /* virtual */
 std::string
-UsdImagingGLHdEngine::GetRendererDisplayName(TfToken const &id) const
+UsdImagingGLMetalHdEngine::GetRendererDisplayName(TfToken const &pluginId) const
 {
-    HfPluginDesc pluginDescriptor;
-    if (!TF_VERIFY(HdxRendererPluginRegistry::GetInstance().
-                   GetPluginDesc(id, &pluginDescriptor))) {
-        return std::string();
-    }
-
-    return pluginDescriptor.displayName;
+    return pluginId;
 }
 
 /* virtual */
 TfToken
-UsdImagingGLHdEngine::GetCurrentRendererId() const
+UsdImagingGLMetalHdEngine::GetCurrentRendererId() const
 {
     return _rendererId;
 }
 
-/* static */
-bool
-UsdImagingGLHdEngine::IsDefaultRendererPluginAvailable()
-{
-    HfPluginDescVector descs;
-    HdxRendererPluginRegistry::GetInstance().GetPluginDescs(&descs);
-    return !descs.empty();
-}
-
 TfToken
-UsdImagingGLHdEngine::GetDefaultRendererPluginId()
+UsdImagingGLMetalHdEngine::GetDefaultRendererPluginId()
 {
-    std::string defaultRendererDisplayName = 
+    std::string defaultRendererDisplayName =
         TfGetenv("HD_DEFAULT_RENDERER", "");
-
+    
     if (defaultRendererDisplayName.empty()) {
         return TfToken();
     }
-
+    
     HfPluginDescVector pluginDescs;
     HdxRendererPluginRegistry::GetInstance().GetPluginDescs(&pluginDescs);
-
+    
     // Look for the one with the matching display name
     for (size_t i = 0; i < pluginDescs.size(); ++i) {
         if (pluginDescs[i].displayName == defaultRendererDisplayName) {
             return pluginDescs[i].id;
         }
     }
-
+    
     TF_WARN("Failed to find default renderer with display name '%s'.",
             defaultRendererDisplayName.c_str());
-
+    
     return TfToken();
+}
+
+/* static */
+bool
+UsdImagingGLMetalHdEngine::IsDefaultRendererPluginAvailable()
+{
+    HfPluginDescVector descs;
+    HdxRendererPluginRegistry::GetInstance().GetPluginDescs(&descs);
+    return !descs.empty();
 }
 
 /* virtual */
 bool
-UsdImagingGLHdEngine::SetRendererPlugin(TfToken const &id)
+UsdImagingGLMetalHdEngine::SetRendererPlugin(TfToken const &pluginId)
 {
     HdxRendererPlugin *plugin = nullptr;
-    TfToken actualId = id;
-
+    TfToken actualId = pluginId;
+    bool forceReload = false;
+    
     // Special case: TfToken() selects the first plugin in the list.
     if (actualId.IsEmpty()) {
         actualId = HdxRendererPluginRegistry::GetInstance().
             GetDefaultPluginId();
     }
+    else {
+#if defined(ARCH_OS_MACOS)
+        NSArray<id<MTLDevice>> *_deviceList = MTLCopyAllDevices();
+#else
+        NSMutableArray<id<MTLDevice>> *_deviceList = [[NSMutableArray alloc] init];
+        [_deviceList addObject:MTLCreateSystemDefaultDevice()];
+#endif
+
+        for (id<MTLDevice> dev in _deviceList) {
+            if (pluginId == _MetalPluginDescriptor(dev))
+            {
+                actualId = HdxRendererPluginRegistry::GetInstance().
+                    GetDefaultPluginId();
+
+                if (dev != MtlfMetalContext::GetMetalContext()->device) {
+                    // Tear it down and bring it back up with the new Metal device
+                    forceReload = true;
+                    
+                    // Recreate the underlying Metal context
+                    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
+                    MtlfMetalContext::RecreateInstance(dev, context->mtlColorTexture.width, context->mtlColorTexture.height);
+                    
+                    //Also recreate a capture scope with the new device
+                    _InitializeCapturing();
+                }
+                break;
+            }
+        }
+    }
     plugin = HdxRendererPluginRegistry::GetInstance().
         GetRendererPlugin(actualId);
-
+    
     if (plugin == nullptr) {
         TF_CODING_ERROR("Couldn't find plugin for id %s", actualId.GetText());
         return false;
     } else if (plugin == _rendererPlugin) {
-        // It's a no-op to load the same plugin twice.
-        HdxRendererPluginRegistry::GetInstance().ReleasePlugin(plugin);
-        return true;
+        if (!forceReload) {
+            // It's a no-op to load the same plugin twice.
+            HdxRendererPluginRegistry::GetInstance().ReleasePlugin(plugin);
+            return true;
+        }
     } else if (!plugin->IsSupported()) {
         // Don't do anything if the plugin isn't supported on the running
         // system, just return that we're not able to set it.
         HdxRendererPluginRegistry::GetInstance().ReleasePlugin(plugin);
         return false;
     }
-
+    
     // Pull old delegate/task controller state.
     GfMatrix4d rootTransform = GfMatrix4d(1.0);
     bool isVisible = true;
@@ -920,38 +1090,56 @@ UsdImagingGLHdEngine::SetRendererPlugin(TfToken const &id)
     if (!selection) {
         selection.reset(new HdSelection);
     }
-
+    
     // Delete hydra state.
     _DeleteHydraResources();
-
+    
     // Recreate the render index.
     _rendererPlugin = plugin;
-    _rendererId = actualId;
-
+    _rendererId = TfToken(_MetalPluginDescriptor(MtlfMetalContext::GetMetalContext()->device));
+    
     HdRenderDelegate *renderDelegate = _rendererPlugin->CreateRenderDelegate();
     _renderIndex = HdRenderIndex::New(renderDelegate);
-
+    
     // Create the new delegate & task controller.
     _delegate = new UsdImagingDelegate(_renderIndex, _delegateID);
     _isPopulated = false;
-
+    
     _taskController = new HdxTaskController(_renderIndex,
         _delegateID.AppendChild(TfToken(TfStringPrintf(
-            "_UsdImaging_%s_%p",
-            TfMakeValidIdentifier(actualId.GetText()).c_str(),
-            this))));
-
+           "_UsdImaging_%s_%p",
+           TfMakeValidIdentifier(actualId.GetText()).c_str(),
+           this))));
+    
     // Rebuild state in the new delegate/task controller.
     _delegate->SetRootVisibility(isVisible);
     _delegate->SetRootTransform(rootTransform);
     _selTracker->SetSelection(selection);
     _taskController->SetSelectionColor(_selectionColor);
-
+    
     return true;
 }
 
 void
-UsdImagingGLHdEngine::_DeleteHydraResources()
+UsdImagingGLMetalHdEngine::_InitializeCapturing()
+{
+    if(_sharedCaptureManager == nil)
+        _sharedCaptureManager = [MTLCaptureManager sharedCaptureManager];
+    else
+        [_sharedCaptureManager.defaultCaptureScope release];
+    
+    if (_captureScope) {
+        [_captureScope release];
+    }
+    _captureScope = [_sharedCaptureManager newCaptureScopeWithDevice:MtlfMetalContext::GetMetalContext()->device];
+    _captureScope.label = @"Hydra Capture Scope";
+    if (_renderOutput == RenderOutput::OpenGL) {
+        _sharedCaptureManager.defaultCaptureScope = _captureScope;
+    }
+}
+
+void
+UsdImagingGLMetalHdEngine::_DeleteHydraResources()
 {
     // Unwinding order: remove data sources first (task controller, scene
     // delegate); then render index; then render delegate; finally the
@@ -979,27 +1167,32 @@ UsdImagingGLHdEngine::_DeleteHydraResources()
         _rendererPlugin = nullptr;
         _rendererId = TfToken();
     }
+    
+    if (_mtlRenderPassDescriptorForInterop != nil) {
+        [_mtlRenderPassDescriptorForInterop release];
+        _mtlRenderPassDescriptorForInterop = NULL;
+    }
 }
 
 /* virtual */
 TfTokenVector
-UsdImagingGLHdEngine::GetRendererAovs() const
+UsdImagingGLMetalHdEngine::GetRendererAovs() const
 {
     if (_renderIndex->IsBprimTypeSupported(HdPrimTypeTokens->renderBuffer)) {
         return TfTokenVector(
-            { HdAovTokens->color,
-              HdAovTokens->primId,
-              HdAovTokens->depth,
-              HdAovTokens->normal,
-              HdAovTokensMakePrimvar(TfToken("st")) }
-        );
+             { HdAovTokens->color,
+                 HdAovTokens->primId,
+                 HdAovTokens->depth,
+                 HdAovTokens->normal,
+                 HdAovTokensMakePrimvar(TfToken("st")) }
+             );
     }
     return TfTokenVector();
 }
 
 /* virtual */
 bool
-UsdImagingGLHdEngine::SetRendererAov(TfToken const& id)
+UsdImagingGLMetalHdEngine::SetRendererAov(TfToken const& id)
 {
     if (_renderIndex->IsBprimTypeSupported(HdPrimTypeTokens->renderBuffer)) {
         // For color, render straight to the viewport instead of rendering
@@ -1016,25 +1209,25 @@ UsdImagingGLHdEngine::SetRendererAov(TfToken const& id)
 
 /* virtual */
 VtDictionary
-UsdImagingGLHdEngine::GetResourceAllocation() const
+UsdImagingGLMetalHdEngine::GetResourceAllocation() const
 {
     return _renderIndex->GetResourceRegistry()->GetResourceAllocation();
 }
 
 /* virtual */
 UsdImagingGLRendererSettingsList
-UsdImagingGLHdEngine::GetRendererSettingsList() const
+UsdImagingGLMetalHdEngine::GetRendererSettingsList() const
 {
     HdRenderSettingDescriptorList descriptors =
-        _renderIndex->GetRenderDelegate()->GetRenderSettingDescriptors();
+    _renderIndex->GetRenderDelegate()->GetRenderSettingDescriptors();
     UsdImagingGLRendererSettingsList ret;
-
+    
     for (auto const& desc : descriptors) {
         UsdImagingGLRendererSetting r;
         r.key = desc.key;
         r.name = desc.name;
         r.defValue = desc.defaultValue;
-
+        
         // Use the type of the default value to tell us what kind of
         // widget to create...
         if (r.defValue.IsHolding<bool>()) {
@@ -1055,23 +1248,36 @@ UsdImagingGLHdEngine::GetRendererSettingsList() const
         }
         ret.push_back(r);
     }
-
+    
     return ret;
 }
 
 /* virtual */
 VtValue
-UsdImagingGLHdEngine::GetRendererSetting(TfToken const& id) const
+UsdImagingGLMetalHdEngine::GetRendererSetting(TfToken const& id) const
 {
     return _renderIndex->GetRenderDelegate()->GetRenderSetting(id);
 }
 
 /* virtual */
 void
-UsdImagingGLHdEngine::SetRendererSetting(TfToken const& id,
-                                         VtValue const& value)
+UsdImagingGLMetalHdEngine::SetRendererSetting(TfToken const& id,
+                                            VtValue const& value)
 {
     _renderIndex->GetRenderDelegate()->SetRenderSetting(id, value);
+}
+
+void
+UsdImagingGLMetalHdEngine::SetMetalRenderPassDescriptor(
+    MTLRenderPassDescriptor *renderPassDescriptor)
+{
+    if (_renderOutput == RenderOutput::OpenGL) {
+        TF_CODING_ERROR("SetMetalRenderPassDescriptor isn't valid to call "
+                        "when using OpenGL as the output target");
+        return;
+    }
+    _mtlRenderPassDescriptorForNativeMetal = [renderPassDescriptor copy];
+    _mtlRenderPassDescriptor = _mtlRenderPassDescriptorForNativeMetal;
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

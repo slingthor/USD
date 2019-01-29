@@ -26,11 +26,11 @@
 
 #if defined(ARCH_GFX_OPENGL)
 #include "pxr/imaging/glf/glew.h"
-#include "pxr/usdImaging/usdImagingGL/GL/hdEngine.h"
+#include "pxr/usdImaging/usdImagingGL/GL/hdEngineGL.h"
 #include "pxr/usdImaging/usdImagingGL/GL/refEngine.h"
 #endif
 #if defined(ARCH_GFX_METAL)
-#include "pxr/usdImaging/usdImagingGL/Metal/hdEngine.h"
+#include "pxr/usdImaging/usdImagingGL/Metal/hdEngineMetal.h"
 #endif
 
 #include "pxr/usdImaging/usdImagingGL/gl.h"

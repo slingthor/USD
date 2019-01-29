@@ -9,14 +9,14 @@ endif()
 
 if (${PXR_ENABLE_METAL_SUPPORT})
     set(METAL_LIBRARY               mtlf)
-    set(METAL_PUBLIC_CLASSES        Metal/hdEngine)
+    set(METAL_PUBLIC_CLASSES        Metal/hdEngineMetal)
 endif()
 
 if (${PXR_ENABLE_GL_SUPPORT})
     set(OPENGL_LIBRARY              glf
                                     ${OPENGL_gl_LIBRARY}
                                     ${OPENGL_glu_LIBRARY})
-    set(OPENGL_PUBLIC_CLASSES       GL/hdEngine
+    set(OPENGL_PUBLIC_CLASSES       GL/hdEngineGL
                                     GL/refEngine)
 else()
     set(OPENGL_INCLUDE_DIR          "")
