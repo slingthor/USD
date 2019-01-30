@@ -606,7 +606,7 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
     while(numPrimitives > 0) {
         uint32_t numPrimitivesInPart = MIN(numPrimitives, maxPrimitivesPerPart);
 
-        if (!useDispatchThreads && (numPrimitivesInPart > maxThreadsPerThreadgroup)) {
+        if (doMVAComputeGS && !useDispatchThreads && (numPrimitivesInPart > maxThreadsPerThreadgroup)) {
             numPrimitivesInPart = numPrimitivesInPart / maxThreadsPerThreadgroup * maxThreadsPerThreadgroup;
         }
         
