@@ -92,13 +92,13 @@ struct HdResourceGPUHandle {
 #if defined(ARCH_GFX_METAL)
     // Metal
     HdResourceGPUHandle(id<MTLBuffer> const _handle) {
-        handle = (__bridge void*)_handle;
+        handle = (__bridge void*)_handle.handle;
     }
     HdResourceGPUHandle& operator =(id<MTLBuffer> const _handle) {
-        handle = (__bridge void*)_handle;
+        handle = (__bridge void*)_handle.handle;
         return *this;
     }
-    operator id<MTLBuffer>() const { return (__bridge id<MTLBuffer>)handle; }
+    operator id<MTLBuffer>() const { return (__bridge id<MTLBuffer>)handle.handle; }
 #endif // ARCH_GFX_METAL
     
     // Storage
