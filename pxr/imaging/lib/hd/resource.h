@@ -73,32 +73,32 @@ struct HdResourceGPUHandle {
     operator GLuint() const { return (GLuint)uint64_t(handle); }
     
     bool operator !=(HdResourceGPUHandle const _handle) const {
-        return handle != _handle;
+        return handle != _handle.handle;
     }
     
     bool operator ==(HdResourceGPUHandle const _handle) const {
-        return handle == _handle;
+        return handle == _handle.handle;
     }
     
     bool operator <(HdResourceGPUHandle const _handle) const {
-        return handle < _handle;
+        return handle < _handle.handle;
     }
     
     bool operator >(HdResourceGPUHandle const _handle) const {
-        return handle > _handle;
+        return handle > _handle.handle;
     }
 #endif // ARCH_GFX_OPENGL
 
 #if defined(ARCH_GFX_METAL)
     // Metal
     HdResourceGPUHandle(id<MTLBuffer> const _handle) {
-        handle = (__bridge void*)_handle;
+        handle = (__bridge void*)_handle.handle;
     }
     HdResourceGPUHandle& operator =(id<MTLBuffer> const _handle) {
-        handle = (__bridge void*)_handle;
+        handle = (__bridge void*)_handle.handle;
         return *this;
     }
-    operator id<MTLBuffer>() const { return (__bridge id<MTLBuffer>)handle; }
+    operator id<MTLBuffer>() const { return (__bridge id<MTLBuffer>)handle.handle; }
 #endif // ARCH_GFX_METAL
     
     // Storage
