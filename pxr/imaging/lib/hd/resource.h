@@ -73,19 +73,19 @@ struct HdResourceGPUHandle {
     operator GLuint() const { return (GLuint)uint64_t(handle); }
     
     bool operator !=(HdResourceGPUHandle const _handle) const {
-        return handle != _handle;
+        return handle != _handle.handle;
     }
     
     bool operator ==(HdResourceGPUHandle const _handle) const {
-        return handle == _handle;
+        return handle == _handle.handle;
     }
     
     bool operator <(HdResourceGPUHandle const _handle) const {
-        return handle < _handle;
+        return handle < _handle.handle;
     }
     
     bool operator >(HdResourceGPUHandle const _handle) const {
-        return handle > _handle;
+        return handle > _handle.handle;
     }
 #endif // ARCH_GFX_OPENGL
 
