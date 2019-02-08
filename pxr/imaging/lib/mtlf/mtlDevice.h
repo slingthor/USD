@@ -498,6 +498,7 @@ private:
     id<MTLFence>               gsFence;
     bool                       gsOpenBatch;
     bool                       gsFirstBatch;
+    bool                       gsSyncRequired;
     bool                       isRenderPassDescriptorPatched;
 
     void _gsAdvanceBuffer();

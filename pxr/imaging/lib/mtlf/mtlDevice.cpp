@@ -153,7 +153,7 @@ id<MTLDevice> MtlfMetalContext::GetMetalDevice(PREFERRED_GPU_TYPE preferredGPUTy
 MtlfMetalContext::MtlfMetalContext(id<MTLDevice> _device, int width, int height)
 : enableMVA(false)
 , enableComputeGS(false)
-, gsDataOffset(0), gsBufferIndex(0), gsMaxConcurrentBatches(0), gsMaxDataPerBatch(0), gsCurrentBuffer(nil), gsFence(nil), gsOpenBatch(false)
+, gsDataOffset(0), gsBufferIndex(0), gsMaxConcurrentBatches(0), gsMaxDataPerBatch(0), gsCurrentBuffer(nil), gsFence(nil), gsOpenBatch(false), gsSyncRequired(false)
 , isRenderPassDescriptorPatched(false)
 {
     if (_device == nil) {
@@ -1496,6 +1496,12 @@ void MtlfMetalContext::ReleaseEncoder(bool endEncoding, MetalWorkQueueType workQ
             }
             case MTLENCODERTYPE_COMPUTE:
             {
+#if METAL_COMPUTEGS_MANUAL_HAZARD_TRACKING
+                if(workQueueType == METALWORKQUEUE_GEOMETRY_SHADER && gsSyncRequired) {
+                    [wq->currentComputeEncoder updateFence:gsFence];
+                    gsSyncRequired = false;
+                }
+#endif
                 [wq->currentComputeEncoder endEncoding];
                 wq->currentComputePipelineState = nil;
                 wq->currentComputeEncoder       = nil;
@@ -1854,15 +1860,15 @@ void MtlfMetalContext::PrepareForComputeGSPart(
             GetRenderEncoder(METALWORKQUEUE_DEFAULT);
             
             if(gsFirstBatch) {
-                [wq_def->currentRenderEncoder updateFence:gsFence];
+                [wq_def->currentRenderEncoder updateFence:gsFence afterStages:MTLRenderStageFragment];
                 [wq_gs->currentComputeEncoder waitForFence:gsFence];
                 
                 ReleaseEncoder(true, METALWORKQUEUE_DEFAULT);
                 GetRenderEncoder(METALWORKQUEUE_DEFAULT);
             }
             
-            //Insert a fence in the two commandBuffers to ensure all writes are finished before we start rendering
-            [wq_gs->currentComputeEncoder updateFence:gsFence];
+            //Insert a fence in the two commandBuffers to ensure all writes are finished before we start rendering.
+            gsSyncRequired = true; //Fence for the compute commandBuffer is inserted just before endEncoding in ReleaseEncoder()
             [wq_def->currentRenderEncoder waitForFence:gsFence beforeStages:MTLRenderStageVertex];
             
             ReleaseEncoder(false, METALWORKQUEUE_GEOMETRY_SHADER);
