@@ -80,7 +80,7 @@ HdxCompositor::~HdxCompositor()
     }
     GLF_POST_PENDING_GL_ERRORS();
 #else
-    TF_FATAL_CODING_ERROR("Not Implemented!"); //MTL_FIXME
+//    TF_FATAL_CODING_ERROR("Not Implemented!"); //MTL_FIXME
 #endif
 }
 
