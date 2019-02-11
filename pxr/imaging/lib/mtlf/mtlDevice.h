@@ -444,7 +444,8 @@ private:
         bool generatesEndOfQueueEvent;
         
         uint64_t currentEventValue;
-        uint64_t currentHighestWaitValue;
+        uint64_t highestExpectedEventValue;
+        uint64_t lastWaitEventValue;
         size_t currentVertexDescriptorHash;
         size_t currentColourAttachmentsHash;
         size_t currentRenderPipelineDescriptorHash;
@@ -496,12 +497,14 @@ private:
     id<MTLBuffer>              gsCurrentBuffer;
     std::vector<id<MTLBuffer>> gsBuffers;
     id<MTLFence>               gsFence;
-    bool                       gsOpenBatch;
+    bool                       gsHasOpenBatch;
     bool                       gsFirstBatch;
+    bool                       gsSyncRequired;
     bool                       isRenderPassDescriptorPatched;
 
     void _gsAdvanceBuffer();
-    void _gsEncodeSync();
+    void _gsResetBuffers();
+    void _gsEncodeSync(bool doOpenBatch);
     void _PatchRenderPassDescriptor();
     
     void CleanupUnusedBuffers(bool forceClean);

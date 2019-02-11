@@ -153,7 +153,7 @@ id<MTLDevice> MtlfMetalContext::GetMetalDevice(PREFERRED_GPU_TYPE preferredGPUTy
 MtlfMetalContext::MtlfMetalContext(id<MTLDevice> _device, int width, int height)
 : enableMVA(false)
 , enableComputeGS(false)
-, gsDataOffset(0), gsBufferIndex(0), gsMaxConcurrentBatches(0), gsMaxDataPerBatch(0), gsCurrentBuffer(nil), gsFence(nil), gsOpenBatch(false)
+, gsDataOffset(0), gsBufferIndex(0), gsMaxConcurrentBatches(0), gsMaxDataPerBatch(0), gsCurrentBuffer(nil), gsFence(nil), gsHasOpenBatch(false), gsSyncRequired(false)
 , isRenderPassDescriptorPatched(false)
 {
     if (_device == nil) {
@@ -542,25 +542,30 @@ void MtlfMetalContext::EncodeWaitForEvent(MetalWorkQueueType waitQueue, MetalWor
         TF_FATAL_CODING_ERROR("One of the work queue has no command buffer associated with it");
     }
     
-    if (wait_wq->encoderHasWork) {
-        if (wait_wq->encoderInUse) {
-            TF_FATAL_CODING_ERROR("Can't set an event dependency if encoder is still in use");
-        }
-        // If the last used encoder wasn't ended then we need to end it now
-        if (!wait_wq->encoderEnded) {
-            wait_wq->encoderInUse = true;
-            ReleaseEncoder(true, waitQueue);
-        }
+    if (wait_wq->encoderHasWork && wait_wq->encoderInUse) {
+        TF_FATAL_CODING_ERROR("Can't set an event dependency if encoder is still in use");
     }
-    // Make this command buffer wait for the event to be resolved
+    // If the last used encoder wasn't ended then we need to end it now
+    if (wait_wq->currentEncoderType != MTLENCODERTYPE_NONE && !wait_wq->encoderEnded) {
+        wait_wq->encoderInUse = true;
+        ReleaseEncoder(true, waitQueue);
+    }
+
     eventValue = (eventValue != 0) ? eventValue : signal_wq->currentEventValue;
-    if(eventValue > signal_wq->currentHighestWaitValue)
-        signal_wq->currentHighestWaitValue = eventValue;
+    
+    // We should only wait for the event if we haven't already encoded a wait for an equal or larger value.
+    if(eventValue > wait_wq->lastWaitEventValue) {
+        // Update the signalling queue's highest expected value to make sure the wait completes.
+        if(eventValue > signal_wq->highestExpectedEventValue)
+            signal_wq->highestExpectedEventValue = eventValue;
 #if defined(METAL_EVENTS_API_PRESENT)
-    if (eventsAvailable) {
-        [wait_wq->commandBuffer encodeWaitForEvent:signal_wq->event value:eventValue];
-    }
+        // Make this command buffer wait for the event to be resolved
+        if (eventsAvailable) {
+            [wait_wq->commandBuffer encodeWaitForEvent:signal_wq->event value:eventValue];
+            wait_wq->lastWaitEventValue = eventValue;
+        }
 #endif
+    }
 }
 
 void MtlfMetalContext::EncodeWaitForQueue(MetalWorkQueueType waitQueue, MetalWorkQueueType signalQueue)
@@ -1331,7 +1336,7 @@ void MtlfMetalContext::ResetEncoders(MetalWorkQueueType workQueueType, bool isIn
     MetalWorkQueue *wq = &workQueues[workQueueType];
  
     if(!isInitializing) {
-        if(wq->currentHighestWaitValue != endOfQueueEventValue && wq->currentHighestWaitValue >= wq->currentEventValue) {
+        if(wq->highestExpectedEventValue != endOfQueueEventValue && wq->highestExpectedEventValue >= wq->currentEventValue) {
             TF_FATAL_CODING_ERROR("There is a WaitForEvent which is never going to get Signalled!");
 		}
 #if defined(METAL_EVENTS_API_PRESENT)
@@ -1339,7 +1344,7 @@ void MtlfMetalContext::ResetEncoders(MetalWorkQueueType workQueueType, bool isIn
             [wq->event release];
 		}
 #endif
-        if(gsOpenBatch)
+        if(gsHasOpenBatch)
             TF_FATAL_CODING_ERROR("A Compute Geometry Shader batch is left open!");
     }
    
@@ -1357,7 +1362,8 @@ void MtlfMetalContext::ResetEncoders(MetalWorkQueueType workQueueType, bool isIn
     wq->currentComputeEncoder    = nil;
     
     wq->currentEventValue                    = 1;
-    wq->currentHighestWaitValue              = 0;
+    wq->highestExpectedEventValue            = 0;
+    wq->lastWaitEventValue                   = 0;
     wq->currentVertexDescriptorHash          = 0;
     wq->currentColourAttachmentsHash         = 0;
     wq->currentRenderPipelineDescriptorHash  = 0;
@@ -1409,9 +1415,8 @@ void MtlfMetalContext::CommitCommandBuffer(bool waituntilScheduled, bool waitUnt
             return;
         }
      }
-    
-    if(gsOpenBatch)
-        _gsEncodeSync();
+
+    _gsEncodeSync(false);
     
     if(wq->generatesEndOfQueueEvent) {
         wq->currentEventValue = endOfQueueEventValue;
@@ -1496,6 +1501,12 @@ void MtlfMetalContext::ReleaseEncoder(bool endEncoding, MetalWorkQueueType workQ
             }
             case MTLENCODERTYPE_COMPUTE:
             {
+#if METAL_COMPUTEGS_MANUAL_HAZARD_TRACKING
+                if(workQueueType == METALWORKQUEUE_GEOMETRY_SHADER && gsSyncRequired) {
+                    [wq->currentComputeEncoder updateFence:gsFence];
+                    gsSyncRequired = false;
+                }
+#endif
                 [wq->currentComputeEncoder endEncoding];
                 wq->currentComputePipelineState = nil;
                 wq->currentComputeEncoder       = nil;
@@ -1771,7 +1782,7 @@ void MtlfMetalContext::EndFrame() {
     currentWorkQueue     = &workQueues[currentWorkQueueType];
 
     //Reset the Compute GS intermediate buffer offset
-    _gsAdvanceBuffer();
+    _gsResetBuffers();
     
     // Reset it here as OSD may get invoked before StartFrame() is called.
     OSDEnabledThisFrame = false;
@@ -1782,6 +1793,12 @@ void MtlfMetalContext::_gsAdvanceBuffer() {
     gsBufferIndex = (gsBufferIndex + 1) % gsMaxConcurrentBatches;
     gsCurrentBuffer = gsBuffers.at(gsBufferIndex);
 
+    gsDataOffset = 0;
+}
+
+void MtlfMetalContext::_gsResetBuffers() {
+    gsBufferIndex = 0;
+    gsCurrentBuffer = gsBuffers.at(gsBufferIndex);
     gsDataOffset = 0;
 }
 
@@ -1823,8 +1840,7 @@ void MtlfMetalContext::PrepareForComputeGSPart(
     if(startingNewBatch) {
         METAL_INC_STAT(resourceStats.GSBatchesStarted);
         if(enableMultiQueue) {
-            _gsEncodeSync();
-            gsOpenBatch = true;
+            _gsEncodeSync(true);
         }
         else {
             //When not using multiple queues we rely on the order in the commandbuffer combined with a fence for synching.
@@ -1854,15 +1870,15 @@ void MtlfMetalContext::PrepareForComputeGSPart(
             GetRenderEncoder(METALWORKQUEUE_DEFAULT);
             
             if(gsFirstBatch) {
-                [wq_def->currentRenderEncoder updateFence:gsFence];
+                [wq_def->currentRenderEncoder updateFence:gsFence afterStages:MTLRenderStageFragment];
                 [wq_gs->currentComputeEncoder waitForFence:gsFence];
                 
                 ReleaseEncoder(true, METALWORKQUEUE_DEFAULT);
                 GetRenderEncoder(METALWORKQUEUE_DEFAULT);
             }
             
-            //Insert a fence in the two commandBuffers to ensure all writes are finished before we start rendering
-            [wq_gs->currentComputeEncoder updateFence:gsFence];
+            //Insert a fence in the two commandBuffers to ensure all writes are finished before we start rendering.
+            gsSyncRequired = true; //Fence for the compute commandBuffer is inserted just before endEncoding in ReleaseEncoder()
             [wq_def->currentRenderEncoder waitForFence:gsFence beforeStages:MTLRenderStageVertex];
             
             ReleaseEncoder(false, METALWORKQUEUE_GEOMETRY_SHADER);
@@ -1872,31 +1888,36 @@ void MtlfMetalContext::PrepareForComputeGSPart(
     }
 }
 
-void MtlfMetalContext::_gsEncodeSync() {
-    //Using multiple queues means the synching happens using events as the queues are executed in parallel.
+void MtlfMetalContext::_gsEncodeSync(bool doOpenBatch) {
+    //Using multiple queues means the synching happens using events as the queuews are executed in parallel.
     
     //There are cases where we don't have a command buffer yet to push the wait onto.
     MetalWorkQueue *wait_wq   = &workQueues[METALWORKQUEUE_DEFAULT];
     if(wait_wq->commandBuffer == nil)
         CreateCommandBuffer(METALWORKQUEUE_DEFAULT);
     
-    EncodeWaitForEvent(METALWORKQUEUE_DEFAULT, METALWORKQUEUE_GEOMETRY_SHADER);
-    
-    if(gsOpenBatch) {
+    // Close the current batch if there is one open
+    if(gsHasOpenBatch) {
         EncodeSignalEvent(METALWORKQUEUE_GEOMETRY_SHADER);
-     
-        uint64_t value_gs = GetEventValue(METALWORKQUEUE_DEFAULT);
-        uint64_t offset = gsMaxConcurrentBatches;
-        if(value_gs > offset) {
-            EncodeWaitForEvent(METALWORKQUEUE_GEOMETRY_SHADER, METALWORKQUEUE_DEFAULT, value_gs - offset);
-            EncodeSignalEvent(METALWORKQUEUE_DEFAULT);
+        
+        if(doOpenBatch) {
+            uint64_t value_gs = GetEventValue(METALWORKQUEUE_GEOMETRY_SHADER);
+            uint64_t offset = gsMaxConcurrentBatches;
+            if(value_gs > offset) {
+                EncodeWaitForEvent(METALWORKQUEUE_GEOMETRY_SHADER, METALWORKQUEUE_DEFAULT, value_gs - offset);
+                EncodeSignalEvent(METALWORKQUEUE_DEFAULT);
+            }
         }
         
         //By using events we triggered ending of the encoders. Need to patch up the render descriptor to prevent previous results from being wiped.
         _PatchRenderPassDescriptor();
+        gsHasOpenBatch = false;
     }
     
-    gsOpenBatch = false;
+    if(doOpenBatch) {
+        EncodeWaitForEvent(METALWORKQUEUE_DEFAULT, METALWORKQUEUE_GEOMETRY_SHADER);
+        gsHasOpenBatch = true;
+    }
 }
 
 void MtlfMetalContext::_PatchRenderPassDescriptor() {
