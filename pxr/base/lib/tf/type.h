@@ -33,9 +33,7 @@
 #include "pxr/base/tf/traits.h"
 #include "pxr/base/tf/typeFunctions.h"
 
-#include <boost/mpl/vector.hpp>
 #include <boost/operators.hpp>
-#include <boost/scoped_ptr.hpp>
 
 #include <iosfwd>
 #include <memory>
@@ -105,7 +103,7 @@ public:
     /// A type-list of C++ base types.
     /// \see TfType::Define()
     template <class ... Args>
-    struct Bases : boost::mpl::vector<Args ...> {};
+    struct Bases {};
 
 public:
     /// Construct an TfType representing an unknown type.

@@ -135,6 +135,8 @@ _GetOIIOBaseType(GLenum type)
     case GL_UNSIGNED_INT:
     case GL_INT:
         return TypeDesc::UINT;
+    case GL_HALF_FLOAT:
+        return TypeDesc::HALF;
     case GL_FLOAT:
         return TypeDesc::FLOAT;
     default:

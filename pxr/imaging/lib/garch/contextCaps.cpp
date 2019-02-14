@@ -39,7 +39,7 @@ TF_DEFINE_ENV_SETTING(GARCH_ENABLE_BINDLESS_BUFFER, false,
 TF_DEFINE_ENV_SETTING(GARCH_ENABLE_BINDLESS_TEXTURE, false,
                       "Use GL bindless texture extention");
 TF_DEFINE_ENV_SETTING(GARCH_ENABLE_MULTI_DRAW_INDIRECT, true,
-                      "Use GL mult draw indirect extention");
+                      "Use GL multi draw indirect extention");
 TF_DEFINE_ENV_SETTING(GARCH_ENABLE_DIRECT_STATE_ACCESS, true,
                       "Use GL direct state access extention");
 TF_DEFINE_ENV_SETTING(GARCH_ENABLE_COPY_BUFFER, true,
@@ -48,8 +48,6 @@ TF_DEFINE_ENV_SETTING(HD_ENABLE_GPU_COUNT_VISIBLE_INSTANCES, false,
                       "Enable GPU frustum culling visible count query");
 TF_DEFINE_ENV_SETTING(HD_ENABLE_GPU_FRUSTUM_CULLING, true,
                       "Enable GPU frustum culling");
-TF_DEFINE_ENV_SETTING(HD_ENABLE_GPU_TINY_PRIM_CULLING, true,
-                      "Enable tiny prim culling");
 TF_DEFINE_ENV_SETTING(HD_ENABLE_GPU_INSTANCE_FRUSTUM_CULLING, true,
                       "Enable GPU per-instance frustum culling");
 
@@ -108,6 +106,7 @@ GarchContextCaps::GarchContextCaps()
     , hasSubDataCopy(false)
     , useCppShaderPadding(false)
     , alwaysNeedsBinding(false)
+    , floatingPointBuffersEnabled(false)
 {
     // Empty
 }
@@ -127,14 +126,6 @@ GarchContextCaps::IsEnabledGPUCountVisibleInstances() const
     static bool isEnabledGPUCountVisibleInstances =
         TfGetEnvSetting(HD_ENABLE_GPU_COUNT_VISIBLE_INSTANCES);
     return isEnabledGPUCountVisibleInstances;
-}
-
-bool
-GarchContextCaps::IsEnabledGPUTinyPrimCulling() const
-{
-    static bool isEnabledGPUTinyPrimCulling =
-        TfGetEnvSetting(HD_ENABLE_GPU_TINY_PRIM_CULLING);
-    return isEnabledGPUTinyPrimCulling;
 }
 
 bool

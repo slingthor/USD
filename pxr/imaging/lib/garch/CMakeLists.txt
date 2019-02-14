@@ -69,7 +69,6 @@ pxr_library(garch
         tf
         vt
         ${Boost_PYTHON_LIBRARY}
-        ${Boost_SYSTEM_LIBRARY}
         ${optionalLibs}
 
     INCLUDE_DIRS

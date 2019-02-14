@@ -32,6 +32,7 @@
 #include "pxr/imaging/garch/uvTextureStorage.h"
 
 #include "pxr/imaging/hdSt/material.h"
+#include "pxr/imaging/hdSt/debugCodes.h"
 #include "pxr/imaging/hdSt/package.h"
 #include "pxr/imaging/hdSt/resourceRegistry.h"
 #include "pxr/imaging/hdSt/resourceFactory.h"
@@ -71,7 +72,7 @@ public:
     {
         if (!_value.IsSet()) {
             TF_CODING_ERROR("Invalid texture handle: %s: %llu\n",
-                            name.GetText(), value.handle);
+                            name.GetText(), uint64_t(value.handle));
         }
     }
 
@@ -125,10 +126,14 @@ HdStMaterial::HdStMaterial(SdfPath const &id)
  , _hasLimitSurfaceEvaluation(false)
  , _hasDisplacement(false)
 {
+    TF_DEBUG(HDST_MATERIAL_ADDED).Msg("HdStMaterial Created: %s\n",
+                                      id.GetText());
 }
 
 HdStMaterial::~HdStMaterial()
 {
+    TF_DEBUG(HDST_MATERIAL_REMOVED).Msg("HdStMaterial Removed: %s\n",
+                                        GetId().GetText());
 }
 
 /* virtual */

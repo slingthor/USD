@@ -54,6 +54,7 @@
 #include "pxr/base/tf/getenv.h"
 #include "pxr/base/tf/iterator.h"
 
+#include <iostream>
 #include <limits>
 
 PXR_NAMESPACE_OPEN_SCOPE

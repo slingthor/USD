@@ -153,6 +153,11 @@ GlfContextCaps::_LoadCaps()
         glGetIntegerv(GL_CONTEXT_PROFILE_MASK, &profileMask);
         coreProfile = (profileMask & GL_CONTEXT_CORE_PROFILE_BIT);
     }
+    if (apiVersion >= 400) {
+        // Older versions of GL maybe support R16F and D32F, but for now we set
+        // the minimum GL at 4.
+        floatingPointBuffersEnabled = true;
+    }
     if (apiVersion >= 420) {
         shadingLanguage420pack = true;
     }

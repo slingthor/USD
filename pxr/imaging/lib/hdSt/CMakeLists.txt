@@ -90,6 +90,7 @@ pxr_library(hdSt
         commandBuffer
         computeShader
         copyComputation
+        debugCodes
         dispatchBuffer
         drawItem
         drawItemInstance

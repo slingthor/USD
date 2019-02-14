@@ -24,13 +24,37 @@
 #include "pxr/imaging/glf/glew.h"
 #include "pxr/usdImaging/usdImagingGL/engine.h"
 
+#if defined(ARCH_GFX_OPENGL)
+#include "pxr/usdImaging/usdImagingGL/GL/legacyEngine.h"
+#endif
+
+#if defined(ARCH_GFX_METAL)
+#include "pxr/imaging/mtlf/mtlDevice.h"
+#endif
+
+#include "pxr/usdImaging/usdImaging/delegate.h"
+
+#include "pxr/usd/usdGeom/tokens.h"
+
+#include "pxr/imaging/garch/contextCaps.h"
+#include "pxr/imaging/garch/resourceFactory.h"
+
 #include "pxr/imaging/glf/diagnostic.h"
 #include "pxr/imaging/glf/glContext.h"
-#include "pxr/imaging/garch/drawTarget.h"
 #include "pxr/imaging/glf/info.h"
 
 #include "pxr/imaging/hdx/intersector.h"
+#include "pxr/imaging/hdx/rendererPlugin.h"
 #include "pxr/imaging/hdx/rendererPluginRegistry.h"
+#include "pxr/imaging/hdx/taskController.h"
+#include "pxr/imaging/hdx/tokens.h"
+
+#if defined(ARCH_GFX_METAL)
+#include "pxr/imaging/hdSt/Metal/resourceFactoryMetal.h"
+#endif
+#if defined(ARCH_GFX_OPENGL)
+#include "pxr/imaging/hdSt/GL/resourceFactoryGL.h"
+#endif
 
 #include "pxr/base/tf/getenv.h"
 #include "pxr/base/tf/stl.h"
@@ -42,31 +66,35 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 namespace {
 
-struct _HitData {
-    int xMin;
-    int yMin;
-    double zMin;
-    int minIndex;
-};
-typedef TfHashMap< int32_t, _HitData > _HitDataById;
-
+static
+bool
+_GetHydraEnabledEnvVar()
+{
+    // XXX: Note that we don't cache the result here.  This is primarily because
+    // of the way usdview currently interacts with this setting.  This should
+    // be cleaned up, and the new class hierarchy around UsdImagingGLEngine
+    // makes it much easier to do so.
+    return TfGetenv("HD_ENABLED", "1") == "1";
+}
 
 static
 bool
 _IsHydraEnabled()
 {
+#if defined(ARCH_GFX_METAL)
+#else
     // Make sure there is an OpenGL context when 
     // trying to initialize Hydra/Reference
     GlfGLContextSharedPtr context = GlfGLContext::GetCurrentGLContext();
-    if (!context) {
+    if (!context || !context->IsValid()) {
         TF_CODING_ERROR("OpenGL context required, using reference renderer");
         return false;
     }
-
-    if (TfGetenv("HD_ENABLED", "1") != "1") {
+#endif
+    if (!_GetHydraEnabledEnvVar()) {
         return false;
     }
-    
+
     // Check to see if we have a default plugin for the renderer
     TfToken defaultPlugin = 
         HdxRendererPluginRegistry::GetInstance().GetDefaultPluginId();
@@ -76,28 +104,332 @@ _IsHydraEnabled()
 
 } // anonymous namespace
 
-
-UsdImagingGLEngine::~UsdImagingGLEngine()
-{
-}
+//----------------------------------------------------------------------------
+// Global State
+//----------------------------------------------------------------------------
 
 /*static*/
 bool
 UsdImagingGLEngine::IsHydraEnabled()
 {
+#if defined(ARCH_GFX_OPENGL)
     GlfGlewInit();
+#endif
 
     static bool isHydraEnabled = _IsHydraEnabled();
     return isHydraEnabled;
 }
 
-/*virtual*/
-void 
-UsdImagingGLEngine::SetCameraState(const GfMatrix4d& viewMatrix,
-                            const GfMatrix4d& projectionMatrix,
-                            const GfVec4d& viewport)
+//----------------------------------------------------------------------------
+// Construction
+//----------------------------------------------------------------------------
+
+UsdImagingGLEngine::UsdImagingGLEngine()
+    : _engine(NULL)
+    , _renderIndex(nullptr)
+    , _selTracker(new HdxSelectionTracker)
+    , _delegateID(SdfPath::AbsoluteRootPath())
+    , _delegate(nullptr)
+    , _rendererPlugin(nullptr)
+    , _taskController(nullptr)
+    , _selectionColor(1.0f, 1.0f, 0.0f, 1.0f)
+    , _rootPath(SdfPath::AbsoluteRootPath())
+    , _excludedPrimPaths()
+    , _invisedPrimPaths()
+    , _isPopulated(false)
+    , _renderTags()
+    , _restoreViewport(0)
+    , _useFloatPointDrawTarget(false)
+#if defined(ARCH_GFX_METAL)
+    , _mtlRenderPassDescriptorForInterop(nil)
+    , _mtlRenderPassDescriptor(nil)
+#endif
 {
-    // By default, do nothing.
+#if defined(ARCH_GFX_METAL)
+    _engine = new HdEngine(HdEngine::Metal);
+    _resourceFactory = new HdStResourceFactoryMetal();
+#else
+    _engine = new HdEngine(HdEngine::OpenGL);
+    _resourceFactory = new HdStResourceFactoryGL();
+#endif
+
+#if defined(ARCH_GFX_OPENGL)
+    _renderOutput = RenderOutput::OpenGL;
+#else
+    _renderOutput = RenderOutput::Metal;
+#endif
+    
+    GarchResourceFactory::GetInstance().SetResourceFactory(dynamic_cast<GarchResourceFactoryInterface*>(_resourceFactory));
+    HdStResourceFactory::GetInstance().SetResourceFactory(_resourceFactory);
+
+    if (IsHydraEnabled()) {
+
+        // _renderIndex, _taskController, and _delegate are initialized
+        // by the plugin system.
+        if (!SetRendererPlugin(_GetDefaultRendererPluginId())) {
+            TF_CODING_ERROR("No renderer plugins found! "
+                            "Check before creation.");
+        }
+
+    } else {
+
+        SdfPathVector excluded;
+#if defined(ARCH_GFX_OPENGL)
+        _legacyImpl.reset(new UsdImagingGLLegacyEngine(excluded));
+#endif
+    }
+}
+
+UsdImagingGLEngine::UsdImagingGLEngine(
+    const SdfPath& rootPath,
+    const SdfPathVector& excludedPaths,
+    const SdfPathVector& invisedPaths,
+    const SdfPath& delegateID)
+    : _engine(NULL)
+    , _renderIndex(nullptr)
+    , _selTracker(new HdxSelectionTracker)
+    , _delegateID(delegateID)
+    , _delegate(nullptr)
+    , _rendererPlugin(nullptr)
+    , _taskController(nullptr)
+    , _selectionColor(1.0f, 1.0f, 0.0f, 1.0f)
+    , _rootPath(rootPath)
+    , _excludedPrimPaths(excludedPaths)
+    , _invisedPrimPaths(invisedPaths)
+    , _isPopulated(false)
+    , _renderTags()
+    , _restoreViewport(0)
+    , _useFloatPointDrawTarget(false)
+#if defined(ARCH_GFX_METAL)
+    , _mtlRenderPassDescriptorForInterop(nil)
+    , _mtlRenderPassDescriptor(nil)
+    , _legacyImpl(nullptr)
+#endif
+{
+#if defined(ARCH_GFX_METAL)
+    _engine = new HdEngine(HdEngine::Metal);
+    _resourceFactory = new HdStResourceFactoryMetal();
+#else
+    _engine = new HdEngine(HdEngine::OpenGL);
+    _resourceFactory = new HdStResourceFactoryGL();
+#endif
+    
+#if defined(ARCH_GFX_OPENGL)
+    _renderOutput = RenderOutput::OpenGL;
+#else
+    _renderOutput = RenderOutput::Metal;
+#endif
+    
+    GarchResourceFactory::GetInstance().SetResourceFactory(dynamic_cast<GarchResourceFactoryInterface*>(_resourceFactory));
+    HdStResourceFactory::GetInstance().SetResourceFactory(_resourceFactory);
+
+    if (IsHydraEnabled()) {
+
+        // _renderIndex, _taskController, and _delegate are initialized
+        // by the plugin system.
+        if (!SetRendererPlugin(_GetDefaultRendererPluginId())) {
+            TF_CODING_ERROR("No renderer plugins found! "
+                            "Check before creation.");
+        }
+
+    } else {
+
+        // In the legacy implementation, both excluded paths and invised paths 
+        // are treated the same way.
+        SdfPathVector pathsToExclude = excludedPaths;
+        pathsToExclude.insert(pathsToExclude.end(), 
+            invisedPaths.begin(), invisedPaths.end());
+#if defined(ARCH_GFX_OPENGL)
+        _legacyImpl.reset(new UsdImagingGLLegacyEngine(pathsToExclude));
+#endif
+    }
+}
+
+UsdImagingGLEngine::~UsdImagingGLEngine()
+{ 
+    _DeleteHydraResources();
+    HdStResourceFactory::GetInstance().SetResourceFactory(NULL);
+    GarchResourceFactory::GetInstance().SetResourceFactory(NULL);
+
+    delete _engine;
+    _engine = NULL;
+    
+    delete _resourceFactory;
+    _resourceFactory = NULL;
+}
+
+//----------------------------------------------------------------------------
+// Rendering
+//----------------------------------------------------------------------------
+
+void
+UsdImagingGLEngine::PrepareBatch(
+    const UsdPrim& root, 
+    const UsdImagingGLRenderParams& params)
+{
+    if (ARCH_UNLIKELY(_legacyImpl)) {
+        return;
+    }
+
+    HD_TRACE_FUNCTION();
+
+    TF_VERIFY(_delegate);
+
+    if (_CanPrepareBatch(root, params)) {
+        if (!_isPopulated) {
+            _delegate->SetUsdDrawModesEnabled(params.enableUsdDrawModes);
+            _delegate->Populate(root.GetStage()->GetPrimAtPath(_rootPath),
+                               _excludedPrimPaths);
+            _delegate->SetInvisedPrimPaths(_invisedPrimPaths);
+            _isPopulated = true;
+        }
+
+        _PreSetTime(root, params);
+        // SetTime will only react if time actually changes.
+        _delegate->SetTime(params.frame);
+        _PostSetTime(root, params);
+    }
+}
+
+void
+UsdImagingGLEngine::RenderBatch(
+    const SdfPathVector& paths, 
+    const UsdImagingGLRenderParams& params)
+{
+    if (ARCH_UNLIKELY(_legacyImpl)) {
+        return;
+    }
+
+    TF_VERIFY(_taskController);
+
+    _taskController->SetCameraClipPlanes(params.clipPlanes);
+    _UpdateHydraCollection(&_renderCollection, paths, params, &_renderTags);
+    _taskController->SetCollection(_renderCollection);
+
+    HdxRenderTaskParams hdParams = _MakeHydraUsdImagingGLRenderParams(params);
+    _taskController->SetRenderParams(hdParams);
+    _taskController->SetEnableSelection(params.highlight);
+
+    _Render(params);
+}
+
+void 
+UsdImagingGLEngine::Render(
+    const UsdPrim& root, 
+    const UsdImagingGLRenderParams &params)
+{
+    if (ARCH_UNLIKELY(_legacyImpl)) {
+#if defined(ARCH_GFX_OPENGL)
+        return _legacyImpl->Render(root, params);
+#endif
+    }
+
+    TF_VERIFY(_taskController);
+
+    PrepareBatch(root, params);
+
+    SdfPath rootPath = _delegate->GetPathForIndex(root.GetPath());
+    SdfPathVector roots(1, rootPath);
+
+    _taskController->SetCameraClipPlanes(params.clipPlanes);
+    _UpdateHydraCollection(&_renderCollection, roots, params, &_renderTags);
+    _taskController->SetCollection(_renderCollection);
+
+    HdxRenderTaskParams hdParams = _MakeHydraUsdImagingGLRenderParams(params);
+    _taskController->SetRenderParams(hdParams);
+    _taskController->SetEnableSelection(params.highlight);
+
+    _Render(params);
+}
+
+void
+UsdImagingGLEngine::InvalidateBuffers()
+{
+    if (ARCH_UNLIKELY(_legacyImpl)) {
+#if defined(ARCH_GFX_OPENGL)
+        return _legacyImpl->InvalidateBuffers();
+#endif
+    }
+}
+
+bool
+UsdImagingGLEngine::IsConverged() const
+{
+    if (ARCH_UNLIKELY(_legacyImpl)) {
+        return true;
+    }
+
+    TF_VERIFY(_taskController);
+    return _taskController->IsConverged();
+}
+
+//----------------------------------------------------------------------------
+// Root and Transform Visibility
+//----------------------------------------------------------------------------
+
+void
+UsdImagingGLEngine::SetRootTransform(GfMatrix4d const& xf)
+{
+    if (ARCH_UNLIKELY(_legacyImpl)) {
+        return;
+    }
+
+    TF_VERIFY(_delegate);
+    _delegate->SetRootTransform(xf);
+}
+
+void
+UsdImagingGLEngine::SetRootVisibility(bool isVisible)
+{
+    if (ARCH_UNLIKELY(_legacyImpl)) {
+        return;
+    }
+
+    TF_VERIFY(_delegate);
+    _delegate->SetRootVisibility(isVisible);
+}
+
+//----------------------------------------------------------------------------
+// Camera and Light State
+//----------------------------------------------------------------------------
+
+void 
+UsdImagingGLEngine::SetCameraState(
+    const GfMatrix4d& viewMatrix,
+    const GfMatrix4d& projectionMatrix,
+    const GfVec4d& viewport)
+{
+    if (ARCH_UNLIKELY(_legacyImpl)) {
+#if defined(ARCH_GFX_OPENGL)
+        _legacyImpl->SetCameraState(viewMatrix, projectionMatrix, viewport);
+#endif
+        return;
+    }
+
+    TF_VERIFY(_taskController);
+
+#if defined(ARCH_GFX_METAL)
+    GfMatrix4d modifiedProjMatrix;
+    static GfMatrix4d zTransform;
+    
+    // Transform from [-1, 1] to [0, 1] clip space
+    static bool _zTransformSet = false;
+    if (!_zTransformSet) {
+        _zTransformSet = true;
+        zTransform.SetIdentity();
+        zTransform.SetScale(GfVec3d(1.0, 1.0, 0.5));
+        zTransform.SetTranslateOnly(GfVec3d(0.0, 0.0, 0.5));
+    }
+    
+    modifiedProjMatrix = projectionMatrix * zTransform;
+#else
+    GfMatrix4d &modifiedProjMatrix = projectionMatrix;
+#endif
+
+    // usdview passes these matrices from OpenGL state.
+    // update the camera in the task controller accordingly.
+    _taskController->SetCameraMatrices(viewMatrix, modifiedProjMatrix);
+    _taskController->SetCameraViewport(viewport);
 }
 
 void
@@ -116,94 +448,149 @@ UsdImagingGLEngine::SetCameraStateFromOpenGL()
 #endif
 }
 
-/* virtual */
 void
 UsdImagingGLEngine::SetLightingStateFromOpenGL()
 {
-    // By default, do nothing.
+    if (ARCH_UNLIKELY(_legacyImpl)) {
+        return;
+    }
+
+    TF_VERIFY(_taskController);
+
+    if (!_lightingContextForOpenGLState) {
+        _lightingContextForOpenGLState = GarchSimpleLightingContext::New();
+    }
+    _lightingContextForOpenGLState->SetStateFromOpenGL();
+
+    _taskController->SetLightingState(_lightingContextForOpenGLState);
 }
 
-/* virtual */
 void
 UsdImagingGLEngine::SetLightingState(GarchSimpleLightingContextPtr const &src)
 {
-    // By default, do nothing.
+    if (ARCH_UNLIKELY(_legacyImpl)) {
+        return;
+    }
+
+    TF_VERIFY(_taskController);
+    _taskController->SetLightingState(src);
 }
 
-/* virtual */
 void
-UsdImagingGLEngine::SetLightingState(GarchSimpleLightVector const &lights,
-                                     GarchSimpleMaterial const &material,
-                                     GfVec4f const &sceneAmbient)
+UsdImagingGLEngine::SetLightingState(
+    GarchSimpleLightVector const &lights,
+    GarchSimpleMaterial const &material,
+    GfVec4f const &sceneAmbient)
 {
-    // By default, do nothing.
+    if (ARCH_UNLIKELY(_legacyImpl)) {
+#if defined(ARCH_GFX_OPENGL)
+        _legacyImpl->SetLightingState(lights, material, sceneAmbient);
+#endif
+        return;
+    }
+
+    TF_VERIFY(_taskController);
+
+    // we still use _lightingContextForOpenGLState for convenience, but
+    // set the values directly.
+    if (!_lightingContextForOpenGLState) {
+        _lightingContextForOpenGLState = GarchSimpleLightingContext::New();
+    }
+    _lightingContextForOpenGLState->SetLights(lights);
+    _lightingContextForOpenGLState->SetMaterial(material);
+    _lightingContextForOpenGLState->SetSceneAmbient(sceneAmbient);
+    _lightingContextForOpenGLState->SetUseLighting(lights.size() > 0);
+
+    _taskController->SetLightingState(_lightingContextForOpenGLState);
 }
 
+//----------------------------------------------------------------------------
+// Selection Highlighting
+//----------------------------------------------------------------------------
 
-/* virtual */
-void
-UsdImagingGLEngine::SetRootTransform(GfMatrix4d const& xf)
-{
-    // By default, do nothing.
-}
-
-/* virtual */
-void
-UsdImagingGLEngine::SetRootVisibility(bool isVisible)
-{
-    // By default, do nothing.
-}
-
-/* virtual */
 void
 UsdImagingGLEngine::SetSelected(SdfPathVector const& paths)
 {
-    // By default, do nothing.
+    if (ARCH_UNLIKELY(_legacyImpl)) {
+        return;
+    }
+
+    TF_VERIFY(_delegate);
+
+    // populate new selection
+    HdSelectionSharedPtr selection(new HdSelection);
+    // XXX: Usdview currently supports selection on click. If we extend to
+    // rollover (locate) selection, we need to pass that mode here.
+    HdSelection::HighlightMode mode = HdSelection::HighlightModeSelect;
+    for (SdfPath const& path : paths) {
+        _delegate->PopulateSelection(mode,
+                                     path,
+                                     UsdImagingDelegate::ALL_INSTANCES,
+                                     selection);
+    }
+
+    // set the result back to selection tracker
+    _selTracker->SetSelection(selection);
 }
 
-/* virtual */
 void
 UsdImagingGLEngine::ClearSelected()
 {
-    // By default, do nothing.
+    if (ARCH_UNLIKELY(_legacyImpl)) {
+        return;
+    }
+
+    TF_VERIFY(_selTracker);
+
+    HdSelectionSharedPtr selection(new HdSelection);
+    _selTracker->SetSelection(selection);
 }
 
-/* virtual */
 void
 UsdImagingGLEngine::AddSelected(SdfPath const &path, int instanceIndex)
 {
-    // By default, do nothing.
+    if (ARCH_UNLIKELY(_legacyImpl)) {
+        return;
+    }
+
+    TF_VERIFY(_delegate);
+
+    HdSelectionSharedPtr selection = _selTracker->GetSelectionMap();
+    if (!selection) {
+        selection.reset(new HdSelection);
+    }
+    // XXX: Usdview currently supports selection on click. If we extend to
+    // rollover (locate) selection, we need to pass that mode here.
+    HdSelection::HighlightMode mode = HdSelection::HighlightModeSelect;
+    _delegate->PopulateSelection(mode, path, instanceIndex, selection);
+
+    // set the result back to selection tracker
+    _selTracker->SetSelection(selection);
 }
 
-/*virtual*/
 void
 UsdImagingGLEngine::SetSelectionColor(GfVec4f const& color)
 {
-    // By default, do nothing.
+    if (ARCH_UNLIKELY(_legacyImpl)) {
+        return;
+    }
+
+    TF_VERIFY(_taskController);
+
+    _selectionColor = color;
+    _taskController->SetSelectionColor(_selectionColor);
 }
 
-/* virtual */
-void
-UsdImagingGLEngine::PrepareBatch(const UsdPrim& root, 
-    const UsdImagingGLRenderParams& params)
-{
-    // By default, do nothing.
-}
+//----------------------------------------------------------------------------
+// Picking
+//----------------------------------------------------------------------------
 
-/* virtual */
-void
-UsdImagingGLEngine::RenderBatch(const SdfPathVector& paths, 
-    const UsdImagingGLRenderParams& params)
-{
-    // By default, do nothing.
-}
-
-bool
+bool 
 UsdImagingGLEngine::TestIntersection(
     const GfMatrix4d &viewMatrix,
-    const GfMatrix4d &projectionMatrix,
+    const GfMatrix4d &inProjectionMatrix,
     const GfMatrix4d &worldToLocalSpace,
-    const UsdPrim& root, 
+    const UsdPrim& root,
     const UsdImagingGLRenderParams& params,
     GfVec3d *outHitPoint,
     SdfPath *outHitPrimPath,
@@ -211,474 +598,109 @@ UsdImagingGLEngine::TestIntersection(
     int *outHitInstanceIndex,
     int *outHitElementIndex)
 {
-    // Choose a framebuffer that's large enough to catch thin slice polys.  No
-    // need to go too large though, since the depth writes will accumulate to
-    // the correct answer.
-
-    // XXX:
-    // TidSceneRenderer exposes this as an environment variable; do we care?
-    // Have not yet encountered cases where more accuracy is required.
-    const int width = 128;
-    const int height = width;
-
-    if (GlfHasLegacyGraphics()) {
-        TF_RUNTIME_ERROR("framebuffer object not supported");
-        return false;
-    }
-
-    // Use a separate drawTarget (framebuffer object) for each GL context
-    // that uses this renderer, but the drawTargets can share attachments.
-    
-    GlfGLContextSharedPtr context = GlfGLContext::GetCurrentGLContext();
-    if (!TF_VERIFY(context)) {
-        TF_RUNTIME_ERROR("Invalid GL context");
-        return false;
-    }
-
-    GfVec2i attachmentSize(width,height);
-    GarchDrawTargetRefPtr drawTarget;
-    if (!TfMapLookup(_drawTargets, context, &drawTarget)) {
-
-        // Create an instance for use with this GL context
-        drawTarget = GarchDrawTarget::New(attachmentSize);
-
-        if (!_drawTargets.empty()) {
-            // Share existing attachments
-            drawTarget->CloneAttachments(_drawTargets.begin()->second);
-        } else {
-            // Need to create initial attachments
-            std::vector<GarchDrawTarget::AttachmentDesc> attachmentDesc;
-            attachmentDesc.push_back(
-                GarchDrawTarget::AttachmentDesc("primId", GL_RGBA, GL_UNSIGNED_BYTE, GL_RGBA8));
-            attachmentDesc.push_back(
-                GarchDrawTarget::AttachmentDesc("instanceId", GL_RGBA, GL_UNSIGNED_BYTE, GL_RGBA8));
-            attachmentDesc.push_back(
-                GarchDrawTarget::AttachmentDesc("elementId", GL_RGBA, GL_UNSIGNED_BYTE, GL_RGBA8));
-            attachmentDesc.push_back(
-                GarchDrawTarget::AttachmentDesc("depth", GL_DEPTH_COMPONENT, GL_FLOAT, GL_DEPTH_COMPONENT32F));
-            drawTarget->SetAttachments(attachmentDesc);
-        }
-
-        // This is a good time to clean up any drawTargets no longer in use.
-        for (_DrawTargetPerContextMap::iterator
-                it = _drawTargets.begin(); it != _drawTargets.end(); ++it) {
-            if (!(it->first && it->first->IsValid())) {
-                _drawTargets.erase(it);
-            }
-        }
-
-        _drawTargets[context] = drawTarget;
-    }
-
-    // Resize if necessary
-    if (drawTarget->GetSize() != attachmentSize) {
-        drawTarget->SetSize(attachmentSize);
-    }
-
-    drawTarget->Bind();
+    if (ARCH_UNLIKELY(_legacyImpl)) {
 #if defined(ARCH_GFX_OPENGL)
-    glPushAttrib( GL_VIEWPORT_BIT |
-                  GL_ENABLE_BIT |
-                  GL_COLOR_BUFFER_BIT |
-                  GL_DEPTH_BUFFER_BIT |
-                  GL_TEXTURE_BIT );
-
-    GLenum drawBuffers[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
-    glDrawBuffers(2, drawBuffers);
-    
-    glDepthMask(GL_TRUE);
-    glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
-
-    glEnable(GL_DEPTH_TEST);
+        return _legacyImpl->TestIntersection(
+            viewMatrix,
+            inProjectionMatrix,
+            worldToLocalSpace,
+            root,
+            params,
+            outHitPoint,
+            outHitPrimPath,
+            outHitInstancerPath,
+            outHitInstanceIndex,
+            outHitElementIndex);
 #endif
-    // Setup the modelview matrix
-    const GfMatrix4d modelViewMatrix = worldToLocalSpace * viewMatrix;
-
-#if defined(ARCH_GFX_OPENGL)
-    // Set up camera matrices and viewport. At some point in the future,
-    // this may be handled by Hydra itself since we are calling SetCameraState
-    // with all of this information so we can support culling
-    glMatrixMode(GL_PROJECTION);
-    glPushMatrix();
-    glLoadMatrixd(projectionMatrix.GetArray());
-    
-    glMatrixMode(GL_MODELVIEW);
-    glPushMatrix();
-    glLoadMatrixd(modelViewMatrix.GetArray());
-   
-    glViewport(0, 0, width, height);
-#endif
-
-    SetCameraState(modelViewMatrix, projectionMatrix, GfVec4d(0,0,width, height) );
-
-    GLF_POST_PENDING_GL_ERRORS();
-    
-    // to enable wireframe picking, should respect incoming drawMode
-    //params.drawMode = DRAW_GEOM_ONLY;
-    Render(root, params);
-    
-    GLF_POST_PENDING_GL_ERRORS();
-
-#if defined(ARCH_GFX_OPENGL)
-    // Restore all gl state
-    glMatrixMode(GL_PROJECTION);
-    glPopMatrix();
-    
-    glMatrixMode(GL_MODELVIEW);
-    glPopMatrix();
-#endif
-
-    int xMin = 0;
-    int yMin = 0;
-    double zMin = 1.0;
-    int zMinIndex = -1;
-
-    GLubyte primId[width*height*4];
-    drawTarget->GetImage("primId", primId);
-
-    GLubyte instanceId[width*height*4];
-    drawTarget->GetImage("instanceId", instanceId);
-
-    GLubyte elementId[width*height*4];
-    drawTarget->GetImage("elementId", elementId);
-
-    GLfloat depths[width*height];
-    drawTarget->GetImage("depth", depths);
-
-#if defined(ARCH_GFX_OPENGL)
-    glPopAttrib(); /* GL_VIEWPORT_BIT |
-                      GL_ENABLE_BIT |
-                      GL_COLOR_BUFFER_BIT
-                      GL_DEPTH_BUFFER_BIT
-                      GL_TEXTURE_BIT */
-#endif
-
-    GLF_POST_PENDING_GL_ERRORS();
-    
-    // Find the smallest value (nearest pixel) in the z buffer
-    for (int y=0, i=0; y<height; y++) {
-        for (int x=0; x<width; x++, i++) {
-            if (depths[i] < zMin) {
-	            xMin = x;
-	            yMin = y;
-	            zMin = depths[i];
-                zMinIndex = i;
-            }
-        }
     }
 
-    bool didHit = (zMin < 1.0);
+    TF_VERIFY(_delegate);
 
-    if (didHit) {
-        GLint viewport[4] = { 0, 0, width, height };
-        GfVec3d hitPoint;
-#if defined(ARCH_GFX_OPENGL)
-        gluUnProject( xMin, yMin, zMin,
-                      viewMatrix.GetArray(),
-                      projectionMatrix.GetArray(),
-                      viewport,
-                      &((*outHitPoint)[0]),
-                      &((*outHitPoint)[1]),
-                      &((*outHitPoint)[2]));
+#if defined(ARCH_GFX_METAL)
+    GfMatrix4d projectionMatrix;
+    static GfMatrix4d zTransform;
+    
+    // Transform from [-1, 1] to [0, 1] clip space
+    static bool _zTransformSet = false;
+    if (!_zTransformSet) {
+        _zTransformSet = true;
+        zTransform.SetIdentity();
+        zTransform.SetScale(GfVec3d(1.0, 1.0, 0.5));
+        zTransform.SetTranslateOnly(GfVec3d(0.0, 0.0, 0.5));
+    }
+    
+    projectionMatrix = inProjectionMatrix * zTransform;
 #else
-        TF_FATAL_CODING_ERROR("Not Implemented!"); //MTL_FIXME
+    GfMatrix4d &projectionMatrix = inProjectionMatrix;
 #endif
-        if (outHitPrimPath) {
-            int idIndex = zMinIndex*4;
 
-            *outHitPrimPath = GetRprimPathFromPrimId(
-                    HdxIntersector::DecodeIDRenderColor(&primId[idIndex]));
-            if (outHitInstanceIndex) {
-                *outHitInstanceIndex = HdxIntersector::DecodeIDRenderColor(
-                        &instanceId[idIndex]);
-            }
-            if (outHitElementIndex) {
-                *outHitElementIndex = HdxIntersector::DecodeIDRenderColor(
-                        &elementId[idIndex]);
-            }
+    SdfPath rootPath = _delegate->GetPathForIndex(root.GetPath());
+    SdfPathVector roots(1, rootPath);
+    _UpdateHydraCollection(&_intersectCollection, roots, params, &_renderTags);
 
-        }
-    }
+    HdxIntersector::HitVector allHits;
+    HdxIntersector::Params qparams;
+    qparams.viewMatrix = worldToLocalSpace * viewMatrix;
+    qparams.projectionMatrix = projectionMatrix;
+    qparams.alphaThreshold = params.alphaThreshold;
+    qparams.renderTags = _renderTags;
+    qparams.cullStyle = HdCullStyleNothing;
+    qparams.enableSceneMaterials = params.enableSceneMaterials;
 
-    drawTarget->Unbind();
-    GLF_POST_PENDING_GL_ERRORS();
-
-    return didHit;
-}
-
-static
-uint32_t
-_pow2roundup (uint32_t x)
-{
-    // Round up to next higher power of 2 (return x if it's already a power
-    // of 2).
-    
-    --x;
-    x |= x >> 1;
-    x |= x >> 2;
-    x |= x >> 4;
-    x |= x >> 8;
-    x |= x >> 16;
-    return x+1;
-}
-
-bool
-UsdImagingGLEngine::TestIntersectionBatch(
-    const GfMatrix4d &viewMatrix,
-    const GfMatrix4d &projectionMatrix,
-    const GfMatrix4d &worldToLocalSpace,
-    const SdfPathVector& paths, 
-    const UsdImagingGLRenderParams& params,
-    unsigned int pickResolution,
-    PathTranslatorCallback pathTranslator,
-    HitBatch *outHit)
-{
-    // outHit is not optional
-    if (!outHit) {
-        return false;
-    }
-    
-    // Choose a framebuffer that's large enough to catch thin slice polys.  No
-    // need to go too large though, since the depth writes will accumulate to
-    // the correct answer.
-    //
-    // The incoming pickResolution may not be a power of two, so round up to the
-    // nearest fully-support resolution.
-    //
-    const int width = _pow2roundup(pickResolution);
-    const int height = width;
-
-    if (GlfHasLegacyGraphics()) {
-        TF_RUNTIME_ERROR("framebuffer object not supported");
+    if (!_taskController->TestIntersection(
+            _engine,
+            _intersectCollection,
+            qparams,
+            HdxIntersectionModeTokens->nearest,
+            &allHits)) {
         return false;
     }
 
-    // Use a separate drawTarget (framebuffer object) for each GL context
-    // that uses this renderer, but the drawTargets can share attachments.
-    
-    GlfGLContextSharedPtr context = GlfGLContext::GetCurrentGLContext();
-    if (!TF_VERIFY(context)) {
-        TF_RUNTIME_ERROR("Invalid GL context");
-        return false;
+    // Since we are in nearest-hit mode, and TestIntersection
+    // returned true, we know allHits has a single point in it.
+    TF_VERIFY(allHits.size() == 1);
+
+    HdxIntersector::Hit &hit = allHits[0];
+
+    if (outHitPoint) {
+        *outHitPoint = GfVec3d(hit.worldSpaceHitPoint[0],
+                               hit.worldSpaceHitPoint[1],
+                               hit.worldSpaceHitPoint[2]);
+    }
+    if (outHitPrimPath) {
+        *outHitPrimPath = hit.objectId;
+    }
+    if (outHitInstancerPath) {
+        *outHitInstancerPath = hit.instancerId;
+    }
+    if (outHitInstanceIndex) {
+        *outHitInstanceIndex = hit.instanceIndex;
+    }
+    if (outHitElementIndex) {
+        *outHitElementIndex = hit.elementIndex;
     }
 
-    GfVec2i attachmentSize(width,height);
-    GarchDrawTargetRefPtr drawTarget;
-    if (!TfMapLookup(_drawTargets, context, &drawTarget)) {
-
-        // Create an instance for use with this GL context
-        drawTarget = GarchDrawTarget::New(attachmentSize);
-
-        if (!_drawTargets.empty()) {
-            // Share existing attachments
-            drawTarget->CloneAttachments(_drawTargets.begin()->second);
-        } else {
-            // Need to create initial attachments
-            std::vector<GarchDrawTarget::AttachmentDesc> attachmentDesc;
-            attachmentDesc.push_back(
-                GarchDrawTarget::AttachmentDesc("primId", GL_RGBA, GL_UNSIGNED_BYTE, GL_RGBA8));
-            attachmentDesc.push_back(
-                GarchDrawTarget::AttachmentDesc("instanceId", GL_RGBA, GL_UNSIGNED_BYTE, GL_RGBA8));
-            attachmentDesc.push_back(
-                GarchDrawTarget::AttachmentDesc("depth", GL_DEPTH_COMPONENT, GL_FLOAT, GL_DEPTH_COMPONENT32F));
-            drawTarget->SetAttachments(attachmentDesc);
-        }
-
-        // This is a good time to clean up any drawTargets no longer in use.
-        for (_DrawTargetPerContextMap::iterator
-                it = _drawTargets.begin(); it != _drawTargets.end(); ++it) {
-            if (!(it->first && it->first->IsValid())) {
-                _drawTargets.erase(it);
-            }
-        }
-
-        _drawTargets[context] = drawTarget;
-    }
-
-    // Resize if necessary
-    if (drawTarget->GetSize() != attachmentSize) {
-        drawTarget->SetSize(attachmentSize);
-    }
-
-    drawTarget->Bind();
-#if defined(ARCH_GFX_OPENGL)
-    glPushAttrib( GL_VIEWPORT_BIT |
-                  GL_ENABLE_BIT |
-                  GL_COLOR_BUFFER_BIT |
-                  GL_DEPTH_BUFFER_BIT |
-                  GL_TEXTURE_BIT );
-
-    GLenum drawBuffers[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
-    glDrawBuffers(2, drawBuffers);
-    
-    glDepthMask(GL_TRUE);
-    glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
-
-    glEnable(GL_DEPTH_TEST);
-#endif
-    // Setup the modelview matrix
-    const GfMatrix4d modelViewMatrix = worldToLocalSpace * viewMatrix;
-#if defined(ARCH_GFX_OPENGL)
-    // Set up camera matrices and viewport. At some point in the future,
-    // this may be handled by Hydra itself since we are calling SetCameraState
-    // with all of this information so we can support culling
-    glMatrixMode(GL_PROJECTION);
-    glPushMatrix();
-    glLoadMatrixd(projectionMatrix.GetArray());
-    
-    glMatrixMode(GL_MODELVIEW);
-    glPushMatrix();
-    glLoadMatrixd(modelViewMatrix.GetArray());
-   
-    glViewport(0, 0, width, height);
-#endif
-    SetCameraState(modelViewMatrix, projectionMatrix, GfVec4d(0,0,width, height) );
-
-    GLF_POST_PENDING_GL_ERRORS();
-    
-    // to enable wireframe picking, should respect incoming drawMode
-    //params.drawMode = DRAW_GEOM_ONLY;
-    RenderBatch(paths, params);
-    
-    GLF_POST_PENDING_GL_ERRORS();
-#if defined(ARCH_GFX_OPENGL)
-    // Restore all gl state
-    glMatrixMode(GL_PROJECTION);
-    glPopMatrix();
-    
-    glMatrixMode(GL_MODELVIEW);
-    glPopMatrix();
-#endif
-    std::vector<GLubyte> primId(width*height*4);
-    drawTarget->GetImage("primId", primId.data());
-
-    std::vector<GLubyte> instanceId(width*height*4);
-    drawTarget->GetImage("instanceId", instanceId.data());
-
-    std::vector<GLfloat> depths(width*height);
-    drawTarget->GetImage("depth", depths.data());
-#if defined(ARCH_GFX_OPENGL)
-    glPopAttrib(); /* GL_VIEWPORT_BIT |
-                      GL_ENABLE_BIT |
-                      GL_COLOR_BUFFER_BIT
-                      GL_DEPTH_BUFFER_BIT
-                      GL_TEXTURE_BIT */
-#endif
-    GLF_POST_PENDING_GL_ERRORS();
-
-    _HitDataById hitResults;
-    
-    // Find the smallest value (nearest pixel) in the z buffer for each primId
-    for (int y=0, i=0; y<height; y++) {
-        for (int x=0; x<width; x++, i++) {
-            if( depths[i]>=1.0 )
-                continue;
-            
-            // primIdx construction mirrors the underlying prim code,
-            // ignoring the A component.
-            int32_t primIdx = ((primId[i*4+0] & 0xff) <<  0) | 
-                              ((primId[i*4+1] & 0xff) <<  8) |
-                              ((primId[i*4+2] & 0xff) << 16);
-            
-            // Set the iterator to the entry if it exists in hitResults,
-            // otherwise insert a new entry with the default values.
-            std::pair< _HitDataById::iterator, bool > primEntry =
-                    hitResults.insert( {primIdx, {0,0,1.0,-1}} );
-            
-            _HitData &primHitData = primEntry.first->second;
-            if (depths[i] < primHitData.zMin) {
-	            primHitData.xMin = x;
-	            primHitData.yMin = y;
-	            primHitData.zMin = depths[i];
-                    primHitData.minIndex = i;
-            }
-        }
-    }
-
-    bool didHit = !hitResults.empty();
-    
-    TfHashMap<SdfPath,double,SdfPath::Hash> minDistToPath;
-
-    if (didHit) {
-        GLint viewport[4] = { 0, 0, width, height };
-        
-        TF_FOR_ALL( hitEntry, hitResults ) {
-            _HitData &primHitData = hitEntry->second;
-
-            int idIndex = primHitData.minIndex*4;
-
-            GfVec4i primIdColor(
-                primId[idIndex+0],
-                primId[idIndex+1],
-                primId[idIndex+2],
-                primId[idIndex+3]);
-
-            GfVec4i instanceIdColor(
-                instanceId[idIndex+0],
-                instanceId[idIndex+1],
-                instanceId[idIndex+2],
-                instanceId[idIndex+3]);
-            
-            int hitInstanceIndex;
-            SdfPath primPath = GetPrimPathFromPrimIdColor(primIdColor,
-                                                          instanceIdColor,
-                                                          &hitInstanceIndex);
-
-            // Translate the path. Allows client-side collating of hit prims into
-            // useful bins as needed. The simplest translator returns primPath.
-            //
-            // Note that this non-Hydra implementation has no concept of an
-            // instancer path.
-            SdfPath hitPath( pathTranslator(primPath, SdfPath(), hitInstanceIndex) );
-            
-            if( !hitPath.IsEmpty() ) {
-                
-                double minDist;
-                bool exists = TfMapLookup( minDistToPath, hitPath, &minDist );
-                if( !exists || primHitData.zMin < minDist ) {
-
-                    GfVec3d hitPoint;
-#if defined(ARCH_GFX_OPENGL)
-                    gluUnProject( primHitData.xMin, primHitData.yMin, primHitData.zMin,
-                                  viewMatrix.GetArray(),
-                                  projectionMatrix.GetArray(),
-                                  viewport,
-                                  &(hitPoint[0]),
-                                  &(hitPoint[1]),
-                                  &(hitPoint[2]));
-#else
-                    TF_FATAL_CODING_ERROR("Not Implemented!"); //MTL_FIXME
-#endif
-
-                    HitInfo &hitInfo = (*outHit)[hitPath];
-
-                    hitInfo.worldSpaceHitPoint = hitPoint;
-                    hitInfo.hitInstanceIndex = hitInstanceIndex;
-
-                    minDistToPath[hitPath] = primHitData.zMin;
-                }
-            }
-        }
-    }
-
-    drawTarget->Unbind();
-    GLF_POST_PENDING_GL_ERRORS();
-
-    return didHit;
+    return true;
 }
 
-/* virtual */
 SdfPath
 UsdImagingGLEngine::GetRprimPathFromPrimId(int primId) const
 {
-    return SdfPath();
+    if (ARCH_UNLIKELY(_legacyImpl)) {
+#if defined(ARCH_GFX_OPENGL)
+        return _legacyImpl->GetRprimPathFromPrimId(primId);
+#endif
+    }
+
+    TF_VERIFY(_delegate);
+    return _delegate->GetRenderIndex().GetRprimPathFromPrimId(primId);
 }
 
-/* virtual */
 SdfPath
-UsdImagingGLEngine::GetPrimPathFromPrimIdColor(GfVec4i const &primIdColor,
-                                             GfVec4i const &instanceIdColor,
-                                             int * instanceIndexOut)
+UsdImagingGLEngine::GetPrimPathFromPrimIdColor(
+    GfVec4i const &primIdColor,
+    GfVec4i const &instanceIdColor,
+    int * instanceIndexOut)
 {
     unsigned char primIdColorBytes[] =  {
         uint8_t(primIdColor[0]),
@@ -704,7 +726,6 @@ UsdImagingGLEngine::GetPrimPathFromPrimIdColor(GfVec4i const &primIdColor,
     return result;
 }
 
-/* virtual */
 SdfPath 
 UsdImagingGLEngine::GetPrimPathFromInstanceIndex(
     SdfPath const& protoPrimPath,
@@ -713,86 +734,1025 @@ UsdImagingGLEngine::GetPrimPathFromInstanceIndex(
     SdfPath *rprimPath,
     SdfPathVector *instanceContext)
 {
-    return SdfPath();
+    if (ARCH_UNLIKELY(_legacyImpl)) {
+        return SdfPath();
+    }
+
+    TF_VERIFY(_delegate);
+
+    return _delegate->GetPathForInstanceIndex(protoPrimPath, instanceIndex,
+                                             absoluteInstanceIndex, rprimPath,
+                                             instanceContext);
 }
 
-/* virtual */
-bool
-UsdImagingGLEngine::IsConverged() const
+//----------------------------------------------------------------------------
+// Renderer Plugin Management
+//----------------------------------------------------------------------------
+#if defined(ARCH_GFX_METAL)
+static std::string _MetalPluginDescriptor(id<MTLDevice> device)
 {
-    // always converges by default.
-    return true;
+    return std::string("Hydra Metal - ") + [[device name] UTF8String];
 }
-
-/* virtual */
+#endif
+/* static */
 TfTokenVector
-UsdImagingGLEngine::GetRendererPlugins() const
+UsdImagingGLEngine::GetRendererPlugins()
 {
-    return std::vector<TfToken>();
+    if (ARCH_UNLIKELY(!_GetHydraEnabledEnvVar())) {
+        // No plugins if the legacy implementation is active.
+        return std::vector<TfToken>();
+    }
+
+    HfPluginDescVector pluginDescriptors;
+    HdxRendererPluginRegistry::GetInstance().GetPluginDescs(&pluginDescriptors);
+
+#if defined(ARCH_GFX_METAL)
+#if defined(ARCH_OS_MACOS)
+    NSArray<id<MTLDevice>> *_deviceList = MTLCopyAllDevices();
+#else
+    NSMutableArray<id<MTLDevice>> *_deviceList = [[NSMutableArray alloc] init];
+    [_deviceList addObject:MTLCreateSystemDefaultDevice()];
+#endif
+    
+    TfTokenVector plugins;
+    
+//    if (pluginDescriptors.size() != 1) {
+//        TF_FATAL_CODING_ERROR("There should only be one plugin!");
+//    }
+    
+    for (id<MTLDevice> dev in _deviceList) {
+        plugins.push_back(TfToken(_MetalPluginDescriptor(dev)));
+    }
+#else
+    TfTokenVector plugins;
+    for(size_t i = 0; i < pluginDescriptors.size(); ++i) {
+        plugins.push_back(pluginDescriptors[i].id);
+    }
+#endif
+
+    return plugins;
 }
 
-/* virtual */
+/* static */
 std::string
-UsdImagingGLEngine::GetRendererDisplayName(TfToken const &id) const
+UsdImagingGLEngine::GetRendererDisplayName(TfToken const &id)
 {
-    return std::string();
+    if (ARCH_UNLIKELY(!_GetHydraEnabledEnvVar() || id.IsEmpty())) {
+        // No renderer name is returned if the user requested to disable Hydra, 
+        // or if the machine does not support any of the available renderers 
+        // and it automatically switches to our legacy engine.
+        return std::string();
+    }
+
+#if defined(ARCH_GFX_METAL)
+    return id;
+#endif
+
+    HfPluginDesc pluginDescriptor;
+    if (!TF_VERIFY(HdxRendererPluginRegistry::GetInstance().
+                   GetPluginDesc(id, &pluginDescriptor))) {
+        return std::string();
+    }
+
+    return pluginDescriptor.displayName;
 }
 
-/* virtual */
 TfToken
 UsdImagingGLEngine::GetCurrentRendererId() const
 {
-    return TfToken();
+    if (ARCH_UNLIKELY(_legacyImpl)) {
+        // No renderer support if the legacy implementation is active.
+        return TfToken();
+    }
+
+    return _rendererId;
 }
 
-/* virtual */
 bool
-UsdImagingGLEngine::SetRendererPlugin(TfToken const &id)
+UsdImagingGLEngine::SetRendererPlugin(TfToken const &pluginId)
 {
-    return false;
+    if (ARCH_UNLIKELY(_legacyImpl)) {
+        return false;
+    }
+
+    HdxRendererPlugin *plugin = nullptr;
+    TfToken actualId = pluginId;
+    bool forceReload = false;
+
+    // Special case: TfToken() selects the first plugin in the list.
+    if (actualId.IsEmpty()) {
+        actualId = HdxRendererPluginRegistry::GetInstance().
+            GetDefaultPluginId();
+    }
+#if defined(ARCH_GFX_METAL)
+#if defined(ARCH_OS_MACOS)
+    NSArray<id<MTLDevice>> *_deviceList = MTLCopyAllDevices();
+#else
+    NSMutableArray<id<MTLDevice>> *_deviceList = [[NSMutableArray alloc] init];
+    [_deviceList addObject:MTLCreateSystemDefaultDevice()];
+#endif
+    
+    for (id<MTLDevice> dev in _deviceList) {
+        if (pluginId == _MetalPluginDescriptor(dev))
+        {
+            actualId = HdxRendererPluginRegistry::GetInstance().
+            GetDefaultPluginId();
+            
+            if (dev != MtlfMetalContext::GetMetalContext()->device) {
+                // Tear it down and bring it back up with the new Metal device
+                forceReload = true;
+                
+                // Recreate the underlying Metal context
+                MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
+                MtlfMetalContext::RecreateInstance(dev, context->mtlColorTexture.width, context->mtlColorTexture.height);
+            }
+            break;
+        }
+    }
+#endif
+
+    plugin = HdxRendererPluginRegistry::GetInstance().
+        GetRendererPlugin(actualId);
+
+    if (plugin == nullptr) {
+        TF_CODING_ERROR("Couldn't find plugin for id %s", actualId.GetText());
+        return false;
+    } else if (plugin == _rendererPlugin) {
+        if (!forceReload) {
+            // It's a no-op to load the same plugin twice.
+            HdxRendererPluginRegistry::GetInstance().ReleasePlugin(plugin);
+            return true;
+        }
+    } else if (!plugin->IsSupported()) {
+        // Don't do anything if the plugin isn't supported on the running
+        // system, just return that we're not able to set it.
+        HdxRendererPluginRegistry::GetInstance().ReleasePlugin(plugin);
+        return false;
+    }
+
+    // Pull old delegate/task controller state.
+    GfMatrix4d rootTransform = GfMatrix4d(1.0);
+    bool isVisible = true;
+    if (_delegate != nullptr) {
+        rootTransform = _delegate->GetRootTransform();
+        isVisible = _delegate->GetRootVisibility();
+    }
+    HdSelectionSharedPtr selection = _selTracker->GetSelectionMap();
+    if (!selection) {
+        selection.reset(new HdSelection);
+    }
+
+    // Delete hydra state.
+    _DeleteHydraResources();
+
+    // Recreate the render index.
+    _rendererPlugin = plugin;
+#if defined(ARCH_GFX_METAL)
+    _rendererId = TfToken(_MetalPluginDescriptor(MtlfMetalContext::GetMetalContext()->device));
+#else
+    _rendererId = actualId;
+#endif
+
+    HdRenderDelegate *renderDelegate = _rendererPlugin->CreateRenderDelegate();
+    _renderIndex = HdRenderIndex::New(renderDelegate);
+
+    // Create the new delegate & task controller.
+    _delegate = new UsdImagingDelegate(_renderIndex, _delegateID);
+    _isPopulated = false;
+
+    _taskController = new HdxTaskController(_renderIndex,
+        _delegateID.AppendChild(TfToken(TfStringPrintf(
+            "_UsdImaging_%s_%p",
+            TfMakeValidIdentifier(actualId.GetText()).c_str(),
+            this))));
+
+    // Rebuild state in the new delegate/task controller.
+    _delegate->SetRootVisibility(isVisible);
+    _delegate->SetRootTransform(rootTransform);
+    _selTracker->SetSelection(selection);
+    _taskController->SetSelectionColor(_selectionColor);
+
+    return true;
 }
 
-/* virtual */
+//----------------------------------------------------------------------------
+// AOVs and Renderer Settings
+//----------------------------------------------------------------------------
+
 TfTokenVector
 UsdImagingGLEngine::GetRendererAovs() const
 {
-    return std::vector<TfToken>();
+    if (ARCH_UNLIKELY(_legacyImpl)) {
+        return std::vector<TfToken>();
+    }
+
+    TF_VERIFY(_renderIndex);
+
+    if (_renderIndex->IsBprimTypeSupported(HdPrimTypeTokens->renderBuffer)) {
+        return TfTokenVector(
+            { HdAovTokens->color,
+              HdAovTokens->primId,
+              HdAovTokens->depth,
+              HdAovTokens->normal,
+              HdAovTokensMakePrimvar(TfToken("st")) }
+        );
+    }
+    return TfTokenVector();
 }
 
-/* virtual */
 bool
 UsdImagingGLEngine::SetRendererAov(TfToken const &id)
 {
+    if (ARCH_UNLIKELY(_legacyImpl)) {
+        return false;
+    }
+
+    TF_VERIFY(_renderIndex);
+    if (_renderIndex->IsBprimTypeSupported(HdPrimTypeTokens->renderBuffer)) {
+        // For color, render straight to the viewport instead of rendering
+        // to an AOV and colorizing (which is the same, but more work).
+        if (id == HdAovTokens->color) {
+            _taskController->SetRenderOutputs(TfTokenVector());
+        } else {
+            _taskController->SetRenderOutputs({id});
+        }
+        return true;
+    }
     return false;
 }
 
-/* virtual */
-VtDictionary
-UsdImagingGLEngine::GetResourceAllocation() const
-{
-    return VtDictionary();
-}
-
-/* virtual */
 UsdImagingGLRendererSettingsList
 UsdImagingGLEngine::GetRendererSettingsList() const
 {
-    return UsdImagingGLRendererSettingsList();
+    if (ARCH_UNLIKELY(_legacyImpl)) {
+        return UsdImagingGLRendererSettingsList();
+    }
+
+    TF_VERIFY(_renderIndex);
+
+    HdRenderSettingDescriptorList descriptors =
+        _renderIndex->GetRenderDelegate()->GetRenderSettingDescriptors();
+    UsdImagingGLRendererSettingsList ret;
+
+    for (auto const& desc : descriptors) {
+        UsdImagingGLRendererSetting r;
+        r.key = desc.key;
+        r.name = desc.name;
+        r.defValue = desc.defaultValue;
+
+        // Use the type of the default value to tell us what kind of
+        // widget to create...
+        if (r.defValue.IsHolding<bool>()) {
+            r.type = UsdImagingGLRendererSetting::TYPE_FLAG;
+        } else if (r.defValue.IsHolding<int>() ||
+                   r.defValue.IsHolding<unsigned int>()) {
+            r.type = UsdImagingGLRendererSetting::TYPE_INT;
+        } else if (r.defValue.IsHolding<float>()) {
+            r.type = UsdImagingGLRendererSetting::TYPE_FLOAT;
+        } else if (r.defValue.IsHolding<std::string>()) {
+            r.type = UsdImagingGLRendererSetting::TYPE_STRING;
+        } else {
+            TF_WARN("Setting '%s' with type '%s' doesn't have a UI"
+                    " implementation...",
+                    r.name.c_str(),
+                    r.defValue.GetTypeName().c_str());
+            continue;
+        }
+        ret.push_back(r);
+    }
+
+    return ret;
 }
 
-/* virtual */
 VtValue
 UsdImagingGLEngine::GetRendererSetting(TfToken const& id) const
 {
-    return VtValue();
+    if (ARCH_UNLIKELY(_legacyImpl)) {
+        return VtValue();
+    }
+
+    TF_VERIFY(_renderIndex);
+    return _renderIndex->GetRenderDelegate()->GetRenderSetting(id);
 }
 
-/* virtual */
 void
-UsdImagingGLEngine::SetRendererSetting(TfToken const& id,
-                                       VtValue const& value)
+UsdImagingGLEngine::SetRendererSetting(TfToken const& id, VtValue const& value)
 {
+    if (ARCH_UNLIKELY(_legacyImpl)) {
+        return;
+    }
+
+    TF_VERIFY(_renderIndex);
+    _renderIndex->GetRenderDelegate()->SetRenderSetting(id, value);
 }
+
+void 
+UsdImagingGLEngine::SetEnableFloatPointDrawTarget(bool state)
+{
+    if (ARCH_UNLIKELY(_legacyImpl)) {
+        return;
+    }
+
+    _useFloatPointDrawTarget = state;
+}
+
+//----------------------------------------------------------------------------
+// Color Correction
+//----------------------------------------------------------------------------
+void 
+UsdImagingGLEngine::SetColorCorrectionSettings(
+    TfToken const& id,
+    GfVec2i const& framebufferResolution)
+{
+    if (ARCH_UNLIKELY(_legacyImpl)) {
+        return;
+    }
+
+    if (!IsColorCorrectionCapable()) {
+        return;
+    }
+
+    TF_VERIFY(_taskController);
+
+    HdxColorCorrectionTaskParams hdParams;
+    hdParams.framebufferSize = framebufferResolution;
+    hdParams.colorCorrectionMode = id;
+    _taskController->SetColorCorrectionParams(hdParams);
+}
+
+bool 
+UsdImagingGLEngine::IsColorCorrectionCapable()
+{
+    GarchContextCaps const &caps =
+        GarchResourceFactory::GetInstance()->GetContextCaps();
+    return caps.floatingPointBuffersEnabled &&
+           IsHydraEnabled();
+}
+
+//----------------------------------------------------------------------------
+// Resource Information
+//----------------------------------------------------------------------------
+
+VtDictionary
+UsdImagingGLEngine::GetResourceAllocation() const
+{
+    if (ARCH_UNLIKELY(_legacyImpl)) {
+        return VtDictionary();
+    }
+
+    TF_VERIFY(_renderIndex);
+    return _renderIndex->GetResourceRegistry()->GetResourceAllocation();
+}
+
+//----------------------------------------------------------------------------
+// Private/Protected
+//----------------------------------------------------------------------------
+
+HdRenderIndex *
+UsdImagingGLEngine::_GetRenderIndex() const
+{
+    if (ARCH_UNLIKELY(_legacyImpl)) {
+        return nullptr;
+    }
+
+    return _renderIndex;
+}
+
+void 
+UsdImagingGLEngine::_Render(const UsdImagingGLRenderParams &params)
+{
+    if (ARCH_UNLIKELY(_legacyImpl)) {
+        return;
+    }
+
+    TF_VERIFY(_delegate);
+
+    // Render into our interal framebuffer for color management / post-effects.
+    _BindInternalDrawTarget(params);
+    SetColorCorrectionSettings(params.colorCorrectionMode, 
+                               params.renderResolution);
+
+    // Forward scene materials enable option to delegate
+    _delegate->SetSceneMaterialsEnabled(params.enableSceneMaterials);
+    
+    GarchContextCaps const &caps =
+    GarchResourceFactory::GetInstance()->GetContextCaps();
+
+#if defined(ARCH_GFX_METAL)
+    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
+
+#if defined(ARCH_GFX_OPENGL)
+    // Make sure the Metal render targets, and GL interop textures match the GL viewport size
+    GLint viewport[4];
+    glGetIntegerv( GL_VIEWPORT, viewport );
+    
+    if (context->mtlColorTexture.width != viewport[2] ||
+        context->mtlColorTexture.height != viewport[3]) {
+        context->AllocateAttachments(viewport[2], viewport[3]);
+    }
+    
+    if (_renderOutput == RenderOutput::OpenGL) {
+        if (_mtlRenderPassDescriptorForInterop == nil)
+            _mtlRenderPassDescriptorForInterop = [[MTLRenderPassDescriptor alloc] init];
+        
+        //Set this state every frame because it may have changed during rendering.
+        
+        // create a color attachment every frame since we have to recreate the texture every frame
+        MTLRenderPassColorAttachmentDescriptor *colorAttachment = _mtlRenderPassDescriptorForInterop.colorAttachments[0];
+        
+        // make sure to clear every frame for best performance
+        colorAttachment.loadAction = MTLLoadActionClear;
+        
+        // store only attachments that will be presented to the screen, as in this case
+        colorAttachment.storeAction = MTLStoreActionStore;
+        
+        MTLRenderPassDepthAttachmentDescriptor *depthAttachment = _mtlRenderPassDescriptorForInterop.depthAttachment;
+        depthAttachment.loadAction = MTLLoadActionClear;
+        depthAttachment.storeAction = MTLStoreActionStore;
+        depthAttachment.clearDepth = 1.0f;
+        
+        colorAttachment.texture = context->mtlColorTexture;
+        
+        GLfloat clearColor[4];
+        glGetFloatv(GL_COLOR_CLEAR_VALUE, clearColor);
+        clearColor[3] = 1.0f;
+        
+        colorAttachment.clearColor = MTLClearColorMake(clearColor[0],
+                                                       clearColor[1],
+                                                       clearColor[2],
+                                                       clearColor[3]);
+        depthAttachment.texture = context->mtlDepthTexture;
+        
+        _mtlRenderPassDescriptor = _mtlRenderPassDescriptorForInterop;
+    }
+    else
+#else
+    if (false) {}
+    else
+#endif
+    {
+        if (_mtlRenderPassDescriptor == nil) {
+            TF_FATAL_CODING_ERROR("SetMetalRenderPassDescriptor must be called prior "
+                                  "to rendering when render output is set to Metal");
+        }
+    }
+    
+    context->StartFrame();
+    
+    // Create a new command buffer for each render pass to the current drawable
+    context->CreateCommandBuffer(METALWORKQUEUE_DEFAULT);
+    context->LabelCommandBuffer(@"HdEngine::Render", METALWORKQUEUE_DEFAULT);
+    
+    // Set the render pass descriptor to use for the render encoders
+    context->SetRenderPassDescriptor(_mtlRenderPassDescriptor);
+    if (_renderOutput == RenderOutput::Metal) {
+        _mtlRenderPassDescriptor = nil;
+    }
+    // hydra orients all geometry during topological processing so that
+    // front faces have ccw winding. We disable culling because culling
+    // is handled by fragment shader discard.
+    if (params.flipFrontFacing) {
+        context->SetFrontFaceWinding(MTLWindingClockwise);
+    } else {
+        context->SetFrontFaceWinding(MTLWindingCounterClockwise);
+    }
+    context->SetCullMode(MTLCullModeNone);
+    
+    if (params.applyRenderState) {
+        // drawmode.
+        // XXX: Temporary solution until shader-based styling implemented.
+        switch (params.drawMode) {
+            case UsdImagingGLDrawMode::DRAW_POINTS:
+                context->SetTempPointWorkaround(true);
+                break;
+            default:
+                context->SetPolygonFillMode(MTLTriangleFillModeFill);
+                context->SetTempPointWorkaround(false);
+                break;
+        }
+    }
+#else
+
+    // User is responsible for initializing GL context and glew
+    bool isCoreProfileContext = caps.coreProfile;
+
+    GLF_GROUP_FUNCTION();
+
+    GLuint vao;
+    if (isCoreProfileContext) {
+        // We must bind a VAO (Vertex Array Object) because core profile 
+        // contexts do not have a default vertex array object. VAO objects are 
+        // container objects which are not shared between contexts, so we create
+        // and bind a VAO here so that core rendering code does not have to 
+        // explicitly manage per-GL context state.
+        glGenVertexArrays(1, &vao);
+        glBindVertexArray(vao);
+    } else {
+        glPushAttrib(GL_ENABLE_BIT | GL_POLYGON_BIT | GL_DEPTH_BUFFER_BIT);
+    }
+
+    // hydra orients all geometry during topological processing so that
+    // front faces have ccw winding. We disable culling because culling
+    // is handled by fragment shader discard.
+    if (params.flipFrontFacing) {
+        glFrontFace(GL_CW); // < State is pushed via GL_POLYGON_BIT
+    } else {
+        glFrontFace(GL_CCW); // < State is pushed via GL_POLYGON_BIT
+    }
+    glDisable(GL_CULL_FACE);
+
+    if (params.applyRenderState) {
+        glDisable(GL_BLEND);
+    }
+
+    // note: to get benefit of alpha-to-coverage, the target framebuffer
+    // has to be a MSAA buffer.
+    if (params.enableIdRender) {
+        glDisable(GL_SAMPLE_ALPHA_TO_COVERAGE);
+    } else if (params.enableSampleAlphaToCoverage) {
+        glEnable(GL_SAMPLE_ALPHA_TO_COVERAGE);
+    }
+
+    // for points width
+    glEnable(GL_PROGRAM_POINT_SIZE);
+
+    // TODO:
+    //  * forceRefresh
+    //  * showGuides, showRender, showProxy
+    //  * gammaCorrectColors
+#endif
+
+    VtValue selectionValue(_selTracker);
+    _engine->SetTaskContextData(HdxTokens->selectionState, selectionValue);
+    VtValue renderTags(_renderTags);
+    _engine->SetTaskContextData(HdxTokens->renderTags, renderTags);
+
+    HdTaskSharedPtrVector tasks = _taskController->GetTasks();
+    _engine->Execute(*_renderIndex, tasks);
+
+#if defined(ARCH_GFX_METAL)
+    if (_renderOutput == RenderOutput::OpenGL) {
+        // Depth texture copy
+        context->CopyDepthTextureToOpenGL();
+    }
+    
+    if (context->GeometryShadersActive()) {
+        // Complete the GS command buffer if we have one
+        context->CommitCommandBuffer(true, false, METALWORKQUEUE_GEOMETRY_SHADER);
+    }
+    
+    // Commit the render buffer (will wait for GS to complete if present)
+    // We wait until scheduled, because we're about to consume the Metal
+    // generated textures in an OpenGL blit
+    context->CommitCommandBuffer(_renderOutput == RenderOutput::OpenGL, false);
+    
+    context->EndFrame();
+    
+    // Finalize rendering here & push the command buffer to the GPU
+    if (_renderOutput == RenderOutput::OpenGL) {
+        context->BlitColorTargetToOpenGL();
+        GLF_POST_PENDING_GL_ERRORS();
+    }
+
+#else
+    if (isCoreProfileContext) {
+
+        glBindVertexArray(0);
+        // XXX: We should not delete the VAO on every draw call, but we 
+        // currently must because it is GL Context state and we do not control 
+        // the context.
+        glDeleteVertexArrays(1, &vao);
+
+    } else {
+        glPopAttrib(); // GL_ENABLE_BIT | GL_POLYGON_BIT | GL_DEPTH_BUFFER_BIT
+    }
+#endif
+    
+    // Copy the results into the client applications framebuffer.
+    _RestoreClientDrawTarget(params);
+}
+
+bool 
+UsdImagingGLEngine::_CanPrepareBatch(
+    const UsdPrim& root, 
+    const UsdImagingGLRenderParams& params)
+{
+    HD_TRACE_FUNCTION();
+
+    if (!TF_VERIFY(root, "Attempting to draw an invalid/null prim\n")) 
+        return false;
+
+    if (!root.GetPath().HasPrefix(_rootPath)) {
+        TF_CODING_ERROR("Attempting to draw path <%s>, but engine is rooted"
+                    "at <%s>\n",
+                    root.GetPath().GetText(),
+                    _rootPath.GetText());
+        return false;
+    }
+
+    return true;
+}
+
+static int
+_GetRefineLevel(float c)
+{
+    // TODO: Change complexity to refineLevel when we refactor UsdImaging.
+    //
+    // Convert complexity float to refine level int.
+    int refineLevel = 0;
+
+    // to avoid floating point inaccuracy (e.g. 1.3 > 1.3f)
+    c = std::min(c + 0.01f, 2.0f);
+
+    if (1.0f <= c && c < 1.1f) { 
+        refineLevel = 0;
+    } else if (1.1f <= c && c < 1.2f) { 
+        refineLevel = 1;
+    } else if (1.2f <= c && c < 1.3f) { 
+        refineLevel = 2;
+    } else if (1.3f <= c && c < 1.4f) { 
+        refineLevel = 3;
+    } else if (1.4f <= c && c < 1.5f) { 
+        refineLevel = 4;
+    } else if (1.5f <= c && c < 1.6f) { 
+        refineLevel = 5;
+    } else if (1.6f <= c && c < 1.7f) { 
+        refineLevel = 6;
+    } else if (1.7f <= c && c < 1.8f) { 
+        refineLevel = 7;
+    } else if (1.8f <= c && c <= 2.0f) { 
+        refineLevel = 8;
+    } else {
+        TF_CODING_ERROR("Invalid complexity %f, expected range is [1.0,2.0]\n", 
+                c);
+    }
+    return refineLevel;
+}
+
+void
+UsdImagingGLEngine::_PreSetTime(const UsdPrim& root, 
+    const UsdImagingGLRenderParams& params)
+{
+    HD_TRACE_FUNCTION();
+
+    // Set the fallback refine level, if this changes from the existing value,
+    // all prim refine levels will be dirtied.
+    int refineLevel = _GetRefineLevel(params.complexity);
+    _delegate->SetRefineLevelFallback(refineLevel);
+
+    // Apply any queued up scene edits.
+    _delegate->ApplyPendingUpdates();
+}
+
+void
+UsdImagingGLEngine::_PostSetTime(
+    const UsdPrim& root, 
+    const UsdImagingGLRenderParams& params)
+{
+    HD_TRACE_FUNCTION();
+}
+
+
+/* static */
+bool
+UsdImagingGLEngine::_UpdateHydraCollection(
+    HdRprimCollection *collection,
+    SdfPathVector const& roots,
+    UsdImagingGLRenderParams const& params,
+    TfTokenVector *renderTags)
+{
+    if (collection == nullptr) {
+        TF_CODING_ERROR("Null passed to _UpdateHydraCollection");
+        return false;
+    }
+
+    // choose repr
+    HdReprSelector reprSelector = HdReprSelector(HdReprTokens->smoothHull);
+    bool refined = params.complexity > 1.0;
+    
+    if (params.drawMode == UsdImagingGLDrawMode::DRAW_POINTS) {
+        reprSelector = HdReprSelector(HdReprTokens->points);
+    } else if (params.drawMode == UsdImagingGLDrawMode::DRAW_GEOM_FLAT ||
+        params.drawMode == UsdImagingGLDrawMode::DRAW_SHADED_FLAT) {
+        // Flat shading
+        reprSelector = HdReprSelector(HdReprTokens->hull);
+    } else if (
+        params.drawMode == UsdImagingGLDrawMode::DRAW_WIREFRAME_ON_SURFACE) {
+        // Wireframe on surface
+        reprSelector = HdReprSelector(refined ?
+            HdReprTokens->refinedWireOnSurf : HdReprTokens->wireOnSurf);
+    } else if (params.drawMode == UsdImagingGLDrawMode::DRAW_WIREFRAME) {
+        // Wireframe
+        reprSelector = HdReprSelector(refined ?
+            HdReprTokens->refinedWire : HdReprTokens->wire);
+    } else {
+        // Smooth shading
+        reprSelector = HdReprSelector(refined ?
+            HdReprTokens->refined : HdReprTokens->smoothHull);
+    }
+
+    // Calculate the rendertags needed based on the parameters passed by
+    // the application
+    renderTags->clear();
+    renderTags->push_back(HdTokens->geometry);
+    if (params.showGuides) {
+        renderTags->push_back(HdxRenderTagsTokens->guide);
+    }
+    if (params.showProxy) {
+        renderTags->push_back(UsdGeomTokens->proxy);
+    }
+    if (params.showRender) {
+        renderTags->push_back(UsdGeomTokens->render);
+    } 
+
+    // By default our main collection will be called geometry
+    TfToken colName = HdTokens->geometry;
+
+    // Check if the collection needs to be updated (so we can avoid the sort).
+    SdfPathVector const& oldRoots = collection->GetRootPaths();
+
+    // inexpensive comparison first
+    bool match = collection->GetName() == colName &&
+                 oldRoots.size() == roots.size() &&
+                 collection->GetReprSelector() == reprSelector &&
+                 collection->GetRenderTags().size() == renderTags->size();
+
+    // Only take the time to compare root paths if everything else matches.
+    if (match) {
+        // Note that oldRoots is guaranteed to be sorted.
+        for(size_t i = 0; i < roots.size(); i++) {
+            // Avoid binary search when both vectors are sorted.
+            if (oldRoots[i] == roots[i])
+                continue;
+            // Binary search to find the current root.
+            if (!std::binary_search(oldRoots.begin(), oldRoots.end(), roots[i])) 
+            {
+                match = false;
+                break;
+            }
+        }
+
+        // Compare if rendertags match
+        if (*renderTags != collection->GetRenderTags()) {
+            match = false;
+        }
+
+        // if everything matches, do nothing.
+        if (match) return false;
+    }
+
+    // Recreate the collection.
+    *collection = HdRprimCollection(colName, reprSelector);
+    collection->SetRootPaths(roots);
+    collection->SetRenderTags(*renderTags);
+
+    return true;
+}
+
+/* static */
+HdxRenderTaskParams
+UsdImagingGLEngine::_MakeHydraUsdImagingGLRenderParams(
+    UsdImagingGLRenderParams const& renderParams)
+{
+    // Note this table is dangerous and making changes to the order of the 
+    // enums in UsdImagingGLCullStyle, will affect this with no compiler help.
+    static const HdCullStyle USD_2_HD_CULL_STYLE[] =
+    {
+        HdCullStyleDontCare,              // Cull No Opinion (unused)
+        HdCullStyleNothing,               // CULL_STYLE_NOTHING,
+        HdCullStyleBack,                  // CULL_STYLE_BACK,
+        HdCullStyleFront,                 // CULL_STYLE_FRONT,
+        HdCullStyleBackUnlessDoubleSided, // CULL_STYLE_BACK_UNLESS_DOUBLE_SIDED
+    };
+    static_assert(((sizeof(USD_2_HD_CULL_STYLE) / 
+                    sizeof(USD_2_HD_CULL_STYLE[0])) 
+              == (size_t)UsdImagingGLCullStyle::CULL_STYLE_COUNT),
+        "enum size mismatch");
+
+    HdxRenderTaskParams params;
+
+    params.overrideColor       = renderParams.overrideColor;
+    params.wireframeColor      = renderParams.wireframeColor;
+
+    if (renderParams.drawMode == UsdImagingGLDrawMode::DRAW_GEOM_ONLY ||
+        renderParams.drawMode == UsdImagingGLDrawMode::DRAW_POINTS) {
+        params.enableLighting = false;
+    } else {
+        params.enableLighting =  renderParams.enableLighting &&
+                                !renderParams.enableIdRender;
+    }
+
+    params.enableIdRender      = renderParams.enableIdRender;
+    params.depthBiasUseDefault = true;
+    params.depthFunc           = HdCmpFuncLess;
+    params.cullStyle           = USD_2_HD_CULL_STYLE[
+        (size_t)renderParams.cullStyle];
+
+    // Decrease the alpha threshold if we are using sample alpha to
+    // coverage.
+    if (renderParams.alphaThreshold < 0.0) {
+        params.alphaThreshold =
+            renderParams.enableSampleAlphaToCoverage ? 0.1f : 0.5f;
+    } else {
+        params.alphaThreshold =
+            renderParams.alphaThreshold;
+    }
+
+    params.enableSceneMaterials = renderParams.enableSceneMaterials;
+
+    // We don't provide the following because task controller ignores them:
+    // - params.camera
+    // - params.viewport
+
+    return params;
+}
+
+void
+UsdImagingGLEngine::_DeleteHydraResources()
+{
+    // Unwinding order: remove data sources first (task controller, scene
+    // delegate); then render index; then render delegate; finally the
+    // renderer plugin used to manage the render delegate.
+    
+    if (_taskController != nullptr) {
+        delete _taskController;
+        _taskController = nullptr;
+    }
+    if (_delegate != nullptr) {
+        delete _delegate;
+        _delegate = nullptr;
+    }
+    HdRenderDelegate *renderDelegate = nullptr;
+    if (_renderIndex != nullptr) {
+        renderDelegate = _renderIndex->GetRenderDelegate();
+        delete _renderIndex;
+        _renderIndex = nullptr;
+    }
+    if (_rendererPlugin != nullptr) {
+        if (renderDelegate != nullptr) {
+            _rendererPlugin->DeleteRenderDelegate(renderDelegate);
+        }
+        HdxRendererPluginRegistry::GetInstance().ReleasePlugin(_rendererPlugin);
+        _rendererPlugin = nullptr;
+        _rendererId = TfToken();
+    }
+}
+
+/* static */
+TfToken
+UsdImagingGLEngine::_GetDefaultRendererPluginId()
+{
+    std::string defaultRendererDisplayName = 
+        TfGetenv("HD_DEFAULT_RENDERER", "");
+
+    if (defaultRendererDisplayName.empty()) {
+        return TfToken();
+    }
+
+    HfPluginDescVector pluginDescs;
+    HdxRendererPluginRegistry::GetInstance().GetPluginDescs(&pluginDescs);
+
+    // Look for the one with the matching display name
+    for (size_t i = 0; i < pluginDescs.size(); ++i) {
+        if (pluginDescs[i].displayName == defaultRendererDisplayName) {
+            return pluginDescs[i].id;
+        }
+    }
+
+    TF_WARN("Failed to find default renderer with display name '%s'.",
+            defaultRendererDisplayName.c_str());
+
+    return TfToken();
+}
+
+void 
+UsdImagingGLEngine::_BindInternalDrawTarget(
+    UsdImagingGLRenderParams const& params)
+{
+    GarchContextCaps const &caps =
+    GarchResourceFactory::GetInstance()->GetContextCaps();
+    
+    // Avoid GL errors in MacOS (e.g. Hydra with Embree)
+    if (!caps.floatingPointBuffersEnabled) {
+        return;
+    }
+
+    if (!_useFloatPointDrawTarget) {
+        return;
+    }
+#if defined(ARCH_GFX_OPENGL)
+    glGetIntegerv(GL_VIEWPORT, _restoreViewport.data());
+    GfVec2i drawTargetSize = GfVec2i(_restoreViewport[2], _restoreViewport[3]);
+
+    // Bind our internal drawtarget to control the render bitdepth.
+    // We want to render (linear-colors), do color-correction and other post-
+    // effects at a higher bitdepth then may be bound by the client.
+    if(!_drawTarget) {
+        bool requestMSAA = glIsEnabled(GL_MULTISAMPLE);
+        _drawTarget = GarchDrawTarget::New(drawTargetSize, requestMSAA);
+        std::vector<GarchDrawTarget::AttachmentDesc> attachmentDesc;
+        attachmentDesc.push_back(
+            GarchDrawTarget::AttachmentDesc("color", GL_RGBA, GL_FLOAT, GL_RGBA16F));
+        attachmentDesc.push_back(
+            GarchDrawTarget::AttachmentDesc("depth", GL_DEPTH_COMPONENT, GL_FLOAT,
+                                   GL_DEPTH_COMPONENT32F));
+        _drawTarget->SetAttachments(attachmentDesc);
+        _drawTarget->Bind();
+    } else {
+        _drawTarget->Bind();
+
+        // The clients viewport may have changed size.
+        _drawTarget->SetSize(drawTargetSize);
+    }
+
+    // Remove any offset applied to the viewport so clearing and rendering
+    // happens in the correct region. (UsdView CameraMask mode messes with this)
+    glViewport(0, 0, _restoreViewport[2], _restoreViewport[3]);
+
+    // Clear our internal drawTarget with the clearcolor set by client
+    glClearBufferfv(GL_COLOR, 0, params.clearColor.data());
+    GLfloat clearDepth[1] = {1.0f};
+    glClearBufferfv(GL_DEPTH, 0, clearDepth);
+#endif
+}
+
+void 
+UsdImagingGLEngine::_RestoreClientDrawTarget(
+    UsdImagingGLRenderParams const& params)
+{
+    GarchContextCaps const &caps =
+        GarchResourceFactory::GetInstance()->GetContextCaps();
+
+    // Avoid GL errors in MacOS (e.g. Hydra with Embree)
+    if (!caps.floatingPointBuffersEnabled) {
+        return;
+    }
+
+    if (!_useFloatPointDrawTarget || !_drawTarget) {
+        return;
+    }
+
+    // Restore the clients framebuffer and copy the contents of our internal
+    // framebuffer into the clients framebuffer.
+    // We need to blit depth because the client may do additional compositing
+    // on top of the render, such as drawing bounding boxes.
+    _drawTarget->Unbind();
+    _drawTarget->Resolve();
+
+#if defined(ARCH_GFX_OPENGL)
+    // Restore viewport set by client/app
+    glViewport(_restoreViewport[0], 
+               _restoreViewport[1], 
+               _restoreViewport[2], 
+               _restoreViewport[3]);
+
+    // Depth test must always pass to ensure that all pixels are transfered
+    // from our drawTarget to the clients when HdxCompositor draws its triangle.
+    GLboolean restoreDepthEnabled = glIsEnabled(GL_DEPTH_TEST);
+    glEnable(GL_DEPTH_TEST);
+
+    // Depth test must be ALWAYS instead of disabling the depth_test because
+    // we still want to write to the depth buffer. Disabling depth_test disables
+    // depth_buffer writes and we need to copy depth to client buffer.
+    GLint restoreDepthFunc;
+    glGetIntegerv(GL_DEPTH_FUNC, &restoreDepthFunc);
+    glDepthFunc(GL_ALWAYS);
+
+    // Any alpha blending the client wanted should have happened into our 
+    // internal FB. When copying back to client buffer disable blending.
+    GLboolean restoreblendEnabled;
+    glGetBooleanv(GL_BLEND, &restoreblendEnabled);
+    glDisable(GL_BLEND);
+
+    GLuint colorId = _drawTarget->GetAttachment("color")->GetTextureName();
+    GLuint depthId = _drawTarget->GetAttachment("depth")->GetTextureName();
+    _compositor.Draw(colorId, depthId, /*remapDepth*/ false);
+
+    if (restoreblendEnabled) {
+        glEnable(GL_BLEND);
+    }
+
+    glDepthFunc(restoreDepthFunc);
+    if (!restoreDepthEnabled) {
+        glDisable(GL_DEPTH_TEST);
+    }
+#endif
+}
+
+#if defined(ARCH_GFX_METAL)
+void
+UsdImagingGLEngine::SetMetalRenderPassDescriptor(
+    MTLRenderPassDescriptor *renderPassDescriptor)
+{
+    if (_renderOutput == RenderOutput::OpenGL) {
+        TF_CODING_ERROR("SetMetalRenderPassDescriptor isn't valid to call "
+                        "when using OpenGL as the output target");
+        return;
+    }
+    _mtlRenderPassDescriptorForNativeMetal = [renderPassDescriptor copy];
+    _mtlRenderPassDescriptor = _mtlRenderPassDescriptorForNativeMetal;
+}
+#endif
 
 PXR_NAMESPACE_CLOSE_SCOPE
 

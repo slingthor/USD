@@ -76,6 +76,11 @@ HdSt_DrawBatch::DrawItemInstanceChanged(HdStDrawItemInstance const* /*instance*/
 {
 }
 
+void
+HdSt_DrawBatch::SetEnableTinyPrimCulling(bool tinyPrimCulling)
+{
+}
+
 namespace {
 inline bool isAggregated(HdBufferArrayRangeSharedPtr const &rangeA,
                          HdBufferArrayRangeSharedPtr const &rangeB)
@@ -139,6 +144,8 @@ HdSt_DrawBatch::_IsAggregated(HdStDrawItem const *drawItem0,
                          drawItem1->GetVertexPrimvarRange())
         && isAggregated(drawItem0->GetElementPrimvarRange(),
                          drawItem1->GetElementPrimvarRange())
+        && isAggregated(drawItem0->GetFaceVaryingPrimvarRange(),
+                         drawItem1->GetFaceVaryingPrimvarRange())
         && isAggregated(drawItem0->GetConstantPrimvarRange(),
                          drawItem1->GetConstantPrimvarRange())
         && isAggregated(drawItem0->GetInstanceIndexRange(),

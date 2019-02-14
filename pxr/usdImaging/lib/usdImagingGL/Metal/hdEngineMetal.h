@@ -27,6 +27,7 @@
 #ifndef USDIMAGINGGLMETAL_HDENGINE_H
 #define USDIMAGINGGLMETAL_HDENGINE_H
 
+#if 0
 #include "pxr/pxr.h"
 
 #include "pxr/imaging/mtlf/mtlDevice.h"
@@ -285,4 +286,5 @@ private:
 
 PXR_NAMESPACE_CLOSE_SCOPE
 
+#endif
 #endif // USDIMAGINGGLMETAL_HDENGINE_H

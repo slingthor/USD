@@ -43,7 +43,7 @@ if sys.platform != "darwin":
 else:
     from pxr import Mtlf as _gfxAPI
 
-from common import (RenderModes, ShadedRenderModes, Timer,
+from common import (RenderModes, ColorCorrectionModes, ShadedRenderModes, Timer,
     GetInstanceIndicesForIds, SelectionHighlightModes, DEBUG_CLIPPING)
 from rootDataModel import RootDataModel
 from selectionDataModel import ALL_INSTANCES, SelectionDataModel
@@ -667,7 +667,8 @@ class StageView(QtOpenGL.QGLWidget):
     signalBboxUpdateTimeChanged = QtCore.Signal(int)
 
     # First arg is primPath, (which could be empty Path)
-    # Second arg is instanceIndex (or UsdImagingGL.GL.ALL_INSTANCES for all instances)
+    # Second arg is instanceIndex (or UsdImagingGL.ALL_INSTANCES for all
+    #  instances)
     # Third arg is selectedPoint
     # Fourth and Fifth args represent state at time of the pick
     signalPrimSelected = QtCore.Signal(Sdf.Path, int, Gf.Vec3f, QtCore.Qt.MouseButton,
@@ -866,17 +867,21 @@ class StageView(QtOpenGL.QGLWidget):
 
         self._renderer = None
         self._reportedContextError = False
-        self._renderModeDict={RenderModes.WIREFRAME:UsdImagingGL.GL.DrawMode.DRAW_WIREFRAME,
-                              RenderModes.WIREFRAME_ON_SURFACE:UsdImagingGL.GL.DrawMode.DRAW_WIREFRAME_ON_SURFACE,
-                              RenderModes.SMOOTH_SHADED:UsdImagingGL.GL.DrawMode.DRAW_SHADED_SMOOTH,
-                              RenderModes.POINTS:UsdImagingGL.GL.DrawMode.DRAW_POINTS,
-                              RenderModes.FLAT_SHADED:UsdImagingGL.GL.DrawMode.DRAW_SHADED_FLAT,
-                              RenderModes.GEOM_ONLY:UsdImagingGL.GL.DrawMode.DRAW_GEOM_ONLY,
-                              RenderModes.GEOM_SMOOTH:UsdImagingGL.GL.DrawMode.DRAW_GEOM_SMOOTH,
-                              RenderModes.GEOM_FLAT:UsdImagingGL.GL.DrawMode.DRAW_GEOM_FLAT,
-                              RenderModes.HIDDEN_SURFACE_WIREFRAME:UsdImagingGL.GL.DrawMode.DRAW_WIREFRAME}
+        self._renderModeDict = {
+            RenderModes.WIREFRAME: UsdImagingGL.DrawMode.DRAW_WIREFRAME,
+            RenderModes.WIREFRAME_ON_SURFACE: 
+                UsdImagingGL.DrawMode.DRAW_WIREFRAME_ON_SURFACE,
+            RenderModes.SMOOTH_SHADED: UsdImagingGL.DrawMode.DRAW_SHADED_SMOOTH,
+            RenderModes.POINTS: UsdImagingGL.DrawMode.DRAW_POINTS,
+            RenderModes.FLAT_SHADED: UsdImagingGL.DrawMode.DRAW_SHADED_FLAT,
+            RenderModes.GEOM_ONLY: UsdImagingGL.DrawMode.DRAW_GEOM_ONLY,
+            RenderModes.GEOM_SMOOTH: UsdImagingGL.DrawMode.DRAW_GEOM_SMOOTH,
+            RenderModes.GEOM_FLAT: UsdImagingGL.DrawMode.DRAW_GEOM_FLAT,
+            RenderModes.HIDDEN_SURFACE_WIREFRAME:
+                UsdImagingGL.DrawMode.DRAW_WIREFRAME
+        }
 
-        self._renderParams = UsdImagingGL.GL.RenderParams()
+        self._renderParams = UsdImagingGL.RenderParams()
         self._dist = 50 
         self._bbox = Gf.BBox3d()
         self._selectionBBox = Gf.BBox3d()
@@ -916,7 +921,7 @@ class StageView(QtOpenGL.QGLWidget):
         # create the renderer lazily, when we try to do real work with it.
         if not self._renderer:
             if self.isValid():
-                self._renderer = UsdImagingGL.GL()
+                self._renderer = UsdImagingGL.Engine()
                 self._handleRendererChanged(self.GetCurrentRendererId())
             elif not self._reportedContextError:
                 self._reportedContextError = True
@@ -1288,7 +1293,7 @@ class StageView(QtOpenGL.QGLWidget):
                         renderer.AddSelected(prim.GetPath(), instanceIndex)
                 else:
                     renderer.AddSelected(
-                        prim.GetPath(), UsdImagingGL.GL.ALL_INSTANCES)
+                        prim.GetPath(), UsdImagingGL.ALL_INSTANCES)
         except Tf.ErrorException as e:
             # If we encounter an error, we want to continue running. Just log 
             # the error and continue.
@@ -1336,18 +1341,27 @@ class StageView(QtOpenGL.QGLWidget):
         self._renderParams.showProxy = self._dataModel.viewSettings.displayProxy
         self._renderParams.showRender = self._dataModel.viewSettings.displayRender
         self._renderParams.forceRefresh = self._forceRefresh
-        self._renderParams.cullStyle =  (UsdImagingGL.GL.CullStyle.CULL_STYLE_BACK_UNLESS_DOUBLE_SIDED
-                                               if self._dataModel.viewSettings.cullBackfaces
-                                               else UsdImagingGL.GL.CullStyle.CULL_STYLE_NOTHING)
+        self._renderParams.cullStyle = \
+            (UsdImagingGL.CullStyle.CULL_STYLE_BACK_UNLESS_DOUBLE_SIDED
+               if self._dataModel.viewSettings.cullBackfaces
+               else UsdImagingGL.CullStyle.CULL_STYLE_NOTHING)
         self._renderParams.gammaCorrectColors = False
         self._renderParams.enableIdRender = self._dataModel.viewSettings.displayPrimId
         self._renderParams.enableSampleAlphaToCoverage = not self._dataModel.viewSettings.displayPrimId
         self._renderParams.highlight = renderSelHighlights
         self._renderParams.enableSceneMaterials = self._dataModel.viewSettings.enableSceneMaterials
+        self._renderParams.colorCorrectionMode = self._dataModel.viewSettings.colorCorrectionMode
+        self._renderParams.clearColor = Gf.ConvertDisplayToLinear(Gf.Vec4f(self._dataModel.viewSettings.clearColor))
+        self._renderParams.renderResolution[0] = self.width()
+        self._renderParams.renderResolution[1] = self.height()
 
         pseudoRoot = self._dataModel.stage.GetPseudoRoot()
 
         renderer.SetSelectionColor(self._dataModel.viewSettings.highlightColor)
+
+        # Enable floating point framebuffer (for color correction)
+        renderer.SetEnableFloatPointDrawTarget(True)
+
         try:
             renderer.Render(pseudoRoot, self._renderParams)
         except Tf.ErrorException as e:
@@ -1553,12 +1567,12 @@ class StageView(QtOpenGL.QGLWidget):
                 self._glPrimitiveGeneratedQuery.BeginPrimitivesGenerated()
                 self._glTimeElapsedQuery.BeginTimeElapsed()
 
-            # Enable sRGB in order to apply a final gamma to this window, just like
-            # in Presto.
-            from OpenGL.GL.EXT.framebuffer_sRGB import GL_FRAMEBUFFER_SRGB_EXT
-            GL.glEnable(GL_FRAMEBUFFER_SRGB_EXT)
+            if not UsdImagingGL.Engine.IsColorCorrectionCapable():
+                from OpenGL.GL.EXT.framebuffer_sRGB import GL_FRAMEBUFFER_SRGB_EXT
+                GL.glEnable(GL_FRAMEBUFFER_SRGB_EXT)
 
-            GL.glClearColor(*(Gf.ConvertDisplayToLinear(Gf.Vec4f(self._dataModel.viewSettings.clearColor))))
+            self._renderParams.clearColor = Gf.ConvertDisplayToLinear(Gf.Vec4f(self._dataModel.viewSettings.clearColor))
+            GL.glClearColor(*self._renderParams.clearColor)
 
             GL.glEnable(GL.GL_DEPTH_TEST)
             GL.glDepthFunc(GL.GL_LESS)
@@ -1675,8 +1689,8 @@ class StageView(QtOpenGL.QGLWidget):
                     GL.glPolygonOffset( 1.0, 1.0 )
                     GL.glPolygonMode( GL.GL_FRONT_AND_BACK, GL.GL_FILL )
 
-                    self.renderSinglePass( renderer.DrawMode.DRAW_GEOM_ONLY,
-                                        False)
+                    self.renderSinglePass( 
+                        UsdImagingGL.DrawMode.DRAW_GEOM_ONLY, False)
 
                     GL.glDisable( GL.GL_POLYGON_OFFSET_FILL )
                     GL.glDepthFunc(GL.GL_LEQUAL)
@@ -1696,6 +1710,9 @@ class StageView(QtOpenGL.QGLWidget):
                 self.renderSinglePass(
                     self._renderModeDict[self._dataModel.viewSettings.renderMode],
                     drawSelHighlights)
+
+                if not UsdImagingGL.Engine.IsColorCorrectionCapable():
+                    GL.glDisable(GL_FRAMEBUFFER_SRGB_EXT)
 
                 self.DrawAxis(viewProjectionMatrix)
 
@@ -1723,7 +1740,7 @@ class StageView(QtOpenGL.QGLWidget):
                 if self._dataModel.viewSettings.showMask_Opaque:
                     color = color[0:3] + (1.0,)
                 else:
-                    color = color[0:3] + (color[3] * 0.7,)
+                    color = color[0:3] + (color[3] * 0.45,)
                 self._mask.updateColor(color)
                 self._mask.updatePrims(cameraViewport, self)
                 uiTasks.append(self._mask)
@@ -1746,8 +1763,6 @@ class StageView(QtOpenGL.QGLWidget):
             # ### DRAW HUD ### #
             if self._dataModel.viewSettings.showHUD:
                 self.drawHUD(renderer)
-
-            GL.glDisable(GL_FRAMEBUFFER_SRGB_EXT)
 
             if (not self._dataModel.playing) & (not renderer.IsConverged()):
                 QtCore.QTimer.singleShot(self.frameDelay, self.update)
@@ -1773,13 +1788,13 @@ class StageView(QtOpenGL.QGLWidget):
         # put the result in the HUD string
         self.fpsHUDInfo['Render'] = "%.2f ms (%.2f FPS)" % (ms, fps)
 
-        col = Gf.ConvertDisplayToLinear(Gf.Vec3f(.733,.604,.333))
+        col = Gf.Vec3f(.733,.604,.333)
 
         # the subtree info does not update while animating, grey it out
         if not self._dataModel.playing:
             subtreeCol = col
         else:
-            subtreeCol = Gf.ConvertDisplayToLinear(Gf.Vec3f(.6,.6,.6))
+            subtreeCol = Gf.Vec3f(.6,.6,.6)
 
         # Subtree Info
         if self._dataModel.viewSettings.showHUD_Info:
@@ -1807,7 +1822,7 @@ class StageView(QtOpenGL.QGLWidget):
         # Hydra Enabled (Top Right)
         hydraMode = "Disabled"
 
-        if UsdImagingGL.GL.IsHydraEnabled():
+        if UsdImagingGL.Engine.IsHydraEnabled():
             hydraMode = self._rendererDisplayName
             if not hydraMode:
                 hydraMode = "Enabled"
@@ -2036,9 +2051,10 @@ class StageView(QtOpenGL.QGLWidget):
         self._renderParams.showProxy = self._dataModel.viewSettings.displayProxy
         self._renderParams.showRender = self._dataModel.viewSettings.displayRender
         self._renderParams.forceRefresh = self._forceRefresh
-        self._renderParams.cullStyle =  (UsdImagingGL.GL.CullStyle.CULL_STYLE_BACK_UNLESS_DOUBLE_SIDED
-                                               if self._dataModel.viewSettings.cullBackfaces
-                                               else UsdImagingGL.GL.CullStyle.CULL_STYLE_NOTHING)
+        self._renderParams.cullStyle = \
+            (UsdImagingGL.CullStyle.CULL_STYLE_BACK_UNLESS_DOUBLE_SIDED
+                   if self._dataModel.viewSettings.cullBackfaces
+                   else UsdImagingGL.CullStyle.CULL_STYLE_NOTHING)
         self._renderParams.gammaCorrectColors = False
         self._renderParams.enableIdRender = True
         self._renderParams.enableSampleAlphaToCoverage = False

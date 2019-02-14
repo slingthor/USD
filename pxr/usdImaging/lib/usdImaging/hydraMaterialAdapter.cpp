@@ -74,14 +74,6 @@ UsdImagingHydraMaterialAdapter::IsSupported(
     return index->IsSprimTypeSupported(HdPrimTypeTokens->material);
 }
 
-bool
-UsdImagingHydraMaterialAdapter::IsPopulatedIndirectly()
-{
-    // Materials are populated as a consequence of populating a prim
-    // which uses the material.
-    return true;
-}
-
 SdfPath
 UsdImagingHydraMaterialAdapter::Populate(UsdPrim const& prim,
                             UsdImagingIndexProxy* index,
@@ -350,9 +342,12 @@ UsdImagingHydraMaterialAdapter::UpdateForTime(
         std::string surfaceSource;
         std::string displacementSource;
 
+        VtDictionary surfaceMetadata;
+
         if (surfaceShaderPrim) {
             surfaceSource = _GetShaderSource(surfaceShaderPrim,
-                                             _tokens->surfaceShader);
+                                             _tokens->surfaceShader,
+                                             &surfaceMetadata);
         }
 
         if (displacementShaderPrim) {
@@ -362,7 +357,10 @@ UsdImagingHydraMaterialAdapter::UpdateForTime(
 
         // DirtySurfaceShader triggers a refresh of both shader sources.
         valueCache->GetSurfaceShaderSource(cachePath) = surfaceSource;
-        valueCache->GetDisplacementShaderSource(cachePath) = displacementSource;
+        valueCache->GetDisplacementShaderSource(cachePath) =
+                                                        displacementSource;
+        valueCache->GetMaterialMetadata(cachePath) =
+                                            VtValue(surfaceMetadata);
 
         // Extract the primvars
         valueCache->GetMaterialPrimvars(cachePath) = primvars;
@@ -395,6 +393,11 @@ UsdImagingHydraMaterialAdapter::ProcessPropertyChange(UsdPrim const& prim,
                                                SdfPath const& cachePath,
                                                TfToken const& propertyName)
 {
+    if (propertyName == UsdGeomTokens->visibility) {
+        // Materials aren't affected by visibility
+        return HdChangeTracker::Clean;
+    }
+
     // XXX: This doesn't get notifications for dependent nodes.
     return HdChangeTracker::AllDirty;
 }
@@ -440,11 +443,15 @@ UsdImagingHydraMaterialAdapter::_RemovePrim(SdfPath const& cachePath,
 std::string
 UsdImagingHydraMaterialAdapter::_GetShaderSource(
     UsdPrim const& shaderPrim, 
-    TfToken const& shaderType) const
+    TfToken const& shaderType,
+    VtDictionary * metadataOut) const
 {
-    auto getGLSLFXSource = [&shaderType](const GLSLFX &gfx) {
+    auto getGLSLFXSource = [&shaderType, &metadataOut](const GLSLFX &gfx) {
         if (!gfx.IsValid()){
             return std::string();
+        }
+        if (metadataOut) {
+            *metadataOut = gfx.GetMetadata();
         }
         if (shaderType == _tokens->surfaceShader){
             return gfx.GetSurfaceSource();

@@ -100,6 +100,8 @@ public:
     
     // Shaders always need a buffer binding, even when unused
     bool alwaysNeedsBinding;
+    
+    bool floatingPointBuffersEnabled;
 
     /// Returns whether to do frustum culling on the GPU
 	GARCH_API
@@ -109,12 +111,7 @@ public:
     /// Disabled by default, since there is some performance penalty.
 	GARCH_API
     virtual bool IsEnabledGPUCountVisibleInstances() const;
-    
-    /// Returns whether to cull tiny prims (in screen space) during GPU culling
-    /// Enabled by default.
-	GARCH_API
-    virtual bool IsEnabledGPUTinyPrimCulling() const;
-    
+
     /// Returns whether to do per-instance culling on the GPU
 	GARCH_API
     virtual bool IsEnabledGPUInstanceFrustumCulling() const;

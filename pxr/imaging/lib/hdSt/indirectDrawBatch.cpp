@@ -51,6 +51,7 @@
 #include "pxr/base/tf/iterator.h"
 #include "pxr/base/tf/staticTokens.h"
 
+#include <iostream>
 #include <limits>
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -76,14 +77,24 @@ TF_DEFINE_PRIVATE_TOKENS(
 
 HdSt_IndirectDrawBatch::HdSt_IndirectDrawBatch(
     HdStDrawItemInstance * drawItemInstance)
-: HdSt_DrawBatch(drawItemInstance)
-, _drawCommandBufferDirty(false)
-, _numVisibleItems(0)
-, _numTotalElements(0)
-, _cullingProgram(0)
-, _lastTinyPrimCulling(false)
-, _instanceCountOffset(0)
-, _cullInstanceCountOffset(0)
+    : HdSt_DrawBatch(drawItemInstance)
+    , _drawCommandBufferDirty(false)
+    , _bufferArraysHash(0)
+    , _numVisibleItems(0)
+    , _numTotalVertices(0)
+    , _numTotalElements(0)
+    /* The following two values are set before draw by
+     * SetEnableTinyPrimCulling(). */
+    , _useTinyPrimCulling(false)
+    , _dirtyCullingProgram(false)
+    /* The following four values are initialized in _Init(). */
+    , _useDrawArrays(false)
+    , _useInstancing(false)
+    , _useGpuCulling(false)
+    , _useGpuInstanceCulling(false)
+
+    , _instanceCountOffset(0)
+    , _cullInstanceCountOffset(0)
 {
 }
 
@@ -98,7 +109,8 @@ HdSt_IndirectDrawBatch::_Init(HdStDrawItemInstance * drawItemInstance)
     drawItemInstance->SetBatchIndex(0);
     drawItemInstance->SetBatch(this);
     
-    GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
+    GarchContextCaps const &caps =
+        GarchResourceFactory::GetInstance()->GetContextCaps();
     
     // remember buffer arrays version for dispatch buffer updating
     HdDrawItem const* drawItem = drawItemInstance->GetDrawItem();
@@ -125,32 +137,37 @@ HdSt_IndirectDrawBatch::_CullingProgram &
 HdSt_IndirectDrawBatch::_GetCullingProgram(
     HdStResourceRegistrySharedPtr const &resourceRegistry)
 {
-    GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
-    
-    if (!_cullingProgram ||
-        _lastTinyPrimCulling != caps.IsEnabledGPUTinyPrimCulling()) {
-        
+	GarchContextCaps const &caps =
+        GarchResourceFactory::GetInstance()->GetContextCaps();
+
+    if (!_cullingProgram->GetProgram() || _dirtyCullingProgram) {
         // create a culling shader key
         HdSt_CullingShaderKey shaderKey(_useGpuInstanceCulling,
-                                        caps.IsEnabledGPUTinyPrimCulling(),
+                                        _useTinyPrimCulling,
                                         caps.IsEnabledGPUCountVisibleInstances());
         
         // sharing the culling geometric shader for the same configuration.
         HdSt_GeometricShaderSharedPtr cullShader =
-        HdSt_GeometricShader::Create(shaderKey, resourceRegistry);
+            HdSt_GeometricShader::Create(shaderKey, resourceRegistry);
         _cullingProgram->SetGeometricShader(cullShader);
         
         _cullingProgram->CompileShader(_drawItemInstances.front()->GetDrawItem(),
                                        /*indirect=*/true,
                                        resourceRegistry);
         
-        // track the last tiny prim culling state as it can be modified at
-        // runtime via TF_DEBUG_CODE HD_DISABLE_TINY_PRIM_CULLING
-        _lastTinyPrimCulling = caps.IsEnabledGPUTinyPrimCulling();
+        _dirtyCullingProgram = false;
     }
     return *_cullingProgram;
 }
 
+void
+HdSt_IndirectDrawBatch::SetEnableTinyPrimCulling(bool tinyPrimCulling)
+{
+    if (_useTinyPrimCulling != tinyPrimCulling) {
+        _useTinyPrimCulling = tinyPrimCulling;
+        _dirtyCullingProgram = true;
+    }
+}
 void
 HdSt_IndirectDrawBatch::_CompileBatch(
     HdStResourceRegistrySharedPtr const &resourceRegistry)
@@ -898,13 +915,13 @@ HdSt_IndirectDrawBatch::PrepareDraw(
     if (!_dispatchBuffer) {
         _CompileBatch(resourceRegistry);
     }
-    
+
     // there is no non-zero draw items.
-    if ((    _useDrawArrays && _numTotalVertices == 0) ||
+    if (( _useDrawArrays && _numTotalVertices == 0) ||
         (!_useDrawArrays && _numTotalElements == 0)) return;
-    
+
     HdStDrawItem const* batchItem = _drawItemInstances.front()->GetDrawItem();
-    
+
     // Bypass freezeCulling if the command buffer is dirty.
     bool freezeCulling = TfDebug::IsEnabled(HD_FREEZE_CULL_FRUSTUM)
     && !_drawCommandBufferDirty;
@@ -1190,7 +1207,7 @@ HdSt_IndirectDrawBatch::_GPUFrustumCulling(
     GfVec2f drawRangeNDC(renderPassState->GetDrawingRangeNDC());
     binder.BindUniformui(_tokens->ulocDrawCommandNumUints, 1, &drawCommandNumUints);
     binder.BindUniformf(_tokens->ulocCullMatrix, 16, cullMatrix.GetArray());
-    if (caps.IsEnabledGPUTinyPrimCulling()) {
+    if (_useTinyPrimCulling) {
         binder.BindUniformf(_tokens->ulocDrawRangeNDC, 2, drawRangeNDC.GetArray());
     }
 
@@ -1272,7 +1289,7 @@ HdSt_IndirectDrawBatch::_GPUFrustumCullingXFB(
     GfMatrix4f cullMatrix(renderPassState->GetCullMatrix());
     GfVec2f drawRangeNDC(renderPassState->GetDrawingRangeNDC());
     binder.BindUniformf(_tokens->ulocCullMatrix, 16, cullMatrix.GetArray());
-    if (caps.IsEnabledGPUTinyPrimCulling()) {
+    if (_useTinyPrimCulling) {
         binder.BindUniformf(_tokens->ulocDrawRangeNDC, 2, drawRangeNDC.GetArray());
     }
     

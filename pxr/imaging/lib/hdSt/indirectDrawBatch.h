@@ -68,7 +68,11 @@ public:
         HdStResourceRegistrySharedPtr const &resourceRegistry) override;
 
     HDST_API
-    void DrawItemInstanceChanged(HdStDrawItemInstance const* instance);
+    virtual void DrawItemInstanceChanged(
+        HdStDrawItemInstance const* instance) override;
+
+    HDST_API
+    virtual void SetEnableTinyPrimCulling(bool tinyPrimCulling) override;
 
 protected:
     HDST_API
@@ -90,7 +94,7 @@ protected:
     
     HDST_API
     virtual void _PrepareDraw(bool gpuCulling, bool freezeCulling) = 0;
-    
+
     HDST_API
     virtual void _ExecuteDraw(_DrawingProgram &program, int batchCount) = 0;
 
@@ -157,10 +161,11 @@ protected:
     size_t _numVisibleItems;
     size_t _numTotalVertices;
     size_t _numTotalElements;
-    
+
     _CullingProgram *_cullingProgram;
-    bool _lastTinyPrimCulling;
-    
+    bool _useTinyPrimCulling;
+    bool _dirtyCullingProgram;
+
     bool _useDrawArrays;
     bool _useInstancing;
     bool _useGpuCulling;

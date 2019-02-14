@@ -35,6 +35,7 @@
 
 #include <boost/functional/hash.hpp>
 
+#include <iostream>
 #include <string>
 
 PXR_NAMESPACE_OPEN_SCOPE

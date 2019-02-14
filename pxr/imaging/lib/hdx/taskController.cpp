@@ -29,6 +29,7 @@
 #include "pxr/imaging/hd/sceneDelegate.h"
 #include "pxr/imaging/hdSt/light.h"
 #include "pxr/imaging/hdx/colorizeTask.h"
+#include "pxr/imaging/hdx/colorCorrectionTask.h"
 #include "pxr/imaging/hdx/intersector.h"
 #include "pxr/imaging/hdx/renderTask.h"
 #include "pxr/imaging/hdx/selectionTask.h"
@@ -51,6 +52,7 @@ TF_DEFINE_PRIVATE_TOKENS(
     (simpleLightTask)
     (shadowTask)
     (colorizeTask)
+    (colorCorrectionTask)
     (camera)
     (renderBufferDescriptor)
 );
@@ -120,6 +122,7 @@ HdxTaskController::HdxTaskController(HdRenderIndex *renderIndex,
     _CreateLightingTask();
     _CreateShadowTask();
     _CreateColorizeTask();
+    _CreateColorCorrectionTask();
 }
 
 void
@@ -158,8 +161,6 @@ HdxTaskController::_CreateRenderTask()
 
     _delegate.SetParameter(_renderTaskId, HdTokens->params,
         renderParams);
-    _delegate.SetParameter(_renderTaskId, HdTokens->children,
-        SdfPathVector());
     _delegate.SetParameter(_renderTaskId, HdTokens->collection,
         collection);
 }
@@ -180,8 +181,6 @@ HdxTaskController::_CreateSelectionTask()
 
     _delegate.SetParameter(_selectionTaskId, HdTokens->params,
         selectionParams);
-    _delegate.SetParameter(_selectionTaskId, HdTokens->children,
-        SdfPathVector());
 }
 
 void
@@ -199,8 +198,6 @@ HdxTaskController::_CreateLightingTask()
 
     _delegate.SetParameter(_simpleLightTaskId, HdTokens->params,
         simpleLightParams);
-    _delegate.SetParameter(_simpleLightTaskId, HdTokens->children,
-        SdfPathVector());
 }
 
 void
@@ -214,7 +211,6 @@ HdxTaskController::_CreateShadowTask()
     GetRenderIndex()->InsertTask<HdxShadowTask>(&_delegate, _shadowTaskId);
 
     _delegate.SetParameter(_shadowTaskId, HdTokens->params, shadowParams);
-    _delegate.SetParameter(_shadowTaskId, HdTokens->children, SdfPathVector());
 }
 
 void
@@ -231,8 +227,21 @@ HdxTaskController::_CreateColorizeTask()
 
     _delegate.SetParameter(_colorizeTaskId, HdTokens->params,
         taskParams);
-    _delegate.SetParameter(_colorizeTaskId, HdTokens->children,
-        SdfPathVector());
+}
+
+void
+HdxTaskController::_CreateColorCorrectionTask()
+{
+    _colorCorrectionTaskId = GetControllerId().AppendChild(
+        _tokens->colorCorrectionTask);
+
+    HdxColorCorrectionTaskParams taskParams;
+
+    GetRenderIndex()->InsertTask<HdxColorCorrectionTask>(&_delegate,
+        _colorCorrectionTaskId);
+
+    _delegate.SetParameter(_colorCorrectionTaskId, HdTokens->params,
+        taskParams);
 }
 
 HdxTaskController::~HdxTaskController()
@@ -244,6 +253,7 @@ HdxTaskController::~HdxTaskController()
         _simpleLightTaskId,
         _shadowTaskId,
         _colorizeTaskId,
+        _colorCorrectionTaskId
     };
     for (size_t i = 0; i < sizeof(tasks)/sizeof(tasks[0]); ++i) {
         GetRenderIndex()->RemoveTask(tasks[i]);
@@ -256,14 +266,14 @@ HdxTaskController::~HdxTaskController()
     }
 }
 
-HdTaskSharedPtrVector const& 
+HdTaskSharedPtrVector const
 HdxTaskController::GetTasks()
 {
-    _tasks.clear();
+    HdTaskSharedPtrVector tasks;
 
     // Light - Only run simpleLightTask if the backend supports simpleLight...
     if (GetRenderIndex()->IsSprimTypeSupported(HdPrimTypeTokens->simpleLight)) {
-        _tasks.push_back(GetRenderIndex()->GetTask(_simpleLightTaskId));
+        tasks.push_back(GetRenderIndex()->GetTask(_simpleLightTaskId));
 
         // If shadows are enabled then we add the task to generate the 
         // shadow maps.
@@ -272,12 +282,12 @@ HdxTaskController::GetTasks()
                 _simpleLightTaskId, HdTokens->params);
 
         if (simpleLightParams.enableShadows) {
-            _tasks.push_back(GetRenderIndex()->GetTask(_shadowTaskId));
+            tasks.push_back(GetRenderIndex()->GetTask(_shadowTaskId));
         }
     }
 
     // Render
-    _tasks.push_back(GetRenderIndex()->GetTask(_renderTaskId));
+    tasks.push_back(GetRenderIndex()->GetTask(_renderTaskId));
 
     // Selection highlighting (overlay as long as this isn't an id render).
     const HdxRenderTaskParams& renderTaskParams =
@@ -285,7 +295,7 @@ HdxTaskController::GetTasks()
             _renderTaskId, HdTokens->params);
 
     if (!renderTaskParams.enableIdRender) {
-        _tasks.push_back(GetRenderIndex()->GetTask(_selectionTaskId));
+        tasks.push_back(GetRenderIndex()->GetTask(_selectionTaskId));
     }
 
     if (_renderBufferIds.size() > 0) {
@@ -293,11 +303,25 @@ HdxTaskController::GetTasks()
             _delegate.GetParameter<HdxColorizeTaskParams>(
                     _colorizeTaskId, HdTokens->params);
         if (!colorizeParams.aovName.IsEmpty()) {
-            _tasks.push_back(GetRenderIndex()->GetTask(_colorizeTaskId));
+            tasks.push_back(GetRenderIndex()->GetTask(_colorizeTaskId));
         }
     }
 
-    return _tasks;
+    // -------------------------------------------------------------------------
+    // Color-Correction - should be LAST task in the list
+    const HdxColorCorrectionTaskParams& colorCorrectionParams =
+        _delegate.GetParameter<HdxColorCorrectionTaskParams>(
+            _colorCorrectionTaskId, HdTokens->params);
+
+    bool useColorCorrect = colorCorrectionParams.colorCorrectionMode != 
+                           HdxColorCorrectionTokens->disabled &&
+                           !colorCorrectionParams.colorCorrectionMode.IsEmpty();
+
+    if (useColorCorrect) {
+        tasks.push_back(GetRenderIndex()->GetTask(_colorCorrectionTaskId));
+    }
+
+    return tasks;
 }
 
 SdfPath
@@ -385,19 +409,20 @@ HdxTaskController::SetRenderOutputs(TfTokenVector const& outputs)
     }
     oldRenderBufferIds.clear();
 
-    // Create the attachment list and set it on the render task.
-    HdRenderPassAttachmentVector attachments;
-    attachments.resize(outputs.size());
+    // Create the aov binding list and set it on the render task.
+    HdRenderPassAovBindingVector aovBindings;
+    aovBindings.resize(outputs.size());
     for (size_t i = 0; i < outputs.size(); ++i) {
         SdfPath renderBufferId = _GetAovPath(outputs[i]);
 
-        attachments[i].aovName = outputs[i];
-        attachments[i].clearValue = outputDescs[i].clearValue;
-        attachments[i].renderBufferId = renderBufferId;
+        aovBindings[i].aovName = outputs[i];
+        aovBindings[i].clearValue = outputDescs[i].clearValue;
+        aovBindings[i].renderBufferId = renderBufferId;
+        aovBindings[i].aovSettings = outputDescs[i].aovSettings;
     }
 
-    if (renderParams.attachments != attachments) {
-        renderParams.attachments = attachments;
+    if (renderParams.aovBindings != aovBindings) {
+        renderParams.aovBindings = aovBindings;
         _delegate.SetParameter(_renderTaskId, HdTokens->params, renderParams);
         GetRenderIndex()->GetChangeTracker().MarkTaskDirty(
             _renderTaskId, HdChangeTracker::DirtyParams);
@@ -472,7 +497,7 @@ HdxTaskController::SetRenderOutputSettings(TfToken const& name,
     }
 
     // HdAovDescriptor contains data for both the renderbuffer descriptor,
-    // and the renderpass attachment.  Update them both.
+    // and the renderpass aov binding.  Update them both.
     HdRenderBufferDescriptor rbDesc =
         _delegate.GetParameter<HdRenderBufferDescriptor>(renderBufferId,
             _tokens->renderBufferDescriptor);
@@ -492,10 +517,12 @@ HdxTaskController::SetRenderOutputSettings(TfToken const& name,
         _delegate.GetParameter<HdxRenderTaskParams>(
             _renderTaskId, HdTokens->params);
 
-    for (size_t i = 0; i < renderParams.attachments.size(); ++i) {
-        if (renderParams.attachments[i].renderBufferId == renderBufferId) {
-            if (renderParams.attachments[i].clearValue != desc.clearValue) {
-                renderParams.attachments[i].clearValue = desc.clearValue;
+    for (size_t i = 0; i < renderParams.aovBindings.size(); ++i) {
+        if (renderParams.aovBindings[i].renderBufferId == renderBufferId) {
+            if (renderParams.aovBindings[i].clearValue != desc.clearValue ||
+                renderParams.aovBindings[i].aovSettings != desc.aovSettings) {
+                renderParams.aovBindings[i].clearValue = desc.clearValue;
+                renderParams.aovBindings[i].aovSettings = desc.aovSettings;
                 _delegate.SetParameter(_renderTaskId, HdTokens->params,
                                        renderParams);
                 GetRenderIndex()->GetChangeTracker().MarkTaskDirty(
@@ -531,7 +558,7 @@ HdxTaskController::SetRenderParams(HdxRenderTaskParams const& params)
     HdxRenderTaskParams mergedParams = params;
     mergedParams.camera = oldParams.camera;
     mergedParams.viewport = oldParams.viewport;
-    mergedParams.attachments = oldParams.attachments;
+    mergedParams.aovBindings = oldParams.aovBindings;
 
     if (mergedParams != oldParams) {
         _delegate.SetParameter(_renderTaskId, HdTokens->params, mergedParams);
@@ -898,6 +925,21 @@ HdxTaskController::IsConverged() const
     return static_cast<HdxRenderTask*>(
         GetRenderIndex()->GetTask(_renderTaskId).get())
         ->IsConverged();
+}
+
+void 
+HdxTaskController::SetColorCorrectionParams(
+    HdxColorCorrectionTaskParams const& params)
+{
+    HdxColorCorrectionTaskParams oldParams = 
+        _delegate.GetParameter<HdxColorCorrectionTaskParams>(
+            _colorCorrectionTaskId, HdTokens->params);
+
+    if (params != oldParams) {
+        _delegate.SetParameter(_colorCorrectionTaskId, HdTokens->params,params);
+        GetRenderIndex()->GetChangeTracker().MarkTaskDirty(
+            _colorCorrectionTaskId, HdChangeTracker::DirtyParams);
+    }
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

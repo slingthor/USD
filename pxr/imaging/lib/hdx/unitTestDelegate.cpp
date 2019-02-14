@@ -321,7 +321,6 @@ Hdx_UnitTestDelegate::AddRenderTask(SdfPath const &id)
 {
     GetRenderIndex().InsertTask<HdxRenderTask>(this, id);
     _ValueCache &cache = _valueCacheMap[id];
-    cache[HdTokens->children] = VtValue(SdfPathVector());
     cache[HdTokens->collection]
         = HdRprimCollection(HdTokens->geometry, 
             HdReprSelector(HdReprTokens->smoothHull));
@@ -335,7 +334,6 @@ Hdx_UnitTestDelegate::AddRenderSetupTask(SdfPath const &id)
     HdxRenderTaskParams params;
     params.camera = _cameraId;
     params.viewport = GfVec4f(0, 0, 512, 512);
-    cache[HdTokens->children] = VtValue(SdfPathVector());
     cache[HdTokens->params] = VtValue(params);
 }
 
@@ -349,7 +347,6 @@ Hdx_UnitTestDelegate::AddSimpleLightTask(SdfPath const &id)
     params.viewport = GfVec4f(0,0,512,512);
     params.enableShadows = true;
     
-    cache[HdTokens->children] = VtValue(SdfPathVector());
     cache[HdTokens->params] = VtValue(params);
 
 }
@@ -362,7 +359,6 @@ Hdx_UnitTestDelegate::AddShadowTask(SdfPath const &id)
     HdxShadowTaskParams params;
     params.camera = _cameraId;
     params.viewport = GfVec4f(0,0,512,512);
-    cache[HdTokens->children] = VtValue(SdfPathVector());
     cache[HdTokens->params] = VtValue(params);
 }
 
@@ -370,8 +366,6 @@ void
 Hdx_UnitTestDelegate::AddSelectionTask(SdfPath const &id)
 {
     GetRenderIndex().InsertTask<HdxSelectionTask>(this, id);
-    _ValueCache &cache = _valueCacheMap[id];
-    cache[HdTokens->children] = VtValue(SdfPathVector());
 }
 
 void
@@ -379,7 +373,6 @@ Hdx_UnitTestDelegate::AddDrawTargetTask(SdfPath const &id)
 {
     GetRenderIndex().InsertTask<HdxDrawTargetTask>(this, id);
     _ValueCache &cache = _valueCacheMap[id];
-    cache[HdTokens->children] = VtValue(SdfPathVector());
 
     HdxDrawTargetTaskParams params;
     params.enableLighting = true;
@@ -390,8 +383,6 @@ void
 Hdx_UnitTestDelegate::AddDrawTargetResolveTask(SdfPath const &id)
 {
     GetRenderIndex().InsertTask<HdxDrawTargetResolveTask>(this, id);
-    _ValueCache &cache = _valueCacheMap[id];
-    cache[HdTokens->children] = VtValue(SdfPathVector());
 }
 
 void

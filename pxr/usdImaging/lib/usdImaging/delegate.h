@@ -364,6 +364,10 @@ public:
     USDIMAGING_API
     virtual TfTokenVector GetMaterialPrimvars(SdfPath const &materialId) override;
 
+    USDIMAGING_API
+    virtual VtDictionary
+    GetMaterialMetadata(SdfPath const &materialId) override;
+
     // Instance path resolution
 
     /// Returns the path of the instance prim corresponding to the
@@ -395,6 +399,35 @@ public:
                                             int *absoluteInstanceIndex,
                                             SdfPath *rprimPath=NULL,
                                             SdfPathVector *instanceContext=NULL) override;
+
+    // ExtComputation support
+    USDIMAGING_API
+    TfTokenVector
+    GetExtComputationSceneInputNames(SdfPath const& computationId) override;
+
+    USDIMAGING_API
+    HdExtComputationInputDescriptorVector
+    GetExtComputationInputDescriptors(SdfPath const& computationId) override;
+
+    USDIMAGING_API
+    HdExtComputationOutputDescriptorVector
+    GetExtComputationOutputDescriptors(SdfPath const& computationId) override;
+
+    USDIMAGING_API
+    HdExtComputationPrimvarDescriptorVector
+    GetExtComputationPrimvarDescriptors(SdfPath const& computationId,
+                                        HdInterpolation interpolation) override;
+
+    USDIMAGING_API
+    VtValue GetExtComputationInput(SdfPath const& computationId,
+                                   TfToken const& input) override;
+
+    USDIMAGING_API
+    std::string GetExtComputationKernel(SdfPath const& computationId) override;
+
+    USDIMAGING_API
+    void InvokeExtComputation(SdfPath const& computationId,
+                              HdExtComputationContext *context) override;
 
 public:
     // Converts a UsdStage path to a path in the render index.

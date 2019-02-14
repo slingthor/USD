@@ -31,6 +31,7 @@
 #include "pxr/imaging/hdx/selectionTracker.h"
 #include "pxr/imaging/hdx/renderSetupTask.h"
 #include "pxr/imaging/hdx/shadowTask.h"
+#include "pxr/imaging/hdx/colorCorrectionTask.h"
 
 #include "pxr/imaging/hd/aov.h"
 #include "pxr/imaging/hd/renderIndex.h"
@@ -92,7 +93,7 @@ public:
     ///
     /// A vector of zero length indicates error.
     HDX_API
-    HdTaskSharedPtrVector const &GetTasks();
+    HdTaskSharedPtrVector const GetTasks();
 
     /// -------------------------------------------------------
     /// Rendering API
@@ -210,6 +211,13 @@ public:
     HDX_API
     bool IsConverged() const;
 
+    /// -------------------------------------------------------
+    /// Color Correction API
+
+    /// Configure color correction by settings params.
+    HDX_API
+    void SetColorCorrectionParams(HdxColorCorrectionTaskParams const& params);
+
 private:
     ///
     /// This class is not intended to be copied.
@@ -220,7 +228,6 @@ private:
     HdRenderIndex *_index;
     SdfPath const _controllerId;
 
-    HdTaskSharedPtrVector _tasks;
     std::unique_ptr<HdxIntersector> _intersector;
 
     // Create taskController objects. Since the camera is a parameter
@@ -231,6 +238,7 @@ private:
     void _CreateLightingTask();
     void _CreateShadowTask();
     void _CreateColorizeTask();
+    void _CreateColorCorrectionTask();
 
     SdfPath _GetAovPath(TfToken const& aov);
 
@@ -291,6 +299,7 @@ private:
     SdfPath _simpleLightTaskId;
     SdfPath _shadowTaskId;
     SdfPath _colorizeTaskId;
+    SdfPath _colorCorrectionTaskId;
 
     // Generated cameras
     SdfPath _cameraId;

@@ -54,9 +54,6 @@ public:
     USDIMAGING_API
     virtual bool IsSupported(UsdImagingIndexProxy const* index) const override;
 
-    USDIMAGING_API
-    virtual bool IsPopulatedIndirectly() override;
-
     // ---------------------------------------------------------------------- //
     /// \name Parallel Setup and Resolve
     // ---------------------------------------------------------------------- //
@@ -129,7 +126,8 @@ private:
     /// 
     /// This obtains the shading source.
     std::string _GetShaderSource(UsdPrim const& prim,
-                                 TfToken const& shaderType) const;
+                                 TfToken const& shaderType,
+                                 VtDictionary * metadataOut = nullptr) const;
 
     /// \brief Returns the root "surface" shader prim for the material, by 
     /// traversing which the entire hydra shading network can be discovered.

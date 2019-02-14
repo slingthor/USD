@@ -686,7 +686,8 @@ HdSt_CodeGenGLSL::Compile()
         {
             // quad interpolation
             _procGS  << "void ProcessPrimvars(int index) {\n"
-                     << "   vec2 localST = vec2[](vec2(0,0), vec2(1,0), vec2(1,1), vec2(0,1))[index];\n";
+                     << "   vec2 lut[4] = vec2[4](vec2(0,0), vec2(1,0), vec2(1,1), vec2(0,1));\n"
+                     << "   vec2 localST = lut[index];\n";
             break;            
         }
 
@@ -694,7 +695,8 @@ HdSt_CodeGenGLSL::Compile()
         {
             // barycentric interpolation
              _procGS  << "void ProcessPrimvars(int index) {\n"
-                      << "   vec2 localST = vec2[](vec2(0,0), vec2(1,0), vec2(0,1))[index];\n";
+                      << "   vec2 lut[3] = vec2[3](vec2(0,0), vec2(1,0), vec2(0,1));\n"
+                      << "   vec2 localST = lut[index];\n";
             break;            
         }
 
@@ -1639,7 +1641,7 @@ HdSt_CodeGenGLSL::_GenerateDrawingCoord()
     if (_metaData.drawingCoordIBinding.binding.IsValid()) {
         _genVS << "  for (int i = 0; i < HD_INSTANCER_NUM_LEVELS; ++i) {\n"
                << "    dc.instanceCoords[i] = drawingCoordI[i] \n"
-               << "      + GetInstanceIndex().indices[i+1]; \n"
+               << "      + dc.instanceIndex[i+1]; \n"
                << "  }\n";
     }
 
@@ -2178,12 +2180,16 @@ HdSt_CodeGenGLSL::_GenerateElementPrimvar()
         // abs() is needed below, since both branches may get executed, and
         // we need to guard against array oob indexing.
         accessors
-        << "int GetAuthoredEdgeId(int primitiveEdgeID) {\n"
-        << "  if (primitiveEdgeID == -1) {\n"
-        << "    return -1;\n"
-        << "  }\n"
-        << "  return HdGet_edgeIndices()[abs(primitiveEdgeID)];\n;"
-        << "}\n";
+            << "int GetAuthoredEdgeId(int primitiveEdgeID) {\n"
+            << "  if (primitiveEdgeID == -1) {\n"
+            << "    return -1;\n"
+            << "  }\n"
+            << "  "
+            << _GetUnpackedType(_metaData.edgeIndexBinding.dataType, false)
+            << " edgeIndices = HdGet_edgeIndices();\n"
+            << "  int coord = abs(primitiveEdgeID);\n"
+            << "  return edgeIndices[coord];\n"
+            << "}\n";
         
         // Primitive EdgeID getter
         if (_geometricShader->IsPrimTypePoints()) {

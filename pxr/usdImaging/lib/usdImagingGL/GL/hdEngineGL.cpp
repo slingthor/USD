@@ -52,7 +52,7 @@
 
 #include "pxr/imaging/glf/diagnostic.h"
 #include "pxr/imaging/glf/info.h"
-
+#if 0
 PXR_NAMESPACE_OPEN_SCOPE
 
 TF_DEFINE_PRIVATE_TOKENS(
@@ -1076,3 +1076,4 @@ UsdImagingGLHdEngine::SetRendererSetting(TfToken const& id,
 
 PXR_NAMESPACE_CLOSE_SCOPE
 
+#endif

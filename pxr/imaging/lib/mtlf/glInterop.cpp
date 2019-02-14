@@ -108,6 +108,7 @@ void MtlfGlInterop::_InitializeStaticState()
     glAttachShader(staticState.glShaderProgram, fs);
     glAttachShader(staticState.glShaderProgram, vs);
     glBindFragDataLocation(staticState.glShaderProgram, 0, "fragColor");
+    glGetError();
     glLinkProgram(staticState.glShaderProgram);
     
     GLint maxLength = 2048;

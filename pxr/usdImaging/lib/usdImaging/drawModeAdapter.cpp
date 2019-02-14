@@ -92,6 +92,25 @@ UsdImagingDrawModeAdapter::~UsdImagingDrawModeAdapter()
 {
 }
 
+bool
+UsdImagingDrawModeAdapter::ShouldCullChildren() const
+{
+    return true;
+}
+
+bool
+UsdImagingDrawModeAdapter::CanPopulateMaster() const
+{
+    return true;
+}
+
+bool
+UsdImagingDrawModeAdapter::IsSupported(
+    UsdImagingIndexProxy const* index) const
+{
+    return true;
+}
+
 SdfPath
 UsdImagingDrawModeAdapter::Populate(UsdPrim const& prim,
                                     UsdImagingIndexProxy* index,
@@ -355,6 +374,8 @@ UsdImagingDrawModeAdapter::UpdateForTime(UsdPrim const& prim,
                 _GetSurfaceShaderSource();
             valueCache->GetDisplacementShaderSource(cachePath) =
                 std::string();
+            valueCache->GetMaterialMetadata(cachePath) =
+                                                VtValue(VtDictionary());
         }
 
         // DirtyParams indicates we should return material bindings;

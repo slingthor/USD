@@ -38,9 +38,10 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 namespace {
 
-const char* pathEnvVarName      = BOOST_PP_STRINGIZE(PXR_PLUGINPATH_NAME);
-const char* buildLocation       = BOOST_PP_STRINGIZE(PXR_BUILD_LOCATION);
-const char* pluginBuildLocation = BOOST_PP_STRINGIZE(PXR_PLUGIN_BUILD_LOCATION);
+const char* sharedLibraryLocation = BOOST_PP_STRINGIZE(PXR_SHARED_LIBRARY_LOCATION);
+const char* pathEnvVarName        = BOOST_PP_STRINGIZE(PXR_PLUGINPATH_NAME);
+const char* buildLocation         = BOOST_PP_STRINGIZE(PXR_BUILD_LOCATION);
+const char* pluginBuildLocation   = BOOST_PP_STRINGIZE(PXR_PLUGIN_BUILD_LOCATION);
 
 #ifdef PXR_INSTALL_LOCATION
 const char* installLocation     = BOOST_PP_STRINGIZE(PXR_INSTALL_LOCATION); 
@@ -74,14 +75,17 @@ ARCH_CONSTRUCTOR(Plug_InitConfig, 2, void)
     // Determine the absolute path to the Plug shared library.
     // Any relative paths specified in the plugin search path will be
     // anchored to this directory, to allow for relocatability.
-    std::string sharedLibPath;
-    if (!ArchGetAddressInfo(
-        reinterpret_cast<void*>(&Plug_InitConfig), &sharedLibPath,
-            nullptr, nullptr, nullptr)) {
-        TF_CODING_ERROR("Unable to determine absolute path for Plug.");
-    }
+    std::string sharedLibPath = TfGetenv(sharedLibraryLocation);
 
-    sharedLibPath = TfGetPathName(sharedLibPath);
+    if (sharedLibPath.empty()) {
+        if (!ArchGetAddressInfo(
+            reinterpret_cast<void*>(&Plug_InitConfig), &sharedLibPath,
+                nullptr, nullptr, nullptr)) {
+            TF_CODING_ERROR("Unable to determine absolute path for Plug.");
+        }
+        
+        sharedLibPath = TfGetPathName(sharedLibPath);
+    }
 
     // Environment locations.
     _AppendPathList(&result, TfGetenv(pathEnvVarName), sharedLibPath);

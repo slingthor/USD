@@ -168,8 +168,8 @@ GarchTextureGPUHandle HdStSimpleTextureResourceGL::GetTexelsTextureHandle()
     bool bindlessTexture =
         GarchResourceFactory::GetInstance()->GetContextCaps().bindlessTextureEnabled;
     if (bindlessTexture) {
-        if (!glIsTextureHandleResidentNV(handle)) {
-            glMakeTextureHandleResidentNV(handle);
+        if (!glIsTextureHandleResidentARB(handle)) {
+            glMakeTextureHandleResidentARB(handle);
         }
     }
     
@@ -199,8 +199,8 @@ GarchTextureGPUHandle HdStSimpleTextureResourceGL::GetLayoutTextureHandle()
     bool bindlessTexture =
         GarchResourceFactory::GetInstance()->GetContextCaps().bindlessTextureEnabled;
     if (bindlessTexture) {
-        if (!glIsTextureHandleResidentNV(handle)) {
-            glMakeTextureHandleResidentNV(handle);
+        if (!glIsTextureHandleResidentARB(handle)) {
+            glMakeTextureHandleResidentARB(handle);
         }
     }
     

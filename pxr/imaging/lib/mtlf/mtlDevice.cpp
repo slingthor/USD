@@ -179,13 +179,13 @@ MtlfMetalContext::MtlfMetalContext(id<MTLDevice> _device, int width, int height)
     // Create a new command queue
     commandQueue = [device newCommandQueue];
     if(enableMultiQueue) {
-        NSLog(@"Device %@ supports Metal 2, enabling multi-queue codepath.", device.name);
+//        NSLog(@"Device %@ supports Metal 2, enabling multi-queue codepath.", device.name);
         commandQueueGS = [device newCommandQueue];
         gsMaxDataPerBatch = 1024 * 1024 * 32;
         gsMaxConcurrentBatches = 3;
     }
     else {
-        NSLog(@"Device %@ does not support Metal 2, using fallback path, performance may be sub-optimal.", device.name);
+//        NSLog(@"Device %@ does not support Metal 2, using fallback path, performance may be sub-optimal.", device.name);
         gsMaxDataPerBatch = 1024 * 1024 * 32;
         gsMaxConcurrentBatches = 2;
     }

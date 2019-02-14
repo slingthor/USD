@@ -9,15 +9,13 @@ endif()
 
 if (${PXR_ENABLE_METAL_SUPPORT})
     set(METAL_LIBRARY               mtlf)
-    set(METAL_PUBLIC_CLASSES        Metal/hdEngineMetal)
 endif()
 
 if (${PXR_ENABLE_GL_SUPPORT})
     set(OPENGL_LIBRARY              glf
                                     ${OPENGL_gl_LIBRARY}
                                     ${OPENGL_glu_LIBRARY})
-    set(OPENGL_PUBLIC_CLASSES       GL/hdEngineGL
-                                    GL/refEngine)
+    set(OPENGL_PRIVATE_CLASSES      GL/legacyEngine)
 else()
     set(OPENGL_INCLUDE_DIR          "")
 endif()
@@ -57,15 +55,15 @@ pxr_library(usdImagingGL
 
     PUBLIC_CLASSES
         engine
-        gl
         renderParams
-        ${OPENGL_PUBLIC_CLASSES}
-        ${METAL_PUBLIC_CLASSES}
 
     PUBLIC_HEADERS
         api.h
-        version.h
         rendererSettings.h
+        version.h
+
+    PRIVATE_CLASSES
+        ${OPENGL_PRIVATE_CLASSES}
 
     PRIVATE_HEADERS
         unitTestGLDrawing.h
@@ -75,7 +73,9 @@ pxr_library(usdImagingGL
 
     PYMODULE_CPPFILES
         module.cpp
-        wrapGL.cpp
+        wrapEngine.cpp
+        wrapRenderParams.cpp
+        wrapRendererSettings.cpp
 
     PYMODULE_FILES
         __init__.py

@@ -216,6 +216,7 @@ public:
             lightListEditor.Build();
             
             interface.setAttr("info.usdOpArgs", opArgs);
+            interface.setAttr("info.usd.outputSession", usdInArgs->GetSessionAttr());
         }
         
         if (FnAttribute::IntAttribute(
@@ -227,6 +228,9 @@ public:
                 .build();
             
             interface.setAttr("info.usdOpArgs", opArgs);
+            interface.setAttr("info.usd.outputSession", usdInArgs->GetSessionAttr());
+
+
         }
         
         
@@ -249,7 +253,7 @@ public:
 
             // When in "as sources and instances" mode, scan for instances
             // and masters at each location that contains a payload.
-            if (prim.HasPayload() &&
+            if (prim.HasAuthoredPayloads() &&
                 !usdInArgs->GetPrePopulate() &&
                 FnAttribute::StringAttribute(
                     interface.getOpArg("instanceMode")
@@ -531,7 +535,7 @@ public:
         // as each payload is loaded, and we emit them under the payload's
         // location.
         if (interface.atRoot() ||
-            (prim.HasPayload() && !usdInArgs->GetPrePopulate())) {
+            (prim.HasAuthoredPayloads() && !usdInArgs->GetPrePopulate())) {
             FnKat::GroupAttribute masterMapping =
                     opArgs.getChildByName("masterMapping");
             if (masterMapping.isValid() && masterMapping.getNumberOfChildren())

@@ -64,6 +64,7 @@ vec3 getNormal(MAT4 transform);
 
 // Fwd declare methods defined in pointId.glslfx, that are used below.
 int GetPointId();
+float GetPointRasterSize(int);
 void ProcessPointId(int);
 #endif
 
@@ -78,7 +79,9 @@ void main(void)
 
     ProcessPrimvars();
 
-    ProcessPointId(GetPointId());
+    int pointId = GetPointId();
+    gl_PointSize = GetPointRasterSize(pointId);
+    ProcessPointId(pointId);
 }
 
 --- --------------------------------------------------------------------------
@@ -110,6 +113,7 @@ out CurveVertexData
 // Fwd declare methods defined in pointId.glslfx, that are used below.
 #if !defined(ARCH_GFX_METAL)
 int GetPointId();
+float GetPointRasterSize(int);
 void ProcessPointId(int);
 #endif
 
@@ -125,8 +129,9 @@ void main(void)
     gl_Position = vec4(GetProjectionMatrix() * outData.Peye);
     ApplyClipPlanes(outData.Peye);
 
-    ProcessPointId(GetPointId());
-}
+    int pointId = GetPointId();
+    gl_PointSize = GetPointRasterSize(pointId);
+    ProcessPointId(pointId);}
 
 --- --------------------------------------------------------------------------
 -- glsl Curves.TessControl.Shared

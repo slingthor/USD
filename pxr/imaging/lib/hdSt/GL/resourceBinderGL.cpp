@@ -351,8 +351,8 @@ HdSt_ResourceBinderGL::BindShaderResources(HdStShaderCode const *shader) const
             // nothing? or make it resident?? but it only binds the first one.
             // XXX: it looks like this function should take all textures in the batch.
 
-//            if (!glIsTextureHandleResidentNV(it->handle)) {
-//                glMakeTextureHandleResidentNV(it->handle);
+//            if (!glIsTextureHandleResidentARB(it->handle)) {
+//                glMakeTextureHandleResidentARB(it->handle);
 //            }
         }
     }

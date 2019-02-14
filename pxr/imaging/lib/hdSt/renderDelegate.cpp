@@ -39,6 +39,7 @@
 #include "pxr/imaging/hdSt/renderPassState.h"
 #include "pxr/imaging/hdSt/resourceFactory.h"
 #include "pxr/imaging/hdSt/texture.h"
+#include "pxr/imaging/hdSt/tokens.h"
 #include "pxr/imaging/hdSt/resourceRegistry.h"
 
 #include "pxr/imaging/hd/engine.h"
@@ -58,7 +59,13 @@
 #include "pxr/imaging/mtlf/contextCaps.h"
 #endif
 
+#include "pxr/base/tf/envSetting.h"
+#include "pxr/base/tf/getenv.h"
+
 PXR_NAMESPACE_OPEN_SCOPE
+
+TF_DEFINE_ENV_SETTING(HD_ENABLE_GPU_TINY_PRIM_CULLING, false,
+                      "Enable tiny prim culling");
 
 const TfTokenVector HdStRenderDelegate::SUPPORTED_RPRIM_TYPES =
 {
@@ -89,6 +96,18 @@ HdStResourceRegistrySharedPtr HdStRenderDelegate::_resourceRegistry;
 
 HdStRenderDelegate::HdStRenderDelegate()
 {
+    _Initialize();
+}
+
+HdStRenderDelegate::HdStRenderDelegate(HdRenderSettingsMap const& settingsMap)
+    : HdRenderDelegate(settingsMap)
+{
+    _Initialize();
+}
+
+void
+HdStRenderDelegate::_Initialize()
+{
     // Initialize one resource registry for all St plugins
     // It will also add the resource to the logging object so we
     // can query the resources used by all St plugins later
@@ -98,6 +117,19 @@ HdStRenderDelegate::HdStRenderDelegate()
         _resourceRegistry.reset( new HdStResourceRegistry() );
         HdPerfLog::GetInstance().AddResourceRegistry(_resourceRegistry);
     }
+
+    // Initialize the settings and settings descriptors.
+    _settingDescriptors.resize(1);
+    _settingDescriptors[0] = { "Enable Tiny Prim Culling",
+        HdStRenderSettingsTokens->enableTinyPrimCulling,
+        VtValue(bool(TfGetEnvSetting(HD_ENABLE_GPU_TINY_PRIM_CULLING))) };
+    _PopulateDefaultSettings(_settingDescriptors);
+}
+
+HdRenderSettingDescriptorList
+HdStRenderDelegate::GetRenderSettingDescriptors() const
+{
+    return _settingDescriptors;
 }
 
 HdStRenderDelegate::~HdStRenderDelegate()

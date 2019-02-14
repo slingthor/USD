@@ -45,6 +45,8 @@ class HdStRenderDelegate final : public HdRenderDelegate {
 public:
     HDST_API
     HdStRenderDelegate();
+    HDST_API
+    HdStRenderDelegate(HdRenderSettingsMap const& settingsMap);
 
     HDST_API
     virtual ~HdStRenderDelegate();
@@ -112,6 +114,9 @@ public:
     HDST_API
     static bool IsSupported();
 
+    virtual HdRenderSettingDescriptorList
+        GetRenderSettingDescriptors() const override;
+
 private:
     static const TfTokenVector SUPPORTED_RPRIM_TYPES;
     static const TfTokenVector SUPPORTED_SPRIM_TYPES;
@@ -121,6 +126,10 @@ private:
     static std::mutex _mutexResourceRegistry;
     static std::atomic_int _counterResourceRegistry;
     static HdStResourceRegistrySharedPtr _resourceRegistry;
+
+    HdRenderSettingDescriptorList _settingDescriptors;
+
+    void _Initialize();
 
     HdSprim *_CreateFallbackMaterialPrim();
 

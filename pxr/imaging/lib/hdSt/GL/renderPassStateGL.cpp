@@ -74,6 +74,10 @@ HdStRenderPassStateGL::Bind()
 {
     HdStRenderPassState::Bind();
 
+    if (!glBlendColor) {
+        return;
+    }
+
     // XXX: viewport should be set.
     // glViewport((GLint)_viewport[0], (GLint)_viewport[1],
     //            (GLsizei)_viewport[2], (GLsizei)_viewport[3]);
@@ -108,6 +112,25 @@ HdStRenderPassStateGL::Bind()
     // Line width
     if (_lineWidth > 0) {
         glLineWidth(_lineWidth);
+    }
+    
+    // Blending
+    if (_blendEnabled) {
+        glEnable(GL_BLEND);
+        glBlendEquationSeparate(
+                                HdStGLConversions::GetGlBlendOp(_blendColorOp),
+                                HdStGLConversions::GetGlBlendOp(_blendAlphaOp));
+        glBlendFuncSeparate(
+                            HdStGLConversions::GetGlBlendFactor(_blendColorSrcFactor),
+                            HdStGLConversions::GetGlBlendFactor(_blendColorDstFactor),
+                            HdStGLConversions::GetGlBlendFactor(_blendAlphaSrcFactor),
+                            HdStGLConversions::GetGlBlendFactor(_blendAlphaDstFactor));
+        glBlendColor(_blendConstantColor[0],
+                     _blendConstantColor[1],
+                     _blendConstantColor[2],
+                     _blendConstantColor[3]);
+    } else {
+        glDisable(GL_BLEND);
     }
 
     if (!_alphaToCoverageUseDefault) {
@@ -148,6 +171,10 @@ HdStRenderPassStateGL::Unbind()
     GLF_GROUP_FUNCTION();
     // restore back to the GL defaults
     
+    if (!glBlendColor) {
+        return;
+    }
+    
     glDisable(GL_POLYGON_OFFSET_FILL);
     glDisable(GL_SAMPLE_ALPHA_TO_COVERAGE);
     glDisable(GL_PROGRAM_POINT_SIZE);
@@ -156,6 +183,11 @@ HdStRenderPassStateGL::Unbind()
     glPolygonOffset(0, 0);
     glLineWidth(1.0f);
     
+    glDisable(GL_BLEND);
+    glBlendEquationSeparate(GL_FUNC_ADD, GL_FUNC_ADD);
+    glBlendFuncSeparate(GL_ONE, GL_ZERO, GL_ONE, GL_ZERO);
+    glBlendColor(0.0f, 0.0f, 0.0f, 0.0f);
+
     for (size_t i = 0; i < _clipPlanes.size(); ++i) {
         glDisable(GL_CLIP_DISTANCE0 + i);
     }

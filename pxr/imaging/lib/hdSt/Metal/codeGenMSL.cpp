@@ -2138,8 +2138,8 @@ HdSt_CodeGenMSL::Compile()
         {
             // quad interpolation
             _procGS  << "void ProcessPrimvars(int index) {\n"
-                     << "   vec2 bc_lookup[] = { vec2(0,0), vec2(1,0), vec2(1,1), vec2(0,1) };\n"
-                     << "   vec2 localST = bc_lookup[index];\n";
+                     << "   vec2 lut[] = { vec2(0,0), vec2(1,0), vec2(1,1), vec2(0,1) };\n"
+                     << "   vec2 localST = lut[index];\n";
             break;
         }
 
@@ -2147,11 +2147,11 @@ HdSt_CodeGenMSL::Compile()
         {
             // barycentric interpolation
             _procGS  << "void ProcessPrimvars(int index) {\n"
-                     << "   vec2 bc_lookup[] = { vec2(0,0), vec2(1,0), vec2(0,1) };\n"
-                     << "   vec2 localST = bc_lookup[index];\n";
+                     << "   vec2 lut[] = { vec2(0,0), vec2(1,0), vec2(0,1) };\n"
+                     << "   vec2 localST = lut[index];\n";
             break;
         }
-            
+
         default: // points, basis curves
             // do nothing. no additional code needs to be generated.
             ;
@@ -3361,7 +3361,7 @@ HdSt_CodeGenMSL::_GenerateDrawingCoord()
     if (_metaData.drawingCoordIBinding.binding.IsValid()) {
         _genVS << "  for (int i = 0; i < HD_INSTANCER_NUM_LEVELS; ++i) {\n"
                << "    dc.instanceCoords[i] = drawingCoordI[i] \n"
-               << "      + GetInstanceIndex().indices[i+1]; \n"
+               << "      + dc.instanceIndex[i+1]; \n"
                << "  }\n";
     }
 
@@ -3932,7 +3932,11 @@ HdSt_CodeGenMSL::_GenerateElementPrimvar()
             << "  if (primitiveEdgeID == -1) {\n"
             << "    return -1;\n"
             << "  }\n"
-            << "  return HdGet_edgeIndices()[abs(primitiveEdgeID)];\n;"
+            << "  "
+            << _GetUnpackedType(_metaData.edgeIndexBinding.dataType, false)
+            << " edgeIndices = HdGet_edgeIndices();\n"
+            << "  int coord = abs(primitiveEdgeID);\n"
+            << "  return edgeIndices[coord];\n"
             << "}\n";
         
         // Primitive EdgeID getter

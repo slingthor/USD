@@ -19,7 +19,7 @@ if (OPENSUBDIV_HAS_METAL_COMPUTE)
     add_definitions(-DOPENSUBDIV_HAS_METAL_COMPUTE)
 endif()
 
-pxr_library(hdStream
+pxr_plugin(hdStream
     LIBRARIES
         plug
         tf

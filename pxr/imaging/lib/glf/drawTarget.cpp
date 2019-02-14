@@ -349,6 +349,9 @@ GlfDrawTarget::_BindAttachment( GlfDrawTarget::GlfAttachment::GlfAttachmentRefPt
         attachment += attach;
     }
 
+    GLint restoreFramebuffer = 0;
+    glGetIntegerv(GL_FRAMEBUFFER_BINDING, &restoreFramebuffer);
+
     // Multisampled framebuffer
     if (HasMSAA()) {
         glBindFramebuffer(GL_FRAMEBUFFER, _framebufferMS);
@@ -360,6 +363,8 @@ GlfDrawTarget::_BindAttachment( GlfDrawTarget::GlfAttachment::GlfAttachmentRefPt
     glBindFramebuffer(GL_FRAMEBUFFER, _framebuffer);
     glFramebufferTexture2D(GL_FRAMEBUFFER,
         attachment, GL_TEXTURE_2D, id, /*level*/ 0);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, restoreFramebuffer);
 
     GLF_POST_PENDING_GL_ERRORS();
 }
@@ -585,8 +590,6 @@ GlfDrawTarget::WriteToFile(std::string const & name,
         glBindTexture( GL_TEXTURE_2D, restoreBinding );
 
         glPopClientAttrib();
-
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
     }
 
     VtDictionary metadata;
@@ -809,7 +812,7 @@ GlfDrawTarget::GlfAttachment::GetTextureInfo(bool forceLoad)
     info["depth"] = 1;
     info["format"] = (int)_internalFormat;
     info["imageFilePath"] = TfToken("DrawTarget");
-    info["referenceCount"] = GetRefCount().Get();
+    info["referenceCount"] = GetCurrentCount();
     info["numSamples"] = _numSamples;
 
     return info;

@@ -48,9 +48,7 @@
 #include "pxr/usdImaging/usdImaging/unitTestHelper.h"
 #include "pxr/usdImaging/usdImaging/tokens.h"
 
-#include "pxr/usdImaging/usdImagingGL/gl.h"
-#include "pxr/usdImaging/usdImagingGL/GL/hdEngine.h"
-#include "pxr/usdImaging/usdImagingGL/GL/refEngine.h"
+#include "pxr/usdImaging/usdImagingGL/engine.h"
 
 #include <boost/shared_ptr.hpp>
 
@@ -100,10 +98,9 @@ My_TestGLDrawing::InitTest()
     _stage = UsdStage::Open(GetStageFilePath());
     SdfPathVector excludedPaths;
 
-    bool isEnabledHydra = (TfGetenv("HD_ENABLED", "1") == "1");
-    if (isEnabledHydra) {
+    if (UsdImagingGLEngine::IsHydraEnabled()) {
         std::cout << "Using HD Renderer.\n";
-        _engine.reset(new UsdImagingGLHdEngine(
+        _engine.reset(new UsdImagingGLEngine(
             _stage->GetPseudoRoot().GetPath(), excludedPaths));
         if (!_GetRenderer().IsEmpty()) {
             if (!_engine->SetRendererPlugin(_GetRenderer())) {
@@ -117,7 +114,9 @@ My_TestGLDrawing::InitTest()
         }
     } else{
         std::cout << "Using Reference Renderer.\n"; 
-        _engine.reset(new UsdImagingGLRefEngine(excludedPaths));
+        _engine.reset(
+            new UsdImagingGLEngine(_stage->GetPseudoRoot().GetPath(), 
+                    excludedPaths));
     }
 
     std::cout << glGetString(GL_VENDOR) << "\n";

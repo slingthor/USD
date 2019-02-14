@@ -54,7 +54,7 @@
 #include "pxr/imaging/garch/simpleLightingContext.h"
 
 #import <simd/simd.h>
-
+#if 0
 typedef struct {
     vector_float2 position;
     vector_float2 uv;
@@ -1282,3 +1282,4 @@ UsdImagingGLMetalHdEngine::SetMetalRenderPassDescriptor(
 
 PXR_NAMESPACE_CLOSE_SCOPE
 
+#endif

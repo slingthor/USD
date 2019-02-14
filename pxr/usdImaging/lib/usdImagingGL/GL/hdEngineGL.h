@@ -27,6 +27,7 @@
 #ifndef USDIMAGINGGL_HDENGINE_H
 #define USDIMAGINGGL_HDENGINE_H
 
+#if 0
 #include "pxr/pxr.h"
 
 #include "pxr/usdImaging/usdImagingGL/api.h"
@@ -261,3 +262,4 @@ private:
 PXR_NAMESPACE_CLOSE_SCOPE
 
 #endif // USDIMAGINGGL_HDENGINE_H
+#endif

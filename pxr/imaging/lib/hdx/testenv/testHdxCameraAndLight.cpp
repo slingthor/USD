@@ -32,6 +32,7 @@
 #include "pxr/imaging/hdSt/renderDelegate.h"
 #include "pxr/imaging/hdSt/renderPass.h"
 #include "pxr/imaging/hdSt/renderPassState.h"
+#include "pxr/imaging/hdSt/resourceFactory.h"
 
 #include "pxr/imaging/hdx/unitTestDelegate.h"
 
@@ -53,21 +54,22 @@ class Hd_TestTask final : public HdTask
 public:
     Hd_TestTask(HdRenderPassSharedPtr const &renderPass,
                 HdRenderPassStateSharedPtr const &renderPassState)
-    : HdTask()
+    : HdTask(SdfPath::EmptyPath())
     , _renderPass(renderPass)
     , _renderPassState(renderPassState)
     {
     }
 
-protected:
-    virtual void _Sync( HdTaskContext* ctx) override
+    virtual void Sync(HdSceneDelegate*,
+                      HdTaskContext*,
+                      HdDirtyBits*) override
     {
         _renderPass->Sync();
         _renderPassState->Sync(
             _renderPass->GetRenderIndex()->GetResourceRegistry());
     }
 
-    virtual void _Execute(HdTaskContext* ctx) override
+    virtual void Execute(HdTaskContext* ctx) override
     {
         _renderPassState->Bind();
         _renderPass->Execute(_renderPassState);
@@ -92,7 +94,8 @@ static void CameraAndLightTest()
     perfLog.Enable();
     HdRprimCollection collection(HdTokens->geometry, 
         HdReprSelector(HdReprTokens->hull));
-    HdRenderPassStateSharedPtr renderPassState(HdStRenderPassState::New());
+    HdRenderPassStateSharedPtr renderPassState(
+        HdStResourceFactory::GetInstance()->NewRenderPassState());
     HdRenderPassSharedPtr renderPass(
         new HdSt_RenderPass(index.get(), collection));
     HdEngine engine(HdEngine::OpenGL);
