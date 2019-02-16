@@ -490,8 +490,8 @@ protected:
     HdxCompositor _compositor;
     GarchDrawTargetRefPtr _drawTarget;
 
-#if defined(ARCH_GFX_METAL)
     RenderOutput _renderOutput;
+#if defined(ARCH_GFX_METAL)
     MTLRenderPassDescriptor *_mtlRenderPassDescriptorForInterop;
     MTLRenderPassDescriptor *_mtlRenderPassDescriptorForNativeMetal;
     MTLRenderPassDescriptor *_mtlRenderPassDescriptor;

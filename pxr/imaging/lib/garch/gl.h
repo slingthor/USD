@@ -68,6 +68,9 @@ typedef GLvoid (*ArchGLCallbackType)(...);
 #define GL_COMPUTE_SHADER 0x91B9
 #define GL_TESS_EVALUATION_SHADER 0x8E87
 #define GL_TESS_CONTROL_SHADER 0x8E88
+#define GL_SRC1_COLOR 0x88F9
+#define GL_ONE_MINUS_SRC1_COLOR 0x88FA
+#define GL_ONE_MINUS_SRC1_ALPHA 0x88FB
 
 
 #if defined(ARCH_OS_MACOS)
@@ -100,10 +103,7 @@ typedef GLvoid (*ArchGLCallbackType)(...);
 #define GL_INT_SAMPLER_BUFFER 0x8DD0
 #define GL_CLAMP_TO_BORDER 0x812D
 #define GL_SAMPLER_1D 0x8B5D
-#define GL_SRC1_COLOR 0x88F9
 #define GL_SRC1_ALPHA 0x8589
-#define GL_ONE_MINUS_SRC1_COLOR 0x88FA
-#define GL_ONE_MINUS_SRC1_ALPHA 0x88FB
 #define GL_PROGRAM_POINT_SIZE 0x8642
 typedef double GLdouble;
 typedef int64_t GLint64EXT;

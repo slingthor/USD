@@ -423,7 +423,7 @@ UsdImagingGLEngine::SetCameraState(
     
     modifiedProjMatrix = projectionMatrix * zTransform;
 #else
-    GfMatrix4d &modifiedProjMatrix = projectionMatrix;
+    GfMatrix4d const &modifiedProjMatrix = projectionMatrix;
 #endif
 
     // usdview passes these matrices from OpenGL state.
@@ -631,7 +631,7 @@ UsdImagingGLEngine::TestIntersection(
     
     projectionMatrix = inProjectionMatrix * zTransform;
 #else
-    GfMatrix4d &projectionMatrix = inProjectionMatrix;
+    GfMatrix4d const &projectionMatrix = inProjectionMatrix;
 #endif
 
     SdfPath rootPath = _delegate->GetPathForIndex(root.GetPath());
