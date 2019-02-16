@@ -26,7 +26,7 @@
 #ifndef HDST_MSL_PROGRAM_H
 #define HDST_MSL_PROGRAM_H
 
-#define GENERATE_METAL_DEBUG_SOURCE_CODE 1
+//#define GENERATE_METAL_DEBUG_SOURCE_CODE
 
 #include "pxr/pxr.h"
 #include "pxr/imaging/hdSt/api.h"
@@ -220,11 +220,6 @@ private:
     id<MTLFunction> _computeGeometryFunction;
     
     id<MTLRenderPipelineState> _pipelineState;
-	
-    uint32_t _vertexFunctionIdx;
-    uint32_t _fragmentFunctionIdx;
-    uint32_t _computeFunctionIdx;
-    uint32_t _computeGeometryFunctionIdx;
 
     bool _valid;
     HdStResourceMetal  _uniformBuffer;

@@ -27,6 +27,8 @@
 /// \file usdImaging/unitTestHelper.h
 
 #include "pxr/pxr.h"
+#include "pxr/base/arch/defines.h"
+
 #include "pxr/usdImaging/usdImaging/delegate.h"
 
 #include "pxr/imaging/hd/changeTracker.h"

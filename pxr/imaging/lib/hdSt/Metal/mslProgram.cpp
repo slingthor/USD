@@ -114,7 +114,6 @@ HdStMSLProgram::HdStMSLProgram(TfToken const &role)
 : HdStProgram(role)
 , _role(role)
 , _vertexFunction(nil), _fragmentFunction(nil), _computeFunction(nil), _computeGeometryFunction(nil)
-, _vertexFunctionIdx(0), _fragmentFunctionIdx(0), _computeFunctionIdx(0), _computeGeometryFunctionIdx(0)
 , _valid(false)
 , _uniformBuffer(role)
 , _buildTarget(kMSL_BuildTarget_Regular)
@@ -131,7 +130,7 @@ HdStMSLProgram::~HdStMSLProgram()
     _bindingMap.clear();
 }
 
-#if GENERATE_METAL_DEBUG_SOURCE_CODE
+#if defined(GENERATE_METAL_DEBUG_SOURCE_CODE)
 
 NSUInteger dumpedFileCount = 0;
 
@@ -301,16 +300,12 @@ HdStMSLProgram::CompileShader(GLenum type,
     
     if (type == GL_VERTEX_SHADER) {
         _vertexFunction = function;
-        _vertexFunctionIdx = dumpedFileCount;
     } else if (type == GL_FRAGMENT_SHADER) {
         _fragmentFunction = function;
-        _fragmentFunctionIdx = dumpedFileCount;
     } else if (type == GL_COMPUTE_SHADER) {
         _computeFunction = function;
-        _computeFunctionIdx = dumpedFileCount;
     } else if (type == GL_GEOMETRY_SHADER) {
         _computeGeometryFunction = function;
-        _computeGeometryFunctionIdx = dumpedFileCount;
     }
 
     return success;

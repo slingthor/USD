@@ -58,7 +58,7 @@
 
 #define MTL_PRIMVAR_PREFIX "__primVar_"
 
-#if GENERATE_METAL_DEBUG_SOURCE_CODE
+#if defined(GENERATE_METAL_DEBUG_SOURCE_CODE)
 template <typename T>
 void METAL_DEBUG_COMMENTfn(std::stringstream *str, T t)
 {
