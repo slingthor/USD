@@ -76,51 +76,72 @@ HdSt_SmoothNormalsComputationMetal::_Execute(
     int numPoints)
 {
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
-    HdStMSLProgramSharedPtr const &mslProgram(boost::dynamic_pointer_cast<HdStMSLProgram>(computeProgram));
+    HdStMSLProgramSharedPtr const &mslProgram(
+        boost::dynamic_pointer_cast<HdStMSLProgram>(computeProgram));
     id<MTLFunction> computeFunction = mslProgram->GetComputeFunction();
     
     // Only the normals are writebale
     unsigned long immutableBufferMask = (1 << 0) | (1 << 2) | (1 << 3);
     
-    // The output of this work is consumed by the GS, so we need to ensure it's executed before the GS
+    // The output of this work is consumed by the GS, so we need to ensure
+    // it's executed before the GS
     if (!context->GeometryShadersActive()) {
         context->CreateCommandBuffer(METALWORKQUEUE_GEOMETRY_SHADER);
-        context->LabelCommandBuffer(@"Geometry Shaders (Smooth Normals)", METALWORKQUEUE_GEOMETRY_SHADER);
+        context->LabelCommandBuffer(@"Geometry Shaders (Smooth Normals)",
+            METALWORKQUEUE_GEOMETRY_SHADER);
     }
     
-    id <MTLComputeCommandEncoder> computeEncoder = context->GetComputeEncoder(METALWORKQUEUE_GEOMETRY_SHADER);
+    id <MTLComputeCommandEncoder> computeEncoder =
+        context->GetComputeEncoder(METALWORKQUEUE_GEOMETRY_SHADER);
     computeEncoder.label = @"Compute pass for GPU Smooth Normals";
     
-    context->SetComputeEncoderState(computeFunction, 4, immutableBufferMask, @"GPU Smooth Normals pipeline state", METALWORKQUEUE_GEOMETRY_SHADER);
+    context->SetComputeEncoderState(
+        computeFunction, 4, immutableBufferMask,
+        @"GPU Smooth Normals pipeline state", METALWORKQUEUE_GEOMETRY_SHADER);
 
     [computeEncoder setBuffer:points->GetId()    offset:0 atIndex:0];
     [computeEncoder setBuffer:normals->GetId()   offset:0 atIndex:1];
     [computeEncoder setBuffer:adjacency->GetId() offset:0 atIndex:2];
-    [computeEncoder setBytes:(const void *)&uniform length:sizeof(uniform) atIndex:3];
+    [computeEncoder setBytes:(const void *)&uniform
+                      length:sizeof(uniform)
+                     atIndex:3];
     
-    int maxThreadsPerThreadgroup = context->GetMaxThreadsPerThreadgroup(METALWORKQUEUE_GEOMETRY_SHADER);
+    int maxThreadsPerThreadgroup =
+        context->GetMaxThreadsPerThreadgroup(METALWORKQUEUE_GEOMETRY_SHADER);
+    MTLSize maxThreadsPerGroup = [context->device maxThreadsPerThreadgroup];
+    
+    if (maxThreadsPerThreadgroup > maxThreadsPerGroup.width) {
+        maxThreadsPerThreadgroup = maxThreadsPerGroup.width;
+    }
+
+    MTLSize threadgroupCount =
+        MTLSizeMake(fmin(maxThreadsPerThreadgroup, numPoints), 1, 1);
     
     if ([context->device supportsFeatureSet:METAL_FEATURESET_FOR_DISPATCHTHREADS]) {
-        MTLSize threadGroupcount = MTLSizeMake(fmin(maxThreadsPerThreadgroup, numPoints), 1, 1);
-        
-        [computeEncoder dispatchThreads:MTLSizeMake(numPoints, 1, 1) threadsPerThreadgroup:threadGroupcount];
+        [computeEncoder dispatchThreads:MTLSizeMake(numPoints, 1, 1)
+                  threadsPerThreadgroup:threadgroupCount];
     }
     else {
-        MTLSize threadgroupCount = MTLSizeMake(fmin(maxThreadsPerThreadgroup, numPoints), 1, 1);
-        MTLSize threadsPerGrid   = MTLSizeMake(numPoints / threadgroupCount.width, 1, 1);
+        MTLSize threadsPerGrid =
+            MTLSizeMake(numPoints / threadgroupCount.width, 1, 1);
         
-        [computeEncoder dispatchThreadgroups:threadsPerGrid threadsPerThreadgroup:threadgroupCount];
+        [computeEncoder dispatchThreadgroups:threadsPerGrid
+                       threadsPerThreadgroup:threadgroupCount];
 
         int remainder = numPoints % threadgroupCount.width;
         if (remainder) {
             Uniform localUniforms(uniform);
 
-            localUniforms.invocationOffset = threadgroupCount.width * threadsPerGrid.width;
-            [computeEncoder setBytes:(const void *)&localUniforms length:sizeof(localUniforms) atIndex:3];
+            localUniforms.invocationOffset =
+                threadgroupCount.width * threadsPerGrid.width;
+            [computeEncoder setBytes:(const void *)&localUniforms
+                              length:sizeof(localUniforms)
+                             atIndex:3];
 
             threadgroupCount = MTLSizeMake(remainder, 1, 1);
             threadsPerGrid   = MTLSizeMake(1, 1, 1);
-            [computeEncoder dispatchThreadgroups:threadsPerGrid threadsPerThreadgroup:threadgroupCount];
+            [computeEncoder dispatchThreadgroups:threadsPerGrid
+                           threadsPerThreadgroup:threadgroupCount];
         }
     }
     

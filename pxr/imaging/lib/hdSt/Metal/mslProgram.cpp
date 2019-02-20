@@ -596,6 +596,12 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
     if (doMVAComputeGS && !useDispatchThreads) {
         maxThreadsPerThreadgroup = METAL_GS_THREADGROUP_SIZE;
     }
+    
+    MTLSize maxThreadsPerGroup = [context->device maxThreadsPerThreadgroup];
+    
+    if (maxThreadsPerThreadgroup > maxThreadsPerGroup.width) {
+        maxThreadsPerThreadgroup = maxThreadsPerGroup.width;
+    }
 
     uint32_t partIndexOffset = 0;
     while(numPrimitives > 0) {

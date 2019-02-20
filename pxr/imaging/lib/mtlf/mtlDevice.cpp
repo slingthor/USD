@@ -157,7 +157,6 @@ MtlfMetalContext::MtlfMetalContext(id<MTLDevice> _device, int width, int height)
 , isRenderPassDescriptorPatched(false)
 {
     if (_device == nil) {
-        // Select Intel GPU if possible due to current issues on AMD. Revert when fixed - MTL_FIXME
         //device = MtlfMetalContext::GetMetalDevice(PREFER_INTEGRATED_GPU);
         device = MtlfMetalContext::GetMetalDevice(PREFER_DISCRETE_GPU);
     }
@@ -1009,7 +1008,7 @@ void MtlfMetalContext::SetRenderPipelineState()
     }
     wq->currentRenderPipelineDescriptorHash = hashVal;
     
-    boost::unordered_map<size_t, id<MTLRenderPipelineState>>::const_iterator pipelineStateIt = renderPipelineStateMap.find(wq->currentRenderPipelineDescriptorHash);
+    auto pipelineStateIt = renderPipelineStateMap.find(wq->currentRenderPipelineDescriptorHash);
     
     if (pipelineStateIt != renderPipelineStateMap.end()) {
         pipelineState = pipelineStateIt->second;
@@ -1286,7 +1285,7 @@ NSUInteger MtlfMetalContext::SetComputeEncoderState(id<MTLFunction>     computeF
     wq->currentComputePipelineDescriptorHash = hashVal;
     
     // Search map to see if we've created a pipeline state object for this already
-    boost::unordered_map<size_t, id<MTLComputePipelineState>>::const_iterator computePipelineStateIt = computePipelineStateMap.find(wq->currentComputePipelineDescriptorHash);
+    auto computePipelineStateIt = computePipelineStateMap.find(wq->currentComputePipelineDescriptorHash);
     
     if (computePipelineStateIt != computePipelineStateMap.end()) {
         // Retrieve pre generated state
