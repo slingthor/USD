@@ -1505,7 +1505,8 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
                 if(!isPresentInVS) {
                     cs_EP_FuncDef   << "\n    , " << (isPtr ? "device const " : "")
                                     << (prefixScope ? "ProgramScope_Geometry::" : "")
-                                    << _GetPackedType(it->dataType, true) << (isPtr ? "* " : " ")
+                                    << _GetPackedMSLType(_GetPackedType(it->dataType, true))
+                                    << (isPtr ? "* " : " ")
                                     << name << "[[buffer(" << currentUniformBufferSlot << ")]]";
                     mslProgram->AddBinding(name, currentUniformBufferSlot++, kMSL_BindingType_UniformBuffer, kMSL_ProgramStage_Compute);
                 }
