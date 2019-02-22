@@ -1653,7 +1653,8 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
             }
             if (_buildTarget == kMSL_BuildTarget_MVA_ComputeGS) //_instanceID is the real Metal instance ID if not using ComputeGS
                 vsEntryPointCode << "    uint _instanceID = _index / drawArgs->indexCount;\n";
-            vsEntryPointCode    << "    uint _gsPrimitiveID = _gsVertexID / " << (numVerticesOutPerPrimitive / numPrimitivesOutPerPrimitive) << ";\n"
+            vsEntryPointCode    << "    uint _gsPrimitiveID = _gsVertexID / "
+                                << (numVerticesOutPerPrimitive / numPrimitivesOutPerPrimitive) << ";\n"
                                 << "    _index = _index % drawArgs->indexCount;\n"
                                 << "    uint gl_InstanceID = _instanceID;\n"
                                 << "    uint gl_BaseVertex = drawArgs->baseVertex;\n"
@@ -1836,8 +1837,10 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
                     mslProgram->AddBinding(bindingName, assignedSlot, kMSL_BindingType_UniformBuffer, kMSL_ProgramStage_Fragment);
                 }
                 
-                fsFuncDef << "\n    , const device " << ((it->usage & TParam::Usage::ProgramScope) ? "ProgramScope_Frag::" : "")
-                          << _GetPackedType(it->dataType, true) << "* " << name << "[[buffer(" << assignedSlot << ")]]";
+                fsFuncDef << "\n    , const device "
+                          << ((it->usage & TParam::Usage::ProgramScope) ? "ProgramScope_Frag::" : "")
+                          << _GetPackedMSLType(_GetPackedType(it->dataType, true))
+                          << "* " << name << "[[buffer(" << assignedSlot << ")]]";
             }
             //else
                 //This parameter is a built-in variable and we won't add it to the function definition as built-ins get added regardless in a different way.
@@ -3991,10 +3994,10 @@ HdSt_CodeGenMSL::_GenerateElementPrimvar()
         TF_FOR_ALL (it, _metaData.elementData) {
             HdBinding binding = it->first;
             TfToken const &name = it->second.name;
-            TfToken const &dataType = it->second.dataType;
+            TfToken const &dataType = _GetPackedType(it->second.dataType, false);
 
             // MTL_FIXME - changing from VS Input params to PS because none of this appaears to be associated with vertex shaders at all... (so possibly nothing to fix)
-            _EmitDeclarationPtr(declarations, name, dataType, TfToken(), binding);
+            _EmitDeclarationPtr(declarations, name, TfToken(_GetPackedMSLType(dataType)), TfToken(), binding);
             _AddInputPtrParam(_mslPSInputParams, name, dataType, TfToken(), binding);
             TParam& entryGS(_AddInputPtrParam(_mslGSInputParams, name, dataType, TfToken(), binding));
             entryGS.usage |= TParam::EntryFuncArgument;
