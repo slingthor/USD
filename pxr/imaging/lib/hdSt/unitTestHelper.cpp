@@ -39,8 +39,15 @@
 #include <string>
 #include <sstream>
 
-PXR_NAMESPACE_OPEN_SCOPE
+#if defined(ARCH_GFX_METAL)
+#define HdStRenderDelegateTest HdStRenderDelegateMetal
+#include "pxr/imaging/hdSt/Metal/renderDelegateMetal.h"
+#else
+#define HdStRenderDelegateTest HdStRenderDelegateOpenGL
+#include "pxr/imaging/hdSt/GL/renderDelegateGL.h"
+#endif
 
+PXR_NAMESPACE_OPEN_SCOPE
 
 TF_DEFINE_PRIVATE_TOKENS(
     _tokens,
@@ -99,16 +106,16 @@ _BuildArray(T values[], int numValues)
 
 HdSt_TestDriver::HdSt_TestDriver()
  : _engine(PXR_UNITTEST_GFX_ARCH)
- , _renderDelegate()
+ , _renderDelegate(new HdStRenderDelegateTest)
  , _renderIndex(nullptr)
  , _sceneDelegate(nullptr)
  , _reprToken()
  , _geomPass()
  , _geomAndGuidePass()
- , _renderPassState(
-    boost::dynamic_pointer_cast<HdStRenderPassState>(
-        _renderDelegate.CreateRenderPassState()))
 {
+    _renderPassState =
+        boost::dynamic_pointer_cast<HdStRenderPassState>(
+            _renderDelegate->CreateRenderPassState());
     if (TfGetenv("HD_ENABLE_SMOOTH_NORMALS", "CPU") == "CPU" ||
         TfGetenv("HD_ENABLE_SMOOTH_NORMALS", "CPU") == "GPU") {
         _Init(HdReprSelector(HdReprTokens->smoothHull));
@@ -119,31 +126,31 @@ HdSt_TestDriver::HdSt_TestDriver()
 
 HdSt_TestDriver::HdSt_TestDriver(TfToken const &reprName)
  : _engine(PXR_UNITTEST_GFX_ARCH)
- , _renderDelegate()
+ , _renderDelegate(new HdStRenderDelegateTest)
  , _renderIndex(nullptr)
  , _sceneDelegate(nullptr)
  , _reprToken()
  , _geomPass()
  , _geomAndGuidePass()
- , _renderPassState(
-    boost::dynamic_pointer_cast<HdStRenderPassState>(
-        _renderDelegate.CreateRenderPassState()))
 {
+    _renderPassState =
+    boost::dynamic_pointer_cast<HdStRenderPassState>(
+                                                     _renderDelegate->CreateRenderPassState());
     _Init(HdReprSelector(reprName));
 }
 
 HdSt_TestDriver::HdSt_TestDriver(HdReprSelector const &reprToken)
  : _engine(PXR_UNITTEST_GFX_ARCH)
- , _renderDelegate()
+ , _renderDelegate(new HdStRenderDelegateTest)
  , _renderIndex(nullptr)
  , _sceneDelegate(nullptr)
  , _reprToken()
  , _geomPass()
  , _geomAndGuidePass()
- , _renderPassState(
-    boost::dynamic_pointer_cast<HdStRenderPassState>(
-        _renderDelegate.CreateRenderPassState()))
 {
+    _renderPassState =
+        boost::dynamic_pointer_cast<HdStRenderPassState>(
+        _renderDelegate->CreateRenderPassState());
     _Init(reprToken);
 }
 
@@ -151,12 +158,13 @@ HdSt_TestDriver::~HdSt_TestDriver()
 {
     delete _sceneDelegate;
     delete _renderIndex;
+    delete _renderDelegate;
 }
 
 void
 HdSt_TestDriver::_Init(HdReprSelector const &reprToken)
 {
-    _renderIndex = HdRenderIndex::New(&_renderDelegate);
+    _renderIndex = HdRenderIndex::New(_renderDelegate);
     TF_VERIFY(_renderIndex != nullptr);
 
     _sceneDelegate = new HdSt_UnitTestDelegate(_renderIndex,

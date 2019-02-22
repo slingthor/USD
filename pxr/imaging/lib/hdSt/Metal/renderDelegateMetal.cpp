@@ -233,10 +233,7 @@ void HdStRenderDelegateMetal::PrepareRender(
     
     // Set the render pass descriptor to use for the render encoders
     context->SetRenderPassDescriptor(_mtlRenderPassDescriptor);
-    if (_renderOutput == DelegateParams::RenderOutput::Metal) {
-        [_mtlRenderPassDescriptor release];
-        _mtlRenderPassDescriptor = nil;
-    }
+
     // hydra orients all geometry during topological processing so that
     // front faces have ccw winding. We disable culling because culling
     // is handled by fragment shader discard.
@@ -286,7 +283,12 @@ void HdStRenderDelegateMetal::FinalizeRender()
         _renderOutput == DelegateParams::RenderOutput::OpenGL, false);
     
     context->EndFrame();
-    
+
+    if (_renderOutput == DelegateParams::RenderOutput::Metal) {
+        [_mtlRenderPassDescriptor release];
+        _mtlRenderPassDescriptor = nil;
+    }
+
     // Finalize rendering here & push the command buffer to the GPU
     if (_renderOutput == DelegateParams::RenderOutput::OpenGL) {
         context->BlitColorTargetToOpenGL();

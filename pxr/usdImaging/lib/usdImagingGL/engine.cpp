@@ -1128,6 +1128,9 @@ UsdImagingGLEngine::_Render(const UsdImagingGLRenderParams &params)
             HdStRenderDelegate::DelegateParams::RenderOutput::OpenGL
 #endif
               );
+#if defined(ARCH_GFX_METAL)
+        delegateParams.mtlRenderPassDescriptorForNativeMetal = params.mtlRenderPassDescriptorForNativeMetal;
+#endif
         hdStRenderDelegate->PrepareRender(delegateParams);
     }
 
@@ -1138,7 +1141,6 @@ UsdImagingGLEngine::_Render(const UsdImagingGLRenderParams &params)
 
     HdTaskSharedPtrVector tasks = _taskController->GetTasks();
     _engine->Execute(*_renderIndex, tasks);
-
 
     if (hdStRenderDelegate) {
         hdStRenderDelegate->FinalizeRender();

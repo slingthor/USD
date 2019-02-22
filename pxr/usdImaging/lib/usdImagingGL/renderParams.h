@@ -28,6 +28,8 @@
 #define USDIMAGINGGL_RENDERPARAMS_H
 
 #include "pxr/pxr.h"
+#include "pxr/base/arch/defines.h"
+
 #include "pxr/usdImaging/usdImagingGL/api.h"
 
 #include "pxr/imaging/hdSt/renderDelegate.h"
@@ -90,6 +92,10 @@ public:
     GfVec4f clearColor;
     TfToken colorCorrectionMode;
     GfVec2i renderResolution;
+    
+#if defined(ARCH_GFX_METAL)
+    MTLRenderPassDescriptor *mtlRenderPassDescriptorForNativeMetal;
+#endif
 
     inline UsdImagingGLRenderParams();
 
@@ -126,6 +132,9 @@ UsdImagingGLRenderParams::UsdImagingGLRenderParams() :
     clearColor(0,0,0,1),
     renderResolution(100,100)
 {
+#if defined(ARCH_GFX_METAL)
+    mtlRenderPassDescriptorForNativeMetal = nil;
+#endif
 }
 
 bool 
