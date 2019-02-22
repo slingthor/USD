@@ -15,7 +15,7 @@ if (${PXR_ENABLE_GL_SUPPORT})
     set(OPENGL_LIBRARY              glf
                                     ${OPENGL_gl_LIBRARY}
                                     ${OPENGL_glu_LIBRARY})
-    set(OPENGL_PRIVATE_CLASSES      GL/legacyEngine)
+    set(OPENGL_PRIVATE_CLASSES      legacyEngine)
 else()
     set(OPENGL_INCLUDE_DIR          "")
 endif()

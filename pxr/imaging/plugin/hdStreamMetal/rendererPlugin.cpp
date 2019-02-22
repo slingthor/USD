@@ -1,5 +1,5 @@
 //
-// Copyright 2018 Pixar
+// Copyright 2017 Pixar
 //
 // Licensed under the Apache License, Version 2.0 (the "Apache License")
 // with the following modification; you may not use this file except in
@@ -21,35 +21,44 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-
-/// \file usdImagingGL/renderSettings.h
-
-#ifndef USDIMAGINGGL_RENDERSETTINGS_H
-#define USDIMAGINGGL_RENDERSETTINGS_H
-
 #include "pxr/pxr.h"
-#include "pxr/base/tf/token.h"
-#include "pxr/base/vt/value.h"
+#include "pxr/imaging/hdStreamMetal/rendererPlugin.h"
+
+#include "pxr/imaging/hdSt/Metal/renderDelegateMetal.h"
+#include "pxr/imaging/hdx/rendererPluginRegistry.h"
+
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-struct UsdImagingGLRendererSetting {
-    enum Type {
-        TYPE_FLAG,
-        TYPE_INT,
-        TYPE_FLOAT,
-        TYPE_STRING,
-        TYPE_OPTION
-    };
-    std::string name;
-    TfToken key;
-    Type type;
-    VtValue defValue;
-};
+TF_REGISTRY_FUNCTION(TfType)
+{
+    HdxRendererPluginRegistry::Define<HdStreamMetalRendererPlugin>();
+}
 
-typedef std::vector<UsdImagingGLRendererSetting>
-    UsdImagingGLRendererSettingsList;
+HdRenderDelegate *
+HdStreamMetalRendererPlugin::CreateRenderDelegate()
+{
+    return new HdStRenderDelegateMetal();
+}
+
+HdRenderDelegate*
+HdStreamMetalRendererPlugin::CreateRenderDelegate(
+    HdRenderSettingsMap const& settingsMap)
+{
+    return new HdStRenderDelegateMetal(settingsMap);
+}
+
+void
+HdStreamMetalRendererPlugin::DeleteRenderDelegate(HdRenderDelegate *renderDelegate)
+{
+    delete renderDelegate;
+}
+
+bool
+HdStreamMetalRendererPlugin::IsSupported() const
+{
+    return HdStRenderDelegate::IsSupported();
+}
+
 
 PXR_NAMESPACE_CLOSE_SCOPE
-
-#endif // USDIMAGINGGL_RENDERSETTINGS_H

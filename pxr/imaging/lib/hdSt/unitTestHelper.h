@@ -26,7 +26,7 @@
 
 #include "pxr/pxr.h"
 #include "pxr/imaging/hdSt/lightingShader.h"
-#include "pxr/imaging/hdSt/renderDelegate.h"
+#include "pxr/imaging/hdSt/GL/renderDelegateGL.h"
 #include "pxr/imaging/hdSt/renderPassState.h"
 #include "pxr/imaging/hdSt/unitTestDelegate.h"
 
@@ -91,7 +91,7 @@ private:
     void _Init(HdReprSelector const &reprToken);
 
     HdEngine _engine;
-    HdStRenderDelegate   _renderDelegate;
+    HdStRenderDelegateGL   _renderDelegate;
     HdRenderIndex       *_renderIndex;
     HdSt_UnitTestDelegate *_sceneDelegate;
     HdReprSelector _reprToken;

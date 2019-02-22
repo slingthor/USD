@@ -52,13 +52,19 @@ TfToken
 HdxRendererPluginRegistry::GetDefaultPluginId()
 {
     // Get all the available plugins to see if any of them is supported on this
-    // platform and use the first one as the default.
+    // platform and use the highest priority one as the default.
     // 
     // Important note, we want to avoid loading plugins as much as possible, 
     // we would prefer to only load plugins when the user asks for them.  So
     // we will only load plugins until we find the first one that works.
     HfPluginDescVector pluginDescriptors;
     GetPluginDescs(&pluginDescriptors);
+    
+    std::sort(pluginDescriptors.begin(), pluginDescriptors.end(),
+         [](HfPluginDesc lhs, HfPluginDesc rhs) {
+             return lhs.priority < rhs.priority;
+         });
+
     for (const HfPluginDesc &desc : pluginDescriptors) {
         
         HdxRendererPlugin *plugin = HdxRendererPluginRegistry::GetInstance().

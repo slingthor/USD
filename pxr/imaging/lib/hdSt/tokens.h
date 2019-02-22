@@ -53,7 +53,8 @@ PXR_NAMESPACE_OPEN_SCOPE
     (flatNormals)
 
 #define HDST_RENDER_SETTINGS_TOKENS             \
-    (enableTinyPrimCulling)
+    (enableTinyPrimCulling)                     \
+    (graphicsAPI)
 
 TF_DECLARE_PUBLIC_TOKENS(HdStGLSLProgramTokens, HDST_API,
                          HDST_GLSL_PROGRAM_TOKENS);

@@ -332,9 +332,9 @@ UsdImagingGLLegacyEngine::Render(const UsdPrim& root,
         glCullFace(USD_2_GL_CULL_FACE[(size_t)params.cullStyle]);
     }
 
-    if (_params.drawMode != UsdImagingGLDrawMode::DRAW_GEOM_ONLY      &&
-        _params.drawMode != UsdImagingGLDrawMode::DRAW_GEOM_SMOOTH    &&
-        _params.drawMode != UsdImagingGLDrawMode::DRAW_GEOM_FLAT) {
+    if (_params.drawMode != HdStDrawMode::DRAW_GEOM_ONLY      &&
+        _params.drawMode != HdStDrawMode::DRAW_GEOM_SMOOTH    &&
+        _params.drawMode != HdStDrawMode::DRAW_GEOM_FLAT) {
         glEnable(GL_COLOR_MATERIAL);
         glColorMaterial(GL_FRONT_AND_BACK, GL_DIFFUSE); 
                 
@@ -345,12 +345,12 @@ UsdImagingGLLegacyEngine::Render(const UsdPrim& root,
     }
 
     switch (_params.drawMode) {
-    case UsdImagingGLDrawMode::DRAW_WIREFRAME:
+    case HdStDrawMode::DRAW_WIREFRAME:
         glDisable( GL_LIGHTING );
         glPolygonMode( GL_FRONT_AND_BACK, GL_LINE );
         break;
-    case UsdImagingGLDrawMode::DRAW_SHADED_FLAT:
-    case UsdImagingGLDrawMode::DRAW_SHADED_SMOOTH:
+    case HdStDrawMode::DRAW_SHADED_FLAT:
+    case HdStDrawMode::DRAW_SHADED_SMOOTH:
         break;
     default:
         break;
@@ -413,23 +413,23 @@ UsdImagingGLLegacyEngine::Render(const UsdPrim& root,
     }
 
     switch (_params.drawMode) {
-    case UsdImagingGLDrawMode::DRAW_GEOM_FLAT:
-    case UsdImagingGLDrawMode::DRAW_GEOM_SMOOTH:
+    case HdStDrawMode::DRAW_GEOM_FLAT:
+    case HdStDrawMode::DRAW_GEOM_SMOOTH:
         glEnableClientState(GL_NORMAL_ARRAY);
         glPolygonMode( GL_FRONT_AND_BACK, GL_FILL);
         break;
-    case UsdImagingGLDrawMode::DRAW_SHADED_FLAT:
+    case HdStDrawMode::DRAW_SHADED_FLAT:
         glEnableClientState(GL_NORMAL_ARRAY);
         glEnableClientState(GL_COLOR_ARRAY);
         glPolygonMode( GL_FRONT_AND_BACK, GL_FILL);
         glShadeModel(GL_FLAT);
         break;
-    case UsdImagingGLDrawMode::DRAW_SHADED_SMOOTH:
+    case HdStDrawMode::DRAW_SHADED_SMOOTH:
         glEnableClientState(GL_NORMAL_ARRAY);
         glEnableClientState(GL_COLOR_ARRAY);
         glPolygonMode( GL_FRONT_AND_BACK, GL_FILL);
         break;
-    case UsdImagingGLDrawMode::DRAW_POINTS:
+    case HdStDrawMode::DRAW_POINTS:
         glEnableClientState(GL_COLOR_ARRAY);
         glPolygonMode( GL_FRONT_AND_BACK, GL_POINT);
     default:
@@ -437,7 +437,7 @@ UsdImagingGLLegacyEngine::Render(const UsdPrim& root,
     }
 
     // Draw the overlay wireframe, if requested.
-    if (_params.drawMode == UsdImagingGLDrawMode::DRAW_WIREFRAME_ON_SURFACE) {
+    if (_params.drawMode == HdStDrawMode::DRAW_WIREFRAME_ON_SURFACE) {
         // We have to push lighting again since we don't know what state we want
         // after this without popping.
         glPushAttrib( GL_LIGHTING_BIT );
@@ -457,7 +457,7 @@ UsdImagingGLLegacyEngine::Render(const UsdPrim& root,
     // Draw polygons & curves.
     _DrawPolygons(drawID);
 
-    if (_params.drawMode == UsdImagingGLDrawMode::DRAW_WIREFRAME_ON_SURFACE)
+    if (_params.drawMode == HdStDrawMode::DRAW_WIREFRAME_ON_SURFACE)
         glDisable(GL_POLYGON_OFFSET_FILL);
 
     _DrawLines(drawID);

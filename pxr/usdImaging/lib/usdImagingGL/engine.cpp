@@ -55,6 +55,7 @@
 #if defined(ARCH_GFX_OPENGL)
 #include "pxr/imaging/hdSt/GL/resourceFactoryGL.h"
 #endif
+#include "pxr/imaging/hdSt/tokens.h"
 
 #include "pxr/base/tf/getenv.h"
 #include "pxr/base/tf/stl.h"
@@ -81,8 +82,7 @@ static
 bool
 _IsHydraEnabled()
 {
-#if defined(ARCH_GFX_METAL)
-#else
+#if defined(ARCH_GFX_OPENGL)
     // Make sure there is an OpenGL context when 
     // trying to initialize Hydra/Reference
     GlfGLContextSharedPtr context = GlfGLContext::GetCurrentGLContext();
@@ -140,10 +140,6 @@ UsdImagingGLEngine::UsdImagingGLEngine()
     , _renderTags()
     , _restoreViewport(0)
     , _useFloatPointDrawTarget(false)
-#if defined(ARCH_GFX_METAL)
-    , _mtlRenderPassDescriptorForInterop(nil)
-    , _mtlRenderPassDescriptor(nil)
-#endif
 {
 #if defined(ARCH_GFX_METAL)
     _engine = new HdEngine(HdEngine::Metal);
@@ -151,12 +147,6 @@ UsdImagingGLEngine::UsdImagingGLEngine()
 #else
     _engine = new HdEngine(HdEngine::OpenGL);
     _resourceFactory = new HdStResourceFactoryGL();
-#endif
-
-#if defined(ARCH_GFX_OPENGL)
-    _renderOutput = RenderOutput::OpenGL;
-#else
-    _renderOutput = RenderOutput::Metal;
 #endif
     
     GarchResourceFactory::GetInstance().SetResourceFactory(dynamic_cast<GarchResourceFactoryInterface*>(_resourceFactory));
@@ -201,8 +191,6 @@ UsdImagingGLEngine::UsdImagingGLEngine(
     , _restoreViewport(0)
     , _useFloatPointDrawTarget(false)
 #if defined(ARCH_GFX_METAL)
-    , _mtlRenderPassDescriptorForInterop(nil)
-    , _mtlRenderPassDescriptor(nil)
     , _legacyImpl(nullptr)
 #endif
 {
@@ -212,12 +200,6 @@ UsdImagingGLEngine::UsdImagingGLEngine(
 #else
     _engine = new HdEngine(HdEngine::OpenGL);
     _resourceFactory = new HdStResourceFactoryGL();
-#endif
-    
-#if defined(ARCH_GFX_OPENGL)
-    _renderOutput = RenderOutput::OpenGL;
-#else
-    _renderOutput = RenderOutput::Metal;
 #endif
     
     GarchResourceFactory::GetInstance().SetResourceFactory(dynamic_cast<GarchResourceFactoryInterface*>(_resourceFactory));
@@ -748,12 +730,6 @@ UsdImagingGLEngine::GetPrimPathFromInstanceIndex(
 //----------------------------------------------------------------------------
 // Renderer Plugin Management
 //----------------------------------------------------------------------------
-#if defined(ARCH_GFX_METAL)
-static std::string _MetalPluginDescriptor(id<MTLDevice> device)
-{
-    return std::string("Hydra Metal - ") + [[device name] UTF8String];
-}
-#endif
 /* static */
 TfTokenVector
 UsdImagingGLEngine::GetRendererPlugins()
@@ -766,29 +742,11 @@ UsdImagingGLEngine::GetRendererPlugins()
     HfPluginDescVector pluginDescriptors;
     HdxRendererPluginRegistry::GetInstance().GetPluginDescs(&pluginDescriptors);
 
-#if defined(ARCH_GFX_METAL)
-#if defined(ARCH_OS_MACOS)
-    NSArray<id<MTLDevice>> *_deviceList = MTLCopyAllDevices();
-#else
-    NSMutableArray<id<MTLDevice>> *_deviceList = [[NSMutableArray alloc] init];
-    [_deviceList addObject:MTLCreateSystemDefaultDevice()];
-#endif
-    
     TfTokenVector plugins;
-    
-//    if (pluginDescriptors.size() != 1) {
-//        TF_FATAL_CODING_ERROR("There should only be one plugin!");
-//    }
-    
-    for (id<MTLDevice> dev in _deviceList) {
-        plugins.push_back(TfToken(_MetalPluginDescriptor(dev)));
-    }
-#else
-    TfTokenVector plugins;
+
     for(size_t i = 0; i < pluginDescriptors.size(); ++i) {
         plugins.push_back(pluginDescriptors[i].id);
     }
-#endif
 
     return plugins;
 }
@@ -803,10 +761,6 @@ UsdImagingGLEngine::GetRendererDisplayName(TfToken const &id)
         // and it automatically switches to our legacy engine.
         return std::string();
     }
-
-#if defined(ARCH_GFX_METAL)
-    return id;
-#endif
 
     HfPluginDesc pluginDescriptor;
     if (!TF_VERIFY(HdxRendererPluginRegistry::GetInstance().
@@ -829,7 +783,7 @@ UsdImagingGLEngine::GetCurrentRendererId() const
 }
 
 bool
-UsdImagingGLEngine::SetRendererPlugin(TfToken const &pluginId)
+UsdImagingGLEngine::SetRendererPlugin(TfToken const &pluginId, bool forceReload)
 {
     if (ARCH_UNLIKELY(_legacyImpl)) {
         return false;
@@ -837,39 +791,12 @@ UsdImagingGLEngine::SetRendererPlugin(TfToken const &pluginId)
 
     HdxRendererPlugin *plugin = nullptr;
     TfToken actualId = pluginId;
-    bool forceReload = false;
 
     // Special case: TfToken() selects the first plugin in the list.
     if (actualId.IsEmpty()) {
         actualId = HdxRendererPluginRegistry::GetInstance().
             GetDefaultPluginId();
     }
-#if defined(ARCH_GFX_METAL)
-#if defined(ARCH_OS_MACOS)
-    NSArray<id<MTLDevice>> *_deviceList = MTLCopyAllDevices();
-#else
-    NSMutableArray<id<MTLDevice>> *_deviceList = [[NSMutableArray alloc] init];
-    [_deviceList addObject:MTLCreateSystemDefaultDevice()];
-#endif
-    
-    for (id<MTLDevice> dev in _deviceList) {
-        if (pluginId == _MetalPluginDescriptor(dev))
-        {
-            actualId = HdxRendererPluginRegistry::GetInstance().
-            GetDefaultPluginId();
-            
-            if (dev != MtlfMetalContext::GetMetalContext()->device) {
-                // Tear it down and bring it back up with the new Metal device
-                forceReload = true;
-                
-                // Recreate the underlying Metal context
-                MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
-                MtlfMetalContext::RecreateInstance(dev, context->mtlColorTexture.width, context->mtlColorTexture.height);
-            }
-            break;
-        }
-    }
-#endif
 
     plugin = HdxRendererPluginRegistry::GetInstance().
         GetRendererPlugin(actualId);
@@ -907,11 +834,7 @@ UsdImagingGLEngine::SetRendererPlugin(TfToken const &pluginId)
 
     // Recreate the render index.
     _rendererPlugin = plugin;
-#if defined(ARCH_GFX_METAL)
-    _rendererId = TfToken(_MetalPluginDescriptor(MtlfMetalContext::GetMetalContext()->device));
-#else
     _rendererId = actualId;
-#endif
 
     HdRenderDelegate *renderDelegate = _rendererPlugin->CreateRenderDelegate();
     _renderIndex = HdRenderIndex::New(renderDelegate);
@@ -993,7 +916,8 @@ UsdImagingGLEngine::GetRendererSettingsList() const
     HdRenderSettingDescriptorList descriptors =
         _renderIndex->GetRenderDelegate()->GetRenderSettingDescriptors();
     UsdImagingGLRendererSettingsList ret;
-
+    
+    // Delegate options
     for (auto const& desc : descriptors) {
         UsdImagingGLRendererSetting r;
         r.key = desc.key;
@@ -1011,6 +935,8 @@ UsdImagingGLEngine::GetRendererSettingsList() const
             r.type = UsdImagingGLRendererSetting::TYPE_FLOAT;
         } else if (r.defValue.IsHolding<std::string>()) {
             r.type = UsdImagingGLRendererSetting::TYPE_STRING;
+        } else if (r.defValue.IsHolding<std::vector<std::string>>()) {
+            r.type = UsdImagingGLRendererSetting::TYPE_OPTION;
         } else {
             TF_WARN("Setting '%s' with type '%s' doesn't have a UI"
                     " implementation...",
@@ -1036,14 +962,63 @@ UsdImagingGLEngine::GetRendererSetting(TfToken const& id) const
 }
 
 void
-UsdImagingGLEngine::SetRendererSetting(TfToken const& id, VtValue const& value)
+UsdImagingGLEngine::SetRendererSetting(TfToken const& settingId, VtValue const& value)
 {
     if (ARCH_UNLIKELY(_legacyImpl)) {
         return;
     }
 
     TF_VERIFY(_renderIndex);
-    _renderIndex->GetRenderDelegate()->SetRenderSetting(id, value);
+    _renderIndex->GetRenderDelegate()->SetRenderSetting(settingId, value);
+
+    if (settingId == HdStRenderSettingsTokens->graphicsAPI) {
+        SetRendererPlugin(_rendererId, true);
+/*
+        // Pull old delegate/task controller state.
+        GfMatrix4d rootTransform = GfMatrix4d(1.0);
+        bool isVisible = true;
+        if (_delegate != nullptr) {
+            rootTransform = _delegate->GetRootTransform();
+            isVisible = _delegate->GetRootVisibility();
+        }
+        HdSelectionSharedPtr selection = _selTracker->GetSelectionMap();
+        if (!selection) {
+            selection.reset(new HdSelection);
+        }
+        
+        TfToken rendererId(_rendererId);
+        HdxRendererPlugin *plugin = HdxRendererPluginRegistry::GetInstance().
+            GetRendererPlugin(rendererId);
+        
+        // Delete hydra state.
+        _DeleteHydraResources();
+        
+        // Recreate the render index.
+        _rendererPlugin = plugin;
+        _rendererId = rendererId;
+
+        // Recreate the render index.
+        HdRenderDelegate *renderDelegate = _rendererPlugin->CreateRenderDelegate();
+        _renderIndex = HdRenderIndex::New(renderDelegate);
+        
+        // Create the new delegate & task controller.
+        _delegate = new UsdImagingDelegate(_renderIndex, _delegateID);
+        _isPopulated = false;
+        
+        _taskController = new HdxTaskController(_renderIndex,
+            _delegateID.AppendChild(TfToken(TfStringPrintf(
+               "_UsdImaging_%s_%p",
+               TfMakeValidIdentifier(_rendererId.GetText()).c_str(),
+               this))));
+        
+        // Rebuild state in the new delegate/task controller.
+        _delegate->SetRootVisibility(isVisible);
+        _delegate->SetRootTransform(rootTransform);
+        _selTracker->SetSelection(selection);
+        _taskController->SetSelectionColor(_selectionColor);
+        return;
+ */
+    }
 }
 
 void 
@@ -1136,151 +1111,25 @@ UsdImagingGLEngine::_Render(const UsdImagingGLRenderParams &params)
     _delegate->SetSceneMaterialsEnabled(params.enableSceneMaterials);
     
     GarchContextCaps const &caps =
-    GarchResourceFactory::GetInstance()->GetContextCaps();
+        GarchResourceFactory::GetInstance()->GetContextCaps();
 
-#if defined(ARCH_GFX_METAL)
-    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
-
-#if defined(ARCH_GFX_OPENGL)
-    // Make sure the Metal render targets, and GL interop textures match the GL viewport size
-    GLint viewport[4];
-    glGetIntegerv( GL_VIEWPORT, viewport );
-    
-    if (context->mtlColorTexture.width != viewport[2] ||
-        context->mtlColorTexture.height != viewport[3]) {
-        context->AllocateAttachments(viewport[2], viewport[3]);
-    }
-    
-    if (_renderOutput == RenderOutput::OpenGL) {
-        if (_mtlRenderPassDescriptorForInterop == nil)
-            _mtlRenderPassDescriptorForInterop = [[MTLRenderPassDescriptor alloc] init];
-        
-        //Set this state every frame because it may have changed during rendering.
-        
-        // create a color attachment every frame since we have to recreate the texture every frame
-        MTLRenderPassColorAttachmentDescriptor *colorAttachment = _mtlRenderPassDescriptorForInterop.colorAttachments[0];
-        
-        // make sure to clear every frame for best performance
-        colorAttachment.loadAction = MTLLoadActionClear;
-        
-        // store only attachments that will be presented to the screen, as in this case
-        colorAttachment.storeAction = MTLStoreActionStore;
-        
-        MTLRenderPassDepthAttachmentDescriptor *depthAttachment = _mtlRenderPassDescriptorForInterop.depthAttachment;
-        depthAttachment.loadAction = MTLLoadActionClear;
-        depthAttachment.storeAction = MTLStoreActionStore;
-        depthAttachment.clearDepth = 1.0f;
-        
-        colorAttachment.texture = context->mtlColorTexture;
-        
-        GLfloat clearColor[4];
-        glGetFloatv(GL_COLOR_CLEAR_VALUE, clearColor);
-        clearColor[3] = 1.0f;
-        
-        colorAttachment.clearColor = MTLClearColorMake(clearColor[0],
-                                                       clearColor[1],
-                                                       clearColor[2],
-                                                       clearColor[3]);
-        depthAttachment.texture = context->mtlDepthTexture;
-        
-        _mtlRenderPassDescriptor = _mtlRenderPassDescriptorForInterop;
-    }
-    else
+    HdStRenderDelegate* hdStRenderDelegate =
+        dynamic_cast<HdStRenderDelegate*>(_renderIndex->GetRenderDelegate());
+    if (hdStRenderDelegate) {
+        HdStRenderDelegate::DelegateParams delegateParams(
+            params.flipFrontFacing,
+            params.applyRenderState,
+            params.enableIdRender,
+            params.enableSampleAlphaToCoverage,
+            params.drawMode,
+#if !defined(ARCH_GFX_OPENGL)
+            HdStRenderDelegate::DelegateParams::RenderOutput::Metal
 #else
-    if (false) {}
-    else
+            HdStRenderDelegate::DelegateParams::RenderOutput::OpenGL
 #endif
-    {
-        if (_mtlRenderPassDescriptor == nil) {
-            TF_FATAL_CODING_ERROR("SetMetalRenderPassDescriptor must be called prior "
-                                  "to rendering when render output is set to Metal");
-        }
+              );
+        hdStRenderDelegate->PrepareRender(delegateParams);
     }
-    
-    context->StartFrame();
-    
-    // Create a new command buffer for each render pass to the current drawable
-    context->CreateCommandBuffer(METALWORKQUEUE_DEFAULT);
-    context->LabelCommandBuffer(@"HdEngine::Render", METALWORKQUEUE_DEFAULT);
-    
-    // Set the render pass descriptor to use for the render encoders
-    context->SetRenderPassDescriptor(_mtlRenderPassDescriptor);
-    if (_renderOutput == RenderOutput::Metal) {
-        _mtlRenderPassDescriptor = nil;
-    }
-    // hydra orients all geometry during topological processing so that
-    // front faces have ccw winding. We disable culling because culling
-    // is handled by fragment shader discard.
-    if (params.flipFrontFacing) {
-        context->SetFrontFaceWinding(MTLWindingClockwise);
-    } else {
-        context->SetFrontFaceWinding(MTLWindingCounterClockwise);
-    }
-    context->SetCullMode(MTLCullModeNone);
-    
-    if (params.applyRenderState) {
-        // drawmode.
-        // XXX: Temporary solution until shader-based styling implemented.
-        switch (params.drawMode) {
-            case UsdImagingGLDrawMode::DRAW_POINTS:
-                context->SetTempPointWorkaround(true);
-                break;
-            default:
-                context->SetPolygonFillMode(MTLTriangleFillModeFill);
-                context->SetTempPointWorkaround(false);
-                break;
-        }
-    }
-#else
-
-    // User is responsible for initializing GL context and glew
-    bool isCoreProfileContext = caps.coreProfile;
-
-    GLF_GROUP_FUNCTION();
-
-    GLuint vao;
-    if (isCoreProfileContext) {
-        // We must bind a VAO (Vertex Array Object) because core profile 
-        // contexts do not have a default vertex array object. VAO objects are 
-        // container objects which are not shared between contexts, so we create
-        // and bind a VAO here so that core rendering code does not have to 
-        // explicitly manage per-GL context state.
-        glGenVertexArrays(1, &vao);
-        glBindVertexArray(vao);
-    } else {
-        glPushAttrib(GL_ENABLE_BIT | GL_POLYGON_BIT | GL_DEPTH_BUFFER_BIT);
-    }
-
-    // hydra orients all geometry during topological processing so that
-    // front faces have ccw winding. We disable culling because culling
-    // is handled by fragment shader discard.
-    if (params.flipFrontFacing) {
-        glFrontFace(GL_CW); // < State is pushed via GL_POLYGON_BIT
-    } else {
-        glFrontFace(GL_CCW); // < State is pushed via GL_POLYGON_BIT
-    }
-    glDisable(GL_CULL_FACE);
-
-    if (params.applyRenderState) {
-        glDisable(GL_BLEND);
-    }
-
-    // note: to get benefit of alpha-to-coverage, the target framebuffer
-    // has to be a MSAA buffer.
-    if (params.enableIdRender) {
-        glDisable(GL_SAMPLE_ALPHA_TO_COVERAGE);
-    } else if (params.enableSampleAlphaToCoverage) {
-        glEnable(GL_SAMPLE_ALPHA_TO_COVERAGE);
-    }
-
-    // for points width
-    glEnable(GL_PROGRAM_POINT_SIZE);
-
-    // TODO:
-    //  * forceRefresh
-    //  * showGuides, showRender, showProxy
-    //  * gammaCorrectColors
-#endif
 
     VtValue selectionValue(_selTracker);
     _engine->SetTaskContextData(HdxTokens->selectionState, selectionValue);
@@ -1290,43 +1139,10 @@ UsdImagingGLEngine::_Render(const UsdImagingGLRenderParams &params)
     HdTaskSharedPtrVector tasks = _taskController->GetTasks();
     _engine->Execute(*_renderIndex, tasks);
 
-#if defined(ARCH_GFX_METAL)
-    if (_renderOutput == RenderOutput::OpenGL) {
-        // Depth texture copy
-        context->CopyDepthTextureToOpenGL();
-    }
-    
-    if (context->GeometryShadersActive()) {
-        // Complete the GS command buffer if we have one
-        context->CommitCommandBuffer(true, false, METALWORKQUEUE_GEOMETRY_SHADER);
-    }
-    
-    // Commit the render buffer (will wait for GS to complete if present)
-    // We wait until scheduled, because we're about to consume the Metal
-    // generated textures in an OpenGL blit
-    context->CommitCommandBuffer(_renderOutput == RenderOutput::OpenGL, false);
-    
-    context->EndFrame();
-    
-    // Finalize rendering here & push the command buffer to the GPU
-    if (_renderOutput == RenderOutput::OpenGL) {
-        context->BlitColorTargetToOpenGL();
-        GLF_POST_PENDING_GL_ERRORS();
-    }
 
-#else
-    if (isCoreProfileContext) {
-
-        glBindVertexArray(0);
-        // XXX: We should not delete the VAO on every draw call, but we 
-        // currently must because it is GL Context state and we do not control 
-        // the context.
-        glDeleteVertexArrays(1, &vao);
-
-    } else {
-        glPopAttrib(); // GL_ENABLE_BIT | GL_POLYGON_BIT | GL_DEPTH_BUFFER_BIT
+    if (hdStRenderDelegate) {
+        hdStRenderDelegate->FinalizeRender();
     }
-#endif
     
     // Copy the results into the client applications framebuffer.
     _RestoreClientDrawTarget(params);
@@ -1430,18 +1246,18 @@ UsdImagingGLEngine::_UpdateHydraCollection(
     HdReprSelector reprSelector = HdReprSelector(HdReprTokens->smoothHull);
     bool refined = params.complexity > 1.0;
     
-    if (params.drawMode == UsdImagingGLDrawMode::DRAW_POINTS) {
+    if (params.drawMode == HdStDrawMode::DRAW_POINTS) {
         reprSelector = HdReprSelector(HdReprTokens->points);
-    } else if (params.drawMode == UsdImagingGLDrawMode::DRAW_GEOM_FLAT ||
-        params.drawMode == UsdImagingGLDrawMode::DRAW_SHADED_FLAT) {
+    } else if (params.drawMode == HdStDrawMode::DRAW_GEOM_FLAT ||
+        params.drawMode == HdStDrawMode::DRAW_SHADED_FLAT) {
         // Flat shading
         reprSelector = HdReprSelector(HdReprTokens->hull);
     } else if (
-        params.drawMode == UsdImagingGLDrawMode::DRAW_WIREFRAME_ON_SURFACE) {
+        params.drawMode == HdStDrawMode::DRAW_WIREFRAME_ON_SURFACE) {
         // Wireframe on surface
         reprSelector = HdReprSelector(refined ?
             HdReprTokens->refinedWireOnSurf : HdReprTokens->wireOnSurf);
-    } else if (params.drawMode == UsdImagingGLDrawMode::DRAW_WIREFRAME) {
+    } else if (params.drawMode == HdStDrawMode::DRAW_WIREFRAME) {
         // Wireframe
         reprSelector = HdReprSelector(refined ?
             HdReprTokens->refinedWire : HdReprTokens->wire);
@@ -1534,8 +1350,8 @@ UsdImagingGLEngine::_MakeHydraUsdImagingGLRenderParams(
     params.overrideColor       = renderParams.overrideColor;
     params.wireframeColor      = renderParams.wireframeColor;
 
-    if (renderParams.drawMode == UsdImagingGLDrawMode::DRAW_GEOM_ONLY ||
-        renderParams.drawMode == UsdImagingGLDrawMode::DRAW_POINTS) {
+    if (renderParams.drawMode == HdStDrawMode::DRAW_GEOM_ONLY ||
+        renderParams.drawMode == HdStDrawMode::DRAW_POINTS) {
         params.enableLighting = false;
     } else {
         params.enableLighting =  renderParams.enableLighting &&
@@ -1738,21 +1554,6 @@ UsdImagingGLEngine::_RestoreClientDrawTarget(
     }
 #endif
 }
-
-#if defined(ARCH_GFX_METAL)
-void
-UsdImagingGLEngine::SetMetalRenderPassDescriptor(
-    MTLRenderPassDescriptor *renderPassDescriptor)
-{
-    if (_renderOutput == RenderOutput::OpenGL) {
-        TF_CODING_ERROR("SetMetalRenderPassDescriptor isn't valid to call "
-                        "when using OpenGL as the output target");
-        return;
-    }
-    _mtlRenderPassDescriptorForNativeMetal = [renderPassDescriptor copy];
-    _mtlRenderPassDescriptor = _mtlRenderPassDescriptorForNativeMetal;
-}
-#endif
 
 PXR_NAMESPACE_CLOSE_SCOPE
 

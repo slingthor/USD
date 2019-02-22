@@ -43,6 +43,7 @@ wrapRendererSettings()
             .value("INT", UsdImagingGLRendererSetting::TYPE_INT)
             .value("FLOAT", UsdImagingGLRendererSetting::TYPE_FLOAT)
             .value("STRING", UsdImagingGLRendererSetting::TYPE_STRING)
+            .value("OPTION", UsdImagingGLRendererSetting::TYPE_OPTION)
     ;
 
     // Wrap the UsdImagingGLRendererSetting struct.

@@ -20,34 +20,53 @@
 // distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
-//
-#ifndef HDSTREAM_RENDERER_PLUGIN_H
-#define HDSTREAM_RENDERER_PLUGIN_H
+#ifndef HDST_RENDER_DELEGATE_GL_H
+#define HDST_RENDER_DELEGATE_GL_H
 
 #include "pxr/pxr.h"
-#include "pxr/imaging/hdx/rendererPlugin.h"
+#include "pxr/imaging/hdSt/renderDelegate.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-class HdStreamRendererPlugin final : public HdxRendererPlugin {
+///
+/// HdStRenderDelegateGL
+///
+/// The Stream Render Delegate provides a Hydra render that uses a
+/// streaming graphics implementation to draw the scene.
+///
+class HdStRenderDelegateGL final : public HdStRenderDelegate {
 public:
-    HdStreamRendererPlugin()          = default;
-    virtual ~HdStreamRendererPlugin() = default;
+    HDST_API
+    HdStRenderDelegateGL();
+    HDST_API
+    HdStRenderDelegateGL(HdRenderSettingsMap const& settingsMap);
 
-    virtual HdRenderDelegate *CreateRenderDelegate() override;
-    virtual HdRenderDelegate *CreateRenderDelegate(
-        HdRenderSettingsMap const& settingsMap) override;
+    HDST_API
+    virtual ~HdStRenderDelegateGL();
 
-    virtual void DeleteRenderDelegate(HdRenderDelegate *renderDelegate) 
-        override;
-
-    virtual bool IsSupported() const override;
+    // Returns whether or not HdStRenderDelegate can run on the current
+    // hardware.
+    HDST_API
+    static bool IsSupported();
+    
+    HDST_API
+    virtual void PrepareRender(DelegateParams const &params) override;
+    
+    HDST_API
+    virtual void FinalizeRender() override;
 
 private:
-    HdStreamRendererPlugin(const HdStreamRendererPlugin &)             = delete;
-    HdStreamRendererPlugin &operator =(const HdStreamRendererPlugin &) = delete;
+
+    HdStRenderDelegateGL(
+        const HdStRenderDelegateGL &) = delete;
+    HdStRenderDelegateGL &operator =(
+        const HdStRenderDelegateGL &) = delete;
+    
+    bool _isCoreProfileContext;
+    GLuint _vao;
 };
+
 
 PXR_NAMESPACE_CLOSE_SCOPE
 
-#endif // HDSTREAM_RENDERER_PLUGIN_H
+#endif // HDST_RENDER_DELEGATE_GL_H

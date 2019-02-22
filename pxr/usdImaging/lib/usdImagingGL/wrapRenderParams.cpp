@@ -37,16 +37,16 @@ void
 wrapRenderParams()
 {
     // Wrap the DrawMode enum. Accessible as UsdImagingGL.DrawMode
-    enum_<UsdImagingGLDrawMode>("DrawMode")
-        .value("DRAW_POINTS", UsdImagingGLDrawMode::DRAW_POINTS)
-        .value("DRAW_WIREFRAME", UsdImagingGLDrawMode::DRAW_WIREFRAME)
+    enum_<HdStDrawMode>("DrawMode")
+        .value("DRAW_POINTS", HdStDrawMode::DRAW_POINTS)
+        .value("DRAW_WIREFRAME", HdStDrawMode::DRAW_WIREFRAME)
         .value("DRAW_WIREFRAME_ON_SURFACE", 
-            UsdImagingGLDrawMode::DRAW_WIREFRAME_ON_SURFACE)
-        .value("DRAW_SHADED_FLAT", UsdImagingGLDrawMode::DRAW_SHADED_FLAT)
-        .value("DRAW_SHADED_SMOOTH", UsdImagingGLDrawMode::DRAW_SHADED_SMOOTH)
-        .value("DRAW_GEOM_ONLY", UsdImagingGLDrawMode::DRAW_GEOM_ONLY)
-        .value("DRAW_GEOM_FLAT", UsdImagingGLDrawMode::DRAW_GEOM_FLAT)
-        .value("DRAW_GEOM_SMOOTH", UsdImagingGLDrawMode::DRAW_GEOM_SMOOTH)
+            HdStDrawMode::DRAW_WIREFRAME_ON_SURFACE)
+        .value("DRAW_SHADED_FLAT", HdStDrawMode::DRAW_SHADED_FLAT)
+        .value("DRAW_SHADED_SMOOTH", HdStDrawMode::DRAW_SHADED_SMOOTH)
+        .value("DRAW_GEOM_ONLY", HdStDrawMode::DRAW_GEOM_ONLY)
+        .value("DRAW_GEOM_FLAT", HdStDrawMode::DRAW_GEOM_FLAT)
+        .value("DRAW_GEOM_SMOOTH", HdStDrawMode::DRAW_GEOM_SMOOTH)
         ;
 
     // Wrap the CullStyle enum. Accessible as UsdImagingGL.CullStyle

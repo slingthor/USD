@@ -1371,6 +1371,16 @@ class AppController(QtCore.QObject):
         if self._stageView:
             self._stageView.SetRendererSetting(action.key, action.isChecked())
 
+    def _rendererSettingsOptionFlagChanged(self, action):
+        if self._stageView:
+            if action.isChecked():
+                self._stageView.SetRendererSetting(action.key, action.text())
+                parent = action.parentWidget()
+                actions = parent.actions() 
+                for a in actions:
+                    if a != action:
+                        a.setChecked(False)
+
     def _configureRendererSettings(self):
         if self._stageView:
             self._ui.menuRendererSettings.clear()
@@ -1379,16 +1389,27 @@ class AppController(QtCore.QObject):
             settings = self._stageView.GetRendererSettingsList()
             moreSettings = False
             for setting in settings:
-                if setting.type != UsdImagingGL.RendererSettingType.FLAG:
+                if setting.type == UsdImagingGL.RendererSettingType.FLAG:
+                    action = self._ui.menuRendererSettings.addAction(setting.name)
+                    action.key = str(setting.key)
+                    action.setCheckable(True)
+                    action.setChecked(self._stageView.GetRendererSetting(setting.key))
+                    action.triggered[bool].connect(lambda _, action=action:
+                        self._rendererSettingsFlagChanged(action))
+                    self._ui.settingsFlagActions.append(action)
+                elif setting.type == UsdImagingGL.RendererSettingType.OPTION:
+                    menu = self._ui.menuRendererSettings.addMenu(str(setting.name))
+                    setValue = self._stageView.GetRendererSetting(setting.key)
+                    for value in setting.defValue:
+                        action = menu.addAction(str(value))
+                        action.key = str(setting.key)
+                        action.setCheckable(True)
+                        action.setChecked(setValue == value)
+                        action.triggered[bool].connect(lambda _, action=action:
+                            self._rendererSettingsOptionFlagChanged(action))
+                        self._ui.settingsFlagActions.append(action)
+                else:
                     moreSettings = True
-                    continue
-                action = self._ui.menuRendererSettings.addAction(setting.name)
-                action.setCheckable(True)
-                action.key = str(setting.key)
-                action.setChecked(self._stageView.GetRendererSetting(setting.key))
-                action.triggered[bool].connect(lambda _, action=action:
-                    self._rendererSettingsFlagChanged(action))
-                self._ui.settingsFlagActions.append(action)
 
             if moreSettings:
                 self._ui.menuRendererSettings.addSeparator()

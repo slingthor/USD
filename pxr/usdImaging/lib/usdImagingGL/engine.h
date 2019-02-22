@@ -31,10 +31,6 @@
 
 #include "pxr/base/arch/defines.h"
 
-#if defined(ARCH_GFX_METAL)
-#include "pxr/imaging/mtlf/mtlDevice.h"
-#endif
-
 #include "pxr/usdImaging/usdImagingGL/api.h"
 #include "pxr/usdImaging/usdImaging/version.h"
 
@@ -88,16 +84,6 @@ TF_DECLARE_WEAK_AND_REF_PTRS(GarchSimpleLightingContext);
 class UsdImagingGLEngine
 {
 public:
-
-    enum RenderOutput {
-        /// Use output of the render will be blitted from Metal into the
-        /// currently bound OpenGL FBO - if OpenGL is included in the build
-        OpenGL,
-
-        /// The output will be rendered using the application supplied
-        /// MTLRenderPassDescriptor - if Metal is included in the build
-        Metal,
-    };
 
     // ---------------------------------------------------------------------
     /// \name Global State
@@ -338,7 +324,8 @@ public:
     /// Set the current render-graph delegate to \p id.
     /// the plugin will be loaded if it's not yet.
     USDIMAGINGGL_API
-    bool SetRendererPlugin(TfToken const &id);
+    bool SetRendererPlugin(TfToken const &pluginId,
+        bool forceReload = false);
 
     /// @}
     
@@ -365,7 +352,7 @@ public:
 
     /// Sets a renderer setting's value.
     USDIMAGINGGL_API
-    void SetRendererSetting(TfToken const& id,
+    void SetRendererSetting(TfToken const& settingId,
                                     VtValue const& value);
 
     /// (Optional) Enable the use of an (internal) 16F draw target.
@@ -405,14 +392,6 @@ public:
     VtDictionary GetResourceAllocation() const;
 
     /// @}
-    
-#if defined(ARCH_GFX_METAL)
-    /// Set the Metal render pass descriptor for the next frame.
-    /// Must set before each call to Render()
-    USDIMAGINGGL_API
-    void SetMetalRenderPassDescriptor(
-        MTLRenderPassDescriptor *renderPassDescriptor);
-#endif
 
 protected:
 
@@ -489,13 +468,6 @@ protected:
     bool _useFloatPointDrawTarget;
     HdxCompositor _compositor;
     GarchDrawTargetRefPtr _drawTarget;
-
-    RenderOutput _renderOutput;
-#if defined(ARCH_GFX_METAL)
-    MTLRenderPassDescriptor *_mtlRenderPassDescriptorForInterop;
-    MTLRenderPassDescriptor *_mtlRenderPassDescriptorForNativeMetal;
-    MTLRenderPassDescriptor *_mtlRenderPassDescriptor;
-#endif
     
     // An implementation of much of the engine functionality that doesn't
     // invoke any of the advanced Hydra features.  It is kept around for 

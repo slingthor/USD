@@ -35,19 +35,73 @@ PXR_NAMESPACE_OPEN_SCOPE
 typedef boost::shared_ptr<class HdStResourceRegistry>
     HdStResourceRegistrySharedPtr;
 
+enum class HdStDrawMode
+{
+    DRAW_POINTS,
+    DRAW_WIREFRAME,
+    DRAW_WIREFRAME_ON_SURFACE,
+    DRAW_SHADED_FLAT,
+    DRAW_SHADED_SMOOTH,
+    DRAW_GEOM_ONLY,
+    DRAW_GEOM_FLAT,
+    DRAW_GEOM_SMOOTH
+};
+
 ///
 /// HdStRenderDelegate
 ///
 /// The Stream Render Delegate provides a Hydra render that uses a
 /// streaming graphics implementation to draw the scene.
 ///
-class HdStRenderDelegate final : public HdRenderDelegate {
+class HdStRenderDelegate : public HdRenderDelegate {
 public:
-    HDST_API
-    HdStRenderDelegate();
-    HDST_API
-    HdStRenderDelegate(HdRenderSettingsMap const& settingsMap);
+    
+    class DelegateParams {
+    public:
 
+        enum RenderOutput {
+            /// Use output of the render will be blitted from Metal into the
+            /// currently bound OpenGL FBO - if OpenGL is included in the build
+            OpenGL,
+            
+            /// The output will be rendered using the application supplied
+            /// MTLRenderPassDescriptor - if Metal is included in the build
+            Metal,
+        };
+        
+        bool flipFrontFacing;
+        bool applyRenderState;
+        bool enableIdRender;
+        bool enableSampleAlphaToCoverage;
+        HdStDrawMode drawMode;
+        RenderOutput renderOutput;
+        
+#if defined(ARCH_GFX_METAL)
+        MTLRenderPassDescriptor *mtlRenderPassDescriptorForNativeMetal;
+#endif
+        
+        DelegateParams(bool _flipFrontFacing,
+                       bool _applyRenderState,
+                       bool _enableIdRender,
+                       bool _enableSampleAlphaToCoverage,
+                       HdStDrawMode _drawMode,
+                       RenderOutput _renderOutput)
+        : flipFrontFacing(_flipFrontFacing)
+        , applyRenderState(_applyRenderState)
+        , enableIdRender(_enableIdRender)
+        , enableSampleAlphaToCoverage(_enableSampleAlphaToCoverage)
+        , drawMode(_drawMode)
+        , renderOutput(_renderOutput)
+        {
+#if defined(ARCH_GFX_METAL)
+            mtlRenderPassDescriptorForNativeMetal = nil;
+#endif
+        }
+
+    private:
+        DelegateParams();
+    };
+    
     HDST_API
     virtual ~HdStRenderDelegate();
 
@@ -116,6 +170,18 @@ public:
 
     virtual HdRenderSettingDescriptorList
         GetRenderSettingDescriptors() const override;
+    
+    HDST_API
+    virtual void PrepareRender(DelegateParams const &params) = 0;
+    
+    HDST_API
+    virtual void FinalizeRender() = 0;
+
+protected:
+    HDST_API
+    HdStRenderDelegate();
+    HDST_API
+    HdStRenderDelegate(HdRenderSettingsMap const& settingsMap);
 
 private:
     static const TfTokenVector SUPPORTED_RPRIM_TYPES;

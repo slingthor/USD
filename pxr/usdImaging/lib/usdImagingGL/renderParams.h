@@ -30,6 +30,8 @@
 #include "pxr/pxr.h"
 #include "pxr/usdImaging/usdImagingGL/api.h"
 
+#include "pxr/imaging/hdSt/renderDelegate.h"
+
 #include "pxr/usd/usd/timeCode.h"
 
 #include "pxr/base/gf/vec2i.h"
@@ -38,18 +40,6 @@
 #include "pxr/base/tf/token.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
-
-enum class UsdImagingGLDrawMode 
-{
-    DRAW_POINTS,
-    DRAW_WIREFRAME,
-    DRAW_WIREFRAME_ON_SURFACE,
-    DRAW_SHADED_FLAT,
-    DRAW_SHADED_SMOOTH,
-    DRAW_GEOM_ONLY,
-    DRAW_GEOM_FLAT,
-    DRAW_GEOM_SMOOTH
-};
 
 // Note: some assumptions are made about the order of these enums, so please
 // be careful when updating them.
@@ -77,7 +67,7 @@ public:
 
     UsdTimeCode frame;
     float complexity;
-    UsdImagingGLDrawMode drawMode;
+    HdStDrawMode drawMode;
     bool showGuides;
     bool showProxy;
     bool showRender;
@@ -114,7 +104,7 @@ public:
 UsdImagingGLRenderParams::UsdImagingGLRenderParams() :
     frame(UsdTimeCode::Default()),
     complexity(1.0),
-    drawMode(UsdImagingGLDrawMode::DRAW_SHADED_SMOOTH),
+    drawMode(HdStDrawMode::DRAW_SHADED_SMOOTH),
     showGuides(false),
     showProxy(true),
     showRender(false),
