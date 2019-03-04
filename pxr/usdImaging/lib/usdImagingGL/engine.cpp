@@ -25,11 +25,13 @@
 #include "pxr/usdImaging/usdImagingGL/engine.h"
 
 #if defined(ARCH_GFX_OPENGL)
-#include "pxr/usdImaging/usdImagingGL/GL/legacyEngine.h"
+#include "pxr/imaging/hdSt/GL/resourceFactoryGL.h"
+#include "pxr/usdImaging/usdImagingGL/legacyEngine.h"
 #endif
 
 #if defined(ARCH_GFX_METAL)
 #include "pxr/imaging/mtlf/mtlDevice.h"
+#include "pxr/imaging/hdSt/Metal/resourceFactoryMetal.h"
 #endif
 
 #include "pxr/usdImaging/usdImaging/delegate.h"
@@ -49,12 +51,6 @@
 #include "pxr/imaging/hdx/taskController.h"
 #include "pxr/imaging/hdx/tokens.h"
 
-#if defined(ARCH_GFX_METAL)
-#include "pxr/imaging/hdSt/Metal/resourceFactoryMetal.h"
-#endif
-#if defined(ARCH_GFX_OPENGL)
-#include "pxr/imaging/hdSt/GL/resourceFactoryGL.h"
-#endif
 #include "pxr/imaging/hdSt/tokens.h"
 
 #include "pxr/base/tf/getenv.h"

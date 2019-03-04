@@ -101,10 +101,11 @@ HdSt_FlatNormalsComputationMetal::_Execute(
 
     int maxThreadsPerThreadgroup =
         context->GetMaxThreadsPerThreadgroup(METALWORKQUEUE_GEOMETRY_SHADER);
-    MTLSize maxThreadsPerGroup = [context->device maxThreadsPerThreadgroup];
-
-    if (maxThreadsPerThreadgroup > maxThreadsPerGroup.width) {
-        maxThreadsPerThreadgroup = maxThreadsPerGroup.width;
+    //    int const maxThreadsPerGroup = [context->device maxThreadsPerThreadgroup].width;
+    int const maxThreadsPerGroup = 32;
+    
+    if (maxThreadsPerThreadgroup > maxThreadsPerGroup) {
+        maxThreadsPerThreadgroup = maxThreadsPerGroup;
     }
     
     MTLSize threadgroupCount =

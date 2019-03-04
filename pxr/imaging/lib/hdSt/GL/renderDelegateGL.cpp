@@ -25,7 +25,6 @@
 
 #include "pxr/pxr.h"
 #include "pxr/imaging/hdSt/GL/renderDelegateGL.h"
-#include "pxr/usdImaging/usdImagingGL/renderParams.h"
 
 #include "pxr/imaging/garch/resourceFactory.h"
 

@@ -25,9 +25,6 @@
 #include "pxr/imaging/hdSt/Metal/renderDelegateMetal.h"
 #include "pxr/imaging/hdSt/tokens.h"
 
-#include "pxr/usdImaging/usdImagingGL/rendererSettings.h"
-#include "pxr/usdImaging/usdImagingGL/renderParams.h"
-
 #include "pxr/imaging/garch/resourceFactory.h"
 
 #include "pxr/imaging/mtlf/contextCaps.h"
