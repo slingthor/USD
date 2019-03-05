@@ -43,7 +43,7 @@
 #define HdStRenderDelegateTest HdStRenderDelegateMetal
 #include "pxr/imaging/hdSt/Metal/renderDelegateMetal.h"
 #else
-#define HdStRenderDelegateTest HdStRenderDelegateOpenGL
+#define HdStRenderDelegateTest HdStRenderDelegateGL
 #include "pxr/imaging/hdSt/GL/renderDelegateGL.h"
 #endif
 
