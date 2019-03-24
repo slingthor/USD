@@ -1839,7 +1839,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
                 
                 fsFuncDef << "\n    , const device "
                           << ((it->usage & TParam::Usage::ProgramScope) ? "ProgramScope_Frag::" : "")
-                          << _GetPackedMSLType(_GetPackedType(it->dataType, true))
+                          << _GetPackedType(it->dataType, true)
                           << "* " << name << "[[buffer(" << assignedSlot << ")]]";
             }
             //else
@@ -3997,7 +3997,7 @@ HdSt_CodeGenMSL::_GenerateElementPrimvar()
             TfToken const &dataType = _GetPackedType(it->second.dataType, false);
 
             // MTL_FIXME - changing from VS Input params to PS because none of this appaears to be associated with vertex shaders at all... (so possibly nothing to fix)
-            _EmitDeclarationPtr(declarations, name, TfToken(_GetPackedMSLType(dataType)), TfToken(), binding);
+            _EmitDeclarationPtr(declarations, name, dataType, TfToken(), binding);
             _AddInputPtrParam(_mslPSInputParams, name, dataType, TfToken(), binding);
             TParam& entryGS(_AddInputPtrParam(_mslGSInputParams, name, dataType, TfToken(), binding));
             entryGS.usage |= TParam::EntryFuncArgument;
