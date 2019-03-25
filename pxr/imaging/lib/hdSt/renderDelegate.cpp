@@ -46,7 +46,8 @@
 #include "pxr/imaging/hd/extComputation.h"
 #include "pxr/imaging/hd/perfLog.h"
 
-#include "pxr/imaging/garch/glslfx.h"
+#include "pxr/imaging/hio/glslfx.h"
+
 #include "pxr/imaging/garch/resourceFactory.h"
 #include "pxr/imaging/garch/textureRegistry.h"
 
@@ -320,7 +321,9 @@ HdStRenderDelegate::DestroyBprim(HdBprim *bPrim)
 HdSprim *
 HdStRenderDelegate::_CreateFallbackMaterialPrim()
 {
-    GLSLFXSharedPtr glslfx(new GLSLFX(HdStPackageFallbackSurfaceShader()));
+    HioGlslfxSharedPtr glslfx(
+        new HioGlslfx(HdStPackageFallbackSurfaceShader()));
+
     HdStSurfaceShaderSharedPtr fallbackShaderCode(new HdStGLSLFXShader(glslfx));
 
     HdStMaterial *material = new HdStMaterial(SdfPath::EmptyPath());
@@ -373,13 +376,13 @@ HdStRenderDelegate::IsSupported()
 TfTokenVector
 HdStRenderDelegate::GetShaderSourceTypes() const
 {
-    return {GarchGLSLFXTokens->glslfx};
+    return {HioGlslfxTokens->glslfx};
 }
 
 TfToken 
 HdStRenderDelegate::GetMaterialNetworkSelector() const
 {
-    return GarchGLSLFXTokens->glslfx;
+    return HioGlslfxTokens->glslfx;
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

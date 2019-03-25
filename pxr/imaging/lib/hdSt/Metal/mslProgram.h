@@ -26,7 +26,7 @@
 #ifndef HDST_MSL_PROGRAM_H
 #define HDST_MSL_PROGRAM_H
 
-//#define GENERATE_METAL_DEBUG_SOURCE_CODE
+#define GENERATE_METAL_DEBUG_SOURCE_CODE
 
 #include "pxr/pxr.h"
 #include "pxr/imaging/hdSt/api.h"

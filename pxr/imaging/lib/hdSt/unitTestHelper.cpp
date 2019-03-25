@@ -75,8 +75,13 @@ public:
                       HdDirtyBits*) override
     {
         _renderPass->Sync();
-        _renderPassState->Sync(
-            _renderPass->GetRenderIndex()->GetResourceRegistry());
+    }
+
+    virtual void Prepare(HdTaskContext* ctx,
+                         HdRenderIndex* renderIndex) override
+    {
+        _renderPassState->Prepare(
+            renderIndex->GetResourceRegistry());
     }
 
     virtual void Execute(HdTaskContext* ctx) override
@@ -305,7 +310,7 @@ HdSt_TestLightingShader::HdSt_TestLightingShader()
     _sceneAmbient    = GfVec3f(0.04, 0.04, 0.04);
 
     std::stringstream ss(lightingShader);
-    _glslfx.reset(new GLSLFX(ss));
+    _glslfx.reset(new HioGlslfx(ss));
 }
 
 HdSt_TestLightingShader::~HdSt_TestLightingShader()

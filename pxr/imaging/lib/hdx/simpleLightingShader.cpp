@@ -30,7 +30,7 @@
 
 #include "pxr/imaging/hf/perfLog.h"
 
-#include "pxr/imaging/garch/glslfx.h"
+#include "pxr/imaging/hio/glslfx.h"
 #include "pxr/imaging/garch/bindingMap.h"
 #include "pxr/imaging/garch/simpleLightingContext.h"
 
@@ -52,7 +52,8 @@ HdxSimpleLightingShader::HdxSimpleLightingShader()
     _bindingMap->GetUniformBinding(TfToken("DrawDataBuffer"));
     _lightingContext->InitUniformBlockBindings(_bindingMap);
     _lightingContext->InitSamplerUnitBindings(_bindingMap);
-    _glslfx.reset(new GLSLFX(HdxPackageSimpleLightingShader()));
+
+    _glslfx.reset(new HioGlslfx(HdxPackageSimpleLightingShader()));
 }
 
 HdxSimpleLightingShader::~HdxSimpleLightingShader()

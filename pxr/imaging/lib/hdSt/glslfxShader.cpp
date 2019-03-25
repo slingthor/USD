@@ -25,11 +25,12 @@
 
 #include "pxr/imaging/hd/engine.h"
 #include "pxr/imaging/hd/tokens.h"
-#include "pxr/imaging/garch/glslfx.h"
+#include "pxr/imaging/hio/glslfx.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-HdStGLSLFXShader::HdStGLSLFXShader(GLSLFXSharedPtr const& glslfx)
+
+HdStGLSLFXShader::HdStGLSLFXShader(HioGlslfxSharedPtr const& glslfx)
  : HdStSurfaceShader()
     , _glslfx(glslfx)
 {
@@ -44,7 +45,8 @@ HdStGLSLFXShader::~HdStGLSLFXShader()
 void
 HdStGLSLFXShader::Reload()
 {
-    GLSLFXSharedPtr newGlslFx(new GLSLFX(_glslfx->GetFilePath()));
+    HioGlslfxSharedPtr newGlslFx(new HioGlslfx(_glslfx->GetFilePath()));
+
     if (newGlslFx->IsValid())
     {
         _glslfx = newGlslFx;

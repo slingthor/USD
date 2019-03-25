@@ -29,12 +29,13 @@
 #include "pxr/usdImaging/usdImaging/tokens.h"
 
 #include "pxr/imaging/garch/contextCaps.h"
-#include "pxr/imaging/garch/glslfx.h"
 #include "pxr/imaging/garch/ptexTexture.h"
 #include "pxr/imaging/garch/resourceFactory.h"
 #include "pxr/imaging/garch/textureHandle.h"
 #include "pxr/imaging/garch/textureRegistry.h"
 #include "pxr/imaging/garch/udimTexture.h"
+
+#include "pxr/imaging/hio/glslfx.h"
 
 #include "pxr/imaging/hd/material.h"
 #include "pxr/imaging/hd/tokens.h"
@@ -87,7 +88,7 @@ _GetWrap(UsdPrim const &usdPrim,
                 auto &shaderReg = SdrRegistry::GetInstance();
                 if (SdrShaderNodeConstPtr sdrNode = 
                     shaderReg.GetShaderNodeByIdentifierAndType(shaderId, 
-                                GarchGLSLFXTokens->glslfx)) {
+                                HioGlslfxTokens->glslfx)) {
                     if (const auto &sdrInput = 
                             sdrNode->GetShaderInput(wrapAttr)) {
                         VtValue wrapVal = sdrInput->GetDefaultValue();

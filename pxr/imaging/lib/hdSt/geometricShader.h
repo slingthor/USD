@@ -31,8 +31,7 @@
 #include "pxr/imaging/hdSt/resourceRegistry.h"
 #include "pxr/imaging/hdSt/shaderKey.h"
 #include "pxr/usd/sdf/path.h"
-
-#include "pxr/imaging/garch/glslfx.h"
+#include "pxr/imaging/hio/glslfx.h"
 
 #include <boost/scoped_ptr.hpp>
 
@@ -119,7 +118,9 @@ public:
     HDST_API
     virtual void AddBindings(HdBindingRequestVector *customBindings) override;
 
-    std::vector<std::string> GetSourceKeys(TfToken const &shaderStageKey) const { return _glslfx->GetSourceKeys(shaderStageKey); }
+    std::vector<std::string> GetSourceKeys(TfToken const &shaderStageKey) const {
+        return _glslfx->GetSourceKeys(shaderStageKey);
+    }
 
     /// Returns true if this geometric shader is used for GPU frustum culling.
     bool IsCullingPass() const {
@@ -205,7 +206,7 @@ private:
     float _lineWidth;
     // depth offset?
 
-    boost::scoped_ptr<GLSLFX> _glslfx;
+    boost::scoped_ptr<HioGlslfx> _glslfx;
     bool _cullingPass;
     ID _hash;
 

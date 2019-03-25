@@ -86,8 +86,6 @@ pxr_library(garch
         imageRegistry
         glDebugWindow
         glPlatformDebugContext
-        glslfx
-        glslfxConfig
         ptexTexture
         resourceFactory
         texture
@@ -128,7 +126,6 @@ pxr_library(garch
     CPPFILES
         ${GARCH_GLPLATFORMCONTEXT}.${GARCH_SOURCE_EXTENSION}
         ${GARCH_GLPLATFORMDEBUGWINDOW}.${GARCH_SOURCE_EXTENSION}
-        dictionary.cpp
         ${optionalCppFiles}
         stbImage.cpp
 

@@ -36,7 +36,7 @@
 #include "pxr/imaging/hd/perfLog.h"
 #include "pxr/imaging/hd/material.h"
 
-#include "pxr/imaging/garch/glslfx.h"
+#include "pxr/imaging/hio/glslfx.h"
 #include "pxr/imaging/garch/image.h"
 
 #include "pxr/imaging/pxOsd/tokens.h"
@@ -304,6 +304,28 @@ UsdImagingDrawModeAdapter::MarkMaterialDirty(UsdPrim const& prim,
     }
 }
 
+void
+UsdImagingDrawModeAdapter::_CheckForTextureVariability(
+    UsdPrim const& prim, HdDirtyBits dirtyBits,
+    HdDirtyBits *timeVaryingBits) const
+{
+    const std::array<TfToken, 6> textureAttrs = {
+        UsdGeomTokens->modelCardTextureXPos,
+        UsdGeomTokens->modelCardTextureYPos,
+        UsdGeomTokens->modelCardTextureZPos,
+        UsdGeomTokens->modelCardTextureXNeg,
+        UsdGeomTokens->modelCardTextureYNeg,
+        UsdGeomTokens->modelCardTextureZNeg,
+    };
+
+    for (const TfToken& attr: textureAttrs) {
+        if (_IsVarying(prim, attr, dirtyBits,
+                       UsdImagingTokens->usdVaryingTexture,
+                       timeVaryingBits, false)) {
+            break;
+        }
+    }
+}
 
 void
 UsdImagingDrawModeAdapter::TrackVariability(UsdPrim const& prim,
@@ -312,8 +334,20 @@ UsdImagingDrawModeAdapter::TrackVariability(UsdPrim const& prim,
                                             UsdImagingInstancerContext const*
                                                instancerContext) const
 {
-    if (_IsMaterialPath(cachePath) || _IsTexturePath(cachePath)) {
-        // Shader/texture aspects aren't time-varying.
+    // If the textures are time-varying, we need to mark DirtyTexture on the
+    // texture, and DirtyParams on the shader (so that the shader picks up
+    // the new texture handle).
+    // XXX: the DirtyParams part of this can go away when we do the dependency
+    // tracking in hydra.
+    if (_IsTexturePath(cachePath)) {
+        _CheckForTextureVariability(prim, HdTexture::DirtyTexture,
+                                    timeVaryingBits);
+        return;
+    }
+
+    if (_IsMaterialPath(cachePath)) {
+        _CheckForTextureVariability(prim, HdMaterial::DirtyParams,
+                                    timeVaryingBits);
         return;
     }
 
@@ -462,18 +496,26 @@ UsdImagingDrawModeAdapter::UpdateForTime(UsdPrim const& prim,
     }
 
     if (requestedBits & HdChangeTracker::DirtyPrimvar) {
-        VtVec4fArray color = VtVec4fArray(1);
+        VtVec3fArray color = VtVec3fArray(1);
         // Default color to 18% gray.
         GfVec3f schemaColor= GfVec3f(0.18f, 0.18f, 0.18f);
         UsdAttribute drawModeColorAttr = model.GetModelDrawModeColorAttr();
         if (drawModeColorAttr) {
             drawModeColorAttr.Get(&schemaColor);
         }
-        color[0] = GfVec4f(schemaColor[0], schemaColor[1], schemaColor[2], 1);
+        color[0] = schemaColor;
         valueCache->GetColor(cachePath) = color;
 
-        _MergePrimvar(&primvars, HdTokens->color,
+        _MergePrimvar(&primvars, HdTokens->displayColor,
                       HdInterpolationConstant, HdPrimvarRoleTokens->color);
+
+        VtFloatArray opacity = VtFloatArray(1);
+        // Full opacity.
+        opacity[0] = 1.0f;
+        valueCache->GetOpacity(cachePath) = opacity;
+
+        _MergePrimvar(&primvars, HdTokens->displayOpacity,
+                      HdInterpolationConstant);
     }
 
     // We compute all of the below items together, since their derivations
@@ -1000,12 +1042,12 @@ UsdImagingDrawModeAdapter::_GenerateTextureCoordinates(
 std::string
 UsdImagingDrawModeAdapter::_GetSurfaceShaderSource() const
 {
-    boost::scoped_ptr<GLSLFX> gfx(new GLSLFX(UsdImagingPackageDrawModeShader()));
-    if (!gfx->IsValid()) {
+    HioGlslfx gfx (UsdImagingPackageDrawModeShader());
+    if (!gfx.IsValid()) {
         TF_CODING_ERROR("Couldn't load UsdImagingPackageDrawModeShader");
         return std::string();
     }
-    return gfx->GetSurfaceSource();
+    return gfx.GetSurfaceSource();
 }
 
 GfRange3d

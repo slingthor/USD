@@ -55,10 +55,23 @@ TF_DEFINE_ENV_SETTING(GLF_ENABLE_SHADER_DRAW_PARAMETERS, true,
 TF_DEFINE_ENV_SETTING(GLF_GLSL_VERSION, 0,
                       "GLSL version");
 
+
+// Set defaults based on GL spec minimums
+static const int _DefaultMaxArrayTextureLayers        = 256;
+static const int _DefaultMaxUniformBlockSize          = 16*1024;
+static const int _DefaultMaxShaderStorageBlockSize    = 16*1024*1024;
+static const int _DefaultMaxTextureBufferSize         = 64*1024;
+static const int _DefaultGLSLVersion                  = 400;
+
 // Initialize members to ensure a sane starting state.
 GlfContextCaps::GlfContextCaps()
 {
     _LoadCaps();
+}
+
+void GlfContextCaps::InitInstance()
+{
+    // MTLTODO: Figure this out
 }
 
 int
@@ -87,8 +100,19 @@ GlfContextCaps::GetAPIVersion()
 void
 GlfContextCaps::_LoadCaps()
 {
-    // note that this function is called without GL context, in some unit tests.
-
+    // Reset Values to reasonable defaults based of OpenGL minimums.
+    // So that if we early out, systems can still depend on the
+    // caps values being valid.
+    //
+    // _LoadCaps can also be called multiple times, so not want
+    // to mix and match values in the event of an early out.
+    apiVersion                   = 0;
+    coreProfile                  = false;
+    maxArrayTextureLayers        = _DefaultMaxArrayTextureLayers;
+    maxUniformBlockSize          = _DefaultMaxUniformBlockSize;
+    maxShaderStorageBlockSize    = _DefaultMaxShaderStorageBlockSize;
+    maxTextureBufferSize         = _DefaultMaxTextureBufferSize;
+    uniformBufferOffsetAlignment = 0;
     arrayTexturesEnabled         = false;
     shaderStorageBufferEnabled   = false;
     bufferStorageEnabled         = false;
@@ -96,6 +120,7 @@ GlfContextCaps::_LoadCaps()
     multiDrawIndirectEnabled     = false;
     bindlessTextureEnabled       = false;
     bindlessBufferEnabled        = false;
+    glslVersion                  = _DefaultGLSLVersion;
     explicitUniformLocation      = false;
     shadingLanguage420pack       = false;
     shaderDrawParametersEnabled  = false;

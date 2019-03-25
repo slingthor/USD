@@ -35,7 +35,7 @@
 #include "pxr/imaging/glf/bindingMap.h"
 #include "pxr/imaging/glf/diagnostic.h"
 
-#include "pxr/imaging/garch/glslfx.h"
+#include "pxr/imaging/hio/glslfx.h"
 
 #include "pxr/base/tf/diagnostic.h"
 #include "pxr/base/tf/envSetting.h"

@@ -24,8 +24,9 @@
 #include "pxr/imaging/glf/glew.h"
 
 #include "pxr/imaging/garch/contextCaps.h"
-#include "pxr/imaging/garch/glslfx.h"
 #include "pxr/imaging/garch/resourceFactory.h"
+
+#include "pxr/imaging/hio/glslfx.h"
 
 #include "pxr/imaging/hdSt/geometricShader.h"
 #include "pxr/imaging/hdSt/package.h"
@@ -127,7 +128,7 @@ std::string
 _GetPtexTextureShaderSource()
 {
     static std::string source =
-        GLSLFX(HdStPackagePtexTextureShader()).GetSource(
+        HioGlslfx(HdStPackagePtexTextureShader()).GetSource(
             _tokens->ptexTextureSampler);
     return source;
 }
@@ -1710,7 +1711,7 @@ HdSt_CodeGenGLSL::_GenerateConstantPrimvar()
           mat4 transform;
           mat4 transformInverse;
           mat4 instancerTransform[2];
-          vec4 color;
+          vec3 displayColor;
           vec4 primID;
       };
       // bindless
@@ -1724,8 +1725,8 @@ HdSt_CodeGenGLSL::_GenerateConstantPrimvar()
       mat4 HdGet_transform(int localIndex) {
           return constantData0[GetConstantCoord()].transform;
       }
-      vec4 HdGet_color(int localIndex) {
-          return constantData0[GetConstantCoord()].color;
+      vec3 HdGet_displayColor(int localIndex) {
+          return constantData0[GetConstantCoord()].displayColor;
       }
 
     */
@@ -1901,15 +1902,15 @@ HdSt_CodeGenGLSL::_GenerateElementPrimvar()
 
       // --------- uniform primvar declaration ---------
       struct ElementData0 {
-          vec4 color;
+          vec3 displayColor;
       };
       layout (std430, binding=?) buffer buffer0 {
           ElementData0 elementData0[];
       };
 
       // ---------uniform primvar data accessor ---------
-      vec4 HdGet_color(int localIndex) {
-          return elementData0[GetAggregatedElementID()].color;
+      vec3 HdGet_displayColor(int localIndex) {
+          return elementData0[GetAggregatedElementID()].displayColor;
       }
 
     */

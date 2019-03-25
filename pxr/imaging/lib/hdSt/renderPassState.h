@@ -54,7 +54,7 @@ public:
 
     HDST_API
     virtual void
-    Sync(HdResourceRegistrySharedPtr const &resourceRegistry) override;
+    Prepare(HdResourceRegistrySharedPtr const &resourceRegistry) override;
 
     HDST_API
     virtual void Bind() override;

@@ -26,7 +26,7 @@
 
 #include "pxr/imaging/mtlf/bindingMap.h"
 
-#include "pxr/imaging/garch/glslfx.h"
+#include "pxr/imaging/hio/glslfx.h"
 
 #include "pxr/imaging/hdSt/Metal/mslProgram.h"
 #include "pxr/imaging/hdSt/package.h"

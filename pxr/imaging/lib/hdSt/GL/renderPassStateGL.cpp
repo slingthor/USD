@@ -96,6 +96,7 @@ HdStRenderPassStateGL::Bind()
     }
 
     glDepthFunc(HdStGLConversions::GetGlDepthFunc(_depthFunc));
+    glDepthMask(_depthMaskEnabled);
     
     // Stencil
     if (_stencilEnabled) {
@@ -193,6 +194,7 @@ HdStRenderPassStateGL::Unbind()
     }
     
     glColorMask(true, true, true, true);
+    glDepthMask(true);
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

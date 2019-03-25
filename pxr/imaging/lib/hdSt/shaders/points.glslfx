@@ -69,7 +69,14 @@ void main(void)
                          HD_GL_POINT_SIZE_MIN, HD_GL_POINT_SIZE_MAX);
 
     ProcessPointId(GetPointId());
-}
+}[8]    float   -0.0568419769
+[9] float   -0.237548724
+[10]    float   -0.565322459
+[11]    float   -0.0106954053
+[12]    float   0.117521353
+[13]    float   0.581208169
+[14]    float   0.331320405
+[15]    float   0.0251874141
 
 --- --------------------------------------------------------------------------
 -- glsl Point.Fragment
@@ -85,10 +92,12 @@ void main(void)
     // camera facing.
     vec3 Neye = vec3(0, 0, 1);
 
-#ifdef HD_HAS_color
-    vec4 color = HdGet_color();
-#else
-    vec4 color = vec4(1);
+    vec4 color = vec4(0.5, 0.5, 0.5, 1);
+#ifdef HD_HAS_displayColor
+    color.rgb = HdGet_displayColor().rgb;
+#endif
+#ifdef HD_HAS_displayOpacity
+    color.a = HdGet_displayOpacity();
 #endif
 
     vec4 patchCoord = vec4(0);

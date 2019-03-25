@@ -23,6 +23,7 @@
 //
 #include "pxr/imaging/hdSt/shaderCode.h"
 
+#include "pxr/imaging/hd/tokens.h"
 #include "pxr/imaging/garch/contextCaps.h"
 #include "pxr/imaging/garch/resourceFactory.h"
 
@@ -55,6 +56,13 @@ HdStShaderCode::ComputeHash(HdStShaderCodeSharedPtrVector const &shaders)
     }
     
     return hash;
+}
+
+/* virtual */
+TfToken
+HdStShaderCode::GetMaterialTag() const
+{
+    return TfToken();
 }
 
 /*virtual*/

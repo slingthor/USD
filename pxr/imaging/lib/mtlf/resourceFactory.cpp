@@ -36,7 +36,7 @@
 #include "pxr/imaging/mtlf/udimTexture.h"
 #include "pxr/imaging/mtlf/uniformBlock.h"
 
-#include "pxr/imaging/garch/glslfx.h"
+#include "pxr/imaging/hio/glslfx.h"
 
 #include "pxr/base/tf/diagnostic.h"
 

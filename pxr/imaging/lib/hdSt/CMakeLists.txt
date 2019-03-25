@@ -73,6 +73,7 @@ endif()
 
 pxr_library(hdSt
     LIBRARIES
+        hio
         garch
         hd
         tf

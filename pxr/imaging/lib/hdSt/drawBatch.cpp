@@ -42,7 +42,7 @@
 #include "pxr/imaging/hd/tokens.h"
 #include "pxr/imaging/hd/vtBufferSource.h"
 
-#include "pxr/imaging/garch/glslfx.h"
+#include "pxr/imaging/hio/glslfx.h"
 
 #include "pxr/base/tf/getenv.h"
 
@@ -248,14 +248,16 @@ HdSt_DrawBatch::_GetDrawingProgram(HdStRenderPassStateSharedPtr const &state,
             // expect all the other shaders to compile or else the shipping
             // code is broken and needs to be fixed.  When we open up more
             // shaders for customization, we will need to check them as well.
-            typedef boost::shared_ptr<class GLSLFX> GLSLFXSharedPtr;
+            
+            typedef boost::shared_ptr<class HioGlslfx> HioGlslfxSharedPtr;
 
-            GLSLFXSharedPtr glslfxSurfaceFallback =
-                GLSLFXSharedPtr(new GLSLFX(HdStPackageFallbackSurfaceShader()));
+            HioGlslfxSharedPtr glslSurfaceFallback = 
+                HioGlslfxSharedPtr(
+                        new HioGlslfx(HdStPackageFallbackSurfaceShader()));
 
             HdStShaderCodeSharedPtr fallbackSurface =
                 HdStShaderCodeSharedPtr(
-                    new HdStGLSLFXShader(glslfxSurfaceFallback));
+                    new HdStGLSLFXShader(glslSurfaceFallback));
 
             _program.SetSurfaceShader(fallbackSurface);
 

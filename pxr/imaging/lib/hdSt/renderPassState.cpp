@@ -77,7 +77,7 @@ HdStRenderPassState::~HdStRenderPassState()
 }
 
 void
-HdStRenderPassState::Sync(HdResourceRegistrySharedPtr const &resourceRegistry)
+HdStRenderPassState::Prepare(HdResourceRegistrySharedPtr const &resourceRegistry)
 {
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();

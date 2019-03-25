@@ -25,7 +25,7 @@
 #include "pxr/imaging/glf/diagnostic.h"
 
 #include "pxr/imaging/garch/contextCaps.h"
-#include "pxr/imaging/garch/glslfx.h"
+#include "pxr/imaging/hio/glslfx.h"
 #include "pxr/imaging/garch/resourceFactory.h"
 
 #include "pxr/imaging/hdSt/commandBuffer.h"

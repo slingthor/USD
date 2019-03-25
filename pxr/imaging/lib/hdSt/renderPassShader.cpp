@@ -30,7 +30,7 @@
 #include "pxr/imaging/hdSt/package.h"
 #include "pxr/imaging/hdSt/renderPassShader.h"
 
-#include "pxr/imaging/garch/glslfx.h"
+#include "pxr/imaging/hio/glslfx.h"
 
 #include <boost/functional/hash.hpp>
 
@@ -46,7 +46,7 @@ HdStRenderPassShader::HdStRenderPassShader()
     , _hashValid(false)
     , _cullStyle(HdCullStyleNothing)
 {
-    _glslfx.reset(new GLSLFX(_glslfxFile));
+    _glslfx.reset(new HioGlslfx(_glslfxFile));
 }
 
 HdStRenderPassShader::HdStRenderPassShader(TfToken const &glslfxFile)
@@ -56,7 +56,7 @@ HdStRenderPassShader::HdStRenderPassShader(TfToken const &glslfxFile)
     , _hashValid(false)
     , _cullStyle(HdCullStyleNothing)
 {
-    _glslfx.reset(new GLSLFX(_glslfxFile));
+    _glslfx.reset(new HioGlslfx(_glslfxFile));
 }
 
 /*virtual*/

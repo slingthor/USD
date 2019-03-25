@@ -29,7 +29,7 @@
 #include "pxr/imaging/hf/perfLog.h"
 #include "pxr/imaging/hd/perfLog.h"
 #include "pxr/imaging/glf/diagnostic.h"
-#include "pxr/imaging/garch/glslfx.h"
+#include "pxr/imaging/hio/glslfx.h"
 #include "pxr/base/tf/staticTokens.h"
 
 #if defined(ARCH_GFX_OPENGL)
@@ -88,7 +88,7 @@ void
 HdxCompositor::_CreateShaderResources(bool useDepthProgram)
 {
     _compositorProgram.reset(HdStProgram::New(_tokens->fullscreenShader));
-    GLSLFX glslfx(HdxPackageFullscreenShader());
+    HioGlslfx glslfx(HdxPackageFullscreenShader());
     TfToken fsToken = useDepthProgram ? _tokens->compositeFragmentWithDepth
                                       : _tokens->compositeFragmentNoDepth;
     if (!_compositorProgram->CompileShader(GL_VERTEX_SHADER,

@@ -77,6 +77,33 @@ _IsStreamRenderingBackend(HdRenderIndex *index)
     return true;
 }
 
+static GfVec3d _Unproject(GfVec3f const &coord,
+                          GfMatrix4d const &modelview,
+                          GfMatrix4d const &projection,
+                          GfVec4i const &viewport)
+{
+    GfMatrix4d m;
+    GfVec4f in, out;
+    
+    // Calculation for inverting a matrix, compute projection x modelview
+    // and store in A[16]
+    m = (modelview * projection).GetInverse();
+    
+    // Transformation of normalized coordinates between -1 and 1
+    in[0] = (coord[0] - float(viewport[0])) / float(viewport[2]) * 2.0f - 1.0f;
+    in[1] = (coord[1] - float(viewport[1])) / float(viewport[3]) * 2.0f - 1.0f;
+    in[2] = coord[2] * 2.0f - 1.0f;
+    in[3] = 1.0f;
+    
+    out = in * m;
+    
+    if(out[3]==0.0)
+        return GfVec3d(0);
+
+    out[3]=1.0 / out[3];
+    return GfVec3d(out[0] * out[3], out[1] * out[3], out[2] * out[3]);
+}
+
 HdxIntersector::HdxIntersector(HdRenderIndex *index)
     : _index(index)
 { 
@@ -148,7 +175,7 @@ HdxIntersector::_ConfigureSceneMaterials(bool enableSceneMaterials,
     } else {
         if (!_overrideShader) {
             _overrideShader = HdStShaderCodeSharedPtr(new HdStGLSLFXShader(
-                GLSLFXSharedPtr(new GLSLFX(
+                HioGlslfxSharedPtr(new HioGlslfx(
                     HdStPackageFallbackSurfaceShader()))));
         }
         renderPassState->SetOverrideShader(_overrideShader);
@@ -268,8 +295,14 @@ public:
                       HdDirtyBits*) override
     {
         _renderPass->Sync();
-        _renderPassState->Sync(
-            _renderPass->GetRenderIndex()->GetResourceRegistry());
+    }
+
+    /// Prepare the tasks resources
+    HDX_API
+    virtual void Prepare(HdTaskContext* ctx,
+                         HdRenderIndex* renderIndex) override
+    {
+        _renderPassState->Prepare(renderIndex->GetResourceRegistry());
     }
 
     virtual void Execute(HdTaskContext* ctx) override
@@ -446,78 +479,28 @@ HdxIntersector::Query(HdxIntersector::Params const& params,
         // multi-task usage below.
         HdTaskSharedPtrVector tasks;
 
-        // The picking operation is composed of one or more ceonceptual passes 
-        // as follows:
+        // The picking operation is composed of one or more conceptual passes:
         // (i) [optional] depth-only pass for "unpickable" prims: This ensures 
-        // that occlusion is honored during picking. We swap the include
-        // and exclude paths of the input collection and render the resulting
-        // prims into the depth buffer.
-        // We currently skip this pass when "picking through" prims.
-        // XXX: This shouldn't be tied to pick through; it should be a separate
-        // knob.
+        // that occlusion stemming for unpickable prims is honored during 
+        // picking.
         //
-        // (ii) [optional] depth-only hull pass for "pickable" prims: This is
-        // relevant only when picking points, when pickThrough isn't set.
-        // To ensure hidden points aren't picked, we render the hull of the 
-        // pickable prims to the depth buffer.
-        //
-        // (iii) [mandatory] id render for "pickable" prims: This writes out the
+        // (ii) [mandatory] id render for "pickable" prims: This writes out the
         // various id's for prims that pass the depth test.
 
-        if (!params.pickThrough) {
-            const bool pickPoints =
-                (params.pickTarget == HdxIntersector::PickPoints);
-            const bool hasUnpickables =
-                (!pickablesCol.GetExcludePaths().empty());
+        if (params.doUnpickablesOcclude &&
+            !pickablesCol.GetExcludePaths().empty()) {
+            // Pass (i) from above
+            HdRprimCollection occluderCol =
+                pickablesCol.CreateInverseCollection();
+            _occluderRenderPass->SetRprimCollection(occluderCol);
 
-            if (pickPoints) {
-                // Passes (i) and (ii) are combined into a single occlusion pass
-                HdRprimCollection occluderCol = pickablesCol;
-
-                // While we'd prefer not to override/use repr's configured by 
-                // Hydra (in HdRenderIndex::_ConfigureReprs), we make an 
-                // exception here.  Point picking support is limited to 
-                // unrefined meshes currently, and so we can use 'hull' to do 
-                // the depth-only pass w/ both pickables and unpickables.
-                occluderCol.SetReprSelector(
-                                HdReprSelector(HdReprTokens->hull,
-                                               HdReprTokens->disabled,
-                                               HdReprTokens->disabled));
-                if (!occluderCol.GetExcludePaths().empty()) {
-                    // add the "unpickables" to the prims rendered to the depth
-                    // buffer
-                    SdfPathVector netIncludePaths = occluderCol.GetRootPaths();
-                    SdfPathVector const& excludePaths = 
-                        occluderCol.GetExcludePaths();
-                    netIncludePaths.insert(netIncludePaths.end(),
-                                           excludePaths.begin(),
-                                           excludePaths.end());
-                    occluderCol.SetRootPaths(netIncludePaths);
-                }
-
-                _occluderRenderPass->SetRprimCollection(occluderCol);
-
-                tasks.push_back(boost::make_shared<HdxIntersector_DrawTask>(
-                        _occluderRenderPass,
-                        _occluderRenderPassState,
-                        params.renderTags));
-            }
-            else if (hasUnpickables) {
-                // Pass (i) from above
-                HdRprimCollection occluderCol =
-                    pickablesCol.CreateInverseCollection();
-                _occluderRenderPass->SetRprimCollection(occluderCol);
-
-                tasks.push_back(boost::make_shared<HdxIntersector_DrawTask>(
-                        _occluderRenderPass,
-                        _occluderRenderPassState,
-                        params.renderTags));
-            }
+            tasks.push_back(boost::make_shared<HdxIntersector_DrawTask>(
+                    _occluderRenderPass,
+                    _occluderRenderPassState,
+                    params.renderTags));
         }
 
-        // 
-        // Pass (iii) from above
-        //
+        // Pass (ii) from above
         _pickableRenderPass->SetRprimCollection(pickablesCol);
         tasks.push_back(boost::make_shared<HdxIntersector_DrawTask>(
                 _pickableRenderPass,
@@ -639,18 +622,12 @@ HdxIntersector::Result::_ResolveHit(int index, int x, int y, float z,
     unsigned char const* edgeIds = _edgeIds.get();
     unsigned char const* pointIds = _pointIds.get();
 
-    GfVec3d hitPoint(0,0,0);
-#if defined(ARCH_GFX_OPENGL)
-    gluUnProject(x, y, z,
-                 _params.viewMatrix.GetArray(),
-                 _params.projectionMatrix.GetArray(),
-                 &_viewport[0],
-                 &((hitPoint)[0]),
-                 &((hitPoint)[1]),
-                 &((hitPoint)[2]));
-#else
-    TF_FATAL_CODING_ERROR("Not Implemented!"); //MTL_FIXME
-#endif
+    GfVec3d hitPoint;
+    hitPoint = _Unproject(GfVec3f(x, y, z),
+                  _params.viewMatrix,
+                  _params.projectionMatrix,
+                  _viewport);
+
     int idIndex = index*4;
 
     int primId = HdxIntersector::DecodeIDRenderColor(&primIds[idIndex]);

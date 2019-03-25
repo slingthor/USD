@@ -39,7 +39,7 @@
 #include "pxr/imaging/hd/vtBufferSource.h"
 
 #include "pxr/imaging/garch/contextCaps.h"
-#include "pxr/imaging/garch/glslfx.h"
+#include "pxr/imaging/hio/glslfx.h"
 #include "pxr/imaging/garch/resourceFactory.h"
 
 

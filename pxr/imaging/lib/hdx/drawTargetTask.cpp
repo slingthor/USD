@@ -109,9 +109,6 @@ HdxDrawTargetTask::Sync(HdSceneDelegate* delegate,
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
 
-    TRACE_FUNCTION();
-    TfAutoMallocTag2 tag("GlimRg", __ARCH_PRETTY_FUNCTION__);
-
     if ((*dirtyBits) & HdChangeTracker::DirtyParams) {
         HdxDrawTargetTaskParams params;
 
@@ -144,7 +141,7 @@ HdxDrawTargetTask::Sync(HdSceneDelegate* delegate,
 
     if (_currentDrawTargetSetVersion != drawTargetVersion) {
         HdStDrawTargetPtrConstVector drawTargets;
-        HdStDrawTarget::GetDrawTargets(delegate, &drawTargets);
+        HdStDrawTarget::GetDrawTargets(&renderIndex, &drawTargets);
 
         _renderPassesInfo.clear();
         _renderPasses.clear();
@@ -297,7 +294,7 @@ HdxDrawTargetTask::Sync(HdSceneDelegate* delegate,
                 lightingContext->GetUseColorMaterialDiffuse());
         }
 
-        renderPassState->Sync(renderIndex.GetResourceRegistry());
+        renderPassState->Prepare(renderIndex.GetResourceRegistry());
         renderPass->Sync();
     }
 
@@ -316,6 +313,21 @@ HdxDrawTargetTask::Sync(HdSceneDelegate* delegate,
     }
 
     *dirtyBits = HdChangeTracker::Clean;
+}
+
+void
+HdxDrawTargetTask::Prepare(HdTaskContext* ctx,
+                           HdRenderIndex* renderIndex)
+{
+    size_t numRenderPasses = _renderPassesInfo.size();
+    for (size_t renderPassIdx = 0;
+         renderPassIdx < numRenderPasses;
+         ++renderPassIdx) {
+
+        HdxDrawTargetRenderPass *renderPass =
+            _renderPasses[renderPassIdx].get();
+        renderPass->Prepare();
+    }
 }
 
 void

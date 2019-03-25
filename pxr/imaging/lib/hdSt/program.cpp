@@ -32,7 +32,7 @@
 #include "pxr/imaging/hd/perfLog.h"
 #include "pxr/imaging/hd/tokens.h"
 
-#include "pxr/imaging/garch/glslfx.h"
+#include "pxr/imaging/hio/glslfx.h"
 
 #if defined(ARCH_GFX_OPENGL)
 #include "pxr/imaging/hdSt/GL/glslProgram.h"
@@ -100,7 +100,7 @@ HdStProgram::GetComputeProgram(
         // if not exists, create new one
         
         HdStProgramSharedPtr newProgram(HdStProgram::New(HdTokens->computeShader));
-        boost::scoped_ptr<GLSLFX> glslfx(new GLSLFX(HdStPackageComputeShader()));
+        boost::scoped_ptr<HioGlslfx> glslfx(new HioGlslfx(HdStPackageComputeShader()));
 
         std::string header = newProgram->GetComputeHeader();
         if (!newProgram->CompileShader(

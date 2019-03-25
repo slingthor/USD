@@ -24,6 +24,7 @@
 #include "pxr/pxr.h"
 
 #include "pxr/imaging/glf/glew.h"
+#include "pxr/imaging/glf/contextCaps.h"
 #include "pxr/imaging/glf/diagnostic.h"
 #include "pxr/imaging/garch/drawTarget.h"
 #include "pxr/imaging/glf/glContext.h"
@@ -56,6 +57,7 @@ int main(int argc, char *argv[])
     GlfGlewInit();
     // wrap into GlfGLContext so that GlfDrawTarget works
     GlfGLContextSharedPtr ctx = GlfGLContext::GetCurrentGLContext();
+    GlfContextCaps::InitInstance();
 
     // prep draw target
     GarchDrawTargetRefPtr drawTarget = GarchDrawTarget::New(GfVec2i(512, 512));

@@ -86,6 +86,10 @@ public:
     HDST_API
     virtual ID ComputeHash() const;
 
+    HDST_API
+    virtual TfToken GetMaterialTag() const override;
+
+
     /// Setter method for prim
     HDST_API
     void SetFragmentSource(const std::string &source);
@@ -98,6 +102,9 @@ public:
     HDST_API
     void SetBufferSources(HdBufferSourceVector &bufferSources, 
                           HdResourceRegistrySharedPtr const &resourceRegistry);
+
+    HDST_API
+    void SetMaterialTag(TfToken const &materialTag);
 
     HDST_API
     TextureDescriptorVector const& GetTextureDescriptors() const { return _textureDescriptors; }
@@ -121,6 +128,8 @@ private:
     HdBufferArrayRangeSharedPtr _paramArray;
 
     TextureDescriptorVector _textureDescriptors;
+
+    TfToken _materialTag;
 
     // No copying
     HdStSurfaceShader(const HdStSurfaceShader &)                     = delete;
