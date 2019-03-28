@@ -994,51 +994,6 @@ UsdImagingGLEngine::SetRendererSetting(TfToken const& settingId, VtValue const& 
 
     if (settingId == HdStRenderSettingsTokens->graphicsAPI) {
         SetRendererPlugin(_rendererId, true);
-/*
-        // Pull old delegate/task controller state.
-        GfMatrix4d rootTransform = GfMatrix4d(1.0);
-        bool isVisible = true;
-        if (_delegate != nullptr) {
-            rootTransform = _delegate->GetRootTransform();
-            isVisible = _delegate->GetRootVisibility();
-        }
-        HdSelectionSharedPtr selection = _selTracker->GetSelectionMap();
-        if (!selection) {
-            selection.reset(new HdSelection);
-        }
-        
-        TfToken rendererId(_rendererId);
-        HdxRendererPlugin *plugin = HdxRendererPluginRegistry::GetInstance().
-            GetRendererPlugin(rendererId);
-        
-        // Delete hydra state.
-        _DeleteHydraResources();
-        
-        // Recreate the render index.
-        _rendererPlugin = plugin;
-        _rendererId = rendererId;
-
-        // Recreate the render index.
-        HdRenderDelegate *renderDelegate = _rendererPlugin->CreateRenderDelegate();
-        _renderIndex = HdRenderIndex::New(renderDelegate);
-        
-        // Create the new delegate & task controller.
-        _delegate = new UsdImagingDelegate(_renderIndex, _delegateID);
-        _isPopulated = false;
-        
-        _taskController = new HdxTaskController(_renderIndex,
-            _delegateID.AppendChild(TfToken(TfStringPrintf(
-               "_UsdImaging_%s_%p",
-               TfMakeValidIdentifier(_rendererId.GetText()).c_str(),
-               this))));
-        
-        // Rebuild state in the new delegate/task controller.
-        _delegate->SetRootVisibility(isVisible);
-        _delegate->SetRootTransform(rootTransform);
-        _selTracker->SetSelection(selection);
-        _taskController->SetSelectionColor(_selectionColor);
-        return;
- */
     }
 }
 

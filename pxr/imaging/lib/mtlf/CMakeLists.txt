@@ -32,7 +32,6 @@ pxr_library(mtlf
         arch
         garch
         gf
-        hio
         js
         plug
         tf

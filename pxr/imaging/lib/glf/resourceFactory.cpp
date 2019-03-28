@@ -36,8 +36,6 @@
 #include <pxr/imaging/glf/udimTexture.h>
 #include <pxr/imaging/glf/uniformBlock.h>
 
-#include <pxr/imaging/hio/glslfx.h>
-
 #include <pxr/base/tf/diagnostic.h>
 
 PXR_NAMESPACE_OPEN_SCOPE

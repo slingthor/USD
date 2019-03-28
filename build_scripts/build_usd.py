@@ -337,7 +337,7 @@ def RunCMake(context, force, buildArgs = None, hostPlatform = False):
 
         Run("cmake --build . --config {config} --target install -- {multiproc}"
             .format(config=config,
-			multiproc=FormatMultiProcs(context.numJobs, generator)))
+			        multiproc=FormatMultiProcs(context.numJobs, generator)))
 
 def PatchFile(filename, patches, multiLineMatches=False):
     """Applies patches to the specified file. patches is a list of tuples
