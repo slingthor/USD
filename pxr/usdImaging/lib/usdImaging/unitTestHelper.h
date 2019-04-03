@@ -89,7 +89,7 @@ private:
 class UsdImaging_TestDriver final {
 public:
     UsdImaging_TestDriver(std::string const& usdFilePath)
-        : _engine(PXR_UNITTEST_GFX_ARCH)
+        : _engine()
         , _renderDelegate()
         , _renderIndex(nullptr)
         , _delegate(nullptr)
@@ -113,7 +113,7 @@ public:
                           TfToken const &collectionName,
                           TfToken const &reprName,
                           TfTokenVector const &renderTags)
-        : _engine(PXR_UNITTEST_GFX_ARCH)
+        : _engine()
         , _renderDelegate()
         , _renderIndex(nullptr)
         , _delegate(nullptr)
@@ -132,7 +132,7 @@ public:
     }
 
     UsdImaging_TestDriver(UsdStageRefPtr const& usdStage)
-        : _engine(PXR_UNITTEST_GFX_ARCH)
+        : _engine()
         , _renderDelegate()
         , _renderIndex(nullptr)
         , _delegate(nullptr)
@@ -154,7 +154,7 @@ public:
                           TfToken const &collectionName,
                           TfToken const &reprName,
                           TfTokenVector const &renderTags)
-        : _engine(PXR_UNITTEST_GFX_ARCH)
+        : _engine()
         , _renderDelegate()
         , _renderIndex(nullptr)
         , _delegate(nullptr)
@@ -173,7 +173,7 @@ public:
     UsdImaging_TestDriver(UsdStageRefPtr const& usdStage,
                           HdRprimCollection const &collection,
                           SdfPath const &delegateId)
-        : _engine(PXR_UNITTEST_GFX_ARCH)
+        : _engine()
         , _renderDelegate()
         , _renderIndex(nullptr)
         , _delegate(nullptr)

@@ -50,6 +50,7 @@ class HdStDrawItemInstance;
 class HdSt_FlatNormalsComputationGPU;
 class HdSt_MeshTopology;
 class HdStPersistentBuffer;
+class HdStProgram;
 class HdStRenderPassState;
 class HdSt_ResourceBinder;
 class HdSt_QuadrangulateComputationGPU;
@@ -72,36 +73,39 @@ public:
 
     HDST_API
     virtual ~HdStResourceFactoryInterface() {}
-    
+
+    // Temp
+    virtual bool IsOpenGL() const = 0;
+
     // HdSt_CodeGen
     HDST_API
     virtual HdSt_CodeGen *NewCodeGen(
-                HdSt_GeometricShaderPtr const &geometricShader,
-                HdStShaderCodeSharedPtrVector const &shaders) const = 0;
+        HdSt_GeometricShaderPtr const &geometricShader,
+        HdStShaderCodeSharedPtrVector const &shaders) const = 0;
     
     HDST_API
     virtual HdSt_CodeGen *NewCodeGen(
-                HdStShaderCodeSharedPtrVector const &shaders) const = 0;
+        HdStShaderCodeSharedPtrVector const &shaders) const = 0;
     
     /// commandNumUints is given in how many integers.
     HDST_API
     virtual HdStDispatchBuffer *NewDispatchBuffer(
-                TfToken const &role, int count,
-                unsigned int commandNumUints) const = 0;
+        TfToken const &role, int count,
+        unsigned int commandNumUints) const = 0;
     
     /// Creates a buffer relocator
     HDST_API
     virtual HdStBufferRelocator *NewBufferRelocator(
-                HdResourceGPUHandle srcBuffer,
-                HdResourceGPUHandle dstBuffer) const = 0;
+        HdResourceGPUHandle srcBuffer,
+        HdResourceGPUHandle dstBuffer) const = 0;
     
     /// Creates a buffer resource
     HDST_API
     virtual HdStBufferResource *NewBufferResource(
-                TfToken const &role,
-                HdTupleType tupleType,
-                int offset,
-                int stride) const = 0;
+        TfToken const &role,
+        HdTupleType tupleType,
+        int offset,
+        int stride) const = 0;
     
     /// Creates a new draw target texture resource
     HDST_API
@@ -110,61 +114,61 @@ public:
     /// Create a striped interleaved buffer
     HDST_API
     virtual HdBufferArraySharedPtr NewStripedInterleavedBuffer(
-                TfToken const &role,
-                HdBufferSpecVector const &bufferSpecs,
-                HdBufferArrayUsageHint usageHint,
-                int bufferOffsetAlignment,
-                int structAlignment,
-                size_t maxSize,
-                TfToken const &garbageCollectionPerfToken) const = 0;
+        TfToken const &role,
+        HdBufferSpecVector const &bufferSpecs,
+        HdBufferArrayUsageHint usageHint,
+        int bufferOffsetAlignment,
+        int structAlignment,
+        size_t maxSize,
+        TfToken const &garbageCollectionPerfToken) const = 0;
     
     /// Create a VBO simple memory buffer for Metal
     HDST_API
     virtual HdBufferArraySharedPtr NewVBOSimpleMemoryBuffer(
-                TfToken const &role,
-                HdBufferSpecVector const &bufferSpecs,
-                HdBufferArrayUsageHint usageHint) const = 0;
+        TfToken const &role,
+        HdBufferSpecVector const &bufferSpecs,
+        HdBufferArrayUsageHint usageHint) const = 0;
     
     /// Create a VBO memory buffer for Metal
     HDST_API
     virtual HdBufferArraySharedPtr NewVBOMemoryBuffer(
-                TfToken const &role,
-                HdBufferSpecVector const &bufferSpecs,
-                HdBufferArrayUsageHint usageHint) const = 0;
+        TfToken const &role,
+        HdBufferSpecVector const &bufferSpecs,
+        HdBufferArrayUsageHint usageHint) const = 0;
     
     /// Creates an indirect draw batch
     HDST_API
     virtual HdSt_DrawBatchSharedPtr NewIndirectDrawBatch(
-                HdStDrawItemInstance * drawItemInstance) const = 0;
+        HdStDrawItemInstance * drawItemInstance) const = 0;
     
     /// Creates a persistent buffer
     HDST_API
     virtual HdStPersistentBuffer *NewPersistentBuffer(
-                TfToken const &role, size_t dataSize, void* data) const = 0;
+        TfToken const &role, size_t dataSize, void* data) const = 0;
 
     /// Creates a graphics API specific GPU quadrangulate computation
     /// This computaion doesn't generate buffer source (i.e. 2nd phase)
     HDST_API
     virtual HdSt_QuadrangulateComputationGPU *NewQuadrangulateComputationGPU(
-                HdSt_MeshTopology *topology,
-                TfToken const &sourceName,
-                HdType dataType,
-                SdfPath const &id) const = 0;
+        HdSt_MeshTopology *topology,
+        TfToken const &sourceName,
+        HdType dataType,
+        SdfPath const &id) const = 0;
     
     /// Creates a new smooth normals GPU computation
     HDST_API
     virtual HdSt_SmoothNormalsComputationGPU *NewSmoothNormalsComputationGPU(
-                Hd_VertexAdjacency const *adjacency,
-                TfToken const &srcName, TfToken const &dstName,
-                HdType srcDataType, bool packed) const = 0;
+        Hd_VertexAdjacency const *adjacency,
+        TfToken const &srcName, TfToken const &dstName,
+        HdType srcDataType, bool packed) const = 0;
     
     /// Creates a new flat normals GPU computation
     HDST_API
     virtual HdSt_FlatNormalsComputationGPU *NewFlatNormalsComputationGPU(
-                HdBufferArrayRangeSharedPtr const &topologyRange,
-                HdBufferArrayRangeSharedPtr const &vertexRange,
-                int numFaces, TfToken const &srcName, TfToken const &dstName,
-                HdType srcDataType, bool packed) const = 0;
+        HdBufferArrayRangeSharedPtr const &topologyRange,
+        HdBufferArrayRangeSharedPtr const &vertexRange,
+        int numFaces, TfToken const &srcName, TfToken const &dstName,
+        HdType srcDataType, bool packed) const = 0;
     
     /// Creates a new render pass state
     HDST_API
@@ -173,7 +177,7 @@ public:
     /// Creates a new render pass state
     HDST_API
     virtual HdStRenderPassState *NewRenderPassState(
-                HdStRenderPassShaderSharedPtr const &renderPassShader) const = 0;
+        HdStRenderPassShaderSharedPtr const &renderPassShader) const = 0;
     
     /// Creates a resource binder
     HDST_API
@@ -188,23 +192,28 @@ public:
     /// this reference requires of the texture.  Set to 0 for unrestricted.
     HDST_API
     virtual HdStSimpleTextureResource *NewSimpleTextureResource(
-                GarchTextureHandleRefPtr const &textureHandle,
-                HdTextureType textureType,
-                size_t memoryRequest) const = 0;
+        GarchTextureHandleRefPtr const &textureHandle,
+        HdTextureType textureType,
+        size_t memoryRequest) const = 0;
     
     HDST_API
     virtual HdStSimpleTextureResource *NewSimpleTextureResource(
-                GarchTextureHandleRefPtr const &textureHandle,
-                HdTextureType textureType,
-                HdWrap wrapS, HdWrap wrapT,
-                HdMinFilter minFilter, HdMagFilter magFilter,
-                size_t memoryRequest = 0) const = 0;
+        GarchTextureHandleRefPtr const &textureHandle,
+        HdTextureType textureType,
+        HdWrap wrapS, HdWrap wrapT,
+        HdMinFilter minFilter, HdMagFilter magFilter,
+        size_t memoryRequest = 0) const = 0;
 
     HDST_API
     virtual char const *const GetComputeShaderFilename() const = 0;
     
     HDST_API
     virtual char const *const GetPtexTextureShaderFilename() const = 0;
+
+    /// Creates a graphics API specific program
+    HDST_API
+    virtual HdStProgram *NewProgram(
+        TfToken const &role) const = 0;
 
 protected:
     HDST_API

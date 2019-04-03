@@ -162,6 +162,9 @@ public:
     MTLF_API
     void AllocateAttachments(int width, int height);
     
+    MTLF_API
+    void InitGLInterop();
+
     /// Blit the current render target contents to the OpenGL FBO
     MTLF_API
     void BlitColorTargetToOpenGL();

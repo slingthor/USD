@@ -53,10 +53,6 @@ class HdStProgram
 public:
     typedef size_t ID;
     
-    /// Creates a graphics API specific program
-    HDST_API
-    static HdStProgram *New(TfToken const &role);
-
     HDST_API
     virtual ~HdStProgram();
 

@@ -138,7 +138,13 @@ HdSt_ImmediateDrawBatch::ExecuteDraw(
 
     if (_drawItemInstances.empty()) return;
 
-    if (!glUseProgram) return;  // glew initialized
+    HdStResourceFactory &resourceFactory(HdStResourceFactory::GetInstance());
+    if (resourceFactory->IsOpenGL()) {
+        // glew has to be initialized
+        if (!glUseProgram) {
+            return;
+        }
+    }
 
     // bind program
     _DrawingProgram & program = _GetDrawingProgram(renderPassState,

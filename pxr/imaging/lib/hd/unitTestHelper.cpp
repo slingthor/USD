@@ -99,7 +99,7 @@ _BuildArray(T values[], int numValues)
 }
 
 Hd_TestDriver::Hd_TestDriver()
- : _engine(PXR_UNITTEST_GFX_ARCH)
+ : _engine()
  , _renderDelegate()
  , _renderIndex(nullptr)
  , _sceneDelegate(nullptr)
@@ -117,7 +117,7 @@ Hd_TestDriver::Hd_TestDriver()
 }
 
 Hd_TestDriver::Hd_TestDriver(HdReprSelector const &reprSelector)
- : _engine(PXR_UNITTEST_GFX_ARCH)
+ : _engine()
  , _renderDelegate()
  , _renderIndex(nullptr)
  , _sceneDelegate(nullptr)

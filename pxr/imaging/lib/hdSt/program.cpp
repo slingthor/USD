@@ -25,6 +25,7 @@
 
 #include "pxr/imaging/hdSt/program.h"
 #include "pxr/imaging/hdSt/package.h"
+#include "pxr/imaging/hdSt/resourceFactory.h"
 #include "pxr/imaging/hdSt/resourceRegistry.h"
 
 #include "pxr/imaging/hd/engine.h"
@@ -34,34 +35,7 @@
 
 #include "pxr/imaging/hio/glslfx.h"
 
-#if defined(ARCH_GFX_OPENGL)
-#include "pxr/imaging/hdSt/GL/glslProgram.h"
-#endif
-#if defined(ARCH_GFX_METAL)
-#include "pxr/imaging/hdSt/Metal/mslProgram.h"
-#endif
-
 PXR_NAMESPACE_OPEN_SCOPE
-
-/// Creates a graphics API specific program
-HdStProgram *HdStProgram::New(TfToken const &role)
-{
-    HdEngine::RenderAPI api = HdEngine::GetRenderAPI();
-    switch(api)
-    {
-#if defined(ARCH_GFX_OPENGL)
-        case HdEngine::OpenGL:
-            return new HdStGLSLProgram(role);
-#endif
-#if defined(ARCH_GFX_METAL)
-        case HdEngine::Metal:
-            return new HdStMSLProgram(role);
-#endif
-        default:
-            TF_FATAL_CODING_ERROR("No HdStBufferResource for this API");
-    }
-    return NULL;
-}
 
 HdStProgram::HdStProgram(TfToken const &role) {
 
@@ -99,8 +73,12 @@ HdStProgram::GetComputeProgram(
     if (programInstance.IsFirstInstance()) {
         // if not exists, create new one
         
-        HdStProgramSharedPtr newProgram(HdStProgram::New(HdTokens->computeShader));
-        boost::scoped_ptr<HioGlslfx> glslfx(new HioGlslfx(HdStPackageComputeShader()));
+        HdStProgramSharedPtr newProgram(
+            HdStResourceFactory::GetInstance()->NewProgram(
+                HdTokens->computeShader));
+        
+        boost::scoped_ptr<HioGlslfx> glslfx(
+            new HioGlslfx(HdStPackageComputeShader()));
 
         std::string header = newProgram->GetComputeHeader();
         if (!newProgram->CompileShader(

@@ -39,8 +39,10 @@
 #include "pxr/imaging/hdSt/renderDelegate.h"
 #include "pxr/imaging/hdSt/renderPassShader.h"
 #include "pxr/imaging/hdSt/renderPassState.h"
+#include "pxr/imaging/hdSt/resourceFactory.h"
 
 #include "pxr/imaging/garch/drawTarget.h"
+#include "pxr/imaging/garch/resourceFactory.h"
 
 #include "pxr/imaging/glf/diagnostic.h"
 #include "pxr/imaging/glf/glContext.h"
@@ -138,30 +140,38 @@ HdxIntersector::_Init(GfVec2i const& size)
         // TODO: determine this size from the incoming projection, we need two
         // different sizes, one for ray picking and one for marquee picking. we
         // could perhaps just use the large size for both.
-        _drawTarget = GarchDrawTarget::New(size);
+        _drawTarget = TfCreateRefPtr(
+            GarchResourceFactory::GetInstance()->NewDrawTarget(size, false));
 
         // Future work: these attachments must match
         // hd/shaders/renderPassShader.glslfx, which is a point of fragility.
-        // Ideally, we would declare the output targets here and specify an overlay
-        // shader that would direct the output to those targets.  In that world, Hd
-        // would know nothing about these outputs, making this code more robust in
-        // the face of future changes.
+        // Ideally, we would declare the output targets here and specify an
+        // overlay shader that would direct the output to those targets.  In
+        // that world, Hd would know nothing about these outputs, making this
+        // code more robust in the face of future changes.
 
         // Create initial attachments
         std::vector<GarchDrawTarget::AttachmentDesc> attachmentDesc;
         attachmentDesc.push_back(
-            GarchDrawTarget::AttachmentDesc("primId", GL_RGBA, GL_UNSIGNED_BYTE, GL_RGBA8));
+            GarchDrawTarget::AttachmentDesc(
+                "primId", GL_RGBA, GL_UNSIGNED_BYTE, GL_RGBA8));
         attachmentDesc.push_back(
-            GarchDrawTarget::AttachmentDesc("instanceId", GL_RGBA, GL_UNSIGNED_BYTE, GL_RGBA8));
+            GarchDrawTarget::AttachmentDesc(
+                "instanceId", GL_RGBA, GL_UNSIGNED_BYTE, GL_RGBA8));
         attachmentDesc.push_back(
-            GarchDrawTarget::AttachmentDesc("elementId", GL_RGBA, GL_UNSIGNED_BYTE, GL_RGBA8));
+            GarchDrawTarget::AttachmentDesc(
+                "elementId", GL_RGBA, GL_UNSIGNED_BYTE, GL_RGBA8));
         attachmentDesc.push_back(
-            GarchDrawTarget::AttachmentDesc("edgeId", GL_RGBA, GL_UNSIGNED_BYTE, GL_RGBA8));
+            GarchDrawTarget::AttachmentDesc(
+                "edgeId", GL_RGBA, GL_UNSIGNED_BYTE, GL_RGBA8));
         attachmentDesc.push_back(
-            GarchDrawTarget::AttachmentDesc("pointId", GL_RGBA, GL_UNSIGNED_BYTE, GL_RGBA8));
+            GarchDrawTarget::AttachmentDesc(
+                "pointId", GL_RGBA, GL_UNSIGNED_BYTE, GL_RGBA8));
         attachmentDesc.push_back(
-            GarchDrawTarget::AttachmentDesc("depth", GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8, GL_DEPTH24_STENCIL8));
-                                            //"depth", GL_DEPTH_COMPONENT, GL_FLOAT, GL_DEPTH_COMPONENT32F));
+            GarchDrawTarget::AttachmentDesc(
+                "depth", GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8,
+                GL_DEPTH24_STENCIL8));
+
         _drawTarget->SetAttachments(attachmentDesc);
     }
 }
@@ -348,16 +358,25 @@ HdxIntersector::Query(HdxIntersector::Params const& params,
         " non-Stream render delegates yet.\n");
         return false;
     }
-    // Make sure we're in a sane GL state before attempting anything.
-    if (GlfHasLegacyGraphics()) {
-        TF_RUNTIME_ERROR("framebuffer object not supported");
-        return false;
+
+    bool usingOpenGLEngine = false;
+#if defined(ARCH_GFX_OPENGL)
+    usingOpenGLEngine |= HdStResourceFactory::GetInstance()->IsOpenGL();
+#endif
+    
+    if (usingOpenGLEngine) {
+        // Make sure we're in a sane GL state before attempting anything.
+        if (GlfHasLegacyGraphics()) {
+            TF_RUNTIME_ERROR("framebuffer object not supported");
+            return false;
+        }
+        GlfGLContextSharedPtr context = GlfGLContext::GetCurrentGLContext();
+        if (!TF_VERIFY(context)) {
+            TF_RUNTIME_ERROR("Invalid GL context");
+            return false;
+        }
     }
-    GlfGLContextSharedPtr context = GlfGLContext::GetCurrentGLContext();
-    if (!TF_VERIFY(context)) {
-        TF_RUNTIME_ERROR("Invalid GL context");
-        return false;
-    }
+
     if (!_drawTarget) {
         // Initialize the shared draw target late to ensure there is a valid GL
         // context, which may not be the case at constructon time.
@@ -367,18 +386,14 @@ HdxIntersector::Query(HdxIntersector::Params const& params,
         !TF_VERIFY(_occluderRenderPass)) {
         return false;
     }
-
-    bool usingOpenGLEngine = false;
-#if defined(ARCH_GFX_OPENGL)
-    usingOpenGLEngine |= HdEngine::GetRenderAPI() == HdEngine::OpenGL;
-#endif
     
     GfVec2i size(_drawTarget->GetSize());
     GfVec4i viewport(0, 0, size[0], size[1]);
 
     // Use a separate drawTarget (framebuffer object) for each GL context
     // that uses this renderer, but the drawTargets share attachments/textures.
-    GarchDrawTargetRefPtr drawTarget = GarchDrawTarget::New(size);
+    GarchDrawTargetRefPtr drawTarget = TfCreateRefPtr(
+        GarchResourceFactory::GetInstance()->NewDrawTarget(size, false));
 
     // Clone attachments into this context. Note that this will do a
     // light-weight copy of the textures, it does not produce a full copy of the
@@ -392,7 +407,8 @@ HdxIntersector::Query(HdxIntersector::Params const& params,
         // Setup GL raster state
         //
         // XXX: We should use the pickTarget param to bind only the attachments
-        // that are necessary. This should affect the shader code generated as well.
+        // that are necessary. This should affect the shader code generated as
+        // well.
         GLenum drawBuffers[5] = { GL_COLOR_ATTACHMENT0,
                                   GL_COLOR_ATTACHMENT1,
                                   GL_COLOR_ATTACHMENT2,
@@ -407,8 +423,8 @@ HdxIntersector::Query(HdxIntersector::Params const& params,
         glDepthMask(GL_TRUE);
         glDepthFunc(GL_LEQUAL);
 
-        // Clear all color channels to 1, so when cast as int, an unwritten pixel
-        // is encoded as -1.
+        // Clear all color channels to 1, so when cast as int, an unwritten
+        // pixel is encoded as -1.
         glClearColor(1,1,1,1);
         glClearStencil(0);
         glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT|GL_STENCIL_BUFFER_BIT);
@@ -525,8 +541,9 @@ HdxIntersector::Query(HdxIntersector::Params const& params,
 #endif
         }
     }
-
-    GLF_POST_PENDING_GL_ERRORS();
+    if (usingOpenGLEngine) {
+        GLF_POST_PENDING_GL_ERRORS();
+    }
 
     //
     // Capture the result buffers to be resolved later.
@@ -540,7 +557,8 @@ HdxIntersector::Query(HdxIntersector::Params const& params,
     std::unique_ptr<float[]> depths(new float[len]);
 
     if (!usingOpenGLEngine) {
-        // Metal requires the draw target to be unbinded in order to capture from it
+        // Metal requires the draw target to be unbinded in order to capture
+        // from it
         drawTarget->Unbind();
     }
 
@@ -568,8 +586,8 @@ HdxIntersector::Query(HdxIntersector::Params const& params,
 
     if (usingOpenGLEngine) {
         drawTarget->Unbind();
+        GLF_POST_PENDING_GL_ERRORS();
     }
-    GLF_POST_PENDING_GL_ERRORS();
 
     return true;
 }

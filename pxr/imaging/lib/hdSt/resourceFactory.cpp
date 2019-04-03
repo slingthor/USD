@@ -57,7 +57,8 @@ HdStResourceFactoryInterface *HdStResourceFactory::operator -> () const
     return factory;
 }
 
-void HdStResourceFactory::SetResourceFactory(HdStResourceFactoryInterface *_factory)
+void HdStResourceFactory::SetResourceFactory(
+    HdStResourceFactoryInterface *_factory)
 {
     factory = _factory;
 }

@@ -85,6 +85,13 @@ class UsdImagingGLEngine
 {
 public:
 
+    enum RenderAPI {
+        Unset = -1,
+        OpenGL,
+        Metal,
+        NumRenderers
+    };
+
     // ---------------------------------------------------------------------
     /// \name Global State
     /// @{
@@ -101,10 +108,11 @@ public:
     /// @{
     // ---------------------------------------------------------------------
     USDIMAGINGGL_API
-    UsdImagingGLEngine();
+    UsdImagingGLEngine(const RenderAPI api);
 
     USDIMAGINGGL_API
-    UsdImagingGLEngine(const SdfPath& rootPath,
+    UsdImagingGLEngine(const RenderAPI api,
+                       const SdfPath& rootPath,
                        const SdfPathVector& excludedPaths,
                        const SdfPathVector& invisedPaths=SdfPathVector(),
                        const SdfPath& delegateID = SdfPath::AbsoluteRootPath());
@@ -469,6 +477,8 @@ protected:
     bool _useFloatPointDrawTarget;
     HdxCompositor _compositor;
     GarchDrawTargetRefPtr _drawTarget;
+    
+    RenderAPI _renderAPI;
     
     // An implementation of much of the engine functionality that doesn't
     // invoke any of the advanced Hydra features.  It is kept around for 

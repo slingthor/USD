@@ -29,6 +29,7 @@
 #include "pxr/imaging/hd/renderBuffer.h"
 #include "pxr/imaging/hd/tokens.h"
 #include "pxr/imaging/hdSt/program.h"
+#include "pxr/imaging/hdSt/resourceFactory.h"
 #include "pxr/imaging/hdSt/glConversions.h"
 #include "pxr/imaging/hf/perfLog.h"
 #include "pxr/imaging/glf/diagnostic.h"
@@ -202,7 +203,8 @@ HdxColorCorrectionTask::_CreateShaderResources()
     _shaderProgram.reset(new HdStGLSLProgram(_tokens->colorCorrectionShader));
 #else
     TF_FATAL_CODING_ERROR("Not Implemented");
-    _shaderProgram.reset(HdStProgram::New(_tokens->colorCorrectionShader));
+    _shaderProgram.reset(HdStResourceFactory::GetInstance()->NewProgram(
+        _tokens->colorCorrectionShader));
 #endif
 
     HioGlslfx glslfx(HdxPackageColorCorrectionShader());

@@ -42,20 +42,14 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-HdEngine::RenderAPI HdEngine::_renderAPI = HdEngine::RenderAPI::Unset;
-
-HdEngine::HdEngine(RenderAPI api)
+HdEngine::HdEngine()
  : _taskContext()
 {
-    if(_renderAPI != RenderAPI::Unset) {
-        TF_FATAL_CODING_ERROR("Only one HdEngine instance can be created at one time");
-    }
-    _renderAPI = api;
+    /* Nothing */
 }
 
 HdEngine::~HdEngine()
 {
-    _renderAPI = RenderAPI::Unset;
 }
 
 void 

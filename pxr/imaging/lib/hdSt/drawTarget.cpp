@@ -185,7 +185,9 @@ HdStDrawTarget::WriteToFile(const HdRenderIndex &renderIndex,
 
     // Check the draw target's been allocated
 #if defined(ARCH_GFX_OPENGL)
-    if (!_drawTarget || (HdEngine::GetRenderAPI()==HdEngine::OpenGL && !_drawTargetContextGL)) {
+    if (!_drawTarget ||
+        (HdStResourceFactory::GetInstance()->IsOpenGL()
+          && !_drawTargetContextGL)) {
         TF_WARN("Missing draw target");
         return false;
     }
@@ -216,7 +218,7 @@ HdStDrawTarget::WriteToFile(const HdRenderIndex &renderIndex,
 
 #if defined(ARCH_GFX_OPENGL)
     GlfGLContextSharedPtr oldContext;
-    if (HdEngine::GetRenderAPI()==HdEngine::OpenGL)
+    if (HdStResourceFactory::GetInstance()->IsOpenGL())
     {
         // Make sure all draw target operations happen on the same
         // context.
@@ -227,7 +229,7 @@ HdStDrawTarget::WriteToFile(const HdRenderIndex &renderIndex,
     bool result = _drawTarget->WriteToFile(attachment, path,
                                            viewMatrix, projMatrix);
 #if defined(ARCH_GFX_OPENGL)
-    if (HdEngine::GetRenderAPI()==HdEngine::OpenGL)
+    if (HdStResourceFactory::GetInstance()->IsOpenGL())
         GlfGLContext::MakeCurrent(oldContext);
 #endif
 
@@ -241,7 +243,7 @@ HdStDrawTarget::_SetAttachments(
 {
     HF_MALLOC_TAG_FUNCTION();
 #if defined(ARCH_GFX_OPENGL)
-    if (HdEngine::GetRenderAPI()==HdEngine::OpenGL) {
+    if (HdStResourceFactory::GetInstance()->IsOpenGL()) {
         if (!_drawTargetContextGL) {
             // Use one of the shared contexts as the master.
             _drawTargetContextGL = GlfGLContext::GetSharedGLContext();
@@ -257,7 +259,7 @@ HdStDrawTarget::_SetAttachments(
 
     // Make sure all draw target operations happen on the same
     // context.
-    if (HdEngine::GetRenderAPI()==HdEngine::OpenGL) {
+    if (HdStResourceFactory::GetInstance()->IsOpenGL()) {
         oldContext = GlfGLContext::GetCurrentGLContext();
         GlfGLContext::MakeCurrent(_drawTargetContextGL);
     }
@@ -364,7 +366,7 @@ HdStDrawTarget::_SetAttachments(
 	_renderPassState.SetDepthPriority(attachments.GetDepthPriority());
 
 #if defined(ARCH_GFX_OPENGL)
-    if (HdEngine::GetRenderAPI()==HdEngine::OpenGL)
+    if (HdStResourceFactory::GetInstance()->IsOpenGL())
         GlfGLContext::MakeCurrent(oldContext);
 #endif
 
@@ -390,7 +392,7 @@ HdStDrawTarget::_ResizeDrawTarget()
     // context.
     GlfGLContextSharedPtr oldContext;
     
-    if (HdEngine::GetRenderAPI()==HdEngine::OpenGL) {
+    if (HdStResourceFactory::GetInstance()->IsOpenGL()) {
         oldContext = GlfGLContext::GetCurrentGLContext();
         GlfGLContext::MakeCurrent(_drawTargetContextGL);
     }
@@ -403,7 +405,7 @@ HdStDrawTarget::_ResizeDrawTarget()
     ++_version;
 
 #if defined(ARCH_GFX_OPENGL)
-    if (HdEngine::GetRenderAPI()==HdEngine::OpenGL)
+    if (HdStResourceFactory::GetInstance()->IsOpenGL())
         GlfGLContext::MakeCurrent(oldContext);
 #endif
 }

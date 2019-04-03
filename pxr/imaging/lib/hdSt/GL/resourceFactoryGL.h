@@ -44,98 +44,102 @@ public:
     HDST_API
     virtual ~HdStResourceFactoryGL();
     
+    // Temp
+    virtual bool IsOpenGL() const override { return true; }
+
     // HdSt_CodeGen for OpenGL
     HDST_API
     virtual HdSt_CodeGen *NewCodeGen(
-                HdSt_GeometricShaderPtr const &geometricShader,
-                HdStShaderCodeSharedPtrVector const &shaders) const override;
+        HdSt_GeometricShaderPtr const &geometricShader,
+        HdStShaderCodeSharedPtrVector const &shaders) const override;
     
     HDST_API
     virtual HdSt_CodeGen *NewCodeGen(
-                HdStShaderCodeSharedPtrVector const &shaders) const override;
+        HdStShaderCodeSharedPtrVector const &shaders) const override;
     
     /// commandNumUints is given in how many integers.
     HDST_API
     virtual HdStDispatchBuffer *NewDispatchBuffer(
-                TfToken const &role, int count,
-                unsigned int commandNumUints) const override;
+        TfToken const &role, int count,
+        unsigned int commandNumUints) const override;
     
     /// Creates a buffer relocator for OpenGL
     HDST_API
     virtual HdStBufferRelocator *NewBufferRelocator(
-                HdResourceGPUHandle srcBuffer,
-                HdResourceGPUHandle dstBuffer) const override;
+        HdResourceGPUHandle srcBuffer,
+        HdResourceGPUHandle dstBuffer) const override;
     
     /// Creates a buffer resource for OpenGL
     HDST_API
     virtual HdStBufferResource *NewBufferResource(
-                TfToken const &role,
-                HdTupleType tupleType,
-                int offset,
-                int stride) const override;
+        TfToken const &role,
+        HdTupleType tupleType,
+        int offset,
+        int stride) const override;
     
     /// Creates a draw target texture resource for OpenGL
     HDST_API
-    virtual HdTextureResourceSharedPtr NewDrawTargetTextureResource() const override;
+    virtual HdTextureResourceSharedPtr
+        NewDrawTargetTextureResource() const override;
     
     /// Create a striped interleaved buffer for OpenGL
     HDST_API
     virtual HdBufferArraySharedPtr NewStripedInterleavedBuffer(
-                TfToken const &role,
-                HdBufferSpecVector const &bufferSpecs,
-                HdBufferArrayUsageHint usageHint,
-                int bufferOffsetAlignment,
-                int structAlignment,
-                size_t maxSize,
-                TfToken const &garbageCollectionPerfToken) const override;
+        TfToken const &role,
+        HdBufferSpecVector const &bufferSpecs,
+        HdBufferArrayUsageHint usageHint,
+        int bufferOffsetAlignment,
+        int structAlignment,
+        size_t maxSize,
+        TfToken const &garbageCollectionPerfToken) const override;
     
     /// Create a VBO simple memory buffer for OpenGL
     HDST_API
     virtual HdBufferArraySharedPtr NewVBOSimpleMemoryBuffer(
-                TfToken const &role,
-                HdBufferSpecVector const &bufferSpecs,
-                HdBufferArrayUsageHint usageHint) const override;
+        TfToken const &role,
+        HdBufferSpecVector const &bufferSpecs,
+        HdBufferArrayUsageHint usageHint) const override;
     
     /// Create a VBO memory buffer for OpenGL
     HDST_API
     virtual HdBufferArraySharedPtr NewVBOMemoryBuffer(
-                TfToken const &role,
-                HdBufferSpecVector const &bufferSpecs,
-                HdBufferArrayUsageHint usageHint) const override;
+        TfToken const &role,
+        HdBufferSpecVector const &bufferSpecs,
+        HdBufferArrayUsageHint usageHint) const override;
     
     /// Creates an indirect draw batch for OpenGL
     HDST_API
     virtual HdSt_DrawBatchSharedPtr NewIndirectDrawBatch(
-                HdStDrawItemInstance * drawItemInstance) const override;
+        HdStDrawItemInstance * drawItemInstance) const override;
     
     /// Creates a persistent buffer for OpenGL
     HDST_API
     virtual HdStPersistentBuffer *NewPersistentBuffer(
-                TfToken const &role, size_t dataSize, void* data) const override;
+        TfToken const &role, size_t dataSize, void* data) const override;
     
     /// Creates a graphics API specific GPU quadrangulate computation
     /// This computaion doesn't generate buffer source (i.e. 2nd phase)
     HDST_API
     virtual HdSt_QuadrangulateComputationGPU *NewQuadrangulateComputationGPU(
-                HdSt_MeshTopology *topology,
-                TfToken const &sourceName,
-                HdType dataType,
-SdfPath const &id) const override;
+        HdSt_MeshTopology *topology,
+        TfToken const &sourceName,
+        HdType dataType,
+        SdfPath const &id) const override;
     
     /// Creates a new smooth normals GPU computation for OpenGL
     HDST_API
     virtual HdSt_SmoothNormalsComputationGPU *NewSmoothNormalsComputationGPU(
-                Hd_VertexAdjacency const *adjacency,
-                TfToken const &srcName, TfToken const &dstName,
-                HdType srcDataType, bool packed) const override;
+        Hd_VertexAdjacency const *adjacency,
+        TfToken const &srcName, TfToken const &dstName,
+        HdType srcDataType, bool packed) const override;
     
     /// Creates a GPU flat normals computation for OpenGL
     HDST_API
     virtual HdSt_FlatNormalsComputationGPU *NewFlatNormalsComputationGPU(
-                HdBufferArrayRangeSharedPtr const &topologyRange,
-                HdBufferArrayRangeSharedPtr const &vertexRange,
-                int numFaces, TfToken const &srcName, TfToken const &dstName,
-HdType srcDataType, bool packed) const override;
+        HdBufferArrayRangeSharedPtr const &topologyRange,
+        HdBufferArrayRangeSharedPtr const &vertexRange,
+        int numFaces, TfToken const &srcName, TfToken const &dstName,
+        HdType srcDataType, bool packed) const override;
     
     /// Creates a new render pass state for OpenGL
     HDST_API
@@ -144,7 +148,7 @@ HdType srcDataType, bool packed) const override;
     /// Creates a new render pass state for OpenGL
     HDST_API
     virtual HdStRenderPassState *NewRenderPassState(
-                HdStRenderPassShaderSharedPtr const &renderPassShader) const override;
+        HdStRenderPassShaderSharedPtr const &renderPassShader) const override;
     
     /// Creates a resource binder for OpenGL
     HDST_API
@@ -159,17 +163,17 @@ HdType srcDataType, bool packed) const override;
     /// this reference requires of the texture.  Set to 0 for unrestricted.
     HDST_API
     virtual HdStSimpleTextureResource *NewSimpleTextureResource(
-                GarchTextureHandleRefPtr const &textureHandle,
-                HdTextureType textureType,
-                size_t memoryRequest) const override;
+        GarchTextureHandleRefPtr const &textureHandle,
+        HdTextureType textureType,
+        size_t memoryRequest) const override;
     
     HDST_API
     virtual HdStSimpleTextureResource *NewSimpleTextureResource(
-                GarchTextureHandleRefPtr const &textureHandle,
-                HdTextureType textureType,
-                HdWrap wrapS, HdWrap wrapT,
-                HdMinFilter minFilter, HdMagFilter magFilter,
-                size_t memoryRequest = 0) const override;
+        GarchTextureHandleRefPtr const &textureHandle,
+        HdTextureType textureType,
+        HdWrap wrapS, HdWrap wrapT,
+        HdMinFilter minFilter, HdMagFilter magFilter,
+        size_t memoryRequest = 0) const override;
     
     HDST_API
     virtual const char* const GetComputeShaderFilename() const override {
@@ -180,6 +184,11 @@ HdType srcDataType, bool packed) const override;
     virtual const char* const GetPtexTextureShaderFilename() const override {
         return "ptexTextureGL.glslfx";
     }
+      
+    HDST_API
+    virtual HdStProgram *NewProgram(
+        TfToken const &role) const override;
+
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

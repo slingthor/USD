@@ -35,6 +35,7 @@
 #include "pxr/imaging/hdSt/Metal/flatNormalsMetal.h"
 #include "pxr/imaging/hdSt/Metal/indirectDrawBatchMetal.h"
 #include "pxr/imaging/hdSt/Metal/interleavedMemoryBufferMetal.h"
+#include "pxr/imaging/hdSt/Metal/mslProgram.h"
 #include "pxr/imaging/hdSt/Metal/persistentBufferMetal.h"
 #include "pxr/imaging/hdSt/Metal/renderPassStateMetal.h"
 #include "pxr/imaging/hdSt/Metal/resourceBinderMetal.h"
@@ -94,19 +95,23 @@ HdStBufferResource *HdStResourceFactoryMetal::NewBufferResource(
     return new HdStBufferResourceMetal(role, tupleType, offset, stride);
 }
 
-HdTextureResourceSharedPtr HdStResourceFactoryMetal::NewDrawTargetTextureResource() const
+HdTextureResourceSharedPtr
+HdStResourceFactoryMetal::NewDrawTargetTextureResource() const
 {
-    return HdTextureResourceSharedPtr(new HdSt_DrawTargetTextureResourceMetal());
+    return HdTextureResourceSharedPtr(
+        new HdSt_DrawTargetTextureResourceMetal());
 }
 
-HdSt_FlatNormalsComputationGPU *HdStResourceFactoryMetal::NewFlatNormalsComputationGPU(
+HdSt_FlatNormalsComputationGPU*
+HdStResourceFactoryMetal::NewFlatNormalsComputationGPU(
     HdBufferArrayRangeSharedPtr const &topologyRange,
     HdBufferArrayRangeSharedPtr const &vertexRange,
     int numFaces, TfToken const &srcName, TfToken const &dstName,
     HdType srcDataType, bool packed) const
 {
-    return new HdSt_FlatNormalsComputationMetal(topologyRange, vertexRange, numFaces,
-                                                srcName, dstName, srcDataType, packed);
+    return new HdSt_FlatNormalsComputationMetal(
+        topologyRange, vertexRange, numFaces, srcName, dstName, srcDataType,
+        packed);
 }
 
 HdBufferArraySharedPtr
@@ -132,7 +137,8 @@ HdStResourceFactoryMetal::NewStripedInterleavedBuffer(
 HdSt_DrawBatchSharedPtr HdStResourceFactoryMetal::NewIndirectDrawBatch(
     HdStDrawItemInstance * drawItemInstance) const
 {
-    return HdSt_DrawBatchSharedPtr(new HdSt_IndirectDrawBatchMetal(drawItemInstance));
+    return HdSt_DrawBatchSharedPtr(
+        new HdSt_IndirectDrawBatchMetal(drawItemInstance));
 }
 
 HdStPersistentBuffer *HdStResourceFactoryMetal::NewPersistentBuffer(
@@ -179,7 +185,7 @@ HdStResourceFactoryMetal::NewSmoothNormalsComputationGPU(
     HdType srcDataType, bool packed) const
 {
     return new HdSt_SmoothNormalsComputationMetal(
-                    adjacency, srcName, dstName, srcDataType, packed);
+        adjacency, srcName, dstName, srcDataType, packed);
 }
 
 HdStSimpleTextureResource *
@@ -188,7 +194,8 @@ HdStResourceFactoryMetal::NewSimpleTextureResource(
     HdTextureType textureType,
     size_t memoryRequest) const
 {
-    return new HdStSimpleTextureResourceMetal(textureHandle, textureType, memoryRequest);
+    return new HdStSimpleTextureResourceMetal(
+        textureHandle, textureType, memoryRequest);
 }
 
 HdStSimpleTextureResource *
@@ -199,9 +206,9 @@ HdStResourceFactoryMetal::NewSimpleTextureResource(
     HdMinFilter minFilter, HdMagFilter magFilter,
     size_t memoryRequest) const
 {
-    return new HdStSimpleTextureResourceMetal(textureHandle, textureType,
-                                              wrapS, wrapT, minFilter, magFilter,
-                                              memoryRequest);
+    return new HdStSimpleTextureResourceMetal(
+        textureHandle, textureType, wrapS, wrapT, minFilter, magFilter,
+        memoryRequest);
 }
 
 HdBufferArraySharedPtr HdStResourceFactoryMetal::NewVBOMemoryBuffer(
@@ -210,7 +217,7 @@ HdBufferArraySharedPtr HdStResourceFactoryMetal::NewVBOMemoryBuffer(
     HdBufferArrayUsageHint usageHint) const
 {
     return boost::make_shared<HdStVBOMemoryBufferMetal>(
-                                    role, bufferSpecs, usageHint);
+        role, bufferSpecs, usageHint);
 }
 
 HdBufferArraySharedPtr HdStResourceFactoryMetal::NewVBOSimpleMemoryBuffer(
@@ -219,7 +226,13 @@ HdBufferArraySharedPtr HdStResourceFactoryMetal::NewVBOSimpleMemoryBuffer(
     HdBufferArrayUsageHint usageHint) const
 {
     return boost::make_shared<HdStVBOSimpleMemoryBufferMetal>(
-                                    role, bufferSpecs, usageHint);
+        role, bufferSpecs, usageHint);
+}
+
+HdStProgram *HdStResourceFactoryMetal::NewProgram(
+    TfToken const &role) const
+{
+    return new HdStMSLProgram(role);
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

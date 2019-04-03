@@ -31,6 +31,7 @@
 #include "pxr/imaging/hdSt/GL/dispatchBufferGL.h"
 #include "pxr/imaging/hdSt/GL/drawTargetTextureResourceGL.h"
 #include "pxr/imaging/hdSt/GL/flatNormalsGL.h"
+#include "pxr/imaging/hdSt/GL/glslProgram.h"
 #include "pxr/imaging/hdSt/GL/indirectDrawBatchGL.h"
 #include "pxr/imaging/hdSt/GL/interleavedMemoryBufferGL.h"
 #include "pxr/imaging/hdSt/GL/persistentBufferGL.h"
@@ -92,19 +93,22 @@ HdStBufferResource *HdStResourceFactoryGL::NewBufferResource(
     return new HdStBufferResourceGL(role, tupleType, offset, stride);
 }
 
-HdTextureResourceSharedPtr HdStResourceFactoryGL::NewDrawTargetTextureResource() const
+HdTextureResourceSharedPtr
+HdStResourceFactoryGL::NewDrawTargetTextureResource() const
 {
     return HdTextureResourceSharedPtr(new HdSt_DrawTargetTextureResourceGL());
 }
 
-HdSt_FlatNormalsComputationGPU *HdStResourceFactoryGL::NewFlatNormalsComputationGPU(
+HdSt_FlatNormalsComputationGPU*
+HdStResourceFactoryGL::NewFlatNormalsComputationGPU(
     HdBufferArrayRangeSharedPtr const &topologyRange,
     HdBufferArrayRangeSharedPtr const &vertexRange,
     int numFaces, TfToken const &srcName, TfToken const &dstName,
     HdType srcDataType, bool packed) const
 {
-    return new HdSt_FlatNormalsComputationGL(topologyRange, vertexRange, numFaces,
-                                                srcName, dstName, srcDataType, packed);
+    return new HdSt_FlatNormalsComputationGL(
+        topologyRange, vertexRange, numFaces, srcName, dstName, srcDataType,
+        packed);
 }
 
 HdBufferArraySharedPtr
@@ -130,7 +134,8 @@ HdStResourceFactoryGL::NewStripedInterleavedBuffer(
 HdSt_DrawBatchSharedPtr HdStResourceFactoryGL::NewIndirectDrawBatch(
     HdStDrawItemInstance * drawItemInstance) const
 {
-    return HdSt_DrawBatchSharedPtr(new HdSt_IndirectDrawBatchGL(drawItemInstance));
+    return HdSt_DrawBatchSharedPtr(
+        new HdSt_IndirectDrawBatchGL(drawItemInstance));
 }
 
 HdStPersistentBuffer *HdStResourceFactoryGL::NewPersistentBuffer(
@@ -177,7 +182,7 @@ HdStResourceFactoryGL::NewSmoothNormalsComputationGPU(
     HdType srcDataType, bool packed) const
 {
     return new HdSt_SmoothNormalsComputationGL(
-                                                  adjacency, srcName, dstName, srcDataType, packed);
+        adjacency, srcName, dstName, srcDataType, packed);
 }
 
 HdStSimpleTextureResource *
@@ -186,7 +191,8 @@ HdStResourceFactoryGL::NewSimpleTextureResource(
     HdTextureType textureType,
     size_t memoryRequest) const
 {
-    return new HdStSimpleTextureResourceGL(textureHandle, textureType, memoryRequest);
+    return new HdStSimpleTextureResourceGL(
+        textureHandle, textureType, memoryRequest);
 }
 
 HdStSimpleTextureResource *
@@ -197,9 +203,9 @@ HdStResourceFactoryGL::NewSimpleTextureResource(
     HdMinFilter minFilter, HdMagFilter magFilter,
     size_t memoryRequest) const
 {
-    return new HdStSimpleTextureResourceGL(textureHandle, textureType,
-                                              wrapS, wrapT, minFilter, magFilter,
-                                              memoryRequest);
+    return new HdStSimpleTextureResourceGL(
+        textureHandle, textureType, wrapS, wrapT, minFilter, magFilter,
+        memoryRequest);
 }
 
 HdBufferArraySharedPtr HdStResourceFactoryGL::NewVBOMemoryBuffer(
@@ -218,6 +224,12 @@ HdBufferArraySharedPtr HdStResourceFactoryGL::NewVBOSimpleMemoryBuffer(
 {
     return boost::make_shared<HdStVBOSimpleMemoryBufferGL>(
                                 role, bufferSpecs, usageHint);
+}
+
+HdStProgram *HdStResourceFactoryGL::NewProgram(
+    TfToken const &role) const
+{
+    return new HdStGLSLProgram(role);
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

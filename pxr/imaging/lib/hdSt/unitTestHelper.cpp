@@ -110,7 +110,7 @@ _BuildArray(T values[], int numValues)
 }
 
 HdSt_TestDriver::HdSt_TestDriver()
- : _engine(PXR_UNITTEST_GFX_ARCH)
+ : _engine()
  , _renderDelegate(new HdStRenderDelegateTest)
  , _renderIndex(nullptr)
  , _sceneDelegate(nullptr)
@@ -130,7 +130,7 @@ HdSt_TestDriver::HdSt_TestDriver()
 }
 
 HdSt_TestDriver::HdSt_TestDriver(TfToken const &reprName)
- : _engine(PXR_UNITTEST_GFX_ARCH)
+ : _engine()
  , _renderDelegate(new HdStRenderDelegateTest)
  , _renderIndex(nullptr)
  , _sceneDelegate(nullptr)
@@ -145,7 +145,7 @@ HdSt_TestDriver::HdSt_TestDriver(TfToken const &reprName)
 }
 
 HdSt_TestDriver::HdSt_TestDriver(HdReprSelector const &reprToken)
- : _engine(PXR_UNITTEST_GFX_ARCH)
+ : _engine()
  , _renderDelegate(new HdStRenderDelegateTest)
  , _renderIndex(nullptr)
  , _sceneDelegate(nullptr)

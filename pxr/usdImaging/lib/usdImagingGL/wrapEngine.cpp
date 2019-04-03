@@ -102,63 +102,70 @@ void wrapEngine()
 {
     { 
         scope engineScope = class_<UsdImagingGLEngine, boost::noncopyable>(
-                "Engine", "UsdImaging Renderer class")
-            .def( init<>() )
-            .def( init<const SdfPath &, const SdfPathVector&,
-                    const SdfPathVector& >() )
-            .def("Render", &UsdImagingGLEngine::Render)
-            .def("SetCameraState", &UsdImagingGLEngine::SetCameraState)
-            .def("SetLightingStateFromOpenGL",
-                    &UsdImagingGLEngine::SetLightingStateFromOpenGL)
-            .def("SetLightingState", &_SetLightingState)
-            .def("SetCameraStateFromOpenGL", 
-                    &UsdImagingGLEngine::SetCameraStateFromOpenGL)
-            .def("SetSelected", &UsdImagingGLEngine::SetSelected)
-            .def("ClearSelected", &UsdImagingGLEngine::ClearSelected)
-            .def("AddSelected", &UsdImagingGLEngine::AddSelected)
-            .def("SetSelectionColor", &UsdImagingGLEngine::SetSelectionColor)
-            .def("GetRprimPathFromPrimId", 
-                    &UsdImagingGLEngine::GetRprimPathFromPrimId)
-            .def("GetPrimPathFromInstanceIndex", &_GetPrimPathFromInstanceIndex)
-            .def("TestIntersection", &_TestIntersection)
-            .def("IsHydraEnabled", &UsdImagingGLEngine::IsHydraEnabled)
-                .staticmethod("IsHydraEnabled")
-            .def("IsConverged", &UsdImagingGLEngine::IsConverged)
-            .def("GetRendererPlugins", &UsdImagingGLEngine::GetRendererPlugins,
-                 return_value_policy< TfPySequenceToList >())
-                .staticmethod("GetRendererPlugins")
-            .def("GetRendererDisplayName", 
-                    &UsdImagingGLEngine::GetRendererDisplayName)
-                .staticmethod("GetRendererDisplayName")
-            .def("GetCurrentRendererId", 
-                    &UsdImagingGLEngine::GetCurrentRendererId)
-            .def("SetRendererPlugin", 
-                    &UsdImagingGLEngine::SetRendererPlugin)
-            .def("GetRendererAovs", 
-                    &UsdImagingGLEngine::GetRendererAovs,
-                 return_value_policy< TfPySequenceToList >())
-            .def("SetRendererAov", 
-                    &UsdImagingGLEngine::SetRendererAov)
-            .def("GetResourceAllocation", 
-                    &UsdImagingGLEngine::GetResourceAllocation)
-            .def("GetRendererSettingsList", 
-                    &UsdImagingGLEngine::GetRendererSettingsList,
-                 return_value_policy< TfPySequenceToList >())
-            .def("GetRendererSetting", &UsdImagingGLEngine::GetRendererSetting)
-            .def("SetRendererSetting", &UsdImagingGLEngine::SetRendererSetting)
-            .def("SetEnableFloatPointDrawTarget", 
-                    &UsdImagingGLEngine::SetEnableFloatPointDrawTarget)
-            .def("SetColorCorrectionSettings", 
-                    &UsdImagingGLEngine::SetColorCorrectionSettings)
-            .def("IsColorCorrectionCapable", 
-                &UsdImagingGLEngine::IsColorCorrectionCapable)
-                .staticmethod("IsColorCorrectionCapable")
+                "Engine", "UsdImaging Renderer class",
+                init<const UsdImagingGLEngine::RenderAPI>() )
+        .def( init<const UsdImagingGLEngine::RenderAPI,
+                const SdfPath &, const SdfPathVector&,
+                const SdfPathVector& >() )
+        .def("Render", &UsdImagingGLEngine::Render)
+        .def("SetCameraState", &UsdImagingGLEngine::SetCameraState)
+        .def("SetLightingStateFromOpenGL",
+                &UsdImagingGLEngine::SetLightingStateFromOpenGL)
+        .def("SetLightingState", &_SetLightingState)
+        .def("SetCameraStateFromOpenGL",
+                &UsdImagingGLEngine::SetCameraStateFromOpenGL)
+        .def("SetSelected", &UsdImagingGLEngine::SetSelected)
+        .def("ClearSelected", &UsdImagingGLEngine::ClearSelected)
+        .def("AddSelected", &UsdImagingGLEngine::AddSelected)
+        .def("SetSelectionColor", &UsdImagingGLEngine::SetSelectionColor)
+        .def("GetRprimPathFromPrimId",
+                &UsdImagingGLEngine::GetRprimPathFromPrimId)
+        .def("GetPrimPathFromInstanceIndex", &_GetPrimPathFromInstanceIndex)
+        .def("TestIntersection", &_TestIntersection)
+        .def("IsHydraEnabled", &UsdImagingGLEngine::IsHydraEnabled)
+            .staticmethod("IsHydraEnabled")
+        .def("IsConverged", &UsdImagingGLEngine::IsConverged)
+        .def("GetRendererPlugins", &UsdImagingGLEngine::GetRendererPlugins,
+             return_value_policy< TfPySequenceToList >())
+            .staticmethod("GetRendererPlugins")
+        .def("GetRendererDisplayName",
+                &UsdImagingGLEngine::GetRendererDisplayName)
+            .staticmethod("GetRendererDisplayName")
+        .def("GetCurrentRendererId",
+                &UsdImagingGLEngine::GetCurrentRendererId)
+        .def("SetRendererPlugin",
+                &UsdImagingGLEngine::SetRendererPlugin)
+        .def("GetRendererAovs",
+                &UsdImagingGLEngine::GetRendererAovs,
+             return_value_policy< TfPySequenceToList >())
+        .def("SetRendererAov",
+                &UsdImagingGLEngine::SetRendererAov)
+        .def("GetResourceAllocation",
+                &UsdImagingGLEngine::GetResourceAllocation)
+        .def("GetRendererSettingsList",
+                &UsdImagingGLEngine::GetRendererSettingsList,
+             return_value_policy< TfPySequenceToList >())
+        .def("GetRendererSetting", &UsdImagingGLEngine::GetRendererSetting)
+        .def("SetRendererSetting", &UsdImagingGLEngine::SetRendererSetting)
+        .def("SetEnableFloatPointDrawTarget",
+                &UsdImagingGLEngine::SetEnableFloatPointDrawTarget)
+        .def("SetColorCorrectionSettings",
+                &UsdImagingGLEngine::SetColorCorrectionSettings)
+        .def("IsColorCorrectionCapable",
+            &UsdImagingGLEngine::IsColorCorrectionCapable)
+            .staticmethod("IsColorCorrectionCapable")
         ;
 
     }
 
     // Wrap the constants.
     scope().attr("ALL_INSTANCES") = UsdImagingDelegate::ALL_INSTANCES;
+    
+    // Wrap the RenderAPI enum. Accessible as UsdImagingGL.RenderAPI
+    enum_<UsdImagingGLEngine::RenderAPI>("RenderAPI")
+    .value("OpenGL", UsdImagingGLEngine::OpenGL)
+    .value("Metal", UsdImagingGLEngine::Metal)
+    ;
 
     TfPyContainerConversions::from_python_sequence<
         std::vector<GarchSimpleLight>,

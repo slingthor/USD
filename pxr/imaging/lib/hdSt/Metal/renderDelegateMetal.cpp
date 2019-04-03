@@ -161,15 +161,16 @@ void HdStRenderDelegateMetal::PrepareRender(
 
 #if defined(ARCH_GFX_OPENGL)
     // Make sure the Metal render targets, and GL interop textures match the GL viewport size
-    GLint viewport[4];
-    glGetIntegerv( GL_VIEWPORT, viewport );
-    
-    if (context->mtlColorTexture.width != viewport[2] ||
-        context->mtlColorTexture.height != viewport[3]) {
-        context->AllocateAttachments(viewport[2], viewport[3]);
-    }
-    
     if (_renderOutput == DelegateParams::RenderOutput::OpenGL) {
+        GLint viewport[4];
+        glGetIntegerv( GL_VIEWPORT, viewport );
+        
+        if (context->mtlColorTexture.width != viewport[2] ||
+            context->mtlColorTexture.height != viewport[3]) {
+            context->InitGLInterop();
+            context->AllocateAttachments(viewport[2], viewport[3]);
+        }
+    
         if (_mtlRenderPassDescriptorForInterop == nil)
             _mtlRenderPassDescriptorForInterop =
                 [[MTLRenderPassDescriptor alloc] init];

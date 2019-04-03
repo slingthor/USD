@@ -42,20 +42,9 @@ TF_DECLARE_WEAK_AND_REF_PTRS(GarchDrawTarget);
 /// Typically the application would only create one of these.
 class HdEngine {
 public:
-    
-    enum RenderAPI {
-        Unset = -1,
-#if defined(ARCH_GFX_OPENGL)
-        OpenGL,
-#endif
-#if defined(ARCH_GFX_METAL)
-        Metal,
-#endif
-        NumRenderers
-    };
 
     HD_API
-    HdEngine(RenderAPI api);
+    HdEngine();
     HD_API
     virtual ~HdEngine();
 
@@ -85,17 +74,12 @@ public:
     HD_API
     void ReloadAllShaders(HdRenderIndex& index);
 
-    /// Returns the current renderAPI in use
-    HD_API
-    static RenderAPI GetRenderAPI() { return _renderAPI; }
-
 private:
     /// Context containing token-value pairs, that is passed to each
     /// task in the render graph.  The task-context can be pre-populated
     /// and managed externally, so the state is persistent between runs of the
     /// render graph.
     HdTaskContext       _taskContext;
-    static RenderAPI    _renderAPI;
 
     void _InitCaps() const;
 };

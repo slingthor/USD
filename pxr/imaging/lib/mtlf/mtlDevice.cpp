@@ -153,8 +153,18 @@ id<MTLDevice> MtlfMetalContext::GetMetalDevice(PREFERRED_GPU_TYPE preferredGPUTy
 MtlfMetalContext::MtlfMetalContext(id<MTLDevice> _device, int width, int height)
 : enableMVA(false)
 , enableComputeGS(false)
-, gsDataOffset(0), gsBufferIndex(0), gsMaxConcurrentBatches(0), gsMaxDataPerBatch(0), gsCurrentBuffer(nil), gsFence(nil), gsHasOpenBatch(false), gsSyncRequired(false)
+, gsDataOffset(0)
+, gsBufferIndex(0)
+, gsMaxConcurrentBatches(0)
+, gsMaxDataPerBatch(0)
+, gsCurrentBuffer(nil)
+, gsFence(nil)
+, gsHasOpenBatch(false)
+, gsSyncRequired(false)
 , isRenderPassDescriptorPatched(false)
+#if defined(ARCH_GFX_OPENGL)
+, glInterop(NULL)
+#endif
 {
     if (_device == nil) {
         //device = MtlfMetalContext::GetMetalDevice(PREFER_INTEGRATED_GPU);
@@ -213,10 +223,6 @@ MtlfMetalContext::MtlfMetalContext(id<MTLDevice> _device, int width, int height)
     depthStateDesc.depthWriteEnabled = YES;
     depthStateDesc.depthCompareFunction = MTLCompareFunctionLessEqual;
     depthState = [device newDepthStencilStateWithDescriptor:depthStateDesc];
-
-#if defined(ARCH_GFX_OPENGL)
-    glInterop = new MtlfGlInterop(device);
-#endif
 
     AllocateAttachments(width, height);
 
@@ -302,8 +308,10 @@ MtlfMetalContext::~MtlfMetalContext()
     }
 
 #if defined(ARCH_GFX_OPENGL)
-    delete glInterop;
-    glInterop = NULL;
+    if (glInterop) {
+        delete glInterop;
+        glInterop = NULL;
+    }
 #endif
 
     CleanupUnusedBuffers(true);
@@ -352,10 +360,12 @@ void MtlfMetalContext::RecreateInstance(id<MTLDevice> device, int width, int hei
 void MtlfMetalContext::AllocateAttachments(int width, int height)
 {
 #if defined(ARCH_GFX_OPENGL)
-    glInterop->AllocateAttachments(width, height);
+    if (glInterop) {
+        glInterop->AllocateAttachments(width, height);
 
-    mtlColorTexture = glInterop->mtlColorTexture;
-    mtlDepthTexture = glInterop->mtlDepthTexture;
+        mtlColorTexture = glInterop->mtlColorTexture;
+        mtlDepthTexture = glInterop->mtlDepthTexture;
+    }
 #endif
 }
 
@@ -372,7 +382,13 @@ void
 MtlfMetalContext::BlitColorTargetToOpenGL()
 {
 #if defined(ARCH_GFX_OPENGL)
-    glInterop->BlitColorTargetToOpenGL();
+    if (glInterop) {
+        glInterop->BlitColorTargetToOpenGL();
+    }
+    else {
+        TF_FATAL_CODING_ERROR("Gl interop is disabled, must call InitGLInterop"
+                              " before rendering");
+    }
 #else
     TF_FATAL_CODING_ERROR("Gl interop is disabled, because OpenGL is disabled");
 #endif
@@ -382,14 +398,28 @@ void
 MtlfMetalContext::CopyDepthTextureToOpenGL()
 {
 #if defined(ARCH_GFX_OPENGL)
-    id <MTLComputeCommandEncoder> computeEncoder = GetComputeEncoder();
-    computeEncoder.label = @"Depth buffer copy";
+    if (glInterop) {
+        id <MTLComputeCommandEncoder> computeEncoder = GetComputeEncoder();
+        computeEncoder.label = @"Depth buffer copy";
 
-    glInterop->CopyDepthTextureToOpenGL(computeEncoder);
+        glInterop->CopyDepthTextureToOpenGL(computeEncoder);
 
-    ReleaseEncoder(true);
+        ReleaseEncoder(true);
+    }
+    else {
+        TF_FATAL_CODING_ERROR("Gl interop is disabled, must call InitGLInterop"
+                              " before rendering");
+    }
 #else
     TF_FATAL_CODING_ERROR("Gl interop is disabled, because OpenGL is disabled");
+#endif
+}
+
+void MtlfMetalContext::InitGLInterop() {
+#if defined(ARCH_GFX_OPENGL)
+    if (!glInterop) {
+        glInterop = new MtlfGlInterop(device);
+    }
 #endif
 }
 

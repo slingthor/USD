@@ -26,6 +26,7 @@
 #include "pxr/imaging/hdx/compositor.h"
 #include "pxr/imaging/hdx/package.h"
 #include "pxr/imaging/hdSt/program.h"
+#include "pxr/imaging/hdSt/resourceFactory.h"
 #include "pxr/imaging/hf/perfLog.h"
 #include "pxr/imaging/hd/perfLog.h"
 #include "pxr/imaging/glf/diagnostic.h"
@@ -87,7 +88,9 @@ HdxCompositor::~HdxCompositor()
 void
 HdxCompositor::_CreateShaderResources(bool useDepthProgram)
 {
-    _compositorProgram.reset(HdStProgram::New(_tokens->fullscreenShader));
+    _compositorProgram.reset(
+        HdStResourceFactory::GetInstance()->NewProgram(
+            _tokens->fullscreenShader));
     HioGlslfx glslfx(HdxPackageFullscreenShader());
     TfToken fsToken = useDepthProgram ? _tokens->compositeFragmentWithDepth
                                       : _tokens->compositeFragmentNoDepth;

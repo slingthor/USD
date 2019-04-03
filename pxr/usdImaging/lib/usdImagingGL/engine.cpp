@@ -91,15 +91,18 @@ void _InitGL()
 
 static
 bool
-_IsHydraEnabled()
+_IsHydraEnabled(const UsdImagingGLEngine::RenderAPI api)
 {
 #if defined(ARCH_GFX_OPENGL)
-    // Make sure there is an OpenGL context when 
-    // trying to initialize Hydra/Reference
-    GlfGLContextSharedPtr context = GlfGLContext::GetCurrentGLContext();
-    if (!context || !context->IsValid()) {
-        TF_CODING_ERROR("OpenGL context required, using reference renderer");
-        return false;
+    if (api == UsdImagingGLEngine::OpenGL) {
+        // Make sure there is an OpenGL context when
+        // trying to initialize Hydra/Reference
+        GlfGLContextSharedPtr context = GlfGLContext::GetCurrentGLContext();
+        if (!context || !context->IsValid()) {
+            TF_CODING_ERROR("OpenGL context required, "
+                "using reference renderer");
+            return false;
+        }
     }
 #endif
     if (!_GetHydraEnabledEnvVar()) {
@@ -123,7 +126,7 @@ _IsHydraEnabled()
 bool
 UsdImagingGLEngine::IsHydraEnabled()
 {
-    static bool isHydraEnabled = _IsHydraEnabled();
+    static bool isHydraEnabled = _IsHydraEnabled(Unset);
     return isHydraEnabled;
 }
 
@@ -131,7 +134,7 @@ UsdImagingGLEngine::IsHydraEnabled()
 // Construction
 //----------------------------------------------------------------------------
 
-UsdImagingGLEngine::UsdImagingGLEngine()
+UsdImagingGLEngine::UsdImagingGLEngine(const RenderAPI api)
     : _engine(NULL)
     , _renderIndex(nullptr)
     , _selTracker(new HdxSelectionTracker)
@@ -147,20 +150,34 @@ UsdImagingGLEngine::UsdImagingGLEngine()
     , _renderTags()
     , _restoreViewport(0)
     , _useFloatPointDrawTarget(false)
-{
+    , _renderAPI(api)
 #if defined(ARCH_GFX_METAL)
-    _engine = new HdEngine(HdEngine::Metal);
-    _resourceFactory = new HdStResourceFactoryMetal();
-#else
-	static std::once_flag initFlag;
-
-    std::call_once(initFlag, _InitGL);
-
-    _engine = new HdEngine(HdEngine::OpenGL);
-    _resourceFactory = new HdStResourceFactoryGL();
+    , _legacyImpl(nullptr)
 #endif
+{
+    _engine = new HdEngine();
+#if defined(ARCH_GFX_METAL)
+    if (_renderAPI == Metal) {
+        _resourceFactory = new HdStResourceFactoryMetal();
+    }
+    else
+#endif
+#if defined(ARCH_GFX_OPENGL)
+    if (_renderAPI == OpenGL) {
+        static std::once_flag initFlag;
+
+        std::call_once(initFlag, _InitGL);
+
+        _resourceFactory = new HdStResourceFactoryGL();
+    }
+    else
+#endif
+    {
+        TF_FATAL_CODING_ERROR("No valid rendering API specified: %d", _renderAPI);
+    }
     
-    GarchResourceFactory::GetInstance().SetResourceFactory(dynamic_cast<GarchResourceFactoryInterface*>(_resourceFactory));
+    GarchResourceFactory::GetInstance().SetResourceFactory(
+        dynamic_cast<GarchResourceFactoryInterface*>(_resourceFactory));
     HdStResourceFactory::GetInstance().SetResourceFactory(_resourceFactory);
 
     if (IsHydraEnabled()) {
@@ -182,6 +199,7 @@ UsdImagingGLEngine::UsdImagingGLEngine()
 }
 
 UsdImagingGLEngine::UsdImagingGLEngine(
+    const RenderAPI api,
     const SdfPath& rootPath,
     const SdfPathVector& excludedPaths,
     const SdfPathVector& invisedPaths,
@@ -201,19 +219,31 @@ UsdImagingGLEngine::UsdImagingGLEngine(
     , _renderTags()
     , _restoreViewport(0)
     , _useFloatPointDrawTarget(false)
+    , _renderAPI(api)
 #if defined(ARCH_GFX_METAL)
     , _legacyImpl(nullptr)
 #endif
 {
+    _engine = new HdEngine();
 #if defined(ARCH_GFX_METAL)
-    _engine = new HdEngine(HdEngine::Metal);
-    _resourceFactory = new HdStResourceFactoryMetal();
-#else
-    _engine = new HdEngine(HdEngine::OpenGL);
-    _resourceFactory = new HdStResourceFactoryGL();
+    if (_renderAPI == Metal) {
+        _resourceFactory = new HdStResourceFactoryMetal();
+    }
+    else
 #endif
+#if defined(ARCH_GFX_OPENGL)
+    if (_renderAPI == OpenGL) {
+        _resourceFactory = new HdStResourceFactoryGL();
+    }
+    else
+#endif
+    {
+        TF_FATAL_CODING_ERROR("No valid rendering API specified: %d", _renderAPI);
+    }
+
     
-    GarchResourceFactory::GetInstance().SetResourceFactory(dynamic_cast<GarchResourceFactoryInterface*>(_resourceFactory));
+    GarchResourceFactory::GetInstance().SetResourceFactory(
+        dynamic_cast<GarchResourceFactoryInterface*>(_resourceFactory));
     HdStResourceFactory::GetInstance().SetResourceFactory(_resourceFactory);
 
     if (IsHydraEnabled()) {
@@ -429,13 +459,15 @@ void
 UsdImagingGLEngine::SetCameraStateFromOpenGL()
 {
 #if defined(ARCH_GFX_OPENGL)
-    GfMatrix4d viewMatrix, projectionMatrix;
-    GfVec4d viewport;
-    glGetDoublev(GL_MODELVIEW_MATRIX, viewMatrix.GetArray());
-    glGetDoublev(GL_PROJECTION_MATRIX, projectionMatrix.GetArray());
-    glGetDoublev(GL_VIEWPORT, &viewport[0]);
+    if (_renderAPI == OpenGL) {
+        GfMatrix4d viewMatrix, projectionMatrix;
+        GfVec4d viewport;
+        glGetDoublev(GL_MODELVIEW_MATRIX, viewMatrix.GetArray());
+        glGetDoublev(GL_PROJECTION_MATRIX, projectionMatrix.GetArray());
+        glGetDoublev(GL_VIEWPORT, &viewport[0]);
 
-    SetCameraState(viewMatrix, projectionMatrix, viewport);
+        SetCameraState(viewMatrix, projectionMatrix, viewport);
+    }
 #else
     TF_FATAL_CODING_ERROR("No OpenGL support available");
 #endif
@@ -983,7 +1015,8 @@ UsdImagingGLEngine::GetRendererSetting(TfToken const& id) const
 }
 
 void
-UsdImagingGLEngine::SetRendererSetting(TfToken const& settingId, VtValue const& value)
+UsdImagingGLEngine::SetRendererSetting(
+    TfToken const& settingId, VtValue const& value)
 {
     if (ARCH_UNLIKELY(_legacyImpl)) {
         return;
@@ -1098,14 +1131,14 @@ UsdImagingGLEngine::_Render(const UsdImagingGLRenderParams &params)
             params.enableIdRender,
             params.enableSampleAlphaToCoverage,
             params.drawMode,
-#if !defined(ARCH_GFX_OPENGL)
-            HdStRenderDelegate::DelegateParams::RenderOutput::Metal
-#else
-            HdStRenderDelegate::DelegateParams::RenderOutput::OpenGL
-#endif
+            (_renderAPI == Metal &&
+             params.mtlRenderPassDescriptorForNativeMetal) ?
+                HdStRenderDelegate::DelegateParams::RenderOutput::Metal:
+                HdStRenderDelegate::DelegateParams::RenderOutput::OpenGL
               );
 #if defined(ARCH_GFX_METAL)
-        delegateParams.mtlRenderPassDescriptorForNativeMetal = params.mtlRenderPassDescriptorForNativeMetal;
+            delegateParams.mtlRenderPassDescriptorForNativeMetal =
+                params.mtlRenderPassDescriptorForNativeMetal;
 #endif
         hdStRenderDelegate->PrepareRender(delegateParams);
     }
@@ -1435,38 +1468,41 @@ UsdImagingGLEngine::_BindInternalDrawTarget(
         return;
     }
 #if defined(ARCH_GFX_OPENGL)
-    glGetIntegerv(GL_VIEWPORT, _restoreViewport.data());
-    GfVec2i drawTargetSize = GfVec2i(_restoreViewport[2], _restoreViewport[3]);
+    if (_renderAPI == OpenGL) {
+        glGetIntegerv(GL_VIEWPORT, _restoreViewport.data());
+        GfVec2i drawTargetSize = GfVec2i(_restoreViewport[2], _restoreViewport[3]);
 
-    // Bind our internal drawtarget to control the render bitdepth.
-    // We want to render (linear-colors), do color-correction and other post-
-    // effects at a higher bitdepth then may be bound by the client.
-    if(!_drawTarget) {
-        bool requestMSAA = glIsEnabled(GL_MULTISAMPLE);
-        _drawTarget = GarchDrawTarget::New(drawTargetSize, requestMSAA);
-        std::vector<GarchDrawTarget::AttachmentDesc> attachmentDesc;
-        attachmentDesc.push_back(
-            GarchDrawTarget::AttachmentDesc("color", GL_RGBA, GL_FLOAT, GL_RGBA16F));
-        attachmentDesc.push_back(
-            GarchDrawTarget::AttachmentDesc("depth", GL_DEPTH_COMPONENT, GL_FLOAT,
-                                   GL_DEPTH_COMPONENT32F));
-        _drawTarget->SetAttachments(attachmentDesc);
-        _drawTarget->Bind();
-    } else {
-        _drawTarget->Bind();
+        // Bind our internal drawtarget to control the render bitdepth.
+        // We want to render (linear-colors), do color-correction and other post-
+        // effects at a higher bitdepth then may be bound by the client.
+        if(!_drawTarget) {
+            bool requestMSAA = glIsEnabled(GL_MULTISAMPLE);
+            _drawTarget = GarchDrawTarget::New(drawTargetSize, requestMSAA);
+            std::vector<GarchDrawTarget::AttachmentDesc> attachmentDesc;
+            attachmentDesc.push_back(
+                GarchDrawTarget::AttachmentDesc(
+                    "color", GL_RGBA, GL_FLOAT, GL_RGBA16F));
+            attachmentDesc.push_back(
+                GarchDrawTarget::AttachmentDesc(
+                    "depth", GL_DEPTH_COMPONENT, GL_FLOAT, GL_DEPTH_COMPONENT32F));
+            _drawTarget->SetAttachments(attachmentDesc);
+            _drawTarget->Bind();
+        } else {
+            _drawTarget->Bind();
 
-        // The clients viewport may have changed size.
-        _drawTarget->SetSize(drawTargetSize);
+            // The clients viewport may have changed size.
+            _drawTarget->SetSize(drawTargetSize);
+        }
+
+        // Remove any offset applied to the viewport so clearing and rendering
+        // happens in the correct region. (UsdView CameraMask mode messes with this)
+        glViewport(0, 0, _restoreViewport[2], _restoreViewport[3]);
+
+        // Clear our internal drawTarget with the clearcolor set by client
+        glClearBufferfv(GL_COLOR, 0, params.clearColor.data());
+        GLfloat clearDepth[1] = {1.0f};
+        glClearBufferfv(GL_DEPTH, 0, clearDepth);
     }
-
-    // Remove any offset applied to the viewport so clearing and rendering
-    // happens in the correct region. (UsdView CameraMask mode messes with this)
-    glViewport(0, 0, _restoreViewport[2], _restoreViewport[3]);
-
-    // Clear our internal drawTarget with the clearcolor set by client
-    glClearBufferfv(GL_COLOR, 0, params.clearColor.data());
-    GLfloat clearDepth[1] = {1.0f};
-    glClearBufferfv(GL_DEPTH, 0, clearDepth);
 #endif
 }
 
@@ -1494,41 +1530,43 @@ UsdImagingGLEngine::_RestoreClientDrawTarget(
     _drawTarget->Resolve();
 
 #if defined(ARCH_GFX_OPENGL)
-    // Restore viewport set by client/app
-    glViewport(_restoreViewport[0], 
-               _restoreViewport[1], 
-               _restoreViewport[2], 
-               _restoreViewport[3]);
+    if (_renderAPI == OpenGL) {
+        // Restore viewport set by client/app
+        glViewport(_restoreViewport[0],
+                   _restoreViewport[1],
+                   _restoreViewport[2],
+                   _restoreViewport[3]);
 
-    // Depth test must always pass to ensure that all pixels are transfered
-    // from our drawTarget to the clients when HdxCompositor draws its triangle.
-    GLboolean restoreDepthEnabled = glIsEnabled(GL_DEPTH_TEST);
-    glEnable(GL_DEPTH_TEST);
+        // Depth test must always pass to ensure that all pixels are transfered
+        // from our drawTarget to the clients when HdxCompositor draws its triangle.
+        GLboolean restoreDepthEnabled = glIsEnabled(GL_DEPTH_TEST);
+        glEnable(GL_DEPTH_TEST);
 
-    // Depth test must be ALWAYS instead of disabling the depth_test because
-    // we still want to write to the depth buffer. Disabling depth_test disables
-    // depth_buffer writes and we need to copy depth to client buffer.
-    GLint restoreDepthFunc;
-    glGetIntegerv(GL_DEPTH_FUNC, &restoreDepthFunc);
-    glDepthFunc(GL_ALWAYS);
+        // Depth test must be ALWAYS instead of disabling the depth_test because
+        // we still want to write to the depth buffer. Disabling depth_test disables
+        // depth_buffer writes and we need to copy depth to client buffer.
+        GLint restoreDepthFunc;
+        glGetIntegerv(GL_DEPTH_FUNC, &restoreDepthFunc);
+        glDepthFunc(GL_ALWAYS);
 
-    // Any alpha blending the client wanted should have happened into our 
-    // internal FB. When copying back to client buffer disable blending.
-    GLboolean restoreblendEnabled;
-    glGetBooleanv(GL_BLEND, &restoreblendEnabled);
-    glDisable(GL_BLEND);
+        // Any alpha blending the client wanted should have happened into our
+        // internal FB. When copying back to client buffer disable blending.
+        GLboolean restoreblendEnabled;
+        glGetBooleanv(GL_BLEND, &restoreblendEnabled);
+        glDisable(GL_BLEND);
 
-    GLuint colorId = _drawTarget->GetAttachment("color")->GetTextureName();
-    GLuint depthId = _drawTarget->GetAttachment("depth")->GetTextureName();
-    _compositor.Draw(colorId, depthId, /*remapDepth*/ false);
+        GLuint colorId = _drawTarget->GetAttachment("color")->GetTextureName();
+        GLuint depthId = _drawTarget->GetAttachment("depth")->GetTextureName();
+        _compositor.Draw(colorId, depthId, /*remapDepth*/ false);
 
-    if (restoreblendEnabled) {
-        glEnable(GL_BLEND);
-    }
+        if (restoreblendEnabled) {
+            glEnable(GL_BLEND);
+        }
 
-    glDepthFunc(restoreDepthFunc);
-    if (!restoreDepthEnabled) {
-        glDisable(GL_DEPTH_TEST);
+        glDepthFunc(restoreDepthFunc);
+        if (!restoreDepthEnabled) {
+            glDisable(GL_DEPTH_TEST);
+        }
     }
 #endif
 }

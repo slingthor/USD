@@ -174,8 +174,9 @@ MtlfDrawTarget::CloneAttachments( GarchDrawTargetPtr const & drawtarget )
     // by the RefPtr
     _attachmentsPtr = drawtarget->_attachmentsPtr;
 
-    for (AttachmentsMap::value_type const& p :  _attachmentsPtr->attachments) {
-        _BindAttachment( TfStatic_cast<TfRefPtr<MtlfDrawTarget::MtlfAttachment>>(p.second) );
+    for (AttachmentsMap::value_type const& p : _attachmentsPtr->attachments) {
+        _BindAttachment(
+            TfStatic_cast<TfRefPtr<MtlfDrawTarget::MtlfAttachment>>(p.second) );
     }
 }
 

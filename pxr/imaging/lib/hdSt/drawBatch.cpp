@@ -283,9 +283,12 @@ HdSt_DrawBatch::_DrawingProgram::CompileShader(
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
 
-    // glew has to be initialized
-    if (!glLinkProgram) {
-        return false;
+    HdStResourceFactory &resourceFactory(HdStResourceFactory::GetInstance());
+    if (resourceFactory->IsOpenGL()) {
+        // glew has to be initialized
+        if (!glLinkProgram) {
+            return false;
+        }
     }
 
     if (!_geometricShader) {
@@ -305,8 +308,8 @@ HdSt_DrawBatch::_DrawingProgram::CompileShader(
         (*it)->AddBindings(&customBindings);
     }
 
-    HdSt_CodeGen *codeGen = HdStResourceFactory::GetInstance()->NewCodeGen(
-                                _geometricShader, shaders);
+    HdSt_CodeGen *codeGen = resourceFactory->NewCodeGen(
+        _geometricShader, shaders);
 
     // let resourcebinder resolve bindings and populate metadata
     // which is owned by codegen.
