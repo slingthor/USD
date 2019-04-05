@@ -2123,7 +2123,7 @@ HdSt_CodeGenMSL::Compile()
     // prep interstage plumbing function
     _procVS  << "void ProcessPrimvars() {\n";
 //    _procTCS << "void ProcessPrimvars() {\n";
-//    _procTES << "void ProcessPrimvars(float u, float v, int i0, int i1, int i2, int i3) {\n";
+//    _procTES << "void ProcessPrimvars(vec4 basis, int i0, int i1, int i2, int i3) {\n";
     
     // geometry shader plumbing
     switch(_geometricShader->GetPrimitiveType())

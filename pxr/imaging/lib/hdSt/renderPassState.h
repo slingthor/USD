@@ -96,6 +96,8 @@ protected:
     HDST_API
     HdStRenderPassState(HdStRenderPassShaderSharedPtr const &shader);
 
+    bool _UseAlphaMask() const;
+
     // ---------------------------------------------------------------------- //
     // Shader Objects
     // ---------------------------------------------------------------------- //
@@ -106,6 +108,7 @@ protected:
 
     HdBufferArrayRangeSharedPtr _renderPassStateBar;
     size_t _clipPlanesBufferSize;
+    float _alphaThresholdCurrent;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

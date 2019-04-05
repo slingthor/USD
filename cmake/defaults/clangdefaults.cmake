@@ -43,6 +43,7 @@ _disable_warning("unused-lambda-capture")
 _disable_warning("reinterpret-base-class")
 _disable_warning("shorten-64-to-32")
 _disable_warning("unguarded-availability-new")
+_disable_warning("self-assign-overloaded")
 
 if (APPLEIOS)
 	_disable_warning("comma")

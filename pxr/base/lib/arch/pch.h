@@ -117,4 +117,3 @@
 #include <typeindex>
 #include <typeinfo>
 #include <vector>
-#include <boost/preprocessor/stringize.hpp>

@@ -57,6 +57,7 @@ HdStRenderPassState::HdStRenderPassState()
     , _renderPassShader(new HdStRenderPassShader())
     , _fallbackLightingShader(new HdSt_FallbackLightingShader())
     , _clipPlanesBufferSize(0)
+    , _alphaThresholdCurrent(0)
 {
     _lightingShader = _fallbackLightingShader;
 }
@@ -67,6 +68,7 @@ HdStRenderPassState::HdStRenderPassState(
     , _renderPassShader(renderPassShader)
     , _fallbackLightingShader(new HdSt_FallbackLightingShader())
     , _clipPlanesBufferSize(0)
+    , _alphaThresholdCurrent(0)
 {
     _lightingShader = _fallbackLightingShader;
 }
@@ -74,6 +76,12 @@ HdStRenderPassState::HdStRenderPassState(
 HdStRenderPassState::~HdStRenderPassState()
 {
     /*NOTHING*/
+}
+
+bool
+HdStRenderPassState::_UseAlphaMask() const
+{
+    return (_alphaThreshold > 0.0f);
 }
 
 void
@@ -94,7 +102,9 @@ HdStRenderPassState::Prepare(HdResourceRegistrySharedPtr const &resourceRegistry
     }
 #endif
     // allocate bar if not exists
-    if (!_renderPassStateBar || (_clipPlanesBufferSize != clipPlanes.size())) {
+    if (!_renderPassStateBar || 
+        (_clipPlanesBufferSize != clipPlanes.size()) ||
+        _alphaThresholdCurrent != _alphaThreshold) {
         HdBufferSpecVector bufferSpecs;
 
         // note: InterleavedMemoryManager computes the offsets in the packed
@@ -135,9 +145,14 @@ HdStRenderPassState::Prepare(HdResourceRegistrySharedPtr const &resourceRegistry
         bufferSpecs.emplace_back(
             HdShaderTokens->lightingBlendAmount,
             HdTupleType{HdTypeFloat, 1});
-        bufferSpecs.emplace_back(
-            HdShaderTokens->alphaThreshold,
-            HdTupleType{HdTypeFloat, 1});
+
+        if (_UseAlphaMask()) {
+            bufferSpecs.emplace_back(
+                HdShaderTokens->alphaThreshold,
+                HdTupleType{HdTypeFloat, 1});
+        }
+        _alphaThresholdCurrent = _alphaThreshold;
+
         bufferSpecs.emplace_back(
             HdShaderTokens->tessLevel,
             HdTupleType{HdTypeFloat, 1});
@@ -205,10 +220,14 @@ HdStRenderPassState::Prepare(HdResourceRegistrySharedPtr const &resourceRegistry
 
     sources.push_back(HdBufferSourceSharedPtr(
                        new HdVtBufferSource(HdShaderTokens->lightingBlendAmount,
-                                            VtValue(lightingBlendAmount))));;
-    sources.push_back(HdBufferSourceSharedPtr(
-                          new HdVtBufferSource(HdShaderTokens->alphaThreshold,
-                                               VtValue(_alphaThreshold))));
+                                            VtValue(lightingBlendAmount))));
+
+    if (_UseAlphaMask()) {
+        sources.push_back(HdBufferSourceSharedPtr(
+                              new HdVtBufferSource(HdShaderTokens->alphaThreshold,
+                                                   VtValue(_alphaThreshold))));
+    }
+
     sources.push_back(HdBufferSourceSharedPtr(
                        new HdVtBufferSource(HdShaderTokens->tessLevel,
                                             VtValue(_tessLevel))));
@@ -310,6 +329,7 @@ HdStRenderPassState::GetShaderHash() const
         boost::hash_combine(hash, _renderPassShader->ComputeHash());
     }
     boost::hash_combine(hash, _clipPlanes.size());
+    boost::hash_combine(hash, _UseAlphaMask());
     return hash;
 }
 

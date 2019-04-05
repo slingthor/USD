@@ -63,11 +63,13 @@ static const int _maxLightsUsed = 16;
 GarchSimpleLightingContextRefPtr
 GarchSimpleLightingContext::New()
 {
-    return TfCreateRefPtr(GarchResourceFactory::GetInstance()->NewSimpleLightingContext());
+    return TfCreateRefPtr(
+        GarchResourceFactory::GetInstance()->NewSimpleLightingContext());
 }
 
 GarchSimpleLightingContext::GarchSimpleLightingContext() :
-    _shadows(GarchSimpleShadowArray::New(GfVec2i(1024, 1024), 0)),
+    _shadows(TfCreateRefPtr(
+        GarchSimpleShadowArray::New(GfVec2i(1024, 1024), 0))),
     _worldToViewMatrix(1.0),
     _projectionMatrix(1.0),
     _sceneAmbient(0.01, 0.01, 0.01, 1.0),
