@@ -104,7 +104,7 @@ HdxCompositor::_CreateShaderResources(bool useDepthProgram)
         return;
     }
 
-    TF_FATAL_CODING_ERROR("Not Implemented!"); //MTL_FIXME
+//    TF_FATAL_CODING_ERROR("Not Implemented!"); //MTL_FIXME
 
 #if defined(ARCH_GFX_OPENGL)
     GLuint programId = boost::dynamic_pointer_cast<HdStGLSLProgram>(_compositorProgram)->GetGLProgram();
@@ -251,7 +251,7 @@ HdxCompositor::Draw(GLuint colorId, GLuint depthId, bool remapDepth)
         return;
     }
 
-	TF_FATAL_CODING_ERROR("Not Implemented!"); //MTL_FIXME
+//	TF_FATAL_CODING_ERROR("Not Implemented!"); //MTL_FIXME
     
 	// A note here: HdxCompositor is used for all of our plugins and has to be
     // robust to poor GL support.  OSX compatibility profile provides a
