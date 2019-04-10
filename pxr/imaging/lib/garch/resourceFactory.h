@@ -47,7 +47,6 @@ class GarchSimpleLightingContext;
 class GarchSimpleShadowArray;
 class GarchUdimTexture;
 class GarchUniformBlock;
-class HdSt_CodeGen;
 
 TF_DECLARE_WEAK_AND_REF_PTRS(GarchArrayTexture);
 TF_DECLARE_WEAK_AND_REF_PTRS(GarchDrawTarget);
