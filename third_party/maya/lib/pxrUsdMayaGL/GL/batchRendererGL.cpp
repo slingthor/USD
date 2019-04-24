@@ -91,7 +91,7 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 UsdMayaGLBatchRendererGL::UsdMayaGLBatchRendererGL() :
-    _hdEngine(HdEngine::OpenGL)
+    _hdEngine()
 {
     GarchResourceFactory::GetInstance().SetResourceFactory(&_resourceFactory);
 }

@@ -92,7 +92,7 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 UsdMayaGLBatchRendererMetal::UsdMayaGLBatchRendererMetal() :
-    _hdEngine(HdEngine::Metal)
+    _hdEngine()
 {
     GarchResourceFactory::GetInstance().SetResourceFactory(&_resourceFactory);
 }
