@@ -100,6 +100,10 @@ public:
     /// Returns true if Hydra is enabled for GL drawing.
     USDIMAGINGGL_API
     static bool IsHydraEnabled();
+    
+    /// Returns the default RendererPluginId.
+    USDIMAGINGGL_API
+    static TfToken GetDefaultRendererPluginId();
 
     /// @}
 
@@ -436,8 +440,6 @@ protected:
     // This function disposes of: the render index, the render plugin,
     // the task controller, and the usd imaging delegate.
     void _DeleteHydraResources();
-
-    static TfToken _GetDefaultRendererPluginId();
 
     // Creates and binds the internal draw-target that Hydra draws into.
     void _BindInternalDrawTarget(UsdImagingGLRenderParams const& params);
