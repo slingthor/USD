@@ -67,6 +67,9 @@
 #include "pxr/imaging/hdx/intersector.h"
 #include "pxr/imaging/hdx/selectionTracker.h"
 #include "pxr/imaging/hdx/tokens.h"
+#include "pxr/imaging/hdx/rendererPlugin.h"
+#include "pxr/imaging/hdx/rendererPluginRegistry.h"
+#include "pxr/usdImaging/usdImagingGL/engine.h"
 #include "pxr/usd/sdf/path.h"
 
 #include <maya/M3dView.h>
@@ -442,6 +445,14 @@ UsdMayaGLBatchRenderer::UsdMayaGLBatchRenderer() :
         _softSelectOptionsCallbackId(0),
         _selectResultsKey(GfMatrix4d(0.0), GfMatrix4d(0.0), false)
 {
+    TfToken pluginId = UsdImagingGLEngine::GetDefaultRendererPluginId();
+    if(pluginId.IsEmpty()) {
+        pluginId = HdxRendererPluginRegistry::GetInstance().
+            GetDefaultPluginId();
+    }
+    _rendererPluginId = pluginId;
+    HdxRendererPlugin *plugin = HdxRendererPluginRegistry::GetInstance().GetRendererPlugin(_rendererPluginId);
+    _renderDelegate = (HdStRenderDelegate*)plugin->CreateRenderDelegate();
 }
 
 void UsdMayaGLBatchRenderer::_Init()
@@ -531,6 +542,9 @@ UsdMayaGLBatchRenderer::~UsdMayaGLBatchRenderer()
     // using CurrentlyExists()/GetInstance() because we call it within the
     // constructor
     MMessage::removeCallback(_softSelectOptionsCallbackId);
+    
+    HdxRendererPlugin *plugin = HdxRendererPluginRegistry::GetInstance().GetRendererPlugin(_rendererPluginId);
+    plugin->DeleteRenderDelegate(_renderDelegate);
 }
 
 const UsdMayaGLSoftSelectHelper&
