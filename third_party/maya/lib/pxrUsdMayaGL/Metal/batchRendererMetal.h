@@ -49,6 +49,7 @@
 #include "pxr/imaging/hd/renderIndex.h"
 #include "pxr/imaging/hd/rprimCollection.h"
 #include "pxr/imaging/hdSt/renderDelegate.h"
+#include "pxr/imaging/hdSt/resourceFactory.h"
 #include "pxr/imaging/hdx/intersector.h"
 #include "pxr/imaging/hdx/selectionTracker.h"
 #include "pxr/usd/sdf/path.h"
@@ -128,7 +129,7 @@ private:
     HdEngine _hdEngine;
 
     /// The low level API resource factory to use for creation of GPU resources
-    MtlfResourceFactory _resourceFactory;
+    HdStResourceFactoryInterface *_resourceFactory;
 };
 
 
