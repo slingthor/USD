@@ -1134,7 +1134,8 @@ UsdImagingGLEngine::_Render(const UsdImagingGLRenderParams &params)
 #if defined(ARCH_GFX_METAL)
             (_renderAPI == Metal &&
              params.mtlRenderPassDescriptorForNativeMetal) ?
-                HdStRenderDelegate::DelegateParams::RenderOutput::Metal:
+                HdStRenderDelegate::DelegateParams::RenderOutput::Metal
+                :HdStRenderDelegate::DelegateParams::RenderOutput::OpenGL
 #else
                 HdStRenderDelegate::DelegateParams::RenderOutput::OpenGL
 #endif
