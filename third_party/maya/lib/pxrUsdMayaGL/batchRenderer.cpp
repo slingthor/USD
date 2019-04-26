@@ -454,7 +454,7 @@ void UsdMayaGLBatchRenderer::_Init()
     _legacyViewportPrefix = _rootId.AppendChild(_tokens->LegacyViewport);
     _viewport2Prefix = _rootId.AppendChild(_tokens->Viewport2);
 
-    _renderIndex.reset(HdRenderIndex::New((HdRenderDelegate*)&_renderDelegate));
+    _renderIndex.reset(HdRenderIndex::New(_renderDelegate));
     if (!TF_VERIFY(_renderIndex)) {
         return;
     }
