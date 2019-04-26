@@ -168,7 +168,8 @@ MtlfMetalContext::MtlfMetalContext(id<MTLDevice> _device, int width, int height)
 {
     if (_device == nil) {
         //device = MtlfMetalContext::GetMetalDevice(PREFER_INTEGRATED_GPU);
-        device = MtlfMetalContext::GetMetalDevice(PREFER_DISCRETE_GPU);
+        //device = MtlfMetalContext::GetMetalDevice(PREFER_DISCRETE_GPU);
+        device = MtlfMetalContext::GetMetalDevice(PREFER_DEFAULT_GPU);
     }
     else
         device = _device;
