@@ -451,7 +451,7 @@ private:
     /// *after* the render index. We enforce that ordering by declaring the
     /// render delegate *before* the render index, since class members are
     /// destructed in reverse declaration order.
-    HdStRenderDelegate _renderDelegate;
+    HdStRenderDelegate *_renderDelegate;
     std::unique_ptr<HdRenderIndex> _renderIndex;
 
     /// The root ID of the batch renderer itself, and the top of the path

@@ -62,8 +62,10 @@ UsdMayaGLHdRenderer::CheckRendererSetup(
         _renderedPrim = usdPrim;
         _excludePrimPaths = excludePaths;
 
-        _renderer.reset(new UsdImagingGLEngine(_renderedPrim.GetPath(),
-                                               _excludePrimPaths));
+        _renderer.reset(new UsdImagingGLEngine(
+            UsdImagingGLEngine::RenderAPI::Metal,
+            _renderedPrim.GetPath(),
+            _excludePrimPaths));
     }
 }
 
@@ -205,9 +207,9 @@ void UsdMayaGLHdRenderer::RenderVp2(
         case UsdMayaGLHdRenderer::DRAW_POINTS: {
 
             params.drawMode = request.drawRequest.token() == 
-                UsdMayaGLHdRenderer::DRAW_WIREFRAME ? 
-                    UsdImagingGLDrawMode::DRAW_WIREFRAME :
-                    UsdImagingGLDrawMode::DRAW_POINTS;
+                UsdMayaGLHdRenderer::DRAW_WIREFRAME ?
+                HdStDrawMode::DRAW_WIREFRAME :
+                HdStDrawMode::DRAW_POINTS;
             params.enableLighting = false;
             params.cullStyle = UsdImagingGLCullStyle::CULL_STYLE_NOTHING;
 
@@ -224,8 +226,8 @@ void UsdMayaGLHdRenderer::RenderVp2(
 
             params.drawMode = ((request.drawRequest.token() == 
                     UsdMayaGLHdRenderer::DRAW_SHADED_FLAT) ?
-                        UsdImagingGLDrawMode::DRAW_GEOM_FLAT : 
-                        UsdImagingGLDrawMode::DRAW_GEOM_SMOOTH);
+                        HdStDrawMode::DRAW_GEOM_FLAT :
+                        HdStDrawMode::DRAW_GEOM_SMOOTH);
             params.enableLighting = true;
             params.cullStyle = 
                 UsdImagingGLCullStyle::CULL_STYLE_BACK_UNLESS_DOUBLE_SIDED;
@@ -294,8 +296,8 @@ UsdMayaGLHdRenderer::Render(
 
 
             params.drawMode = drawMode == DRAW_WIREFRAME ? 
-                UsdImagingGLDrawMode::DRAW_WIREFRAME : 
-                UsdImagingGLDrawMode::DRAW_POINTS;
+                HdStDrawMode::DRAW_WIREFRAME :
+                HdStDrawMode::DRAW_POINTS;
             params.enableLighting = false;
             glGetFloatv(GL_CURRENT_COLOR, &params.overrideColor[0]);
 
@@ -315,8 +317,8 @@ UsdMayaGLHdRenderer::Render(
 
 
             params.drawMode = drawMode == DRAW_SHADED_FLAT ?
-                UsdImagingGLDrawMode::DRAW_SHADED_FLAT : 
-                UsdImagingGLDrawMode::DRAW_SHADED_SMOOTH;
+                HdStDrawMode::DRAW_SHADED_FLAT :
+                HdStDrawMode::DRAW_SHADED_SMOOTH;
 
             _renderer->Render(_renderedPrim, params);
 
@@ -377,7 +379,7 @@ UsdMayaGLHdRenderer::TestIntersection(
         viewMatrix,
         projectionMatrix);
 
-    params.drawMode = UsdImagingGLDrawMode::DRAW_GEOM_ONLY;
+    params.drawMode = HdStDrawMode::DRAW_GEOM_ONLY;
 
     return _renderer->TestIntersection(viewMatrix,
                                        projectionMatrix,
