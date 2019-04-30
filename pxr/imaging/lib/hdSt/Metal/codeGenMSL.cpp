@@ -1749,6 +1749,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
     
     fsInterpolationCode << "////////////////////////////////////////////////////////////////////////////////////////////////////////////////////\n"
                         << "// MSL FS Interpolation Code ///////////////////////////////////////////////////////////////////////////////////////\n\n"
+                        << "float Interpolate_CenterPerspective(float in1, float in2, float in3, vec2 bary) { return in1 * (1 - (bary.x + bary.y)) + in2 * bary.x + in3 * bary.y; }\n"
                         << "vec2 Interpolate_CenterPerspective(vec2 in1, vec2 in2, vec2 in3, vec2 bary) { return in1 * (1 - (bary.x + bary.y)) + in2 * bary.x + in3 * bary.y; }\n"
                         << "vec3 Interpolate_CenterPerspective(vec3 in1, vec3 in2, vec3 in3, vec2 bary) { return in1 * (1 - (bary.x + bary.y)) + in2 * bary.x + in3 * bary.y; }\n"
                         << "vec4 Interpolate_CenterPerspective(vec4 in1, vec4 in2, vec4 in3, vec2 bary) { return in1 * (1 - (bary.x + bary.y)) + in2 * bary.x + in3 * bary.y; }\n\n";
