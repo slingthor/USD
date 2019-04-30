@@ -63,6 +63,7 @@
 #include "pxr/imaging/hdx/intersector.h"
 #include "pxr/imaging/hdx/selectionTracker.h"
 #include "pxr/imaging/hdx/tokens.h"
+#include "pxr/imaging/hdSt/Metal/resourceFactoryMetal.h"
 #include "pxr/usd/sdf/path.h"
 
 #include <maya/M3dView.h>
@@ -94,7 +95,9 @@ PXR_NAMESPACE_OPEN_SCOPE
 UsdMayaGLBatchRendererMetal::UsdMayaGLBatchRendererMetal() :
     _hdEngine()
 {
-    GarchResourceFactory::GetInstance().SetResourceFactory(&_resourceFactory);
+    _resourceFactory = new HdStResourceFactoryMetal();
+    HdStResourceFactory::GetInstance().SetResourceFactory(_resourceFactory);
+    GarchResourceFactory::GetInstance().SetResourceFactory(dynamic_cast<GarchResourceFactoryInterface*>(_resourceFactory));
 }
 
 /* virtual */
@@ -188,6 +191,7 @@ UsdMayaGLBatchRendererMetal::_Render(
     // Make sure the Metal render targets, and GL interop textures match the GL viewport size
     if (context->mtlColorTexture.width != viewport[2] ||
         context->mtlColorTexture.height != viewport[3]) {
+        context->InitGLInterop();
         context->AllocateAttachments(viewport[2], viewport[3]);
     }
     

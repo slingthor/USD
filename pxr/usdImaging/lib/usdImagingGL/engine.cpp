@@ -184,7 +184,7 @@ UsdImagingGLEngine::UsdImagingGLEngine(const RenderAPI api)
 
         // _renderIndex, _taskController, and _delegate are initialized
         // by the plugin system.
-        if (!SetRendererPlugin(_GetDefaultRendererPluginId())) {
+        if (!SetRendererPlugin(GetDefaultRendererPluginId())) {
             TF_CODING_ERROR("No renderer plugins found! "
                             "Check before creation.");
         }
@@ -250,7 +250,7 @@ UsdImagingGLEngine::UsdImagingGLEngine(
 
         // _renderIndex, _taskController, and _delegate are initialized
         // by the plugin system.
-        if (!SetRendererPlugin(_GetDefaultRendererPluginId())) {
+        if (!SetRendererPlugin(GetDefaultRendererPluginId())) {
             TF_CODING_ERROR("No renderer plugins found! "
                             "Check before creation.");
         }
@@ -1429,7 +1429,7 @@ UsdImagingGLEngine::_DeleteHydraResources()
 
 /* static */
 TfToken
-UsdImagingGLEngine::_GetDefaultRendererPluginId()
+UsdImagingGLEngine::GetDefaultRendererPluginId()
 {
     std::string defaultRendererDisplayName = 
         TfGetenv("HD_DEFAULT_RENDERER", "");
