@@ -34,13 +34,16 @@ if (PXR_ENABLE_GL_SUPPORT)
                         GL/renderDelegateGL
                         GL/renderPassStateGL
                         GL/resourceBinderGL
-                        GL/resourceFactoryGL
                         GL/resourceGL
                         GL/smoothNormalsGL
                         GL/textureResourceGL
                         GL/vboMemoryBufferGL
                         GL/vboSimpleMemoryBufferGL
                         unitTestGLDrawing)
+
+    set(GFXADDITIONALPUBLIC ${GFXADDITIONALPUBLIC}
+                            GL/resourceFactoryGL)
+
 endif()
 
 if (PXR_ENABLE_METAL_SUPPORT)
@@ -63,12 +66,14 @@ if (PXR_ENABLE_METAL_SUPPORT)
                         Metal/renderDelegateMetal
                         Metal/renderPassStateMetal
                         Metal/resourceBinderMetal
-                        Metal/resourceFactoryMetal
                         Metal/resourceMetal
                         Metal/smoothNormalsMetal
                         Metal/textureResourceMetal
                         Metal/vboMemoryBufferMetal
                         Metal/vboSimpleMemoryBufferMetal)
+
+set(GFXADDITIONALPUBLIC ${GFXADDITIONALPUBLIC}
+                        Metal/resourceFactoryMetal)
 endif()
 
 pxr_library(hdSt
@@ -138,6 +143,7 @@ pxr_library(hdSt
         tokens
         vboMemoryManager
         vboSimpleMemoryManager
+        ${GFXADDITIONALPUBLIC}
 
     PUBLIC_HEADERS
         api.h
