@@ -3361,7 +3361,7 @@ HdSt_CodeGenMSL::_GenerateDrawingCoord()
            << "  dc.vertexCoord    = drawingCoord1.w; \n"
            << "  dc.topologyVisibilityCoord = drawingCoord2; \n"
            << "  hd_instanceIndex r = GetInstanceIndex();\n"
-           << "  for(int i = 0; i < HD_INSTANCER_NUM_LEVELS; ++i)\n"
+           << "  for(int i = 0; i < HD_INSTANCE_INDEX_WIDTH; ++i)\n"
            << "    dc.instanceIndex[i]  = r.indices[i];\n";
 
     if (_metaData.drawingCoordIBinding.binding.IsValid()) {
