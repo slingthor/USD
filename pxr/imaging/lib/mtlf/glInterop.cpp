@@ -428,7 +428,7 @@ MtlfGlInterop::BlitColorTargetToOpenGL()
 void
 MtlfGlInterop::CopyDepthTextureToOpenGL(id<MTLComputeCommandEncoder> computeEncoder)
 {
-    MtlfMetalContextSharedPtr context(MtlfMetalContext::GetMetalContext());
+    MtlfMetalContext *context(MtlfMetalContext::GetMetalContext());
 
     NSUInteger exeWidth = context->SetComputeEncoderState(computeDepthCopyProgram, 0, 0, @"Depth copy pipeline state");
     NSUInteger maxThreadsPerThreadgroup = context->GetMaxThreadsPerThreadgroup();

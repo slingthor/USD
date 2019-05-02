@@ -184,7 +184,7 @@ void
 HdStBufferResourceMetal::CopyData(size_t vboOffset, size_t dataSize, void const *data)
 {
     if (_id[1] != nil) {
-        MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
+        MtlfMetalContext *context = MtlfMetalContext::GetMetalContext();
         int64_t currentFrame = context->GetCurrentFrame();
         
         if (currentFrame != _lastFrameModified) {

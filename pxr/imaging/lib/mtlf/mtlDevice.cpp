@@ -60,7 +60,7 @@ enum {
 #endif
 
 PXR_NAMESPACE_OPEN_SCOPE
-MtlfMetalContextSharedPtr MtlfMetalContext::context = NULL;
+MtlfMetalContext *MtlfMetalContext::context = NULL;
 
 #if defined(ARCH_OS_MACOS)
 // Called when the window is dragged to another display
@@ -361,8 +361,8 @@ MtlfMetalContext::~MtlfMetalContext()
 
 void MtlfMetalContext::RecreateInstance(id<MTLDevice> device, int width, int height)
 {
-    context = NULL;
-    context = MtlfMetalContextSharedPtr(new MtlfMetalContext(device, width, height));
+    delete context;
+    context = new MtlfMetalContext(device, width, height);
 }
 
 void MtlfMetalContext::AllocateAttachments(int width, int height)
@@ -381,7 +381,7 @@ bool
 MtlfMetalContext::IsInitialized()
 {
     if (!context)
-        context = MtlfMetalContextSharedPtr(new MtlfMetalContext(nil, 256, 256));
+        context = new MtlfMetalContext(nil, 256, 256);
 
     return context->device != nil;
 }

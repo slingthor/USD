@@ -100,7 +100,6 @@ class MtlfGlInterop;
 #endif
 
 class MtlfDrawTarget;
-typedef boost::shared_ptr<class MtlfMetalContext> MtlfMetalContextSharedPtr;
 
 /// \class MtlfMetalContext
 ///
@@ -144,9 +143,10 @@ public:
 
     /// Returns an instance for the current Metal device.
     MTLF_API
-    static MtlfMetalContextSharedPtr GetMetalContext() {
+    //static MtlfMetalContextSharedPtr GetMetalContext() {
+    static MtlfMetalContext *GetMetalContext() {
         if (!context)
-            context = MtlfMetalContextSharedPtr(new MtlfMetalContext(nil, 256, 256));
+            context = new MtlfMetalContext(nil, 256, 256);
         
         return context;
     }
@@ -428,7 +428,7 @@ private:
     void handleGPUHotPlug(id<MTLDevice> device, MTLDeviceNotificationName notifier);
 #endif
 
-    static MtlfMetalContextSharedPtr context;
+    static MtlfMetalContext         *context;
     
     struct MetalWorkQueue {
         id<MTLCommandBuffer>         commandBuffer;

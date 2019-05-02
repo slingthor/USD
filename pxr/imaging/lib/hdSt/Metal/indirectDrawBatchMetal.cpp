@@ -195,7 +195,7 @@ HdSt_IndirectDrawBatchMetal::_GPUFrustumCullingXFBExecute(
 
 //    TF_FATAL_CODING_ERROR("Not Implemented");
 
-    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
+    MtlfMetalContext *context = MtlfMetalContext::GetMetalContext();
 
 //    context->SetBuffer(1, _dispatchBuffer->GetEntireResource()->GetId(), TfToken("drawingCoord1"));
 

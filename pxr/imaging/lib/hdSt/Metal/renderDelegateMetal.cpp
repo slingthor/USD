@@ -104,7 +104,7 @@ void HdStRenderDelegateMetal::SetRenderSetting(TfToken const& key, VtValue const
         for (id<MTLDevice> dev in _deviceList) {
             if (value == _MetalDeviceDescriptor(dev)) {
                 // Recreate the underlying Metal context
-                MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
+                MtlfMetalContext *context = MtlfMetalContext::GetMetalContext();
                 MtlfMetalContext::RecreateInstance(dev, context->mtlColorTexture.width, context->mtlColorTexture.height);
                 break;
             }
@@ -145,7 +145,7 @@ void HdStRenderDelegateMetal::PrepareRender(
     GarchContextCaps const &caps =
         GarchResourceFactory::GetInstance()->GetContextCaps();
     
-    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
+    MtlfMetalContext *context = MtlfMetalContext::GetMetalContext();
     
     _renderOutput = params.renderOutput;
 
@@ -262,7 +262,7 @@ void HdStRenderDelegateMetal::PrepareRender(
 }
 void HdStRenderDelegateMetal::FinalizeRender()
 {
-    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
+    MtlfMetalContext *context = MtlfMetalContext::GetMetalContext();
 
     if (_renderOutput == DelegateParams::RenderOutput::OpenGL) {
         // Depth texture copy

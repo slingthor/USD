@@ -75,7 +75,7 @@ HdSt_FlatNormalsComputationMetal::_Execute(
     HdBufferResourceSharedPtr primitiveParam,
     int numPrims)
 {
-    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
+    MtlfMetalContext *context = MtlfMetalContext::GetMetalContext();
     HdStMSLProgramSharedPtr const &mslProgram(boost::dynamic_pointer_cast<HdStMSLProgram>(computeProgram));
     id<MTLFunction> computeFunction = mslProgram->GetComputeFunction();
     
