@@ -810,10 +810,10 @@ void MtlfMetalContext::SetOldStyleUniformBuffer(
     oldStyleUniformBufferIndex[stage] = index;
     
     if(stage == kMSL_ProgramStage_Vertex) {
-        dirtyRenderState |= DIRTY_METALRENDERSTATE_VERTEX_UNIFORM_BUFFER;
+        dirtyRenderState |= DIRTY_METALRENDERSTATE_OLD_STYLE_VERTEX_UNIFORM;
     }
     if(stage == kMSL_ProgramStage_Fragment) {
-        dirtyRenderState |= DIRTY_METALRENDERSTATE_FRAGMENT_UNIFORM_BUFFER;
+        dirtyRenderState |= DIRTY_METALRENDERSTATE_OLD_STYLE_FRAGMENT_UNIFORM;
     }
 }
 
@@ -891,14 +891,15 @@ size_t MtlfMetalContext::HashColourAttachments(uint32_t numColourAttachments)
     size_t hashVal = 0;
     MTLRenderPipelineColorAttachmentDescriptorArray *colourAttachments = renderPipelineStateDescriptor.colorAttachments;
     for (int i = 0; i < numColourAttachments; i++) {
-        boost::hash_combine(hashVal, colourAttachments[i].pixelFormat);
-        boost::hash_combine(hashVal, colourAttachments[i].blendingEnabled);
-        boost::hash_combine(hashVal, colourAttachments[i].sourceRGBBlendFactor);
-        boost::hash_combine(hashVal, colourAttachments[i].destinationRGBBlendFactor);
-        boost::hash_combine(hashVal, colourAttachments[i].rgbBlendOperation);
-        boost::hash_combine(hashVal, colourAttachments[i].sourceAlphaBlendFactor);
-        boost::hash_combine(hashVal, colourAttachments[i].destinationAlphaBlendFactor);
-        boost::hash_combine(hashVal, colourAttachments[i].alphaBlendOperation);
+        MTLRenderPipelineColorAttachmentDescriptor *attachment = colourAttachments[i];
+        boost::hash_combine(hashVal, attachment.pixelFormat);
+        boost::hash_combine(hashVal, attachment.blendingEnabled);
+        boost::hash_combine(hashVal, attachment.sourceRGBBlendFactor);
+        boost::hash_combine(hashVal, attachment.destinationRGBBlendFactor);
+        boost::hash_combine(hashVal, attachment.rgbBlendOperation);
+        boost::hash_combine(hashVal, attachment.sourceAlphaBlendFactor);
+        boost::hash_combine(hashVal, attachment.destinationAlphaBlendFactor);
+        boost::hash_combine(hashVal, attachment.alphaBlendOperation);
     }
     return hashVal;
 }
@@ -1065,8 +1066,6 @@ void MtlfMetalContext::SetRenderPipelineState()
 
 void MtlfMetalContext::SetRenderEncoderState()
 {
-    dirtyRenderState = DIRTY_METALRENDERSTATE_ALL;
-
     MetalWorkQueue *wq = currentWorkQueue;
     MetalWorkQueue *gswq = &workQueues[METALWORKQUEUE_GEOMETRY_SHADER];
     id <MTLComputeCommandEncoder> computeEncoder;
@@ -1107,9 +1106,7 @@ void MtlfMetalContext::SetRenderEncoderState()
     // Any buffers modified
     if (dirtyRenderState & (DIRTY_METALRENDERSTATE_VERTEX_UNIFORM_BUFFER     |
                             DIRTY_METALRENDERSTATE_FRAGMENT_UNIFORM_BUFFER   |
-                            DIRTY_METALRENDERSTATE_VERTEX_BUFFER             |
-                            DIRTY_METALRENDERSTATE_OLD_STYLE_VERTEX_UNIFORM  |
-                            DIRTY_METALRENDERSTATE_OLD_STYLE_FRAGMENT_UNIFORM)) {
+                            DIRTY_METALRENDERSTATE_VERTEX_BUFFER)) {
         
         for(auto buffer : boundBuffers)
         {
@@ -1146,38 +1143,37 @@ void MtlfMetalContext::SetRenderEncoderState()
                 buffer->modified = false;
             }
         }
-         
-         if (dirtyRenderState & DIRTY_METALRENDERSTATE_OLD_STYLE_VERTEX_UNIFORM) {
-             uint32_t index = oldStyleUniformBufferIndex[kMSL_ProgramStage_Vertex];
-             if(enableComputeGS) {
-                 [computeEncoder setBytes:oldStyleUniformBuffer[kMSL_ProgramStage_Vertex]
-                                   length:oldStyleUniformBufferSize[kMSL_ProgramStage_Vertex]
-                                  atIndex:index];
+        
+        dirtyRenderState &= ~(DIRTY_METALRENDERSTATE_VERTEX_UNIFORM_BUFFER    |
+                              DIRTY_METALRENDERSTATE_FRAGMENT_UNIFORM_BUFFER  |
+                              DIRTY_METALRENDERSTATE_VERTEX_BUFFER);
+    }
+    
+    if (dirtyRenderState & DIRTY_METALRENDERSTATE_OLD_STYLE_VERTEX_UNIFORM) {
+        uint32_t index = oldStyleUniformBufferIndex[kMSL_ProgramStage_Vertex];
+        if(enableComputeGS) {
+            [computeEncoder setBytes:oldStyleUniformBuffer[kMSL_ProgramStage_Vertex]
+                              length:oldStyleUniformBufferSize[kMSL_ProgramStage_Vertex]
+                             atIndex:index];
 #if CACHE_GSCOMPUTE
-                 // Remove writable status
-                 immutableBufferMask |= (1 << index);
+            // Remove writable status
+            immutableBufferMask |= (1 << index);
 #else
-                 computePipelineStateDescriptor.buffers[index].mutability = MTLMutabilityImmutable;
+            computePipelineStateDescriptor.buffers[index].mutability = MTLMutabilityImmutable;
 #endif
-             }
-             [wq->currentRenderEncoder setVertexBytes:oldStyleUniformBuffer[kMSL_ProgramStage_Vertex]
-                                               length:oldStyleUniformBufferSize[kMSL_ProgramStage_Vertex]
-                                              atIndex:index];
-         }
-         if (dirtyRenderState & DIRTY_METALRENDERSTATE_OLD_STYLE_FRAGMENT_UNIFORM) {
-             [wq->currentRenderEncoder setFragmentBytes:oldStyleUniformBuffer[kMSL_ProgramStage_Fragment]
-                                                 length:oldStyleUniformBufferSize[kMSL_ProgramStage_Fragment]
-                                                atIndex:oldStyleUniformBufferIndex[kMSL_ProgramStage_Fragment]];
-         }
-         
-         dirtyRenderState &= ~(DIRTY_METALRENDERSTATE_VERTEX_UNIFORM_BUFFER    |
-                         DIRTY_METALRENDERSTATE_FRAGMENT_UNIFORM_BUFFER  |
-                         DIRTY_METALRENDERSTATE_VERTEX_BUFFER            |
-                         DIRTY_METALRENDERSTATE_OLD_STYLE_VERTEX_UNIFORM |
-                         DIRTY_METALRENDERSTATE_OLD_STYLE_FRAGMENT_UNIFORM);
+        }
+        [wq->currentRenderEncoder setVertexBytes:oldStyleUniformBuffer[kMSL_ProgramStage_Vertex]
+                                          length:oldStyleUniformBufferSize[kMSL_ProgramStage_Vertex]
+                                         atIndex:index];
+        dirtyRenderState &= DIRTY_METALRENDERSTATE_OLD_STYLE_VERTEX_UNIFORM;
+    }
+    if (dirtyRenderState & DIRTY_METALRENDERSTATE_OLD_STYLE_FRAGMENT_UNIFORM) {
+        [wq->currentRenderEncoder setFragmentBytes:oldStyleUniformBuffer[kMSL_ProgramStage_Fragment]
+                                            length:oldStyleUniformBufferSize[kMSL_ProgramStage_Fragment]
+                                           atIndex:oldStyleUniformBufferIndex[kMSL_ProgramStage_Fragment]];
+        dirtyRenderState &= DIRTY_METALRENDERSTATE_OLD_STYLE_FRAGMENT_UNIFORM;
     }
 
- 
     if (dirtyRenderState & DIRTY_METALRENDERSTATE_TEXTURE) {
         for(auto texture : textures) {
             if(texture.stage == kMSL_ProgramStage_Vertex) {
@@ -1891,7 +1887,7 @@ void MtlfMetalContext::PrepareForComputeGSPart(
                 
                 CreateCommandBuffer(METALWORKQUEUE_DEFAULT);
                 
-                //Patch the drescriptor to prevent clearing attachments we just rendered to.
+                //Patch the descriptor to prevent clearing attachments we just rendered to.
                 _PatchRenderPassDescriptor();
             }
             

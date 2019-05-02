@@ -502,10 +502,6 @@ void HdStMSLProgram::SetProgram(char const* const label) {
                 continue;
 
             context->SetOldStyleUniformBuffer(binding._index, loopParams[i].stage, binding._uniformBufferSize);
-//            id<MTLBuffer> mtlBuffer = context->GetMetalBuffer((binding._uniformBufferSize * METAL_OLD_STYLE_UNIFORM_BUFFER_SIZE), MTLResourceStorageModeDefault);
-//
-//            context->SetUniformBuffer(binding._index, mtlBuffer, binding._nameToken, loopParams[i].stage, 0 /*offset*/, binding._uniformBufferSize);
-//            _buffers.push_back(mtlBuffer);
         }
     }
 }
