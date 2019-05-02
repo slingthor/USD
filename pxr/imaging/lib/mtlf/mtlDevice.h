@@ -574,6 +574,8 @@ private:
     bool tempPointsWorkaroundActive = false;
     bool OSDEnabledThisFrame = false;
     
+    id<MTLCaptureScope> captureScope;
+
 #if defined(ARCH_GFX_OPENGL)
     MtlfGlInterop *glInterop;
 #endif

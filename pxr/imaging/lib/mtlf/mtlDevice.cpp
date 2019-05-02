@@ -173,6 +173,9 @@ MtlfMetalContext::MtlfMetalContext(id<MTLDevice> _device, int width, int height)
     }
     else
         device = _device;
+    
+    captureScope = [[MTLCaptureManager sharedCaptureManager] newCaptureScopeWithDevice:device];
+    [[MTLCaptureManager sharedCaptureManager] setDefaultCaptureScope:captureScope];
 
     NSLog(@"Selected %@ for Metal Device", device.name);
     
@@ -308,6 +311,10 @@ MtlfMetalContext::~MtlfMetalContext()
         delete[] oldStyleUniformBuffer[i];
     }
 
+    [[MTLCaptureManager sharedCaptureManager] setDefaultCaptureScope:nil];
+    [captureScope release];
+    captureScope = nil;
+    
 #if defined(ARCH_GFX_OPENGL)
     if (glInterop) {
         delete glInterop;
@@ -1795,6 +1802,8 @@ void MtlfMetalContext::StartFrame() {
     GPUTImerResetTimer(frameCount);
     
     gsFirstBatch = true;
+    
+    [captureScope beginScope];
 }
 
 void MtlfMetalContext::EndFrame() {
@@ -1813,6 +1822,8 @@ void MtlfMetalContext::EndFrame() {
     // Reset it here as OSD may get invoked before StartFrame() is called.
     OSDEnabledThisFrame = false;
     isRenderPassDescriptorPatched = false;
+    
+    [captureScope endScope];
 }
 
 void MtlfMetalContext::_gsAdvanceBuffer() {
