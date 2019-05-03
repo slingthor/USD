@@ -37,8 +37,6 @@
 enum {
     DIRTY_METALRENDERSTATE_OLD_STYLE_VERTEX_UNIFORM   = 1 << 0,
     DIRTY_METALRENDERSTATE_OLD_STYLE_FRAGMENT_UNIFORM = 1 << 1,
-    DIRTY_METALRENDERSTATE_VERTEX_UNIFORM_BUFFER      = 1 << 2,
-    DIRTY_METALRENDERSTATE_FRAGMENT_UNIFORM_BUFFER    = 1 << 3,
     DIRTY_METALRENDERSTATE_INDEX_BUFFER               = 1 << 4,
     DIRTY_METALRENDERSTATE_VERTEX_BUFFER              = 1 << 5,
     DIRTY_METALRENDERSTATE_SAMPLER                    = 1 << 6,
@@ -1073,6 +1071,8 @@ void MtlfMetalContext::SetRenderPipelineState()
 
 void MtlfMetalContext::SetRenderEncoderState()
 {
+    dirtyRenderState |= DIRTY_METALRENDERSTATE_OLD_STYLE_VERTEX_UNIFORM;
+
     MetalWorkQueue *wq = currentWorkQueue;
     MetalWorkQueue *gswq = &workQueues[METALWORKQUEUE_GEOMETRY_SHADER];
     id <MTLComputeCommandEncoder> computeEncoder;
@@ -1111,9 +1111,7 @@ void MtlfMetalContext::SetRenderEncoderState()
     }
 
     // Any buffers modified
-    if (dirtyRenderState & (DIRTY_METALRENDERSTATE_VERTEX_UNIFORM_BUFFER     |
-                            DIRTY_METALRENDERSTATE_FRAGMENT_UNIFORM_BUFFER   |
-                            DIRTY_METALRENDERSTATE_VERTEX_BUFFER)) {
+    if (dirtyRenderState & DIRTY_METALRENDERSTATE_VERTEX_BUFFER) {
         
         for(auto buffer : boundBuffers)
         {
@@ -1151,9 +1149,7 @@ void MtlfMetalContext::SetRenderEncoderState()
             }
         }
         
-        dirtyRenderState &= ~(DIRTY_METALRENDERSTATE_VERTEX_UNIFORM_BUFFER    |
-                              DIRTY_METALRENDERSTATE_FRAGMENT_UNIFORM_BUFFER  |
-                              DIRTY_METALRENDERSTATE_VERTEX_BUFFER);
+        dirtyRenderState &= ~DIRTY_METALRENDERSTATE_VERTEX_BUFFER;
     }
     
     if (dirtyRenderState & DIRTY_METALRENDERSTATE_OLD_STYLE_VERTEX_UNIFORM) {
@@ -1172,13 +1168,13 @@ void MtlfMetalContext::SetRenderEncoderState()
         [wq->currentRenderEncoder setVertexBytes:oldStyleUniformBuffer[kMSL_ProgramStage_Vertex]
                                           length:oldStyleUniformBufferSize[kMSL_ProgramStage_Vertex]
                                          atIndex:index];
-        dirtyRenderState &= DIRTY_METALRENDERSTATE_OLD_STYLE_VERTEX_UNIFORM;
+        dirtyRenderState &= ~DIRTY_METALRENDERSTATE_OLD_STYLE_VERTEX_UNIFORM;
     }
     if (dirtyRenderState & DIRTY_METALRENDERSTATE_OLD_STYLE_FRAGMENT_UNIFORM) {
         [wq->currentRenderEncoder setFragmentBytes:oldStyleUniformBuffer[kMSL_ProgramStage_Fragment]
                                             length:oldStyleUniformBufferSize[kMSL_ProgramStage_Fragment]
                                            atIndex:oldStyleUniformBufferIndex[kMSL_ProgramStage_Fragment]];
-        dirtyRenderState &= DIRTY_METALRENDERSTATE_OLD_STYLE_FRAGMENT_UNIFORM;
+        dirtyRenderState &= ~DIRTY_METALRENDERSTATE_OLD_STYLE_FRAGMENT_UNIFORM;
     }
 
     if (dirtyRenderState & DIRTY_METALRENDERSTATE_TEXTURE) {
