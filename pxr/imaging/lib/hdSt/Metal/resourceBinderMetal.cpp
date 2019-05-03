@@ -142,46 +142,40 @@ HdSt_ResourceBinderMetal::BindBuffer(TfToken const &name,
     if (!buffer->GetId().IsSet())
         return;
     
-    uint32_t typeMask = kMSL_BindingType_VertexAttribute | kMSL_BindingType_UniformBuffer | kMSL_BindingType_IndexBuffer;
-    uint i = 0;
-    while(1)
-    {
-        MSL_ShaderBinding const* const shaderBinding = MSL_FindBinding(_shaderBindingMap, name, typeMask, 0xFFFFFFFF, i, level);
-        
-        if(!shaderBinding)
-            break;
-        
-        HdStBufferResourceMetalSharedPtr const metalBuffer = boost::dynamic_pointer_cast<HdStBufferResourceMetal>(buffer);
-        HdTupleType tupleType = buffer->GetTupleType();
+    MtlfMetalContext *context = MtlfMetalContext::GetMetalContext();
+    HdStBufferResourceMetalSharedPtr const metalBuffer = boost::dynamic_pointer_cast<HdStBufferResourceMetal>(buffer);
+    HdTupleType tupleType = buffer->GetTupleType();
+
+    auto shaderBindings = MSL_FindBinding(_shaderBindingMap, name, level);
+    auto it = shaderBindings.first;
+    
+    for(; it != shaderBindings.second; ++it) {
+        MSL_ShaderBinding const* const shaderBinding = (*it).second;
+
         switch(shaderBinding->_type)
         {
         case kMSL_BindingType_VertexAttribute:
-            MtlfMetalContext::GetMetalContext()->SetVertexAttribute(
-                        shaderBinding->_index,
-                        _GetNumComponents(tupleType.type),
-                        HdStMetalConversions::GetGLAttribType(tupleType.type),  // ??!??!
-                        buffer->GetStride(),
-                        offset,
-                        name);
+            context->SetVertexAttribute(
+                shaderBinding->_index,
+                _GetNumComponents(tupleType.type),
+                HdStMetalConversions::GetGLAttribType(tupleType.type),  // ??!??!
+                buffer->GetStride(),
+                offset,
+                name);
             MtlfMetalContext::GetMetalContext()->SetBuffer(shaderBinding->_index, metalBuffer->GetId(), name);
             break;
         case kMSL_BindingType_UniformBuffer:
-            MtlfMetalContext::GetMetalContext()->SetUniformBuffer(shaderBinding->_index, metalBuffer->GetId(), name, shaderBinding->_stage, offset);
+            context->SetUniformBuffer(shaderBinding->_index, metalBuffer->GetId(), name, shaderBinding->_stage, offset);
             break;
         case kMSL_BindingType_IndexBuffer:
             if(offset != 0)
                 TF_FATAL_CODING_ERROR("Not implemented!");
-            MtlfMetalContext::GetMetalContext()->SetIndexBuffer(metalBuffer->GetId());
+            context->SetIndexBuffer(metalBuffer->GetId());
             break;
         default:
             TF_FATAL_CODING_ERROR("Not allowed!");
         }
-        
-        i++;
     }
-    
-    if(i == 0)
-        TF_FATAL_CODING_ERROR("Could not find shader binding for buffer!");
 }
 
 void
@@ -208,21 +202,22 @@ void
 HdSt_ResourceBinderMetal::BindUniformi(TfToken const &name,
                                 int count, const int *value) const
 {
-    uint i = 0;
-    while(1)
-    {
-        MSL_ShaderBinding const* const binding = MSL_FindBinding(_shaderBindingMap, name, kMSL_BindingType_Uniform, 0xFFFFFFFF, i);
+    auto shaderBindings = MSL_FindBinding(_shaderBindingMap, name, -1);
+    auto it = shaderBindings.first;
+    
+    MtlfMetalContext *context = MtlfMetalContext::GetMetalContext();
+    
+    int found = 0;
+    for(; it != shaderBindings.second; ++it) {
+        MSL_ShaderBinding const* const shaderBinding = (*it).second;
         
-        if(!binding)
-            break;
-
-        MtlfMetalContext::GetMetalContext()->SetUniform(value, count * sizeof(int), name, binding->_offsetWithinResource, binding->_stage);
-
-        i++;
+        context->SetUniform(value, count * sizeof(int), name, shaderBinding->_offsetWithinResource, shaderBinding->_stage);
+        found++;
     }
     
-    if(i == 0)  //If we tried searching but couldn't find a single uniform.
+    if(found == 0) { //If we tried searching but couldn't find a single uniform.
         TF_FATAL_CODING_ERROR("Could not find uniform!");
+    }
 }
 
 void
@@ -232,24 +227,23 @@ HdSt_ResourceBinderMetal::BindUniformArrayi(TfToken const &name,
     HdBinding uniformLocation = GetBinding(name);
     if (uniformLocation.GetLocation() == HdBinding::NOT_EXIST) return;
 
-    TF_VERIFY(uniformLocation.IsValid());
-    TF_VERIFY(uniformLocation.GetType() == HdBinding::UNIFORM_ARRAY);
+    auto shaderBindings = MSL_FindBinding(_shaderBindingMap, name, -1);
+    auto it = shaderBindings.first;
     
-    uint i = 0;
-    while(1)
-    {
-        MSL_ShaderBinding const* const binding = MSL_FindBinding(_shaderBindingMap, name, kMSL_BindingType_Uniform, 0xFFFFFFFF, i);
+    MtlfMetalContext *context = MtlfMetalContext::GetMetalContext();
+    
+    int found = 0;
+    for(; it != shaderBindings.second; ++it) {
+        MSL_ShaderBinding const* const shaderBinding = (*it).second;
+        if (shaderBinding->_type != kMSL_BindingType_Uniform)
+            continue;
         
-        if(!binding)
-            break;
-        
-        MtlfMetalContext::GetMetalContext()->SetUniform(value, count * sizeof(int), name, binding->_offsetWithinResource, binding->_stage);
-        
-        i++;
+        context->SetUniform(value, count * sizeof(int), name, shaderBinding->_offsetWithinResource, shaderBinding->_stage);
+        found++;
     }
     
-    if(i == 0) { //If we tried searching but couldn't find a single uniform.
-        TF_FATAL_CODING_ERROR("Could not find uniform buffer!");
+    if(found == 0) { //If we tried searching but couldn't find a single uniform.
+        TF_FATAL_CODING_ERROR("Could not find uniform!");
     }
 }
 

@@ -80,6 +80,35 @@ static MTLPrimitiveType GetMetalPrimType(GLenum glPrimType) {
     return primType;
 }
 
+MSL_ShaderBindingMapResults MSL_FindBinding(
+        MSL_ShaderBindingMap const& bindings,
+        TfToken const& name,
+        int32_t level) {
+    TfToken nameToFind;
+    if (level < 0) {
+        nameToFind = name;
+    }
+    else {
+        if (level >= 10) {
+            TF_FATAL_CODING_ERROR("Not Implemented");
+        }
+        
+        char const *pN = name.GetText();
+        char buf[256];
+        char *pD = buf;
+        
+        while(*pN)
+        *pD++ = *pN++;
+        
+        *pD++ = '_';
+        *pD++ = '0' + level;
+        *pD = 0;
+        
+        nameToFind = TfToken(buf, TfToken::Immortal);
+    }
+    return bindings.equal_range(nameToFind.Hash());
+}
+
 MSL_ShaderBinding const* MSL_FindBinding(MSL_ShaderBindingMap const& bindings,
                                          TfToken const& name,
                                          uint bindingTypeMask,
@@ -87,17 +116,7 @@ MSL_ShaderBinding const* MSL_FindBinding(MSL_ShaderBindingMap const& bindings,
                                          uint skipCount,
                                          int level)
 {
-    TfToken nameToFind;
-    if (level < 0) {
-        nameToFind = name;
-    }
-    else {
-        // follow nested instancing naming convention.
-        std::stringstream n;
-        n << name << "_" << level;
-        nameToFind = TfToken(n.str(), TfToken::Immortal);
-    }
-    auto it_range = bindings.equal_range(nameToFind.Hash());
+    auto it_range = MSL_FindBinding(bindings, name, level);
     auto it = it_range.first;
 
     for(; it != it_range.second; ++it) {
@@ -109,6 +128,7 @@ MSL_ShaderBinding const* MSL_FindBinding(MSL_ShaderBindingMap const& bindings,
     }
     return NULL;
 }
+
 
 HdStMSLProgram::HdStMSLProgram(TfToken const &role)
 : HdStProgram(role)
@@ -588,7 +608,7 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
     const uint32_t maxPrimitivesPerPart = doMVAComputeGS ? context->GetMaxComputeGSPartSize(numOutVertsPerInPrim, numOutPrimsPerInPrim, _gsVertOutStructSize, _gsPrimOutStructSize) : numPrimitives;
 
     int maxThreadsPerThreadgroup = 0;
-    bool useDispatchThreads = [context->device supportsFeatureSet:METAL_FEATURESET_FOR_DISPATCHTHREADS];
+    bool useDispatchThreads = true;//[context->device supportsFeatureSet:METAL_FEATURESET_FOR_DISPATCHTHREADS];
     if (doMVAComputeGS && !useDispatchThreads) {
         maxThreadsPerThreadgroup = METAL_GS_THREADGROUP_SIZE;
     }
@@ -677,7 +697,7 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
                 [renderEncoder drawPrimitives:primType
                                   vertexStart:0
                                   vertexCount:(numPrimitivesInPart * numOutVertsPerInPrim)
-                                instanceCount:1
+                                instanceCount:instanceCount
                                  baseInstance:0];
             }
         }

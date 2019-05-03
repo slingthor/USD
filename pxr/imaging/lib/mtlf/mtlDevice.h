@@ -469,13 +469,8 @@ private:
     // Pipeline state functions
     void SetRenderPipelineState();
     size_t HashVertexDescriptor();
-    size_t HashColourAttachments(uint32_t numColourAttachments);
-    size_t HashPipelineDescriptor();
-    size_t HashComputePipelineDescriptor(unsigned int bufferCount);
     
     // Pipeline state
-    MTLRenderPipelineDescriptor  *renderPipelineStateDescriptor;
-    MTLComputePipelineDescriptor *computePipelineStateDescriptor;
     MTLVertexDescriptor          *vertexDescriptor;
     uint32_t numVertexComponents;
     boost::unordered_map<size_t, id<MTLRenderPipelineState>>  renderPipelineStateMap;

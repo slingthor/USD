@@ -32,21 +32,18 @@
 #import <simd/simd.h>
 
 #define METAL_TESSELLATION_SUPPORT 0
-#define CACHE_GSCOMPUTE 1
 
 enum {
     DIRTY_METALRENDERSTATE_OLD_STYLE_VERTEX_UNIFORM   = 1 << 0,
     DIRTY_METALRENDERSTATE_OLD_STYLE_FRAGMENT_UNIFORM = 1 << 1,
-    DIRTY_METALRENDERSTATE_VERTEX_UNIFORM_BUFFER      = 1 << 2,
-    DIRTY_METALRENDERSTATE_FRAGMENT_UNIFORM_BUFFER    = 1 << 3,
-    DIRTY_METALRENDERSTATE_INDEX_BUFFER               = 1 << 4,
-    DIRTY_METALRENDERSTATE_VERTEX_BUFFER              = 1 << 5,
-    DIRTY_METALRENDERSTATE_SAMPLER                    = 1 << 6,
-    DIRTY_METALRENDERSTATE_TEXTURE                    = 1 << 7,
-    DIRTY_METALRENDERSTATE_DRAW_TARGET                = 1 << 8,
-    DIRTY_METALRENDERSTATE_VERTEX_DESCRIPTOR          = 1 << 9,
-    DIRTY_METALRENDERSTATE_CULLMODE_WINDINGORDER      = 1 << 10,
-    DIRTY_METALRENDERSTATE_FILL_MODE                  = 1 << 11,
+    DIRTY_METALRENDERSTATE_INDEX_BUFFER               = 1 << 2,
+    DIRTY_METALRENDERSTATE_VERTEX_BUFFER              = 1 << 3,
+    DIRTY_METALRENDERSTATE_SAMPLER                    = 1 << 4,
+    DIRTY_METALRENDERSTATE_TEXTURE                    = 1 << 5,
+    DIRTY_METALRENDERSTATE_DRAW_TARGET                = 1 << 6,
+    DIRTY_METALRENDERSTATE_VERTEX_DESCRIPTOR          = 1 << 7,
+    DIRTY_METALRENDERSTATE_CULLMODE_WINDINGORDER      = 1 << 8,
+    DIRTY_METALRENDERSTATE_FILL_MODE                  = 1 << 9,
 
     DIRTY_METALRENDERSTATE_ALL                      = 0xFFFFFFFF
 };
@@ -230,8 +227,6 @@ MtlfMetalContext::MtlfMetalContext(id<MTLDevice> _device, int width, int height)
 
     AllocateAttachments(width, height);
 
-    renderPipelineStateDescriptor = nil;
-    computePipelineStateDescriptor = nil;
     vertexDescriptor = nil;
     indexBuffer = nil;
     vertexPositionBuffer = nil;
@@ -526,14 +521,6 @@ MtlfMetalContext::GetPointIndexBuffer(MTLIndexType indexTypeMetal, int numIndice
 
 void MtlfMetalContext::CheckNewStateGather()
 {
-    // Lazily create a new state object
-    if (!renderPipelineStateDescriptor)
-        renderPipelineStateDescriptor = [[MTLRenderPipelineDescriptor alloc] init];
-    if (!computePipelineStateDescriptor)
-        computePipelineStateDescriptor = [[MTLComputePipelineDescriptor alloc] init];
-    
-    [renderPipelineStateDescriptor reset];
-    [computePipelineStateDescriptor reset];
 }
 
 void MtlfMetalContext::CreateCommandBuffer(MetalWorkQueueType workQueueType) {
@@ -668,25 +655,12 @@ void MtlfMetalContext::SetShadingPrograms(id<MTLFunction> vertexFunction, id<MTL
 {
     CheckNewStateGather();
     
-#if CACHE_GSCOMPUTE
     renderVertexFunction     = vertexFunction;
     renderFragmentFunction   = fragmentFunction;
     enableMVA                = _enableMVA;
     // Assume there is no GS associated with these shaders, they must be linked by calling SetGSPrograms after this
     renderComputeGSFunction  = nil;
     enableComputeGS          = false;
-#else
-    renderPipelineStateDescriptor.vertexFunction   = vertexFunction;
-    renderPipelineStateDescriptor.fragmentFunction = fragmentFunction;
-    
-    if (fragmentFunction == nil) {
-        renderPipelineStateDescriptor.rasterizationEnabled = false;
-    }
-    else {
-        renderPipelineStateDescriptor.rasterizationEnabled = true;
-    }
-#endif
-    
 }
 
 void MtlfMetalContext::SetGSProgram(id<MTLFunction> computeFunction)
@@ -893,153 +867,72 @@ size_t MtlfMetalContext::HashVertexDescriptor()
     return hashVal;
 }
 
-size_t MtlfMetalContext::HashColourAttachments(uint32_t numColourAttachments)
-{
-    size_t hashVal = 0;
-    MTLRenderPipelineColorAttachmentDescriptorArray *colourAttachments = renderPipelineStateDescriptor.colorAttachments;
-    for (int i = 0; i < numColourAttachments; i++) {
-        MTLRenderPipelineColorAttachmentDescriptor *attachment = colourAttachments[i];
-        boost::hash_combine(hashVal, attachment.pixelFormat);
-        boost::hash_combine(hashVal, attachment.blendingEnabled);
-        boost::hash_combine(hashVal, attachment.sourceRGBBlendFactor);
-        boost::hash_combine(hashVal, attachment.destinationRGBBlendFactor);
-        boost::hash_combine(hashVal, attachment.rgbBlendOperation);
-        boost::hash_combine(hashVal, attachment.sourceAlphaBlendFactor);
-        boost::hash_combine(hashVal, attachment.destinationAlphaBlendFactor);
-        boost::hash_combine(hashVal, attachment.alphaBlendOperation);
-    }
-    return hashVal;
-}
-
-size_t MtlfMetalContext::HashPipelineDescriptor()
-{
-    MetalWorkQueue *wq = currentWorkQueue;
-    
-    size_t hashVal = 0;
-    boost::hash_combine(hashVal, renderPipelineStateDescriptor.vertexFunction);
-    boost::hash_combine(hashVal, renderPipelineStateDescriptor.fragmentFunction);
-    boost::hash_combine(hashVal, renderPipelineStateDescriptor.sampleCount);
-    boost::hash_combine(hashVal, renderPipelineStateDescriptor.rasterSampleCount);
-    boost::hash_combine(hashVal, renderPipelineStateDescriptor.alphaToCoverageEnabled);
-    boost::hash_combine(hashVal, renderPipelineStateDescriptor.alphaToOneEnabled);
-    boost::hash_combine(hashVal, renderPipelineStateDescriptor.rasterizationEnabled);
-    boost::hash_combine(hashVal, renderPipelineStateDescriptor.depthAttachmentPixelFormat);
-    boost::hash_combine(hashVal, renderPipelineStateDescriptor.stencilAttachmentPixelFormat);
-#if METAL_TESSELLATION_SUPPORT
-    // Add here...
-#endif
-    boost::hash_combine(hashVal, wq->currentVertexDescriptorHash);
-    boost::hash_combine(hashVal, wq->currentColourAttachmentsHash);
-    return hashVal;
-}
-
 void MtlfMetalContext::SetRenderPipelineState()
 {
     MetalWorkQueue *wq = currentWorkQueue;
-    
-    id<MTLRenderPipelineState> pipelineState;
-    
-    if (renderPipelineStateDescriptor == nil) {
-         TF_FATAL_CODING_ERROR("No pipeline state descriptor allocated!");
-    }
     
     if (wq->currentEncoderType != MTLENCODERTYPE_RENDER || !wq->encoderInUse || !wq->currentRenderEncoder) {
         TF_FATAL_CODING_ERROR("Not valid to call SetPipelineState() without an active render encoder");
     }
     
-    renderPipelineStateDescriptor.label = @"SetRenderEncoderState";
-    renderPipelineStateDescriptor.sampleCount = 1;
-    renderPipelineStateDescriptor.inputPrimitiveTopology = MTLPrimitiveTopologyClassUnspecified;
-    
-#if CACHE_GSCOMPUTE
-    renderPipelineStateDescriptor.vertexFunction   = renderVertexFunction;
-    renderPipelineStateDescriptor.fragmentFunction = renderFragmentFunction;
-    
-    if (renderFragmentFunction == nil) {
-        renderPipelineStateDescriptor.rasterizationEnabled = false;
-    }
-    else {
-        renderPipelineStateDescriptor.rasterizationEnabled = true;
-    }
-#endif
-
-#if METAL_TESSELLATION_SUPPORT
-    renderPipelineStateDescriptor.maxTessellationFactor             = 1;
-    renderPipelineStateDescriptor.tessellationFactorScaleEnabled    = NO;
-    renderPipelineStateDescriptor.tessellationFactorFormat          = MTLTessellationFactorFormatHalf;
-    renderPipelineStateDescriptor.tessellationControlPointIndexType = MTLTessellationControlPointIndexTypeNone;
-    renderPipelineStateDescriptor.tessellationFactorStepFunction    = MTLTessellationFactorStepFunctionConstant;
-    renderPipelineStateDescriptor.tessellationOutputWindingOrder    = MTLWindingCounterClockwise;
-    renderPipelineStateDescriptor.tessellationPartitionMode         = MTLTessellationPartitionModePow2;
-#endif
-    if (enableMVA)
-        renderPipelineStateDescriptor.vertexDescriptor = nil;
-    else {
-        if (dirtyRenderState & DIRTY_METALRENDERSTATE_VERTEX_DESCRIPTOR || renderPipelineStateDescriptor.vertexDescriptor == NULL) {
-            // This assignment can be expensive as the vertexdescriptor will be copied (due to interface property)
-            renderPipelineStateDescriptor.vertexDescriptor = vertexDescriptor;
+    if (!enableMVA) {
+        if (dirtyRenderState & DIRTY_METALRENDERSTATE_VERTEX_DESCRIPTOR/* || renderPipelineStateDescriptor.vertexDescriptor == NULL*/) {
             // Update vertex descriptor hash
             wq->currentVertexDescriptorHash = HashVertexDescriptor();
         }
     }
     
     if (dirtyRenderState & DIRTY_METALRENDERSTATE_DRAW_TARGET) {
-        uint32_t numColourAttachments = 0;
-    
+        size_t hashVal = 0;
+
         if (drawTarget) {
             auto& attachments = drawTarget->GetAttachments();
             for(auto it : attachments) {
                 MtlfDrawTarget::MtlfAttachment* attachment = ((MtlfDrawTarget::MtlfAttachment*)&(*it.second));
                 MTLPixelFormat depthFormat = [attachment->GetTextureName() pixelFormat];
+
                 if(attachment->GetFormat() == GL_DEPTH_COMPONENT || attachment->GetFormat() == GL_DEPTH_STENCIL) {
-                    renderPipelineStateDescriptor.depthAttachmentPixelFormat = depthFormat;
-                    if(attachment->GetFormat() == GL_DEPTH_STENCIL)
-                        renderPipelineStateDescriptor.stencilAttachmentPixelFormat = depthFormat; //Do not use the stencil pixel format (X32_S8)
+                    boost::hash_combine(hashVal, depthFormat);
+                    if(attachment->GetFormat() == GL_DEPTH_STENCIL) {
+                        boost::hash_combine(hashVal, depthFormat); // again
+                    }
                 }
                 else {
                     id<MTLTexture> texture = attachment->GetTextureName();
+                    MTLPixelFormat pixelFormat = [texture pixelFormat];
                     int idx = attachment->GetAttach();
                     
-                    renderPipelineStateDescriptor.colorAttachments[idx].blendingEnabled = NO;
-                    renderPipelineStateDescriptor.colorAttachments[idx].pixelFormat = [texture pixelFormat];
+                    boost::hash_combine(hashVal, pixelFormat);
                 }
-                numColourAttachments++;
             }
         }
         else {
-            //METAL TODO: Why does this need to be hardcoded? There is no matching drawTarget? Can we get this info from somewhere?
-            renderPipelineStateDescriptor.colorAttachments[0].blendingEnabled = YES;
-            renderPipelineStateDescriptor.colorAttachments[0].sourceRGBBlendFactor = MTLBlendFactorSourceAlpha;
-            renderPipelineStateDescriptor.colorAttachments[0].sourceAlphaBlendFactor = MTLBlendFactorSourceAlpha;
-            renderPipelineStateDescriptor.colorAttachments[0].destinationRGBBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
-            renderPipelineStateDescriptor.colorAttachments[0].destinationAlphaBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
-            
             if (mtlColorTexture != nil) {
-                renderPipelineStateDescriptor.colorAttachments[0].pixelFormat = mtlColorTexture.pixelFormat;
+                boost::hash_combine(hashVal, mtlColorTexture.pixelFormat);
             }
             else {
-                renderPipelineStateDescriptor.colorAttachments[0].pixelFormat = outputPixelFormat;
+                boost::hash_combine(hashVal, outputPixelFormat);
             }
-            numColourAttachments++;
             
             if (mtlDepthTexture != nil) {
-                renderPipelineStateDescriptor.depthAttachmentPixelFormat = mtlDepthTexture.pixelFormat;
+                boost::hash_combine(hashVal, mtlDepthTexture.pixelFormat);
             }
             else {
-                renderPipelineStateDescriptor.depthAttachmentPixelFormat = outputDepthFormat;
-                renderPipelineStateDescriptor.stencilAttachmentPixelFormat = outputDepthFormat;
+                boost::hash_combine(hashVal, outputDepthFormat);
             }
         }
         [wq->currentRenderEncoder setDepthStencilState:depthState];
         // Update colour attachments hash
-        wq->currentColourAttachmentsHash = HashColourAttachments(numColourAttachments);
+        wq->currentColourAttachmentsHash = hashVal;
     }
     
-    // Unset the state tracking flags
-    dirtyRenderState &= ~(DIRTY_METALRENDERSTATE_VERTEX_DESCRIPTOR | DIRTY_METALRENDERSTATE_DRAW_TARGET);
-    
     // Always call this because currently we're not tracking changes to its state
-    size_t hashVal = HashPipelineDescriptor();
+    size_t hashVal = 0;
+    
+    boost::hash_combine(hashVal, renderVertexFunction);
+    boost::hash_combine(hashVal, renderFragmentFunction);
+    boost::hash_combine(hashVal, wq->currentVertexDescriptorHash);
+    boost::hash_combine(hashVal, wq->currentColourAttachmentsHash);
     
     // If this matches the current pipeline state then we should already have the correct pipeline bound
     if (hashVal == wq->currentRenderPipelineDescriptorHash && wq->currentRenderPipelineState != nil) {
@@ -1049,17 +942,110 @@ void MtlfMetalContext::SetRenderPipelineState()
     
     auto pipelineStateIt = renderPipelineStateMap.find(wq->currentRenderPipelineDescriptorHash);
     
+    id<MTLRenderPipelineState> pipelineState;
+
     if (pipelineStateIt != renderPipelineStateMap.end()) {
         pipelineState = pipelineStateIt->second;
     }
     else
     {
+        MTLRenderPipelineDescriptor *renderPipelineStateDescriptor = [[MTLRenderPipelineDescriptor alloc] init];
+
+        if (!enableMVA) {
+            if (dirtyRenderState & DIRTY_METALRENDERSTATE_VERTEX_DESCRIPTOR || renderPipelineStateDescriptor.vertexDescriptor == NULL) {
+                // This assignment can be expensive as the vertexdescriptor will be copied (due to interface property)
+                renderPipelineStateDescriptor.vertexDescriptor = vertexDescriptor;
+                // Update vertex descriptor hash
+                wq->currentVertexDescriptorHash = HashVertexDescriptor();
+            }
+        }
+        
+        dirtyRenderState &= ~DIRTY_METALRENDERSTATE_VERTEX_DESCRIPTOR;
+
+        // Create a new render pipeline state object
+        renderPipelineStateDescriptor.label = @"SetRenderEncoderState";
+        renderPipelineStateDescriptor.sampleCount = 1;
+        renderPipelineStateDescriptor.inputPrimitiveTopology = MTLPrimitiveTopologyClassUnspecified;
+        
+        renderPipelineStateDescriptor.vertexFunction   = renderVertexFunction;
+        renderPipelineStateDescriptor.fragmentFunction = renderFragmentFunction;
+        
+        if (renderFragmentFunction == nil) {
+            renderPipelineStateDescriptor.rasterizationEnabled = false;
+        }
+        else {
+            renderPipelineStateDescriptor.rasterizationEnabled = true;
+        }
+        
+#if METAL_TESSELLATION_SUPPORT
+        renderPipelineStateDescriptor.maxTessellationFactor             = 1;
+        renderPipelineStateDescriptor.tessellationFactorScaleEnabled    = NO;
+        renderPipelineStateDescriptor.tessellationFactorFormat          = MTLTessellationFactorFormatHalf;
+        renderPipelineStateDescriptor.tessellationControlPointIndexType = MTLTessellationControlPointIndexTypeNone;
+        renderPipelineStateDescriptor.tessellationFactorStepFunction    = MTLTessellationFactorStepFunctionConstant;
+        renderPipelineStateDescriptor.tessellationOutputWindingOrder    = MTLWindingCounterClockwise;
+        renderPipelineStateDescriptor.tessellationPartitionMode         = MTLTessellationPartitionModePow2;
+#endif
+    
+        if (dirtyRenderState & DIRTY_METALRENDERSTATE_DRAW_TARGET) {
+            dirtyRenderState &= ~DIRTY_METALRENDERSTATE_DRAW_TARGET;
+            
+            if (drawTarget) {
+                auto& attachments = drawTarget->GetAttachments();
+                for(auto it : attachments) {
+                    MtlfDrawTarget::MtlfAttachment* attachment = ((MtlfDrawTarget::MtlfAttachment*)&(*it.second));
+                    MTLPixelFormat depthFormat = [attachment->GetTextureName() pixelFormat];
+                    
+                    if(attachment->GetFormat() == GL_DEPTH_COMPONENT || attachment->GetFormat() == GL_DEPTH_STENCIL) {
+                        renderPipelineStateDescriptor.depthAttachmentPixelFormat = depthFormat;
+                        if(attachment->GetFormat() == GL_DEPTH_STENCIL) {
+                            renderPipelineStateDescriptor.stencilAttachmentPixelFormat = depthFormat; //Do not use the stencil pixel format (X32_S8)
+                        }
+                    }
+                    else {
+                        id<MTLTexture> texture = attachment->GetTextureName();
+                        MTLPixelFormat pixelFormat = [texture pixelFormat];
+                        int idx = attachment->GetAttach();
+                        
+                        renderPipelineStateDescriptor.colorAttachments[idx].blendingEnabled = NO;
+                        renderPipelineStateDescriptor.colorAttachments[idx].pixelFormat = pixelFormat;
+                    }
+                }
+            }
+            else {
+                //METAL TODO: Why does this need to be hardcoded? There is no matching drawTarget? Can we get this info from somewhere?
+                renderPipelineStateDescriptor.colorAttachments[0].blendingEnabled = YES;
+                renderPipelineStateDescriptor.colorAttachments[0].sourceRGBBlendFactor = MTLBlendFactorSourceAlpha;
+                renderPipelineStateDescriptor.colorAttachments[0].sourceAlphaBlendFactor = MTLBlendFactorSourceAlpha;
+                renderPipelineStateDescriptor.colorAttachments[0].destinationRGBBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
+                renderPipelineStateDescriptor.colorAttachments[0].destinationAlphaBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
+                
+                if (mtlColorTexture != nil) {
+                    renderPipelineStateDescriptor.colorAttachments[0].pixelFormat = mtlColorTexture.pixelFormat;
+                }
+                else {
+                    renderPipelineStateDescriptor.colorAttachments[0].pixelFormat = outputPixelFormat;
+                }
+                
+                if (mtlDepthTexture != nil) {
+                    renderPipelineStateDescriptor.depthAttachmentPixelFormat = mtlDepthTexture.pixelFormat;
+                }
+                else {
+                    renderPipelineStateDescriptor.depthAttachmentPixelFormat = outputDepthFormat;
+                    renderPipelineStateDescriptor.stencilAttachmentPixelFormat = outputDepthFormat;
+                }
+            }
+        }
+
         NSError *error = NULL;
         pipelineState = [device newRenderPipelineStateWithDescriptor:renderPipelineStateDescriptor error:&error];
         if (!pipelineState) {
             NSLog(@"Failed to created pipeline state, error %@", error);
             return;
         }
+        
+        [renderPipelineStateDescriptor release];
+        
         renderPipelineStateMap.emplace(wq->currentRenderPipelineDescriptorHash, pipelineState);
         METAL_INC_STAT(resourceStats.renderPipelineStates);
     }
@@ -1073,16 +1059,14 @@ void MtlfMetalContext::SetRenderPipelineState()
 
 void MtlfMetalContext::SetRenderEncoderState()
 {
+    dirtyRenderState |= DIRTY_METALRENDERSTATE_OLD_STYLE_VERTEX_UNIFORM;
+
     MetalWorkQueue *wq = currentWorkQueue;
     MetalWorkQueue *gswq = &workQueues[METALWORKQUEUE_GEOMETRY_SHADER];
     id <MTLComputeCommandEncoder> computeEncoder;
     
-#if CACHE_GSCOMPUTE
     // Default is all buffers writable
     unsigned long immutableBufferMask = 0;
-#else
-    id<MTLComputePipelineState> computePipelineState;
-#endif
     
     // Get a compute encoder on the Geometry Shader work queue
     if(enableComputeGS) {
@@ -1111,9 +1095,7 @@ void MtlfMetalContext::SetRenderEncoderState()
     }
 
     // Any buffers modified
-    if (dirtyRenderState & (DIRTY_METALRENDERSTATE_VERTEX_UNIFORM_BUFFER     |
-                            DIRTY_METALRENDERSTATE_FRAGMENT_UNIFORM_BUFFER   |
-                            DIRTY_METALRENDERSTATE_VERTEX_BUFFER)) {
+    if (dirtyRenderState & DIRTY_METALRENDERSTATE_VERTEX_BUFFER) {
         
         for(auto buffer : boundBuffers)
         {
@@ -1122,12 +1104,9 @@ void MtlfMetalContext::SetRenderEncoderState()
                 if(buffer->stage == kMSL_ProgramStage_Vertex){
                     if(enableComputeGS) {
                         [computeEncoder setBuffer:buffer->buffer offset:buffer->offset atIndex:buffer->index];
-#if CACHE_GSCOMPUTE
+
                         // Remove writable status
                         immutableBufferMask |= (1 << buffer->index);
-#else
-                        computePipelineStateDescriptor.buffers[buffer->index].mutability = MTLMutabilityImmutable;
-#endif
                     }
                     [wq->currentRenderEncoder setVertexBuffer:buffer->buffer offset:buffer->offset atIndex:buffer->index];
                 }
@@ -1137,12 +1116,9 @@ void MtlfMetalContext::SetRenderEncoderState()
                 else{
                     if(enableComputeGS) {
                         [computeEncoder setBuffer:buffer->buffer offset:buffer->offset atIndex:buffer->index];
-#if CACHE_GSCOMPUTE
+
                         // Remove writable status
                         immutableBufferMask |= (1 << buffer->index);
-#else
-                        computePipelineStateDescriptor.buffers[buffer->index].mutability = MTLMutabilityImmutable;
-#endif
                     }
                     else
                         TF_FATAL_CODING_ERROR("Compute Geometry Shader should be enabled when modifying Compute buffers!");
@@ -1151,9 +1127,7 @@ void MtlfMetalContext::SetRenderEncoderState()
             }
         }
         
-        dirtyRenderState &= ~(DIRTY_METALRENDERSTATE_VERTEX_UNIFORM_BUFFER    |
-                              DIRTY_METALRENDERSTATE_FRAGMENT_UNIFORM_BUFFER  |
-                              DIRTY_METALRENDERSTATE_VERTEX_BUFFER);
+        dirtyRenderState &= ~DIRTY_METALRENDERSTATE_VERTEX_BUFFER;
     }
     
     if (dirtyRenderState & DIRTY_METALRENDERSTATE_OLD_STYLE_VERTEX_UNIFORM) {
@@ -1162,23 +1136,20 @@ void MtlfMetalContext::SetRenderEncoderState()
             [computeEncoder setBytes:oldStyleUniformBuffer[kMSL_ProgramStage_Vertex]
                               length:oldStyleUniformBufferSize[kMSL_ProgramStage_Vertex]
                              atIndex:index];
-#if CACHE_GSCOMPUTE
+
             // Remove writable status
             immutableBufferMask |= (1 << index);
-#else
-            computePipelineStateDescriptor.buffers[index].mutability = MTLMutabilityImmutable;
-#endif
         }
         [wq->currentRenderEncoder setVertexBytes:oldStyleUniformBuffer[kMSL_ProgramStage_Vertex]
                                           length:oldStyleUniformBufferSize[kMSL_ProgramStage_Vertex]
                                          atIndex:index];
-        dirtyRenderState &= DIRTY_METALRENDERSTATE_OLD_STYLE_VERTEX_UNIFORM;
+        dirtyRenderState &= ~DIRTY_METALRENDERSTATE_OLD_STYLE_VERTEX_UNIFORM;
     }
     if (dirtyRenderState & DIRTY_METALRENDERSTATE_OLD_STYLE_FRAGMENT_UNIFORM) {
         [wq->currentRenderEncoder setFragmentBytes:oldStyleUniformBuffer[kMSL_ProgramStage_Fragment]
                                             length:oldStyleUniformBufferSize[kMSL_ProgramStage_Fragment]
                                            atIndex:oldStyleUniformBufferIndex[kMSL_ProgramStage_Fragment]];
-        dirtyRenderState &= DIRTY_METALRENDERSTATE_OLD_STYLE_FRAGMENT_UNIFORM;
+        dirtyRenderState &= ~DIRTY_METALRENDERSTATE_OLD_STYLE_FRAGMENT_UNIFORM;
     }
 
     if (dirtyRenderState & DIRTY_METALRENDERSTATE_TEXTURE) {
@@ -1213,15 +1184,8 @@ void MtlfMetalContext::SetRenderEncoderState()
     }
     
     if(enableComputeGS) {
-#if CACHE_GSCOMPUTE
         SetComputeEncoderState(renderComputeGSFunction, boundBuffers.size(), immutableBufferMask, @"GS Compute phase", METALWORKQUEUE_GEOMETRY_SHADER);
-#else
-        //MTL_FIXME: We should cache compute pipelines like we cache render pipelines.
-        NSError *error = NULL;
-        MTLAutoreleasedComputePipelineReflection* reflData = 0;
-        computePipelineState = [device newComputePipelineStateWithDescriptor:computePipelineStateDescriptor options:MTLPipelineOptionNone reflection:reflData error:&error];
-        [computeEncoder setComputePipelineState:computePipelineState];
-#endif
+
         // Release the geometry shader encoder
         ReleaseEncoder(false, METALWORKQUEUE_GEOMETRY_SHADER);
     }
@@ -1232,12 +1196,8 @@ void MtlfMetalContext::ClearRenderEncoderState()
     MetalWorkQueue *wq = currentWorkQueue;
     
     // Release owned resources
-    [renderPipelineStateDescriptor  release];
-    [computePipelineStateDescriptor release];
     [vertexDescriptor               release];
     
-    renderPipelineStateDescriptor  = nil;
-    computePipelineStateDescriptor = nil;
     vertexDescriptor               = nil;
     
     wq->currentRenderPipelineDescriptorHash  = 0;
@@ -1258,29 +1218,11 @@ void MtlfMetalContext::ClearRenderEncoderState()
     samplers.clear();
 }
 
-size_t MtlfMetalContext::HashComputePipelineDescriptor(unsigned int bufferCount)
-{
-    size_t hashVal = 0;
-    boost::hash_combine(hashVal, computePipelineStateDescriptor.computeFunction);
-    boost::hash_combine(hashVal, computePipelineStateDescriptor.label);
-    boost::hash_combine(hashVal, computePipelineStateDescriptor.threadGroupSizeIsMultipleOfThreadExecutionWidth);
-#if defined(METAL_EVENTS_API_PRESENT)
-    if (eventsAvailable) {
-        boost::hash_combine(hashVal, computePipelineStateDescriptor.maxTotalThreadsPerThreadgroup);
-    }
-#endif
-    for (int i = 0; i < bufferCount; i++) {
-        boost::hash_combine(hashVal, computePipelineStateDescriptor.buffers[i].mutability);
-    }
-    //boost::hash_combine(hashVal, computePipelineStateDescriptor.stageInputDescriptor); MTL_FIXME
-    return hashVal;
-}
-
 // Using this function instead of setting the pipeline state directly allows caching
 NSUInteger MtlfMetalContext::SetComputeEncoderState(id<MTLFunction>     computeFunction,
                                                     unsigned int        bufferCount,
                                                     unsigned long       immutableBufferMask,
-                                                    NSString           *label,
+                                                    NSString            *label,
                                                     MetalWorkQueueType  workQueueType)
 {
     MetalWorkQueue *wq = &workQueues[workQueueType];
@@ -1291,36 +1233,23 @@ NSUInteger MtlfMetalContext::SetComputeEncoderState(id<MTLFunction>     computeF
         || !wq->encoderInUse) {
         TF_FATAL_CODING_ERROR("Compute encoder must be set and active to set the pipeline state");
     }
-    
-    if (computePipelineStateDescriptor == nil) {
-        computePipelineStateDescriptor = [[MTLComputePipelineDescriptor alloc] init];
-    }
-    
-    [computePipelineStateDescriptor reset];
-    computePipelineStateDescriptor.computeFunction = computeFunction;
-    computePipelineStateDescriptor.label = label;
-    
-    // Setup buffer mutability
-    while (immutableBufferMask) {
-        if (immutableBufferMask & 0x1) {
-            computePipelineStateDescriptor.buffers[bufferCount].mutability = MTLMutabilityImmutable;
-        }
-        immutableBufferMask >>= 1;
-    }
-    
-    // Always call this because currently we're not tracking changes to its state
-    size_t hashVal = HashComputePipelineDescriptor(bufferCount);
-    
+
+    size_t hashVal = 0;
+    boost::hash_combine(hashVal, bufferCount);
+    boost::hash_combine(hashVal, computeFunction);
+    boost::hash_combine(hashVal, immutableBufferMask);
+
     // If this matches the currently bound pipeline state (assuming one is bound) then carry on using it
     if (wq->currentComputePipelineState != nil && hashVal == wq->currentComputePipelineDescriptorHash) {
         return wq->currentComputeThreadExecutionWidth;
     }
+
     // Update the hash
     wq->currentComputePipelineDescriptorHash = hashVal;
     
     // Search map to see if we've created a pipeline state object for this already
     auto computePipelineStateIt = computePipelineStateMap.find(wq->currentComputePipelineDescriptorHash);
-    
+
     if (computePipelineStateIt != computePipelineStateMap.end()) {
         // Retrieve pre generated state
         computePipelineState = computePipelineStateIt->second;
@@ -1330,8 +1259,26 @@ NSUInteger MtlfMetalContext::SetComputeEncoderState(id<MTLFunction>     computeF
         NSError *error = NULL;
         MTLAutoreleasedComputePipelineReflection* reflData = 0;
         
+        MTLComputePipelineDescriptor *computePipelineStateDescriptor = [[MTLComputePipelineDescriptor alloc] init];
+        
+        [computePipelineStateDescriptor reset];
+        computePipelineStateDescriptor.computeFunction = computeFunction;
+        computePipelineStateDescriptor.label = label;
+        
+        // Setup buffer mutability
+        int i = 0;
+        while (immutableBufferMask) {
+            if (immutableBufferMask & 0x1) {
+                computePipelineStateDescriptor.buffers[i].mutability = MTLMutabilityImmutable;
+            }
+            immutableBufferMask >>= 1;
+            i++;
+        }
+        
         // Create a new Compute pipeline state object
         computePipelineState = [device newComputePipelineStateWithDescriptor:computePipelineStateDescriptor options:MTLPipelineOptionNone reflection:reflData error:&error];
+        [computePipelineStateDescriptor release];
+
         if (!computePipelineState) {
             NSLog(@"Failed to create compute pipeline state, error %@", error);
             return 0;

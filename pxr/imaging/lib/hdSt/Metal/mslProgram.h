@@ -75,6 +75,8 @@ struct MSL_ShaderBinding
 };
 
 typedef std::multimap<size_t, MSL_ShaderBinding*> MSL_ShaderBindingMap;
+typedef std::multimap<size_t, MSL_ShaderBinding*>::const_iterator MSL_ShaderBindingMapConstIterator;
+typedef std::pair<MSL_ShaderBindingMapConstIterator,MSL_ShaderBindingMapConstIterator> MSL_ShaderBindingMapResults;
 
 MSL_ShaderBinding const *MSL_FindBinding(
     MSL_ShaderBindingMap const& bindings,
@@ -82,6 +84,11 @@ MSL_ShaderBinding const *MSL_FindBinding(
     uint32_t bindingTypeMask = 0xFFFFFFFF,
     uint32_t programStageMask = 0xFFFFFFFF,
     uint32_t skipCount = 0,
+    int32_t level = -1);
+
+MSL_ShaderBindingMapResults MSL_FindBinding(
+    MSL_ShaderBindingMap const& bindings,
+    TfToken const& name,
     int32_t level = -1);
 
 /// \class HdStMSLProgram

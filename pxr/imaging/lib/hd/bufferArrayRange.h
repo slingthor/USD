@@ -156,7 +156,16 @@ public:
     /// Returns the bar at \p index. returns null if either the index
     // is out of range or not yet set.
     HD_API
-    HdBufferArrayRangeSharedPtr const &Get(int index) const;
+    HdBufferArrayRangeSharedPtr const &Get(int index) const
+    {
+        if (index < 0 || static_cast<size_t>(index) >= _ranges.size()) {
+            // out of range access is not an errorneous path.
+            // (i.e. element/instance bars can be null if not exists)
+            static HdBufferArrayRangeSharedPtr empty;
+            return empty;
+        }
+        return _ranges[index];
+    }
 
 private:
     std::vector<HdBufferArrayRangeSharedPtr> _ranges;

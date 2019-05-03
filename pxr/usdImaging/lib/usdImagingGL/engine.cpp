@@ -279,6 +279,9 @@ UsdImagingGLEngine::~UsdImagingGLEngine()
     
     delete _resourceFactory;
     _resourceFactory = NULL;
+    
+    // delete the context to get the stats
+    delete MtlfMetalContext::GetMetalContext();
 }
 
 //----------------------------------------------------------------------------

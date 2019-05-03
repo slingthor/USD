@@ -58,18 +58,6 @@ HdBufferArrayRangeContainer::Set(int index,
     _ranges[index] = range;
 }
 
-HdBufferArrayRangeSharedPtr const &
-HdBufferArrayRangeContainer::Get(int index) const
-{
-    if (index < 0 || static_cast<size_t>(index) >= _ranges.size()) {
-        // out of range access is not an errorneous path.
-        // (i.e. element/instance bars can be null if not exists)
-        static HdBufferArrayRangeSharedPtr empty;
-        return empty;
-    }
-    return _ranges[index];
-}
-
 void
 HdBufferArrayRange::GetBufferSpecs(HdBufferSpecVector *specs) const
 {

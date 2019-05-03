@@ -112,15 +112,41 @@ HdStCommandBuffer::ExecuteDraw(
     //
     // draw batches
     //
-    for (auto const& batch : _drawBatches) {
-        batch->ExecuteDraw(renderPassState, resourceRegistry);
-    }
-    HD_PERF_COUNTER_SET(HdPerfTokens->drawBatches, _drawBatches.size());
+//    for (auto const& batch : _drawBatches) {
+//        batch->ExecuteDraw(renderPassState, resourceRegistry);
+//    }
+    
+    struct _Worker {
+        static
+        void draw(std::vector<HdSt_DrawBatchSharedPtr> * drawBatches,
+                  HdStRenderPassStateSharedPtr const &renderPassState,
+                  HdStResourceRegistrySharedPtr const &resourceRegistry,
+                  size_t begin, size_t end)
+        {
+            for(size_t i = begin; i < end; i++) {
+                HdSt_DrawBatchSharedPtr& batch = (*drawBatches)[i];
+                batch->ExecuteDraw(renderPassState, resourceRegistry);
+            }
+        }
+    };
 
-    if (!glBindBuffer) {
-        // useful when testing with GL drawing disabled
-        HD_PERF_COUNTER_SET(HdTokens->itemsDrawn, _visibleSize);
+    bool mtBatchDrawing = false;
+    if (mtBatchDrawing) {
+        WorkParallelForN(_drawBatches.size(),
+                         std::bind(&_Worker::draw, &_drawBatches,
+                                   std::cref(renderPassState),
+                                   std::cref(resourceRegistry),
+                                   std::placeholders::_1,
+                                   std::placeholders::_2));
+    } else {
+        _Worker::draw(&_drawBatches,
+                      renderPassState,
+                      resourceRegistry,
+                      0,
+                      _drawBatches.size());
     }
+
+    HD_PERF_COUNTER_SET(HdPerfTokens->drawBatches, _drawBatches.size());
 }
 
 void
