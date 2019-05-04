@@ -54,6 +54,8 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 MtlfMetalContext *MtlfMetalContext::context = NULL;
 std::mutex MtlfMetalContext::_commandBufferPoolMutex;
+std::mutex MtlfMetalContext::_pipelineMutex;
+std::mutex MtlfMetalContext::_bufferMutex;
 thread_local MtlfMetalContext::ThreadState MtlfMetalContext::threadState(MtlfMetalContext::GetMetalContext());
 
 #if defined(ARCH_OS_MACOS)
@@ -147,6 +149,7 @@ id<MTLDevice> MtlfMetalContext::GetMetalDevice(PREFERRED_GPU_TYPE preferredGPUTy
 MtlfMetalContext::MtlfMetalContext(id<MTLDevice> _device, int width, int height)
 : gsMaxConcurrentBatches(0)
 , gsMaxDataPerBatch(0)
+, points("points")
 #if defined(ARCH_GFX_OPENGL)
 , glInterop(NULL)
 #endif
@@ -167,14 +170,10 @@ MtlfMetalContext::MtlfMetalContext(id<MTLDevice> _device, int width, int height)
     enableMultiQueue = true;
 
     // Create a new command queue
-    const int maxCommandBuffers = 1024;
-    commandBuffers.reserve(maxCommandBuffers);
-    commandBuffersGS.reserve(maxCommandBuffers);
-
-    commandQueue = [device newCommandQueueWithMaxCommandBufferCount:maxCommandBuffers];
+    commandQueue = [device newCommandQueueWithMaxCommandBufferCount:commandBufferPoolSize];
     if(enableMultiQueue) {
 //        NSLog(@"Device %@ supports Metal 2, enabling multi-queue codepath.", device.name);
-        commandQueueGS = [device newCommandQueueWithMaxCommandBufferCount:maxCommandBuffers];
+        commandQueueGS = [device newCommandQueueWithMaxCommandBufferCount:commandBufferPoolSize];
         gsMaxDataPerBatch = 1024 * 1024 * 32;
         gsMaxConcurrentBatches = 3;
     }
@@ -186,6 +185,9 @@ MtlfMetalContext::MtlfMetalContext(id<MTLDevice> _device, int width, int height)
     
     ResetEncoders(METALWORKQUEUE_GEOMETRY_SHADER, true);
     ResetEncoders(METALWORKQUEUE_RESOURCE, true);
+    
+    memset(commandBuffers, 0x00, sizeof(commandBuffers));
+    memset(commandBuffersGS, 0x00, sizeof(commandBuffersGS));
 
 #if defined(ARCH_OS_IOS)
     #define SYSTEM_VERSION_GREATER_THAN_OR_EQUAL_TO(v) ([[[UIDevice currentDevice] systemVersion] compare:v options:NSNumericSearch] != NSOrderedAscending)
@@ -224,34 +226,29 @@ MtlfMetalContext::MtlfMetalContext(id<MTLDevice> _device, int width, int height)
     outputPixelFormat = MTLPixelFormatInvalid;
     outputDepthFormat = MTLPixelFormatInvalid;
 
-    perFrameBuffer           = nil;
-    perFrameBufferSize       = 5*1024*1024;
-    perFrameBufferOffset     = 0;
-    perFrameBufferAlignment  = 16;
-    
 #if defined(METAL_ENABLE_STATS)
-    resourceStats.commandBuffersCreated   = 0;
-    resourceStats.commandBuffersCommitted = 0;
-    resourceStats.buffersCreated          = 0;
-    resourceStats.buffersReused           = 0;
-    resourceStats.bufferSearches          = 0;
-    resourceStats.renderEncodersCreated   = 0;
-    resourceStats.computeEncodersCreated  = 0;
-    resourceStats.blitEncodersCreated     = 0;
-    resourceStats.renderEncodersRequested = 0;
-    resourceStats.computeEncodersRequested= 0;
-    resourceStats.blitEncodersRequested   = 0;
-    resourceStats.renderPipelineStates    = 0;
-    resourceStats.computePipelineStates   = 0;
-    resourceStats.currentBufferAllocation = 0;
-    resourceStats.peakBufferAllocation    = 0;
-    resourceStats.GSBatchesStarted        = 0;
+    resourceStats.commandBuffersCreated.store(0, std::memory_order_relaxed);
+    resourceStats.commandBuffersCommitted.store(0, std::memory_order_relaxed);
+    resourceStats.buffersCreated.store(0, std::memory_order_relaxed);
+    resourceStats.buffersReused.store(0, std::memory_order_relaxed);
+    resourceStats.bufferSearches.store(0, std::memory_order_relaxed);
+    resourceStats.renderEncodersCreated.store(0, std::memory_order_relaxed);
+    resourceStats.computeEncodersCreated.store(0, std::memory_order_relaxed);
+    resourceStats.blitEncodersCreated.store(0, std::memory_order_relaxed);
+    resourceStats.renderEncodersRequested.store(0, std::memory_order_relaxed);
+    resourceStats.computeEncodersRequested.store(0, std::memory_order_relaxed);
+    resourceStats.blitEncodersRequested.store(0, std::memory_order_relaxed);
+    resourceStats.renderPipelineStates.store(0, std::memory_order_relaxed);
+    resourceStats.computePipelineStates.store(0, std::memory_order_relaxed);
+    resourceStats.currentBufferAllocation.store(0, std::memory_order_relaxed);
+    resourceStats.peakBufferAllocation.store(0, std::memory_order_relaxed);
+    resourceStats.GSBatchesStarted.store(0, std::memory_order_relaxed);
 #endif
     
     frameCount = 0;
     lastCompletedFrame = -1;
     lastCompletedCommandBuffer = -1;
-    committedCommandBufferCount = 0;
+    committedCommandBufferCount.store(0, std::memory_order_relaxed);
 }
 
 MtlfMetalContext::~MtlfMetalContext()
@@ -268,9 +265,7 @@ MtlfMetalContext::~MtlfMetalContext()
 #endif
 
     CleanupUnusedBuffers(true);
-#if defined(METAL_REUSE_BUFFERS)
     bufferFreeList.clear();
-#endif
 
     [commandQueue release];
     if(enableMultiQueue)
@@ -280,21 +275,51 @@ MtlfMetalContext::~MtlfMetalContext()
     if(frameCount > 0) {
         NSLog(@"--- METAL Resource Stats (average per frame / total) ----");
         NSLog(@"Frame count:                %7lld", frameCount);
-        NSLog(@"Command Buffers created:    %7llu / %7lu", resourceStats.commandBuffersCreated   / frameCount, resourceStats.commandBuffersCreated);
-        NSLog(@"Command Buffers committed:  %7llu / %7lu", resourceStats.commandBuffersCommitted / frameCount, resourceStats.commandBuffersCommitted);
-        NSLog(@"Metal   Buffers created:    %7llu / %7lu", resourceStats.buffersCreated          / frameCount, resourceStats.buffersCreated);
-        NSLog(@"Metal   Buffers reused:     %7llu / %7lu", resourceStats.buffersReused           / frameCount, resourceStats.buffersReused);
-        NSLog(@"Metal   Av buf search depth:%7lu"       , resourceStats.bufferSearches           / (resourceStats.buffersCreated + resourceStats.buffersReused));
-        NSLog(@"Render  Encoders requested: %7llu / %7lu", resourceStats.renderEncodersRequested / frameCount, resourceStats.renderEncodersRequested);
-        NSLog(@"Render  Encoders created:   %7llu / %7lu", resourceStats.renderEncodersCreated   / frameCount, resourceStats.renderEncodersCreated);
-        NSLog(@"Render  Pipeline States:    %7llu / %7lu", resourceStats.renderPipelineStates    / frameCount, resourceStats.renderPipelineStates);
-        NSLog(@"Compute Encoders requested: %7llu / %7lu", resourceStats.computeEncodersRequested/ frameCount, resourceStats.computeEncodersRequested);
-        NSLog(@"Compute Encoders created:   %7llu / %7lu", resourceStats.computeEncodersCreated  / frameCount, resourceStats.computeEncodersCreated);
-        NSLog(@"Compute Pipeline States:    %7llu / %7lu", resourceStats.computePipelineStates   / frameCount, resourceStats.computePipelineStates);
-        NSLog(@"Blit    Encoders requested: %7llu / %7lu", resourceStats.blitEncodersRequested   / frameCount, resourceStats.blitEncodersRequested);
-        NSLog(@"Blit    Encoders created:   %7llu / %7lu", resourceStats.blitEncodersCreated     / frameCount, resourceStats.blitEncodersCreated);
-        NSLog(@"GS Batches started:         %7llu / %7lu", resourceStats.GSBatchesStarted        / frameCount, resourceStats.GSBatchesStarted);
-        NSLog(@"Peak    Buffer Allocation:  %7luMbs",     resourceStats.peakBufferAllocation     / (1024*1024));
+        NSLog(@"Command Buffers created:    %7llu / %7lu",
+              resourceStats.commandBuffersCreated.load(std::memory_order_relaxed) / frameCount,
+              resourceStats.commandBuffersCreated.load(std::memory_order_relaxed));
+        NSLog(@"Command Buffers committed:  %7llu / %7lu",
+              resourceStats.commandBuffersCommitted.load(std::memory_order_relaxed) / frameCount,
+              resourceStats.commandBuffersCommitted.load(std::memory_order_relaxed));
+        NSLog(@"Metal   Buffers created:    %7llu / %7lu",
+              resourceStats.buffersCreated.load(std::memory_order_relaxed) / frameCount,
+              resourceStats.buffersCreated.load(std::memory_order_relaxed));
+        NSLog(@"Metal   Buffers reused:     %7llu / %7lu",
+              resourceStats.buffersReused.load(std::memory_order_relaxed) / frameCount,
+              resourceStats.buffersReused.load(std::memory_order_relaxed));
+        NSLog(@"Metal   Av buf search depth:%7lu"       ,
+              resourceStats.bufferSearches.load(std::memory_order_relaxed) /
+              (resourceStats.buffersCreated.load(std::memory_order_relaxed) +
+               resourceStats.buffersReused.load(std::memory_order_relaxed)));
+        NSLog(@"Render  Encoders requested: %7llu / %7lu",
+              resourceStats.renderEncodersRequested.load(std::memory_order_relaxed) / frameCount,
+              resourceStats.renderEncodersRequested.load(std::memory_order_relaxed));
+        NSLog(@"Render  Encoders created:   %7llu / %7lu",
+              resourceStats.renderEncodersCreated.load(std::memory_order_relaxed) / frameCount,
+              resourceStats.renderEncodersCreated.load(std::memory_order_relaxed));
+        NSLog(@"Render  Pipeline States:    %7llu / %7lu",
+              resourceStats.renderPipelineStates.load(std::memory_order_relaxed) / frameCount,
+              resourceStats.renderPipelineStates.load(std::memory_order_relaxed));
+        NSLog(@"Compute Encoders requested: %7llu / %7lu",
+              resourceStats.computeEncodersRequested.load(std::memory_order_relaxed) / frameCount,
+              resourceStats.computeEncodersRequested.load(std::memory_order_relaxed));
+        NSLog(@"Compute Encoders created:   %7llu / %7lu",
+              resourceStats.computeEncodersCreated.load(std::memory_order_relaxed) / frameCount,
+              resourceStats.computeEncodersCreated.load(std::memory_order_relaxed));
+        NSLog(@"Compute Pipeline States:    %7llu / %7lu",
+              resourceStats.computePipelineStates.load(std::memory_order_relaxed) / frameCount,
+              resourceStats.computePipelineStates.load(std::memory_order_relaxed));
+        NSLog(@"Blit    Encoders requested: %7llu / %7lu",
+              resourceStats.blitEncodersRequested.load(std::memory_order_relaxed) / frameCount,
+              resourceStats.blitEncodersRequested.load(std::memory_order_relaxed));
+        NSLog(@"Blit    Encoders created:   %7llu / %7lu",
+              resourceStats.blitEncodersCreated.load(std::memory_order_relaxed) / frameCount,
+              resourceStats.blitEncodersCreated.load(std::memory_order_relaxed));
+        NSLog(@"GS Batches started:         %7llu / %7lu",
+              resourceStats.GSBatchesStarted.load(std::memory_order_relaxed) / frameCount,
+              resourceStats.GSBatchesStarted.load(std::memory_order_relaxed));
+        NSLog(@"Peak    Buffer Allocation:  %7luMbs",
+              resourceStats.peakBufferAllocation.load(std::memory_order_relaxed) / (1024 * 1024));
     }
  #endif
 }
@@ -477,23 +502,21 @@ void MtlfMetalContext::CreateCommandBuffer(MetalWorkQueueType workQueueType) {
         std::lock_guard<std::mutex> lock(_commandBufferPoolMutex);
 
         if (enableMultiQueue && workQueueType == METALWORKQUEUE_GEOMETRY_SHADER) {
-            int poolSize = commandBuffersGS.size();
-            if (poolSize > 0) {
-                wq->commandBuffer = commandBuffersGS.back();
-                commandBuffersGS.pop_back();
+            if (commandBuffersGSStackPos > 0) {
+                wq->commandBuffer = commandBuffersGS[--commandBuffersGSStackPos];
             }
             else {
                 wq->commandBuffer = [context->commandQueueGS commandBuffer];
+                [wq->commandBuffer retain];
             }
         }
         else {
-            int poolSize = commandBuffers.size();
-            if (poolSize > 0) {
-                wq->commandBuffer = commandBuffers.back();
-                commandBuffers.pop_back();
+            if (commandBuffersStackPos > 0) {
+                wq->commandBuffer = commandBuffers[--commandBuffersStackPos];
             }
             else {
                 wq->commandBuffer = [context->commandQueue commandBuffer];
+                [wq->commandBuffer retain];
             }
         }
 
@@ -514,7 +537,7 @@ void MtlfMetalContext::LabelCommandBuffer(NSString *label, MetalWorkQueueType wo
 {
     MetalWorkQueue *wq = &GetWorkQueue(workQueueType);
     
-     if (wq->commandBuffer == nil) {
+    if (wq->commandBuffer == nil) {
         TF_FATAL_CODING_ERROR("No command buffer to label");
     }
     wq->commandBuffer.label = label;
@@ -784,8 +807,8 @@ void MtlfMetalContext::SetBuffer(int index, id<MTLBuffer> buffer, const TfToken&
 {
     BufferBinding *bufferInfo = new BufferBinding{index, buffer, name, kMSL_ProgramStage_Vertex, 0, true};
     threadState.boundBuffers.push_back(bufferInfo);
-    
-    if (name == TfToken("points")) {
+
+    if (name == points) {
         threadState.vertexPositionBuffer = buffer;
     }
     
@@ -904,6 +927,7 @@ void MtlfMetalContext::SetRenderPipelineState()
     }
     wq->currentRenderPipelineDescriptorHash = hashVal;
     
+    std::lock_guard<std::mutex> lock(_pipelineMutex);
     auto pipelineStateIt = renderPipelineStateMap.find(wq->currentRenderPipelineDescriptorHash);
     
     id<MTLRenderPipelineState> pipelineState;
@@ -1024,6 +1048,7 @@ void MtlfMetalContext::SetRenderPipelineState()
 void MtlfMetalContext::SetRenderEncoderState()
 {
     threadState.dirtyRenderState |= DIRTY_METALRENDERSTATE_OLD_STYLE_VERTEX_UNIFORM;
+    threadState.dirtyRenderState |= 0xffffffff;
 
     MetalWorkQueue *wq = threadState.currentWorkQueue;
     MetalWorkQueue *gswq = &GetWorkQueue(METALWORKQUEUE_GEOMETRY_SHADER);
@@ -1212,6 +1237,7 @@ NSUInteger MtlfMetalContext::SetComputeEncoderState(id<MTLFunction>     computeF
     wq->currentComputePipelineDescriptorHash = hashVal;
     
     // Search map to see if we've created a pipeline state object for this already
+    std::lock_guard<std::mutex> lock(_pipelineMutex);
     auto computePipelineStateIt = computePipelineStateMap.find(wq->currentComputePipelineDescriptorHash);
 
     if (computePipelineStateIt != computePipelineStateMap.end()) {
@@ -1355,10 +1381,12 @@ void MtlfMetalContext::CommitCommandBufferForThread(bool waituntilScheduled, boo
             //NSLog(@"No work in this command buffer: %@", wq->commandBuffer.label);
             {
                 std::lock_guard<std::mutex> lock(_commandBufferPoolMutex);
+                wq->commandBuffer.label = @"stacked";
                 if (workQueueType == METALWORKQUEUE_GEOMETRY_SHADER)
-                    commandBuffersGS.push_back(wq->commandBuffer);
+                    commandBuffersGS[commandBuffersGSStackPos++] = wq->commandBuffer;
                 else
-                    commandBuffers.push_back(wq->commandBuffer);
+                    commandBuffers[commandBuffersStackPos++] = wq->commandBuffer;
+                wq->commandBuffer = nil;
             }
             ResetEncoders(workQueueType);
             return;
@@ -1385,6 +1413,7 @@ void MtlfMetalContext::CommitCommandBufferForThread(bool waituntilScheduled, boo
     else if (waituntilScheduled && wq->encoderHasWork) {
         [wq->commandBuffer waitUntilScheduled];
     }
+    [wq->commandBuffer release];
     
     ResetEncoders(workQueueType);
     committedCommandBufferCount++;
@@ -1574,99 +1603,67 @@ id<MTLRenderCommandEncoder>  MtlfMetalContext::GetRenderEncoder(MetalWorkQueueTy
 
 id<MTLBuffer> MtlfMetalContext::GetMetalBuffer(NSUInteger length, MTLResourceOptions options, const void *pointer)
 {
-    id<MTLBuffer> buffer;
-    
-#if defined(METAL_REUSE_BUFFERS)
+    id<MTLBuffer> buffer = nil;
+
+    MTLStorageMode  storageMode  =  MTLStorageMode((options & MTLResourceStorageModeMask)  >> MTLResourceStorageModeShift);
+    MTLCPUCacheMode cpuCacheMode = MTLCPUCacheMode((options & MTLResourceCPUCacheModeMask) >> MTLResourceCPUCacheModeShift);
+
+    std::lock_guard<std::mutex> lock(_bufferMutex);
     for (auto entry = bufferFreeList.begin(); entry != bufferFreeList.end(); entry++) {
         MetalBufferListEntry bufferEntry = *entry;
-        buffer = bufferEntry.buffer;
-        MTLStorageMode  storageMode  =  MTLStorageMode((options & MTLResourceStorageModeMask)  >> MTLResourceStorageModeShift);
-        MTLCPUCacheMode cpuCacheMode = MTLCPUCacheMode((options & MTLResourceCPUCacheModeMask) >> MTLResourceCPUCacheModeShift);
+
         METAL_INC_STAT(resourceStats.bufferSearches);
         // Check if buffer matches size and storage mode and is old enough to reuse
-        if (buffer.length == length              &&
-            storageMode   == buffer.storageMode  &&
-            cpuCacheMode  == buffer.cpuCacheMode &&
+        if (bufferEntry.buffer.length == length              &&
+            storageMode   == bufferEntry.buffer.storageMode  &&
+            cpuCacheMode  == bufferEntry.buffer.cpuCacheMode &&
             lastCompletedCommandBuffer >= (bufferEntry.releasedOnCommandBuffer + METAL_SAFE_BUFFER_REUSE_AGE)) {
-
-            // Copy over data
-            if (pointer) {
-                memcpy(buffer.contents, pointer, length);
-#if defined(ARCH_OS_MACOS)
-                [buffer didModifyRange:(NSMakeRange(0, length))];
-#endif
-            }
-            
+            buffer = bufferEntry.buffer;
             bufferFreeList.erase(entry);
-            METAL_INC_STAT(resourceStats.buffersReused);
-            return buffer;
+            break;
         }
     }
+    
+    if (buffer) {
+        // Copy over data
+        if (pointer) {
+            memcpy(buffer.contents, pointer, length);
+#if defined(ARCH_OS_MACOS)
+            [buffer didModifyRange:(NSMakeRange(0, length))];
 #endif
-    //NSLog(@"Creating buffer of length %lu (%lu)", length, frameCount);
-    if (pointer) {
-        buffer  =  [device newBufferWithBytes:pointer length:length options:options];
-    } else {
-        buffer  =  [device newBufferWithLength:length options:options];
-    }
-    METAL_INC_STAT(resourceStats.buffersCreated);
-    METAL_INC_STAT_VAL(resourceStats.currentBufferAllocation, length);
-    METAL_MAX_STAT_VAL(resourceStats.peakBufferAllocation, resourceStats.currentBufferAllocation);
-    return buffer;
-}
-
-// Gets space inside a buffer that has a lifetime of the current frame only - to be used for temporary data such as uniforms, the offset *must* be used
-id<MTLBuffer> MtlfMetalContext::GetMetalBufferAllocation(NSUInteger length, const void *pointer, NSUInteger *offset)
-{
-    // If there's no existing buffer or we're about to overflow the current one then create one
-    if (perFrameBuffer == nil ||
-        (length + perFrameBufferOffset > perFrameBufferSize)) {
-        
-        // Release the current buffer
-        if (perFrameBuffer != nil) {
-             ReleaseMetalBuffer(perFrameBuffer);
         }
-        // This allows the buffer to grow from its initial size
-        perFrameBufferSize = MAX(length, perFrameBufferSize);
         
-        // Get a new buffer
-        perFrameBuffer = GetMetalBuffer(perFrameBufferSize, MTLResourceStorageModePrivate|MTLResourceOptionCPUCacheModeDefault);
-        perFrameBufferOffset = 0;
+        METAL_INC_STAT(resourceStats.buffersReused);
     }
-    
-    // Set the current offset
-    *offset = perFrameBufferOffset;
-    
-    // Move the offset to the next aligned position
-    perFrameBufferOffset += (perFrameBufferAlignment - (perFrameBufferOffset % perFrameBufferAlignment));
-    
-    return perFrameBuffer;
+    else {
+        //NSLog(@"Creating buffer of length %lu (%lu)", length, frameCount);
+        if (pointer) {
+            buffer  =  [device newBufferWithBytes:pointer length:length options:options];
+        } else {
+            buffer  =  [device newBufferWithLength:length options:options];
+        }
+        METAL_INC_STAT(resourceStats.buffersCreated);
+        METAL_INC_STAT_VAL(resourceStats.currentBufferAllocation, length);
+        METAL_MAX_STAT_VAL(resourceStats.peakBufferAllocation, resourceStats.currentBufferAllocation);
+    }
+    return buffer;
 }
 
 void MtlfMetalContext::ReleaseMetalBuffer(id<MTLBuffer> buffer)
 {
- #if defined(METAL_REUSE_BUFFERS)
     MetalBufferListEntry bufferEntry;
     bufferEntry.buffer = buffer;
     bufferEntry.releasedOnFrame = frameCount;
-    bufferEntry.releasedOnCommandBuffer = committedCommandBufferCount;
+    bufferEntry.releasedOnCommandBuffer = committedCommandBufferCount.load(std::memory_order_relaxed);
+    
+    std::lock_guard<std::mutex> lock(_bufferMutex);
     bufferFreeList.push_back(bufferEntry);
     //NSLog(@"Adding buffer to free list of length %lu (%lu)", buffer.length, frameCount);
-#else
-    [buffer release];
-#endif
 }
 
 void MtlfMetalContext::CleanupUnusedBuffers(bool forceClean)
 {
-     // Release resources associated with the per frame buffer
-    if (perFrameBuffer) {
-        ReleaseMetalBuffer(perFrameBuffer);
-        perFrameBuffer       = nil;
-        perFrameBufferOffset = 0;
-    }
-    
-#if defined(METAL_REUSE_BUFFERS)
+    std::lock_guard<std::mutex> lock(_bufferMutex);
     // Release all buffers that have not been recently reused
     for (auto entry = bufferFreeList.begin(); entry != bufferFreeList.end();) {
         MetalBufferListEntry bufferEntry = *entry;
@@ -1678,7 +1675,7 @@ void MtlfMetalContext::CleanupUnusedBuffers(bool forceClean)
         // c) Memory threshold higher than z
         bool bReleaseBuffer = (frameCount > (bufferEntry.releasedOnFrame + METAL_MAX_BUFFER_AGE_IN_FRAMES)  ||
                                lastCompletedCommandBuffer > (bufferEntry.releasedOnCommandBuffer +  METAL_MAX_BUFFER_AGE_IN_COMMAND_BUFFERS) ||
-                               resourceStats.currentBufferAllocation > METAL_HIGH_MEMORY_THRESHOLD ||
+                               resourceStats.currentBufferAllocation.load(std::memory_order_relaxed) > METAL_HIGH_MEMORY_THRESHOLD ||
                                forceClean);
                                
         if (bReleaseBuffer) {
@@ -1695,8 +1692,6 @@ void MtlfMetalContext::CleanupUnusedBuffers(bool forceClean)
     if (forceClean && (bufferFreeList.size() != 0)) {
         TF_FATAL_CODING_ERROR("Failed to release all Metal buffers");
     }
-#endif
-
 }
 
 void MtlfMetalContext::StartFrameForThread() {

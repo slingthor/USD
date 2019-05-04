@@ -241,8 +241,7 @@ private:
     int _drawArgsSlot;
     int _indicesSlot;
     
-//    std::vector<id<MTLBuffer>> _buffers;
-//    bool _currentlySet;
+    bool _currentlySet;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

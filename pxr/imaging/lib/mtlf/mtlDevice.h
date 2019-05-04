@@ -60,10 +60,6 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 class MtlfGlInterop;
 
-// Enable reuse of metal buffers - should increase perforamance but may also increase memory footprint
-#define METAL_REUSE_BUFFERS
-
-#if defined(METAL_REUSE_BUFFERS)
 // How old a buffer must be before it can be reused - 0 should allow for most optimal memory footprint, higher values can be used for debugging issues
 #define METAL_SAFE_BUFFER_REUSE_AGE 1
 // How old a buffer can be before it's freed
@@ -75,14 +71,13 @@ class MtlfGlInterop;
 #else
 #define METAL_HIGH_MEMORY_THRESHOLD (2UL * 1024UL * 1024UL * 1024UL)
 #endif
-#endif
 
 // Enable stats gathering
 #define METAL_ENABLE_STATS
 #if defined(METAL_ENABLE_STATS)
 #define METAL_INC_STAT(STAT) STAT++
-#define METAL_INC_STAT_VAL(STAT, VAL) STAT+=VAL
-#define METAL_MAX_STAT_VAL(ORIG, NEWVAL) ORIG = MAX(ORIG, NEWVAL)
+#define METAL_INC_STAT_VAL(STAT, VAL) STAT.fetch_add(VAL, std::memory_order_relaxed)
+#define METAL_MAX_STAT_VAL(ORIG, NEWVAL) ORIG = MAX(ORIG.load(std::memory_order_relaxed), NEWVAL.load(std::memory_order_relaxed))
 #else
 #define METAL_INC_STAT(STAT)
 #define METAL_INC_STAT_VAL(STAT, VAL)
@@ -312,11 +307,6 @@ public:
     MTLF_API
     void ReleaseMetalBuffer(id<MTLBuffer> buffer);
 
-    // Gets space inside a buffer that has a lifetime of the current frame only - to be used for temporary data such as uniforms, the offset *must* be used
-    // Resource options are MTLResourceStorageModeShared | MTLResourceStorageModeManaged | MTLResourceOptionCPUCacheModeDefault
-    MTLF_API
-    id<MTLBuffer> GetMetalBufferAllocation(NSUInteger length, const void *pointer, NSUInteger *offset);
-    
     MTLF_API
     void StartFrame();
 
@@ -371,13 +361,6 @@ public:
     id<MTLCommandQueue> commandQueueGS;
     id<MTLTexture> mtlColorTexture;
     id<MTLTexture> mtlDepthTexture;
-    
-protected:
-    MTLF_API
-    MtlfMetalContext(id<MTLDevice> device, int width, int height);
-
-    MTLF_API
-    void CheckNewStateGather();
 
     MTLF_API MetalWorkQueue& GetWorkQueue(MetalWorkQueueType workQueueType) {
         if (workQueueType == METALWORKQUEUE_DEFAULT)
@@ -386,6 +369,13 @@ protected:
             return workQueueGeometry;
         return workQueueResource;
     }
+
+protected:
+    MTLF_API
+    MtlfMetalContext(id<MTLDevice> device, int width, int height);
+
+    MTLF_API
+    void CheckNewStateGather();
    
     struct BufferBinding {
         int              index;
@@ -533,11 +523,17 @@ protected:
     static thread_local ThreadState threadState;
     
     static std::mutex _commandBufferPoolMutex;
-    std::vector<id<MTLCommandBuffer>> commandBuffers;
-    std::vector<id<MTLCommandBuffer>> commandBuffersGS;
+    static int const commandBufferPoolSize = 256;
+    id<MTLCommandBuffer> commandBuffers[commandBufferPoolSize];
+    int commandBuffersStackPos = 0;
+    id<MTLCommandBuffer> commandBuffersGS[commandBufferPoolSize];
+    int commandBuffersGSStackPos = 0;
 
+    static std::mutex _pipelineMutex;
     boost::unordered_map<size_t, id<MTLRenderPipelineState>>  renderPipelineStateMap;
     boost::unordered_map<size_t, id<MTLComputePipelineState>> computePipelineStateMap;
+
+    static std::mutex _bufferMutex;
 
     MetalWorkQueue             workQueueGeometry;
     MetalWorkQueue             workQueueResource;
@@ -603,44 +599,38 @@ private:
     
     bool                       isRenderPassDescriptorPatched;
 
-#if defined(METAL_REUSE_BUFFERS)
     struct MetalBufferListEntry {
         id<MTLBuffer> buffer;
         unsigned int releasedOnFrame;
         unsigned int releasedOnCommandBuffer;
     };
     std::vector<MetalBufferListEntry> bufferFreeList;
-#endif
 
-    // Metal buffer for per frame data
-    id<MTLBuffer> perFrameBuffer;
-    NSUInteger    perFrameBufferSize;
-    NSUInteger    perFrameBufferOffset;
-    NSUInteger    perFrameBufferAlignment;
-    
     int64_t frameCount;
     int64_t lastCompletedFrame;
-    int64_t committedCommandBufferCount;
+    std::atomic_int64_t committedCommandBufferCount;
     int64_t lastCompletedCommandBuffer;
+    
+    TfToken points;
 
 #if defined(METAL_ENABLE_STATS)
     struct ResourceStats {
-        unsigned long commandBuffersCreated;
-        unsigned long commandBuffersCommitted;
-        unsigned long buffersCreated;
-        unsigned long buffersReused;
-        unsigned long bufferSearches;
-        unsigned long currentBufferAllocation;
-        unsigned long peakBufferAllocation;
-        unsigned long renderEncodersCreated;
-        unsigned long computeEncodersCreated;
-        unsigned long blitEncodersCreated;
-        unsigned long renderEncodersRequested;
-        unsigned long computeEncodersRequested;
-        unsigned long blitEncodersRequested;
-        unsigned long renderPipelineStates;
-        unsigned long computePipelineStates;
-        unsigned long GSBatchesStarted;
+        std::atomic_ulong commandBuffersCreated;
+        std::atomic_ulong commandBuffersCommitted;
+        std::atomic_ulong buffersCreated;
+        std::atomic_ulong buffersReused;
+        std::atomic_ulong bufferSearches;
+        std::atomic_ulong currentBufferAllocation;
+        std::atomic_ulong peakBufferAllocation;
+        std::atomic_ulong renderEncodersCreated;
+        std::atomic_ulong computeEncodersCreated;
+        std::atomic_ulong blitEncodersCreated;
+        std::atomic_ulong renderEncodersRequested;
+        std::atomic_ulong computeEncodersRequested;
+        std::atomic_ulong blitEncodersRequested;
+        std::atomic_ulong renderPipelineStates;
+        std::atomic_ulong computePipelineStates;
+        std::atomic_ulong GSBatchesStarted;
     } resourceStats;
 #endif
     

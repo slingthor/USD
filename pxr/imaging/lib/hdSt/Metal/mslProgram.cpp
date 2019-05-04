@@ -140,6 +140,7 @@ HdStMSLProgram::HdStMSLProgram(TfToken const &role)
 , _gsVertOutBufferSlot(-1), _gsPrimOutBufferSlot(-1), _gsVertOutStructSize(-1), _gsPrimOutStructSize(-1)
 , _drawArgsSlot(-1), _indicesSlot(-1)
 {
+    _currentlySet = false;
 }
 
 HdStMSLProgram::~HdStMSLProgram()
@@ -153,11 +154,14 @@ HdStMSLProgram::~HdStMSLProgram()
 
 NSUInteger dumpedFileCount = 0;
 
+static std::mutex _DebugDumpSourceMutex;
 const HdStProgram* previousProgram = 0;
 NSUInteger totalPrograms = 0;
 
 void DumpMetalSource(const HdStProgram* program, NSString *metalSrc, NSString *fileSuffix, NSString *compilerMessages)
 {
+    std::lock_guard<std::mutex> lock(_DebugDumpSourceMutex);
+
     if(program != previousProgram) {
         previousProgram = program;
         totalPrograms++;
@@ -193,6 +197,8 @@ void DumpMetalSource(const HdStProgram* program, NSString *metalSrc, NSString *f
 
 NSString *LoadPreviousMetalSource(const HdStProgram* program, NSString *metalSrc, NSString *fileSuffix)
 {
+    std::lock_guard<std::mutex> lock(_DebugDumpSourceMutex);
+
     NSUInteger programIndex = totalPrograms;
     if (program != previousProgram) {
         programIndex++;
@@ -264,6 +270,9 @@ HdStMSLProgram::CompileShader(GLenum type,
     }
     
     if (TfDebug::IsEnabled(HD_DUMP_SHADER_SOURCE)) {
+        static std::mutex _mutex;
+        std::lock_guard<std::mutex> lock(_mutex);
+
         std::cout   << "--------- " << shaderType << " ----------\n"
                     << shaderSourceOriginal
                     << "---------------------------\n"
@@ -313,7 +322,7 @@ HdStMSLProgram::CompileShader(GLenum type,
         filePostFix += "_Fail";
         success = false;
     }
-    
+
     //MTL_FIXME: Remove this debug line once done.
     DumpMetalSource(this, [NSString stringWithUTF8String:shaderSource.c_str()], [NSString stringWithUTF8String:filePostFix.c_str()], error != nil ? [error localizedDescription] : nil);
     
@@ -499,6 +508,11 @@ void HdStMSLProgram::SetProgram(char const* const label) {
         return;
     }
     
+    if (_currentlySet) {
+        _currentlySet = true;
+    }
+    _currentlySet = true;
+    
     //Create defaults for old-style uniforms
     struct _LoopParameters {
         TfToken uniformToken;
@@ -522,6 +536,11 @@ void HdStMSLProgram::SetProgram(char const* const label) {
 
 void HdStMSLProgram::UnsetProgram() {
     MtlfMetalContext::GetMetalContext()->ClearRenderEncoderState();
+
+    if (!_currentlySet) {
+        _currentlySet = false;
+    }
+    _currentlySet = false;
 }
 
 

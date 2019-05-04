@@ -141,6 +141,9 @@ HdSt_ImmediateDrawBatch::ExecuteDraw(
 
     bool hasOverrideShader = bool(renderPassState->GetOverrideShader());
 
+    static std::mutex _mutex;
+    std::lock_guard<std::mutex> lock(_mutex);
+    
     TF_FOR_ALL(it, shaders) {
         (*it)->BindResources(binder, *gpuProgram);
     }

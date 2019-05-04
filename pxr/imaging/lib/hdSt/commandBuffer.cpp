@@ -129,8 +129,8 @@ HdStCommandBuffer::ExecuteDraw(
             MtlfMetalContext *context = MtlfMetalContext::GetMetalContext();
 
             {
-//              static std::mutex _mutex;
-//              std::lock_guard<std::mutex> lock(_mutex);
+//                static std::mutex _mutex;
+//                std::lock_guard<std::mutex> lock(_mutex);
                 
                 context->StartFrameForThread();
                 
@@ -157,7 +157,7 @@ HdStCommandBuffer::ExecuteDraw(
         }
     };
 
-    bool mtBatchDrawing = true;
+    static bool mtBatchDrawing = true;
     if (mtBatchDrawing) {
         // Manually draw one, to ensure the renderpass descriptor is appropriately patched
         _Worker::draw(&_drawBatches,
