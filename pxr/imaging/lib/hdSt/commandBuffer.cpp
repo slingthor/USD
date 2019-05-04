@@ -164,8 +164,8 @@ HdStCommandBuffer::ExecuteDraw(
                       renderPassState,
                       resourceRegistry,
                       renderPassDescriptor,
-                      _drawBatches.size() - 2,
-                      _drawBatches.size() - 1);
+                      _drawBatches.size() - 1,
+                      _drawBatches.size());
 
         // Now render the rest
         WorkParallelForN(_drawBatches.size() - 1,
@@ -279,6 +279,18 @@ HdStCommandBuffer::_RebuildDrawBatches()
             _drawBatches.push_back(batch);
             batchMap[key] = batch;
         }
+    }
+    
+    //  Make sure the first item is the one with the fewest draw calls
+    auto smallestBatchIt = std::min_element(_drawBatches.begin(), _drawBatches.end(),
+        [](const HdSt_DrawBatchSharedPtr& a, const HdSt_DrawBatchSharedPtr& b)
+        {
+            return a->GetNumDrawCalls() < b->GetNumDrawCalls();
+        });
+    if (smallestBatchIt != _drawBatches.end()) {
+        HdSt_DrawBatchSharedPtr smallestBatch = *smallestBatchIt;
+        _drawBatches.erase(smallestBatchIt);
+        _drawBatches.push_back(smallestBatch);
     }
 }
 

@@ -102,6 +102,11 @@ public:
     HDST_API
     virtual void SetEnableTinyPrimCulling(bool tinyPrimCulling);
 
+    HDST_API
+    int GetNumDrawCalls() const {
+        return _drawItemInstances.size();
+    }
+
 protected:
     HDST_API
     virtual void _Init(HdStDrawItemInstance * drawItemInstance);

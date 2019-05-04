@@ -97,10 +97,17 @@ inline bool isAggregated(HdBufferArrayRangeSharedPtr const &rangeA,
 }
 }
 
+int const maxDrawItemsPerBatch = 128;
+
 bool
 HdSt_DrawBatch::Append(HdStDrawItemInstance * drawItemInstance)
 {
     if (!TF_VERIFY(!_drawItemInstances.empty())) {
+        return false;
+    }
+    
+    // When multi-threaded rendering, we go wide with a thread per batch
+    if (_drawItemInstances.size() >= maxDrawItemsPerBatch) {
         return false;
     }
 
