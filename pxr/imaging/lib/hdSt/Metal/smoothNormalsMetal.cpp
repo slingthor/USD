@@ -83,21 +83,13 @@ HdSt_SmoothNormalsComputationMetal::_Execute(
     // Only the normals are writebale
     unsigned long immutableBufferMask = (1 << 0) | (1 << 2) | (1 << 3);
     
-    // The output of this work is consumed by the GS, so we need to ensure
-    // it's executed before the GS
-    if (!context->GeometryShadersActive()) {
-        context->CreateCommandBuffer(METALWORKQUEUE_GEOMETRY_SHADER);
-        context->LabelCommandBuffer(@"Geometry Shaders (Smooth Normals)",
-            METALWORKQUEUE_GEOMETRY_SHADER);
-    }
-    
     id <MTLComputeCommandEncoder> computeEncoder =
-        context->GetComputeEncoder(METALWORKQUEUE_GEOMETRY_SHADER);
+        context->GetComputeEncoder(METALWORKQUEUE_DEFAULT);
     computeEncoder.label = @"Compute pass for GPU Smooth Normals";
     
     context->SetComputeEncoderState(
         computeFunction, 4, immutableBufferMask,
-        @"GPU Smooth Normals pipeline state", METALWORKQUEUE_GEOMETRY_SHADER);
+        @"GPU Smooth Normals pipeline state", METALWORKQUEUE_DEFAULT);
 
     [computeEncoder setBuffer:points->GetId()    offset:0 atIndex:0];
     [computeEncoder setBuffer:normals->GetId()   offset:0 atIndex:1];
@@ -107,7 +99,7 @@ HdSt_SmoothNormalsComputationMetal::_Execute(
                      atIndex:3];
     
     int maxThreadsPerThreadgroup =
-        context->GetMaxThreadsPerThreadgroup(METALWORKQUEUE_GEOMETRY_SHADER);
+        context->GetMaxThreadsPerThreadgroup(METALWORKQUEUE_DEFAULT);
 
 //    int const maxThreadsPerGroup = [context->device maxThreadsPerThreadgroup].width;
     int const maxThreadsPerGroup = 32;
@@ -119,39 +111,14 @@ HdSt_SmoothNormalsComputationMetal::_Execute(
     MTLSize threadgroupCount =
         MTLSizeMake(fmin(maxThreadsPerThreadgroup, numPoints), 1, 1);
     
-    if ([context->device supportsFeatureSet:METAL_FEATURESET_FOR_DISPATCHTHREADS]) {
-        [computeEncoder dispatchThreads:MTLSizeMake(numPoints, 1, 1)
-                  threadsPerThreadgroup:threadgroupCount];
-    }
-    else {
-        MTLSize threadsPerGrid =
-            MTLSizeMake(numPoints / threadgroupCount.width, 1, 1);
-        
-        [computeEncoder dispatchThreadgroups:threadsPerGrid
-                       threadsPerThreadgroup:threadgroupCount];
-
-        int remainder = numPoints % threadgroupCount.width;
-        if (remainder) {
-            Uniform localUniforms(uniform);
-
-            localUniforms.invocationOffset =
-                threadgroupCount.width * threadsPerGrid.width;
-            [computeEncoder setBytes:(const void *)&localUniforms
-                              length:sizeof(localUniforms)
-                             atIndex:3];
-
-            threadgroupCount = MTLSizeMake(remainder, 1, 1);
-            threadsPerGrid   = MTLSizeMake(1, 1, 1);
-            [computeEncoder dispatchThreadgroups:threadsPerGrid
-                           threadsPerThreadgroup:threadgroupCount];
-        }
-    }
+    [computeEncoder dispatchThreads:MTLSizeMake(numPoints, 1, 1)
+              threadsPerThreadgroup:threadgroupCount];
     
-    context->ReleaseEncoder(false, METALWORKQUEUE_GEOMETRY_SHADER);
+    context->ReleaseEncoder(false, METALWORKQUEUE_DEFAULT);
     
     // If OSD is enabled then it might require the data generated here. Would be better to do this per object if possible.
     if (context->IsOSDEnabledThisFrame()) {
-        context->CommitCommandBuffer(false, false, METALWORKQUEUE_GEOMETRY_SHADER);
+        context->CommitCommandBufferForThread(false, false, METALWORKQUEUE_DEFAULT);
     }
 }
 

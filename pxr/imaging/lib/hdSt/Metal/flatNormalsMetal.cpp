@@ -82,16 +82,10 @@ HdSt_FlatNormalsComputationMetal::_Execute(
     //  All but the normals are immutable
     unsigned long immutableBufferMask = (1 << 0) | (1 << 2) | (1 << 3) | (1 << 4);
     
-    // The output of this work is consumed by the GS, so we need to ensure it's executed before the GS
-    if (!context->GeometryShadersActive()) {
-        context->CreateCommandBuffer(METALWORKQUEUE_GEOMETRY_SHADER);
-        context->LabelCommandBuffer(@"Geometry Shaders (Flat Normals)", METALWORKQUEUE_GEOMETRY_SHADER);
-    }
-
-    id <MTLComputeCommandEncoder> computeEncoder = context->GetComputeEncoder(METALWORKQUEUE_GEOMETRY_SHADER);
+    id <MTLComputeCommandEncoder> computeEncoder = context->GetComputeEncoder(METALWORKQUEUE_DEFAULT);
     computeEncoder.label = @"Compute pass for GPU Flat Normals";
     
-    context->SetComputeEncoderState(computeFunction, 5, immutableBufferMask, @"GPU Flat Normals pipeline state", METALWORKQUEUE_GEOMETRY_SHADER);
+    context->SetComputeEncoderState(computeFunction, 5, immutableBufferMask, @"GPU Flat Normals pipeline state", METALWORKQUEUE_DEFAULT);
     
     [computeEncoder setBuffer:points->GetId()    offset:0 atIndex:0];
     [computeEncoder setBuffer:normals->GetId()   offset:0 atIndex:1];
@@ -100,7 +94,7 @@ HdSt_FlatNormalsComputationMetal::_Execute(
     [computeEncoder setBytes:(const void *)&uniform length:sizeof(uniform) atIndex:4];
 
     int maxThreadsPerThreadgroup =
-        context->GetMaxThreadsPerThreadgroup(METALWORKQUEUE_GEOMETRY_SHADER);
+        context->GetMaxThreadsPerThreadgroup(METALWORKQUEUE_DEFAULT);
     //    int const maxThreadsPerGroup = [context->device maxThreadsPerThreadgroup].width;
     int const maxThreadsPerGroup = 32;
     
@@ -111,34 +105,10 @@ HdSt_FlatNormalsComputationMetal::_Execute(
     MTLSize threadgroupCount =
         MTLSizeMake(fmin(maxThreadsPerThreadgroup, numPrims), 1, 1);
 
-    if ([context->device supportsFeatureSet:METAL_FEATURESET_FOR_DISPATCHTHREADS]) {
-        [computeEncoder dispatchThreads:MTLSizeMake(numPrims, 1, 1)
-                  threadsPerThreadgroup:threadgroupCount];
-    }
-    else {
-        MTLSize threadsPerGrid =
-            MTLSizeMake(numPrims / threadgroupCount.width, 1, 1);
-        
-        [computeEncoder dispatchThreadgroups:threadsPerGrid
-                       threadsPerThreadgroup:threadgroupCount];
-        
-        int remainder = numPrims % threadgroupCount.width;
-        if (remainder) {
-            Uniform localUniforms(uniform);
-            
-            localUniforms.invocationOffset =
-                threadgroupCount.width * threadsPerGrid.width;
-            [computeEncoder setBytes:(const void *)&localUniforms
-                              length:sizeof(localUniforms)
-                             atIndex:4];
-            
-            threadgroupCount = MTLSizeMake(remainder, 1, 1);
-            threadsPerGrid   = MTLSizeMake(1, 1, 1);
-            [computeEncoder dispatchThreadgroups:threadsPerGrid
-                           threadsPerThreadgroup:threadgroupCount];
-        }
-    }
-    context->ReleaseEncoder(false, METALWORKQUEUE_GEOMETRY_SHADER);
+    [computeEncoder dispatchThreads:MTLSizeMake(numPrims, 1, 1)
+              threadsPerThreadgroup:threadgroupCount];
+
+    context->ReleaseEncoder(false, METALWORKQUEUE_DEFAULT);
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

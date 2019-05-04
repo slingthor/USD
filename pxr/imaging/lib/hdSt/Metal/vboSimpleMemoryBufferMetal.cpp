@@ -180,7 +180,7 @@ HdStVBOSimpleMemoryBufferMetal::Reallocate(
     }
 
     context->ReleaseEncoder(true, METALWORKQUEUE_RESOURCE);
-    context->CommitCommandBuffer(false, false, METALWORKQUEUE_RESOURCE);
+    context->CommitCommandBufferForThread(false, false, METALWORKQUEUE_RESOURCE);
 
     _capacity = numElements;
     _needsReallocation = false;

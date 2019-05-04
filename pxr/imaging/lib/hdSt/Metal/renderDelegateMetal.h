@@ -72,6 +72,9 @@ public:
     HDST_API
     virtual void FinalizeRender() override;
 
+    HDST_API
+    virtual void CommitResources(HdChangeTracker *tracker) override;
+
 private:
     
     TfToken _deviceDesc;

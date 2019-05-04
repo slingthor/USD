@@ -57,7 +57,7 @@ HdStBufferRelocatorMetal::Commit()
                                size:it->copySize];
     }
     context->ReleaseEncoder(true, METALWORKQUEUE_RESOURCE);
-    context->CommitCommandBuffer(false, false, METALWORKQUEUE_RESOURCE);
+    context->CommitCommandBufferForThread(false, false, METALWORKQUEUE_RESOURCE);
 
     HD_PERF_COUNTER_ADD(HdPerfTokens->glCopyBufferSubData,
                         (double)_queue.size());

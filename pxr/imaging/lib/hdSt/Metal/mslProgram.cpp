@@ -84,28 +84,28 @@ MSL_ShaderBindingMapResults MSL_FindBinding(
         MSL_ShaderBindingMap const& bindings,
         TfToken const& name,
         int32_t level) {
-    TfToken nameToFind;
     if (level < 0) {
-        nameToFind = name;
+        return bindings.equal_range(name.Hash());
     }
-    else {
-        if (level >= 10) {
-            TF_FATAL_CODING_ERROR("Not Implemented");
-        }
-        
-        char const *pN = name.GetText();
-        char buf[256];
-        char *pD = buf;
-        
-        while(*pN)
-        *pD++ = *pN++;
-        
-        *pD++ = '_';
-        *pD++ = '0' + level;
-        *pD = 0;
-        
-        nameToFind = TfToken(buf, TfToken::Immortal);
+    
+    TfToken nameToFind;
+    if (level >= 10) {
+        TF_FATAL_CODING_ERROR("Not Implemented");
     }
+    
+    char const *pN = name.GetText();
+    char buf[256];
+    char *pD = buf;
+    
+    while(*pN)
+    *pD++ = *pN++;
+    
+    *pD++ = '_';
+    *pD++ = '0' + level;
+    *pD = 0;
+    
+    nameToFind = TfToken(buf, TfToken::Immortal);
+
     return bindings.equal_range(nameToFind.Hash());
 }
 
@@ -139,7 +139,6 @@ HdStMSLProgram::HdStMSLProgram(TfToken const &role)
 , _buildTarget(kMSL_BuildTarget_Regular)
 , _gsVertOutBufferSlot(-1), _gsPrimOutBufferSlot(-1), _gsVertOutStructSize(-1), _gsPrimOutStructSize(-1)
 , _drawArgsSlot(-1), _indicesSlot(-1)
-, _currentlySet(false)
 {
 }
 
@@ -495,11 +494,6 @@ void HdStMSLProgram::SetProgram(char const* const label) {
          context->SetGSProgram(_computeGeometryFunction);
     }
     
-    if (_currentlySet) {
-        TF_FATAL_CODING_ERROR("HdStProgram is already set");
-    }
-    _currentlySet = true;
-    
     // Ignore a compute program being set as it will be provided directly to SetComputeEncoderState (may revisit later)
     if (_computeFunction) {
         return;
@@ -528,16 +522,6 @@ void HdStMSLProgram::SetProgram(char const* const label) {
 
 void HdStMSLProgram::UnsetProgram() {
     MtlfMetalContext::GetMetalContext()->ClearRenderEncoderState();
-    
-    if (!_currentlySet) {
-        TF_FATAL_CODING_ERROR("HdStProgram wasn't previously set, or has already been unset");
-    }
-    _currentlySet = false;
-
-    for(auto buffer : _buffers) {
-        MtlfMetalContext::GetMetalContext()->ReleaseMetalBuffer(buffer);
-    }
-    _buffers.clear();
 }
 
 
@@ -575,10 +559,10 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
     bool const drawingQuads = (primitiveMode == GL_LINES_ADJACENCY);
     bool const tempPointsWorkaround = context->IsTempPointWorkaroundActive();
     
-    if (!context->GeometryShadersActive()) {
-        context->CreateCommandBuffer(METALWORKQUEUE_GEOMETRY_SHADER);
-        context->LabelCommandBuffer(@"Geometry Shaders", METALWORKQUEUE_GEOMETRY_SHADER);
-    }
+//    if (!context->GeometryShadersActive()) {
+//        context->CreateCommandBuffer(METALWORKQUEUE_GEOMETRY_SHADER);
+//        context->LabelCommandBuffer(@"Geometry Shaders", METALWORKQUEUE_GEOMETRY_SHADER);
+//    }
     
     uint32_t numOutVertsPerInPrim(3), numOutPrimsPerInPrim(1);
     if (drawingQuads) {
@@ -612,6 +596,10 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
     if (doMVAComputeGS && !useDispatchThreads) {
         maxThreadsPerThreadgroup = METAL_GS_THREADGROUP_SIZE;
     }
+    
+    // DEMO!!!
+    if (doMVAComputeGS)
+        return;
     
     int const maxThreadsPerGroup = 32;
     

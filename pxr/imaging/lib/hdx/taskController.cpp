@@ -769,6 +769,9 @@ HdxTaskController::TestIntersection(
         TfToken const& intersectionMode,
         HdxIntersector::HitVector *allHits)
 {
+    // DEMO!!!
+//    return false;
+
     if (allHits == nullptr) {
         TF_CODING_ERROR("Null hit vector passed to TestIntersection");
         return false;

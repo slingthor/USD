@@ -26,6 +26,8 @@
 #include "pxr/imaging/garch/contextCaps.h"
 #include "pxr/imaging/garch/resourceFactory.h"
 
+#include "pxr/imaging/mtlf/mtlDevice.h"
+
 #include "pxr/imaging/hdSt/commandBuffer.h"
 #include "pxr/imaging/hdSt/geometricShader.h"
 #include "pxr/imaging/hdSt/immediateDrawBatch.h"
@@ -112,36 +114,81 @@ HdStCommandBuffer::ExecuteDraw(
     //
     // draw batches
     //
-//    for (auto const& batch : _drawBatches) {
-//        batch->ExecuteDraw(renderPassState, resourceRegistry);
-//    }
-    
+
+    MtlfMetalContext *context = MtlfMetalContext::GetMetalContext();
+    MTLRenderPassDescriptor *renderPassDescriptor = context->GetRenderPassDescriptor();
+
     struct _Worker {
         static
         void draw(std::vector<HdSt_DrawBatchSharedPtr> * drawBatches,
                   HdStRenderPassStateSharedPtr const &renderPassState,
                   HdStResourceRegistrySharedPtr const &resourceRegistry,
+                  MTLRenderPassDescriptor *rpd,
                   size_t begin, size_t end)
         {
-            for(size_t i = begin; i < end; i++) {
-                HdSt_DrawBatchSharedPtr& batch = (*drawBatches)[i];
-                batch->ExecuteDraw(renderPassState, resourceRegistry);
+            MtlfMetalContext *context = MtlfMetalContext::GetMetalContext();
+
+            {
+//              static std::mutex _mutex;
+//              std::lock_guard<std::mutex> lock(_mutex);
+                
+                context->StartFrameForThread();
+                
+                // Create a new command buffer for each render pass to the current drawable
+                context->CreateCommandBuffer(METALWORKQUEUE_DEFAULT);
+                context->LabelCommandBuffer(@"HdEngine::RenderWorker", METALWORKQUEUE_DEFAULT);
+
+                context->SetRenderPassDescriptor(rpd);
+                
+                for(size_t i = begin; i < end; i++) {
+                    HdSt_DrawBatchSharedPtr& batch = (*drawBatches)[i];
+                    batch->ExecuteDraw(renderPassState, resourceRegistry);
+                }
+                
+                if (context->GeometryShadersActive()) {
+                    // Complete the GS command buffer if we have one
+                    context->CommitCommandBufferForThread(true, false, METALWORKQUEUE_GEOMETRY_SHADER);
+                }
+                
+                context->CommitCommandBufferForThread(false, false);
+
+                context->EndFrameForThread();
             }
         }
     };
 
-    bool mtBatchDrawing = false;
+    bool mtBatchDrawing = true;
     if (mtBatchDrawing) {
-        WorkParallelForN(_drawBatches.size(),
-                         std::bind(&_Worker::draw, &_drawBatches,
-                                   std::cref(renderPassState),
-                                   std::cref(resourceRegistry),
-                                   std::placeholders::_1,
-                                   std::placeholders::_2));
-    } else {
+        // Manually draw one, to ensure the renderpass descriptor is appropriately patched
         _Worker::draw(&_drawBatches,
                       renderPassState,
                       resourceRegistry,
+                      renderPassDescriptor,
+                      _drawBatches.size() - 2,
+                      _drawBatches.size() - 1);
+
+        // Now render the rest
+        WorkParallelForN(_drawBatches.size() - 1,
+                         std::bind(&_Worker::draw, &_drawBatches,
+                                   std::cref(renderPassState),
+                                   std::cref(resourceRegistry),
+                                   std::ref(renderPassDescriptor),
+                                   std::placeholders::_1,
+                                   std::placeholders::_2));
+    } else {
+//        for (int i = 0; i < _drawBatches.size(); i++) {
+//            _Worker::draw(&_drawBatches,
+//                          renderPassState,
+//                          resourceRegistry,
+//                          renderPassDescriptor,
+//                          i,
+//                          i + 1);
+//        }
+
+        _Worker::draw(&_drawBatches,
+                      renderPassState,
+                      resourceRegistry,
+                      renderPassDescriptor,
                       0,
                       _drawBatches.size());
     }

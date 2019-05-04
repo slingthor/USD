@@ -132,6 +132,8 @@ enum MetalWorkQueueType {
 };
 
 class MtlfMetalContext : public boost::noncopyable {
+protected:
+    struct MetalWorkQueue;
 public:
     typedef struct {
         float position[2];
@@ -174,7 +176,7 @@ public:
     
     MTLF_API
     id<MTLBuffer> GetIndexBuffer() {
-        return indexBuffer;
+        return threadState.indexBuffer;
     }
     
     MTLF_API
@@ -190,7 +192,10 @@ public:
     void LabelCommandBuffer(NSString *label, MetalWorkQueueType workQueueType = METALWORKQUEUE_DEFAULT);
     
     MTLF_API
-    void CommitCommandBuffer(bool waituntilScheduled, bool waitUntilCompleted, MetalWorkQueueType workQueueType = METALWORKQUEUE_DEFAULT);
+    void CommitCommandBufferForThread(bool waituntilScheduled, bool waitUntilCompleted, MetalWorkQueueType workQueueType = METALWORKQUEUE_DEFAULT);
+
+    MTLF_API
+    void CleanupUnusedBuffers(bool forceClean);
     
     MTLF_API
     void SetOutputPixelFormats(MTLPixelFormat pixelFormat, MTLPixelFormat depthFormat);
@@ -283,7 +288,10 @@ public:
     void ReleaseEncoder(bool endEncoding, MetalWorkQueueType workQueueType = METALWORKQUEUE_DEFAULT);
     
     MTLF_API
-    void SetActiveWorkQueue(MetalWorkQueueType workQueueType) { currentWorkQueue = &workQueues[workQueueType]; currentWorkQueueType = workQueueType;};
+    void SetActiveWorkQueue(MetalWorkQueueType workQueueType) {
+        threadState.currentWorkQueue = &GetWorkQueue(workQueueType);
+        threadState.currentWorkQueueType = workQueueType;
+    };
     
     MTLF_API
     void EncodeWaitForEvent(MetalWorkQueueType waitingQueue, MetalWorkQueueType signalQueue, uint64_t eventValue = 0);
@@ -296,7 +304,7 @@ public:
     uint64_t EncodeSignalEvent(MetalWorkQueueType signalQueue);
     
     MTLF_API
-    uint64_t GetEventValue(MetalWorkQueueType signalQueue) const { return workQueues[signalQueue].currentEventValue; }
+    uint64_t GetEventValue(MetalWorkQueueType signalQueue) { return GetWorkQueue(signalQueue).currentEventValue; }
 	
     MTLF_API
     id<MTLBuffer> GetMetalBuffer(NSUInteger length, MTLResourceOptions options = MTLResourceStorageModeDefault, const void *pointer = NULL);
@@ -311,12 +319,20 @@ public:
     
     MTLF_API
     void StartFrame();
-    
+
+    MTLF_API
+    void StartFrameForThread();
+
     MTLF_API
     void EndFrame();
     
     MTLF_API
-    bool GeometryShadersActive() const { return workQueues[METALWORKQUEUE_GEOMETRY_SHADER].commandBuffer != nil; }
+    void EndFrameForThread();
+
+    MTLF_API
+    bool GeometryShadersActive() const {
+        return workQueueGeometry.commandBuffer != nil;
+    }
     
     //Returns the maximum number of _primitives_ to process per ComputeGS part.
     MTLF_API
@@ -331,10 +347,10 @@ public:
     unsigned long IncNumberPrimsDrawn(unsigned long numPrims, bool init) { numPrimsDrawn = init ? numPrims : (numPrimsDrawn += numPrims); return numPrimsDrawn; }
     
     MTLF_API
-    bool IsTempPointWorkaroundActive() const { return tempPointsWorkaroundActive; }
+    bool IsTempPointWorkaroundActive() const { return threadState.tempPointsWorkaroundActive; }
 
     MTLF_API
-    void SetTempPointWorkaround(bool activate) { tempPointsWorkaroundActive = activate; }
+    void SetTempPointWorkaround(bool activate) { threadState.tempPointsWorkaroundActive = activate; }
     
     MTLF_API
     void SetOSDEnabledThisFrame(bool OSDStatus) { OSDEnabledThisFrame = OSDStatus; }
@@ -348,15 +364,13 @@ public:
     MTLF_API
     float GetGPUTimeInMs();
     
+    bool enableMultiQueue;
+
     id<MTLDevice> device;
     id<MTLCommandQueue> commandQueue;
     id<MTLCommandQueue> commandQueueGS;
     id<MTLTexture> mtlColorTexture;
     id<MTLTexture> mtlDepthTexture;
-    
-    bool enableMultiQueue;
-    bool enableMVA;
-    bool enableComputeGS;
     
 protected:
     MTLF_API
@@ -365,6 +379,13 @@ protected:
     MTLF_API
     void CheckNewStateGather();
 
+    MTLF_API MetalWorkQueue& GetWorkQueue(MetalWorkQueueType workQueueType) {
+        if (workQueueType == METALWORKQUEUE_DEFAULT)
+            return threadState.workQueueDefault;
+        if (workQueueType == METALWORKQUEUE_GEOMETRY_SHADER)
+            return workQueueGeometry;
+        return workQueueResource;
+    }
    
     struct BufferBinding {
         int              index;
@@ -375,23 +396,159 @@ protected:
         bool             modified;
         uint8_t          *contents;
     };
-    std::vector<BufferBinding*> boundBuffers;
-	
-    size_t oldStyleUniformBufferSize[kMSL_ProgramStage_NumStages];
-    size_t oldStyleUniformBufferAllocatedSize[kMSL_ProgramStage_NumStages];
-    uint8_t *oldStyleUniformBuffer[kMSL_ProgramStage_NumStages];
-    uint32_t oldStyleUniformBufferIndex[kMSL_ProgramStage_NumStages];
     
     struct TextureBinding { int index; id<MTLTexture> texture; TfToken name; MSL_ProgramStage stage; };
-    std::vector<TextureBinding> textures;
-	struct SamplerBinding { int index; id<MTLSamplerState> sampler; TfToken name; MSL_ProgramStage stage; };
-    std::vector<SamplerBinding> samplers;
+    struct SamplerBinding { int index; id<MTLSamplerState> sampler; TfToken name; MSL_ProgramStage stage; };
+
+    struct MetalWorkQueue {
+        id<MTLCommandBuffer>         commandBuffer;
+#if defined(METAL_EVENTS_API_PRESENT)
+        id<MTLEvent>                 event;
+#endif
+        
+        MetalEncoderType             currentEncoderType;
+        id<MTLBlitCommandEncoder>    currentBlitEncoder;
+        id<MTLRenderCommandEncoder>  currentRenderEncoder;
+        id<MTLComputeCommandEncoder> currentComputeEncoder;
+        MTLRenderPassDescriptor      *currentRenderPassDescriptor;
+        bool encoderInUse;
+        bool encoderEnded;
+        bool encoderHasWork;
+        bool generatesEndOfQueueEvent;
+        
+        uint64_t currentEventValue;
+        uint64_t highestExpectedEventValue;
+        uint64_t lastWaitEventValue;
+        size_t currentVertexDescriptorHash;
+        size_t currentColourAttachmentsHash;
+        size_t currentRenderPipelineDescriptorHash;
+        size_t currentComputePipelineDescriptorHash;
+        id<MTLRenderPipelineState>  currentRenderPipelineState;
+        id<MTLComputePipelineState> currentComputePipelineState;
+        NSUInteger                  currentComputeThreadExecutionWidth;
+    };
     
-    id<MTLBuffer> indexBuffer;
-    id<MTLBuffer> vertexPositionBuffer;
-    id<MTLBuffer> remappedQuadIndexBuffer;
-    id<MTLBuffer> remappedQuadIndexBufferSource;
-    id<MTLBuffer> pointIndexBuffer;
+    struct ThreadState {
+
+        ThreadState(MtlfMetalContext *_this)
+            : gsDataOffset(0)
+            , gsBufferIndex(0)
+            , gsCurrentBuffer(nil)
+            , gsFence(nil)
+            , gsHasOpenBatch(false)
+            , gsSyncRequired(false)
+            , enableMVA(false)
+            , enableComputeGS(false)
+        {
+            size_t const defaultBufferSize = 1024;
+            
+            for(int i = 0; i < kMSL_ProgramStage_NumStages; i++) {
+                oldStyleUniformBufferSize[i] = 0;
+                oldStyleUniformBufferAllocatedSize[i] = defaultBufferSize;
+                oldStyleUniformBuffer[i] = new uint8_t[defaultBufferSize];
+                memset(oldStyleUniformBuffer[i], 0x00, defaultBufferSize);
+            }
+            
+            vertexDescriptor = nil;
+            indexBuffer = nil;
+            vertexPositionBuffer = nil;
+
+            numVertexComponents = 0;
+            
+            currentWorkQueueType = METALWORKQUEUE_DEFAULT;
+            currentWorkQueue     = &workQueueDefault;
+            
+            _this->ResetEncoders(METALWORKQUEUE_DEFAULT, true);
+
+            MTLResourceOptions resourceOptions = MTLResourceStorageModePrivate|MTLResourceCPUCacheModeDefaultCache;
+            for(int i = 0; i < _this->gsMaxConcurrentBatches; i++)
+                gsBuffers.push_back([_this->device newBufferWithLength:_this->gsMaxDataPerBatch options:resourceOptions]);
+            gsCurrentBuffer = gsBuffers.at(0);
+            
+            gsFence = [_this->device newFence];
+
+            remappedQuadIndexBuffer = nil;
+            pointIndexBuffer = nil;
+        }
+        
+        ~ThreadState() {
+            for(int i = 0; i < kMSL_ProgramStage_NumStages; i++) {
+                delete[] oldStyleUniformBuffer[i];
+            }
+            [gsFence release];
+            for(int i = 0; i < gsBuffers.size(); i++)
+            [gsBuffers.at(i) release];
+            gsBuffers.clear();
+        }
+
+        std::vector<BufferBinding*> boundBuffers;
+
+        size_t oldStyleUniformBufferSize[kMSL_ProgramStage_NumStages];
+        size_t oldStyleUniformBufferAllocatedSize[kMSL_ProgramStage_NumStages];
+        uint8_t *oldStyleUniformBuffer[kMSL_ProgramStage_NumStages];
+        uint32_t oldStyleUniformBufferIndex[kMSL_ProgramStage_NumStages];
+
+        std::vector<TextureBinding> textures;
+        std::vector<SamplerBinding> samplers;
+
+        id<MTLBuffer> indexBuffer;
+        id<MTLBuffer> vertexPositionBuffer;
+        
+        id<MTLComputePipelineState> computePipelineState;
+
+        MetalWorkQueue      *currentWorkQueue;
+        MetalWorkQueueType  currentWorkQueueType;
+        
+        MetalWorkQueue      workQueueDefault;
+
+        // Pipeline state
+        MTLVertexDescriptor          *vertexDescriptor;
+        uint32_t numVertexComponents;
+        id<MTLFunction> renderVertexFunction;
+        id<MTLFunction> renderFragmentFunction;
+        id<MTLFunction> renderComputeGSFunction;
+        
+        uint32_t dirtyRenderState;
+        
+        //Geometry Shader Related
+        int                        gsDataOffset;
+        int                        gsBufferIndex;
+        id<MTLBuffer>              gsCurrentBuffer;
+        std::vector<id<MTLBuffer>> gsBuffers;
+        id<MTLFence>               gsFence;
+        bool                       gsHasOpenBatch;
+        bool                       gsFirstBatch;
+        bool                       gsSyncRequired;
+        
+        bool tempPointsWorkaroundActive = false;
+        
+        id<MTLBuffer> remappedQuadIndexBuffer;
+        id<MTLBuffer> remappedQuadIndexBufferSource;
+        id<MTLBuffer> pointIndexBuffer;
+        
+        bool enableMVA;
+        bool enableComputeGS;
+    };
+
+    static thread_local ThreadState threadState;
+    
+    static std::mutex _commandBufferPoolMutex;
+    std::vector<id<MTLCommandBuffer>> commandBuffers;
+    std::vector<id<MTLCommandBuffer>> commandBuffersGS;
+
+    boost::unordered_map<size_t, id<MTLRenderPipelineState>>  renderPipelineStateMap;
+    boost::unordered_map<size_t, id<MTLComputePipelineState>> computePipelineStateMap;
+
+    MetalWorkQueue             workQueueGeometry;
+    MetalWorkQueue             workQueueResource;
+
+    int                        gsMaxConcurrentBatches;
+    int                        gsMaxDataPerBatch;
+
+    // Internal state which gets applied to the render encoder
+    MTLWinding windingOrder;
+    MTLCullMode cullMode;
+    MTLTriangleFillMode fillMode;
     
     MtlfDrawTarget *drawTarget;
 
@@ -399,7 +556,6 @@ private:
     const static uint64_t endOfQueueEventValue = 0xFFFFFFFFFFFFFFFF;
 
     id<MTLDepthStencilState> depthState;
-    id<MTLComputePipelineState> computePipelineState;
     
     // These are used when rendering from within a native Metal application, and
     // are set by the application
@@ -428,39 +584,7 @@ private:
     void handleGPUHotPlug(id<MTLDevice> device, MTLDeviceNotificationName notifier);
 #endif
 
-    static MtlfMetalContext         *context;
-    
-    struct MetalWorkQueue {
-        id<MTLCommandBuffer>         commandBuffer;
-#if defined(METAL_EVENTS_API_PRESENT)
-        id<MTLEvent>                 event;
-#endif
- 
-        MetalEncoderType             currentEncoderType;
-        id<MTLBlitCommandEncoder>    currentBlitEncoder;
-        id<MTLRenderCommandEncoder>  currentRenderEncoder;
-        id<MTLComputeCommandEncoder> currentComputeEncoder;
-        MTLRenderPassDescriptor      *currentRenderPassDescriptor;
-        bool encoderInUse;
-        bool encoderEnded;
-        bool encoderHasWork;
-        bool generatesEndOfQueueEvent;
-        
-        uint64_t currentEventValue;
-        uint64_t highestExpectedEventValue;
-        uint64_t lastWaitEventValue;
-        size_t currentVertexDescriptorHash;
-        size_t currentColourAttachmentsHash;
-        size_t currentRenderPipelineDescriptorHash;
-        size_t currentComputePipelineDescriptorHash;
-        id<MTLRenderPipelineState>  currentRenderPipelineState;
-        id<MTLComputePipelineState> currentComputePipelineState;
-        NSUInteger                  currentComputeThreadExecutionWidth;
-    };
-    
-    MetalWorkQueue      workQueues[METALWORKQUEUE_MAX];
-    MetalWorkQueue      *currentWorkQueue;
-    MetalWorkQueueType  currentWorkQueueType;
+    static MtlfMetalContext          *context;
     
     // Internal encoder functions
     void SetCurrentEncoder(MetalEncoderType encoderType, MetalWorkQueueType workQueueType);
@@ -470,42 +594,15 @@ private:
     void SetRenderPipelineState();
     size_t HashVertexDescriptor();
     
-    // Pipeline state
-    MTLVertexDescriptor          *vertexDescriptor;
-    uint32_t numVertexComponents;
-    boost::unordered_map<size_t, id<MTLRenderPipelineState>>  renderPipelineStateMap;
-    boost::unordered_map<size_t, id<MTLComputePipelineState>> computePipelineStateMap;
-    id<MTLFunction> renderVertexFunction;
-    id<MTLFunction> renderFragmentFunction;
-    id<MTLFunction> renderComputeGSFunction;
- 
     bool concurrentDispatchSupported;
     
-    // Internal state which gets applied to the render encoder
-    MTLWinding windingOrder;
-    MTLCullMode cullMode;
-    MTLTriangleFillMode fillMode;
-    uint32_t dirtyRenderState;
-    
-    //Geometry Shader Related
-    int                        gsDataOffset;
-    int                        gsBufferIndex;
-    int                        gsMaxConcurrentBatches;
-    int                        gsMaxDataPerBatch;
-    id<MTLBuffer>              gsCurrentBuffer;
-    std::vector<id<MTLBuffer>> gsBuffers;
-    id<MTLFence>               gsFence;
-    bool                       gsHasOpenBatch;
-    bool                       gsFirstBatch;
-    bool                       gsSyncRequired;
-    bool                       isRenderPassDescriptorPatched;
-
     void _gsAdvanceBuffer();
     void _gsResetBuffers();
     void _gsEncodeSync(bool doOpenBatch);
     void _PatchRenderPassDescriptor();
     
-    void CleanupUnusedBuffers(bool forceClean);
+    bool                       isRenderPassDescriptorPatched;
+
 #if defined(METAL_REUSE_BUFFERS)
     struct MetalBufferListEntry {
         id<MTLBuffer> buffer;
@@ -566,7 +663,6 @@ private:
     
     unsigned long numPrimsDrawn;
     
-    bool tempPointsWorkaroundActive = false;
     bool OSDEnabledThisFrame = false;
     
     id<MTLCaptureScope> captureScope;

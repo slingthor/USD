@@ -116,6 +116,27 @@ void HdStRenderDelegateMetal::SetRenderSetting(TfToken const& key, VtValue const
     HdStRenderDelegateMetal::SetRenderSetting(key, value);
 }
 
+void HdStRenderDelegateMetal::CommitResources(HdChangeTracker *tracker)
+{
+    MtlfMetalContext *context = MtlfMetalContext::GetMetalContext();
+
+    context->StartFrameForThread();
+    
+    // Create a new command buffer for each render pass to the current drawable
+    context->CreateCommandBuffer(METALWORKQUEUE_DEFAULT);
+    context->LabelCommandBuffer(@"CommitResources", METALWORKQUEUE_DEFAULT);
+    
+    HdStRenderDelegate::CommitResources(tracker);
+
+    if (context->GeometryShadersActive()) {
+        // Complete the GS command buffer if we have one
+        context->CommitCommandBufferForThread(true, false, METALWORKQUEUE_GEOMETRY_SHADER);
+    }
+    context->CommitCommandBufferForThread(false, false);
+    
+    context->EndFrameForThread();
+}
+
 VtValue HdStRenderDelegateMetal::GetRenderSetting(TfToken const& key) const
 {
     if (key == HdStRenderSettingsTokens->graphicsAPI) {
@@ -226,8 +247,8 @@ void HdStRenderDelegateMetal::PrepareRender(
     context->StartFrame();
     
     // Create a new command buffer for each render pass to the current drawable
-    context->CreateCommandBuffer(METALWORKQUEUE_DEFAULT);
-    context->LabelCommandBuffer(@"HdEngine::Render", METALWORKQUEUE_DEFAULT);
+//    context->CreateCommandBuffer(METALWORKQUEUE_DEFAULT);
+//    context->LabelCommandBuffer(@"HdEngine::Render", METALWORKQUEUE_DEFAULT);
     
     // Set the render pass descriptor to use for the render encoders
     context->SetRenderPassDescriptor(_mtlRenderPassDescriptor);
@@ -264,22 +285,25 @@ void HdStRenderDelegateMetal::FinalizeRender()
 {
     MtlfMetalContext *context = MtlfMetalContext::GetMetalContext();
 
+    context->StartFrameForThread();
+
+    // Create a new command buffer for each render pass to the current drawable
+    context->CreateCommandBuffer(METALWORKQUEUE_DEFAULT);
+    context->LabelCommandBuffer(@"HdEngine::Render", METALWORKQUEUE_DEFAULT);
+
     if (_renderOutput == DelegateParams::RenderOutput::OpenGL) {
         // Depth texture copy
         context->CopyDepthTextureToOpenGL();
     }
     
-    if (context->GeometryShadersActive()) {
-        // Complete the GS command buffer if we have one
-        context->CommitCommandBuffer(true, false, METALWORKQUEUE_GEOMETRY_SHADER);
-    }
-    
     // Commit the render buffer (will wait for GS to complete if present)
     // We wait until scheduled, because we're about to consume the Metal
     // generated textures in an OpenGL blit
-    context->CommitCommandBuffer(
+    context->CommitCommandBufferForThread(
         _renderOutput == DelegateParams::RenderOutput::OpenGL, false);
-    
+    context->CleanupUnusedBuffers(false);
+
+    context->EndFrameForThread();
     context->EndFrame();
 
     if (_renderOutput == DelegateParams::RenderOutput::Metal) {

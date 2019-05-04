@@ -48,16 +48,13 @@ enum {
     DIRTY_METALRENDERSTATE_ALL                      = 0xFFFFFFFF
 };
 
-//Be careful with these when using Concurrent Dispatch. Also; you can't enable asynchronous compute without also enabling METAL_EVENTS_API_PRESENT.
-#define METAL_COMPUTEGS_MANUAL_HAZARD_TRACKING            0
-#if defined(ARCH_OS_MACOS)
-#define METAL_COMPUTEGS_ALLOW_ASYNCHRONOUS_COMPUTE        0     //Currently disabled due to additional overhead of using events to synchronize.
-#else
-#define METAL_COMPUTEGS_ALLOW_ASYNCHRONOUS_COMPUTE        0     //Currently disabled due to additional overhead of using events to synchronize.
-#endif
+#define METAL_COMPUTEGS_ALLOW_ASYNCHRONOUS_COMPUTE        1
 
 PXR_NAMESPACE_OPEN_SCOPE
+
 MtlfMetalContext *MtlfMetalContext::context = NULL;
+std::mutex MtlfMetalContext::_commandBufferPoolMutex;
+thread_local MtlfMetalContext::ThreadState MtlfMetalContext::threadState(MtlfMetalContext::GetMetalContext());
 
 #if defined(ARCH_OS_MACOS)
 // Called when the window is dragged to another display
@@ -148,17 +145,8 @@ id<MTLDevice> MtlfMetalContext::GetMetalDevice(PREFERRED_GPU_TYPE preferredGPUTy
 //
 
 MtlfMetalContext::MtlfMetalContext(id<MTLDevice> _device, int width, int height)
-: enableMVA(false)
-, enableComputeGS(false)
-, gsDataOffset(0)
-, gsBufferIndex(0)
-, gsMaxConcurrentBatches(0)
+: gsMaxConcurrentBatches(0)
 , gsMaxDataPerBatch(0)
-, gsCurrentBuffer(nil)
-, gsFence(nil)
-, gsHasOpenBatch(false)
-, gsSyncRequired(false)
-, isRenderPassDescriptorPatched(false)
 #if defined(ARCH_GFX_OPENGL)
 , glInterop(NULL)
 #endif
@@ -175,22 +163,18 @@ MtlfMetalContext::MtlfMetalContext(id<MTLDevice> _device, int width, int height)
     [[MTLCaptureManager sharedCaptureManager] setDefaultCaptureScope:captureScope];
 
     NSLog(@"Selected %@ for Metal Device", device.name);
-    
-#if METAL_COMPUTEGS_ALLOW_ASYNCHRONOUS_COMPUTE
-#if defined(ARCH_OS_MACOS)
-    enableMultiQueue = [device supportsFeatureSet:MTLFeatureSet_macOS_GPUFamily2_v1];
-#else // ARCH_OS_MACOS
-    enableMultiQueue = [device supportsFeatureSet:MTLFeatureSet_iOS_GPUFamily1_v5];
-#endif // ARCH_OS_MACOS
-#else
-    enableMultiQueue = false;
-#endif // METAL_COMPUTEGS_ALLOW_ASYNCHRONOUS_COMPUTE
+
+    enableMultiQueue = true;
 
     // Create a new command queue
-    commandQueue = [device newCommandQueue];
+    const int maxCommandBuffers = 1024;
+    commandBuffers.reserve(maxCommandBuffers);
+    commandBuffersGS.reserve(maxCommandBuffers);
+
+    commandQueue = [device newCommandQueueWithMaxCommandBufferCount:maxCommandBuffers];
     if(enableMultiQueue) {
 //        NSLog(@"Device %@ supports Metal 2, enabling multi-queue codepath.", device.name);
-        commandQueueGS = [device newCommandQueue];
+        commandQueueGS = [device newCommandQueueWithMaxCommandBufferCount:maxCommandBuffers];
         gsMaxDataPerBatch = 1024 * 1024 * 32;
         gsMaxConcurrentBatches = 3;
     }
@@ -200,6 +184,9 @@ MtlfMetalContext::MtlfMetalContext(id<MTLDevice> _device, int width, int height)
         gsMaxConcurrentBatches = 2;
     }
     
+    ResetEncoders(METALWORKQUEUE_GEOMETRY_SHADER, true);
+    ResetEncoders(METALWORKQUEUE_RESOURCE, true);
+
 #if defined(ARCH_OS_IOS)
     #define SYSTEM_VERSION_GREATER_THAN_OR_EQUAL_TO(v) ([[[UIDevice currentDevice] systemVersion] compare:v options:NSNumericSearch] != NSOrderedAscending)
 
@@ -225,42 +212,18 @@ MtlfMetalContext::MtlfMetalContext(id<MTLDevice> _device, int width, int height)
     depthStateDesc.depthCompareFunction = MTLCompareFunctionLessEqual;
     depthState = [device newDepthStencilStateWithDescriptor:depthStateDesc];
 
+    windingOrder = MTLWindingClockwise;
+    cullMode = MTLCullModeBack;
+    fillMode = MTLTriangleFillModeFill;
+    
     AllocateAttachments(width, height);
-
-    vertexDescriptor = nil;
-    indexBuffer = nil;
-    vertexPositionBuffer = nil;
-    remappedQuadIndexBuffer = nil;
-    pointIndexBuffer = nil;
-    numVertexComponents = 0;
     
     drawTarget = NULL;
     mtlColorTexture = nil;
     mtlDepthTexture = nil;
     outputPixelFormat = MTLPixelFormatInvalid;
     outputDepthFormat = MTLPixelFormatInvalid;
-    
-    currentWorkQueueType = METALWORKQUEUE_DEFAULT;
-    currentWorkQueue     = &workQueues[currentWorkQueueType];
 
-    MTLResourceOptions resourceOptions = MTLResourceStorageModePrivate|MTLResourceCPUCacheModeDefaultCache;
-#if METAL_COMPUTEGS_MANUAL_HAZARD_TRACKING
-    resourceOptions |= MTLResourceHazardTrackingModeUntracked;
-#endif
-    for(int i = 0; i < gsMaxConcurrentBatches; i++)
-        gsBuffers.push_back([device newBufferWithLength:gsMaxDataPerBatch options:resourceOptions]);
-    gsCurrentBuffer = gsBuffers.at(0);
-
-    gsFence = [device newFence];
-    
-    windingOrder = MTLWindingClockwise;
-    cullMode = MTLCullModeBack;
-    fillMode = MTLTriangleFillModeFill;
-    
-    for (int i = 0; i < METALWORKQUEUE_MAX; i ++) {
-        ResetEncoders((MetalWorkQueueType)i, true);
-    }
-    
     perFrameBuffer           = nil;
     perFrameBufferSize       = 5*1024*1024;
     perFrameBufferOffset     = 0;
@@ -289,23 +252,10 @@ MtlfMetalContext::MtlfMetalContext(id<MTLDevice> _device, int width, int height)
     lastCompletedFrame = -1;
     lastCompletedCommandBuffer = -1;
     committedCommandBufferCount = 0;
-    
-    size_t const defaultBufferSize = 1024;
-
-    for(int i = 0; i < kMSL_ProgramStage_NumStages; i++) {
-        oldStyleUniformBufferSize[i] = 0;
-        oldStyleUniformBufferAllocatedSize[i] = defaultBufferSize;
-        oldStyleUniformBuffer[i] = new uint8_t[defaultBufferSize];
-        memset(oldStyleUniformBuffer[i], 0x00, defaultBufferSize);
-    }
 }
 
 MtlfMetalContext::~MtlfMetalContext()
 {
-    for(int i = 0; i < kMSL_ProgramStage_NumStages; i++) {
-        delete[] oldStyleUniformBuffer[i];
-    }
-
     [[MTLCaptureManager sharedCaptureManager] setDefaultCaptureScope:nil];
     [captureScope release];
     captureScope = nil;
@@ -325,11 +275,6 @@ MtlfMetalContext::~MtlfMetalContext()
     [commandQueue release];
     if(enableMultiQueue)
         [commandQueueGS release];
-
-    [gsFence release];
-    for(int i = 0; i < gsBuffers.size(); i++)
-        [gsBuffers.at(i) release];
-    gsBuffers.clear();
    
 #if defined(METAL_ENABLE_STATS)
     if(frameCount > 0) {
@@ -429,29 +374,29 @@ void MtlfMetalContext::InitGLInterop() {
 id<MTLBuffer>
 MtlfMetalContext::GetQuadIndexBuffer(MTLIndexType indexTypeMetal) {
     // Each 4 vertices will require 6 remapped one
-    uint32_t remappedIndexBufferSize = (indexBuffer.length / 4) * 6;
-    
+    uint32_t remappedIndexBufferSize = (threadState.indexBuffer.length / 4) * 6;
+
     // Since remapping is expensive check if the buffer we created this from originally has changed  - MTL_FIXME - these checks are not robust
-    if (remappedQuadIndexBuffer) {
-        if ((remappedQuadIndexBufferSource != indexBuffer) ||
-            (remappedQuadIndexBuffer.length != remappedIndexBufferSize)) {
-            [remappedQuadIndexBuffer release];
-            remappedQuadIndexBuffer = nil;
+    if (threadState.remappedQuadIndexBuffer) {
+        if ((threadState.remappedQuadIndexBufferSource != threadState.indexBuffer) ||
+            (threadState.remappedQuadIndexBuffer.length != remappedIndexBufferSize)) {
+            [threadState.remappedQuadIndexBuffer release];
+            threadState.remappedQuadIndexBuffer = nil;
         }
     }
     // Remap the quad indices into two sets of triangle indices
-    if (!remappedQuadIndexBuffer) {
+    if (!threadState.remappedQuadIndexBuffer) {
         if (indexTypeMetal != MTLIndexTypeUInt32) {
             TF_FATAL_CODING_ERROR("Only 32 bit indices currently supported for quads");
         }
         NSLog(@"Recreating quad remapped index buffer");
         
-        remappedQuadIndexBufferSource = indexBuffer;
-        remappedQuadIndexBuffer = [device newBufferWithLength:remappedIndexBufferSize  options:MTLResourceStorageModeDefault];
+        threadState.remappedQuadIndexBufferSource = threadState.indexBuffer;
+        threadState.remappedQuadIndexBuffer = [device newBufferWithLength:remappedIndexBufferSize  options:MTLResourceStorageModeDefault];
         
-        uint32_t *srcData =  (uint32_t *)indexBuffer.contents;
-        uint32_t *destData = (uint32_t *)remappedQuadIndexBuffer.contents;
-        for (int i= 0; i < (indexBuffer.length / 4) ; i+=4)
+        uint32_t *srcData =  (uint32_t *)threadState.indexBuffer.contents;
+        uint32_t *destData = (uint32_t *)threadState.remappedQuadIndexBuffer.contents;
+        for (int i = 0; i < (threadState.indexBuffer.length / 4) ; i+=4)
         {
             destData[0] = srcData[0];
             destData[1] = srcData[1];
@@ -463,10 +408,10 @@ MtlfMetalContext::GetQuadIndexBuffer(MTLIndexType indexTypeMetal) {
             destData += 6;
         }
 #if defined(ARCH_OS_MACOS)
-        [remappedQuadIndexBuffer didModifyRange:(NSMakeRange(0, remappedQuadIndexBuffer.length))];
+        [threadState.remappedQuadIndexBuffer didModifyRange:(NSMakeRange(0, threadState.remappedQuadIndexBuffer.length))];
 #endif
     }
-    return remappedQuadIndexBuffer;
+    return threadState.remappedQuadIndexBuffer;
 }
 
 id<MTLBuffer>
@@ -475,22 +420,22 @@ MtlfMetalContext::GetPointIndexBuffer(MTLIndexType indexTypeMetal, int numIndice
     uint32_t pointBufferSize = numIndicesNeeded * sizeof(int);
     
     // Since remapping is expensive check if the buffer we created this from originally has changed  - MTL_FIXME - these checks are not robust
-    if (pointIndexBuffer) {
-        if ((pointIndexBuffer.length < pointBufferSize)) {
-            [pointIndexBuffer release];
-            pointIndexBuffer = nil;
+    if (threadState.pointIndexBuffer) {
+        if ((threadState.pointIndexBuffer.length < pointBufferSize)) {
+            [threadState.pointIndexBuffer release];
+            threadState.pointIndexBuffer = nil;
         }
     }
     // Remap the quad indices into two sets of triangle indices
-    if (!pointIndexBuffer) {
+    if (!threadState.pointIndexBuffer) {
         if (indexTypeMetal != MTLIndexTypeUInt32) {
             TF_FATAL_CODING_ERROR("Only 32 bit indices currently supported for quads");
         }
         NSLog(@"Recreating quad remapped index buffer");
         
-        pointIndexBuffer = [device newBufferWithLength:pointBufferSize options:MTLResourceStorageModeDefault];
+        threadState.pointIndexBuffer = [device newBufferWithLength:pointBufferSize options:MTLResourceStorageModeDefault];
         
-        uint32_t *destData = (uint32_t *)pointIndexBuffer.contents;
+        uint32_t *destData = (uint32_t *)threadState.pointIndexBuffer.contents;
         uint32_t arraySize = numIndicesNeeded;
         
         if (usingQuads) {
@@ -513,10 +458,10 @@ MtlfMetalContext::GetPointIndexBuffer(MTLIndexType indexTypeMetal, int numIndice
             }
         }
 #if defined(ARCH_OS_MACOS)
-        [pointIndexBuffer didModifyRange:(NSMakeRange(0, pointIndexBuffer.length))];
+        [threadState.pointIndexBuffer didModifyRange:(NSMakeRange(0, threadState.pointIndexBuffer.length))];
 #endif
     }
-    return pointIndexBuffer;
+    return threadState.pointIndexBuffer;
 }
 
 void MtlfMetalContext::CheckNewStateGather()
@@ -524,15 +469,34 @@ void MtlfMetalContext::CheckNewStateGather()
 }
 
 void MtlfMetalContext::CreateCommandBuffer(MetalWorkQueueType workQueueType) {
-    MetalWorkQueue *wq = &workQueues[workQueueType];
+    MetalWorkQueue *wq = &GetWorkQueue(workQueueType);
     
     //NSLog(@"Creating command buffer %d", (int)workQueueType);
 
     if (wq->commandBuffer == nil) {
-        if (enableMultiQueue && workQueueType == METALWORKQUEUE_GEOMETRY_SHADER)
-            wq->commandBuffer = [context->commandQueueGS commandBuffer];
-        else
-            wq->commandBuffer = [context->commandQueue commandBuffer];
+        std::lock_guard<std::mutex> lock(_commandBufferPoolMutex);
+
+        if (enableMultiQueue && workQueueType == METALWORKQUEUE_GEOMETRY_SHADER) {
+            int poolSize = commandBuffersGS.size();
+            if (poolSize > 0) {
+                wq->commandBuffer = commandBuffersGS.back();
+                commandBuffersGS.pop_back();
+            }
+            else {
+                wq->commandBuffer = [context->commandQueueGS commandBuffer];
+            }
+        }
+        else {
+            int poolSize = commandBuffers.size();
+            if (poolSize > 0) {
+                wq->commandBuffer = commandBuffers.back();
+                commandBuffers.pop_back();
+            }
+            else {
+                wq->commandBuffer = [context->commandQueue commandBuffer];
+            }
+        }
+
 #if defined(METAL_EVENTS_API_PRESENT)
         if (eventsAvailable) {
             wq->event = [device newEvent];
@@ -548,7 +512,7 @@ void MtlfMetalContext::CreateCommandBuffer(MetalWorkQueueType workQueueType) {
 
 void MtlfMetalContext::LabelCommandBuffer(NSString *label, MetalWorkQueueType workQueueType)
 {
-    MetalWorkQueue *wq = &workQueues[workQueueType];
+    MetalWorkQueue *wq = &GetWorkQueue(workQueueType);
     
      if (wq->commandBuffer == nil) {
         TF_FATAL_CODING_ERROR("No command buffer to label");
@@ -558,8 +522,8 @@ void MtlfMetalContext::LabelCommandBuffer(NSString *label, MetalWorkQueueType wo
 
 void MtlfMetalContext::EncodeWaitForEvent(MetalWorkQueueType waitQueue, MetalWorkQueueType signalQueue, uint64_t eventValue)
 {
-    MetalWorkQueue *wait_wq   = &workQueues[waitQueue];
-    MetalWorkQueue *signal_wq = &workQueues[signalQueue];
+    MetalWorkQueue *wait_wq   = &GetWorkQueue(waitQueue);
+    MetalWorkQueue *signal_wq = &GetWorkQueue(signalQueue);
     
     // Check both work queues have been set up 
     if (!wait_wq->commandBuffer || !signal_wq->commandBuffer) {
@@ -594,7 +558,7 @@ void MtlfMetalContext::EncodeWaitForEvent(MetalWorkQueueType waitQueue, MetalWor
 
 void MtlfMetalContext::EncodeWaitForQueue(MetalWorkQueueType waitQueue, MetalWorkQueueType signalQueue)
 {
-    MetalWorkQueue *signal_wq = &workQueues[signalQueue];
+    MetalWorkQueue *signal_wq = &GetWorkQueue(signalQueue);
     signal_wq->generatesEndOfQueueEvent = true;
 
     EncodeWaitForEvent(waitQueue, signalQueue, endOfQueueEventValue);
@@ -602,7 +566,7 @@ void MtlfMetalContext::EncodeWaitForQueue(MetalWorkQueueType waitQueue, MetalWor
 
 uint64_t MtlfMetalContext::EncodeSignalEvent(MetalWorkQueueType signalQueue)
 {
-    MetalWorkQueue *wq = &workQueues[signalQueue];
+    MetalWorkQueue *wq = &GetWorkQueue(signalQueue);
 
     if (!wq->commandBuffer) {
         TF_FATAL_CODING_ERROR("Signal work queue has no command buffer associated with it");
@@ -629,51 +593,51 @@ uint64_t MtlfMetalContext::EncodeSignalEvent(MetalWorkQueueType signalQueue)
 
 MTLRenderPassDescriptor* MtlfMetalContext::GetRenderPassDescriptor()
 {
-    MetalWorkQueue *wq = &workQueues[METALWORKQUEUE_DEFAULT];
+    MetalWorkQueue *wq = &GetWorkQueue(METALWORKQUEUE_DEFAULT);
     return (wq == nil) ? nil : wq->currentRenderPassDescriptor;
 }
 
 void MtlfMetalContext::SetFrontFaceWinding(MTLWinding _windingOrder)
 {
     windingOrder = _windingOrder;
-    dirtyRenderState |= DIRTY_METALRENDERSTATE_CULLMODE_WINDINGORDER;
+    //threadState.dirtyRenderState |= DIRTY_METALRENDERSTATE_CULLMODE_WINDINGORDER;
 }
 
 void MtlfMetalContext::SetCullMode(MTLCullMode _cullMode)
 {
     cullMode = _cullMode;
-    dirtyRenderState |= DIRTY_METALRENDERSTATE_CULLMODE_WINDINGORDER;
+    //threadState.dirtyRenderState |= DIRTY_METALRENDERSTATE_CULLMODE_WINDINGORDER;
 }
 
 void MtlfMetalContext::SetPolygonFillMode(MTLTriangleFillMode _fillMode)
 {
     fillMode = _fillMode;
-    dirtyRenderState |= DIRTY_METALRENDERSTATE_FILL_MODE;
+    //threadState.dirtyRenderState |= DIRTY_METALRENDERSTATE_FILL_MODE;
 }
 
 void MtlfMetalContext::SetShadingPrograms(id<MTLFunction> vertexFunction, id<MTLFunction> fragmentFunction, bool _enableMVA)
 {
     CheckNewStateGather();
     
-    renderVertexFunction     = vertexFunction;
-    renderFragmentFunction   = fragmentFunction;
-    enableMVA                = _enableMVA;
+    threadState.renderVertexFunction     = vertexFunction;
+    threadState.renderFragmentFunction   = fragmentFunction;
+    threadState.enableMVA                = _enableMVA;
     // Assume there is no GS associated with these shaders, they must be linked by calling SetGSPrograms after this
-    renderComputeGSFunction  = nil;
-    enableComputeGS          = false;
+    threadState.renderComputeGSFunction  = nil;
+    threadState.enableComputeGS          = false;
 }
 
 void MtlfMetalContext::SetGSProgram(id<MTLFunction> computeFunction)
 {
-    if (!computeFunction || !renderVertexFunction) {
+    if (!computeFunction || !threadState.renderVertexFunction) {
          TF_FATAL_CODING_ERROR("Compute and Vertex functions must be set when using a Compute Geometry Shader!");
     }
-    if(!enableMVA)
+    if(!threadState.enableMVA)
     {
         TF_FATAL_CODING_ERROR("Manual Vertex Assembly must be enabled when using a Compute Geometry Shader!");
     }
-    renderComputeGSFunction = computeFunction;
-    enableComputeGS = true;
+    threadState.renderComputeGSFunction = computeFunction;
+    threadState.enableComputeGS = true;
  }
 
 void MtlfMetalContext::SetVertexAttribute(uint32_t index,
@@ -683,49 +647,49 @@ void MtlfMetalContext::SetVertexAttribute(uint32_t index,
                                           uint32_t offset,
                                           const TfToken& name)
 {
-    if (enableMVA)  //Setting vertex attributes means nothing when Manual Vertex Assembly is enabled.
+    if (threadState.enableMVA)  //Setting vertex attributes means nothing when Manual Vertex Assembly is enabled.
         return;
 
-    if (!vertexDescriptor)
+    if (!threadState.vertexDescriptor)
     {
-        vertexDescriptor = [[MTLVertexDescriptor alloc] init];
+        threadState.vertexDescriptor = [[MTLVertexDescriptor alloc] init];
 
-        vertexDescriptor.layouts[0].stepFunction = MTLVertexStepFunctionConstant;
-        vertexDescriptor.layouts[0].stepRate = 0;
-        vertexDescriptor.layouts[0].stride = stride;
-        vertexDescriptor.attributes[0].format = MTLVertexFormatUInt;
-        numVertexComponents = 1;
+        threadState.vertexDescriptor.layouts[0].stepFunction = MTLVertexStepFunctionConstant;
+        threadState.vertexDescriptor.layouts[0].stepRate = 0;
+        threadState.vertexDescriptor.layouts[0].stride = stride;
+        threadState.vertexDescriptor.attributes[0].format = MTLVertexFormatUInt;
+        threadState.numVertexComponents = 1;
     }
 
-    vertexDescriptor.attributes[index].bufferIndex = index;
-    vertexDescriptor.attributes[index].offset = offset;
-    vertexDescriptor.layouts[index].stepFunction = MTLVertexStepFunctionPerVertex;
-    vertexDescriptor.layouts[index].stepRate = 1;
-    vertexDescriptor.layouts[index].stride = stride;
+    threadState.vertexDescriptor.attributes[index].bufferIndex = index;
+    threadState.vertexDescriptor.attributes[index].offset = offset;
+    threadState.vertexDescriptor.layouts[index].stepFunction = MTLVertexStepFunctionPerVertex;
+    threadState.vertexDescriptor.layouts[index].stepRate = 1;
+    threadState.vertexDescriptor.layouts[index].stride = stride;
     
     switch (type) {
         case GL_INT:
-            vertexDescriptor.attributes[index].format = MTLVertexFormat(MTLVertexFormatInt + (size - 1));
+            threadState.vertexDescriptor.attributes[index].format = MTLVertexFormat(MTLVertexFormatInt + (size - 1));
             break;
         case GL_UNSIGNED_INT:
-            vertexDescriptor.attributes[index].format = MTLVertexFormat(MTLVertexFormatUInt + (size - 1));
+            threadState.vertexDescriptor.attributes[index].format = MTLVertexFormat(MTLVertexFormatUInt + (size - 1));
             break;
         case GL_FLOAT:
-            vertexDescriptor.attributes[index].format = MTLVertexFormat(MTLVertexFormatFloat + (size - 1));
+            threadState.vertexDescriptor.attributes[index].format = MTLVertexFormat(MTLVertexFormatFloat + (size - 1));
             break;
         case GL_INT_2_10_10_10_REV:
-            vertexDescriptor.attributes[index].format = MTLVertexFormatInt1010102Normalized;
+            threadState.vertexDescriptor.attributes[index].format = MTLVertexFormatInt1010102Normalized;
             break;
         default:
             TF_CODING_ERROR("Unsupported data type");
             break;
     }
     
-    if (index + 1 > numVertexComponents) {
-        numVertexComponents = index + 1;
+    if (index + 1 > threadState.numVertexComponents) {
+        threadState.numVertexComponents = index + 1;
     }
     
-    dirtyRenderState |= DIRTY_METALRENDERSTATE_VERTEX_DESCRIPTOR;
+    threadState.dirtyRenderState |= DIRTY_METALRENDERSTATE_VERTEX_DESCRIPTOR;
 }
 
 // I think this can be removed didn't seem to make too much difference to speeds
@@ -763,7 +727,7 @@ void MtlfMetalContext::SetUniform(
         return;
     }
 
-    uint8_t* bufferContents  = oldStyleUniformBuffer[_stage];
+    uint8_t* bufferContents  = threadState.oldStyleUniformBuffer[_stage];
 
     uint32_t uniformEnd = (_index + _dataSize);
     copyUniform(bufferContents + _index, (uint8_t*)_data, _dataSize);
@@ -777,24 +741,24 @@ void MtlfMetalContext::SetOldStyleUniformBuffer(
     if(stage == 0)
         TF_FATAL_CODING_ERROR("Not allowed!");
     
-    oldStyleUniformBufferSize[stage] = oldStyleUniformSize;
+    threadState.oldStyleUniformBufferSize[stage] = oldStyleUniformSize;
 
-    if (oldStyleUniformSize > oldStyleUniformBufferAllocatedSize[stage]) {
-        oldStyleUniformBufferAllocatedSize[stage] = oldStyleUniformSize;
+    if (oldStyleUniformSize > threadState.oldStyleUniformBufferAllocatedSize[stage]) {
+        threadState.oldStyleUniformBufferAllocatedSize[stage] = oldStyleUniformSize;
 
         uint8_t *newBuffer = new uint8_t[oldStyleUniformSize];
-        memcpy(newBuffer, oldStyleUniformBuffer[stage], oldStyleUniformSize);
-        delete[] oldStyleUniformBuffer[stage];
-        oldStyleUniformBuffer[stage] = newBuffer;
+        memcpy(newBuffer, threadState.oldStyleUniformBuffer[stage], oldStyleUniformSize);
+        delete[] threadState.oldStyleUniformBuffer[stage];
+        threadState.oldStyleUniformBuffer[stage] = newBuffer;
     }
 
-    oldStyleUniformBufferIndex[stage] = index;
+    threadState.oldStyleUniformBufferIndex[stage] = index;
     
     if(stage == kMSL_ProgramStage_Vertex) {
-        dirtyRenderState |= DIRTY_METALRENDERSTATE_OLD_STYLE_VERTEX_UNIFORM;
+        threadState.dirtyRenderState |= DIRTY_METALRENDERSTATE_OLD_STYLE_VERTEX_UNIFORM;
     }
     if(stage == kMSL_ProgramStage_Fragment) {
-        dirtyRenderState |= DIRTY_METALRENDERSTATE_OLD_STYLE_FRAGMENT_UNIFORM;
+        threadState.dirtyRenderState |= DIRTY_METALRENDERSTATE_OLD_STYLE_FRAGMENT_UNIFORM;
     }
 }
 
@@ -813,76 +777,76 @@ void MtlfMetalContext::SetUniformBuffer(
         index, buffer, name, stage, offset, true,
         (uint8_t *)(buffer.contents)};
 
-    boundBuffers.push_back(bufferInfo);
+    threadState.boundBuffers.push_back(bufferInfo);
 }
 
 void MtlfMetalContext::SetBuffer(int index, id<MTLBuffer> buffer, const TfToken& name)
 {
     BufferBinding *bufferInfo = new BufferBinding{index, buffer, name, kMSL_ProgramStage_Vertex, 0, true};
-    boundBuffers.push_back(bufferInfo);
+    threadState.boundBuffers.push_back(bufferInfo);
     
     if (name == TfToken("points")) {
-        vertexPositionBuffer = buffer;
+        threadState.vertexPositionBuffer = buffer;
     }
     
-    dirtyRenderState |= DIRTY_METALRENDERSTATE_VERTEX_BUFFER;
+    threadState.dirtyRenderState |= DIRTY_METALRENDERSTATE_VERTEX_BUFFER;
 }
 
 void MtlfMetalContext::SetIndexBuffer(id<MTLBuffer> buffer)
 {
-    indexBuffer = buffer;
-    //remappedQuadIndexBuffer = nil;
-    dirtyRenderState |= DIRTY_METALRENDERSTATE_INDEX_BUFFER;
+    threadState.indexBuffer = buffer;
+    //threadState.remappedQuadIndexBuffer = nil;
+    threadState.dirtyRenderState |= DIRTY_METALRENDERSTATE_INDEX_BUFFER;
 }
 
 void MtlfMetalContext::SetSampler(int index, id<MTLSamplerState> sampler, const TfToken& name, MSL_ProgramStage stage)
 {
-    samplers.push_back({index, sampler, name, stage});
-    dirtyRenderState |= DIRTY_METALRENDERSTATE_SAMPLER;
+    threadState.samplers.push_back({index, sampler, name, stage});
+    threadState.dirtyRenderState |= DIRTY_METALRENDERSTATE_SAMPLER;
 }
 
 void MtlfMetalContext::SetTexture(int index, id<MTLTexture> texture, const TfToken& name, MSL_ProgramStage stage)
 {
-    textures.push_back({index, texture, name, stage});
-    dirtyRenderState |= DIRTY_METALRENDERSTATE_TEXTURE;
+    threadState.textures.push_back({index, texture, name, stage});
+    threadState.dirtyRenderState |= DIRTY_METALRENDERSTATE_TEXTURE;
 }
 
 void MtlfMetalContext::SetDrawTarget(MtlfDrawTarget *dt)
 {
     drawTarget = dt;
-    dirtyRenderState |= DIRTY_METALRENDERSTATE_DRAW_TARGET;
+    threadState.dirtyRenderState |= DIRTY_METALRENDERSTATE_DRAW_TARGET;
 }
 
 size_t MtlfMetalContext::HashVertexDescriptor()
 {
     size_t hashVal = 0;
-    for (int i = 0; i < numVertexComponents; i++) {
-        boost::hash_combine(hashVal, vertexDescriptor.layouts[i].stepFunction);
-        boost::hash_combine(hashVal, vertexDescriptor.layouts[i].stepRate);
-        boost::hash_combine(hashVal, vertexDescriptor.layouts[i].stride);
-        boost::hash_combine(hashVal, vertexDescriptor.attributes[i].bufferIndex);
-        boost::hash_combine(hashVal, vertexDescriptor.attributes[i].offset);
-        boost::hash_combine(hashVal, vertexDescriptor.attributes[i].format);
+    for (int i = 0; i < threadState.numVertexComponents; i++) {
+        boost::hash_combine(hashVal, threadState.vertexDescriptor.layouts[i].stepFunction);
+        boost::hash_combine(hashVal, threadState.vertexDescriptor.layouts[i].stepRate);
+        boost::hash_combine(hashVal, threadState.vertexDescriptor.layouts[i].stride);
+        boost::hash_combine(hashVal, threadState.vertexDescriptor.attributes[i].bufferIndex);
+        boost::hash_combine(hashVal, threadState.vertexDescriptor.attributes[i].offset);
+        boost::hash_combine(hashVal, threadState.vertexDescriptor.attributes[i].format);
     }
     return hashVal;
 }
 
 void MtlfMetalContext::SetRenderPipelineState()
 {
-    MetalWorkQueue *wq = currentWorkQueue;
+    MetalWorkQueue *wq = threadState.currentWorkQueue;
     
     if (wq->currentEncoderType != MTLENCODERTYPE_RENDER || !wq->encoderInUse || !wq->currentRenderEncoder) {
         TF_FATAL_CODING_ERROR("Not valid to call SetPipelineState() without an active render encoder");
     }
     
-    if (!enableMVA) {
-        if (dirtyRenderState & DIRTY_METALRENDERSTATE_VERTEX_DESCRIPTOR/* || renderPipelineStateDescriptor.vertexDescriptor == NULL*/) {
+    if (!threadState.enableMVA) {
+        if (threadState.dirtyRenderState & DIRTY_METALRENDERSTATE_VERTEX_DESCRIPTOR/* || renderPipelineStateDescriptor.vertexDescriptor == NULL*/) {
             // Update vertex descriptor hash
             wq->currentVertexDescriptorHash = HashVertexDescriptor();
         }
     }
     
-    if (dirtyRenderState & DIRTY_METALRENDERSTATE_DRAW_TARGET) {
+    if (threadState.dirtyRenderState & DIRTY_METALRENDERSTATE_DRAW_TARGET) {
         size_t hashVal = 0;
 
         if (drawTarget) {
@@ -929,8 +893,8 @@ void MtlfMetalContext::SetRenderPipelineState()
     // Always call this because currently we're not tracking changes to its state
     size_t hashVal = 0;
     
-    boost::hash_combine(hashVal, renderVertexFunction);
-    boost::hash_combine(hashVal, renderFragmentFunction);
+    boost::hash_combine(hashVal, threadState.renderVertexFunction);
+    boost::hash_combine(hashVal, threadState.renderFragmentFunction);
     boost::hash_combine(hashVal, wq->currentVertexDescriptorHash);
     boost::hash_combine(hashVal, wq->currentColourAttachmentsHash);
     
@@ -951,26 +915,26 @@ void MtlfMetalContext::SetRenderPipelineState()
     {
         MTLRenderPipelineDescriptor *renderPipelineStateDescriptor = [[MTLRenderPipelineDescriptor alloc] init];
 
-        if (!enableMVA) {
-            if (dirtyRenderState & DIRTY_METALRENDERSTATE_VERTEX_DESCRIPTOR || renderPipelineStateDescriptor.vertexDescriptor == NULL) {
+        if (!threadState.enableMVA) {
+            if (threadState.dirtyRenderState & DIRTY_METALRENDERSTATE_VERTEX_DESCRIPTOR || renderPipelineStateDescriptor.vertexDescriptor == NULL) {
                 // This assignment can be expensive as the vertexdescriptor will be copied (due to interface property)
-                renderPipelineStateDescriptor.vertexDescriptor = vertexDescriptor;
+                renderPipelineStateDescriptor.vertexDescriptor = threadState.vertexDescriptor;
                 // Update vertex descriptor hash
                 wq->currentVertexDescriptorHash = HashVertexDescriptor();
             }
         }
         
-        dirtyRenderState &= ~DIRTY_METALRENDERSTATE_VERTEX_DESCRIPTOR;
+        threadState.dirtyRenderState &= ~DIRTY_METALRENDERSTATE_VERTEX_DESCRIPTOR;
 
         // Create a new render pipeline state object
         renderPipelineStateDescriptor.label = @"SetRenderEncoderState";
         renderPipelineStateDescriptor.sampleCount = 1;
         renderPipelineStateDescriptor.inputPrimitiveTopology = MTLPrimitiveTopologyClassUnspecified;
         
-        renderPipelineStateDescriptor.vertexFunction   = renderVertexFunction;
-        renderPipelineStateDescriptor.fragmentFunction = renderFragmentFunction;
+        renderPipelineStateDescriptor.vertexFunction   = threadState.renderVertexFunction;
+        renderPipelineStateDescriptor.fragmentFunction = threadState.renderFragmentFunction;
         
-        if (renderFragmentFunction == nil) {
+        if (threadState.renderFragmentFunction == nil) {
             renderPipelineStateDescriptor.rasterizationEnabled = false;
         }
         else {
@@ -987,8 +951,8 @@ void MtlfMetalContext::SetRenderPipelineState()
         renderPipelineStateDescriptor.tessellationPartitionMode         = MTLTessellationPartitionModePow2;
 #endif
     
-        if (dirtyRenderState & DIRTY_METALRENDERSTATE_DRAW_TARGET) {
-            dirtyRenderState &= ~DIRTY_METALRENDERSTATE_DRAW_TARGET;
+        if (threadState.dirtyRenderState & DIRTY_METALRENDERSTATE_DRAW_TARGET) {
+            threadState.dirtyRenderState &= ~DIRTY_METALRENDERSTATE_DRAW_TARGET;
             
             if (drawTarget) {
                 auto& attachments = drawTarget->GetAttachments();
@@ -1059,21 +1023,21 @@ void MtlfMetalContext::SetRenderPipelineState()
 
 void MtlfMetalContext::SetRenderEncoderState()
 {
-    dirtyRenderState |= DIRTY_METALRENDERSTATE_OLD_STYLE_VERTEX_UNIFORM;
+    threadState.dirtyRenderState |= DIRTY_METALRENDERSTATE_OLD_STYLE_VERTEX_UNIFORM;
 
-    MetalWorkQueue *wq = currentWorkQueue;
-    MetalWorkQueue *gswq = &workQueues[METALWORKQUEUE_GEOMETRY_SHADER];
+    MetalWorkQueue *wq = threadState.currentWorkQueue;
+    MetalWorkQueue *gswq = &GetWorkQueue(METALWORKQUEUE_GEOMETRY_SHADER);
     id <MTLComputeCommandEncoder> computeEncoder;
     
     // Default is all buffers writable
     unsigned long immutableBufferMask = 0;
     
     // Get a compute encoder on the Geometry Shader work queue
-    if(enableComputeGS) {
-        MetalWorkQueueType oldWorkQueueType = currentWorkQueueType;
+    if(threadState.enableComputeGS) {
+        MetalWorkQueueType oldWorkQueueType = threadState.currentWorkQueueType;
         computeEncoder = GetComputeEncoder(METALWORKQUEUE_GEOMETRY_SHADER);
-        currentWorkQueueType = oldWorkQueueType;
-        currentWorkQueue     = &workQueues[currentWorkQueueType];
+        threadState.currentWorkQueueType = oldWorkQueueType;
+        threadState.currentWorkQueue     = &GetWorkQueue(threadState.currentWorkQueueType);
     }
     
     if (wq->currentEncoderType != MTLENCODERTYPE_RENDER || !wq->encoderInUse || !wq->currentRenderEncoder) {
@@ -1083,26 +1047,26 @@ void MtlfMetalContext::SetRenderEncoderState()
     // Create and set a new pipelinestate if required
     SetRenderPipelineState();
     
-    if (dirtyRenderState & DIRTY_METALRENDERSTATE_CULLMODE_WINDINGORDER) {
+    if (threadState.dirtyRenderState & DIRTY_METALRENDERSTATE_CULLMODE_WINDINGORDER) {
         [wq->currentRenderEncoder setFrontFacingWinding:windingOrder];
         [wq->currentRenderEncoder setCullMode:cullMode];
-        dirtyRenderState &= ~DIRTY_METALRENDERSTATE_CULLMODE_WINDINGORDER;
+        threadState.dirtyRenderState &= ~DIRTY_METALRENDERSTATE_CULLMODE_WINDINGORDER;
     }
 
-    if (dirtyRenderState & DIRTY_METALRENDERSTATE_FILL_MODE) {
+    if (threadState.dirtyRenderState & DIRTY_METALRENDERSTATE_FILL_MODE) {
         [wq->currentRenderEncoder setTriangleFillMode:fillMode];
-        dirtyRenderState &= ~DIRTY_METALRENDERSTATE_FILL_MODE;
+        threadState.dirtyRenderState &= ~DIRTY_METALRENDERSTATE_FILL_MODE;
     }
 
     // Any buffers modified
-    if (dirtyRenderState & DIRTY_METALRENDERSTATE_VERTEX_BUFFER) {
+    if (threadState.dirtyRenderState & DIRTY_METALRENDERSTATE_VERTEX_BUFFER) {
         
-        for(auto buffer : boundBuffers)
+        for(auto buffer : threadState.boundBuffers)
         {
             // Only output if this buffer was modified
             if (buffer->modified) {
                 if(buffer->stage == kMSL_ProgramStage_Vertex){
-                    if(enableComputeGS) {
+                    if(threadState.enableComputeGS) {
                         [computeEncoder setBuffer:buffer->buffer offset:buffer->offset atIndex:buffer->index];
 
                         // Remove writable status
@@ -1114,7 +1078,7 @@ void MtlfMetalContext::SetRenderEncoderState()
                     [wq->currentRenderEncoder setFragmentBuffer:buffer->buffer offset:buffer->offset atIndex:buffer->index];
                 }
                 else{
-                    if(enableComputeGS) {
+                    if(threadState.enableComputeGS) {
                         [computeEncoder setBuffer:buffer->buffer offset:buffer->offset atIndex:buffer->index];
 
                         // Remove writable status
@@ -1127,35 +1091,35 @@ void MtlfMetalContext::SetRenderEncoderState()
             }
         }
         
-        dirtyRenderState &= ~DIRTY_METALRENDERSTATE_VERTEX_BUFFER;
+        threadState.dirtyRenderState &= ~DIRTY_METALRENDERSTATE_VERTEX_BUFFER;
     }
     
-    if (dirtyRenderState & DIRTY_METALRENDERSTATE_OLD_STYLE_VERTEX_UNIFORM) {
-        uint32_t index = oldStyleUniformBufferIndex[kMSL_ProgramStage_Vertex];
-        if(enableComputeGS) {
-            [computeEncoder setBytes:oldStyleUniformBuffer[kMSL_ProgramStage_Vertex]
-                              length:oldStyleUniformBufferSize[kMSL_ProgramStage_Vertex]
+    if (threadState.dirtyRenderState & DIRTY_METALRENDERSTATE_OLD_STYLE_VERTEX_UNIFORM) {
+        uint32_t index = threadState.oldStyleUniformBufferIndex[kMSL_ProgramStage_Vertex];
+        if(threadState.enableComputeGS) {
+            [computeEncoder setBytes:threadState.oldStyleUniformBuffer[kMSL_ProgramStage_Vertex]
+                              length:threadState.oldStyleUniformBufferSize[kMSL_ProgramStage_Vertex]
                              atIndex:index];
 
             // Remove writable status
             immutableBufferMask |= (1 << index);
         }
-        [wq->currentRenderEncoder setVertexBytes:oldStyleUniformBuffer[kMSL_ProgramStage_Vertex]
-                                          length:oldStyleUniformBufferSize[kMSL_ProgramStage_Vertex]
+        [wq->currentRenderEncoder setVertexBytes:threadState.oldStyleUniformBuffer[kMSL_ProgramStage_Vertex]
+                                          length:threadState.oldStyleUniformBufferSize[kMSL_ProgramStage_Vertex]
                                          atIndex:index];
-        dirtyRenderState &= ~DIRTY_METALRENDERSTATE_OLD_STYLE_VERTEX_UNIFORM;
+        threadState.dirtyRenderState &= ~DIRTY_METALRENDERSTATE_OLD_STYLE_VERTEX_UNIFORM;
     }
-    if (dirtyRenderState & DIRTY_METALRENDERSTATE_OLD_STYLE_FRAGMENT_UNIFORM) {
-        [wq->currentRenderEncoder setFragmentBytes:oldStyleUniformBuffer[kMSL_ProgramStage_Fragment]
-                                            length:oldStyleUniformBufferSize[kMSL_ProgramStage_Fragment]
-                                           atIndex:oldStyleUniformBufferIndex[kMSL_ProgramStage_Fragment]];
-        dirtyRenderState &= ~DIRTY_METALRENDERSTATE_OLD_STYLE_FRAGMENT_UNIFORM;
+    if (threadState.dirtyRenderState & DIRTY_METALRENDERSTATE_OLD_STYLE_FRAGMENT_UNIFORM) {
+        [wq->currentRenderEncoder setFragmentBytes:threadState.oldStyleUniformBuffer[kMSL_ProgramStage_Fragment]
+                                            length:threadState.oldStyleUniformBufferSize[kMSL_ProgramStage_Fragment]
+                                           atIndex:threadState.oldStyleUniformBufferIndex[kMSL_ProgramStage_Fragment]];
+        threadState.dirtyRenderState &= ~DIRTY_METALRENDERSTATE_OLD_STYLE_FRAGMENT_UNIFORM;
     }
 
-    if (dirtyRenderState & DIRTY_METALRENDERSTATE_TEXTURE) {
-        for(auto texture : textures) {
+    if (threadState.dirtyRenderState & DIRTY_METALRENDERSTATE_TEXTURE) {
+        for(auto texture : threadState.textures) {
             if(texture.stage == kMSL_ProgramStage_Vertex) {
-                if(enableComputeGS) {
+                if(threadState.enableComputeGS) {
                     [computeEncoder setTexture:texture.texture atIndex:texture.index];
                 }
                 [wq->currentRenderEncoder setVertexTexture:texture.texture atIndex:texture.index];
@@ -1165,12 +1129,12 @@ void MtlfMetalContext::SetRenderEncoderState()
             //else
             //    TF_FATAL_CODING_ERROR("Not implemented!"); //Compute case
         }
-        dirtyRenderState &= ~DIRTY_METALRENDERSTATE_TEXTURE;
+        threadState.dirtyRenderState &= ~DIRTY_METALRENDERSTATE_TEXTURE;
     }
-    if (dirtyRenderState & DIRTY_METALRENDERSTATE_SAMPLER) {
-        for(auto sampler : samplers) {
+    if (threadState.dirtyRenderState & DIRTY_METALRENDERSTATE_SAMPLER) {
+        for(auto sampler : threadState.samplers) {
             if(sampler.stage == kMSL_ProgramStage_Vertex) {
-                if(enableComputeGS) {
+                if(threadState.enableComputeGS) {
                     [computeEncoder setSamplerState:sampler.sampler atIndex:sampler.index];
                 }
                 [wq->currentRenderEncoder setVertexSamplerState:sampler.sampler atIndex:sampler.index];
@@ -1180,11 +1144,12 @@ void MtlfMetalContext::SetRenderEncoderState()
             //else
             //    TF_FATAL_CODING_ERROR("Not implemented!"); //Compute case
         }
-        dirtyRenderState &= ~DIRTY_METALRENDERSTATE_SAMPLER;
+        threadState.dirtyRenderState &= ~DIRTY_METALRENDERSTATE_SAMPLER;
     }
     
-    if(enableComputeGS) {
-        SetComputeEncoderState(renderComputeGSFunction, boundBuffers.size(), immutableBufferMask, @"GS Compute phase", METALWORKQUEUE_GEOMETRY_SHADER);
+    if(threadState.enableComputeGS) {
+        SetComputeEncoderState(threadState.renderComputeGSFunction, threadState.boundBuffers.size(),
+                               immutableBufferMask, @"GS Compute phase", METALWORKQUEUE_GEOMETRY_SHADER);
 
         // Release the geometry shader encoder
         ReleaseEncoder(false, METALWORKQUEUE_GEOMETRY_SHADER);
@@ -1193,29 +1158,28 @@ void MtlfMetalContext::SetRenderEncoderState()
 
 void MtlfMetalContext::ClearRenderEncoderState()
 {
-    MetalWorkQueue *wq = currentWorkQueue;
+    MetalWorkQueue *wq = threadState.currentWorkQueue;
     
     // Release owned resources
-    [vertexDescriptor               release];
-    
-    vertexDescriptor               = nil;
+    [threadState.vertexDescriptor               release];
+    threadState.vertexDescriptor               = nil;
     
     wq->currentRenderPipelineDescriptorHash  = 0;
     wq->currentRenderPipelineState           = nil;
     
     // clear referenced resources
-    indexBuffer          = nil;
-    vertexPositionBuffer = nil;
-    numVertexComponents  = 0;
-    dirtyRenderState     = DIRTY_METALRENDERSTATE_ALL;
+    threadState.indexBuffer          = nil;
+    threadState.vertexPositionBuffer = nil;
+    threadState.numVertexComponents  = 0;
+    threadState.dirtyRenderState     = DIRTY_METALRENDERSTATE_ALL;
     
     // Free all state associated with the buffers
-    for(auto buffer : boundBuffers) {
+    for(auto buffer : threadState.boundBuffers) {
         delete buffer;
     }
-    boundBuffers.clear();
-    textures.clear();
-    samplers.clear();
+    threadState.boundBuffers.clear();
+    threadState.textures.clear();
+    threadState.samplers.clear();
 }
 
 // Using this function instead of setting the pipeline state directly allows caching
@@ -1225,7 +1189,7 @@ NSUInteger MtlfMetalContext::SetComputeEncoderState(id<MTLFunction>     computeF
                                                     NSString            *label,
                                                     MetalWorkQueueType  workQueueType)
 {
-    MetalWorkQueue *wq = &workQueues[workQueueType];
+    MetalWorkQueue *wq = &GetWorkQueue(workQueueType);
     
     id<MTLComputePipelineState> computePipelineState;
     
@@ -1299,21 +1263,21 @@ NSUInteger MtlfMetalContext::SetComputeEncoderState(id<MTLFunction>     computeF
 
 int MtlfMetalContext::GetCurrentComputeThreadExecutionWidth(MetalWorkQueueType workQueueType)
 {
-    MetalWorkQueue const* const wq = &workQueues[workQueueType];
+    MetalWorkQueue const* const wq = &GetWorkQueue(workQueueType);
     
     return wq->currentComputeThreadExecutionWidth;
 }
 
 int MtlfMetalContext::GetMaxThreadsPerThreadgroup(MetalWorkQueueType workQueueType)
 {
-    MetalWorkQueue const* const wq = &workQueues[workQueueType];
+    MetalWorkQueue const* const wq = &GetWorkQueue(workQueueType);
     
     return [wq->currentComputePipelineState maxTotalThreadsPerThreadgroup];
 }
 
 void MtlfMetalContext::ResetEncoders(MetalWorkQueueType workQueueType, bool isInitializing)
 {
-    MetalWorkQueue *wq = &workQueues[workQueueType];
+    MetalWorkQueue *wq = &GetWorkQueue(workQueueType);
  
     if(!isInitializing) {
         if(wq->highestExpectedEventValue != endOfQueueEventValue && wq->highestExpectedEventValue >= wq->currentEventValue) {
@@ -1324,7 +1288,7 @@ void MtlfMetalContext::ResetEncoders(MetalWorkQueueType workQueueType, bool isIn
             [wq->event release];
 		}
 #endif
-        if(gsHasOpenBatch)
+        if(threadState.gsHasOpenBatch)
             TF_FATAL_CODING_ERROR("A Compute Geometry Shader batch is left open!");
     }
    
@@ -1352,9 +1316,9 @@ void MtlfMetalContext::ResetEncoders(MetalWorkQueueType workQueueType, bool isIn
     wq->currentComputePipelineState          = nil;
 }
 
-void MtlfMetalContext::CommitCommandBuffer(bool waituntilScheduled, bool waitUntilCompleted, MetalWorkQueueType workQueueType)
+void MtlfMetalContext::CommitCommandBufferForThread(bool waituntilScheduled, bool waitUntilCompleted, MetalWorkQueueType workQueueType)
 {
-    MetalWorkQueue *wq = &workQueues[workQueueType];
+    MetalWorkQueue *wq = &GetWorkQueue(workQueueType);
     
     //NSLog(@"Committing command buffer %d %@", (int)workQueueType, wq->commandBuffer.label);
     
@@ -1366,10 +1330,10 @@ void MtlfMetalContext::CommitCommandBuffer(bool waituntilScheduled, bool waitUnt
     if (wq->commandBuffer == nil) {
         TF_FATAL_CODING_ERROR("Can't commit command buffer if it was never created");
     }
-
+    
     // Check that we actually encoded something to commit..
     if (wq->encoderHasWork) {
-         if (wq->encoderInUse) {
+        if (wq->encoderInUse) {
             TF_FATAL_CODING_ERROR("Can't commit command buffer if encoder is still in use");
         }
         
@@ -1389,13 +1353,18 @@ void MtlfMetalContext::CommitCommandBuffer(bool waituntilScheduled, bool waitUnt
          */
         if (!wq->generatesEndOfQueueEvent) {
             //NSLog(@"No work in this command buffer: %@", wq->commandBuffer.label);
-            // Have to disable reuse as the command buffer seems to dissapear if not used (garbage collected?), need to investigate
-            // Just reset it for now so a new one will get created.
+            {
+                std::lock_guard<std::mutex> lock(_commandBufferPoolMutex);
+                if (workQueueType == METALWORKQUEUE_GEOMETRY_SHADER)
+                    commandBuffersGS.push_back(wq->commandBuffer);
+                else
+                    commandBuffers.push_back(wq->commandBuffer);
+            }
             ResetEncoders(workQueueType);
             return;
         }
-     }
-
+    }
+    
     _gsEncodeSync(false);
     
     if(wq->generatesEndOfQueueEvent) {
@@ -1408,15 +1377,6 @@ void MtlfMetalContext::CommitCommandBuffer(bool waituntilScheduled, bool waitUnt
         wq->generatesEndOfQueueEvent = false;
     }
     
-    __block unsigned long thisFrameNumber = frameCount;
-
-     [wq->commandBuffer addCompletedHandler:^(id<MTLCommandBuffer> commandBuffer) {
-        GPUTimerEndTimer(thisFrameNumber);
-        lastCompletedCommandBuffer++;
-      }];
-
-    GPUTimerStartTimer(thisFrameNumber);
-
     [wq->commandBuffer commit];
     
     if (waitUntilCompleted) {
@@ -1425,11 +1385,10 @@ void MtlfMetalContext::CommitCommandBuffer(bool waituntilScheduled, bool waitUnt
     else if (waituntilScheduled && wq->encoderHasWork) {
         [wq->commandBuffer waitUntilScheduled];
     }
-
+    
     ResetEncoders(workQueueType);
     committedCommandBufferCount++;
     METAL_INC_STAT(resourceStats.commandBuffersCommitted);
-    CleanupUnusedBuffers(false);
 }
 
 void MtlfMetalContext::SetOutputPixelFormats(MTLPixelFormat pixelFormat, MTLPixelFormat depthFormat)
@@ -1440,7 +1399,7 @@ void MtlfMetalContext::SetOutputPixelFormats(MTLPixelFormat pixelFormat, MTLPixe
 
 void MtlfMetalContext::SetRenderPassDescriptor(MTLRenderPassDescriptor *renderPassDescriptor)
 {
-    MetalWorkQueue *wq = currentWorkQueue;
+    MetalWorkQueue *wq = threadState.currentWorkQueue;
     
     // Could relax this check to only include render encoders but probably not worthwhile
     if (wq->encoderInUse) {
@@ -1461,7 +1420,7 @@ void MtlfMetalContext::SetRenderPassDescriptor(MTLRenderPassDescriptor *renderPa
 
 void MtlfMetalContext::ReleaseEncoder(bool endEncoding, MetalWorkQueueType workQueueType)
 {
-    MetalWorkQueue *wq = &workQueues[workQueueType];
+    MetalWorkQueue *wq = &GetWorkQueue(workQueueType);
     
     if (!wq->encoderInUse) {
         TF_FATAL_CODING_ERROR("No encoder to release");
@@ -1481,12 +1440,6 @@ void MtlfMetalContext::ReleaseEncoder(bool endEncoding, MetalWorkQueueType workQ
             }
             case MTLENCODERTYPE_COMPUTE:
             {
-#if METAL_COMPUTEGS_MANUAL_HAZARD_TRACKING
-                if(workQueueType == METALWORKQUEUE_GEOMETRY_SHADER && gsSyncRequired) {
-                    [wq->currentComputeEncoder updateFence:gsFence];
-                    gsSyncRequired = false;
-                }
-#endif
                 [wq->currentComputeEncoder endEncoding];
                 wq->currentComputePipelineState = nil;
                 wq->currentComputeEncoder       = nil;
@@ -1513,7 +1466,7 @@ void MtlfMetalContext::ReleaseEncoder(bool endEncoding, MetalWorkQueueType workQ
 
 void MtlfMetalContext::SetCurrentEncoder(MetalEncoderType encoderType, MetalWorkQueueType workQueueType)
 {
-    MetalWorkQueue *wq = &workQueues[workQueueType];
+    MetalWorkQueue *wq = &GetWorkQueue(workQueueType);
     
     if (wq->encoderInUse) {
         TF_FATAL_CODING_ERROR("Need to release the current encoder before getting a new one");
@@ -1549,9 +1502,11 @@ void MtlfMetalContext::SetCurrentEncoder(MetalEncoderType encoderType, MetalWork
                 TF_FATAL_CODING_ERROR("Can ony pass null renderPassDescriptor if the render encoder is currently active");
             }
             wq->currentRenderEncoder = [wq->commandBuffer renderCommandEncoderWithDescriptor: wq->currentRenderPassDescriptor];
+            _PatchRenderPassDescriptor();
+
             // Since the encoder is new we'll need to emit all the state again
-            dirtyRenderState     = DIRTY_METALRENDERSTATE_ALL;
-            for(auto buffer : boundBuffers) { buffer->modified = true; }
+            threadState.dirtyRenderState     = DIRTY_METALRENDERSTATE_ALL;
+            for(auto buffer : threadState.boundBuffers) { buffer->modified = true; }
             METAL_INC_STAT(resourceStats.renderEncodersCreated);
             break;
         }
@@ -1566,8 +1521,8 @@ void MtlfMetalContext::SetCurrentEncoder(MetalEncoderType encoderType, MetalWork
                 wq->currentComputeEncoder = [wq->commandBuffer computeCommandEncoder];
             }
             
-            dirtyRenderState     = DIRTY_METALRENDERSTATE_ALL;
-            for(auto buffer : boundBuffers) { buffer->modified = true; }
+            threadState.dirtyRenderState     = DIRTY_METALRENDERSTATE_ALL;
+            for(auto buffer : threadState.boundBuffers) { buffer->modified = true; }
             METAL_INC_STAT(resourceStats.computeEncodersCreated);
             break;
         }
@@ -1587,13 +1542,13 @@ void MtlfMetalContext::SetCurrentEncoder(MetalEncoderType encoderType, MetalWork
     wq->encoderEnded       = false;
     wq->encoderHasWork     = true;
     
-    currentWorkQueueType = workQueueType;
-    currentWorkQueue     = &workQueues[currentWorkQueueType];
+    threadState.currentWorkQueueType = workQueueType;
+    threadState.currentWorkQueue     = &GetWorkQueue(threadState.currentWorkQueueType);
 }
 
 id<MTLBlitCommandEncoder> MtlfMetalContext::GetBlitEncoder(MetalWorkQueueType workQueueType)
 {
-    MetalWorkQueue *wq = &workQueues[workQueueType];
+    MetalWorkQueue *wq = &GetWorkQueue(workQueueType);
     SetCurrentEncoder(MTLENCODERTYPE_BLIT, workQueueType);
     METAL_INC_STAT(resourceStats.blitEncodersRequested);
     return wq->currentBlitEncoder;
@@ -1601,7 +1556,7 @@ id<MTLBlitCommandEncoder> MtlfMetalContext::GetBlitEncoder(MetalWorkQueueType wo
 
 id<MTLComputeCommandEncoder> MtlfMetalContext::GetComputeEncoder(MetalWorkQueueType workQueueType)
 {
-    MetalWorkQueue *wq = &workQueues[workQueueType];
+    MetalWorkQueue *wq = &GetWorkQueue(workQueueType);
     SetCurrentEncoder(MTLENCODERTYPE_COMPUTE, workQueueType);
     METAL_INC_STAT(resourceStats.computeEncodersRequested);
     return wq->currentComputeEncoder;
@@ -1611,10 +1566,10 @@ id<MTLComputeCommandEncoder> MtlfMetalContext::GetComputeEncoder(MetalWorkQueueT
 // If a renderpass descriptor is provided a new render encoder will be created otherwise we'll use the current one
 id<MTLRenderCommandEncoder>  MtlfMetalContext::GetRenderEncoder(MetalWorkQueueType workQueueType)
 {
-    MetalWorkQueue *wq = &workQueues[workQueueType];
+    MetalWorkQueue *wq = &GetWorkQueue(workQueueType);
     SetCurrentEncoder(MTLENCODERTYPE_RENDER, workQueueType);
     METAL_INC_STAT(resourceStats.renderEncodersRequested);
-    return currentWorkQueue->currentRenderEncoder;
+    return threadState.currentWorkQueue->currentRenderEncoder;
 }
 
 id<MTLBuffer> MtlfMetalContext::GetMetalBuffer(NSUInteger length, MTLResourceOptions options, const void *pointer)
@@ -1744,13 +1699,23 @@ void MtlfMetalContext::CleanupUnusedBuffers(bool forceClean)
 
 }
 
+void MtlfMetalContext::StartFrameForThread() {
+    threadState.gsFirstBatch = true;
+}
+
 void MtlfMetalContext::StartFrame() {
     numPrimsDrawn = 0;
     GPUTImerResetTimer(frameCount);
     
-    gsFirstBatch = true;
-    
     [captureScope beginScope];
+}
+
+void MtlfMetalContext::EndFrameForThread() {
+    threadState.currentWorkQueueType = METALWORKQUEUE_DEFAULT;
+    threadState.currentWorkQueue     = &GetWorkQueue(threadState.currentWorkQueueType);
+    
+    //Reset the Compute GS intermediate buffer offset
+    _gsResetBuffers();
 }
 
 void MtlfMetalContext::EndFrame() {
@@ -1760,12 +1725,6 @@ void MtlfMetalContext::EndFrame() {
     
     frameCount++;
     
-    currentWorkQueueType = METALWORKQUEUE_DEFAULT;
-    currentWorkQueue     = &workQueues[currentWorkQueueType];
-
-    //Reset the Compute GS intermediate buffer offset
-    _gsResetBuffers();
-    
     // Reset it here as OSD may get invoked before StartFrame() is called.
     OSDEnabledThisFrame = false;
     isRenderPassDescriptorPatched = false;
@@ -1774,16 +1733,16 @@ void MtlfMetalContext::EndFrame() {
 }
 
 void MtlfMetalContext::_gsAdvanceBuffer() {
-    gsBufferIndex = (gsBufferIndex + 1) % gsMaxConcurrentBatches;
-    gsCurrentBuffer = gsBuffers.at(gsBufferIndex);
+    threadState.gsBufferIndex = (threadState.gsBufferIndex + 1) % gsMaxConcurrentBatches;
+    threadState.gsCurrentBuffer = threadState.gsBuffers.at(threadState.gsBufferIndex);
 
-    gsDataOffset = 0;
+    threadState.gsDataOffset = 0;
 }
 
 void MtlfMetalContext::_gsResetBuffers() {
-    gsBufferIndex = 0;
-    gsCurrentBuffer = gsBuffers.at(gsBufferIndex);
-    gsDataOffset = 0;
+    threadState.gsBufferIndex = 0;
+    threadState.gsCurrentBuffer = threadState.gsBuffers.at(threadState.gsBufferIndex);
+    threadState.gsDataOffset = 0;
 }
 
 uint32_t MtlfMetalContext::GetMaxComputeGSPartSize(
@@ -1810,15 +1769,15 @@ void MtlfMetalContext::PrepareForComputeGSPart(
     vertData = ((vertData + (alignment - 1)) / alignment) * alignment;
     primData = ((primData + (alignment - 1)) / alignment) * alignment;
     
-    bool useNextBuffer = (gsDataOffset + vertData + primData) > gsMaxDataPerBatch;
-    bool startingNewBatch = useNextBuffer || (gsBufferIndex == 0 && gsDataOffset == 0);
+    bool useNextBuffer = (threadState.gsDataOffset + vertData + primData) > gsMaxDataPerBatch;
+    bool startingNewBatch = useNextBuffer || (threadState.gsBufferIndex == 0 && threadState.gsDataOffset == 0);
     if(useNextBuffer)
         _gsAdvanceBuffer();
-    dataBuffer = gsCurrentBuffer;
-    vertOffset = gsDataOffset;
-    gsDataOffset += vertData;
-    primOffset = gsDataOffset;
-    gsDataOffset += primData;
+    dataBuffer = threadState.gsCurrentBuffer;
+    vertOffset = threadState.gsDataOffset;
+    threadState.gsDataOffset += vertData;
+    primOffset = threadState.gsDataOffset;
+    threadState.gsDataOffset += primData;
 
     //If we are using a new buffer we've started a new batch. That means some synching/committing may need to happen before we can continue.
     if(startingNewBatch) {
@@ -1828,46 +1787,26 @@ void MtlfMetalContext::PrepareForComputeGSPart(
         }
         else {
             //When not using multiple queues we rely on the order in the commandbuffer combined with a fence for synching.
-            MetalWorkQueue* wq_def = &workQueues[METALWORKQUEUE_DEFAULT];
-            MetalWorkQueue* wq_gs = &workQueues[METALWORKQUEUE_GEOMETRY_SHADER];
+            MetalWorkQueue* wq_def = &GetWorkQueue(METALWORKQUEUE_DEFAULT);
+            MetalWorkQueue* wq_gs = &GetWorkQueue(METALWORKQUEUE_GEOMETRY_SHADER);
             
             if(wq_def->encoderInUse || wq_gs->encoderInUse)
                 TF_FATAL_CODING_ERROR("Default and Geometry Shader encoder must not be active before calling PrepareForComputeGSPart!");
 
             //Commit the geometry shader queue ahead of the rendering queue. But only if there has been work before it.
             if(wq_gs->encoderHasWork) {
-                CommitCommandBuffer(false, false, METALWORKQUEUE_GEOMETRY_SHADER);
+                CommitCommandBufferForThread(false, false, METALWORKQUEUE_GEOMETRY_SHADER);
                 
                 CreateCommandBuffer(METALWORKQUEUE_GEOMETRY_SHADER);
             }
             if(wq_def->encoderHasWork) {
-                CommitCommandBuffer(false, false, METALWORKQUEUE_DEFAULT);
+                CommitCommandBufferForThread(false, false, METALWORKQUEUE_DEFAULT);
                 
                 CreateCommandBuffer(METALWORKQUEUE_DEFAULT);
                 
                 //Patch the descriptor to prevent clearing attachments we just rendered to.
                 _PatchRenderPassDescriptor();
             }
-            
- #if METAL_COMPUTEGS_MANUAL_HAZARD_TRACKING
-            GetComputeEncoder(METALWORKQUEUE_GEOMETRY_SHADER);
-            GetRenderEncoder(METALWORKQUEUE_DEFAULT);
-            
-            if(gsFirstBatch) {
-                [wq_def->currentRenderEncoder updateFence:gsFence afterStages:MTLRenderStageFragment];
-                [wq_gs->currentComputeEncoder waitForFence:gsFence];
-                
-                ReleaseEncoder(true, METALWORKQUEUE_DEFAULT);
-                GetRenderEncoder(METALWORKQUEUE_DEFAULT);
-            }
-            
-            //Insert a fence in the two commandBuffers to ensure all writes are finished before we start rendering.
-            gsSyncRequired = true; //Fence for the compute commandBuffer is inserted just before endEncoding in ReleaseEncoder()
-            [wq_def->currentRenderEncoder waitForFence:gsFence beforeStages:MTLRenderStageVertex];
-            
-            ReleaseEncoder(false, METALWORKQUEUE_GEOMETRY_SHADER);
-            ReleaseEncoder(false, METALWORKQUEUE_DEFAULT);
- #endif
         }
     }
 }
@@ -1876,12 +1815,12 @@ void MtlfMetalContext::_gsEncodeSync(bool doOpenBatch) {
     //Using multiple queues means the synching happens using events as the queuews are executed in parallel.
     
     //There are cases where we don't have a command buffer yet to push the wait onto.
-    MetalWorkQueue *wait_wq   = &workQueues[METALWORKQUEUE_DEFAULT];
+    MetalWorkQueue *wait_wq   = &GetWorkQueue(METALWORKQUEUE_DEFAULT);
     if(wait_wq->commandBuffer == nil)
         CreateCommandBuffer(METALWORKQUEUE_DEFAULT);
     
     // Close the current batch if there is one open
-    if(gsHasOpenBatch) {
+    if(threadState.gsHasOpenBatch) {
         EncodeSignalEvent(METALWORKQUEUE_GEOMETRY_SHADER);
         
         if(doOpenBatch) {
@@ -1895,23 +1834,23 @@ void MtlfMetalContext::_gsEncodeSync(bool doOpenBatch) {
         
         //By using events we triggered ending of the encoders. Need to patch up the render descriptor to prevent previous results from being wiped.
         _PatchRenderPassDescriptor();
-        gsHasOpenBatch = false;
+        threadState.gsHasOpenBatch = false;
     }
     
     if(doOpenBatch) {
         EncodeWaitForEvent(METALWORKQUEUE_DEFAULT, METALWORKQUEUE_GEOMETRY_SHADER);
-        gsHasOpenBatch = true;
+        threadState.gsHasOpenBatch = true;
     }
 }
 
 void MtlfMetalContext::_PatchRenderPassDescriptor() {
-    if(isRenderPassDescriptorPatched)
+    if (isRenderPassDescriptorPatched)
         return;
     
     MTLRenderPassDescriptor* rpd = context->GetRenderPassDescriptor();
-    if(rpd.depthAttachment != nil)
+    if (rpd.depthAttachment != nil)
         rpd.depthAttachment.loadAction = MTLLoadActionLoad;
-    if(rpd.stencilAttachment != nil)
+    if (rpd.stencilAttachment != nil)
         rpd.stencilAttachment.loadAction = MTLLoadActionLoad;
     for(int i = 0; i < 8; i++) {
         if(rpd.colorAttachments[i] != nil)

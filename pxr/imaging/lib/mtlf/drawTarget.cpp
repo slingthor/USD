@@ -328,16 +328,18 @@ MtlfDrawTarget::Bind()
     MtlfMetalContext *context = MtlfMetalContext::GetMetalContext();
    
     context->SetDrawTarget(this);
-    context->CreateCommandBuffer();
-    context->LabelCommandBuffer(@"DrawTarget:Bind");
+//    context->CreateCommandBuffer();
+//    context->LabelCommandBuffer(@"DrawTarget:Bind");
     
 #pragma message("Unconditionally enabling GS buffer creation for now")
 
     // Create a command buffer for the geometry shaders and make the default/render queue dependent on it completeing
-    context->CreateCommandBuffer(METALWORKQUEUE_GEOMETRY_SHADER);
-    context->LabelCommandBuffer(@"DrawTarget CommandBuffer GS", METALWORKQUEUE_GEOMETRY_SHADER);
+//    context->CreateCommandBuffer(METALWORKQUEUE_GEOMETRY_SHADER);
+//    context->LabelCommandBuffer(@"DrawTarget CommandBuffer GS", METALWORKQUEUE_GEOMETRY_SHADER);
 
+    context->StartFrameForThread();
     context->SetRenderPassDescriptor(_mtlRenderPassDescriptor);
+    context->EndFrameForThread();
 }
 
 void
@@ -366,14 +368,15 @@ MtlfDrawTarget::Unbind()
     }
     MtlfMetalContext *context = MtlfMetalContext::GetMetalContext();
     context->SetDrawTarget(NULL);
+
     // Terminate the render encoder containing all the draw commands
-    context->GetRenderEncoder();
-    context->ReleaseEncoder(true);
-    
+//    context->GetRenderEncoder();
+//    context->ReleaseEncoder(true);
+
     // Generate an event to indicate that the GS buffer has completed then commit it
-    context->CommitCommandBuffer(true, false, METALWORKQUEUE_GEOMETRY_SHADER);
+    //context->CommitCommandBufferForThread(false, false, METALWORKQUEUE_GEOMETRY_SHADER);
     
-    context->CommitCommandBuffer(false, false);
+//    context->CommitCommandBufferForThread(false, false);
     
     TouchContents();
 }
@@ -473,7 +476,7 @@ MtlfDrawTarget::GetImage(std::string const & name, void* buffer) const
 #endif
 
     context->ReleaseEncoder(true);
-    context->CommitCommandBuffer(false, true);
+    context->CommitCommandBufferForThread(false, true);
 
     memcpy(buffer, [cpuBuffer contents], bytesPerPixel * width * height);
 	context->ReleaseMetalBuffer(cpuBuffer);

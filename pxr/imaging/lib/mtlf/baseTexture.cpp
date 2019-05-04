@@ -384,7 +384,7 @@ MtlfBaseTexture::_CreateTexture(GarchBaseTextureDataConstPtr texData,
                 [blitEncoder generateMipmapsForTexture:_textureName];
                 
                 context->ReleaseEncoder(true);
-                context->CommitCommandBuffer(false, false);
+                context->CommitCommandBufferForThread(false, false);
             }
 
         } else {
