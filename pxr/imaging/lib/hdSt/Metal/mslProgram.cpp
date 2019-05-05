@@ -578,12 +578,7 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
     MTLPrimitiveType primType = GetMetalPrimType(primitiveMode);
     bool const drawingQuads = (primitiveMode == GL_LINES_ADJACENCY);
     bool const tempPointsWorkaround = context->IsTempPointWorkaroundActive();
-    
-//    if (!context->GeometryShadersActive()) {
-//        context->CreateCommandBuffer(METALWORKQUEUE_GEOMETRY_SHADER);
-//        context->LabelCommandBuffer(@"Geometry Shaders", METALWORKQUEUE_GEOMETRY_SHADER);
-//    }
-    
+
     uint32_t numOutVertsPerInPrim(3), numOutPrimsPerInPrim(1);
     if (drawingQuads) {
         if (!doMVA) {
@@ -618,8 +613,8 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
     }
     
     // DEMO!!!
-    if (doMVAComputeGS)
-        return;
+//    if (doMVAComputeGS)
+//        return;
     
     int const maxThreadsPerGroup = 32;
     

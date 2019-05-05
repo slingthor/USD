@@ -321,7 +321,7 @@ public:
 
     MTLF_API
     bool GeometryShadersActive() const {
-        return workQueueGeometry.commandBuffer != nil;
+        return threadState.workQueueGeometry.commandBuffer != nil;
     }
     
     //Returns the maximum number of _primitives_ to process per ComputeGS part.
@@ -366,7 +366,7 @@ public:
         if (workQueueType == METALWORKQUEUE_DEFAULT)
             return threadState.workQueueDefault;
         if (workQueueType == METALWORKQUEUE_GEOMETRY_SHADER)
-            return workQueueGeometry;
+            return threadState.workQueueGeometry;
         return workQueueResource;
     }
 
@@ -449,6 +449,7 @@ protected:
             currentWorkQueue     = &workQueueDefault;
             
             _this->ResetEncoders(METALWORKQUEUE_DEFAULT, true);
+            _this->ResetEncoders(METALWORKQUEUE_GEOMETRY_SHADER, true);
 
             MTLResourceOptions resourceOptions = MTLResourceStorageModePrivate|MTLResourceCPUCacheModeDefaultCache;
             for(int i = 0; i < _this->gsMaxConcurrentBatches; i++)
@@ -489,6 +490,7 @@ protected:
         MetalWorkQueue      *currentWorkQueue;
         MetalWorkQueueType  currentWorkQueueType;
         
+        MetalWorkQueue      workQueueGeometry;
         MetalWorkQueue      workQueueDefault;
 
         // Pipeline state
@@ -535,7 +537,6 @@ protected:
 
     static std::mutex _bufferMutex;
 
-    MetalWorkQueue             workQueueGeometry;
     MetalWorkQueue             workQueueResource;
 
     int                        gsMaxConcurrentBatches;

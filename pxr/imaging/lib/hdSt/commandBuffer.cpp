@@ -132,6 +132,12 @@ HdStCommandBuffer::ExecuteDraw(
 //                static std::mutex _mutex;
 //                std::lock_guard<std::mutex> lock(_mutex);
                 
+                if (!context->GeometryShadersActive()) {
+                    context->CreateCommandBuffer(METALWORKQUEUE_GEOMETRY_SHADER);
+                    context->LabelCommandBuffer(@"Geometry Shaders", METALWORKQUEUE_GEOMETRY_SHADER);
+                    //[context->GetWorkQueue(METALWORKQUEUE_GEOMETRY_SHADER).commandBuffer enqueue];
+                }
+
                 context->StartFrameForThread();
                 
                 // Create a new command buffer for each render pass to the current drawable
@@ -144,19 +150,19 @@ HdStCommandBuffer::ExecuteDraw(
                     HdSt_DrawBatchSharedPtr& batch = (*drawBatches)[i];
                     batch->ExecuteDraw(renderPassState, resourceRegistry);
                 }
-                
+
                 if (context->GeometryShadersActive()) {
                     // Complete the GS command buffer if we have one
                     context->CommitCommandBufferForThread(true, false, METALWORKQUEUE_GEOMETRY_SHADER);
                 }
-                
+
                 context->CommitCommandBufferForThread(false, false);
 
                 context->EndFrameForThread();
             }
         }
     };
-
+    
     static bool mtBatchDrawing = true;
     if (mtBatchDrawing) {
         // Manually draw one, to ensure the renderpass descriptor is appropriately patched

@@ -177,11 +177,6 @@ MtlfMetalContext::MtlfMetalContext(id<MTLDevice> _device, int width, int height)
         gsMaxDataPerBatch = 1024 * 1024 * 32;
         gsMaxConcurrentBatches = 3;
     }
-    else {
-//        NSLog(@"Device %@ does not support Metal 2, using fallback path, performance may be sub-optimal.", device.name);
-        gsMaxDataPerBatch = 1024 * 1024 * 32;
-        gsMaxConcurrentBatches = 2;
-    }
     
     ResetEncoders(METALWORKQUEUE_GEOMETRY_SHADER, true);
     ResetEncoders(METALWORKQUEUE_RESOURCE, true);
@@ -1779,29 +1774,6 @@ void MtlfMetalContext::PrepareForComputeGSPart(
         METAL_INC_STAT(resourceStats.GSBatchesStarted);
         if(enableMultiQueue) {
             _gsEncodeSync(true);
-        }
-        else {
-            //When not using multiple queues we rely on the order in the commandbuffer combined with a fence for synching.
-            MetalWorkQueue* wq_def = &GetWorkQueue(METALWORKQUEUE_DEFAULT);
-            MetalWorkQueue* wq_gs = &GetWorkQueue(METALWORKQUEUE_GEOMETRY_SHADER);
-            
-            if(wq_def->encoderInUse || wq_gs->encoderInUse)
-                TF_FATAL_CODING_ERROR("Default and Geometry Shader encoder must not be active before calling PrepareForComputeGSPart!");
-
-            //Commit the geometry shader queue ahead of the rendering queue. But only if there has been work before it.
-            if(wq_gs->encoderHasWork) {
-                CommitCommandBufferForThread(false, false, METALWORKQUEUE_GEOMETRY_SHADER);
-                
-                CreateCommandBuffer(METALWORKQUEUE_GEOMETRY_SHADER);
-            }
-            if(wq_def->encoderHasWork) {
-                CommitCommandBufferForThread(false, false, METALWORKQUEUE_DEFAULT);
-                
-                CreateCommandBuffer(METALWORKQUEUE_DEFAULT);
-                
-                //Patch the descriptor to prevent clearing attachments we just rendered to.
-                _PatchRenderPassDescriptor();
-            }
         }
     }
 }

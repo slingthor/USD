@@ -128,9 +128,9 @@ void
 HdSt_GeometricShader::UnbindResources(HdSt_ResourceBinder const &binder, HdStProgram const &program)
 {
 #if defined(ARCH_GFX_OPENGL)
-    if (_polygonMode == HdPolygonModeLine) {
-        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-    }
+//    if (_polygonMode == HdPolygonModeLine) {
+//        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+//    }
 #else
 //    TF_FATAL_CODING_ERROR("Not Implemented!"); //MTL_FIXME
 #endif
