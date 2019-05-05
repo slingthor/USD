@@ -109,16 +109,16 @@ HdSt_GeometricShader::BindResources(HdSt_ResourceBinder const &binder, HdStProgr
         // don't care -- use renderPass's fallback
     }
 #if defined(ARCH_GFX_OPENGL)
-    if (GetPrimitiveMode() == GL_PATCHES) {
-        glPatchParameteri(GL_PATCH_VERTICES, GetPrimitiveIndexSize());
-    }
-
-    if (_polygonMode == HdPolygonModeLine) {
-        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-        if (_lineWidth > 0) {
-            glLineWidth(_lineWidth);
-        }
-    }
+//    if (GetPrimitiveMode() == GL_PATCHES) {
+//        glPatchParameteri(GL_PATCH_VERTICES, GetPrimitiveIndexSize());
+//    }
+//
+//    if (_polygonMode == HdPolygonModeLine) {
+//        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+//        if (_lineWidth > 0) {
+//            glLineWidth(_lineWidth);
+//        }
+//    }
 #else
 //    TF_FATAL_CODING_ERROR("Not Implemented!"); //MTL_FIXME
 #endif

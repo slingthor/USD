@@ -61,6 +61,7 @@ static MTLPrimitiveType GetMetalPrimType(GLenum glPrimType) {
         case GL_TRIANGLES:
         // See comment in the draw function as to why we do this
         case GL_LINES_ADJACENCY:
+        case GL_PATCHES:
             primType = MTLPrimitiveTypeTriangle;
             break;
         case GL_LINE_STRIP_ADJACENCY:
@@ -71,7 +72,7 @@ static MTLPrimitiveType GetMetalPrimType(GLenum glPrimType) {
         case GL_TRIANGLE_FAN:
         case GL_TRIANGLE_STRIP_ADJACENCY:
         case GL_TRIANGLES_ADJACENCY:
-        case GL_PATCHES:
+        //case GL_PATCHES:
             primType = MTLPrimitiveTypePoint;
             TF_FATAL_CODING_ERROR("Not Implemented");
             break;
