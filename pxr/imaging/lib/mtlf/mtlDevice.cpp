@@ -922,13 +922,14 @@ void MtlfMetalContext::SetRenderPipelineState()
     }
     wq->currentRenderPipelineDescriptorHash = hashVal;
     
-    std::lock_guard<std::mutex> lock(_pipelineMutex);
+    _pipelineMutex.lock();
     auto pipelineStateIt = renderPipelineStateMap.find(wq->currentRenderPipelineDescriptorHash);
     
     id<MTLRenderPipelineState> pipelineState;
 
     if (pipelineStateIt != renderPipelineStateMap.end()) {
         pipelineState = pipelineStateIt->second;
+        _pipelineMutex.unlock();
     }
     else
     {
@@ -1023,13 +1024,16 @@ void MtlfMetalContext::SetRenderPipelineState()
         NSError *error = NULL;
         pipelineState = [device newRenderPipelineStateWithDescriptor:renderPipelineStateDescriptor error:&error];
         if (!pipelineState) {
+            _pipelineMutex.unlock();
             NSLog(@"Failed to created pipeline state, error %@", error);
             return;
         }
         
-        [renderPipelineStateDescriptor release];
-        
         renderPipelineStateMap.emplace(wq->currentRenderPipelineDescriptorHash, pipelineState);
+        _pipelineMutex.unlock();
+        
+        [renderPipelineStateDescriptor release];
+
         METAL_INC_STAT(resourceStats.renderPipelineStates);
     }
   
@@ -1232,12 +1236,13 @@ NSUInteger MtlfMetalContext::SetComputeEncoderState(id<MTLFunction>     computeF
     wq->currentComputePipelineDescriptorHash = hashVal;
     
     // Search map to see if we've created a pipeline state object for this already
-    std::lock_guard<std::mutex> lock(_pipelineMutex);
+    _pipelineMutex.lock();
     auto computePipelineStateIt = computePipelineStateMap.find(wq->currentComputePipelineDescriptorHash);
 
     if (computePipelineStateIt != computePipelineStateMap.end()) {
         // Retrieve pre generated state
         computePipelineState = computePipelineStateIt->second;
+        _pipelineMutex.unlock();
     }
     else
     {
@@ -1262,14 +1267,17 @@ NSUInteger MtlfMetalContext::SetComputeEncoderState(id<MTLFunction>     computeF
         
         // Create a new Compute pipeline state object
         computePipelineState = [device newComputePipelineStateWithDescriptor:computePipelineStateDescriptor options:MTLPipelineOptionNone reflection:reflData error:&error];
-        [computePipelineStateDescriptor release];
 
         if (!computePipelineState) {
+            _pipelineMutex.unlock();
             NSLog(@"Failed to create compute pipeline state, error %@", error);
             return 0;
         }
         computePipelineStateMap.emplace(wq->currentComputePipelineDescriptorHash, computePipelineState);
+        _pipelineMutex.unlock();
         METAL_INC_STAT(resourceStats.computePipelineStates);
+        
+        [computePipelineStateDescriptor release];
     }
     
     if (computePipelineState != wq->currentComputePipelineState)

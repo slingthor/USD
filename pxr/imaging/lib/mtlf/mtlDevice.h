@@ -126,9 +126,35 @@ enum MetalWorkQueueType {
     METALWORKQUEUE_MAX              =  3,       // This should always be last
 };
 
+struct MetalWorkQueue {
+    id<MTLCommandBuffer>         commandBuffer;
+#if defined(METAL_EVENTS_API_PRESENT)
+    id<MTLEvent>                 event;
+#endif
+    
+    MetalEncoderType             currentEncoderType;
+    id<MTLBlitCommandEncoder>    currentBlitEncoder;
+    id<MTLRenderCommandEncoder>  currentRenderEncoder;
+    id<MTLComputeCommandEncoder> currentComputeEncoder;
+    MTLRenderPassDescriptor      *currentRenderPassDescriptor;
+    bool encoderInUse;
+    bool encoderEnded;
+    bool encoderHasWork;
+    bool generatesEndOfQueueEvent;
+    
+    uint64_t currentEventValue;
+    uint64_t highestExpectedEventValue;
+    uint64_t lastWaitEventValue;
+    size_t currentVertexDescriptorHash;
+    size_t currentColourAttachmentsHash;
+    size_t currentRenderPipelineDescriptorHash;
+    size_t currentComputePipelineDescriptorHash;
+    id<MTLRenderPipelineState>  currentRenderPipelineState;
+    id<MTLComputePipelineState> currentComputePipelineState;
+    NSUInteger                  currentComputeThreadExecutionWidth;
+};
+
 class MtlfMetalContext : public boost::noncopyable {
-protected:
-    struct MetalWorkQueue;
 public:
     typedef struct {
         float position[2];
@@ -389,34 +415,6 @@ protected:
     
     struct TextureBinding { int index; id<MTLTexture> texture; TfToken name; MSL_ProgramStage stage; };
     struct SamplerBinding { int index; id<MTLSamplerState> sampler; TfToken name; MSL_ProgramStage stage; };
-
-    struct MetalWorkQueue {
-        id<MTLCommandBuffer>         commandBuffer;
-#if defined(METAL_EVENTS_API_PRESENT)
-        id<MTLEvent>                 event;
-#endif
-        
-        MetalEncoderType             currentEncoderType;
-        id<MTLBlitCommandEncoder>    currentBlitEncoder;
-        id<MTLRenderCommandEncoder>  currentRenderEncoder;
-        id<MTLComputeCommandEncoder> currentComputeEncoder;
-        MTLRenderPassDescriptor      *currentRenderPassDescriptor;
-        bool encoderInUse;
-        bool encoderEnded;
-        bool encoderHasWork;
-        bool generatesEndOfQueueEvent;
-        
-        uint64_t currentEventValue;
-        uint64_t highestExpectedEventValue;
-        uint64_t lastWaitEventValue;
-        size_t currentVertexDescriptorHash;
-        size_t currentColourAttachmentsHash;
-        size_t currentRenderPipelineDescriptorHash;
-        size_t currentComputePipelineDescriptorHash;
-        id<MTLRenderPipelineState>  currentRenderPipelineState;
-        id<MTLComputePipelineState> currentComputePipelineState;
-        NSUInteger                  currentComputeThreadExecutionWidth;
-    };
     
     struct ThreadState {
 

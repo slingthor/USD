@@ -641,8 +641,7 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
         
         id<MTLRenderCommandEncoder>  renderEncoder = context->GetRenderEncoder(METALWORKQUEUE_DEFAULT);
     
-        if (!partIndexOffset)
-            const_cast<HdStMSLProgram*>(this)->BakeState();
+        const_cast<HdStMSLProgram*>(this)->BakeState();
     
         id<MTLComputeCommandEncoder> computeEncoder = doMVAComputeGS ? context->GetComputeEncoder(METALWORKQUEUE_GEOMETRY_SHADER) : nil;
         
