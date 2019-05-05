@@ -611,11 +611,7 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
     if (doMVAComputeGS && !useDispatchThreads) {
         maxThreadsPerThreadgroup = METAL_GS_THREADGROUP_SIZE;
     }
-    
-    // DEMO!!!
-//    if (doMVAComputeGS)
-//        return;
-    
+
     int const maxThreadsPerGroup = 32;
     
     if (maxThreadsPerThreadgroup > maxThreadsPerGroup) {
@@ -640,9 +636,9 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
             context->PrepareForComputeGSPart(gsVertDataSize, gsPrimDataSize, gsDataBuffer, gsVertDataOffset, gsPrimDataOffset);
         
         id<MTLRenderCommandEncoder>  renderEncoder = context->GetRenderEncoder(METALWORKQUEUE_DEFAULT);
-    
+
         const_cast<HdStMSLProgram*>(this)->BakeState();
-    
+
         id<MTLComputeCommandEncoder> computeEncoder = doMVAComputeGS ? context->GetComputeEncoder(METALWORKQUEUE_GEOMETRY_SHADER) : nil;
         
         if(doMVA) {

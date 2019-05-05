@@ -163,6 +163,7 @@ MtlfMetalContext::MtlfMetalContext(id<MTLDevice> _device, int width, int height)
         device = _device;
     
     captureScope = [[MTLCaptureManager sharedCaptureManager] newCaptureScopeWithDevice:device];
+    captureScope.label = @"Full Frame";
     [[MTLCaptureManager sharedCaptureManager] setDefaultCaptureScope:captureScope];
 
     NSLog(@"Selected %@ for Metal Device", device.name);
@@ -1504,9 +1505,9 @@ void MtlfMetalContext::SetCurrentEncoder(MetalEncoderType encoderType, MetalWork
         TF_FATAL_CODING_ERROR("Need to release the current encoder before getting a new one");
     }
     if (!wq->commandBuffer) {
-        NSLog(@"Creating a command buffer on demand, try and avoid this!");
+        //NSLog(@"Creating a command buffer on demand, try and avoid this!");
         CreateCommandBuffer(workQueueType);
-        LabelCommandBuffer(@"Default label - fix!");
+        //LabelCommandBuffer(@"Default label - fix!");
         //TF_FATAL_CODING_ERROR("Shouldn't be able to get here without having a command buffer created");
     }
 
@@ -1534,7 +1535,7 @@ void MtlfMetalContext::SetCurrentEncoder(MetalEncoderType encoderType, MetalWork
                 TF_FATAL_CODING_ERROR("Can ony pass null renderPassDescriptor if the render encoder is currently active");
             }
             wq->currentRenderEncoder = [wq->commandBuffer renderCommandEncoderWithDescriptor: wq->currentRenderPassDescriptor];
-            _PatchRenderPassDescriptor();
+            //_PatchRenderPassDescriptor();
 
             // Since the encoder is new we'll need to emit all the state again
             threadState.dirtyRenderState     = DIRTY_METALRENDERSTATE_ALL;
@@ -1806,9 +1807,7 @@ void MtlfMetalContext::_gsEncodeSync(bool doOpenBatch) {
                 EncodeSignalEvent(METALWORKQUEUE_DEFAULT);
             }
         }
-        
-        //By using events we triggered ending of the encoders. Need to patch up the render descriptor to prevent previous results from being wiped.
-        _PatchRenderPassDescriptor();
+
         threadState.gsHasOpenBatch = false;
     }
     

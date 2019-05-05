@@ -371,7 +371,7 @@ HdSt_ImmediateDrawBatch::ExecuteDraw(
         int baseVertex = vertexOffset;
         int instanceCount = instanceIndexBar
             ? instanceIndexBar->GetNumElements()/instanceIndexWidth : 1;
-
+        
         // update standalone uniforms
         int drawingCoord0[4] = {
             0, // reserved for modelBar

@@ -122,10 +122,6 @@ void HdStRenderDelegateMetal::CommitResources(HdChangeTracker *tracker)
 
     context->StartFrameForThread();
     
-    // Create a new command buffer for each render pass to the current drawable
-    context->CreateCommandBuffer(METALWORKQUEUE_DEFAULT);
-    context->LabelCommandBuffer(@"CommitResources", METALWORKQUEUE_DEFAULT);
-    
     HdStRenderDelegate::CommitResources(tracker);
 
     if (context->GeometryShadersActive()) {

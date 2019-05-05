@@ -156,23 +156,29 @@ HdStCommandBuffer::ExecuteDraw(
                     context->CommitCommandBufferForThread(true, false, METALWORKQUEUE_GEOMETRY_SHADER);
                 }
 
-                context->CommitCommandBufferForThread(false, false);
+                if (context->GetWorkQueue(METALWORKQUEUE_DEFAULT).commandBuffer != nil) {
+                    context->CommitCommandBufferForThread(false, false);
 
-                context->EndFrameForThread();
+                    context->EndFrameForThread();
+                }
             }
         }
     };
+
+    // Create a new command buffer for each render pass to the current drawable
+    id <MTLCommandBuffer> commandBuffer = [context->commandQueue commandBuffer];
+    commandBuffer.label = @"Clear";
+
+    id <MTLRenderCommandEncoder> renderEncoder =
+        [commandBuffer renderCommandEncoderWithDescriptor:renderPassDescriptor];
+    [renderEncoder endEncoding];
+    [commandBuffer commit];
+ 
+    renderPassDescriptor.depthAttachment.loadAction = MTLLoadActionLoad;
+    renderPassDescriptor.colorAttachments[0].loadAction = MTLLoadActionLoad;
     
     static bool mtBatchDrawing = true;
     if (mtBatchDrawing) {
-        // Manually draw one, to ensure the renderpass descriptor is appropriately patched
-        _Worker::draw(&_drawBatches,
-                      renderPassState,
-                      resourceRegistry,
-                      renderPassDescriptor,
-                      _drawBatches.size() - 1,
-                      _drawBatches.size());
-
         // Now render the rest
         WorkParallelForN(_drawBatches.size() - 1,
                          std::bind(&_Worker::draw, &_drawBatches,
@@ -285,18 +291,6 @@ HdStCommandBuffer::_RebuildDrawBatches()
             _drawBatches.push_back(batch);
             batchMap[key] = batch;
         }
-    }
-    
-    //  Make sure the first item is the one with the fewest draw calls
-    auto smallestBatchIt = std::min_element(_drawBatches.begin(), _drawBatches.end(),
-        [](const HdSt_DrawBatchSharedPtr& a, const HdSt_DrawBatchSharedPtr& b)
-        {
-            return a->GetNumDrawCalls() < b->GetNumDrawCalls();
-        });
-    if (smallestBatchIt != _drawBatches.end()) {
-        HdSt_DrawBatchSharedPtr smallestBatch = *smallestBatchIt;
-        _drawBatches.erase(smallestBatchIt);
-        _drawBatches.push_back(smallestBatch);
     }
 }
 
