@@ -386,8 +386,11 @@ public:
     id<MTLCommandQueue> commandQueue;
     id<MTLCommandQueue> commandQueueGS;
     id<MTLTexture> mtlColorTexture;
+    id<MTLTexture> mtlMultisampleColorTexture;
     id<MTLTexture> mtlDepthTexture;
 
+    NSUInteger mtlSampleCount;
+    
     MTLF_API MetalWorkQueue& GetWorkQueue(MetalWorkQueueType workQueueType) {
         if (workQueueType == METALWORKQUEUE_DEFAULT)
             return threadState.workQueueDefault;

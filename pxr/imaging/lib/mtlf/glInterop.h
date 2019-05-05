@@ -70,12 +70,15 @@ public:
     id<MTLTexture> mtlDepthTexture;
     id<MTLTexture> mtlDepthRegularFloatTexture;
 
+    NSUInteger mtlSampleCount;
+    
 private:
 
     id<MTLDevice>               device;
 
     id<MTLLibrary>              defaultLibrary;
     id<MTLFunction>             computeDepthCopyProgram;
+    id<MTLFunction>             computeDepthCopyMultisampleProgram;
     
     CVPixelBufferRef pixelBuffer;
     CVPixelBufferRef depthBuffer;
