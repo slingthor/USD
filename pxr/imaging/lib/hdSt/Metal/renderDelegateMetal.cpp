@@ -27,11 +27,15 @@
 
 #include "pxr/imaging/garch/resourceFactory.h"
 
+#include "pxr/base/tf/envSetting.h"
+
 #include "pxr/imaging/mtlf/contextCaps.h"
 #include "pxr/imaging/mtlf/diagnostic.h"
 #include "pxr/imaging/mtlf/mtlDevice.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
+
+TF_DEFINE_ENV_SETTING(PXR_MTL_SAMPLE_COUNT, 1, "");
 
 namespace {
 static
@@ -166,6 +170,8 @@ void HdStRenderDelegateMetal::PrepareRender(
     
     MtlfMetalContext *context = MtlfMetalContext::GetMetalContext();
     
+    context->mtlSampleCount = TfGetEnvSetting(PXR_MTL_SAMPLE_COUNT);
+    
     _renderOutput = params.renderOutput;
 
     if (_renderOutput == DelegateParams::RenderOutput::OpenGL &&
@@ -187,6 +193,9 @@ void HdStRenderDelegateMetal::PrepareRender(
         if (context->mtlColorTexture.width != viewport[2] ||
             context->mtlColorTexture.height != viewport[3]) {
             context->InitGLInterop();
+            
+            NSLog(@"updated viewport: %d, %d", viewport[2], viewport[3]);
+            
             context->AllocateAttachments(viewport[2], viewport[3]);
         }
     
@@ -207,7 +216,10 @@ void HdStRenderDelegateMetal::PrepareRender(
         
         // store only attachments that will be presented to the
         // screen, as in this case
-        colorAttachment.storeAction = MTLStoreActionStore;
+        if (context->mtlSampleCount > 1)
+            colorAttachment.storeAction = MTLStoreActionMultisampleResolve;
+        else
+            colorAttachment.storeAction = MTLStoreActionStore;
         
         MTLRenderPassDepthAttachmentDescriptor *depthAttachment =
             _mtlRenderPassDescriptorForInterop.depthAttachment;
@@ -215,7 +227,13 @@ void HdStRenderDelegateMetal::PrepareRender(
         depthAttachment.storeAction = MTLStoreActionStore;
         depthAttachment.clearDepth = 1.0f;
         
-        colorAttachment.texture = context->mtlColorTexture;
+        if (context->mtlSampleCount > 1)
+        {
+            colorAttachment.texture = context->mtlMultisampleColorTexture;
+            colorAttachment.resolveTexture = context->mtlColorTexture;
+        }
+        else
+            colorAttachment.texture = context->mtlColorTexture;
         
         GLfloat clearColor[4];
         glGetFloatv(GL_COLOR_CLEAR_VALUE, clearColor);

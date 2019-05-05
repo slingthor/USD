@@ -40,7 +40,7 @@ fragment half4 tex_fs(Interpolated in [[stage_in]], texture2d<half> tex [[textur
 }
 
 // Depth buffer copy function
-kernel void copyDepth(texture2d<float, access::read> texIn,
+kernel void copyDepth(depth2d<float, access::read> texIn,
                       texture2d<float, access::write> texOut,
                       uint2 gid [[thread_position_in_grid]])
 {
@@ -48,5 +48,16 @@ kernel void copyDepth(texture2d<float, access::read> texIn,
         return;
     }
     
-    texOut.write(float4(texIn.read(gid).rgb, 1), gid);
+    texOut.write(float(texIn.read(gid)), gid);
+}
+
+kernel void copyDepthMultisample(depth2d_ms<float, access::read> texIn,
+                                 texture2d<float, access::write> texOut,
+                                 uint2 gid [[thread_position_in_grid]])
+{
+    if(gid.x >= texOut.get_width() || gid.y >= texOut.get_height()) {
+        return;
+    }
+    
+    texOut.write(float(texIn.read(gid, 0)), gid);
 }

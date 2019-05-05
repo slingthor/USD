@@ -198,6 +198,7 @@ MtlfGlInterop::MtlfGlInterop(id<MTLDevice> _device)
     
     // Load the fragment program into the library
     computeDepthCopyProgram = [defaultLibrary newFunctionWithName:@"copyDepth"];
+    computeDepthCopyMultisampleProgram = [defaultLibrary newFunctionWithName:@"copyDepthMultisample"];
 
     // Create the texture caches
     CVReturn cvret = CVMetalTextureCacheCreate(kCFAllocatorDefault, nil, device, nil, &cvmtlTextureCache);
@@ -219,6 +220,8 @@ MtlfGlInterop::MtlfGlInterop(id<MTLDevice> _device)
     mtlColorTexture = nil;
     mtlDepthTexture = nil;
     mtlDepthRegularFloatTexture = nil;
+    
+    mtlSampleCount = 1;
 
     AllocateAttachments(256, 256);
 }
@@ -358,6 +361,11 @@ void MtlfGlInterop::AllocateAttachments(int width, int height)
                              mipmapped:false];
     depthTexDescriptor.usage = MTLTextureUsageRenderTarget|MTLTextureUsageShaderRead;
     depthTexDescriptor.resourceOptions = MTLResourceCPUCacheModeDefaultCache | MTLResourceStorageModePrivate;
+    if (mtlSampleCount > 1)
+    {
+        depthTexDescriptor.sampleCount = mtlSampleCount;
+        depthTexDescriptor.textureType = MTLTextureType2DMultisample;
+    }
     mtlDepthTexture = [device newTextureWithDescriptor:depthTexDescriptor];
     
     // Flush the caches
@@ -430,7 +438,11 @@ MtlfGlInterop::CopyDepthTextureToOpenGL(id<MTLComputeCommandEncoder> computeEnco
 {
     MtlfMetalContext *context(MtlfMetalContext::GetMetalContext());
 
-    NSUInteger exeWidth = context->SetComputeEncoderState(computeDepthCopyProgram, 0, 0, @"Depth copy pipeline state");
+    id<MTLFunction> computeProgram = computeDepthCopyProgram;
+    if (mtlSampleCount > 1)
+        computeProgram =computeDepthCopyMultisampleProgram;
+    
+    NSUInteger exeWidth = context->SetComputeEncoderState(computeProgram, 0, 0, @"Depth copy pipeline state");
     NSUInteger maxThreadsPerThreadgroup = context->GetMaxThreadsPerThreadgroup();
 
     MTLSize threadgroupCount = MTLSizeMake(exeWidth, maxThreadsPerThreadgroup / exeWidth, 1);
