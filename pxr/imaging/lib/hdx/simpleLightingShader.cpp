@@ -110,6 +110,9 @@ void
 HdxSimpleLightingShader::BindResources(HdSt_ResourceBinder const &binder,
                                        HdStProgram const &program)
 {
+    static std::mutex _mutex;
+    std::lock_guard<std::mutex> lock(_mutex);
+
     // XXX: we'd like to use HdSt_ResourceBinder instead of GarchBindingMap.
     //
     program.AssignUniformBindings(_bindingMap);

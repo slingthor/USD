@@ -36,6 +36,8 @@
 #include "pxr/imaging/hdSt/resourceRegistry.h"
 #include "pxr/imaging/hdSt/shaderCode.h"
 
+#include "pxr/imaging/hdSt/lightingShader.h"
+
 #include "pxr/imaging/hd/bufferArrayRange.h"
 #include "pxr/imaging/hd/debugCodes.h"
 #include "pxr/imaging/hd/mesh.h"
@@ -125,6 +127,9 @@ HdSt_ImmediateDrawBatch::ExecuteDraw(
 {
     if (_drawItemInstances.empty()) return;
 
+//    static std::mutex _mutex;
+//    std::lock_guard<std::mutex> lock(_mutex);
+
     // bind program
     _DrawingProgram & program = _GetDrawingProgram(renderPassState,
                                                    /*indirect=*/false,
@@ -141,9 +146,6 @@ HdSt_ImmediateDrawBatch::ExecuteDraw(
 
     bool hasOverrideShader = bool(renderPassState->GetOverrideShader());
 
-    static std::mutex _mutex;
-    std::lock_guard<std::mutex> lock(_mutex);
-    
     TF_FOR_ALL(it, shaders) {
         (*it)->BindResources(binder, *gpuProgram);
     }

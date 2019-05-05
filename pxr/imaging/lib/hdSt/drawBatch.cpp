@@ -97,7 +97,7 @@ inline bool isAggregated(HdBufferArrayRangeSharedPtr const &rangeA,
 }
 }
 
-int const maxDrawItemsPerBatch = 128;
+int const maxDrawItemsPerBatch = 2048;
 
 bool
 HdSt_DrawBatch::Append(HdStDrawItemInstance * drawItemInstance)

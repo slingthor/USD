@@ -168,7 +168,7 @@ HdSt_GeometricShader::GetPrimitiveMode() const
         case PrimitiveType::PRIM_BASIS_CURVES_LINEAR_PATCHES:
         case PrimitiveType::PRIM_MESH_PATCHES:
             primMode = GL_PATCHES;
-            break;    
+            break;
     }
 
     return primMode;

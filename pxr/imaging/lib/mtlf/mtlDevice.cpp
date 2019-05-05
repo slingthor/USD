@@ -1002,7 +1002,7 @@ void MtlfMetalContext::SetRenderPipelineState()
             }
             else {
                 //METAL TODO: Why does this need to be hardcoded? There is no matching drawTarget? Can we get this info from somewhere?
-                renderPipelineStateDescriptor.colorAttachments[0].blendingEnabled = YES;
+                renderPipelineStateDescriptor.colorAttachments[0].blendingEnabled = NO;
                 renderPipelineStateDescriptor.colorAttachments[0].sourceRGBBlendFactor = MTLBlendFactorSourceAlpha;
                 renderPipelineStateDescriptor.colorAttachments[0].sourceAlphaBlendFactor = MTLBlendFactorSourceAlpha;
                 renderPipelineStateDescriptor.colorAttachments[0].destinationRGBBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
