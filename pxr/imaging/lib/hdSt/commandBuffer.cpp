@@ -180,7 +180,7 @@ HdStCommandBuffer::ExecuteDraw(
     static bool mtBatchDrawing = true;
     if (mtBatchDrawing) {
         // Now render the rest
-        WorkParallelForN(_drawBatches.size() - 1,
+        WorkParallelForN(_drawBatches.size(),
                          std::bind(&_Worker::draw, &_drawBatches,
                                    std::cref(renderPassState),
                                    std::cref(resourceRegistry),
