@@ -1048,7 +1048,7 @@ void MtlfMetalContext::SetRenderPipelineState()
 void MtlfMetalContext::SetRenderEncoderState()
 {
     threadState.dirtyRenderState |= DIRTY_METALRENDERSTATE_OLD_STYLE_VERTEX_UNIFORM;
-    threadState.dirtyRenderState |= 0xffffffff;
+//    threadState.dirtyRenderState |= 0xffffffff;
 
     MetalWorkQueue *wq = threadState.currentWorkQueue;
     MetalWorkQueue *gswq = &GetWorkQueue(METALWORKQUEUE_GEOMETRY_SHADER);
