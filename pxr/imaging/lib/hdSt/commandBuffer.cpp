@@ -166,21 +166,23 @@ HdStCommandBuffer::ExecuteDraw(
     };
 
     // Create a new command buffer for each render pass to the current drawable
-    id <MTLCommandBuffer> commandBuffer = [context->commandQueue commandBuffer];
-    commandBuffer.label = @"Clear";
+    if (renderPassDescriptor.colorAttachments[0].loadAction == MTLLoadActionClear) {
+        id <MTLCommandBuffer> commandBuffer = [context->commandQueue commandBuffer];
+        commandBuffer.label = @"Clear";
 
-    id <MTLRenderCommandEncoder> renderEncoder =
-        [commandBuffer renderCommandEncoderWithDescriptor:renderPassDescriptor];
-    [renderEncoder endEncoding];
-    [commandBuffer commit];
- 
-    renderPassDescriptor.depthAttachment.loadAction = MTLLoadActionLoad;
-    renderPassDescriptor.colorAttachments[0].loadAction = MTLLoadActionLoad;
-    
+        id <MTLRenderCommandEncoder> renderEncoder =
+            [commandBuffer renderCommandEncoderWithDescriptor:renderPassDescriptor];
+        [renderEncoder endEncoding];
+        [commandBuffer commit];
+     
+        renderPassDescriptor.depthAttachment.loadAction = MTLLoadActionLoad;
+        renderPassDescriptor.colorAttachments[0].loadAction = MTLLoadActionLoad;
+    }
+
     static bool mtBatchDrawing = true;
     if (mtBatchDrawing) {
         // Now render the rest
-        WorkParallelForN(_drawBatches.size() - 1,
+        WorkParallelForN(_drawBatches.size(),
                          std::bind(&_Worker::draw, &_drawBatches,
                                    std::cref(renderPassState),
                                    std::cref(resourceRegistry),

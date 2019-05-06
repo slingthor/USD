@@ -229,9 +229,12 @@ MtlfMetalContext::MtlfMetalContext(id<MTLDevice> _device, int width, int height)
     
     drawTarget = NULL;
     mtlColorTexture = nil;
+    mtlMultisampleColorTexture = nil;
     mtlDepthTexture = nil;
     outputPixelFormat = MTLPixelFormatInvalid;
     outputDepthFormat = MTLPixelFormatInvalid;
+    
+    mtlSampleCount = 1;
 
 #if defined(METAL_ENABLE_STATS)
     resourceStats.commandBuffersCreated.store(0, std::memory_order_relaxed);
@@ -345,6 +348,23 @@ void MtlfMetalContext::AllocateAttachments(int width, int height)
 
         mtlColorTexture = glInterop->mtlColorTexture;
         mtlDepthTexture = glInterop->mtlDepthTexture;
+        
+        if (mtlSampleCount > 1)
+        {
+            MTLTextureDescriptor* desc = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:mtlColorTexture.pixelFormat
+                                                                                            width:width
+                                                                                           height:height
+                                                                                        mipmapped:NO];
+            desc.textureType = MTLTextureType2DMultisample;
+            desc.sampleCount = mtlSampleCount;
+            desc.usage = MTLTextureUsageRenderTarget | MTLTextureUsageShaderRead;
+            desc.storageMode = MTLStorageModePrivate;
+            
+            if (mtlMultisampleColorTexture)
+                [mtlMultisampleColorTexture release];
+            
+            mtlMultisampleColorTexture = [device newTextureWithDescriptor:desc];
+        }
     }
 #endif
 }
@@ -399,6 +419,7 @@ void MtlfMetalContext::InitGLInterop() {
 #if defined(ARCH_GFX_OPENGL)
     if (!glInterop) {
         glInterop = new MtlfGlInterop(device);
+        glInterop->mtlSampleCount = mtlSampleCount;
     }
 #endif
 }
@@ -964,7 +985,11 @@ void MtlfMetalContext::SetRenderPipelineState()
 
         // Create a new render pipeline state object
         renderPipelineStateDescriptor.label = @"SetRenderEncoderState";
-        renderPipelineStateDescriptor.sampleCount = 1;
+        if (drawTarget)
+            renderPipelineStateDescriptor.rasterSampleCount = 1;
+        else
+            renderPipelineStateDescriptor.rasterSampleCount = mtlSampleCount;
+        
         renderPipelineStateDescriptor.inputPrimitiveTopology = MTLPrimitiveTopologyClassUnspecified;
         
         renderPipelineStateDescriptor.vertexFunction   = threadState.renderVertexFunction;
@@ -1063,7 +1088,7 @@ void MtlfMetalContext::SetRenderPipelineState()
 void MtlfMetalContext::SetRenderEncoderState()
 {
     threadState.dirtyRenderState |= DIRTY_METALRENDERSTATE_OLD_STYLE_VERTEX_UNIFORM;
-    threadState.dirtyRenderState |= 0xffffffff;
+//    threadState.dirtyRenderState |= 0xffffffff;
 
     MetalWorkQueue *wq = threadState.currentWorkQueue;
     MetalWorkQueue *gswq = &GetWorkQueue(METALWORKQUEUE_GEOMETRY_SHADER);
