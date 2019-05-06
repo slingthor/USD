@@ -236,7 +236,7 @@ UsdMayaGLBatchRendererMetal::_Render(
     context->SetRenderPassDescriptor(_mtlRenderPassDescriptor);
 
     context->SetFrontFaceWinding(MTLWindingCounterClockwise);
-    context->SetCullMode(MTLCullModeNone);
+    context->SetCullMode(MTLCullModeBack);
 
     VtValue selectionTrackerValue(_selectionTracker);
     _hdEngine.SetTaskContextData(HdxTokens->selectionState,
