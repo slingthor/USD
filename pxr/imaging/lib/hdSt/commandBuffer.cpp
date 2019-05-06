@@ -26,6 +26,7 @@
 #include "pxr/imaging/garch/contextCaps.h"
 #include "pxr/imaging/garch/resourceFactory.h"
 
+#include "pxr/imaging/mtlf/drawTarget.h"
 #include "pxr/imaging/mtlf/mtlDevice.h"
 
 #include "pxr/imaging/hdSt/commandBuffer.h"
@@ -175,8 +176,17 @@ HdStCommandBuffer::ExecuteDraw(
         [renderEncoder endEncoding];
         [commandBuffer commit];
      
+        int numAttachments = 1;
+        
+        if (context->GetDrawTarget()) {
+            numAttachments = context->GetDrawTarget()->GetAttachments().size();
+        }
+
         renderPassDescriptor.depthAttachment.loadAction = MTLLoadActionLoad;
-        renderPassDescriptor.colorAttachments[0].loadAction = MTLLoadActionLoad;
+
+        for (int i = 0; i < numAttachments; i++) {
+            renderPassDescriptor.colorAttachments[i].loadAction = MTLLoadActionLoad;
+        }
     }
 
     static bool mtBatchDrawing = true;

@@ -331,15 +331,15 @@ MtlfDrawTarget::Bind()
 //    context->CreateCommandBuffer();
 //    context->LabelCommandBuffer(@"DrawTarget:Bind");
     
-#pragma message("Unconditionally enabling GS buffer creation for now")
+//#pragma message("Unconditionally enabling GS buffer creation for now")
 
     // Create a command buffer for the geometry shaders and make the default/render queue dependent on it completeing
 //    context->CreateCommandBuffer(METALWORKQUEUE_GEOMETRY_SHADER);
 //    context->LabelCommandBuffer(@"DrawTarget CommandBuffer GS", METALWORKQUEUE_GEOMETRY_SHADER);
 
-    context->StartFrameForThread();
+//    context->StartFrameForThread();
     context->SetRenderPassDescriptor(_mtlRenderPassDescriptor);
-    context->EndFrameForThread();
+//    context->EndFrameForThread();
 }
 
 void

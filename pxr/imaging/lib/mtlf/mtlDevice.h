@@ -283,6 +283,11 @@ public:
     void SetDrawTarget(MtlfDrawTarget *drawTarget);
     
     MTLF_API
+    MtlfDrawTarget *GetDrawTarget() const {
+        return drawTarget;
+    }
+    
+    MTLF_API
     void SetShadingPrograms(id<MTLFunction> vertexFunction, id<MTLFunction> fragmentFunction, bool _enableMVA);
     
     MTLF_API
