@@ -58,6 +58,26 @@ std::mutex MtlfMetalContext::_pipelineMutex;
 std::mutex MtlfMetalContext::_bufferMutex;
 thread_local MtlfMetalContext::ThreadState MtlfMetalContext::threadState(MtlfMetalContext::GetMetalContext());
 
+MtlfMetalContext::ThreadState::~ThreadState() {
+    for(int i = 0; i < kMSL_ProgramStage_NumStages; i++) {
+        delete[] oldStyleUniformBuffer[i];
+    }
+    [gsFence release];
+    for(int i = 0; i < gsBuffers.size(); i++)
+        [gsBuffers.at(i) release];
+    gsBuffers.clear();
+}
+
+void MtlfMetalContext::MtlfMultiBuffer::release() {
+    for (int i = 0; i < MAX_GPUS; i++) {
+        if (!buffer[i])
+            break;
+        
+        [buffer[i] release];
+    }
+}
+
+
 #if defined(ARCH_OS_MACOS)
 // Called when the window is dragged to another display
 void MtlfMetalContext::handleDisplayChange()

@@ -192,14 +192,7 @@ public:
             return buffer[0].length;
         }
         
-        void release() {
-            for (int i = 0; i < MAX_GPUS; i++) {
-                if (!buffer[i])
-                    break;
-                
-                [buffer[i] release];
-            }
-        }
+        void release();
         
         id<MTLBuffer> forCurrentGPU() const {
             MtlfMetalContext *context = MtlfMetalContext::GetMetalContext();
@@ -531,15 +524,7 @@ protected:
             pointIndexBuffer.Clear();
         }
         
-        ~ThreadState() {
-            for(int i = 0; i < kMSL_ProgramStage_NumStages; i++) {
-                delete[] oldStyleUniformBuffer[i];
-            }
-            [gsFence release];
-            for(int i = 0; i < gsBuffers.size(); i++)
-            [gsBuffers.at(i) release];
-            gsBuffers.clear();
-        }
+        ~ThreadState();
 
         std::vector<BufferBinding*> boundBuffers;
 
