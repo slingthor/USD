@@ -186,7 +186,7 @@ UsdMayaGLBatchRendererMetal::_Render(
         tasks.insert(tasks.end(), renderTasks.begin(), renderTasks.end());
     }
 
-    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
+    MtlfMetalContext *context = MtlfMetalContext::GetMetalContext();
     
     // Make sure the Metal render targets, and GL interop textures match the GL viewport size
     if (context->mtlColorTexture.width != viewport[2] ||
@@ -230,10 +230,7 @@ UsdMayaGLBatchRendererMetal::_Render(
     }
     
     context->StartFrame();
-    
-    // Create a new command buffer for each render pass to the current drawable
-    context->CreateCommandBuffer(METALWORKQUEUE_DEFAULT);
-    context->LabelCommandBuffer(@"HdEngine::Render", METALWORKQUEUE_DEFAULT);
+    context->StartFrameForThread();
     
     // Set the render pass descriptor to use for the render encoders
     context->SetRenderPassDescriptor(_mtlRenderPassDescriptor);
@@ -252,14 +249,15 @@ UsdMayaGLBatchRendererMetal::_Render(
     
     if (context->GeometryShadersActive()) {
         // Complete the GS command buffer if we have one
-        context->CommitCommandBuffer(true, false, METALWORKQUEUE_GEOMETRY_SHADER);
+        context->CommitCommandBufferForThread(true, false, METALWORKQUEUE_GEOMETRY_SHADER);
     }
     
     // Commit the render buffer (will wait for GS to complete if present)
     // We wait until scheduled, because we're about to consume the Metal
     // generated textures in an OpenGL blit
-    context->CommitCommandBuffer(true, false);
+    context->CommitCommandBufferForThread(true, false);
     
+    context->EndFrameForThread();
     context->EndFrame();
     
     // Finalize rendering here & push the command buffer to the GPU
