@@ -237,7 +237,7 @@ PxrMayaHdUsdProxyShapeAdapter::_Sync(
         // Add in kWireFrame to the display style we'll use to determine the
         // repr selector (e.g. so that we draw the wireframe over the shaded
         // geometry for selected objects).
-        reprDisplayStyle |= MHWRender::MFrameContext::DisplayStyle::kWireFrame;
+        //reprDisplayStyle |= MHWRender::MFrameContext::DisplayStyle::kWireFrame;
     }
 
     HdReprSelector reprSelector =
