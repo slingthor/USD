@@ -190,15 +190,6 @@ HdStCommandBuffer::ExecuteDraw(
                                    std::placeholders::_1,
                                    std::placeholders::_2));
     } else {
-//        for (int i = 0; i < _drawBatches.size(); i++) {
-//            _Worker::draw(&_drawBatches,
-//                          renderPassState,
-//                          resourceRegistry,
-//                          renderPassDescriptor,
-//                          i,
-//                          i + 1);
-//        }
-
         _Worker::draw(&_drawBatches,
                       renderPassState,
                       resourceRegistry,
