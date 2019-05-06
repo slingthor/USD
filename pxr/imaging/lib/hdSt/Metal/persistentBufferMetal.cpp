@@ -39,21 +39,21 @@ HdStPersistentBufferMetal::HdStPersistentBufferMetal(
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
 
-    id<MTLBuffer> newId = nil;
+    MtlfMetalContext::MtlfMultiBuffer newId;
     
     newId = MtlfMetalContext::GetMetalContext()->GetMetalBuffer(dataSize, MTLResourceStorageModeDefault, data);
-    _mappedAddress = [newId contents];
+    _mappedAddress = NULL;
 
     SetAllocation(newId, dataSize);
 }
 
 HdStPersistentBufferMetal::~HdStPersistentBufferMetal()
 {
-    id<MTLBuffer> buffer = GetId();
-    if (buffer) {
+    MtlfMetalContext::MtlfMultiBuffer buffer = GetId();
+    if (buffer.IsSet()) {
         MtlfMetalContext::GetMetalContext()->ReleaseMetalBuffer(buffer);
     }
-    buffer = nil;
+    buffer.Clear();
     SetAllocation(buffer, 0);
 }
 

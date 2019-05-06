@@ -28,6 +28,7 @@
 
 #include "pxr/pxr.h"
 #include "pxr/imaging/mtlf/api.h"
+#include "pxr/imaging/mtlf/mtlDevice.h"
 #include "pxr/imaging/garch/uniformBlock.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -61,7 +62,7 @@ protected:
     friend class MtlfResourceFactory;
 
 private:
-    id<MTLBuffer> _buffer;
+    MtlfMetalContext::MtlfMultiBuffer _buffer;
     int _size;
 };
 

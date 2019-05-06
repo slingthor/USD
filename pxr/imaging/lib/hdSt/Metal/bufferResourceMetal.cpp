@@ -84,7 +84,7 @@ HdStBufferResourceMetal::HdStBufferResourceMetal(TfToken const &role,
       _firstFrameBeingFilled(true)
 {
     for (int i = 0; i < 3; i++) {
-        _id[i] = nil;
+        _id[i].Clear();
         _texId[i] = nil;
         _gpuAddr[i] = 0;
     }
@@ -121,13 +121,16 @@ HdStBufferResourceMetal::SetAllocations(HdResourceGPUHandle idBuffer0,
             _texId[i] = nil;
         }
 
-        _gpuAddr[i] = (uint64_t)[_id[i] contents];
+        MtlfMetalContext::MtlfMultiBuffer &b = _id[i];
+        MtlfMetalContext *context = MtlfMetalContext::GetMetalContext();
+        _gpuAddr[i] = (uint64_t)[b.forCurrentGPU() contents];
     }
     HdResource::SetSize(size);
 
     _lastFrameModified = MtlfMetalContext::GetMetalContext()->GetCurrentFrame();
     _activeBuffer = 0;
-    _firstFrameBeingFilled = _id[1] != nil;
+    MtlfMetalContext::MtlfMultiBuffer &b = _id[1];
+    _firstFrameBeingFilled = b.forCurrentGPU() != nil;
 }
 
 GarchTextureGPUHandle
@@ -168,14 +171,14 @@ HdStBufferResourceMetal::GetTextureBuffer()
         }
         
         size_t pixelSize = HdDataSizeOfTupleType(_tupleType);
-        size_t numPixels = [_id[_activeBuffer] length] / pixelSize;
+        size_t numPixels = [_id[_activeBuffer].forCurrentGPU() length] / pixelSize;
 
         MTLTextureDescriptor* texDesc =
             [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:format
                                                                width:numPixels
                                                               height:1
                                                            mipmapped:NO];
-        _texId[_activeBuffer] = [_id[_activeBuffer] newTextureWithDescriptor:texDesc offset:0 bytesPerRow:pixelSize * numPixels];
+        _texId[_activeBuffer] = [_id[_activeBuffer].forCurrentGPU() newTextureWithDescriptor:texDesc offset:0 bytesPerRow:pixelSize * numPixels];
     }
     return _texId[_activeBuffer];
 }
@@ -183,7 +186,7 @@ HdStBufferResourceMetal::GetTextureBuffer()
 void
 HdStBufferResourceMetal::CopyData(size_t vboOffset, size_t dataSize, void const *data)
 {
-    if (_id[1] != nil) {
+    if (_id[1].IsSet()) {
         MtlfMetalContext *context = MtlfMetalContext::GetMetalContext();
         int64_t currentFrame = context->GetCurrentFrame();
         
@@ -202,14 +205,14 @@ HdStBufferResourceMetal::CopyData(size_t vboOffset, size_t dataSize, void const 
         for (int i = 0; i < 3; i++) {
             memcpy((uint8_t*)_gpuAddr[i] + vboOffset, data, dataSize);
 #if defined(ARCH_OS_MACOS)
-            [_id[i] didModifyRange:NSMakeRange(vboOffset, dataSize)];
+            [_id[i].forCurrentGPU() didModifyRange:NSMakeRange(vboOffset, dataSize)];
 #endif
         }
     }
     else {
         memcpy((uint8_t*)_gpuAddr[_activeBuffer] + vboOffset, data, dataSize);
 #if defined(ARCH_OS_MACOS)
-        [_id[_activeBuffer] didModifyRange:NSMakeRange(vboOffset, dataSize)];
+        [_id[_activeBuffer].forCurrentGPU() didModifyRange:NSMakeRange(vboOffset, dataSize)];
 #endif
     }
 }

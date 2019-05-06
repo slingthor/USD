@@ -156,6 +156,71 @@ struct MetalWorkQueue {
 
 class MtlfMetalContext : public boost::noncopyable {
 public:
+
+#define MAX_GPUS    4
+    struct MtlfMultiBuffer {
+        
+        MtlfMultiBuffer() {}
+        
+        MtlfMultiBuffer(uint64_t length, MTLResourceOptions options) {
+            NSArray<id<MTLDevice>> *allDevices = MtlfMetalContext::GetMetalContext()->allDevices;
+            int i = 0;
+            for (id<MTLDevice>dev in allDevices) {
+                buffer[i++] = [dev newBufferWithLength:length options:options];
+            }
+            while(i < MAX_GPUS)
+                buffer[i++] = nil;
+        }
+        MtlfMultiBuffer(void const* data, uint64_t length, MTLResourceOptions options) {
+            NSArray<id<MTLDevice>> *allDevices = MtlfMetalContext::GetMetalContext()->allDevices;
+            int i = 0;
+            for (id<MTLDevice>dev in allDevices) {
+                buffer[i++] = [dev newBufferWithBytes:data length:length options:options];
+            }
+            while(i < MAX_GPUS)
+                buffer[i++] = nil;
+        }
+
+        bool IsSet() const { return buffer[0] != nil; }
+        void Clear() {
+            for (int i = 0; i < MAX_GPUS; i++) {
+                buffer[i] = nil;
+            }
+        }
+        
+        uint64_t length() const {
+            return buffer[0].length;
+        }
+        
+        void release() {
+            for (int i = 0; i < MAX_GPUS; i++) {
+                if (!buffer[i])
+                    break;
+                
+                [buffer[i] release];
+            }
+        }
+        
+        id<MTLBuffer> forCurrentGPU() const {
+            MtlfMetalContext *context = MtlfMetalContext::GetMetalContext();
+            return buffer[context->currentGPU];
+        }
+        
+        id<MTLBuffer> operator[](int64_t const index) {
+            return buffer[index];
+        }
+        
+        bool operator==(MtlfMultiBuffer const &other) const {
+            return other.buffer[0] == buffer[0];
+        }
+        
+        bool operator!=(MtlfMultiBuffer const &other) const {
+            return other.buffer[0] != buffer[0];
+        }
+        
+        id<MTLBuffer> buffer[MAX_GPUS];
+    };
+
     typedef struct {
         float position[2];
         float uv[2];
@@ -196,8 +261,8 @@ public:
     void CopyDepthTextureToOpenGL();
     
     MTLF_API
-    id<MTLBuffer> GetIndexBuffer() {
-        return threadState.indexBuffer;
+    id<MTLBuffer> GetIndexBuffer() const {
+        return threadState.indexBuffer.forCurrentGPU();
     }
     
     MTLF_API
@@ -242,7 +307,7 @@ public:
     void SetUniform(const void* _data, uint32_t _dataSize, const TfToken& _name, uint32_t index, MSL_ProgramStage stage);
     
     MTLF_API
-    void SetUniformBuffer(int index, id<MTLBuffer> buffer, const TfToken& name, MSL_ProgramStage stage, int offset = 0);
+    void SetUniformBuffer(int index, MtlfMultiBuffer const &buffer, const TfToken& name, MSL_ProgramStage stage, int offset = 0);
     
     MTLF_API
     void SetOldStyleUniformBuffer(
@@ -251,10 +316,10 @@ public:
              int oldStyleUniformSize);
 
     MTLF_API
-    void SetBuffer(int index, id<MTLBuffer> buffer, const TfToken& name);	//Implementation binds this as a vertex buffer!
+    void SetBuffer(int index, MtlfMultiBuffer const &buffer, const TfToken& name);	//Implementation binds this as a vertex buffer!
     
     MTLF_API
-    void SetIndexBuffer(id<MTLBuffer> buffer);
+    void SetIndexBuffer(MtlfMultiBuffer const &buffer);
 
     MTLF_API
     void SetTexture(int index, id<MTLTexture> texture, const TfToken& name, MSL_ProgramStage stage);
@@ -328,10 +393,10 @@ public:
     uint64_t GetEventValue(MetalWorkQueueType signalQueue) { return GetWorkQueue(signalQueue).currentEventValue; }
 	
     MTLF_API
-    id<MTLBuffer> GetMetalBuffer(NSUInteger length, MTLResourceOptions options = MTLResourceStorageModeDefault, const void *pointer = NULL);
+    MtlfMultiBuffer GetMetalBuffer(NSUInteger length, MTLResourceOptions options = MTLResourceStorageModeDefault, const void *pointer = NULL);
     
     MTLF_API
-    void ReleaseMetalBuffer(id<MTLBuffer> buffer);
+    void ReleaseMetalBuffer(MtlfMultiBuffer const &buffer);
 
     MTLF_API
     void StartFrame();
@@ -383,6 +448,9 @@ public:
     bool enableMultiQueue;
 
     id<MTLDevice> device;
+    NSArray<id<MTLDevice>> *allDevices;
+    int currentGPU;
+
     id<MTLCommandQueue> commandQueue;
     id<MTLCommandQueue> commandQueueGS;
     id<MTLTexture> mtlColorTexture;
@@ -438,7 +506,7 @@ protected:
             }
             
             vertexDescriptor = nil;
-            indexBuffer = nil;
+            indexBuffer.Clear();
             vertexPositionBuffer = nil;
 
             numVertexComponents = 0;
@@ -456,8 +524,8 @@ protected:
             
             gsFence = [_this->device newFence];
 
-            remappedQuadIndexBuffer = nil;
-            pointIndexBuffer = nil;
+            remappedQuadIndexBuffer.Clear();
+            pointIndexBuffer.Clear();
         }
         
         ~ThreadState() {
@@ -480,7 +548,7 @@ protected:
         std::vector<TextureBinding> textures;
         std::vector<SamplerBinding> samplers;
 
-        id<MTLBuffer> indexBuffer;
+        MtlfMultiBuffer indexBuffer;
         id<MTLBuffer> vertexPositionBuffer;
         
         id<MTLComputePipelineState> computePipelineState;
@@ -512,9 +580,9 @@ protected:
         
         bool tempPointsWorkaroundActive = false;
         
-        id<MTLBuffer> remappedQuadIndexBuffer;
-        id<MTLBuffer> remappedQuadIndexBufferSource;
-        id<MTLBuffer> pointIndexBuffer;
+        MtlfMultiBuffer remappedQuadIndexBuffer;
+        MtlfMultiBuffer remappedQuadIndexBufferSource;
+        MtlfMultiBuffer pointIndexBuffer;
         
         bool enableMVA;
         bool enableComputeGS;
@@ -581,6 +649,8 @@ private:
 
     static MtlfMetalContext          *context;
     
+    void UpdateCurrentGPU();
+    
     // Internal encoder functions
     void SetCurrentEncoder(MetalEncoderType encoderType, MetalWorkQueueType workQueueType);
     void ResetEncoders(MetalWorkQueueType workQueueType, bool isInitializing = false);
@@ -599,7 +669,7 @@ private:
     bool                       isRenderPassDescriptorPatched;
 
     struct MetalBufferListEntry {
-        id<MTLBuffer> buffer;
+        MtlfMultiBuffer buffer;
         unsigned int releasedOnFrame;
         unsigned int releasedOnCommandBuffer;
     };

@@ -126,8 +126,8 @@ HdStVBOSimpleMemoryBufferMetal::Reallocate(
         size_t const bufferSize = bytesPerElement * numElements;
 
         // allocate new one
-        HdResourceGPUHandle newId[3];
-        HdResourceGPUHandle oldId[3];
+        MtlfMetalContext::MtlfMultiBuffer newId[3];
+        MtlfMetalContext::MtlfMultiBuffer oldId[3];
 
         for (int i = 0; i < 3; i++) {
             oldId[i] = bres->GetIdAtIndex(i);
@@ -161,9 +161,9 @@ HdStVBOSimpleMemoryBufferMetal::Reallocate(
             HD_PERF_COUNTER_INCR(HdPerfTokens->glCopyBufferSubData);
 
             for (int i = 0; i < 3; i++) {
-                [blitEncoder copyFromBuffer:oldId[i]
+                [blitEncoder copyFromBuffer:oldId[i].forCurrentGPU()
                                sourceOffset:0
-                                   toBuffer:newId[i]
+                                   toBuffer:newId[i].forCurrentGPU()
                           destinationOffset:0
                                        size:copySize];
             }

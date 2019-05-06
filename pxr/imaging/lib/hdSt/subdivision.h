@@ -229,7 +229,8 @@ public:
         }
 #if OPENSUBDIV_HAS_METAL_COMPUTE && defined(ARCH_GFX_METAL)
         id<MTLBuffer> BindMTLBuffer(OpenSubdiv::v3_3_1::Osd::MTLContext* context) {
-            return _resource->GetId();
+            MtlfMetalContext::MtlfMultiBuffer buffer = _resource->GetId();
+            return buffer.forCurrentGPU();
         }
 #endif
         HdStBufferResourceSharedPtr _resource;

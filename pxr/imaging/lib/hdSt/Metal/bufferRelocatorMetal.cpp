@@ -50,9 +50,9 @@ HdStBufferRelocatorMetal::Commit()
     id<MTLBlitCommandEncoder> blitEncoder = context->GetBlitEncoder(METALWORKQUEUE_RESOURCE);
     
     TF_FOR_ALL (it, _queue) {
-        [blitEncoder copyFromBuffer:_srcBuffer
+        [blitEncoder copyFromBuffer:_srcBuffer.forCurrentGPU()
                        sourceOffset:it->readOffset
-                           toBuffer:_dstBuffer
+                           toBuffer:_dstBuffer.forCurrentGPU()
                   destinationOffset:it->writeOffset
                                size:it->copySize];
     }

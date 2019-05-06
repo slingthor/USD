@@ -47,8 +47,8 @@ public:
 
 private:
 
-    id<MTLBuffer> _srcBuffer;
-    id<MTLBuffer> _dstBuffer;
+    MtlfMetalContext::MtlfMultiBuffer _srcBuffer;
+    MtlfMetalContext::MtlfMultiBuffer _dstBuffer;
 };
 
 

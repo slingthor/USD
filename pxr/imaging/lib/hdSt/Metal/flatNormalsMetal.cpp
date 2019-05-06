@@ -87,10 +87,15 @@ HdSt_FlatNormalsComputationMetal::_Execute(
     
     context->SetComputeEncoderState(computeFunction, 5, immutableBufferMask, @"GPU Flat Normals pipeline state", METALWORKQUEUE_DEFAULT);
     
-    [computeEncoder setBuffer:points->GetId()    offset:0 atIndex:0];
-    [computeEncoder setBuffer:normals->GetId()   offset:0 atIndex:1];
-    [computeEncoder setBuffer:indices->GetId()   offset:0 atIndex:2];
-    [computeEncoder setBuffer:primitiveParam->GetId() offset:0 atIndex:3];
+    MtlfMetalContext::MtlfMultiBuffer const& pointsBuffer = points->GetId();
+    MtlfMetalContext::MtlfMultiBuffer const& normalsBuffer = normals->GetId();
+    MtlfMetalContext::MtlfMultiBuffer const& indicesBuffer = indices->GetId();
+    MtlfMetalContext::MtlfMultiBuffer const& primitiveParamBuffer = primitiveParam->GetId();
+    
+    [computeEncoder setBuffer:pointsBuffer.forCurrentGPU()    offset:0 atIndex:0];
+    [computeEncoder setBuffer:normalsBuffer.forCurrentGPU()   offset:0 atIndex:1];
+    [computeEncoder setBuffer:indicesBuffer.forCurrentGPU()   offset:0 atIndex:2];
+    [computeEncoder setBuffer:primitiveParamBuffer.forCurrentGPU() offset:0 atIndex:3];
     [computeEncoder setBytes:(const void *)&uniform length:sizeof(uniform) atIndex:4];
 
     int maxThreadsPerThreadgroup =

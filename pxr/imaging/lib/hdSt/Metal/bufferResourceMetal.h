@@ -108,7 +108,7 @@ public:
 private:
     uint64_t        _gpuAddr[3];
     id<MTLTexture>  _texId[3];
-    id<MTLBuffer>   _id[3];
+    MtlfMetalContext::MtlfMultiBuffer   _id[3];
     int64_t         _lastFrameModified;
     int64_t         _activeBuffer;
     bool            _firstFrameBeingFilled;

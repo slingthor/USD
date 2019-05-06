@@ -35,6 +35,7 @@
 
 #if defined(ARCH_GFX_METAL)
 #include <Metal/Metal.h>
+#include "pxr/imaging/mtlf/mtlDevice.h"
 #endif
 
 #include <boost/noncopyable.hpp>
@@ -53,7 +54,7 @@ struct HdResourceGPUHandle {
         handle = 0;
     }
     HdResourceGPUHandle(HdResourceGPUHandle const & _gpuHandle) {
-        handle = _gpuHandle.handle;
+        multiBuffer = _gpuHandle.multiBuffer;
     }
     
     void Clear() {
@@ -91,18 +92,31 @@ struct HdResourceGPUHandle {
 
 #if defined(ARCH_GFX_METAL)
     // Metal
-    HdResourceGPUHandle(id<MTLBuffer> const _handle) {
-        handle = (__bridge void*)_handle;
+//    HdResourceGPUHandle(id<MTLBuffer> const _handle) {
+//        handle = (__bridge void*)_handle;
+//    }
+//    HdResourceGPUHandle& operator =(id<MTLBuffer> const _handle) {
+//        handle = (__bridge void*)_handle;
+//        return *this;
+//    }
+//    operator id<MTLBuffer>() const { return (__bridge id<MTLBuffer>)handle; }
+
+    HdResourceGPUHandle(MtlfMetalContext::MtlfMultiBuffer const _handle) {
+        multiBuffer = _handle;
     }
-    HdResourceGPUHandle& operator =(id<MTLBuffer> const _handle) {
-        handle = (__bridge void*)_handle;
+    HdResourceGPUHandle& operator =(MtlfMetalContext::MtlfMultiBuffer const _handle) {
+        multiBuffer = _handle;
         return *this;
     }
-    operator id<MTLBuffer>() const { return (__bridge id<MTLBuffer>)handle; }
+    operator MtlfMetalContext::MtlfMultiBuffer() const { return multiBuffer; }
+
 #endif // ARCH_GFX_METAL
-    
+
     // Storage
-    void* handle;
+    union {
+        void* handle;
+        MtlfMetalContext::MtlfMultiBuffer multiBuffer;
+    };
 };
 /// \class HdResource
 ///

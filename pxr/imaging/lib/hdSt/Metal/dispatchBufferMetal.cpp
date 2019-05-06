@@ -57,8 +57,7 @@ HdStDispatchBufferMetal::HdStDispatchBufferMetal(TfToken const &role, int count,
 HdStDispatchBufferMetal::~HdStDispatchBufferMetal()
 {
     HdResourceGPUHandle _id = _entireResource->GetId();
-    id<MTLBuffer> oid = _id;
-    MtlfMetalContext::GetMetalContext()->ReleaseMetalBuffer(oid);
+    MtlfMetalContext::GetMetalContext()->ReleaseMetalBuffer(_id);
     _entireResource->SetAllocation(HdResourceGPUHandle(), 0);
 }
 
@@ -68,8 +67,8 @@ HdStDispatchBufferMetal::CopyData(std::vector<GLuint> const &data)
     if (!TF_VERIFY(data.size()*sizeof(GLuint) == static_cast<size_t>(_entireResource->GetSize())))
         return;
 
-    id<MTLBuffer> buffer = _entireResource->GetId();
-    memcpy([buffer contents], &data[0], _entireResource->GetSize());
+    MtlfMetalContext::MtlfMultiBuffer buffer = _entireResource->GetId();
+    memcpy([buffer.forCurrentGPU() contents], &data[0], _entireResource->GetSize());
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

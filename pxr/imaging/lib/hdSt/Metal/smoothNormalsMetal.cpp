@@ -91,9 +91,13 @@ HdSt_SmoothNormalsComputationMetal::_Execute(
         computeFunction, 4, immutableBufferMask,
         @"GPU Smooth Normals pipeline state", METALWORKQUEUE_DEFAULT);
 
-    [computeEncoder setBuffer:points->GetId()    offset:0 atIndex:0];
-    [computeEncoder setBuffer:normals->GetId()   offset:0 atIndex:1];
-    [computeEncoder setBuffer:adjacency->GetId() offset:0 atIndex:2];
+    MtlfMetalContext::MtlfMultiBuffer const& pointsBuffer = points->GetId();
+    MtlfMetalContext::MtlfMultiBuffer const& normalsBuffer = normals->GetId();
+    MtlfMetalContext::MtlfMultiBuffer const& adjacencyBuffer = adjacency->GetId();
+
+    [computeEncoder setBuffer:pointsBuffer.forCurrentGPU()    offset:0 atIndex:0];
+    [computeEncoder setBuffer:normalsBuffer.forCurrentGPU()   offset:0 atIndex:1];
+    [computeEncoder setBuffer:adjacencyBuffer.forCurrentGPU() offset:0 atIndex:2];
     [computeEncoder setBytes:(const void *)&uniform
                       length:sizeof(uniform)
                      atIndex:3];

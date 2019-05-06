@@ -90,7 +90,7 @@ id<MTLDevice> MtlfMetalContext::GetMetalDevice(PREFERRED_GPU_TYPE preferredGPUTy
     id <NSObject> metalDeviceObserver = nil;
     
     // Get a list of all devices and register an obsever for eGPU events
-    NSArray<id<MTLDevice>> *_deviceList = MTLCopyAllDevicesWithObserver(&metalDeviceObserver,
+    allDevices = MTLCopyAllDevicesWithObserver(&metalDeviceObserver,
                                                 ^(id<MTLDevice> device, MTLDeviceNotificationName name) {
                                                     MtlfMetalContext::handleGPUHotPlug(device, name);
                                                 });
@@ -99,13 +99,13 @@ id<MTLDevice> MtlfMetalContext::GetMetalDevice(PREFERRED_GPU_TYPE preferredGPUTy
     NSMutableArray<id<MTLDevice>> *_discreteGPUs   = [NSMutableArray array];
     id<MTLDevice>                  _defaultDevice  = MTLCreateSystemDefaultDevice();
     NSArray *preferredDeviceList = _discreteGPUs;
-    
+
     if (preferredGPUType == PREFER_DEFAULT_GPU) {
         return _defaultDevice;
     }
     
     // Put the device into the appropriate device list
-    for (id<MTLDevice>dev in _deviceList) {
+    for (id<MTLDevice>dev in allDevices) {
         if (dev.removable)
         	[_eGPUs addObject:dev];
         else if (dev.lowPower)
@@ -146,6 +146,15 @@ id<MTLDevice> MtlfMetalContext::GetMetalDevice(PREFERRED_GPU_TYPE preferredGPUTy
 // MtlfMetalContext
 //
 
+void MtlfMetalContext::UpdateCurrentGPU() {
+    currentGPU = 0;
+    for (id<MTLDevice>dev in allDevices) {
+        if (dev == device)
+            return;
+        currentGPU++;
+    }
+}
+
 MtlfMetalContext::MtlfMetalContext(id<MTLDevice> _device, int width, int height)
 : gsMaxConcurrentBatches(0)
 , gsMaxDataPerBatch(0)
@@ -161,7 +170,9 @@ MtlfMetalContext::MtlfMetalContext(id<MTLDevice> _device, int width, int height)
     }
     else
         device = _device;
-    
+
+    UpdateCurrentGPU();
+
     captureScope = [[MTLCaptureManager sharedCaptureManager] newCaptureScopeWithDevice:device];
     captureScope.label = @"Full Frame";
     [[MTLCaptureManager sharedCaptureManager] setDefaultCaptureScope:captureScope];
@@ -395,44 +406,46 @@ void MtlfMetalContext::InitGLInterop() {
 id<MTLBuffer>
 MtlfMetalContext::GetQuadIndexBuffer(MTLIndexType indexTypeMetal) {
     // Each 4 vertices will require 6 remapped one
-    uint32_t remappedIndexBufferSize = (threadState.indexBuffer.length / 4) * 6;
+    uint32_t remappedIndexBufferSize = (threadState.indexBuffer.length() / 4) * 6;
 
     // Since remapping is expensive check if the buffer we created this from originally has changed  - MTL_FIXME - these checks are not robust
-    if (threadState.remappedQuadIndexBuffer) {
+    if (threadState.remappedQuadIndexBuffer.IsSet()) {
         if ((threadState.remappedQuadIndexBufferSource != threadState.indexBuffer) ||
-            (threadState.remappedQuadIndexBuffer.length != remappedIndexBufferSize)) {
-            [threadState.remappedQuadIndexBuffer release];
-            threadState.remappedQuadIndexBuffer = nil;
+            (threadState.remappedQuadIndexBuffer.length() != remappedIndexBufferSize)) {
+            threadState.remappedQuadIndexBuffer.release();
+            threadState.remappedQuadIndexBuffer.Clear();
         }
     }
     // Remap the quad indices into two sets of triangle indices
-    if (!threadState.remappedQuadIndexBuffer) {
+    if (!threadState.remappedQuadIndexBuffer.IsSet()) {
         if (indexTypeMetal != MTLIndexTypeUInt32) {
             TF_FATAL_CODING_ERROR("Only 32 bit indices currently supported for quads");
         }
         NSLog(@"Recreating quad remapped index buffer");
         
         threadState.remappedQuadIndexBufferSource = threadState.indexBuffer;
-        threadState.remappedQuadIndexBuffer = [device newBufferWithLength:remappedIndexBufferSize  options:MTLResourceStorageModeDefault];
+        threadState.remappedQuadIndexBuffer = MtlfMultiBuffer(remappedIndexBufferSize, MTLResourceStorageModeDefault);
         
-        uint32_t *srcData =  (uint32_t *)threadState.indexBuffer.contents;
-        uint32_t *destData = (uint32_t *)threadState.remappedQuadIndexBuffer.contents;
-        for (int i = 0; i < (threadState.indexBuffer.length / 4) ; i+=4)
-        {
-            destData[0] = srcData[0];
-            destData[1] = srcData[1];
-            destData[2] = srcData[2];
-            destData[3] = srcData[0];
-            destData[4] = srcData[2];
-            destData[5] = srcData[3];
-            srcData  += 4;
-            destData += 6;
-        }
+        for (int i = 0; i < allDevices.count; i++) {
+            uint32_t *srcData =  (uint32_t *)threadState.indexBuffer[i].contents;
+            uint32_t *destData = (uint32_t *)threadState.remappedQuadIndexBuffer[i].contents;
+            for (int i = 0; i < (threadState.indexBuffer.length() / 4) ; i+=4)
+            {
+                destData[0] = srcData[0];
+                destData[1] = srcData[1];
+                destData[2] = srcData[2];
+                destData[3] = srcData[0];
+                destData[4] = srcData[2];
+                destData[5] = srcData[3];
+                srcData  += 4;
+                destData += 6;
+            }
 #if defined(ARCH_OS_MACOS)
-        [threadState.remappedQuadIndexBuffer didModifyRange:(NSMakeRange(0, threadState.remappedQuadIndexBuffer.length))];
+            [threadState.remappedQuadIndexBuffer[i] didModifyRange:(NSMakeRange(0, threadState.remappedQuadIndexBuffer[i].length))];
 #endif
+        }
     }
-    return threadState.remappedQuadIndexBuffer;
+    return threadState.remappedQuadIndexBuffer.forCurrentGPU();
 }
 
 id<MTLBuffer>
@@ -441,48 +454,50 @@ MtlfMetalContext::GetPointIndexBuffer(MTLIndexType indexTypeMetal, int numIndice
     uint32_t pointBufferSize = numIndicesNeeded * sizeof(int);
     
     // Since remapping is expensive check if the buffer we created this from originally has changed  - MTL_FIXME - these checks are not robust
-    if (threadState.pointIndexBuffer) {
-        if ((threadState.pointIndexBuffer.length < pointBufferSize)) {
-            [threadState.pointIndexBuffer release];
-            threadState.pointIndexBuffer = nil;
+    if (threadState.pointIndexBuffer.IsSet()) {
+        if ((threadState.pointIndexBuffer.length() < pointBufferSize)) {
+            threadState.pointIndexBuffer.release();
+            threadState.pointIndexBuffer.Clear();;
         }
     }
     // Remap the quad indices into two sets of triangle indices
-    if (!threadState.pointIndexBuffer) {
+    if (!threadState.pointIndexBuffer.IsSet()) {
         if (indexTypeMetal != MTLIndexTypeUInt32) {
             TF_FATAL_CODING_ERROR("Only 32 bit indices currently supported for quads");
         }
         NSLog(@"Recreating quad remapped index buffer");
         
-        threadState.pointIndexBuffer = [device newBufferWithLength:pointBufferSize options:MTLResourceStorageModeDefault];
+        threadState.pointIndexBuffer = MtlfMultiBuffer(pointBufferSize, MTLResourceStorageModeDefault);
         
-        uint32_t *destData = (uint32_t *)threadState.pointIndexBuffer.contents;
-        uint32_t arraySize = numIndicesNeeded;
-        
-        if (usingQuads) {
-            for (int i = 0; i < arraySize; i+=6) {
-                int base = i;
-                *destData++ = base + 0;
-                *destData++ = base + 1;
-                *destData++ = base + 2;
-                *destData++ = base + 1;
-                *destData++ = base + 2;
-                *destData++ = base + 3;
+        for (int i = 0; i < allDevices.count; i++) {
+            uint32_t *destData = (uint32_t *)threadState.pointIndexBuffer[i].contents;
+            uint32_t arraySize = numIndicesNeeded;
+            
+            if (usingQuads) {
+                for (int i = 0; i < arraySize; i+=6) {
+                    int base = i;
+                    *destData++ = base + 0;
+                    *destData++ = base + 1;
+                    *destData++ = base + 2;
+                    *destData++ = base + 1;
+                    *destData++ = base + 2;
+                    *destData++ = base + 3;
+                }
             }
-        }
-        else {
-            for (int i = 0; i < arraySize; i+=3) {
-                int base = i;
-                *destData++ = base + 0;
-                *destData++ = base + 1;
-                *destData++ = base + 2;
+            else {
+                for (int i = 0; i < arraySize; i+=3) {
+                    int base = i;
+                    *destData++ = base + 0;
+                    *destData++ = base + 1;
+                    *destData++ = base + 2;
+                }
             }
-        }
 #if defined(ARCH_OS_MACOS)
-        [threadState.pointIndexBuffer didModifyRange:(NSMakeRange(0, threadState.pointIndexBuffer.length))];
+            [threadState.pointIndexBuffer[i] didModifyRange:(NSMakeRange(0, threadState.pointIndexBuffer.length()))];
 #endif
+        }
     }
-    return threadState.pointIndexBuffer;
+    return threadState.pointIndexBuffer.forCurrentGPU();
 }
 
 void MtlfMetalContext::CheckNewStateGather()
@@ -783,7 +798,7 @@ void MtlfMetalContext::SetOldStyleUniformBuffer(
 
 void MtlfMetalContext::SetUniformBuffer(
         int index,
-        id<MTLBuffer> buffer,
+        MtlfMultiBuffer const &buffer,
         const TfToken& name,
         MSL_ProgramStage stage,
         int offset)
@@ -793,25 +808,25 @@ void MtlfMetalContext::SetUniformBuffer(
     
     // Allocate a binding for this buffer
     BufferBinding *bufferInfo = new BufferBinding{
-        index, buffer, name, stage, offset, true,
-        (uint8_t *)(buffer.contents)};
+        index, buffer.forCurrentGPU(), name, stage, offset, true,
+        (uint8_t *)(buffer.forCurrentGPU().contents)};
 
     threadState.boundBuffers.push_back(bufferInfo);
 }
 
-void MtlfMetalContext::SetBuffer(int index, id<MTLBuffer> buffer, const TfToken& name)
+void MtlfMetalContext::SetBuffer(int index, MtlfMultiBuffer const &buffer, const TfToken& name)
 {
-    BufferBinding *bufferInfo = new BufferBinding{index, buffer, name, kMSL_ProgramStage_Vertex, 0, true};
+    BufferBinding *bufferInfo = new BufferBinding{index, buffer.forCurrentGPU(), name, kMSL_ProgramStage_Vertex, 0, true};
     threadState.boundBuffers.push_back(bufferInfo);
 
     if (name == points) {
-        threadState.vertexPositionBuffer = buffer;
+        threadState.vertexPositionBuffer = buffer.forCurrentGPU();
     }
     
     threadState.dirtyRenderState |= DIRTY_METALRENDERSTATE_VERTEX_BUFFER;
 }
 
-void MtlfMetalContext::SetIndexBuffer(id<MTLBuffer> buffer)
+void MtlfMetalContext::SetIndexBuffer(MtlfMultiBuffer const &buffer)
 {
     threadState.indexBuffer = buffer;
     //threadState.remappedQuadIndexBuffer = nil;
@@ -1193,7 +1208,7 @@ void MtlfMetalContext::ClearRenderEncoderState()
     wq->currentRenderPipelineState           = nil;
     
     // clear referenced resources
-    threadState.indexBuffer          = nil;
+    threadState.indexBuffer.Clear();
     threadState.vertexPositionBuffer = nil;
     threadState.numVertexComponents  = 0;
     threadState.dirtyRenderState     = DIRTY_METALRENDERSTATE_ALL;
@@ -1605,55 +1620,57 @@ id<MTLRenderCommandEncoder>  MtlfMetalContext::GetRenderEncoder(MetalWorkQueueTy
     return threadState.currentWorkQueue->currentRenderEncoder;
 }
 
-id<MTLBuffer> MtlfMetalContext::GetMetalBuffer(NSUInteger length, MTLResourceOptions options, const void *pointer)
+MtlfMetalContext::MtlfMultiBuffer MtlfMetalContext::GetMetalBuffer(NSUInteger length, MTLResourceOptions options, const void *pointer)
 {
-    id<MTLBuffer> buffer = nil;
+    MtlfMultiBuffer buffer;
 
     MTLStorageMode  storageMode  =  MTLStorageMode((options & MTLResourceStorageModeMask)  >> MTLResourceStorageModeShift);
     MTLCPUCacheMode cpuCacheMode = MTLCPUCacheMode((options & MTLResourceCPUCacheModeMask) >> MTLResourceCPUCacheModeShift);
 
-    std::lock_guard<std::mutex> lock(_bufferMutex);
+    _bufferMutex.lock();
     for (auto entry = bufferFreeList.begin(); entry != bufferFreeList.end(); entry++) {
         MetalBufferListEntry bufferEntry = *entry;
 
         METAL_INC_STAT(resourceStats.bufferSearches);
         // Check if buffer matches size and storage mode and is old enough to reuse
-        if (bufferEntry.buffer.length == length              &&
-            storageMode   == bufferEntry.buffer.storageMode  &&
-            cpuCacheMode  == bufferEntry.buffer.cpuCacheMode &&
+        if (bufferEntry.buffer.length() == length              &&
+            storageMode   == bufferEntry.buffer[0].storageMode  &&
+            cpuCacheMode  == bufferEntry.buffer[0].cpuCacheMode &&
             lastCompletedCommandBuffer >= (bufferEntry.releasedOnCommandBuffer + METAL_SAFE_BUFFER_REUSE_AGE)) {
             buffer = bufferEntry.buffer;
             bufferFreeList.erase(entry);
-            break;
-        }
-    }
-    
-    if (buffer) {
-        // Copy over data
-        if (pointer) {
-            memcpy(buffer.contents, pointer, length);
+            _bufferMutex.unlock();
+            
+            // Copy over data
+            if (pointer) {
+                for (int i = 0; i < allDevices.count; i++) {
+                    memcpy(buffer[i].contents, pointer, length);
 #if defined(ARCH_OS_MACOS)
-            [buffer didModifyRange:(NSMakeRange(0, length))];
+                    [buffer[i] didModifyRange:(NSMakeRange(0, length))];
 #endif
+                }
+            }
+
+            METAL_INC_STAT(resourceStats.buffersReused);
+            return buffer;
         }
-        
-        METAL_INC_STAT(resourceStats.buffersReused);
     }
-    else {
-        //NSLog(@"Creating buffer of length %lu (%lu)", length, frameCount);
-        if (pointer) {
-            buffer  =  [device newBufferWithBytes:pointer length:length options:options];
-        } else {
-            buffer  =  [device newBufferWithLength:length options:options];
-        }
-        METAL_INC_STAT(resourceStats.buffersCreated);
-        METAL_INC_STAT_VAL(resourceStats.currentBufferAllocation, length);
-        METAL_MAX_STAT_VAL(resourceStats.peakBufferAllocation, resourceStats.currentBufferAllocation);
+    _bufferMutex.unlock();
+    
+    //NSLog(@"Creating buffer of length %lu (%lu)", length, frameCount);
+    if (pointer) {
+        buffer  = MtlfMultiBuffer(pointer, length, options);
+    } else {
+        buffer  =  MtlfMultiBuffer(length, options);
     }
+    METAL_INC_STAT(resourceStats.buffersCreated);
+    METAL_INC_STAT_VAL(resourceStats.currentBufferAllocation, length);
+    METAL_MAX_STAT_VAL(resourceStats.peakBufferAllocation, resourceStats.currentBufferAllocation);
+
     return buffer;
 }
 
-void MtlfMetalContext::ReleaseMetalBuffer(id<MTLBuffer> buffer)
+void MtlfMetalContext::ReleaseMetalBuffer(MtlfMultiBuffer const &buffer)
 {
     MetalBufferListEntry bufferEntry;
     bufferEntry.buffer = buffer;
@@ -1671,7 +1688,6 @@ void MtlfMetalContext::CleanupUnusedBuffers(bool forceClean)
     // Release all buffers that have not been recently reused
     for (auto entry = bufferFreeList.begin(); entry != bufferFreeList.end();) {
         MetalBufferListEntry bufferEntry = *entry;
-        id<MTLBuffer>  buffer = bufferEntry.buffer;
         
         // Criteria for non forced releasing buffers:
         // a) Older than x number of frames
@@ -1683,9 +1699,10 @@ void MtlfMetalContext::CleanupUnusedBuffers(bool forceClean)
                                forceClean);
                                
         if (bReleaseBuffer) {
+            MtlfMultiBuffer &buffer = bufferEntry.buffer;
             //NSLog(@"Releasing buffer of length %lu (%lu) (%lu outstanding)", buffer.length, frameCount, bufferFreeList.size());
-            METAL_INC_STAT_VAL(resourceStats.currentBufferAllocation, -buffer.length);
-            [buffer release];
+            METAL_INC_STAT_VAL(resourceStats.currentBufferAllocation, -buffer.length());
+            buffer.release();
             entry = bufferFreeList.erase(entry);
         }
         else {

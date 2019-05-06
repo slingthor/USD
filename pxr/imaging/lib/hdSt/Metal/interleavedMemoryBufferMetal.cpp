@@ -217,12 +217,12 @@ HdStStripedInterleavedBufferMetal::_DeallocateResources()
         boost::static_pointer_cast<HdStBufferResourceMetal>(GetResource());
     if (resource) {
         for(int i = 0; i < 3; i++) {
-            id<MTLBuffer> _id = resource->GetIdAtIndex(i);
-            if (_id != nil) {
+            MtlfMetalContext::MtlfMultiBuffer _id = resource->GetIdAtIndex(i);
+            if (_id.IsSet()) {
                 MtlfMetalContext::GetMetalContext()->ReleaseMetalBuffer(_id);
             }
         }
-        resource->SetAllocations(nil, nil, nil, 0);
+        resource->SetAllocations(0, 0, 0, 0);
     }
 }
 
