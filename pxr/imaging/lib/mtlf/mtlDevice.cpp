@@ -199,7 +199,7 @@ MtlfMetalContext::MtlfMetalContext(id<MTLDevice> _device, int width, int height)
 
     NSLog(@"Selected %@ for Metal Device", device.name);
 
-    enableMultiQueue = true;
+    enableMultiQueue = false;
 
     // Create a new command queue
     commandQueue = [device newCommandQueueWithMaxCommandBufferCount:commandBufferPoolSize];
