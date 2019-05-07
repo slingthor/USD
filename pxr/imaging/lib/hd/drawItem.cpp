@@ -25,6 +25,8 @@
 #include "pxr/imaging/hd/bufferArrayRange.h"
 
 #include "pxr/base/gf/frustum.h"
+#include "pxr/base/gf/matrix4f.h"
+#include "pxr/base/gf/matrix4d.h"
 
 #include <boost/functional/hash.hpp>
 #include <iostream>
@@ -78,7 +80,35 @@ bool
 HdDrawItem::IntersectsViewVolume(GfMatrix4d const &viewProjMatrix) const
 {
     if (GetInstanceIndexRange()) {
-        // XXX: need to test intersections of the bound of all instances.
+        int instancerNumLevels = GetInstancePrimvarNumLevels();
+        int instanceIndexWidth = instancerNumLevels + 1;
+
+        if (instancerNumLevels == 1 &&
+            GetInstanceIndexRange()->GetNumElements()/instanceIndexWidth == 1) {
+            HdBufferArrayRangeSharedPtr const & instanceBar = GetInstancePrimvarRange(0);
+            HdBufferResourceSharedPtr const & instanceRes = instanceBar->GetResource(HdTokens->instanceTransform);
+
+            size_t stride = instanceRes->GetStride();
+            uint8_t const* rawBuffer = instanceRes->GetBufferContents();
+            GfMatrix4f const *instanceTransform = (GfMatrix4f const*)&rawBuffer[stride * instanceBar->GetOffset()];
+
+            
+            
+            HdBufferArrayRangeSharedPtr const & primvar = GetConstantPrimvarRange();
+            HdBufferResourceSharedPtr const & primvarRes = primvar->GetResource(HdTokens->instancerTransform);
+            
+            stride = primvarRes->GetStride();
+            rawBuffer = primvarRes->GetBufferContents();
+            GfMatrix4f const *instancerTransform = (GfMatrix4f const*)&rawBuffer[stride * primvar->GetIndex() + primvarRes->GetOffset()];
+
+            GfMatrix4f bla = (*instancerTransform) * (*instanceTransform);
+            
+            GfBBox3d box(GetBounds());
+            box.Transform(GfMatrix4d(bla));
+
+            return GfFrustum::IntersectsViewVolume(box, viewProjMatrix);
+        }
+        
         return true;
     } else {
         return GfFrustum::IntersectsViewVolume(GetBounds(), viewProjMatrix);
