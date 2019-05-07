@@ -199,6 +199,8 @@ MtlfGlInterop::MtlfGlInterop(id<MTLDevice> _device)
     // Load the fragment program into the library
     computeDepthCopyProgram = [defaultLibrary newFunctionWithName:@"copyDepth"];
     computeDepthCopyMultisampleProgram = [defaultLibrary newFunctionWithName:@"copyDepthMultisample"];
+    computeColourCopyProgram = [defaultLibrary newFunctionWithName:@"copyColour"];
+    computeColourCopyMultisampleProgram = [defaultLibrary newFunctionWithName:@"copyColourMultisample"];
 
     // Create the texture caches
     CVReturn cvret = CVMetalTextureCacheCreate(kCFAllocatorDefault, nil, device, nil, &cvmtlTextureCache);

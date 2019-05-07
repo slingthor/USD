@@ -61,3 +61,41 @@ kernel void copyDepthMultisample(depth2d_ms<float, access::read> texIn,
     
     texOut.write(float(texIn.read(gid, 0)), gid);
 }
+
+kernel void copyColour(texture2d<float, access::read> texIn,
+                                 texture2d<float, access::write> texOut,
+                                 uint2 gid [[thread_position_in_grid]])
+{
+    if(gid.x >= texOut.get_width() || gid.y >= texOut.get_height()) {
+        return;
+    }
+    
+    // TODO: colour correction
+    float4 pixel = texIn.read(gid);
+    pixel.a = 1.0;
+
+    texOut.write(pixel, gid);
+}
+
+kernel void copyColourMultisample(texture2d_ms<float, access::read> texIn,
+                                 texture2d<float, access::write> texOut,
+                                 uint2 gid [[thread_position_in_grid]])
+{
+    if(gid.x >= texOut.get_width() || gid.y >= texOut.get_height()) {
+        return;
+    }
+    
+    int sampleCount = texIn.get_num_samples();
+
+    float4 pixel = float4(0, 0, 0, 0);
+
+    // TODO: colour correction
+    for(int i = 0; i < sampleCount; i++)
+        pixel += texIn.read(gid, i);
+
+    pixel/=sampleCount;
+
+    pixel.a = 1.0;
+
+    texOut.write(pixel, gid);
+}
