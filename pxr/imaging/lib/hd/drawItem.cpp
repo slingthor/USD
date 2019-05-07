@@ -111,7 +111,8 @@ HdDrawItem::IntersectsViewVolume(GfMatrix4d const &viewProjMatrix) const
         
         return true;
     } else {
-        return GfFrustum::IntersectsViewVolume(GetBounds(), viewProjMatrix);
+        id<MTLTexture> texture = MtlfMetalContext::GetMetalContext()->mtlColorTexture;
+        return GfFrustum::IntersectsViewVolume(GetBounds(), viewProjMatrix, texture.width, texture.height);
     }
 }
 

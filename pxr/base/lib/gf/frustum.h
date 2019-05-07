@@ -544,11 +544,12 @@ class GfFrustum {
     /// early-out tests such as draw or intersection culling.
     ///
     GF_API static bool  IntersectsViewVolume(const GfBBox3d &bbox,
-                                             const GfMatrix4d &vpMat);
+                                             const GfMatrix4d &vpMat,
+                                             double windowWidth, double windowHeight);
 
     ///@}
 
-  private:
+private:
     // Dirty the result of _CalculateFrustumPlanes.
       GF_API void _DirtyFrustumPlanes();
 

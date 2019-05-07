@@ -52,11 +52,10 @@ enum {
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-MtlfMetalContext *MtlfMetalContext::context = NULL;
 std::mutex MtlfMetalContext::_commandBufferPoolMutex;
 std::mutex MtlfMetalContext::_pipelineMutex;
 std::mutex MtlfMetalContext::_bufferMutex;
-thread_local MtlfMetalContext::ThreadState MtlfMetalContext::threadState(MtlfMetalContext::GetMetalContext());
+thread_local MtlfMetalContext::ThreadState MtlfMetalContext::threadState;
 
 MtlfMetalContext::ThreadState::~ThreadState() {
     for(int i = 0; i < kMSL_ProgramStage_NumStages; i++) {
@@ -110,7 +109,7 @@ id<MTLDevice> MtlfMetalContext::GetMetalDevice(PREFERRED_GPU_TYPE preferredGPUTy
     id <NSObject> metalDeviceObserver = nil;
     
     // Get a list of all devices and register an obsever for eGPU events
-    allDevices = MTLCopyAllDevicesWithObserver(&metalDeviceObserver,
+    renderDevices = MTLCopyAllDevicesWithObserver(&metalDeviceObserver,
                                                 ^(id<MTLDevice> device, MTLDeviceNotificationName name) {
                                                     MtlfMetalContext::handleGPUHotPlug(device, name);
                                                 });
@@ -125,7 +124,7 @@ id<MTLDevice> MtlfMetalContext::GetMetalDevice(PREFERRED_GPU_TYPE preferredGPUTy
     }
     
     // Put the device into the appropriate device list
-    for (id<MTLDevice>dev in allDevices) {
+    for (id<MTLDevice>dev in renderDevices) {
         if (dev.removable)
         	[_eGPUs addObject:dev];
         else if (dev.lowPower)
@@ -168,7 +167,7 @@ id<MTLDevice> MtlfMetalContext::GetMetalDevice(PREFERRED_GPU_TYPE preferredGPUTy
 
 void MtlfMetalContext::UpdateCurrentGPU() {
     currentGPU = 0;
-    for (id<MTLDevice>dev in allDevices) {
+    for (id<MTLDevice>dev in renderDevices) {
         if (dev == device)
             return;
         currentGPU++;
@@ -176,13 +175,24 @@ void MtlfMetalContext::UpdateCurrentGPU() {
 }
 
 MtlfMetalContext::MtlfMetalContext(id<MTLDevice> _device, int width, int height)
-: gsMaxConcurrentBatches(0)
-, gsMaxDataPerBatch(0)
-, points("points")
-#if defined(ARCH_GFX_OPENGL)
-, glInterop(NULL)
-#endif
 {
+    Init(_device, width, height);
+}
+
+MtlfMetalContext::~MtlfMetalContext()
+{
+    Cleanup();
+}
+
+void MtlfMetalContext::Init(id<MTLDevice> _device, int width, int height)
+{
+    gsMaxConcurrentBatches = 0;
+    gsMaxDataPerBatch = 0;
+    points = TfToken("points");
+#if defined(ARCH_GFX_OPENGL)
+    glInterop = NULL;
+#endif
+    
     if (_device == nil) {
         //device = MtlfMetalContext::GetMetalDevice(PREFER_INTEGRATED_GPU);
         //device = MtlfMetalContext::GetMetalDevice(PREFER_DISCRETE_GPU);
@@ -190,24 +200,29 @@ MtlfMetalContext::MtlfMetalContext(id<MTLDevice> _device, int width, int height)
     }
     else
         device = _device;
-
+    
     UpdateCurrentGPU();
-
+    
     captureScope = [[MTLCaptureManager sharedCaptureManager] newCaptureScopeWithDevice:device];
     captureScope.label = @"Full Frame";
     [[MTLCaptureManager sharedCaptureManager] setDefaultCaptureScope:captureScope];
-
+    
     NSLog(@"Selected %@ for Metal Device", device.name);
-
-    enableMultiQueue = true;
-
+    
+    enableMultiQueue = false;
+    
     // Create a new command queue
     commandQueue = [device newCommandQueueWithMaxCommandBufferCount:commandBufferPoolSize];
     if(enableMultiQueue) {
-//        NSLog(@"Device %@ supports Metal 2, enabling multi-queue codepath.", device.name);
+        //        NSLog(@"Device %@ supports Metal 2, enabling multi-queue codepath.", device.name);
         commandQueueGS = [device newCommandQueueWithMaxCommandBufferCount:commandBufferPoolSize];
         gsMaxDataPerBatch = 1024 * 1024 * 32;
         gsMaxConcurrentBatches = 3;
+    }
+    else
+    {
+        gsMaxDataPerBatch = 1024 * 1024 * 32;
+        gsMaxConcurrentBatches = 2;
     }
     
     ResetEncoders(METALWORKQUEUE_GEOMETRY_SHADER, true);
@@ -215,34 +230,34 @@ MtlfMetalContext::MtlfMetalContext(id<MTLDevice> _device, int width, int height)
     
     memset(commandBuffers, 0x00, sizeof(commandBuffers));
     memset(commandBuffersGS, 0x00, sizeof(commandBuffersGS));
-
+    
 #if defined(ARCH_OS_IOS)
-    #define SYSTEM_VERSION_GREATER_THAN_OR_EQUAL_TO(v) ([[[UIDevice currentDevice] systemVersion] compare:v options:NSNumericSearch] != NSOrderedAscending)
-
+#define SYSTEM_VERSION_GREATER_THAN_OR_EQUAL_TO(v) ([[[UIDevice currentDevice] systemVersion] compare:v options:NSNumericSearch] != NSOrderedAscending)
+    
     static bool sysVerGreaterThanOrEqualTo12_0 = SYSTEM_VERSION_GREATER_THAN_OR_EQUAL_TO(@"12.0");
     concurrentDispatchSupported = sysVerGreaterThanOrEqualTo12_0;
 #if defined(METAL_EVENTS_API_PRESENT)
     eventsAvailable = sysVerGreaterThanOrEqualTo12_0;
 #endif
-
+    
 #else // ARCH_OS_IOS
     static NSOperatingSystemVersion minimumSupportedOSVersion = { .majorVersion = 10, .minorVersion = 14, .patchVersion = 5 };
     static bool sysVerGreaterOrEqualTo10_14_5 = [NSProcessInfo.processInfo isOperatingSystemAtLeastVersion:minimumSupportedOSVersion];
-
+    
     concurrentDispatchSupported = sysVerGreaterOrEqualTo10_14_5;
 #if defined(METAL_EVENTS_API_PRESENT)
     eventsAvailable = sysVerGreaterOrEqualTo10_14_5;
 #endif
     
 #endif // ARCH_OS_IOS
-
+    
     eventsAvailable = false;
     
     MTLDepthStencilDescriptor *depthStateDesc = [[MTLDepthStencilDescriptor alloc] init];
     depthStateDesc.depthWriteEnabled = YES;
     depthStateDesc.depthCompareFunction = MTLCompareFunctionLessEqual;
     depthState = [device newDepthStencilStateWithDescriptor:depthStateDesc];
-
+    
     windingOrder = MTLWindingClockwise;
     cullMode = MTLCullModeBack;
     fillMode = MTLTriangleFillModeFill;
@@ -258,7 +273,7 @@ MtlfMetalContext::MtlfMetalContext(id<MTLDevice> _device, int width, int height)
     outputDepthFormat = MTLPixelFormatInvalid;
     
     mtlSampleCount = 1;
-
+    
 #if defined(METAL_ENABLE_STATS)
     resourceStats.commandBuffersCreated.store(0, std::memory_order_relaxed);
     resourceStats.commandBuffersCommitted.store(0, std::memory_order_relaxed);
@@ -284,7 +299,7 @@ MtlfMetalContext::MtlfMetalContext(id<MTLDevice> _device, int width, int height)
     committedCommandBufferCount.store(0, std::memory_order_relaxed);
 }
 
-MtlfMetalContext::~MtlfMetalContext()
+void MtlfMetalContext::Cleanup()
 {
     [[MTLCaptureManager sharedCaptureManager] setDefaultCaptureScope:nil];
     [captureScope release];
@@ -296,14 +311,14 @@ MtlfMetalContext::~MtlfMetalContext()
         glInterop = NULL;
     }
 #endif
-
+    
     CleanupUnusedBuffers(true);
     bufferFreeList.clear();
-
+    
     [commandQueue release];
     if(enableMultiQueue)
         [commandQueueGS release];
-   
+    
 #if defined(METAL_ENABLE_STATS)
     if(frameCount > 0) {
         NSLog(@"--- METAL Resource Stats (average per frame / total) ----");
@@ -354,13 +369,13 @@ MtlfMetalContext::~MtlfMetalContext()
         NSLog(@"Peak    Buffer Allocation:  %7luMbs",
               resourceStats.peakBufferAllocation.load(std::memory_order_relaxed) / (1024 * 1024));
     }
- #endif
+#endif
 }
 
 void MtlfMetalContext::RecreateInstance(id<MTLDevice> device, int width, int height)
 {
-    delete context;
-    context = new MtlfMetalContext(device, width, height);
+    Cleanup();
+    Init(device, width, height);
 }
 
 void MtlfMetalContext::AllocateAttachments(int width, int height)
@@ -397,10 +412,7 @@ void MtlfMetalContext::AllocateAttachments(int width, int height)
 bool
 MtlfMetalContext::IsInitialized()
 {
-    if (!context)
-        context = new MtlfMetalContext(nil, 256, 256);
-
-    return context->device != nil;
+    return true;
 }
 
 void
@@ -493,7 +505,7 @@ MtlfMetalContext::GetQuadIndexBuffer(MTLIndexType indexTypeMetal) {
         threadState.remappedQuadIndexBufferSource = threadState.indexBuffer;
         threadState.remappedQuadIndexBuffer = MtlfMultiBuffer(remappedIndexBufferSize, MTLResourceStorageModeDefault);
         
-        for (int i = 0; i < allDevices.count; i++) {
+        for (int i = 0; i < renderDevices.count; i++) {
             uint32_t *srcData =  (uint32_t *)threadState.indexBuffer[i].contents;
             uint32_t *destData = (uint32_t *)threadState.remappedQuadIndexBuffer[i].contents;
             for (int i = 0; i < (threadState.indexBuffer.length() / 4) ; i+=4)
@@ -536,7 +548,7 @@ MtlfMetalContext::GetPointIndexBuffer(MTLIndexType indexTypeMetal, int numIndice
         
         threadState.pointIndexBuffer = MtlfMultiBuffer(pointBufferSize, MTLResourceStorageModeDefault);
         
-        for (int i = 0; i < allDevices.count; i++) {
+        for (int i = 0; i < renderDevices.count; i++) {
             uint32_t *destData = (uint32_t *)threadState.pointIndexBuffer[i].contents;
             uint32_t arraySize = numIndicesNeeded;
             
@@ -584,7 +596,7 @@ void MtlfMetalContext::CreateCommandBuffer(MetalWorkQueueType workQueueType) {
                 wq->commandBuffer = commandBuffersGS[--commandBuffersGSStackPos];
             }
             else {
-                wq->commandBuffer = [context->commandQueueGS commandBuffer];
+                wq->commandBuffer = [commandQueueGS commandBuffer];
                 [wq->commandBuffer retain];
             }
         }
@@ -593,7 +605,7 @@ void MtlfMetalContext::CreateCommandBuffer(MetalWorkQueueType workQueueType) {
                 wq->commandBuffer = commandBuffers[--commandBuffersStackPos];
             }
             else {
-                wq->commandBuffer = [context->commandQueue commandBuffer];
+                wq->commandBuffer = [commandQueue commandBuffer];
                 [wq->commandBuffer retain];
             }
         }
@@ -1483,8 +1495,8 @@ void MtlfMetalContext::CommitCommandBufferForThread(bool waituntilScheduled, boo
             //NSLog(@"No work in this command buffer: %@", wq->commandBuffer.label);
             {
                 std::lock_guard<std::mutex> lock(_commandBufferPoolMutex);
-                wq->commandBuffer.label = @"stacked";
-                if (workQueueType == METALWORKQUEUE_GEOMETRY_SHADER)
+                
+                if (enableMultiQueue && workQueueType == METALWORKQUEUE_GEOMETRY_SHADER)
                     commandBuffersGS[commandBuffersGSStackPos++] = wq->commandBuffer;
                 else
                     commandBuffers[commandBuffersStackPos++] = wq->commandBuffer;
@@ -1545,7 +1557,6 @@ void MtlfMetalContext::SetRenderPassDescriptor(MTLRenderPassDescriptor *renderPa
     }
     
     wq->currentRenderPassDescriptor = renderPassDescriptor;
-    isRenderPassDescriptorPatched = false;
 }
 
 
@@ -1726,7 +1737,7 @@ MtlfMetalContext::MtlfMultiBuffer MtlfMetalContext::GetMetalBuffer(NSUInteger le
             
             // Copy over data
             if (pointer) {
-                for (int i = 0; i < allDevices.count; i++) {
+                for (int i = 0; i < renderDevices.count; i++) {
                     memcpy(buffer[i].contents, pointer, length);
 #if defined(ARCH_OS_MACOS)
                     [buffer[i] didModifyRange:(NSMakeRange(0, length))];
@@ -1799,11 +1810,18 @@ void MtlfMetalContext::CleanupUnusedBuffers(bool forceClean)
 }
 
 void MtlfMetalContext::StartFrameForThread() {
+    threadState.PrepareThread(this);
     threadState.gsFirstBatch = true;
 }
 
 void MtlfMetalContext::StartFrame() {
     numPrimsDrawn = 0;
+
+//    if (device == renderDevices[0])
+//        device = renderDevices[1];
+//    else
+//        device = renderDevices[0];
+//    UpdateCurrentGPU();
     GPUTImerResetTimer(frameCount);
     
     [captureScope beginScope];
@@ -1826,7 +1844,6 @@ void MtlfMetalContext::EndFrame() {
     
     // Reset it here as OSD may get invoked before StartFrame() is called.
     OSDEnabledThisFrame = false;
-    isRenderPassDescriptorPatched = false;
     
     [captureScope endScope];
 }
@@ -1915,24 +1932,6 @@ void MtlfMetalContext::_gsEncodeSync(bool doOpenBatch) {
         EncodeWaitForEvent(METALWORKQUEUE_DEFAULT, METALWORKQUEUE_GEOMETRY_SHADER);
         threadState.gsHasOpenBatch = true;
     }
-}
-
-void MtlfMetalContext::_PatchRenderPassDescriptor() {
-    if (isRenderPassDescriptorPatched)
-        return;
-    
-    MTLRenderPassDescriptor* rpd = context->GetRenderPassDescriptor();
-    if (rpd.depthAttachment != nil)
-        rpd.depthAttachment.loadAction = MTLLoadActionLoad;
-    if (rpd.stencilAttachment != nil)
-        rpd.stencilAttachment.loadAction = MTLLoadActionLoad;
-    for(int i = 0; i < 8; i++) {
-        if(rpd.colorAttachments[i] != nil)
-            rpd.colorAttachments[i].loadAction = MTLLoadActionLoad;
-    }
-    context->SetRenderPassDescriptor(rpd);
-    
-    isRenderPassDescriptorPatched = true;
 }
 
 void  MtlfMetalContext::GPUTImerResetTimer(unsigned long frameNumber) {
