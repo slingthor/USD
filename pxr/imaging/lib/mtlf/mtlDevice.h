@@ -163,18 +163,18 @@ public:
         MtlfMultiBuffer() {}
         
         MtlfMultiBuffer(uint64_t length, MTLResourceOptions options) {
-            NSArray<id<MTLDevice>> *allDevices = MtlfMetalContext::GetMetalContext()->allDevices;
+            NSArray<id<MTLDevice>> *renderDevices = MtlfMetalContext::GetMetalContext()->renderDevices;
             int i = 0;
-            for (id<MTLDevice>dev in allDevices) {
+            for (id<MTLDevice>dev in renderDevices) {
                 buffer[i++] = [dev newBufferWithLength:length options:options];
             }
             while(i < MAX_GPUS)
                 buffer[i++] = nil;
         }
         MtlfMultiBuffer(void const* data, uint64_t length, MTLResourceOptions options) {
-            NSArray<id<MTLDevice>> *allDevices = MtlfMetalContext::GetMetalContext()->allDevices;
+            NSArray<id<MTLDevice>> *renderDevices = MtlfMetalContext::GetMetalContext()->renderDevices;
             int i = 0;
-            for (id<MTLDevice>dev in allDevices) {
+            for (id<MTLDevice>dev in renderDevices) {
                 buffer[i++] = [dev newBufferWithBytes:data length:length options:options];
             }
             while(i < MAX_GPUS)
@@ -226,10 +226,8 @@ public:
     MTLF_API
     //static MtlfMetalContextSharedPtr GetMetalContext() {
     static MtlfMetalContext *GetMetalContext() {
-        if (!context)
-            context = new MtlfMetalContext(nil, 256, 256);
-        
-        return context;
+        static MtlfMetalContext context(nil, 256, 256);
+        return &context;
     }
 
     /// Returns whether this interface has been initialized.
@@ -238,7 +236,7 @@ public:
     
     /// Returns a reset instance for the current Metal device.
     MTLF_API
-    static void RecreateInstance(id<MTLDevice> device, int width, int height);
+    void RecreateInstance(id<MTLDevice> device, int width, int height);
 
     MTLF_API
     void AllocateAttachments(int width, int height);
@@ -441,7 +439,7 @@ public:
     bool enableMultiQueue;
 
     id<MTLDevice> device;
-    NSArray<id<MTLDevice>> *allDevices;
+    NSArray<id<MTLDevice>> *renderDevices;
     int currentGPU;
 
     id<MTLCommandQueue> commandQueue;
@@ -463,6 +461,9 @@ public:
 protected:
     MTLF_API
     MtlfMetalContext(id<MTLDevice> device, int width, int height);
+    
+    void Init(id<MTLDevice> device, int width, int height);
+    void Cleanup();
 
     MTLF_API
     void CheckNewStateGather();
@@ -482,50 +483,59 @@ protected:
     
     struct ThreadState {
 
-        ThreadState(MtlfMetalContext *_this)
-            : gsDataOffset(0)
-            , gsBufferIndex(0)
-            , gsCurrentBuffer(nil)
-            , gsFence(nil)
-            , gsHasOpenBatch(false)
-            , gsSyncRequired(false)
-            , enableMVA(false)
-            , enableComputeGS(false)
-        {
-            size_t const defaultBufferSize = 1024;
-            
-            for(int i = 0; i < kMSL_ProgramStage_NumStages; i++) {
-                oldStyleUniformBufferSize[i] = 0;
-                oldStyleUniformBufferAllocatedSize[i] = defaultBufferSize;
-                oldStyleUniformBuffer[i] = new uint8_t[defaultBufferSize];
-                memset(oldStyleUniformBuffer[i], 0x00, defaultBufferSize);
-            }
-            
-            vertexDescriptor = nil;
-            indexBuffer.Clear();
-            vertexPositionBuffer = nil;
-
-            numVertexComponents = 0;
-            
-            currentWorkQueueType = METALWORKQUEUE_DEFAULT;
-            currentWorkQueue     = &workQueueDefault;
-            
-            _this->ResetEncoders(METALWORKQUEUE_DEFAULT, true);
-            _this->ResetEncoders(METALWORKQUEUE_GEOMETRY_SHADER, true);
-
-            MTLResourceOptions resourceOptions = MTLResourceStorageModePrivate|MTLResourceCPUCacheModeDefaultCache;
-            for(int i = 0; i < _this->gsMaxConcurrentBatches; i++)
-                gsBuffers.push_back([_this->device newBufferWithLength:_this->gsMaxDataPerBatch options:resourceOptions]);
-            gsCurrentBuffer = gsBuffers.at(0);
-            
-            gsFence = [_this->device newFence];
-
-            remappedQuadIndexBuffer.Clear();
-            pointIndexBuffer.Clear();
-        }
+        ThreadState(){}
         
         ~ThreadState();
 
+        void PrepareThread(MtlfMetalContext *_this) {
+            if (!init)
+            {
+                gsDataOffset = 0;
+                gsBufferIndex = 0;
+                gsCurrentBuffer = nil;
+                gsFence = nil;
+                gsHasOpenBatch = false;
+                gsSyncRequired = false;
+                enableMVA = false;
+                enableComputeGS = false;
+
+                size_t const defaultBufferSize = 1024;
+                
+                for(int i = 0; i < kMSL_ProgramStage_NumStages; i++) {
+                    oldStyleUniformBufferSize[i] = 0;
+                    oldStyleUniformBufferAllocatedSize[i] = defaultBufferSize;
+                    oldStyleUniformBuffer[i] = new uint8_t[defaultBufferSize];
+                    memset(oldStyleUniformBuffer[i], 0x00, defaultBufferSize);
+                }
+                
+                vertexDescriptor = nil;
+                indexBuffer.Clear();
+                vertexPositionBuffer = nil;
+                
+                numVertexComponents = 0;
+                
+                currentWorkQueueType = METALWORKQUEUE_DEFAULT;
+                currentWorkQueue     = &workQueueDefault;
+                
+                _this->ResetEncoders(METALWORKQUEUE_DEFAULT, true);
+                _this->ResetEncoders(METALWORKQUEUE_GEOMETRY_SHADER, true);
+                
+                MTLResourceOptions resourceOptions = MTLResourceStorageModePrivate|MTLResourceCPUCacheModeDefaultCache;
+                for(int i = 0; i < _this->gsMaxConcurrentBatches; i++)
+                    gsBuffers.push_back([_this->device newBufferWithLength:_this->gsMaxDataPerBatch options:resourceOptions]);
+                gsCurrentBuffer = gsBuffers.at(0);
+                
+                gsFence = [_this->device newFence];
+                
+                remappedQuadIndexBuffer.Clear();
+                pointIndexBuffer.Clear();
+                init = true;
+            }
+            
+        }
+        
+        bool init = false;
+        
         std::vector<BufferBinding*> boundBuffers;
 
         size_t oldStyleUniformBufferSize[kMSL_ProgramStage_NumStages];
@@ -634,8 +644,6 @@ private:
     void handleDisplayChange();
     void handleGPUHotPlug(id<MTLDevice> device, MTLDeviceNotificationName notifier);
 #endif
-
-    static MtlfMetalContext          *context;
     
     void UpdateCurrentGPU();
     
@@ -652,9 +660,6 @@ private:
     void _gsAdvanceBuffer();
     void _gsResetBuffers();
     void _gsEncodeSync(bool doOpenBatch);
-    void _PatchRenderPassDescriptor();
-    
-    bool                       isRenderPassDescriptorPatched;
 
     struct MetalBufferListEntry {
         MtlfMultiBuffer buffer;

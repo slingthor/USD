@@ -109,7 +109,7 @@ void HdStRenderDelegateMetal::SetRenderSetting(TfToken const& key, VtValue const
             if (value == _MetalDeviceDescriptor(dev)) {
                 // Recreate the underlying Metal context
                 MtlfMetalContext *context = MtlfMetalContext::GetMetalContext();
-                MtlfMetalContext::RecreateInstance(dev, context->mtlColorTexture.width, context->mtlColorTexture.height);
+                context->RecreateInstance(dev, context->mtlColorTexture.width, context->mtlColorTexture.height);
                 break;
             }
         }
@@ -261,10 +261,7 @@ void HdStRenderDelegateMetal::PrepareRender(
     }
     
     context->StartFrame();
-    
-    // Create a new command buffer for each render pass to the current drawable
-//    context->CreateCommandBuffer(METALWORKQUEUE_DEFAULT);
-//    context->LabelCommandBuffer(@"HdEngine::Render", METALWORKQUEUE_DEFAULT);
+    context->StartFrameForThread();
     
     // Set the render pass descriptor to use for the render encoders
     context->SetRenderPassDescriptor(_mtlRenderPassDescriptor);

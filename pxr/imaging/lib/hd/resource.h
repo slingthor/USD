@@ -51,7 +51,7 @@ typedef boost::shared_ptr<class HdResource> HdResourceSharedPtr;
 struct HdResourceGPUHandle {
 
     HdResourceGPUHandle() {
-        handle = 0;
+        multiBuffer.Clear();
     }
     HdResourceGPUHandle(HdResourceGPUHandle const & _gpuHandle) {
         multiBuffer = _gpuHandle.multiBuffer;
