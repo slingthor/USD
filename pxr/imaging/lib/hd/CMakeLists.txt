@@ -13,6 +13,7 @@ pxr_library(hd
         sdf
         cameraUtil
         hf
+        mtlf
         pxOsd
         ${TBB_tbb_LIBRARY}
 

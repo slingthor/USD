@@ -252,7 +252,10 @@ public:
     
     MTLF_API
     void CopyDepthTextureToOpenGL();
-    
+
+    MTLF_API
+    void ColourCorrectColourTexture(id<MTLTexture> colourTexture);
+
     MTLF_API
     id<MTLBuffer> GetIndexBuffer() const {
         return threadState.indexBuffer.forCurrentGPU();

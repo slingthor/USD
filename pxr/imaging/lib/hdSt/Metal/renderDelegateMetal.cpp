@@ -216,9 +216,9 @@ void HdStRenderDelegateMetal::PrepareRender(
         
         // store only attachments that will be presented to the
         // screen, as in this case
-        if (context->mtlSampleCount > 1)
-            colorAttachment.storeAction = MTLStoreActionMultisampleResolve;
-        else
+//        if (context->mtlSampleCount > 1)
+//            colorAttachment.storeAction = MTLStoreActionMultisampleResolve;
+//        else
             colorAttachment.storeAction = MTLStoreActionStore;
         
         MTLRenderPassDepthAttachmentDescriptor *depthAttachment =
@@ -227,13 +227,7 @@ void HdStRenderDelegateMetal::PrepareRender(
         depthAttachment.storeAction = MTLStoreActionStore;
         depthAttachment.clearDepth = 1.0f;
         
-        if (context->mtlSampleCount > 1)
-        {
-            colorAttachment.texture = context->mtlMultisampleColorTexture;
-            colorAttachment.resolveTexture = context->mtlColorTexture;
-        }
-        else
-            colorAttachment.texture = context->mtlColorTexture;
+        colorAttachment.texture = context->mtlMultisampleColorTexture;
         
         GLfloat clearColor[4];
         glGetFloatv(GL_COLOR_CLEAR_VALUE, clearColor);
@@ -308,6 +302,8 @@ void HdStRenderDelegateMetal::FinalizeRender()
     // Create a new command buffer for each render pass to the current drawable
     context->CreateCommandBuffer(METALWORKQUEUE_DEFAULT);
     context->LabelCommandBuffer(@"HdEngine::Render", METALWORKQUEUE_DEFAULT);
+
+    context->ColourCorrectColourTexture(context->mtlMultisampleColorTexture);
 
     if (_renderOutput == DelegateParams::RenderOutput::OpenGL) {
         // Depth texture copy

@@ -62,6 +62,23 @@ kernel void copyDepthMultisample(depth2d_ms<float, access::read> texIn,
     texOut.write(float(texIn.read(gid, 0)), gid);
 }
 
+float linear_to_srgb(float c) {
+  if (c < 0.0031308)
+    c = 12.92 * c;
+  else
+    c = 1.055 * powr(c, 1.0/2.4) - 0.055;
+  return c;
+}
+
+float srgb_to_linear(float c) {
+  float result;
+  if (c <= 0.04045)
+    result = c / 12.92;
+  else
+    result = powr((c + 0.055) / 1.055, 2.4);
+  return result;
+}
+
 kernel void copyColour(texture2d<float, access::read> texIn,
                                  texture2d<float, access::write> texOut,
                                  uint2 gid [[thread_position_in_grid]])
@@ -72,6 +89,9 @@ kernel void copyColour(texture2d<float, access::read> texIn,
     
     // TODO: colour correction
     float4 pixel = texIn.read(gid);
+    pixel.rgb = float3(linear_to_srgb(pixel.r),
+                       linear_to_srgb(pixel.g),
+                       linear_to_srgb(pixel.b));
     pixel.a = 1.0;
 
     texOut.write(pixel, gid);
@@ -95,7 +115,9 @@ kernel void copyColourMultisample(texture2d_ms<float, access::read> texIn,
 
     pixel/=sampleCount;
 
-    pixel.a = 1.0;
+    pixel.rgb = float3(linear_to_srgb(pixel.r),
+                       linear_to_srgb(pixel.g),
+                       linear_to_srgb(pixel.b));
 
     texOut.write(pixel, gid);
 }

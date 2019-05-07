@@ -371,23 +371,25 @@ void MtlfMetalContext::AllocateAttachments(int width, int height)
 
         mtlColorTexture = glInterop->mtlColorTexture;
         mtlDepthTexture = glInterop->mtlDepthTexture;
+
+        MTLTextureDescriptor* desc = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA16Float
+                                                                                        width:width
+                                                                                       height:height
+                                                                                    mipmapped:NO];
+        desc.usage = MTLTextureUsageRenderTarget | MTLTextureUsageShaderRead;
+        desc.storageMode = MTLStorageModePrivate;
         
-        if (mtlSampleCount > 1)
-        {
-            MTLTextureDescriptor* desc = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:mtlColorTexture.pixelFormat
-                                                                                            width:width
-                                                                                           height:height
-                                                                                        mipmapped:NO];
-            desc.textureType = MTLTextureType2DMultisample;
+        if (mtlSampleCount > 1) {
             desc.sampleCount = mtlSampleCount;
-            desc.usage = MTLTextureUsageRenderTarget | MTLTextureUsageShaderRead;
-            desc.storageMode = MTLStorageModePrivate;
-            
-            if (mtlMultisampleColorTexture)
-                [mtlMultisampleColorTexture release];
-            
-            mtlMultisampleColorTexture = [device newTextureWithDescriptor:desc];
+            desc.textureType = MTLTextureType2DMultisample;
         }
+        else
+            desc.textureType = MTLTextureType2D;
+        
+        if (mtlMultisampleColorTexture)
+            [mtlMultisampleColorTexture release];
+
+        mtlMultisampleColorTexture = [device newTextureWithDescriptor:desc];
     }
 #endif
 }
@@ -407,6 +409,27 @@ MtlfMetalContext::BlitColorTargetToOpenGL()
 #if defined(ARCH_GFX_OPENGL)
     if (glInterop) {
         glInterop->BlitColorTargetToOpenGL();
+    }
+    else {
+        TF_FATAL_CODING_ERROR("Gl interop is disabled, must call InitGLInterop"
+                              " before rendering");
+    }
+#else
+    TF_FATAL_CODING_ERROR("Gl interop is disabled, because OpenGL is disabled");
+#endif
+}
+
+void
+MtlfMetalContext::ColourCorrectColourTexture(id<MTLTexture> colourTexture)
+{
+#if defined(ARCH_GFX_OPENGL)
+    if (glInterop) {
+        id <MTLComputeCommandEncoder> computeEncoder = GetComputeEncoder();
+        computeEncoder.label = @"Colour correction/resolve copy";
+        
+        glInterop->ColourCorrectColourTexture(computeEncoder, colourTexture);
+        
+        ReleaseEncoder(true);
     }
     else {
         TF_FATAL_CODING_ERROR("Gl interop is disabled, must call InitGLInterop"
@@ -1080,7 +1103,8 @@ void MtlfMetalContext::SetRenderPipelineState()
                 renderPipelineStateDescriptor.colorAttachments[0].destinationAlphaBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
                 
                 if (mtlColorTexture != nil) {
-                    renderPipelineStateDescriptor.colorAttachments[0].pixelFormat = mtlColorTexture.pixelFormat;
+                    //renderPipelineStateDescriptor.colorAttachments[0].pixelFormat = mtlColorTexture.pixelFormat;
+                    renderPipelineStateDescriptor.colorAttachments[0].pixelFormat = MTLPixelFormatRGBA16Float;
                 }
                 else {
                     renderPipelineStateDescriptor.colorAttachments[0].pixelFormat = outputPixelFormat;

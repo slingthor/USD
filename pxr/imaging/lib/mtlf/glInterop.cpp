@@ -458,5 +458,28 @@ MtlfGlInterop::CopyDepthTextureToOpenGL(id<MTLComputeCommandEncoder> computeEnco
     [computeEncoder dispatchThreadgroups:threadsPerGrid threadsPerThreadgroup:threadgroupCount];
 }
 
+void
+MtlfGlInterop::ColourCorrectColourTexture(id<MTLComputeCommandEncoder> computeEncoder, id<MTLTexture> colourTexture)
+{
+    MtlfMetalContext *context(MtlfMetalContext::GetMetalContext());
+    
+    id<MTLFunction> computeProgram = computeColourCopyProgram;
+    if (mtlSampleCount > 1)
+        computeProgram =computeColourCopyMultisampleProgram;
+    
+    NSUInteger exeWidth = context->SetComputeEncoderState(computeProgram, 0, 0, @"Colour correction pipeline state");
+    NSUInteger maxThreadsPerThreadgroup = context->GetMaxThreadsPerThreadgroup();
+    
+    MTLSize threadgroupCount = MTLSizeMake(exeWidth, maxThreadsPerThreadgroup / exeWidth, 1);
+    MTLSize threadsPerGrid   = MTLSizeMake((colourTexture.width + (threadgroupCount.width - 1)) / threadgroupCount.width,
+                                           (colourTexture.height + (threadgroupCount.height - 1)) / threadgroupCount.height,
+                                           1);
+    
+    [computeEncoder setTexture:colourTexture atIndex:0];
+    [computeEncoder setTexture:mtlColorTexture atIndex:1];
+    
+    [computeEncoder dispatchThreadgroups:threadsPerGrid threadsPerThreadgroup:threadgroupCount];
+}
+
 PXR_NAMESPACE_CLOSE_SCOPE
 

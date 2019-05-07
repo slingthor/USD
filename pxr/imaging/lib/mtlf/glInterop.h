@@ -65,6 +65,9 @@ public:
     
     MTLF_API
     void CopyDepthTextureToOpenGL(id<MTLComputeCommandEncoder> computeEncoder);
+    
+    MTLF_API
+    void ColourCorrectColourTexture(id<MTLComputeCommandEncoder> computeEncoder, id<MTLTexture> colourTexture);
 
     id<MTLTexture> mtlColorTexture;
     id<MTLTexture> mtlDepthTexture;
