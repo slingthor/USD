@@ -79,6 +79,8 @@ private:
     id<MTLLibrary>              defaultLibrary;
     id<MTLFunction>             computeDepthCopyProgram;
     id<MTLFunction>             computeDepthCopyMultisampleProgram;
+    id<MTLFunction>             computeColourCopyProgram;
+    id<MTLFunction>             computeColourCopyMultisampleProgram;
     
     CVPixelBufferRef pixelBuffer;
     CVPixelBufferRef depthBuffer;

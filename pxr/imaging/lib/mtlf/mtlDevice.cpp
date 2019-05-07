@@ -261,6 +261,7 @@ void MtlfMetalContext::Init(id<MTLDevice> _device, int width, int height)
     windingOrder = MTLWindingClockwise;
     cullMode = MTLCullModeBack;
     fillMode = MTLTriangleFillModeFill;
+    blendEnable = false;
     
     AllocateAttachments(width, height);
     
@@ -704,6 +705,11 @@ void MtlfMetalContext::SetPolygonFillMode(MTLTriangleFillMode _fillMode)
     //threadState.dirtyRenderState |= DIRTY_METALRENDERSTATE_FILL_MODE;
 }
 
+void MtlfMetalContext::SetAlphaBlendingEnable(bool _blendEnable)
+{
+    blendEnable = _blendEnable;
+}
+
 void MtlfMetalContext::SetShadingPrograms(id<MTLFunction> vertexFunction, id<MTLFunction> fragmentFunction, bool _enableMVA)
 {
     CheckNewStateGather();
@@ -986,7 +992,8 @@ void MtlfMetalContext::SetRenderPipelineState()
     boost::hash_combine(hashVal, threadState.renderFragmentFunction);
     boost::hash_combine(hashVal, wq->currentVertexDescriptorHash);
     boost::hash_combine(hashVal, wq->currentColourAttachmentsHash);
-    
+    boost::hash_combine(hashVal, blendEnable);
+
     // If this matches the current pipeline state then we should already have the correct pipeline bound
     if (hashVal == wq->currentRenderPipelineDescriptorHash && wq->currentRenderPipelineState != nil) {
         return;
@@ -1073,7 +1080,12 @@ void MtlfMetalContext::SetRenderPipelineState()
             }
             else {
                 //METAL TODO: Why does this need to be hardcoded? There is no matching drawTarget? Can we get this info from somewhere?
-                renderPipelineStateDescriptor.colorAttachments[0].blendingEnabled = NO;
+                if (blendEnable) {
+                    renderPipelineStateDescriptor.colorAttachments[0].blendingEnabled = YES;
+                }
+                else {
+                    renderPipelineStateDescriptor.colorAttachments[0].blendingEnabled = NO;
+                }
                 renderPipelineStateDescriptor.colorAttachments[0].sourceRGBBlendFactor = MTLBlendFactorSourceAlpha;
                 renderPipelineStateDescriptor.colorAttachments[0].sourceAlphaBlendFactor = MTLBlendFactorSourceAlpha;
                 renderPipelineStateDescriptor.colorAttachments[0].destinationRGBBlendFactor = MTLBlendFactorOneMinusSourceAlpha;

@@ -26,6 +26,7 @@
 #include "pxr/imaging/garch/contextCaps.h"
 #include "pxr/imaging/garch/resourceFactory.h"
 
+#include "pxr/imaging/mtlf/drawTarget.h"
 #include "pxr/imaging/mtlf/mtlDevice.h"
 
 #include "pxr/imaging/hdSt/commandBuffer.h"
@@ -51,6 +52,8 @@
 #include <tbb/enumerable_thread_specific.h>
 
 #include <functional>
+
+#include <sys/time.h>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -153,7 +156,7 @@ HdStCommandBuffer::ExecuteDraw(
 
                 if (context->GeometryShadersActive()) {
                     // Complete the GS command buffer if we have one
-                    context->CommitCommandBufferForThread(true, false, METALWORKQUEUE_GEOMETRY_SHADER);
+                    context->CommitCommandBufferForThread(false, false, METALWORKQUEUE_GEOMETRY_SHADER);
                 }
 
                 if (context->GetWorkQueue(METALWORKQUEUE_DEFAULT).commandBuffer != nil) {
@@ -164,6 +167,11 @@ HdStCommandBuffer::ExecuteDraw(
             }
         }
     };
+    
+    struct timeval timeStart;
+    gettimeofday(&timeStart, NULL);
+
+    bool setAlpha = false;
 
     // Create a new command buffer for each render pass to the current drawable
     if (renderPassDescriptor.colorAttachments[0].loadAction == MTLLoadActionClear) {
@@ -175,11 +183,22 @@ HdStCommandBuffer::ExecuteDraw(
         [renderEncoder endEncoding];
         [commandBuffer commit];
      
+        int numAttachments = 1;
+        
+        if (context->GetDrawTarget()) {
+            numAttachments = context->GetDrawTarget()->GetAttachments().size();
+        }
+        else
+            setAlpha = true;
+
         renderPassDescriptor.depthAttachment.loadAction = MTLLoadActionLoad;
-        renderPassDescriptor.colorAttachments[0].loadAction = MTLLoadActionLoad;
+
+        for (int i = 0; i < numAttachments; i++) {
+            renderPassDescriptor.colorAttachments[i].loadAction = MTLLoadActionLoad;
+        }
     }
 
-    static bool mtBatchDrawing = true;
+    static bool mtBatchDrawing = _drawBatches.size() >= 10;
     if (mtBatchDrawing) {
         // Now render the rest
         WorkParallelForN(_drawBatches.size(),
@@ -197,6 +216,21 @@ HdStCommandBuffer::ExecuteDraw(
                       0,
                       _drawBatches.size());
     }
+    
+    if (setAlpha) {
+        context->SetAlphaBlendingEnable(true);
+//        renderPassDescriptor.colorAttachments[0].blendingEnabled = YES;
+//        renderPipelineStateDescriptor.colorAttachments[0].sourceRGBBlendFactor = MTLBlendFactorOne;
+//        renderPipelineStateDescriptor.colorAttachments[0].sourceAlphaBlendFactor = MTLBlendFactorOne;
+//        renderPipelineStateDescriptor.colorAttachments[0].destinationRGBBlendFactor = MTLBlendFactorOne;
+//        renderPipelineStateDescriptor.colorAttachments[0].destinationAlphaBlendFactor = MTLBlendFactorOne;
+    }
+    
+    struct timeval timeEnd, timeDiff;
+    gettimeofday(&timeEnd, NULL);
+    
+    timersub(&timeEnd, &timeStart, &timeDiff);
+//    NSLog(@"%.2fms", timeDiff.tv_sec + float(timeDiff.tv_usec) / 1000.0f);
 
     HD_PERF_COUNTER_SET(HdPerfTokens->drawBatches, _drawBatches.size());
 }

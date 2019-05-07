@@ -35,7 +35,7 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-TF_DEFINE_ENV_SETTING(PXR_MTL_SAMPLE_COUNT, 1, "");
+TF_DEFINE_ENV_SETTING(PXR_MTL_SAMPLE_COUNT, 2, "");
 
 namespace {
 static
@@ -289,6 +289,8 @@ void HdStRenderDelegateMetal::PrepareRender(
                 break;
         }
     }
+    
+    context->SetAlphaBlendingEnable(false);
     // TODO:
     //  * forceRefresh
     //  * showGuides, showRender, showProxy

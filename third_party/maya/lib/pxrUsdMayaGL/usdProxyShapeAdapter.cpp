@@ -237,7 +237,7 @@ PxrMayaHdUsdProxyShapeAdapter::_Sync(
         // Add in kWireFrame to the display style we'll use to determine the
         // repr selector (e.g. so that we draw the wireframe over the shaded
         // geometry for selected objects).
-        reprDisplayStyle |= MHWRender::MFrameContext::DisplayStyle::kWireFrame;
+        //reprDisplayStyle |= MHWRender::MFrameContext::DisplayStyle::kWireFrame;
     }
 
     HdReprSelector reprSelector =
@@ -276,7 +276,8 @@ PxrMayaHdUsdProxyShapeAdapter::_Sync(
     // The kBackfaceCulling display style was introduced in Maya 2016 SP2.
     HdCullStyle cullStyle = HdCullStyleNothing;
 #if MAYA_API_VERSION >= 201603
-    if (displayStyle & MHWRender::MFrameContext::DisplayStyle::kBackfaceCulling) {
+//    if (displayStyle & MHWRender::MFrameContext::DisplayStyle::kBackfaceCulling)
+    {
         cullStyle = HdCullStyleBackUnlessDoubleSided;
     }
 #endif

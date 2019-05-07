@@ -281,6 +281,11 @@ public:
     void SetDrawTarget(MtlfDrawTarget *drawTarget);
     
     MTLF_API
+    MtlfDrawTarget *GetDrawTarget() const {
+        return drawTarget;
+    }
+    
+    MTLF_API
     void SetShadingPrograms(id<MTLFunction> vertexFunction, id<MTLFunction> fragmentFunction, bool _enableMVA);
     
     MTLF_API
@@ -326,7 +331,10 @@ public:
 	
     MTLF_API
     void SetPolygonFillMode(MTLTriangleFillMode fillMode);
-    
+
+    MTLF_API
+    void SetAlphaBlendingEnable(bool blendEnable);
+
     MTLF_API
     void SetRenderPassDescriptor(MTLRenderPassDescriptor *renderPassDescriptor);
     
@@ -610,6 +618,7 @@ protected:
     MTLWinding windingOrder;
     MTLCullMode cullMode;
     MTLTriangleFillMode fillMode;
+    bool blendEnable;
     
     MtlfDrawTarget *drawTarget;
 
