@@ -79,6 +79,7 @@ HdDrawItem::GetBufferArraysHash() const
 bool
 HdDrawItem::IntersectsViewVolume(GfMatrix4d const &viewProjMatrix) const
 {
+    id<MTLTexture> texture = MtlfMetalContext::GetMetalContext()->mtlColorTexture;
     if (GetInstanceIndexRange()) {
         int instancerNumLevels = GetInstancePrimvarNumLevels();
         int instanceIndexWidth = instancerNumLevels + 1;
@@ -106,12 +107,11 @@ HdDrawItem::IntersectsViewVolume(GfMatrix4d const &viewProjMatrix) const
             GfBBox3d box(GetBounds());
             box.Transform(GfMatrix4d(bla));
 
-            return GfFrustum::IntersectsViewVolume(box, viewProjMatrix);
+            return GfFrustum::IntersectsViewVolume(box, viewProjMatrix, texture.width, texture.height);
         }
         
         return true;
     } else {
-        id<MTLTexture> texture = MtlfMetalContext::GetMetalContext()->mtlColorTexture;
         return GfFrustum::IntersectsViewVolume(GetBounds(), viewProjMatrix, texture.width, texture.height);
     }
 }
