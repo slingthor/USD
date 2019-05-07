@@ -292,6 +292,8 @@ void HdStRenderDelegateMetal::PrepareRender(
                 break;
         }
     }
+    
+    context->SetAlphaBlendingEnable(false);
     // TODO:
     //  * forceRefresh
     //  * showGuides, showRender, showProxy

@@ -333,7 +333,10 @@ public:
 	
     MTLF_API
     void SetPolygonFillMode(MTLTriangleFillMode fillMode);
-    
+
+    MTLF_API
+    void SetAlphaBlendingEnable(bool blendEnable);
+
     MTLF_API
     void SetRenderPassDescriptor(MTLRenderPassDescriptor *renderPassDescriptor);
     
@@ -605,6 +608,7 @@ protected:
     MTLWinding windingOrder;
     MTLCullMode cullMode;
     MTLTriangleFillMode fillMode;
+    bool blendEnable;
     
     MtlfDrawTarget *drawTarget;
 
