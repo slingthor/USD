@@ -1249,7 +1249,8 @@ GfFrustum::_CalculateFrustumPlanes() const
 
 bool
 GfFrustum::IntersectsViewVolume(const GfBBox3d &bbox,
-                                const GfMatrix4d &viewProjMat)
+                                const GfMatrix4d &viewProjMat,
+                                double windowWidth, double windowHeight)
 {
     // This implementation is a standard technique employed in frustum
     // culling during rendering.  It correctly culls the box even from
@@ -1263,25 +1264,53 @@ GfFrustum::IntersectsViewVolume(const GfBBox3d &bbox,
     // clipping interval, then the entire
     // box volume must lie outside the view volume.
 
-    // Compute the 8 points of the bbox in
+    // Compute the min and max points of the bbox in
     // bbox local space.
     GfVec4d points[8];
     const GfVec3d &localMin = bbox.GetRange().GetMin();
     const GfVec3d &localMax = bbox.GetRange().GetMax();
+    const GfMatrix4d matrix = bbox.GetMatrix() * viewProjMat;
     points[0] = GfVec4d(localMin[0], localMin[1], localMin[2], 1);
+    points[7] = GfVec4d(localMax[0], localMax[1], localMax[2], 1);
+
+    // Transform min/max bbox local space points into clip space
+    points[0] = points[0] * matrix;
+    points[7] = points[7] * matrix;
+
+    // Small prim cull
+    GfVec4d screenSpace[2];
+    
+    double inv = 1.0f / points[0][3];
+    screenSpace[0][0] = points[0][0] * inv;
+    screenSpace[0][1] = points[0][1] * inv;
+    screenSpace[0][2] = points[0][2] * inv;
+    
+    inv = 1.0f / points[7][3];
+    screenSpace[1][0] = points[7][0] * inv;
+    screenSpace[1][1] = points[7][1] * inv;
+    screenSpace[1][2] = points[7][2] * inv;
+    
+    double const threshold = 2.0; // number of pixels in a dimension
+    double dx = (screenSpace[1][0] - screenSpace[0][0]) * windowWidth;
+    double dy = (screenSpace[1][1] - screenSpace[0][1]) * windowHeight;
+    if (fabs(dx) < threshold &&
+        fabs(dy) < threshold)
+        return false;
+    
+    // Compute the remaining 8 points of the bbox in
+    // bbox local space.
     points[1] = GfVec4d(localMin[0], localMin[1], localMax[2], 1);
     points[2] = GfVec4d(localMin[0], localMax[1], localMin[2], 1);
     points[3] = GfVec4d(localMin[0], localMax[1], localMax[2], 1);
     points[4] = GfVec4d(localMax[0], localMin[1], localMin[2], 1);
     points[5] = GfVec4d(localMax[0], localMin[1], localMax[2], 1);
     points[6] = GfVec4d(localMax[0], localMax[1], localMin[2], 1);
-    points[7] = GfVec4d(localMax[0], localMax[1], localMax[2], 1);
-
-    // Transform bbox local space points into clip space
-    for (int i = 0; i < 8; ++i) {
-        points[i] = points[i] * bbox.GetMatrix() * viewProjMat;
+    
+    // Transform remaining bbox local space points into clip space
+    for (int i = 1; i < 7; ++i) {
+        points[i] = points[i] * matrix;
     }
-
+    
     // clipFlags is a 6-bit field with one bit per +/- per x,y,z,
     // or one per frustum plane.  If the points overlap the
     // clip volume in any axis, then clipFlags will be 0x3f (0b111111).
