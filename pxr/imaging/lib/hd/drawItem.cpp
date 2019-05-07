@@ -85,29 +85,33 @@ HdDrawItem::IntersectsViewVolume(GfMatrix4d const &viewProjMatrix) const
         int instanceIndexWidth = instancerNumLevels + 1;
 
         if (instancerNumLevels == 1 &&
-            GetInstanceIndexRange()->GetNumElements()/instanceIndexWidth == 1) {
-            HdBufferArrayRangeSharedPtr const & instanceBar = GetInstancePrimvarRange(0);
-            HdBufferResourceSharedPtr const & instanceRes = instanceBar->GetResource(HdTokens->instanceTransform);
+            GetInstanceIndexRange()->GetNumElements() / instanceIndexWidth == 1) {
+            if (!_instancedCullingBoundsCalculated) {
+                const_cast<HdDrawItem*>(this)->_instancedCullingBoundsCalculated = true;
 
-            size_t stride = instanceRes->GetStride();
-            uint8_t const* rawBuffer = instanceRes->GetBufferContents();
-            GfMatrix4f const *instanceTransform = (GfMatrix4f const*)&rawBuffer[stride * instanceBar->GetOffset()];
+                HdBufferArrayRangeSharedPtr const & instanceBar = GetInstancePrimvarRange(0);
+                HdBufferResourceSharedPtr const & instanceRes = instanceBar->GetResource(HdTokens->instanceTransform);
 
-            
-            
-            HdBufferArrayRangeSharedPtr const & primvar = GetConstantPrimvarRange();
-            HdBufferResourceSharedPtr const & primvarRes = primvar->GetResource(HdTokens->instancerTransform);
-            
-            stride = primvarRes->GetStride();
-            rawBuffer = primvarRes->GetBufferContents();
-            GfMatrix4f const *instancerTransform = (GfMatrix4f const*)&rawBuffer[stride * primvar->GetIndex() + primvarRes->GetOffset()];
+                size_t stride = instanceRes->GetStride();
+                uint8_t const* rawBuffer = instanceRes->GetBufferContents();
+                GfMatrix4f const *instanceTransform = (GfMatrix4f const*)&rawBuffer[stride * instanceBar->GetOffset()];
 
-            GfMatrix4f bla = (*instancerTransform) * (*instanceTransform);
-            
-            GfBBox3d box(GetBounds());
-            box.Transform(GfMatrix4d(bla));
+                
+                
+                HdBufferArrayRangeSharedPtr const & primvar = GetConstantPrimvarRange();
+                HdBufferResourceSharedPtr const & primvarRes = primvar->GetResource(HdTokens->instancerTransform);
+                
+                stride = primvarRes->GetStride();
+                rawBuffer = primvarRes->GetBufferContents();
+                GfMatrix4f const *instancerTransform = (GfMatrix4f const*)&rawBuffer[stride * primvar->GetIndex() + primvarRes->GetOffset()];
 
-            return GfFrustum::IntersectsViewVolume(box, viewProjMatrix, texture.width, texture.height);
+                GfMatrix4f bla = (*instancerTransform) * (*instanceTransform);
+                
+                const_cast<HdDrawItem*>(this)->_instancedCullingBounds = GetBounds();
+                const_cast<GfBBox3d&>(this->_instancedCullingBounds).Transform(GfMatrix4d(bla));
+            }
+
+            return GfFrustum::IntersectsViewVolume(_instancedCullingBounds, viewProjMatrix, texture.width, texture.height);
         }
         
         return true;

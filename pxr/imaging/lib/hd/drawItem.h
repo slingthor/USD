@@ -211,6 +211,9 @@ private:
     // pointer to shared data across reprs, owned by rprim:
     //    bufferArrayRanges, bounds, visibility
     HdRprimSharedData const *_sharedData;
+    
+    GfBBox3d _instancedCullingBounds;
+    bool _instancedCullingBoundsCalculated = false;
 };
 
 
