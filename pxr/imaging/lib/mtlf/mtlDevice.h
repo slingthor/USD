@@ -219,6 +219,13 @@ public:
         float uv[2];
     } Vertex;
 
+    void PrepareBufferFlush();
+    bool _FlushCachingStarted = false;
+    
+    void QueueBufferFlush(id<MTLBuffer> const &buffer, uint64_t start, uint64_t end);
+    
+    void FlushBuffers();
+    
     MTLF_API
     virtual ~MtlfMetalContext();
 
@@ -679,6 +686,16 @@ private:
         unsigned int releasedOnCommandBuffer;
     };
     std::vector<MetalBufferListEntry> bufferFreeList;
+    
+    struct MetalBufferFlushListEntry {
+        MetalBufferFlushListEntry(uint64_t _start, uint64_t _end) {
+            start = _start;
+            end = _end;
+        }
+        uint64_t start;
+        uint64_t end;
+    };
+    boost::unordered_map<id<MTLBuffer>, MetalBufferFlushListEntry> modifiedBuffers;
 
     int64_t frameCount;
     int64_t lastCompletedFrame;

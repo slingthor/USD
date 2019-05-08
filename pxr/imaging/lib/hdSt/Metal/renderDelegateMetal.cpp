@@ -126,7 +126,11 @@ void HdStRenderDelegateMetal::CommitResources(HdChangeTracker *tracker)
 
     context->StartFrameForThread();
     
+    context->PrepareBufferFlush();
+    
     HdStRenderDelegate::CommitResources(tracker);
+    
+    context->FlushBuffers();
 
     if (context->GeometryShadersActive()) {
         // Complete the GS command buffer if we have one
@@ -216,10 +220,7 @@ void HdStRenderDelegateMetal::PrepareRender(
         
         // store only attachments that will be presented to the
         // screen, as in this case
-//        if (context->mtlSampleCount > 1)
-//            colorAttachment.storeAction = MTLStoreActionMultisampleResolve;
-//        else
-            colorAttachment.storeAction = MTLStoreActionStore;
+        colorAttachment.storeAction = MTLStoreActionStore;
         
         MTLRenderPassDepthAttachmentDescriptor *depthAttachment =
             _mtlRenderPassDescriptorForInterop.depthAttachment;
@@ -233,6 +234,11 @@ void HdStRenderDelegateMetal::PrepareRender(
         glGetFloatv(GL_COLOR_CLEAR_VALUE, clearColor);
         clearColor[3] = 1.0f;
         
+        // Blue sky for Pixar demo
+        clearColor[0] = 118/255.0f;
+        clearColor[1] = 162/255.0f;
+        clearColor[2] = 225/255.0f;
+
         colorAttachment.clearColor = MTLClearColorMake(clearColor[0],
                                                        clearColor[1],
                                                        clearColor[2],

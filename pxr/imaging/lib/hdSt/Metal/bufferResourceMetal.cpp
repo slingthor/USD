@@ -186,8 +186,8 @@ HdStBufferResourceMetal::GetTextureBuffer()
 void
 HdStBufferResourceMetal::CopyData(size_t vboOffset, size_t dataSize, void const *data)
 {
+    MtlfMetalContext *context = MtlfMetalContext::GetMetalContext();
     if (_id[1].IsSet()) {
-        MtlfMetalContext *context = MtlfMetalContext::GetMetalContext();
         int64_t currentFrame = context->GetCurrentFrame();
         
         if (currentFrame != _lastFrameModified) {
@@ -205,14 +205,16 @@ HdStBufferResourceMetal::CopyData(size_t vboOffset, size_t dataSize, void const 
         for (int i = 0; i < 3; i++) {
             memcpy((uint8_t*)_gpuAddr[i] + vboOffset, data, dataSize);
 #if defined(ARCH_OS_MACOS)
-            [_id[i].forCurrentGPU() didModifyRange:NSMakeRange(vboOffset, dataSize)];
+            context->QueueBufferFlush(_id[i].forCurrentGPU(), vboOffset, vboOffset + dataSize);
+//            [_id[i].forCurrentGPU() didModifyRange:NSMakeRange(vboOffset, dataSize)];
 #endif
         }
     }
     else {
         memcpy((uint8_t*)_gpuAddr[_activeBuffer] + vboOffset, data, dataSize);
 #if defined(ARCH_OS_MACOS)
-        [_id[_activeBuffer].forCurrentGPU() didModifyRange:NSMakeRange(vboOffset, dataSize)];
+        context->QueueBufferFlush(_id[_activeBuffer].forCurrentGPU(), vboOffset, vboOffset + dataSize);
+//        [_id[_activeBuffer].forCurrentGPU() didModifyRange:NSMakeRange(vboOffset, dataSize)];
 #endif
     }
 }

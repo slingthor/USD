@@ -1776,6 +1776,39 @@ void MtlfMetalContext::ReleaseMetalBuffer(MtlfMultiBuffer const &buffer)
     //NSLog(@"Adding buffer to free list of length %lu (%lu)", buffer.length, frameCount);
 }
 
+void MtlfMetalContext::PrepareBufferFlush()
+{
+    _FlushCachingStarted = true;
+}
+
+void MtlfMetalContext::FlushBuffers() {
+    for(auto &buffer: modifiedBuffers) {
+        id<MTLBuffer> const &b = buffer.first;
+        MetalBufferFlushListEntry const &e = buffer.second;
+        [buffer.first didModifyRange:NSMakeRange(e.start, e.end - e.start)];
+    }
+    modifiedBuffers.empty();
+    _FlushCachingStarted = false;
+}
+
+void MtlfMetalContext::QueueBufferFlush(id<MTLBuffer> const &buffer, uint64_t start, uint64_t end) {
+    if (!_FlushCachingStarted) {
+        [buffer didModifyRange:NSMakeRange(start, end - start)];
+        return;
+    }
+
+    auto it = modifiedBuffers.find(buffer);
+    if (it != modifiedBuffers.end()) {
+        auto &bufferEntry = it->second;
+        bufferEntry.start = std::min(bufferEntry.start, start);
+        bufferEntry.end = std::max(bufferEntry.end, end);
+    }
+    else
+    {
+        modifiedBuffers.emplace(buffer, MetalBufferFlushListEntry(start, end));
+    }
+}
+
 void MtlfMetalContext::CleanupUnusedBuffers(bool forceClean)
 {
     std::lock_guard<std::mutex> lock(_bufferMutex);
