@@ -1011,10 +1011,10 @@ UsdImagingInstanceAdapter::MarkDirty(UsdPrim const& prim,
                                                     cachePath,
                                                     &instancerContext);
         if (TF_VERIFY(rproto.adapter, "%s", cachePath.GetText())) {
-            rproto.adapter->MarkDirty(prim, cachePath, dirty, index);
+//            rproto.adapter->MarkDirty(prim, cachePath, dirty, index);
         }
     } else if (TfMapLookupPtr(_instancerData, prim.GetPath()) != nullptr) {
-        index->MarkInstancerDirty(cachePath, dirty);
+//        index->MarkInstancerDirty(cachePath, dirty);
     }
 }
 
