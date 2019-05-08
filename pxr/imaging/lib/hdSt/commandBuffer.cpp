@@ -131,39 +131,34 @@ HdStCommandBuffer::ExecuteDraw(
         {
             MtlfMetalContext *context = MtlfMetalContext::GetMetalContext();
 
-            {
-//                static std::mutex _mutex;
-//                std::lock_guard<std::mutex> lock(_mutex);
-                
-                if (!context->GeometryShadersActive()) {
-                    context->CreateCommandBuffer(METALWORKQUEUE_GEOMETRY_SHADER);
-                    context->LabelCommandBuffer(@"Geometry Shaders", METALWORKQUEUE_GEOMETRY_SHADER);
-                    //[context->GetWorkQueue(METALWORKQUEUE_GEOMETRY_SHADER).commandBuffer enqueue];
-                }
+            if (!context->GeometryShadersActive()) {
+                context->CreateCommandBuffer(METALWORKQUEUE_GEOMETRY_SHADER);
+                context->LabelCommandBuffer(@"Geometry Shaders", METALWORKQUEUE_GEOMETRY_SHADER);
+                //[context->GetWorkQueue(METALWORKQUEUE_GEOMETRY_SHADER).commandBuffer enqueue];
+            }
 
-                context->StartFrameForThread();
-                
-                // Create a new command buffer for each render pass to the current drawable
-                context->CreateCommandBuffer(METALWORKQUEUE_DEFAULT);
-                context->LabelCommandBuffer(@"HdEngine::RenderWorker", METALWORKQUEUE_DEFAULT);
+            context->StartFrameForThread();
+            
+            // Create a new command buffer for each render pass to the current drawable
+            context->CreateCommandBuffer(METALWORKQUEUE_DEFAULT);
+            context->LabelCommandBuffer(@"HdEngine::RenderWorker", METALWORKQUEUE_DEFAULT);
 
-                context->SetRenderPassDescriptor(rpd);
-                
-                for(size_t i = begin; i < end; i++) {
-                    HdSt_DrawBatchSharedPtr& batch = (*drawBatches)[i];
-                    batch->ExecuteDraw(renderPassState, resourceRegistry);
-                }
+            context->SetRenderPassDescriptor(rpd);
+            
+            for(size_t i = begin; i < end; i++) {
+                HdSt_DrawBatchSharedPtr& batch = (*drawBatches)[i];
+                batch->ExecuteDraw(renderPassState, resourceRegistry);
+            }
 
-                if (context->GeometryShadersActive()) {
-                    // Complete the GS command buffer if we have one
-                    context->CommitCommandBufferForThread(false, false, METALWORKQUEUE_GEOMETRY_SHADER);
-                }
+            if (context->GeometryShadersActive()) {
+                // Complete the GS command buffer if we have one
+                context->CommitCommandBufferForThread(false, false, METALWORKQUEUE_GEOMETRY_SHADER);
+            }
 
-                if (context->GetWorkQueue(METALWORKQUEUE_DEFAULT).commandBuffer != nil) {
-                    context->CommitCommandBufferForThread(false, false);
+            if (context->GetWorkQueue(METALWORKQUEUE_DEFAULT).commandBuffer != nil) {
+                context->CommitCommandBufferForThread(false, false);
 
-                    context->EndFrameForThread();
-                }
+                context->EndFrameForThread();
             }
         }
     };

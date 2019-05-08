@@ -1654,7 +1654,7 @@ void MtlfMetalContext::SetCurrentEncoder(MetalEncoderType encoderType, MetalWork
         }
         case MTLENCODERTYPE_COMPUTE: {
 #if defined(METAL_EVENTS_API_PRESENT)
-            if (concurrentDispatchSupported && eventsAvailable) {
+            if (concurrentDispatchSupported){//} && eventsAvailable) {
                 wq->currentComputeEncoder = [wq->commandBuffer computeCommandEncoderWithDispatchType:MTLDispatchTypeConcurrent];
             }
             else

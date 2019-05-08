@@ -1289,14 +1289,14 @@ GfFrustum::IntersectsViewVolume(const GfBBox3d &bbox,
     screenSpace[1][0] = points[7][0] * inv;
     screenSpace[1][1] = points[7][1] * inv;
     screenSpace[1][2] = points[7][2] * inv;
-    
-    double const threshold = 2.0; // number of pixels in a dimension
+
+    double const threshold = 4.0; // number of pixels in a dimension
     double dx = (screenSpace[1][0] - screenSpace[0][0]) * windowWidth;
     double dy = (screenSpace[1][1] - screenSpace[0][1]) * windowHeight;
     if (fabs(dx) < threshold &&
         fabs(dy) < threshold)
         return false;
-    
+
     // Compute the remaining 8 points of the bbox in
     // bbox local space.
     points[1] = GfVec4d(localMin[0], localMin[1], localMax[2], 1);

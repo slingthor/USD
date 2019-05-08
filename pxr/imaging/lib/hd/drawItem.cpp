@@ -83,37 +83,80 @@ HdDrawItem::IntersectsViewVolume(GfMatrix4d const &viewProjMatrix) const
     if (GetInstanceIndexRange()) {
         int instancerNumLevels = GetInstancePrimvarNumLevels();
         int instanceIndexWidth = instancerNumLevels + 1;
+        int numInstances = GetInstanceIndexRange()->GetNumElements() / instanceIndexWidth;
 
-        if (instancerNumLevels == 1 &&
-            GetInstanceIndexRange()->GetNumElements() / instanceIndexWidth == 1) {
-            if (!_instancedCullingBoundsCalculated) {
-                const_cast<HdDrawItem*>(this)->_instancedCullingBoundsCalculated = true;
+        if (instancerNumLevels == 1) {
+            if (numInstances >= 1) {
+                if (!_instancedCullingBoundsCalculated) {
+                    const_cast<HdDrawItem*>(this)->_instancedCullingBoundsCalculated = true;
 
-                HdBufferArrayRangeSharedPtr const & instanceBar = GetInstancePrimvarRange(0);
-                HdBufferResourceSharedPtr const & instanceRes = instanceBar->GetResource(HdTokens->instanceTransform);
+                    HdBufferArrayRangeSharedPtr const & primvar = GetConstantPrimvarRange();
+                    HdBufferResourceSharedPtr const & primvarRes = primvar->GetResource(HdTokens->instancerTransform);
 
-                size_t stride = instanceRes->GetStride();
-                uint8_t const* rawBuffer = instanceRes->GetBufferContents();
-                GfMatrix4f const *instanceTransform = (GfMatrix4f const*)&rawBuffer[stride * instanceBar->GetOffset()];
+                    // Instancer transform
+                    size_t stride = primvarRes->GetStride();
+                    uint8_t const* rawBuffer = primvarRes->GetBufferContents();
+                    GfMatrix4f const *instancerTransform = (GfMatrix4f const*)&rawBuffer[stride * primvar->GetIndex() + primvarRes->GetOffset()];
+                    GfMatrix4f m;
 
-                
-                
-                HdBufferArrayRangeSharedPtr const & primvar = GetConstantPrimvarRange();
-                HdBufferResourceSharedPtr const & primvarRes = primvar->GetResource(HdTokens->instancerTransform);
-                
-                stride = primvarRes->GetStride();
-                rawBuffer = primvarRes->GetBufferContents();
-                GfMatrix4f const *instancerTransform = (GfMatrix4f const*)&rawBuffer[stride * primvar->GetIndex() + primvarRes->GetOffset()];
+                    for (int i = 0; i < numInstances; i++) {
+                        HdBufferArrayRangeSharedPtr const & instanceBar = GetInstancePrimvarRange(0);
+                        HdBufferResourceSharedPtr const & instanceTransformRes = instanceBar->GetResource(HdTokens->instanceTransform);
+                        int instanceIndex = instanceBar->GetOffset() + i;
+                        if (instanceTransformRes) {
+                            // Instance transform
+                            stride = instanceTransformRes->GetStride();
+                            rawBuffer = instanceTransformRes->GetBufferContents();
+                            GfMatrix4f const *instanceTransform = (GfMatrix4f const*)&rawBuffer[stride * instanceIndex];
+                            m = (*instancerTransform) * (*instanceTransform);
+                        }
+                        else {
+                            HdBufferResourceSharedPtr const & translateRes = instanceBar->GetResource(HdTokens->translate);
+                            HdBufferResourceSharedPtr const & rotateRes = instanceBar->GetResource(HdTokens->rotate);
+                            HdBufferResourceSharedPtr const & scaleRes = instanceBar->GetResource(HdTokens->scale);
+                            
+                            GfVec3f translate(0), scale(1);
+                            GfQuaternion rotate(GfQuaternion::GetIdentity());
 
-                GfMatrix4f bla = (*instancerTransform) * (*instanceTransform);
-                
-                const_cast<HdDrawItem*>(this)->_instancedCullingBounds = GetBounds();
-                const_cast<GfBBox3d&>(this->_instancedCullingBounds).Transform(GfMatrix4d(bla));
+                            if (translateRes) {
+                                stride = translateRes->GetStride();
+                                rawBuffer = translateRes->GetBufferContents();
+                                translate = *(GfVec3f const*)&rawBuffer[stride * instanceIndex];
+                            }
+
+                            if (rotateRes) {
+                                stride = rotateRes->GetStride();
+                                rawBuffer = rotateRes->GetBufferContents();
+                                float const* const floatArray = (float const*)&rawBuffer[stride * instanceIndex];
+                                rotate = GfQuaternion(floatArray[0], GfVec3d(floatArray[1], floatArray[2], floatArray[3]));
+                            }
+
+                            if (scaleRes) {
+                                stride = scaleRes->GetStride();
+                                rawBuffer = scaleRes->GetBufferContents();
+                                scale = *(GfVec3f const*)&rawBuffer[stride * instanceIndex];
+                            }
+                            GfMatrix4f mxtScale, mtxRotate, mtxTranslate;
+                            mxtScale.SetScale(scale);
+                            mtxRotate.SetRotate(rotate);
+                            mtxTranslate.SetTranslate(translate);
+                            
+                            m = (*instancerTransform) * mxtScale * mtxRotate * mtxTranslate;
+                        }
+                        
+                        HdDrawItem* _this = const_cast<HdDrawItem*>(this);
+                        _this->_instancedCullingBounds.push_back(GetBounds());
+                        _this->_instancedCullingBounds.back().Transform(GfMatrix4d(m));
+                    }
+                }
+
+                for(auto& bounds : _instancedCullingBounds) {
+                    if (GfFrustum::IntersectsViewVolume(bounds, viewProjMatrix, texture.width, texture.height))
+                        return true;
+                }
+                return false;
             }
-
-            return GfFrustum::IntersectsViewVolume(_instancedCullingBounds, viewProjMatrix, texture.width, texture.height);
         }
-        
         return true;
     } else {
         return GfFrustum::IntersectsViewVolume(GetBounds(), viewProjMatrix, texture.width, texture.height);

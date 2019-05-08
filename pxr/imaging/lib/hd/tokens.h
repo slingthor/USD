@@ -109,7 +109,10 @@ PXR_NAMESPACE_OPEN_SCOPE
     (transform)                                 \
     (transformInverse)                          \
     (visibility)                                \
-    (widths)
+    (widths)                                    \
+    (rotate)                                    \
+    (scale)                                     \
+    (translate)
 
 #define HD_REPR_TOKENS                          \
     (disabled)                                  \
