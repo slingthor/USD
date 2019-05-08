@@ -130,7 +130,7 @@ void HdStRenderDelegateMetal::CommitResources(HdChangeTracker *tracker)
 
     if (context->GeometryShadersActive()) {
         // Complete the GS command buffer if we have one
-        context->CommitCommandBufferForThread(true, false, METALWORKQUEUE_GEOMETRY_SHADER);
+        context->CommitCommandBufferForThread(false, false, METALWORKQUEUE_GEOMETRY_SHADER);
     }
     if (context->GetWorkQueue(METALWORKQUEUE_DEFAULT).commandBuffer != nil) {
         context->CommitCommandBufferForThread(false, false);
