@@ -223,7 +223,7 @@ UsdMayaGLBatchRendererMetal::_Render(
         glGetFloatv(GL_COLOR_CLEAR_VALUE, clearColor);
         clearColor[3] = 1.0f;
         
-        colorAttachment.texture = context->mtlColorTexture;
+        colorAttachment.texture = context->mtlMultisampleColorTexture;
         colorAttachment.clearColor = MTLClearColorMake(clearColor[0], clearColor[1], clearColor[2], clearColor[3]);
         
         depthAttachment.texture = context->mtlDepthTexture;
@@ -245,12 +245,8 @@ UsdMayaGLBatchRendererMetal::_Render(
     _hdEngine.Execute(*_renderIndex, tasks);
 
     // Depth texture copy
+    context->ColourCorrectColourTexture(context->mtlMultisampleColorTexture);
     context->CopyDepthTextureToOpenGL();
-    
-    if (context->GeometryShadersActive()) {
-        // Complete the GS command buffer if we have one
-        context->CommitCommandBufferForThread(true, false, METALWORKQUEUE_GEOMETRY_SHADER);
-    }
     
     // Commit the render buffer (will wait for GS to complete if present)
     // We wait until scheduled, because we're about to consume the Metal
