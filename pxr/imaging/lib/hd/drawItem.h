@@ -212,7 +212,7 @@ private:
     //    bufferArrayRanges, bounds, visibility
     HdRprimSharedData const *_sharedData;
     
-    GfBBox3d _instancedCullingBounds;
+    std::vector<GfBBox3d> _instancedCullingBounds;
     bool _instancedCullingBoundsCalculated = false;
 };
 
