@@ -317,10 +317,14 @@ HdStMSLProgram::CompileShader(GLenum type,
     // Load the function into the library
     id <MTLFunction> function = [library newFunctionWithName:entryPoint];
     if (!function) {
-        // XXX:validation
-        TF_WARN("Failed to compile shader (%s): \n%s",
-                shaderType, [[error localizedDescription] UTF8String]);
-        filePostFix += "_Fail";
+        NSString *err = [error localizedDescription];
+        err = [err stringByReplacingOccurrencesOfString:@"error: use of undeclared identifier 'surfaceShader'" withString:@"redacted"];
+        if ([err rangeOfString:@"error: "].location != NSNotFound) {
+            // XXX:validation
+            TF_WARN("Failed to compile shader (%s): \n%s",
+                    shaderType, [err UTF8String]);
+            filePostFix += "_Fail";
+        }
         success = false;
     }
 
