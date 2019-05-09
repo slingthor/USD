@@ -77,9 +77,8 @@ HdDrawItem::GetBufferArraysHash() const
 }
 
 bool
-HdDrawItem::IntersectsViewVolume(GfMatrix4d const &viewProjMatrix) const
+HdDrawItem::IntersectsViewVolume(GfMatrix4d const &viewProjMatrix, int viewport_width, int viewport_height) const
 {
-    id<MTLTexture> texture = MtlfMetalContext::GetMetalContext()->mtlColorTexture;
     if (GetInstanceIndexRange()) {
         int instancerNumLevels = GetInstancePrimvarNumLevels();
         int instanceIndexWidth = instancerNumLevels + 1;
@@ -151,7 +150,7 @@ HdDrawItem::IntersectsViewVolume(GfMatrix4d const &viewProjMatrix) const
                 }
 
                 for(auto& bounds : _instancedCullingBounds) {
-                    if (GfFrustum::IntersectsViewVolume(bounds, viewProjMatrix, texture.width, texture.height))
+                    if (GfFrustum::IntersectsViewVolume(bounds, viewProjMatrix, viewport_width, viewport_height))
                         return true;
                 }
                 return false;
@@ -159,7 +158,7 @@ HdDrawItem::IntersectsViewVolume(GfMatrix4d const &viewProjMatrix) const
         }
         return true;
     } else {
-        return GfFrustum::IntersectsViewVolume(GetBounds(), viewProjMatrix, texture.width, texture.height);
+        return GfFrustum::IntersectsViewVolume(GetBounds(), viewProjMatrix, viewport_width, viewport_height);
     }
 }
 

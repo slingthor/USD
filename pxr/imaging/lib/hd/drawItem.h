@@ -189,7 +189,7 @@ public:
     ///
     /// XXX: Currently if this drawitem uses HW instancing, always returns true.
     HD_API
-    bool IntersectsViewVolume(GfMatrix4d const &viewProjMatrix) const;
+    bool IntersectsViewVolume(GfMatrix4d const &viewProjMatrix, int viewport_width, int viewport_height) const;
 
     HD_API
     friend std::ostream &operator <<(std::ostream &out, 

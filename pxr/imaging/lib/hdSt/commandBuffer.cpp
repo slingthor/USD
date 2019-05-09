@@ -383,11 +383,13 @@ HdStCommandBuffer::FrustumCull(GfMatrix4d const &viewProjMatrix)
                 GfMatrix4d const &viewProjMatrix,
                 size_t begin, size_t end) 
         {
+            id<MTLTexture> texture = MtlfMetalContext::GetMetalContext()->mtlColorTexture;
+    
             for(size_t i = begin; i < end; i++) {
                 HdStDrawItemInstance& itemInstance = (*drawItemInstances)[i];
                 HdStDrawItem const* item = itemInstance.GetDrawItem();
                 bool visible = item->GetVisible() && 
-                    item->IntersectsViewVolume(viewProjMatrix);
+                    item->IntersectsViewVolume(viewProjMatrix, texture.width, texture.height);
                 if ((itemInstance.IsVisible() != visible) || 
                     (visible && item->HasInstancer())) {
                     itemInstance.SetVisible(visible);
