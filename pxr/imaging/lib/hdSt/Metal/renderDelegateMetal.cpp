@@ -310,7 +310,7 @@ void HdStRenderDelegateMetal::FinalizeRender()
 
     // Create a new command buffer for each render pass to the current drawable
     context->CreateCommandBuffer(METALWORKQUEUE_DEFAULT);
-    context->LabelCommandBuffer(@"HdEngine::Render", METALWORKQUEUE_DEFAULT);
+    context->LabelCommandBuffer(@"Post Process", METALWORKQUEUE_DEFAULT);
 
     context->ColourCorrectColourTexture(context->mtlMultisampleColorTexture);
 
