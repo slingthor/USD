@@ -93,11 +93,15 @@ public:
     TfToken colorCorrectionMode;
     GfVec2i renderResolution;
     
+    UsdImagingGLRenderParams();
+    
+    union
+    {
+        void *_dummyPtr;
 #if defined(ARCH_GFX_METAL)
-    MTLRenderPassDescriptor *mtlRenderPassDescriptorForNativeMetal;
+        MTLRenderPassDescriptor *mtlRenderPassDescriptorForNativeMetal;
 #endif
-
-    inline UsdImagingGLRenderParams();
+    };
 
     inline bool operator==(const UsdImagingGLRenderParams &other) const;
 
@@ -106,40 +110,9 @@ public:
     }
 };
 
-
-UsdImagingGLRenderParams::UsdImagingGLRenderParams() :
-    frame(UsdTimeCode::Default()),
-    complexity(1.0),
-    drawMode(HdStDrawMode::DRAW_SHADED_SMOOTH),
-    showGuides(false),
-    showProxy(true),
-    showRender(false),
-    forceRefresh(false),
-    flipFrontFacing(false),
-    cullStyle(UsdImagingGLCullStyle::CULL_STYLE_NOTHING),
-    enableIdRender(false),
-    enableLighting(true),
-    enableSampleAlphaToCoverage(false),
-    applyRenderState(true),
-    gammaCorrectColors(true),
-    highlight(false),
-    overrideColor(.0f, .0f, .0f, .0f),
-    wireframeColor(.0f, .0f, .0f, .0f),
-    alphaThreshold(-1),
-    clipPlanes(),
-    enableSceneMaterials(true),
-    enableUsdDrawModes(true),
-    clearColor(0,0,0,1),
-    renderResolution(100,100)
-{
-#if defined(ARCH_GFX_METAL)
-    mtlRenderPassDescriptorForNativeMetal = nil;
-#endif
-}
-
-bool 
-UsdImagingGLRenderParams::operator==(const UsdImagingGLRenderParams &other) 
-    const 
+bool
+UsdImagingGLRenderParams::operator==(const UsdImagingGLRenderParams &other)
+    const
 {
     return frame                       == other.frame
         && complexity                  == other.complexity
