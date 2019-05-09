@@ -34,7 +34,6 @@
 #include "pxr/imaging/garch/gl.h"
 
 #if defined(ARCH_GFX_METAL)
-#include <Metal/Metal.h>
 #include "pxr/imaging/mtlf/mtlDevice.h"
 #endif
 
@@ -50,13 +49,6 @@ typedef boost::shared_ptr<class HdResource> HdResourceSharedPtr;
 
 struct HdResourceGPUHandle {
 
-    HdResourceGPUHandle() {
-        multiBuffer.Clear();
-    }
-    HdResourceGPUHandle(HdResourceGPUHandle const & _gpuHandle) {
-        multiBuffer = _gpuHandle.multiBuffer;
-    }
-    
     void Clear() {
         handle = 0;
     }
@@ -101,6 +93,13 @@ struct HdResourceGPUHandle {
 //    }
 //    operator id<MTLBuffer>() const { return (__bridge id<MTLBuffer>)handle; }
 
+    HdResourceGPUHandle() {
+        multiBuffer.Clear();
+    }
+    HdResourceGPUHandle(HdResourceGPUHandle const & _gpuHandle) {
+        multiBuffer = _gpuHandle.multiBuffer;
+    }
+
     HdResourceGPUHandle(MtlfMetalContext::MtlfMultiBuffer const _handle) {
         multiBuffer = _handle;
     }
@@ -115,7 +114,9 @@ struct HdResourceGPUHandle {
     // Storage
     union {
         void* handle;
+#if defined(ARCH_GFX_METAL)
         MtlfMetalContext::MtlfMultiBuffer multiBuffer;
+#endif
     };
 };
 /// \class HdResource
