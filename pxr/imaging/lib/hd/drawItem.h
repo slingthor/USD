@@ -195,6 +195,8 @@ public:
     friend std::ostream &operator <<(std::ostream &out, 
                                      const HdDrawItem& self);
 
+    void CountPrimitives(std::atomic_ulong &primCount, int numIndicesPerPrimitive) const;
+    
 protected:
 
     /// Returns the shared data

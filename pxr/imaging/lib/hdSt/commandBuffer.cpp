@@ -368,6 +368,7 @@ HdStCommandBuffer::SyncDrawItemVisibility(unsigned visChangeCount)
     _visChangeCount = visChangeCount;
 }
 
+static std::atomic_ulong primCount;
 void
 HdStCommandBuffer::FrustumCull(GfMatrix4d const &viewProjMatrix)
 {
@@ -377,6 +378,8 @@ HdStCommandBuffer::FrustumCull(GfMatrix4d const &viewProjMatrix)
         mtCullingDisabled = TfDebug::IsEnabled(HD_DISABLE_MULTITHREADED_CULLING)
         || _drawItems.size() < 10000;
 
+    primCount.store(0);
+    
     struct _Worker {
         static
         void cull(std::vector<HdStDrawItemInstance> * drawItemInstances,
@@ -385,6 +388,19 @@ HdStCommandBuffer::FrustumCull(GfMatrix4d const &viewProjMatrix)
         {
             id<MTLTexture> texture = MtlfMetalContext::GetMetalContext()->mtlColorTexture;
     
+            // Count primitives for marketing purposes!
+            if (false)
+            {
+                int numIndicesPerPrimitive = 3;
+                
+                for(size_t i = begin; i < end; i++) {
+                    HdStDrawItemInstance& itemInstance = (*drawItemInstances)[i];
+                    HdStDrawItem const* item = itemInstance.GetDrawItem();
+                    
+                    item->CountPrimitives(primCount, numIndicesPerPrimitive);
+                }
+            }
+            
             for(size_t i = begin; i < end; i++) {
                 HdStDrawItemInstance& itemInstance = (*drawItemInstances)[i];
                 HdStDrawItem const* item = itemInstance.GetDrawItem();
@@ -411,6 +427,10 @@ HdStCommandBuffer::FrustumCull(GfMatrix4d const &viewProjMatrix)
                       _drawItemInstances.size());
     }
 
+    if (primCount.load()) {
+        NSLog(@"Scene prims: %lu", primCount.load());
+    }
+    
     _visibleSize = 0;
     for (auto const& instance : _drawItemInstances) {
         if (instance.IsVisible()) {

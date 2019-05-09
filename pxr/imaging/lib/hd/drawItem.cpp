@@ -76,8 +76,29 @@ HdDrawItem::GetBufferArraysHash() const
     return hash;
 }
 
+void
+HdDrawItem::CountPrimitives(std::atomic_ulong &primCount, int numIndicesPerPrimitive) const
+{
+    
+    HdBufferArrayRangeSharedPtr const & indexBar =
+        GetTopologyRange();
+    int indexCount = indexBar ? indexBar->GetNumElements() : 0;
+
+    HdBufferArrayRangeSharedPtr const & instanceIndexBar =
+        GetInstanceIndexRange();
+
+    int instancerNumLevels = instanceIndexBar ? GetInstancePrimvarNumLevels() : 0;
+    int instanceIndexWidth = instancerNumLevels + 1;
+
+    int instanceCount = instanceIndexBar
+        ? instanceIndexBar->GetNumElements() / instanceIndexWidth : 1;
+    
+    primCount.fetch_add(indexCount * instanceCount);
+}
+
 bool
-HdDrawItem::IntersectsViewVolume(GfMatrix4d const &viewProjMatrix, int viewport_width, int viewport_height) const
+HdDrawItem::IntersectsViewVolume(GfMatrix4d const &viewProjMatrix,
+                                 int viewport_width, int viewport_height) const
 {
     if (GetInstanceIndexRange()) {
         int instancerNumLevels = GetInstancePrimvarNumLevels();
