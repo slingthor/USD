@@ -87,6 +87,8 @@ private:
     DelegateParams::RenderOutput _renderOutput;
     MTLRenderPassDescriptor *_mtlRenderPassDescriptorForInterop;
     MTLRenderPassDescriptor *_mtlRenderPassDescriptor;
+
+    dispatch_semaphore_t _inFlightSemaphore;
 };
 
 

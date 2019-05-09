@@ -54,6 +54,8 @@ HdStRenderDelegateMetal::HdStRenderDelegateMetal()
 {
     _deviceDesc = TfToken(_MetalDeviceDescriptor(MtlfMetalContext::GetMetalContext()->device));
 //    _Initialize();
+    
+    _inFlightSemaphore = dispatch_semaphore_create(3);
 }
 
 HdStRenderDelegateMetal::HdStRenderDelegateMetal(HdRenderSettingsMap const& settingsMap)
@@ -62,6 +64,8 @@ HdStRenderDelegateMetal::HdStRenderDelegateMetal(HdRenderSettingsMap const& sett
     , _mtlRenderPassDescriptor(nil)
 {
     _deviceDesc = TfToken(_MetalDeviceDescriptor(MtlfMetalContext::GetMetalContext()->device));
+    
+    _inFlightSemaphore = dispatch_semaphore_create(3);
 }
 
 HdRenderSettingDescriptorList
@@ -194,6 +198,8 @@ void HdStRenderDelegateMetal::PrepareRender(
         GLint viewport[4];
         glGetIntegerv( GL_VIEWPORT, viewport );
         
+        dispatch_semaphore_wait(_inFlightSemaphore, DISPATCH_TIME_FOREVER);
+        
         if (context->mtlColorTexture.width != viewport[2] ||
             context->mtlColorTexture.height != viewport[3]) {
             context->InitGLInterop();
@@ -312,7 +318,13 @@ void HdStRenderDelegateMetal::FinalizeRender()
         // Depth texture copy
         context->CopyDepthTextureToOpenGL();
     }
-    
+
+    __block dispatch_semaphore_t block_sema = _inFlightSemaphore;
+    [context->GetWorkQueue(METALWORKQUEUE_DEFAULT).commandBuffer addCompletedHandler:^(id<MTLCommandBuffer> buffer)
+     {
+        dispatch_semaphore_signal(block_sema);
+     }];
+
     // Commit the render buffer (will wait for GS to complete if present)
     // We wait until scheduled, because we're about to consume the Metal
     // generated textures in an OpenGL blit
