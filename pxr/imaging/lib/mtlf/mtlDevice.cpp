@@ -1773,6 +1773,13 @@ void MtlfMetalContext::ReleaseMetalBuffer(MtlfMultiBuffer const &buffer)
     
     std::lock_guard<std::mutex> lock(_bufferMutex);
     bufferFreeList.push_back(bufferEntry);
+    
+    for (int i = 0; i < renderDevices.count; i++) {
+        auto const &it = modifiedBuffers.find(buffer[i]);
+        if (it != modifiedBuffers.end()) {
+            modifiedBuffers.erase(it);
+        }
+    }
     //NSLog(@"Adding buffer to free list of length %lu (%lu)", buffer.length, frameCount);
 }
 
@@ -1787,7 +1794,7 @@ void MtlfMetalContext::FlushBuffers() {
         MetalBufferFlushListEntry const &e = buffer.second;
         [buffer.first didModifyRange:NSMakeRange(e.start, e.end - e.start)];
     }
-    modifiedBuffers.empty();
+    modifiedBuffers.clear();
     _FlushCachingStarted = false;
 }
 
@@ -1797,7 +1804,7 @@ void MtlfMetalContext::QueueBufferFlush(id<MTLBuffer> const &buffer, uint64_t st
         return;
     }
 
-    auto it = modifiedBuffers.find(buffer);
+    auto const &it = modifiedBuffers.find(buffer);
     if (it != modifiedBuffers.end()) {
         auto &bufferEntry = it->second;
         bufferEntry.start = std::min(bufferEntry.start, start);
@@ -1848,7 +1855,7 @@ void MtlfMetalContext::StartFrameForThread() {
 }
 
 void MtlfMetalContext::StartFrame() {
-    numPrimsDrawn = 0;
+    numPrimsDrawn.store(0);
 
 //    if (device == renderDevices[0])
 //        device = renderDevices[1];

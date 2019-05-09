@@ -199,7 +199,7 @@ public:
             return buffer[context->currentGPU];
         }
         
-        id<MTLBuffer> operator[](int64_t const index) {
+        id<MTLBuffer> operator[](int64_t const index) const {
             return buffer[index];
         }
         
@@ -434,7 +434,15 @@ public:
     void PrepareForComputeGSPart(uint32_t vertData, uint32_t primData, id<MTLBuffer>& dataBuffer, uint32_t& vertOffset, uint32_t& primOffset);
    
     MTLF_API
-    unsigned long IncNumberPrimsDrawn(unsigned long numPrims, bool init) { numPrimsDrawn = init ? numPrims : (numPrimsDrawn += numPrims); return numPrimsDrawn; }
+    unsigned long IncNumberPrimsDrawn(unsigned long numPrims, bool init)
+    {
+        if (init) {
+            numPrimsDrawn.store(numPrims);
+            return numPrims;
+        }
+
+        return numPrimsDrawn.fetch_add(numPrims) + numPrims;
+    }
     
     MTLF_API
     bool IsTempPointWorkaroundActive() const { return threadState.tempPointsWorkaroundActive; }
@@ -695,7 +703,7 @@ private:
         uint64_t start;
         uint64_t end;
     };
-    boost::unordered_map<id<MTLBuffer>, MetalBufferFlushListEntry> modifiedBuffers;
+    boost::unordered_map<id<MTLBuffer> const, MetalBufferFlushListEntry> modifiedBuffers;
 
     int64_t frameCount;
     int64_t lastCompletedFrame;
@@ -742,7 +750,7 @@ private:
     void  GPUTimerFinish(unsigned long frameNumber);
     void  GPUTImerResetTimer(unsigned long frameNumber);
     
-    unsigned long numPrimsDrawn;
+    std::atomic_ulong numPrimsDrawn;
     
     bool OSDEnabledThisFrame = false;
     
