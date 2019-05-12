@@ -63,6 +63,7 @@ GarchGetElementSize(GLenum type)
             return sizeof(GLubyte);
         case GL_UNSIGNED_SHORT:
         case GL_SHORT:
+        case GL_HALF_APPLE:
             return sizeof(GLshort);
         case GL_FLOAT:
             return sizeof(GLfloat);
