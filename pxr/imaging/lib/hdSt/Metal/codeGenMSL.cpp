@@ -3581,16 +3581,18 @@ HdSt_CodeGenMSL::_GenerateInstancePrimvar()
         nameAndLevels[it->second.name].dataType = dataType;
         nameAndLevels[it->second.name].levels.push_back(level);
 
+        std::stringstream _n;
+        _n << it->second.name << "_" << level;
+        TfToken name(_n.str());
+
         std::stringstream n;
-        n << it->second.name << "_" << level;
-        TfToken name(n.str());
-        n.str("");
         n << "GetDrawingCoord().instanceCoords[" << level << "]";
 
         // << layout (location=x) uniform float *translate_0;
         _EmitDeclarationPtr(declarations, name, dataType, TfToken(), binding);
         _AddInputPtrParam(_mslVSInputParams, name, dataType, TfToken(), binding);
         _AddInputPtrParam(_mslGSInputParams, name, dataType, TfToken(), binding);
+        _AddInputPtrParam(_mslPSInputParams, name, dataType, TfToken(), binding);
         _EmitAccessor(accessors, name, dataType, binding, n.str().c_str());
     }
 
