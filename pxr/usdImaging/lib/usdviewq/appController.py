@@ -553,7 +553,8 @@ class AppController(QtCore.QObject):
                 self._ui.actionBlack,
                 self._ui.actionGrey_Dark,
                 self._ui.actionGrey_Light,
-                self._ui.actionWhite)
+                self._ui.actionWhite,
+                self._ui.actionDemo_Blue)
             for action in self._clearColorActions:
                 self._ui.colorGroup.addAction(action)
 
