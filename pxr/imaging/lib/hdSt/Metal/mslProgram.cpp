@@ -690,18 +690,9 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
                 [computeEncoder dispatchThreadgroups:threadsPerGrid threadsPerThreadgroup:threadgroupCount];
             }
             
-            if (instanceCount == 1) {
-                [renderEncoder drawPrimitives:primType
-                                  vertexStart:0
-                                  vertexCount:(numPrimitivesInPart * numOutVertsPerInPrim)];
-            }
-            else {
-                [renderEncoder drawPrimitives:primType
-                                  vertexStart:0
-                                  vertexCount:(numPrimitivesInPart * numOutVertsPerInPrim)
-                                instanceCount:instanceCount
-                                 baseInstance:0];
-            }
+            [renderEncoder drawPrimitives:primType
+                              vertexStart:0
+                              vertexCount:(numPrimitivesInPart * numOutVertsPerInPrim)];
         }
         else if(doMVA) {
             if (instanceCount == 1) {
