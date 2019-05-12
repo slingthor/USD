@@ -1682,12 +1682,12 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
             }
             else {
                 vsEntryPointCode << "    uint _index = drawArgs->batchIndexOffset + _gsVertexID;\n"
-                                 << "    uint _primitiveID = drawArgs->batchIndexOffset + (_vertexID / 3);\n";
+                                 << "    uint _primitiveID = (drawArgs->batchIndexOffset + (_vertexID / 3)) % drawArgs->indexCount;\n";
             }
             if (_buildTarget == kMSL_BuildTarget_MVA_ComputeGS) //_instanceID is the real Metal instance ID if not using ComputeGS
                 vsEntryPointCode << "    uint _instanceID = _index / drawArgs->indexCount;\n";
-            vsEntryPointCode    << "    uint _gsPrimitiveID = _gsVertexID / "
-                                << (numVerticesOutPerPrimitive / numPrimitivesOutPerPrimitive) << ";\n"
+            vsEntryPointCode    << "    uint _gsPrimitiveID = (_gsVertexID / "
+                                << (numVerticesOutPerPrimitive / numPrimitivesOutPerPrimitive) << ") % drawArgs->indexCount;\n"
                                 << "    _index = _index % drawArgs->indexCount;\n"
                                 << "    uint gl_InstanceID = _instanceID;\n"
                                 << "    uint gl_BaseVertex = drawArgs->baseVertex;\n"
@@ -1729,7 +1729,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
                 << "// MSL Compute Entry Point /////////////////////////////////////////////////////////////////////////////////////////\n\n"
                 << cs_EP_FuncDef.str()
                 << "    uint _vertexID = drawArgs->batchIndexOffset + _threadPositionInGrid * " << numVerticesInPerPrimitive << ";\n"
-                << "    uint _primitiveID = drawArgs->batchIndexOffset / " << numVerticesInPerPrimitive << " + _threadPositionInGrid;\n"
+                << "    uint _primitiveID = (drawArgs->batchIndexOffset / " << numVerticesInPerPrimitive << " + _threadPositionInGrid) % drawArgs->indexCount;\n"
                 << "    uint _instanceID = _vertexID / drawArgs->indexCount;\n"
                 << "    _vertexID = _vertexID % drawArgs->indexCount;\n"
                 << "    uint gl_BaseVertex = drawArgs->baseVertex;\n"
