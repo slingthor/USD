@@ -1278,17 +1278,15 @@ GfFrustum::IntersectsViewVolume(const GfBBox3d &bbox,
     points[7] = points[7] * matrix;
 
     // Small prim cull
-    GfVec4d screenSpace[2];
+    GfVec2d screenSpace[2];
     
     double inv = 1.0f / points[0][3];
     screenSpace[0][0] = points[0][0] * inv;
     screenSpace[0][1] = points[0][1] * inv;
-    screenSpace[0][2] = points[0][2] * inv;
     
     inv = 1.0f / points[7][3];
     screenSpace[1][0] = points[7][0] * inv;
     screenSpace[1][1] = points[7][1] * inv;
-    screenSpace[1][2] = points[7][2] * inv;
 
     double const threshold = 4.0; // number of pixels in a dimension
     double dx = (screenSpace[1][0] - screenSpace[0][0]) * windowWidth;

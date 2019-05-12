@@ -122,6 +122,10 @@ HdDrawItem::IntersectsViewVolume(GfMatrix4d const &viewProjMatrix,
                     for (int i = 0; i < numInstances; i++) {
                         HdBufferArrayRangeSharedPtr const & instanceBar = GetInstancePrimvarRange(0);
                         HdBufferResourceSharedPtr const & instanceTransformRes = instanceBar->GetResource(HdTokens->instanceTransform);
+                        HdBufferResourceSharedPtr const & translateRes = instanceBar->GetResource(HdTokens->translate);
+                        HdBufferResourceSharedPtr const & rotateRes = instanceBar->GetResource(HdTokens->rotate);
+                        HdBufferResourceSharedPtr const & scaleRes = instanceBar->GetResource(HdTokens->scale);
+                
                         int instanceIndex = instanceBar->GetOffset() + i;
                         if (instanceTransformRes) {
                             // Instance transform
@@ -131,10 +135,6 @@ HdDrawItem::IntersectsViewVolume(GfMatrix4d const &viewProjMatrix,
                             m = (*instancerTransform) * (*instanceTransform);
                         }
                         else {
-                            HdBufferResourceSharedPtr const & translateRes = instanceBar->GetResource(HdTokens->translate);
-                            HdBufferResourceSharedPtr const & rotateRes = instanceBar->GetResource(HdTokens->rotate);
-                            HdBufferResourceSharedPtr const & scaleRes = instanceBar->GetResource(HdTokens->scale);
-                            
                             GfVec3f translate(0), scale(1);
                             GfQuaternion rotate(GfQuaternion::GetIdentity());
 
