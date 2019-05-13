@@ -48,9 +48,7 @@ ARCH_HIDDEN
 void
 Arch_InitTickTimer()
 {
-    mach_timebase_info_data_t info;
-    mach_timebase_info(&info);
-    Arch_NanosecondsPerTick = static_cast<double>(info.numer) / info.denom;
+    Arch_NanosecondsPerTick = 1000.0;
 }
 
 #elif defined(ARCH_OS_LINUX)
