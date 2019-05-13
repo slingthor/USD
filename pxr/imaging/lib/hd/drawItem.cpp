@@ -116,7 +116,8 @@ HdDrawItem::IntersectsViewVolume(GfMatrix4d const &viewProjMatrix,
                     // Instancer transform
                     size_t stride = primvarRes->GetStride();
                     uint8_t const* rawBuffer = primvarRes->GetBufferContents();
-                    GfMatrix4f const *instancerTransform = (GfMatrix4f const*)&rawBuffer[stride * primvar->GetIndex() + primvarRes->GetOffset()];
+                    GfMatrix4f const *instancerTransform =
+                        (GfMatrix4f const*)&rawBuffer[stride * primvar->GetIndex() + primvarRes->GetOffset()];
                     GfMatrix4f m;
 
                     for (int i = 0; i < numInstances; i++) {
@@ -125,45 +126,48 @@ HdDrawItem::IntersectsViewVolume(GfMatrix4d const &viewProjMatrix,
                         HdBufferResourceSharedPtr const & translateRes = instanceBar->GetResource(HdTokens->translate);
                         HdBufferResourceSharedPtr const & rotateRes = instanceBar->GetResource(HdTokens->rotate);
                         HdBufferResourceSharedPtr const & scaleRes = instanceBar->GetResource(HdTokens->scale);
-                
+                        
                         int instanceIndex = instanceBar->GetOffset() + i;
                         if (instanceTransformRes) {
                             // Instance transform
                             stride = instanceTransformRes->GetStride();
                             rawBuffer = instanceTransformRes->GetBufferContents();
                             GfMatrix4f const *instanceTransform = (GfMatrix4f const*)&rawBuffer[stride * instanceIndex];
-                            m = (*instancerTransform) * (*instanceTransform);
+                            m = *instanceTransform;
                         }
                         else {
-                            GfVec3f translate(0), scale(1);
-                            GfQuaternion rotate(GfQuaternion::GetIdentity());
-
-                            if (translateRes) {
-                                stride = translateRes->GetStride();
-                                rawBuffer = translateRes->GetBufferContents();
-                                translate = *(GfVec3f const*)&rawBuffer[stride * instanceIndex];
-                            }
-
-                            if (rotateRes) {
-                                stride = rotateRes->GetStride();
-                                rawBuffer = rotateRes->GetBufferContents();
-                                float const* const floatArray = (float const*)&rawBuffer[stride * instanceIndex];
-                                rotate = GfQuaternion(floatArray[0], GfVec3d(floatArray[1], floatArray[2], floatArray[3]));
-                            }
-
-                            if (scaleRes) {
-                                stride = scaleRes->GetStride();
-                                rawBuffer = scaleRes->GetBufferContents();
-                                scale = *(GfVec3f const*)&rawBuffer[stride * instanceIndex];
-                            }
-                            GfMatrix4f mxtScale, mtxRotate, mtxTranslate;
-                            mxtScale.SetScale(scale);
-                            mtxRotate.SetRotate(rotate);
-                            mtxTranslate.SetTranslate(translate);
-                            
-                            m = (*instancerTransform) * mxtScale * mtxRotate * mtxTranslate;
+                            m.SetIdentity();
                         }
-                        
+
+                        GfVec3f translate(0), scale(1);
+                        GfQuaternion rotate(GfQuaternion::GetIdentity());
+
+                        if (scaleRes) {
+                            stride = scaleRes->GetStride();
+                            rawBuffer = scaleRes->GetBufferContents();
+                            scale = *(GfVec3f const*)&rawBuffer[stride * instanceIndex];
+                        }
+
+                        if (rotateRes) {
+                            stride = rotateRes->GetStride();
+                            rawBuffer = rotateRes->GetBufferContents();
+                            float const* const floatArray = (float const*)&rawBuffer[stride * instanceIndex];
+                            rotate = GfQuaternion(floatArray[0], GfVec3d(floatArray[1], floatArray[2], floatArray[3]));
+                        }
+
+                        if (translateRes) {
+                            stride = translateRes->GetStride();
+                            rawBuffer = translateRes->GetBufferContents();
+                            translate = *(GfVec3f const*)&rawBuffer[stride * instanceIndex];
+                        }
+
+                        GfMatrix4f mtxScale, mtxRotate, mtxTranslate;
+                        mtxScale.SetScale(scale);
+                        mtxRotate.SetRotate(rotate);
+                        mtxTranslate.SetTranslate(translate);
+
+                        m = m * mtxScale * mtxRotate * mtxTranslate * (*instancerTransform);
+
                         HdDrawItem* _this = const_cast<HdDrawItem*>(this);
                         _this->_instancedCullingBounds.push_back(GetBounds());
                         _this->_instancedCullingBounds.back().Transform(GfMatrix4d(m));
