@@ -44,6 +44,7 @@
 #include "pxr/base/gf/matrix4f.h"
 #include "pxr/base/tf/diagnostic.h"
 #include "pxr/base/tf/stl.h"
+#include "pxr/base/work/dispatcher.h"
 
 #include "pxr/base/work/loops.h"
 
@@ -163,9 +164,6 @@ HdStCommandBuffer::ExecuteDraw(
         }
     };
     
-    struct timeval timeStart;
-    gettimeofday(&timeStart, NULL);
-
     bool setAlpha = false;
 
     // Create a new command buffer for each render pass to the current drawable
@@ -193,9 +191,16 @@ HdStCommandBuffer::ExecuteDraw(
         }
     }
 
+    uint64_t timeStart = ArchGetTickTime();
     static bool mtBatchDrawing = _drawBatches.size() >= 10;
+
     if (mtBatchDrawing) {
-        // Now render the rest
+        auto systemLimit = WorkGetConcurrencyLimit();
+        
+        // Limit the number of threads used to render with
+        unsigned const maxRenderThreads = 12;
+        WorkSetConcurrencyLimit(std::min(systemLimit, maxRenderThreads));
+
         WorkParallelForN(_drawBatches.size(),
                          std::bind(&_Worker::draw, &_drawBatches,
                                    std::cref(renderPassState),
@@ -203,6 +208,8 @@ HdStCommandBuffer::ExecuteDraw(
                                    std::ref(renderPassDescriptor),
                                    std::placeholders::_1,
                                    std::placeholders::_2));
+
+        WorkSetConcurrencyLimit(systemLimit);
     } else {
         _Worker::draw(&_drawBatches,
                       renderPassState,
@@ -221,11 +228,13 @@ HdStCommandBuffer::ExecuteDraw(
 //        renderPipelineStateDescriptor.colorAttachments[0].destinationAlphaBlendFactor = MTLBlendFactorOne;
     }
     
-    struct timeval timeEnd, timeDiff;
-    gettimeofday(&timeEnd, NULL);
+    uint64_t timeDiff = ArchGetTickTime() - timeStart;
+    static uint64_t fastestTime = 0xffffffffffffffff;
     
-    timersub(&timeEnd, &timeStart, &timeDiff);
-//    NSLog(@"%.2fms", timeDiff.tv_sec + float(timeDiff.tv_usec) / 1000.0f);
+//    fastestTime = std::min(fastestTime, timeDiff);
+//    NSLog(@"HdStCommandBuffer::ExecuteDraw: %.2fms (%.2fms fastest)",
+//          ArchTicksToNanoseconds(timeDiff) / 1000.0f / 1000.0f,
+//          ArchTicksToNanoseconds(fastestTime) / 1000.0f / 1000.0f);
 
     HD_PERF_COUNTER_SET(HdPerfTokens->drawBatches, _drawBatches.size());
 }
@@ -375,8 +384,7 @@ HdStCommandBuffer::FrustumCull(GfMatrix4d const &viewProjMatrix)
     HD_TRACE_FUNCTION();
 
     const bool 
-        mtCullingDisabled = TfDebug::IsEnabled(HD_DISABLE_MULTITHREADED_CULLING)
-        || _drawItems.size() < 10000;
+    mtCullingDisabled = TfDebug::IsEnabled(HD_DISABLE_MULTITHREADED_CULLING);
 
     primCount.store(0);
     
@@ -412,20 +420,69 @@ HdStCommandBuffer::FrustumCull(GfMatrix4d const &viewProjMatrix)
                 }
             }
         }
+        
+        static
+        void cullDispatch(WorkDispatcher &dispatcher,
+                HdStDrawItemInstance &itemInstance,
+                GfMatrix4d const &viewProjMatrix,
+                int const width, int const height)
+        {
+            HdStDrawItem const* item = itemInstance.GetDrawItem();
+            if (item->GetVisible()) {
+                item->IntersectsViewVolume(dispatcher,
+                                           itemInstance.cullResult,
+                                           viewProjMatrix,
+                                           width,
+                                           height);
+            }
+        }
     };
 
+    uint64_t timeStart = ArchGetTickTime();
+
     if (!mtCullingDisabled) {
-        WorkParallelForN(_drawItemInstances.size(), 
-                         std::bind(&_Worker::cull, &_drawItemInstances, 
+        WorkParallelForN(_drawItemInstances.size(),
+                         std::bind(&_Worker::cull, &_drawItemInstances,
                                    std::cref(viewProjMatrix),
                                    std::placeholders::_1,
                                    std::placeholders::_2));
+/*        WorkDispatcher dispatcher;
+        id<MTLTexture> texture = MtlfMetalContext::GetMetalContext()->mtlColorTexture;
+        int width = [texture width];
+        int height = [texture height];
+
+        for (auto & instance : _drawItemInstances) {
+            dispatcher.Run(std::bind(&_Worker::cullDispatch,
+                                     std::ref(dispatcher),
+                                     std::ref(instance),
+                                     std::cref(viewProjMatrix),
+                                     std::cref(width),
+                                     std::cref(height)));
+        }
+        dispatcher.Wait();
+        
+        for (auto & itemInstance : _drawItemInstances) {
+            HdStDrawItem const* item = itemInstance.GetDrawItem();
+            bool visible = item->GetVisible() && itemInstance.cullResult;
+            if ((itemInstance.IsVisible() != visible) ||
+                (visible && item->HasInstancer())) {
+                itemInstance.SetVisible(visible);
+            }
+        }*/
     } else {
-        _Worker::cull(&_drawItemInstances, 
+        _Worker::cull(&_drawItemInstances,
                       viewProjMatrix, 
                       0, 
                       _drawItemInstances.size());
     }
+
+    uint64_t timeDiff = ArchGetTickTime() - timeStart;
+    static uint64_t fastestTime = 0xffffffff;
+    
+    fastestTime = std::min(fastestTime, timeDiff);
+//    NSLog(@"HdStCommandBuffer::FrustumCull: %.2fms (%.2fms fastest)",
+//          ArchTicksToNanoseconds(timeDiff) / 1000.0f / 1000.0f,
+//          ArchTicksToNanoseconds(fastestTime) / 1000.0f / 1000.0f);
 
     if (primCount.load()) {
         NSLog(@"Scene prims: %lu", primCount.load());

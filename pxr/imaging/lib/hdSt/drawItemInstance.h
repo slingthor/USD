@@ -77,8 +77,18 @@ public:
     /// Return a const pointer to draw item
     HdStDrawItem const *GetDrawItem() const { return _drawItem; }
 
-private:
+    std::atomic_bool cullResult;
+
     HdStDrawItemInstance();
+    HdStDrawItemInstance(HdStDrawItemInstance const &_item)
+    : cullResult(false)
+    , _batch(_item._batch)
+    , _drawItem(_item._drawItem)
+    , _batchIndex(_item._batchIndex)
+    , _visible(_item._visible)
+    {}
+    
+private:
 
     HdSt_DrawBatch * _batch;
     HdStDrawItem const * _drawItem;

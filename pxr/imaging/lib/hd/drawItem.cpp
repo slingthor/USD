@@ -97,9 +97,12 @@ HdDrawItem::CountPrimitives(std::atomic_ulong &primCount, int numIndicesPerPrimi
 }
 
 bool
-HdDrawItem::IntersectsViewVolume(GfMatrix4d const &viewProjMatrix,
+HdDrawItem::IntersectsViewVolume(WorkDispatcher &dispatcher,
+                                 std::atomic_bool &cullResult,
+                                 GfMatrix4d const &viewProjMatrix,
                                  int viewport_width, int viewport_height) const
 {
+    cullResult.store(false, std::memory_order_relaxed);
     if (GetInstanceIndexRange()) {
         int instancerNumLevels = GetInstancePrimvarNumLevels();
         int instanceIndexWidth = instancerNumLevels + 1;
@@ -174,6 +177,121 @@ HdDrawItem::IntersectsViewVolume(GfMatrix4d const &viewProjMatrix,
                     }
                 }
 
+                struct _Worker {
+                    static
+                    void cull(std::atomic_bool &result,
+                              GfBBox3d const &bounds,
+                              GfMatrix4d const &viewProjMatrix,
+                              int const viewport_width,
+                              int const viewport_height) {
+                        if (GfFrustum::IntersectsViewVolume(bounds, viewProjMatrix, viewport_width, viewport_height)) {
+                            result.store(true, std::memory_order_relaxed);
+                        }
+                    }
+                };
+                if( GfFrustum::IntersectsViewVolume(_instancedCullingBounds.front(), viewProjMatrix, viewport_width, viewport_height)) {
+                    cullResult.store(true, std::memory_order_relaxed);
+                }
+                else {
+                    for(auto& bounds : _instancedCullingBounds) {
+                        dispatcher.Run(std::bind(&_Worker::cull,
+                                                 std::ref(cullResult),
+                                                 std::cref(bounds),
+                                                 std::cref(viewProjMatrix),
+                                                 std::cref(viewport_width),
+                                                 std::cref(viewport_height)));
+                    }
+                }
+                return false;
+            }
+        }
+        cullResult.store(true, std::memory_order_relaxed);
+    } else {
+        if( GfFrustum::IntersectsViewVolume(GetBounds(), viewProjMatrix, viewport_width, viewport_height)) {
+            cullResult.store(true, std::memory_order_relaxed);
+        }
+    }
+    return false;
+}
+
+bool
+HdDrawItem::IntersectsViewVolume(GfMatrix4d const &viewProjMatrix,
+                                 int viewport_width, int viewport_height) const
+{
+    if (GetInstanceIndexRange()) {
+        int instancerNumLevels = GetInstancePrimvarNumLevels();
+        int instanceIndexWidth = instancerNumLevels + 1;
+        int numInstances = GetInstanceIndexRange()->GetNumElements() / instanceIndexWidth;
+        
+        if (instancerNumLevels == 1) {
+            if (numInstances >= 1) {
+                if (!_instancedCullingBoundsCalculated) {
+                    const_cast<HdDrawItem*>(this)->_instancedCullingBoundsCalculated = true;
+                    
+                    HdBufferArrayRangeSharedPtr const & primvar = GetConstantPrimvarRange();
+                    HdBufferResourceSharedPtr const & primvarRes = primvar->GetResource(HdTokens->instancerTransform);
+                    
+                    // Instancer transform
+                    size_t stride = primvarRes->GetStride();
+                    uint8_t const* rawBuffer = primvarRes->GetBufferContents();
+                    GfMatrix4f const *instancerTransform =
+                    (GfMatrix4f const*)&rawBuffer[stride * primvar->GetIndex() + primvarRes->GetOffset()];
+                    GfMatrix4f m;
+                    
+                    for (int i = 0; i < numInstances; i++) {
+                        HdBufferArrayRangeSharedPtr const & instanceBar = GetInstancePrimvarRange(0);
+                        HdBufferResourceSharedPtr const & instanceTransformRes = instanceBar->GetResource(HdTokens->instanceTransform);
+                        HdBufferResourceSharedPtr const & translateRes = instanceBar->GetResource(HdTokens->translate);
+                        HdBufferResourceSharedPtr const & rotateRes = instanceBar->GetResource(HdTokens->rotate);
+                        HdBufferResourceSharedPtr const & scaleRes = instanceBar->GetResource(HdTokens->scale);
+                        
+                        int instanceIndex = instanceBar->GetOffset() + i;
+                        if (instanceTransformRes) {
+                            // Instance transform
+                            stride = instanceTransformRes->GetStride();
+                            rawBuffer = instanceTransformRes->GetBufferContents();
+                            GfMatrix4f const *instanceTransform = (GfMatrix4f const*)&rawBuffer[stride * instanceIndex];
+                            m = *instanceTransform;
+                        }
+                        else {
+                            m.SetIdentity();
+                        }
+                        
+                        GfVec3f translate(0), scale(1);
+                        GfQuaternion rotate(GfQuaternion::GetIdentity());
+                        
+                        if (scaleRes) {
+                            stride = scaleRes->GetStride();
+                            rawBuffer = scaleRes->GetBufferContents();
+                            scale = *(GfVec3f const*)&rawBuffer[stride * instanceIndex];
+                        }
+                        
+                        if (rotateRes) {
+                            stride = rotateRes->GetStride();
+                            rawBuffer = rotateRes->GetBufferContents();
+                            float const* const floatArray = (float const*)&rawBuffer[stride * instanceIndex];
+                            rotate = GfQuaternion(floatArray[0], GfVec3d(floatArray[1], floatArray[2], floatArray[3]));
+                        }
+                        
+                        if (translateRes) {
+                            stride = translateRes->GetStride();
+                            rawBuffer = translateRes->GetBufferContents();
+                            translate = *(GfVec3f const*)&rawBuffer[stride * instanceIndex];
+                        }
+                        
+                        GfMatrix4f mtxScale, mtxRotate, mtxTranslate;
+                        mtxScale.SetScale(scale);
+                        mtxRotate.SetRotate(rotate);
+                        mtxTranslate.SetTranslate(translate);
+                        
+                        m = m * mtxScale * mtxRotate * mtxTranslate * (*instancerTransform);
+                        
+                        HdDrawItem* _this = const_cast<HdDrawItem*>(this);
+                        _this->_instancedCullingBounds.push_back(GetBounds());
+                        _this->_instancedCullingBounds.back().Transform(GfMatrix4d(m));
+                    }
+                }
+                
                 for(auto& bounds : _instancedCullingBounds) {
                     if (GfFrustum::IntersectsViewVolume(bounds, viewProjMatrix, viewport_width, viewport_height))
                         return true;

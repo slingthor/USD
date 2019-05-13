@@ -38,6 +38,8 @@
 #include "pxr/base/gf/vec2i.h"
 #include "pxr/base/gf/vec4f.h"
 
+#include "pxr/base/work/dispatcher.h"
+
 #include <iosfwd>
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -189,7 +191,15 @@ public:
     ///
     /// XXX: Currently if this drawitem uses HW instancing, always returns true.
     HD_API
-    bool IntersectsViewVolume(GfMatrix4d const &viewProjMatrix, int viewport_width, int viewport_height) const;
+    bool IntersectsViewVolume(WorkDispatcher &dispatcher,
+                              std::atomic_bool &cullResult,
+                              GfMatrix4d const &viewProjMatrix,
+                              int viewport_width,
+                              int viewport_height) const;
+    
+    HD_API
+    bool IntersectsViewVolume(GfMatrix4d const &viewProjMatrix,
+                              int viewport_width, int viewport_height) const;
 
     HD_API
     friend std::ostream &operator <<(std::ostream &out, 
