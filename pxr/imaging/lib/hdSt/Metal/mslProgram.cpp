@@ -647,12 +647,15 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
         
         if(doMVA) {
             //Setup Draw Args on the render context
-            struct { uint32_t _indexCount, _startIndex, _baseVertex, _instanceCount, _batchIndexOffset; }
+            struct { uint32_t _indexCount, _startIndex, _baseVertex, _instanceCount, _batchIndexOffset, _primitiveCount, _batchPrimitiveOffset; }
             drawArgs = { (uint32_t)indexCount,
                          (uint32_t)firstIndex,
                          (uint32_t)baseVertex,
                          (uint32_t)instanceCount,
-                         partIndexOffset };
+                         partIndexOffset,
+                         indexCount / vertsPerPrimitive,
+                         partIndexOffset / vertsPerPrimitive,
+            };
             [renderEncoder setVertexBytes:(const void*)&drawArgs
                                    length:sizeof(drawArgs)
                                   atIndex:_drawArgsSlot];

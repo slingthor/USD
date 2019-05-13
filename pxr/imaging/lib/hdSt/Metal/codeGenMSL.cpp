@@ -1129,7 +1129,8 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
 
     drawArgsStruct              << "////////////////////////////////////////////////////////////////////////////////////////////////////////////////////\n"
                                 << "// MSL Draw Args Struct ////////////////////////////////////////////////////////////////////////////////////////////\n\n"
-                                << "struct MSLDrawArgs { uint indexCount, startIndex, baseVertex, instanceCount, batchIndexOffset; };\n";
+                                << "struct MSLDrawArgs { uint indexCount, startIndex, baseVertex,\n"
+                                   "    instanceCount, batchIndexOffset, primitiveCount, batchPrimitiveOffset; };\n";
 
     //Do an initial pass over _mslVSInputParams and _mslFSInputParams to count the number of vertexAttributes that will needs
     // slots. This allows us to do the rest of the VS/PS generation in a single pass.
@@ -1678,16 +1679,16 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
             if (quadIndexRemap) {
                 vsEntryPointCode << "    uint quadRemap[] = { 3, 0, 2, 2, 0, 1 };\n"
                                  << "    uint _index = drawArgs->batchIndexOffset + (_vertexID / 6) * 4 + quadRemap[_vertexID % 6];\n"
-                                 << "    uint _primitiveID = drawArgs->batchIndexOffset + (_vertexID / 6);\n";
+                                 << "    uint _primitiveID = (drawArgs->batchIndexOffset + (_vertexID / 6)) % drawArgs->primitiveCount;\n";
             }
             else {
                 vsEntryPointCode << "    uint _index = drawArgs->batchIndexOffset + _gsVertexID;\n"
-                                 << "    uint _primitiveID = (drawArgs->batchIndexOffset + (_vertexID / 3)) % drawArgs->indexCount;\n";
+                                 << "    uint _primitiveID = (drawArgs->batchIndexOffset + (_vertexID / 3)) % drawArgs->primitiveCount;\n";
             }
             if (_buildTarget == kMSL_BuildTarget_MVA_ComputeGS) //_instanceID is the real Metal instance ID if not using ComputeGS
                 vsEntryPointCode << "    uint _instanceID = _index / drawArgs->indexCount;\n";
             vsEntryPointCode    << "    uint _gsPrimitiveID = (_gsVertexID / "
-                                << (numVerticesOutPerPrimitive / numPrimitivesOutPerPrimitive) << ") % drawArgs->indexCount;\n"
+                                << (numVerticesOutPerPrimitive / numPrimitivesOutPerPrimitive) << ") % drawArgs->primitiveCount;\n"
                                 << "    _index = _index % drawArgs->indexCount;\n"
                                 << "    uint gl_InstanceID = _instanceID;\n"
                                 << "    uint gl_BaseVertex = drawArgs->baseVertex;\n"
@@ -1729,7 +1730,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
                 << "// MSL Compute Entry Point /////////////////////////////////////////////////////////////////////////////////////////\n\n"
                 << cs_EP_FuncDef.str()
                 << "    uint _vertexID = drawArgs->batchIndexOffset + _threadPositionInGrid * " << numVerticesInPerPrimitive << ";\n"
-                << "    uint _primitiveID = (drawArgs->batchIndexOffset / " << numVerticesInPerPrimitive << " + _threadPositionInGrid) % drawArgs->indexCount;\n"
+                << "    uint _primitiveID = (drawArgs->batchPrimitiveOffset + _threadPositionInGrid) % drawArgs->primitiveCount;\n"
                 << "    uint _instanceID = _vertexID / drawArgs->indexCount;\n"
                 << "    _vertexID = _vertexID % drawArgs->indexCount;\n"
                 << "    uint gl_BaseVertex = drawArgs->baseVertex;\n"
