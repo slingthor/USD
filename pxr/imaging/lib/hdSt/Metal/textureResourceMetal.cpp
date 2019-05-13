@@ -131,7 +131,15 @@ GarchSamplerGPUHandle HdStSimpleTextureResourceMetal::GetTexelsSamplerId()
         samplerDesc.mipFilter = fmipFilter;
         samplerDesc.maxAnisotropy = _maxAnisotropy;
 #if defined(ARCH_OS_MACOS)
-        samplerDesc.borderColor = MTLSamplerBorderColorTransparentBlack;
+        if (_borderColor[3] <= 0.5f) {
+            samplerDesc.borderColor = MTLSamplerBorderColorTransparentBlack;
+        }
+        else if (_borderColor[0] >= 0.5f) {
+            samplerDesc.borderColor = MTLSamplerBorderColorOpaqueWhite;
+        }
+        else {
+            samplerDesc.borderColor = MTLSamplerBorderColorOpaqueBlack;
+        }
 #endif
         id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->device;
         _sampler = [device newSamplerStateWithDescriptor:samplerDesc];
