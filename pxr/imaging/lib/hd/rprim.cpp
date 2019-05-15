@@ -255,7 +255,7 @@ HdRprim::_PopulateConstantPrimvars(HdSceneDelegate* delegate,
     HdBufferSourceVector sources;
     if (HdChangeTracker::IsTransformDirty(*dirtyBits, id)) {
         GfMatrix4d transform = delegate->GetTransform(id);
-        _sharedData.bounds.SetMatrix(transform); // for CPU frustum culling
+        _sharedData.bounds.SetMatrix(GfMatrix4f(transform)); // for CPU frustum culling
 
         HdBufferSourceSharedPtr source(new HdVtBufferSource(
                                            HdTokens->transform,
@@ -301,7 +301,8 @@ HdRprim::_PopulateConstantPrimvars(HdSceneDelegate* delegate,
         }
     }
     if (HdChangeTracker::IsExtentDirty(*dirtyBits, id)) {
-        _sharedData.bounds.SetRange(GetExtent(delegate));
+        GfRange3d const &range = GetExtent(delegate);
+        _sharedData.bounds.SetRange(GfRange3f(range.GetMin(), range.GetMax()));
 
         GfVec3d const & localMin = drawItem->GetBounds().GetBox().GetMin();
         HdBufferSourceSharedPtr sourceMin(new HdVtBufferSource(

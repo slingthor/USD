@@ -32,6 +32,7 @@
 
 #include "pxr/usd/sdf/path.h"
 
+#include "pxr/base/gf/bbox3f.h"
 #include "pxr/base/gf/bbox3d.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -73,7 +74,7 @@ struct HdRprimSharedData {
     HdBufferArrayRangeContainer barContainer;
 
     // Used for CPU frustum culling.
-    GfBBox3d bounds;
+    GfBBox3f bounds;
 
     // The number of levels of instancing applied to this rprim.
     int instancerLevels;

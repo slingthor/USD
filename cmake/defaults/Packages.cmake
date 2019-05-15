@@ -117,6 +117,7 @@ if (PXR_BUILD_IMAGING)
     # --Metal
     if (PXR_ENABLE_METAL_SUPPORT)
         FIND_LIBRARY(METAL_LIBRARY Metal)
+        FIND_LIBRARY(ACCELERATE_LIBRARY Accelerate)
         FIND_LIBRARY(COREVIDEO_LIBRARY CoreVideo)
         add_definitions(-DPXR_METAL_SUPPORT_ENABLED)
     endif()

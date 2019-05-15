@@ -230,7 +230,7 @@ HdStCommandBuffer::ExecuteDraw(
     
     uint64_t timeDiff = ArchGetTickTime() - timeStart;
     static uint64_t fastestTime = 0xffffffffffffffff;
-    
+
 //    fastestTime = std::min(fastestTime, timeDiff);
 //    NSLog(@"HdStCommandBuffer::ExecuteDraw: %.2fms (%.2fms fastest)",
 //          ArchTicksToNanoseconds(timeDiff) / 1000.0f / 1000.0f,
@@ -391,10 +391,11 @@ HdStCommandBuffer::FrustumCull(GfMatrix4d const &viewProjMatrix)
     struct _Worker {
         static
         void cull(std::vector<HdStDrawItemInstance> * drawItemInstances,
-                GfMatrix4d const &viewProjMatrix,
+                matrix_float4x4 const &viewProjMatrix,
                 size_t begin, size_t end) 
         {
             id<MTLTexture> texture = MtlfMetalContext::GetMetalContext()->mtlColorTexture;
+            vector_float2 dimensions = {float(texture.width), float(texture.height)};
     
             // Count primitives for marketing purposes!
             if (false)
@@ -413,7 +414,7 @@ HdStCommandBuffer::FrustumCull(GfMatrix4d const &viewProjMatrix)
                 HdStDrawItemInstance& itemInstance = (*drawItemInstances)[i];
                 HdStDrawItem const* item = itemInstance.GetDrawItem();
                 bool visible = item->GetVisible() && 
-                    item->IntersectsViewVolume(viewProjMatrix, texture.width, texture.height);
+                    item->IntersectsViewVolume(viewProjMatrix, dimensions);
                 if ((itemInstance.IsVisible() != visible) || 
                     (visible && item->HasInstancer())) {
                     itemInstance.SetVisible(visible);
@@ -424,8 +425,8 @@ HdStCommandBuffer::FrustumCull(GfMatrix4d const &viewProjMatrix)
         static
         void cullDispatch(WorkDispatcher &dispatcher,
                 HdStDrawItemInstance &itemInstance,
-                GfMatrix4d const &viewProjMatrix,
-                int const width, int const height)
+                GfMatrix4f const &viewProjMatrix,
+                float const width, float const height)
         {
             HdStDrawItem const* item = itemInstance.GetDrawItem();
             if (item->GetVisible()) {
@@ -440,49 +441,57 @@ HdStCommandBuffer::FrustumCull(GfMatrix4d const &viewProjMatrix)
 
     uint64_t timeStart = ArchGetTickTime();
 
+    GfMatrix4f viewProjMatrixf(viewProjMatrix);
+    matrix_float4x4 simdViewProjMatrix = matrix_from_columns(
+       (vector_float4){viewProjMatrixf[0][0], viewProjMatrixf[0][1], viewProjMatrixf[0][2], viewProjMatrixf[0][3]},
+       (vector_float4){viewProjMatrixf[1][0], viewProjMatrixf[1][1], viewProjMatrixf[1][2], viewProjMatrixf[1][3]},
+       (vector_float4){viewProjMatrixf[2][0], viewProjMatrixf[2][1], viewProjMatrixf[2][2], viewProjMatrixf[2][3]},
+       (vector_float4){viewProjMatrixf[3][0], viewProjMatrixf[3][1], viewProjMatrixf[3][2], viewProjMatrixf[3][3]});
+
     if (!mtCullingDisabled) {
         WorkParallelForN(_drawItemInstances.size(),
                          std::bind(&_Worker::cull, &_drawItemInstances,
-                                   std::cref(viewProjMatrix),
+                                   std::cref(simdViewProjMatrix),
                                    std::placeholders::_1,
                                    std::placeholders::_2));
-/*        WorkDispatcher dispatcher;
-        id<MTLTexture> texture = MtlfMetalContext::GetMetalContext()->mtlColorTexture;
-        int width = [texture width];
-        int height = [texture height];
-
-        for (auto & instance : _drawItemInstances) {
-            dispatcher.Run(std::bind(&_Worker::cullDispatch,
-                                     std::ref(dispatcher),
-                                     std::ref(instance),
-                                     std::cref(viewProjMatrix),
-                                     std::cref(width),
-                                     std::cref(height)));
-        }
-        dispatcher.Wait();
-        
-        for (auto & itemInstance : _drawItemInstances) {
-            HdStDrawItem const* item = itemInstance.GetDrawItem();
-            bool visible = item->GetVisible() && itemInstance.cullResult;
-            if ((itemInstance.IsVisible() != visible) ||
-                (visible && item->HasInstancer())) {
-                itemInstance.SetVisible(visible);
-            }
-        }*/
+//        WorkDispatcher dispatcher;
+//        id<MTLTexture> texture = MtlfMetalContext::GetMetalContext()->mtlColorTexture;
+//        float width = [texture width];
+//        float height = [texture height];
+//
+//        for (auto & instance : _drawItemInstances) {
+//            dispatcher.Run(std::bind(&_Worker::cullDispatch,
+//                                     std::ref(dispatcher),
+//                                     std::ref(instance),
+//                                     std::cref(viewProjMatrixf),
+//                                     std::cref(width),
+//                                     std::cref(height)));
+//        }
+//        dispatcher.Wait();
+//
+//        for (auto & itemInstance : _drawItemInstances) {
+//            HdStDrawItem const* item = itemInstance.GetDrawItem();
+//            bool visible = item->GetVisible() && itemInstance.cullResult;
+//            if ((itemInstance.IsVisible() != visible) ||
+//                (visible && item->HasInstancer())) {
+//                itemInstance.SetVisible(visible);
+//            }
+//        }
     } else {
         _Worker::cull(&_drawItemInstances,
-                      viewProjMatrix, 
+                      simdViewProjMatrix,
                       0, 
                       _drawItemInstances.size());
     }
 
     uint64_t timeDiff = ArchGetTickTime() - timeStart;
-    static uint64_t fastestTime = 0xffffffff;
     
-    fastestTime = std::min(fastestTime, timeDiff);
-//    NSLog(@"HdStCommandBuffer::FrustumCull: %.2fms (%.2fms fastest)",
+    static uint64_t fastestTime = 0xffffffffffffffff;
+
+//    fastestTime = std::min(fastestTime, timeDiff);
+//    NSLog(@"HdStCommandBuffer::FrustumCull: %.2fms (%.2fms fastest) : %lu items",
 //          ArchTicksToNanoseconds(timeDiff) / 1000.0f / 1000.0f,
-//          ArchTicksToNanoseconds(fastestTime) / 1000.0f / 1000.0f);
+//          ArchTicksToNanoseconds(fastestTime) / 1000.0f / 1000.0f, _drawItemInstances.size());
 
     if (primCount.load()) {
         NSLog(@"Scene prims: %lu", primCount.load());
