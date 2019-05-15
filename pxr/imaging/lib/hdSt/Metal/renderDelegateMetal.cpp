@@ -291,6 +291,12 @@ void HdStRenderDelegateMetal::PrepareRender(
         }
     }
     
+    if (params.enableIdRender) {
+        context->SetAlphaCoverageEnable(false);
+    } else if (params.enableSampleAlphaToCoverage) {
+        context->SetAlphaCoverageEnable(true);
+    }
+
     context->SetAlphaBlendingEnable(false);
     // TODO:
     //  * forceRefresh
