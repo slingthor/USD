@@ -217,6 +217,7 @@ protected:
     static bool _IsAggregated(HdStDrawItem const *drawItem0,
                               HdStDrawItem const *drawItem1);
 
+public:
     std::vector<HdStDrawItemInstance const*> _drawItemInstances;
 
 private:
