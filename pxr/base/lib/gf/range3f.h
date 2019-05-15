@@ -89,6 +89,12 @@ public:
     {
     }
 
+    /// This constructor initializes the minimum and maximum points.
+    GfRange3f(const GfVec3d &min, const GfVec3d &max)
+    : _min(min), _max(max)
+    {
+    }
+
     /// Returns the minimum value of the range.
     const GfVec3f &GetMin() const { return _min; }
 

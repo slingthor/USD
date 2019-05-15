@@ -8,9 +8,11 @@ pxr_library(gf
     LIBRARIES
         arch
         tf
+        ${ACCELERATE_LIBRARY}
 
     PUBLIC_CLASSES
         bbox3d
+        bbox3f
         camera
         frustum
         gamma

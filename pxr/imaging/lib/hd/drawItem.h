@@ -34,13 +34,16 @@
 #include "pxr/imaging/hf/perfLog.h"
 
 #include "pxr/base/gf/matrix4d.h"
+#include "pxr/base/gf/matrix4f.h"
 #include "pxr/base/gf/bbox3d.h"
+#include "pxr/base/gf/bbox3f.h"
 #include "pxr/base/gf/vec2i.h"
 #include "pxr/base/gf/vec4f.h"
 
 #include "pxr/base/work/dispatcher.h"
 
 #include <iosfwd>
+#include <simd/simd.h>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -78,15 +81,15 @@ public:
     SdfPath const &GetRprimID() const { return _sharedData->rprimID; }
 
     HD_API
-    GfBBox3d const & GetBounds() const { return _sharedData->bounds; }
-
+    GfBBox3f const & GetBounds() const { return _sharedData->bounds; }
+    
     HD_API
-    GfRange3d const& GetExtent() const {
+    GfRange3f const& GetExtent() const {
         return _sharedData->bounds.GetRange();
     }
 
     HD_API
-    GfMatrix4d const& GetMatrix() const {
+    GfMatrix4f const& GetMatrix() const {
         return _sharedData->bounds.GetMatrix();
     }
 
@@ -191,15 +194,19 @@ public:
     ///
     /// XXX: Currently if this drawitem uses HW instancing, always returns true.
     HD_API
-    bool IntersectsViewVolume(WorkDispatcher &dispatcher,
+    void IntersectsViewVolume(WorkDispatcher &dispatcher,
                               std::atomic_bool &cullResult,
-                              GfMatrix4d const &viewProjMatrix,
-                              int viewport_width,
-                              int viewport_height) const;
+                              GfMatrix4f const &viewProjMatrix,
+                              float viewport_width,
+                              float viewport_height) const;
     
     HD_API
-    bool IntersectsViewVolume(GfMatrix4d const &viewProjMatrix,
-                              int viewport_width, int viewport_height) const;
+    bool IntersectsViewVolume(GfMatrix4f const &viewProjMatrix,
+                              float viewport_width, float viewport_height) const;
+    
+    HD_API
+    bool IntersectsViewVolume(matrix_float4x4 const &viewProjMatrix,
+                              vector_float2 windowDimensions) const;
 
     HD_API
     friend std::ostream &operator <<(std::ostream &out, 
@@ -224,7 +231,7 @@ private:
     //    bufferArrayRanges, bounds, visibility
     HdRprimSharedData const *_sharedData;
     
-    std::vector<GfBBox3d> _instancedCullingBounds;
+    std::vector<GfBBox3f> _instancedCullingBounds;
     bool _instancedCullingBoundsCalculated = false;
 };
 

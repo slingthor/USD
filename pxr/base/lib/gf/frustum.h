@@ -29,7 +29,9 @@
 
 #include "pxr/pxr.h"
 #include "pxr/base/gf/bbox3d.h"
+#include "pxr/base/gf/bbox3f.h"
 #include "pxr/base/gf/matrix4d.h"
+#include "pxr/base/gf/matrix4f.h"
 #include "pxr/base/gf/plane.h"
 #include "pxr/base/gf/ray.h"
 #include "pxr/base/gf/range1d.h"
@@ -43,6 +45,7 @@
 
 #include <iosfwd>
 #include <vector>
+#include <simd/simd.h>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -546,6 +549,14 @@ class GfFrustum {
     GF_API static bool  IntersectsViewVolume(const GfBBox3d &bbox,
                                              const GfMatrix4d &vpMat,
                                              double windowWidth, double windowHeight);
+    
+    GF_API static bool  IntersectsViewVolumeFloat(const GfBBox3f &bbox,
+                                             const GfMatrix4f &vpMat,
+                                             float windowWidth, float windowHeight);
+    
+    GF_API static bool  IntersectsViewVolumeFloat(const GfBBox3f &bbox,
+                                  const matrix_float4x4 &viewProjMat,
+                                  vector_float2 windowDimensions);
 
     ///@}
 

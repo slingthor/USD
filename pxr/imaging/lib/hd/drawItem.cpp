@@ -96,11 +96,32 @@ HdDrawItem::CountPrimitives(std::atomic_ulong &primCount, int numIndicesPerPrimi
     primCount.fetch_add(indexCount * instanceCount);
 }
 
-bool
+static GfBBox3f BakeBoundsTransform(GfBBox3f const& bounds)
+{
+    GfVec3f const &localMin = bounds.GetRange().GetMin();
+    GfVec3f const &localMax = bounds.GetRange().GetMax();
+    GfVec4f worldMin = GfVec4f(localMin[0], localMin[1], localMin[2], 1);
+    GfVec4f worldMax = GfVec4f(localMax[0], localMax[1], localMax[2], 1);
+    GfMatrix4f const &matrix = bounds.GetMatrix();
+    
+    // Transform min/max bbox local space points into clip space
+    worldMin = worldMin * matrix;
+    worldMax = worldMax * matrix;
+    
+    static GfMatrix4f identity(1.0f);
+    
+    return GfBBox3f(
+            GfRange3f(
+              GfVec3f(worldMin[0], worldMin[1], worldMin[2]),
+              GfVec3f(worldMax[0], worldMax[1], worldMax[2])),
+            identity);
+}
+
+void
 HdDrawItem::IntersectsViewVolume(WorkDispatcher &dispatcher,
                                  std::atomic_bool &cullResult,
-                                 GfMatrix4d const &viewProjMatrix,
-                                 int viewport_width, int viewport_height) const
+                                 GfMatrix4f const &viewProjMatrix,
+                                 float viewport_width, float viewport_height) const
 {
     cullResult.store(false, std::memory_order_relaxed);
     if (GetInstanceIndexRange()) {
@@ -111,8 +132,6 @@ HdDrawItem::IntersectsViewVolume(WorkDispatcher &dispatcher,
         if (instancerNumLevels == 1) {
             if (numInstances >= 1) {
                 if (!_instancedCullingBoundsCalculated) {
-                    const_cast<HdDrawItem*>(this)->_instancedCullingBoundsCalculated = true;
-
                     HdBufferArrayRangeSharedPtr const & primvar = GetConstantPrimvarRange();
                     HdBufferResourceSharedPtr const & primvarRes = primvar->GetResource(HdTokens->instancerTransform);
 
@@ -171,26 +190,30 @@ HdDrawItem::IntersectsViewVolume(WorkDispatcher &dispatcher,
 
                         m = m * mtxScale * mtxRotate * mtxTranslate * (*instancerTransform);
 
+                        GfBBox3f box(GetBounds().GetRange(), GetBounds().GetMatrix() * m);
                         HdDrawItem* _this = const_cast<HdDrawItem*>(this);
-                        _this->_instancedCullingBounds.push_back(GetBounds());
-                        _this->_instancedCullingBounds.back().Transform(GfMatrix4d(m));
+
+                        _this->_instancedCullingBoundsCalculated = true;
+                        _this->_instancedCullingBounds.push_back(BakeBoundsTransform(box));
                     }
                 }
 
                 struct _Worker {
                     static
                     void cull(std::atomic_bool &result,
-                              GfBBox3d const &bounds,
-                              GfMatrix4d const &viewProjMatrix,
-                              int const viewport_width,
-                              int const viewport_height) {
-                        if (GfFrustum::IntersectsViewVolume(bounds, viewProjMatrix, viewport_width, viewport_height)) {
+                              GfBBox3f const &bounds,
+                              GfMatrix4f const &viewProjMatrix,
+                              float const viewport_width,
+                              float const viewport_height) {
+                        if (GfFrustum::IntersectsViewVolumeFloat(bounds, viewProjMatrix, viewport_width, viewport_height)) {
                             result.store(true, std::memory_order_relaxed);
                         }
                     }
                 };
-                if( GfFrustum::IntersectsViewVolume(_instancedCullingBounds.front(), viewProjMatrix, viewport_width, viewport_height)) {
-                    cullResult.store(true, std::memory_order_relaxed);
+                if(numInstances == 1) {
+                    if (GfFrustum::IntersectsViewVolumeFloat(_instancedCullingBounds.front(), viewProjMatrix, viewport_width, viewport_height)) {
+                        cullResult.store(true, std::memory_order_relaxed);
+                    }
                 }
                 else {
                     for(auto& bounds : _instancedCullingBounds) {
@@ -202,21 +225,128 @@ HdDrawItem::IntersectsViewVolume(WorkDispatcher &dispatcher,
                                                  std::cref(viewport_height)));
                     }
                 }
-                return false;
+                return;
             }
         }
         cullResult.store(true, std::memory_order_relaxed);
     } else {
-        if( GfFrustum::IntersectsViewVolume(GetBounds(), viewProjMatrix, viewport_width, viewport_height)) {
+        if (!_instancedCullingBoundsCalculated) {
+            HdDrawItem* _this = const_cast<HdDrawItem*>(this);
+            _this->_instancedCullingBoundsCalculated = true;
+            _this->_instancedCullingBounds.push_back(BakeBoundsTransform(GetBounds()));
+        }
+        if( GfFrustum::IntersectsViewVolumeFloat(_instancedCullingBounds.front(), viewProjMatrix, viewport_width, viewport_height)) {
             cullResult.store(true, std::memory_order_relaxed);
         }
     }
-    return false;
+    return;
 }
 
 bool
-HdDrawItem::IntersectsViewVolume(GfMatrix4d const &viewProjMatrix,
-                                 int viewport_width, int viewport_height) const
+HdDrawItem::IntersectsViewVolume(GfMatrix4f const &viewProjMatrix,
+                                 float viewport_width, float viewport_height) const
+{
+    if (GetInstanceIndexRange()) {
+        int instancerNumLevels = GetInstancePrimvarNumLevels();
+        int instanceIndexWidth = instancerNumLevels + 1;
+        int numInstances = GetInstanceIndexRange()->GetNumElements() / instanceIndexWidth;
+        
+        if (instancerNumLevels == 1) {
+            if (numInstances >= 1) {
+                if (!_instancedCullingBoundsCalculated) {
+                    const_cast<HdDrawItem*>(this)->_instancedCullingBoundsCalculated = true;
+                    
+                    HdBufferArrayRangeSharedPtr const & primvar = GetConstantPrimvarRange();
+                    HdBufferResourceSharedPtr const & primvarRes = primvar->GetResource(HdTokens->instancerTransform);
+                    
+                    // Instancer transform
+                    size_t stride = primvarRes->GetStride();
+                    uint8_t const* rawBuffer = primvarRes->GetBufferContents();
+                    GfMatrix4f const *instancerTransform =
+                        (GfMatrix4f const*)&rawBuffer[stride * primvar->GetIndex() + primvarRes->GetOffset()];
+                    GfMatrix4f m;
+                    
+                    for (int i = 0; i < numInstances; i++) {
+                        HdBufferArrayRangeSharedPtr const & instanceBar = GetInstancePrimvarRange(0);
+                        HdBufferResourceSharedPtr const & instanceTransformRes = instanceBar->GetResource(HdTokens->instanceTransform);
+                        HdBufferResourceSharedPtr const & translateRes = instanceBar->GetResource(HdTokens->translate);
+                        HdBufferResourceSharedPtr const & rotateRes = instanceBar->GetResource(HdTokens->rotate);
+                        HdBufferResourceSharedPtr const & scaleRes = instanceBar->GetResource(HdTokens->scale);
+                        
+                        int instanceIndex = instanceBar->GetOffset() + i;
+                        if (instanceTransformRes) {
+                            // Instance transform
+                            stride = instanceTransformRes->GetStride();
+                            rawBuffer = instanceTransformRes->GetBufferContents();
+                            GfMatrix4f const *instanceTransform = (GfMatrix4f const*)&rawBuffer[stride * instanceIndex];
+                            m = *instanceTransform;
+                        }
+                        else {
+                            m.SetIdentity();
+                        }
+                        
+                        GfVec3f translate(0), scale(1);
+                        GfQuaternion rotate(GfQuaternion::GetIdentity());
+                        
+                        if (scaleRes) {
+                            stride = scaleRes->GetStride();
+                            rawBuffer = scaleRes->GetBufferContents();
+                            scale = *(GfVec3f const*)&rawBuffer[stride * instanceIndex];
+                        }
+                        
+                        if (rotateRes) {
+                            stride = rotateRes->GetStride();
+                            rawBuffer = rotateRes->GetBufferContents();
+                            float const* const floatArray = (float const*)&rawBuffer[stride * instanceIndex];
+                            rotate = GfQuaternion(floatArray[0], GfVec3d(floatArray[1], floatArray[2], floatArray[3]));
+                        }
+                        
+                        if (translateRes) {
+                            stride = translateRes->GetStride();
+                            rawBuffer = translateRes->GetBufferContents();
+                            translate = *(GfVec3f const*)&rawBuffer[stride * instanceIndex];
+                        }
+
+                        GfMatrix4f mtxScale, mtxRotate, mtxTranslate;
+                        mtxScale.SetScale(scale);
+                        mtxRotate.SetRotate(rotate);
+                        mtxTranslate.SetTranslate(translate);
+
+                        m = m * mtxScale * mtxRotate * mtxTranslate * (*instancerTransform);
+
+                        HdDrawItem* _this = const_cast<HdDrawItem*>(this);
+
+                        GfBBox3f box(GetBounds().GetRange(), GetBounds().GetMatrix() * m);
+                        _this->_instancedCullingBounds.push_back(BakeBoundsTransform(box));
+                    }
+                }
+
+                bool result = false;
+                for(auto& bounds : _instancedCullingBounds) {
+                    if (GfFrustum::IntersectsViewVolumeFloat(bounds, viewProjMatrix, viewport_width, viewport_height))
+                        result |= true;
+                }
+                return result;
+            }
+        }
+        return true;
+    }
+    else {
+        if (!_instancedCullingBoundsCalculated) {
+            HdDrawItem* _this = const_cast<HdDrawItem*>(this);
+            _this->_instancedCullingBoundsCalculated = true;
+            _this->_instancedCullingBounds.push_back(BakeBoundsTransform(GetBounds()));
+        }
+        if( GfFrustum::IntersectsViewVolumeFloat(_instancedCullingBounds.front(), viewProjMatrix, viewport_width, viewport_height)) {
+            return true;
+        }
+        return false;
+    }
+}
+
+bool
+HdDrawItem::IntersectsViewVolume(matrix_float4x4 const &viewProjMatrix,
+                                 vector_float2 windowDimensions) const
 {
     if (GetInstanceIndexRange()) {
         int instancerNumLevels = GetInstancePrimvarNumLevels();
@@ -287,21 +417,34 @@ HdDrawItem::IntersectsViewVolume(GfMatrix4d const &viewProjMatrix,
                         m = m * mtxScale * mtxRotate * mtxTranslate * (*instancerTransform);
                         
                         HdDrawItem* _this = const_cast<HdDrawItem*>(this);
-                        _this->_instancedCullingBounds.push_back(GetBounds());
-                        _this->_instancedCullingBounds.back().Transform(GfMatrix4d(m));
+                        
+                        GfBBox3f box(GetBounds().GetRange(), GetBounds().GetMatrix() * m);
+                        _this->_instancedCullingBounds.push_back(BakeBoundsTransform(box));
                     }
                 }
-                
+                bool result = false;
                 for(auto& bounds : _instancedCullingBounds) {
-                    if (GfFrustum::IntersectsViewVolume(bounds, viewProjMatrix, viewport_width, viewport_height))
-                        return true;
+                    if (GfFrustum::IntersectsViewVolumeFloat(bounds, viewProjMatrix, windowDimensions)) {
+                        result = true;
+                        /// Temporary - until per-instance culling GPU side is hooked up
+                        break;
+                    }
                 }
-                return false;
+                return result;
             }
         }
         return true;
-    } else {
-        return GfFrustum::IntersectsViewVolume(GetBounds(), viewProjMatrix, viewport_width, viewport_height);
+    }
+    else {
+        if (!_instancedCullingBoundsCalculated) {
+            HdDrawItem* _this = const_cast<HdDrawItem*>(this);
+            _this->_instancedCullingBoundsCalculated = true;
+            _this->_instancedCullingBounds.push_back(BakeBoundsTransform(GetBounds()));
+        }
+//        if( GfFrustum::IntersectsViewVolumeFloat(_instancedCullingBounds.front(), viewProjMatrix, windowDimensions)) {
+//            return true;
+//        }
+        return false;
     }
 }
 
