@@ -1555,6 +1555,9 @@ void MtlfMetalContext::SetOutputPixelFormats(MTLPixelFormat pixelFormat, MTLPixe
 
 void MtlfMetalContext::SetRenderPassDescriptor(MTLRenderPassDescriptor *renderPassDescriptor)
 {
+    if (!threadState.currentWorkQueue)
+        return;
+    
     MetalWorkQueue *wq = threadState.currentWorkQueue;
     
     // Could relax this check to only include render encoders but probably not worthwhile
