@@ -415,6 +415,8 @@ HdStCommandBuffer::FrustumCull(GfMatrix4d const &viewProjMatrix)
     dimensions.x = float(MtlfMetalContext::GetMetalContext()->mtlColorTexture.width);
     dimensions.y = float(MtlfMetalContext::GetMetalContext()->mtlColorTexture.height);
 
+    MtlfMetalContext::GetMetalContext()->PrepareBufferFlush();
+    
     struct _Worker {
         static
         void cull(std::vector<HdStDrawItemInstance> * drawItemInstances,
@@ -508,6 +510,8 @@ HdStCommandBuffer::FrustumCull(GfMatrix4d const &viewProjMatrix)
                       0, 
                       _drawItemInstances.size());
     }
+
+    MtlfMetalContext::GetMetalContext()->FlushBuffers();
 
     uint64_t timeDiff = ArchGetTickTime() - timeStart;
     

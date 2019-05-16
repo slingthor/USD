@@ -1816,6 +1816,9 @@ void MtlfMetalContext::QueueBufferFlush(id<MTLBuffer> const &buffer, uint64_t st
         [buffer didModifyRange:NSMakeRange(start, end - start)];
         return;
     }
+    
+    static std::mutex _mutex;
+    std::lock_guard<std::mutex> lock(_mutex);
 
     auto const &it = modifiedBuffers.find(buffer);
     if (it != modifiedBuffers.end()) {
