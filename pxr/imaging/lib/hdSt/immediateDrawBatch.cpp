@@ -369,9 +369,10 @@ HdSt_ImmediateDrawBatch::ExecuteDraw(
         int indexCount = indexBar ? indexBar->GetNumElements() * numIndicesPerPrimitive : 0;
         int firstIndex = indexBar ? indexBar->GetOffset() * numIndicesPerPrimitive : 0;
         int baseVertex = vertexOffset;
-        int instanceCount = instanceIndexBar
-            ? instanceIndexBar->GetNumElements()/instanceIndexWidth : 1;
-        
+//        int instanceCount = instanceIndexBar
+//            ? instanceIndexBar->GetNumElements()/instanceIndexWidth : 1;
+        int instanceCount = drawItem->GetNumVisible();
+
         // update standalone uniforms
         int drawingCoord0[4] = {
             0, // reserved for modelBar

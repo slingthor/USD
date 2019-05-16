@@ -214,6 +214,10 @@ public:
 
     void CountPrimitives(std::atomic_ulong &primCount, int numIndicesPerPrimitive) const;
     
+    int GetNumVisible() const {
+        return numVisible;
+    }
+    
 protected:
 
     /// Returns the shared data
@@ -231,8 +235,10 @@ private:
     //    bufferArrayRanges, bounds, visibility
     HdRprimSharedData const *_sharedData;
     
+    // CPU culling
     std::vector<GfBBox3f> _instancedCullingBounds;
     bool _instancedCullingBoundsCalculated = false;
+    int numVisible = 1;
 };
 
 
