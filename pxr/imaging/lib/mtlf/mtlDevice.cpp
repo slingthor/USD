@@ -262,6 +262,7 @@ void MtlfMetalContext::Init(id<MTLDevice> _device, int width, int height)
     cullMode = MTLCullModeBack;
     fillMode = MTLTriangleFillModeFill;
     blendEnable = false;
+    alphaCoverageEnable = false;
     
     AllocateAttachments(width, height);
     
@@ -733,6 +734,11 @@ void MtlfMetalContext::SetAlphaBlendingEnable(bool _blendEnable)
     blendEnable = _blendEnable;
 }
 
+void MtlfMetalContext::SetAlphaCoverageEnable(bool _alphaCoverageEnable)
+{
+    alphaCoverageEnable = _alphaCoverageEnable;
+}
+
 void MtlfMetalContext::SetShadingPrograms(id<MTLFunction> vertexFunction, id<MTLFunction> fragmentFunction, bool _enableMVA)
 {
     CheckNewStateGather();
@@ -1016,6 +1022,7 @@ void MtlfMetalContext::SetRenderPipelineState()
     boost::hash_combine(hashVal, wq->currentVertexDescriptorHash);
     boost::hash_combine(hashVal, wq->currentColourAttachmentsHash);
     boost::hash_combine(hashVal, blendEnable);
+    boost::hash_combine(hashVal, alphaCoverageEnable);
 
     // If this matches the current pipeline state then we should already have the correct pipeline bound
     if (hashVal == wq->currentRenderPipelineDescriptorHash && wq->currentRenderPipelineState != nil) {
@@ -1108,6 +1115,12 @@ void MtlfMetalContext::SetRenderPipelineState()
                 }
                 else {
                     renderPipelineStateDescriptor.colorAttachments[0].blendingEnabled = NO;
+                }
+                if (alphaCoverageEnable) {
+                    renderPipelineStateDescriptor.alphaToCoverageEnabled = YES;
+                }
+                else {
+                    renderPipelineStateDescriptor.alphaToCoverageEnabled = NO;
                 }
                 renderPipelineStateDescriptor.colorAttachments[0].sourceRGBBlendFactor = MTLBlendFactorSourceAlpha;
                 renderPipelineStateDescriptor.colorAttachments[0].sourceAlphaBlendFactor = MTLBlendFactorSourceAlpha;

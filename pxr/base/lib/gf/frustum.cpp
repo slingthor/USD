@@ -1465,7 +1465,7 @@ GfFrustum::IntersectsViewVolumeFloat(const GfBBox3f &bbox,
     screenSpace[1] = points[1].xy * inv;
 
     float const threshold = 4.0f; // number of pixels in a dimension
-    vector_float2 d = vector_abs(screenSpace[1] - screenSpace[0] * windowDimensions);
+    vector_float2 d = vector_abs((screenSpace[1] - screenSpace[0]) * windowDimensions);
     if (d.x < threshold &&
         d.y < threshold)
         return false;

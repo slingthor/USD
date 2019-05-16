@@ -118,10 +118,6 @@ HdStCommandBuffer::ExecuteDraw(
     //
     // draw batches
     //
-
-    MtlfMetalContext *context = MtlfMetalContext::GetMetalContext();
-    MTLRenderPassDescriptor *renderPassDescriptor = context->GetRenderPassDescriptor();
-
     struct _Worker {
         static
         void draw(std::vector<HdSt_DrawBatchSharedPtr> * drawBatches,
@@ -130,11 +126,29 @@ HdStCommandBuffer::ExecuteDraw(
                   MTLRenderPassDescriptor *rpd,
                   size_t begin, size_t end)
         {
+            bool foundSomethingVisible = false;
+            
+            for(size_t i = begin; i < end; i++) {
+                HdSt_DrawBatchSharedPtr& batch = (*drawBatches)[i];
+                
+                for (auto const& instance : batch->_drawItemInstances) {
+                    if (instance->IsVisible()) {
+                        foundSomethingVisible = true;
+                        break;
+                    }
+                }
+            }
+            if (!foundSomethingVisible) {
+                return;
+            }
+            
             MtlfMetalContext *context = MtlfMetalContext::GetMetalContext();
 
             if (!context->GeometryShadersActive()) {
                 context->CreateCommandBuffer(METALWORKQUEUE_GEOMETRY_SHADER);
+#ifdef DEBUG
                 context->LabelCommandBuffer(@"Geometry Shaders", METALWORKQUEUE_GEOMETRY_SHADER);
+#endif
                 //[context->GetWorkQueue(METALWORKQUEUE_GEOMETRY_SHADER).commandBuffer enqueue];
             }
 
@@ -142,8 +156,9 @@ HdStCommandBuffer::ExecuteDraw(
             
             // Create a new command buffer for each render pass to the current drawable
             context->CreateCommandBuffer(METALWORKQUEUE_DEFAULT);
+#ifdef DEBUG
             context->LabelCommandBuffer(@"HdEngine::RenderWorker", METALWORKQUEUE_DEFAULT);
-
+#endif
             context->SetRenderPassDescriptor(rpd);
             
             for(size_t i = begin; i < end; i++) {
@@ -166,11 +181,15 @@ HdStCommandBuffer::ExecuteDraw(
     
     bool setAlpha = false;
 
+    MtlfMetalContext *context = MtlfMetalContext::GetMetalContext();
+    MTLRenderPassDescriptor *renderPassDescriptor = context->GetRenderPassDescriptor();
+    
     // Create a new command buffer for each render pass to the current drawable
     if (renderPassDescriptor.colorAttachments[0].loadAction == MTLLoadActionClear) {
         id <MTLCommandBuffer> commandBuffer = [context->commandQueue commandBuffer];
+#ifdef DEBUG
         commandBuffer.label = @"Clear";
-
+#endif
         id <MTLRenderCommandEncoder> renderEncoder =
             [commandBuffer renderCommandEncoderWithDescriptor:renderPassDescriptor];
         [renderEncoder endEncoding];
@@ -195,11 +214,14 @@ HdStCommandBuffer::ExecuteDraw(
     static bool mtBatchDrawing = _drawBatches.size() >= 10;
 
     if (mtBatchDrawing) {
-        auto systemLimit = WorkGetConcurrencyLimit();
+        unsigned const systemLimit = WorkGetConcurrencyLimit();
         
         // Limit the number of threads used to render with
-        unsigned const maxRenderThreads = 12;
-        WorkSetConcurrencyLimit(std::min(systemLimit, maxRenderThreads));
+        unsigned const maxRenderThreads = MIN(systemLimit, 12);
+        WorkSetConcurrencyLimit(maxRenderThreads);
+
+        unsigned const maxRenderCommandBufferCount = maxRenderThreads * 2;
+        unsigned grainSize = MAX(_drawBatches.size() / maxRenderCommandBufferCount, 1);
 
         WorkParallelForN(_drawBatches.size(),
                          std::bind(&_Worker::draw, &_drawBatches,
@@ -207,7 +229,8 @@ HdStCommandBuffer::ExecuteDraw(
                                    std::cref(resourceRegistry),
                                    std::ref(renderPassDescriptor),
                                    std::placeholders::_1,
-                                   std::placeholders::_2));
+                                   std::placeholders::_2),
+                         grainSize);
 
         WorkSetConcurrencyLimit(systemLimit);
     } else {
@@ -388,14 +411,16 @@ HdStCommandBuffer::FrustumCull(GfMatrix4d const &viewProjMatrix)
 
     primCount.store(0);
     
+    static vector_float2 dimensions = {1.f, 1.f};
+    dimensions.x = float(MtlfMetalContext::GetMetalContext()->mtlColorTexture.width);
+    dimensions.y = float(MtlfMetalContext::GetMetalContext()->mtlColorTexture.height);
+
     struct _Worker {
         static
         void cull(std::vector<HdStDrawItemInstance> * drawItemInstances,
                 matrix_float4x4 const &viewProjMatrix,
                 size_t begin, size_t end) 
         {
-            id<MTLTexture> texture = MtlfMetalContext::GetMetalContext()->mtlColorTexture;
-            vector_float2 dimensions = {float(texture.width), float(texture.height)};
     
             // Count primitives for marketing purposes!
             if (false)

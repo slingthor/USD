@@ -283,6 +283,10 @@ void MtlfGlInterop::FreeTransientTextureCacheRefs()
 
 void MtlfGlInterop::AllocateAttachments(int width, int height)
 {
+#ifdef DEBUG
+    NSLog(@"Resizing targets: %ix%i", width, height);
+#endif
+
     NSDictionary* cvBufferProperties = @{
         (__bridge NSString*)kCVPixelBufferOpenGLCompatibilityKey : @(TRUE),
         (__bridge NSString*)kCVPixelBufferMetalCompatibilityKey : @(TRUE),

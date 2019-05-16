@@ -344,6 +344,9 @@ public:
 
     MTLF_API
     void SetAlphaBlendingEnable(bool blendEnable);
+    
+    MTLF_API
+    void SetAlphaCoverageEnable(bool alphaCoverageEnable);
 
     MTLF_API
     void SetRenderPassDescriptor(MTLRenderPassDescriptor *renderPassDescriptor);
@@ -637,6 +640,7 @@ protected:
     MTLCullMode cullMode;
     MTLTriangleFillMode fillMode;
     bool blendEnable;
+    bool alphaCoverageEnable;
     
     MtlfDrawTarget *drawTarget;
 
