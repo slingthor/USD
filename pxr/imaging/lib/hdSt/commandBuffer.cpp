@@ -42,6 +42,7 @@
 #include "pxr/imaging/hd/tokens.h"
 
 #include "pxr/base/gf/matrix4f.h"
+#include "pxr/base/gf/frustum.h"
 #include "pxr/base/tf/diagnostic.h"
 #include "pxr/base/tf/stl.h"
 #include "pxr/base/work/dispatcher.h"
@@ -58,6 +59,403 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+#define USE_BVH_FOR_CULLING 1
+
+#ifdef USE_BVH_FOR_CULLING
+namespace SpatialHierarchy {
+    enum Intersection {
+        Inside,
+        Outside,
+        Intersects
+    };
+    
+    const unsigned maxElementCountPerNode = 10;
+    const unsigned maxOctreeDepth = 100;
+    const float minOctreeLeafVolume = 0.f;
+    
+    struct DrawableItem {
+        DrawableItem(HdStDrawItemInstance* itemInstance);
+        void SetVisible(bool visible) const;
+
+        HdStDrawItemInstance *item;
+        GfRange3f aabb;
+        GfVec3f halfSize;
+    };
+    
+    class OctreeNode {
+    public:
+        OctreeNode(float minX, float minY, float minZ, float maxX, float maxY, float maxZ, unsigned currentDepth);
+        ~OctreeNode();
+        
+        void ReInit(GfRange3f const &boundingBox);
+        
+        unsigned long PerformCulling(matrix_float4x4 const &viewProjMatrix, vector_float2 const &dimensions);
+        unsigned long MarkSubtreeVisible(bool visible);
+        unsigned Insert(const DrawableItem &drawable);
+
+        void LogStatus(bool recursive);
+
+        GfRange3f aabb;
+        GfVec3f minVec;
+        GfVec3f maxVec;
+        GfVec3f halfSize;
+
+    private:
+        void subdivide();
+        bool canSubdivide();
+        unsigned insertStraight(const DrawableItem &drawable);
+
+        std::vector<const DrawableItem> drawables;
+        
+        unsigned depth;
+        bool isSplit;
+
+        //OctreeNode* parent;
+        OctreeNode* children[8] = {NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL};
+    };
+    
+    class BVH {
+    public:
+        BVH();
+        void BuildBVH(const std::vector<HdStDrawItemInstance*> &drawables);
+        unsigned long PerformCulling(matrix_float4x4 const &viewProjMatrix, vector_float2 const &dimensions);
+        
+        OctreeNode root;
+        unsigned long totalItems;
+        unsigned long visibleItems;
+    };
+    
+    namespace MissingFunctions {
+        
+        // TODO: this can be #DEFINED
+        bool allLarger(const GfVec3f &lhs, const GfVec3f &rhs)
+        {
+            return (lhs.data()[0] >= rhs.data()[0]) && (lhs.data()[1] >= rhs.data()[1]) && (lhs.data()[2] >= rhs.data()[2]);
+        }
+        
+        void LogBounds(GfBBox3f bounds)
+        {
+            NSLog(@"(%f, %f, %f) -- (%f, %f, %f)", bounds.GetRange().GetMin().data()[0], bounds.GetRange().GetMin().data()[1], bounds.GetRange().GetMin().data()[2], bounds.GetRange().GetMax().data()[0], bounds.GetRange().GetMax().data()[1], bounds.GetRange().GetMax().data()[2]);
+        }
+        
+        bool IntersectsAllChildren(const OctreeNode* node, const GfBBox3f &entity)
+        {
+            const GfVec3f sizeEntity = entity.GetRange().GetMax() - entity.GetRange().GetMin();
+            
+            // Better alternative: (calc center) of entity within node, check if (minVec is negative) && (maxVec is positive);
+            // Or if needs touch >= 2 children: verify that at least one component is negative and the other positive (minVec, maxVec)
+            
+            if (allLarger(sizeEntity, node->halfSize)) {
+                LogBounds(node->aabb);
+                LogBounds(entity);
+                return true;
+            }
+            return false;
+        }
+        
+        Intersection SpatialRelation(const OctreeNode* node, const GfBBox3f &entity)
+        {
+            const GfVec3f &entityMin = entity.GetRange().GetMin();
+            const GfVec3f &entityMax = entity.GetRange().GetMax();
+            
+            if (allLarger(entityMin, node->minVec) && allLarger(node->maxVec, entityMax)) {
+                return Intersection::Inside;
+            }
+            
+            if (allLarger(node->maxVec, entityMin) && allLarger(entityMax, node->minVec)) {
+                return Intersection::Intersects;
+            }
+            
+            return Intersection::Outside;
+        }
+        
+        bool ShouldRejectBasedOnSize(const GfVec3f& minVec, const GfVec3f& maxVec, matrix_float4x4 const &viewProjMatrix, vector_float2 const &dimensions)
+        {
+            float const threshold = 4.0f; // number of pixels in a dimension
+
+            vector_float4 points[] =
+            {
+                matrix_multiply(viewProjMatrix, (vector_float4){minVec[0], minVec[1], minVec[2], 1}),
+                matrix_multiply(viewProjMatrix, (vector_float4){maxVec[0], maxVec[1], maxVec[2], 1})
+            };
+            
+            vector_float2 screenSpace[2];
+            
+            float inv = 1.0f / points[0][3];
+            screenSpace[0] = points[0].xy * inv;
+            
+            inv = 1.0f / points[1][3];
+            screenSpace[1] = points[1].xy * inv;
+            
+            vector_float2 d = vector_abs((screenSpace[1] - screenSpace[0]) * dimensions);
+            return (d.x < threshold && d.y < threshold);
+        }
+        
+        bool FrustumFullyContains(const OctreeNode* node, matrix_float4x4 const &viewProjMatrix, vector_float2 const &dimensions)
+        {
+            vector_float4 points[] =
+            {
+                {node->minVec[0], node->minVec[1], node->minVec[2], 1},
+                {node->maxVec[0], node->maxVec[1], node->maxVec[2], 1},
+                {node->minVec[0], node->minVec[1], node->maxVec[2], 1},
+                {node->minVec[0], node->maxVec[1], node->minVec[2], 1},
+                {node->minVec[0], node->maxVec[1], node->maxVec[2], 1},
+                {node->maxVec[0], node->minVec[1], node->minVec[2], 1},
+                {node->maxVec[0], node->minVec[1], node->maxVec[2], 1},
+                {node->maxVec[0], node->maxVec[1], node->minVec[2], 1}
+            };
+            
+            for (int i = 0; i < 8; ++i) {
+                int clipFlags = 0;
+                vector_float4 clipPos;
+                
+                clipPos = matrix_multiply(viewProjMatrix, points[i]);
+                clipFlags |= ((clipPos.x < clipPos.z) << 3) |
+                             ((clipPos.x > -clipPos.z) << 2) |
+                             ((clipPos.y <  clipPos.z) << 1) |
+                              (clipPos.y > -clipPos.z);
+
+                if (clipFlags != 0xf) {
+                    return false;
+                }
+            }
+            
+            return true;
+        }
+    };
+    
+    DrawableItem::DrawableItem(HdStDrawItemInstance* itemInstance)
+    : item(itemInstance),
+      aabb(itemInstance->GetDrawItem()->GetBounds().GetRange()),
+      halfSize(aabb.GetSize() * 0.5)
+    {
+    }
+    
+    void DrawableItem::SetVisible(bool visible) const
+    {
+        item->SetVisible(visible);
+    }
+
+    BVH::BVH()
+    : root(OctreeNode(0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0))
+    {
+        // nothing.
+    }
+    
+    void BVH::BuildBVH(const std::vector<HdStDrawItemInstance*> &drawables)
+    {
+        NSLog(@"Building BVH for %zu items", drawables.size());
+        if (drawables.size() <= 0) {
+            return;
+        }
+        
+        totalItems = drawables.size();
+        
+        // calculate the max size
+        GfBBox3f bbox = drawables[0]->GetDrawItem()->GetBounds();
+        for (auto drawable: drawables) {
+            bbox = bbox.Combine(bbox, drawable->GetDrawItem()->GetBounds());
+        }
+
+        root.ReInit(bbox.GetRange());
+        
+        unsigned depth = 0;
+        for (size_t idx=0; idx < drawables.size(); ++idx)
+        {
+            depth = MAX(depth, root.Insert(drawables[idx]));
+        }
+        
+        //root.LogStatus(true);
+        
+        NSLog(@"Building BVH done. MaxDepth=%u", depth);
+    }
+    
+    unsigned long BVH::PerformCulling(matrix_float4x4 const &viewProjMatrix, vector_float2 const &dimensions)
+    {
+        visibleItems = root.PerformCulling(viewProjMatrix, dimensions);
+        
+        return visibleItems;
+    }
+    
+    OctreeNode::OctreeNode(float minX, float minY, float minZ, float maxX, float maxY, float maxZ, unsigned currentDepth)
+    : aabb(GfRange3f(GfVec3f(minX, minY, minZ), GfVec3f(maxX, maxY, maxZ))),
+      minVec(minX, minY, minZ),
+      maxVec(maxX, maxY, maxZ),
+      halfSize((maxX - minX) * 0.5, (maxY - minY) * 0.5, (maxZ - minZ) * 0.5),
+      depth(currentDepth),
+      isSplit(false)
+    {
+    }
+    
+    OctreeNode::~OctreeNode()
+    {
+        if (isSplit) {
+            for (size_t idx=0; idx < 8; ++idx)
+            {
+                delete children[idx];
+            }
+        }
+    }
+    
+    void OctreeNode::ReInit(GfRange3f const &boundingBox)
+    {
+        MissingFunctions::LogBounds(boundingBox);
+        aabb = GfRange3f(boundingBox);
+        minVec = aabb.GetMin();
+        maxVec = aabb.GetMax();
+        halfSize = (maxVec - minVec) * 0.5;
+    }
+    
+    unsigned long OctreeNode::PerformCulling(matrix_float4x4 const &viewProjMatrix, vector_float2 const &dimensions)
+    {
+        if (MissingFunctions::ShouldRejectBasedOnSize(minVec, maxVec, viewProjMatrix, dimensions)) {
+            MarkSubtreeVisible(false);
+            return 0;
+        }
+        
+        if (!GfFrustum::IntersectsViewVolumeFloat(aabb, viewProjMatrix, dimensions)) {
+            MarkSubtreeVisible(false);
+            return 0;
+        }
+        
+        if (MissingFunctions::FrustumFullyContains(this, viewProjMatrix, dimensions)) {
+            return MarkSubtreeVisible(true);
+        }
+
+        unsigned long visibleCount = drawables.size();
+        
+        for (auto &drawable : drawables) {
+            drawable.SetVisible(true);
+        }
+        
+        if (isSplit) {
+            for (auto const &item : children) {
+                visibleCount += item->PerformCulling(viewProjMatrix, dimensions);
+            }
+        }
+        
+        return visibleCount;
+    }
+    
+    unsigned long OctreeNode::MarkSubtreeVisible(bool visible)
+    {
+        unsigned long visibleCount = drawables.size();
+        
+        for (auto &drawable : drawables) {
+            drawable.SetVisible(visible);
+        }
+        
+        if (isSplit) {
+            for (auto const &item : children) {
+                visibleCount += item->MarkSubtreeVisible(visible);
+            }
+        }
+        
+        return visibleCount;
+    }
+    
+    void OctreeNode::LogStatus(bool recursive)
+    {
+        NSLog(@"Lvl %u, MustKeep: %zu", depth, drawables.size());
+        if (recursive) {
+            if (isSplit) {
+                for (int idx=0; idx < 8; ++idx) {
+                    children[idx]->LogStatus(recursive);
+                }
+            }
+        }
+    }
+    
+    void OctreeNode::subdivide()
+    {
+        const GfVec3f &localMin = aabb.GetMin();
+        const GfVec3f &localMax = aabb.GetMax();
+        const GfVec3f midPoint = localMin + (localMax - localMin) / 2.f;
+
+        children[0] = new OctreeNode(localMin.data()[0], localMin.data()[1], localMin.data()[2], midPoint.data()[0], midPoint.data()[1], midPoint.data()[2], depth + 1);
+        children[1] = new OctreeNode(midPoint.data()[0], localMin.data()[1], localMin.data()[2], localMax.data()[0], midPoint.data()[1], midPoint.data()[2], depth + 1);
+        children[2] = new OctreeNode(localMin.data()[0], midPoint.data()[1], localMin.data()[2], midPoint.data()[0], localMax.data()[1], midPoint.data()[2], depth + 1);
+        children[3] = new OctreeNode(localMin.data()[0], localMin.data()[1], midPoint.data()[2], midPoint.data()[0], midPoint.data()[1], localMax.data()[2], depth + 1);
+        
+        children[4] = new OctreeNode(midPoint.data()[0], midPoint.data()[1], localMin.data()[2], localMax.data()[0], localMax.data()[1], midPoint.data()[2], depth + 1);
+        children[5] = new OctreeNode(midPoint.data()[0], localMin.data()[1], midPoint.data()[2], localMax.data()[0], midPoint.data()[1], localMax.data()[2], depth + 1);
+        children[6] = new OctreeNode(localMin.data()[0], midPoint.data()[1], midPoint.data()[2], midPoint.data()[0], localMax.data()[1], localMax.data()[2], depth + 1);
+        children[7] = new OctreeNode(midPoint.data()[0], midPoint.data()[1], midPoint.data()[2], localMax.data()[0], localMax.data()[1], localMax.data()[2], depth + 1);
+        isSplit = true;
+    }
+    
+    bool OctreeNode::canSubdivide()
+    {
+        return (depth < maxOctreeDepth);// && (aabb.GetVolume() > minOctreeLeafVolume);
+    }
+    
+    unsigned OctreeNode::Insert(const DrawableItem &drawable)
+    {
+        if (!canSubdivide()) {
+//            NSLog(@"Adding: @ %u", depth);
+            drawables.push_back(drawable);
+            return depth;
+        }
+        
+        if (!isSplit) {
+//            NSLog(@"Subdivide @ %u", depth);
+            subdivide();
+        }
+        
+        return insertStraight(drawable);
+    }
+    
+    unsigned OctreeNode::insertStraight(const DrawableItem &drawable)
+    {
+        int intersectsCount = 0;
+        
+        // TODO: ideally this is a bit vector.
+        bool intersects[8] = {false, false, false, false, false, false, false, false};
+        //bool foundContainer = false;
+        
+        if (MissingFunctions::IntersectsAllChildren(this, drawable.aabb)) {
+            intersectsCount = 8;
+        }
+        
+        if (intersectsCount <= 0) {
+            for (int idx = 0; idx < 8; ++idx) {
+                Intersection intersection = MissingFunctions::SpatialRelation(children[idx], drawable.aabb);
+                if (Intersection::Inside == intersection) {
+    //                NSLog(@"Found containing Container: @ %u::%i", depth, idx);
+                    return children[idx]->Insert(drawable);
+                }
+                intersects[idx] = (Intersection::Intersects == intersection);
+                intersectsCount += intersects[idx] ? 1 : 0;
+            }
+        }
+        
+        if (intersectsCount >= 8) {
+//                NSLog(@"Intersects all 8! @ %u", depth);
+            MissingFunctions::IntersectsAllChildren(this, drawable.aabb);
+            drawables.push_back(drawable);
+            return depth;
+        } else {
+            /* NOTE: this stores all objects that intersect with more than 1 item at the root
+                    ==> fewer tests
+                    ==> unique node/item
+                    ==> possibly more overdraw
+            */
+            drawables.push_back(drawable);
+            return depth;
+            // Test: if an object is only at one tree level, it might be faster to process
+//                for (int idx = 0; idx < 8; ++idx) {
+//                    if (intersects[idx]) {
+////                        NSLog(@"Found intersecting Container: @ %u::%i", depth, idx);
+//                        children[idx]->Insert(drawable);
+//                        return;
+//                    }
+//                }
+        }
+    }
+
+}
+
+#endif
 
 HdStCommandBuffer::HdStCommandBuffer()
     : _visibleSize(0)
@@ -275,7 +673,7 @@ void
 HdStCommandBuffer::RebuildDrawBatchesIfNeeded(unsigned currentBatchVersion)
 {
     HD_TRACE_FUNCTION();
-
+    
     bool deepValidation
         = (currentBatchVersion != _batchVersion);
 
@@ -405,8 +803,8 @@ void
 HdStCommandBuffer::FrustumCull(GfMatrix4d const &viewProjMatrix)
 {
     HD_TRACE_FUNCTION();
-
-    const bool 
+    
+    const bool
     mtCullingDisabled = TfDebug::IsEnabled(HD_DISABLE_MULTITHREADED_CULLING);
 
     primCount.store(0);
@@ -464,51 +862,49 @@ HdStCommandBuffer::FrustumCull(GfMatrix4d const &viewProjMatrix)
         }
     };
 
+    
+    GfMatrix4f viewProjMatrixf(viewProjMatrix);
+    matrix_float4x4 simdViewProjMatrix = matrix_from_columns((vector_float4){viewProjMatrixf[0][0], viewProjMatrixf[0][1], viewProjMatrixf[0][2], viewProjMatrixf[0][3]},
+                                                             (vector_float4){viewProjMatrixf[1][0], viewProjMatrixf[1][1], viewProjMatrixf[1][2], viewProjMatrixf[1][3]},
+                                                             (vector_float4){viewProjMatrixf[2][0], viewProjMatrixf[2][1], viewProjMatrixf[2][2], viewProjMatrixf[2][3]},
+                                                             (vector_float4){viewProjMatrixf[3][0], viewProjMatrixf[3][1], viewProjMatrixf[3][2], viewProjMatrixf[3][3]});
+
+#ifdef USE_BVH_FOR_CULLING
+    static bool didBVH = false;
+    static SpatialHierarchy::BVH bvh = SpatialHierarchy::BVH();
+
+    if (!didBVH)
+    {
+        std::vector<HdStDrawItemInstance*> drawItemInstances;
+        drawItemInstances.reserve(_drawItemInstances.size());
+        for (size_t idx=0; idx < _drawItemInstances.size(); ++idx) {
+            drawItemInstances.push_back(&_drawItemInstances[idx]);
+        }
+        bvh.BuildBVH(drawItemInstances);
+        
+        didBVH = true;
+    }
+#endif
     uint64_t timeStart = ArchGetTickTime();
 
-    GfMatrix4f viewProjMatrixf(viewProjMatrix);
-    matrix_float4x4 simdViewProjMatrix = matrix_from_columns(
-       (vector_float4){viewProjMatrixf[0][0], viewProjMatrixf[0][1], viewProjMatrixf[0][2], viewProjMatrixf[0][3]},
-       (vector_float4){viewProjMatrixf[1][0], viewProjMatrixf[1][1], viewProjMatrixf[1][2], viewProjMatrixf[1][3]},
-       (vector_float4){viewProjMatrixf[2][0], viewProjMatrixf[2][1], viewProjMatrixf[2][2], viewProjMatrixf[2][3]},
-       (vector_float4){viewProjMatrixf[3][0], viewProjMatrixf[3][1], viewProjMatrixf[3][2], viewProjMatrixf[3][3]});
-
+#ifdef USE_BVH_FOR_CULLING
+    bvh.PerformCulling(simdViewProjMatrix, dimensions);
+    NSLog(@"Visible: %lu, total: %lu", bvh.visibleItems, bvh.totalItems);
+#else
     if (!mtCullingDisabled) {
         WorkParallelForN(_drawItemInstances.size(),
                          std::bind(&_Worker::cull, &_drawItemInstances,
                                    std::cref(simdViewProjMatrix),
                                    std::placeholders::_1,
                                    std::placeholders::_2));
-//        WorkDispatcher dispatcher;
-//        id<MTLTexture> texture = MtlfMetalContext::GetMetalContext()->mtlColorTexture;
-//        float width = [texture width];
-//        float height = [texture height];
-//
-//        for (auto & instance : _drawItemInstances) {
-//            dispatcher.Run(std::bind(&_Worker::cullDispatch,
-//                                     std::ref(dispatcher),
-//                                     std::ref(instance),
-//                                     std::cref(viewProjMatrixf),
-//                                     std::cref(width),
-//                                     std::cref(height)));
-//        }
-//        dispatcher.Wait();
-//
-//        for (auto & itemInstance : _drawItemInstances) {
-//            HdStDrawItem const* item = itemInstance.GetDrawItem();
-//            bool visible = item->GetVisible() && itemInstance.cullResult;
-//            if ((itemInstance.IsVisible() != visible) ||
-//                (visible && item->HasInstancer())) {
-//                itemInstance.SetVisible(visible);
-//            }
-//        }
     } else {
         _Worker::cull(&_drawItemInstances,
                       simdViewProjMatrix,
-                      0, 
+                      0,
                       _drawItemInstances.size());
     }
-
+#endif
+    
     uint64_t timeDiff = ArchGetTickTime() - timeStart;
     
     static uint64_t fastestTime = 0xffffffffffffffff;
