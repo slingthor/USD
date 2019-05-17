@@ -146,9 +146,9 @@ HdStCommandBuffer::ExecuteDraw(
 
             if (!context->GeometryShadersActive()) {
                 context->CreateCommandBuffer(METALWORKQUEUE_GEOMETRY_SHADER);
-#ifdef DEBUG
-                context->LabelCommandBuffer(@"Geometry Shaders", METALWORKQUEUE_GEOMETRY_SHADER);
-#endif
+                if (TF_DEV_BUILD) {
+                    context->LabelCommandBuffer(@"Geometry Shaders", METALWORKQUEUE_GEOMETRY_SHADER);
+                }
                 //[context->GetWorkQueue(METALWORKQUEUE_GEOMETRY_SHADER).commandBuffer enqueue];
             }
 
@@ -156,9 +156,9 @@ HdStCommandBuffer::ExecuteDraw(
             
             // Create a new command buffer for each render pass to the current drawable
             context->CreateCommandBuffer(METALWORKQUEUE_DEFAULT);
-#ifdef DEBUG
-            context->LabelCommandBuffer(@"HdEngine::RenderWorker", METALWORKQUEUE_DEFAULT);
-#endif
+            if (TF_DEV_BUILD) {
+                context->LabelCommandBuffer(@"HdEngine::RenderWorker", METALWORKQUEUE_DEFAULT);
+            }
             context->SetRenderPassDescriptor(rpd);
             
             for(size_t i = begin; i < end; i++) {
@@ -187,9 +187,9 @@ HdStCommandBuffer::ExecuteDraw(
     // Create a new command buffer for each render pass to the current drawable
     if (renderPassDescriptor.colorAttachments[0].loadAction == MTLLoadActionClear) {
         id <MTLCommandBuffer> commandBuffer = [context->commandQueue commandBuffer];
-#ifdef DEBUG
-        commandBuffer.label = @"Clear";
-#endif
+        if (TF_DEV_BUILD) {
+            commandBuffer.label = @"Clear";
+        }
         id <MTLRenderCommandEncoder> renderEncoder =
             [commandBuffer renderCommandEncoderWithDescriptor:renderPassDescriptor];
         [renderEncoder endEncoding];
