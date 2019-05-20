@@ -1687,8 +1687,8 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
             }
             if (_buildTarget == kMSL_BuildTarget_MVA_ComputeGS) //_instanceID is the real Metal instance ID if not using ComputeGS
                 vsEntryPointCode << "    uint _instanceID = _index / drawArgs->indexCount;\n";
-            vsEntryPointCode    << "    uint _gsPrimitiveID = (_gsVertexID / "
-                                << (numVerticesOutPerPrimitive / numPrimitivesOutPerPrimitive) << ") % drawArgs->primitiveCount;\n"
+            vsEntryPointCode    << "    uint _gsPrimitiveID = _gsVertexID / "
+                                << (numVerticesOutPerPrimitive / numPrimitivesOutPerPrimitive) << ";\n"
                                 << "    _index = _index % drawArgs->indexCount;\n"
                                 << "    uint gl_InstanceID = _instanceID;\n"
                                 << "    uint gl_BaseVertex = drawArgs->baseVertex;\n"
@@ -1699,7 +1699,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
                                 << "\n"
                                 << "    MSLVsOutputs vsOutput;\n"
                                 << vsMI_EP_CallCode.str()
-                                << "\n    vsOutput.gl_PrimitiveID = _gsPrimitiveID;\n"
+                                << "\n    vsOutput.gl_PrimitiveID = _gsPrimitiveID % drawArgs->primitiveCount;\n"
                                 << "    vsOutput._gsPrimitiveID = _gsPrimitiveID;\n"
                                 << "    vsOutput._barycentricCoords = vec2((_vertexID % 3 == 1)? 1.0 : 0.0, (_vertexID % 3 == 2) ? 1.0 : 0.0);\n\n"
                                 << vsGsOutputMergeCode.str()

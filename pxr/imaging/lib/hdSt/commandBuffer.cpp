@@ -510,9 +510,9 @@ HdStCommandBuffer::ExecuteDraw(
 
             if (!context->GeometryShadersActive()) {
                 context->CreateCommandBuffer(METALWORKQUEUE_GEOMETRY_SHADER);
-#ifdef DEBUG
-                context->LabelCommandBuffer(@"Geometry Shaders", METALWORKQUEUE_GEOMETRY_SHADER);
-#endif
+                if (TF_DEV_BUILD) {
+                    context->LabelCommandBuffer(@"Geometry Shaders", METALWORKQUEUE_GEOMETRY_SHADER);
+                }
                 //[context->GetWorkQueue(METALWORKQUEUE_GEOMETRY_SHADER).commandBuffer enqueue];
             }
 
@@ -520,9 +520,9 @@ HdStCommandBuffer::ExecuteDraw(
             
             // Create a new command buffer for each render pass to the current drawable
             context->CreateCommandBuffer(METALWORKQUEUE_DEFAULT);
-#ifdef DEBUG
-            context->LabelCommandBuffer(@"HdEngine::RenderWorker", METALWORKQUEUE_DEFAULT);
-#endif
+            if (TF_DEV_BUILD) {
+                context->LabelCommandBuffer(@"HdEngine::RenderWorker", METALWORKQUEUE_DEFAULT);
+            }
             context->SetRenderPassDescriptor(rpd);
             
             for(size_t i = begin; i < end; i++) {
@@ -551,9 +551,9 @@ HdStCommandBuffer::ExecuteDraw(
     // Create a new command buffer for each render pass to the current drawable
     if (renderPassDescriptor.colorAttachments[0].loadAction == MTLLoadActionClear) {
         id <MTLCommandBuffer> commandBuffer = [context->commandQueue commandBuffer];
-#ifdef DEBUG
-        commandBuffer.label = @"Clear";
-#endif
+        if (TF_DEV_BUILD) {
+            commandBuffer.label = @"Clear";
+        }
         id <MTLRenderCommandEncoder> renderEncoder =
             [commandBuffer renderCommandEncoderWithDescriptor:renderPassDescriptor];
         [renderEncoder endEncoding];
@@ -779,6 +779,8 @@ HdStCommandBuffer::FrustumCull(GfMatrix4d const &viewProjMatrix)
     dimensions.x = float(MtlfMetalContext::GetMetalContext()->mtlColorTexture.width);
     dimensions.y = float(MtlfMetalContext::GetMetalContext()->mtlColorTexture.height);
 
+    MtlfMetalContext::GetMetalContext()->PrepareBufferFlush();
+    
     struct _Worker {
         static
         void cull(std::vector<HdStDrawItemInstance> * drawItemInstances,
@@ -871,6 +873,8 @@ HdStCommandBuffer::FrustumCull(GfMatrix4d const &viewProjMatrix)
     }
 #endif
     
+    MtlfMetalContext::GetMetalContext()->FlushBuffers();
+
     uint64_t timeDiff = ArchGetTickTime() - timeStart;
     
     static uint64_t fastestTime = 0xffffffffffffffff;
