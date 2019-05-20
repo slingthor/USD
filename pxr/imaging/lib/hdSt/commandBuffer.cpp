@@ -57,73 +57,15 @@
 
 #include <sys/time.h>
 
+#include <os/signpost.h>
+
 PXR_NAMESPACE_OPEN_SCOPE
 
 #define USE_BVH_FOR_CULLING 1
 
 #ifdef USE_BVH_FOR_CULLING
 namespace SpatialHierarchy {
-    enum Intersection {
-        Inside,
-        Outside,
-        Intersects
-    };
-    
-    const unsigned maxElementCountPerNode = 10;
-    const unsigned maxOctreeDepth = 100;
-    const float minOctreeLeafVolume = 0.f;
-    
-    struct DrawableItem {
-        DrawableItem(HdStDrawItemInstance* itemInstance);
-        void SetVisible(bool visible) const;
-
-        HdStDrawItemInstance *item;
-        GfRange3f aabb;
-        GfVec3f halfSize;
-    };
-    
-    class OctreeNode {
-    public:
-        OctreeNode(float minX, float minY, float minZ, float maxX, float maxY, float maxZ, unsigned currentDepth);
-        ~OctreeNode();
-        
-        void ReInit(GfRange3f const &boundingBox);
-        
-        unsigned long PerformCulling(matrix_float4x4 const &viewProjMatrix, vector_float2 const &dimensions);
-        unsigned long MarkSubtreeVisible(bool visible);
-        unsigned Insert(const DrawableItem &drawable);
-
-        void LogStatus(bool recursive);
-
-        GfRange3f aabb;
-        GfVec3f minVec;
-        GfVec3f maxVec;
-        GfVec3f halfSize;
-
-    private:
-        void subdivide();
-        bool canSubdivide();
-        unsigned insertStraight(const DrawableItem &drawable);
-
-        std::vector<const DrawableItem> drawables;
-        
-        unsigned depth;
-        bool isSplit;
-
-        //OctreeNode* parent;
-        OctreeNode* children[8] = {NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL};
-    };
-    
-    class BVH {
-    public:
-        BVH();
-        void BuildBVH(const std::vector<HdStDrawItemInstance*> &drawables);
-        unsigned long PerformCulling(matrix_float4x4 const &viewProjMatrix, vector_float2 const &dimensions);
-        
-        OctreeNode root;
-        unsigned long totalItems;
-        unsigned long visibleItems;
-    };
+    const unsigned maxOctreeDepth = 1024;
     
     namespace MissingFunctions {
         
@@ -146,8 +88,6 @@ namespace SpatialHierarchy {
             // Or if needs touch >= 2 children: verify that at least one component is negative and the other positive (minVec, maxVec)
             
             if (allLarger(sizeEntity, node->halfSize)) {
-                LogBounds(node->aabb);
-                LogBounds(entity);
                 return true;
             }
             return false;
@@ -234,11 +174,13 @@ namespace SpatialHierarchy {
     
     void DrawableItem::SetVisible(bool visible) const
     {
-        item->SetVisible(visible);
+        //item->SetVisible(visible);
     }
 
     BVH::BVH()
-    : root(OctreeNode(0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0))
+    : root(OctreeNode(0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0)),
+      buildTimeMS(0.f),
+      populated(false)
     {
         // nothing.
     }
@@ -250,6 +192,7 @@ namespace SpatialHierarchy {
             return;
         }
         
+        uint64_t buildStart = ArchGetTickTime();
         totalItems = drawables.size();
         
         // calculate the max size
@@ -266,14 +209,18 @@ namespace SpatialHierarchy {
             depth = MAX(depth, root.Insert(DrawableItem(drawables[idx])));
         }
         
-        //root.LogStatus(true);
+        buildTimeMS = (ArchGetTickTime() - buildStart) / 1000000.0f;
         
-        NSLog(@"Building BVH done. MaxDepth=%u", depth);
+        populated = true;
+        
+        NSLog(@"Building BVH done: MaxDepth=%u, %fms", depth, buildTimeMS);
     }
     
     unsigned long BVH::PerformCulling(matrix_float4x4 const &viewProjMatrix, vector_float2 const &dimensions)
     {
+        uint64_t cullStart = ArchGetTickTime();
         visibleItems = root.PerformCulling(viewProjMatrix, dimensions);
+        lastCullTimeMS = (ArchGetTickTime() - cullStart) / 1000000.0f;
         
         return visibleItems;
     }
@@ -578,6 +525,10 @@ HdStCommandBuffer::ExecuteDraw(
     uint64_t timeStart = ArchGetTickTime();
     static bool mtBatchDrawing = _drawBatches.size() >= 10;
 
+    static os_log_t encodingLog = os_log_create("hydra.metal", "Drawing");
+    os_signpost_id_t issueEncoding = os_signpost_id_generate(encodingLog);
+    
+    os_signpost_interval_begin(encodingLog, issueEncoding, "Encoding");
     if (mtBatchDrawing) {
         unsigned const systemLimit = WorkGetConcurrencyLimit();
         
@@ -606,7 +557,8 @@ HdStCommandBuffer::ExecuteDraw(
                       0,
                       _drawBatches.size());
     }
-    
+    os_signpost_interval_end(encodingLog, issueEncoding, "Encoding");
+
     if (setAlpha) {
         context->SetAlphaBlendingEnable(true);
 //        renderPassDescriptor.colorAttachments[0].blendingEnabled = YES;
@@ -838,28 +790,35 @@ HdStCommandBuffer::FrustumCull(GfMatrix4d const &viewProjMatrix)
                                                              (vector_float4){viewProjMatrixf[2][0], viewProjMatrixf[2][1], viewProjMatrixf[2][2], viewProjMatrixf[2][3]},
                                                              (vector_float4){viewProjMatrixf[3][0], viewProjMatrixf[3][1], viewProjMatrixf[3][2], viewProjMatrixf[3][3]});
 
-#ifdef USE_BVH_FOR_CULLING
-    static bool didBVH = false;
-    static SpatialHierarchy::BVH bvh = SpatialHierarchy::BVH();
+    static os_log_t cullingLog = os_log_create("hydra.metal", "Culling");
 
-    if (!didBVH)
+#ifdef USE_BVH_FOR_CULLING
+    if (!bvh.populated)
     {
+        os_signpost_id_t bvhGenerate = os_signpost_id_generate(cullingLog);
+        
+        os_signpost_interval_begin(cullingLog, bvhGenerate, "BVH Generation");
         std::vector<HdStDrawItemInstance*> drawItemInstances;
         drawItemInstances.reserve(_drawItemInstances.size());
         for (size_t idx=0; idx < _drawItemInstances.size(); ++idx) {
             drawItemInstances.push_back(&_drawItemInstances[idx]);
         }
         bvh.BuildBVH(drawItemInstances);
-        
-        didBVH = true;
+        os_signpost_interval_end(cullingLog, bvhGenerate, "BVH Generation");
     }
 #endif
     uint64_t timeStart = ArchGetTickTime();
 
-#ifdef USE_BVH_FOR_CULLING
+//#ifdef USE_BVH_FOR_CULLING
+    os_signpost_id_t bvhCulling = os_signpost_id_generate(cullingLog);
+    
+    os_signpost_interval_begin(cullingLog, bvhCulling, "Culling: BVH");
     bvh.PerformCulling(simdViewProjMatrix, dimensions);
-    NSLog(@"Visible: %lu, total: %lu", bvh.visibleItems, bvh.totalItems);
-#else
+    os_signpost_interval_end(cullingLog, bvhCulling, "Culling: BVH");
+//#else
+    os_signpost_id_t naiveCulling = os_signpost_id_generate(cullingLog);
+    
+    os_signpost_interval_begin(cullingLog, naiveCulling, "Culling: Naïve");
     if (!mtCullingDisabled) {
         WorkParallelForN(_drawItemInstances.size(),
                          std::bind(&_Worker::cull, &_drawItemInstances,
@@ -872,7 +831,8 @@ HdStCommandBuffer::FrustumCull(GfMatrix4d const &viewProjMatrix)
                       0,
                       _drawItemInstances.size());
     }
-#endif
+    os_signpost_interval_end(cullingLog, naiveCulling, "Culling: Naïve");
+//#endif
     
     MtlfMetalContext::GetMetalContext()->FlushBuffers();
 

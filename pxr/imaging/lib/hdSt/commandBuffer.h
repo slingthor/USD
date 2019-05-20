@@ -39,7 +39,70 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-
+namespace SpatialHierarchy {
+    enum Intersection {
+        Inside,
+        Outside,
+        Intersects
+    };
+    
+    struct DrawableItem {
+        DrawableItem(HdStDrawItemInstance* itemInstance);
+        void SetVisible(bool visible) const;
+        
+        HdStDrawItemInstance *item;
+        GfRange3f aabb;
+        GfVec3f halfSize;
+    };
+    
+    class OctreeNode {
+    public:
+        OctreeNode(float minX, float minY, float minZ, float maxX, float maxY, float maxZ, unsigned currentDepth);
+        ~OctreeNode();
+        
+        void ReInit(GfRange3f const &boundingBox);
+        
+        unsigned long PerformCulling(matrix_float4x4 const &viewProjMatrix, vector_float2 const &dimensions);
+        unsigned long MarkSubtreeVisible(bool visible);
+        unsigned Insert(const DrawableItem &drawable);
+        
+        void LogStatus(bool recursive);
+        
+        GfRange3f aabb;
+        GfVec3f minVec;
+        GfVec3f maxVec;
+        GfVec3f halfSize;
+        
+    private:
+        void subdivide();
+        bool canSubdivide();
+        unsigned insertStraight(const DrawableItem &drawable);
+        
+        std::vector<const DrawableItem> drawables;
+        
+        unsigned depth;
+        bool isSplit;
+        
+        //OctreeNode* parent;
+        OctreeNode* children[8] = {NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL};
+    };
+    
+    class BVH {
+    public:
+        BVH();
+        void BuildBVH(const std::vector<HdStDrawItemInstance*> &drawables);
+        unsigned long PerformCulling(matrix_float4x4 const &viewProjMatrix, vector_float2 const &dimensions);
+        
+        OctreeNode root;
+        unsigned long totalItems;
+        unsigned long visibleItems;
+        
+        float buildTimeMS;
+        float lastCullTimeMS;
+        
+        bool populated;
+    };
+}
 class HdStDrawItem;
 class HdStDrawItemInstance;
 
@@ -115,6 +178,8 @@ private:
     size_t _visibleSize;
     unsigned _visChangeCount;
     unsigned _batchVersion;
+    
+    SpatialHierarchy::BVH bvh;
 };
 
 
