@@ -139,7 +139,7 @@ HdStStripedInterleavedBufferMetal::Reallocate(
         // pre-pass to combine consecutive buffer range relocation
         HdStBufferRelocator* relocator[3];
         for(int i = 0; i < 3; i++) {
-            int const curIndex = curId[i] ? i : 0;
+            int const curIndex = curId[i].IsSet() ? i : 0;
             relocator[i] = HdStResourceFactory::GetInstance()->NewBufferRelocator(curId[curIndex], newId[i]);
         }
 
@@ -222,7 +222,7 @@ HdStStripedInterleavedBufferMetal::_DeallocateResources()
                 MtlfMetalContext::GetMetalContext()->ReleaseMetalBuffer(_id);
             }
         }
-        resource->SetAllocations(0, 0, 0, 0);
+        resource->SetAllocations(HdResourceGPUHandle(), HdResourceGPUHandle(), HdResourceGPUHandle(), 0);
     }
 }
 

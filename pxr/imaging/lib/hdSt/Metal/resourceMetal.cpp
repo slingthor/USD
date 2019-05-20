@@ -29,7 +29,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 HdStResourceMetal::HdStResourceMetal(TfToken const & role)
     : HdResource(role)
-    , _id(0)
+    , _id()
 {
     /*NOTHING*/
 }

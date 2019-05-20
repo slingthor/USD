@@ -64,6 +64,7 @@ struct HdResourceGPUHandle {
         return *this;
     }
     operator GLuint() const { return (GLuint)uint64_t(handle); }
+#endif // ARCH_GFX_OPENGL
     
     bool operator !=(HdResourceGPUHandle const _handle) const {
         return handle != _handle.handle;
@@ -80,7 +81,7 @@ struct HdResourceGPUHandle {
     bool operator >(HdResourceGPUHandle const _handle) const {
         return handle > _handle.handle;
     }
-#endif // ARCH_GFX_OPENGL
+
 
 #if defined(ARCH_GFX_METAL)
     // Metal
