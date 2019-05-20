@@ -225,10 +225,11 @@ namespace SpatialHierarchy {
     };
     
     DrawableItem::DrawableItem(HdStDrawItemInstance* itemInstance)
-    : item(itemInstance),
-      aabb(itemInstance->GetDrawItem()->GetBounds().GetRange()),
-      halfSize(aabb.GetSize() * 0.5)
+    : item(itemInstance)
+    
     {
+        aabb = itemInstance->GetDrawItem()->GetBounds().ComputeAlignedRange();
+        halfSize = aabb.GetSize() * 0.5;
     }
     
     void DrawableItem::SetVisible(bool visible) const
@@ -262,7 +263,7 @@ namespace SpatialHierarchy {
         unsigned depth = 0;
         for (size_t idx=0; idx < drawables.size(); ++idx)
         {
-            depth = MAX(depth, root.Insert(drawables[idx]));
+            depth = MAX(depth, root.Insert(DrawableItem(drawables[idx])));
         }
         
         //root.LogStatus(true);
