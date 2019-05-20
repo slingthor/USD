@@ -308,10 +308,10 @@ namespace SpatialHierarchy {
     
     unsigned long OctreeNode::PerformCulling(matrix_float4x4 const &viewProjMatrix, vector_float2 const &dimensions)
     {
-        if (MissingFunctions::ShouldRejectBasedOnSize(minVec, maxVec, viewProjMatrix, dimensions)) {
-            MarkSubtreeVisible(false);
-            return 0;
-        }
+//        if (MissingFunctions::ShouldRejectBasedOnSize(minVec, maxVec, viewProjMatrix, dimensions)) {
+//            MarkSubtreeVisible(false);
+//            return 0;
+//        }
         
         if (!GfFrustum::IntersectsViewVolumeFloat(aabb, viewProjMatrix, dimensions)) {
             MarkSubtreeVisible(false);
@@ -325,6 +325,7 @@ namespace SpatialHierarchy {
         unsigned long visibleCount = drawables.size();
         
         for (auto &drawable : drawables) {
+            // TODO: could test here
             drawable.SetVisible(true);
         }
         
@@ -386,19 +387,17 @@ namespace SpatialHierarchy {
     
     bool OctreeNode::canSubdivide()
     {
-        return (depth < maxOctreeDepth);// && (aabb.GetVolume() > minOctreeLeafVolume);
+        return (depth < maxOctreeDepth);
     }
     
     unsigned OctreeNode::Insert(const DrawableItem &drawable)
     {
         if (!canSubdivide()) {
-//            NSLog(@"Adding: @ %u", depth);
             drawables.push_back(drawable);
             return depth;
         }
         
         if (!isSplit) {
-//            NSLog(@"Subdivide @ %u", depth);
             subdivide();
         }
         
@@ -407,52 +406,19 @@ namespace SpatialHierarchy {
     
     unsigned OctreeNode::insertStraight(const DrawableItem &drawable)
     {
-        int intersectsCount = 0;
-        
-        // TODO: ideally this is a bit vector.
-        bool intersects[8] = {false, false, false, false, false, false, false, false};
-        //bool foundContainer = false;
-        
-        if (MissingFunctions::IntersectsAllChildren(this, drawable.aabb)) {
-            intersectsCount = 8;
-        }
-        
-        if (intersectsCount <= 0) {
+        if (!MissingFunctions::IntersectsAllChildren(this, drawable.aabb)) {
             for (int idx = 0; idx < 8; ++idx) {
                 Intersection intersection = MissingFunctions::SpatialRelation(children[idx], drawable.aabb);
                 if (Intersection::Inside == intersection) {
-    //                NSLog(@"Found containing Container: @ %u::%i", depth, idx);
                     return children[idx]->Insert(drawable);
                 }
-                intersects[idx] = (Intersection::Intersects == intersection);
-                intersectsCount += intersects[idx] ? 1 : 0;
             }
         }
         
-        if (intersectsCount >= 8) {
-//                NSLog(@"Intersects all 8! @ %u", depth);
-            MissingFunctions::IntersectsAllChildren(this, drawable.aabb);
-            drawables.push_back(drawable);
-            return depth;
-        } else {
-            /* NOTE: this stores all objects that intersect with more than 1 item at the root
-                    ==> fewer tests
-                    ==> unique node/item
-                    ==> possibly more overdraw
-            */
-            drawables.push_back(drawable);
-            return depth;
-            // Test: if an object is only at one tree level, it might be faster to process
-//                for (int idx = 0; idx < 8; ++idx) {
-//                    if (intersects[idx]) {
-////                        NSLog(@"Found intersecting Container: @ %u::%i", depth, idx);
-//                        children[idx]->Insert(drawable);
-//                        return;
-//                    }
-//                }
-        }
+        drawables.push_back(drawable);
+        
+        return depth;
     }
-
 }
 
 #endif
