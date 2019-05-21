@@ -1699,7 +1699,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
                                 << "\n"
                                 << "    MSLVsOutputs vsOutput;\n"
                                 << vsMI_EP_CallCode.str()
-                                << "\n    vsOutput.gl_PrimitiveID = _gsPrimitiveID % drawArgs->primitiveCount;\n"
+                                << "\n    vsOutput.gl_PrimitiveID = _primitiveID;\n"
                                 << "    vsOutput._gsPrimitiveID = _gsPrimitiveID;\n"
                                 << "    vsOutput._barycentricCoords = vec2((_vertexID % 3 == 1)? 1.0 : 0.0, (_vertexID % 3 == 2) ? 1.0 : 0.0);\n\n"
                                 << vsGsOutputMergeCode.str()
