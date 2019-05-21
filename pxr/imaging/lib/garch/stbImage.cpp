@@ -32,6 +32,7 @@
 #include "pxr/base/gf/matrix4f.h"
 #include "pxr/base/gf/matrix4d.h"
 
+#include "pxr/base/arch/defines.h"
 #include "pxr/base/arch/pragmas.h"
 #include "pxr/base/tf/diagnostic.h"
 #include "pxr/base/tf/stringUtils.h"
@@ -444,6 +445,10 @@ Garch_StbImage::ReadCropped(int const cropTop,
     } else {
         stbi_set_flip_vertically_on_load(false);
     }
+    
+#if defined(ARCH_OS_IOS)
+    stbi_convert_iphone_png_to_rgb(true);
+#endif
 
     std::shared_ptr<ArAsset> asset = ArGetResolver().OpenAsset(_filename);
     if (!asset) 

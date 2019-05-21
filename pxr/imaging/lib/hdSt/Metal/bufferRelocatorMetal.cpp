@@ -44,7 +44,7 @@ HdStBufferRelocatorMetal::Commit()
     if (_queue.empty())
         return;
 
-    MtlfMetalContext *context = MtlfMetalContext::GetMetalContext();
+    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
     context->CreateCommandBuffer(METALWORKQUEUE_RESOURCE);
     context->LabelCommandBuffer(@"HdStBufferRelocatorMetal::Commit()", METALWORKQUEUE_RESOURCE);
     id<MTLBlitCommandEncoder> blitEncoder = context->GetBlitEncoder(METALWORKQUEUE_RESOURCE);

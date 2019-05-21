@@ -52,6 +52,7 @@ enum {
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+MtlfMetalContextSharedPtr MtlfMetalContext::context = NULL;
 std::mutex MtlfMetalContext::_commandBufferPoolMutex;
 std::mutex MtlfMetalContext::_pipelineMutex;
 std::mutex MtlfMetalContext::_bufferMutex;
@@ -157,6 +158,8 @@ id<MTLDevice> MtlfMetalContext::GetMetalDevice(PREFERRED_GPU_TYPE preferredGPUTy
         return _defaultDevice;
     }
 #else
+    renderDevices = [NSArray arrayWithObjects: MTLCreateSystemDefaultDevice(), nil];
+    [renderDevices retain];
     return MTLCreateSystemDefaultDevice();
 #endif
 }
@@ -192,14 +195,16 @@ void MtlfMetalContext::Init(id<MTLDevice> _device, int width, int height)
 #if defined(ARCH_GFX_OPENGL)
     glInterop = NULL;
 #endif
+    renderDevices = NULL;
     
     if (_device == nil) {
         //device = MtlfMetalContext::GetMetalDevice(PREFER_INTEGRATED_GPU);
         //device = MtlfMetalContext::GetMetalDevice(PREFER_DISCRETE_GPU);
         device = MtlfMetalContext::GetMetalDevice(PREFER_DEFAULT_GPU);
     }
-    else
+    else {
         device = _device;
+    }
     
     UpdateCurrentGPU();
     

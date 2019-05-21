@@ -95,13 +95,11 @@ public:
     
     UsdImagingGLRenderParams();
     
-    union
-    {
-        void *_dummyPtr;
 #if defined(ARCH_GFX_METAL)
-        MTLRenderPassDescriptor *mtlRenderPassDescriptorForNativeMetal;
+    MTLRenderPassDescriptor *mtlRenderPassDescriptorForNativeMetal;
+#else
+    void *_dummyPtr;
 #endif
-    };
 
     inline bool operator==(const UsdImagingGLRenderParams &other) const;
 

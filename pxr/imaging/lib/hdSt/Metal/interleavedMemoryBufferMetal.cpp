@@ -118,7 +118,7 @@ HdStStripedInterleavedBufferMetal::Reallocate(
         boost::static_pointer_cast<HdStBufferResourceMetal>(
             curRangeOwner_->GetResources().begin()->second);
 
-    MtlfMetalContext *context = MtlfMetalContext::GetMetalContext();
+    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
 
     HdResourceGPUHandle newId[3];
     HdResourceGPUHandle oldId[3];

@@ -1454,7 +1454,7 @@ GfFrustum::IntersectsViewVolumeFloat(const GfBBox3f &bbox,
     
     points[0] = matrix_multiply(viewProjMat, (vector_float4){localMin[0], localMin[1], localMin[2], 1});
     points[1] = matrix_multiply(viewProjMat, (vector_float4){localMax[0], localMax[1], localMax[2], 1});
-    
+
     // Small prim cull
     vector_float2 screenSpace[2];
     

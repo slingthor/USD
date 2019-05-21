@@ -498,7 +498,7 @@ void HdStMSLProgram::UnbindResources(HdStSurfaceShader* surfaceShader, HdSt_Reso
 
 void HdStMSLProgram::SetProgram(char const* const label) {
     
-    MtlfMetalContext *context = MtlfMetalContext::GetMetalContext();
+    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
     
     context->SetShadingPrograms(_vertexFunction,
                                 _fragmentFunction,
@@ -555,7 +555,7 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
                                                      GLint firstIndex,
                                                      GLint instanceCount,
                                                      GLint baseVertex) const {
-    MtlfMetalContext *context = MtlfMetalContext::GetMetalContext();
+    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
     id<MTLBuffer> indexBuffer = context->GetIndexBuffer();
     const bool doMVAComputeGS = _buildTarget == kMSL_BuildTarget_MVA_ComputeGS;
     const bool doMVA = doMVAComputeGS || _buildTarget == kMSL_BuildTarget_MVA;
@@ -748,7 +748,7 @@ void HdStMSLProgram::DrawArraysInstanced(GLenum primitiveMode,
                                           GLint vertexCount,
                                           GLint instanceCount) const {
     
-    MtlfMetalContext *context = MtlfMetalContext::GetMetalContext();
+    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
     
     MTLPrimitiveType primType = GetMetalPrimType(primitiveMode);
     
@@ -775,7 +775,7 @@ void HdStMSLProgram::DrawArrays(GLenum primitiveMode,
                                 GLint baseVertex,
                                 GLint vertexCount) const {
     
-    MtlfMetalContext *context = MtlfMetalContext::GetMetalContext();
+    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
     
     MTLPrimitiveType primType = GetMetalPrimType(primitiveMode);
     

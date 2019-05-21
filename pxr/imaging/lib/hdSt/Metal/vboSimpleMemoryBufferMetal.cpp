@@ -103,7 +103,7 @@ HdStVBOSimpleMemoryBufferMetal::Reallocate(
     }
     int numElements = range->GetNumElements();
 
-    MtlfMetalContext *context = MtlfMetalContext::GetMetalContext();
+    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
     
     id<MTLDevice> device = context->device;
     

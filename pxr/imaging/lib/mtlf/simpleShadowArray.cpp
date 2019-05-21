@@ -138,7 +138,7 @@ MtlfSimpleShadowArray::EndCapture(size_t)
 void
 MtlfSimpleShadowArray::_AllocSamplers()
 {
-    MtlfMetalContext *mtlContext = MtlfMetalContext::GetMetalContext()->GetMetalContext();
+    MtlfMetalContextSharedPtr mtlContext = MtlfMetalContext::GetMetalContext();
     MTLSamplerDescriptor* samplerDescriptor = [[MTLSamplerDescriptor alloc] init];
 #if defined(ARCH_OS_IOS)
     samplerDescriptor.tAddressMode = MTLSamplerAddressModeClampToZero;

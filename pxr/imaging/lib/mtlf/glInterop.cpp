@@ -442,7 +442,7 @@ MtlfGlInterop::BlitColorTargetToOpenGL()
 void
 MtlfGlInterop::CopyDepthTextureToOpenGL(id<MTLComputeCommandEncoder> computeEncoder)
 {
-    MtlfMetalContext *context(MtlfMetalContext::GetMetalContext());
+    MtlfMetalContextSharedPtr context(MtlfMetalContext::GetMetalContext());
 
     id<MTLFunction> computeProgram = computeDepthCopyProgram;
     if (mtlSampleCount > 1)
@@ -465,7 +465,7 @@ MtlfGlInterop::CopyDepthTextureToOpenGL(id<MTLComputeCommandEncoder> computeEnco
 void
 MtlfGlInterop::ColourCorrectColourTexture(id<MTLComputeCommandEncoder> computeEncoder, id<MTLTexture> colourTexture)
 {
-    MtlfMetalContext *context(MtlfMetalContext::GetMetalContext());
+    MtlfMetalContextSharedPtr context(MtlfMetalContext::GetMetalContext());
     
     id<MTLFunction> computeProgram = computeColourCopyProgram;
     if (mtlSampleCount > 1)

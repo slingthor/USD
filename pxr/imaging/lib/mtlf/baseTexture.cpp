@@ -378,7 +378,7 @@ MtlfBaseTexture::_CreateTexture(GarchBaseTextureDataConstPtr texData,
 
             if (genMips) {
                 // Blit command encoder to generate mips
-                MtlfMetalContext *context = MtlfMetalContext::GetMetalContext();
+                MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
                 id<MTLBlitCommandEncoder> blitEncoder = context->GetBlitEncoder();
              
                 [blitEncoder generateMipmapsForTexture:_textureName];

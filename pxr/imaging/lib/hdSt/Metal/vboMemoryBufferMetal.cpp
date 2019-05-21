@@ -144,7 +144,7 @@ HdStVBOMemoryBufferMetal::Reallocate(
         HdResourceGPUHandle oldId[3];
         HdResourceGPUHandle curId[3];
 
-        MtlfMetalContext *context = MtlfMetalContext::GetMetalContext();
+        MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
         
         for (int i = 0; i < 3; i++) {
             newId[i] = context->GetMetalBuffer(bufferSize, MTLResourceStorageModeDefault);

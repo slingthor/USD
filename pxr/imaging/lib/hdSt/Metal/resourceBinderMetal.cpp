@@ -142,7 +142,7 @@ HdSt_ResourceBinderMetal::BindBuffer(TfToken const &name,
     if (!buffer->GetId().IsSet())
         return;
     
-    MtlfMetalContext *context = MtlfMetalContext::GetMetalContext();
+    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
     HdStBufferResourceMetalSharedPtr const metalBuffer = boost::dynamic_pointer_cast<HdStBufferResourceMetal>(buffer);
     HdTupleType tupleType = buffer->GetTupleType();
 
@@ -205,7 +205,7 @@ HdSt_ResourceBinderMetal::BindUniformi(TfToken const &name,
     auto shaderBindings = MSL_FindBinding(_shaderBindingMap, name, -1);
     auto it = shaderBindings.first;
     
-    MtlfMetalContext *context = MtlfMetalContext::GetMetalContext();
+    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
     
     int found = 0;
     for(; it != shaderBindings.second; ++it) {
@@ -230,7 +230,7 @@ HdSt_ResourceBinderMetal::BindUniformArrayi(TfToken const &name,
     auto shaderBindings = MSL_FindBinding(_shaderBindingMap, name, -1);
     auto it = shaderBindings.first;
     
-    MtlfMetalContext *context = MtlfMetalContext::GetMetalContext();
+    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
     
     int found = 0;
     for(; it != shaderBindings.second; ++it) {

@@ -95,6 +95,7 @@ class MtlfGlInterop;
 #endif
 
 class MtlfDrawTarget;
+typedef boost::shared_ptr<class MtlfMetalContext> MtlfMetalContextSharedPtr;
 
 /// \class MtlfMetalContext
 ///
@@ -156,8 +157,11 @@ struct MetalWorkQueue {
 
 class MtlfMetalContext : public boost::noncopyable {
 public:
-
+#if defined(ARCH_OS_IOS)
+#define MAX_GPUS    1
+#else
 #define MAX_GPUS    4
+#endif
     struct MtlfMultiBuffer {
         
         MtlfMultiBuffer() {}
@@ -195,8 +199,12 @@ public:
         void release();
         
         id<MTLBuffer> forCurrentGPU() const {
-            MtlfMetalContext *context = MtlfMetalContext::GetMetalContext();
+#if MAX_GPUS == 1
+            return buffer[0];
+#else
+            MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
             return buffer[context->currentGPU];
+#endif
         }
         
         id<MTLBuffer> operator[](int64_t const index) const {
@@ -231,10 +239,11 @@ public:
 
     /// Returns an instance for the current Metal device.
     MTLF_API
-    //static MtlfMetalContextSharedPtr GetMetalContext() {
-    static MtlfMetalContext *GetMetalContext() {
-        static MtlfMetalContext context(nil, 256, 256);
-        return &context;
+    static MtlfMetalContextSharedPtr GetMetalContext() {
+        if (!context)
+            context = MtlfMetalContextSharedPtr(new MtlfMetalContext(nil, 256, 256));
+        
+        return context;
     }
 
     /// Returns whether this interface has been initialized.
@@ -488,6 +497,8 @@ public:
     }
 
 protected:
+    static MtlfMetalContextSharedPtr context;
+
     MTLF_API
     MtlfMetalContext(id<MTLDevice> device, int width, int height);
     
