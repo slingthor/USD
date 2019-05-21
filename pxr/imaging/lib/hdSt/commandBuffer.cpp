@@ -137,6 +137,10 @@ HdStCommandBuffer::ExecuteDraw(
                         break;
                     }
                 }
+                if (foundSomethingVisible) {
+                    begin = i;
+                    break;
+                }
             }
             if (!foundSomethingVisible) {
                 return;
