@@ -131,12 +131,19 @@ HdStVBOSimpleMemoryBufferMetal::Reallocate(
 
         for (int i = 0; i < 3; i++) {
             oldId[i] = bres->GetIdAtIndex(i);
-            if (bufferSize) {
-                newId[i] = context->GetMetalBuffer(bufferSize, MTLResourceStorageModeDefault);
+            
+            // Triple buffer everything
+            if (true) {//i == 0) {
+                if (bufferSize) {
+                    newId[i] = context->GetMetalBuffer(bufferSize, MTLResourceStorageModeDefault);
+                }
+                else {
+                    // Dummy buffer - 0 byte buffers are invalid
+                    newId[i] = context->GetMetalBuffer(256, MTLResourceStorageModeDefault);
+                }
             }
             else {
-                // Dummy buffer - 0 byte buffers are invalid
-                newId[i] = context->GetMetalBuffer(256, MTLResourceStorageModeDefault);
+                newId[i].Clear();
             }
         }
 
@@ -161,11 +168,13 @@ HdStVBOSimpleMemoryBufferMetal::Reallocate(
             HD_PERF_COUNTER_INCR(HdPerfTokens->glCopyBufferSubData);
 
             for (int i = 0; i < 3; i++) {
-                [blitEncoder copyFromBuffer:oldId[i].forCurrentGPU()
-                               sourceOffset:0
-                                   toBuffer:newId[i].forCurrentGPU()
-                          destinationOffset:0
-                                       size:copySize];
+                if (newId[i].IsSet()) {
+                    [blitEncoder copyFromBuffer:oldId[i].forCurrentGPU()
+                                   sourceOffset:0
+                                       toBuffer:newId[i].forCurrentGPU()
+                              destinationOffset:0
+                                           size:copySize];
+                }
             }
         }
 
@@ -177,8 +186,12 @@ HdStVBOSimpleMemoryBufferMetal::Reallocate(
         }
 
         bres->SetAllocations(newId[0], newId[1], newId[2], bufferSize);
+        
+//        static size_t size = 0;
+//        size += range->GetNumElements();
+//        NSLog(@"vboSimpleMemoryBufferMetal - %zu", size);
     }
-
+    
     context->ReleaseEncoder(true, METALWORKQUEUE_RESOURCE);
     context->CommitCommandBufferForThread(false, false, METALWORKQUEUE_RESOURCE);
 

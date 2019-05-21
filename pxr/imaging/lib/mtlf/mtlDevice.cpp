@@ -380,8 +380,10 @@ void MtlfMetalContext::Cleanup()
 
 void MtlfMetalContext::RecreateInstance(id<MTLDevice> device, int width, int height)
 {
-    Cleanup();
-    Init(device, width, height);
+    context = NULL;
+    context = MtlfMetalContextSharedPtr(new MtlfMetalContext(device, width, height));
+//    Cleanup();
+//    Init(device, width, height);
 }
 
 void MtlfMetalContext::AllocateAttachments(int width, int height)

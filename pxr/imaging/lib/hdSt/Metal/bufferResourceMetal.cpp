@@ -120,6 +120,10 @@ HdStBufferResourceMetal::SetAllocations(HdResourceGPUHandle idBuffer0,
             [_texId[i] release];
             _texId[i] = nil;
         }
+        
+        if (!_id[i].IsSet()) {
+            continue;
+        }
 
         MtlfMetalContext::MtlfMultiBuffer &b = _id[i];
         MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
