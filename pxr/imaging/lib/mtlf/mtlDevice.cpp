@@ -1805,16 +1805,19 @@ void MtlfMetalContext::PrepareBufferFlush()
 }
 
 void MtlfMetalContext::FlushBuffers() {
+#if defined(ARCH_OS_MACOS)
     for(auto &buffer: modifiedBuffers) {
         id<MTLBuffer> const &b = buffer.first;
         MetalBufferFlushListEntry const &e = buffer.second;
         [buffer.first didModifyRange:NSMakeRange(e.start, e.end - e.start)];
     }
     modifiedBuffers.clear();
+#endif
     _FlushCachingStarted = false;
 }
 
 void MtlfMetalContext::QueueBufferFlush(id<MTLBuffer> const &buffer, uint64_t start, uint64_t end) {
+#if defined(ARCH_OS_MACOS)
     if (!_FlushCachingStarted) {
         [buffer didModifyRange:NSMakeRange(start, end - start)];
         return;
@@ -1833,6 +1836,7 @@ void MtlfMetalContext::QueueBufferFlush(id<MTLBuffer> const &buffer, uint64_t st
     {
         modifiedBuffers.emplace(buffer, MetalBufferFlushListEntry(start, end));
     }
+#endif
 }
 
 void MtlfMetalContext::CleanupUnusedBuffers(bool forceClean)
