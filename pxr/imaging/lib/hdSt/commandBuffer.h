@@ -48,11 +48,19 @@ namespace SpatialHierarchy {
     
     struct DrawableItem {
         DrawableItem(HdStDrawItemInstance* itemInstance);
-        void SetVisible(bool visible) const;
+        DrawableItem(HdStDrawItemInstance* itemInstance, GfRange3f boundingBox, size_t instanceIndex);
+        
+        void SetVisible(bool visible);
+        
+        static void ConvertDrawablesToItems(const std::vector<HdStDrawItemInstance*> &drawables, std::vector<DrawableItem*> *items);
         
         HdStDrawItemInstance *item;
         GfRange3f aabb;
         GfVec3f halfSize;
+        
+        bool visible;
+        bool isInstanced;
+        size_t instanceIdx;
     };
     
     class OctreeNode {
@@ -64,7 +72,7 @@ namespace SpatialHierarchy {
         
         unsigned long PerformCulling(matrix_float4x4 const &viewProjMatrix, vector_float2 const &dimensions);
         unsigned long MarkSubtreeVisible(bool visible);
-        unsigned Insert(const DrawableItem &drawable);
+        unsigned Insert(DrawableItem* drawable);
         
         void LogStatus(bool recursive);
         
@@ -76,9 +84,8 @@ namespace SpatialHierarchy {
     private:
         void subdivide();
         bool canSubdivide();
-        unsigned insertStraight(const DrawableItem &drawable);
         
-        std::vector<const DrawableItem> drawables;
+        std::vector<DrawableItem*> drawables;
         
         unsigned depth;
         bool isSplit;
@@ -96,6 +103,7 @@ namespace SpatialHierarchy {
         OctreeNode root;
         unsigned long totalItems;
         unsigned long visibleItems;
+        std::vector<DrawableItem*> drawableItems;
         
         float buildTimeMS;
         float lastCullTimeMS;

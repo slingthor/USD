@@ -218,6 +218,13 @@ public:
         return numVisible;
     }
     
+    void CalculateInstanceBounds() const;
+    
+    const std::vector<GfBBox3f>* GetInstanceBounds() const {
+        return &_instancedCullingBounds;
+    }
+    
+    
 protected:
 
     /// Returns the shared data

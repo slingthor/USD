@@ -166,21 +166,53 @@ namespace SpatialHierarchy {
     
     DrawableItem::DrawableItem(HdStDrawItemInstance* itemInstance)
     : item(itemInstance)
-    
+    , visible(false)
+    , isInstanced(false)
+    , instanceIdx(0)
     {
         aabb = itemInstance->GetDrawItem()->GetBounds().ComputeAlignedRange();
         halfSize = aabb.GetSize() * 0.5;
     }
     
-    void DrawableItem::SetVisible(bool visible) const
+    DrawableItem::DrawableItem(HdStDrawItemInstance* itemInstance, GfRange3f boundingBox, size_t instanceIndex)
+    : item(itemInstance)
+    , aabb(boundingBox)
+    , visible(false)
+    , isInstanced(true)
+    , instanceIdx(instanceIndex)
+    {
+        halfSize = aabb.GetSize() * 0.5;
+    }
+    
+
+    void DrawableItem::SetVisible(bool visible)
     {
         //item->SetVisible(visible);
+        this->visible = visible;
+    }
+    
+    void DrawableItem::ConvertDrawablesToItems(const std::vector<HdStDrawItemInstance*> &drawables, std::vector<DrawableItem*> *items)
+    {
+        for (auto drawable: drawables) {
+            HdBufferArrayRangeSharedPtr const & instanceIndexRange = drawable->GetDrawItem()->GetInstanceIndexRange();
+            if (instanceIndexRange) {
+                drawable->GetDrawItem()->CalculateInstanceBounds();
+                const std::vector<GfBBox3f>* instancedCullingBounds = drawable->GetDrawItem()->GetInstanceBounds();
+                for (size_t idx = 0; idx < instancedCullingBounds->size(); ++idx) {
+                    items->push_back(new DrawableItem(drawable, (*instancedCullingBounds)[idx].ComputeAlignedRange(), idx));
+                }
+                drawable->SetVisible(true);
+            } else {
+                items->push_back(new DrawableItem(drawable));
+            }
+        }
     }
 
+
     BVH::BVH()
-    : root(OctreeNode(0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0)),
-      buildTimeMS(0.f),
-      populated(false)
+    : root(OctreeNode(0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0))
+    , buildTimeMS(0.f)
+    , populated(false)
     {
         // nothing.
     }
@@ -192,21 +224,29 @@ namespace SpatialHierarchy {
             return;
         }
         
+        drawableItems.clear();
+        
         uint64_t buildStart = ArchGetTickTime();
         totalItems = drawables.size();
         
+        DrawableItem::ConvertDrawablesToItems(drawables, &(this->drawableItems));
+        
+        if (drawableItems.size() <= 0) {
+            return;
+        }
+        
         // calculate the max size
-        GfBBox3f bbox = drawables[0]->GetDrawItem()->GetBounds();
-        for (auto drawable: drawables) {
-            bbox = bbox.Combine(bbox, drawable->GetDrawItem()->GetBounds());
+        GfRange3f bbox = drawableItems[0]->aabb;
+        for (auto drawableItem: drawableItems) {
+            bbox.ExtendBy(drawableItem->aabb);
         }
 
-        root.ReInit(bbox.GetRange());
+        root.ReInit(bbox);
         
         unsigned depth = 0;
-        for (size_t idx=0; idx < drawables.size(); ++idx)
+        for (size_t idx=0; idx < drawableItems.size(); ++idx)
         {
-            depth = MAX(depth, root.Insert(DrawableItem(drawables[idx])));
+            depth = MAX(depth, root.Insert(drawableItems[idx]));
         }
         
         buildTimeMS = (ArchGetTickTime() - buildStart) / 1000000.0f;
@@ -219,19 +259,37 @@ namespace SpatialHierarchy {
     unsigned long BVH::PerformCulling(matrix_float4x4 const &viewProjMatrix, vector_float2 const &dimensions)
     {
         uint64_t cullStart = ArchGetTickTime();
+        
+        // mark & set all invisible
+        for (auto drawableItem : drawableItems) {
+            drawableItem->visible = false;
+        }
+        
         visibleItems = root.PerformCulling(viewProjMatrix, dimensions);
+        
+        // set visible based on marker
+        for (auto drawableItem : drawableItems) {
+            if (drawableItem->isInstanced) {
+                if (drawableItem->visible) {
+                    drawableItem->item->SetVisible(true);
+                }
+            } else {
+                drawableItem->item->SetVisible(drawableItem->visible);
+            }
+        }
+
         lastCullTimeMS = (ArchGetTickTime() - cullStart) / 1000000.0f;
         
         return visibleItems;
     }
     
     OctreeNode::OctreeNode(float minX, float minY, float minZ, float maxX, float maxY, float maxZ, unsigned currentDepth)
-    : aabb(GfRange3f(GfVec3f(minX, minY, minZ), GfVec3f(maxX, maxY, maxZ))),
-      minVec(minX, minY, minZ),
-      maxVec(maxX, maxY, maxZ),
-      halfSize((maxX - minX) * 0.5, (maxY - minY) * 0.5, (maxZ - minZ) * 0.5),
-      depth(currentDepth),
-      isSplit(false)
+    : aabb(GfRange3f(GfVec3f(minX, minY, minZ), GfVec3f(maxX, maxY, maxZ)))
+    , minVec(minX, minY, minZ)
+    , maxVec(maxX, maxY, maxZ)
+    , halfSize((maxX - minX) * 0.5, (maxY - minY) * 0.5, (maxZ - minZ) * 0.5)
+    , depth(currentDepth)
+    , isSplit(false)
     {
     }
     
@@ -247,7 +305,6 @@ namespace SpatialHierarchy {
     
     void OctreeNode::ReInit(GfRange3f const &boundingBox)
     {
-        MissingFunctions::LogBounds(boundingBox);
         aabb = GfRange3f(boundingBox);
         minVec = aabb.GetMin();
         maxVec = aabb.GetMax();
@@ -274,7 +331,7 @@ namespace SpatialHierarchy {
         
         for (auto &drawable : drawables) {
             // TODO: could test here
-            drawable.SetVisible(true);
+            drawable->SetVisible(true);
         }
         
         if (isSplit) {
@@ -291,7 +348,7 @@ namespace SpatialHierarchy {
         unsigned long visibleCount = drawables.size();
         
         for (auto &drawable : drawables) {
-            drawable.SetVisible(visible);
+            drawable->SetVisible(visible);
         }
         
         if (isSplit) {
@@ -338,7 +395,7 @@ namespace SpatialHierarchy {
         return (depth < maxOctreeDepth);
     }
     
-    unsigned OctreeNode::Insert(const DrawableItem &drawable)
+    unsigned OctreeNode::Insert(DrawableItem* drawable)
     {
         if (!canSubdivide()) {
             drawables.push_back(drawable);
@@ -349,14 +406,9 @@ namespace SpatialHierarchy {
             subdivide();
         }
         
-        return insertStraight(drawable);
-    }
-    
-    unsigned OctreeNode::insertStraight(const DrawableItem &drawable)
-    {
-        if (!MissingFunctions::IntersectsAllChildren(this, drawable.aabb)) {
+        if (!MissingFunctions::IntersectsAllChildren(this, drawable->aabb)) {
             for (int idx = 0; idx < 8; ++idx) {
-                Intersection intersection = MissingFunctions::SpatialRelation(children[idx], drawable.aabb);
+                Intersection intersection = MissingFunctions::SpatialRelation(children[idx], drawable->aabb);
                 if (Intersection::Inside == intersection) {
                     return children[idx]->Insert(drawable);
                 }
@@ -677,6 +729,10 @@ HdStCommandBuffer::SyncDrawItemVisibility(unsigned visChangeCount)
         // sync after contruction.
         return;
     }
+    static os_log_t visSyncLog = os_log_create("hydra.metal", "VisibilitySync");
+    os_signpost_id_t visSync = os_signpost_id_generate(visSyncLog);
+    
+    os_signpost_interval_begin(visSyncLog, visSync, "Visibility Sync");
 
     _visibleSize = 0;
     int const N = 10000;
@@ -712,6 +768,7 @@ HdStCommandBuffer::SyncDrawItemVisibility(unsigned visChangeCount)
     for (size_t i : visCounts) {
         _visibleSize += i;
     }
+    os_signpost_interval_end(visSyncLog, visSync, "Visibility Sync");
 
     // Mark visible state as clean;
     _visChangeCount = visChangeCount;
@@ -816,22 +873,22 @@ HdStCommandBuffer::FrustumCull(GfMatrix4d const &viewProjMatrix)
     bvh.PerformCulling(simdViewProjMatrix, dimensions);
     os_signpost_interval_end(cullingLog, bvhCulling, "Culling: BVH");
 //#else
-    os_signpost_id_t naiveCulling = os_signpost_id_generate(cullingLog);
-    
-    os_signpost_interval_begin(cullingLog, naiveCulling, "Culling: Naïve");
-    if (!mtCullingDisabled) {
-        WorkParallelForN(_drawItemInstances.size(),
-                         std::bind(&_Worker::cull, &_drawItemInstances,
-                                   std::cref(simdViewProjMatrix),
-                                   std::placeholders::_1,
-                                   std::placeholders::_2));
-    } else {
-        _Worker::cull(&_drawItemInstances,
-                      simdViewProjMatrix,
-                      0,
-                      _drawItemInstances.size());
-    }
-    os_signpost_interval_end(cullingLog, naiveCulling, "Culling: Naïve");
+//    os_signpost_id_t naiveCulling = os_signpost_id_generate(cullingLog);
+//
+//    os_signpost_interval_begin(cullingLog, naiveCulling, "Culling: Naïve");
+//    if (!mtCullingDisabled) {
+//        WorkParallelForN(_drawItemInstances.size(),
+//                         std::bind(&_Worker::cull, &_drawItemInstances,
+//                                   std::cref(simdViewProjMatrix),
+//                                   std::placeholders::_1,
+//                                   std::placeholders::_2));
+//    } else {
+//        _Worker::cull(&_drawItemInstances,
+//                      simdViewProjMatrix,
+//                      0,
+//                      _drawItemInstances.size());
+//    }
+//    os_signpost_interval_end(cullingLog, naiveCulling, "Culling: Naïve");
 //#endif
     
     MtlfMetalContext::GetMetalContext()->FlushBuffers();
