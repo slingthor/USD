@@ -82,23 +82,21 @@ namespace SpatialHierarchy {
             NSLog(@"(%f, %f, %f) -- (%f, %f, %f)", bounds.GetRange().GetMin().data()[0], bounds.GetRange().GetMin().data()[1], bounds.GetRange().GetMin().data()[2], bounds.GetRange().GetMax().data()[0], bounds.GetRange().GetMax().data()[1], bounds.GetRange().GetMax().data()[2]);
         }
         
-        bool IntersectsAllChildren(const OctreeNode* node, const GfBBox3f &entity)
+        bool IntersectsAllChildren(const OctreeNode* node, const GfRange3f &entity)
         {
-            const GfVec3f sizeEntity = entity.GetRange().GetMax() - entity.GetRange().GetMin();
-            
             // Better alternative: (calc center) of entity within node, check if (minVec is negative) && (maxVec is positive);
             // Or if needs touch >= 2 children: verify that at least one component is negative and the other positive (minVec, maxVec)
             
-            if (allLarger(sizeEntity, node->halfSize)) {
+            if (allLarger(entity.GetSize(), node->halfSize)) {
                 return true;
             }
             return false;
         }
         
-        Intersection SpatialRelation(const OctreeNode* node, const GfBBox3f &entity)
+        Intersection SpatialRelation(const OctreeNode* node, const GfRange3f &entity)
         {
-            const GfVec3f &entityMin = entity.GetRange().GetMin();
-            const GfVec3f &entityMax = entity.GetRange().GetMax();
+            const GfVec3f &entityMin = entity.GetMin();
+            const GfVec3f &entityMax = entity.GetMax();
             
             if (allLarger(entityMin, node->minVec) && allLarger(node->maxVec, entityMax)) {
                 return Intersection::Inside;
@@ -189,6 +187,7 @@ namespace SpatialHierarchy {
 
     void DrawableItem::SetVisible(bool visible)
     {
+        
         if (isInstanced) {
             if (visible) {
                 item->SetVisible(true);
@@ -207,12 +206,24 @@ namespace SpatialHierarchy {
             if (instanceIndexRange) {
                 drawable->GetDrawItem()->CalculateInstanceBounds();
                 const std::vector<GfBBox3f>* instancedCullingBounds = drawable->GetDrawItem()->GetInstanceBounds();
+#if 1
+                // create an item per instance
                 for (size_t idx = 0; idx < instancedCullingBounds->size(); ++idx) {
                     GfRange3f bbox = (*instancedCullingBounds)[idx].ComputeAlignedRange();
                     boundingBox.ExtendBy(bbox);
                     items->push_back(new DrawableItem(drawable, bbox, idx));
                 }
-                drawable->SetVisible(true);
+#else
+                // create an item for all instances
+                GfRange3f itemBBox;
+                for (size_t idx = 0; idx < instancedCullingBounds->size(); ++idx) {
+                    GfRange3f bbox = (*instancedCullingBounds)[idx].ComputeAlignedRange();
+                    itemBBox.ExtendBy(bbox);
+                }
+                items->push_back(new DrawableItem(drawable, itemBBox, 0));
+                boundingBox.ExtendBy(itemBBox);
+#endif
+                
             } else {
                 DrawableItem* drawableItem = new DrawableItem(drawable);
                 boundingBox.ExtendBy(drawableItem->aabb);
@@ -223,21 +234,31 @@ namespace SpatialHierarchy {
         return boundingBox;
     }
 
-
+    static int BVHCounterX = 0;
+    
     BVH::BVH()
     : root(OctreeNode(0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0))
     , buildTimeMS(0.f)
     , populated(false)
     {
         // nothing.
-        NSLog(@"BVH Created");
+        BVHCounter = ++BVHCounterX;
+        NSLog(@"BVH Created,%i", BVHCounter);
+    }
+    
+    BVH::~BVH()
+    {
+        for (size_t idx = 0; idx < drawableItems.size(); ++idx) {
+            delete drawableItems[idx];
+        }
+        NSLog(@"BVH dead,%i", BVHCounter);
     }
     
     void BVH::BuildBVH(const std::vector<HdStDrawItemInstance*> &drawables)
     {
         os_signpost_id_t bvhGenerate = os_signpost_id_generate(cullingLog);
         
-        NSLog(@"Building BVH for %zu HdStDrawItemInstance(s)", drawables.size());
+        NSLog(@"Building BVH for %zu HdStDrawItemInstance(s), %i", drawables.size(), BVHCounter);
         if (drawables.size() <= 0) {
             return;
         }
@@ -271,6 +292,7 @@ namespace SpatialHierarchy {
     
     void BVH::PerformCulling(matrix_float4x4 const &viewProjMatrix, vector_float2 const &dimensions)
     {
+        NSLog(@"Culling: %i", BVHCounter);
         os_signpost_id_t bvhCulling = os_signpost_id_generate(cullingLog);
         os_signpost_id_t bvhCullingInit = os_signpost_id_generate(cullingLog);
         os_signpost_id_t bvhCullingCull = os_signpost_id_generate(cullingLog);
@@ -377,11 +399,6 @@ namespace SpatialHierarchy {
                                        std::placeholders::_2),
                              1);
         }
-//        if (isSplit) {
-//            for (int i=0; i < 8; ++i) {
-//                children[i]->MarkSubtreeVisible();
-//            }
-//        }
     }
     
     void OctreeNode::MarkSubtreeHidden()
@@ -424,6 +441,7 @@ namespace SpatialHierarchy {
         children[5] = new OctreeNode(midPoint.data()[0], localMin.data()[1], midPoint.data()[2], localMax.data()[0], midPoint.data()[1], localMax.data()[2], depth + 1);
         children[6] = new OctreeNode(localMin.data()[0], midPoint.data()[1], midPoint.data()[2], midPoint.data()[0], localMax.data()[1], localMax.data()[2], depth + 1);
         children[7] = new OctreeNode(midPoint.data()[0], midPoint.data()[1], midPoint.data()[2], localMax.data()[0], localMax.data()[1], localMax.data()[2], depth + 1);
+        
         isSplit = true;
     }
     

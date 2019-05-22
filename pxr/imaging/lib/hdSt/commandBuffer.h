@@ -82,14 +82,14 @@ namespace SpatialHierarchy {
         GfVec3f maxVec;
         GfVec3f halfSize;
         
+        std::vector<DrawableItem*> drawables;
+        bool isSplit;
+
     private:
         void subdivide();
         bool canSubdivide();
         
-        std::vector<DrawableItem*> drawables;
-        
         unsigned depth;
-        bool isSplit;
         
         //OctreeNode* parent;
         OctreeNode* children[8] = {NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL};
@@ -98,6 +98,7 @@ namespace SpatialHierarchy {
     class BVH {
     public:
         BVH();
+        ~BVH();
         void BuildBVH(const std::vector<HdStDrawItemInstance*> &drawables);
         void PerformCulling(matrix_float4x4 const &viewProjMatrix, vector_float2 const &dimensions);
         
@@ -108,6 +109,7 @@ namespace SpatialHierarchy {
         float lastCullTimeMS;
         
         bool populated;
+        int BVHCounter;
     };
 }
 class HdStDrawItem;
