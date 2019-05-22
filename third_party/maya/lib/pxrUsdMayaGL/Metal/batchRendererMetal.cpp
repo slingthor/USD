@@ -186,7 +186,7 @@ UsdMayaGLBatchRendererMetal::_Render(
         tasks.insert(tasks.end(), renderTasks.begin(), renderTasks.end());
     }
 
-    MtlfMetalContext *context = MtlfMetalContext::GetMetalContext();
+    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
     
     // Make sure the Metal render targets, and GL interop textures match the GL viewport size
     if (context->mtlColorTexture.width != viewport[2] ||
