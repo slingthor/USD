@@ -22,6 +22,8 @@
 // language governing permissions and limitations under the Apache License.
 //
 #include "pxr/pxr.h"
+#include "pxr/base/arch/defines.h"
+
 #include "pxr/imaging/hdSt/Metal/renderDelegateMetal.h"
 #include "pxr/imaging/hdSt/tokens.h"
 
@@ -35,7 +37,11 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+#if defined(ARCH_OS_MACOS)
 TF_DEFINE_ENV_SETTING(PXR_MTL_SAMPLE_COUNT, 2, "");
+#else
+TF_DEFINE_ENV_SETTING(PXR_MTL_SAMPLE_COUNT, 1, "");
+#endif
 
 namespace {
 static
@@ -158,7 +164,7 @@ VtValue HdStRenderDelegateMetal::GetRenderSetting(TfToken const& key) const
 
 HdStRenderDelegateMetal::~HdStRenderDelegateMetal()
 {
-    // Nothing
+    MtlfMetalContext::context = NULL;
 }
 
 bool
