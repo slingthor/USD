@@ -1134,9 +1134,13 @@ void MtlfMetalContext::SetRenderPipelineState()
                 renderPipelineStateDescriptor.colorAttachments[0].destinationRGBBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
                 renderPipelineStateDescriptor.colorAttachments[0].destinationAlphaBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
                 
-                if (mtlColorTexture != nil) {
-                    //renderPipelineStateDescriptor.colorAttachments[0].pixelFormat = mtlColorTexture.pixelFormat;
-                    renderPipelineStateDescriptor.colorAttachments[0].pixelFormat = MTLPixelFormatRGBA16Float;
+                if (mtlMultisampleColorTexture != nil) {
+                    renderPipelineStateDescriptor.colorAttachments[0].pixelFormat = mtlMultisampleColorTexture.pixelFormat;
+                    //renderPipelineStateDescriptor.colorAttachments[0].pixelFormat = MTLPixelFormatRGBA16Float;
+                }
+                else if (mtlColorTexture != nil) {
+                    renderPipelineStateDescriptor.colorAttachments[0].pixelFormat = mtlColorTexture.pixelFormat;
+                    //renderPipelineStateDescriptor.colorAttachments[0].pixelFormat = MTLPixelFormatRGBA16Float;
                 }
                 else {
                     renderPipelineStateDescriptor.colorAttachments[0].pixelFormat = outputPixelFormat;
