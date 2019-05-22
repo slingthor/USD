@@ -496,8 +496,9 @@ public:
         return workQueueResource;
     }
 
-protected:
     static MtlfMetalContextSharedPtr context;
+
+protected:
 
     MTLF_API
     MtlfMetalContext(id<MTLDevice> device, int width, int height);
