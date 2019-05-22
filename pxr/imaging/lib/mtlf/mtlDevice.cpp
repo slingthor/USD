@@ -208,9 +208,12 @@ void MtlfMetalContext::Init(id<MTLDevice> _device, int width, int height)
     
     UpdateCurrentGPU();
     
-    captureScope = [[MTLCaptureManager sharedCaptureManager] newCaptureScopeWithDevice:device];
-    captureScope.label = @"Full Frame";
-    [[MTLCaptureManager sharedCaptureManager] setDefaultCaptureScope:captureScope];
+    captureScopeFullFrame = [[MTLCaptureManager sharedCaptureManager] newCaptureScopeWithDevice:device];
+    captureScopeFullFrame.label = @"Full Frame";
+    [[MTLCaptureManager sharedCaptureManager] setDefaultCaptureScope:captureScopeFullFrame];
+    
+    captureScopeSubset = [[MTLCaptureManager sharedCaptureManager] newCaptureScopeWithDevice:device];
+    captureScopeSubset.label = @"Subset";
     
     NSLog(@"Selected %@ for Metal Device", device.name);
     
@@ -311,8 +314,11 @@ void MtlfMetalContext::Init(id<MTLDevice> _device, int width, int height)
 void MtlfMetalContext::Cleanup()
 {
     [[MTLCaptureManager sharedCaptureManager] setDefaultCaptureScope:nil];
-    [captureScope release];
-    captureScope = nil;
+    [captureScopeFullFrame release];
+    captureScopeFullFrame = nil;
+    
+    [captureScopeSubset release];
+    captureScopeSubset = nil;
     
 #if defined(ARCH_GFX_OPENGL)
     if (glInterop) {
@@ -1884,7 +1890,7 @@ void MtlfMetalContext::StartFrame() {
 //    UpdateCurrentGPU();
     GPUTImerResetTimer(frameCount);
     
-    [captureScope beginScope];
+    [captureScopeFullFrame beginScope];
 }
 
 void MtlfMetalContext::EndFrameForThread() {
@@ -1905,7 +1911,17 @@ void MtlfMetalContext::EndFrame() {
     // Reset it here as OSD may get invoked before StartFrame() is called.
     OSDEnabledThisFrame = false;
     
-    [captureScope endScope];
+    [captureScopeFullFrame endScope];
+}
+
+void MtlfMetalContext::BeginCaptureSubset()
+{
+    [captureScopeSubset beginScope];
+}
+
+void MtlfMetalContext::EndCaptureSubset()
+{
+    [captureScopeSubset endScope];
 }
 
 void MtlfMetalContext::_gsAdvanceBuffer() {

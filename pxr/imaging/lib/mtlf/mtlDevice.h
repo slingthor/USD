@@ -471,6 +471,9 @@ public:
     MTLF_API
     float GetGPUTimeInMs();
     
+    void BeginCaptureSubset();
+    void EndCaptureSubset();
+    
     bool enableMultiQueue;
 
     id<MTLDevice> device;
@@ -779,7 +782,8 @@ private:
     
     bool OSDEnabledThisFrame = false;
     
-    id<MTLCaptureScope> captureScope;
+    id<MTLCaptureScope> captureScopeFullFrame;
+    id<MTLCaptureScope> captureScopeSubset;
 
 #if defined(ARCH_GFX_OPENGL)
     MtlfGlInterop *glInterop;
