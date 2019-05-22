@@ -52,7 +52,7 @@ namespace SpatialHierarchy {
         
         void SetVisible(bool visible);
         
-        static void ConvertDrawablesToItems(const std::vector<HdStDrawItemInstance*> &drawables, std::vector<DrawableItem*> *items);
+        static GfRange3f ConvertDrawablesToItems(const std::vector<HdStDrawItemInstance*> &drawables, std::vector<DrawableItem*> *items);
         
         HdStDrawItemInstance *item;
         GfRange3f aabb;
@@ -70,8 +70,9 @@ namespace SpatialHierarchy {
         
         void ReInit(GfRange3f const &boundingBox);
         
-        unsigned long PerformCulling(matrix_float4x4 const &viewProjMatrix, vector_float2 const &dimensions);
-        unsigned long MarkSubtreeVisible(bool visible);
+        void PerformCulling(matrix_float4x4 const &viewProjMatrix, vector_float2 const &dimensions);
+        void MarkSubtreeVisible();
+        void MarkSubtreeHidden();
         unsigned Insert(DrawableItem* drawable);
         
         void LogStatus(bool recursive);
@@ -98,11 +99,9 @@ namespace SpatialHierarchy {
     public:
         BVH();
         void BuildBVH(const std::vector<HdStDrawItemInstance*> &drawables);
-        unsigned long PerformCulling(matrix_float4x4 const &viewProjMatrix, vector_float2 const &dimensions);
+        void PerformCulling(matrix_float4x4 const &viewProjMatrix, vector_float2 const &dimensions);
         
         OctreeNode root;
-        unsigned long totalItems;
-        unsigned long visibleItems;
         std::vector<DrawableItem*> drawableItems;
         
         float buildTimeMS;
