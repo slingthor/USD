@@ -129,9 +129,6 @@ enum MetalWorkQueueType {
 
 struct MetalWorkQueue {
     id<MTLCommandBuffer>         commandBuffer;
-#if defined(METAL_EVENTS_API_PRESENT)
-    id<MTLEvent>                 event;
-#endif
     
     MetalEncoderType             currentEncoderType;
     id<MTLBlitCommandEncoder>    currentBlitEncoder;
@@ -534,7 +531,6 @@ protected:
                 gsDataOffset = 0;
                 gsBufferIndex = 0;
                 gsCurrentBuffer = nil;
-                gsFence = nil;
                 gsHasOpenBatch = false;
                 gsSyncRequired = false;
                 enableMVA = false;
@@ -558,6 +554,14 @@ protected:
                 currentWorkQueueType = METALWORKQUEUE_DEFAULT;
                 currentWorkQueue     = &workQueueDefault;
                 
+                workQueueDefault.currentEventValue                    = 1;
+                workQueueDefault.highestExpectedEventValue            = 0;
+                workQueueDefault.lastWaitEventValue                   = 0;
+
+                workQueueGeometry.currentEventValue                   = 1;
+                workQueueGeometry.highestExpectedEventValue           = 0;
+                workQueueGeometry.lastWaitEventValue                  = 0;
+
                 _this->ResetEncoders(METALWORKQUEUE_DEFAULT, true);
                 _this->ResetEncoders(METALWORKQUEUE_GEOMETRY_SHADER, true);
                 
@@ -566,8 +570,10 @@ protected:
                     gsBuffers.push_back([_this->device newBufferWithLength:_this->gsMaxDataPerBatch options:resourceOptions]);
                 gsCurrentBuffer = gsBuffers.at(0);
                 
-                gsFence = [_this->device newFence];
-                
+                if (_this->eventsAvailable) {
+                    gsSyncEvent = [_this->device newEvent];
+                }
+
                 remappedQuadIndexBuffer.Clear();
                 pointIndexBuffer.Clear();
                 init = true;
@@ -591,6 +597,10 @@ protected:
         id<MTLBuffer> vertexPositionBuffer;
         
         id<MTLComputePipelineState> computePipelineState;
+        
+#if defined(METAL_EVENTS_API_PRESENT)
+        id<MTLEvent>                 gsSyncEvent;
+#endif
 
         MetalWorkQueue      *currentWorkQueue;
         MetalWorkQueueType  currentWorkQueueType;
@@ -612,7 +622,6 @@ protected:
         int                        gsBufferIndex;
         id<MTLBuffer>              gsCurrentBuffer;
         std::vector<id<MTLBuffer>> gsBuffers;
-        id<MTLFence>               gsFence;
         bool                       gsHasOpenBatch;
         bool                       gsFirstBatch;
         bool                       gsSyncRequired;

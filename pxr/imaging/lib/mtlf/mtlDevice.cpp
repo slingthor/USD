@@ -62,7 +62,7 @@ MtlfMetalContext::ThreadState::~ThreadState() {
     for(int i = 0; i < kMSL_ProgramStage_NumStages; i++) {
         delete[] oldStyleUniformBuffer[i];
     }
-    [gsFence release];
+    [gsSyncEvent release];
     for(int i = 0; i < gsBuffers.size(); i++)
         [gsBuffers.at(i) release];
     gsBuffers.clear();
@@ -230,7 +230,10 @@ void MtlfMetalContext::Init(id<MTLDevice> _device, int width, int height)
         gsMaxConcurrentBatches = 2;
     }
     
-    ResetEncoders(METALWORKQUEUE_GEOMETRY_SHADER, true);
+    workQueueResource.currentEventValue                   = 1;
+    workQueueResource.highestExpectedEventValue           = 0;
+    workQueueResource.lastWaitEventValue                  = 0;
+
     ResetEncoders(METALWORKQUEUE_RESOURCE, true);
     
     memset(commandBuffers, 0x00, sizeof(commandBuffers));
@@ -617,12 +620,6 @@ void MtlfMetalContext::CreateCommandBuffer(MetalWorkQueueType workQueueType) {
                 [wq->commandBuffer retain];
             }
         }
-
-#if defined(METAL_EVENTS_API_PRESENT)
-        if (eventsAvailable) {
-            wq->event = [device newEvent];
-        }
-#endif
     }
     // We'll reuse an existing buffer silently if it's empty, otherwise emit warning
     else if (wq->encoderHasWork) {
@@ -670,7 +667,7 @@ void MtlfMetalContext::EncodeWaitForEvent(MetalWorkQueueType waitQueue, MetalWor
 #if defined(METAL_EVENTS_API_PRESENT)
         // Make this command buffer wait for the event to be resolved
         if (eventsAvailable) {
-            [wait_wq->commandBuffer encodeWaitForEvent:signal_wq->event value:eventValue];
+            [wait_wq->commandBuffer encodeWaitForEvent:threadState.gsSyncEvent value:eventValue];
             wait_wq->lastWaitEventValue = eventValue;
         }
 #endif
@@ -706,7 +703,7 @@ uint64_t MtlfMetalContext::EncodeSignalEvent(MetalWorkQueueType signalQueue)
 #if defined(METAL_EVENTS_API_PRESENT)
     if (eventsAvailable) {
         // Generate event
-        [wq->commandBuffer encodeSignalEvent:wq->event value:wq->currentEventValue];
+        [wq->commandBuffer encodeSignalEvent:threadState.gsSyncEvent value:wq->currentEventValue];
     }
 #endif
     return wq->currentEventValue++;
@@ -1447,19 +1444,11 @@ void MtlfMetalContext::ResetEncoders(MetalWorkQueueType workQueueType, bool isIn
         if(wq->highestExpectedEventValue != endOfQueueEventValue && wq->highestExpectedEventValue >= wq->currentEventValue) {
             TF_FATAL_CODING_ERROR("There is a WaitForEvent which is never going to get Signalled!");
 		}
-#if defined(METAL_EVENTS_API_PRESENT)
-        if(wq->event != nil) {
-            [wq->event release];
-		}
-#endif
         if(threadState.gsHasOpenBatch)
             TF_FATAL_CODING_ERROR("A Compute Geometry Shader batch is left open!");
     }
    
     wq->commandBuffer         = nil;
-#if defined(METAL_EVENTS_API_PRESENT)
-    wq->event                 = nil;
-#endif
     
     wq->encoderInUse             = false;
     wq->encoderEnded             = false;
@@ -1469,9 +1458,6 @@ void MtlfMetalContext::ResetEncoders(MetalWorkQueueType workQueueType, bool isIn
     wq->currentRenderEncoder     = nil;
     wq->currentComputeEncoder    = nil;
     
-    wq->currentEventValue                    = 1;
-    wq->highestExpectedEventValue            = 0;
-    wq->lastWaitEventValue                   = 0;
     wq->currentVertexDescriptorHash          = 0;
     wq->currentColourAttachmentsHash         = 0;
     wq->currentRenderPipelineDescriptorHash  = 0;
@@ -1537,7 +1523,7 @@ void MtlfMetalContext::CommitCommandBufferForThread(bool waituntilScheduled, boo
         wq->currentEventValue = endOfQueueEventValue;
 #if defined(METAL_EVENTS_API_PRESENT)
         if (eventsAvailable) {
-            [wq->commandBuffer encodeSignalEvent:wq->event value:wq->currentEventValue];
+            [wq->commandBuffer encodeSignalEvent:threadState.gsSyncEvent value:wq->currentEventValue];
         }
 #endif
         wq->generatesEndOfQueueEvent = false;
