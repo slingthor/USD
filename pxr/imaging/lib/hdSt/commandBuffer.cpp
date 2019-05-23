@@ -58,6 +58,7 @@
 #include <sys/time.h>
 
 #include <os/signpost.h>
+#include <queue>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -314,11 +315,22 @@ namespace SpatialHierarchy {
         os_signpost_interval_begin(cullingLog, bvhCulling, "Culling: BVH");
         // set instanced items to invisible. Everything else will be set to visible during culling.
         os_signpost_interval_begin(cullingLog, bvhCullingInit, "Culling: BVH -- Init");
-        for (auto drawableItem : drawableItems) {
-            //if (drawableItem->isInstanced) {
-                drawableItem->item->SetVisible(false);
-            //}
-        }
+        struct _WorkerInvisible {
+            static
+            void setInVisible(const std::vector<DrawableItem*> &items, size_t begin, size_t end)
+            {
+                for(size_t idx = begin; idx < end; ++idx) {
+                    items[idx]->item->SetVisible(false);
+                }
+            }
+        };
+
+        int grainSize = MAX(drawableItems.size()/WorkGetConcurrencyLimit(), 8);
+        WorkParallelForN(drawableItems.size(),
+                         std::bind(&_WorkerInvisible::setInVisible, drawableItems,
+                                   std::placeholders::_1,
+                                   std::placeholders::_2),
+                         grainSize);
         os_signpost_interval_end(cullingLog, bvhCullingInit, "Culling: BVH -- Init");
 
         os_signpost_interval_begin(cullingLog, bvhCullingCull, "Culling: BVH -- Cull");
@@ -326,20 +338,31 @@ namespace SpatialHierarchy {
             static
             void setVisible(std::vector<OctreeNode*> *nodes, size_t begin, size_t end)
             {
+                std::queue<OctreeNode*> q;
+
                 for(size_t idx = begin; idx < end; ++idx) {
-                    for (auto &drawable : (*nodes)[idx]->drawables) {
+                    q.push((*nodes)[idx]);
+                }
+                
+                while (!q.empty()) {
+                    OctreeNode* node = q.front();
+                    q.pop();
+                    
+                    for (auto &drawable : node->drawables) {
                         drawable->SetVisible(true);
                     }
-                    for (auto &drawable : (*nodes)[idx]->drawablesTooLarge) {
+                    for (auto &drawable : node->drawablesTooLarge) {
                         drawable->SetVisible(true);
                     }
-                    if ((*nodes)[idx]->isSplit) {
-                        std::vector<OctreeNode*> children(std::begin((*nodes)[idx]->children), std::end((*nodes)[idx]->children));
-                        setVisible(&children, 0, 7);
+                    if (node->isSplit) {
+                        for (size_t idx = 0; idx < 8; ++idx) {
+                            q.push(node->children[0]);
+                        }
                     }
                 }
             }
         };
+
         std::list<OctreeNode*> visibleSubtreesList = root.PerformCulling(viewProjMatrix, dimensions);
         
         std::vector<OctreeNode*> visibleSubtreesVec{
