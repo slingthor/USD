@@ -334,15 +334,18 @@ namespace SpatialHierarchy {
                         drawable->SetVisible(true);
                     }
                     if ((*nodes)[idx]->isSplit) {
-                        std::vector<OctreeNode*> children(std::begin(children[idx]->children), std::end(children[idx]->children));
+                        std::vector<OctreeNode*> children(std::begin((*nodes)[idx]->children), std::end((*nodes)[idx]->children));
                         setVisible(&children, 0, 7);
                     }
                 }
             }
         };
         std::list<OctreeNode*> visibleSubtreesList = root.PerformCulling(viewProjMatrix, dimensions);
-        std::vector<OctreeNode*> visibleSubtreesVec{ std::make_move_iterator(std::begin(visibleSubtreesList)), std::make_move_iterator(std::end(visibleSubtreesList)) };
-        NSLog(@"Visible Subtrees: %zu", visibleSubtreesVec.size());
+        
+        std::vector<OctreeNode*> visibleSubtreesVec{
+            std::make_move_iterator(std::begin(visibleSubtreesList)),
+            std::make_move_iterator(std::end(visibleSubtreesList))
+        };
 
         WorkParallelForN(visibleSubtreesVec.size(),
                          std::bind(&_Worker::setVisible, &visibleSubtreesVec,
