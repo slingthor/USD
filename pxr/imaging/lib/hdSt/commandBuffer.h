@@ -71,8 +71,6 @@ namespace SpatialHierarchy {
         void ReInit(GfRange3f const &boundingBox, std::vector<DrawableItem*> *drawables);
         
         std::list<OctreeNode*> PerformCulling(matrix_float4x4 const &viewProjMatrix, vector_float2 const &dimensions);
-        void MarkSubtreeVisible();
-        void MarkSubtreeHidden();
         unsigned Insert(DrawableItem* drawable);
         
         void LogStatus(bool recursive);
@@ -93,7 +91,7 @@ namespace SpatialHierarchy {
         
         unsigned depth;
         
-        //OctreeNode* parent;
+        unsigned InsertStraight(DrawableItem* drawable);
     };
     
     class BVH {
