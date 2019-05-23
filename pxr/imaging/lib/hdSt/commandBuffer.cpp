@@ -67,7 +67,8 @@ static os_log_t cullingLog = os_log_create("hydra.metal", "Culling");
 
 #ifdef USE_BVH_FOR_CULLING
 namespace SpatialHierarchy {
-    const unsigned maxOctreeDepth = 64;
+    const unsigned maxOctreeDepth = 10;
+    const unsigned maxPerLevel = 100;
     
     namespace MissingFunctions {
         
@@ -84,15 +85,20 @@ namespace SpatialHierarchy {
         
         bool IntersectsAllChildren(const OctreeNode* node, const GfRange3f &entity)
         {
-            // Better alternative: (calc center) of entity within node, check if (minVec is negative) && (maxVec is positive);
-            // Or if needs touch >= 2 children: verify that at least one component is negative and the other positive (minVec, maxVec)
-            
-            if (allLarger(entity.GetSize(), node->halfSize)) {
-                return true;
-            }
-            return false;
+            return (allLarger(entity.GetSize(), node->halfSize));
         }
-        
+
+        bool IntersectsAtLeast2Children(const OctreeNode* node, const GfRange3f &entity)
+        {
+            const GfVec3f &midPoint = node->aabb.GetMidpoint();
+            const GfVec3f &entityMin = entity.GetMin();
+            const GfVec3f &entityMax = entity.GetMax();
+
+            return (((entityMin.data()[0] < midPoint.data()[0]) && (entityMax.data()[0] > midPoint.data()[0]))
+                    || ((entityMin.data()[1] < midPoint.data()[1]) && (entityMax.data()[1] > midPoint.data()[1]))
+                    || ((entityMin.data()[2] < midPoint.data()[2]) && (entityMax.data()[2] > midPoint.data()[2])));
+        }
+
         Intersection SpatialRelation(const OctreeNode* node, const GfRange3f &entity)
         {
             const GfVec3f &entityMin = entity.GetMin();
@@ -256,6 +262,9 @@ namespace SpatialHierarchy {
     
     void BVH::BuildBVH(const std::vector<HdStDrawItemInstance*> &drawables)
     {
+        if (BVHCounter > 2) {
+            return;
+        }
         os_signpost_id_t bvhGenerate = os_signpost_id_generate(cullingLog);
         
         NSLog(@"Building BVH for %zu HdStDrawItemInstance(s), %i", drawables.size(), BVHCounter);
@@ -274,7 +283,7 @@ namespace SpatialHierarchy {
             return;
         }
 
-        root.ReInit(bbox);
+        root.ReInit(bbox, &drawableItems);
         
         unsigned depth = 0;
         for (size_t idx=0; idx < drawableItems.size(); ++idx)
@@ -292,7 +301,10 @@ namespace SpatialHierarchy {
     
     void BVH::PerformCulling(matrix_float4x4 const &viewProjMatrix, vector_float2 const &dimensions)
     {
-        NSLog(@"Culling: %i", BVHCounter);
+        if (BVHCounter > 2) {
+            return;
+        }
+
         os_signpost_id_t bvhCulling = os_signpost_id_generate(cullingLog);
         os_signpost_id_t bvhCullingInit = os_signpost_id_generate(cullingLog);
         os_signpost_id_t bvhCullingCull = os_signpost_id_generate(cullingLog);
@@ -310,7 +322,33 @@ namespace SpatialHierarchy {
         os_signpost_interval_end(cullingLog, bvhCullingInit, "Culling: BVH -- Init");
 
         os_signpost_interval_begin(cullingLog, bvhCullingCull, "Culling: BVH -- Cull");
-        root.PerformCulling(viewProjMatrix, dimensions);
+        struct _Worker {
+            static
+            void setVisible(std::vector<OctreeNode*> *nodes, size_t begin, size_t end)
+            {
+                for(size_t idx = begin; idx < end; ++idx) {
+                    for (auto &drawable : (*nodes)[idx]->drawables) {
+                        drawable->SetVisible(true);
+                    }
+                    for (auto &drawable : (*nodes)[idx]->drawablesTooLarge) {
+                        drawable->SetVisible(true);
+                    }
+                    if ((*nodes)[idx]->isSplit) {
+                        std::vector<OctreeNode*> children(std::begin(children[idx]->children), std::end(children[idx]->children));
+                        setVisible(&children, 0, 7);
+                    }
+                }
+            }
+        };
+        std::list<OctreeNode*> visibleSubtreesList = root.PerformCulling(viewProjMatrix, dimensions);
+        std::vector<OctreeNode*> visibleSubtreesVec{ std::make_move_iterator(std::begin(visibleSubtreesList)), std::make_move_iterator(std::end(visibleSubtreesList)) };
+        NSLog(@"Visible Subtrees: %zu", visibleSubtreesVec.size());
+
+        WorkParallelForN(visibleSubtreesVec.size(),
+                         std::bind(&_Worker::setVisible, &visibleSubtreesVec,
+                                   std::placeholders::_1,
+                                   std::placeholders::_2),
+                         1);
         os_signpost_interval_end(cullingLog, bvhCullingCull, "Culling: BVH -- Cull");
         
         os_signpost_interval_end(cullingLog, bvhCulling, "Culling: BVH");
@@ -323,8 +361,8 @@ namespace SpatialHierarchy {
     , minVec(minX, minY, minZ)
     , maxVec(maxX, maxY, maxZ)
     , halfSize((maxX - minX) * 0.5, (maxY - minY) * 0.5, (maxZ - minZ) * 0.5)
-    , depth(currentDepth)
     , isSplit(false)
+    , depth(currentDepth)
     {
     }
     
@@ -338,7 +376,7 @@ namespace SpatialHierarchy {
         }
     }
     
-    void OctreeNode::ReInit(GfRange3f const &boundingBox)
+    void OctreeNode::ReInit(GfRange3f const &boundingBox, std::vector<DrawableItem*> *drawables)
     {
         aabb = GfRange3f(boundingBox);
         minVec = aabb.GetMin();
@@ -346,27 +384,34 @@ namespace SpatialHierarchy {
         halfSize = (maxVec - minVec) * 0.5;
     }
     
-    void OctreeNode::PerformCulling(matrix_float4x4 const &viewProjMatrix, vector_float2 const &dimensions)
+    std::list<OctreeNode*> OctreeNode::PerformCulling(matrix_float4x4 const &viewProjMatrix, vector_float2 const &dimensions)
     {
+        std::list<OctreeNode*> result;
         if (!GfFrustum::IntersectsViewVolumeFloat(aabb, viewProjMatrix, dimensions)) {
-            return;
+            return result;
         }
         
         if (MissingFunctions::FrustumFullyContains(this, viewProjMatrix, dimensions)) {
-            MarkSubtreeVisible();
-            return;
+            //MarkSubtreeVisible();
+            result.push_back(this);
+            return result;
         }
 
         for (auto &drawable : drawables) {
             // TODO: could test here?
             drawable->SetVisible(true);
         }
-        
+        for (auto &drawable : drawablesTooLarge) {
+            drawable->SetVisible(true);
+        }
+
         if (isSplit) {
             for (int i=0; i < 8; ++i) {
-                children[i]->PerformCulling(viewProjMatrix, dimensions);
+                result.splice(result.end(), children[i]->PerformCulling(viewProjMatrix, dimensions));
             }
         }
+        
+        return result;
     }
     
     void OctreeNode::MarkSubtreeVisible()
@@ -377,12 +422,19 @@ namespace SpatialHierarchy {
             drawable->SetVisible(true);
         }
 
+        for (auto &drawable : drawablesTooLarge) {
+            drawable->SetVisible(true);
+        }
+
         struct _Worker {
             static
             void setVisible(OctreeNode* children[8],size_t begin, size_t end)
             {
                 for(size_t idx = begin; idx < end; ++idx) {
                     for (auto &drawable : children[idx]->drawables) {
+                        drawable->SetVisible(true);
+                    }
+                    for (auto &drawable : children[idx]->drawablesTooLarge) {
                         drawable->SetVisible(true);
                     }
                     if (children[idx]->isSplit) {
@@ -406,7 +458,10 @@ namespace SpatialHierarchy {
         for (auto &drawable : drawables) {
             drawable->SetVisible(false);
         }
-        
+        for (auto &drawable : drawablesTooLarge) {
+            drawable->SetVisible(false);
+        }
+
         if (isSplit) {
             for (int i=0; i < 8; ++i) {
                 children[i]->MarkSubtreeHidden();
@@ -452,7 +507,17 @@ namespace SpatialHierarchy {
     
     unsigned OctreeNode::Insert(DrawableItem* drawable)
     {
-        if (!canSubdivide()) {
+        if (!canSubdivide()){//} || MissingFunctions::IntersectsAtLeast2Children(this, drawable->aabb)) {
+            drawablesTooLarge.push_back(drawable);
+            
+            if (drawablesTooLarge.size() > maxPerLevel) {
+                // redistribute!
+            }
+            // potential check for overflow here.
+            return depth;
+        }
+        
+        if (drawables.size() + drawablesTooLarge.size() < maxPerLevel) {
             drawables.push_back(drawable);
             return depth;
         }
@@ -470,7 +535,7 @@ namespace SpatialHierarchy {
             }
         }
         
-        drawables.push_back(drawable);
+        drawablesTooLarge.push_back(drawable);
         
         return depth;
     }
@@ -912,6 +977,7 @@ HdStCommandBuffer::FrustumCull(GfMatrix4d const &viewProjMatrix)
             drawItemInstances.push_back(&_drawItemInstances[idx]);
         }
         bvh.BuildBVH(drawItemInstances);
+        //bvh.root.LogStatus(true);
     }
 #endif
     uint64_t timeStart = ArchGetTickTime();

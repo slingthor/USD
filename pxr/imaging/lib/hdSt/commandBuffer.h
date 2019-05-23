@@ -68,9 +68,9 @@ namespace SpatialHierarchy {
         OctreeNode(float minX, float minY, float minZ, float maxX, float maxY, float maxZ, unsigned currentDepth);
         ~OctreeNode();
         
-        void ReInit(GfRange3f const &boundingBox);
+        void ReInit(GfRange3f const &boundingBox, std::vector<DrawableItem*> *drawables);
         
-        void PerformCulling(matrix_float4x4 const &viewProjMatrix, vector_float2 const &dimensions);
+        std::list<OctreeNode*> PerformCulling(matrix_float4x4 const &viewProjMatrix, vector_float2 const &dimensions);
         void MarkSubtreeVisible();
         void MarkSubtreeHidden();
         unsigned Insert(DrawableItem* drawable);
@@ -82,9 +82,11 @@ namespace SpatialHierarchy {
         GfVec3f maxVec;
         GfVec3f halfSize;
         
-        std::vector<DrawableItem*> drawables;
+        std::list<DrawableItem*> drawables;
+        std::list<DrawableItem*> drawablesTooLarge;
         bool isSplit;
 
+        OctreeNode* children[8] = {NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL};
     private:
         void subdivide();
         bool canSubdivide();
@@ -92,7 +94,6 @@ namespace SpatialHierarchy {
         unsigned depth;
         
         //OctreeNode* parent;
-        OctreeNode* children[8] = {NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL};
     };
     
     class BVH {
