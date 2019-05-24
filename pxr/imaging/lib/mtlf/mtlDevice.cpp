@@ -218,20 +218,21 @@ void MtlfMetalContext::Init(id<MTLDevice> _device, int width, int height)
     NSLog(@"Selected %@ for Metal Device", device.name);
     
     enableMultiQueue = true;
-    
+
+    gsMaxConcurrentBatches = 1;
+
     // Create a new command queue
     commandQueue = [device newCommandQueueWithMaxCommandBufferCount:commandBufferPoolSize];
     if(enableMultiQueue) {
         commandQueueGS = [device newCommandQueueWithMaxCommandBufferCount:commandBufferPoolSize];
-        gsMaxDataPerBatch = 1024 * 1024 * 32;
-        gsMaxConcurrentBatches = 3;
     }
-    else
-    {
-        gsMaxDataPerBatch = 1024 * 1024 * 32;
-        gsMaxConcurrentBatches = 2;
-    }
-    
+
+#if defined(ARCH_OS_IOS)
+    gsMaxDataPerBatch = 1024 * 1024 * 64;
+#else
+    gsMaxDataPerBatch = 1024 * 1024 * 128;
+#endif
+
     workQueueResource.lastWaitEventValue                  = 0;
 
     ResetEncoders(METALWORKQUEUE_RESOURCE, true);
@@ -1991,10 +1992,15 @@ void MtlfMetalContext::_gsEncodeSync(bool doOpenBatch) {
         if(doOpenBatch) {
             uint64_t value_gs = GetEventValue();
             uint64_t offset = gsMaxConcurrentBatches;
-            if(value_gs > offset) {
-                EncodeWaitForEvent(METALWORKQUEUE_GEOMETRY_SHADER, METALWORKQUEUE_DEFAULT, value_gs - offset);
+            //if(value_gs > offset) {
+//                TF_CODING_WARNING("Geometry shader buffer overrun");
+                // This is a hard sync between the gs and 3d passes. It's not efficient, as it
+                // prevents compute/3d overlap, plus the driver overhead of the sync.
+                // However latency is hidden because we mutli-thread our rendering
+                // and there's hopefully other command encoders that are able to execute
+                EncodeWaitForEvent(METALWORKQUEUE_GEOMETRY_SHADER, METALWORKQUEUE_DEFAULT);
                 EncodeSignalEvent(METALWORKQUEUE_DEFAULT);
-            }
+            //}
         }
 
         threadState.gsHasOpenBatch = false;
