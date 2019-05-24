@@ -64,6 +64,9 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 #define USE_BVH_FOR_CULLING 1
 
+#define CULL_NAÏVE
+#define CULL_BVH
+
 static os_log_t cullingLog = os_log_create("hydra.metal", "Culling");
 
 namespace SpatialHierarchy {
@@ -170,22 +173,24 @@ namespace SpatialHierarchy {
         }
     };
     
-    DrawableItem::DrawableItem(HdStDrawItemInstance* itemInstance)
-    : item(itemInstance)
+    DrawableItem::DrawableItem(HdStDrawItemInstance* itemInstance, GfRange3f boundingBox)
+    : itemInstance(itemInstance)
+    , aabb(boundingBox)
     , visible(false)
     , isInstanced(false)
     , instanceIdx(0)
+    , numItemsInInstance(0)
     {
-        aabb = itemInstance->GetDrawItem()->GetBounds().ComputeAlignedRange();
         halfSize = aabb.GetSize() * 0.5;
     }
     
-    DrawableItem::DrawableItem(HdStDrawItemInstance* itemInstance, GfRange3f boundingBox, size_t instanceIndex)
-    : item(itemInstance)
+    DrawableItem::DrawableItem(HdStDrawItemInstance* itemInstance, GfRange3f boundingBox, size_t instanceIndex, size_t totalInstancers)
+    : itemInstance(itemInstance)
     , aabb(boundingBox)
     , visible(false)
     , isInstanced(true)
     , instanceIdx(instanceIndex)
+    , numItemsInInstance(totalInstancers)
     {
         halfSize = aabb.GetSize() * 0.5;
     }
@@ -196,10 +201,11 @@ namespace SpatialHierarchy {
         if (isInstanced) {
             // NOTE: this is where the instanced indices can be set - .instanceIdx has it stored.
             if (visible) {
-                item->SetVisible(true);
+                itemInstance->SetVisible(visible);
+                const_cast<HdStDrawItem*>(itemInstance->GetDrawItem())->SetNumVisible(numItemsInInstance);
             }
         } else {
-            item->SetVisible(visible);
+            itemInstance->SetVisible(visible);
         }
     }
     
@@ -213,12 +219,12 @@ namespace SpatialHierarchy {
             if (instanceIndexRange) {
                 drawable->GetDrawItem()->CalculateInstanceBounds();
                 const std::vector<GfBBox3f>* instancedCullingBounds = drawable->GetDrawItem()->GetInstanceBounds();
-#if 0
+#if 1
                 // NOTE: create an item per instance
                 for (size_t idx = 0; idx < instancedCullingBounds->size(); ++idx) {
                     GfRange3f bbox = (*instancedCullingBounds)[idx].ComputeAlignedRange();
                     boundingBox.ExtendBy(bbox);
-                    items->push_back(new DrawableItem(drawable, bbox, idx));
+                    items->push_back(new DrawableItem(drawable, bbox, idx, instancedCullingBounds->size()));
                 }
 #else
                 // NOTE: create an item for all instances ... that's equal to the 'naïve approach'
@@ -227,12 +233,13 @@ namespace SpatialHierarchy {
                     GfRange3f bbox = (*instancedCullingBounds)[idx].ComputeAlignedRange();
                     itemBBox.ExtendBy(bbox);
                 }
-                items->push_back(new DrawableItem(drawable, itemBBox, 0));
+                items->push_back(new DrawableItem(drawable, itemBBox));
                 boundingBox.ExtendBy(itemBBox);
 #endif
                 
             } else {
-                DrawableItem* drawableItem = new DrawableItem(drawable);
+                GfRange3f bbox = drawable->GetDrawItem()->GetBounds().ComputeAlignedRange();
+                DrawableItem* drawableItem = new DrawableItem(drawable, bbox);
                 boundingBox.ExtendBy(drawableItem->aabb);
                 items->push_back(drawableItem);
             }
@@ -330,7 +337,7 @@ namespace SpatialHierarchy {
             void setInVisible(const std::vector<DrawableItem*> &items, size_t begin, size_t end)
             {
                 for(size_t idx = begin; idx < end; ++idx) {
-                    items[idx]->item->SetVisible(false);
+                    items[idx]->SetVisible(true);
                 }
             }
         };
@@ -913,7 +920,7 @@ HdStCommandBuffer::FrustumCull(GfMatrix4d const &viewProjMatrix)
             for(size_t i = begin; i < end; i++) {
                 HdStDrawItemInstance& itemInstance = (*drawItemInstances)[i];
                 HdStDrawItem const* item = itemInstance.GetDrawItem();
-                bool visible = item->GetVisible() && 
+                bool visible = item->GetVisible() &&
                     item->IntersectsViewVolume(viewProjMatrix, dimensions);
                 if ((itemInstance.IsVisible() != visible) || 
                     (visible && item->HasInstancer())) {
@@ -951,32 +958,31 @@ HdStCommandBuffer::FrustumCull(GfMatrix4d const &viewProjMatrix)
     if (!bvh.populated)
     {
         bvh.BuildBVH(&_drawItemInstances);
-        //bvh.root.LogStatus(true);
     }
 #endif
     uint64_t timeStart = ArchGetTickTime();
 
-    // NOTE: here's the switch between the methods.
-//#ifndef USE_BVH_FOR_CULLING
+#ifdef CULL_NAÏVE
     os_signpost_id_t naiveCulling = os_signpost_id_generate(cullingLog);
     os_signpost_interval_begin(cullingLog, naiveCulling, "Culling: Naïve");
-//    if (!mtCullingDisabled) {
-//        WorkParallelForN(_drawItemInstances.size(),
-//                         std::bind(&_Worker::cull, &_drawItemInstances,
-//                                   std::cref(simdViewProjMatrix),
-//                                   std::placeholders::_1,
-//                                   std::placeholders::_2));
-//    } else {
-//        _Worker::cull(&_drawItemInstances,
-//                      simdViewProjMatrix,
-//                      0,
-//                      _drawItemInstances.size());
-//    }
+    if (!mtCullingDisabled) {
+        WorkParallelForN(_drawItemInstances.size(),
+                         std::bind(&_Worker::cull, &_drawItemInstances,
+                                   std::cref(simdViewProjMatrix),
+                                   std::placeholders::_1,
+                                   std::placeholders::_2));
+    } else {
+        _Worker::cull(&_drawItemInstances,
+                      simdViewProjMatrix,
+                      0,
+                      _drawItemInstances.size());
+    }
     os_signpost_interval_end(cullingLog, naiveCulling, "Culling: Naïve");
-//#else
+#endif
+
+#ifdef CULL_BVH
     bvh.PerformCulling(simdViewProjMatrix, dimensions);
-//#endif
-    
+#endif
     
     MtlfMetalContext::GetMetalContext()->FlushBuffers();
 

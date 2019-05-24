@@ -47,20 +47,21 @@ namespace SpatialHierarchy {
     };
     
     struct DrawableItem {
-        DrawableItem(HdStDrawItemInstance* itemInstance);
-        DrawableItem(HdStDrawItemInstance* itemInstance, GfRange3f boundingBox, size_t instanceIndex);
+        DrawableItem(HdStDrawItemInstance* itemInstance, GfRange3f boundingBox);
+        DrawableItem(HdStDrawItemInstance* itemInstance, GfRange3f boundingBox, size_t instanceIndex, size_t totalInstancers);
         
         void SetVisible(bool visible);
         
         static GfRange3f ConvertDrawablesToItems(std::vector<HdStDrawItemInstance> *drawables, std::vector<DrawableItem*> *items);
         
-        HdStDrawItemInstance *item;
+        HdStDrawItemInstance *itemInstance;
         GfRange3f aabb;
         GfVec3f halfSize;
         
         bool visible;
         bool isInstanced;
         size_t instanceIdx;
+        size_t numItemsInInstance;
     };
     
     class OctreeNode {
