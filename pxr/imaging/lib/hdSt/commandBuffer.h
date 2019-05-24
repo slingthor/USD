@@ -52,7 +52,7 @@ namespace SpatialHierarchy {
         
         void SetVisible(bool visible);
         
-        static GfRange3f ConvertDrawablesToItems(const std::vector<HdStDrawItemInstance*> &drawables, std::vector<DrawableItem*> *items);
+        static GfRange3f ConvertDrawablesToItems(std::vector<HdStDrawItemInstance> *drawables, std::vector<DrawableItem*> *items);
         
         HdStDrawItemInstance *item;
         GfRange3f aabb;
@@ -98,7 +98,7 @@ namespace SpatialHierarchy {
     public:
         BVH();
         ~BVH();
-        void BuildBVH(const std::vector<HdStDrawItemInstance*> &drawables);
+        void BuildBVH(std::vector<HdStDrawItemInstance> *drawables);
         void PerformCulling(matrix_float4x4 const &viewProjMatrix, vector_float2 const &dimensions);
         
         OctreeNode root;

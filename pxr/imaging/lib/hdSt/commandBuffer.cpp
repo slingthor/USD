@@ -203,16 +203,17 @@ namespace SpatialHierarchy {
         }
     }
     
-    GfRange3f DrawableItem::ConvertDrawablesToItems(const std::vector<HdStDrawItemInstance*> &drawables, std::vector<DrawableItem*> *items)
+    GfRange3f DrawableItem::ConvertDrawablesToItems(std::vector<HdStDrawItemInstance> *drawables, std::vector<DrawableItem*> *items)
     {
         GfRange3f boundingBox;
         
-        for (auto drawable: drawables) {
+        for (size_t idx=0; idx<drawables->size(); ++idx){
+            HdStDrawItemInstance* drawable = &(*drawables)[idx];
             HdBufferArrayRangeSharedPtr const & instanceIndexRange = drawable->GetDrawItem()->GetInstanceIndexRange();
             if (instanceIndexRange) {
                 drawable->GetDrawItem()->CalculateInstanceBounds();
                 const std::vector<GfBBox3f>* instancedCullingBounds = drawable->GetDrawItem()->GetInstanceBounds();
-#if 1
+#if 0
                 // NOTE: create an item per instance
                 for (size_t idx = 0; idx < instancedCullingBounds->size(); ++idx) {
                     GfRange3f bbox = (*instancedCullingBounds)[idx].ComputeAlignedRange();
@@ -260,7 +261,7 @@ namespace SpatialHierarchy {
         NSLog(@"BVH dead,%i", BVHCounter);
     }
     
-    void BVH::BuildBVH(const std::vector<HdStDrawItemInstance*> &drawables)
+    void BVH::BuildBVH(std::vector<HdStDrawItemInstance> *drawables)
     {
         // NOTE: this is a hack to not have twice the same octree...
         if (BVHCounter > 2) {
@@ -268,8 +269,8 @@ namespace SpatialHierarchy {
         }
         os_signpost_id_t bvhGenerate = os_signpost_id_generate(cullingLog);
         
-        NSLog(@"Building BVH for %zu HdStDrawItemInstance(s), %i", drawables.size(), BVHCounter);
-        if (drawables.size() <= 0) {
+        NSLog(@"Building BVH for %zu HdStDrawItemInstance(s), %i", drawables->size(), BVHCounter);
+        if (drawables->size() <= 0) {
             return;
         }
         
@@ -351,26 +352,16 @@ namespace SpatialHierarchy {
             static
             void setVisible(std::vector<OctreeNode*> *nodes, size_t begin, size_t end)
             {
-                std::queue<OctreeNode*> q;
-
                 for(size_t idx = begin; idx < end; ++idx) {
-                    q.push((*nodes)[idx]);
-                }
-                
-                while (!q.empty()) {
-                    OctreeNode* node = q.front();
-                    q.pop();
-                    
-                    for (auto &drawable : node->drawables) {
+                    for (auto &drawable : (*nodes)[idx]->drawables) {
                         drawable->SetVisible(true);
                     }
-                    for (auto &drawable : node->drawablesTooLarge) {
+                    for (auto &drawable : (*nodes)[idx]->drawablesTooLarge) {
                         drawable->SetVisible(true);
                     }
-                    if (node->isSplit) {
-                        for (size_t idx = 0; idx < 8; ++idx) {
-                            q.push(node->children[0]);
-                        }
+                    if ((*nodes)[idx]->isSplit) {
+                        std::vector<OctreeNode*> children(std::begin((*nodes)[idx]->children), std::end((*nodes)[idx]->children));
+                        setVisible(&children, 0, 7);
                     }
                 }
             }
@@ -959,38 +950,32 @@ HdStCommandBuffer::FrustumCull(GfMatrix4d const &viewProjMatrix)
 #ifdef USE_BVH_FOR_CULLING
     if (!bvh.populated)
     {
-        std::vector<HdStDrawItemInstance*> drawItemInstances;
-        drawItemInstances.reserve(_drawItemInstances.size());
-        for (size_t idx=0; idx < _drawItemInstances.size(); ++idx) {
-            drawItemInstances.push_back(&_drawItemInstances[idx]);
-        }
-        bvh.BuildBVH(drawItemInstances);
+        bvh.BuildBVH(&_drawItemInstances);
         //bvh.root.LogStatus(true);
     }
 #endif
     uint64_t timeStart = ArchGetTickTime();
 
     // NOTE: here's the switch between the methods.
-#ifdef USE_BVH_FOR_CULLING
-    bvh.PerformCulling(simdViewProjMatrix, dimensions);
-#else
+//#ifndef USE_BVH_FOR_CULLING
     os_signpost_id_t naiveCulling = os_signpost_id_generate(cullingLog);
-    
     os_signpost_interval_begin(cullingLog, naiveCulling, "Culling: Naïve");
-    if (!mtCullingDisabled) {
-        WorkParallelForN(_drawItemInstances.size(),
-                         std::bind(&_Worker::cull, &_drawItemInstances,
-                                   std::cref(simdViewProjMatrix),
-                                   std::placeholders::_1,
-                                   std::placeholders::_2));
-    } else {
-        _Worker::cull(&_drawItemInstances,
-                      simdViewProjMatrix,
-                      0,
-                      _drawItemInstances.size());
-    }
+//    if (!mtCullingDisabled) {
+//        WorkParallelForN(_drawItemInstances.size(),
+//                         std::bind(&_Worker::cull, &_drawItemInstances,
+//                                   std::cref(simdViewProjMatrix),
+//                                   std::placeholders::_1,
+//                                   std::placeholders::_2));
+//    } else {
+//        _Worker::cull(&_drawItemInstances,
+//                      simdViewProjMatrix,
+//                      0,
+//                      _drawItemInstances.size());
+//    }
     os_signpost_interval_end(cullingLog, naiveCulling, "Culling: Naïve");
-#endif
+//#else
+    bvh.PerformCulling(simdViewProjMatrix, dimensions);
+//#endif
     
     
     MtlfMetalContext::GetMetalContext()->FlushBuffers();
