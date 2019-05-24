@@ -189,7 +189,7 @@ void
 MtlfMetalQueryObject::BeginPrimitivesGenerated()
 {
     Begin(GL_PRIMITIVES_GENERATED);
-    MtlfMetalContext *context = MtlfMetalContext::GetMetalContext();
+    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
     context->IncNumberPrimsDrawn(0, true);
  }
 void
@@ -210,7 +210,7 @@ MtlfMetalQueryObject::Begin(GLenum target)
 void
 MtlfMetalQueryObject::End()
 {
-    MtlfMetalContext *context = MtlfMetalContext::GetMetalContext();
+    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
     
     switch (_target) {
         case GL_PRIMITIVES_GENERATED: {

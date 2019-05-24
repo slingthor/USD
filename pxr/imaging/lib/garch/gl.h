@@ -95,6 +95,7 @@ typedef GLvoid (*ArchGLCallbackType)(...);
 #define GL_COLOR_INDEX 0x1900
 #define GL_TEXTURE_1D 0x0DE0
 #define GL_HALF_FLOAT_ARB 0x140B
+#define GL_HALF_APPLE 0x140B
 #define GL_SAMPLES_PASSED 0x8914
 #define GL_2_BYTES 0x1407
 #define GL_3_BYTES 0x1408

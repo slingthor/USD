@@ -118,7 +118,7 @@ HdStStripedInterleavedBufferMetal::Reallocate(
         boost::static_pointer_cast<HdStBufferResourceMetal>(
             curRangeOwner_->GetResources().begin()->second);
 
-    MtlfMetalContext *context = MtlfMetalContext::GetMetalContext();
+    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
 
     HdResourceGPUHandle newId[3];
     HdResourceGPUHandle oldId[3];
@@ -127,7 +127,14 @@ HdStStripedInterleavedBufferMetal::Reallocate(
     for(int i = 0; i < 3; i++) {
         oldId[i] = oldBuffer->GetIdAtIndex(i);
         curId[i] = currentBuffer->GetIdAtIndex(i);
-        newId[i] = context->GetMetalBuffer(totalSize, MTLResourceStorageModeDefault);
+        
+        // Triple buffer everything
+        if (true) {
+            newId[i] = context->GetMetalBuffer(totalSize, MTLResourceStorageModeDefault);
+        }
+        else {
+            newId[i].Clear();
+        }
     }
     
     // if old buffer exists, copy unchanged data
@@ -139,8 +146,13 @@ HdStStripedInterleavedBufferMetal::Reallocate(
         // pre-pass to combine consecutive buffer range relocation
         HdStBufferRelocator* relocator[3];
         for(int i = 0; i < 3; i++) {
-            int const curIndex = curId[i] ? i : 0;
-            relocator[i] = HdStResourceFactory::GetInstance()->NewBufferRelocator(curId[curIndex], newId[i]);
+            int const curIndex = curId[i].IsSet() ? i : 0;
+            if (newId[i].IsSet()) {
+                relocator[i] = HdStResourceFactory::GetInstance()->NewBufferRelocator(curId[curIndex], newId[i]);
+            }
+            else {
+                relocator[i] = NULL;
+            }
         }
 
         for (size_t rangeIdx = 0; rangeIdx < rangeCount; ++rangeIdx) {
@@ -159,7 +171,9 @@ HdStStripedInterleavedBufferMetal::Reallocate(
                 size_t const copySize = _stride * range->GetNumElements();
                 
                 for(int i = 0; i < 3; i++) {
-                    relocator[i]->AddRange(readOffset, writeOffset, copySize);
+                    if (relocator[i]) {
+                        relocator[i]->AddRange(readOffset, writeOffset, copySize);
+                    }
                 }
             }
             
@@ -169,8 +183,10 @@ HdStStripedInterleavedBufferMetal::Reallocate(
 
         // buffer copy
         for(int i = 0; i < 3; i++) {
-            relocator[i]->Commit();
-            delete relocator[i];
+            if (relocator[i]) {
+                relocator[i]->Commit();
+                delete relocator[i];
+            }
         }
     } else {
         // just set index
@@ -195,6 +211,10 @@ HdStStripedInterleavedBufferMetal::Reallocate(
             context->ReleaseMetalBuffer(oldId[i]);
         }
     }
+    
+//    static size_t size = 0;
+//    size += totalSize;
+//    NSLog(@"interleavedMemoryBufferMetal - %zu", size);
 
     // update id to all buffer resources
     TF_FOR_ALL(it, GetResources()) {
@@ -222,7 +242,7 @@ HdStStripedInterleavedBufferMetal::_DeallocateResources()
                 MtlfMetalContext::GetMetalContext()->ReleaseMetalBuffer(_id);
             }
         }
-        resource->SetAllocations(0, 0, 0, 0);
+        resource->SetAllocations(HdResourceGPUHandle(), HdResourceGPUHandle(), HdResourceGPUHandle(), 0);
     }
 }
 

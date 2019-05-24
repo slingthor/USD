@@ -22,6 +22,8 @@
 // language governing permissions and limitations under the Apache License.
 //
 #include "pxr/pxr.h"
+#include "pxr/base/arch/defines.h"
+
 #include "pxr/imaging/hdSt/Metal/renderDelegateMetal.h"
 #include "pxr/imaging/hdSt/tokens.h"
 
@@ -35,7 +37,11 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+#if defined(ARCH_OS_MACOS)
 TF_DEFINE_ENV_SETTING(PXR_MTL_SAMPLE_COUNT, 2, "");
+#else
+TF_DEFINE_ENV_SETTING(PXR_MTL_SAMPLE_COUNT, 1, "");
+#endif
 
 namespace {
 static
@@ -112,7 +118,7 @@ void HdStRenderDelegateMetal::SetRenderSetting(TfToken const& key, VtValue const
         for (id<MTLDevice> dev in _deviceList) {
             if (value == _MetalDeviceDescriptor(dev)) {
                 // Recreate the underlying Metal context
-                MtlfMetalContext *context = MtlfMetalContext::GetMetalContext();
+                MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
                 context->RecreateInstance(dev, context->mtlColorTexture.width, context->mtlColorTexture.height);
                 break;
             }
@@ -126,7 +132,7 @@ void HdStRenderDelegateMetal::SetRenderSetting(TfToken const& key, VtValue const
 
 void HdStRenderDelegateMetal::CommitResources(HdChangeTracker *tracker)
 {
-    MtlfMetalContext *context = MtlfMetalContext::GetMetalContext();
+    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
 
     context->StartFrameForThread();
     
@@ -158,7 +164,7 @@ VtValue HdStRenderDelegateMetal::GetRenderSetting(TfToken const& key) const
 
 HdStRenderDelegateMetal::~HdStRenderDelegateMetal()
 {
-    // Nothing
+    MtlfMetalContext::context = NULL;
 }
 
 bool
@@ -176,7 +182,7 @@ void HdStRenderDelegateMetal::PrepareRender(
     GarchContextCaps const &caps =
         GarchResourceFactory::GetInstance()->GetContextCaps();
     
-    MtlfMetalContext *context = MtlfMetalContext::GetMetalContext();
+    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
     
     context->mtlSampleCount = TfGetEnvSetting(PXR_MTL_SAMPLE_COUNT);
     
@@ -305,7 +311,7 @@ void HdStRenderDelegateMetal::PrepareRender(
 }
 void HdStRenderDelegateMetal::FinalizeRender()
 {
-    MtlfMetalContext *context = MtlfMetalContext::GetMetalContext();
+    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
 
     context->StartFrameForThread();
 
@@ -313,9 +319,8 @@ void HdStRenderDelegateMetal::FinalizeRender()
     context->CreateCommandBuffer(METALWORKQUEUE_DEFAULT);
     context->LabelCommandBuffer(@"Post Process", METALWORKQUEUE_DEFAULT);
 
-    context->ColourCorrectColourTexture(context->mtlMultisampleColorTexture);
-
     if (_renderOutput == DelegateParams::RenderOutput::OpenGL) {
+        context->ColourCorrectColourTexture(context->mtlMultisampleColorTexture);
         // Depth texture copy
         context->CopyDepthTextureToOpenGL();
     }

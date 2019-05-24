@@ -325,7 +325,7 @@ MtlfDrawTarget::Bind()
     TF_VERIFY(!GetAttachments().empty(), "No attachments set. Bind() is only valid after a call "
               "to Bind(GarchDrawTarget::AttachmentsMap const &attachments)");
     
-    MtlfMetalContext *context = MtlfMetalContext::GetMetalContext();
+    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
    
     context->SetDrawTarget(this);
 //    context->CreateCommandBuffer();
@@ -366,7 +366,7 @@ MtlfDrawTarget::Unbind()
     if (--_bindDepth != 0) {
         return;
     }
-    MtlfMetalContext *context = MtlfMetalContext::GetMetalContext();
+    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
     context->SetDrawTarget(NULL);
 
     // Terminate the render encoder containing all the draw commands
@@ -462,7 +462,7 @@ MtlfDrawTarget::GetImage(std::string const & name, void* buffer) const
         bytesPerPixel = 4;
     }
     
-    MtlfMetalContext *context = MtlfMetalContext::GetMetalContext();
+    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
     id<MTLDevice> device = context->device;
     context->CreateCommandBuffer();
     context->LabelCommandBuffer(@"Get Image");

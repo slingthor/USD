@@ -144,10 +144,18 @@ HdStVBOMemoryBufferMetal::Reallocate(
         HdResourceGPUHandle oldId[3];
         HdResourceGPUHandle curId[3];
 
-        MtlfMetalContext *context = MtlfMetalContext::GetMetalContext();
+        MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
         
         for (int i = 0; i < 3; i++) {
-            newId[i] = context->GetMetalBuffer(bufferSize, MTLResourceStorageModeDefault);
+            
+            // Disable triple buffering
+            if (i == 0) {
+                newId[i] = context->GetMetalBuffer(bufferSize, MTLResourceStorageModeDefault);
+            }
+            else {
+                newId[i].Clear();
+            }
+
             oldId[i] = bres->GetIdAtIndex(i);
             curId[i] = curRes->GetIdAtIndex(i);
         }
@@ -160,7 +168,10 @@ HdStVBOMemoryBufferMetal::Reallocate(
             
             for (int i = 0; i < 3; i++) {
                 int const curIndex = curId[i].IsSet() ? i : 0;
-                relocator[i] = HdStResourceFactory::GetInstance()->NewBufferRelocator(curId[curIndex], newId[i]);
+                if (newId[i].IsSet())
+                    relocator[i] = HdStResourceFactory::GetInstance()->NewBufferRelocator(curId[curIndex], newId[i]);
+                else
+                    relocator[i] = NULL;
             }
 
             TF_FOR_ALL (it, ranges) {
@@ -206,8 +217,10 @@ HdStVBOMemoryBufferMetal::Reallocate(
 
             // buffer copy
             for (int i = 0; i < 3; i++) {
-                relocator[i]->Commit();
-                delete relocator[i];
+                if (relocator[i]) {
+                    relocator[i]->Commit();
+                    delete relocator[i];
+                }
             }
         }
 
@@ -217,7 +230,7 @@ HdStVBOMemoryBufferMetal::Reallocate(
                 MtlfMetalContext::GetMetalContext()->ReleaseMetalBuffer(oldId[i]);
             }
         }
-    
+
         // update id of buffer resource
         bres->SetAllocations(newId[0], newId[1], newId[2], bufferSize);
     }

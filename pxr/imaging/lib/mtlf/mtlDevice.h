@@ -95,6 +95,7 @@ class MtlfGlInterop;
 #endif
 
 class MtlfDrawTarget;
+typedef boost::shared_ptr<class MtlfMetalContext> MtlfMetalContextSharedPtr;
 
 /// \class MtlfMetalContext
 ///
@@ -128,9 +129,6 @@ enum MetalWorkQueueType {
 
 struct MetalWorkQueue {
     id<MTLCommandBuffer>         commandBuffer;
-#if defined(METAL_EVENTS_API_PRESENT)
-    id<MTLEvent>                 event;
-#endif
     
     MetalEncoderType             currentEncoderType;
     id<MTLBlitCommandEncoder>    currentBlitEncoder;
@@ -142,8 +140,6 @@ struct MetalWorkQueue {
     bool encoderHasWork;
     bool generatesEndOfQueueEvent;
     
-    uint64_t currentEventValue;
-    uint64_t highestExpectedEventValue;
     uint64_t lastWaitEventValue;
     size_t currentVertexDescriptorHash;
     size_t currentColourAttachmentsHash;
@@ -156,8 +152,11 @@ struct MetalWorkQueue {
 
 class MtlfMetalContext : public boost::noncopyable {
 public:
-
+#if defined(ARCH_OS_IOS)
+#define MAX_GPUS    1
+#else
 #define MAX_GPUS    4
+#endif
     struct MtlfMultiBuffer {
         
         MtlfMultiBuffer() {}
@@ -195,8 +194,12 @@ public:
         void release();
         
         id<MTLBuffer> forCurrentGPU() const {
-            MtlfMetalContext *context = MtlfMetalContext::GetMetalContext();
+#if MAX_GPUS == 1
+            return buffer[0];
+#else
+            MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
             return buffer[context->currentGPU];
+#endif
         }
         
         id<MTLBuffer> operator[](int64_t const index) const {
@@ -231,10 +234,11 @@ public:
 
     /// Returns an instance for the current Metal device.
     MTLF_API
-    //static MtlfMetalContextSharedPtr GetMetalContext() {
-    static MtlfMetalContext *GetMetalContext() {
-        static MtlfMetalContext context(nil, 256, 256);
-        return &context;
+    static MtlfMetalContextSharedPtr GetMetalContext() {
+        if (!context)
+            context = MtlfMetalContextSharedPtr(new MtlfMetalContext(nil, 256, 256));
+        
+        return context;
     }
 
     /// Returns whether this interface has been initialized.
@@ -402,7 +406,7 @@ public:
     uint64_t EncodeSignalEvent(MetalWorkQueueType signalQueue);
     
     MTLF_API
-    uint64_t GetEventValue(MetalWorkQueueType signalQueue) { return GetWorkQueue(signalQueue).currentEventValue; }
+    uint64_t GetEventValue() { return threadState.currentEventValue; }
 	
     MTLF_API
     MtlfMultiBuffer GetMetalBuffer(NSUInteger length, MTLResourceOptions options = MTLResourceStorageModeDefault, const void *pointer = NULL);
@@ -465,6 +469,9 @@ public:
     MTLF_API
     float GetGPUTimeInMs();
     
+    void BeginCaptureSubset();
+    void EndCaptureSubset();
+    
     bool enableMultiQueue;
 
     id<MTLDevice> device;
@@ -487,7 +494,10 @@ public:
         return workQueueResource;
     }
 
+    static MtlfMetalContextSharedPtr context;
+
 protected:
+
     MTLF_API
     MtlfMetalContext(id<MTLDevice> device, int width, int height);
     
@@ -522,9 +532,7 @@ protected:
                 gsDataOffset = 0;
                 gsBufferIndex = 0;
                 gsCurrentBuffer = nil;
-                gsFence = nil;
                 gsHasOpenBatch = false;
-                gsSyncRequired = false;
                 enableMVA = false;
                 enableComputeGS = false;
 
@@ -546,6 +554,12 @@ protected:
                 currentWorkQueueType = METALWORKQUEUE_DEFAULT;
                 currentWorkQueue     = &workQueueDefault;
                 
+                workQueueDefault.lastWaitEventValue                   = 0;
+                workQueueGeometry.lastWaitEventValue                  = 0;
+
+                currentEventValue                    = 1;
+                highestExpectedEventValue            = 0;
+
                 _this->ResetEncoders(METALWORKQUEUE_DEFAULT, true);
                 _this->ResetEncoders(METALWORKQUEUE_GEOMETRY_SHADER, true);
                 
@@ -554,8 +568,10 @@ protected:
                     gsBuffers.push_back([_this->device newBufferWithLength:_this->gsMaxDataPerBatch options:resourceOptions]);
                 gsCurrentBuffer = gsBuffers.at(0);
                 
-                gsFence = [_this->device newFence];
-                
+                if (_this->eventsAvailable) {
+                    gsSyncEvent = [_this->device newEvent];
+                }
+
                 remappedQuadIndexBuffer.Clear();
                 pointIndexBuffer.Clear();
                 init = true;
@@ -579,6 +595,12 @@ protected:
         id<MTLBuffer> vertexPositionBuffer;
         
         id<MTLComputePipelineState> computePipelineState;
+        
+#if defined(METAL_EVENTS_API_PRESENT)
+        id<MTLEvent>                 gsSyncEvent;
+#endif
+        uint64_t currentEventValue;
+        uint64_t highestExpectedEventValue;
 
         MetalWorkQueue      *currentWorkQueue;
         MetalWorkQueueType  currentWorkQueueType;
@@ -600,10 +622,7 @@ protected:
         int                        gsBufferIndex;
         id<MTLBuffer>              gsCurrentBuffer;
         std::vector<id<MTLBuffer>> gsBuffers;
-        id<MTLFence>               gsFence;
         bool                       gsHasOpenBatch;
-        bool                       gsFirstBatch;
-        bool                       gsSyncRequired;
         
         bool tempPointsWorkaroundActive = false;
         
@@ -758,7 +777,8 @@ private:
     
     bool OSDEnabledThisFrame = false;
     
-    id<MTLCaptureScope> captureScope;
+    id<MTLCaptureScope> captureScopeFullFrame;
+    id<MTLCaptureScope> captureScopeSubset;
 
 #if defined(ARCH_GFX_OPENGL)
     MtlfGlInterop *glInterop;

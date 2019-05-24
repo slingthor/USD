@@ -120,9 +120,13 @@ HdStBufferResourceMetal::SetAllocations(HdResourceGPUHandle idBuffer0,
             [_texId[i] release];
             _texId[i] = nil;
         }
+        
+        if (!_id[i].IsSet()) {
+            continue;
+        }
 
         MtlfMetalContext::MtlfMultiBuffer &b = _id[i];
-        MtlfMetalContext *context = MtlfMetalContext::GetMetalContext();
+        MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
         _gpuAddr[i] = (uint64_t)[b.forCurrentGPU() contents];
     }
     HdResource::SetSize(size);
@@ -186,7 +190,7 @@ HdStBufferResourceMetal::GetTextureBuffer()
 void
 HdStBufferResourceMetal::CopyData(size_t vboOffset, size_t dataSize, void const *data)
 {
-    MtlfMetalContext *context = MtlfMetalContext::GetMetalContext();
+    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
     if (_id[1].IsSet()) {
         int64_t currentFrame = context->GetCurrentFrame();
         

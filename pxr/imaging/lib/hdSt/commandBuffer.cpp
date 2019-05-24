@@ -607,12 +607,18 @@ HdStCommandBuffer::ExecuteDraw(
                         break;
                     }
                 }
+                if (foundSomethingVisible) {
+                    begin = i;
+                    break;
+                }
             }
             if (!foundSomethingVisible) {
                 return;
             }
             
-            MtlfMetalContext *context = MtlfMetalContext::GetMetalContext();
+            MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
+
+            context->StartFrameForThread();
 
             if (!context->GeometryShadersActive()) {
                 context->CreateCommandBuffer(METALWORKQUEUE_GEOMETRY_SHADER);
@@ -621,8 +627,6 @@ HdStCommandBuffer::ExecuteDraw(
                 }
                 //[context->GetWorkQueue(METALWORKQUEUE_GEOMETRY_SHADER).commandBuffer enqueue];
             }
-
-            context->StartFrameForThread();
             
             // Create a new command buffer for each render pass to the current drawable
             context->CreateCommandBuffer(METALWORKQUEUE_DEFAULT);
@@ -651,7 +655,7 @@ HdStCommandBuffer::ExecuteDraw(
     
     bool setAlpha = false;
 
-    MtlfMetalContext *context = MtlfMetalContext::GetMetalContext();
+    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
     MTLRenderPassDescriptor *renderPassDescriptor = context->GetRenderPassDescriptor();
     
     // Create a new command buffer for each render pass to the current drawable
@@ -892,9 +896,13 @@ HdStCommandBuffer::FrustumCull(GfMatrix4d const &viewProjMatrix)
     primCount.store(0);
     
     static vector_float2 dimensions = {1.f, 1.f};
-    dimensions.x = float(MtlfMetalContext::GetMetalContext()->mtlColorTexture.width);
-    dimensions.y = float(MtlfMetalContext::GetMetalContext()->mtlColorTexture.height);
+//    dimensions.x = float(MtlfMetalContext::GetMetalContext()->mtlColorTexture.width);
+//    dimensions.y = float(MtlfMetalContext::GetMetalContext()->mtlColorTexture.height);
 
+    MTLRenderPassDescriptor *rpd = MtlfMetalContext::GetMetalContext()->GetRenderPassDescriptor();
+    dimensions.x = float(rpd.colorAttachments[0].texture.width);
+    dimensions.y = float(rpd.colorAttachments[0].texture.height);
+    
     MtlfMetalContext::GetMetalContext()->PrepareBufferFlush();
     
     struct _Worker {
