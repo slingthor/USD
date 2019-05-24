@@ -140,8 +140,6 @@ struct MetalWorkQueue {
     bool encoderHasWork;
     bool generatesEndOfQueueEvent;
     
-    uint64_t currentEventValue;
-    uint64_t highestExpectedEventValue;
     uint64_t lastWaitEventValue;
     size_t currentVertexDescriptorHash;
     size_t currentColourAttachmentsHash;
@@ -408,7 +406,7 @@ public:
     uint64_t EncodeSignalEvent(MetalWorkQueueType signalQueue);
     
     MTLF_API
-    uint64_t GetEventValue(MetalWorkQueueType signalQueue) { return GetWorkQueue(signalQueue).currentEventValue; }
+    uint64_t GetEventValue() { return threadState.currentEventValue; }
 	
     MTLF_API
     MtlfMultiBuffer GetMetalBuffer(NSUInteger length, MTLResourceOptions options = MTLResourceStorageModeDefault, const void *pointer = NULL);
@@ -535,7 +533,6 @@ protected:
                 gsBufferIndex = 0;
                 gsCurrentBuffer = nil;
                 gsHasOpenBatch = false;
-                gsSyncRequired = false;
                 enableMVA = false;
                 enableComputeGS = false;
 
@@ -557,13 +554,11 @@ protected:
                 currentWorkQueueType = METALWORKQUEUE_DEFAULT;
                 currentWorkQueue     = &workQueueDefault;
                 
-                workQueueDefault.currentEventValue                    = 1;
-                workQueueDefault.highestExpectedEventValue            = 0;
                 workQueueDefault.lastWaitEventValue                   = 0;
-
-                workQueueGeometry.currentEventValue                   = 1;
-                workQueueGeometry.highestExpectedEventValue           = 0;
                 workQueueGeometry.lastWaitEventValue                  = 0;
+
+                currentEventValue                    = 1;
+                highestExpectedEventValue            = 0;
 
                 _this->ResetEncoders(METALWORKQUEUE_DEFAULT, true);
                 _this->ResetEncoders(METALWORKQUEUE_GEOMETRY_SHADER, true);
@@ -604,6 +599,8 @@ protected:
 #if defined(METAL_EVENTS_API_PRESENT)
         id<MTLEvent>                 gsSyncEvent;
 #endif
+        uint64_t currentEventValue;
+        uint64_t highestExpectedEventValue;
 
         MetalWorkQueue      *currentWorkQueue;
         MetalWorkQueueType  currentWorkQueueType;
@@ -626,8 +623,6 @@ protected:
         id<MTLBuffer>              gsCurrentBuffer;
         std::vector<id<MTLBuffer>> gsBuffers;
         bool                       gsHasOpenBatch;
-        bool                       gsFirstBatch;
-        bool                       gsSyncRequired;
         
         bool tempPointsWorkaroundActive = false;
         

@@ -148,6 +148,8 @@ HdStCommandBuffer::ExecuteDraw(
             
             MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
 
+            context->StartFrameForThread();
+
             if (!context->GeometryShadersActive()) {
                 context->CreateCommandBuffer(METALWORKQUEUE_GEOMETRY_SHADER);
                 if (TF_DEV_BUILD) {
@@ -155,8 +157,6 @@ HdStCommandBuffer::ExecuteDraw(
                 }
                 //[context->GetWorkQueue(METALWORKQUEUE_GEOMETRY_SHADER).commandBuffer enqueue];
             }
-
-            context->StartFrameForThread();
             
             // Create a new command buffer for each render pass to the current drawable
             context->CreateCommandBuffer(METALWORKQUEUE_DEFAULT);
