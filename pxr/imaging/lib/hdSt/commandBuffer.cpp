@@ -361,7 +361,7 @@ namespace SpatialHierarchy {
                     }
                     if ((*nodes)[idx]->isSplit) {
                         std::vector<OctreeNode*> children(std::begin((*nodes)[idx]->children), std::end((*nodes)[idx]->children));
-                        setVisible(&children, 0, 7);
+                        setVisible(&children, 0, 8);
                     }
                 }
             }
