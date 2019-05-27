@@ -155,7 +155,6 @@ HdStCommandBuffer::ExecuteDraw(
                 if (TF_DEV_BUILD) {
                     context->LabelCommandBuffer(@"Geometry Shaders", METALWORKQUEUE_GEOMETRY_SHADER);
                 }
-                //[context->GetWorkQueue(METALWORKQUEUE_GEOMETRY_SHADER).commandBuffer enqueue];
             }
             
             // Create a new command buffer for each render pass to the current drawable

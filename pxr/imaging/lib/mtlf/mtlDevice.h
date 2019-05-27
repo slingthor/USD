@@ -472,14 +472,11 @@ public:
     void BeginCaptureSubset();
     void EndCaptureSubset();
     
-    bool enableMultiQueue;
-
     id<MTLDevice> device;
     NSArray<id<MTLDevice>> *renderDevices;
     int currentGPU;
 
     id<MTLCommandQueue> commandQueue;
-    id<MTLCommandQueue> commandQueueGS;
     id<MTLTexture> mtlColorTexture;
     id<MTLTexture> mtlMultisampleColorTexture;
     id<MTLTexture> mtlDepthTexture;
@@ -531,6 +528,7 @@ protected:
             {
                 gsDataOffset = 0;
                 gsBufferIndex = 0;
+                gsEncodedBatches = 0;
                 gsCurrentBuffer = nil;
                 gsHasOpenBatch = false;
                 enableMVA = false;
@@ -567,10 +565,6 @@ protected:
                 for(int i = 0; i < _this->gsMaxConcurrentBatches; i++)
                     gsBuffers.push_back([_this->device newBufferWithLength:_this->gsMaxDataPerBatch options:resourceOptions]);
                 gsCurrentBuffer = gsBuffers.at(0);
-                
-                if (_this->eventsAvailable) {
-                    gsSyncEvent = [_this->device newEvent];
-                }
 
                 remappedQuadIndexBuffer.Clear();
                 pointIndexBuffer.Clear();
@@ -595,10 +589,7 @@ protected:
         id<MTLBuffer> vertexPositionBuffer;
         
         id<MTLComputePipelineState> computePipelineState;
-        
-#if defined(METAL_EVENTS_API_PRESENT)
-        id<MTLEvent>                 gsSyncEvent;
-#endif
+
         uint64_t currentEventValue;
         uint64_t highestExpectedEventValue;
 
@@ -620,6 +611,7 @@ protected:
         //Geometry Shader Related
         int                        gsDataOffset;
         int                        gsBufferIndex;
+        int                        gsEncodedBatches;
         id<MTLBuffer>              gsCurrentBuffer;
         std::vector<id<MTLBuffer>> gsBuffers;
         bool                       gsHasOpenBatch;
@@ -640,8 +632,6 @@ protected:
     static int const commandBufferPoolSize = 256;
     id<MTLCommandBuffer> commandBuffers[commandBufferPoolSize];
     int commandBuffersStackPos = 0;
-    id<MTLCommandBuffer> commandBuffersGS[commandBufferPoolSize];
-    int commandBuffersGSStackPos = 0;
 
     static std::mutex _pipelineMutex;
     boost::unordered_map<size_t, id<MTLRenderPipelineState>>  renderPipelineStateMap;
@@ -682,10 +672,6 @@ private:
     };
     
     // State for tracking dependencies between work queues
-#if defined(METAL_EVENTS_API_PRESENT)
-    id<MTLEvent> queueSyncEvent;
-    bool         eventsAvailable;
-#endif
     uint32_t queueSyncEventCounter;
     MetalWorkQueueType outstandingDependency;
     

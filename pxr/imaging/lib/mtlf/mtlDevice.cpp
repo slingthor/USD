@@ -62,7 +62,6 @@ MtlfMetalContext::ThreadState::~ThreadState() {
     for(int i = 0; i < kMSL_ProgramStage_NumStages; i++) {
         delete[] oldStyleUniformBuffer[i];
     }
-    [gsSyncEvent release];
     for(int i = 0; i < gsBuffers.size(); i++)
         [gsBuffers.at(i) release];
     gsBuffers.clear();
@@ -216,48 +215,35 @@ void MtlfMetalContext::Init(id<MTLDevice> _device, int width, int height)
     captureScopeSubset.label = @"Subset";
     
     NSLog(@"Selected %@ for Metal Device", device.name);
-    
-    enableMultiQueue = true;
-
-    gsMaxConcurrentBatches = 1;
 
     // Create a new command queue
     commandQueue = [device newCommandQueueWithMaxCommandBufferCount:commandBufferPoolSize];
-    if(enableMultiQueue) {
-        commandQueueGS = [device newCommandQueueWithMaxCommandBufferCount:commandBufferPoolSize];
-    }
 
 #if defined(ARCH_OS_IOS)
-    gsMaxDataPerBatch = 1024 * 1024 * 64;
+    gsMaxDataPerBatch = 1024 * 1024 * 32;
+    gsMaxConcurrentBatches = 2;
 #else
-    gsMaxDataPerBatch = 1024 * 1024 * 128;
+    gsMaxDataPerBatch = 1024 * 1024 * 32;
+    gsMaxConcurrentBatches = 4;
 #endif
 
     workQueueResource.lastWaitEventValue                  = 0;
 
     ResetEncoders(METALWORKQUEUE_RESOURCE, true);
-    
+
     memset(commandBuffers, 0x00, sizeof(commandBuffers));
-    memset(commandBuffersGS, 0x00, sizeof(commandBuffersGS));
-    
+
 #if defined(ARCH_OS_IOS)
 #define SYSTEM_VERSION_GREATER_THAN_OR_EQUAL_TO(v) ([[[UIDevice currentDevice] systemVersion] compare:v options:NSNumericSearch] != NSOrderedAscending)
     
     static bool sysVerGreaterThanOrEqualTo12_0 = SYSTEM_VERSION_GREATER_THAN_OR_EQUAL_TO(@"12.0");
     concurrentDispatchSupported = sysVerGreaterThanOrEqualTo12_0;
-#if defined(METAL_EVENTS_API_PRESENT)
-    eventsAvailable = sysVerGreaterThanOrEqualTo12_0;
-#endif
     
 #else // ARCH_OS_IOS
     static NSOperatingSystemVersion minimumSupportedOSVersion = { .majorVersion = 10, .minorVersion = 14, .patchVersion = 5 };
     static bool sysVerGreaterOrEqualTo10_14_5 = [NSProcessInfo.processInfo isOperatingSystemAtLeastVersion:minimumSupportedOSVersion];
     
     concurrentDispatchSupported = sysVerGreaterOrEqualTo10_14_5;
-#if defined(METAL_EVENTS_API_PRESENT)
-    eventsAvailable = sysVerGreaterOrEqualTo10_14_5;
-#endif
-    
 #endif // ARCH_OS_IOS
     
     MTLDepthStencilDescriptor *depthStateDesc = [[MTLDepthStencilDescriptor alloc] init];
@@ -327,9 +313,7 @@ void MtlfMetalContext::Cleanup()
     bufferFreeList.clear();
     
     [commandQueue release];
-    if(enableMultiQueue)
-        [commandQueueGS release];
-    
+
 #if defined(METAL_ENABLE_STATS)
     if(frameCount > 0) {
         NSLog(@"--- METAL Resource Stats (average per frame / total) ----");
@@ -604,23 +588,12 @@ void MtlfMetalContext::CreateCommandBuffer(MetalWorkQueueType workQueueType) {
     if (wq->commandBuffer == nil) {
         std::lock_guard<std::mutex> lock(_commandBufferPoolMutex);
 
-        if (enableMultiQueue && workQueueType == METALWORKQUEUE_GEOMETRY_SHADER) {
-            if (commandBuffersGSStackPos > 0) {
-                wq->commandBuffer = commandBuffersGS[--commandBuffersGSStackPos];
-            }
-            else {
-                wq->commandBuffer = [commandQueueGS commandBuffer];
-                [wq->commandBuffer retain];
-            }
+        if (commandBuffersStackPos > 0) {
+            wq->commandBuffer = commandBuffers[--commandBuffersStackPos];
         }
         else {
-            if (commandBuffersStackPos > 0) {
-                wq->commandBuffer = commandBuffers[--commandBuffersStackPos];
-            }
-            else {
-                wq->commandBuffer = [commandQueue commandBuffer];
-                [wq->commandBuffer retain];
-            }
+            wq->commandBuffer = [commandQueue commandBuffer];
+            [wq->commandBuffer retain];
         }
     }
     // We'll reuse an existing buffer silently if it's empty, otherwise emit warning
@@ -666,13 +639,6 @@ void MtlfMetalContext::EncodeWaitForEvent(MetalWorkQueueType waitQueue, MetalWor
         // Update the signalling queue's highest expected value to make sure the wait completes.
         if(eventValue > threadState.highestExpectedEventValue)
             threadState.highestExpectedEventValue = eventValue;
-#if defined(METAL_EVENTS_API_PRESENT)
-        // Make this command buffer wait for the event to be resolved
-        if (eventsAvailable) {
-            [wait_wq->commandBuffer encodeWaitForEvent:threadState.gsSyncEvent value:eventValue];
-            wait_wq->lastWaitEventValue = eventValue;
-        }
-#endif
     }
 }
 
@@ -702,12 +668,6 @@ uint64_t MtlfMetalContext::EncodeSignalEvent(MetalWorkQueueType signalQueue)
             ReleaseEncoder(true, signalQueue);
         }
     }
-#if defined(METAL_EVENTS_API_PRESENT)
-    if (eventsAvailable) {
-        // Generate event
-        [wq->commandBuffer encodeSignalEvent:threadState.gsSyncEvent value:threadState.currentEventValue];
-    }
-#endif
     return threadState.currentEventValue++;
 }
 
@@ -1441,7 +1401,7 @@ int MtlfMetalContext::GetMaxThreadsPerThreadgroup(MetalWorkQueueType workQueueTy
 void MtlfMetalContext::ResetEncoders(MetalWorkQueueType workQueueType, bool isInitializing)
 {
     MetalWorkQueue *wq = &GetWorkQueue(workQueueType);
- 
+
     if(!isInitializing) {
         if(threadState.highestExpectedEventValue != endOfQueueEventValue && threadState.highestExpectedEventValue >= threadState.currentEventValue) {
             TF_FATAL_CODING_ERROR("There is a WaitForEvent which is never going to get Signalled!");
@@ -1449,7 +1409,7 @@ void MtlfMetalContext::ResetEncoders(MetalWorkQueueType workQueueType, bool isIn
         if(threadState.gsHasOpenBatch)
             TF_FATAL_CODING_ERROR("A Compute Geometry Shader batch is left open!");
     }
-   
+
     wq->commandBuffer         = nil;
     
     wq->encoderInUse             = false;
@@ -1509,10 +1469,7 @@ void MtlfMetalContext::CommitCommandBufferForThread(bool waituntilScheduled, boo
             {
                 std::lock_guard<std::mutex> lock(_commandBufferPoolMutex);
                 
-                if (enableMultiQueue && workQueueType == METALWORKQUEUE_GEOMETRY_SHADER)
-                    commandBuffersGS[commandBuffersGSStackPos++] = wq->commandBuffer;
-                else
-                    commandBuffers[commandBuffersStackPos++] = wq->commandBuffer;
+                commandBuffers[commandBuffersStackPos++] = wq->commandBuffer;
                 wq->commandBuffer = nil;
             }
             ResetEncoders(workQueueType);
@@ -1525,11 +1482,6 @@ void MtlfMetalContext::CommitCommandBufferForThread(bool waituntilScheduled, boo
     if(wq->generatesEndOfQueueEvent) {
         TF_FATAL_CODING_ERROR("TODO: This needs updating to work with persistent event objects. Can't just use a large value.");
         threadState.currentEventValue = endOfQueueEventValue;
-#if defined(METAL_EVENTS_API_PRESENT)
-        if (eventsAvailable) {
-            [wq->commandBuffer encodeSignalEvent:threadState.gsSyncEvent value:threadState.currentEventValue];
-        }
-#endif
         wq->generatesEndOfQueueEvent = false;
     }
     
@@ -1671,7 +1623,7 @@ void MtlfMetalContext::SetCurrentEncoder(MetalEncoderType encoderType, MetalWork
         }
         case MTLENCODERTYPE_COMPUTE: {
 #if defined(METAL_EVENTS_API_PRESENT)
-            if (concurrentDispatchSupported){//} && eventsAvailable) {
+            if (concurrentDispatchSupported) {
                 wq->currentComputeEncoder = [wq->commandBuffer computeCommandEncoderWithDispatchType:MTLDispatchTypeConcurrent];
             }
             else
@@ -1874,7 +1826,9 @@ void MtlfMetalContext::CleanupUnusedBuffers(bool forceClean)
 }
 
 void MtlfMetalContext::StartFrameForThread() {
-    threadState.PrepareThread(this);\
+    threadState.PrepareThread(this);
+    threadState.gsDataOffset = 0;
+    threadState.gsEncodedBatches = 0;
 }
 
 void MtlfMetalContext::StartFrame() {
@@ -1971,9 +1925,7 @@ void MtlfMetalContext::PrepareForComputeGSPart(
     //If we are using a new buffer we've started a new batch. That means some synching/committing may need to happen before we can continue.
     if(startingNewBatch) {
         METAL_INC_STAT(resourceStats.GSBatchesStarted);
-        if(enableMultiQueue) {
-            _gsEncodeSync(true);
-        }
+        _gsEncodeSync(true);
     }
 }
 
@@ -1987,27 +1939,26 @@ void MtlfMetalContext::_gsEncodeSync(bool doOpenBatch) {
     
     // Close the current batch if there is one open
     if(threadState.gsHasOpenBatch) {
-        EncodeSignalEvent(METALWORKQUEUE_GEOMETRY_SHADER);
-        
         if(doOpenBatch) {
-            uint64_t value_gs = GetEventValue();
-            uint64_t offset = gsMaxConcurrentBatches;
-            //if(value_gs > offset) {
-//                TF_CODING_WARNING("Geometry shader buffer overrun");
-                // This is a hard sync between the gs and 3d passes. It's not efficient, as it
-                // prevents compute/3d overlap, plus the driver overhead of the sync.
-                // However latency is hidden because we mutli-thread our rendering
-                // and there's hopefully other command encoders that are able to execute
-                EncodeWaitForEvent(METALWORKQUEUE_GEOMETRY_SHADER, METALWORKQUEUE_DEFAULT);
-                EncodeSignalEvent(METALWORKQUEUE_DEFAULT);
-            //}
-        }
+            
+            threadState.gsEncodedBatches++;
+            if (threadState.gsEncodedBatches == gsMaxConcurrentBatches) {
+                [GetWorkQueue(METALWORKQUEUE_GEOMETRY_SHADER).commandBuffer enqueue];
+                CommitCommandBufferForThread(false, false, METALWORKQUEUE_GEOMETRY_SHADER);
+                
+                [GetWorkQueue(METALWORKQUEUE_DEFAULT).commandBuffer enqueue];
+                CommitCommandBufferForThread(false, false, METALWORKQUEUE_DEFAULT);
 
+                CreateCommandBuffer(METALWORKQUEUE_GEOMETRY_SHADER);
+                CreateCommandBuffer(METALWORKQUEUE_DEFAULT);
+                
+                threadState.gsEncodedBatches = 0;
+            }
+        }
         threadState.gsHasOpenBatch = false;
     }
-    
+
     if(doOpenBatch) {
-        EncodeWaitForEvent(METALWORKQUEUE_DEFAULT, METALWORKQUEUE_GEOMETRY_SHADER);
         threadState.gsHasOpenBatch = true;
     }
 }
