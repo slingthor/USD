@@ -356,7 +356,7 @@ MtlfBaseTexture::_CreateTexture(GarchBaseTextureDataConstPtr texData,
                 TF_FATAL_CODING_ERROR("Unsupported/unimplemented texture format");
             }
             
-            id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->device;
+            id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->currentDevice;
             MTLTextureDescriptor* desc =
                 [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:mtlFormat
                                                                    width:texDataWidth
@@ -396,7 +396,7 @@ MtlfBaseTexture::_CreateTexture(GarchBaseTextureDataConstPtr texData,
                 TF_FATAL_CODING_ERROR("Unsupported/unimplemented texture format");
             }
 
-            id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->device;
+            id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->currentDevice;
             MTLTextureDescriptor* desc =
                 [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:mtlFormat
                                                                    width:texData->ResizedWidth()

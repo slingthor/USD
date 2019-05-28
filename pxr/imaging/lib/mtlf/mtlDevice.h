@@ -471,15 +471,21 @@ public:
     
     void BeginCaptureSubset();
     void EndCaptureSubset();
-    
-    id<MTLDevice> device;
-    NSArray<id<MTLDevice>> *renderDevices;
+
+    id<MTLDevice> currentDevice;
+    id<MTLDevice> interopDevice;
+    NSMutableArray<id<MTLDevice>> *renderDevices;
     int currentGPU;
 
-    id<MTLCommandQueue> commandQueue;
-    id<MTLTexture> mtlColorTexture;
-    id<MTLTexture> mtlMultisampleColorTexture;
-    id<MTLTexture> mtlDepthTexture;
+    struct GPUInstance {
+        id<MTLCommandQueue> commandQueue;
+        id<MTLTexture> mtlColorTexture;
+        id<MTLTexture> mtlMultisampleColorTexture;
+        id<MTLTexture> mtlDepthTexture;
+        id<MTLDepthStencilState> depthState;
+    };
+    
+    GPUInstance gpus[MAX_GPUS];
 
     NSUInteger mtlSampleCount;
     
@@ -562,9 +568,10 @@ protected:
                 _this->ResetEncoders(METALWORKQUEUE_GEOMETRY_SHADER, true);
                 
                 MTLResourceOptions resourceOptions = MTLResourceStorageModePrivate|MTLResourceCPUCacheModeDefaultCache;
-                for(int i = 0; i < _this->gsMaxConcurrentBatches; i++)
-                    gsBuffers.push_back([_this->device newBufferWithLength:_this->gsMaxDataPerBatch options:resourceOptions]);
-                gsCurrentBuffer = gsBuffers.at(0);
+                for(int d = 0; d < _this->renderDevices.count; d++) {
+                    for(int i = 0; i < _this->gsMaxConcurrentBatches; i++)
+                        gsBuffers[d].push_back([_this->currentDevice newBufferWithLength:_this->gsMaxDataPerBatch options:resourceOptions]);
+                }
 
                 remappedQuadIndexBuffer.Clear();
                 pointIndexBuffer.Clear();
@@ -613,7 +620,7 @@ protected:
         int                        gsBufferIndex;
         int                        gsEncodedBatches;
         id<MTLBuffer>              gsCurrentBuffer;
-        std::vector<id<MTLBuffer>> gsBuffers;
+        std::vector<id<MTLBuffer>> gsBuffers[MAX_GPUS];
         bool                       gsHasOpenBatch;
         
         bool tempPointsWorkaroundActive = false;
@@ -630,8 +637,8 @@ protected:
     
     static std::mutex _commandBufferPoolMutex;
     static int const commandBufferPoolSize = 256;
-    id<MTLCommandBuffer> commandBuffers[commandBufferPoolSize];
-    int commandBuffersStackPos = 0;
+    id<MTLCommandBuffer> commandBuffers[MAX_GPUS][commandBufferPoolSize];
+    int commandBuffersStackPos[MAX_GPUS];
 
     static std::mutex _pipelineMutex;
     boost::unordered_map<size_t, id<MTLRenderPipelineState>>  renderPipelineStateMap;
@@ -655,8 +662,6 @@ protected:
 
 private:
     const static uint64_t endOfQueueEventValue = 0xFFFFFFFFFFFFFFFF;
-
-    id<MTLDepthStencilState> depthState;
     
     // These are used when rendering from within a native Metal application, and
     // are set by the application

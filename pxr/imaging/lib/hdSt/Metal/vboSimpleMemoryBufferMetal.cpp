@@ -104,9 +104,7 @@ HdStVBOSimpleMemoryBufferMetal::Reallocate(
     int numElements = range->GetNumElements();
 
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
-    
-    id<MTLDevice> device = context->device;
-    
+
     /*
         MTL_FIXE - Ideally we wouldn't be creating and committing a command buffer here but we'd need some extra call
         to know when all reallocates had been performed so could commit them. However, if this is only an initialisation step it's probably OK.

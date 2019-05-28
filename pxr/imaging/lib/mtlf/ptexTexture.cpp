@@ -181,7 +181,7 @@ MtlfPtexTexture::_ReadImage()
         //     uint8_t  height log2;
         // };
 
-        id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->device;
+        id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->currentDevice;
         
         // Create the layout texture
         MTLTextureDescriptor* descLayout =

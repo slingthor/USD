@@ -258,7 +258,7 @@ HdStMSLProgram::CompileShader(GLenum type,
 
     // create a shader, compile it
     NSError *error = NULL;
-    id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->device;
+    id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->currentDevice;
     
     bool success = true;
     NSString *entryPoint = nil;
@@ -364,9 +364,8 @@ HdStMSLProgram::Link()
         TF_CODING_ERROR("Missing Compute Geometry shader while linking.");
         return false;
     }
-        
-    
-    id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->device;
+
+    id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->currentDevice;
 
     // update the program resource allocation
     _valid = true;

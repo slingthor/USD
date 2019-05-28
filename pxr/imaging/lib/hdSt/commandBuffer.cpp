@@ -189,7 +189,7 @@ HdStCommandBuffer::ExecuteDraw(
     
     // Create a new command buffer for each render pass to the current drawable
     if (renderPassDescriptor.colorAttachments[0].loadAction == MTLLoadActionClear) {
-        id <MTLCommandBuffer> commandBuffer = [context->commandQueue commandBuffer];
+        id <MTLCommandBuffer> commandBuffer = [context->gpus[context->currentGPU].commandQueue commandBuffer];
         if (TF_DEV_BUILD) {
             commandBuffer.label = @"Clear";
         }
@@ -197,7 +197,7 @@ HdStCommandBuffer::ExecuteDraw(
             [commandBuffer renderCommandEncoderWithDescriptor:renderPassDescriptor];
         [renderEncoder endEncoding];
         [commandBuffer commit];
-     
+
         int numAttachments = 1;
         
         if (context->GetDrawTarget()) {

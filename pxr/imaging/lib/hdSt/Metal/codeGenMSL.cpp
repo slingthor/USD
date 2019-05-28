@@ -2795,7 +2795,7 @@ HdSt_CodeGenMSL::_GenerateCommonDefinitions()
                 << "#define ARCH_GFX_METAL\n";
     
     // Metal feature set defines
-    id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->device;
+    id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->currentDevice;
 #if defined(ARCH_OS_MACOS)
     _genDefinitions  << "#define ARCH_OS_MACOS\n";
     // Define all macOS 10.13 feature set enums onwards

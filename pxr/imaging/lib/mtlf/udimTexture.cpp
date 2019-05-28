@@ -103,7 +103,7 @@ MtlfUdimTexture::_CreateGPUResources(unsigned int numChannels,
         internalFormat = internalFormats[numChannels - 1];
     }
 
-    id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->device;
+    id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->currentDevice;
     
     MTLTextureDescriptor* descImage =
         [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormat(internalFormat)

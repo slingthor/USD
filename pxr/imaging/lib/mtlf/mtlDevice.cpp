@@ -62,9 +62,11 @@ MtlfMetalContext::ThreadState::~ThreadState() {
     for(int i = 0; i < kMSL_ProgramStage_NumStages; i++) {
         delete[] oldStyleUniformBuffer[i];
     }
-    for(int i = 0; i < gsBuffers.size(); i++)
-        [gsBuffers.at(i) release];
-    gsBuffers.clear();
+    for(int d = 0; d < MAX_GPUS; d++) {
+        for(int i = 0; i < gsBuffers[d].size(); i++)
+            [gsBuffers[d].at(i) release];
+        gsBuffers[d].clear();
+    }
 }
 
 void MtlfMetalContext::MtlfMultiBuffer::release() {
@@ -109,35 +111,45 @@ id<MTLDevice> MtlfMetalContext::GetMetalDevice(PREFERRED_GPU_TYPE preferredGPUTy
     id <NSObject> metalDeviceObserver = nil;
     
     // Get a list of all devices and register an obsever for eGPU events
-    renderDevices = MTLCopyAllDevicesWithObserver(&metalDeviceObserver,
+    NSArray<id<MTLDevice>> *allDevices = MTLCopyAllDevicesWithObserver(&metalDeviceObserver,
                                                 ^(id<MTLDevice> device, MTLDeviceNotificationName name) {
                                                     MtlfMetalContext::handleGPUHotPlug(device, name);
                                                 });
+
+    renderDevices = [NSMutableArray array];
+    [renderDevices retain];
+    
     NSMutableArray<id<MTLDevice>> *_eGPUs          = [NSMutableArray array];
     NSMutableArray<id<MTLDevice>> *_integratedGPUs = [NSMutableArray array];
     NSMutableArray<id<MTLDevice>> *_discreteGPUs   = [NSMutableArray array];
     id<MTLDevice>                  _defaultDevice  = MTLCreateSystemDefaultDevice();
     NSArray *preferredDeviceList = _discreteGPUs;
-
-    if (preferredGPUType == PREFER_DEFAULT_GPU) {
-        return _defaultDevice;
-    }
     
     // Put the device into the appropriate device list
-    for (id<MTLDevice>dev in renderDevices) {
-        if (dev.removable)
+    for (id<MTLDevice>dev in allDevices) {
+        bool multiDeviceRenderOption = false;
+        if (dev.removable) {
         	[_eGPUs addObject:dev];
-        else if (dev.lowPower)
+            multiDeviceRenderOption = true;
+        }
+        else if (dev.lowPower) {
         	[_integratedGPUs addObject:dev];
-        else
+        }
+        else {
         	[_discreteGPUs addObject:dev];
+            multiDeviceRenderOption = true;
+        }
+        
+        if (multiDeviceRenderOption) {
+            [renderDevices addObject:dev];
+        }
     }
-    
+
     switch (preferredGPUType) {
         case PREFER_DISPLAY_GPU:
             NSLog(@"Display device selection not supported yet, returning default GPU");
         case PREFER_DEFAULT_GPU:
-            break;
+            return _defaultDevice;
         case PREFER_EGPU:
             preferredDeviceList = _eGPUs;
             break;
@@ -170,7 +182,7 @@ id<MTLDevice> MtlfMetalContext::GetMetalDevice(PREFERRED_GPU_TYPE preferredGPUTy
 void MtlfMetalContext::UpdateCurrentGPU() {
     currentGPU = 0;
     for (id<MTLDevice>dev in renderDevices) {
-        if (dev == device)
+        if (dev == currentDevice)
             return;
         currentGPU++;
     }
@@ -199,25 +211,28 @@ void MtlfMetalContext::Init(id<MTLDevice> _device, int width, int height)
     if (_device == nil) {
         //device = MtlfMetalContext::GetMetalDevice(PREFER_INTEGRATED_GPU);
         //device = MtlfMetalContext::GetMetalDevice(PREFER_DISCRETE_GPU);
-        device = MtlfMetalContext::GetMetalDevice(PREFER_DEFAULT_GPU);
+        currentDevice = MtlfMetalContext::GetMetalDevice(PREFER_DEFAULT_GPU);
     }
     else {
-        device = _device;
+        currentDevice = _device;
     }
     
+    interopDevice = currentDevice;
     UpdateCurrentGPU();
     
-    captureScopeFullFrame = [[MTLCaptureManager sharedCaptureManager] newCaptureScopeWithDevice:device];
+    captureScopeFullFrame = [[MTLCaptureManager sharedCaptureManager] newCaptureScopeWithDevice:currentDevice];
     captureScopeFullFrame.label = @"Full Frame";
     [[MTLCaptureManager sharedCaptureManager] setDefaultCaptureScope:captureScopeFullFrame];
     
-    captureScopeSubset = [[MTLCaptureManager sharedCaptureManager] newCaptureScopeWithDevice:device];
+    captureScopeSubset = [[MTLCaptureManager sharedCaptureManager] newCaptureScopeWithDevice:currentDevice];
     captureScopeSubset.label = @"Subset";
     
-    NSLog(@"Selected %@ for Metal Device", device.name);
+    NSLog(@"Selected %@ for Metal Device", currentDevice.name);
 
     // Create a new command queue
-    commandQueue = [device newCommandQueueWithMaxCommandBufferCount:commandBufferPoolSize];
+    for (int i = 0; i < renderDevices.count; i++) {
+        gpus[i].commandQueue = [renderDevices[i] newCommandQueueWithMaxCommandBufferCount:commandBufferPoolSize];
+    }
 
 #if defined(ARCH_OS_IOS)
     gsMaxDataPerBatch = 1024 * 1024 * 32;
@@ -232,6 +247,7 @@ void MtlfMetalContext::Init(id<MTLDevice> _device, int width, int height)
     ResetEncoders(METALWORKQUEUE_RESOURCE, true);
 
     memset(commandBuffers, 0x00, sizeof(commandBuffers));
+    memset(commandBuffersStackPos, 0x00, sizeof(commandBuffersStackPos));
 
 #if defined(ARCH_OS_IOS)
 #define SYSTEM_VERSION_GREATER_THAN_OR_EQUAL_TO(v) ([[[UIDevice currentDevice] systemVersion] compare:v options:NSNumericSearch] != NSOrderedAscending)
@@ -249,8 +265,14 @@ void MtlfMetalContext::Init(id<MTLDevice> _device, int width, int height)
     MTLDepthStencilDescriptor *depthStateDesc = [[MTLDepthStencilDescriptor alloc] init];
     depthStateDesc.depthWriteEnabled = YES;
     depthStateDesc.depthCompareFunction = MTLCompareFunctionLessEqual;
-    depthState = [device newDepthStencilStateWithDescriptor:depthStateDesc];
     
+    for(int i = 0; i < renderDevices.count; i++) {
+        gpus[i].depthState = [renderDevices[i] newDepthStencilStateWithDescriptor:depthStateDesc];
+        gpus[i].mtlColorTexture = nil;
+        gpus[i].mtlMultisampleColorTexture = nil;
+        gpus[i].mtlDepthTexture = nil;
+    }
+
     windingOrder = MTLWindingClockwise;
     cullMode = MTLCullModeBack;
     fillMode = MTLTriangleFillModeFill;
@@ -260,9 +282,6 @@ void MtlfMetalContext::Init(id<MTLDevice> _device, int width, int height)
     AllocateAttachments(width, height);
     
     drawTarget = NULL;
-    mtlColorTexture = nil;
-    mtlMultisampleColorTexture = nil;
-    mtlDepthTexture = nil;
     outputPixelFormat = MTLPixelFormatInvalid;
     outputDepthFormat = MTLPixelFormatInvalid;
     
@@ -302,6 +321,9 @@ void MtlfMetalContext::Cleanup()
     [captureScopeSubset release];
     captureScopeSubset = nil;
     
+    [renderDevices release];
+    renderDevices = nil;
+
 #if defined(ARCH_GFX_OPENGL)
     if (glInterop) {
         delete glInterop;
@@ -312,7 +334,9 @@ void MtlfMetalContext::Cleanup()
     CleanupUnusedBuffers(true);
     bufferFreeList.clear();
     
-    [commandQueue release];
+    for (int i = 0; i < renderDevices.count; i++) {
+        [gpus[i].commandQueue release];
+    }
 
 #if defined(METAL_ENABLE_STATS)
     if(frameCount > 0) {
@@ -371,8 +395,6 @@ void MtlfMetalContext::RecreateInstance(id<MTLDevice> device, int width, int hei
 {
     context = NULL;
     context = MtlfMetalContextSharedPtr(new MtlfMetalContext(device, width, height));
-//    Cleanup();
-//    Init(device, width, height);
 }
 
 void MtlfMetalContext::AllocateAttachments(int width, int height)
@@ -380,9 +402,6 @@ void MtlfMetalContext::AllocateAttachments(int width, int height)
 #if defined(ARCH_GFX_OPENGL)
     if (glInterop) {
         glInterop->AllocateAttachments(width, height);
-
-        mtlColorTexture = glInterop->mtlColorTexture;
-        mtlDepthTexture = glInterop->mtlDepthTexture;
 
         MTLTextureDescriptor* desc = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA16Float
                                                                                         width:width
@@ -398,10 +417,15 @@ void MtlfMetalContext::AllocateAttachments(int width, int height)
         else
             desc.textureType = MTLTextureType2D;
         
-        if (mtlMultisampleColorTexture)
-            [mtlMultisampleColorTexture release];
+        for(int i = 0; i < renderDevices.count; i++) {
+            gpus[i].mtlColorTexture = glInterop->mtlColorTexture;
+            gpus[i].mtlDepthTexture = glInterop->mtlDepthTexture;
 
-        mtlMultisampleColorTexture = [device newTextureWithDescriptor:desc];
+            if (gpus[i].mtlMultisampleColorTexture)
+                [gpus[i].mtlMultisampleColorTexture release];
+
+            gpus[i].mtlMultisampleColorTexture = [renderDevices[i] newTextureWithDescriptor:desc];
+        }
     }
 #endif
 }
@@ -473,7 +497,7 @@ MtlfMetalContext::CopyDepthTextureToOpenGL()
 void MtlfMetalContext::InitGLInterop() {
 #if defined(ARCH_GFX_OPENGL)
     if (!glInterop) {
-        glInterop = new MtlfGlInterop(device);
+        glInterop = new MtlfGlInterop(interopDevice);
         glInterop->mtlSampleCount = mtlSampleCount;
     }
 #endif
@@ -588,11 +612,11 @@ void MtlfMetalContext::CreateCommandBuffer(MetalWorkQueueType workQueueType) {
     if (wq->commandBuffer == nil) {
         std::lock_guard<std::mutex> lock(_commandBufferPoolMutex);
 
-        if (commandBuffersStackPos > 0) {
-            wq->commandBuffer = commandBuffers[--commandBuffersStackPos];
+        if (commandBuffersStackPos[currentGPU] > 0) {
+            wq->commandBuffer = commandBuffers[currentGPU][--commandBuffersStackPos[currentGPU]];
         }
         else {
-            wq->commandBuffer = [commandQueue commandBuffer];
+            wq->commandBuffer = [gpus[currentGPU].commandQueue commandBuffer];
             [wq->commandBuffer retain];
         }
     }
@@ -961,21 +985,21 @@ void MtlfMetalContext::SetRenderPipelineState()
             }
         }
         else {
-            if (mtlColorTexture != nil) {
-                boost::hash_combine(hashVal, mtlColorTexture.pixelFormat);
+            if (gpus[currentGPU].mtlColorTexture != nil) {
+                boost::hash_combine(hashVal, gpus[currentGPU].mtlColorTexture.pixelFormat);
             }
             else {
                 boost::hash_combine(hashVal, outputPixelFormat);
             }
             
-            if (mtlDepthTexture != nil) {
-                boost::hash_combine(hashVal, mtlDepthTexture.pixelFormat);
+            if (gpus[currentGPU].mtlDepthTexture != nil) {
+                boost::hash_combine(hashVal, gpus[currentGPU].mtlDepthTexture.pixelFormat);
             }
             else {
                 boost::hash_combine(hashVal, outputDepthFormat);
             }
         }
-        [wq->currentRenderEncoder setDepthStencilState:depthState];
+        [wq->currentRenderEncoder setDepthStencilState:gpus[currentGPU].depthState];
         // Update colour attachments hash
         wq->currentColourAttachmentsHash = hashVal;
     }
@@ -983,6 +1007,7 @@ void MtlfMetalContext::SetRenderPipelineState()
     // Always call this because currently we're not tracking changes to its state
     size_t hashVal = 0;
     
+    boost::hash_combine(hashVal, currentDevice);
     boost::hash_combine(hashVal, threadState.renderVertexFunction);
     boost::hash_combine(hashVal, threadState.renderFragmentFunction);
     boost::hash_combine(hashVal, wq->currentVertexDescriptorHash);
@@ -1093,20 +1118,21 @@ void MtlfMetalContext::SetRenderPipelineState()
                 renderPipelineStateDescriptor.colorAttachments[0].destinationRGBBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
                 renderPipelineStateDescriptor.colorAttachments[0].destinationAlphaBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
                 
-                if (mtlMultisampleColorTexture != nil) {
-                    renderPipelineStateDescriptor.colorAttachments[0].pixelFormat = mtlMultisampleColorTexture.pixelFormat;
-                    //renderPipelineStateDescriptor.colorAttachments[0].pixelFormat = MTLPixelFormatRGBA16Float;
+                if (gpus[currentGPU].mtlMultisampleColorTexture != nil) {
+                    renderPipelineStateDescriptor.colorAttachments[0].pixelFormat =
+                        gpus[currentGPU].mtlMultisampleColorTexture.pixelFormat;
                 }
-                else if (mtlColorTexture != nil) {
-                    renderPipelineStateDescriptor.colorAttachments[0].pixelFormat = mtlColorTexture.pixelFormat;
-                    //renderPipelineStateDescriptor.colorAttachments[0].pixelFormat = MTLPixelFormatRGBA16Float;
+                else if (gpus[currentGPU].mtlColorTexture != nil) {
+                    renderPipelineStateDescriptor.colorAttachments[0].pixelFormat =
+                        gpus[currentGPU].mtlColorTexture.pixelFormat;
                 }
                 else {
                     renderPipelineStateDescriptor.colorAttachments[0].pixelFormat = outputPixelFormat;
                 }
                 
-                if (mtlDepthTexture != nil) {
-                    renderPipelineStateDescriptor.depthAttachmentPixelFormat = mtlDepthTexture.pixelFormat;
+                if (gpus[currentGPU].mtlDepthTexture != nil) {
+                    renderPipelineStateDescriptor.depthAttachmentPixelFormat =
+                        gpus[currentGPU].mtlDepthTexture.pixelFormat;
                 }
                 else {
                     renderPipelineStateDescriptor.depthAttachmentPixelFormat = outputDepthFormat;
@@ -1116,7 +1142,7 @@ void MtlfMetalContext::SetRenderPipelineState()
         }
 
         NSError *error = NULL;
-        pipelineState = [device newRenderPipelineStateWithDescriptor:renderPipelineStateDescriptor error:&error];
+        pipelineState = [currentDevice newRenderPipelineStateWithDescriptor:renderPipelineStateDescriptor error:&error];
         if (!pipelineState) {
             _pipelineMutex.unlock();
             NSLog(@"Failed to created pipeline state, error %@", error);
@@ -1317,6 +1343,7 @@ NSUInteger MtlfMetalContext::SetComputeEncoderState(id<MTLFunction>     computeF
     }
 
     size_t hashVal = 0;
+    boost::hash_combine(hashVal, currentDevice);
     boost::hash_combine(hashVal, bufferCount);
     boost::hash_combine(hashVal, computeFunction);
     boost::hash_combine(hashVal, immutableBufferMask);
@@ -1360,7 +1387,9 @@ NSUInteger MtlfMetalContext::SetComputeEncoderState(id<MTLFunction>     computeF
         }
         
         // Create a new Compute pipeline state object
-        computePipelineState = [device newComputePipelineStateWithDescriptor:computePipelineStateDescriptor options:MTLPipelineOptionNone reflection:reflData error:&error];
+        computePipelineState = [currentDevice newComputePipelineStateWithDescriptor:computePipelineStateDescriptor
+                                                                            options:MTLPipelineOptionNone
+                                                                         reflection:reflData error:&error];
 
         if (!computePipelineState) {
             _pipelineMutex.unlock();
@@ -1469,7 +1498,7 @@ void MtlfMetalContext::CommitCommandBufferForThread(bool waituntilScheduled, boo
             {
                 std::lock_guard<std::mutex> lock(_commandBufferPoolMutex);
                 
-                commandBuffers[commandBuffersStackPos++] = wq->commandBuffer;
+                commandBuffers[currentGPU][commandBuffersStackPos[currentGPU]++] = wq->commandBuffer;
                 wq->commandBuffer = nil;
             }
             ResetEncoders(workQueueType);
@@ -1828,17 +1857,20 @@ void MtlfMetalContext::CleanupUnusedBuffers(bool forceClean)
 void MtlfMetalContext::StartFrameForThread() {
     threadState.PrepareThread(this);
     threadState.gsDataOffset = 0;
+    threadState.gsCurrentBuffer = 0;
     threadState.gsEncodedBatches = 0;
+
+    threadState.gsCurrentBuffer = threadState.gsBuffers[currentGPU].at(0);
 }
 
 void MtlfMetalContext::StartFrame() {
     numPrimsDrawn.store(0);
 
-//    if (device == renderDevices[0])
-//        device = renderDevices[1];
+//    if (currentDevice == renderDevices[0])
+//        currentDevice = renderDevices[1];
 //    else
-//        device = renderDevices[0];
-//    UpdateCurrentGPU();
+//        currentDevice = renderDevices[0];
+    UpdateCurrentGPU();
     GPUTImerResetTimer(frameCount);
     
     [captureScopeFullFrame beginScope];
@@ -1877,14 +1909,14 @@ void MtlfMetalContext::EndCaptureSubset()
 
 void MtlfMetalContext::_gsAdvanceBuffer() {
     threadState.gsBufferIndex = (threadState.gsBufferIndex + 1) % gsMaxConcurrentBatches;
-    threadState.gsCurrentBuffer = threadState.gsBuffers.at(threadState.gsBufferIndex);
+    threadState.gsCurrentBuffer = threadState.gsBuffers[currentGPU].at(threadState.gsBufferIndex);
 
     threadState.gsDataOffset = 0;
 }
 
 void MtlfMetalContext::_gsResetBuffers() {
     threadState.gsBufferIndex = 0;
-    threadState.gsCurrentBuffer = threadState.gsBuffers.at(threadState.gsBufferIndex);
+    threadState.gsCurrentBuffer = threadState.gsBuffers[currentGPU].at(threadState.gsBufferIndex);
     threadState.gsDataOffset = 0;
 }
 

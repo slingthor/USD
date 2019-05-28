@@ -317,8 +317,8 @@ HdSt_OsdRefineComputation<VERTEX_BUFFER>::Resolve()
 #if OPENSUBDIV_HAS_METAL_COMPUTE && defined(ARCH_GFX_METAL) //MTL_CHANGE
     OpenSubdiv::Osd::MTLContext deviceContext;
     OpenSubdiv::Osd::MTLContext *deviceContextPtr = &deviceContext;
-    deviceContext.device       = MtlfMetalContext::GetMetalContext()->device;
-    deviceContext.commandQueue = MtlfMetalContext::GetMetalContext()->commandQueue;
+    deviceContext.device       = MtlfMetalContext::GetMetalContext()->currentDevice;
+    deviceContext.commandQueue = MtlfMetalContext::GetMetalContext()->gpus[MtlfMetalContext::GetMetalContext()->currentGPU].commandQueue;
 #else
     void *deviceContextPtr = NULL;
 #endif

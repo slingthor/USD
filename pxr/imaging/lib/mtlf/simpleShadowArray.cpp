@@ -150,7 +150,7 @@ MtlfSimpleShadowArray::_AllocSamplers()
 #endif
     samplerDescriptor.minFilter = MTLSamplerMinMagFilterLinear;
     samplerDescriptor.magFilter = MTLSamplerMinMagFilterLinear;
-    _shadowDepthSampler = [mtlContext->device newSamplerStateWithDescriptor:samplerDescriptor];
+    _shadowDepthSampler = [mtlContext->currentDevice newSamplerStateWithDescriptor:samplerDescriptor];
     
     //METAL TODO: Check whether the sampler below is really going to provide the same functionality as the GL sample in the comments.
 #if defined(ARCH_OS_IOS)
@@ -167,7 +167,7 @@ MtlfSimpleShadowArray::_AllocSamplers()
 #endif
     samplerDescriptor.minFilter = MTLSamplerMinMagFilterLinear;
     samplerDescriptor.magFilter = MTLSamplerMinMagFilterLinear;
-    _shadowCompareSampler = [mtlContext->device newSamplerStateWithDescriptor:samplerDescriptor];
+    _shadowCompareSampler = [mtlContext->currentDevice newSamplerStateWithDescriptor:samplerDescriptor];
 }
 
 void

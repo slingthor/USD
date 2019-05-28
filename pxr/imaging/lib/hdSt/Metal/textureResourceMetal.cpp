@@ -141,7 +141,7 @@ GarchSamplerGPUHandle HdStSimpleTextureResourceMetal::GetTexelsSamplerId()
             samplerDesc.borderColor = MTLSamplerBorderColorOpaqueBlack;
         }
 #endif
-        id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->device;
+        id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->currentDevice;
         _sampler = [device newSamplerStateWithDescriptor:samplerDesc];
     }
     return _sampler;

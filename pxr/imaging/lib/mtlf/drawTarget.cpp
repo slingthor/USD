@@ -463,7 +463,7 @@ MtlfDrawTarget::GetImage(std::string const & name, void* buffer) const
     }
     
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
-    id<MTLDevice> device = context->device;
+    id<MTLDevice> device = context->currentDevice;
     context->CreateCommandBuffer();
     context->LabelCommandBuffer(@"Get Image");
     id<MTLBlitCommandEncoder> blitEncoder = context->GetBlitEncoder();
@@ -602,7 +602,7 @@ MtlfDrawTarget::MtlfAttachment::_GenTexture()
     int numChannel;
     bool depth24stencil8 = false;
     MTLPixelFormat mtlFormat = MTLPixelFormatInvalid;
-    id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->device;
+    id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->currentDevice;
 
     switch (_format)
     {
