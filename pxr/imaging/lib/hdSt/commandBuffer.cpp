@@ -150,13 +150,13 @@ HdStCommandBuffer::ExecuteDraw(
 
             context->StartFrameForThread();
 
-            if (!context->GeometryShadersActive()) {
-                context->CreateCommandBuffer(METALWORKQUEUE_GEOMETRY_SHADER);
-                if (TF_DEV_BUILD) {
-                    context->LabelCommandBuffer(@"Geometry Shaders", METALWORKQUEUE_GEOMETRY_SHADER);
-                }
-            }
-            
+//            if (!context->GeometryShadersActive()) {
+//                context->CreateCommandBuffer(METALWORKQUEUE_GEOMETRY_SHADER);
+//                if (TF_DEV_BUILD) {
+//                    context->LabelCommandBuffer(@"Geometry Shaders", METALWORKQUEUE_GEOMETRY_SHADER);
+//                }
+//            }
+
             // Create a new command buffer for each render pass to the current drawable
             context->CreateCommandBuffer(METALWORKQUEUE_DEFAULT);
             if (TF_DEV_BUILD) {
