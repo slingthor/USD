@@ -74,12 +74,22 @@ namespace SpatialHierarchy {
         std::list<OctreeNode*> PerformCulling(matrix_float4x4 const &viewProjMatrix, vector_float2 const &dimensions);
         unsigned Insert(DrawableItem* drawable);
         
+        size_t CalcSubtreeItems();
+        void WriteToList(size_t &idx, std::vector<DrawableItem*> *bakedDrawableItems);
+        
         void LogStatus(bool recursive);
         
         GfRange3f aabb;
         GfVec3f minVec;
         GfVec3f maxVec;
         GfVec3f halfSize;
+        
+        size_t index;
+        size_t indexEnd;
+        size_t itemCount;
+        size_t totalItemCount;
+        
+        NSString* name;
         
         std::list<DrawableItem*> drawables;
         std::list<DrawableItem*> drawablesTooLarge;
@@ -110,6 +120,10 @@ namespace SpatialHierarchy {
         
         bool populated;
         int BVHCounter;
+    private:
+        void Bake();
+        
+        std::vector<DrawableItem*> bakedDrawableItems;
     };
 }
 class HdStDrawItem;

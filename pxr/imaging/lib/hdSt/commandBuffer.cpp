@@ -59,6 +59,7 @@
 
 #include <os/signpost.h>
 #include <queue>
+#include <stack>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -173,17 +174,6 @@ namespace SpatialHierarchy {
         }
     };
     
-    DrawableItem::DrawableItem(HdStDrawItemInstance* itemInstance, GfRange3f boundingBox)
-    : itemInstance(itemInstance)
-    , aabb(boundingBox)
-    , visible(false)
-    , isInstanced(false)
-    , instanceIdx(0)
-    , numItemsInInstance(0)
-    {
-        halfSize = aabb.GetSize() * 0.5;
-    }
-    
     DrawableItem::DrawableItem(HdStDrawItemInstance* itemInstance, GfRange3f boundingBox, size_t instanceIndex, size_t totalInstancers)
     : itemInstance(itemInstance)
     , aabb(boundingBox)
@@ -195,7 +185,12 @@ namespace SpatialHierarchy {
         halfSize = aabb.GetSize() * 0.5;
     }
     
-
+    DrawableItem::DrawableItem(HdStDrawItemInstance* itemInstance, GfRange3f boundingBox)
+    : DrawableItem(itemInstance, boundingBox, 0, 0)
+    {
+        isInstanced = false;
+    }
+    
     void DrawableItem::SetVisible(bool visible)
     {
         if (isInstanced) {
@@ -275,7 +270,8 @@ namespace SpatialHierarchy {
             return;
         }
         os_signpost_id_t bvhGenerate = os_signpost_id_generate(cullingLog);
-        
+        os_signpost_id_t bvhBake = os_signpost_id_generate(cullingLog);
+
         NSLog(@"Building BVH for %zu HdStDrawItemInstance(s), %i", drawables->size(), BVHCounter);
         if (drawables->size() <= 0) {
             return;
@@ -293,19 +289,36 @@ namespace SpatialHierarchy {
         }
 
         root.ReInit(bbox, &drawableItems);
+        root.name = @"0";
         
         unsigned depth = 0;
-        for (size_t idx=0; idx < drawableItems.size(); ++idx)
+        size_t drawableItemsCount = drawableItems.size();
+        for (size_t idx=0; idx < drawableItemsCount; ++idx)
         {
-            depth = MAX(depth, root.Insert(drawableItems[idx]));
+            unsigned currentDepth = root.Insert(drawableItems[idx]);
+            depth = MAX(depth, currentDepth);
         }
         os_signpost_interval_end(cullingLog, bvhGenerate, "BVH Generation");
+        
+        os_signpost_interval_begin(cullingLog, bvhBake, "BVH Bake");
+        Bake();
+        os_signpost_interval_end(cullingLog, bvhBake, "BVH Bake");
 
         buildTimeMS = (ArchGetTickTime() - buildStart) / 1000.0f;
         
         populated = true;
         
         NSLog(@"Building BVH done: MaxDepth=%u, %fms, %zu items", depth, buildTimeMS, drawableItems.size());
+    }
+    
+    void BVH::Bake()
+    {
+        root.CalcSubtreeItems();
+
+        bakedDrawableItems.resize(drawableItems.size());
+        
+        size_t index = 0;
+        root.WriteToList(index, &bakedDrawableItems);
     }
     
     void BVH::PerformCulling(matrix_float4x4 const &viewProjMatrix, vector_float2 const &dimensions)
@@ -322,14 +335,6 @@ namespace SpatialHierarchy {
 
         uint64_t cullStart = ArchGetTickTime();
 
-        /* Algo
-         1) Init: set all items to invisible (multithreaded)
-         2) cull:
-            - collect all fully visible subtrees
-            - set all items to visible
-         3) finalize: set all fully visible subtrees to visible (multithreaded)
-         */
-        
         os_signpost_interval_begin(cullingLog, bvhCulling, "Culling: BVH");
         os_signpost_interval_begin(cullingLog, bvhCullingInit, "Culling: BVH -- Init");
         struct _WorkerInvisible {
@@ -337,7 +342,7 @@ namespace SpatialHierarchy {
             void setInVisible(const std::vector<DrawableItem*> &items, size_t begin, size_t end)
             {
                 for(size_t idx = begin; idx < end; ++idx) {
-                    items[idx]->SetVisible(true);
+                    items[idx]->SetVisible(false);
                 }
             }
         };
@@ -355,35 +360,34 @@ namespace SpatialHierarchy {
         os_signpost_interval_end(cullingLog, bvhCullingCull, "Culling: BVH -- Cull");
 
         os_signpost_interval_begin(cullingLog, bvhCullingFinal, "Culling: BVH -- Final");
+        static std::vector<DrawableItem*>* octreeHeap = &this->bakedDrawableItems;
+        octreeHeap = &this->bakedDrawableItems;
+
         struct _Worker {
             static
-            void setVisible(std::vector<OctreeNode*> *nodes, size_t begin, size_t end)
+            void setVisible(std::vector<OctreeNode*> *subTreeRoots, size_t begin, size_t end)
             {
                 for(size_t idx = begin; idx < end; ++idx) {
-                    for (auto &drawable : (*nodes)[idx]->drawables) {
-                        drawable->SetVisible(true);
-                    }
-                    for (auto &drawable : (*nodes)[idx]->drawablesTooLarge) {
-                        drawable->SetVisible(true);
-                    }
-                    if ((*nodes)[idx]->isSplit) {
-                        std::vector<OctreeNode*> children(std::begin((*nodes)[idx]->children), std::end((*nodes)[idx]->children));
-                        setVisible(&children, 0, 8);
+                    OctreeNode* subTreeRoot = (*subTreeRoots)[idx];
+                    for (size_t diIdx = subTreeRoot->index; diIdx < subTreeRoot->indexEnd; ++diIdx) {
+                        assert((*octreeHeap)[diIdx] != NULL);
+                        (*octreeHeap)[diIdx]->SetVisible(true);
                     }
                 }
             }
         };
 
-        std::vector<OctreeNode*> visibleSubtreesVec{
-            std::make_move_iterator(std::begin(visibleSubtreesList)),
-            std::make_move_iterator(std::end(visibleSubtreesList))
-        };
-
+        std::vector<OctreeNode*> visibleSubtreesVec;
+        for(std::list<OctreeNode*>::const_iterator it = visibleSubtreesList.begin(); it != visibleSubtreesList.end(); ++it) {
+            if ((*it)->totalItemCount > 0) {
+                visibleSubtreesVec.push_back(*it);
+            }
+        }
         WorkParallelForN(visibleSubtreesVec.size(),
                          std::bind(&_Worker::setVisible, &visibleSubtreesVec,
                                    std::placeholders::_1,
-                                   std::placeholders::_2),
-                         1);
+                                   std::placeholders::_2));
+
         os_signpost_interval_end(cullingLog, bvhCullingFinal, "Culling: BVH -- Final");
 
         os_signpost_interval_end(cullingLog, bvhCulling, "Culling: BVH");
@@ -396,9 +400,14 @@ namespace SpatialHierarchy {
     , minVec(minX, minY, minZ)
     , maxVec(maxX, maxY, maxZ)
     , halfSize((maxX - minX) * 0.5, (maxY - minY) * 0.5, (maxZ - minZ) * 0.5)
+    , index(0)
+    , indexEnd(0)
+    , itemCount(0)
+    , totalItemCount(0)
     , isSplit(false)
     , depth(currentDepth)
     {
+        // do nothing
     }
     
     OctreeNode::~OctreeNode()
@@ -432,11 +441,9 @@ namespace SpatialHierarchy {
         }
 
         for (auto &drawable : drawables) {
-            // TODO: could test here...
             drawable->SetVisible(true);
         }
         for (auto &drawable : drawablesTooLarge) {
-            // TODO: could test here...
             drawable->SetVisible(true);
         }
 
@@ -477,6 +484,15 @@ namespace SpatialHierarchy {
         children[6] = new OctreeNode(localMin.data()[0], midPoint.data()[1], midPoint.data()[2], midPoint.data()[0], localMax.data()[1], localMax.data()[2], depth + 1);
         children[7] = new OctreeNode(midPoint.data()[0], midPoint.data()[1], midPoint.data()[2], localMax.data()[0], localMax.data()[1], localMax.data()[2], depth + 1);
         
+        children[0]->name = [name stringByAppendingString:@"-0"];
+        children[1]->name = [name stringByAppendingString:@"-1"];
+        children[2]->name = [name stringByAppendingString:@"-2"];
+        children[3]->name = [name stringByAppendingString:@"-3"];
+        children[4]->name = [name stringByAppendingString:@"-4"];
+        children[5]->name = [name stringByAppendingString:@"-5"];
+        children[6]->name = [name stringByAppendingString:@"-6"];
+        children[7]->name = [name stringByAppendingString:@"-7"];
+        
         isSplit = true;
     }
     
@@ -493,6 +509,7 @@ namespace SpatialHierarchy {
             if (drawablesTooLarge.size() > maxPerLevel) {
                 // move the drawables to either 'drawablesTooLarge' or to children
                 std::list<DrawableItem*> lst(drawables.begin(), drawables.end());
+
                 drawables.clear();
                 for (auto drawable : lst) {
                     InsertStraight(drawable);
@@ -506,15 +523,14 @@ namespace SpatialHierarchy {
             return depth;
         }
         
-        if (!isSplit) {
-            subdivide();
-        }
-        
         return InsertStraight(drawable);
     }
     
     unsigned OctreeNode::InsertStraight(DrawableItem* drawable) {
         if (!MissingFunctions::IntersectsAllChildren(this, drawable->aabb)) {
+            if (!isSplit) {
+                subdivide();
+            }
             for (int idx = 0; idx < 8; ++idx) {
                 Intersection intersection = MissingFunctions::SpatialRelation(children[idx], drawable->aabb);
                 if (Intersection::Inside == intersection) {
@@ -527,6 +543,47 @@ namespace SpatialHierarchy {
         
         return depth;
     }
+    
+    size_t OctreeNode::CalcSubtreeItems() {
+        itemCount = drawables.size() + drawablesTooLarge.size();
+        
+        size_t res = itemCount;
+
+        if (isSplit) {
+            for (size_t idx = 0; idx < 8; ++idx) {
+                res += children[idx]->CalcSubtreeItems();
+            }
+        }
+        
+        totalItemCount = res;
+
+        return res;
+    };
+    
+    void OctreeNode::WriteToList(size_t &pos, std::vector<DrawableItem*> *bakedDrawableItems) {
+        index = pos;
+        
+        for(std::list<DrawableItem*>::const_iterator it = drawablesTooLarge.begin();
+            it != drawablesTooLarge.end(); ++it)
+        {
+            (*bakedDrawableItems)[pos++] = *it;
+        }
+        
+        for(std::list<DrawableItem*>::const_iterator it = drawables.begin();
+            it != drawables.end(); ++it)
+        {
+            (*bakedDrawableItems)[pos++] = *it;
+        }
+
+        if (isSplit) {
+            for (size_t idx = 0; idx < 8; ++idx) {
+                children[idx]->WriteToList(pos, bakedDrawableItems);
+            }
+        }
+        
+        indexEnd = pos;
+    }
+
 }
 
 HdStCommandBuffer::HdStCommandBuffer()
