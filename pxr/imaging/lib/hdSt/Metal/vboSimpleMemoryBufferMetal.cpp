@@ -109,10 +109,13 @@ HdStVBOSimpleMemoryBufferMetal::Reallocate(
         MTL_FIXE - Ideally we wouldn't be creating and committing a command buffer here but we'd need some extra call
         to know when all reallocates had been performed so could commit them. However, if this is only an initialisation step it's probably OK.
      */
-    context->CreateCommandBuffer(METALWORKQUEUE_RESOURCE);
-    context->LabelCommandBuffer(@"HdStVBOSimpleMemoryBufferMetal::Reallocate()", METALWORKQUEUE_RESOURCE);
- 
-    id<MTLBlitCommandEncoder> blitEncoder = context->GetBlitEncoder(METALWORKQUEUE_RESOURCE);
+    id<MTLCommandBuffer> commandBuffer[MAX_GPUS];
+    id<MTLBlitCommandEncoder> blitEncoder[MAX_GPUS];
+
+    for (int g = 0; g < GPUState::gpuCount; g++) {
+        commandBuffer[g] = [context->gpus[g].commandQueue commandBuffer];
+        blitEncoder[g] = [commandBuffer[g] blitCommandEncoder];
+    }
     
     TF_FOR_ALL (bresIt, GetResources()) {
         HdStBufferResourceMetalSharedPtr const &bres =
@@ -165,13 +168,15 @@ HdStVBOSimpleMemoryBufferMetal::Reallocate(
         if (copySize > 0) {
             HD_PERF_COUNTER_INCR(HdPerfTokens->glCopyBufferSubData);
 
-            for (int i = 0; i < 3; i++) {
-                if (newId[i].IsSet()) {
-                    [blitEncoder copyFromBuffer:oldId[i].forCurrentGPU()
-                                   sourceOffset:0
-                                       toBuffer:newId[i].forCurrentGPU()
-                              destinationOffset:0
-                                           size:copySize];
+            for (int g = 0; g < GPUState::gpuCount; g++) {
+                for (int i = 0; i < 3; i++) {
+                    if (newId[i].IsSet()) {
+                        [blitEncoder[g] copyFromBuffer:oldId[i][g]
+                                          sourceOffset:0
+                                              toBuffer:newId[i][g]
+                                     destinationOffset:0
+                                                  size:copySize];
+                    }
                 }
             }
         }
@@ -185,13 +190,15 @@ HdStVBOSimpleMemoryBufferMetal::Reallocate(
 
         bres->SetAllocations(newId[0], newId[1], newId[2], bufferSize);
         
-//        static size_t size = 0;
-//        size += range->GetNumElements();
-//        NSLog(@"vboSimpleMemoryBufferMetal - %zu", size);
+//          static size_t size = 0;
+//          size += range->GetNumElements();
+//          NSLog(@"vboSimpleMemoryBufferMetal - %zu", size);
     }
     
-    context->ReleaseEncoder(true, METALWORKQUEUE_RESOURCE);
-    context->CommitCommandBufferForThread(false, false, METALWORKQUEUE_RESOURCE);
+    for (int g = 0; g < GPUState::gpuCount; g++) {
+        [blitEncoder[g] endEncoding];
+        [commandBuffer[g] commit];
+    }
 
     _capacity = numElements;
     _needsReallocation = false;

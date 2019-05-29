@@ -61,16 +61,135 @@ TF_DECLARE_PUBLIC_TOKENS(GarchTextureTokens, GARCH_API, GARCH_TEXTURE_TOKENS);
 
 TF_DECLARE_WEAK_AND_REF_PTRS(GarchTexture);
 
-struct GarchTextureGPUHandle {
-    GarchTextureGPUHandle() {
-        handle = NULL;
-    }
-    GarchTextureGPUHandle(GarchTextureGPUHandle const & _gpuHandle) {
-        handle = _gpuHandle.handle;
+#if defined(ARCH_OS_IOS)
+#define MAX_GPUS    1
+#else
+#define MAX_GPUS    4
+#endif
+
+struct GPUState {
+    static NSArray<id<MTLDevice>> *renderDevices;
+    static int gpuCount;
+    static int currentGPU;
+};
+
+struct MtlfMultiSampler {
+    
+    MtlfMultiSampler() {}
+    
+    MtlfMultiSampler(MTLSamplerDescriptor* samplerDescriptor) {
+        int i = 0;
+        if (samplerDescriptor) {
+            for (id<MTLDevice>dev in GPUState::renderDevices) {
+                sampler[i++] = [dev newSamplerStateWithDescriptor:samplerDescriptor];
+            }
+        }
+        while(i < MAX_GPUS)
+            sampler[i++] = nil;
     }
     
-    void Clear() { handle = NULL; }
-    bool IsSet() const { return handle != NULL; }
+    bool IsSet() const { return sampler[0] != nil; }
+    void Clear() {
+        for (int i = 0; i < MAX_GPUS; i++) {
+            sampler[i] = nil;
+        }
+    }
+    
+    void release() {
+        for (int i = 0; i < MAX_GPUS; i++) {
+            if (!sampler[i])
+                break;
+            
+            [sampler[i] release];
+        }
+        Clear();
+    }
+    
+    id<MTLSamplerState> forCurrentGPU() const {
+#if MAX_GPUS == 1
+        return sampler[0];
+#else
+        return sampler[GPUState::currentGPU];
+#endif
+    }
+    
+    id<MTLSamplerState> operator[](int64_t const index) const {
+        return sampler[index];
+    }
+    
+    bool operator==(MtlfMultiSampler const &other) const {
+        return other.sampler[0] == sampler[0];
+    }
+    
+    bool operator!=(MtlfMultiSampler const &other) const {
+        return other.sampler[0] != sampler[0];
+    }
+    
+    id<MTLSamplerState> sampler[MAX_GPUS];
+};
+
+struct MtlfMultiTexture {
+    
+    MtlfMultiTexture() {}
+    
+    MtlfMultiTexture(MTLTextureDescriptor* textureDescriptor) {
+        int i = 0;
+        if (textureDescriptor) {
+            for (id<MTLDevice>dev in GPUState::renderDevices) {
+                texture[i++] = [dev newTextureWithDescriptor:textureDescriptor];
+            }
+        }
+        while(i < MAX_GPUS)
+            texture[i++] = nil;
+    }
+    
+    bool IsSet() const { return texture[0] != nil; }
+    void Clear() {
+        for (int i = 0; i < MAX_GPUS; i++) {
+            texture[i] = nil;
+        }
+    }
+    
+    void release() {
+        for (int i = 0; i < MAX_GPUS; i++) {
+            if (!texture[i])
+                break;
+            
+            [texture[i] release];
+        }
+        Clear();
+    }
+    
+    void Set(int index, id<MTLTexture> _texture) {
+        texture[index] = _texture;
+    }
+    
+    id<MTLTexture> forCurrentGPU() const {
+#if MAX_GPUS == 1
+        return texture[0];
+#else
+        return texture[GPUState::currentGPU];
+#endif
+    }
+    
+    id<MTLTexture> operator[](int64_t const index) const {
+        return texture[index];
+    }
+    
+    bool operator==(MtlfMultiTexture const &other) const {
+        return other.texture[0] == texture[0];
+    }
+    
+    bool operator!=(MtlfMultiTexture const &other) const {
+        return other.texture[0] != texture[0];
+    }
+    
+    id<MTLTexture> texture[MAX_GPUS];
+};
+struct GarchTextureGPUHandle {
+    
+    void Clear() { handle = 0; }
+    bool IsSet() const { return handle != 0; }
 
     // OpenGL
 #if defined(ARCH_GFX_OPENGL)
@@ -94,29 +213,36 @@ struct GarchTextureGPUHandle {
     
 #if defined(ARCH_GFX_METAL)
     // Metal
-    GarchTextureGPUHandle(id<MTLTexture> const _handle) {
-        handle = (__bridge void*)_handle;
+    GarchTextureGPUHandle() {
+        multiTexture.Clear();
     }
-    GarchTextureGPUHandle& operator =(id<MTLTexture> const _handle) {
-        handle = (__bridge void*)_handle;
+    GarchTextureGPUHandle(GarchTextureGPUHandle const & _gpuHandle) {
+        multiTexture = _gpuHandle.multiTexture;
+    }
+    GarchTextureGPUHandle(MtlfMultiTexture const & _multiTexture) {
+        multiTexture = _multiTexture;
+    }
+    GarchTextureGPUHandle& operator =(MtlfMultiTexture const _handle) {
+        multiTexture = _handle;
         return *this;
     }
-    operator id<MTLTexture>() const { return (__bridge id<MTLTexture>)handle; }
+    operator MtlfMultiTexture() const { return multiTexture; }
 #endif
     
-    void* handle;
+    // Storage
+    union {
+        void* handle;
+#if defined(ARCH_GFX_METAL)
+        MtlfMultiTexture multiTexture;
+#endif
+    };
+
 };
 
 struct GarchSamplerGPUHandle {
-    GarchSamplerGPUHandle() {
-        handle = NULL;
-    }
-    GarchSamplerGPUHandle(GarchSamplerGPUHandle const & _gpuHandle) {
-        handle = _gpuHandle.handle;
-    }
-    
-    void Clear() { handle = NULL; }
-    bool IsSet() const { return handle != NULL; }
+
+    void Clear() { handle = 0; }
+    bool IsSet() const { return handle != 0; }
     
     // OpenGL
 #if defined(ARCH_GFX_OPENGL)
@@ -140,17 +266,26 @@ struct GarchSamplerGPUHandle {
 
 #if defined(ARCH_GFX_METAL)
     // Metal
-    GarchSamplerGPUHandle(id<MTLSamplerState> const _handle) {
-        handle = (__bridge void*)_handle;
+    GarchSamplerGPUHandle() {
+        multiSampler.Clear();
     }
-    GarchSamplerGPUHandle& operator =(id<MTLSamplerState> const _handle) {
-        handle = (__bridge void*)_handle;
+    GarchSamplerGPUHandle(GarchSamplerGPUHandle const & _gpuHandle) {
+        multiSampler = _gpuHandle.multiSampler;
+    }
+    GarchSamplerGPUHandle& operator =(MtlfMultiSampler const _handle) {
+        multiSampler = _handle;
         return *this;
     }
-    operator id<MTLSamplerState>() const { return (__bridge id<MTLSamplerState>)handle; }
+    operator MtlfMultiSampler() const { return multiSampler; }
 #endif
     
-    void* handle;
+    // Storage
+    union {
+        void* handle;
+#if defined(ARCH_GFX_METAL)
+        MtlfMultiSampler multiSampler;
+#endif
+    };
 };
 
 /// \class GarchTexture

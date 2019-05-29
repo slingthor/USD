@@ -85,8 +85,11 @@ HdStBufferResourceMetal::HdStBufferResourceMetal(TfToken const &role,
 {
     for (int i = 0; i < 3; i++) {
         _id[i].Clear();
-        _texId[i] = nil;
-        _gpuAddr[i] = 0;
+        _texId[i].Clear();
+        
+        for (int g = 0; g < GPUState::gpuCount; g++) {
+            _gpuAddr[g][i] = 0;
+        }
     }
 }
 
@@ -112,23 +115,23 @@ HdStBufferResourceMetal::SetAllocations(HdResourceGPUHandle idBuffer0,
     _id[0] = idBuffer0;
     _id[1] = idBuffer1;
     _id[2] = idBuffer2;
+    
+    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
 
     // release texid if exist. SetAllocation is guaranteed to be called
     // at the destruction of the hosting buffer array.
     for (int i = 0; i < 3; i++) {
-        if (_texId[i]) {
-            [_texId[i] release];
-            _texId[i] = nil;
+        if (_texId[i].IsSet()) {
+            _texId[i].release();
+            _texId[i].Clear();
         }
         
-        if (!_id[i].IsSet()) {
-            continue;
+        for (int g = 0; g < GPUState::gpuCount; g++) {
+            MtlfMetalContext::MtlfMultiBuffer &b = _id[i];
+            _gpuAddr[g][i] = (uint64_t)[b[g] contents];
         }
-
-        MtlfMetalContext::MtlfMultiBuffer &b = _id[i];
-        MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
-        _gpuAddr[i] = (uint64_t)[b.forCurrentGPU() contents];
     }
+
     HdResource::SetSize(size);
 
     _lastFrameModified = MtlfMetalContext::GetMetalContext()->GetCurrentFrame();
@@ -141,7 +144,7 @@ GarchTextureGPUHandle
 HdStBufferResourceMetal::GetTextureBuffer()
 {
     // XXX: need change tracking.
-    if (_texId[_activeBuffer] == nil) {
+    if (_texId[_activeBuffer].forCurrentGPU() == nil) {
         MTLPixelFormat format = MTLPixelFormatInvalid;
         switch(_tupleType.type) {
             case HdTypeFloat:
@@ -182,7 +185,10 @@ HdStBufferResourceMetal::GetTextureBuffer()
                                                                width:numPixels
                                                               height:1
                                                            mipmapped:NO];
-        _texId[_activeBuffer] = [_id[_activeBuffer].forCurrentGPU() newTextureWithDescriptor:texDesc offset:0 bytesPerRow:pixelSize * numPixels];
+
+        for (int g = 0; g < GPUState::gpuCount; g++) {
+            _texId[_activeBuffer].Set(g, [_id[_activeBuffer][g] newTextureWithDescriptor:texDesc offset:0 bytesPerRow:pixelSize * numPixels]);
+        }
     }
     return _texId[_activeBuffer];
 }
@@ -206,20 +212,22 @@ HdStBufferResourceMetal::CopyData(size_t vboOffset, size_t dataSize, void const 
 
     if (_firstFrameBeingFilled) {
         // populate all the buffers
-        for (int i = 0; i < 3; i++) {
-            memcpy((uint8_t*)_gpuAddr[i] + vboOffset, data, dataSize);
+        for (int g = 0; g < GPUState::gpuCount; g++) {
+            for (int i = 0; i < 3; i++) {
+                memcpy((uint8_t*)_gpuAddr[g][i] + vboOffset, data, dataSize);
 #if defined(ARCH_OS_MACOS)
-            context->QueueBufferFlush(_id[i].forCurrentGPU(), vboOffset, vboOffset + dataSize);
-//            [_id[i].forCurrentGPU() didModifyRange:NSMakeRange(vboOffset, dataSize)];
+                context->QueueBufferFlush(_id[i][g], vboOffset, vboOffset + dataSize);
 #endif
+            }
         }
     }
     else {
-        memcpy((uint8_t*)_gpuAddr[_activeBuffer] + vboOffset, data, dataSize);
+        for (int g = 0; g < GPUState::gpuCount; g++) {
+            memcpy((uint8_t*)_gpuAddr[g][_activeBuffer] + vboOffset, data, dataSize);
 #if defined(ARCH_OS_MACOS)
-        context->QueueBufferFlush(_id[_activeBuffer].forCurrentGPU(), vboOffset, vboOffset + dataSize);
-//        [_id[_activeBuffer].forCurrentGPU() didModifyRange:NSMakeRange(vboOffset, dataSize)];
+            context->QueueBufferFlush(_id[_activeBuffer][g], vboOffset, vboOffset + dataSize);
 #endif
+        }
     }
 }
 
@@ -248,7 +256,7 @@ HdStBufferResourceMetal::ReadBuffer(HdTupleType tupleType,
     // read data
     std::vector<unsigned char> tmp(vboSize);
     
-    uint8_t const* const data = (uint8_t*)_gpuAddr[_activeBuffer];
+    uint8_t const* const data = (uint8_t*)_gpuAddr[GPUState::currentGPU][_activeBuffer];
     size_t const dataSize = GetSize();
     
     VtValue result;
@@ -300,7 +308,7 @@ HdStBufferResourceMetal::ReadBuffer(HdTupleType tupleType,
 uint8_t const*
 HdStBufferResourceMetal::GetBufferContents() const
 {
-    return (uint8_t const*)_gpuAddr[_activeBuffer];
+    return (uint8_t const*)_gpuAddr[GPUState::currentGPU][_activeBuffer];
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

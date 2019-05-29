@@ -77,43 +77,49 @@ HdSt_FlatNormalsComputationMetal::_Execute(
 {
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
     HdStMSLProgramSharedPtr const &mslProgram(boost::dynamic_pointer_cast<HdStMSLProgram>(computeProgram));
-    id<MTLFunction> computeFunction = mslProgram->GetComputeFunction();
     
     //  All but the normals are immutable
     unsigned long immutableBufferMask = (1 << 0) | (1 << 2) | (1 << 3) | (1 << 4);
-    
-    id <MTLComputeCommandEncoder> computeEncoder = context->GetComputeEncoder(METALWORKQUEUE_DEFAULT);
-    computeEncoder.label = @"Compute pass for GPU Flat Normals";
-    
-    context->SetComputeEncoderState(computeFunction, 5, immutableBufferMask, @"GPU Flat Normals pipeline state", METALWORKQUEUE_DEFAULT);
-    
+
     MtlfMetalContext::MtlfMultiBuffer const& pointsBuffer = points->GetId();
     MtlfMetalContext::MtlfMultiBuffer const& normalsBuffer = normals->GetId();
     MtlfMetalContext::MtlfMultiBuffer const& indicesBuffer = indices->GetId();
     MtlfMetalContext::MtlfMultiBuffer const& primitiveParamBuffer = primitiveParam->GetId();
     
-    [computeEncoder setBuffer:pointsBuffer.forCurrentGPU()    offset:0 atIndex:0];
-    [computeEncoder setBuffer:normalsBuffer.forCurrentGPU()   offset:0 atIndex:1];
-    [computeEncoder setBuffer:indicesBuffer.forCurrentGPU()   offset:0 atIndex:2];
-    [computeEncoder setBuffer:primitiveParamBuffer.forCurrentGPU() offset:0 atIndex:3];
-    [computeEncoder setBytes:(const void *)&uniform length:sizeof(uniform) atIndex:4];
-
-    int maxThreadsPerThreadgroup =
-        context->GetMaxThreadsPerThreadgroup(METALWORKQUEUE_DEFAULT);
-    //    int const maxThreadsPerGroup = [context->device maxThreadsPerThreadgroup].width;
-    int const maxThreadsPerGroup = 32;
+    context->FlushBuffers();
+    context->PrepareBufferFlush();
     
-    if (maxThreadsPerThreadgroup > maxThreadsPerGroup) {
-        maxThreadsPerThreadgroup = maxThreadsPerGroup;
+    for (int g = 0; g < context->renderDevices.count; g++) {
+        id<MTLCommandBuffer> commandBuffer = [context->gpus[g].commandQueue commandBuffer];
+        id<MTLComputeCommandEncoder> computeEncoder = [commandBuffer computeCommandEncoder];
+        
+        id<MTLFunction> computeFunction = mslProgram->GetComputeFunction(g);
+        id<MTLComputePipelineState> pipelineState =
+            context->GetComputeEncoderState(g, computeFunction, 4, immutableBufferMask,
+                                            @"GPU Flat Normals pipeline state");
+        
+        [computeEncoder setComputePipelineState:pipelineState];
+        [computeEncoder setBuffer:pointsBuffer[g]    offset:0 atIndex:0];
+        [computeEncoder setBuffer:normalsBuffer[g]   offset:0 atIndex:1];
+        [computeEncoder setBuffer:indicesBuffer[g]   offset:0 atIndex:2];
+        [computeEncoder setBuffer:primitiveParamBuffer[g] offset:0 atIndex:3];
+        [computeEncoder setBytes:(const void *)&uniform length:sizeof(uniform) atIndex:4];
+
+        int maxThreadsPerThreadgroup = [pipelineState threadExecutionWidth];
+        int const maxThreadsPerGroup = 32;
+        if (maxThreadsPerThreadgroup > maxThreadsPerGroup) {
+            maxThreadsPerThreadgroup = maxThreadsPerGroup;
+        }
+        
+        MTLSize threadgroupCount =
+            MTLSizeMake(fmin(maxThreadsPerThreadgroup, numPrims), 1, 1);
+
+        [computeEncoder dispatchThreads:MTLSizeMake(numPrims, 1, 1)
+                  threadsPerThreadgroup:threadgroupCount];
+
+        [computeEncoder endEncoding];
+        [commandBuffer commit];
     }
-    
-    MTLSize threadgroupCount =
-        MTLSizeMake(fmin(maxThreadsPerThreadgroup, numPrims), 1, 1);
-
-    [computeEncoder dispatchThreads:MTLSizeMake(numPrims, 1, 1)
-              threadsPerThreadgroup:threadgroupCount];
-
-    context->ReleaseEncoder(false, METALWORKQUEUE_DEFAULT);
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE
