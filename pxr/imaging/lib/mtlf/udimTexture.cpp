@@ -60,12 +60,12 @@ void
 MtlfUdimTexture::_FreeTextureObject()
 {
     if (_imageArray.IsSet()) {
-        [_imageArray release];
+        _imageArray.multiTexture.release();
         _imageArray.Clear();
     }
 
     if (_layout.IsSet()) {
-        [_layout release];
+        _layout.multiTexture.release();
         _layout.Clear();
     }
 }
@@ -114,7 +114,7 @@ MtlfUdimTexture::_CreateGPUResources(unsigned int numChannels,
     descImage.arrayLength = _depth;
     descImage.mipmapLevelCount = mipCount;
     descImage.resourceOptions = MTLResourceStorageModeDefault;
-    _imageArray = [device newTextureWithDescriptor:descImage];
+    _imageArray = MtlfMultiTexture(descImage);
     
     for (int mip = 0; mip < mipCount; ++mip) {
         _TextureSize const& mipSize = mips[mip];
@@ -123,12 +123,14 @@ MtlfUdimTexture::_CreateGPUResources(unsigned int numChannels,
             uint8_t const *sliceBase = static_cast<uint8_t const*>(mipData[mip].data()) +
                 pixelByteSize * mipSize.width * mipSize.height * slice;
 
-            [_imageArray replaceRegion:MTLRegionMake2D(0, 0, mipSize.width, mipSize.height)
-                           mipmapLevel:mip
-                                 slice:slice
-                             withBytes:sliceBase
-                           bytesPerRow:pixelByteSize * mipSize.width
-                         bytesPerImage:0];
+            for (int g = 0; g < GPUState::gpuCount; g++) {
+                [_imageArray.multiTexture[g] replaceRegion:MTLRegionMake2D(0, 0, mipSize.width, mipSize.height)
+                               mipmapLevel:mip
+                                     slice:slice
+                                 withBytes:sliceBase
+                               bytesPerRow:pixelByteSize * mipSize.width
+                             bytesPerImage:0];
+            }
         }
     }
     
@@ -139,12 +141,14 @@ MtlfUdimTexture::_CreateGPUResources(unsigned int numChannels,
                                                        mipmapped:NO];
     descLayout.textureType = MTLTextureType1D;
     descLayout.resourceOptions = MTLResourceStorageModeDefault;
-    _layout = [device newTextureWithDescriptor:descLayout];
+    _layout = MtlfMultiTexture(descLayout);
 
-    [_layout replaceRegion:MTLRegionMake1D(0, layoutData.size())
-               mipmapLevel:0
-                 withBytes:layoutData.data()
-               bytesPerRow:layoutData.size() * sizeof(float)];
+    for (int g = 0; g < GPUState::gpuCount; g++) {
+        [_layout.multiTexture[g] replaceRegion:MTLRegionMake1D(0, layoutData.size())
+                   mipmapLevel:0
+                     withBytes:layoutData.data()
+                   bytesPerRow:layoutData.size() * sizeof(float)];
+    }
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

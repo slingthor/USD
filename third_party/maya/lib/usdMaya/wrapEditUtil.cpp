@@ -220,7 +220,7 @@ _GetAvarEdits(
         pathDict[ pathEdits->first ] = valueMap;
     }
 
-    return pathDict;
+    return std::move(pathDict);
 }
 
 } // anonymous namespace 

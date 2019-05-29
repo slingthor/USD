@@ -45,19 +45,22 @@ HdStBufferRelocatorMetal::Commit()
         return;
 
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
-    context->CreateCommandBuffer(METALWORKQUEUE_RESOURCE);
-    context->LabelCommandBuffer(@"HdStBufferRelocatorMetal::Commit()", METALWORKQUEUE_RESOURCE);
-    id<MTLBlitCommandEncoder> blitEncoder = context->GetBlitEncoder(METALWORKQUEUE_RESOURCE);
     
-    TF_FOR_ALL (it, _queue) {
-        [blitEncoder copyFromBuffer:_srcBuffer.forCurrentGPU()
-                       sourceOffset:it->readOffset
-                           toBuffer:_dstBuffer.forCurrentGPU()
-                  destinationOffset:it->writeOffset
-                               size:it->copySize];
+    for (int i = 0; i < context->renderDevices.count; i++) {
+        id<MTLCommandBuffer> commandBuffer = [context->gpus[i].commandQueue commandBuffer];
+        id<MTLBlitCommandEncoder> blitEncoder = [commandBuffer blitCommandEncoder];
+        
+        TF_FOR_ALL (it, _queue) {
+            [blitEncoder copyFromBuffer:_srcBuffer[i]
+                           sourceOffset:it->readOffset
+                               toBuffer:_dstBuffer[i]
+                      destinationOffset:it->writeOffset
+                                   size:it->copySize];
+        }
+        
+        [blitEncoder endEncoding];
+        [commandBuffer commit];
     }
-    context->ReleaseEncoder(true, METALWORKQUEUE_RESOURCE);
-    context->CommitCommandBufferForThread(false, false, METALWORKQUEUE_RESOURCE);
 
     HD_PERF_COUNTER_ADD(HdPerfTokens->glCopyBufferSubData,
                         (double)_queue.size());

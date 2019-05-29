@@ -184,8 +184,8 @@ MtlfBaseTexture::MtlfBaseTexture()
 
 MtlfBaseTexture::~MtlfBaseTexture()
 {
-    if (_textureName != nil) {
-        [_textureName release];
+    if (_textureName.IsSet()) {
+        _textureName.multiTexture.release();
     }
 }
 
@@ -296,8 +296,8 @@ MtlfBaseTexture::_CreateTexture(GarchBaseTextureDataConstPtr texData,
             }
         }
         
-        if (_textureName != nil) {
-            [_textureName release];
+        if (_textureName.IsSet()) {
+            _textureName.multiTexture.release();
         }
 
         // Uncompressed textures can have cropping and other special
@@ -363,14 +363,16 @@ MtlfBaseTexture::_CreateTexture(GarchBaseTextureDataConstPtr texData,
                                                                   height:texDataHeight
                                                                mipmapped:genMips?YES:NO];
             desc.resourceOptions = MTLResourceStorageModeDefault;
-            _textureName = [device newTextureWithDescriptor:desc];
+            _textureName = MtlfMultiTexture(desc);;
 
             char *rawData = (char*)texBuffer + (unpackSkipRows * unpackRowLength * pixelByteSize)
                 + (unpackSkipPixels * pixelByteSize);
-            [_textureName replaceRegion:MTLRegionMake2D(0, 0, texDataWidth, texDataHeight)
-                            mipmapLevel:0
-                              withBytes:rawData
-                            bytesPerRow:pixelByteSize * unpackRowLength];
+            for(int i = 0; i < GPUState::gpuCount; i++) {
+                [_textureName.multiTexture[i] replaceRegion:MTLRegionMake2D(0, 0, texDataWidth, texDataHeight)
+                                mipmapLevel:0
+                                  withBytes:rawData
+                                bytesPerRow:pixelByteSize * unpackRowLength];
+            }
 
             if (b24BitFormat) {
                 delete[] (uint8_t*)texBuffer;
@@ -379,12 +381,16 @@ MtlfBaseTexture::_CreateTexture(GarchBaseTextureDataConstPtr texData,
             if (genMips) {
                 // Blit command encoder to generate mips
                 MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
-                id<MTLBlitCommandEncoder> blitEncoder = context->GetBlitEncoder();
-             
-                [blitEncoder generateMipmapsForTexture:_textureName];
                 
-                context->ReleaseEncoder(true);
-                context->CommitCommandBufferForThread(false, false);
+                for(int i = 0; i < GPUState::gpuCount; i++) {
+                    id<MTLCommandBuffer> commandBuffer = [context->gpus[i].commandQueue commandBuffer];
+                    id<MTLBlitCommandEncoder> blitEncoder = [commandBuffer blitCommandEncoder];
+
+                    [blitEncoder generateMipmapsForTexture:_textureName.multiTexture[i]];
+                    [blitEncoder endEncoding];
+
+                    [commandBuffer commit];
+                }
             }
 
         } else {
@@ -404,7 +410,7 @@ MtlfBaseTexture::_CreateTexture(GarchBaseTextureDataConstPtr texData,
                                                                mipmapped:genMips?YES:NO];
             
             desc.resourceOptions = MTLResourceStorageModeDefault;
-            _textureName = [device newTextureWithDescriptor:desc];
+            _textureName = MtlfMultiTexture(desc);
 
             for (int i = 0 ; i < numMipLevels; i++) {
                 size_t mipWidth = texData->ResizedWidth(i);
@@ -417,7 +423,7 @@ MtlfBaseTexture::_CreateTexture(GarchBaseTextureDataConstPtr texData,
                     texBuffer = PadImage(texData->GLInternalFormat(), texData->GetRawBuffer(1), pixelByteSize, numPixels);
                 }
 
-                [_textureName replaceRegion:MTLRegionMake2D(0, 0, mipWidth, texData->ResizedHeight(i))
+                [_textureName.multiTexture[i] replaceRegion:MTLRegionMake2D(0, 0, mipWidth, texData->ResizedHeight(i))
                                 mipmapLevel:i
                                   withBytes:texBuffer
                                 bytesPerRow:pixelByteSize * mipWidth];

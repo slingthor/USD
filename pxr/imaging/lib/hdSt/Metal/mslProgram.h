@@ -188,19 +188,19 @@ public:
     HDST_API
     void UpdateUniformBinding(std::string const &name, int index);
 
+//    HDST_API
+//    id<MTLFunction> GetVertexFunction() const {
+//        return _vertexFunction;
+//    }
+//
+//    HDST_API
+//    id<MTLFunction> GetFragmentFunction() const {
+//        return _fragmentFunction;
+//    }
+//
     HDST_API
-    id<MTLFunction> GetVertexFunction() const {
-        return _vertexFunction;
-    }
-    
-    HDST_API
-    id<MTLFunction> GetFragmentFunction() const {
-        return _fragmentFunction;
-    }
-    
-    HDST_API
-    id<MTLFunction> GetComputeFunction() const {
-        return _computeFunction;
+    id<MTLFunction> GetComputeFunction(int gpuIndex) const {
+        return _computeFunction[gpuIndex];
     }
     
     HDST_API
@@ -221,12 +221,12 @@ protected:
 private:
     TfToken const _role;
     
-    id<MTLFunction> _vertexFunction;
-    id<MTLFunction> _fragmentFunction;
-    id<MTLFunction> _computeFunction;
-    id<MTLFunction> _computeGeometryFunction;
+    id<MTLFunction> _vertexFunction[MAX_GPUS];
+    id<MTLFunction> _fragmentFunction[MAX_GPUS];
+    id<MTLFunction> _computeFunction[MAX_GPUS];
+    id<MTLFunction> _computeGeometryFunction[MAX_GPUS];
     
-    id<MTLRenderPipelineState> _pipelineState;
+    id<MTLRenderPipelineState> _pipelineState[MAX_GPUS];
 
     bool _valid;
     HdStResourceMetal  _uniformBuffer;

@@ -135,11 +135,10 @@ void HdStRenderDelegateMetal::CommitResources(HdChangeTracker *tracker)
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
 
     context->StartFrameForThread();
-    
     context->PrepareBufferFlush();
-    
+
     HdStRenderDelegate::CommitResources(tracker);
-    
+
     context->FlushBuffers();
 
     if (context->GeometryShadersActive()) {
@@ -295,6 +294,7 @@ void HdStRenderDelegateMetal::PrepareRender(
                 context->SetTempPointWorkaround(false);
                 break;
         }
+        context->SetAlphaBlendingEnable(false);
     }
     
     if (params.enableIdRender) {
@@ -303,7 +303,6 @@ void HdStRenderDelegateMetal::PrepareRender(
         context->SetAlphaCoverageEnable(true);
     }
 
-    context->SetAlphaBlendingEnable(false);
     // TODO:
     //  * forceRefresh
     //  * showGuides, showRender, showProxy

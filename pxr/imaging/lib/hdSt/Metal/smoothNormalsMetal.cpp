@@ -78,51 +78,50 @@ HdSt_SmoothNormalsComputationMetal::_Execute(
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
     HdStMSLProgramSharedPtr const &mslProgram(
         boost::dynamic_pointer_cast<HdStMSLProgram>(computeProgram));
-    id<MTLFunction> computeFunction = mslProgram->GetComputeFunction();
-    
+
     // Only the normals are writebale
     unsigned long immutableBufferMask = (1 << 0) | (1 << 2) | (1 << 3);
-    
-    id <MTLComputeCommandEncoder> computeEncoder =
-        context->GetComputeEncoder(METALWORKQUEUE_DEFAULT);
-    computeEncoder.label = @"Compute pass for GPU Smooth Normals";
-    
-    context->SetComputeEncoderState(
-        computeFunction, 4, immutableBufferMask,
-        @"GPU Smooth Normals pipeline state", METALWORKQUEUE_DEFAULT);
 
     MtlfMetalContext::MtlfMultiBuffer const& pointsBuffer = points->GetId();
     MtlfMetalContext::MtlfMultiBuffer const& normalsBuffer = normals->GetId();
     MtlfMetalContext::MtlfMultiBuffer const& adjacencyBuffer = adjacency->GetId();
 
-    [computeEncoder setBuffer:pointsBuffer.forCurrentGPU()    offset:0 atIndex:0];
-    [computeEncoder setBuffer:normalsBuffer.forCurrentGPU()   offset:0 atIndex:1];
-    [computeEncoder setBuffer:adjacencyBuffer.forCurrentGPU() offset:0 atIndex:2];
-    [computeEncoder setBytes:(const void *)&uniform
-                      length:sizeof(uniform)
-                     atIndex:3];
+    context->FlushBuffers();
+    context->PrepareBufferFlush();
     
-    int maxThreadsPerThreadgroup =
-        context->GetMaxThreadsPerThreadgroup(METALWORKQUEUE_DEFAULT);
+    for (int g = 0; g < context->renderDevices.count; g++) {
+        id<MTLCommandBuffer> commandBuffer = [context->gpus[g].commandQueue commandBuffer];
+        id<MTLComputeCommandEncoder> computeEncoder = [commandBuffer computeCommandEncoder];
+        
+        id<MTLFunction> computeFunction = mslProgram->GetComputeFunction(g);
+        id<MTLComputePipelineState> pipelineState =
+            context->GetComputeEncoderState(g, computeFunction, 4, immutableBufferMask,
+                                            @"GPU Smooth Normals pipeline state");
 
-//    int const maxThreadsPerGroup = [context->device maxThreadsPerThreadgroup].width;
-    int const maxThreadsPerGroup = 32;
-    
-    if (maxThreadsPerThreadgroup > maxThreadsPerGroup) {
-        maxThreadsPerThreadgroup = maxThreadsPerGroup;
-    }
+        id<MTLBuffer> p = pointsBuffer[g];
+        
+        [computeEncoder setComputePipelineState:pipelineState];
+        [computeEncoder setBuffer:p    offset:0 atIndex:0];
+        [computeEncoder setBuffer:normalsBuffer[g]   offset:0 atIndex:1];
+        [computeEncoder setBuffer:adjacencyBuffer[g] offset:0 atIndex:2];
+        [computeEncoder setBytes:(const void *)&uniform
+                          length:sizeof(uniform)
+                         atIndex:3];
+        
+        int maxThreadsPerThreadgroup = [pipelineState threadExecutionWidth];
+        int const maxThreadsPerGroup = 32;
+        if (maxThreadsPerThreadgroup > maxThreadsPerGroup) {
+            maxThreadsPerThreadgroup = maxThreadsPerGroup;
+        }
 
-    MTLSize threadgroupCount =
-        MTLSizeMake(fmin(maxThreadsPerThreadgroup, numPoints), 1, 1);
-    
-    [computeEncoder dispatchThreads:MTLSizeMake(numPoints, 1, 1)
-              threadsPerThreadgroup:threadgroupCount];
-    
-    context->ReleaseEncoder(false, METALWORKQUEUE_DEFAULT);
-    
-    // If OSD is enabled then it might require the data generated here. Would be better to do this per object if possible.
-    if (context->IsOSDEnabledThisFrame()) {
-        context->CommitCommandBufferForThread(false, false, METALWORKQUEUE_DEFAULT);
+        MTLSize threadgroupCount =
+            MTLSizeMake(fmin(maxThreadsPerThreadgroup, numPoints), 1, 1);
+        
+        [computeEncoder dispatchThreads:MTLSizeMake(numPoints, 1, 1)
+                  threadsPerThreadgroup:threadgroupCount];
+        
+        [computeEncoder endEncoding];
+        [commandBuffer commit];
     }
 }
 

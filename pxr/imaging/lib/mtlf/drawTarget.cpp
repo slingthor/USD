@@ -254,8 +254,8 @@ MtlfDrawTarget::_GenFrameBuffer()
 void
 MtlfDrawTarget::_BindAttachment( MtlfAttachmentRefPtr const & a )
 {
-    id<MTLTexture> tid = a->GetTextureName();
-    id<MTLTexture> tidMS = a->GetTextureMSName();
+    id<MTLTexture> tid = a->GetTextureName().multiTexture.forCurrentGPU();
+    id<MTLTexture> tidMS = a->GetTextureMSName().multiTexture.forCurrentGPU();
 
     int attach = a->GetAttach();
 
@@ -278,9 +278,9 @@ MtlfDrawTarget::_BindAttachment( MtlfAttachmentRefPtr const & a )
             MTLRenderPassStencilAttachmentDescriptor *stencilAttachment = _mtlRenderPassDescriptor.stencilAttachment;
             
             if (HasMSAA()) {
-                stencilAttachment.texture = a->GetStencilTextureMSName();
+                stencilAttachment.texture = a->GetStencilTextureMSName().multiTexture.forCurrentGPU();
             } else {
-                stencilAttachment.texture = a->GetStencilTextureName();
+                stencilAttachment.texture = a->GetStencilTextureName().multiTexture.forCurrentGPU();
             }
             
             // make sure to clear every frame for best performance
@@ -441,7 +441,7 @@ MtlfDrawTarget::GetImage(std::string const & name, void* buffer) const
 {
     MtlfAttachmentRefPtr attachment = TfStatic_cast<TfRefPtr<MtlfDrawTarget::MtlfAttachment>>(_GetAttachments().at(name));
 
-    id<MTLTexture> texture = attachment->GetTextureName();
+    id<MTLTexture> texture = attachment->GetTextureName().multiTexture.forCurrentGPU();
     int bytesPerPixel = attachment->GetBytesPerPixel();
     int width = [texture width];
     int height = [texture height];
@@ -637,11 +637,11 @@ MtlfDrawTarget::MtlfAttachment::_GenTexture()
             }
             else if (type == GL_UNSIGNED_INT_24_8) {
 #if defined(ARCH_OS_MACOS)
-                if([device isDepth24Stencil8PixelFormatSupported]) {
-                    mtlFormat = MTLPixelFormatDepth24Unorm_Stencil8;
-                    depth24stencil8 = true;
-                }
-                else
+//                if([device isDepth24Stencil8PixelFormatSupported]) {
+//                    mtlFormat = MTLPixelFormatDepth24Unorm_Stencil8;
+//                    depth24stencil8 = true;
+//                }
+//                else
 #endif
                     mtlFormat = MTLPixelFormatDepth32Float_Stencil8;
             }
@@ -673,13 +673,13 @@ MtlfDrawTarget::MtlfAttachment::_GenTexture()
                                                        mipmapped:NO];
     desc.usage = MTLTextureUsageRenderTarget;
     desc.resourceOptions = MTLResourceStorageModePrivate;
-    _textureName = [device newTextureWithDescriptor:desc];
+    _textureName = MtlfMultiTexture(desc);
 
     memoryUsed += baseImageSize;
 
     if (_numSamples > 1) {
         desc.sampleCount = _numSamples;
-        _textureNameMS = [device newTextureWithDescriptor:desc];
+        _textureNameMS = MtlfMultiTexture(desc);
         memoryUsed = baseImageSize * _numSamples;
     }
     
@@ -695,25 +695,25 @@ MtlfDrawTarget::MtlfAttachment::_GenTexture()
 void
 MtlfDrawTarget::MtlfAttachment::_DeleteTexture()
 {
-    if (_textureName) {
-        [_textureName release];
-        _textureName = nil;
+    if (_textureName.IsSet()) {
+        _textureName.release();
+        _textureName.Clear();
     }
 
-    if (_textureNameMS) {
-        [_textureNameMS release];
-        _textureNameMS = nil;
+    if (_textureNameMS.IsSet()) {
+        _textureNameMS.release();
+        _textureNameMS.Clear();
     }
     
     if (_format != GL_DEPTH_STENCIL) {
-        if (_stencilTextureName) {
-            [_stencilTextureName release];
-            _stencilTextureName = nil;
+        if (_stencilTextureName.IsSet()) {
+            _stencilTextureName.release();
+            _stencilTextureName.Clear();
         }
     
-        if (_stencilTextureNameMS) {
-            [_stencilTextureNameMS release];
-            _stencilTextureNameMS = nil;
+        if (_stencilTextureNameMS.IsSet()) {
+            _stencilTextureNameMS.release();
+            _stencilTextureNameMS.Clear();
         }
     }
 }

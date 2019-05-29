@@ -49,6 +49,12 @@ public:
 
     HDST_API
     static GLenum GetGlStencilOp(HdStencilOp op);
+    
+    HDST_API
+    static MTLBlendOperation GetGlBlendOp(HdBlendOp op);
+    
+    HDST_API
+    static MTLBlendFactor GetGlBlendFactor(HdBlendFactor factor);
 
     HDST_API
     static MTLSamplerMinMagFilter GetMinFilter(HdMinFilter filter);
