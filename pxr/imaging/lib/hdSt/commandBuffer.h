@@ -46,6 +46,20 @@ namespace SpatialHierarchy {
         Intersects
     };
     
+    class OctreeNode;
+    
+    struct Interval {
+        size_t start;
+        size_t end;
+        bool visible;
+        
+        Interval(size_t start, size_t end, bool visible);// : start(start), end(end), visible(visible) {}
+        Interval(OctreeNode* node, bool visible);// : Interval(node->index, node->indexEnd, visible) {}
+        
+        static
+        bool compare(Interval &a, Interval &b) { return a.start < b.start; };
+    };
+
     struct DrawableItem {
         DrawableItem(HdStDrawItemInstance* itemInstance, GfRange3f boundingBox);
         DrawableItem(HdStDrawItemInstance* itemInstance, GfRange3f boundingBox, size_t instanceIndex, size_t totalInstancers);
@@ -71,7 +85,7 @@ namespace SpatialHierarchy {
         
         void ReInit(GfRange3f const &boundingBox, std::vector<DrawableItem*> *drawables);
         
-        std::list<OctreeNode*> PerformCulling(matrix_float4x4 const &viewProjMatrix, vector_float2 const &dimensions);
+        std::list<Interval> PerformCulling(matrix_float4x4 const &viewProjMatrix, vector_float2 const &dimensions);
         unsigned Insert(DrawableItem* drawable);
         
         size_t CalcSubtreeItems();

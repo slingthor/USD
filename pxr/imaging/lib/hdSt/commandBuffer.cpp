@@ -60,19 +60,20 @@
 #include <os/signpost.h>
 #include <queue>
 #include <stack>
+#include <algorithm>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
 #define USE_BVH_FOR_CULLING 1
 
-#define CULL_NAÏVE
+//#define CULL_NAÏVE
 #define CULL_BVH
 
 static os_log_t cullingLog = os_log_create("hydra.metal", "Culling");
 
 namespace SpatialHierarchy {
     const unsigned maxOctreeDepth = 64;
-    const unsigned maxPerLevel = 100;
+    const unsigned maxPerLevel = 500;
     
     namespace MissingFunctions {
         
@@ -174,6 +175,16 @@ namespace SpatialHierarchy {
         }
     };
     
+    Interval::Interval(size_t start, size_t end, bool visible)
+    : start(start), end(end), visible(visible) {
+        // nothing
+    }
+    
+    Interval::Interval(OctreeNode* node, bool visible)
+    : Interval(node->index, node->indexEnd, visible) {
+        // nothing
+    }
+
     DrawableItem::DrawableItem(HdStDrawItemInstance* itemInstance, GfRange3f boundingBox, size_t instanceIndex, size_t totalInstancers)
     : itemInstance(itemInstance)
     , aabb(boundingBox)
@@ -329,65 +340,57 @@ namespace SpatialHierarchy {
         }
 
         os_signpost_id_t bvhCulling = os_signpost_id_generate(cullingLog);
-        os_signpost_id_t bvhCullingInit = os_signpost_id_generate(cullingLog);
         os_signpost_id_t bvhCullingCull = os_signpost_id_generate(cullingLog);
         os_signpost_id_t bvhCullingFinal = os_signpost_id_generate(cullingLog);
 
         uint64_t cullStart = ArchGetTickTime();
 
         os_signpost_interval_begin(cullingLog, bvhCulling, "Culling: BVH");
-        os_signpost_interval_begin(cullingLog, bvhCullingInit, "Culling: BVH -- Init");
-        struct _WorkerInvisible {
-            static
-            void setInVisible(const std::vector<DrawableItem*> &items, size_t begin, size_t end)
-            {
-                for(size_t idx = begin; idx < end; ++idx) {
-                    items[idx]->SetVisible(false);
-                }
-            }
-        };
+        os_signpost_interval_begin(cullingLog, bvhCullingCull, "Culling: BVH -- Culllist");
+        std::list<Interval> visibleSubtreesList = root.PerformCulling(viewProjMatrix, dimensions);
+        os_signpost_interval_end(cullingLog, bvhCullingCull, "Culling: BVH -- Culllist");
 
-        int grainSize = MAX(drawableItems.size()/WorkGetConcurrencyLimit(), 8);
-        WorkParallelForN(drawableItems.size(),
-                         std::bind(&_WorkerInvisible::setInVisible, drawableItems,
-                                   std::placeholders::_1,
-                                   std::placeholders::_2),
-                         grainSize);
-        os_signpost_interval_end(cullingLog, bvhCullingInit, "Culling: BVH -- Init");
-
-        os_signpost_interval_begin(cullingLog, bvhCullingCull, "Culling: BVH -- Cull");
-        std::list<OctreeNode*> visibleSubtreesList = root.PerformCulling(viewProjMatrix, dimensions);
-        os_signpost_interval_end(cullingLog, bvhCullingCull, "Culling: BVH -- Cull");
-
-        os_signpost_interval_begin(cullingLog, bvhCullingFinal, "Culling: BVH -- Final");
+        os_signpost_interval_begin(cullingLog, bvhCullingFinal, "Culling: BVH -- Apply");
         static std::vector<DrawableItem*>* octreeHeap = &this->bakedDrawableItems;
         octreeHeap = &this->bakedDrawableItems;
-
+        
         struct _Worker {
             static
-            void setVisible(std::vector<OctreeNode*> *subTreeRoots, size_t begin, size_t end)
+            void setIntervals(std::vector<Interval> *intervals, size_t begin, size_t end)
             {
                 for(size_t idx = begin; idx < end; ++idx) {
-                    OctreeNode* subTreeRoot = (*subTreeRoots)[idx];
-                    for (size_t diIdx = subTreeRoot->index; diIdx < subTreeRoot->indexEnd; ++diIdx) {
+                    Interval &interval = (*intervals)[idx];
+                    for (size_t diIdx = interval.start; diIdx < interval.end; ++diIdx) {
                         assert((*octreeHeap)[diIdx] != NULL);
-                        (*octreeHeap)[diIdx]->SetVisible(true);
+                        (*octreeHeap)[diIdx]->SetVisible(interval.visible);
                     }
                 }
             }
         };
 
-        std::vector<OctreeNode*> visibleSubtreesVec;
-        for(std::list<OctreeNode*>::const_iterator it = visibleSubtreesList.begin(); it != visibleSubtreesList.end(); ++it) {
-            if ((*it)->totalItemCount > 0) {
-                visibleSubtreesVec.push_back(*it);
+        std::vector<Interval> intervals {
+            std::make_move_iterator(std::begin(visibleSubtreesList)),
+            std::make_move_iterator(std::end(visibleSubtreesList))
+        };
+        std::sort(intervals.begin(), intervals.end(), Interval::compare);
+        
+        size_t minInterval = 0;
+        size_t count = intervals.size();
+        for (size_t idx=0; idx < count; ++idx) {
+            Interval &interval = intervals[idx];
+            if (interval.start > minInterval) {
+                intervals.push_back(Interval(minInterval, interval.start, false));
             }
+            minInterval = intervals[idx].end;
         }
-        WorkParallelForN(visibleSubtreesVec.size(),
-                         std::bind(&_Worker::setVisible, &visibleSubtreesVec,
+        if (minInterval < bakedDrawableItems.size()) {
+            intervals.push_back(Interval(minInterval, bakedDrawableItems.size(), false));
+        }
+        
+        WorkParallelForN(intervals.size(),
+                         std::bind(&_Worker::setIntervals, &intervals,
                                    std::placeholders::_1,
                                    std::placeholders::_2));
-
         os_signpost_interval_end(cullingLog, bvhCullingFinal, "Culling: BVH -- Final");
 
         os_signpost_interval_end(cullingLog, bvhCulling, "Culling: BVH");
@@ -428,25 +431,24 @@ namespace SpatialHierarchy {
         halfSize = (maxVec - minVec) * 0.5;
     }
     
-    std::list<OctreeNode*> OctreeNode::PerformCulling(matrix_float4x4 const &viewProjMatrix, vector_float2 const &dimensions)
+    std::list<Interval> OctreeNode::PerformCulling(matrix_float4x4 const &viewProjMatrix, vector_float2 const &dimensions)
     {
-        std::list<OctreeNode*> result;
+        std::list<Interval> result;
         if (!GfFrustum::IntersectsViewVolumeFloat(aabb, viewProjMatrix, dimensions)) {
             return result;
         }
         
         if (MissingFunctions::FrustumFullyContains(this, viewProjMatrix, dimensions)) {
-            result.push_back(this);
+            if (totalItemCount > 0) {
+                result.push_back(Interval(this, true));
+            }
             return result;
         }
 
-        for (auto &drawable : drawables) {
-            drawable->SetVisible(true);
+        if (itemCount > 0) {
+            result.push_back(Interval(index, index + itemCount, true));
         }
-        for (auto &drawable : drawablesTooLarge) {
-            drawable->SetVisible(true);
-        }
-
+        
         if (isSplit) {
             for (int i=0; i < 8; ++i) {
                 result.splice(result.end(), children[i]->PerformCulling(viewProjMatrix, dimensions));
