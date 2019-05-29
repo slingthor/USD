@@ -146,7 +146,7 @@ GarchUVTexture::~GarchUVTexture()
 VtDictionary
 GarchUVTexture::GetTextureInfo(bool forceLoad)
 {
-    VtDictionary info = GarchBaseTexture::GetTextureInfo(forceLoad);
+    VtDictionary info = _baseTexture->GarchBaseTexture::GetTextureInfo(forceLoad);
 
     info["imageFilePath"] = _imageFilePath;
 
