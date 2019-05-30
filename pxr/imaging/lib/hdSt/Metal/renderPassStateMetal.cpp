@@ -89,11 +89,11 @@ HdStRenderPassStateMetal::Bind()
         context->SetAlphaBlendingEnable(true);
         context->SetBlendOps(HdStMetalConversions::GetGlBlendOp(_blendColorOp),
                              HdStMetalConversions::GetGlBlendOp(_blendAlphaOp));
-        context->SetBlendFactors(
-            HdStMetalConversions::GetGlBlendFactor(_blendColorSrcFactor),
-            HdStMetalConversions::GetGlBlendFactor(_blendColorDstFactor),
-            HdStMetalConversions::GetGlBlendFactor(_blendAlphaSrcFactor),
-            HdStMetalConversions::GetGlBlendFactor(_blendAlphaDstFactor));
+//        context->SetBlendFactors(
+//            HdStMetalConversions::GetGlBlendFactor(_blendColorSrcFactor),
+//            HdStMetalConversions::GetGlBlendFactor(_blendColorDstFactor),
+//            HdStMetalConversions::GetGlBlendFactor(_blendAlphaSrcFactor),
+//            HdStMetalConversions::GetGlBlendFactor(_blendAlphaDstFactor));
         context->SetBlendColor(_blendConstantColor);
     } else {
         context->SetAlphaBlendingEnable(false);
