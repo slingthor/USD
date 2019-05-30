@@ -54,7 +54,6 @@ PXR_NAMESPACE_OPEN_SCOPE
 /// HdRprim might require multiple draw items.
 /// 
 /// HdDrawItem(s) are created by the HdRprim (HdMesh, HdBasisCurve, ..) for each
-/// HdRepr. The relevant compositional hierarchy is:
 /// 
 ///  HdRprim
 ///  |
@@ -218,6 +217,31 @@ public:
         return numVisible;
     }
     
+    void SetNumVisible(int visibleCount) const {
+        numVisible = visibleCount;
+    }
+    
+    void CalculateInstanceBounds() const;
+    
+    const std::vector<GfBBox3f>* GetInstanceBounds() const {
+        return &_instancedCullingBounds;
+    }
+    
+    void SetInstanceVisibility(size_t idx, bool visibility) const {
+        _instanceVisibility[idx] = visibility;
+        _anyInstanceVisible = _anyInstanceVisible || visibility;
+    }
+    
+    bool AnyInstanceVisible() const {
+        return _anyInstanceVisible;
+    }
+    
+    void SetAnyInstanceVisible(bool visible) const {
+        _anyInstanceVisible = visible;
+    }
+    
+    void BuildInstanceBuffer() const;
+    
 protected:
 
     /// Returns the shared data
@@ -236,9 +260,11 @@ private:
     HdRprimSharedData const *_sharedData;
     
     // CPU culling
-    std::vector<GfBBox3f> _instancedCullingBounds;
-    bool _instancedCullingBoundsCalculated = false;
-    int numVisible = 1;
+    mutable std::vector<GfBBox3f> _instancedCullingBounds;
+    mutable std::vector<bool> _instanceVisibility;
+    mutable bool _anyInstanceVisible = false;
+    mutable bool _instancedCullingBoundsCalculated = false;
+    mutable int numVisible = 1;
 };
 
 

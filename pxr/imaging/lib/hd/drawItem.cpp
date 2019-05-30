@@ -516,6 +516,167 @@ HdDrawItem::IntersectsViewVolume(matrix_float4x4 const &viewProjMatrix,
     }
 }
 
+void
+HdDrawItem::CalculateInstanceBounds() const
+{
+    if (_instancedCullingBoundsCalculated) {
+        return;
+    }
+    
+    HdBufferArrayRangeSharedPtr const & instanceIndexRange = GetInstanceIndexRange();
+    if (instanceIndexRange) {
+        int instancerNumLevels = GetInstancePrimvarNumLevels();
+        int instanceIndexWidth = instancerNumLevels + 1;
+        int numInstances = instanceIndexRange->GetNumElements() / instanceIndexWidth;
+        
+        if (instancerNumLevels == 1) {
+            int instanceOffset = instanceIndexRange->GetOffset();
+            
+            HdBufferResourceSharedPtr const & instanceIndexRes = instanceIndexRange->GetResource(HdTokens->instanceIndices);
+            
+            uint8_t *instanceIndexBuffer = const_cast<uint8_t*>(instanceIndexRes->GetBufferContents());
+            uint32_t *instanceBuffer = reinterpret_cast<uint32_t*>(instanceIndexBuffer) + instanceOffset;
+            
+            HdDrawItem* _this = const_cast<HdDrawItem*>(this);
+            _this->_instancedCullingBoundsCalculated = true;
+            
+            HdBufferArrayRangeSharedPtr const & primvar = GetConstantPrimvarRange();
+            HdBufferResourceSharedPtr const & transformRes = primvar->GetResource(HdTokens->transform);
+            HdBufferResourceSharedPtr const & instancerTransformRes = primvar->GetResource(HdTokens->instancerTransform);
+            HdBufferArrayRangeSharedPtr const & instanceBar = GetInstancePrimvarRange(0);
+            
+            HdBufferResourceSharedPtr const & instanceTransformRes = instanceBar->GetResource(HdTokens->instanceTransform);
+            HdBufferResourceSharedPtr const & translateRes = instanceBar->GetResource(HdTokens->translate);
+            HdBufferResourceSharedPtr const & rotateRes = instanceBar->GetResource(HdTokens->rotate);
+            HdBufferResourceSharedPtr const & scaleRes = instanceBar->GetResource(HdTokens->scale);
+            
+            // Item transform
+            size_t stride = transformRes->GetStride();
+            uint8_t const* rawBuffer = transformRes->GetBufferContents();
+            GfMatrix4f const *itemTransform =
+            (GfMatrix4f const*)&rawBuffer[stride * primvar->GetIndex() + transformRes->GetOffset()];
+            
+            // Instancer transform
+            stride = instancerTransformRes->GetStride();
+            rawBuffer = instancerTransformRes->GetBufferContents();
+            GfMatrix4f const *instancerTransform =
+            (GfMatrix4f const*)&rawBuffer[stride * primvar->GetIndex() + instancerTransformRes->GetOffset()];
+            GfMatrix4f m;
+            
+            int instanceDrawingCoord = instanceBar->GetOffset();
+            
+            _this->_instancedCullingBounds.clear();
+                
+            for (int i = 0; i < numInstances; i++) {
+                
+                int instanceIndex = instanceBuffer[i * instanceIndexWidth + 1] + instanceDrawingCoord;
+                
+                // instance coordinates
+                
+                if (instanceTransformRes) {
+                    // Instance transform
+                    stride = instanceTransformRes->GetStride();
+                    rawBuffer = instanceTransformRes->GetBufferContents();
+                    GfMatrix4f const *instanceTransform = (GfMatrix4f const*)&rawBuffer[stride * instanceIndex];
+                    m = *instanceTransform;
+                }
+                else {
+                    m.SetIdentity();
+                }
+                
+                GfVec3f translate(0), scale(1);
+                GfQuaternion rotate(GfQuaternion::GetIdentity());
+                
+                if (scaleRes) {
+                    stride = scaleRes->GetStride();
+                    rawBuffer = scaleRes->GetBufferContents();
+                    scale = *(GfVec3f const*)&rawBuffer[stride * instanceIndex];
+                }
+                
+                if (rotateRes) {
+                    stride = rotateRes->GetStride();
+                    rawBuffer = rotateRes->GetBufferContents();
+                    float const* const floatArray = (float const*)&rawBuffer[stride * instanceIndex];
+                    rotate = GfQuaternion(floatArray[0], GfVec3d(floatArray[1], floatArray[2], floatArray[3]));
+                }
+                
+                if (translateRes) {
+                    stride = translateRes->GetStride();
+                    rawBuffer = translateRes->GetBufferContents();
+                    translate = *(GfVec3f const*)&rawBuffer[stride * instanceIndex];
+                }
+                
+                GfMatrix4f mtxScale, mtxRotate, mtxTranslate;
+                mtxScale.SetScale(scale);
+                mtxRotate.SetRotate(rotate);
+                mtxTranslate.SetTranslate(translate);
+                
+                m = (*itemTransform) * (m * mtxScale * mtxRotate * mtxTranslate * (*instancerTransform));
+                
+                GfBBox3f box(GetBounds().GetRange(), m);
+                _this->_instancedCullingBounds.push_back(BakeBoundsTransform(box));
+            }
+        }
+    }
+    
+    _instanceVisibility.resize(_instancedCullingBounds.size(), false);
+    
+    _instancedCullingBoundsCalculated = true;
+}
+
+void HdDrawItem::BuildInstanceBuffer() const
+{
+    int instancerNumLevels = GetInstancePrimvarNumLevels();
+    int instanceIndexWidth = instancerNumLevels + 1;
+
+    HdBufferArrayRangeSharedPtr const & instanceIndexRange = GetInstanceIndexRange();
+    int instanceOffset = instanceIndexRange->GetOffset();
+    
+    HdBufferResourceSharedPtr const & instanceIndexRes = instanceIndexRange->GetResource(HdTokens->instanceIndices);
+    
+    uint8_t *instanceIndexBuffer = const_cast<uint8_t*>(instanceIndexRes->GetBufferContents());
+    uint32_t *instanceBuffer = reinterpret_cast<uint32_t*>(instanceIndexBuffer) + instanceOffset;
+
+    HdBufferResourceSharedPtr const & culledInstanceIndexRes = instanceIndexRange->GetResource(HdTokens->culledInstanceIndices);
+    
+    uint8_t *culledInstanceIndexBuffer = const_cast<uint8_t*>(culledInstanceIndexRes->GetBufferContents());
+    uint32_t *culledInstanceBuffer = reinterpret_cast<uint32_t*>(culledInstanceIndexBuffer) + instanceOffset;
+    
+    bool modified = false;
+    int numVisible = 0;
+    int numItems = _instancedCullingBounds.size();
+    for(int i = 0; i < numItems; i++) {
+        int instanceIndex = instanceBuffer[i * instanceIndexWidth];
+        auto const & bounds = _instancedCullingBounds[i];
+        
+        if (_instanceVisibility[i]) {
+            if (*culledInstanceBuffer != instanceIndex) {
+                modified = true;
+                *culledInstanceBuffer++ = instanceIndex;
+                for(int j = 1; j < instanceIndexWidth; j++)
+                    *culledInstanceBuffer++ = instanceBuffer[i * instanceIndexWidth + j];
+                    }
+            else {
+                culledInstanceBuffer+=instanceIndexWidth;
+            }
+            numVisible++;
+        }
+    }
+    
+    if (modified) {
+#if defined(ARCH_OS_MACOS)
+        MtlfMetalContext::MtlfMultiBuffer h = culledInstanceIndexRes->GetId();
+        id<MTLBuffer> metalBuffer = h.forCurrentGPU();
+        
+        uint32_t start = instanceOffset * sizeof(uint32_t);
+        uint32_t length = numVisible * sizeof(uint32_t) * instanceIndexWidth;
+        MtlfMetalContext::GetMetalContext()->QueueBufferFlush(metalBuffer, start, start + length);
+#endif
+    }
+    
+    HdDrawItem* _this = const_cast<HdDrawItem*>(this);
+    _this->numVisible = numVisible;
+}
 HD_API
 std::ostream &operator <<(std::ostream &out, 
                           const HdDrawItem& self) {
