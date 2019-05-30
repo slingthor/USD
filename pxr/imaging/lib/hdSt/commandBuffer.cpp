@@ -72,8 +72,8 @@ PXR_NAMESPACE_OPEN_SCOPE
 static os_log_t cullingLog = os_log_create("hydra.metal", "Culling");
 
 namespace SpatialHierarchy {
-    const unsigned maxOctreeDepth = 64;
-    const unsigned maxPerLevel = 500;
+    const unsigned maxOctreeDepth = 1024;
+    const unsigned maxPerLevel = 25;
     
     namespace MissingFunctions {
         
@@ -361,6 +361,7 @@ namespace SpatialHierarchy {
         os_signpost_id_t bvhCulling = os_signpost_id_generate(cullingLog);
         os_signpost_id_t bvhCullingCull = os_signpost_id_generate(cullingLog);
         os_signpost_id_t bvhCullingFinal = os_signpost_id_generate(cullingLog);
+        os_signpost_id_t bvhCullingBuildBuffer = os_signpost_id_generate(cullingLog);
 
         uint64_t cullStart = ArchGetTickTime();
 
@@ -435,11 +436,13 @@ namespace SpatialHierarchy {
                                    std::placeholders::_1,
                                    std::placeholders::_2));
 
+        os_signpost_interval_begin(cullingLog, bvhCullingBuildBuffer, "Culling: BVH -- Build Buffer");
         WorkParallelForN(instancedDrawableItems.size(),
                          std::bind(&_Worker::processInstancesVisible, &instancedDrawableItems,
                                    std::placeholders::_1,
                                    std::placeholders::_2),
                          instacedGrain);
+        os_signpost_interval_end(cullingLog, bvhCullingBuildBuffer, "Culling: BVH -- Build Buffer");
 
         os_signpost_interval_end(cullingLog, bvhCullingFinal, "Culling: BVH -- Apply");
 
@@ -557,16 +560,6 @@ namespace SpatialHierarchy {
     {
         if (!canSubdivide()){
             drawablesTooLarge.push_back(drawable);
-            
-            if (drawablesTooLarge.size() > maxPerLevel) {
-                // move the drawables to either 'drawablesTooLarge' or to children
-                std::list<DrawableItem*> lst(drawables.begin(), drawables.end());
-
-                drawables.clear();
-                for (auto drawable : lst) {
-                    InsertStraight(drawable);
-                }
-            }
             return depth;
         }
         
@@ -575,6 +568,16 @@ namespace SpatialHierarchy {
             return depth;
         }
         
+        if (drawablesTooLarge.size() > maxPerLevel) {
+            // move the drawables to either 'drawablesTooLarge' or to children
+            std::list<DrawableItem*> lst(drawables.begin(), drawables.end());
+            
+            drawables.clear();
+            for (auto drawable : lst) {
+                InsertStraight(drawable);
+            }
+        }
+
         return InsertStraight(drawable);
     }
     
