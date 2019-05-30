@@ -95,15 +95,7 @@ struct MtlfMultiSampler {
         }
     }
     
-    void release() {
-        for (int i = 0; i < MAX_GPUS; i++) {
-            if (!sampler[i])
-                break;
-            
-            [sampler[i] release];
-        }
-        Clear();
-    }
+    void release();
     
     id<MTLSamplerState> forCurrentGPU() const {
 #if MAX_GPUS == 1
@@ -150,15 +142,7 @@ struct MtlfMultiTexture {
         }
     }
     
-    void release() {
-        for (int i = 0; i < MAX_GPUS; i++) {
-            if (!texture[i])
-                break;
-            
-            [texture[i] release];
-        }
-        Clear();
-    }
+    void release();
     
     void Set(int index, id<MTLTexture> _texture) {
         texture[index] = _texture;
@@ -186,8 +170,11 @@ struct MtlfMultiTexture {
     
     id<MTLTexture> texture[MAX_GPUS];
 };
+
 struct GarchTextureGPUHandle {
     
+    ~GarchTextureGPUHandle() {}
+
     void Clear() { handle = 0; }
     bool IsSet() const { return handle != 0; }
 
@@ -240,6 +227,8 @@ struct GarchTextureGPUHandle {
 };
 
 struct GarchSamplerGPUHandle {
+
+    ~GarchSamplerGPUHandle() {}
 
     void Clear() { handle = 0; }
     bool IsSet() const { return handle != 0; }

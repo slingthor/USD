@@ -182,9 +182,9 @@ id<MTLDevice> MtlfMetalContext::GetMetalDevice(PREFERRED_GPU_TYPE preferredGPUTy
         return _defaultDevice;
     }
 #else
-    renderDevices = [NSArray arrayWithObjects: MTLCreateSystemDefaultDevice(), nil];
+    renderDevices = [NSMutableArray arrayWithObjects: MTLCreateSystemDefaultDevice(), nil];
     [renderDevices retain];
-    GPUStatus::renderDevices = renderDevices;
+    GPUState::renderDevices = renderDevices;
     return MTLCreateSystemDefaultDevice();
 #endif
 }

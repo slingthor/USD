@@ -156,7 +156,7 @@ MtlfSimpleShadowArray::_AllocSamplers()
 #if defined(ARCH_OS_IOS)
     samplerDescriptor.tAddressMode = MTLSamplerAddressModeClampToZero;
     samplerDescriptor.sAddressMode = MTLSamplerAddressModeClampToZero;
-    if ([mtlContext->device supportsFeatureSet:MTLFeatureSet_iOS_GPUFamily3_v1]) {
+    if ([mtlContext->currentDevice supportsFeatureSet:MTLFeatureSet_iOS_GPUFamily3_v1]) {
         samplerDescriptor.compareFunction = MTLCompareFunctionLessEqual;
     }
 #else

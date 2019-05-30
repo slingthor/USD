@@ -45,6 +45,26 @@ NSArray<id<MTLDevice>> *GPUState::renderDevices = nil;
 int GPUState::gpuCount = 0;
 int GPUState::currentGPU = 0;
 
+void MtlfMultiSampler::release() {
+    for (int i = 0; i < MAX_GPUS; i++) {
+        if (!sampler[i])
+            break;
+        
+        [sampler[i] release];
+    }
+    Clear();
+}
+
+void MtlfMultiTexture::release() {
+    for (int i = 0; i < MAX_GPUS; i++) {
+        if (!texture[i])
+            break;
+        
+        [texture[i] release];
+    }
+    Clear();
+}
+
 static size_t
 _GetNewContentsID()
 {
