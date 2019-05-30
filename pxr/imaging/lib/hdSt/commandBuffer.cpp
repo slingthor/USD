@@ -211,7 +211,9 @@ namespace SpatialHierarchy {
                 const_cast<HdStDrawItem*>(itemInstance->GetDrawItem())->SetNumVisible(numItemsInInstance);
             }
         } else {
-            itemInstance->SetVisible(visible);
+            if (itemInstance->IsVisible() != visible) {
+                itemInstance->SetVisible(visible);
+            }
         }
     }
     
@@ -391,7 +393,7 @@ namespace SpatialHierarchy {
                          std::bind(&_Worker::setIntervals, &intervals,
                                    std::placeholders::_1,
                                    std::placeholders::_2));
-        os_signpost_interval_end(cullingLog, bvhCullingFinal, "Culling: BVH -- Final");
+        os_signpost_interval_end(cullingLog, bvhCullingFinal, "Culling: BVH -- Apply");
 
         os_signpost_interval_end(cullingLog, bvhCulling, "Culling: BVH");
 
