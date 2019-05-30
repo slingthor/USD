@@ -162,6 +162,7 @@ pxr_library(hdSt
         meshTopology 
         pointsShaderKey
         quadrangulate
+        spatialHierarchy
         subdivision
         subdivision3
         triangulate

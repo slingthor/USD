@@ -190,19 +190,6 @@ public:
 
     /// Tests the intersection with the view projection matrix.
     /// Returns true if this drawItem is in the frustum.
-    ///
-    /// XXX: Currently if this drawitem uses HW instancing, always returns true.
-    HD_API
-    void IntersectsViewVolume(WorkDispatcher &dispatcher,
-                              std::atomic_bool &cullResult,
-                              GfMatrix4f const &viewProjMatrix,
-                              float viewport_width,
-                              float viewport_height) const;
-    
-    HD_API
-    bool IntersectsViewVolume(GfMatrix4f const &viewProjMatrix,
-                              float viewport_width, float viewport_height) const;
-    
     HD_API
     bool IntersectsViewVolume(matrix_float4x4 const &viewProjMatrix,
                               vector_float2 windowDimensions) const;
