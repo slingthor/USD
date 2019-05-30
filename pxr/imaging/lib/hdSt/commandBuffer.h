@@ -65,6 +65,7 @@ namespace SpatialHierarchy {
         DrawableItem(HdStDrawItemInstance* itemInstance, GfRange3f boundingBox, size_t instanceIndex, size_t totalInstancers);
         
         void SetVisible(bool visible);
+        void ProcessInstancesVisible();
         
         static GfRange3f ConvertDrawablesToItems(std::vector<HdStDrawItemInstance> *drawables, std::vector<DrawableItem*> *items);
         
@@ -137,6 +138,7 @@ namespace SpatialHierarchy {
     private:
         void Bake();
         
+        std::vector<DrawableItem*> instancedDrawableItems;
         std::vector<DrawableItem*> bakedDrawableItems;
     };
 }

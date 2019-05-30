@@ -217,7 +217,7 @@ public:
         return numVisible;
     }
     
-    void SetNumVisible(int visibleCount) {
+    void SetNumVisible(int visibleCount) const {
         numVisible = visibleCount;
     }
     
@@ -227,6 +227,20 @@ public:
         return &_instancedCullingBounds;
     }
     
+    void SetInstanceVisibility(size_t idx, bool visibility) const {
+        _instanceVisibility[idx] = visibility;
+        _anyInstanceVisible = _anyInstanceVisible || visibility;
+    }
+    
+    bool AnyInstanceVisible() const {
+        return _anyInstanceVisible;
+    }
+    
+    void SetAnyInstanceVisible(bool visible) const {
+        _anyInstanceVisible = visible;
+    }
+    
+    void BuildInstanceBuffer() const;
     
 protected:
 
@@ -246,9 +260,11 @@ private:
     HdRprimSharedData const *_sharedData;
     
     // CPU culling
-    std::vector<GfBBox3f> _instancedCullingBounds;
-    bool _instancedCullingBoundsCalculated = false;
-    int numVisible = 1;
+    mutable std::vector<GfBBox3f> _instancedCullingBounds;
+    mutable std::vector<bool> _instanceVisibility;
+    mutable bool _anyInstanceVisible = false;
+    mutable bool _instancedCullingBoundsCalculated = false;
+    mutable int numVisible = 1;
 };
 
 

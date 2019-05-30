@@ -66,8 +66,8 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 #define USE_BVH_FOR_CULLING 1
 
-//#define CULL_NAÏVE
-#define CULL_BVH
+#define CULL_NAÏVE
+//#define CULL_BVH
 
 static os_log_t cullingLog = os_log_create("hydra.metal", "Culling");
 
@@ -197,7 +197,7 @@ namespace SpatialHierarchy {
     }
     
     DrawableItem::DrawableItem(HdStDrawItemInstance* itemInstance, GfRange3f boundingBox)
-    : DrawableItem(itemInstance, boundingBox, 0, 0)
+    : DrawableItem(itemInstance, boundingBox, 0, 1)
     {
         isInstanced = false;
     }
@@ -205,18 +205,28 @@ namespace SpatialHierarchy {
     void DrawableItem::SetVisible(bool visible)
     {
         if (isInstanced) {
-            // NOTE: this is where the instanced indices can be set - .instanceIdx has it stored.
-            if (visible) {
-                itemInstance->SetVisible(visible);
-                const_cast<HdStDrawItem*>(itemInstance->GetDrawItem())->SetNumVisible(numItemsInInstance);
-            }
+            itemInstance->GetDrawItem()->SetInstanceVisibility(instanceIdx, visible);
         } else {
             if (itemInstance->IsVisible() != visible) {
                 itemInstance->SetVisible(visible);
             }
+            itemInstance->GetDrawItem()->SetNumVisible(numItemsInInstance);
         }
     }
-    
+
+    void DrawableItem::ProcessInstancesVisible()
+    {
+        if (isInstanced) {
+            itemInstance->GetDrawItem()->SetNumVisible(numItemsInInstance);
+            itemInstance->GetDrawItem()->BuildInstanceBuffer();
+
+            bool shouldBeVisible = itemInstance->GetDrawItem()->AnyInstanceVisible();
+            if (itemInstance->IsVisible() != shouldBeVisible) {
+                itemInstance->SetVisible(shouldBeVisible);
+            }
+        }
+    }
+
     GfRange3f DrawableItem::ConvertDrawablesToItems(std::vector<HdStDrawItemInstance> *drawables, std::vector<DrawableItem*> *items)
     {
         GfRange3f boundingBox;
@@ -241,7 +251,9 @@ namespace SpatialHierarchy {
                     GfRange3f bbox = (*instancedCullingBounds)[idx].ComputeAlignedRange();
                     itemBBox.ExtendBy(bbox);
                 }
-                items->push_back(new DrawableItem(drawable, itemBBox));
+                DrawableItem* item = new DrawableItem(drawable, itemBBox);
+                item->numItemsInInstance = instancedCullingBounds->size();
+                items->push_back(item);
                 boundingBox.ExtendBy(itemBBox);
 #endif
                 
@@ -292,6 +304,7 @@ namespace SpatialHierarchy {
         
         os_signpost_interval_begin(cullingLog, bvhGenerate, "BVH Generation");
         drawableItems.clear();
+        instancedDrawableItems.clear();
         
         uint64_t buildStart = ArchGetTickTime();
         
@@ -310,6 +323,10 @@ namespace SpatialHierarchy {
         {
             unsigned currentDepth = root.Insert(drawableItems[idx]);
             depth = MAX(depth, currentDepth);
+            
+            if (drawableItems[idx]->isInstanced && drawableItems[idx]->instanceIdx == 0) {
+                instancedDrawableItems.push_back(drawableItems[idx]);
+            }
         }
         os_signpost_interval_end(cullingLog, bvhGenerate, "BVH Generation");
         
@@ -353,10 +370,19 @@ namespace SpatialHierarchy {
         os_signpost_interval_end(cullingLog, bvhCullingCull, "Culling: BVH -- Culllist");
 
         os_signpost_interval_begin(cullingLog, bvhCullingFinal, "Culling: BVH -- Apply");
-        static std::vector<DrawableItem*>* octreeHeap = &this->bakedDrawableItems;
+
+       static std::vector<DrawableItem*>* octreeHeap = &this->bakedDrawableItems;
         octreeHeap = &this->bakedDrawableItems;
         
         struct _Worker {
+            static
+            void setAnyInstanceInvisible(std::vector<DrawableItem*> *instancedDrawableItems, size_t begin, size_t end)
+            {
+                for (size_t idx=begin; idx < end; ++idx) {
+                    (*instancedDrawableItems)[idx]->itemInstance->GetDrawItem()->SetAnyInstanceVisible(false);
+                }
+            }
+            
             static
             void setIntervals(std::vector<Interval> *intervals, size_t begin, size_t end)
             {
@@ -366,6 +392,14 @@ namespace SpatialHierarchy {
                         assert((*octreeHeap)[diIdx] != NULL);
                         (*octreeHeap)[diIdx]->SetVisible(interval.visible);
                     }
+                }
+            }
+            
+            static
+            void processInstancesVisible(std::vector<DrawableItem*> *instancedDrawableItems, size_t begin, size_t end)
+            {
+                for (size_t idx=begin; idx < end; ++idx) {
+                    (*instancedDrawableItems)[idx]->ProcessInstancesVisible();
                 }
             }
         };
@@ -389,10 +423,24 @@ namespace SpatialHierarchy {
             intervals.push_back(Interval(minInterval, bakedDrawableItems.size(), false));
         }
         
+        unsigned instacedGrain = 100;
+        WorkParallelForN(instancedDrawableItems.size(),
+                         std::bind(&_Worker::setAnyInstanceInvisible, &instancedDrawableItems,
+                                   std::placeholders::_1,
+                                   std::placeholders::_2),
+                         instacedGrain);
+        
         WorkParallelForN(intervals.size(),
                          std::bind(&_Worker::setIntervals, &intervals,
                                    std::placeholders::_1,
                                    std::placeholders::_2));
+
+        WorkParallelForN(instancedDrawableItems.size(),
+                         std::bind(&_Worker::processInstancesVisible, &instancedDrawableItems,
+                                   std::placeholders::_1,
+                                   std::placeholders::_2),
+                         instacedGrain);
+
         os_signpost_interval_end(cullingLog, bvhCullingFinal, "Culling: BVH -- Apply");
 
         os_signpost_interval_end(cullingLog, bvhCulling, "Culling: BVH");

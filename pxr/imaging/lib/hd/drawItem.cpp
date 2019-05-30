@@ -619,9 +619,64 @@ HdDrawItem::CalculateInstanceBounds() const
         }
     }
     
-    //_instancedCullingBoundsCalculated = true;
+    _instanceVisibility.resize(_instancedCullingBounds.size(), false);
+    
+    _instancedCullingBoundsCalculated = true;
 }
 
+void HdDrawItem::BuildInstanceBuffer() const
+{
+    int instancerNumLevels = GetInstancePrimvarNumLevels();
+    int instanceIndexWidth = instancerNumLevels + 1;
+
+    HdBufferArrayRangeSharedPtr const & instanceIndexRange = GetInstanceIndexRange();
+    int instanceOffset = instanceIndexRange->GetOffset();
+    
+    HdBufferResourceSharedPtr const & instanceIndexRes = instanceIndexRange->GetResource(HdTokens->instanceIndices);
+    
+    uint8_t *instanceIndexBuffer = const_cast<uint8_t*>(instanceIndexRes->GetBufferContents());
+    uint32_t *instanceBuffer = reinterpret_cast<uint32_t*>(instanceIndexBuffer) + instanceOffset;
+
+    HdBufferResourceSharedPtr const & culledInstanceIndexRes = instanceIndexRange->GetResource(HdTokens->culledInstanceIndices);
+    
+    uint8_t *culledInstanceIndexBuffer = const_cast<uint8_t*>(culledInstanceIndexRes->GetBufferContents());
+    uint32_t *culledInstanceBuffer = reinterpret_cast<uint32_t*>(culledInstanceIndexBuffer) + instanceOffset;
+    
+    bool modified = false;
+    int numVisible = 0;
+    int numItems = _instancedCullingBounds.size();
+    for(int i = 0; i < numItems; i++) {
+        int instanceIndex = instanceBuffer[i * instanceIndexWidth];
+        auto const & bounds = _instancedCullingBounds[i];
+        
+        if (_instanceVisibility[i]) {
+            if (*culledInstanceBuffer != instanceIndex) {
+                modified = true;
+                *culledInstanceBuffer++ = instanceIndex;
+                for(int j = 1; j < instanceIndexWidth; j++)
+                    *culledInstanceBuffer++ = instanceBuffer[i * instanceIndexWidth + j];
+                    }
+            else {
+                culledInstanceBuffer+=instanceIndexWidth;
+            }
+            numVisible++;
+        }
+    }
+    
+    if (modified) {
+#if defined(ARCH_OS_MACOS)
+        MtlfMetalContext::MtlfMultiBuffer h = culledInstanceIndexRes->GetId();
+        id<MTLBuffer> metalBuffer = h.forCurrentGPU();
+        
+        uint32_t start = instanceOffset * sizeof(uint32_t);
+        uint32_t length = numVisible * sizeof(uint32_t) * instanceIndexWidth;
+        MtlfMetalContext::GetMetalContext()->QueueBufferFlush(metalBuffer, start, start + length);
+#endif
+    }
+    
+    HdDrawItem* _this = const_cast<HdDrawItem*>(this);
+    _this->numVisible = numVisible;
+}
 HD_API
 std::ostream &operator <<(std::ostream &out, 
                           const HdDrawItem& self) {
