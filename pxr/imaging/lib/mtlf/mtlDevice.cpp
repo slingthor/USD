@@ -62,10 +62,11 @@ MtlfMetalContext::ThreadState::~ThreadState() {
     for(int i = 0; i < kMSL_ProgramStage_NumStages; i++) {
         delete[] oldStyleUniformBuffer[i];
     }
-    [gsSyncEvent release];
-    for(int i = 0; i < gsBuffers.size(); i++)
-        [gsBuffers.at(i) release];
-    gsBuffers.clear();
+    for(int d = 0; d < MAX_GPUS; d++) {
+        for(int i = 0; i < gsBuffers[d].size(); i++)
+            [gsBuffers[d].at(i) release];
+        gsBuffers[d].clear();
+    }
 }
 
 void MtlfMetalContext::MtlfMultiBuffer::release() {
@@ -110,35 +111,52 @@ id<MTLDevice> MtlfMetalContext::GetMetalDevice(PREFERRED_GPU_TYPE preferredGPUTy
     id <NSObject> metalDeviceObserver = nil;
     
     // Get a list of all devices and register an obsever for eGPU events
-    renderDevices = MTLCopyAllDevicesWithObserver(&metalDeviceObserver,
+    NSArray<id<MTLDevice>> *allDevices = MTLCopyAllDevicesWithObserver(&metalDeviceObserver,
                                                 ^(id<MTLDevice> device, MTLDeviceNotificationName name) {
                                                     MtlfMetalContext::handleGPUHotPlug(device, name);
                                                 });
+
+    renderDevices = [NSMutableArray array];
+    [renderDevices retain];
+    GPUState::renderDevices = renderDevices;
+    
     NSMutableArray<id<MTLDevice>> *_eGPUs          = [NSMutableArray array];
     NSMutableArray<id<MTLDevice>> *_integratedGPUs = [NSMutableArray array];
     NSMutableArray<id<MTLDevice>> *_discreteGPUs   = [NSMutableArray array];
     id<MTLDevice>                  _defaultDevice  = MTLCreateSystemDefaultDevice();
     NSArray *preferredDeviceList = _discreteGPUs;
-
-    if (preferredGPUType == PREFER_DEFAULT_GPU) {
-        return _defaultDevice;
-    }
+    
+    bool const multiGPUSuportEnabled = false;
     
     // Put the device into the appropriate device list
-    for (id<MTLDevice>dev in renderDevices) {
-        if (dev.removable)
+    for (id<MTLDevice>dev in allDevices) {
+        bool multiDeviceRenderOption = false;
+        if (dev.removable) {
         	[_eGPUs addObject:dev];
-        else if (dev.lowPower)
+            multiDeviceRenderOption = multiGPUSuportEnabled;
+        }
+        else if (dev.lowPower) {
         	[_integratedGPUs addObject:dev];
-        else
+            //multiDeviceRenderOption = multiGPUSuportEnabled;
+        }
+        else {
         	[_discreteGPUs addObject:dev];
+            multiDeviceRenderOption = multiGPUSuportEnabled;
+        }
+        
+        if (multiDeviceRenderOption) {
+            [renderDevices addObject:dev];
+        }
     }
-    
+
     switch (preferredGPUType) {
         case PREFER_DISPLAY_GPU:
             NSLog(@"Display device selection not supported yet, returning default GPU");
         case PREFER_DEFAULT_GPU:
-            break;
+            if (!multiGPUSuportEnabled) {
+                [renderDevices addObject:_defaultDevice];
+            }
+            return _defaultDevice;
         case PREFER_EGPU:
             preferredDeviceList = _eGPUs;
             break;
@@ -151,15 +169,22 @@ id<MTLDevice> MtlfMetalContext::GetMetalDevice(PREFERRED_GPU_TYPE preferredGPUTy
     }
     // If no device matching the requested one was found then get the default device
     if (preferredDeviceList.count != 0) {
+        if (!multiGPUSuportEnabled) {
+            [renderDevices addObject:preferredDeviceList.firstObject];
+        }
         return preferredDeviceList.firstObject;
     }
     else {
+        if (!multiGPUSuportEnabled) {
+            [renderDevices addObject:_defaultDevice];
+        }
         NSLog(@"Preferred device not found, returning default GPU");
         return _defaultDevice;
     }
 #else
     renderDevices = [NSArray arrayWithObjects: MTLCreateSystemDefaultDevice(), nil];
     [renderDevices retain];
+    GPUStatus::renderDevices = renderDevices;
     return MTLCreateSystemDefaultDevice();
 #endif
 }
@@ -167,15 +192,6 @@ id<MTLDevice> MtlfMetalContext::GetMetalDevice(PREFERRED_GPU_TYPE preferredGPUTy
 //
 // MtlfMetalContext
 //
-
-void MtlfMetalContext::UpdateCurrentGPU() {
-    currentGPU = 0;
-    for (id<MTLDevice>dev in renderDevices) {
-        if (dev == device)
-            return;
-        currentGPU++;
-    }
-}
 
 MtlfMetalContext::MtlfMetalContext(id<MTLDevice> _device, int width, int height)
 {
@@ -200,83 +216,97 @@ void MtlfMetalContext::Init(id<MTLDevice> _device, int width, int height)
     if (_device == nil) {
         //device = MtlfMetalContext::GetMetalDevice(PREFER_INTEGRATED_GPU);
         //device = MtlfMetalContext::GetMetalDevice(PREFER_DISCRETE_GPU);
-        device = MtlfMetalContext::GetMetalDevice(PREFER_DEFAULT_GPU);
+        currentDevice = MtlfMetalContext::GetMetalDevice(PREFER_DEFAULT_GPU);
     }
     else {
-        device = _device;
+        currentDevice = _device;
     }
     
-    UpdateCurrentGPU();
-    
-    captureScopeFullFrame = [[MTLCaptureManager sharedCaptureManager] newCaptureScopeWithDevice:device];
-    captureScopeFullFrame.label = @"Full Frame";
-    [[MTLCaptureManager sharedCaptureManager] setDefaultCaptureScope:captureScopeFullFrame];
-    
-    captureScopeSubset = [[MTLCaptureManager sharedCaptureManager] newCaptureScopeWithDevice:device];
-    captureScopeSubset.label = @"Subset";
-    
-    NSLog(@"Selected %@ for Metal Device", device.name);
-    
-    enableMultiQueue = true;
+    interopDevice = currentDevice;
+    currentGPU = 0;
+    int i = 0;
+    for (id<MTLDevice>dev in renderDevices) {
+        if (dev == currentDevice)
+            currentGPU = i;
+        
+        captureScopeFullFrame[i] =
+            [[MTLCaptureManager sharedCaptureManager] newCaptureScopeWithDevice:dev];
+        captureScopeFullFrame[i].label = [NSString stringWithFormat:@"Full Frame GPU %@", [dev name]];
+        
+        captureScopeSubset[i] =
+            [[MTLCaptureManager sharedCaptureManager] newCaptureScopeWithDevice:dev];
+        captureScopeSubset[i].label = [NSString stringWithFormat:@"Subset GPU %@", [dev name]];;
 
-    gsMaxConcurrentBatches = 1;
+        i++;
+    }
+    GPUState::gpuCount = i;
+    GPUState::currentGPU = currentGPU;
+    
+    [[MTLCaptureManager sharedCaptureManager] setDefaultCaptureScope:captureScopeFullFrame[currentGPU]];
+    
+    NSLog(@"Selected %@ for Metal Device", currentDevice.name);
 
     // Create a new command queue
-    commandQueue = [device newCommandQueueWithMaxCommandBufferCount:commandBufferPoolSize];
-    if(enableMultiQueue) {
-        commandQueueGS = [device newCommandQueueWithMaxCommandBufferCount:commandBufferPoolSize];
+    for (int i = 0; i < renderDevices.count; i++) {
+        gpus[i].commandQueue = [renderDevices[i] newCommandQueueWithMaxCommandBufferCount:commandBufferPoolSize];
     }
 
 #if defined(ARCH_OS_IOS)
-    gsMaxDataPerBatch = 1024 * 1024 * 64;
+    gsMaxDataPerBatch = 1024 * 1024 * 32;
+    gsMaxConcurrentBatches = 2;
 #else
-    gsMaxDataPerBatch = 1024 * 1024 * 128;
+    gsMaxDataPerBatch = 1024 * 1024 * 32;
+    gsMaxConcurrentBatches = 4;
 #endif
 
     workQueueResource.lastWaitEventValue                  = 0;
 
     ResetEncoders(METALWORKQUEUE_RESOURCE, true);
-    
+
     memset(commandBuffers, 0x00, sizeof(commandBuffers));
-    memset(commandBuffersGS, 0x00, sizeof(commandBuffersGS));
-    
+    memset(commandBuffersStackPos, 0x00, sizeof(commandBuffersStackPos));
+
 #if defined(ARCH_OS_IOS)
 #define SYSTEM_VERSION_GREATER_THAN_OR_EQUAL_TO(v) ([[[UIDevice currentDevice] systemVersion] compare:v options:NSNumericSearch] != NSOrderedAscending)
     
     static bool sysVerGreaterThanOrEqualTo12_0 = SYSTEM_VERSION_GREATER_THAN_OR_EQUAL_TO(@"12.0");
     concurrentDispatchSupported = sysVerGreaterThanOrEqualTo12_0;
-#if defined(METAL_EVENTS_API_PRESENT)
-    eventsAvailable = sysVerGreaterThanOrEqualTo12_0;
-#endif
     
 #else // ARCH_OS_IOS
     static NSOperatingSystemVersion minimumSupportedOSVersion = { .majorVersion = 10, .minorVersion = 14, .patchVersion = 5 };
     static bool sysVerGreaterOrEqualTo10_14_5 = [NSProcessInfo.processInfo isOperatingSystemAtLeastVersion:minimumSupportedOSVersion];
     
     concurrentDispatchSupported = sysVerGreaterOrEqualTo10_14_5;
-#if defined(METAL_EVENTS_API_PRESENT)
-    eventsAvailable = sysVerGreaterOrEqualTo10_14_5;
-#endif
-    
 #endif // ARCH_OS_IOS
     
     MTLDepthStencilDescriptor *depthStateDesc = [[MTLDepthStencilDescriptor alloc] init];
     depthStateDesc.depthWriteEnabled = YES;
     depthStateDesc.depthCompareFunction = MTLCompareFunctionLessEqual;
-    depthState = [device newDepthStencilStateWithDescriptor:depthStateDesc];
     
+    for(int i = 0; i < renderDevices.count; i++) {
+        gpus[i].depthState = [renderDevices[i] newDepthStencilStateWithDescriptor:depthStateDesc];
+        gpus[i].mtlColorTexture = nil;
+        gpus[i].mtlMultisampleColorTexture = nil;
+        gpus[i].mtlDepthTexture = nil;
+    }
+
     windingOrder = MTLWindingClockwise;
     cullMode = MTLCullModeBack;
     fillMode = MTLTriangleFillModeFill;
-    blendEnable = false;
-    alphaCoverageEnable = false;
+    
+    blendState.blendEnable = false;
+    blendState.alphaCoverageEnable = false;
+    blendState.rgbBlendOp = MTLBlendOperationAdd;
+    blendState.alphaBlendOp = MTLBlendOperationAdd;
+    blendState.sourceColorFactor = MTLBlendFactorSourceAlpha;
+    blendState.destColorFactor = MTLBlendFactorOneMinusSourceAlpha;
+    blendState.sourceAlphaFactor = MTLBlendFactorSourceAlpha;
+    blendState.destAlphaFactor = MTLBlendFactorOneMinusSourceAlpha;
+    blendState.blendColor = GfVec4f(1.0f);
     
     AllocateAttachments(width, height);
     
     drawTarget = NULL;
-    mtlColorTexture = nil;
-    mtlMultisampleColorTexture = nil;
-    mtlDepthTexture = nil;
     outputPixelFormat = MTLPixelFormatInvalid;
     outputDepthFormat = MTLPixelFormatInvalid;
     
@@ -309,13 +339,9 @@ void MtlfMetalContext::Init(id<MTLDevice> _device, int width, int height)
 
 void MtlfMetalContext::Cleanup()
 {
-    [[MTLCaptureManager sharedCaptureManager] setDefaultCaptureScope:nil];
-    [captureScopeFullFrame release];
-    captureScopeFullFrame = nil;
-    
-    [captureScopeSubset release];
-    captureScopeSubset = nil;
-    
+    [renderDevices release];
+    renderDevices = nil;
+
 #if defined(ARCH_GFX_OPENGL)
     if (glInterop) {
         delete glInterop;
@@ -325,11 +351,19 @@ void MtlfMetalContext::Cleanup()
     
     CleanupUnusedBuffers(true);
     bufferFreeList.clear();
-    
-    [commandQueue release];
-    if(enableMultiQueue)
-        [commandQueueGS release];
-    
+
+    [[MTLCaptureManager sharedCaptureManager] setDefaultCaptureScope:nil];
+
+    for (int i = 0; i < renderDevices.count; i++) {
+        [captureScopeFullFrame[i] release];
+        captureScopeFullFrame[i] = nil;
+        
+        [captureScopeSubset[i] release];
+        captureScopeSubset[i] = nil;
+
+        [gpus[i].commandQueue release];
+    }
+
 #if defined(METAL_ENABLE_STATS)
     if(frameCount > 0) {
         NSLog(@"--- METAL Resource Stats (average per frame / total) ----");
@@ -387,8 +421,6 @@ void MtlfMetalContext::RecreateInstance(id<MTLDevice> device, int width, int hei
 {
     context = NULL;
     context = MtlfMetalContextSharedPtr(new MtlfMetalContext(device, width, height));
-//    Cleanup();
-//    Init(device, width, height);
 }
 
 void MtlfMetalContext::AllocateAttachments(int width, int height)
@@ -396,9 +428,6 @@ void MtlfMetalContext::AllocateAttachments(int width, int height)
 #if defined(ARCH_GFX_OPENGL)
     if (glInterop) {
         glInterop->AllocateAttachments(width, height);
-
-        mtlColorTexture = glInterop->mtlColorTexture;
-        mtlDepthTexture = glInterop->mtlDepthTexture;
 
         MTLTextureDescriptor* desc = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA16Float
                                                                                         width:width
@@ -414,10 +443,15 @@ void MtlfMetalContext::AllocateAttachments(int width, int height)
         else
             desc.textureType = MTLTextureType2D;
         
-        if (mtlMultisampleColorTexture)
-            [mtlMultisampleColorTexture release];
+        for(int i = 0; i < renderDevices.count; i++) {
+            gpus[i].mtlColorTexture = glInterop->mtlAliasedColorTexture[i];
+            gpus[i].mtlDepthTexture = glInterop->mtlLocalDepthTexture[i];
 
-        mtlMultisampleColorTexture = [device newTextureWithDescriptor:desc];
+            if (gpus[i].mtlMultisampleColorTexture)
+                [gpus[i].mtlMultisampleColorTexture release];
+
+            gpus[i].mtlMultisampleColorTexture = [renderDevices[i] newTextureWithDescriptor:desc];
+        }
     }
 #endif
 }
@@ -489,7 +523,7 @@ MtlfMetalContext::CopyDepthTextureToOpenGL()
 void MtlfMetalContext::InitGLInterop() {
 #if defined(ARCH_GFX_OPENGL)
     if (!glInterop) {
-        glInterop = new MtlfGlInterop(device);
+        glInterop = new MtlfGlInterop(interopDevice, renderDevices);
         glInterop->mtlSampleCount = mtlSampleCount;
     }
 #endif
@@ -604,23 +638,12 @@ void MtlfMetalContext::CreateCommandBuffer(MetalWorkQueueType workQueueType) {
     if (wq->commandBuffer == nil) {
         std::lock_guard<std::mutex> lock(_commandBufferPoolMutex);
 
-        if (enableMultiQueue && workQueueType == METALWORKQUEUE_GEOMETRY_SHADER) {
-            if (commandBuffersGSStackPos > 0) {
-                wq->commandBuffer = commandBuffersGS[--commandBuffersGSStackPos];
-            }
-            else {
-                wq->commandBuffer = [commandQueueGS commandBuffer];
-                [wq->commandBuffer retain];
-            }
+        if (commandBuffersStackPos[currentGPU] > 0) {
+            wq->commandBuffer = commandBuffers[currentGPU][--commandBuffersStackPos[currentGPU]];
         }
         else {
-            if (commandBuffersStackPos > 0) {
-                wq->commandBuffer = commandBuffers[--commandBuffersStackPos];
-            }
-            else {
-                wq->commandBuffer = [commandQueue commandBuffer];
-                [wq->commandBuffer retain];
-            }
+            wq->commandBuffer = [gpus[currentGPU].commandQueue commandBuffer];
+            [wq->commandBuffer retain];
         }
     }
     // We'll reuse an existing buffer silently if it's empty, otherwise emit warning
@@ -666,13 +689,6 @@ void MtlfMetalContext::EncodeWaitForEvent(MetalWorkQueueType waitQueue, MetalWor
         // Update the signalling queue's highest expected value to make sure the wait completes.
         if(eventValue > threadState.highestExpectedEventValue)
             threadState.highestExpectedEventValue = eventValue;
-#if defined(METAL_EVENTS_API_PRESENT)
-        // Make this command buffer wait for the event to be resolved
-        if (eventsAvailable) {
-            [wait_wq->commandBuffer encodeWaitForEvent:threadState.gsSyncEvent value:eventValue];
-            wait_wq->lastWaitEventValue = eventValue;
-        }
-#endif
     }
 }
 
@@ -702,12 +718,6 @@ uint64_t MtlfMetalContext::EncodeSignalEvent(MetalWorkQueueType signalQueue)
             ReleaseEncoder(true, signalQueue);
         }
     }
-#if defined(METAL_EVENTS_API_PRESENT)
-    if (eventsAvailable) {
-        // Generate event
-        [wq->commandBuffer encodeSignalEvent:threadState.gsSyncEvent value:threadState.currentEventValue];
-    }
-#endif
     return threadState.currentEventValue++;
 }
 
@@ -720,29 +730,49 @@ MTLRenderPassDescriptor* MtlfMetalContext::GetRenderPassDescriptor()
 void MtlfMetalContext::SetFrontFaceWinding(MTLWinding _windingOrder)
 {
     windingOrder = _windingOrder;
-    //threadState.dirtyRenderState |= DIRTY_METALRENDERSTATE_CULLMODE_WINDINGORDER;
+//    for(int i = 0; i < MAX_GPUS; i++)
+//        threadState.dirtyRenderState[i] |= DIRTY_METALRENDERSTATE_CULLMODE_WINDINGORDER;
 }
 
 void MtlfMetalContext::SetCullMode(MTLCullMode _cullMode)
 {
     cullMode = _cullMode;
-    //threadState.dirtyRenderState |= DIRTY_METALRENDERSTATE_CULLMODE_WINDINGORDER;
+//    for(int i = 0; i < MAX_GPUS; i++)
+//      threadState.dirtyRenderState[i] |= DIRTY_METALRENDERSTATE_CULLMODE_WINDINGORDER;
 }
 
 void MtlfMetalContext::SetPolygonFillMode(MTLTriangleFillMode _fillMode)
 {
     fillMode = _fillMode;
-    //threadState.dirtyRenderState |= DIRTY_METALRENDERSTATE_FILL_MODE;
+//    for(int i = 0; i < MAX_GPUS; i++)
+//        threadState.dirtyRenderState[i] |= DIRTY_METALRENDERSTATE_FILL_MODE;
 }
 
 void MtlfMetalContext::SetAlphaBlendingEnable(bool _blendEnable)
 {
-    blendEnable = _blendEnable;
+    blendState.blendEnable = _blendEnable;
+}
+
+void MtlfMetalContext::SetBlendOps(MTLBlendOperation _rgbBlendOp, MTLBlendOperation _alphaBlendOp) {
+    blendState.rgbBlendOp = _rgbBlendOp;
+    blendState.alphaBlendOp = _alphaBlendOp;
+}
+
+void MtlfMetalContext::SetBlendFactors(MTLBlendFactor _sourceColorFactor, MTLBlendFactor _destColorFactor,
+                                       MTLBlendFactor _sourceAlphaFactor, MTLBlendFactor _destAlphaFactor) {
+    blendState.sourceColorFactor = _sourceColorFactor;
+    blendState.destColorFactor = _destColorFactor;
+    blendState.sourceAlphaFactor = _sourceAlphaFactor;
+    blendState.destAlphaFactor = _destAlphaFactor;
+}
+
+void MtlfMetalContext::SetBlendColor(GfVec4f const &_blendColor) {
+    blendState.blendColor = _blendColor;
 }
 
 void MtlfMetalContext::SetAlphaCoverageEnable(bool _alphaCoverageEnable)
 {
-    alphaCoverageEnable = _alphaCoverageEnable;
+    blendState.alphaCoverageEnable = _alphaCoverageEnable;
 }
 
 void MtlfMetalContext::SetShadingPrograms(id<MTLFunction> vertexFunction, id<MTLFunction> fragmentFunction, bool _enableMVA)
@@ -819,7 +849,9 @@ void MtlfMetalContext::SetVertexAttribute(uint32_t index,
         threadState.numVertexComponents = index + 1;
     }
     
-    threadState.dirtyRenderState |= DIRTY_METALRENDERSTATE_VERTEX_DESCRIPTOR;
+    for(int i = 0; i < MAX_GPUS; i++) {
+        threadState.dirtyRenderState[i] |= DIRTY_METALRENDERSTATE_VERTEX_DESCRIPTOR;
+    }
 }
 
 // I think this can be removed didn't seem to make too much difference to speeds
@@ -885,10 +917,12 @@ void MtlfMetalContext::SetOldStyleUniformBuffer(
     threadState.oldStyleUniformBufferIndex[stage] = index;
     
     if(stage == kMSL_ProgramStage_Vertex) {
-        threadState.dirtyRenderState |= DIRTY_METALRENDERSTATE_OLD_STYLE_VERTEX_UNIFORM;
+        for(int i = 0; i < MAX_GPUS; i++)
+            threadState.dirtyRenderState[i] |= DIRTY_METALRENDERSTATE_OLD_STYLE_VERTEX_UNIFORM;
     }
     if(stage == kMSL_ProgramStage_Fragment) {
-        threadState.dirtyRenderState |= DIRTY_METALRENDERSTATE_OLD_STYLE_FRAGMENT_UNIFORM;
+        for(int i = 0; i < MAX_GPUS; i++)
+            threadState.dirtyRenderState[i] |= DIRTY_METALRENDERSTATE_OLD_STYLE_FRAGMENT_UNIFORM;
     }
 }
 
@@ -919,32 +953,37 @@ void MtlfMetalContext::SetBuffer(int index, MtlfMultiBuffer const &buffer, const
         threadState.vertexPositionBuffer = buffer.forCurrentGPU();
     }
     
-    threadState.dirtyRenderState |= DIRTY_METALRENDERSTATE_VERTEX_BUFFER;
+    for(int i = 0; i < MAX_GPUS; i++)
+        threadState.dirtyRenderState[i] |= DIRTY_METALRENDERSTATE_VERTEX_BUFFER;
 }
 
 void MtlfMetalContext::SetIndexBuffer(MtlfMultiBuffer const &buffer)
 {
     threadState.indexBuffer = buffer;
     //threadState.remappedQuadIndexBuffer = nil;
-    threadState.dirtyRenderState |= DIRTY_METALRENDERSTATE_INDEX_BUFFER;
+    for(int i = 0; i < MAX_GPUS; i++)
+        threadState.dirtyRenderState[i] |= DIRTY_METALRENDERSTATE_INDEX_BUFFER;
 }
 
-void MtlfMetalContext::SetSampler(int index, id<MTLSamplerState> sampler, const TfToken& name, MSL_ProgramStage stage)
+void MtlfMetalContext::SetSampler(int index, MtlfMultiSampler const &sampler, const TfToken& name, MSL_ProgramStage stage)
 {
     threadState.samplers.push_back({index, sampler, name, stage});
-    threadState.dirtyRenderState |= DIRTY_METALRENDERSTATE_SAMPLER;
+    for(int i = 0; i < MAX_GPUS; i++)
+        threadState.dirtyRenderState[i] |= DIRTY_METALRENDERSTATE_SAMPLER;
 }
 
-void MtlfMetalContext::SetTexture(int index, id<MTLTexture> texture, const TfToken& name, MSL_ProgramStage stage)
+void MtlfMetalContext::SetTexture(int index, MtlfMultiTexture const &texture, const TfToken& name, MSL_ProgramStage stage)
 {
     threadState.textures.push_back({index, texture, name, stage});
-    threadState.dirtyRenderState |= DIRTY_METALRENDERSTATE_TEXTURE;
+    for(int i = 0; i < MAX_GPUS; i++)
+        threadState.dirtyRenderState[i] |= DIRTY_METALRENDERSTATE_TEXTURE;
 }
 
 void MtlfMetalContext::SetDrawTarget(MtlfDrawTarget *dt)
 {
     drawTarget = dt;
-    threadState.dirtyRenderState |= DIRTY_METALRENDERSTATE_DRAW_TARGET;
+    for(int i = 0; i < MAX_GPUS; i++)
+        threadState.dirtyRenderState[i] |= DIRTY_METALRENDERSTATE_DRAW_TARGET;
 }
 
 size_t MtlfMetalContext::HashVertexDescriptor()
@@ -970,20 +1009,20 @@ void MtlfMetalContext::SetRenderPipelineState()
     }
     
     if (!threadState.enableMVA) {
-        if (threadState.dirtyRenderState & DIRTY_METALRENDERSTATE_VERTEX_DESCRIPTOR/* || renderPipelineStateDescriptor.vertexDescriptor == NULL*/) {
+        if (threadState.dirtyRenderState[currentGPU] & DIRTY_METALRENDERSTATE_VERTEX_DESCRIPTOR/* || renderPipelineStateDescriptor.vertexDescriptor == NULL*/) {
             // Update vertex descriptor hash
             wq->currentVertexDescriptorHash = HashVertexDescriptor();
         }
     }
     
-    if (threadState.dirtyRenderState & DIRTY_METALRENDERSTATE_DRAW_TARGET) {
+    if (threadState.dirtyRenderState[currentGPU] & DIRTY_METALRENDERSTATE_DRAW_TARGET) {
         size_t hashVal = 0;
 
         if (drawTarget) {
             auto& attachments = drawTarget->GetAttachments();
             for(auto it : attachments) {
                 MtlfDrawTarget::MtlfAttachment* attachment = ((MtlfDrawTarget::MtlfAttachment*)&(*it.second));
-                MTLPixelFormat depthFormat = [attachment->GetTextureName() pixelFormat];
+                MTLPixelFormat depthFormat = [attachment->GetTextureName().multiTexture[currentGPU] pixelFormat];
 
                 if(attachment->GetFormat() == GL_DEPTH_COMPONENT || attachment->GetFormat() == GL_DEPTH_STENCIL) {
                     boost::hash_combine(hashVal, depthFormat);
@@ -992,7 +1031,7 @@ void MtlfMetalContext::SetRenderPipelineState()
                     }
                 }
                 else {
-                    id<MTLTexture> texture = attachment->GetTextureName();
+                    id<MTLTexture> texture = attachment->GetTextureName().multiTexture[currentGPU];
                     MTLPixelFormat pixelFormat = [texture pixelFormat];
                     int idx = attachment->GetAttach();
                     
@@ -1001,21 +1040,21 @@ void MtlfMetalContext::SetRenderPipelineState()
             }
         }
         else {
-            if (mtlColorTexture != nil) {
-                boost::hash_combine(hashVal, mtlColorTexture.pixelFormat);
+            if (gpus[currentGPU].mtlColorTexture != nil) {
+                boost::hash_combine(hashVal, gpus[currentGPU].mtlColorTexture.pixelFormat);
             }
             else {
                 boost::hash_combine(hashVal, outputPixelFormat);
             }
             
-            if (mtlDepthTexture != nil) {
-                boost::hash_combine(hashVal, mtlDepthTexture.pixelFormat);
+            if (gpus[currentGPU].mtlDepthTexture != nil) {
+                boost::hash_combine(hashVal, gpus[currentGPU].mtlDepthTexture.pixelFormat);
             }
             else {
                 boost::hash_combine(hashVal, outputDepthFormat);
             }
         }
-        [wq->currentRenderEncoder setDepthStencilState:depthState];
+        [wq->currentRenderEncoder setDepthStencilState:gpus[currentGPU].depthState];
         // Update colour attachments hash
         wq->currentColourAttachmentsHash = hashVal;
     }
@@ -1023,12 +1062,19 @@ void MtlfMetalContext::SetRenderPipelineState()
     // Always call this because currently we're not tracking changes to its state
     size_t hashVal = 0;
     
+    boost::hash_combine(hashVal, currentDevice);
     boost::hash_combine(hashVal, threadState.renderVertexFunction);
     boost::hash_combine(hashVal, threadState.renderFragmentFunction);
     boost::hash_combine(hashVal, wq->currentVertexDescriptorHash);
     boost::hash_combine(hashVal, wq->currentColourAttachmentsHash);
-    boost::hash_combine(hashVal, blendEnable);
-    boost::hash_combine(hashVal, alphaCoverageEnable);
+    boost::hash_combine(hashVal, blendState.blendEnable);
+    boost::hash_combine(hashVal, blendState.alphaCoverageEnable);
+    boost::hash_combine(hashVal, blendState.rgbBlendOp);
+    boost::hash_combine(hashVal, blendState.alphaBlendOp);
+    boost::hash_combine(hashVal, blendState.sourceColorFactor);
+    boost::hash_combine(hashVal, blendState.sourceAlphaFactor);
+    boost::hash_combine(hashVal, blendState.destColorFactor);
+    boost::hash_combine(hashVal, blendState.destAlphaFactor);
 
     // If this matches the current pipeline state then we should already have the correct pipeline bound
     if (hashVal == wq->currentRenderPipelineDescriptorHash && wq->currentRenderPipelineState != nil) {
@@ -1050,7 +1096,8 @@ void MtlfMetalContext::SetRenderPipelineState()
         MTLRenderPipelineDescriptor *renderPipelineStateDescriptor = [[MTLRenderPipelineDescriptor alloc] init];
 
         if (!threadState.enableMVA) {
-            if (threadState.dirtyRenderState & DIRTY_METALRENDERSTATE_VERTEX_DESCRIPTOR || renderPipelineStateDescriptor.vertexDescriptor == NULL) {
+            if (threadState.dirtyRenderState[currentGPU] & DIRTY_METALRENDERSTATE_VERTEX_DESCRIPTOR ||
+                renderPipelineStateDescriptor.vertexDescriptor == NULL) {
                 // This assignment can be expensive as the vertexdescriptor will be copied (due to interface property)
                 renderPipelineStateDescriptor.vertexDescriptor = threadState.vertexDescriptor;
                 // Update vertex descriptor hash
@@ -1058,7 +1105,7 @@ void MtlfMetalContext::SetRenderPipelineState()
             }
         }
         
-        threadState.dirtyRenderState &= ~DIRTY_METALRENDERSTATE_VERTEX_DESCRIPTOR;
+        threadState.dirtyRenderState[currentGPU] &= ~DIRTY_METALRENDERSTATE_VERTEX_DESCRIPTOR;
 
         // Create a new render pipeline state object
         renderPipelineStateDescriptor.label = @"SetRenderEncoderState";
@@ -1089,14 +1136,14 @@ void MtlfMetalContext::SetRenderPipelineState()
         renderPipelineStateDescriptor.tessellationPartitionMode         = MTLTessellationPartitionModePow2;
 #endif
     
-        if (threadState.dirtyRenderState & DIRTY_METALRENDERSTATE_DRAW_TARGET) {
-            threadState.dirtyRenderState &= ~DIRTY_METALRENDERSTATE_DRAW_TARGET;
+        if (threadState.dirtyRenderState[currentGPU] & DIRTY_METALRENDERSTATE_DRAW_TARGET) {
+            threadState.dirtyRenderState[currentGPU] &= ~DIRTY_METALRENDERSTATE_DRAW_TARGET;
             
             if (drawTarget) {
                 auto& attachments = drawTarget->GetAttachments();
                 for(auto it : attachments) {
                     MtlfDrawTarget::MtlfAttachment* attachment = ((MtlfDrawTarget::MtlfAttachment*)&(*it.second));
-                    MTLPixelFormat depthFormat = [attachment->GetTextureName() pixelFormat];
+                    MTLPixelFormat depthFormat = [attachment->GetTextureName().multiTexture[currentGPU] pixelFormat];
                     
                     if(attachment->GetFormat() == GL_DEPTH_COMPONENT || attachment->GetFormat() == GL_DEPTH_STENCIL) {
                         renderPipelineStateDescriptor.depthAttachmentPixelFormat = depthFormat;
@@ -1105,7 +1152,7 @@ void MtlfMetalContext::SetRenderPipelineState()
                         }
                     }
                     else {
-                        id<MTLTexture> texture = attachment->GetTextureName();
+                        id<MTLTexture> texture = attachment->GetTextureName().multiTexture[currentGPU];
                         MTLPixelFormat pixelFormat = [texture pixelFormat];
                         int idx = attachment->GetAttach();
                         
@@ -1115,38 +1162,42 @@ void MtlfMetalContext::SetRenderPipelineState()
                 }
             }
             else {
-                //METAL TODO: Why does this need to be hardcoded? There is no matching drawTarget? Can we get this info from somewhere?
-                if (blendEnable) {
+                if (blendState.blendEnable) {
                     renderPipelineStateDescriptor.colorAttachments[0].blendingEnabled = YES;
                 }
                 else {
                     renderPipelineStateDescriptor.colorAttachments[0].blendingEnabled = NO;
                 }
-                if (alphaCoverageEnable) {
+                if (blendState.alphaCoverageEnable) {
                     renderPipelineStateDescriptor.alphaToCoverageEnabled = YES;
                 }
                 else {
                     renderPipelineStateDescriptor.alphaToCoverageEnabled = NO;
                 }
-                renderPipelineStateDescriptor.colorAttachments[0].sourceRGBBlendFactor = MTLBlendFactorSourceAlpha;
-                renderPipelineStateDescriptor.colorAttachments[0].sourceAlphaBlendFactor = MTLBlendFactorSourceAlpha;
-                renderPipelineStateDescriptor.colorAttachments[0].destinationRGBBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
-                renderPipelineStateDescriptor.colorAttachments[0].destinationAlphaBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
                 
-                if (mtlMultisampleColorTexture != nil) {
-                    renderPipelineStateDescriptor.colorAttachments[0].pixelFormat = mtlMultisampleColorTexture.pixelFormat;
-                    //renderPipelineStateDescriptor.colorAttachments[0].pixelFormat = MTLPixelFormatRGBA16Float;
+                renderPipelineStateDescriptor.colorAttachments[0].rgbBlendOperation = blendState.rgbBlendOp;
+                renderPipelineStateDescriptor.colorAttachments[0].alphaBlendOperation = blendState.alphaBlendOp;
+
+                renderPipelineStateDescriptor.colorAttachments[0].sourceRGBBlendFactor = blendState.sourceColorFactor;
+                renderPipelineStateDescriptor.colorAttachments[0].sourceAlphaBlendFactor = blendState.sourceAlphaFactor;
+                renderPipelineStateDescriptor.colorAttachments[0].destinationRGBBlendFactor = blendState.destColorFactor;
+                renderPipelineStateDescriptor.colorAttachments[0].destinationAlphaBlendFactor = blendState.destAlphaFactor;
+                
+                if (gpus[currentGPU].mtlMultisampleColorTexture != nil) {
+                    renderPipelineStateDescriptor.colorAttachments[0].pixelFormat =
+                        gpus[currentGPU].mtlMultisampleColorTexture.pixelFormat;
                 }
-                else if (mtlColorTexture != nil) {
-                    renderPipelineStateDescriptor.colorAttachments[0].pixelFormat = mtlColorTexture.pixelFormat;
-                    //renderPipelineStateDescriptor.colorAttachments[0].pixelFormat = MTLPixelFormatRGBA16Float;
+                else if (gpus[currentGPU].mtlColorTexture != nil) {
+                    renderPipelineStateDescriptor.colorAttachments[0].pixelFormat =
+                        gpus[currentGPU].mtlColorTexture.pixelFormat;
                 }
                 else {
                     renderPipelineStateDescriptor.colorAttachments[0].pixelFormat = outputPixelFormat;
                 }
                 
-                if (mtlDepthTexture != nil) {
-                    renderPipelineStateDescriptor.depthAttachmentPixelFormat = mtlDepthTexture.pixelFormat;
+                if (gpus[currentGPU].mtlDepthTexture != nil) {
+                    renderPipelineStateDescriptor.depthAttachmentPixelFormat =
+                        gpus[currentGPU].mtlDepthTexture.pixelFormat;
                 }
                 else {
                     renderPipelineStateDescriptor.depthAttachmentPixelFormat = outputDepthFormat;
@@ -1156,7 +1207,7 @@ void MtlfMetalContext::SetRenderPipelineState()
         }
 
         NSError *error = NULL;
-        pipelineState = [device newRenderPipelineStateWithDescriptor:renderPipelineStateDescriptor error:&error];
+        pipelineState = [currentDevice newRenderPipelineStateWithDescriptor:renderPipelineStateDescriptor error:&error];
         if (!pipelineState) {
             _pipelineMutex.unlock();
             NSLog(@"Failed to created pipeline state, error %@", error);
@@ -1180,7 +1231,9 @@ void MtlfMetalContext::SetRenderPipelineState()
 
 void MtlfMetalContext::SetRenderEncoderState()
 {
-    threadState.dirtyRenderState |= DIRTY_METALRENDERSTATE_OLD_STYLE_VERTEX_UNIFORM;
+    uint32_t dirtyRenderState = threadState.dirtyRenderState[currentGPU];
+
+    dirtyRenderState |= DIRTY_METALRENDERSTATE_OLD_STYLE_VERTEX_UNIFORM;
 //    threadState.dirtyRenderState |= 0xffffffff;
 
     MetalWorkQueue *wq = threadState.currentWorkQueue;
@@ -1205,19 +1258,19 @@ void MtlfMetalContext::SetRenderEncoderState()
     // Create and set a new pipelinestate if required
     SetRenderPipelineState();
     
-    if (threadState.dirtyRenderState & DIRTY_METALRENDERSTATE_CULLMODE_WINDINGORDER) {
+    if (dirtyRenderState & DIRTY_METALRENDERSTATE_CULLMODE_WINDINGORDER) {
         [wq->currentRenderEncoder setFrontFacingWinding:windingOrder];
         [wq->currentRenderEncoder setCullMode:cullMode];
-        threadState.dirtyRenderState &= ~DIRTY_METALRENDERSTATE_CULLMODE_WINDINGORDER;
+        threadState.dirtyRenderState[currentGPU] &= ~DIRTY_METALRENDERSTATE_CULLMODE_WINDINGORDER;
     }
 
-    if (threadState.dirtyRenderState & DIRTY_METALRENDERSTATE_FILL_MODE) {
+    if (dirtyRenderState & DIRTY_METALRENDERSTATE_FILL_MODE) {
         [wq->currentRenderEncoder setTriangleFillMode:fillMode];
-        threadState.dirtyRenderState &= ~DIRTY_METALRENDERSTATE_FILL_MODE;
+        threadState.dirtyRenderState[currentGPU] &= ~DIRTY_METALRENDERSTATE_FILL_MODE;
     }
 
     // Any buffers modified
-    if (threadState.dirtyRenderState & DIRTY_METALRENDERSTATE_VERTEX_BUFFER) {
+    if (dirtyRenderState & DIRTY_METALRENDERSTATE_VERTEX_BUFFER) {
         
         for(auto buffer : threadState.boundBuffers)
         {
@@ -1249,10 +1302,10 @@ void MtlfMetalContext::SetRenderEncoderState()
             }
         }
         
-        threadState.dirtyRenderState &= ~DIRTY_METALRENDERSTATE_VERTEX_BUFFER;
+        threadState.dirtyRenderState[currentGPU] &= ~DIRTY_METALRENDERSTATE_VERTEX_BUFFER;
     }
     
-    if (threadState.dirtyRenderState & DIRTY_METALRENDERSTATE_OLD_STYLE_VERTEX_UNIFORM) {
+    if (dirtyRenderState & DIRTY_METALRENDERSTATE_OLD_STYLE_VERTEX_UNIFORM) {
         uint32_t index = threadState.oldStyleUniformBufferIndex[kMSL_ProgramStage_Vertex];
         if(threadState.enableComputeGS) {
             [computeEncoder setBytes:threadState.oldStyleUniformBuffer[kMSL_ProgramStage_Vertex]
@@ -1265,44 +1318,44 @@ void MtlfMetalContext::SetRenderEncoderState()
         [wq->currentRenderEncoder setVertexBytes:threadState.oldStyleUniformBuffer[kMSL_ProgramStage_Vertex]
                                           length:threadState.oldStyleUniformBufferSize[kMSL_ProgramStage_Vertex]
                                          atIndex:index];
-        threadState.dirtyRenderState &= ~DIRTY_METALRENDERSTATE_OLD_STYLE_VERTEX_UNIFORM;
+        threadState.dirtyRenderState[currentGPU] &= ~DIRTY_METALRENDERSTATE_OLD_STYLE_VERTEX_UNIFORM;
     }
-    if (threadState.dirtyRenderState & DIRTY_METALRENDERSTATE_OLD_STYLE_FRAGMENT_UNIFORM) {
+    if (dirtyRenderState & DIRTY_METALRENDERSTATE_OLD_STYLE_FRAGMENT_UNIFORM) {
         [wq->currentRenderEncoder setFragmentBytes:threadState.oldStyleUniformBuffer[kMSL_ProgramStage_Fragment]
                                             length:threadState.oldStyleUniformBufferSize[kMSL_ProgramStage_Fragment]
                                            atIndex:threadState.oldStyleUniformBufferIndex[kMSL_ProgramStage_Fragment]];
-        threadState.dirtyRenderState &= ~DIRTY_METALRENDERSTATE_OLD_STYLE_FRAGMENT_UNIFORM;
+        threadState.dirtyRenderState[currentGPU] &= ~DIRTY_METALRENDERSTATE_OLD_STYLE_FRAGMENT_UNIFORM;
     }
 
-    if (threadState.dirtyRenderState & DIRTY_METALRENDERSTATE_TEXTURE) {
+    if (dirtyRenderState & DIRTY_METALRENDERSTATE_TEXTURE) {
         for(auto texture : threadState.textures) {
             if(texture.stage == kMSL_ProgramStage_Vertex) {
                 if(threadState.enableComputeGS) {
-                    [computeEncoder setTexture:texture.texture atIndex:texture.index];
+                    [computeEncoder setTexture:texture.texture.forCurrentGPU() atIndex:texture.index];
                 }
-                [wq->currentRenderEncoder setVertexTexture:texture.texture atIndex:texture.index];
+                [wq->currentRenderEncoder setVertexTexture:texture.texture.forCurrentGPU() atIndex:texture.index];
             }
             else if(texture.stage == kMSL_ProgramStage_Fragment)
-                [wq->currentRenderEncoder setFragmentTexture:texture.texture atIndex:texture.index];
+                [wq->currentRenderEncoder setFragmentTexture:texture.texture.forCurrentGPU() atIndex:texture.index];
             //else
             //    TF_FATAL_CODING_ERROR("Not implemented!"); //Compute case
         }
-        threadState.dirtyRenderState &= ~DIRTY_METALRENDERSTATE_TEXTURE;
+        threadState.dirtyRenderState[currentGPU] &= ~DIRTY_METALRENDERSTATE_TEXTURE;
     }
-    if (threadState.dirtyRenderState & DIRTY_METALRENDERSTATE_SAMPLER) {
+    if (dirtyRenderState & DIRTY_METALRENDERSTATE_SAMPLER) {
         for(auto sampler : threadState.samplers) {
             if(sampler.stage == kMSL_ProgramStage_Vertex) {
                 if(threadState.enableComputeGS) {
-                    [computeEncoder setSamplerState:sampler.sampler atIndex:sampler.index];
+                    [computeEncoder setSamplerState:sampler.sampler.forCurrentGPU() atIndex:sampler.index];
                 }
-                [wq->currentRenderEncoder setVertexSamplerState:sampler.sampler atIndex:sampler.index];
+                [wq->currentRenderEncoder setVertexSamplerState:sampler.sampler.forCurrentGPU() atIndex:sampler.index];
             }
             else if(sampler.stage == kMSL_ProgramStage_Fragment)
-                [wq->currentRenderEncoder setFragmentSamplerState:sampler.sampler atIndex:sampler.index];
+                [wq->currentRenderEncoder setFragmentSamplerState:sampler.sampler.forCurrentGPU() atIndex:sampler.index];
             //else
             //    TF_FATAL_CODING_ERROR("Not implemented!"); //Compute case
         }
-        threadState.dirtyRenderState &= ~DIRTY_METALRENDERSTATE_SAMPLER;
+        threadState.dirtyRenderState[currentGPU] &= ~DIRTY_METALRENDERSTATE_SAMPLER;
     }
     
     if(threadState.enableComputeGS) {
@@ -1329,7 +1382,7 @@ void MtlfMetalContext::ClearRenderEncoderState()
     threadState.indexBuffer.Clear();
     threadState.vertexPositionBuffer = nil;
     threadState.numVertexComponents  = 0;
-    threadState.dirtyRenderState     = DIRTY_METALRENDERSTATE_ALL;
+    memset(threadState.dirtyRenderState, 0xff, sizeof(threadState.dirtyRenderState));
     
     // Free all state associated with the buffers
     for(auto buffer : threadState.boundBuffers) {
@@ -1357,6 +1410,7 @@ NSUInteger MtlfMetalContext::SetComputeEncoderState(id<MTLFunction>     computeF
     }
 
     size_t hashVal = 0;
+    boost::hash_combine(hashVal, currentDevice);
     boost::hash_combine(hashVal, bufferCount);
     boost::hash_combine(hashVal, computeFunction);
     boost::hash_combine(hashVal, immutableBufferMask);
@@ -1400,7 +1454,9 @@ NSUInteger MtlfMetalContext::SetComputeEncoderState(id<MTLFunction>     computeF
         }
         
         // Create a new Compute pipeline state object
-        computePipelineState = [device newComputePipelineStateWithDescriptor:computePipelineStateDescriptor options:MTLPipelineOptionNone reflection:reflData error:&error];
+        computePipelineState = [currentDevice newComputePipelineStateWithDescriptor:computePipelineStateDescriptor
+                                                                            options:MTLPipelineOptionNone
+                                                                         reflection:reflData error:&error];
 
         if (!computePipelineState) {
             _pipelineMutex.unlock();
@@ -1424,6 +1480,72 @@ NSUInteger MtlfMetalContext::SetComputeEncoderState(id<MTLFunction>     computeF
     return wq->currentComputeThreadExecutionWidth;
 }
 
+// Using this function instead of setting the pipeline state directly allows caching
+id<MTLComputePipelineState> MtlfMetalContext::GetComputeEncoderState(
+    int                 gpuIndex,
+    id<MTLFunction>     computeFunction,
+    unsigned int        bufferCount,
+    unsigned long       immutableBufferMask,
+    NSString            *label)
+{
+    id<MTLComputePipelineState> computePipelineState;
+    
+    size_t hashVal = 0;
+    boost::hash_combine(hashVal, renderDevices[gpuIndex]);
+    boost::hash_combine(hashVal, bufferCount);
+    boost::hash_combine(hashVal, computeFunction);
+    boost::hash_combine(hashVal, immutableBufferMask);
+    
+    // Search map to see if we've created a pipeline state object for this already
+    _pipelineMutex.lock();
+    auto computePipelineStateIt = computePipelineStateMap.find(hashVal);
+
+    if (computePipelineStateIt != computePipelineStateMap.end()) {
+        // Retrieve pre generated state
+        computePipelineState = computePipelineStateIt->second;
+        _pipelineMutex.unlock();
+    }
+    else
+    {
+        NSError *error = NULL;
+        MTLAutoreleasedComputePipelineReflection* reflData = 0;
+        
+        MTLComputePipelineDescriptor *computePipelineStateDescriptor = [[MTLComputePipelineDescriptor alloc] init];
+        
+        [computePipelineStateDescriptor reset];
+        computePipelineStateDescriptor.computeFunction = computeFunction;
+        computePipelineStateDescriptor.label = label;
+        
+        // Setup buffer mutability
+        int i = 0;
+        while (immutableBufferMask) {
+            if (immutableBufferMask & 0x1) {
+                computePipelineStateDescriptor.buffers[i].mutability = MTLMutabilityImmutable;
+            }
+            immutableBufferMask >>= 1;
+            i++;
+        }
+        
+        // Create a new Compute pipeline state object
+        computePipelineState = [renderDevices[gpuIndex] newComputePipelineStateWithDescriptor:computePipelineStateDescriptor
+                                                                                      options:MTLPipelineOptionNone
+                                                                                   reflection:reflData error:&error];
+        
+        if (!computePipelineState) {
+            _pipelineMutex.unlock();
+            NSLog(@"Failed to create compute pipeline state, error %@", error);
+            return 0;
+        }
+        computePipelineStateMap.emplace(hashVal, computePipelineState);
+        _pipelineMutex.unlock();
+        METAL_INC_STAT(resourceStats.computePipelineStates);
+        
+        [computePipelineStateDescriptor release];
+    }
+    
+    return computePipelineState;
+}
+
 int MtlfMetalContext::GetCurrentComputeThreadExecutionWidth(MetalWorkQueueType workQueueType)
 {
     MetalWorkQueue const* const wq = &GetWorkQueue(workQueueType);
@@ -1441,7 +1563,7 @@ int MtlfMetalContext::GetMaxThreadsPerThreadgroup(MetalWorkQueueType workQueueTy
 void MtlfMetalContext::ResetEncoders(MetalWorkQueueType workQueueType, bool isInitializing)
 {
     MetalWorkQueue *wq = &GetWorkQueue(workQueueType);
- 
+
     if(!isInitializing) {
         if(threadState.highestExpectedEventValue != endOfQueueEventValue && threadState.highestExpectedEventValue >= threadState.currentEventValue) {
             TF_FATAL_CODING_ERROR("There is a WaitForEvent which is never going to get Signalled!");
@@ -1449,7 +1571,7 @@ void MtlfMetalContext::ResetEncoders(MetalWorkQueueType workQueueType, bool isIn
         if(threadState.gsHasOpenBatch)
             TF_FATAL_CODING_ERROR("A Compute Geometry Shader batch is left open!");
     }
-   
+
     wq->commandBuffer         = nil;
     
     wq->encoderInUse             = false;
@@ -1509,10 +1631,7 @@ void MtlfMetalContext::CommitCommandBufferForThread(bool waituntilScheduled, boo
             {
                 std::lock_guard<std::mutex> lock(_commandBufferPoolMutex);
                 
-                if (enableMultiQueue && workQueueType == METALWORKQUEUE_GEOMETRY_SHADER)
-                    commandBuffersGS[commandBuffersGSStackPos++] = wq->commandBuffer;
-                else
-                    commandBuffers[commandBuffersStackPos++] = wq->commandBuffer;
+                commandBuffers[currentGPU][commandBuffersStackPos[currentGPU]++] = wq->commandBuffer;
                 wq->commandBuffer = nil;
             }
             ResetEncoders(workQueueType);
@@ -1525,11 +1644,6 @@ void MtlfMetalContext::CommitCommandBufferForThread(bool waituntilScheduled, boo
     if(wq->generatesEndOfQueueEvent) {
         TF_FATAL_CODING_ERROR("TODO: This needs updating to work with persistent event objects. Can't just use a large value.");
         threadState.currentEventValue = endOfQueueEventValue;
-#if defined(METAL_EVENTS_API_PRESENT)
-        if (eventsAvailable) {
-            [wq->commandBuffer encodeSignalEvent:threadState.gsSyncEvent value:threadState.currentEventValue];
-        }
-#endif
         wq->generatesEndOfQueueEvent = false;
     }
     
@@ -1652,7 +1766,7 @@ void MtlfMetalContext::SetCurrentEncoder(MetalEncoderType encoderType, MetalWork
             ReleaseEncoder(true);
         }
     }
-   
+
     // Create a new encoder
     switch (encoderType) {
         case MTLENCODERTYPE_RENDER: {
@@ -1664,14 +1778,14 @@ void MtlfMetalContext::SetCurrentEncoder(MetalEncoderType encoderType, MetalWork
             //_PatchRenderPassDescriptor();
 
             // Since the encoder is new we'll need to emit all the state again
-            threadState.dirtyRenderState     = DIRTY_METALRENDERSTATE_ALL;
+            memset(threadState.dirtyRenderState, 0xff, sizeof(threadState.dirtyRenderState));
             for(auto buffer : threadState.boundBuffers) { buffer->modified = true; }
             METAL_INC_STAT(resourceStats.renderEncodersCreated);
             break;
         }
         case MTLENCODERTYPE_COMPUTE: {
 #if defined(METAL_EVENTS_API_PRESENT)
-            if (concurrentDispatchSupported){//} && eventsAvailable) {
+            if (concurrentDispatchSupported) {
                 wq->currentComputeEncoder = [wq->commandBuffer computeCommandEncoderWithDispatchType:MTLDispatchTypeConcurrent];
             }
             else
@@ -1680,7 +1794,7 @@ void MtlfMetalContext::SetCurrentEncoder(MetalEncoderType encoderType, MetalWork
                 wq->currentComputeEncoder = [wq->commandBuffer computeCommandEncoder];
             }
             
-            threadState.dirtyRenderState     = DIRTY_METALRENDERSTATE_ALL;
+            memset(threadState.dirtyRenderState, 0xff, sizeof(threadState.dirtyRenderState));
             for(auto buffer : threadState.boundBuffers) { buffer->modified = true; }
             METAL_INC_STAT(resourceStats.computeEncodersCreated);
             break;
@@ -1874,20 +1988,31 @@ void MtlfMetalContext::CleanupUnusedBuffers(bool forceClean)
 }
 
 void MtlfMetalContext::StartFrameForThread() {
-    threadState.PrepareThread(this);\
+    threadState.PrepareThread(this);
+    threadState.gsDataOffset = 0;
+    threadState.gsCurrentBuffer = 0;
+    threadState.gsEncodedBatches = 0;
+
+    threadState.gsBufferIndex = 0;
+    threadState.gsCurrentBuffer = threadState.gsBuffers[currentGPU].at(threadState.gsBufferIndex);
 }
 
 void MtlfMetalContext::StartFrame() {
     numPrimsDrawn.store(0);
 
-//    if (device == renderDevices[0])
-//        device = renderDevices[1];
-//    else
-//        device = renderDevices[0];
-//    UpdateCurrentGPU();
+#if defined(ARCH_GFX_OPENGL)
+    // Only support alternate frame rendering with OpenGL interop for now
+    currentGPU++;
+    if (currentGPU >= renderDevices.count) {
+        currentGPU = 0;
+    }
+    GPUState::currentGPU = currentGPU;
+
+    currentDevice = renderDevices[currentGPU];
+#endif
     GPUTImerResetTimer(frameCount);
     
-    [captureScopeFullFrame beginScope];
+    [captureScopeFullFrame[currentGPU] beginScope];
 }
 
 void MtlfMetalContext::EndFrameForThread() {
@@ -1908,29 +2033,29 @@ void MtlfMetalContext::EndFrame() {
     // Reset it here as OSD may get invoked before StartFrame() is called.
     OSDEnabledThisFrame = false;
     
-    [captureScopeFullFrame endScope];
+    [captureScopeFullFrame[currentGPU] endScope];
 }
 
-void MtlfMetalContext::BeginCaptureSubset()
+void MtlfMetalContext::BeginCaptureSubset(int gpuIndex)
 {
-    [captureScopeSubset beginScope];
+    [captureScopeSubset[gpuIndex] beginScope];
 }
 
-void MtlfMetalContext::EndCaptureSubset()
+void MtlfMetalContext::EndCaptureSubset(int gpuIndex)
 {
-    [captureScopeSubset endScope];
+    [captureScopeSubset[gpuIndex] endScope];
 }
 
 void MtlfMetalContext::_gsAdvanceBuffer() {
     threadState.gsBufferIndex = (threadState.gsBufferIndex + 1) % gsMaxConcurrentBatches;
-    threadState.gsCurrentBuffer = threadState.gsBuffers.at(threadState.gsBufferIndex);
+    threadState.gsCurrentBuffer = threadState.gsBuffers[currentGPU].at(threadState.gsBufferIndex);
 
     threadState.gsDataOffset = 0;
 }
 
 void MtlfMetalContext::_gsResetBuffers() {
     threadState.gsBufferIndex = 0;
-    threadState.gsCurrentBuffer = threadState.gsBuffers.at(threadState.gsBufferIndex);
+    threadState.gsCurrentBuffer = threadState.gsBuffers[currentGPU].at(threadState.gsBufferIndex);
     threadState.gsDataOffset = 0;
 }
 
@@ -1960,8 +2085,9 @@ void MtlfMetalContext::PrepareForComputeGSPart(
     
     bool useNextBuffer = (threadState.gsDataOffset + vertData + primData) > gsMaxDataPerBatch;
     bool startingNewBatch = useNextBuffer || !threadState.gsHasOpenBatch;
-    if(useNextBuffer)
+    if(useNextBuffer) {
         _gsAdvanceBuffer();
+    }
     dataBuffer = threadState.gsCurrentBuffer;
     vertOffset = threadState.gsDataOffset;
     threadState.gsDataOffset += vertData;
@@ -1971,9 +2097,7 @@ void MtlfMetalContext::PrepareForComputeGSPart(
     //If we are using a new buffer we've started a new batch. That means some synching/committing may need to happen before we can continue.
     if(startingNewBatch) {
         METAL_INC_STAT(resourceStats.GSBatchesStarted);
-        if(enableMultiQueue) {
-            _gsEncodeSync(true);
-        }
+        _gsEncodeSync(true);
     }
 }
 
@@ -1987,27 +2111,26 @@ void MtlfMetalContext::_gsEncodeSync(bool doOpenBatch) {
     
     // Close the current batch if there is one open
     if(threadState.gsHasOpenBatch) {
-        EncodeSignalEvent(METALWORKQUEUE_GEOMETRY_SHADER);
-        
         if(doOpenBatch) {
-            uint64_t value_gs = GetEventValue();
-            uint64_t offset = gsMaxConcurrentBatches;
-            //if(value_gs > offset) {
-//                TF_CODING_WARNING("Geometry shader buffer overrun");
-                // This is a hard sync between the gs and 3d passes. It's not efficient, as it
-                // prevents compute/3d overlap, plus the driver overhead of the sync.
-                // However latency is hidden because we mutli-thread our rendering
-                // and there's hopefully other command encoders that are able to execute
-                EncodeWaitForEvent(METALWORKQUEUE_GEOMETRY_SHADER, METALWORKQUEUE_DEFAULT);
-                EncodeSignalEvent(METALWORKQUEUE_DEFAULT);
-            //}
-        }
+            
+            threadState.gsEncodedBatches++;
+            if (threadState.gsEncodedBatches == gsMaxConcurrentBatches) {
+                [GetWorkQueue(METALWORKQUEUE_GEOMETRY_SHADER).commandBuffer enqueue];
+                CommitCommandBufferForThread(false, false, METALWORKQUEUE_GEOMETRY_SHADER);
+                
+                [GetWorkQueue(METALWORKQUEUE_DEFAULT).commandBuffer enqueue];
+                CommitCommandBufferForThread(false, false, METALWORKQUEUE_DEFAULT);
 
+                CreateCommandBuffer(METALWORKQUEUE_GEOMETRY_SHADER);
+                CreateCommandBuffer(METALWORKQUEUE_DEFAULT);
+                
+                threadState.gsEncodedBatches = 0;
+            }
+        }
         threadState.gsHasOpenBatch = false;
     }
-    
+
     if(doOpenBatch) {
-        EncodeWaitForEvent(METALWORKQUEUE_DEFAULT, METALWORKQUEUE_GEOMETRY_SHADER);
         threadState.gsHasOpenBatch = true;
     }
 }

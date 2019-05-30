@@ -181,7 +181,7 @@ MtlfPtexTexture::_ReadImage()
         //     uint8_t  height log2;
         // };
 
-        id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->device;
+        id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->currentDevice;
         
         // Create the layout texture
         MTLTextureDescriptor* descLayout =
@@ -191,12 +191,14 @@ MtlfPtexTexture::_ReadImage()
                                                            mipmapped:NO];
         descLayout.textureType = MTLTextureType1D;
         descLayout.resourceOptions = MTLResourceStorageModeDefault;
-        _layout = [device newTextureWithDescriptor:descLayout];
+        _layout = MtlfMultiTexture(descLayout);
 
-        [_layout replaceRegion:MTLRegionMake1D(0, numFaces * 6)
-                   mipmapLevel:0
-                     withBytes:loader.GetLayoutBuffer()
-                   bytesPerRow:numFaces * 6 * sizeof(uint16_t)];
+        for(int i = 0; i < GPUState::gpuCount; i++) {
+            [_layout.multiTexture[i] replaceRegion:MTLRegionMake1D(0, numFaces * 6)
+                       mipmapLevel:0
+                         withBytes:loader.GetLayoutBuffer()
+                       bytesPerRow:numFaces * 6 * sizeof(uint16_t)];
+        }
 
         // Create the texel texture
         MTLTextureDescriptor* descTexels =
@@ -207,18 +209,20 @@ MtlfPtexTexture::_ReadImage()
         descTexels.textureType = MTLTextureType2DArray;
         descTexels.arrayLength = _depth;
         descTexels.resourceOptions = MTLResourceStorageModeDefault;
-        _texels = [device newTextureWithDescriptor:descTexels];
+        _texels = MtlfMultiTexture(descTexels);
 
         size_t pageSize = pixelByteSize * _width * _height;
         for (int i = 0; i < _depth; i++) {
             uint8_t const *pageBase = static_cast<uint8_t const*>(texelData)
                                         + (pageSize * i);
-            [_texels replaceRegion:MTLRegionMake2D(0, 0, _width, _height)
-                       mipmapLevel:0
-                             slice:i
-                         withBytes:pageBase
-                       bytesPerRow:pixelByteSize * _width
-                     bytesPerImage:0];
+            for (int g = 0; g < GPUState::gpuCount; g++) {
+                [_texels.multiTexture[g] replaceRegion:MTLRegionMake2D(0, 0, _width, _height)
+                           mipmapLevel:0
+                                 slice:i
+                             withBytes:pageBase
+                           bytesPerRow:pixelByteSize * _width
+                         bytesPerImage:0];
+            }
         }
         
         if (needFreeTexelData) {
@@ -245,12 +249,12 @@ MtlfPtexTexture::_FreePtexTextureObject()
 {
 //    // delete layout lookup --------------------------------
     if (_layout.IsSet())
-        [_layout release];
+        _layout.multiTexture.release();
     _layout.Clear();
 
     // delete textures lookup ------------------------------
     if (_texels.IsSet())
-       [_texels release];
+       _texels.multiTexture.release();
     _texels.Clear();
 }
 

@@ -150,22 +150,22 @@ public:
         void _GenTexture();
         void _DeleteTexture();
 
-        id<MTLTexture>  _textureName;
-        id<MTLTexture>  _textureNameMS;
+        MtlfMultiTexture _textureName;
+        MtlfMultiTexture _textureNameMS;
         
-        id<MTLTexture>  _stencilTextureName;
-        id<MTLTexture>  _stencilTextureNameMS;
+        MtlfMultiTexture _stencilTextureName;
+        MtlfMultiTexture _stencilTextureNameMS;
 
-        GLenum          _format,
-                        _type;
-        MTLPixelFormat  _internalFormat;
+        GLenum           _format,
+                         _type;
+        MTLPixelFormat   _internalFormat;
 
-        uint32_t        _attachmentIndex;
+        uint32_t         _attachmentIndex;
         
-        GfVec2i         _size;
+        GfVec2i          _size;
 
-        uint32_t        _numSamples;
-        uint32_t        _bytesPerPixel;
+        uint32_t         _numSamples;
+        uint32_t         _bytesPerPixel;
     };
 
     typedef TfDeclarePtrs<class MtlfAttachment>::RefPtr MtlfAttachmentRefPtr;

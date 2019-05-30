@@ -23,6 +23,8 @@
 //
 #include "pxr/imaging/glf/glew.h"
 
+#include "pxr/imaging/mtlf/mtlDevice.h"
+
 #include "pxr/imaging/hdSt/drawItem.h"
 #include "pxr/imaging/hdSt/fallbackLightingShader.h"
 #include "pxr/imaging/hdSt/renderPassShader.h"
@@ -30,6 +32,7 @@
 #include "pxr/imaging/hdSt/shaderCode.h"
 
 #include "pxr/imaging/hdSt/Metal/renderPassStateMetal.h"
+#include "pxr/imaging/hdSt/Metal/metalConversions.h"
 
 #include "pxr/imaging/hd/bufferArrayRange.h"
 #include "pxr/imaging/hd/changeTracker.h"
@@ -78,6 +81,31 @@ HdStRenderPassStateMetal::Bind()
 
     // when adding another GL state change here, please document
     // which states to be altered at the comment in the header file
+    
+    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
+
+    // Blending
+    if (_blendEnabled) {
+        context->SetAlphaBlendingEnable(true);
+        context->SetBlendOps(HdStMetalConversions::GetGlBlendOp(_blendColorOp),
+                             HdStMetalConversions::GetGlBlendOp(_blendAlphaOp));
+//        context->SetBlendFactors(
+//            HdStMetalConversions::GetGlBlendFactor(_blendColorSrcFactor),
+//            HdStMetalConversions::GetGlBlendFactor(_blendColorDstFactor),
+//            HdStMetalConversions::GetGlBlendFactor(_blendAlphaSrcFactor),
+//            HdStMetalConversions::GetGlBlendFactor(_blendAlphaDstFactor));
+        context->SetBlendColor(_blendConstantColor);
+    } else {
+        context->SetAlphaBlendingEnable(false);
+    }
+    
+    if (!_alphaToCoverageUseDefault) {
+        if (_alphaToCoverageEnabled) {
+            context->SetAlphaCoverageEnable(true);
+        } else {
+            context->SetAlphaCoverageEnable(false);
+        }
+    }
 /*
     // Apply polygon offset to whole pass.
     if (!_depthBiasUseDefault) {

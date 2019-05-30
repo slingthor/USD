@@ -189,15 +189,11 @@ UsdMayaGLBatchRendererMetal::_Render(
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
     
     // Make sure the Metal render targets, and GL interop textures match the GL viewport size
-    if (context->mtlColorTexture.width != viewport[2] ||
-        context->mtlColorTexture.height != viewport[3]) {
+    if (context->gpus[context->currentGPU].mtlColorTexture.width != viewport[2] ||
+        context->gpus[context->currentGPU].mtlColorTexture.height != viewport[3]) {
         context->InitGLInterop();
         context->AllocateAttachments(viewport[2], viewport[3]);
     }
-    
-    MTLCaptureManager *sharedCaptureManager = [MTLCaptureManager sharedCaptureManager];
-    //[sharedCaptureManager startCaptureWithScope:sharedCaptureManager.defaultCaptureScope];
-    [sharedCaptureManager.defaultCaptureScope beginScope];
     
     static MTLRenderPassDescriptor *_mtlRenderPassDescriptor = nil;
     if (_mtlRenderPassDescriptor == nil)
@@ -223,10 +219,10 @@ UsdMayaGLBatchRendererMetal::_Render(
         glGetFloatv(GL_COLOR_CLEAR_VALUE, clearColor);
         clearColor[3] = 1.0f;
         
-        colorAttachment.texture = context->mtlMultisampleColorTexture;
+        colorAttachment.texture = context->gpus[context->currentGPU].mtlMultisampleColorTexture;
         colorAttachment.clearColor = MTLClearColorMake(clearColor[0], clearColor[1], clearColor[2], clearColor[3]);
         
-        depthAttachment.texture = context->mtlDepthTexture;
+        depthAttachment.texture = context->gpus[context->currentGPU].mtlDepthTexture;
     }
     
     context->StartFrame();
@@ -245,7 +241,7 @@ UsdMayaGLBatchRendererMetal::_Render(
     _hdEngine.Execute(*_renderIndex, tasks);
 
     // Depth texture copy
-    context->ColourCorrectColourTexture(context->mtlMultisampleColorTexture);
+    context->ColourCorrectColourTexture(context->gpus[context->currentGPU].mtlMultisampleColorTexture);
     context->CopyDepthTextureToOpenGL();
     
     // Commit the render buffer (will wait for GS to complete if present)
@@ -255,10 +251,7 @@ UsdMayaGLBatchRendererMetal::_Render(
     
     context->EndFrameForThread();
     context->EndFrame();
-    
-    // Finalize rendering here & push the command buffer to the GPU
-    [sharedCaptureManager.defaultCaptureScope endScope];
-    
+        
     context->BlitColorTargetToOpenGL();
 
     glDisable(GL_FRAMEBUFFER_SRGB_EXT);

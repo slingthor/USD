@@ -58,7 +58,7 @@ HdStRenderDelegateMetal::HdStRenderDelegateMetal()
     , _mtlRenderPassDescriptorForInterop(nil)
     , _mtlRenderPassDescriptor(nil)
 {
-    _deviceDesc = TfToken(_MetalDeviceDescriptor(MtlfMetalContext::GetMetalContext()->device));
+    _deviceDesc = TfToken(_MetalDeviceDescriptor(MtlfMetalContext::GetMetalContext()->currentDevice));
 //    _Initialize();
     
     _inFlightSemaphore = dispatch_semaphore_create(3);
@@ -69,7 +69,7 @@ HdStRenderDelegateMetal::HdStRenderDelegateMetal(HdRenderSettingsMap const& sett
     , _mtlRenderPassDescriptorForInterop(nil)
     , _mtlRenderPassDescriptor(nil)
 {
-    _deviceDesc = TfToken(_MetalDeviceDescriptor(MtlfMetalContext::GetMetalContext()->device));
+    _deviceDesc = TfToken(_MetalDeviceDescriptor(MtlfMetalContext::GetMetalContext()->currentDevice));
     
     _inFlightSemaphore = dispatch_semaphore_create(3);
 }
@@ -119,7 +119,7 @@ void HdStRenderDelegateMetal::SetRenderSetting(TfToken const& key, VtValue const
             if (value == _MetalDeviceDescriptor(dev)) {
                 // Recreate the underlying Metal context
                 MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
-                context->RecreateInstance(dev, context->mtlColorTexture.width, context->mtlColorTexture.height);
+                context->RecreateInstance(dev, context->gpus[0].mtlColorTexture.width, context->gpus[0].mtlColorTexture.height);
                 break;
             }
         }
@@ -135,11 +135,10 @@ void HdStRenderDelegateMetal::CommitResources(HdChangeTracker *tracker)
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
 
     context->StartFrameForThread();
-    
     context->PrepareBufferFlush();
-    
+
     HdStRenderDelegate::CommitResources(tracker);
-    
+
     context->FlushBuffers();
 
     if (context->GeometryShadersActive()) {
@@ -198,6 +197,9 @@ void HdStRenderDelegateMetal::PrepareRender(
         _mtlRenderPassDescriptor = [params.mtlRenderPassDescriptorForNativeMetal copy];
     }
 
+    context->StartFrame();
+    context->StartFrameForThread();
+
 #if defined(ARCH_GFX_OPENGL)
     // Make sure the Metal render targets, and GL interop textures match the GL viewport size
     if (_renderOutput == DelegateParams::RenderOutput::OpenGL) {
@@ -206,10 +208,10 @@ void HdStRenderDelegateMetal::PrepareRender(
         
         dispatch_semaphore_wait(_inFlightSemaphore, DISPATCH_TIME_FOREVER);
         
-        if (context->mtlColorTexture.width != viewport[2] ||
-            context->mtlColorTexture.height != viewport[3]) {
+        if (context->gpus[context->currentGPU].mtlColorTexture.width != viewport[2] ||
+            context->gpus[context->currentGPU].mtlColorTexture.height != viewport[3]) {
             context->InitGLInterop();
-            
+
             NSLog(@"updated viewport: %d, %d", viewport[2], viewport[3]);
             
             context->AllocateAttachments(viewport[2], viewport[3]);
@@ -240,7 +242,7 @@ void HdStRenderDelegateMetal::PrepareRender(
         depthAttachment.storeAction = MTLStoreActionStore;
         depthAttachment.clearDepth = 1.0f;
         
-        colorAttachment.texture = context->mtlMultisampleColorTexture;
+        colorAttachment.texture = context->gpus[context->currentGPU].mtlMultisampleColorTexture;
         
         GLfloat clearColor[4];
         glGetFloatv(GL_COLOR_CLEAR_VALUE, clearColor);
@@ -250,7 +252,7 @@ void HdStRenderDelegateMetal::PrepareRender(
                                                        clearColor[1],
                                                        clearColor[2],
                                                        clearColor[3]);
-        depthAttachment.texture = context->mtlDepthTexture;
+        depthAttachment.texture = context->gpus[context->currentGPU].mtlDepthTexture;
         
         _mtlRenderPassDescriptor = _mtlRenderPassDescriptorForInterop;
     }
@@ -266,10 +268,7 @@ void HdStRenderDelegateMetal::PrepareRender(
                 "to rendering when render output is set to Metal");
         }
     }
-    
-    context->StartFrame();
-    context->StartFrameForThread();
-    
+
     // Set the render pass descriptor to use for the render encoders
     context->SetRenderPassDescriptor(_mtlRenderPassDescriptor);
 
@@ -295,6 +294,7 @@ void HdStRenderDelegateMetal::PrepareRender(
                 context->SetTempPointWorkaround(false);
                 break;
         }
+        context->SetAlphaBlendingEnable(false);
     }
     
     if (params.enableIdRender) {
@@ -303,7 +303,6 @@ void HdStRenderDelegateMetal::PrepareRender(
         context->SetAlphaCoverageEnable(true);
     }
 
-    context->SetAlphaBlendingEnable(false);
     // TODO:
     //  * forceRefresh
     //  * showGuides, showRender, showProxy
@@ -320,7 +319,7 @@ void HdStRenderDelegateMetal::FinalizeRender()
     context->LabelCommandBuffer(@"Post Process", METALWORKQUEUE_DEFAULT);
 
     if (_renderOutput == DelegateParams::RenderOutput::OpenGL) {
-        context->ColourCorrectColourTexture(context->mtlMultisampleColorTexture);
+        context->ColourCorrectColourTexture(context->gpus[context->currentGPU].mtlMultisampleColorTexture);
         // Depth texture copy
         context->CopyDepthTextureToOpenGL();
     }

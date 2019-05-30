@@ -41,6 +41,10 @@ TF_DEFINE_PUBLIC_TOKENS(GarchTextureTokens, GARCH_TEXTURE_TOKENS);
 static size_t _TextureMemoryAllocated=0;
 static size_t _TextureContentsID=0;
 
+NSArray<id<MTLDevice>> *GPUState::renderDevices = nil;
+int GPUState::gpuCount = 0;
+int GPUState::currentGPU = 0;
+
 static size_t
 _GetNewContentsID()
 {

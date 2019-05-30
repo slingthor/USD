@@ -175,6 +175,56 @@ HdStMetalConversions::GetGlStencilOp(HdStencilOp op)
     return HD_2_GL_STENCIL_OP[op];
 }
 
+MTLBlendOperation
+HdStMetalConversions::GetGlBlendOp(HdBlendOp op)
+{
+    static MTLBlendOperation HD_2_GL_BLEND_OP[] =
+    {
+        MTLBlendOperationAdd,               // HdBlendOpAdd
+        MTLBlendOperationSubtract,          // HdBlendOpSubtract
+        MTLBlendOperationReverseSubtract,   // HdBlendOpReverseSubtract
+        MTLBlendOperationMin,               // HdBlendOpMin
+        MTLBlendOperationMax,               // HdBlendOpMax
+    };
+    static_assert(
+                  (sizeof(HD_2_GL_BLEND_OP) / sizeof(HD_2_GL_BLEND_OP[0])) ==
+                  HdBlendOpLast, "Mismatch enum sizes in convert function");
+    
+    return HD_2_GL_BLEND_OP[op];
+}
+
+MTLBlendFactor
+HdStMetalConversions::GetGlBlendFactor(HdBlendFactor factor)
+{
+    static MTLBlendFactor HD_2_GL_BLEND_FACTOR[] =
+    {
+        MTLBlendFactorZero,                     // HdBlendFactorZero,
+        MTLBlendFactorOne,                      // HdBlendFactorOne,
+        MTLBlendFactorSourceColor,              // HdBlendFactorSrcColor,
+        MTLBlendFactorOneMinusSourceColor,      // HdBlendFactorOneMinusSrcColor,
+        MTLBlendFactorDestinationColor,         // HdBlendFactorDstColor,
+        MTLBlendFactorOneMinusDestinationColor, // HdBlendFactorOneMinusDstColor,
+        MTLBlendFactorSourceAlpha,              // HdBlendFactorSrcAlpha,
+        MTLBlendFactorOneMinusBlendAlpha,       // HdBlendFactorOneMinusSrcAlpha,
+        MTLBlendFactorDestinationAlpha,         // HdBlendFactorDstAlpha,
+        MTLBlendFactorOneMinusDestinationAlpha, // HdBlendFactorOneMinusDstAlpha,
+        MTLBlendFactorBlendColor,               // HdBlendFactorConstantColor,
+        MTLBlendFactorOneMinusBlendColor,       // HdBlendFactorOneMinusConstantColor,
+        MTLBlendFactorBlendAlpha,               // HdBlendFactorConstantAlpha,
+        MTLBlendFactorOneMinusBlendAlpha,       // HdBlendFactorOneMinusConstantAlpha,
+        MTLBlendFactorSourceAlphaSaturated,     // HdBlendFactorSrcAlphaSaturate,
+        MTLBlendFactorSource1Color,             // HdBlendFactorSrc1Color,
+        MTLBlendFactorOneMinusSource1Color,     // HdBlendFactorOneMinusSrc1Color,
+        MTLBlendFactorSource1Alpha,             // HdBlendFactorSrc1Alpha,
+        MTLBlendFactorOneMinusSource1Alpha,     // HdBlendFactorOneMinusSrc1Alpha,
+    };
+    static_assert(
+                  (sizeof(HD_2_GL_BLEND_FACTOR) / sizeof(HD_2_GL_BLEND_FACTOR[0])) ==
+                  HdBlendFactorLast, "Mismatch enum sizes in convert function");
+    
+    return HD_2_GL_BLEND_FACTOR[factor];
+}
+
 MTLSamplerMinMagFilter
 HdStMetalConversions::GetMinFilter(HdMinFilter filter)
 {

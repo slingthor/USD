@@ -47,7 +47,9 @@
 #endif // ARCH_OS_MACOS
 
 #include "pxr/imaging/mtlf/api.h"
+#include "pxr/imaging/garch/texture.h"
 #include "pxr/base/arch/threads.h"
+#include "pxr/base/gf/vec4f.h"
 #include "pxr/base/tf/token.h"
 
 #include <boost/noncopyable.hpp>
@@ -332,10 +334,10 @@ public:
     void SetIndexBuffer(MtlfMultiBuffer const &buffer);
 
     MTLF_API
-    void SetTexture(int index, id<MTLTexture> texture, const TfToken& name, MSL_ProgramStage stage);
+    void SetTexture(int index, MtlfMultiTexture const &texture, const TfToken& name, MSL_ProgramStage stage);
     
     MTLF_API
-    void SetSampler(int index, id<MTLSamplerState> sampler, const TfToken& name, MSL_ProgramStage stage);
+    void SetSampler(int index, MtlfMultiSampler const &sampler, const TfToken& name, MSL_ProgramStage stage);
 
     MTLF_API
     void SetFrontFaceWinding(MTLWinding winding);
@@ -349,6 +351,16 @@ public:
     MTLF_API
     void SetAlphaBlendingEnable(bool blendEnable);
     
+    MTLF_API
+    void SetBlendOps(MTLBlendOperation rgbBlendOp, MTLBlendOperation alphaBlendOp);
+
+    MTLF_API
+    void SetBlendFactors(MTLBlendFactor sourceColorFactor, MTLBlendFactor destColorFactor,
+                         MTLBlendFactor sourceAlphaFactor, MTLBlendFactor destAlphaFactor);
+
+    MTLF_API
+    void SetBlendColor(GfVec4f const &blendColor);
+
     MTLF_API
     void SetAlphaCoverageEnable(bool alphaCoverageEnable);
 
@@ -371,6 +383,14 @@ public:
                                       unsigned long       immutableBufferMask,
                                       NSString           *label,
                                       MetalWorkQueueType  workQueueType = METALWORKQUEUE_DEFAULT);
+    
+    MTLF_API
+    id<MTLComputePipelineState> GetComputeEncoderState(
+                                     int                 gpuIndex,
+                                     id<MTLFunction>     computeFunction,
+                                     unsigned int        bufferCount,
+                                     unsigned long       immutableBufferMask,
+                                     NSString            *label);
     
     MTLF_API
     id<MTLBlitCommandEncoder>    GetBlitEncoder(MetalWorkQueueType workQueueType = METALWORKQUEUE_DEFAULT);
@@ -469,20 +489,23 @@ public:
     MTLF_API
     float GetGPUTimeInMs();
     
-    void BeginCaptureSubset();
-    void EndCaptureSubset();
-    
-    bool enableMultiQueue;
+    void BeginCaptureSubset(int gpuIndex);
+    void EndCaptureSubset(int gpuIndex);
 
-    id<MTLDevice> device;
-    NSArray<id<MTLDevice>> *renderDevices;
+    id<MTLDevice> currentDevice;
+    id<MTLDevice> interopDevice;
+    NSMutableArray<id<MTLDevice>> *renderDevices;
     int currentGPU;
 
-    id<MTLCommandQueue> commandQueue;
-    id<MTLCommandQueue> commandQueueGS;
-    id<MTLTexture> mtlColorTexture;
-    id<MTLTexture> mtlMultisampleColorTexture;
-    id<MTLTexture> mtlDepthTexture;
+    struct GPUInstance {
+        id<MTLCommandQueue> commandQueue;
+        id<MTLTexture> mtlColorTexture;
+        id<MTLTexture> mtlMultisampleColorTexture;
+        id<MTLTexture> mtlDepthTexture;
+        id<MTLDepthStencilState> depthState;
+    };
+    
+    GPUInstance gpus[MAX_GPUS];
 
     NSUInteger mtlSampleCount;
     
@@ -517,8 +540,8 @@ protected:
         uint8_t          *contents;
     };
     
-    struct TextureBinding { int index; id<MTLTexture> texture; TfToken name; MSL_ProgramStage stage; };
-    struct SamplerBinding { int index; id<MTLSamplerState> sampler; TfToken name; MSL_ProgramStage stage; };
+    struct TextureBinding { int index; MtlfMultiTexture texture; TfToken name; MSL_ProgramStage stage; };
+    struct SamplerBinding { int index; MtlfMultiSampler sampler; TfToken name; MSL_ProgramStage stage; };
     
     struct ThreadState {
 
@@ -531,6 +554,7 @@ protected:
             {
                 gsDataOffset = 0;
                 gsBufferIndex = 0;
+                gsEncodedBatches = 0;
                 gsCurrentBuffer = nil;
                 gsHasOpenBatch = false;
                 enableMVA = false;
@@ -564,16 +588,13 @@ protected:
                 _this->ResetEncoders(METALWORKQUEUE_GEOMETRY_SHADER, true);
                 
                 MTLResourceOptions resourceOptions = MTLResourceStorageModePrivate|MTLResourceCPUCacheModeDefaultCache;
-                for(int i = 0; i < _this->gsMaxConcurrentBatches; i++)
-                    gsBuffers.push_back([_this->device newBufferWithLength:_this->gsMaxDataPerBatch options:resourceOptions]);
-                gsCurrentBuffer = gsBuffers.at(0);
-                
-                if (_this->eventsAvailable) {
-                    gsSyncEvent = [_this->device newEvent];
+                for(int d = 0; d < _this->renderDevices.count; d++) {
+                    for(int i = 0; i < _this->gsMaxConcurrentBatches; i++)
+                        gsBuffers[d].push_back([_this->renderDevices[d] newBufferWithLength:_this->gsMaxDataPerBatch options:resourceOptions]);
+                    remappedQuadIndexBuffer.Clear();
+                    pointIndexBuffer.Clear();
                 }
 
-                remappedQuadIndexBuffer.Clear();
-                pointIndexBuffer.Clear();
                 init = true;
             }
             
@@ -595,10 +616,7 @@ protected:
         id<MTLBuffer> vertexPositionBuffer;
         
         id<MTLComputePipelineState> computePipelineState;
-        
-#if defined(METAL_EVENTS_API_PRESENT)
-        id<MTLEvent>                 gsSyncEvent;
-#endif
+
         uint64_t currentEventValue;
         uint64_t highestExpectedEventValue;
 
@@ -615,13 +633,14 @@ protected:
         id<MTLFunction> renderFragmentFunction;
         id<MTLFunction> renderComputeGSFunction;
         
-        uint32_t dirtyRenderState;
+        uint32_t dirtyRenderState[MAX_GPUS];
         
         //Geometry Shader Related
         int                        gsDataOffset;
         int                        gsBufferIndex;
+        int                        gsEncodedBatches;
         id<MTLBuffer>              gsCurrentBuffer;
-        std::vector<id<MTLBuffer>> gsBuffers;
+        std::vector<id<MTLBuffer>> gsBuffers[MAX_GPUS];
         bool                       gsHasOpenBatch;
         
         bool tempPointsWorkaroundActive = false;
@@ -638,10 +657,8 @@ protected:
     
     static std::mutex _commandBufferPoolMutex;
     static int const commandBufferPoolSize = 256;
-    id<MTLCommandBuffer> commandBuffers[commandBufferPoolSize];
-    int commandBuffersStackPos = 0;
-    id<MTLCommandBuffer> commandBuffersGS[commandBufferPoolSize];
-    int commandBuffersGSStackPos = 0;
+    id<MTLCommandBuffer> commandBuffers[MAX_GPUS][commandBufferPoolSize];
+    int commandBuffersStackPos[MAX_GPUS];
 
     static std::mutex _pipelineMutex;
     boost::unordered_map<size_t, id<MTLRenderPipelineState>>  renderPipelineStateMap;
@@ -658,15 +675,24 @@ protected:
     MTLWinding windingOrder;
     MTLCullMode cullMode;
     MTLTriangleFillMode fillMode;
-    bool blendEnable;
-    bool alphaCoverageEnable;
     
+    struct BlendState {
+        bool blendEnable;
+        bool alphaCoverageEnable;
+        MTLBlendOperation rgbBlendOp;
+        MTLBlendOperation alphaBlendOp;
+        MTLBlendFactor sourceColorFactor;
+        MTLBlendFactor destColorFactor;
+        MTLBlendFactor sourceAlphaFactor;
+        MTLBlendFactor destAlphaFactor;
+        GfVec4f blendColor;
+        size_t hashValue;
+    } blendState;
+
     MtlfDrawTarget *drawTarget;
 
 private:
     const static uint64_t endOfQueueEventValue = 0xFFFFFFFFFFFFFFFF;
-
-    id<MTLDepthStencilState> depthState;
     
     // These are used when rendering from within a native Metal application, and
     // are set by the application
@@ -682,10 +708,6 @@ private:
     };
     
     // State for tracking dependencies between work queues
-#if defined(METAL_EVENTS_API_PRESENT)
-    id<MTLEvent> queueSyncEvent;
-    bool         eventsAvailable;
-#endif
     uint32_t queueSyncEventCounter;
     MetalWorkQueueType outstandingDependency;
     
@@ -694,8 +716,6 @@ private:
     void handleDisplayChange();
     void handleGPUHotPlug(id<MTLDevice> device, MTLDeviceNotificationName notifier);
 #endif
-    
-    void UpdateCurrentGPU();
     
     // Internal encoder functions
     void SetCurrentEncoder(MetalEncoderType encoderType, MetalWorkQueueType workQueueType);
@@ -777,8 +797,8 @@ private:
     
     bool OSDEnabledThisFrame = false;
     
-    id<MTLCaptureScope> captureScopeFullFrame;
-    id<MTLCaptureScope> captureScopeSubset;
+    id<MTLCaptureScope> captureScopeFullFrame[MAX_GPUS];
+    id<MTLCaptureScope> captureScopeSubset[MAX_GPUS];
 
 #if defined(ARCH_GFX_OPENGL)
     MtlfGlInterop *glInterop;

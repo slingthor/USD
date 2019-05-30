@@ -134,7 +134,6 @@ MSL_ShaderBinding const* MSL_FindBinding(MSL_ShaderBindingMap const& bindings,
 HdStMSLProgram::HdStMSLProgram(TfToken const &role)
 : HdStProgram(role)
 , _role(role)
-, _vertexFunction(nil), _fragmentFunction(nil), _computeFunction(nil), _computeGeometryFunction(nil)
 , _valid(false)
 , _uniformBuffer(role)
 , _buildTarget(kMSL_BuildTarget_Regular)
@@ -142,6 +141,10 @@ HdStMSLProgram::HdStMSLProgram(TfToken const &role)
 , _drawArgsSlot(-1), _indicesSlot(-1)
 {
     _currentlySet = false;
+    memset(_vertexFunction, 0x00, sizeof(_vertexFunction));
+    memset(_fragmentFunction, 0x00, sizeof(_fragmentFunction));
+    memset(_computeFunction, 0x00, sizeof(_computeFunction));
+    memset(_computeGeometryFunction, 0x00, sizeof(_computeGeometryFunction));
 }
 
 HdStMSLProgram::~HdStMSLProgram()
@@ -149,6 +152,17 @@ HdStMSLProgram::~HdStMSLProgram()
     for(auto it = _bindingMap.begin(); it != _bindingMap.end(); ++it)
         delete (*it).second;
     _bindingMap.clear();
+    
+    for (int i = 0; i < GPUState::gpuCount; i++) {
+        if (_vertexFunction[i])
+            [_vertexFunction[i] release];
+        if (_fragmentFunction[i])
+            [_fragmentFunction[i] release];
+        if (_computeFunction[i])
+            [_computeFunction[i] release];
+        if (_computeGeometryFunction[i])
+            [_computeGeometryFunction[i] release];
+    }
 }
 
 #if defined(GENERATE_METAL_DEBUG_SOURCE_CODE)
@@ -258,7 +272,7 @@ HdStMSLProgram::CompileShader(GLenum type,
 
     // create a shader, compile it
     NSError *error = NULL;
-    id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->device;
+    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
     
     bool success = true;
     NSString *entryPoint = nil;
@@ -307,40 +321,43 @@ HdStMSLProgram::CompileShader(GLenum type,
         @"HD_MTL_FRAGMENTSHADER":(type==GL_FRAGMENT_SHADER)?@1:@0,
     };
 
-    id<MTLLibrary> library = [device newLibraryWithSource:@(shaderSource.c_str())
-                                                  options:options
-                                                    error:&error];
-    
+    for (int i = 0; i < context->renderDevices.count; i++) {
+        id<MTLLibrary> library = [context->renderDevices[i] newLibraryWithSource:@(shaderSource.c_str())
+                                                      options:options
+                                                        error:&error];
+        
+        // Load the function into the library
+        id <MTLFunction> function = [library newFunctionWithName:entryPoint];
+        if (!function) {
+            NSString *err = [error localizedDescription];
+            err = [err stringByReplacingOccurrencesOfString:@"error: use of undeclared identifier 'surfaceShader'" withString:@"redacted"];
+            if ([err rangeOfString:@"error: "].location != NSNotFound) {
+                // XXX:validation
+                TF_WARN("Failed to compile shader (%s): \n%s",
+                        shaderType, [err UTF8String]);
+                filePostFix += "_Fail";
+            }
+            success = false;
+        }
+        
+        if (type == GL_VERTEX_SHADER) {
+            _vertexFunction[i] = function;
+        } else if (type == GL_FRAGMENT_SHADER) {
+            _fragmentFunction[i] = function;
+        } else if (type == GL_COMPUTE_SHADER) {
+            _computeFunction[i] = function;
+        } else if (type == GL_GEOMETRY_SHADER) {
+            _computeGeometryFunction[i] = function;
+        }
+        [library release];
+    }
+
     [options release];
     options = nil;
-
-    // Load the function into the library
-    id <MTLFunction> function = [library newFunctionWithName:entryPoint];
-    if (!function) {
-        NSString *err = [error localizedDescription];
-        err = [err stringByReplacingOccurrencesOfString:@"error: use of undeclared identifier 'surfaceShader'" withString:@"redacted"];
-        if ([err rangeOfString:@"error: "].location != NSNotFound) {
-            // XXX:validation
-            TF_WARN("Failed to compile shader (%s): \n%s",
-                    shaderType, [err UTF8String]);
-            filePostFix += "_Fail";
-        }
-        success = false;
-    }
 
     //MTL_FIXME: Remove this debug line once done.
     DumpMetalSource(this, [NSString stringWithUTF8String:shaderSource.c_str()], [NSString stringWithUTF8String:filePostFix.c_str()], error != nil ? [error localizedDescription] : nil);
     
-    if (type == GL_VERTEX_SHADER) {
-        _vertexFunction = function;
-    } else if (type == GL_FRAGMENT_SHADER) {
-        _fragmentFunction = function;
-    } else if (type == GL_COMPUTE_SHADER) {
-        _computeFunction = function;
-    } else if (type == GL_GEOMETRY_SHADER) {
-        _computeGeometryFunction = function;
-    }
-
     return success;
 }
 
@@ -350,10 +367,10 @@ HdStMSLProgram::Link()
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
 
-    bool vertexFuncPresent = _vertexFunction != nil;
-    bool fragmentFuncPresent = _fragmentFunction != nil;
-    bool computeFuncPresent = _computeFunction != nil;
-    bool computeGeometryFuncPresent = _computeGeometryFunction != nil;
+    bool vertexFuncPresent = _vertexFunction[0] != nil;
+    bool fragmentFuncPresent = _fragmentFunction[0] != nil;
+    bool computeFuncPresent = _computeFunction[0] != nil;
+    bool computeGeometryFuncPresent = _computeGeometryFunction[0] != nil;
     
     if (computeFuncPresent && (vertexFuncPresent ^ fragmentFuncPresent)) {
         TF_CODING_ERROR("A compute shader can't be set with a vertex shader or fragment shader also set.");
@@ -364,9 +381,8 @@ HdStMSLProgram::Link()
         TF_CODING_ERROR("Missing Compute Geometry shader while linking.");
         return false;
     }
-        
-    
-    id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->device;
+
+    id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->currentDevice;
 
     // update the program resource allocation
     _valid = true;
@@ -500,16 +516,16 @@ void HdStMSLProgram::SetProgram(char const* const label) {
     
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
     
-    context->SetShadingPrograms(_vertexFunction,
-                                _fragmentFunction,
+    context->SetShadingPrograms(_vertexFunction[context->currentGPU],
+                                _fragmentFunction[context->currentGPU],
                                 (_buildTarget == kMSL_BuildTarget_MVA || _buildTarget == kMSL_BuildTarget_MVA_ComputeGS));
     
     if (_buildTarget == kMSL_BuildTarget_MVA_ComputeGS) {
-         context->SetGSProgram(_computeGeometryFunction);
+         context->SetGSProgram(_computeGeometryFunction[context->currentGPU]);
     }
     
     // Ignore a compute program being set as it will be provided directly to SetComputeEncoderState (may revisit later)
-    if (_computeFunction) {
+    if (_computeFunction[context->currentGPU]) {
         return;
     }
     
@@ -636,8 +652,9 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
         uint32_t const gsPrimDataSize = numPrimitivesInPart * numOutPrimsPerInPrim * _gsPrimOutStructSize;
         id<MTLBuffer> gsDataBuffer = nil;
         uint32_t gsVertDataOffset(0), gsPrimDataOffset(0);
-        if(doMVAComputeGS)
+        if(doMVAComputeGS) {
             context->PrepareForComputeGSPart(gsVertDataSize, gsPrimDataSize, gsDataBuffer, gsVertDataOffset, gsPrimDataOffset);
+        }
         
         id<MTLRenderCommandEncoder>  renderEncoder = context->GetRenderEncoder(METALWORKQUEUE_DEFAULT);
 

@@ -181,8 +181,8 @@ private:
     
     HdSt_OsdGpuDeviceContextPtr GetDeviceContextPtr() { //MTL_CHANGE
  #if OPENSUBDIV_HAS_METAL_COMPUTE && defined(ARCH_GFX_METAL)
-        _deviceContext.device       = MtlfMetalContext::GetMetalContext()->device;
-        _deviceContext.commandQueue = MtlfMetalContext::GetMetalContext()->commandQueue;
+        _deviceContext.device       = MtlfMetalContext::GetMetalContext()->currentDevice;
+        _deviceContext.commandQueue = MtlfMetalContext::GetMetalContext()->gpus[MtlfMetalContext::GetMetalContext()->currentGPU].commandQueue;
         return &_deviceContext;
 #else
         return NULL;

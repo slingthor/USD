@@ -48,7 +48,7 @@ public:
     } Vertex;
     
     MTLF_API
-    MtlfGlInterop(id<MTLDevice> device);
+    MtlfGlInterop(id<MTLDevice> interopDevice, NSMutableArray<id<MTLDevice>> *renderDevices);
 
     MTLF_API
     virtual ~MtlfGlInterop();
@@ -69,30 +69,39 @@ public:
     MTLF_API
     void ColourCorrectColourTexture(id<MTLComputeCommandEncoder> computeEncoder, id<MTLTexture> colourTexture);
 
-    id<MTLTexture> mtlColorTexture;
-    id<MTLTexture> mtlDepthTexture;
-    id<MTLTexture> mtlDepthRegularFloatTexture;
+    id<MTLTexture> mtlAliasedColorTexture[MAX_GPUS];
+    id<MTLTexture> mtlAliasedDepthRegularFloatTexture[MAX_GPUS];
+
+    id<MTLTexture> mtlLocalColorTexture[MAX_GPUS];
+    id<MTLTexture> mtlLocalDepthTexture[MAX_GPUS];
 
     NSUInteger mtlSampleCount;
     
 private:
 
-    id<MTLDevice>               device;
+    id<MTLDevice>                   interopDevice;
+    NSMutableArray<id<MTLDevice>>   *renderDevices;
 
-    id<MTLLibrary>              defaultLibrary;
-    id<MTLFunction>             computeDepthCopyProgram;
-    id<MTLFunction>             computeDepthCopyMultisampleProgram;
-    id<MTLFunction>             computeColourCopyProgram;
-    id<MTLFunction>             computeColourCopyMultisampleProgram;
+    struct InteropGPUInstance {
+        id<MTLLibrary>              defaultLibrary;
+        id<MTLFunction>             computeDepthCopyProgram;
+        id<MTLFunction>             computeDepthCopyMultisampleProgram;
+        id<MTLFunction>             computeColourCopyProgram;
+        id<MTLFunction>             computeColourCopyMultisampleProgram;
+    };
+    
+    InteropGPUInstance gpus[MAX_GPUS];
     
     CVPixelBufferRef pixelBuffer;
     CVPixelBufferRef depthBuffer;
+    CVMetalTextureCacheRef cvmtlTextureCache[MAX_GPUS];
+    CVMetalTextureRef cvmtlColorTexture[MAX_GPUS];
+    CVMetalTextureRef cvmtlDepthTexture[MAX_GPUS];
+
     CVOpenGLTextureCacheRef cvglTextureCache;
-    CVMetalTextureCacheRef cvmtlTextureCache;
     CVOpenGLTextureRef cvglColorTexture;
     CVOpenGLTextureRef cvglDepthTexture;
-    CVMetalTextureRef cvmtlColorTexture;
-    CVMetalTextureRef cvmtlDepthTexture;
+
     uint32_t glColorTexture;
     uint32_t glDepthTexture;
     
@@ -108,10 +117,6 @@ private:
     static void _InitializeStaticState();
     
     static StaticGLState   staticState;
-
-    id<MTLFunction> renderVertexFunction;
-    id<MTLFunction> renderFragmentFunction;
-    id<MTLFunction> renderComputeGSFunction;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

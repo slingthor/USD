@@ -150,7 +150,7 @@ MtlfSimpleShadowArray::_AllocSamplers()
 #endif
     samplerDescriptor.minFilter = MTLSamplerMinMagFilterLinear;
     samplerDescriptor.magFilter = MTLSamplerMinMagFilterLinear;
-    _shadowDepthSampler = [mtlContext->device newSamplerStateWithDescriptor:samplerDescriptor];
+    _shadowDepthSampler = MtlfMultiSampler(samplerDescriptor);
     
     //METAL TODO: Check whether the sampler below is really going to provide the same functionality as the GL sample in the comments.
 #if defined(ARCH_OS_IOS)
@@ -167,19 +167,19 @@ MtlfSimpleShadowArray::_AllocSamplers()
 #endif
     samplerDescriptor.minFilter = MTLSamplerMinMagFilterLinear;
     samplerDescriptor.magFilter = MTLSamplerMinMagFilterLinear;
-    _shadowCompareSampler = [mtlContext->device newSamplerStateWithDescriptor:samplerDescriptor];
+    _shadowCompareSampler = MtlfMultiSampler(samplerDescriptor);
 }
 
 void
 MtlfSimpleShadowArray::_FreeSamplers()
 {
     if (_shadowDepthSampler.IsSet()) {
-        [_shadowDepthSampler release];
-        _shadowDepthSampler = nil;
+        _shadowDepthSampler.multiSampler.release();
+        _shadowDepthSampler.Clear();
     }
     if (_shadowCompareSampler.IsSet()) {
-        [_shadowCompareSampler release];
-        _shadowCompareSampler = nil;
+        _shadowCompareSampler.multiSampler.release();
+        _shadowCompareSampler.Clear();
     }
 }
 
@@ -230,11 +230,11 @@ void
 MtlfSimpleShadowArray::_FreeTextureArray()
 {
     if (_texture.IsSet()) {
-        [_texture release];
+        _texture.multiTexture.release();
         _texture = nil;
     }
     if (_framebuffer.IsSet()) {
-        [_framebuffer release];
+        _framebuffer.multiTexture.release();
         _framebuffer = nil;
     }
 }

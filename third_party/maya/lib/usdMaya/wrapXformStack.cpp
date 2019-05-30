@@ -184,7 +184,7 @@ namespace {
             {
                 result.append(convert_index_pair(idxPair));
             }
-            return result;
+            return std::move(result);
         }
 
         static object

@@ -732,14 +732,6 @@ HdStCommandBuffer::ExecuteDraw(
 
             context->StartFrameForThread();
 
-            if (!context->GeometryShadersActive()) {
-                context->CreateCommandBuffer(METALWORKQUEUE_GEOMETRY_SHADER);
-                if (TF_DEV_BUILD) {
-                    context->LabelCommandBuffer(@"Geometry Shaders", METALWORKQUEUE_GEOMETRY_SHADER);
-                }
-                //[context->GetWorkQueue(METALWORKQUEUE_GEOMETRY_SHADER).commandBuffer enqueue];
-            }
-            
             // Create a new command buffer for each render pass to the current drawable
             context->CreateCommandBuffer(METALWORKQUEUE_DEFAULT);
             if (TF_DEV_BUILD) {
@@ -772,7 +764,7 @@ HdStCommandBuffer::ExecuteDraw(
     
     // Create a new command buffer for each render pass to the current drawable
     if (renderPassDescriptor.colorAttachments[0].loadAction == MTLLoadActionClear) {
-        id <MTLCommandBuffer> commandBuffer = [context->commandQueue commandBuffer];
+        id <MTLCommandBuffer> commandBuffer = [context->gpus[context->currentGPU].commandQueue commandBuffer];
         if (TF_DEV_BUILD) {
             commandBuffer.label = @"Clear";
         }
@@ -780,7 +772,7 @@ HdStCommandBuffer::ExecuteDraw(
             [commandBuffer renderCommandEncoderWithDescriptor:renderPassDescriptor];
         [renderEncoder endEncoding];
         [commandBuffer commit];
-     
+
         int numAttachments = 1;
         
         if (context->GetDrawTarget()) {
@@ -834,7 +826,7 @@ HdStCommandBuffer::ExecuteDraw(
     os_signpost_interval_end(encodingLog, issueEncoding, "Encoding");
 
     if (setAlpha) {
-        context->SetAlphaBlendingEnable(true);
+//        context->SetAlphaBlendingEnable(true);
 //        renderPassDescriptor.colorAttachments[0].blendingEnabled = YES;
 //        renderPipelineStateDescriptor.colorAttachments[0].sourceRGBBlendFactor = MTLBlendFactorOne;
 //        renderPipelineStateDescriptor.colorAttachments[0].sourceAlphaBlendFactor = MTLBlendFactorOne;
