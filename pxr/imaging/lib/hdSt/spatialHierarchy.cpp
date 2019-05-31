@@ -472,10 +472,9 @@ void OctreeNode::PerformCulling(matrix_float4x4 const &viewProjMatrix,
 
     if (itemCount > 0) {
         uint8_t *visibilityWritePtr = visibility + index;
-        for(std::list<DrawableItem*>::const_iterator it = drawablesTooLarge.begin();
-            it != drawablesTooLarge.end(); ++it)
+        for(auto drawableItem : drawablesTooLarge)
         {
-            DrawableItem* drawableItem = *it;
+            //DrawableItem* drawableItem = *drawableItemList;
             GfBBox3f const &box = (*drawableItem->itemInstance->GetDrawItem()->GetInstanceBounds())[drawableItem->instanceIdx];
             
             bool visible;
@@ -564,10 +563,8 @@ size_t OctreeNode::CalcSubtreeItems() {
     size_t res = itemCount;
     
     GfRange3f bbox;
-    for(std::list<DrawableItem*>::const_iterator it = drawablesTooLarge.begin();
-        it != drawablesTooLarge.end(); ++it)
+    for(auto drawItem : drawablesTooLarge)
     {
-        DrawableItem* drawItem = *it;
         bbox.ExtendBy(drawItem->aabb);
     }
 
@@ -607,10 +604,8 @@ void OctreeNode::WriteToList(size_t &pos,
                              uint8_t *bakedVisibility) {
     index = pos;
     
-    for(std::list<DrawableItem*>::const_iterator it = drawablesTooLarge.begin();
-        it != drawablesTooLarge.end(); ++it)
+    for(auto drawItem : drawablesTooLarge)
     {
-        DrawableItem* drawItem = *it;
         drawItem->itemInstance->SetCullResultVisibilityCache(bakedVisibility + pos, drawItem->instanceIdx);
         (*bakedDrawableItems)[pos++] = drawItem;
     }

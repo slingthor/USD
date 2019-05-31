@@ -93,7 +93,7 @@ public:
     
     NSString* name;
     
-    std::list<DrawableItem*> drawablesTooLarge;
+    std::vector<DrawableItem*> drawablesTooLarge;
     bool isSplit;
 
     int numChildren;
