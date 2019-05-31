@@ -66,8 +66,8 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 #define USE_BVH_FOR_CULLING 1
 
-#define CULL_NAÏVE
-//#define CULL_BVH
+//#define CULL_NAÏVE
+#define CULL_BVH
 
 static os_log_t cullingLog = os_log_create("hydra.metal", "Culling");
 
@@ -526,11 +526,11 @@ HdStCommandBuffer::FrustumCull(GfMatrix4d const &viewProjMatrix)
     }
     
     _visibleSize = 0;
-    for (auto const& instance : _drawItemInstances) {
-        if (instance.IsVisible()) {
-            ++_visibleSize;
-        }
-    }
+//    for (auto const& instance : _drawItemInstances) {
+//        if (instance.IsVisible()) {
+//            ++_visibleSize;
+//        }
+//    }
 }
 
 void

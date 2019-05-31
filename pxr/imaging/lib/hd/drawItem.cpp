@@ -401,6 +401,17 @@ HdDrawItem::CalculateCullingBounds() const
 
 void HdDrawItem::BuildInstanceBuffer(uint8_t** instanceVisibility) const
 {
+    int numItems = _instancedCullingBounds.size();
+    int i;
+    for(i = 0; i < numItems; i++) {
+        if (*instanceVisibility[i])
+            break;
+    }
+    if (i == numItems) {
+        numVisible = 0;
+        return;
+    }
+
     int instancerNumLevels = GetInstancePrimvarNumLevels();
     int instanceIndexWidth = instancerNumLevels + 1;
 
@@ -419,23 +430,23 @@ void HdDrawItem::BuildInstanceBuffer(uint8_t** instanceVisibility) const
     
     bool modified = false;
     int numVisible = 0;
-    int numItems = _instancedCullingBounds.size();
-    for(int i = 0; i < numItems; i++) {
+    for(i = 0; i < numItems; i++) {
+        if (!*instanceVisibility[i])
+            continue;
+        
         int instanceIndex = instanceBuffer[i * instanceIndexWidth];
         auto const & bounds = _instancedCullingBounds[i];
-        
-        if (*instanceVisibility[i]) {
-            if (*culledInstanceBuffer != instanceIndex) {
-                modified = true;
-                *culledInstanceBuffer++ = instanceIndex;
-                for(int j = 1; j < instanceIndexWidth; j++)
-                    *culledInstanceBuffer++ = instanceBuffer[i * instanceIndexWidth + j];
-                    }
-            else {
-                culledInstanceBuffer+=instanceIndexWidth;
-            }
-            numVisible++;
+
+        if (*culledInstanceBuffer != instanceIndex) {
+            modified = true;
+            *culledInstanceBuffer++ = instanceIndex;
+            for(int j = 1; j < instanceIndexWidth; j++)
+                *culledInstanceBuffer++ = instanceBuffer[i * instanceIndexWidth + j];
         }
+        else {
+            culledInstanceBuffer+=instanceIndexWidth;
+        }
+        numVisible++;
     }
     
     if (modified) {

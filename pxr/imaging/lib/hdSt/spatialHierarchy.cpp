@@ -248,7 +248,7 @@ GfRange3f DrawableItem::ConvertDrawablesToItems(std::vector<HdStDrawItemInstance
                 boundingBox.ExtendBy(aabb);
                 items->push_back(new DrawableItem(drawable, aabb, i, numItems));
             }
-        } else {
+        } else if (numItems == 1) {
             GfRange3f const &oobb = (*instancedCullingBounds)[0].GetRange();
             GfRange3f aabb;
             
