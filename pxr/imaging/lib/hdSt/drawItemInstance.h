@@ -77,22 +77,37 @@ public:
     /// Return a const pointer to draw item
     HdStDrawItem const *GetDrawItem() const { return _drawItem; }
 
-    std::atomic_bool cullResult;
-
     HdStDrawItemInstance();
     HdStDrawItemInstance(HdStDrawItemInstance const &_item)
-    : cullResult(false)
-    , _batch(_item._batch)
+    : _batch(_item._batch)
     , _drawItem(_item._drawItem)
     , _batchIndex(_item._batchIndex)
     , _visible(_item._visible)
     {}
+
+    void SetCullResultVisibilityCacheSize(size_t instanceCount) const {
+        _instanceVisibility.resize(instanceCount);
+    }
+
+    uint8_t** GetCullResultVisibilityCache() const {
+        return &_instanceVisibility[0];
+    }
+
+    void SetCullResultVisibilityCache(uint8_t *visibility, size_t instanceIndex) const {
+        _instanceVisibility[instanceIndex] = visibility;
+    }
+
+    // Only works for non-instanced geo
+    bool CullResultIsVisible() const {
+        return *_instanceVisibility[0];
+    }
     
 private:
 
     HdSt_DrawBatch * _batch;
     HdStDrawItem const * _drawItem;
     size_t _batchIndex;
+    mutable std::vector<uint8_t*> _instanceVisibility;
     bool _visible;
 };
 

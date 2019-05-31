@@ -136,8 +136,7 @@ HdDrawItem::IntersectsViewVolume(matrix_float4x4 const &viewProjMatrix,
             uint32_t *instanceBuffer = reinterpret_cast<uint32_t*>(instanceIndexBuffer) + instanceOffset;
             
             if (!_instancedCullingBoundsCalculated) {
-                HdDrawItem* _this = const_cast<HdDrawItem*>(this);
-                _this->_instancedCullingBoundsCalculated = true;
+                _instancedCullingBoundsCalculated = true;
 
                 HdBufferArrayRangeSharedPtr const & primvar = GetConstantPrimvarRange();
                 HdBufferResourceSharedPtr const & transformRes = primvar->GetResource(HdTokens->transform);
@@ -211,11 +210,11 @@ HdDrawItem::IntersectsViewVolume(matrix_float4x4 const &viewProjMatrix,
                     m = (*itemTransform) * (m * mtxScale * mtxRotate * mtxTranslate * (*instancerTransform));
 
                     GfBBox3f box(GetBounds().GetRange(), m);
-                    _this->_instancedCullingBounds.push_back(BakeBoundsTransform(box));
+                    _instancedCullingBounds.push_back(BakeBoundsTransform(box));
                 }
             }
             
-            static bool perInstanceCulling = true;
+            static bool perInstanceCulling = false;
 
             if (!perInstanceCulling) {
                 HdDrawItem* _this = const_cast<HdDrawItem*>(this);
@@ -278,9 +277,8 @@ HdDrawItem::IntersectsViewVolume(matrix_float4x4 const &viewProjMatrix,
     }
     else {
         if (!_instancedCullingBoundsCalculated) {
-            HdDrawItem* _this = const_cast<HdDrawItem*>(this);
-            _this->_instancedCullingBoundsCalculated = true;
-            _this->_instancedCullingBounds.push_back(BakeBoundsTransform(GetBounds()));
+            _instancedCullingBoundsCalculated = true;
+            _instancedCullingBounds.push_back(BakeBoundsTransform(GetBounds()));
         }
         if( GfFrustum::IntersectsViewVolumeFloat(_instancedCullingBounds.front(), viewProjMatrix, windowDimensions)) {
             return true;
@@ -290,7 +288,7 @@ HdDrawItem::IntersectsViewVolume(matrix_float4x4 const &viewProjMatrix,
 }
 
 void
-HdDrawItem::CalculateInstanceBounds() const
+HdDrawItem::CalculateCullingBounds() const
 {
     if (_instancedCullingBoundsCalculated) {
         return;
@@ -310,8 +308,7 @@ HdDrawItem::CalculateInstanceBounds() const
             uint8_t *instanceIndexBuffer = const_cast<uint8_t*>(instanceIndexRes->GetBufferContents());
             uint32_t *instanceBuffer = reinterpret_cast<uint32_t*>(instanceIndexBuffer) + instanceOffset;
             
-            HdDrawItem* _this = const_cast<HdDrawItem*>(this);
-            _this->_instancedCullingBoundsCalculated = true;
+            _instancedCullingBoundsCalculated = true;
             
             HdBufferArrayRangeSharedPtr const & primvar = GetConstantPrimvarRange();
             HdBufferResourceSharedPtr const & transformRes = primvar->GetResource(HdTokens->transform);
@@ -338,7 +335,7 @@ HdDrawItem::CalculateInstanceBounds() const
             
             int instanceDrawingCoord = instanceBar->GetOffset();
             
-            _this->_instancedCullingBounds.clear();
+            _instancedCullingBounds.clear();
                 
             for (int i = 0; i < numInstances; i++) {
                 
@@ -387,17 +384,22 @@ HdDrawItem::CalculateInstanceBounds() const
                 m = (*itemTransform) * (m * mtxScale * mtxRotate * mtxTranslate * (*instancerTransform));
                 
                 GfBBox3f box(GetBounds().GetRange(), m);
-                _this->_instancedCullingBounds.push_back(BakeBoundsTransform(box));
+                _instancedCullingBounds.push_back(BakeBoundsTransform(box));
             }
         }
+        else {
+            TF_CODING_WARNING("Only expected to find one instance level, found %d with %d instances", instancerNumLevels, numInstances);
+            _instancedCullingBounds.push_back(BakeBoundsTransform(GetBounds()));
+        }
     }
-    
-    _instanceVisibility.resize(_instancedCullingBounds.size(), false);
+    else {
+        _instancedCullingBounds.push_back(BakeBoundsTransform(GetBounds()));
+    }
     
     _instancedCullingBoundsCalculated = true;
 }
 
-void HdDrawItem::BuildInstanceBuffer() const
+void HdDrawItem::BuildInstanceBuffer(uint8_t** instanceVisibility) const
 {
     int instancerNumLevels = GetInstancePrimvarNumLevels();
     int instanceIndexWidth = instancerNumLevels + 1;
@@ -422,7 +424,7 @@ void HdDrawItem::BuildInstanceBuffer() const
         int instanceIndex = instanceBuffer[i * instanceIndexWidth];
         auto const & bounds = _instancedCullingBounds[i];
         
-        if (_instanceVisibility[i]) {
+        if (*instanceVisibility[i]) {
             if (*culledInstanceBuffer != instanceIndex) {
                 modified = true;
                 *culledInstanceBuffer++ = instanceIndex;

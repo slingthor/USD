@@ -47,23 +47,10 @@ enum Intersection {
 
 class OctreeNode;
 
-struct Interval {
-    size_t start;
-    size_t end;
-    bool visible;
-    
-    Interval(size_t start, size_t end, bool visible);// : start(start), end(end), visible(visible) {}
-    Interval(OctreeNode* node, bool visible);// : Interval(node->index, node->indexEnd, visible) {}
-    
-    static
-    bool compare(Interval &a, Interval &b) { return a.start < b.start; };
-};
-
 struct DrawableItem {
-    DrawableItem(HdStDrawItemInstance* itemInstance, GfRange3f boundingBox);
-    DrawableItem(HdStDrawItemInstance* itemInstance, GfRange3f boundingBox, size_t instanceIndex, size_t totalInstancers);
+    DrawableItem(HdStDrawItemInstance* itemInstance, GfRange3f const &aaBoundingBox);
+    DrawableItem(HdStDrawItemInstance* itemInstance, GfRange3f const &aaBoundingBox, size_t instanceIndex, size_t totalInstancers);
     
-    void SetVisible(bool visible);
     void ProcessInstancesVisible();
     
     static GfRange3f ConvertDrawablesToItems(std::vector<HdStDrawItemInstance> *drawables, std::vector<DrawableItem*> *items);
@@ -72,7 +59,6 @@ struct DrawableItem {
     GfRange3f aabb;
     GfVec3f halfSize;
     
-    bool visible;
     bool isInstanced;
     size_t instanceIdx;
     size_t numItemsInInstance;
@@ -83,13 +69,14 @@ public:
     OctreeNode(float minX, float minY, float minZ, float maxX, float maxY, float maxZ, unsigned currentDepth);
     ~OctreeNode();
     
-    void ReInit(GfRange3f const &boundingBox, std::vector<DrawableItem*> *drawables);
+    void CalcPoints();
+    void ReInit(GfRange3f const &boundingBox);
     
-    std::list<Interval> PerformCulling(matrix_float4x4 const &viewProjMatrix, vector_float2 const &dimensions);
+    void PerformCulling(matrix_float4x4 const &viewProjMatrix, vector_float2 const &dimensions, uint8_t *visibility, bool fullyContained);
     unsigned Insert(DrawableItem* drawable);
     
     size_t CalcSubtreeItems();
-    void WriteToList(size_t &idx, std::vector<DrawableItem*> *bakedDrawableItems);
+    void WriteToList(size_t &idx, std::vector<DrawableItem*> *bakedDrawableItems, uint8_t *bakedVisibility);
     
     void LogStatus(bool recursive);
     
@@ -97,6 +84,7 @@ public:
     GfVec3f minVec;
     GfVec3f maxVec;
     GfVec3f halfSize;
+    vector_float4 points[8];
     
     size_t index;
     size_t indexEnd;
@@ -105,18 +93,17 @@ public:
     
     NSString* name;
     
-    std::list<DrawableItem*> drawables;
     std::list<DrawableItem*> drawablesTooLarge;
     bool isSplit;
 
+    int numChildren;
     OctreeNode* children[8] = {NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL};
+
 private:
     void subdivide();
     bool canSubdivide();
     
     unsigned depth;
-    
-    unsigned InsertStraight(DrawableItem* drawable);
 };
 
 class BVH {
@@ -136,9 +123,10 @@ public:
     int BVHCounter;
 private:
     void Bake();
-    
-    std::vector<DrawableItem*> instancedDrawableItems;
+
     std::vector<DrawableItem*> bakedDrawableItems;
+    std::vector<uint8_t> bakedVisibility;
+    bool visibilityDirty;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

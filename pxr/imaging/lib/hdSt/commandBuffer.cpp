@@ -517,9 +517,9 @@ HdStCommandBuffer::FrustumCull(GfMatrix4d const &viewProjMatrix)
     static uint64_t fastestTime = 0xffffffffffffffff;
 
 //    fastestTime = std::min(fastestTime, timeDiff);
-//    NSLog(@"HdStCommandBuffer::FrustumCull: %.2fms (%.2fms fastest) : %lu items",
+//    NSLog(@"HdStCommandBuffer::FrustumCull: %.2fms (%.2fms fastest)",
 //          ArchTicksToNanoseconds(timeDiff) / 1000.0f / 1000.0f,
-//          ArchTicksToNanoseconds(fastestTime) / 1000.0f / 1000.0f, _drawItemInstances.size());
+//          ArchTicksToNanoseconds(fastestTime) / 1000.0f / 1000.0f);
 
     if (primCount.load()) {
         NSLog(@"Scene prims: %lu", primCount.load());

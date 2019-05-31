@@ -208,26 +208,13 @@ public:
         numVisible = visibleCount;
     }
     
-    void CalculateInstanceBounds() const;
+    void CalculateCullingBounds() const;
     
     const std::vector<GfBBox3f>* GetInstanceBounds() const {
         return &_instancedCullingBounds;
     }
     
-    void SetInstanceVisibility(size_t idx, bool visibility) const {
-        _instanceVisibility[idx] = visibility;
-        _anyInstanceVisible = _anyInstanceVisible || visibility;
-    }
-    
-    bool AnyInstanceVisible() const {
-        return _anyInstanceVisible;
-    }
-    
-    void SetAnyInstanceVisible(bool visible) const {
-        _anyInstanceVisible = visible;
-    }
-    
-    void BuildInstanceBuffer() const;
+    void BuildInstanceBuffer(uint8_t** instanceVisibility) const;
     
 protected:
 
@@ -248,8 +235,6 @@ private:
     
     // CPU culling
     mutable std::vector<GfBBox3f> _instancedCullingBounds;
-    mutable std::vector<bool> _instanceVisibility;
-    mutable bool _anyInstanceVisible = false;
     mutable bool _instancedCullingBoundsCalculated = false;
     mutable int numVisible = 1;
 };

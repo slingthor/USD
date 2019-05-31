@@ -66,9 +66,8 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 static os_log_t cullingLog = os_log_create("hydra.metal", "Culling");
 
-
-const unsigned maxOctreeDepth = 1024;
-const unsigned maxPerLevel = 25;
+float const sizeThreshold = 1.0f;
+float const sizeThresholdSq = sizeThreshold * sizeThreshold;
 
 namespace MissingFunctions {
     
@@ -115,10 +114,32 @@ namespace MissingFunctions {
         return Intersection::Outside;
     }
     
+    bool ShouldRejectBasedOnSize(vector_float4 const* points, matrix_float4x4 const &viewProjMatrix, vector_float2 const &dimensions)
+    {
+        float const threshold = 4.0f; // number of pixels in a dimension
+        
+        vector_float4 projectedPoints[] =
+        {
+            matrix_multiply(viewProjMatrix, points[0]),
+            matrix_multiply(viewProjMatrix, points[1])
+        };
+        
+        vector_float2 screenSpace[2];
+        
+        float inv = 1.0f / projectedPoints[0][3];
+        screenSpace[0] = projectedPoints[0].xy * inv;
+        
+        inv = 1.0f / projectedPoints[1][3];
+        screenSpace[1] = projectedPoints[1].xy * inv;
+        
+        vector_float2 d = vector_abs((screenSpace[1] - screenSpace[0]) * dimensions);
+        return (d.x < threshold && d.y < threshold);
+    }
+    
     bool ShouldRejectBasedOnSize(const GfVec3f& minVec, const GfVec3f& maxVec, matrix_float4x4 const &viewProjMatrix, vector_float2 const &dimensions)
     {
         float const threshold = 4.0f; // number of pixels in a dimension
-
+        
         vector_float4 points[] =
         {
             matrix_multiply(viewProjMatrix, (vector_float4){minVec[0], minVec[1], minVec[2], 1}),
@@ -137,19 +158,9 @@ namespace MissingFunctions {
         return (d.x < threshold && d.y < threshold);
     }
     
-    bool FrustumFullyContains(const OctreeNode* node, matrix_float4x4 const &viewProjMatrix, vector_float2 const &dimensions)
+    bool FrustumFullyContains(const OctreeNode* node, matrix_float4x4 const &viewProjMatrix)
     {
-        vector_float4 points[] =
-        {
-            {node->minVec[0], node->minVec[1], node->minVec[2], 1},
-            {node->maxVec[0], node->maxVec[1], node->maxVec[2], 1},
-            {node->minVec[0], node->minVec[1], node->maxVec[2], 1},
-            {node->minVec[0], node->maxVec[1], node->minVec[2], 1},
-            {node->minVec[0], node->maxVec[1], node->maxVec[2], 1},
-            {node->maxVec[0], node->minVec[1], node->minVec[2], 1},
-            {node->maxVec[0], node->minVec[1], node->maxVec[2], 1},
-            {node->maxVec[0], node->maxVec[1], node->minVec[2], 1}
-        };
+        vector_float4 const * const points = node->points;
         
         for (int i = 0; i < 8; ++i) {
             int clipFlags = 0;
@@ -170,20 +181,9 @@ namespace MissingFunctions {
     }
 };
 
-Interval::Interval(size_t start, size_t end, bool visible)
-: start(start), end(end), visible(visible) {
-    // nothing
-}
-
-Interval::Interval(OctreeNode* node, bool visible)
-: Interval(node->index, node->indexEnd, visible) {
-    // nothing
-}
-
-DrawableItem::DrawableItem(HdStDrawItemInstance* itemInstance, GfRange3f boundingBox, size_t instanceIndex, size_t totalInstancers)
+DrawableItem::DrawableItem(HdStDrawItemInstance* itemInstance, GfRange3f const &aaBoundingBox, size_t instanceIndex, size_t totalInstancers)
 : itemInstance(itemInstance)
-, aabb(boundingBox)
-, visible(false)
+, aabb(aaBoundingBox)
 , isInstanced(true)
 , instanceIdx(instanceIndex)
 , numItemsInInstance(totalInstancers)
@@ -191,34 +191,28 @@ DrawableItem::DrawableItem(HdStDrawItemInstance* itemInstance, GfRange3f boundin
     halfSize = aabb.GetSize() * 0.5;
 }
 
-DrawableItem::DrawableItem(HdStDrawItemInstance* itemInstance, GfRange3f boundingBox)
-: DrawableItem(itemInstance, boundingBox, 0, 1)
+DrawableItem::DrawableItem(HdStDrawItemInstance* itemInstance, GfRange3f const &aaBoundingBox)
+: DrawableItem(itemInstance, aaBoundingBox, 0, 1)
 {
     isInstanced = false;
-}
-
-void DrawableItem::SetVisible(bool visible)
-{
-    if (isInstanced) {
-        itemInstance->GetDrawItem()->SetInstanceVisibility(instanceIdx, visible);
-    } else {
-        if (itemInstance->IsVisible() != visible) {
-            itemInstance->SetVisible(visible);
-        }
-        itemInstance->GetDrawItem()->SetNumVisible(numItemsInInstance);
-    }
 }
 
 void DrawableItem::ProcessInstancesVisible()
 {
     if (isInstanced) {
-        itemInstance->GetDrawItem()->SetNumVisible(numItemsInInstance);
-        itemInstance->GetDrawItem()->BuildInstanceBuffer();
+        itemInstance->GetDrawItem()->BuildInstanceBuffer(itemInstance->GetCullResultVisibilityCache());
+    }
+    else {
+        if (itemInstance->CullResultIsVisible())
+            itemInstance->GetDrawItem()->SetNumVisible(1);
+        else
+            itemInstance->GetDrawItem()->SetNumVisible(0);
+    }
 
-        bool shouldBeVisible = itemInstance->GetDrawItem()->AnyInstanceVisible();
-        if (itemInstance->IsVisible() != shouldBeVisible) {
-            itemInstance->SetVisible(shouldBeVisible);
-        }
+    bool shouldBeVisible = itemInstance->GetDrawItem()->GetVisible() &&
+        itemInstance->GetDrawItem()->GetNumVisible() > 0;
+    if (itemInstance->IsVisible() != shouldBeVisible) {
+      itemInstance->SetVisible(shouldBeVisible);
     }
 }
 
@@ -226,36 +220,54 @@ GfRange3f DrawableItem::ConvertDrawablesToItems(std::vector<HdStDrawItemInstance
 {
     GfRange3f boundingBox;
     
-    for (size_t idx=0; idx<drawables->size(); ++idx){
+    for (size_t idx = 0; idx < drawables->size(); ++idx){
         HdStDrawItemInstance* drawable = &(*drawables)[idx];
+        drawable->GetDrawItem()->CalculateCullingBounds();
+
         HdBufferArrayRangeSharedPtr const & instanceIndexRange = drawable->GetDrawItem()->GetInstanceIndexRange();
+        const std::vector<GfBBox3f>* instancedCullingBounds = drawable->GetDrawItem()->GetInstanceBounds();
+        size_t const numItems = instancedCullingBounds->size();
+        
+        drawable->SetCullResultVisibilityCacheSize(numItems);
+        
         if (instanceIndexRange) {
-            drawable->GetDrawItem()->CalculateInstanceBounds();
-            const std::vector<GfBBox3f>* instancedCullingBounds = drawable->GetDrawItem()->GetInstanceBounds();
-#if 1
             // NOTE: create an item per instance
-            for (size_t idx = 0; idx < instancedCullingBounds->size(); ++idx) {
-                GfRange3f bbox = (*instancedCullingBounds)[idx].ComputeAlignedRange();
-                boundingBox.ExtendBy(bbox);
-                items->push_back(new DrawableItem(drawable, bbox, idx, instancedCullingBounds->size()));
+            for (size_t i = 0; i < numItems; ++i) {
+                GfRange3f const &oobb = (*instancedCullingBounds)[i].GetRange();
+                GfRange3f aabb;
+
+                // We combine the min and max sparately because the range is not really AABB
+                // The CalculateCullingBounds bakes the transform in, creating an OOBB.
+                // This breakes GfRange3's internals sometimes, one being that IsEmpty() may return
+                // true when it isn't?
+                aabb.ExtendBy(oobb.GetMin());
+                aabb.ExtendBy(oobb.GetMax());
+                
+                if (aabb.IsEmpty()) {
+//                    aabb.ExtendBy(aabb.GetMin() + GfVec3f(0.1f));
+                }
+
+                boundingBox.ExtendBy(aabb);
+                items->push_back(new DrawableItem(drawable, aabb, i, numItems));
             }
-#else
-            // NOTE: create an item for all instances ... that's equal to the 'naïve approach'
-            GfRange3f itemBBox;
-            for (size_t idx = 0; idx < instancedCullingBounds->size(); ++idx) {
-                GfRange3f bbox = (*instancedCullingBounds)[idx].ComputeAlignedRange();
-                itemBBox.ExtendBy(bbox);
-            }
-            DrawableItem* item = new DrawableItem(drawable, itemBBox);
-            item->numItemsInInstance = instancedCullingBounds->size();
-            items->push_back(item);
-            boundingBox.ExtendBy(itemBBox);
-#endif
-            
         } else {
-            GfRange3f bbox = drawable->GetDrawItem()->GetBounds().ComputeAlignedRange();
-            DrawableItem* drawableItem = new DrawableItem(drawable, bbox);
-            boundingBox.ExtendBy(drawableItem->aabb);
+            GfRange3f const &oobb = (*instancedCullingBounds)[0].GetRange();
+            GfRange3f aabb;
+            
+            // We combine the min and max sparately because the range is not really AABB
+            // The CalculateCullingBounds bakes the transform in, creating an OOBB.
+            // This breakes GfRange3's internals sometimes, one being that IsEmpty() may return
+            // true when it isn't?
+            aabb.ExtendBy(oobb.GetMin());
+            aabb.ExtendBy(oobb.GetMax());
+            
+            if (aabb.IsEmpty()) {
+//                aabb.ExtendBy(aabb.GetMin() + GfVec3f(0.1f));
+            }
+            
+            DrawableItem* drawableItem = new DrawableItem(drawable, aabb);
+            
+            boundingBox.ExtendBy(aabb);
             items->push_back(drawableItem);
         }
     }
@@ -287,7 +299,7 @@ void BVH::BuildBVH(std::vector<HdStDrawItemInstance> *drawables)
 {
     // NOTE: this is a hack to not have twice the same octree...
     if (BVHCounter > 2) {
-        return;
+//        return;
     }
     os_signpost_id_t bvhGenerate = os_signpost_id_generate(cullingLog);
     os_signpost_id_t bvhBake = os_signpost_id_generate(cullingLog);
@@ -299,17 +311,12 @@ void BVH::BuildBVH(std::vector<HdStDrawItemInstance> *drawables)
     
     os_signpost_interval_begin(cullingLog, bvhGenerate, "BVH Generation");
     drawableItems.clear();
-    instancedDrawableItems.clear();
     
     uint64_t buildStart = ArchGetTickTime();
     
     GfRange3f bbox = DrawableItem::ConvertDrawablesToItems(drawables, &(this->drawableItems));
 
-    if (drawableItems.size() <= 0) {
-        return;
-    }
-
-    root.ReInit(bbox, &drawableItems);
+    root.ReInit(bbox);
     root.name = @"0";
     
     unsigned depth = 0;
@@ -318,10 +325,6 @@ void BVH::BuildBVH(std::vector<HdStDrawItemInstance> *drawables)
     {
         unsigned currentDepth = root.Insert(drawableItems[idx]);
         depth = MAX(depth, currentDepth);
-        
-        if (drawableItems[idx]->isInstanced && drawableItems[idx]->instanceIdx == 0) {
-            instancedDrawableItems.push_back(drawableItems[idx]);
-        }
     }
     os_signpost_interval_end(cullingLog, bvhGenerate, "BVH Generation");
     
@@ -341,18 +344,14 @@ void BVH::Bake()
     root.CalcSubtreeItems();
 
     bakedDrawableItems.resize(drawableItems.size());
-    
+    bakedVisibility.resize(drawableItems.size());
+
     size_t index = 0;
-    root.WriteToList(index, &bakedDrawableItems);
+    root.WriteToList(index, &bakedDrawableItems, &bakedVisibility[0]);
 }
 
 void BVH::PerformCulling(matrix_float4x4 const &viewProjMatrix, vector_float2 const &dimensions)
 {
-    // NOTE: this is a hack to not have twice the same octree...
-    if (BVHCounter > 2) {
-        return;
-    }
-
     os_signpost_id_t bvhCulling = os_signpost_id_generate(cullingLog);
     os_signpost_id_t bvhCullingCull = os_signpost_id_generate(cullingLog);
     os_signpost_id_t bvhCullingFinal = os_signpost_id_generate(cullingLog);
@@ -362,35 +361,16 @@ void BVH::PerformCulling(matrix_float4x4 const &viewProjMatrix, vector_float2 co
 
     os_signpost_interval_begin(cullingLog, bvhCulling, "Culling: BVH");
     os_signpost_interval_begin(cullingLog, bvhCullingCull, "Culling: BVH -- Culllist");
-    std::list<Interval> visibleSubtreesList = root.PerformCulling(viewProjMatrix, dimensions);
+    root.PerformCulling(viewProjMatrix, dimensions, &bakedVisibility[0], false);
     os_signpost_interval_end(cullingLog, bvhCullingCull, "Culling: BVH -- Culllist");
+    float cullListTimeMS = (ArchGetTickTime() - cullStart) / 1000.0f;
 
     os_signpost_interval_begin(cullingLog, bvhCullingFinal, "Culling: BVH -- Apply");
 
-   static std::vector<DrawableItem*>* octreeHeap = &this->bakedDrawableItems;
+    static std::vector<DrawableItem*>* octreeHeap = &this->bakedDrawableItems;
     octreeHeap = &this->bakedDrawableItems;
     
     struct _Worker {
-        static
-        void setAnyInstanceInvisible(std::vector<DrawableItem*> *instancedDrawableItems, size_t begin, size_t end)
-        {
-            for (size_t idx=begin; idx < end; ++idx) {
-                (*instancedDrawableItems)[idx]->itemInstance->GetDrawItem()->SetAnyInstanceVisible(false);
-            }
-        }
-        
-        static
-        void setIntervals(std::vector<Interval> *intervals, size_t begin, size_t end)
-        {
-            for(size_t idx = begin; idx < end; ++idx) {
-                Interval &interval = (*intervals)[idx];
-                for (size_t diIdx = interval.start; diIdx < interval.end; ++diIdx) {
-                    assert((*octreeHeap)[diIdx] != NULL);
-                    (*octreeHeap)[diIdx]->SetVisible(interval.visible);
-                }
-            }
-        }
-        
         static
         void processInstancesVisible(std::vector<DrawableItem*> *instancedDrawableItems, size_t begin, size_t end)
         {
@@ -399,51 +379,27 @@ void BVH::PerformCulling(matrix_float4x4 const &viewProjMatrix, vector_float2 co
             }
         }
     };
-
-    std::vector<Interval> intervals {
-        std::make_move_iterator(std::begin(visibleSubtreesList)),
-        std::make_move_iterator(std::end(visibleSubtreesList))
-    };
-    std::sort(intervals.begin(), intervals.end(), Interval::compare);
     
-    size_t minInterval = 0;
-    size_t count = intervals.size();
-    for (size_t idx=0; idx < count; ++idx) {
-        Interval &interval = intervals[idx];
-        if (interval.start > minInterval) {
-            intervals.push_back(Interval(minInterval, interval.start, false));
-        }
-        minInterval = intervals[idx].end;
-    }
-    if (minInterval < bakedDrawableItems.size()) {
-        intervals.push_back(Interval(minInterval, bakedDrawableItems.size(), false));
-    }
-    
-    unsigned instacedGrain = 100;
-    WorkParallelForN(instancedDrawableItems.size(),
-                     std::bind(&_Worker::setAnyInstanceInvisible, &instancedDrawableItems,
-                               std::placeholders::_1,
-                               std::placeholders::_2),
-                     instacedGrain);
-    
-    WorkParallelForN(intervals.size(),
-                     std::bind(&_Worker::setIntervals, &intervals,
-                               std::placeholders::_1,
-                               std::placeholders::_2));
-
-    os_signpost_interval_begin(cullingLog, bvhCullingBuildBuffer, "Culling: BVH -- Build Buffer");
-    WorkParallelForN(instancedDrawableItems.size(),
-                     std::bind(&_Worker::processInstancesVisible, &instancedDrawableItems,
-                               std::placeholders::_1,
-                               std::placeholders::_2),
-                     instacedGrain);
-    os_signpost_interval_end(cullingLog, bvhCullingBuildBuffer, "Culling: BVH -- Build Buffer");
+    unsigned grain = 20;
 
     os_signpost_interval_end(cullingLog, bvhCullingFinal, "Culling: BVH -- Apply");
+    
+    uint64_t cullBuildBufferTimeBegin = ArchGetTickTime();
+    os_signpost_interval_begin(cullingLog, bvhCullingBuildBuffer, "Culling: BVH -- Build Buffer");
+    WorkParallelForN(drawableItems.size(),
+                     std::bind(&_Worker::processInstancesVisible, &drawableItems,
+                               std::placeholders::_1,
+                               std::placeholders::_2),
+                     grain);
+    os_signpost_interval_end(cullingLog, bvhCullingBuildBuffer, "Culling: BVH -- Build Buffer");
 
     os_signpost_interval_end(cullingLog, bvhCulling, "Culling: BVH");
 
-    lastCullTimeMS = (ArchGetTickTime() - cullStart) / 1000.0f;
+    uint64_t end = ArchGetTickTime();
+    float cullBuildBufferTimeMS = (end - cullBuildBufferTimeBegin) / 1000.0f;
+    lastCullTimeMS = (end - cullStart) / 1000.0f;
+    
+    NSLog(@"CullList: %.2fms     BuildBuffer: %.2fms", cullListTimeMS, cullBuildBufferTimeMS);
 }
 
 OctreeNode::OctreeNode(float minX, float minY, float minZ, float maxX, float maxY, float maxZ, unsigned currentDepth)
@@ -456,62 +412,102 @@ OctreeNode::OctreeNode(float minX, float minY, float minZ, float maxX, float max
 , itemCount(0)
 , totalItemCount(0)
 , isSplit(false)
+, numChildren(0)
 , depth(currentDepth)
 {
-    // do nothing
+    CalcPoints();
 }
 
 OctreeNode::~OctreeNode()
 {
     if (isSplit) {
-        for (size_t idx=0; idx < 8; ++idx)
+        for (size_t idx=0; idx < numChildren; ++idx)
         {
             delete children[idx];
         }
     }
 }
 
-void OctreeNode::ReInit(GfRange3f const &boundingBox, std::vector<DrawableItem*> *drawables)
+void OctreeNode::CalcPoints()
+{
+    points[0] = {minVec[0], minVec[1], minVec[2], 1};
+    points[1] = {maxVec[0], maxVec[1], maxVec[2], 1};
+    points[2] = {minVec[0], minVec[1], maxVec[2], 1};
+    points[3] = {minVec[0], maxVec[1], minVec[2], 1};
+    points[4] = {minVec[0], maxVec[1], maxVec[2], 1};
+    points[5] = {maxVec[0], minVec[1], minVec[2], 1};
+    points[6] = {maxVec[0], minVec[1], maxVec[2], 1};
+    points[7] = {maxVec[0], maxVec[1], minVec[2], 1};
+}
+
+void OctreeNode::ReInit(GfRange3f const &boundingBox)
 {
     aabb = GfRange3f(boundingBox);
     minVec = aabb.GetMin();
     maxVec = aabb.GetMax();
     halfSize = (maxVec - minVec) * 0.5;
+    CalcPoints();
 }
 
-std::list<Interval> OctreeNode::PerformCulling(matrix_float4x4 const &viewProjMatrix, vector_float2 const &dimensions)
+void OctreeNode::PerformCulling(matrix_float4x4 const &viewProjMatrix,
+                                vector_float2 const &dimensions,
+                                uint8_t *visibility,
+                                bool fullyContained)
 {
-    std::list<Interval> result;
-    if (!GfFrustum::IntersectsViewVolumeFloat(aabb, viewProjMatrix, dimensions)) {
-        return result;
-    }
-    
-    if (MissingFunctions::FrustumFullyContains(this, viewProjMatrix, dimensions)) {
-        if (totalItemCount > 0) {
-            result.push_back(Interval(this, true));
+    if (!fullyContained) {
+        if (!GfFrustum::IntersectsViewVolumeFloat(aabb, viewProjMatrix, dimensions)) {
+            if (totalItemCount) {
+                memset(visibility + index, 0, totalItemCount);
+            }
+            return;
         }
-        return result;
+        
+        if (MissingFunctions::FrustumFullyContains(this, viewProjMatrix)) {
+            fullyContained = true;
+        }
+    }
+
+    if (fullyContained) {
+        if (MissingFunctions::ShouldRejectBasedOnSize(points, viewProjMatrix, dimensions)) {
+            if (totalItemCount) {
+                memset(visibility + index, 0, totalItemCount);
+            }
+            return;
+        }
     }
 
     if (itemCount > 0) {
-        result.push_back(Interval(index, index + itemCount, true));
-    }
-    
-    if (isSplit) {
-        for (int i=0; i < 8; ++i) {
-            result.splice(result.end(), children[i]->PerformCulling(viewProjMatrix, dimensions));
+        uint8_t *visibilityWritePtr = visibility + index;
+        for(std::list<DrawableItem*>::const_iterator it = drawablesTooLarge.begin();
+            it != drawablesTooLarge.end(); ++it)
+        {
+            DrawableItem* drawableItem = *it;
+            GfBBox3f const &box = (*drawableItem->itemInstance->GetDrawItem()->GetInstanceBounds())[drawableItem->instanceIdx];
+            
+            bool visible;
+            if (fullyContained) {
+                visible = !MissingFunctions::ShouldRejectBasedOnSize(box.GetRange().GetMin(), box.GetRange().GetMax(), viewProjMatrix, dimensions);
+            }
+            else {
+                visible = GfFrustum::IntersectsViewVolumeFloat(box, viewProjMatrix, dimensions);
+            }
+            *visibilityWritePtr++ = visible;
         }
     }
     
-    return result;
+    if (isSplit) {
+        for (int i = 0; i < numChildren; ++i) {
+            children[i]->PerformCulling(viewProjMatrix, dimensions, visibility, fullyContained);
+        }
+    }
 }
 
 void OctreeNode::LogStatus(bool recursive)
 {
-    NSLog(@"Lvl %u, MustKeep: %zu", depth, drawables.size());
+    NSLog(@"Lvl %u, MustKeep: %zu", depth, drawablesTooLarge.size());
     if (recursive) {
         if (isSplit) {
-            for (int idx=0; idx < 8; ++idx) {
+            for (int idx=0; idx < numChildren; ++idx) {
                 children[idx]->LogStatus(recursive);
             }
         }
@@ -534,6 +530,8 @@ void OctreeNode::subdivide()
     children[6] = new OctreeNode(localMin.data()[0], midPoint.data()[1], midPoint.data()[2], midPoint.data()[0], localMax.data()[1], localMax.data()[2], depth + 1);
     children[7] = new OctreeNode(midPoint.data()[0], midPoint.data()[1], midPoint.data()[2], localMax.data()[0], localMax.data()[1], localMax.data()[2], depth + 1);
     
+    numChildren = 8;
+
     children[0]->name = [name stringByAppendingString:@"-0"];
     children[1]->name = [name stringByAppendingString:@"-1"];
     children[2]->name = [name stringByAppendingString:@"-2"];
@@ -542,46 +540,18 @@ void OctreeNode::subdivide()
     children[5]->name = [name stringByAppendingString:@"-5"];
     children[6]->name = [name stringByAppendingString:@"-6"];
     children[7]->name = [name stringByAppendingString:@"-7"];
-    
+
     isSplit = true;
 }
 
-bool OctreeNode::canSubdivide()
-{
-    return (depth < maxOctreeDepth);
-}
-
-unsigned OctreeNode::Insert(DrawableItem* drawable)
-{
-    if (!canSubdivide()){
-        drawablesTooLarge.push_back(drawable);
-        return depth;
-    }
-    
-    if (drawables.size() + drawablesTooLarge.size() < maxPerLevel) {
-        drawables.push_back(drawable);
-        return depth;
-    }
-    
-    if (drawablesTooLarge.size() > maxPerLevel) {
-        // move the drawables to either 'drawablesTooLarge' or to children
-        std::list<DrawableItem*> lst(drawables.begin(), drawables.end());
-        
-        drawables.clear();
-        for (auto drawable : lst) {
-            InsertStraight(drawable);
-        }
-    }
-
-    return InsertStraight(drawable);
-}
-
-unsigned OctreeNode::InsertStraight(DrawableItem* drawable) {
+unsigned OctreeNode::Insert(DrawableItem* drawable) {
     if (!MissingFunctions::IntersectsAllChildren(this, drawable->aabb)) {
         if (!isSplit) {
-            subdivide();
+            if ((maxVec - minVec).GetLengthSq() > sizeThresholdSq) {
+                subdivide();
+            }
         }
-        for (int idx = 0; idx < 8; ++idx) {
+        for (int idx = 0; idx < numChildren; ++idx) {
             Intersection intersection = MissingFunctions::SpatialRelation(children[idx], drawable->aabb);
             if (Intersection::Inside == intersection) {
                 return children[idx]->Insert(drawable);
@@ -595,39 +565,65 @@ unsigned OctreeNode::InsertStraight(DrawableItem* drawable) {
 }
 
 size_t OctreeNode::CalcSubtreeItems() {
-    itemCount = drawables.size() + drawablesTooLarge.size();
+    itemCount = drawablesTooLarge.size();
     
     size_t res = itemCount;
+    
+    GfRange3f bbox;
+    for(std::list<DrawableItem*>::const_iterator it = drawablesTooLarge.begin();
+        it != drawablesTooLarge.end(); ++it)
+    {
+        DrawableItem* drawItem = *it;
+        bbox.ExtendBy(drawItem->aabb);
+    }
 
     if (isSplit) {
-        for (size_t idx = 0; idx < 8; ++idx) {
-            res += children[idx]->CalcSubtreeItems();
+        for (int idx = 0; idx < numChildren; ++idx) {
+            int subItems = children[idx]->CalcSubtreeItems();
+            if (!subItems) {
+                // empty node - remove from list
+                delete children[idx];
+                numChildren--;
+                if (idx == 7)
+                    children[idx--] = NULL;
+                else {
+                    children[idx--] = children[numChildren];
+                    children[numChildren] = NULL;
+                }
+            }
+            else {
+                bbox.ExtendBy(children[idx]->aabb);
+            }
+            res += subItems;
+        }
+        if (numChildren == 0) {
+            isSplit = false;
         }
     }
+    
+    ReInit(bbox);
     
     totalItemCount = res;
 
     return res;
 };
 
-void OctreeNode::WriteToList(size_t &pos, std::vector<DrawableItem*> *bakedDrawableItems) {
+void OctreeNode::WriteToList(size_t &pos,
+                             std::vector<DrawableItem*> *bakedDrawableItems,
+                             uint8_t *bakedVisibility) {
     index = pos;
     
     for(std::list<DrawableItem*>::const_iterator it = drawablesTooLarge.begin();
         it != drawablesTooLarge.end(); ++it)
     {
-        (*bakedDrawableItems)[pos++] = *it;
-    }
-    
-    for(std::list<DrawableItem*>::const_iterator it = drawables.begin();
-        it != drawables.end(); ++it)
-    {
-        (*bakedDrawableItems)[pos++] = *it;
+        DrawableItem* drawItem = *it;
+        drawItem->itemInstance->SetCullResultVisibilityCache(bakedVisibility + pos, drawItem->instanceIdx);
+        (*bakedDrawableItems)[pos++] = drawItem;
     }
 
     if (isSplit) {
-        for (size_t idx = 0; idx < 8; ++idx) {
-            children[idx]->WriteToList(pos, bakedDrawableItems);
+        for (size_t idx = 0; idx < numChildren; ++idx) {
+            children[idx]->WriteToList(pos, bakedDrawableItems, bakedVisibility);
         }
     }
     
