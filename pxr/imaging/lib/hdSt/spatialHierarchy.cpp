@@ -426,7 +426,7 @@ void BVH::PerformCulling(matrix_float4x4 const &viewProjMatrix, vector_float2 co
     float cullBuildBufferTimeMS = (end - cullBuildBufferTimeBegin) / 1000.0f;
     lastCullTimeMS = (end - cullStart) / 1000.0f;
     
-    NSLog(@"CullList: %.2fms   Apply: %.2fms   BuildBuffer: %.2fms", cullListTimeMS, cullApplyTimeMS, cullBuildBufferTimeMS);
+//    NSLog(@"CullList: %.2fms   Apply: %.2fms   BuildBuffer: %.2fms", cullListTimeMS, cullApplyTimeMS, cullBuildBufferTimeMS);
 }
 
 OctreeNode::OctreeNode(float minX, float minY, float minZ, float maxX, float maxY, float maxZ, unsigned currentDepth)
