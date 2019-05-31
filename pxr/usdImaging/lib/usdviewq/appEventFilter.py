@@ -124,6 +124,12 @@ class AppEventFilter(QtCore.QObject):
                 # who currently holds focus
                 self.SetFocusFromMousePos(widget)
                 return True
+            elif (key == QtCore.Qt.Key_W or
+                key == QtCore.Qt.Key_S or
+                key == QtCore.Qt.Key_A or
+                key == QtCore.Qt.Key_D):
+                self._appController._stageView.processWSADPressEvent(event)
+                return True
             elif currFocusWidget and self.JealousFocus(currFocusWidget):
                 # Don't touch if there's a greedy focus widget
                 return False
