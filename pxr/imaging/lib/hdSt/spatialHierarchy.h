@@ -45,7 +45,14 @@ enum Intersection {
     Intersects
 };
 
+struct DrawableItem;
 class OctreeNode;
+
+struct CullListItem {
+    DrawableItem*   drawableItem;
+    uint8_t*        visibilityWritePtr;
+    bool            fullyContained;
+};
 
 struct DrawableItem {
     DrawableItem(HdStDrawItemInstance* itemInstance, GfRange3f const &aaBoundingBox);
@@ -72,7 +79,12 @@ public:
     void CalcPoints();
     void ReInit(GfRange3f const &boundingBox);
     
-    void PerformCulling(matrix_float4x4 const &viewProjMatrix, vector_float2 const &dimensions, uint8_t *visibility, bool fullyContained);
+    void PerformCulling(matrix_float4x4 const &viewProjMatrix,
+                        vector_float2 const &dimensions,
+                        uint8_t *visibility,
+                        std::vector<CullListItem> &cullList,
+                        bool fullyContained);
+
     unsigned Insert(DrawableItem* drawable);
     
     size_t CalcSubtreeItems();
@@ -126,6 +138,7 @@ private:
 
     std::vector<DrawableItem*> bakedDrawableItems;
     std::vector<uint8_t> bakedVisibility;
+    std::vector<CullListItem> cullList;
     bool visibilityDirty;
 };
 

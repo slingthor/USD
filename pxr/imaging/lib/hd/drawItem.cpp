@@ -403,14 +403,14 @@ void HdDrawItem::BuildInstanceBuffer(uint8_t** instanceVisibility) const
 {
     int numItems = _instancedCullingBounds.size();
     int i;
-    for(i = 0; i < numItems; i++) {
-        if (*instanceVisibility[i])
-            break;
-    }
-    if (i == numItems) {
-        numVisible = 0;
-        return;
-    }
+//    for(i = 0; i < numItems; i++) {
+//        if (*instanceVisibility[i])
+//            break;
+//    }
+//    if (i == numItems) {
+//        numVisible = 0;
+//        return;
+//    }
 
     int instancerNumLevels = GetInstancePrimvarNumLevels();
     int instanceIndexWidth = instancerNumLevels + 1;

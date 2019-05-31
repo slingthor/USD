@@ -339,6 +339,7 @@ void BVH::Bake()
 
     bakedDrawableItems.resize(drawableItems.size());
     bakedVisibility.resize(drawableItems.size());
+    cullList.resize(drawableItems.size());
 
     size_t index = 0;
     root.WriteToList(index, &bakedDrawableItems, &bakedVisibility[0]);
@@ -355,28 +356,60 @@ void BVH::PerformCulling(matrix_float4x4 const &viewProjMatrix, vector_float2 co
 
     os_signpost_interval_begin(cullingLog, bvhCulling, "Culling: BVH");
     os_signpost_interval_begin(cullingLog, bvhCullingCull, "Culling: BVH -- Culllist");
-    root.PerformCulling(viewProjMatrix, dimensions, &bakedVisibility[0], false);
+    cullList.clear();
+    root.PerformCulling(viewProjMatrix, dimensions, &bakedVisibility[0], cullList, false);
     os_signpost_interval_end(cullingLog, bvhCullingCull, "Culling: BVH -- Culllist");
     float cullListTimeMS = (ArchGetTickTime() - cullStart) / 1000.0f;
-
-    os_signpost_interval_begin(cullingLog, bvhCullingFinal, "Culling: BVH -- Apply");
-
-    static std::vector<DrawableItem*>* octreeHeap = &this->bakedDrawableItems;
-    octreeHeap = &this->bakedDrawableItems;
+    
+    static matrix_float4x4 const *_viewProjMatrix;
+    static vector_float2 const *_dimensions;
+    
+    _viewProjMatrix = &viewProjMatrix;
+    _dimensions = &dimensions;
     
     struct _Worker {
         static
         void processInstancesVisible(std::vector<DrawableItem*> *instancedDrawableItems, size_t begin, size_t end)
         {
-            for (size_t idx=begin; idx < end; ++idx) {
+            for (size_t idx = begin; idx < end; ++idx) {
                 (*instancedDrawableItems)[idx]->ProcessInstancesVisible();
+            }
+        }
+        
+        static
+        void processApply(std::vector<CullListItem> *cullList, size_t begin, size_t end)
+        {
+            for (size_t idx = begin; idx < end; ++idx)
+            {
+                auto &cullItem((*cullList)[idx]);
+                GfBBox3f const &box = (*cullItem.drawableItem->itemInstance->GetDrawItem()->GetInstanceBounds())[cullItem.drawableItem->instanceIdx];
+                
+                bool visible;
+                if (cullItem.fullyContained) {
+                    visible = !MissingFunctions::ShouldRejectBasedOnSize(box.GetRange().GetMin(), box.GetRange().GetMax(), *_viewProjMatrix, *_dimensions);
+                }
+                else {
+                    visible = GfFrustum::IntersectsViewVolumeFloat(box, *_viewProjMatrix, *_dimensions);
+                }
+                *cullItem.visibilityWritePtr++ = visible;
             }
         }
     };
     
-    unsigned grain = 20;
+    unsigned grainApply = 50;
+    unsigned grainBuild = 20;
+
+    os_signpost_interval_begin(cullingLog, bvhCullingFinal, "Culling: BVH -- Apply");
+    uint64_t cullApplyStart = ArchGetTickTime();
+
+    WorkParallelForN(cullList.size(),
+                     std::bind(&_Worker::processApply, &cullList,
+                               std::placeholders::_1,
+                               std::placeholders::_2),
+                     grainApply);
 
     os_signpost_interval_end(cullingLog, bvhCullingFinal, "Culling: BVH -- Apply");
+    float cullApplyTimeMS = (ArchGetTickTime() - cullApplyStart) / 1000.0f;
     
     uint64_t cullBuildBufferTimeBegin = ArchGetTickTime();
     os_signpost_interval_begin(cullingLog, bvhCullingBuildBuffer, "Culling: BVH -- Build Buffer");
@@ -384,7 +417,7 @@ void BVH::PerformCulling(matrix_float4x4 const &viewProjMatrix, vector_float2 co
                      std::bind(&_Worker::processInstancesVisible, &drawableItems,
                                std::placeholders::_1,
                                std::placeholders::_2),
-                     grain);
+                     grainBuild);
     os_signpost_interval_end(cullingLog, bvhCullingBuildBuffer, "Culling: BVH -- Build Buffer");
 
     os_signpost_interval_end(cullingLog, bvhCulling, "Culling: BVH");
@@ -393,7 +426,7 @@ void BVH::PerformCulling(matrix_float4x4 const &viewProjMatrix, vector_float2 co
     float cullBuildBufferTimeMS = (end - cullBuildBufferTimeBegin) / 1000.0f;
     lastCullTimeMS = (end - cullStart) / 1000.0f;
     
-    NSLog(@"CullList: %.2fms     BuildBuffer: %.2fms", cullListTimeMS, cullBuildBufferTimeMS);
+    NSLog(@"CullList: %.2fms   Apply: %.2fms   BuildBuffer: %.2fms", cullListTimeMS, cullApplyTimeMS, cullBuildBufferTimeMS);
 }
 
 OctreeNode::OctreeNode(float minX, float minY, float minZ, float maxX, float maxY, float maxZ, unsigned currentDepth)
@@ -446,6 +479,7 @@ void OctreeNode::ReInit(GfRange3f const &boundingBox)
 void OctreeNode::PerformCulling(matrix_float4x4 const &viewProjMatrix,
                                 vector_float2 const &dimensions,
                                 uint8_t *visibility,
+                                std::vector<CullListItem> &cullList,
                                 bool fullyContained)
 {
     if (!fullyContained) {
@@ -474,23 +508,23 @@ void OctreeNode::PerformCulling(matrix_float4x4 const &viewProjMatrix,
         uint8_t *visibilityWritePtr = visibility + index;
         for(auto drawableItem : drawablesTooLarge)
         {
-            //DrawableItem* drawableItem = *drawableItemList;
-            GfBBox3f const &box = (*drawableItem->itemInstance->GetDrawItem()->GetInstanceBounds())[drawableItem->instanceIdx];
-            
-            bool visible;
-            if (fullyContained) {
-                visible = !MissingFunctions::ShouldRejectBasedOnSize(box.GetRange().GetMin(), box.GetRange().GetMax(), viewProjMatrix, dimensions);
-            }
-            else {
-                visible = GfFrustum::IntersectsViewVolumeFloat(box, viewProjMatrix, dimensions);
-            }
-            *visibilityWritePtr++ = visible;
+            cullList.push_back({drawableItem, visibilityWritePtr++, fullyContained});
+//            GfBBox3f const &box = (*drawableItem->itemInstance->GetDrawItem()->GetInstanceBounds())[drawableItem->instanceIdx];
+//
+//            bool visible;
+//            if (fullyContained) {
+//                visible = !MissingFunctions::ShouldRejectBasedOnSize(box.GetRange().GetMin(), box.GetRange().GetMax(), viewProjMatrix, dimensions);
+//            }
+//            else {
+//                visible = GfFrustum::IntersectsViewVolumeFloat(box, viewProjMatrix, dimensions);
+//            }
+//            *visibilityWritePtr++ = visible;
         }
     }
     
     if (isSplit) {
         for (int i = 0; i < numChildren; ++i) {
-            children[i]->PerformCulling(viewProjMatrix, dimensions, visibility, fullyContained);
+            children[i]->PerformCulling(viewProjMatrix, dimensions, visibility, cullList, fullyContained);
         }
     }
 }
