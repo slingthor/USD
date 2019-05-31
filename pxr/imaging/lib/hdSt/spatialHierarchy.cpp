@@ -200,6 +200,9 @@ DrawableItem::DrawableItem(HdStDrawItemInstance* itemInstance, GfRange3f const &
 void DrawableItem::ProcessInstancesVisible()
 {
     if (isInstanced) {
+        if (instanceIdx)
+            return;
+
         itemInstance->GetDrawItem()->BuildInstanceBuffer(itemInstance->GetCullResultVisibilityCache());
     }
     else {
@@ -224,13 +227,12 @@ GfRange3f DrawableItem::ConvertDrawablesToItems(std::vector<HdStDrawItemInstance
         HdStDrawItemInstance* drawable = &(*drawables)[idx];
         drawable->GetDrawItem()->CalculateCullingBounds();
 
-        HdBufferArrayRangeSharedPtr const & instanceIndexRange = drawable->GetDrawItem()->GetInstanceIndexRange();
         const std::vector<GfBBox3f>* instancedCullingBounds = drawable->GetDrawItem()->GetInstanceBounds();
         size_t const numItems = instancedCullingBounds->size();
         
         drawable->SetCullResultVisibilityCacheSize(numItems);
         
-        if (instanceIndexRange) {
+        if (numItems > 1) {
             // NOTE: create an item per instance
             for (size_t i = 0; i < numItems; ++i) {
                 GfRange3f const &oobb = (*instancedCullingBounds)[i].GetRange();
@@ -242,10 +244,6 @@ GfRange3f DrawableItem::ConvertDrawablesToItems(std::vector<HdStDrawItemInstance
                 // true when it isn't?
                 aabb.ExtendBy(oobb.GetMin());
                 aabb.ExtendBy(oobb.GetMax());
-                
-                if (aabb.IsEmpty()) {
-//                    aabb.ExtendBy(aabb.GetMin() + GfVec3f(0.1f));
-                }
 
                 boundingBox.ExtendBy(aabb);
                 items->push_back(new DrawableItem(drawable, aabb, i, numItems));
@@ -260,10 +258,6 @@ GfRange3f DrawableItem::ConvertDrawablesToItems(std::vector<HdStDrawItemInstance
             // true when it isn't?
             aabb.ExtendBy(oobb.GetMin());
             aabb.ExtendBy(oobb.GetMax());
-            
-            if (aabb.IsEmpty()) {
-//                aabb.ExtendBy(aabb.GetMin() + GfVec3f(0.1f));
-            }
             
             DrawableItem* drawableItem = new DrawableItem(drawable, aabb);
             
