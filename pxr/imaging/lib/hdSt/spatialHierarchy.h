@@ -45,13 +45,37 @@ enum Intersection {
     Intersects
 };
 
+enum NodeCullState {
+    Unspecified = -1,
+    OutsideCull,
+    InsideCull,
+    InsideTest
+};
+
 struct DrawableItem;
 class OctreeNode;
 
 struct CullListItem {
-    DrawableItem*   drawableItem;
+    OctreeNode*     node;
     uint8_t*        visibilityWritePtr;
-    bool            fullyContained;
+};
+
+struct CullList {
+    std::vector<CullListItem> perItemContained;
+    std::vector<CullListItem> perItemFrustum;
+    std::vector<CullListItem> allItemInvisible;
+    
+    void clear() {
+        perItemContained.clear();
+        perItemFrustum.clear();
+        allItemInvisible.clear();
+    }
+    
+    void resize(size_t size) {
+        perItemContained.resize(size);
+        perItemFrustum.resize(size);
+        allItemInvisible.resize(size);
+    }
 };
 
 struct DrawableItem {
@@ -73,7 +97,7 @@ struct DrawableItem {
 
 class OctreeNode {
 public:
-    OctreeNode(float minX, float minY, float minZ, float maxX, float maxY, float maxZ, unsigned currentDepth);
+    OctreeNode(float minX, float minY, float minZ, float maxX, float maxY, float maxZ);
     ~OctreeNode();
     
     void CalcPoints();
@@ -82,15 +106,13 @@ public:
     void PerformCulling(matrix_float4x4 const &viewProjMatrix,
                         vector_float2 const &dimensions,
                         uint8_t *visibility,
-                        std::vector<CullListItem> &cullList,
+                        CullList &cullList,
                         bool fullyContained);
 
-    unsigned Insert(DrawableItem* drawable);
+    unsigned Insert(DrawableItem* drawable, unsigned currentDepth);
     
     size_t CalcSubtreeItems();
     void WriteToList(size_t &idx, std::vector<DrawableItem*> *bakedDrawableItems, uint8_t *bakedVisibility);
-    
-    void LogStatus(bool recursive);
     
     GfRange3f aabb;
     GfVec3f minVec;
@@ -103,9 +125,9 @@ public:
     size_t itemCount;
     size_t totalItemCount;
     
-    NSString* name;
+    NodeCullState lastIntersection;
+    std::vector<DrawableItem*> drawables;
     
-    std::vector<DrawableItem*> drawablesTooLarge;
     bool isSplit;
 
     int numChildren;
@@ -114,8 +136,6 @@ public:
 private:
     void subdivide();
     bool canSubdivide();
-    
-    unsigned depth;
 };
 
 class BVH {
@@ -138,7 +158,7 @@ private:
 
     std::vector<DrawableItem*> bakedDrawableItems;
     std::vector<uint8_t> bakedVisibility;
-    std::vector<CullListItem> cullList;
+    CullList cullList;
     bool visibilityDirty;
 };
 

@@ -429,13 +429,11 @@ HdStCommandBuffer::FrustumCull(GfMatrix4d const &viewProjMatrix)
 
     primCount.store(0);
     
-    static vector_float2 dimensions = {1.f, 1.f};
-//    dimensions.x = float(MtlfMetalContext::GetMetalContext()->mtlColorTexture.width);
-//    dimensions.y = float(MtlfMetalContext::GetMetalContext()->mtlColorTexture.height);
+    static vector_float2 dimensions;
 
     MTLRenderPassDescriptor *rpd = MtlfMetalContext::GetMetalContext()->GetRenderPassDescriptor();
-    dimensions.x = float(rpd.colorAttachments[0].texture.width);
-    dimensions.y = float(rpd.colorAttachments[0].texture.height);
+    dimensions.x = 4.0f / float(rpd.colorAttachments[0].texture.width);
+    dimensions.y = 4.0f / float(rpd.colorAttachments[0].texture.height);
     
     MtlfMetalContext::GetMetalContext()->PrepareBufferFlush();
     

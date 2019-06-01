@@ -550,9 +550,9 @@ class GfFrustum {
                                              const GfMatrix4d &vpMat,
                                              double windowWidth, double windowHeight);
         
-    GF_API static bool  IntersectsViewVolumeFloat(const GfBBox3f &bbox,
-                                  const matrix_float4x4 &viewProjMat,
-                                  vector_float2 windowDimensions);
+    GF_API static bool  IntersectsViewVolumeFloat(GfBBox3f const &bbox,
+                                  matrix_float4x4 const &viewProjMat,
+                                  vector_float2 const &windowDimensions);
 
     ///@}
 

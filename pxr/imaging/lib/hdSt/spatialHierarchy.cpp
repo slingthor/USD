@@ -116,8 +116,6 @@ namespace MissingFunctions {
     
     bool ShouldRejectBasedOnSize(vector_float4 const* points, matrix_float4x4 const &viewProjMatrix, vector_float2 const &dimensions)
     {
-        float const threshold = 4.0f; // number of pixels in a dimension
-        
         vector_float4 projectedPoints[] =
         {
             matrix_multiply(viewProjMatrix, points[0]),
@@ -132,14 +130,12 @@ namespace MissingFunctions {
         inv = 1.0f / projectedPoints[1][3];
         screenSpace[1] = projectedPoints[1].xy * inv;
         
-        vector_float2 d = vector_abs((screenSpace[1] - screenSpace[0]) * dimensions);
-        return (d.x < threshold && d.y < threshold);
+        vector_float2 d = vector_abs(screenSpace[1] - screenSpace[0]);
+        return (d.x < dimensions.x && d.y < dimensions.y);
     }
     
     bool ShouldRejectBasedOnSize(const GfVec3f& minVec, const GfVec3f& maxVec, matrix_float4x4 const &viewProjMatrix, vector_float2 const &dimensions)
     {
-        float const threshold = 4.0f; // number of pixels in a dimension
-        
         vector_float4 points[] =
         {
             matrix_multiply(viewProjMatrix, (vector_float4){minVec[0], minVec[1], minVec[2], 1}),
@@ -154,29 +150,71 @@ namespace MissingFunctions {
         inv = 1.0f / points[1][3];
         screenSpace[1] = points[1].xy * inv;
         
-        vector_float2 d = vector_abs((screenSpace[1] - screenSpace[0]) * dimensions);
-        return (d.x < threshold && d.y < threshold);
+        vector_float2 d = vector_abs(screenSpace[1] - screenSpace[0]);
+        return (d.x < dimensions.x && d.y < dimensions.y);
     }
     
     bool FrustumFullyContains(const OctreeNode* node, matrix_float4x4 const &viewProjMatrix)
     {
-        vector_float4 const * const points = node->points;
+        vector_float4 const *points = node->points;
         
-        for (int i = 0; i < 8; ++i) {
-            int clipFlags = 0;
-            vector_float4 clipPos;
-            
-            clipPos = matrix_multiply(viewProjMatrix, points[i]);
-            clipFlags |= ((clipPos.x < clipPos.z) << 3) |
-                         ((clipPos.x > -clipPos.z) << 2) |
-                         ((clipPos.y <  clipPos.z) << 1) |
-                          (clipPos.y > -clipPos.z);
+        int clipFlags;
+        // point[0]
+        vector_float4 clipPos = matrix_multiply(viewProjMatrix, *points++);
+        clipFlags = ((clipPos.x < clipPos.z) << 3) | ((clipPos.x > -clipPos.z) << 2) |
+                    ((clipPos.y < clipPos.z) << 1) | (clipPos.y  > -clipPos.z);
+        if (clipFlags != 0xf)
+            return false;
+        
+        // point[1]
+        clipPos = matrix_multiply(viewProjMatrix, *points++);
+        clipFlags = ((clipPos.x < clipPos.z) << 3) | ((clipPos.x > -clipPos.z) << 2) |
+                    ((clipPos.y < clipPos.z) << 1) | (clipPos.y  > -clipPos.z);
+        if (clipFlags != 0xf)
+            return false;
+        
+        // point[2]
+        clipPos = matrix_multiply(viewProjMatrix, *points++);
+        clipFlags = ((clipPos.x < clipPos.z) << 3) | ((clipPos.x > -clipPos.z) << 2) |
+                    ((clipPos.y < clipPos.z) << 1) | (clipPos.y  > -clipPos.z);
+        if (clipFlags != 0xf)
+            return false;
+        
+        // point[3]
+        clipPos = matrix_multiply(viewProjMatrix, *points++);
+        clipFlags = ((clipPos.x < clipPos.z) << 3) | ((clipPos.x > -clipPos.z) << 2) |
+                    ((clipPos.y < clipPos.z) << 1) | (clipPos.y  > -clipPos.z);
+        if (clipFlags != 0xf)
+            return false;
+        
+        // point[4]
+        clipPos = matrix_multiply(viewProjMatrix, *points++);
+        clipFlags = ((clipPos.x < clipPos.z) << 3) | ((clipPos.x > -clipPos.z) << 2) |
+                    ((clipPos.y < clipPos.z) << 1) | (clipPos.y  > -clipPos.z);
+        if (clipFlags != 0xf)
+            return false;
+        
+        // point[5]
+        clipPos = matrix_multiply(viewProjMatrix, *points++);
+        clipFlags = ((clipPos.x < clipPos.z) << 3) | ((clipPos.x > -clipPos.z) << 2) |
+                    ((clipPos.y < clipPos.z) << 1) | (clipPos.y  > -clipPos.z);
+        if (clipFlags != 0xf)
+            return false;
+        
+        // point[6]
+        clipPos = matrix_multiply(viewProjMatrix, *points++);
+        clipFlags = ((clipPos.x < clipPos.z) << 3) | ((clipPos.x > -clipPos.z) << 2) |
+                    ((clipPos.y < clipPos.z) << 1) | (clipPos.y  > -clipPos.z);
+        if (clipFlags != 0xf)
+            return false;
+        
+        // point[7]
+        clipPos = matrix_multiply(viewProjMatrix, *points);
+        clipFlags = ((clipPos.x < clipPos.z) << 3) | ((clipPos.x > -clipPos.z) << 2) |
+                    ((clipPos.y < clipPos.z) << 1) | (clipPos.y  > -clipPos.z);
+        if (clipFlags != 0xf)
+            return false;
 
-            if (clipFlags != 0xf) {
-                return false;
-            }
-        }
-        
         return true;
     }
 };
@@ -272,7 +310,7 @@ GfRange3f DrawableItem::ConvertDrawablesToItems(std::vector<HdStDrawItemInstance
 static int BVHCounterX = 0;
 
 BVH::BVH()
-: root(OctreeNode(0.f, 0.f, 0.f, 0.f, 0.f, 0.f, 0))
+: root(OctreeNode(0.f, 0.f, 0.f, 0.f, 0.f, 0.f))
 , buildTimeMS(0.f)
 , populated(false)
 {
@@ -291,10 +329,6 @@ BVH::~BVH()
 
 void BVH::BuildBVH(std::vector<HdStDrawItemInstance> *drawables)
 {
-    // NOTE: this is a hack to not have twice the same octree...
-    if (BVHCounter > 2) {
-//        return;
-    }
     os_signpost_id_t bvhGenerate = os_signpost_id_generate(cullingLog);
     os_signpost_id_t bvhBake = os_signpost_id_generate(cullingLog);
 
@@ -311,13 +345,12 @@ void BVH::BuildBVH(std::vector<HdStDrawItemInstance> *drawables)
     GfRange3f bbox = DrawableItem::ConvertDrawablesToItems(drawables, &(this->drawableItems));
 
     root.ReInit(bbox);
-    root.name = @"0";
     
     unsigned depth = 0;
     size_t drawableItemsCount = drawableItems.size();
-    for (size_t idx=0; idx < drawableItemsCount; ++idx)
+    for (size_t idx = 0; idx < drawableItemsCount; ++idx)
     {
-        unsigned currentDepth = root.Insert(drawableItems[idx]);
+        unsigned currentDepth = root.Insert(drawableItems[idx], 0);
         depth = MAX(depth, currentDepth);
     }
     os_signpost_interval_end(cullingLog, bvhGenerate, "BVH Generation");
@@ -377,21 +410,49 @@ void BVH::PerformCulling(matrix_float4x4 const &viewProjMatrix, vector_float2 co
         }
         
         static
-        void processApply(std::vector<CullListItem> *cullList, size_t begin, size_t end)
+        void processApplyContained(std::vector<CullListItem> *cullList, size_t begin, size_t end)
         {
             for (size_t idx = begin; idx < end; ++idx)
             {
-                auto &cullItem((*cullList)[idx]);
-                GfBBox3f const &box = (*cullItem.drawableItem->itemInstance->GetDrawItem()->GetInstanceBounds())[cullItem.drawableItem->instanceIdx];
-                
-                bool visible;
-                if (cullItem.fullyContained) {
+                auto &cullItem = (*cullList)[idx];
+                uint8_t *visibilityWritePtr = cullItem.visibilityWritePtr;
+
+                for (auto &drawableItem : cullItem.node->drawables) {
+                    GfBBox3f const &box = (*drawableItem->itemInstance->GetDrawItem()->GetInstanceBounds())[drawableItem->instanceIdx];
+
+                    bool visible;
                     visible = !MissingFunctions::ShouldRejectBasedOnSize(box.GetRange().GetMin(), box.GetRange().GetMax(), *_viewProjMatrix, *_dimensions);
+                    *visibilityWritePtr++ = visible;
                 }
-                else {
+            }
+        }
+        
+        static
+        void processApplyFrustum(std::vector<CullListItem> *cullList, size_t begin, size_t end)
+        {
+            for (size_t idx = begin; idx < end; ++idx)
+            {
+                auto const& cullItem = (*cullList)[idx];
+                uint8_t *visibilityWritePtr = cullItem.visibilityWritePtr;
+                
+                for (auto &drawableItem : cullItem.node->drawables) {
+                    GfBBox3f const &box = (*drawableItem->itemInstance->GetDrawItem()->GetInstanceBounds())[drawableItem->instanceIdx];
+                    
+                    bool visible;
                     visible = GfFrustum::IntersectsViewVolumeFloat(box, *_viewProjMatrix, *_dimensions);
+                    *visibilityWritePtr++ = visible;
                 }
-                *cullItem.visibilityWritePtr++ = visible;
+            }
+        }
+
+        static
+        void processApplyInvisible(std::vector<CullListItem> *cullList, size_t begin, size_t end)
+        {
+            for (size_t idx = begin; idx < end; ++idx)
+            {
+                auto const& cullItem = (*cullList)[idx];
+                uint8_t *visibilityWritePtr = cullItem.visibilityWritePtr;
+                memset(visibilityWritePtr, 0, cullItem.node->totalItemCount);
             }
         }
     };
@@ -402,11 +463,18 @@ void BVH::PerformCulling(matrix_float4x4 const &viewProjMatrix, vector_float2 co
     os_signpost_interval_begin(cullingLog, bvhCullingFinal, "Culling: BVH -- Apply");
     uint64_t cullApplyStart = ArchGetTickTime();
 
-    WorkParallelForN(cullList.size(),
-                     std::bind(&_Worker::processApply, &cullList,
+    WorkParallelForN(cullList.perItemContained.size(),
+                     std::bind(&_Worker::processApplyContained, &cullList.perItemContained,
                                std::placeholders::_1,
-                               std::placeholders::_2),
-                     grainApply);
+                               std::placeholders::_2));
+    WorkParallelForN(cullList.perItemFrustum.size(),
+                     std::bind(&_Worker::processApplyFrustum, &cullList.perItemFrustum,
+                               std::placeholders::_1,
+                               std::placeholders::_2));
+    WorkParallelForN(cullList.allItemInvisible.size(),
+                     std::bind(&_Worker::processApplyInvisible, &cullList.allItemInvisible,
+                               std::placeholders::_1,
+                               std::placeholders::_2));
 
     os_signpost_interval_end(cullingLog, bvhCullingFinal, "Culling: BVH -- Apply");
     float cullApplyTimeMS = (ArchGetTickTime() - cullApplyStart) / 1000.0f;
@@ -426,10 +494,10 @@ void BVH::PerformCulling(matrix_float4x4 const &viewProjMatrix, vector_float2 co
     float cullBuildBufferTimeMS = (end - cullBuildBufferTimeBegin) / 1000.0f;
     lastCullTimeMS = (end - cullStart) / 1000.0f;
     
-//    NSLog(@"CullList: %.2fms   Apply: %.2fms   BuildBuffer: %.2fms", cullListTimeMS, cullApplyTimeMS, cullBuildBufferTimeMS);
+//    NSLog(@"CullList: %.2fms   Apply: %.2fms   BuildBuffer: %.2fms   Total: %.2fms", cullListTimeMS, cullApplyTimeMS, cullBuildBufferTimeMS, lastCullTimeMS);
 }
 
-OctreeNode::OctreeNode(float minX, float minY, float minZ, float maxX, float maxY, float maxZ, unsigned currentDepth)
+OctreeNode::OctreeNode(float minX, float minY, float minZ, float maxX, float maxY, float maxZ)
 : aabb(GfRange3f(GfVec3f(minX, minY, minZ), GfVec3f(maxX, maxY, maxZ)))
 , minVec(minX, minY, minZ)
 , maxVec(maxX, maxY, maxZ)
@@ -438,9 +506,9 @@ OctreeNode::OctreeNode(float minX, float minY, float minZ, float maxX, float max
 , indexEnd(0)
 , itemCount(0)
 , totalItemCount(0)
+, lastIntersection(Unspecified)
 , isSplit(false)
 , numChildren(0)
-, depth(currentDepth)
 {
     CalcPoints();
 }
@@ -448,7 +516,7 @@ OctreeNode::OctreeNode(float minX, float minY, float minZ, float maxX, float max
 OctreeNode::~OctreeNode()
 {
     if (isSplit) {
-        for (size_t idx=0; idx < numChildren; ++idx)
+        for (size_t idx = 0; idx < numChildren; ++idx)
         {
             delete children[idx];
         }
@@ -479,17 +547,20 @@ void OctreeNode::ReInit(GfRange3f const &boundingBox)
 void OctreeNode::PerformCulling(matrix_float4x4 const &viewProjMatrix,
                                 vector_float2 const &dimensions,
                                 uint8_t *visibility,
-                                std::vector<CullListItem> &cullList,
+                                CullList &cullList,
                                 bool fullyContained)
 {
     if (!fullyContained) {
         if (!GfFrustum::IntersectsViewVolumeFloat(aabb, viewProjMatrix, dimensions)) {
             if (totalItemCount) {
-                memset(visibility + index, 0, totalItemCount);
+                if (lastIntersection != OutsideCull) {
+                    cullList.allItemInvisible.push_back({this, visibility + index});
+                }
             }
+            lastIntersection = OutsideCull;
             return;
         }
-        
+
         if (MissingFunctions::FrustumFullyContains(this, viewProjMatrix)) {
             fullyContained = true;
         }
@@ -498,45 +569,26 @@ void OctreeNode::PerformCulling(matrix_float4x4 const &viewProjMatrix,
     if (fullyContained) {
         if (MissingFunctions::ShouldRejectBasedOnSize(points, viewProjMatrix, dimensions)) {
             if (totalItemCount) {
-                memset(visibility + index, 0, totalItemCount);
+                if (lastIntersection != InsideCull) {
+                    cullList.allItemInvisible.push_back({this, visibility + index});
+                }
             }
+            lastIntersection = InsideCull;
             return;
         }
     }
 
     if (itemCount > 0) {
-        uint8_t *visibilityWritePtr = visibility + index;
-        for(auto drawableItem : drawablesTooLarge)
-        {
-            cullList.push_back({drawableItem, visibilityWritePtr++, fullyContained});
-//            GfBBox3f const &box = (*drawableItem->itemInstance->GetDrawItem()->GetInstanceBounds())[drawableItem->instanceIdx];
-//
-//            bool visible;
-//            if (fullyContained) {
-//                visible = !MissingFunctions::ShouldRejectBasedOnSize(box.GetRange().GetMin(), box.GetRange().GetMax(), viewProjMatrix, dimensions);
-//            }
-//            else {
-//                visible = GfFrustum::IntersectsViewVolumeFloat(box, viewProjMatrix, dimensions);
-//            }
-//            *visibilityWritePtr++ = visible;
-        }
+        if (fullyContained)
+            cullList.perItemContained.push_back({this, visibility + index});
+        else
+            cullList.perItemFrustum.push_back({this, visibility + index});
+        lastIntersection = InsideTest;
     }
     
     if (isSplit) {
         for (int i = 0; i < numChildren; ++i) {
             children[i]->PerformCulling(viewProjMatrix, dimensions, visibility, cullList, fullyContained);
-        }
-    }
-}
-
-void OctreeNode::LogStatus(bool recursive)
-{
-    NSLog(@"Lvl %u, MustKeep: %zu", depth, drawablesTooLarge.size());
-    if (recursive) {
-        if (isSplit) {
-            for (int idx=0; idx < numChildren; ++idx) {
-                children[idx]->LogStatus(recursive);
-            }
         }
     }
 }
@@ -547,31 +599,22 @@ void OctreeNode::subdivide()
     const GfVec3f &localMax = aabb.GetMax();
     const GfVec3f midPoint = localMin + (localMax - localMin) / 2.f;
 
-    children[0] = new OctreeNode(localMin.data()[0], localMin.data()[1], localMin.data()[2], midPoint.data()[0], midPoint.data()[1], midPoint.data()[2], depth + 1);
-    children[1] = new OctreeNode(midPoint.data()[0], localMin.data()[1], localMin.data()[2], localMax.data()[0], midPoint.data()[1], midPoint.data()[2], depth + 1);
-    children[2] = new OctreeNode(localMin.data()[0], midPoint.data()[1], localMin.data()[2], midPoint.data()[0], localMax.data()[1], midPoint.data()[2], depth + 1);
-    children[3] = new OctreeNode(localMin.data()[0], localMin.data()[1], midPoint.data()[2], midPoint.data()[0], midPoint.data()[1], localMax.data()[2], depth + 1);
+    children[0] = new OctreeNode(localMin.data()[0], localMin.data()[1], localMin.data()[2], midPoint.data()[0], midPoint.data()[1], midPoint.data()[2]);
+    children[1] = new OctreeNode(midPoint.data()[0], localMin.data()[1], localMin.data()[2], localMax.data()[0], midPoint.data()[1], midPoint.data()[2]);
+    children[2] = new OctreeNode(localMin.data()[0], midPoint.data()[1], localMin.data()[2], midPoint.data()[0], localMax.data()[1], midPoint.data()[2]);
+    children[3] = new OctreeNode(localMin.data()[0], localMin.data()[1], midPoint.data()[2], midPoint.data()[0], midPoint.data()[1], localMax.data()[2]);
     
-    children[4] = new OctreeNode(midPoint.data()[0], midPoint.data()[1], localMin.data()[2], localMax.data()[0], localMax.data()[1], midPoint.data()[2], depth + 1);
-    children[5] = new OctreeNode(midPoint.data()[0], localMin.data()[1], midPoint.data()[2], localMax.data()[0], midPoint.data()[1], localMax.data()[2], depth + 1);
-    children[6] = new OctreeNode(localMin.data()[0], midPoint.data()[1], midPoint.data()[2], midPoint.data()[0], localMax.data()[1], localMax.data()[2], depth + 1);
-    children[7] = new OctreeNode(midPoint.data()[0], midPoint.data()[1], midPoint.data()[2], localMax.data()[0], localMax.data()[1], localMax.data()[2], depth + 1);
+    children[4] = new OctreeNode(midPoint.data()[0], midPoint.data()[1], localMin.data()[2], localMax.data()[0], localMax.data()[1], midPoint.data()[2]);
+    children[5] = new OctreeNode(midPoint.data()[0], localMin.data()[1], midPoint.data()[2], localMax.data()[0], midPoint.data()[1], localMax.data()[2]);
+    children[6] = new OctreeNode(localMin.data()[0], midPoint.data()[1], midPoint.data()[2], midPoint.data()[0], localMax.data()[1], localMax.data()[2]);
+    children[7] = new OctreeNode(midPoint.data()[0], midPoint.data()[1], midPoint.data()[2], localMax.data()[0], localMax.data()[1], localMax.data()[2]);
     
     numChildren = 8;
-
-    children[0]->name = [name stringByAppendingString:@"-0"];
-    children[1]->name = [name stringByAppendingString:@"-1"];
-    children[2]->name = [name stringByAppendingString:@"-2"];
-    children[3]->name = [name stringByAppendingString:@"-3"];
-    children[4]->name = [name stringByAppendingString:@"-4"];
-    children[5]->name = [name stringByAppendingString:@"-5"];
-    children[6]->name = [name stringByAppendingString:@"-6"];
-    children[7]->name = [name stringByAppendingString:@"-7"];
 
     isSplit = true;
 }
 
-unsigned OctreeNode::Insert(DrawableItem* drawable) {
+unsigned OctreeNode::Insert(DrawableItem* drawable, unsigned currentDepth) {
     if (!MissingFunctions::IntersectsAllChildren(this, drawable->aabb)) {
         if (!isSplit) {
             if ((maxVec - minVec).GetLengthSq() > sizeThresholdSq) {
@@ -581,23 +624,23 @@ unsigned OctreeNode::Insert(DrawableItem* drawable) {
         for (int idx = 0; idx < numChildren; ++idx) {
             Intersection intersection = MissingFunctions::SpatialRelation(children[idx], drawable->aabb);
             if (Intersection::Inside == intersection) {
-                return children[idx]->Insert(drawable);
+                return children[idx]->Insert(drawable, currentDepth + 1);
             }
         }
     }
     
-    drawablesTooLarge.push_back(drawable);
-    
-    return depth;
+    drawables.push_back(drawable);
+
+    return currentDepth;
 }
 
 size_t OctreeNode::CalcSubtreeItems() {
-    itemCount = drawablesTooLarge.size();
+    itemCount = drawables.size();
     
     size_t res = itemCount;
     
     GfRange3f bbox;
-    for(auto drawItem : drawablesTooLarge)
+    for(auto drawItem : drawables)
     {
         bbox.ExtendBy(drawItem->aabb);
     }
@@ -638,7 +681,7 @@ void OctreeNode::WriteToList(size_t &pos,
                              uint8_t *bakedVisibility) {
     index = pos;
     
-    for(auto drawItem : drawablesTooLarge)
+    for(auto drawItem : drawables)
     {
         drawItem->itemInstance->SetCullResultVisibilityCache(bakedVisibility + pos, drawItem->instanceIdx);
         (*bakedDrawableItems)[pos++] = drawItem;

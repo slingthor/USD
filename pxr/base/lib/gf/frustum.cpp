@@ -1290,11 +1290,10 @@ GfFrustum::IntersectsViewVolume(const GfBBox3d &bbox,
     screenSpace[1][0] = points[7][0] * inv;
     screenSpace[1][1] = points[7][1] * inv;
 
-    double const threshold = 4.0; // number of pixels in a dimension
-    double dx = (screenSpace[1][0] - screenSpace[0][0]) * windowWidth;
-    double dy = (screenSpace[1][1] - screenSpace[0][1]) * windowHeight;
-    if (fabs(dx) < threshold &&
-        fabs(dy) < threshold)
+    double dx = (screenSpace[1][0] - screenSpace[0][0]);
+    double dy = (screenSpace[1][1] - screenSpace[0][1]);
+    if (fabs(dx) < windowWidth &&
+        fabs(dy) < windowHeight)
         return false;
 
     // Compute the remaining 8 points of the bbox in
@@ -1337,9 +1336,9 @@ GfFrustum::IntersectsViewVolume(const GfBBox3d &bbox,
 }
 
 bool
-GfFrustum::IntersectsViewVolumeFloat(const GfBBox3f &bbox,
-                                     const matrix_float4x4 &viewProjMat,
-                                     vector_float2 windowDimensions)
+GfFrustum::IntersectsViewVolumeFloat(GfBBox3f const &bbox,
+                                     matrix_float4x4 const &viewProjMat,
+                                     vector_float2 const &windowDimensions)
 {
     // This implementation is a standard technique employed in frustum
     // culling during rendering.  It correctly culls the box even from
@@ -1372,51 +1371,72 @@ GfFrustum::IntersectsViewVolumeFloat(const GfBBox3f &bbox,
     inv = 1.0f / points[1][3];
     screenSpace[1] = points[1].xy * inv;
 
-    float const threshold = 4.0f; // number of pixels in a dimension
-    vector_float2 d = vector_abs((screenSpace[1] - screenSpace[0]) * windowDimensions);
-    if (d.x < threshold &&
-        d.y < threshold)
+    vector_float2 d = vector_abs(screenSpace[1] - screenSpace[0]);
+    if (d.x < windowDimensions.x &&
+        d.y < windowDimensions.y)
         return false;
     
-    // Compute the remaining 8 points of the bbox in
-    // bbox local space.
-    points[2] = {localMin[0], localMin[1], localMax[2], 1};
-    points[3] = {localMin[0], localMax[1], localMin[2], 1};
-    points[4] = {localMin[0], localMax[1], localMax[2], 1};
-    points[5] = {localMax[0], localMin[1], localMin[2], 1};
-    points[6] = {localMax[0], localMin[1], localMax[2], 1};
-    points[7] = {localMax[0], localMax[1], localMin[2], 1};
-    
-    // clipFlags is a 6-bit field with one bit per +/- per x,y,z,
-    // or one per frustum plane.  If the points overlap the
-    // clip volume in any axis, then clipFlags will be 0x3f (0b111111).
     int clipFlags = 0;
-    for (int i = 0; i < 8; ++i) {
-        vector_float4 clipPos;
+    {
+        // point[0]
+        vector_float4 *clipPos = points;
+        clipFlags |= ((clipPos->x < clipPos->z) << 3) | ((clipPos->x > -clipPos->z) << 2) |
+                     ((clipPos->y < clipPos->z) << 1) | (clipPos->y  > -clipPos->z);
+        if (clipFlags == 0xf)
+            return true;
         
-        if (i > 1)
-            clipPos = matrix_multiply(viewProjMat, points[i]);
-        else
-            clipPos = points[i];
-
-        // flag is used as a 6-bit shift register, as we append
-        // results of plane-side testing.  OR-ing all the flags
-        // combines all the records of what plane-side the points
-        // have been on.
-
-        // DEMO!!! Ingnore z planes. Tiny prim deals with far clip, and the
-        // near clip is largely irrelevant due to the other planes in a
-        // perspective projection
-        clipFlags |= ((clipPos.x < clipPos.z) << 3) |
-                ((clipPos.x > -clipPos.z) << 2) |
-                ((clipPos.y <  clipPos.z) << 1) |
-                (clipPos.y > -clipPos.z);
-        
+        // point[1]
+        clipPos++;
+        clipFlags |= ((clipPos->x < clipPos->z) << 3) | ((clipPos->x > -clipPos->z) << 2) |
+                     ((clipPos->y < clipPos->z) << 1) | (clipPos->y  > -clipPos->z);
         if (clipFlags == 0xf)
             return true;
     }
     
-    return clipFlags == 0xf;
+    vector_float4 clipPos;
+    // point[2]
+    clipPos = matrix_multiply(viewProjMat, (vector_float4){localMin[0], localMin[1], localMax[2], 1});
+    clipFlags |= ((clipPos.x < clipPos.z) << 3) | ((clipPos.x > -clipPos.z) << 2) |
+                 ((clipPos.y < clipPos.z) << 1) | (clipPos.y  > -clipPos.z);
+    if (clipFlags == 0xf)
+        return true;
+    
+    // point[3]
+    clipPos = matrix_multiply(viewProjMat, (vector_float4){localMin[0], localMax[1], localMin[2], 1});
+    clipFlags |= ((clipPos.x < clipPos.z) << 3) | ((clipPos.x > -clipPos.z) << 2) |
+                 ((clipPos.y < clipPos.z) << 1) | (clipPos.y  > -clipPos.z);
+    if (clipFlags == 0xf)
+        return true;
+    
+    // point[4]
+    clipPos = matrix_multiply(viewProjMat, (vector_float4){localMin[0], localMax[1], localMax[2], 1});
+    clipFlags |= ((clipPos.x < clipPos.z) << 3) | ((clipPos.x > -clipPos.z) << 2) |
+                 ((clipPos.y < clipPos.z) << 1) | (clipPos.y  > -clipPos.z);
+    if (clipFlags == 0xf)
+        return true;
+    
+    // point[5]
+    clipPos = matrix_multiply(viewProjMat, (vector_float4){localMax[0], localMin[1], localMin[2], 1});
+    clipFlags |= ((clipPos.x < clipPos.z) << 3) | ((clipPos.x > -clipPos.z) << 2) |
+                 ((clipPos.y < clipPos.z) << 1) | (clipPos.y  > -clipPos.z);
+    if (clipFlags == 0xf)
+        return true;
+    
+    // point[6]
+    clipPos = matrix_multiply(viewProjMat, (vector_float4){localMax[0], localMin[1], localMax[2], 1});
+    clipFlags |= ((clipPos.x < clipPos.z) << 3) | ((clipPos.x > -clipPos.z) << 2) |
+                 ((clipPos.y < clipPos.z) << 1) | (clipPos.y  > -clipPos.z);
+    if (clipFlags == 0xf)
+        return true;
+    
+    // point[7]
+    clipPos = matrix_multiply(viewProjMat, (vector_float4){localMax[0], localMax[1], localMin[2], 1});
+    clipFlags |= ((clipPos.x < clipPos.z) << 3) | ((clipPos.x > -clipPos.z) << 2) |
+                 ((clipPos.y < clipPos.z) << 1) | (clipPos.y  > -clipPos.z);
+    if (clipFlags == 0xf)
+        return true;
+
+    return false;
 }
 
 void
