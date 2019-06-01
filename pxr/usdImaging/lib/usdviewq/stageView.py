@@ -1993,10 +1993,13 @@ class StageView(QtOpenGL.QGLWidget):
     def processWSADPressEvent(self, event):
         self.switchToFreeCamera()
         step = 5.0
+        rotStep = 1.0
         if (event.modifiers() & QtCore.Qt.ShiftModifier):
             step *= 10.0
+            rotStep *= 10.0
         elif (event.modifiers() & QtCore.Qt.AltModifier):
             step *= 0.1
+            rotStep *= 0.1
 
         if event.key() == QtCore.Qt.Key_W:
             self._dataModel.viewSettings.freeCamera.Walk(step, 0)
@@ -2004,9 +2007,9 @@ class StageView(QtOpenGL.QGLWidget):
             self._dataModel.viewSettings.freeCamera.Walk(-step, 0)
 
         if event.key() == QtCore.Qt.Key_A:
-            self._dataModel.viewSettings.freeCamera.Walk(0, -step)
+            self._dataModel.viewSettings.freeCamera.PanTilt(rotStep, 0)
         elif event.key() == QtCore.Qt.Key_D:
-            self._dataModel.viewSettings.freeCamera.Walk(0, step)
+            self._dataModel.viewSettings.freeCamera.PanTilt(-rotStep, 0)
         self.updateGL()
 
     def detachAndReClipFromCurrentCamera(self):
