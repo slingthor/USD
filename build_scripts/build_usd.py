@@ -718,6 +718,11 @@ def InstallTBB_LinuxOrMacOS(context, force, buildArgs):
         if iOS():
             updateTBBIOS(context)
             buildArgs.append('compiler=clang target=ios arch=arm64 extra_inc=big_iron.inc ')
+
+        if iOS() or MacOS():
+                PatchFile(context.instDir + "/src/tbb-2019_U7/include/tbb/machine/macos_common.h", 
+                    [("#define __TBB_Yield()  sched_yield()",
+                      "#define __TBB_Yield()  __TBB_Pause(1)")])
         Run('make -j{procs} {buildArgs}'
             .format(procs=context.numJobs, 
                     buildArgs=" ".join(buildArgs)))
