@@ -145,7 +145,7 @@ public:
     void BuildBVH(std::vector<HdStDrawItemInstance> *drawables);
     void PerformCulling(matrix_float4x4 const &viewProjMatrix, vector_float2 const &dimensions);
     
-    OctreeNode root;
+    OctreeNode *root;
     std::vector<DrawableItem*> drawableItems;
     
     float buildTimeMS;

@@ -359,6 +359,8 @@ HdStCommandBuffer::_RebuildDrawBatches()
             batchMap[key] = batch;
         }
     }
+    
+    bvh.BuildBVH(&_drawItemInstances);
 }
 
 void

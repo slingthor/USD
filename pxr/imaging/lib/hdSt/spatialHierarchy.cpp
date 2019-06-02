@@ -310,7 +310,7 @@ GfRange3f DrawableItem::ConvertDrawablesToItems(std::vector<HdStDrawItemInstance
 static int BVHCounterX = 0;
 
 BVH::BVH()
-: root(OctreeNode(0.f, 0.f, 0.f, 0.f, 0.f, 0.f))
+: root(NULL)
 , buildTimeMS(0.f)
 , populated(false)
 {
@@ -321,6 +321,9 @@ BVH::BVH()
 
 BVH::~BVH()
 {
+    delete root;
+    root = NULL;
+
     for (size_t idx = 0; idx < drawableItems.size(); ++idx) {
         delete drawableItems[idx];
     }
@@ -344,13 +347,17 @@ void BVH::BuildBVH(std::vector<HdStDrawItemInstance> *drawables)
     
     GfRange3f bbox = DrawableItem::ConvertDrawablesToItems(drawables, &(this->drawableItems));
 
-    root.ReInit(bbox);
+    if (root) {
+        delete root;
+    }
+    root = new OctreeNode(0.f, 0.f, 0.f, 0.f, 0.f, 0.f);
+    root->ReInit(bbox);
     
     unsigned depth = 0;
     size_t drawableItemsCount = drawableItems.size();
     for (size_t idx = 0; idx < drawableItemsCount; ++idx)
     {
-        unsigned currentDepth = root.Insert(drawableItems[idx], 0);
+        unsigned currentDepth = root->Insert(drawableItems[idx], 0);
         depth = MAX(depth, currentDepth);
     }
     os_signpost_interval_end(cullingLog, bvhGenerate, "BVH Generation");
@@ -368,14 +375,14 @@ void BVH::BuildBVH(std::vector<HdStDrawItemInstance> *drawables)
 
 void BVH::Bake()
 {
-    root.CalcSubtreeItems();
+    root->CalcSubtreeItems();
 
     bakedDrawableItems.resize(drawableItems.size());
     bakedVisibility.resize(drawableItems.size());
     cullList.resize(drawableItems.size());
 
     size_t index = 0;
-    root.WriteToList(index, &bakedDrawableItems, &bakedVisibility[0]);
+    root->WriteToList(index, &bakedDrawableItems, &bakedVisibility[0]);
 }
 
 void BVH::PerformCulling(matrix_float4x4 const &viewProjMatrix, vector_float2 const &dimensions)
@@ -390,7 +397,7 @@ void BVH::PerformCulling(matrix_float4x4 const &viewProjMatrix, vector_float2 co
     os_signpost_interval_begin(cullingLog, bvhCulling, "Culling: BVH");
     os_signpost_interval_begin(cullingLog, bvhCullingCull, "Culling: BVH -- Culllist");
     cullList.clear();
-    root.PerformCulling(viewProjMatrix, dimensions, &bakedVisibility[0], cullList, false);
+    root->PerformCulling(viewProjMatrix, dimensions, &bakedVisibility[0], cullList, false);
     os_signpost_interval_end(cullingLog, bvhCullingCull, "Culling: BVH -- Culllist");
     float cullListTimeMS = (ArchGetTickTime() - cullStart) / 1000.0f;
     
