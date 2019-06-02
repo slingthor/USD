@@ -1516,9 +1516,6 @@
    <property name="toolTip">
     <string>Toggle camera with view saved before last Frame operation</string>
    </property>
-   <property name="shortcut">
-    <string>J</string>
-   </property>
    <property name="shortcutContext">
     <enum>Qt::ApplicationShortcut</enum>
    </property>
@@ -2037,9 +2034,6 @@
    </property>
    <property name="toolTip">
     <string>Show Python interpreter console</string>
-   </property>
-   <property name="shortcut">
-    <string>I</string>
    </property>
   </action>
   <action name="actionHUD_VBOInfo">
