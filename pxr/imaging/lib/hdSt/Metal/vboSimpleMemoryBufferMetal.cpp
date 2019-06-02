@@ -23,6 +23,8 @@
 //
 #include "pxr/imaging/glf/glew.h"
 
+#include "pxr/base/arch/defines.h"
+
 #include "pxr/imaging/garch/contextCaps.h"
 #include "pxr/imaging/garch/resourceFactory.h"
 
@@ -133,8 +135,13 @@ HdStVBOSimpleMemoryBufferMetal::Reallocate(
         for (int i = 0; i < 3; i++) {
             oldId[i] = bres->GetIdAtIndex(i);
             
+#if defined(ARCH_OS_MACOS)
+            if (i == 0)
+#else
             // Triple buffer everything
-            if (true) {//i == 0) {
+            if (true)
+#endif
+            {
                 if (bufferSize) {
                     newId[i] = context->GetMetalBuffer(bufferSize, MTLResourceStorageModeDefault);
                 }

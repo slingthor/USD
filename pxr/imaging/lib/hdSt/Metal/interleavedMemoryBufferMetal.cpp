@@ -33,6 +33,7 @@
 #include <vector>
 
 #include "pxr/base/arch/hash.h"
+#include "pxr/base/arch/defines.h"
 #include "pxr/base/tf/diagnostic.h"
 #include "pxr/base/tf/enum.h"
 #include "pxr/base/tf/iterator.h"
@@ -128,8 +129,13 @@ HdStStripedInterleavedBufferMetal::Reallocate(
         oldId[i] = oldBuffer->GetIdAtIndex(i);
         curId[i] = currentBuffer->GetIdAtIndex(i);
         
+#if defined(ARCH_OS_MACOS)
+        if (i == 0)
+#else
         // Triple buffer everything
-        if (true) {
+        if (true)
+#endif
+        {
             newId[i] = context->GetMetalBuffer(totalSize, MTLResourceStorageModeDefault);
         }
         else {
