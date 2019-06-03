@@ -249,15 +249,6 @@ HdStCommandBuffer::ExecuteDraw(
                       _drawBatches.size());
     }
     os_signpost_interval_end(encodingLog, issueEncoding, "Encoding");
-
-    if (setAlpha) {
-//        context->SetAlphaBlendingEnable(true);
-//        renderPassDescriptor.colorAttachments[0].blendingEnabled = YES;
-//        renderPipelineStateDescriptor.colorAttachments[0].sourceRGBBlendFactor = MTLBlendFactorOne;
-//        renderPipelineStateDescriptor.colorAttachments[0].sourceAlphaBlendFactor = MTLBlendFactorOne;
-//        renderPipelineStateDescriptor.colorAttachments[0].destinationRGBBlendFactor = MTLBlendFactorOne;
-//        renderPipelineStateDescriptor.colorAttachments[0].destinationAlphaBlendFactor = MTLBlendFactorOne;
-    }
     
     uint64_t timeDiff = ArchGetTickTime() - timeStart;
     static uint64_t fastestTime = 0xffffffffffffffff;

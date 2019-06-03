@@ -114,21 +114,26 @@ namespace MissingFunctions {
         return Intersection::Outside;
     }
     
-    bool ShouldRejectBasedOnSize(vector_float4 const* points, matrix_float4x4 const &viewProjMatrix, vector_float2 const &dimensions)
+    bool ShouldRejectBasedOnSize(vector_float4 const* _points, matrix_float4x4 const &viewProjMatrix, vector_float2 const &dimensions)
     {
-        vector_float4 projectedPoints[] =
+        vector_float4 points[] =
         {
-            matrix_multiply(viewProjMatrix, points[0]),
-            matrix_multiply(viewProjMatrix, points[1])
+            matrix_multiply(viewProjMatrix, _points[0]),
+            matrix_multiply(viewProjMatrix, _points[1]),
+            matrix_multiply(viewProjMatrix, _points[2]),
+            matrix_multiply(viewProjMatrix, _points[3])
         };
 
-        vector_float2 screenSpace[2];
-        vector_float2 inv = vector_fast_recip((vector_float2){projectedPoints[0][3], projectedPoints[1][3]});
-        screenSpace[0] = projectedPoints[0].xy * inv.x;
-        screenSpace[1] = projectedPoints[1].xy * inv.y;
-
-        vector_float2 d = vector_abs(screenSpace[1] - screenSpace[0]);
-        return (d.x < dimensions.x && d.y < dimensions.y);
+        vector_float4 screenSpace[2];
+        vector_float4 inv = vector_fast_recip((vector_float4){points[0][3], points[1][3], points[2][3], points[3][3]});
+        screenSpace[0].xy = points[0].xy * inv.x;
+        screenSpace[1].xy = points[1].xy * inv.y;
+        screenSpace[0].zw = points[2].xy * inv.z;
+        screenSpace[1].zw = points[3].xy * inv.w;
+        
+        vector_float4 d = vector_abs(screenSpace[1] - screenSpace[0]);
+        return (d.x < dimensions.x && d.y < dimensions.y) &&
+               (d.z < dimensions.x && d.w < dimensions.y);
     }
     
     bool ShouldRejectBasedOnSize(const GfVec3f& minVec, const GfVec3f& maxVec, matrix_float4x4 const &viewProjMatrix, vector_float2 const &dimensions)
@@ -136,16 +141,21 @@ namespace MissingFunctions {
         vector_float4 points[] =
         {
             matrix_multiply(viewProjMatrix, (vector_float4){minVec[0], minVec[1], minVec[2], 1}),
-            matrix_multiply(viewProjMatrix, (vector_float4){maxVec[0], maxVec[1], maxVec[2], 1})
+            matrix_multiply(viewProjMatrix, (vector_float4){maxVec[0], maxVec[1], maxVec[2], 1}),
+            matrix_multiply(viewProjMatrix, (vector_float4){minVec[0], maxVec[1], minVec[2], 1}),
+            matrix_multiply(viewProjMatrix, (vector_float4){maxVec[0], minVec[1], maxVec[2], 1})
         };
         
-        vector_float2 screenSpace[2];
-        vector_float2 inv = vector_fast_recip((vector_float2){points[0][3], points[1][3]});
-        screenSpace[0] = points[0].xy * inv.x;
-        screenSpace[1] = points[1].xy * inv.y;
+        vector_float4 screenSpace[2];
+        vector_float4 inv = vector_fast_recip((vector_float4){points[0][3], points[1][3], points[2][3], points[3][3]});
+        screenSpace[0].xy = points[0].xy * inv.x;
+        screenSpace[1].xy = points[1].xy * inv.y;
+        screenSpace[0].zw = points[2].xy * inv.z;
+        screenSpace[1].zw = points[3].xy * inv.w;
 
-        vector_float2 d = vector_abs(screenSpace[1] - screenSpace[0]);
-        return (d.x < dimensions.x && d.y < dimensions.y);
+        vector_float4 d = vector_abs(screenSpace[1] - screenSpace[0]);
+        return (d.x < dimensions.x && d.y < dimensions.y) &&
+               (d.z < dimensions.x && d.w < dimensions.y);
     }
     
     bool FrustumFullyContains(const OctreeNode* node,
@@ -277,11 +287,11 @@ DrawableItem::DrawableItem(HdStDrawItemInstance* itemInstance,
 
     points[0] = {minVec[0], minVec[1], minVec[2], 1};
     points[1] = {maxVec[0], maxVec[1], maxVec[2], 1};
-    points[2] = {minVec[0], minVec[1], maxVec[2], 1};
-    points[3] = {minVec[0], maxVec[1], minVec[2], 1};
-    points[4] = {minVec[0], maxVec[1], maxVec[2], 1};
-    points[5] = {maxVec[0], minVec[1], minVec[2], 1};
-    points[6] = {maxVec[0], minVec[1], maxVec[2], 1};
+    points[2] = {minVec[0], maxVec[1], minVec[2], 1};
+    points[3] = {maxVec[0], minVec[1], maxVec[2], 1};
+    points[4] = {minVec[0], minVec[1], maxVec[2], 1};
+    points[5] = {minVec[0], maxVec[1], maxVec[2], 1};
+    points[6] = {maxVec[0], minVec[1], minVec[2], 1};
     points[7] = {maxVec[0], maxVec[1], minVec[2], 1};
 }
 
@@ -344,11 +354,12 @@ GfRange3f DrawableItem::ConvertDrawablesToItems(std::vector<HdStDrawItemInstance
 
                 boundingBox.ExtendBy(aabb);
 
-                DrawableItem *newItem = new DrawableItem(drawable, aabb, oobb, i, numItems);
-
-                items->push_back(newItem);
-                if (i == 0) {
-                    visibilityOwners->push_back(newItem);
+                if (aabb.GetMax()[0] != FLT_MAX) {
+                    DrawableItem *newItem = new DrawableItem(drawable, aabb, oobb, i, numItems);
+                    items->push_back(newItem);
+                    if (i == 0) {
+                        visibilityOwners->push_back(newItem);
+                    }
                 }
             }
         } else if (numItems == 1) {
@@ -365,10 +376,12 @@ GfRange3f DrawableItem::ConvertDrawablesToItems(std::vector<HdStDrawItemInstance
 
             boundingBox.ExtendBy(aabb);
 
-            DrawableItem* drawableItem = new DrawableItem(drawable, aabb, oobb);
-            
-            items->push_back(drawableItem);
-            visibilityOwners->push_back(drawableItem);
+            if (aabb.GetMax()[0] != FLT_MAX) {
+                DrawableItem* drawableItem = new DrawableItem(drawable, aabb, oobb);
+                
+                items->push_back(drawableItem);
+                visibilityOwners->push_back(drawableItem);
+            }
         }
     }
     
@@ -403,6 +416,8 @@ void BVH::BuildBVH(std::vector<HdStDrawItemInstance> *drawables)
     os_signpost_id_t bvhGenerate = os_signpost_id_generate(cullingLog);
     os_signpost_id_t bvhBake = os_signpost_id_generate(cullingLog);
 
+    populated = true;
+
     NSLog(@"Building BVH for %zu HdStDrawItemInstance(s), %i", drawables->size(), BVHCounter);
     if (drawables->size() <= 0) {
         return;
@@ -417,6 +432,10 @@ void BVH::BuildBVH(std::vector<HdStDrawItemInstance> *drawables)
     GfRange3f bbox = DrawableItem::ConvertDrawablesToItems(drawables,
                                                            &(this->drawableItems),
                                                            &drawableVisibilityOwners);
+    
+    if (!drawableItems.size()) {
+        return;
+    }
 
     if (root) {
         delete root;
@@ -439,8 +458,6 @@ void BVH::BuildBVH(std::vector<HdStDrawItemInstance> *drawables)
 
     buildTimeMS = (ArchGetTickTime() - buildStart) / 1000.0f;
     
-    populated = true;
-    
     NSLog(@"Building BVH done: MaxDepth=%u, %fms, %zu items", depth, buildTimeMS, drawableItems.size());
 }
 
@@ -459,6 +476,10 @@ void BVH::Bake()
 void BVH::PerformCulling(matrix_float4x4 const &viewProjMatrix,
                          vector_float2 const &dimensions)
 {
+    if (!root) {
+        return;
+    }
+
     os_signpost_id_t bvhCulling = os_signpost_id_generate(cullingLog);
     os_signpost_id_t bvhCullingCull = os_signpost_id_generate(cullingLog);
     os_signpost_id_t bvhCullingFinal = os_signpost_id_generate(cullingLog);
@@ -620,7 +641,7 @@ void BVH::PerformCulling(matrix_float4x4 const &viewProjMatrix,
     float cullBuildBufferTimeMS = (end - cullBuildBufferTimeBegin) / 1000.0f;
     lastCullTimeMS = (end - cullStart) / 1000.0f;
     
-    //NSLog(@"CullList: %.2fms   Apply: %.2fms   BuildBuffer: %.2fms   Total: %.2fms", cullListTimeMS, cullApplyTimeMS, cullBuildBufferTimeMS, lastCullTimeMS);
+    NSLog(@"CullList: %.2fms   Apply: %.2fms   BuildBuffer: %.2fms   Total: %.2fms", cullListTimeMS, cullApplyTimeMS, cullBuildBufferTimeMS, lastCullTimeMS);
 }
 
 OctreeNode::OctreeNode(float minX, float minY, float minZ, float maxX, float maxY, float maxZ)
@@ -654,11 +675,11 @@ void OctreeNode::CalcPoints()
 {
     points[0] = {minVec[0], minVec[1], minVec[2], 1};
     points[1] = {maxVec[0], maxVec[1], maxVec[2], 1};
-    points[2] = {minVec[0], minVec[1], maxVec[2], 1};
-    points[3] = {minVec[0], maxVec[1], minVec[2], 1};
-    points[4] = {minVec[0], maxVec[1], maxVec[2], 1};
-    points[5] = {maxVec[0], minVec[1], minVec[2], 1};
-    points[6] = {maxVec[0], minVec[1], maxVec[2], 1};
+    points[2] = {minVec[0], maxVec[1], minVec[2], 1};
+    points[3] = {maxVec[0], minVec[1], maxVec[2], 1};
+    points[4] = {minVec[0], minVec[1], maxVec[2], 1};
+    points[5] = {minVec[0], maxVec[1], maxVec[2], 1};
+    points[6] = {maxVec[0], minVec[1], minVec[2], 1};
     points[7] = {maxVec[0], maxVec[1], minVec[2], 1};
 }
 
