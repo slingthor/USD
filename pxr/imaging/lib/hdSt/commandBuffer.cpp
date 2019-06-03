@@ -64,11 +64,6 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-#define USE_BVH_FOR_CULLING 1
-
-//#define CULL_NAÏVE
-#define CULL_BVH
-
 static os_log_t cullingLog = os_log_create("hydra.metal", "Culling");
 
 HdStCommandBuffer::HdStCommandBuffer()
@@ -474,41 +469,22 @@ HdStCommandBuffer::FrustumCull(GfMatrix4d const &viewProjMatrix)
 
     
     GfMatrix4f viewProjMatrixf(viewProjMatrix);
-    matrix_float4x4 simdViewProjMatrix = matrix_from_columns((vector_float4){viewProjMatrixf[0][0], viewProjMatrixf[0][1], viewProjMatrixf[0][2], viewProjMatrixf[0][3]},
-                                                             (vector_float4){viewProjMatrixf[1][0], viewProjMatrixf[1][1], viewProjMatrixf[1][2], viewProjMatrixf[1][3]},
-                                                             (vector_float4){viewProjMatrixf[2][0], viewProjMatrixf[2][1], viewProjMatrixf[2][2], viewProjMatrixf[2][3]},
-                                                             (vector_float4){viewProjMatrixf[3][0], viewProjMatrixf[3][1], viewProjMatrixf[3][2], viewProjMatrixf[3][3]});
+    matrix_float4x4 simdViewProjMatrix =
+        matrix_from_columns((vector_float4){viewProjMatrixf[0][0], viewProjMatrixf[0][1], viewProjMatrixf[0][2], viewProjMatrixf[0][3]},
+                            (vector_float4){viewProjMatrixf[1][0], viewProjMatrixf[1][1], viewProjMatrixf[1][2], viewProjMatrixf[1][3]},
+                            (vector_float4){viewProjMatrixf[2][0], viewProjMatrixf[2][1], viewProjMatrixf[2][2], viewProjMatrixf[2][3]},
+                            (vector_float4){viewProjMatrixf[3][0], viewProjMatrixf[3][1], viewProjMatrixf[3][2], viewProjMatrixf[3][3]});
 
 
-#ifdef USE_BVH_FOR_CULLING
     if (!bvh.populated)
     {
         bvh.BuildBVH(&_drawItemInstances);
     }
-#endif
+
     uint64_t timeStart = ArchGetTickTime();
 
-#ifdef CULL_NAÏVE
-    os_signpost_id_t naiveCulling = os_signpost_id_generate(cullingLog);
-    os_signpost_interval_begin(cullingLog, naiveCulling, "Culling: Naïve");
-    if (!mtCullingDisabled) {
-        WorkParallelForN(_drawItemInstances.size(),
-                         std::bind(&_Worker::cull, &_drawItemInstances,
-                                   std::cref(simdViewProjMatrix),
-                                   std::placeholders::_1,
-                                   std::placeholders::_2));
-    } else {
-        _Worker::cull(&_drawItemInstances,
-                      simdViewProjMatrix,
-                      0,
-                      _drawItemInstances.size());
-    }
-    os_signpost_interval_end(cullingLog, naiveCulling, "Culling: Naïve");
-#endif
 
-#ifdef CULL_BVH
     bvh.PerformCulling(simdViewProjMatrix, dimensions);
-#endif
     
     MtlfMetalContext::GetMetalContext()->FlushBuffers();
 
