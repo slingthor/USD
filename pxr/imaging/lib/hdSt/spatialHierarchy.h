@@ -79,20 +79,32 @@ struct CullList {
 };
 
 struct DrawableItem {
-    DrawableItem(HdStDrawItemInstance* itemInstance, GfRange3f const &aaBoundingBox);
-    DrawableItem(HdStDrawItemInstance* itemInstance, GfRange3f const &aaBoundingBox, size_t instanceIndex, size_t totalInstancers);
+    DrawableItem(HdStDrawItemInstance* itemInstance,
+                 GfRange3f const &aaBoundingBox,
+                 GfBBox3f const &cullingBBox);
+    DrawableItem(HdStDrawItemInstance* itemInstance,
+                 GfRange3f const &aaBoundingBox,
+                 GfBBox3f const &cullingBBox,
+                 size_t instanceIndex,
+                 size_t totalInstancers);
     
     void ProcessInstancesVisible();
     
-    static GfRange3f ConvertDrawablesToItems(std::vector<HdStDrawItemInstance> *drawables, std::vector<DrawableItem*> *items);
+    static GfRange3f ConvertDrawablesToItems(std::vector<HdStDrawItemInstance> *drawables,
+                                             std::vector<DrawableItem*> *items,
+                                             std::vector<DrawableItem*> *visibilityOwners);
     
     HdStDrawItemInstance *itemInstance;
     GfRange3f aabb;
-    GfVec3f halfSize;
-    
-    bool isInstanced;
+    GfBBox3f const& cullingBBox;
+
+    vector_float4 points[8];
+    mutable int   lastCullPlane;
+
     size_t instanceIdx;
     size_t numItemsInInstance;
+
+    bool isInstanced;
 };
 
 class OctreeNode {
@@ -104,6 +116,7 @@ public:
     void ReInit(GfRange3f const &boundingBox);
     
     void PerformCulling(matrix_float4x4 const &viewProjMatrix,
+                        vector_float4 const *clipPlanes,
                         vector_float2 const &dimensions,
                         uint8_t *visibility,
                         CullList &cullList,
@@ -119,6 +132,7 @@ public:
     GfVec3f maxVec;
     GfVec3f halfSize;
     vector_float4 points[8];
+    mutable int   lastCullPlane;
     
     size_t index;
     size_t indexEnd;
@@ -135,7 +149,6 @@ public:
 
 private:
     void subdivide();
-    bool canSubdivide();
 };
 
 class BVH {
@@ -143,10 +156,12 @@ public:
     BVH();
     ~BVH();
     void BuildBVH(std::vector<HdStDrawItemInstance> *drawables);
-    void PerformCulling(matrix_float4x4 const &viewProjMatrix, vector_float2 const &dimensions);
+    void PerformCulling(matrix_float4x4 const &viewProjMatrix,
+                        vector_float2 const &dimensions);
     
     OctreeNode *root;
     std::vector<DrawableItem*> drawableItems;
+    std::vector<DrawableItem*> drawableVisibilityOwners;
     
     float buildTimeMS;
     float lastCullTimeMS;

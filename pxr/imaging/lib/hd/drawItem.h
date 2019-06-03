@@ -214,7 +214,7 @@ public:
         return &_instancedCullingBounds;
     }
     
-    void BuildInstanceBuffer(uint8_t** instanceVisibility) const;
+    int BuildInstanceBuffer(uint8_t** instanceVisibility) const;
     
 protected:
 

@@ -399,21 +399,19 @@ HdDrawItem::CalculateCullingBounds() const
     _instancedCullingBoundsCalculated = true;
 }
 
-void HdDrawItem::BuildInstanceBuffer(uint8_t** instanceVisibility) const
+int HdDrawItem::BuildInstanceBuffer(uint8_t** instanceVisibility) const
 {
     int numItems = _instancedCullingBounds.size();
     int i;
-//    for(i = 0; i < numItems; i++) {
-//        if (*instanceVisibility[i])
-//            break;
-//    }
-//    if (i == numItems) {
-//        numVisible = 0;
-//        return;
-//    }
 
     int instancerNumLevels = GetInstancePrimvarNumLevels();
     int instanceIndexWidth = instancerNumLevels + 1;
+    
+    if (instanceIndexWidth != 2) {
+        // We use 64 bit read/writes below for a more efficient copy
+        TF_FATAL_CODING_ERROR("Only expected to find one instance level, found %d", instancerNumLevels);
+        return 0;
+    }
 
     HdBufferArrayRangeSharedPtr const & instanceIndexRange = GetInstanceIndexRange();
     int instanceOffset = instanceIndexRange->GetOffset();
@@ -427,6 +425,8 @@ void HdDrawItem::BuildInstanceBuffer(uint8_t** instanceVisibility) const
     
     uint8_t *culledInstanceIndexBuffer = const_cast<uint8_t*>(culledInstanceIndexRes->GetBufferContents());
     uint32_t *culledInstanceBuffer = reinterpret_cast<uint32_t*>(culledInstanceIndexBuffer) + instanceOffset;
+    uint64_t *instanceBuffer64 = reinterpret_cast<uint64_t*>(instanceBuffer);
+    uint64_t *culledInstanceBuffer64 = reinterpret_cast<uint64_t*>(culledInstanceBuffer);
     
     bool modified = false;
     int numVisible = 0;
@@ -434,35 +434,46 @@ void HdDrawItem::BuildInstanceBuffer(uint8_t** instanceVisibility) const
         if (!*instanceVisibility[i])
             continue;
         
-        int instanceIndex = instanceBuffer[i * instanceIndexWidth];
-        auto const & bounds = _instancedCullingBounds[i];
+        numVisible++;
 
-        if (*culledInstanceBuffer != instanceIndex) {
+        uint64_t instanceIndex64 = instanceBuffer64[i];
+        if (*culledInstanceBuffer64 != instanceIndex64) {
+            *culledInstanceBuffer64++ = instanceIndex64;
+            
+            // Exit early, and perform a more efficient loop for the remainder
+            i++;
             modified = true;
-            *culledInstanceBuffer++ = instanceIndex;
-            for(int j = 1; j < instanceIndexWidth; j++)
-                *culledInstanceBuffer++ = instanceBuffer[i * instanceIndexWidth + j];
+            break;
         }
         else {
-            culledInstanceBuffer+=instanceIndexWidth;
+            culledInstanceBuffer64++;
         }
-        numVisible++;
     }
-    
+
     if (modified) {
+        for(; i < numItems; i++) {
+            if (!*instanceVisibility[i])
+                continue;
+
+            numVisible++;
+            *culledInstanceBuffer64++ = instanceBuffer64[i];
+        }
+
 #if defined(ARCH_OS_MACOS)
         MtlfMetalContext::MtlfMultiBuffer h = culledInstanceIndexRes->GetId();
         id<MTLBuffer> metalBuffer = h.forCurrentGPU();
-        
+
         uint32_t start = instanceOffset * sizeof(uint32_t);
-        uint32_t length = numVisible * sizeof(uint32_t) * instanceIndexWidth;
+        uint32_t length = numVisible * sizeof(uint32_t) * 2;
         MtlfMetalContext::GetMetalContext()->QueueBufferFlush(metalBuffer, start, start + length);
 #endif
     }
     
     HdDrawItem* _this = const_cast<HdDrawItem*>(this);
     _this->numVisible = numVisible;
+    return numVisible;
 }
+
 HD_API
 std::ostream &operator <<(std::ostream &out, 
                           const HdDrawItem& self) {

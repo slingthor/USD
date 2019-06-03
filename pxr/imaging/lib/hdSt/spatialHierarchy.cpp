@@ -121,15 +121,12 @@ namespace MissingFunctions {
             matrix_multiply(viewProjMatrix, points[0]),
             matrix_multiply(viewProjMatrix, points[1])
         };
-        
+
         vector_float2 screenSpace[2];
-        
-        float inv = 1.0f / projectedPoints[0][3];
-        screenSpace[0] = projectedPoints[0].xy * inv;
-        
-        inv = 1.0f / projectedPoints[1][3];
-        screenSpace[1] = projectedPoints[1].xy * inv;
-        
+        vector_float2 inv = vector_fast_recip((vector_float2){projectedPoints[0][3], projectedPoints[1][3]});
+        screenSpace[0] = projectedPoints[0].xy * inv.x;
+        screenSpace[1] = projectedPoints[1].xy * inv.y;
+
         vector_float2 d = vector_abs(screenSpace[1] - screenSpace[0]);
         return (d.x < dimensions.x && d.y < dimensions.y);
     }
@@ -143,121 +140,182 @@ namespace MissingFunctions {
         };
         
         vector_float2 screenSpace[2];
-        
-        float inv = 1.0f / points[0][3];
-        screenSpace[0] = points[0].xy * inv;
-        
-        inv = 1.0f / points[1][3];
-        screenSpace[1] = points[1].xy * inv;
-        
+        vector_float2 inv = vector_fast_recip((vector_float2){points[0][3], points[1][3]});
+        screenSpace[0] = points[0].xy * inv.x;
+        screenSpace[1] = points[1].xy * inv.y;
+
         vector_float2 d = vector_abs(screenSpace[1] - screenSpace[0]);
         return (d.x < dimensions.x && d.y < dimensions.y);
     }
     
-    bool FrustumFullyContains(const OctreeNode* node, matrix_float4x4 const &viewProjMatrix)
+    bool FrustumFullyContains(const OctreeNode* node,
+                              vector_float4 const *clipPlanes)
     {
         vector_float4 const *points = node->points;
         
-        int clipFlags;
-        // point[0]
-        vector_float4 clipPos = matrix_multiply(viewProjMatrix, *points++);
-        clipFlags = ((clipPos.x < clipPos.z) << 3) | ((clipPos.x > -clipPos.z) << 2) |
-                    ((clipPos.y < clipPos.z) << 1) | (clipPos.y  > -clipPos.z);
-        if (clipFlags != 0xf)
-            return false;
+        float value;
+        for (int p = 0; p < 5; p++) {
+            int hits = 0;
+            value = vector_dot(clipPlanes[p].xyz, points[0].xyz) + clipPlanes[p].w;
+            if (value < 0)
+                return false;
+            value = vector_dot(clipPlanes[p].xyz, points[1].xyz) + clipPlanes[p].w;
+            if (value < 0)
+                return false;
+            value = vector_dot(clipPlanes[p].xyz, points[2].xyz) + clipPlanes[p].w;
+            if (value < 0)
+                return false;
+            value = vector_dot(clipPlanes[p].xyz, points[3].xyz) + clipPlanes[p].w;
+            if (value < 0)
+                return false;
+            value = vector_dot(clipPlanes[p].xyz, points[4].xyz) + clipPlanes[p].w;
+            if (value < 0)
+                return false;
+            value = vector_dot(clipPlanes[p].xyz, points[5].xyz) + clipPlanes[p].w;
+            if (value < 0)
+                return false;
+            value = vector_dot(clipPlanes[p].xyz, points[6].xyz) + clipPlanes[p].w;
+            if (value < 0)
+                return false;
+            value = vector_dot(clipPlanes[p].xyz, points[7].xyz) + clipPlanes[p].w;
+            if (value < 0)
+                return false;
+        }
+
+        return true;
+    }
+    
+    bool IntersectsFrustum(vector_float4 const *points,
+                           vector_float4 const *clipPlanes,
+                           int &planeHint)
+    {
+        float value;
         
-        // point[1]
-        clipPos = matrix_multiply(viewProjMatrix, *points++);
-        clipFlags = ((clipPos.x < clipPos.z) << 3) | ((clipPos.x > -clipPos.z) << 2) |
-                    ((clipPos.y < clipPos.z) << 1) | (clipPos.y  > -clipPos.z);
-        if (clipFlags != 0xf)
+        // Test the plane we hit last time we discarded this object first
+        if (planeHint >= 0) {
+            do {
+                value = vector_dot(clipPlanes[planeHint].xyz, points[0].xyz) + clipPlanes[planeHint].w;
+                if (value > 0)
+                    break;
+                value = vector_dot(clipPlanes[planeHint].xyz, points[1].xyz) + clipPlanes[planeHint].w;
+                if (value > 0)
+                    break;
+                value = vector_dot(clipPlanes[planeHint].xyz, points[2].xyz) + clipPlanes[planeHint].w;
+                if (value > 0)
+                    break;
+                value = vector_dot(clipPlanes[planeHint].xyz, points[3].xyz) + clipPlanes[planeHint].w;
+                if (value > 0)
+                    break;
+                value = vector_dot(clipPlanes[planeHint].xyz, points[4].xyz) + clipPlanes[planeHint].w;
+                if (value > 0)
+                    break;
+                value = vector_dot(clipPlanes[planeHint].xyz, points[5].xyz) + clipPlanes[planeHint].w;
+                if (value > 0)
+                    break;
+                value = vector_dot(clipPlanes[planeHint].xyz, points[6].xyz) + clipPlanes[planeHint].w;
+                if (value > 0)
+                    break;
+                value = vector_dot(clipPlanes[planeHint].xyz, points[7].xyz) + clipPlanes[planeHint].w;
+                if (value > 0)
+                    break;
+                return false;
+            } while(false);
+        }
+
+        for (int p = 0; p < 5; p++, clipPlanes++) {
+            if (p == planeHint)
+                continue;
+
+            value = vector_dot(clipPlanes->xyz, points[0].xyz) + clipPlanes->w;
+            if (value > 0)
+                continue;
+            value = vector_dot(clipPlanes->xyz, points[1].xyz) + clipPlanes->w;
+            if (value > 0)
+                continue;
+            value = vector_dot(clipPlanes->xyz, points[2].xyz) + clipPlanes->w;
+            if (value > 0)
+                continue;
+            value = vector_dot(clipPlanes->xyz, points[3].xyz) + clipPlanes->w;
+            if (value > 0)
+                continue;
+            value = vector_dot(clipPlanes->xyz, points[4].xyz) + clipPlanes->w;
+            if (value > 0)
+                continue;
+            value = vector_dot(clipPlanes->xyz, points[5].xyz) + clipPlanes->w;
+            if (value > 0)
+                continue;
+            value = vector_dot(clipPlanes->xyz, points[6].xyz) + clipPlanes->w;
+            if (value > 0)
+                continue;
+            value = vector_dot(clipPlanes->xyz, points[7].xyz) + clipPlanes->w;
+            if (value > 0)
+                continue;
+            planeHint = p;
             return false;
-        
-        // point[2]
-        clipPos = matrix_multiply(viewProjMatrix, *points++);
-        clipFlags = ((clipPos.x < clipPos.z) << 3) | ((clipPos.x > -clipPos.z) << 2) |
-                    ((clipPos.y < clipPos.z) << 1) | (clipPos.y  > -clipPos.z);
-        if (clipFlags != 0xf)
-            return false;
-        
-        // point[3]
-        clipPos = matrix_multiply(viewProjMatrix, *points++);
-        clipFlags = ((clipPos.x < clipPos.z) << 3) | ((clipPos.x > -clipPos.z) << 2) |
-                    ((clipPos.y < clipPos.z) << 1) | (clipPos.y  > -clipPos.z);
-        if (clipFlags != 0xf)
-            return false;
-        
-        // point[4]
-        clipPos = matrix_multiply(viewProjMatrix, *points++);
-        clipFlags = ((clipPos.x < clipPos.z) << 3) | ((clipPos.x > -clipPos.z) << 2) |
-                    ((clipPos.y < clipPos.z) << 1) | (clipPos.y  > -clipPos.z);
-        if (clipFlags != 0xf)
-            return false;
-        
-        // point[5]
-        clipPos = matrix_multiply(viewProjMatrix, *points++);
-        clipFlags = ((clipPos.x < clipPos.z) << 3) | ((clipPos.x > -clipPos.z) << 2) |
-                    ((clipPos.y < clipPos.z) << 1) | (clipPos.y  > -clipPos.z);
-        if (clipFlags != 0xf)
-            return false;
-        
-        // point[6]
-        clipPos = matrix_multiply(viewProjMatrix, *points++);
-        clipFlags = ((clipPos.x < clipPos.z) << 3) | ((clipPos.x > -clipPos.z) << 2) |
-                    ((clipPos.y < clipPos.z) << 1) | (clipPos.y  > -clipPos.z);
-        if (clipFlags != 0xf)
-            return false;
-        
-        // point[7]
-        clipPos = matrix_multiply(viewProjMatrix, *points);
-        clipFlags = ((clipPos.x < clipPos.z) << 3) | ((clipPos.x > -clipPos.z) << 2) |
-                    ((clipPos.y < clipPos.z) << 1) | (clipPos.y  > -clipPos.z);
-        if (clipFlags != 0xf)
-            return false;
+        }
+        planeHint = -1;
 
         return true;
     }
 };
 
-DrawableItem::DrawableItem(HdStDrawItemInstance* itemInstance, GfRange3f const &aaBoundingBox, size_t instanceIndex, size_t totalInstancers)
+DrawableItem::DrawableItem(HdStDrawItemInstance* itemInstance,
+                           GfRange3f const &aaBoundingBox,
+                           GfBBox3f const &cullingBoundingBox,
+                           size_t instanceIndex,
+                           size_t totalInstancers)
 : itemInstance(itemInstance)
 , aabb(aaBoundingBox)
-, isInstanced(true)
+, cullingBBox(cullingBoundingBox)
+, lastCullPlane(-1)
 , instanceIdx(instanceIndex)
 , numItemsInInstance(totalInstancers)
+, isInstanced(true)
 {
-    halfSize = aabb.GetSize() * 0.5;
+    GfVec3f const &minVec(cullingBBox.GetRange().GetMin());
+    GfVec3f const &maxVec(cullingBBox.GetRange().GetMax());
+
+    points[0] = {minVec[0], minVec[1], minVec[2], 1};
+    points[1] = {maxVec[0], maxVec[1], maxVec[2], 1};
+    points[2] = {minVec[0], minVec[1], maxVec[2], 1};
+    points[3] = {minVec[0], maxVec[1], minVec[2], 1};
+    points[4] = {minVec[0], maxVec[1], maxVec[2], 1};
+    points[5] = {maxVec[0], minVec[1], minVec[2], 1};
+    points[6] = {maxVec[0], minVec[1], maxVec[2], 1};
+    points[7] = {maxVec[0], maxVec[1], minVec[2], 1};
 }
 
-DrawableItem::DrawableItem(HdStDrawItemInstance* itemInstance, GfRange3f const &aaBoundingBox)
-: DrawableItem(itemInstance, aaBoundingBox, 0, 1)
+DrawableItem::DrawableItem(HdStDrawItemInstance* itemInstance,
+                           GfRange3f const &aaBoundingBox,
+                           GfBBox3f const &cullingBoundingBox)
+: DrawableItem(itemInstance, aaBoundingBox, cullingBoundingBox, 0, 1)
 {
     isInstanced = false;
 }
 
 void DrawableItem::ProcessInstancesVisible()
 {
+    int numVisible;
     if (isInstanced) {
-        if (instanceIdx)
-            return;
-
-        itemInstance->GetDrawItem()->BuildInstanceBuffer(itemInstance->GetCullResultVisibilityCache());
+        numVisible = itemInstance->GetDrawItem()->BuildInstanceBuffer(itemInstance->GetCullResultVisibilityCache());
     }
     else {
         if (itemInstance->CullResultIsVisible())
-            itemInstance->GetDrawItem()->SetNumVisible(1);
+            numVisible = 1;
         else
-            itemInstance->GetDrawItem()->SetNumVisible(0);
+            numVisible = 0;
+        itemInstance->GetDrawItem()->SetNumVisible(numVisible);
     }
 
-    bool shouldBeVisible = itemInstance->GetDrawItem()->GetVisible() &&
-        itemInstance->GetDrawItem()->GetNumVisible() > 0;
+    bool shouldBeVisible = itemInstance->GetDrawItem()->GetVisible() && numVisible;
     if (itemInstance->IsVisible() != shouldBeVisible) {
-      itemInstance->SetVisible(shouldBeVisible);
+        itemInstance->SetVisible(shouldBeVisible);
     }
 }
 
-GfRange3f DrawableItem::ConvertDrawablesToItems(std::vector<HdStDrawItemInstance> *drawables, std::vector<DrawableItem*> *items)
+GfRange3f DrawableItem::ConvertDrawablesToItems(std::vector<HdStDrawItemInstance> *drawables,
+                                                std::vector<DrawableItem*> *items,
+                                                std::vector<DrawableItem*> *visibilityOwners)
 {
     GfRange3f boundingBox;
     
@@ -267,40 +325,50 @@ GfRange3f DrawableItem::ConvertDrawablesToItems(std::vector<HdStDrawItemInstance
 
         const std::vector<GfBBox3f>* instancedCullingBounds = drawable->GetDrawItem()->GetInstanceBounds();
         size_t const numItems = instancedCullingBounds->size();
-        
+
         drawable->SetCullResultVisibilityCacheSize(numItems);
-        
+
         if (numItems > 1) {
             // NOTE: create an item per instance
             for (size_t i = 0; i < numItems; ++i) {
-                GfRange3f const &oobb = (*instancedCullingBounds)[i].GetRange();
+                GfBBox3f const &oobb = (*instancedCullingBounds)[i];
+                GfRange3f const &ooRange = oobb.GetRange();
                 GfRange3f aabb;
 
                 // We combine the min and max sparately because the range is not really AABB
                 // The CalculateCullingBounds bakes the transform in, creating an OOBB.
                 // This breakes GfRange3's internals sometimes, one being that IsEmpty() may return
-                // true when it isn't?
-                aabb.ExtendBy(oobb.GetMin());
-                aabb.ExtendBy(oobb.GetMax());
+                // true when it isn't.
+                aabb.ExtendBy(ooRange.GetMin());
+                aabb.ExtendBy(ooRange.GetMax());
 
                 boundingBox.ExtendBy(aabb);
-                items->push_back(new DrawableItem(drawable, aabb, i, numItems));
+
+                DrawableItem *newItem = new DrawableItem(drawable, aabb, oobb, i, numItems);
+
+                items->push_back(newItem);
+                if (i == 0) {
+                    visibilityOwners->push_back(newItem);
+                }
             }
         } else if (numItems == 1) {
-            GfRange3f const &oobb = (*instancedCullingBounds)[0].GetRange();
+            GfBBox3f const &oobb = (*instancedCullingBounds)[0];
+            GfRange3f const &ooRange = oobb.GetRange();
             GfRange3f aabb;
             
             // We combine the min and max sparately because the range is not really AABB
             // The CalculateCullingBounds bakes the transform in, creating an OOBB.
             // This breakes GfRange3's internals sometimes, one being that IsEmpty() may return
             // true when it isn't?
-            aabb.ExtendBy(oobb.GetMin());
-            aabb.ExtendBy(oobb.GetMax());
-            
-            DrawableItem* drawableItem = new DrawableItem(drawable, aabb);
-            
+            aabb.ExtendBy(ooRange.GetMin());
+            aabb.ExtendBy(ooRange.GetMax());
+
             boundingBox.ExtendBy(aabb);
+
+            DrawableItem* drawableItem = new DrawableItem(drawable, aabb, oobb);
+            
             items->push_back(drawableItem);
+            visibilityOwners->push_back(drawableItem);
         }
     }
     
@@ -342,10 +410,13 @@ void BVH::BuildBVH(std::vector<HdStDrawItemInstance> *drawables)
     
     os_signpost_interval_begin(cullingLog, bvhGenerate, "BVH Generation");
     drawableItems.clear();
+    drawableVisibilityOwners.clear();
     
     uint64_t buildStart = ArchGetTickTime();
     
-    GfRange3f bbox = DrawableItem::ConvertDrawablesToItems(drawables, &(this->drawableItems));
+    GfRange3f bbox = DrawableItem::ConvertDrawablesToItems(drawables,
+                                                           &(this->drawableItems),
+                                                           &drawableVisibilityOwners);
 
     if (root) {
         delete root;
@@ -385,7 +456,8 @@ void BVH::Bake()
     root->WriteToList(index, &bakedDrawableItems, &bakedVisibility[0]);
 }
 
-void BVH::PerformCulling(matrix_float4x4 const &viewProjMatrix, vector_float2 const &dimensions)
+void BVH::PerformCulling(matrix_float4x4 const &viewProjMatrix,
+                         vector_float2 const &dimensions)
 {
     os_signpost_id_t bvhCulling = os_signpost_id_generate(cullingLog);
     os_signpost_id_t bvhCullingCull = os_signpost_id_generate(cullingLog);
@@ -394,18 +466,59 @@ void BVH::PerformCulling(matrix_float4x4 const &viewProjMatrix, vector_float2 co
 
     uint64_t cullStart = ArchGetTickTime();
 
+    vector_float4 clipPlanes[6] = {
+        // Right clip plane
+        (vector_float4){viewProjMatrix.columns[0][3] - viewProjMatrix.columns[0][0],
+                        viewProjMatrix.columns[1][3] - viewProjMatrix.columns[1][0],
+                        viewProjMatrix.columns[2][3] - viewProjMatrix.columns[2][0],
+                        viewProjMatrix.columns[3][3] - viewProjMatrix.columns[3][0]},
+        // Left clip plane
+        (vector_float4){viewProjMatrix.columns[0][3] + viewProjMatrix.columns[0][0],
+                        viewProjMatrix.columns[1][3] + viewProjMatrix.columns[1][0],
+                        viewProjMatrix.columns[2][3] + viewProjMatrix.columns[2][0],
+                        viewProjMatrix.columns[3][3] + viewProjMatrix.columns[3][0]},
+        // Bottom clip plane
+        (vector_float4){viewProjMatrix.columns[0][3] + viewProjMatrix.columns[0][1],
+                        viewProjMatrix.columns[1][3] + viewProjMatrix.columns[1][1],
+                        viewProjMatrix.columns[2][3] + viewProjMatrix.columns[2][1],
+                        viewProjMatrix.columns[3][3] + viewProjMatrix.columns[3][1]},
+        // Top clip plane
+        (vector_float4){viewProjMatrix.columns[0][3] - viewProjMatrix.columns[0][1],
+                        viewProjMatrix.columns[1][3] - viewProjMatrix.columns[1][1],
+                        viewProjMatrix.columns[2][3] - viewProjMatrix.columns[2][1],
+                        viewProjMatrix.columns[3][3] - viewProjMatrix.columns[3][1]},
+        // Far clip plane
+        (vector_float4){viewProjMatrix.columns[0][3] - viewProjMatrix.columns[0][2],
+                        viewProjMatrix.columns[1][3] - viewProjMatrix.columns[1][2],
+                        viewProjMatrix.columns[2][3] - viewProjMatrix.columns[2][2],
+                        viewProjMatrix.columns[3][3] - viewProjMatrix.columns[3][2]},
+        // Near clipping plane
+        (vector_float4){viewProjMatrix.columns[0][3] + viewProjMatrix.columns[0][2],
+                        viewProjMatrix.columns[1][3] + viewProjMatrix.columns[1][2],
+                        viewProjMatrix.columns[2][3] + viewProjMatrix.columns[2][2],
+                        viewProjMatrix.columns[3][3] + viewProjMatrix.columns[3][2]}
+    };
+    for (int i = 0; i < 6; i++)
+    {
+        vector_float4 t = clipPlanes[i] * clipPlanes[i];
+        float inv = vector_precise_rsqrt(vector_reduce_add(t.xyz));
+        clipPlanes[i] = clipPlanes[i] * inv;
+    }
+
     os_signpost_interval_begin(cullingLog, bvhCulling, "Culling: BVH");
     os_signpost_interval_begin(cullingLog, bvhCullingCull, "Culling: BVH -- Culllist");
     cullList.clear();
-    root->PerformCulling(viewProjMatrix, dimensions, &bakedVisibility[0], cullList, false);
+    root->PerformCulling(viewProjMatrix, clipPlanes, dimensions, &bakedVisibility[0], cullList, false);
     os_signpost_interval_end(cullingLog, bvhCullingCull, "Culling: BVH -- Culllist");
     float cullListTimeMS = (ArchGetTickTime() - cullStart) / 1000.0f;
     
     static matrix_float4x4 const *_viewProjMatrix;
     static vector_float2 const *_dimensions;
+    static vector_float4 const *_clipPlanes;
     
     _viewProjMatrix = &viewProjMatrix;
     _dimensions = &dimensions;
+    _clipPlanes = clipPlanes;
     
     struct _Worker {
         static
@@ -422,14 +535,17 @@ void BVH::PerformCulling(matrix_float4x4 const &viewProjMatrix, vector_float2 co
             for (size_t idx = begin; idx < end; ++idx)
             {
                 auto &cullItem = (*cullList)[idx];
+                int numItems = cullItem.node->drawables.size();
+                DrawableItem const * const *drawableItem = &cullItem.node->drawables[0];
                 uint8_t *visibilityWritePtr = cullItem.visibilityWritePtr;
 
-                for (auto &drawableItem : cullItem.node->drawables) {
-                    GfBBox3f const &box = (*drawableItem->itemInstance->GetDrawItem()->GetInstanceBounds())[drawableItem->instanceIdx];
+                while (numItems--) {
+                    GfRange3f const &range = (*drawableItem)->cullingBBox.GetRange();
 
-                    bool visible;
-                    visible = !MissingFunctions::ShouldRejectBasedOnSize(box.GetRange().GetMin(), box.GetRange().GetMax(), *_viewProjMatrix, *_dimensions);
+                    bool visible = !MissingFunctions::ShouldRejectBasedOnSize(
+                                        range.GetMin(), range.GetMax(), *_viewProjMatrix, *_dimensions);
                     *visibilityWritePtr++ = visible;
+                    drawableItem++;
                 }
             }
         }
@@ -440,14 +556,19 @@ void BVH::PerformCulling(matrix_float4x4 const &viewProjMatrix, vector_float2 co
             for (size_t idx = begin; idx < end; ++idx)
             {
                 auto const& cullItem = (*cullList)[idx];
+                int numItems = cullItem.node->drawables.size();
+                DrawableItem const * const *drawableItem = &cullItem.node->drawables[0];
                 uint8_t *visibilityWritePtr = cullItem.visibilityWritePtr;
                 
-                for (auto &drawableItem : cullItem.node->drawables) {
-                    GfBBox3f const &box = (*drawableItem->itemInstance->GetDrawItem()->GetInstanceBounds())[drawableItem->instanceIdx];
+                while (numItems--) {
+                    GfBBox3f const &box = (*drawableItem)->cullingBBox;
                     
                     bool visible;
-                    visible = GfFrustum::IntersectsViewVolumeFloat(box, *_viewProjMatrix, *_dimensions);
+                    visible = MissingFunctions::IntersectsFrustum((*drawableItem)->points, _clipPlanes, (*drawableItem)->lastCullPlane) &&
+                                !MissingFunctions::ShouldRejectBasedOnSize(
+                                    box.GetRange().GetMin(), box.GetRange().GetMax(), *_viewProjMatrix, *_dimensions);
                     *visibilityWritePtr++ = visible;
+                    drawableItem++;
                 }
             }
         }
@@ -458,8 +579,7 @@ void BVH::PerformCulling(matrix_float4x4 const &viewProjMatrix, vector_float2 co
             for (size_t idx = begin; idx < end; ++idx)
             {
                 auto const& cullItem = (*cullList)[idx];
-                uint8_t *visibilityWritePtr = cullItem.visibilityWritePtr;
-                memset(visibilityWritePtr, 0, cullItem.node->totalItemCount);
+                memset(cullItem.visibilityWritePtr, 0, cullItem.node->totalItemCount);
             }
         }
     };
@@ -488,11 +608,10 @@ void BVH::PerformCulling(matrix_float4x4 const &viewProjMatrix, vector_float2 co
     
     uint64_t cullBuildBufferTimeBegin = ArchGetTickTime();
     os_signpost_interval_begin(cullingLog, bvhCullingBuildBuffer, "Culling: BVH -- Build Buffer");
-    WorkParallelForN(drawableItems.size(),
-                     std::bind(&_Worker::processInstancesVisible, &drawableItems,
+    WorkParallelForN(drawableVisibilityOwners.size(),
+                     std::bind(&_Worker::processInstancesVisible, &drawableVisibilityOwners,
                                std::placeholders::_1,
-                               std::placeholders::_2),
-                     grainBuild);
+                               std::placeholders::_2));
     os_signpost_interval_end(cullingLog, bvhCullingBuildBuffer, "Culling: BVH -- Build Buffer");
 
     os_signpost_interval_end(cullingLog, bvhCulling, "Culling: BVH");
@@ -501,7 +620,7 @@ void BVH::PerformCulling(matrix_float4x4 const &viewProjMatrix, vector_float2 co
     float cullBuildBufferTimeMS = (end - cullBuildBufferTimeBegin) / 1000.0f;
     lastCullTimeMS = (end - cullStart) / 1000.0f;
     
-//    NSLog(@"CullList: %.2fms   Apply: %.2fms   BuildBuffer: %.2fms   Total: %.2fms", cullListTimeMS, cullApplyTimeMS, cullBuildBufferTimeMS, lastCullTimeMS);
+    //NSLog(@"CullList: %.2fms   Apply: %.2fms   BuildBuffer: %.2fms   Total: %.2fms", cullListTimeMS, cullApplyTimeMS, cullBuildBufferTimeMS, lastCullTimeMS);
 }
 
 OctreeNode::OctreeNode(float minX, float minY, float minZ, float maxX, float maxY, float maxZ)
@@ -509,6 +628,7 @@ OctreeNode::OctreeNode(float minX, float minY, float minZ, float maxX, float max
 , minVec(minX, minY, minZ)
 , maxVec(maxX, maxY, maxZ)
 , halfSize((maxX - minX) * 0.5, (maxY - minY) * 0.5, (maxZ - minZ) * 0.5)
+, lastCullPlane(-1)
 , index(0)
 , indexEnd(0)
 , itemCount(0)
@@ -552,13 +672,15 @@ void OctreeNode::ReInit(GfRange3f const &boundingBox)
 }
 
 void OctreeNode::PerformCulling(matrix_float4x4 const &viewProjMatrix,
+                                vector_float4 const *clipPlanes,
                                 vector_float2 const &dimensions,
                                 uint8_t *visibility,
                                 CullList &cullList,
                                 bool fullyContained)
 {
     if (!fullyContained) {
-        if (!GfFrustum::IntersectsViewVolumeFloat(aabb, viewProjMatrix, dimensions)) {
+        if (!MissingFunctions::IntersectsFrustum(points, clipPlanes, lastCullPlane) ||
+            MissingFunctions::ShouldRejectBasedOnSize(points, viewProjMatrix, dimensions)) {
             if (totalItemCount) {
                 if (lastIntersection != OutsideCull) {
                     cullList.allItemInvisible.push_back({this, visibility + index});
@@ -568,7 +690,7 @@ void OctreeNode::PerformCulling(matrix_float4x4 const &viewProjMatrix,
             return;
         }
 
-        if (MissingFunctions::FrustumFullyContains(this, viewProjMatrix)) {
+        if (MissingFunctions::FrustumFullyContains(this, clipPlanes)) {
             fullyContained = true;
         }
     }
@@ -595,7 +717,7 @@ void OctreeNode::PerformCulling(matrix_float4x4 const &viewProjMatrix,
     
     if (isSplit) {
         for (int i = 0; i < numChildren; ++i) {
-            children[i]->PerformCulling(viewProjMatrix, dimensions, visibility, cullList, fullyContained);
+            children[i]->PerformCulling(viewProjMatrix, clipPlanes, dimensions, visibility, cullList, fullyContained);
         }
     }
 }
@@ -659,6 +781,7 @@ size_t OctreeNode::CalcSubtreeItems() {
                 // empty node - remove from list
                 delete children[idx];
                 numChildren--;
+                
                 if (idx == 7)
                     children[idx--] = NULL;
                 else {

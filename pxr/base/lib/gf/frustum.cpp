@@ -1354,6 +1354,7 @@ GfFrustum::IntersectsViewVolumeFloat(GfBBox3f const &bbox,
     
     // Compute the min and max points of the bbox in
     // bbox local space.
+    
     vector_float4 points[8];
     //GfVec4f center;
     const GfVec3f &localMin = bbox.GetRange().GetMin();
@@ -1365,11 +1366,9 @@ GfFrustum::IntersectsViewVolumeFloat(GfBBox3f const &bbox,
     // Small prim cull
     vector_float2 screenSpace[2];
     
-    float inv = 1.0f / points[0][3];
-    screenSpace[0] = points[0].xy * inv;
-    
-    inv = 1.0f / points[1][3];
-    screenSpace[1] = points[1].xy * inv;
+    vector_float2 inv = vector_fast_recip((vector_float2){points[0][3], points[1][3]});
+    screenSpace[0] = points[0].xy * inv.x;
+    screenSpace[1] = points[1].xy * inv.y;
 
     vector_float2 d = vector_abs(screenSpace[1] - screenSpace[0]);
     if (d.x < windowDimensions.x &&
