@@ -280,7 +280,8 @@ _GetPackedTypeDefinitions()
     "    return *(thread int*)&pi;\n"
     "}\n"
     
-    "mat4 inverse(float4x4 a) {\n"
+    "mat4 inverse(float4x4 a) { return transpose(a); }\n"
+    "mat4 _inverse(float4x4 a) {\n"
     "    float b00 = a[0][0] * a[1][1] - a[0][1] * a[1][0];\n"
     "    float b01 = a[0][0] * a[1][2] - a[0][2] * a[1][0];\n"
     "    float b02 = a[0][0] * a[1][3] - a[0][3] * a[1][0];\n"
@@ -1771,6 +1772,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
                 << "\n"
                 << gs_GSInputCode.str()
                 << "\n"
+                << "        scope.CacheDrawingCoord();\n"
                 << "        scope.main();\n"
                 << "    }\n"
                 << "}\n";
@@ -2064,6 +2066,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
             << (_buildTarget != kMSL_BuildTarget_Regular ? "    scope.gl_PrimitiveID = gl_PrimitiveID;\n" : "")
             << fsInputCode.str()
             << "\n"
+            << "    scope.CacheDrawingCoord();\n"
             << "    scope.main();\n"
             << "\n"
             << "    MSLFsOutputs fsOutput;\n"
@@ -3384,7 +3387,8 @@ HdSt_CodeGenMSL::_GenerateDrawingCoord()
         _AddInputParam(_mslPSInputParams, tkn___dc_instanceCoords, intType, tkn_flat, HdBinding(HdBinding::UNKNOWN, 0), 0, tkn_gs_instanceCoords).usage |= HdSt_CodeGenMSL::TParam::DrawingCoord;
     }
     
-    _genVS << "hd_drawingCoord GetDrawingCoord() { hd_drawingCoord dc; \n"
+    _genVS << "hd_drawingCoord thread &GetDrawingCoord() { return vsDrawingCoord; } \n";
+    _genVS << "void _GetDrawingCoord(hd_drawingCoord thread &dc) { \n"
            << "  dc.modelCoord     = drawingCoord0.x; \n"
            << "  dc.constantCoord  = drawingCoord0.y; \n"
            << "  dc.elementCoord   = drawingCoord0.z; \n"
@@ -3404,7 +3408,7 @@ HdSt_CodeGenMSL::_GenerateDrawingCoord()
                << "  }\n";
     }
 
-    _genVS << "  return dc;\n"
+    _genVS << "  return;\n"
            << "}\n";
 
     // note: GL spec says tessellation input array size must be equal to
@@ -3431,31 +3435,41 @@ HdSt_CodeGenMSL::_GenerateDrawingCoord()
 //            << "}\n";
 
     // geometry shader ( VSdc + gl_PrimitiveIDIn )
-    _genGS << "hd_drawingCoord GetDrawingCoord() { \n"
-           << "  hd_drawingCoord dc = vsDrawingCoord[0]; \n"
+    _genGS << "hd_drawingCoord gsDrawingCoordCached;\n"
+           << "void CacheDrawingCoord() {\n"
+           << "  _GetDrawingCoord(gsDrawingCoordCached);\n"
+           << "}\n"
+           << "hd_drawingCoord thread &GetDrawingCoord() { return gsDrawingCoordCached; }\n"
+           << "void _GetDrawingCoord(hd_drawingCoord thread &dc) { \n"
+           << "  dc = vsDrawingCoord[0]; \n"
            << "  dc.primitiveCoord += gl_PrimitiveIDIn; \n"
-           << "  return dc; \n"
+           << "  return; \n"
            << "}\n";
 
     // fragment shader ( VSdc + gl_PrimitiveID )
     // note that gsDrawingCoord isn't offsetted by gl_PrimitiveIDIn
     _genFS << "hd_drawingCoord gsDrawingCoord;\n"
-           << "hd_drawingCoord GetDrawingCoord() { \n"
-           << "  hd_drawingCoord dc = gsDrawingCoord; \n"
+           << "hd_drawingCoord gsDrawingCoordCached;\n"
+           << "void CacheDrawingCoord() {\n"
+           << "  _GetDrawingCoord(gsDrawingCoordCached);\n"
+           << "}\n"
+           << "hd_drawingCoord thread &GetDrawingCoord() { return gsDrawingCoordCached; }\n"
+           << "void _GetDrawingCoord(hd_drawingCoord thread &dc) { \n"
+           << "  dc = gsDrawingCoord; \n"
            << "  dc.primitiveCoord += gl_PrimitiveID; \n"
-           << "  return dc; \n"
+           << "  return; \n"
            << "}\n";
 
     // drawing coord plumbing.
     // Note that copying from [0] for multiple input source since the
     // drawingCoord is flat (no interpolation required).
-    _procVS  << "  vsDrawingCoord = GetDrawingCoord();\n"
-             << "  gsDrawingCoord = GetDrawingCoord();\n";
+    _procVS  << "    _GetDrawingCoord(vsDrawingCoord);\n";
+             //<< "    gsDrawingCoord = vsDrawingCoord;\n";
 //    _procTCS << "  tcsDrawingCoord[gl_InvocationID] = "
 //             << "  vsDrawingCoord[gl_InvocationID];\n";
 //    _procTES << "  vsDrawingCoord = tcsDrawingCoord[0];\n"
 //             << "  gsDrawingCoord = tcsDrawingCoord[0];\n";
-    _procGS  << "  gsDrawingCoord = vsDrawingCoord[0];\n";
+    _procGS  << "    gsDrawingCoord = vsDrawingCoord[0];\n";
     
     METAL_DEBUG_COMMENT(&_genCommon, "End _GenerateDrawingCoord Common\n"); //MTL_FIXME
     METAL_DEBUG_COMMENT(&_genVS,     "End _GenerateDrawingCoord VS\n"); //MTL_FIXME

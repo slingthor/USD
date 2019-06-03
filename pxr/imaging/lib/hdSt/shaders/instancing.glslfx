@@ -50,13 +50,30 @@ MAT4 GetRotationMatrix(vec4 q)
     return r;
 }
 
+void GetRotationMatrixInPlace(vec4 q, MAT4 thread &r)
+{
+    r[0].xyzw = vec4(1 - 2 * (q.z * q.z + q.w * q.w),
+                         2 * (q.y * q.z + q.w * q.x),
+                         2 * (q.y * q.w - q.z * q.x),
+                     0);
+    r[1].xyzw = vec4(    2 * (q.y * q.z - q.w * q.x),
+                     1 - 2 * (q.y * q.y + q.w * q.w),
+                         2 * (q.z * q.w + q.y * q.x),
+                     0);
+    r[2].xyzw = vec4(    2 * (q.y * q.w + q.z * q.x),
+                         2 * (q.z * q.w - q.y * q.x),
+                     1 - 2 * (q.y * q.y + q.z * q.z),
+                     0);
+    r[3] = vec4(0, 0, 0, 1);
+}
+
 // ---------------------------------------------------------------------------
 
 MAT4 GetInstanceTransform(int level)
 {
-    MAT4 m = MAT4(1);
 #ifdef HD_HAS_INSTANCE_instanceTransform
-    m = HdGetInstance_instanceTransform(level, MAT4(1)) * m;
+    MAT4 m = HdGetInstance_instanceTransform(level, MAT4(1));
+  #define _matrix_initialised
 #endif
 
     // instance transform elements are applied:
@@ -65,24 +82,46 @@ MAT4 GetInstanceTransform(int level)
 
 #ifdef HD_HAS_INSTANCE_scale
     vec3 s = HdGetInstance_scale(level, /*default=*/vec3(1));
-    m = MAT4(s.x,   0,   0, 0,
-               0, s.y,   0, 0,
-               0,   0, s.z, 0,
-               0,   0,   0, 1) * m;
+#if !defined(_matrix_initialised)
+    MAT4 m(s.x,   0,   0, 0,
+             0, s.y,   0, 0,
+             0,   0, s.z, 0,
+             0,   0,   0, 1);
+  #define _matrix_initialised
+#else
+    m[0][0] *= s.x;
+    m[1][1] *= s.y;
+    m[2][2] *= s.z;
+#endif
 #endif
 
 #ifdef HD_HAS_INSTANCE_rotate // GfQuaternion(real, ix, iy, iz)
     vec4 q = HdGetInstance_rotate(level, /*default=*/vec4(0));
+#if !defined(_matrix_initialised)
+    MAT4 m;
+    GetRotationMatrixInPlace(q, m);
+  #define _matrix_initialised
+#else
     m = GetRotationMatrix(q) * m;
+#endif
 #endif
 
 #ifdef HD_HAS_INSTANCE_translate
     vec3 t = HdGetInstance_translate(level, /*default=*/vec3(0));
-    m = MAT4(  1,   0,   0,  0,
-               0,   1,   0,  0,
-               0,   0,   1,  0,
-             t.x, t.y, t.z,  1) * m;
+#if !defined(_matrix_initialised)
+    MAT4 m((  1,   0,   0,  0,
+              0,   1,   0,  0,
+              0,   0,   1,  0,
+            t.x, t.y, t.z,  1);
+  #define _matrix_initialised
+#else
+      m[3] += vec4(t.xyz, 0);
 #endif
+#endif
+#if !defined(_matrix_initialised)
+    MAT4 m = MAT4(1);
+#endif
+#undef _matrix_initialised
     return m;
 }
 
