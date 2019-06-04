@@ -61,25 +61,31 @@ public:
 
     /// Blit the current render target contents to the OpenGL FBO
     MTLF_API
-    void BlitColorTargetToOpenGL();
+    void BlitToOpenGL();
     
     MTLF_API
-    void CopyDepthTextureToOpenGL(id<MTLComputeCommandEncoder> computeEncoder);
-    
-    MTLF_API
-    void ColourCorrectColourTexture(id<MTLComputeCommandEncoder> computeEncoder, id<MTLTexture> colourTexture);
+    void CopyToInterop();
 
-    id<MTLTexture> mtlAliasedColorTexture[MAX_GPUS];
-    id<MTLTexture> mtlAliasedDepthRegularFloatTexture[MAX_GPUS];
+    id<MTLTexture> mtlAliasedColorTexture;
+    id<MTLTexture> mtlAliasedDepthRegularFloatTexture;
 
     id<MTLTexture> mtlLocalColorTexture[MAX_GPUS];
     id<MTLTexture> mtlLocalDepthTexture[MAX_GPUS];
+    id<MTLTexture> mtlLocalDepthTextureResolved[MAX_GPUS];
+    
+    id<MTLTexture> mtlRemoteColorTexture[MAX_GPUS];
+    id<MTLTexture> mtlRemoteDepthTexture[MAX_GPUS];
 
     NSUInteger mtlSampleCount;
     
 private:
 
     id<MTLDevice>                   interopDevice;
+    id<MTLCommandQueue>             interopCommandQueue;
+    int                             interopGPUIndex;
+    id<MTLSharedEvent>              interopSyncEvent;
+    int                             interopEventValue;
+
     NSMutableArray<id<MTLDevice>>   *renderDevices;
 
     struct InteropGPUInstance {
@@ -94,9 +100,9 @@ private:
     
     CVPixelBufferRef pixelBuffer;
     CVPixelBufferRef depthBuffer;
-    CVMetalTextureCacheRef cvmtlTextureCache[MAX_GPUS];
-    CVMetalTextureRef cvmtlColorTexture[MAX_GPUS];
-    CVMetalTextureRef cvmtlDepthTexture[MAX_GPUS];
+    CVMetalTextureCacheRef cvmtlTextureCache;
+    CVMetalTextureRef cvmtlColorTexture;
+    CVMetalTextureRef cvmtlDepthTexture;
 
     CVOpenGLTextureCacheRef cvglTextureCache;
     CVOpenGLTextureRef cvglColorTexture;

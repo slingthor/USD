@@ -126,22 +126,22 @@ id<MTLDevice> MtlfMetalContext::GetMetalDevice(PREFERRED_GPU_TYPE preferredGPUTy
     id<MTLDevice>                  _defaultDevice  = MTLCreateSystemDefaultDevice();
     NSArray *preferredDeviceList = _discreteGPUs;
     
-    bool const multiGPUSuportEnabled = false;
+    bool const multiGPUSuportEnabled = true && preferredGPUType == PREFER_DEFAULT_GPU;
     
     // Put the device into the appropriate device list
     for (id<MTLDevice>dev in allDevices) {
         bool multiDeviceRenderOption = false;
         if (dev.removable) {
         	[_eGPUs addObject:dev];
-            multiDeviceRenderOption = multiGPUSuportEnabled;
         }
         else if (dev.lowPower) {
         	[_integratedGPUs addObject:dev];
-            //multiDeviceRenderOption = multiGPUSuportEnabled;
         }
         else {
         	[_discreteGPUs addObject:dev];
-            multiDeviceRenderOption = multiGPUSuportEnabled;
+            multiDeviceRenderOption = multiGPUSuportEnabled &&
+                [dev peerGroupID] != 0 &&
+                [dev peerGroupID] == [_defaultDevice peerGroupID];
         }
         
         if (multiDeviceRenderOption) {
@@ -444,7 +444,12 @@ void MtlfMetalContext::AllocateAttachments(int width, int height)
             desc.textureType = MTLTextureType2D;
         
         for(int i = 0; i < renderDevices.count; i++) {
-            gpus[i].mtlColorTexture = glInterop->mtlAliasedColorTexture[i];
+            if (i) {
+                gpus[i].mtlColorTexture = glInterop->mtlLocalColorTexture[i];
+            }
+            else {
+                gpus[i].mtlColorTexture = glInterop->mtlAliasedColorTexture;
+            }
             gpus[i].mtlDepthTexture = glInterop->mtlLocalDepthTexture[i];
 
             if (gpus[i].mtlMultisampleColorTexture)
@@ -463,11 +468,11 @@ MtlfMetalContext::IsInitialized()
 }
 
 void
-MtlfMetalContext::BlitColorTargetToOpenGL()
+MtlfMetalContext::BlitToOpenGL()
 {
 #if defined(ARCH_GFX_OPENGL)
     if (glInterop) {
-        glInterop->BlitColorTargetToOpenGL();
+        glInterop->BlitToOpenGL();
     }
     else {
         TF_FATAL_CODING_ERROR("Gl interop is disabled, must call InitGLInterop"
@@ -479,37 +484,11 @@ MtlfMetalContext::BlitColorTargetToOpenGL()
 }
 
 void
-MtlfMetalContext::ColourCorrectColourTexture(id<MTLTexture> colourTexture)
+MtlfMetalContext::CopyToInterop()
 {
 #if defined(ARCH_GFX_OPENGL)
     if (glInterop) {
-        id <MTLComputeCommandEncoder> computeEncoder = GetComputeEncoder();
-        computeEncoder.label = @"Colour correction/resolve copy";
-        
-        glInterop->ColourCorrectColourTexture(computeEncoder, colourTexture);
-        
-        ReleaseEncoder(true);
-    }
-    else {
-        TF_FATAL_CODING_ERROR("Gl interop is disabled, must call InitGLInterop"
-                              " before rendering");
-    }
-#else
-    TF_FATAL_CODING_ERROR("Gl interop is disabled, because OpenGL is disabled");
-#endif
-}
-
-void
-MtlfMetalContext::CopyDepthTextureToOpenGL()
-{
-#if defined(ARCH_GFX_OPENGL)
-    if (glInterop) {
-        id <MTLComputeCommandEncoder> computeEncoder = GetComputeEncoder();
-        computeEncoder.label = @"Depth buffer copy";
-
-        glInterop->CopyDepthTextureToOpenGL(computeEncoder);
-
-        ReleaseEncoder(true);
+        glInterop->CopyToInterop();
     }
     else {
         TF_FATAL_CODING_ERROR("Gl interop is disabled, must call InitGLInterop"

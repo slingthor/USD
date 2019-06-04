@@ -157,7 +157,7 @@ public:
 #if defined(ARCH_OS_IOS)
 #define MAX_GPUS    1
 #else
-#define MAX_GPUS    4
+#define MAX_GPUS    2 // Can't be bigger than the maximum number of GPUs in a MTLDevice peer group
 #endif
     struct MtlfMultiBuffer {
         
@@ -259,13 +259,10 @@ public:
 
     /// Blit the current render target contents to the OpenGL FBO
     MTLF_API
-    void BlitColorTargetToOpenGL();
+    void BlitToOpenGL();
     
     MTLF_API
-    void CopyDepthTextureToOpenGL();
-
-    MTLF_API
-    void ColourCorrectColourTexture(id<MTLTexture> colourTexture);
+    void CopyToInterop();
 
     MTLF_API
     id<MTLBuffer> GetIndexBuffer() const {

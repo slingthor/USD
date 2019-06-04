@@ -319,9 +319,7 @@ void HdStRenderDelegateMetal::FinalizeRender()
     context->LabelCommandBuffer(@"Post Process", METALWORKQUEUE_DEFAULT);
 
     if (_renderOutput == DelegateParams::RenderOutput::OpenGL) {
-        context->ColourCorrectColourTexture(context->gpus[context->currentGPU].mtlMultisampleColorTexture);
-        // Depth texture copy
-        context->CopyDepthTextureToOpenGL();
+        context->CopyToInterop();
     }
 
     __block dispatch_semaphore_t block_sema = _inFlightSemaphore;
@@ -347,7 +345,7 @@ void HdStRenderDelegateMetal::FinalizeRender()
 
     // Finalize rendering here & push the command buffer to the GPU
     if (_renderOutput == DelegateParams::RenderOutput::OpenGL) {
-        context->BlitColorTargetToOpenGL();
+        context->BlitToOpenGL();
         GLF_POST_PENDING_GL_ERRORS();
     }
 }

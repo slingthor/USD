@@ -206,23 +206,33 @@ MtlfGlInterop::MtlfGlInterop(id<MTLDevice> _interopDevice, NSMutableArray<id<MTL
 
         mtlLocalColorTexture[i] = nil;
         mtlLocalDepthTexture[i] = nil;
+        mtlLocalDepthTextureResolved[i] = nil;
+        
+        mtlRemoteColorTexture[i] = nil;
+        mtlRemoteDepthTexture[i] = nil;
+        
+        if (renderDevices[i] == interopDevice) {
+            interopGPUIndex = i;
+        }
     }
     [options release];
     options = nil;
 
+    interopCommandQueue = [interopDevice newCommandQueue];
+    interopSyncEvent = [interopDevice newSharedEvent];
+    interopEventValue = 1;
+    
     CVReturn cvret;
 
     // Create the texture caches
-    for (int i = 0; i < renderDevices.count; i++) {
-        cvret = CVMetalTextureCacheCreate(kCFAllocatorDefault, nil, renderDevices[i], nil, &cvmtlTextureCache[i]);
-        assert(cvret == kCVReturnSuccess);
-        
-        cvmtlColorTexture[i] = nil;
-        cvmtlDepthTexture[i] = nil;
-        
-        mtlAliasedColorTexture[i] = nil;
-        mtlAliasedDepthRegularFloatTexture[i] = nil;
-    }
+    cvret = CVMetalTextureCacheCreate(kCFAllocatorDefault, nil, interopDevice, nil, &cvmtlTextureCache);
+    assert(cvret == kCVReturnSuccess);
+    
+    cvmtlColorTexture = nil;
+    cvmtlDepthTexture = nil;
+    
+    mtlAliasedColorTexture = nil;
+    mtlAliasedDepthRegularFloatTexture = nil;
     
     CGLContextObj glctx = [[NSOpenGLContext currentContext] CGLContextObj];
     CGLPixelFormatObj glPixelFormat = [[[NSOpenGLContext currentContext] pixelFormat] CGLPixelFormatObj];
@@ -249,12 +259,12 @@ MtlfGlInterop::~MtlfGlInterop()
         CFRelease(cvglTextureCache);
         cvglTextureCache = nil;
     }
-    for (int i = 0; i < renderDevices.count; i++) {
-        if (cvmtlTextureCache[i]) {
-            CFRelease(cvmtlTextureCache[i]);
-            cvmtlTextureCache[i] = nil;
-        }
+    if (cvmtlTextureCache) {
+        CFRelease(cvmtlTextureCache);
+        cvmtlTextureCache = nil;
     }
+    
+    [interopCommandQueue release];
 }
 
 void MtlfGlInterop::FreeTransientTextureCacheRefs()
@@ -268,30 +278,42 @@ void MtlfGlInterop::FreeTransientTextureCacheRefs()
         glDepthTexture = 0;
     }
     
+    if (mtlAliasedColorTexture) {
+        [mtlAliasedColorTexture release];
+        mtlAliasedColorTexture = nil;
+    }
+    if (mtlAliasedDepthRegularFloatTexture) {
+        [mtlAliasedDepthRegularFloatTexture release];
+        mtlAliasedDepthRegularFloatTexture = nil;
+    }
+
     for (int i = 0; i < renderDevices.count; i++) {
-        if (mtlAliasedColorTexture[i]) {
-            [mtlAliasedColorTexture[i] release];
-            mtlAliasedColorTexture[i] = nil;
-        }
-        if (mtlAliasedDepthRegularFloatTexture[i]) {
-            [mtlAliasedDepthRegularFloatTexture[i] release];
-            mtlAliasedDepthRegularFloatTexture[i] = nil;
-        }
 
         if (mtlLocalColorTexture[i]) {
-            if (renderDevices[i] != interopDevice) {
-//                [mtlLocalColorTexture[i] release];
-            }
+            [mtlLocalColorTexture[i] release];
             mtlLocalColorTexture[i] = nil;
         }
         if (mtlLocalDepthTexture[i]) {
             [mtlLocalDepthTexture[i] release];
             mtlLocalDepthTexture[i] = nil;
         }
-        
-        cvmtlColorTexture[i] = nil;
-        cvmtlDepthTexture[i] = nil;
+        if (mtlLocalDepthTextureResolved[i]) {
+            [mtlLocalDepthTextureResolved[i] release];
+            mtlLocalDepthTextureResolved[i] = nil;
+        }
+
+        if (mtlRemoteColorTexture[i]) {
+            [mtlRemoteColorTexture[i] release];
+            mtlRemoteColorTexture[i] = nil;
+        }
+        if (mtlRemoteDepthTexture[i]) {
+            [mtlRemoteDepthTexture[i] release];
+            mtlRemoteDepthTexture[i] = nil;
+        }
     }
+
+    cvmtlColorTexture = nil;
+    cvmtlDepthTexture = nil;
 
     cvglColorTexture = nil;
     cvglDepthTexture = nil;
@@ -358,42 +380,54 @@ void MtlfGlInterop::AllocateAttachments(int width, int height)
     NSDictionary* metalTextureProperties = @{
         (__bridge NSString*)kCVMetalTextureCacheMaximumTextureAgeKey : @0,
     };
-    for (int i = 0; i < renderDevices.count; i++) {
-        cvret = CVMetalTextureCacheCreateTextureFromImage(kCFAllocatorDefault,
-                                                          cvmtlTextureCache[i],
-                                                          pixelBuffer,
-                                                          (__bridge CFDictionaryRef)metalTextureProperties,
-                                                          MTLPixelFormatBGRA8Unorm,
-                                                          width,
-                                                          height,
-                                                          0,
-                                                          &cvmtlColorTexture[i]);
-        assert(cvret == kCVReturnSuccess);
-        mtlAliasedColorTexture[i] = CVMetalTextureGetTexture(cvmtlColorTexture[i]);
-    }
+    cvret = CVMetalTextureCacheCreateTextureFromImage(kCFAllocatorDefault,
+                                                      cvmtlTextureCache,
+                                                      pixelBuffer,
+                                                      (__bridge CFDictionaryRef)metalTextureProperties,
+                                                      MTLPixelFormatBGRA8Unorm,
+                                                      width,
+                                                      height,
+                                                      0,
+                                                      &cvmtlColorTexture);
+    assert(cvret == kCVReturnSuccess);
+    mtlAliasedColorTexture = CVMetalTextureGetTexture(cvmtlColorTexture);
     
     // Create the Metal texture for the depth buffer
-    for (int i = 0; i < renderDevices.count; i++) {
-        cvret = CVMetalTextureCacheCreateTextureFromImage(kCFAllocatorDefault,
-                                                          cvmtlTextureCache[i],
-                                                          depthBuffer,
-                                                          (__bridge CFDictionaryRef)metalTextureProperties,
-                                                          MTLPixelFormatR32Float,
-                                                          width,
-                                                          height,
-                                                          0,
-                                                          &cvmtlDepthTexture[i]);
-        assert(cvret == kCVReturnSuccess);
-        mtlAliasedDepthRegularFloatTexture[i] = CVMetalTextureGetTexture(cvmtlDepthTexture[i]);
-    }
-    
-    // Create a Metal texture of type Depth32Float that we can actually use as a depth attachment
+    cvret = CVMetalTextureCacheCreateTextureFromImage(kCFAllocatorDefault,
+                                                      cvmtlTextureCache,
+                                                      depthBuffer,
+                                                      (__bridge CFDictionaryRef)metalTextureProperties,
+                                                      MTLPixelFormatR32Float,
+                                                      width,
+                                                      height,
+                                                      0,
+                                                      &cvmtlDepthTexture);
+    assert(cvret == kCVReturnSuccess);
+    mtlAliasedDepthRegularFloatTexture = CVMetalTextureGetTexture(cvmtlDepthTexture);
+
     MTLTextureDescriptor *depthTexDescriptor =
                             [MTLTextureDescriptor
-                             texture2DDescriptorWithPixelFormat:MTLPixelFormatDepth32Float
+                             texture2DDescriptorWithPixelFormat:MTLPixelFormatR32Float
                              width:width
                              height:height
                              mipmapped:false];
+    depthTexDescriptor.usage = MTLTextureUsageShaderRead|MTLTextureUsageShaderWrite;
+    depthTexDescriptor.resourceOptions = MTLResourceCPUCacheModeDefaultCache | MTLResourceStorageModePrivate;
+
+    for(int i = 0; i < renderDevices.count; i++) {
+        id<MTLDevice> dev = renderDevices[i];
+        if (dev != interopDevice) {
+            mtlLocalDepthTextureResolved[i] = [dev newTextureWithDescriptor:depthTexDescriptor];
+            mtlRemoteDepthTexture[i] = [mtlLocalDepthTextureResolved[i] newRemoteTextureViewForDevice:interopDevice];
+        }
+    }
+    
+    // Create a Metal texture of type Depth32Float that we can actually use as a depth attachment
+    depthTexDescriptor = [MTLTextureDescriptor
+                          texture2DDescriptorWithPixelFormat:MTLPixelFormatDepth32Float
+                          width:width
+                          height:height
+                          mipmapped:false];
 
     depthTexDescriptor.usage = MTLTextureUsageRenderTarget|MTLTextureUsageShaderRead;
     depthTexDescriptor.resourceOptions = MTLResourceCPUCacheModeDefaultCache | MTLResourceStorageModePrivate;
@@ -417,24 +451,20 @@ void MtlfGlInterop::AllocateAttachments(int width, int height)
     for(int i = 0; i < renderDevices.count; i++) {
         id<MTLDevice> dev = renderDevices[i];
         mtlLocalDepthTexture[i] = [dev newTextureWithDescriptor:depthTexDescriptor];
+        mtlLocalColorTexture[i] = [dev newTextureWithDescriptor:colorTexDescriptor];
 
-        if (dev == interopDevice) {
-            mtlLocalColorTexture[i] = mtlAliasedColorTexture[i];
-        }
-        else {
-            mtlLocalColorTexture[i] = mtlAliasedColorTexture[i];//[dev newTextureWithDescriptor:colorTexDescriptor];
+        if (dev != interopDevice) {
+            mtlRemoteColorTexture[i] = [mtlLocalColorTexture[i] newRemoteTextureViewForDevice:interopDevice];
         }
     }
-    
+
     // Flush the caches
     CVOpenGLTextureCacheFlush(cvglTextureCache, 0);
-    for(int i = 0; i < renderDevices.count; i++) {
-        CVMetalTextureCacheFlush(cvmtlTextureCache[i], 0);
-    }
+    CVMetalTextureCacheFlush(cvmtlTextureCache, 0);
 }
 
 void
-MtlfGlInterop::BlitColorTargetToOpenGL()
+MtlfGlInterop::BlitToOpenGL()
 {
     GLint core;
     glGetIntegerv(GL_CONTEXT_PROFILE_MASK, &core);
@@ -472,12 +502,10 @@ MtlfGlInterop::BlitColorTargetToOpenGL()
 
     MtlfMetalContextSharedPtr context(MtlfMetalContext::GetMetalContext());
     glUniform2f(staticState.blitTexSizeUniform,
-                mtlAliasedColorTexture[context->currentGPU].width,
-                mtlAliasedColorTexture[context->currentGPU].height);
+                mtlAliasedColorTexture.width,
+                mtlAliasedColorTexture.height);
     
     glDrawArrays(GL_TRIANGLES, 0, 6);
-    
-    glFlush();
     
     glBindTexture(GL_TEXTURE_RECTANGLE, 0);
     glActiveTexture(GL_TEXTURE0);
@@ -497,77 +525,111 @@ MtlfGlInterop::BlitColorTargetToOpenGL()
 }
 
 void
-MtlfGlInterop::CopyDepthTextureToOpenGL(id<MTLComputeCommandEncoder> computeEncoder)
+MtlfGlInterop::CopyToInterop()
 {
     MtlfMetalContextSharedPtr context(MtlfMetalContext::GetMetalContext());
 
-    if (true || context->currentDevice == interopDevice) {
-        id<MTLFunction> computeProgram = gpus[context->currentGPU].computeDepthCopyProgram;
-        if (mtlSampleCount > 1)
-            computeProgram = gpus[context->currentGPU].computeDepthCopyMultisampleProgram;
-        
-        NSUInteger exeWidth = context->SetComputeEncoderState(computeProgram, 0, 0, @"Depth copy pipeline state");
-        NSUInteger maxThreadsPerThreadgroup = context->GetMaxThreadsPerThreadgroup();
+    id <MTLComputeCommandEncoder> computeEncoder = context->GetComputeEncoder();
+    computeEncoder.label = @"Colour correction/resolve copy";
 
-        MTLSize threadgroupCount = MTLSizeMake(exeWidth, maxThreadsPerThreadgroup / exeWidth, 1);
-        MTLSize threadsPerGrid   = MTLSizeMake((mtlAliasedDepthRegularFloatTexture[context->currentGPU].width + (threadgroupCount.width - 1)) / threadgroupCount.width,
-                                               (mtlAliasedDepthRegularFloatTexture[context->currentGPU].height + (threadgroupCount.height - 1)) / threadgroupCount.height,
-                                               1);
+    id<MTLFunction> computeProgram = gpus[context->currentGPU].computeColourCopyProgram;
+    if (mtlSampleCount > 1)
+        computeProgram = gpus[context->currentGPU].computeColourCopyMultisampleProgram;
 
-        [computeEncoder setTexture:mtlLocalDepthTexture[context->currentGPU] atIndex:0];
-        [computeEncoder setTexture:mtlAliasedDepthRegularFloatTexture[context->currentGPU] atIndex:1];
-        
-        [computeEncoder dispatchThreadgroups:threadsPerGrid threadsPerThreadgroup:threadgroupCount];
+    NSUInteger exeWidth = context->SetComputeEncoderState(computeProgram, 0, 0, @"Colour correction pipeline state");
+    NSUInteger maxThreadsPerThreadgroup = context->GetMaxThreadsPerThreadgroup();
+
+    id<MTLTexture> sourceColorTexture = context->gpus[context->currentGPU].mtlMultisampleColorTexture;
+    id<MTLTexture> sourceDepthTexture = mtlLocalDepthTexture[context->currentGPU];
+
+    MTLSize threadgroupCount = MTLSizeMake(exeWidth, maxThreadsPerThreadgroup / exeWidth, 1);
+    MTLSize threadsPerGrid   = MTLSizeMake((sourceColorTexture.width + (threadgroupCount.width - 1)) / threadgroupCount.width,
+                                           (sourceColorTexture.height + (threadgroupCount.height - 1)) / threadgroupCount.height,
+                                           1);
+
+    id<MTLTexture> destColorTexture;
+    id<MTLTexture> destDepthTexture;
+    if (context->currentDevice == interopDevice) {
+        destColorTexture = mtlAliasedColorTexture;
+        destDepthTexture = mtlAliasedDepthRegularFloatTexture;
     }
     else {
-        // Transfer to interop GPU
-        if ([interopDevice peerGroupID] != 0 &&
-            [interopDevice peerGroupID] == [context->currentDevice peerGroupID]) {
-            
-            // XGMI transfer
-        }
-        else {
-            // Via system memory
-            
-        }
+        destColorTexture = mtlLocalColorTexture[context->currentGPU];
+        destDepthTexture = mtlLocalDepthTextureResolved[context->currentGPU];
     }
-}
 
-void
-MtlfGlInterop::ColourCorrectColourTexture(id<MTLComputeCommandEncoder> computeEncoder, id<MTLTexture> colourTexture)
-{
-    MtlfMetalContextSharedPtr context(MtlfMetalContext::GetMetalContext());
+    [computeEncoder setTexture:sourceColorTexture atIndex:0];
+    [computeEncoder setTexture:destColorTexture atIndex:1];
+
+    [computeEncoder dispatchThreadgroups:threadsPerGrid threadsPerThreadgroup:threadgroupCount];
+
+    //  Now Depth - if going over peer transfer, we're already good to go
+    computeProgram = gpus[context->currentGPU].computeDepthCopyProgram;
+    if (mtlSampleCount > 1)
+        computeProgram = gpus[context->currentGPU].computeDepthCopyMultisampleProgram;
     
-    if (true || context->currentDevice == interopDevice) {
-        id<MTLFunction> computeProgram = gpus[context->currentGPU].computeColourCopyProgram;
-        if (mtlSampleCount > 1)
-            computeProgram = gpus[context->currentGPU].computeColourCopyMultisampleProgram;
-        
-        NSUInteger exeWidth = context->SetComputeEncoderState(computeProgram, 0, 0, @"Colour correction pipeline state");
-        NSUInteger maxThreadsPerThreadgroup = context->GetMaxThreadsPerThreadgroup();
-        
-        MTLSize threadgroupCount = MTLSizeMake(exeWidth, maxThreadsPerThreadgroup / exeWidth, 1);
-        MTLSize threadsPerGrid   = MTLSizeMake((colourTexture.width + (threadgroupCount.width - 1)) / threadgroupCount.width,
-                                               (colourTexture.height + (threadgroupCount.height - 1)) / threadgroupCount.height,
-                                               1);
-        
-        [computeEncoder setTexture:colourTexture atIndex:0];
-        [computeEncoder setTexture:mtlAliasedColorTexture[context->currentGPU] atIndex:1];
-        
-        [computeEncoder dispatchThreadgroups:threadsPerGrid threadsPerThreadgroup:threadgroupCount];
-    }
-    else {
-        // Transfer to interop GPU
-        if ([interopDevice peerGroupID] != 0 &&
-            [interopDevice peerGroupID] == [context->currentDevice peerGroupID]) {
+    exeWidth = context->SetComputeEncoderState(computeProgram, 0, 0, @"Depth copy pipeline state");
+    maxThreadsPerThreadgroup = context->GetMaxThreadsPerThreadgroup();
 
-            // XGMI transfer
-        }
-        else {
-            // Via system memory
-            
-        }
+    threadgroupCount = MTLSizeMake(exeWidth, maxThreadsPerThreadgroup / exeWidth, 1);
+    threadsPerGrid   = MTLSizeMake((destDepthTexture.width + (threadgroupCount.width - 1)) / threadgroupCount.width,
+                                   (destDepthTexture.height + (threadgroupCount.height - 1)) / threadgroupCount.height,
+                                   1);
+    
+    [computeEncoder setTexture:sourceDepthTexture atIndex:0];
+    [computeEncoder setTexture:destDepthTexture atIndex:1];
+    
+    [computeEncoder dispatchThreadgroups:threadsPerGrid threadsPerThreadgroup:threadgroupCount];
+
+    context->ReleaseEncoder(true);
+
+    if (context->currentDevice == interopDevice) {
+        // We're done
+        return;
     }
+    
+    ////////////////////////////////////////////////////
+    /// Peer transfer from active  GPU to interop device
+    ////////////////////////////////////////////////////
+
+    // Encode fence signal on active GPU
+    [context->GetWorkQueue(METALWORKQUEUE_DEFAULT).commandBuffer encodeSignalEvent:interopSyncEvent value:interopEventValue];
+    context->CommitCommandBufferForThread(true, false);
+    context->CreateCommandBuffer(METALWORKQUEUE_DEFAULT);
+    
+    // Switch to the interop GPU
+    id<MTLCommandBuffer> commandBuffer = [interopCommandQueue commandBuffer];
+    
+    // Encode fence wait on interop GPU
+    [commandBuffer encodeWaitForEvent:interopSyncEvent value:interopEventValue++];
+
+    id<MTLBlitCommandEncoder> blitEncoder = [commandBuffer blitCommandEncoder];
+    blitEncoder.label = @"XGMI copy";
+    
+    // Blit from the remote texture to our local texture
+    [blitEncoder copyFromTexture:mtlRemoteColorTexture[context->currentGPU]
+                     sourceSlice:0
+                     sourceLevel:0
+                    sourceOrigin:MTLOriginMake(0, 0, 0)
+                      sourceSize:MTLSizeMake(mtlAliasedColorTexture.width, mtlAliasedColorTexture.height, 1)
+                       toTexture:mtlAliasedColorTexture
+                destinationSlice:0
+                destinationLevel:0
+               destinationOrigin:MTLOriginMake(0, 0, 0)];
+    
+    [blitEncoder copyFromTexture:mtlRemoteDepthTexture[context->currentGPU]
+                     sourceSlice:0
+                     sourceLevel:0
+                    sourceOrigin:MTLOriginMake(0, 0, 0)
+                      sourceSize:MTLSizeMake(mtlAliasedDepthRegularFloatTexture.width, mtlAliasedDepthRegularFloatTexture.height, 1)
+                       toTexture:mtlAliasedDepthRegularFloatTexture
+                destinationSlice:0
+                destinationLevel:0
+               destinationOrigin:MTLOriginMake(0, 0, 0)];
+
+    [blitEncoder endEncoding];
+    [commandBuffer commit];
+    [commandBuffer waitUntilScheduled];
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

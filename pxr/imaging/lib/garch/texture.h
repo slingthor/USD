@@ -64,7 +64,7 @@ TF_DECLARE_WEAK_AND_REF_PTRS(GarchTexture);
 #if defined(ARCH_OS_IOS)
 #define MAX_GPUS    1
 #else
-#define MAX_GPUS    4
+#define MAX_GPUS    2 // Can't be bigger than the maximum number of GPUs in a MTLDevice peer group
 #endif
 
 struct GPUState {
