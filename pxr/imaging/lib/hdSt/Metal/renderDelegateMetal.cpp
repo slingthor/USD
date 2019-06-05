@@ -332,7 +332,7 @@ void HdStRenderDelegateMetal::FinalizeRender()
     // We wait until scheduled, because we're about to consume the Metal
     // generated textures in an OpenGL blit
     context->CommitCommandBufferForThread(
-        _renderOutput == DelegateParams::RenderOutput::OpenGL, false);
+        false/*_renderOutput == DelegateParams::RenderOutput::OpenGL*/, false);
     context->CleanupUnusedBuffers(false);
 
     context->EndFrameForThread();
@@ -345,7 +345,7 @@ void HdStRenderDelegateMetal::FinalizeRender()
 
     // Finalize rendering here & push the command buffer to the GPU
     if (_renderOutput == DelegateParams::RenderOutput::OpenGL) {
-        context->BlitToOpenGL();
+        //context->BlitToOpenGL();
         GLF_POST_PENDING_GL_ERRORS();
     }
 }

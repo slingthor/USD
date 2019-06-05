@@ -24,7 +24,8 @@ endif()
 if (${PXR_ENABLE_GL_SUPPORT})
     SET(GLINTEROP_PRIVATE_CLASS     glInterop)
     set(OPENGL_LIBRARY              ${OPENGL_gl_LIBRARY}
-                                    ${OPENGL_glu_LIBRARY})
+                                    ${OPENGL_glu_LIBRARY}
+                                    glf)
 endif()
 
 pxr_library(mtlf

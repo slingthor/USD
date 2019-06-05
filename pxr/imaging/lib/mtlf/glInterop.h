@@ -98,6 +98,8 @@ private:
     
     InteropGPUInstance gpus[MAX_GPUS];
     
+    NSOpenGLContext *glInteropCtx;
+    
     CVPixelBufferRef pixelBuffer;
     CVPixelBufferRef depthBuffer;
     CVMetalTextureCacheRef cvmtlTextureCache;

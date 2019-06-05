@@ -24,6 +24,7 @@
 
 #include "pxr/imaging/garch/gl.h"
 
+#include "pxr/imaging/glf/glContext.h"
 #include "pxr/imaging/mtlf/glInterop.h"
 #include "pxr/imaging/mtlf/package.h"
 
@@ -238,6 +239,9 @@ MtlfGlInterop::MtlfGlInterop(id<MTLDevice> _interopDevice, NSMutableArray<id<MTL
     CGLPixelFormatObj glPixelFormat = [[[NSOpenGLContext currentContext] pixelFormat] CGLPixelFormatObj];
     cvret = CVOpenGLTextureCacheCreate(kCFAllocatorDefault, nil, (__bridge CGLContextObj _Nonnull)(glctx), glPixelFormat, nil, &cvglTextureCache);
     assert(cvret == kCVReturnSuccess);
+    
+    glInteropCtx = [[NSOpenGLContext alloc] initWithFormat:[[NSOpenGLContext currentContext] pixelFormat]
+                                              shareContext:[NSOpenGLContext currentContext]];
 
     pixelBuffer = nil;
     depthBuffer = nil;
@@ -446,7 +450,7 @@ void MtlfGlInterop::AllocateAttachments(int width, int height)
                              mipmapped:false];
 
     colorTexDescriptor.usage = MTLTextureUsageShaderRead|MTLTextureUsageShaderWrite;
-    colorTexDescriptor.resourceOptions = MTLResourceStorageModeManaged;
+    colorTexDescriptor.resourceOptions = MTLResourceCPUCacheModeDefaultCache | MTLResourceStorageModePrivate;
 
     for(int i = 0; i < renderDevices.count; i++) {
         id<MTLDevice> dev = renderDevices[i];
@@ -473,7 +477,7 @@ MtlfGlInterop::BlitToOpenGL()
     if (!core) {
         glPushAttrib(GL_ENABLE_BIT | GL_POLYGON_BIT | GL_DEPTH_BUFFER_BIT);
     }
-
+    
     glDepthFunc(GL_LEQUAL);
     glDepthMask(GL_TRUE);
     glEnable(GL_DEPTH_TEST);
@@ -522,12 +526,20 @@ MtlfGlInterop::BlitToOpenGL()
     else {
         glPopAttrib();
     }
+    
+//    glFlush();
 }
 
 void
 MtlfGlInterop::CopyToInterop()
 {
     MtlfMetalContextSharedPtr context(MtlfMetalContext::GetMetalContext());
+    
+//    if (context->currentDevice != interopDevice) {
+//        context->CommitCommandBufferForThread(false , false);
+//        context->BeginCaptureSubset(context->currentGPU);
+//        context->CreateCommandBuffer(METALWORKQUEUE_DEFAULT, true);
+//    }
 
     id <MTLComputeCommandEncoder> computeEncoder = context->GetComputeEncoder();
     computeEncoder.label = @"Colour correction/resolve copy";
@@ -582,9 +594,17 @@ MtlfGlInterop::CopyToInterop()
     [computeEncoder dispatchThreadgroups:threadsPerGrid threadsPerThreadgroup:threadgroupCount];
 
     context->ReleaseEncoder(true);
-
+    
     if (context->currentDevice == interopDevice) {
         // We're done
+//        [context->GetWorkQueue(METALWORKQUEUE_DEFAULT).commandBuffer addScheduledHandler:^(id<MTLCommandBuffer> buffer)
+//         {
+//            [glInteropCtx makeCurrentContext];
+//            BlitToOpenGL();
+//         }];
+        context->CommitCommandBufferForThread(false , false);
+        context->CreateCommandBuffer(METALWORKQUEUE_DEFAULT);
+        BlitToOpenGL();
         return;
     }
     
@@ -592,16 +612,21 @@ MtlfGlInterop::CopyToInterop()
     /// Peer transfer from active  GPU to interop device
     ////////////////////////////////////////////////////
 
-    // Encode fence signal on active GPU
+    // Encode sync signal on active render GPU
     [context->GetWorkQueue(METALWORKQUEUE_DEFAULT).commandBuffer encodeSignalEvent:interopSyncEvent value:interopEventValue];
-    context->CommitCommandBufferForThread(true, false);
+
+    context->CommitCommandBufferForThread(true , false);
+//    context->EndCaptureSubset(context->currentGPU);
+
     context->CreateCommandBuffer(METALWORKQUEUE_DEFAULT);
-    
+//    context->BeginCaptureSubset(interopGPUIndex);
+
     // Switch to the interop GPU
     id<MTLCommandBuffer> commandBuffer = [interopCommandQueue commandBuffer];
     
-    // Encode fence wait on interop GPU
-    [commandBuffer encodeWaitForEvent:interopSyncEvent value:interopEventValue++];
+    // Encode sync wait on interop GPU
+    [commandBuffer encodeWaitForEvent:interopSyncEvent value:interopEventValue];
+    interopEventValue++;
 
     id<MTLBlitCommandEncoder> blitEncoder = [commandBuffer blitCommandEncoder];
     blitEncoder.label = @"XGMI copy";
@@ -616,7 +641,7 @@ MtlfGlInterop::CopyToInterop()
                 destinationSlice:0
                 destinationLevel:0
                destinationOrigin:MTLOriginMake(0, 0, 0)];
-    
+
     [blitEncoder copyFromTexture:mtlRemoteDepthTexture[context->currentGPU]
                      sourceSlice:0
                      sourceLevel:0
@@ -628,8 +653,17 @@ MtlfGlInterop::CopyToInterop()
                destinationOrigin:MTLOriginMake(0, 0, 0)];
 
     [blitEncoder endEncoding];
+//    [commandBuffer addScheduledHandler:^(id<MTLCommandBuffer> buffer)
+//     {
+//        [glInteropCtx makeCurrentContext];
+//        BlitToOpenGL();
+//     }];
+    
     [commandBuffer commit];
     [commandBuffer waitUntilScheduled];
+//    context->EndCaptureSubset(interopGPUIndex);
+
+    BlitToOpenGL();
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

@@ -609,7 +609,7 @@ void MtlfMetalContext::CheckNewStateGather()
 {
 }
 
-void MtlfMetalContext::CreateCommandBuffer(MetalWorkQueueType workQueueType) {
+void MtlfMetalContext::CreateCommandBuffer(MetalWorkQueueType workQueueType, bool forceFromDevice) {
     MetalWorkQueue *wq = &GetWorkQueue(workQueueType);
     
     //NSLog(@"Creating command buffer %d", (int)workQueueType);
@@ -617,7 +617,7 @@ void MtlfMetalContext::CreateCommandBuffer(MetalWorkQueueType workQueueType) {
     if (wq->commandBuffer == nil) {
         std::lock_guard<std::mutex> lock(_commandBufferPoolMutex);
 
-        if (commandBuffersStackPos[currentGPU] > 0) {
+        if (commandBuffersStackPos[currentGPU] > 0 && !forceFromDevice) {
             wq->commandBuffer = commandBuffers[currentGPU][--commandBuffersStackPos[currentGPU]];
         }
         else {
