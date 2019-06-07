@@ -78,6 +78,50 @@ struct CullList {
     }
 };
 
+struct CullStateCache {
+    enum CullTestType {
+        TestSphere,
+        TestBox,
+    };
+
+    CullStateCache(GfVec3f const &minVec, GfVec3f const &maxVec) {
+        points[0] = {minVec[0], minVec[1], minVec[2], 1};
+        points[1] = {maxVec[0], maxVec[1], maxVec[2], 1};
+        points[2] = {minVec[0], maxVec[1], minVec[2], 1};
+        points[3] = {maxVec[0], minVec[1], maxVec[2], 1};
+        points[4] = {minVec[0], minVec[1], maxVec[2], 1};
+        points[5] = {minVec[0], maxVec[1], maxVec[2], 1};
+        points[6] = {maxVec[0], minVec[1], minVec[2], 1};
+        points[7] = {maxVec[0], maxVec[1], minVec[2], 1};
+        GfVec3f m((minVec + maxVec) * 0.5f);
+        mid = {m[0], m[1], m[2], 1};
+        lastCullPlane = -1;
+
+        vector_float3 size = (points[1].xyz - points[0].xyz) * 0.5f;
+        radius = vector_length(size);
+
+        vector_float3 t = vector_abs(vector_normalize(size));
+        static float chooseBoxThreshold = vector_normalize((vector_float3){1, 1, 1}).x * 0.75f;
+        if (t.x < chooseBoxThreshold ||
+            t.y < chooseBoxThreshold ||
+            t.z < chooseBoxThreshold) {
+            suggestedTestType = TestBox;
+        }
+        else {
+            suggestedTestType = TestSphere;
+        }
+        
+        // Pending further sphere optimisation
+        suggestedTestType = TestBox;
+    }
+    
+    vector_float4   points[8];
+    vector_float4   mid;
+    float           radius;
+    int             lastCullPlane;
+    int             suggestedTestType;
+};
+
 struct DrawableItem {
     DrawableItem(HdStDrawItemInstance* itemInstance,
                  GfRange3f const &aaBoundingBox,
@@ -94,12 +138,10 @@ struct DrawableItem {
                                              std::vector<DrawableItem*> *items,
                                              std::vector<DrawableItem*> *visibilityOwners);
     
-    HdStDrawItemInstance *itemInstance;
-    GfRange3f aabb;
-    GfBBox3f const& cullingBBox;
-
-    vector_float4 points[8];
-    mutable int   lastCullPlane;
+    HdStDrawItemInstance    *itemInstance;
+    GfRange3f               aabb;
+    GfBBox3f const&         cullingBBox;
+    mutable CullStateCache  cullCache;
 
     size_t instanceIdx;
     size_t numItemsInInstance;
@@ -131,8 +173,7 @@ public:
     GfVec3f minVec;
     GfVec3f maxVec;
     GfVec3f halfSize;
-    vector_float4 points[8];
-    mutable int   lastCullPlane;
+    mutable CullStateCache  cullCache;
     
     size_t index;
     size_t indexEnd;

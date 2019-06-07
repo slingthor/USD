@@ -308,8 +308,6 @@ HdDrawItem::CalculateCullingBounds() const
             uint8_t *instanceIndexBuffer = const_cast<uint8_t*>(instanceIndexRes->GetBufferContents());
             uint32_t *instanceBuffer = reinterpret_cast<uint32_t*>(instanceIndexBuffer) + instanceOffset;
             
-            _instancedCullingBoundsCalculated = true;
-            
             HdBufferArrayRangeSharedPtr const & primvar = GetConstantPrimvarRange();
             HdBufferResourceSharedPtr const & transformRes = primvar->GetResource(HdTokens->transform);
             HdBufferResourceSharedPtr const & instancerTransformRes = primvar->GetResource(HdTokens->instancerTransform);

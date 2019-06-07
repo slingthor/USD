@@ -133,35 +133,8 @@ HdStCommandBuffer::ExecuteDraw(
                   MTLRenderPassDescriptor *rpd,
                   size_t begin, size_t end)
         {
-            bool foundSomethingVisible = false;
-            
-            for(size_t i = begin; i < end; i++) {
-                HdSt_DrawBatchSharedPtr& batch = (*drawBatches)[i];
-                
-                for (auto const& instance : batch->_drawItemInstances) {
-                    if (instance->IsVisible()) {
-                        foundSomethingVisible = true;
-                        break;
-                    }
-                }
-                if (foundSomethingVisible) {
-                    begin = i;
-                    break;
-                }
-            }
-            if (!foundSomethingVisible) {
-                return;
-            }
-            
             MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
-
             context->StartFrameForThread();
-
-            // Create a new command buffer for each render pass to the current drawable
-            context->CreateCommandBuffer(METALWORKQUEUE_DEFAULT);
-            if (TF_DEV_BUILD) {
-                context->LabelCommandBuffer(@"HdEngine::RenderWorker", METALWORKQUEUE_DEFAULT);
-            }
             context->SetRenderPassDescriptor(rpd);
             
             for(size_t i = begin; i < end; i++) {
@@ -180,8 +153,80 @@ HdStCommandBuffer::ExecuteDraw(
                 context->EndFrameForThread();
             }
         }
+        
+        struct VisibleBatch {
+            HdSt_DrawBatch* batch;
+            int             numVisible;
+        };
+        
+        static
+        void draw2(std::vector<VisibleBatch> *drawBatches,
+                   HdStRenderPassStateSharedPtr const &renderPassState,
+                   HdStResourceRegistrySharedPtr const &resourceRegistry,
+                   MTLRenderPassDescriptor *rpd,
+                   size_t begin, size_t end)
+        {
+            MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
+            context->StartFrameForThread();
+            context->SetRenderPassDescriptor(rpd);
+            
+            for(size_t i = begin; i < end; i++) {
+                HdSt_DrawBatch* batch = (*drawBatches)[i].batch;
+                batch->ExecuteDraw(renderPassState, resourceRegistry);
+            }
+            
+            if (context->GeometryShadersActive()) {
+                // Complete the GS command buffer if we have one
+                context->CommitCommandBufferForThread(false, false, METALWORKQUEUE_GEOMETRY_SHADER);
+            }
+            
+            if (context->GetWorkQueue(METALWORKQUEUE_DEFAULT).commandBuffer != nil) {
+                context->CommitCommandBufferForThread(false, false);
+                
+                context->EndFrameForThread();
+            }
+        }
+        
+        static
+        void draw3(std::vector<std::vector<_Worker::VisibleBatch const*>> *drawBatches,
+                   HdStRenderPassStateSharedPtr const &renderPassState,
+                   HdStResourceRegistrySharedPtr const &resourceRegistry,
+                   MTLRenderPassDescriptor *rpd,
+                   size_t begin, size_t end)
+        {
+//            uint64_t timeStart = ArchGetTickTime();
+//            int numItems = 0;
+
+            MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
+            context->StartFrameForThread();
+            context->SetRenderPassDescriptor(rpd);
+
+            if ((end - begin) != 1) {
+                TF_FATAL_CODING_ERROR("We're explicitly expecting one item ");
+            }
+            for(auto const& batchList : (*drawBatches)[begin]) {
+                HdSt_DrawBatch* batch = batchList->batch;
+                batch->ExecuteDraw(renderPassState, resourceRegistry);
+//                numItems += batchList->numVisible;
+            }
+            
+            if (context->GeometryShadersActive()) {
+                // Complete the GS command buffer if we have one
+                context->CommitCommandBufferForThread(false, false, METALWORKQUEUE_GEOMETRY_SHADER);
+            }
+            
+            if (context->GetWorkQueue(METALWORKQUEUE_DEFAULT).commandBuffer != nil) {
+                context->CommitCommandBufferForThread(false, false);
+                
+                context->EndFrameForThread();
+            }
+
+//            uint64_t timeDiff = ArchGetTickTime() - timeStart;
+//            NSLog(@"Thread time: %.2fms (%d items)",
+//                  ArchTicksToNanoseconds(timeDiff) / 1000.0f / 1000.0f, numItems);
+        }
     };
-    
+
     bool setAlpha = false;
 
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
@@ -214,32 +259,90 @@ HdStCommandBuffer::ExecuteDraw(
     }
 
     uint64_t timeStart = ArchGetTickTime();
-    static bool mtBatchDrawing = _drawBatches.size() >= 10;
+    static bool mtBatchDrawing = true;
 
     static os_log_t encodingLog = os_log_create("hydra.metal", "Drawing");
     os_signpost_id_t issueEncoding = os_signpost_id_generate(encodingLog);
     
     os_signpost_interval_begin(encodingLog, issueEncoding, "Encoding");
     if (mtBatchDrawing) {
+        std::vector<_Worker::VisibleBatch> visibleBatches;
+        visibleBatches.reserve(_drawBatches.size());
+        for (auto const& batch : _drawBatches) {
+            int numVisible = 0;
+            for (auto &itemInstance : batch->_drawItemInstances) {
+                if (itemInstance->IsVisible()) {
+                    numVisible++;
+                }
+            }
+            if (numVisible) {
+                HdSt_DrawBatch &b = *batch;
+                visibleBatches.push_back({&b, numVisible});
+//                NSLog(@"Batch: %d of %lu", numVisible, batch->_drawItemInstances.size());
+            }
+        }
+        
+        // sort based on number of drawables
+        std::sort(visibleBatches.begin(), visibleBatches.end(),
+            [] (_Worker::VisibleBatch const& a, _Worker::VisibleBatch const& b)
+                {
+                    return a.numVisible > b.numVisible;
+                });
+
+//        NSLog(@"Culled from %lu batches to %lu", _drawBatches.size(), visibleBatches.size());
+        
         unsigned const systemLimit = WorkGetConcurrencyLimit();
         
-        // Limit the number of threads used to render with
-        unsigned const maxRenderThreads = MIN(systemLimit, 12);
-        WorkSetConcurrencyLimit(maxRenderThreads);
+        // Limit the number of threads used to render with. Save two threads for the su
+        unsigned const maxRenderThreads = MIN(MIN(systemLimit - 2, 12), visibleBatches.size());
+        if (maxRenderThreads) {
+            WorkSetConcurrencyLimit(maxRenderThreads);
 
-        unsigned const maxRenderCommandBufferCount = maxRenderThreads * 2;
-        unsigned grainSize = MAX(_drawBatches.size() / maxRenderCommandBufferCount, 1);
+            // Now distribute so that the number of draw instances is more evenly distributed across
+            // all the threads
+            std::vector<std::vector<_Worker::VisibleBatch const*>> renderOrderedBatches(maxRenderThreads);
+            int index = 0;
+            int step = 1;
 
-        WorkParallelForN(_drawBatches.size(),
-                         std::bind(&_Worker::draw, &_drawBatches,
-                                   std::cref(renderPassState),
-                                   std::cref(resourceRegistry),
-                                   std::ref(renderPassDescriptor),
-                                   std::placeholders::_1,
-                                   std::placeholders::_2),
-                         grainSize);
+            for (auto const& batch : visibleBatches) {
+                renderOrderedBatches[index].push_back(&batch);
+                index += step;
+                if (index == -1) {
+                    index++;
+                    step = 1;
+                }
+                else if (index == maxRenderThreads) {
+                    index--;
+                    step = -1;
+                }
+            }
 
-        WorkSetConcurrencyLimit(systemLimit);
+//            WorkParallelForN(_drawBatches.size(),
+//                             std::bind(&_Worker::draw, &_drawBatches,
+//                                       std::cref(renderPassState),
+//                                       std::cref(resourceRegistry),
+//                                       std::ref(renderPassDescriptor),
+//                                       std::placeholders::_1,
+//                                       std::placeholders::_2));
+            
+//            WorkParallelForN(visibleBatches.size(),
+//                             std::bind(&_Worker::draw2, &visibleBatches,
+//                                       std::cref(renderPassState),
+//                                       std::cref(resourceRegistry),
+//                                       std::ref(renderPassDescriptor),
+//                                       std::placeholders::_1,
+//                                       std::placeholders::_2));
+
+            WorkParallelForN(maxRenderThreads,
+                             std::bind(&_Worker::draw3, &renderOrderedBatches,
+                                       std::cref(renderPassState),
+                                       std::cref(resourceRegistry),
+                                       std::ref(renderPassDescriptor),
+                                       std::placeholders::_1,
+                                       std::placeholders::_2));
+
+            WorkSetConcurrencyLimit(systemLimit);
+        }
     } else {
         _Worker::draw(&_drawBatches,
                       renderPassState,
@@ -249,14 +352,22 @@ HdStCommandBuffer::ExecuteDraw(
                       _drawBatches.size());
     }
     os_signpost_interval_end(encodingLog, issueEncoding, "Encoding");
-    
-    uint64_t timeDiff = ArchGetTickTime() - timeStart;
-    static uint64_t fastestTime = 0xffffffffffffffff;
 
-//    fastestTime = std::min(fastestTime, timeDiff);
+//    uint64_t timeDiff = ArchGetTickTime() - timeStart;
+//    static std::unordered_map<HdStCommandBuffer*, uint64_t> timings;
+//    auto search = timings.find(this);
+//    uint64_t fastest;
+//    if(search == timings.end()) {
+//        timings.insert(std::make_pair(this, timeDiff));
+//        fastest = timeDiff;
+//    }
+//    else {
+//        search->second = std::min(search->second, timeDiff);
+//        fastest = search->second;
+//    }
 //    NSLog(@"HdStCommandBuffer::ExecuteDraw: %.2fms (%.2fms fastest)",
 //          ArchTicksToNanoseconds(timeDiff) / 1000.0f / 1000.0f,
-//          ArchTicksToNanoseconds(fastestTime) / 1000.0f / 1000.0f);
+//          ArchTicksToNanoseconds(fastest) / 1000.0f / 1000.0f);
 
     HD_PERF_COUNTER_SET(HdPerfTokens->drawBatches, _drawBatches.size());
 }

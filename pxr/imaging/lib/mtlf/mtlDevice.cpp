@@ -126,7 +126,7 @@ id<MTLDevice> MtlfMetalContext::GetMetalDevice(PREFERRED_GPU_TYPE preferredGPUTy
     id<MTLDevice>                  _defaultDevice  = MTLCreateSystemDefaultDevice();
     NSArray *preferredDeviceList = _discreteGPUs;
     
-    bool const multiGPUSuportEnabled = true && preferredGPUType == PREFER_DEFAULT_GPU;
+    bool const multiGPUSuportEnabled = false && preferredGPUType == PREFER_DEFAULT_GPU;
     
     // Put the device into the appropriate device list
     for (id<MTLDevice>dev in allDevices) {
@@ -153,7 +153,7 @@ id<MTLDevice> MtlfMetalContext::GetMetalDevice(PREFERRED_GPU_TYPE preferredGPUTy
         case PREFER_DISPLAY_GPU:
             NSLog(@"Display device selection not supported yet, returning default GPU");
         case PREFER_DEFAULT_GPU:
-            if (!multiGPUSuportEnabled) {
+            if (!multiGPUSuportEnabled || renderDevices.count == 0) {
                 [renderDevices addObject:_defaultDevice];
             }
             return _defaultDevice;
@@ -169,13 +169,13 @@ id<MTLDevice> MtlfMetalContext::GetMetalDevice(PREFERRED_GPU_TYPE preferredGPUTy
     }
     // If no device matching the requested one was found then get the default device
     if (preferredDeviceList.count != 0) {
-        if (!multiGPUSuportEnabled) {
+        if (!multiGPUSuportEnabled || renderDevices.count == 0) {
             [renderDevices addObject:preferredDeviceList.firstObject];
         }
         return preferredDeviceList.firstObject;
     }
     else {
-        if (!multiGPUSuportEnabled) {
+        if (!multiGPUSuportEnabled || renderDevices.count == 0) {
             [renderDevices addObject:_defaultDevice];
         }
         NSLog(@"Preferred device not found, returning default GPU");
@@ -1724,7 +1724,6 @@ void MtlfMetalContext::SetCurrentEncoder(MetalEncoderType encoderType, MetalWork
         TF_FATAL_CODING_ERROR("Need to release the current encoder before getting a new one");
     }
     if (!wq->commandBuffer) {
-        //NSLog(@"Creating a command buffer on demand, try and avoid this!");
         CreateCommandBuffer(workQueueType);
         //LabelCommandBuffer(@"Default label - fix!");
         //TF_FATAL_CODING_ERROR("Shouldn't be able to get here without having a command buffer created");

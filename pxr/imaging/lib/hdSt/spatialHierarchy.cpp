@@ -114,14 +114,34 @@ namespace MissingFunctions {
         return Intersection::Outside;
     }
     
-    bool ShouldRejectBasedOnSize(vector_float4 const* _points, matrix_float4x4 const &viewProjMatrix, vector_float2 const &dimensions)
+    bool ShouldRejectBasedOnSize(CullStateCache &cache, matrix_float4x4 const &viewProjMatrix, vector_float2 const &dimensions)
     {
+        if (cache.suggestedTestType == CullStateCache::TestSphere) {
+            vector_float4 points[] =
+            {
+                matrix_multiply(viewProjMatrix, cache.points[0]),
+                matrix_multiply(viewProjMatrix, cache.points[1]),
+            };
+            
+            vector_float4 screenSpace[2];
+            vector_float4 inv = vector_fast_recip((vector_float4){points[0][3], points[1][3], points[2][3], points[3][3]});
+            screenSpace[0].xy = points[0].xy * inv.x;
+            screenSpace[1].xy = points[1].xy * inv.y;
+            screenSpace[0].zw = points[2].xy * inv.z;
+            screenSpace[1].zw = points[3].xy * inv.w;
+            
+            vector_float4 d = vector_abs(screenSpace[1] - screenSpace[0]);
+            return (d.x < dimensions.x && d.y < dimensions.y) &&
+            (d.z < dimensions.x && d.w < dimensions.y);
+            return true;
+        }
+
         vector_float4 points[] =
         {
-            matrix_multiply(viewProjMatrix, _points[0]),
-            matrix_multiply(viewProjMatrix, _points[1]),
-            matrix_multiply(viewProjMatrix, _points[2]),
-            matrix_multiply(viewProjMatrix, _points[3])
+            matrix_multiply(viewProjMatrix, cache.points[0]),
+            matrix_multiply(viewProjMatrix, cache.points[1]),
+            matrix_multiply(viewProjMatrix, cache.points[2]),
+            matrix_multiply(viewProjMatrix, cache.points[3])
         };
 
         vector_float4 screenSpace[2];
@@ -158,10 +178,23 @@ namespace MissingFunctions {
                (d.z < dimensions.x && d.w < dimensions.y);
     }
     
-    bool FrustumFullyContains(const OctreeNode* node,
+    bool FrustumFullyContains(CullStateCache &cache,
                               vector_float4 const *clipPlanes)
     {
-        vector_float4 const *points = node->points;
+        if (cache.suggestedTestType == CullStateCache::TestSphere) {
+            vector_float3 mid = cache.mid.xyz;
+            float radius = cache.radius;
+
+            for (int p = 0; p < 5; p++, clipPlanes++) {
+                float value = vector_dot(clipPlanes->xyz, mid) + clipPlanes->w - radius;
+                if (value < 0) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        vector_float4 const *points = cache.points;
         
         float value;
         for (int p = 0; p < 5; p++) {
@@ -195,14 +228,40 @@ namespace MissingFunctions {
         return true;
     }
     
-    bool IntersectsFrustum(vector_float4 const *points,
-                           vector_float4 const *clipPlanes,
-                           int &planeHint)
+    bool IntersectsFrustum(CullStateCache &cache,
+                           vector_float4 const *clipPlanes)
     {
-        float value;
+        int planeHint = cache.lastCullPlane;
+
+        if (cache.suggestedTestType == CullStateCache::TestSphere) {
+            vector_float3 mid = cache.mid.xyz;
+            float radius = cache.radius;
+            
+            if (planeHint >= 0) {
+                float value = vector_dot(clipPlanes[planeHint].xyz, mid) + clipPlanes[planeHint].w + radius;
+                if (value < 0)
+                    return false;
+            }
+            
+            for (int p = 0; p < 5; p++, clipPlanes++) {
+                if (p == planeHint)
+                    continue;
+
+                float value = vector_dot(clipPlanes->xyz, mid) + clipPlanes->w + radius;
+                if (value < 0) {
+                    cache.lastCullPlane = p;
+                    return false;
+                }
+            }
+            cache.lastCullPlane = -1;
+            return true;
+        }
+
+        vector_float4 const *points = cache.points;
         
         // Test the plane we hit last time we discarded this object first
         if (planeHint >= 0) {
+            float value;
             do {
                 value = vector_dot(clipPlanes[planeHint].xyz, points[0].xyz) + clipPlanes[planeHint].w;
                 if (value > 0)
@@ -232,6 +291,8 @@ namespace MissingFunctions {
             } while(false);
         }
 
+        // Don't test near - the left/right/top/bottom converge just behind it anyway
+        float value;
         for (int p = 0; p < 5; p++, clipPlanes++) {
             if (p == planeHint)
                 continue;
@@ -263,7 +324,7 @@ namespace MissingFunctions {
             planeHint = p;
             return false;
         }
-        planeHint = -1;
+        cache.lastCullPlane = -1;
 
         return true;
     }
@@ -277,22 +338,12 @@ DrawableItem::DrawableItem(HdStDrawItemInstance* itemInstance,
 : itemInstance(itemInstance)
 , aabb(aaBoundingBox)
 , cullingBBox(cullingBoundingBox)
-, lastCullPlane(-1)
+, cullCache(cullingBoundingBox.GetRange().GetMin(), cullingBoundingBox.GetRange().GetMax())
 , instanceIdx(instanceIndex)
 , numItemsInInstance(totalInstancers)
 , isInstanced(true)
 {
-    GfVec3f const &minVec(cullingBBox.GetRange().GetMin());
-    GfVec3f const &maxVec(cullingBBox.GetRange().GetMax());
-
-    points[0] = {minVec[0], minVec[1], minVec[2], 1};
-    points[1] = {maxVec[0], maxVec[1], maxVec[2], 1};
-    points[2] = {minVec[0], maxVec[1], minVec[2], 1};
-    points[3] = {maxVec[0], minVec[1], maxVec[2], 1};
-    points[4] = {minVec[0], minVec[1], maxVec[2], 1};
-    points[5] = {minVec[0], maxVec[1], maxVec[2], 1};
-    points[6] = {maxVec[0], minVec[1], minVec[2], 1};
-    points[7] = {maxVec[0], maxVec[1], minVec[2], 1};
+    // Nothing
 }
 
 DrawableItem::DrawableItem(HdStDrawItemInstance* itemInstance,
@@ -585,7 +636,7 @@ void BVH::PerformCulling(matrix_float4x4 const &viewProjMatrix,
                     GfBBox3f const &box = (*drawableItem)->cullingBBox;
                     
                     bool visible;
-                    visible = MissingFunctions::IntersectsFrustum((*drawableItem)->points, _clipPlanes, (*drawableItem)->lastCullPlane) &&
+                    visible = MissingFunctions::IntersectsFrustum((*drawableItem)->cullCache, _clipPlanes) &&
                                 !MissingFunctions::ShouldRejectBasedOnSize(
                                     box.GetRange().GetMin(), box.GetRange().GetMax(), *_viewProjMatrix, *_dimensions);
                     *visibilityWritePtr++ = visible;
@@ -640,7 +691,7 @@ void BVH::PerformCulling(matrix_float4x4 const &viewProjMatrix,
     uint64_t end = ArchGetTickTime();
     float cullBuildBufferTimeMS = (end - cullBuildBufferTimeBegin) / 1000.0f;
     lastCullTimeMS = (end - cullStart) / 1000.0f;
-    
+
 //    NSLog(@"CullList: %.2fms   Apply: %.2fms   BuildBuffer: %.2fms   Total: %.2fms", cullListTimeMS, cullApplyTimeMS, cullBuildBufferTimeMS, lastCullTimeMS);
 }
 
@@ -649,7 +700,7 @@ OctreeNode::OctreeNode(float minX, float minY, float minZ, float maxX, float max
 , minVec(minX, minY, minZ)
 , maxVec(maxX, maxY, maxZ)
 , halfSize((maxX - minX) * 0.5, (maxY - minY) * 0.5, (maxZ - minZ) * 0.5)
-, lastCullPlane(-1)
+, cullCache(minVec, maxVec)
 , index(0)
 , indexEnd(0)
 , itemCount(0)
@@ -658,7 +709,7 @@ OctreeNode::OctreeNode(float minX, float minY, float minZ, float maxX, float max
 , isSplit(false)
 , numChildren(0)
 {
-    CalcPoints();
+    // Nothing
 }
 
 OctreeNode::~OctreeNode()
@@ -671,25 +722,13 @@ OctreeNode::~OctreeNode()
     }
 }
 
-void OctreeNode::CalcPoints()
-{
-    points[0] = {minVec[0], minVec[1], minVec[2], 1};
-    points[1] = {maxVec[0], maxVec[1], maxVec[2], 1};
-    points[2] = {minVec[0], maxVec[1], minVec[2], 1};
-    points[3] = {maxVec[0], minVec[1], maxVec[2], 1};
-    points[4] = {minVec[0], minVec[1], maxVec[2], 1};
-    points[5] = {minVec[0], maxVec[1], maxVec[2], 1};
-    points[6] = {maxVec[0], minVec[1], minVec[2], 1};
-    points[7] = {maxVec[0], maxVec[1], minVec[2], 1};
-}
-
 void OctreeNode::ReInit(GfRange3f const &boundingBox)
 {
     aabb = GfRange3f(boundingBox);
     minVec = aabb.GetMin();
     maxVec = aabb.GetMax();
     halfSize = (maxVec - minVec) * 0.5;
-    CalcPoints();
+    cullCache = CullStateCache(minVec, maxVec);
 }
 
 void OctreeNode::PerformCulling(matrix_float4x4 const &viewProjMatrix,
@@ -700,8 +739,8 @@ void OctreeNode::PerformCulling(matrix_float4x4 const &viewProjMatrix,
                                 bool fullyContained)
 {
     if (!fullyContained) {
-        if (!MissingFunctions::IntersectsFrustum(points, clipPlanes, lastCullPlane) ||
-            MissingFunctions::ShouldRejectBasedOnSize(points, viewProjMatrix, dimensions)) {
+        if (!MissingFunctions::IntersectsFrustum(cullCache, clipPlanes) ||
+            MissingFunctions::ShouldRejectBasedOnSize(cullCache, viewProjMatrix, dimensions)) {
             if (totalItemCount) {
                 if (lastIntersection != OutsideCull) {
                     cullList.allItemInvisible.push_back({this, visibility + index});
@@ -711,13 +750,13 @@ void OctreeNode::PerformCulling(matrix_float4x4 const &viewProjMatrix,
             return;
         }
 
-        if (MissingFunctions::FrustumFullyContains(this, clipPlanes)) {
+        if (MissingFunctions::FrustumFullyContains(cullCache, clipPlanes)) {
             fullyContained = true;
         }
     }
 
     if (fullyContained) {
-        if (MissingFunctions::ShouldRejectBasedOnSize(points, viewProjMatrix, dimensions)) {
+        if (MissingFunctions::ShouldRejectBasedOnSize(cullCache, viewProjMatrix, dimensions)) {
             if (totalItemCount) {
                 if (lastIntersection != InsideCull) {
                     cullList.allItemInvisible.push_back({this, visibility + index});

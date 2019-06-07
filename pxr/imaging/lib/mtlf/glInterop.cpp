@@ -597,11 +597,6 @@ MtlfGlInterop::CopyToInterop()
     
     if (context->currentDevice == interopDevice) {
         // We're done
-//        [context->GetWorkQueue(METALWORKQUEUE_DEFAULT).commandBuffer addScheduledHandler:^(id<MTLCommandBuffer> buffer)
-//         {
-//            [glInteropCtx makeCurrentContext];
-//            BlitToOpenGL();
-//         }];
         context->CommitCommandBufferForThread(false , false);
         context->CreateCommandBuffer(METALWORKQUEUE_DEFAULT);
         BlitToOpenGL();
@@ -653,11 +648,6 @@ MtlfGlInterop::CopyToInterop()
                destinationOrigin:MTLOriginMake(0, 0, 0)];
 
     [blitEncoder endEncoding];
-//    [commandBuffer addScheduledHandler:^(id<MTLCommandBuffer> buffer)
-//     {
-//        [glInteropCtx makeCurrentContext];
-//        BlitToOpenGL();
-//     }];
     
     [commandBuffer commit];
     [commandBuffer waitUntilScheduled];

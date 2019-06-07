@@ -183,7 +183,7 @@ HdSt_ImmediateDrawBatch::ExecuteDraw(
             drawItem->GetTopologyRange();
 
         if (indexBar && (!indexBar->IsAggregatedWith(indexBarCurrent))) {
-            binder.UnbindBufferArray(indexBarCurrent);
+            //binder.UnbindBufferArray(indexBarCurrent);
             binder.BindBufferArray(indexBar);
             indexBarCurrent = indexBar;
         }
@@ -195,8 +195,8 @@ HdSt_ImmediateDrawBatch::ExecuteDraw(
             topVisBar = drawItem->GetTopologyVisibilityRange();
 
         if (topVisBar && (!topVisBar->IsAggregatedWith(topVisBarCurrent))) {
-            binder.UnbindInterleavedBuffer(topVisBarCurrent,
-                                           HdTokens->topologyVisibility);
+            //binder.UnbindInterleavedBuffer(topVisBarCurrent,
+            //                               HdTokens->topologyVisibility);
             binder.BindInterleavedBuffer(topVisBar,
                                          HdTokens->topologyVisibility);
             topVisBarCurrent = topVisBar;
@@ -209,7 +209,7 @@ HdSt_ImmediateDrawBatch::ExecuteDraw(
             drawItem->GetElementPrimvarRange();
 
         if (elementBar && (!elementBar->IsAggregatedWith(elementBarCurrent))) {
-            binder.UnbindBufferArray(elementBarCurrent);
+            //binder.UnbindBufferArray(elementBarCurrent);
             binder.BindBufferArray(elementBar);
             elementBarCurrent = elementBar;
         }
@@ -221,7 +221,7 @@ HdSt_ImmediateDrawBatch::ExecuteDraw(
             drawItem->GetVertexPrimvarRange();
 
         if (vertexBar && (!vertexBar->IsAggregatedWith(vertexBarCurrent))) {
-            binder.UnbindBufferArray(vertexBarCurrent);
+            //binder.UnbindBufferArray(vertexBarCurrent);
             binder.BindBufferArray(vertexBar);
             vertexBarCurrent = vertexBar;
         }
@@ -233,7 +233,7 @@ HdSt_ImmediateDrawBatch::ExecuteDraw(
             drawItem->GetConstantPrimvarRange();
 
         if (constantBar && (!constantBar->IsAggregatedWith(constantBarCurrent))) {
-            binder.UnbindConstantBuffer(constantBarCurrent);
+            //binder.UnbindConstantBuffer(constantBarCurrent);
             binder.BindConstantBuffer(constantBar);
             constantBarCurrent = constantBar;
         }
@@ -245,7 +245,7 @@ HdSt_ImmediateDrawBatch::ExecuteDraw(
             drawItem->GetFaceVaryingPrimvarRange();
 
         if (fvarBar && (!fvarBar->IsAggregatedWith(fvarBarCurrent))) {
-            binder.UnbindBufferArray(fvarBarCurrent);
+            //binder.UnbindBufferArray(fvarBarCurrent);
             binder.BindBufferArray(fvarBar);
             fvarBarCurrent = fvarBar;
         }
@@ -266,7 +266,7 @@ HdSt_ImmediateDrawBatch::ExecuteDraw(
                     continue;
                 } else if (!instanceBar->IsAggregatedWith(
                                instanceBarCurrents[i])) {
-                    binder.UnbindInstanceBufferArray(instanceBarCurrents[i], i);
+                    //binder.UnbindInstanceBufferArray(instanceBarCurrents[i], i);
                     binder.BindInstanceBufferArray(instanceBar, i);
                 }
                 instanceBarCurrents[i] = instanceBar;
@@ -281,7 +281,7 @@ HdSt_ImmediateDrawBatch::ExecuteDraw(
 
         if (instanceIndexBar &&
             (!instanceIndexBar->IsAggregatedWith(instanceIndexBarCurrent))) {
-            binder.UnbindBufferArray(instanceIndexBarCurrent);
+            //binder.UnbindBufferArray(instanceIndexBarCurrent);
             binder.BindBufferArray(instanceIndexBar);
             instanceIndexBarCurrent = instanceIndexBar;
         }
@@ -296,10 +296,10 @@ HdSt_ImmediateDrawBatch::ExecuteDraw(
 
         // shaderBar isn't needed when the material is overridden
         if (shaderBar && (!shaderBar->IsAggregatedWith(shaderBarCurrent))) {
-            if (shaderBarCurrent) {
-                binder.UnbindBuffer(HdTokens->materialParams,
-                                    dynamic_pointer_cast<HdStBufferResource>(shaderBarCurrent->GetResource()));
-            }
+            //if (shaderBarCurrent) {
+            //    binder.UnbindBuffer(HdTokens->materialParams,
+            //                        dynamic_pointer_cast<HdStBufferResource>(shaderBarCurrent->GetResource()));
+            //}
             binder.BindBuffer(HdTokens->materialParams,
                               dynamic_pointer_cast<HdStBufferResource>(shaderBar->GetResource()));
             shaderBarCurrent = shaderBar;
@@ -418,15 +418,15 @@ HdSt_ImmediateDrawBatch::ExecuteDraw(
                 instanceCount);
         }
 
-        if (!hasOverrideShader) {
-            program.GetSurfaceShader()->UnbindResources(binder, *gpuProgram);
-        }
+//        if (!hasOverrideShader) {
+//            program.GetSurfaceShader()->UnbindResources(binder, *gpuProgram);
+//        }
 
         HD_PERF_COUNTER_INCR(HdPerfTokens->drawCalls);
     }
 
     HD_PERF_COUNTER_ADD(HdTokens->itemsDrawn, numItemsDrawn);
-
+/*
     TF_FOR_ALL(it, shaders) {
         (*it)->UnbindResources(binder, *gpuProgram);
     }
@@ -454,7 +454,7 @@ HdSt_ImmediateDrawBatch::ExecuteDraw(
         binder.UnbindBuffer(HdTokens->materialParams,
                             dynamic_pointer_cast<HdStBufferResource>(shaderBarCurrent->GetResource()));
     }
-
+*/
     gpuProgram->UnsetProgram();
 }
 
