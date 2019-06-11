@@ -293,8 +293,8 @@ HdStCommandBuffer::ExecuteDraw(
         
         unsigned const systemLimit = WorkGetConcurrencyLimit();
         
-        // Limit the number of threads used to render with. Save two threads for the su
-        unsigned const maxRenderThreads = MIN(MIN(systemLimit - 2, 12), visibleBatches.size());
+        // Limit the number of threads used to render with. Save two threads for the system
+        unsigned const maxRenderThreads = MIN(MIN(systemLimit - 2, 6), visibleBatches.size());
         if (maxRenderThreads) {
             WorkSetConcurrencyLimit(maxRenderThreads);
 
