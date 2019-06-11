@@ -37,6 +37,8 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+static bool useAsncTextureUploads = true;
+
 static MTLPixelFormat GetMetalFormat(GLenum inInternalFormat, GLenum inType, size_t *outPixelByteSize, bool *out24BitFormat)
 {
     MTLPixelFormat mtlFormat = MTLPixelFormatInvalid;
@@ -367,32 +369,66 @@ MtlfBaseTexture::_CreateTexture(GarchBaseTextureDataConstPtr texData,
 
             char *rawData = (char*)texBuffer + (unpackSkipRows * unpackRowLength * pixelByteSize)
                 + (unpackSkipPixels * pixelByteSize);
-            for(int i = 0; i < GPUState::gpuCount; i++) {
-                [_textureName.multiTexture[i] replaceRegion:MTLRegionMake2D(0, 0, texDataWidth, texDataHeight)
-                                mipmapLevel:0
-                                  withBytes:rawData
-                                bytesPerRow:pixelByteSize * unpackRowLength];
+            
+            if (useAsncTextureUploads) {
+                GarchBaseTextureDataConstPtr *asyncOwnedTexData = new GarchBaseTextureDataConstPtr(texData);
+                dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0),
+                   ^ {
+                       for(int i = 0; i < GPUState::gpuCount; i++) {
+                           [_textureName.multiTexture[i] replaceRegion:MTLRegionMake2D(0, 0, texDataWidth, texDataHeight)
+                                                           mipmapLevel:0
+                                                             withBytes:rawData
+                                                           bytesPerRow:pixelByteSize * unpackRowLength];
+                       }
+                       
+                       if (b24BitFormat) {
+                           delete[] (uint8_t*)texBuffer;
+                       }
+                       
+                      if (genMips) {
+                          // Blit command encoder to generate mips
+                          MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
+                          
+                          for(int i = 0; i < GPUState::gpuCount; i++) {
+                              id<MTLCommandBuffer> commandBuffer = [context->gpus[i].commandQueue commandBuffer];
+                              id<MTLBlitCommandEncoder> blitEncoder = [commandBuffer blitCommandEncoder];
+                              
+                              [blitEncoder generateMipmapsForTexture:_textureName.multiTexture[i]];
+                              [blitEncoder endEncoding];
+                              
+                              [commandBuffer commit];
+                          }
+                      }
+                    delete asyncOwnedTexData;
+                   });
             }
-
-            if (b24BitFormat) {
-                delete[] (uint8_t*)texBuffer;
-            }
-
-            if (genMips) {
-                // Blit command encoder to generate mips
-                MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
-                
+            else {
                 for(int i = 0; i < GPUState::gpuCount; i++) {
-                    id<MTLCommandBuffer> commandBuffer = [context->gpus[i].commandQueue commandBuffer];
-                    id<MTLBlitCommandEncoder> blitEncoder = [commandBuffer blitCommandEncoder];
+                    [_textureName.multiTexture[i] replaceRegion:MTLRegionMake2D(0, 0, texDataWidth, texDataHeight)
+                                    mipmapLevel:0
+                                      withBytes:rawData
+                                    bytesPerRow:pixelByteSize * unpackRowLength];
+                }
 
-                    [blitEncoder generateMipmapsForTexture:_textureName.multiTexture[i]];
-                    [blitEncoder endEncoding];
+                if (b24BitFormat) {
+                    delete[] (uint8_t*)texBuffer;
+                }
 
-                    [commandBuffer commit];
+                if (genMips) {
+                    // Blit command encoder to generate mips
+                    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
+                    
+                    for(int i = 0; i < GPUState::gpuCount; i++) {
+                        id<MTLCommandBuffer> commandBuffer = [context->gpus[i].commandQueue commandBuffer];
+                        id<MTLBlitCommandEncoder> blitEncoder = [commandBuffer blitCommandEncoder];
+
+                        [blitEncoder generateMipmapsForTexture:_textureName.multiTexture[i]];
+                        [blitEncoder endEncoding];
+
+                        [commandBuffer commit];
+                    }
                 }
             }
-
         } else {
             size_t pixelByteSize;
             bool b24BitFormat;
@@ -412,24 +448,54 @@ MtlfBaseTexture::_CreateTexture(GarchBaseTextureDataConstPtr texData,
             desc.resourceOptions = MTLResourceStorageModeDefault;
             _textureName = MtlfMultiTexture(desc);
 
-            for (int i = 0 ; i < numMipLevels; i++) {
-                size_t mipWidth = texData->ResizedWidth(i);
-                size_t mipHeight = texData->ResizedHeight(i);
-                void *texBuffer = texData->GetRawBuffer(i);
-                int numPixels = mipWidth * mipHeight;
-                
-                if (b24BitFormat) {
-                    // Pad out 24bit formats to 32bit
-                    texBuffer = PadImage(texData->GLInternalFormat(), texData->GetRawBuffer(1), pixelByteSize, numPixels);
-                }
+            if (useAsncTextureUploads) {
+                // Retain an active reference to the tex data for the async operation
+                GarchBaseTextureDataConstPtr *asyncOwnedTexData = new GarchBaseTextureDataConstPtr(texData);
+                dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0),
+                   ^ {
+                        for (int i = 0 ; i < numMipLevels; i++) {
+                            size_t mipWidth = (*asyncOwnedTexData)->ResizedWidth(i);
+                            size_t mipHeight = (*asyncOwnedTexData)->ResizedHeight(i);
+                            void *texBuffer = (*asyncOwnedTexData)->GetRawBuffer(i);
+                            int numPixels = mipWidth * mipHeight;
+                           
+                            if (b24BitFormat) {
+                                // Pad out 24bit formats to 32bit
+                                texBuffer = PadImage((*asyncOwnedTexData)->GLInternalFormat(), (*asyncOwnedTexData)->GetRawBuffer(1), pixelByteSize, numPixels);
+                            }
 
-                [_textureName.multiTexture[i] replaceRegion:MTLRegionMake2D(0, 0, mipWidth, texData->ResizedHeight(i))
-                                mipmapLevel:i
-                                  withBytes:texBuffer
-                                bytesPerRow:pixelByteSize * mipWidth];
-                
-                if (b24BitFormat) {
-                    delete[] (uint8_t*)texBuffer;
+                            [_textureName.multiTexture[i] replaceRegion:MTLRegionMake2D(0, 0, mipWidth, texData->ResizedHeight(i))
+                                            mipmapLevel:i
+                                              withBytes:texBuffer
+                                            bytesPerRow:pixelByteSize * mipWidth];
+                           
+                            if (b24BitFormat) {
+                                delete[] (uint8_t*)texBuffer;
+                            }
+                        }
+                       delete asyncOwnedTexData;
+                });
+            }
+            else {
+                for (int i = 0 ; i < numMipLevels; i++) {
+                    size_t mipWidth = texData->ResizedWidth(i);
+                    size_t mipHeight = texData->ResizedHeight(i);
+                    void *texBuffer = texData->GetRawBuffer(i);
+                    int numPixels = mipWidth * mipHeight;
+                    
+                    if (b24BitFormat) {
+                        // Pad out 24bit formats to 32bit
+                        texBuffer = PadImage(texData->GLInternalFormat(), texData->GetRawBuffer(1), pixelByteSize, numPixels);
+                    }
+                    
+                    [_textureName.multiTexture[i] replaceRegion:MTLRegionMake2D(0, 0, mipWidth, texData->ResizedHeight(i))
+                                                    mipmapLevel:i
+                                                      withBytes:texBuffer
+                                                    bytesPerRow:pixelByteSize * mipWidth];
+                    
+                    if (b24BitFormat) {
+                        delete[] (uint8_t*)texBuffer;
+                    }
                 }
             }
         }
