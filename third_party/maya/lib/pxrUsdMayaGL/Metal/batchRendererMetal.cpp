@@ -241,8 +241,7 @@ UsdMayaGLBatchRendererMetal::_Render(
     _hdEngine.Execute(*_renderIndex, tasks);
 
     // Depth texture copy
-    context->ColourCorrectColourTexture(context->gpus[context->currentGPU].mtlMultisampleColorTexture);
-    context->CopyDepthTextureToOpenGL();
+    context->CopyToInterop();
     
     // Commit the render buffer (will wait for GS to complete if present)
     // We wait until scheduled, because we're about to consume the Metal
@@ -251,8 +250,6 @@ UsdMayaGLBatchRendererMetal::_Render(
     
     context->EndFrameForThread();
     context->EndFrame();
-        
-    context->BlitColorTargetToOpenGL();
 
     glDisable(GL_FRAMEBUFFER_SRGB_EXT);
 
