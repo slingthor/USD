@@ -61,6 +61,7 @@ pxr_library(mtlf
         diagnostic
         drawTarget
         info
+        OSDMetalContext
         mtlDevice
         package
         ptexTexture

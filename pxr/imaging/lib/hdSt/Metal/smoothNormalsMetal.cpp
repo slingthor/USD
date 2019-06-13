@@ -22,6 +22,7 @@
 // language governing permissions and limitations under the Apache License.
 //
 #include "pxr/imaging/mtlf/mtlDevice.h"
+#include "pxr/imaging/mtlf/OSDMetalContext.h"
 #include "pxr/imaging/hdSt/Metal/mslProgram.h"
 
 #include "pxr/imaging/garch/contextCaps.h"
@@ -149,10 +150,12 @@ HdSt_SmoothNormalsComputationMetal::_Execute(
     
     context->ReleaseEncoder(false, METALWORKQUEUE_GEOMETRY_SHADER);
     
-    // If OSD is enabled then it might require the data generated here. Would be better to do this per object if possible.
+#if !OSD_METAL_DEFERRED
+    // If OSD is enabled and we're not deferring the execution then it might require the data generated here. 
     if (context->IsOSDEnabledThisFrame()) {
         context->CommitCommandBuffer(false, false, METALWORKQUEUE_GEOMETRY_SHADER);
     }
+#endif
 }
 
 

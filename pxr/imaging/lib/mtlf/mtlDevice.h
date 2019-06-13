@@ -186,6 +186,11 @@ public:
     MTLF_API
     void CreateCommandBuffer(MetalWorkQueueType workQueueType = METALWORKQUEUE_DEFAULT);
     
+    // Function intended to allow code outside of the normal Hydra/Metal stack to put its work into a common command buffer
+    // there must be no active encoders when this function is called and no active encoders left when the calling code finishes with it.
+    MTLF_API
+    id<MTLCommandBuffer> GetCommandBuffer(MetalWorkQueueType workQueueType = METALWORKQUEUE_DEFAULT);
+    
     MTLF_API
     void LabelCommandBuffer(NSString *label, MetalWorkQueueType workQueueType = METALWORKQUEUE_DEFAULT);
     
