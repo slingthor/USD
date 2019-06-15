@@ -279,6 +279,11 @@ UsdImagingGLEngine::~UsdImagingGLEngine()
     
     delete _resourceFactory;
     _resourceFactory = NULL;
+#if defined(ARCH_GFX_METAL)
+    if (MtlfMetalContext::context) {
+        MtlfMetalContext::context = NULL;
+    }
+#endif
 }
 
 //----------------------------------------------------------------------------

@@ -967,7 +967,7 @@ class StageView(QtOpenGL.QGLWidget):
 
     def SetRendererPlugin(self, plugId):
         if self._renderer:
-            if self._renderer.SetRendererPlugin(plugId):
+            if self._renderer.SetRendererPlugin(plugId, False):
                 self._handleRendererChanged(plugId)
                 self.updateGL()
                 return True

@@ -25,7 +25,6 @@
 
 #include "pxr/imaging/hdx/compositor.h"
 #include "pxr/imaging/hdx/package.h"
-#include "pxr/imaging/hdSt/program.h"
 #include "pxr/imaging/hdSt/resourceFactory.h"
 #include "pxr/imaging/hf/perfLog.h"
 #include "pxr/imaging/hd/perfLog.h"
@@ -88,9 +87,9 @@ HdxCompositor::~HdxCompositor()
 void
 HdxCompositor::_CreateShaderResources(bool useDepthProgram)
 {
+#if defined(ARCH_GFX_OPENGL)
     _compositorProgram.reset(
-        HdStResourceFactory::GetInstance()->NewProgram(
-            _tokens->fullscreenShader));
+        new HdStGLSLProgram(_tokens->fullscreenShader));
     HioGlslfx glslfx(HdxPackageFullscreenShader());
     TfToken fsToken = useDepthProgram ? _tokens->compositeFragmentWithDepth
                                       : _tokens->compositeFragmentNoDepth;
@@ -106,7 +105,6 @@ HdxCompositor::_CreateShaderResources(bool useDepthProgram)
 
 //    TF_FATAL_CODING_ERROR("Not Implemented!"); //MTL_FIXME
 
-#if defined(ARCH_GFX_OPENGL)
     GLuint programId = boost::dynamic_pointer_cast<HdStGLSLProgram>(_compositorProgram)->GetGLProgram();
     _locations[colorIn]  = glGetUniformLocation(programId, "colorIn");
     _locations[depthIn]  = glGetUniformLocation(programId, "depthIn");
@@ -160,7 +158,7 @@ HdxCompositor::_CreateBufferResources()
 void
 HdxCompositor::_CreateTextureResources(GLuint *texture)
 {
-    TF_FATAL_CODING_ERROR("Not Implemented!"); //MTL_FIXME
+//    TF_FATAL_CODING_ERROR("Not Implemented!"); //MTL_FIXME
 #if defined(ARCH_GFX_OPENGL)
     glGenTextures(1, texture);
     glBindTexture(GL_TEXTURE_2D, *texture);
@@ -177,7 +175,7 @@ HdxCompositor::UpdateColor(int width, int height, uint8_t *data)
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
     
-    TF_FATAL_CODING_ERROR("Not Implemented!"); //MTL_FIXME
+//    TF_FATAL_CODING_ERROR("Not Implemented!"); //MTL_FIXME
 #if defined(ARCH_GFX_OPENGL)
     if (width == 0 || height == 0) {
         if (_colorTexture != 0) {
@@ -204,7 +202,7 @@ HdxCompositor::UpdateDepth(int width, int height, uint8_t *data)
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
     
-    TF_FATAL_CODING_ERROR("Not Implemented!"); //MTL_FIXME
+//    TF_FATAL_CODING_ERROR("Not Implemented!"); //MTL_FIXME
 #if defined(ARCH_GFX_OPENGL)
     if (width == 0 || height == 0) {
         if (_depthTexture != 0) {
@@ -258,8 +256,9 @@ HdxCompositor::Draw(GLuint colorId, GLuint depthId, bool remapDepth)
     // GL 2.1 API, slightly restricting our choice of API and heavily
     // restricting our shader syntax.
 
-    _compositorProgram->SetProgram();
 #if defined(ARCH_GFX_OPENGL)
+    _compositorProgram->SetProgram();
+
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, colorId);
     glUniform1i(_locations[colorIn], 0);
