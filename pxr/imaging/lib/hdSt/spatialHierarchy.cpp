@@ -656,8 +656,8 @@ void BVH::PerformCulling(matrix_float4x4 const &viewProjMatrix,
         }
     };
     
-    unsigned grainApply = 50;
-    unsigned grainBuild = 20;
+    unsigned grainApply = 1;
+    unsigned grainBuild = 2;
 
     os_signpost_interval_begin(cullingLog, bvhCullingFinal, "Culling: BVH -- Apply");
     uint64_t cullApplyStart = ArchGetTickTime();
@@ -665,15 +665,18 @@ void BVH::PerformCulling(matrix_float4x4 const &viewProjMatrix,
     WorkParallelForN(cullList.perItemContained.size(),
                      std::bind(&_Worker::processApplyContained, &cullList.perItemContained,
                                std::placeholders::_1,
-                               std::placeholders::_2));
+                               std::placeholders::_2),
+                     grainApply);
     WorkParallelForN(cullList.perItemFrustum.size(),
                      std::bind(&_Worker::processApplyFrustum, &cullList.perItemFrustum,
                                std::placeholders::_1,
-                               std::placeholders::_2));
+                               std::placeholders::_2),
+                     grainApply);
     WorkParallelForN(cullList.allItemInvisible.size(),
                      std::bind(&_Worker::processApplyInvisible, &cullList.allItemInvisible,
                                std::placeholders::_1,
-                               std::placeholders::_2));
+                               std::placeholders::_2),
+                     grainApply * 10);
 
     os_signpost_interval_end(cullingLog, bvhCullingFinal, "Culling: BVH -- Apply");
     float cullApplyTimeMS = (ArchGetTickTime() - cullApplyStart) / 1000.0f;
