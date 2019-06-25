@@ -86,7 +86,7 @@
 # set_xcode_property (TARGET XCODE_PROPERTY XCODE_VALUE XCODE_VARIANT)
 #   A convenience macro for setting xcode specific properties on targets.
 #   Available variants are: All, Release, RelWithDebInfo, Debug, MinSizeRel
-#   example: set_xcode_property (myioslib IPHONEOS_DEPLOYMENT_TARGET "3.1" "all").
+#   example: set_xcode_property (myioslib IPHONEOS_DEPLOYMENT_TARGET "3.1" "All").
 #
 # find_host_package (PROGRAM ARGS)
 #   A macro used to find executable programs on the host system, not within the
