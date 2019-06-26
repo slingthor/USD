@@ -66,19 +66,19 @@ HdxCompositor::HdxCompositor()
 HdxCompositor::~HdxCompositor()
 {
 #if defined(ARCH_GFX_OPENGL)
-    if (_colorTexture != 0) {
-        glDeleteTextures(1, &_colorTexture);
-    }
-    if (_depthTexture != 0) {
-        glDeleteTextures(1, &_depthTexture);
-    }
-    if (_vertexBuffer != 0) {
-        glDeleteBuffers(1, &_vertexBuffer);
-    }
-    if (_compositorProgram) {
-        _compositorProgram.reset();
-    }
-    GLF_POST_PENDING_GL_ERRORS();
+//    if (_colorTexture != 0) {
+//        glDeleteTextures(1, &_colorTexture);
+//    }
+//    if (_depthTexture != 0) {
+//        glDeleteTextures(1, &_depthTexture);
+//    }
+//    if (_vertexBuffer != 0) {
+//        glDeleteBuffers(1, &_vertexBuffer);
+//    }
+//    if (_compositorProgram) {
+//        _compositorProgram.reset();
+//    }
+//    GLF_POST_PENDING_GL_ERRORS();
 #else
 //    TF_FATAL_CODING_ERROR("Not Implemented!"); //MTL_FIXME
 #endif
