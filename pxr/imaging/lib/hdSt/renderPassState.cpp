@@ -85,20 +85,25 @@ HdStRenderPassState::_UseAlphaMask() const
 }
 
 void
-HdStRenderPassState::Prepare(HdResourceRegistrySharedPtr const &resourceRegistry)
+HdStRenderPassState::Prepare(
+    HdResourceRegistrySharedPtr const &resourceRegistry)
 {
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
     GLF_GROUP_FUNCTION();
 
+    HdRenderPassState::Prepare(resourceRegistry);
+
     VtVec4fArray clipPlanes;
-    TF_FOR_ALL(it, _clipPlanes) {
+    TF_FOR_ALL(it, GetClipPlanes()) {
         clipPlanes.push_back(GfVec4f(*it));
     }
 #if defined(ARCH_GFX_OPENGL)
-    // Is this suppose to use GL_MAX_CLIP_PLANES directly, or fetch it from OpenGL?
-    if (clipPlanes.size() >= GL_MAX_CLIP_PLANES) {
-        clipPlanes.resize(GL_MAX_CLIP_PLANES);
+    GLint glMaxClipPlanes;
+    glGetIntegerv(GL_MAX_CLIP_PLANES, &glMaxClipPlanes);
+    size_t maxClipPlanes = (size_t)glMaxClipPlanes;
+    if (clipPlanes.size() >= maxClipPlanes) {
+        clipPlanes.resize(maxClipPlanes);
     }
 #endif
     // allocate bar if not exists
@@ -184,16 +189,19 @@ HdStRenderPassState::Prepare(HdResourceRegistrySharedPtr const &resourceRegistry
     // only using the feature to turn lighting on and off.
     float lightingBlendAmount = (_lightingEnabled ? 1.0f : 0.0f);
 
+    GfMatrix4d const& worldToViewMatrix = GetWorldToViewMatrix();
+    GfMatrix4d projMatrix = GetProjectionMatrix();
+
     HdBufferSourceVector sources;
     sources.push_back(HdBufferSourceSharedPtr(
                          new HdVtBufferSource(HdShaderTokens->worldToViewMatrix,
-                                              _worldToViewMatrix)));
+                                              worldToViewMatrix)));
     sources.push_back(HdBufferSourceSharedPtr(
                   new HdVtBufferSource(HdShaderTokens->worldToViewInverseMatrix,
-                                       _worldToViewMatrix.GetInverse())));
+                                       worldToViewMatrix.GetInverse() )));
     sources.push_back(HdBufferSourceSharedPtr(
                           new HdVtBufferSource(HdShaderTokens->projectionMatrix,
-                                               _projectionMatrix)));
+                                               projMatrix)));
     // Override color alpha component is used as the amount to blend in the
     // override color over the top of the regular fragment color.
     sources.push_back(HdBufferSourceSharedPtr(
@@ -246,7 +254,7 @@ HdStRenderPassState::Prepare(HdResourceRegistrySharedPtr const &resourceRegistry
     resourceRegistry->AddSources(_renderPassStateBar, sources);
 
     // notify view-transform to the lighting shader to update its uniform block
-    _lightingShader->SetCamera(_worldToViewMatrix, _projectionMatrix);
+    _lightingShader->SetCamera(worldToViewMatrix, projMatrix);
 
     // Update cull style on renderpass shader
     // XXX: Ideanlly cullstyle should stay in renderPassState.
@@ -309,7 +317,9 @@ HdStRenderPassState::Bind()
     // this needs to be done in execute as a multi camera setup may have been synced
     // with a different view matrix baked in for shadows.
     // SetCamera will no-op if the transforms are the same as before.
-    _lightingShader->SetCamera(_worldToViewMatrix, _projectionMatrix);
+    
+    // METALTODO: THIS IS A TEMP FIX - INVESTIGAGE WITH LINUX
+//    _lightingShader->SetCamera(_worldToViewMatrix, _projectionMatrix);
 }
 
 void
@@ -328,7 +338,7 @@ HdStRenderPassState::GetShaderHash() const
     if (_renderPassShader) {
         boost::hash_combine(hash, _renderPassShader->ComputeHash());
     }
-    boost::hash_combine(hash, _clipPlanes.size());
+    boost::hash_combine(hash, GetClipPlanes().size());
     boost::hash_combine(hash, _UseAlphaMask());
     return hash;
 }

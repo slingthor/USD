@@ -3620,6 +3620,35 @@ HdSt_CodeGenMSL::_GenerateInstancePrimvar()
         accessors << "  return defaultValue;\n"
                   << "}\n";
     }
+
+    /*
+      common accessor, if the primvar is defined on the instancer but not
+      the rprim.
+
+      #if !defined(HD_HAS_translate)
+      #define HD_HAS_translate 1
+      vec3 HdGet_translate(int localIndex) {
+          // 0 is the lowest level for which this is defined
+          return HdGet_translate_0();
+      }
+      vec3 HdGet_translate() {
+          return HdGet_translate(0);
+      }
+      #endif
+    */
+    TF_FOR_ALL (it, nameAndLevels) {
+        accessors << "#if !defined(HD_HAS_" << it->first << ")\n"
+                  << "#define HD_HAS_" << it->first << " 1\n"
+                  << _GetUnpackedType(it->second.dataType, false)
+                  << " HdGet_" << it->first << "(int localIndex) {\n"
+                  << "  return HdGet_" << it->first << "_"
+                                       << it->second.levels.front() << "();\n"
+                  << "}\n"
+                  << _GetUnpackedType(it->second.dataType, false)
+                  << " HdGet_" << it->first << "() { return HdGet_"
+                  << it->first << "(0); }\n"
+                  << "#endif\n";
+    }
     
     METAL_DEBUG_COMMENT(&declarations, "End _GenerateInstancePrimvar() declarations\n"); //MTL_FIXME
     METAL_DEBUG_COMMENT(&accessors,    "End _GenerateInstancePrimvar() accessors\n"); //MTL_FIXME
@@ -3862,7 +3891,7 @@ HdSt_CodeGenMSL::_GenerateElementPrimvar()
                 {
                     TF_CODING_ERROR("HdSt_GeometricShader::PrimitiveType %d is "
                       "unexpected in _GenerateElementPrimvar().",
-                      _geometricShader->GetPrimitiveType());
+                      (int)_geometricShader->GetPrimitiveType());
                 }
             }
 
@@ -3903,7 +3932,7 @@ HdSt_CodeGenMSL::_GenerateElementPrimvar()
         else {
             TF_CODING_ERROR("HdSt_GeometricShader::PrimitiveType %d is "
                   "unexpected in _GenerateElementPrimvar().",
-                  _geometricShader->GetPrimitiveType());
+                  (int)_geometricShader->GetPrimitiveType());
         }
     } else {
         // no primitiveParamBinding
@@ -4284,7 +4313,7 @@ HdSt_CodeGenMSL::_GenerateVertexAndFaceVaryingPrimvar(bool hasGS)
                 default:
                     TF_CODING_ERROR("Face varing bindings for unexpected for"
                                     " HdSt_GeometricShader::PrimitiveType %d",
-                                    _geometricShader->GetPrimitiveType());
+                                    (int)_geometricShader->GetPrimitiveType());
             }
             
             {
@@ -4313,7 +4342,6 @@ HdSt_CodeGenMSL::_GenerateVertexAndFaceVaryingPrimvar(bool hasGS)
     METAL_DEBUG_COMMENT(&vertexInputs,    "End _GenerateVertexPrimvar() vertexInputs\n"); //MTL_FIXME
     METAL_DEBUG_COMMENT(&accessorsVS,     "End _GenerateVertexPrimvar() accessorsVS\n"); //MTL_FIXME
     METAL_DEBUG_COMMENT(&accessorsFS,     "End _GenerateVertexPrimvar() accessorsFS\n"); //MTL_FIXME
-
 
     _genVS << fvarDeclarations.str()
            << vertexInputs.str()

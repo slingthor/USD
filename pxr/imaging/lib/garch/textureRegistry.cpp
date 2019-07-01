@@ -273,7 +273,7 @@ GarchTextureRegistry::_GetTextureFactory(const TfToken &filename)
         return nullptr;
     }
 
-    TF_DEBUG(GARCH_DEBUG_TEXTURE_IMAGE_PLUGINS).Msg(
+    TF_DEBUG(GARCH_DEBUG_TEXTURE_PLUGINS).Msg(
     	        "[PluginLoad] Loaded plugin '%s' for texture type '%s'\n",
                 pluginType.GetTypeName().c_str(),
                 fileExtension.GetText());
