@@ -613,10 +613,10 @@ void MtlfMetalContext::CreateCommandBuffer(MetalWorkQueueType workQueueType, boo
     MetalWorkQueue *wq = &GetWorkQueue(workQueueType);
     
     //NSLog(@"Creating command buffer %d", (int)workQueueType);
-
     if (wq->commandBuffer == nil) {
         std::lock_guard<std::mutex> lock(_commandBufferPoolMutex);
 
+        forceFromDevice |= [[MTLCaptureManager sharedCaptureManager] isCapturing];
         if (commandBuffersStackPos[currentGPU] > 0 && !forceFromDevice) {
             wq->commandBuffer = commandBuffers[currentGPU][--commandBuffersStackPos[currentGPU]];
         }
