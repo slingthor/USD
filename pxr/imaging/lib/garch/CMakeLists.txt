@@ -68,6 +68,7 @@ pxr_library(garch
         sdf
         tf
         vt
+        ${X11_LIBRARIES}
         ${Boost_PYTHON_LIBRARY}
         ${optionalLibs}
 

@@ -47,7 +47,7 @@ GARCH_API bool GarchIsSupportedPtexTexture(std::string const & imageFilePath);
 
 PXR_NAMESPACE_CLOSE_SCOPE
 
-#ifdef PXR_PTEX_SUPPORT_ENABLED
+#if defined(PXR_PTEX_SUPPORT_ENABLED) || defined(doxygen)
 
 #include "pxr/imaging/garch/texture.h"
 

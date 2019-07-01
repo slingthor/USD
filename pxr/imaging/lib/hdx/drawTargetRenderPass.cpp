@@ -129,7 +129,8 @@ HdxDrawTargetRenderPass::Prepare()
 
 void
 HdxDrawTargetRenderPass::Execute(
-    HdRenderPassStateSharedPtr const &renderPassState)
+    HdRenderPassStateSharedPtr const &renderPassState,
+    TfTokenVector const &renderTags)
 {
     if (!_drawTarget) {
         return;
@@ -148,7 +149,7 @@ HdxDrawTargetRenderPass::Execute(
     glViewport(0, 0, resolution[0], resolution[1]);
 #endif
     // Perform actual draw
-    _renderPass.Execute(renderPassState, TfTokenVector());
+    _renderPass.Execute(renderPassState, renderTags);
 #if defined(ARCH_GFX_OPENGL)
     // restore viewport
     glViewport(viewport[0], viewport[1], viewport[2], viewport[3]);

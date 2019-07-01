@@ -53,9 +53,11 @@ typedef boost::shared_ptr<HdRenderPass> HdRenderPassSharedPtr;
 class UsdImaging_TestTask final : public HdTask
 {
 public:
-    UsdImaging_TestTask(HdRenderPassSharedPtr const &renderPass)
+    UsdImaging_TestTask(HdRenderPassSharedPtr const &renderPass,
+                        TfTokenVector const &renderTags)
         : HdTask(SdfPath::EmptyPath())
         , _renderPass(renderPass)
+        , _renderTags(renderTags)
     {
     }
 
@@ -74,8 +76,13 @@ public:
     virtual void Execute(HdTaskContext* ctx) override {
     }
 
+    virtual const TfTokenVector &GetRenderTags() const override {
+        return _renderTags;
+    }
+
 private:
     HdRenderPassSharedPtr _renderPass;
+    TfTokenVector _renderTags;
 };
 
 /// \class UsdImaging_TestDriver
@@ -102,11 +109,11 @@ public:
 
         TfTokenVector renderTags;
         renderTags.push_back(HdTokens->geometry);
-        collection.SetRenderTags(renderTags);
 
         _Init(UsdStage::Open(usdFilePath),
               collection,
-              SdfPath::AbsoluteRootPath());
+              SdfPath::AbsoluteRootPath(),
+              renderTags);
     }
 
     UsdImaging_TestDriver(std::string const& usdFilePath,
@@ -124,11 +131,10 @@ public:
                 collectionName,
                 HdReprSelector(reprName));
 
-        collection.SetRenderTags(renderTags);
-
         _Init(UsdStage::Open(usdFilePath),
               collection,
-              SdfPath::AbsoluteRootPath());
+              SdfPath::AbsoluteRootPath(),
+              renderTags);
     }
 
     UsdImaging_TestDriver(UsdStageRefPtr const& usdStage)
@@ -145,9 +151,8 @@ public:
 
         TfTokenVector renderTags;
         renderTags.push_back(HdTokens->geometry);
-        collection.SetRenderTags(renderTags);
 
-        _Init(usdStage, collection, SdfPath::AbsoluteRootPath());
+        _Init(usdStage, collection, SdfPath::AbsoluteRootPath(), renderTags);
     }
 
     UsdImaging_TestDriver(UsdStageRefPtr const& usdStage,
@@ -165,14 +170,13 @@ public:
                 collectionName,
                 HdReprSelector(reprName));
 
-        collection.SetRenderTags(renderTags);
-
-        _Init(usdStage, collection, SdfPath::AbsoluteRootPath());
+        _Init(usdStage, collection, SdfPath::AbsoluteRootPath(), renderTags);
     }
 
     UsdImaging_TestDriver(UsdStageRefPtr const& usdStage,
                           HdRprimCollection const &collection,
-                          SdfPath const &delegateId)
+                          SdfPath const &delegateId,
+                          TfTokenVector const &renderTags)
         : _engine()
         , _renderDelegate()
         , _renderIndex(nullptr)
@@ -180,7 +184,7 @@ public:
         , _geometryPass()
         , _stage()
     {
-        _Init(usdStage, collection, delegateId);
+        _Init(usdStage, collection, delegateId, renderTags);
     }
 
     ~UsdImaging_TestDriver()
@@ -191,9 +195,9 @@ public:
 
     void Draw() {
         HdTaskSharedPtrVector tasks = {
-            boost::make_shared<UsdImaging_TestTask>(_geometryPass)
+            boost::make_shared<UsdImaging_TestTask>(_geometryPass, _renderTags)
         };
-        _engine.Execute(_delegate->GetRenderIndex(), tasks);
+        _engine.Execute(&_delegate->GetRenderIndex(), &tasks);
     }
     void SetTime(double time) {
         _delegate->SetTime(time);
@@ -222,10 +226,12 @@ private:
     UsdImagingDelegate  *_delegate;
     HdRenderPassSharedPtr _geometryPass;
     UsdStageRefPtr _stage;
+    TfTokenVector _renderTags;
 
     void _Init(UsdStageRefPtr const& usdStage,
                HdRprimCollection const &collection,
-               SdfPath const &delegateId) {
+               SdfPath const &delegateId,
+               TfTokenVector const &renderTags) {
         _renderIndex = HdRenderIndex::New(&_renderDelegate);
         TF_VERIFY(_renderIndex != nullptr);
         _delegate = new UsdImagingDelegate(_renderIndex, delegateId);
@@ -235,6 +241,8 @@ private:
 
         _geometryPass = HdRenderPassSharedPtr(
                        new Hd_UnitTestNullRenderPass(_renderIndex, collection));
+
+        _renderTags = renderTags;
     }
 };
 

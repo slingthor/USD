@@ -141,7 +141,7 @@ HdSt_OsdRefineComputationGPU::HdSt_OsdRefineComputationGPU(
                                                     HdSt_MeshTopology *topology,
                                                     TfToken const &name,
                                                     HdType type)
-    : _topology(topology), _name(name), _type(type)
+    : _topology(topology), _name(name)
 {
 }
 
