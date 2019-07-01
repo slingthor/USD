@@ -22,6 +22,11 @@
                         "bases": ["GarchBaseTexture"],
                         "textureTypes": ["*"],
                         "precedence": 0
+                    },
+                    "GarchBaseTexture" : {
+                        "bases": ["GarchTexture"],
+                        "textureTypes": [],
+                        "precedence": 3
                     }
                 }
             },

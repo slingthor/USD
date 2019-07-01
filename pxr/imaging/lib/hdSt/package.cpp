@@ -61,17 +61,15 @@ HdStPackagePtexTextureShader()
 TfToken
 HdStPackageRenderPassShader()
 {
-    static TfToken renderPassShader =
-        _GetShaderPath("renderPassShader.glslfx");
-    return renderPassShader;
+    static TfToken s = _GetShaderPath("renderPassShader.glslfx");
+    return s;
 }
 
 TfToken
 HdStPackageFallbackLightingShader()
 {
-    static TfToken fallbackLightingShader =
-        _GetShaderPath("fallbackLightingShader.glslfx");
-    return fallbackLightingShader;
+    static TfToken s = _GetShaderPath("fallbackLightingShader.glslfx");
+    return s;
 }
 
 TfToken
@@ -85,6 +83,13 @@ TfToken
 HdStPackageLightingIntegrationShader()
 {
     static TfToken s = _GetShaderPath("lightingIntegrationShader.glslfx");
+    return s;
+}
+
+TfToken
+HdStPackageImageShader()
+{
+    static TfToken s = _GetShaderPath("imageShader.glslfx");
     return s;
 }
 
