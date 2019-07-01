@@ -30,6 +30,7 @@
 #include "pxr/base/tf/declarePtrs.h"
 
 #include "pxr/usdImaging/usdImagingGL/engine.h"
+#include "pxr/imaging/hdSt/renderDelegate.h"
 
 #include <string>
 #include <vector>
@@ -56,7 +57,7 @@ public:
     bool IsEnabledCullBackfaces() const { return _cullBackfaces; }
     bool IsEnabledIdRender() const { return _testIdRender; }
 
-    UsdImagingGLDrawMode GetDrawMode() const { return _drawMode; }
+    HdStDrawMode GetDrawMode() const { return _drawMode; }
 
     std::string const & GetStageFilePath() const { return _stageFilePath; }
     std::string const & GetOutputFilePath() const { return _outputFilePath; }
@@ -90,7 +91,8 @@ protected:
     
     void _Render(UsdImagingGLEngine *engine, 
                  const UsdImagingGLRenderParams &params) {
-        engine->_Render(params);
+        SdfPathVector roots(1, SdfPath::AbsoluteRootPath());
+        engine->RenderBatch(roots, params);
     }
 
 private:
@@ -113,7 +115,7 @@ private:
 
     std::vector<GfVec4d> _clipPlanes;
 
-    UsdImagingGLDrawMode _drawMode;
+    HdStDrawMode _drawMode;
     bool _shouldFrameAll;
     bool _cullBackfaces;
     GfVec4f _clearColor;

@@ -62,7 +62,7 @@ _CreateVtArray(int numElements, int arraySize, int stride,
 
     TF_VERIFY(data.size() == stride*(numElements-1) + arraySize*sizeof(T));
 
-    if (stride == arraySize*sizeof(T)) {
+    if (stride == static_cast<int>(arraySize*sizeof(T))) {
         memcpy(dst, src, numElements*arraySize*sizeof(T));
     } else {
         // deinterleaving

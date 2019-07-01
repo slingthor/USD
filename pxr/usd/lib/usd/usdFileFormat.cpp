@@ -182,7 +182,7 @@ _GetFormatArgumentForFileFormat(const SdfFileFormatConstPtr& fileFormat)
     return formatArg;
 }
 
-// Returns the file format associated with the given arguments, or NULL.
+// Returns the file format associated with the given arguments, or nullptr.
 static
 SdfFileFormatConstPtr
 _GetFileFormatForArguments(const SdfFileFormat::FileFormatArguments& args)
@@ -371,15 +371,6 @@ UsdUsdFileFormat::WriteToStream(
     return _GetUnderlyingFileFormatForLayer(
         *boost::get_pointer(spec->GetLayer()))->WriteToStream(
             spec, out, indent);
-}
-
-bool 
-UsdUsdFileFormat::_IsStreamingLayer(
-    const SdfLayer& layer) const
-{
-    auto formatId = _GetUnderlyingFileFormatForLayer(layer)->GetFormatId();
-    return formatId == UsdUsdbFileFormatTokens->Id ||
-        formatId == UsdUsdcFileFormatTokens->Id;
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE
