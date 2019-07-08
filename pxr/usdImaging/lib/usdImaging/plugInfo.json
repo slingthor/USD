@@ -46,6 +46,13 @@
                         "isInternal": true,
                         "primTypeName": "BasisCurves"
                     },
+                    "UsdImagingCameraAdapter": {
+                        "bases": [
+                            "UsdImagingPrimAdapter"
+                        ],
+                        "isInternal": true,
+                        "primTypeName": "Camera"
+                    },
                     "UsdImagingCapsuleAdapter": {
                         "bases": [
                             "UsdImagingGprimAdapter"
@@ -59,6 +66,13 @@
                         ],
                         "isInternal": true,
                         "primTypeName": "Cone"
+                    },
+                    "UsdImagingCoordSysAdapter": {
+                        "bases": [
+                            "UsdImagingPrimAdapter"
+                        ],
+                        "isInternal": true,
+                        "primTypeName": "coordSys"
                     },
                     "UsdImagingCubeAdapter": {
                         "bases": [

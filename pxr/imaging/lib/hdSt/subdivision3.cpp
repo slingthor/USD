@@ -55,6 +55,7 @@
 #if OPENSUBDIV_HAS_METAL_COMPUTE && defined(ARCH_GFX_METAL)// MTL_CHANGE
 #include <opensubdiv/osd/mtlVertexBuffer.h>
 #include "pxr/imaging/mtlf/mtlDevice.h"
+#include "pxr/imaging/mtlf/OSDMetalContext.h"
 #else
 #include <opensubdiv/osd/glVertexBuffer.h>
 #include <opensubdiv/osd/glComputeEvaluator.h>
@@ -74,8 +75,8 @@ PXR_NAMESPACE_OPEN_SCOPE
 typedef OpenSubdiv::Osd::MTLStencilTable     HdSt_OsdGpuStencilTable;
 typedef OpenSubdiv::Osd::MTLComputeEvaluator HdSt_OsdGpuEvaluator;
 typedef OpenSubdiv::Osd::CPUMTLVertexBuffer  HdSt_OsdCpuVertexBuffer;
-typedef OpenSubdiv::Osd::MTLContext          HdSt_OsdGpuDeviceContext;
-typedef OpenSubdiv::Osd::MTLContext*         HdSt_OsdGpuDeviceContextPtr;
+typedef pxr::OSDMetalContext                 HdSt_OsdGpuDeviceContext;
+typedef pxr::OSDMetalContext*                HdSt_OsdGpuDeviceContextPtr;
 #pragma message("Building for Metal OpenSubDiv")
 #else
 typedef OpenSubdiv::Osd::GLStencilTableSSBO HdSt_OsdGpuStencilTable;
@@ -181,8 +182,7 @@ private:
     
     HdSt_OsdGpuDeviceContextPtr GetDeviceContextPtr() { //MTL_CHANGE
  #if OPENSUBDIV_HAS_METAL_COMPUTE && defined(ARCH_GFX_METAL)
-        _deviceContext.device       = MtlfMetalContext::GetMetalContext()->currentDevice;
-        _deviceContext.commandQueue = MtlfMetalContext::GetMetalContext()->gpus[MtlfMetalContext::GetMetalContext()->currentGPU].commandQueue;
+        _deviceContext.Init();
         return &_deviceContext;
 #else
         return NULL;

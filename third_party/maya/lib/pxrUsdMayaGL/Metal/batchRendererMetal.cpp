@@ -60,7 +60,7 @@
 #include "pxr/imaging/hd/rprimCollection.h"
 #include "pxr/imaging/hd/task.h"
 #include "pxr/imaging/hd/tokens.h"
-#include "pxr/imaging/hdx/intersector.h"
+#include "pxr/imaging/hdx/pickTask.h"
 #include "pxr/imaging/hdx/selectionTracker.h"
 #include "pxr/imaging/hdx/tokens.h"
 #include "pxr/imaging/hdSt/Metal/resourceFactoryMetal.h"
@@ -97,6 +97,7 @@ UsdMayaGLBatchRendererMetal::UsdMayaGLBatchRendererMetal() :
 {
     _resourceFactory = new HdStResourceFactoryMetal();
     HdStResourceFactory::GetInstance().SetResourceFactory(_resourceFactory);
+
     GarchResourceFactory::GetInstance().SetResourceFactory(dynamic_cast<GarchResourceFactoryInterface*>(_resourceFactory));
 }
 
@@ -174,15 +175,15 @@ UsdMayaGLBatchRendererMetal::_Render(
         const PxrMayaHdRenderParams& params = iter.first;
         const size_t paramsHash = params.Hash();
 
-        const HdRprimCollectionVector& rprimCollections = iter.second;
+        const PxrMayaHdPrimFilterVector& primFilters = iter.second;
 
         TF_DEBUG(PXRUSDMAYAGL_BATCHED_DRAWING).Msg(
             "    *** renderBucket, parameters hash: %zu, bucket size %zu\n",
             paramsHash,
-            rprimCollections.size());
+            primFilters.size());
 
         HdTaskSharedPtrVector renderTasks =
-            _taskDelegate->GetRenderTasks(paramsHash, params, rprimCollections);
+            _taskDelegate->GetRenderTasks(paramsHash, params, primFilters);
         tasks.insert(tasks.end(), renderTasks.begin(), renderTasks.end());
     }
 
@@ -238,7 +239,7 @@ UsdMayaGLBatchRendererMetal::_Render(
     _hdEngine.SetTaskContextData(HdxTokens->selectionState,
                                  selectionTrackerValue);
     
-    _hdEngine.Execute(*_renderIndex, tasks);
+    _hdEngine.Execute(_renderIndex.get(), &tasks);
 
     // Depth texture copy
     context->CopyToInterop();

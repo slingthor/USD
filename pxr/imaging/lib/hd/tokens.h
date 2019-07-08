@@ -42,6 +42,7 @@ PXR_NAMESPACE_OPEN_SCOPE
     (catmullRom)                                \
     (collection)                                \
     (computeShader)                             \
+    (coordSysBindings)                          \
     (cubic)                                     \
     (culledInstanceIndices)                     \
     (cullStyle)                                 \
@@ -108,6 +109,7 @@ PXR_NAMESPACE_OPEN_SCOPE
     (totalItemCount)                            \
     (transform)                                 \
     (transformInverse)                          \
+    (velocities)                                \
     (visibility)                                \
     (widths)                                    \
     (rotate)                                    \
@@ -214,6 +216,7 @@ PXR_NAMESPACE_OPEN_SCOPE
     (camera)                                    \
     (drawTarget)                                \
     (material)                                  \
+    (coordSys)                                  \
     /* Sprims Lights */                         \
     (simpleLight)                               \
     (cylinderLight)                             \
@@ -245,7 +248,8 @@ PXR_NAMESPACE_OPEN_SCOPE
     /* Standard rendering outputs */            \
                                                 \
     /* HdAovTokens->color represents the final
-     * fragment RGBA color.
+     * fragment RGBA color. For correct compositing
+     * using Hydra, it should have pre-multiplied alpha.
      */                                         \
     (color)                                     \
     /* HdAovTokens->depth represents the clip-space

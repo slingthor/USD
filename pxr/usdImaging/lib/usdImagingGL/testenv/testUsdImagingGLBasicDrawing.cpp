@@ -101,7 +101,9 @@ My_TestGLDrawing::InitTest()
     if (UsdImagingGLEngine::IsHydraEnabled()) {
         std::cout << "Using HD Renderer.\n";
         _engine.reset(new UsdImagingGLEngine(
-            _stage->GetPseudoRoot().GetPath(), excludedPaths));
+            PXR_UNITTEST_GFX_ARCH,
+            _stage->GetPseudoRoot().GetPath(),
+            excludedPaths));
         if (!_GetRenderer().IsEmpty()) {
             if (!_engine->SetRendererPlugin(_GetRenderer())) {
                 std::cerr << "Couldn't set renderer plugin: " <<
@@ -115,7 +117,9 @@ My_TestGLDrawing::InitTest()
     } else{
         std::cout << "Using Reference Renderer.\n"; 
         _engine.reset(
-            new UsdImagingGLEngine(_stage->GetPseudoRoot().GetPath(), 
+            new UsdImagingGLEngine(
+                    PXR_UNITTEST_GFX_ARCH,
+                    _stage->GetPseudoRoot().GetPath(),
                     excludedPaths));
     }
 
@@ -239,7 +243,8 @@ My_TestGLDrawing::DrawTest(bool offscreen)
     }
 
     GfVec4d viewport(0, 0, width, height);
-    _engine->SetCameraState(modelViewMatrix, projMatrix, viewport);
+    _engine->SetCameraState(modelViewMatrix, projMatrix);
+    _engine->SetRenderViewport(viewport);
 
     size_t i = 0;
     TF_FOR_ALL(timeIt, GetTimes()) {

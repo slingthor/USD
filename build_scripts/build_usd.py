@@ -251,12 +251,14 @@ def CopyDirectory(context, srcDir, destDir):
     shutil.copytree(srcDir, instDestDir)
 
 def FormatMultiProcs(numJobs, generator):
-    if generator and "Visual Studio" in generator:
-        return "/M:{procs}".format(procs=numJobs)
-    elif Linux():
-        return "-j{procs}".format(procs=numJobs)
-    
-    return "-j {procs}".format(procs=numJobs)
+    tag = "-j"
+    if generator:
+        if "Visual Studio" in generator:
+            tag = "/M:"
+        elif "Xcode" in generator:
+            tag = "-j "
+
+    return "{tag}{procs}".format(tag=tag, procs=numJobs)
 
 def RunCMake(context, force, buildArgs = None, hostPlatform = False):
     """Invoke CMake to configure, build, and install a library whose 
@@ -340,7 +342,7 @@ def RunCMake(context, force, buildArgs = None, hostPlatform = False):
 
         Run("cmake --build . --config {config} --target install -- {multiproc}"
             .format(config=config,
-			        multiproc=FormatMultiProcs(context.numJobs, generator)))
+                    multiproc=FormatMultiProcs(context.numJobs, generator)))
 
 def PatchFile(filename, patches, multiLineMatches=False):
     """Applies patches to the specified file. patches is a list of tuples
@@ -1312,6 +1314,14 @@ def InstallUSD(context, force, buildArgs):
                 extraArgs.append('-DPXR_BUILD_EMBREE_PLUGIN=ON')
             else:
                 extraArgs.append('-DPXR_BUILD_EMBREE_PLUGIN=OFF')
+
+            if context.buildPrman:
+                if context.prmanLocation:
+                    extraArgs.append('-DRENDERMAN_LOCATION="{location}"'
+                                     .format(location=context.prmanLocation))
+                extraArgs.append('-DPXR_BUILD_PRMAN_PLUGIN=ON')
+            else:
+                extraArgs.append('-DPXR_BUILD_PRMAN_PLUGIN=OFF')                
             
             if context.buildOIIO:
                 extraArgs.append('-DPXR_BUILD_OPENIMAGEIO_PLUGIN=ON')
@@ -1585,6 +1595,14 @@ subgroup.add_argument("--no-embree", dest="build_embree", action="store_false",
 group.add_argument("--embree-location", type=str,
                    help="Directory where Embree is installed.")
 subgroup = group.add_mutually_exclusive_group()
+subgroup.add_argument("--prman", dest="build_prman", action="store_true",
+                      default=False,
+                      help="Build Pixar's RenderMan imaging plugin")
+subgroup.add_argument("--no-prman", dest="build_prman", action="store_false",
+                      help="Do not build Pixar's RenderMan imaging plugin (default)")
+group.add_argument("--prman-location", type=str,
+                   help="Directory where Pixar's RenderMan is installed.")
+subgroup = group.add_mutually_exclusive_group()
 subgroup.add_argument("--openimageio", dest="build_oiio", action="store_true", 
                       default=False,
                       help="Build OpenImageIO plugin for USD")
@@ -1738,6 +1756,9 @@ class InstallContext:
         self.buildEmbree = self.buildImaging and args.build_embree
         self.embreeLocation = (os.path.abspath(args.embree_location)
                                if args.embree_location else None)
+        self.buildPrman = self.buildImaging and args.build_prman
+        self.prmanLocation = (os.path.abspath(args.prman_location)
+                               if args.prman_location else None)                               
         self.buildOIIO = args.build_oiio
         self.buildOCIO = args.build_ocio
 
@@ -1977,6 +1998,7 @@ Building with settings:
       Ptex support:             {enablePtex}
       OpenImageIO support:      {buildOIIO} 
       OpenColorIO support:      {buildOCIO} 
+      PRMan support:            {buildPrman}
     UsdImaging                  {buildUsdImaging}
       usdview:                  {buildUsdview}
     Python support              {buildPython}
@@ -2026,6 +2048,7 @@ summaryMsg = summaryMsg.format(
     enablePtex=("On" if context.enablePtex else "Off"),
     buildOIIO=("On" if context.buildOIIO else "Off"),
     buildOCIO=("On" if context.buildOCIO else "Off"),
+    buildPrman=("On" if context.buildPrman else "Off"),
     buildUsdImaging=("On" if context.buildUsdImaging else "Off"),
     buildUsdview=("On" if context.buildUsdview else "Off"),
     buildPython=("On" if context.buildPython else "Off"),
@@ -2122,3 +2145,7 @@ if context.buildKatana:
 if context.buildHoudini:
     Print("See documentation at http://openusd.org/docs/Houdini-USD-Plugins.html "
           "for setting up the Houdini plugin.\n")
+
+if context.buildPrman:
+    Print("See documentation at http://openusd.org/docs/RenderMan-USD-Imaging-Plugin.html "
+          "for setting up the RenderMan plugin.\n")

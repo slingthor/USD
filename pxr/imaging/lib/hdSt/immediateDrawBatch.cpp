@@ -290,7 +290,7 @@ HdSt_ImmediateDrawBatch::ExecuteDraw(
         // shader buffer
         //
         HdBufferArrayRangeSharedPtr const & shaderBar =
-            renderPassState->GetOverrideShader()
+            renderPassState->GetOverrideShader() || !program.GetSurfaceShader()
                 ? HdBufferArrayRangeSharedPtr()
                 : program.GetSurfaceShader()->GetShaderData();
 
@@ -308,7 +308,7 @@ HdSt_ImmediateDrawBatch::ExecuteDraw(
         //
         // shader textures
         //
-        if (!hasOverrideShader) {
+        if (!hasOverrideShader && program.GetSurfaceShader()) {
             program.GetSurfaceShader()->BindResources(binder, *gpuProgram);
         }
 
@@ -418,7 +418,7 @@ HdSt_ImmediateDrawBatch::ExecuteDraw(
                 instanceCount);
         }
 
-//        if (!hasOverrideShader) {
+//        if (!hasOverrideShader && program.GetSurfaceShader()) {
 //            program.GetSurfaceShader()->UnbindResources(binder, *gpuProgram);
 //        }
 

@@ -36,6 +36,7 @@ pxr_library(hd
         changeTracker
         compExtCompInputSource
         computation
+        coordSys
         debugCodes
         dirtyList
         drawingCoord

@@ -28,6 +28,7 @@
 
 #include "pxr/imaging/hio/glslfx.h"
 
+#include "pxr/imaging/hdSt/debugCodes.h"
 #include "pxr/imaging/hdSt/Metal/mslProgram.h"
 #include "pxr/imaging/hdSt/package.h"
 #include "pxr/imaging/hdSt/surfaceShader.h"
@@ -284,7 +285,7 @@ HdStMSLProgram::CompileShader(GLenum type,
     default: TF_FATAL_CODING_ERROR("Not allowed!");
     }
     
-    if (TfDebug::IsEnabled(HD_DUMP_SHADER_SOURCE)) {
+    if (TfDebug::IsEnabled(HDST_DUMP_SHADER_SOURCE)) {
         static std::mutex _mutex;
         std::lock_guard<std::mutex> lock(_mutex);
 

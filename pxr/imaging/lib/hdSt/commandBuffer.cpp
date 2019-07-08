@@ -30,6 +30,7 @@
 #include "pxr/imaging/mtlf/mtlDevice.h"
 
 #include "pxr/imaging/hdSt/commandBuffer.h"
+#include "pxr/imaging/hdSt/debugCodes.h"
 #include "pxr/imaging/hdSt/geometricShader.h"
 #include "pxr/imaging/hdSt/immediateDrawBatch.h"
 #include "pxr/imaging/hdSt/indirectDrawBatch.h"
@@ -37,7 +38,6 @@
 #include "pxr/imaging/hdSt/resourceRegistry.h"
 
 #include "pxr/imaging/hd/bufferArrayRange.h"
-#include "pxr/imaging/hd/debugCodes.h"
 #include "pxr/imaging/hd/perfLog.h"
 #include "pxr/imaging/hd/tokens.h"
 
@@ -443,7 +443,7 @@ HdStCommandBuffer::_RebuildDrawBatches()
                             drawItem->GetMaterialShader()->GetParams()));
         }
 
-        TF_DEBUG(HD_DRAW_BATCH).Msg("%lu (%lu)\n", 
+        TF_DEBUG(HDST_DRAW_BATCH).Msg("%lu (%lu)\n", 
                 key, 
                 drawItem->GetBufferArraysHash());
                 //, drawItem->GetRprimID().GetText());
@@ -524,7 +524,7 @@ HdStCommandBuffer::FrustumCull(GfMatrix4d const &viewProjMatrix)
     HD_TRACE_FUNCTION();
     
     const bool
-    mtCullingDisabled = TfDebug::IsEnabled(HD_DISABLE_MULTITHREADED_CULLING);
+    mtCullingDisabled = TfDebug::IsEnabled(HDST_DISABLE_MULTITHREADED_CULLING);
 
     primCount.store(0);
     

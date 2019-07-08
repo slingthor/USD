@@ -71,8 +71,14 @@ HdEngine::RemoveTaskContextData(const TfToken &id)
 }
 
 void
-HdEngine::Execute(HdRenderIndex& index, HdTaskSharedPtrVector const &tasks)
+HdEngine::Execute(HdRenderIndex *index, HdTaskSharedPtrVector *tasks)
 {
+    if ((index == nullptr) || (tasks == nullptr)) {
+        TF_CODING_ERROR("Passed nullptr to HdEngine::Execute()");
+        return;
+    }
+
+
     // --------------------------------------------------------------------- //
     // DATA DISCOVERY PHASE
     // --------------------------------------------------------------------- //
@@ -91,7 +97,7 @@ HdEngine::Execute(HdRenderIndex& index, HdTaskSharedPtrVector const &tasks)
             "      HdEngine [Data Discovery Phase](RenderIndex::SyncAll)   \n"
             "--------------------------------------------------------------\n");
 
-    index.SyncAll(tasks, &_taskContext);
+    index->SyncAll(tasks, &_taskContext);
 
 
     // --------------------------------------------------------------------- //
@@ -114,11 +120,11 @@ HdEngine::Execute(HdRenderIndex& index, HdTaskSharedPtrVector const &tasks)
             "             HdEngine [Prepare Phase](Task::Prepare)          \n"
             "--------------------------------------------------------------\n");
 
-    size_t numTasks = tasks.size();
+    size_t numTasks = tasks->size();
     for (size_t taskNum = 0; taskNum < numTasks; ++taskNum) {
-        const HdTaskSharedPtr &task = tasks[taskNum];
+        const HdTaskSharedPtr &task = (*tasks)[taskNum];
 
-        task->Prepare(&_taskContext, &index);
+        task->Prepare(&_taskContext, index);
     }
 
 
@@ -135,8 +141,8 @@ HdEngine::Execute(HdRenderIndex& index, HdTaskSharedPtrVector const &tasks)
             " HdEngine [Data Commit Phase](RenderDelegate::CommitResources)\n"
             "--------------------------------------------------------------\n");
     
-    HdRenderDelegate *renderDelegate = index.GetRenderDelegate();
-    renderDelegate->CommitResources(&index.GetChangeTracker());
+    HdRenderDelegate *renderDelegate = index->GetRenderDelegate();
+    renderDelegate->CommitResources(&index->GetChangeTracker());
 
     // --------------------------------------------------------------------- //
     // EXECUTE PHASE
@@ -150,7 +156,7 @@ HdEngine::Execute(HdRenderIndex& index, HdTaskSharedPtrVector const &tasks)
             "--------------------------------------------------------------\n");
 
     for (size_t taskNum = 0; taskNum < numTasks; ++taskNum) {
-        const HdTaskSharedPtr &task = tasks[taskNum];
+        const HdTaskSharedPtr &task = (*tasks)[taskNum];
 
         task->Execute(&_taskContext);
     }
