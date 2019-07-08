@@ -177,18 +177,22 @@ HdxColorizeSelectionTask::Execute(HdTaskContext* ctx)
     // color, and the selection alpha is the residual value used to scale the
     // scene color. This gives us the blend func:
     // GL_ONE, GL_SRC_ALPHA, GL_ZERO, GL_ONE.
+#if defined(ARCH_GFX_OPENGL)
     glDisable(GL_DEPTH_TEST);
     GLboolean blendEnabled;
     glGetBooleanv(GL_BLEND, &blendEnabled);
     glEnable(GL_BLEND);
     glBlendFuncSeparate(GL_ONE, GL_SRC_ALPHA, GL_ZERO, GL_ONE);
+#endif
 
     _compositor.Draw();
 
+#if defined(ARCH_GFX_OPENGL)
     glEnable(GL_DEPTH_TEST);
     if (!blendEnabled) {
         glDisable(GL_BLEND);
     }
+#endif
 }
 
 GfVec4f
