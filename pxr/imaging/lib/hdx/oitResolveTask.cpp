@@ -170,13 +170,15 @@ HdxOitResolveTask::Execute(HdTaskContext* ctx)
     }
 
     _renderPassState->Bind(); 
-
+#if defined(ARCH_GFX_OPENGL)
     glDisable(GL_DEPTH_TEST);
+#endif
 
     _renderPass->Execute(_renderPassState, GetRenderTags());
 
+#if defined(ARCH_GFX_OPENGL)
     glEnable(GL_DEPTH_TEST);
-
+#endif
     _renderPassState->Unbind();
 }
 

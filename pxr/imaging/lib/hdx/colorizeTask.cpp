@@ -342,16 +342,20 @@ HdxColorizeTask::Execute(HdTaskContext* ctx)
     }
 
     // Blit!
+#if defined(ARCH_GFX_OPENGL)
     GLboolean blendEnabled;
     glGetBooleanv(GL_BLEND, &blendEnabled);
     glEnable(GL_BLEND);
     glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+#endif
 
     _compositor.Draw();
 
+#if defined(ARCH_GFX_OPENGL)
     if (!blendEnabled) {
         glDisable(GL_BLEND);
     }
+#endif
 }
 
 
