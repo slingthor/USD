@@ -1217,6 +1217,7 @@ function(_pxr_library NAME)
             PREFIX "${args_PREFIX}"
             SUFFIX "${args_SUFFIX}"
             PUBLIC_HEADER "${args_PUBLIC_HEADERS}"
+            XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY "$ENV{CODE_SIGN_IDENTITY}"
     )
 
     set(pythonEnabled "PXR_PYTHON_ENABLED=1")

@@ -42,11 +42,16 @@
 #include "pxr/imaging/hdSt/lightingShader.h"
 #include "pxr/imaging/hdSt/renderPassShader.h"
 #include "pxr/imaging/hd/bufferArrayRange.h"
-#include "pxr/imaging/hdSt/GL/bufferResourceGL.h"
+#include "pxr/imaging/hd/bufferResource.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-TF_DEFINE_ENV_SETTING(HDX_ENABLE_OIT, true, 
+TF_DEFINE_ENV_SETTING(HDX_ENABLE_OIT,
+#if !defined(ARCH_OS_IOS)
+                      false,
+#else
+                      true,
+#endif
                       "Enable order independent translucency");
 
 typedef std::vector<HdBufferSourceSharedPtr> HdBufferSourceSharedPtrVector;
@@ -114,6 +119,7 @@ HdxOitRenderTask::Execute(HdTaskContext* ctx)
     _ClearOitGpuBuffers(ctx);
 
     // We render into a SSBO -- not MSSA compatible
+#if defined(ARCH_GFX_OPENGL)
     bool oldMSAA = glIsEnabled(GL_MULTISAMPLE);
     glDisable(GL_MULTISAMPLE);
     // XXX When rendering HdStPoints we set GL_POINTS and assume that
@@ -124,7 +130,7 @@ HdxOitRenderTask::Execute(HdTaskContext* ctx)
     // XXX Switch points rendering to emit quad with FS that draws circle.
     bool oldPointSmooth = glIsEnabled(GL_POINT_SMOOTH);
     glEnable(GL_POINT_SMOOTH);
-
+#endif
     //
     // Opaque pixels pass
     // These pixels are rendered to FB instead of OIT buffers
@@ -145,7 +151,7 @@ HdxOitRenderTask::Execute(HdTaskContext* ctx)
     //
     // Post Execute Restore
     //
-
+#if defined(ARCH_GFX_OPENGL)
     if (oldMSAA) {
         glEnable(GL_MULTISAMPLE);
     }
@@ -153,6 +159,7 @@ HdxOitRenderTask::Execute(HdTaskContext* ctx)
     if (!oldPointSmooth) {
         glDisable(GL_POINT_SMOOTH);
     }
+#endif
 }
 
 static int 
@@ -183,6 +190,7 @@ _GetScreenSize()
 
     GfVec2i s;
 
+#if defined(ARCH_GFX_OPENGL)
     GLint attachType = 0;
     glGetFramebufferAttachmentParameteriv(
         GL_DRAW_FRAMEBUFFER, 
@@ -208,7 +216,6 @@ _GetScreenSize()
         s[1] = viewport[3];
         return s;
     }
-
     if (attachType == GL_TEXTURE) {
         glGetTextureLevelParameteriv(attachId, 0, GL_TEXTURE_WIDTH, &s[0]);
         glGetTextureLevelParameteriv(attachId, 0, GL_TEXTURE_HEIGHT, &s[1]);
@@ -219,7 +226,7 @@ _GetScreenSize()
         TF_CODING_ERROR("Unknown framebuffer attachment");
         return s;
     }
-
+#endif
     return s;
 }
 
@@ -231,9 +238,10 @@ HdxOitRenderTask::_PrepareOitBuffers(
     // XXX OIT can be globally disabled to preserve GPU memory
     if (!bool(TfGetEnvSetting(HDX_ENABLE_OIT))) return;
 
+#if defined(ARCH_GFX_OPENGL)
     // XXX Exit if opengl version too old
     if (!glGetTextureLevelParameteriv) return;
-
+#endif
     const int numSamples = 8; // Should match glslfx files
 
     HdResourceRegistrySharedPtr const& resourceRegistry = 
@@ -250,11 +258,12 @@ HdxOitRenderTask::_PrepareOitBuffers(
     bool rebuildOitBuffers = (newBufferSize > _bufferSize);
 
     if (rebuildOitBuffers) {
+#if defined(ARCH_GFX_OPENGL)
         // If glew version too old we emit a warning since OIT will not work.
         if (!glClearNamedBufferData) {
             TF_WARN("glClearNamedBufferData missing for OIT (old glew?)");
         }
-
+#endif
         _counterBar.reset();
         _dataBar.reset();
         _depthBar.reset();
@@ -434,6 +443,7 @@ HdxOitRenderTask::_PrepareOitBuffers(
 void 
 HdxOitRenderTask::_ClearOitGpuBuffers(HdTaskContext* ctx)
 {
+#if defined(ARCH_GFX_OPENGL)
     // Exit if glew version used by app is too old
     if (!glClearNamedBufferData) return;
     if (!_counterBar) return;
@@ -494,6 +504,7 @@ HdxOitRenderTask::_ClearOitGpuBuffers(HdTaskContext* ctx)
                             GL_RED,
                             GL_FLOAT,
                             &clearDepth);
+#endif
 }
 
 

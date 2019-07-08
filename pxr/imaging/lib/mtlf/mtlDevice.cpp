@@ -30,6 +30,7 @@
 #endif
 
 #import <simd/simd.h>
+#include <sys/time.h>
 
 #define METAL_TESSELLATION_SUPPORT 0
 #define CACHE_GSCOMPUTE 1

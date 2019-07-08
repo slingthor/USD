@@ -48,8 +48,8 @@
 #include "pxr/imaging/glf/diagnostic.h"
 #if defined(ARCH_GFX_OPENGL)
 #include "pxr/imaging/glf/glContext.h"
-#include "pxr/imaging/glf/info.h"
 #endif
+#include "pxr/imaging/glf/info.h"
 
 #include <iostream>
 
@@ -196,7 +196,9 @@ HdxPickTask::_SetResolution(GfVec2i const& widthHeight)
 
     // Make sure master draw target is always modified on the shared context,
     // so we access it consistently.
+#if defined(ARCH_GFX_OPENGL)
     GlfSharedGLContextScopeHolder sharedContextHolder;
+#endif
     {
         _drawTarget->Bind();
         _drawTarget->SetSize(widthHeight);
@@ -212,6 +214,7 @@ HdxPickTask::_ConditionStencilWithGLCallback(
     // We don't use the pickable/unpickable render pass state below, since
     // the callback uses immediate mode GL, and doesn't conform to Hydra's
     // command buffer based execution philosophy.
+#if defined(ARCH_GFX_OPENGL)
     {
         glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
         glEnable(GL_STENCIL_TEST);
@@ -220,12 +223,13 @@ HdxPickTask::_ConditionStencilWithGLCallback(
                     GL_KEEP,     // stencil passed, depth failed
                     GL_REPLACE); // stencil passed, depth passed
     }
-    
+#endif
     //
     // Condition the stencil buffer.
     //
     maskCallback();
 
+#if defined(ARCH_GFX_OPENGL)
     // We expect any GL state changes are restored.
     {
         // Clear depth incase the depthMaskCallback pollutes the depth buffer.
@@ -236,6 +240,7 @@ HdxPickTask::_ConditionStencilWithGLCallback(
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
         glFrontFace(GL_CCW);
     }
+#endif
 }
 
 bool
@@ -273,12 +278,13 @@ HdxPickTask::Sync(HdSceneDelegate* delegate,
         TF_RUNTIME_ERROR("framebuffer object not supported");
         return;
     }
+#if defined(ARCH_GFX_OPENGL)
     GlfGLContextSharedPtr context = GlfGLContext::GetCurrentGLContext();
     if (!TF_VERIFY(context)) {
         TF_RUNTIME_ERROR("Invalid GL context");
         return;
     }
-
+#endif
     if (!_drawTarget) {
         // Initialize the shared draw target late to ensure there is a valid GL
         // context, which may not be the case at constructon time.
@@ -516,9 +522,11 @@ HdxPickTask::Execute(HdTaskContext* ctx)
     GLfloat p[2];
     
     if (usingOpenGLEngine) {
+#if defined(ARCH_GFX_OPENGL)
         drawTarget->Unbind();
         GLF_POST_PENDING_GL_ERRORS();
         glGetFloatv(GL_DEPTH_RANGE, &p[0]);
+#endif
     }
     else {
         p[0] = 0.0f;
