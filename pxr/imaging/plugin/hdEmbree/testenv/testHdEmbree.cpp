@@ -24,8 +24,8 @@
 #include "pxr/pxr.h"
 
 #include "pxr/imaging/glf/glew.h"
-#include "pxr/imaging/glf/drawTarget.h"
-#include "pxr/imaging/glf/image.h"
+#include "pxr/imaging/garch/drawTarget.h"
+#include "pxr/imaging/garch/image.h"
 
 #include "pxr/imaging/hd/engine.h"
 #include "pxr/imaging/hdSt/unitTestGLDrawing.h"
@@ -291,6 +291,9 @@ void HdEmbree_TestGLDrawing::InitTest()
     _sceneDelegate->UpdateCamera(camera,
         HdCameraTokens->projectionMatrix,
         VtValue(frustum.ComputeProjectionMatrix()));
+    _sceneDelegate->UpdateCamera(camera,
+        HdCameraTokens->windowPolicy,
+        VtValue(CameraUtilCrop));
 };
 
 void HdEmbree_TestGLDrawing::DrawTest()
@@ -298,10 +301,12 @@ void HdEmbree_TestGLDrawing::DrawTest()
     // The GL viewport needs to be set before calling execute.
     glViewport(0, 0, GetWidth(), GetHeight());
 
+    // XXX: We don't plumb changes to window size to the task.
+
     // Ask hydra to execute our render task (producing an image).
     HdTaskSharedPtr renderTask = _renderIndex->GetTask(SdfPath("/renderTask"));
     HdTaskSharedPtrVector tasks = { renderTask };
-    _engine.Execute(*_renderIndex, tasks);
+    _engine.Execute(_renderIndex, &tasks);
 
     // We don't support live-rendering of AOV output in this test...
 }
@@ -364,7 +369,7 @@ void HdEmbree_TestGLDrawing::OffscreenTest()
     // For offline rendering, make sure we render to convergence.
     HdTaskSharedPtrVector tasks = { renderTask };
     do {
-        _engine.Execute(*_renderIndex, tasks);
+        _engine.Execute(_renderIndex, &tasks);
     } while (!renderTask->IsConverged());
    
     if (_aov.size() > 0) {
@@ -378,7 +383,7 @@ void HdEmbree_TestGLDrawing::OffscreenTest()
         rb->Resolve();
 
         GLenum unused;
-        GlfImage::StorageSpec storage;
+        GarchImage::StorageSpec storage;
         storage.width = rb->GetWidth();
         storage.height = rb->GetHeight();
         HdStGLConversions::GetGlFormat(rb->GetFormat(),
@@ -402,7 +407,7 @@ void HdEmbree_TestGLDrawing::OffscreenTest()
 
         VtDictionary metadata;
 
-        GlfImageSharedPtr image = GlfImage::OpenForWriting(_outputName);
+        GarchImageSharedPtr image = GarchImage::OpenForWriting(_outputName);
         if (image) {
             image->Write(storage, metadata);
         }

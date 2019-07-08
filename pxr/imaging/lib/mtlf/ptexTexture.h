@@ -31,7 +31,7 @@
 
 #include <string>
 
-#ifdef PXR_PTEX_SUPPORT_ENABLED
+#if defined(PXR_PTEX_SUPPORT_ENABLED) || defined(doxygen)
 
 #include "pxr/imaging/garch/ptexTexture.h"
 

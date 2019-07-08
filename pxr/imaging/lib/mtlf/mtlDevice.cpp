@@ -30,6 +30,7 @@
 #endif
 
 #import <simd/simd.h>
+#include <sys/time.h>
 
 #define METAL_TESSELLATION_SUPPORT 0
 
@@ -631,6 +632,29 @@ void MtlfMetalContext::CreateCommandBuffer(MetalWorkQueueType workQueueType, boo
     }
     METAL_INC_STAT(resourceStats.commandBuffersCreated);
 }
+
+MTLF_API
+id<MTLCommandBuffer> MtlfMetalContext::GetCommandBuffer(MetalWorkQueueType workQueueType) {
+    MetalWorkQueue *wq = &GetWorkQueue(workQueueType);
+
+    if (wq->commandBuffer == nil) {
+        CreateCommandBuffer(workQueueType);
+    }
+    else {
+        if (wq->encoderInUse) {
+            TF_FATAL_CODING_ERROR("Not valid to get a command buffer if an encoder is still in use");
+        }
+        
+        // If the last used encoder wasn't ended then we need to end it now
+        if (wq->encoderHasWork && !wq->encoderEnded) {
+            wq->encoderInUse = true;
+            ReleaseEncoder(true, workQueueType);
+        }
+    }
+ 
+    return wq->commandBuffer;
+}
+
 
 void MtlfMetalContext::LabelCommandBuffer(NSString *label, MetalWorkQueueType workQueueType)
 {
