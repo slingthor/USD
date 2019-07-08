@@ -289,7 +289,7 @@ def RunCMake(context, force, buildArgs = None, hostPlatform = False):
                 generator = "Visual Studio 15 2017 Win64"
             else:
                 generator = "Visual Studio 14 2015 Win64"
-        elif targetMacOS:
+        elif targetMacOS or targetIOS:
             generator = "Xcode"
 
     if generator is not None:
@@ -313,9 +313,12 @@ def RunCMake(context, force, buildArgs = None, hostPlatform = False):
                 '-DENABLE_VISIBILITY=1 '
                 '-DAPPLEIOS=1 '
                 '-DENABLE_ARC=0 '
+                '-DCMAKE_XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY="iPhone Developer" '
+                '-DCMAKE_XCODE_ATTRIBUTE_DEVELOPMENT_TEAM={developmentTeam} '
                 '-DPYTHON_INCLUDE_DIR=/System/Library/Frameworks/Python.framework/Versions/2.7/include/python2.7  '
                 '-DPYTHON_LIBRARY=/System/Library/Frameworks/Python.framework/Versions/2.7/lib '
-                '-DPYTHON_EXECUTABLE:FILEPATH=/usr/bin/python ')
+                '-DPYTHON_EXECUTABLE:FILEPATH=/usr/bin/python '.format(
+                    developmentTeam=os.environ.get('XCODE_ATTRIBUTE_DEVELOPMENT_TEAM')))
 
     # We use -DCMAKE_BUILD_TYPE for single-configuration generators 
     # (Ninja, make), and --config for multi-configuration generators 
@@ -1119,7 +1122,6 @@ def InstallOpenSubdiv(context, force, buildArgs):
 
             buildDirmacOS = os.path.join(context.buildDir, os.path.split(srcOSDmacOSDir)[1])
 
-            extraArgs.append('-G Xcode')
             extraArgs.append('-DNO_CLEW=ON')
             extraArgs.append('-DNO_OPENGL=ON')
             extraArgs.append('-DSTRINGIFY_LOCATION={buildDirmacOS}/bin/Release/stringify'

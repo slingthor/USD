@@ -458,8 +458,9 @@ void
 UsdImagingGLEngine::SetRenderViewport(GfVec4d const& viewport)
 {
     if (ARCH_UNLIKELY(_legacyImpl)) {
+#if defined(ARCH_GFX_OPENGL)
         _legacyImpl->SetRenderViewport(viewport);
-        return;
+#endif        return;
     }
 
     TF_VERIFY(_taskController);
@@ -488,7 +489,9 @@ void
 UsdImagingGLEngine::SetCameraPath(SdfPath const& id)
 {
     if (ARCH_UNLIKELY(_legacyImpl)) {
+#if defined(ARCH_GFX_OPENGL)
         _legacyImpl->SetCameraPath(id);
+#endif
         return;
     }
 
@@ -501,7 +504,9 @@ UsdImagingGLEngine::SetCameraState(const GfMatrix4d& viewMatrix,
                                    const GfMatrix4d& projectionMatrix)
 {
     if (ARCH_UNLIKELY(_legacyImpl)) {
+#if defined(ARCH_GFX_OPENGL)
         _legacyImpl->SetFreeCameraMatrices(viewMatrix, projectionMatrix);
+#endif
         return;
     }
 
