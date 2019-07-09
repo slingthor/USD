@@ -47,7 +47,7 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 TF_DEFINE_ENV_SETTING(HDX_ENABLE_OIT,
-#if !defined(ARCH_OS_IOS)
+#if defined(ARCH_OS_IOS)
                       false,
 #else
                       true,
