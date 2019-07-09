@@ -79,7 +79,8 @@ public:
                 BASE_VERTEX_ID,      // base vertex ID
                 FRONT_FACING,        // boolean indicating if fragment belongs to a front-facing primitive
                 SAMPLER,             // texture sampler in non-GL APIs
-                INSTANCE_ID          // instance ID
+                INSTANCE_ID,         // instance ID
+                FRAG_COORD           // screen space frament position
     };
     enum Location {
                 // NOT_EXIST is a special value of location for a uniform
