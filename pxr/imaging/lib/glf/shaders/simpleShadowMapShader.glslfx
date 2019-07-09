@@ -143,5 +143,9 @@ in vec4 Cout;
 void
 main()
 {
+#if defined(ARCH_GFX_OPENGL)
     gl_FragDepth = gl_FragCoord.z;
+#else
+    gl_FragDepth = gl_Position.z;
+#endif
 }

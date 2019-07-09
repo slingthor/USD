@@ -2970,7 +2970,7 @@ HdSt_CodeGenMSL::_GenerateCommonCode()
     _AddInputParam(  _mslVSInputParams,
                 TfToken("gl_InstanceID"), TfToken("uint"), TfToken("[[instance_id]]"),
                 HdBinding(HdBinding::INSTANCE_ID, 0));
-    
+
     METAL_DEBUG_COMMENT(&_genCommon, "End of special inputs\n"); //MTL_FIXME
     
     METAL_DEBUG_COMMENT(&_genCommon, "Start of vertex/fragment interface\n"); //MTL_FIXME
@@ -2982,18 +2982,20 @@ HdSt_CodeGenMSL::_GenerateCommonCode()
         |= TParam::VertexData;
     _AddOutputParam(_mslGSOutputParams, TfToken("gl_Position"), TfToken("vec4"), TfToken("[[position]]")).usage
         |= TParam::VertexData;
+    _AddInputParam(  _mslPSInputParams,
+                   TfToken("gl_Position"), TfToken("vec4"), TfToken("[[position]]"),
+                   HdBinding(HdBinding::FRAG_COORD, 0)).usage |= TParam::VertexData;
     
     _EmitOutput(_genCommon, TfToken("gl_PointSize"), TfToken("float"), TfToken("[[point_size]]"));
     _AddOutputParam(_mslVSOutputParams, TfToken("gl_PointSize"), TfToken("float"), TfToken("[[point_size]]")).usage
         |= TParam::VertexShaderOnly;
     
     _EmitOutput(_genCommon, TfToken("gl_ClipDistance"), TfToken("float"),
-                // XXX - Causes an internal error on Lobo - fixed in Liberty 18A281+
                 //TfToken("[[clip_distance]]")).usage |= TParam::VertexShaderOnly;
                 TfToken(""));
     _AddOutputParam(_mslVSOutputParams,  TfToken("gl_ClipDistance"), TfToken("float"),
-                TfToken("" /*[[clip_distance]]*/ )).usage // XXX - Causes an internal error on Lobo - fixed in Liberty 18A281+
-                |= TParam::VertexShaderOnly;
+                    TfToken("" /*[[clip_distance]]*/ )).usage
+    |= TParam::VertexShaderOnly;
 
     _genCommon << "uint gl_PrimitiveID = 0;\n"
                << "uint gl_PrimitiveIDIn = 0;\n"
