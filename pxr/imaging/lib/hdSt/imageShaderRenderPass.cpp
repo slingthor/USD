@@ -23,6 +23,8 @@
 //
 #include "pxr/imaging/glf/glew.h"
 
+#include "pxr/imaging/mtlf/mtlDevice.h"
+
 #include "pxr/imaging/hdSt/imageShaderRenderPass.h"
 #include "pxr/imaging/hdSt/imageShaderShaderKey.h"
 #include "pxr/imaging/hdSt/resourceRegistry.h"
@@ -122,8 +124,23 @@ HdSt_ImageShaderRenderPass::_Execute(
         _drawItem.SetGeometricShader(geometricShader);
     }
 
+    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
+    context->StartFrameForThread();
+
     _immediateBatch->PrepareDraw(stRenderPassState, resourceRegistry);
     _immediateBatch->ExecuteDraw(stRenderPassState, resourceRegistry);
+    
+    if (context->GeometryShadersActive()) {
+        // Complete the GS command buffer if we have one
+        context->CommitCommandBufferForThread(false, false, METALWORKQUEUE_GEOMETRY_SHADER);
+    }
+    
+    if (context->GetWorkQueue(METALWORKQUEUE_DEFAULT).commandBuffer != nil) {
+        context->CommitCommandBufferForThread(false, false);
+        
+        context->EndFrameForThread();
+    }
+
 }
 
 void
