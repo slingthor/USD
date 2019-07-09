@@ -262,6 +262,8 @@ void MtlfMetalContext::Init(id<MTLDevice> _device, int width, int height)
 
     workQueueResource.lastWaitEventValue                  = 0;
 
+    triIndexBuffer.Clear();
+
     ResetEncoders(METALWORKQUEUE_RESOURCE, true);
 
     memset(commandBuffers, 0x00, sizeof(commandBuffers));
@@ -552,6 +554,40 @@ MtlfMetalContext::GetQuadIndexBuffer(MTLIndexType indexTypeMetal) {
         }
     }
     return threadState.remappedQuadIndexBuffer.forCurrentGPU();
+}
+
+MtlfMetalContext::MtlfMultiBuffer&
+MtlfMetalContext::GetTriListIndexBuffer(MTLIndexType indexTypeMetal, uint32_t numTriangles) {
+    uint32_t numIndices = numTriangles * 3;
+    uint32_t indexBufferSize = numIndices * sizeof(uint32_t);
+    
+    if (triIndexBuffer.IsSet()) {
+        if ((triIndexBuffer.length() < indexBufferSize)) {
+            triIndexBuffer.release();
+            triIndexBuffer.Clear();
+        }
+    }
+    // Remap the quad indices into two sets of triangle indices
+    if (!triIndexBuffer.IsSet()) {
+        if (indexTypeMetal != MTLIndexTypeUInt32) {
+            TF_FATAL_CODING_ERROR("Only 32 bit indices currently supported for quads");
+        }
+        NSLog(@"Recreating triangle list index buffer");
+        
+        triIndexBuffer = MtlfMultiBuffer(indexBufferSize, MTLResourceStorageModeDefault);
+        
+        for (int i = 0; i < renderDevices.count; i++) {
+            uint32_t *destData = (uint32_t *)triIndexBuffer[i].contents;
+            for (int i = 0; i < numIndices; i++)
+            {
+                *destData = i;
+            }
+#if defined(ARCH_OS_MACOS)
+            [triIndexBuffer[i] didModifyRange:(NSMakeRange(0, triIndexBuffer[i].length))];
+#endif
+        }
+    }
+    return triIndexBuffer;
 }
 
 id<MTLBuffer>

@@ -142,6 +142,7 @@ HdStMSLProgram::HdStMSLProgram(TfToken const &role)
 , _drawArgsSlot(-1), _indicesSlot(-1)
 {
     _currentlySet = false;
+    _reapplyIndexBuffer = false;
     memset(_vertexFunction, 0x00, sizeof(_vertexFunction));
     memset(_fragmentFunction, 0x00, sizeof(_fragmentFunction));
     memset(_computeFunction, 0x00, sizeof(_computeFunction));
@@ -678,7 +679,8 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
                                    length:sizeof(drawArgs)
                                   atIndex:_drawArgsSlot];
             
-            if (tempPointsWorkaround && _indicesSlot >= 0) {
+            if ((tempPointsWorkaround && _indicesSlot >= 0) ||
+                _reapplyIndexBuffer) {
                 [renderEncoder setVertexBuffer:indexBuffer offset:0 atIndex:_indicesSlot];
             }
     
@@ -765,9 +767,15 @@ void HdStMSLProgram::DrawArraysInstanced(GLenum primitiveMode,
                                           GLint baseVertex,
                                           GLint vertexCount,
                                           GLint instanceCount) const {
-    
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
-    
+    context->SetIndexBuffer(context->GetTriListIndexBuffer(MTLIndexTypeUInt32, vertexCount / 3));
+
+    _reapplyIndexBuffer = _indicesSlot >= 0;
+    DrawElementsInstancedBaseVertex(primitiveMode, vertexCount, GL_UNSIGNED_INT, 0, instanceCount, baseVertex);
+    _reapplyIndexBuffer = false;
+
+    return;
+
     MTLPrimitiveType primType = GetMetalPrimType(primitiveMode);
     
     // Possibly move this outside this function as we shouldn't need to get a render encoder every draw call

@@ -274,7 +274,10 @@ public:
     
     MTLF_API
     id<MTLBuffer> GetPointIndexBuffer(MTLIndexType indexTypeMetal, int numIndicesNeeded, bool usingQuads);
-     
+
+    MTLF_API
+    MtlfMultiBuffer& GetTriListIndexBuffer(MTLIndexType indexTypeMetal, uint32_t numTriangles);
+
     MTLF_API
     void CreateCommandBuffer(MetalWorkQueueType workQueueType = METALWORKQUEUE_DEFAULT, bool forceFromDevice = false);
     
@@ -749,6 +752,8 @@ private:
         uint64_t end;
     };
     boost::unordered_map<id<MTLBuffer> const, MetalBufferFlushListEntry> modifiedBuffers;
+    
+    MtlfMultiBuffer triIndexBuffer;
 
     int64_t frameCount;
     int64_t lastCompletedFrame;

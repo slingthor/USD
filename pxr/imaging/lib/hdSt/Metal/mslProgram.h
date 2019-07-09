@@ -242,6 +242,7 @@ private:
     int _indicesSlot;
     
     bool _currentlySet;
+    mutable bool _reapplyIndexBuffer;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE
