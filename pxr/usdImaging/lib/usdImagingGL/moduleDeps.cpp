@@ -24,6 +24,7 @@
 ////////////////////////////////////////////////////////////////////////
 
 #include "pxr/pxr.h"
+#include "pxr/base/arch/defines.h"
 #include "pxr/base/tf/registryManager.h"
 #include "pxr/base/tf/scriptModuleLoader.h"
 #include "pxr/base/tf/token.h"
@@ -39,6 +40,9 @@ TF_REGISTRY_FUNCTION(TfScriptModuleLoader) {
         TfToken("garch"),
         TfToken("gf"),
         TfToken("glf"),
+#if defined(ARCH_GFX_METAL)
+        TfToken("mtlf"),
+#endif
         TfToken("hd"),
         TfToken("hdx"),
         TfToken("hio"),
