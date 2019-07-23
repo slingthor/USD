@@ -460,7 +460,8 @@ UsdImagingGLEngine::SetRenderViewport(GfVec4d const& viewport)
     if (ARCH_UNLIKELY(_legacyImpl)) {
 #if defined(ARCH_GFX_OPENGL)
         _legacyImpl->SetRenderViewport(viewport);
-#endif        return;
+#endif
+        return;
     }
 
     TF_VERIFY(_taskController);

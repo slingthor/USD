@@ -128,7 +128,12 @@ HdStBufferResourceMetal::SetAllocations(HdResourceGPUHandle idBuffer0,
         
         for (int g = 0; g < GPUState::gpuCount; g++) {
             MtlfMetalContext::MtlfMultiBuffer &b = _id[i];
-            _gpuAddr[g][i] = (uint64_t)[b[g] contents];
+            if (b[g]) {
+                _gpuAddr[g][i] = (uint64_t)[b[g] contents];
+            }
+            else {
+                _gpuAddr[g][i] = NULL;
+            }
         }
     }
 

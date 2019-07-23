@@ -342,16 +342,16 @@ void MtlfMetalContext::Init(id<MTLDevice> _device, int width, int height)
 
 void MtlfMetalContext::Cleanup()
 {
-    [renderDevices release];
-    renderDevices = nil;
-
 #if defined(ARCH_GFX_OPENGL)
     if (glInterop) {
         delete glInterop;
         glInterop = NULL;
     }
 #endif
-    
+ 
+    [renderDevices release];
+    renderDevices = nil;
+
     CleanupUnusedBuffers(true);
     bufferFreeList.clear();
 
