@@ -57,9 +57,14 @@ HdStBufferRelocatorMetal::Commit()
                       destinationOffset:it->writeOffset
                                    size:it->copySize];
         }
-        
+#if defined(ARCH_OS_MACOS)
+        // Update CPU side copy so that any future CPU side didModifyRange calls
+        // don't mess us up!
+        [blitEncoder synchronizeResource:_dstBuffer[i]];
+#endif
         [blitEncoder endEncoding];
         [commandBuffer commit];
+        [commandBuffer waitUntilCompleted];
     }
 
     HD_PERF_COUNTER_ADD(HdPerfTokens->glCopyBufferSubData,
