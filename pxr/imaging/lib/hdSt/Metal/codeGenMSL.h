@@ -66,6 +66,7 @@ public:
             VertexData          = 1 << 12,
             DrawingCoord        = 1 << 13,
             PointerType         = 1 << 14,
+            Mutable             = 1 << 15,
         };
         static Usage const maskShaderUsage = Usage(EntryFuncArgument - 1);
         
@@ -185,7 +186,11 @@ private:
     
     void _ParseHints(std::stringstream &source);
     void _ParseGLSL(std::stringstream &source, InOutParams& inParams, InOutParams& outParams, bool asComputeGS = false);
-    void _GenerateGlue(std::stringstream& glueVS, std::stringstream& glueGS, std::stringstream& gluePS, HdStMSLProgramSharedPtr mslProgram);
+    void _GenerateGlue(std::stringstream& glueVS,
+                       std::stringstream& glueGS,
+                       std::stringstream& gluePS,
+                       std::stringstream& glueCS,
+                       HdStMSLProgramSharedPtr mslProgram);
 //    void _MSL_GenerateVSWrapper(UInt32& inout_slotIndex, UInt32 vtxUniformBufferSize, std::stringstream& shader, std::stringstream& inout_ComputeGSArguments);
 
     HdSt_ResourceBinder::MetaData _metaData;

@@ -377,6 +377,9 @@ public:
     
     MTLF_API
     void SetRenderEncoderState();
+    
+    MTLF_API
+    void SetComputeEncoderState(id<MTLComputeCommandEncoder> computeEncoder);
 
     MTLF_API
     void ClearRenderEncoderState();

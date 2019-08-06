@@ -28,7 +28,7 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-class HdMaterialNetworkMap;
+struct HdMaterialNetworkMap;
 
 /// Convert any USD preview shading nodes to Renderman equivalents.
 /// Some caveats:

@@ -141,6 +141,15 @@ public:
         int numFaces, TfToken const &srcName, TfToken const &dstName,
         HdType srcDataType, bool packed) const override;
     
+    /// Creates a new ExtCompGPUComputation computation
+    HDST_API
+    virtual HdStExtCompGpuComputation *NewExtCompGPUComputationGPU(
+        SdfPath const &id,
+        HdStExtCompGpuComputationResourceSharedPtr const &resource,
+        HdExtComputationPrimvarDescriptorVector const &compPrimvars,
+        int dispatchCount,
+        int elementCount) const override;
+
     /// Creates a new render pass state for OpenGL
     HDST_API
     virtual HdStRenderPassState *NewRenderPassState() const override;

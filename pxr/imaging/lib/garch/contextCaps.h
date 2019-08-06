@@ -102,6 +102,9 @@ public:
     bool alwaysNeedsBinding;
     
     bool floatingPointBuffersEnabled;
+    
+    bool hasDispatchCompute;
+    bool hasBufferBindOffset;
 
     /// Returns whether to do frustum culling on the GPU
 	GARCH_API

@@ -154,8 +154,15 @@ public:
         HDST_API
         virtual void DebugDump(std::ostream &out) const override;
         
+        /// Reconstructs the bufferspecs and returns it (for buffer splitting)
         HDST_API
-        virtual void GetBufferSpecs(HdBufferSpecVector *specs) const override {}
+        virtual void GetBufferSpecs(HdBufferSpecVector *specs) const override {
+            HdStBufferResourceNamedList const &resources = _stripedBuffer->GetResources();
+                
+            TF_FOR_ALL(it, resources) {
+                specs->emplace_back(it->first, it->second->GetTupleType());
+            }
+        }
 
         /// Set the relative offset for this range.
         HDST_API

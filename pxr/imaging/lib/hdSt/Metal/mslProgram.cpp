@@ -100,7 +100,7 @@ MSL_ShaderBindingMapResults MSL_FindBinding(
     char *pD = buf;
     
     while(*pN)
-    *pD++ = *pN++;
+        *pD++ = *pN++;
     
     *pD++ = '_';
     *pD++ = '0' + level;
@@ -333,7 +333,8 @@ HdStMSLProgram::CompileShader(GLenum type,
         if (!function) {
             NSString *err = [error localizedDescription];
             err = [err stringByReplacingOccurrencesOfString:@"error: use of undeclared identifier 'surfaceShader'" withString:@"redacted"];
-            if ([err rangeOfString:@"error: "].location != NSNotFound) {
+            NSUInteger loc = [err rangeOfString:@"error: "].location;
+            if (loc != NSNotFound) {
                 // XXX:validation
                 TF_WARN("Failed to compile shader (%s): \n%s",
                         shaderType, [err UTF8String]);

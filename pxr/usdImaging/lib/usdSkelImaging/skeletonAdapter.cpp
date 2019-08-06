@@ -1561,7 +1561,7 @@ UsdSkelImagingSkeletonAdapter::_UpdateSkinningComputationForTime(
                 xformCache.GetLocalToWorldTransform(skinnedPrim).GetInverse();
             valueCache->GetExtComputationInput(
                 computationPath,_tokens->primWorldToLocal)
-                    = VtValue(primWorldToLocal);
+                    = VtValue(GfMatrix4f(primWorldToLocal));
         }
 
         // skinningXforms, skelLocalToWorld, blendShapeWeights
@@ -1616,7 +1616,7 @@ UsdSkelImagingSkeletonAdapter::_UpdateSkinningComputationForTime(
             GfMatrix4d skelLocalToWorld =
                 xformCache.GetLocalToWorldTransform(skelPrim);
             valueCache->GetExtComputationInput(
-                computationPath, _tokens->skelLocalToWorld) = skelLocalToWorld;
+                computationPath, _tokens->skelLocalToWorld) = GfMatrix4f(skelLocalToWorld);
         }
     }
     

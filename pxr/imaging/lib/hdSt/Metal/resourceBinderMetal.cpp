@@ -262,7 +262,7 @@ HdSt_ResourceBinderMetal::BindUniformf(TfToken const &name,
 }
 
 void
-HdSt_ResourceBinderMetal::IntrospectBindings(HdStProgramSharedPtr programResource)
+HdSt_ResourceBinderMetal::IntrospectBindings(HdStProgramSharedPtr programResource) const
 {
     HdStMSLProgramSharedPtr program(boost::dynamic_pointer_cast<HdStMSLProgram>(programResource));
     

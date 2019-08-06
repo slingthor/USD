@@ -30,6 +30,7 @@
 #include "pxr/imaging/hdSt/GL/codeGenGLSL.h"
 #include "pxr/imaging/hdSt/GL/dispatchBufferGL.h"
 #include "pxr/imaging/hdSt/GL/drawTargetTextureResourceGL.h"
+#include "pxr/imaging/hdSt/GL/extCompGpuComputationGL.h"
 #include "pxr/imaging/hdSt/GL/flatNormalsGL.h"
 #include "pxr/imaging/hdSt/GL/glslProgram.h"
 #include "pxr/imaging/hdSt/GL/indirectDrawBatchGL.h"
@@ -230,6 +231,18 @@ HdStProgram *HdStResourceFactoryGL::NewProgram(
     TfToken const &role) const
 {
     return new HdStGLSLProgram(role);
+}
+
+HdStExtCompGpuComputation *
+HdStResourceFactoryGL::NewExtCompGPUComputationGPU(
+    SdfPath const &id,
+    HdStExtCompGpuComputationResourceSharedPtr const &resource,
+    HdExtComputationPrimvarDescriptorVector const &compPrimvars,
+    int dispatchCount,
+    int elementCount) const
+{
+    return new HdStExtCompGpuComputationGL(
+                    id, resource, compPrimvars, dispatchCount, elementCount);
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

@@ -48,7 +48,7 @@ public:
     /// in case if explicit resource location qualifier is not available
     /// (GL 4.2 or before)
     HDST_API
-    virtual void IntrospectBindings(HdStProgramSharedPtr programResource) override;
+    virtual void IntrospectBindings(HdStProgramSharedPtr programResource) const override;
 
     /// bind/unbind shader parameters and textures
     HDST_API
@@ -85,7 +85,7 @@ public:
     virtual void BindUniformf(TfToken const &name, int count, const float *value) const override;
 
 private:
-    MSL_ShaderBindingMap _shaderBindingMap;
+    mutable MSL_ShaderBindingMap _shaderBindingMap;
 };
 
 

@@ -24,6 +24,7 @@ if (PXR_ENABLE_GL_SUPPORT)
                         GL/codeGenGLSL
                         GL/dispatchBufferGL
                         GL/drawTargetTextureResourceGL
+                        GL/extCompGpuComputationGL
                         GL/flatNormalsGL
                         GL/glslProgram
                         GL/glUtils
@@ -55,6 +56,7 @@ if (PXR_ENABLE_METAL_SUPPORT)
                         Metal/codeGenMSL
                         Metal/dispatchBufferMetal
                         Metal/drawTargetTextureResourceMetal
+                        Metal/extCompGpuComputationMetal
                         Metal/flatNormalsMetal
                         Metal/indirectDrawBatchMetal
                         Metal/interleavedMemoryBufferMetal

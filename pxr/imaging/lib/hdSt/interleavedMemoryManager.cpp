@@ -466,6 +466,7 @@ HdStInterleavedMemoryManager::_StripedInterleavedBuffer::GetBufferSpecs() const
     return result;
 }
 
+
 // ---------------------------------------------------------------------------
 //  _StripedInterleavedBufferRange
 // ---------------------------------------------------------------------------
@@ -558,13 +559,15 @@ HdStInterleavedMemoryManager::_StripedInterleavedBufferRange::CopyData(
         const unsigned char *data =
             (const unsigned char*)bufferSource->GetData();
 
-        for (size_t i = 0; i < _numElements; ++i) {
-            HD_PERF_COUNTER_INCR(HdPerfTokens->glBufferSubData);
+        if (data) {
+            for (size_t i = 0; i < _numElements; ++i) {
+                HD_PERF_COUNTER_INCR(HdPerfTokens->glBufferSubData);
 
-            VBO->CopyData(vboOffset, dataSize, data);
+                VBO->CopyData(vboOffset, dataSize, data);
 
-            vboOffset += vboStride;
-            data += dataSize;
+                vboOffset += vboStride;
+                data += dataSize;
+            }
         }
     }
 }

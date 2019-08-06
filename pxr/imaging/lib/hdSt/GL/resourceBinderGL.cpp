@@ -466,7 +466,7 @@ HdSt_ResourceBinderGL::BindUniformf(TfToken const &name,
 }
 
 void
-HdSt_ResourceBinderGL::IntrospectBindings(HdStProgramSharedPtr programResource)
+HdSt_ResourceBinderGL::IntrospectBindings(HdStProgramSharedPtr programResource) const
 {
     GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
     GLuint program = boost::dynamic_pointer_cast<HdStGLSLProgram>(programResource)->GetGLProgram();

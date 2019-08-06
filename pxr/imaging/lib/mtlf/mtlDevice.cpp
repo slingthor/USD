@@ -570,7 +570,7 @@ MtlfMetalContext::GetTriListIndexBuffer(MTLIndexType indexTypeMetal, uint32_t nu
     // Remap the quad indices into two sets of triangle indices
     if (!triIndexBuffer.IsSet()) {
         if (indexTypeMetal != MTLIndexTypeUInt32) {
-            TF_FATAL_CODING_ERROR("Only 32 bit indices currently supported for quads");
+            TF_FATAL_CODING_ERROR("Only 32 bit indices currently supported");
         }
         NSLog(@"Recreating triangle list index buffer");
         
@@ -1406,6 +1406,32 @@ void MtlfMetalContext::SetRenderEncoderState()
     }
 }
 
+void MtlfMetalContext::SetComputeEncoderState(id<MTLComputeCommandEncoder> computeEncoder)
+{
+    // Any buffers modified
+    for(auto buffer : threadState.boundBuffers)
+    {
+        // Only output if this buffer was modified
+//        if (buffer->modified) {
+        [computeEncoder setBuffer:buffer->buffer offset:buffer->offset atIndex:buffer->index];
+
+        // Remove writable status
+//        immutableBufferMask |= (1 << buffer->index);
+    }
+
+    for(auto texture : threadState.textures) {
+        [computeEncoder setTexture:texture.texture.forCurrentGPU() atIndex:texture.index];
+        //else
+        //    TF_FATAL_CODING_ERROR("Not implemented!"); //Compute case
+    }
+
+    for(auto sampler : threadState.samplers) {
+        [computeEncoder setSamplerState:sampler.sampler.forCurrentGPU() atIndex:sampler.index];
+        //else
+        //    TF_FATAL_CODING_ERROR("Not implemented!"); //Compute case
+    }
+}
+
 void MtlfMetalContext::ClearRenderEncoderState()
 {
     MetalWorkQueue *wq = threadState.currentWorkQueue;
@@ -1979,6 +2005,11 @@ void MtlfMetalContext::QueueBufferFlush(id<MTLBuffer> const &buffer, uint64_t st
     static std::mutex _mutex;
     std::lock_guard<std::mutex> lock(_mutex);
 
+    if (start == 3424 && end == 3552) {
+        float const* mat = ((float*)[buffer contents]) + (start / 4);
+        mat[0] == mat[0];
+    }
+    
     auto const &it = modifiedBuffers.find(buffer);
     if (it != modifiedBuffers.end()) {
         auto &bufferEntry = it->second;

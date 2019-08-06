@@ -279,7 +279,7 @@ public:
     /// in case if explicit resource location qualifier is not available
     /// (GL 4.2 or before)
     HDST_API
-    virtual void IntrospectBindings(HdStProgramSharedPtr programResource) = 0;
+    virtual void IntrospectBindings(HdStProgramSharedPtr programResource) const = 0;
 
     HDST_API
     void Bind(HdBindingRequest const& req) const;
@@ -386,7 +386,7 @@ protected:
         }
     };
     typedef std::map<NameAndLevel, HdBinding> _BindingMap;
-    _BindingMap _bindingMap;
+    mutable _BindingMap _bindingMap;
     int _numReservedTextureUnits;
 };
 
