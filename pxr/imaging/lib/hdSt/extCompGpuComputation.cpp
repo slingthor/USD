@@ -135,7 +135,7 @@ HdStExtCompGpuComputation::Execute(
 
         HdBinding const &binding = binder.GetBinding(name);
         // These should all be valid as they are required outputs
-        if (TF_VERIFY(binding.IsValid()) && TF_VERIFY(buffer->GetId())) {
+        if (TF_VERIFY(binding.IsValid()) && TF_VERIFY(buffer->GetId().IsSet())) {
             size_t componentSize = HdDataSizeOfType(
                 HdGetComponentType(buffer->GetTupleType().type));
             _uniforms.push_back(buffer->GetOffset() / componentSize);
