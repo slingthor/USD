@@ -178,7 +178,8 @@ HdxPickTask::_SetResolution(GfVec2i const& widthHeight)
     TRACE_FUNCTION();
 
     // Make sure we're in a sane GL state before attempting anything.
-    if (GlfHasLegacyGraphics()) {
+    bool isOpenGL = HdStResourceFactory::GetInstance()->IsOpenGL();
+    if (isOpenGL && GlfHasLegacyGraphics()) {
         TF_RUNTIME_ERROR("framebuffer object not supported");
         return;
     }
@@ -274,15 +275,19 @@ HdxPickTask::Sync(HdSceneDelegate* delegate,
     _index = &(delegate->GetRenderIndex());
 
     // Make sure we're in a sane GL state before attempting anything.
-    if (GlfHasLegacyGraphics()) {
+    bool isOpenGL = HdStResourceFactory::GetInstance()->IsOpenGL();
+    if (isOpenGL && GlfHasLegacyGraphics()) {
         TF_RUNTIME_ERROR("framebuffer object not supported");
         return;
     }
 #if defined(ARCH_GFX_OPENGL)
-    GlfGLContextSharedPtr context = GlfGLContext::GetCurrentGLContext();
-    if (!TF_VERIFY(context)) {
-        TF_RUNTIME_ERROR("Invalid GL context");
-        return;
+    GlfGLContextSharedPtr context;
+    if (isOpenGL) {
+        context = GlfGLContext::GetCurrentGLContext();
+        if (!TF_VERIFY(context)) {
+            TF_RUNTIME_ERROR("Invalid GL context");
+            return;
+        }
     }
 #endif
     if (!_drawTarget) {
