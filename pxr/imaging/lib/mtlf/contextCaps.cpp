@@ -76,6 +76,8 @@ MtlfContextCaps::_LoadCaps()
     hasSubDataCopy               = true;
     alwaysNeedsBinding           = true;
     floatingPointBuffersEnabled  = true;
+    hasDispatchCompute           = true;
+    hasBufferBindOffset          = true;
 
 #if OPENSUBDIV_HAS_METAL_COMPUTE
     //METAL_TODO: Metal always has compute capabilities. gpuComputeNormals only affects

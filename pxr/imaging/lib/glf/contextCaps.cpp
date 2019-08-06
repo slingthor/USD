@@ -132,6 +132,7 @@ GlfContextCaps::_LoadCaps()
     flipTexturesOnLoad           = true;
     useCppShaderPadding          = false;
     hasSubDataCopy               = glBufferSubData != NULL;
+    hasDispatchCompute           = glDispatchCompute != NULL;
 
     const char *glVersionStr = (const char*)glGetString(GL_VERSION);
 

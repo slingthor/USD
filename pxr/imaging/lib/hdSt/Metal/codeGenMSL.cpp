@@ -563,6 +563,19 @@ static void _EmitDeclarationPtr(std::stringstream &str,
     _EmitDeclaration(str, ptrName, type, attribute, binding, arraySize);
 }
 
+static void _EmitDeclarationMutablePtr(std::stringstream &str,
+                                TfToken const &name, TfToken const &type, TfToken const &attribute,
+                                HdBinding const &binding, int arraySize = 0, bool programScope = false)
+
+{
+    TfToken ptrName(std::string("*") + name.GetString());
+    str << "device ";
+    if (programScope) {
+        str << "ProgramScope<st>::";
+    }
+    
+    _EmitDeclaration(str, ptrName, type, attribute, binding, arraySize);
+}
 static void _EmitDeclarationPtr(std::stringstream &str,
                                 HdSt_ResourceBinder::MetaData::BindingDeclaration const &bd,
                                 TfToken const &attribute = TfToken(), int arraySize = 0, bool programScope = false)
@@ -582,12 +595,14 @@ static void _EmitStructAccessor(std::stringstream &str,
                                 const char *index);
 
 static void _EmitComputeAccessor(std::stringstream &str,
+                                 TfToken const &structMemberName,
                                  TfToken const &name,
                                  TfToken const &type,
                                  HdBinding const &binding,
                                  const char *index);
 
 static void _EmitComputeMutator(std::stringstream &str,
+                                TfToken const &structMemberName,
                                 TfToken const &name,
                                 TfToken const &type,
                                 HdBinding const &binding,
@@ -1096,7 +1111,12 @@ HdSt_CodeGenMSL::_ParseGLSL(std::stringstream &source, InOutParams& inParams, In
 }
 
 static bool IsIgnoredVSAttribute(const TfToken& name) {
-    const static TfToken ignoreList[] = { TfToken("tesPatchCoord"), TfToken("tesTessCoord"), TfToken("gsPatchCoord"), TfToken("gsTessCoord") };
+    const static TfToken ignoreList[] = {
+        TfToken("tesPatchCoord"),
+        TfToken("tesTessCoord"),
+        TfToken("gsPatchCoord"),
+        TfToken("gsTessCoord") };
+
     for(uint i = 0; i < (sizeof(ignoreList) / sizeof(ignoreList[0])); i++) {
         if(ignoreList[i] != name)
             continue;
@@ -1105,22 +1125,27 @@ static bool IsIgnoredVSAttribute(const TfToken& name) {
     return false;
 }
 
-void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream& glueGS, std::stringstream& gluePS, HdStMSLProgramSharedPtr mslProgram)
+void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
+                                    std::stringstream& glueGS,
+                                    std::stringstream& gluePS,
+                                    std::stringstream& glueCS,
+                                    HdStMSLProgramSharedPtr mslProgram)
 {
     std::stringstream   glueCommon, copyInputsVtx, copyOutputsVtx, copyInputsVtxStruct_Compute,
                         copyInputsVtx_Compute, copyGSOutputsIntoVSOutputs;
     std::stringstream   copyInputsFrag, copyOutputsFrag;
 
     std::stringstream   vsInputStruct, vsOutputStruct, vsAttributeDefineEnabled, vsAttributeDefineDisabled, vsAttributeDefineUndef,
-                        vsFuncDef, vsMI_FuncDef,
+                        vsFuncDef, vsMI_FuncDef, csFuncDef,
                         vsMI_EP_FuncDef, vsMI_EP_FuncDefParams, vsMI_EP_CallCode, vsMI_EP_InputCode,
                         vsCode, vsEntryPointCode, vsInputCode, vsOutputCode, vsGsOutputMergeCode,
-                        vsUniformStruct, drawArgsStruct,
+                        vsUniformStruct, drawArgsStruct, csCode,
                         gsVertIntermediateStruct, gsVertIntermediateFlatStruct, gs_IntermediateVSOutput, gs_IntermediateVSOutput_Flat;
 
     METAL_DEBUG_COMMENT(&glueCommon, "_GenerateGlue(glueCommon)\n"); //MTL_FIXME
     METAL_DEBUG_COMMENT(&glueVS, "_GenerateGlue(glueVS)\n"); //MTL_FIXME
     METAL_DEBUG_COMMENT(&gluePS, "_GenerateGlue(gluePS)\n"); //MTL_FIXME
+    METAL_DEBUG_COMMENT(&glueCS, "_GenerateGlue(glueCS)\n"); //MTL_FIXME
     
     vsAttributeDefineEnabled    << "/****** Vertex Attributes Specifiers are ENABLED ******/\n"
                                 << "#define HD_MTL_VS_ATTRIBUTE(t,n,a) t n a\n\n";
@@ -1229,6 +1254,9 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
                         << "\n    MSLVsInputs input //[[stage_in]]";
     vsMI_EP_FuncDef     << "vertex MSLVsOutputs vertexEntryPoint("
                         << "\n      uint _vertexID[[vertex_id]]";
+    csFuncDef           << "kernel void computeEntryPoint("
+                        << "    uint _threadPositionInGrid[[thread_position_in_grid]]\n";
+
     if (_buildTarget != kMSL_BuildTarget_MVA_ComputeGS)
         vsMI_EP_FuncDef << "\n    , uint _instanceID[[instance_id]]";
     
@@ -1327,6 +1355,13 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
                             << dataType << (isPtrParam ? "* " : " ")
                             << name << attrib;
                 
+                bool isMutable = (input.usage & HdSt_CodeGenMSL::TParam::Mutable);
+                csFuncDef   << "\n    , " << (isPtrParam ? "device " : "")
+                            << (isMutable ? "" : "const ")
+                            << (inProgramScope ? "ProgramScope_Compute::" : "")
+                            << dataType << (isPtrParam ? "* " : " ")
+                            << name << attrib;
+                
                 if(availableInMI_EP) {
                     //The MI entry point needs these too in identical form.
                     vsMI_EP_FuncDefParams << "\n    , " << (isPtrParam ? "device const " : "")
@@ -1377,6 +1412,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
     vsFuncDef       << ")\n{\n";
     vsMI_FuncDef    << ")\n{\n";
     vsMI_EP_FuncDef << vsMI_EP_FuncDefParams.str() << ")\n{\n";
+    csFuncDef       << ")\n{\n";
     
     vsMI_EP_CallCode    << ");\n";
     vsMI_EP_InputCode   << "\n        };\n";
@@ -1778,6 +1814,19 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
                 << "}\n";
     }
     
+    //Start concatenating the generated code snippets into glueCS
+    {
+        csCode  << "////////////////////////////////////////////////////////////////////////////////////////////////////////////////////\n";
+        csCode  << "// MSL Compute Entry Point //////////////////////////////////////////////////////////////////////////////////////////\n\n";
+        csCode  << csFuncDef.str()
+                << "    ProgramScope_Compute scope;\n"
+                << vsInputCode.str()
+                << "\n"
+                << "    scope.compute(_threadPositionInGrid);\n"
+                << "\n"
+                << "}\n\n";
+    }
+    
     ////////////////////////////////// Fragment Shader //////////////////////////////
     std::stringstream   fsCode, fsFuncDef, fsInputCode, fsOutputCode, fsOutputStruct, fsTexturingStruct, fsUniformStruct, fsInterpolationCode;
     int                 fsUniformStructSize(0);
@@ -2081,10 +2130,11 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS, std::stringstream
     glueVS << vsCode.str() << (_buildTarget != kMSL_BuildTarget_Regular ? vsEntryPointCode.str() : "");
     glueGS << gsCode.str();
     gluePS << fsCode.str();
+    glueCS << csCode.str();
     
     METAL_DEBUG_COMMENT(&glueVS, "End of _GenerateGlue(glueVS)\n\n"); //MTL_FIXME
     METAL_DEBUG_COMMENT(&gluePS, "End of _GenerateGlue(gluePS)\n\n"); //MTL_FIXME
-    
+    METAL_DEBUG_COMMENT(&glueCS, "End of _GenerateGlue(glueCS)\n\n"); //MTL_FIXME
 }
 
 HdStProgramSharedPtr
@@ -2313,10 +2363,10 @@ HdSt_CodeGenMSL::Compile()
     _ParseGLSL(_genCommon, _mslVSInputParams, _mslVSOutputParams);
 
     // MSL<->Metal API plumbing
-    std::stringstream glueVS, gluePS, glueGS;
-    glueVS.str(""); gluePS.str(""); glueGS.str("");
+    std::stringstream glueVS, gluePS, glueGS, glueCS;
+    glueVS.str(""); gluePS.str(""); glueGS.str(""); glueCS.str("");
     
-    _GenerateGlue(glueVS, glueGS, gluePS, mslProgram);
+    _GenerateGlue(glueVS, glueGS, gluePS, glueCS, mslProgram);
 
     std::stringstream vsConfigString, fsConfigString, gsConfigString;
     _GenerateConfigComments(vsConfigString, fsConfigString, gsConfigString);
@@ -2402,27 +2452,121 @@ HdSt_CodeGenMSL::CompileComputeProgram()
     _genGS.str(""); _genFS.str(""); _genCS.str("");
     _procVS.str(""); _procTCS.str(""), _procTES.str(""), _procGS.str("");
     
-    // GLSL version.
     GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
-    _genCommon << "#version " << caps.glslVersion << "\n";
+    _genCommon  << "#define HD_SHADER_API " << HD_SHADER_API << "\n"
+    << "#define ARCH_GFX_METAL\n";
+    
+    _buildTarget = kMSL_BuildTarget_Regular;
 
-    // Used in glslfx files to determine if it is using new/old
-    // imaging system. It can also be used as API guards when
-    // we need new versions of Hydra shading. 
-    _genCommon << "#define HD_SHADER_API " << HD_SHADER_API << "\n";
-        
-    // a trick to tightly pack unaligned data (vec3, etc) into SSBO/UBO.
-    _genCommon << _GetPackedTypeDefinitions();
-
+    // Metal feature set defines
+    id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->currentDevice;
+#if defined(ARCH_OS_MACOS)
+    _genCommon  << "#define ARCH_OS_MACOS\n";
+    // Define all macOS 10.13 feature set enums onwards
+    if ([device supportsFeatureSet:MTLFeatureSet_macOS_GPUFamily1_v3])
+        _genCommon << "#define METAL_FEATURESET_MACOS_GPUFAMILY1_v3\n";
+    if ([device supportsFeatureSet:MTLFeatureSet_macOS_GPUFamily1_v4])
+        _genCommon << "#define METAL_FEATURESET_MACOS_GPUFAMILY1_v4\n";
+    if ([device supportsFeatureSet:MTLFeatureSet_macOS_GPUFamily2_v1])
+        _genCommon << "#define METAL_FEATURESET_MACOS_GPUFAMILY2_v1\n";
+    
+#else // ARCH_OS_MACOS
+    _genCommon  << "#define ARCH_OS_IOS\n";
+    // Define all iOS 12 feature set enums onwards
+    if ([device supportsFeatureSet:MTLFeatureSet_iOS_GPUFamily1_v5])
+        _genCommon << "#define METAL_FEATURESET_IOS_GPUFAMILY1_v5\n";
+    if ([device supportsFeatureSet:MTLFeatureSet_iOS_GPUFamily2_v5])
+        _genCommon << "#define METAL_FEATURESET_IOS_GPUFAMILY2_v5\n";
+    if ([device supportsFeatureSet:MTLFeatureSet_iOS_GPUFamily3_v4])
+        _genCommon << "#define METAL_FEATURESET_IOS_GPUFAMILY3_v4\n";
+    if ([device supportsFeatureSet:MTLFeatureSet_iOS_GPUFamily4_v2])
+        _genCommon << "#define METAL_FEATURESET_IOS_GPUFAMILY4_v2\n";
+#endif // ARCH_OS_MACOS
+    
+    _genCommon  << "#include <metal_stdlib>\n"
+                << "#include <simd/simd.h>\n"
+                << "#include <metal_pack>\n"
+                << "using namespace metal;\n";
+    
+    _genCommon  << "#define double float\n"
+                << "#define vec2 float2\n"
+                << "#define vec3 float3\n"
+                << "#define vec4 float4\n"
+                << "#define mat3 float3x3\n"
+                << "#define mat4 float4x4\n"
+                << "#define ivec2 int2\n"
+                << "#define ivec3 int3\n"
+                << "#define ivec4 int4\n"
+                << "#define bvec2 bool2\n"
+                << "#define bvec3 bool3\n"
+                << "#define bvec4 bool4\n"
+                << "#define dvec2 float2\n"
+                << "#define dvec3 float3\n"
+                << "#define dvec4 float4\n"
+                << "#define dmat3 float3x3\n"
+                << "#define dmat4 float4x4\n";
+    
+    // XXX: this macro is still used in GlobalUniform.
+    _genCommon  << "#define MAT4 mat4\n";
+    
+    // a trick to tightly pack vec3 into SSBO/UBO.
+    _genCommon  << _GetPackedTypeDefinitions();
+    
+    _genCommon  << "#define in /*in*/\n"
+                //<< "#define out /*out*/\n"  //This define is going to cause issues, do not enable.
+                << "#define discard discard_fragment();\n"
+                << "#define radians(d) (d * 0.01745329252)\n"
+                << "#define noperspective /*center_no_perspective MTL_FIXME*/\n"
+                << "#define greaterThan(a,b) (a > b)\n"
+                << "#define lessThan(a,b)    (a < b)\n"
+                << "#define dFdx    dfdx\n"
+                << "#define dFdy    dfdy\n";
+    
+    // wrapper for type float and int to deal with .x accessors and the like that are valid in GLSL
+    _genCommon  << "struct wrapped_float {\n"
+                << "    union {\n"
+                << "        float x;\n"
+                << "        float xx;\n"
+                << "        float xxx;\n"
+                << "        float xxxx;\n"
+                << "    };\n"
+                << "    operator float () {\n"
+                << "        return x;\n"
+                << "    }\n"
+                << "};\n";
+    
+    _genCommon  << "struct wrapped_int {\n"
+                << "    union {\n"
+                << "        int x;\n"
+                << "        int xx;\n"
+                << "        int xxx;\n"
+                << "        int xxxx;\n"
+                << "    };\n"
+                << "    operator int () {\n"
+                << "        return x;\n"
+                << "    }\n"
+                << "};\n";
+    
     std::stringstream uniforms;
     std::stringstream declarations;
     std::stringstream accessors;
     
+    _genCommon  << "class ProgramScope<st> {\n"
+                << "public:\n";
+
     uniforms << "// Uniform block\n";
 
     HdBinding uboBinding(HdBinding::UBO, 0);
-    uniforms << AddressSpace(uboBinding);
-    uniforms << "uniform ubo_" << uboBinding.GetLocation() << " {\n";
+    TfToken varName(TfStringPrintf("ubo_%d", uboBinding.GetLocation()));
+    TfToken typeName(TfStringPrintf("ubo_%d_t", uboBinding.GetLocation()));
+    uniforms << "struct " << typeName << " {\n";
+    
+    _EmitDeclarationPtr(
+        declarations, varName, typeName, TfToken(), HdBinding(), 0, true);
+    _AddInputPtrParam(
+        _mslVSInputParams, varName, typeName, TfToken(), HdBinding(), 0, true);
+    
+//    declarations << "device const " << typeName << " *" << varName << ";\n";
 
     accessors << "// Read-Write Accessors & Mutators\n";
     uniforms << "    int vertexOffset;       // offset in aggregated buffer\n";
@@ -2434,22 +2578,22 @@ HdSt_CodeGenMSL::CompileComputeProgram()
         uniforms << "    int " << name << "Offset;\n";
         uniforms << "    int " << name << "Stride;\n";
         
-        _EmitDeclaration(   declarations,
+        _EmitDeclarationMutablePtr(declarations,
                             name, _GetFlatType(dataType), TfToken(), //compute shaders need vector types to be flat arrays
                             binding);
-        _AddInputParam(  _mslVSInputParams,
-                    name, _GetFlatType(dataType), TfToken(),
-                    binding);
+        _AddInputPtrParam(_mslVSInputParams,
+                          name, _GetFlatType(dataType), TfToken(),
+                          binding).usage |= TParam::EntryFuncArgument | TParam::Mutable;
         
         // getter & setter
         {
             std::stringstream indexing;
-            indexing << "(localIndex + vertexOffset)"
-                     << " * " << name << "Stride"
-                     << " + " << name << "Offset";
-            _EmitComputeAccessor(accessors, name, dataType, binding,
+            indexing << "(localIndex + " << varName << "->" << "vertexOffset)"
+                     << " * " << varName << "->"  << name << "Stride"
+                     << " + " << varName << "->"  << name << "Offset";
+            _EmitComputeAccessor(accessors, varName, name, dataType, binding,
                     indexing.str().c_str());
-            _EmitComputeMutator(accessors, name, dataType, binding,
+            _EmitComputeMutator(accessors, varName, name, dataType, binding,
                     indexing.str().c_str());
         }
     }
@@ -2462,20 +2606,20 @@ HdSt_CodeGenMSL::CompileComputeProgram()
         
         uniforms << "    int " << name << "Offset;\n";
         uniforms << "    int " << name << "Stride;\n";
-        _EmitDeclaration(   declarations,
+        _EmitDeclarationPtr(declarations,
                             name, _GetFlatType(dataType), TfToken(),
                             binding);
-        _AddInputParam(  _mslVSInputParams,
-                    name, _GetFlatType(dataType), TfToken(),
-                    binding);
+        _AddInputPtrParam(_mslVSInputParams,
+                          name, _GetFlatType(dataType), TfToken(),
+                          binding).usage |= TParam::EntryFuncArgument;
         // getter
         {
             std::stringstream indexing;
             // no vertex offset for constant data
             indexing << "(localIndex)"
-                     << " * " << name << "Stride"
-                     << " + " << name << "Offset";
-            _EmitComputeAccessor(accessors, name, dataType, binding,
+                     << " * " << varName << "->"  << name << "Stride"
+                     << " + " << varName << "->"  << name << "Offset";
+            _EmitComputeAccessor(accessors, varName, name, dataType, binding,
                     indexing.str().c_str());
         }
     }
@@ -2491,37 +2635,27 @@ HdSt_CodeGenMSL::CompileComputeProgram()
         _genCS  << shader->GetSource(HdShaderTokens->computeShader);
     }
 
-    // main
-    _genCS << "void main() {\n";
-    _genCS << "  int computeCoordinate = int(gl_GlobalInvocationID.x);\n";
-    _genCS << "  compute(computeCoordinate);\n";
-    _genCS << "}\n";
+    _genCS << "};\n\n";
+    
+    // MSL<->Metal API plumbing
+    std::stringstream glueVS, gluePS, glueGS, glueCS;
+    glueVS.str(""); gluePS.str(""); glueGS.str(""); glueCS.str("");
     
     // create Metal function.
-    HdStProgramSharedPtr program(
-        new HdStMSLProgram(HdTokens->computeShader));
+    HdStMSLProgramSharedPtr program(new HdStMSLProgram(HdTokens->drawingShader));
+
+    _GenerateGlue(glueVS, glueGS, gluePS, glueCS, program);
     
-    TF_FATAL_CODING_ERROR("Not Implemented");
-    /*
     // compile shaders
     {
-        _csSource = _genCommon.str() + _genCS.str();
-        if (!program->CompileShader(GL_COMPUTE_SHADER, _csSource)) {
-            const char *shaderSources[1];
-            shaderSources[0] = _csSource.c_str();
-            GLuint shader = glCreateShader(GL_COMPUTE_SHADER);
-            glShaderSource(shader, 1, shaderSources, NULL);
-            glCompileShader(shader);
+        _csSource = _genCommon.str() + _genCS.str() + glueCS.str();
+        _csSource = replaceStringAll(_csSource, "<st>", "_Compute");
 
-            std::string logString;
-            HdStGLUtils::GetShaderCompileStatus(shader, &logString);
-            TF_WARN("Failed to compile compute shader:\n%s\n",
-                    logString.c_str());
-            glDeleteShader(shader);
-            return HdProgramSharedPtr();
+        if (!program->CompileShader(GL_COMPUTE_SHADER, _csSource)) {
+            return HdStProgramSharedPtr();
         }
     }
-    */
+
     return program;
 }
 
@@ -2621,6 +2755,7 @@ static int _GetNumComponents(TfToken const& type)
 
 static void _EmitComputeAccessor(
                     std::stringstream &str,
+                    TfToken const &structMemberName,
                     TfToken const &name,
                     TfToken const &type,
                     HdBinding const &binding,
@@ -2654,7 +2789,8 @@ static void _EmitComputeAccessor(
             binding.GetType() == HdBinding::VERTEX_ATTR) {
             str << _GetUnpackedType(type, false)
                 << " HdGet_" << name << "(int localIndex) { return ";
-            str << _GetPackedTypeAccessor(type, true) << "(" << name << ");}\n";
+            str << _GetPackedTypeAccessor(type, true)
+                << "(" << name << ");}\n";
         }
     }
     // GLSL spec doesn't allow default parameter. use function overload instead.
@@ -2666,6 +2802,7 @@ static void _EmitComputeAccessor(
 
 static void _EmitComputeMutator(
                     std::stringstream &str,
+                    TfToken const &structMemberName,
                     TfToken const &name,
                     TfToken const &type,
                     HdBinding const &binding,

@@ -500,7 +500,10 @@ HdStVBOMemoryManager::_StripedBufferArrayRange::CopyData(
 
         HD_PERF_COUNTER_INCR(HdPerfTokens->glBufferSubData);
 
-        VBO->CopyData(vboOffset, srcSize, bufferSource->GetData());
+        void const* const data = bufferSource->GetData();
+        if (data) {
+            VBO->CopyData(vboOffset, srcSize, data);
+        }
     }
 }
 

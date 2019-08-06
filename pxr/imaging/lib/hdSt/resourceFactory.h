@@ -31,6 +31,7 @@
 
 #include "pxr/imaging/hd/bufferArray.h"
 #include "pxr/imaging/hd/resource.h"
+#include "pxr/imaging/hd/sceneDelegate.h"
 #include "pxr/imaging/hd/types.h"
 
 #include "pxr/base/tf/singleton.h"
@@ -56,6 +57,7 @@ class HdSt_ResourceBinder;
 class HdSt_QuadrangulateComputationGPU;
 class HdSt_SmoothNormalsComputationGPU;
 class HdStSimpleTextureResource;
+class HdStExtCompGpuComputation;
 
 typedef boost::shared_ptr<class HdBufferArrayRange> HdBufferArrayRangeSharedPtr;
 typedef boost::shared_ptr<class HdBufferArray> HdBufferArraySharedPtr;
@@ -67,6 +69,11 @@ typedef boost::shared_ptr<class HdStRenderPassShader>
                             HdStRenderPassShaderSharedPtr;
 typedef boost::shared_ptr<class HdStShaderCode> HdStShaderCodeSharedPtr;
 typedef std::vector<HdStShaderCodeSharedPtr> HdStShaderCodeSharedPtrVector;
+
+typedef boost::shared_ptr<class HdStExtCompGpuComputationResource>
+                            HdStExtCompGpuComputationResourceSharedPtr;
+typedef std::vector<HdExtComputationPrimvarDescriptor>
+                            HdExtComputationPrimvarDescriptorVector;
 
 class HdStResourceFactoryInterface {
 public:
@@ -169,7 +176,16 @@ public:
         HdBufferArrayRangeSharedPtr const &vertexRange,
         int numFaces, TfToken const &srcName, TfToken const &dstName,
         HdType srcDataType, bool packed) const = 0;
-    
+
+    /// Creates a new ExtCompGPUComputation computation
+    HDST_API
+    virtual HdStExtCompGpuComputation *NewExtCompGPUComputationGPU(
+        SdfPath const &id,
+        HdStExtCompGpuComputationResourceSharedPtr const &resource,
+        HdExtComputationPrimvarDescriptorVector const &compPrimvars,
+        int dispatchCount,
+        int elementCount) const = 0;
+
     /// Creates a new render pass state
     HDST_API
     virtual HdStRenderPassState *NewRenderPassState() const = 0;

@@ -32,6 +32,7 @@
 #include "pxr/imaging/hdSt/Metal/codeGenMSL.h"
 #include "pxr/imaging/hdSt/Metal/dispatchBufferMetal.h"
 #include "pxr/imaging/hdSt/Metal/drawTargetTextureResourceMetal.h"
+#include "pxr/imaging/hdSt/Metal/extCompGpuComputationMetal.h"
 #include "pxr/imaging/hdSt/Metal/flatNormalsMetal.h"
 #include "pxr/imaging/hdSt/Metal/indirectDrawBatchMetal.h"
 #include "pxr/imaging/hdSt/Metal/interleavedMemoryBufferMetal.h"
@@ -234,6 +235,19 @@ HdStProgram *HdStResourceFactoryMetal::NewProgram(
 {
     return new HdStMSLProgram(role);
 }
+
+HdStExtCompGpuComputation *
+HdStResourceFactoryMetal::NewExtCompGPUComputationGPU(
+    SdfPath const &id,
+    HdStExtCompGpuComputationResourceSharedPtr const &resource,
+    HdExtComputationPrimvarDescriptorVector const &compPrimvars,
+    int dispatchCount,
+                           int elementCount) const
+{
+    return new HdStExtCompGpuComputationMetal(
+        id, resource, compPrimvars, dispatchCount, elementCount);
+}
+
 
 PXR_NAMESPACE_CLOSE_SCOPE
 

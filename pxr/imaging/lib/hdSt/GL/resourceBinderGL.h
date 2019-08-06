@@ -44,7 +44,7 @@ public:
 
     /// call introspection APIs and fix up binding locations
     HDST_API
-    virtual void IntrospectBindings(HdStProgramSharedPtr programResource) override;
+    virtual void IntrospectBindings(HdStProgramSharedPtr programResource) const override;
     
     /// bind/unbind shader parameters and textures
     HDST_API

@@ -37,6 +37,7 @@
 #include "pxr/imaging/hdSt/extCompGpuComputation.h"
 #include "pxr/imaging/hdSt/extComputation.h"
 #include "pxr/imaging/hdSt/program.h"
+#include "pxr/imaging/hdSt/resourceFactory.h"
 #include "pxr/imaging/hdSt/resourceRegistry.h"
 #include "pxr/imaging/hd/bufferArrayRange.h"
 #include "pxr/imaging/hd/compExtCompInputSource.h"
@@ -66,8 +67,8 @@ HdStExtCompGpuComputation::HdStExtCompGpuComputation(
  , _compPrimvars(compPrimvars)
  , _dispatchCount(dispatchCount)
  , _elementCount(elementCount)
+ , _introspectedBindings(false)
 {
-    
 }
 
 static std::string
@@ -98,13 +99,9 @@ HdStExtCompGpuComputation::Execute(
             "GPU computation '%s' executed for primvars: %s\n",
             _id.GetText(), _GetDebugPrimvarNames(_compPrimvars).c_str());
 
-#if defined(ARCH_GFX_METAL)
-    // Emit error until we support this
-    TF_CODING_ERROR("Metal Compute currently not supported");
-#else
-
-    if (!glDispatchCompute) {
-        TF_WARN("glDispatchCompute not available");
+    bool hasDispatchCompute = GarchResourceFactory::GetInstance()->GetContextCaps().hasDispatchCompute;
+    if (!hasDispatchCompute) {
+        TF_WARN("Compute Dispatch not available");
         return;
     }
 
@@ -115,6 +112,10 @@ HdStExtCompGpuComputation::Execute(
         return;
     }
 
+    if (!_introspectedBindings) {
+        binder.IntrospectBindings(computeProgram);
+        _introspectedBindings = true;
+    }
     computeProgram->SetProgram();
 
     HdBufferArrayRangeSharedPtr outputBar =
@@ -144,6 +145,7 @@ HdStExtCompGpuComputation::Execute(
         } 
     }
 
+    GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
     for (HdBufferArrayRangeSharedPtr const & input: _resource->GetInputs()) {
         HdBufferArrayRangeSharedPtr const & inputBar =
             boost::static_pointer_cast<HdBufferArrayRange>(input);
@@ -159,8 +161,13 @@ HdStExtCompGpuComputation::Execute(
                 HdTupleType tupleType = buffer->GetTupleType();
                 size_t componentSize =
                     HdDataSizeOfType(HdGetComponentType(tupleType.type));
-                _uniforms.push_back(
-                 (inputBar->GetOffset() + buffer->GetOffset()) / componentSize);
+                int32_t offset = inputBar->GetOffset();
+                
+                if (!caps.hasBufferBindOffset) {
+                    offset += buffer->GetOffset();
+                }
+                
+                _uniforms.push_back(offset / componentSize);
                 // If allocated with a VBO allocator use the line below instead.
                 //_uniforms.push_back(
                 //    buffer->GetStride() / buffer->GetComponentSize());
@@ -171,61 +178,9 @@ HdStExtCompGpuComputation::Execute(
         }
     }
     
-    // Prepare uniform buffer for GPU computation
-    GLuint ubo = (GLuint)(uint64_t)computeProgram->GetGlobalUniformBuffer().GetId();
-    glBindBuffer(GL_UNIFORM_BUFFER, ubo);
-    glBufferData(GL_UNIFORM_BUFFER,
-            sizeof(int32_t) * _uniforms.size(),
-            &_uniforms[0],
-            GL_STATIC_DRAW);
-    glBindBuffer(GL_UNIFORM_BUFFER, 0);
-
-    glBindBufferBase(GL_UNIFORM_BUFFER, 0, ubo);
-
-    glDispatchCompute((GLuint)GetDispatchCount(), 1, 1);
-    GLF_POST_PENDING_GL_ERRORS();
-
-    // For now we make sure the computation finishes right away.
-    // Figure out if sync or async is the way to go.
-    // Assuming SSBOs for the output
-    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
-
-    // Unbind.
-    // XXX this should go away once we use a graphics abstraction
-    // as that would take care of cleaning state.
-    glBindBufferBase(GL_UNIFORM_BUFFER, 0, 0);
-    for (HdStBufferResourceNamedPair const & it: outputBar->GetResources()) {
-        TfToken const &name = it.first;
-        HdBufferResourceSharedPtr const &buffer = it.second;
-
-        HdBinding const &binding = binder.GetBinding(name);
-        // XXX we need a better way than this to pick
-        // which buffers to bind on the output.
-        // No guarantee that we are hiding buffers that
-        // shouldn't be written to for example.
-        if (binding.IsValid()) {
-            binder.UnbindBuffer(name, buffer);
-        }
-    }
-    for (HdBufferArrayRangeSharedPtr const & input: _resource->GetInputs()) {
-        HdBufferArrayRangeSharedPtr const & inputBar =
-            boost::static_pointer_cast<HdBufferArrayRange>(input);
-
-        for (HdStBufferResourceNamedPair const & it:
-                        inputBar->GetResources()) {
-            TfToken const &name = it.first;
-            HdBufferResourceSharedPtr const &buffer = it.second;
-
-            HdBinding const &binding = binder.GetBinding(name);
-            // These should all be valid as they are required inputs
-            if (TF_VERIFY(binding.IsValid())) {
-                binder.UnbindBuffer(name, buffer);
-            }
-        }
-    }
+    _Execute(computeProgram, _uniforms, outputBar);
 
     computeProgram->UnsetProgram();
-#endif
 }
 
 void
@@ -317,7 +272,7 @@ HdStExtCompGpuComputation::CreateGpuComputation(
                 resourceRegistry));
 
     return HdStExtCompGpuComputationSharedPtr(
-                new HdStExtCompGpuComputation(
+                HdStResourceFactory::GetInstance()->NewExtCompGPUComputationGPU(
                         sourceComp->GetId(),
                         resource,
                         compPrimvars,

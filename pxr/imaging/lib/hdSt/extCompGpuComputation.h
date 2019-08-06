@@ -80,43 +80,8 @@ typedef boost::shared_ptr<class HdStExtCompGpuComputation>
 /// \see HdResourceRegistry
 /// \see HdExtComputation
 /// \see HdBufferArrayRange
-class HdStExtCompGpuComputation final : public HdComputation {
+class HdStExtCompGpuComputation : public HdComputation {
 public:
-    /// Constructs a new GPU ExtComputation computation.
-    /// resource provides the set of input data and kernel to execute this
-    /// computation.
-    /// compPrimvars identifies the primvar data being computed
-    ///
-    /// dispatchCount specifies the number of kernel invocations to execute.
-    /// elementCount specifies the number of elements to allocate for output.
-    HdStExtCompGpuComputation(
-            SdfPath const &id,
-            HdStExtCompGpuComputationResourceSharedPtr const &resource,
-            HdExtComputationPrimvarDescriptorVector const &compPrimvars,
-            int dispatchCount,
-            int elementCount);
-
-    /// Creates a GPU computation implementing the given abstract computation.
-    /// When created this allocates HdStExtCompGpuComputationResource to be
-    /// shared with the HdStExtCompGpuComputationBufferSource. Nothing
-    /// is assigned GPU resources unless the source is subsequently added to 
-    /// the hdResourceRegistry and the registry is committed.
-    /// 
-    /// This delayed allocation allow Rprims to share computed primvar data and
-    /// avoid duplicate allocations GPU resources for computation inputs and
-    /// outputs.
-    ///
-    /// \param[in] sceneDelegate the delegate to pull scene inputs from.
-    /// \param[in] sourceComp the abstract computation in the HdRenderIndex
-    /// this instance actually implements.
-    /// \param[in] compPrimvars identifies the primvar data being computed.
-    /// \see HdExtComputation
-    HDST_API
-    static HdStExtCompGpuComputationSharedPtr
-    CreateGpuComputation(
-        HdSceneDelegate *sceneDelegate,
-        HdExtComputation const *sourceComp,
-        HdExtComputationPrimvarDescriptorVector const &compPrimvars);
 
     HDST_API
     virtual ~HdStExtCompGpuComputation() = default;
@@ -160,14 +125,57 @@ public:
     HDST_API
     virtual HdStExtCompGpuComputationResourceSharedPtr const &
     GetResource() const;
+    
+    /// Creates a GPU computation implementing the given abstract computation.
+    /// When created this allocates HdStExtCompGpuComputationResource to be
+    /// shared with the HdStExtCompGpuComputationBufferSource. Nothing
+    /// is assigned GPU resources unless the source is subsequently added to
+    /// the hdResourceRegistry and the registry is committed.
+    ///
+    /// This delayed allocation allow Rprims to share computed primvar data and
+    /// avoid duplicate allocations GPU resources for computation inputs and
+    /// outputs.
+    ///
+    /// \param[in] sceneDelegate the delegate to pull scene inputs from.
+    /// \param[in] sourceComp the abstract computation in the HdRenderIndex
+    /// this instance actually implements.
+    /// \param[in] compPrimvars identifies the primvar data being computed.
+    /// \see HdExtComputation
+    HDST_API
+    static HdStExtCompGpuComputationSharedPtr
+    CreateGpuComputation(
+         HdSceneDelegate *sceneDelegate,
+         HdExtComputation const *sourceComp,
+         HdExtComputationPrimvarDescriptorVector const &compPrimvars);
 
-private:
+protected:
+    /// Constructs a new GPU ExtComputation computation.
+    /// resource provides the set of input data and kernel to execute this
+    /// computation.
+    /// compPrimvars identifies the primvar data being computed
+    ///
+    /// dispatchCount specifies the number of kernel invocations to execute.
+    /// elementCount specifies the number of elements to allocate for output.
+    HdStExtCompGpuComputation(
+          SdfPath const &id,
+          HdStExtCompGpuComputationResourceSharedPtr const &resource,
+          HdExtComputationPrimvarDescriptorVector const &compPrimvars,
+          int dispatchCount,
+          int elementCount);
+
+    HDST_API
+    virtual void _Execute(HdStProgramSharedPtr const &computeProgram,
+                          std::vector<int32_t> const &_uniforms,
+                          HdBufferArrayRangeSharedPtr outputBar) = 0;
+
     SdfPath                                      _id;
     HdStExtCompGpuComputationResourceSharedPtr   _resource;
     HdExtComputationPrimvarDescriptorVector      _compPrimvars;
     int                                          _dispatchCount;
     int                                          _elementCount;
+    bool                                         _introspectedBindings;
 
+private:
     HdStExtCompGpuComputation()                                        = delete;
     HdStExtCompGpuComputation(const HdStExtCompGpuComputation &)       = delete;
     HdStExtCompGpuComputation &operator = (const HdStExtCompGpuComputation &)

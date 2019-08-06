@@ -107,6 +107,9 @@ GarchContextCaps::GarchContextCaps()
     , useCppShaderPadding(false)
     , alwaysNeedsBinding(false)
     , floatingPointBuffersEnabled(false)
+
+    , hasDispatchCompute(false)
+    , hasBufferBindOffset(false)
 {
     // Empty
 }
