@@ -134,6 +134,10 @@ GlfContextCaps::_LoadCaps()
     hasSubDataCopy               = glBufferSubData != NULL;
     hasDispatchCompute           = glDispatchCompute != NULL;
 
+    GLint glMaxClipPlanes;
+    glGetIntegerv(GL_MAX_CLIP_PLANES, &glMaxClipPlanes);
+    glMaxClipPlanes = size_t(glMaxClipPlanes);
+
     const char *glVersionStr = (const char*)glGetString(GL_VERSION);
 
     // GL hasn't been initialized yet.

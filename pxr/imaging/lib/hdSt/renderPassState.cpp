@@ -24,6 +24,9 @@
 #include "pxr/imaging/glf/glew.h"
 #include "pxr/imaging/glf/diagnostic.h"
 
+#include "pxr/imaging/garch/contextCaps.h"
+#include "pxr/imaging/garch/resourceFactory.h"
+
 #include "pxr/imaging/hdSt/drawItem.h"
 #include "pxr/imaging/hdSt/fallbackLightingShader.h"
 #include "pxr/imaging/hdSt/glConversions.h"
@@ -98,14 +101,12 @@ HdStRenderPassState::Prepare(
     TF_FOR_ALL(it, GetClipPlanes()) {
         clipPlanes.push_back(GfVec4f(*it));
     }
-#if defined(ARCH_GFX_OPENGL)
-    GLint glMaxClipPlanes;
-    glGetIntegerv(GL_MAX_CLIP_PLANES, &glMaxClipPlanes);
-    size_t maxClipPlanes = (size_t)glMaxClipPlanes;
+    
+    size_t maxClipPlanes = GarchResourceFactory::GetInstance()->GetContextCaps().maxClipPlanes;
     if (clipPlanes.size() >= maxClipPlanes) {
         clipPlanes.resize(maxClipPlanes);
     }
-#endif
+
     // allocate bar if not exists
     if (!_renderPassStateBar || 
         (_clipPlanesBufferSize != clipPlanes.size()) ||
