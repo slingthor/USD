@@ -105,6 +105,8 @@ public:
     
     bool hasDispatchCompute;
     bool hasBufferBindOffset;
+    
+    size_t maxClipPlanes;
 
     /// Returns whether to do frustum culling on the GPU
 	GARCH_API

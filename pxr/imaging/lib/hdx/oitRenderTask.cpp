@@ -41,6 +41,7 @@
 
 #include "pxr/imaging/hdSt/lightingShader.h"
 #include "pxr/imaging/hdSt/renderPassShader.h"
+#include "pxr/imaging/hdSt/resourceFactory.h"
 #include "pxr/imaging/hd/bufferArrayRange.h"
 #include "pxr/imaging/hd/bufferResource.h"
 
@@ -120,16 +121,21 @@ HdxOitRenderTask::Execute(HdTaskContext* ctx)
 
     // We render into a SSBO -- not MSSA compatible
 #if defined(ARCH_GFX_OPENGL)
-    bool oldMSAA = glIsEnabled(GL_MULTISAMPLE);
-    glDisable(GL_MULTISAMPLE);
-    // XXX When rendering HdStPoints we set GL_POINTS and assume that
-    //     GL_POINT_SMOOTH is enabled by default. This renders circles instead
-    //     of squares. However, when toggling MSAA off (above) we see GL_POINTS
-    //     start to render squares (driver bug?).
-    //     For now we always enable GL_POINT_SMOOTH. 
-    // XXX Switch points rendering to emit quad with FS that draws circle.
-    bool oldPointSmooth = glIsEnabled(GL_POINT_SMOOTH);
-    glEnable(GL_POINT_SMOOTH);
+    bool isOpenGL = HdStResourceFactory::GetInstance()->IsOpenGL();
+    bool oldMSAA = false;
+    bool oldPointSmooth = false;
+    if (isOpenGL) {
+        oldMSAA = glIsEnabled(GL_MULTISAMPLE);
+        glDisable(GL_MULTISAMPLE);
+        // XXX When rendering HdStPoints we set GL_POINTS and assume that
+        //     GL_POINT_SMOOTH is enabled by default. This renders circles instead
+        //     of squares. However, when toggling MSAA off (above) we see GL_POINTS
+        //     start to render squares (driver bug?).
+        //     For now we always enable GL_POINT_SMOOTH.
+        // XXX Switch points rendering to emit quad with FS that draws circle.
+        oldPointSmooth = glIsEnabled(GL_POINT_SMOOTH);
+        glEnable(GL_POINT_SMOOTH);
+    }
 #endif
     //
     // Opaque pixels pass
@@ -152,12 +158,14 @@ HdxOitRenderTask::Execute(HdTaskContext* ctx)
     // Post Execute Restore
     //
 #if defined(ARCH_GFX_OPENGL)
-    if (oldMSAA) {
-        glEnable(GL_MULTISAMPLE);
-    }
+    if (isOpenGL) {
+        if (oldMSAA) {
+            glEnable(GL_MULTISAMPLE);
+        }
 
-    if (!oldPointSmooth) {
-        glDisable(GL_POINT_SMOOTH);
+        if (!oldPointSmooth) {
+            glDisable(GL_POINT_SMOOTH);
+        }
     }
 #endif
 }

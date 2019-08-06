@@ -110,6 +110,7 @@ GarchContextCaps::GarchContextCaps()
 
     , hasDispatchCompute(false)
     , hasBufferBindOffset(false)
+    , maxClipPlanes(0)
 {
     // Empty
 }

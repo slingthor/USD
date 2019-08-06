@@ -78,6 +78,7 @@ MtlfContextCaps::_LoadCaps()
     floatingPointBuffersEnabled  = true;
     hasDispatchCompute           = true;
     hasBufferBindOffset          = true;
+    maxClipPlanes                = 16;
 
 #if OPENSUBDIV_HAS_METAL_COMPUTE
     //METAL_TODO: Metal always has compute capabilities. gpuComputeNormals only affects
