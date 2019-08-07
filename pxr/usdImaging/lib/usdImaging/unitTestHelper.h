@@ -108,7 +108,7 @@ public:
                 HdReprSelector(HdReprTokens->hull));
 
         TfTokenVector renderTags;
-        renderTags.push_back(HdTokens->geometry);
+        renderTags.push_back(HdRenderTagTokens->geometry);
 
         _Init(UsdStage::Open(usdFilePath),
               collection,
@@ -150,7 +150,7 @@ public:
                 HdReprSelector(HdReprTokens->hull));
 
         TfTokenVector renderTags;
-        renderTags.push_back(HdTokens->geometry);
+        renderTags.push_back(HdRenderTagTokens->geometry);
 
         _Init(usdStage, collection, SdfPath::AbsoluteRootPath(), renderTags);
     }

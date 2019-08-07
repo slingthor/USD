@@ -78,13 +78,13 @@ public:
     HDST_API
     virtual TextureDescriptorVector GetTextures() const override;
     HDST_API
-    virtual void BindResources(HdSt_ResourceBinder const &binder, HdStProgram const &program);
+    virtual void BindResources(HdSt_ResourceBinder const &binder, HdStProgram const &program) override;
     HDST_API
-    virtual void UnbindResources(HdSt_ResourceBinder const &binder, HdStProgram const &program);
+    virtual void UnbindResources(HdSt_ResourceBinder const &binder, HdStProgram const &program) override;
     HDST_API
     virtual void AddBindings(HdBindingRequestVector *customBindings) override;
     HDST_API
-    virtual ID ComputeHash() const;
+    virtual ID ComputeHash() const override;
 
     HDST_API
     virtual TfToken GetMaterialTag() const override;

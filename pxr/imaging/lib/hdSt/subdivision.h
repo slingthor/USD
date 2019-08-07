@@ -148,7 +148,7 @@ protected:
     HdSt_OsdIndexComputation(HdSt_MeshTopology *topology,
                            HdBufferSourceSharedPtr const &osdTopology);
 
-    virtual bool _CheckValid() const;
+    virtual bool _CheckValid() const override;
 
     HdSt_MeshTopology *_topology;
     HdBufferSourceSharedPtr _osdTopology;

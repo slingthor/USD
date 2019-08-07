@@ -37,7 +37,7 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-static bool useAsncTextureUploads = true;
+static bool useAsncTextureUploads = false;
 
 static MTLPixelFormat GetMetalFormat(GLenum inInternalFormat, GLenum inType, size_t *outPixelByteSize, bool *out24BitFormat)
 {
