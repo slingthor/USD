@@ -34,28 +34,15 @@ using namespace boost::python;
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
-namespace {
-
-static GarchUVTextureStorageRefPtr _NewUVTextureStorage(
-    unsigned int width,
-    unsigned int height, 
-    const VtValue &storageData)
-{
-    return GarchUVTextureStorage::New(width, height, storageData);
-}
-
-} // anonymous namespace 
-
 void wrapUVTextureStorage()
 {    
-    typedef GarchUVTextureStorage This;
-    typedef GarchUVTextureStoragePtr ThisPtr;
+    using This    = GarchUVTextureStorage;
+    using ThisPtr = GarchUVTextureStoragePtr;
 
     scope thisScope = class_<This, bases<GarchBaseTexture>, ThisPtr, 
         boost::noncopyable>("UVTextureStorage", no_init)
         .def(TfPyRefAndWeakPtr())
-        .def("__init__",TfMakePyConstructor(&_NewUVTextureStorage))
-
+        .def(TfMakePyConstructor(&This::New))
         ;
 }
 

@@ -143,8 +143,8 @@ void wrapEngine()
                  return_value_policy< TfPySequenceToList >())
             .def("SetRendererAov", 
                     &UsdImagingGLEngine::SetRendererAov)
-            .def("GetResourceAllocation", 
-                    &UsdImagingGLEngine::GetResourceAllocation)
+            .def("GetRenderStats", 
+                    &UsdImagingGLEngine::GetRenderStats)
             .def("GetRendererSettingsList", 
                     &UsdImagingGLEngine::GetRendererSettingsList,
                  return_value_policy< TfPySequenceToList >())
@@ -157,6 +157,10 @@ void wrapEngine()
             .def("IsColorCorrectionCapable", 
                 &UsdImagingGLEngine::IsColorCorrectionCapable)
                 .staticmethod("IsColorCorrectionCapable")
+            .def("IsPauseRendererSupported", 
+                &UsdImagingGLEngine::IsPauseRendererSupported)
+            .def("PauseRenderer", &UsdImagingGLEngine::PauseRenderer)
+            .def("ResumeRenderer", &UsdImagingGLEngine::ResumeRenderer)
         ;
 
     }

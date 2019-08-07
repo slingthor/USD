@@ -86,7 +86,7 @@ public:
                                     unsigned int numSamples);
         
         GLF_API
-        virtual ~GlfAttachment();
+        ~GlfAttachment() override;
         
         /// Returns the GL texture index (can be used as any regular GL texture)
         virtual GarchTextureGPUHandle GetTextureName() override { return _textureName; }
