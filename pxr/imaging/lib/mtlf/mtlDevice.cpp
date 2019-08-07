@@ -2004,11 +2004,6 @@ void MtlfMetalContext::QueueBufferFlush(id<MTLBuffer> const &buffer, uint64_t st
     
     static std::mutex _mutex;
     std::lock_guard<std::mutex> lock(_mutex);
-
-    if (start == 3424 && end == 3552) {
-        float const* mat = ((float*)[buffer contents]) + (start / 4);
-        mat[0] == mat[0];
-    }
     
     auto const &it = modifiedBuffers.find(buffer);
     if (it != modifiedBuffers.end()) {

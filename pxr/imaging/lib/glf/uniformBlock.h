@@ -29,6 +29,7 @@
 #include "pxr/pxr.h"
 #include "pxr/imaging/glf/api.h"
 #include "pxr/imaging/garch/uniformBlock.h"
+#include <string>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -68,6 +69,7 @@ protected:
 private:
     GLuint _buffer;
     int _size;
+    std::string _debugLabel;
 };
 
 

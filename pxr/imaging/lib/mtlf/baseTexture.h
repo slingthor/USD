@@ -51,7 +51,7 @@ TF_DECLARE_WEAK_AND_REF_PTRS(GarchBaseTextureData);
 class MtlfBaseTexture : public GarchBaseTexture {
 public:
     MTLF_API
-    virtual ~MtlfBaseTexture();
+    ~MtlfBaseTexture() override;
 
     /// Returns the OpenGl texture name for the texture. 
     MTLF_API
