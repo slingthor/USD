@@ -21,44 +21,35 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
+#ifndef HDSTORM_METAL_RENDERER_PLUGIN_H
+#define HDSTORM_METAL_RENDERER_PLUGIN_H
+
 #include "pxr/pxr.h"
-#include "pxr/imaging/hdStreamGL/rendererPlugin.h"
-
-#include "pxr/imaging/hdSt/GL/renderDelegateGL.h"
-#include "pxr/imaging/hdx/rendererPluginRegistry.h"
-
+#include "pxr/imaging/hdx/rendererPlugin.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-TF_REGISTRY_FUNCTION(TfType)
-{
-    HdxRendererPluginRegistry::Define<HdStreamGLRendererPlugin>();
-}
+class HdStormMetalRendererPlugin final : public HdxRendererPlugin {
+public:
+    HdStormMetalRendererPlugin()          = default;
+    virtual ~HdStormMetalRendererPlugin() = default;
 
-HdRenderDelegate *
-HdStreamGLRendererPlugin::CreateRenderDelegate()
-{
-    return new HdStRenderDelegateGL();
-}
+    virtual HdRenderDelegate *CreateRenderDelegate() override;
+    virtual HdRenderDelegate *CreateRenderDelegate(
+        HdRenderSettingsMap const& settingsMap) override;
 
-HdRenderDelegate*
-HdStreamGLRendererPlugin::CreateRenderDelegate(
-    HdRenderSettingsMap const& settingsMap)
-{
-    return new HdStRenderDelegateGL(settingsMap);
-}
+    virtual void DeleteRenderDelegate(HdRenderDelegate *renderDelegate) 
+        override;
 
-void
-HdStreamGLRendererPlugin::DeleteRenderDelegate(HdRenderDelegate *renderDelegate)
-{
-    delete renderDelegate;
-}
+    virtual bool IsSupported() const override;
 
-bool
-HdStreamGLRendererPlugin::IsSupported() const
-{
-    return HdStRenderDelegate::IsSupported();
-}
-
+private:
+    HdStormMetalRendererPlugin(
+        const HdStormMetalRendererPlugin &)             = delete;
+    HdStormMetalRendererPlugin &operator =(
+        const HdStormMetalRendererPlugin &) = delete;
+};
 
 PXR_NAMESPACE_CLOSE_SCOPE
+
+#endif // HDSTREAM_METAL_RENDERER_PLUGIN_H
