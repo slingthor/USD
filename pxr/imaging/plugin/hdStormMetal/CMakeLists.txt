@@ -1,5 +1,5 @@
 set(PXR_PREFIX pxr/imaging)
-set(PXR_PACKAGE hdStreamMetal)
+set(PXR_PACKAGE hdStormMetal)
 
 set(optionalPublicClasses "")
 
@@ -10,7 +10,7 @@ if (OPENSUBDIV_HAS_METAL_COMPUTE)
     add_definitions(-DOPENSUBDIV_HAS_METAL_COMPUTE)
 endif()
 
-pxr_plugin(hdStreamMetal
+pxr_plugin(hdStormMetal
     LIBRARIES
         plug
         tf
