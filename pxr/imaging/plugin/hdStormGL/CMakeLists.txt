@@ -1,5 +1,5 @@
 set(PXR_PREFIX pxr/imaging)
-set(PXR_PACKAGE hdStreamGL)
+set(PXR_PACKAGE hdStormGL)
 
 set(optionalPublicClasses "")
 
@@ -13,7 +13,7 @@ if (OPENSUBDIV_HAS_METAL_COMPUTE)
     add_definitions(-DOPENSUBDIV_HAS_METAL_COMPUTE)
 endif()
 
-pxr_plugin(hdStreamGL
+pxr_plugin(hdStormGL
     LIBRARIES
         plug
         tf
