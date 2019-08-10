@@ -408,6 +408,7 @@ HdxOitRenderTask::_PrepareOitBuffers(
 void 
 HdxOitRenderTask::_ClearOitGpuBuffers(HdTaskContext* ctx)
 {
+    #if defined(ARCH_GFX_OPENGL)
     // The shader determines what elements in each buffer are used based on
     // finding -1 in the counter buffer. We can skip clearing the other buffers.
 
@@ -433,6 +434,7 @@ HdxOitRenderTask::_ClearOitGpuBuffers(HdTaskContext* ctx)
             &clearCounter);
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
     }
+    #endif
 }
 
 
