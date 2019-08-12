@@ -70,7 +70,7 @@ public:
     GLF_API
     static GlfContextCaps &GetInstance();
 
-
+    GLF_API
     static int GetAPIVersion();
 
 protected:
