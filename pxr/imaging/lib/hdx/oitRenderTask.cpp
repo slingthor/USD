@@ -50,13 +50,13 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-TF_DEFINE_ENV_SETTING(HDX_ENABLE_OIT,
 #if defined(ARCH_OS_IOS)
-                      false,
+#define HDX_ENABLE_OIT_VALUE false
 #else
-                      true,
+#define HDX_ENABLE_OIT_VALUE true
 #endif
-                      "Enable order independent translucency");
+TF_DEFINE_ENV_SETTING(HDX_ENABLE_OIT, HDX_ENABLE_OIT_VALUE,
+		                  "Enable order independent translucency");
 
 typedef std::vector<HdBufferSourceSharedPtr> HdBufferSourceSharedPtrVector;
 
