@@ -535,7 +535,7 @@ HdxPickTask::Execute(HdTaskContext* ctx)
 #endif
     }
     else {
-        p[0] = 0.0f;
+        p[0] = -1.0f;
         p[1] = 1.0f;
     }
     GfVec2f depthRange(p[0], p[1]);
