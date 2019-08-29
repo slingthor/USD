@@ -4786,8 +4786,12 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
         } else if (bindingType == HdBinding::TEXTURE_UDIM_LAYOUT) {
             declarations
                 << "texture1d<float> textureBind_" << it->second.name << ";\n";
-            _AddInputParam(_mslPSInputParams, TfToken("textureBind_" + it->second.name.GetString()), TfToken("texture1d<float>"), TfToken()).usage
-                |= HdSt_CodeGenMSL::TParam::Texture;
+            _AddInputParam(_mslPSInputParams,
+                TfToken("textureBind_" + it->second.name.GetString()),
+                TfToken("texture1d<float>"),
+                TfToken(),
+                it->first).usage
+                    |= HdSt_CodeGenMSL::TParam::Texture;
 
         } else if (bindingType == HdBinding::BINDLESS_TEXTURE_PTEX_TEXEL) {
             accessors
