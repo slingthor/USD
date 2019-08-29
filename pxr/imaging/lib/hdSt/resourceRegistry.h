@@ -39,6 +39,8 @@ typedef boost::shared_ptr<class HdStPersistentBuffer>
     HdStPersistentBufferSharedPtr;
 typedef boost::shared_ptr<class HdStResourceRegistry>
     HdStResourceRegistrySharedPtr;
+typedef boost::shared_ptr<class HdStTextureResourceHandle>
+    HdStTextureResourceHandleSharedPtr;
 typedef boost::shared_ptr<class HdSt_GeometricShader>
     HdSt_GeometricShaderSharedPtr;
 typedef boost::shared_ptr<class HdStProgram> HdStProgramSharedPtr;
@@ -133,6 +135,18 @@ public:
     std::unique_lock<std::mutex> RegisterProgram(HdStProgram::ID id,
         HdInstance<HdStProgram::ID, HdStProgramSharedPtr> *pInstance);
 
+    /// Register a texture resource handle.
+    HDST_API
+    std::unique_lock<std::mutex> RegisterTextureResourceHandle(
+        HdStShaderKey::ID id,
+        HdInstance<HdStShaderKey::ID, HdStTextureResourceHandleSharedPtr> *pInstance);
+
+    HDST_API
+    std::unique_lock<std::mutex> FindTextureResourceHandle(
+        TextureKey id,
+        HdInstance<TextureKey, HdStTextureResourceHandleSharedPtr>
+        *instance, bool *found);
+
     void InvalidateShaderRegistry() override;
 
 protected:
@@ -158,6 +172,11 @@ private:
     typedef HdInstance<HdStProgram::ID, HdStProgramSharedPtr>
         _ProgramInstance;
     HdInstanceRegistry<_ProgramInstance> _programRegistry;
+
+    typedef HdInstance<TextureKey, HdStTextureResourceHandleSharedPtr>
+         _TextureResourceHandleInstance;
+    HdInstanceRegistry<_TextureResourceHandleInstance> _textureResourceHandleRegistry;
+
 };
 
 

@@ -238,8 +238,8 @@ HdStDrawTarget::_SetAttachments(
     }
 #endif
     // Clear out old texture resources for the attachments.
-    _colorTextureResources.clear();
-    _depthTextureResource.reset();
+    _colorTextureResourceHandles.clear();
+    _depthTextureResourceHandle.reset();
 
 #if defined(ARCH_GFX_OPENGL)
     GlfGLContextSharedPtr oldContext;
@@ -264,7 +264,7 @@ HdStDrawTarget::_SetAttachments(
     // XXX: Discard old draw target and create a new one
     // This is necessary because a we have to clone the draw target into each
     // gl context.
-    // XXX : All draw targets in Hydra are currently trying to create MSAA
+    // XXX : All draw targets in Storm are currently trying to create MSAA
     // buffers (as long as they are allowed by the environment variables) 
     // because we need alpha to coverage for transparent object.
     _drawTarget = GarchDrawTarget::New(_resolution, /* MSAA */ true);
@@ -272,7 +272,7 @@ HdStDrawTarget::_SetAttachments(
     size_t numAttachments = attachments.GetNumAttachments();
     _renderPassState.SetNumColorAttachments(numAttachments);
 
-    _colorTextureResources.resize(numAttachments);
+    _colorTextureResourceHandles.resize(numAttachments);
 
     std::vector<GarchDrawTarget::AttachmentDesc> attachmentDesc;
     for (size_t attachmentNum = 0; attachmentNum < numAttachments;
@@ -302,14 +302,13 @@ HdStDrawTarget::_SetAttachments(
     _drawTarget->SetAttachments(attachmentDesc);
     _drawTarget->Bind();
     
-    _RegisterTextureResource(sceneDelegate,
+    _RegisterTextureResourceHandle(sceneDelegate,
                              DEPTH_ATTACHMENT_NAME,
-                             &_depthTextureResource);
-    
-    
+                             &_depthTextureResourceHandle);
+
     HdSt_DrawTargetTextureResource *depthResource =
     static_cast<HdSt_DrawTargetTextureResource *>(
-                                                  _depthTextureResource.get());
+        _depthTextureResourceHandle->GetTextureResource().get());
     
     depthResource->SetAttachment(_drawTarget->GetAttachment(DEPTH_ATTACHMENT_NAME));
     depthResource->SetSampler(attachments.GetDepthWrapS(),
@@ -332,13 +331,14 @@ HdStDrawTarget::_SetAttachments(
 
         _renderPassState.SetColorClearValue(attachmentNum, desc.GetClearColor());
 
-        _RegisterTextureResource(sceneDelegate,
+        _RegisterTextureResourceHandle(sceneDelegate,
                                  name,
-                                 &_colorTextureResources[attachmentNum]);
+                                 &_colorTextureResourceHandles[attachmentNum]);
 
         HdSt_DrawTargetTextureResource *resource =
                 static_cast<HdSt_DrawTargetTextureResource *>(
-                                 _colorTextureResources[attachmentNum].get());
+                    _colorTextureResourceHandles[attachmentNum]->
+                        GetTextureResource().get());
 
         resource->SetAttachment(_drawTarget->GetAttachment(name));
         resource->SetSampler(desc.GetWrapS(),
@@ -398,15 +398,16 @@ HdStDrawTarget::_ResizeDrawTarget()
 }
 
 void
-HdStDrawTarget::_RegisterTextureResource(
-                                        HdSceneDelegate *sceneDelegate,
-                                        const std::string &name,
-                                        HdTextureResourceSharedPtr *resourcePtr)
+HdStDrawTarget::_RegisterTextureResourceHandle(
+        HdSceneDelegate *sceneDelegate,
+        const std::string &name,
+        HdStTextureResourceHandleSharedPtr *handlePtr)
 {
     HF_MALLOC_TAG_FUNCTION();
 
-    HdResourceRegistrySharedPtr const& resourceRegistry =
-        sceneDelegate->GetRenderIndex().GetResourceRegistry();
+    HdStResourceRegistrySharedPtr const& resourceRegistry =
+         boost::static_pointer_cast<HdStResourceRegistry>(
+             sceneDelegate->GetRenderIndex().GetResourceRegistry());
 
     // Create Path for the texture resource
     SdfPath resourcePath = GetId().AppendProperty(TfToken(name));
@@ -437,7 +438,25 @@ HdStDrawTarget::_RegisterTextureResource(
         texInstance.SetValue(HdStResourceFactory::GetInstance()->NewDrawTargetTextureResource());
     }
 
-    *resourcePtr =  texInstance.GetValue();
+    HdStTextureResourceSharedPtr texResource =
+        boost::static_pointer_cast<HdStTextureResource>(texInstance.GetValue());
+
+    HdResourceRegistry::TextureKey handleKey =
+        HdStTextureResourceHandle::GetHandleKey(&renderIndex, resourcePath);
+    HdInstance<HdResourceRegistry::TextureKey,
+               HdStTextureResourceHandleSharedPtr> handleInstance;
+
+    std::unique_lock<std::mutex> regLock2 =
+    resourceRegistry->RegisterTextureResourceHandle(handleKey,
+                                                    &handleInstance);
+    if (handleInstance.IsFirstInstance()) {
+        handleInstance.SetValue(HdStTextureResourceHandleSharedPtr(   
+                                          new HdStTextureResourceHandle(
+                                              texResource)));
+    } else {
+        handleInstance.GetValue()->SetTextureResource(texResource);
+    }
+    *handlePtr = handleInstance.GetValue();
 }
 
 

@@ -119,7 +119,9 @@ protected:
                                 int const unpackCropTop = 0,
                                 int const unpackCropBottom = 0,
                                 int const unpackCropLeft = 0,
-                                int const unpackCropRight = 0) {}
+                                int const unpackCropRight = 0,
+                                int const unpackCropFront = 0,
+                                int const unpackCropBack = 0) override {}
 
 private:
 

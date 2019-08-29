@@ -63,8 +63,18 @@ enum MSL_BuildTarget
 
 struct MSL_ShaderBinding
 {
-    MSL_ShaderBinding(MSL_BindingType type, MSL_ProgramStage stage, int index, const std::string& name, int offsetWithinResource, int uniformBufferSize) :
-        _type(type), _stage(stage), _index(index), _name(name), _nameToken(name), _offsetWithinResource(offsetWithinResource), _uniformBufferSize(uniformBufferSize) {}
+    MSL_ShaderBinding(MSL_BindingType type, MSL_ProgramStage stage, int index,
+        const std::string& name, int offsetWithinResource,
+        int uniformBufferSize, HdBinding const &binding) :
+        _type(type),
+        _stage(stage),
+        _index(index),
+        _name(name),
+        _nameToken(name),
+        _offsetWithinResource(offsetWithinResource),
+        _uniformBufferSize(uniformBufferSize),
+        _binding(binding) {}
+
     MSL_BindingType  _type;
     MSL_ProgramStage _stage;
     int              _index;
@@ -72,6 +82,7 @@ struct MSL_ShaderBinding
     TfToken          _nameToken;
     int              _offsetWithinResource;
 	int              _uniformBufferSize;
+    HdBinding        _binding;
 };
 
 typedef std::multimap<size_t, MSL_ShaderBinding*> MSL_ShaderBindingMap;
@@ -176,7 +187,10 @@ public:
     }
     
     HDST_API
-    void AddBinding(std::string const &name, int index, MSL_BindingType bindingType, MSL_ProgramStage programStage, int offsetWithinResource = 0, int uniformBufferSize = 0);
+    void AddBinding(std::string const &name, int index,
+        HdBinding const &binding, MSL_BindingType bindingType,
+        MSL_ProgramStage programStage, int offsetWithinResource = 0,
+        int uniformBufferSize = 0);
 
     HDST_API
     void UpdateUniformBinding(std::string const &name, int index);

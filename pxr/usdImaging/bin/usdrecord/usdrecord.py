@@ -89,6 +89,15 @@ def main():
             'spaces or quote the argument and separate paths by commas and/or '
             'spaces.'))
 
+    parser.add_argument('--purposes', action='store', type=str,
+        dest='purposes', metavar='PURPOSE[,PURPOSE...]', default='proxy',
+        help=(
+            'Specify which UsdGeomImageable purposes should be included '
+            'in the renders.  The "default" purpose is automatically included, '
+            'so you need specify only the *additional* purposes.  If you want '
+            'more than one extra purpose, either use commas with no spaces or '
+            'quote the argument and separate purposes by commas and/or spaces.'))
+
     UsdAppUtils.cameraArgs.AddCmdlineArgs(parser)
     UsdAppUtils.framesArgs.AddCmdlineArgs(parser)
     UsdAppUtils.complexityArgs.AddCmdlineArgs(parser,
@@ -108,6 +117,8 @@ def main():
         frameFormatArgName='outputImagePath')
 
     args.imageWidth = max(args.imageWidth, 1)
+
+    purposes = args.purposes.replace(',', ' ').split()
 
     # Open the USD stage, using a population mask if paths were given.
     if args.populationMask:
@@ -139,6 +150,7 @@ def main():
     frameRecorder.SetImageWidth(args.imageWidth)
     frameRecorder.SetComplexity(args.complexity.value)
     frameRecorder.SetColorCorrectionMode(args.colorCorrectionMode)
+    frameRecorder.SetIncludedPurposes(purposes)
 
     _Msg('Camera: %s' % usdCamera.GetPath().pathString)
     _Msg('Renderer plugin: %s' % frameRecorder.GetCurrentRendererId())

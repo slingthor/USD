@@ -54,6 +54,8 @@ public:
     GLF_API
     static GlfTestGLContextSharedPtr Create( GlfTestGLContextSharedPtr const & share );
 
+    int GetNumDimensions() const override;
+
 protected:
     // GlfGLContext overrides
     GLF_API
