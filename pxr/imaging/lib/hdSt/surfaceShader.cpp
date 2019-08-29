@@ -25,6 +25,8 @@
 
 #include "pxr/imaging/hdSt/surfaceShader.h"
 #include "pxr/imaging/hdSt/resourceRegistry.h"
+#include "pxr/imaging/hdSt/textureResource.h"
+#include "pxr/imaging/hdSt/textureResourceHandle.h"
 
 #include "pxr/imaging/hd/binding.h"
 #include "pxr/imaging/hd/bufferArrayRange.h"

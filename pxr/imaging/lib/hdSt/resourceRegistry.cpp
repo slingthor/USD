@@ -75,6 +75,7 @@ HdStResourceRegistry::_GarbageCollect()
     // Cleanup Shader registries
     _geometricShaderRegistry.GarbageCollect();
     _programRegistry.GarbageCollect();
+    _textureResourceHandleRegistry.GarbageCollect();
 }
 
 void
@@ -332,6 +333,23 @@ HdStResourceRegistry::RegisterProgram(HdStProgram::ID id,
               HdInstance<HdStProgram::ID, HdStProgramSharedPtr> *instance)
 {
     return _programRegistry.GetInstance(id, instance);
+}
+
+std::unique_lock<std::mutex>
+HdStResourceRegistry::RegisterTextureResourceHandle(
+        TextureKey id,
+        HdInstance<TextureKey, HdStTextureResourceHandleSharedPtr> *instance)
+{
+    return _textureResourceHandleRegistry.GetInstance(id, instance);
+}
+
+std::unique_lock<std::mutex>
+HdStResourceRegistry::FindTextureResourceHandle(
+        TextureKey id,
+        HdInstance<TextureKey, HdStTextureResourceHandleSharedPtr> *instance,
+        bool *found)
+{
+    return _textureResourceHandleRegistry.FindInstance(id, instance, found);
 }
 
 void HdStResourceRegistry::InvalidateShaderRegistry()
