@@ -386,6 +386,12 @@ def DownloadFileWithUrllib(url, outputFilename):
     with open(outputFilename, "wb") as outfile:
         outfile.write(r.read())
 
+def DownloadFromCache(srcDir, url, outputFilename):
+
+    filename = url.split("/")[-1]
+    shutil.copy(os.path.abspath(srcDir +'/cache/'+filename), outputFilename)
+
+
 def DownloadURL(url, context, force, dontExtract = None):
     """Download and extract the archive file at given URL to the
     source directory specified in the context. 
@@ -423,7 +429,10 @@ def DownloadURL(url, context, force, dontExtract = None):
 
             for i in xrange(maxRetries):
                 try:
-                    context.downloader(url, tmpFilename)
+                    if context.downloader == DownloadFromCache:
+                        context.downloader(context.usdSrcDir, url, tmpFilename)
+                    else:
+                        context.downloader(url, tmpFilename)
                     break
                 except Exception as e:
                     PrintCommandOutput("Retrying download due to error: {err}\n"
@@ -1696,7 +1705,11 @@ class InstallContext:
         # use urllib2 all the time is that some older versions of Python
         # don't support TLS v1.2, which is required for downloading some
         # dependencies.
-        if find_executable("curl"):
+        
+        if os.path.exists(self.usdSrcDir+'/cache/'):
+            self.downloader = DownloadFromCache
+            self.downloaderName = "cache"
+        elif find_executable("curl"):
             self.downloader = DownloadFileWithCurl
             self.downloaderName = "curl"
         elif Windows() and find_executable("powershell"):
@@ -2121,6 +2134,8 @@ if Windows():
         os.path.join(context.instDir, "bin"),
         os.path.join(context.instDir, "lib")
     ])
+
+subprocess.check_call(['%s %s %s' %(context.usdSrcDir+'/build_scripts/make_relocatable.sh', context.usdInstDir, context.usdSrcDir+'/lib/qt@4')],   shell=True)
 
 Print("""
 Success! To use USD, please ensure that you have:""")
