@@ -53,6 +53,12 @@ public:
     MTLF_API
     virtual ~MtlfBaseTexture();
 
+    MTLF_API
+    virtual int GetNumDimensions() const override {
+        TF_FATAL_CODING_ERROR("Not Expected");
+        return 2;
+    }
+
     /// Returns the OpenGl texture name for the texture. 
     MTLF_API
     GarchTextureGPUHandle GetAPITextureName();
@@ -96,7 +102,9 @@ protected:
                         int const unpackCropTop = 0,
                         int const unpackCropBottom = 0,
                         int const unpackCropLeft = 0,
-                        int const unpackCropRight = 0) override;
+                        int const unpackCropRight = 0,
+                        int const unpackCropFront = 0,
+                        int const unpackCropBack = 0) override;
 };
 
 

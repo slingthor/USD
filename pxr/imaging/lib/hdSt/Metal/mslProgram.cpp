@@ -32,6 +32,8 @@
 #include "pxr/imaging/hdSt/Metal/mslProgram.h"
 #include "pxr/imaging/hdSt/package.h"
 #include "pxr/imaging/hdSt/surfaceShader.h"
+#include "pxr/imaging/hdSt/textureResourceHandle.h"
+#include "pxr/imaging/hdSt/textureResource.h"
 
 #include "pxr/imaging/hd/perfLog.h"
 #include "pxr/imaging/hd/resourceRegistry.h"
@@ -403,14 +405,20 @@ void HdStMSLProgram::AssignSamplerUnits(GarchBindingMapRefPtr bindingMap) const
     }
 }
 
-void HdStMSLProgram::AddBinding(std::string const &name, int index, MSL_BindingType bindingType, MSL_ProgramStage programStage, int offsetWithinResource, int uniformBufferSize) {
+void HdStMSLProgram::AddBinding(std::string const &name, int index,
+    HdBinding const &binding, MSL_BindingType bindingType,
+    MSL_ProgramStage programStage, int offsetWithinResource,
+    int uniformBufferSize)
+{
     _locationMap.insert(make_pair(name, index));
     MSL_ShaderBinding* newBinding = new MSL_ShaderBinding(
-        bindingType, programStage, index, name, offsetWithinResource, uniformBufferSize);
+        bindingType, programStage, index, name, offsetWithinResource,
+        uniformBufferSize, binding);
     _bindingMap.insert(std::make_pair(newBinding->_nameToken.Hash(), newBinding));
 }
 
-void HdStMSLProgram::UpdateUniformBinding(std::string const &name, int index) {
+void HdStMSLProgram::UpdateUniformBinding(std::string const &name, int index)
+{
     TfToken nameToken(name);
     auto it_range = _bindingMap.equal_range(nameToken.Hash());
     for(auto it = it_range.first; it != it_range.second; ++it) {
@@ -441,20 +449,33 @@ void HdStMSLProgram::BindResources(HdStSurfaceShader* surfaceShader, HdSt_Resour
         textureName = "textureBind_" + it->name.GetString();
         TfToken textureNameToken(textureName, TfToken::Immortal);
 
-        MSL_ShaderBinding const* const textureBinding = MSL_FindBinding(_bindingMap, textureNameToken, kMSL_BindingType_Texture, 0xFFFFFFFF, 0);
+        MSL_ShaderBinding const* const textureBinding = MSL_FindBinding(
+            _bindingMap, textureNameToken, kMSL_BindingType_Texture, 0xFFFFFFFF,
+            0);
         if(!textureBinding)
         {
             TF_FATAL_CODING_ERROR("Could not bind a texture to the shader?!");
         }
 
-        MtlfMetalContext::GetMetalContext()->SetTexture(textureBinding->_index, it->handle, textureNameToken, textureBinding->_stage);
+        GarchTextureGPUHandle texture;
+        HdBinding::Type type = textureBinding->_binding.GetType();
+        
+        if (type == HdBinding::TEXTURE_UDIM_LAYOUT ||
+            type == HdBinding::TEXTURE_PTEX_LAYOUT) {
+            texture = it->handle->GetTextureResource()->GetLayoutTextureId();
+        }
+        else {
+            texture = it->handle->GetTextureResource()->GetTexelsTextureId();
+        }
+        MtlfMetalContext::GetMetalContext()->SetTexture(textureBinding->_index, texture, textureNameToken, textureBinding->_stage);
 
         samplerName = "samplerBind_" + it->name.GetString();
         TfToken samplerNameToken(samplerName, TfToken::Immortal);
 
         MSL_ShaderBinding const* const samplerBinding = MSL_FindBinding(_bindingMap, samplerNameToken, kMSL_BindingType_Sampler, 0xFFFFFFFF, 0);
         if(samplerBinding) {
-            MtlfMetalContext::GetMetalContext()->SetSampler(samplerBinding->_index, it->sampler, samplerNameToken, samplerBinding->_stage);
+            MtlfMetalContext::GetMetalContext()->SetSampler(
+                samplerBinding->_index, it->handle->GetTextureResource()->GetTexelsSamplerId(), samplerNameToken, samplerBinding->_stage);
         }
     }
 }

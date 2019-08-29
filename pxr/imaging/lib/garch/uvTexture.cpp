@@ -105,6 +105,12 @@ GarchUVTexture::New(
             originLocation));
 }
 
+int
+GarchUVTexture::GetNumDimensions() const
+{
+    return 2;
+}
+
 bool 
 GarchUVTexture::IsSupportedImageFile(TfToken const &imageFilePath)
 {

@@ -83,6 +83,8 @@ public:
     static GarchUVTextureDataRefPtr
     New(std::string const &filePath, Params const &params);
 
+    int NumDimensions() const override;
+
     const Params& GetParams() const { return _params; }
 
     // GarchBaseTextureData overrides
@@ -91,6 +93,9 @@ public:
 
     GARCH_API
     virtual int ResizedHeight(int mipLevel = 0) const override;
+
+    GARCH_API
+    virtual int ResizedDepth(int mipLevel = 0) const override;
 
     virtual GLenum GLInternalFormat() const override {
         return _glInternalFormat;

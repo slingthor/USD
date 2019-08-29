@@ -67,6 +67,12 @@ GarchUVTextureStorage::~GarchUVTextureStorage()
     }
 }
 
+int
+GarchUVTextureStorage::GetNumDimensions() const
+{
+    return 2;
+}
+
 void 
 GarchUVTextureStorage::_ReadTexture()
 {
