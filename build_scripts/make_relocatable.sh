@@ -28,7 +28,6 @@ else
 fi
 
 
-
 # Run otool to determine the hard-coded absolute path
 otool -l $basepath/lib/libar.dylib | sed 1d |  {
 absolute=""
@@ -76,3 +75,42 @@ install_name_tool -change $absolute/libGLEW.2.0.0.dylib  @loader_path/../../../l
 install_name_tool -change $absolute/libGLEW.2.0.0.dylib  @loader_path/../../lib/libGLEW.2.0.0.dylib $basepath/plugin/usd/hdStormGL.dylib
 install_name_tool -change $absolute/libGLEW.2.0.0.dylib  @loader_path/../../lib/libGLEW.2.0.0.dylib $basepath/plugin/usd/hdStormMetal.dylib
 }
+
+
+
+# TODO: Add option to specify which python to use
+pyside_base=`python -c 'import PySide; print(PySide.__file__)'`
+pyside_base=${pyside_base%%__init__.pyc}
+
+openGL_base=`python -c 'import OpenGL; print(OpenGL.__file__)'`
+openGL_base=${openGL_base%%__init__.pyc}
+
+qt_base="/usr/local/opt/qt@4"
+qt_cellar_base="/usr/local/Cellar/qt@4"
+
+
+cp -r $pyside_base $basepath/lib/python/PySide
+cp -r $openGL_base $basepath/lib/python/OpenGL
+
+# Argument 2 specifies a custom location for qt(e.g for when we cache it in the usd src directory)
+if [ -d $2 ]
+then
+    cp -r $2        $basepath/lib/qt@4
+else
+    cp -r $qt_base  $basepath/lib/qt@4
+fi
+
+chmod -R +w $basepath/lib/qt@4
+
+install_name_tool -change $qt_base/lib/QtCore.framework/Versions/4/QtCore @loader_path/../../qt@4/lib/QtCore.framework/Versions/4/QtCore  $basepath/lib/python/PySide/QtCore.so
+install_name_tool -change $qt_base/lib/QtCore.framework/Versions/4/QtCore @loader_path/../../qt@4/lib/QtCore.framework/Versions/4/QtCore  $basepath/lib/python/PySide/libpyside-python2.7.1.2.dylib
+install_name_tool -change $qt_base/lib/QtGui.framework/Versions/4/QtGui   @loader_path/../../qt@4/lib/QtGui.framework/Versions/4/QtGui    $basepath/lib/python/PySide/QtGui.so
+install_name_tool -change $qt_base/lib/QtCore.framework/Versions/4/QtCore @loader_path/../../qt@4/lib/QtCore.framework/Versions/4/QtCore  $basepath/lib/python/PySide/QtGui.so
+install_name_tool -change $qt_base/lib/QtCore.framework/Versions/4/QtCore @loader_path/../../qt@4/lib/QtCore.framework/Versions/4/QtCore  $basepath/lib/python/PySide/QtOpenGL.so
+install_name_tool -change $qt_base/lib/QtGui.framework/Versions/4/QtGui   @loader_path/../../qt@4/lib/QtGui.framework/Versions/4/QtGui    $basepath/lib/python/PySide/QtOpenGL.so
+install_name_tool -change $qt_cellar_base/4.8.7_5/lib/QtCore.framework/Versions/4/QtCore  @loader_path/../../qt@4/lib/QtCore.framework/Versions/4/QtCore     $basepath/lib/qt@4/lib/QtCore.framework/Versions/4/QtCore
+install_name_tool -change $qt_cellar_base/4.8.7_5/lib/QtCore.framework/Versions/4/QtCore  @loader_path/../../../QtCore.framework/Versions/4/QtCore           $basepath/lib/qt@4/lib/QtGui.framework/Versions/4/QtGui
+install_name_tool -change $qt_base/lib/QtOpenGL.framework/Versions/4/QtOpenGL             @loader_path/../../qt@4/lib/QtOpenGL.framework/Versions/4/QtOpenGL $basepath/lib/python/PySide/QtOpenGL.so
+install_name_tool -change $qt_cellar_base/4.8.7_5/lib/QtGui.framework/Versions/4/QtGui    @loader_path/../../qt@4/lib/QtGui.framework/Versions/4/QtGui       $basepath/lib/python/PySide/QtOpenGL.so
+install_name_tool -change $qt_cellar_base/4.8.7_5/lib/QtGui.framework/Versions/4/QtGui    @loader_path/../../../QtGui.framework/Versions/4/QtGui             $basepath/lib/qt@4/lib/QtOpenGL.framework/Versions/4/QtOpenGL
+install_name_tool -change $qt_cellar_base/4.8.7_5/lib/QtCore.framework/Versions/4/QtCore  @loader_path/../../../QtCore.framework/Versions/4/QtCore           $basepath/lib/qt@4/lib/QtOpenGL.framework/Versions/4/QtOpenGL
