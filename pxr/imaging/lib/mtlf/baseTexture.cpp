@@ -248,19 +248,23 @@ MtlfBaseTexture::_UpdateTexture(GarchBaseTextureDataConstPtr texData)
     if (texData && texData->HasRawBuffer()) {
         _currentWidth  = texData->ResizedWidth();
         _currentHeight = texData->ResizedHeight();
+        _currentDepth  = texData->ResizedDepth();
         _format        = texData->GLFormat();
         _hasWrapModeS  = texData->GetWrapInfo().hasWrapModeS;
         _hasWrapModeT  = texData->GetWrapInfo().hasWrapModeT;
+        _hasWrapModeR  = texData->GetWrapInfo().hasWrapModeR;
         _wrapModeS     = texData->GetWrapInfo().wrapModeS;
-        _wrapModeT     = texData->GetWrapInfo().wrapModeT;        
+        _wrapModeT     = texData->GetWrapInfo().wrapModeT;
+        _wrapModeR     = texData->GetWrapInfo().wrapModeR;
 
         _SetMemoryUsed(texData->ComputeBytesUsed());
 
     } else {
         _currentWidth  = _currentHeight = 0;
+        _currentDepth  = 1;
         _format        =  GL_RGBA;
-        _hasWrapModeS  = _hasWrapModeT  = false;
-        _wrapModeS     = _wrapModeT     = GL_REPEAT;
+        _hasWrapModeS  = _hasWrapModeT  = _hasWrapModeR = false;
+        _wrapModeS     = _wrapModeT     = _wrapModeR    = GL_REPEAT;
 
         _SetMemoryUsed(0);
     }
@@ -272,12 +276,23 @@ MtlfBaseTexture::_CreateTexture(GarchBaseTextureDataConstPtr texData,
                 int const unpackCropTop,
                 int const unpackCropBottom,
                 int const unpackCropLeft,
-                int const unpackCropRight)
+                int const unpackCropRight,
+                int const unpackCropFront,
+                int const unpackCropBack)
 {
     TRACE_FUNCTION();
     
     if (texData && texData->HasRawBuffer()) {
 
+        const int numDimensions = texData->NumDimensions();
+/*
+        if (texData->NumDimensions() != numDimensions) {
+            TF_CODING_ERROR("Dimension mismatch %d != %d between "
+                            "GarchBaseTextureData and MtlfBaseTexture",
+                            texData->NumDimensions(), numDimensions);
+            return;
+        }
+*/
         // Check if mip maps have been requested, if so, it will either
         // enable automatic generation or use the ones loaded in cpu memory
         int numMipLevels = 1;
@@ -310,6 +325,7 @@ MtlfBaseTexture::_CreateTexture(GarchBaseTextureDataConstPtr texData,
         if (numMipLevels == 1) {
             int texDataWidth = texData->ResizedWidth();
             int texDataHeight = texData->ResizedHeight();
+            int texDataDepth = texData->ResizedDepth();
             int unpackRowLength = texDataWidth;
             int unpackSkipPixels = 0;
             int unpackSkipRows = 0;
@@ -326,28 +342,49 @@ MtlfBaseTexture::_CreateTexture(GarchBaseTextureDataConstPtr texData,
             }
             
             if (!texData->IsCompressed()) {
-                if (unpackCropTop < 0 || unpackCropTop > texDataHeight) {
+                const int width = texData->ResizedWidth();
+                const int height = texData->ResizedHeight();
+                const int depth = texData->ResizedDepth();
+                
+                int croppedWidth  = width;
+                int croppedHeight = height;
+                int croppedDepth  = depth;
+                
+                if (unpackCropLeft < 0 || unpackCropLeft > croppedWidth) {
                     return;
-                } else if (unpackCropTop > 0) {
-                    unpackSkipRows = unpackCropTop;
-                    texDataHeight -= unpackCropTop;
                 }
-                if (unpackCropBottom < 0 || unpackCropBottom > texDataHeight) {
+                
+                croppedWidth -= unpackCropLeft;
+                
+                if (unpackCropRight < 0 || unpackCropRight > croppedWidth) {
                     return;
-                } else if (unpackCropBottom) {
-                    texDataHeight -= unpackCropBottom;
                 }
-                if (unpackCropLeft < 0 || unpackCropLeft > texDataWidth) {
+                
+                croppedWidth -= unpackCropRight;
+                
+                if (unpackCropTop < 0 || unpackCropTop > croppedHeight) {
                     return;
-                } else {
-                    unpackSkipPixels = unpackCropLeft;
-                    texDataWidth -= unpackCropLeft;
                 }
-                if (unpackCropRight < 0 || unpackCropRight > texDataWidth) {
+                
+                croppedHeight -= unpackCropTop;
+                
+                if (unpackCropBottom < 0 || unpackCropBottom > croppedHeight) {
                     return;
-                } else if (unpackCropRight > 0) {
-                    texDataWidth -= unpackCropRight;
                 }
+                
+                croppedHeight -= unpackCropBottom;
+                
+                if (unpackCropFront < 0 || unpackCropFront > croppedDepth) {
+                    return;
+                }
+                
+                croppedDepth -= unpackCropFront;
+                
+                if (unpackCropBack < 0 || unpackCropBack > croppedDepth) {
+                    return;
+                }
+                
+                croppedDepth -= unpackCropBack;
             }
             
             if (texDataWidth == 1 || texDataHeight == 1) {

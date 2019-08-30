@@ -144,6 +144,7 @@ pxr_library(hdSt
         surfaceShader
         texture
         textureResource
+        textureResourceHandle
         tokens
         vboMemoryManager
         vboSimpleMemoryManager
@@ -164,6 +165,7 @@ pxr_library(hdSt
         imageShaderShaderKey
         immediateDrawBatch
         indirectDrawBatch
+        materialBufferSourceAndTextureHelper
         meshShaderKey
         meshTopology 
         pointsShaderKey
@@ -186,6 +188,7 @@ pxr_library(hdSt
         shaders/fallbackLighting.glslfx
         shaders/fallbackLightingShader.glslfx
         shaders/fallbackSurface.glslfx
+        shaders/fallbackVolume.glslfx
         shaders/frustumCull.glslfx
         shaders/imageShader.glslfx
         shaders/instancing.glslfx

@@ -50,6 +50,7 @@ public:
     GARCH_API
     virtual ~GarchUVTextureStorageData();
 
+    int NumDimensions() const override;
    // GarchBaseTextureData overrides
     virtual int ResizedWidth(int mipLevel = 0) const override {
         return _resizedWidth;
@@ -57,6 +58,10 @@ public:
 
     virtual int ResizedHeight(int mipLevel = 0) const override {
         return _resizedHeight;
+    };
+
+    virtual int ResizedDepth(int mipLevel = 0) const override {
+        return 1;
     };
 
     virtual GLenum GLInternalFormat() const override {

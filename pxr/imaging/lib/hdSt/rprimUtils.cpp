@@ -101,6 +101,9 @@ HdStPopulateConstantPrimvars(
         }
     }
     if (HdChangeTracker::IsExtentDirty(*dirtyBits, id)) {
+        // Note: If the scene description doesn't provide the extents, we use
+        // the default constructed GfRange3d which is [FLT_MAX, -FLT_MAX],
+        // which disables frustum culling for the prim.
         GfRange3d const &range = prim->GetExtent(delegate);
         sharedData->bounds.SetRange(GfRange3f(range.GetMin(), range.GetMax()));
 

@@ -53,6 +53,12 @@ class GlfBaseTexture : public GarchBaseTexture {
 public:
     GLF_API
     ~GlfBaseTexture() override;
+    
+    GLF_API
+    virtual int GetNumDimensions() const override {
+        TF_FATAL_CODING_ERROR("Not Expected");
+        return 0;
+    }
 
     /// Returns the OpenGl texture name for the texture. 
     GLF_API
@@ -93,7 +99,9 @@ protected:
                         int const unpackCropTop = 0,
                         int const unpackCropBottom = 0,
                         int const unpackCropLeft = 0,
-                        int const unpackCropRight = 0);
+                        int const unpackCropRight = 0,
+                        int const unpackCropFront = 0,
+                        int const unpackCropBack = 0) override;
 };
 
 

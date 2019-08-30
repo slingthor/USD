@@ -58,11 +58,18 @@ public:
     GARCH_API
     GarchTextureGPUHandle GetAPITextureName();
     
+    /// Is this a 1-, 2- or 3-dimensional texture.
+    GARCH_API
+    virtual int GetNumDimensions() const = 0;
+    
     GARCH_API
     int GetWidth();
     
     GARCH_API
     int GetHeight();
+    
+    GARCH_API
+    int GetDepth();
     
     GARCH_API
     int GetFormat();
@@ -101,7 +108,9 @@ protected:
                                 int const unpackCropTop = 0,
                                 int const unpackCropBottom = 0,
                                 int const unpackCropLeft = 0,
-                                int const unpackCropRight = 0) = 0;
+                                int const unpackCropRight = 0,
+                                int const unpackCropFront = 0,
+                                int const unpackCropBack = 0) = 0;
 
     GARCH_API
     virtual void _SetLoaded();
@@ -114,12 +123,14 @@ protected:
 
     // required for stats/tracking
     bool    _loaded;
-    int     _currentWidth, _currentHeight;
+    int     _currentWidth, _currentHeight, _currentDepth;
     int     _format;
     bool    _hasWrapModeS;
     bool    _hasWrapModeT;
+    bool    _hasWrapModeR;
     GLenum	_wrapModeS;
     GLenum	_wrapModeT;
+    GLenum  _wrapModeR;
 };
 
 
