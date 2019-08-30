@@ -50,6 +50,9 @@ typedef std::vector<class HdBindingRequest> HdBindingRequestVector;
 typedef boost::shared_ptr<class HdStShaderCode> HdStShaderCodeSharedPtr;
 typedef std::vector<HdStShaderCodeSharedPtr> HdStShaderCodeSharedPtrVector;
 
+typedef boost::shared_ptr<class HdStTextureResourceHandle>
+                HdStTextureResourceHandleSharedPtr;
+
 
 /// \class HdStShaderCode
 ///
@@ -85,7 +88,7 @@ public:
 
     struct TextureDescriptor {
         TfToken name;
-        GarchTextureGPUHandle handle;
+        HdStTextureResourceHandleSharedPtr handle;
 		GarchSamplerGPUHandle sampler;
         enum { TEXTURE_2D, TEXTURE_UDIM_ARRAY, TEXTURE_UDIM_LAYOUT,
                TEXTURE_PTEX_TEXEL, TEXTURE_PTEX_LAYOUT };

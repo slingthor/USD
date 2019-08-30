@@ -54,6 +54,12 @@ GarchUVTextureStorageData::~GarchUVTextureStorageData()
     }
 }
 
+int
+GarchUVTextureStorageData::NumDimensions() const
+{
+    return 2;
+}
+
 size_t GarchUVTextureStorageData::ComputeBytesUsed() const
 {
     if (_rawBuffer) {

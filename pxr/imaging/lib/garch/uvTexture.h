@@ -72,6 +72,8 @@ public:
         unsigned int cropRight  = 0,
         GarchImage::ImageOriginLocation originLocation = 
                            GarchImage::OriginUpperLeft); 
+
+    int GetNumDimensions() const override;
     
     /// Returns true if the file at \p imageFilePath is an image that
     /// can be used with this texture object.
@@ -139,7 +141,9 @@ protected:
                                 int const unpackCropTop = 0,
                                 int const unpackCropBottom = 0,
                                 int const unpackCropLeft = 0,
-                                int const unpackCropRight = 0) override
+                                int const unpackCropRight = 0,
+                                int const unpackCropFront = 0,
+                                int const unpackCropBack = 0) override
     {
         _baseTexture->_CreateTexture(texData, useMipmaps,
                                      unpackCropTop, unpackCropBottom,

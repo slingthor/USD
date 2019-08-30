@@ -1190,7 +1190,8 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
     
     int vsUniformsBufferSlot(-1), fsUniformsBufferSlot(-1), drawArgsSlot(-1), currentUniformBufferSlot(-1), indexBufferSlot(-1);
 
-    mslProgram->AddBinding("indices", -1, kMSL_BindingType_IndexBuffer, kMSL_ProgramStage_Vertex);
+    mslProgram->AddBinding("indices", -1, HdBinding(),
+        kMSL_BindingType_IndexBuffer, kMSL_ProgramStage_Vertex);
     
     //Add an index buffer for CSGS/vsMI. Increment vertexAttribsLocation (this means that in the VS
     //the buffers are offset by 1, with 1 slot skipped, the indices). You must bind it if you're
@@ -1198,10 +1199,12 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
     if(_buildTarget != kMSL_BuildTarget_Regular) {
         indexBufferSlot = vsNumVertexAttributes;
         //Instead of using BindingType IndexBuffer we use UniformBuffer as that is how we use the indexBuffer in this case.
-        mslProgram->AddBinding("indices", indexBufferSlot, kMSL_BindingType_UniformBuffer, kMSL_ProgramStage_Vertex);
+        mslProgram->AddBinding("indices", indexBufferSlot, HdBinding(),
+            kMSL_BindingType_UniformBuffer, kMSL_ProgramStage_Vertex);
         
         if(_buildTarget == kMSL_BuildTarget_MVA_ComputeGS)
-            mslProgram->AddBinding("indices", indexBufferSlot, kMSL_BindingType_UniformBuffer, kMSL_ProgramStage_Compute);
+            mslProgram->AddBinding("indices", indexBufferSlot, HdBinding(),
+                kMSL_BindingType_UniformBuffer, kMSL_ProgramStage_Compute);
     }
     vsNumVertexAttributes++;
 
@@ -1213,8 +1216,10 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
     //present for MI calls. The drawArgs buffer is not known to Hydra, it is kept internal to the Metal code.
     drawArgsSlot = currentUniformBufferSlot;
     if(_buildTarget != kMSL_BuildTarget_Regular) {
-        mslProgram->AddBinding("drawArgs", drawArgsSlot, kMSL_BindingType_DrawArgs, kMSL_ProgramStage_Vertex);
-        mslProgram->AddBinding("drawArgs", drawArgsSlot, kMSL_BindingType_DrawArgs, kMSL_ProgramStage_Compute);
+        mslProgram->AddBinding("drawArgs", drawArgsSlot, HdBinding(),
+            kMSL_BindingType_DrawArgs, kMSL_ProgramStage_Vertex);
+        mslProgram->AddBinding("drawArgs", drawArgsSlot, HdBinding(),
+            kMSL_BindingType_DrawArgs, kMSL_ProgramStage_Compute);
     }
     currentUniformBufferSlot++;
     
@@ -1222,12 +1227,18 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
     const UInt32 gsVertOutputSlot = currentUniformBufferSlot++;
     const UInt32 gsPrimOutputSlot = currentUniformBufferSlot++;
     if(_buildTarget == kMSL_BuildTarget_MVA_ComputeGS) {
-        mslProgram->AddBinding("gsVertOutput", gsVertOutputSlot, kMSL_BindingType_GSVertOutput, kMSL_ProgramStage_Compute);
-        mslProgram->AddBinding("gsVertOutput", gsVertOutputSlot, kMSL_BindingType_GSVertOutput, kMSL_ProgramStage_Vertex);      //As input
-        mslProgram->AddBinding("gsVertOutput", gsVertOutputSlot, kMSL_BindingType_GSVertOutput, kMSL_ProgramStage_Fragment);    //As input
-        mslProgram->AddBinding("gsPrimOutput", gsPrimOutputSlot, kMSL_BindingType_GSPrimOutput, kMSL_ProgramStage_Compute);
-        mslProgram->AddBinding("gsPrimOutput", gsPrimOutputSlot, kMSL_BindingType_GSPrimOutput, kMSL_ProgramStage_Vertex);      //As input
-        mslProgram->AddBinding("gsPrimOutput", gsPrimOutputSlot, kMSL_BindingType_GSPrimOutput, kMSL_ProgramStage_Fragment);    //As input
+        mslProgram->AddBinding("gsVertOutput", gsVertOutputSlot, HdBinding(),
+            kMSL_BindingType_GSVertOutput, kMSL_ProgramStage_Compute);
+        mslProgram->AddBinding("gsVertOutput", gsVertOutputSlot, HdBinding(),
+            kMSL_BindingType_GSVertOutput, kMSL_ProgramStage_Vertex);      //As input
+        mslProgram->AddBinding("gsVertOutput", gsVertOutputSlot, HdBinding(),
+            kMSL_BindingType_GSVertOutput, kMSL_ProgramStage_Fragment);    //As input
+        mslProgram->AddBinding("gsPrimOutput", gsPrimOutputSlot, HdBinding(),
+            kMSL_BindingType_GSPrimOutput, kMSL_ProgramStage_Compute);
+        mslProgram->AddBinding("gsPrimOutput", gsPrimOutputSlot, HdBinding(),
+            kMSL_BindingType_GSPrimOutput, kMSL_ProgramStage_Vertex);      //As input
+        mslProgram->AddBinding("gsPrimOutput", gsPrimOutputSlot, HdBinding(),
+            kMSL_BindingType_GSPrimOutput, kMSL_ProgramStage_Fragment);    //As input
     }
 
     //Add our (to be) generated uniform buffer as input param for VS.
@@ -1306,7 +1317,9 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
                     vsUniformStructSize += 16 - (vsUniformStructSize % 16);
                 //Add a binding for each uniform. They are currently all bound to slot -1 which is "patched" a little further down, once
                 //the actual slot is known (depends on other elements of _mslVSInputParams which may not have been processed yet)
-                mslProgram->AddBinding(input.name, -1, kMSL_BindingType_Uniform, kMSL_ProgramStage_Vertex, vsUniformStructSize);
+                mslProgram->AddBinding(input.name, -1, input.binding,
+                    kMSL_BindingType_Uniform, kMSL_ProgramStage_Vertex,
+                    vsUniformStructSize);
                 vsUniformStructSize += size;
             }
             else if(input.usage & HdSt_CodeGenMSL::TParam::UniformBlockMember) {
@@ -1335,20 +1348,27 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
                     if(name == "vsUniforms")
                         vsUniformsBufferSlot = currentUniformBufferSlot;
                     else
-                        mslProgram->AddBinding(name, currentUniformBufferSlot, kMSL_BindingType_UniformBuffer, kMSL_ProgramStage_Vertex, 0, 0);
+                        mslProgram->AddBinding(name, currentUniformBufferSlot,
+                            input.binding, kMSL_BindingType_UniformBuffer,
+                            kMSL_ProgramStage_Vertex, 0, 0);
                     
                     currentUniformBufferSlot++;
                 }
                 else {
                     //This input param is a built-in variable of some kind
                     
-                    availableInMI_EP = false;   //Built-in variables like gl_VertexID are _always_ supplied to the MI wrapper but are passed in
-                                                //via a different mechanism because of required special behavior
+                    // Built-in variables like gl_VertexID are _always_ supplied
+                    // to the MI wrapper but are passed in via a different
+                    // mechanism because of required special behavior
+                    availableInMI_EP = false;
                 }
                 
-                //Don't treat our own uniform buffer as a regular input parameter. It's members will be copied over individually instead.
+                // Don't treat our own uniform buffer as a regular input
+                // parameter. It's members will be copied over individually
+                // instead.
                 if(name != "vsUniforms")
-                    vsInputCode << "    scope." << name << " = " << name << ";\n";
+                    vsInputCode << "    scope." << name << " = "
+                                << name << ";\n";
                     
                 vsFuncDef   << "\n    , " << (isPtrParam ? "device const " : "")
                             << (inProgramScope ? "ProgramScope_Vert::" : "")
@@ -1364,17 +1384,18 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
                 
                 if(availableInMI_EP) {
                     //The MI entry point needs these too in identical form.
-                    vsMI_EP_FuncDefParams << "\n    , " << (isPtrParam ? "device const " : "")
-                                    << (inProgramScope ? "ProgramScope_Vert::" : "")
-                                    << dataType << (isPtrParam ? "* " : " ")
-                                    << name << attrib;
+                    vsMI_EP_FuncDefParams << "\n    , "
+                            << (isPtrParam ? "device const " : "")
+                            << (inProgramScope ? "ProgramScope_Vert::" : "")
+                            << dataType << (isPtrParam ? "* " : " ")
+                            << name << attrib;
                 }
                 
                 //MI wrapper code can't use "attrib" attribute specifier.
-                vsMI_FuncDef    << "\n    , " << (isPtrParam ? "device const " : "")
-                                << (inProgramScope ? "ProgramScope_Vert::" : "")
-                                << dataType << (isPtrParam ? "* " : " ")
-                                << name;
+                vsMI_FuncDef << "\n    , " << (isPtrParam ? "device const ":"")
+                             << (inProgramScope ? "ProgramScope_Vert::" : "")
+                             << dataType << (isPtrParam ? "* " : " ")
+                             << name;
                 
                 //Add as a parameter to the call to the vertex wrapper function
                 vsMI_EP_CallCode    << ",\n            " << name;
@@ -1382,26 +1403,36 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
             else {
                 //This input param is a vertex attribute
                 
-                vsInputStruct << "HD_MTL_VS_ATTRIBUTE(" << dataType << ", " << name << ", [[attribute(" << vsCurrentVertexAttributeSlot << ")]]);\n";
+                vsInputStruct << "HD_MTL_VS_ATTRIBUTE(" << dataType << ", "
+                              << name << ", [[attribute("
+                              << vsCurrentVertexAttributeSlot << ")]]);\n";
                 
-                vsInputCode << "    scope." << name << " = input." << name << ";\n";
+                vsInputCode << "    scope." << name
+                            << " = input." << name << ";\n";
                 
-                //MI Entry Point needs these as buffers instead of vertex attributes. And to full the MSLVsInput struct
-                //we add them to the InputCode as well.
+                // MI Entry Point needs these as buffers instead of vertex
+                // attributes. And to full the MSLVsInput struct we add them to
+                // the InputCode as well.
                 
-                //We need to replace some of the dataTypes here to account for changes in
-                //packing/alignment/unpacking
+                // We need to replace some of the dataTypes here to account
+                // for changes in packing/alignment/unpacking
                 if(usesPackedNormals)
                     dataType = _tokens->_int;
                 else
                     dataType = _GetPackedMSLType(dataType);
                 
-                vsMI_EP_FuncDefParams   << "\n    , device const " << dataType
-                                        << " *" << name << "[[buffer(" << vsCurrentVertexAttributeSlot << ")]]";
-                vsMI_EP_InputCode   << ",\n            " << (usesPackedNormals ? "hd_vec4_2_10_10_10_get(" : "")
-                                    << name << "[gl_VertexID]" << (usesPackedNormals ? ")" : "");
+                vsMI_EP_FuncDefParams << "\n    , device const " << dataType
+                                      << " *" << name << "[[buffer("
+                                      << vsCurrentVertexAttributeSlot << ")]]";
+                vsMI_EP_InputCode << ",\n            "
+                                  << (usesPackedNormals ?
+                                      "hd_vec4_2_10_10_10_get(" : "")
+                                  << name << "[gl_VertexID]"
+                                  << (usesPackedNormals ? ")" : "");
                 
-                mslProgram->AddBinding(name, vsCurrentVertexAttributeSlot++, kMSL_BindingType_VertexAttribute, kMSL_ProgramStage_Vertex);
+                mslProgram->AddBinding(name, vsCurrentVertexAttributeSlot++,
+                    input.binding, kMSL_BindingType_VertexAttribute,
+                    kMSL_ProgramStage_Vertex);
             }
         }
     }
@@ -1420,7 +1451,9 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
     //Round up size of uniform buffer to next 16 byte boundary.
     vsUniformStructSize = ((vsUniformStructSize + 15) / 16) * 16;
     if(hasVSUniformBuffer)
-        mslProgram->AddBinding("vsUniforms", vsUniformsBufferSlot, kMSL_BindingType_UniformBuffer, kMSL_ProgramStage_Vertex, 0, vsUniformStructSize);
+        mslProgram->AddBinding("vsUniforms", vsUniformsBufferSlot, HdBinding(),
+            kMSL_BindingType_UniformBuffer, kMSL_ProgramStage_Vertex, 0,
+            vsUniformStructSize);
 
     ///////////////////////// Setup Geometry Shader Attributes ////////////////////////////
 
@@ -1568,7 +1601,9 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
                 TF_FOR_ALL(it_vs, _mslVSInputParams) {
                     std::string vs_name = it_vs->name.GetString();
                     if(vs_name.at(0) == '*') vs_name = vs_name.substr(1,vs_name.length()-1);
-                    //If the name matches but for example type is different we have a problem. We're assuming this doesn't happen. Cumbersome to design around.
+                    // If the name matches but for example type is different we
+                    // have a problem. We're assuming this doesn't happen.
+                    // Cumbersome to design around.
                     if(vs_name != name)
                         continue;
                     isPresentInVS = true;
@@ -1579,7 +1614,9 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
                                     << _GetPackedMSLType(_GetPackedType(it->dataType, true))
                                     << (isPtr ? "* " : " ")
                                     << name << "[[buffer(" << currentUniformBufferSlot << ")]]";
-                    mslProgram->AddBinding(name, currentUniformBufferSlot++, kMSL_BindingType_UniformBuffer, kMSL_ProgramStage_Compute);
+                    mslProgram->AddBinding(name, currentUniformBufferSlot++,
+                        it->binding, kMSL_BindingType_UniformBuffer,
+                        kMSL_ProgramStage_Compute);
                 }
             }
         }
@@ -1868,7 +1905,8 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
             //This parameter is a sampler
             
             fsTexturingStruct << "    " << dataType << " " << name << "[[sampler(" << fsCurrentSamplerSlot << ")]]" << ";\n";
-            mslProgram->AddBinding(name, fsCurrentSamplerSlot, kMSL_BindingType_Sampler, kMSL_ProgramStage_Fragment);
+            mslProgram->AddBinding(name, fsCurrentSamplerSlot, it->binding,
+                kMSL_BindingType_Sampler, kMSL_ProgramStage_Fragment);
             sourcePrefix << "fsTexturing.";
             fsCurrentSamplerSlot++;
         }
@@ -1876,7 +1914,8 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
             //This parameter is a texture
             
             fsTexturingStruct << "    " << dataType << " " << name << "[[texture(" << fsCurrentTextureSlot << ")]]" << ";\n";
-            mslProgram->AddBinding(name, fsCurrentTextureSlot, kMSL_BindingType_Texture, kMSL_ProgramStage_Fragment);
+            mslProgram->AddBinding(name, fsCurrentTextureSlot, it->binding,
+                kMSL_BindingType_Texture, kMSL_ProgramStage_Fragment);
             sourcePrefix << "fsTexturing.";
             fsCurrentTextureSlot++;
         }
@@ -1914,22 +1953,31 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
                 else {
                     //Attempt to find the same buffer in the VS inputs. If found, assign this buffer to the same slot.
                     TfToken bindingNameToken(bindingName);
-                    MSL_ShaderBinding const * const binding = MSL_FindBinding(mslProgram->GetBindingMap(), bindingNameToken, kMSL_BindingType_UniformBuffer, kMSL_ProgramStage_Vertex);
+                    MSL_ShaderBinding const * const binding =
+                        MSL_FindBinding(mslProgram->GetBindingMap(),
+                            bindingNameToken, kMSL_BindingType_UniformBuffer,
+                            kMSL_ProgramStage_Vertex);
                     
                     if(binding)
                         assignedSlot = binding->_index;
                     else
                         currentUniformBufferSlot++;
-                    mslProgram->AddBinding(bindingName, assignedSlot, kMSL_BindingType_UniformBuffer, kMSL_ProgramStage_Fragment);
+                    mslProgram->AddBinding(bindingName, assignedSlot,
+                        it->binding, kMSL_BindingType_UniformBuffer,
+                        kMSL_ProgramStage_Fragment);
                 }
                 
                 fsFuncDef << "\n    , const device "
-                          << ((it->usage & TParam::Usage::ProgramScope) ? "ProgramScope_Frag::" : "")
+                          << ((it->usage & TParam::Usage::ProgramScope) ?
+                            "ProgramScope_Frag::" : "")
                           << _GetPackedType(it->dataType, true)
-                          << "* " << name << "[[buffer(" << assignedSlot << ")]]";
+                          << "* " << name << "[[buffer("
+                          << assignedSlot << ")]]";
             }
             //else
-                //This parameter is a built-in variable and we won't add it to the function definition as built-ins get added regardless in a different way.
+                // This parameter is a built-in variable and we won't add it to
+                // the function definition as built-ins get added regardless in
+                // a different way.
         }
         else
         {
@@ -1952,18 +2000,35 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
                 
                 fsUniformStruct << "    " << dataType << " " << name << ";\n";
 
-                uint32_t memberSize(4), memberAlignment(4); //Alignment would be 16 if not using packed_vecs
-                if(dataType.find("mat") != std::string::npos) TF_FATAL_CODING_ERROR("Not implemented!");
-                else if(dataType.find("2") != std::string::npos) memberSize = 8;
-                else if(dataType.find("3") != std::string::npos) memberSize = 12;
-                else if(dataType.find("4") != std::string::npos) memberSize = 16;
+                //Alignment would be 16 if not using packed_vecs
+                uint32_t memberSize(4), memberAlignment(4);
+                if(dataType.find("mat") != std::string::npos) {
+                    TF_FATAL_CODING_ERROR("Not implemented!");
+                }
+                else if(dataType.find("2") != std::string::npos) {
+                    memberSize = 8;
+                }
+                else if(dataType.find("3") != std::string::npos) {
+                    memberSize = 12;
+                }
+                else if(dataType.find("4") != std::string::npos) {
+                    memberSize = 16;
+                }
                 uint32_t regStart = fsUniformStructSize / memberAlignment;
-                uint32_t regEnd = (fsUniformStructSize + memberSize - 1) / memberAlignment;
-                if(regStart != regEnd && fsUniformStructSize % memberAlignment != 0)
-                    fsUniformStructSize += memberAlignment - (fsUniformStructSize % memberAlignment);
-                //Add a binding for each uniform. They are currently all bound to slot -1 which is "patched" a little further down, once
-                //the actual slot is known (depends on other elements of _mslVSInputParams which may not have been processed yet)
-                mslProgram->AddBinding(name, -1, kMSL_BindingType_Uniform, kMSL_ProgramStage_Fragment, fsUniformStructSize);
+                uint32_t regEnd =
+                    (fsUniformStructSize + memberSize - 1) / memberAlignment;
+                if(regStart != regEnd &&
+                   fsUniformStructSize % memberAlignment != 0) {
+                    fsUniformStructSize += memberAlignment -
+                    (fsUniformStructSize % memberAlignment);
+                }
+                // Add a binding for each uniform. They are currently all bound
+                // to slot -1 which is "patched" a little further down, once
+                // the actual slot is known (depends on other elements of
+                // _mslVSInputParams which may not have been processed yet)
+                mslProgram->AddBinding(name, -1, it->binding,
+                    kMSL_BindingType_Uniform, kMSL_ProgramStage_Fragment,
+                    fsUniformStructSize);
                 fsUniformStructSize += memberSize;
             }
             else {
@@ -2054,12 +2119,15 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
     
     //Round up size of uniform buffer to next 16 byte boundary.
     fsUniformStructSize = ((fsUniformStructSize + 15) / 16) * 16;
-    if(hasFSUniformBuffer)
-        mslProgram->AddBinding("fsUniforms", fsUniformsBufferSlot, kMSL_BindingType_UniformBuffer, kMSL_ProgramStage_Fragment, 0, fsUniformStructSize);
+    if(hasFSUniformBuffer) {
+        mslProgram->AddBinding("fsUniforms", fsUniformsBufferSlot, HdBinding(),
+            kMSL_BindingType_UniformBuffer, kMSL_ProgramStage_Fragment, 0,
+            fsUniformStructSize);
+    }
     
     bool usesTexturingStruct = (fsCurrentSamplerSlot != 0 || fsCurrentTextureSlot != 0);
     
-    ////////////////////////////////// Fragment Outputs //////////////////////////////
+    ////////////////////////////////// Fragment Outputs ////////////////////////
     
     int fsCurrentOutputSlot = 0;
     fsOutputStruct  << "////////////////////////////////////////////////////////////////////////////////////////////////////////////////////\n"
@@ -2074,7 +2142,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
     }
     fsOutputStruct  << "};\n\n";
     
-    ////////////////////////////////// FS Code Concatenation ////////////////////////
+    ////////////////////////////////// FS Code Concatenation ///////////////////
     
     if(hasFSUniformBuffer)
         fsCode << fsUniformStruct.str();
@@ -3843,7 +3911,7 @@ HdSt_CodeGenMSL::_GenerateElementPrimvar()
     For an unrefined prim, the subprimitive ID s simply the gl_PrimitiveID.
     For a refined prim, gl_PrimitiveID corresponds to the refined element ID.
 
-    To map a refined face to its coarse face, Hydra builds a "primitive param"
+    To map a refined face to its coarse face, Storm builds a "primitive param"
     buffer (more details in the section below). This buffer is also aggregated,
     and for each subprimitive, GetDrawingCoord().primitiveCoord gives us the
     index into this buffer (meaning it has already added the gl_PrimitiveID)
@@ -3928,7 +3996,7 @@ HdSt_CodeGenMSL::_GenerateElementPrimvar()
     // PatchParam is defined as ivec3 (see opensubdiv/far/patchParam.h)
     //  Field0     | Bits | Content
     //  -----------|:----:|---------------------------------------------------
-    //  faceId     | 28   | the faceId of the patch (Hydra uses ptexIndex)
+    //  faceId     | 28   | the faceId of the patch (Storm uses ptexIndex)
     //  transition | 4    | transition edge mask encoding
     //
     //  Field1     | Bits | Content
@@ -4872,8 +4940,12 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
         } else if (bindingType == HdBinding::TEXTURE_UDIM_LAYOUT) {
             declarations
                 << "texture1d<float> textureBind_" << it->second.name << ";\n";
-            _AddInputParam(_mslPSInputParams, TfToken("textureBind_" + it->second.name.GetString()), TfToken("texture1d<float>"), TfToken()).usage
-                |= HdSt_CodeGenMSL::TParam::Texture;
+            _AddInputParam(_mslPSInputParams,
+                TfToken("textureBind_" + it->second.name.GetString()),
+                TfToken("texture1d<float>"),
+                TfToken(),
+                it->first).usage
+                    |= HdSt_CodeGenMSL::TParam::Texture;
 
         } else if (bindingType == HdBinding::BINDLESS_TEXTURE_PTEX_TEXEL) {
             accessors
@@ -4910,8 +4982,12 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
             _AddInputParam(_mslPSInputParams, TfToken(texelBindName),
                            TfToken("texture2d_array<float>"), TfToken(), it->first).usage
                 |= HdSt_CodeGenMSL::TParam::Texture;
+            
+            HdBinding layoutBinding(HdBinding::TEXTURE_PTEX_LAYOUT,
+                it->first.GetLocation(),
+                it->first.GetTextureUnit());
             _AddInputParam(_mslPSInputParams, TfToken(layoutBindName),
-                           TfToken("texture1d<int>"), TfToken(), it->first).usage
+                           TfToken("texture1d<int>"), TfToken(), layoutBinding).usage
                 |= HdSt_CodeGenMSL::TParam::Texture;
 
             accessors

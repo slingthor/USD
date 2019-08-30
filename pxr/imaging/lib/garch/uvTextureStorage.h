@@ -73,6 +73,10 @@ protected:
     GARCH_API
     virtual ~GarchUVTextureStorage();
     
+    /// Is this a 1-, 2- or 3-dimensional texture.
+    GARCH_API
+    virtual int GetNumDimensions() const override;
+
     GARCH_API
     virtual void _ReadTexture();
     GARCH_API
@@ -89,7 +93,9 @@ protected:
                                 int const unpackCropTop = 0,
                                 int const unpackCropBottom = 0,
                                 int const unpackCropLeft = 0,
-                                int const unpackCropRight = 0) override
+                                int const unpackCropRight = 0,
+                                int const unpackCropFront = 0,
+                                int const unpackCropBack = 0) override
     {
         return _baseTexture->_CreateTexture(texData, useMipmaps,
                                             unpackCropTop, unpackCropBottom,

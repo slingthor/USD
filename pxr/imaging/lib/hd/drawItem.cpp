@@ -76,6 +76,9 @@ HdDrawItem::GetBufferArraysHash() const
     boost::hash_combine(hash,
                         GetInstanceIndexRange() ?
                         GetInstanceIndexRange()->GetVersion(): 0);
+
+    boost::hash_combine(hash, _GetBufferArraysHash());
+
     return hash;
 }
 
@@ -511,6 +514,13 @@ std::ostream &operator <<(std::ostream &out,
     }
     return out;
 }
+
+size_t
+HdDrawItem::_GetBufferArraysHash() const
+{
+    return 0;
+}
+
 
 PXR_NAMESPACE_CLOSE_SCOPE
 

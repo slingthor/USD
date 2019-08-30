@@ -42,11 +42,15 @@ GarchBaseTexture::GarchBaseTexture()
   : _loaded(false),
     _currentWidth(0),
     _currentHeight(0),
+    // 1 since a 2d-texture can be thought of as x*y*1 3d-texture
+    _currentDepth(1),
     _format(GL_RGBA),
     _hasWrapModeS(false),
     _hasWrapModeT(false),
+    _hasWrapModeR(false),
     _wrapModeS(GL_REPEAT),
-    _wrapModeT(GL_REPEAT)
+    _wrapModeT(GL_REPEAT),
+    _wrapModeR(GL_REPEAT)
 {
     /* nothing */
 }
@@ -56,11 +60,15 @@ GarchBaseTexture::GarchBaseTexture(GarchImage::ImageOriginLocation originLocatio
     _loaded(false),
     _currentWidth(0),
     _currentHeight(0),
+    // 1 since a 2d-texture can be thought of as x*y*1 3d-texture
+    _currentDepth(1),
     _format(GL_RGBA),
     _hasWrapModeS(false),
     _hasWrapModeT(false),
+    _hasWrapModeR(false),
     _wrapModeS(GL_REPEAT),
-    _wrapModeT(GL_REPEAT)
+    _wrapModeT(GL_REPEAT),
+    _wrapModeR(GL_REPEAT)
 {
     /* nothing */
 }
@@ -101,6 +109,16 @@ GarchBaseTexture::GetHeight()
 }
 
 int
+GarchBaseTexture::GetDepth()
+{
+    if (!_loaded) {
+        _ReadTexture();
+    }
+    
+    return _currentDepth;
+}
+
+int
 GarchBaseTexture::GetFormat()
 {
     if (!_loaded) {
@@ -132,7 +150,7 @@ GarchBaseTexture::GetTextureInfo(bool forceLoad)
         info["memoryUsed"] = GetMemoryUsed();
         info["width"] = _currentWidth;
         info["height"] = _currentHeight;
-        info["depth"] = 1;
+        info["depth"] = _currentDepth;
         info["format"] = _format;
         
         if (_hasWrapModeS) {
@@ -141,6 +159,10 @@ GarchBaseTexture::GetTextureInfo(bool forceLoad)
         
         if (_hasWrapModeT) {
             info["wrapModeT"] = _wrapModeT;
+        }
+        
+        if (_hasWrapModeR) {
+            info["wrapModeR"] = _wrapModeR;
         }
     } else {
         info["memoryUsed"] = (size_t)0;

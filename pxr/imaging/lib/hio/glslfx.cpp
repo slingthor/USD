@@ -72,6 +72,7 @@ TF_DEFINE_PRIVATE_TOKENS(
     (preamble)
     ((shaderResources, "ShaderResources"))
     (surfaceShader)
+    (volumeShader)
     (displacementShader)
     (vertexShaderInjection)
     (geometryShaderInjection)
@@ -628,6 +629,12 @@ string
 HioGlslfx::GetFragmentSource() const
 {
     return _GetSource(_tokens->fragmentShader);
+}
+
+string
+HioGlslfx::GetVolumeSource() const
+{
+    return _GetSource(_tokens->volumeShader);
 }
 
 string
