@@ -570,7 +570,7 @@ if Linux():
     BOOST_URL = "https://downloads.sourceforge.net/project/boost/boost/1.55.0/boost_1_55_0.tar.gz"
     BOOST_VERSION_FILE = "include/boost/version.hpp"
 elif MacOS() or iOS():
-    BOOST_URL = "https://downloads.sourceforge.net/project/boost/boost/1.61.0/boost_1_61_0.tar.gz"
+    BOOST_URL = "https://downloads.sourceforge.net/project/boost/boost/1.61.0/boost_1_61_0.tar.bz2"
     BOOST_VERSION_FILE = "include/boost/version.hpp"
 elif Windows():
     BOOST_URL = "https://downloads.sourceforge.net/project/boost/boost/1.61.0/boost_1_61_0.tar.gz"
@@ -1514,6 +1514,13 @@ group.add_argument("--iOS", action="store_const", const="iOS",
                    dest="crossPlatform",
                    help="Target iOS platform")
 
+group = parser.add_mutually_exclusive_group()
+group.add_argument("--cache", dest="use_download_cache", action="store_true",
+                   default=False,
+                   help="Copy dependencies from repository folder instead of downloading")
+group.add_argument("--no-cache", dest="use_download_cache", action="store_false",
+                   help="Download dependencies, don't use the cache download folder")
+
 group = parser.add_argument_group(title="Build Options")
 group.add_argument("-j", "--jobs", type=int, default=GetCPUCount(),
                    help=("Number of build jobs to run in parallel. "
@@ -1713,7 +1720,7 @@ class InstallContext:
         # don't support TLS v1.2, which is required for downloading some
         # dependencies.
         
-        if os.path.exists(self.usdSrcDir+'/cache/'):
+        if args.use_download_cache:
             self.downloader = DownloadFromCache
             self.downloaderName = "cache"
         elif find_executable("curl"):
