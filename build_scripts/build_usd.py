@@ -570,7 +570,7 @@ if Linux():
     BOOST_URL = "https://downloads.sourceforge.net/project/boost/boost/1.55.0/boost_1_55_0.tar.gz"
     BOOST_VERSION_FILE = "include/boost/version.hpp"
 elif MacOS() or iOS():
-    BOOST_URL = "https://downloads.sourceforge.net/project/boost/boost/1.61.0/boost_1_61_0.tar.gz"
+    BOOST_URL = "https://downloads.sourceforge.net/project/boost/boost/1.61.0/boost_1_61_0.tar.bz2"
     BOOST_VERSION_FILE = "include/boost/version.hpp"
 elif Windows():
     BOOST_URL = "https://downloads.sourceforge.net/project/boost/boost/1.61.0/boost_1_61_0.tar.gz"
