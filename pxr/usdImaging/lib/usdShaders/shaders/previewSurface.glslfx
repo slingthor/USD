@@ -83,7 +83,10 @@ surfaceShader(vec4 Peye, vec3 Neye, vec4 color, vec4 patchCoord)
     float roughness          = GETVALUE(HdGet_roughness);
     vec3 specularColor       = HdGet_specularColor().xyz;
     bool useSpecularWorkflow = (GETVALUE(HdGet_useSpecularWorkflow) == 1);
-
+#if defined(ARCH_GFX_METAL)
+    if (specularColor.y == specularColor.z && specularColor.y == 0)
+        specularColor = specularColor.xxx;
+#endif
     vec3 clearcoatColor      = vec3(1.0);
     float specularAmount     = 1.0;
 
