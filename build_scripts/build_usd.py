@@ -1520,6 +1520,13 @@ group.add_argument("--cache", dest="use_download_cache", action="store_true",
                    help="Copy dependencies from repository folder instead of downloading")
 group.add_argument("--no-cache", dest="use_download_cache", action="store_false",
                    help="Download dependencies, don't use the cache download folder")
+group = parser.add_mutually_exclusive_group()
+group.add_argument("--make-relocatable", dest="make_relocatable",
+                   action="store_true", default=False,
+                   help="MacOS only: Run make_relocatable.sh script to make the instalation folder relocatable in the system")
+group.add_argument("--no-make-relocatable", dest="make_relocatable",
+                   action="store_false",
+                   help="MacOS only: Don't run the make_relocatable.sh script")
 
 group = parser.add_argument_group(title="Build Options")
 group.add_argument("-j", "--jobs", type=int, default=GetCPUCount(),
@@ -1720,7 +1727,7 @@ class InstallContext:
         # don't support TLS v1.2, which is required for downloading some
         # dependencies.
         
-        if args.use_download_cache:
+        if args.use_download_cache and MacOS():
             self.downloader = DownloadFromCache
             self.downloaderName = "cache"
         elif find_executable("curl"):
@@ -1732,6 +1739,11 @@ class InstallContext:
         else:
             self.downloader = DownloadFileWithUrllib
             self.downloaderName = "built-in"
+
+
+        #MacOS only
+        self.use_download_cache = args.use_download_cache
+        self.make_relocatable = args.make_relocatable
 
         # CMake generator
         self.cmakeGenerator = args.generator
@@ -2019,6 +2031,10 @@ Building with settings:
   Build directory               {buildDir}
   CMake generator               {cmakeGenerator}
   Downloader                    {downloader}
+  
+  MacOS:
+    Use download cache          {use_download_cache}
+    Make relocatable            {make_relocatable}
 
   Building                      {buildType}
     Cross Platform              {targetPlatform}
@@ -2065,6 +2081,8 @@ summaryMsg = summaryMsg.format(
     cmakeGenerator=("Default" if not context.cmakeGenerator
                     else context.cmakeGenerator),
     downloader=(context.downloaderName),
+    use_download_cache=("On" if context.use_download_cache and MacOS() else "Off"),
+    make_relocatable=("On" if context.make_relocatable and MacOS() else "Off"),
     dependencies=("None" if not dependenciesToBuild else 
                   ", ".join([d.name for d in dependenciesToBuild])),
     buildArgs=FormatBuildArguments(context.buildArgs),
@@ -2149,7 +2167,8 @@ if Windows():
         os.path.join(context.instDir, "lib")
     ])
 
-subprocess.check_call(['%s %s %s' %(context.usdSrcDir+'/build_scripts/make_relocatable.sh', context.usdInstDir, context.usdSrcDir+'/lib/qt@4')],   shell=True)
+if args.make_relocatable and MacOS():
+    subprocess.check_call(['%s %s %s' %(context.usdSrcDir+'/build_scripts/make_relocatable.sh', context.usdInstDir, context.usdSrcDir+'/lib/qt@4')],   shell=True)
 
 Print("""
 Success! To use USD, please ensure that you have:""")
