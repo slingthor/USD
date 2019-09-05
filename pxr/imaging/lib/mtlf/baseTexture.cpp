@@ -402,7 +402,7 @@ MtlfBaseTexture::_CreateTexture(GarchBaseTextureDataConstPtr texData,
                                                                   height:texDataHeight
                                                                mipmapped:genMips?YES:NO];
             desc.resourceOptions = MTLResourceStorageModeDefault;
-            _textureName = MtlfMultiTexture(desc);;
+            _textureName = MtlfMultiTexture(desc);
 
             char *rawData = (char*)texBuffer + (unpackSkipRows * unpackRowLength * pixelByteSize)
                 + (unpackSkipPixels * pixelByteSize);

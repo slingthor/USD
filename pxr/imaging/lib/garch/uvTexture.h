@@ -99,7 +99,11 @@ public:
     GARCH_API
     virtual GarchTextureGPUHandle GetTextureName() override {
         if (!_baseTexture->_loaded) {
-            _ReadTexture();
+            _readMutex.lock();
+            if (!_baseTexture->_loaded) {
+                _ReadTexture();
+            }
+            _readMutex.unlock();
         }
         return _baseTexture->GetTextureName();
     }
@@ -164,6 +168,8 @@ private:
     const unsigned int _cropBottom;
     const unsigned int _cropLeft;
     const unsigned int _cropRight;
+    
+    std::mutex _readMutex;
 };
 
 
