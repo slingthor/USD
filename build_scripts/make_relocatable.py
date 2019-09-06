@@ -38,7 +38,6 @@ def change_absolute_to_relative(files, path_to_replace, custom_path=""):
                 else:
                     inside_idx = replace_path_idx + len(path_to_replace)
                     suffix_path = extracted_path[inside_idx:]
-                    print(custom_path+suffix_path)
                     path_between = os.path.relpath(custom_path+suffix_path, cur_dir_path)
                 subprocess.call(['install_name_tool', '-change', extracted_path, '@loader_path/' + path_between, f])
 
