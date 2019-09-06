@@ -42,6 +42,8 @@ import tarfile
 import urllib2
 import zipfile
 
+from make_relocatable import make_relocatable
+
 # Helpers for printing output
 verbosity = 1
 
@@ -2168,7 +2170,7 @@ if Windows():
     ])
 
 if args.make_relocatable and MacOS():
-    subprocess.check_call(['%s %s %s' %(context.usdSrcDir+'/build_scripts/make_relocatable.sh', context.usdInstDir, context.usdSrcDir+'/lib/qt@4')],   shell=True)
+    make_relocatable(context.usdInstDir, context.usdSrcDir+'/lib/qt@4')
 
 Print("""
 Success! To use USD, please ensure that you have:""")
