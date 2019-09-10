@@ -1142,8 +1142,8 @@ def InstallOpenSubdiv(context, force, buildArgs):
 
             extraArgs.append('-DNO_CLEW=ON')
             extraArgs.append('-DNO_OPENGL=ON')
-            extraArgs.append('-DSTRINGIFY_LOCATION={buildDirmacOS}/bin/Release/stringify'
-                             .format(buildDirmacOS=buildDirmacOS))
+            extraArgs.append('-DSTRINGIFY_LOCATION={buildDirmacOS}/bin/{variant}/stringify'
+                             .format(buildDirmacOS=buildDirmacOS, variant="Debug" if context.buildDebug else "Release"))
             extraArgs.append('-DCMAKE_TOOLCHAIN_FILE={srcOSDDir}/cmake/iOSToolchain.cmake'
                              .format(srcOSDDir=srcOSDDir))
 
