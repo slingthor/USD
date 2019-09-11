@@ -2170,7 +2170,7 @@ if Windows():
     ])
 
 if args.make_relocatable and MacOS():
-    make_relocatable(context.usdInstDir, context.usdSrcDir+'/lib/qt@4')
+    make_relocatable(context.usdInstDir, context.buildPython , context.usdSrcDir+'/lib/qt@4')
 
 Print("""
 Success! To use USD, please ensure that you have:""")
