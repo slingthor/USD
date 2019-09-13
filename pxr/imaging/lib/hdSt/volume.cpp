@@ -41,7 +41,7 @@
 #include "pxr/imaging/hf/diagnostic.h"
 
 #include "pxr/imaging/hio/glslfx.h"
-#include "pxr/imaging/glf/vdbTexture.h"
+#include "pxr/imaging/garch/vdbTexture.h"
 #include "pxr/imaging/glf/contextCaps.h"
 
 #include "pxr/base/tf/staticTokens.h"

@@ -29,7 +29,7 @@
 #include "pxr/imaging/hdSt/api.h"
 #include "pxr/imaging/hdSt/textureResource.h"
 
-#include "pxr/imaging/glf/vdbTexture.h"
+#include "pxr/imaging/garch/vdbTexture.h"
 #include "pxr/imaging/garch/textureHandle.h"
 
 #include "pxr/base/gf/bbox3d.h"
