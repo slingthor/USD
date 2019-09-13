@@ -90,7 +90,7 @@ public:
         TfToken name;
         HdStTextureResourceHandleSharedPtr handle;
 		GarchSamplerGPUHandle sampler;
-        enum { TEXTURE_2D, TEXTURE_UDIM_ARRAY, TEXTURE_UDIM_LAYOUT,
+        enum { TEXTURE_2D, TEXTURE_3D, TEXTURE_UDIM_ARRAY, TEXTURE_UDIM_LAYOUT,
                TEXTURE_PTEX_TEXEL, TEXTURE_PTEX_LAYOUT };
         int type;
     };

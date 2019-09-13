@@ -196,9 +196,7 @@ GarchTexture::BindingVector
 MtlfBaseTexture::GetBindings(TfToken const & identifier,
                              GarchSamplerGPUHandle samplerName)
 {
-    if (!_loaded) {
-        _ReadTexture();
-    }
+    _ReadTextureIfNotLoaded();
 
     return BindingVector(1,
                 Binding(identifier, GarchTextureTokens->texels,
@@ -207,36 +205,28 @@ MtlfBaseTexture::GetBindings(TfToken const & identifier,
 
 GarchTextureGPUHandle MtlfBaseTexture::GetAPITextureName()
 {
-    if (!_loaded) {
-        _ReadTexture();
-    }
+    _ReadTextureIfNotLoaded();
     
     return _textureName;
 }
 
 int MtlfBaseTexture::GetWidth()
 {
-    if (!_loaded) {
-        _ReadTexture();
-    }
+    _ReadTextureIfNotLoaded();
 
     return _currentWidth;
 }
 
 int MtlfBaseTexture::GetHeight()
 {
-    if (!_loaded) {
-        _ReadTexture();
-    }
+    _ReadTextureIfNotLoaded();
 
     return _currentHeight;
 }
 
 int MtlfBaseTexture::GetFormat()
 {
-    if (!_loaded) {
-        _ReadTexture();
-    }
+    _ReadTextureIfNotLoaded();
     
     return _format;
 }

@@ -45,7 +45,7 @@ HdStTextureResource::~HdStTextureResource()
 HdStSimpleTextureResource::HdStSimpleTextureResource(
      								GarchTextureHandleRefPtr const &textureHandle,
                                     HdTextureType textureType,
-     								HdWrap wrapS, HdWrap wrapT,
+     								HdWrap wrapS, HdWrap wrapT, HdWrap wrapR,
      								HdMinFilter minFilter,
 									HdMagFilter magFilter,
      								size_t memoryRequest)
@@ -58,6 +58,7 @@ HdStSimpleTextureResource::HdStSimpleTextureResource(
 , _memoryRequest(memoryRequest)
 , _wrapS(wrapS)
 , _wrapT(wrapT)
+, _wrapR(wrapR)
 , _minFilter(minFilter)
 , _magFilter(magFilter)
 {

@@ -103,6 +103,7 @@ pxr_library(garch
         uvTextureData
         uvTextureStorage
         uvTextureStorageData
+        vdbTexture
         ${optionalPublicClasses}
 
     PRIVATE_CLASSES
@@ -141,6 +142,7 @@ pxr_library(garch
         wrapTextureRegistry.cpp
         wrapUVTexture.cpp
         wrapUVTextureStorage.cpp
+        wrapVdbTexture.cpp
 
     PYMODULE_FILES
         __init__.py

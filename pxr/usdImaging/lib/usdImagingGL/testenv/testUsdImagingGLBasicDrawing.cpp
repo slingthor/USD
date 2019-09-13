@@ -167,18 +167,20 @@ My_TestGLDrawing::InitTest()
             // set same parameter as GlfSimpleLightingContext::SetStateFromOpenGL
             // OpenGL defaults
             _lightingContext = GarchSimpleLightingContext::New();
-            GarchSimpleLight light;
-            if (IsEnabledCameraLight()) {
-                light.SetPosition(GfVec4f(_translate[0], _translate[2], _translate[1], 0));
-            } else {
-                light.SetPosition(GfVec4f(0, -.5, .5, 0));
+            if (!IsEnabledSceneLights()) {
+	            GarchSimpleLight light;
+	            if (IsEnabledCameraLight()) {
+	                light.SetPosition(GfVec4f(_translate[0], _translate[2], _translate[1], 0));
+	            } else {
+	                light.SetPosition(GfVec4f(0, -.5, .5, 0));
+	            }
+	            light.SetDiffuse(GfVec4f(1,1,1,1));
+	            light.SetAmbient(GfVec4f(0,0,0,1));
+	            light.SetSpecular(GfVec4f(1,1,1,1));
+	            GarchSimpleLightVector lights;
+	            lights.push_back(light);
+	            _lightingContext->SetLights(lights);
             }
-            light.SetDiffuse(GfVec4f(1,1,1,1));
-            light.SetAmbient(GfVec4f(0,0,0,1));
-            light.SetSpecular(GfVec4f(1,1,1,1));
-            GarchSimpleLightVector lights;
-            lights.push_back(light);
-            _lightingContext->SetLights(lights);
 
             GarchSimpleMaterial material;
             material.SetAmbient(GfVec4f(0.2, 0.2, 0.2, 1.0));

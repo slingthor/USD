@@ -100,6 +100,8 @@ protected:
     GARCH_API
     virtual void _ReadTexture() override = 0;
 
+    void _ReadTextureIfNotLoaded();
+
     GARCH_API
     virtual void _UpdateTexture(GarchBaseTextureDataConstPtr texData) = 0;
     GARCH_API
@@ -117,6 +119,7 @@ protected:
 
     friend class GarchUVTexture;
     friend class GarchUVTextureStorage;
+    friend class GarchVdbTexture;
 
     // texture object
     GarchTextureGPUHandle _textureName;

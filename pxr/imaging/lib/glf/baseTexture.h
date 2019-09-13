@@ -69,6 +69,9 @@ public:
 
     GLF_API
     int GetHeight();
+    
+    GLF_API
+    int GetDepth();
 
     GLF_API
     int GetFormat();

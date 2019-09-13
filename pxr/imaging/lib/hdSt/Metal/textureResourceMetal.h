@@ -54,7 +54,7 @@ public:
     HDST_API
     HdStSimpleTextureResourceMetal(GarchTextureHandleRefPtr const &textureHandle,
                                    HdTextureType textureType,
-                                   HdWrap wrapS, HdWrap wrapT,
+                                   HdWrap wrapS, HdWrap wrapT, HdWrap wrapR,
                                    HdMinFilter minFilter, HdMagFilter magFilter,
                                    size_t memoryRequest);
     HDST_API

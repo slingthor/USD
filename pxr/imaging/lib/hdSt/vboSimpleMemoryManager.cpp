@@ -32,7 +32,7 @@
 #include "pxr/base/tf/iterator.h"
 
 #include "pxr/imaging/hdSt/bufferResource.h"
-#include "pxr/imaging/hdSt/glConversions.h"
+
 #include "pxr/imaging/hdSt/resourceFactory.h"
 #include "pxr/imaging/hdSt/vboSimpleMemoryManager.h"
 

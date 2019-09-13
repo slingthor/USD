@@ -26,6 +26,7 @@
 
 #include "pxr/imaging/hd/binding.h"
 #include "pxr/imaging/hd/perfLog.h"
+#include "pxr/imaging/hdSt/textureResource.h"
 #include "pxr/imaging/hd/tokens.h"
 
 #include "pxr/imaging/hf/perfLog.h"
@@ -34,12 +35,27 @@
 #include "pxr/imaging/garch/bindingMap.h"
 #include "pxr/imaging/garch/simpleLightingContext.h"
 
+#include "pxr/base/tf/staticTokens.h"
+
+#if defined(ARCH_GFX_OPENGL)
+#include "pxr/imaging/hdSt/GL/glslProgram.h"
+#endif
+#include "pxr/imaging/hdSt/resourceFactory.h"
+
 #include <boost/functional/hash.hpp>
 
 #include <string>
 #include <sstream>
 
 PXR_NAMESPACE_OPEN_SCOPE
+
+TF_DEFINE_PRIVATE_TOKENS(
+    _tokens,
+    // (DomeLightTexture)  // textures in previewSurface.glslfx
+    (domeLightIrradiance)
+    (domeLightPrefilter) 
+    (domeLightBRDF)
+);
 
 
 HdxSimpleLightingShader::HdxSimpleLightingShader()
@@ -117,6 +133,83 @@ HdxSimpleLightingShader::BindResources(HdSt_ResourceBinder const &binder,
 
     program.AssignSamplerUnits(_bindingMap);
     _lightingContext->BindSamplers(_bindingMap);
+
+#if defined(ARCH_GFX_OPENGL)
+    GLuint programId = 0;
+    
+    bool isOpenGL = HdStResourceFactory::GetInstance()->IsOpenGL();
+    if (isOpenGL) {
+        HdStGLSLProgram const &glslProgram(
+            dynamic_cast<const HdStGLSLProgram&>(program));
+        programId = glslProgram.GetGLProgram();
+    }
+#endif
+
+    for (auto const& light : _lightingContext->GetLights()){
+
+        if (light.IsDomeLight()) {
+
+            HdBinding irradianceBinding = 
+                                binder.GetBinding(_tokens->domeLightIrradiance);
+            if (irradianceBinding.GetType() == HdBinding::TEXTURE_2D) {
+                int samplerUnit = irradianceBinding.GetTextureUnit();
+                
+                uint32_t textureId = uint32_t(light.GetIrradianceId());
+                uint32_t samplerId = uint32_t(light.GetSamplerId());
+#if defined(ARCH_GFX_OPENGL)
+                if (isOpenGL) {
+                    glActiveTexture(GL_TEXTURE0 + samplerUnit);
+                    glBindTexture(GL_TEXTURE_2D, (GLuint)textureId);
+                    glBindSampler(samplerUnit, (unsigned int)samplerId);
+                    
+                    glProgramUniform1i(programId, irradianceBinding.GetLocation(),
+                                        samplerUnit);
+                }
+#endif
+            } 
+            HdBinding prefilterBinding = 
+                                binder.GetBinding(_tokens->domeLightPrefilter);
+            if (prefilterBinding.GetType() == HdBinding::TEXTURE_2D) {
+                int samplerUnit = prefilterBinding.GetTextureUnit();
+                
+                uint32_t textureId = uint32_t(light.GetPrefilterId());
+                uint32_t samplerId = uint32_t(light.GetSamplerId());
+#if defined(ARCH_GFX_OPENGL)
+                if (isOpenGL) {
+                    glActiveTexture(GL_TEXTURE0 + samplerUnit);
+                    glBindTexture(GL_TEXTURE_2D, (GLuint)textureId);
+                    glBindSampler(samplerUnit, (unsigned int)samplerId);
+                    
+                    glProgramUniform1i(programId, prefilterBinding.GetLocation(),
+                                        samplerUnit);
+                }
+#endif
+            } 
+            HdBinding brdfBinding = binder.GetBinding(_tokens->domeLightBRDF);
+            if (brdfBinding.GetType() == HdBinding::TEXTURE_2D) {
+                int samplerUnit = brdfBinding.GetTextureUnit();
+                
+                uint32_t textureId = uint32_t(light.GetBrdfId());
+                uint32_t samplerId = uint32_t(light.GetSamplerId());
+#if defined(ARCH_GFX_OPENGL)
+                if (isOpenGL) {
+                    glActiveTexture(GL_TEXTURE0 + samplerUnit);
+                    glBindTexture(GL_TEXTURE_2D, (GLuint)textureId);
+                    glBindSampler(samplerUnit, (unsigned int)samplerId);
+                    
+                    glProgramUniform1i(programId, brdfBinding.GetLocation(),
+                                       samplerUnit);
+                }
+#endif
+            }
+        }
+    }
+#if defined(ARCH_GFX_OPENGL)
+    if (isOpenGL) {
+        glActiveTexture(GL_TEXTURE0);
+    }
+#endif
+    binder.BindShaderResources(this);
 }
 
 /* virtual */
@@ -127,12 +220,93 @@ HdxSimpleLightingShader::UnbindResources(HdSt_ResourceBinder const &binder,
     // XXX: we'd like to use HdSt_ResourceBinder instead of GlfBindingMap.
     //
     _lightingContext->UnbindSamplers(_bindingMap);
+    
+#if defined(ARCH_GFX_OPENGL)
+    if (HdStResourceFactory::GetInstance()->IsOpenGL()) {
+       for (auto const& light : _lightingContext->GetLights()){
+
+            if (light.IsDomeLight()) {
+
+                HdBinding irradianceBinding =
+                                    binder.GetBinding(_tokens->domeLightIrradiance);
+                if (irradianceBinding.GetType() == HdBinding::TEXTURE_2D) {
+                    int samplerUnit = irradianceBinding.GetTextureUnit();
+                    glActiveTexture(GL_TEXTURE0 + samplerUnit);
+                    glBindTexture(GL_TEXTURE_2D, 0);
+                    
+                    glBindSampler(samplerUnit, 0);
+                }
+                HdBinding prefilterBinding =
+                                    binder.GetBinding(_tokens->domeLightPrefilter);
+                if (prefilterBinding.GetType() == HdBinding::TEXTURE_2D) {
+                    int samplerUnit = prefilterBinding.GetTextureUnit();
+                    glActiveTexture(GL_TEXTURE0 + samplerUnit);
+                    glBindTexture(GL_TEXTURE_2D, 0);
+                    
+                    glBindSampler(samplerUnit, 0);
+                }
+                HdBinding brdfBinding = binder.GetBinding(_tokens->domeLightBRDF);
+                if (brdfBinding.GetType() == HdBinding::TEXTURE_2D) {
+                    int samplerUnit = brdfBinding.GetTextureUnit();
+                    glActiveTexture(GL_TEXTURE0 + samplerUnit);
+                    glBindTexture(GL_TEXTURE_2D, 0);
+                    
+                    glBindSampler(samplerUnit, 0);
+                }
+            }
+        }
+        glActiveTexture(GL_TEXTURE0);
+    }
+#endif
 }
 
 /*virtual*/
 void
 HdxSimpleLightingShader::AddBindings(HdBindingRequestVector *customBindings)
 {
+    _lightTextureParams.clear();
+
+    bool haveDomeLight = false;
+    for (auto const& light : _lightingContext->GetLights()) { 
+
+        if (light.IsDomeLight() && !haveDomeLight) {
+
+            // For now we assume that the only simple light with a texture is
+            // a domeLight (ignoring RectLights, and multiple domeLights)
+            haveDomeLight = true;
+
+            // irradiance map
+            _lightTextureParams.push_back(
+                    HdMaterialParam(HdMaterialParam::ParamTypeTexture,
+                    _tokens->domeLightIrradiance,
+                    VtValue(GfVec4f(0.0)),
+                    SdfPath(),
+                    TfTokenVector(),
+                    HdTextureType::Uv));
+            // prefilter map
+            _lightTextureParams.push_back(
+                    HdMaterialParam(HdMaterialParam::ParamTypeTexture,
+                    _tokens->domeLightPrefilter,
+                    VtValue(GfVec4f(0.0)),
+                    SdfPath(),
+                    TfTokenVector(),
+                    HdTextureType::Uv));
+            // BRDF texture
+            _lightTextureParams.push_back(
+                    HdMaterialParam(HdMaterialParam::ParamTypeTexture,
+                    _tokens->domeLightBRDF,
+                    VtValue(GfVec4f(0.0)),
+                    SdfPath(),
+                    TfTokenVector(),
+                    HdTextureType::Uv));
+        }
+    }
+}
+
+HdMaterialParamVector const& 
+HdxSimpleLightingShader::GetParams() const 
+{
+    return _lightTextureParams;
 }
 
 void

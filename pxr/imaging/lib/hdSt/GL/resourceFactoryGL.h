@@ -149,6 +149,17 @@ public:
         HdExtComputationPrimvarDescriptorVector const &compPrimvars,
         int dispatchCount,
         int elementCount) const override;
+      
+    /// Creates a new HdSt_DomeLightComputationGPU computation
+    HDST_API
+    virtual HdSt_DomeLightComputationGPU *NewDomeLightComputationGPU(
+        TfToken token,
+        unsigned int sourceId,
+        unsigned int destId,
+        int width, int height,
+        unsigned int numLevels,
+        unsigned int level,
+        float roughness) const override;
 
     /// Creates a new render pass state for OpenGL
     HDST_API
@@ -180,7 +191,7 @@ public:
     virtual HdStSimpleTextureResource *NewSimpleTextureResource(
         GarchTextureHandleRefPtr const &textureHandle,
         HdTextureType textureType,
-        HdWrap wrapS, HdWrap wrapT,
+        HdWrap wrapS, HdWrap wrapT, HdWrap wrapR,
         HdMinFilter minFilter, HdMagFilter magFilter,
         size_t memoryRequest = 0) const override;
     

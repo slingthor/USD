@@ -101,6 +101,10 @@ public:
                                                   GarchImage::ImageOriginLocation originLocation,
                                                   std::vector<std::tuple<int, TfToken>>&& tiles) const override;
     
+    // Vdb Texture
+    GLF_API
+    virtual GarchVdbTextureRefPtr NewVdbTexture(const TfToken &imageFilePath) const override;
+    
 private:
     GlfContextCaps contextCaps;
 };

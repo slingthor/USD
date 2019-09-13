@@ -45,6 +45,11 @@ GarchSimpleLight::GarchSimpleLight(GfVec4f const & position) :
     _shadowIndex(0),
     _transform(GfMatrix4d().SetIdentity()),
     _shadowMatrix(GfMatrix4d().SetIdentity()),
+    _isDomeLight(false),
+    _samplerId(0),
+    _irradianceId(0),
+    _prefilterId(0),
+    _brdfId(0),
     _id()
 {
 }
@@ -258,6 +263,58 @@ void GarchSimpleLight::SetID(SdfPath const & id)
     _id = id;
 }
 
+bool
+GarchSimpleLight::IsDomeLight() const
+{
+    return _isDomeLight;
+}
+
+void
+GarchSimpleLight::SetIsDomeLight(bool isDomeLight)
+{
+    _isDomeLight = isDomeLight;
+}
+
+uint32_t const & GarchSimpleLight::GetSamplerId() const
+{
+    return _samplerId;
+}
+
+void GarchSimpleLight::SetSamplerId(uint32_t const & samplerId)
+{
+    _samplerId = samplerId;
+}
+
+uint32_t const & GarchSimpleLight::GetIrradianceId() const
+{
+    return _irradianceId;
+}
+
+void GarchSimpleLight::SetIrradianceId(uint32_t const & irradianceId)
+{
+    _irradianceId = irradianceId;
+}
+
+uint32_t const & GarchSimpleLight::GetPrefilterId() const
+{
+    return _prefilterId;
+}
+
+void GarchSimpleLight::SetPrefilterId(uint32_t const & prefilterId)
+{
+    _prefilterId = prefilterId;
+}
+
+uint32_t const & GarchSimpleLight::GetBrdfId() const
+{
+    return _brdfId;
+}
+
+void GarchSimpleLight::SetBrdfId(uint32_t const & brdfId)
+{
+    _brdfId = brdfId;
+}
+
 // -------------------------------------------------------------------------- //
 // VtValue requirements
 // -------------------------------------------------------------------------- //
@@ -281,6 +338,11 @@ GarchSimpleLight::operator==(const GarchSimpleLight& other) const
         &&  _transform == other._transform
         &&  _shadowMatrix == other._shadowMatrix
         &&  _isCameraSpaceLight == other._isCameraSpaceLight
+        &&  _isDomeLight == other._isDomeLight
+        &&  _samplerId == other._samplerId
+        &&  _irradianceId == other._irradianceId
+        &&  _prefilterId == other._prefilterId
+        &&  _brdfId == other._brdfId
         &&  _id == other._id;
 }
 
@@ -308,6 +370,11 @@ std::ostream& operator<<(std::ostream& out, const GarchSimpleLight& v)
         << v._transform
         << v._shadowMatrix
         << v._isCameraSpaceLight
+        << v._isDomeLight
+        << v._samplerId
+        << v._irradianceId
+        << v._prefilterId
+        << v._brdfId
         << v._id;
     return out;
 }

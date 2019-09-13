@@ -291,6 +291,7 @@ HdStMaterial::_GetTextureResourceHandle(
                   HdTextureType::Uv,
                   HdWrapClamp,
                   HdWrapClamp,
+        		  HdWrapClamp,
                   HdMinFilterNearest,
                   HdMagFilterNearest,
                   0));

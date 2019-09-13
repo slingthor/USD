@@ -33,10 +33,6 @@
 #include "pxr/imaging/hdSt/resourceFactory.h"
 //#include "pxr/imaging/hdSt/GL/glUtils.h"
 
-#include <boost/make_shared.hpp>
-#include <boost/scoped_ptr.hpp>
-#include <vector>
-
 #include "pxr/base/arch/hash.h"
 #include "pxr/base/tf/diagnostic.h"
 #include "pxr/base/tf/enum.h"
@@ -49,6 +45,9 @@
 #include "pxr/imaging/hf/perfLog.h"
 
 using namespace boost;
+#include <boost/make_shared.hpp>
+#include <boost/scoped_ptr.hpp>
+#include <vector>
 
 PXR_NAMESPACE_OPEN_SCOPE
 

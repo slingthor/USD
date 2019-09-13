@@ -1,7 +1,15 @@
 {
     "Plugins": [
         {
-        	"Info": {},
+        	"Info": {
+			     "Types": {
+	                    "UsdImagingGLDomeLightAdapter" : {
+	                        "bases": ["UsdImagingDomeLightAdapter"],
+	                        "isInternal": true,
+	                        "primTypeName": "PreviewDomeLight"
+	                   }
+		          }
+            },
             "LibraryPath": "@PLUG_INFO_LIBRARY_PATH@",
             "Name": "usdImagingGL",
             "ResourcePath": "@PLUG_INFO_RESOURCE_PATH@",

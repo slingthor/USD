@@ -65,16 +65,20 @@ public:
                 // shader parameter bindings
                 FALLBACK,             // fallback value
                 TEXTURE_2D,           // non-bindless uv texture
+                TEXTURE_3D,
                 TEXTURE_UDIM_ARRAY,   // non-bindless udim texture array
                 TEXTURE_UDIM_LAYOUT,  // non-bindless udim layout
                 TEXTURE_PTEX_TEXEL,   // non-bindless ptex texels
                 TEXTURE_PTEX_LAYOUT,  // non-bindless ptex layout
                 BINDLESS_TEXTURE_2D,          // bindless uv texture
+                BINDLESS_TEXTURE_3D,
                 BINDLESS_TEXTURE_UDIM_ARRAY,  // bindless uv texture array
                 BINDLESS_TEXTURE_UDIM_LAYOUT, // bindless udim layout
                 BINDLESS_TEXTURE_PTEX_TEXEL,  // bindless ptex texels
                 BINDLESS_TEXTURE_PTEX_LAYOUT, // bindless ptex layout
                 PRIMVAR_REDIRECT,    // primvar redirection
+				FIELD_REDIRECT,  // accesses 3d texture with potential
+                                // transform and fallback under different name
                 VERTEX_ID,           // vertex ID
                 BASE_VERTEX_ID,      // base vertex ID
                 FRONT_FACING,        // boolean indicating if fragment belongs to a front-facing primitive

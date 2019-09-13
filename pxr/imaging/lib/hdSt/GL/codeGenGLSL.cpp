@@ -425,6 +425,8 @@ namespace {
         case HdBinding::BINDLESS_SSBO_RANGE:
         case HdBinding::TEXTURE_2D:
         case HdBinding::BINDLESS_TEXTURE_2D:
+        case HdBinding::TEXTURE_3D:
+        case HdBinding::BINDLESS_TEXTURE_3D:
         case HdBinding::TEXTURE_UDIM_ARRAY:
         case HdBinding::BINDLESS_TEXTURE_UDIM_ARRAY:
         case HdBinding::TEXTURE_UDIM_LAYOUT:
@@ -665,6 +667,13 @@ HdSt_CodeGenGLSL::Compile()
                 _genCommon << "#define HD_HAS_" << it->second.name << " 1\n";
             }
         } else {
+            _genCommon << "#define HD_HAS_" << it->second.name << " 1\n";
+        }
+    }
+    
+    TF_FOR_ALL (it, _metaData.fieldRedirectBinding) {
+        HdBinding::Type bindingType = it->first.GetType();
+        if (bindingType == HdBinding::FIELD_REDIRECT) {
             _genCommon << "#define HD_HAS_" << it->second.name << " 1\n";
         }
     }
@@ -1101,6 +1110,10 @@ static void _EmitDeclaration(std::stringstream &str,
         case HdBinding::TEXTURE_2D:
         case HdBinding::BINDLESS_TEXTURE_2D:
             str << "uniform sampler2D " << name << ";\n";
+            break;
+        case HdBinding::TEXTURE_3D:
+        case HdBinding::BINDLESS_TEXTURE_3D:
+            str << "uniform sampler3D " << name << ";\n";
             break;
         case HdBinding::TEXTURE_UDIM_ARRAY:
         case HdBinding::BINDLESS_TEXTURE_UDIM_ARRAY:
@@ -2738,6 +2751,78 @@ HdSt_CodeGenGLSL::_GenerateShaderParameters()
                     << "vec2(0.0, 0.0)";
             }
             accessors << "); }\n";
+        } else if (bindingType == HdBinding::BINDLESS_TEXTURE_3D) {
+            // a function returning sampler3D is allowed in 430 or later
+            if (caps.glslVersion >= 430) {
+                accessors
+                << "sampler3D\n"
+                << "HdGetSampler_" << it->second.name << "() {\n"
+                << "  int shaderCoord = GetDrawingCoord().shaderCoord; \n"
+                << "  return sampler3D(shaderData[shaderCoord]." << it->second.name << ");\n"
+                << "  }\n";
+            }
+            accessors
+            << _GetUnpackedType(it->second.dataType, false)
+            << " HdGet_" << it->second.name << "() {\n"
+            << "  int shaderCoord = GetDrawingCoord().shaderCoord; \n"
+            << "  return "
+            << _GetPackedTypeAccessor(it->second.dataType, false) << "("
+            << "texture(sampler3D(shaderData[shaderCoord]." << it->second.name << "), ";
+            
+            if (!it->second.inPrimvars.empty()) {
+                accessors
+                << "\n"
+                << "#if defined(HD_HAS_" << it->second.inPrimvars[0] << ")\n"
+                << " HdGet_" << it->second.inPrimvars[0] << "().xyz\n"
+                << "#else\n"
+                << "vec3(0.0, 0.0, 0.0)\n"
+                << "#endif\n";
+            } else {
+                // allow to fetch uv texture without sampler coordinate for convenience.
+                accessors
+                << " vec3(0.0, 0.0, 0.0)";
+            }
+            accessors
+            << ")" << swizzle << ");\n"
+            << "}\n";
+        } else if (bindingType == HdBinding::TEXTURE_3D) {
+            declarations
+            << LayoutQualifier(it->first)
+            << "uniform sampler3D sampler3d_" << it->second.name << ";\n";
+            // a function returning sampler3D is allowed in 430 or later
+            if (caps.glslVersion >= 430) {
+                accessors
+                << "sampler3D\n"
+                << "HdGetSampler_" << it->second.name << "() {\n"
+                << "  return sampler3d_" << it->second.name << ";"
+                << "}\n";
+            }
+            // vec4 HdGet_name(vec3 coord) { return texture(sampler3d_name, coord).xyz; }
+            accessors
+            << _GetUnpackedType(it->second.dataType, false)
+            << " HdGet_" << it->second.name
+            << "(vec3 coord) { return "
+            << _GetPackedTypeAccessor(it->second.dataType, false)
+            << "(texture(sampler3d_" << it->second.name << ", coord)"
+            << swizzle << ");}\n";
+            // vec4 HdGet_name() { return HdGet_name(HdGet_st().xyz); }
+            accessors
+            << _GetUnpackedType(it->second.dataType, false)
+            << " HdGet_" << it->second.name
+            << "() { return HdGet_" << it->second.name << "(";
+            if (!it->second.inPrimvars.empty()) {
+                accessors
+                << "\n"
+                << "#if defined(HD_HAS_" << it->second.inPrimvars[0] << ")\n"
+                << "HdGet_" << it->second.inPrimvars[0] << "().xyz\n"
+                << "#else\n"
+                << "vec3(0.0, 0.0, 0.0)\n"
+                << "#endif\n";
+            } else {
+                accessors
+                << "vec3(0.0, 0.0, 0.0)";
+            }
+            accessors << "); }\n";
         } else if (bindingType == HdBinding::BINDLESS_TEXTURE_UDIM_ARRAY) {
             // a function returning sampler2DArray is allowed in 430 or later
             if (caps.apiVersion >= 430) {
@@ -2902,6 +2987,34 @@ HdSt_CodeGenGLSL::_GenerateShaderParameters()
                     << "\n}\n"
                     ;
             }
+        }
+    }
+    
+    TF_FOR_ALL (it, _metaData.fieldRedirectBinding) {
+        HdBinding::Type bindingType = it->first.GetType();
+        if (bindingType == HdBinding::FIELD_REDIRECT) {
+            
+            accessors
+                << "vec3 HdGet_" << it->second.name << "(vec3 p) {\n"
+                << "#if defined(HD_HAS_" << it->second.fieldName << "Texture)\n"
+                << "\n"
+                << "#if defined(HD_HAS_" << it->second.fieldName << "SamplingTransform)\n"
+                << "    vec4 q = vec4(HdGet_" << it->second.fieldName << "SamplingTransform() * vec4(p.xyz, 1));\n"
+                << "    vec3 s = q.xyz/q.w;\n"
+                << "#else\n"
+                << "    vec3 s = p;\n"
+                << "#endif\n"
+                << "\n"
+                << "    return vec3(HdGet_" << it->second.fieldName << "Texture(s).xyz);\n"
+                << "#else\n"
+                << "#if defined(HD_HAS_" << it->second.name << "Fallback)\n"
+                << "    return vec3(HdGet_" << it->second.name << "Fallback().xyz);\n"
+                << "#else\n"
+                << "    return vec3(0.0);\n"
+                << "#endif\n"
+                << "#endif\n"
+                << "};\n"
+                ;
         }
     }
     

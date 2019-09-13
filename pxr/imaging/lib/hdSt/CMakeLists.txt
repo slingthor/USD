@@ -18,11 +18,13 @@ if (OPENSUBDIV_HAS_METAL_COMPUTE)
 endif()
 
 if (PXR_ENABLE_GL_SUPPORT)
-    set(GFX             glf)
+    set(GFX             glf
+    			hgiGL)
     set(GFXADDITIONAL   GL/bufferRelocatorGL
                         GL/bufferResourceGL
                         GL/codeGenGLSL
                         GL/dispatchBufferGL
+                        GL/domeLightComputationsGL
                         GL/drawTargetTextureResourceGL
                         GL/extCompGpuComputationGL
                         GL/flatNormalsGL
@@ -55,6 +57,7 @@ if (PXR_ENABLE_METAL_SUPPORT)
                         Metal/bufferResourceMetal
                         Metal/codeGenMSL
                         Metal/dispatchBufferMetal
+                        Metal/domeLightComputationsMetal
                         Metal/drawTargetTextureResourceMetal
                         Metal/extCompGpuComputationMetal
                         Metal/flatNormalsMetal
@@ -102,6 +105,7 @@ pxr_library(hdSt
         copyComputation
         debugCodes
         dispatchBuffer
+        domeLightComputations
         drawItem
         drawItemInstance
         drawTarget
@@ -114,10 +118,13 @@ pxr_library(hdSt
         extCompGpuComputationResource
         extCompGpuPrimvarBufferSource
         fallbackLightingShader
+        field
+        fieldResource
         flatNormals
         geometricShader
         glConversions
         glslfxShader
+        hgiConversions
         imageShaderRenderPass
         instancer
         interleavedMemoryManager
@@ -130,6 +137,7 @@ pxr_library(hdSt
         persistentBuffer
         points
         program
+	renderBuffer
         renderDelegate
         renderPass
         renderPassShader

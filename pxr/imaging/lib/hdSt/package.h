@@ -34,6 +34,9 @@ HDST_API
 TfToken HdStPackageComputeShader();
 
 HDST_API
+TfToken HdStPackageDomeLightShader();
+
+HDST_API
 TfToken HdStPackagePtexTextureShader();
 
 HDST_API

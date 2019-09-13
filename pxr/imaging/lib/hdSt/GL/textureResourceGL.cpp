@@ -40,7 +40,9 @@ HdStSimpleTextureResourceGL::HdStSimpleTextureResourceGL(
          HdTextureType textureType,
          size_t memoryRequest):
         HdStSimpleTextureResourceGL(textureHandle, textureType,
-            /*wrapS*/ HdWrapUseMetadata, /*wrapT*/ HdWrapUseMetadata,
+            /*wrapS*/ HdWrapUseMetadata,
+            /*wrapT*/ HdWrapUseMetadata,
+            /*wrapR*/ HdWrapUseMetadata,
             /*minFilter*/ HdMinFilterNearestMipmapLinear, 
             /*magFilter*/ HdMagFilterLinear, memoryRequest)
 {
@@ -49,10 +51,10 @@ HdStSimpleTextureResourceGL::HdStSimpleTextureResourceGL(
 HdStSimpleTextureResourceGL::HdStSimpleTextureResourceGL(
     GarchTextureHandleRefPtr const &textureHandle,
     HdTextureType textureType,
-    HdWrap wrapS, HdWrap wrapT,
+    HdWrap wrapS, HdWrap wrapT, HdWrap wrapR,
     HdMinFilter minFilter, HdMagFilter magFilter,
     size_t memoryRequest)
-: HdStSimpleTextureResource(textureHandle, textureType, wrapS, wrapT, minFilter, magFilter, memoryRequest)
+: HdStSimpleTextureResource(textureHandle, textureType, wrapS, wrapT, wrapR, minFilter, magFilter, memoryRequest)
 {
     // In cases of upstream errors, texture handle can be null.
     if (_textureHandle) {
@@ -99,6 +101,7 @@ GarchSamplerGPUHandle HdStSimpleTextureResourceGL::GetTexelsSamplerId()
         // its own wrap mode. The fallback value is always HdWrapRepeat
         GLenum fwrapS = HdStGLConversions::GetWrap(_wrapS);
         GLenum fwrapT = HdStGLConversions::GetWrap(_wrapT);
+        GLenum fwrapR = HdStGLConversions::GetWrap(_wrapR);
         GLenum fminFilter = HdStGLConversions::GetMinFilter(_minFilter);
         GLenum fmagFilter = HdStGLConversions::GetMagFilter(_magFilter);
         
@@ -115,6 +118,11 @@ GarchSamplerGPUHandle HdStSimpleTextureResourceGL::GetTexelsSamplerId()
                 fwrapT = VtDictionaryGet<GLuint>(txInfo, "wrapModeT");
             }
             
+            if ((_wrapR == HdWrapUseMetadata || _wrapR == HdWrapLegacy) &&
+                VtDictionaryIsHolding<GLuint>(txInfo, "wrapModeR")) {
+                fwrapR = VtDictionaryGet<GLuint>(txInfo, "wrapModeR");
+            }
+            
             if (!_texture->IsMinFilterSupported(fminFilter)) {
                 fminFilter = GL_NEAREST;
             }
@@ -129,6 +137,9 @@ GarchSamplerGPUHandle HdStSimpleTextureResourceGL::GetTexelsSamplerId()
         _sampler = s;
         glSamplerParameteri(_sampler, GL_TEXTURE_WRAP_S, fwrapS);
         glSamplerParameteri(_sampler, GL_TEXTURE_WRAP_T, fwrapT);
+        if (_textureType == HdTextureType::Uvw) {
+            glSamplerParameteri(_sampler, GL_TEXTURE_WRAP_R, fwrapR);
+        }
         glSamplerParameteri(_sampler, GL_TEXTURE_MIN_FILTER, fminFilter);
         glSamplerParameteri(_sampler, GL_TEXTURE_MAG_FILTER, fmagFilter);
         glSamplerParameterf(_sampler, GL_TEXTURE_MAX_ANISOTROPY_EXT,

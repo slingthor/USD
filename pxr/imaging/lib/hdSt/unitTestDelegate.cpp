@@ -97,6 +97,7 @@ HdSt_UnitTestDelegate::GetTextureResource(SdfPath const& textureId)
                         textureType,
                         HdWrapUseMetadata,
                         HdWrapUseMetadata,
+                		HdWrapUseMetadata,
                         HdMinFilterNearestMipmapLinear,
                         HdMagFilterLinear,
                         0));

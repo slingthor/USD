@@ -129,6 +129,12 @@ public:
     HDST_API
     static HdStProgramSharedPtr GetComputeProgram(TfToken const &shaderToken,
         HdStResourceRegistry *resourceRegistry);
+    
+    HDST_API
+    static HdStProgramSharedPtr GetComputeProgram(
+        TfToken const &shaderFileName,
+        TfToken const &shaderToken,
+        HdStResourceRegistry *resourceRegistry);
 
 protected:
     HDST_API

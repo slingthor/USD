@@ -48,7 +48,9 @@ HdStSimpleTextureResourceMetal::HdStSimpleTextureResourceMetal(
     HdTextureType textureType,
     size_t memoryRequest):
         HdStSimpleTextureResourceMetal(textureHandle, textureType,
-            /*wrapS*/ HdWrapUseMetadata, /*wrapT*/ HdWrapUseMetadata,
+            /*wrapS*/ HdWrapUseMetadata,
+            /*wrapT*/ HdWrapUseMetadata,
+            /*wrapR*/ HdWrapUseMetadata,
             /*minFilter*/ HdMinFilterNearestMipmapLinear, 
             /*magFilter*/ HdMagFilterLinear, memoryRequest)
 {
@@ -57,10 +59,12 @@ HdStSimpleTextureResourceMetal::HdStSimpleTextureResourceMetal(
 HdStSimpleTextureResourceMetal::HdStSimpleTextureResourceMetal(
     GarchTextureHandleRefPtr const &textureHandle,
         HdTextureType textureType,
-        HdWrap wrapS, HdWrap wrapT,
+        HdWrap wrapS, HdWrap wrapT, HdWrap wrapR,
         HdMinFilter minFilter, HdMagFilter magFilter,
         size_t memoryRequest)
-: HdStSimpleTextureResource(textureHandle, textureType, wrapS, wrapT, minFilter, magFilter, memoryRequest)
+: HdStSimpleTextureResource(
+        textureHandle, textureType, wrapS, wrapT, wrapR,
+        minFilter, magFilter, memoryRequest)
 {
     // In cases of upstream errors, texture handle can be null.
     if (_textureHandle) {
@@ -97,6 +101,7 @@ GarchSamplerGPUHandle HdStSimpleTextureResourceMetal::GetTexelsSamplerId()
         // its own wrap mode. The fallback value is always HdWrapRepeat
         MTLSamplerAddressMode fwrapS = HdStMetalConversions::GetWrap(_wrapS);
         MTLSamplerAddressMode fwrapT = HdStMetalConversions::GetWrap(_wrapT);
+        MTLSamplerAddressMode fwrapR = HdStMetalConversions::GetWrap(_wrapR);
         MTLSamplerMinMagFilter fminFilter = HdStMetalConversions::GetMinFilter(_minFilter);
         MTLSamplerMinMagFilter fmagFilter = HdStMetalConversions::GetMagFilter(_magFilter);
         MTLSamplerMipFilter fmipFilter = HdStMetalConversions::GetMipFilter(_minFilter);
@@ -114,6 +119,11 @@ GarchSamplerGPUHandle HdStSimpleTextureResourceMetal::GetTexelsSamplerId()
                 fwrapT = HdStMetalConversions::ConvertGLWrap(VtDictionaryGet<GLuint>(txInfo, "wrapModeT"));
             }
             
+            if (_wrapR == HdWrapUseMetadata &&
+                VtDictionaryIsHolding<GLuint>(txInfo, "wrapModeR")) {
+                fwrapR = HdStMetalConversions::ConvertGLWrap(VtDictionaryGet<GLuint>(txInfo, "wrapModeR"));
+            }
+            
             if (!_texture->IsMinFilterSupported(fminFilter)) {
                 fminFilter = MTLSamplerMinMagFilterNearest;
             }
@@ -126,6 +136,7 @@ GarchSamplerGPUHandle HdStSimpleTextureResourceMetal::GetTexelsSamplerId()
         
         samplerDesc.sAddressMode = fwrapS;
         samplerDesc.tAddressMode = fwrapT;
+        samplerDesc.rAddressMode = fwrapR;
         samplerDesc.minFilter = fminFilter;
         samplerDesc.magFilter = fmagFilter;
         samplerDesc.mipFilter = fmipFilter;

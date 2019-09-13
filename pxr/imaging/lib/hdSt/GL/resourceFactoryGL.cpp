@@ -29,6 +29,7 @@
 #include "pxr/imaging/hdSt/GL/bufferResourceGL.h"
 #include "pxr/imaging/hdSt/GL/codeGenGLSL.h"
 #include "pxr/imaging/hdSt/GL/dispatchBufferGL.h"
+#include "pxr/imaging/hdSt/GL/domeLightComputationsGL.h"
 #include "pxr/imaging/hdSt/GL/drawTargetTextureResourceGL.h"
 #include "pxr/imaging/hdSt/GL/extCompGpuComputationGL.h"
 #include "pxr/imaging/hdSt/GL/flatNormalsGL.h"
@@ -200,12 +201,12 @@ HdStSimpleTextureResource *
 HdStResourceFactoryGL::NewSimpleTextureResource(
     GarchTextureHandleRefPtr const &textureHandle,
     HdTextureType textureType,
-    HdWrap wrapS, HdWrap wrapT,
+    HdWrap wrapS, HdWrap wrapT, HdWrap wrapR,
     HdMinFilter minFilter, HdMagFilter magFilter,
     size_t memoryRequest) const
 {
     return new HdStSimpleTextureResourceGL(
-        textureHandle, textureType, wrapS, wrapT, minFilter, magFilter,
+        textureHandle, textureType, wrapS, wrapT, wrapR, minFilter, magFilter,
         memoryRequest);
 }
 
@@ -243,6 +244,20 @@ HdStResourceFactoryGL::NewExtCompGPUComputationGPU(
 {
     return new HdStExtCompGpuComputationGL(
                     id, resource, compPrimvars, dispatchCount, elementCount);
+}
+
+HdSt_DomeLightComputationGPU*
+HdStResourceFactoryGL::NewDomeLightComputationGPU(
+    TfToken token,
+    unsigned int sourceId,
+    unsigned int destId,
+    int width, int height,
+    unsigned int numLevels,
+    unsigned int level,
+    float roughness) const
+{
+    return new HdSt_DomeLightComputationGPUGL(token, sourceId, destId,
+                                                 width, height, numLevels, level, roughness);
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

@@ -75,41 +75,45 @@ GlfBaseTexture::~GlfBaseTexture()
         glDeleteTextures(1, &t);
     }
 }
-
-
-GarchTextureGPUHandle GlfBaseTexture::GetAPITextureName()
-{
-    if (!_loaded) {
-        _ReadTexture();
-    }
     
+GarchTextureGPUHandle
+GlfBaseTexture::GetAPITextureName()
+
+{
+    _ReadTextureIfNotLoaded();
+
     return _textureName;
 }
 
-int GlfBaseTexture::GetWidth()
+int
+GlfBaseTexture::GetWidth()
 {
-    if (!_loaded) {
-        _ReadTexture();
-    }
-    
+    _ReadTextureIfNotLoaded();
+
     return _currentWidth;
 }
 
-int GlfBaseTexture::GetHeight()
+int
+GlfBaseTexture::GetHeight()
 {
-    if (!_loaded) {
-        _ReadTexture();
-    }
-    
+    _ReadTextureIfNotLoaded();
+
     return _currentHeight;
 }
 
-int GlfBaseTexture::GetFormat()
+int
+GlfBaseTexture::GetDepth()
 {
-    if (!_loaded) {
-        _ReadTexture();
-    }
-    
+    _ReadTextureIfNotLoaded();
+
+    return _currentDepth;
+}
+
+int
+GlfBaseTexture::GetFormat()
+{
+    _ReadTextureIfNotLoaded();
+
     return _format;
 }
 
@@ -135,9 +139,7 @@ GarchTexture::BindingVector
 GlfBaseTexture::GetBindings(TfToken const & identifier,
                             GarchSamplerGPUHandle samplerName)
 {
-    if (!_loaded) {
-        _ReadTexture();
-    }
+    _ReadTextureIfNotLoaded();
 
     return BindingVector(1,
                 Binding(

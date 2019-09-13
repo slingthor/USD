@@ -63,6 +63,16 @@ HdStProgram::GetComputeProgram(
     TfToken const &shaderToken,
     HdStResourceRegistry *resourceRegistry)
 {
+    return GetComputeProgram(HdStPackageComputeShader(), shaderToken,
+                             resourceRegistry);
+}
+
+HdStProgramSharedPtr
+HdStProgram::GetComputeProgram(
+    TfToken const &shaderFileName,
+    TfToken const &shaderToken,
+    HdStResourceRegistry *resourceRegistry)
+{
     // Find the program from registry
     HdInstance<HdStProgram::ID, HdStProgramSharedPtr> programInstance;
 
@@ -78,7 +88,13 @@ HdStProgram::GetComputeProgram(
                 HdTokens->computeShader));
         
         boost::scoped_ptr<HioGlslfx> glslfx(
-            new HioGlslfx(HdStPackageComputeShader()));
+            new HioGlslfx(shaderFileName));
+        std::string errorString;
+        if (!glslfx->IsValid(&errorString)){
+            TF_CODING_ERROR("Failed to parse " + shaderFileName.GetString()
+                            + ": " + errorString);
+            return HdStProgramSharedPtr();
+        }
 
         std::string header = newProgram->GetComputeHeader();
         if (!newProgram->CompileShader(

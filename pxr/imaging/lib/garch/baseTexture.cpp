@@ -77,23 +77,26 @@ GarchBaseTexture::~GarchBaseTexture()
 {
 }
 
-
-GarchTextureGPUHandle
-GarchBaseTexture::GetAPITextureName()
+void
+GarchBaseTexture::_ReadTextureIfNotLoaded()
 {
     if (!_loaded) {
         _ReadTexture();
     }
-    
+}
+
+GarchTextureGPUHandle
+GarchBaseTexture::GetAPITextureName()
+{
+    _ReadTextureIfNotLoaded();
+
     return _textureName;
 }
 
 int
 GarchBaseTexture::GetWidth()
 {
-    if (!_loaded) {
-        _ReadTexture();
-    }
+    _ReadTextureIfNotLoaded();
     
     return _currentWidth;
 }
@@ -101,9 +104,7 @@ GarchBaseTexture::GetWidth()
 int
 GarchBaseTexture::GetHeight()
 {
-    if (!_loaded) {
-        _ReadTexture();
-    }
+    _ReadTextureIfNotLoaded();
     
     return _currentHeight;
 }
@@ -111,9 +112,7 @@ GarchBaseTexture::GetHeight()
 int
 GarchBaseTexture::GetDepth()
 {
-    if (!_loaded) {
-        _ReadTexture();
-    }
+    _ReadTextureIfNotLoaded();
     
     return _currentDepth;
 }
@@ -121,18 +120,14 @@ GarchBaseTexture::GetDepth()
 int
 GarchBaseTexture::GetFormat()
 {
-    if (!_loaded) {
-        _ReadTexture();
-    }
+    _ReadTextureIfNotLoaded();
     
     return _format;
 }
 
 GarchTextureGPUHandle GarchBaseTexture::GetTextureName()
 {
-    if (!_loaded) {
-        _ReadTexture();
-    }
+    _ReadTextureIfNotLoaded();
     
     return _textureName;
 }
@@ -142,8 +137,8 @@ GarchBaseTexture::GetTextureInfo(bool forceLoad)
 {
     VtDictionary info;
     
-    if (!_loaded && forceLoad) {
-        _ReadTexture();
+    if (forceLoad) {
+        _ReadTextureIfNotLoaded();
     }
     
     if (_loaded) {

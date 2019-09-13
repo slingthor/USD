@@ -31,6 +31,7 @@
 #include "pxr/imaging/hdSt/Metal/bufferResourceMetal.h"
 #include "pxr/imaging/hdSt/Metal/codeGenMSL.h"
 #include "pxr/imaging/hdSt/Metal/dispatchBufferMetal.h"
+#include "pxr/imaging/hdSt/Metal/domeLightComputationsMetal.h"
 #include "pxr/imaging/hdSt/Metal/drawTargetTextureResourceMetal.h"
 #include "pxr/imaging/hdSt/Metal/extCompGpuComputationMetal.h"
 #include "pxr/imaging/hdSt/Metal/flatNormalsMetal.h"
@@ -203,12 +204,12 @@ HdStSimpleTextureResource *
 HdStResourceFactoryMetal::NewSimpleTextureResource(
     GarchTextureHandleRefPtr const &textureHandle,
     HdTextureType textureType,
-    HdWrap wrapS, HdWrap wrapT,
+    HdWrap wrapS, HdWrap wrapT, HdWrap wrapR,
     HdMinFilter minFilter, HdMagFilter magFilter,
     size_t memoryRequest) const
 {
     return new HdStSimpleTextureResourceMetal(
-        textureHandle, textureType, wrapS, wrapT, minFilter, magFilter,
+        textureHandle, textureType, wrapS, wrapT, wrapR, minFilter, magFilter,
         memoryRequest);
 }
 
@@ -236,7 +237,7 @@ HdStProgram *HdStResourceFactoryMetal::NewProgram(
     return new HdStMSLProgram(role);
 }
 
-HdStExtCompGpuComputation *
+HdStExtCompGpuComputation*
 HdStResourceFactoryMetal::NewExtCompGPUComputationGPU(
     SdfPath const &id,
     HdStExtCompGpuComputationResourceSharedPtr const &resource,
@@ -248,6 +249,19 @@ HdStResourceFactoryMetal::NewExtCompGPUComputationGPU(
         id, resource, compPrimvars, dispatchCount, elementCount);
 }
 
+HdSt_DomeLightComputationGPU*
+HdStResourceFactoryMetal::NewDomeLightComputationGPU(
+    TfToken token,
+    unsigned int sourceId,
+    unsigned int destId,
+    int width, int height,
+    unsigned int numLevels,
+    unsigned int level,
+    float roughness) const
+{
+    return new HdSt_DomeLightComputationGPUMetal(token, sourceId, destId,
+                    width, height, numLevels, level, roughness);
+}
 
 PXR_NAMESPACE_CLOSE_SCOPE
 

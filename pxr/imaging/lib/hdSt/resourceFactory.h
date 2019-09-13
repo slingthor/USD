@@ -58,6 +58,7 @@ class HdSt_QuadrangulateComputationGPU;
 class HdSt_SmoothNormalsComputationGPU;
 class HdStSimpleTextureResource;
 class HdStExtCompGpuComputation;
+class HdSt_DomeLightComputation;
 
 typedef boost::shared_ptr<class HdBufferArrayRange> HdBufferArrayRangeSharedPtr;
 typedef boost::shared_ptr<class HdBufferArray> HdBufferArraySharedPtr;
@@ -68,6 +69,8 @@ typedef boost::shared_ptr<class HdSt_GeometricShader> HdSt_GeometricShaderPtr;
 typedef boost::shared_ptr<class HdStRenderPassShader>
                             HdStRenderPassShaderSharedPtr;
 typedef boost::shared_ptr<class HdStShaderCode> HdStShaderCodeSharedPtr;
+typedef boost::shared_ptr<class HdSt_DomeLightComputationGPU>
+                            HdSt_DomeLightComputationGPUSharedPtr;
 typedef std::vector<HdStShaderCodeSharedPtr> HdStShaderCodeSharedPtrVector;
 
 typedef boost::shared_ptr<class HdStExtCompGpuComputationResource>
@@ -186,6 +189,17 @@ public:
         int dispatchCount,
         int elementCount) const = 0;
 
+    /// Creates a new HdSt_DomeLightComputationGPU computation
+    HDST_API
+    virtual HdSt_DomeLightComputationGPU *NewDomeLightComputationGPU(
+        TfToken token,
+        unsigned int sourceId,
+        unsigned int destId,
+        int width, int height,
+        unsigned int numLevels,
+        unsigned int level,
+        float roughness) const = 0;
+
     /// Creates a new render pass state
     HDST_API
     virtual HdStRenderPassState *NewRenderPassState() const = 0;
@@ -216,7 +230,7 @@ public:
     virtual HdStSimpleTextureResource *NewSimpleTextureResource(
         GarchTextureHandleRefPtr const &textureHandle,
         HdTextureType textureType,
-        HdWrap wrapS, HdWrap wrapT,
+        HdWrap wrapS, HdWrap wrapT, HdWrap wrapR,
         HdMinFilter minFilter, HdMagFilter magFilter,
         size_t memoryRequest = 0) const = 0;
 
