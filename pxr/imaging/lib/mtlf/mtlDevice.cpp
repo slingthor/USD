@@ -215,9 +215,9 @@ void MtlfMetalContext::Init(id<MTLDevice> _device, int width, int height)
     renderDevices = NULL;
     
     if (_device == nil) {
-        currentDevice = MtlfMetalContext::GetMetalDevice(PREFER_INTEGRATED_GPU);
+        //currentDevice = MtlfMetalContext::GetMetalDevice(PREFER_INTEGRATED_GPU);
         //currentDevice = MtlfMetalContext::GetMetalDevice(PREFER_DISCRETE_GPU);
-        //currentDevice = MtlfMetalContext::GetMetalDevice(PREFER_DEFAULT_GPU);
+        currentDevice = MtlfMetalContext::GetMetalDevice(PREFER_DEFAULT_GPU);
     }
     else {
         currentDevice = _device;

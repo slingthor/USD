@@ -84,8 +84,12 @@ surfaceShader(vec4 Peye, vec3 Neye, vec4 color, vec4 patchCoord)
     vec3 specularColor       = HdGet_specularColor().xyz;
     bool useSpecularWorkflow = (GETVALUE(HdGet_useSpecularWorkflow) == 1);
 #if defined(ARCH_GFX_METAL)
-    if (specularColor.y == specularColor.z && specularColor.y == 0)
-        specularColor = specularColor.xxx;
+    if (HdGet_specularColor_IsTextureSource()) {
+        if (specularColor.y == specularColor.z == 0.0) {
+            // At the moment, assume this implied the texture is a single channel grey scale
+            specularColor = specularColor.xxx;
+        }
+    }
 #endif
     vec3 clearcoatColor      = vec3(1.0);
     float specularAmount     = 1.0;

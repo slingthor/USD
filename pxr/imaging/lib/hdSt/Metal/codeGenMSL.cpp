@@ -4762,18 +4762,19 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
         // adjust datatype
         std::string swizzle = _GetSwizzleString(it->second.dataType);
         bool addScalarAccessor = true;
+        bool isTextureSource = false;
 
         HdBinding::Type bindingType = it->first.GetType();
         if (bindingType == HdBinding::FALLBACK) {
             if (swizzle != ".x")
                 swizzle = "";
-
+/*
             // TEMP: FIXME: THIS IS REALY BAD: Sort something better out here. I think there's a Hydra bug
             // causing the diffuseColour to be represented as a float rather than a vec3, which doesn't
             // cause an issue in GLSL but does in MSL
             if (it->second.name == "diffuseColor")
                 swizzle = ".x";
-
+*/
             accessors
                 << _GetUnpackedType(it->second.dataType, false)
                 << " HdGet_" << it->second.name << "() {\n"
@@ -4817,6 +4818,7 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
             accessors
                 << ")" << swizzle << ");\n"
                 << "}\n";
+            isTextureSource = true;
         } else if (bindingType == HdBinding::TEXTURE_2D) {
             declarations
                 << "sampler samplerBind_" << it->second.name << ";\n"
@@ -4861,6 +4863,7 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
                     << "vec2(0.0, 0.0)";
             }
             accessors << "); }\n";
+            isTextureSource = true;
         } else if (bindingType == HdBinding::BINDLESS_TEXTURE_3D) {
             accessors
                 << _GetUnpackedType(it->second.dataType, false)
@@ -4886,6 +4889,7 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
             accessors
                 << ")" << swizzle << ");\n"
                 << "}\n";
+            isTextureSource = true;
         } else if (bindingType == HdBinding::TEXTURE_3D) {
             declarations
                 << "sampler samplerBind_" << it->second.name << ";\n"
@@ -4930,6 +4934,7 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
                     << "vec3(0.0, 0.0, 0.0)";
             }
             accessors << "); }\n";
+            isTextureSource = true;
         } else if (bindingType == HdBinding::BINDLESS_TEXTURE_UDIM_ARRAY) {
             // a function returning sampler2DArray is allowed in 430 or later
             if (caps.glslVersion >= 430) {
@@ -5136,6 +5141,11 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
                     << "}\n";
             }
         }
+        
+        accessors
+            << "bool HdGet_" << it->second.name << "_IsTextureSource() {\n"
+            << "  return " << isTextureSource << "; \n"
+            << "}\n";
     }
     
     TF_FOR_ALL (it, _metaData.fieldRedirectBinding) {
