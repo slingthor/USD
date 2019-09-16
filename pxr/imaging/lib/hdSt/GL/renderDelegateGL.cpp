@@ -31,11 +31,14 @@
 #include "pxr/imaging/glf/contextCaps.h"
 #include "pxr/imaging/glf/diagnostic.h"
 
+#include "pxr/imaging/hgiGL/hgi.h"
+
 PXR_NAMESPACE_OPEN_SCOPE
 
 HdStRenderDelegateGL::HdStRenderDelegateGL()
     : HdStRenderDelegate()
 {
+    _hgi = new HgiGL();
 }
 
 HdStRenderDelegateGL::HdStRenderDelegateGL(HdRenderSettingsMap const& settingsMap)

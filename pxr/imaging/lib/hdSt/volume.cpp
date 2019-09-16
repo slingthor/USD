@@ -42,7 +42,7 @@
 
 #include "pxr/imaging/hio/glslfx.h"
 #include "pxr/imaging/garch/vdbTexture.h"
-#include "pxr/imaging/glf/contextCaps.h"
+#include "pxr/imaging/garch/contextCaps.h"
 
 #include "pxr/base/tf/staticTokens.h"
 

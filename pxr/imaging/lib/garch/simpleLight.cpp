@@ -46,12 +46,12 @@ GarchSimpleLight::GarchSimpleLight(GfVec4f const & position) :
     _transform(GfMatrix4d().SetIdentity()),
     _shadowMatrix(GfMatrix4d().SetIdentity()),
     _isDomeLight(false),
-    _samplerId(0),
-    _irradianceId(0),
-    _prefilterId(0),
-    _brdfId(0),
     _id()
 {
+    _samplerId.Clear();
+    _irradianceId.Clear();
+    _prefilterId.Clear();
+    _brdfId.Clear();
 }
 
 GarchSimpleLight::~GarchSimpleLight()
@@ -275,42 +275,42 @@ GarchSimpleLight::SetIsDomeLight(bool isDomeLight)
     _isDomeLight = isDomeLight;
 }
 
-uint32_t const & GarchSimpleLight::GetSamplerId() const
+GarchSamplerGPUHandle const & GarchSimpleLight::GetSamplerId() const
 {
     return _samplerId;
 }
 
-void GarchSimpleLight::SetSamplerId(uint32_t const & samplerId)
+void GarchSimpleLight::SetSamplerId(GarchSamplerGPUHandle const & samplerId)
 {
     _samplerId = samplerId;
 }
 
-uint32_t const & GarchSimpleLight::GetIrradianceId() const
+GarchTextureGPUHandle const & GarchSimpleLight::GetIrradianceId() const
 {
     return _irradianceId;
 }
 
-void GarchSimpleLight::SetIrradianceId(uint32_t const & irradianceId)
+void GarchSimpleLight::SetIrradianceId(GarchTextureGPUHandle const & irradianceId)
 {
     _irradianceId = irradianceId;
 }
 
-uint32_t const & GarchSimpleLight::GetPrefilterId() const
+GarchTextureGPUHandle const & GarchSimpleLight::GetPrefilterId() const
 {
     return _prefilterId;
 }
 
-void GarchSimpleLight::SetPrefilterId(uint32_t const & prefilterId)
+void GarchSimpleLight::SetPrefilterId(GarchTextureGPUHandle const & prefilterId)
 {
     _prefilterId = prefilterId;
 }
 
-uint32_t const & GarchSimpleLight::GetBrdfId() const
+GarchTextureGPUHandle const & GarchSimpleLight::GetBrdfId() const
 {
     return _brdfId;
 }
 
-void GarchSimpleLight::SetBrdfId(uint32_t const & brdfId)
+void GarchSimpleLight::SetBrdfId(GarchTextureGPUHandle const & brdfId)
 {
     _brdfId = brdfId;
 }
@@ -371,10 +371,10 @@ std::ostream& operator<<(std::ostream& out, const GarchSimpleLight& v)
         << v._shadowMatrix
         << v._isCameraSpaceLight
         << v._isDomeLight
-        << v._samplerId
-        << v._irradianceId
-        << v._prefilterId
-        << v._brdfId
+        << (uint64_t)v._samplerId.handle
+        << (uint64_t)v._irradianceId.handle
+        << (uint64_t)v._prefilterId.handle
+        << (uint64_t)v._brdfId.handle
         << v._id;
     return out;
 }

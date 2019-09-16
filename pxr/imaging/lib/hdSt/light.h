@@ -30,6 +30,7 @@
 #include "pxr/imaging/hd/light.h"
 
 #include "pxr/imaging/garch/simpleLight.h"
+#include "pxr/imaging/garch/texture.h"
 
 #include "pxr/base/tf/staticTokens.h"
 #include "pxr/base/vt/dictionary.h"
@@ -40,7 +41,6 @@
 #include <vector>
 
 PXR_NAMESPACE_OPEN_SCOPE
-
 
 class HdResourceRegistry;
 class HdSceneDelegate;
@@ -91,7 +91,7 @@ private:
                                     HdSceneDelegate *sceneDelegate);
     
     /// called by _CreateDomeLight to add the compute tasks
-    void _SetupComputations(GLuint sourceTexture, 
+    void _SetupComputations(GarchTextureGPUHandle const &sourceTexture,
                             HdResourceRegistry *resourceRegistry);
 
 private:
@@ -103,9 +103,9 @@ private:
 
     HdStTextureResourceSharedPtr _textureResource;
 
-    GLuint _irradianceTexture;
-    GLuint _prefilterTexture;
-    GLuint _brdfTexture;
+    GarchTextureGPUHandle _irradianceTexture;
+    GarchTextureGPUHandle _prefilterTexture;
+    GarchTextureGPUHandle _brdfTexture;
 };
 
 

@@ -24,7 +24,7 @@
 #define HDST_RENDER_DELEGATE_H
 
 #include "pxr/pxr.h"
-#include "pxr/imaging/hgiGL/hgi.h"
+#include "pxr/imaging/hgi/hgi.h"
 #include "pxr/imaging/hdSt/api.h"
 #include "pxr/imaging/hd/engine.h"
 #include "pxr/imaging/hd/renderDelegate.h"
@@ -196,6 +196,9 @@ protected:
     HDST_API
     Hgi* GetHgi();
 
+protected:
+    Hgi *_hgi;
+    
 private:
     static const TfTokenVector SUPPORTED_RPRIM_TYPES;
     static const TfTokenVector SUPPORTED_SPRIM_TYPES;
@@ -207,8 +210,6 @@ private:
     static HdStResourceRegistrySharedPtr _resourceRegistry;
 
     HdRenderSettingDescriptorList _settingDescriptors;
-
-    HgiGL _hgiGL;
 
     void _Initialize();
 

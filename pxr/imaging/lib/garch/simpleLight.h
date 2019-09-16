@@ -26,6 +26,8 @@
 
 /// \file garch/simpleLight.h
 
+#include "pxr/imaging/garch/texture.h"
+
 #include "pxr/pxr.h"
 #include "pxr/imaging/garch/api.h"
 #include "pxr/base/gf/matrix4d.h"
@@ -35,6 +37,7 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+struct GarchSamplerGPUHandle;
 
 class GarchSimpleLight {
 public:
@@ -136,24 +139,24 @@ public:
     // the following Id's are GL resource handles for the precomputed textures
     // created by HdStLight
     GARCH_API
-    uint32_t const & GetIrradianceId() const;
+    GarchTextureGPUHandle const & GetIrradianceId() const;
     GARCH_API
-    void SetIrradianceId(uint32_t const & irradianceId);
+    void SetIrradianceId(GarchTextureGPUHandle const & irradianceId);
     
     GARCH_API
-    uint32_t const & GetPrefilterId() const;
+    GarchTextureGPUHandle const & GetPrefilterId() const;
     GARCH_API
-    void SetPrefilterId(uint32_t const & prefilterId);
+    void SetPrefilterId(GarchTextureGPUHandle const & prefilterId);
     
     GARCH_API
-    uint32_t const & GetBrdfId() const;
+    GarchTextureGPUHandle const & GetBrdfId() const;
     GARCH_API
-    void SetBrdfId(uint32_t const & brdfId);
+    void SetBrdfId(GarchTextureGPUHandle const & brdfId);
     
     GARCH_API
-    uint32_t const & GetSamplerId() const;
+    GarchSamplerGPUHandle const & GetSamplerId() const;
     GARCH_API
-    void SetSamplerId(uint32_t const & samplerId);
+    void SetSamplerId(GarchSamplerGPUHandle const & samplerId);
 
     GARCH_API
     virtual bool operator ==(GarchSimpleLight const & other) const;
@@ -186,10 +189,10 @@ private:
     // domeLight specific parameters
     bool _isDomeLight;
     // handles for the resource bindings from HdXSimpleLightingShader
-    uint32_t _samplerId;
-    uint32_t _irradianceId; // pre-computed irradiance map
-    uint32_t _prefilterId;  // pre-computed preFiltered map
-    uint32_t _brdfId;       // pre-computed BRDF look up texture
+    GarchSamplerGPUHandle _samplerId;
+    GarchTextureGPUHandle _irradianceId; // pre-computed irradiance map
+    GarchTextureGPUHandle _prefilterId;  // pre-computed preFiltered map
+    GarchTextureGPUHandle _brdfId;       // pre-computed BRDF look up texture
 
     SdfPath _id;
 };

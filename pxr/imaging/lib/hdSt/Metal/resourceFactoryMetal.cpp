@@ -252,8 +252,8 @@ HdStResourceFactoryMetal::NewExtCompGPUComputationGPU(
 HdSt_DomeLightComputationGPU*
 HdStResourceFactoryMetal::NewDomeLightComputationGPU(
     TfToken token,
-    unsigned int sourceId,
-    unsigned int destId,
+    GarchTextureGPUHandle const &sourceId,
+    GarchTextureGPUHandle const &destId,
     int width, int height,
     unsigned int numLevels,
     unsigned int level,

@@ -146,6 +146,8 @@ HdStRenderDelegate::_Initialize()
         HdStRenderSettingsTokens->enableTinyPrimCulling,
         VtValue(bool(TfGetEnvSetting(HD_ENABLE_GPU_TINY_PRIM_CULLING))) };
     _PopulateDefaultSettings(_settingDescriptors);
+    
+    _hgi = NULL;
 }
 
 HdRenderSettingDescriptorList
@@ -368,7 +370,7 @@ HdStRenderDelegate::CreateBprim(TfToken const& typeId,
     } else if (typeId == _tokens->openvdbAsset) {
         return new HdStField(bprimId, typeId);
     } else if (typeId == HdPrimTypeTokens->renderBuffer) {
-        return new HdStRenderBuffer(&_hgiGL, bprimId);
+        return new HdStRenderBuffer(_hgi, bprimId);
     } else {
         TF_CODING_ERROR("Unknown Bprim Type %s", typeId.GetText());
     }
@@ -384,7 +386,7 @@ HdStRenderDelegate::CreateFallbackBprim(TfToken const& typeId)
     } else if (typeId == _tokens->openvdbAsset) {
         return new HdStField(SdfPath::EmptyPath(), typeId);
     } else if (typeId == HdPrimTypeTokens->renderBuffer) {
-        return new HdStRenderBuffer(&_hgiGL, SdfPath::EmptyPath());
+        return new HdStRenderBuffer(_hgi, SdfPath::EmptyPath());
     } else {
         TF_CODING_ERROR("Unknown Bprim Type %s", typeId.GetText());
     }
@@ -468,7 +470,7 @@ HdStRenderDelegate::GetMaterialNetworkSelector() const
 Hgi*
 HdStRenderDelegate::GetHgi()
 {
-    return &_hgiGL;
+    return _hgi;
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

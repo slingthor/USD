@@ -215,7 +215,25 @@ struct GarchTextureGPUHandle {
     }
     operator MtlfMultiTexture() const { return multiTexture; }
 #endif
+
+#if defined(ARCH_GFX_METAL)
+    bool operator==(GarchTextureGPUHandle const &other) const {
+        return other.multiTexture == multiTexture;
+    }
     
+    bool operator!=(GarchTextureGPUHandle const &other) const {
+        return other.multiTexture != multiTexture;
+    }
+#else
+    bool operator==(GarchTextureGPUHandle const &other) const {
+        return other.handle == handle;
+    }
+    
+    bool operator!=(GarchTextureGPUHandle const &other) const {
+        return other.handle != handle;
+    }
+#endif
+
     // Storage
     union {
         void* handle;
@@ -266,6 +284,24 @@ struct GarchSamplerGPUHandle {
         return *this;
     }
     operator MtlfMultiSampler() const { return multiSampler; }
+#endif
+    
+#if defined(ARCH_GFX_METAL)
+    bool operator==(GarchSamplerGPUHandle const &other) const {
+        return other.multiSampler == multiSampler;
+    }
+    
+    bool operator!=(GarchSamplerGPUHandle const &other) const {
+        return other.multiSampler != multiSampler;
+    }
+#else
+    bool operator==(GarchSamplerGPUHandle const &other) const {
+        return other.handle == handle;
+    }
+    
+    bool operator!=(GarchSamplerGPUHandle const &other) const {
+        return other.handle != handle;
+    }
 #endif
     
     // Storage

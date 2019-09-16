@@ -48,18 +48,22 @@ TF_DEFINE_PRIVATE_TOKENS(
 
 HdStLight::HdStLight(SdfPath const &id, TfToken const &lightType)
     : HdLight(id),
-    _lightType(lightType),
-    _irradianceTexture(0),
-    _prefilterTexture(0),
-    _brdfTexture(0)
+    _lightType(lightType)
 {
+    _irradianceTexture.Clear();
+    _prefilterTexture.Clear();
+    _brdfTexture.Clear();
 }
 
 HdStLight::~HdStLight()
 {
-    glDeleteTextures(1, &_irradianceTexture);
-    glDeleteTextures(1, &_prefilterTexture);
-    glDeleteTextures(1, &_brdfTexture);
+#if defined(ARCH_GFX_OPENGL)
+    uint32_t t[] = { _irradianceTexture, _prefilterTexture, _brdfTexture };
+    glDeleteTextures(sizeof(t) / sizeof(t[0]), t);
+#endif
+#if defined(ARCH_GFX_METAL)
+    TF_CODING_ERROR("Not Implemented");
+#endif
 }
 
 GarchSimpleLight
@@ -126,8 +130,8 @@ HdStLight::_PrepareDomeLight(SdfPath const &id,
     GfVec4f p = GfVec4f(hdp[0], hdp[1], hdp[2], 1.0f);
 
     // get/load the texture resource
-    uint32_t textureId = 0; // environment map
-    uint32_t samplerId = 0;
+    GarchTextureGPUHandle textureId; // environment map
+    GarchSamplerGPUHandle samplerId;
     VtValue textureResourceValue = sceneDelegate->GetLightParamValue(id, 
                                             HdLightTokens->textureResource);
         
@@ -141,8 +145,8 @@ HdStLight::_PrepareDomeLight(SdfPath const &id,
 
             // Use the texture resource (environment map) to pre-compute 
             // the necessary maps (irradiance, pre-filtered, BRDF LUT)
-            textureId = uint32_t(_textureResource->GetTexelsTextureId());
-            samplerId = uint32_t(_textureResource->GetTexelsSamplerId());
+            textureId = _textureResource->GetTexelsTextureId();
+            samplerId = _textureResource->GetTexelsSamplerId();
 
             // Schedule texture computations
             _SetupComputations(textureId, 
@@ -150,7 +154,7 @@ HdStLight::_PrepareDomeLight(SdfPath const &id,
         }
     } 
 
-    // Create the Glf Simple Light object that will be used by the rest
+    // Create the Garch Simple Light object that will be used by the rest
     // of the pipeline. No support for shadows for this translated light.
     GarchSimpleLight l;
     l.SetPosition(p);
@@ -165,23 +169,31 @@ HdStLight::_PrepareDomeLight(SdfPath const &id,
 }
 
 void 
-HdStLight::_SetupComputations(GLuint sourceTexture, 
+HdStLight::_SetupComputations(GarchTextureGPUHandle const &sourceTexture,
                                 HdResourceRegistry *resourceRegistry)
 {
-    // get the width and height of the source texture
+#if defined(ARCH_GFX_METAL)
+    TF_FATAL_CODING_ERROR("Not Implemented");
+#endif
+
     int textureWidth = 0, textureHeight = 0;
+#if defined(ARCH_GFX_OPENGL)
+    // get the width and height of the source texture
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, sourceTexture);
     glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &textureWidth);
     glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, 
                             &textureHeight);
-
+#endif
 
     // initialize the 3 textures and add computations to the resource registry
     GLuint numLevels = 1, numPrefilterLevels = 5, level = 0;
 
     // Diffuse Irradiance
-    glGenTextures(1, &_irradianceTexture);
+#if defined(ARCH_GFX_OPENGL)
+    uint32_t t;
+    glGenTextures(1, &t);
+    _irradianceTexture = t;
     glBindTexture(GL_TEXTURE_2D, _irradianceTexture);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
@@ -189,7 +201,8 @@ HdStLight::_SetupComputations(GLuint sourceTexture,
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexStorage2D(GL_TEXTURE_2D, numLevels, GL_RGBA16F, textureWidth, 
                     textureHeight);
-    
+#endif
+
     // Add Computation 
     HdSt_DomeLightComputationGPUSharedPtr irradianceComputation(
         HdSt_DomeLightComputationGPU::New(_tokens->domeLightIrradiance, 
@@ -197,8 +210,10 @@ HdStLight::_SetupComputations(GLuint sourceTexture,
             numLevels, level));
     resourceRegistry->AddComputation(nullptr, irradianceComputation);
 
-    // PreFilter 
-    glGenTextures(1, &_prefilterTexture);
+    // PreFilter
+#if defined(ARCH_GFX_OPENGL)
+    glGenTextures(1, &t);
+    _prefilterTexture = t;
     glBindTexture(GL_TEXTURE_2D, _prefilterTexture);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
@@ -207,6 +222,7 @@ HdStLight::_SetupComputations(GLuint sourceTexture,
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexStorage2D(GL_TEXTURE_2D, numPrefilterLevels, GL_RGBA16F, 
                     textureWidth, textureHeight);
+#endif
 
     // Add Computation for each of the mipLevels 
     for (unsigned int mipLevel = 0; mipLevel < numPrefilterLevels; ++mipLevel) {
@@ -220,7 +236,9 @@ HdStLight::_SetupComputations(GLuint sourceTexture,
     }
 
     // BRDF LUT
-    glGenTextures(1, &_brdfTexture);
+#if defined(ARCH_GFX_OPENGL)
+    glGenTextures(1, &t);
+    _brdfTexture = t;
     glBindTexture(GL_TEXTURE_2D, _brdfTexture);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
@@ -228,6 +246,7 @@ HdStLight::_SetupComputations(GLuint sourceTexture,
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexStorage2D(GL_TEXTURE_2D, numLevels, GL_RGBA16F, 
                     textureHeight, textureHeight);
+#endif
 
     // Add Computation 
     HdSt_DomeLightComputationGPUSharedPtr brdfComputation(

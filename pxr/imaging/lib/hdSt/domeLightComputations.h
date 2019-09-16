@@ -30,7 +30,10 @@
 
 #include "pxr/base/tf/token.h"
 
+#include "pxr/imaging/garch/texture.h"
+
 PXR_NAMESPACE_OPEN_SCOPE
+
 
 typedef boost::shared_ptr<class HdStProgram> HdStProgramSharedPtr;
 
@@ -45,8 +48,8 @@ public:
     /// Constructor
     HDST_API
     static HdSt_DomeLightComputationGPUSharedPtr New(TfToken token,
-                                 unsigned int sourceId,
-                                 unsigned int destId,
+                                 GarchTextureGPUHandle const &sourceId,
+                                 GarchTextureGPUHandle const &destId,
                                  int width, int height,
                                  unsigned int numLevels,
                                  unsigned int level,
@@ -69,8 +72,8 @@ protected:
     /// Constructor
     HDST_API
     HdSt_DomeLightComputationGPU(TfToken token,
-                                 unsigned int sourceId,
-                                 unsigned int destId,
+                                 GarchTextureGPUHandle const &sourceId,
+                                 GarchTextureGPUHandle const &destId,
                                  int width, int height,
                                  unsigned int numLevels,
                                  unsigned int level,
@@ -81,8 +84,8 @@ protected:
 
     TfToken _shaderToken;
 
-    unsigned int _sourceTextureId;
-    unsigned int _destTextureId;
+    GarchTextureGPUHandle _sourceTextureId;
+    GarchTextureGPUHandle _destTextureId;
     int _textureWidth;
     int _textureHeight;
 

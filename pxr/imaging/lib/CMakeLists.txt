@@ -7,11 +7,14 @@ set(DIRS
     glf
     mtlf
     hgi
-    hgiGL
     hd
     hdSt
     hdx
 )
+
+if (${PXR_ENABLE_GL_SUPPORT})
+    add_subdirectory(hgiGL)
+endif()
 
 foreach(d ${DIRS})
     add_subdirectory(${d})

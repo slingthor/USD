@@ -41,7 +41,9 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 HdSt_DomeLightComputationGPUSharedPtr
 HdSt_DomeLightComputationGPU::New(
-    TfToken token, unsigned int sourceId, unsigned int destId,
+    TfToken token,
+    GarchTextureGPUHandle const &sourceId,
+    GarchTextureGPUHandle const &destId,
     int width, int height, unsigned int numLevels, unsigned int level,
     float roughness)
 {
@@ -52,7 +54,8 @@ HdSt_DomeLightComputationGPU::New(
 }
 
 HdSt_DomeLightComputationGPU::HdSt_DomeLightComputationGPU(
-    TfToken token, unsigned int sourceId, unsigned int destId, 
+    TfToken token,
+    GarchTextureGPUHandle const &sourceId, GarchTextureGPUHandle const &destId,
     int width, int height, unsigned int numLevels, unsigned int level, 
     float roughness) 
     : _shaderToken(token), 
