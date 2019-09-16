@@ -1,11 +1,11 @@
 /*!
-\page hdStream_page_front HdStream : GL-based Hydra renderer plugin
+\page hdStormMetal_page_front HdStream : Metal-based Hydra renderer plugin
 \if ( PIXAR_MFB_BUILD )
-\mainpage  HdStream : GL-based Hydra renderer plugin
+\mainpage  HdStormMetal : Metal-based Hydra renderer plugin
 \publicLib
 \endif
 
-HdStream implements a Hydra renderer plugin that uses OpenGL. 
+HdStorm implements a Hydra renderer plugin that uses Metal. 
 This is a thin plugin layer, you will find most rendering functionality 
 in the HdSt library.
 
