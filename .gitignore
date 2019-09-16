@@ -1,3 +1,8 @@
 .p4*
 .DS_Store
 /build_scripts/make_relocatable.pyc
+/lib/python/OpenGL/__init__.pyc
+/lib/python/OpenGL/plugins.pyc
+/lib/python/OpenGL/version.pyc
+/lib/python/PySide/__init__.pyc
+/lib/python/PySide/_utils.pyc
