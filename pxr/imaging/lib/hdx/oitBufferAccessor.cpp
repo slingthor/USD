@@ -25,6 +25,11 @@
 
 #include "pxr/imaging/glf/glew.h"
 
+#if defined(ARCH_GFX_METAL)
+#include "pxr/imaging/mtlf/mtlDevice.h"
+#include "pxr/imaging/mtlf/drawTarget.h"
+#endif
+
 #include "pxr/imaging/garch/resourceFactory.h"
 #include "pxr/imaging/garch/contextCaps.h"
 
@@ -166,8 +171,26 @@ HdxOitBufferAccessor::InitializeOitBuffersIfNecessary()
         stCounterBar->GetResource(HdxTokens->hdxOitCounterBuffer);
 
     GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
+
+#if defined(ARCH_GFX_METAL)
+    uint8_t clearCounter = 255; // -1
+
+    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
+    MtlfMetalContext::MtlfMultiBuffer mtlMultiBuffer = stCounterResource->GetId();
+
+    for(int iGPU = 0; iGPU < GPUState::gpuCount; iGPU++) {
+        id<MTLCommandBuffer> commandBuffer = [context->gpus[iGPU].commandQueue commandBuffer];
+        id<MTLBlitCommandEncoder> blitEncoder = [commandBuffer blitCommandEncoder];
+
+        auto mtlBuffer = mtlMultiBuffer[iGPU];
+        [blitEncoder fillBuffer:mtlBuffer range:NSMakeRange(0, mtlBuffer.length) value:clearCounter];
+
+        [blitEncoder endEncoding];
+        [commandBuffer commit];
+    }
+
+#elif defined(ARCH_GFX_OPENGL)
     const GLint clearCounter = -1;
-#if defined(ARCH_GFX_OPENGL)
     // Old versions of glew may be missing glClearNamedBufferData
     if (ARCH_LIKELY(caps.directStateAccessEnabled) && glClearNamedBufferData) {
         glClearNamedBufferData(stCounterResource->GetId(),

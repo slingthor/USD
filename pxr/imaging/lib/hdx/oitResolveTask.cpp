@@ -23,6 +23,11 @@
 //
 #include "pxr/imaging/glf/glew.h"
 
+#if defined(ARCH_GFX_METAL)
+#include "pxr/imaging/mtlf/mtlDevice.h"
+#include "pxr/imaging/mtlf/drawTarget.h"
+#endif
+
 #include "pxr/imaging/garch/resourceFactory.h"
 #include "pxr/imaging/garch/contextCaps.h"
 
@@ -96,7 +101,11 @@ _GetScreenSize()
 
     GfVec2i s;
 
-#if defined(ARCH_GFX_OPENGL)
+#if defined(ARCH_GFX_METAL)
+    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext()->GetMetalContext();
+    s[0] = context->gpus[context->currentGPU].mtlColorTexture.width;
+    s[1] = context->gpus[context->currentGPU].mtlColorTexture.width;
+#elif defined(ARCH_GFX_OPENGL)
     if (HdStResourceFactory::GetInstance()->IsOpenGL()) {
         GLint attachType = 0;
         glGetFramebufferAttachmentParameteriv(
@@ -158,10 +167,6 @@ _GetScreenSize()
         }
         return s;
     }
-#endif
-#if defined(ARCH_GFX_METAL)
-    s[0] = 0;
-    s[1] = 0;
 #endif
     return s;
 }
@@ -344,7 +349,9 @@ HdxOitResolveTask::Execute(HdTaskContext* ctx)
     }
 
     _renderPassState->Bind(); 
-#if defined(ARCH_GFX_OPENGL)
+#if defined(ARCH_GFX_METAL)
+    // AJG TODO: Use Metal to enable depth testing
+#elif defined(ARCH_GFX_OPENGL)
     bool isOpenGL = HdStResourceFactory::GetInstance()->IsOpenGL();
     if (isOpenGL) {
         glDisable(GL_DEPTH_TEST);
@@ -353,7 +360,9 @@ HdxOitResolveTask::Execute(HdTaskContext* ctx)
 
     _renderPass->Execute(_renderPassState, GetRenderTags());
 
-#if defined(ARCH_GFX_OPENGL)
+#if defined(ARCH_GFX_METAL)
+    // AJG TODO: Use Metal to enable depth testing
+#elif defined(ARCH_GFX_OPENGL)
     if (isOpenGL) {
         glEnable(GL_DEPTH_TEST);
     }

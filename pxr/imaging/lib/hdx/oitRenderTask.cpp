@@ -131,7 +131,11 @@ HdxOitRenderTask::Execute(HdTaskContext* ctx)
     }
     
     // We render into a SSBO -- not MSSA compatible
-#if defined(ARCH_GFX_OPENGL)
+#if defined(ARCH_GFX_METAL)
+
+// AJG TODO: Deal with MSAA on Metal
+
+#elif defined(ARCH_GFX_OPENGL)
     bool isOpenGL = HdStResourceFactory::GetInstance()->IsOpenGL();
     bool oldMSAA = false;
     bool oldPointSmooth = false;
@@ -168,7 +172,13 @@ HdxOitRenderTask::Execute(HdTaskContext* ctx)
     //
     // Post Execute Restore
     //
-#if defined(ARCH_GFX_OPENGL)
+
+
+#if defined(ARCH_GFX_METAL)
+
+// AJG TODO: Deal with MSAA on Metal
+
+#elif defined(ARCH_GFX_OPENGL)
     if (isOpenGL) {
         if (oldMSAA) {
             glEnable(GL_MULTISAMPLE);
