@@ -1122,6 +1122,11 @@ def InstallOpenSubdiv(context, force, buildArgs):
         sdkroot = os.environ.get('SDKROOT')
 
         if iOS():
+            PatchFile(srcOSDDir + "/cmake/iOSToolchain.cmake", 
+                [("set(SDKROOT $ENV{SDKROOT})",
+                  "set(CMAKE_TRY_COMPILE_TARGET_TYPE \"STATIC_LIBRARY\")\n"
+                  "set(SDKROOT $ENV{SDKROOT})")])
+
             # We build for macOS in order to leverage the STRINGIFY binary built
             srcOSDmacOSDir = srcOSDDir + "_macOS"
             if os.path.isdir(srcOSDmacOSDir):
