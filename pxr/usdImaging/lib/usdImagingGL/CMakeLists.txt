@@ -32,11 +32,13 @@ pxr_library(usdImagingGL
         hio
         garch
         hd
+        hdx
         pxOsd
         sdf
         sdr
         usd
         usdGeom
+        usdHydra
         usdShade
         usdImaging
         ar

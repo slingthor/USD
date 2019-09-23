@@ -19,7 +19,7 @@ endif()
 
 if (PXR_ENABLE_GL_SUPPORT)
     set(GFX             glf
-    			hgiGL)
+    			        hgiGL)
     set(GFXADDITIONAL   GL/bufferRelocatorGL
                         GL/bufferResourceGL
                         GL/codeGenGLSL
@@ -137,7 +137,7 @@ pxr_library(hdSt
         persistentBuffer
         points
         program
-	renderBuffer
+	    renderBuffer
         renderDelegate
         renderPass
         renderPassShader
