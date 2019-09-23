@@ -178,6 +178,9 @@ HdStRenderDelegate::GetRenderStats() const
 
 HdStRenderDelegate::~HdStRenderDelegate()
 {
+    if (_hgi) {
+        delete _hgi;
+    }
     // Here we could destroy the resource registry when the last render
     // delegate HdSt is destroyed, however we prefer to keep the resources
     // around to match previous singleton behaviour (for now).
