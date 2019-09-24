@@ -1027,6 +1027,22 @@ def InstallPtex_Windows(context, force, buildArgs):
 
 def InstallPtex_LinuxOrMacOS(context, force, buildArgs):
     with CurrentWorkingDirectory(DownloadURL(PTEX_URL, context, force)):
+
+        if iOS():
+            # Replace util/test executables with static libraries to avoid issues with code signing.
+            PatchFile(context.instDir + "/src/ptex-2.1.28/src/utils/CMakeLists.txt", 
+                [("add_executable(ptxinfo ptxinfo.cpp)",
+                  "add_library(ptxinfo STATIC ptxinfo.cpp)")])
+            PatchFile(context.instDir + "/src/ptex-2.1.28/src/tests/CMakeLists.txt", 
+                [("add_executable(wtest wtest.cpp)",
+                  "add_library(wtest STATIC wtest.cpp)"),
+                 ("add_executable(rtest rtest.cpp)",
+                  "add_library(rtest STATIC rtest.cpp)"),
+                 ("add_executable(ftest ftest.cpp)",
+                  "add_library(ftest STATIC ftest.cpp)"),
+                 ("add_executable(halftest halftest.cpp)",
+                  "add_library(halftest STATIC halftest.cpp)")])
+
         RunCMake(context, force, buildArgs)
 
 PTEX = Dependency("Ptex", InstallPtex, "include/PtexVersion.h")
