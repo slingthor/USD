@@ -308,16 +308,26 @@ def RunCMake(context, force, buildArgs = None, hostPlatform = False):
                 '-DCMAKE_TOOLCHAIN_FILE={usdSrcDir}/cmake/toolchains/ios.toolchain.cmake '
                 .format(usdSrcDir=context.usdSrcDir))
 
+        SDKVersion = subprocess.check_output(['xcodebuild', '-version']).strip()[6:10]
+
+        if os.environ.get('XCODE_ATTRIBUTE_CODE_SIGN_ID') == "-":
+            CODE_SIGN_ID="-"
+        elif SDKVersion >= "11.0":
+            CODE_SIGN_ID="Apple Development"
+        else:
+            CODE_SIGN_ID="iPhone Developer"
+
         extraArgs.append(
-                '-DIOS_PLATFORM=OS ' 
+                '-DIOS_PLATFORM=OS '
                 '-DENABLE_VISIBILITY=1 '
                 '-DAPPLEIOS=1 '
                 '-DENABLE_ARC=0 '
-                '-DCMAKE_XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY="iPhone Developer" '
+                '-DCMAKE_XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY="{codesignid}" '
                 '-DCMAKE_XCODE_ATTRIBUTE_DEVELOPMENT_TEAM={developmentTeam} '
                 '-DPYTHON_INCLUDE_DIR=/System/Library/Frameworks/Python.framework/Versions/2.7/include/python2.7  '
                 '-DPYTHON_LIBRARY=/System/Library/Frameworks/Python.framework/Versions/2.7/lib '
                 '-DPYTHON_EXECUTABLE:FILEPATH=/usr/bin/python '.format(
+                    codesignid=CODE_SIGN_ID,
                     developmentTeam=os.environ.get('XCODE_ATTRIBUTE_DEVELOPMENT_TEAM')))
 
     # We use -DCMAKE_BUILD_TYPE for single-configuration generators 
