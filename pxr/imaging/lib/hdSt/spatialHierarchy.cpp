@@ -74,7 +74,17 @@ namespace MissingFunctions {
     // TODO: this can be #DEFINED
     bool allLarger(const GfVec3f &lhs, const GfVec3f &rhs)
     {
-        return (lhs.data()[0] >= rhs.data()[0]) && (lhs.data()[1] >= rhs.data()[1]) && (lhs.data()[2] >= rhs.data()[2]);
+        return (lhs.data()[0] > rhs.data()[0]) && (lhs.data()[1] > rhs.data()[1]) && (lhs.data()[2] > rhs.data()[2]);
+    }
+    
+    bool firstAllSmallerThanSecond(const GfVec3f &lhs, const GfVec3f &rhs)
+    {
+        return (lhs.data()[0] < rhs.data()[0]) && (lhs.data()[1] < rhs.data()[1]) && (lhs.data()[2] < rhs.data()[2]);
+    }
+    
+    bool firstAllLargerThanSecond(const GfVec3f &lhs, const GfVec3f &rhs)
+    {
+        return (lhs.data()[0] > rhs.data()[0]) && (lhs.data()[1] > rhs.data()[1]) && (lhs.data()[2] > rhs.data()[2]);
     }
     
     void LogBounds(GfBBox3f bounds)
@@ -84,7 +94,10 @@ namespace MissingFunctions {
     
     bool IntersectsAllChildren(const OctreeNode* node, const GfRange3f &entity)
     {
-        return (allLarger(entity.GetSize(), node->halfSize));
+        const GfVec3f &midPoint = node->aabb.GetMidpoint();
+        
+        return firstAllSmallerThanSecond(entity.GetMin(), midPoint)
+            && firstAllLargerThanSecond(entity.GetMax(), midPoint);
     }
 
     bool IntersectsAtLeast2Children(const OctreeNode* node, const GfRange3f &entity)
