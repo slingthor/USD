@@ -572,11 +572,9 @@ def InstallZlib(context, force, buildArgs):
 
         if iOS():
             # Replace test executables with static libraries to avoid issues with code signing.
-            PatchFile(context.instDir + "/src/zlib-1.2.11/CMakeLists.txt", 
-                [("add_executable(example test/example.c)",
-                  "add_library(example STATIC test/example.c)"),
-                 ("add_executable(minigzip test/minigzip.c)",
-                  "add_library(minigzip STATIC test/minigzip.c)")])
+            PatchFile("CMakeLists.txt", 
+                [("add_executable(example test/example.c)", "add_library(example STATIC test/example.c)"),
+                 ("add_executable(minigzip test/minigzip.c)", "add_library(minigzip STATIC test/minigzip.c)")])
 
         RunCMake(context, force, buildArgs)
 
@@ -847,6 +845,12 @@ def InstallTIFF(context, force, buildArgs):
             PatchFile("CMakeLists.txt", 
                    [("option(ld-version-script \"Enable linker version script\" ON)", 
                      "option(ld-version-script \"Enable linker version script\" OFF)")])
+
+        if iOS():
+            # Skip contrib to avoid issues with code signing.
+            PatchFile("CMakeLists.txt", 
+                    [("add_subdirectory(contrib)", "# add_subdirectory(contrib)")])
+
         RunCMake(context, force, buildArgs)
 
 TIFF = Dependency("TIFF", InstallTIFF, "include/tiff.h")
@@ -864,6 +868,16 @@ def InstallPNG(context, force, buildArgs):
             extraArgs.append('-DCMAKE_SYSTEM_PROCESSOR=aarch64');
             extraArgs.append('-DPNG_ARM_NEON=off');
 
+            # Skip tests to avoid issues with code signing.
+            # Replace utility executables with static libraries to avoid issues with code signing.
+            PatchFile("CMakeLists.txt", 
+                [("option(PNG_TESTS  \"Build libpng tests\" ON)",
+                  "option(PNG_TESTS  \"Build libpng tests\" OFF)"),
+                 ("add_executable(pngfix ${pngfix_sources})",
+                  "add_library(pngfix STATIC ${pngfix_sources})"),
+                 ("add_executable(png-fix-itxt ${png_fix_itxt_sources})",
+                  "add_library(png-fix-itxt STATIC ${png_fix_itxt_sources})")])
+
         RunCMake(context, force, extraArgs)
 
 PNG = Dependency("PNG", InstallPNG, "include/png.h")
@@ -878,6 +892,44 @@ def InstallOpenEXR(context, force, buildArgs):
 
     if iOS():
         updateOpenEXRIOS(context, srcDir)
+
+        # Skip utils, examples, and tests to avoid issues with code signing.
+        # Replace utility executables with static libraries to avoid issues with code signing.
+        PatchFile(srcDir + "/IlmBase/CMakeLists.txt", 
+            [("ADD_SUBDIRECTORY ( HalfTest )", "# ADD_SUBDIRECTORY ( HalfTest )"),
+             ("ADD_SUBDIRECTORY ( IexTest )", "# ADD_SUBDIRECTORY ( IexTest )"),
+             ("ADD_SUBDIRECTORY ( ImathTest )", "# ADD_SUBDIRECTORY ( ImathTest )")])
+
+        PatchFile(srcDir + "/IlmBase/Half/CMakeLists.txt", 
+            [("ADD_EXECUTABLE ( eLut eLut.cpp )",
+              "ADD_LIBRARY ( eLut STATIC eLut.cpp )"),
+             ("ADD_EXECUTABLE ( toFloat toFloat.cpp )",
+              "ADD_LIBRARY ( toFloat STATIC toFloat.cpp )")])
+
+        PatchFile(srcDir + "/OpenEXR/CMakeLists.txt", 
+            [("ADD_SUBDIRECTORY ( IlmImfExamples )", "# ADD_SUBDIRECTORY ( IlmImfExamples )"),
+             ("ADD_SUBDIRECTORY ( IlmImfTest )", "# ADD_SUBDIRECTORY ( IlmImfTest )"),
+             ("ADD_SUBDIRECTORY ( IlmImfUtilTest )", "# ADD_SUBDIRECTORY ( IlmImfUtilTest )"),
+             ("ADD_SUBDIRECTORY ( IlmImfFuzzTest )", "# ADD_SUBDIRECTORY ( IlmImfFuzzTest )"),
+             ("ADD_SUBDIRECTORY ( exrheader )", "# ADD_SUBDIRECTORY ( exrheader )"),
+             ("ADD_SUBDIRECTORY ( exrmaketiled )", "# ADD_SUBDIRECTORY ( exrmaketiled )"),
+             ("ADD_SUBDIRECTORY ( exrstdattr )", "# ADD_SUBDIRECTORY ( exrstdattr )"),
+             ("ADD_SUBDIRECTORY ( exrmakepreview )", "# ADD_SUBDIRECTORY ( exrmakepreview )"),
+             ("ADD_SUBDIRECTORY ( exrenvmap )", "# ADD_SUBDIRECTORY ( exrenvmap )"),
+             ("ADD_SUBDIRECTORY ( exrmultiview )", "# ADD_SUBDIRECTORY ( exrmultiview )"),
+             ("ADD_SUBDIRECTORY ( exrmultipart )", "# ADD_SUBDIRECTORY ( exrmultipart )")])
+
+        PatchFile(srcDir + "/OpenEXR/exr2aces/CMakeLists.txt", 
+            [("ADD_EXECUTABLE ( exr2aces",
+              "ADD_LIBRARY ( exr2aces STATIC")])
+        PatchFile(srcDir + "/OpenEXR/exrbuild/CMakeLists.txt", 
+            [("ADD_EXECUTABLE ( exrbuild",
+              "ADD_LIBRARY ( exrbuild STATIC")])
+        PatchFile(srcDir + "/OpenEXR/IlmImf/CMakeLists.txt", 
+            [("ADD_EXECUTABLE ( dwaLookups",
+              "ADD_LIBRARY ( dwaLookups STATIC"),
+             ("ADD_EXECUTABLE ( b44ExpLogTable",
+              "ADD_LIBRARY ( b44ExpLogTable STATIC")])
 
     ilmbaseSrcDir = os.path.join(srcDir, "IlmBase")
     with CurrentWorkingDirectory(ilmbaseSrcDir):
@@ -1029,19 +1081,10 @@ def InstallPtex_LinuxOrMacOS(context, force, buildArgs):
     with CurrentWorkingDirectory(DownloadURL(PTEX_URL, context, force)):
 
         if iOS():
-            # Replace util/test executables with static libraries to avoid issues with code signing.
-            PatchFile(context.instDir + "/src/ptex-2.1.28/src/utils/CMakeLists.txt", 
-                [("add_executable(ptxinfo ptxinfo.cpp)",
-                  "add_library(ptxinfo STATIC ptxinfo.cpp)")])
-            PatchFile(context.instDir + "/src/ptex-2.1.28/src/tests/CMakeLists.txt", 
-                [("add_executable(wtest wtest.cpp)",
-                  "add_library(wtest STATIC wtest.cpp)"),
-                 ("add_executable(rtest rtest.cpp)",
-                  "add_library(rtest STATIC rtest.cpp)"),
-                 ("add_executable(ftest ftest.cpp)",
-                  "add_library(ftest STATIC ftest.cpp)"),
-                 ("add_executable(halftest halftest.cpp)",
-                  "add_library(halftest STATIC halftest.cpp)")])
+            # Skip utils and tests to avoid issues with code signing.
+            PatchFile("CMakeLists.txt", 
+                [("add_subdirectory(src/utils)", "# add_subdirectory(src/utils)"),
+                 ("add_subdirectory(src/tests)", "# add_subdirectory(src/tests)")])
 
         RunCMake(context, force, buildArgs)
 
