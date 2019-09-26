@@ -5,9 +5,21 @@ import subprocess
 import PySide
 import OpenGL
 from distutils.dir_util import copy_tree
+from os.path import isdir, isfile, join
 
 
-def extract_object_files(path, cond, files):
+
+def extract_files(path, cond, files):
+    if not os.path.exists(path):
+        return
+    
+    for file in os.listdir(path):
+        if file[0] != '.' and cond(join(path, file)):
+            files.append(os.path.join(path, file))
+
+
+
+def extract_files_recursive(path, cond, files):
     # r=root, d=directories, f = files
     for r, d, f in os.walk(path):
         for file in f:
@@ -22,7 +34,7 @@ def add_rpath_to_files(path, files):
         path_between = os.path.relpath(path, dir_path)
         if path_between != ".":
             subprocess.call(['install_name_tool', '-add_rpath', '@loader_path/' + path_between, f])
-        
+
 
 
 def change_absolute_to_relative(files, path_to_replace, custom_path=""):
@@ -54,10 +66,12 @@ def is_object_file(file):
 def make_relocatable(install_path, buildPython, qt_path="/usr/local/opt/qt@4"):
     files = []
     
-    extract_object_files(install_path + '/bin/', is_object_file, files)
-    extract_object_files(install_path + '/lib/', (lambda file: '.so' in file or '.dylib' in file), files)
-    extract_object_files(install_path + '/plugin/', (lambda file: '.so' in file or '.dylib' in file), files)
-    
+    extract_files_recursive(install_path + '/bin/', is_object_file, files)
+    extract_files_recursive(install_path + '/lib/', (lambda file: '.so' in file or '.dylib' in file), files)
+    extract_files_recursive(install_path + '/plugin/', (lambda file: '.so' in file or '.dylib' in file), files)
+    extract_files_recursive(install_path + '/tests', (lambda file: '.so' in file or '.dylib' in file), files)
+    extract_files(install_path + '/tests', (lambda file: isfile(file) and open(file).readline().rstrip()[0] != "#"), files)
+
     add_rpath_to_files(install_path+ '/lib/', files)
     change_absolute_to_relative(files, install_path)
 
@@ -82,8 +96,8 @@ def make_relocatable(install_path, buildPython, qt_path="/usr/local/opt/qt@4"):
         qt_cellar_base="/usr/local/Cellar/qt@4/4.8.7_5"
 
         files=[]
-        extract_object_files(install_path + '/lib/python/PySide', (lambda file: '.so' in file or '.dylib' in file), files)
-        extract_object_files(install_path + '/lib/qt@4', (lambda file: '.so' in file or '.dylib' in file), files)
+        extract_files_recursive(install_path + '/lib/python/PySide', (lambda file: '.so' in file or '.dylib' in file), files)
+        extract_files_recursive(install_path + '/lib/qt@4', (lambda file: '.so' in file or '.dylib' in file), files)
 
         change_absolute_to_relative(files, qt_base, install_path + '/lib/qt@4')
         change_absolute_to_relative(files, qt_cellar_base, install_path + '/lib/qt@4')
