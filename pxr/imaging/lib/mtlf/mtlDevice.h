@@ -339,7 +339,7 @@ public:
     void SetIndexBuffer(MtlfMultiBuffer const &buffer);
 
     MTLF_API
-    void SetTexture(int index, MtlfMultiTexture const &texture, const TfToken& name, MSL_ProgramStage stage);
+    void SetTexture(int index, MtlfMultiTexture const &texture, const TfToken& name, MSL_ProgramStage stage, bool arrayTexture = false);
     
     MTLF_API
     void SetSampler(int index, MtlfMultiSampler const &sampler, const TfToken& name, MSL_ProgramStage stage);
@@ -511,6 +511,11 @@ public:
         id<MTLTexture> mtlMultisampleColorTexture;
         id<MTLTexture> mtlDepthTexture;
         id<MTLDepthStencilState> depthState;
+
+        // Dummy black texture for missing textures
+        id<MTLTexture> blackTexture2D;
+        // Dummy black texture for missing textures
+        id<MTLTexture> blackTexture2DArray;
     };
     
     GPUInstance gpus[MAX_GPUS];
@@ -548,7 +553,7 @@ protected:
         uint8_t          *contents;
     };
     
-    struct TextureBinding { int index; MtlfMultiTexture texture; TfToken name; MSL_ProgramStage stage; };
+    struct TextureBinding { int index; MtlfMultiTexture texture; TfToken name; MSL_ProgramStage stage; bool array; };
     struct SamplerBinding { int index; MtlfMultiSampler sampler; TfToken name; MSL_ProgramStage stage; };
     
     struct ThreadState {

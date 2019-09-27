@@ -286,11 +286,38 @@ void MtlfMetalContext::Init(id<MTLDevice> _device, int width, int height)
     depthStateDesc.depthWriteEnabled = YES;
     depthStateDesc.depthCompareFunction = MTLCompareFunctionLessEqual;
     
+    MTLTextureDescriptor* blackDesc = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA16Float
+                                                                                    width:1
+                                                                                   height:1
+                                                                                mipmapped:NO];
+    blackDesc.usage = MTLTextureUsageShaderRead;
+    blackDesc.resourceOptions = MTLResourceStorageModeDefault;
+    blackDesc.arrayLength = 1;
+    
+    uint16_t zero[4] = {};
+
     for(int i = 0; i < renderDevices.count; i++) {
         gpus[i].depthState = [renderDevices[i] newDepthStencilStateWithDescriptor:depthStateDesc];
         gpus[i].mtlColorTexture = nil;
         gpus[i].mtlMultisampleColorTexture = nil;
         gpus[i].mtlDepthTexture = nil;
+
+        blackDesc.textureType = MTLTextureType2D;
+        gpus[i].blackTexture2D = [renderDevices[i] newTextureWithDescriptor:blackDesc];
+        
+        blackDesc.textureType = MTLTextureType2DArray;
+        gpus[i].blackTexture2DArray = [renderDevices[i] newTextureWithDescriptor:blackDesc];
+        [gpus[i].blackTexture2D replaceRegion:MTLRegionMake2D(0, 0, 1, 1)
+                                  mipmapLevel:0
+                                    withBytes:&zero
+                                  bytesPerRow:sizeof(zero)];
+        
+        [gpus[i].blackTexture2DArray replaceRegion:MTLRegionMake2D(0, 0, 1, 1)
+                                       mipmapLevel:0
+                                             slice:0
+                                         withBytes:&zero
+                                       bytesPerRow:sizeof(zero)
+                                     bytesPerImage:0];
     }
 
     windingOrder = MTLWindingClockwise;
@@ -364,6 +391,8 @@ void MtlfMetalContext::Cleanup()
         [captureScopeSubset[i] release];
         captureScopeSubset[i] = nil;
 
+        [gpus[i].blackTexture2D release];
+        [gpus[i].blackTexture2DArray release];
         [gpus[i].commandQueue release];
     }
 
@@ -1011,9 +1040,9 @@ void MtlfMetalContext::SetSampler(int index, MtlfMultiSampler const &sampler, co
         threadState.dirtyRenderState[i] |= DIRTY_METALRENDERSTATE_SAMPLER;
 }
 
-void MtlfMetalContext::SetTexture(int index, MtlfMultiTexture const &texture, const TfToken& name, MSL_ProgramStage stage)
+void MtlfMetalContext::SetTexture(int index, MtlfMultiTexture const &texture, const TfToken& name, MSL_ProgramStage stage, bool arrayTexture)
 {
-    threadState.textures.push_back({index, texture, name, stage});
+    threadState.textures.push_back({index, texture, name, stage, arrayTexture});
     for(int i = 0; i < MAX_GPUS; i++)
         threadState.dirtyRenderState[i] |= DIRTY_METALRENDERSTATE_TEXTURE;
 }
@@ -1368,14 +1397,21 @@ void MtlfMetalContext::SetRenderEncoderState()
 
     if (dirtyRenderState & DIRTY_METALRENDERSTATE_TEXTURE) {
         for(auto texture : threadState.textures) {
+            id<MTLTexture> t = texture.texture.forCurrentGPU();
+            if (t == nil) {
+                if (texture.array)
+                    t = gpus[currentGPU].blackTexture2DArray;
+                else
+                    t = gpus[currentGPU].blackTexture2D;
+            }
             if(texture.stage == kMSL_ProgramStage_Vertex) {
                 if(threadState.enableComputeGS) {
-                    [computeEncoder setTexture:texture.texture.forCurrentGPU() atIndex:texture.index];
+                    [computeEncoder setTexture:t atIndex:texture.index];
                 }
-                [wq->currentRenderEncoder setVertexTexture:texture.texture.forCurrentGPU() atIndex:texture.index];
+                [wq->currentRenderEncoder setVertexTexture:t atIndex:texture.index];
             }
             else if(texture.stage == kMSL_ProgramStage_Fragment)
-                [wq->currentRenderEncoder setFragmentTexture:texture.texture.forCurrentGPU() atIndex:texture.index];
+                [wq->currentRenderEncoder setFragmentTexture:t atIndex:texture.index];
             //else
             //    TF_FATAL_CODING_ERROR("Not implemented!"); //Compute case
         }
