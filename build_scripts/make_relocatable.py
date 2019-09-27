@@ -69,6 +69,7 @@ def make_relocatable(install_path, buildPython, qt_path="/usr/local/opt/qt@4"):
     extract_files_recursive(install_path + '/bin/', is_object_file, files)
     extract_files_recursive(install_path + '/lib/', (lambda file: '.so' in file or '.dylib' in file), files)
     extract_files_recursive(install_path + '/plugin/', (lambda file: '.so' in file or '.dylib' in file), files)
+    extract_files_recursive(install_path + '/share/', (lambda file: '.so' in file or '.dylib' in file), files)
     extract_files_recursive(install_path + '/tests', (lambda file: '.so' in file or '.dylib' in file), files)
     extract_files(install_path + '/tests', (lambda file: isfile(file) and open(file).readline().rstrip()[0] != "#"), files)
 
