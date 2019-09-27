@@ -73,7 +73,7 @@ MtlfMetalContext::ThreadState::~ThreadState() {
 void MtlfMetalContext::MtlfMultiBuffer::release() {
     for (int i = 0; i < MAX_GPUS; i++) {
         if (!buffer[i])
-            break;
+            continue;
         
         [buffer[i] release];
     }
@@ -281,6 +281,8 @@ void MtlfMetalContext::Init(id<MTLDevice> _device, int width, int height)
     
     concurrentDispatchSupported = sysVerGreaterOrEqualTo10_14_5;
 #endif // ARCH_OS_IOS
+    
+    // AJG HERE ... here's where we make the depth state descriptor and create a depth state on each GPU. Is this then subsequently changed anywhere?
     
     MTLDepthStencilDescriptor *depthStateDesc = [[MTLDepthStencilDescriptor alloc] init];
     depthStateDesc.depthWriteEnabled = YES;
