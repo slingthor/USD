@@ -351,6 +351,8 @@ HdxOitResolveTask::Execute(HdTaskContext* ctx)
     _renderPassState->Bind(); 
 #if defined(ARCH_GFX_METAL)
     // AJG TODO: Use Metal to enable depth testing
+    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext()->GetMetalContext();
+    context->SetDepthTestEnable(NO);
 #elif defined(ARCH_GFX_OPENGL)
     bool isOpenGL = HdStResourceFactory::GetInstance()->IsOpenGL();
     if (isOpenGL) {
@@ -362,6 +364,7 @@ HdxOitResolveTask::Execute(HdTaskContext* ctx)
 
 #if defined(ARCH_GFX_METAL)
     // AJG TODO: Use Metal to enable depth testing
+    context->SetDepthTestEnable(YES);
 #elif defined(ARCH_GFX_OPENGL)
     if (isOpenGL) {
         glEnable(GL_DEPTH_TEST);

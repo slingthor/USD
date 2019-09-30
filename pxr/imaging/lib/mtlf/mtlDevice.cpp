@@ -45,6 +45,8 @@ enum {
     DIRTY_METALRENDERSTATE_VERTEX_DESCRIPTOR          = 1 << 7,
     DIRTY_METALRENDERSTATE_CULLMODE_WINDINGORDER      = 1 << 8,
     DIRTY_METALRENDERSTATE_FILL_MODE                  = 1 << 9,
+//    DIRTY_METALRENDERSTATE_DEPTH_STENCIL              = 1 << 10,
+
 
     DIRTY_METALRENDERSTATE_ALL                      = 0xFFFFFFFF
 };
@@ -283,13 +285,15 @@ void MtlfMetalContext::Init(id<MTLDevice> _device, int width, int height)
 #endif // ARCH_OS_IOS
     
     // AJG HERE ... here's where we make the depth state descriptor and create a depth state on each GPU. Is this then subsequently changed anywhere?
-    
-    MTLDepthStencilDescriptor *depthStateDesc = [[MTLDepthStencilDescriptor alloc] init];
-    depthStateDesc.depthWriteEnabled = YES;
-    depthStateDesc.depthCompareFunction = MTLCompareFunctionLessEqual;
+   
+    // TODO Take this code and re-use it when the depthStencil 'current render state'
+    // code is run.
+    //MTLDepthStencilDescriptor *depthStateDesc = [[MTLDepthStencilDescriptor alloc] init];
+    //depthStateDesc.depthWriteEnabled = YES;
+    //depthStateDesc.depthCompareFunction = MTLCompareFunctionLessEqual;
     
     for(int i = 0; i < renderDevices.count; i++) {
-        gpus[i].depthState = [renderDevices[i] newDepthStencilStateWithDescriptor:depthStateDesc];
+        //gpus[i].depthState = [renderDevices[i] newDepthStencilStateWithDescriptor:depthStateDesc];
         gpus[i].mtlColorTexture = nil;
         gpus[i].mtlMultisampleColorTexture = nil;
         gpus[i].mtlDepthTexture = nil;
@@ -308,6 +312,9 @@ void MtlfMetalContext::Init(id<MTLDevice> _device, int width, int height)
     blendState.sourceAlphaFactor = MTLBlendFactorSourceAlpha;
     blendState.destAlphaFactor = MTLBlendFactorOneMinusSourceAlpha;
     blendState.blendColor = GfVec4f(1.0f);
+    
+    depthState.depthTestEnable = YES;
+    depthState.depthCompareFunction = MTLCompareFunctionLessEqual;
     
     AllocateAttachments(width, height);
     
@@ -330,6 +337,7 @@ void MtlfMetalContext::Init(id<MTLDevice> _device, int width, int height)
     resourceStats.computeEncodersRequested.store(0, std::memory_order_relaxed);
     resourceStats.blitEncodersRequested.store(0, std::memory_order_relaxed);
     resourceStats.renderPipelineStates.store(0, std::memory_order_relaxed);
+    resourceStats.depthStencilStates.store(0, std::memory_order_relaxed);
     resourceStats.computePipelineStates.store(0, std::memory_order_relaxed);
     resourceStats.currentBufferAllocation.store(0, std::memory_order_relaxed);
     resourceStats.peakBufferAllocation.store(0, std::memory_order_relaxed);
@@ -398,6 +406,9 @@ void MtlfMetalContext::Cleanup()
         NSLog(@"Render  Pipeline States:    %7llu / %7lu",
               resourceStats.renderPipelineStates.load(std::memory_order_relaxed) / frameCount,
               resourceStats.renderPipelineStates.load(std::memory_order_relaxed));
+        NSLog(@"Depth   Stencil  States:    %7llu / %7lu",
+              resourceStats.depthStencilStates.load(std::memory_order_relaxed) / frameCount,
+              resourceStats.depthStencilStates.load(std::memory_order_relaxed));
         NSLog(@"Compute Encoders requested: %7llu / %7lu",
               resourceStats.computeEncodersRequested.load(std::memory_order_relaxed) / frameCount,
               resourceStats.computeEncodersRequested.load(std::memory_order_relaxed));
@@ -811,6 +822,16 @@ void MtlfMetalContext::SetBlendColor(GfVec4f const &_blendColor) {
     blendState.blendColor = _blendColor;
 }
 
+void MtlfMetalContext::SetDepthTestEnable(bool depthTestEnable)
+{
+    depthState.depthTestEnable = depthTestEnable;
+}
+
+void MtlfMetalContext::SetDepthComparisonFunction(MTLCompareFunction comparisonFn)
+{
+    depthState.depthCompareFunction = comparisonFn;
+}
+
 void MtlfMetalContext::SetAlphaCoverageEnable(bool _alphaCoverageEnable)
 {
     blendState.alphaCoverageEnable = _alphaCoverageEnable;
@@ -1095,7 +1116,7 @@ void MtlfMetalContext::SetRenderPipelineState()
                 boost::hash_combine(hashVal, outputDepthFormat);
             }
         }
-        [wq->currentRenderEncoder setDepthStencilState:gpus[currentGPU].depthState];
+        //[wq->currentRenderEncoder setDepthStencilState:gpus[currentGPU].depthState];
         // Update colour attachments hash
         wq->currentColourAttachmentsHash = hashVal;
     }
@@ -1270,6 +1291,67 @@ void MtlfMetalContext::SetRenderPipelineState()
     }
 }
 
+void MtlfMetalContext::SetDepthStencilState()
+{
+    MetalWorkQueue *wq = threadState.currentWorkQueue;
+    
+    if (wq->currentEncoderType != MTLENCODERTYPE_RENDER || !wq->encoderInUse || !wq->currentRenderEncoder) {
+        TF_FATAL_CODING_ERROR("Not valid to call SetPipelineState() without an active render encoder");
+    }
+    
+    size_t hashVal = 0;
+    
+    boost::hash_combine(hashVal, currentDevice);
+    boost::hash_combine(hashVal, depthState.depthTestEnable);
+    boost::hash_combine(hashVal, depthState.depthCompareFunction);
+    
+    if (hashVal == wq->currentDepthStencilDescriptorHash && wq->currentDepthStencilState != nil)
+    {
+        return;
+    }
+    
+    wq->currentDepthStencilDescriptorHash = hashVal;
+    
+    _pipelineMutex.lock();
+    auto depthStencilStateIt = depthStencilStateMap.find(wq->currentDepthStencilDescriptorHash);
+    
+    id<MTLDepthStencilState> depthStencilState;
+    
+    if (depthStencilStateIt != depthStencilStateMap.end()) {
+        depthStencilState = depthStencilStateIt->second;
+        _pipelineMutex.unlock();
+    }
+    else
+    {
+        MTLDepthStencilDescriptor * depthStencilStateDescriptor = [[MTLDepthStencilDescriptor alloc] init];
+        depthStencilStateDescriptor.label = @"SetDepthStencilState";
+
+        depthStencilStateDescriptor.depthWriteEnabled = depthState.depthTestEnable;
+        depthStencilStateDescriptor.depthCompareFunction = depthState.depthCompareFunction;
+        
+        depthStencilState = [currentDevice newDepthStencilStateWithDescriptor:depthStencilStateDescriptor];
+        if (!depthStencilState) {
+            _pipelineMutex.unlock();
+            NSLog(@"Failed to created depth stencil state");
+            return;
+        }
+        
+        depthStencilStateMap.emplace(wq->currentDepthStencilDescriptorHash, depthStencilState);
+        _pipelineMutex.unlock();
+        
+        [depthStencilStateDescriptor release];
+        
+        METAL_INC_STAT(resourceStats.depthStencilStates);
+    }
+    
+    if (depthStencilState != wq->currentDepthStencilState)
+    {
+        [wq->currentRenderEncoder setDepthStencilState:depthStencilState];
+        wq->currentDepthStencilState = depthStencilState;
+    }
+}
+
+
 void MtlfMetalContext::SetRenderEncoderState()
 {
     uint32_t dirtyRenderState = threadState.dirtyRenderState[currentGPU];
@@ -1298,6 +1380,7 @@ void MtlfMetalContext::SetRenderEncoderState()
     
     // Create and set a new pipelinestate if required
     SetRenderPipelineState();
+    SetDepthStencilState();
     
     if (dirtyRenderState & DIRTY_METALRENDERSTATE_CULLMODE_WINDINGORDER) {
         [wq->currentRenderEncoder setFrontFacingWinding:windingOrder];
@@ -1441,6 +1524,9 @@ void MtlfMetalContext::ClearRenderEncoderState()
     // Release owned resources
     [threadState.vertexDescriptor               release];
     threadState.vertexDescriptor               = nil;
+    
+    wq->currentDepthStencilDescriptorHash = 0;
+    wq->currentDepthStencilState = nil;
     
     wq->currentRenderPipelineDescriptorHash  = 0;
     wq->currentRenderPipelineState           = nil;
