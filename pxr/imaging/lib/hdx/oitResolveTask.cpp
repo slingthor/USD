@@ -104,7 +104,7 @@ _GetScreenSize()
 #if defined(ARCH_GFX_METAL)
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext()->GetMetalContext();
     s[0] = context->gpus[context->currentGPU].mtlColorTexture.width;
-    s[1] = context->gpus[context->currentGPU].mtlColorTexture.width;
+    s[1] = context->gpus[context->currentGPU].mtlColorTexture.height;
 #elif defined(ARCH_GFX_OPENGL)
     if (HdStResourceFactory::GetInstance()->IsOpenGL()) {
         GLint attachType = 0;

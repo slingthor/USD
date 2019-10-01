@@ -44,8 +44,13 @@
 float checker(vec2 uv, float scale) 
 {
   float x = floor(scale * uv.x);
-  float y = floor(scale * uv.y); 
+  float y = floor(scale * uv.y);
+
+#ifdef ARCH_GFX_METAL
+  float result = fmod(x+y, 2.0);
+#else
   float result = mod(x+y, 2.0);
+#endif
   return sign(result);
 }
 
