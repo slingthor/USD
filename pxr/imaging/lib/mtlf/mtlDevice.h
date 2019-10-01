@@ -796,6 +796,7 @@ private:
         std::atomic_ulong computeEncodersRequested;
         std::atomic_ulong blitEncodersRequested;
         std::atomic_ulong renderPipelineStates;
+        std::atomic_ulong depthStencilStates;
         std::atomic_ulong computePipelineStates;
         std::atomic_ulong GSBatchesStarted;
     } resourceStats;
