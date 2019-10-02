@@ -63,17 +63,36 @@ def is_object_file(file):
 
 
 
+def replace_string_in_file(path, old_string, new_string):
+    if not os.path.exists(path):
+        return
+
+    with open(path, 'r') as file :
+      contents = file.read()
+
+    contents = contents.replace(old_string, new_string)
+    
+    with open(path, 'w') as file:
+      file.write(contents)
+
+
+
 def make_relocatable(install_path, buildPython, qt_path="/usr/local/opt/qt@4"):
     files = []
     
     extract_files_recursive(install_path + '/bin/', is_object_file, files)
     extract_files_recursive(install_path + '/lib/', (lambda file: '.so' in file or '.dylib' in file), files)
     extract_files_recursive(install_path + '/plugin/', (lambda file: '.so' in file or '.dylib' in file), files)
+    extract_files_recursive(install_path + '/share/', (lambda file: '.so' in file or '.dylib' in file), files)
     extract_files_recursive(install_path + '/tests', (lambda file: '.so' in file or '.dylib' in file), files)
     extract_files(install_path + '/tests', (lambda file: isfile(file) and open(file).readline().rstrip()[0] != "#"), files)
 
     add_rpath_to_files(install_path+ '/lib/', files)
     change_absolute_to_relative(files, install_path)
+
+    replace_string_in_file(install_path + '/pxrConfig.cmake', install_path, "REPLACE_ME")
+    replace_string_in_file(install_path + '/cmake/pxrTargets.cmake', install_path, "REPLACE_ME")
+    replace_string_in_file(install_path + '/cmake/pxrTargets-release.cmake', install_path, "REPLACE_ME")
 
     if buildPython:
         pyside_path = PySide.__file__

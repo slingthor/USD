@@ -572,16 +572,14 @@ def InstallZlib(context, force, buildArgs):
 
         if iOS():
             # Replace test executables with static libraries to avoid issues with code signing.
-            PatchFile(context.instDir + "/src/zlib-1.2.11/CMakeLists.txt", 
-                [("add_executable(example test/example.c)",
-                  "add_library(example STATIC test/example.c)"),
-                 ("add_executable(minigzip test/minigzip.c)",
-                  "add_library(minigzip STATIC test/minigzip.c)")])
+            PatchFile("CMakeLists.txt", 
+                [("add_executable(example test/example.c)", "add_library(example STATIC test/example.c)"),
+                 ("add_executable(minigzip test/minigzip.c)", "add_library(minigzip STATIC test/minigzip.c)")])
 
         RunCMake(context, force, buildArgs)
 
 ZLIB = Dependency("zlib", InstallZlib, "include/zlib.h")
-        
+
 ############################################################
 # boost
 
@@ -810,6 +808,38 @@ def InstallJPEG_Turbo(jpeg_url, context, force, buildArgs):
         if iOS():
             extraArgs.append('-DCMAKE_SYSTEM_PROCESSOR=aarch64');
 
+            # Replace test and utility executables with static libraries to avoid issues with code signing.
+            PatchFile("CMakeLists.txt",
+                [("add_executable(tjunittest tjunittest.c tjutil.c md5/md5.c md5/md5hl.c)",
+                  "add_library(tjunittest STATIC tjunittest.c tjutil.c md5/md5.c md5/md5hl.c)"),
+                 ("add_executable(tjbench tjbench.c tjutil.c)",
+                  "add_library(tjbench STATIC tjbench.c tjutil.c)"),
+                 ("add_executable(tjexample tjexample.c)",
+                  "add_library(tjexample STATIC tjexample.c)"),
+                 ("add_executable(tjunittest-static tjunittest.c tjutil.c md5/md5.c",
+                  "add_library(tjunittest-static STATIC tjunittest.c tjutil.c md5/md5.c"),
+                 ("add_executable(tjbench-static tjbench.c tjutil.c)",
+                  "add_library(tjbench-static STATIC tjbench.c tjutil.c)"),
+                 ("add_executable(cjpeg-static cjpeg.c cdjpeg.c rdgif.c rdppm.c rdswitch.c",
+                  "add_library(cjpeg-static STATIC cjpeg.c cdjpeg.c rdgif.c rdppm.c rdswitch.c"),
+                 ("add_executable(djpeg-static djpeg.c cdjpeg.c rdcolmap.c rdswitch.c wrgif.c",
+                  "add_library(djpeg-static STATIC djpeg.c cdjpeg.c rdcolmap.c rdswitch.c wrgif.c"),
+                 ("add_executable(jpegtran-static jpegtran.c cdjpeg.c rdswitch.c transupp.c)",
+                  "add_library(jpegtran-static STATIC jpegtran.c cdjpeg.c rdswitch.c transupp.c)"),
+                 ("add_executable(rdjpgcom rdjpgcom.c)", "add_library(rdjpgcom STATIC rdjpgcom.c)"),
+                 ("add_executable(wrjpgcom wrjpgcom.c)", "add_library(wrjpgcom STATIC wrjpgcom.c)"),
+                 ("add_subdirectory(md5)", "# add_subdirectory(md5)")])
+
+            PatchFile("sharedlib/CMakeLists.txt",
+                [("add_executable(cjpeg ../cjpeg.c ../cdjpeg.c ../rdgif.c ../rdppm.c",
+                  "add_library(cjpeg STATIC ../cjpeg.c ../cdjpeg.c ../rdgif.c ../rdppm.c"),
+                 ("add_executable(djpeg ../djpeg.c ../cdjpeg.c ../rdcolmap.c ../rdswitch.c",
+                  "add_library(djpeg STATIC ../djpeg.c ../cdjpeg.c ../rdcolmap.c ../rdswitch.c"),
+                 ("add_executable(jpegtran ../jpegtran.c ../cdjpeg.c ../rdswitch.c ../transupp.c)",
+                  "add_library(jpegtran STATIC ../jpegtran.c ../cdjpeg.c ../rdswitch.c ../transupp.c)"),
+                 ("add_executable(jcstest ../jcstest.c)",
+                  "add_library(jcstest STATIC ../jcstest.c)")])
+
         RunCMake(context, force, extraArgs)
 
 def InstallJPEG_Lib(jpeg_url, context, force, buildArgs):
@@ -823,7 +853,7 @@ def InstallJPEG_Lib(jpeg_url, context, force, buildArgs):
             .format(procs=context.numJobs))
 
 JPEG = Dependency("JPEG", InstallJPEG, "include/jpeglib.h")
-        
+
 ############################################################
 # TIFF
 
@@ -837,16 +867,22 @@ def InstallTIFF(context, force, buildArgs):
         # the tools entirely. We do this on Linux and MacOS as well
         # to avoid requiring some GL and X dependencies.
         #
-        # We also need to skip building tests, since they rely on 
+        # We also need to skip building tests, since they rely on
         # the tools we've just elided.
-        PatchFile("CMakeLists.txt", 
+        PatchFile("CMakeLists.txt",
                    [("add_subdirectory(tools)", "# add_subdirectory(tools)"),
                     ("add_subdirectory(test)", "# add_subdirectory(test)")])
 
         if MacOS() or iOS():
-            PatchFile("CMakeLists.txt", 
-                   [("option(ld-version-script \"Enable linker version script\" ON)", 
+            PatchFile("CMakeLists.txt",
+                   [("option(ld-version-script \"Enable linker version script\" ON)",
                      "option(ld-version-script \"Enable linker version script\" OFF)")])
+
+        if iOS():
+            # Skip contrib to avoid issues with code signing.
+            PatchFile("CMakeLists.txt",
+                    [("add_subdirectory(contrib)", "# add_subdirectory(contrib)")])
+
         RunCMake(context, force, buildArgs)
 
 TIFF = Dependency("TIFF", InstallTIFF, "include/tiff.h")
@@ -859,10 +895,20 @@ PNG_URL = "https://downloads.sourceforge.net/project/libpng/libpng16/older-relea
 def InstallPNG(context, force, buildArgs):
     with CurrentWorkingDirectory(DownloadURL(PNG_URL, context, force)):
         extraArgs = buildArgs;
-        
+
         if iOS():
             extraArgs.append('-DCMAKE_SYSTEM_PROCESSOR=aarch64');
             extraArgs.append('-DPNG_ARM_NEON=off');
+
+            # Skip tests to avoid issues with code signing.
+            # Replace utility executables with static libraries to avoid issues with code signing.
+            PatchFile("CMakeLists.txt",
+                [("option(PNG_TESTS  \"Build libpng tests\" ON)",
+                  "option(PNG_TESTS  \"Build libpng tests\" OFF)"),
+                 ("add_executable(pngfix ${pngfix_sources})",
+                  "add_library(pngfix STATIC ${pngfix_sources})"),
+                 ("add_executable(png-fix-itxt ${png_fix_itxt_sources})",
+                  "add_library(png-fix-itxt STATIC ${png_fix_itxt_sources})")])
 
         RunCMake(context, force, extraArgs)
 
@@ -878,6 +924,44 @@ def InstallOpenEXR(context, force, buildArgs):
 
     if iOS():
         updateOpenEXRIOS(context, srcDir)
+
+        # Skip utils, examples, and tests to avoid issues with code signing.
+        # Replace utility executables with static libraries to avoid issues with code signing.
+        PatchFile(srcDir + "/IlmBase/CMakeLists.txt",
+            [("ADD_SUBDIRECTORY ( HalfTest )", "# ADD_SUBDIRECTORY ( HalfTest )"),
+             ("ADD_SUBDIRECTORY ( IexTest )", "# ADD_SUBDIRECTORY ( IexTest )"),
+             ("ADD_SUBDIRECTORY ( ImathTest )", "# ADD_SUBDIRECTORY ( ImathTest )")])
+
+        PatchFile(srcDir + "/IlmBase/Half/CMakeLists.txt",
+            [("ADD_EXECUTABLE ( eLut eLut.cpp )",
+              "ADD_LIBRARY ( eLut STATIC eLut.cpp )"),
+             ("ADD_EXECUTABLE ( toFloat toFloat.cpp )",
+              "ADD_LIBRARY ( toFloat STATIC toFloat.cpp )")])
+
+        PatchFile(srcDir + "/OpenEXR/CMakeLists.txt",
+            [("ADD_SUBDIRECTORY ( IlmImfExamples )", "# ADD_SUBDIRECTORY ( IlmImfExamples )"),
+             ("ADD_SUBDIRECTORY ( IlmImfTest )", "# ADD_SUBDIRECTORY ( IlmImfTest )"),
+             ("ADD_SUBDIRECTORY ( IlmImfUtilTest )", "# ADD_SUBDIRECTORY ( IlmImfUtilTest )"),
+             ("ADD_SUBDIRECTORY ( IlmImfFuzzTest )", "# ADD_SUBDIRECTORY ( IlmImfFuzzTest )"),
+             ("ADD_SUBDIRECTORY ( exrheader )", "# ADD_SUBDIRECTORY ( exrheader )"),
+             ("ADD_SUBDIRECTORY ( exrmaketiled )", "# ADD_SUBDIRECTORY ( exrmaketiled )"),
+             ("ADD_SUBDIRECTORY ( exrstdattr )", "# ADD_SUBDIRECTORY ( exrstdattr )"),
+             ("ADD_SUBDIRECTORY ( exrmakepreview )", "# ADD_SUBDIRECTORY ( exrmakepreview )"),
+             ("ADD_SUBDIRECTORY ( exrenvmap )", "# ADD_SUBDIRECTORY ( exrenvmap )"),
+             ("ADD_SUBDIRECTORY ( exrmultiview )", "# ADD_SUBDIRECTORY ( exrmultiview )"),
+             ("ADD_SUBDIRECTORY ( exrmultipart )", "# ADD_SUBDIRECTORY ( exrmultipart )")])
+
+        PatchFile(srcDir + "/OpenEXR/exr2aces/CMakeLists.txt",
+            [("ADD_EXECUTABLE ( exr2aces",
+              "ADD_LIBRARY ( exr2aces STATIC")])
+        PatchFile(srcDir + "/OpenEXR/exrbuild/CMakeLists.txt",
+            [("ADD_EXECUTABLE ( exrbuild",
+              "ADD_LIBRARY ( exrbuild STATIC")])
+        PatchFile(srcDir + "/OpenEXR/IlmImf/CMakeLists.txt",
+            [("ADD_EXECUTABLE ( dwaLookups",
+              "ADD_LIBRARY ( dwaLookups STATIC"),
+             ("ADD_EXECUTABLE ( b44ExpLogTable",
+              "ADD_LIBRARY ( b44ExpLogTable STATIC")])
 
     ilmbaseSrcDir = os.path.join(srcDir, "IlmBase")
     with CurrentWorkingDirectory(ilmbaseSrcDir):
@@ -1029,19 +1113,10 @@ def InstallPtex_LinuxOrMacOS(context, force, buildArgs):
     with CurrentWorkingDirectory(DownloadURL(PTEX_URL, context, force)):
 
         if iOS():
-            # Replace util/test executables with static libraries to avoid issues with code signing.
-            PatchFile(context.instDir + "/src/ptex-2.1.28/src/utils/CMakeLists.txt", 
-                [("add_executable(ptxinfo ptxinfo.cpp)",
-                  "add_library(ptxinfo STATIC ptxinfo.cpp)")])
-            PatchFile(context.instDir + "/src/ptex-2.1.28/src/tests/CMakeLists.txt", 
-                [("add_executable(wtest wtest.cpp)",
-                  "add_library(wtest STATIC wtest.cpp)"),
-                 ("add_executable(rtest rtest.cpp)",
-                  "add_library(rtest STATIC rtest.cpp)"),
-                 ("add_executable(ftest ftest.cpp)",
-                  "add_library(ftest STATIC ftest.cpp)"),
-                 ("add_executable(halftest halftest.cpp)",
-                  "add_library(halftest STATIC halftest.cpp)")])
+            # Skip utils and tests to avoid issues with code signing.
+            PatchFile("CMakeLists.txt",
+                [("add_subdirectory(src/utils)", "# add_subdirectory(src/utils)"),
+                 ("add_subdirectory(src/tests)", "# add_subdirectory(src/tests)")])
 
         RunCMake(context, force, buildArgs)
 
