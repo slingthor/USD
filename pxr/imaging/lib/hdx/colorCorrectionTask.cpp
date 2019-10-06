@@ -453,6 +453,7 @@ HdxColorCorrectionTask::_CreateFramebufferResources(GLuint *texture)
 void
 HdxColorCorrectionTask::_ApplyColorCorrection()
 {
+    return;
     // Client can choose to use Hydra's built-in sRGB color correction or use
     // OpenColorIO for color correction in which case we insert extra OCIO code.
     #ifdef PXR_OCIO_PLUGIN_ENABLED
