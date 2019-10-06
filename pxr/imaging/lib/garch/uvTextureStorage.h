@@ -75,10 +75,10 @@ protected:
     
     /// Is this a 1-, 2- or 3-dimensional texture.
     GARCH_API
-    virtual int GetNumDimensions() const override;
+    int GetNumDimensions() const override;
 
     GARCH_API
-    virtual void _ReadTexture();
+    void _ReadTexture() override;
     GARCH_API
     virtual bool _GenerateMipmap() const;
     

@@ -35,6 +35,9 @@
 
 #include "pxr/base/gf/matrix4d.h"
 
+#include "pxr/imaging/garch/contextCaps.h"
+#include "pxr/imaging/garch/resourceFactory.h"
+
 #include "pxr/base/tf/staticTokens.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -44,6 +47,7 @@ TF_DEFINE_PRIVATE_TOKENS(
     (domeLightIrradiance)
     (domeLightPrefilter) 
     (domeLightBRDF)
+    (StageOrientation)
 );
 
 HdStLight::HdStLight(SdfPath const &id, TfToken const &lightType)
@@ -106,32 +110,8 @@ GarchSimpleLight
 HdStLight::_PrepareDomeLight(SdfPath const &id, 
                                  HdSceneDelegate *sceneDelegate)
 {
-    // Get the color of the light
-    GfVec3f hdc = sceneDelegate->GetLightParamValue(id, HdStLightTokens->color)
-            .Get<GfVec3f>();
-
-    // Extract intensity
-    float intensity = 
-        sceneDelegate->GetLightParamValue(id, HdLightTokens->intensity)
-            .Get<float>();
-
-    // Extract the exposure of the light
-    float exposure = 
-        sceneDelegate->GetLightParamValue(id, HdLightTokens->exposure)
-            .Get<float>();
-    intensity *= powf(2.0f, GfClamp(exposure, -50.0f, 50.0f));
-
-    // Calculate the final color of the light
-    GfVec4f c(hdc[0]*intensity, hdc[1]*intensity, hdc[2]*intensity, 1.0f); 
-
-    // Get the transform of the light
-    GfMatrix4d transform = _params[HdTokens->transform].Get<GfMatrix4d>();
-    GfVec3d hdp = transform.ExtractTranslation();
-    GfVec4f p = GfVec4f(hdp[0], hdp[1], hdp[2], 1.0f);
-
-    // get/load the texture resource
-    GarchTextureGPUHandle textureId; // environment map
-    GarchSamplerGPUHandle samplerId;
+    // get/load the environment map texture resource
+    GarchTextureGPUHandle textureId;
     VtValue textureResourceValue = sceneDelegate->GetLightParamValue(id, 
                                             HdLightTokens->textureResource);
         
@@ -141,12 +121,12 @@ HdStLight::_PrepareDomeLight(SdfPath const &id,
         _textureResource = boost::dynamic_pointer_cast<HdStTextureResource>(
                     textureResourceValue.Get<HdTextureResourceSharedPtr>());
 
-        if (TF_VERIFY(_textureResource)) {
+        // texture resource would be empty if the path could not be resolved
+        if (_textureResource) {
 
             // Use the texture resource (environment map) to pre-compute 
             // the necessary maps (irradiance, pre-filtered, BRDF LUT)
             textureId = _textureResource->GetTexelsTextureId();
-            samplerId = _textureResource->GetTexelsSamplerId();
 
             // Schedule texture computations
             _SetupComputations(textureId, 
@@ -154,14 +134,19 @@ HdStLight::_PrepareDomeLight(SdfPath const &id,
         }
     } 
 
-    // Create the Garch Simple Light object that will be used by the rest
-    // of the pipeline. No support for shadows for this translated light.
+    // get the orientation of the scene so can make sure the top of the texture
+    // is in the "up" direction
+    VtValue vIsZup = sceneDelegate->GetLightParamValue(id, 
+                                                _tokens->StageOrientation);
+    
+    // Create the Glf Simple Light object that will be used by the rest
+    // of the pipeline. No support for shadows for dome light.
     GarchSimpleLight l;
-    l.SetPosition(p);
-    l.SetDiffuse(c);
     l.SetHasShadow(false);
     l.SetIsDomeLight(true);
-    l.SetSamplerId(samplerId);
+    if (vIsZup.IsHolding<bool>()) {
+        l.SetIsZup(vIsZup.UncheckedGet<bool>());
+    }
     l.SetIrradianceId(_irradianceTexture);
     l.SetPrefilterId(_prefilterTexture);
     l.SetBrdfId(_brdfTexture);
@@ -175,10 +160,17 @@ HdStLight::_SetupComputations(GarchTextureGPUHandle const &sourceTexture,
 #if defined(ARCH_GFX_METAL)
     TF_FATAL_CODING_ERROR("Not Implemented");
 #endif
-
+    GarchContextCaps const &caps =
+        GarchResourceFactory::GetInstance()->GetContextCaps();
+    // verify that the GL version supports compute shaders
+    if (caps.apiVersion < 430) {
+        TF_WARN("Need OpenGL version 4.30 or higher to use DomeLight");
+        return;
+    }
+    
+    // get the width and height of the source texture
     int textureWidth = 0, textureHeight = 0;
 #if defined(ARCH_GFX_OPENGL)
-    // get the width and height of the source texture
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, sourceTexture);
     glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &textureWidth);
@@ -188,6 +180,9 @@ HdStLight::_SetupComputations(GarchTextureGPUHandle const &sourceTexture,
 
     // initialize the 3 textures and add computations to the resource registry
     GLuint numLevels = 1, numPrefilterLevels = 5, level = 0;
+    // make the computed textures half the size of the given environment map
+    textureHeight = textureHeight/2;
+    textureWidth = textureWidth/2;
 
     // Diffuse Irradiance
 #if defined(ARCH_GFX_OPENGL)
@@ -251,7 +246,7 @@ HdStLight::_SetupComputations(GarchTextureGPUHandle const &sourceTexture,
     // Add Computation 
     HdSt_DomeLightComputationGPUSharedPtr brdfComputation(
             HdSt_DomeLightComputationGPU::New(_tokens->domeLightBRDF, 
-            sourceTexture, _brdfTexture, textureWidth, textureHeight, 
+            sourceTexture, _brdfTexture, textureHeight, textureHeight, 
             numLevels, level));    
     resourceRegistry->AddComputation(nullptr, brdfComputation);
 }
@@ -300,7 +295,7 @@ HdStLight::Sync(HdSceneDelegate *sceneDelegate,
         else if (_lightType == HdPrimTypeTokens->domeLight) {
             _params[HdLightTokens->params] = 
                 _PrepareDomeLight(id, sceneDelegate);
-        }        
+        }
         // If it is an area light we will extract the parameters and convert
         // them to a gl friendly representation. 
         else {

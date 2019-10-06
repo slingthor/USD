@@ -57,7 +57,8 @@ from selectionDataModel import ALL_INSTANCES, SelectionDataModel
 # Common Utilities
 from common import (UIBaseColors, UIPropertyValueSourceColors, UIFonts,
                     GetPropertyColor, GetPropertyTextFont,
-                    Timer, Drange, BusyContext, DumpMallocTags, GetShortString,
+                    Timer, Drange, BusyContext, DumpMallocTags, 
+                    GetValueAtFrame, GetShortStringForValue,
                     GetInstanceIdForIndex,
                     ResetSessionVisibility, InvisRootPrims, GetAssetCreationTime,
                     PropertyViewIndex, PropertyViewIcons, PropertyViewDataRoles, 
@@ -66,7 +67,7 @@ from common import (UIBaseColors, UIPropertyValueSourceColors, UIFonts,
                     PropTreeWidgetTypeIsRel, PrimNotFoundException,
                     GetRootLayerStackInfo, HasSessionVis, GetEnclosingModelPrim,
                     GetPrimsLoadability, ClearColors,
-                    HighlightColors)
+                    HighlightColors, KeyboardShortcuts)
 
 import settings2
 from settings2 import StateSource
@@ -554,15 +555,6 @@ class AppController(QtCore.QObject):
             for action in self._clearColorActions:
                 self._ui.colorGroup.addAction(action)
 
-            self._ui.threePointLights = QtWidgets.QActionGroup(self)
-            self._ui.threePointLights.setExclusive(False)
-            self._threePointLightsActions = (
-                self._ui.actionKey,
-                self._ui.actionFill,
-                self._ui.actionBack)
-            for action in self._threePointLightsActions:
-                self._ui.threePointLights.addAction(action)
-
             self._ui.renderModeActionGroup = QtWidgets.QActionGroup(self)
             self._ui.renderModeActionGroup.setExclusive(True)
             self._renderModeActions = (
@@ -703,7 +695,7 @@ class AppController(QtCore.QObject):
                 QtCore.Qt.ScrollBarAlwaysOn)
 
             self._ui.attributeValueEditor.setAppController(self)
-            self._ui.primView.InitDrawModeDelegate(self)
+            self._ui.primView.InitControllers(self)
 
             self._ui.currentPathWidget.editingFinished.connect(
                 self._currentPathChanged)
@@ -798,8 +790,6 @@ class AppController(QtCore.QObject):
 
             self._ui.actionReload_All_Layers.triggered.connect(self._reloadStage)
 
-            self._ui.actionFrame_Selection.triggered.connect(self._frameSelection)
-
             self._ui.actionToggle_Framed_View.triggered.connect(self._toggleFramedView)
 
             self._ui.actionAdjust_FOV.triggered.connect(self._adjustFOV)
@@ -880,11 +870,7 @@ class AppController(QtCore.QObject):
             self._ui.actionAmbient_Only.triggered[bool].connect(
                 self._ambientOnlyClicked)
 
-            self._ui.actionKey.triggered[bool].connect(self._onKeyLightClicked)
-
-            self._ui.actionFill.triggered[bool].connect(self._onFillLightClicked)
-
-            self._ui.actionBack.triggered[bool].connect(self._onBackLightClicked)
+            self._ui.actionDomeLight.triggered[bool].connect(self._onDomeLightClicked)
 
             self._ui.colorGroup.triggered.connect(self._changeBgColor)
 
@@ -1677,22 +1663,9 @@ class AppController(QtCore.QObject):
                 # the times being similar (esp when they are large)
                 if not expandedPrims:
                     self._expandToDepth(startingDepth, suppressTiming=True)
-                # to maintain the primview, for each prim that has been 
-                # expanded, first check that it exists. then if its item has not 
-                # yet been populated,  use _getItemAtPath to populate its "chain" 
-                # of parents, so that the prim's item can be expanded. if it
-                # does already exist in the _primToItemMap, expand the item.
-                else:
-                    for prim in expandedPrims:
-                        if prim:
-                            item = self._primToItemMap.get(prim)
-                            if not item:
-                                primPath = prim.GetPrimPath()
-                                item = self._getItemAtPath(primPath)
-                            item.setExpanded(True)
 
                 if restoreSelection:
-                    self._refreshPrimViewSelection()
+                    self._refreshPrimViewSelection(expandedPrims)
                 self._ui.primView.setUpdatesEnabled(True)
             self._refreshCameraListAndMenu(preserveCurrCamera = True)
         if self._printTiming:
@@ -2004,6 +1977,7 @@ class AppController(QtCore.QObject):
                     self._dataModel.selection.addPrim(nextResult.prim)
                 self._primSearchResults.append(nextResult)
                 self._lastPrimSearched = self._dataModel.selection.getFocusPrim()
+                self._ui.primView.setCurrentItem(nextResult)
             # The path is effectively pruned if we couldn't map the
             # path to an item
         else:
@@ -2293,24 +2267,9 @@ class AppController(QtCore.QObject):
         if self._stageView and checked is not None:
             self._dataModel.viewSettings.ambientLightOnly = checked
 
-            # If all three lights are disabled, re-enable them all.
-            if (not self._dataModel.viewSettings.keyLightEnabled and not self._dataModel.viewSettings.fillLightEnabled and
-                    not self._dataModel.viewSettings.backLightEnabled):
-                self._dataModel.viewSettings.keyLightEnabled = True
-                self._dataModel.viewSettings.fillLightEnabled = True
-                self._dataModel.viewSettings.backLightEnabled = True
-
-    def _onKeyLightClicked(self, checked=None):
+    def _onDomeLightClicked(self, checked=None):
         if self._stageView and checked is not None:
-            self._dataModel.viewSettings.keyLightEnabled = checked
-
-    def _onFillLightClicked(self, checked=None):
-        if self._stageView and checked is not None:
-            self._dataModel.viewSettings.fillLightEnabled = checked
-
-    def _onBackLightClicked(self, checked=None):
-        if self._stageView and checked is not None:
-            self._dataModel.viewSettings.backLightEnabled = checked
+            self._dataModel.viewSettings.domeLightEnabled = checked
 
     def _changeBgColor(self, mode):
         self._dataModel.viewSettings.clearColorText = str(mode.text())
@@ -3235,16 +3194,41 @@ class AppController(QtCore.QObject):
 
             self._dataModel.selection.clearComputedProps()
 
-    def _refreshPrimViewSelection(self):
+    # A function for maintaining the primview. For each prim in prims, 
+    # first check that it exists. Then if its item has not 
+    # yet been populated,  use _getItemAtPath to populate its "chain" 
+    # of parents, so that the prim's item can be accessed. If it
+    # does already exist in the _primToItemMap, either expand or
+    # unexpand the item.
+    def _expandPrims(self, prims, expand=True):
+        if prims:
+            for prim in prims:
+                if prim:
+                    item = self._primToItemMap.get(prim)
+                    if not item:
+                        primPath = prim.GetPrimPath()
+                        item = self._getItemAtPath(primPath)
+                    item.setExpanded(expand)
+
+    def _refreshPrimViewSelection(self, expandedPrims):
         """Refresh the selected prim view items to match the selection data
         model.
         """
         self._ui.primView.clearSelection()
         selectedItems = [
-            self._getItemAtPath(prim.GetPath(), ensureExpanded=True)
+            self._getItemAtPath(prim.GetPath())
             for prim in self._dataModel.selection.getPrims()]
+
         if len(selectedItems) > 0:
             self._ui.primView.setCurrentItem(selectedItems[0])
+
+        # unexpand items that were expanded through setting the current item
+        currExpandedPrims = self._getExpandedPrimViewPrims()
+        self._expandPrims(currExpandedPrims, expand=False)
+
+        # expand previously expanded items in primview
+        self._expandPrims(expandedPrims)
+
         self._ui.primView.updateSelection(selectedItems, [])
 
     def _updatePrimViewSelection(self, added, removed):
@@ -3252,7 +3236,7 @@ class AppController(QtCore.QObject):
         removed prim paths from the selectionDataModel.
         """
         addedItems = [ 
-            self._getItemAtPath(path, ensureExpanded=True) 
+            self._getItemAtPath(path) 
             for path in added ]
         removedItems = [ self._getItemAtPath(path) for path in removed ]
         self._ui.primView.updateSelection(addedItems, removedItems)
@@ -3525,9 +3509,11 @@ class AppController(QtCore.QObject):
                     (key, type(primProperty)))
                 continue
 
-            attrText = GetShortString(primProperty, frame)
-            treeWidget.addTopLevelItem(
-                QtWidgets.QTreeWidgetItem(["", str(key), attrText]))
+            val = GetValueAtFrame(primProperty, frame)
+            attrText = GetShortStringForValue(primProperty, val)
+            item = QtWidgets.QTreeWidgetItem(["", str(key), attrText])
+            item.rawValue = val
+            treeWidget.addTopLevelItem(item)
 
             treeWidget.topLevelItem(currRow).setIcon(PropertyViewIndex.TYPE, 
                     typeContent)
@@ -4059,8 +4045,8 @@ class AppController(QtCore.QObject):
                 tableWidget.setItem(i, 1, pathItem)
 
                 if path.IsPropertyPath():
-                    valStr = GetShortString(
-                        spec, self._dataModel.currentFrame)
+                    val = GetValueAtFrame(spec, self._dataModel.currentFrame)
+                    valStr = GetShortStringForValue(spec, val)
                     ttStr = valStr
                     valueItem = QtWidgets.QTableWidgetItem(valStr)
                     sampleBased = (spec.HasInfo('timeSamples') and
@@ -4713,6 +4699,8 @@ class AppController(QtCore.QObject):
         elif key == QtCore.Qt.Key_Left:
             self._retreatFrame()
             return True
+        elif key == KeyboardShortcuts.FramingKey:
+            self._frameSelection()
         return False
 
     def _viewSettingChanged(self):
@@ -4774,20 +4762,13 @@ class AppController(QtCore.QObject):
 
     def _refreshLightsMenu(self):
         # lighting is not activated until a shaded mode is selected
-        self._ui.menuLights.setEnabled(self._dataModel.viewSettings.renderMode in ShadedRenderModes)
-
-        # three point lights not activated until ambient is deselected
-        self._ui.threePointLights.setEnabled(
-            not self._dataModel.viewSettings.ambientLightOnly)
+        self._ui.menuLights.setEnabled(
+            self._dataModel.viewSettings.renderMode in ShadedRenderModes)
 
         self._ui.actionAmbient_Only.setChecked(
             self._dataModel.viewSettings.ambientLightOnly)
-        self._ui.actionKey.setChecked(
-            self._dataModel.viewSettings.keyLightEnabled)
-        self._ui.actionFill.setChecked(
-            self._dataModel.viewSettings.fillLightEnabled)
-        self._ui.actionBack.setChecked(
-            self._dataModel.viewSettings.backLightEnabled)
+        self._ui.actionDomeLight.setChecked(
+            self._dataModel.viewSettings.domeLightEnabled)
 
     def _refreshClearColorsMenu(self):
         clearColorText = self._dataModel.viewSettings.clearColorText

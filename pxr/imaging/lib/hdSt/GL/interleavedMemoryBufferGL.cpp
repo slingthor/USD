@@ -125,12 +125,13 @@ HdStStripedInterleavedBufferGL::Reallocate(
     HdResourceGPUHandle curId = (GLuint)(uint64_t)curRangeOwner_->GetResources().begin()->second->GetId();
 
     if (glGenBuffers) {
-        glGenBuffers(1, &newId);
 
         GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
         if (caps.directStateAccessEnabled) {
-            glNamedBufferDataEXT(newId, totalSize, /*data=*/NULL, GL_STATIC_DRAW);
+            glCreateBuffers(1, &newId);
+            glNamedBufferData(newId, totalSize, /*data=*/NULL, GL_STATIC_DRAW);
         } else {
+            glGenBuffers(1, &newId);
             glBindBuffer(GL_ARRAY_BUFFER, newId);
             glBufferData(GL_ARRAY_BUFFER, totalSize, /*data=*/NULL, GL_STATIC_DRAW);
             glBindBuffer(GL_ARRAY_BUFFER, 0);

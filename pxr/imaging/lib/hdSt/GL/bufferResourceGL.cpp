@@ -179,10 +179,10 @@ HdStBufferResourceGL::CopyData(size_t vboOffset, size_t dataSize, void const *da
 {
     GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
     if (ARCH_LIKELY(caps.directStateAccessEnabled)) {
-        glNamedBufferSubDataEXT(_id,
-                                vboOffset,
-                                dataSize,
-                                data);
+        glNamedBufferSubData(_id,
+                             vboOffset,
+                             dataSize,
+                             data);
     } else {
         glBindBuffer(GL_ARRAY_BUFFER, _id);
         glBufferSubData(GL_ARRAY_BUFFER, vboOffset, dataSize, data);

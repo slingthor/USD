@@ -35,6 +35,8 @@
 #include "pxr/imaging/mtlf/diagnostic.h"
 #include "pxr/imaging/mtlf/mtlDevice.h"
 
+#include "pxr/imaging/hgiMetal/hgi.h"
+
 PXR_NAMESPACE_OPEN_SCOPE
 
 #if defined(ARCH_OS_MACOS)
@@ -61,6 +63,8 @@ HdStRenderDelegateMetal::HdStRenderDelegateMetal()
     _deviceDesc = TfToken(_MetalDeviceDescriptor(MtlfMetalContext::GetMetalContext()->currentDevice));
 //    _Initialize();
     
+    _hgi = new HgiMetal();
+    
     _inFlightSemaphore = dispatch_semaphore_create(3);
 }
 
@@ -71,6 +75,8 @@ HdStRenderDelegateMetal::HdStRenderDelegateMetal(HdRenderSettingsMap const& sett
 {
     _deviceDesc = TfToken(_MetalDeviceDescriptor(MtlfMetalContext::GetMetalContext()->currentDevice));
     
+    _hgi = new HgiMetal();
+
     _inFlightSemaphore = dispatch_semaphore_create(3);
 }
 

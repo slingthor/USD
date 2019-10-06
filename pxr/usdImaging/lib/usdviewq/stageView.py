@@ -941,6 +941,10 @@ class StageView(QtOpenGL.QGLWidget):
         self._rendererDisplayName = self.GetRendererDisplayName(rendererId)
         self._rendererAovName = "color"
         self._renderPauseState = False
+        # XXX For HdSt we explicitely enable AOV via SetRendererAov
+        # This is because ImagingGL / TaskController are spawned via prims in
+        # Presto, so we default AOVs OFF until everything is AOV ready.
+        self.SetRendererAov(self.rendererAovName)
 
     def closeRenderer(self):
         '''Close the current renderer.'''
@@ -1011,11 +1015,12 @@ class StageView(QtOpenGL.QGLWidget):
             self.updateGL()
 
     def SetRendererPaused(self, paused):
-        if self._renderer:
+        if self._renderer and (not self._renderer.IsConverged()):
             if paused:
                 self._renderPauseState = self._renderer.PauseRenderer()
             else:
                 self._renderPauseState = not self._renderer.ResumeRenderer()
+            self.updateGL()
 
     def IsPauseRendererSupported(self):
         if self._renderer:
@@ -1388,9 +1393,6 @@ class StageView(QtOpenGL.QGLWidget):
 
         renderer.SetSelectionColor(self._dataModel.viewSettings.highlightColor)
 
-        # Enable floating point framebuffer (for color correction)
-        renderer.SetEnableFloatPointDrawTarget(True)
-
         try:
             renderer.Render(pseudoRoot, self._renderParams)
         except Tf.ErrorException as e:
@@ -1691,52 +1693,14 @@ class StageView(QtOpenGL.QGLWidget):
                         l.ambient = (0, 0, 0, 0)
                         l.position = (cam_pos[0], cam_pos[1], cam_pos[2], 1)
                         lights.append(l)
-                    # three-point lighting
-                    else:
-                        if self._dataModel.viewSettings.keyLightEnabled:
-                            # 45 degree horizontal viewing angle, 20 degree vertical
-                            keyHorz = -1 / tan(rad(45)) * cam_right
-                            keyVert = 1 / tan(rad(70)) * cam_up
-                            keyPos = cam_pos + (keyVert + keyHorz) * cam_light_dist
-                            keyColor = (.8, .8, .8, 1.0)
 
-                            l = Garch.SimpleLight()
-                            l.ambient = (0, 0, 0, 0)
-                            l.diffuse = keyColor
-                            l.specular = keyColor
-                            l.position = (keyPos[0], keyPos[1], keyPos[2], 1)
-                            lights.append(l)
-
-                        if self._dataModel.viewSettings.fillLightEnabled:
-                            # 60 degree horizontal viewing angle, 45 degree vertical
-                            fillHorz = 1 / tan(rad(30)) * cam_right
-                            fillVert = 1 / tan(rad(45)) * cam_up
-                            fillPos = cam_pos + (fillVert + fillHorz) * cam_light_dist
-                            fillColor = (.6, .6, .6, 1.0)
-
-                            l = Garch.SimpleLight()
-                            l.ambient = (0, 0, 0, 0)
-                            l.diffuse = fillColor
-                            l.specular = fillColor
-                            l.position = (fillPos[0], fillPos[1], fillPos[2], 1)
-                            lights.append(l)
-
-                        if self._dataModel.viewSettings.backLightEnabled:
-                            # back light base is camera position reflected over origin
-                            # 30 degree horizontal viewing angle, 30 degree vertical
-                            origin = Gf.Vec3d(0.0)
-                            backPos = cam_pos + (origin - cam_pos) * 2
-                            backHorz = 1 / tan(rad(60)) * cam_right
-                            backVert = -1 / tan(rad(60)) * cam_up
-                            backPos += (backHorz + backVert) * cam_light_dist
-                            backColor = (.6, .6, .6, 1.0)
-
-                            l = Garch.SimpleLight()
-                            l.ambient = (0, 0, 0, 0)
-                            l.diffuse = backColor
-                            l.specular = backColor
-                            l.position = (backPos[0], backPos[1], backPos[2], 1)
-                            lights.append(l)
+                    # Default Dome Light
+                    if self._dataModel.viewSettings.domeLightEnabled:
+                        # testing for pseudo domeLight
+                        l = Garch.SimpleLight()
+                        l.isDomeLight = True
+                        l.isZup = self._stageIsZup
+                        lights.append(l)
 
                     kA = self._dataModel.viewSettings.defaultMaterialAmbient
                     kS = self._dataModel.viewSettings.defaultMaterialSpecular
@@ -1914,7 +1878,8 @@ class StageView(QtOpenGL.QGLWidget):
             rStats = renderer.GetRenderStats()
 
             toPrint["GL prims "] = self._glPrimitiveGeneratedQuery.GetResult()
-            toPrint["GPU time "] = "%.2f ms " % (self._glTimeElapsedQuery.GetResult() / 1000000.0)
+            if not self._renderPauseState:
+                toPrint["GPU time "] = "%.2f ms " % (self._glTimeElapsedQuery.GetResult() / 1000000.0)
             _addSizeMetric(toPrint, rStats, "GPU mem  ", "gpuMemoryUsed")
             _addSizeMetric(toPrint, rStats, " primvar ", "primvar")
             _addSizeMetric(toPrint, rStats, " topology", "topology")
@@ -1925,13 +1890,12 @@ class StageView(QtOpenGL.QGLWidget):
                 toPrint["Samples done "] = rStats["numCompletedSamples"]
 
         # Playback Rate
-        if self._dataModel.viewSettings.showHUD_Performance:
+        if (not self._renderPauseState) and self._dataModel.viewSettings.showHUD_Performance:
             for key in self.fpsHUDKeys:
                 toPrint[key] = self.fpsHUDInfo[key]
-        if len(toPrint) > 0:
-            self._hud.updateGroup("BottomLeft",
-                                  0, self.height()-len(toPrint)*self._hud._HUDLineSpacing,
-                                  col, toPrint, toPrint.keys())
+        self._hud.updateGroup("BottomLeft",
+                              0, self.height()-len(toPrint)*self._hud._HUDLineSpacing,
+                              col, toPrint, toPrint.keys())
 
         # draw HUD
         self._hud.draw(self)
@@ -2021,7 +1985,13 @@ class StageView(QtOpenGL.QGLWidget):
 
             elif self._cameraMode == "zoom":
                 zoomDelta = -.002 * (dx + dy)
-                freeCam.AdjustDistance(1 + zoomDelta)
+                if freeCam.orthographic:
+                    # orthographic cameras zoom by scaling fov
+                    # fov is the height of the view frustum in world units
+                    freeCam.fov *= (1 + zoomDelta)
+                else:
+                    # perspective cameras dolly forward or back
+                    freeCam.AdjustDistance(1 + zoomDelta)
 
             elif self._cameraMode == "truck":
                 height = float(self.size().height())

@@ -32,6 +32,12 @@
 #include "pxr/usd/usdShade/material.h"
 #include "pxr/usd/usdShade/shader.h"
 
+#include "pxr/usd/ar/resolver.h"
+#include "pxr/usd/sdr/registry.h"
+#include "pxr/usd/sdr/shaderNode.h"
+#include "pxr/usd/sdr/shaderProperty.h"
+
+
 PXR_NAMESPACE_OPEN_SCOPE
 
 TF_REGISTRY_FUNCTION(TfType)
@@ -39,6 +45,40 @@ TF_REGISTRY_FUNCTION(TfType)
     typedef UsdImagingMaterialAdapter Adapter;
     TfType t = TfType::Define<Adapter, TfType::Bases<Adapter::BaseAdapter> >();
     t.SetFactory< UsdImagingPrimAdapterFactory<Adapter> >();
+}
+
+static TfToken
+_GetShaderNodeForSourceTypeFallback(
+    UsdShadeShader const& shader,
+    TfToken const& networkSelector)
+{
+    std::string identifier;
+    TfToken implSource = shader.GetImplementationSource();
+
+    if (implSource == UsdShadeTokens->id) {
+        TfToken shaderId;
+
+        if (shader.GetShaderId(&shaderId)) {
+            auto &shaderReg = SdrRegistry::GetInstance();
+            if (SdrShaderNodeConstPtr sdrNode = 
+                    shaderReg.GetShaderNodeByIdentifierAndType(shaderId, 
+                        networkSelector)) {
+                identifier = sdrNode->GetSourceURI();
+            }
+        }
+    } else if (implSource == UsdShadeTokens->sourceAsset) {
+        SdfAssetPath sourceAsset;
+        if (shader.GetSourceAsset(&sourceAsset, networkSelector)) {
+            identifier = ArGetResolver().Resolve(sourceAsset.GetAssetPath());
+        }
+    } else if (implSource == UsdShadeTokens->sourceCode) {
+        std::string sourceCode;
+        if (shader.GetSourceCode(&sourceCode, networkSelector)) {
+            identifier = sourceCode;
+        }
+    }
+
+    return TfToken(identifier);
 }
 
 UsdImagingMaterialAdapter::~UsdImagingMaterialAdapter()
@@ -93,24 +133,14 @@ UsdImagingMaterialAdapter::UpdateForTime(UsdPrim const& prim,
     UsdImagingValueCache* valueCache = _GetValueCache();
 
     if (requestedBits & HdMaterial::DirtyResource) {
+        TfToken const& networkSelector = _GetMaterialNetworkSelector();
+
         // Walk the material network and generate a HdMaterialNetworkMap
         // structure to store it in the value cache.
-        HdMaterialNetworkMap materialNetworkMap;
-        _GetMaterialNetworkMap(prim, &materialNetworkMap);
+        HdMaterialNetworkMap networkMap;
+        _GetMaterialNetworkMap(prim, networkSelector, &networkMap);
 
-        valueCache->GetMaterialResource(cachePath) = materialNetworkMap;
-
-        // Compute union of primvars from all networks
-        std::vector<TfToken> primvars;
-        for (const auto& entry: materialNetworkMap.map) {
-            primvars.insert(primvars.end(),
-                            entry.second.primvars.begin(),
-                            entry.second.primvars.end());
-        }
-        std::sort(primvars.begin(), primvars.end());
-        primvars.erase(std::unique(primvars.begin(), primvars.end()),
-                       primvars.end());
-        valueCache->GetMaterialPrimvars(cachePath) = primvars;
+        valueCache->GetMaterialResource(cachePath) = networkMap;
     }
 }
 
@@ -172,9 +202,9 @@ UsdImagingMaterialAdapter::_RemovePrim(SdfPath const& cachePath,
 }
 
 static
-void _ExtractPrimvarsFromNode(UsdShadeShader const & shadeNode, 
-                             HdMaterialNode const & node, 
-                             HdMaterialNetwork *materialNetwork)
+void _ExtractPrimvarsFromNode(UsdShadeShader const & shadeNode,
+                              HdMaterialNode const & node,
+                              HdMaterialNetwork *materialNetwork)
 {
     // Check if it is a node that reads primvars.
     // XXX : We could be looking at more stuff here like manifolds..
@@ -189,16 +219,24 @@ void _ExtractPrimvarsFromNode(UsdShadeShader const & shadeNode,
                 materialNetwork->primvars.push_back(
                     TfToken(value.Get<std::string>()));
             }
-        }        
+        }
     }
 }
 
-// Walk the shader graph and emit nodes in topological order
-// to avoid forward-references.
+// Walk the shader graph and emit nodes in topological order to avoid
+// forward-references.
+// This current implementation of _WalkGraph flattens the shading network into
+// a single graph with connectivity and values. It does not try to identify
+// NodeGraphs that can be processed once and shared, or even look for a
+// pre-baked implementation. Currently neither the material processing in Hydra
+// nor any of the back-ends (like HdPrman) can make use of this anyway.
 static
-void _WalkGraph(UsdShadeShader const & shadeNode, 
-               HdMaterialNetwork *materialNetwork,
-               const TfTokenVector &shaderSourceTypes)
+void _WalkGraph(
+    UsdShadeShader const & shadeNode,
+    HdMaterialNetwork* materialNetwork,
+    TfToken const& networkSelector,
+    SdfPathSet* visitedNodes,
+    TfTokenVector const & shaderSourceTypes)
 {
     // Store the path of the node
     HdMaterialNode node;
@@ -206,45 +244,58 @@ void _WalkGraph(UsdShadeShader const & shadeNode,
     if (!TF_VERIFY(node.path != SdfPath::EmptyPath())) {
         return;
     }
+
     // If this node has already been found via another path, we do
     // not need to add it again.
-    for (HdMaterialNode const& existingNode: materialNetwork->nodes) {
-        if (existingNode.path == node.path) {
-            return;
-        }
+    if (visitedNodes->count(node.path) > 0) {
+        return;
     }
 
     // Visit the inputs of this node to ensure they are emitted first.
     const std::vector<UsdShadeInput> shadeNodeInputs = shadeNode.GetInputs();
-    for (UsdShadeInput const& input: shadeNodeInputs) {
-        // Check if this input is a connection and if so follow the path
-        UsdShadeConnectableAPI source;
-        TfToken sourceName;
-        UsdShadeAttributeType sourceType;
-        if (UsdShadeConnectableAPI::GetConnectedSource(input, 
-                &source, &sourceName, &sourceType)) {
-            // When we find a connection to a shading node output,
-            // walk the upstream shading node.  Do not do this for
-            // other sources (ex: a connection to a material
-            // public interface parameter), since they are not
-            // part of the shading node graph.
-            // XXX NodeGraph - if the target node is an instanced
-            // NodeGraph, we want to share its processed form, or even
-            // use a pre-baked implementation instead of recursing.
-            if (sourceType == UsdShadeAttributeType::Output) {
-                UsdShadeShader connectedNode(source);
-                _WalkGraph(connectedNode, materialNetwork, shaderSourceTypes);
+    for (UsdShadeInput input: shadeNodeInputs) {
+
+        TfToken inputName = input.GetBaseName();
+
+        // Find the attribute this input is getting its value from, which might
+        // be an output or an input, including possibly itself if not connected
+        UsdShadeAttributeType attrType;
+        UsdAttribute attr = input.GetValueProducingAttribute(&attrType);
+
+        if (attrType == UsdShadeAttributeType::Output) {
+            // If it is an output on a shading node we visit the node and also
+            // create a relationship in the network
+            _WalkGraph(UsdShadeShader(
+                attr.GetPrim()),
+                materialNetwork,
+                networkSelector,
+                visitedNodes,
+                shaderSourceTypes);
+
+            HdMaterialRelationship relationship;
+            relationship.outputId = node.path;
+            relationship.outputName = inputName;
+            relationship.inputId = attr.GetPrim().GetPath();
+            relationship.inputName = UsdShadeOutput(attr).GetBaseName();
+            materialNetwork->relationships.push_back(relationship);
+        } else if (attrType == UsdShadeAttributeType::Input) {
+            // If it is an input attribute we get the authored value
+            VtValue value;
+            if (attr.Get(&value)) {
+                node.parameters[inputName] = value;
             }
         }
     }
 
-    // Extract the identifier of the node
+    // Extract the identifier of the node.
+    // GetShaderNodeForSourceType will try to find/create an Sdr node for all
+    // three info cases: info:id, info:sourceAsset and info:sourceCode.
     TfToken id;
     if (!shadeNode.GetShaderId(&id)) {
-        for (auto &sourceType : shaderSourceTypes) {
-            if (SdrShaderNodeConstPtr n = 
+        for (auto const& sourceType : shaderSourceTypes) {
+            if (SdrShaderNodeConstPtr sdrNode = 
                     shadeNode.GetShaderNodeForSourceType(sourceType)) {
-                id = n->GetIdentifier();
+                id = sdrNode->GetIdentifier();
                 break;
             }
         }
@@ -258,68 +309,58 @@ void _WalkGraph(UsdShadeShader const & shadeNode,
         // optimize what what is needed from a prim when making data 
         // accessible for renderers.
         _ExtractPrimvarsFromNode(shadeNode, node, materialNetwork);
-    } else {
-        TF_WARN("UsdShade Shader without an id: %s.", node.path.GetText());
-        node.identifier = TfToken("PbsNetworkMaterialStandIn_2");
-    }
-
-
-    // Add the parameters and the relationships of this node
-    // XXX: Ideally, this loop would be combined with the one above,
-    // so that we are only calling GetConnectedSource once per input...
-    // it's not particularly cheap.
-    VtValue value;
-    for (UsdShadeInput const& input: shadeNodeInputs) {
-        // Check if this input is a connection and if so follow the path
-        UsdShadeConnectableAPI source;
-        TfToken sourceName;
-        UsdShadeAttributeType sourceType;
-        if (UsdShadeConnectableAPI::GetConnectedSource(input,
-            &source, &sourceName, &sourceType)) {
-            if (sourceType == UsdShadeAttributeType::Output) {
-                // Store the relationship
-                // XXX NodeGraph - If this is a NodeGraph output and
-                // we are not consuming the NodeGraph as a monolithic
-                // shader, we need to recurse until we hit a Shader output.
-                HdMaterialRelationship relationship;
-                relationship.outputId = shadeNode.GetPath();
-                relationship.outputName = input.GetBaseName();
-                relationship.inputId = source.GetPath();
-                relationship.inputName = sourceName;
-                materialNetwork->relationships.push_back(relationship);
-            } else if (sourceType == UsdShadeAttributeType::Input) {
-                // Connected to an input on the public interface.
-                // The source is not a node in the shader network, so
-                // pull the value and pass it in as a parameter.
-                // XXX NodeGraph - If this is a NodeGraph input, chase
-                // its own connection, if it has one, since the "outermost"
-                // is the one whose value we want.
-                if (UsdShadeInput connectedInput =
-                    source.GetInput(sourceName)) {
-                    if (connectedInput.Get(&value)) {
-                        node.parameters[input.GetBaseName()] = value;
-                    }
-                    // If the target input has no value, use our own if
-                    // one exists
-                    else if (input.Get(&value)) {
-                        node.parameters[input.GetBaseName()] = value;
-                    }
-                }
-            }
-        } else {
-            // Parameters detected, let's store it
-            if (input.Get(&value)) {
-                node.parameters[input.GetBaseName()] = value;
-            }
-        }
-    }
-
+    } 
+    
     materialNetwork->nodes.push_back(node);
+    visitedNodes->emplace(node.path);
 }
 
+static void
+_BuildHdMaterialNetworkFromTerminal(
+    UsdShadeShader const& usdTerminal,
+    TfToken const& terminalIdentifier,
+    TfToken const& networkSelector,
+    TfTokenVector const& shaderSourceTypes,
+    HdMaterialNetworkMap *materialNetworkMap)
+{
+    HdMaterialNetwork& network = materialNetworkMap->map[terminalIdentifier];
+    std::vector<HdMaterialNode>& nodes = network.nodes;
+    SdfPathSet visitedNodes;
+
+    _WalkGraph(
+        usdTerminal, 
+        &network,
+        networkSelector,
+        &visitedNodes, 
+        shaderSourceTypes);
+
+    if (!TF_VERIFY(!nodes.empty())) return;
+
+    // _WalkGraph() inserts the terminal last in the nodes list.
+    HdMaterialNode& terminalNode = nodes.back();
+
+    // If the identifier could not be found, there likely isn't a Sdr plugin
+    // for this network type. This is currently the case for glslfx files.
+    // Put source path/code as identifier for backend to resolve.
+    // XXX Deprecate when glslfx has a Sdr plugin?
+    if (terminalNode.identifier.IsEmpty()) {
+        terminalNode.identifier = _GetShaderNodeForSourceTypeFallback(
+            usdTerminal, networkSelector);
+    }
+
+    if (terminalNode.identifier.IsEmpty()) {
+        TF_WARN("UsdShade Shader without id: %s.", terminalNode.path.GetText());
+    }
+
+    // Store terminals on material network so backend can easily access them.
+    materialNetworkMap->terminals.push_back(terminalNode.path);
+};
+
 void 
-UsdImagingMaterialAdapter::_GetMaterialNetworkMap(UsdPrim const &usdPrim, 
-    HdMaterialNetworkMap *materialNetworkMap) const
+UsdImagingMaterialAdapter::_GetMaterialNetworkMap(
+    UsdPrim const &usdPrim, 
+    TfToken const& networkSelector,
+    HdMaterialNetworkMap *networkMap) const
 {
     UsdShadeMaterial material(usdPrim);
     if (!material) {
@@ -329,18 +370,35 @@ UsdImagingMaterialAdapter::_GetMaterialNetworkMap(UsdPrim const &usdPrim,
                          usdPrim.GetTypeName().GetText());
         return;
     }
+
     const TfToken context = _GetMaterialNetworkSelector();
+    TfTokenVector shaderSourceTypes = _GetShaderSourceTypes();
+
     if (UsdShadeShader s = material.ComputeSurfaceSource(context)) {
-        _WalkGraph(s, &materialNetworkMap->map[UsdImagingTokens->bxdf],
-                  _GetShaderSourceTypes());
+        _BuildHdMaterialNetworkFromTerminal(
+            s, 
+            HdMaterialTerminalTokens->surface,
+            networkSelector,
+            shaderSourceTypes,
+            networkMap);
     }
+
     if (UsdShadeShader d = material.ComputeDisplacementSource(context)) {
-        _WalkGraph(d, &materialNetworkMap->map[UsdImagingTokens->displacement],
-                  _GetShaderSourceTypes());
+        _BuildHdMaterialNetworkFromTerminal(
+            d,
+            HdMaterialTerminalTokens->displacement,
+            networkSelector,
+            shaderSourceTypes,
+            networkMap);
     }
+
     if (UsdShadeShader v = material.ComputeVolumeSource(context)) {
-        _WalkGraph(v, &materialNetworkMap->map[UsdImagingTokens->volume],
-                  _GetShaderSourceTypes());
+        _BuildHdMaterialNetworkFromTerminal(
+            v,
+            HdMaterialTerminalTokens->volume,
+            networkSelector,
+            shaderSourceTypes,
+            networkMap);
     }
 }
 

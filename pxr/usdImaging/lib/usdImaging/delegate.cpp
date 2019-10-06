@@ -62,6 +62,7 @@
 
 #include "pxr/usd/usdGeom/camera.h"
 #include "pxr/usd/usdGeom/tokens.h"
+#include "pxr/usd/usdGeom/metrics.h"
 #include "pxr/usd/usdGeom/modelAPI.h"
 
 #include "pxr/usd/usdLux/domeLight.h"
@@ -79,6 +80,9 @@
 #include <limits>
 #include <string>
 
+// XXX In progress of deprecating hydra material adapter
+#include "pxr/base/tf/getenv.h"
+
 PXR_NAMESPACE_OPEN_SCOPE
 
 
@@ -95,6 +99,7 @@ TF_DEFINE_PRIVATE_TOKENS(
     (HydraPbsSurface)
     (DomeLight)
     (PreviewDomeLight)
+    (StageOrientation)
 );
 
 // This environment variable matches a set of similar ones in
@@ -105,6 +110,15 @@ static bool _IsEnabledDrawModeCache() {
     static bool _v = TfGetEnvSetting(USDIMAGING_ENABLE_DRAWMODE_CACHE) == 1;
     return _v;
 }
+
+// XXX In progress of deprecating hydra material adapter
+static bool _IsEnabledStormMaterialNetworks() {
+    static std::string _stormMatNet = 
+        TfGetenv("STORM_ENABLE_MATERIAL_NETWORKS");
+
+    return !_stormMatNet.empty() && std::stoi(_stormMatNet) > 0;
+}
+
 
 // -------------------------------------------------------------------------- //
 // Delegate Implementation.
@@ -253,10 +267,15 @@ UsdImagingDelegate::_AdapterLookup(UsdPrim const& prim, bool ignoreInstancing)
         // for backwards compatibility.
         TfToken bindingPurpose = GetRenderIndex().
             GetRenderDelegate()->GetMaterialBindingPurpose();
-        if (bindingPurpose == HdTokens->preview &&
-            adapterKey == _tokens->Material) {
-            adapterKey = _tokens->HydraPbsSurface;
-        } 
+
+        // XXX In progress of deprecating hydra material adapter
+        if (!_IsEnabledStormMaterialNetworks()) {
+            if (bindingPurpose == HdTokens->preview &&
+                adapterKey == _tokens->Material) {
+                adapterKey = _tokens->HydraPbsSurface;
+            } 
+        }
+
         if (bindingPurpose == HdTokens->preview &&
             adapterKey == _tokens->DomeLight) {
             adapterKey = _tokens->PreviewDomeLight;
@@ -2802,17 +2821,9 @@ UsdImagingDelegate::GetMaterialParams(SdfPath const &materialId)
     TF_VERIFY(_valueCache.FindMaterialParams(cachePath, &params));
 
     // Connections need to be represented as index paths...
-    TF_FOR_ALL(paramIt, params) {
-        if (paramIt->IsTexture()) {
-            // Unfortunately, HdMaterialParam is immutable;
-            // fortunately, it has relatively lightweight members.
-            *paramIt = HdMaterialParam(
-                HdMaterialParam::ParamTypeTexture,
-                paramIt->GetName(),
-                paramIt->GetFallbackValue(),
-                ConvertCachePathToIndexPath(paramIt->GetConnection()),
-                paramIt->GetSamplerCoordinates(),
-                paramIt->GetTextureType());
+    for (HdMaterialParam& param : params) {
+        if (param.IsTexture()) {
+            param.connection = ConvertCachePathToIndexPath(param.connection);
         }
     }
 
@@ -2906,6 +2917,9 @@ UsdImagingDelegate::GetLightParamValue(SdfPath const &id,
     } else if (paramName == HdTokens->shadowLink) {
         UsdCollectionAPI shadowLink = light.GetShadowLinkCollectionAPI();
         return VtValue(_collectionCache.GetIdForCollection(shadowLink));
+    } else if (paramName == _tokens->StageOrientation) {
+        // get the orientation of the stage 
+        return VtValue(UsdGeomGetStageUpAxis(_stage) == UsdGeomTokens->z);
     }
 
     // Fallback to USD attributes.

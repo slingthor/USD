@@ -64,7 +64,8 @@ PXR_NAMESPACE_OPEN_SCOPE
     (selColor)                  \
     (selLocateColor)            \
     (selectionPointColors)      \
-    (drawTargetRenderPasses)
+    (drawTargetRenderPasses)    \
+    (aovBindings)
 
 TF_DECLARE_PUBLIC_TOKENS(HdxTokens, HDX_API, HDX_TOKENS);
 
@@ -103,6 +104,7 @@ TF_DECLARE_PUBLIC_TOKENS(HdxOptionTokens, HDX_API, HDX_OPTION_TOKENS);
 
 TF_DECLARE_PUBLIC_TOKENS(HdxRenderTagTokens, HDX_API, HDX_RENDERTAG_TOKENS);
 
+// XXX Deprecated Use: HdStMaterialTagTokens
 #define HDX_MATERIALTAG_TOKENS   \
     (additive)                   \
     (translucent)

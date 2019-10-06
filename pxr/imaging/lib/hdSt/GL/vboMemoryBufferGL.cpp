@@ -147,18 +147,18 @@ HdStVBOMemoryBufferGL::Reallocate(
 
         if(glGenBuffers) {
             GLuint nid = 0;
-            glGenBuffers(1, &nid);
             
             if (ARCH_LIKELY(caps.directStateAccessEnabled)) {
-                glNamedBufferDataEXT(nid,
-                                     bufferSize, NULL, GL_STATIC_DRAW);
+                glCreateBuffers(1, &nid);
+                glNamedBufferData(nid,
+                                  bufferSize, /*data=*/NULL, GL_STATIC_DRAW);
             } else {
+                glGenBuffers(1, &nid);
                 glBindBuffer(GL_ARRAY_BUFFER, nid);
                 glBufferData(GL_ARRAY_BUFFER,
-                             bufferSize, NULL, GL_STATIC_DRAW);
+                             bufferSize, /*data=*/NULL, GL_STATIC_DRAW);
                 glBindBuffer(GL_ARRAY_BUFFER, 0);
             }
-
             newId = nid;
 
             // if old buffer exists, copy unchanged data

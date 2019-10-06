@@ -32,6 +32,7 @@
 #include "pxr/imaging/hdSt/rprimUtils.h"
 #include "pxr/imaging/hdSt/surfaceShader.h"
 #include "pxr/imaging/hdSt/tokens.h"
+#include "pxr/imaging/hdSt/volumeShader.h"
 #include "pxr/imaging/hdSt/volumeShaderKey.h"
 #include "pxr/imaging/hdSt/textureResourceHandle.h"
 
@@ -54,6 +55,16 @@ TF_DEFINE_PRIVATE_TOKENS(
     (volumeBBoxLocalMin)
     (volumeBBoxLocalMax)
 );
+
+TF_DEFINE_PRIVATE_TOKENS(
+    _fallbackShaderTokens,
+
+    (density)
+    (emission)
+);
+
+const float HdStVolume::defaultStepSize         = 1.0f;
+const float HdStVolume::defaultStepSizeLighting = 2.0f;
 
 HdStVolume::HdStVolume(SdfPath const& id, SdfPath const & instancerId)
     : HdVolume(id)
@@ -187,7 +198,7 @@ HdStVolume::_ComputeNameToFieldResource(
 
 namespace {
 
-// Fallback volume shader created from source in shaders/fallbackVolume.glslfx
+// Fallback volume shader created from shaders/fallbackVolume.glslfx
 HdStShaderCodeSharedPtr
 _MakeFallbackVolumeShader()
 {
@@ -202,6 +213,20 @@ _MakeFallbackVolumeShader()
         boost::make_shared<HdStSurfaceShader>();
     
     result->SetFragmentSource(glslfx.GetVolumeSource());
+    result->SetParams(
+        {
+            HdMaterialParam(
+                HdMaterialParam::ParamTypeField,
+                _fallbackShaderTokens->density,
+                VtValue(GfVec3f(0.0, 0.0, 0.0)),
+                SdfPath(),
+                { _fallbackShaderTokens->density }),
+            HdMaterialParam(
+                HdMaterialParam::ParamTypeField,
+                _fallbackShaderTokens->emission,
+                VtValue(GfVec3f(0.0, 0.0, 0.0)),
+                SdfPath(),
+                { _fallbackShaderTokens->emission })});
 
     return result;
 }
@@ -284,8 +309,9 @@ HdStVolume::_ComputeMaterialShaderAndBBox(
             sceneDelegate->GetRenderIndex().GetResourceRegistry());
 
     // Generate new shader from volume shader
-    HdStSurfaceShaderSharedPtr const result =
-        boost::make_shared<HdStSurfaceShader>();
+    HdSt_VolumeShaderSharedPtr const result =
+        boost::make_shared<HdSt_VolumeShader>(
+            sceneDelegate->GetRenderIndex().GetRenderDelegate());
 
     // The GLSL code for the new shader
     std::stringstream glsl;
@@ -306,7 +332,7 @@ HdStVolume::_ComputeMaterialShaderAndBBox(
 
             // Determine the field name the field reader requests
             TfTokenVector const &samplerCoordinates =
-                param.GetSamplerCoordinates();
+                param.samplerCoords;
             const TfToken fieldName =
                 samplerCoordinates.empty() ? TfToken() : samplerCoordinates[0];
 
@@ -315,7 +341,7 @@ HdStVolume::_ComputeMaterialShaderAndBBox(
             const TfToken samplingTransformName(
                 fieldName.GetString() + "SamplingTransform");
             const TfToken fallbackName(
-                param.GetName().GetString() + "Fallback");
+                param.name.GetString() + "Fallback");
 
             // Get the field resource associated with the field name if
             // field name was not seen before (two field readers could
@@ -334,7 +360,7 @@ HdStVolume::_ComputeMaterialShaderAndBBox(
                     const HdMaterialParam textureParam(
                         HdMaterialParam::ParamTypeTexture,
                         textureName,
-                        param.GetFallbackValue(),
+                        param.fallbackValue,
                         SdfPath(),
                         TfTokenVector(),
                         HdTextureType::Uvw);
@@ -387,10 +413,10 @@ HdStVolume::_ComputeMaterialShaderAndBBox(
             const HdMaterialParam fallbackParam(
                 HdMaterialParam::ParamTypeFallback,
                 fallbackName,
-                param.GetFallbackValue());
+                param.fallbackValue);
 
             sourcesAndTextures.ProcessFallbackMaterialParam(
-                fallbackParam, param.GetFallbackValue());
+                fallbackParam, param.fallbackValue);
 
             materialParams.push_back(fallbackParam);
             
@@ -398,8 +424,8 @@ HdStVolume::_ComputeMaterialShaderAndBBox(
             
             const HdMaterialParam fieldRedirectParam(
                 HdMaterialParam::ParamTypeFieldRedirect,
-                param.GetName(),
-                param.GetFallbackValue(),
+                param.name,
+                param.fallbackValue,
                 SdfPath(),
                 { fieldName });
                 
@@ -441,7 +467,7 @@ HdStVolume::_ComputeMaterialShaderAndBBox(
             VtValue(localVolumeBBox->GetMatrix().GetInverse()));
         
         sourcesAndTextures.ProcessFallbackMaterialParam(
-            transformParam, transformParam.GetFallbackValue());
+            transformParam, transformParam.fallbackValue);
         
         materialParams.push_back(transformParam);
     }
@@ -455,7 +481,7 @@ HdStVolume::_ComputeMaterialShaderAndBBox(
             VtValue(localVolumeBBox->GetRange().GetMin()));
         
         sourcesAndTextures.ProcessFallbackMaterialParam(
-            minParam, minParam.GetFallbackValue());
+            minParam, minParam.fallbackValue);
         
         materialParams.push_back(minParam);
     }
@@ -469,7 +495,7 @@ HdStVolume::_ComputeMaterialShaderAndBBox(
             VtValue(localVolumeBBox->GetRange().GetMax()));
         
         sourcesAndTextures.ProcessFallbackMaterialParam(
-            maxParam, maxParam.GetFallbackValue());
+            maxParam, maxParam.fallbackValue);
         
         materialParams.push_back(maxParam);
     }

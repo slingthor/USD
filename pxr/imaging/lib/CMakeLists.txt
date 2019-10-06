@@ -1,8 +1,3 @@
-set(hgiGL "")
-if (PXR_ENABLE_GL_SUPPORT)
-    set(hgiGL hgiGL)
-endif()
-
 set(DIRS
     garch
     hf
@@ -12,7 +7,8 @@ set(DIRS
     glf
     mtlf
     hgi
-    ${hgiGL}
+    hgiGL
+    hgiMetal
     hd
     hdSt
     hdx

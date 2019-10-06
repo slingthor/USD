@@ -48,17 +48,18 @@ HdStPersistentBufferGL::HdStPersistentBufferGL(
     GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
 
     GLuint newId = 0;
-    glGenBuffers(1, &newId);
 
     if (caps.bufferStorageEnabled) {
-        GLbitfield access = 
+        GLbitfield access =
             GL_MAP_READ_BIT | GL_MAP_WRITE_BIT |
             GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT;
 
         if (caps.directStateAccessEnabled) {
-            glNamedBufferStorageEXT(newId, dataSize, data, access);
-            _mappedAddress = glMapNamedBufferRangeEXT(newId, 0, dataSize, access);
+            glCreateBuffers(1, &newId);
+            glNamedBufferStorage(newId, dataSize, data, access);
+            _mappedAddress = glMapNamedBufferRange(newId, 0, dataSize, access);
         } else {
+            glGenBuffers(1, &newId);
             glBindBuffer(GL_ARRAY_BUFFER, newId);
             glBufferStorage(GL_ARRAY_BUFFER, dataSize, data, access);
             _mappedAddress = glMapBufferRange(GL_ARRAY_BUFFER, 0, dataSize, access);
@@ -66,8 +67,10 @@ HdStPersistentBufferGL::HdStPersistentBufferGL(
         }
     } else {
         if (caps.directStateAccessEnabled) {
-            glNamedBufferDataEXT(newId, dataSize, data, GL_DYNAMIC_DRAW);
+            glCreateBuffers(1, &newId);
+            glNamedBufferData(newId, dataSize, data, GL_DYNAMIC_DRAW);
         } else {
+            glGenBuffers(1, &newId);
             glBindBuffer(GL_ARRAY_BUFFER, newId);
             glBufferData(GL_ARRAY_BUFFER, dataSize, data, GL_DYNAMIC_DRAW);
             glBindBuffer(GL_ARRAY_BUFFER, 0);

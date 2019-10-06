@@ -51,7 +51,6 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 TF_DEFINE_PRIVATE_TOKENS(
     _tokens,
-    // (DomeLightTexture)  // textures in previewSurface.glslfx
     (domeLightIrradiance)
     (domeLightPrefilter) 
     (domeLightBRDF)
@@ -157,10 +156,9 @@ HdxSimpleLightingShader::BindResources(HdSt_ResourceBinder const &binder,
 #if defined(ARCH_GFX_OPENGL)
                 if (isOpenGL) {
                     uint32_t textureId = uint32_t(light.GetIrradianceId());
-                    uint32_t samplerId = uint32_t(light.GetSamplerId());
                     glActiveTexture(GL_TEXTURE0 + samplerUnit);
                     glBindTexture(GL_TEXTURE_2D, (GLuint)textureId);
-                    glBindSampler(samplerUnit, (unsigned int)samplerId);
+                	glBindSampler(samplerUnit, 0);
                     
                     glProgramUniform1i(programId, irradianceBinding.GetLocation(),
                                         samplerUnit);
@@ -175,10 +173,9 @@ HdxSimpleLightingShader::BindResources(HdSt_ResourceBinder const &binder,
 #if defined(ARCH_GFX_OPENGL)
                 if (isOpenGL) {
                     uint32_t textureId = uint32_t(light.GetPrefilterId());
-                    uint32_t samplerId = uint32_t(light.GetSamplerId());
                     glActiveTexture(GL_TEXTURE0 + samplerUnit);
                     glBindTexture(GL_TEXTURE_2D, (GLuint)textureId);
-                    glBindSampler(samplerUnit, (unsigned int)samplerId);
+                	glBindSampler(samplerUnit, 0);
                     
                     glProgramUniform1i(programId, prefilterBinding.GetLocation(),
                                         samplerUnit);
@@ -192,10 +189,9 @@ HdxSimpleLightingShader::BindResources(HdSt_ResourceBinder const &binder,
 #if defined(ARCH_GFX_OPENGL)
                 if (isOpenGL) {
                     uint32_t textureId = uint32_t(light.GetBrdfId());
-                    uint32_t samplerId = uint32_t(light.GetSamplerId());
                     glActiveTexture(GL_TEXTURE0 + samplerUnit);
                     glBindTexture(GL_TEXTURE_2D, (GLuint)textureId);
-                    glBindSampler(samplerUnit, (unsigned int)samplerId);
+                	glBindSampler(samplerUnit, 0);
                     
                     glProgramUniform1i(programId, brdfBinding.GetLocation(),
                                        samplerUnit);

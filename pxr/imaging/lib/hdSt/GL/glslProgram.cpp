@@ -23,6 +23,9 @@
 //
 #include "pxr/imaging/glf/glew.h"
 
+#include "pxr/imaging/garch/resourceFactory.h"
+#include "pxr/imaging/garch/contextCaps.h"
+
 #include "pxr/imaging/hdSt/debugCodes.h"
 #include "pxr/imaging/hdSt/package.h"
 #include "pxr/imaging/hdSt/surfaceShader.h"
@@ -377,8 +380,14 @@ HdStGLSLProgram::Link()
 
     // create an uniform buffer
     GLuint uniformBuffer = _uniformBuffer.GetId();
+    GarchContextCaps const &caps =
+        GarchResourceFactory::GetInstance()->GetContextCaps();
     if (uniformBuffer == 0) {
-        glGenBuffers(1, &uniformBuffer);
+        if (ARCH_LIKELY(caps.directStateAccessEnabled)) {
+            glCreateBuffers(1, &uniformBuffer);
+        } else {
+            glGenBuffers(1, &uniformBuffer);
+        }
         _uniformBuffer.SetAllocation(uniformBuffer, 0);
     }
 

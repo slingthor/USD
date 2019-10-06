@@ -138,6 +138,8 @@ GlfContextCaps::_LoadCaps()
     glGetIntegerv(GL_MAX_CLIP_PLANES, &glMaxClipPlanes);
     glMaxClipPlanes = size_t(glMaxClipPlanes);
 
+    const char *glVendorStr = (const char*)glGetString(GL_VENDOR);
+    const char *glRendererStr = (const char*)glGetString(GL_RENDERER);
     const char *glVersionStr = (const char*)glGetString(GL_VERSION);
 
     // GL hasn't been initialized yet.
@@ -232,9 +234,6 @@ GlfContextCaps::_LoadCaps()
         shaderDrawParametersEnabled = true;
     }
 #endif
-    if (GLEW_EXT_direct_state_access) {
-        directStateAccessEnabled = true;
-    }
 
     // Environment variable overrides (only downgrading is possible)
     if (!TfGetEnvSetting(GLF_ENABLE_SHADER_STORAGE_BUFFER)) {
@@ -278,6 +277,12 @@ GlfContextCaps::_LoadCaps()
     if (TfDebug::IsEnabled(GLF_DEBUG_CONTEXT_CAPS)) {
         std::cout
             << "GlfContextCaps: \n"
+            << "  GL_VENDOR                          = " 
+            <<    glVendorStr << "\n"
+            << "  GL_RENDERER                        = "
+            <<    glRendererStr << "\n"
+            << "  GL_VERSION                         = "
+            <<    glVersionStr << "\n"
             << "  GL version                         = "
             <<    apiVersion << "\n"
             << "  GLSL version                       = "
@@ -300,7 +305,7 @@ GlfContextCaps::_LoadCaps()
             <<    explicitUniformLocation << "\n"
             << "  ARB_multi_draw_indirect            = "
             <<    multiDrawIndirectEnabled << "\n"
-            << "  ARB_shader_draw_parameters   = "
+            << "  ARB_shader_draw_parameters         = "
             <<    shaderDrawParametersEnabled << "\n"
             << "  ARB_shader_storage_buffer_object   = "
             <<    shaderStorageBufferEnabled << "\n"

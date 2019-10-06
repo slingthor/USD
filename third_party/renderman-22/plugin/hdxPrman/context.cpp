@@ -52,7 +52,21 @@ static riley::RileyCallback nullRileyCallback([](void*){}, nullptr);
 
 void HdxPrman_RenderThreadCallback(HdxPrman_InteractiveContext *context)
 {
-    context->riley->Render();
+    bool renderComplete = false;
+    while (!renderComplete) {
+        while (context->renderThread.IsPauseRequested()) {
+            if (context->renderThread.IsStopRequested()) {
+                break;
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        }
+        if (context->renderThread.IsStopRequested()) {
+            break;
+        }
+        context->riley->Render();
+        // If a pause was requested, we may have stopped early
+        renderComplete = !context->renderThread.IsPauseDirty();
+    }
 }
 
 HdxPrman_InteractiveContext::HdxPrman_InteractiveContext() :
@@ -266,7 +280,7 @@ void HdxPrman_InteractiveContext::Begin(HdRenderDelegate *renderDelegate)
         // Projection
         RixParamList *projParams = mgr->CreateRixParamList();
         projParams->SetFloat(RixStr.k_fov, 60.0f);
-        cameraNode = riley::ShadingNode {
+        riley::ShadingNode cameraNode = riley::ShadingNode {
             riley::ShadingNode::k_Projection,
             us_PxrPerspective,
             us_main_cam_projection,
@@ -443,13 +457,13 @@ void HdxPrman_InteractiveContext::End()
     // Reset to initial state.
     if(riley) {
         riley->End();
-        riley = nullptr;
     }
     if (mgr) {
         mgr->DestroyRixParamList(_fallbackLightAttrs);
         mgr->DestroyRiley(riley);
         mgr = nullptr;
     }
+    riley = nullptr;
     if (ri) {
         ri->PRManEnd();
         ri = nullptr;

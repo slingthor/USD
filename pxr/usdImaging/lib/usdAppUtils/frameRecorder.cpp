@@ -63,7 +63,6 @@ UsdAppUtilsFrameRecorder::UsdAppUtilsFrameRecorder(
     _purposes({UsdGeomTokens->default_, UsdGeomTokens->proxy})
 {
     GlfGlewInit();
-    _imagingEngine.SetEnableFloatPointDrawTarget(true);
 }
 
 static bool
@@ -240,6 +239,10 @@ UsdAppUtilsFrameRecorder::Record(
     const UsdPrim& pseudoRoot = stage->GetPseudoRoot();
 
     do {
+#if defined(ARCH_GFX_OPENGL)
+        glClearBufferfv(GL_COLOR, 0, CLEAR_COLOR.data());
+        glClearBufferfv(GL_DEPTH, 0, CLEAR_DEPTH);
+#endif
         _imagingEngine.Render(pseudoRoot, renderParams);
     } while (!_imagingEngine.IsConverged());
 

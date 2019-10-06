@@ -153,7 +153,7 @@ HdSt_IndirectDrawBatchGL::_PrepareDraw(bool gpuCulling, bool freezeCulling)
 
         if (gpuCulling) {
             if (caps.directStateAccessEnabled) {
-                glUnmapNamedBufferEXT((GLuint)(uint64_t)_dispatchBuffer->GetEntireResource()->GetId());
+                glUnmapNamedBuffer((GLuint)(uint64_t)_dispatchBuffer->GetEntireResource()->GetId());
             } else {
                 glBindBuffer(GL_ARRAY_BUFFER,
                              (GLuint)(uint64_t)_dispatchBuffer->GetEntireResource()->GetId());
@@ -318,8 +318,8 @@ HdSt_IndirectDrawBatchGL::_BeginGPUCountVisibleInstances(
         GLint count = 0;
         GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
         if (caps.directStateAccessEnabled) {
-            glNamedBufferSubDataEXT(_resultBuffer->GetId(), 0,
-                                    sizeof(count), &count);
+            glNamedBufferSubData(_resultBuffer->GetId(), 0,
+                                 sizeof(count), &count);
         } else {
             glBindBuffer(GL_ARRAY_BUFFER, _resultBuffer->GetId());
             glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(count), &count);
@@ -354,8 +354,8 @@ HdSt_IndirectDrawBatchGL::_EndGPUCountVisibleInstances(GLsync resultSync, size_t
         GLint count = 0;
         GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
         if (caps.directStateAccessEnabled) {
-            glGetNamedBufferSubDataEXT(_resultBuffer->GetId(), 0,
-                                       sizeof(count), &count);
+            glGetNamedBufferSubData(_resultBuffer->GetId(), 0,
+                                    sizeof(count), &count);
         } else {
             glBindBuffer(GL_ARRAY_BUFFER, _resultBuffer->GetId());
             glGetBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(count), &count);

@@ -73,10 +73,6 @@ PXR_NAMESPACE_OPEN_SCOPE
 TF_DEFINE_ENV_SETTING(HD_ENABLE_GPU_TINY_PRIM_CULLING, false,
                       "Enable tiny prim culling");
 
-TF_DEFINE_ENV_SETTING(HDST_ENABLE_EXPERIMENTAL_VOLUME_ELLIPSOID_STANDINS, false,
-                      "Render constant density ellipsoid standins for "
-                      "volume prims");
-
 // This token is repeated from usdVolImaging which we cannot access from here.
 // Should we even instantiate bprims of different types for OpenVDB vs Field3d?
 TF_DEFINE_PRIVATE_TOKENS(
@@ -107,9 +103,8 @@ const TfTokenVector HdStRenderDelegate::SUPPORTED_SPRIM_TYPES =
 const TfTokenVector HdStRenderDelegate::SUPPORTED_BPRIM_TYPES =
 {
     HdPrimTypeTokens->texture,
-    _tokens->openvdbAsset
-    // XXX Wait with enabling AOV in HdSt until TaskController has HdSt AOV code
-    //HdPrimTypeTokens->renderBuffer
+    _tokens->openvdbAsset,
+    HdPrimTypeTokens->renderBuffer
 };
 
 std::mutex HdStRenderDelegate::_mutexResourceRegistry;
@@ -141,10 +136,21 @@ HdStRenderDelegate::_Initialize()
     }
 
     // Initialize the settings and settings descriptors.
-    _settingDescriptors.resize(1);
-    _settingDescriptors[0] = { "Enable Tiny Prim Culling",
-        HdStRenderSettingsTokens->enableTinyPrimCulling,
-        VtValue(bool(TfGetEnvSetting(HD_ENABLE_GPU_TINY_PRIM_CULLING))) };
+    _settingDescriptors = {
+        HdRenderSettingDescriptor{
+            "Enable Tiny Prim Culling",
+            HdStRenderSettingsTokens->enableTinyPrimCulling,
+            VtValue(bool(TfGetEnvSetting(HD_ENABLE_GPU_TINY_PRIM_CULLING))) },
+        HdRenderSettingDescriptor{
+            "Step size when raymarching volume",
+            HdStRenderSettingsTokens->volumeRaymarchingStepSize,
+            VtValue(HdStVolume::defaultStepSize) },
+        HdRenderSettingDescriptor{
+            "Step size when raymarching volume for lighting computation",
+            HdStRenderSettingsTokens->volumeRaymarchingStepSizeLighting,
+            VtValue(HdStVolume::defaultStepSizeLighting) }
+    };
+
     _PopulateDefaultSettings(_settingDescriptors);
     
     _hgi = NULL;
@@ -234,7 +240,10 @@ HdStRenderDelegate::GetDefaultAovDescriptor(TfToken const& name) const
             GarchResourceFactory::GetInstance()->GetContextCaps().floatingPointBuffersEnabled ?
             HdFormatFloat16Vec4 : HdFormatUNorm8Vec4;
         return HdAovDescriptor(colorFormat,colorDepthMSAA, VtValue(GfVec4f(0)));
-    } else if (name == HdAovTokens->normal || name == HdAovTokens->Neye) {
+    } else if (name == HdAovTokens->normal) {
+        return HdAovDescriptor(HdFormatFloat32Vec3, /*msaa*/ false,
+                               VtValue(GfVec3f(0.0f)));
+    } else if (name == HdAovTokens->Neye) {
         return HdAovDescriptor(HdFormatFloat32Vec3, /*msaa*/ false,
                                VtValue(GfVec3f(-1.0f)));
     } else if (name == HdAovTokens->depth) {
@@ -294,9 +303,7 @@ HdStRenderDelegate::CreateRprim(TfToken const& typeId,
         return new HdStBasisCurves(rprimId, instancerId);
     } else  if (typeId == HdPrimTypeTokens->points) {
         return new HdStPoints(rprimId, instancerId);
-    } else  if (typeId == HdPrimTypeTokens->volume &&
-                bool(TfGetEnvSetting(
-                         HDST_ENABLE_EXPERIMENTAL_VOLUME_ELLIPSOID_STANDINS))) {
+    } else  if (typeId == HdPrimTypeTokens->volume) {
         return new HdStVolume(rprimId, instancerId);
     } else {
         TF_CODING_ERROR("Unknown Rprim Type %s", typeId.GetText());

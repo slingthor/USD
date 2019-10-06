@@ -119,5 +119,15 @@ void wrapSimpleLight()
                           &This::GetID,
                           return_value_policy<return_by_value>()),
                       &This::SetID)
+        .add_property("isDomeLight",
+                      make_function(
+                          &This::IsDomeLight,
+                          return_value_policy<return_by_value>()),
+                      &This::SetIsDomeLight)
+        .add_property("isZup",
+                      make_function(
+                          &This::IsZup,
+                          return_value_policy<return_by_value>()),
+                      &This::SetIsZup)
         ;
 }

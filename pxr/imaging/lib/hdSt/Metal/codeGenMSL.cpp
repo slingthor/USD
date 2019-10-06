@@ -314,7 +314,7 @@ _GetPackedTypeDefinitions()
     "                a[3][1] * b01 - a[3][0] * b03 - a[3][2] * b00,\n"
     "                a[2][0] * b03 - a[2][1] * b01 + a[2][2] * b00) * invdet;\n"
     "}\n\n"
-    "float atan(float x, float y) { return atan2(x, y); }\n\n"
+    "float atan(float y, float x) { return atan2(y, x); }\n\n"
 
     "constexpr sampler texelSampler(address::clamp_to_edge,\n"
     "                               filter::linear);\n";

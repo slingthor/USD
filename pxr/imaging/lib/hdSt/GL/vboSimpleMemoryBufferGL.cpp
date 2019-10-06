@@ -111,14 +111,15 @@ HdStVBOSimpleMemoryBufferGL::Reallocate(
             HdResourceGPUHandle oldId(bres->GetId());
 
             GLuint nid = 0;
-            glGenBuffers(1, &nid);
             if (ARCH_LIKELY(caps.directStateAccessEnabled)) {
-                glNamedBufferDataEXT(nid,
-                                     bufferSize, NULL, GL_STATIC_DRAW);
+                glCreateBuffers(1, &nid);
+                glNamedBufferData(nid,
+                                  bufferSize, /*data=*/NULL, GL_STATIC_DRAW);
             } else {
+                glGenBuffers(1, &nid);
                 glBindBuffer(GL_ARRAY_BUFFER, nid);
                 glBufferData(GL_ARRAY_BUFFER,
-                             bufferSize, NULL, GL_STATIC_DRAW);
+                             bufferSize, /*data=*/NULL, GL_STATIC_DRAW);
                 glBindBuffer(GL_ARRAY_BUFFER, 0);
             }
             newId = nid;
@@ -145,7 +146,7 @@ HdStVBOSimpleMemoryBufferGL::Reallocate(
 
                 if (caps.copyBufferEnabled) {
                     if (ARCH_LIKELY(caps.directStateAccessEnabled)) {
-                        glNamedCopyBufferSubDataEXT(oldId, newId, 0, 0, copySize);
+                        glCopyNamedBufferSubData(oldId, newId, 0, 0, copySize);
                     } else {
                         glBindBuffer(GL_COPY_READ_BUFFER, oldId);
                         glBindBuffer(GL_COPY_WRITE_BUFFER, newId);

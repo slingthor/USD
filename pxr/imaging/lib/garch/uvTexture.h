@@ -83,10 +83,10 @@ public:
     static bool IsSupportedImageFile(std::string const &imageFilePath);
 
     GARCH_API
-    virtual VtDictionary GetTextureInfo(bool forceLoad);
+    VtDictionary GetTextureInfo(bool forceLoad) override;
 
     GARCH_API
-    virtual bool IsMinFilterSupported(GLenum filter);
+    bool IsMinFilterSupported(GLenum filter) override;
     
     GARCH_API
     virtual BindingVector GetBindings(TfToken const & identifier,
@@ -118,13 +118,13 @@ protected:
         unsigned int cropLeft,
         unsigned int cropRight,
         GarchImage::ImageOriginLocation originLocation =
-                           GarchImage::OriginUpperLeft);
+            GarchImage::OriginUpperLeft);
 
     GARCH_API
     virtual ~GarchUVTexture();
     
     GARCH_API
-    virtual void _ReadTexture() override;
+    void _ReadTexture() override;
     GARCH_API
     virtual bool _GenerateMipmap() const;
     GARCH_API

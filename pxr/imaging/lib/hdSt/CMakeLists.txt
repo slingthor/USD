@@ -51,7 +51,8 @@ endif()
 
 if (PXR_ENABLE_METAL_SUPPORT)
     set(GFX             ${GFX}
-                        mtlf)
+                        mtlf
+                        hgiMetal)
     set(GFXADDITIONAL   ${GFXADDITIONAL}
                         Metal/bufferRelocatorMetal
                         Metal/bufferResourceMetal
@@ -86,6 +87,7 @@ pxr_library(hdSt
         hio
         garch
         hd
+        sdr
         tf
         trace
         ${GFX}
@@ -184,6 +186,7 @@ pxr_library(hdSt
         triangulate
         unitTestDelegate
         unitTestHelper
+        volumeShader
 	volumeShaderKey
         ${GFXADDITIONAL}
 
@@ -192,6 +195,7 @@ pxr_library(hdSt
         shaders/basisCurves.glslfx
         shaders/compute.glslfx
         shaders/compute.metal
+	shaders/domeLight.glslfx
         shaders/edgeId.glslfx
         shaders/fallbackLighting.glslfx
         shaders/fallbackLightingShader.glslfx

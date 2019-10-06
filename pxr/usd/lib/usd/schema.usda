@@ -225,6 +225,7 @@ class "CollectionAPI"
 
     customData = {
         string extraIncludes = """
+#include "pxr/usd/usd/collectionMembershipQuery.h"
 #include "pxr/usd/usd/primFlags.h"
 #include "pxr/usd/usd/tokens.h"
 """
@@ -244,7 +245,7 @@ class "CollectionAPI"
     }
 )
 {
-    uniform token expansionRule (
+    uniform token expansionRule = "expandPrims" (
         allowedTokens = ["explicitOnly", "expandPrims", "expandPrimsAndProperties"]
         doc = """Specifies how the paths that are included in
         the collection must be expanded to determine its members."""
