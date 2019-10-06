@@ -51,7 +51,6 @@ static MTLPixelFormat GetMetalFormat(GLenum inInternalFormat, GLenum inType, siz
         case GL_RGB32F:
         case GL_RGB16F:
         case GL_RGB16:
-        case GL_SRGB:
         case GL_RGB:
             *out24BitFormat = true;
             // Drop through
@@ -60,7 +59,11 @@ static MTLPixelFormat GetMetalFormat(GLenum inInternalFormat, GLenum inType, siz
             mtlFormat = MTLPixelFormatRGBA8Unorm;
             *outPixelByteSize = sizeof(char) * 4;
             break;
-            
+
+        case GL_SRGB:
+            *out24BitFormat = true;
+            // Drop through
+
         case GL_SRGB_ALPHA:
             mtlFormat = MTLPixelFormatRGBA8Unorm_sRGB;
             *outPixelByteSize = sizeof(char) * 4;
