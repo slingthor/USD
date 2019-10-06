@@ -26,6 +26,7 @@
 #include "pxr/imaging/hdSt/light.h"
 #include "pxr/imaging/hdSt/tokens.h"
 #include "pxr/imaging/hdSt/textureResource.h"
+#include "pxr/imaging/hdSt/resourceFactory.h"
 #include "pxr/imaging/hdSt/domeLightComputations.h"
 
 #include "pxr/imaging/hd/perfLog.h"
@@ -61,12 +62,27 @@ HdStLight::HdStLight(SdfPath const &id, TfToken const &lightType)
 
 HdStLight::~HdStLight()
 {
+    bool isOpenGL = HdStResourceFactory::GetInstance()->IsOpenGL();
 #if defined(ARCH_GFX_OPENGL)
-    uint32_t t[] = { _irradianceTexture, _prefilterTexture, _brdfTexture };
-    glDeleteTextures(sizeof(t) / sizeof(t[0]), t);
+    if (isOpenGL) {
+        uint32_t t[] = { _irradianceTexture, _prefilterTexture, _brdfTexture };
+        glDeleteTextures(sizeof(t) / sizeof(t[0]), t);
+    }
 #endif
 #if defined(ARCH_GFX_METAL)
-    TF_CODING_ERROR("Not Implemented");
+    if (!isOpenGL) {
+        MtlfMultiTexture mt = _irradianceTexture;
+        mt.release();
+        _irradianceTexture = mt;
+        
+        mt = _prefilterTexture;
+        mt.release();
+        _prefilterTexture = mt;
+        
+        mt = _brdfTexture;
+        mt.release();
+        _brdfTexture = mt;
+    }
 #endif
 }
 
