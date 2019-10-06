@@ -62,7 +62,7 @@ MtlfContextCaps::_LoadCaps()
     bindlessTextureEnabled       = false;
     bindlessBufferEnabled        = false;
     multiDrawIndirectEnabled     = false;
-    directStateAccessEnabled     = true;
+    directStateAccessEnabled     = false;
     bufferStorageEnabled         = true;
     shadingLanguage420pack       = true;
     explicitUniformLocation      = true;
