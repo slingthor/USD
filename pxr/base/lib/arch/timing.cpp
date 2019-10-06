@@ -48,7 +48,7 @@ ARCH_HIDDEN
 void
 Arch_InitTickTimer()
 {
-    Arch_NanosecondsPerTick = 1000.0;
+    Arch_NanosecondsPerTick = 1.0;
 }
 
 #elif defined(ARCH_OS_LINUX)

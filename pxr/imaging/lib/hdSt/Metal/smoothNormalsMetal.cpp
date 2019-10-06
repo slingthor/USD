@@ -76,6 +76,9 @@ HdSt_SmoothNormalsComputationMetal::_Execute(
     HdBufferResourceSharedPtr adjacency,
     int numPoints)
 {
+    
+    if(numPoints == 0) return;
+    
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
     HdStMSLProgramSharedPtr const &mslProgram(
         boost::dynamic_pointer_cast<HdStMSLProgram>(computeProgram));

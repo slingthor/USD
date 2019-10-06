@@ -39,6 +39,7 @@
 #if defined(ARCH_OS_LINUX)
 #include <x86intrin.h>
 #elif defined(ARCH_OS_DARWIN)
+#include <mach/mach_time.h>
 #include <sys/time.h>
 #elif defined(ARCH_OS_WINDOWS)
 #include <intrin.h>
@@ -60,14 +61,23 @@ PXR_NAMESPACE_OPEN_SCOPE
 /// timing routines varies, but on all systems, it is well under one
 /// microsecond.  The cost of this routine is in the tens of nanoseconds
 /// on GHz class machines.
+
+#if defined(ARCH_OS_DARWIN)
+inline mach_timebase_info_data_t
+init_mach_timebase_info()
+{
+    mach_timebase_info_data_t info;
+    mach_timebase_info(&info);
+    return info;
+}
+#endif
+
 inline uint64_t
 ArchGetTickTime()
 {
 #if defined(ARCH_OS_DARWIN)
-    // On Darwin we'll use clock_gettime().
-    struct timeval timeCurrent;
-    gettimeofday(&timeCurrent, NULL);
-    return timeCurrent.tv_usec + (timeCurrent.tv_sec * 1000 * 1000);
+    static mach_timebase_info_data_t info = init_mach_timebase_info();
+    return (mach_absolute_time() * info.numer) / info.denom;
 #elif defined(ARCH_CPU_INTEL)
     // On Intel we'll use the rdtsc instruction.
     return __rdtsc();
