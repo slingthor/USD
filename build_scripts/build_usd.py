@@ -1187,6 +1187,13 @@ def InstallOpenColorIO(context, force, buildArgs):
                      '-DOCIO_BUILD_JNIGLUE=OFF',
                      '-DOCIO_STATIC_JNIGLUE=OFF']
 
+        PatchFile("src/core/Config.cpp", 
+                   [("cacheidnocontext_ = cacheidnocontext_;", 
+                     "cacheidnocontext_ = rhs.cacheidnocontext_;")])
+
+        if iOS() or MacOS():
+            extraArgs.append('-DCMAKE_CXX_FLAGS="-Wno-unused-function -Wno-unused-const-variable -Wno-unused-private-field"')
+
         # Add on any user-specified extra arguments.
         extraArgs += buildArgs
 
