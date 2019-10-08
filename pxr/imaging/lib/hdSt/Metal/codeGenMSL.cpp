@@ -1762,8 +1762,9 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
                 vsEntryPointCode << "    uint _index = drawArgs->batchIndexOffset + _gsVertexID;\n"
                                  << "    uint _primitiveID = (drawArgs->batchIndexOffset + (_vertexID / 3)) % drawArgs->primitiveCount;\n";
             }
-            if (_buildTarget == kMSL_BuildTarget_MVA_ComputeGS) //_instanceID is the real Metal instance ID if not using ComputeGS
+            if (_buildTarget == kMSL_BuildTarget_MVA_ComputeGS) { //_instanceID is the real Metal instance ID if not using ComputeGS
                 vsEntryPointCode << "    uint _instanceID = _index / drawArgs->indexCount;\n";
+            }
             vsEntryPointCode    << "    uint _gsPrimitiveID = _gsVertexID / "
                                 << (numVerticesOutPerPrimitive / numPrimitivesOutPerPrimitive) << ";\n"
                                 << "    _index = _index % drawArgs->indexCount;\n"
@@ -1773,6 +1774,10 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
                                 << "    uint gl_PrimitiveIDIn = _primitiveID;\n"
                                 << "\n"
                                 << vsMI_EP_InputCode.str()
+                                << "\n"
+                                << "    //Full-screen passes need _vertexID for proper FS triangle to be generated.\n"
+                                << "    //AFAIK gl_VertexID is not used further for other passes at the moment\n"
+                                << "    gl_VertexID = _gsVertexID;\n"
                                 << "\n"
                                 << "    MSLVsOutputs vsOutput;\n"
                                 << vsMI_EP_CallCode.str()

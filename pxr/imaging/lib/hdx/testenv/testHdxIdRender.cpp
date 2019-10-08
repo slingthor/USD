@@ -29,7 +29,7 @@
 #include "pxr/imaging/hd/engine.h"
 #include "pxr/imaging/hd/renderPassState.h"
 
-#include "pxr/imaging/hdSt/renderDelegate.h"
+#include "pxr/imaging/hdSt/GL/renderDelegateGL.h"
 
 #include "pxr/imaging/hdx/pickTask.h"
 #include "pxr/imaging/hdx/renderTask.h"
@@ -52,7 +52,7 @@ PXR_NAMESPACE_USING_DIRECTIVE
 class My_TestGLDrawing : public Hdx_UnitTestGLDrawing {
 public:
     My_TestGLDrawing():
-        _engine(HdEngine::OpenGL)
+        _engine()
     {
         SetCameraRotate(0, 0);
         SetCameraTranslate(GfVec3f(0));
@@ -82,7 +82,7 @@ protected:
 
 private:
     HdEngine              _engine;
-    HdStRenderDelegate    _renderDelegate;
+    HdStRenderDelegateGL  _renderDelegate;
     HdRenderIndex        *_renderIndex;
     Hdx_UnitTestDelegate *_delegate;
 

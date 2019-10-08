@@ -35,7 +35,7 @@
 #include "pxr/imaging/hdx/renderSetupTask.h"
 #include "pxr/imaging/hdx/unitTestDelegate.h"
 
-#include "pxr/imaging/hdSt/renderDelegate.h"
+#include "pxr/imaging/hdSt/GL/renderDelegateGL.h"
 
 #include <iostream>
 
@@ -61,8 +61,8 @@ int main(int argc, char *argv[])
     GlfContextCaps::InitInstance();
 
 
-    HdEngine engine(HdEngine::OpenGL);
-    HdStRenderDelegate renderDelegate;
+    HdEngine engine;
+    HdStRenderDelegateGL renderDelegate;
     std::unique_ptr<HdRenderIndex> index(HdRenderIndex::New(&renderDelegate));
     TF_VERIFY(index != nullptr);
     std::unique_ptr<Hdx_UnitTestDelegate> delegate(
