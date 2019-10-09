@@ -45,12 +45,12 @@
 #include <GU/GU_AgentRig.h>
 #include <GU/GU_AgentShapeLib.h>
 #include <UT/UT_StringArray.h>
+#include <GT/GT_RefineParms.h>
 
 
 PXR_NAMESPACE_OPEN_SCOPE
 
 
-class GT_RefineParms;
 class UsdSkelBinding;
 class UsdSkelSkeleton;
 class UsdSkelSkeletonQuery;

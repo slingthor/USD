@@ -104,6 +104,9 @@ template <>
 struct _UsdScalarToGaScalar<unsigned long>  { using type = int64; };
 
 template <>
+struct _UsdScalarToGaScalar<unsigned long long>  { using type = int64; };
+
+template <>
 struct _UsdScalarToGaScalar<GfHalf>         { using type = fpreal32; };
 
 template <>

@@ -28,6 +28,7 @@
 
 #include <GU/GU_PackedImpl.h>
 #include <GT/GT_Handles.h>
+#include <GT/GT_RefineParms.h>
 #include <SYS/SYS_Version.h>
 #include <UT/UT_Error.h>
 
@@ -40,7 +41,6 @@
 
 class GusdPrimDef;
 class GU_PrimPacked;
-class GT_RefineParms;
 
 PXR_NAMESPACE_OPEN_SCOPE
 

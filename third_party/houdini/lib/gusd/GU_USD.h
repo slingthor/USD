@@ -28,6 +28,7 @@
 #include <GA/GA_Handle.h>
 #include <GA/GA_Range.h>
 #include <UT/UT_ErrorManager.h>
+#include <GT/GT_RefineParms.h>
 
 #include "pxr/pxr.h"
 
@@ -38,7 +39,6 @@
 #include "USD_Utils.h"
 
 class GA_AttributeFilter;
-class GT_RefineParms;
 class GU_Detail;
 class GU_PrimPacked;
 

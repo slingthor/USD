@@ -13,7 +13,7 @@ add_definitions(
 
 if (APPLE)
 
-    add_definitions(-D_GNU_SOURCE -DMBSD -DMBSD_COCOA -DMBSD_INTEL -DAMD64 -DSIZEOF_VOID_P=8 -DFBX_ENABLED=1 -DOPENCL_ENABLED=1 -DOPENVDB_ENABLED=1 -DSESI_LITTLE_ENDIAN -DENABLE_THREADS -DUSE_PTHREADS -D_REENTRANT -D_FILE_OFFSET_BITS=64 -c -DMAKING_DSO -mmacosx-version-min=10.9 -DGCC4 -DGCC3 -Wno-deprecated -std=c++11 -Wall -W -Wno-parentheses -Wno-sign-compare -Wno-reorder -Wno-uninitialized -Wunused -Wno-unused-parameter -O2)
+    add_definitions(-D_GNU_SOURCE -DMBSD -DMBSD_COCOA -DMBSD_INTEL -DAMD64 -DSIZEOF_VOID_P=8 -DFBX_ENABLED=1 -DOPENCL_ENABLED=1 -DOPENVDB_ENABLED=1 -DSESI_LITTLE_ENDIAN -DENABLE_THREADS -DUSE_PTHREADS -D_REENTRANT -D_FILE_OFFSET_BITS=64 -c -DMAKING_DSO -DGCC4 -DGCC3 -Wno-deprecated -std=c++11 -Wall -W -Wno-parentheses -Wno-sign-compare -Wno-reorder -Wno-uninitialized -Wunused -Wno-unused-parameter -O2)
 
 elseif (UNIX)
 
