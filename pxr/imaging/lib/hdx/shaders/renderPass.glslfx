@@ -53,6 +53,14 @@ void RenderOutput(vec4 Peye, vec3 Neye, vec4 color, vec4 patchCoord)
 layout (early_fragment_tests) in;
 #endif
 
+
+#if defined(HD_HAS_hdxOitDataBuffer)
+#if defined(ARCH_GFX_METAL)
+	#define gl_FragCoord vec2(float2(HdGet_oitScreenSize()) * gl_Position.xy)
+#endif
+#endif
+
+
 void RenderOutput(vec4 Peye, vec3 Neye, vec4 color, vec4 patchCoord)
 {
 #if defined(HD_HAS_hdxOitDataBuffer)

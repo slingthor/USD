@@ -57,7 +57,12 @@ float checker(vec2 uv, float scale)
 vec4 surfaceShader(vec4 Peye, vec3 Neye, vec4 color, vec4 patchCoord)
 {
     color.rgb = HdGet_displayColor().rgb;
+
+#ifdef ARCH_GFX_METAL
+    float a = checker(gl_Position.xy, 0.05);
+#else
     float a = checker(gl_FragCoord.xy, 0.05);
+#endif
     color.a = min(a+0.5, 1.0);
     return color;
 }
