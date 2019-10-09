@@ -220,6 +220,13 @@ HdSt_MeshTopology::RefinesToBSplinePatches() const
             HdSt_Subdivision::RefinesToBSplinePatches(_topology.GetScheme()));
 }
 
+bool
+HdSt_MeshTopology::RefinesToBoxSplineTrianglePatches() const
+{
+    return ((IsEnabledAdaptive() || (_refineMode == RefineModePatches)) &&
+    HdSt_Subdivision::RefinesToBoxSplineTrianglePatches(_topology.GetScheme()));
+}
+
 HdBufferSourceSharedPtr
 HdSt_MeshTopology::GetOsdTopologyComputation(SdfPath const &id)
 {
@@ -235,7 +242,8 @@ HdSt_MeshTopology::GetOsdTopologyComputation(SdfPath const &id)
 
     if (!TF_VERIFY(_subdivision)) return HdBufferSourceSharedPtr();
 
-    bool adaptive = RefinesToBSplinePatches();
+    bool adaptive = RefinesToBSplinePatches() ||
+                    RefinesToBoxSplineTrianglePatches();
 
     // create a topology computation for HdSt_Subdivision
     HdBufferSourceSharedPtr builder =

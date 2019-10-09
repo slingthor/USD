@@ -159,7 +159,11 @@ HdPrman_Gprim<BASE>::Sync(HdSceneDelegate* sceneDelegate,
     SdfPath const& id = BASE::GetId();
     SdfPath const& instancerId = BASE::GetInstancerId();
     const bool isHdInstance = !instancerId.IsEmpty();
-    const int32_t primId = BASE::GetPrimId();
+    // Prman has a default value for identifier:id of 0 (in case of ray miss),
+    // while Hydra treats id -1 as the clear value.  We map Prman primId as
+    // (Hydra primId + 1) to get around this, here and in
+    // hdxPrman/framebuffer.cpp.
+    const int32_t primId = BASE::GetPrimId() + 1;
 
     // Sample transform
     HdTimeSampleArray<GfMatrix4d, HDPRMAN_MAX_TIME_SAMPLES> xf;
@@ -274,12 +278,15 @@ HdPrman_Gprim<BASE>::Sync(HdSceneDelegate* sceneDelegate,
     if (!isHdInstance) {
         // Simple case: Singleton instance.
         // Convert transform.
-        RtMatrix4x4 xf_rt_values[HDPRMAN_MAX_TIME_SAMPLES];
+        TfSmallVector<RtMatrix4x4, HDPRMAN_MAX_TIME_SAMPLES> xf_rt(xf.count);
         for (size_t i=0; i < xf.count; ++i) {
-            xf_rt_values[i] = HdPrman_GfMatrixToRtMatrix(xf.values[i]);
+            xf_rt[i] = HdPrman_GfMatrixToRtMatrix(xf.values[i]);
         }
         const riley::Transform xform = {
-            unsigned(xf.count), xf_rt_values, xf.times};
+            unsigned(xf.count), 
+            xf_rt.data(), 
+            xf.times.data()};
+
         // Resolve attributes.
         RixParamList *attrs = context->ConvertAttributes(sceneDelegate, id);
         // Add "identifier:id" with the hydra prim id, and "identifier:id2"
@@ -298,8 +305,9 @@ HdPrman_Gprim<BASE>::Sync(HdSceneDelegate* sceneDelegate,
                         riley::GeometryMasterId::k_InvalidId, oldInstanceId);
                 }
             }
-            _instanceIds.resize(newCount,
-                                riley::GeometryInstanceId::k_InvalidId);
+            _instanceIds.resize(
+                newCount,
+                riley::GeometryInstanceId::k_InvalidId);
         }
         // Create or modify Riley instances corresponding to a
         // singleton Hydra instance.
@@ -390,7 +398,9 @@ HdPrman_Gprim<BASE>::Sync(HdSceneDelegate* sceneDelegate,
             // Convert transform.
             // PRMan does not allow transforms on geometry masters,
             // so we apply that transform (xf) to all the instances, here.
-            RtMatrix4x4 rt_xf[HDPRMAN_MAX_TIME_SAMPLES];
+            TfSmallVector<RtMatrix4x4, HDPRMAN_MAX_TIME_SAMPLES> 
+                rt_xf(ixf.count);
+
             if (xf.count == 0 ||
                 (xf.count == 1 && (xf.values[0] == GfMatrix4d(1)))) {
                 // Expected case: master xf is constant & exactly identity.
@@ -401,12 +411,12 @@ HdPrman_Gprim<BASE>::Sync(HdSceneDelegate* sceneDelegate,
                 // Multiply resampled master xf against instance xforms.
                 for (size_t j=0; j < ixf.count; ++j) {
                     GfMatrix4d xf_j = xf.Resample(ixf.times[j]);
-                    rt_xf[j] =
+                    rt_xf[j] = 
                         HdPrman_GfMatrixToRtMatrix(xf_j * ixf.values[j][i]);
                 }
             }
             const riley::Transform xform = 
-                { unsigned(ixf.count), rt_xf, ixf.times };
+                { unsigned(ixf.count), rt_xf.data(), ixf.times.data() };
 
             // Create or modify Riley instances corresponding to this
             // Hydra instance.

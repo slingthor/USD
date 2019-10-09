@@ -54,6 +54,7 @@
 #include "pxr/base/vt/value.h"
 
 #include "pxr/base/gf/range3d.h"
+#include "pxr/base/gf/interval.h"
 #include "pxr/base/tf/declarePtrs.h"
 #include "pxr/base/tf/hashmap.h"
 #include "pxr/base/tf/hashset.h"
@@ -267,6 +268,15 @@ public:
     USDIMAGING_API
     void SetWindowPolicy(CameraUtilConformWindowPolicy policy);
 
+    /// Setup for the shutter open and close to be used for motion sampling.
+    USDIMAGING_API
+    void SetCameraForSampling(SdfPath const& id);
+
+    /// Returns the current interval that will be used when using the 
+    /// sample* API in the scene delegate.
+    USDIMAGING_API
+    GfInterval GetCurrentTimeSamplingInterval();
+
     // ---------------------------------------------------------------------- //
     // See HdSceneDelegate for documentation of the following virtual methods.
     // ---------------------------------------------------------------------- //
@@ -275,11 +285,12 @@ public:
     USDIMAGING_API
     virtual HdMeshTopology GetMeshTopology(SdfPath const& id) override;
     USDIMAGING_API
-    virtual HdBasisCurvesTopology GetBasisCurvesTopology(SdfPath const& id) override;
+    virtual HdBasisCurvesTopology GetBasisCurvesTopology(SdfPath const& id) 
+        override;
     typedef PxOsdSubdivTags SubdivTags;
 
     // XXX: animated subdiv tags are not currently supported
-    // XXX: subdiv tags currently feteched on demand 
+    // XXX: subdiv tags currently fetched on-demand 
     USDIMAGING_API
     virtual SubdivTags GetSubdivTags(SdfPath const& id) override;
 
@@ -375,8 +386,6 @@ public:
     // Material Support
     USDIMAGING_API 
     virtual VtValue GetMaterialResource(SdfPath const &materialId) override;
-    USDIMAGING_API
-    virtual TfTokenVector GetMaterialPrimvars(SdfPath const &materialId) override;
 
     USDIMAGING_API
     virtual VtDictionary
@@ -660,6 +669,7 @@ private:
         HdDirtyBits       timeVaryingBits;  // Dirty Bits to set when
                                             // time changes
         HdDirtyBits       dirtyBits;        // Current dirty state of the prim.
+        SdfPathVector     extraDependencies;// Dependencies that aren't usdPrim.
     };
 
     typedef TfHashMap<SdfPath, _HdPrimInfo, SdfPath::Hash> _HdPrimInfoMap;
@@ -667,16 +677,21 @@ private:
     // Map from cache path to Hydra prim info
     _HdPrimInfoMap _hdPrimInfoMap;
 
+    typedef std::multimap<SdfPath, SdfPath> _DependencyMap;
+
+    // Map from USD path to Hydra path, for tracking USD->hydra dependencies.
+    _DependencyMap _dependencyInfo;
+
+    void _GatherDependencies(SdfPath const& subtree,
+                             SdfPathVector *affectedCachePaths,
+                             SdfPathVector *affectedUsdPaths = nullptr);
+
     // SdfPath::ReplacePrefix() is used frequently to convert between
     // cache path and Hydra render index path and is a performance bottleneck.
     // These maps pre-computes these conversion.
     typedef TfHashMap<SdfPath, SdfPath, SdfPath::Hash> SdfPathMap;
     SdfPathMap _cache2indexPath;
     SdfPathMap _index2cachePath;
-
-    // List of all cache paths in use, corresponding to the keys
-    // in _hdPrimInfoMap.
-    Hd_SortedIds _cachePaths;
 
     // Only use this method when we think no existing adapter has been
     // established. For example, during initial Population.
@@ -724,8 +739,8 @@ private:
     /// The current time from which the delegate will read data.
     UsdTimeCode _time;
 
-    /// The requested time offsets for time samples.
-    std::vector<float> _timeSampleOffsets;
+    /// Path to the camera that its shutter will be used for time samples.
+    SdfPath _cameraPathForSampling;
 
     int _refineLevelFallback;
     HdReprSelector _reprFallback;

@@ -242,9 +242,12 @@ HdxPrman_RenderPass::_Execute(HdRenderPassStateSharedPtr const& renderPassState,
         viewToWorldCorrectionMatrix = flipZ * viewToWorldCorrectionMatrix;
 
         // Convert  from Gf to Rt.
-        HdTimeSampleArray<GfMatrix4d, HDPRMAN_MAX_TIME_SAMPLES> xforms =
+        HdTimeSampleArray<GfMatrix4d, HDPRMAN_MAX_TIME_SAMPLES> const& xforms =
             hdCam->GetTimeSampleXforms();
-        RtMatrix4x4 xf_rt_values[HDPRMAN_MAX_TIME_SAMPLES];
+
+        TfSmallVector<RtMatrix4x4, HDPRMAN_MAX_TIME_SAMPLES> 
+            xf_rt_values(xforms.count);
+        
         for (size_t i=0; i < xforms.count; ++i) {
             xf_rt_values[i] = HdPrman_GfMatrixToRtMatrix(
                 viewToWorldCorrectionMatrix * xforms.values[i]);
@@ -252,9 +255,13 @@ HdxPrman_RenderPass::_Execute(HdRenderPassStateSharedPtr const& renderPassState,
 
         // Commit new camera.
         riley::Transform xform = {
-            unsigned(xforms.count), xf_rt_values, xforms.times };
-        riley->ModifyCamera(_interactiveContext->cameraId, &cameraNode,
-                            &xform, camParams);
+            unsigned(xforms.count), xf_rt_values.data(), xforms.times.data() };
+
+        riley->ModifyCamera(
+            _interactiveContext->cameraId, 
+            &cameraNode,
+            &xform, 
+            camParams);
         mgr->DestroyRixParamList(camParams);
         mgr->DestroyRixParamList(projParams);
 
@@ -385,7 +392,7 @@ HdxPrman_RenderPass::_Execute(HdRenderPassStateSharedPtr const& renderPassState,
         rb->SetConverged(_converged);
 
         if (aovBindings[aov].aovName == HdAovTokens->color) {
-            rb->Blit(HdFormatUNorm8Vec4, width, height, offset, stride,
+            rb->Blit(HdFormatFloat32Vec4, width, height, offset, stride,
                 reinterpret_cast<uint8_t*>(
                     &_interactiveContext->framebuffer.color[0]));
         } else if (aovBindings[aov].aovName == HdAovTokens->depth) {

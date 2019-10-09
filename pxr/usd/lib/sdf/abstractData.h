@@ -37,6 +37,7 @@
 #include "pxr/base/tf/declarePtrs.h"
 
 #include <vector>
+#include <type_traits>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -168,6 +169,36 @@ public:
     SDF_API
     virtual bool Has(const SdfPath& path, const TfToken &fieldName,
                      VtValue *value = NULL) const = 0;
+
+    /// Fill \p specType (which cannot be nullptr) as if by a call to
+    /// GetSpecType(path).  If the resulting specType is not SdfSpecTypeUnknown,
+    /// then act as if Has(path, fieldName, value) was called and return its
+    /// result.  In other words, the semantics of this function must be
+    /// identical to this sequence:
+    ///
+    /// \code
+    /// *specType = GetSpecType(path);
+    /// return *specType != SdfSpecTypeUnknown && Has(path, fieldName, value);
+    /// \endcode
+    SDF_API
+    virtual bool
+    HasSpecAndField(const SdfPath &path, const TfToken &fieldName,
+                    SdfAbstractDataValue *value, SdfSpecType *specType) const;
+
+    /// Fill \p specType (which cannot be nullptr) as if by a call to
+    /// GetSpecType(path).  If the resulting specType is not SdfSpecTypeUnknown,
+    /// then act as if Has(path, fieldName, value) was called and return its
+    /// result.  In other words, the semantics of this function must be
+    /// identical to this sequence:
+    ///
+    /// \code
+    /// *specType = GetSpecType(path);
+    /// return *specType != SdfSpecTypeUnknown && Has(path, fieldName, value);
+    /// \endcode
+    SDF_API
+    virtual bool
+    HasSpecAndField(const SdfPath &path, const TfToken &fieldName,
+                    VtValue *value, SdfSpecType *specType) const;
 
     /// Return the value for the given \a path and \a fieldName. Returns an
     /// empty value if none is set.
@@ -416,17 +447,20 @@ public:
 
     virtual bool StoreValue(const VtValue& v)
     {
+        if (ARCH_LIKELY(v.IsHolding<T>())) {
+            *static_cast<T*>(value) = v.UncheckedGet<T>();
+            if (std::is_same<T, SdfValueBlock>::value) {
+                isValueBlock = true;
+            }
+            return true;
+        }
+        
         if (v.IsHolding<SdfValueBlock>()) {
             isValueBlock = true;
             return true;
         }
 
-        if (!v.IsHolding<T>()) {
-            return false;
-        }
-
-        *static_cast<T*>(value) = v.UncheckedGet<T>();
-        return true;
+        return false;
     }
 };
 

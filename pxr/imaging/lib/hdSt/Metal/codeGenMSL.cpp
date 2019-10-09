@@ -2293,7 +2293,8 @@ HdSt_CodeGenMSL::Compile()
     {
         case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_REFINED_QUADS:
         case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_REFINED_TRIANGLES:
-        case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_PATCHES:
+        case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_BSPLINE:
+        case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_BOXSPLINETRIANGLE:
         {
             // patch interpolation
             _procGS //<< "vec4 GetPatchCoord(int index);\n"
@@ -4086,7 +4087,8 @@ HdSt_CodeGenMSL::_GenerateElementPrimvar()
                     break;
                 }
 
-                case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_PATCHES:
+                case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_BSPLINE:
+                case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_BOXSPLINETRIANGLE:
                 {
                     // refined patches (tessellated triangles)
                     accessors
@@ -4145,7 +4147,9 @@ HdSt_CodeGenMSL::_GenerateElementPrimvar()
             }
 
             // GetFVarIndex
-            if (_geometricShader->IsPrimTypeTriangles()) {
+            if (_geometricShader->IsPrimTypeTriangles() ||
+                (_geometricShader->GetPrimitiveType() ==
+                 HdSt_GeometricShader::PrimitiveType::PRIM_MESH_BOXSPLINETRIANGLE)) {
                 // note that triangulated meshes don't have ptexIndex.
                 // Here we're passing primitiveID as ptexIndex PatchParam
                 // since HdSt_TriangulateFaceVaryingComputation unrolls facevaring
@@ -4525,7 +4529,7 @@ HdSt_CodeGenMSL::_GenerateVertexAndFaceVaryingPrimvar(bool hasGS)
             {
                 case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_COARSE_QUADS:
                 case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_REFINED_QUADS:
-                case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_PATCHES:
+                case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_BSPLINE:
                 {
                     // linear interpolation within a quad.
                     _procGS << "    // MTL_HINT EXPORTS:outPrimvars." << name << "\n"
@@ -4540,6 +4544,7 @@ HdSt_CodeGenMSL::_GenerateVertexAndFaceVaryingPrimvar(bool hasGS)
 
                 case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_REFINED_TRIANGLES:
                 case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_COARSE_TRIANGLES:
+                case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_BOXSPLINETRIANGLE:
                 {
                     // barycentric interpolation within a triangle.
                     _procGS << "    // MTL_HINT EXPORTS:outPrimvars." << name << "\n"

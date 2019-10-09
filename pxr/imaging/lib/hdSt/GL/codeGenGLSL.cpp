@@ -693,7 +693,8 @@ HdSt_CodeGenGLSL::Compile()
     {
         case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_REFINED_QUADS:
         case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_REFINED_TRIANGLES:
-        case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_PATCHES:
+        case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_BSPLINE:
+        case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_BOXSPLINETRIANGLE:
         {
             // patch interpolation
             _procGS << "vec4 GetPatchCoord(int index);\n"
@@ -1408,7 +1409,7 @@ static void _EmitFVarGSAccessor(
     {
         case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_COARSE_QUADS:
         case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_REFINED_QUADS:
-        case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_PATCHES:
+        case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_BSPLINE:
         {
             // linear interpolation within a quad.
             str << "  return mix("
@@ -1421,6 +1422,7 @@ static void _EmitFVarGSAccessor(
             
         case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_REFINED_TRIANGLES:
         case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_COARSE_TRIANGLES:
+        case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_BOXSPLINETRIANGLE:
         {
             // barycentric interpolation within a triangle.
             str << "  return ("
@@ -2076,7 +2078,8 @@ HdSt_CodeGenGLSL::_GenerateElementPrimvar()
                     break;
                 }
 
-                case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_PATCHES:
+                case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_BSPLINE:
+                case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_BOXSPLINETRIANGLE:
                 {
                     // refined patches (tessellated triangles)
                     accessors
@@ -2135,7 +2138,9 @@ HdSt_CodeGenGLSL::_GenerateElementPrimvar()
             }
 
             // GetFVarIndex
-            if (_geometricShader->IsPrimTypeTriangles()) {
+            if (_geometricShader->IsPrimTypeTriangles() ||
+                (_geometricShader->GetPrimitiveType() ==
+                 HdSt_GeometricShader::PrimitiveType::PRIM_MESH_BOXSPLINETRIANGLE)) {
                 // note that triangulated meshes don't have ptexIndex.
                 // Here we're passing primitiveID as ptexIndex PatchParam
                 // since Hd_TriangulateFaceVaryingComputation unrolls facevaring

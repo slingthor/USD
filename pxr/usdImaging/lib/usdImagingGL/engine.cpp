@@ -482,6 +482,10 @@ UsdImagingGLEngine::SetCameraPath(SdfPath const& id)
 
     TF_VERIFY(_taskController);
     _taskController->SetCameraPath(id);
+
+    // The camera that is set for viewing will also be used for
+    // time sampling.
+    _delegate->SetCameraForSampling(id);
 }
 
 void 
@@ -931,6 +935,12 @@ UsdImagingGLEngine::SetRendererPlugin(TfToken const &pluginId, bool forceReload)
         return false;
     }
 
+    HdRenderDelegate *renderDelegate = plugin->CreateRenderDelegate();
+    if(!renderDelegate) {
+        HdRendererPluginRegistry::GetInstance().ReleasePlugin(plugin);
+        return false;
+    }
+
     // Pull old delegate/task controller state.
     GfMatrix4d rootTransform = GfMatrix4d(1.0);
     bool isVisible = true;
@@ -950,7 +960,6 @@ UsdImagingGLEngine::SetRendererPlugin(TfToken const &pluginId, bool forceReload)
     _rendererPlugin = plugin;
     _rendererId = actualId;
 
-    HdRenderDelegate *renderDelegate = _rendererPlugin->CreateRenderDelegate();
     _renderIndex = HdRenderIndex::New(renderDelegate);
 
     // Create the new delegate & task controller.

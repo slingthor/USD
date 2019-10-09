@@ -178,7 +178,7 @@ pxr_test_scripts(
     testenv/testUsdChangeProcessing.py
     testenv/testUsdClasses.py
     testenv/testUsdCollectionAPI.py
-    testenv/testUsdCrate07To08Conversion.py
+    testenv/testUsdCratePayloadConversionFromVersion07.py
     testenv/testUsdCreateProperties.py
     testenv/testUsdDataFormats.py
     testenv/testUsdFileFormats.py
@@ -209,6 +209,7 @@ pxr_test_scripts(
     testenv/testUsdTimeCodeRepr.py
     testenv/testUsdTimeOffsets.py
     testenv/testUsdTimeSamples.py
+    testenv/testUsdTimeValueAuthoring.py
     testenv/testUsdUsdzFileFormat.py
     testenv/testUsdValueClips.py
     testenv/testUsdVariantEditing.py
@@ -327,6 +328,17 @@ pxr_build_test(testUsdSchemaBase
         testenv/testUsdSchemaBase.cpp
 )
 
+pxr_build_test(testUsdTimeValueAuthoringCpp
+    LIBRARIES
+        arch
+        plug
+        sdf
+        tf
+        usd
+    CPPFILES
+        testenv/testUsdTimeValueAuthoring.cpp
+)
+
 pxr_build_test(testUsdUsdzResolver
     LIBRARIES
         ar
@@ -343,8 +355,8 @@ pxr_install_test_dir(
 )
 
 pxr_install_test_dir(
-    SRC testenv/testUsdCrate07To08Conversion.testenv
-    DEST testUsdCrate07To08Conversion
+    SRC testenv/testUsdCratePayloadConversionFromVersion07.testenv
+    DEST testUsdCratePayloadConversionFromVersion07
 )
 
 pxr_install_test_dir(
@@ -450,6 +462,16 @@ pxr_install_test_dir(
 pxr_install_test_dir(
     SRC testenv/testUsdSchemaRegistry
     DEST testUsdSchemaRegistry
+)
+
+pxr_install_test_dir(
+    SRC testenv/testUsdTimeValueAuthoring
+    DEST testUsdTimeValueAuthoring
+)
+
+pxr_install_test_dir(
+    SRC testenv/testUsdTimeValueAuthoring
+    DEST testUsdTimeValueAuthoringCpp
 )
 
 pxr_install_test_dir(
@@ -778,9 +800,9 @@ pxr_register_test(testUsdPayloads
     EXPECTED_RETURN_CODE 0
 )
 
-pxr_register_test(testUsdCrate07To08Conversion
+pxr_register_test(testUsdCratePayloadConversionFromVersion07
     PYTHON
-    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdCrate07To08Conversion"
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdCratePayloadConversionFromVersion07"
     EXPECTED_RETURN_CODE 0
 )
 
@@ -882,6 +904,17 @@ pxr_register_test(testUsdSchemaBasePy
 pxr_register_test(testUsdSchemaRegistry
     PYTHON
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdSchemaRegistry"
+    EXPECTED_RETURN_CODE 0
+)
+
+pxr_register_test(testUsdTimeValueAuthoring
+    PYTHON
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdTimeValueAuthoring"
+    EXPECTED_RETURN_CODE 0
+)
+
+pxr_register_test(testUsdTimeValueAuthoringCpp
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdTimeValueAuthoringCpp"
     EXPECTED_RETURN_CODE 0
 )
 

@@ -135,12 +135,7 @@ public:
     bool IsDomeLight() const;
     GARCH_API
     void SetIsDomeLight(bool isDomeLight);
-    
-    GARCH_API
-    bool IsZup() const;
-    GARCH_API
-    void SetIsZup(bool isZup);
-    
+        
     // the following Id's are GL resource handles for the precomputed textures
     // created by HdStLight
     GARCH_API
@@ -188,7 +183,6 @@ private:
     
     // domeLight specific parameters
     bool _isDomeLight;
-    bool _isZup;
 
     // handles for the resource bindings from HdXSimpleLightingShader
     GarchTextureGPUHandle _irradianceId; // pre-computed irradiance map

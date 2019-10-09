@@ -46,7 +46,6 @@ GarchSimpleLight::GarchSimpleLight(GfVec4f const & position) :
     _transform(GfMatrix4d().SetIdentity()),
     _shadowMatrix(GfMatrix4d().SetIdentity()),
     _isDomeLight(false),
-    _isZup(true),
     _id()
 {
     _irradianceId.Clear();
@@ -275,18 +274,6 @@ GarchSimpleLight::SetIsDomeLight(bool isDomeLight)
     _isDomeLight = isDomeLight;
 }
 
-bool
-GarchSimpleLight::IsZup() const
-{
-    return _isZup;
-}
-
-void
-GarchSimpleLight::SetIsZup(bool isZup)
-{
-    _isZup = isZup;
-}
-
 GarchTextureGPUHandle const & GarchSimpleLight::GetIrradianceId() const
 {
     return _irradianceId;
@@ -341,7 +328,6 @@ GarchSimpleLight::operator==(const GarchSimpleLight& other) const
         &&  _shadowMatrix == other._shadowMatrix
         &&  _isCameraSpaceLight == other._isCameraSpaceLight
         &&  _isDomeLight == other._isDomeLight
-        &&  _isZup == other._isZup
         &&  _irradianceId == other._irradianceId
         &&  _prefilterId == other._prefilterId
         &&  _brdfId == other._brdfId
@@ -373,7 +359,6 @@ std::ostream& operator<<(std::ostream& out, const GarchSimpleLight& v)
         << v._shadowMatrix
         << v._isCameraSpaceLight
         << v._isDomeLight
-        << v._isZup
         << (uint64_t)v._irradianceId.handle
         << (uint64_t)v._prefilterId.handle
         << (uint64_t)v._brdfId.handle

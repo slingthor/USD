@@ -322,7 +322,7 @@ HdxColorCorrectionTask::_CopyTexture()
     glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &restoreReadFB);
     glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &restoreDrawFB);
 
-    if (_aovBuffer) {
+    if (_aovTexture) {
         // If we have an AOV we copy it so we can read from it while writing the
         // color corrected pixels back into the AOV.
         glBindFramebuffer(GL_READ_FRAMEBUFFER, _aovFramebuffer);
@@ -349,7 +349,7 @@ HdxColorCorrectionTask::_CopyTexture()
 }
 
 bool
-HdxColorCorrectionTask::_CreateFramebufferResources(GLuint *texture)
+HdxColorCorrectionTask::_CreateFramebufferResources()
 {
 #if defined(ARCH_GFX_OPENGL)
     // If framebufferSize is not provided we use the viewport size.
@@ -360,6 +360,7 @@ HdxColorCorrectionTask::_CreateFramebufferResources(GLuint *texture)
         GLint res[4] = {0};
         glGetIntegerv(GL_VIEWPORT, res);
         fboSize = GfVec2i(res[2], res[3]);
+        _framebufferSize = fboSize;
     }
 
     bool createTexture = (_texture == 0 || fboSize != _textureSize);
@@ -375,8 +376,8 @@ HdxColorCorrectionTask::_CreateFramebufferResources(GLuint *texture)
         GLint restoreTexture;
         glGetIntegerv(GL_TEXTURE_BINDING_2D, &restoreTexture);
 
-        glGenTextures(1, texture);
-        glBindTexture(GL_TEXTURE_2D, *texture);
+        glGenTextures(1, &_texture);
+        glBindTexture(GL_TEXTURE_2D, _texture);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -611,10 +612,11 @@ HdxColorCorrectionTask::Execute(HdTaskContext* ctx)
     HF_MALLOC_TAG_FUNCTION();
     GLF_GROUP_FUNCTION();
 
-    // We do not color correct depth buffers (glBlitFramebuffer will fail to
-    // blit the D32F format into our RGBA16F texture)
-    if (_aovName == HdAovTokens->depth ||
-        _aovName == HdAovTokens->linearDepth) {
+    // We currently only color correct the color aov. Depth aov currently won't
+    // work well due to how we use glBlitFramebuffer. Other aovs may work, if
+    // they are color buffers, but it isn't currently clear if we want to
+    // color correct those or leave them as their raw values for debugging.
+    if (!_aovName.IsEmpty() && _aovName != HdAovTokens->color) {
         return;
     }
 
@@ -626,14 +628,14 @@ HdxColorCorrectionTask::Execute(HdTaskContext* ctx)
         return;
     }
 
-    _CreateFramebufferResources(&_texture);
+    _CreateFramebufferResources();
 
     _CopyTexture();
 
     // If an Aov is provided, we render the color corrected pixels in the aov.
     // Otherwise, we render the color corrected pixels into bound FB.
     GLint restoreReadFB, restoreDrawFB;
-    if (_aovBuffer) {
+    if (_aovTexture) {
 #if defined(ARCH_GFX_OPENGL)
         glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &restoreReadFB);
         glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &restoreDrawFB);
@@ -643,7 +645,7 @@ HdxColorCorrectionTask::Execute(HdTaskContext* ctx)
 
     _ApplyColorCorrection();
 
-    if (_aovBuffer) {
+    if (_aovTexture) {
 #if defined(ARCH_GFX_OPENGL)
         glBindFramebuffer(GL_READ_FRAMEBUFFER, restoreReadFB);
         glBindFramebuffer(GL_DRAW_FRAMEBUFFER, restoreDrawFB);

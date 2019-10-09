@@ -767,7 +767,7 @@ HdxTaskController::_SetParameters(SdfPath const& pathName,
                                     GarchSimpleLight const& light)
 {
     _delegate.SetParameter(pathName, HdLightTokens->transform,
-        VtValue());
+        VtValue(light.GetTransform()));
     _delegate.SetParameter(pathName, HdLightTokens->shadowParams,
         HdxShadowParams());
     _delegate.SetParameter(pathName, HdLightTokens->shadowCollection,
@@ -776,12 +776,10 @@ HdxTaskController::_SetParameters(SdfPath const& pathName,
         light);
 
     // if we are setting the parameters for the dome light we need to add the 
-    // default texture resource as well as the stage's up axisn
+    // default dome light texture resource.
     if (light.IsDomeLight()) {
         _delegate.SetParameter(pathName, HdLightTokens->textureResource, 
             _defaultDomeLightTextureResource);
-        _delegate.SetParameter(pathName, _tokens->StageOrientation, 
-            light.IsZup());
     }
 }
 

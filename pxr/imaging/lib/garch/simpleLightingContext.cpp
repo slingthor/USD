@@ -278,11 +278,11 @@ GarchSimpleLightingContext::BindUniformBlocks(GarchBindingMapPtr const &bindingM
             float spotFalloff;
             float padding[2];
             float attenuation[4];
+            float worldToLightTransform[16];
             bool hasShadow;
             int32_t shadowIndex;
             bool isIndirectLight;
-            bool padding2[3];
-            bool isZup;
+            float padding0;
         };
 
         struct Lighting {
@@ -349,9 +349,10 @@ GarchSimpleLightingContext::BindUniformBlocks(GarchBindingMapPtr const &bindingM
                     light.GetAttenuation());
             lightingData->lightSource[i].spotCutoff = light.GetSpotCutoff();
             lightingData->lightSource[i].spotFalloff = light.GetSpotFalloff();
+            setMatrix(lightingData->lightSource[i].worldToLightTransform,
+                      light.GetTransform().GetInverse());
             lightingData->lightSource[i].hasShadow = light.HasShadow();
             lightingData->lightSource[i].isIndirectLight = light.IsDomeLight();
-            lightingData->lightSource[i].isZup = light.IsZup();
 
             if (lightingData->lightSource[i].hasShadow) {
                 int shadowIndex = light.GetShadowIndex();
