@@ -115,7 +115,7 @@ vec3 FloatToSRGB(vec3 val)
 
 // Forward declare because C++ code will append the OCIO fn at end of shader
 #if defined(GLSLFX_USE_OCIO)
-    vec4 OCIODisplay(vec4 inPixel, sampler3D lut3d);
+    vec4 OCIODisplay(vec4 inPixel, texture3D<float> lut3d);
 #endif
 
 #if defined(ARCH_GFX_METAL)
@@ -123,7 +123,7 @@ constexpr sampler s = sampler(coord::normalized,
                               address::clamp_to_edge,
                               filter::nearest);
 
-fragment half4 fragmentEntryPoint(Interpolated in[[stage_in]], texture2d<float> colorIn[[texture(0)]])
+fragment half4 fragmentEntryPoint(Interpolated in[[stage_in]], texture2d<float> colorIn[[texture(0)]], texture3d<float> LUT3dIn[[texture(1)]])
 {
     vec4 color = colorIn.sample(s, in.uv);
 
