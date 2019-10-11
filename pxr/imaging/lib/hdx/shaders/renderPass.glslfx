@@ -57,6 +57,7 @@ layout (early_fragment_tests) in;
 #if defined(HD_HAS_hdxOitDataBuffer)
 #if defined(ARCH_GFX_METAL)
 	#define gl_FragCoord vec2(float2(HdGet_oitScreenSize()) * gl_Position.xy)
+	#define atomicAdd(value, addend) atomic_fetch_add_explicit(value, addend, memory_order_relaxed)
 #endif
 #endif
 
