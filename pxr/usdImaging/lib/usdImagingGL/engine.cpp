@@ -1231,8 +1231,9 @@ UsdImagingGLEngine::_Execute(const UsdImagingGLRenderParams &params,
             params.enableSampleAlphaToCoverage,
             params.drawMode,
 #if defined(ARCH_GFX_METAL)
-            (_renderAPI == Metal &&
-             params.mtlRenderPassDescriptorForNativeMetal) ?
+            ((_renderAPI == Metal &&
+              params.mtlRenderPassDescriptorForNativeMetal) ||
+             MtlfMetalContext::GetMetalContext()->GetDrawTarget()) ?
             HdStRenderDelegate::DelegateParams::RenderOutput::Metal :
 #endif
             HdStRenderDelegate::DelegateParams::RenderOutput::OpenGL

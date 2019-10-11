@@ -1178,7 +1178,7 @@ void MtlfMetalContext::SetRenderPipelineState()
         // Create a new render pipeline state object
         renderPipelineStateDescriptor.label = @"SetRenderEncoderState";
         if (drawTarget)
-            renderPipelineStateDescriptor.rasterSampleCount = 1;
+            renderPipelineStateDescriptor.rasterSampleCount = drawTarget->GetNumSamples();
         else
             renderPipelineStateDescriptor.rasterSampleCount = mtlSampleCount;
         

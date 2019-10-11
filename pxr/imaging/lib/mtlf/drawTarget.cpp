@@ -46,7 +46,7 @@ TF_DEFINE_ENV_SETTING(MTLF_DRAW_TARGETS_NUM_SAMPLES, 4,
                       "Number of samples greater than 1 forces MSAA.");
 
 static unsigned int 
-GetNumSamples()
+_GetNumSamples()
 {
     static int reqNumSamples = TfGetEnvSetting(MTLF_DRAW_TARGETS_NUM_SAMPLES);
     unsigned int numSamples = 1;
@@ -71,7 +71,7 @@ MtlfDrawTarget::MtlfDrawTarget( GfVec2i const & size, bool requestMSAA /* =false
     // If MSAA has been requested and it is enabled then we will create
     // msaa buffers
     if (requestMSAA) {
-        _numSamples = GetNumSamples();
+        _numSamples = _GetNumSamples();
     }
 
     _GenFrameBuffer();
@@ -533,7 +533,7 @@ MtlfDrawTarget::WriteToFile(std::string const & name,
     storage.height = _size[1];
     storage.format = a->GetFormat();
     storage.type = a->GetType();
-    storage.flipped = true;
+    storage.flipped = false;
     storage.data = buf;
 
     GarchImageSharedPtr image = GarchImage::OpenForWriting(filename);
