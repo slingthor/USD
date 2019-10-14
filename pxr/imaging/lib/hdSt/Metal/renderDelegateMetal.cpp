@@ -176,7 +176,7 @@ HdStRenderDelegateMetal::~HdStRenderDelegateMetal()
 bool
 HdStRenderDelegateMetal::IsSupported()
 {
-    if (MtlfContextCaps::GetAPIVersion() >= 400)
+    if (MtlfContextCaps::GetAPIVersion() >= MtlfContextCaps::APIVersion_Metal2_0)
         return true;
 
     return false;

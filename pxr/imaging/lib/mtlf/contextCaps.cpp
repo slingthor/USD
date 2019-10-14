@@ -40,12 +40,16 @@ MtlfContextCaps::MtlfContextCaps()
 
 int MtlfContextCaps::GetAPIVersion()
 {
-#if __MAC_OS_X_VERSION_MAX_ALLOWED >= 101300 /* __MAC_10_13 */
-    return 450;
+#if __MAC_OS_X_VERSION_MAX_ALLOWED >= 101500 /* __MAC_10_15 */
+    return APIVersion_Metal3_0;
+#elif __MAC_OS_X_VERSION_MAX_ALLOWED >= 101300 /* __MAC_10_13 */
+    return APIVersion_Metal2_0;
+#elif __IPHONE_OS_VERSION_MAX_ALLOWED >= 130000 /* __IOS_13_00 */
+    return APIVersion_Metal3_0;
 #elif __IPHONE_OS_VERSION_MAX_ALLOWED >= 110000 /* __IOS_11_00 */
-    return 450;
+    return APIVersion_Metal2_0;
 #endif
-    return 0;
+    return APIVersion_Metal1_0;
 }
 
 void
@@ -53,7 +57,7 @@ MtlfContextCaps::_LoadCaps()
 {
     apiVersion                   = GetAPIVersion();
     
-    if (apiVersion == 0)
+    if (apiVersion == APIVersion_Metal1_0)
         return;
 
     glslVersion                  = 450;

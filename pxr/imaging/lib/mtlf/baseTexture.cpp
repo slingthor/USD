@@ -26,10 +26,13 @@
 #include "pxr/imaging/mtlf/mtlDevice.h"
 
 #include "pxr/imaging/mtlf/baseTexture.h"
+#include "pxr/imaging/mtlf/contextCaps.h"
 #include "pxr/imaging/mtlf/diagnostic.h"
 #include "pxr/imaging/mtlf/utils.h"
 
 #include "pxr/imaging/garch/baseTextureData.h"
+#include "pxr/imaging/garch/contextCaps.h"
+#include "pxr/imaging/garch/resourceFactory.h"
 
 #include "pxr/base/tf/registryManager.h"
 #include "pxr/base/tf/type.h"
@@ -39,12 +42,12 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 static bool useAsncTextureUploads = false;
 
-static MTLPixelFormat GetMetalFormat(GLenum inInternalFormat, GLenum inType, size_t *outPixelByteSize, bool *out24BitFormat)
+static MTLPixelFormat GetMetalFormat(GLenum inInternalFormat, GLenum inType, size_t *outPixelByteSize, int *numChannels)
 {
     MTLPixelFormat mtlFormat = MTLPixelFormatInvalid;
     
     *outPixelByteSize = 0;
-    *out24BitFormat = false;
+    *numChannels = 4;
     
     switch (inInternalFormat)
     {
@@ -52,7 +55,7 @@ static MTLPixelFormat GetMetalFormat(GLenum inInternalFormat, GLenum inType, siz
         case GL_RGB16F:
         case GL_RGB16:
         case GL_RGB:
-            *out24BitFormat = true;
+            *numChannels = 3;
             // Drop through
             
         case GL_RGBA:
@@ -61,7 +64,7 @@ static MTLPixelFormat GetMetalFormat(GLenum inInternalFormat, GLenum inType, siz
             break;
 
         case GL_SRGB:
-            *out24BitFormat = true;
+            *numChannels = 3;
             // Drop through
 
         case GL_SRGB_ALPHA:
@@ -72,6 +75,7 @@ static MTLPixelFormat GetMetalFormat(GLenum inInternalFormat, GLenum inType, siz
         case GL_RED:
             mtlFormat = MTLPixelFormatR8Unorm;
             *outPixelByteSize = sizeof(char);
+            *numChannels = 1;
             break;
             
         case GL_RGBA16:
@@ -82,6 +86,7 @@ static MTLPixelFormat GetMetalFormat(GLenum inInternalFormat, GLenum inType, siz
         case GL_R16:
             mtlFormat = MTLPixelFormatRGBA16Unorm;
             *outPixelByteSize = sizeof(short);
+            *numChannels = 1;
             break;
             
         case GL_RGBA16F:
@@ -92,6 +97,7 @@ static MTLPixelFormat GetMetalFormat(GLenum inInternalFormat, GLenum inType, siz
         case GL_R16F:
             mtlFormat = MTLPixelFormatR16Float;
             *outPixelByteSize = sizeof(short);
+            *numChannels = 1;
             break;
             
         case GL_RGBA32F:
@@ -102,6 +108,7 @@ static MTLPixelFormat GetMetalFormat(GLenum inInternalFormat, GLenum inType, siz
         case GL_R32F:
             mtlFormat = MTLPixelFormatRGBA32Float;
             *outPixelByteSize = sizeof(float);
+            *numChannels = 1;
             break;
     }
     
@@ -325,8 +332,9 @@ MtlfBaseTexture::_CreateTexture(GarchBaseTextureDataConstPtr texData,
             
             size_t pixelByteSize;
             int numPixels = texDataWidth * texDataHeight;
-            bool b24BitFormat = false;
-            MTLPixelFormat mtlFormat = GetMetalFormat(texData->GLInternalFormat(), texData->GLType(), &pixelByteSize, &b24BitFormat);
+            int numChannels = false;
+            MTLPixelFormat mtlFormat = GetMetalFormat(texData->GLInternalFormat(), texData->GLType(), &pixelByteSize, &numChannels);
+            int b24BitFormat = numChannels == 3;
             
             void *texBuffer = texData->GetRawBuffer(0);
             if (b24BitFormat) {
@@ -396,6 +404,14 @@ MtlfBaseTexture::_CreateTexture(GarchBaseTextureDataConstPtr texData,
                                                                mipmapped:genMips?YES:NO];
             desc.resourceOptions = MTLResourceStorageModeDefault;
             _textureName = MtlfMultiTexture(desc);
+            
+            if (numChannels == 1) {
+#if (__MAC_OS_X_VERSION_MAX_ALLOWED >= 101500) || (__IPHONE_OS_VERSION_MAX_ALLOWED >= 130000) /* __MAC_10_15 __IOS_13_00 */
+                if (GarchResourceFactory::GetInstance()->GetContextCaps().apiVersion >= MtlfContextCaps::APIVersion_Metal3_0) {
+                    desc.swizzle = MTLTextureSwizzleChannelsMake(MTLTextureSwizzleRed, MTLTextureSwizzleRed, MTLTextureSwizzleRed, MTLTextureSwizzleRed);
+                }
+#endif
+            }
 
             char *rawData = (char*)texBuffer + (unpackSkipRows * unpackRowLength * pixelByteSize)
                 + (unpackSkipPixels * pixelByteSize);
@@ -461,9 +477,10 @@ MtlfBaseTexture::_CreateTexture(GarchBaseTextureDataConstPtr texData,
             }
         } else {
             size_t pixelByteSize;
-            bool b24BitFormat;
-            MTLPixelFormat mtlFormat = GetMetalFormat(texData->GLInternalFormat(), texData->GLType(), &pixelByteSize, &b24BitFormat);
-            
+            int numChannels;
+            MTLPixelFormat mtlFormat = GetMetalFormat(texData->GLInternalFormat(), texData->GLType(), &pixelByteSize, &numChannels);
+            bool b24BitFormat = numChannels == 3;
+
             if (mtlFormat == MTLPixelFormatInvalid) {
                 TF_FATAL_CODING_ERROR("Unsupported/unimplemented texture format");
             }

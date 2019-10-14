@@ -2531,7 +2531,8 @@ HdSt_CodeGenMSL::CompileComputeProgram()
     
     GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
     _genCommon  << "#define HD_SHADER_API " << HD_SHADER_API << "\n"
-    << "#define ARCH_GFX_METAL\n";
+                << "#define ARCH_GFX_METAL\n"
+                << "#define METAL_API_VERSION " << caps.apiVersion + 1 << "\n";
     
     _buildTarget = kMSL_BuildTarget_Regular;
 
@@ -3008,8 +3009,10 @@ HdSt_CodeGenMSL::_GenerateCommonDefinitions()
     // Used in glslfx files to determine if it is using new/old
     // imaging system. It can also be used as API guards when
     // we need new versions of Hydra shading.
-    _genDefinitions  << "#define HD_SHADER_API " << HD_SHADER_API << "\n"
-                << "#define ARCH_GFX_METAL\n";
+    GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
+    _genDefinitions << "#define HD_SHADER_API " << HD_SHADER_API << "\n"
+                    << "#define ARCH_GFX_METAL\n"
+                    << "#define METAL_API_VERSION " << caps.apiVersion + 1 << "\n";
     
     // Metal feature set defines
     id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->currentDevice;

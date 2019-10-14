@@ -455,7 +455,7 @@ bool
 HdStRenderDelegate::IsSupported()
 {
 #if defined(ARCH_GFX_METAL)
-    if (MtlfContextCaps::GetAPIVersion() >= 400)
+    if (MtlfContextCaps::GetAPIVersion() >= MtlfContextCaps::APIVersion_Metal2_0)
         return true;
 #endif
 #if defined(ARCH_GFX_OPENGL)
