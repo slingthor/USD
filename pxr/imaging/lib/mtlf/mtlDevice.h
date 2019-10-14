@@ -531,6 +531,11 @@ public:
     }
 
     static MtlfMetalContextSharedPtr context;
+    
+    void  GPUTimerStartTimer(unsigned long frameNumber);
+    void  GPUTimerEventExpected(unsigned long frameNumber);
+    void  GPUTimerUnexpectEvent(unsigned long frameNumber);
+    void  GPUTimerEndTimer(unsigned long frameNumber);
 
 protected:
 
@@ -795,7 +800,7 @@ private:
         unsigned long  startingFrame;
         struct timeval frameStartTime;
         struct timeval frameEndTime;
-        unsigned int   timingEventsIssued;
+        unsigned int   timingEventsExpected;
         unsigned int   timingEventsReceived;
         bool timingCompleted;
         
@@ -803,10 +808,8 @@ private:
     
     float lastGPUFrameTime;
     
-    void  GPUTimerStartTimer(unsigned long frameNumber);
-    void  GPUTimerEndTimer(unsigned long frameNumber);
     void  GPUTimerFinish(unsigned long frameNumber);
-    void  GPUTImerResetTimer(unsigned long frameNumber);
+    void  GPUTimerResetTimer(unsigned long frameNumber);
     
     std::atomic_ulong numPrimsDrawn;
     

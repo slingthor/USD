@@ -242,6 +242,15 @@ HdStCommandBuffer::ExecuteDraw(
         id <MTLRenderCommandEncoder> renderEncoder =
             [commandBuffer renderCommandEncoderWithDescriptor:renderPassDescriptor];
         [renderEncoder endEncoding];
+        int frameNumber = context->GetCurrentFrame();
+        [commandBuffer addScheduledHandler:^(id<MTLCommandBuffer> buffer)
+         {
+            context->GPUTimerStartTimer(frameNumber);
+         }];
+        [commandBuffer addCompletedHandler:^(id<MTLCommandBuffer> buffer)
+        {
+           context->GPUTimerEndTimer(frameNumber);
+        }];
         [commandBuffer commit];
 
         int numAttachments = 1;

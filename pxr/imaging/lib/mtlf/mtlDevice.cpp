@@ -690,6 +690,10 @@ void MtlfMetalContext::CreateCommandBuffer(MetalWorkQueueType workQueueType, boo
             wq->commandBuffer = [gpus[currentGPU].commandQueue commandBuffer];
             [wq->commandBuffer retain];
         }
+        if (workQueueType == METALWORKQUEUE_DEFAULT) {
+            int frameNumber = GetCurrentFrame();
+            GPUTimerEventExpected(frameNumber);
+        }
     }
     // We'll reuse an existing buffer silently if it's empty, otherwise emit warning
     else if (wq->encoderHasWork) {
@@ -1735,6 +1739,10 @@ void MtlfMetalContext::CommitCommandBufferForThread(bool waituntilScheduled, boo
                 commandBuffers[currentGPU][commandBuffersStackPos[currentGPU]++] = wq->commandBuffer;
                 wq->commandBuffer = nil;
             }
+            if (workQueueType == METALWORKQUEUE_DEFAULT) {
+                int frameNumber = GetCurrentFrame();
+                GPUTimerUnexpectEvent(frameNumber);
+            }
             ResetEncoders(workQueueType);
             return;
         }
@@ -1748,6 +1756,13 @@ void MtlfMetalContext::CommitCommandBufferForThread(bool waituntilScheduled, boo
         wq->generatesEndOfQueueEvent = false;
     }
     
+    if (workQueueType == METALWORKQUEUE_DEFAULT) {
+        int frameNumber = GetCurrentFrame();
+        [wq->commandBuffer addCompletedHandler:^(id<MTLCommandBuffer> buffer)
+        {
+           GPUTimerEndTimer(frameNumber);
+        }];
+    }
     [wq->commandBuffer commit];
     
     if (waitUntilCompleted) {
@@ -2110,7 +2125,7 @@ void MtlfMetalContext::StartFrame() {
 
     currentDevice = renderDevices[currentGPU];
 #endif
-    GPUTImerResetTimer(frameCount);
+    GPUTimerResetTimer(frameCount);
     
     [captureScopeFullFrame[currentGPU] beginScope];
 }
@@ -2235,11 +2250,11 @@ void MtlfMetalContext::_gsEncodeSync(bool doOpenBatch) {
     }
 }
 
-void  MtlfMetalContext::GPUTImerResetTimer(unsigned long frameNumber) {
+void  MtlfMetalContext::GPUTimerResetTimer(unsigned long frameNumber) {
     GPUFrameTime *timer = &gpuFrameTimes[frameNumber % METAL_NUM_GPU_FRAME_TIMES];
     
     timer->startingFrame        = frameNumber;
-    timer->timingEventsIssued   = 0;
+    timer->timingEventsExpected = 0;
     timer->timingEventsReceived = 0;
     timer->timingCompleted      = false;
 }
@@ -2250,10 +2265,20 @@ void MtlfMetalContext::GPUTimerStartTimer(unsigned long frameNumber)
 {
     GPUFrameTime *timer = &gpuFrameTimes[frameNumber % METAL_NUM_GPU_FRAME_TIMES];
     // Just start the timer on the first call
-    if (!timer->timingEventsIssued) {
-        gettimeofday(&timer->frameStartTime, 0);
-    }
-    timer->timingEventsIssued++;
+    gettimeofday(&timer->frameStartTime, 0);
+    timer->timingEventsExpected++;
+}
+
+void MtlfMetalContext::GPUTimerEventExpected(unsigned long frameNumber)
+{
+    GPUFrameTime *timer = &gpuFrameTimes[frameNumber % METAL_NUM_GPU_FRAME_TIMES];
+    timer->timingEventsExpected++;
+}
+
+void MtlfMetalContext::GPUTimerUnexpectEvent(unsigned long frameNumber)
+{
+    GPUFrameTime *timer = &gpuFrameTimes[frameNumber % METAL_NUM_GPU_FRAME_TIMES];
+    timer->timingEventsExpected--;
 }
 
 // Records a GPU end of frame timer, if multiple are received only the last is recorded
@@ -2267,7 +2292,7 @@ void MtlfMetalContext::GPUTimerEndTimer(unsigned long frameNumber)
     // Note there is potentially a race condition here that means if this command buffer completes before EndOfFrame marks
     // the timer as complete we won't update. But this would only result in less efficient resource resusage.
     // We update again in the GPUGetTime call so it will get set eventually
-    if (timer->timingCompleted && timer->timingEventsIssued == timer->timingEventsReceived) {
+    if (timer->timingCompleted && timer->timingEventsExpected == timer->timingEventsReceived) {
         lastCompletedFrame = frameNumber;
     }
 }
@@ -2288,7 +2313,8 @@ float MtlfMetalContext::GetGPUTimeInMs() {
         // To be a valid time it must have received all timing events back and have it's frame marked as finished
         if (timer->startingFrame >= highestFrameNumber &&
             timer->timingCompleted                   &&
-            timer->timingEventsIssued == timer->timingEventsReceived) {
+            timer->timingEventsExpected == timer->timingEventsReceived &&
+            timer->timingEventsExpected > 0) {
             validTimer = timer;
             highestFrameNumber = timer->startingFrame;
         }
