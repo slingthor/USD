@@ -392,8 +392,10 @@ void HdStRenderDelegateMetal::FinalizeRender()
     context->EndFrame();
 
     if (_renderOutput == DelegateParams::RenderOutput::Metal) {
-        [_mtlRenderPassDescriptor release];
-        _mtlRenderPassDescriptor = nil;
+        if (!context->GetDrawTarget()) {
+            [_mtlRenderPassDescriptor release];
+            _mtlRenderPassDescriptor = nil;
+        }
     }
 
     // Finalize rendering here & push the command buffer to the GPU
