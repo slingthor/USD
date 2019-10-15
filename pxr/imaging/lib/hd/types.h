@@ -231,6 +231,10 @@ enum HdType
     /// Corresponds to GL_INT_2_10_10_10_REV.
     /// \see HdVec4f_2_10_10_10_REV
     HdTypeInt32_2_10_10_10_REV,
+    
+    /// Atomic types ... used only for binding SSBOs where the buffer contents will be altered by atomic shader functions
+    HdTypeInt32_Atomic,
+    HdTypeUInt32_Atomic,
 };
 
 /// HdTupleType represents zero, one, or more values of the same HdType.
