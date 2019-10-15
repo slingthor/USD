@@ -1170,7 +1170,7 @@ _SkinningAdapter::_SkinningAdapter(
     if (_flags & RequiresGeomBindXform) {
         _geomBindXformTask.SetActive(true);
         if ((_geomBindXformQuery = UsdAttributeQuery(
-                _skinningQuery.GetGeomBindTransformAttr()))) {
+                 _skinningQuery.GetGeomBindTransformAttr()))) {
             _geomBindXformTask.SetMightBeTimeVarying(
                 _geomBindXformQuery.ValueMightBeTimeVarying());
         }
@@ -2182,7 +2182,11 @@ _UpdateExtentHints(
                 for (size_t i = 0; i < adaptersPerModel.size(); ++i) {
                     
                     bool shouldProcess = false;
-                    for (const auto& adapter : adaptersPerModel[i]) {
+                    // Make sure the adapter arrays are accessed via
+                    // const refs to avoid detaching.
+                    const VtArray<_SkinningAdapterRefPtr>& adapters =
+                        adaptersPerModel[i];
+                    for (const auto& adapter : adapters) {
                         if (adapter->ShouldProcessAtTime(ti)) {
                             shouldProcess = true;
                             break;

@@ -145,9 +145,11 @@ UsdImagingGprimAdapter::_AddRprim(TfToken const& primType,
     HD_PERF_COUNTER_INCR(UsdImagingTokens->usdPopulatedPrimCount);
 
     // As long as we're passing the proxyPrim in here, we need to add a
-    // manual dependency on usdPrim so that usd editing works correctly.
-    // XXX: Get rid of proxyPrim?
+    // manual dependency on usdPrim so that usd editing works correctly;
+    // also, get rid of the proxyPrim dependency.
+    // XXX: We should get rid of proxyPrim entirely.
     if (instancerContext != nullptr) {
+        index->_RemovePrimInfoDependency(cachePath);
         index->AddDependency(cachePath, usdPrim);
     }
 
@@ -163,6 +165,11 @@ UsdImagingGprimAdapter::_AddRprim(TfToken const& primType,
                 index->GetMaterialAdapter(materialPrim);
             if (materialAdapter) {
                 materialAdapter->Populate(materialPrim, index, nullptr);
+                // We need to register a dependency on the material prim so
+                // that geometry is updated when the material is
+                // (specifically, DirtyMaterialId).
+                // XXX: Eventually, it would be great to push this into hydra.
+                index->AddDependency(cachePath, materialPrim);
             }
         } else {
             TF_WARN("Gprim <%s> has illegal material reference to "

@@ -1070,15 +1070,6 @@ UsdImagingDelegate::_ResyncUsdPrim(SdfPath const& usdPath,
     TF_DEBUG(USDIMAGING_CHANGES).Msg("[Resync Prim]: <%s>\n",
             usdPath.GetText());
 
-    // XXX: This shouldn't be handled here, but we don't support resync for
-    // materials, so if we see a resync notice for a shader (material component)
-    // we drop it.  We'll typically get a paired refresh that will update the
-    // relevant material.
-    UsdPrim prim = _stage->GetPrimAtPath(usdPath);
-    if (prim && prim.IsA<UsdShadeShader>()) {
-        return;
-    }
-
     // This function is confusing, so an explainer:
     //
     // In general, the USD prims that get mapped to hydra prims are leaf prims.
@@ -1265,7 +1256,9 @@ UsdImagingDelegate::_RefreshUsdObject(SdfPath const& usdPath,
         SdfPath const& usdPrimPath = usdPath.GetPrimPath();
         TfToken const& attrName = usdPath.GetNameToken();
         UsdPrim usdPrim = _stage->GetPrimAtPath(usdPrimPath);
-        UsdAttribute attr = usdPrim.GetProperty(attrName).As<UsdAttribute>();
+        UsdAttribute attr = usdPrim
+            ? usdPrim.GetAttribute(attrName)
+            : UsdAttribute();
 
         // If either model:drawMode or model:applyDrawMode changes, we need to
         // repopulate the whole subtree starting at the owning prim.
@@ -1556,6 +1549,10 @@ UsdImagingDelegate::SetWindowPolicy(CameraUtilConformWindowPolicy policy)
 GfInterval 
 UsdImagingDelegate::GetCurrentTimeSamplingInterval()
 {
+    // XXX : Since the introduction of the sampling API in Hydra, we have
+    // had a shutter interval. Our next move will be to make this default
+    // shutter below have the same values as the UsdGeomCamera shutters
+    // which means a shutter open of 0.0 and a shutter close of 0.0.
     float shutterOpen = 0.0f;
     float shutterClose = 0.5f;
 
@@ -1574,7 +1571,10 @@ UsdImagingDelegate::GetCurrentTimeSamplingInterval()
                 HdCameraTokens->shutterOpen, 
                 &vShutterOpen);
         }
-        shutterOpen = vShutterOpen.Get<double>();
+
+        if (vShutterOpen.IsHolding<double>()) {
+            shutterOpen = vShutterOpen.Get<double>();
+        }
 
         if (!_valueCache.FindCameraParam(
                 _cameraPathForSampling, 
@@ -1587,7 +1587,10 @@ UsdImagingDelegate::GetCurrentTimeSamplingInterval()
                 HdCameraTokens->shutterClose, 
                 &vShutterClose);
         }
-        shutterClose = vShutterClose.Get<double>();
+
+        if (vShutterClose.IsHolding<double>()) {
+            shutterClose = vShutterClose.Get<double>();
+        }
     }
 
     return GfInterval(
@@ -2927,23 +2930,21 @@ UsdImagingDelegate::GetCameraParamValue(SdfPath const &id,
 
     SdfPath cachePath = ConvertIndexPathToCachePath(id);
     VtValue value;
-    if (!_valueCache.ExtractCameraParam(cachePath, paramName, &value)) {
-        HdDirtyBits dirtyBit = HdCamera::Clean;
-        if (paramName == HdCameraTokens->worldToViewMatrix) {
-            dirtyBit = HdCamera::DirtyViewMatrix;
-        } else if (paramName == HdCameraTokens->projectionMatrix) {
-            dirtyBit = HdCamera::DirtyProjMatrix;
-        } else if (paramName == HdCameraTokens->clipPlanes) {
-            dirtyBit = HdCamera::DirtyClipPlanes;
-        } else {
-            dirtyBit = HdCamera::DirtyParams;
-        }
-        
-        _UpdateSingleValue(cachePath, dirtyBit);
-         if (!_valueCache.ExtractCameraParam(cachePath, paramName, &value)) {
-            // Fallback to USD attributes.
-            value = _GetUsdPrimAttribute(cachePath, paramName);
-        }
+    HdDirtyBits dirtyBit = HdCamera::Clean;
+    if (paramName == HdCameraTokens->worldToViewMatrix) {
+        dirtyBit = HdCamera::DirtyViewMatrix;
+    } else if (paramName == HdCameraTokens->projectionMatrix) {
+        dirtyBit = HdCamera::DirtyProjMatrix;
+    } else if (paramName == HdCameraTokens->clipPlanes) {
+        dirtyBit = HdCamera::DirtyClipPlanes;
+    } else {
+        dirtyBit = HdCamera::DirtyParams;
+    }
+    
+    _UpdateSingleValue(cachePath, dirtyBit);
+    if (!_valueCache.FindCameraParam(cachePath, paramName, &value)) {
+        // Fallback to USD attributes.
+        value = _GetUsdPrimAttribute(cachePath, paramName);
     }
     return value;
 }
