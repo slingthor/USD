@@ -234,12 +234,20 @@ public:
         struct BindingDeclaration {
             BindingDeclaration() {}
             BindingDeclaration(TfToken const &name,
-                         TfToken const &dataType,
-                         HdBinding binding)
-                : name(name), dataType(dataType), binding(binding) {}
+                               TfToken const &dataType,
+                               HdBinding binding)
+            : name(name), dataType(dataType), binding(binding), typeIsAtomic(false) {}
+            
+            BindingDeclaration(TfToken const &name,
+                               TfToken const &dataType,
+                               HdBinding binding,
+                               bool isAtomic)
+            : name(name), dataType(dataType), binding(binding), typeIsAtomic(isAtomic) {}
+            
             TfToken name;
             TfToken dataType;
             HdBinding binding;
+            bool typeIsAtomic;
         };
 
         // -------------------------------------------------------------------
