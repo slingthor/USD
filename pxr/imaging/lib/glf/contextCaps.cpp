@@ -133,6 +133,7 @@ GlfContextCaps::_LoadCaps()
     useCppShaderPadding          = false;
     hasSubDataCopy               = glBufferSubData != NULL;
     hasDispatchCompute           = glDispatchCompute != NULL;
+    hasMipLevelTextureWrite      = true;
 
     GLint glMaxClipPlanes;
     glGetIntegerv(GL_MAX_CLIP_PLANES, &glMaxClipPlanes);

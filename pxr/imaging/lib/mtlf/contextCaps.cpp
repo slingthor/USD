@@ -83,6 +83,11 @@ MtlfContextCaps::_LoadCaps()
     hasDispatchCompute           = true;
     hasBufferBindOffset          = true;
     maxClipPlanes                = 16;
+#if defined(ARCH_OS_IOS)
+    hasMipLevelTextureWrite      = true;
+#else
+    hasMipLevelTextureWrite      = false;
+#endif
 
 #if OPENSUBDIV_HAS_METAL_COMPUTE
     //METAL_TODO: Metal always has compute capabilities. gpuComputeNormals only affects
