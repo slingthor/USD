@@ -29,6 +29,7 @@
 #include "pxr/imaging/hio/glslfx.h"
 
 #include "pxr/imaging/hdSt/debugCodes.h"
+#include "pxr/imaging/hdSt/Metal/codeGenMSL.h"
 #include "pxr/imaging/hdSt/Metal/mslProgram.h"
 #include "pxr/imaging/hdSt/package.h"
 #include "pxr/imaging/hdSt/surfaceShader.h"
@@ -844,7 +845,7 @@ void HdStMSLProgram::BakeState()
 
 std::string HdStMSLProgram::GetComputeHeader() const
 {
-    return "#include <metal_stdlib>\nusing namespace metal;\n";
+    return HdSt_CodeGenMSL::GetComputeHeader();
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE
