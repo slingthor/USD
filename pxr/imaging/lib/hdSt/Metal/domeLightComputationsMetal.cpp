@@ -58,9 +58,9 @@ HdSt_DomeLightComputationGPUMetal::_Execute(HdStProgramSharedPtr computeProgram)
         
         id<MTLFunction> computeFunction = mslProgram->GetComputeFunction(g);
         id<MTLComputePipelineState> pipelineState =
-        context->GetComputeEncoderState(
-            g, computeFunction, 4, 0,
-            @"HdSt_DomeLightComputationGPUMetal pipeline state");
+            context->GetComputeEncoderState(
+                g, computeFunction, 1, 2, 1,
+                @"HdSt_DomeLightComputationGPUMetal pipeline state");
         
         [computeEncoder setComputePipelineState:pipelineState];
         

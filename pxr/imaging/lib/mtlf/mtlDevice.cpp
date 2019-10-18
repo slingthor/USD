@@ -1590,6 +1590,7 @@ id<MTLComputePipelineState> MtlfMetalContext::GetComputeEncoderState(
     int                 gpuIndex,
     id<MTLFunction>     computeFunction,
     unsigned int        bufferCount,
+    unsigned int        textureCount,
     unsigned long       immutableBufferMask,
     NSString            *label)
 {
@@ -1598,6 +1599,7 @@ id<MTLComputePipelineState> MtlfMetalContext::GetComputeEncoderState(
     size_t hashVal = 0;
     boost::hash_combine(hashVal, renderDevices[gpuIndex]);
     boost::hash_combine(hashVal, bufferCount);
+    boost::hash_combine(hashVal, textureCount);
     boost::hash_combine(hashVal, computeFunction);
     boost::hash_combine(hashVal, immutableBufferMask);
     

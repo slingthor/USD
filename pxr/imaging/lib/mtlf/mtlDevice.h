@@ -397,6 +397,7 @@ public:
                                      int                 gpuIndex,
                                      id<MTLFunction>     computeFunction,
                                      unsigned int        bufferCount,
+                                     unsigned int        textureCount,
                                      unsigned long       immutableBufferMask,
                                      NSString            *label);
     

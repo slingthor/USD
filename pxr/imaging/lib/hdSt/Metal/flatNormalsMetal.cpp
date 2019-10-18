@@ -98,7 +98,7 @@ HdSt_FlatNormalsComputationMetal::_Execute(
         
         id<MTLFunction> computeFunction = mslProgram->GetComputeFunction(g);
         id<MTLComputePipelineState> pipelineState =
-            context->GetComputeEncoderState(g, computeFunction, 4, immutableBufferMask,
+            context->GetComputeEncoderState(g, computeFunction, 4, 0, immutableBufferMask,
                                             @"GPU Flat Normals pipeline state");
         
         [computeEncoder setComputePipelineState:pipelineState];
