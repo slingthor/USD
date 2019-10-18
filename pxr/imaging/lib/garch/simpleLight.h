@@ -153,6 +153,22 @@ public:
     GARCH_API
     void SetBrdfId(GarchTextureGPUHandle const & brdfId);
 
+    // .. and the samplers
+    GARCH_API
+    GarchSamplerGPUHandle const & GetIrradianceSamplerId() const;
+    GARCH_API
+    void SetIrradianceSamplerId(GarchSamplerGPUHandle const & irradianceSamplerId);
+    
+    GARCH_API
+    GarchSamplerGPUHandle const & GetPrefilterSamplerId() const;
+    GARCH_API
+    void SetPrefilterSamplerId(GarchSamplerGPUHandle const & prefilterSamplerId);
+    
+    GARCH_API
+    GarchSamplerGPUHandle const & GetBrdfSamplerId() const;
+    GARCH_API
+    void SetBrdfSamplerId(GarchSamplerGPUHandle const & brdfSamplerId);
+    
     GARCH_API
     virtual bool operator ==(GarchSimpleLight const & other) const;
     GARCH_API
@@ -188,6 +204,10 @@ private:
     GarchTextureGPUHandle _irradianceId; // pre-computed irradiance map
     GarchTextureGPUHandle _prefilterId;  // pre-computed preFiltered map
     GarchTextureGPUHandle _brdfId;       // pre-computed BRDF look up texture
+
+    GarchSamplerGPUHandle _irradianceSamplerId;
+    GarchSamplerGPUHandle _prefilterSamplerId;
+    GarchSamplerGPUHandle _brdfSamplerId;
 
     SdfPath _id;
 };

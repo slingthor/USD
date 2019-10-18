@@ -51,6 +51,10 @@ GarchSimpleLight::GarchSimpleLight(GfVec4f const & position) :
     _irradianceId.Clear();
     _prefilterId.Clear();
     _brdfId.Clear();
+
+    _irradianceSamplerId.Clear();
+    _prefilterSamplerId.Clear();
+    _brdfSamplerId.Clear();
 }
 
 GarchSimpleLight::~GarchSimpleLight()
@@ -304,6 +308,36 @@ void GarchSimpleLight::SetBrdfId(GarchTextureGPUHandle const & brdfId)
     _brdfId = brdfId;
 }
 
+GarchSamplerGPUHandle const & GarchSimpleLight::GetIrradianceSamplerId() const
+{
+    return _irradianceSamplerId;
+}
+
+void GarchSimpleLight::SetIrradianceSamplerId(GarchSamplerGPUHandle const & irradianceSamplerId)
+{
+    _irradianceSamplerId = irradianceSamplerId;
+}
+
+GarchSamplerGPUHandle const & GarchSimpleLight::GetPrefilterSamplerId() const
+{
+    return _prefilterSamplerId;
+}
+
+void GarchSimpleLight::SetPrefilterSamplerId(GarchSamplerGPUHandle const & prefilterSamplerId)
+{
+    _prefilterSamplerId = prefilterSamplerId;
+}
+
+GarchSamplerGPUHandle const & GarchSimpleLight::GetBrdfSamplerId() const
+{
+    return _brdfSamplerId;
+}
+
+void GarchSimpleLight::SetBrdfSamplerId(GarchSamplerGPUHandle const & brdfSamplerId)
+{
+    _brdfSamplerId = brdfSamplerId;
+}
+
 // -------------------------------------------------------------------------- //
 // VtValue requirements
 // -------------------------------------------------------------------------- //
@@ -331,6 +365,9 @@ GarchSimpleLight::operator==(const GarchSimpleLight& other) const
         &&  _irradianceId == other._irradianceId
         &&  _prefilterId == other._prefilterId
         &&  _brdfId == other._brdfId
+        &&  _irradianceSamplerId == other._irradianceSamplerId
+        &&  _prefilterSamplerId == other._prefilterSamplerId
+        &&  _brdfSamplerId == other._brdfSamplerId
         &&  _id == other._id;
 }
 
