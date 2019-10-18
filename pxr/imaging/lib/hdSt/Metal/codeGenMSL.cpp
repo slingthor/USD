@@ -586,6 +586,16 @@ static void _EmitDeclarationPtr(std::stringstream &str,
                         bd.binding, arraySize, programScope);
 }
 
+static void _EmitDeclarationMutablePtr(std::stringstream &str,
+                                HdSt_ResourceBinder::MetaData::BindingDeclaration const &bd,
+                                TfToken const &attribute = TfToken(), int arraySize = 0, bool programScope = false)
+{
+    _EmitDeclarationMutablePtr(str,
+                        bd.name, bd.dataType, attribute,
+                        bd.binding, arraySize, programScope);
+}
+
+
 // TODO: Shuffle code to remove these declarations.
 static void _EmitStructAccessor(std::stringstream &str,
                                 TfToken const &structMemberName,
@@ -3255,7 +3265,14 @@ HdSt_CodeGenMSL::_GenerateBindingsCode()
             if (binDecl->binding.GetType() == HdBinding::SSBO)
             {
                 indexStr = "localIndex";
-                _EmitDeclarationPtr(_genCommon, *binDecl);
+                if (binDecl->typeIsAtomic)
+                {
+                    _EmitDeclarationMutablePtr(_genCommon, *binDecl);
+                }
+                else
+                {
+                    _EmitDeclarationPtr(_genCommon, *binDecl);
+                }
                 _AddInputPtrParam(_mslVSInputParams, *binDecl);
                 _AddInputPtrParam(_mslPSInputParams, *binDecl);
             }
@@ -3266,11 +3283,14 @@ HdSt_CodeGenMSL::_GenerateBindingsCode()
                 _AddInputParam(_mslPSInputParams, *binDecl);
             }
 
-            _EmitAccessor(_genCommon,
-                          binDecl->name,
-                          binDecl->dataType,
-                          binDecl->binding,
-                          indexStr);
+            if (!binDecl->typeIsAtomic)
+            {
+                _EmitAccessor(_genCommon,
+                              binDecl->name,
+                              binDecl->dataType,
+                              binDecl->binding,
+                              indexStr);
+            }
         }
     }
     

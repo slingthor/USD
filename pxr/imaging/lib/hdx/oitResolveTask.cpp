@@ -189,7 +189,7 @@ HdxOitResolveTask::_PrepareOitBuffers(
         HdBufferSpecVector counterSpecs;
         counterSpecs.push_back(HdBufferSpec(
             HdxTokens->hdxOitCounterBuffer, 
-            HdTupleType {HdTypeInt32, 1}));
+            HdTupleType {HdTypeInt32_Atomic, 1}));
         _counterBar = resourceRegistry->AllocateSingleBufferArrayRange(
                                             /*role*/HdxTokens->oitCounter,
                                             counterSpecs,

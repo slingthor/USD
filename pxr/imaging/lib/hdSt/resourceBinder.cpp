@@ -711,10 +711,10 @@ HdSt_ResourceBinder::ResolveBindings(HdStDrawItem const *drawItem,
 
                 for (auto const& nameRes : bar->GetResources()) {
                     HdBinding binding = locator.GetBinding(it->GetBindingType(), nameRes.first);
-                    BindingDeclaration b(nameRes.first,
-                        HdStGLConversions::GetGLSLTypename(
-                            nameRes.second->GetTupleType().type),
-                        binding);
+                    auto tupleType = nameRes.second->GetTupleType().type;
+                    auto glslTypename = HdStGLConversions::GetGLSLTypename(tupleType);
+                    BindingDeclaration b(nameRes.first, glslTypename,
+                        binding, HdStGLConversions::TypeIsAtomic(tupleType));
                     metaDataOut->customBindings.push_back(b);
                     _bindingMap[nameRes.first] = binding;
                 }

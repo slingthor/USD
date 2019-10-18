@@ -301,6 +301,7 @@ size_t HdDataSizeOfType(HdType t)
     case HdTypeUInt16:
         return sizeof(uint16_t);
     case HdTypeInt32:
+    case HdTypeInt32_Atomic:
         return sizeof(int32_t);
     case HdTypeInt32Vec2:
         return sizeof(int32_t)*2;
@@ -309,6 +310,7 @@ size_t HdDataSizeOfType(HdType t)
     case HdTypeInt32Vec4:
         return sizeof(int32_t)*4;
     case HdTypeUInt32:
+    case HdTypeUInt32_Atomic:
         return sizeof(uint32_t);
     case HdTypeUInt32Vec2:
         return sizeof(uint32_t)*2;
