@@ -81,7 +81,7 @@ def make_relocatable(install_path, buildPython, qt_path="/usr/local/opt/qt@4"):
     files = []
 
     #path of the usd repo folder
-    src_path = os.path.realpath(__file__)[:-25] 
+    src_path = os.path.realpath(__file__)[:-34] 
     
     extract_files_recursive(install_path + '/bin/', is_object_file, files)
     extract_files_recursive(install_path + '/lib/', (lambda file: '.so' in file or '.dylib' in file), files)
