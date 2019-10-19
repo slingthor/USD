@@ -79,6 +79,9 @@ def replace_string_in_file(path, old_string, new_string):
 
 def make_relocatable(install_path, buildPython, qt_path="/usr/local/opt/qt@4"):
     files = []
+
+    #path of the usd repo folder
+    src_path = os.path.realpath(__file__)[:-25] 
     
     extract_files_recursive(install_path + '/bin/', is_object_file, files)
     extract_files_recursive(install_path + '/lib/', (lambda file: '.so' in file or '.dylib' in file), files)
@@ -93,6 +96,14 @@ def make_relocatable(install_path, buildPython, qt_path="/usr/local/opt/qt@4"):
     replace_string_in_file(install_path + '/pxrConfig.cmake', install_path, "REPLACE_ME")
     replace_string_in_file(install_path + '/cmake/pxrTargets.cmake', install_path, "REPLACE_ME")
     replace_string_in_file(install_path + '/cmake/pxrTargets-release.cmake', install_path, "REPLACE_ME")
+
+
+    ctest_files = []
+    extract_files_recursive(install_path + '/build/', (lambda file: 'CTestTestfile' in file), ctest_files)
+    for file in ctest_files:
+        replace_string_in_file(file, install_path , "$ENV{USD_BUILD}")
+        replace_string_in_file(file, src_path , "$ENV{USD_BUILD}")
+
 
     if buildPython:
         pyside_path = PySide.__file__
