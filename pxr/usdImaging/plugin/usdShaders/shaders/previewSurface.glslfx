@@ -336,8 +336,15 @@ evaluateIndirectLighting(
     float lod = roughness * MAX_REFLECTION_LOD;
     vec3 Rdir = vec4(transformationMatrix * vec4(Reye,0.0)).xyz;
     vec2 Rcoord = projectToLatLong(Rdir);
+#if defined(ARCH_GFX_METAL)
+    vec3 prefilter = textureBind_domeLightPrefilter.sample(
+        samplerBind_domeLightPrefilter,
+        coord,
+        level(lod)).rgb;
+#else
     vec3 prefilter = textureLod(HdGetSampler_domeLightPrefilter(),
                                 Rcoord, lod).rgb;
+#endif
 
     vec2 brdf = HdGet_domeLightBRDF(vec2(NdotE, roughness)).rg;
 

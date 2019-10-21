@@ -148,6 +148,9 @@ HdSt_ResourceBinder::ResolveBindings(HdStDrawItem const *drawItem,
 
     if (!TF_VERIFY(metaDataOut)) return;
 
+    static std::mutex _mutex;
+    std::lock_guard<std::mutex> lock(_mutex);
+
     // GL context caps
     const bool ssboEnabled
         = GarchResourceFactory::GetInstance()->GetContextCaps().shaderStorageBufferEnabled;
