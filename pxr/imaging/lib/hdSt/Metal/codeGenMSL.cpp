@@ -1310,6 +1310,8 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
             bool isVertexAttribute = true;
             bool usesPackedNormals = (input.name == _tokens->packedSmoothNormals) || (input.name == _tokens->packedFlatNormals);
             
+            bool inputIsAtomic = (input.dataType.GetString().find("atomic") != std::string::npos);
+            
             if (input.usage & HdSt_CodeGenMSL::TParam::Uniform) {
                 //This input param is a uniform
                 
@@ -1357,6 +1359,9 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
                     }
                     attrib = TfStringPrintf("[[buffer(%d)]]", currentUniformBufferSlot);
                     
+                    // HERE! Below need to look at how mslProgram->AddBinding works and update it so it deals with atomicity...
+                    // (Look at the 'mutability' code for the Compute shader binding stuff...?)
+                    
                     //Check whether it is the uniform buffer we made
                     if(name == "vsUniforms")
                         vsUniformsBufferSlot = currentUniformBufferSlot;
@@ -1383,10 +1388,12 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
                     vsInputCode << "    scope." << name << " = "
                                 << name << ";\n";
                     
-                vsFuncDef   << "\n    , " << (isPtrParam ? "device const " : "")
+                vsFuncDef   << "\n    , " << (isPtrParam ? (inputIsAtomic ? "device " : "device const ") : "")
                             << (inProgramScope ? "ProgramScope_Vert::" : "")
                             << dataType << (isPtrParam ? "* " : " ")
                             << name << attrib;
+                
+                // HERE! This is doing Compute Shader stuff. Can we re-use the 'isMutable' flag?
                 
                 bool isMutable = (input.usage & HdSt_CodeGenMSL::TParam::Mutable);
                 csFuncDef   << "\n    , " << (isPtrParam ? "device " : "")
@@ -1398,14 +1405,16 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
                 if(availableInMI_EP) {
                     //The MI entry point needs these too in identical form.
                     vsMI_EP_FuncDefParams << "\n    , "
-                            << (isPtrParam ? "device const " : "")
+                            << (isPtrParam ? (inputIsAtomic ? "device " : "device const ") : "")
                             << (inProgramScope ? "ProgramScope_Vert::" : "")
                             << dataType << (isPtrParam ? "* " : " ")
                             << name << attrib;
                 }
                 
+                // HERE! Check atomicity and use 'device' instead of 'device const'...
+                
                 //MI wrapper code can't use "attrib" attribute specifier.
-                vsMI_FuncDef << "\n    , " << (isPtrParam ? "device const ":"")
+                vsMI_FuncDef << "\n    , " << (isPtrParam ? (inputIsAtomic ? "device " : "device const ") : "")
                              << (inProgramScope ? "ProgramScope_Vert::" : "")
                              << dataType << (isPtrParam ? "* " : " ")
                              << name;
@@ -1980,7 +1989,12 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
                         kMSL_ProgramStage_Fragment);
                 }
                 
-                fsFuncDef << "\n    , const device "
+                
+                // HERE! don't use const device for atomics
+                
+                bool isAtomicType = it->dataType.GetString().find("atomic") != std::string::npos;
+                
+                fsFuncDef << "\n    , " << (isAtomicType ? "" : "const ") << "device "
                           << ((it->usage & TParam::Usage::ProgramScope) ?
                             "ProgramScope_Frag::" : "")
                           << _GetPackedType(it->dataType, true)
