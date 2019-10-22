@@ -72,7 +72,6 @@ HdxColorCorrectionTask::HdxColorCorrectionTask(HdSceneDelegate* delegate,
     : HdTask(id)
     , _shaderProgram()
     , _texture(0)
-    , _texture3dLUT(0)
     , _textureSize(0)
     , _vertexBuffer(0)
     , _copyFramebuffer(0)
@@ -83,21 +82,40 @@ HdxColorCorrectionTask::HdxColorCorrectionTask(HdSceneDelegate* delegate,
     , _aovTexture(nullptr)
     , _aovFramebuffer(0)
 {
+    _texture3dLUT.Clear();
 }
 
 HdxColorCorrectionTask::~HdxColorCorrectionTask()
 {
-#if defined(ARCH_GFX_OPENGL)
     if (_texture != 0) {
+#if defined(ARCH_GFX_OPENGL)
         glDeleteTextures(1, &_texture);
+#endif
     }
 
-    if (_texture3dLUT != 0) {
-        glDeleteTextures(1, &_texture3dLUT);
+    if (_texture3dLUT.IsSet()) {
+        bool isOpenGL = HdStResourceFactory::GetInstance()->IsOpenGL();
+        if (isOpenGL) {
+#if defined(ARCH_GFX_OPENGL)
+            GLuint t = _texture3dLUT;
+            glDeleteTextures(1, &t);
+#endif
+        }
+        else {
+            for(int i = 0; i < GPUState::gpuCount; i++) {
+                id<MTLTexture> t = _texture3dLUT.multiTexture[i];
+                if (t) {
+                    [t release];
+                }
+            }
+        }
+        _texture3dLUT.Clear();
     }
 
     if (_vertexBuffer != 0) {
+#if defined(ARCH_GFX_OPENGL)
         glDeleteBuffers(1, &_vertexBuffer);
+#endif
     }
 
     if (_shaderProgram) {
@@ -105,13 +123,17 @@ HdxColorCorrectionTask::~HdxColorCorrectionTask()
     }
 
     if (_copyFramebuffer != 0) {
+#if defined(ARCH_GFX_OPENGL)
         glDeleteFramebuffers(1, &_copyFramebuffer);
+#endif
     }
 
     if (_aovFramebuffer != 0) {
+#if defined(ARCH_GFX_OPENGL)
         glDeleteFramebuffers(1, &_aovFramebuffer);
-    }
 #endif
+    }
+
     GLF_POST_PENDING_GL_ERRORS();
 }
 
@@ -154,43 +176,103 @@ HdxColorCorrectionTask::_CreateOpenColorIOResources()
 
         OCIO::ConstProcessorRcPtr processor = config->getProcessor(transform);
 
+        bool isOpenGL = HdStResourceFactory::GetInstance()->IsOpenGL();
+        OCIO::GpuLanguage gpuLanguage = OCIO::GPU_LANGUAGE_GLSL_1_0;
+        if (!isOpenGL) {
+//            gpuLanguage = OCIO::GPU_LANGUAGE_MSL;
+        }
+
         // Create a GPU Shader Description
-        OCIO::GpuShaderDesc shaderDesc;
-        shaderDesc.setLanguage(OCIO::GPU_LANGUAGE_GLSL_1_0);
-        shaderDesc.setFunctionName("OCIODisplay");
-        shaderDesc.setLut3DEdgeLen(_lut3dSizeOCIO);
+        OCIO::GpuShaderDescRcPtr shaderDesc = OCIO::GpuShaderDesc::CreateLegacyShaderDesc(_lut3dSizeOCIO);
+        shaderDesc->setLanguage(gpuLanguage);
+        shaderDesc->setFunctionName("OCIODisplay");
+    
+        OCIO::ConstGPUProcessorRcPtr gpuProcessor
+            = processor->getDefaultGPUProcessor();
+        gpuProcessor->extractGpuShaderInfo(shaderDesc);
+
+        // Load the data into an OpenGL 3D Texture
+        if (_texture3dLUT.IsSet()) {
+            bool isOpenGL = HdStResourceFactory::GetInstance()->IsOpenGL();
+            if (isOpenGL) {
+    #if defined(ARCH_GFX_OPENGL)
+                GLuint t = _texture3dLUT;
+                glDeleteTextures(1, &t);
+    #endif
+            }
+            else {
+                for(int i = 0; i < GPUState::gpuCount; i++) {
+                    id<MTLTexture> t = _texture3dLUT.multiTexture[i];
+                    if (t) {
+                        [t release];
+                    }
+                }
+            }
+            _texture3dLUT.Clear();
+        }
 
         // Compute and the 3D LUT
-        int num3Dentries = 3 * _lut3dSizeOCIO*_lut3dSizeOCIO*_lut3dSizeOCIO;
-        std::vector<float> lut3d;
-        lut3d.resize(num3Dentries);
-        processor->getGpuLut3D(&lut3d[0], shaderDesc);
+        // 1. Get the information of the 3D LUT.
+        const char* name = 0x0;
+        const char* uid  = 0x0;
+        unsigned edgelen = 0;
+        OCIO::Interpolation interpolation = OCIO::INTERP_NEAREST;
+        shaderDesc->get3DTexture(0, name, uid, edgelen, interpolation);
 
+        const float* values = 0x0;
+        shaderDesc->get3DTextureValues(0, values);
+
+        // 2. Allocate the 3D LUT.
+
+        if (isOpenGL) {
 #if defined(ARCH_GFX_OPENGL)
-        // Load the data into an OpenGL 3D Texture
-        if (_texture3dLUT != 0) {
-            glDeleteTextures(1, &_texture3dLUT);
-        }
-        GLint restoreTexture;
-        glGetIntegerv(GL_TEXTURE_BINDING_3D, &restoreTexture);
-        glGenTextures(1, &_texture3dLUT);
-        glBindTexture(GL_TEXTURE_3D, _texture3dLUT);
-        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-        glTexImage3D(GL_TEXTURE_3D, 0, GL_RGB32F,
-                     _lut3dSizeOCIO, _lut3dSizeOCIO, _lut3dSizeOCIO,
-                     0, GL_RGB, GL_FLOAT, &lut3d[0]);
-        glBindTexture(GL_TEXTURE_3D, restoreTexture);
-
-        const char* gpuShaderText = processor->getGpuShaderText(shaderDesc);
+            GLint restoreTexture;
+            glGetIntegerv(GL_TEXTURE_BINDING_3D, &restoreTexture);
+            GLuint t;
+            glGenTextures(1, &t);
+            _texture3dLUT = t;
+            glBindTexture(GL_TEXTURE_3D, t);
+            glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+            glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+            glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+            glTexImage3D(GL_TEXTURE_3D, 0, GL_RGB32F,
+                         edgelen, edgelen, edgelen,
+                         0, GL_RGB, GL_FLOAT, values);
+            glBindTexture(GL_TEXTURE_3D, restoreTexture);
+            GLF_POST_PENDING_GL_ERRORS();
 #endif
-        GLF_POST_PENDING_GL_ERRORS();
+        }
+        else {
+            id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->currentDevice;
+            MTLTextureDescriptor* desc =
+                [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA16Float
+                                                                   width:edgelen
+                                                                  height:edgelen
+                                                               mipmapped:NO];
+            desc.resourceOptions = MTLResourceStorageModeDefault;
+            desc.depth = edgelen;
+            _texture3dLUT = MtlfMultiTexture(desc);
+            
+            for(int i = 0; i < GPUState::gpuCount; i++) {
+                [_texture3dLUT.multiTexture[i] replaceRegion:MTLRegionMake3D(0, 0, 0, edgelen, edgelen, edgelen)
+                                                 mipmapLevel:0
+                                                       slice:0
+                                                   withBytes:&values[edgelen*edgelen*edgelen]
+                                                 bytesPerRow:edgelen*sizeof(float)
+                                               bytesPerImage:edgelen*edgelen*sizeof(float)];
+            }
+            /*
+            MTLSamplerDescriptor* samplerDescriptor = [[MTLSamplerDescriptor alloc] init];
+            samplerDescriptor.sAddressMode = MTLSamplerAddressModeClampToEdge;
+            samplerDescriptor.tAddressMode = MTLSamplerAddressModeClampToEdge;
+            _irradianceSampler = MtlfMultiSampler(samplerDescriptor);*/
+        }
+
+        const char* gpuShaderText = shaderDesc->getShaderText();
+
         return std::string(gpuShaderText);
-    #else
-        return std::string();
     #endif
 }
 

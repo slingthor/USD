@@ -96,7 +96,7 @@ private:
 
     HdStProgramSharedPtr _shaderProgram;
     GLuint _texture;
-    GLuint _texture3dLUT;
+    GarchTextureGPUHandle _texture3dLUT;
     GfVec2i _textureSize;
     GLint _locations[4];
     GLuint _vertexBuffer;

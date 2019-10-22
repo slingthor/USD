@@ -1174,7 +1174,8 @@ OPENIMAGEIO = Dependency("OpenImageIO", InstallOpenImageIO,
 
 # Note that we use v1.1.0 instead of the minimum required v1.0.9
 # because v1.0.9 has problems building on macOS and Windows.
-OCIO_URL = "https://github.com/imageworks/OpenColorIO/archive/v1.1.0.zip"
+# OCIO_URL = "https://github.com/imageworks/OpenColorIO/archive/v1.1.0.zip"
+OCIO_URL = "https://github.com/AcademySoftwareFoundation/OpenColorIO/archive/master.zip"
 
 def InstallOpenColorIO(context, force, buildArgs):
     with CurrentWorkingDirectory(DownloadURL(OCIO_URL, context, force)):
@@ -1187,9 +1188,9 @@ def InstallOpenColorIO(context, force, buildArgs):
                      '-DOCIO_BUILD_JNIGLUE=OFF',
                      '-DOCIO_STATIC_JNIGLUE=OFF']
 
-        PatchFile("src/core/Config.cpp", 
-                   [("cacheidnocontext_ = cacheidnocontext_;", 
-                     "cacheidnocontext_ = rhs.cacheidnocontext_;")])
+        #PatchFile("src/core/Config.cpp", 
+        #           [("cacheidnocontext_ = cacheidnocontext_;", 
+        #             "cacheidnocontext_ = rhs.cacheidnocontext_;")])
 
         if iOS() or MacOS():
             extraArgs.append('-DCMAKE_CXX_FLAGS="-Wno-unused-function -Wno-unused-const-variable -Wno-unused-private-field"')
