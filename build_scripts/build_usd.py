@@ -402,7 +402,7 @@ def DownloadFromCache(srcDir, url, outputFilename):
     filename = url.split("/")[-1]
 
     if url=="https://github.com/google/draco/archive/master.zip":
-        shutil.copy(os.path.abspath(srcDir +'/cache/draco'), outputFilename)
+        shutil.copy(os.path.abspath(srcDir +'/cache/draco.zip'), outputFilename)
     else:
         shutil.copy(os.path.abspath(srcDir +'/cache/'+filename), outputFilename)
 
