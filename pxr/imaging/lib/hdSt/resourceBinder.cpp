@@ -954,6 +954,7 @@ HdSt_ResourceBinder::MetaData::ComputeHash() const
         boost::hash_combine(hash, binDecl->dataType);
         boost::hash_combine(hash, binDecl->binding.GetType());
         boost::hash_combine(hash, binDecl->binding.GetLocation());
+        boost::hash_combine(hash, binDecl->writable);
     }
 
     boost::hash_combine(hash, 0); // separator

@@ -37,6 +37,16 @@
 
 -- glsl OitResolve.Image
 
+
+#if defined(HD_HAS_hdxOitDataBuffer)
+#if defined(ARCH_GFX_METAL)
+	#define gl_FragCoord vec2(float2(HdGet_oitScreenSize()) * gl_Position.xy)
+	#define atomic_load(target) atomic_load_explicit(&target, memory_order_relaxed)
+#else
+	#define atomic_load(target) target
+#endif
+#endif
+
 vec4 imageShader(vec2 uv)
 {
 #if defined(HD_HAS_hdxOitDataBuffer)
@@ -47,7 +57,7 @@ vec4 imageShader(vec2 uv)
     int screenIndex = int(gl_FragCoord.x) + int(gl_FragCoord.y) * screenWidth;
     screenIndex += 1;
 
-    int nodeIndex = hdxOitCounterBuffer[screenIndex];
+    int nodeIndex = atomic_load(hdxOitCounterBuffer[screenIndex]);
     int numDepths = 0;
 
     // XXX renderPass.WriteOitLayersToBuffer does not clamp the number of
@@ -59,8 +69,9 @@ vec4 imageShader(vec2 uv)
     float sortedDepth[maxSamples];
 
     while (nodeIndex != -1 && 
-           numDepths < maxSamples && 
-           nodeIndex < hdxOitDataBuffer.length()) 
+           numDepths < maxSamples
+	   // && nodeIndex < hdxOitDataBuffer.length()
+    ) 
     {
         float currentDepth = hdxOitDepthBuffer[nodeIndex]; 
         int insertIndex = numDepths; 

@@ -77,6 +77,11 @@ public:
     /// Return a GLSL-safe, mangled name identifier.
     HDST_API
     static TfToken GetGLSLIdentifier(TfToken const& identifier);
+    
+    /// Indicates whether a type is intended to be operated on by atomic operations
+    HDST_API
+    static bool TypeIsAtomic(HdType type);
+    
 };
 
 

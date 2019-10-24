@@ -67,6 +67,7 @@ public:
             DrawingCoord        = 1 << 13,
             PointerType         = 1 << 14,
             Mutable             = 1 << 15,
+            Writable            = 1 << 16,
         };
         static Usage const maskShaderUsage = Usage(EntryFuncArgument - 1);
         
