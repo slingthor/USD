@@ -356,41 +356,53 @@ HdxSimpleLightingShader::AddBindings(HdBindingRequestVector *customBindings)
     static std::mutex _mutex;
     std::lock_guard<std::mutex> lock(_mutex);
 
-    _lightTextureParams.clear();
-
     bool haveDomeLight = false;
-    for (auto const& light : _lightingContext->GetLights()) { 
+    for (auto const& light : _lightingContext->GetLights()) {
 
         if (light.IsDomeLight() && !haveDomeLight) {
 
             // For now we assume that the only simple light with a texture is
             // a domeLight (ignoring RectLights, and multiple domeLights)
             haveDomeLight = true;
+            break;
+        }
+    }
 
-            // irradiance map
-            _lightTextureParams.push_back(
-                    HdMaterialParam(HdMaterialParam::ParamTypeTexture,
-                    _tokens->domeLightIrradiance,
-                    VtValue(GfVec4f(0.0)),
-                    SdfPath(),
-                    TfTokenVector(),
-                    HdTextureType::Uv));
-            // prefilter map
-            _lightTextureParams.push_back(
-                    HdMaterialParam(HdMaterialParam::ParamTypeTexture,
-                    _tokens->domeLightPrefilter,
-                    VtValue(GfVec4f(0.0)),
-                    SdfPath(),
-                    TfTokenVector(),
-                    HdTextureType::Uv));
-            // BRDF texture
-            _lightTextureParams.push_back(
-                    HdMaterialParam(HdMaterialParam::ParamTypeTexture,
-                    _tokens->domeLightBRDF,
-                    VtValue(GfVec4f(0.0)),
-                    SdfPath(),
-                    TfTokenVector(),
-                    HdTextureType::Uv));
+    if (!haveDomeLight && _lightTextureParams.size()) {
+        _lightTextureParams.clear();
+    }
+
+    if (haveDomeLight && !_lightTextureParams.size()) {
+        for (auto const& light : _lightingContext->GetLights()) {
+
+            if (light.IsDomeLight()) {
+
+                // irradiance map
+                _lightTextureParams.push_back(
+                        HdMaterialParam(HdMaterialParam::ParamTypeTexture,
+                        _tokens->domeLightIrradiance,
+                        VtValue(GfVec4f(0.0)),
+                        SdfPath(),
+                        TfTokenVector(),
+                        HdTextureType::Uv));
+                // prefilter map
+                _lightTextureParams.push_back(
+                        HdMaterialParam(HdMaterialParam::ParamTypeTexture,
+                        _tokens->domeLightPrefilter,
+                        VtValue(GfVec4f(0.0)),
+                        SdfPath(),
+                        TfTokenVector(),
+                        HdTextureType::Uv));
+                // BRDF texture
+                _lightTextureParams.push_back(
+                        HdMaterialParam(HdMaterialParam::ParamTypeTexture,
+                        _tokens->domeLightBRDF,
+                        VtValue(GfVec4f(0.0)),
+                        SdfPath(),
+                        TfTokenVector(),
+                        HdTextureType::Uv));
+                break;
+            }
         }
     }
 }
