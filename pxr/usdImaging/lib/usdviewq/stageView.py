@@ -1877,6 +1877,17 @@ class StageView(QtOpenGL.QGLWidget):
                     toPrint[label] = ReportMetricSize(stats[key])
 
             rStats = renderer.GetRenderStats()
+            if self._dataModel.stats is not None:
+                stat = {"rStats": rStats}
+                stat["currentFrame"] = str(self._dataModel.currentFrame)
+                stat["elapsedTime"] = self._glTimeElapsedQuery.GetResult()
+                stat["prims"] = self._glPrimitiveGeneratedQuery.GetResult()
+                stat["gpuTime"] = None
+                if not self._renderPauseState:
+                    stat["gpuTime"] = "%.2f ms " % (self._glTimeElapsedQuery.GetResult() / 1000000.0)
+                    for key in self.fpsHUDKeys:
+                        stat[key] = self.fpsHUDInfo[key]
+                self._dataModel.stats.append(stat)
 
             toPrint["GL prims "] = self._glPrimitiveGeneratedQuery.GetResult()
             if not self._renderPauseState:

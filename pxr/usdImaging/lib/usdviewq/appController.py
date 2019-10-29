@@ -116,6 +116,8 @@ class UsdviewDataModel(RootDataModel):
 
         self._selectionDataModel = SelectionDataModel(self)
         self._viewSettingsDataModel = ViewSettingsDataModel(self, settings2)
+        self._statsFile = None
+        self._stats = None
 
     @property
     def selection(self):
@@ -124,6 +126,20 @@ class UsdviewDataModel(RootDataModel):
     @property
     def viewSettings(self):
         return self._viewSettingsDataModel
+
+    @property
+    def statsFile(self):
+        return self._statsFile
+
+    @statsFile.setter
+    def statsFile(self, value):
+        self._statsFile = value
+        self._stats = []
+
+    @property
+    def stats(self):
+        return self._stats
+
 
 class UIStateProxySource(StateSource):
     """XXX Temporary class which allows AppController to serve as two state sources.
@@ -390,6 +406,10 @@ class AppController(QtCore.QObject):
 
             self._dataModel = UsdviewDataModel(
                 self._printTiming, self._settings2)
+
+
+            if parserData.statsFile is not None:
+                self._dataModel.statsFile = parserData.statsFile
 
             self._dataModel.signalPrimsChanged.connect(
                 self._onPrimsChanged)
@@ -2408,6 +2428,13 @@ class AppController(QtCore.QObject):
     def _cleanAndClose(self):
 
         self._settings2.save()
+
+        if self._dataModel.statsFile is not None:
+            statsFile = self._dataModel.statsFile
+            stats = self._dataModel.stats
+            import json
+            with open(statsFile, 'w') as f:
+                json.dump(stats, f, indent=2, sort_keys=True)
 
         # If the current path widget is focused when closing usdview, it can
         # trigger an "editingFinished()" signal, which will look for a prim in
