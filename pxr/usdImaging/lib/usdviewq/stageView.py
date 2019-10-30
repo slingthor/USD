@@ -1877,7 +1877,7 @@ class StageView(QtOpenGL.QGLWidget):
                     toPrint[label] = ReportMetricSize(stats[key])
 
             rStats = renderer.GetRenderStats()
-            if self._dataModel.stats is not None:
+            if self._dataModel.renderStats is not None:
                 stat = {"rStats": rStats}
                 stat["currentFrame"] = str(self._dataModel.currentFrame)
                 stat["elapsedTime"] = self._glTimeElapsedQuery.GetResult()
@@ -1890,7 +1890,7 @@ class StageView(QtOpenGL.QGLWidget):
                         # we believe these are all verbose, we just
                         # want the first value, the time in ms.
                         stat[key] = value.split(' ')[0] 
-                self._dataModel.stats.append(stat)
+                self._dataModel.renderStats.append(stat)
 
             toPrint["GL prims "] = self._glPrimitiveGeneratedQuery.GetResult()
             if not self._renderPauseState:
