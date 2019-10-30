@@ -365,9 +365,9 @@ HdStGLSLProgram::Link()
         // XXX:validation
         TF_WARN("Failed to link shader: %s", logString.c_str());
         success = false;
-        
+
         if (TfDebug::IsEnabled(HDST_DUMP_FAILING_SHADER_SOURCE)) {
-            _DebugLinkSource(_program);
+            std::cout << _DebugLinkSource(_program) << std::flush;
         }
     }
 
