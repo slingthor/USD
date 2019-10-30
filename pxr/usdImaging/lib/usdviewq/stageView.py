@@ -1884,9 +1884,12 @@ class StageView(QtOpenGL.QGLWidget):
                 stat["prims"] = self._glPrimitiveGeneratedQuery.GetResult()
                 stat["gpuTime"] = None
                 if not self._renderPauseState:
-                    stat["gpuTime"] = "%.2f ms " % (self._glTimeElapsedQuery.GetResult() / 1000000.0)
+                    stat["gpuTime"] = "%.2f" % (self._glTimeElapsedQuery.GetResult() / 1000000.0)
                     for key in self.fpsHUDKeys:
-                        stat[key] = self.fpsHUDInfo[key]
+                        value = self.fpsHUDInfo[key]
+                        # we believe these are all verbose, we just
+                        # want the first value, the time in ms.
+                        stat[key] = value.split(' ')[0] 
                 self._dataModel.stats.append(stat)
 
             toPrint["GL prims "] = self._glPrimitiveGeneratedQuery.GetResult()

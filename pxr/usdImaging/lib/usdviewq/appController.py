@@ -116,8 +116,8 @@ class UsdviewDataModel(RootDataModel):
 
         self._selectionDataModel = SelectionDataModel(self)
         self._viewSettingsDataModel = ViewSettingsDataModel(self, settings2)
-        self._statsFile = None
-        self._stats = None
+        self._renderStatsFile = None
+        self._renderStats = None
 
     @property
     def selection(self):
@@ -128,17 +128,17 @@ class UsdviewDataModel(RootDataModel):
         return self._viewSettingsDataModel
 
     @property
-    def statsFile(self):
-        return self._statsFile
+    def renderStatsFile(self):
+        return self._renderStatsFile
 
-    @statsFile.setter
-    def statsFile(self, value):
-        self._statsFile = value
-        self._stats = []
+    @renderStatsFile.setter
+    def renderStatsFile(self, value):
+        self._renderStatsFile = value
+        self._renderStats = []
 
     @property
-    def stats(self):
-        return self._stats
+    def renderStats(self):
+        return self._renderStats
 
 
 class UIStateProxySource(StateSource):
@@ -408,8 +408,8 @@ class AppController(QtCore.QObject):
                 self._printTiming, self._settings2)
 
 
-            if parserData.statsFile is not None:
-                self._dataModel.statsFile = parserData.statsFile
+            if parserData.renderStatsFile is not None:
+                self._dataModel.renderStatsFile = parserData.renderStatsFile
 
             self._dataModel.signalPrimsChanged.connect(
                 self._onPrimsChanged)
@@ -2424,17 +2424,68 @@ class AppController(QtCore.QObject):
             return None
 
     # File handling functionality =============================================
+    def  _exportRenderStatsAsCSV(self, statsFile, stats):
+        if len(stats) < 1:
+            print "empty stats data"
+            return 
+        import csv
+        with open(statsFile, 'w') as f:
+            one = stats[0]
+            keys = one.keys()
+            # the key rStats actually itself contains a
+            # dictionary, so we need to unpack that
+            rStatsKey = 'rStats'
+            keys.remove(rStatsKey)
+            # we'll hold on to this for when we're iterating
+            # over each of the individualy dictionaries of
+            # stats so we can treat the rStats entry special.
+            mainKeys = keys[:]
+            rStats = one[rStatsKey]
+            for key in rStats.keys():
+                keys.append('rStats:' + key)
+            # we now have the header info - open up a writer and put
+            # out the top row
+            writer = csv.writer(f, delimiter=',', quotechar='"', 
+                                quoting=csv.QUOTE_MINIMAL)
+            writer.writerow(keys)
+            # now iterate over all the data, writing it out a row at a
+            # time
+            for stat in stats:
+                row = []
+                for key in mainKeys:
+                    row.append(stat[key])
+                # now grab the 'rStats' object and iterate 
+                # over its keys
+                rStat = stat[rStatsKey]
+                for key in rStat.keys():
+                    row.append(rStat[key])
+                writer.writerow(row)
+        
+
+    def _exportRenderStats(self):
+        statsFile = self._dataModel.renderStatsFile
+        if statsFile == None:
+            print "no stats file"
+            return
+        stats = self._dataModel.renderStats
+        if stats == None:
+            print "no stats data"
+            return
+        # default to json, but if the extension is .csv, use that instead
+        parts = os.path.splitext(statsFile)
+        if  (len(parts) == 2) and (parts[1] == '.csv'):
+            self._exportRenderStatsAsCSV(statsFile, stats)
+        else:
+            import json
+            with open(statsFile, 'w') as f:
+                json.dump(stats, f, indent=2, sort_keys=True)
 
     def _cleanAndClose(self):
 
         self._settings2.save()
 
-        if self._dataModel.statsFile is not None:
-            statsFile = self._dataModel.statsFile
-            stats = self._dataModel.stats
-            import json
-            with open(statsFile, 'w') as f:
-                json.dump(stats, f, indent=2, sort_keys=True)
+        if self._dataModel.renderStatsFile is not None:
+            self._exportRenderStats()
 
         # If the current path widget is focused when closing usdview, it can
         # trigger an "editingFinished()" signal, which will look for a prim in
