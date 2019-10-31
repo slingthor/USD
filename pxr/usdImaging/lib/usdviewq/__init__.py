@@ -164,6 +164,10 @@ class Launcher(object):
                             dest='currentframe', type=int,
                             help='Set the current frame of the viewer')
 
+        parser.add_argument('--renderStats', default=None, type=str,
+                            dest='renderStatsFile',
+                            help='file to write render statistics info in JSON or CSV')
+
         UsdAppUtils.complexityArgs.AddCmdlineArgs(parser,
             altHelpText=(
                 'Set the initial mesh refinement complexity (%(default)s).'))

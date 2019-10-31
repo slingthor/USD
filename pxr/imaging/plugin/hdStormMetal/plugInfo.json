@@ -5,7 +5,7 @@
                 "Types": {
                     "HdStormMetalRendererPlugin": {
                         "bases": [
-                            "HdxRendererPlugin"
+                            "HdRendererPlugin"
                         ],
                         "displayName": "Metal",
                         "priority": 0

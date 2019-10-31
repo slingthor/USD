@@ -341,7 +341,7 @@ public:
     void SetIndexBuffer(MtlfMultiBuffer const &buffer);
 
     MTLF_API
-    void SetTexture(int index, MtlfMultiTexture const &texture, const TfToken& name, MSL_ProgramStage stage);
+    void SetTexture(int index, MtlfMultiTexture const &texture, const TfToken& name, MSL_ProgramStage stage, bool arrayTexture = false);
     
     MTLF_API
     void SetSampler(int index, MtlfMultiSampler const &sampler, const TfToken& name, MSL_ProgramStage stage);
@@ -405,6 +405,7 @@ public:
                                      int                 gpuIndex,
                                      id<MTLFunction>     computeFunction,
                                      unsigned int        bufferCount,
+                                     unsigned int        textureCount,
                                      unsigned long       immutableBufferMask,
                                      NSString            *label);
     
@@ -519,6 +520,11 @@ public:
         id<MTLTexture> mtlMultisampleColorTexture;
         id<MTLTexture> mtlDepthTexture;
         //id<MTLDepthStencilState> depthState;
+
+        // Dummy black texture for missing textures
+        id<MTLTexture> blackTexture2D;
+        // Dummy black texture for missing textures
+        id<MTLTexture> blackTexture2DArray;
     };
     
     GPUInstance gpus[MAX_GPUS];
@@ -534,6 +540,11 @@ public:
     }
 
     static MtlfMetalContextSharedPtr context;
+    
+    void  GPUTimerStartTimer(unsigned long frameNumber);
+    void  GPUTimerEventExpected(unsigned long frameNumber);
+    void  GPUTimerUnexpectEvent(unsigned long frameNumber);
+    void  GPUTimerEndTimer(unsigned long frameNumber);
 
 protected:
 
@@ -556,7 +567,7 @@ protected:
         uint8_t          *contents;
     };
     
-    struct TextureBinding { int index; MtlfMultiTexture texture; TfToken name; MSL_ProgramStage stage; };
+    struct TextureBinding { int index; MtlfMultiTexture texture; TfToken name; MSL_ProgramStage stage; bool array; };
     struct SamplerBinding { int index; MtlfMultiSampler sampler; TfToken name; MSL_ProgramStage stage; };
     
     struct ThreadState {
@@ -806,7 +817,7 @@ private:
         unsigned long  startingFrame;
         struct timeval frameStartTime;
         struct timeval frameEndTime;
-        unsigned int   timingEventsIssued;
+        unsigned int   timingEventsExpected;
         unsigned int   timingEventsReceived;
         bool timingCompleted;
         
@@ -814,10 +825,8 @@ private:
     
     float lastGPUFrameTime;
     
-    void  GPUTimerStartTimer(unsigned long frameNumber);
-    void  GPUTimerEndTimer(unsigned long frameNumber);
     void  GPUTimerFinish(unsigned long frameNumber);
-    void  GPUTImerResetTimer(unsigned long frameNumber);
+    void  GPUTimerResetTimer(unsigned long frameNumber);
     
     std::atomic_ulong numPrimsDrawn;
     

@@ -31,8 +31,6 @@
 
 #include "pxr/usdImaging/usdImaging/delegate.h"
 
-#include "pxr/imaging/hdx/rendererPluginRegistry.h"
-
 #include "pxr/usd/usd/prim.h"
 #include "pxr/base/tf/pyContainerConversions.h"
 #include "pxr/base/tf/pyEnum.h"
@@ -150,8 +148,6 @@ void wrapEngine()
                  return_value_policy< TfPySequenceToList >())
             .def("GetRendererSetting", &UsdImagingGLEngine::GetRendererSetting)
             .def("SetRendererSetting", &UsdImagingGLEngine::SetRendererSetting)
-            .def("SetEnableFloatPointDrawTarget", 
-                    &UsdImagingGLEngine::SetEnableFloatPointDrawTarget)
             .def("SetColorCorrectionSettings", 
                     &UsdImagingGLEngine::SetColorCorrectionSettings)
             .def("IsColorCorrectionCapable", 

@@ -1680,7 +1680,6 @@ GusdGU_USD::MultTransformableAttrs(GU_Detail& gd,
     return !task.wasInterrupted();
 }
 
-
 bool
 GusdGU_USD::ImportPrimUnpacked(GU_Detail& gd,
                                const UsdPrim& prim,

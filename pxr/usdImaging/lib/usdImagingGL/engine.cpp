@@ -46,8 +46,8 @@
 #include "pxr/imaging/glf/glContext.h"
 #include "pxr/imaging/glf/info.h"
 
-#include "pxr/imaging/hdx/rendererPlugin.h"
-#include "pxr/imaging/hdx/rendererPluginRegistry.h"
+#include "pxr/imaging/hd/rendererPlugin.h"
+#include "pxr/imaging/hd/rendererPluginRegistry.h"
 #include "pxr/imaging/hdx/taskController.h"
 #include "pxr/imaging/hdx/tokens.h"
 
@@ -117,7 +117,7 @@ _IsHydraEnabled(const UsdImagingGLEngine::RenderAPI api)
 
     // Check to see if we have a default plugin for the renderer
     TfToken defaultPlugin = 
-        HdxRendererPluginRegistry::GetInstance().GetDefaultPluginId();
+        HdRendererPluginRegistry::GetInstance().GetDefaultPluginId();
 
     return !defaultPlugin.IsEmpty();
 }
@@ -153,8 +153,6 @@ UsdImagingGLEngine::UsdImagingGLEngine(const RenderAPI api)
     , _excludedPrimPaths()
     , _invisedPrimPaths()
     , _isPopulated(false)
-    , _restoreViewport(0)
-    , _useFloatPointDrawTarget(false)
     , _renderAPI(api)
 #if defined(ARCH_GFX_METAL)
     , _legacyImpl(nullptr)
@@ -219,8 +217,6 @@ UsdImagingGLEngine::UsdImagingGLEngine(
     , _excludedPrimPaths(excludedPaths)
     , _invisedPrimPaths(invisedPaths)
     , _isPopulated(false)
-    , _restoreViewport(0)
-    , _useFloatPointDrawTarget(false)
     , _renderAPI(api)
 #if defined(ARCH_GFX_METAL)
     , _legacyImpl(nullptr)
@@ -349,13 +345,23 @@ UsdImagingGLEngine::RenderBatch(
     SetColorCorrectionSettings(params.colorCorrectionMode, 
                                params.renderResolution);
 
+    // XXX App sets the clear color via 'params' instead of setting up Aovs 
+    // that has clearColor in their descriptor. So for now we must pass this
+    // clear color to the color AOV.
+    HdAovDescriptor colorAovDesc = 
+        _taskController->GetRenderOutputSettings(HdAovTokens->color);
+    if (colorAovDesc.format != HdFormatInvalid) {
+        colorAovDesc.clearValue = VtValue(params.clearColor);
+        _taskController->SetRenderOutputSettings(
+            HdAovTokens->color, colorAovDesc);
+    }
+
     // Forward scene materials enable option to delegate
     _delegate->SetSceneMaterialsEnabled(params.enableSceneMaterials);
 
     VtValue selectionValue(_selTracker);
     _engine->SetTaskContextData(HdxTokens->selectionState, selectionValue);
-    _Execute(params, /*fp16 draw target*/true,
-             _taskController->GetRenderingTasks());
+    _Execute(params, _taskController->GetRenderingTasks());
 }
 
 void 
@@ -476,6 +482,10 @@ UsdImagingGLEngine::SetCameraPath(SdfPath const& id)
 
     TF_VERIFY(_taskController);
     _taskController->SetCameraPath(id);
+
+    // The camera that is set for viewing will also be used for
+    // time sampling.
+    _delegate->SetCameraForSampling(id);
 }
 
 void 
@@ -744,8 +754,7 @@ UsdImagingGLEngine::TestIntersection(
     VtValue vtPickParams(pickParams);
 
     _engine->SetTaskContextData(HdxPickTokens->pickParams, vtPickParams);
-    _Execute(params, /*fp16 draw target*/false,
-             _taskController->GetPickingTasks());
+    _Execute(params, _taskController->GetPickingTasks());
 
     // Since we are in nearest-hit mode, we expect allHits to have
     // a single point in it.
@@ -850,7 +859,7 @@ UsdImagingGLEngine::GetRendererPlugins()
     }
 
     HfPluginDescVector pluginDescriptors;
-    HdxRendererPluginRegistry::GetInstance().GetPluginDescs(&pluginDescriptors);
+    HdRendererPluginRegistry::GetInstance().GetPluginDescs(&pluginDescriptors);
 
     TfTokenVector plugins;
 
@@ -873,7 +882,7 @@ UsdImagingGLEngine::GetRendererDisplayName(TfToken const &id)
     }
 
     HfPluginDesc pluginDescriptor;
-    if (!TF_VERIFY(HdxRendererPluginRegistry::GetInstance().
+    if (!TF_VERIFY(HdRendererPluginRegistry::GetInstance().
                    GetPluginDesc(id, &pluginDescriptor))) {
         return std::string();
     }
@@ -899,16 +908,15 @@ UsdImagingGLEngine::SetRendererPlugin(TfToken const &pluginId, bool forceReload)
         return false;
     }
 
-    HdxRendererPlugin *plugin = nullptr;
+    HdRendererPlugin *plugin = nullptr;
     TfToken actualId = pluginId;
 
     // Special case: TfToken() selects the first plugin in the list.
     if (actualId.IsEmpty()) {
-        actualId = HdxRendererPluginRegistry::GetInstance().
+        actualId = HdRendererPluginRegistry::GetInstance().
             GetDefaultPluginId();
     }
-
-    plugin = HdxRendererPluginRegistry::GetInstance().
+    plugin = HdRendererPluginRegistry::GetInstance().
         GetRendererPlugin(actualId);
 
     if (plugin == nullptr) {
@@ -917,13 +925,19 @@ UsdImagingGLEngine::SetRendererPlugin(TfToken const &pluginId, bool forceReload)
     } else if (plugin == _rendererPlugin) {
         if (!forceReload) {
             // It's a no-op to load the same plugin twice.
-            HdxRendererPluginRegistry::GetInstance().ReleasePlugin(plugin);
+            HdRendererPluginRegistry::GetInstance().ReleasePlugin(plugin);
             return true;
         }
     } else if (!plugin->IsSupported()) {
         // Don't do anything if the plugin isn't supported on the running
         // system, just return that we're not able to set it.
-        HdxRendererPluginRegistry::GetInstance().ReleasePlugin(plugin);
+        HdRendererPluginRegistry::GetInstance().ReleasePlugin(plugin);
+        return false;
+    }
+
+    HdRenderDelegate *renderDelegate = plugin->CreateRenderDelegate();
+    if(!renderDelegate) {
+        HdRendererPluginRegistry::GetInstance().ReleasePlugin(plugin);
         return false;
     }
 
@@ -946,7 +960,6 @@ UsdImagingGLEngine::SetRendererPlugin(TfToken const &pluginId, bool forceReload)
     _rendererPlugin = plugin;
     _rendererId = actualId;
 
-    HdRenderDelegate *renderDelegate = _rendererPlugin->CreateRenderDelegate();
     _renderIndex = HdRenderIndex::New(renderDelegate);
 
     // Create the new delegate & task controller.
@@ -1091,16 +1104,6 @@ UsdImagingGLEngine::SetRendererSetting(
     }
 }
 
-void 
-UsdImagingGLEngine::SetEnableFloatPointDrawTarget(bool state)
-{
-    if (ARCH_UNLIKELY(_legacyImpl)) {
-        return;
-    }
-
-    _useFloatPointDrawTarget = state;
-}
-
 // ---------------------------------------------------------------------
 // Control of background rendering threads.
 // ---------------------------------------------------------------------
@@ -1201,7 +1204,6 @@ UsdImagingGLEngine::_GetRenderIndex() const
 
 void 
 UsdImagingGLEngine::_Execute(const UsdImagingGLRenderParams &params,
-                             bool fp16DrawTarget,
                              HdTaskSharedPtrVector tasks)
 {
     if (ARCH_UNLIKELY(_legacyImpl)) {
@@ -1210,11 +1212,6 @@ UsdImagingGLEngine::_Execute(const UsdImagingGLRenderParams &params,
 
     TF_VERIFY(_delegate);
 
-    // Render into our interal framebuffer for color management / post-effects.
-	if (fp16DrawTarget) {
-        _BindInternalDrawTarget(params);
-    }
-	
     SetColorCorrectionSettings(params.colorCorrectionMode, 
                                params.renderResolution);
 
@@ -1234,8 +1231,9 @@ UsdImagingGLEngine::_Execute(const UsdImagingGLRenderParams &params,
             params.enableSampleAlphaToCoverage,
             params.drawMode,
 #if defined(ARCH_GFX_METAL)
-            (_renderAPI == Metal &&
-             params.mtlRenderPassDescriptorForNativeMetal) ?
+            ((_renderAPI == Metal &&
+              params.mtlRenderPassDescriptorForNativeMetal) ||
+             MtlfMetalContext::GetMetalContext()->GetDrawTarget()) ?
             HdStRenderDelegate::DelegateParams::RenderOutput::Metal :
 #endif
             HdStRenderDelegate::DelegateParams::RenderOutput::OpenGL
@@ -1251,11 +1249,6 @@ UsdImagingGLEngine::_Execute(const UsdImagingGLRenderParams &params,
 
     if (hdStRenderDelegate) {
         hdStRenderDelegate->FinalizeRender();
-    }
-
-    if (fp16DrawTarget) {
-        // Copy the results into the client applications framebuffer.
-        _RestoreClientDrawTarget(params);
     }
 }
 
@@ -1518,7 +1511,7 @@ UsdImagingGLEngine::_DeleteHydraResources()
         if (renderDelegate != nullptr) {
             _rendererPlugin->DeleteRenderDelegate(renderDelegate);
         }
-        HdxRendererPluginRegistry::GetInstance().ReleasePlugin(_rendererPlugin);
+        HdRendererPluginRegistry::GetInstance().ReleasePlugin(_rendererPlugin);
         _rendererPlugin = nullptr;
         _rendererId = TfToken();
     }
@@ -1536,7 +1529,7 @@ UsdImagingGLEngine::GetDefaultRendererPluginId()
     }
 
     HfPluginDescVector pluginDescs;
-    HdxRendererPluginRegistry::GetInstance().GetPluginDescs(&pluginDescs);
+    HdRendererPluginRegistry::GetInstance().GetPluginDescs(&pluginDescs);
 
     // Look for the one with the matching display name
     for (size_t i = 0; i < pluginDescs.size(); ++i) {
@@ -1549,125 +1542,6 @@ UsdImagingGLEngine::GetDefaultRendererPluginId()
             defaultRendererDisplayName.c_str());
 
     return TfToken();
-}
-
-void 
-UsdImagingGLEngine::_BindInternalDrawTarget(
-    UsdImagingGLRenderParams const& params)
-{
-    GarchContextCaps const &caps =
-    GarchResourceFactory::GetInstance()->GetContextCaps();
-    
-    // Avoid GL errors in MacOS (e.g. Hydra with Embree)
-    if (!caps.floatingPointBuffersEnabled) {
-        return;
-    }
-
-    if (!_useFloatPointDrawTarget) {
-        return;
-    }
-#if defined(ARCH_GFX_OPENGL)
-    if (_renderAPI == OpenGL) {
-        glGetIntegerv(GL_VIEWPORT, _restoreViewport.data());
-        GfVec2i drawTargetSize = GfVec2i(_restoreViewport[2], _restoreViewport[3]);
-
-        // Bind our internal drawtarget to control the render bitdepth.
-        // We want to render (linear-colors), do color-correction and other post-
-        // effects at a higher bitdepth then may be bound by the client.
-        if(!_drawTarget) {
-            bool requestMSAA = glIsEnabled(GL_MULTISAMPLE);
-            _drawTarget = GarchDrawTarget::New(drawTargetSize, requestMSAA);
-            std::vector<GarchDrawTarget::AttachmentDesc> attachmentDesc;
-            attachmentDesc.push_back(
-                GarchDrawTarget::AttachmentDesc(
-                    "color", GL_RGBA, GL_FLOAT, GL_RGBA16F));
-            attachmentDesc.push_back(
-                GarchDrawTarget::AttachmentDesc(
-                    "depth", GL_DEPTH_COMPONENT, GL_FLOAT, GL_DEPTH_COMPONENT32F));
-            _drawTarget->SetAttachments(attachmentDesc);
-            _drawTarget->Bind();
-        } else {
-            _drawTarget->Bind();
-
-            // The clients viewport may have changed size.
-            _drawTarget->SetSize(drawTargetSize);
-        }
-
-        // Remove any offset applied to the viewport so clearing and rendering
-        // happens in the correct region. (UsdView CameraMask mode messes with this)
-        glViewport(0, 0, _restoreViewport[2], _restoreViewport[3]);
-
-        // Clear our internal drawTarget with the clearcolor set by client
-        glClearBufferfv(GL_COLOR, 0, params.clearColor.data());
-        GLfloat clearDepth[1] = {1.0f};
-        glClearBufferfv(GL_DEPTH, 0, clearDepth);
-    }
-#endif
-}
-
-void 
-UsdImagingGLEngine::_RestoreClientDrawTarget(
-    UsdImagingGLRenderParams const& params)
-{
-    GarchContextCaps const &caps =
-        GarchResourceFactory::GetInstance()->GetContextCaps();
-
-    // Avoid GL errors in MacOS (e.g. Hydra with Embree)
-    if (!caps.floatingPointBuffersEnabled) {
-        return;
-    }
-
-    if (!_useFloatPointDrawTarget || !_drawTarget) {
-        return;
-    }
-
-    // Restore the clients framebuffer and copy the contents of our internal
-    // framebuffer into the clients framebuffer.
-    // We need to blit depth because the client may do additional compositing
-    // on top of the render, such as drawing bounding boxes.
-    _drawTarget->Unbind();
-    _drawTarget->Resolve();
-
-#if defined(ARCH_GFX_OPENGL)
-    if (_renderAPI == OpenGL) {
-        // Restore viewport set by client/app
-        glViewport(_restoreViewport[0],
-                   _restoreViewport[1],
-                   _restoreViewport[2],
-                   _restoreViewport[3]);
-
-        // Depth test must always pass to ensure that all pixels are transfered
-        // from our drawTarget to the clients when HdxCompositor draws its triangle.
-        GLboolean restoreDepthEnabled = glIsEnabled(GL_DEPTH_TEST);
-        glEnable(GL_DEPTH_TEST);
-
-        // Depth test must be ALWAYS instead of disabling the depth_test because
-        // we still want to write to the depth buffer. Disabling depth_test disables
-        // depth_buffer writes and we need to copy depth to client buffer.
-        GLint restoreDepthFunc;
-        glGetIntegerv(GL_DEPTH_FUNC, &restoreDepthFunc);
-        glDepthFunc(GL_ALWAYS);
-
-        // Any alpha blending the client wanted should have happened into our
-        // internal FB. When copying back to client buffer disable blending.
-        GLboolean restoreblendEnabled;
-        glGetBooleanv(GL_BLEND, &restoreblendEnabled);
-        glDisable(GL_BLEND);
-
-        GLuint colorId = _drawTarget->GetAttachment("color")->GetTextureName();
-        GLuint depthId = _drawTarget->GetAttachment("depth")->GetTextureName();
-        _compositor.Draw(colorId, depthId, /*remapDepth*/ false);
-
-        if (restoreblendEnabled) {
-            glEnable(GL_BLEND);
-        }
-
-        glDepthFunc(restoreDepthFunc);
-        if (!restoreDepthEnabled) {
-            glDisable(GL_DEPTH_TEST);
-        }
-    }
-#endif
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

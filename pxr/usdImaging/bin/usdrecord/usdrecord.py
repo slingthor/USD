@@ -26,6 +26,7 @@
 from pxr import Usd
 from pxr import UsdAppUtils
 from pxr import Tf
+from pxr import UsdImagingGL
 
 import argparse
 import os

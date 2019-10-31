@@ -76,6 +76,9 @@ HdSt_SmoothNormalsComputationMetal::_Execute(
     HdBufferResourceSharedPtr adjacency,
     int numPoints)
 {
+    
+    if(numPoints == 0) return;
+    
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
     HdStMSLProgramSharedPtr const &mslProgram(
         boost::dynamic_pointer_cast<HdStMSLProgram>(computeProgram));
@@ -96,7 +99,7 @@ HdSt_SmoothNormalsComputationMetal::_Execute(
         
         id<MTLFunction> computeFunction = mslProgram->GetComputeFunction(g);
         id<MTLComputePipelineState> pipelineState =
-            context->GetComputeEncoderState(g, computeFunction, 4, immutableBufferMask,
+            context->GetComputeEncoderState(g, computeFunction, 4, 0, immutableBufferMask,
                                             @"GPU Smooth Normals pipeline state");
 
         id<MTLBuffer> p = pointsBuffer[g];

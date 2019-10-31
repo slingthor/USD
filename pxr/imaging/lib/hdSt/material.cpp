@@ -32,6 +32,7 @@
 
 #include "pxr/imaging/hdSt/material.h"
 #include "pxr/imaging/hdSt/materialBufferSourceAndTextureHelper.h"
+#include "pxr/imaging/hdSt/materialNetwork.h"
 #include "pxr/imaging/hdSt/debugCodes.h"
 #include "pxr/imaging/hdSt/package.h"
 #include "pxr/imaging/hdSt/resourceRegistry.h"
@@ -40,6 +41,7 @@
 #include "pxr/imaging/hdSt/surfaceShader.h"
 #include "pxr/imaging/hdSt/textureResource.h"
 #include "pxr/imaging/hdSt/textureResourceHandle.h"
+#include "pxr/imaging/hdSt/tokens.h"
 
 #include "pxr/imaging/hd/changeTracker.h"
 #include "pxr/imaging/hd/tokens.h"
@@ -50,15 +52,29 @@
 
 #include <boost/pointer_cast.hpp>
 
+// XXX In progress of moving HdStMaterial to use 
+// HdSceneDelegate::GetMaterialResource to obtain full material networks
+// which will let us receive more general networks in Storm in the future.
+#include "pxr/base/tf/getenv.h"
+
 PXR_NAMESPACE_OPEN_SCOPE
 
 
 TF_DEFINE_PRIVATE_TOKENS(
     _tokens,
     (limitSurfaceEvaluation)
+    (opacity)
 );
 
 HioGlslfx *HdStMaterial::_fallbackSurfaceShader = nullptr;
+
+// XXX In progress of deprecating hydra material adapter
+static bool _IsEnabledStormMaterialNetworks() {
+    static std::string _stormMatNet = 
+        TfGetenv("STORM_ENABLE_MATERIAL_NETWORKS");
+
+    return !_stormMatNet.empty() && std::stoi(_stormMatNet) > 0;
+}
 
 HdStMaterial::HdStMaterial(SdfPath const &id)
  : HdMaterial(id)
@@ -67,7 +83,7 @@ HdStMaterial::HdStMaterial(SdfPath const &id)
  , _hasPtex(false)
  , _hasLimitSurfaceEvaluation(false)
  , _hasDisplacement(false)
- , _materialTag(HdMaterialTagTokens->defaultMaterialTag)
+ , _materialTag(HdStMaterialTagTokens->defaultMaterialTag)
 {
     TF_DEBUG(HDST_MATERIAL_ADDED).Msg("HdStMaterial Created: %s\n",
                                       id.GetText());
@@ -96,13 +112,41 @@ HdStMaterial::Sync(HdSceneDelegate *sceneDelegate,
 
     bool needsRprimMaterialStateUpdate = false;
 
-    if(bits & DirtySurfaceShader) {
-        const std::string &fragmentSource =
-                GetSurfaceShaderSource(sceneDelegate);
-        const std::string &geometrySource =
-                GetDisplacementShaderSource(sceneDelegate);
-        VtDictionary materialMetadata = GetMaterialMetadata(sceneDelegate);
+    std::string fragmentSource;
+    std::string geometrySource;
+    VtDictionary materialMetadata;
+    TfToken materialTag = _materialTag;
+    HdMaterialParamVector params;
 
+    if ((bits & DirtyResource) && _IsEnabledStormMaterialNetworks()) {
+        // Consume material network
+        HdMaterialNetworkMap const& hdNetworkMap = 
+            _GetMaterialResource(sceneDelegate);
+        HdStMaterialNetwork networkProcessor;
+        networkProcessor.ProcessMaterialNetwork(GetId(), hdNetworkMap);
+        fragmentSource = networkProcessor.GetFragmentCode();
+        geometrySource = networkProcessor.GetGeometryCode();
+        materialTag = networkProcessor.GetMaterialTag();
+        params = networkProcessor.GetMaterialParams();
+    } else {
+        // XXX Consume deprecated material
+        if (bits & DirtySurfaceShader) {
+            fragmentSource = GetSurfaceShaderSource(sceneDelegate);
+            geometrySource = GetDisplacementShaderSource(sceneDelegate);
+            materialMetadata = GetMaterialMetadata(sceneDelegate);
+            materialTag = _GetMaterialTagDeprecated(materialMetadata);
+        }
+        if (bits & DirtyParams) {
+            params = GetMaterialParams(sceneDelegate);
+        }
+    }
+
+    //
+    // Propagate shader changes
+    //
+    bool shaderIsDirty= ((bits & DirtyResource) || (bits & DirtySurfaceShader));
+
+    if (shaderIsDirty) {
         if (fragmentSource.empty() && geometrySource.empty()) {
             _InitFallbackShader();
             _surfaceShader->SetFragmentSource(
@@ -111,16 +155,10 @@ HdStMaterial::Sync(HdSceneDelegate *sceneDelegate,
                                    _fallbackSurfaceShader->GetGeometrySource());
 
             materialMetadata = _fallbackSurfaceShader->GetMetadata();
-
         } else {
             _surfaceShader->SetFragmentSource(fragmentSource);
             _surfaceShader->SetGeometrySource(geometrySource);
         }
-
-
-        // Mark batches dirty to force batch validation/rebuild.
-        sceneDelegate->GetRenderIndex().GetChangeTracker().
-            MarkBatchesDirty();
 
         bool hasDisplacement = !(geometrySource.empty());
 
@@ -137,25 +175,54 @@ HdStMaterial::Sync(HdSceneDelegate *sceneDelegate,
             needsRprimMaterialStateUpdate = true;
         }
 
-        TfToken materialTag =
-           _GetMaterialTag(materialMetadata);
-
         if (_materialTag != materialTag) {
             _materialTag = materialTag;
             _surfaceShader->SetMaterialTag(_materialTag);
             needsRprimMaterialStateUpdate = true;
         }
-
     }
 
-    if(bits & DirtyParams) {
-        HdSt_MaterialBufferSourceAndTextureHelper sourcesAndTextures;
+    //
+    // Mark batches dirty to force batch validation/rebuild.
+    //
 
-        const HdMaterialParamVector &params = GetMaterialParams(sceneDelegate);
+    if (_isInitialized) {
+
+        // We need to re-batch when the shader or materialTag changes. I.e. when
+        // network topology changes or the prim goes from opaque to translucent.
+        // We skip this the first time since batches will already be rebuild.
+
+        bool markBatchesDirty = (bits & DirtySurfaceShader) ||
+                                (_materialTag != materialTag);
+
+        if (!markBatchesDirty && shaderIsDirty) {
+            // XXX cheaper to compare network topology instead fo strings?
+            std::string const& oldFragmentSource = 
+                _surfaceShader->GetSource(HdShaderTokens->fragmentShader);
+            std::string const& oldGeometrySource = 
+                _surfaceShader->GetSource(HdShaderTokens->geometryShader);
+
+            markBatchesDirty |= (oldFragmentSource!=fragmentSource) || 
+                                (oldGeometrySource!=geometrySource);
+        }
+
+        if (markBatchesDirty) {
+            sceneDelegate->GetRenderIndex().GetChangeTracker().
+                MarkBatchesDirty();
+        }
+    }
+
+    //
+    // Update material parameters
+    //
+    bool paramsAreDirty = (bits & DirtyResource || bits & DirtyParams);
+    if (paramsAreDirty) {
         _surfaceShader->SetParams(params);
 
         // Release any fallback texture resources
         _fallbackTextureResourceHandles.clear();
+
+        HdSt_MaterialBufferSourceAndTextureHelper sourcesAndTextures;
 
         bool hasPtex = false;
         for (HdMaterialParam const & param: params) {
@@ -163,6 +230,9 @@ HdStMaterial::Sync(HdSceneDelegate *sceneDelegate,
                 sourcesAndTextures.ProcessPrimvarMaterialParam(
                     param);
             } else if (param.IsFallback()) {
+                // XXX Deprecate the use of sceneDelegate here.
+                // We can use Sdr or glslfx to get the fallback value once we
+                // switch over to only consume material networks.
                 sourcesAndTextures.ProcessFallbackMaterialParam(
                     param, sceneDelegate, GetId());
             } else if (param.IsTexture()) {
@@ -211,7 +281,7 @@ HdStMaterial::_GetTextureResourceHandle(
     HdStTextureResourceSharedPtr texResource;
     HdStTextureResourceHandleSharedPtr handle;
 
-    SdfPath const &connection = param.GetConnection();
+    SdfPath const &connection = param.connection;
     if (!connection.IsEmpty()) {
         HdTextureResource::ID texID =
             GetTextureResourceID(sceneDelegate, connection);
@@ -236,7 +306,7 @@ HdStMaterial::_GetTextureResourceHandle(
             // next param.
             if (!textureResourceFound) {
                 TF_WARN("No texture resource found with path %s",
-                    param.GetConnection().GetText());
+                    param.connection.GetText());
             } else {
                 texResource =
                     boost::dynamic_pointer_cast<HdStTextureResource>
@@ -261,7 +331,7 @@ HdStMaterial::_GetTextureResourceHandle(
         // next param.
         if (!handleFound) {
             TF_WARN("No texture resource handle found with path %s",
-                param.GetConnection().GetText());
+                param.connection.GetText());
         } else {
             handle = handleInstance.GetValue();
             handle->SetTextureResource(texResource);
@@ -279,11 +349,11 @@ HdStMaterial::_GetTextureResourceHandle(
     // XXX todo handle fallback Ptex textures
     if (!(handle && handle->GetTextureResource())) {
         // Fallback texture are only supported for UV textures.
-        if (param.GetTextureType() != HdTextureType::Uv) {
+        if (param.textureType != HdTextureType::Uv) {
             return {};
         }
         GarchUVTextureStorageRefPtr texPtr =
-            GarchUVTextureStorage::New(1,1, param.GetFallbackValue());
+            GarchUVTextureStorage::New(1,1, param.fallbackValue);
         GarchTextureHandleRefPtr texture =
             GarchTextureRegistry::GetInstance().GetTextureHandle(texPtr);
         HdStTextureResourceSharedPtr texResource(
@@ -311,8 +381,12 @@ HdStMaterial::_GetHasLimitSurfaceEvaluation(VtDictionary const & metadata) const
     return value.IsHolding<bool>() && value.Get<bool>();
 }
 
+// XXX Deprecated. This is used for old material descriptions where
+// HydraMaterialAdapter calculates the materialTag and we extract it here from
+// the metadata. The new '_GetMaterialTag' function is at top of file.
+// Once we exclusively use HdMaterialNetwork for storm we can remove this.
 TfToken
-HdStMaterial::_GetMaterialTag(VtDictionary const & metadata) const
+HdStMaterial::_GetMaterialTagDeprecated(VtDictionary const & metadata) const
 {
     VtValue value = TfMapLookupByValue(metadata,
                                        HdShaderTokens->materialTag,
@@ -329,7 +403,7 @@ HdStMaterial::_GetMaterialTag(VtDictionary const & metadata) const
     // An empty materialTag on the HdRprimCollection level means: 'ignore all
     // materialTags and add everything to the collection'. Instead we return a
     // default token because we do want materialTags to drive HdSt collections.
-    return HdMaterialTagTokens->defaultMaterialTag;
+    return HdStMaterialTagTokens->defaultMaterialTag;
 }
 
 // virtual
@@ -375,6 +449,19 @@ HdStMaterial::_InitFallbackShader()
     // be drawn.
     TF_VERIFY(_fallbackSurfaceShader->IsValid(),
               "Failed to load fallback surface shader!");
+}
+
+HdMaterialNetworkMap const&
+HdStMaterial::_GetMaterialResource(HdSceneDelegate* sceneDelegate) const
+{
+    VtValue vtMat = sceneDelegate->GetMaterialResource(GetId());
+    if (vtMat.IsHolding<HdMaterialNetworkMap>()) {
+        return vtMat.UncheckedGet<HdMaterialNetworkMap>();
+    } else {
+        TF_CODING_ERROR("Not a valid material network map");
+        static const HdMaterialNetworkMap emptyNetworkMap;
+        return emptyNetworkMap;
+    }
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

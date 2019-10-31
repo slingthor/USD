@@ -26,6 +26,7 @@ from distutils.spawn import find_executable
 import argparse
 import contextlib
 import copy
+import ctypes
 import datetime
 import distutils
 import fnmatch
@@ -308,16 +309,26 @@ def RunCMake(context, force, buildArgs = None, hostPlatform = False):
                 '-DCMAKE_TOOLCHAIN_FILE={usdSrcDir}/cmake/toolchains/ios.toolchain.cmake '
                 .format(usdSrcDir=context.usdSrcDir))
 
+        SDKVersion = subprocess.check_output(['xcodebuild', '-version']).strip()[6:10]
+
+        if os.environ.get('XCODE_ATTRIBUTE_CODE_SIGN_ID') == "-":
+            CODE_SIGN_ID="-"
+        elif SDKVersion >= "11.0":
+            CODE_SIGN_ID="Apple Development"
+        else:
+            CODE_SIGN_ID="iPhone Developer"
+
         extraArgs.append(
-                '-DIOS_PLATFORM=OS ' 
+                '-DIOS_PLATFORM=OS '
                 '-DENABLE_VISIBILITY=1 '
                 '-DAPPLEIOS=1 '
                 '-DENABLE_ARC=0 '
-                '-DCMAKE_XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY="iPhone Developer" '
+                '-DCMAKE_XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY="{codesignid}" '
                 '-DCMAKE_XCODE_ATTRIBUTE_DEVELOPMENT_TEAM={developmentTeam} '
                 '-DPYTHON_INCLUDE_DIR=/System/Library/Frameworks/Python.framework/Versions/2.7/include/python2.7  '
                 '-DPYTHON_LIBRARY=/System/Library/Frameworks/Python.framework/Versions/2.7/lib '
                 '-DPYTHON_EXECUTABLE:FILEPATH=/usr/bin/python '.format(
+                    codesignid=CODE_SIGN_ID,
                     developmentTeam=os.environ.get('XCODE_ATTRIBUTE_DEVELOPMENT_TEAM')))
 
     # We use -DCMAKE_BUILD_TYPE for single-configuration generators 
@@ -389,6 +400,7 @@ def DownloadFileWithUrllib(url, outputFilename):
 def DownloadFromCache(srcDir, url, outputFilename):
 
     filename = url.split("/")[-1]
+
     shutil.copy(os.path.abspath(srcDir +'/cache/'+filename), outputFilename)
 
 
@@ -559,10 +571,17 @@ ZLIB_URL = "https://github.com/madler/zlib/archive/v1.2.11.zip"
 
 def InstallZlib(context, force, buildArgs):
     with CurrentWorkingDirectory(DownloadURL(ZLIB_URL, context, force)):
+
+        if iOS():
+            # Replace test executables with static libraries to avoid issues with code signing.
+            PatchFile("CMakeLists.txt", 
+                [("add_executable(example test/example.c)", "add_library(example STATIC test/example.c)"),
+                 ("add_executable(minigzip test/minigzip.c)", "add_library(minigzip STATIC test/minigzip.c)")])
+
         RunCMake(context, force, buildArgs)
 
 ZLIB = Dependency("zlib", InstallZlib, "include/zlib.h")
-        
+
 ############################################################
 # boost
 
@@ -728,6 +747,12 @@ def InstallTBB_Windows(context, force, buildArgs):
 
 def InstallTBB_LinuxOrMacOS(context, force, buildArgs):
     with CurrentWorkingDirectory(DownloadURL(TBB_URL, context, force)):
+        # Note: TBB installation fails on OSX when cuda is installed, a 
+        # suggested fix:
+        # https://github.com/spack/spack/issues/6000#issuecomment-358817701
+        if MacOS():
+            PatchFile("build/macos.inc", 
+                    [("shell clang -v ", "shell clang --version ")])
         # TBB does not support out-of-source builds in a custom location.
         if iOS():
             updateTBBIOS(context)
@@ -791,6 +816,38 @@ def InstallJPEG_Turbo(jpeg_url, context, force, buildArgs):
         if iOS():
             extraArgs.append('-DCMAKE_SYSTEM_PROCESSOR=aarch64');
 
+            # Replace test and utility executables with static libraries to avoid issues with code signing.
+            PatchFile("CMakeLists.txt",
+                [("add_executable(tjunittest tjunittest.c tjutil.c md5/md5.c md5/md5hl.c)",
+                  "add_library(tjunittest STATIC tjunittest.c tjutil.c md5/md5.c md5/md5hl.c)"),
+                 ("add_executable(tjbench tjbench.c tjutil.c)",
+                  "add_library(tjbench STATIC tjbench.c tjutil.c)"),
+                 ("add_executable(tjexample tjexample.c)",
+                  "add_library(tjexample STATIC tjexample.c)"),
+                 ("add_executable(tjunittest-static tjunittest.c tjutil.c md5/md5.c",
+                  "add_library(tjunittest-static STATIC tjunittest.c tjutil.c md5/md5.c"),
+                 ("add_executable(tjbench-static tjbench.c tjutil.c)",
+                  "add_library(tjbench-static STATIC tjbench.c tjutil.c)"),
+                 ("add_executable(cjpeg-static cjpeg.c cdjpeg.c rdgif.c rdppm.c rdswitch.c",
+                  "add_library(cjpeg-static STATIC cjpeg.c cdjpeg.c rdgif.c rdppm.c rdswitch.c"),
+                 ("add_executable(djpeg-static djpeg.c cdjpeg.c rdcolmap.c rdswitch.c wrgif.c",
+                  "add_library(djpeg-static STATIC djpeg.c cdjpeg.c rdcolmap.c rdswitch.c wrgif.c"),
+                 ("add_executable(jpegtran-static jpegtran.c cdjpeg.c rdswitch.c transupp.c)",
+                  "add_library(jpegtran-static STATIC jpegtran.c cdjpeg.c rdswitch.c transupp.c)"),
+                 ("add_executable(rdjpgcom rdjpgcom.c)", "add_library(rdjpgcom STATIC rdjpgcom.c)"),
+                 ("add_executable(wrjpgcom wrjpgcom.c)", "add_library(wrjpgcom STATIC wrjpgcom.c)"),
+                 ("add_subdirectory(md5)", "# add_subdirectory(md5)")])
+
+            PatchFile("sharedlib/CMakeLists.txt",
+                [("add_executable(cjpeg ../cjpeg.c ../cdjpeg.c ../rdgif.c ../rdppm.c",
+                  "add_library(cjpeg STATIC ../cjpeg.c ../cdjpeg.c ../rdgif.c ../rdppm.c"),
+                 ("add_executable(djpeg ../djpeg.c ../cdjpeg.c ../rdcolmap.c ../rdswitch.c",
+                  "add_library(djpeg STATIC ../djpeg.c ../cdjpeg.c ../rdcolmap.c ../rdswitch.c"),
+                 ("add_executable(jpegtran ../jpegtran.c ../cdjpeg.c ../rdswitch.c ../transupp.c)",
+                  "add_library(jpegtran STATIC ../jpegtran.c ../cdjpeg.c ../rdswitch.c ../transupp.c)"),
+                 ("add_executable(jcstest ../jcstest.c)",
+                  "add_library(jcstest STATIC ../jcstest.c)")])
+
         RunCMake(context, force, extraArgs)
 
 def InstallJPEG_Lib(jpeg_url, context, force, buildArgs):
@@ -804,7 +861,7 @@ def InstallJPEG_Lib(jpeg_url, context, force, buildArgs):
             .format(procs=context.numJobs))
 
 JPEG = Dependency("JPEG", InstallJPEG, "include/jpeglib.h")
-        
+
 ############################################################
 # TIFF
 
@@ -818,16 +875,22 @@ def InstallTIFF(context, force, buildArgs):
         # the tools entirely. We do this on Linux and MacOS as well
         # to avoid requiring some GL and X dependencies.
         #
-        # We also need to skip building tests, since they rely on 
+        # We also need to skip building tests, since they rely on
         # the tools we've just elided.
-        PatchFile("CMakeLists.txt", 
+        PatchFile("CMakeLists.txt",
                    [("add_subdirectory(tools)", "# add_subdirectory(tools)"),
                     ("add_subdirectory(test)", "# add_subdirectory(test)")])
 
         if MacOS() or iOS():
-            PatchFile("CMakeLists.txt", 
-                   [("option(ld-version-script \"Enable linker version script\" ON)", 
+            PatchFile("CMakeLists.txt",
+                   [("option(ld-version-script \"Enable linker version script\" ON)",
                      "option(ld-version-script \"Enable linker version script\" OFF)")])
+
+        if iOS():
+            # Skip contrib to avoid issues with code signing.
+            PatchFile("CMakeLists.txt",
+                    [("add_subdirectory(contrib)", "# add_subdirectory(contrib)")])
+
         RunCMake(context, force, buildArgs)
 
 TIFF = Dependency("TIFF", InstallTIFF, "include/tiff.h")
@@ -840,10 +903,20 @@ PNG_URL = "https://downloads.sourceforge.net/project/libpng/libpng16/older-relea
 def InstallPNG(context, force, buildArgs):
     with CurrentWorkingDirectory(DownloadURL(PNG_URL, context, force)):
         extraArgs = buildArgs;
-        
+
         if iOS():
             extraArgs.append('-DCMAKE_SYSTEM_PROCESSOR=aarch64');
             extraArgs.append('-DPNG_ARM_NEON=off');
+
+            # Skip tests to avoid issues with code signing.
+            # Replace utility executables with static libraries to avoid issues with code signing.
+            PatchFile("CMakeLists.txt",
+                [("option(PNG_TESTS  \"Build libpng tests\" ON)",
+                  "option(PNG_TESTS  \"Build libpng tests\" OFF)"),
+                 ("add_executable(pngfix ${pngfix_sources})",
+                  "add_library(pngfix STATIC ${pngfix_sources})"),
+                 ("add_executable(png-fix-itxt ${png_fix_itxt_sources})",
+                  "add_library(png-fix-itxt STATIC ${png_fix_itxt_sources})")])
 
         RunCMake(context, force, extraArgs)
 
@@ -859,6 +932,44 @@ def InstallOpenEXR(context, force, buildArgs):
 
     if iOS():
         updateOpenEXRIOS(context, srcDir)
+
+        # Skip utils, examples, and tests to avoid issues with code signing.
+        # Replace utility executables with static libraries to avoid issues with code signing.
+        PatchFile(srcDir + "/IlmBase/CMakeLists.txt",
+            [("ADD_SUBDIRECTORY ( HalfTest )", "# ADD_SUBDIRECTORY ( HalfTest )"),
+             ("ADD_SUBDIRECTORY ( IexTest )", "# ADD_SUBDIRECTORY ( IexTest )"),
+             ("ADD_SUBDIRECTORY ( ImathTest )", "# ADD_SUBDIRECTORY ( ImathTest )")])
+
+        PatchFile(srcDir + "/IlmBase/Half/CMakeLists.txt",
+            [("ADD_EXECUTABLE ( eLut eLut.cpp )",
+              "ADD_LIBRARY ( eLut STATIC eLut.cpp )"),
+             ("ADD_EXECUTABLE ( toFloat toFloat.cpp )",
+              "ADD_LIBRARY ( toFloat STATIC toFloat.cpp )")])
+
+        PatchFile(srcDir + "/OpenEXR/CMakeLists.txt",
+            [("ADD_SUBDIRECTORY ( IlmImfExamples )", "# ADD_SUBDIRECTORY ( IlmImfExamples )"),
+             ("ADD_SUBDIRECTORY ( IlmImfTest )", "# ADD_SUBDIRECTORY ( IlmImfTest )"),
+             ("ADD_SUBDIRECTORY ( IlmImfUtilTest )", "# ADD_SUBDIRECTORY ( IlmImfUtilTest )"),
+             ("ADD_SUBDIRECTORY ( IlmImfFuzzTest )", "# ADD_SUBDIRECTORY ( IlmImfFuzzTest )"),
+             ("ADD_SUBDIRECTORY ( exrheader )", "# ADD_SUBDIRECTORY ( exrheader )"),
+             ("ADD_SUBDIRECTORY ( exrmaketiled )", "# ADD_SUBDIRECTORY ( exrmaketiled )"),
+             ("ADD_SUBDIRECTORY ( exrstdattr )", "# ADD_SUBDIRECTORY ( exrstdattr )"),
+             ("ADD_SUBDIRECTORY ( exrmakepreview )", "# ADD_SUBDIRECTORY ( exrmakepreview )"),
+             ("ADD_SUBDIRECTORY ( exrenvmap )", "# ADD_SUBDIRECTORY ( exrenvmap )"),
+             ("ADD_SUBDIRECTORY ( exrmultiview )", "# ADD_SUBDIRECTORY ( exrmultiview )"),
+             ("ADD_SUBDIRECTORY ( exrmultipart )", "# ADD_SUBDIRECTORY ( exrmultipart )")])
+
+        PatchFile(srcDir + "/OpenEXR/exr2aces/CMakeLists.txt",
+            [("ADD_EXECUTABLE ( exr2aces",
+              "ADD_LIBRARY ( exr2aces STATIC")])
+        PatchFile(srcDir + "/OpenEXR/exrbuild/CMakeLists.txt",
+            [("ADD_EXECUTABLE ( exrbuild",
+              "ADD_LIBRARY ( exrbuild STATIC")])
+        PatchFile(srcDir + "/OpenEXR/IlmImf/CMakeLists.txt",
+            [("ADD_EXECUTABLE ( dwaLookups",
+              "ADD_LIBRARY ( dwaLookups STATIC"),
+             ("ADD_EXECUTABLE ( b44ExpLogTable",
+              "ADD_LIBRARY ( b44ExpLogTable STATIC")])
 
     ilmbaseSrcDir = os.path.join(srcDir, "IlmBase")
     with CurrentWorkingDirectory(ilmbaseSrcDir):
@@ -1008,6 +1119,13 @@ def InstallPtex_Windows(context, force, buildArgs):
 
 def InstallPtex_LinuxOrMacOS(context, force, buildArgs):
     with CurrentWorkingDirectory(DownloadURL(PTEX_URL, context, force)):
+
+        if iOS():
+            # Skip utils and tests to avoid issues with code signing.
+            PatchFile("CMakeLists.txt",
+                [("add_subdirectory(src/utils)", "# add_subdirectory(src/utils)"),
+                 ("add_subdirectory(src/tests)", "# add_subdirectory(src/tests)")])
+
         RunCMake(context, force, buildArgs)
 
 PTEX = Dependency("Ptex", InstallPtex, "include/PtexVersion.h")
@@ -1057,7 +1175,8 @@ OPENIMAGEIO = Dependency("OpenImageIO", InstallOpenImageIO,
 
 # Note that we use v1.1.0 instead of the minimum required v1.0.9
 # because v1.0.9 has problems building on macOS and Windows.
-OCIO_URL = "https://github.com/imageworks/OpenColorIO/archive/v1.1.0.zip"
+# OCIO_URL = "https://github.com/imageworks/OpenColorIO/archive/v1.1.0.zip"
+OCIO_URL = "https://github.com/AcademySoftwareFoundation/OpenColorIO/archive/master.tar.gz"
 
 def InstallOpenColorIO(context, force, buildArgs):
     with CurrentWorkingDirectory(DownloadURL(OCIO_URL, context, force)):
@@ -1069,6 +1188,13 @@ def InstallOpenColorIO(context, force, buildArgs):
                      '-DOCIO_BUILD_PYGLUE=OFF',
                      '-DOCIO_BUILD_JNIGLUE=OFF',
                      '-DOCIO_STATIC_JNIGLUE=OFF']
+
+        #PatchFile("src/core/Config.cpp", 
+        #           [("cacheidnocontext_ = cacheidnocontext_;", 
+        #             "cacheidnocontext_ = rhs.cacheidnocontext_;")])
+
+        if iOS() or MacOS():
+            extraArgs.append('-DCMAKE_CXX_FLAGS="-Wno-unused-function -Wno-unused-const-variable -Wno-unused-private-field"')
 
         # Add on any user-specified extra arguments.
         extraArgs += buildArgs
@@ -1122,6 +1248,11 @@ def InstallOpenSubdiv(context, force, buildArgs):
         sdkroot = os.environ.get('SDKROOT')
 
         if iOS():
+            PatchFile(srcOSDDir + "/cmake/iOSToolchain.cmake", 
+                [("set(SDKROOT $ENV{SDKROOT})",
+                  "set(CMAKE_TRY_COMPILE_TARGET_TYPE \"STATIC_LIBRARY\")\n"
+                  "set(SDKROOT $ENV{SDKROOT})")])
+
             # We build for macOS in order to leverage the STRINGIFY binary built
             srcOSDmacOSDir = srcOSDDir + "_macOS"
             if os.path.isdir(srcOSDmacOSDir):
@@ -1257,6 +1388,19 @@ def InstallAlembic(context, force, buildArgs):
 ALEMBIC = Dependency("Alembic", InstallAlembic, "include/Alembic/Abc/Base.h")
 
 ############################################################
+# Draco
+
+DRACO_URL = "https://github.com/google/draco/archive/master.zip"
+
+def InstallDraco(context, force, buildArgs):
+    with CurrentWorkingDirectory(DownloadURL(DRACO_URL, context, force)):
+        cmakeOptions = ['-DBUILD_USD_PLUGIN=ON']
+        cmakeOptions += buildArgs
+        RunCMake(context, force, cmakeOptions)
+
+DRACO = Dependency("Draco", InstallDraco, "include/Draco/src/draco/compression/decode.h")
+
+############################################################
 # MaterialX
 
 MATERIALX_URL = "https://github.com/materialx/MaterialX/archive/v1.36.0.zip"
@@ -1377,6 +1521,14 @@ def InstallUSD(context, force, buildArgs):
                 extraArgs.append('-DPXR_ENABLE_HDF5_SUPPORT=OFF')
         else:
             extraArgs.append('-DPXR_BUILD_ALEMBIC_PLUGIN=OFF')
+
+        if context.buildDraco:
+            extraArgs.append('-DPXR_BUILD_DRACO_PLUGIN=ON')
+            draco_root = (context.dracoLocation
+                          if context.dracoLocation else context.instDir)
+            extraArgs.append('-DDRACO_ROOT="{}"'.format(draco_root))
+        else:
+            extraArgs.append('-DPXR_BUILD_DRACO_PLUGIN=OFF')
 
         if context.buildMaterialX:
             extraArgs.append('-DPXR_BUILD_MATERIALX_PLUGIN=ON')
@@ -1661,6 +1813,16 @@ subgroup.add_argument("--hdf5", dest="enable_hdf5", action="store_true",
 subgroup.add_argument("--no-hdf5", dest="enable_hdf5", action="store_false",
                       help="Disable HDF5 support in the Alembic plugin (default)")
 
+group = parser.add_argument_group(title="Draco Plugin Options")
+subgroup = group.add_mutually_exclusive_group()
+subgroup.add_argument("--draco", dest="build_draco", action="store_true", 
+                      default=False,
+                      help="Build Draco plugin for USD")
+subgroup.add_argument("--no-draco", dest="build_draco", action="store_false",
+                      help="Do not build Draco plugin for USD (default)")
+group.add_argument("--draco-location", type=str,
+                   help="Directory where Draco is installed.")
+
 group = parser.add_argument_group(title="MaterialX Plugin Options")
 subgroup = group.add_mutually_exclusive_group()
 subgroup.add_argument("--materialx", dest="build_materialx", action="store_true", 
@@ -1807,6 +1969,11 @@ class InstallContext:
         self.buildAlembic = args.build_alembic
         self.enableHDF5 = self.buildAlembic and args.enable_hdf5
 
+        # - Draco Plugin
+        self.buildDraco = args.build_draco
+        self.dracoLocation = (os.path.abspath(args.draco_location)
+                                if args.draco_location else None)
+
         # - MaterialX Plugin
         self.buildMaterialX = args.build_materialx
 
@@ -1870,6 +2037,9 @@ if context.buildAlembic:
     if context.enableHDF5:
         requiredDependencies += [HDF5]
     requiredDependencies += [OPENEXR, ALEMBIC]
+
+if context.buildDraco:
+    requiredDependencies += [DRACO]
 
 if context.buildMaterialX:
     requiredDependencies += [MATERIALX]
@@ -1981,7 +2151,18 @@ if (not find_executable("g++") and
     PrintError("C++ compiler not found -- please install a compiler")
     sys.exit(1)
 
-if not find_executable("python"):
+pythonExecutable = find_executable("python")
+if pythonExecutable:
+    # Error out if a 64bit version of python interpreter is not found
+    # Note: Ideally we should be checking the python binary found above, but
+    # there is an assumption (for very valid reasons) at other places in the
+    # script that the python process used to run this script will be found.
+    isPython64Bit = (ctypes.sizeof(ctypes.c_voidp) == 8)
+    if not isPython64Bit:
+        PrintError("64bit python not found -- please install it and adjust your"
+                   "PATH")
+        sys.exit(1)
+else:
     PrintError("python not found -- please ensure python is included in your "
                "PATH")
     sys.exit(1)
@@ -2051,6 +2232,7 @@ Building with settings:
     Tests                       {buildTests}
     Alembic Plugin              {buildAlembic}
       HDF5 support:             {enableHDF5}
+    Draco Plugin                {buildDraco}
     MaterialX Plugin            {buildMaterialX}
     Maya Plugin                 {buildMaya}
     Katana Plugin               {buildKatana}
@@ -2102,6 +2284,7 @@ summaryMsg = summaryMsg.format(
     buildDocs=("On" if context.buildDocs else "Off"),
     buildTests=("On" if context.buildTests else "Off"),
     buildAlembic=("On" if context.buildAlembic else "Off"),
+    buildDraco=("On" if context.buildDraco else "Off"),
     buildMaterialX=("On" if context.buildMaterialX else "Off"),
     enableHDF5=("On" if context.enableHDF5 else "Off"),
     buildMaya=("On" if context.buildMaya else "Off"),

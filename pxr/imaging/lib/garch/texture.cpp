@@ -45,6 +45,34 @@ NSArray<id<MTLDevice>> *GPUState::renderDevices = nil;
 int GPUState::gpuCount = 0;
 int GPUState::currentGPU = 0;
 
+MtlfMultiSampler::MtlfMultiSampler() {
+    for(int i = 0; i < MAX_GPUS; i++)
+        sampler[i++] = nil;
+}
+
+MtlfMultiSampler::MtlfMultiSampler(MTLSamplerDescriptor* samplerDescriptor) {
+    int i = 0;
+    if (samplerDescriptor) {
+        for (id<MTLDevice>dev in GPUState::renderDevices) {
+            sampler[i++] = [dev newSamplerStateWithDescriptor:samplerDescriptor];
+        }
+    }
+    while(i < MAX_GPUS)
+        sampler[i++] = nil;
+}
+
+MtlfMultiSampler& MtlfMultiSampler::operator=(const MtlfMultiSampler& rhs) {
+    for(int i = 0; i < MAX_GPUS; i++)
+        sampler[i] = rhs.sampler[i];
+    return *this;
+}
+
+void MtlfMultiSampler::Clear() {
+    for (int i = 0; i < MAX_GPUS; i++) {
+        sampler[i] = nil;
+    }
+}
+
 void MtlfMultiSampler::release() {
     for (int i = 0; i < MAX_GPUS; i++) {
         if (!sampler[i])
@@ -53,6 +81,34 @@ void MtlfMultiSampler::release() {
         [sampler[i] release];
     }
     Clear();
+}
+
+MtlfMultiTexture::MtlfMultiTexture() {
+    for(int i = 0; i < MAX_GPUS; i++)
+        texture[i++] = nil;
+}
+
+MtlfMultiTexture::MtlfMultiTexture(MTLTextureDescriptor* textureDescriptor) {
+    int i = 0;
+    if (textureDescriptor) {
+        for (id<MTLDevice>dev in GPUState::renderDevices) {
+            texture[i++] = [dev newTextureWithDescriptor:textureDescriptor];
+        }
+    }
+    while(i < MAX_GPUS)
+        texture[i++] = nil;
+}
+
+MtlfMultiTexture& MtlfMultiTexture::operator=(const MtlfMultiTexture& rhs) {
+    for(int i = 0; i < MAX_GPUS; i++)
+        texture[i] = rhs.texture[i];
+    return *this;
+}
+
+void MtlfMultiTexture::Clear() {
+    for (int i = 0; i < MAX_GPUS; i++) {
+        texture[i] = nil;
+    }
 }
 
 void MtlfMultiTexture::release() {

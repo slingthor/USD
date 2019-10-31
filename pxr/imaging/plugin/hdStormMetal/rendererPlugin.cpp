@@ -25,14 +25,14 @@
 #include "pxr/imaging/hdStormMetal/rendererPlugin.h"
 
 #include "pxr/imaging/hdSt/Metal/renderDelegateMetal.h"
-#include "pxr/imaging/hdx/rendererPluginRegistry.h"
+#include "pxr/imaging/hd/rendererPluginRegistry.h"
 
 
 PXR_NAMESPACE_OPEN_SCOPE
 
 TF_REGISTRY_FUNCTION(TfType)
 {
-    HdxRendererPluginRegistry::Define<HdStormMetalRendererPlugin>();
+    HdRendererPluginRegistry::Define<HdStormMetalRendererPlugin>();
 }
 
 HdRenderDelegate *

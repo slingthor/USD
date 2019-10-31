@@ -162,6 +162,8 @@ public:
     
     /// Return the pointer of metadata to be populated by resource binder.
     virtual HdSt_ResourceBinder::MetaData *GetMetaData() { return &_metaData; }
+    
+    static std::string GetComputeHeader();
 
 private:
 

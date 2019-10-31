@@ -52,85 +52,70 @@ HdSt_DomeLightComputationGPUMetal::_Execute(HdStProgramSharedPtr computeProgram)
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
     HdStMSLProgramSharedPtr const &mslProgram(boost::dynamic_pointer_cast<HdStMSLProgram>(computeProgram));
 
+    struct Uniforms {
+        Uniforms(float _roughness, int _level)
+        : roughness(_roughness)
+        , level(_level)
+        , rowOffset(0)
+        {}
+
+        float roughness;
+        int level;
+        int rowOffset;
+    } _uniforms(_roughness, _level);
+
     for (int g = 0; g < context->renderDevices.count; g++) {
-        id<MTLCommandBuffer> commandBuffer = [context->gpus[g].commandQueue commandBuffer];
-        id<MTLComputeCommandEncoder> computeEncoder = [commandBuffer computeCommandEncoder];
-        
         id<MTLFunction> computeFunction = mslProgram->GetComputeFunction(g);
         id<MTLComputePipelineState> pipelineState =
-        context->GetComputeEncoderState(
-            g, computeFunction, 4, 0,
-            @"HdSt_DomeLightComputationGPUMetal pipeline state");
-        
-        [computeEncoder setComputePipelineState:pipelineState];
-        
-        context->SetComputeEncoderState(computeEncoder);
-        
-        struct Uniforms {
-            Uniforms(float _roughness, int _level)
-            : roughness(_roughness)
-            , level(_level)
-            {}
+            context->GetComputeEncoderState(
+                g, computeFunction, 1, 2, 1,
+                @"HdSt_DomeLightComputationGPUMetal pipeline state");
 
-            float roughness;
-            int level;
-        } _uniforms(_roughness, _level);
+        NSUInteger exeWidth = [pipelineState threadExecutionWidth];
+        NSUInteger maxThreadsPerThreadgroup = [pipelineState maxTotalThreadsPerThreadgroup];
+        MTLSize threadgroupCount = MTLSizeMake(exeWidth, maxThreadsPerThreadgroup / exeWidth, 1);
+        MTLSize threadsPerGrid   = MTLSizeMake((_destTextureId.multiTexture[g].width + (threadgroupCount.width - 1)) / threadgroupCount.width,
+                                               1,
+                                               1);
 
-        [computeEncoder setBytes:(const void *)&_uniforms
-                          length:sizeof(_uniforms)
-                         atIndex:4];
+        int numRows = (_destTextureId.multiTexture[g].height + (threadgroupCount.height - 1)) / threadgroupCount.height;
         
-        int maxThreadsPerThreadgroup = [pipelineState threadExecutionWidth];
-        int const maxThreadsPerGroup = 32;
-        if (maxThreadsPerThreadgroup > maxThreadsPerGroup) {
-            maxThreadsPerThreadgroup = maxThreadsPerGroup;
+        for (int i = 0; i < numRows; i++) {
+            id<MTLCommandBuffer> commandBuffer = [context->gpus[g].commandQueue commandBuffer];
+            id<MTLComputeCommandEncoder> computeEncoder = [commandBuffer computeCommandEncoder];
+            
+            [computeEncoder setComputePipelineState:pipelineState];
+            
+            context->SetComputeEncoderState(computeEncoder);
+
+            _uniforms.rowOffset = i * threadgroupCount.height;
+            [computeEncoder setBytes:(const void *)&_uniforms
+                              length:sizeof(_uniforms)
+                             atIndex:0];
+            
+            [computeEncoder setTexture:_sourceTextureId.multiTexture[g]
+                               atIndex:0];
+            [computeEncoder setTexture:_destTextureId.multiTexture[g]
+                               atIndex:1];
+
+            [computeEncoder dispatchThreadgroups:threadsPerGrid threadsPerThreadgroup:threadgroupCount];
+            
+            [computeEncoder endEncoding];
+            [commandBuffer commit];
         }
         
-        MTLSize threadgroupCount =
-            MTLSizeMake(fmin(maxThreadsPerThreadgroup, _textureWidth / 32),
-                        fmin(maxThreadsPerThreadgroup, _textureHeight / 32),
-                        1);
-        
-        [computeEncoder dispatchThreads:MTLSizeMake(_textureWidth / 32, _textureHeight / 32, 1)
-                  threadsPerThreadgroup:threadgroupCount];
-        
-        [computeEncoder endEncoding];
-        [commandBuffer commit];
+        if (_numLevels > 1) {
+            id<MTLCommandBuffer> commandBuffer = [context->gpus[g].commandQueue commandBuffer];
+
+            // Generate the rest of the mip chain
+            id<MTLBlitCommandEncoder> blitEncoder = [commandBuffer blitCommandEncoder];
+            
+            [blitEncoder generateMipmapsForTexture:_destTextureId.multiTexture[g]];
+            [blitEncoder endEncoding];
+
+            [commandBuffer commit];
+        }
     }
-/*
-    GLuint programId = computeProgram->GetProgram().GetId();
-
-    // bind the input and output textures
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, _sourceTextureId);
-    
-    glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, _destTextureId);
-    glBindImageTexture(1, _destTextureId, _level, _layered, _layer, 
-                        GL_WRITE_ONLY, GL_RGBA16F);
-
-    glUseProgram(programId);
-
-    // if we are calculating the irradiance map we do not need to send over
-    // the roughness value to the shader
-    // flagged this with a negative roughness value
-    if (_roughness >= 0.0) {
-        glUniform1f(glGetUniformLocation(programId, "roughness"), _roughness);
-    }
-
-    // dispatch compute kernel
-    glDispatchCompute(  (GLuint)_textureWidth / 32, 
-                        (GLuint)_textureHeight / 32, 1);
-
-    glUseProgram(0);
-    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
-    glMemoryBarrier(GL_TEXTURE_FETCH_BARRIER_BIT);
-
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, 0);
-    glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, 0);
- */
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

@@ -459,7 +459,19 @@ UsdImagingHydraMaterialAdapter::UpdateForTime(
                                             VtValue(surfaceMetadata);
 
         // Extract the primvars
-        valueCache->GetMaterialPrimvars(cachePath) = primvars;
+        // XXX We are deprecating HydraMaterialAdapter in favor of
+        // UsdImagingMaterialAdapter. Since this is happening in small checkins
+        // we need to ensure primvars can be found in gprimAdapter.
+        // gPrimAdapter is looking for a HdMaterial resource to grab the
+        // primvars from. So even though HydraMaterialAdapter does not use
+        // HdMaterialNetwork, we push a material network here just for primvars.
+        // Was: valueCache->GetMaterialPrimvars(cachePath) = primvars;
+        HdMaterialNetworkMap networkForPrimvars;
+        HdMaterialNetwork materialForPrimvars;
+        materialForPrimvars.primvars = primvars;
+        networkForPrimvars.map[HdMaterialTerminalTokens->surface]
+            = materialForPrimvars;
+        valueCache->GetMaterialResource(cachePath)= VtValue(networkForPrimvars);
     }
 
     if (requestedBits & HdMaterial::DirtyParams) {
@@ -472,16 +484,16 @@ UsdImagingHydraMaterialAdapter::UpdateForTime(
         // Hydra expects values in the value cache for any param that's
         // a "fallback" param (constant, as opposed to texture- or
         // primvar-based).
-        TF_FOR_ALL(paramIt, materialParams) {
-            if (paramIt->IsFallback()) {
+        for (HdMaterialParam const& p : materialParams) {
+            if (p.IsFallback()) {
                 VtValue& param = valueCache->GetMaterialParam(
-                    cachePath, paramIt->GetName());
+                    cachePath, p.name);
                 if (surfaceShaderPrim) {
                     param = _GetMaterialParamValue(surfaceShaderPrim,
-                                                   paramIt->GetName(), time);
+                                                   p.name, time);
                 } else {
                     param = _GetMaterialParamValue(volumeShaderPrim,
-                                                   paramIt->GetName(), time);
+                                                   p.name, time);
                 }
             }
         }

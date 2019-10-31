@@ -375,8 +375,8 @@ _AttrWriter::Set(const T& value, UsdTimeCode time)
     TF_VERIFY(_spec);
 
     if (time.IsNumeric()) {
-        const SdfAbstractDataSpecId id(&_primPath, &_name);
-        _spec->GetLayer()->SetTimeSample(id, time.GetValue(), value);
+        const SdfPath path = _primPath.AppendProperty(_name);
+        _spec->GetLayer()->SetTimeSample(path, time.GetValue(), value);
     } else {
         _spec->SetDefaultValue(VtValue(value));
     }
@@ -601,11 +601,11 @@ _SkelAdapter::_SkelAdapter(const UsdSkelBakeSkinningParms& parms,
         skelQuery.GetPrim().GetPath().GetText());
 
     // Activate skinning transform computations if we have a mappable anim,
-    // or if restTransforms are auathored as a fallback.
+    // or if restTransforms are authored as a fallback.
     if (parms.deformationFlags & UsdSkelBakeSkinningParms::DeformWithLBS) {
         if (const UsdSkelSkeleton& skel = skelQuery.GetSkeleton()) {
             const auto& animQuery = skelQuery.GetAnimQuery();
-            if ((animQuery&& !skelQuery.GetMapper().IsNull()) ||
+            if ((animQuery && !skelQuery.GetMapper().IsNull()) ||
                 skel.GetRestTransformsAttr().HasAuthoredValue()) {
 
                 // XXX: Activate computations, but tag them as not required;
@@ -614,9 +614,15 @@ _SkelAdapter::_SkelAdapter(const UsdSkelBakeSkinningParms& parms,
                 _skinningInvTransposeXformsTask.SetActive(
                     true, /*required*/ false);
 
-                if (animQuery.JointTransformsMightBeTimeVarying()) {
+                // The animQuery object may not be valid if the skeleton has a
+                // rest transform attribute.
+                if (animQuery && animQuery.JointTransformsMightBeTimeVarying()) {
                     _skinningXformsTask.SetMightBeTimeVarying(true);
                     _skinningInvTransposeXformsTask.SetMightBeTimeVarying(true);
+                }
+                else {
+                    _skinningXformsTask.SetMightBeTimeVarying(false);
+                    _skinningInvTransposeXformsTask.SetMightBeTimeVarying(false);
                 }
 
                 // Also active computation for skel's local to world transform.
@@ -1164,7 +1170,7 @@ _SkinningAdapter::_SkinningAdapter(
     if (_flags & RequiresGeomBindXform) {
         _geomBindXformTask.SetActive(true);
         if ((_geomBindXformQuery = UsdAttributeQuery(
-                _skinningQuery.GetGeomBindTransformAttr()))) {
+                 _skinningQuery.GetGeomBindTransformAttr()))) {
             _geomBindXformTask.SetMightBeTimeVarying(
                 _geomBindXformQuery.ValueMightBeTimeVarying());
         }
@@ -1861,6 +1867,13 @@ _ComputeTimeSamples(
 
     // Pre-compute time samples for each skel adapter.
     std::unordered_map<_SkelAdapterRefPtr, std::vector<double> > skelTimesMap;
+
+    // Pre-populate the skelTimesMap on a single thread. Each worker thread
+    // will only access its own members in this map, so access to each vector
+    // is safe.
+    for (const _SkelAdapterRefPtr &adapter : skelAdapters)
+        skelTimesMap[adapter] = std::vector<double>();
+
     WorkParallelForN(
         skelAdapters.size(),
         [&](size_t start, size_t end) {
@@ -1903,7 +1916,7 @@ _ComputeTimeSamples(
     // the driving animation, particularly when considering joint rotations.
     // It is impossible to get a perfect match at every possible sub-frame,
     // since the resulting stage may be read at arbitrary sub-frames, but
-    // we can at least make sure that the samples are correctly at the
+    // we can at least make sure that the samples are correct at the
     // frames on which the stage is expected to be sampled, based on the
     // stage's time-code metadata.
     // In other words, we wish to bake skinning at every time ordinate at
@@ -2169,7 +2182,11 @@ _UpdateExtentHints(
                 for (size_t i = 0; i < adaptersPerModel.size(); ++i) {
                     
                     bool shouldProcess = false;
-                    for (const auto& adapter : adaptersPerModel[i]) {
+                    // Make sure the adapter arrays are accessed via
+                    // const refs to avoid detaching.
+                    const VtArray<_SkinningAdapterRefPtr>& adapters =
+                        adaptersPerModel[i];
+                    for (const auto& adapter : adapters) {
                         if (adapter->ShouldProcessAtTime(ti)) {
                             shouldProcess = true;
                             break;

@@ -31,6 +31,7 @@
 #include "pxr/usdImaging/usdImaging/tokens.h"
 
 #include "pxr/imaging/hd/perfLog.h"
+#include "pxr/imaging/hd/material.h"
 #include "pxr/imaging/hd/renderDelegate.h"
 #include "pxr/imaging/hd/sceneDelegate.h"
 
@@ -52,6 +53,38 @@ TF_REGISTRY_FUNCTION(TfType)
     typedef UsdImagingGprimAdapter Adapter;
     TfType::Define<Adapter, TfType::Bases<Adapter::BaseAdapter> >();
     // No factory here, GprimAdapter is abstract.
+}
+
+static TfTokenVector
+_CollectMaterialPrimvars(
+    UsdImagingValueCache* valueCache,
+    SdfPath const& materialPath)
+{
+    VtValue vtMaterial;
+    valueCache->FindMaterialResource(materialPath, &vtMaterial);
+
+    TfTokenVector primvars;
+
+    if (vtMaterial.IsHolding<HdMaterialNetworkMap>()) {
+
+        HdMaterialNetworkMap const& networkMap = 
+            vtMaterial.UncheckedGet<HdMaterialNetworkMap>();
+
+        // To simplify the logic so we do not have to pick between different
+        // networks (surface, displacement, volume), we merge all primvars.
+
+        for (auto const& itMap : networkMap.map) {
+            HdMaterialNetwork const& network = itMap.second;
+            primvars.insert(primvars.end(), 
+                network.primvars.begin(), network.primvars.end());
+        }
+    }
+
+    std::sort(primvars.begin(), primvars.end());
+    primvars.erase(std::unique(primvars.begin(), primvars.end()),
+                   primvars.end());
+
+    return primvars;
 }
 
 UsdImagingGprimAdapter::~UsdImagingGprimAdapter() 
@@ -111,6 +144,15 @@ UsdImagingGprimAdapter::_AddRprim(TfToken const& primType,
             : UsdImagingPrimAdapterSharedPtr());
     HD_PERF_COUNTER_INCR(UsdImagingTokens->usdPopulatedPrimCount);
 
+    // As long as we're passing the proxyPrim in here, we need to add a
+    // manual dependency on usdPrim so that usd editing works correctly;
+    // also, get rid of the proxyPrim dependency.
+    // XXX: We should get rid of proxyPrim entirely.
+    if (instancerContext != nullptr) {
+        index->_RemovePrimInfoDependency(cachePath);
+        index->AddDependency(cachePath, usdPrim);
+    }
+
     // Allow instancer context to override the material binding.
     SdfPath resolvedUsdMaterialPath = instancerContext ?
         instancerContext->instancerMaterialUsdPath : materialUsdPath;
@@ -123,6 +165,11 @@ UsdImagingGprimAdapter::_AddRprim(TfToken const& primType,
                 index->GetMaterialAdapter(materialPrim);
             if (materialAdapter) {
                 materialAdapter->Populate(materialPrim, index, nullptr);
+                // We need to register a dependency on the material prim so
+                // that geometry is updated when the material is
+                // (specifically, DirtyMaterialId).
+                // XXX: Eventually, it would be great to push this into hydra.
+                index->AddDependency(cachePath, materialPrim);
             }
         } else {
             TF_WARN("Gprim <%s> has illegal material reference to "
@@ -340,20 +387,19 @@ UsdImagingGprimAdapter::UpdateForTime(UsdPrim const& prim,
         std::vector<UsdGeomPrimvar> local = primvarsAPI.GetPrimvarsWithValues();
         primvars.insert(primvars.end(), local.begin(), local.end());
 
-        // A list of primvar names to filter against.
-        // XXX: This currently doesn't work for the material network adapter;
-        // we should fix that!
+        // Some backends may not want to load all primvars due to memory limits.
+        // We filter the list of primvars based on what the material needs.
         TfTokenVector matPrimvarNames;
-        if (_GetMaterialBindingPurpose() != HdTokens->full &&
-            !materialUsdPath.IsEmpty()) {
-            valueCache->FindMaterialPrimvars(materialUsdPath, &matPrimvarNames);
+        if (_IsPrimvarFilteringNeeded() && !materialUsdPath.IsEmpty()) {
+                matPrimvarNames = _CollectMaterialPrimvars(
+                    valueCache, materialUsdPath);
         }
 
         for (auto const &pv : primvars) {
             if (_IsBuiltinPrimvar(pv.GetPrimvarName())) {
                 continue;
             }
-            if (_GetMaterialBindingPurpose() != HdTokens->full &&
+            if (_IsPrimvarFilteringNeeded() &&
                 std::find(matPrimvarNames.begin(),
                           matPrimvarNames.end(),
                           pv.GetPrimvarName()) == matPrimvarNames.end()) {

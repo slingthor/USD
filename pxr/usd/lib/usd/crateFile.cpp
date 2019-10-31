@@ -269,7 +269,7 @@ uint64_t GetPageNumber(T *addr) {
 namespace Usd_CrateFile {
 
 // XXX: These checks ensure VtValue can hold ValueRep in the lightest
-// possible way -- WBN not to rely on intenral knowledge of that.
+// possible way -- WBN not to rely on internal knowledge of that.
 static_assert(boost::has_trivial_constructor<ValueRep>::value, "");
 static_assert(boost::has_trivial_copy<ValueRep>::value, "");
 static_assert(boost::has_trivial_assign<ValueRep>::value, "");
@@ -285,6 +285,7 @@ using std::unordered_map;
 using std::vector;
 
 // Version history:
+// 0.9.0: Added support for the timecode and timecode[] value types.
 // 0.8.0: Added support for SdfPayloadListOp values and SdfPayload values with
 //        layer offsets.
 // 0.7.0: Array sizes written as 64 bit ints.
@@ -298,7 +299,7 @@ using std::vector;
 //        See _PathItemHeader_0_0_1.
 // 0.0.1: Initial release.
 constexpr uint8_t USDC_MAJOR = 0;
-constexpr uint8_t USDC_MINOR = 8;
+constexpr uint8_t USDC_MINOR = 9;
 constexpr uint8_t USDC_PATCH = 0;
 
 struct CrateFile::Version
@@ -634,7 +635,7 @@ struct _PreadStream {
         _cur += ArchPRead(_file, dest, nBytes, _start + _cur);
     }
     inline int64_t Tell() const { return _cur; }
-    inline void Seek(int64_t offset) { _cur = _start + offset; }
+    inline void Seek(int64_t offset) { _cur = offset; }
     inline void Prefetch(int64_t offset, int64_t size) {
         ArchFileAdvise(_file, _start+offset, size, ArchFileAdviceWillNeed);
     }
@@ -1080,6 +1081,7 @@ public:
     SdfAssetPath Read(SdfAssetPath *) {
         return SdfAssetPath(Read<string>());
     }
+    SdfTimeCode Read(SdfTimeCode *) { return SdfTimeCode(Read<double>()); }
     SdfUnregisteredValue Read(SdfUnregisteredValue *) {
         VtValue val = Read<VtValue>();
         if (val.IsHolding<string>())
@@ -1320,6 +1322,13 @@ public:
     void Write(SdfPath const &path) { Write(crate->_AddPath(path)); }
     void Write(VtDictionary const &dict) { WriteMap(dict); }
     void Write(SdfAssetPath const &ap) { Write(ap.GetAssetPath()); }
+    void Write(SdfTimeCode const &tc) { 
+        crate->_packCtx->RequestWriteVersionUpgrade(
+            Version(0, 9, 0),
+            "A timecode or timecode[] value type was detected, which requires "
+            "crate version 0.9.0.");
+        Write(tc.GetValue()); 
+    }
     void Write(SdfUnregisteredValue const &urv) { Write(urv.GetValue()); }
     void Write(SdfVariantSelectionMap const &vsmap) { WriteMap(vsmap); }
     void Write(SdfLayerOffset const &layerOffset) {
@@ -2519,6 +2528,22 @@ CrateFile::_AddSpec(const SdfPath &path, SdfSpecType type,
     vector<pair<TfToken, TimeSamples>> timeSampleFields;
     vector<FieldValuePair> versionUpgradePendingFields;
 
+    auto _IsCompatiblePre08PayloadValue = [this](const VtValue &v)
+    {
+        // There are two cases where a field's value is backwards compatible
+        // with verion 0.7.0. 
+        // 1. The value holds an SdfPayload with an identity layer offset.
+        // 2. The value holds a ValueRep that packs a payload read from a 0.7.0
+        //    or earlier crate file.
+        // In both cases, the value will need to be repacked if the version
+        // needs to be upgraded to 0.8.0 or higher for any reason.
+        return (v.IsHolding<SdfPayload>() && 
+                v.UncheckedGet<SdfPayload>().GetLayerOffset().IsIdentity()) ||
+            (Version(this->_boot) < Version(0, 8, 0) &&
+             v.IsHolding<ValueRep>() &&
+             v.UncheckedGet<ValueRep>().GetType() == TypeEnum::Payload);
+    };
+
     ordinaryFields.reserve(fields.size());
     for (auto const &p: fields) {
         if (p.second.IsHolding<TimeSamples>() &&
@@ -2530,12 +2555,10 @@ CrateFile::_AddSpec(const SdfPath &path, SdfSpecType type,
             timeSampleFields.emplace_back(
                 p.first, p.second.UncheckedGet<TimeSamples>());
         } else if (_packCtx->writeVersion < Version(0, 8, 0) &&
-            p.second.IsHolding<SdfPayload>() && 
-            p.second.UncheckedGet<SdfPayload>().GetLayerOffset().IsIdentity()) {
-
+                   _IsCompatiblePre08PayloadValue(p.second)) {
             // If the file we're writing has not yet been upgraded to a 0.8.0 or 
-            // later version and the field value is a single SdfPayload that 
-            // does not require a version update, then we defer this spec until 
+            // later version and the field value is a SdfPayload that can still
+            // be represented in a older version, then we defer this spec until 
             // the call to _Write. This is to make sure that if we end up 
             // needing to upgrade the file version for some other field or spec,
             // that we still write all SdfPayloads in the file using the current
@@ -3610,8 +3633,22 @@ CrateFile::_PackValue(VtValue const &v)
 {
     // If the value is holding a ValueRep, then we can just return it, we don't
     // need to add anything.
-    if (v.IsHolding<ValueRep>())
-        return v.UncheckedGet<ValueRep>();
+    if (v.IsHolding<ValueRep>()) {
+        const ValueRep &valueRep = v.UncheckedGet<ValueRep>();
+        // Special case for packed SdfPayloads. If the packed value is from 
+        // a pre 0.8.0 version but we're writing to a 0.8.0 or later file, we
+        // need to unpack and repack the payload. Otherwise the packed payload
+        // won't have a layer offset and will not be read correctly when reading
+        // the new file.
+        if (valueRep.GetType() == TypeEnum::Payload &&
+            Version(_boot) < Version(0, 8, 0) && 
+            _packCtx->writeVersion >= Version(0, 8, 0)) {
+            VtValue payloadValue;
+            _UnpackValue(valueRep, &payloadValue);
+            return _PackValue(payloadValue);
+        }
+        return valueRep;
+    }
 
     // Similarly if the value is holding a TimeSamples that is still reading
     // from the file, we can return its held rep and continue.

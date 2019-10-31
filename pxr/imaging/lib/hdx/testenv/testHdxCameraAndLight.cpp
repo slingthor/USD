@@ -35,7 +35,7 @@
 
 #include "pxr/imaging/hd/camera.h"
 #include "pxr/imaging/hdSt/light.h"
-#include "pxr/imaging/hdSt/renderDelegate.h"
+#include "pxr/imaging/hdSt/GL/renderDelegateGL.h"
 #include "pxr/imaging/hdSt/renderPass.h"
 #include "pxr/imaging/hdSt/renderPassState.h"
 #include "pxr/imaging/hdSt/resourceFactory.h"
@@ -93,7 +93,7 @@ private:
 
 static void CameraAndLightTest()
 {
-    HdStRenderDelegate renderDelegate;
+    HdStRenderDelegateGL renderDelegate;
     std::unique_ptr<HdRenderIndex> index(HdRenderIndex::New(&renderDelegate));
     TF_VERIFY(index);
     std::unique_ptr<Hdx_UnitTestDelegate> delegate(
@@ -108,7 +108,7 @@ static void CameraAndLightTest()
         HdStResourceFactory::GetInstance()->NewRenderPassState());
     HdRenderPassSharedPtr renderPass(
         new HdSt_RenderPass(index.get(), collection));
-    HdEngine engine(HdEngine::OpenGL);
+    HdEngine engine;
 
     HdTaskSharedPtr drawTask = boost::make_shared<Hd_TestTask>(renderPass,
                                                                renderPassState);

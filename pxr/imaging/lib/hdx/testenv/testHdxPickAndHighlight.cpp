@@ -33,7 +33,7 @@
 #include "pxr/imaging/hd/task.h"
 #include "pxr/imaging/hd/tokens.h"
 
-#include "pxr/imaging/hdSt/renderDelegate.h"
+#include "pxr/imaging/hdSt/GL/renderDelegateGL.h"
 
 #include "pxr/imaging/hdx/selectionTask.h"
 #include "pxr/imaging/hdx/selectionTracker.h"
@@ -93,7 +93,7 @@ _GetSelectedInstances(HdSelectionSharedPtr const& sel,
 
 class My_TestGLDrawing : public Hdx_UnitTestGLDrawing {
 public:
-    My_TestGLDrawing(): _engine(HdEngine::OpenGL) {
+    My_TestGLDrawing(): _engine() {
         SetCameraRotate(0, 0);
         SetCameraTranslate(GfVec3f(0));
         _reprName = HdReprTokens->hull;
@@ -124,7 +124,7 @@ protected:
 
 private:
     HdEngine _engine;
-    HdStRenderDelegate _renderDelegate;
+    HdStRenderDelegateGL _renderDelegate;
     HdRenderIndex *_renderIndex;
     std::unique_ptr<Hdx_UnitTestDelegate> _delegate;
     

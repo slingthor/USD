@@ -72,10 +72,12 @@ TF_WRAP_MODULE
 
     // Miscellaenous classes
     TF_WRAP(UsdAttributeQuery);
+    TF_WRAP(UsdCollectionMembershipQuery);
     TF_WRAP(UsdCrateInfo);
     TF_WRAP(UsdResolveInfo);
     TF_WRAP(Version);
     TF_WRAP(UsdZipFile);
     TF_WRAP(UsdPrimCompositionQueryArc);
     TF_WRAP(UsdPrimCompositionQuery);
+    TF_WRAP(UsdFlattenUtils);
 }

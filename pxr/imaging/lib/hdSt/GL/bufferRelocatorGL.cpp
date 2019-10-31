@@ -56,11 +56,11 @@ HdStBufferRelocatorGL::Commit()
 
         TF_FOR_ALL (it, _queue) {
             if (ARCH_LIKELY(caps.directStateAccessEnabled)) {
-                glNamedCopyBufferSubDataEXT(_srcBuffer,
-                                            _dstBuffer,
-                                            it->readOffset,
-                                            it->writeOffset,
-                                            it->copySize);
+                glCopyNamedBufferSubData(_srcBuffer,
+                                         _dstBuffer,
+                                         it->readOffset,
+                                         it->writeOffset,
+                                         it->copySize);
             } else {
                 glCopyBufferSubData(GL_COPY_READ_BUFFER,
                                     GL_COPY_WRITE_BUFFER,

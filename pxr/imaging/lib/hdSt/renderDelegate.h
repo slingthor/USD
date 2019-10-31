@@ -164,6 +164,9 @@ public:
     HDST_API
     virtual TfTokenVector GetShaderSourceTypes() const override;
 
+    HDST_API
+    virtual bool IsPrimvarFilteringNeeded() const override;
+
     // Returns whether or not HdStRenderDelegate can run on the current
     // hardware.
     HDST_API
@@ -179,12 +182,6 @@ public:
     HDST_API
     virtual void FinalizeRender() = 0;
 
-protected:
-    HDST_API
-    HdStRenderDelegate();
-    HDST_API
-    HdStRenderDelegate(HdRenderSettingsMap const& settingsMap);
-
     HDST_API
     virtual VtDictionary GetRenderStats() const override;
 
@@ -197,6 +194,11 @@ protected:
     Hgi* GetHgi();
 
 protected:
+    HDST_API
+    HdStRenderDelegate();
+    HDST_API
+    HdStRenderDelegate(HdRenderSettingsMap const& settingsMap);
+
     Hgi *_hgi;
     
 private:

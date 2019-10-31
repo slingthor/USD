@@ -292,11 +292,38 @@ void MtlfMetalContext::Init(id<MTLDevice> _device, int width, int height)
     //depthStateDesc.depthWriteEnabled = YES;
     //depthStateDesc.depthCompareFunction = MTLCompareFunctionLessEqual;
     
+    MTLTextureDescriptor* blackDesc = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA16Float
+                                                                                    width:1
+                                                                                   height:1
+                                                                                mipmapped:NO];
+    blackDesc.usage = MTLTextureUsageShaderRead;
+    blackDesc.resourceOptions = MTLResourceStorageModeDefault;
+    blackDesc.arrayLength = 1;
+    
+    uint16_t zero[4] = {};
+
     for(int i = 0; i < renderDevices.count; i++) {
         //gpus[i].depthState = [renderDevices[i] newDepthStencilStateWithDescriptor:depthStateDesc];
         gpus[i].mtlColorTexture = nil;
         gpus[i].mtlMultisampleColorTexture = nil;
         gpus[i].mtlDepthTexture = nil;
+
+        blackDesc.textureType = MTLTextureType2D;
+        gpus[i].blackTexture2D = [renderDevices[i] newTextureWithDescriptor:blackDesc];
+        
+        blackDesc.textureType = MTLTextureType2DArray;
+        gpus[i].blackTexture2DArray = [renderDevices[i] newTextureWithDescriptor:blackDesc];
+        [gpus[i].blackTexture2D replaceRegion:MTLRegionMake2D(0, 0, 1, 1)
+                                  mipmapLevel:0
+                                    withBytes:&zero
+                                  bytesPerRow:sizeof(zero)];
+        
+        [gpus[i].blackTexture2DArray replaceRegion:MTLRegionMake2D(0, 0, 1, 1)
+                                       mipmapLevel:0
+                                             slice:0
+                                         withBytes:&zero
+                                       bytesPerRow:sizeof(zero)
+                                     bytesPerImage:0];
     }
 
     windingOrder = MTLWindingClockwise;
@@ -374,6 +401,8 @@ void MtlfMetalContext::Cleanup()
         [captureScopeSubset[i] release];
         captureScopeSubset[i] = nil;
 
+        [gpus[i].blackTexture2D release];
+        [gpus[i].blackTexture2DArray release];
         [gpus[i].commandQueue release];
     }
 
@@ -673,6 +702,10 @@ void MtlfMetalContext::CreateCommandBuffer(MetalWorkQueueType workQueueType, boo
         else {
             wq->commandBuffer = [gpus[currentGPU].commandQueue commandBuffer];
             [wq->commandBuffer retain];
+        }
+        if (workQueueType == METALWORKQUEUE_DEFAULT) {
+            int frameNumber = GetCurrentFrame();
+            GPUTimerEventExpected(frameNumber);
         }
     }
     // We'll reuse an existing buffer silently if it's empty, otherwise emit warning
@@ -1034,9 +1067,9 @@ void MtlfMetalContext::SetSampler(int index, MtlfMultiSampler const &sampler, co
         threadState.dirtyRenderState[i] |= DIRTY_METALRENDERSTATE_SAMPLER;
 }
 
-void MtlfMetalContext::SetTexture(int index, MtlfMultiTexture const &texture, const TfToken& name, MSL_ProgramStage stage)
+void MtlfMetalContext::SetTexture(int index, MtlfMultiTexture const &texture, const TfToken& name, MSL_ProgramStage stage, bool arrayTexture)
 {
-    threadState.textures.push_back({index, texture, name, stage});
+    threadState.textures.push_back({index, texture, name, stage, arrayTexture});
     for(int i = 0; i < MAX_GPUS; i++)
         threadState.dirtyRenderState[i] |= DIRTY_METALRENDERSTATE_TEXTURE;
 }
@@ -1172,7 +1205,7 @@ void MtlfMetalContext::SetRenderPipelineState()
         // Create a new render pipeline state object
         renderPipelineStateDescriptor.label = @"SetRenderEncoderState";
         if (drawTarget)
-            renderPipelineStateDescriptor.rasterSampleCount = 1;
+            renderPipelineStateDescriptor.rasterSampleCount = drawTarget->GetNumSamples();
         else
             renderPipelineStateDescriptor.rasterSampleCount = mtlSampleCount;
         
@@ -1453,14 +1486,21 @@ void MtlfMetalContext::SetRenderEncoderState()
 
     if (dirtyRenderState & DIRTY_METALRENDERSTATE_TEXTURE) {
         for(auto texture : threadState.textures) {
+            id<MTLTexture> t = texture.texture.forCurrentGPU();
+            if (t == nil) {
+                if (texture.array)
+                    t = gpus[currentGPU].blackTexture2DArray;
+                else
+                    t = gpus[currentGPU].blackTexture2D;
+            }
             if(texture.stage == kMSL_ProgramStage_Vertex) {
                 if(threadState.enableComputeGS) {
-                    [computeEncoder setTexture:texture.texture.forCurrentGPU() atIndex:texture.index];
+                    [computeEncoder setTexture:t atIndex:texture.index];
                 }
-                [wq->currentRenderEncoder setVertexTexture:texture.texture.forCurrentGPU() atIndex:texture.index];
+                [wq->currentRenderEncoder setVertexTexture:t atIndex:texture.index];
             }
             else if(texture.stage == kMSL_ProgramStage_Fragment)
-                [wq->currentRenderEncoder setFragmentTexture:texture.texture.forCurrentGPU() atIndex:texture.index];
+                [wq->currentRenderEncoder setFragmentTexture:t atIndex:texture.index];
             //else
             //    TF_FATAL_CODING_ERROR("Not implemented!"); //Compute case
         }
@@ -1638,6 +1678,7 @@ id<MTLComputePipelineState> MtlfMetalContext::GetComputeEncoderState(
     int                 gpuIndex,
     id<MTLFunction>     computeFunction,
     unsigned int        bufferCount,
+    unsigned int        textureCount,
     unsigned long       immutableBufferMask,
     NSString            *label)
 {
@@ -1646,6 +1687,7 @@ id<MTLComputePipelineState> MtlfMetalContext::GetComputeEncoderState(
     size_t hashVal = 0;
     boost::hash_combine(hashVal, renderDevices[gpuIndex]);
     boost::hash_combine(hashVal, bufferCount);
+    boost::hash_combine(hashVal, textureCount);
     boost::hash_combine(hashVal, computeFunction);
     boost::hash_combine(hashVal, immutableBufferMask);
     
@@ -1787,6 +1829,10 @@ void MtlfMetalContext::CommitCommandBufferForThread(bool waituntilScheduled, boo
                 commandBuffers[currentGPU][commandBuffersStackPos[currentGPU]++] = wq->commandBuffer;
                 wq->commandBuffer = nil;
             }
+            if (workQueueType == METALWORKQUEUE_DEFAULT) {
+                int frameNumber = GetCurrentFrame();
+                GPUTimerUnexpectEvent(frameNumber);
+            }
             ResetEncoders(workQueueType);
             return;
         }
@@ -1800,6 +1846,13 @@ void MtlfMetalContext::CommitCommandBufferForThread(bool waituntilScheduled, boo
         wq->generatesEndOfQueueEvent = false;
     }
     
+    if (workQueueType == METALWORKQUEUE_DEFAULT) {
+        int frameNumber = GetCurrentFrame();
+        [wq->commandBuffer addCompletedHandler:^(id<MTLCommandBuffer> buffer)
+        {
+           GPUTimerEndTimer(frameNumber);
+        }];
+    }
     [wq->commandBuffer commit];
     
     if (waitUntilCompleted) {
@@ -2162,7 +2215,7 @@ void MtlfMetalContext::StartFrame() {
 
     currentDevice = renderDevices[currentGPU];
 #endif
-    GPUTImerResetTimer(frameCount);
+    GPUTimerResetTimer(frameCount);
     
     [captureScopeFullFrame[currentGPU] beginScope];
 }
@@ -2287,11 +2340,11 @@ void MtlfMetalContext::_gsEncodeSync(bool doOpenBatch) {
     }
 }
 
-void  MtlfMetalContext::GPUTImerResetTimer(unsigned long frameNumber) {
+void  MtlfMetalContext::GPUTimerResetTimer(unsigned long frameNumber) {
     GPUFrameTime *timer = &gpuFrameTimes[frameNumber % METAL_NUM_GPU_FRAME_TIMES];
     
     timer->startingFrame        = frameNumber;
-    timer->timingEventsIssued   = 0;
+    timer->timingEventsExpected = 0;
     timer->timingEventsReceived = 0;
     timer->timingCompleted      = false;
 }
@@ -2302,10 +2355,20 @@ void MtlfMetalContext::GPUTimerStartTimer(unsigned long frameNumber)
 {
     GPUFrameTime *timer = &gpuFrameTimes[frameNumber % METAL_NUM_GPU_FRAME_TIMES];
     // Just start the timer on the first call
-    if (!timer->timingEventsIssued) {
-        gettimeofday(&timer->frameStartTime, 0);
-    }
-    timer->timingEventsIssued++;
+    gettimeofday(&timer->frameStartTime, 0);
+    timer->timingEventsExpected++;
+}
+
+void MtlfMetalContext::GPUTimerEventExpected(unsigned long frameNumber)
+{
+    GPUFrameTime *timer = &gpuFrameTimes[frameNumber % METAL_NUM_GPU_FRAME_TIMES];
+    timer->timingEventsExpected++;
+}
+
+void MtlfMetalContext::GPUTimerUnexpectEvent(unsigned long frameNumber)
+{
+    GPUFrameTime *timer = &gpuFrameTimes[frameNumber % METAL_NUM_GPU_FRAME_TIMES];
+    timer->timingEventsExpected--;
 }
 
 // Records a GPU end of frame timer, if multiple are received only the last is recorded
@@ -2319,7 +2382,7 @@ void MtlfMetalContext::GPUTimerEndTimer(unsigned long frameNumber)
     // Note there is potentially a race condition here that means if this command buffer completes before EndOfFrame marks
     // the timer as complete we won't update. But this would only result in less efficient resource resusage.
     // We update again in the GPUGetTime call so it will get set eventually
-    if (timer->timingCompleted && timer->timingEventsIssued == timer->timingEventsReceived) {
+    if (timer->timingCompleted && timer->timingEventsExpected == timer->timingEventsReceived) {
         lastCompletedFrame = frameNumber;
     }
 }
@@ -2340,7 +2403,8 @@ float MtlfMetalContext::GetGPUTimeInMs() {
         // To be a valid time it must have received all timing events back and have it's frame marked as finished
         if (timer->startingFrame >= highestFrameNumber &&
             timer->timingCompleted                   &&
-            timer->timingEventsIssued == timer->timingEventsReceived) {
+            timer->timingEventsExpected == timer->timingEventsReceived &&
+            timer->timingEventsExpected > 0) {
             validTimer = timer;
             highestFrameNumber = timer->startingFrame;
         }

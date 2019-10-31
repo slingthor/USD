@@ -179,7 +179,7 @@ endif()
 # Specify minimum version of deployment target.
 if (NOT DEFINED IOS_DEPLOYMENT_TARGET)
   # Unless specified, SDK version 10.0 is used by default as minimum target version.
-  set(IOS_DEPLOYMENT_TARGET "10.0"
+  set(IOS_DEPLOYMENT_TARGET "13.0"
       CACHE STRING "Minimum iOS version to build for." )
   message(STATUS "Using the default min-version since IOS_DEPLOYMENT_TARGET not provided!")
 endif()
@@ -399,6 +399,7 @@ set(CMAKE_SHARED_MODULE_CREATE_C_FLAGS "-bundle ${HEADER_PAD}")
 set(CMAKE_SHARED_MODULE_LOADER_C_FLAG "-Wl,-bundle_loader,")
 set(CMAKE_SHARED_MODULE_LOADER_CXX_FLAG "-Wl,-bundle_loader,")
 set(CMAKE_FIND_LIBRARY_SUFFIXES ".dylib" ".so" ".a")
+set(CMAKE_SHARED_LIBRARY_RUNTIME_C_FLAG "-Wl,-rpath,")
 
 # Hack: if a new cmake (which uses CMAKE_INSTALL_NAME_TOOL) runs on an old
 # build tree (where install_name_tool was hardcoded) and where

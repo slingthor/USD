@@ -107,6 +107,8 @@ public:
     bool hasBufferBindOffset;
     
     size_t maxClipPlanes;
+    
+    bool hasMipLevelTextureWrite;
 
     /// Returns whether to do frustum culling on the GPU
 	GARCH_API

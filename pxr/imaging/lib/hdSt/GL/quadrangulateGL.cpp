@@ -150,8 +150,8 @@ HdSt_QuadrangulateComputationGPUGL::Execute(
     GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
     // XXX: workaround for 319.xx driver bug of glNamedBufferDataEXT on UBO
     // XXX: move this workaround to renderContextCaps
-    if (false && caps.directStateAccessEnabled) {
-        glNamedBufferDataEXT(ubo, sizeof(uniform), &uniform, GL_STATIC_DRAW);
+    if (caps.directStateAccessEnabled) {
+        glNamedBufferData(ubo, sizeof(uniform), &uniform, GL_STATIC_DRAW);
     } else {
         glBindBuffer(GL_UNIFORM_BUFFER, ubo);
         glBufferData(GL_UNIFORM_BUFFER, sizeof(uniform), &uniform, GL_STATIC_DRAW);

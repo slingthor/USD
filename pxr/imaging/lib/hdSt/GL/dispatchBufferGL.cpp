@@ -43,25 +43,22 @@ HdStDispatchBufferGL::HdStDispatchBufferGL(TfToken const &role, int count,
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
 
-    GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
+    GarchContextCaps const &caps =
+        GarchResourceFactory::GetInstance()->GetContextCaps();
 
+    GLuint newId = 0;
     size_t stride = commandNumUints * sizeof(GLuint);
     size_t dataSize = count * stride;
-    
-    HdResourceGPUHandle newId;
-
-    GLuint nid = 0;
-    glGenBuffers(1, &nid);
     // just allocate uninitialized
     if (caps.directStateAccessEnabled) {
-        glNamedBufferDataEXT(nid, dataSize, NULL, GL_STATIC_DRAW);
+        glCreateBuffers(1, &newId);
+        glNamedBufferData(newId, dataSize, NULL, GL_STATIC_DRAW);
     } else {
-        glBindBuffer(GL_ARRAY_BUFFER, nid);
+        glGenBuffers(1, &newId);
+        glBindBuffer(GL_ARRAY_BUFFER, newId);
         glBufferData(GL_ARRAY_BUFFER, dataSize, NULL, GL_STATIC_DRAW);
         glBindBuffer(GL_ARRAY_BUFFER, 0);
     }
-
-    newId = nid;
 
     _entireResource->SetAllocation(newId, dataSize);
 }
@@ -83,10 +80,10 @@ HdStDispatchBufferGL::CopyData(std::vector<GLuint> const &data)
     GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
 
     if (caps.directStateAccessEnabled) {
-        glNamedBufferSubDataEXT(_entireResource->GetId(),
-                                0,
-                                _entireResource->GetSize(),
-                                &data[0]);
+        glNamedBufferSubData(_entireResource->GetId(),
+                             0,
+                             _entireResource->GetSize(),
+                             &data[0]);
     } else {
         glBindBuffer(GL_ARRAY_BUFFER, _entireResource->GetId());
         glBufferSubData(GL_ARRAY_BUFFER, 0,

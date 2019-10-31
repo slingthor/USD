@@ -26,11 +26,13 @@ pxr_library(usd
         clipsAPI
         attributeQuery
         collectionAPI
+        collectionMembershipQuery
         common
         crateInfo
         debugCodes
         editContext
         editTarget
+        flattenUtils
         inherits
         interpolation
         modelAPI
@@ -101,10 +103,12 @@ pxr_library(usd
         wrapAttributeQuery.cpp
         wrapClipsAPI.cpp
         wrapCollectionAPI.cpp
+        wrapCollectionMembershipQuery.cpp
         wrapCommon.cpp
         wrapCrateInfo.cpp
         wrapEditContext.cpp
         wrapEditTarget.cpp
+        wrapFlattenUtils.cpp
         wrapInherits.cpp
         wrapInterpolation.cpp
         wrapModelAPI.cpp
@@ -174,12 +178,13 @@ pxr_test_scripts(
     testenv/testUsdChangeProcessing.py
     testenv/testUsdClasses.py
     testenv/testUsdCollectionAPI.py
-    testenv/testUsdCrate07To08Conversion.py
+    testenv/testUsdCratePayloadConversionFromVersion07.py
     testenv/testUsdCreateProperties.py
     testenv/testUsdDataFormats.py
     testenv/testUsdFileFormats.py
     testenv/testUsdFlatten.py
     testenv/testUsdFlatten2.py
+    testenv/testUsdFlattenLayerStack.py
     testenv/testUsdFlattenProperties.py
     testenv/testUsdInherits.py
     testenv/testUsdInstanceProxy.py
@@ -204,6 +209,7 @@ pxr_test_scripts(
     testenv/testUsdTimeCodeRepr.py
     testenv/testUsdTimeOffsets.py
     testenv/testUsdTimeSamples.py
+    testenv/testUsdTimeValueAuthoring.py
     testenv/testUsdUsdzFileFormat.py
     testenv/testUsdValueClips.py
     testenv/testUsdVariantEditing.py
@@ -322,6 +328,17 @@ pxr_build_test(testUsdSchemaBase
         testenv/testUsdSchemaBase.cpp
 )
 
+pxr_build_test(testUsdTimeValueAuthoringCpp
+    LIBRARIES
+        arch
+        plug
+        sdf
+        tf
+        usd
+    CPPFILES
+        testenv/testUsdTimeValueAuthoring.cpp
+)
+
 pxr_build_test(testUsdUsdzResolver
     LIBRARIES
         ar
@@ -338,8 +355,8 @@ pxr_install_test_dir(
 )
 
 pxr_install_test_dir(
-    SRC testenv/testUsdCrate07To08Conversion.testenv
-    DEST testUsdCrate07To08Conversion
+    SRC testenv/testUsdCratePayloadConversionFromVersion07.testenv
+    DEST testUsdCratePayloadConversionFromVersion07
 )
 
 pxr_install_test_dir(
@@ -360,6 +377,11 @@ pxr_install_test_dir(
 pxr_install_test_dir(
     SRC testenv/testUsdFlatten2
     DEST testUsdFlatten4
+)
+
+pxr_install_test_dir(
+    SRC testenv/testUsdFlattenLayerStack
+    DEST testUsdFlattenLayerStack
 )
 
 pxr_install_test_dir(
@@ -440,6 +462,16 @@ pxr_install_test_dir(
 pxr_install_test_dir(
     SRC testenv/testUsdSchemaRegistry
     DEST testUsdSchemaRegistry
+)
+
+pxr_install_test_dir(
+    SRC testenv/testUsdTimeValueAuthoring
+    DEST testUsdTimeValueAuthoring
+)
+
+pxr_install_test_dir(
+    SRC testenv/testUsdTimeValueAuthoring
+    DEST testUsdTimeValueAuthoringCpp
 )
 
 pxr_install_test_dir(
@@ -768,9 +800,9 @@ pxr_register_test(testUsdPayloads
     EXPECTED_RETURN_CODE 0
 )
 
-pxr_register_test(testUsdCrate07To08Conversion
+pxr_register_test(testUsdCratePayloadConversionFromVersion07
     PYTHON
-    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdCrate07To08Conversion"
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdCratePayloadConversionFromVersion07"
     EXPECTED_RETURN_CODE 0
 )
 
@@ -840,6 +872,12 @@ pxr_register_test(testUsdFlatten4
         USD_ASSIGN_MASTERS_DETERMINISTICALLY=1
 )
 
+pxr_register_test(testUsdFlattenLayerStack
+    PYTHON
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdFlattenLayerStack"
+    EXPECTED_RETURN_CODE 0
+)
+
 pxr_register_test(testUsdNotices
     PYTHON
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdNotices"
@@ -866,6 +904,17 @@ pxr_register_test(testUsdSchemaBasePy
 pxr_register_test(testUsdSchemaRegistry
     PYTHON
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdSchemaRegistry"
+    EXPECTED_RETURN_CODE 0
+)
+
+pxr_register_test(testUsdTimeValueAuthoring
+    PYTHON
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdTimeValueAuthoring"
+    EXPECTED_RETURN_CODE 0
+)
+
+pxr_register_test(testUsdTimeValueAuthoringCpp
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdTimeValueAuthoringCpp"
     EXPECTED_RETURN_CODE 0
 )
 

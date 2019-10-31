@@ -46,6 +46,10 @@ TF_REGISTRY_FUNCTION(TfScriptModuleLoader) {
         TfToken("hd"),
         TfToken("hdx"),
         TfToken("hio"),
+        TfToken("hgi"),
+#if defined(ARCH_GFX_OPENGL)
+        TfToken("hgiGL"),
+#endif
         TfToken("plug"),
         TfToken("pxOsd"),
         TfToken("sdf"),

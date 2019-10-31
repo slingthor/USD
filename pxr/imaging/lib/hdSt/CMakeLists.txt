@@ -19,7 +19,7 @@ endif()
 
 if (PXR_ENABLE_GL_SUPPORT)
     set(GFX             glf
-    			hgiGL)
+    			        hgiGL)
     set(GFXADDITIONAL   GL/bufferRelocatorGL
                         GL/bufferResourceGL
                         GL/codeGenGLSL
@@ -51,7 +51,8 @@ endif()
 
 if (PXR_ENABLE_METAL_SUPPORT)
     set(GFX             ${GFX}
-                        mtlf)
+                        mtlf
+                        hgiMetal)
     set(GFXADDITIONAL   ${GFXADDITIONAL}
                         Metal/bufferRelocatorMetal
                         Metal/bufferResourceMetal
@@ -86,6 +87,7 @@ pxr_library(hdSt
         hio
         garch
         hd
+        sdr
         tf
         trace
         ${GFX}
@@ -137,7 +139,7 @@ pxr_library(hdSt
         persistentBuffer
         points
         program
-	renderBuffer
+	    renderBuffer
         renderDelegate
         renderPass
         renderPassShader
@@ -174,6 +176,7 @@ pxr_library(hdSt
         immediateDrawBatch
         indirectDrawBatch
         materialBufferSourceAndTextureHelper
+        materialNetwork
         meshShaderKey
         meshTopology 
         pointsShaderKey
@@ -184,6 +187,7 @@ pxr_library(hdSt
         triangulate
         unitTestDelegate
         unitTestHelper
+        volumeShader
 	volumeShaderKey
         ${GFXADDITIONAL}
 
@@ -192,6 +196,7 @@ pxr_library(hdSt
         shaders/basisCurves.glslfx
         shaders/compute.glslfx
         shaders/compute.metal
+	shaders/domeLight.glslfx
         shaders/edgeId.glslfx
         shaders/fallbackLighting.glslfx
         shaders/fallbackLightingShader.glslfx

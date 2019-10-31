@@ -146,15 +146,16 @@ public:
     SampleInstancerTransform(UsdPrim const& instancerPrim,
                              SdfPath const& instancerPath,
                              UsdTimeCode time,
-                             const std::vector<float>& configuredSampleTimes,
                              size_t maxSampleCount,
-                             float *times,
-                             GfMatrix4d *samples) override;
+                             float *sampleTimes,
+                             GfMatrix4d *sampleValues) override;
 
     virtual size_t
-    SampleTransform(UsdPrim const& prim, SdfPath const& cachePath,
-                    const std::vector<float>& configuredSampleTimes,
-                    size_t maxNumSamples, float *sampleTimes,
+    SampleTransform(UsdPrim const& prim, 
+                    SdfPath const& cachePath,
+                    UsdTimeCode time, 
+                    size_t maxNumSamples, 
+                    float *sampleTimes,
                     GfMatrix4d *sampleValues) override;
 
     virtual size_t
@@ -162,9 +163,9 @@ public:
                   SdfPath const& cachePath,
                   TfToken const& key,
                   UsdTimeCode time,
-                  const std::vector<float>& configuredSampleTimes,
-                  size_t maxNumSamples, float *times,
-                  VtValue *samples) override;
+                  size_t maxNumSamples, 
+                  float *sampleTimes,
+                  VtValue *sampleValues) override;
 
     virtual PxOsdSubdivTags GetSubdivTags(UsdPrim const& usdPrim,
                                           SdfPath const& cachePath,
@@ -286,6 +287,13 @@ private:
     bool _ComputeInstanceTransforms(UsdPrim const& instancer,
                                     VtMatrix4dArray* transforms,
                                     UsdTimeCode time) const;
+
+    // Gathers the authored transforms time samples given an instancer.
+    struct _GatherInstanceTransformTimeSamplesFn;
+    bool _GatherInstanceTransformsTimeSamples(UsdPrim const& instancer,
+                                              GfInterval interval,
+                                              std::vector<double>* outTimes) 
+                                                  const;
 
     // Returns true if any of the instances corresponding to the given
     // instancer has a varying transform.
@@ -439,7 +447,10 @@ private:
         // This is a set of reference paths, where this instancer needs
         // to deferer to another instancer.  While refered to here as a child
         // instancer, the actual relationship is more like a directed graph.
-        SdfPathSet childInstancers;
+        SdfPathSet childPointInstancers;
+
+        // Nested native instances.
+        SdfPathVector nestedInstances;
 
         // Proto group containing the instance indexes for each prototype
         // rprim.

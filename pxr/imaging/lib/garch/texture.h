@@ -75,25 +75,12 @@ struct GPUState {
 
 struct MtlfMultiSampler {
     
-    MtlfMultiSampler() {}
+    MtlfMultiSampler();
     
-    MtlfMultiSampler(MTLSamplerDescriptor* samplerDescriptor) {
-        int i = 0;
-        if (samplerDescriptor) {
-            for (id<MTLDevice>dev in GPUState::renderDevices) {
-                sampler[i++] = [dev newSamplerStateWithDescriptor:samplerDescriptor];
-            }
-        }
-        while(i < MAX_GPUS)
-            sampler[i++] = nil;
-    }
+    MtlfMultiSampler(MTLSamplerDescriptor* samplerDescriptor);
     
     bool IsSet() const { return sampler[0] != nil; }
-    void Clear() {
-        for (int i = 0; i < MAX_GPUS; i++) {
-            sampler[i] = nil;
-        }
-    }
+    void Clear();
     
     void release();
     
@@ -117,30 +104,19 @@ struct MtlfMultiSampler {
         return other.sampler[0] != sampler[0];
     }
     
+    MtlfMultiSampler& operator=(const MtlfMultiSampler&);
+    
     id<MTLSamplerState> sampler[MAX_GPUS];
 };
 
 struct MtlfMultiTexture {
     
-    MtlfMultiTexture() {}
+    MtlfMultiTexture();
     
-    MtlfMultiTexture(MTLTextureDescriptor* textureDescriptor) {
-        int i = 0;
-        if (textureDescriptor) {
-            for (id<MTLDevice>dev in GPUState::renderDevices) {
-                texture[i++] = [dev newTextureWithDescriptor:textureDescriptor];
-            }
-        }
-        while(i < MAX_GPUS)
-            texture[i++] = nil;
-    }
-    
+    MtlfMultiTexture(MTLTextureDescriptor* textureDescriptor);
+
     bool IsSet() const { return texture[0] != nil; }
-    void Clear() {
-        for (int i = 0; i < MAX_GPUS; i++) {
-            texture[i] = nil;
-        }
-    }
+    void Clear();
     
     void release();
     
@@ -168,6 +144,8 @@ struct MtlfMultiTexture {
         return other.texture[0] != texture[0];
     }
     
+    MtlfMultiTexture& operator=(const MtlfMultiTexture&);
+
     id<MTLTexture> texture[MAX_GPUS];
 };
 
@@ -233,6 +211,15 @@ struct GarchTextureGPUHandle {
         return other.handle != handle;
     }
 #endif
+
+    GarchTextureGPUHandle& operator=(const GarchTextureGPUHandle& rhs) {
+#if defined(ARCH_GFX_METAL)
+        multiTexture = rhs.multiTexture;
+#else
+        handle = rhs.handle;
+#endif
+        return *this;
+    }
 
     // Storage
     union {
@@ -304,6 +291,15 @@ struct GarchSamplerGPUHandle {
     }
 #endif
     
+    GarchSamplerGPUHandle& operator=(const GarchSamplerGPUHandle& rhs) {
+#if defined(ARCH_GFX_METAL)
+        multiSampler = rhs.multiSampler;
+#else
+        handle = rhs.handle;
+#endif
+        return *this;
+    }
+
     // Storage
     union {
         void* handle;

@@ -314,7 +314,20 @@ _GetPackedTypeDefinitions()
     "                a[3][1] * b01 - a[3][0] * b03 - a[3][2] * b00,\n"
     "                a[2][0] * b03 - a[2][1] * b01 + a[2][2] * b00) * invdet;\n"
     "}\n\n"
-    "float atan(float x, float y) { return atan2(x, y); }\n\n"
+    "template <typename T>\n"
+    "T atan(T y, T x) { return atan2(y, x); }\n\n"
+    "template <typename T>\n"
+    "T bitfieldReverse(T x) { return reverse_bits(x); }\n\n"
+    "template <typename T>\n"
+    "ivec2 imageSize(T texture) {\n"
+    "    return ivec2(texture.get_width(), texture.get_height());\n"
+    "}\n\n"
+
+    "template <typename T>\n"
+    "ivec2 textureSize(T texture, int lod) {\n"
+    "    return ivec2(texture.get_width(lod), texture.get_height(lod));\n"
+    "}\n\n"
+
 
     "constexpr sampler texelSampler(address::clamp_to_edge,\n"
     "                               filter::linear);\n";
@@ -1787,8 +1800,9 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
                 vsEntryPointCode << "    uint _index = drawArgs->batchIndexOffset + _gsVertexID;\n"
                                  << "    uint _primitiveID = (drawArgs->batchIndexOffset + (_vertexID / 3)) % drawArgs->primitiveCount;\n";
             }
-            if (_buildTarget == kMSL_BuildTarget_MVA_ComputeGS) //_instanceID is the real Metal instance ID if not using ComputeGS
+            if (_buildTarget == kMSL_BuildTarget_MVA_ComputeGS) { //_instanceID is the real Metal instance ID if not using ComputeGS
                 vsEntryPointCode << "    uint _instanceID = _index / drawArgs->indexCount;\n";
+            }
             vsEntryPointCode    << "    uint _gsPrimitiveID = _gsVertexID / "
                                 << (numVerticesOutPerPrimitive / numPrimitivesOutPerPrimitive) << ";\n"
                                 << "    _index = _index % drawArgs->indexCount;\n"
@@ -1798,6 +1812,10 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
                                 << "    uint gl_PrimitiveIDIn = _primitiveID;\n"
                                 << "\n"
                                 << vsMI_EP_InputCode.str()
+                                << "\n"
+                                << "    //Full-screen passes need _vertexID for proper FS triangle to be generated.\n"
+                                << "    //AFAIK gl_VertexID is not used further for other passes at the moment\n"
+                                << "    gl_VertexID = _gsVertexID;\n"
                                 << "\n"
                                 << "    MSLVsOutputs vsOutput;\n"
                                 << vsMI_EP_CallCode.str()
@@ -2319,7 +2337,8 @@ HdSt_CodeGenMSL::Compile()
     {
         case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_REFINED_QUADS:
         case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_REFINED_TRIANGLES:
-        case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_PATCHES:
+        case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_BSPLINE:
+        case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_BOXSPLINETRIANGLE:
         {
             // patch interpolation
             _procGS //<< "vec4 GetPatchCoord(int index);\n"
@@ -2543,6 +2562,109 @@ HdSt_CodeGenMSL::Compile()
     return mslProgram;
 }
 
+std::string
+HdSt_CodeGenMSL::GetComputeHeader()
+{
+    std::stringstream header;
+    header.str("");
+
+    GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
+        header  << "#define HD_SHADER_API " << HD_SHADER_API << "\n"
+                    << "#define ARCH_GFX_METAL\n"
+                    << "#define METAL_API_VERSION " << caps.apiVersion + 1 << "\n";
+    
+    // Metal feature set defines
+    id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->currentDevice;
+#if defined(ARCH_OS_MACOS)
+    header  << "#define ARCH_OS_MACOS\n";
+    // Define all macOS 10.13 feature set enums onwards
+    if ([device supportsFeatureSet:MTLFeatureSet_macOS_GPUFamily1_v3])
+        header << "#define METAL_FEATURESET_MACOS_GPUFAMILY1_v3\n";
+    if ([device supportsFeatureSet:MTLFeatureSet_macOS_GPUFamily1_v4])
+        header << "#define METAL_FEATURESET_MACOS_GPUFAMILY1_v4\n";
+    if ([device supportsFeatureSet:MTLFeatureSet_macOS_GPUFamily2_v1])
+        header << "#define METAL_FEATURESET_MACOS_GPUFAMILY2_v1\n";
+    
+#else // ARCH_OS_MACOS
+    header  << "#define ARCH_OS_IOS\n";
+    // Define all iOS 12 feature set enums onwards
+    if ([device supportsFeatureSet:MTLFeatureSet_iOS_GPUFamily1_v5])
+        header << "#define METAL_FEATURESET_IOS_GPUFAMILY1_v5\n";
+    if ([device supportsFeatureSet:MTLFeatureSet_iOS_GPUFamily2_v5])
+        header << "#define METAL_FEATURESET_IOS_GPUFAMILY2_v5\n";
+    if ([device supportsFeatureSet:MTLFeatureSet_iOS_GPUFamily3_v4])
+        header << "#define METAL_FEATURESET_IOS_GPUFAMILY3_v4\n";
+    if ([device supportsFeatureSet:MTLFeatureSet_iOS_GPUFamily4_v2])
+        header << "#define METAL_FEATURESET_IOS_GPUFAMILY4_v2\n";
+#endif // ARCH_OS_MACOS
+    
+    header  << "#include <metal_stdlib>\n"
+            << "#include <simd/simd.h>\n"
+            << "#include <metal_pack>\n"
+            << "using namespace metal;\n";
+    
+    header  << "#define double float\n"
+            << "#define vec2 float2\n"
+            << "#define vec3 float3\n"
+            << "#define vec4 float4\n"
+            << "#define mat3 float3x3\n"
+            << "#define mat4 float4x4\n"
+            << "#define ivec2 int2\n"
+            << "#define ivec3 int3\n"
+            << "#define ivec4 int4\n"
+            << "#define bvec2 bool2\n"
+            << "#define bvec3 bool3\n"
+            << "#define bvec4 bool4\n"
+            << "#define dvec2 float2\n"
+            << "#define dvec3 float3\n"
+            << "#define dvec4 float4\n"
+            << "#define dmat3 float3x3\n"
+            << "#define dmat4 float4x4\n";
+    
+    // XXX: this macro is still used in GlobalUniform.
+    header  << "#define MAT4 mat4\n";
+    
+    // a trick to tightly pack vec3 into SSBO/UBO.
+    header  << _GetPackedTypeDefinitions();
+    
+    header  << "#define in /*in*/\n"
+            //<< "#define out /*out*/\n"  //This define is going to cause issues, do not enable.
+            << "#define discard discard_fragment();\n"
+            << "#define radians(d) (d * 0.01745329252)\n"
+            << "#define noperspective /*center_no_perspective MTL_FIXME*/\n"
+            << "#define greaterThan(a,b) (a > b)\n"
+            << "#define lessThan(a,b)    (a < b)\n"
+            << "#define dFdx    dfdx\n"
+            << "#define dFdy    dfdy\n";
+    
+    // wrapper for type float and int to deal with .x accessors and the like that are valid in GLSL
+    header  << "struct wrapped_float {\n"
+            << "    union {\n"
+            << "        float x;\n"
+            << "        float xx;\n"
+            << "        float xxx;\n"
+            << "        float xxxx;\n"
+            << "    };\n"
+            << "    operator float () {\n"
+            << "        return x;\n"
+            << "    }\n"
+            << "};\n";
+    
+    header  << "struct wrapped_int {\n"
+            << "    union {\n"
+            << "        int x;\n"
+            << "        int xx;\n"
+            << "        int xxx;\n"
+            << "        int xxxx;\n"
+            << "    };\n"
+            << "    operator int () {\n"
+            << "        return x;\n"
+            << "    }\n"
+            << "};\n";
+
+    return header.str();
+}
+                
 HdStProgramSharedPtr
 HdSt_CodeGenMSL::CompileComputeProgram()
 {
@@ -2554,101 +2676,10 @@ HdSt_CodeGenMSL::CompileComputeProgram()
     _genGS.str(""); _genFS.str(""); _genCS.str("");
     _procVS.str(""); _procTCS.str(""), _procTES.str(""), _procGS.str("");
     
-    GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
-    _genCommon  << "#define HD_SHADER_API " << HD_SHADER_API << "\n"
-    << "#define ARCH_GFX_METAL\n";
+    _genCommon  << GetComputeHeader();
     
     _buildTarget = kMSL_BuildTarget_Regular;
 
-    // Metal feature set defines
-    id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->currentDevice;
-#if defined(ARCH_OS_MACOS)
-    _genCommon  << "#define ARCH_OS_MACOS\n";
-    // Define all macOS 10.13 feature set enums onwards
-    if ([device supportsFeatureSet:MTLFeatureSet_macOS_GPUFamily1_v3])
-        _genCommon << "#define METAL_FEATURESET_MACOS_GPUFAMILY1_v3\n";
-    if ([device supportsFeatureSet:MTLFeatureSet_macOS_GPUFamily1_v4])
-        _genCommon << "#define METAL_FEATURESET_MACOS_GPUFAMILY1_v4\n";
-    if ([device supportsFeatureSet:MTLFeatureSet_macOS_GPUFamily2_v1])
-        _genCommon << "#define METAL_FEATURESET_MACOS_GPUFAMILY2_v1\n";
-    
-#else // ARCH_OS_MACOS
-    _genCommon  << "#define ARCH_OS_IOS\n";
-    // Define all iOS 12 feature set enums onwards
-    if ([device supportsFeatureSet:MTLFeatureSet_iOS_GPUFamily1_v5])
-        _genCommon << "#define METAL_FEATURESET_IOS_GPUFAMILY1_v5\n";
-    if ([device supportsFeatureSet:MTLFeatureSet_iOS_GPUFamily2_v5])
-        _genCommon << "#define METAL_FEATURESET_IOS_GPUFAMILY2_v5\n";
-    if ([device supportsFeatureSet:MTLFeatureSet_iOS_GPUFamily3_v4])
-        _genCommon << "#define METAL_FEATURESET_IOS_GPUFAMILY3_v4\n";
-    if ([device supportsFeatureSet:MTLFeatureSet_iOS_GPUFamily4_v2])
-        _genCommon << "#define METAL_FEATURESET_IOS_GPUFAMILY4_v2\n";
-#endif // ARCH_OS_MACOS
-    
-    _genCommon  << "#include <metal_stdlib>\n"
-                << "#include <simd/simd.h>\n"
-                << "#include <metal_pack>\n"
-                << "using namespace metal;\n";
-    
-    _genCommon  << "#define double float\n"
-                << "#define vec2 float2\n"
-                << "#define vec3 float3\n"
-                << "#define vec4 float4\n"
-                << "#define mat3 float3x3\n"
-                << "#define mat4 float4x4\n"
-                << "#define ivec2 int2\n"
-                << "#define ivec3 int3\n"
-                << "#define ivec4 int4\n"
-                << "#define bvec2 bool2\n"
-                << "#define bvec3 bool3\n"
-                << "#define bvec4 bool4\n"
-                << "#define dvec2 float2\n"
-                << "#define dvec3 float3\n"
-                << "#define dvec4 float4\n"
-                << "#define dmat3 float3x3\n"
-                << "#define dmat4 float4x4\n";
-    
-    // XXX: this macro is still used in GlobalUniform.
-    _genCommon  << "#define MAT4 mat4\n";
-    
-    // a trick to tightly pack vec3 into SSBO/UBO.
-    _genCommon  << _GetPackedTypeDefinitions();
-    
-    _genCommon  << "#define in /*in*/\n"
-                //<< "#define out /*out*/\n"  //This define is going to cause issues, do not enable.
-                << "#define discard discard_fragment();\n"
-                << "#define radians(d) (d * 0.01745329252)\n"
-                << "#define noperspective /*center_no_perspective MTL_FIXME*/\n"
-                << "#define greaterThan(a,b) (a > b)\n"
-                << "#define lessThan(a,b)    (a < b)\n"
-                << "#define dFdx    dfdx\n"
-                << "#define dFdy    dfdy\n";
-    
-    // wrapper for type float and int to deal with .x accessors and the like that are valid in GLSL
-    _genCommon  << "struct wrapped_float {\n"
-                << "    union {\n"
-                << "        float x;\n"
-                << "        float xx;\n"
-                << "        float xxx;\n"
-                << "        float xxxx;\n"
-                << "    };\n"
-                << "    operator float () {\n"
-                << "        return x;\n"
-                << "    }\n"
-                << "};\n";
-    
-    _genCommon  << "struct wrapped_int {\n"
-                << "    union {\n"
-                << "        int x;\n"
-                << "        int xx;\n"
-                << "        int xxx;\n"
-                << "        int xxxx;\n"
-                << "    };\n"
-                << "    operator int () {\n"
-                << "        return x;\n"
-                << "    }\n"
-                << "};\n";
-    
     std::stringstream uniforms;
     std::stringstream declarations;
     std::stringstream accessors;
@@ -3033,97 +3064,7 @@ HdSt_CodeGenMSL::_GenerateCommonDefinitions()
     // Used in glslfx files to determine if it is using new/old
     // imaging system. It can also be used as API guards when
     // we need new versions of Hydra shading.
-    _genDefinitions  << "#define HD_SHADER_API " << HD_SHADER_API << "\n"
-                << "#define ARCH_GFX_METAL\n";
-    
-    // Metal feature set defines
-    id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->currentDevice;
-#if defined(ARCH_OS_MACOS)
-    _genDefinitions  << "#define ARCH_OS_MACOS\n";
-    // Define all macOS 10.13 feature set enums onwards
-    if ([device supportsFeatureSet:MTLFeatureSet_macOS_GPUFamily1_v3])
-        _genDefinitions << "#define METAL_FEATURESET_MACOS_GPUFAMILY1_v3\n";
-    if ([device supportsFeatureSet:MTLFeatureSet_macOS_GPUFamily1_v4])
-        _genDefinitions << "#define METAL_FEATURESET_MACOS_GPUFAMILY1_v4\n";
-    if ([device supportsFeatureSet:MTLFeatureSet_macOS_GPUFamily2_v1])
-        _genDefinitions << "#define METAL_FEATURESET_MACOS_GPUFAMILY2_v1\n";
-
-#else // ARCH_OS_MACOS
-    _genDefinitions  << "#define ARCH_OS_IOS\n";
-    // Define all iOS 12 feature set enums onwards
-    if ([device supportsFeatureSet:MTLFeatureSet_iOS_GPUFamily1_v5])
-        _genDefinitions << "#define METAL_FEATURESET_IOS_GPUFAMILY1_v5\n";
-    if ([device supportsFeatureSet:MTLFeatureSet_iOS_GPUFamily2_v5])
-        _genDefinitions << "#define METAL_FEATURESET_IOS_GPUFAMILY2_v5\n";
-    if ([device supportsFeatureSet:MTLFeatureSet_iOS_GPUFamily3_v4])
-        _genDefinitions << "#define METAL_FEATURESET_IOS_GPUFAMILY3_v4\n";
-    if ([device supportsFeatureSet:MTLFeatureSet_iOS_GPUFamily4_v2])
-        _genDefinitions << "#define METAL_FEATURESET_IOS_GPUFAMILY4_v2\n";
-#endif // ARCH_OS_MACOS
-    
-    _genDefinitions  << "#include <metal_stdlib>\n"
-                << "#include <simd/simd.h>\n"
-                << "#include <metal_pack>\n"
-                << "using namespace metal;\n";
-    
-    _genDefinitions  << "#define double float\n"
-                << "#define vec2 float2\n"
-                << "#define vec3 float3\n"
-                << "#define vec4 float4\n"
-                << "#define mat3 float3x3\n"
-                << "#define mat4 float4x4\n"
-                << "#define ivec2 int2\n"
-                << "#define ivec3 int3\n"
-                << "#define ivec4 int4\n"
-                << "#define bvec2 bool2\n"
-                << "#define bvec3 bool3\n"
-                << "#define bvec4 bool4\n"
-                << "#define dvec2 float2\n"
-                << "#define dvec3 float3\n"
-                << "#define dvec4 float4\n"
-                << "#define dmat3 float3x3\n"
-                << "#define dmat4 float4x4\n";
-    
-    // XXX: this macro is still used in GlobalUniform.
-    _genDefinitions  << "#define MAT4 mat4\n";
-    
-    // a trick to tightly pack vec3 into SSBO/UBO.
-    _genDefinitions  << _GetPackedTypeDefinitions();
-    
-    _genDefinitions  << "#define in /*in*/\n"
-                //<< "#define out /*out*/\n"  //This define is going to cause issues, do not enable.
-                << "#define discard discard_fragment();\n"
-                << "#define radians(d) (d * 0.01745329252)\n"
-                << "#define noperspective /*center_no_perspective MTL_FIXME*/\n"
-                << "#define greaterThan(a,b) (a > b)\n"
-                << "#define lessThan(a,b)    (a < b)\n"
-                << "#define dFdx    dfdx\n"
-                << "#define dFdy    dfdy\n";
-    
-    // wrapper for type float and int to deal with .x accessors and the like that are valid in GLSL
-    _genDefinitions  << "struct wrapped_float {\n"
-                << "    union {\n"
-                << "        float x;\n"
-                << "        float xx;\n"
-                << "        float xxx;\n"
-                << "        float xxxx;\n"
-                << "    };\n"
-                << "    operator float () {\n"
-                << "        return x;\n"
-                << "    }\n"
-                << "};\n";
-    
-    _genDefinitions  << "struct wrapped_int {\n"
-                << "    union {\n"
-                << "        int x;\n"
-                << "        int xx;\n"
-                << "        int xxx;\n"
-                << "        int xxxx;\n"
-                << "    };\n"
-                << "    operator int () {\n"
-                << "        return x;\n"
-                << "    }\n"
-                << "};\n";
+    _genDefinitions  << GetComputeHeader();
 
     // primvar existence macros
     
@@ -3195,7 +3136,7 @@ HdSt_CodeGenMSL::_GenerateCommonCode()
 {
     _genCommon  << "class ProgramScope<st> {\n"
                 << "public:\n";
-    
+
     METAL_DEBUG_COMMENT(&_genCommon, "Start of special inputs\n"); //MTL_FIXME
     
     
@@ -4122,7 +4063,8 @@ HdSt_CodeGenMSL::_GenerateElementPrimvar()
                     break;
                 }
 
-                case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_PATCHES:
+                case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_BSPLINE:
+                case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_BOXSPLINETRIANGLE:
                 {
                     // refined patches (tessellated triangles)
                     accessors
@@ -4181,7 +4123,9 @@ HdSt_CodeGenMSL::_GenerateElementPrimvar()
             }
 
             // GetFVarIndex
-            if (_geometricShader->IsPrimTypeTriangles()) {
+            if (_geometricShader->IsPrimTypeTriangles() ||
+                (_geometricShader->GetPrimitiveType() ==
+                 HdSt_GeometricShader::PrimitiveType::PRIM_MESH_BOXSPLINETRIANGLE)) {
                 // note that triangulated meshes don't have ptexIndex.
                 // Here we're passing primitiveID as ptexIndex PatchParam
                 // since HdSt_TriangulateFaceVaryingComputation unrolls facevaring
@@ -4561,7 +4505,7 @@ HdSt_CodeGenMSL::_GenerateVertexAndFaceVaryingPrimvar(bool hasGS)
             {
                 case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_COARSE_QUADS:
                 case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_REFINED_QUADS:
-                case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_PATCHES:
+                case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_BSPLINE:
                 {
                     // linear interpolation within a quad.
                     _procGS << "    // MTL_HINT EXPORTS:outPrimvars." << name << "\n"
@@ -4576,6 +4520,7 @@ HdSt_CodeGenMSL::_GenerateVertexAndFaceVaryingPrimvar(bool hasGS)
 
                 case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_REFINED_TRIANGLES:
                 case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_COARSE_TRIANGLES:
+                case HdSt_GeometricShader::PrimitiveType::PRIM_MESH_BOXSPLINETRIANGLE:
                 {
                     // barycentric interpolation within a triangle.
                     _procGS << "    // MTL_HINT EXPORTS:outPrimvars." << name << "\n"
@@ -4800,6 +4745,21 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
     // accessors.
     TF_FOR_ALL (it, _metaData.shaderParameterBinding) {
 
+        bool dup = false;
+        TF_FOR_ALL (sub_it, _metaData.shaderParameterBinding) {
+            if (sub_it == it)
+                break;
+            
+            if (it->second.name != sub_it->second.name)
+                continue;
+                
+            dup = true;
+            break;
+        }
+
+        if (dup) {
+            continue;
+        }
         // adjust datatype
         std::string swizzle = _GetSwizzleString(it->second.dataType);
         bool addScalarAccessor = true;

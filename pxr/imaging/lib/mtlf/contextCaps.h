@@ -55,6 +55,12 @@ PXR_NAMESPACE_OPEN_SCOPE
 class MtlfContextCaps : public GarchContextCaps {
 
 public:
+    enum {
+        APIVersion_Metal1_0 = 0,
+        APIVersion_Metal2_0,
+        APIVersion_Metal3_0
+    };
+
     MTLF_API
     static int GetAPIVersion();
 

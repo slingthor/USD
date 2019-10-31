@@ -135,7 +135,7 @@ public:
     bool IsDomeLight() const;
     GARCH_API
     void SetIsDomeLight(bool isDomeLight);
-    
+        
     // the following Id's are GL resource handles for the precomputed textures
     // created by HdStLight
     GARCH_API
@@ -152,12 +152,23 @@ public:
     GarchTextureGPUHandle const & GetBrdfId() const;
     GARCH_API
     void SetBrdfId(GarchTextureGPUHandle const & brdfId);
+
+    // .. and the samplers
+    GARCH_API
+    GarchSamplerGPUHandle const & GetIrradianceSamplerId() const;
+    GARCH_API
+    void SetIrradianceSamplerId(GarchSamplerGPUHandle const & irradianceSamplerId);
     
     GARCH_API
-    GarchSamplerGPUHandle const & GetSamplerId() const;
+    GarchSamplerGPUHandle const & GetPrefilterSamplerId() const;
     GARCH_API
-    void SetSamplerId(GarchSamplerGPUHandle const & samplerId);
-
+    void SetPrefilterSamplerId(GarchSamplerGPUHandle const & prefilterSamplerId);
+    
+    GARCH_API
+    GarchSamplerGPUHandle const & GetBrdfSamplerId() const;
+    GARCH_API
+    void SetBrdfSamplerId(GarchSamplerGPUHandle const & brdfSamplerId);
+    
     GARCH_API
     virtual bool operator ==(GarchSimpleLight const & other) const;
     GARCH_API
@@ -188,11 +199,15 @@ private:
     
     // domeLight specific parameters
     bool _isDomeLight;
+
     // handles for the resource bindings from HdXSimpleLightingShader
-    GarchSamplerGPUHandle _samplerId;
     GarchTextureGPUHandle _irradianceId; // pre-computed irradiance map
     GarchTextureGPUHandle _prefilterId;  // pre-computed preFiltered map
     GarchTextureGPUHandle _brdfId;       // pre-computed BRDF look up texture
+
+    GarchSamplerGPUHandle _irradianceSamplerId;
+    GarchSamplerGPUHandle _prefilterSamplerId;
+    GarchSamplerGPUHandle _brdfSamplerId;
 
     SdfPath _id;
 };

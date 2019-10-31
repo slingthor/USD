@@ -81,7 +81,7 @@ HdStExtCompGpuComputationMetal::_Execute(
         id<MTLFunction> computeFunction = mslProgram->GetComputeFunction(g);
         id<MTLComputePipelineState> pipelineState =
             context->GetComputeEncoderState(
-                g, computeFunction, 4, immutableBufferMask,
+                g, computeFunction, 4, 0, immutableBufferMask,
                 @"HdStExtCompGpuComputationMetal pipeline state");
 
         [computeEncoder setComputePipelineState:pipelineState];

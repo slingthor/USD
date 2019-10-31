@@ -25,11 +25,11 @@
 #define HDSTORM_METAL_RENDERER_PLUGIN_H
 
 #include "pxr/pxr.h"
-#include "pxr/imaging/hdx/rendererPlugin.h"
+#include "pxr/imaging/hd/rendererPlugin.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-class HdStormMetalRendererPlugin final : public HdxRendererPlugin {
+class HdStormMetalRendererPlugin final : public HdRendererPlugin {
 public:
     HdStormMetalRendererPlugin()          = default;
     virtual ~HdStormMetalRendererPlugin() = default;

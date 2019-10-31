@@ -32,8 +32,11 @@
 #include "pxr/base/tf/envSetting.h"
 
 #include "pxr/imaging/mtlf/contextCaps.h"
+#include "pxr/imaging/mtlf/drawTarget.h"
 #include "pxr/imaging/mtlf/diagnostic.h"
 #include "pxr/imaging/mtlf/mtlDevice.h"
+
+#include "pxr/imaging/hgiMetal/hgi.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -61,6 +64,8 @@ HdStRenderDelegateMetal::HdStRenderDelegateMetal()
     _deviceDesc = TfToken(_MetalDeviceDescriptor(MtlfMetalContext::GetMetalContext()->currentDevice));
 //    _Initialize();
     
+    _hgi = new HgiMetal();
+    
     _inFlightSemaphore = dispatch_semaphore_create(3);
 }
 
@@ -71,6 +76,8 @@ HdStRenderDelegateMetal::HdStRenderDelegateMetal(HdRenderSettingsMap const& sett
 {
     _deviceDesc = TfToken(_MetalDeviceDescriptor(MtlfMetalContext::GetMetalContext()->currentDevice));
     
+    _hgi = new HgiMetal();
+
     _inFlightSemaphore = dispatch_semaphore_create(3);
 }
 
@@ -169,7 +176,7 @@ HdStRenderDelegateMetal::~HdStRenderDelegateMetal()
 bool
 HdStRenderDelegateMetal::IsSupported()
 {
-    if (MtlfContextCaps::GetAPIVersion() >= 400)
+    if (MtlfContextCaps::GetAPIVersion() >= MtlfContextCaps::APIVersion_Metal2_0)
         return true;
 
     return false;
@@ -262,7 +269,53 @@ void HdStRenderDelegateMetal::PrepareRender(
     else
 #endif
     {
-        if (_mtlRenderPassDescriptor == nil) {
+        if (context->GetDrawTarget()) {
+            if (_mtlRenderPassDescriptorForInterop == nil)
+                _mtlRenderPassDescriptorForInterop =
+                    [[MTLRenderPassDescriptor alloc] init];
+
+            //Set this state every frame because it may have changed
+            // during rendering.
+            
+            // create a color attachment every frame since we have to
+            // recreate the texture every frame
+            MTLRenderPassColorAttachmentDescriptor *colorAttachment =
+                _mtlRenderPassDescriptorForInterop.colorAttachments[0];
+            
+            // make sure to clear every frame for best performance
+            colorAttachment.loadAction = MTLLoadActionClear;
+            
+            // store only attachments that will be presented to the
+            // screen, as in this case
+            colorAttachment.storeAction = MTLStoreActionStore;
+            
+            MTLRenderPassDepthAttachmentDescriptor *depthAttachment =
+                _mtlRenderPassDescriptorForInterop.depthAttachment;
+            depthAttachment.loadAction = MTLLoadActionClear;
+            depthAttachment.storeAction = MTLStoreActionStore;
+            
+            auto& attachments = context->GetDrawTarget()->GetAttachments();
+            {
+                auto const it = attachments.find("color");
+                MtlfDrawTarget::MtlfAttachment::MtlfAttachmentRefPtr const & a =
+                    TfStatic_cast<TfRefPtr<MtlfDrawTarget::MtlfAttachment>>(it->second);
+
+                colorAttachment.texture = a->GetTextureName().multiTexture.forCurrentGPU();
+                colorAttachment.clearColor = MTLClearColorMake(0.0f, 0.0f, 0.0f, 1.0f);
+            }
+            
+            {
+                auto const it = attachments.find("depth");
+                MtlfDrawTarget::MtlfAttachment::MtlfAttachmentRefPtr const & a =
+                    TfStatic_cast<TfRefPtr<MtlfDrawTarget::MtlfAttachment>>(it->second);
+
+                depthAttachment.texture = a->GetTextureName().multiTexture.forCurrentGPU();
+                depthAttachment.clearDepth = 1.0f;
+            }
+            
+            _mtlRenderPassDescriptor = _mtlRenderPassDescriptorForInterop;
+        }
+        else if (_mtlRenderPassDescriptor == nil) {
             TF_FATAL_CODING_ERROR(
                 "SetMetalRenderPassDescriptor must be called prior "
                 "to rendering when render output is set to Metal");
@@ -339,8 +392,10 @@ void HdStRenderDelegateMetal::FinalizeRender()
     context->EndFrame();
 
     if (_renderOutput == DelegateParams::RenderOutput::Metal) {
-        [_mtlRenderPassDescriptor release];
-        _mtlRenderPassDescriptor = nil;
+        if (!context->GetDrawTarget()) {
+            [_mtlRenderPassDescriptor release];
+            _mtlRenderPassDescriptor = nil;
+        }
     }
 
     // Finalize rendering here & push the command buffer to the GPU

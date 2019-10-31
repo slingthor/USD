@@ -69,6 +69,8 @@ pxr_library(hd
         renderIndex
         renderPass
         renderPassState
+        rendererPlugin
+        rendererPluginRegistry
         renderThread
         repr
         resource

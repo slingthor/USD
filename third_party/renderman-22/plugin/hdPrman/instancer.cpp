@@ -204,12 +204,9 @@ static void
 _AccumulateSampleTimes(HdTimeSampleArray<T1,C> const& in,
                        HdTimeSampleArray<T2,C> *out)
 {
-    size_t cappedNumSamplesIn = std::min(in.count, C);
-    if (cappedNumSamplesIn > out->count) {
-        out->count = cappedNumSamplesIn;
-        for (size_t i=0; i < cappedNumSamplesIn; ++i) {
-            out->times[i] = in.times[i];
-        }
+    if (in.count > out->count) {
+        out->Resize(in.count);
+        out->times = in.times;
     }
 }
 
@@ -251,13 +248,12 @@ HdPrmanInstancer::SampleInstanceTransforms(
     // As a simple resampling strategy, find the input with the max #
     // of samples and use its sample placement.  In practice we expect
     // them to all be the same, i.e. to not require resampling.
-    sa->count = 0;
+    sa->Resize(0);
     _AccumulateSampleTimes(instancerXform, sa);
     _AccumulateSampleTimes(instanceXforms, sa);
     _AccumulateSampleTimes(translates, sa);
     _AccumulateSampleTimes(scales, sa);
     _AccumulateSampleTimes(rotates, sa);
-    TF_VERIFY(sa->count <= sa->capacity);
 
     // Resample inputs and concatenate transformations.
     //
@@ -289,27 +285,28 @@ HdPrmanInstancer::SampleInstanceTransforms(
         }
 
         // Concatenate transformations and filter to just the instanceIndices.
-        sa->values[i].resize(instanceIndices.size());
+        VtMatrix4dArray &ma = sa->values[i];
+        ma.resize(instanceIndices.size());
         for (size_t j=0; j < instanceIndices.size(); ++j) {
-            sa->values[i][j] = xf;
+            ma[j] = xf;
             size_t instanceIndex = instanceIndices[j];
             if (trans.size() > instanceIndex) {
                 GfMatrix4d t(1);
                 t.SetTranslate(GfVec3d(trans[instanceIndex]));
-                sa->values[i][j] = t * sa->values[i][j];
+                ma[j] = t * ma[j];
             }
             if (rot.size() > instanceIndex) {
                 GfMatrix4d r(1);
                 r.SetRotate(GfRotation(rot[instanceIndex]));
-                sa->values[i][j] = r * sa->values[i][j];
+                ma[j] = r * ma[j];
             }
             if (scale.size() > instanceIndex) {
                 GfMatrix4d s(1);
                 s.SetScale(GfVec3d(scale[instanceIndex]));
-                sa->values[i][j] = s * sa->values[i][j];
+                ma[j] = s * ma[j];
             }
             if (ixf.size() > instanceIndex) {
-                sa->values[i][j] = ixf[instanceIndex] * sa->values[i][j];
+                ma[j] = ixf[instanceIndex] * ma[j];
             }
         }
     }
@@ -319,6 +316,7 @@ HdPrmanInstancer::SampleInstanceTransforms(
     if (GetParentId().IsEmpty()) {
         return;
     }
+
     HdInstancer *parentInstancer =
         GetDelegate()->GetRenderIndex().GetInstancer(GetParentId());
     if (!TF_VERIFY(parentInstancer)) {
@@ -343,12 +341,7 @@ HdPrmanInstancer::SampleInstanceTransforms(
         return;
     }
     // Move aside previously computed child xform samples to childXf.
-    HdTimeSampleArray<VtMatrix4dArray, HDPRMAN_MAX_TIME_SAMPLES> childXf;
-    childXf.count = sa->count;
-    for (size_t i=0; i < sa->count; ++i) {
-        childXf.times[i] = sa->times[i];
-        childXf.values[i] = sa->values[i];
-    }
+    HdTimeSampleArray<VtMatrix4dArray, HDPRMAN_MAX_TIME_SAMPLES> childXf(*sa);
     // Merge sample times, taking the densest sampling.
     _AccumulateSampleTimes(parentXf, sa);
     // Apply parent xforms to the children.

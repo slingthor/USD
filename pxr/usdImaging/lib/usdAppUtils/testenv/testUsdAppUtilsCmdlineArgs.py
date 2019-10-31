@@ -252,10 +252,10 @@ class TestUsdAppUtilsCmdlineArgs(unittest.TestCase):
         self.assertEqual(args.rendererPlugin, None)
 
         args = self._parser.parse_args(['--renderer', 'GL'])
-        self.assertEqual(args.rendererPlugin.id, 'HdStormRendererPlugin')
+        self.assertEqual(args.rendererPlugin.id, 'HdStormGLRendererPlugin')
 
         args = self._parser.parse_args(['-r', 'GL'])
-        self.assertEqual(args.rendererPlugin.id, 'HdStormRendererPlugin')
+        self.assertEqual(args.rendererPlugin.id, 'HdStormGLRendererPlugin')
 
         # Test passing an invalid option.
         parser = _NonExitingArgumentParser(prog=self._progName)

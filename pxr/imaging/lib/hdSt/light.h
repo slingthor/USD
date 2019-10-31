@@ -106,6 +106,10 @@ private:
     GarchTextureGPUHandle _irradianceTexture;
     GarchTextureGPUHandle _prefilterTexture;
     GarchTextureGPUHandle _brdfTexture;
+
+    GarchSamplerGPUHandle _irradianceSampler;
+    GarchSamplerGPUHandle _prefilterSampler;
+    GarchSamplerGPUHandle _brdfSampler;
 };
 
 

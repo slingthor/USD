@@ -33,7 +33,7 @@
 
 #include "pxr/imaging/hd/engine.h"
 
-#include "pxr/imaging/hdSt/renderDelegate.h"
+#include "pxr/imaging/hdSt/GL/renderDelegateGL.h"
 #include "pxr/imaging/hdSt/light.h"
 
 #include "pxr/imaging/hdx/simpleLightTask.h"
@@ -74,12 +74,12 @@ int main(int argc, char *argv[])
     GLfloat clearColor[4] = { 0.1f, 0.1f, 0.1f, 1.0f };
     GLfloat clearDepth[1] = { 1.0f };
 
-    HdStRenderDelegate renderDelegate;
+    HdStRenderDelegateGL renderDelegate;
     std::unique_ptr<HdRenderIndex> index(HdRenderIndex::New(&renderDelegate));
     TF_VERIFY(index);
     std::unique_ptr<Hdx_UnitTestDelegate> delegate(
                                          new Hdx_UnitTestDelegate(index.get()));
-    HdEngine engine(HdEngine::OpenGL);
+    HdEngine engine;
 
     // --------------------------------------------------------------------
 

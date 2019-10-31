@@ -89,53 +89,53 @@ public:
 
     // GarchBaseTextureData overrides
     GARCH_API
-    virtual int ResizedWidth(int mipLevel = 0) const override;
+    int ResizedWidth(int mipLevel = 0) const override;
 
     GARCH_API
-    virtual int ResizedHeight(int mipLevel = 0) const override;
+    int ResizedHeight(int mipLevel = 0) const override;
 
     GARCH_API
-    virtual int ResizedDepth(int mipLevel = 0) const override;
+    int ResizedDepth(int mipLevel = 0) const override;
 
-    virtual GLenum GLInternalFormat() const override {
+    GLenum GLInternalFormat() const override {
         return _glInternalFormat;
     };
 
-    virtual GLenum GLFormat() const override {
+    GLenum GLFormat() const override {
         return _glFormat;
     };
 
-    virtual GLenum GLType() const override {
+    GLenum GLType() const override {
         return _glType;
     };
 
-    virtual size_t TargetMemory() const override {
+    size_t TargetMemory() const override {
         return _targetMemory;
     };
 
-    virtual WrapInfo GetWrapInfo() const override {
+    WrapInfo GetWrapInfo() const override {
         return _wrapInfo;
     };
 
     GARCH_API
-    virtual size_t ComputeBytesUsed() const override;
+    size_t ComputeBytesUsed() const override;
 
     GARCH_API
-    virtual size_t ComputeBytesUsedByMip(int mipLevel = 0) const override;
+    size_t ComputeBytesUsedByMip(int mipLevel = 0) const override;
 
     GARCH_API
-    virtual bool HasRawBuffer(int mipLevel = 0) const override;
+    bool HasRawBuffer(int mipLevel = 0) const override;
 
     GARCH_API
-    virtual unsigned char * GetRawBuffer(int mipLevel = 0) const override;
+    unsigned char * GetRawBuffer(int mipLevel = 0) const override;
 
     GARCH_API
-    virtual bool Read(int degradeLevel, bool generateMipmap,
-                      GarchImage::ImageOriginLocation originLocation =
-                      GarchImage::OriginUpperLeft) override;
+    bool Read(int degradeLevel, bool generateMipmap,
+              GarchImage::ImageOriginLocation originLocation =
+                    GarchImage::OriginUpperLeft) override;
 
     GARCH_API
-    virtual int GetNumMipLevels() const override;
+    int GetNumMipLevels() const override;
 
 private:
     // A structure that keeps the mips loaded from disk in the format

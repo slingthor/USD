@@ -44,6 +44,7 @@ HdStRenderDelegateGL::HdStRenderDelegateGL()
 HdStRenderDelegateGL::HdStRenderDelegateGL(HdRenderSettingsMap const& settingsMap)
     : HdStRenderDelegate(settingsMap)
 {
+    _hgi = new HgiGL();
 }
 
 HdStRenderDelegateGL::~HdStRenderDelegateGL()

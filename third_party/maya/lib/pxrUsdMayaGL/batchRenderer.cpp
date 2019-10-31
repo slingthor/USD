@@ -65,8 +65,8 @@
 #include "pxr/imaging/hd/tokens.h"
 #include "pxr/imaging/hdx/selectionTracker.h"
 #include "pxr/imaging/hdx/tokens.h"
-#include "pxr/imaging/hdx/rendererPlugin.h"
-#include "pxr/imaging/hdx/rendererPluginRegistry.h"
+#include "pxr/imaging/hd/rendererPlugin.h"
+#include "pxr/imaging/hd/rendererPluginRegistry.h"
 #include "pxr/usdImaging/usdImagingGL/engine.h"
 #include "pxr/usd/sdf/path.h"
 
@@ -441,11 +441,13 @@ UsdMayaGLBatchRenderer::UsdMayaGLBatchRenderer() :
 {
     TfToken pluginId = UsdImagingGLEngine::GetDefaultRendererPluginId();
     if(pluginId.IsEmpty()) {
-        pluginId = HdxRendererPluginRegistry::GetInstance().
+        pluginId = HdRendererPluginRegistry::GetInstance().
             GetDefaultPluginId();
     }
     _rendererPluginId = pluginId;
-    HdxRendererPlugin *plugin = HdxRendererPluginRegistry::GetInstance().GetRendererPlugin(_rendererPluginId);
+    HdRendererPlugin *plugin =
+        HdRendererPluginRegistry::GetInstance().GetRendererPlugin(
+            _rendererPluginId);
     _renderDelegate = (HdStRenderDelegate*)plugin->CreateRenderDelegate();
 }
 
@@ -531,7 +533,9 @@ UsdMayaGLBatchRenderer::~UsdMayaGLBatchRenderer()
     // constructor
     MMessage::removeCallback(_softSelectOptionsCallbackId);
     
-    HdxRendererPlugin *plugin = HdxRendererPluginRegistry::GetInstance().GetRendererPlugin(_rendererPluginId);
+    HdRendererPlugin *plugin =
+        HdRendererPluginRegistry::GetInstance().GetRendererPlugin(
+            _rendererPluginId);
     plugin->DeleteRenderDelegate(_renderDelegate);
 }
 

@@ -26,6 +26,9 @@
 #include "pxr/imaging/garch/image.h"
 #include "pxr/imaging/garch/utils.h"
 
+#include "pxr/usd/ar/asset.h"
+#include "pxr/usd/ar/resolver.h"
+
 #include "pxr/base/arch/pragmas.h"
 
 // use gf types to read and write metadata
@@ -35,12 +38,14 @@
 #include "pxr/base/tf/diagnostic.h"
 #include "pxr/base/tf/stringUtils.h"
 #include "pxr/base/tf/type.h"
+#include "pxr/base/tf/staticData.h"
 
 ARCH_PRAGMA_PUSH
 ARCH_PRAGMA_MACRO_REDEFINITION // due to Python copysign
 #include <OpenImageIO/imagebuf.h>
 #include <OpenImageIO/imagebufalgo.h>
 #include <OpenImageIO/imageio.h>
+#include <OpenImageIO/filesystem.h>
 #include <OpenImageIO/typedesc.h>
 ARCH_PRAGMA_POP
 
@@ -48,6 +53,18 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 
 OIIO_NAMESPACE_USING
+
+// _ioProxySupportedExtensions is a list of hardcoded file extensions that
+// support ioProxy. Although OIIO has an api call for checking whether or
+// not a file type supports ioProxy, version 2.0.9 does not include this
+// for EXR's, even though EXR's support ioProxy. This issue was fixed in
+// commit 7677d498b599295fa8277d050ef994efbd297b55. Thus, for now we check
+// whether or not a file extension is included in our hardcoded list of
+// extensions we know to support ioProxy.
+TF_MAKE_STATIC_DATA(std::vector<std::string>, _ioProxySupportedExtensions)
+{
+    _ioProxySupportedExtensions->push_back("exr");
+}
 
 class Garch_OIIOImage : public GarchImage {
 public:
@@ -87,10 +104,18 @@ protected:
     virtual bool _OpenForWriting(std::string const & filename);
 
 private:
+    std::string _GetFilenameExtension() const;
+    #if OIIO_VERSION >= 20003
+        cspan<unsigned char> _GenerateBufferCSpan(
+            const std::shared_ptr<const char>& buffer,
+            int bufferSize) const;
+    #endif
+        bool _CanUseIOProxyForExtension(std::string extension,
+                                        const ImageSpec &config) const;
     std::string _filename;
     int _subimage;
     int _miplevel;
-    ImageBuf _imagebuf;
+    ImageSpec _imagespec;
 };
 
 TF_REGISTRY_FUNCTION(TfType)
@@ -294,51 +319,51 @@ Garch_OIIOImage::GetFilename() const
 int
 Garch_OIIOImage::GetWidth() const
 {
-    return _imagebuf.spec().width;
+    return _imagespec.width;
 }
 
 /* virtual */
 int
 Garch_OIIOImage::GetHeight() const
 {
-    return _imagebuf.spec().height;
+    return _imagespec.height;
 }
 
 /* virtual */
 GLenum
 Garch_OIIOImage::GetFormat() const
 {
-    return _MTLFormatFromImageData(_imagebuf.spec().nchannels);
+    return _MTLFormatFromImageData(_imagespec.nchannels);
 }
 
 /* virtual */
 GLenum
 Garch_OIIOImage::GetType() const
 {
-    return _GLTypeFromImageData(_imagebuf.spec().format);
+    return _GLTypeFromImageData(_imagespec.format);
 }
 
 /* virtual */
 int
 Garch_OIIOImage::GetBytesPerPixel() const
 {
-    return _imagebuf.spec().pixel_bytes();
+    return _imagespec.pixel_bytes();
 }
 
 /* virtual */
 bool
 Garch_OIIOImage::IsColorSpaceSRGB() const
 {
-    return ((_imagebuf.spec().nchannels == 3  ||
-             _imagebuf.spec().nchannels == 4) &&
-            _imagebuf.spec().format == TypeDesc::UINT8);
+    return ((_imagespec.nchannels == 3  ||
+             _imagespec.nchannels == 4) &&
+            _imagespec.format == TypeDesc::UINT8);
 }
 
 /* virtual */
 bool
 Garch_OIIOImage::GetMetadata(TfToken const & key, VtValue * value) const
 {
-    VtValue result = _FindAttribute(_imagebuf.spec(), key.GetString());
+    VtValue result = _FindAttribute(_imagespec, key.GetString());
     if (!result.IsEmpty()) {
         *value = result;
         return true;
@@ -367,14 +392,14 @@ Garch_OIIOImage::GetSamplerMetadata(GLenum pname, VtValue * param) const
 {
     switch (pname) {
         case GL_TEXTURE_WRAP_S: {
-                VtValue smode = _FindAttribute(_imagebuf.spec(), "s mode");
+                VtValue smode = _FindAttribute(_imagespec, "s mode");
                 if (!smode.IsEmpty() && smode.IsHolding<std::string>()) {
                     *param = VtValue(_TranslateWrap(smode.Get<std::string>()));
                     return true;
                 }
             } return false;
         case GL_TEXTURE_WRAP_T: {
-                VtValue tmode = _FindAttribute(_imagebuf.spec(), "t mode");
+                VtValue tmode = _FindAttribute(_imagespec, "t mode");
                 if (!tmode.IsEmpty() && tmode.IsHolding<std::string>()) {
                     *param = VtValue(_TranslateWrap(tmode.Get<std::string>()));
                     return true;
@@ -393,6 +418,49 @@ Garch_OIIOImage::GetNumMipLevels() const
     return 1;
 }
 
+std::string
+Garch_OIIOImage::_GetFilenameExtension() const
+{
+    std::string fileExtension = ArGetResolver().GetExtension(_filename);
+    return TfStringToLower(fileExtension);
+}
+
+#if OIIO_VERSION >= 20003
+cspan<unsigned char>
+Garch_OIIOImage::_GenerateBufferCSpan(const std::shared_ptr<const char>& buffer,
+                                    int bufferSize) const
+{
+    const char* bufferPtr = buffer.get();
+    const unsigned char* bufferPtrUnsigned = (const unsigned char *) bufferPtr;
+    cspan<unsigned char> bufferCSpan(bufferPtrUnsigned, bufferSize);
+    return bufferCSpan;
+}
+#endif
+
+bool
+Garch_OIIOImage::_CanUseIOProxyForExtension(std::string extension,
+                                          const ImageSpec & config) const
+{
+    if (std::find(_ioProxySupportedExtensions->begin(),
+                  _ioProxySupportedExtensions->end(),
+                  extension)
+            != _ioProxySupportedExtensions->end()) {
+        return true;
+    }
+    std::string inputFilename("test.");
+    inputFilename.append(extension);
+    std::unique_ptr<ImageInput> imageInput(
+        ImageInput::open(inputFilename, &config));
+
+    if (!imageInput) {
+        return false;
+    }
+    if (imageInput->supports("ioproxy")) {
+        return true;
+    }
+    return false;
+}
+
 /* virtual */
 bool
 Garch_OIIOImage::_OpenForReading(std::string const & filename, int subimage,
@@ -401,10 +469,51 @@ Garch_OIIOImage::_OpenForReading(std::string const & filename, int subimage,
     _filename = filename;
     _subimage = subimage;
     _miplevel = mip;
-    _imagebuf.clear();
-    return _imagebuf.init_spec(_filename, subimage, mip)
-           && (_imagebuf.nsubimages() > subimage)
-           && _imagebuf.nmiplevels() > mip;
+    _imagespec = ImageSpec();
+
+#if OIIO_VERSION >= 20003
+    std::shared_ptr<ArAsset> asset = ArGetResolver().OpenAsset(_filename);
+    if (!asset) {
+        return false;
+    }
+
+    std::shared_ptr<const char> buffer = asset->GetBuffer();
+    if (!buffer) {
+        return false;
+    }
+
+    size_t bufferSize = asset->GetSize();
+
+    Filesystem::IOMemReader memreader(_GenerateBufferCSpan(buffer, bufferSize));
+    void *ptr = &memreader;
+    ImageSpec config;
+    config.attribute("oiio:ioproxy", TypeDesc::PTR, &ptr);
+
+    std::string extension = _GetFilenameExtension();
+
+    std::unique_ptr<ImageInput> imageInput;
+
+    if (_CanUseIOProxyForExtension(extension, config)) {
+        std::string inputFileName("in.");
+        inputFileName.append(extension);
+        imageInput = ImageInput::open(inputFileName, &config);
+    }
+    else {
+        imageInput = ImageInput::open(_filename);
+    }
+#else
+    std::unique_ptr<ImageInput> imageInput(ImageInput::open(_filename));
+#endif
+
+    if (!imageInput) {
+        return false;
+    }
+
+    if (!imageInput->seek_subimage(subimage, mip, _imagespec)) {
+        return false;
+    }
+
+    return true;
 }
 
 /* virtual */
@@ -422,9 +531,43 @@ Garch_OIIOImage::ReadCropped(int const cropTop,
                            int const cropRight,
                            StorageSpec const & storage)
 {
+#if OIIO_VERSION >= 20003
+    std::shared_ptr<ArAsset> asset = ArGetResolver().OpenAsset(_filename);
+    if (!asset) {
+        return false;
+    }
+
+    std::shared_ptr<const char> buffer = asset->GetBuffer();
+    if (!buffer) {
+        return false;
+    }
+
+    size_t bufferSize = asset->GetSize();
+    
+    Filesystem::IOMemReader memreader(_GenerateBufferCSpan(buffer, bufferSize));
+    void *ptr = &memreader;
+    ImageSpec config;
+    config.attribute("oiio:ioproxy", TypeDesc::PTR, &ptr);
+
+    std::string extension = _GetFilenameExtension();
+
+    std::unique_ptr<ImageInput> imageInput;
+
+    if (_CanUseIOProxyForExtension(extension, config)) {
+        std::string inputFileName("in.");
+        inputFileName.append(extension);
+
+        imageInput = ImageInput::open(inputFileName, &config);
+    }
+    else {
+        imageInput = ImageInput::open(_filename);
+    }
+
+#else
     // read from file
-    ImageBuf * image = &_imagebuf;
     std::unique_ptr<ImageInput> imageInput(ImageInput::open(_filename));
+
+#endif
 
     //// seek subimage
     ImageSpec spec = imageInput->spec();
@@ -465,7 +608,7 @@ Garch_OIIOImage::ReadCropped(int const cropTop,
     
     // Construct ImageBuf that wraps around allocated pixels memory
     ImageBuf imagebuf =ImageBuf(imageInput->spec(), pixels);
-    image = &imagebuf;
+    ImageBuf *image = &imagebuf;
 
     // Convert color images to linear (unless they are sRGB)
     // (Currently unimplemented, requires OpenColorIO support from OpenImageIO)
@@ -502,9 +645,8 @@ Garch_OIIOImage::ReadCropped(int const cropTop,
         return false;
     }
 
-    if (image != &_imagebuf) {
-        _imagebuf.swap(*image);
-    }
+    _imagespec = image->spec();
+
     return true;
 }
 
@@ -513,7 +655,7 @@ bool
 Garch_OIIOImage::_OpenForWriting(std::string const & filename)
 {
     _filename = filename;
-    _imagebuf.clear();
+    _imagespec = ImageSpec();
     return true;
 }
 
@@ -547,9 +689,8 @@ Garch_OIIOImage::Write(StorageSpec const & storage,
         return false;
     }
 
-    if (image != &_imagebuf) {
-        _imagebuf.swap(*image);
-    }
+    _imagespec = image->spec();
+
     return true;
 }
 

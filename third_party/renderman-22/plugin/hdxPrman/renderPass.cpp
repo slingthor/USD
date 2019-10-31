@@ -21,7 +21,6 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#include "pxr/imaging/glf/glew.h"
 #include "hdxPrman/renderPass.h"
 #include "hdxPrman/context.h"
 #include "hdxPrman/renderBuffer.h"
@@ -94,6 +93,7 @@ HdxPrman_RenderPass::_Execute(HdRenderPassStateSharedPtr const& renderPassState,
     static const RtUString us_PxrPerspective("PxrPerspective");
     static const RtUString us_PxrOrthographic("PxrOrthographic");
     static const RtUString us_PathTracer("PathTracer");
+    static const RtUString us_main_cam_projection("main_cam_projection");
 
     if (!_interactiveContext) {
         // If this is not an interactive context, don't use Hydra to drive
@@ -185,16 +185,13 @@ HdxPrman_RenderPass::_Execute(HdRenderPassStateSharedPtr const& renderPassState,
         // - World is Y-up
         // - Camera looks along +Z.
 
-        // Check if camera has switched between perspective or orthographic
-        riley::ShadingNode* cameraNode = &_interactiveContext->cameraNode;
-        bool isPerspective = cameraNode->name == us_PxrPerspective;
-        bool wantsOrtho = round(proj[3][3]) == 1 && proj != GfMatrix4d(1);
-
-        if (wantsOrtho && isPerspective) {
-            cameraNode->name = us_PxrOrthographic;
-        } else if (!wantsOrtho && !isPerspective) {
-            cameraNode->name = us_PxrPerspective;
-        }
+        bool isPerspective = round(proj[3][3]) != 1 || proj == GfMatrix4d(1);
+        riley::ShadingNode cameraNode = riley::ShadingNode {
+            riley::ShadingNode::k_Projection,
+            isPerspective ? us_PxrPerspective : us_PxrOrthographic,
+            us_main_cam_projection,
+            projParams
+        };
 
         // Set riley camera and projection shader params from the Hydra camera.
         hdCam->SetRileyCameraParams(camParams, projParams);
@@ -206,7 +203,7 @@ HdxPrman_RenderPass::_Execute(HdRenderPassStateSharedPtr const& renderPassState,
         // We apply the orthographic-width to the viewMatrix scale instead.
         // Inverse computation of GfFrustum::ComputeProjectionMatrix()
         GfMatrix4d viewToWorldCorrectionMatrix(1.0);
-        if (wantsOrtho) {
+        if (!isPerspective) {
             double left   = -(1 + proj[3][0]) / proj[0][0];
             double right  =  (1 - proj[3][0]) / proj[0][0];
             double bottom = -(1 - proj[3][1]) / proj[1][1];
@@ -223,7 +220,6 @@ HdxPrman_RenderPass::_Execute(HdRenderPassStateSharedPtr const& renderPassState,
             const float fov_deg = fov_rad / M_PI * 180.0;
 
             projParams->SetFloat(RixStr.k_fov, fov_deg);
-            _interactiveContext->cameraNode.params = projParams;
 
             // Aspect ratio correction: modify the camera so the image aspect
             // ratio matches the viewport (the image dimensions here being the
@@ -246,9 +242,12 @@ HdxPrman_RenderPass::_Execute(HdRenderPassStateSharedPtr const& renderPassState,
         viewToWorldCorrectionMatrix = flipZ * viewToWorldCorrectionMatrix;
 
         // Convert  from Gf to Rt.
-        HdTimeSampleArray<GfMatrix4d, HDPRMAN_MAX_TIME_SAMPLES> xforms =
+        HdTimeSampleArray<GfMatrix4d, HDPRMAN_MAX_TIME_SAMPLES> const& xforms =
             hdCam->GetTimeSampleXforms();
-        RtMatrix4x4 xf_rt_values[HDPRMAN_MAX_TIME_SAMPLES];
+
+        TfSmallVector<RtMatrix4x4, HDPRMAN_MAX_TIME_SAMPLES> 
+            xf_rt_values(xforms.count);
+        
         for (size_t i=0; i < xforms.count; ++i) {
             xf_rt_values[i] = HdPrman_GfMatrixToRtMatrix(
                 viewToWorldCorrectionMatrix * xforms.values[i]);
@@ -256,9 +255,13 @@ HdxPrman_RenderPass::_Execute(HdRenderPassStateSharedPtr const& renderPassState,
 
         // Commit new camera.
         riley::Transform xform = {
-            unsigned(xforms.count), xf_rt_values, xforms.times };
-        riley->ModifyCamera(_interactiveContext->cameraId, cameraNode,
-                            &xform, camParams);
+            unsigned(xforms.count), xf_rt_values.data(), xforms.times.data() };
+
+        riley->ModifyCamera(
+            _interactiveContext->cameraId, 
+            &cameraNode,
+            &xform, 
+            camParams);
         mgr->DestroyRixParamList(camParams);
         mgr->DestroyRixParamList(projParams);
 
@@ -377,75 +380,37 @@ HdxPrman_RenderPass::_Execute(HdRenderPassStateSharedPtr const& renderPassState,
     int offset = skipPixels + skipRows * _interactiveContext->framebuffer.w;
     int stride = _interactiveContext->framebuffer.w;
 
-    if (aovBindings.size() == 0) {
-        // No AOV bindings means blit current framebuffer contents.
-        // We don't bother to synchronize -- but we could, if presenting
-        // partial updates becomes objectionable.
+    // Blit from the framebuffer to the currently selected AOVs.
+    for (size_t aov = 0; aov < aovBindings.size(); ++aov) {
+        if(!TF_VERIFY(aovBindings[aov].renderBuffer)) {
+            continue;
+        }
+        HdxPrmanRenderBuffer *rb = static_cast<HdxPrmanRenderBuffer*>(
+            aovBindings[aov].renderBuffer);
 
-        // Adjust GL blending for compositing.
-        //
-        // As configured, the framebuffer coming from Renderman will be
-        // effectively premultiplied.  The transition from a foreground
-        // object that is blurred (ex: due to motion or lens defocus)
-        // to the background will have alpha go from 1..0 and color
-        // channels likewise to go zero.  To composite this correctly
-        // we want to use GL_ONE for the foreground element.
-        glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-        glEnable(GL_BLEND);
+        // Forward convergence state to the render buffers...
+        rb->SetConverged(_converged);
 
-        glPixelStorei(GL_UNPACK_ROW_LENGTH, _interactiveContext->framebuffer.w);
-        glPixelStorei(GL_UNPACK_SKIP_PIXELS, skipPixels);
-        glPixelStorei(GL_UNPACK_SKIP_ROWS,  skipRows);
-        _compositor.UpdateColor(_interactiveContext->framebuffer.w * fracWidth,
-                                _interactiveContext->framebuffer.h * fracHeight,
-                                &_interactiveContext->framebuffer.color[0]);
-        _compositor.UpdateDepth(_interactiveContext->framebuffer.w * fracWidth,
-                                _interactiveContext->framebuffer.h * fracHeight,
-                                reinterpret_cast<uint8_t*>(
-                                   &_interactiveContext->framebuffer.depth[0]));
-        glPixelStorei(GL_UNPACK_SKIP_ROWS, 0);
-        glPixelStorei(GL_UNPACK_SKIP_PIXELS, 0);
-        glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
-
-        // Blit
-        _compositor.Draw();
-
-        glBlendFunc(GL_ONE, GL_ZERO);
-        glDisable(GL_BLEND);
-    } else {
-
-        // Blit from the framebuffer to the currently selected AOVs.
-        for (size_t aov = 0; aov < aovBindings.size(); ++aov) {
-            if(!TF_VERIFY(aovBindings[aov].renderBuffer)) {
-                continue;
-            }
-            HdxPrmanRenderBuffer *rb = static_cast<HdxPrmanRenderBuffer*>(
-                aovBindings[aov].renderBuffer);
-
-            // Forward convergence state to the render buffers...
-            rb->SetConverged(_converged);
-
-            if (aovBindings[aov].aovName == HdAovTokens->color) {
-                rb->Blit(HdFormatUNorm8Vec4, width, height, offset, stride,
-                    reinterpret_cast<uint8_t*>(
-                        &_interactiveContext->framebuffer.color[0]));
-            } else if (aovBindings[aov].aovName == HdAovTokens->depth) {
-                rb->Blit(HdFormatFloat32, width, height, offset, stride,
-                    reinterpret_cast<uint8_t*>(
-                        &_interactiveContext->framebuffer.depth[0]));
-            } else if (aovBindings[aov].aovName == HdAovTokens->primId) {
-                rb->Blit(HdFormatInt32, width, height, offset, stride,
-                    reinterpret_cast<uint8_t*>(
-                        &_interactiveContext->framebuffer.primId[0]));
-            } else if (aovBindings[aov].aovName == HdAovTokens->instanceId) {
-                rb->Blit(HdFormatInt32, width, height, offset, stride,
-                    reinterpret_cast<uint8_t*>(
-                        &_interactiveContext->framebuffer.instanceId[0]));
-            } else if (aovBindings[aov].aovName == HdAovTokens->elementId) {
-                rb->Blit(HdFormatInt32, width, height, offset, stride,
-                    reinterpret_cast<uint8_t*>(
-                        &_interactiveContext->framebuffer.elementId[0]));
-            }
+        if (aovBindings[aov].aovName == HdAovTokens->color) {
+            rb->Blit(HdFormatFloat32Vec4, width, height, offset, stride,
+                reinterpret_cast<uint8_t*>(
+                    &_interactiveContext->framebuffer.color[0]));
+        } else if (aovBindings[aov].aovName == HdAovTokens->depth) {
+            rb->Blit(HdFormatFloat32, width, height, offset, stride,
+                reinterpret_cast<uint8_t*>(
+                    &_interactiveContext->framebuffer.depth[0]));
+        } else if (aovBindings[aov].aovName == HdAovTokens->primId) {
+            rb->Blit(HdFormatInt32, width, height, offset, stride,
+                reinterpret_cast<uint8_t*>(
+                    &_interactiveContext->framebuffer.primId[0]));
+        } else if (aovBindings[aov].aovName == HdAovTokens->instanceId) {
+            rb->Blit(HdFormatInt32, width, height, offset, stride,
+                reinterpret_cast<uint8_t*>(
+                    &_interactiveContext->framebuffer.instanceId[0]));
+        } else if (aovBindings[aov].aovName == HdAovTokens->elementId) {
+            rb->Blit(HdFormatInt32, width, height, offset, stride,
+                reinterpret_cast<uint8_t*>(
+                    &_interactiveContext->framebuffer.elementId[0]));
         }
     }
 }

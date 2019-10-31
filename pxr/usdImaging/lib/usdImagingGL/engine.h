@@ -71,7 +71,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 class UsdPrim;
 class HdRenderIndex;
-class HdxRendererPlugin;
+class HdRendererPlugin;
 class HdxTaskController;
 class UsdImagingDelegate;
 class UsdImagingGLLegacyEngine;
@@ -408,11 +408,6 @@ public:
     void SetRendererSetting(TfToken const& settingId,
                                     VtValue const& value);
 
-    /// (Optional) Enable the use of an (internal) 16F draw target.
-    /// A 16F or higher framebuffer is needed when color correction is enabled.
-    USDIMAGINGGL_API
-    void SetEnableFloatPointDrawTarget(bool state);
-
     /// @}
 
     // ---------------------------------------------------------------------
@@ -445,8 +440,8 @@ public:
 
     /// Set \p id to one of the HdxColorCorrectionTokens.
     /// \p framebufferResolution should be the size of the bound framebuffer
-    /// that will be color corrected. A 16F framebuffer should be bound when
-    /// using color correction. See SetEnableFloatPointDrawTarget().
+    /// that will be color corrected. It is recommended that a 16F or higher
+    /// AOV is bound for color correction.
     USDIMAGINGGL_API
     void SetColorCorrectionSettings(
         TfToken const& id, 
@@ -485,7 +480,6 @@ protected:
 
     USDIMAGINGGL_API
     void _Execute(const UsdImagingGLRenderParams &params,
-                  bool fp16DrawTarget,
                   HdTaskSharedPtrVector tasks);
 
     // These functions factor batch preparation into separate steps so they
@@ -519,14 +513,6 @@ protected:
     void _DeleteHydraResources();
 
     USDIMAGINGGL_API
-    // Creates and binds the internal draw-target that Hydra draws into.
-    USDIMAGINGGL_API
-    void _BindInternalDrawTarget(UsdImagingGLRenderParams const& params);
-
-    // Restores clients framebuffer and copies our result into their framebuffer
-    USDIMAGINGGL_API
-    void _RestoreClientDrawTarget(UsdImagingGLRenderParams const& params);
-
     HdEngine *_engine;
     HdStResourceFactoryInterface *_resourceFactory;
 
@@ -539,7 +525,7 @@ protected:
     SdfPath const _delegateID;
     UsdImagingDelegate *_delegate;
 
-    HdxRendererPlugin *_rendererPlugin;
+    HdRendererPlugin *_rendererPlugin;
     TfToken _rendererId;
     HdxTaskController *_taskController;
 
@@ -553,11 +539,6 @@ protected:
     SdfPathVector _invisedPrimPaths;
     bool _isPopulated;
 
-    GfVec4i _restoreViewport;
-    bool _useFloatPointDrawTarget;
-    HdxCompositor _compositor;
-    GarchDrawTargetRefPtr _drawTarget;
-    
     RenderAPI _renderAPI;
     
     // An implementation of much of the engine functionality that doesn't

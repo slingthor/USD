@@ -1618,23 +1618,31 @@ private:
     // Value & Metadata Authoring
     // --------------------------------------------------------------------- //
 
-    bool _SetValue(UsdTimeCode time, const UsdAttribute &attr,
-                   const VtValue &newValue);
-    bool _SetValue(UsdTimeCode time, const UsdAttribute &attr,
-                   const SdfAbstractDataConstValue &newValue);
     template <class T>
-    bool _SetValueImpl(UsdTimeCode time, const UsdAttribute &attr, const T& value);
+    bool _SetValue(
+        UsdTimeCode time, const UsdAttribute &attr, const T &newValue);
+    bool _SetValue(
+        UsdTimeCode time, const UsdAttribute &attr, const VtValue &newValue);
+
+    template <class T>
+    bool _SetEditTargetMappedValue(
+        UsdTimeCode time, const UsdAttribute &attr, const T &newValue);
+
+    template <class T>
+    bool _SetValueImpl(
+        UsdTimeCode time, const UsdAttribute &attr, const T& value);
 
     bool _ClearValue(UsdTimeCode time, const UsdAttribute &attr);
 
-    bool _SetMetadata(const UsdObject &obj, const TfToken& fieldName,
-                      const TfToken &keyPath, const VtValue &newValue);
-    bool _SetMetadata(const UsdObject &obj, const TfToken& fieldName,
-                      const TfToken &keyPath,
-                      const SdfAbstractDataConstValue &newValue);
     template <class T>
-    bool _SetMetadataImpl(const UsdObject &obj, const TfToken& fieldName,
-                          const TfToken &keyPath, const T &value);
+    bool _SetEditTargetMappedMetadata(
+        const UsdObject &obj, const TfToken& fieldName,
+        const TfToken &keyPath, const T &newValue);
+
+    template <class T>
+    bool _SetMetadataImpl(
+        const UsdObject &obj, const TfToken& fieldName,
+        const TfToken &keyPath, const T &value);
 
     bool _ClearMetadata(const UsdObject &obj, const TfToken& fieldName,
                         const TfToken &keyPath=TfToken());
@@ -1823,6 +1831,13 @@ private:
                                       VtValue *value,
                                       bool anchorAssetPathsOnly = false) const;
 
+    void _MakeResolvedTimeCodes(UsdTimeCode time, const UsdAttribute &attr,
+                                SdfTimeCode *timeCodes,
+                                size_t numTimeCodes) const;
+
+    void _MakeResolvedAttributeValue(UsdTimeCode time, const UsdAttribute &attr,
+                                     VtValue *value) const;
+
     // --------------------------------------------------------------------- //
     // Metadata Resolution
     // --------------------------------------------------------------------- //
@@ -1922,10 +1937,6 @@ private:
                              const TfToken &fieldName,
                              const TfToken &keyPath,
                              Composer *composer) const;
-
-    template <class T>
-    bool _GetFallbackMetadata(const UsdObject &obj, const TfToken& fieldName,
-                              const TfToken &keyPath, T* result) const;
 
     // --------------------------------------------------------------------- //
     // Default & TimeSample Resolution
