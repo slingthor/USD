@@ -87,6 +87,8 @@ HdxColorCorrectionTask::HdxColorCorrectionTask(HdSceneDelegate* delegate,
 
 HdxColorCorrectionTask::~HdxColorCorrectionTask()
 {
+    bool isOpenGL = HdStResourceFactory::GetInstance()->IsOpenGL();
+
     if (_texture != 0) {
 #if defined(ARCH_GFX_OPENGL)
         glDeleteTextures(1, &_texture);
@@ -94,7 +96,6 @@ HdxColorCorrectionTask::~HdxColorCorrectionTask()
     }
 
     if (_texture3dLUT.IsSet()) {
-        bool isOpenGL = HdStResourceFactory::GetInstance()->IsOpenGL();
         if (isOpenGL) {
 #if defined(ARCH_GFX_OPENGL)
             GLuint t = _texture3dLUT;
@@ -134,7 +135,9 @@ HdxColorCorrectionTask::~HdxColorCorrectionTask()
 #endif
     }
 
-    GLF_POST_PENDING_GL_ERRORS();
+    if (isOpenGL) {
+        GLF_POST_PENDING_GL_ERRORS();
+    }
 }
 
 std::string
