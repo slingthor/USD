@@ -56,7 +56,7 @@ layout (early_fragment_tests) in;
 
 #if defined(HD_HAS_hdxOitDataBuffer)
 #if defined(ARCH_GFX_METAL)
-	#define gl_FragCoord vec2(float2(HdGet_oitScreenSize()) * gl_Position.xy)
+	#define gl_FragCoord gl_Position
 	#define atomicAdd(value, addend) atomic_fetch_add_explicit(&value, addend, memory_order_relaxed)
 	#define atomicExchange(target, desired) atomic_exchange_explicit(&target, desired, memory_order_relaxed)
 #endif
@@ -68,16 +68,20 @@ void RenderOutput(vec4 Peye, vec3 Neye, vec4 color, vec4 patchCoord)
 #if defined(HD_HAS_hdxOitDataBuffer)
     if (color.a < 1.0 && color.a > 0.0001) {
         int screenWidth = int(HdGet_oitScreenSize().x);
+        int screenHeight = int(HdGet_oitScreenSize().y);
+        
+        int dataBufferSize = screenWidth * screenHeight;
+        int counterBufferSize = screenWidth * screenHeight;
 
         // +1 because the counter buffer is cleared with -1, but we want the
         // first index to start at 0.
         int writeIndex = atomicAdd(hdxOitCounterBuffer[0], 1) + 1;
 
-        //if (writeIndex < hdxOitDataBuffer.length()) {
+        if (writeIndex < dataBufferSize) {
             int screenIndex =
                 int(gl_FragCoord.x) + int(gl_FragCoord.y) * screenWidth;
 
-            //if (screenIndex < hdxOitCounterBuffer.length()) {
+            if (screenIndex < counterBufferSize) {
                 int prevIndex =
                     atomicExchange(hdxOitCounterBuffer[screenIndex+1], writeIndex);
                 hdxOitDataBuffer[writeIndex] = color;
@@ -104,12 +108,12 @@ void RenderOutput(vec4 Peye, vec3 Neye, vec4 color, vec4 patchCoord)
                 // transform into account.
                 hdxOitDepthBuffer[writeIndex] = Peye.z / Peye.w;
                 hdxOitIndexBuffer[writeIndex] = prevIndex;
-        //    }
-        //} else {
-        //    // We may overrun the counter buffer integer and wrap back to 0 if
-        //    // we have a lot of OIT samples.
-        //    atomicAdd(hdxOitCounterBuffer[0], -1);
-        //}
+            }
+        } else {
+            // We may overrun the counter buffer integer and wrap back to 0 if
+            // we have a lot of OIT samples.
+            atomicAdd(hdxOitCounterBuffer[0], -1);
+        }
     }
 #endif
 }

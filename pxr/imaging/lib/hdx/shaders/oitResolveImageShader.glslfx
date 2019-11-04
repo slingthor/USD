@@ -40,7 +40,8 @@
 
 #if defined(HD_HAS_hdxOitDataBuffer)
 #if defined(ARCH_GFX_METAL)
-	#define gl_FragCoord vec2(float2(HdGet_oitScreenSize()) * gl_Position.xy)
+//	#define gl_FragCoord vec2(float2(HdGet_oitScreenSize()) * gl_Position.xy)
+    #define gl_FragCoord gl_Position
 	#define atomic_load(target) atomic_load_explicit(&target, memory_order_relaxed)
 #else
 	#define atomic_load(target) target
@@ -51,6 +52,9 @@ vec4 imageShader(vec2 uv)
 {
 #if defined(HD_HAS_hdxOitDataBuffer)
     int screenWidth = int(HdGet_oitScreenSize().x);
+    int screenHeight = int(HdGet_oitScreenSize().y);
+
+    int dataBufferSize = screenWidth * screenHeight;
 
     // +1 because index 0 of counter buffer is reserved as atomic counter in
     // WriteOitLayersToBuffer
@@ -70,7 +74,7 @@ vec4 imageShader(vec2 uv)
 
     while (nodeIndex != -1 && 
            numDepths < maxSamples
-	   // && nodeIndex < hdxOitDataBuffer.length()
+        && nodeIndex < dataBufferSize
     ) 
     {
         float currentDepth = hdxOitDepthBuffer[nodeIndex]; 
