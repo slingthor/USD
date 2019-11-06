@@ -316,8 +316,8 @@ HdSt_DrawBatch::_DrawingProgram::CompileShader(
         (*it)->AddBindings(&customBindings);
     }
 
-    HdSt_CodeGen *codeGen = resourceFactory->NewCodeGen(
-        _geometricShader, shaders);
+    boost::scoped_ptr<HdSt_CodeGen> codeGen(
+    HdStResourceFactory::GetInstance()->NewCodeGen( _geometricShader, shaders));
 
     // let resourcebinder resolve bindings and populate metadata
     // which is owned by codegen.
