@@ -31,6 +31,7 @@
 #include "pxr/imaging/hdx/renderSetupTask.h"
 #include "pxr/imaging/hdx/shadowTask.h"
 #include "pxr/imaging/hdx/colorCorrectionTask.h"
+#include "pxr/imaging/hdx/colorChannelTask.h"
 
 #include "pxr/imaging/hd/aov.h"
 #include "pxr/imaging/hd/renderIndex.h"
@@ -201,6 +202,13 @@ public:
     HDX_API
     void SetColorCorrectionParams(HdxColorCorrectionTaskParams const& params);
 
+    /// -------------------------------------------------------
+    /// Color Channel API
+
+    /// Configure color channel by settings params.
+    HDX_API
+    void SetColorChannelParams(HdxColorChannelTaskParams const& params);
+
 private:
     ///
     /// This class is not intended to be copied.
@@ -224,6 +232,7 @@ private:
     void _CreateColorizeTask();
     void _CreateColorizeSelectionTask();
     void _CreateColorCorrectionTask();
+    void _CreateColorChannelTask();
     void _CreatePickTask();
     void _CreatePickFromRenderBufferTask();
     SdfPath _CreateAovResolveTask(TfToken const& aovName);
@@ -241,6 +250,7 @@ private:
     bool _SelectionEnabled() const;
     bool _ColorizeSelectionEnabled() const;
     bool _ColorCorrectionEnabled() const;
+    bool _ColorChannelEnabled() const;
     bool _ColorizeQuantizationEnabled() const;
     bool _AovsSupported() const;
 
@@ -326,6 +336,7 @@ private:
     SdfPath _colorizeSelectionTaskId;
     SdfPath _colorizeTaskId;
     SdfPath _colorCorrectionTaskId;
+    SdfPath _colorChannelTaskId;
     SdfPath _pickTaskId;
     SdfPath _pickFromRenderBufferTaskId;
     SdfPath _aovColorResolveTaskId;

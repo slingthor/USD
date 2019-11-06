@@ -79,12 +79,12 @@ HdStPopulateConstantPrimvars(
             }
 
             source.reset(new HdVtBufferSource(
-                             HdTokens->instancerTransform,
+                             HdInstancerTokens->instancerTransform,
                              rootTransforms,
                              rootTransforms.size()));
             sources.push_back(source);
             source.reset(new HdVtBufferSource(
-                             HdTokens->instancerTransformInverse,
+                             HdInstancerTokens->instancerTransformInverse,
                              rootInverseTransforms,
                              rootInverseTransforms.size()));
             sources.push_back(source);
@@ -143,7 +143,8 @@ HdStPopulateConstantPrimvars(
                 VtValue value = delegate->Get(id, pv.name);
 
                 // XXX Storm doesn't support string primvars yet
-                if (value.IsHolding<std::string>()) {
+                if (value.IsHolding<std::string>() ||
+                    value.IsHolding<VtStringArray>()) {
                     continue;
                 }
 

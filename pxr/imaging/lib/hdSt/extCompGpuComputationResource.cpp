@@ -111,11 +111,9 @@ HdStExtCompGpuComputationResource::Resolve()
         HdStProgram::ID registryID = codeGen->ComputeHash();
 
         {
-            HdInstance<HdStProgram::ID, HdStProgramSharedPtr> programInstance;
-
             // ask registry to see if there's already compiled program
-            std::unique_lock<std::mutex> regLock =
-                _registry->RegisterProgram(registryID, &programInstance);
+            HdInstance<HdStProgramSharedPtr> programInstance =
+                                _registry->RegisterProgram(registryID);
 
             if (programInstance.IsFirstInstance()) {
                 HdStProgramSharedPtr program = codeGen->CompileComputeProgram();

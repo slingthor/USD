@@ -331,11 +331,9 @@ HdSt_DrawBatch::_DrawingProgram::CompileShader(
     HdStProgram::ID hash = codeGen->ComputeHash();
 
     {
-        HdInstance<HdStProgram::ID, HdStProgramSharedPtr> programInstance;
-
         // ask registry to see if there's already compiled program
-        std::unique_lock<std::mutex> regLock = 
-            resourceRegistry->RegisterProgram(hash, &programInstance);
+        HdInstance<HdStProgramSharedPtr> programInstance =
+                                resourceRegistry->RegisterProgram(hash);
 
         if (programInstance.IsFirstInstance()) {
             HdStProgramSharedPtr program = codeGen->Compile();

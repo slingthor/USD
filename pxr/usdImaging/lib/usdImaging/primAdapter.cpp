@@ -230,13 +230,6 @@ UsdImagingPrimAdapter::InvokeComputation(SdfPath const& computationPath,
 }
 
 /*virtual*/
-SdfPath
-UsdImagingPrimAdapter::GetInstancer(SdfPath const &cachePath)
-{
-    return SdfPath();
-}
-
-/*virtual*/
 std::vector<VtArray<TfToken>>
 UsdImagingPrimAdapter::GetInstanceCategories(UsdPrim const& prim)
 {
@@ -467,7 +460,7 @@ UsdImagingPrimAdapter::SetDelegate(UsdImagingDelegate* delegate)
 bool
 UsdImagingPrimAdapter::IsChildPath(SdfPath const& path) const
 {
-    return _delegate->_IsChildPath(path);
+    return path.IsPropertyPath();
 }
 
 UsdImagingValueCache* 
@@ -699,7 +692,8 @@ UsdImagingPrimAdapter::_PrimvarChangeRequiresResync(
         UsdPrim const& prim,
         SdfPath const& cachePath,
         TfToken const& propertyName,
-        TfToken const& primvarName) const
+        TfToken const& primvarName,
+        bool inherited) const
 {
     bool primvarInValueCache = false;
     HdPrimvarDescriptorVector const& vec =
@@ -712,8 +706,13 @@ UsdImagingPrimAdapter::_PrimvarChangeRequiresResync(
     }
 
     bool primvarOnPrim = false;
-    UsdAttribute attr = prim.GetAttribute(propertyName);
-    if (attr && attr.HasValue()) {
+    UsdGeomPrimvar pv;
+    if (inherited) {
+        pv = UsdGeomPrimvarsAPI(prim).FindPrimvarWithInheritance(propertyName);
+    } else {
+        pv = UsdGeomPrimvarsAPI(prim).GetPrimvar(propertyName);
+    }
+    if (pv && pv.HasValue()) {
         primvarOnPrim = true;
     }
 
@@ -1000,30 +999,6 @@ TfToken
 UsdImagingPrimAdapter::GetModelDrawMode(UsdPrim const& prim)
 {
     return _delegate->_GetModelDrawMode(prim);
-}
-
-SdfPath
-UsdImagingPrimAdapter::GetInstancerCachePath(UsdPrim const& prim,
-                        UsdImagingInstancerContext const* instancerContext)
-{
-    return instancerContext ? instancerContext->instancerCachePath
-                            : SdfPath();
-    
-}
-
-SdfPathVector
-UsdImagingPrimAdapter::GetDependPaths(SdfPath const &path) const
-{
-    return SdfPathVector();
-}
-
-/*virtual*/
-VtIntArray
-UsdImagingPrimAdapter::GetInstanceIndices(SdfPath const &instancerPath,
-                                          SdfPath const &protoRprimPath,
-                                          UsdTimeCode time)
-{
-    return VtIntArray();
 }
 
 /*virtual*/

@@ -102,7 +102,7 @@ _GetPageShift(unsigned int mask)
 }
 
 static unsigned int PAGESIZE = ArchGetPageSize();
-static uint64_t PAGEMASK = ~(PAGESIZE-1);
+static uint64_t PAGEMASK = ~(static_cast<uint64_t>(PAGESIZE-1));
 static unsigned int PAGESHIFT = _GetPageShift(PAGEMASK);
 
 TF_REGISTRY_FUNCTION(TfType) {
@@ -1990,10 +1990,14 @@ CrateFile::_MmapAsset(char const *assetPath, ArAssetSharedPtr const &asset)
 {
     FILE *file; size_t offset;
     std::tie(file, offset) = asset->GetFileUnsafe();
+    std::string errMsg;
     auto mapping = _FileMappingIPtr(
-        new _FileMapping(ArchMapFileReadWrite(file), offset, asset->GetSize()));
+        new _FileMapping(ArchMapFileReadWrite(file, &errMsg),
+                         offset, asset->GetSize()));
     if (!mapping->GetMapStart()) {
-        TF_RUNTIME_ERROR("Couldn't map asset '%s'", assetPath);
+        TF_RUNTIME_ERROR("Couldn't map asset '%s'%s%s", assetPath,
+                         !errMsg.empty() ? ": " : "",
+                         errMsg.c_str());
         mapping.reset();
     }
     return mapping;
@@ -2003,10 +2007,13 @@ CrateFile::_MmapAsset(char const *assetPath, ArAssetSharedPtr const &asset)
 CrateFile::_FileMappingIPtr
 CrateFile::_MmapFile(char const *fileName, FILE *file)
 {
+    std::string errMsg;
     auto mapping = _FileMappingIPtr(
-        new _FileMapping(ArchMapFileReadWrite(file)));
+        new _FileMapping(ArchMapFileReadWrite(file, &errMsg)));
     if (!mapping->GetMapStart()) {
-        TF_RUNTIME_ERROR("Couldn't map file '%s'", fileName);
+        TF_RUNTIME_ERROR("Couldn't map file '%s'%s%s", fileName,
+                         !errMsg.empty() ? ": " : "",
+                         errMsg.c_str());
         mapping.reset();
     }
     return mapping;

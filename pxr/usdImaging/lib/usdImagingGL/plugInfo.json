@@ -3,11 +3,16 @@
         {
         	"Info": {
 			     "Types": {
-	                    "UsdImagingGLDomeLightAdapter" : {
+	                     "UsdImagingGLDomeLightAdapter" : {
 	                        "bases": ["UsdImagingDomeLightAdapter"],
 	                        "isInternal": true,
 	                        "primTypeName": "PreviewDomeLight"
-	                   }
+	                    },
+	                    "UsdImagingGLMaterialTextureAdapter" : {
+	                        "bases": ["UsdImagingMaterialAdapter"],
+	                        "isInternal": true,
+	                        "primTypeName": "MaterialTexture"
+	                    }
 		          }
             },
             "LibraryPath": "@PLUG_INFO_LIBRARY_PATH@",

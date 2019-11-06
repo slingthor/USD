@@ -74,11 +74,10 @@ HdStProgram::GetComputeProgram(
     HdStResourceRegistry *resourceRegistry)
 {
     // Find the program from registry
-    HdInstance<HdStProgram::ID, HdStProgramSharedPtr> programInstance;
-
-    std::unique_lock<std::mutex> regLock = 
-        resourceRegistry->RegisterProgram(
-            HdStProgram::ComputeHash(shaderToken), &programInstance);
+    // Find the program from registry
+    HdInstance<HdStProgramSharedPtr> programInstance =
+                resourceRegistry->RegisterProgram(
+                        HdStProgram::ComputeHash(shaderToken));
 
     if (programInstance.IsFirstInstance()) {
         // if not exists, create new one

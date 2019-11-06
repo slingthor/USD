@@ -1296,35 +1296,61 @@ SdfPath::ReplacePrefix(const SdfPath &oldPrefix, const SdfPath &newPrefix,
 }
 
 SdfPath
-SdfPath::GetCommonPrefix(const SdfPath &path) const {
+SdfPath::GetCommonPrefix(const SdfPath &path2) const {
 
-    if (path == SdfPath()) {
+    if (path2.IsEmpty()) {
         TF_WARN("GetCommonPrefix(): invalid path.");
         return SdfPath();
     }
 
-    SdfPath path1 = *this;
-    SdfPath path2 = path;
+    SdfPath const &path1 = *this;
+    
+    // Skip as much as we can based on whether or not the paths have property
+    // elements, etc.  We either start in the prim area (if one or both paths
+    // have no property elements, or if they both do but the leafmost prim
+    // elements differ) or we stay fully in the property area (up to the
+    // leafmost prim element).
+    Sdf_PathNode const *path1Node;
+    Sdf_PathNode const *path2Node;
 
-    size_t count1 = path1.GetPathElementCount();
-    size_t count2 = path2.GetPathElementCount();
+    bool isPrimLike = true;
+    if (ARCH_LIKELY(!path1._propPart || !path2._propPart ||
+                    (path1._primPart != path2._primPart))) {
+        path1Node = path1._primPart.get();
+        path2Node = path2._primPart.get();
+    }
+    else {
+        isPrimLike = false;
+        path1Node = path1._propPart.get();
+        path2Node = path2._propPart.get();
+    }        
 
-    if (count1 > count2) {
-        for (size_t i=0; i < (count1-count2); ++i) {
-            path1 = path1.GetParentPath();
-        }
-    } else {
-        for (size_t i=0; i < (count2-count1); ++i) {
-            path2 = path2.GetParentPath();
-        }
+    size_t count1 = path1Node->GetElementCount();
+    size_t count2 = path2Node->GetElementCount();
+
+    while (count1 > count2) {
+        path1Node = path1Node->GetParentNode();
+        --count1;
+    }
+    while (count2 > count1) {
+        path2Node = path2Node->GetParentNode();
+        --count2;
     }
 
-    while (path1 != path2) {
-        path1 = path1.GetParentPath();
-        path2 = path2.GetParentPath();
+    while (path1Node != path2Node) {
+        path1Node = path1Node->GetParentNode();
+        path2Node = path2Node->GetParentNode();
     }
-
-    return path1;
+    
+    SdfPath ret;
+    if (ARCH_LIKELY(isPrimLike)) {
+        ret._primPart = path1Node;
+    }
+    else {
+        ret._primPart = path1._primPart;
+        ret._propPart = path1Node;
+    }
+    return ret;
 }
 
 namespace {
@@ -1853,6 +1879,43 @@ SdfPath::IsValidPathString(const std::string &pathString,
     return valid;
 }
 
+// Caller ensures both absolute or both relative.  We need to crawl up the
+// longer path until both are the same length.  Then we crawl up both until we
+// find the nodes whose parents match.  Then we can compare those nodes.
+static inline bool
+_LessThanCompareNodes(Sdf_PathNode const *l, Sdf_PathNode const *r)
+{
+    size_t lCount = l->GetElementCount();
+    size_t rCount = r->GetElementCount();
+    
+    // walk up to the same depth
+    size_t upSteps = lCount > rCount ? lCount - rCount : 0;
+    while (upSteps--) {
+        l = l->GetParentNode();
+    }
+    upSteps = rCount > lCount ? rCount - lCount : 0;
+    while (upSteps--) {
+        r = r->GetParentNode();
+    }
+    
+    // Now the cur nodes are at the same depth in the node tree
+    if (l == r) {
+        // They differ only in the tail.  If r has the tail, then this is
+        // less, otherwise r is less.
+        return lCount < rCount;
+    }
+    
+    Sdf_PathNode const *lp = l->GetParentNode();
+    Sdf_PathNode const *rp = r->GetParentNode();
+    while (lp != rp) {
+        l = lp, r = rp;
+        lp = l->GetParentNode(), rp = r->GetParentNode();
+    }
+    
+    // Now parents are equal, compare the current child nodes.
+    return l->Compare<Sdf_PathNode::LessThan>(*r);
+}
+
 bool
 SdfPath::_LessThanInternal(SdfPath const &lhs, SdfPath const &rhs)
 {
@@ -1869,49 +1932,17 @@ SdfPath::_LessThanInternal(SdfPath const &lhs, SdfPath const &rhs)
         return false;
     }
 
-    // Both absolute or both relative.  We need to crawl up the longer path
-    // until both are the same length.  Then we crawl up both till we find the
-    // nodes whose parents match.  Then we can compare those nodes.
-    auto compareNodes = [](Sdf_PathNode const *l, Sdf_PathNode const *r) {
-        size_t lCount = l->GetElementCount();
-        size_t rCount = r->GetElementCount();
-
-        // walk up to the same depth
-        size_t upSteps = lCount > rCount ? lCount - rCount : 0;
-        while (upSteps--) {
-            l = l->GetParentNode();
-        }
-        upSteps = rCount > lCount ? rCount - lCount : 0;
-        while (upSteps--) {
-            r = r->GetParentNode();
-        }
-        
-        // Now the cur nodes are at the same depth in the node tree
-        if (l == r) {
-            // They differ only in the tail.  If r has the tail, then this is
-            // less, otherwise r is less.
-            return lCount < rCount;
-        }
-
-        while (l->GetParentNode() != r->GetParentNode()) {
-            l = l->GetParentNode(), r = r->GetParentNode();
-        }
-
-        // Now parents are equal, compare the current child nodes.
-        return l->Compare<Sdf_PathNode::LessThan>(*r);
-    };
-
     // If there is a difference in prim part, it's more significant than the
     // property part.
     if (ARCH_LIKELY(lNode != rNode)) {
-        return compareNodes(lNode, rNode);
+        return _LessThanCompareNodes(lNode, rNode);
     }
 
     lNode = lhs._propPart.get(), rNode = rhs._propPart.get();
     if (!lNode || !rNode) {
         return !lNode;
     }
-    return compareNodes(lNode, rNode);
+    return _LessThanCompareNodes(lNode, rNode);
 }
 
 std::ostream & operator<<( std::ostream &out, const SdfPath &path ) {

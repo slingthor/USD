@@ -463,7 +463,21 @@ UsdImagingGprimAdapter::ProcessPropertyChange(UsdPrim const& prim,
         return HdChangeTracker::DirtyMaterialId;
     }
     
-    // TODO: support sparse displayColor updates
+    // Is the property a primvar?
+    static std::string primvarsNS = "primvars:";
+    if (TfStringStartsWith(propertyName.GetString(), primvarsNS)) {
+        TfToken primvarName = TfToken(
+            propertyName.GetString().substr(primvarsNS.size()));
+
+        if (!_IsBuiltinPrimvar(primvarName)) {
+            if (_PrimvarChangeRequiresResync(
+                    prim, cachePath, propertyName, primvarName)) {
+                return HdChangeTracker::AllDirty;
+            } else {
+                return HdChangeTracker::DirtyPrimvar;
+            }
+        }
+    }
 
     return HdChangeTracker::AllDirty;
 }
@@ -600,7 +614,8 @@ UsdImagingGprimAdapter::GetColor(UsdPrim const& prim,
         // the Rprim data, it should live as part of the shader so it can be 
         // shared, though that poses some interesting questions for vertex & 
         // varying rate shader provided primvars.
-        UsdRelationship mat = UsdShadeMaterial::GetBindingRel(prim);
+        UsdRelationship mat = 
+            UsdShadeMaterialBindingAPI(prim).GetDirectBindingRel();
         SdfPathVector matTargets;
         if (mat.GetForwardedTargets(&matTargets)) {
             if (!matTargets.empty()) {
@@ -677,7 +692,8 @@ UsdImagingGprimAdapter::GetOpacity(UsdPrim const& prim,
         // the Rprim data, it should live as part of the shader so it can be 
         // shared, though that poses some interesting questions for vertex & 
         // varying rate shader provided primvars.
-        UsdRelationship mat = UsdShadeMaterial::GetBindingRel(prim);
+        UsdRelationship mat = 
+            UsdShadeMaterialBindingAPI(prim).GetDirectBindingRel();
         SdfPathVector matTargets;
         if (mat.GetForwardedTargets(&matTargets)) {
             if (!matTargets.empty()) {

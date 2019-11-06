@@ -218,8 +218,10 @@ public:
     
     /// Returns the spec definition for the given spec type.
     /// Returns NULL if no definition exists for the given spec type.
-    SDF_API 
-    const SpecDefinition* GetSpecDefinition(SdfSpecType type) const;
+    inline const SpecDefinition* GetSpecDefinition(SdfSpecType specType) const {
+        return _specDefinitions[specType].second ?
+            &_specDefinitions[specType].first : nullptr;
+    }
 
     /// Convenience functions for accessing specific field information.
     /// @{
@@ -310,9 +312,15 @@ public:
     /// Returns all registered type names.
     std::vector<SdfValueTypeName> GetAllTypes() const;
 
-    /// Return the type name object for the given type name string.
+    /// Return the type name object for the given type name token.
     SDF_API 
-    SdfValueTypeName FindType(const std::string& typeName) const;
+    SdfValueTypeName FindType(const TfToken& typeName) const;
+    /// \overload
+    SDF_API
+    SdfValueTypeName FindType(const char *typeName) const;
+    /// \overload
+    SDF_API
+    SdfValueTypeName FindType(std::string const &typeName) const;
 
     /// Return the type name object for the given type and optional role.
     SDF_API 
@@ -328,7 +336,7 @@ public:
     /// exists otherwise create a temporary type name object.  Clients
     /// should not normally need to call this.
     SDF_API
-    SdfValueTypeName FindOrCreateType(const std::string& typeName) const;
+    SdfValueTypeName FindOrCreateType(const TfToken& typeName) const;
 
     /// @}
 
@@ -376,13 +384,18 @@ protected:
             // Specify a type with the given name, default value, and default
             // array value of VtArray<T>.
             template <class T>
-            Type(const std::string& name, const T& defaultValue)
+            Type(const TfToken& name, const T& defaultValue)
                 : Type(name, VtValue(defaultValue), VtValue(VtArray<T>()))
+            { }
+            template <class T>
+            Type(char const *name, const T& defaultValue)
+                : Type(TfToken(name),
+                       VtValue(defaultValue), VtValue(VtArray<T>()))
             { }
 
             // Specify a type with the given name and underlying C++ type.
             // No default value or array value will be registered.
-            Type(const std::string& name, const TfType& type);
+            Type(const TfToken& name, const TfType& type);
 
             // Set C++ type name string for this type. Defaults to type name
             // from TfType.
@@ -401,7 +414,7 @@ protected:
             Type& NoArrays();
 
         private:
-            Type(const std::string& name, 
+            Type(const TfToken& name, 
                  const VtValue& defaultValue, 
                  const VtValue& defaultArrayValue);
 
@@ -444,7 +457,9 @@ protected:
     /// Registers the given spec \p type with this schema and return a 
     /// _SpecDefiner for specifying additional fields.
     _SpecDefiner _Define(SdfSpecType type) {
-        return _SpecDefiner(this, &_specDefinitions[type]);
+        // Mark the definition as valid and return a pointer to it.
+        _specDefinitions[type].second = true;
+        return _SpecDefiner(this, &_specDefinitions[type].first);
     }
 
     /// Returns a _SpecDefiner for the previously-defined spec \p type
@@ -515,10 +530,9 @@ private:
         _FieldDefinitionMap;
     _FieldDefinitionMap _fieldDefinitions;
     
-    typedef TfHashMap<SdfSpecType, SdfSchemaBase::SpecDefinition, 
-                                 TfHash> 
-        _SpecDefinitionMap;
-    _SpecDefinitionMap _specDefinitions;
+    // Pair of definition and flag indicating validity.
+    std::pair<SdfSchemaBase::SpecDefinition, bool>
+    _specDefinitions[SdfNumSpecTypes];
 
     std::unique_ptr<Sdf_ValueTypeRegistry> _valueTypeRegistry;
     TfTokenVector _requiredFieldNames;

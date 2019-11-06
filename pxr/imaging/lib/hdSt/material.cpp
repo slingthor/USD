@@ -68,13 +68,6 @@ TF_DEFINE_PRIVATE_TOKENS(
 
 HioGlslfx *HdStMaterial::_fallbackSurfaceShader = nullptr;
 
-// XXX In progress of deprecating hydra material adapter
-static bool _IsEnabledStormMaterialNetworks() {
-    static std::string _stormMatNet = 
-        TfGetenv("STORM_ENABLE_MATERIAL_NETWORKS");
-
-    return !_stormMatNet.empty() && std::stoi(_stormMatNet) > 0;
-}
 
 HdStMaterial::HdStMaterial(SdfPath const &id)
  : HdMaterial(id)
@@ -110,6 +103,7 @@ HdStMaterial::Sync(HdSceneDelegate *sceneDelegate,
         sceneDelegate->GetRenderIndex().GetResourceRegistry();
     HdDirtyBits bits = *dirtyBits;
 
+    bool useDeprecatedSurface = true;
     bool needsRprimMaterialStateUpdate = false;
 
     std::string fragmentSource;
@@ -118,25 +112,34 @@ HdStMaterial::Sync(HdSceneDelegate *sceneDelegate,
     TfToken materialTag = _materialTag;
     HdMaterialParamVector params;
 
-    if ((bits & DirtyResource) && _IsEnabledStormMaterialNetworks()) {
-        // Consume material network
+    if ((bits & DirtyResource)) {
+
         HdMaterialNetworkMap const& hdNetworkMap = 
             _GetMaterialResource(sceneDelegate);
-        HdStMaterialNetwork networkProcessor;
-        networkProcessor.ProcessMaterialNetwork(GetId(), hdNetworkMap);
-        fragmentSource = networkProcessor.GetFragmentCode();
-        geometrySource = networkProcessor.GetGeometryCode();
-        materialTag = networkProcessor.GetMaterialTag();
-        params = networkProcessor.GetMaterialParams();
-    } else {
-        // XXX Consume deprecated material
+
+        if (!hdNetworkMap.map.empty()) {
+            useDeprecatedSurface = false;
+            HdStMaterialNetwork networkProcessor;
+            networkProcessor.ProcessMaterialNetwork(GetId(), hdNetworkMap);
+            fragmentSource = networkProcessor.GetFragmentCode();
+            geometrySource = networkProcessor.GetGeometryCode();
+            materialTag = networkProcessor.GetMaterialTag();
+            params = networkProcessor.GetMaterialParams();
+        }
+    } 
+
+    // XXX Consume deprecated material
+    // Many places in code still use SurfaceShader, so if we do not find a
+    // material network, we try the old SurfaceShader method.
+    // We want this to eventually not exist.
+    if (useDeprecatedSurface) {
         if (bits & DirtySurfaceShader) {
             fragmentSource = GetSurfaceShaderSource(sceneDelegate);
             geometrySource = GetDisplacementShaderSource(sceneDelegate);
             materialMetadata = GetMaterialMetadata(sceneDelegate);
             materialTag = _GetMaterialTagDeprecated(materialMetadata);
         }
-        if (bits & DirtyParams) {
+        if ((bits & DirtySurfaceShader) || (bits & DirtyParams)) {
             params = GetMaterialParams(sceneDelegate);
         }
     }
@@ -149,16 +152,15 @@ HdStMaterial::Sync(HdSceneDelegate *sceneDelegate,
     if (shaderIsDirty) {
         if (fragmentSource.empty() && geometrySource.empty()) {
             _InitFallbackShader();
-            _surfaceShader->SetFragmentSource(
-                                   _fallbackSurfaceShader->GetFragmentSource());
-            _surfaceShader->SetGeometrySource(
-                                   _fallbackSurfaceShader->GetGeometrySource());
-
+            fragmentSource = _fallbackSurfaceShader->GetSurfaceSource();
+            // Note that we don't want displacement on purpose for the 
+            // fallback material.
+            geometrySource = std::string();
             materialMetadata = _fallbackSurfaceShader->GetMetadata();
-        } else {
-            _surfaceShader->SetFragmentSource(fragmentSource);
-            _surfaceShader->SetGeometrySource(geometrySource);
         }
+
+        _surfaceShader->SetFragmentSource(fragmentSource);
+        _surfaceShader->SetGeometrySource(geometrySource);
 
         bool hasDisplacement = !(geometrySource.empty());
 
@@ -215,12 +217,12 @@ HdStMaterial::Sync(HdSceneDelegate *sceneDelegate,
     //
     // Update material parameters
     //
-    bool paramsAreDirty = (bits & DirtyResource || bits & DirtyParams);
+    bool paramsAreDirty = ((bits & DirtyResource) || (bits & DirtyParams));
     if (paramsAreDirty) {
         _surfaceShader->SetParams(params);
 
         // Release any fallback texture resources
-        _fallbackTextureResourceHandles.clear();
+        _internalTextureResourceHandles.clear();
 
         HdSt_MaterialBufferSourceAndTextureHelper sourcesAndTextures;
 
@@ -230,11 +232,8 @@ HdStMaterial::Sync(HdSceneDelegate *sceneDelegate,
                 sourcesAndTextures.ProcessPrimvarMaterialParam(
                     param);
             } else if (param.IsFallback()) {
-                // XXX Deprecate the use of sceneDelegate here.
-                // We can use Sdr or glslfx to get the fallback value once we
-                // switch over to only consume material networks.
                 sourcesAndTextures.ProcessFallbackMaterialParam(
-                    param, sceneDelegate, GetId());
+                    param, param.fallbackValue);
             } else if (param.IsTexture()) {
                 sourcesAndTextures.ProcessTextureMaterialParam(
                     param, 
@@ -286,6 +285,10 @@ HdStMaterial::_GetTextureResourceHandle(
         HdTextureResource::ID texID =
             GetTextureResourceID(sceneDelegate, connection);
 
+        // Step 1.
+        // Try to locate the texture in resource registry.
+        // A Bprim might have been inserted for this texture.
+        //
         if (texID != HdTextureResource::ID(-1)) {
             // Use render index to convert local texture id into global
             // texture key
@@ -293,13 +296,10 @@ HdStMaterial::_GetTextureResourceHandle(
             HdResourceRegistry::TextureKey texKey =
                                                renderIndex.GetTextureKey(texID);
 
-            HdInstance<HdResourceRegistry::TextureKey,
-                        HdTextureResourceSharedPtr> texInstance;
-
             bool textureResourceFound = false;
-            std::unique_lock<std::mutex> regLock =
+            HdInstance<HdTextureResourceSharedPtr> texInstance =
                 resourceRegistry->FindTextureResource
-                                  (texKey, &texInstance, &textureResourceFound);
+                                  (texKey, &textureResourceFound);
 
             // A bad asset can cause the texture resource to not
             // be found. Hence, issue a warning and continue onto the
@@ -318,23 +318,26 @@ HdStMaterial::_GetTextureResourceHandle(
             HdStTextureResourceHandle::GetHandleKey(
                 &sceneDelegate->GetRenderIndex(), connection);
 
-        HdInstance<HdResourceRegistry::TextureKey,
-                    HdStTextureResourceHandleSharedPtr> handleInstance;
-
         bool handleFound = false;
-        std::unique_lock<std::mutex> regLock =
+        HdInstance<HdStTextureResourceHandleSharedPtr> handleInstance =
             resourceRegistry->FindTextureResourceHandle
-                              (handleKey, &handleInstance, &handleFound);
+                              (handleKey, &handleFound);
 
-        // A bad asset can cause the texture resource to not
-        // be found. Hence, issue a warning and continue onto the
-        // next param.
-        if (!handleFound) {
-            TF_WARN("No texture resource handle found with path %s",
-                param.connection.GetText());
-        } else {
+        if (handleFound) {
             handle = handleInstance.GetValue();
             handle->SetTextureResource(texResource);
+        }
+
+        // Step 2.
+        // If no texture was found in the registry, it might be a texture we
+        // discovered in the material network. If we can load it we will store
+        // the handle internally in this material.
+        //
+        if (!texResource) {
+            HdTextureResourceSharedPtr hdTexResource = 
+                sceneDelegate->GetTextureResource(connection);
+            texResource = boost::static_pointer_cast<HdStTextureResource>(
+                hdTexResource);
         }
     }
 
@@ -348,25 +351,37 @@ HdStMaterial::_GetTextureResourceHandle(
     //
     // XXX todo handle fallback Ptex textures
     if (!(handle && handle->GetTextureResource())) {
-        // Fallback texture are only supported for UV textures.
-        if (param.textureType != HdTextureType::Uv) {
-            return {};
+
+        if (!texResource) {
+            // A bad asset can cause the texture resource to not
+            // be found. Hence, issue a warning and insert a fallback texture.
+            TF_WARN("Texture not found. Using fallback texture for: %s",
+                    param.connection.GetText());
+
+            // Fallback texture are only supported for UV textures.
+            if (param.textureType != HdTextureType::Uv) {
+                return {};
+            }
+            GarchUVTextureStorageRefPtr texPtr =
+                GarchUVTextureStorage::New(1,1, param.fallbackValue);
+            GarchTextureHandleRefPtr texture =
+                GarchTextureRegistry::GetInstance().GetTextureHandle(texPtr);
+
+            texResource = HdStTextureResourceSharedPtr(
+                HdStResourceFactory::GetInstance()->NewSimpleTextureResource(texture,
+                                              HdTextureType::Uv,
+                                              HdWrapClamp,
+                                              HdWrapClamp,
+                                              HdWrapClamp,
+                                              HdMinFilterNearest,
+                                              HdMagFilterNearest,
+                                              0));
         }
-        GarchUVTextureStorageRefPtr texPtr =
-            GarchUVTextureStorage::New(1,1, param.fallbackValue);
-        GarchTextureHandleRefPtr texture =
-            GarchTextureRegistry::GetInstance().GetTextureHandle(texPtr);
-        HdStTextureResourceSharedPtr texResource(
-            HdStResourceFactory::GetInstance()->NewSimpleTextureResource(texture,
-                  HdTextureType::Uv,
-                  HdWrapClamp,
-                  HdWrapClamp,
-        		  HdWrapClamp,
-                  HdMinFilterNearest,
-                  HdMagFilterNearest,
-                  0));
-        handle.reset(new HdStTextureResourceHandle(texResource));
-        _fallbackTextureResourceHandles.push_back(handle);
+
+        if (texResource) {
+            handle.reset(new HdStTextureResourceHandle(texResource));
+            _internalTextureResourceHandles.push_back(handle);
+        }
     }
 
     return handle;
@@ -458,7 +473,6 @@ HdStMaterial::_GetMaterialResource(HdSceneDelegate* sceneDelegate) const
     if (vtMat.IsHolding<HdMaterialNetworkMap>()) {
         return vtMat.UncheckedGet<HdMaterialNetworkMap>();
     } else {
-        TF_CODING_ERROR("Not a valid material network map");
         static const HdMaterialNetworkMap emptyNetworkMap;
         return emptyNetworkMap;
     }

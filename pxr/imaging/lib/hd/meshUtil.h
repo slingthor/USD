@@ -37,7 +37,6 @@
 
 #include <unordered_map>
 #include <utility> // std::{min,max}, std::pair
-#include <boost/functional/hash.hpp> // boost::hash_combine
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -201,24 +200,30 @@ public:
     struct EdgeHash {
         // Use a custom hash so that edges (a,b) and (b,a) are equivalent
         inline size_t operator()(GfVec2i const& v) const {
-            size_t hash = 0;
-            boost::hash_combine(hash, std::min(v[0], v[1]));
-            boost::hash_combine(hash, std::max(v[0], v[1]));
-            return hash;
+            // Triangular numbers for 2-d hash.
+            int theMin = v[0], theMax = v[1];
+            if (theMin > theMax) {
+                std::swap(theMin, theMax);
+            }
+            size_t x = theMin;
+            size_t y = x + theMax;
+            return x + (y * (y + 1)) / 2;
         }
     };
 
     struct EdgeEquality {
-        inline bool operator() (GfVec2i const& v1, GfVec2i const& v2) const
-        {
-            if (EdgeHash()(v1) == EdgeHash()(v2))
-                return true;
-
-            return false;
+        inline bool operator() (GfVec2i const& v1, GfVec2i const& v2) const {
+            // The bitwise operators here give a small speedup in the generated
+            // code since we avoid the conditional jumps required by
+            // short-circuiting logical ops.
+            return
+                ((v1[0] == v2[0]) & (v1[1] == v2[1])) |
+                ((v1[0] == v2[1]) & (v1[1] == v2[0]));
         }
     };
 
-    typedef std::unordered_map<GfVec2i, int, EdgeHash, EdgeEquality> EdgeMap;
+    using EdgeMap = std::unordered_map<GfVec2i, int, EdgeHash, EdgeEquality>;
+    using ReverseEdgeMap = std::unordered_map<int, GfVec2i>;
     
     // Enumerates all the edges of the authored mesh topology, and returns a map
     // of (vertex indices pair, edge id).
@@ -227,13 +232,18 @@ public:
     static EdgeMap ComputeAuthoredEdgeMap(HdMeshTopology const* topology,
                                           bool skipHoles = false);
 
+    // Given the map from (vertex indices pair, edge id) computed by
+    // ComputeAuthoredEdgeMap, returns the reverse map (edge id, vertex indices
+    // pair).
+    HD_API
+    static ReverseEdgeMap ComputeReverseEdgeMap(const EdgeMap &edgeMap);
+
     // Translates an authored edge id to its vertex indices
     // Returns a pair, with first indicating success of the look up, and
     // second being the vertex indices for the edge.
     HD_API
     static std::pair<bool, GfVec2i>
-    GetVertexIndicesForEdge(HdMeshTopology const* topology,
-                            int authoredEdgeId);
+    GetVertexIndicesForEdge(const ReverseEdgeMap &rEdgeMap, int authoredEdgeId);
 
     // Translates an edge to its authored edge id
     // Returns a pair, with first indicating success of the look up, and

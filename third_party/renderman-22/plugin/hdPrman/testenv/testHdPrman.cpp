@@ -731,13 +731,6 @@ int main(int argc, char *argv[])
             hdPrmanContext->fallbackMaterial = fallbackMaterial;
             hdPrmanContext->fallbackVolumeMaterial = fallbackVolumeMaterial;
 
-            // Configure default time samples.
-            for (double const& offset : timeSampleOffsets) {
-                hdPrmanContext->defaultTimeSamples.push_back(offset);
-            }
-            hdPrmanContext->timeSampleMap[SdfPath::AbsoluteRootPath()] =
-                hdPrmanContext->defaultTimeSamples;
-
             // Set up frontend -> index -> backend
             // TODO We should configure the render delegate to request
             // the appropriate materialBindingPurposes from the USD scene.
@@ -751,6 +744,9 @@ int main(int argc, char *argv[])
             hdUsdFrontend.Populate(stage->GetPseudoRoot());
             hdUsdFrontend.SetTime(frameNum);
             hdUsdFrontend.SetRefineLevelFallback(8); // max refinement
+            if (!product.cameraPath.IsEmpty()) {
+                hdUsdFrontend.SetCameraForSampling(product.cameraPath);
+            }
 
             TfTokenVector renderTags(1, HdRenderTagTokens->geometry);
             // The collection of scene contents to render
