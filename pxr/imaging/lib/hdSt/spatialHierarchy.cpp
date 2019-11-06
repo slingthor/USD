@@ -475,6 +475,10 @@ void BVH::BuildBVH(std::vector<HdStDrawItemInstance> *drawables)
     }
     
     os_signpost_interval_begin(cullingLog, bvhGenerate, "BVH Generation");
+
+    for (size_t idx = 0; idx < drawableItems.size(); ++idx) {
+        delete drawableItems[idx];
+    }
     drawableItems.clear();
     drawableVisibilityOwners.clear();
     
