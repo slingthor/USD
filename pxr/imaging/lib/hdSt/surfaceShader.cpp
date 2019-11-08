@@ -24,6 +24,7 @@
 #include "pxr/imaging/glf/glew.h"
 
 #include "pxr/imaging/hdSt/surfaceShader.h"
+#include "pxr/imaging/hdSt/resourceBinder.h"
 #include "pxr/imaging/hdSt/resourceRegistry.h"
 #include "pxr/imaging/hdSt/textureResource.h"
 #include "pxr/imaging/hdSt/textureResourceHandle.h"
@@ -31,14 +32,29 @@
 #include "pxr/imaging/hd/binding.h"
 #include "pxr/imaging/hd/bufferArrayRange.h"
 #include "pxr/imaging/hd/resource.h"
-#include "pxr/imaging/hdSt/resourceBinder.h"
 #include "pxr/imaging/hd/sceneDelegate.h"
 #include "pxr/imaging/hd/tokens.h"
 #include "pxr/imaging/hd/vtBufferSource.h"
 
+#include "pxr/imaging/garch/contextCaps.h"
+#include "pxr/imaging/garch/resourceFactory.h"
+
+#include "pxr/base/tf/envSetting.h"
+#include "pxr/base/tf/staticTokens.h"
+
 PXR_NAMESPACE_OPEN_SCOPE
 
 
+TF_DEFINE_ENV_SETTING(HDST_ENABLE_MATERIAL_PRIMVAR_FILTERING, true,
+    "Enables filtering of primvar signals by material binding.");
+
+static bool
+_IsEnabledMaterialPrimvarFiltering() {
+    return TfGetEnvSetting(HDST_ENABLE_MATERIAL_PRIMVAR_FILTERING);
+}
+
+static TfTokenVector
+_CollectPrimvarNames(const HdMaterialParamVector &params);
 
 HdStSurfaceShader::HdStSurfaceShader()
  : HdStShaderCode()
@@ -47,6 +63,8 @@ HdStSurfaceShader::HdStSurfaceShader()
  , _params()
  , _paramSpec()
  , _paramArray()
+ , _primvarNames(_CollectPrimvarNames(_params))
+ , _isEnabledPrimvarFiltering(_IsEnabledMaterialPrimvarFiltering())
  , _textureDescriptors()
  , _materialTag()
 {
@@ -87,6 +105,24 @@ HdMaterialParamVector const&
 HdStSurfaceShader::GetParams() const
 {
     return _params;
+}
+void
+HdStSurfaceShader::SetEnabledPrimvarFiltering(bool enabled)
+{
+    _isEnabledPrimvarFiltering =
+        enabled && _IsEnabledMaterialPrimvarFiltering();
+}
+/* virtual */
+bool
+HdStSurfaceShader::IsEnabledPrimvarFiltering() const
+{
+    return _isEnabledPrimvarFiltering;
+}
+/*virtual*/
+TfTokenVector const&
+HdStSurfaceShader::GetPrimvarNames() const
+{
+    return _primvarNames;
 }
 /*virtual*/
 HdBufferArrayRangeSharedPtr const&
@@ -172,6 +208,7 @@ void
 HdStSurfaceShader::SetParams(const HdMaterialParamVector &params)
 {
     _params = params;
+    _primvarNames = _CollectPrimvarNames(_params);
 }
 
 void
@@ -232,5 +269,117 @@ HdStSurfaceShader::Reload()
 {
     // Nothing to do, this shader's sources are externally managed.
 }
+
+/*static*/
+bool
+HdStSurfaceShader::CanAggregate(HdStShaderCodeSharedPtr const &shaderA,
+                                HdStShaderCodeSharedPtr const &shaderB)
+{
+    HdBufferArrayRangeSharedPtr dataA = shaderA->GetShaderData();
+    HdBufferArrayRangeSharedPtr dataB = shaderB->GetShaderData();
+
+    bool dataIsAggregated = (dataA == dataB) ||
+                            (dataA && dataA->IsAggregatedWith(dataB));
+
+    // We can't aggregate if the shaders have data buffers that aren't
+    // aggregated or if the shaders don't match.
+    if (!dataIsAggregated || shaderA->ComputeHash() != shaderB->ComputeHash()) {
+        return false;
+    }
+
+    bool bindlessTexture = GarchResourceFactory::GetInstance()->GetContextCaps()
+                                                .bindlessTextureEnabled;
+
+    // Without bindless textures, we can't aggregate shaders with textures.
+    if (!bindlessTexture) {
+        bool eitherHasTextures = !shaderA->GetTextures().empty() ||
+                                 !shaderB->GetTextures().empty();
+        if (eitherHasTextures) {
+            return false;
+        }
+    }
+     
+    return true;
+}
+
+TF_DEFINE_PRIVATE_TOKENS(
+    _tokens,
+
+    (ptexFaceOffset)            // geometric shader
+
+    (displayMetallic)           // simple lighting shader
+    (displayRoughness)          // simple lighting shader
+
+    (hullColor)                 // terminal shader
+    (hullOpacity)               // terminal shader
+    (scalarOverride)            // terminal shader
+    (scalarOverrideColorRamp)   // terminal shader
+    (selectedWeight)            // terminal shader
+
+    (indicatorColor)            // renderPass shader
+    (indicatorWeight)           // renderPass shader
+    (overrideColor)             // renderPass shader
+    (overrideWireframeColor)    // renderPass shader
+    (maskColor)                 // renderPass shader
+    (maskWeight)                // renderPass shader
+    (wireframeColor)            // renderPass shader
+);
+
+static TfTokenVector const &
+_GetExtraWhitelistedShaderPrimvarNames()
+{
+    static const TfTokenVector primvarNames = {
+        HdTokens->displayColor,
+        HdTokens->displayOpacity,
+
+        // Whitelist a few ad hoc primvar names that
+        // are used by the built-in material shading system.
+
+        _tokens->ptexFaceOffset,
+
+        _tokens->displayMetallic,
+        _tokens->displayRoughness,
+
+        _tokens->hullColor,
+        _tokens->hullOpacity,
+        _tokens->scalarOverride,
+        _tokens->scalarOverrideColorRamp,
+        _tokens->selectedWeight,
+
+        _tokens->indicatorColor,
+        _tokens->indicatorWeight,
+        _tokens->overrideColor,
+        _tokens->overrideWireframeColor,
+        _tokens->maskColor,
+        _tokens->maskWeight,
+        _tokens->wireframeColor
+    };
+    return primvarNames;
+}
+
+static TfTokenVector
+_CollectPrimvarNames(const HdMaterialParamVector &params)
+{
+    TfTokenVector primvarNames = _GetExtraWhitelistedShaderPrimvarNames();
+
+    for (HdMaterialParam const &param: params) {
+        if (param.IsFallback()) {
+            primvarNames.push_back(param.name);
+        } else if (param.IsPrimvar()) {
+            primvarNames.push_back(param.name);
+            // primvar redirect connections are encoded as sampler coords
+            primvarNames.insert(primvarNames.end(),
+                                param.samplerCoords.begin(),
+                                param.samplerCoords.end());
+        } else if (param.IsTexture()) {
+            // include sampler coords for textures
+            primvarNames.insert(primvarNames.end(),
+                                param.samplerCoords.begin(),
+                                param.samplerCoords.end());
+        }
+    }
+    return primvarNames;
+}
+
 
 PXR_NAMESPACE_CLOSE_SCOPE

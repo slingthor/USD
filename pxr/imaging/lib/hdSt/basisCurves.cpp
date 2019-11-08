@@ -148,9 +148,13 @@ HdStBasisCurves::_UpdateDrawItem(HdSceneDelegate *sceneDelegate,
     /* VISIBILITY */
     _UpdateVisibility(sceneDelegate, dirtyBits);
 
+    /* MATERIAL SHADER (may affect subsequent primvar population) */
+    drawItem->SetMaterialShader(HdStGetMaterialShader(this, sceneDelegate));
+
     /* CONSTANT PRIMVARS, TRANSFORM AND EXTENT */
     HdPrimvarDescriptorVector constantPrimvars =
-        GetPrimvarDescriptors(sceneDelegate, HdInterpolationConstant);
+        HdStGetPrimvarDescriptors(this, drawItem, sceneDelegate,
+                                  HdInterpolationConstant);
     HdStPopulateConstantPrimvars(this, &_sharedData, sceneDelegate, drawItem, 
         dirtyBits, constantPrimvars);
 
@@ -159,7 +163,8 @@ HdStBasisCurves::_UpdateDrawItem(HdSceneDelegate *sceneDelegate,
         HdStInstancer *instancer = static_cast<HdStInstancer*>(
             sceneDelegate->GetRenderIndex().GetInstancer(GetInstancerId()));
         if (TF_VERIFY(instancer)) {
-            instancer->PopulateDrawItem(drawItem, &_sharedData, *dirtyBits);
+            instancer->PopulateDrawItem(this, drawItem,
+                                        &_sharedData, *dirtyBits);
         }
     }
 
@@ -431,12 +436,10 @@ HdStBasisCurves::_UpdateShadersForAllReprs(HdSceneDelegate *sceneDelegate,
         Msg("HdStMesh(%s) - Resetting shaders for draw items of all reprs.",
             GetId().GetText());
 
-    SdfPath materialId;
+    HdStShaderCodeSharedPtr materialShader;
     if (updateMaterialShader) {
-        materialId = GetMaterialId();
+        materialShader = HdStGetMaterialShader(this, sceneDelegate);
     }
-
-    HdRenderIndex &renderIndex = sceneDelegate->GetRenderIndex();
 
     for (auto const& reprPair : _reprs) {
         const TfToken &reprToken = reprPair.first;
@@ -452,8 +455,7 @@ HdStBasisCurves::_UpdateShadersForAllReprs(HdSceneDelegate *sceneDelegate,
                 repr->GetDrawItem(drawItemIndex++));
 
             if (updateMaterialShader) {
-                drawItem->SetMaterialShaderFromRenderIndex(
-                    renderIndex, materialId);
+                drawItem->SetMaterialShader(materialShader);
             }
             if (updateGeometricShader) {
                 _UpdateDrawItemGeometricShader(sceneDelegate, drawItem,
@@ -618,12 +620,14 @@ HdStBasisCurves::_PopulateVertexPrimvars(HdSceneDelegate *sceneDelegate,
 
     // The "points" attribute is expected to be in this list.
     HdPrimvarDescriptorVector primvars =
-        GetPrimvarDescriptors(sceneDelegate, HdInterpolationVertex);
+        HdStGetPrimvarDescriptors(this, drawItem, sceneDelegate,
+                                  HdInterpolationVertex);
 
     // Analyze and append varying primvars.
     {
         HdPrimvarDescriptorVector varyingPvs =
-            GetPrimvarDescriptors(sceneDelegate, HdInterpolationVarying);
+            HdStGetPrimvarDescriptors(this, drawItem, sceneDelegate,
+                                      HdInterpolationVarying);
 
         // XXX: It's sort of a waste to do basis width interpolation
         // by default, but in testImagingComputation there seems
@@ -766,7 +770,8 @@ HdStBasisCurves::_PopulateElementPrimvars(HdSceneDelegate *sceneDelegate,
         sceneDelegate->GetRenderIndex().GetResourceRegistry());
 
     HdPrimvarDescriptorVector uniformPrimvars =
-        GetPrimvarDescriptors(sceneDelegate, HdInterpolationUniform);
+        HdStGetPrimvarDescriptors(this, drawItem, sceneDelegate,
+                                  HdInterpolationUniform);
 
     HdBufferSourceVector sources;
     sources.reserve(uniformPrimvars.size());

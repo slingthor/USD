@@ -92,7 +92,6 @@ TF_DEFINE_PRIVATE_TOKENS(
     _tokens,
     (instance)
     (Material)
-    (HydraPbsSurface)
     (DomeLight)
     (PreviewDomeLight)
     (MaterialTexture)
@@ -243,11 +242,12 @@ UsdImagingDelegate::_AdapterLookup(UsdPrim const& prim, bool ignoreInstancing)
         adapterKey = UsdImagingAdapterKeyTokens->drawModeAdapterKey;
     } else {
         adapterKey = prim.GetTypeName();
-        // XXX: transitional code
-        // If we are using material networks, we want Looks to be 
-        // treated like Materials. When not using networks,
-        // we want Shaders to be treated like HydraPbsSurface
-        // for backwards compatibility.
+
+        // XXX Checking for preview binding purpose here is wrong.
+        // What we really want to do is check for Storm specifically, because
+        // a renderer like HdPrman also supports Preview purpose, but does not
+        // want to run the below Storm-specific adapters.
+
         TfToken bindingPurpose = GetRenderIndex().
             GetRenderDelegate()->GetMaterialBindingPurpose();
 
@@ -255,7 +255,6 @@ UsdImagingDelegate::_AdapterLookup(UsdPrim const& prim, bool ignoreInstancing)
             adapterKey == _tokens->Material) {
             adapterKey = _tokens->MaterialTexture;
         }
-
         if (bindingPurpose == HdTokens->preview &&
             adapterKey == _tokens->DomeLight) {
             adapterKey = _tokens->PreviewDomeLight;
@@ -2913,10 +2912,13 @@ UsdImagingDelegate::GetMaterialResource(SdfPath const &materialId)
 
     SdfPath cachePath = ConvertIndexPathToCachePath(materialId);
     _UpdateSingleValue(cachePath, HdMaterial::DirtyResource);
-    // XXX When all code has transitioned over to use material networks we can
-    // change this TF_WARN back into a TF_VERIFY.
     bool result = _valueCache.FindMaterialResource(cachePath, &vtMatResource);
-    if (!result) TF_WARN("Material network not found: %s", cachePath.GetText());
+
+    // XXX When all code has transitioned over to use material networks we can
+    // renable this TF_VERIFY.
+    TF_UNUSED(result);
+    // TF_VERIFY(result, "Material network not found: %s", cachePath.GetText());
+
     return vtMatResource;
 }
 

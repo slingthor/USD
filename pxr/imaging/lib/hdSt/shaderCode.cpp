@@ -24,8 +24,6 @@
 #include "pxr/imaging/hdSt/shaderCode.h"
 
 #include "pxr/imaging/hd/tokens.h"
-#include "pxr/imaging/garch/contextCaps.h"
-#include "pxr/imaging/garch/resourceFactory.h"
 
 #include "pxr/base/tf/iterator.h"
 
@@ -73,6 +71,21 @@ HdStShaderCode::GetParams() const
     return empty;
 }
 
+/* virtual */
+bool
+HdStShaderCode::IsEnabledPrimvarFiltering() const
+{
+    return false;
+}
+
+/* virtual */
+TfTokenVector const&
+HdStShaderCode::GetPrimvarNames() const
+{
+    static const TfTokenVector EMPTY;
+    return EMPTY;
+}
+
 /*virtual*/
 HdBufferArrayRangeSharedPtr const&
 HdStShaderCode::GetShaderData() const
@@ -87,32 +100,6 @@ HdStShaderCode::GetTextures() const
 {
     return HdStShaderCode::TextureDescriptorVector();
 }
-
-/*static*/
-bool
-HdStShaderCode::CanAggregate(HdStShaderCodeSharedPtr const &shaderA,
-                              HdStShaderCodeSharedPtr const &shaderB)
-{
-    bool bindlessTexture = GarchResourceFactory::GetInstance()->GetContextCaps()
-                                                .bindlessTextureEnabled;
-
-    // See if the shaders are same or not. If the bindless texture option
-    // is enabled, the shaders can be aggregated for those differences are
-    // only texture addresses.
-    if (bindlessTexture) {
-        if (shaderA->ComputeHash() != shaderB->ComputeHash()) {
-            return false;
-        }
-    } else {
-        // XXX: still wrong. it breaks batches for the shaders with same
-        // signature.
-        if (shaderA != shaderB) {
-            return false;
-        }
-    }
-    return true;
-}
-
 
 
 PXR_NAMESPACE_CLOSE_SCOPE

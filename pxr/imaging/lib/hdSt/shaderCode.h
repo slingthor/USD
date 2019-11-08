@@ -86,6 +86,14 @@ public:
     HDST_API
     virtual HdMaterialParamVector const& GetParams() const;
 
+    /// Returns whether primvar filtering is enabled for this shader.
+    HDST_API
+    virtual bool IsEnabledPrimvarFiltering() const;
+
+    /// Returns the names of primvar that are used by this shader.
+    HDST_API
+    virtual TfTokenVector const& GetPrimvarNames() const;
+
     struct TextureDescriptor {
         TfToken name;
         HdStTextureResourceHandleSharedPtr handle;
@@ -118,11 +126,6 @@ public:
 
     /// Add custom bindings (used by codegen)
     virtual void AddBindings(HdBindingRequestVector* customBindings) = 0;
-
-    /// Returns if the two shaders can be aggregated in a same drawbatch or not.
-    HDST_API
-    static bool CanAggregate(HdStShaderCodeSharedPtr const &shaderA,
-                             HdStShaderCodeSharedPtr const &shaderB);
 
     /// Material tags can be set in the meta-data of a glslfx file to control
     /// what rprim collection that prims using this shader should go into.
