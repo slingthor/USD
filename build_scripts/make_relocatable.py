@@ -36,11 +36,15 @@ def add_rpath_to_files(path, files):
             subprocess.call(['install_name_tool', '-add_rpath', '@loader_path/' + path_between, f])
 
 
+def remove_rpath(path, files):
+    for f in files:
+        subprocess.call(['install_name_tool', '-delete_rpath', path, f])
+
 
 def change_absolute_to_relative(files, path_to_replace, custom_path=""):
     for f in files:
         otool_output = subprocess.check_output(['otool', '-L', f])
-        for line in otool_output.splitlines()[1:]:
+        for line in otool_output.splitlines():
             extracted_path = line.split()[0]
             replace_path_idx = extracted_path.find(path_to_replace)
             if replace_path_idx != -1:
@@ -90,6 +94,7 @@ def make_relocatable(install_path, buildPython, qt_path="/usr/local/opt/qt@4"):
     extract_files_recursive(install_path + '/tests', (lambda file: '.so' in file or '.dylib' in file), files)
     extract_files(install_path + '/tests', (lambda file: isfile(file) and open(file).readline().rstrip()[0] != "#"), files)
 
+    remove_rpath(install_path+ '/lib', files)
     add_rpath_to_files(install_path+ '/lib/', files)
     change_absolute_to_relative(files, install_path)
 
