@@ -2,7 +2,7 @@
 import sys
 import os
 import subprocess
-import PySide
+import PySide2
 import OpenGL
 from distutils.dir_util import copy_tree
 from os.path import isdir, isfile, join
@@ -81,7 +81,7 @@ def replace_string_in_file(path, old_string, new_string):
 
 
 
-def make_relocatable(install_path, buildPython, qt_path="/usr/local/opt/qt@4"):
+def make_relocatable(install_path, buildPython, qt_path="/usr/local/opt/qt"):
     files = []
 
     #path of the usd repo folder
@@ -111,7 +111,7 @@ def make_relocatable(install_path, buildPython, qt_path="/usr/local/opt/qt@4"):
 
 
     if buildPython:
-        pyside_path = PySide.__file__
+        pyside_path = PySide2.__file__
         pyside_index = pyside_path.find("__init__.py")
         pyside_path = pyside_path[:pyside_index]
 
@@ -121,18 +121,18 @@ def make_relocatable(install_path, buildPython, qt_path="/usr/local/opt/qt@4"):
 
         subprocess.call(['chmod', '-R', '+w', install_path + "/lib"])
         
-        copy_tree(pyside_path, install_path + "/lib/python/PySide")
+        copy_tree(pyside_path, install_path + "/lib/python/PySide2")
         copy_tree(openGL_path, install_path + "/lib/python/OpenGL")
-        copy_tree(qt_path, install_path + "/lib/qt@4")
+        # copy_tree(qt_path, install_path + "/lib/qt")
 
-        subprocess.call(['chmod', '-R', '+w', install_path + "/lib/qt@4"])
+        # subprocess.call(['chmod', '-R', '+w', install_path + "/lib/qt"])
 
-        qt_base="/usr/local/opt/qt@4"
-        qt_cellar_base="/usr/local/Cellar/qt@4/4.8.7_5"
+        # qt_base="/usr/local/opt/qt"
+        # qt_cellar_base="/usr/local/Cellar/qt/5.13.2"
 
-        files=[]
-        extract_files_recursive(install_path + '/lib/python/PySide', (lambda file: '.so' in file or '.dylib' in file), files)
-        extract_files_recursive(install_path + '/lib/qt@4', (lambda file: '.so' in file or '.dylib' in file), files)
+        # files=[]
+        # extract_files_recursive(install_path + '/lib/python/PySide', (lambda file: '.so' in file or '.dylib' in file), files)
+        # extract_files_recursive(install_path + '/lib/qt', (lambda file: '.so' in file or '.dylib' in file), files)
 
-        change_absolute_to_relative(files, qt_base, install_path + '/lib/qt@4')
-        change_absolute_to_relative(files, qt_cellar_base, install_path + '/lib/qt@4')
+        # change_absolute_to_relative(files, qt_base, install_path + '/lib/qt')
+        # change_absolute_to_relative(files, qt_cellar_base, install_path + '/lib/qt')
