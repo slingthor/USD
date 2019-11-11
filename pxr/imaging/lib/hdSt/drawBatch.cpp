@@ -135,8 +135,8 @@ bool
 HdSt_DrawBatch::_IsAggregated(HdStDrawItem const *drawItem0,
                               HdStDrawItem const *drawItem1)
 {
-    if (!HdStShaderCode::CanAggregate(drawItem0->GetMaterialShader(),
-                                    drawItem1->GetMaterialShader())) {
+    if (!HdStSurfaceShader::CanAggregate(drawItem0->GetMaterialShader(),
+                                         drawItem1->GetMaterialShader())) {
         return false;
     }
 
@@ -316,8 +316,8 @@ HdSt_DrawBatch::_DrawingProgram::CompileShader(
         (*it)->AddBindings(&customBindings);
     }
 
-    HdSt_CodeGen *codeGen = resourceFactory->NewCodeGen(
-        _geometricShader, shaders);
+    boost::scoped_ptr<HdSt_CodeGen> codeGen(
+    HdStResourceFactory::GetInstance()->NewCodeGen( _geometricShader, shaders));
 
     // let resourcebinder resolve bindings and populate metadata
     // which is owned by codegen.
@@ -331,11 +331,9 @@ HdSt_DrawBatch::_DrawingProgram::CompileShader(
     HdStProgram::ID hash = codeGen->ComputeHash();
 
     {
-        HdInstance<HdStProgram::ID, HdStProgramSharedPtr> programInstance;
-
         // ask registry to see if there's already compiled program
-        std::unique_lock<std::mutex> regLock = 
-            resourceRegistry->RegisterProgram(hash, &programInstance);
+        HdInstance<HdStProgramSharedPtr> programInstance =
+                                resourceRegistry->RegisterProgram(hash);
 
         if (programInstance.IsFirstInstance()) {
             HdStProgramSharedPtr program = codeGen->Compile();

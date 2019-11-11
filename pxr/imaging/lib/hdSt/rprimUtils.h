@@ -28,11 +28,43 @@
 #include "pxr/imaging/hdSt/api.h"
 #include "pxr/imaging/hd/sceneDelegate.h"
 
+#include <boost/shared_ptr.hpp>
+
+#include <string>
+
 PXR_NAMESPACE_OPEN_SCOPE
 
 class HdDrawItem;
 class HdRprim;
 struct HdRprimSharedData;
+class HdStDrawItem;
+class HdStInstancer;
+typedef boost::shared_ptr<class HdStShaderCode> HdStShaderCodeSharedPtr;
+
+// Get filtered primvar descriptors for drawItem
+HdPrimvarDescriptorVector
+HdStGetPrimvarDescriptors(
+    HdRprim const * prim,
+    HdStDrawItem const * drawItem,
+    HdSceneDelegate * delegate,
+    HdInterpolation interpolation);
+
+// Get filtered instancer primvar descriptors for drawItem
+HdPrimvarDescriptorVector
+HdStGetInstancerPrimvarDescriptors(
+    HdStInstancer const * instancer,
+    HdRprim const * prim,
+    HdStDrawItem const * drawItem,
+    HdSceneDelegate * delegate);
+
+// Resolves the material shader for the given prim (using a fallback
+// material as necessary), including optional mixin shader source code.
+HDST_API
+HdStShaderCodeSharedPtr
+HdStGetMaterialShader(
+    HdRprim const * prim,
+    HdSceneDelegate * delegate,
+    std::string const & mixinSource = std::string());
 
 // Given prim information it will create sources representing
 // constant primvars and hand it to the resource registry.

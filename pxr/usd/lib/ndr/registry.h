@@ -89,8 +89,8 @@ public:
     NDR_API
     void SetExtraDiscoveryPlugins(const std::vector<TfType>& pluginTypes);
 
-    /// Parses the given \p asset, constucts a NdrNode from it and adds it to 
-    /// the registry. 
+    /// Parses the given \p asset, constructs a NdrNode from it and adds it to
+    /// the registry.
     /// 
     /// Nodes created from an asset using this API can be looked up by the 
     /// unique identifier and sourceType of the returned node, or by URI, 
@@ -100,12 +100,22 @@ public:
     /// compiling the source code in the file pointed to by \p asset correctly.
     /// This metadata supplements the metadata available in the asset and 
     /// overrides it in cases where there are key collisions.
-    /// 
+    ///
+    /// \p subidentifier is optional, and it would be used to indicate a
+    /// particular definition in the asset file if the asset contains multiple
+    /// node definitions.
+    ///
+    /// \p sourceType is optional, and it is only needed to indicate a
+    /// particular type if the asset file is capable of representing a node
+    /// definition of multiple source types.
+    ///
     /// Returns a valid node if the asset is parsed successfully using one 
     /// of the registered parser plugins.
     NDR_API
     NdrNodeConstPtr GetNodeFromAsset(const SdfAssetPath &asset,
-                                     const NdrTokenMap &metadata);
+                                     const NdrTokenMap &metadata,
+                                     const TfToken &subIdentifier=TfToken(),
+                                     const TfToken &sourceType=TfToken());
 
     /// Parses the given \p sourceCode string, constructs a NdrNode from it and 
     /// adds it to the registry. The parser to be used is determined by the 

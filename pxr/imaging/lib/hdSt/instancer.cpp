@@ -24,11 +24,12 @@
 #include "pxr/imaging/hdSt/instancer.h"
 
 #include "pxr/imaging/hdSt/drawItem.h"
+#include "pxr/imaging/hdSt/resourceRegistry.h"
+#include "pxr/imaging/hdSt/rprimUtils.h"
 #include "pxr/imaging/hd/debugCodes.h"
 #include "pxr/imaging/hd/rprimSharedData.h"
 #include "pxr/imaging/hd/sceneDelegate.h"
 #include "pxr/imaging/hd/vtBufferSource.h"
-#include "pxr/imaging/hdSt/resourceRegistry.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -42,7 +43,9 @@ HdStInstancer::HdStInstancer(HdSceneDelegate* delegate,
 }
 
 void
-HdStInstancer::PopulateDrawItem(HdDrawItem *drawItem, HdRprimSharedData *sharedData,
+HdStInstancer::PopulateDrawItem(HdRprim *prim,
+                                HdStDrawItem *drawItem,
+                                HdRprimSharedData *sharedData,
                                 HdDirtyBits dirtyBits)
 {
     HD_TRACE_FUNCTION();
@@ -62,7 +65,7 @@ HdStInstancer::PopulateDrawItem(HdDrawItem *drawItem, HdRprimSharedData *sharedD
         // allocate instance primvar slot in the drawing coordinate.
         sharedData->barContainer.Set(
             drawingCoord->GetInstancePrimvarIndex(level),
-            currentInstancer->GetInstancePrimvars());
+            currentInstancer->GetInstancePrimvars(prim, drawItem));
 
         // next
         currentInstancer = static_cast<HdStInstancer*>(
@@ -71,7 +74,7 @@ HdStInstancer::PopulateDrawItem(HdDrawItem *drawItem, HdRprimSharedData *sharedD
     }
 
     /* INSTANCE INDICES */
-    if (HdChangeTracker::IsInstanceIndexDirty(dirtyBits, sharedData->rprimID)) {
+    if (HdChangeTracker::IsInstancerDirty(dirtyBits, sharedData->rprimID)) {
         sharedData->barContainer.Set(
             drawingCoord->GetInstanceIndexIndex(),
             GetInstanceIndices(sharedData->rprimID));
@@ -81,7 +84,8 @@ HdStInstancer::PopulateDrawItem(HdDrawItem *drawItem, HdRprimSharedData *sharedD
 }
 
 HdBufferArrayRangeSharedPtr
-HdStInstancer::GetInstancePrimvars()
+HdStInstancer::GetInstancePrimvars(HdRprim *prim,
+                                   HdStDrawItem *drawItem)
 {
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
@@ -110,8 +114,8 @@ HdStInstancer::GetInstancePrimvars()
                 delegate->GetRenderIndex().GetResourceRegistry());
 
             HdPrimvarDescriptorVector primvars =
-                delegate->GetPrimvarDescriptors(instancerId,
-                                                HdInterpolationInstance);
+                HdStGetInstancerPrimvarDescriptors(this,
+                                                   prim, drawItem, delegate);
 
             // for all instance primvars
             HdBufferSourceVector sources;
@@ -129,7 +133,8 @@ HdStInstancer::GetInstancePrimvars()
                     VtValue value = delegate->Get(instancerId, primvar.name);
                     if (!value.IsEmpty()) {
                         HdBufferSourceSharedPtr source;
-                        if (primvar.name == HdTokens->instanceTransform &&
+                        if (primvar.name ==
+                                HdInstancerTokens->instanceTransform &&
                             TF_VERIFY(value.IsHolding<VtArray<GfMatrix4d> >())) {
                             // Explicitly invoke the c'tor taking a
                             // VtArray<GfMatrix4d> to ensure we properly convert to
@@ -264,8 +269,8 @@ HdStInstancer::GetInstanceIndices(SdfPath const &prototypeId)
     HF_MALLOC_TAG_FUNCTION();
 
     // Note: this function is called from the prototype HdRprm only if
-    // the prototype has DirtyInstanceIndex. There's no need to guard using
-    // dirtyBits within this function.
+    // the prototype has DirtyInstancer.  We should figure out a way to cache
+    // this on DirtyInstanceIndex (set on this instancer).
 
     HdStResourceRegistrySharedPtr const& resourceRegistry = 
         boost::static_pointer_cast<HdStResourceRegistry>(
@@ -289,11 +294,11 @@ HdStInstancer::GetInstanceIndices(SdfPath const &prototypeId)
                     "range for <%s>\n",
                     GetId().GetText());
             HdBufferSpecVector bufferSpecs;
-            bufferSpecs.emplace_back(HdTokens->instanceIndices,
+            bufferSpecs.emplace_back(HdInstancerTokens->instanceIndices,
                                      HdTupleType {HdTypeInt32, 1});
             // for GPU frustum culling, we need a copy of instanceIndices.
             // see shader/frustumCull.glslfx
-            bufferSpecs.emplace_back(HdTokens->culledInstanceIndices,
+            bufferSpecs.emplace_back(HdInstancerTokens->culledInstanceIndices,
                                      HdTupleType {HdTypeInt32, 1});
 
             // allocate new one
@@ -364,10 +369,10 @@ HdStInstancer::GetInstanceIndices(SdfPath const &prototypeId)
     // update instance indices
     HdBufferSourceVector sources;
     HdBufferSourceSharedPtr source(
-        new HdVtBufferSource(HdTokens->instanceIndices,
+        new HdVtBufferSource(HdInstancerTokens->instanceIndices,
                              VtValue(instanceIndices)));
     sources.push_back(source);
-    source.reset(new HdVtBufferSource(HdTokens->culledInstanceIndices,
+    source.reset(new HdVtBufferSource(HdInstancerTokens->culledInstanceIndices,
                                       VtValue(instanceIndices)));
     sources.push_back(source);
     resourceRegistry->AddSources(indexRange, sources);

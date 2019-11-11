@@ -81,7 +81,9 @@ public:
     SDR_API
     SdrShaderNodeConstPtr GetShaderNodeFromAsset(
         const SdfAssetPath &shaderAsset,
-        const NdrTokenMap &metadata=NdrTokenMap());
+        const NdrTokenMap &metadata=NdrTokenMap(),
+        const TfToken &subIdentifier=TfToken(),
+        const TfToken &sourceType=TfToken());
 
     /// Wrapper method for NdrRegistry::GetNodeFromSourceCode(). 
     /// Returns a valid SdrShaderNode pointer upon success.

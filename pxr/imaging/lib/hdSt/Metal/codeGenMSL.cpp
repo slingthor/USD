@@ -100,6 +100,8 @@ TF_DEFINE_PRIVATE_TOKENS(
     ((_double, "double"))
     ((_float, "float"))
     ((_int, "int"))
+    (wrapped_float)
+    (wrapped_int)
     (hd_vec2)
     (hd_vec3)
     (hd_vec3_get)
@@ -385,6 +387,12 @@ _GetUnpackedType(TfToken const &token, bool packedAlignment)
 {
     if (token == _tokens->packed_2_10_10_10) {
         return _tokens->vec4;
+    }
+    else if (token == _tokens->_float) {
+        return _tokens->wrapped_float;
+    }
+    else if (token == _tokens->_int) {
+        return _tokens->wrapped_int;
     }
     return token;
 }
@@ -2644,7 +2652,12 @@ HdSt_CodeGenMSL::GetComputeHeader()
             << "        float xx;\n"
             << "        float xxx;\n"
             << "        float xxxx;\n"
+            << "        float r;\n"
+            << "        float rr;\n"
+            << "        float rrr;\n"
+            << "        float rrrr;\n"
             << "    };\n"
+            << "    wrapped_float(float _x) { x = _x;}\n"
             << "    operator float () {\n"
             << "        return x;\n"
             << "    }\n"
@@ -2656,7 +2669,12 @@ HdSt_CodeGenMSL::GetComputeHeader()
             << "        int xx;\n"
             << "        int xxx;\n"
             << "        int xxxx;\n"
+            << "        int r;\n"
+            << "        int rr;\n"
+            << "        int rrr;\n"
+            << "        int rrrr;\n"
             << "    };\n"
+            << "    wrapped_int(int _x) { x = _x;}\n"
             << "    operator int () {\n"
             << "        return x;\n"
             << "    }\n"

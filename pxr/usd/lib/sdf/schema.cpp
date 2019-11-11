@@ -571,13 +571,13 @@ _AddLegacyTypesToRegistry(Sdf_ValueTypeRegistry* r)
 class SdfSchemaBase::_ValueTypeRegistrar::Type::_Impl
 {
 public:
-    _Impl(const std::string& name, 
+    _Impl(const TfToken& name, 
           const VtValue& defaultValue, 
           const VtValue& defaultArrayValue)
         : type(name, defaultValue, defaultArrayValue)
     { }
 
-    _Impl(const std::string& name, const TfType& type_)
+    _Impl(const TfToken& name, const TfType& type_)
         : type(name, type_)
     { }
 
@@ -585,7 +585,7 @@ public:
 };
 
 SdfSchemaBase::_ValueTypeRegistrar::Type::Type(
-    const std::string& name, 
+    const TfToken& name, 
     const VtValue& defaultValue, 
     const VtValue& defaultArrayValue)
     : _impl(new _Impl(name, defaultValue, defaultArrayValue))
@@ -593,7 +593,7 @@ SdfSchemaBase::_ValueTypeRegistrar::Type::Type(
 }
 
 SdfSchemaBase::_ValueTypeRegistrar::Type::Type(
-    const std::string& name, 
+    const TfToken& name, 
     const TfType& type)
     : _impl(new _Impl(name, type))
 { 
@@ -1045,24 +1045,17 @@ SdfSchemaBase::_DoRegisterField(const TfToken &key, const VtValue &v)
 SdfSchemaBase::_SpecDefiner
 SdfSchemaBase::_ExtendSpecDefinition(SdfSpecType specType)
 {
-    SpecDefinition* specDef = TfMapLookupPtr(_specDefinitions, specType);
-    if (!specDef) {
+    if (!_specDefinitions[specType].second) {
         TF_FATAL_ERROR("No definition for spec type %s",
                        TfEnum::GetName(specType).c_str());
     }
-    return _SpecDefiner(this, specDef);
+    return _SpecDefiner(this, &_specDefinitions[specType].first);
 }
 
 const SdfSchemaBase::FieldDefinition* 
 SdfSchemaBase::GetFieldDefinition(const TfToken &fieldKey) const
 {
     return TfMapLookupPtr(_fieldDefinitions, fieldKey);
-}
-
-const SdfSchemaBase::SpecDefinition* 
-SdfSchemaBase::GetSpecDefinition(SdfSpecType specType) const
-{
-    return TfMapLookupPtr(_specDefinitions, specType);
 }
 
 const VtValue&
@@ -1203,9 +1196,21 @@ SdfSchemaBase::GetAllTypes() const
 }
 
 SdfValueTypeName
-SdfSchemaBase::FindType(const std::string& typeName) const
+SdfSchemaBase::FindType(const TfToken& typeName) const
 {
     return _valueTypeRegistry->FindType(typeName);
+}
+
+SdfValueTypeName
+SdfSchemaBase::FindType(const char *typeName) const
+{
+    return _valueTypeRegistry->FindType(TfToken(typeName));
+}
+
+SdfValueTypeName
+SdfSchemaBase::FindType(const std::string &typeName) const
+{
+    return _valueTypeRegistry->FindType(TfToken(typeName));
 }
 
 SdfValueTypeName
@@ -1221,7 +1226,7 @@ SdfSchemaBase::FindType(const VtValue& value, const TfToken& role) const
 }
 
 SdfValueTypeName
-SdfSchemaBase::FindOrCreateType(const std::string& typeName) const
+SdfSchemaBase::FindOrCreateType(const TfToken& typeName) const
 {
     return _valueTypeRegistry->FindOrCreateTypeName(typeName);
 }

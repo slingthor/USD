@@ -114,22 +114,23 @@ HdStPoints::_UpdateDrawItem(HdSceneDelegate *sceneDelegate,
     /* VISIBILITY */
     _UpdateVisibility(sceneDelegate, dirtyBits);
 
+    /* MATERIAL SHADER (may affect subsequent primvar population) */
+    drawItem->SetMaterialShader(HdStGetMaterialShader(this, sceneDelegate));
+
     /* CONSTANT PRIMVARS, TRANSFORM AND EXTENT */
     HdPrimvarDescriptorVector constantPrimvars =
-        GetPrimvarDescriptors(sceneDelegate, HdInterpolationConstant);
+        HdStGetPrimvarDescriptors(this, drawItem, sceneDelegate,
+                                  HdInterpolationConstant);
     HdStPopulateConstantPrimvars(this, &_sharedData, sceneDelegate, drawItem, 
         dirtyBits, constantPrimvars);
-
-    /* MATERIAL SHADER */
-    drawItem->SetMaterialShaderFromRenderIndex(
-        sceneDelegate->GetRenderIndex(), GetMaterialId());
 
     /* INSTANCE PRIMVARS */
     if (!GetInstancerId().IsEmpty()) {
         HdStInstancer *instancer = static_cast<HdStInstancer*>(
             sceneDelegate->GetRenderIndex().GetInstancer(GetInstancerId()));
         if (TF_VERIFY(instancer)) {
-            instancer->PopulateDrawItem(drawItem, &_sharedData, *dirtyBits);
+            instancer->PopulateDrawItem(this, drawItem,
+                                        &_sharedData, *dirtyBits);
         }
     }
 
@@ -199,11 +200,13 @@ HdStPoints::_PopulateVertexPrimvars(HdSceneDelegate *sceneDelegate,
 
     // The "points" attribute is expected to be in this list.
     HdPrimvarDescriptorVector primvars =
-        GetPrimvarDescriptors(sceneDelegate, HdInterpolationVertex);
+        HdStGetPrimvarDescriptors(this, drawItem, sceneDelegate,
+                                  HdInterpolationVertex);
 
     // Add varying primvars so we can process them together, below.
     HdPrimvarDescriptorVector varyingPvs =
-        GetPrimvarDescriptors(sceneDelegate, HdInterpolationVarying);
+        HdStGetPrimvarDescriptors(this, drawItem, sceneDelegate,
+                                  HdInterpolationVarying);
     primvars.insert(primvars.end(), varyingPvs.begin(), varyingPvs.end());
 
     HdBufferSourceVector sources;
@@ -281,7 +284,6 @@ HdStPoints::GetInitialDirtyBitsMask() const
     HdDirtyBits mask = HdChangeTracker::Clean
         | HdChangeTracker::InitRepr
         | HdChangeTracker::DirtyExtent
-        | HdChangeTracker::DirtyInstanceIndex
         | HdChangeTracker::DirtyPoints
         | HdChangeTracker::DirtyPrimID
         | HdChangeTracker::DirtyPrimvar
@@ -291,6 +293,10 @@ HdStPoints::GetInitialDirtyBitsMask() const
         | HdChangeTracker::DirtyVisibility
         | HdChangeTracker::DirtyWidths
         ;
+
+    if (!GetInstancerId().IsEmpty()) {
+        mask |= HdChangeTracker::DirtyInstancer;
+    }
 
     return mask;
 }

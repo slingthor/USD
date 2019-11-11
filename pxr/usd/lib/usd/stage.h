@@ -34,7 +34,7 @@
 #include "pxr/usd/usd/schemaRegistry.h"
 #include "pxr/usd/usd/stageLoadRules.h"
 #include "pxr/usd/usd/stagePopulationMask.h"
-#include "pxr/usd/usd/prim.h"
+#include "pxr/usd/usd/primFlags.h"
 
 #include "pxr/base/tf/declarePtrs.h"
 #include "pxr/base/tf/hashmap.h"
@@ -72,6 +72,7 @@ class Usd_InstanceChanges;
 class Usd_InterpolatorBase;
 class UsdResolveInfo;
 class Usd_Resolver;
+class UsdPrim;
 class UsdPrimRange;
 
 SDF_DECLARE_HANDLES(SdfLayer);
@@ -1618,9 +1619,32 @@ private:
     // Value & Metadata Authoring
     // --------------------------------------------------------------------- //
 
+    // Trait that allows us to call the correct versions of _SetValue and 
+    // _SetMetadata for types whose values need to be mapped when written to
+    // different edit targets.
     template <class T>
-    bool _SetValue(
+    struct _IsEditTargetMappable {
+        static const bool value =
+            std::is_same<T, SdfTimeCode>::value ||
+            std::is_same<T, VtArray<SdfTimeCode>>::value ||
+            std::is_same<T, SdfTimeSampleMap>::value ||
+            std::is_same<T, VtDictionary>::value;
+    };
+
+    // Set value for types that don't need to be mapped for edit targets.
+    template <class T>
+    typename std::enable_if<!_IsEditTargetMappable<T>::value, bool>::type
+    _SetValue(
         UsdTimeCode time, const UsdAttribute &attr, const T &newValue);
+
+    // Set value for types that do need to be mapped for edit targets.
+    template <class T>
+    typename std::enable_if<_IsEditTargetMappable<T>::value, bool>::type
+    _SetValue(
+        UsdTimeCode time, const UsdAttribute &attr, const T &newValue);
+
+    // Set value for dynamically typed VtValue. Will map the value across edit
+    // targets if the held value type supports it.
     bool _SetValue(
         UsdTimeCode time, const UsdAttribute &attr, const VtValue &newValue);
 
@@ -1633,6 +1657,26 @@ private:
         UsdTimeCode time, const UsdAttribute &attr, const T& value);
 
     bool _ClearValue(UsdTimeCode time, const UsdAttribute &attr);
+
+    // Set metadata for types that don't need to be mapped across edit targets.
+    template <class T>
+    typename std::enable_if<!_IsEditTargetMappable<T>::value, bool>::type
+    _SetMetadata(const UsdObject &object, const TfToken& key,
+                 const TfToken &keyPath, const T& value);
+
+    // Set metadata for types that do need to be mapped for edit targets.
+    template <class T>
+    typename std::enable_if<_IsEditTargetMappable<T>::value, bool>::type
+    _SetMetadata(const UsdObject &object, const TfToken& key,
+                 const TfToken &keyPath, const T& value);
+
+    // Set metadata for dynamically typed VtValue. Will map the value across 
+    // edit targets if the held value type supports it.
+    USD_API
+    bool _SetMetadata(const UsdObject &object,
+                      const TfToken& key,
+                      const TfToken &keyPath,
+                      const VtValue& value);
 
     template <class T>
     bool _SetEditTargetMappedMetadata(
@@ -1841,17 +1885,70 @@ private:
     // --------------------------------------------------------------------- //
     // Metadata Resolution
     // --------------------------------------------------------------------- //
+
+public:
+    // Trait that allows us to call the correct version of _GetMetadata for 
+    // types that require type specific value resolution as opposed to just
+    // strongest opinion. These types also use type specific resolution 
+    // in _GetValue.
+    template <class T>
+    struct _HasTypeSpecificResolution {
+        static const bool value =
+            std::is_same<T, SdfAssetPath>::value ||
+            std::is_same<T, VtArray<SdfAssetPath>>::value ||
+            std::is_same<T, SdfTimeCode>::value ||
+            std::is_same<T, VtArray<SdfTimeCode>>::value ||
+            std::is_same<T, SdfTimeSampleMap>::value ||
+            std::is_same<T, VtDictionary>::value;
+    };
+
+private:
+    // Get metadata for types that do not have type specific value resolution.
+    template <class T>
+    typename std::enable_if<!_HasTypeSpecificResolution<T>::value, bool>::type
+    _GetMetadata(const UsdObject &obj,
+                 const TfToken& fieldName,
+                 const TfToken &keyPath,
+                 bool useFallbacks,
+                 T* result) const;
+
+    // Get metadata for types that do have type specific value resolution.
+    template <class T>
+    typename std::enable_if<_HasTypeSpecificResolution<T>::value, bool>::type
+    _GetMetadata(const UsdObject &obj,
+                 const TfToken& fieldName,
+                 const TfToken &keyPath,
+                 bool useFallbacks,
+                 T* result) const;
+
+    // Get metadata as a dynamically typed VtValue. Will perform type specific
+    // value resolution if the returned held type requires it.
     bool _GetMetadata(const UsdObject &obj,
                       const TfToken& fieldName,
                       const TfToken &keyPath,
                       bool useFallbacks,
                       VtValue* result) const;
 
-    bool _GetMetadata(const UsdObject &obj,
-                      const TfToken& fieldName,
-                      const TfToken &keyPath,
-                      bool useFallbacks,
-                      SdfAbstractDataValue* result) const;
+    // Gets a metadata value using only strongest value resolution. It is 
+    // assumed that result is holding a value that does not require type 
+    // specific value resolution.
+    USD_API
+    bool _GetStrongestResolvedMetadata(const UsdObject &obj,
+                                       const TfToken& fieldName,
+                                       const TfToken &keyPath,
+                                       bool useFallbacks,
+                                       SdfAbstractDataValue* result) const;
+
+    // Gets a metadata value with the type specific value resolution for the 
+    // type applied. This is only implemented for types that 
+    // _HasTypeSpecificResolution.
+    template <class T>
+    USD_API
+    bool _GetTypeSpecificResolvedMetadata(const UsdObject &obj,
+                                          const TfToken& fieldName,
+                                          const TfToken &keyPath,
+                                          bool useFallbacks,
+                                          T* result) const;
 
     template <class T>
     bool _GetMetadataImpl(const UsdObject &obj, const TfToken& fieldName, 
@@ -2182,6 +2279,61 @@ UsdStage::SetMetadataByDictKey(const TfToken& key, const TfToken &keyPath,
     return SetMetadataByDictKey(key, keyPath, in);
 }
 
+// Get metadata for types that do not have type specific value resolution.
+template <class T>
+typename std::enable_if<
+    !UsdStage::_HasTypeSpecificResolution<T>::value, bool>::type
+UsdStage::_GetMetadata(const UsdObject &obj,
+                       const TfToken& fieldName,
+                       const TfToken &keyPath,
+                       bool useFallbacks,
+                       T* result) const
+{
+    // Since these types don't have type specific value resolution, we can just 
+    // get the strongest metadata value and be done.
+    SdfAbstractDataTypedValue<T> out(result);
+    return _GetStrongestResolvedMetadata(
+        obj, fieldName, keyPath, useFallbacks, &out);
+}
+
+// Get metadata for types that do have type specific value resolution.
+template <class T>
+typename std::enable_if<
+    UsdStage::_HasTypeSpecificResolution<T>::value, bool>::type
+UsdStage::_GetMetadata(const UsdObject &obj,
+                       const TfToken& fieldName,
+                       const TfToken &keyPath,
+                       bool useFallbacks,
+                       T* result) const
+{
+    // Call the templated type specifice resolved metadata implementation that 
+    // will only be implemented for types that support it.
+    return _GetTypeSpecificResolvedMetadata(
+        obj, fieldName, keyPath, useFallbacks, result);
+}
+
+
+// Set metadata for types that don't need to be mapped across edit targets.
+template <class T>
+typename std::enable_if<!UsdStage::_IsEditTargetMappable<T>::value, bool>::type
+UsdStage::_SetMetadata(const UsdObject &object, const TfToken& key,
+                       const TfToken &keyPath, const T& value)
+{
+    // Since we know that we don't need to map the value for edit targets, 
+    // we can just type erase the value and set the metadata as is.
+    SdfAbstractDataConstTypedValue<T> in(&value);
+    return _SetMetadataImpl<SdfAbstractDataConstValue>(
+        object, key, keyPath, in);
+}
+
+// Set metadata for types that do need to be mapped for edit targets.
+template <class T>
+typename std::enable_if<UsdStage::_IsEditTargetMappable<T>::value, bool>::type
+UsdStage::_SetMetadata(const UsdObject &object, const TfToken& key,
+                       const TfToken &keyPath, const T& value)
+{
+    return _SetEditTargetMappedMetadata(object, key, keyPath, value);
+}
 
 
 PXR_NAMESPACE_CLOSE_SCOPE

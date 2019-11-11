@@ -39,13 +39,6 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 
-TF_DEFINE_PRIVATE_TOKENS(
-    _tokens,
-    (rotate)
-    (scale)
-    (translate)
-);
-
 template <typename T>
 static VtArray<T>
 _BuildArray(T values[], int numValues)
@@ -251,6 +244,12 @@ HdUnitTestDelegate::AddInstancer(SdfPath const &id,
     if (!parentId.IsEmpty()) {
         _instancers[parentId].prototypes.push_back(id);
     }
+
+    // Instancers don't have initial dirty bits, so we need to add them.
+    HdChangeTracker& tracker = GetRenderIndex().GetChangeTracker();
+    tracker.MarkInstancerDirty(id, HdChangeTracker::DirtyTransform |
+                                   HdChangeTracker::DirtyPrimvar |
+                                   HdChangeTracker::DirtyInstanceIndex);
 }
 
 void
@@ -272,6 +271,10 @@ HdUnitTestDelegate::SetInstancerProperties(SdfPath const &id,
     _instancers[id].rotate = rotate;
     _instancers[id].translate = translate;
     _instancers[id].prototypeIndices = prototypeIndex;
+
+    HdChangeTracker& tracker = GetRenderIndex().GetChangeTracker();
+    tracker.MarkInstancerDirty(id, HdChangeTracker::DirtyPrimvar |
+                                   HdChangeTracker::DirtyInstanceIndex);
 }
 
 void
@@ -472,15 +475,7 @@ HdUnitTestDelegate::UpdateInstancerPrimvars(float time)
         }
 
         GetRenderIndex().GetChangeTracker().MarkInstancerDirty(
-            it->first,
-            HdChangeTracker::DirtyPrimvar);
-
-        // propagate dirtiness to all prototypes
-        TF_FOR_ALL (protoIt, it->second.prototypes) {
-            if (_instancers.find(*protoIt) != _instancers.end()) continue;
-            GetRenderIndex().GetChangeTracker().MarkRprimDirty(
-                *protoIt, HdChangeTracker::DirtyInstancer);
-        }
+            it->first, HdChangeTracker::DirtyPrimvar);
     }
 }
 
@@ -500,11 +495,8 @@ HdUnitTestDelegate::UpdateInstancerPrototypes(float time)
         }
 
         // invalidate instance index
-        TF_FOR_ALL (protoIt, it->second.prototypes) {
-            if (_instancers.find(*protoIt) != _instancers.end()) continue;
-            GetRenderIndex().GetChangeTracker().MarkRprimDirty(
-                *protoIt, HdChangeTracker::DirtyInstanceIndex);
-        }
+        GetRenderIndex().GetChangeTracker().MarkInstancerDirty(
+            it->first, HdChangeTracker::DirtyInstanceIndex);
     }
 }
 
@@ -886,15 +878,15 @@ HdUnitTestDelegate::Get(SdfPath const& id, TfToken const& key)
         else if(_points.find(id) != _points.end()) {
             return _points[id].width;
         }
-    } else if (key == _tokens->scale) {
+    } else if (key == HdInstancerTokens->scale) {
         if (_instancers.find(id) != _instancers.end()) {
             return VtValue(_instancers[id].scale);
         }
-    } else if (key == _tokens->rotate) {
+    } else if (key == HdInstancerTokens->rotate) {
         if (_instancers.find(id) != _instancers.end()) {
             return VtValue(_instancers[id].rotate);
         }
-    } else if (key == _tokens->translate) {
+    } else if (key == HdInstancerTokens->translate) {
         if (_instancers.find(id) != _instancers.end()) {
             return VtValue(_instancers[id].translate);
         }
@@ -929,9 +921,9 @@ HdUnitTestDelegate::GetPrimvarDescriptors(SdfPath const& id,
     }
     if (interpolation == HdInterpolationInstance && _hasInstancePrimvars &&
         _instancers.find(id) != _instancers.end()) {
-        primvars.emplace_back(_tokens->scale, interpolation);
-        primvars.emplace_back(_tokens->rotate, interpolation);
-        primvars.emplace_back(_tokens->translate, interpolation);
+        primvars.emplace_back(HdInstancerTokens->scale, interpolation);
+        primvars.emplace_back(HdInstancerTokens->rotate, interpolation);
+        primvars.emplace_back(HdInstancerTokens->translate, interpolation);
     } else if(_meshes.find(id) != _meshes.end()) {
         if (_meshes[id].colorInterpolation == interpolation) {
             primvars.emplace_back(HdTokens->displayColor, interpolation,

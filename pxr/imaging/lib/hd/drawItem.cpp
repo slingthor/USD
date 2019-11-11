@@ -136,7 +136,7 @@ HdDrawItem::IntersectsViewVolume(matrix_float4x4 const &viewProjMatrix,
         if (instancerNumLevels == 1) {
             int instanceOffset = instanceIndexRange->GetOffset();
 
-            HdBufferResourceSharedPtr const & instanceIndexRes = instanceIndexRange->GetResource(HdTokens->instanceIndices);
+            HdBufferResourceSharedPtr const & instanceIndexRes = instanceIndexRange->GetResource(HdInstancerTokens->instanceIndices);
             
             uint8_t *instanceIndexBuffer = const_cast<uint8_t*>(instanceIndexRes->GetBufferContents());
             uint32_t *instanceBuffer = reinterpret_cast<uint32_t*>(instanceIndexBuffer) + instanceOffset;
@@ -146,13 +146,13 @@ HdDrawItem::IntersectsViewVolume(matrix_float4x4 const &viewProjMatrix,
 
                 HdBufferArrayRangeSharedPtr const & primvar = GetConstantPrimvarRange();
                 HdBufferResourceSharedPtr const & transformRes = primvar->GetResource(HdTokens->transform);
-                HdBufferResourceSharedPtr const & instancerTransformRes = primvar->GetResource(HdTokens->instancerTransform);
+                HdBufferResourceSharedPtr const & instancerTransformRes = primvar->GetResource(HdInstancerTokens->instancerTransform);
                 HdBufferArrayRangeSharedPtr const & instanceBar = GetInstancePrimvarRange(0);
 
-                HdBufferResourceSharedPtr const & instanceTransformRes = instanceBar->GetResource(HdTokens->instanceTransform);
-                HdBufferResourceSharedPtr const & translateRes = instanceBar->GetResource(HdTokens->translate);
-                HdBufferResourceSharedPtr const & rotateRes = instanceBar->GetResource(HdTokens->rotate);
-                HdBufferResourceSharedPtr const & scaleRes = instanceBar->GetResource(HdTokens->scale);
+                HdBufferResourceSharedPtr const & instanceTransformRes = instanceBar->GetResource(HdInstancerTokens->instanceTransform);
+                HdBufferResourceSharedPtr const & translateRes = instanceBar->GetResource(HdInstancerTokens->translate);
+                HdBufferResourceSharedPtr const & rotateRes = instanceBar->GetResource(HdInstancerTokens->rotate);
+                HdBufferResourceSharedPtr const & scaleRes = instanceBar->GetResource(HdInstancerTokens->scale);
 
                 // Item transform
                 size_t stride = transformRes->GetStride();
@@ -234,7 +234,7 @@ HdDrawItem::IntersectsViewVolume(matrix_float4x4 const &viewProjMatrix,
             }
 
             bool result = false;
-            HdBufferResourceSharedPtr const & culledInstanceIndexRes = instanceIndexRange->GetResource(HdTokens->culledInstanceIndices);
+            HdBufferResourceSharedPtr const & culledInstanceIndexRes = instanceIndexRange->GetResource(HdInstancerTokens->culledInstanceIndices);
 
             uint8_t *culledInstanceIndexBuffer = const_cast<uint8_t*>(culledInstanceIndexRes->GetBufferContents());
             uint32_t *culledInstanceBuffer = reinterpret_cast<uint32_t*>(culledInstanceIndexBuffer) + instanceOffset;
@@ -309,17 +309,17 @@ HdDrawItem::CalculateCullingBounds() const
         if (instancerNumLevels == 1) {
             int instanceOffset = instanceIndexRange->GetOffset();
             
-            HdBufferResourceSharedPtr const & instanceIndexRes = instanceIndexRange->GetResource(HdTokens->instanceIndices);
+            HdBufferResourceSharedPtr const & instanceIndexRes = instanceIndexRange->GetResource(HdInstancerTokens->instanceIndices);
             
             uint8_t *instanceIndexBuffer = const_cast<uint8_t*>(instanceIndexRes->GetBufferContents());
             uint32_t *instanceBuffer = reinterpret_cast<uint32_t*>(instanceIndexBuffer) + instanceOffset;
             
             HdBufferArrayRangeSharedPtr const & primvar = GetConstantPrimvarRange();
             HdBufferResourceSharedPtr const & transformRes = primvar->GetResource(HdTokens->transform);
-            HdBufferResourceSharedPtr const & instancerTransformRes = primvar->GetResource(HdTokens->instancerTransform);
+            HdBufferResourceSharedPtr const & instancerTransformRes = primvar->GetResource(HdInstancerTokens->instancerTransform);
             HdBufferArrayRangeSharedPtr const & instanceBar = GetInstancePrimvarRange(0);
             
-            HdBufferResourceSharedPtr const & instanceTransformRes = instanceBar->GetResource(HdTokens->instanceTransform);
+            HdBufferResourceSharedPtr const & instanceTransformRes = instanceBar->GetResource(HdInstancerTokens->instanceTransform);
             HdBufferResourceSharedPtr const & translateRes = instanceBar->GetResource(HdTokens->translate);
             HdBufferResourceSharedPtr const & rotateRes = instanceBar->GetResource(HdTokens->rotate);
             HdBufferResourceSharedPtr const & scaleRes = instanceBar->GetResource(HdTokens->scale);
@@ -420,12 +420,12 @@ int HdDrawItem::BuildInstanceBuffer(uint8_t** instanceVisibility) const
     HdBufferArrayRangeSharedPtr const & instanceIndexRange = GetInstanceIndexRange();
     int instanceOffset = instanceIndexRange->GetOffset();
     
-    HdBufferResourceSharedPtr const & instanceIndexRes = instanceIndexRange->GetResource(HdTokens->instanceIndices);
+    HdBufferResourceSharedPtr const & instanceIndexRes = instanceIndexRange->GetResource(HdInstancerTokens->instanceIndices);
     
     uint8_t *instanceIndexBuffer = const_cast<uint8_t*>(instanceIndexRes->GetBufferContents());
     uint32_t *instanceBuffer = reinterpret_cast<uint32_t*>(instanceIndexBuffer) + instanceOffset;
 
-    HdBufferResourceSharedPtr const & culledInstanceIndexRes = instanceIndexRange->GetResource(HdTokens->culledInstanceIndices);
+    HdBufferResourceSharedPtr const & culledInstanceIndexRes = instanceIndexRange->GetResource(HdInstancerTokens->culledInstanceIndices);
     
     uint8_t *culledInstanceIndexBuffer = const_cast<uint8_t*>(culledInstanceIndexRes->GetBufferContents());
     uint32_t *culledInstanceBuffer = reinterpret_cast<uint32_t*>(culledInstanceIndexBuffer) + instanceOffset;
