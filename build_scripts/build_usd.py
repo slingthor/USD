@@ -1674,8 +1674,8 @@ group.add_argument("--no-cache", dest="use_download_cache", action="store_false"
                    help="Download dependencies, don't use the cache download folder")
 group = parser.add_mutually_exclusive_group()
 group.add_argument("--make-relocatable", dest="make_relocatable",
-                   action="store_true", default=False,
-                   help="MacOS only: Run make_relocatable.sh script to make the instalation folder relocatable in the system")
+                   action="store_true", default=True,
+                   help="MacOS only: Run make_relocatable.py script to make the instalation folder relocatable in the system")
 group.add_argument("--no-make-relocatable", dest="make_relocatable",
                    action="store_false",
                    help="MacOS only: Don't run the make_relocatable.sh script")
@@ -2352,7 +2352,7 @@ if Windows():
 
 if args.make_relocatable and MacOS():
     from make_relocatable import make_relocatable
-    make_relocatable(context.usdInstDir, context.buildPython , context.usdSrcDir+'/lib/qt@4')
+    make_relocatable(context.usdInstDir, context.buildPython , context.usdSrcDir+'/lib/qt@4', verbosity > 1)
 
 Print("""
 Success! To use USD, please ensure that you have:""")
