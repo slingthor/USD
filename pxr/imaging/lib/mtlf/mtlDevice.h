@@ -519,7 +519,6 @@ public:
         id<MTLTexture> mtlColorTexture;
         id<MTLTexture> mtlMultisampleColorTexture;
         id<MTLTexture> mtlDepthTexture;
-        //id<MTLDepthStencilState> depthState;
 
         // Dummy black texture for missing textures
         id<MTLTexture> blackTexture2D;
@@ -757,6 +756,7 @@ private:
     // Pipeline state functions
     void SetRenderPipelineState();
     void SetDepthStencilState();
+
     size_t HashVertexDescriptor();
     
     bool concurrentDispatchSupported;

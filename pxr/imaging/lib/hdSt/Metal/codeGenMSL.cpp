@@ -1386,9 +1386,6 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
                     }
                     attrib = TfStringPrintf("[[buffer(%d)]]", currentUniformBufferSlot);
                     
-                    // HERE! Below need to look at how mslProgram->AddBinding works and update it so it deals with atomicity...
-                    // (Look at the 'mutability' code for the Compute shader binding stuff...?)
-                    
                     //Check whether it is the uniform buffer we made
                     if(name == "vsUniforms")
                         vsUniformsBufferSlot = currentUniformBufferSlot;
@@ -1420,8 +1417,6 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
                             << dataType << (isPtrParam ? "* " : " ")
                             << name << attrib;
                 
-                // HERE! This is doing Compute Shader stuff. Can we re-use the 'isMutable' flag?
-                
                 bool isMutable = (input.usage & HdSt_CodeGenMSL::TParam::Mutable);
                 csFuncDef   << "\n    , " << (isPtrParam ? "device " : "")
                             << ((isMutable || isShaderWritable) ? "" : "const ")
@@ -1437,8 +1432,6 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
                             << dataType << (isPtrParam ? "* " : " ")
                             << name << attrib;
                 }
-                
-                // HERE! Check atomicity and use 'device' instead of 'device const'...
                 
                 //MI wrapper code can't use "attrib" attribute specifier.
                 vsMI_FuncDef << "\n    , " << (isPtrParam ? ((inputIsAtomic || isShaderWritable) ? "device " : "device const ") : "")
@@ -2020,9 +2013,6 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
                         it->binding, kMSL_BindingType_UniformBuffer,
                         kMSL_ProgramStage_Fragment);
                 }
-                
-                
-                // HERE! don't use const device for atomics
                 
                 bool isAtomicType = it->dataType.GetString().find("atomic") != std::string::npos;
                 bool isShaderWritable = (it->usage & HdSt_CodeGenMSL::TParam::Usage::Writable);
@@ -3263,6 +3253,9 @@ HdSt_CodeGenMSL::_GenerateBindingsCode()
                 _AddInputParam(_mslPSInputParams, *binDecl);
             }
 
+            // Accessor are currently only emitted for non-atomic types because Metal requires all accesses (even simple reads)
+            // of atomics to go via the atomic_read functions, which does not play well with the way the accessor functions
+            // work. This could possibly be refactored to allow accessors for atomics.
             if (!binDecl->typeIsAtomic)
             {
                 _EmitAccessor(_genCommon,

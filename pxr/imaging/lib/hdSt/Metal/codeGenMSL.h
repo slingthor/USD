@@ -66,8 +66,8 @@ public:
             VertexData          = 1 << 12,
             DrawingCoord        = 1 << 13,
             PointerType         = 1 << 14,
-            Mutable             = 1 << 15,
-            Writable            = 1 << 16,
+            Mutable             = 1 << 15,  // Contents may be changed after initial creation.
+            Writable            = 1 << 16,  // Buffer contents can be written to from shader code.
         };
         static Usage const maskShaderUsage = Usage(EntryFuncArgument - 1);
         

@@ -45,8 +45,6 @@ enum {
     DIRTY_METALRENDERSTATE_VERTEX_DESCRIPTOR          = 1 << 7,
     DIRTY_METALRENDERSTATE_CULLMODE_WINDINGORDER      = 1 << 8,
     DIRTY_METALRENDERSTATE_FILL_MODE                  = 1 << 9,
-//    DIRTY_METALRENDERSTATE_DEPTH_STENCIL              = 1 << 10,
-
 
     DIRTY_METALRENDERSTATE_ALL                      = 0xFFFFFFFF
 };
@@ -74,10 +72,10 @@ MtlfMetalContext::ThreadState::~ThreadState() {
 
 void MtlfMetalContext::MtlfMultiBuffer::release() {
     for (int i = 0; i < MAX_GPUS; i++) {
-        if (!buffer[i])
-            continue;
-        
-        [buffer[i] release];
+        if (buffer[i])
+        {
+            [buffer[i] release];
+        }
     }
 }
 
@@ -283,15 +281,8 @@ void MtlfMetalContext::Init(id<MTLDevice> _device, int width, int height)
     
     concurrentDispatchSupported = sysVerGreaterOrEqualTo10_14_5;
 #endif // ARCH_OS_IOS
-    
-    // AJG HERE ... here's where we make the depth state descriptor and create a depth state on each GPU. Is this then subsequently changed anywhere?
-   
-    // TODO Take this code and re-use it when the depthStencil 'current render state'
-    // code is run.
-    //MTLDepthStencilDescriptor *depthStateDesc = [[MTLDepthStencilDescriptor alloc] init];
-    //depthStateDesc.depthWriteEnabled = YES;
-    //depthStateDesc.depthCompareFunction = MTLCompareFunctionLessEqual;
-    
+
+
     MTLTextureDescriptor* blackDesc = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA16Float
                                                                                     width:1
                                                                                    height:1
@@ -303,7 +294,6 @@ void MtlfMetalContext::Init(id<MTLDevice> _device, int width, int height)
     uint16_t zero[4] = {};
 
     for(int i = 0; i < renderDevices.count; i++) {
-        //gpus[i].depthState = [renderDevices[i] newDepthStencilStateWithDescriptor:depthStateDesc];
         gpus[i].mtlColorTexture = nil;
         gpus[i].mtlMultisampleColorTexture = nil;
         gpus[i].mtlDepthTexture = nil;
@@ -1149,7 +1139,7 @@ void MtlfMetalContext::SetRenderPipelineState()
                 boost::hash_combine(hashVal, outputDepthFormat);
             }
         }
-        //[wq->currentRenderEncoder setDepthStencilState:gpus[currentGPU].depthState];
+
         // Update colour attachments hash
         wq->currentColourAttachmentsHash = hashVal;
     }
