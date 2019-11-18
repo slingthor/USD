@@ -118,9 +118,9 @@ def make_relocatable(install_path, buildPython, qt_path="/usr/local/opt/qt", ver
     change_absolute_to_relative(files, install_path)
     codesign_files(files)
 
-    replace_string_in_file(install_path + '/pxrConfig.cmake', install_path, "$ENV{USD_BUILD}")
-    replace_string_in_file(install_path + '/cmake/pxrTargets.cmake', install_path, "$ENV{USD_BUILD}")
-    replace_string_in_file(install_path + '/cmake/pxrTargets-release.cmake', install_path, "$ENV{USD_BUILD}")
+    replace_string_in_file(install_path + '/pxrConfig.cmake', install_path, "$ENV{USD_PATH}")
+    replace_string_in_file(install_path + '/cmake/pxrTargets.cmake', install_path, "$ENV{USD_PATH}")
+    replace_string_in_file(install_path + '/cmake/pxrTargets-release.cmake', install_path, "$ENV{USD_PATH}")
 
 
     ctest_files = []
