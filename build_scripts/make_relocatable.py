@@ -67,7 +67,7 @@ def change_absolute_to_relative(files, path_to_replace, custom_path=""):
                     suffix_path = extracted_path[inside_idx:]
                     path_between = os.path.relpath(custom_path+suffix_path, cur_dir_path)
                 subprocess.call(['install_name_tool', '-change', extracted_path, '@loader_path/' + path_between, f],
-                    stdout=devout)
+                    stdout=devout, stderr=devout)
 
 
 def codesign_files(files):
