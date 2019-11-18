@@ -99,7 +99,10 @@ HdxColorChannelTask::~HdxColorChannelTask()
 #endif
     }
 
-    GLF_POST_PENDING_GL_ERRORS();
+    bool isOpenGL = HdStResourceFactory::GetInstance()->IsOpenGL();
+    if (isOpenGL) {
+        GLF_POST_PENDING_GL_ERRORS();
+    }
 }
 
 bool
