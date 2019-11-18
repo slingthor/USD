@@ -92,6 +92,7 @@ public:
     GfVec4f clearColor;
     TfToken colorCorrectionMode;
     GfVec2i renderResolution;
+    unsigned long sampleCount;
     
     UsdImagingGLRenderParams();
     
@@ -135,7 +136,8 @@ UsdImagingGLRenderParams::operator==(const UsdImagingGLRenderParams &other)
         && enableUsdDrawModes          == other.enableUsdDrawModes
         && clearColor                  == other.clearColor
         && colorCorrectionMode         == other.colorCorrectionMode
-        && renderResolution            == other.renderResolution;
+        && renderResolution            == other.renderResolution
+        && sampleCount                 == other.sampleCount;
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE
