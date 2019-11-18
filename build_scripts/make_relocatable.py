@@ -78,9 +78,7 @@ def codesign_files(files):
 
 def is_object_file(file):
     first_line = open(file).readline().rstrip()
-    not_bash_script = first_line != "#! /bin/sh"
-    not_python_script = first_line != "#!/System/Library/Frameworks/Python.framework/Versions/2.7/bin/python"
-    return not_bash_script and not_python_script
+    return first_line.startswith("#!")
 
 
 
@@ -120,9 +118,9 @@ def make_relocatable(install_path, buildPython, qt_path="/usr/local/opt/qt", ver
     change_absolute_to_relative(files, install_path)
     codesign_files(files)
 
-    replace_string_in_file(install_path + '/pxrConfig.cmake', install_path, "REPLACE_ME")
-    replace_string_in_file(install_path + '/cmake/pxrTargets.cmake', install_path, "REPLACE_ME")
-    replace_string_in_file(install_path + '/cmake/pxrTargets-release.cmake', install_path, "REPLACE_ME")
+    replace_string_in_file(install_path + '/pxrConfig.cmake', install_path, "$ENV{USD_PATH}")
+    replace_string_in_file(install_path + '/cmake/pxrTargets.cmake', install_path, "$ENV{USD_PATH}")
+    replace_string_in_file(install_path + '/cmake/pxrTargets-release.cmake', install_path, "$ENV{USD_PATH}")
 
 
     ctest_files = []
