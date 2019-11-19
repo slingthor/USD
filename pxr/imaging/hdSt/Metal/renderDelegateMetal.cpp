@@ -40,12 +40,6 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-#if defined(ARCH_OS_MACOS)
-TF_DEFINE_ENV_SETTING(PXR_MTL_SAMPLE_COUNT, 2, "");
-#else
-TF_DEFINE_ENV_SETTING(PXR_MTL_SAMPLE_COUNT, 1, "");
-#endif
-
 namespace {
 static
 std::string
@@ -187,11 +181,11 @@ void HdStRenderDelegateMetal::PrepareRender(
 {
     GarchContextCaps const &caps =
         GarchResourceFactory::GetInstance()->GetContextCaps();
-    
+
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
-    
-    context->mtlSampleCount = TfGetEnvSetting(PXR_MTL_SAMPLE_COUNT);
-    
+
+    context->mtlSampleCount = params.sampleCount;
+
     _renderOutput = params.renderOutput;
 
     if (_renderOutput == DelegateParams::RenderOutput::OpenGL &&

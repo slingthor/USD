@@ -2,7 +2,7 @@
 import sys
 import os
 import subprocess
-import PySide
+import PySide2
 import OpenGL
 from distutils.dir_util import copy_tree
 from os.path import isdir, isfile, join
@@ -67,7 +67,7 @@ def change_absolute_to_relative(files, path_to_replace, custom_path=""):
                     suffix_path = extracted_path[inside_idx:]
                     path_between = os.path.relpath(custom_path+suffix_path, cur_dir_path)
                 subprocess.call(['install_name_tool', '-change', extracted_path, '@loader_path/' + path_between, f],
-                    stdout=devout)
+                    stdout=devout, stderr=devout)
 
 
 def codesign_files(files):
@@ -78,9 +78,7 @@ def codesign_files(files):
 
 def is_object_file(file):
     first_line = open(file).readline().rstrip()
-    not_bash_script = first_line != "#! /bin/sh"
-    not_python_script = first_line != "#!/System/Library/Frameworks/Python.framework/Versions/2.7/bin/python"
-    return not_bash_script and not_python_script
+    return first_line.startswith("#!")
 
 
 
@@ -98,7 +96,8 @@ def replace_string_in_file(path, old_string, new_string):
 
 
 
-def make_relocatable(install_path, buildPython, qt_path="/usr/local/opt/qt@4", verbose_output=False):
+
+def make_relocatable(install_path, buildPython, qt_path="/usr/local/opt/qt", verbose_output=False):
     files = []
     if verbose_output:
         global devout
@@ -119,9 +118,9 @@ def make_relocatable(install_path, buildPython, qt_path="/usr/local/opt/qt@4", v
     change_absolute_to_relative(files, install_path)
     codesign_files(files)
 
-    replace_string_in_file(install_path + '/pxrConfig.cmake', install_path, "REPLACE_ME")
-    replace_string_in_file(install_path + '/cmake/pxrTargets.cmake', install_path, "REPLACE_ME")
-    replace_string_in_file(install_path + '/cmake/pxrTargets-release.cmake', install_path, "REPLACE_ME")
+    replace_string_in_file(install_path + '/pxrConfig.cmake', install_path, "$ENV{USD_PATH}")
+    replace_string_in_file(install_path + '/cmake/pxrTargets.cmake', install_path, "$ENV{USD_PATH}")
+    replace_string_in_file(install_path + '/cmake/pxrTargets-release.cmake', install_path, "$ENV{USD_PATH}")
 
 
     ctest_files = []
@@ -132,7 +131,7 @@ def make_relocatable(install_path, buildPython, qt_path="/usr/local/opt/qt@4", v
 
 
     if buildPython:
-        pyside_path = PySide.__file__
+        pyside_path = PySide2.__file__
         pyside_index = pyside_path.find("__init__.py")
         pyside_path = pyside_path[:pyside_index]
 
@@ -143,19 +142,5 @@ def make_relocatable(install_path, buildPython, qt_path="/usr/local/opt/qt@4", v
         subprocess.call(['chmod', '-R', '+w', install_path + "/lib"],
             stdout=devout)
         
-        copy_tree(pyside_path, install_path + "/lib/python/PySide")
+        copy_tree(pyside_path, install_path + "/lib/python/PySide2")
         copy_tree(openGL_path, install_path + "/lib/python/OpenGL")
-        copy_tree(qt_path, install_path + "/lib/qt@4")
-
-        subprocess.call(['chmod', '-R', '+w', install_path + "/lib/qt@4"],
-            stdout=devout)
-
-        qt_base="/usr/local/opt/qt@4"
-        qt_cellar_base="/usr/local/Cellar/qt@4/4.8.7_5"
-
-        files=[]
-        extract_files_recursive(install_path + '/lib/python/PySide', (lambda file: '.so' in file or '.dylib' in file), files)
-        extract_files_recursive(install_path + '/lib/qt@4', (lambda file: '.so' in file or '.dylib' in file), files)
-
-        change_absolute_to_relative(files, qt_base, install_path + '/lib/qt@4')
-        change_absolute_to_relative(files, qt_cellar_base, install_path + '/lib/qt@4')

@@ -1229,6 +1229,7 @@ UsdImagingGLEngine::_Execute(const UsdImagingGLRenderParams &params,
             params.applyRenderState,
             params.enableIdRender,
             params.enableSampleAlphaToCoverage,
+            params.sampleCount,
             params.drawMode,
 #if defined(ARCH_GFX_METAL)
             ((_renderAPI == Metal &&

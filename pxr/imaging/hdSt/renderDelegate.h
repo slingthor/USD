@@ -74,6 +74,7 @@ public:
         bool applyRenderState;
         bool enableIdRender;
         bool enableSampleAlphaToCoverage;
+        unsigned long sampleCount;
         HdStDrawMode drawMode;
         RenderOutput renderOutput;
         
@@ -85,12 +86,14 @@ public:
                        bool _applyRenderState,
                        bool _enableIdRender,
                        bool _enableSampleAlphaToCoverage,
+                       unsigned long _sampleCount,
                        HdStDrawMode _drawMode,
                        RenderOutput _renderOutput)
         : flipFrontFacing(_flipFrontFacing)
         , applyRenderState(_applyRenderState)
         , enableIdRender(_enableIdRender)
         , enableSampleAlphaToCoverage(_enableSampleAlphaToCoverage)
+        , sampleCount(_sampleCount)
         , drawMode(_drawMode)
         , renderOutput(_renderOutput)
         {
