@@ -303,7 +303,7 @@ HdStMaterial::_GetTextureResourceHandle(
                                                renderIndex.GetTextureKey(texID);
 
             bool textureResourceFound = false;
-            HdInstance<HdTextureResourceSharedPtr> texInstance =
+            HdInstance<HdStTextureResourceSharedPtr> texInstance =
                 resourceRegistry->FindTextureResource
                                   (texKey, &textureResourceFound);
 
@@ -314,9 +314,7 @@ HdStMaterial::_GetTextureResourceHandle(
                 TF_WARN("No texture resource found with path %s",
                     param.connection.GetText());
             } else {
-                texResource =
-                    boost::dynamic_pointer_cast<HdStTextureResource>
-                    (texInstance.GetValue());
+                texResource = texInstance.GetValue();
             }
         }
 

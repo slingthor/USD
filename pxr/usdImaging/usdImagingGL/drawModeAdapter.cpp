@@ -41,6 +41,8 @@
 #include "pxr/imaging/pxOsd/tokens.h"
 
 #include "pxr/usd/usdGeom/modelAPI.h"
+#include "pxr/usd/sdr/registry.h"
+#include "pxr/usd/sdr/shaderNode.h"
 
 #include "pxr/base/gf/matrix4f.h"
 #include "pxr/base/tf/type.h"
@@ -70,6 +72,10 @@ TF_DEFINE_PRIVATE_TOKENS(
     (st)
     (rgba)
     (fallback)
+
+    (varname)
+    (result)
+    (activeTexCard)
 );
 
 namespace {
@@ -352,6 +358,23 @@ UsdImagingGLDrawModeAdapter::UpdateForTime(UsdPrim const& prim,
 
         if (requestedBits & HdMaterial::DirtyResource) {
 
+
+            SdfAssetPath path(UsdImagingGLPackageDrawModeShader());
+            
+            SdrRegistry &shaderReg = SdrRegistry::GetInstance();
+            SdrShaderNodeConstPtr sdrNode = 
+                shaderReg.GetShaderNodeFromAsset(
+                    path, 
+                    NdrTokenMap(), 
+                    TfToken(), 
+                    HioGlslfxTokens->glslfx);
+
+            // An sdr node representing the drawCards.glslfx should be added
+            // to the registry, so we don't expect this to fail.
+            if (!TF_VERIFY(sdrNode)) {
+                return;
+            }
+
             // Generate material network with a terminal that points to
             // the DrawMode glslfx shader.
             TfToken const& terminalType = HdMaterialTerminalTokens->surface;
@@ -359,7 +382,7 @@ UsdImagingGLDrawModeAdapter::UpdateForTime(UsdPrim const& prim,
             HdMaterialNetwork& network = networkMap.map[terminalType];
             HdMaterialNode terminal;
             terminal.path = cachePath;
-            terminal.identifier = UsdImagingGLPackageDrawModeShader();
+            terminal.identifier = sdrNode->GetIdentifier();
 
             const TfToken textureAttrs[6] = {
                 UsdGeomTokens->modelCardTextureXPos,
@@ -399,7 +422,7 @@ UsdImagingGLDrawModeAdapter::UpdateForTime(UsdPrim const& prim,
                     textureNode.parameters[_tokens->st] = _tokens->cardsUv;
                     textureNode.parameters[_tokens->fallback] = fallback;
                     VtValue textureFile;
-                    if (attr.Get(&textureFile, time)) {
+                    if (attr && attr.Get(&textureFile, time)) {
                         textureNode.parameters[_tokens->file] = textureFile;
                     }
 
@@ -413,8 +436,31 @@ UsdImagingGLDrawModeAdapter::UpdateForTime(UsdPrim const& prim,
 
                     // Insert texture node
                     network.nodes.emplace_back(std::move(textureNode));
+                } else {
+                    terminal.parameters[textureNames[i]] = fallback;
                 }
             }
+
+            // Adding a primvar reader for the card assignment
+            // Make primvar reader node
+            SdfPath primvarNodePath = _GetMaterialPath(prim)
+                .AppendProperty(_tokens->cardsTexAssign);
+            HdMaterialNode primvarNode;
+            primvarNode.path = primvarNodePath;
+            primvarNode.identifier = UsdImagingTokens->UsdPrimvarReader_int;
+            primvarNode.parameters[_tokens->varname] = _tokens->cardsTexAssign;
+            primvarNode.parameters[_tokens->fallback] = VtValue(0);
+
+            // Insert connection between primvar reader node and terminal
+            HdMaterialRelationship relPrimvar;
+            relPrimvar.inputId = primvarNode.path;
+            relPrimvar.inputName = _tokens->result;
+            relPrimvar.outputId = terminal.path;
+            relPrimvar.outputName = _tokens->activeTexCard;
+            network.relationships.emplace_back(std::move(relPrimvar));
+
+            // Insert primvar reader node
+            network.nodes.emplace_back(std::move(primvarNode));
 
             // Insert terminal and update material network
             networkMap.terminals.push_back(terminal.path);

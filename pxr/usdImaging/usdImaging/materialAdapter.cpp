@@ -393,10 +393,9 @@ _BuildHdMaterialNetworkFromTerminal(
 
     // Validate that idenfitier (info:id) is known to Sdr.
     // Return empty network if it fails so backend can use fallback material.
-
     SdrRegistry &shaderReg = SdrRegistry::GetInstance();
     if (!shaderReg.GetNodeByIdentifier(terminalNode.identifier)) {
-        TF_WARN("Invalid info:id %s node: %s",
+        TF_WARN("Invalid info:id %s node: %s", 
                 terminalNode.identifier.GetText(),
                 terminalNode.path.GetText());
         *materialNetworkMap = HdMaterialNetworkMap();

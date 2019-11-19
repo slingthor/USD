@@ -682,7 +682,7 @@ _MakeParamsForInputParameter(
 
                     }
                 } else {
-                    TF_WARN("Unrecognized connected node: %s",
+                    TF_WARN("Unrecognized connected node: %s", 
                             upstreamNode.nodeTypeId.GetText());
                 }
             }

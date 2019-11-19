@@ -476,6 +476,7 @@ HdxColorCorrectionTask::_CreateFramebufferResources()
         glBindTexture(GL_TEXTURE_2D, restoreTexture);
     }
 
+      
     // XXX: Removed due to slowness in the IsCurrent() call when multiple
     //      gl contexts are registered in GlfGLContextRegistry. This code is
     //      relevant only when there is a possibility of having context
@@ -483,7 +484,7 @@ HdxColorCorrectionTask::_CreateFramebufferResources()
     //      of this task on each frame.
     //
     // bool switchedGLContext = !_owningContext || !_owningContext->IsCurrent();
-    //
+    // 
     // if (switchedGLContext) {
     //     // If we're rendering with a different context than the render pass
     //     // was created with, recreate the FBO because FB is not shared.
@@ -497,12 +498,12 @@ HdxColorCorrectionTask::_CreateFramebufferResources()
     //         glDeleteFramebuffers(1, &_copyFramebuffer);
     //         glDeleteFramebuffers(1, &_aovFramebuffer);
     //     }
-    //
+    // 
     //     _owningContext = GlfGLContext::GetCurrentGLContext();
     //     if (!TF_VERIFY(_owningContext, "No valid GL context")) {
     //         return false;
     //     }
-    //
+    // 
     
         if (_copyFramebuffer == 0) {
             glGenFramebuffers(1, &_copyFramebuffer);
@@ -513,16 +514,14 @@ HdxColorCorrectionTask::_CreateFramebufferResources()
 
     // }
     //
-
-    HgiGLTexture* aovTexture =
-        static_cast<HgiGLTexture*>(_GetAovHgiTexture());
+    HgiGLTexture* aovTexture = static_cast<HgiGLTexture*>(_GetAovHgiTexture());
 
     // XXX: see code comment above. Here we remove switchedGLContext from the
     //      if statement.
     // if (createTexture || switchedGLContext || aovTexture!=_aovTexture) {
 
     if (createTexture || aovTexture!=_aovTexture) {
-
+   
         _aovTexture = aovTexture;
 
         GLint restoreReadFB, restoreDrawFB;

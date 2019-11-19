@@ -95,10 +95,10 @@ HdStBufferResource *HdStResourceFactoryGL::NewBufferResource(
     return new HdStBufferResourceGL(role, tupleType, offset, stride);
 }
 
-HdTextureResourceSharedPtr
+HdStTextureResourceSharedPtr
 HdStResourceFactoryGL::NewDrawTargetTextureResource() const
 {
-    return HdTextureResourceSharedPtr(new HdSt_DrawTargetTextureResourceGL());
+    return HdStTextureResourceSharedPtr(new HdSt_DrawTargetTextureResourceGL());
 }
 
 HdSt_FlatNormalsComputationGPU*

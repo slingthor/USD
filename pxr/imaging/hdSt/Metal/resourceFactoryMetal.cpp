@@ -97,10 +97,10 @@ HdStBufferResource *HdStResourceFactoryMetal::NewBufferResource(
     return new HdStBufferResourceMetal(role, tupleType, offset, stride);
 }
 
-HdTextureResourceSharedPtr
+HdStTextureResourceSharedPtr
 HdStResourceFactoryMetal::NewDrawTargetTextureResource() const
 {
-    return HdTextureResourceSharedPtr(
+    return HdStTextureResourceSharedPtr(
         new HdSt_DrawTargetTextureResourceMetal());
 }
 

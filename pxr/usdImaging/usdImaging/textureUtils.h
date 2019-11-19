@@ -28,11 +28,11 @@
 #include "pxr/usd/sdf/path.h"
 #include "pxr/usd/usd/prim.h"
 #include "pxr/usd/usd/timeCode.h"
-#include "pxr/imaging/hd/texture.h"
+#include "pxr/imaging/hdSt/textureResource.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-HdTextureResource::ID
+HdStTextureResource::ID
 UsdImaging_GetTextureResourceID(UsdPrim const& usdPrim,
                                 SdfPath const& usdPath,
                                 UsdTimeCode time,

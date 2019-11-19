@@ -79,7 +79,7 @@ public:
     
     /// Creates a draw target texture resource for OpenGL
     HDST_API
-    virtual HdTextureResourceSharedPtr
+    virtual HdStTextureResourceSharedPtr
         NewDrawTargetTextureResource() const override;
     
     /// Create a striped interleaved buffer for OpenGL

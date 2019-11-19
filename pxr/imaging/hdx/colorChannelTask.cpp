@@ -242,7 +242,7 @@ HdxColorChannelTask::_CreateFramebufferResources()
     //      switching between the creation of the render pass and the execution
     //      of this task on each frame.
     // bool switchedGLContext = !_owningContext || !_owningContext->IsCurrent();
-    //
+    // 
     // if (switchedGLContext) {
     //     // If we're rendering with a different context than the render pass
     //     // was created with, recreate the FBO because FB is not shared.
@@ -255,19 +255,19 @@ HdxColorChannelTask::_CreateFramebufferResources()
     //         GlfGLContextScopeHolder contextHolder(_owningContext);
     //         glDeleteFramebuffers(1, &_copyFramebuffer);
     //     }
-    //
+    // 
     //     _owningContext = GlfGLContext::GetCurrentGLContext();
     //     if (!TF_VERIFY(_owningContext, "No valid GL context")) {
     //         return false;
     //     }
-    //
+    // 
 
         if (_copyFramebuffer == 0) {
             glGenFramebuffers(1, &_copyFramebuffer);
         }
 
     // }
-    //
+    // 
     // if (createTexture || switchedGLContext) {
 
     if (createTexture) {

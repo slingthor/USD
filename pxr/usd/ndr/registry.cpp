@@ -379,7 +379,7 @@ NdrRegistry::SetExtraParserPlugins(const std::vector<TfType>& pluginTypes)
     {
         std::lock_guard<std::mutex> nmLock(_nodeMapMutex);
 
-         // This policy was implemented in order to keep internal registry
+        // This policy was implemented in order to keep internal registry
         // operations simpler, and it "just makes sense" to have all plugins
         // run before asking for information from the registry.
         if (!_nodeMap.empty()) {
@@ -389,7 +389,7 @@ NdrRegistry::SetExtraParserPlugins(const std::vector<TfType>& pluginTypes)
         }
     }
 
-     // Validate the types and remove duplicates.
+    // Validate the types and remove duplicates.
     std::set<TfType> parserPluginTypes;
     auto& parserPluginType = TfType::Find<NdrParserPlugin>();
     for (auto&& type: pluginTypes) {
@@ -402,7 +402,7 @@ NdrRegistry::SetExtraParserPlugins(const std::vector<TfType>& pluginTypes)
         parserPluginTypes.insert(type);
     }
 
-     _InstantiateParserPlugins(parserPluginTypes);
+    _InstantiateParserPlugins(parserPluginTypes);
 }
 
 NdrNodeConstPtr 
@@ -508,7 +508,7 @@ NdrRegistry::GetNodeFromSourceCode(const std::string &sourceCode,
        
         TF_DEBUG(NDR_PARSING).Msg("Encountered source code of type [%s], but "
                                   "a parser for the type could not be found; "
-                                  "ignoring.", sourceType.GetText());
+                                  "ignoring.\n", sourceType.GetText());
         return nullptr;
     }
 
@@ -827,7 +827,7 @@ NdrRegistry::_FindAndInstantiateDiscoveryPlugins()
     // Instantiate any discovery plugins that were found
     for (const TfType& discoveryPluginType : discoveryPluginTypes) {
         TF_DEBUG(NDR_DISCOVERY).Msg(
-            "Found NdrDiscoveryPlugin '%s'\n",
+            "Found NdrDiscoveryPlugin '%s'\n", 
             discoveryPluginType.GetTypeName().c_str());
 
         NdrDiscoveryPluginFactoryBase* pluginFactory =
@@ -852,7 +852,7 @@ NdrRegistry::_FindAndInstantiateParserPlugins()
     std::set<TfType> parserPluginTypes;
     PlugRegistry::GetInstance().GetAllDerivedTypes<NdrParserPlugin>(
         &parserPluginTypes);
-    
+
     _InstantiateParserPlugins(parserPluginTypes);
 }
 
@@ -863,7 +863,7 @@ NdrRegistry::_InstantiateParserPlugins(
     // Instantiate any parser plugins that were found
     for (const TfType& parserPluginType : parserPluginTypes) {
         TF_DEBUG(NDR_DISCOVERY).Msg(
-            "Found NdrParserPlugin '%s' for discovery types:\n",
+            "Found NdrParserPlugin '%s' for discovery types:\n", 
             parserPluginType.GetTypeName().c_str());
 
         NdrParserPluginFactoryBase* pluginFactory =

@@ -62,7 +62,7 @@ class HdSt_DomeLightComputation;
 
 typedef boost::shared_ptr<class HdBufferArrayRange> HdBufferArrayRangeSharedPtr;
 typedef boost::shared_ptr<class HdBufferArray> HdBufferArraySharedPtr;
-typedef boost::shared_ptr<class HdTextureResource> HdTextureResourceSharedPtr;
+typedef boost::shared_ptr<class HdStTextureResource> HdStTextureResourceSharedPtr;
 
 typedef boost::shared_ptr<class HdSt_DrawBatch> HdSt_DrawBatchSharedPtr;
 typedef boost::shared_ptr<class HdSt_GeometricShader> HdSt_GeometricShaderPtr;
@@ -119,7 +119,7 @@ public:
     
     /// Creates a new draw target texture resource
     HDST_API
-    virtual HdTextureResourceSharedPtr NewDrawTargetTextureResource() const = 0;
+    virtual HdStTextureResourceSharedPtr NewDrawTargetTextureResource() const = 0;
     
     /// Create a striped interleaved buffer
     HDST_API
