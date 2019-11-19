@@ -22,7 +22,7 @@
 // language governing permissions and limitations under the Apache License.
 //
 #include "pxr/pxr.h"
-#include "pxr/imaging/hdStormMetal/rendererPlugin.h"
+#include "pxr/imaging/plugin/hdStormMetal/rendererPlugin.h"
 
 #include "pxr/imaging/hdSt/Metal/renderDelegateMetal.h"
 #include "pxr/imaging/hd/rendererPluginRegistry.h"

@@ -1,5 +1,22 @@
 set(DIRS
-    lib
+    ar
+    kind
+    sdf
+    ndr
+    sdr
+    pcp
+    usd
+    usdGeom
+    usdVol
+    usdLux
+    usdMedia
+    usdShade
+    usdRender
+    usdHydra
+    usdRi
+    usdSkel
+    usdUI
+    usdUtils
     bin
     plugin
 )
