@@ -635,6 +635,9 @@ def InstallBoost(context, force, buildArgs):
             '--with-regex'
         ]
 
+        if context.buildPython:
+            b2_settings.append("--with-python")
+
         if context.buildKatana or context.buildOIIO:
             b2_settings.append("--with-date_time")
             b2_settings.append("--with-system")
