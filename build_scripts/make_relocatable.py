@@ -6,6 +6,7 @@ import PySide2
 import OpenGL
 from distutils.dir_util import copy_tree
 from os.path import isdir, isfile, join
+from shutil import copy
 
 SDKVersion = subprocess.check_output(['xcodebuild', '-version']).strip()[6:10]
 codeSignID = ""
@@ -144,3 +145,8 @@ def make_relocatable(install_path, buildPython, qt_path="/usr/local/opt/qt", ver
         
         copy_tree(pyside_path, install_path + "/lib/python/PySide2")
         copy_tree(openGL_path, install_path + "/lib/python/OpenGL")
+        copy_tree(src_path+"/lib/python/shiboken2", install_path+"/lib/python/shiboken2")
+        copy_tree(src_path+"/lib/python/pysideuic", install_path+"/lib/python/pysideuic")
+        copy_tree(src_path+"/lib/python/pyside2uic", install_path+"/lib/python/pyside2uic")
+        copy(src_path+"/lib/python/pyside-uic", install_path+"/lib/python/pyside-uic")
+        copy(src_path+"/lib/python/pyside2-uic", install_path+"/lib/python/pyside2-uic")
