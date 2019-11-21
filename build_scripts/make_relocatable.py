@@ -2,8 +2,6 @@
 import sys
 import os
 import subprocess
-import PySide2
-import OpenGL
 from distutils.dir_util import copy_tree
 from os.path import isdir, isfile, join
 from shutil import copy
@@ -132,6 +130,9 @@ def make_relocatable(install_path, buildPython, qt_path="/usr/local/opt/qt", ver
 
 
     if buildPython:
+        import PySide2
+        import OpenGL
+        
         pyside_path = PySide2.__file__
         pyside_index = pyside_path.find("__init__.py")
         pyside_path = pyside_path[:pyside_index]
