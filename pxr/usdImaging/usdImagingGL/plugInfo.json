@@ -2,8 +2,8 @@
     "Plugins": [
         {
         	"Info": {
-			     "Types": {
-	                     "UsdImagingGLDomeLightAdapter" : {
+			    "Types": {
+	                    "UsdImagingGLDomeLightAdapter" : {
 	                        "bases": ["UsdImagingDomeLightAdapter"],
 	                        "isInternal": true,
 	                        "primTypeName": "PreviewDomeLight"
