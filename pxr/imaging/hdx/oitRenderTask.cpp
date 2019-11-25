@@ -133,7 +133,7 @@ HdxOitRenderTask::Execute(HdTaskContext* ctx)
     // We render into a SSBO -- not MSSA compatible
 #if defined(ARCH_GFX_METAL)
 
-// AJG TODO: Deal with MSAA on Metal
+    //MTL_FIXME: OIT - Deal with disabling MSAA state and remembering old state
 
 #elif defined(ARCH_GFX_OPENGL)
     bool isOpenGL = HdStResourceFactory::GetInstance()->IsOpenGL();
@@ -184,7 +184,7 @@ HdxOitRenderTask::Execute(HdTaskContext* ctx)
 
 #if defined(ARCH_GFX_METAL)
 
-// AJG TODO: Deal with MSAA on Metal
+    //MTL_FIXME: OIT - Re-enable old multisample state
 
 #elif defined(ARCH_GFX_OPENGL)
     if (isOpenGL) {

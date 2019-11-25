@@ -124,7 +124,9 @@ HdxOitVolumeRenderTask::Execute(HdTaskContext* ctx)
     // We render into a SSBO -- not MSSA compatible
     bool oldMSAA = false;
 #if defined(ARCH_GFX_METAL)
-    // AJG TODO: Deal with querying and setting multisampling state on Metal
+
+    //MTL_FIXME: OIT - Deal with disabling MSAA state and remembering old state
+
 #elif defined(ARCH_GFX_OPENGL)
     if (HdStResourceFactory::GetInstance()->IsOpenGL()) {
         oldMSAA = glIsEnabled(GL_MULTISAMPLE);
@@ -140,7 +142,9 @@ HdxOitVolumeRenderTask::Execute(HdTaskContext* ctx)
     // XXX Switch points rendering to emit quad with FS that draws circle.
     bool oldPointSmooth = false;
 #if defined(ARCH_GFX_METAL)
-    // AJG TODO: Deal with querying and setting point smoothing state on Metal
+
+    //MTL_FIXME: OIT - Deal with enabling point smoothing on Metal, and remembering old state
+
 #elif defined(ARCH_GFX_OPENGL)
     if (HdStResourceFactory::GetInstance()->IsOpenGL()) {
         oldPointSmooth = glIsEnabled(GL_POINT_SMOOTH);
@@ -167,7 +171,7 @@ HdxOitVolumeRenderTask::Execute(HdTaskContext* ctx)
     // Post Execute Restore
     //
 #if defined(ARCH_GFX_METAL)
-    // AJG TODO: Deal with restoring MSAA and point-sampling state on Metal
+    //MTL_FIXME: OIT - Re-enable old multisample state and old point-smoothing state
 #elif defined(ARCH_GFX_OPENGL)
     if (oldMSAA) {
         glEnable(GL_MULTISAMPLE);
