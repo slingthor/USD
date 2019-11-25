@@ -22,7 +22,7 @@
 // language governing permissions and limitations under the Apache License.
 //
 #include "pxr/pxr.h"
-#include "pxr/imaging/hdStormGL/rendererPlugin.h"
+#include "pxr/imaging/plugin/hdStormGL/rendererPlugin.h"
 
 #include "pxr/imaging/hdSt/GL/renderDelegateGL.h"
 #include "pxr/imaging/hd/rendererPluginRegistry.h"

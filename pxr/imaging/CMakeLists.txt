@@ -1,5 +1,17 @@
 set(DIRS
-    lib
+    garch
+    hf
+    hio
+    cameraUtil
+    pxOsd
+    glf
+    mtlf
+    hgi
+    hgiGL
+    hgiMetal
+    hd
+    hdSt
+    hdx
     plugin
 )
 
