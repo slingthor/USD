@@ -295,7 +295,7 @@ void HdStRenderDelegateMetal::PrepareRender(
                     TfStatic_cast<TfRefPtr<MtlfDrawTarget::MtlfAttachment>>(it->second);
 
                 colorAttachment.texture = a->GetTextureName().multiTexture.forCurrentGPU();
-                colorAttachment.clearColor = MTLClearColorMake(0.0f, 0.0f, 0.0f, 1.0f);
+                colorAttachment.clearColor = MTLClearColorMake(0.0f, 0.0f, 0.0f, 0.0f);
             }
             
             {
