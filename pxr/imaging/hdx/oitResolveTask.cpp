@@ -310,7 +310,7 @@ HdxOitResolveTask::Execute(HdTaskContext* ctx)
     _renderPassState->Bind(); 
 #if defined(ARCH_GFX_METAL)
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext()->GetMetalContext();
-    context->SetDepthTestEnable(NO);
+    context->SetDepthTestEnable(false);
 #elif defined(ARCH_GFX_OPENGL)
     bool isOpenGL = HdStResourceFactory::GetInstance()->IsOpenGL();
     if (isOpenGL) {
@@ -321,7 +321,7 @@ HdxOitResolveTask::Execute(HdTaskContext* ctx)
     _renderPass->Execute(_renderPassState, GetRenderTags());
 
 #if defined(ARCH_GFX_METAL)
-    context->SetDepthTestEnable(YES);
+    context->SetDepthTestEnable(true);
 #elif defined(ARCH_GFX_OPENGL)
     if (isOpenGL) {
         glEnable(GL_DEPTH_TEST);

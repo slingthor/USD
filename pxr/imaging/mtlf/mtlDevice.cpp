@@ -330,7 +330,7 @@ void MtlfMetalContext::Init(id<MTLDevice> _device, int width, int height)
     blendState.destAlphaFactor = MTLBlendFactorOneMinusSourceAlpha;
     blendState.blendColor = GfVec4f(1.0f);
     
-    depthState.depthTestEnable = YES;
+    depthState.depthTestEnable = true;
     depthState.depthCompareFunction = MTLCompareFunctionLessEqual;
     
     AllocateAttachments(width, height);
