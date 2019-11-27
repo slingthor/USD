@@ -44,6 +44,10 @@
 #include "pxr/imaging/hdSt/GL/glslProgram.h"
 #endif
 
+#if defined(ARCH_GFX_METAL)
+#include "pxr/imaging/hdSt/Metal/codeGenMSL.h"
+#endif
+
 #ifdef PXR_OCIO_PLUGIN_ENABLED
     #include <OpenColorIO/OpenColorIO.h>
     namespace OCIO = OCIO_NAMESPACE;
@@ -154,7 +158,11 @@ HdxColorCorrectionTask::_CreateOpenColorIOResources()
         const char* view = _viewOCIO.empty() ? 
                            config->getDefaultView(display) :
                            _viewOCIO.c_str();
-
+    
+        const char* looks = _looksOCIO.empty() ?
+                            config->getDisplayLooks(display, view) :
+                            _looksOCIO.c_str();
+    
         std::string inputColorSpace = _colorspaceOCIO;
         if (inputColorSpace.empty()) {
             OCIO::ConstColorSpaceRcPtr cs = config->getColorSpace("default");
@@ -170,12 +178,8 @@ HdxColorCorrectionTask::_CreateOpenColorIOResources()
         transform->setDisplay(display);
         transform->setView(view);
         transform->setInputColorSpaceName(inputColorSpace.c_str());
-        if (!_looksOCIO.empty()) {
-            transform->setLooksOverride(_looksOCIO.c_str());
-            transform->setLooksOverrideEnabled(true);
-        } else {
-            transform->setLooksOverrideEnabled(false);
-        }
+        transform->setLooksOverride(looks);
+        transform->setLooksOverrideEnabled(true);
 
         OCIO::ConstProcessorRcPtr processor = config->getProcessor(transform);
 
@@ -189,6 +193,7 @@ HdxColorCorrectionTask::_CreateOpenColorIOResources()
         OCIO::GpuShaderDescRcPtr shaderDesc = OCIO::GpuShaderDesc::CreateLegacyShaderDesc(_lut3dSizeOCIO);
         shaderDesc->setLanguage(gpuLanguage);
         shaderDesc->setFunctionName("OCIODisplay");
+        shaderDesc->setResourcePrefix("ocio_");
     
         OCIO::ConstGPUProcessorRcPtr gpuProcessor
             = processor->getDefaultGPUProcessor();
@@ -220,57 +225,59 @@ HdxColorCorrectionTask::_CreateOpenColorIOResources()
         const char* uid  = 0x0;
         unsigned edgelen = 0;
         OCIO::Interpolation interpolation = OCIO::INTERP_NEAREST;
-        shaderDesc->get3DTexture(0, name, uid, edgelen, interpolation);
+        if (shaderDesc->getNum3DTextures()) {
+            shaderDesc->get3DTexture(0, name, uid, edgelen, interpolation);
 
-        const float* values = 0x0;
-        shaderDesc->get3DTextureValues(0, values);
+            const float* values = 0x0;
+            shaderDesc->get3DTextureValues(0, values);
 
-        // 2. Allocate the 3D LUT.
+            // 2. Allocate the 3D LUT.
 
-        if (isOpenGL) {
-#if defined(ARCH_GFX_OPENGL)
-            GLint restoreTexture;
-            glGetIntegerv(GL_TEXTURE_BINDING_3D, &restoreTexture);
-            GLuint t;
-            glGenTextures(1, &t);
-            _texture3dLUT = t;
-            glBindTexture(GL_TEXTURE_3D, t);
-            glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-            glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-            glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-            glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-            glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-            glTexImage3D(GL_TEXTURE_3D, 0, GL_RGB32F,
-                         edgelen, edgelen, edgelen,
-                         0, GL_RGB, GL_FLOAT, values);
-            glBindTexture(GL_TEXTURE_3D, restoreTexture);
-            GLF_POST_PENDING_GL_ERRORS();
-#endif
-        }
-        else {
-            id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->currentDevice;
-            MTLTextureDescriptor* desc =
-                [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA16Float
-                                                                   width:edgelen
-                                                                  height:edgelen
-                                                               mipmapped:NO];
-            desc.resourceOptions = MTLResourceStorageModeDefault;
-            desc.depth = edgelen;
-            _texture3dLUT = MtlfMultiTexture(desc);
-            
-            for(int i = 0; i < GPUState::gpuCount; i++) {
-                [_texture3dLUT.multiTexture[i] replaceRegion:MTLRegionMake3D(0, 0, 0, edgelen, edgelen, edgelen)
-                                                 mipmapLevel:0
-                                                       slice:0
-                                                   withBytes:&values[edgelen*edgelen*edgelen]
-                                                 bytesPerRow:edgelen*sizeof(float)
-                                               bytesPerImage:edgelen*edgelen*sizeof(float)];
+            if (isOpenGL) {
+    #if defined(ARCH_GFX_OPENGL)
+                GLint restoreTexture;
+                glGetIntegerv(GL_TEXTURE_BINDING_3D, &restoreTexture);
+                GLuint t;
+                glGenTextures(1, &t);
+                _texture3dLUT = t;
+                glBindTexture(GL_TEXTURE_3D, t);
+                glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+                glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+                glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+                glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+                glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+                glTexImage3D(GL_TEXTURE_3D, 0, GL_RGB32F,
+                             edgelen, edgelen, edgelen,
+                             0, GL_RGB, GL_FLOAT, values);
+                glBindTexture(GL_TEXTURE_3D, restoreTexture);
+                GLF_POST_PENDING_GL_ERRORS();
+    #endif
             }
-            /*
-            MTLSamplerDescriptor* samplerDescriptor = [[MTLSamplerDescriptor alloc] init];
-            samplerDescriptor.sAddressMode = MTLSamplerAddressModeClampToEdge;
-            samplerDescriptor.tAddressMode = MTLSamplerAddressModeClampToEdge;
-            _irradianceSampler = MtlfMultiSampler(samplerDescriptor);*/
+            else {
+                id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->currentDevice;
+                MTLTextureDescriptor* desc =
+                    [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA16Float
+                                                                       width:edgelen
+                                                                      height:edgelen
+                                                                   mipmapped:NO];
+                desc.resourceOptions = MTLResourceStorageModeDefault;
+                desc.depth = edgelen;
+                _texture3dLUT = MtlfMultiTexture(desc);
+                
+                for(int i = 0; i < GPUState::gpuCount; i++) {
+                    [_texture3dLUT.multiTexture[i] replaceRegion:MTLRegionMake3D(0, 0, 0, edgelen, edgelen, edgelen)
+                                                     mipmapLevel:0
+                                                           slice:0
+                                                       withBytes:&values[edgelen*edgelen*edgelen]
+                                                     bytesPerRow:edgelen*sizeof(float)
+                                                   bytesPerImage:edgelen*edgelen*sizeof(float)];
+                }
+                /*
+                MTLSamplerDescriptor* samplerDescriptor = [[MTLSamplerDescriptor alloc] init];
+                samplerDescriptor.sAddressMode = MTLSamplerAddressModeClampToEdge;
+                samplerDescriptor.tAddressMode = MTLSamplerAddressModeClampToEdge;
+                _irradianceSampler = MtlfMultiSampler(samplerDescriptor);*/
+            }
         }
 
         const char* gpuShaderText = shaderDesc->getShaderText();
@@ -310,7 +317,9 @@ HdxColorCorrectionTask::_CreateShaderResources()
                     "#define ARCH_GFX_OPENGL\n";
     }
     else {
-        commonCode += "#define ARCH_GFX_METAL\n";
+#if defined(ARCH_GFX_METAL)
+        commonCode += HdSt_CodeGenMSL::GetComputeHeader();
+#endif
     }
 
     if (useOCIO) {
