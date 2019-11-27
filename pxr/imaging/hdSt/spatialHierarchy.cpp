@@ -448,7 +448,7 @@ BVH::BVH()
 {
     // nothing.
     BVHCounter = ++BVHCounterX;
-    NSLog(@"BVH Created,%i", BVHCounter);
+//    NSLog(@"BVH Created,%i", BVHCounter);
 }
 
 BVH::~BVH()
@@ -459,7 +459,7 @@ BVH::~BVH()
     for (size_t idx = 0; idx < drawableItems.size(); ++idx) {
         delete drawableItems[idx];
     }
-    NSLog(@"BVH dead,%i", BVHCounter);
+//    NSLog(@"BVH dead,%i", BVHCounter);
 }
 
 void BVH::BuildBVH(std::vector<HdStDrawItemInstance> *drawables)
@@ -469,7 +469,7 @@ void BVH::BuildBVH(std::vector<HdStDrawItemInstance> *drawables)
 
     populated = true;
 
-    NSLog(@"Building BVH for %zu HdStDrawItemInstance(s), %i", drawables->size(), BVHCounter);
+//    NSLog(@"Building BVH for %zu HdStDrawItemInstance(s), %i", drawables->size(), BVHCounter);
     if (drawables->size() <= 0) {
         return;
     }
