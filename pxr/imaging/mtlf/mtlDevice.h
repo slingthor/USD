@@ -147,8 +147,10 @@ struct MetalWorkQueue {
     size_t currentColourAttachmentsHash;
     size_t currentRenderPipelineDescriptorHash;
     size_t currentComputePipelineDescriptorHash;
+    size_t currentDepthStencilDescriptorHash;
     id<MTLRenderPipelineState>  currentRenderPipelineState;
     id<MTLComputePipelineState> currentComputePipelineState;
+    id<MTLDepthStencilState>    currentDepthStencilState;
     NSUInteger                  currentComputeThreadExecutionWidth;
 };
 
@@ -367,6 +369,12 @@ public:
     void SetBlendColor(GfVec4f const &blendColor);
 
     MTLF_API
+    void SetDepthTestEnable(bool depthTestEnable);
+    
+    MTLF_API
+    void SetDepthComparisonFunction(MTLCompareFunction comparisonFn);
+    
+    MTLF_API
     void SetAlphaCoverageEnable(bool alphaCoverageEnable);
 
     MTLF_API
@@ -511,7 +519,6 @@ public:
         id<MTLTexture> mtlColorTexture;
         id<MTLTexture> mtlMultisampleColorTexture;
         id<MTLTexture> mtlDepthTexture;
-        id<MTLDepthStencilState> depthState;
 
         // Dummy black texture for missing textures
         id<MTLTexture> blackTexture2D;
@@ -681,6 +688,7 @@ protected:
 
     static std::mutex _pipelineMutex;
     boost::unordered_map<size_t, id<MTLRenderPipelineState>>  renderPipelineStateMap;
+    boost::unordered_map<size_t, id<MTLDepthStencilState>>  depthStencilStateMap;
     boost::unordered_map<size_t, id<MTLComputePipelineState>> computePipelineStateMap;
 
     static std::mutex _bufferMutex;
@@ -708,6 +716,11 @@ protected:
         size_t hashValue;
     } blendState;
 
+    struct DepthState {
+        bool depthTestEnable;
+        MTLCompareFunction depthCompareFunction;
+    } depthState;
+    
     MtlfDrawTarget *drawTarget;
 
 private:
@@ -742,6 +755,8 @@ private:
 
     // Pipeline state functions
     void SetRenderPipelineState();
+    void SetDepthStencilState();
+
     size_t HashVertexDescriptor();
     
     bool concurrentDispatchSupported;
@@ -792,6 +807,7 @@ private:
         std::atomic_ulong computeEncodersRequested;
         std::atomic_ulong blitEncodersRequested;
         std::atomic_ulong renderPipelineStates;
+        std::atomic_ulong depthStencilStates;
         std::atomic_ulong computePipelineStates;
         std::atomic_ulong GSBatchesStarted;
     } resourceStats;

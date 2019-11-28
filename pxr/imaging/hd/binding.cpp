@@ -33,6 +33,7 @@ HdBindingRequest::ComputeHash() const
     boost::hash_combine(hash, _bindingType);
     boost::hash_combine(hash, _dataType);
     boost::hash_combine(hash, _isInterleaved);
+    boost::hash_combine(hash, _isWritable);
 
     return hash;
 }

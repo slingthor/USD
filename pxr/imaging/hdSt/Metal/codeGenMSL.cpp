@@ -524,7 +524,7 @@ static HdSt_CodeGenMSL::TParam& _AddInputParam(  HdSt_CodeGenMSL::InOutParams &i
 static HdSt_CodeGenMSL::TParam& _AddInputPtrParam(
         HdSt_CodeGenMSL::InOutParams &inputParams,
         TfToken const &name, TfToken const& type, TfToken const &attribute,
-        HdBinding const &binding, int arraySize = 0, bool programScope = false)
+        HdBinding const &binding, int arraySize = 0, bool programScope = false, bool writable = false)
 {
     // MTL_FIXME - we need to map vec3 device pointers to the packed variants as that's how HYDRA presents its buffers
     // but we should orobably alter type at source not do a last minute fix up here
@@ -535,8 +535,13 @@ static HdSt_CodeGenMSL::TParam& _AddInputPtrParam(
     TfToken ptrName(std::string("*") + name.GetString());
     HdSt_CodeGenMSL::TParam& result(_AddInputParam(inputParams, ptrName, dataType, attribute, binding, arraySize));
     result.usage |= HdSt_CodeGenMSL::TParam::Usage::EntryFuncArgument;
+    
     if (programScope)
         result.usage |= HdSt_CodeGenMSL::TParam::Usage::ProgramScope;
+    
+    if (writable)
+        result.usage |= HdSt_CodeGenMSL::TParam::Usage::Writable;
+    
     return result;
 }
 
@@ -547,7 +552,7 @@ static HdSt_CodeGenMSL::TParam& _AddInputPtrParam(
 {
     return _AddInputPtrParam(inputParams,
                         bd.name, bd.dataType, attribute,
-                        bd.binding, arraySize, programScope);
+                        bd.binding, arraySize, programScope, bd.writable);
 }
 
 static void _EmitDeclaration(std::stringstream &str,
@@ -606,6 +611,16 @@ static void _EmitDeclarationPtr(std::stringstream &str,
                         bd.name, bd.dataType, attribute,
                         bd.binding, arraySize, programScope);
 }
+
+static void _EmitDeclarationMutablePtr(std::stringstream &str,
+                                HdSt_ResourceBinder::MetaData::BindingDeclaration const &bd,
+                                TfToken const &attribute = TfToken(), int arraySize = 0, bool programScope = false)
+{
+    _EmitDeclarationMutablePtr(str,
+                        bd.name, bd.dataType, attribute,
+                        bd.binding, arraySize, programScope);
+}
+
 
 // TODO: Shuffle code to remove these declarations.
 static void _EmitStructAccessor(std::stringstream &str,
@@ -1321,6 +1336,9 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
             bool isVertexAttribute = true;
             bool usesPackedNormals = (input.name == _tokens->packedSmoothNormals) || (input.name == _tokens->packedFlatNormals);
             
+            bool inputIsAtomic = (input.dataType.GetString().find("atomic") != std::string::npos);
+            bool isShaderWritable = (input.usage & HdSt_CodeGenMSL::TParam::Usage::Writable);
+            
             if (input.usage & HdSt_CodeGenMSL::TParam::Uniform) {
                 //This input param is a uniform
                 
@@ -1394,14 +1412,14 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
                     vsInputCode << "    scope." << name << " = "
                                 << name << ";\n";
                     
-                vsFuncDef   << "\n    , " << (isPtrParam ? "device const " : "")
+                vsFuncDef   << "\n    , " << (isPtrParam ? ((inputIsAtomic || isShaderWritable) ? "device " : "device const ") : "")
                             << (inProgramScope ? "ProgramScope_Vert::" : "")
                             << dataType << (isPtrParam ? "* " : " ")
                             << name << attrib;
                 
                 bool isMutable = (input.usage & HdSt_CodeGenMSL::TParam::Mutable);
                 csFuncDef   << "\n    , " << (isPtrParam ? "device " : "")
-                            << (isMutable ? "" : "const ")
+                            << ((isMutable || isShaderWritable) ? "" : "const ")
                             << (inProgramScope ? "ProgramScope_Compute::" : "")
                             << dataType << (isPtrParam ? "* " : " ")
                             << name << attrib;
@@ -1409,14 +1427,14 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
                 if(availableInMI_EP) {
                     //The MI entry point needs these too in identical form.
                     vsMI_EP_FuncDefParams << "\n    , "
-                            << (isPtrParam ? "device const " : "")
+                            << (isPtrParam ? ((inputIsAtomic || isShaderWritable) ? "device " : "device const ") : "")
                             << (inProgramScope ? "ProgramScope_Vert::" : "")
                             << dataType << (isPtrParam ? "* " : " ")
                             << name << attrib;
                 }
                 
                 //MI wrapper code can't use "attrib" attribute specifier.
-                vsMI_FuncDef << "\n    , " << (isPtrParam ? "device const ":"")
+                vsMI_FuncDef << "\n    , " << (isPtrParam ? ((inputIsAtomic || isShaderWritable) ? "device " : "device const ") : "")
                              << (inProgramScope ? "ProgramScope_Vert::" : "")
                              << dataType << (isPtrParam ? "* " : " ")
                              << name;
@@ -1996,7 +2014,10 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
                         kMSL_ProgramStage_Fragment);
                 }
                 
-                fsFuncDef << "\n    , const device "
+                bool isAtomicType = it->dataType.GetString().find("atomic") != std::string::npos;
+                bool isShaderWritable = (it->usage & HdSt_CodeGenMSL::TParam::Usage::Writable);
+                
+                fsFuncDef << "\n    , " << ((isAtomicType || isShaderWritable) ? "" : "const ") << "device "
                           << ((it->usage & TParam::Usage::ProgramScope) ?
                             "ProgramScope_Frag::" : "")
                           << _GetPackedType(it->dataType, true)
@@ -3214,7 +3235,14 @@ HdSt_CodeGenMSL::_GenerateBindingsCode()
             if (binDecl->binding.GetType() == HdBinding::SSBO)
             {
                 indexStr = "localIndex";
-                _EmitDeclarationPtr(_genCommon, *binDecl);
+                if (binDecl->typeIsAtomic || binDecl->writable)
+                {
+                    _EmitDeclarationMutablePtr(_genCommon, *binDecl);
+                }
+                else
+                {
+                    _EmitDeclarationPtr(_genCommon, *binDecl);
+                }
                 _AddInputPtrParam(_mslVSInputParams, *binDecl);
                 _AddInputPtrParam(_mslPSInputParams, *binDecl);
             }
@@ -3225,11 +3253,17 @@ HdSt_CodeGenMSL::_GenerateBindingsCode()
                 _AddInputParam(_mslPSInputParams, *binDecl);
             }
 
-            _EmitAccessor(_genCommon,
-                          binDecl->name,
-                          binDecl->dataType,
-                          binDecl->binding,
-                          indexStr);
+            // Accessor are currently only emitted for non-atomic types because Metal requires all accesses (even simple reads)
+            // of atomics to go via the atomic_read functions, which does not play well with the way the accessor functions
+            // work. This could possibly be refactored to allow accessors for atomics.
+            if (!binDecl->typeIsAtomic)
+            {
+                _EmitAccessor(_genCommon,
+                              binDecl->name,
+                              binDecl->dataType,
+                              binDecl->binding,
+                              indexStr);
+            }
         }
     }
     

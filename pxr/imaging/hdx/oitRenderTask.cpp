@@ -130,8 +130,9 @@ HdxOitRenderTask::Execute(HdTaskContext* ctx)
         return;
     }
     
-    // We render into a SSBO -- not MSSA compatible
-#if defined(ARCH_GFX_OPENGL)
+    // We render into a SSBO -- not MSSA compatible. On Metal we do not need to worry about setting/clearing MSAA
+    // state because Multisampling is not global state but is instead a property of every attachment.
+#if defined(ARCH_GFX_OPENGL) && !defined(ARCH_GFX_METAL)
     bool isOpenGL = HdStResourceFactory::GetInstance()->IsOpenGL();
     bool oldMSAA = false;
     bool oldPointSmooth = false;
@@ -147,6 +148,8 @@ HdxOitRenderTask::Execute(HdTaskContext* ctx)
         oldPointSmooth = glIsEnabled(GL_POINT_SMOOTH);
         glEnable(GL_POINT_SMOOTH);
     }
+#endif
+    
     // XXX HdxRenderTask::Prepare calls HdStRenderPassState::Prepare.
     // This sets the cullStyle for the render pass shader.
     // Since Oit uses a custom render pass shader, we must manually
@@ -155,7 +158,7 @@ HdxOitRenderTask::Execute(HdTaskContext* ctx)
         extendedState->GetCullStyle());
     _oitTranslucentRenderPassShader->SetCullStyle(
         extendedState->GetCullStyle());
-#endif
+
     //
     // Opaque pixels pass
     // These pixels are rendered to FB instead of OIT buffers
@@ -176,7 +179,8 @@ HdxOitRenderTask::Execute(HdTaskContext* ctx)
     //
     // Post Execute Restore
     //
-#if defined(ARCH_GFX_OPENGL)
+
+#if defined(ARCH_GFX_OPENGL) && !defined(ARCH_GFX_METAL)
     if (isOpenGL) {
         if (oldMSAA) {
             glEnable(GL_MULTISAMPLE);

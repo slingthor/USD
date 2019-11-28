@@ -308,11 +308,13 @@ HdStGLConversions::GetGLAttribType(HdType type)
     case HdTypeInt32Vec2:
     case HdTypeInt32Vec3:
     case HdTypeInt32Vec4:
+    case HdTypeInt32_Atomic:
         return GL_INT;
     case HdTypeUInt32:
     case HdTypeUInt32Vec2:
     case HdTypeUInt32Vec3:
     case HdTypeUInt32Vec4:
+    case HdTypeUInt32_Atomic:
         return GL_UNSIGNED_INT;
     case HdTypeFloat:
     case HdTypeFloatVec2:
@@ -365,7 +367,16 @@ TF_DEFINE_PRIVATE_TOKENS(
     (uvec4)
 
     (packed_2_10_10_10)
+                         
+    ((_atomic_uint, "atomic_uint"))
+
+    ((_atomic_int, "atomic_int"))
 );
+
+bool HdStGLConversions::TypeIsAtomic(HdType type)
+{
+    return type == HdTypeUInt32_Atomic || type == HdTypeInt32_Atomic;
+}
 
 TfToken
 HdStGLConversions::GetGLSLTypename(HdType type)
@@ -391,6 +402,12 @@ HdStGLConversions::GetGLSLTypename(HdType type)
     case HdTypeInt32Vec4:
         return _glTypeNames->ivec4;
 
+    case HdTypeInt32_Atomic:
+        return _glTypeNames->_atomic_int;
+        
+    case HdTypeUInt32_Atomic:
+        return _glTypeNames->_atomic_uint;
+            
     case HdTypeUInt32:
         return _glTypeNames->_uint;
     case HdTypeUInt32Vec2:

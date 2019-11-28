@@ -750,10 +750,10 @@ HdSt_ResourceBinder::ResolveBindings(HdStDrawItem const *drawItem,
 
                 for (auto const& nameRes : bar->GetResources()) {
                     HdBinding binding = locator.GetBinding(it->GetBindingType(), nameRes.first);
-                    BindingDeclaration b(nameRes.first,
-                        HdStGLConversions::GetGLSLTypename(
-                            nameRes.second->GetTupleType().type),
-                        binding);
+                    auto tupleType = nameRes.second->GetTupleType().type;
+                    auto glslTypename = HdStGLConversions::GetGLSLTypename(tupleType);
+                    BindingDeclaration b(nameRes.first, glslTypename,
+                        binding, HdStGLConversions::TypeIsAtomic(tupleType), it->isWritable());
                     metaDataOut->customBindings.push_back(b);
                     _bindingMap[nameRes.first] = binding;
                 }
@@ -993,6 +993,7 @@ HdSt_ResourceBinder::MetaData::ComputeHash() const
         boost::hash_combine(hash, binDecl->dataType);
         boost::hash_combine(hash, binDecl->binding.GetType());
         boost::hash_combine(hash, binDecl->binding.GetLocation());
+        boost::hash_combine(hash, binDecl->writable);
     }
 
     boost::hash_combine(hash, 0); // separator

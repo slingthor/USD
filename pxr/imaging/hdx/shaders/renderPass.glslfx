@@ -53,21 +53,38 @@ void RenderOutput(vec4 Peye, vec3 Neye, vec4 color, vec4 patchCoord)
 layout (early_fragment_tests) in;
 #endif
 
+
+#if defined(HD_HAS_hdxOitDataBuffer)
+#if defined(ARCH_GFX_METAL)
+	#define gl_FragCoord gl_Position
+	#define atomicAdd(value, addend) atomic_fetch_add_explicit(&value, addend, memory_order_relaxed)
+	#define atomicExchange(target, desired) atomic_exchange_explicit(&target, desired, memory_order_relaxed)
+#endif
+#endif
+
+
 void RenderOutput(vec4 Peye, vec3 Neye, vec4 color, vec4 patchCoord)
 {
 #if defined(HD_HAS_hdxOitDataBuffer)
     if (color.a < 1.0 && color.a > 0.0001) {
         int screenWidth = int(HdGet_oitScreenSize().x);
+        int screenHeight = int(HdGet_oitScreenSize().y);
+        
+        // Must match the per-pixel sample count used when creating the OIT buffers. (See HdxOitResolveTask::_PrepareOitBuffers)
+        const int numSamples = 8;
+        
+        int dataBufferSize = screenWidth * screenHeight * numSamples;
+        int counterBufferSize = screenWidth * screenHeight; // Note that the buffer itself is one larger than this value. Index 0 is used as an atomic counter.
 
         // +1 because the counter buffer is cleared with -1, but we want the
         // first index to start at 0.
         int writeIndex = atomicAdd(hdxOitCounterBuffer[0], 1) + 1;
 
-        if (writeIndex < hdxOitDataBuffer.length()) {
+        if (writeIndex < dataBufferSize) {
             int screenIndex =
                 int(gl_FragCoord.x) + int(gl_FragCoord.y) * screenWidth;
 
-            if (screenIndex < hdxOitCounterBuffer.length()) {
+            if (screenIndex < counterBufferSize) {
                 int prevIndex =
                     atomicExchange(hdxOitCounterBuffer[screenIndex+1], writeIndex);
                 hdxOitDataBuffer[writeIndex] = color;

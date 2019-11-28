@@ -23,6 +23,11 @@
 //
 #include "pxr/imaging/glf/glew.h"
 
+#if defined(ARCH_GFX_METAL)
+#include "pxr/imaging/mtlf/mtlDevice.h"
+#include "pxr/imaging/mtlf/drawTarget.h"
+#endif
+
 #include "pxr/imaging/garch/resourceFactory.h"
 #include "pxr/imaging/garch/contextCaps.h"
 
@@ -95,7 +100,7 @@ HdxOitResolveTask::_PrepareOitBuffers(
         HdBufferSpecVector counterSpecs;
         counterSpecs.push_back(HdBufferSpec(
             HdxTokens->hdxOitCounterBuffer, 
-            HdTupleType {HdTypeInt32, 1}));
+            HdTupleType {HdTypeInt32_Atomic, 1}));
         _counterBar = resourceRegistry->AllocateSingleBufferArrayRange(
                                             /*role*/HdxTokens->oitCounter,
                                             counterSpecs,
@@ -303,7 +308,10 @@ HdxOitResolveTask::Execute(HdTaskContext* ctx)
     }
 
     _renderPassState->Bind(); 
-#if defined(ARCH_GFX_OPENGL)
+#if defined(ARCH_GFX_METAL)
+    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext()->GetMetalContext();
+    context->SetDepthTestEnable(false);
+#elif defined(ARCH_GFX_OPENGL)
     bool isOpenGL = HdStResourceFactory::GetInstance()->IsOpenGL();
     if (isOpenGL) {
         glDisable(GL_DEPTH_TEST);
@@ -312,7 +320,9 @@ HdxOitResolveTask::Execute(HdTaskContext* ctx)
 
     _renderPass->Execute(_renderPassState, GetRenderTags());
 
-#if defined(ARCH_GFX_OPENGL)
+#if defined(ARCH_GFX_METAL)
+    context->SetDepthTestEnable(true);
+#elif defined(ARCH_GFX_OPENGL)
     if (isOpenGL) {
         glEnable(GL_DEPTH_TEST);
     }
