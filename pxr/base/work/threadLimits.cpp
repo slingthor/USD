@@ -26,6 +26,7 @@
 
 #include "pxr/pxr.h"
 #include "pxr/base/work/threadLimits.h"
+#include "pxr/base/work/detachedTask.h"
 
 #include "pxr/base/tf/envSetting.h"
 
@@ -67,7 +68,15 @@ static tbb::atomic<unsigned> _threadLimit;
 
 // We create a task_scheduler_init instance at static initialization time if
 // PXR_WORK_THREAD_LIMIT is set to a nonzero value.  Otherwise this stays NULL.
-static tbb::task_scheduler_init *_tbbTaskSchedInit;
+tbb::task_scheduler_init *_tbbTaskSchedInit;
+
+void ResetTBBTaskSchedInit(){
+    if(_tbbTaskSchedInit) {
+        _tbbTaskSchedInit->terminate();
+        delete _tbbTaskSchedInit;
+        _tbbTaskSchedInit = NULL;
+    }
+}
 
 unsigned
 WorkGetPhysicalConcurrencyLimit()
@@ -162,6 +171,7 @@ WorkSetConcurrencyLimit(unsigned n)
     // According to the documentation that should be the case, but we should
     // make sure.  If we do decide to delete it, we have to make sure to 
     // note that it has already been initialized.
+    Work_ResetDetachedTaskGroupContext();
     if (_tbbTaskSchedInit) {
         _tbbTaskSchedInit->terminate();
         _tbbTaskSchedInit->initialize(_threadLimit);

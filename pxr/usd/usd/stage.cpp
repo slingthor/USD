@@ -90,6 +90,7 @@
 #include "pxr/base/work/arenaDispatcher.h"
 #include "pxr/base/work/loops.h"
 #include "pxr/base/work/utils.h"
+#include "pxr/base/work/threadLimits.h"
 
 #include <boost/optional.hpp>
 #include <boost/iterator/transform_iterator.hpp>
@@ -499,6 +500,9 @@ UsdStage::~UsdStage()
     if (_mallocTagID != _dormantMallocTagID){
         free(const_cast<char*>(_mallocTagID));
     }
+
+    DeleteTheArenaManager();
+    ResetTBBTaskSchedInit();
 }
 
 void

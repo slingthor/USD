@@ -27,14 +27,27 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+tbb::task_group_context* ctx = NULL;
+
 tbb::task_group_context &
 Work_GetDetachedTaskGroupContext()
 {
     // Deliberately leak this in case there are tasks still using it after
     // we exit from main().
-    static tbb::task_group_context* ctx =
-        new tbb::task_group_context(tbb::task_group_context::isolated);
+    if(!ctx) {
+        ctx = new tbb::task_group_context(tbb::task_group_context::isolated);
+    }
     return *ctx;
+}
+
+void Work_ResetDetachedTaskGroupContext()
+{
+    // Deliberately leak this in case there are tasks still using it after
+    // we exit from main().
+    if(ctx) {
+        delete ctx;
+        ctx = NULL;
+    }
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

@@ -128,6 +128,8 @@ private:
     WorkDispatcher _dispatcher;
 };
 
+void DeleteTheArenaManager();
+
 ///////////////////////////////////////////////////////////////////////////////
 
 PXR_NAMESPACE_CLOSE_SCOPE
