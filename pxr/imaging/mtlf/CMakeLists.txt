@@ -33,7 +33,6 @@ pxr_library(mtlf
         arch
         garch
         gf
-        hgi
         hgiMetal
         js
         plug

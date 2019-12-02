@@ -51,8 +51,7 @@ endif()
 
 if (PXR_ENABLE_METAL_SUPPORT)
     set(GFX             ${GFX}
-                        mtlf
-                        hgiMetal)
+                        mtlf)
     set(GFXADDITIONAL   ${GFXADDITIONAL}
                         Metal/bufferRelocatorMetal
                         Metal/bufferResourceMetal

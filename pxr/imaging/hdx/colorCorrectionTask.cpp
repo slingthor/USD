@@ -284,6 +284,7 @@ HdxColorCorrectionTask::_CreateOpenColorIOResources()
 
         return std::string(gpuShaderText);
     #endif
+    return std::string();
 }
 
 bool

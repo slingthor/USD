@@ -5,10 +5,10 @@ set(DIRS
     cameraUtil
     pxOsd
     glf
-    mtlf
     hgi
     hgiGL
     hgiMetal
+    mtlf
     hd
     hdSt
     hdx

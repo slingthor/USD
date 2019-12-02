@@ -50,6 +50,9 @@ TF_REGISTRY_FUNCTION(TfScriptModuleLoader) {
 #if defined(ARCH_GFX_OPENGL)
         TfToken("hgiGL"),
 #endif
+#if defined(ARCH_GFX_METAL)
+        TfToken("hgiMetal"),
+#endif
         TfToken("plug"),
         TfToken("pxOsd"),
         TfToken("sdf"),
