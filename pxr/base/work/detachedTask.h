@@ -64,6 +64,8 @@ void WorkRunDetachedTask(Fn &&fn)
         Work_DetachedInvoker<FnType>(std::forward<Fn>(fn)));
 }
 
+void Work_ResetDetachedTaskGroupContext();
+
 PXR_NAMESPACE_CLOSE_SCOPE
 
 #endif // PXR_BASE_WORK_DETACHED_TASK_H

@@ -29,7 +29,7 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-namespace {
+
 // We do this at Intel's suggestion, since creating and destroying arenas is
 // pretty expensive and rather concurrency unfriendly.  We have code that,
 // depending on usage patterns, may have concurrent transient arenas so here we
@@ -68,17 +68,35 @@ struct _ArenaManager
     tbb::concurrent_queue<tbb::task_arena *> freeArenas;
 };
 
+_ArenaManager *theManager = NULL;
+
 _ArenaManager &
 GetTheArenaManager()
 {
     // We heap allocate the manager so we don't try to run the dtor at static
     // destruction time, to avoid any potential issues with task_arena dtors
     // accessing destroyed parts of tbb internals.
-    static _ArenaManager *theManager = new _ArenaManager;
+    if(!theManager) {
+        theManager = new _ArenaManager;
+    }
     return *theManager;
 }
 
-} // anon
+
+void
+DeleteTheArenaManager()
+{
+    if(theManager) {
+        tbb::task_arena *ret;
+        while(theManager->freeArenas.try_pop(ret)) {
+            delete ret;
+            ret = NULL;
+        }
+        delete theManager;
+        theManager = NULL;
+    }
+}
+
 
 WorkArenaDispatcher::~WorkArenaDispatcher()
 {

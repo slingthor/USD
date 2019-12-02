@@ -29,6 +29,9 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+
+void ResetTBBTaskSchedInit();
+
 /// \file work/threadLimits.h
 
 /// Return the current concurrency limit, always >= 1.
