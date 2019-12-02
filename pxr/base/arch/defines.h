@@ -119,6 +119,10 @@ defined(_M_IX86) || defined(_M_X64)
 #define ARCH_HAS_MMAP_MAP_POPULATE
 #endif
 
+#if !defined(ARCH_OS_IOS)
+#define ARCH_HAS_MMAP
+#endif
+
 // OpenGL API present
 #if defined(PXR_OPENGL_SUPPORT_ENABLED)
 #define ARCH_GFX_OPENGL
