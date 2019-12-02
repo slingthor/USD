@@ -29,6 +29,8 @@
 #include "pxr/imaging/hgiMetal/immediateCommandBuffer.h"
 #include "pxr/imaging/hgi/hgi.h"
 
+#import <Metal/Metal.h>
+
 PXR_NAMESPACE_OPEN_SCOPE
 
 
@@ -40,7 +42,7 @@ class HgiMetal final : public Hgi
 {
 public:
     HGIMETAL_API
-    HgiMetal();
+    HgiMetal(id<MTLDevice> device = nil);
 
     HGIMETAL_API
     ~HgiMetal();
@@ -62,9 +64,20 @@ public:
     HGIMETAL_API
     void DestroyTexture(HgiTextureHandle* texHandle) override;
 
+    //
+    // HgiMetal specific
+    //
+    
+    HGIMETAL_API
+    id<MTLDevice> GetDevice() const {
+        return _device;
+    }
+    
 private:
     HgiMetal & operator=(const HgiMetal&) = delete;
     HgiMetal(const HgiMetal&) = delete;
+
+    id<MTLDevice> _device;
 
     HgiMetalImmediateCommandBuffer _immediateCommandBuffer;
 };

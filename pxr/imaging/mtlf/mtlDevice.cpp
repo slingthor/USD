@@ -214,15 +214,14 @@ void MtlfMetalContext::Init(id<MTLDevice> _device, int width, int height)
 #endif
     renderDevices = NULL;
     
-    if (_device == nil) {
-        //currentDevice = MtlfMetalContext::GetMetalDevice(PREFER_INTEGRATED_GPU);
-        //currentDevice = MtlfMetalContext::GetMetalDevice(PREFER_DISCRETE_GPU);
-        currentDevice = MtlfMetalContext::GetMetalDevice(PREFER_DEFAULT_GPU);
-    }
-    else {
+    //currentDevice = MtlfMetalContext::GetMetalDevice(PREFER_INTEGRATED_GPU);
+    //currentDevice = MtlfMetalContext::GetMetalDevice(PREFER_DISCRETE_GPU);
+    currentDevice = MtlfMetalContext::GetMetalDevice(PREFER_DEFAULT_GPU);
+
+    if (_device != nil) {
         currentDevice = _device;
     }
-    
+
     interopDevice = currentDevice;
     currentGPU = 0;
     int i = 0;
@@ -454,8 +453,20 @@ void MtlfMetalContext::Cleanup()
 
 void MtlfMetalContext::RecreateInstance(id<MTLDevice> device, int width, int height)
 {
+    // This is all temporary, and hacky - caused by being a global state.
+    // Talk to Jason if you run into issues!
+#if defined(ARCH_GFX_OPENGL)
+    if (glInterop) {
+        delete glInterop;
+        glInterop = NULL;
+    }
+#endif
+
     context = NULL;
+
     context = MtlfMetalContextSharedPtr(new MtlfMetalContext(device, width, height));
+    context->interopDevice = device;
+    [context->renderDevices replaceObjectAtIndex:0 withObject:device];
 }
 
 void MtlfMetalContext::AllocateAttachments(int width, int height)

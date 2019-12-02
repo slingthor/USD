@@ -39,7 +39,7 @@
 #define GL_TIME_ELAPSED                 0x88BF
 #endif // ARCH_GFX_OPENGL
 
-#include <Metal/Metal.h>
+#import <Metal/Metal.h>
 #if defined(ARCH_OS_MACOS)
 #import <Cocoa/Cocoa.h>
 #else
@@ -48,6 +48,7 @@
 
 #include "pxr/imaging/mtlf/api.h"
 #include "pxr/imaging/garch/texture.h"
+#include "pxr/imaging/hgiMetal/hgi.h"
 #include "pxr/base/arch/threads.h"
 #include "pxr/base/gf/vec4f.h"
 #include "pxr/base/tf/token.h"
@@ -236,12 +237,16 @@ public:
     MTLF_API
     virtual ~MtlfMetalContext();
 
+    MTLF_API
+    static MtlfMetalContextSharedPtr CreateMetalContext(HgiMetal *hgi) {
+        context = MtlfMetalContextSharedPtr(new MtlfMetalContext(hgi->GetDevice(), 256, 256));
+
+        return context;
+    }
+
     /// Returns an instance for the current Metal device.
     MTLF_API
     static MtlfMetalContextSharedPtr GetMetalContext() {
-        if (!context)
-            context = MtlfMetalContextSharedPtr(new MtlfMetalContext(nil, 256, 256));
-        
         return context;
     }
 

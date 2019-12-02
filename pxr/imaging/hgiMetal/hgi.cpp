@@ -30,13 +30,19 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 
-HgiMetal::HgiMetal()
+HgiMetal::HgiMetal(id<MTLDevice> device)
+: _device(device)
 {
+    if (!_device) {
+        _device = MTLCreateSystemDefaultDevice();
+    }
+
     HgiMetalSetupMetalDebug();
 }
 
 HgiMetal::~HgiMetal()
 {
+    _device = nil;
 }
 
 HgiImmediateCommandBuffer&

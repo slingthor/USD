@@ -55,11 +55,22 @@ HdStRenderDelegateMetal::HdStRenderDelegateMetal()
     , _mtlRenderPassDescriptorForInterop(nil)
     , _mtlRenderPassDescriptor(nil)
 {
+    id<MTLDevice> currentDevice = nil;
+    
+    if (MtlfMetalContext::GetMetalContext()) {
+        currentDevice = MtlfMetalContext::GetMetalContext()->currentDevice;
+    }
+    HgiMetal *hgi = new HgiMetal(currentDevice);
+    
+    if (currentDevice == nil) {
+        MtlfMetalContext::CreateMetalContext(hgi);
+    }
+
     _deviceDesc = TfToken(_MetalDeviceDescriptor(MtlfMetalContext::GetMetalContext()->currentDevice));
 //    _Initialize();
     
-    _hgi = new HgiMetal();
-    
+    _hgi = hgi;
+        
     _inFlightSemaphore = dispatch_semaphore_create(3);
 }
 
@@ -128,7 +139,7 @@ void HdStRenderDelegateMetal::SetRenderSetting(TfToken const& key, VtValue const
         return;
     }
 
-    HdStRenderDelegateMetal::SetRenderSetting(key, value);
+    HdStRenderDelegate::SetRenderSetting(key, value);
 }
 
 void HdStRenderDelegateMetal::CommitResources(HdChangeTracker *tracker)
@@ -164,7 +175,6 @@ VtValue HdStRenderDelegateMetal::GetRenderSetting(TfToken const& key) const
 
 HdStRenderDelegateMetal::~HdStRenderDelegateMetal()
 {
-    MtlfMetalContext::context = NULL;
 }
 
 bool

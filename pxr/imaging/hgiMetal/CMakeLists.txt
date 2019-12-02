@@ -13,6 +13,7 @@ pxr_library(hgiMetal
         hgi
         tf
         trace
+        ${METAL_LIBRARY}
 
     PRIVATE_CLASSES
         conversions

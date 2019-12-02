@@ -110,6 +110,26 @@ HgiMetalBlitEncoder::CopyTextureGpuToCpu(
         copyOp.destinationBufferByteSize,
         copyOp.cpuDestinationBuffer);
 */
+    /*
+    id<MTLDevice> device = nil;
+     
+    context->CreateCommandBuffer();
+    context->LabelCommandBuffer(@"Get Image");
+    id<MTLBlitCommandEncoder> blitEncoder = context->GetBlitEncoder();
+    
+    MtlfMetalContext::MtlfMultiBuffer const &cpuBuffer = context->GetMetalBuffer((bytesPerPixel * width * height), MTLResourceStorageModeDefault);
+    
+    [blitEncoder copyFromTexture:texture sourceSlice:0 sourceLevel:0 sourceOrigin:MTLOriginMake(0, 0, 0) sourceSize:MTLSizeMake(width, height, 1) toBuffer:cpuBuffer.forCurrentGPU() destinationOffset:0 destinationBytesPerRow:(bytesPerPixel * width) destinationBytesPerImage:(bytesPerPixel * width * height) options:blitOptions];
+#if defined(ARCH_OS_MACOS)
+    [blitEncoder synchronizeResource:cpuBuffer.forCurrentGPU()];
+#endif
+
+    context->ReleaseEncoder(true);
+    context->CommitCommandBufferForThread(false, true);
+
+    memcpy(buffer, [cpuBuffer.forCurrentGPU() contents], bytesPerPixel * width * height);
+    context->ReleaseMetalBuffer(cpuBuffer);
+     */
 }
 
 void 
