@@ -4,7 +4,7 @@ import os
 import subprocess
 from distutils.dir_util import copy_tree
 from os.path import isdir, isfile, join
-from shutil import copy
+from shutil import copy, copyfile
 
 SDKVersion = subprocess.check_output(['xcodebuild', '-version']).strip()[6:10]
 codeSignID = ""
@@ -128,6 +128,7 @@ def make_relocatable(install_path, buildPython, qt_path="/usr/local/opt/qt", ver
         replace_string_in_file(file, install_path , "$ENV{USD_BUILD}")
         replace_string_in_file(file, src_path , "$ENV{USD_BUILD}")
 
+    copy(src_path+"/build_scripts/Hydra.command", install_path+"/Hydra.command")
 
     if buildPython:
         import PySide2
