@@ -35,6 +35,7 @@ HgiMetal::HgiMetal(id<MTLDevice> device)
 {
     if (!_device) {
         _device = MTLCreateSystemDefaultDevice();
+        //_device = MTLCopyAllDevices()[1];
     }
 
     HgiMetalSetupMetalDebug();

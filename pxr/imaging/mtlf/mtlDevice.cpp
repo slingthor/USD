@@ -329,7 +329,7 @@ void MtlfMetalContext::Init(id<MTLDevice> _device, int width, int height)
     blendState.destAlphaFactor = MTLBlendFactorOneMinusSourceAlpha;
     blendState.blendColor = GfVec4f(1.0f);
     
-    depthState.depthTestEnable = true;
+    depthState.depthWriteEnable = true;
     depthState.depthCompareFunction = MTLCompareFunctionLessEqual;
     
     AllocateAttachments(width, height);
@@ -856,9 +856,9 @@ void MtlfMetalContext::SetBlendColor(GfVec4f const &_blendColor) {
     blendState.blendColor = _blendColor;
 }
 
-void MtlfMetalContext::SetDepthTestEnable(bool depthTestEnable)
+void MtlfMetalContext::SetDepthWriteEnable(bool depthWriteEnable)
 {
-    depthState.depthTestEnable = depthTestEnable;
+    depthState.depthWriteEnable = depthWriteEnable;
 }
 
 void MtlfMetalContext::SetDepthComparisonFunction(MTLCompareFunction comparisonFn)
@@ -1336,7 +1336,7 @@ void MtlfMetalContext::SetDepthStencilState()
     size_t hashVal = 0;
     
     boost::hash_combine(hashVal, currentDevice);
-    boost::hash_combine(hashVal, depthState.depthTestEnable);
+    boost::hash_combine(hashVal, depthState.depthWriteEnable);
     boost::hash_combine(hashVal, depthState.depthCompareFunction);
     
     if (hashVal == wq->currentDepthStencilDescriptorHash && wq->currentDepthStencilState != nil)
@@ -1360,7 +1360,7 @@ void MtlfMetalContext::SetDepthStencilState()
         MTLDepthStencilDescriptor * depthStencilStateDescriptor = [[MTLDepthStencilDescriptor alloc] init];
         depthStencilStateDescriptor.label = @"SetDepthStencilState";
 
-        depthStencilStateDescriptor.depthWriteEnabled = depthState.depthTestEnable;
+        depthStencilStateDescriptor.depthWriteEnabled = depthState.depthWriteEnable;
         depthStencilStateDescriptor.depthCompareFunction = depthState.depthCompareFunction;
         
         depthStencilState = [currentDevice newDepthStencilStateWithDescriptor:depthStencilStateDescriptor];
@@ -1783,6 +1783,8 @@ void MtlfMetalContext::ResetEncoders(MetalWorkQueueType workQueueType, bool isIn
     wq->currentColourAttachmentsHash         = 0;
     wq->currentRenderPipelineDescriptorHash  = 0;
     wq->currentRenderPipelineState           = nil;
+    wq->currentDepthStencilDescriptorHash    = 0;
+    wq->currentDepthStencilState             = nil;
     wq->currentComputePipelineDescriptorHash = 0;
     wq->currentComputePipelineState          = nil;
 }
@@ -1916,6 +1918,7 @@ void MtlfMetalContext::ReleaseEncoder(bool endEncoding, MetalWorkQueueType workQ
                 [wq->currentRenderEncoder endEncoding];
                 wq->currentRenderEncoder      = nil;
                 wq->currentRenderPipelineState = nil;
+                wq->currentDepthStencilState = nil;
                 break;
             }
             case MTLENCODERTYPE_COMPUTE:

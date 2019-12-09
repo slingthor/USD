@@ -374,7 +374,7 @@ public:
     void SetBlendColor(GfVec4f const &blendColor);
 
     MTLF_API
-    void SetDepthTestEnable(bool depthTestEnable);
+    void SetDepthWriteEnable(bool depthWriteEnable);
     
     MTLF_API
     void SetDepthComparisonFunction(MTLCompareFunction comparisonFn);
@@ -722,7 +722,7 @@ protected:
     } blendState;
 
     struct DepthState {
-        bool depthTestEnable;
+        bool depthWriteEnable;
         MTLCompareFunction depthCompareFunction;
     } depthState;
     

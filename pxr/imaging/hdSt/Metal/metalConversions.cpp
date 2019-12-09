@@ -118,19 +118,19 @@ HdStMetalConversions::GetComponentSize(int glDataType)
 }
 
 
-GLenum
+MTLCompareFunction
 HdStMetalConversions::GetGlDepthFunc(HdCompareFunction func)
 {
-    static GLenum HD_2_GL_DEPTH_FUNC[] =
+    static MTLCompareFunction HD_2_GL_DEPTH_FUNC[] =
     {
-        GL_NEVER,    // HdCmpFuncNever
-        GL_LESS,     // HdCmpFuncLess
-        GL_EQUAL,    // HdCmpFuncEqual
-        GL_LEQUAL,   // HdCmpFuncLEqual
-        GL_GREATER,  // HdCmpFuncGreater
-        GL_NOTEQUAL, // HdCmpFuncNotEqual
-        GL_GEQUAL,   // HdCmpFuncGEqual
-        GL_ALWAYS,   // HdCmpFuncAlways
+        MTLCompareFunctionNever,        // HdCmpFuncNever
+        MTLCompareFunctionLess,         // HdCmpFuncLess
+        MTLCompareFunctionEqual,        // HdCmpFuncEqual
+        MTLCompareFunctionLessEqual,    // HdCmpFuncLEqual
+        MTLCompareFunctionGreater,      // HdCmpFuncGreater
+        MTLCompareFunctionNotEqual,     // HdCmpFuncNotEqual
+        MTLCompareFunctionGreaterEqual, // HdCmpFuncGEqual
+        MTLCompareFunctionAlways,       // HdCmpFuncAlways
     };
     static_assert((sizeof(HD_2_GL_DEPTH_FUNC) / sizeof(HD_2_GL_DEPTH_FUNC[0])) == HdCmpFuncLast, "Mismatch enum sizes in convert function");
 

@@ -89,11 +89,11 @@ HdStRenderPassStateMetal::Bind()
         context->SetAlphaBlendingEnable(true);
         context->SetBlendOps(HdStMetalConversions::GetGlBlendOp(_blendColorOp),
                              HdStMetalConversions::GetGlBlendOp(_blendAlphaOp));
-//        context->SetBlendFactors(
-//            HdStMetalConversions::GetGlBlendFactor(_blendColorSrcFactor),
-//            HdStMetalConversions::GetGlBlendFactor(_blendColorDstFactor),
-//            HdStMetalConversions::GetGlBlendFactor(_blendAlphaSrcFactor),
-//            HdStMetalConversions::GetGlBlendFactor(_blendAlphaDstFactor));
+        context->SetBlendFactors(
+            HdStMetalConversions::GetGlBlendFactor(_blendColorSrcFactor),
+            HdStMetalConversions::GetGlBlendFactor(_blendColorDstFactor),
+            HdStMetalConversions::GetGlBlendFactor(_blendAlphaSrcFactor),
+            HdStMetalConversions::GetGlBlendFactor(_blendAlphaDstFactor));
         context->SetBlendColor(_blendConstantColor);
     } else {
         context->SetAlphaBlendingEnable(false);
@@ -106,6 +106,9 @@ HdStRenderPassStateMetal::Bind()
             context->SetAlphaCoverageEnable(false);
         }
     }
+    
+    context->SetDepthComparisonFunction(HdStMetalConversions::GetGlDepthFunc(_depthFunc));
+    context->SetDepthWriteEnable(_depthMaskEnabled);
 /*
     // Apply polygon offset to whole pass.
     if (!_depthBiasUseDefault) {
@@ -117,8 +120,6 @@ HdStRenderPassStateMetal::Bind()
         }
     }
 
-    glDepthFunc(HdStGLConversions::GetGlDepthFunc(_depthFunc));
-    
     // Stencil
     if (_stencilEnabled) {
         glEnable(GL_STENCIL_TEST);

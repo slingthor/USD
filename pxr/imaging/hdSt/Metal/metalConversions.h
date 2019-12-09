@@ -42,7 +42,7 @@ public:
     static size_t GetComponentSize(int glDataType);
 
     HDST_API
-    static GLenum GetGlDepthFunc(HdCompareFunction func);
+    static MTLCompareFunction GetGlDepthFunc(HdCompareFunction func);
 
     HDST_API
     static GLenum GetGlStencilFunc(HdCompareFunction func);
