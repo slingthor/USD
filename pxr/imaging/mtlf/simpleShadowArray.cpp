@@ -168,6 +168,7 @@ MtlfSimpleShadowArray::_AllocSamplers()
     samplerDescriptor.minFilter = MTLSamplerMinMagFilterLinear;
     samplerDescriptor.magFilter = MTLSamplerMinMagFilterLinear;
     _shadowCompareSampler = MtlfMultiSampler(samplerDescriptor);
+    [samplerDescriptor release];
 }
 
 void

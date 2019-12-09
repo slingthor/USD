@@ -154,6 +154,7 @@ GarchSamplerGPUHandle HdStSimpleTextureResourceMetal::GetTexelsSamplerId()
 #endif
         id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->currentDevice;
         _sampler = MtlfMultiSampler(samplerDesc);
+        [samplerDesc release];
     }
     return _sampler;
 }
