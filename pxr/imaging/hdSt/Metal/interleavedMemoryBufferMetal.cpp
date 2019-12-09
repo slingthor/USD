@@ -66,6 +66,11 @@ HdStStripedInterleavedBufferMetal::HdStStripedInterleavedBufferMetal(
     // Empty
 }
 
+HdStStripedInterleavedBufferMetal::~HdStStripedInterleavedBufferMetal()
+{
+    _DeallocateResources();
+}
+
 void
 HdStStripedInterleavedBufferMetal::Reallocate(
     std::vector<HdBufferArrayRangeSharedPtr> const &ranges,

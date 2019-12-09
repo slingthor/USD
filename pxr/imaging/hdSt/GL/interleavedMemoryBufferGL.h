@@ -49,7 +49,7 @@ public:
 
     /// Destructor
     HDST_API
-    virtual ~HdStStripedInterleavedBufferGL() {}
+    virtual ~HdStStripedInterleavedBufferGL();
 
     /// Performs reallocation.
     /// GLX context has to be set when calling this function.

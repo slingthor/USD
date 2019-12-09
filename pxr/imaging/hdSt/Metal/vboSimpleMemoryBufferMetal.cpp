@@ -74,6 +74,11 @@ HdStVBOSimpleMemoryBufferMetal::HdStVBOSimpleMemoryBufferMetal(
     // Empty
 }
 
+HdStVBOSimpleMemoryBufferMetal::~HdStVBOSimpleMemoryBufferMetal() {
+    _DeallocateResources();
+}
+
+
 void
 HdStVBOSimpleMemoryBufferMetal::Reallocate(
     std::vector<HdBufferArrayRangeSharedPtr> const & ranges,

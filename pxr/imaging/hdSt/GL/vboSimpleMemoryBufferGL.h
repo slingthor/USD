@@ -46,7 +46,7 @@ public:
 
     /// Destructor. It invalidates _range
     HDST_API
-    virtual ~HdStVBOSimpleMemoryBufferGL() {}
+    virtual ~HdStVBOSimpleMemoryBufferGL();
 
     /// Performs reallocation.
     /// GLX context has to be set when calling this function.

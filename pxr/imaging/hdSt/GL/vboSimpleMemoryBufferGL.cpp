@@ -65,6 +65,10 @@ HdStVBOSimpleMemoryBufferGL::HdStVBOSimpleMemoryBufferGL(
 {
 }
 
+HdStVBOSimpleMemoryBufferGL::~HdStVBOSimpleMemoryBufferGL() {
+    _DeallocateResources();
+}
+
 void
 HdStVBOSimpleMemoryBufferGL::Reallocate(
     std::vector<HdBufferArrayRangeSharedPtr> const & ranges,

@@ -61,6 +61,11 @@ HdStVBOMemoryBufferMetal::HdStVBOMemoryBufferMetal(
 {
 }
 
+HdStVBOMemoryBufferMetal::~HdStVBOMemoryBufferMetal()
+{
+    _DeallocateResources();
+}
+
 void
 HdStVBOMemoryBufferMetal::Reallocate(
     std::vector<HdBufferArrayRangeSharedPtr> const &ranges,

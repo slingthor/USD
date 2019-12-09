@@ -72,6 +72,11 @@ HdStStripedInterleavedBufferGL::HdStStripedInterleavedBufferGL(
 {
 }
 
+HdStStripedInterleavedBufferGL::~HdStStripedInterleavedBufferGL()
+{
+    _DeallocateResources();
+}
+
 void
 HdStStripedInterleavedBufferGL::Reallocate(
     std::vector<HdBufferArrayRangeSharedPtr> const &ranges,

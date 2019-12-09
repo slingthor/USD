@@ -61,6 +61,11 @@ HdStVBOMemoryBufferGL::HdStVBOMemoryBufferGL(
 {
 }
 
+HdStVBOMemoryBufferGL::~HdStVBOMemoryBufferGL()
+{
+    _DeallocateResources();
+}
+
 void
 HdStVBOMemoryBufferGL::Reallocate(
     std::vector<HdBufferArrayRangeSharedPtr> const &ranges,
