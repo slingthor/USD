@@ -86,5 +86,6 @@ wrapRenderParams()
         .def_readwrite("colorCorrectionMode", &Params::colorCorrectionMode)
         .def_readwrite("clearColor", &Params::clearColor)
         .def_readwrite("renderResolution", &Params::renderResolution)
+        .def_readwrite("sampleCount", &Params::sampleCount)
         ;
 }

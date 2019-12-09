@@ -823,9 +823,11 @@ class StageView(QtOpenGL.QGLWidget):
 
         glFormat = QtOpenGL.QGLFormat()
         msaa = os.getenv("USDVIEW_ENABLE_MSAA", "1")
+        samples = 1;
         if msaa == "1":
             glFormat.setSampleBuffers(True)
-            glFormat.setSamples(4)
+            samples = 4;
+            glFormat.setSamples(samples)
         # XXX: for OSX (QT5 required)
         # glFormat.setVersion(4, 1)
         # glFormat.setProfile(QtOpenGL.QGLFormat.CoreProfile)
@@ -891,6 +893,7 @@ class StageView(QtOpenGL.QGLWidget):
         }
 
         self._renderParams = UsdImagingGL.RenderParams()
+        self._renderParams.sampleCount = samples;
         self._dist = 50 
         self._bbox = Gf.BBox3d()
         self._selectionBBox = Gf.BBox3d()
