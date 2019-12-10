@@ -28,7 +28,7 @@
 #include "pxr/base/tf/getenv.h"
 #include "pxr/base/tf/setenv.h"
 #include "pxr/imaging/hd/rendererPluginRegistry.h"
-#include "pxr/imaging/hdPrmanLoader/rendererPlugin.h"
+#include "pxr/imaging/plugin/hdPrmanLoader/rendererPlugin.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -89,18 +89,14 @@ void HdPrmanLoader::Load()
 
     // hdxPrman is assumed to be next to hdPrmanLoader (this plugin)
     PlugPluginPtr plugin =
-        PlugRegistry::GetInstance().GetPluginWithName("hdPrmanLoader");
+        PlugRegistry::GetInstance().GetPluginWithName("hdxPrman");
     if (plugin) {
-        std::string path = TfGetPathName(plugin->GetPath());
-        if (!path.empty()) {
-            const std::string hdxPrmanPath =
-                TfStringCatPaths(path, "hdxPrman" ARCH_LIBRARY_SUFFIX);
-            _hdPrman.hdxPrman = ArchLibraryOpen(hdxPrmanPath,
-                                        ARCH_LIBRARY_NOW | ARCH_LIBRARY_LOCAL);
-        }
+        _hdPrman.hdxPrman = ArchLibraryOpen(plugin->GetPath(),
+                                         ARCH_LIBRARY_NOW | ARCH_LIBRARY_LOCAL);
     }
     if (!_hdPrman.hdxPrman) {
-        TF_WARN("Could not load versioned hdPrman backend.");
+        TF_WARN("Could not load versioned hdPrman backend: %s",
+                ArchLibraryError().c_str());
         return;
     }
 

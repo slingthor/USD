@@ -88,9 +88,6 @@ private:
     // Copies the client framebuffer texture into ours
     void _CopyTexture();
 
-    // Extracts the HgiTexture from the AOV
-    class HgiTexture* _GetAovHgiTexture();
-
     /// Apply color correction to the currently bound framebuffer.
     void _ApplyColorCorrection();
 

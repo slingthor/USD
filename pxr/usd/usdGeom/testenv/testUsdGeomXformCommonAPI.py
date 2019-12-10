@@ -300,8 +300,8 @@ class TestUsdGeomXformAPI(unittest.TestCase):
         # component values *may* not.
         xtrans = x.GetLocalTransformation(Usd.TimeCode.Default())
         ztrans = z.GetLocalTransformation(Usd.TimeCode.Default())
-        for a, b in zip([xtrans.GetRow(i) for i in range(0,5)],
-                        [ztrans.GetRow(i) for i in range(0,5)]):
+        for a, b in zip([xtrans.GetRow(i) for i in range(4)],
+                        [ztrans.GetRow(i) for i in range(4)]):
             if any(map(math.isnan, a)) or any(map(math.isnan, b)):
                 continue
             self.assertTrue(Gf.IsClose(a,b,1e-5))
@@ -648,6 +648,76 @@ class TestUsdGeomXformAPI(unittest.TestCase):
                 rotation, rotOrder)
             self.assertTrue(Gf.IsClose(
                 x.GetLocalTransformation(), transform, 1e-5))
+
+    def test_CreateXformOps(self):
+        stage = Usd.Stage.CreateInMemory()
+
+        xf = UsdGeom.Xform.Define(stage, "/A")
+        xfc = UsdGeom.XformCommonAPI(xf)
+
+        # Call with no flags should create no ops.
+        t, p, r, s, pInv = xfc.CreateXformOps()
+        self.assertFalse(t)
+        self.assertFalse(p)
+        self.assertFalse(r)
+        self.assertFalse(s)
+        self.assertFalse(pInv)
+        self.assertEqual(xf.GetOrderedXformOps(), [])
+        self.assertTrue(xfc)
+
+        # Try creating a single op.
+        t, p, r, s, pInv = xfc.CreateXformOps(
+            UsdGeom.XformCommonAPI.OpRotate)
+        self.assertFalse(t)
+        self.assertFalse(p)
+        self.assertTrue(r)
+        self.assertFalse(s)
+        self.assertFalse(pInv)
+        self.assertEqual(len(xf.GetOrderedXformOps()), 1)
+        self.assertEqual(xf.GetOrderedXformOps()[0].GetName(),
+            "xformOp:rotateXYZ")
+        self.assertTrue(xfc)
+
+        # Error when adding another xform op with different rotation order.
+        with self.assertRaises(Tf.ErrorException):
+            xfc.CreateXformOps(
+                UsdGeom.XformCommonAPI.RotationOrderYXZ,
+                UsdGeom.XformCommonAPI.OpRotate)
+        self.assertEqual(len(xf.GetOrderedXformOps()), 1)
+        self.assertTrue(xfc)
+
+        # Muck around with the xform op order outside of XformCommonAPI.
+        xf.AddScaleOp()
+        self.assertEqual(len(xf.GetOrderedXformOps()), 2)
+        self.assertEqual(xf.GetOrderedXformOps()[1].GetName(),
+            "xformOp:scale")
+        self.assertTrue(xfc)
+        t, p, r, s, pInv = xfc.CreateXformOps()
+        self.assertFalse(t)
+        self.assertFalse(p)
+        self.assertTrue(r)
+        self.assertTrue(s)
+        self.assertFalse(pInv)
+
+        xf = UsdGeom.Xform.Define(stage, "/B")
+        xfc = UsdGeom.XformCommonAPI(xf)
+
+        # Create a rotate op with explicit rotation order.
+        t, p, r, s, pInv = xfc.CreateXformOps(
+            UsdGeom.XformCommonAPI.RotationOrderYXZ,
+            UsdGeom.XformCommonAPI.OpTranslate,
+            UsdGeom.XformCommonAPI.OpRotate)
+        self.assertTrue(t)
+        self.assertTrue(r)
+        self.assertTrue(xfc)
+
+        # Create a rotate op again but with no rotation order specified.
+        t, p, r, s, pInv = xfc.CreateXformOps(
+            UsdGeom.XformCommonAPI.OpRotate)
+        self.assertTrue(t)
+        self.assertTrue(r)
+        self.assertTrue(xfc)
+        self.assertEqual(r.GetOpType(), UsdGeom.XformOp.TypeRotateYXZ)
 
 if __name__ == "__main__":
     unittest.main()

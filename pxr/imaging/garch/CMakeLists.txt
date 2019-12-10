@@ -42,7 +42,6 @@ if (${PXR_ENABLE_METAL_SUPPORT})
     # On Apple, we add the gl framework anyway, to ensure the header files
     # are available for include. This is due to Hydra's dependence on GL enums
     # and types. Remove this once Hydra is fully GL free
-#    list(APPEND optionalLibs      ${OPENGL_gl_LIBRARY})
     list(APPEND optionalLibs      ${METAL_LIBRARY})
 endif()
 
@@ -59,6 +58,11 @@ if (PXR_BUILD_OPENIMAGEIO_PLUGIN)
     list(APPEND optionalCppFiles oiioImage.cpp)
     list(APPEND optionalLibs ${OIIO_LIBRARIES})
     list(APPEND optionalIncludeDirs ${OIIO_INCLUDE_DIRS})
+endif()
+if (PXR_ENABLE_OPENVDB_SUPPORT)
+    list(APPEND optionalPublicClasses vdbTextureData)
+    list(APPEND optionalLibs ${OPENEXR_Half_LIBRARY} ${OPENVDB_LIBRARY})
+    list(APPEND optionalIncludeDirs ${OPENVDB_INCLUDE_DIR})
 endif()
 pxr_library(garch
     LIBRARIES
