@@ -60,7 +60,9 @@ int GetPointId()
 }
 
 // Fwd declare selection decoder method defined in hdx/shaders/selection.glslfx
+#if !defined(ARCH_GFX_METAL)
 bool IsPointSelected(int);
+#endif
 float GetPointRasterSize(int pointId)
 {
     return IsPointSelected(pointId)? 
