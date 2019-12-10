@@ -97,22 +97,27 @@ public:
     GARCH_API
     int ResizedDepth(int mipLevel = 0) const override;
 
+    GARCH_API
     GLenum GLInternalFormat() const override {
         return _glInternalFormat;
     };
 
+    GARCH_API
     GLenum GLFormat() const override {
         return _glFormat;
     };
 
+    GARCH_API
     GLenum GLType() const override {
         return _glType;
     };
 
+    GARCH_API
     size_t TargetMemory() const override {
         return _targetMemory;
     };
 
+    GARCH_API
     WrapInfo GetWrapInfo() const override {
         return _wrapInfo;
     };

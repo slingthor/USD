@@ -23,10 +23,10 @@
 //
 #include "pxr/imaging/glf/glew.h"
 
-#include "pxr/imaging/glf/debugCodes.h"
-#include "pxr/imaging/glf/image.h"
-#include "pxr/imaging/glf/utils.h"
-#include "pxr/imaging/glf/vdbTextureData.h"
+#include "pxr/imaging/garch/debugCodes.h"
+#include "pxr/imaging/garch/image.h"
+#include "pxr/imaging/garch/utils.h"
+#include "pxr/imaging/garch/vdbTextureData.h"
 
 #include "pxr/base/tf/fileUtils.h"
 #include "pxr/base/trace/trace.h"
@@ -36,14 +36,14 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-GlfVdbTextureDataRefPtr
-GlfVdbTextureData::New(
+GarchVdbTextureDataRefPtr
+GarchVdbTextureData::New(
     std::string const &filePath, const size_t targetMemory)
 {
-    return TfCreateRefPtr(new GlfVdbTextureData(filePath, targetMemory));
+    return TfCreateRefPtr(new GarchVdbTextureData(filePath, targetMemory));
 }
 
-GlfVdbTextureData::GlfVdbTextureData(
+GarchVdbTextureData::GarchVdbTextureData(
     const std::string &filePath,
     const size_t targetMemory)
     : _filePath(filePath),
@@ -57,77 +57,77 @@ GlfVdbTextureData::GlfVdbTextureData(
 {
 }
 
-GlfVdbTextureData::~GlfVdbTextureData() = default;
+GarchVdbTextureData::~GarchVdbTextureData() = default;
 
 int
-GlfVdbTextureData::NumDimensions() const
+GarchVdbTextureData::NumDimensions() const
 {
     return 3;
 }
 
 GLenum
-GlfVdbTextureData::GLInternalFormat() const {
+GarchVdbTextureData::GLInternalFormat() const {
     return _glInternalFormat;
 };
 
 GLenum
-GlfVdbTextureData::GLFormat() const {
+GarchVdbTextureData::GLFormat() const {
     return _glFormat;
 };
 
 GLenum
-GlfVdbTextureData::GLType() const {
+GarchVdbTextureData::GLType() const {
     return _glType;
 };
 
 size_t
-GlfVdbTextureData::TargetMemory() const
+GarchVdbTextureData::TargetMemory() const
 {
     return _targetMemory;
 }
 
-GlfVdbTextureData::WrapInfo
-GlfVdbTextureData::GetWrapInfo() const {
+GarchVdbTextureData::WrapInfo
+GarchVdbTextureData::GetWrapInfo() const {
     return _wrapInfo;
 }
 
 int
-GlfVdbTextureData::GetNumMipLevels() const {
+GarchVdbTextureData::GetNumMipLevels() const {
     return 1;
 }
 
 size_t
-GlfVdbTextureData::ComputeBytesUsed() const
+GarchVdbTextureData::ComputeBytesUsed() const
 {
     return _size;
 }
 
 size_t
-GlfVdbTextureData::ComputeBytesUsedByMip(int mipLevel) const
+GarchVdbTextureData::ComputeBytesUsedByMip(int mipLevel) const
 {
     return _size;
 }
 
 int
-GlfVdbTextureData::ResizedWidth(int mipLevel) const
+GarchVdbTextureData::ResizedWidth(int mipLevel) const
 {
     return _nativeWidth;
 }
 
 int
-GlfVdbTextureData::ResizedHeight(int mipLevel) const
+GarchVdbTextureData::ResizedHeight(int mipLevel) const
 {
     return _nativeHeight;
 }
 
 int
-GlfVdbTextureData::ResizedDepth(int mipLevel) const
+GarchVdbTextureData::ResizedDepth(int mipLevel) const
 {
     return _nativeDepth;
 }
 
 bool
-GlfVdbTextureData::HasRawBuffer(int mipLevel) const
+GarchVdbTextureData::HasRawBuffer(int mipLevel) const
 {
     return bool(GetRawBuffer(mipLevel));
 }
@@ -142,7 +142,7 @@ GlfVdbTextureData::HasRawBuffer(int mipLevel) const
 // virtual destructor on the base class after the data have been
 // uploaded to the GPU by GlfBaseTexture::_CreateTexture.
 //
-class GlfVdbTextureData_DenseGridHolderBase
+class GarchVdbTextureData_DenseGridHolderBase
 {
 public:
     // Get the bounding box of the tree of the OpenVDB grid
@@ -151,7 +151,7 @@ public:
     // Get the raw data of the dense grid
     virtual const unsigned char * GetData() const = 0;
 
-    virtual ~GlfVdbTextureData_DenseGridHolderBase() = default;
+    virtual ~GarchVdbTextureData_DenseGridHolderBase() = default;
 
 protected:
     // Compute the tree's bounding box of an OpenVDB grid
@@ -173,7 +173,7 @@ namespace {
 
 // Holds on to an OpenVDB dense grid
 template<typename GridType>
-class _DenseGridHolder : public GlfVdbTextureData_DenseGridHolderBase
+class _DenseGridHolder : public GarchVdbTextureData_DenseGridHolderBase
 {
 public:
     using ValueType = typename GridType::ValueType;
@@ -262,7 +262,7 @@ _LoadGridFromFile(openvdb::io::File &f)
     }
 
     const std::string &gridName = f.beginName().gridName();
-    TF_DEBUG(GLF_DEBUG_VDB_TEXTURE).Msg(
+    TF_DEBUG(GARCH_DEBUG_VDB_TEXTURE).Msg(
         "[VdbTextureData] Loading first grid (name: '%s')\n",
         gridName.c_str());
 
@@ -306,12 +306,12 @@ _ToRange3d(const openvdb::CoordBBox &b)
 } // end anonymous namespace
 
 bool
-GlfVdbTextureData::Read(int degradeLevel, bool generateMipmap,
-                        GlfImage::ImageOriginLocation originLocation)
+GarchVdbTextureData::Read(int degradeLevel, bool generateMipmap,
+                        GarchImage::ImageOriginLocation originLocation)
 {   
     TRACE_FUNCTION();
 
-    TF_DEBUG(GLF_DEBUG_VDB_TEXTURE).Msg(
+    TF_DEBUG(GARCH_DEBUG_VDB_TEXTURE).Msg(
         "[VdbTextureData] Path: %s\n", _filePath.c_str());
 
     openvdb::initialize();
@@ -324,7 +324,7 @@ GlfVdbTextureData::Read(int degradeLevel, bool generateMipmap,
     if (openvdb::FloatGrid::Ptr const floatGrid =
             openvdb::gridPtrCast<openvdb::FloatGrid>(grid)) {
 
-        TF_DEBUG(GLF_DEBUG_VDB_TEXTURE).Msg(
+        TF_DEBUG(GARCH_DEBUG_VDB_TEXTURE).Msg(
             "[VdbTextureData] Converting float grid to dense");
         TRACE_SCOPE("Converting to float dense grid");
 
@@ -338,7 +338,7 @@ GlfVdbTextureData::Read(int degradeLevel, bool generateMipmap,
     } else if (openvdb::DoubleGrid::Ptr const doubleGrid =
                    openvdb::gridPtrCast<openvdb::DoubleGrid>(grid)) {
 
-        TF_DEBUG(GLF_DEBUG_VDB_TEXTURE).Msg(
+        TF_DEBUG(GARCH_DEBUG_VDB_TEXTURE).Msg(
             "[VdbTextureData] Converting double grid to dense");
         TRACE_SCOPE("Converting to double dense grid");
 
@@ -352,7 +352,7 @@ GlfVdbTextureData::Read(int degradeLevel, bool generateMipmap,
     } else if (openvdb::Vec3fGrid::Ptr const vec3fGrid =
                    openvdb::gridPtrCast<openvdb::Vec3fGrid>(grid)) {
 
-        TF_DEBUG(GLF_DEBUG_VDB_TEXTURE).Msg(
+        TF_DEBUG(GARCH_DEBUG_VDB_TEXTURE).Msg(
             "[VdbTextureData] Converting vec3f grid to dense");
         TRACE_SCOPE("Converting to vec3f dense grid");
 
@@ -366,7 +366,7 @@ GlfVdbTextureData::Read(int degradeLevel, bool generateMipmap,
     } else if (openvdb::Vec3dGrid::Ptr const vec3dGrid =
                    openvdb::gridPtrCast<openvdb::Vec3dGrid>(grid)) {
 
-        TF_DEBUG(GLF_DEBUG_VDB_TEXTURE).Msg(
+        TF_DEBUG(GARCH_DEBUG_VDB_TEXTURE).Msg(
             "[VdbTextureData] Converting vec3d grid to dense");
         TRACE_SCOPE("Converting to vec3d dense grid");
 
@@ -407,7 +407,7 @@ GlfVdbTextureData::Read(int degradeLevel, bool generateMipmap,
     _nativeHeight = dim.y();
     _nativeDepth  = dim.z();
 
-    TF_DEBUG(GLF_DEBUG_VDB_TEXTURE).Msg(
+    TF_DEBUG(GARCH_DEBUG_VDB_TEXTURE).Msg(
         "[VdbTextureData] Dimensions %d x %d x %d\n",
         _nativeWidth, _nativeHeight, _nativeDepth);
 
@@ -417,7 +417,7 @@ GlfVdbTextureData::Read(int degradeLevel, bool generateMipmap,
 }
 
 unsigned char *
-GlfVdbTextureData::GetRawBuffer(int mipLevel) const
+GarchVdbTextureData::GetRawBuffer(int mipLevel) const
 {
     if (mipLevel > 0) {
         return nullptr;
