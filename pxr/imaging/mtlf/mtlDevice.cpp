@@ -1304,20 +1304,23 @@ void MtlfMetalContext::SetRenderPipelineState()
 
         NSError *error = NULL;
         pipelineState = [currentDevice newRenderPipelineStateWithDescriptor:renderPipelineStateDescriptor error:&error];
+        [renderPipelineStateDescriptor release];
+
         if (!pipelineState) {
             _pipelineMutex.unlock();
             NSLog(@"Failed to created pipeline state, error %@", error);
+            if (error) {
+                [error release];
+            }
             return;
         }
         
         renderPipelineStateMap.emplace(wq->currentRenderPipelineDescriptorHash, pipelineState);
         _pipelineMutex.unlock();
-        
-        [renderPipelineStateDescriptor release];
 
         METAL_INC_STAT(resourceStats.renderPipelineStates);
     }
-  
+
     if (pipelineState != wq->currentRenderPipelineState)
     {
         [wq->currentRenderEncoder setRenderPipelineState:pipelineState];
@@ -1364,6 +1367,8 @@ void MtlfMetalContext::SetDepthStencilState()
         depthStencilStateDescriptor.depthCompareFunction = depthState.depthCompareFunction;
         
         depthStencilState = [currentDevice newDepthStencilStateWithDescriptor:depthStencilStateDescriptor];
+        [depthStencilStateDescriptor release];
+
         if (!depthStencilState) {
             _pipelineMutex.unlock();
             NSLog(@"Failed to created depth stencil state");
@@ -1372,8 +1377,6 @@ void MtlfMetalContext::SetDepthStencilState()
         
         depthStencilStateMap.emplace(wq->currentDepthStencilDescriptorHash, depthStencilState);
         _pipelineMutex.unlock();
-        
-        [depthStencilStateDescriptor release];
         
         METAL_INC_STAT(resourceStats.depthStencilStates);
     }
@@ -1651,17 +1654,19 @@ NSUInteger MtlfMetalContext::SetComputeEncoderState(id<MTLFunction>     computeF
         computePipelineState = [currentDevice newComputePipelineStateWithDescriptor:computePipelineStateDescriptor
                                                                             options:MTLPipelineOptionNone
                                                                          reflection:reflData error:&error];
+        [computePipelineStateDescriptor release];
 
         if (!computePipelineState) {
             _pipelineMutex.unlock();
             NSLog(@"Failed to create compute pipeline state, error %@", error);
+            if (error) {
+                [error release];
+            }
             return 0;
         }
         computePipelineStateMap.emplace(wq->currentComputePipelineDescriptorHash, computePipelineState);
         _pipelineMutex.unlock();
         METAL_INC_STAT(resourceStats.computePipelineStates);
-        
-        [computePipelineStateDescriptor release];
     }
     
     if (computePipelineState != wq->currentComputePipelineState)
@@ -1726,17 +1731,19 @@ id<MTLComputePipelineState> MtlfMetalContext::GetComputeEncoderState(
         computePipelineState = [renderDevices[gpuIndex] newComputePipelineStateWithDescriptor:computePipelineStateDescriptor
                                                                                       options:MTLPipelineOptionNone
                                                                                    reflection:reflData error:&error];
+        [computePipelineStateDescriptor release];
         
         if (!computePipelineState) {
             _pipelineMutex.unlock();
             NSLog(@"Failed to create compute pipeline state, error %@", error);
+            if (error) {
+                [error release];
+            }
             return 0;
         }
         computePipelineStateMap.emplace(hashVal, computePipelineState);
         _pipelineMutex.unlock();
         METAL_INC_STAT(resourceStats.computePipelineStates);
-        
-        [computePipelineStateDescriptor release];
     }
     
     return computePipelineState;
