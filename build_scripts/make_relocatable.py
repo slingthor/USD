@@ -103,7 +103,8 @@ def make_relocatable(install_path, buildPython, qt_path="/usr/local/opt/qt", ver
         devout = sys.stdout
 
     #path of the usd repo folder
-    src_path = os.path.realpath(__file__)[:-34] 
+    file_path = os.path.abspath(__file__)
+    src_path  = os.path.abspath(os.path.join(file_path,"../..")) 
     
     extract_files_recursive(install_path + '/bin/', is_object_file, files)
     extract_files_recursive(install_path + '/lib/', (lambda file: '.so' in file or '.dylib' in file), files)
@@ -134,20 +135,18 @@ def make_relocatable(install_path, buildPython, qt_path="/usr/local/opt/qt", ver
         import PySide2
         import OpenGL
         
-        pyside_path = PySide2.__file__
-        pyside_index = pyside_path.find("__init__.py")
-        pyside_path = pyside_path[:pyside_index]
+        pyside_file = os.path.abspath(PySide2.__file__)
+        pyside_path = os.path.dirname(pyside_file)
 
-        openGL_path = OpenGL.__file__
-        opengl_index = openGL_path.find("__init__.py")
-        openGL_path = openGL_path[:opengl_index]
+        openGL_file = os.path.abspath(OpenGL.__file__)
+        openGL_path = os.path.dirname(openGL_file)
 
         subprocess.call(['chmod', '-R', '+w', install_path + "/lib"],
             stdout=devout)
         
         copy_tree(pyside_path, install_path + "/lib/python/PySide2")
         copy_tree(openGL_path, install_path + "/lib/python/OpenGL")
-        copy_tree(src_path+"/lib/python/shiboken2", install_path+"/lib/python/shiboken2")
+        copy_tree(os.path.dirname(pyside_path) + "/shiboken2", install_path+"/lib/python/shiboken2")
         copy_tree(src_path+"/lib/python/pysideuic", install_path+"/lib/python/pysideuic")
         copy_tree(src_path+"/lib/python/pyside2uic", install_path+"/lib/python/pyside2uic")
         copy(src_path+"/lib/python/pyside-uic", install_path+"/lib/python/pyside-uic")

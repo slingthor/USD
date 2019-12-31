@@ -8,5 +8,6 @@ realpath() {
 BASEPATH=$(dirname "$(realpath "$0")")
 export PATH=$PATH:$BASEPATH/bin:$PATH;
 export PYTHONPATH=$PYTHONPATH:$BASEPATH/lib/python
+export PYTHONPATH=$PYTHONPATH:$BASEPATH/lib/python/PySide2
 
 $SHELL
