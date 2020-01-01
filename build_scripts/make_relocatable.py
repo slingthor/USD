@@ -7,12 +7,14 @@ from os.path import isdir, isfile, join
 from shutil import copy, copyfile
 
 SDKVersion = subprocess.check_output(['xcodebuild', '-version']).strip()[6:10]
-codeSignID = ""
+codeSignIDs = subprocess.check_output(['security', 'find-identity', '-v', '-p', 'codesigning'])
+
+codeSignID = "-"
 if os.environ.get('XCODE_ATTRIBUTE_CODE_SIGN_ID') == "-":
     codeSignID="-"
-elif SDKVersion >= "11.0":
+elif SDKVersion >= "11.0" and codeSignIDs.find("Apple Development") != -1:
     codeSignID="Apple Development"
-else:
+elif codeSignIDs.find("Mac Developer") != -1:
     codeSignID="Mac Developer"
 
 devout = open(os.devnull, 'w')
@@ -113,8 +115,8 @@ def make_relocatable(install_path, buildPython, qt_path="/usr/local/opt/qt", ver
     extract_files_recursive(install_path + '/tests', (lambda file: '.so' in file or '.dylib' in file), files)
     extract_files(install_path + '/tests', (lambda file: isfile(file) and open(file).readline().rstrip()[0] != "#"), files)
 
-    remove_rpath(install_path+ '/lib', files)
-    add_rpath_to_files(install_path+ '/lib/', files)
+    remove_rpath(install_path + '/lib', files)
+    add_rpath_to_files(install_path + '/lib/', files)
     change_absolute_to_relative(files, install_path)
     codesign_files(files)
 
@@ -147,7 +149,7 @@ def make_relocatable(install_path, buildPython, qt_path="/usr/local/opt/qt", ver
         copy_tree(pyside_path, install_path + "/lib/python/PySide2")
         copy_tree(openGL_path, install_path + "/lib/python/OpenGL")
         copy_tree(os.path.dirname(pyside_path) + "/shiboken2", install_path+"/lib/python/shiboken2")
-        copy_tree(src_path+"/lib/python/pysideuic", install_path+"/lib/python/pysideuic")
-        copy_tree(src_path+"/lib/python/pyside2uic", install_path+"/lib/python/pyside2uic")
-        copy(src_path+"/lib/python/pyside-uic", install_path+"/lib/python/pyside-uic")
-        copy(src_path+"/lib/python/pyside2-uic", install_path+"/lib/python/pyside2-uic")
+        copy_tree(src_path + "/lib/python/pysideuic", install_path+"/lib/python/pysideuic")
+        copy_tree(src_path + "/lib/python/pyside2uic", install_path+"/lib/python/pyside2uic")
+        copy(src_path + "/lib/python/pyside-uic", install_path+"/lib/python/pyside-uic")
+        copy(src_path + "/lib/python/pyside2-uic", install_path+"/lib/python/pyside2-uic")
