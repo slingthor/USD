@@ -6,7 +6,7 @@ from distutils.dir_util import copy_tree
 from os.path import isdir, isfile, join
 from shutil import copy, copyfile
 
-SDKVersion = subprocess.check_output(['xcodebuild', '-version']).strip()[6:10]
+SDKVersion  = subprocess.check_output(['xcodebuild', '-version']).strip()[6:10]
 codeSignIDs = subprocess.check_output(['security', 'find-identity', '-v', '-p', 'codesigning'])
 
 codeSignID = "-"
@@ -98,7 +98,7 @@ def replace_string_in_file(path, old_string, new_string):
 
 
 
-def make_relocatable(install_path, buildPython, qt_path="/usr/local/opt/qt", verbose_output=False):
+def make_relocatable(install_path, buildPython, verbose_output=False):
     files = []
     if verbose_output:
         global devout
