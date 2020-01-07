@@ -10,12 +10,12 @@ SDKVersion  = subprocess.check_output(['xcodebuild', '-version']).strip()[6:10]
 codeSignIDs = subprocess.check_output(['security', 'find-identity', '-v', '-p', 'codesigning'])
 
 codeSignID = "-"
-if os.environ.get('XCODE_ATTRIBUTE_CODE_SIGN_ID') == "-":
-    codeSignID="-"
+if os.environ.get('XCODE_ATTRIBUTE_CODE_SIGN_ID'):
+    codeSignID = os.environ.get('XCODE_ATTRIBUTE_CODE_SIGN_ID')
 elif SDKVersion >= "11.0" and codeSignIDs.find("Apple Development") != -1:
-    codeSignID="Apple Development"
+    codeSignID = "Apple Development"
 elif codeSignIDs.find("Mac Developer") != -1:
-    codeSignID="Mac Developer"
+    codeSignID = "Mac Developer"
 
 devout = open(os.devnull, 'w')
 
@@ -55,7 +55,11 @@ def remove_rpath(path, files):
 
 def change_absolute_to_relative(files, path_to_replace, custom_path=""):
     for f in files:
-        otool_output = subprocess.check_output(['otool', '-L', f])
+        otool_output = ""
+        returncode = subprocess.call(['otool', '-L', f], stdout=otool_output)
+
+        if returncode != 0:
+            return
         for line in otool_output.splitlines():
             extracted_path = line.split()[0]
             replace_path_idx = extracted_path.find(path_to_replace)
