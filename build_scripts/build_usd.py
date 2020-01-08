@@ -2251,12 +2251,10 @@ if context.buildImaging:
     requiredDependencies += [OPENEXR, OPENSUBDIV]
     
     if context.enableOpenVDB:
-        # OpenVDB requires Half type from IlmBase which is already
-        # pulled in through OPENEXR.
-        requiredDependencies += [BLOSC, OPENVDB]
+        requiredDependencies += [BLOSC, OPENEXR, OPENVDB]
 		
     if context.buildOIIO:
-        requiredDependencies += [JPEG, TIFF, PNG, OPENIMAGEIO]
+        requiredDependencies += [JPEG, TIFF, PNG, OPENEXR, OPENIMAGEIO]
 
     if context.buildOCIO:
         requiredDependencies += [OPENCOLORIO]
