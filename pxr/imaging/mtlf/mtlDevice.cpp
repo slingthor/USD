@@ -24,6 +24,7 @@
 
 #include "pxr/imaging/mtlf/mtlDevice.h"
 #include "pxr/imaging/mtlf/drawTarget.h"
+#include "pxr/base/tf/getenv.h"
 
 #if defined(ARCH_GFX_OPENGL)
 #include "pxr/imaging/mtlf/glInterop.h"
@@ -214,9 +215,11 @@ void MtlfMetalContext::Init(id<MTLDevice> _device, int width, int height)
 #endif
     renderDevices = NULL;
     
-    //currentDevice = MtlfMetalContext::GetMetalDevice(PREFER_INTEGRATED_GPU);
-    //currentDevice = MtlfMetalContext::GetMetalDevice(PREFER_DISCRETE_GPU);
-    currentDevice = MtlfMetalContext::GetMetalDevice(PREFER_DEFAULT_GPU);
+    if( TfGetenvBool("USD_METAL_USE_INTEGRATED_GPU", false)) {
+        MtlfMetalContext::GetMetalDevice(PREFER_INTEGRATED_GPU);
+    } else {
+        MtlfMetalContext::GetMetalDevice(PREFER_DEFAULT_GPU);
+    }
 
     if (_device != nil) {
         currentDevice = _device;
