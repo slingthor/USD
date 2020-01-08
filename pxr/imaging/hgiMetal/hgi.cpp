@@ -24,8 +24,8 @@
 #include "pxr/imaging/hgiMetal/hgi.h"
 #include "pxr/imaging/hgiMetal/conversions.h"
 #include "pxr/imaging/hgiMetal/diagnostic.h"
+#include "pxr/base/tf/getenv.h"
 #include "pxr/imaging/hgiMetal/texture.h"
-
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -34,8 +34,11 @@ HgiMetal::HgiMetal(id<MTLDevice> device)
 : _device(device)
 {
     if (!_device) {
-        _device = MTLCreateSystemDefaultDevice();
-        //_device = MTLCopyAllDevices()[1];
+       if( TfGetenvBool("USD_METAL_USE_INTEGRATED_GPU", false)) {
+            _device = MTLCopyAllDevices()[1];
+        } else {
+            _device = MTLCreateSystemDefaultDevice();
+        }
     }
 
     HgiMetalSetupMetalDebug();
