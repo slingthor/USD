@@ -24,6 +24,7 @@
 #include "pxr/imaging/hgiMetal/hgi.h"
 #include "pxr/imaging/hgiMetal/conversions.h"
 #include "pxr/imaging/hgiMetal/diagnostic.h"
+#include "pxr/base/tf/getenv.h"
 #include "pxr/imaging/hgiMetal/texture.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
