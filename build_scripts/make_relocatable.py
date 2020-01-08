@@ -56,7 +56,10 @@ def remove_rpath(path, files):
 def change_absolute_to_relative(files, path_to_replace, custom_path=""):
     for f in files:
         otool_output = ""
-        returncode = subprocess.call(['otool', '-L', f], stdout=otool_output)
+
+        p = subprocess.Popen(['otool', '-L', f], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        otool_output, err = p.communicate(b"")
+        returncode = p.returncode
 
         if returncode != 0:
             return
