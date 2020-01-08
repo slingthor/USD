@@ -35,6 +35,7 @@ if (PXR_ENABLE_GL_SUPPORT)
                         GL/persistentBufferGL
                         GL/quadrangulateGL
                         GL/renderDelegateGL
+                        GL/renderPassShaderGL
                         GL/renderPassStateGL
                         GL/resourceBinderGL
                         GL/resourceGL
@@ -69,6 +70,7 @@ if (PXR_ENABLE_METAL_SUPPORT)
                         Metal/persistentBufferMetal
                         Metal/quadrangulateMetal
                         Metal/renderDelegateMetal
+                        Metal/renderPassShaderMetal
                         Metal/renderPassStateMetal
                         Metal/resourceBinderMetal
                         Metal/resourceMetal

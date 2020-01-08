@@ -36,6 +36,7 @@
 #include "pxr/base/gf/vec2i.h"
 #include "pxr/base/gf/vec4d.h"
 #include "pxr/base/tf/debug.h"
+#include "pxr/base/tf/envSetting.h"
 #include "pxr/base/tf/stringUtils.h"
 
 #include <string>
@@ -45,9 +46,8 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 
-GlfSimpleShadowArray::GlfSimpleShadowArray(GfVec2i const & size,
-                                           size_t numLayers) :
-    GarchSimpleShadowArray(size, numLayers),
+GlfSimpleShadowArray::GlfSimpleShadowArray() :
+    GarchSimpleShadowArray(),
     _unbindRestoreDrawFramebuffer(0),
     _unbindRestoreReadFramebuffer(0),
     _unbindRestoreViewport{0,0,0,0}
@@ -56,14 +56,14 @@ GlfSimpleShadowArray::GlfSimpleShadowArray(GfVec2i const & size,
 
 GlfSimpleShadowArray::~GlfSimpleShadowArray()
 {
-    _FreeTextureArray();
+    _FreeResources();
 }
 
 void
 GlfSimpleShadowArray::SetSize(GfVec2i const & size)
 {
     if (_size != size) {
-        _FreeTextureArray();
+        _FreeBindfulTextures();
     }
     GarchSimpleShadowArray::SetSize(size);
 }
@@ -72,7 +72,7 @@ void
 GlfSimpleShadowArray::SetNumLayers(size_t numLayers)
 {
     if (_numLayers != numLayers) {
-        _FreeTextureArray();
+        _FreeBindfulTextures();
     }
     GarchSimpleShadowArray::SetNumLayers(numLayers);
 }
@@ -94,13 +94,6 @@ void GlfSimpleShadowArray::InitCaptureEnvironment(bool   depthBiasEnable,
     glEnable(GL_PROGRAM_POINT_SIZE);
 }
 
-void GlfSimpleShadowArray::DisableCaptureEnvironment()
-{
-    // restore GL states to default
-    glDisable(GL_PROGRAM_POINT_SIZE);
-    glDisable(GL_POLYGON_OFFSET_FILL);
-}
-
 void
 GlfSimpleShadowArray::BeginCapture(size_t index, bool clear)
 {
@@ -113,7 +106,8 @@ GlfSimpleShadowArray::BeginCapture(size_t index, bool clear)
     // save the current viewport
     glGetIntegerv(GL_VIEWPORT, _unbindRestoreViewport);
 
-    glViewport(0, 0, GetSize()[0], GetSize()[1]);
+    GfVec2i resolution = GetShadowMapSize(index);
+    glViewport(0, 0, resolution[0], resolution[1]);
 
     // depth 1.0 means infinity (no occluders).
     // This value is also used as a border color
@@ -130,10 +124,11 @@ GlfSimpleShadowArray::EndCapture(size_t index)
     glDepthRange(0, 1.0);
     glDisable(GL_DEPTH_CLAMP);
 
-    if (TfDebug::IsEnabled(GLF_DEBUG_SHADOW_TEXTURES)) {
+    if (TfDebug::IsEnabled(GLF_DEBUG_DUMP_SHADOW_TEXTURES)) {
         GarchImage::StorageSpec storage;
-        storage.width = GetSize()[0];
-        storage.height = GetSize()[1];
+        GfVec2i resolution = GetShadowMapSize(index);
+        storage.width = resolution[0];
+        storage.height = resolution[1];
         storage.format = GL_DEPTH_COMPONENT;
         storage.type = GL_FLOAT;
 
@@ -176,11 +171,12 @@ GlfSimpleShadowArray::EndCapture(size_t index)
                            index));
         GarchImageSharedPtr image = GarchImage::OpenForWriting(outputImageFile);
         if (image->Write(storage)) {
-            TF_DEBUG(GLF_DEBUG_SHADOW_TEXTURES).Msg(
+            TfDebug::Helper().Msg(
                 "Wrote shadow texture: %s\n", outputImageFile.c_str());
         } else {
-            TF_DEBUG(GLF_DEBUG_SHADOW_TEXTURES).Msg(
-                "Failed to write shadow texture: %s\n", outputImageFile.c_str());
+            TfDebug::Helper().Msg(
+                "Failed to write shadow texture: %s\n", outputImageFile.c_str()
+            );
         }
     }
 
@@ -196,78 +192,179 @@ GlfSimpleShadowArray::EndCapture(size_t index)
 }
 
 void
-GlfSimpleShadowArray::_AllocTextureArray()
+GlfSimpleShadowArray::_AllocResources()
 {
-    GLuint shadowDepthSampler;
-    GLuint shadowCompareSampler;
-    GLuint framebuffer;
-    GLuint texture;
-
-    glGenTextures(1, &texture);
-    glBindTexture(GL_TEXTURE_2D_ARRAY, texture);
-
-    glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_DEPTH_COMPONENT32F,
-                 _size[0], _size[1], _numLayers, 0, 
-                 GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
-
     GLfloat border[] = {1, 1, 1, 1};
-    glGenSamplers(1, &shadowDepthSampler);
-    glSamplerParameteri(shadowDepthSampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glSamplerParameteri(shadowDepthSampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glSamplerParameteri(shadowDepthSampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-    glSamplerParameteri(shadowDepthSampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
-    glSamplerParameterfv(shadowDepthSampler, GL_TEXTURE_BORDER_COLOR, border);
 
-    glGenSamplers(1, &shadowCompareSampler);
-    glSamplerParameteri(shadowCompareSampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glSamplerParameteri(shadowCompareSampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glSamplerParameteri(shadowCompareSampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-    glSamplerParameteri(shadowCompareSampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
-    glSamplerParameterfv(shadowCompareSampler, GL_TEXTURE_BORDER_COLOR, border);
-    glSamplerParameteri(shadowCompareSampler, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_R_TO_TEXTURE );
-    glSamplerParameteri(shadowCompareSampler, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL );
+	if (!_shadowDepthSampler.IsSet()) {
+        GLuint shadowDepthSampler;
+		glGenSamplers(1, &shadowDepthSampler);
+    	glSamplerParameteri(shadowDepthSampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    	glSamplerParameteri(shadowDepthSampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    	glSamplerParameteri(shadowDepthSampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+    	glSamplerParameteri(shadowDepthSampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+    	glSamplerParameterfv(shadowDepthSampler, GL_TEXTURE_BORDER_COLOR, border);
+        _shadowDepthSampler = GarchSamplerGPUHandle(shadowDepthSampler);
 
-    glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
+	}
 
-    glGenFramebuffers(1, &framebuffer);
-    glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+	if (!_shadowCompareSampler.IsSet()) {
+        GLuint shadowCompareSampler;
+    	glGenSamplers(1, &shadowCompareSampler);
+    	glSamplerParameteri(shadowCompareSampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    	glSamplerParameteri(shadowCompareSampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    	glSamplerParameteri(shadowCompareSampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+    	glSamplerParameteri(shadowCompareSampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+    	glSamplerParameterfv(shadowCompareSampler, GL_TEXTURE_BORDER_COLOR, border);
+    	glSamplerParameteri(shadowCompareSampler, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_R_TO_TEXTURE );
+    	glSamplerParameteri(shadowCompareSampler, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL );
+        _shadowCompareSampler = GarchSamplerGPUHandle(shadowCompareSampler);
+	}
+    
+    // Shadow maps
+    if (GetBindlessShadowMapsEnabled()) {
+        _AllocBindlessTextures();
+    } else {
+       _AllocBindfulTextures();
+    }
 
-    glFramebufferTextureLayer(GL_FRAMEBUFFER,
-                              GL_DEPTH_ATTACHMENT, texture, 0, 0);
-
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-    _shadowDepthSampler = (GarchSamplerGPUHandle)(uint64_t)shadowDepthSampler;
-    _shadowCompareSampler = (GarchSamplerGPUHandle)(uint64_t)shadowCompareSampler;
-    _framebuffer = framebuffer;
-    _texture = texture;
+    // Framebuffer
+    if (!_framebuffer.IsSet()) {
+        GLuint framebuffer;
+        glGenFramebuffers(1, &framebuffer);
+        _framebuffer = GarchTextureGPUHandle(framebuffer);
+    }
 }
 
 void
-GlfSimpleShadowArray::_FreeTextureArray()
+GlfSimpleShadowArray::_AllocBindfulTextures()
+{
+    GLuint bindfulTexture;
+    glGenTextures(1, &bindfulTexture);
+    glBindTexture(GL_TEXTURE_2D_ARRAY, _bindfulTexture);
+
+    glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_DEPTH_COMPONENT32F,
+                _size[0], _size[1], _numLayers, 0,
+                GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+    glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
+    
+    _bindfulTexture = GarchTextureGPUHandle(bindfulTexture);
+
+    TF_DEBUG(GLF_DEBUG_SHADOW_TEXTURES).Msg(
+        "Created bindful shadow map texture array with %lu %dx%d textures\n"
+        , _numLayers, _size[0], _size[1]);
+}
+
+void
+GlfSimpleShadowArray::_AllocBindlessTextures()
+{
+    if (!TF_VERIFY(_shadowCompareSampler.IsSet()) ||
+        !TF_VERIFY(_bindlessTextures.empty()) ||
+        !TF_VERIFY(_bindlessTextureHandles.empty())) {
+        TF_CODING_ERROR("Unexpected entry state in %s\n",
+                        TF_FUNC_NAME().c_str());
+        return;
+    }
+
+    // Commenting out the line below results in the residency check in
+    // _FreeBindlessTextures failing.
+    GlfSharedGLContextScopeHolder sharedContextScopeHolder;
+
+    // XXX: Currently, we allocate/reallocate ALL shadow maps each time.
+    for (GfVec2i const& size : _resolutions) {
+        GLuint id;
+        glGenTextures(1, &id);
+        glBindTexture(GL_TEXTURE_2D, id);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32F,
+            size[0], size[1], 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+        _bindlessTextures.push_back(id);
+
+        GLuint64 gpuHandle =
+            glGetTextureSamplerHandleARB(id, _shadowCompareSampler);
+        
+        _bindlessTextureHandles.push_back(gpuHandle);
+
+        if (TF_VERIFY(!glIsTextureHandleResidentARB(gpuHandle))) {
+            glMakeTextureHandleResidentARB(gpuHandle);
+        } else {
+            GLF_POST_PENDING_GL_ERRORS();
+        }
+
+        TF_DEBUG(GLF_DEBUG_SHADOW_TEXTURES).Msg(
+            "Created bindless shadow map texture of size %dx%d "
+            "(id %#x, handle %#llx)\n" , size[0], size[1], id, gpuHandle);
+    }
+
+    glBindTexture(GL_TEXTURE_2D, 0);
+}
+
+void
+GlfSimpleShadowArray::_FreeResources()
 {
     GlfSharedGLContextScopeHolder sharedContextScopeHolder;
-    
-    if (_texture.IsSet()) {
-        GLuint texture = _texture;
-        glDeleteTextures(1, &texture);
-        _texture.Clear();
+
+    if (GetBindlessShadowMapsEnabled()) {
+        _FreeBindlessTextures();
+    } else {
+        _FreeBindfulTextures();
     }
+
     if (_framebuffer.IsSet()) {
-        GLuint framebuffer = _framebuffer;
-        glDeleteFramebuffers(1, &framebuffer);
+        GLuint h = _framebuffer;
+        glDeleteFramebuffers(1, &h);
         _framebuffer.Clear();
     }
     if (_shadowDepthSampler.IsSet()) {
-        GLuint shadowDepthSampler = (GLuint)(uint64_t)_shadowDepthSampler;
-        glDeleteSamplers(1, &shadowDepthSampler);
+        GLuint h = _shadowDepthSampler;
+        glDeleteSamplers(1, &h);
         _shadowDepthSampler.Clear();
     }
     if (_shadowCompareSampler.IsSet()) {
-        GLuint shadowCompareSampler = (GLuint)(uint64_t)_shadowCompareSampler;
-        glDeleteSamplers(1, &shadowCompareSampler);
+        GLuint h = _shadowCompareSampler;
+        glDeleteSamplers(1, &h);
         _shadowCompareSampler.Clear();
     }
+}
+
+void
+GlfSimpleShadowArray::_FreeBindfulTextures()
+{
+    GlfSharedGLContextScopeHolder sharedContextScopeHolder;
+
+    if (_bindfulTexture.IsSet()) {
+        GLuint h = _bindfulTexture;
+        glDeleteTextures(1, &h);
+        _bindfulTexture.Clear();
+    }
+
+    GLF_POST_PENDING_GL_ERRORS();
+}
+
+void
+GlfSimpleShadowArray::_FreeBindlessTextures()
+{
+    GlfSharedGLContextScopeHolder sharedContextScopeHolder;
+    // XXX: Ideally, we don't deallocate all textures, and only those that have
+    // resolution modified.
+
+    if (!_bindlessTextureHandles.empty()) {
+        for (uint64_t handle : _bindlessTextureHandles) {
+            // Handles are made resident on creation.
+            if (TF_VERIFY(glIsTextureHandleResidentARB(handle))) {
+                glMakeTextureHandleNonResidentARB(handle);
+            }
+        }
+        _bindlessTextureHandles.clear();
+    }
+
+    for (GLuint const& id : _bindlessTextures) {
+        if (id) {
+            glDeleteTextures(1, &id);
+        }
+    }
+    _bindlessTextures.clear();
+    
+    GLF_POST_PENDING_GL_ERRORS();
 }
 
 void
@@ -278,13 +375,20 @@ GlfSimpleShadowArray::_BindFramebuffer(size_t index)
     glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING,
                   (GLint*)&_unbindRestoreReadFramebuffer);
 
-    if (!_framebuffer.IsSet() || !_texture.IsSet()) {
-        _AllocTextureArray();
+    if (!_framebuffer.IsSet() || !_ShadowMapExists()) {
+        _AllocResources();
     }
 
     glBindFramebuffer(GL_FRAMEBUFFER, _framebuffer);
-    glFramebufferTextureLayer(GL_FRAMEBUFFER,
-                              GL_DEPTH_ATTACHMENT, _texture, 0, index);
+    if (GetBindlessShadowMapsEnabled()) {
+        glFramebufferTexture(GL_FRAMEBUFFER,
+            GL_DEPTH_ATTACHMENT, _bindlessTextures[index], 0);
+    } else {
+        glFramebufferTextureLayer(GL_FRAMEBUFFER,
+            GL_DEPTH_ATTACHMENT, _bindfulTexture, 0, index);
+    }
+
+    GLF_POST_PENDING_GL_ERRORS();
 }
 
 void
@@ -292,7 +396,10 @@ GlfSimpleShadowArray::_UnbindFramebuffer()
 {
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, _unbindRestoreDrawFramebuffer);
     glBindFramebuffer(GL_READ_FRAMEBUFFER, _unbindRestoreReadFramebuffer);
+
+    GLF_POST_PENDING_GL_ERRORS();
 }
+
 
 PXR_NAMESPACE_CLOSE_SCOPE
 

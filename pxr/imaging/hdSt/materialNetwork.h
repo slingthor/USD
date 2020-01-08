@@ -30,6 +30,8 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+typedef std::unique_ptr<class HioGlslfx> HioGlslfxUniquePtr;
+
 
 /// \class HdStMaterialNetwork
 ///
@@ -65,12 +67,17 @@ public:
     HDST_API
     HdMaterialParamVector const& GetMaterialParams() const;
 
+    /// Primarily used during reload of the material (glslfx may have changed)
+    HDST_API
+    void ClearGlslfx();
+
 private:
     TfToken _materialTag;
     std::string _fragmentSource;
     std::string _geometrySource;
     VtDictionary _materialMetadata;
     HdMaterialParamVector _materialParams;
+    HioGlslfxUniquePtr _surfaceGfx;
 };
 
 

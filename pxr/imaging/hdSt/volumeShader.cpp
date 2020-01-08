@@ -64,10 +64,11 @@ HdSt_VolumeShader::AddBindings(HdBindingRequestVector * const customBindings)
 }
 
 void 
-HdSt_VolumeShader::BindResources(HdSt_ResourceBinder const &binder,
-                                 HdStProgram const &program)
+HdSt_VolumeShader::BindResources(HdStProgram const &program,
+                                 HdSt_ResourceBinder const &binder,
+                                 HdRenderPassState const &state)
 {
-    HdStSurfaceShader::BindResources(binder, program);
+    HdStSurfaceShader::BindResources(program, binder, state);
     
     const int currentRenderSettingsVersion =
         _renderDelegate->GetRenderSettingsVersion();

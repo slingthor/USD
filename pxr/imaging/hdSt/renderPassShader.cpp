@@ -23,10 +23,13 @@
 //
 #include "pxr/imaging/glf/glew.h"
 
+#include "pxr/imaging/hd/aov.h"
 #include "pxr/imaging/hd/binding.h"
 #include "pxr/imaging/hd/engine.h"
 #include "pxr/imaging/hd/perfLog.h"
 #include "pxr/imaging/hd/tokens.h"
+#include "pxr/imaging/hd/renderBuffer.h"
+#include "pxr/imaging/hd/renderPassState.h"
 #include "pxr/imaging/hdSt/package.h"
 #include "pxr/imaging/hdSt/renderPassShader.h"
 
@@ -38,6 +41,14 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+// Name shader uses to read AOV, i.e., shader calls
+// HdGet_AOVNAMEReadback().
+static
+TfToken
+_GetReadbackName(const TfToken &aovName)
+{
+    return TfToken(aovName.GetString() + "Readback");
+}
 
 HdStRenderPassShader::HdStRenderPassShader()
     : HdStShaderCode()
@@ -96,10 +107,12 @@ HdStRenderPassShader::GetSource(TfToken const &shaderStageKey) const
     return _glslfx->GetSource(shaderStageKey);
 }
 
+
 /*virtual*/
 void
-HdStRenderPassShader::BindResources(HdSt_ResourceBinder const &binder,
-                                    HdStProgram const &program)
+HdStRenderPassShader::BindResources(HdStProgram const &program,
+                                    HdSt_ResourceBinder const &binder,
+                                    HdRenderPassState const &state)
 {
     TF_FOR_ALL(it, _customBuffers) {
         binder.Bind(it->second);
@@ -110,10 +123,12 @@ HdStRenderPassShader::BindResources(HdSt_ResourceBinder const &binder,
     binder.BindUniformui(HdShaderTokens->cullStyle, 1, &cullStyle);
 }
 
+
 /*virtual*/
 void
-HdStRenderPassShader::UnbindResources(HdSt_ResourceBinder const &binder,
-                                      HdStProgram const &program)
+HdStRenderPassShader::UnbindResources(HdStProgram const &program,
+                                      HdSt_ResourceBinder const &binder,
+                                      HdRenderPassState const &state)
 {
     TF_FOR_ALL(it, _customBuffers) {
         binder.Unbind(it->second);
@@ -181,5 +196,47 @@ HdStRenderPassShader::AddBindings(HdBindingRequestVector *customBindings)
                          HdTypeUInt32));
 }
 
-PXR_NAMESPACE_CLOSE_SCOPE
+void
+HdStRenderPassShader::AddAovReadback(TfToken const &name)
+{
+    if (_aovReadbackRequests.count(name) > 0) {
+        // Record readback request only once.
+        return;
+    }
 
+    // Add request.
+    _aovReadbackRequests.insert(name);
+
+    // Add read back name to material params so that binding resolution
+    // allocated a sampler unit and codegen generates an accessor
+    // HdGet_NAMEReadback().
+    _params.emplace_back(
+        HdMaterialParam::ParamTypeTexture,
+        _GetReadbackName(name),
+        VtValue(GfVec4f(0.0)),
+        SdfPath(),
+        TfTokenVector(),
+        HdTextureType::Uv);
+}
+
+void
+HdStRenderPassShader::RemoveAovReadback(TfToken const &name)
+{
+    // Remove request.
+    _aovReadbackRequests.erase(name);
+
+    // And the corresponding material param.
+    const TfToken accessorName = _GetReadbackName(name);
+    std::remove_if(
+        _params.begin(), _params.end(),
+        [&accessorName](const HdMaterialParam &p) {
+            return p.name == accessorName; });
+}
+
+HdMaterialParamVector const &
+HdStRenderPassShader::GetParams() const
+{
+    return _params;
+}
+
+PXR_NAMESPACE_CLOSE_SCOPE

@@ -54,6 +54,7 @@ pxr_library(usdImaging
         implicitSurfaceMeshUtils
         instanceAdapter
         lightAdapter
+        lightFilterAdapter
         materialAdapter
         meshAdapter
         nurbsCurvesAdapter

@@ -841,7 +841,7 @@ UsdImagingPointInstancerAdapter::ProcessPropertyChange(UsdPrim const& prim,
         }
 
         if (_PrimvarChangeRequiresResync(
-                prim, cachePath, propertyName, primvarName)) {
+                prim, cachePath, propertyName, primvarName, false)) {
             return HdChangeTracker::AllDirty;
         } else {
             return HdChangeTracker::DirtyPrimvar;
@@ -1791,14 +1791,12 @@ UsdImagingPointInstancerAdapter::GetSubdivTags(UsdPrim const& usdPrim,
 bool
 UsdImagingPointInstancerAdapter::PopulateSelection(
     HdSelection::HighlightMode const& highlightMode,
-    SdfPath const &path,
+    SdfPath const &cachePath,
+    UsdPrim const &usdPrim,
     VtIntArray const &instanceIndices,
     HdSelectionSharedPtr const &result)
 {
-    // XXX(UsdImagingPaths): Is this a Hydra ID? Cache Path? Or UsdPath?
-    // primAdapter.h calls it a usdPath, but clients pass in an rprimPath.
-    //
-    SdfPath indexPath = _ConvertCachePathToIndexPath(path);
+    SdfPath indexPath = _ConvertCachePathToIndexPath(cachePath);
     SdfPathVector const& ids = _GetRprimSubtree(indexPath);
 
     bool added = false;

@@ -156,6 +156,14 @@ struct GarchTextureGPUHandle {
     void Clear() { handle = 0; }
     bool IsSet() const { return handle != 0; }
 
+    GarchTextureGPUHandle() {
+#if defined(ARCH_GFX_METAL)
+        multiTexture.Clear();
+#else
+        handle = NULL;
+#endif
+    }
+
     // OpenGL
 #if defined(ARCH_GFX_OPENGL)
     GarchTextureGPUHandle(GLuint const _handle) {
@@ -178,9 +186,6 @@ struct GarchTextureGPUHandle {
     
 #if defined(ARCH_GFX_METAL)
     // Metal
-    GarchTextureGPUHandle() {
-        multiTexture.Clear();
-    }
     GarchTextureGPUHandle(GarchTextureGPUHandle const & _gpuHandle) {
         multiTexture = _gpuHandle.multiTexture;
     }
@@ -238,6 +243,14 @@ struct GarchSamplerGPUHandle {
     void Clear() { handle = 0; }
     bool IsSet() const { return handle != 0; }
     
+    GarchSamplerGPUHandle() {
+#if defined(ARCH_GFX_METAL)
+        multiSampler.Clear();
+#else
+        handle = NULL;
+#endif
+    }
+
     // OpenGL
 #if defined(ARCH_GFX_OPENGL)
     GarchSamplerGPUHandle(GLuint const _handle) {
@@ -260,9 +273,6 @@ struct GarchSamplerGPUHandle {
 
 #if defined(ARCH_GFX_METAL)
     // Metal
-    GarchSamplerGPUHandle() {
-        multiSampler.Clear();
-    }
     GarchSamplerGPUHandle(GarchSamplerGPUHandle const & _gpuHandle) {
         multiSampler = _gpuHandle.multiSampler;
     }

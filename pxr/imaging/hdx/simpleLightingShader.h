@@ -71,9 +71,13 @@ public:
     HDX_API
     std::string GetSource(TfToken const &shaderStageKey) const override;
     HDX_API
-    void BindResources(HdSt_ResourceBinder const &binder, HdStProgram const &program) override;
+    void BindResources(HdStProgram const &program,
+                       HdSt_ResourceBinder const &binder,
+                       HdRenderPassState const &state) override;
     HDX_API
-    void UnbindResources(HdSt_ResourceBinder const &binder, HdStProgram const &program) override;
+    void UnbindResources(HdStProgram const &program,
+                         HdSt_ResourceBinder const &binder,
+                         HdRenderPassState const &state) override;
     HDX_API
     void AddBindings(HdBindingRequestVector *customBindings) override;
 

@@ -208,7 +208,13 @@ public:
     HDST_API
     virtual HdStProgram *NewProgram(
         TfToken const &role) const override;
+      
+    HDST_API
+    virtual HdStRenderPassShaderSharedPtr NewRenderPassShader() const override;
 
+    HDST_API
+    virtual HdStRenderPassShaderSharedPtr NewRenderPassShader(
+        TfToken const &glslfxFile) const override;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

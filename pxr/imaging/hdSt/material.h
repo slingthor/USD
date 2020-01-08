@@ -26,6 +26,7 @@
 
 #include "pxr/pxr.h"
 #include "pxr/imaging/hdSt/api.h"
+#include "pxr/imaging/hdSt/materialNetwork.h"
 #include "pxr/imaging/hd/material.h"
 #include "pxr/imaging/hf/perfLog.h"
 
@@ -106,8 +107,6 @@ private:
     bool
     _GetHasLimitSurfaceEvaluation(VtDictionary const & metadata) const;
 
-    TfToken _GetMaterialTagDeprecated(VtDictionary const & metadata) const;
-
     void _InitFallbackShader();
 
     static HioGlslfx *_fallbackGlslfx;
@@ -125,6 +124,8 @@ private:
     bool _hasDisplacement : 1;
 
     TfToken _materialTag;
+
+    HdStMaterialNetwork _networkProcessor;
 };
 
 inline HdTextureResource::ID

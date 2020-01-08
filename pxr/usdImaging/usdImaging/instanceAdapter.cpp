@@ -764,7 +764,6 @@ struct UsdImagingInstanceAdapter::_GatherInstanceTransformTimeSamplesFn
                     localTimeSamples.begin(), 
                     localTimeSamples.end());
             }
-
         }
         return true;
     }
@@ -783,6 +782,73 @@ UsdImagingInstanceAdapter::_GatherInstanceTransformsTimeSamples(
     HD_TRACE_FUNCTION();
 
     _GatherInstanceTransformTimeSamplesFn gatherSamples(this, interval);
+    _RunForAllInstancesToDraw(instancer, &gatherSamples);
+    outTimes->swap(gatherSamples.result);
+    return true;
+}
+
+struct UsdImagingInstanceAdapter::_GatherInstancePrimvarTimeSamplesFn
+{
+    _GatherInstancePrimvarTimeSamplesFn(
+        const UsdImagingInstanceAdapter* adapter_,
+        const GfInterval& interval_,
+        TfToken const& key_)
+        : adapter(adapter_), interval(interval_), key(key_)
+    { }
+
+    void Initialize(size_t numInstances)
+    { }
+
+    bool operator()(
+        const std::vector<UsdPrim>& instanceContext, size_t instanceIdx)
+    {
+        SdfPathVector instanceChain;
+        for (UsdPrim const& prim : instanceContext) {
+            instanceChain.push_back(prim.GetPath());
+        }
+        SdfPath instanceChainPath =
+            adapter->_GetPrimPathFromInstancerChain(instanceChain);
+        if (UsdPrim instanceProxyPrim =
+                adapter->_GetPrim(instanceChainPath)) {
+            UsdImaging_InheritedPrimvarStrategy::value_type
+                inheritedPrimvarRecord =
+                    adapter->_GetInheritedPrimvars(instanceProxyPrim);
+            if (inheritedPrimvarRecord) {
+                for (auto const& pv : inheritedPrimvarRecord->primvars) {
+                    if (pv.GetPrimvarName() == key) {
+                        // At this point, pv is the actual primvar attribute
+                        // for this instantiation of instanceContext.
+                        std::vector<double> localTimeSamples;
+                        pv.GetTimeSamplesInInterval(interval, &localTimeSamples);
+
+                        // Join timesamples
+                        result.insert(
+                            result.end(), 
+                            localTimeSamples.begin(), 
+                            localTimeSamples.end());
+                    }
+                }
+            }
+        }
+        return true;
+    }
+
+    const UsdImagingInstanceAdapter* adapter;
+    GfInterval interval;
+    TfToken key;
+    std::vector<double> result;
+};
+
+bool
+UsdImagingInstanceAdapter::_GatherInstancePrimvarTimeSamples(
+    UsdPrim const& instancer,
+    TfToken const& key,
+    GfInterval interval,
+    std::vector<double>* outTimes) const
+{
+    HD_TRACE_FUNCTION();
+
+    _GatherInstancePrimvarTimeSamplesFn gatherSamples(this, interval, key);
     _RunForAllInstancesToDraw(instancer, &gatherSamples);
     outTimes->swap(gatherSamples.result);
     return true;
@@ -1540,34 +1606,63 @@ UsdImagingInstanceAdapter::SamplePrimvar(
             maxNumSamples, sampleTimes, sampleValues);
     }
 
+    GfInterval interval = _GetCurrentTimeSamplingInterval();
+    std::vector<double> timeSamples;
+    SdfValueTypeName type;
+
+    if (key != HdInstancerTokens->instanceTransform) {
+        // "instanceTransform" is built-in and synthesized, but other primvars
+        // need to be in the inherited primvar list. Loop through to check
+        // existence and find the correct type.
+        _InstancerData const* instrData =
+            TfMapLookupPtr(_instancerData, usdPrim.GetPath());
+        if (!instrData) {
+            return 0;
+        }
+        bool found = false;
+        for (auto const& ipv : instrData->inheritedPrimvars) {
+            if (ipv.name == key) {
+                type = ipv.type;
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            return 0;
+        }
+    }
+
     if (key == HdInstancerTokens->instanceTransform) {
-        GfInterval interval = _GetCurrentTimeSamplingInterval();
-        std::vector<double> timeSamples;
         _GatherInstanceTransformsTimeSamples(usdPrim, interval, &timeSamples);
-        timeSamples.push_back(interval.GetMin());
-        timeSamples.push_back(interval.GetMax());
+    } else {
+        _GatherInstancePrimvarTimeSamples(usdPrim, key, interval, &timeSamples);
+    }
 
-        // Sort here
-        std::sort(timeSamples.begin(), timeSamples.end());
-        timeSamples.erase(
-            std::unique(timeSamples.begin(), 
-                timeSamples.end()), 
-                timeSamples.end());
-        size_t numSamples = timeSamples.size();
+    timeSamples.push_back(interval.GetMin());
+    timeSamples.push_back(interval.GetMax());
 
-        size_t numSamplesToEvaluate = std::min(maxNumSamples, numSamples);
-        for (size_t i=0; i < numSamplesToEvaluate; ++i) {
-            sampleTimes[i] = timeSamples[i] - time.GetValue();
+    // Sort here
+    std::sort(timeSamples.begin(), timeSamples.end());
+    timeSamples.erase(
+        std::unique(timeSamples.begin(), 
+            timeSamples.end()), 
+            timeSamples.end());
+    size_t numSamples = timeSamples.size();
+    size_t numSamplesToEvaluate = std::min(maxNumSamples, numSamples);
+
+    for (size_t i=0; i < numSamplesToEvaluate; ++i) {
+        sampleTimes[i] = timeSamples[i] - time.GetValue();
+        if (key == HdInstancerTokens->instanceTransform) {
             VtMatrix4dArray xf;
             _ComputeInstanceTransforms(usdPrim, &xf, timeSamples[i]);
             sampleValues[i] = xf;
+        } else {
+            VtValue val;
+            _ComputeInheritedPrimvar(usdPrim, key, type, &val, timeSamples[i]);
+            sampleValues[i] = val;
         }
-        return numSamples;
-    } else {
-        return UsdImagingPrimAdapter::SamplePrimvar(
-            usdPrim, cachePath, key, time,
-            maxNumSamples, sampleTimes, sampleValues);
     }
+    return numSamples;
 }
 
 PxOsdSubdivTags
@@ -2124,31 +2219,27 @@ struct UsdImagingInstanceAdapter::_PopulateInstanceSelectionFn
 bool
 UsdImagingInstanceAdapter::PopulateSelection(
     HdSelection::HighlightMode const& highlightMode,
-    SdfPath const &instancePath,
+    SdfPath const &cachePath,
+    UsdPrim const &usdPrim,
     VtIntArray const &instanceIndices,
     HdSelectionSharedPtr const &result)
 {
     HD_TRACE_FUNCTION();
 
+    // cachePath points to an actual hydra instancer, so we use it as
+    // instancerPath.  The instance path is usdPrim.
+    SdfPath instancePath = usdPrim.GetPath();
+
     TF_DEBUG(USDIMAGING_SELECTION).Msg(
         "PopulateSelection: instance = %s\n", instancePath.GetText());
 
-    // look for instancePath
-    //
-    // XXX: do we still need to iterate over all instancer?
-    //
-    bool found = false;
-    TF_FOR_ALL (it, _instancerData) {
-        _PopulateInstanceSelectionFn populateFn(
-            this, it->first, instancePath, instanceIndices,
+    _PopulateInstanceSelectionFn populateFn(
+        this, cachePath, instancePath, instanceIndices,
             highlightMode, result);
 
-        _RunForAllInstancesToDraw(_GetPrim(it->first), &populateFn);
+    _RunForAllInstancesToDraw(_GetPrim(cachePath), &populateFn);
 
-        found |= populateFn.found;
-    }
-
-    return found;
+    return populateFn.found;
 }
 
 /*virtual*/

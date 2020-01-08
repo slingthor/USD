@@ -179,7 +179,8 @@ public:
     // ---------------------------------------------------------------------- //
     virtual bool PopulateSelection( 
                                 HdSelection::HighlightMode const& highlightMode,
-                                SdfPath const &path,
+                                SdfPath const &cachePath,
+                                UsdPrim const &usdPrim,
                                 VtIntArray const &instanceIndices,
                                 HdSelectionSharedPtr const &result) override;
 
@@ -246,7 +247,6 @@ private:
     // per-node), and returns whether the instance map is variable.
     // Note: this function assumes the instancer data is already locked by
     // the caller...
-    struct _InstancerData;
     struct _ComputeInstanceMapVariabilityFn;
     bool _ComputeInstanceMapVariability(UsdPrim const& instancerPrim,
                                         _InstancerData const& instrData) const;
@@ -270,6 +270,14 @@ private:
                                               GfInterval interval,
                                               std::vector<double>* outTimes) 
                                                   const;
+
+    // Gathers the specified primvar time samples given an instancer.
+    struct _GatherInstancePrimvarTimeSamplesFn;
+    bool _GatherInstancePrimvarTimeSamples(UsdPrim const& instancer,
+                                           TfToken const& key,
+                                           GfInterval interval,
+                                           std::vector<double>* outTimes) 
+                                               const;
 
     // Returns true if any of the instances corresponding to the given
     // instancer has a varying transform.

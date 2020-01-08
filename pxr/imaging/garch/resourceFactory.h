@@ -71,7 +71,7 @@ public:
     
     // SimpleShadowArray creation
 	GARCH_API
-    virtual GarchSimpleShadowArray *NewSimpleShadowArray(GfVec2i const & size, size_t numLayers) const = 0;
+    virtual GarchSimpleShadowArray *NewSimpleShadowArray() const = 0;
     
     // BindingMap
 	GARCH_API

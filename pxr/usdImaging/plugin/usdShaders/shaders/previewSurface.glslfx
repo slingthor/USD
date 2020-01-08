@@ -52,11 +52,19 @@
  #endif
 #endif
 
+#ifndef GETVALUEINDEX
+ #if defined(ARCH_GFX_METAL)
+  #define GETVALUEINDEX(_val, _index) _val##_Scalar(_index)
+ #else
+  #define GETVALUEINDEX(_val, _index) _val##(_index).x
+ #endif
+#endif
+
 vec4
 displacementShader(int index, vec4 Peye, vec3 Neye, vec4 patchCoord)
 {
     // Calculate scalar displacement.
-    float texDisplacement = GETVALUE(HdGet_displacement);
+    float texDisplacement = GETVALUEINDEX(HdGet_displacement, index);
     return Peye + vec4(Neye*texDisplacement, 0);
 }
 

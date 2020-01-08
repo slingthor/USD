@@ -38,6 +38,7 @@
 #include "pxr/imaging/hdSt/GL/interleavedMemoryBufferGL.h"
 #include "pxr/imaging/hdSt/GL/persistentBufferGL.h"
 #include "pxr/imaging/hdSt/GL/renderPassStateGL.h"
+#include "pxr/imaging/hdSt/GL/renderPassShaderGL.h"
 #include "pxr/imaging/hdSt/GL/resourceBinderGL.h"
 #include "pxr/imaging/hdSt/GL/quadrangulateGL.h"
 #include "pxr/imaging/hdSt/GL/smoothNormalsGL.h"
@@ -258,6 +259,17 @@ HdStResourceFactoryGL::NewDomeLightComputationGPU(
 {
     return new HdSt_DomeLightComputationGPUGL(token, sourceId, destId,
                                                  width, height, numLevels, level, roughness);
+}
+
+HdStRenderPassShaderSharedPtr HdStResourceFactoryGL::NewRenderPassShader() const
+{
+    return boost::make_shared<HdStRenderPassShaderGL>();
+}
+
+HdStRenderPassShaderSharedPtr HdStResourceFactoryGL::NewRenderPassShader(
+    TfToken const &glslfxFile) const
+{
+    return boost::make_shared<HdStRenderPassShaderGL>(glslfxFile);
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

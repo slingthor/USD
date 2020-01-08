@@ -632,7 +632,8 @@ HdxPickResult::_GetNormal(int index) const
 {
     GfVec3f normal = GfVec3f(0);
     if (_neyes != nullptr) {
-        GfVec3f neye = HdVec4f_2_10_10_10_REV(_neyes[index]).GetAsVec<GfVec3f>();
+        GfVec3f neye =
+            HdVec4f_2_10_10_10_REV(_neyes[index]).GetAsVec<GfVec3f>();
         normal = _eyeToWorld.TransformDir(neye);
     }
     return normal;
@@ -663,8 +664,9 @@ HdxPickResult::_ResolveHit(int index, int x, int y, float z,
         ((double)y / _bufferSize[1]) * 2.0 - 1.0,
         ((z - _depthRange[0]) / (_depthRange[1] - _depthRange[0])) * 2.0 - 1.0);
     hit->worldSpaceHitPoint = GfVec3f(_ndcToWorld.Transform(ndcHit));
-    hit->ndcDepth = ndcHit[2];
     hit->worldSpaceHitNormal = _GetNormal(index);
+    hit->normalizedDepth =
+        (z - _depthRange[0]) / (_depthRange[1] - _depthRange[0]);
 
     hit->instanceIndex = _GetInstanceId(index);
     hit->elementIndex = _GetElementId(index);
@@ -888,7 +890,7 @@ HdxPickHit::GetHash() const
     boost::hash_combine(hash, worldSpaceHitNormal[0]);
     boost::hash_combine(hash, worldSpaceHitNormal[1]);
     boost::hash_combine(hash, worldSpaceHitNormal[2]);
-    boost::hash_combine(hash, ndcDepth);
+    boost::hash_combine(hash, normalizedDepth);
     
     return hash;
 }
@@ -896,7 +898,7 @@ HdxPickHit::GetHash() const
 bool
 operator<(HdxPickHit const& lhs, HdxPickHit const& rhs)
 {
-    return lhs.ndcDepth < rhs.ndcDepth;
+    return lhs.normalizedDepth < rhs.normalizedDepth;
 }
 
 bool
@@ -911,7 +913,7 @@ operator==(HdxPickHit const& lhs, HdxPickHit const& rhs)
         && lhs.pointIndex == rhs.pointIndex
         && lhs.worldSpaceHitPoint == rhs.worldSpaceHitPoint
         && lhs.worldSpaceHitNormal == rhs.worldSpaceHitNormal
-        && lhs.ndcDepth == rhs.ndcDepth;
+        && lhs.normalizedDepth == rhs.normalizedDepth;
 }
 
 bool
@@ -932,7 +934,7 @@ operator<<(std::ostream& out, HdxPickHit const& h)
         << "Point: [" << h.pointIndex  << "] "
         << "HitPoint: (" << h.worldSpaceHitPoint << ") "
         << "HitNormal: (" << h.worldSpaceHitNormal << ") "
-        << "Depth: (" << h.ndcDepth << ") ";
+        << "Depth: (" << h.normalizedDepth << ") ";
     return out;
 }
 

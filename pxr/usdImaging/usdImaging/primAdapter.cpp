@@ -402,14 +402,11 @@ UsdImagingPrimAdapter::GetPathForInstanceIndex(
 /*virtual*/
 bool
 UsdImagingPrimAdapter::PopulateSelection(HdSelection::HighlightMode const& mode,
-                                         SdfPath const &usdPath,
+                                         SdfPath const &cachePath,
+                                         UsdPrim const &usdPrim,
                                          VtIntArray const &instanceIndices,
                                          HdSelectionSharedPtr const &result)
 {
-    // XXX(UsdImagingPaths): Is this a Hydra ID? Cache Path? Or UsdPath?
-    // primAdapter.h calls it a usdPath, but clients pass in an rprimPath.
-    //
-    SdfPath const& cachePath = usdPath;
     const SdfPath indexPath = _delegate->ConvertCachePathToIndexPath(cachePath);
 
     // insert itself into the selection map.
@@ -706,13 +703,14 @@ UsdImagingPrimAdapter::_PrimvarChangeRequiresResync(
     }
 
     bool primvarOnPrim = false;
-    UsdGeomPrimvar pv;
+    UsdAttribute attr;
     if (inherited) {
-        pv = UsdGeomPrimvarsAPI(prim).FindPrimvarWithInheritance(propertyName);
+        attr = UsdGeomPrimvarsAPI(prim)
+            .FindPrimvarWithInheritance(propertyName);
     } else {
-        pv = UsdGeomPrimvarsAPI(prim).GetPrimvar(propertyName);
+        attr = prim.GetAttribute(propertyName);
     }
-    if (pv && pv.HasValue()) {
+    if (attr && attr.HasValue()) {
         primvarOnPrim = true;
     }
 

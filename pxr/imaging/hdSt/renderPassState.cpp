@@ -33,6 +33,7 @@
 #include "pxr/imaging/hdSt/renderBuffer.h"
 #include "pxr/imaging/hdSt/renderPassShader.h"
 #include "pxr/imaging/hdSt/renderPassState.h"
+#include "pxr/imaging/hdSt/resourceFactory.h"
 #include "pxr/imaging/hdSt/resourceRegistry.h"
 #include "pxr/imaging/hdSt/shaderCode.h"
 
@@ -61,7 +62,7 @@ TF_DEFINE_PRIVATE_TOKENS(
 
 HdStRenderPassState::HdStRenderPassState()
     : HdRenderPassState()
-    , _renderPassShader(new HdStRenderPassShader())
+    , _renderPassShader(HdStResourceFactory::GetInstance()->NewRenderPassShader())
     , _fallbackLightingShader(new HdSt_FallbackLightingShader())
     , _clipPlanesBufferSize(0)
     , _alphaThresholdCurrent(0)
@@ -351,6 +352,7 @@ HdStRenderPassState::MakeGraphicsEncoderDesc() const
 {
     const size_t maxColorAttachments = 8;
     const HdRenderPassAovBindingVector& aovBindings = GetAovBindings();
+    const bool useMultiSample = GetUseAovMultiSample();
 
     HgiGraphicsEncoderDesc desc;
 
@@ -363,7 +365,8 @@ HdStRenderPassState::MakeGraphicsEncoderDesc() const
         if (!TF_VERIFY(aov.renderBuffer, "Invalid render buffer")) {
             continue;
         }
-        bool multiSampled = aov.renderBuffer->IsMultiSampled();
+
+        bool multiSampled= useMultiSample && aov.renderBuffer->IsMultiSampled();
         HgiTextureHandle hgiTexHandle =
             aov.renderBuffer->GetHgiTextureHandle(multiSampled);
 
@@ -393,8 +396,7 @@ HdStRenderPassState::MakeGraphicsEncoderDesc() const
             attachmentDesc.clearValue = col;
         }
 
-        if (aov.aovName == HdAovTokens->linearDepth ||
-            aov.aovName == HdAovTokens->depth) {
+        if (aov.aovName == HdAovTokens->depth) {
             desc.depthAttachment = std::move(attachmentDesc);
         } else if (TF_VERIFY(desc.colorAttachments.size() < maxColorAttachments, 
                             "Too many aov bindings for color attachments")) 

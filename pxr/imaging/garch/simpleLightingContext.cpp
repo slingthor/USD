@@ -47,6 +47,7 @@ TF_DEFINE_PRIVATE_TOKENS(
     _tokens,
     ((lightingUB, "Lighting"))
     ((shadowUB, "Shadow"))
+    ((bindlessShadowUB, "BindlessShadowSamplers"))
     ((materialUB, "Material"))
     ((shadowSampler, "shadowTexture"))
     ((shadowCompareSampler, "shadowCompareTexture"))
@@ -69,7 +70,7 @@ GarchSimpleLightingContext::New()
 
 GarchSimpleLightingContext::GarchSimpleLightingContext() :
     _shadows(TfCreateRefPtr(
-        GarchSimpleShadowArray::New(GfVec2i(1024, 1024), 0))),
+        GarchSimpleShadowArray::New())),
     _worldToViewMatrix(1.0),
     _projectionMatrix(1.0),
     _sceneAmbient(0.01, 0.01, 0.01, 1.0),
@@ -215,14 +216,20 @@ GarchSimpleLightingContext::InitUniformBlockBindings(
     bindingMap->GetUniformBinding(_tokens->lightingUB);
     bindingMap->GetUniformBinding(_tokens->shadowUB);
     bindingMap->GetUniformBinding(_tokens->materialUB);
+    
+    if (GarchSimpleShadowArray::GetBindlessShadowMapsEnabled()) {
+        bindingMap->GetUniformBinding(_tokens->bindlessShadowUB);
+    }
 }
 
 void
 GarchSimpleLightingContext::InitSamplerUnitBindings(
         GarchBindingMapPtr const &bindingMap) const
 {
-    bindingMap->GetSamplerUnit(_tokens->shadowSampler);
-    bindingMap->GetSamplerUnit(_tokens->shadowCompareSampler);
+    if (!GarchSimpleShadowArray::GetBindlessShadowMapsEnabled()) {
+        bindingMap->GetSamplerUnit(_tokens->shadowSampler);
+        bindingMap->GetSamplerUnit(_tokens->shadowCompareSampler);
+    }
 }
 
 inline void
@@ -259,6 +266,14 @@ GarchSimpleLightingContext::BindUniformBlocks(GarchBindingMapPtr const &bindingM
         _shadowUniformBlock = GarchResourceFactory::GetInstance()->NewUniformBlock("_shadowUniformBlock");
     if (!_materialUniformBlock)
         _materialUniformBlock = GarchResourceFactory::GetInstance()->NewUniformBlock("_materialUniformBlock");
+
+    const bool usingBindlessShadowMaps =
+        GarchSimpleShadowArray::GetBindlessShadowMapsEnabled();
+    
+    if (usingBindlessShadowMaps && !_bindlessShadowlUniformBlock) {
+        _bindlessShadowlUniformBlock =
+            GarchResourceFactory::GetInstance()->NewUniformBlock("_bindlessShadowUniformBlock");
+    }
 
     bool bAlwaysNeedsBinding = GarchResourceFactory::GetInstance()->GetContextCaps().alwaysNeedsBinding;
     
@@ -311,6 +326,25 @@ GarchSimpleLightingContext::BindUniformBlocks(GarchBindingMapPtr const &bindingM
             ShadowMatrix shadow[0];
             ARCH_PRAGMA_POP
         };
+        
+        // Use a uniform buffer block for the array of 64bit bindless handles.
+        //
+        // glf/shaders/simpleLighting.glslfx uses a uvec2 array instead of
+        // uint64_t.
+        // Note that uint64_t has different padding rules depending on the
+        // layout: std140 results in 128bit alignment, while shared (default)
+        // results in 64bit alignment.
+        struct PaddedHandle {
+            uint64_t handle;
+            //uint64_t padding; // Skip padding since we don't need it.
+        };
+
+        struct BindlessShadowSamplers {
+            ARCH_PRAGMA_PUSH
+            ARCH_PRAGMA_ZERO_SIZED_STRUCT
+            PaddedHandle shadowCompareTextures[0];
+            ARCH_PRAGMA_POP
+        };
 
         size_t lightingSize;
         size_t shadowSize;
@@ -330,6 +364,15 @@ GarchSimpleLightingContext::BindUniformBlocks(GarchBindingMapPtr const &bindingM
         memset(shadowData, 0, shadowSize);
         memset(lightingData, 0, lightingSize);
 
+        BindlessShadowSamplers *bindlessHandlesData = nullptr;
+        size_t bindlessHandlesSize = 0;
+        if (usingBindlessShadowMaps) {
+            bindlessHandlesSize = sizeof(PaddedHandle) * numLights;
+            bindlessHandlesData =
+                (BindlessShadowSamplers*)alloca(bindlessHandlesSize);
+            memset(bindlessHandlesData, 0, bindlessHandlesSize);
+        }
+        
         GfMatrix4d viewToWorldMatrix = _worldToViewMatrix.GetInverse();
 
         lightingData->useLighting = _useLighting;
@@ -384,6 +427,19 @@ GarchSimpleLightingContext::BindUniformBlocks(GarchBindingMapPtr const &bindingM
         if (shadowExists || bAlwaysNeedsBinding) {
             _shadowUniformBlock->Update(shadowData, shadowSize);
             _shadowUniformBlockValid = true;
+            
+            if (usingBindlessShadowMaps) {
+                std::vector<uint64_t> const& shadowMapHandles =
+                    _shadows->GetBindlessShadowMapHandles();
+
+                for (size_t i = 0; i < shadowMapHandles.size(); i++) {
+                    bindlessHandlesData->shadowCompareTextures[i].handle
+                        = shadowMapHandles[i];
+                }
+
+                _bindlessShadowlUniformBlock->Update(
+                    bindlessHandlesData, bindlessHandlesSize);
+            }
         }
     }
 
@@ -391,6 +447,11 @@ GarchSimpleLightingContext::BindUniformBlocks(GarchBindingMapPtr const &bindingM
 
     if (shadowExists || bAlwaysNeedsBinding) {
         _shadowUniformBlock->Bind(bindingMap, _tokens->shadowUB);
+        
+        if (usingBindlessShadowMaps) {
+            _bindlessShadowlUniformBlock->Bind(
+                bindingMap, _tokens->bindlessShadowUB);
+        }
     }
 
     if (!_materialUniformBlockValid) {

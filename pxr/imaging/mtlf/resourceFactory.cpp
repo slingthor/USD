@@ -57,9 +57,9 @@ GarchSimpleLightingContext *MtlfResourceFactory::NewSimpleLightingContext() cons
     return new MtlfSimpleLightingContext();
 }
 
-GarchSimpleShadowArray *MtlfResourceFactory::NewSimpleShadowArray(GfVec2i const & size, size_t numLayers) const
+GarchSimpleShadowArray *MtlfResourceFactory::NewSimpleShadowArray() const
 {
-    return new MtlfSimpleShadowArray(size, numLayers);
+    return new MtlfSimpleShadowArray();
 }
 
 GarchBindingMap *MtlfResourceFactory::NewBindingMap() const

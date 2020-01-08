@@ -138,36 +138,6 @@ TF_REGISTRY_FUNCTION(TfEnum)
     TF_ADD_ENUM_NAME(UsdGeomXformCommonAPI::OpPivot);
 };
 
-TF_DEFINE_PRIVATE_TOKENS(
-    _tokens,
-    (pivot)
-    ((xformOpTranslate, "xformOp:translate"))
-    ((xformOpTranslatePivot, "xformOp:translate:pivot"))
-    ((xformOpRotateXYZ, "xformOp:rotateXYZ"))
-    ((xformOpScale, "xformOp:scale"))
-    ((xformOpInvTranslatePivot, "!invert!xformOp:translate:pivot"))
-);
-
-// List of valid rotate op types.
-TF_MAKE_STATIC_DATA(std::set<UsdGeomXformOp::Type>, _validRotateTypes) {
-    *_validRotateTypes = {
-        UsdGeomXformOp::TypeRotateXYZ,
-        UsdGeomXformOp::TypeRotateXZY,
-        UsdGeomXformOp::TypeRotateYXZ,
-        UsdGeomXformOp::TypeRotateYZX,
-        UsdGeomXformOp::TypeRotateZXY,
-        UsdGeomXformOp::TypeRotateZYX
-    };
-}
-
-TF_MAKE_STATIC_DATA(std::set<UsdGeomXformOp::Type>, _validSingleAxisRotateTypes) {
-    *_validSingleAxisRotateTypes = {
-        UsdGeomXformOp::TypeRotateX,
-        UsdGeomXformOp::TypeRotateY,
-        UsdGeomXformOp::TypeRotateZ
-    };
-}
-
 static
 bool
 _GetCommonXformOps(
@@ -287,26 +257,99 @@ _MatricesAreInverses(const GfMatrix4d& matrix1, const GfMatrix4d& matrix2)
     return _IsMatrixIdentity(mult);
 }
 
+static constexpr
+bool
+_IsThreeAxisRotateOpType(UsdGeomXformOp::Type opType)
+{
+    static_assert(
+        UsdGeomXformOp::TypeRotateZYX - UsdGeomXformOp::TypeRotateXYZ == 5,
+        "Exactly six three-axis rotate op types");
+    return opType >= UsdGeomXformOp::TypeRotateXYZ &&
+           opType <= UsdGeomXformOp::TypeRotateZYX;
+}
+
+static constexpr
+bool
+_IsRotateOpType(UsdGeomXformOp::Type opType)
+{
+    static_assert(
+        UsdGeomXformOp::TypeRotateZYX - UsdGeomXformOp::TypeRotateX == 8,
+        "Exactly nine rotate op types");
+    return opType >= UsdGeomXformOp::TypeRotateX &&
+           opType <= UsdGeomXformOp::TypeRotateZYX;
+}
+
+static_assert(_IsRotateOpType(UsdGeomXformOp::TypeRotateX) &&
+             !_IsThreeAxisRotateOpType(UsdGeomXformOp::TypeRotateX), "");
+static_assert(_IsRotateOpType(UsdGeomXformOp::TypeRotateY) &&
+             !_IsThreeAxisRotateOpType(UsdGeomXformOp::TypeRotateY), "");
+static_assert(_IsRotateOpType(UsdGeomXformOp::TypeRotateZ) &&
+             !_IsThreeAxisRotateOpType(UsdGeomXformOp::TypeRotateZ), "");
+static_assert(_IsRotateOpType(UsdGeomXformOp::TypeRotateXYZ) &&
+              _IsThreeAxisRotateOpType(UsdGeomXformOp::TypeRotateXYZ), "");
+static_assert(_IsRotateOpType(UsdGeomXformOp::TypeRotateXZY) &&
+              _IsThreeAxisRotateOpType(UsdGeomXformOp::TypeRotateXZY), "");
+static_assert(_IsRotateOpType(UsdGeomXformOp::TypeRotateYXZ) &&
+              _IsThreeAxisRotateOpType(UsdGeomXformOp::TypeRotateYXZ), "");
+static_assert(_IsRotateOpType(UsdGeomXformOp::TypeRotateYZX) &&
+              _IsThreeAxisRotateOpType(UsdGeomXformOp::TypeRotateYZX), "");
+static_assert(_IsRotateOpType(UsdGeomXformOp::TypeRotateZXY) &&
+              _IsThreeAxisRotateOpType(UsdGeomXformOp::TypeRotateZXY), "");
+static_assert(_IsRotateOpType(UsdGeomXformOp::TypeRotateZYX) &&
+              _IsThreeAxisRotateOpType(UsdGeomXformOp::TypeRotateZYX), "");
+
+static_assert(!_IsRotateOpType(UsdGeomXformOp::TypeTranslate) &&
+              !_IsThreeAxisRotateOpType(UsdGeomXformOp::TypeTranslate), "");
+static_assert(!_IsRotateOpType(UsdGeomXformOp::TypeScale) &&
+              !_IsThreeAxisRotateOpType(UsdGeomXformOp::TypeScale), "");
+
 static
 UsdGeomXformOp::Type
-_GetRotateOpType(const vector<UsdGeomXformOp>& ops,
-                 bool includeSingleAxisTypes=false)
+_GetRotateOpType(const vector<UsdGeomXformOp>& ops)
 {
-    TF_FOR_ALL(it, ops) {
-        if (_validRotateTypes->count(it->GetOpType()))
-            return it->GetOpType();
-        if (includeSingleAxisTypes &&
-                _validSingleAxisRotateTypes->count(it->GetOpType()))
-            return it->GetOpType();
+    for (const UsdGeomXformOp& op : ops) {
+        if (_IsRotateOpType(op.GetOpType())) {
+            return op.GetOpType();
+        }
     }
     return UsdGeomXformOp::TypeRotateXYZ;
 }
 
-static
+/* static */
+UsdGeomXformOp::Type
+UsdGeomXformCommonAPI::ConvertRotationOrderToOpType(
+    RotationOrder rotOrder)
+{
+    switch (rotOrder) {
+        case UsdGeomXformCommonAPI::RotationOrderXYZ: 
+            return UsdGeomXformOp::TypeRotateXYZ;
+        case UsdGeomXformCommonAPI::RotationOrderXZY: 
+            return UsdGeomXformOp::TypeRotateXZY;
+        case UsdGeomXformCommonAPI::RotationOrderYXZ: 
+            return UsdGeomXformOp::TypeRotateYXZ;
+        case UsdGeomXformCommonAPI::RotationOrderYZX: 
+            return UsdGeomXformOp::TypeRotateYZX;
+        case UsdGeomXformCommonAPI::RotationOrderZXY: 
+            return UsdGeomXformOp::TypeRotateZXY;
+        case UsdGeomXformCommonAPI::RotationOrderZYX: 
+            return UsdGeomXformOp::TypeRotateZYX;
+        default:
+            // Should never hit this.
+            TF_CODING_ERROR("Invalid rotation order <%s>.",  
+                TfEnum::GetName(rotOrder).c_str());
+            // Default rotation order is XYZ.
+            return UsdGeomXformOp::TypeRotateXYZ;
+    }
+}
+
+/* static */
 UsdGeomXformCommonAPI::RotationOrder
-_GetRotationOrderFromRotateOpType(const UsdGeomXformOp::Type opType)
+UsdGeomXformCommonAPI::ConvertOpTypeToRotationOrder(
+    UsdGeomXformOp::Type opType)
 {
     switch (opType) {
+        case UsdGeomXformOp::TypeRotateXYZ:
+            return UsdGeomXformCommonAPI::RotationOrderXYZ;
         case UsdGeomXformOp::TypeRotateXZY:
             return UsdGeomXformCommonAPI::RotationOrderXZY;
         case UsdGeomXformOp::TypeRotateYXZ:
@@ -317,25 +360,24 @@ _GetRotationOrderFromRotateOpType(const UsdGeomXformOp::Type opType)
             return UsdGeomXformCommonAPI::RotationOrderZXY;
         case UsdGeomXformOp::TypeRotateZYX:
             return UsdGeomXformCommonAPI::RotationOrderZYX;
-        case UsdGeomXformOp::TypeRotateX:
-        case UsdGeomXformOp::TypeRotateY:
-        case UsdGeomXformOp::TypeRotateZ:
-        case UsdGeomXformOp::TypeRotateXYZ:
         default:
+            TF_CODING_ERROR("'%s' is not a three-axis rotate op type",
+                TfEnum::GetName(opType).c_str());
             // Default rotation order is XYZ.
             return UsdGeomXformCommonAPI::RotationOrderXYZ;
     }
 }
 
-static
-UsdGeomXformCommonAPI::RotationOrder
-_GetRotationOrderFromRotateOp(const UsdGeomXformOp& rotateOp)
+/* static */
+bool
+UsdGeomXformCommonAPI::CanConvertOpTypeToRotationOrder(
+    UsdGeomXformOp::Type opType)
 {
-    if (!rotateOp) {
-        return UsdGeomXformCommonAPI::RotationOrderXYZ;
-    }
-
-    return _GetRotationOrderFromRotateOpType(rotateOp.GetOpType());
+    // _IsThreeAxisRotateOpType must be a separate function because it is
+    // constexpr (so that we can static_assert) but we want to keep the
+    // definition out of the header (constexpr implies inline, so it needs to be
+    // defined where it's declared).
+    return _IsThreeAxisRotateOpType(opType);
 }
 
 // This helper method looks through the given xformOps and returns a vector of
@@ -356,8 +398,7 @@ _GetCommonOpTypesForOpOrder(const vector<UsdGeomXformOp>& xformOps,
     size_t numInverseTranslateOps = 0;
 
     TF_FOR_ALL(it, xformOps) {
-        if (_validRotateTypes->count(it->GetOpType()) ||
-                _validSingleAxisRotateTypes->count(it->GetOpType())) {
+        if (_IsRotateOpType(it->GetOpType())) {
             hasRotateOp = true;
             rotateOpType = it->GetOpType();
         } else if (it->GetOpType() == UsdGeomXformOp::TypeScale) {
@@ -462,7 +503,8 @@ UsdGeomXformCommonAPI::GetXformVectors(
         *pivot = GfVec3f(0.);
     }
 
-    *rotOrder = r ? _GetRotationOrderFromRotateOp(r) : RotationOrderXYZ;
+    *rotOrder = r ? ConvertOpTypeToRotationOrder(r.GetOpType())
+                  : RotationOrderXYZ;
 
     return true;
 }
@@ -491,7 +533,7 @@ UsdGeomXformCommonAPI::GetXformVectorsByAccumulation(
     // Note that we don't currently accumulate rotate ops, so we'll be looking
     // for one xformOp of a particular rotation type. Any xformOp order with
     // multiple rotates will be considered not to conform.
-    const UsdGeomXformOp::Type rotateOpType = _GetRotateOpType(xformOps, true);
+    const UsdGeomXformOp::Type rotateOpType = _GetRotateOpType(xformOps);
 
     // The xformOp order expected by the common API is:
     // {Translate, Translate (pivot), Rotate, Scale, Translate (invert pivot)}
@@ -621,7 +663,9 @@ UsdGeomXformCommonAPI::GetXformVectorsByAccumulation(
     }
 
     if (rotOrder) {
-        *rotOrder = _GetRotationOrderFromRotateOpType(rotateOpType);
+        *rotOrder = CanConvertOpTypeToRotationOrder(rotateOpType)
+            ? ConvertOpTypeToRotationOrder(rotateOpType)
+            : UsdGeomXformCommonAPI::RotationOrderXYZ;
     }
 
     return true;
@@ -637,43 +681,6 @@ bool
 UsdGeomXformCommonAPI::SetResetXformStack(bool resetXformStack) const
 {
     return UsdGeomXformable(GetPrim()).SetResetXformStack(resetXformStack);
-}
-
-static
-UsdGeomXformOp::Type
-_GetXformOpTypeForRotationOrder(UsdGeomXformCommonAPI::RotationOrder rotOrder)
-{
-    switch (rotOrder) {
-        case UsdGeomXformCommonAPI::RotationOrderXYZ: 
-            return UsdGeomXformOp::TypeRotateXYZ;
-        case UsdGeomXformCommonAPI::RotationOrderXZY: 
-            return UsdGeomXformOp::TypeRotateXZY;
-        case UsdGeomXformCommonAPI::RotationOrderYXZ: 
-            return UsdGeomXformOp::TypeRotateYXZ;
-        case UsdGeomXformCommonAPI::RotationOrderYZX: 
-            return UsdGeomXformOp::TypeRotateYZX;
-        case UsdGeomXformCommonAPI::RotationOrderZXY: 
-            return UsdGeomXformOp::TypeRotateZXY;
-        case UsdGeomXformCommonAPI::RotationOrderZYX: 
-            return UsdGeomXformOp::TypeRotateZYX;
-        default:
-            // Should never hit this.
-            TF_CODING_ERROR("Invalid rotation order <%s>.",  
-                TfEnum::GetName(rotOrder).c_str());
-            // Default rotation order is XYZ.
-            return UsdGeomXformOp::TypeRotateXYZ;
-    }
-}
-
-static
-TfToken
-_GetRotateOpNameToken(const vector<UsdGeomXformOp> &ops)
-{
-    TF_FOR_ALL(it, ops) {
-        if (_validRotateTypes->count(it->GetOpType()))
-            return it->GetOpName();
-    }
-    return _tokens->xformOpRotateXYZ;
 }
 
 // Retrieves the XformCommonAPI-compatible component ops for the given xformable
@@ -695,8 +702,6 @@ _GetCommonXformOps(
 {
     TRACE_FUNCTION();
 
-    constexpr int _InvalidIndex = -1;
-
     bool tempResetXformStack;
     std::vector<UsdGeomXformOp> xformOps =
         xformable.GetOrderedXformOps(&tempResetXformStack);
@@ -704,81 +709,101 @@ _GetCommonXformOps(
         return false;
 
     // The expected order is:
-    // {Translate, TranslatePivot, Rotate, Scale, InvTranslatePivot}
-    TfTokenVector opNameTokens = {
-        _tokens->xformOpTranslate,
-        _tokens->xformOpTranslatePivot,
-        _GetRotateOpNameToken(xformOps),
-        _tokens->xformOpScale,
-        _tokens->xformOpInvTranslatePivot
-    };
+    // ["xformOp:translate", "xformOp:translate:pivot", "xformOp:rotateABC",
+    //  "xformOp:scale", "!invert!xformOp:translate:pivot"]
+    auto it = xformOps.begin();
 
-    typedef std::map<TfToken, int> XformOpToIndexMap;
-    XformOpToIndexMap xformOpToIndexMap;
-    // Initialize all indices to _InvalidIndex.
-    TF_FOR_ALL(it, opNameTokens)
-        xformOpToIndexMap[*it] = _InvalidIndex;
+    // This holds the computed attribute name tokens so that we can avoid
+    // hard-coding them.
+    // The name for the rotate op is not computed here because it can vary.
+    static const struct {
+        TfToken translate = UsdGeomXformOp::GetOpName(
+            UsdGeomXformOp::TypeTranslate);
+        TfToken pivot = UsdGeomXformOp::GetOpName(
+            UsdGeomXformOp::TypeTranslate, UsdGeomTokens->pivot);
+        TfToken scale = UsdGeomXformOp::GetOpName(
+            UsdGeomXformOp::TypeScale);
+    } attrNames;
 
-    for(size_t index = 0; index < xformOps.size(); ++index) {
-        const TfToken opName = xformOps[index].GetOpName();
-        XformOpToIndexMap::iterator it = xformOpToIndexMap.find(opName);
-        if (it == xformOpToIndexMap.end()) {
-            // Unknown opname. Hence, incompatible.
-            return false;
-        } else {
-            it->second = index;
-        }
+    // Search one-by-one for the ops in the correct order.
+    // We can skip ops in the "expected" order (that is, all the common ops are
+    // optional) but we can't skip ops in the "actual" order (that is, extra ops
+    // aren't allowed).
+    //
+    // Note, in checks below, avoid using UsdGeomXformOp::GetOpName() because
+    // it will construct strings in the case of an inverted op.
+    UsdGeomXformOp t;
+    if (it != xformOps.end() &&
+            it->GetName() == attrNames.translate &&
+            !it->IsInverseOp()) {
+        t = std::move(*it);
+        ++it;
     }
-    
-    // Verify that the xformOps that do exist are in a compatible order.
-    int lastNonNegativeIndex = _InvalidIndex;
-    TF_FOR_ALL(opNameIt, opNameTokens) {
-        int opIndex = xformOpToIndexMap[*opNameIt];
-        if (opIndex != _InvalidIndex) {    
-            TF_VERIFY(opIndex != lastNonNegativeIndex);
 
-            if (opIndex < lastNonNegativeIndex)
-                return false;
+    UsdGeomXformOp p;
+    if (it != xformOps.end() &&
+            it->GetName() == attrNames.pivot &&
+            !it->IsInverseOp()) {
+        p = std::move(*it);
+        ++it;
+    }
 
-            lastNonNegativeIndex = opIndex;
-        }
+    UsdGeomXformOp r;
+    if (it != xformOps.end() &&
+            UsdGeomXformCommonAPI::CanConvertOpTypeToRotationOrder(
+                it->GetOpType()) &&
+            !it->IsInverseOp()) {
+        r = std::move(*it);
+        ++it;
+    }
+
+    UsdGeomXformOp s;
+    if (it != xformOps.end() &&
+            it->GetName() == attrNames.scale &&
+            !it->IsInverseOp()) {
+        s = std::move(*it);
+        ++it;
+    }
+
+    UsdGeomXformOp pInv;
+    if (it != xformOps.end() &&
+            it->GetName() == attrNames.pivot &&
+            it->IsInverseOp()) {
+        pInv = std::move(*it);
+        ++it;
+    }
+
+    // If we did not reach the end of the xformOps vector, then there were
+    // extra ops that did not match any of the expected ops.
+    // This means that the xformOps vector isn't XformCommonAPI-compatible.
+    if (it != xformOps.end()) {
+        return false;
     }
 
     // Verify that translate pivot and inverse translate pivot are either both 
     // present or both absent.
-    int hasPivotOp = (xformOpToIndexMap[opNameTokens[1]] != _InvalidIndex);
-    int hasInversePivotOp = (xformOpToIndexMap[opNameTokens[4]] != _InvalidIndex);
-    if (hasPivotOp != hasInversePivotOp)
+    if ((bool) p != (bool) pInv) {
         return false;
+    }
 
     if (translateOp) {
-        const int index = xformOpToIndexMap[opNameTokens[0]];
-        *translateOp = (index == _InvalidIndex)
-            ? UsdGeomXformOp() : std::move(xformOps[index]);
+        *translateOp = std::move(t);
     }
 
     if (pivotOp) {
-        const int index = xformOpToIndexMap[opNameTokens[1]];
-        *pivotOp = (index == _InvalidIndex)
-            ? UsdGeomXformOp() : std::move(xformOps[index]);
+        *pivotOp = std::move(p);
     }
 
     if (rotateOp) {
-        const int index = xformOpToIndexMap[opNameTokens[2]];
-        *rotateOp = (index == _InvalidIndex)
-            ? UsdGeomXformOp() : std::move(xformOps[index]);
+        *rotateOp = std::move(r);
     }
     
     if (scaleOp) {
-        const int index = xformOpToIndexMap[opNameTokens[3]];
-        *scaleOp = (index == _InvalidIndex)
-            ? UsdGeomXformOp() : std::move(xformOps[index]);
+        *scaleOp = std::move(s);
     }
 
     if (pivotInvOp) {
-        const int index = xformOpToIndexMap[opNameTokens[4]];
-        *pivotInvOp = (index == _InvalidIndex)
-            ? UsdGeomXformOp() : std::move(xformOps[index]);
+        *pivotInvOp = std::move(pInv);
     }
 
     if (resetXformStack) {
@@ -810,7 +835,7 @@ _GetOrAddCommonXformOps(
 
     // Can't get or add ops on an xformable with incompatible schema.
     UsdGeomXformOp t, p, r, s, pInv;
-    bool resetXformStack;
+    bool resetXformStack = false;
     if (!_GetCommonXformOps(
             xformable, &t, &p, &r, &s, &pInv, &resetXformStack)) {
         TF_WARN("Could not determine xform ops for incompatible xformable <%s>",
@@ -824,7 +849,7 @@ _GetOrAddCommonXformOps(
     // op order if we encounter an error.
     if (createRotate && rotOrder && r) {
         const UsdGeomXformCommonAPI::RotationOrder existingRotOrder =
-            _GetRotationOrderFromRotateOp(r);
+            UsdGeomXformCommonAPI::ConvertOpTypeToRotationOrder(r.GetOpType());
         if (existingRotOrder != *rotOrder) {
             TF_CODING_ERROR("Rotation order mismatch on prim <%s> (%s != %s)",
                 xformable.GetPath().GetText(), 
@@ -846,9 +871,9 @@ _GetOrAddCommonXformOps(
     if (createPivot && !p) {
         addedOps = true;
         p = xformable.AddTranslateOp(
-            UsdGeomXformOp::PrecisionFloat, _tokens->pivot);
+            UsdGeomXformOp::PrecisionFloat, UsdGeomTokens->pivot);
         pInv = xformable.AddTranslateOp(
-            UsdGeomXformOp::PrecisionFloat, _tokens->pivot,
+            UsdGeomXformOp::PrecisionFloat, UsdGeomTokens->pivot,
             /* isInverseOp */ true);
         if (!TF_VERIFY(p && pInv)) {
             return UsdGeomXformCommonAPI::Ops();
@@ -857,7 +882,7 @@ _GetOrAddCommonXformOps(
     if (createRotate && !r) {
         addedOps = true;
         const UsdGeomXformOp::Type rotateOpType = rotOrder
-            ? _GetXformOpTypeForRotationOrder(*rotOrder)
+            ? UsdGeomXformCommonAPI::ConvertRotationOrderToOpType(*rotOrder)
             : UsdGeomXformOp::TypeRotateXYZ;
         r = xformable.AddXformOp(
             rotateOpType, 
@@ -1003,7 +1028,7 @@ UsdGeomXformCommonAPI::GetRotationTransform(
     const UsdGeomXformCommonAPI::RotationOrder rotationOrder)
 {
     const UsdGeomXformOp::Type rotateOpType =
-        _GetXformOpTypeForRotationOrder(rotationOrder);
+        UsdGeomXformCommonAPI::ConvertRotationOrderToOpType(rotationOrder);
     return UsdGeomXformOp::GetOpTransform(rotateOpType, VtValue(rotation));
 }
 

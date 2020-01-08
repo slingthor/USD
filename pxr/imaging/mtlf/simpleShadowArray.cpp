@@ -34,24 +34,21 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 
-MtlfSimpleShadowArray::MtlfSimpleShadowArray(GfVec2i const & size,
-                                           size_t numLayers) :
-    GarchSimpleShadowArray(size, numLayers)
+MtlfSimpleShadowArray::MtlfSimpleShadowArray() :
+    GarchSimpleShadowArray()
 {
-    _AllocSamplers();
 }
 
 MtlfSimpleShadowArray::~MtlfSimpleShadowArray()
 {
-    _FreeSamplers();
-    _FreeTextureArray();
+    _FreeResources();
 }
 
 void
 MtlfSimpleShadowArray::SetSize(GfVec2i const & size)
 {
     if (_size != size) {
-        _FreeTextureArray();
+        _FreeBindfulTextures();
     }
     GarchSimpleShadowArray::SetSize(size);
 }
@@ -60,7 +57,7 @@ void
 MtlfSimpleShadowArray::SetNumLayers(size_t numLayers)
 {
     if (_numLayers != numLayers) {
-        _FreeTextureArray();
+        _FreeBindfulTextures();
     }
     GarchSimpleShadowArray::SetNumLayers(numLayers);
 }
@@ -81,15 +78,6 @@ MtlfSimpleShadowArray::InitCaptureEnvironment(bool   depthBiasEnable,
     // XXX: Move conversion to sync time once Task header becomes private.
     glDepthFunc(depthFunc);
     glEnable(GL_PROGRAM_POINT_SIZE);*/
-}
-
-
-void
-MtlfSimpleShadowArray::DisableCaptureEnvironment()
-{
-    // restore GL states to default
-    /*glDisable(GL_PROGRAM_POINT_SIZE);
-    glDisable(GL_POLYGON_OFFSET_FILL);*/
 }
 
 
@@ -136,44 +124,129 @@ MtlfSimpleShadowArray::EndCapture(size_t)
 }
 
 void
-MtlfSimpleShadowArray::_AllocSamplers()
+MtlfSimpleShadowArray::_AllocResources()
 {
     MtlfMetalContextSharedPtr mtlContext = MtlfMetalContext::GetMetalContext();
-    MTLSamplerDescriptor* samplerDescriptor = [[MTLSamplerDescriptor alloc] init];
-#if defined(ARCH_OS_IOS)
-    samplerDescriptor.tAddressMode = MTLSamplerAddressModeClampToZero;
-    samplerDescriptor.sAddressMode = MTLSamplerAddressModeClampToZero;
-#else
-    samplerDescriptor.tAddressMode = MTLSamplerAddressModeClampToBorderColor;
-    samplerDescriptor.sAddressMode = MTLSamplerAddressModeClampToBorderColor;
-    samplerDescriptor.borderColor = MTLSamplerBorderColorOpaqueWhite;
-#endif
-    samplerDescriptor.minFilter = MTLSamplerMinMagFilterLinear;
-    samplerDescriptor.magFilter = MTLSamplerMinMagFilterLinear;
-    _shadowDepthSampler = MtlfMultiSampler(samplerDescriptor);
     
-    //METAL TODO: Check whether the sampler below is really going to provide the same functionality as the GL sample in the comments.
+    if (!_shadowDepthSampler.IsSet()) {
+        MTLSamplerDescriptor* samplerDescriptor = [[MTLSamplerDescriptor alloc] init];
 #if defined(ARCH_OS_IOS)
-    samplerDescriptor.tAddressMode = MTLSamplerAddressModeClampToZero;
-    samplerDescriptor.sAddressMode = MTLSamplerAddressModeClampToZero;
-    if ([mtlContext->currentDevice supportsFeatureSet:MTLFeatureSet_iOS_GPUFamily3_v1]) {
-        samplerDescriptor.compareFunction = MTLCompareFunctionLessEqual;
-    }
+        samplerDescriptor.tAddressMode = MTLSamplerAddressModeClampToZero;
+        samplerDescriptor.sAddressMode = MTLSamplerAddressModeClampToZero;
 #else
-    samplerDescriptor.tAddressMode = MTLSamplerAddressModeClampToBorderColor;
-    samplerDescriptor.sAddressMode = MTLSamplerAddressModeClampToBorderColor;
-    samplerDescriptor.borderColor = MTLSamplerBorderColorOpaqueWhite;
-    samplerDescriptor.compareFunction = MTLCompareFunctionLessEqual;
+        samplerDescriptor.tAddressMode = MTLSamplerAddressModeClampToBorderColor;
+        samplerDescriptor.sAddressMode = MTLSamplerAddressModeClampToBorderColor;
+        samplerDescriptor.borderColor = MTLSamplerBorderColorOpaqueWhite;
 #endif
-    samplerDescriptor.minFilter = MTLSamplerMinMagFilterLinear;
-    samplerDescriptor.magFilter = MTLSamplerMinMagFilterLinear;
-    _shadowCompareSampler = MtlfMultiSampler(samplerDescriptor);
-    [samplerDescriptor release];
+        samplerDescriptor.minFilter = MTLSamplerMinMagFilterLinear;
+        samplerDescriptor.magFilter = MTLSamplerMinMagFilterLinear;
+        _shadowDepthSampler = MtlfMultiSampler(samplerDescriptor);
+        [samplerDescriptor release];
+    }
+
+    if (!_shadowCompareSampler.IsSet()) {
+        MTLSamplerDescriptor* samplerDescriptor = [[MTLSamplerDescriptor alloc] init];
+        //METAL TODO: Check whether the sampler below is really going to provide the same functionality as the GL sample in the comments.
+#if defined(ARCH_OS_IOS)
+        samplerDescriptor.tAddressMode = MTLSamplerAddressModeClampToZero;
+        samplerDescriptor.sAddressMode = MTLSamplerAddressModeClampToZero;
+        if ([mtlContext->currentDevice supportsFeatureSet:MTLFeatureSet_iOS_GPUFamily3_v1]) {
+            samplerDescriptor.compareFunction = MTLCompareFunctionLessEqual;
+        }
+#else
+        samplerDescriptor.tAddressMode = MTLSamplerAddressModeClampToBorderColor;
+        samplerDescriptor.sAddressMode = MTLSamplerAddressModeClampToBorderColor;
+        samplerDescriptor.borderColor = MTLSamplerBorderColorOpaqueWhite;
+        samplerDescriptor.compareFunction = MTLCompareFunctionLessEqual;
+#endif
+        samplerDescriptor.minFilter = MTLSamplerMinMagFilterLinear;
+        samplerDescriptor.magFilter = MTLSamplerMinMagFilterLinear;
+        _shadowCompareSampler = MtlfMultiSampler(samplerDescriptor);
+        [samplerDescriptor release];
+    }
+    
+    // Shadow maps
+    if (GetBindlessShadowMapsEnabled()) {
+        _AllocBindlessTextures();
+    } else {
+       _AllocBindfulTextures();
+    }
 }
 
 void
-MtlfSimpleShadowArray::_FreeSamplers()
+MtlfSimpleShadowArray::_AllocBindfulTextures()
 {
+    TF_FATAL_CODING_ERROR("Not Implemented");
+
+    /*
+    GLuint bindfulTexture;
+    glGenTextures(1, &bindfulTexture);
+    glBindTexture(GL_TEXTURE_2D_ARRAY, _bindfulTexture);
+
+    glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_DEPTH_COMPONENT32F,
+                _size[0], _size[1], _numLayers, 0,
+                GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+    glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
+    
+    _bindfulTexture = GarchTextureGPUHandle(bindfulTexture);
+
+    TF_DEBUG(GLF_DEBUG_SHADOW_TEXTURES).Msg(
+        "Created bindful shadow map texture array with %lu %dx%d textures\n"
+        , _numLayers, _size[0], _size[1]);
+     */
+}
+
+void
+MtlfSimpleShadowArray::_AllocBindlessTextures()
+{
+    if (!TF_VERIFY(_shadowCompareSampler.IsSet()) ||
+        !TF_VERIFY(_bindlessTextures.empty()) ||
+        !TF_VERIFY(_bindlessTextureHandles.empty())) {
+        TF_CODING_ERROR("Unexpected entry state in %s\n",
+                        TF_FUNC_NAME().c_str());
+        return;
+    }
+
+    TF_FATAL_CODING_ERROR("Not Implemented");
+/*
+    // XXX: Currently, we allocate/reallocate ALL shadow maps each time.
+    for (GfVec2i const& size : _resolutions) {
+        GLuint id;
+        glGenTextures(1, &id);
+        glBindTexture(GL_TEXTURE_2D, id);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32F,
+            size[0], size[1], 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+        _bindlessTextures.push_back(id);
+
+        GLuint64 gpuHandle =
+            glGetTextureSamplerHandleARB(id, _shadowCompareSampler);
+        
+        _bindlessTextureHandles.push_back(gpuHandle);
+
+        if (TF_VERIFY(!glIsTextureHandleResidentARB(gpuHandle))) {
+            glMakeTextureHandleResidentARB(gpuHandle);
+        } else {
+            GLF_POST_PENDING_GL_ERRORS();
+        }
+
+        TF_DEBUG(GLF_DEBUG_SHADOW_TEXTURES).Msg(
+            "Created bindless shadow map texture of size %dx%d "
+            "(id %#x, handle %#llx)\n" , size[0], size[1], id, gpuHandle);
+    }
+
+    glBindTexture(GL_TEXTURE_2D, 0);
+ */
+}
+
+void
+MtlfSimpleShadowArray::_FreeResources()
+{
+    if (GetBindlessShadowMapsEnabled()) {
+        _FreeBindlessTextures();
+    } else {
+        _FreeBindfulTextures();
+    }
+
     if (_shadowDepthSampler.IsSet()) {
         _shadowDepthSampler.multiSampler.release();
         _shadowDepthSampler.Clear();
@@ -185,59 +258,35 @@ MtlfSimpleShadowArray::_FreeSamplers()
 }
 
 void
-MtlfSimpleShadowArray::_AllocTextureArray()
+MtlfSimpleShadowArray::_FreeBindfulTextures()
 {
-    TF_FATAL_CODING_ERROR("Not Implemented");
-    
-    /*
-    glGenTextures(1, &_texture);
-    glBindTexture(GL_TEXTURE_2D_ARRAY, _texture);
+    if (_bindfulTexture.IsSet()) {
+        _bindfulTexture.multiTexture.release();
+        _bindfulTexture.Clear();
+    }
 
-    glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_DEPTH_COMPONENT32F,
-                 _size[0], _size[1], _numLayers, 0, 
-                 GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
-
-    GLfloat border[] = {1, 1, 1, 1};
-
-    glGenSamplers(1, &_shadowDepthSampler);
-    glSamplerParameteri(_shadowDepthSampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glSamplerParameteri(_shadowDepthSampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glSamplerParameteri(_shadowDepthSampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-    glSamplerParameteri(_shadowDepthSampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
-    glSamplerParameterfv(_shadowDepthSampler, GL_TEXTURE_BORDER_COLOR, border);
-
-    glGenSamplers(1, &_shadowCompareSampler);
-    glSamplerParameteri(_shadowCompareSampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glSamplerParameteri(_shadowCompareSampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glSamplerParameteri(_shadowCompareSampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-    glSamplerParameteri(_shadowCompareSampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
-    glSamplerParameterfv(_shadowCompareSampler, GL_TEXTURE_BORDER_COLOR, border);
-    glSamplerParameteri(_shadowCompareSampler, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_R_TO_TEXTURE );
-    glSamplerParameteri(_shadowCompareSampler, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL );
-
-    glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
-
-    glGenFramebuffers(1, &_framebuffer);
-    glBindFramebuffer(GL_FRAMEBUFFER, _framebuffer);
-
-    glFramebufferTextureLayer(GL_FRAMEBUFFER,
-                              GL_DEPTH_ATTACHMENT, _texture, 0, 0);
-
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-*/
+    GLF_POST_PENDING_GL_ERRORS();
 }
 
 void
-MtlfSimpleShadowArray::_FreeTextureArray()
+MtlfSimpleShadowArray::_FreeBindlessTextures()
 {
-    if (_texture.IsSet()) {
-        _texture.multiTexture.release();
-        _texture = nil;
+    // XXX: Ideally, we don't deallocate all textures, and only those that have
+    // resolution modified.
+
+    if (!_bindlessTextureHandles.empty()) {
+        _bindlessTextureHandles.clear();
     }
-    if (_framebuffer.IsSet()) {
-        _framebuffer.multiTexture.release();
-        _framebuffer = nil;
+
+    for (GarchTextureGPUHandle& id : _bindlessTextures) {
+        if (id.IsSet()) {
+            id.multiTexture.release();
+            id.Clear();
+        }
     }
+    _bindlessTextures.clear();
+    
+    GLF_POST_PENDING_GL_ERRORS();
 }
 
 void

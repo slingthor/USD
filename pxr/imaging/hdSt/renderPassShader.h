@@ -52,7 +52,7 @@ public:
     HdStRenderPassShader();
     HDST_API
     HdStRenderPassShader(TfToken const &glslfxFile);
-    HDST_API
+
     virtual ~HdStRenderPassShader() override;
 
     /// HdShader overrides
@@ -61,11 +61,17 @@ public:
     HDST_API
     virtual std::string GetSource(TfToken const &shaderStageKey) const override;
     HDST_API
-    virtual void BindResources(HdSt_ResourceBinder const &binder, HdStProgram const &program) override;
+    virtual void BindResources(HdStProgram const &program,
+                               HdSt_ResourceBinder const &binder,
+                               HdRenderPassState const &state) override;
     HDST_API
-    virtual void UnbindResources(HdSt_ResourceBinder const &binder, HdStProgram const &program) override;
+    virtual void UnbindResources(HdStProgram const &program,
+                                 HdSt_ResourceBinder const &binder,
+                                 HdRenderPassState const &state) override;
     HDST_API
     virtual void AddBindings(HdBindingRequestVector *customBindings) override;
+    HDST_API
+    virtual HdMaterialParamVector const& GetParams() const override;
 
     /// Add a custom binding request for use when this shader executes.
     HDST_API
@@ -79,6 +85,15 @@ public:
     HDST_API
     void ClearBufferBindings();
 
+    /// Add a request to read an AOV back in the shader. The shader can
+    /// access the requested AOV as HdGet_NAMEReadback().
+    HDST_API
+    void AddAovReadback(TfToken const &name);
+
+    /// Remove \p name from requests to read AOVs.
+    HDST_API
+    void RemoveAovReadback(TfToken const &name);
+
     HdCullStyle GetCullStyle() const {
         return _cullStyle;
     }
@@ -87,7 +102,8 @@ public:
         _cullStyle = cullStyle;
     }
 
-private:
+protected:
+
     TfToken _glslfxFile;
     boost::scoped_ptr<HioGlslfx> _glslfx;
     mutable size_t  _hash;
@@ -96,6 +112,8 @@ private:
     TfHashMap<TfToken, HdBindingRequest, TfToken::HashFunctor> _customBuffers;
     HdCullStyle _cullStyle;
 
+    TfHashSet<TfToken, TfToken::HashFunctor> _aovReadbackRequests;
+    HdMaterialParamVector _params;
 
     // No copying
     HdStRenderPassShader(const HdStRenderPassShader &)                     = delete;

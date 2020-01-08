@@ -108,6 +108,12 @@ HdxSimpleLightingShader::GetSource(TfToken const &shaderStageKey) const
     bool useShadows = _useLighting ? _lightingContext->GetUseShadows() : false;
     defineStream << "#define NUM_LIGHTS " << numLights<< "\n";
     defineStream << "#define USE_SHADOWS " << (int)(useShadows) << "\n";
+    if (useShadows) {
+        bool const useBindlessShadowMaps =
+            GarchSimpleShadowArray::GetBindlessShadowMapsEnabled();;
+        defineStream << "#define USE_BINDLESS_SHADOW_TEXTURES "
+                     << int(useBindlessShadowMaps) << "\n";
+    }
 
     return defineStream.str() + source;
 }
@@ -169,8 +175,9 @@ static void _BindToMetal(
 
 /* virtual */
 void
-HdxSimpleLightingShader::BindResources(HdSt_ResourceBinder const &binder,
-                                       HdStProgram const &program)
+HdxSimpleLightingShader::BindResources(HdStProgram const &program,
+                                       HdSt_ResourceBinder const &binder,
+                                       HdRenderPassState const &state)
 {
     static std::mutex _mutex;
     std::lock_guard<std::mutex> lock(_mutex);
@@ -303,8 +310,9 @@ HdxSimpleLightingShader::BindResources(HdSt_ResourceBinder const &binder,
 
 /* virtual */
 void
-HdxSimpleLightingShader::UnbindResources(HdSt_ResourceBinder const &binder,
-                                         HdStProgram const &program)
+HdxSimpleLightingShader::UnbindResources(HdStProgram const &program,
+                                         HdSt_ResourceBinder const &binder,
+                                         HdRenderPassState const &state)
 {
     // XXX: we'd like to use HdSt_ResourceBinder instead of GlfBindingMap.
     //

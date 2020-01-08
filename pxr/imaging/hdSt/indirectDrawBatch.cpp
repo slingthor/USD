@@ -1006,9 +1006,9 @@ HdSt_IndirectDrawBatch::ExecuteDraw(
     // XXX: for surfaces shader, we need to iterate all drawItems to
     //      make textures resident, instead of just the first batchItem
     TF_FOR_ALL(it, shaders) {
-        (*it)->BindResources(binder, *hdStProgram);
+        (*it)->BindResources(*hdStProgram, binder, *renderPassState);
     }
-    
+
     // constant buffer bind
     HdBufferArrayRangeSharedPtr constantBar_ = batchItem->GetConstantPrimvarRange();
     HdBufferArrayRangeSharedPtr constantBar =
@@ -1097,7 +1097,8 @@ HdSt_IndirectDrawBatch::ExecuteDraw(
     binder.BindBufferArray(dispatchBar);
     
     // update geometric shader states
-    program.GetGeometricShader()->BindResources(binder, *hdStProgram);
+    program.GetGeometricShader()->BindResources(
+        *hdStProgram, binder, *renderPassState);
     
     GLuint batchCount = _dispatchBuffer->GetCount();
     
@@ -1131,9 +1132,9 @@ HdSt_IndirectDrawBatch::ExecuteDraw(
     }
     
     TF_FOR_ALL(it, shaders) {
-        (*it)->UnbindResources(binder, *hdStProgram);
+        (*it)->UnbindResources(*hdStProgram, binder, *renderPassState);
     }
-    program.GetGeometricShader()->UnbindResources(binder, *hdStProgram);
+    program.GetGeometricShader()->UnbindResources(*hdStProgram, binder, *renderPassState);
     
     hdStProgram->UnsetProgram();
 }

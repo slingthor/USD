@@ -37,6 +37,7 @@
 #include "pxr/imaging/hd/renderPass.h"
 #include "pxr/imaging/hd/sceneDelegate.h"
 
+#include "pxr/imaging/garch/contextCaps.h"
 #include "pxr/imaging/garch/simpleLight.h"
 
 #include "pxr/base/gf/frustum.h"
@@ -62,10 +63,8 @@ HdxSimpleLightTask::HdxSimpleLightTask(HdSceneDelegate* delegate, SdfPath const&
     , _viewport(0.0f, 0.0f, 0.0f, 0.0f)
     , _material()
     , _sceneAmbient()
-    , _shadows()
     , _simpleLights()
 {
-    _shadows = TfCreateRefPtr(GarchSimpleShadowArray::New(_defaultShadowRes, 0));
 }
 
 HdxSimpleLightTask::~HdxSimpleLightTask()
@@ -111,12 +110,20 @@ HdxSimpleLightTask::Sync(HdSceneDelegate* delegate,
     if (!TF_VERIFY(camera)) {
         return;
     }
-    GarchSimpleLightingContextRefPtr const& lightingContext =
-    _lightingShader->GetLightingContext();
 
+    // The lighting shader owns the lighting context, which in turn owns the
+    // shadow array.
+    GarchSimpleLightingContextRefPtr const& lightingContext = 
+                                    _lightingShader->GetLightingContext(); 
     if (!TF_VERIFY(lightingContext)) {
         return;
     }
+    GarchSimpleShadowArrayRefPtr const& shadows = lightingContext->GetShadows();
+    if (!TF_VERIFY(shadows)) {
+        return;
+    }
+    bool const useBindlessShadowMaps =
+        GarchSimpleShadowArray::GetBindlessShadowMapsEnabled();
 
     // Place lighting context in task context
     (*ctx)[HdxTokens->lightingContext] = lightingContext;
@@ -131,11 +138,6 @@ HdxSimpleLightTask::Sync(HdSceneDelegate* delegate,
 
     // Unique identifier for lights with shadows
     int shadowIndex = -1;
-
-    // Value used to extract the maximum resolution from all shadow maps 
-    // because we need to create an array of shadow maps with the same resolution
-    int maxShadowRes = 0;
-
 
     // Extract all light paths for each type of light
     static const TfTokenVector lightTypes = 
@@ -163,6 +165,9 @@ HdxSimpleLightTask::Sync(HdSceneDelegate* delegate,
         _simpleLights.shrink_to_fit();
         _simpleLights.reserve(_numLights);
     }
+
+    std::vector<GfVec2i> shadowMapResolutions;
+    shadowMapResolutions.reserve(_numLights);
 
     TF_FOR_ALL (lightPerTypeIt, _lightIds) {
         TF_FOR_ALL (lightPathIt, lightPerTypeIt->second) {
@@ -232,7 +237,9 @@ HdxSimpleLightTask::Sync(HdSceneDelegate* delegate,
                 garchl.SetShadowBias(lightShadowParams.bias);
                 garchl.SetShadowBlur(lightShadowParams.blur);
                 garchl.SetShadowResolution(lightShadowParams.resolution);
-                maxShadowRes = GfMax(maxShadowRes, garchl.GetShadowResolution());
+
+                shadowMapResolutions.push_back(
+                    GfVec2i(lightShadowParams.resolution));
             }
         }
     }
@@ -249,8 +256,19 @@ HdxSimpleLightTask::Sync(HdSceneDelegate* delegate,
     // the shadow array needed in the lighting context in 
     // order to receive shadows
     // These calls will re-allocate internal buffers if they change.
-    _shadows->SetSize(GfVec2i(maxShadowRes, maxShadowRes));
-    _shadows->SetNumLayers(shadowIndex + 1);
+
+    if (useBindlessShadowMaps) {
+        shadows->SetShadowMapResolutions(shadowMapResolutions);
+    } else {
+        // Bindful shadow maps use a texture array, and hence are limited to
+        // a single resolution. Use the maximum authored resolution.
+        int maxRes = 0;
+        for (GfVec2i const& res : shadowMapResolutions) {
+            maxRes = std::max(maxRes, res[0]);
+        }
+        shadows->SetSize(GfVec2i(maxRes, maxRes));
+        shadows->SetNumLayers(shadowIndex + 1);
+    }
 
     if (shadowIndex > -1) {
         for (size_t lightId = 0; lightId < _numLights; ++lightId) {
@@ -260,13 +278,12 @@ HdxSimpleLightTask::Sync(HdSceneDelegate* delegate,
             // Complete the shadow setup for this light
             int shadowId = _simpleLights[lightId].GetShadowIndex();
 
-            _shadows->SetViewMatrix(shadowId,
+            shadows->SetViewMatrix(shadowId,
                 _simpleLights[lightId].GetTransform());
-            _shadows->SetProjectionMatrix(shadowId,
+            shadows->SetProjectionMatrix(shadowId,
                 _simpleLights[lightId].GetShadowMatrix());
         }
     }
-    lightingContext->SetShadows(_shadows);
 
     *dirtyBits = HdChangeTracker::Clean;
 }

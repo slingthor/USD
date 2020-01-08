@@ -84,6 +84,11 @@ MtlfSimpleLightingContext::InitSamplerUnitBindings(GarchBindingMapPtr const &bin
 void
 MtlfSimpleLightingContext::BindSamplers(GarchBindingMapPtr const &bindingMap)
 {
+    if (GarchSimpleShadowArray::GetBindlessShadowMapsEnabled()) {
+        // Bindless shadow maps are made resident on creation.
+        return;
+    }
+
     MtlfBindingMap::MTLFBindingIndex shadowTexture(bindingMap->GetSamplerUnit(_tokens->shadowSampler));
     MtlfBindingMap::MTLFBindingIndex shadowCompareTexture(bindingMap->GetSamplerUnit(_tokens->shadowCompareSampler));
     MtlfBindingMap::MTLFBindingIndex shadowSampler(bindingMap->GetSamplerUnit(_tokens->shadowSamplerMetalSampler));

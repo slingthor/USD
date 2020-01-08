@@ -101,7 +101,9 @@ HdSt_GeometricShader::GetSource(TfToken const &shaderStageKey) const
 }
 
 void
-HdSt_GeometricShader::BindResources(HdSt_ResourceBinder const &binder, HdStProgram const &program)
+HdSt_GeometricShader::BindResources(HdStProgram const &program,
+                                    HdSt_ResourceBinder const &binder,
+                                    HdRenderPassState const &state)
 {
     if (_cullStyle != HdCullStyleDontCare) {
         unsigned int cullStyle = _cullStyle;
@@ -126,7 +128,9 @@ HdSt_GeometricShader::BindResources(HdSt_ResourceBinder const &binder, HdStProgr
 }
 
 void
-HdSt_GeometricShader::UnbindResources(HdSt_ResourceBinder const &binder, HdStProgram const &program)
+HdSt_GeometricShader::UnbindResources(HdStProgram const &program,
+                                      HdSt_ResourceBinder const &binder,
+                                      HdRenderPassState const &state)
 {
 #if defined(ARCH_GFX_OPENGL)
 //    if (_polygonMode == HdPolygonModeLine) {

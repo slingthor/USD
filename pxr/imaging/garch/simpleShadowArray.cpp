@@ -28,21 +28,24 @@
 
 #include "pxr/base/gf/vec2i.h"
 #include "pxr/base/gf/vec4d.h"
+#include "pxr/base/tf/debug.h"
+#include "pxr/base/tf/envSetting.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-GarchSimpleShadowArray* GarchSimpleShadowArray::New(GfVec2i const & size, size_t numLayers)
+TF_DEFINE_ENV_SETTING(GARCH_ENABLE_BINDLESS_SHADOW_TEXTURES, false,
+                      "Enable use of bindless shadow maps");
+
+GarchSimpleShadowArray* GarchSimpleShadowArray::New()
 {
-    return GarchResourceFactory::GetInstance()->NewSimpleShadowArray(size, numLayers);
+    return GarchResourceFactory::GetInstance()->NewSimpleShadowArray();
 }
 
-GarchSimpleShadowArray::GarchSimpleShadowArray(GfVec2i const & size,
-                                           size_t numLayers) :
-    _size(size),
-    _numLayers(numLayers),
-    _viewMatrix(_numLayers),
-    _projectionMatrix(_numLayers),
-    _shadowDepthSampler(),
+GarchSimpleShadowArray::GarchSimpleShadowArray() :
+    _size(0),
+    _numLayers(0),
+    // common state
+    _framebuffer(),
     _shadowCompareSampler()
 {
 }
@@ -51,29 +54,42 @@ GarchSimpleShadowArray::~GarchSimpleShadowArray()
 {
 }
 
-GfVec2i
-GarchSimpleShadowArray::GetSize() const
+/*static*/
+bool
+GarchSimpleShadowArray::GetBindlessShadowMapsEnabled()
 {
-    return _size;
+    // Note: We do not test the GL context caps for the availability of the
+    // bindless texture and int64 extensions.
+    static bool usingBindlessShadowMaps =
+        TfGetEnvSetting(GARCH_ENABLE_BINDLESS_SHADOW_TEXTURES);
+
+    return usingBindlessShadowMaps;
 }
 
+// --------- (public) Bindful API ----------
 void
 GarchSimpleShadowArray::SetSize(GfVec2i const & size)
 {
+    if (GetBindlessShadowMapsEnabled()) {
+        TF_CODING_ERROR("Using bindful API %s when bindless "
+            "shadow maps are enabled\n", TF_FUNC_NAME().c_str());
+        return;
+    }
     if (_size != size) {
+        _FreeBindfulTextures();
         _size = size;
     }
-}
-
-size_t
-GarchSimpleShadowArray::GetNumLayers() const
-{
-    return _numLayers;
 }
 
 void
 GarchSimpleShadowArray::SetNumLayers(size_t numLayers)
 {
+    if (GetBindlessShadowMapsEnabled()) {
+        TF_CODING_ERROR("Using bindful API %s when bindless "
+            "shadow maps are enabled\n", TF_FUNC_NAME().c_str());
+        return;
+    }
+
     if (_numLayers != numLayers) {
         _viewMatrix.resize(numLayers, GfMatrix4d().SetIdentity());
         _projectionMatrix.resize(numLayers, GfMatrix4d().SetIdentity());
@@ -132,19 +148,99 @@ GarchSimpleShadowArray::GetWorldToShadowMatrix(size_t index) const
 GarchTextureGPUHandle
 GarchSimpleShadowArray::GetShadowMapTexture() const
 {
-    return _texture;
+    if (GetBindlessShadowMapsEnabled()) {
+        TF_CODING_ERROR("Using bindful API in %s when bindless "
+            "shadow maps are enabled\n",  TF_FUNC_NAME().c_str());
+        return GarchTextureGPUHandle();
+    }
+    return _bindfulTexture;
 }
 
 GarchSamplerGPUHandle
 GarchSimpleShadowArray::GetShadowMapDepthSampler() const
 {
+    if (GetBindlessShadowMapsEnabled()) {
+        TF_CODING_ERROR("Using bindful API in %s when bindless "
+            "shadow maps are enabled\n",  TF_FUNC_NAME().c_str());
+        return GarchSamplerGPUHandle();
+    }
     return _shadowDepthSampler;
 }
 
 GarchSamplerGPUHandle
 GarchSimpleShadowArray::GetShadowMapCompareSampler() const
 {
+    if (GetBindlessShadowMapsEnabled()) {
+        TF_CODING_ERROR("Using bindful API in %s when bindless "
+            "shadow maps are enabled\n",  TF_FUNC_NAME().c_str());
+        return GarchSamplerGPUHandle();
+    }
     return _shadowCompareSampler;
+}
+
+// --------- (public) Bindless API ----------
+void
+GarchSimpleShadowArray::SetShadowMapResolutions(
+    std::vector<GfVec2i> const& resolutions)
+{
+    if (_resolutions == resolutions) {
+        return;
+    }
+
+    _resolutions = resolutions;
+
+    _FreeBindlessTextures();
+
+    size_t numShadowMaps = _resolutions.size();
+    if (_viewMatrix.size() != numShadowMaps ||
+        _projectionMatrix.size() != numShadowMaps) {
+        _viewMatrix.resize(numShadowMaps, GfMatrix4d().SetIdentity());
+        _projectionMatrix.resize(numShadowMaps, GfMatrix4d().SetIdentity());
+    }
+
+}
+
+std::vector<uint64_t> const&
+GarchSimpleShadowArray::GetBindlessShadowMapHandles() const
+{
+    return _bindlessTextureHandles;
+}
+
+// --------- (public) Common API ----------
+size_t
+GarchSimpleShadowArray::GetNumShadowMapPasses() const
+{
+    // In both the bindful and bindless cases, we require one pass per shadow
+    // map.
+    if (GetBindlessShadowMapsEnabled()) {
+        return _resolutions.size();
+    } else {
+        return _numLayers;
+    }
+}
+
+GfVec2i
+GarchSimpleShadowArray::GetShadowMapSize(size_t index) const
+{
+    GfVec2i shadowMapSize(0);
+    if (GetBindlessShadowMapsEnabled()) {
+        if (TF_VERIFY(index < _resolutions.size())) {
+            shadowMapSize = _resolutions[index];
+        }
+    } else {
+        // In the bindful case, all shadow map textures use the same size.
+        shadowMapSize = _size;
+    }
+
+    return shadowMapSize;
+}
+
+// --------- private helpers ----------
+bool
+GarchSimpleShadowArray::_ShadowMapExists() const
+{
+    return GetBindlessShadowMapsEnabled() ? !_bindlessTextures.empty() :
+                                             _bindfulTexture.IsSet();
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

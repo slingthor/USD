@@ -73,18 +73,26 @@ HdStVolume::HdStVolume(SdfPath const& id, SdfPath const & instancerId)
 
 HdStVolume::~HdStVolume() = default;
 
+// Dirty bits requiring recomputing the material shader and the
+// bounding box.
+static const int _shaderAndBBoxComputationDirtyBitsMask =
+    HdChangeTracker::Clean 
+    | HdChangeTracker::DirtyExtent
+    | HdChangeTracker::DirtyMaterialId
+    | HdChangeTracker::DirtyRepr
+    | HdChangeTracker::DirtyVolumeField;
+
+static const int _initialDirtyBitsMask =
+    _shaderAndBBoxComputationDirtyBitsMask
+    | HdChangeTracker::DirtyPrimID
+    | HdChangeTracker::DirtyPrimvar
+    | HdChangeTracker::DirtyTransform
+    | HdChangeTracker::DirtyVisibility;
+
 HdDirtyBits 
 HdStVolume::GetInitialDirtyBitsMask() const
 {
-    int mask = HdChangeTracker::Clean
-        | HdChangeTracker::DirtyExtent
-        | HdChangeTracker::DirtyPrimID
-        | HdChangeTracker::DirtyRepr
-        | HdChangeTracker::DirtyTransform
-        | HdChangeTracker::DirtyVisibility
-        | HdChangeTracker::DirtyPrimvar
-        | HdChangeTracker::DirtyMaterialId
-        ;
+    int mask = _initialDirtyBitsMask;
 
     if (!GetInstancerId().IsEmpty()) {
         mask |= HdChangeTracker::DirtyInstancer;
@@ -306,6 +314,8 @@ HdStVolume::_ComputeMaterialShaderAndBBox(
 {
     // The bounding box containing all fields.
     GfBBox3d totalFieldBbox;
+    // Does the material have any field readers.
+    bool hasField = false;
 
     HdStResourceRegistrySharedPtr resourceRegistry =
         boost::static_pointer_cast<HdStResourceRegistry>(
@@ -332,6 +342,7 @@ HdStVolume::_ComputeMaterialShaderAndBBox(
     for (const auto & param : volumeShader->GetParams()) {
         if (param.IsField()) {
             // Process field readers.
+            hasField = true;
 
             // Determine the field name the field reader requests
             TfTokenVector const &samplerCoordinates =
@@ -449,9 +460,9 @@ HdStVolume::_ComputeMaterialShaderAndBBox(
         }
     }
 
-    // If there was a field, update the local volume bbox to be
+    // If there was a field reader, update the local volume bbox to be
     // the bounding box containing all fields.
-    if (!totalFieldBbox.GetRange().IsEmpty()) {
+    if (hasField) {
         *localVolumeBBox = totalFieldBbox;
     }
 
@@ -521,8 +532,14 @@ VtValue
 _GetCubeVertices(GfBBox3d const &bbox)
 {
     const GfMatrix4d &transform = bbox.GetMatrix();
-    const GfVec3d &min = bbox.GetRange().GetMin();
-    const GfVec3d &max = bbox.GetRange().GetMax();
+    const GfRange3d &range = bbox.GetRange();
+    const bool isEmpty = range.IsEmpty();
+    
+    // Use vertices of a cube shrunk to point for empty bounding box
+    // (to avoid min and max being large floating point numbers).
+
+    const GfVec3d &min = isEmpty ? GfVec3d(0,0,0) : range.GetMin();
+    const GfVec3d &max = isEmpty ? GfVec3d(0,0,0) : range.GetMax();
 
     const float minX = min[0];
     const float minY = min[1];
@@ -589,6 +606,17 @@ HdStVolume::_UpdateDrawItem(HdSceneDelegate *sceneDelegate,
                                   HdInterpolationConstant);
     HdStPopulateConstantPrimvars(this, &_sharedData, sceneDelegate, drawItem, 
         dirtyBits, constantPrimvars);
+
+    // The rest of this method is computing the material shader and the vertices
+    // and topology of the bounding box. We can skip it unless the material, any
+    // of the parameters or the fields have changed.
+    //
+    // XXX:
+    // We might separate the material shader and bounding box computation and
+    // do a finer grained sync.
+    if (!((*dirtyBits) & _shaderAndBBoxComputationDirtyBitsMask)) {
+        return;
+    }
 
     /* FIELDS */
     const _NameToFieldResource nameToFieldResource =

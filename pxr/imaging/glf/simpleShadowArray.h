@@ -51,9 +51,7 @@ public:
                                         float  depthBiasConstantFactor,
                                         float  depthBiasSlopeFactor,
                                         GLenum depthFunc) override;
-    GLF_API
-    virtual void DisableCaptureEnvironment() override;
-    
+
     GLF_API
     virtual void BeginCapture(size_t index, bool clear) override;
     GLF_API
@@ -61,16 +59,20 @@ public:
 
 protected:
     GLF_API
-    GlfSimpleShadowArray(GfVec2i const & size, size_t numLayers);
+    GlfSimpleShadowArray();
     GLF_API
     virtual ~GlfSimpleShadowArray();
 
     friend class GlfResourceFactory;
+
+    virtual void _AllocResources();
+    virtual void _AllocBindfulTextures();
+    virtual void _AllocBindlessTextures();
+    virtual void _FreeResources();
+    virtual void _FreeBindfulTextures();
+    virtual void _FreeBindlessTextures();
     
 private:
-    void _AllocTextureArray();
-    void _FreeTextureArray();
-
     void _BindFramebuffer(size_t index);
     void _UnbindFramebuffer();
 

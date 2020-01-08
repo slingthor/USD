@@ -55,7 +55,7 @@ public:
     
     // GarchSimpleShadowArray creation
     GLF_API
-    virtual GarchSimpleShadowArray *NewSimpleShadowArray(GfVec2i const & size, size_t numLayers) const override;
+    virtual GarchSimpleShadowArray *NewSimpleShadowArray() const override;
     
     // GarchBindingMap creation
     GLF_API

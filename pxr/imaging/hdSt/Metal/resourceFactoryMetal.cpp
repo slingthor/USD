@@ -39,6 +39,7 @@
 #include "pxr/imaging/hdSt/Metal/interleavedMemoryBufferMetal.h"
 #include "pxr/imaging/hdSt/Metal/mslProgram.h"
 #include "pxr/imaging/hdSt/Metal/persistentBufferMetal.h"
+#include "pxr/imaging/hdSt/Metal/renderPassShaderMetal.h"
 #include "pxr/imaging/hdSt/Metal/renderPassStateMetal.h"
 #include "pxr/imaging/hdSt/Metal/resourceBinderMetal.h"
 #include "pxr/imaging/hdSt/Metal/quadrangulateMetal.h"
@@ -261,6 +262,17 @@ HdStResourceFactoryMetal::NewDomeLightComputationGPU(
 {
     return new HdSt_DomeLightComputationGPUMetal(token, sourceId, destId,
                     width, height, numLevels, level, roughness);
+}
+
+HdStRenderPassShaderSharedPtr HdStResourceFactoryMetal::NewRenderPassShader() const
+{
+    return boost::make_shared<HdStRenderPassShaderMetal>();
+}
+
+HdStRenderPassShaderSharedPtr HdStResourceFactoryMetal::NewRenderPassShader(
+    TfToken const &glslfxFile) const
+{
+    return boost::make_shared<HdStRenderPassShaderMetal>(glslfxFile);
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

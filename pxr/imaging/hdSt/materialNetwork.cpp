@@ -41,7 +41,6 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-typedef std::unique_ptr<HioGlslfx> HioGlslfxUniquePtr;
 
 TF_DEFINE_PRIVATE_TOKENS(
     _tokens,
@@ -209,6 +208,8 @@ _GetGlslfxForTerminal(
     HioGlslfxUniquePtr& glslfxOut,
     TfToken const& nodeTypeId)
 {
+    HD_TRACE_FUNCTION();
+
     // If there is a URI, we will use that, otherwise we will try to use
     // the source code.
     SdrRegistry &shaderReg = SdrRegistry::GetInstance();
@@ -218,6 +219,14 @@ _GetGlslfxForTerminal(
     if (sdrNode) {
         std::string const& glslfxFilePath = sdrNode->GetResolvedSourceURI();
         if (!glslfxFilePath.empty()) {
+
+            // It is slow to go to disk and load the glslfx file. We don't want
+            // to do this every time the material is dirtied.
+            // XXX We need a way to force reload the same glslfx.
+            if (glslfxOut && glslfxOut->GetFilePath() == glslfxFilePath) {
+                return;
+            }
+
             glslfxOut.reset(new HioGlslfx(glslfxFilePath));
         } else {
             std::string const& sourceCode = sdrNode->GetSourceCode();
@@ -710,8 +719,10 @@ static HdMaterialParamVector
 _GatherMaterialParams(
     HdSt_MaterialNetwork const& network,
     HdSt_MaterialNode const& node,
-    HioGlslfxUniquePtr const& glslfx)
+    HioGlslfxUniquePtr const& glslfx) 
 {
+    HD_TRACE_FUNCTION();
+
     // Hydra Storm currently supports two material configurations.
     // A custom glslfx file or a PreviewSurface material network.
     // Either configuration consists of a terminal (Shader or PreviewSurface)
@@ -782,6 +793,13 @@ HdStMaterialNetwork::ProcessMaterialNetwork(
     SdfPath const& materialId,
     HdMaterialNetworkMap const& hdNetworkMap)
 {
+    HD_TRACE_FUNCTION();
+
+    _fragmentSource.clear();
+    _geometrySource.clear();
+    _materialMetadata.clear();
+    _materialParams.clear();
+
     HdSt_MaterialNetwork surfaceNetwork;
 
     // The fragment source comes from the 'surface' network or the
@@ -803,27 +821,26 @@ HdStMaterialNetwork::ProcessMaterialNetwork(
             _GetTerminalNode(materialId, surfaceNetwork)) 
     {
         // Extract the glslfx and metadata for surface/volume.
-        HioGlslfxUniquePtr surfaceGfx;
-        _GetGlslfxForTerminal(surfaceGfx, surfTerminal->nodeTypeId);
-        if (surfaceGfx) {
+        _GetGlslfxForTerminal(_surfaceGfx, surfTerminal->nodeTypeId);
+        if (_surfaceGfx) {
 
             // If the glslfx file is not valid we skip parsing the network.
             // This produces no fragmentSource which means Storm's material
             // will use the fallback shader.
 
-            if (surfaceGfx->IsValid()) {
-                _fragmentSource = isVolume ? surfaceGfx->GetVolumeSource() :
-                    surfaceGfx->GetSurfaceSource();
-                _materialMetadata = surfaceGfx->GetMetadata();
+            if (_surfaceGfx->IsValid()) {
+                _fragmentSource = isVolume ? _surfaceGfx->GetVolumeSource() : 
+                    _surfaceGfx->GetSurfaceSource();
+                _materialMetadata = _surfaceGfx->GetMetadata();
                 _materialTag= _GetMaterialTag(_materialMetadata, *surfTerminal);
                 _materialParams = _GatherMaterialParams(
-                    surfaceNetwork, *surfTerminal, surfaceGfx);
+                    surfaceNetwork, *surfTerminal, _surfaceGfx);
 
                 // OSL networks have a displacement network in hdNetworkMap
                 // under terminal: HdMaterialTerminalTokens->displacement.
                 // For Storm however we expect the displacement shader to be
                 // provided via the surface glslfx / terminal.
-                _geometrySource = surfaceGfx->GetDisplacementSource();
+                _geometrySource = _surfaceGfx->GetDisplacementSource();
             }
         }
     }
@@ -859,4 +876,11 @@ HdStMaterialNetwork::GetMaterialParams() const
     return _materialParams;
 }
 
+void
+HdStMaterialNetwork::ClearGlslfx()
+{
+    _surfaceGfx.reset();
+}
+
 PXR_NAMESPACE_CLOSE_SCOPE
+

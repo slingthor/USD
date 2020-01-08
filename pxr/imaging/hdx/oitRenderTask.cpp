@@ -50,10 +50,10 @@ PXR_NAMESPACE_OPEN_SCOPE
 HdxOitRenderTask::HdxOitRenderTask(HdSceneDelegate* delegate, SdfPath const& id)
     : HdxRenderTask(delegate, id)
     , _oitTranslucentRenderPassShader(
-        boost::make_shared<HdStRenderPassShader>(
+        HdStResourceFactory::GetInstance()->NewRenderPassShader(
             HdxPackageRenderPassOitShader()))
     , _oitOpaqueRenderPassShader(
-        boost::make_shared<HdStRenderPassShader>(
+        HdStResourceFactory::GetInstance()->NewRenderPassShader(
             HdxPackageRenderPassOitOpaqueShader()))
     , _isOitEnabled(HdxOitBufferAccessor::IsOitEnabled())
 {
@@ -158,6 +158,11 @@ HdxOitRenderTask::Execute(HdTaskContext* ctx)
         extendedState->GetCullStyle());
     _oitTranslucentRenderPassShader->SetCullStyle(
         extendedState->GetCullStyle());
+
+    // We want OIT to render into the resolve aov, not the multi sample aov.
+    // This assumes a 'resolve' task has been run between rendering the opaque
+    // prims and translucent prims. See HdxTaskController::GetRenderingTasks().
+    renderPassState->SetUseAovMultiSample(false);
 
     //
     // Opaque pixels pass

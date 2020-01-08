@@ -37,6 +37,7 @@
 #include "pxr/imaging/hdSt/package.h"
 #include "pxr/imaging/hdSt/renderPassShader.h"
 #include "pxr/imaging/hdSt/renderPassState.h"
+#include "pxr/imaging/hdSt/resourceFactory.h"
 
 #include "pxr/imaging/cameraUtil/conformWindow.h"
 
@@ -55,10 +56,10 @@ HdxRenderSetupTask::HdxRenderSetupTask(HdSceneDelegate* delegate, SdfPath const&
     , _cameraId()
     , _aovBindings()
 {
-    _colorRenderPassShader.reset(
-        new HdStRenderPassShader(HdxPackageRenderPassShader()));
-    _idRenderPassShader.reset(
-        new HdStRenderPassShader(HdxPackageRenderPassIdShader()));
+    _colorRenderPassShader = HdStResourceFactory::GetInstance()->NewRenderPassShader(
+        HdxPackageRenderPassShader());
+    _idRenderPassShader = HdStResourceFactory::GetInstance()->NewRenderPassShader(
+        HdxPackageRenderPassIdShader());
 }
 
 HdxRenderSetupTask::~HdxRenderSetupTask()

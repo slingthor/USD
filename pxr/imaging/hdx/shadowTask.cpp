@@ -47,7 +47,7 @@
 #include "pxr/imaging/hdSt/resourceFactory.h"
 
 #include "pxr/imaging/garch/simpleLightingContext.h"
-
+#include "pxr/imaging/garch/contextCaps.h"
 #include "pxr/imaging/glf/diagnostic.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -172,7 +172,7 @@ HdxShadowTask::Sync(HdSceneDelegate* delegate,
         for (size_t passId = _renderPassStates.size();
              passId < _passes.size(); passId++) {
             HdStRenderPassShaderSharedPtr renderPassShadowShader
-                (new HdStRenderPassShader(HdxPackageRenderPassShadowShader()));
+                (HdStResourceFactory::GetInstance()->NewRenderPassShader(HdxPackageRenderPassShadowShader()));
             HdRenderPassStateSharedPtr renderPassState
                 (HdStResourceFactory::GetInstance()->NewRenderPassState(renderPassShadowShader));
 
@@ -196,18 +196,21 @@ HdxShadowTask::Sync(HdSceneDelegate* delegate,
 
     
     // This should always be true.
-    TF_VERIFY(_passes.size() == shadows->GetNumLayers());
+    TF_VERIFY(_passes.size() == shadows->GetNumShadowMapPasses());
 
     // But if it is not then we still have to make sure we don't
     // buffer overrun here.
     const size_t shadowCount = 
-        std::min(shadows->GetNumLayers(), _passes.size());
+        std::min(shadows->GetNumShadowMapPasses(), _passes.size());
     for(size_t passId = 0; passId < shadowCount; passId++) {
+
+        GfVec2i shadowMapRes = shadows->GetShadowMapSize(passId);
+
         // Move the camera to the correct position to take the shadow map
         _renderPassStates[passId]->SetCameraFramingState( 
             shadows->GetViewMatrix(passId), 
             shadows->GetProjectionMatrix(passId),
-            GfVec4d(0,0,shadows->GetSize()[0],shadows->GetSize()[1]),
+            GfVec4d(0,0,shadowMapRes[0], shadowMapRes[1]),
             HdRenderPassState::ClipPlanesVector());
 
         _passes[passId]->Sync();
@@ -261,7 +264,7 @@ HdxShadowTask::Execute(HdTaskContext* ctx)
     // The TF_VERIFY is in Sync for making sure they match but we handle
     // failure gracefully here.
     const size_t shadowCount =
-        std::min(shadows->GetNumLayers(), _passes.size());
+        std::min(shadows->GetNumShadowMapPasses(), _passes.size());
     for(size_t shadowId = 0; shadowId < shadowCount; shadowId++) {
 
         // Bind the framebuffer that will store shadowId shadow map

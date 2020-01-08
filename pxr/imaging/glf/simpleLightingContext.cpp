@@ -67,6 +67,11 @@ GlfSimpleLightingContext::~GlfSimpleLightingContext()
 void
 GlfSimpleLightingContext::BindSamplers(GarchBindingMapPtr const &bindingMap)
 {
+    if (GarchSimpleShadowArray::GetBindlessShadowMapsEnabled()) {
+        // Bindless shadow maps are made resident on creation.
+        return;
+    }
+
     int shadowSampler = bindingMap->GetSamplerUnit(_tokens->shadowSampler);
     int shadowCompareSampler = bindingMap->GetSamplerUnit(_tokens->shadowCompareSampler);
     
@@ -89,6 +94,11 @@ GlfSimpleLightingContext::BindSamplers(GarchBindingMapPtr const &bindingMap)
 void
 GlfSimpleLightingContext::UnbindSamplers(GarchBindingMapPtr const &bindingMap)
 {
+    if (GarchSimpleShadowArray::GetBindlessShadowMapsEnabled()) {
+        // We leave the bindless shadow maps as always resident.
+        return;
+    }
+
     int shadowSampler = bindingMap->GetSamplerUnit(_tokens->shadowSampler);
     int shadowCompareSampler = bindingMap->GetSamplerUnit(_tokens->shadowCompareSampler);
 

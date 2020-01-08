@@ -56,8 +56,6 @@ public:
                                         float  depthBiasConstantFactor,
                                         float  depthBiasSlopeFactor,
                                         GLenum depthFunc) override;
-    MTLF_API
-    virtual void DisableCaptureEnvironment() override;
 
     MTLF_API
     virtual void BeginCapture(size_t index, bool clear) override;
@@ -66,19 +64,20 @@ public:
 
 protected:
     MTLF_API
-    MtlfSimpleShadowArray(GfVec2i const & size, size_t numLayers);
+    MtlfSimpleShadowArray();
     MTLF_API
     virtual ~MtlfSimpleShadowArray();
 
     friend class MtlfResourceFactory;
+    
+    virtual void _AllocResources();
+    virtual void _AllocBindfulTextures();
+    virtual void _AllocBindlessTextures();
+    virtual void _FreeResources();
+    virtual void _FreeBindfulTextures();
+    virtual void _FreeBindlessTextures();
 
 private:
-    void _AllocTextureArray();
-    void _FreeTextureArray();
-	
-    void _AllocSamplers();
-    void _FreeSamplers();
-
     void _BindFramebuffer(size_t index);
     void _UnbindFramebuffer();
 };

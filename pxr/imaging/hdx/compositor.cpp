@@ -52,7 +52,8 @@ namespace {
         depthIn = 1,
         position = 2,
         uvIn = 3,
-        remapDepthIn = 4
+
+        NUM_LOCATIONS
     };
 }
 
@@ -106,11 +107,11 @@ HdxCompositor::_CreateShaderResources(bool useDepthProgram)
 //    TF_FATAL_CODING_ERROR("Not Implemented!"); //MTL_FIXME
 
     GLuint programId = boost::dynamic_pointer_cast<HdStGLSLProgram>(_compositorProgram)->GetGLProgram();
+    _locations.resize(NUM_LOCATIONS);
     _locations[colorIn]  = glGetUniformLocation(programId, "colorIn");
     _locations[depthIn]  = glGetUniformLocation(programId, "depthIn");
     _locations[position] = glGetAttribLocation(programId, "position");
     _locations[uvIn]     = glGetAttribLocation(programId, "uvIn");
-    _locations[remapDepthIn] = glGetUniformLocation(programId, "remapDepthIn");
 #endif
 }
 
@@ -232,7 +233,7 @@ HdxCompositor::UpdateDepth(int width, int height, uint8_t *data)
 }
 
 void 
-HdxCompositor::Draw(GLuint colorId, GLuint depthId, bool remapDepth)
+HdxCompositor::Draw(GLuint colorId, GLuint depthId)
 {
     // No-op if no color data was specified.
     if (colorId == 0) {
@@ -277,8 +278,6 @@ HdxCompositor::Draw(GLuint colorId, GLuint depthId, bool remapDepth)
         glUniform1i(_locations[depthIn], 1);
     }
 
-    glUniform1i(_locations[remapDepthIn], (GLint)remapDepth);
-
     glBindBuffer(GL_ARRAY_BUFFER, _vertexBuffer);
     glVertexAttribPointer(_locations[position], 4, GL_FLOAT, GL_FALSE,
             sizeof(float)*6, 0);
@@ -317,9 +316,7 @@ HdxCompositor::Draw(GLuint colorId, GLuint depthId, bool remapDepth)
 void
 HdxCompositor::Draw()
 {
-    // we default remapDepth to true because RmMan/Embree give us depth
-    // in the -1, 1 range.
-    Draw(_colorTexture, _depthTexture, /*remapDepth*/ true);
+    Draw(_colorTexture, _depthTexture);
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

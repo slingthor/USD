@@ -135,6 +135,7 @@ protected:
     GarchUniformBlockRefPtr _lightingUniformBlock;
     GarchUniformBlockRefPtr _shadowUniformBlock;
     GarchUniformBlockRefPtr _materialUniformBlock;
+    GarchUniformBlockRefPtr _bindlessShadowlUniformBlock;
 
     bool _lightingUniformBlockValid;
     bool _shadowUniformBlockValid;

@@ -54,6 +54,8 @@ typedef std::vector<HdStShaderCodeSharedPtr> HdStShaderCodeSharedPtrVector;
 typedef boost::shared_ptr<class HdStTextureResourceHandle>
                 HdStTextureResourceHandleSharedPtr;
 
+class HdRenderPassState;
+
 
 /// \class HdStShaderCode
 ///
@@ -118,12 +120,14 @@ public:
     /// Binds shader-specific resources to \a program
     /// XXX: this interface is meant to be used for bridging
     /// the GlfSimpleLightingContext mechanism, and not for generic use-cases.
-    virtual void BindResources(HdSt_ResourceBinder const &binder,
-                               HdStProgram const &program) = 0;
+    virtual void BindResources(HdStProgram const &program,
+                               HdSt_ResourceBinder const &binder,
+                               HdRenderPassState const &state) = 0;
 
     /// Unbinds shader-specific resources.
-    virtual void UnbindResources(HdSt_ResourceBinder const &binder,
-                                 HdStProgram const &program) = 0;
+    virtual void UnbindResources(HdStProgram const &program,
+                                 HdSt_ResourceBinder const &binder,
+                                 HdRenderPassState const &state) = 0;
 
     /// Add custom bindings (used by codegen)
     virtual void AddBindings(HdBindingRequestVector* customBindings) = 0;

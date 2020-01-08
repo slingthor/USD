@@ -36,6 +36,7 @@
 #include "pxr/imaging/hd/renderPassState.h"
 #include "pxr/imaging/hd/rprimCollection.h"
 #include "pxr/imaging/hd/sceneDelegate.h"
+#include "pxr/imaging/hd/tokens.h"
 
 #include "pxr/imaging/hdSt/lightingShader.h"
 #include "pxr/imaging/hdSt/renderPassShader.h"
@@ -47,10 +48,13 @@ HdxOitVolumeRenderTask::HdxOitVolumeRenderTask(
                 HdSceneDelegate* delegate, SdfPath const& id)
     : HdxRenderTask(delegate, id)
     , _oitVolumeRenderPassShader(
-        boost::make_shared<HdStRenderPassShader>(
-            HdxPackageRenderPassOitShader()))
+        HdStResourceFactory::GetInstance()->NewRenderPassShader(
+                HdxPackageRenderPassOitShader()))
     , _isOitEnabled(HdxOitBufferAccessor::IsOitEnabled())
 {
+    // Raymarching shader needs to stop when hitting opaque geometry,
+    // so allow shader to read the depth buffer.
+    _oitVolumeRenderPassShader->AddAovReadback(HdAovTokens->depth);
 }
 
 HdxOitVolumeRenderTask::~HdxOitVolumeRenderTask() = default;
@@ -150,6 +154,11 @@ HdxOitVolumeRenderTask::Execute(HdTaskContext* ctx)
     // set cullStyle.
     _oitVolumeRenderPassShader->SetCullStyle(
         renderPassState->GetCullStyle());
+
+    // We want OIT to render into the resolve aov, not the multi sample aov.
+    // This assumes a 'resolve' task has been run between rendering the opaque
+    // prims and volume prims. See HdxTaskController::GetRenderingTasks().
+    renderPassState->SetUseAovMultiSample(false);
 
     //
     // Translucent pixels pass

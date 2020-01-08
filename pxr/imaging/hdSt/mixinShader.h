@@ -68,12 +68,16 @@ public:
     virtual HdBufferArrayRangeSharedPtr const& GetShaderData() const override;
 
     /// Binds shader-specific resources to \a program
-    virtual void BindResources(HdSt_ResourceBinder const &binder,
-                               HdStProgram const &program) override;
+    HDST_API
+    virtual void BindResources(HdStProgram const &program,
+                               HdSt_ResourceBinder const &binder,
+                               HdRenderPassState const &state) override;
 
     /// Unbinds shader-specific resources.
-    virtual void UnbindResources(HdSt_ResourceBinder const &binder,
-                                 HdStProgram const &program) override;
+    HDST_API
+    virtual void UnbindResources(HdStProgram const &program,
+                                 HdSt_ResourceBinder const &binder,
+                                 HdRenderPassState const &state) override;
 
     /// Add custom bindings (used by codegen)
     virtual void AddBindings(HdBindingRequestVector* customBindings) override;

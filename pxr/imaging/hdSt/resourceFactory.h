@@ -244,6 +244,14 @@ public:
     HDST_API
     virtual HdStProgram *NewProgram(
         TfToken const &role) const = 0;
+    
+    HDST_API
+    virtual HdStRenderPassShaderSharedPtr NewRenderPassShader() const = 0;
+
+    HDST_API
+    virtual HdStRenderPassShaderSharedPtr NewRenderPassShader(
+        TfToken const &glslfxFile) const = 0;
+
 
 protected:
     HDST_API

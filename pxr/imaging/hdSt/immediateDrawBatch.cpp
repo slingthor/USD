@@ -147,7 +147,7 @@ HdSt_ImmediateDrawBatch::ExecuteDraw(
     bool hasOverrideShader = bool(renderPassState->GetOverrideShader());
 
     TF_FOR_ALL(it, shaders) {
-        (*it)->BindResources(binder, *gpuProgram);
+        (*it)->BindResources(*gpuProgram, binder, *renderPassState);
     }
 
     HdBufferArrayRangeSharedPtr indexBarCurrent;
@@ -164,7 +164,7 @@ HdSt_ImmediateDrawBatch::ExecuteDraw(
     // all batch item should have the same geometric shader.
     HdSt_GeometricShaderSharedPtr const &geometricShader
         = program.GetGeometricShader();
-    geometricShader->BindResources(binder, *gpuProgram);
+    geometricShader->BindResources(*gpuProgram, binder, *renderPassState);
 
     size_t numItemsDrawn = 0;
     TF_FOR_ALL(drawItemIt, _drawItemInstances) {
@@ -309,7 +309,8 @@ HdSt_ImmediateDrawBatch::ExecuteDraw(
         // shader textures
         //
         if (!hasOverrideShader && program.GetSurfaceShader()) {
-            program.GetSurfaceShader()->BindResources(binder, *gpuProgram);
+            program.GetSurfaceShader()->BindResources(
+                *gpuProgram, binder, *renderPassState);
         }
 
         /*
@@ -419,7 +420,8 @@ HdSt_ImmediateDrawBatch::ExecuteDraw(
         }
 
 //        if (!hasOverrideShader && program.GetSurfaceShader()) {
-//            program.GetSurfaceShader()->UnbindResources(binder, *gpuProgram);
+//            program.GetSurfaceShader()->UnbindResources(binder, programId);
+//                *gpuProgram, binder, *renderPassState);
 //        }
 
         HD_PERF_COUNTER_INCR(HdPerfTokens->drawCalls);
@@ -428,9 +430,9 @@ HdSt_ImmediateDrawBatch::ExecuteDraw(
     HD_PERF_COUNTER_ADD(HdTokens->itemsDrawn, numItemsDrawn);
 /*
     TF_FOR_ALL(it, shaders) {
-        (*it)->UnbindResources(binder, *gpuProgram);
+        (*it)->UnbindResources(*gpuProgram, binder, *renderPassState);
     }
-    geometricShader->UnbindResources(binder, *gpuProgram);
+    geometricShader->UnbindResources(*gpuProgram, binder, *renderPassState);
 
     // unbind (make non resident all bindless buffers)
     if (constantBarCurrent)

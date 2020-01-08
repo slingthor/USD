@@ -25,6 +25,7 @@
 
 #include "pxr/imaging/garch/contextCaps.h"
 #include "pxr/imaging/garch/resourceFactory.h"
+#include "pxr/imaging/garch/simpleShadowArray.h"
 
 #include "pxr/imaging/hio/glslfx.h"
 
@@ -870,6 +871,13 @@ HdSt_CodeGenGLSL::CompileComputeProgram()
         << "#extension GL_NV_gpu_shader5 : require\n";
     }
     if (caps.bindlessTextureEnabled) {
+        _genCommon << "#extension GL_ARB_bindless_texture : require\n";
+    }
+    // XXX: Skip checking the context caps for whether the bindless texture
+    // extension is available when bindless shadow maps are enabled. This needs
+    // to be done because GlfSimpleShadowArray is used internally in a manner
+    // wherein context caps initialization might not have happened.
+    if (GarchSimpleShadowArray::GetBindlessShadowMapsEnabled()) {
         _genCommon << "#extension GL_ARB_bindless_texture : require\n";
     }
     if (caps.glslVersion < 430 && caps.explicitUniformLocation) {
@@ -2675,18 +2683,24 @@ HdSt_CodeGenGLSL::_GenerateShaderParameters()
         
         HdBinding::Type bindingType = it->first.GetType();
         if (bindingType == HdBinding::FALLBACK) {
+            // vec4 HdGet_name(int localIndex)
             accessors
                 << _GetUnpackedType(it->second.dataType, false)
-                << " HdGet_" << it->second.name << "() {\n"
+                << " HdGet_" << it->second.name << "(int localIndex) {\n"
                 << "  int shaderCoord = GetDrawingCoord().shaderCoord; \n"
                 << "  return "
                 << _GetPackedTypeAccessor(it->second.dataType, false)
                 << "(shaderData[shaderCoord]." << it->second.name << swizzle
                 << ");\n"
                 << "}\n";
+            // vec4 HdGet_name()
+            accessors
+                << _GetUnpackedType(it->second.dataType, false)
+                << " HdGet_" << it->second.name
+                << "() { return HdGet_" << it->second.name << "(0); }\n";
         } else if (bindingType == HdBinding::BINDLESS_TEXTURE_2D) {
-            // a function returning sampler2D is allowed in 430 or later
-            if (caps.glslVersion >= 430) {
+            // a function returning sampler requires bindless_texture
+            if (caps.bindlessTextureEnabled) {
                 accessors
                     << "sampler2D\n"
                     << "HdGetSampler_" << it->second.name << "() {\n"
@@ -2694,19 +2708,32 @@ HdSt_CodeGenGLSL::_GenerateShaderParameters()
                     << "  return sampler2D(shaderData[shaderCoord]." << it->second.name << ");\n"
                     << "  }\n";
             }
+            // vec4 HdGet_name(vec2 coord)
             accessors
                 << _GetUnpackedType(it->second.dataType, false)
-                << " HdGet_" << it->second.name << "() {\n"
+                << " HdGet_" << it->second.name << "(vec2 coord) {\n"
+                << "  int shaderCoord = GetDrawingCoord().shaderCoord;\n"
+                << "  return "
+                << _GetPackedTypeAccessor(it->second.dataType, false)
+                << "(texture(sampler2D(shaderData[shaderCoord]."
+                << it->second.name << "), coord)" << swizzle
+                << ");\n}\n";
+
+            // vec4 HdGet_name(int localIndex)
+            accessors
+                << _GetUnpackedType(it->second.dataType, false)
+                << " HdGet_" << it->second.name << "(int localIndex) {\n"
                 << "  int shaderCoord = GetDrawingCoord().shaderCoord; \n"
                 << "  return "
                 << _GetPackedTypeAccessor(it->second.dataType, false) << "("
-                << "texture(sampler2D(shaderData[shaderCoord]." << it->second.name << "), ";
-            
+                << "texture(sampler2D(shaderData[shaderCoord]."
+                << it->second.name << "), ";
             if (!it->second.inPrimvars.empty()) {
                 accessors
                     << "\n"
                     << "#if defined(HD_HAS_" << it->second.inPrimvars[0] << ")\n"
-                    << " HdGet_" << it->second.inPrimvars[0] << "().xy\n"
+                    << " HdGet_" << it->second.inPrimvars[0]
+                    << "(localIndex).xy\n"
                     << "#else\n"
                     << "vec2(0.0, 0.0)\n"
                     << "#endif\n";
@@ -2718,36 +2745,45 @@ HdSt_CodeGenGLSL::_GenerateShaderParameters()
             accessors
                 << ")" << swizzle << ");\n"
                 << "}\n";
+            // vec4 HdGet_name()
+            accessors
+                << _GetUnpackedType(it->second.dataType, false)
+                << " HdGet_" << it->second.name
+                << "() { return HdGet_" << it->second.name << "(0); }\n";
         } else if (bindingType == HdBinding::TEXTURE_2D) {
             declarations
                 << LayoutQualifier(it->first)
                 << "uniform sampler2D sampler2d_" << it->second.name << ";\n";
-            // a function returning sampler2D is allowed in 430 or later
-            if (caps.glslVersion >= 430) {
+            // a function returning sampler requires bindless_texture
+            if (caps.bindlessTextureEnabled) {
                 accessors
                 << "sampler2D\n"
                 << "HdGetSampler_" << it->second.name << "() {\n"
                 << "  return sampler2d_" << it->second.name << ";"
                 << "}\n";
+            } else {
+                accessors
+                    << "#define HdGetSampler_" << it->second.name << "()"
+                    << " sampler2d_" << it->second.name << "\n";
             }
-            // vec4 HdGet_name(vec2 coord) { return texture(sampler2d_name, coord).xyz; }
+            // vec4 HdGet_name(vec2 coord)
             accessors
                 << _GetUnpackedType(it->second.dataType, false)
-                << " HdGet_" << it->second.name
-                << "(vec2 coord) { return "
+                << " HdGet_" << it->second.name << "(vec2 coord) { return "
                 << _GetPackedTypeAccessor(it->second.dataType, false)
                 << "(texture(sampler2d_" << it->second.name << ", coord)"
                 << swizzle << ");}\n";
-            // vec4 HdGet_name() { return HdGet_name(HdGet_st().xy); }
+            // vec4 HdGet_name(int localIndex)
             accessors
                 << _GetUnpackedType(it->second.dataType, false)
                 << " HdGet_" << it->second.name
-                << "() { return HdGet_" << it->second.name << "(";
+                << "(int localIndex) { return HdGet_" << it->second.name << "(";
             if (!it->second.inPrimvars.empty()) {
                 accessors
                     << "\n"
                     << "#if defined(HD_HAS_" << it->second.inPrimvars[0] << ")\n"
-                    << "HdGet_" << it->second.inPrimvars[0] << "().xy\n"
+                    << "HdGet_" << it->second.inPrimvars[0]
+                    << "(localIndex).xy\n"
                     << "#else\n"
                     << "vec2(0.0, 0.0)\n"
                     << "#endif\n";
@@ -2756,29 +2792,47 @@ HdSt_CodeGenGLSL::_GenerateShaderParameters()
                     << "vec2(0.0, 0.0)";
             }
             accessors << "); }\n";
+            // vec4 HdGet_name()
+            accessors
+                << _GetUnpackedType(it->second.dataType, false)
+                << " HdGet_" << it->second.name
+                << "() { return HdGet_" << it->second.name << "(0); }\n";
         } else if (bindingType == HdBinding::BINDLESS_TEXTURE_3D) {
-            // a function returning sampler3D is allowed in 430 or later
-            if (caps.glslVersion >= 430) {
+            // a function returning sampler requires bindless_texture
+            if (caps.bindlessTextureEnabled) {
                 accessors
                 << "sampler3D\n"
                 << "HdGetSampler_" << it->second.name << "() {\n"
                 << "  int shaderCoord = GetDrawingCoord().shaderCoord; \n"
                 << "  return sampler3D(shaderData[shaderCoord]." << it->second.name << ");\n"
-                << "  }\n";
+                << "}\n";
             }
+            // vec4 HdGet_name(vec3 coord)
             accessors
-            << _GetUnpackedType(it->second.dataType, false)
-            << " HdGet_" << it->second.name << "() {\n"
-            << "  int shaderCoord = GetDrawingCoord().shaderCoord; \n"
-            << "  return "
-            << _GetPackedTypeAccessor(it->second.dataType, false) << "("
-            << "texture(sampler3D(shaderData[shaderCoord]." << it->second.name << "), ";
+                << _GetUnpackedType(it->second.dataType, false)
+                << " HdGet_" << it->second.name << "(vec3 coord) { \n"
+                << "  int shaderCoord = GetDrawingCoord().shaderCoord; \n"
+                << "  return "
+                << _GetPackedTypeAccessor(it->second.dataType, false) << "("
+                << "texture(sampler3D(shaderData[shaderCoord]."
+                << it->second.name << "), coord)"
+                << swizzle << ");\n}\n";
+
+            // vec4 HdGet_name(int localIndex)
+            accessors
+                << _GetUnpackedType(it->second.dataType, false)
+                << " HdGet_" << it->second.name << "(int localIndex) {\n"
+                << "  int shaderCoord = GetDrawingCoord().shaderCoord; \n"
+                << "  return "
+                << _GetPackedTypeAccessor(it->second.dataType, false) << "("
+                << "texture(sampler3D(shaderData[shaderCoord]." << it->second.name << "), ";
             
             if (!it->second.inPrimvars.empty()) {
                 accessors
                 << "\n"
                 << "#if defined(HD_HAS_" << it->second.inPrimvars[0] << ")\n"
-                << " HdGet_" << it->second.inPrimvars[0] << "().xyz\n"
+                << " HdGet_" << it->second.inPrimvars[0]
+                << "(localIndex).xyz\n"
                 << "#else\n"
                 << "vec3(0.0, 0.0, 0.0)\n"
                 << "#endif\n";
@@ -2788,49 +2842,66 @@ HdSt_CodeGenGLSL::_GenerateShaderParameters()
                 << " vec3(0.0, 0.0, 0.0)";
             }
             accessors
-            << ")" << swizzle << ");\n"
-            << "}\n";
+                << ")" << swizzle << ");\n"
+                << "}\n";
+            // vec4 HdGet_name()
+            accessors
+                << _GetUnpackedType(it->second.dataType, false)
+                << " HdGet_" << it->second.name
+                << "() { return HdGet_" << it->second.name << "(0); }\n";
         } else if (bindingType == HdBinding::TEXTURE_3D) {
             declarations
             << LayoutQualifier(it->first)
             << "uniform sampler3D sampler3d_" << it->second.name << ";\n";
-            // a function returning sampler3D is allowed in 430 or later
-            if (caps.glslVersion >= 430) {
+            // a function returning sampler requires bindless_texture
+            if (caps.bindlessTextureEnabled) {
                 accessors
-                << "sampler3D\n"
-                << "HdGetSampler_" << it->second.name << "() {\n"
-                << "  return sampler3d_" << it->second.name << ";"
-                << "}\n";
-            }
-            // vec4 HdGet_name(vec3 coord) { return texture(sampler3d_name, coord).xyz; }
-            accessors
-            << _GetUnpackedType(it->second.dataType, false)
-            << " HdGet_" << it->second.name
-            << "(vec3 coord) { return "
-            << _GetPackedTypeAccessor(it->second.dataType, false)
-            << "(texture(sampler3d_" << it->second.name << ", coord)"
-            << swizzle << ");}\n";
-            // vec4 HdGet_name() { return HdGet_name(HdGet_st().xyz); }
-            accessors
-            << _GetUnpackedType(it->second.dataType, false)
-            << " HdGet_" << it->second.name
-            << "() { return HdGet_" << it->second.name << "(";
-            if (!it->second.inPrimvars.empty()) {
-                accessors
-                << "\n"
-                << "#if defined(HD_HAS_" << it->second.inPrimvars[0] << ")\n"
-                << "HdGet_" << it->second.inPrimvars[0] << "().xyz\n"
-                << "#else\n"
-                << "vec3(0.0, 0.0, 0.0)\n"
-                << "#endif\n";
+                    << "sampler3D\n"
+                    << "HdGetSampler_" << it->second.name << "() {\n"
+                    << "  return sampler3d_" << it->second.name << ";"
+                    << "}\n";
             } else {
                 accessors
-                << "vec3(0.0, 0.0, 0.0)";
+                    << "#define HdGetSampler_" << it->second.name << "()"
+                    << " sampler3d_" << it->second.name << "\n";
             }
-            accessors << "); }\n";
+
+            // vec4 HdGet_name(vec3 coord)
+            accessors
+                << _GetUnpackedType(it->second.dataType, false)
+                << " HdGet_" << it->second.name << "(vec3 coord) { return "
+                << _GetPackedTypeAccessor(it->second.dataType, false)
+                << "(texture(sampler3d_" << it->second.name << ", coord)"
+                << swizzle << ");}\n";
+
+            // vec4 HdGet_name(int localIndex)
+            accessors
+                << _GetUnpackedType(it->second.dataType, false)
+                << " HdGet_" << it->second.name
+                << "(int localIndex) { return HdGet_" << it->second.name << "(";
+            if (!it->second.inPrimvars.empty()) {
+                accessors
+                    << "\n"
+                    << "#if defined(HD_HAS_" << it->second.inPrimvars[0] << ")\n"
+                    << "HdGet_" << it->second.inPrimvars[0]
+                    << "(localIndex).xyz\n"
+                    << "#else\n"
+                    << "vec3(0.0, 0.0, 0.0)\n"
+                    << "#endif\n";
+            } else {
+                accessors
+                    << "vec3(0.0, 0.0, 0.0)";
+            }
+            accessors << ");\n}\n";
+                
+            // vec4 HdGet_name()
+            accessors
+                << _GetUnpackedType(it->second.dataType, false)
+                << " HdGet_" << it->second.name
+                << "() { return HdGet_" << it->second.name << "(0); }\n";
         } else if (bindingType == HdBinding::BINDLESS_TEXTURE_UDIM_ARRAY) {
-            // a function returning sampler2DArray is allowed in 430 or later
-            if (caps.apiVersion >= 430) {
+            // a function returning sampler requires bindless_texture
+            if (caps.bindlessTextureEnabled) {
                 accessors
                     << "sampler2DArray\n"
                     << "HdGetSampler_" << it->second.name << "() {\n"
@@ -2870,12 +2941,17 @@ HdSt_CodeGenGLSL::_GenerateShaderParameters()
                 << "uniform sampler2DArray sampler2dArray_"
                 << it->second.name << ";\n";
             
-            if (caps.apiVersion >= 430) {
+            // a function returning sampler requires bindless_texture
+            if (caps.bindlessTextureEnabled) {
                 accessors
                     << "sampler2DArray\n"
                     << "HdGetSampler_" << it->second.name << "() {\n"
                     << "  return sampler2dArray_" << it->second.name << ";"
                     << "}\n";
+            } else {
+                accessors
+                    << "#define HdGetSampler_" << it->second.name << "()"
+                    << " sampler2dArray_" << it->second.name << "\n";
             }
             // vec4 HdGet_name(vec2 coord) { vec3 c = hd_sample_udim(coord);
             // c.z = texelFetch(sampler1d_name_layout, int(c.z), 0).x - 1;

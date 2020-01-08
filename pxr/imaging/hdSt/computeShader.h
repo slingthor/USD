@@ -73,9 +73,13 @@ public:
     HDST_API
     virtual TextureDescriptorVector GetTextures() const override;
     HDST_API
-    virtual void BindResources(HdSt_ResourceBinder const &binder, HdStProgram const &program) override;
+    virtual void BindResources(HdStProgram const &program,
+                               HdSt_ResourceBinder const &binder,
+                               HdRenderPassState const &state) override;
     HDST_API
-    virtual void UnbindResources(HdSt_ResourceBinder const &binder, HdStProgram const &program) override;
+    virtual void UnbindResources(HdStProgram const &program,
+                                 HdSt_ResourceBinder const &binder,
+                                 HdRenderPassState const &state) override;
     HDST_API
     virtual void AddBindings(HdBindingRequestVector *customBindings) override;
     HDST_API
