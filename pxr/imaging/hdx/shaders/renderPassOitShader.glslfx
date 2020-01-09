@@ -57,7 +57,8 @@
                             "Selection.DecodeUtils",
                             "Selection.ComputeColor",
                             "RenderPass.ApplyColorOverrides",
-                            "HdxRenderPass.WriteOitLayersToBuffer" ]
+                            "HdxRenderPass.WriteOitLayersToBufferCommon",
+                            "HdxRenderPass.WriteOitLayersToBufferTranslucent" ]
             }
         }
     }

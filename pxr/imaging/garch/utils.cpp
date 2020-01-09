@@ -31,7 +31,7 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-
+GARCH_API
 int
 GarchGetNumElements(GLenum format)
 {
@@ -54,6 +54,7 @@ GarchGetNumElements(GLenum format)
     }
 }
 
+GARCH_API
 int
 GarchGetElementSize(GLenum type)
 {
@@ -75,7 +76,7 @@ GarchGetElementSize(GLenum type)
     }
 }
 
-
+GARCH_API
 bool GarchIsCompressedFormat(GLenum format)
 {
     if (format == GL_COMPRESSED_RGBA_BPTC_UNORM ||
@@ -85,6 +86,7 @@ bool GarchIsCompressedFormat(GLenum format)
     return false;
 }
 
+GARCH_API
 size_t GarchGetCompressedTextureSize(int width, int height, GLenum format, GLenum type)
 {
     int blockSize = 0;

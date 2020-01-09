@@ -27,6 +27,7 @@
 /// \file glf/utils.h
 
 #include "pxr/pxr.h"
+#include "pxr/imaging/glf/api.h"
 #include "pxr/imaging/garch/gl.h"
 
 #include <string>
@@ -37,20 +38,23 @@ PXR_NAMESPACE_OPEN_SCOPE
 ///
 /// True if the currently bound GL framebuffer is valid and can be bound
 /// or returns the cause of the problem
+GLF_API
 bool GlfCheckGLFrameBufferStatus(GLuint target, std::string * reason);
 
 /// Check if the format is compressed.
 ///
-/// Supported OGL compressed formats : GL_COMPRESSED_RGBA_BPTC_UNORM, 
+/// Supported GL compressed formats : GL_COMPRESSED_RGBA_BPTC_UNORM, 
 /// GL_COMPRESSED_RGB_BPTC_UNSIGNED_FLOAT
+GLF_API
 bool GlfIsCompressedFormat(GLenum format);
 
 /// Calculate the byte size of compressed textures.
 ///
-/// Supported OGL compressed formats : GL_COMPRESSED_RGBA_BPTC_UNORM, 
+/// Supported GL compressed formats : GL_COMPRESSED_RGBA_BPTC_UNORM, 
 /// GL_COMPRESSED_RGB_BPTC_UNSIGNED_FLOAT
-size_t GlfGetCompressedTextureSize(int width, int height, GLenum format, GLenum type);
-
+GLF_API
+size_t GlfGetCompressedTextureSize(int width, int height, 
+                                   GLenum format, GLenum type);
 
 PXR_NAMESPACE_CLOSE_SCOPE
 

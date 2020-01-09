@@ -49,7 +49,7 @@ HdxOitVolumeRenderTask::HdxOitVolumeRenderTask(
     : HdxRenderTask(delegate, id)
     , _oitVolumeRenderPassShader(
         HdStResourceFactory::GetInstance()->NewRenderPassShader(
-                HdxPackageRenderPassOitShader()))
+            HdxPackageRenderPassOitVolumeShader()))
     , _isOitEnabled(HdxOitBufferAccessor::IsOitEnabled())
 {
     // Raymarching shader needs to stop when hitting opaque geometry,
