@@ -34,9 +34,12 @@ HgiMetal::HgiMetal(id<MTLDevice> device)
 : _device(device)
 {
     if (!_device) {
-       if( TfGetenvBool("USD_METAL_USE_INTEGRATED_GPU", false)) {
+#if defined(ARCH_OS_MACOS)
+        if( TfGetenvBool("USD_METAL_USE_INTEGRATED_GPU", false)) {
             _device = MTLCopyAllDevices()[1];
-        } else {
+        }
+#endif
+        if (!_device) {
             _device = MTLCreateSystemDefaultDevice();
         }
     }
