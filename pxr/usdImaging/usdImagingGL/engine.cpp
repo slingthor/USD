@@ -369,6 +369,10 @@ UsdImagingGLEngine::Render(
     const UsdPrim& root, 
     const UsdImagingGLRenderParams &params)
 {
+#if defined(ARCH_GFX_METAL)
+@autoreleasepool{
+#endif
+
     if (ARCH_UNLIKELY(_legacyImpl)) {
 #if defined(ARCH_GFX_OPENGL)
         return _legacyImpl->Render(root, params);
@@ -385,6 +389,10 @@ UsdImagingGLEngine::Render(
     SdfPathVector paths(1, _delegate->ConvertCachePathToIndexPath(cachePath));
 
     RenderBatch(paths, params);
+#if defined(ARCH_GFX_METAL)
+}
+#endif
+
 }
 
 void
