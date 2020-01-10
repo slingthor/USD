@@ -279,8 +279,13 @@ void RenderOutput(vec4 Peye, vec3 Neye, vec4 color, vec4 patchCoord)
 // XXX: This whole snippet is a little sketchy and should ideally be replaced
 // with AoVs.  We generate "primId" and "instanceId", and depending on how
 // the client called glDrawBuffers, they will get one or both.
+#if defined(ARCH_GFX_METAL)
+out vec4 primIdOut;
+out vec4 instanceIdOut;
+#else
 layout (location = 0) out vec4 primIdOut;
 layout (location = 1) out vec4 instanceIdOut;
+#endif
 
 vec4 IntToVec4(int id)
 {
