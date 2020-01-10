@@ -529,6 +529,8 @@ public:
         id<MTLTexture> blackTexture2D;
         // Dummy black texture for missing textures
         id<MTLTexture> blackTexture2DArray;
+        // Dummy sampler for missing textures
+        id<MTLSamplerState> dummySampler;
     };
     
     GPUInstance gpus[MAX_GPUS];

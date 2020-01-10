@@ -316,6 +316,10 @@ void MtlfMetalContext::Init(id<MTLDevice> _device, int width, int height)
                                          withBytes:&zero
                                        bytesPerRow:sizeof(zero)
                                      bytesPerImage:0];
+        
+        MTLSamplerDescriptor* samplerDescriptor = [[MTLSamplerDescriptor alloc] init];
+        gpus[i].dummySampler = [renderDevices[i] newSamplerStateWithDescriptor:samplerDescriptor];
+        [samplerDescriptor release];
     }
 
     windingOrder = MTLWindingClockwise;
@@ -395,6 +399,7 @@ void MtlfMetalContext::Cleanup()
 
         [gpus[i].blackTexture2D release];
         [gpus[i].blackTexture2DArray release];
+        [gpus[i].dummySampler release];
         [gpus[i].commandQueue release];
     }
 
@@ -1515,14 +1520,18 @@ void MtlfMetalContext::SetRenderEncoderState()
     }
     if (dirtyRenderState & DIRTY_METALRENDERSTATE_SAMPLER) {
         for(auto sampler : threadState.samplers) {
+            id<MTLSamplerState> s = sampler.sampler.forCurrentGPU();
+            if (s == nil) {
+                s = gpus[currentGPU].dummySampler;
+            }
             if(sampler.stage == kMSL_ProgramStage_Vertex) {
                 if(threadState.enableComputeGS) {
-                    [computeEncoder setSamplerState:sampler.sampler.forCurrentGPU() atIndex:sampler.index];
+                    [computeEncoder setSamplerState:s atIndex:sampler.index];
                 }
-                [wq->currentRenderEncoder setVertexSamplerState:sampler.sampler.forCurrentGPU() atIndex:sampler.index];
+                [wq->currentRenderEncoder setVertexSamplerState:s atIndex:sampler.index];
             }
             else if(sampler.stage == kMSL_ProgramStage_Fragment)
-                [wq->currentRenderEncoder setFragmentSamplerState:sampler.sampler.forCurrentGPU() atIndex:sampler.index];
+                [wq->currentRenderEncoder setFragmentSamplerState:s atIndex:sampler.index];
             //else
             //    TF_FATAL_CODING_ERROR("Not implemented!"); //Compute case
         }
