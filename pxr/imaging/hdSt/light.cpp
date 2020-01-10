@@ -216,6 +216,11 @@ HdStLight::_SetupComputations(GarchTextureGPUHandle const &sourceTexture,
         textureHeight = [tex height];
 #endif
     }
+    
+    if (!textureWidth || !textureHeight) {
+        TF_WARN("DomeLight source texture has a zero dimension");
+        return;
+    }
 
     // initialize the 3 textures and add computations to the resource registry
     GLuint numLevels = 1, numPrefilterLevels = 5, level = 0;
