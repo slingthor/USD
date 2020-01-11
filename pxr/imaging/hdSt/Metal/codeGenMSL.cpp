@@ -4297,7 +4297,11 @@ HdSt_CodeGenMSL::_GenerateElementPrimvar()
         TF_FOR_ALL (it, _metaData.elementData) {
             HdBinding binding = it->first;
             TfToken const &name = it->second.name;
-            TfToken const &dataType = _GetPackedType(it->second.dataType, false);
+            TfToken dataType = _GetPackedType(it->second.dataType, false);
+                
+            if (it->second.dataType == _tokens->packed_2_10_10_10) {
+                dataType = _tokens->packed_2_10_10_10;
+            }
 
             // MTL_FIXME - changing from VS Input params to PS because none of this appaears to be associated with vertex shaders at all... (so possibly nothing to fix)
             _EmitDeclarationPtr(declarations, name, dataType, TfToken(), binding);
