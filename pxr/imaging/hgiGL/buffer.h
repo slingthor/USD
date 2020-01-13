@@ -42,6 +42,9 @@ public:
 
     HGIGL_API
     virtual ~HgiGLBuffer();
+    
+    HGIGL_API
+    virtual void Copy(void const *data, size_t offset, size_t size);
 
     uint32_t GetBufferId() const {return _bufferId;}
 
@@ -50,6 +53,8 @@ private:
     HgiGLBuffer & operator=(const HgiGLBuffer&) = delete;
     HgiGLBuffer(const HgiGLBuffer&) = delete;
 
+    GLenum _target;
+    size_t _length;
     uint32_t _bufferId;
 };
 

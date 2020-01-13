@@ -122,6 +122,24 @@ enum HgiAttachmentStoreOp {
     HgiAttachmentStoreOpStore,
 };
 
+/// \enum HgiBufferUsage
+///
+/// Describes how the buffer will be used.
+///
+/// <ul>
+/// <li>HgiBufferUsageVertexData:
+///   The buffer contains vertex data.</li>
+/// <li>HgiBufferUsageIndices:
+///   The buffer contains indices for indexed draw calls.</li>
+/// <li>HgiTextureUsageUniform:
+///   The buffer contains data to be read within shader programs.</li>
+/// </ul>
+///
+enum HgiBufferUsage {
+    HgiBufferUsageVertexData = 0,
+    HgiBufferUsageIndices,
+    HgiBufferUsageUniforms,
+};
 
 PXR_NAMESPACE_CLOSE_SCOPE
 

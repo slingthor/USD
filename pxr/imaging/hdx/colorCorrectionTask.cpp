@@ -386,21 +386,11 @@ HdxColorCorrectionTask::_CreateBufferResources()
                                        3, -1, -1, 1,        2, 0 };
     
     HgiBufferDesc desc;
+    desc.usage = HgiBufferUsageVertexData;
     desc.length = sizeof(vertices);
     _vertexBuffer = _hgi->CreateBuffer(desc);
+    _vertexBuffer->Copy(&vertices[0], 0, sizeof(vertices));
 
-    if (_isOpenGL) {
-#if defined(ARCH_GFX_OPENGL)
-        HgiGLBuffer* buffer = static_cast<HgiGLBuffer*>(_vertexBuffer);
-        glBindBuffer(GL_ARRAY_BUFFER, buffer->GetBufferId());
-        glBufferData(GL_ARRAY_BUFFER, sizeof(vertices),
-                     &vertices[0], GL_STATIC_DRAW);
-
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
-
-        GLF_POST_PENDING_GL_ERRORS();
-#endif
-    }
     return true;
 }
 

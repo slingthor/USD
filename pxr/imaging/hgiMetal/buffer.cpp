@@ -55,5 +55,9 @@ HgiMetalBuffer::~HgiMetalBuffer()
     }
 }
 
+void HgiMetalBuffer::Copy(void const *data, size_t offset, size_t size) {
+    memcpy((uint8_t*)[_bufferId contents] + offset, data, size);
+    [_bufferId didModifyRange:NSMakeRange(offset, size)];
+}
 
 PXR_NAMESPACE_CLOSE_SCOPE

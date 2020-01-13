@@ -36,11 +36,23 @@ HgiGLBuffer::HgiGLBuffer(HgiBufferDesc const & desc)
     if (desc.length == 0) {
         TF_CODING_ERROR("Buffers must have a non-zero length");
     }
+    
+    if (desc.usage & HgiBufferUsageVertexData) {
+        _target = GL_ARRAY_BUFFER;
+    } else if (desc.usage & HgiBufferUsageIndices) {
+        _target = GL_ELEMENT_ARRAY_BUFFER;
+    } else if (desc.usage & HgiBufferUsageUniforms) {
+        _target = GL_UNIFORM_BUFFER;
+    } else {
+        TF_CODING_ERROR("Unknown HgTextureUsage bit");
+    }
+
+    _length = desc.length;
 
     glGenBuffers(1, &_bufferId);
-    glBindBuffer(GL_ARRAY_BUFFER, _bufferId);
-    glBufferData(GL_ARRAY_BUFFER, desc.length, NULL, GL_STATIC_DRAW);
-
+    glBindBuffer(_target, _bufferId);
+    glBufferData(_target, desc.length, NULL, GL_STATIC_DRAW);
+    glBindBuffer(_target, 0);
 
     HGIGL_POST_PENDING_GL_ERRORS();
 }
@@ -55,5 +67,25 @@ HgiGLBuffer::~HgiGLBuffer()
     HGIGL_POST_PENDING_GL_ERRORS();
 }
 
+void HgiGLBuffer::Copy(void const *data, size_t offset, size_t size) {
+    
+    glBindBuffer(_target, _bufferId);
+    
+    if (offset || size != _length) {
+        if (glBufferSubData != NULL) {
+            glBufferSubData(_target, offset, size, data);
+        }
+        else {
+            TF_CODING_ERROR("glBufferSubData is not available");
+        }
+    }
+    else {
+        glBufferData(_target, size, data, GL_STATIC_DRAW);
+    }
+
+    glBindBuffer(_target, 0);
+    
+    HGIGL_POST_PENDING_GL_ERRORS();
+}
 
 PXR_NAMESPACE_CLOSE_SCOPE

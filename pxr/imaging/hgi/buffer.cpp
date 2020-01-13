@@ -36,7 +36,8 @@ HgiBuffer::~HgiBuffer()
 bool operator==(const HgiBufferDesc& lhs,
     const HgiBufferDesc& rhs)
 {
-    return  lhs.length == rhs.length;
+    return  lhs.usage == rhs.usage &&
+            lhs.length == rhs.length;
 }
 
 bool operator!=(const HgiBufferDesc& lhs,

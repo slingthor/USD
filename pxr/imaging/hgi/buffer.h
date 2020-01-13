@@ -52,6 +52,9 @@ public:
 
     HGI_API
     virtual ~HgiBuffer();
+    
+    HGI_API
+    virtual void Copy(void const *data, size_t offset, size_t size) = 0;
 
 private:
     HgiBuffer() = delete;
@@ -74,9 +77,11 @@ typedef HgiBuffer* HgiBufferHandle;
 ///
 struct HgiBufferDesc {
     HgiBufferDesc()
-    : length(0)
+    : usage(HgiBufferUsageUniforms)
+    , length(0)
     {}
 
+    HgiBufferUsage usage;
     size_t length;
 };
 
