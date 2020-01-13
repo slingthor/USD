@@ -68,6 +68,8 @@ private:
     HdRenderBuffer *_depthBuffer;
 
     HdxCompositor _compositor;
+    
+    bool _isOpenGL;
 
     HdxPresentTask() = delete;
     HdxPresentTask(const HdxPresentTask &) = delete;

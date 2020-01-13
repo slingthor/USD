@@ -26,6 +26,7 @@
 #include "pxr/imaging/hd/aov.h"
 #include "pxr/imaging/hd/tokens.h"
 #include "pxr/imaging/hdSt/renderBuffer.h"
+#include "pxr/imaging/hdSt/resourceFactory.h"
 #if defined(ARCH_GFX_OPENGL)
 #include "pxr/imaging/hgiGL/texture.h"
 #endif
@@ -41,6 +42,7 @@ HdxPresentTask::HdxPresentTask(HdSceneDelegate* delegate, SdfPath const& id)
  , _depthBuffer(nullptr)
  , _compositor()
 {
+    _isOpenGL = HdStResourceFactory::GetInstance()->IsOpenGL();
 }
 
 HdxPresentTask::~HdxPresentTask()
@@ -95,47 +97,49 @@ HdxPresentTask::Execute(HdTaskContext* ctx)
 
     const bool mulSmp = false;
 
+    if (_isOpenGL) {
 #if defined(ARCH_GFX_OPENGL)
-    HgiGLTexture* colorTex = _aovBuffer ? 
-        static_cast<HgiGLTexture*>(_aovBuffer->GetHgiTextureHandle(mulSmp)) :
-        nullptr;
+        HgiGLTexture* colorTex = _aovBuffer ?
+            static_cast<HgiGLTexture*>(_aovBuffer->GetHgiTextureHandle(mulSmp)) :
+            nullptr;
 
-    HgiGLTexture* depthTex = _depthBuffer ? 
-        static_cast<HgiGLTexture*>(_depthBuffer->GetHgiTextureHandle(mulSmp)):
-        nullptr;
+        HgiGLTexture* depthTex = _depthBuffer ?
+            static_cast<HgiGLTexture*>(_depthBuffer->GetHgiTextureHandle(mulSmp)):
+            nullptr;
 
-    uint32_t colorId = colorTex ? colorTex->GetTextureId() : 0;
-    uint32_t depthId = depthTex ? depthTex->GetTextureId() : 0;
+        uint32_t colorId = colorTex ? colorTex->GetTextureId() : 0;
+        uint32_t depthId = depthTex ? depthTex->GetTextureId() : 0;
 
-    if (colorId == 0 && depthId == 0) {
-        return;
-    }
-    // Depth test must be ALWAYS instead of disabling the depth_test because
-    // we want to transfer the depth pixels. Disabling depth_test 
-    // disables depth writes and we need to copy depth to screen FB.
-    GLboolean restoreDepthEnabled = glIsEnabled(GL_DEPTH_TEST);
-    glEnable(GL_DEPTH_TEST);
-    GLint restoreDepthFunc;
-    glGetIntegerv(GL_DEPTH_FUNC, &restoreDepthFunc);
-    glDepthFunc(GL_ALWAYS);
+        if (colorId == 0 && depthId == 0) {
+            return;
+        }
+        // Depth test must be ALWAYS instead of disabling the depth_test because
+        // we want to transfer the depth pixels. Disabling depth_test
+        // disables depth writes and we need to copy depth to screen FB.
+        GLboolean restoreDepthEnabled = glIsEnabled(GL_DEPTH_TEST);
+        glEnable(GL_DEPTH_TEST);
+        GLint restoreDepthFunc;
+        glGetIntegerv(GL_DEPTH_FUNC, &restoreDepthFunc);
+        glDepthFunc(GL_ALWAYS);
 
-    // Any alpha blending the client wanted should have happened into the AOV. 
-    // When copying back to client buffer disable blending.
-    GLboolean blendEnabled;
-    glGetBooleanv(GL_BLEND, &blendEnabled);
-    glDisable(GL_BLEND);
+        // Any alpha blending the client wanted should have happened into the AOV.
+        // When copying back to client buffer disable blending.
+        GLboolean blendEnabled;
+        glGetBooleanv(GL_BLEND, &blendEnabled);
+        glDisable(GL_BLEND);
 
-    _compositor.Draw(colorId, depthId);
+        _compositor.Draw(colorId, depthId);
 
-    if (blendEnabled) {
-        glEnable(GL_BLEND);
-    }
+        if (blendEnabled) {
+            glEnable(GL_BLEND);
+        }
 
-    glDepthFunc(restoreDepthFunc);
-    if (!restoreDepthEnabled) {
-        glDisable(GL_DEPTH_TEST);
-    }
+        glDepthFunc(restoreDepthFunc);
+        if (!restoreDepthEnabled) {
+            glDisable(GL_DEPTH_TEST);
+        }
 #endif
+    }
 }
 
 

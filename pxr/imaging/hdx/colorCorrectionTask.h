@@ -35,6 +35,10 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 class HdStProgram;
+class Hgi;
+class HgiBuffer;
+class HgiTexture;
+
 typedef boost::shared_ptr<class HdStProgram> HdStProgramSharedPtr;
 typedef boost::shared_ptr<class GlfGLContext> GlfGLContextSharedPtr;
 
@@ -91,12 +95,13 @@ private:
     /// Apply color correction to the currently bound framebuffer.
     void _ApplyColorCorrection();
 
+    Hgi *_hgi;
     HdStProgramSharedPtr _shaderProgram;
-    GLuint _texture;
+    HgiTexture *_texture;
     GarchTextureGPUHandle _texture3dLUT;
     GfVec2i _textureSize;
     GLint _locations[4];
-    GLuint _vertexBuffer;
+    HgiBuffer *_vertexBuffer;
 
     // XXX: Removed due to slowness in the IsCurrent() call when multiple
     //      gl contexts are registered in GlfGLContextRegistry.
@@ -115,8 +120,10 @@ private:
     TfToken _aovName;
     SdfPath _aovBufferPath;
     HdRenderBuffer* _aovBuffer;
-    class HgiGLTexture* _aovTexture;
+    HgiTexture* _aovTexture;
     GLuint _aovFramebuffer;
+    
+    bool _isOpenGL;
 };
 
 
