@@ -21,6 +21,7 @@ pxr_library(hgiMetal
 
     PUBLIC_CLASSES
         blitEncoder
+        buffer
         graphicsEncoder
         hgi
         immediateCommandBuffer

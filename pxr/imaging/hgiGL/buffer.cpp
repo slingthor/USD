@@ -21,60 +21,39 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#ifndef PXR_IMAGING_HGI_GL_HGI_H
-#define PXR_IMAGING_HGI_GL_HGI_H
+#include <GL/glew.h>
+#include "pxr/imaging/hgiGL/diagnostic.h"
+#include "pxr/imaging/hgiGL/buffer.h"
 
-#include "pxr/pxr.h"
-#include "pxr/imaging/hgiGL/api.h"
-#include "pxr/imaging/hgiGL/immediateCommandBuffer.h"
-#include "pxr/imaging/hgi/hgi.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-
-/// \class HgiGL
-///
-/// OpenGL implementation of the Hydra Graphics Interface.
-///
-class HgiGL final : public Hgi
+HgiGLBuffer::HgiGLBuffer(HgiBufferDesc const & desc)
+    : HgiBuffer(desc)
+    , _bufferId(0)
 {
-public:
-    HGIGL_API
-    HgiGL();
 
-    HGIGL_API
-    ~HgiGL();
+    if (desc.length == 0) {
+        TF_CODING_ERROR("Buffers must have a non-zero length");
+    }
 
-    //
-    // Command Buffers
-    //
+    glGenBuffers(1, &_bufferId);
+    glBindBuffer(GL_ARRAY_BUFFER, _bufferId);
+    glBufferData(GL_ARRAY_BUFFER, desc.length, NULL, GL_STATIC_DRAW);
 
-    HGIGL_API
-    HgiImmediateCommandBuffer& GetImmediateCommandBuffer() override;
 
-    //
-    // Resources
-    //
+    HGIGL_POST_PENDING_GL_ERRORS();
+}
 
-    HGIGL_API
-    HgiTextureHandle CreateTexture(HgiTextureDesc const & desc) override;
+HgiGLBuffer::~HgiGLBuffer()
+{
+    if (_bufferId > 0) {
+        glDeleteBuffers(1, &_bufferId);
+        _bufferId = 0;
+    }
 
-    HGIGL_API
-    void DestroyTexture(HgiTextureHandle* texHandle) override;
-    
-    HGIGL_API
-    HgiBufferHandle CreateBuffer(HgiBufferDesc const & desc) override;
+    HGIGL_POST_PENDING_GL_ERRORS();
+}
 
-    HGIGL_API
-    void DestroyBuffer(HgiBufferHandle* bufHandle) override;
-
-private:
-    HgiGL & operator=(const HgiGL&) = delete;
-    HgiGL(const HgiGL&) = delete;
-
-    HgiGLImmediateCommandBuffer _immediateCommandBuffer;
-};
 
 PXR_NAMESPACE_CLOSE_SCOPE
-
-#endif

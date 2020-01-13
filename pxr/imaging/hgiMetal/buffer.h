@@ -21,59 +21,40 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#ifndef PXR_IMAGING_HGI_GL_HGI_H
-#define PXR_IMAGING_HGI_GL_HGI_H
+#ifndef PXR_IMAGING_HGI_METAL_BUFFER_H
+#define PXR_IMAGING_HGI_METAL_BUFFER_H
+
+#include <Metal/Metal.h>
 
 #include "pxr/pxr.h"
-#include "pxr/imaging/hgiGL/api.h"
-#include "pxr/imaging/hgiGL/immediateCommandBuffer.h"
-#include "pxr/imaging/hgi/hgi.h"
+#include "pxr/imaging/hgiMetal/api.h"
+#include "pxr/imaging/hgi/buffer.h"
+
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-
-/// \class HgiGL
+/// \class HgiMetalBuffer
 ///
-/// OpenGL implementation of the Hydra Graphics Interface.
+/// Represents a Metal GPU buffer resource.
 ///
-class HgiGL final : public Hgi
-{
+class HgiMetalBuffer final : public HgiBuffer {
 public:
-    HGIGL_API
-    HgiGL();
+    HGIMETAL_API
+    HgiMetalBuffer(HgiMetal *hgi, HgiBufferDesc const & desc);
 
-    HGIGL_API
-    ~HgiGL();
+    HGIMETAL_API
+    virtual ~HgiMetalBuffer();
 
-    //
-    // Command Buffers
-    //
-
-    HGIGL_API
-    HgiImmediateCommandBuffer& GetImmediateCommandBuffer() override;
-
-    //
-    // Resources
-    //
-
-    HGIGL_API
-    HgiTextureHandle CreateTexture(HgiTextureDesc const & desc) override;
-
-    HGIGL_API
-    void DestroyTexture(HgiTextureHandle* texHandle) override;
-    
-    HGIGL_API
-    HgiBufferHandle CreateBuffer(HgiBufferDesc const & desc) override;
-
-    HGIGL_API
-    void DestroyBuffer(HgiBufferHandle* bufHandle) override;
+    id<MTLBuffer> GetBufferId() const {return _bufferId;}
 
 private:
-    HgiGL & operator=(const HgiGL&) = delete;
-    HgiGL(const HgiGL&) = delete;
+    HgiMetalBuffer() = delete;
+    HgiMetalBuffer & operator=(const HgiMetalBuffer&) = delete;
+    HgiMetalBuffer(const HgiMetalBuffer&) = delete;
 
-    HgiGLImmediateCommandBuffer _immediateCommandBuffer;
+    id<MTLBuffer> _bufferId;
 };
+
 
 PXR_NAMESPACE_CLOSE_SCOPE
 

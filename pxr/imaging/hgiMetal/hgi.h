@@ -33,6 +33,11 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+enum {
+    APIVersion_Metal1_0 = 0,
+    APIVersion_Metal2_0,
+    APIVersion_Metal3_0
+};
 
 /// \class HgiMetal
 ///
@@ -64,6 +69,12 @@ public:
     HGIMETAL_API
     void DestroyTexture(HgiTextureHandle* texHandle) override;
 
+    HGIMETAL_API
+    HgiBufferHandle CreateBuffer(HgiBufferDesc const & desc) override;
+
+    HGIMETAL_API
+    void DestroyBuffer(HgiBufferHandle* texHandle) override;
+
     //
     // HgiMetal specific
     //
@@ -73,11 +84,17 @@ public:
         return _device;
     }
     
+    HGIMETAL_API
+    int GetAPIVersion() const {
+        return _apiVersion;
+    }
+    
 private:
     HgiMetal & operator=(const HgiMetal&) = delete;
     HgiMetal(const HgiMetal&) = delete;
 
     id<MTLDevice> _device;
+    int _apiVersion;
 
     HgiMetalImmediateCommandBuffer _immediateCommandBuffer;
 };

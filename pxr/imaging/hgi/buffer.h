@@ -21,59 +21,75 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#ifndef PXR_IMAGING_HGI_GL_HGI_H
-#define PXR_IMAGING_HGI_GL_HGI_H
+#ifndef PXR_IMAGING_HGI_BUFFER_H
+#define PXR_IMAGING_HGI_BUFFER_H
 
 #include "pxr/pxr.h"
-#include "pxr/imaging/hgiGL/api.h"
-#include "pxr/imaging/hgiGL/immediateCommandBuffer.h"
-#include "pxr/imaging/hgi/hgi.h"
+#include "pxr/base/gf/vec3i.h"
+#include "pxr/imaging/hgi/api.h"
+#include "pxr/imaging/hgi/enums.h"
+#include "pxr/imaging/hgi/types.h"
+
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+struct HgiBufferDesc;
 
-/// \class HgiGL
+
 ///
-/// OpenGL implementation of the Hydra Graphics Interface.
+/// \class HgiBuffer
 ///
-class HgiGL final : public Hgi
-{
+/// Represents a graphics platform independent GPU buffer resource.
+///
+/// Base class for Hgi buffers.
+/// To the client (HdSt) buffer resources are referred to via
+/// opaque, stateless handles (HgBufferHandle).
+///
+class HgiBuffer {
 public:
-    HGIGL_API
-    HgiGL();
+    HGI_API
+    HgiBuffer(HgiBufferDesc const& desc);
 
-    HGIGL_API
-    ~HgiGL();
-
-    //
-    // Command Buffers
-    //
-
-    HGIGL_API
-    HgiImmediateCommandBuffer& GetImmediateCommandBuffer() override;
-
-    //
-    // Resources
-    //
-
-    HGIGL_API
-    HgiTextureHandle CreateTexture(HgiTextureDesc const & desc) override;
-
-    HGIGL_API
-    void DestroyTexture(HgiTextureHandle* texHandle) override;
-    
-    HGIGL_API
-    HgiBufferHandle CreateBuffer(HgiBufferDesc const & desc) override;
-
-    HGIGL_API
-    void DestroyBuffer(HgiBufferHandle* bufHandle) override;
+    HGI_API
+    virtual ~HgiBuffer();
 
 private:
-    HgiGL & operator=(const HgiGL&) = delete;
-    HgiGL(const HgiGL&) = delete;
-
-    HgiGLImmediateCommandBuffer _immediateCommandBuffer;
+    HgiBuffer() = delete;
+    HgiBuffer & operator=(const HgiBuffer&) = delete;
+    HgiBuffer(const HgiBuffer&) = delete;
 };
+
+typedef HgiBuffer* HgiBufferHandle;
+
+
+
+/// \struct HgiBufferDesc
+///
+/// Describes the properties needed to create a GPU buffer.
+///
+/// <ul>
+/// <li>length:
+///   The size of the buffer in bytes.</li>
+/// </ul>
+///
+struct HgiBufferDesc {
+    HgiBufferDesc()
+    : length(0)
+    {}
+
+    size_t length;
+};
+
+HGI_API
+bool operator==(
+    const HgiBufferDesc& lhs,
+    const HgiBufferDesc& rhs);
+
+HGI_API
+inline bool operator!=(
+    const HgiBufferDesc& lhs,
+    const HgiBufferDesc& rhs);
+
 
 PXR_NAMESPACE_CLOSE_SCOPE
 

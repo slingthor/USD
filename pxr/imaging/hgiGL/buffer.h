@@ -21,59 +21,38 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#ifndef PXR_IMAGING_HGI_GL_HGI_H
-#define PXR_IMAGING_HGI_GL_HGI_H
+#ifndef PXR_IMAGING_HGI_GL_BUFFER_H
+#define PXR_IMAGING_HGI_GL_BUFFER_H
 
 #include "pxr/pxr.h"
 #include "pxr/imaging/hgiGL/api.h"
-#include "pxr/imaging/hgiGL/immediateCommandBuffer.h"
-#include "pxr/imaging/hgi/hgi.h"
+#include "pxr/imaging/hgi/buffer.h"
+
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-
-/// \class HgiGL
+/// \class HgiGLBuffer
 ///
-/// OpenGL implementation of the Hydra Graphics Interface.
+/// Represents a OpenGL GPU buffer resource.
 ///
-class HgiGL final : public Hgi
-{
+class HgiGLBuffer final : public HgiBuffer {
 public:
     HGIGL_API
-    HgiGL();
+    HgiGLBuffer(HgiBufferDesc const & desc);
 
     HGIGL_API
-    ~HgiGL();
+    virtual ~HgiGLBuffer();
 
-    //
-    // Command Buffers
-    //
-
-    HGIGL_API
-    HgiImmediateCommandBuffer& GetImmediateCommandBuffer() override;
-
-    //
-    // Resources
-    //
-
-    HGIGL_API
-    HgiTextureHandle CreateTexture(HgiTextureDesc const & desc) override;
-
-    HGIGL_API
-    void DestroyTexture(HgiTextureHandle* texHandle) override;
-    
-    HGIGL_API
-    HgiBufferHandle CreateBuffer(HgiBufferDesc const & desc) override;
-
-    HGIGL_API
-    void DestroyBuffer(HgiBufferHandle* bufHandle) override;
+    uint32_t GetBufferId() const {return _bufferId;}
 
 private:
-    HgiGL & operator=(const HgiGL&) = delete;
-    HgiGL(const HgiGL&) = delete;
+    HgiGLBuffer() = delete;
+    HgiGLBuffer & operator=(const HgiGLBuffer&) = delete;
+    HgiGLBuffer(const HgiGLBuffer&) = delete;
 
-    HgiGLImmediateCommandBuffer _immediateCommandBuffer;
+    uint32_t _bufferId;
 };
+
 
 PXR_NAMESPACE_CLOSE_SCOPE
 

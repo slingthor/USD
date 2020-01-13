@@ -22,6 +22,10 @@
 // language governing permissions and limitations under the Apache License.
 //
 #include <Metal/Metal.h>
+
+#include "pxr/base/arch/defines.h"
+
+#include "pxr/imaging/hgiMetal/hgi.h"
 #include "pxr/imaging/hgiMetal/diagnostic.h"
 #include "pxr/imaging/hgiMetal/conversions.h"
 #include "pxr/imaging/hgiMetal/texture.h"
@@ -29,9 +33,9 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-HgiMetalTexture::HgiMetalTexture(HgiTextureDesc const & desc)
+HgiMetalTexture::HgiMetalTexture(HgiMetal *hgi, HgiTextureDesc const & desc)
     : HgiTexture(desc)
-    , _textureId(0)
+    , _textureId(nil)
 {
 
     if (desc.dimensions[2] > 1) {
@@ -48,6 +52,28 @@ HgiMetalTexture::HgiMetalTexture(HgiTextureDesc const & desc)
     } else {
         TF_CODING_ERROR("Unknown HgTextureUsage bit");
     }
+
+    MTLTextureDescriptor* texDesc =
+        [MTLTextureDescriptor
+         texture2DDescriptorWithPixelFormat:mtlFormat
+                                      width:desc.dimensions[0]
+                                     height:desc.dimensions[1]
+                                  mipmapped:NO];
+    //texDesc.resourceOptions = MTLResourceStorageModeDefault;
+    texDesc.resourceOptions = MTLResourceStorageModePrivate;
+    texDesc.usage = MTLTextureUsageShaderRead;
+
+#if (__MAC_OS_X_VERSION_MAX_ALLOWED >= 101500) || (__IPHONE_OS_VERSION_MAX_ALLOWED >= 130000) /* __MAC_10_15 __IOS_13_00 */
+    if (hgi->GetAPIVersion() >= APIVersion_Metal3_0) {
+        texDesc.swizzle = MTLTextureSwizzleChannelsMake(
+            MTLTextureSwizzleRed,
+            MTLTextureSwizzleRed,
+            MTLTextureSwizzleRed,
+            MTLTextureSwizzleRed);
+    }
+#endif
+    
+    _textureId = [hgi->GetDevice() newTextureWithDescriptor:texDesc];
 
 //    if (desc.sampleCount == HgiSampleCount1) {
 //        glCreateTextures(GL_TEXTURE_2D, 1, &_textureId);

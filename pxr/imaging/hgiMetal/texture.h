@@ -33,6 +33,8 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+class HgiMetal;
+
 /// \class HgiMetalTexture
 ///
 /// Represents a Metal GPU texture resource.
@@ -40,7 +42,8 @@ PXR_NAMESPACE_OPEN_SCOPE
 class HgiMetalTexture final : public HgiTexture {
 public:
     HGIMETAL_API
-    HgiMetalTexture(HgiTextureDesc const & desc);
+    HgiMetalTexture(HgiMetal *hgi,
+                    HgiTextureDesc const & desc);
 
     HGIMETAL_API
     virtual ~HgiMetalTexture();
