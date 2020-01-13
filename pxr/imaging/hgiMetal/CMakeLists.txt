@@ -7,6 +7,13 @@ if (NOT ${PXR_ENABLE_METAL_SUPPORT})
     return()
 endif()
 
+set(optionalLibs "")
+if (APPLEIOS)
+    list(APPEND optionalLibs      ${UIKIT_LIBRARY})
+else()
+    list(APPEND optionalLibs      ${APPKIT_LIBRARY})
+endif()
+
 pxr_library(hgiMetal
     LIBRARIES
         arch
@@ -14,6 +21,7 @@ pxr_library(hgiMetal
         tf
         trace
         ${METAL_LIBRARY}
+        ${optionalLibs}
 
     PRIVATE_CLASSES
         conversions

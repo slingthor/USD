@@ -12,9 +12,7 @@ if(APPLE)
     set(GARCH_GLPLATFORMDEBUGWINDOW   glPlatformDebugWindowDarwin)
     set(GARCH_SOURCE_EXTENSION        mm)
     
-    if (APPLEIOS)
-        list(APPEND optionalLibs      ${UIKIT_LIBRARY})
-    else()
+    if (NOT APPLEIOS)
         list(APPEND optionalLibs      ${APPKIT_LIBRARY})
     endif()
 
