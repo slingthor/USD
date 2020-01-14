@@ -63,6 +63,11 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 namespace {
 
+#if defined(ARCH_GFX_METAL)
+std::mutex engineCountMutex;
+int engineCount = 0;
+#endif
+
 static
 bool
 _GetHydraEnabledEnvVar()
@@ -158,6 +163,13 @@ UsdImagingGLEngine::UsdImagingGLEngine(const RenderAPI api)
     , _legacyImpl(nullptr)
 #endif
 {
+
+#if defined(ARCH_GFX_METAL)
+    engineCountMutex.lock();
+    engineCount++;
+#endif
+
+    
     _engine = new HdEngine();
 #if defined(ARCH_GFX_METAL)
     if (_renderAPI == Metal) {
@@ -197,6 +209,10 @@ UsdImagingGLEngine::UsdImagingGLEngine(const RenderAPI api)
         _legacyImpl.reset(new UsdImagingGLLegacyEngine(excluded));
 #endif
     }
+
+#if defined(ARCH_GFX_METAL)
+    engineCountMutex.unlock();
+#endif
 }
 
 UsdImagingGLEngine::UsdImagingGLEngine(
@@ -222,6 +238,12 @@ UsdImagingGLEngine::UsdImagingGLEngine(
     , _legacyImpl(nullptr)
 #endif
 {
+
+#if defined(ARCH_GFX_METAL)
+    engineCountMutex.lock();
+    engineCount++;
+#endif
+
     _engine = new HdEngine();
 #if defined(ARCH_GFX_METAL)
     if (_renderAPI == Metal) {
@@ -265,23 +287,36 @@ UsdImagingGLEngine::UsdImagingGLEngine(
         _legacyImpl.reset(new UsdImagingGLLegacyEngine(pathsToExclude));
 #endif
     }
+
+#if defined(ARCH_GFX_METAL)
+    engineCountMutex.unlock();
+#endif
 }
 
 UsdImagingGLEngine::~UsdImagingGLEngine()
 { 
+    GarchResourceFactory::GetInstance().SetResourceFactory(
+        dynamic_cast<GarchResourceFactoryInterface*>(_resourceFactory));
+    HdStResourceFactory::GetInstance().SetResourceFactory(_resourceFactory);
+
     _DeleteHydraResources();
-    HdStResourceFactory::GetInstance().SetResourceFactory(NULL);
+
     GarchResourceFactory::GetInstance().SetResourceFactory(NULL);
+    HdStResourceFactory::GetInstance().SetResourceFactory(NULL);
 
     delete _engine;
     _engine = NULL;
     
     delete _resourceFactory;
     _resourceFactory = NULL;
+
 #if defined(ARCH_GFX_METAL)
-    if (MtlfMetalContext::context) {
+    engineCountMutex.lock();
+    engineCount--;
+    if (MtlfMetalContext::context && engineCount == 0)  {
         MtlfMetalContext::context = NULL;
     }
+    engineCountMutex.unlock();
 #endif
 }
 
@@ -327,6 +362,10 @@ UsdImagingGLEngine::RenderBatch(
         return;
     }
 
+    GarchResourceFactory::GetInstance().SetResourceFactory(
+        dynamic_cast<GarchResourceFactoryInterface*>(_resourceFactory));
+    HdStResourceFactory::GetInstance().SetResourceFactory(_resourceFactory);
+
     TF_VERIFY(_taskController);
 
     _taskController->SetFreeCameraClipPlanes(params.clipPlanes);
@@ -362,6 +401,9 @@ UsdImagingGLEngine::RenderBatch(
     VtValue selectionValue(_selTracker);
     _engine->SetTaskContextData(HdxTokens->selectionState, selectionValue);
     _Execute(params, _taskController->GetRenderingTasks());
+
+    HdStResourceFactory::GetInstance().SetResourceFactory(NULL);
+    GarchResourceFactory::GetInstance().SetResourceFactory(NULL);
 }
 
 void 
@@ -714,6 +756,11 @@ UsdImagingGLEngine::TestIntersection(
 #endif
     }
 
+
+    GarchResourceFactory::GetInstance().SetResourceFactory(
+        dynamic_cast<GarchResourceFactoryInterface*>(_resourceFactory));
+    HdStResourceFactory::GetInstance().SetResourceFactory(_resourceFactory);
+
     TF_VERIFY(_delegate);
 #if defined(ARCH_GFX_METAL)
     GfMatrix4d projectionMatrix;
@@ -790,6 +837,9 @@ UsdImagingGLEngine::TestIntersection(
         *outHitElementIndex = hit.elementIndex;
     }
 
+
+    HdStResourceFactory::GetInstance().SetResourceFactory(NULL);
+    GarchResourceFactory::GetInstance().SetResourceFactory(NULL);
     return true;
 }
 
@@ -1175,10 +1225,19 @@ UsdImagingGLEngine::SetColorCorrectionSettings(
 bool 
 UsdImagingGLEngine::IsColorCorrectionCapable()
 {
-    GarchContextCaps const &caps =
-        GarchResourceFactory::GetInstance()->GetContextCaps();
-    return caps.floatingPointBuffersEnabled &&
-           IsHydraEnabled();
+    static bool first = false;
+    static bool ColorCorrectionCapable = true;
+
+    if (first) {
+        first = false;
+
+        GarchContextCaps const &caps =
+            GarchResourceFactory::GetInstance()->GetContextCaps();
+        ColorCorrectionCapable = caps.floatingPointBuffersEnabled &&
+            IsHydraEnabled();
+    }
+
+    return ColorCorrectionCapable;
 }
 
 //----------------------------------------------------------------------------
