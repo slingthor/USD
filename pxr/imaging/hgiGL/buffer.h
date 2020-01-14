@@ -53,7 +53,7 @@ private:
     HgiGLBuffer & operator=(const HgiGLBuffer&) = delete;
     HgiGLBuffer(const HgiGLBuffer&) = delete;
 
-    GLenum _target;
+    uint32_t _target;
     size_t _length;
     uint32_t _bufferId;
 };
