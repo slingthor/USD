@@ -337,7 +337,7 @@ GlfSimpleShadowArray::_FreeBindfulTextures()
         _bindfulTexture.Clear();
     }
 
-    GLF_POST_PENDING_GL_ERRORS();
+    // GLF_POST_PENDING_GL_ERRORS();
 }
 
 void
@@ -364,7 +364,7 @@ GlfSimpleShadowArray::_FreeBindlessTextures()
     }
     _bindlessTextures.clear();
     
-    GLF_POST_PENDING_GL_ERRORS();
+    // GLF_POST_PENDING_GL_ERRORS();
 }
 
 void
