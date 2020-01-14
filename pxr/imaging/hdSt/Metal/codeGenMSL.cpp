@@ -5194,7 +5194,7 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
             if (it->second.name != it->second.inPrimvars[0]) {
                 accessors
                     << _GetUnpackedType(it->second.dataType, false)
-                    << " HdGet_" << it->second.name << "() {\n"
+                    << " HdGet_" << it->second.name << "(int localIndex) {\n"
                     << "#if defined(HD_HAS_" << it->second.inPrimvars[0] << ")\n"
                     << "  return HdGet_" << it->second.inPrimvars[0] << "();\n"
                     << "#else\n"
@@ -5204,8 +5204,21 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
                     << "(shaderData[shaderCoord]." << it->second.name
                     << swizzle <<  ");\n"
                     << "#endif\n"
-                    << "\n}\n"
-                    ;
+                    << "\n}\n";
+                
+                accessors
+                    << _GetUnpackedType(it->second.dataType, false)
+                    << " HdGet_" << it->second.name << "() {\n"
+                    << "#if defined(HD_HAS_" << it->second.inPrimvars[0] << ")\n"
+                    << "  return HdGet_" << it->second.inPrimvars[0] << "(0);\n"
+                    << "#else\n"
+                    << "  int shaderCoord = GetDrawingCoord().shaderCoord;\n"
+                    << "  return "
+                    << _GetPackedTypeAccessor(it->second.dataType, false)
+                    << "(shaderData[shaderCoord]." << it->second.name
+                    << swizzle <<  ");\n"
+                    << "#endif\n"
+                    << "\n}\n";
             }
         }
         
