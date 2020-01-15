@@ -205,6 +205,9 @@ HdStLight::_SetupComputations(
         return;
     }
     
+    HdStResourceRegistry* hdStResourceRegistry =
+        static_cast<HdStResourceRegistry*>(resourceRegistry);
+
     // get the width and height of the source texture
     int textureWidth = 0, textureHeight = 0;
     if (isOpenGL) {
@@ -277,7 +280,7 @@ HdStLight::_SetupComputations(
         HdSt_DomeLightComputationGPU::New(_tokens->domeLightIrradiance, 
             sourceTexture, _irradianceTexture, textureWidth, textureHeight,
             numLevels, level));
-    resourceRegistry->AddComputation(nullptr, irradianceComputation);
+    hdStResourceRegistry->AddComputation(nullptr, irradianceComputation);
 
     // PreFilter
     if (isOpenGL) {
