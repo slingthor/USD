@@ -208,6 +208,12 @@ HdxColorCorrectionTask::_CreateOpenColorIOResources()
         if (size > 0) {
             _lut3dSizeOCIO = size;
         }
+
+        // Optionally override similar to KATANA_OCIO_LUT3D_EDGE_SIZE
+        int size = TfGetenvInt("USDVIEW_OCIO_LUT3D_EDGE_SIZE", 0);
+        if (size > 0) {
+            _lut3dSizeOCIO = size;
+        }
     // Create a GPU Shader Description
     OCIO::GpuShaderDescRcPtr shaderDesc = OCIO::GpuShaderDesc::CreateLegacyShaderDesc(_lut3dSizeOCIO);
     shaderDesc->setLanguage(gpuLanguage);
