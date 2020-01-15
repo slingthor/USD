@@ -44,7 +44,6 @@
 
 #include "pxr/imaging/hdSt/resourceFactory.h"
 
-#include "pxr/imaging/hdx/compositor.h"
 #include "pxr/imaging/hdx/selectionTracker.h"
 #include "pxr/imaging/hdx/renderSetupTask.h"
 #include "pxr/imaging/hdx/pickTask.h"
