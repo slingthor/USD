@@ -587,7 +587,7 @@ GlfDrawTarget::WriteToFile(std::string const & name,
         glBindTexture( GL_TEXTURE_2D, a->GetTextureName() );
 
         {
-            TRACE_SCOPE("Call to glGetTexImage");
+            TRACE_FUNCTION_SCOPE("glGetTexImage");
             glGetTexImage(GL_TEXTURE_2D, 0, a->GetFormat(), a->GetType(),
                           buf.get());
         }
@@ -628,7 +628,7 @@ GlfDrawTarget::WriteToFile(std::string const & name,
     storage.data = buf.get();
 
     {
-        TRACE_SCOPE("Writing Image");
+        TRACE_FUNCTION_SCOPE("writing image");
 
         GarchImageSharedPtr const image = GarchImage::OpenForWriting(filename);
         const bool writeSuccess = image && image->Write(storage, metadata);
