@@ -289,6 +289,24 @@ class ViewSettingsDataModel(QtCore.QObject, StateSource):
             self._freeCameraFOV = self.freeCamera.fov
 
     @property
+    def freeCameraFOV(self):
+        return self._freeCameraFOV
+
+    @freeCameraFOV.setter
+    @visibleViewSetting
+    def freeCameraFOV(self, value):
+        if self._freeCamera:
+            # Setting the freeCamera's fov will trigger our own update
+            self._freeCamera.fov = value
+        else:
+            self._freeCameraFOV = value
+
+    @visibleViewSetting
+    def _updateFOV(self):
+        if self._freeCamera:
+            self._freeCameraFOV = self.freeCamera.fov
+
+    @property
     def colorCorrectionMode(self):
         return self._colorCorrectionMode
 
