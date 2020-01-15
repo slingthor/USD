@@ -311,6 +311,7 @@ My_TestGLDrawing::DrawTest(bool offscreen)
 
         // Make sure we render to convergence.
         TfErrorMark mark;
+
         int convergenceIterations = 0;
 
         {
