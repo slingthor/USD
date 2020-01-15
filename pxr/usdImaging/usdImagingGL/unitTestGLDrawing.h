@@ -58,6 +58,10 @@ public:
     bool IsEnabledCameraLight() const { return _cameraLight; }
     bool IsEnabledCullBackfaces() const { return _cullBackfaces; }
     bool IsEnabledIdRender() const { return _testIdRender; }
+    
+    bool IsShowGuides() const { return _showGuides; }
+    bool IsShowRender() const { return _showRender; }
+    bool IsShowProxy() const { return _showProxy; }
 
     HdStDrawMode GetDrawMode() const { return _drawMode; }
 
@@ -129,6 +133,10 @@ private:
     GfVec3f _translate;
     VtDictionary _renderSettings;
     TfToken _rendererAov;
+
+    bool _showGuides;
+    bool _showRender;
+    bool _showProxy;
 };
 
 
