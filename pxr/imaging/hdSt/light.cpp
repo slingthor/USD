@@ -205,9 +205,6 @@ HdStLight::_SetupComputations(
         return;
     }
     
-    HdStResourceRegistry* hdStResourceRegistry =
-        static_cast<HdStResourceRegistry*>(resourceRegistry);
-
     // get the width and height of the source texture
     int textureWidth = 0, textureHeight = 0;
     if (isOpenGL) {
@@ -280,7 +277,7 @@ HdStLight::_SetupComputations(
         HdSt_DomeLightComputationGPU::New(_tokens->domeLightIrradiance, 
             sourceTexture, _irradianceTexture, textureWidth, textureHeight,
             numLevels, level));
-    hdStResourceRegistry->AddComputation(nullptr, irradianceComputation);
+    resourceRegistry->AddComputation(nullptr, irradianceComputation);
 
     // PreFilter
     if (isOpenGL) {
@@ -340,7 +337,7 @@ HdStLight::_SetupComputations(
                 HdSt_DomeLightComputationGPU::New(_tokens->domeLightPrefilter,
                 sourceTexture, _prefilterTexture, textureWidth, textureHeight,
                 numPrefilterLevels, 0, roughness));
-        hdStResourceRegistry->AddComputation(nullptr, preFilterComputation);
+        resourceRegistry->AddComputation(nullptr, preFilterComputation);
     }
 
     // BRDF LUT
@@ -385,7 +382,7 @@ HdStLight::_SetupComputations(
             HdSt_DomeLightComputationGPU::New(_tokens->domeLightBRDF, 
             sourceTexture, _brdfTexture, textureHeight, textureHeight, 
             numLevels, level));
-    hdStResourceRegistry->AddComputation(nullptr, brdfComputation);
+    resourceRegistry->AddComputation(nullptr, brdfComputation);
 }
 
 /* virtual */
