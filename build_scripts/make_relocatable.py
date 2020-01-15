@@ -10,8 +10,8 @@ SDKVersion  = subprocess.check_output(['xcodebuild', '-version']).strip()[6:10]
 codeSignIDs = subprocess.check_output(['security', 'find-identity', '-v', '-p', 'codesigning'])
 
 codeSignID = "-"
-if os.environ.get('XCODE_ATTRIBUTE_CODE_SIGN_ID'):
-    codeSignID = os.environ.get('XCODE_ATTRIBUTE_CODE_SIGN_ID')
+if os.environ.get('CODE_SIGN_ID'):
+    codeSignID = os.environ.get('CODE_SIGN_ID')
 elif SDKVersion >= "11.0" and codeSignIDs.find("Apple Development") != -1:
     codeSignID = "Apple Development"
 elif codeSignIDs.find("Mac Developer") != -1:
