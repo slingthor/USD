@@ -69,6 +69,7 @@
 
 #include <Windows.h>
 #include <DbgHelp.h>
+#include <Memoryapi.h>
 #include <Psapi.h>
 #include <WinIoCtl.h>
 #include <Winsock2.h>
@@ -80,7 +81,9 @@
 #endif
 #include <algorithm>
 #include <atomic>
+#include <cctype>
 #include <cerrno>
+#include <cinttypes>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -93,19 +96,18 @@
 #include <functional>
 #include <inttypes.h>
 #include <iosfwd>
-#include <iostream>
 #include <iterator>
 #include <limits>
 #include <map>
 #include <memory>
 #include <mutex>
+#include <ostream>
 #include <regex>
 #include <set>
 #include <signal.h>
 #include <sstream>
 #include <stdarg.h>
 #include <stddef.h>
-#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -116,4 +118,5 @@
 #include <time.h>
 #include <typeindex>
 #include <typeinfo>
+#include <utility>
 #include <vector>
