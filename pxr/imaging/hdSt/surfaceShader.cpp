@@ -249,12 +249,15 @@ HdStSurfaceShader::SetBufferSources(HdBufferSourceVector &bufferSources,
         HdBufferSpecVector bufferSpecs;
         HdBufferSpec::GetBufferSpecs(bufferSources, &bufferSpecs);
 
+        HdStResourceRegistrySharedPtr const& hdStResourceRegistry =
+            boost::static_pointer_cast<HdStResourceRegistry>(resourceRegistry);
+
         if (!_paramArray || _paramSpec != bufferSpecs) {
             _paramSpec = bufferSpecs;
 
             // establish a buffer range
             HdBufferArrayRangeSharedPtr range =
-                    resourceRegistry->AllocateShaderStorageBufferArrayRange(
+                    hdStResourceRegistry->AllocateShaderStorageBufferArrayRange(
                                                   HdTokens->materialParams,
                                                   bufferSpecs,
                                                   HdBufferArrayUsageHint());
@@ -267,7 +270,7 @@ HdStSurfaceShader::SetBufferSources(HdBufferSourceVector &bufferSources,
         }
 
         if (_paramArray->IsValid()) {
-            resourceRegistry->AddSources(_paramArray, bufferSources);
+            hdStResourceRegistry->AddSources(_paramArray, bufferSources);
         }
     }
     _isValidComputedHash = false;

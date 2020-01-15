@@ -102,6 +102,9 @@ HdStRenderPassState::Prepare(
 
     HdRenderPassState::Prepare(resourceRegistry);
 
+    HdStResourceRegistrySharedPtr const& hdStResourceRegistry =
+        boost::static_pointer_cast<HdStResourceRegistry>(resourceRegistry);
+
     VtVec4fArray clipPlanes;
     TF_FOR_ALL(it, GetClipPlanes()) {
         clipPlanes.push_back(GfVec4f(*it));
@@ -179,8 +182,9 @@ HdStRenderPassState::Prepare(
         _clipPlanesBufferSize = clipPlanes.size();
 
         // allocate interleaved buffer
-        _renderPassStateBar = resourceRegistry->AllocateUniformBufferArrayRange(
-            HdTokens->drawingShader, bufferSpecs, HdBufferArrayUsageHint());
+        _renderPassStateBar = 
+            hdStResourceRegistry->AllocateUniformBufferArrayRange(
+                HdTokens->drawingShader, bufferSpecs, HdBufferArrayUsageHint());
 
         HdBufferArrayRangeSharedPtr _renderPassStateBar_ =
             boost::static_pointer_cast<HdBufferArrayRange> (_renderPassStateBar);
@@ -257,7 +261,7 @@ HdStRenderPassState::Prepare(
                                   clipPlanes.size())));
     }
 
-    resourceRegistry->AddSources(_renderPassStateBar, sources);
+    hdStResourceRegistry->AddSources(_renderPassStateBar, sources);
 
     // notify view-transform to the lighting shader to update its uniform block
     _lightingShader->SetCamera(worldToViewMatrix, projMatrix);
