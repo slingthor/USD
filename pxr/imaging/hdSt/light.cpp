@@ -139,8 +139,9 @@ HdStLight::_ApproximateAreaLight(SdfPath const &id,
 }
 
 GarchSimpleLight
-HdStLight::_PrepareDomeLight(SdfPath const &id, 
-                                 HdSceneDelegate *sceneDelegate)
+HdStLight::_PrepareDomeLight(
+    SdfPath const &id, 
+    HdSceneDelegate *sceneDelegate)
 {
     // get/load the environment map texture resource
     GarchTextureGPUHandle textureId;
@@ -160,9 +161,13 @@ HdStLight::_PrepareDomeLight(SdfPath const &id,
             // the necessary maps (irradiance, pre-filtered, BRDF LUT)
             textureId = _textureResource->GetTexelsTextureId();
 
+            HdRenderIndex& index = sceneDelegate->GetRenderIndex();
+            HdStResourceRegistry* hdStResourceRegistry =
+                static_cast<HdStResourceRegistry*>(
+                    index.GetResourceRegistry().get());
+
             // Schedule texture computations
-            _SetupComputations(textureId, 
-                sceneDelegate->GetRenderIndex().GetResourceRegistry().get());
+            _SetupComputations(textureId, hdStResourceRegistry);
         }
     } 
 
@@ -187,8 +192,9 @@ HdStLight::_PrepareDomeLight(SdfPath const &id,
 }
 
 void 
-HdStLight::_SetupComputations(GarchTextureGPUHandle const &sourceTexture,
-                                HdResourceRegistry *resourceRegistry)
+HdStLight::_SetupComputations(
+    GarchTextureGPUHandle const &sourceTexture, 
+    HdStResourceRegistry *resourceRegistry)
 {
     bool isOpenGL = HdStResourceFactory::GetInstance()->IsOpenGL();
     GarchContextCaps const &caps =
@@ -199,9 +205,6 @@ HdStLight::_SetupComputations(GarchTextureGPUHandle const &sourceTexture,
         return;
     }
     
-    HdStResourceRegistry* hdStResourceRegistry =
-        static_cast<HdStResourceRegistry*>(resourceRegistry);
-
     // get the width and height of the source texture
     int textureWidth = 0, textureHeight = 0;
     if (isOpenGL) {
@@ -274,7 +277,7 @@ HdStLight::_SetupComputations(GarchTextureGPUHandle const &sourceTexture,
         HdSt_DomeLightComputationGPU::New(_tokens->domeLightIrradiance, 
             sourceTexture, _irradianceTexture, textureWidth, textureHeight,
             numLevels, level));
-    hdStResourceRegistry->AddComputation(nullptr, irradianceComputation);
+    resourceRegistry->AddComputation(nullptr, irradianceComputation);
 
     // PreFilter
     if (isOpenGL) {
