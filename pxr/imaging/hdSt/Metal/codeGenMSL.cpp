@@ -3194,14 +3194,13 @@ HdSt_CodeGenMSL::_GenerateCommonCode()
     _EmitOutput(_genCommon, TfToken("gl_PointSize"), TfToken("float"), TfToken("[[point_size]]"));
     _AddOutputParam(_mslVSOutputParams, TfToken("gl_PointSize"), TfToken("float"), TfToken("[[point_size]]")).usage
         |= TParam::VertexShaderOnly;
-    
-    _EmitOutput(_genCommon, TfToken("gl_ClipDistance"), TfToken("float"),
-                //TfToken("[[clip_distance]]")).usage |= TParam::VertexShaderOnly;
-                TfToken(""));
-    _AddOutputParam(_mslVSOutputParams,  TfToken("gl_ClipDistance"), TfToken("float"),
-                    TfToken("" /*[[clip_distance]]*/ )).usage
-    |= TParam::VertexShaderOnly;
 
+#if 0    
+    _EmitOutput(_genCommon, TfToken("gl_ClipDistance"), TfToken("float"), 
+                    TfToken("[[clip_distance]] [1]"));
+    _AddOutputParam(_mslVSOutputParams,  TfToken("gl_ClipDistance[1]"), TfToken("float"),
+                    TfToken("" /*"[[clip_distance]] [1]"*/ )).usage |= TParam::VertexShaderOnly;
+#endif
     _genCommon << "uint gl_PrimitiveID = 0;\n"
                << "uint gl_PrimitiveIDIn = 0;\n"
                << "int gl_MaxTessGenLevel = 64;\n";
