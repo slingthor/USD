@@ -1677,10 +1677,12 @@ def InstallUSD(context, force, buildArgs):
 
         if iOS():
             # some build options are implicit with this
-            extraArgs.append('-DPXR_ENABLE_GL_SUPPORT=OFF')
             extraArgs.append('-G Xcode')
-        else:
+        
+        if context.enableOpenGL:
             extraArgs.append('-DPXR_ENABLE_GL_SUPPORT=ON')
+        else:
+            extraArgs.append('-DPXR_ENABLE_GL_SUPPORT=OFF')
 
         extraArgs += buildArgs
 
@@ -1956,6 +1958,12 @@ subgroup.add_argument("--no-houdini", dest="build_houdini", action="store_false"
 group.add_argument("--houdini-location", type=str,
                    help="Directory where Houdini is installed.")
 
+subgroup = group.add_mutually_exclusive_group()
+subgroup.add_argument("--opengl", dest="enable_opengl", action="store_true", 
+                      default=True,
+                      help="Enable OpenGL support in Storm (default)")
+subgroup.add_argument("--no-opengl", dest="enable_opengl", action="store_false",
+                      help="Disable OpenGL support in Storm")
 args = parser.parse_args()
 
 class InstallContext:
@@ -2083,6 +2091,7 @@ class InstallContext:
         self.houdiniLocation = (os.path.abspath(args.houdini_location)
                                 if args.houdini_location else None)
        
+        self.enableOpenGL = args.enable_opengl
     def GetBuildArguments(self, dep):
         return self.buildArgs.get(dep.name.lower(), [])
        
@@ -2139,7 +2148,7 @@ if context.buildImaging:
     if context.enablePtex:
         requiredDependencies += [PTEX]
 
-    if not iOS():
+    if not iOS() and context.enableOpenGL:
         requiredDependencies += [GLEW]
 
     requiredDependencies += [OPENEXR, OPENSUBDIV]
@@ -2324,6 +2333,8 @@ Building with settings:
       OpenImageIO support:      {buildOIIO} 
       OpenColorIO support:      {buildOCIO} 
       PRMan support:            {buildPrman}
+      OpenGL:                   {enableOpenGL}
+      Metal:                    {enableMetal}
     UsdImaging                  {buildUsdImaging}
       usdview:                  {buildUsdview}
     Python support              {buildPython}
@@ -2387,7 +2398,9 @@ summaryMsg = summaryMsg.format(
     buildMaterialX=("On" if context.buildMaterialX else "Off"),
     enableHDF5=("On" if context.enableHDF5 else "Off"),
     buildKatana=("On" if context.buildKatana else "Off"),
-    buildHoudini=("On" if context.buildHoudini else "Off"))
+    buildHoudini=("On" if context.buildHoudini else "Off"),
+    enableOpenGL=("On" if context.enableOpenGL else "Off"),
+    enableMetal=("On" if iOS() or MacOS() else "Off"))
 
 Print(summaryMsg)
 
