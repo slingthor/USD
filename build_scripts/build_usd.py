@@ -459,7 +459,7 @@ def DownloadURL(url, context, force, dontExtract = None):
     been extracted."""
     with CurrentWorkingDirectory(context.srcDir):
         # Extract filename from URL and see if file already exists. 
-        filename = url.split("/")[-1]       
+        filename = url.split("/")[-1]
         if force and os.path.exists(filename):
             os.remove(filename)
 
@@ -661,8 +661,9 @@ def InstallBoost(context, force, buildArgs):
     with CurrentWorkingDirectory(DownloadURL(BOOST_URL, context, force, 
                                              dontExtract)):
         bootstrap = "bootstrap.bat" if Windows() else "./bootstrap.sh"
-        Run('{bootstrap} --prefix="{instDir}"'
-            .format(bootstrap=bootstrap, instDir=context.instDir))
+        bootstrapCmd = '{bootstrap} --prefix="{instDir}"'.format(
+            bootstrap=bootstrap, instDir=context.instDir)
+        Run(bootstrapCmd)
 
         # b2 supports at most -j64 and will error if given a higher value.
         num_procs = min(64, context.numJobs)
@@ -759,8 +760,16 @@ def InstallBoost(context, force, buildArgs):
         b2_settings += buildArgs
 
         b2 = "b2" if Windows() else "./b2"
-        Run('{b2} {options} install'
-            .format(b2=b2, options=" ".join(b2_settings)))
+        b2Cmd = '{b2} {options} install'.format(
+            b2=b2, options=" ".join(b2_settings))
+        Run(b2Cmd)
+
+        # Output paths that are of interest
+        with open(context.usdInstDir + '/boostBuild.txt', 'wt') as file:
+            file.write('ARCHIVE:' + BOOST_URL.split("/")[-1] + '\n')
+            file.write('BUILDFOLDER:' + os.path.split(os.getcwd())[1] + '\n')
+            file.write('BOOTSTRAP:' + bootstrapCmd + '\n')
+            file.write('B2:' + b2Cmd + '\n')
 
         if iOS():
             for filename in os.listdir(context.instDir + "/lib"):
@@ -826,9 +835,16 @@ def InstallTBB_LinuxOrMacOS(context, force, buildArgs):
                 [("#define __TBB_Yield()  sched_yield()",
                   "#define __TBB_Yield()  __TBB_Pause(1)")])
 
-        Run('make -j{procs} {buildArgs}'
-            .format(procs=context.numJobs, 
-                    buildArgs=" ".join(buildArgs)))
+        makeCmd = 'make -j{procs} {buildArgs}'.format(
+            procs=context.numJobs, 
+            buildArgs=" ".join(buildArgs))
+        Run(makeCmd)
+
+        # Output paths that are of interest
+        with open(context.usdInstDir + '/tbbBuild.txt', 'wt') as file:
+            file.write('ARCHIVE:' + TBB_URL.split("/")[-1] + '\n')
+            file.write('BUILDFOLDER:' + os.path.split(os.getcwd())[1] + '\n')
+            file.write('MAKE:' + makeCmd + '\n')
 
         CopyFiles(context, "build/*_release/libtbb*.*", "lib")
         CopyDirectory(context, "include/serial", "include/serial")
@@ -915,13 +931,20 @@ def InstallJPEG_Turbo(jpeg_url, context, force, buildArgs):
 
 def InstallJPEG_Lib(jpeg_url, context, force, buildArgs):
     with CurrentWorkingDirectory(DownloadURL(jpeg_url, context, force)):
-        Run('./configure --prefix="{instDir}" '
-            '--disable-static --enable-shared '
-            '{buildArgs}'
-            .format(instDir=context.instDir,
-                    buildArgs=" ".join(buildArgs)))
-        Run('make -j{procs} install'
-            .format(procs=context.numJobs))
+        configureCmd = './configure --prefix="{instDir}" '.format(instDir=context.instDir) + \
+            '--disable-static --enable-shared ' + \
+            '{buildArgs}'.format(buildArgs=" ".join(buildArgs))
+        Run(configureCmd)
+
+        makeCmd = 'make -j{procs} install'.format(procs=context.numJobs)
+        Run(makeCmd)
+
+        # Output paths that are of interest
+        with open(context.usdInstDir + '/jpegBuild.txt', 'wt') as file:
+            file.write('ARCHIVE:' + jpeg_url.split("/")[-1] + '\n')
+            file.write('BUILDFOLDER:' + os.path.split(os.getcwd())[1] + '\n')
+            file.write('CONFIGURE:' + configureCmd + '\n')
+            file.write('MAKE:' + makeCmd + '\n')
 
 JPEG = Dependency("JPEG", InstallJPEG, "include/jpeglib.h")
 
@@ -2435,6 +2458,10 @@ for dir in [context.usdInstDir, context.instDir, context.srcDir,
                    "or choose a different location to install to."
                    .format(dir=dir))
         sys.exit(1)
+
+# Output paths that are of interest
+with open(context.usdInstDir + '/buildFolders.txt', 'wt') as file:
+    file.write('SOURCE:' + context.usdSrcDir + '\n')
 
 try:
     # Download and install 3rd-party dependencies, followed by USD.
