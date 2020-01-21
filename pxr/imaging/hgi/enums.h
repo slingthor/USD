@@ -63,13 +63,19 @@ typedef HgiBits HgiDeviceCapabilities;
 ///   The texture is sampled from in a shader (image load / sampling)</li>
 /// <li>HgiTextureUsageBitsShaderWrite:
 ///   The texture is written into from in a shader (image store)</li>
+///
+/// <li>HgiTextureUsageCustomBitsBegin:
+///   This bit (and any bit after) can be used to attached custom, backend
+///   specific  bits to the usage bit. </li>
 /// </ul>
 ///
 enum HgiTextureUsageBits : HgiBits {
-    HgiTextureUsageBitsColorTarget  = 1 << 0,
-    HgiTextureUsageBitsDepthTarget  = 1 << 1,
-    HgiTextureUsageBitsShaderRead   = 1 << 2,
-    HgiTextureUsageBitsShaderWrite  = 1 << 3,
+    HgiTextureUsageBitsColorTarget = 1 << 0,
+    HgiTextureUsageBitsDepthTarget = 1 << 1,
+    HgiTextureUsageBitsShaderRead  = 1 << 2,
+    HgiTextureUsageBitsShaderWrite = 1 << 3,
+
+    HgiTextureUsageCustomBitsBegin = 1 << 4,
 };
 
 typedef HgiBits HgiTextureUsage;
@@ -122,24 +128,35 @@ enum HgiAttachmentStoreOp {
     HgiAttachmentStoreOpStore,
 };
 
-/// \enum HgiBufferUsage
+/// \enum HgiBufferUsageBits
 ///
-/// Describes how the buffer will be used.
+/// Describes the properties and usage of the buffer.
 ///
 /// <ul>
-/// <li>HgiBufferUsageVertexData:
-///   The buffer contains vertex data.</li>
-/// <li>HgiBufferUsageIndices:
-///   The buffer contains indices for indexed draw calls.</li>
-/// <li>HgiTextureUsageUniform:
-///   The buffer contains data to be read within shader programs.</li>
+/// <li>HgiBufferUsageUniform:
+///   Shader uniform buffer </li>
+/// <li>HgiBufferUsageIndex32:
+///   Topology 32 bit indices.</li>
+/// <li>HgiBufferUsageVertex:
+///   Vertex attributes.</li>
+/// <li>HgiBufferUsageStorage:
+///   Shader storage buffer / Argument buffer.</li>
+///
+/// <li>HgiBufferUsageCustomBitsBegin:
+///   This bit (and any bit after) can be used to attached custom, backend
+///   specific  bits to the usage bit. </li>
 /// </ul>
 ///
-enum HgiBufferUsage {
-    HgiBufferUsageVertexData = 0,
-    HgiBufferUsageIndices,
-    HgiBufferUsageUniforms,
+enum HgiBufferUsageBits : HgiBits {
+    HgiBufferUsageUniform = 1 << 0,
+    HgiBufferUsageIndex32 = 1 << 1,
+    HgiBufferUsageVertex  = 1 << 2,
+    HgiBufferUsageStorage = 1 << 3,
+
+    HgiBufferUsageCustomBitsBegin = 1 << 4,
 };
+typedef HgiBits HgiBufferUsage;
+
 
 PXR_NAMESPACE_CLOSE_SCOPE
 

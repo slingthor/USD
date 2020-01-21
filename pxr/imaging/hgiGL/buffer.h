@@ -1,5 +1,5 @@
 //
-// Copyright 2019 Pixar
+// Copyright 2020 Pixar
 //
 // Licensed under the Apache License, Version 2.0 (the "Apache License")
 // with the following modification; you may not use this file except in
@@ -33,29 +33,29 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 /// \class HgiGLBuffer
 ///
-/// Represents a OpenGL GPU buffer resource.
+/// Represents an OpenGL GPU buffer resource.
 ///
 class HgiGLBuffer final : public HgiBuffer {
 public:
     HGIGL_API
-    HgiGLBuffer(HgiBufferDesc const & desc);
-
-    HGIGL_API
     virtual ~HgiGLBuffer();
-    
-    HGIGL_API
-    virtual void Copy(void const *data, size_t offset, size_t size);
 
     uint32_t GetBufferId() const {return _bufferId;}
+
+protected:
+    friend class HgiGL;
+
+    HGIGL_API
+    HgiGLBuffer(HgiBufferDesc const & desc);
 
 private:
     HgiGLBuffer() = delete;
     HgiGLBuffer & operator=(const HgiGLBuffer&) = delete;
     HgiGLBuffer(const HgiGLBuffer&) = delete;
 
-    uint32_t _target;
-    size_t _length;
+    HgiBufferDesc _descriptor;
     uint32_t _bufferId;
+    void* _mapped;
 };
 
 

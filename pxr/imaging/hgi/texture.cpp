@@ -36,7 +36,8 @@ HgiTexture::~HgiTexture()
 bool operator==(const HgiTextureDesc& lhs,
     const HgiTextureDesc& rhs) 
 {
-    return  lhs.usage == rhs.usage &&
+    return  lhs.debugName == rhs.debugName &&
+            lhs.usage == rhs.usage &&
             lhs.format == rhs.format &&
             lhs.dimensions == rhs.dimensions &&
             lhs.sampleCount == rhs.sampleCount;

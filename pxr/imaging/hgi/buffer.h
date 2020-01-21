@@ -1,5 +1,5 @@
 //
-// Copyright 2019 Pixar
+// Copyright 2020 Pixar
 //
 // Licensed under the Apache License, Version 2.0 (the "Apache License")
 // with the following modification; you may not use this file except in
@@ -24,6 +24,9 @@
 #ifndef PXR_IMAGING_HGI_BUFFER_H
 #define PXR_IMAGING_HGI_BUFFER_H
 
+#include <string>
+#include <vector>
+
 #include "pxr/pxr.h"
 #include "pxr/base/gf/vec3i.h"
 #include "pxr/imaging/hgi/api.h"
@@ -40,6 +43,9 @@ struct HgiBufferDesc;
 /// \class HgiBuffer
 ///
 /// Represents a graphics platform independent GPU buffer resource.
+/// Buffers should be created via Hgi::CreateBuffer.
+/// The fill the buffer with data you supply `initialData` in the descriptor.
+/// To update the data in a buffer later, use a blitEncoder.
 ///
 /// Base class for Hgi buffers.
 /// To the client (HdSt) buffer resources are referred to via
@@ -48,13 +54,11 @@ struct HgiBufferDesc;
 class HgiBuffer {
 public:
     HGI_API
-    HgiBuffer(HgiBufferDesc const& desc);
-
-    HGI_API
     virtual ~HgiBuffer();
-    
+
+protected:
     HGI_API
-    virtual void Copy(void const *data, size_t offset, size_t size) = 0;
+    HgiBuffer(HgiBufferDesc const& desc);
 
 private:
     HgiBuffer() = delete;
@@ -63,7 +67,7 @@ private:
 };
 
 typedef HgiBuffer* HgiBufferHandle;
-
+typedef std::vector<HgiBufferHandle> HgiBufferHandleVector;
 
 
 /// \struct HgiBufferDesc
@@ -71,18 +75,31 @@ typedef HgiBuffer* HgiBufferHandle;
 /// Describes the properties needed to create a GPU buffer.
 ///
 /// <ul>
-/// <li>length:
-///   The size of the buffer in bytes.</li>
+/// <li>debugName:
+///   This label can be applied as debug label for gpu debugging.</li>
+/// <li>usage:
+///   Bits describing the intended usage and properties of the buffer.</li>
+/// <li>byteSize:
+///   Length of buffer in bytes</li>
+/// <li>initialData:
+///   CPU pointer to initialization data of buffer.
+///   The memory is consumed immediately during the creation of the HgiBuffer.
+///   The application may alter or free this memory as soon as the constructor
+///   of the HgiBuffer has returned.</li>
 /// </ul>
 ///
 struct HgiBufferDesc {
+    HGI_API
     HgiBufferDesc()
-    : usage(HgiBufferUsageUniforms)
-    , length(0)
+    : usage(HgiBufferUsageUniform)
+    , byteSize(0)
+    , initialData(nullptr)
     {}
 
+    std::string debugName;
     HgiBufferUsage usage;
-    size_t length;
+    size_t byteSize;
+    void const* initialData;
 };
 
 HGI_API

@@ -1,5 +1,5 @@
 //
-// Copyright 2019 Pixar
+// Copyright 2020 Pixar
 //
 // Licensed under the Apache License, Version 2.0 (the "Apache License")
 // with the following modification; you may not use this file except in
@@ -33,18 +33,25 @@ HgiBuffer::~HgiBuffer()
 {
 }
 
-bool operator==(const HgiBufferDesc& lhs,
+bool operator==(
+    const HgiBufferDesc& lhs,
     const HgiBufferDesc& rhs)
 {
-    return  lhs.usage == rhs.usage &&
-            lhs.length == rhs.length;
+    return lhs.debugName == rhs.debugName &&
+           lhs.usage == rhs.usage &&
+           lhs.byteSize == rhs.byteSize
+           // Omitted because data ptr should not be held onto
+           // lhs.initialData == rhs.initialData &&
+    ;
 }
 
-bool operator!=(const HgiBufferDesc& lhs,
+bool operator!=(
+    const HgiBufferDesc& lhs,
     const HgiBufferDesc& rhs)
 {
     return !(lhs == rhs);
 }
+
 
 
 PXR_NAMESPACE_CLOSE_SCOPE
