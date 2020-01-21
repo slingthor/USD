@@ -658,8 +658,6 @@ HdPrman_Context::ConvertCategoriesToAttributes(
     if (categories.empty()) {
         attrs.SetString( RixStr.k_lightfilter_subset,
                          RtUString("") );
-        attrs.SetString( RixStr.k_lightfilter_subset,
-                         RtUString("") );
         attrs.SetString( RixStr.k_lighting_subset,
                          RtUString("default") );
         TF_DEBUG(HDPRMAN_LIGHT_LINKING)
