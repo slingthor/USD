@@ -878,6 +878,7 @@ class StageView(QtOpenGL.QGLWidget):
 
         self._renderer = None
         self._renderPauseState = False
+        self._renderStopState = False
         self._reportedContextError = False
         self._renderModeDict = {
             RenderModes.WIREFRAME: UsdImagingGL.DrawMode.DRAW_WIREFRAME,
@@ -945,6 +946,7 @@ class StageView(QtOpenGL.QGLWidget):
         self._rendererDisplayName = self.GetRendererDisplayName(rendererId)
         self._rendererAovName = "color"
         self._renderPauseState = False
+        self._renderStopState = False
         # XXX For HdSt we explicitely enable AOV via SetRendererAov
         # This is because ImagingGL / TaskController are spawned via prims in
         # Presto, so we default AOVs OFF until everything is AOV ready.
@@ -1029,6 +1031,24 @@ class StageView(QtOpenGL.QGLWidget):
     def IsPauseRendererSupported(self):
         if self._renderer:
             if self._renderer.IsPauseRendererSupported():
+                return True
+
+        return False
+
+    def IsRendererConverged(self):
+        return self._renderer and self._renderer.IsConverged()
+
+    def SetRendererStopped(self, stopped):
+        if self._renderer:
+            if stopped:
+                self._renderStopState = self._renderer.StopRenderer()
+            else:
+                self._renderStopState = not self._renderer.RestartRenderer()
+            self.updateGL()
+
+    def IsStopRendererSupported(self):
+        if self._renderer:
+            if self._renderer.IsStopRendererSupported():
                 return True
 
         return False
@@ -1794,6 +1814,10 @@ class StageView(QtOpenGL.QGLWidget):
             for task in uiTasks:
                 task.Execute(None)
 
+            # check current state of renderer -- (not IsConverged()) means renderer is running
+            if self._renderStopState and (not renderer.IsConverged()):
+                self._renderStopState = False
+
             # ### DRAW HUD ### #
             if self._dataModel.viewSettings.showHUD:
                 self.drawHUD(renderer)
@@ -1863,6 +1887,8 @@ class StageView(QtOpenGL.QGLWidget):
 
         if self._renderPauseState:
             toPrint = {"Hydra": "(paused)"}
+        elif self._renderStopState:
+            toPrint = {"Hydra": "(stopped)"}
         else:
             toPrint = {"Hydra": hydraMode}
             
@@ -1899,7 +1925,7 @@ class StageView(QtOpenGL.QGLWidget):
                 self._dataModel.renderStats.append(stat)
 
             toPrint["GL prims "] = self._glPrimitiveGeneratedQuery.GetResult()
-            if not self._renderPauseState:
+            if not (self._renderPauseState or self._renderStopState):
                 toPrint["GPU time "] = "%.2f ms " % (self._glTimeElapsedQuery.GetResult() / 1000000.0)
             _addSizeMetric(toPrint, rStats, "GPU mem  ", "gpuMemoryUsed")
             _addSizeMetric(toPrint, rStats, " primvar ", "primvar")
@@ -1911,7 +1937,8 @@ class StageView(QtOpenGL.QGLWidget):
                 toPrint["Samples done "] = rStats["numCompletedSamples"]
 
         # Playback Rate
-        if (not self._renderPauseState) and self._dataModel.viewSettings.showHUD_Performance:
+        if (not (self._renderPauseState or self._renderStopState)) and \
+                            self._dataModel.viewSettings.showHUD_Performance:
             for key in self.fpsHUDKeys:
                 toPrint[key] = self.fpsHUDInfo[key]
         self._hud.updateGroup("BottomLeft",
