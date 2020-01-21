@@ -1608,6 +1608,18 @@ def InstallUSD(context, force, buildArgs):
                 extraArgs.append('-DPXR_BUILD_OPENCOLORIO_PLUGIN=ON')
             else:
                 extraArgs.append('-DPXR_BUILD_OPENCOLORIO_PLUGIN=OFF')
+        
+            if context.enableOpenGL:
+                extraArgs.append('-DPXR_ENABLE_GL_SUPPORT=ON')
+            else:
+                extraArgs.append('-DPXR_ENABLE_GL_SUPPORT=OFF')
+
+            if MacOS() or iOS():
+                extraArgs.append('-DPXR_ENABLE_METAL_SUPPORT=ON')
+            else:
+                extraArgs.append('-DPXR_ENABLE_METAL_SUPPORT=OFF')
+
+            extraArgs += buildArgs
 
         else:
             extraArgs.append('-DPXR_BUILD_IMAGING=OFF')
@@ -1671,19 +1683,11 @@ def InstallUSD(context, force, buildArgs):
 
         if MacOS() or iOS():
             extraArgs.append('-DCMAKE_CXX_FLAGS="-x objective-c++"')
-            extraArgs.append('-DPXR_ENABLE_METAL_SUPPORT=ON')
-        else:
-            extraArgs.append('-DPXR_ENABLE_METAL_SUPPORT=OFF')
 
         if iOS():
             # some build options are implicit with this
             extraArgs.append('-G Xcode')
         
-        if context.enableOpenGL:
-            extraArgs.append('-DPXR_ENABLE_GL_SUPPORT=ON')
-        else:
-            extraArgs.append('-DPXR_ENABLE_GL_SUPPORT=OFF')
-
         extraArgs += buildArgs
 
         RunCMake(context, force, extraArgs)
