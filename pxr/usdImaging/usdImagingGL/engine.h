@@ -469,6 +469,13 @@ public:
     /// @}
 
 protected:
+    
+    struct ResourceFactoryGuard {
+        ResourceFactoryGuard(HdStResourceFactoryInterface *resourceFactory);
+        ~ResourceFactoryGuard();
+        
+        static std::recursive_mutex contextLock;
+    };
 
     /// Open some protected methods for whitebox testing.
     friend class UsdImagingGL_UnitTestGLDrawing;

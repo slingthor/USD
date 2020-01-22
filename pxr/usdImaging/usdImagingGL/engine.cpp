@@ -129,6 +129,21 @@ _IsHydraEnabled(const UsdImagingGLEngine::RenderAPI api)
 
 } // anonymous namespace
 
+std::recursive_mutex UsdImagingGLEngine::ResourceFactoryGuard::contextLock;
+
+UsdImagingGLEngine::ResourceFactoryGuard::ResourceFactoryGuard(HdStResourceFactoryInterface *resourceFactory) {
+    contextLock.lock();
+    GarchResourceFactory::GetInstance().SetResourceFactory(
+        dynamic_cast<GarchResourceFactoryInterface*>(resourceFactory));
+    HdStResourceFactory::GetInstance().SetResourceFactory(resourceFactory);
+}
+
+UsdImagingGLEngine::ResourceFactoryGuard::~ResourceFactoryGuard() {
+    GarchResourceFactory::GetInstance().SetResourceFactory(NULL);
+    HdStResourceFactory::GetInstance().SetResourceFactory(NULL);
+    contextLock.unlock();
+}
+
 //----------------------------------------------------------------------------
 // Global State
 //----------------------------------------------------------------------------
@@ -189,10 +204,6 @@ UsdImagingGLEngine::UsdImagingGLEngine(const RenderAPI api)
         TF_FATAL_CODING_ERROR("No valid rendering API specified: %d", _renderAPI);
     }
     
-    GarchResourceFactory::GetInstance().SetResourceFactory(
-        dynamic_cast<GarchResourceFactoryInterface*>(_resourceFactory));
-    HdStResourceFactory::GetInstance().SetResourceFactory(_resourceFactory);
-
     if (IsHydraEnabled()) {
 
         // _renderIndex, _taskController, and _delegate are initialized
@@ -262,11 +273,6 @@ UsdImagingGLEngine::UsdImagingGLEngine(
         TF_FATAL_CODING_ERROR("No valid rendering API specified: %d", _renderAPI);
     }
 
-    
-    GarchResourceFactory::GetInstance().SetResourceFactory(
-        dynamic_cast<GarchResourceFactoryInterface*>(_resourceFactory));
-    HdStResourceFactory::GetInstance().SetResourceFactory(_resourceFactory);
-
     if (IsHydraEnabled()) {
 
         // _renderIndex, _taskController, and _delegate are initialized
@@ -294,15 +300,11 @@ UsdImagingGLEngine::UsdImagingGLEngine(
 }
 
 UsdImagingGLEngine::~UsdImagingGLEngine()
-{ 
-    GarchResourceFactory::GetInstance().SetResourceFactory(
-        dynamic_cast<GarchResourceFactoryInterface*>(_resourceFactory));
-    HdStResourceFactory::GetInstance().SetResourceFactory(_resourceFactory);
-
-    _DeleteHydraResources();
-
-    GarchResourceFactory::GetInstance().SetResourceFactory(NULL);
-    HdStResourceFactory::GetInstance().SetResourceFactory(NULL);
+{
+    {
+        ResourceFactoryGuard guard(_resourceFactory);
+        _DeleteHydraResources();
+    }
 
     delete _engine;
     _engine = NULL;
@@ -362,9 +364,7 @@ UsdImagingGLEngine::RenderBatch(
         return;
     }
 
-    GarchResourceFactory::GetInstance().SetResourceFactory(
-        dynamic_cast<GarchResourceFactoryInterface*>(_resourceFactory));
-    HdStResourceFactory::GetInstance().SetResourceFactory(_resourceFactory);
+    ResourceFactoryGuard guard(_resourceFactory);
 
     TF_VERIFY(_taskController);
 
@@ -401,9 +401,6 @@ UsdImagingGLEngine::RenderBatch(
     VtValue selectionValue(_selTracker);
     _engine->SetTaskContextData(HdxTokens->selectionState, selectionValue);
     _Execute(params, _taskController->GetRenderingTasks());
-
-    HdStResourceFactory::GetInstance().SetResourceFactory(NULL);
-    GarchResourceFactory::GetInstance().SetResourceFactory(NULL);
 }
 
 void 
@@ -632,6 +629,8 @@ UsdImagingGLEngine::SetLightingState(
     }
 
     TF_VERIFY(_taskController);
+    
+    ResourceFactoryGuard guard(_resourceFactory);
 
     // we still use _lightingContextForOpenGLState for convenience, but
     // set the values directly.
@@ -756,10 +755,7 @@ UsdImagingGLEngine::TestIntersection(
 #endif
     }
 
-
-    GarchResourceFactory::GetInstance().SetResourceFactory(
-        dynamic_cast<GarchResourceFactoryInterface*>(_resourceFactory));
-    HdStResourceFactory::GetInstance().SetResourceFactory(_resourceFactory);
+    ResourceFactoryGuard guard(_resourceFactory);
 
     TF_VERIFY(_delegate);
 #if defined(ARCH_GFX_METAL)
@@ -837,9 +833,6 @@ UsdImagingGLEngine::TestIntersection(
         *outHitElementIndex = hit.elementIndex;
     }
 
-
-    HdStResourceFactory::GetInstance().SetResourceFactory(NULL);
-    GarchResourceFactory::GetInstance().SetResourceFactory(NULL);
     return true;
 }
 
@@ -965,6 +958,8 @@ UsdImagingGLEngine::SetRendererPlugin(TfToken const &pluginId, bool forceReload)
     if (ARCH_UNLIKELY(_legacyImpl)) {
         return false;
     }
+    
+    ResourceFactoryGuard guard(_resourceFactory);
 
     HdRendererPlugin *plugin = nullptr;
     TfToken actualId = pluginId;
@@ -1080,6 +1075,8 @@ UsdImagingGLEngine::SetRendererAov(TfToken const &id)
     if (ARCH_UNLIKELY(_legacyImpl)) {
         return false;
     }
+    
+    ResourceFactoryGuard guard(_resourceFactory);
 
     TF_VERIFY(_renderIndex);
     if (_renderIndex->IsBprimTypeSupported(HdPrimTypeTokens->renderBuffer)) {
@@ -1153,6 +1150,8 @@ UsdImagingGLEngine::SetRendererSetting(
     if (ARCH_UNLIKELY(_legacyImpl)) {
         return;
     }
+    
+    ResourceFactoryGuard guard(_resourceFactory);
 
     TF_VERIFY(_renderIndex);
     _renderIndex->GetRenderDelegate()->SetRenderSetting(settingId, value);
