@@ -182,6 +182,7 @@ bool ShouldCullFace(bool frontFacing, bool doubleSided)
 
 void ApplyClipPlanes(vec4 Peye)
 {
+#if 0
 #if defined(HD_HAS_clipPlanes)
 #if defined(HD_NUM_clipPlanes) // more than 1 (clipPlanes[N])
     for (int i=0; i<HD_NUM_clipPlanes; ++i) {
@@ -189,6 +190,7 @@ void ApplyClipPlanes(vec4 Peye)
     }
 #else                          // only 1      (clipPlanes)
     gl_ClipDistance[0] = dot(HdGet_clipPlanes(), Peye);
+#endif
 #endif
 #endif
 }
