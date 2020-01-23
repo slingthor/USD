@@ -467,8 +467,11 @@ public:
     VtDictionary GetRenderStats() const;
 
     /// @}
-
-protected:
+    
+    USDIMAGINGGL_API
+    HdStResourceFactoryInterface *GetResourceFactory() {
+        return _resourceFactory;
+    }
     
     struct ResourceFactoryGuard {
         ResourceFactoryGuard(HdStResourceFactoryInterface *resourceFactory);
@@ -476,6 +479,8 @@ protected:
         
         static std::recursive_mutex contextLock;
     };
+
+protected:
 
     /// Open some protected methods for whitebox testing.
     friend class UsdImagingGL_UnitTestGLDrawing;
