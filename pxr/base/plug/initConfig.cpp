@@ -23,7 +23,6 @@
 //
 
 #include "pxr/pxr.h"
-#include "pxr/base/plug/debugCodes.h"
 #include "pxr/base/plug/info.h"
 #include "pxr/base/tf/diagnosticLite.h"
 #include "pxr/base/tf/getenv.h"
@@ -37,9 +36,6 @@
 #include <boost/preprocessor/stringize.hpp>
 
 PXR_NAMESPACE_OPEN_SCOPE
-
-// Defined in debugCodes.cpp  See comment there for explanation.
-void Plug_RegistryFunctionForTfDebug();
 
 namespace {
 
@@ -75,9 +71,6 @@ _AppendPathList(
 
 ARCH_CONSTRUCTOR(Plug_InitConfig, 2, void)
 {
-    // Defined in debugCodes.cpp  See comment there for explanation.
-    Plug_RegistryFunctionForTfDebug();
-    
     std::vector<std::string> result;
 
     std::vector<std::string> debugMessages;
