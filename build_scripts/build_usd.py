@@ -1741,11 +1741,14 @@ def InstallUSD(context, force, buildArgs):
 
         RunCMake(context, force, extraArgs)
 
-        # fake src folder
+        # fake src folder, to communicate original USD source folder
         srcDir = os.path.join(context.srcDir, 'USD')
         if not os.path.isdir(srcDir):
             os.mkdir(srcDir)
-        return srcDir
+        with open(os.path.join(srcDir, 'metadata.txt'), 'wt') as file:
+            file.write('NAME:' + 'USD' + '\n')
+            file.write('PATH:' + context.usdSrcDir + '\n')
+        return ''
 
 USD = Dependency("USD", InstallUSD, "include/pxr/pxr.h")
 
@@ -2498,9 +2501,10 @@ try:
         sourcePath = dep.installer(context, 
                       buildArgs=context.GetBuildArguments(dep),
                       force=context.ForceBuildDependency(dep))
-        with open(os.path.join(sourcePath, 'metadata.txt'), 'wt') as file:
-            file.write('NAME:' + dep.name + '\n')
-            file.write('PATH:' + os.path.split(sourcePath)[1] + '\n')
+        if (os.path.isdir(sourcePath)):
+            with open(os.path.join(sourcePath, 'metadata.txt'), 'wt') as file:
+                file.write('NAME:' + dep.name + '\n')
+                file.write('PATH:' + sourcePath + '\n')
 except Exception as e:
     PrintError(str(e))
     sys.exit(1)
