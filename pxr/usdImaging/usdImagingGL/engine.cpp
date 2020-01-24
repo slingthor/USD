@@ -595,6 +595,8 @@ UsdImagingGLEngine::SetLightingStateFromOpenGL()
     }
 
     TF_VERIFY(_taskController);
+    
+    ResourceFactoryGuard guard(_resourceFactory);
 
     if (!_lightingContextForOpenGLState) {
         _lightingContextForOpenGLState = GarchSimpleLightingContext::New();
