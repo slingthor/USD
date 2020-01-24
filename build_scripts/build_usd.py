@@ -865,7 +865,13 @@ def InstallTBB_LinuxOrMacOS(context, force, buildArgs):
             file.write('BUILDFOLDER:' + os.path.split(os.getcwd())[1] + '\n')
             file.write('MAKE:' + makeCmd + '\n')
 
+        # Install both release and debug builds. USD requires the debug
+        # libraries when building in debug mode, and installing both
+        # makes it easier for users to install dependencies in some
+        # location that can be shared by both release and debug USD
+        # builds. Plus, the TBB build system builds both versions anyway.
         CopyFiles(context, "build/*_release/libtbb*.*", "lib")
+        CopyFiles(context, "build/*_debug/libtbb*.*", "lib")
         CopyDirectory(context, "include/serial", "include/serial")
         CopyDirectory(context, "include/tbb", "include/tbb")
         return os.getcwd()
