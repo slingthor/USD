@@ -623,6 +623,7 @@ def InstallZlib(context, force, buildArgs):
                  ("add_executable(minigzip test/minigzip.c)", "add_library(minigzip STATIC test/minigzip.c)")])
 
         RunCMake(context, force, buildArgs)
+        return os.getcwd()
 
 ZLIB = Dependency("zlib", InstallZlib, "include/zlib.h")
 
@@ -765,7 +766,7 @@ def InstallBoost(context, force, buildArgs):
         Run(b2Cmd)
 
         # Output paths that are of interest
-        with open(context.usdInstDir + '/boostBuild.txt', 'wt') as file:
+        with open(os.path.join(context.usdInstDir, 'boostBuild.txt'), 'wt') as file:
             file.write('ARCHIVE:' + BOOST_URL.split("/")[-1] + '\n')
             file.write('BUILDFOLDER:' + os.path.split(os.getcwd())[1] + '\n')
             file.write('BOOTSTRAP:' + bootstrapCmd + '\n')
@@ -783,6 +784,8 @@ def InstallBoost(context, force, buildArgs):
                         os.remove(newFilename)
                     os.rename(oldFilename, newFilename)
 
+        return os.getcwd()
+
 
 BOOST = Dependency("boost", InstallBoost, BOOST_VERSION_FILE)
 
@@ -798,9 +801,9 @@ else:
 
 def InstallTBB(context, force, buildArgs):
     if Windows():
-        InstallTBB_Windows(context, force, buildArgs)
+        return InstallTBB_Windows(context, force, buildArgs)
     elif Linux() or MacOS() or iOS():
-        InstallTBB_LinuxOrMacOS(context, force, buildArgs)
+        return InstallTBB_LinuxOrMacOS(context, force, buildArgs)
 
 def InstallTBB_Windows(context, force, buildArgs):
     with CurrentWorkingDirectory(DownloadURL(TBB_URL, context, force)):
@@ -816,6 +819,7 @@ def InstallTBB_Windows(context, force, buildArgs):
         CopyFiles(context, "lib\\intel64\\vc14\\*.*", "lib")
         CopyDirectory(context, "include\\serial", "include\\serial")
         CopyDirectory(context, "include\\tbb", "include\\tbb")
+        return os.getcwd()
 
 def InstallTBB_LinuxOrMacOS(context, force, buildArgs):
     with CurrentWorkingDirectory(DownloadURL(TBB_URL, context, force)):
@@ -841,7 +845,7 @@ def InstallTBB_LinuxOrMacOS(context, force, buildArgs):
         Run(makeCmd)
 
         # Output paths that are of interest
-        with open(context.usdInstDir + '/tbbBuild.txt', 'wt') as file:
+        with open(os.path.join(context.usdInstDir, 'tbbBuild.txt'), 'wt') as file:
             file.write('ARCHIVE:' + TBB_URL.split("/")[-1] + '\n')
             file.write('BUILDFOLDER:' + os.path.split(os.getcwd())[1] + '\n')
             file.write('MAKE:' + makeCmd + '\n')
@@ -849,6 +853,7 @@ def InstallTBB_LinuxOrMacOS(context, force, buildArgs):
         CopyFiles(context, "build/*_release/libtbb*.*", "lib")
         CopyDirectory(context, "include/serial", "include/serial")
         CopyDirectory(context, "include/tbb", "include/tbb")
+        return os.getcwd()
 
 def updateTBBIOS(context):
     filename = context.instDir + '/src/tbb-2019_U7/build/macos.clang.inc'
@@ -880,13 +885,13 @@ TBB = Dependency("TBB", InstallTBB, "include/tbb/tbb.h")
 
 def InstallJPEG(context, force, buildArgs):
     if Windows():
-        InstallJPEG_Turbo("https://github.com/libjpeg-turbo/libjpeg-turbo/archive/1.5.1.zip",
+        return InstallJPEG_Turbo("https://github.com/libjpeg-turbo/libjpeg-turbo/archive/1.5.1.zip",
             context, force, buildArgs)
     elif iOS():
-        InstallJPEG_Turbo("https://github.com/libjpeg-turbo/libjpeg-turbo/archive/2.0.1.zip",
+        return InstallJPEG_Turbo("https://github.com/libjpeg-turbo/libjpeg-turbo/archive/2.0.1.zip",
             context, force, buildArgs)
     else:
-        InstallJPEG_Lib("https://www.ijg.org/files/jpegsrc.v9b.tar.gz",
+        return InstallJPEG_Lib("https://www.ijg.org/files/jpegsrc.v9b.tar.gz",
             context, force, buildArgs)
 
 def InstallJPEG_Turbo(jpeg_url, context, force, buildArgs):
@@ -928,6 +933,7 @@ def InstallJPEG_Turbo(jpeg_url, context, force, buildArgs):
                   "add_library(jcstest STATIC ../jcstest.c)")])
 
         RunCMake(context, force, extraArgs)
+        return os.getcwd()
 
 def InstallJPEG_Lib(jpeg_url, context, force, buildArgs):
     with CurrentWorkingDirectory(DownloadURL(jpeg_url, context, force)):
@@ -940,11 +946,13 @@ def InstallJPEG_Lib(jpeg_url, context, force, buildArgs):
         Run(makeCmd)
 
         # Output paths that are of interest
-        with open(context.usdInstDir + '/jpegBuild.txt', 'wt') as file:
+        with open(os.path.join(context.usdInstDir, 'jpegBuild.txt'), 'wt') as file:
             file.write('ARCHIVE:' + jpeg_url.split("/")[-1] + '\n')
             file.write('BUILDFOLDER:' + os.path.split(os.getcwd())[1] + '\n')
             file.write('CONFIGURE:' + configureCmd + '\n')
             file.write('MAKE:' + makeCmd + '\n')
+
+        return os.getcwd()
 
 JPEG = Dependency("JPEG", InstallJPEG, "include/jpeglib.h")
 
@@ -978,6 +986,7 @@ def InstallTIFF(context, force, buildArgs):
                     [("add_subdirectory(contrib)", "# add_subdirectory(contrib)")])
 
         RunCMake(context, force, buildArgs)
+        return os.getcwd()
 
 TIFF = Dependency("TIFF", InstallTIFF, "include/tiff.h")
 
@@ -1005,6 +1014,7 @@ def InstallPNG(context, force, buildArgs):
                   "add_library(png-fix-itxt STATIC ${png_fix_itxt_sources})")])
 
         RunCMake(context, force, extraArgs)
+        return os.getcwd()
 
 PNG = Dependency("PNG", InstallPNG, "include/png.h")
 
@@ -1094,6 +1104,8 @@ def InstallOpenEXR(context, force, buildArgs):
         RunCMake(context, force,
                  ['-DILMBASE_PACKAGE_PREFIX="{instDir}"'
                   .format(instDir=context.instDir)] + buildArgs)
+    
+    return srcDir
 
 def updateOpenEXRIOS(context, srcDir):
     # IlmBase
@@ -1148,9 +1160,9 @@ else:
 
 def InstallGLEW(context, force, buildArgs):
     if Windows():
-        InstallGLEW_Windows(context, force)
+        return InstallGLEW_Windows(context, force)
     elif Linux() or MacOS():
-        InstallGLEW_LinuxOrMacOS(context, force, buildArgs)
+        return InstallGLEW_LinuxOrMacOS(context, force, buildArgs)
 
 def InstallGLEW_Windows(context, force):
     with CurrentWorkingDirectory(DownloadURL(GLEW_URL, context, force)):
@@ -1163,12 +1175,15 @@ def InstallGLEW_Windows(context, force):
         CopyFiles(context, "lib\\Release\\x64\\glew32.lib", "lib")
         CopyDirectory(context, "include\\GL", "include\\GL")
 
+        return os.getcwd()
+
 def InstallGLEW_LinuxOrMacOS(context, force, buildArgs):
     with CurrentWorkingDirectory(DownloadURL(GLEW_URL, context, force)):
         Run('make GLEW_DEST="{instDir}" -j{procs} {buildArgs} install'
             .format(instDir=context.instDir,
                     procs=context.numJobs,
                     buildArgs=" ".join(buildArgs)))
+        return os.getcwd()
 
 GLEW = Dependency("GLEW", InstallGLEW, "include/GL/glew.h")
 
@@ -1179,9 +1194,9 @@ PTEX_URL = "https://github.com/wdas/ptex/archive/v2.1.28.zip"
 
 def InstallPtex(context, force, buildArgs):
     if Windows():
-        InstallPtex_Windows(context, force, buildArgs)
+        return InstallPtex_Windows(context, force, buildArgs)
     else:
-        InstallPtex_LinuxOrMacOS(context, force, buildArgs)
+        return InstallPtex_LinuxOrMacOS(context, force, buildArgs)
 
 def InstallPtex_Windows(context, force, buildArgs):
     with CurrentWorkingDirectory(DownloadURL(PTEX_URL, context, force)):
@@ -1202,6 +1217,7 @@ def InstallPtex_Windows(context, force, buildArgs):
                     "# add_definitions(-DPTEX_STATIC)")])
 
         RunCMake(context, force, buildArgs)
+        return os.getcwd()
 
 def InstallPtex_LinuxOrMacOS(context, force, buildArgs):
     with CurrentWorkingDirectory(DownloadURL(PTEX_URL, context, force)):
@@ -1213,6 +1229,7 @@ def InstallPtex_LinuxOrMacOS(context, force, buildArgs):
                  ("add_subdirectory(src/tests)", "# add_subdirectory(src/tests)")])
 
         RunCMake(context, force, buildArgs)
+        return os.getcwd()
 
 PTEX = Dependency("Ptex", InstallPtex, "include/PtexVersion.h")
 
@@ -1227,6 +1244,7 @@ BLOSC_URL = "https://github.com/Blosc/c-blosc/archive/v1.17.0.zip"
 def InstallOpenVDB(context, force, buildArgs):
     with CurrentWorkingDirectory(DownloadURL(BLOSC_URL, context, force)):
         RunCMake(context, force, buildArgs)
+        return os.getcwd()
 
 BLOSC = Dependency("Blosc", InstallOpenVDB, "include/blosc.h")
 
@@ -1259,6 +1277,7 @@ def InstallOpenVDB(context, force, buildArgs):
                          .format(instDir=context.instDir))
         
         RunCMake(context, force, extraArgs)
+        return os.getcwd()
 
 OPENVDB = Dependency("OpenVDB", InstallOpenVDB, "include/openvdb/openvdb.h")
 
@@ -1298,6 +1317,7 @@ def InstallOpenImageIO(context, force, buildArgs):
         extraArgs += buildArgs
 
         RunCMake(context, force, extraArgs)
+        return os.getcwd()
 
 OPENIMAGEIO = Dependency("OpenImageIO", InstallOpenImageIO,
                          "include/OpenImageIO/oiioversion.h")
@@ -1332,6 +1352,7 @@ def InstallOpenColorIO(context, force, buildArgs):
         extraArgs += buildArgs
 
         RunCMake(context, force, extraArgs)
+        return os.getcwd()
 
 OPENCOLORIO = Dependency("OpenColorIO", InstallOpenColorIO,
                          "include/OpenColorIO/OpenColorABI.h")
@@ -1428,6 +1449,7 @@ def InstallOpenSubdiv(context, force, buildArgs):
             os.unsetenv('SDKROOT')
         else:
             os.environ['SDKROOT'] = sdkroot
+        return os.getcwd()
 
 OPENSUBDIV = Dependency("OpenSubdiv", InstallOpenSubdiv, 
                         "include/opensubdiv/version.h")
@@ -1484,6 +1506,7 @@ def InstallHDF5(context, force, buildArgs):
                  ['-DBUILD_TESTING=OFF',
                   '-DHDF5_BUILD_TOOLS=OFF',
                   '-DHDF5_BUILD_EXAMPLES=OFF'] + buildArgs)
+        return os.getcwd()
                  
 HDF5 = Dependency("HDF5", InstallHDF5, "include/hdf5.h")
 
@@ -1516,6 +1539,7 @@ def InstallAlembic(context, force, buildArgs):
         cmakeOptions += buildArgs
 
         RunCMake(context, force, cmakeOptions)
+        return os.getcwd()
 
 ALEMBIC = Dependency("Alembic", InstallAlembic, "include/Alembic/Abc/Base.h")
 
@@ -1529,6 +1553,7 @@ def InstallDraco(context, force, buildArgs):
         cmakeOptions = ['-DBUILD_USD_PLUGIN=ON']
         cmakeOptions += buildArgs
         RunCMake(context, force, cmakeOptions)
+        return os.getcwd()
 
 DRACO = Dependency("Draco", InstallDraco, "include/Draco/src/draco/compression/decode.h")
 
@@ -1540,6 +1565,7 @@ MATERIALX_URL = "https://github.com/materialx/MaterialX/archive/v1.36.0.zip"
 def InstallMaterialX(context, force, buildArgs):
     with CurrentWorkingDirectory(DownloadURL(MATERIALX_URL, context, force)):
         RunCMake(context, force, buildArgs)
+        return os.getcwd()
 
 MATERIALX = Dependency("MaterialX", InstallMaterialX, "include/MaterialXCore/Library.h")
 
@@ -1714,6 +1740,12 @@ def InstallUSD(context, force, buildArgs):
         extraArgs += buildArgs
 
         RunCMake(context, force, extraArgs)
+
+        # fake src folder
+        srcDir = os.path.join(context.srcDir, 'USD')
+        if not os.path.isdir(srcDir):
+            os.mkdir(srcDir)
+        return srcDir
 
 USD = Dependency("USD", InstallUSD, "include/pxr/pxr.h")
 
@@ -2459,17 +2491,16 @@ for dir in [context.usdInstDir, context.instDir, context.srcDir,
                    .format(dir=dir))
         sys.exit(1)
 
-# Output paths that are of interest
-with open(context.usdInstDir + '/buildFolders.txt', 'wt') as file:
-    file.write('SOURCE:' + context.usdSrcDir + '\n')
-
 try:
     # Download and install 3rd-party dependencies, followed by USD.
     for dep in dependenciesToBuild + [USD]:
         PrintStatus("Installing {dep}...".format(dep=dep.name))
-        dep.installer(context, 
+        sourcePath = dep.installer(context, 
                       buildArgs=context.GetBuildArguments(dep),
                       force=context.ForceBuildDependency(dep))
+        with open(os.path.join(sourcePath, 'metadata.txt'), 'wt') as file:
+            file.write('NAME:' + dep.name + '\n')
+            file.write('PATH:' + os.path.split(sourcePath)[1] + '\n')
 except Exception as e:
     PrintError(str(e))
     sys.exit(1)
