@@ -1099,13 +1099,25 @@ def InstallOpenEXR(context, force, buildArgs):
                 multiLineMatches=True)
         RunCMake(context, force, buildArgs)
 
+        # fake IlmBase src folder
+        dummySrcDir = os.path.join(context.srcDir, 'IlmBase')
+        if not os.path.isdir(dummySrcDir):
+            os.mkdir(dummySrcDir)
+        with open(os.path.join(dummySrcDir, 'metadata.txt'), 'wt') as file:
+            file.write('NAME:' + 'IlmBase' + '\n')
+            file.write('PATH:' + ilmbaseSrcDir + '\n')
+
     openexrSrcDir = os.path.join(srcDir, "OpenEXR")
     with CurrentWorkingDirectory(openexrSrcDir):
         RunCMake(context, force,
                  ['-DILMBASE_PACKAGE_PREFIX="{instDir}"'
                   .format(instDir=context.instDir)] + buildArgs)
     
-    return srcDir
+    # manually output metadata.txt
+    with open(os.path.join(srcDir, 'metadata.txt'), 'wt') as file:
+        file.write('NAME:' + 'OpenEXR' + '\n')
+        file.write('PATH:' + openexrSrcDir + '\n')
+    return ''
 
 def updateOpenEXRIOS(context, srcDir):
     # IlmBase
@@ -2493,6 +2505,13 @@ for dir in [context.usdInstDir, context.instDir, context.srcDir,
                    "or choose a different location to install to."
                    .format(dir=dir))
         sys.exit(1)
+
+# Output dependency order
+with open(context.usdInstDir + '/dependencies.txt', 'wt') as file:
+    def GetName(dep):
+        return dep.name
+    deps = ','.join(map(GetName, requiredDependencies))
+    file.write('BUILDORDER:' + deps + '\n')
 
 try:
     # Download and install 3rd-party dependencies, followed by USD.
