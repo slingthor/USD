@@ -25,8 +25,8 @@
 #include "RtxPlugin.h"
 #include "RixInterfaces.h"
 #include "pxr/imaging/glf/glew.h"
-#include "pxr/imaging/glf/image.h"
-#include "pxr/imaging/glf/utils.h"
+#include "pxr/imaging/garch/image.h"
+#include "pxr/imaging/garch/utils.h"
 #include "pxr/base/gf/gamma.h"
 #include <mutex>
 
@@ -40,10 +40,10 @@ namespace {
 
 // Per TextureCtx user data.
 struct RtxGlfImagePluginUserData {
-    GlfImageSharedPtr image;
+    GarchImageSharedPtr image;
 
     std::mutex mipLevelsMutex;
-    std::vector<GlfImage::StorageSpec> mipLevels;
+    std::vector<GarchImage::StorageSpec> mipLevels;
 };
 
 /// A Renderman Rtx texture plugin that uses GlfImage to read files,
@@ -145,7 +145,7 @@ RtxGlfImagePlugin::Open(TextureCtx& tCtx)
     }
 
     // Open GlfImage.
-    GlfImageSharedPtr image = GlfImage::OpenForReading(filename);
+    GarchImageSharedPtr image = GarchImage::OpenForReading(filename);
     if (!image) {
         m_msgHandler->ErrorAlways(
             "RtxGlfImagePlugin %p: "
@@ -205,12 +205,12 @@ RtxGlfImagePlugin::Fill(TextureCtx& tCtx, FillRequest& fillReq)
     assert(nullptr != data);
 
     // Find (or create) appropriate MIP level.
-    GlfImage::StorageSpec level;
+    GarchImage::StorageSpec level;
     level.flipped = true;
     {
         // Lock mutex while scanning or modifying mipLevels.
         std::lock_guard<std::mutex> lock(data->mipLevelsMutex);
-        for (GlfImage::StorageSpec &cachedLevel: data->mipLevels) {
+        for (GarchImage::StorageSpec &cachedLevel: data->mipLevels) {
             if (cachedLevel.width == fillReq.imgRes.X &&
                 cachedLevel.height == fillReq.imgRes.Y) {
                 level = cachedLevel;
@@ -244,8 +244,8 @@ RtxGlfImagePlugin::Fill(TextureCtx& tCtx, FillRequest& fillReq)
     const bool isSRGB = data->image->IsColorSpaceSRGB();
     const GLenum type = data->image->GetType();
 
-    const int numImageChannels = GlfGetNumElements(level.format);
-    const int bytesPerChannel = GlfGetElementSize(type);
+    const int numImageChannels = GarchGetNumElements(level.format);
+    const int bytesPerChannel = GarchGetElementSize(type);
 
     // Copy out tile data, one row at a time.
     const int bytesPerImagePixel = level.depth;
@@ -306,7 +306,7 @@ RtxGlfImagePlugin::Close(TextureCtx& tCtx)
 {
     RtxGlfImagePluginUserData* data = this->data(tCtx);
     if (nullptr != data) {
-        for (GlfImage::StorageSpec &cachedLevel: data->mipLevels) {
+        for (GarchImage::StorageSpec &cachedLevel: data->mipLevels) {
             delete [] (char*) cachedLevel.data;
         }
         delete data;
