@@ -44,7 +44,7 @@ HgiMetalBuffer::HgiMetalBuffer(HgiMetal *hgi, HgiBufferDesc const & desc)
     MTLResourceOptions resourceOptions =
         MTLResourceStorageModeDefault|MTLResourceCPUCacheModeDefaultCache;
     _bufferId = [hgi->GetDevice() newBufferWithLength:desc.length
-                                                   options:resourceOptions];
+                                              options:resourceOptions];
 }
 
 HgiMetalBuffer::~HgiMetalBuffer()
@@ -57,7 +57,9 @@ HgiMetalBuffer::~HgiMetalBuffer()
 
 void HgiMetalBuffer::Copy(void const *data, size_t offset, size_t size) {
     memcpy((uint8_t*)[_bufferId contents] + offset, data, size);
+#if defined(ARCH_OS_MACOS)
     [_bufferId didModifyRange:NSMakeRange(offset, size)];
+#endif
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

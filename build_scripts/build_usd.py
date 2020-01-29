@@ -2185,6 +2185,8 @@ except Exception as e:
 # Build target platform
 crossPlatform = args.crossPlatform
 
+context.enableOpenGL = context.enableOpenGL and not iOS()
+
 verbosity = args.verbosity
 
 # Augment PATH on Windows so that 3rd-party dependencies can find libraries
@@ -2222,7 +2224,7 @@ if context.buildImaging:
     if context.enablePtex:
         requiredDependencies += [PTEX]
 
-    if not iOS() and context.enableOpenGL:
+    if context.enableOpenGL:
         requiredDependencies += [GLEW]
 
     requiredDependencies += [OPENEXR, OPENSUBDIV]
