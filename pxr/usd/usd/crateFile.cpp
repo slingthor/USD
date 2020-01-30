@@ -101,9 +101,19 @@ _GetPageShift(unsigned int mask)
     return shift;
 }
 
-static unsigned int PAGESIZE = ArchGetPageSize();
-static uint64_t PAGEMASK = ~(static_cast<uint64_t>(PAGESIZE-1));
-static unsigned int PAGESHIFT = _GetPageShift(PAGEMASK);
+static unsigned int GET_PAGESIZE(void) {
+    static unsigned int size = ArchGetPageSize();
+    return size;
+}
+
+static uint64_t GET_PAGEMASK(void) {
+    static uint64_t size = ~(GET_PAGESIZE()-1);
+    return size;
+}
+
+#define PAGESIZE (GET_PAGESIZE())
+#define PAGEMASK (GET_PAGEMASK())
+#define PAGESHIFT _GetPageShift(PAGEMASK)
 
 TF_REGISTRY_FUNCTION(TfType) {
     TfType::Define<Usd_CrateFile::TimeSamples>();
@@ -2084,8 +2094,8 @@ CrateFile::Open(string const &assetPath)
 TfToken const &
 CrateFile::GetSoftwareVersionToken()
 {
-    static TfToken tok(_SoftwareVersion.AsString());
-    return tok;
+    static const auto tok = new TfToken(_SoftwareVersion.AsString());
+    return *tok;
 }
 
 TfToken
@@ -2216,7 +2226,7 @@ CrateFile::_InitAsset()
 
 CrateFile::~CrateFile()
 {
-    static std::mutex outputMutex;
+    static auto outputMutex = new std::mutex;
 
     // Dump a debug page map if requested.
     if (_useMmap && _mmapSrc && _debugPageMap) {
@@ -2250,7 +2260,7 @@ CrateFile::~CrateFile()
             }
         }
 
-        std::lock_guard<std::mutex> lock(outputMutex);
+        std::lock_guard<std::mutex> lock(*outputMutex);
 
         printf(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>"
                ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n"
@@ -3912,4 +3922,3 @@ static_assert(sizeof(_PathItemHeader_0_0_1) == 16, "");
 
 
 PXR_NAMESPACE_CLOSE_SCOPE
-

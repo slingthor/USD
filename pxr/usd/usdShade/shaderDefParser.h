@@ -59,7 +59,7 @@ public:
     const TfToken &GetSourceType() const override;    
 
 private:
-    static UsdStageCache _cache;
+    static UsdStageCache& _cache();
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

@@ -79,12 +79,10 @@ public:
     }
 
     /// The default constructor creates an empty range.
-    GfRange3d() {
-        SetEmpty();
-    }
+    constexpr GfRange3d() : _min(FLT_MAX), _max(-FLT_MAX) {}
 
     /// This constructor initializes the minimum and maximum points.
-    GfRange3d(const GfVec3d &min, const GfVec3d &max)
+    constexpr GfRange3d(const GfVec3d &min, const GfVec3d &max)
         : _min(min), _max(max)
     {
     }

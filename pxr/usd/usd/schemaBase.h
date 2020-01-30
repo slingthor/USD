@@ -147,8 +147,8 @@ public:
     GetSchemaAttributeNames(bool includeInherited=true)
     {
         /* This only exists for consistency */
-        static TfTokenVector names;
-        return names;
+        static const auto names = new TfTokenVector;
+        return *names;
     }
 
     /// Return true if this schema object is compatible with its held prim,

@@ -27,12 +27,19 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-const Usd_PrimFlagsConjunction UsdPrimDefaultPredicate = 
-    UsdPrimIsActive && UsdPrimIsDefined && 
-    UsdPrimIsLoaded && !UsdPrimIsAbstract;
+const Usd_PrimFlagsConjunction &GetUsdPrimDefaultPredicate(void) {
+    static const auto pred = new Usd_PrimFlagsConjunction(
+                                    UsdPrimIsActive && UsdPrimIsDefined &&
+                                    UsdPrimIsLoaded && !UsdPrimIsAbstract
+                            );
+    return *pred;
+}
 
-const Usd_PrimFlagsPredicate UsdPrimAllPrimsPredicate = 
-    Usd_PrimFlagsPredicate::Tautology();
+const Usd_PrimFlagsPredicate& GetUsdPrimAllPrimsPredicate()
+{
+    static const Usd_PrimFlagsPredicate UsdPrimallPrimsPredicate;
+    return UsdPrimallPrimsPredicate;
+}
 
 bool
 Usd_PrimFlagsPredicate::operator()(const UsdPrim &prim) const
@@ -55,4 +62,3 @@ Usd_PrimFlagsConjunction::operator!() const {
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE
-

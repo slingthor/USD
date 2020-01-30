@@ -2291,6 +2291,9 @@ static
 VtValue
 _CopyGenericValue(const shared_ptr<TypedArraySample<AlembicTraits> >& src)
 {
+    if(src == NULL) {
+        return VtValue();
+    }
     typedef typename PODTraitsFromEnum<
         AlembicTraits::pod_enum>::value_type SrcType;
     static const int SrcExtent = AlembicTraits::extent;
@@ -4168,4 +4171,3 @@ UsdAbc_AlembicDataReader::ListTimeSamplesForPath(
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE
-

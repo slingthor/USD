@@ -538,8 +538,10 @@ static const Usd_PrimFlags UsdPrimIsInstance = Usd_PrimInstanceFlag;
 static const Usd_PrimFlags UsdPrimHasDefiningSpecifier 
     = Usd_PrimHasDefiningSpecifierFlag;
 
-USD_API extern const Usd_PrimFlagsConjunction UsdPrimDefaultPredicate;
-USD_API extern const Usd_PrimFlagsPredicate UsdPrimAllPrimsPredicate;
+USD_API extern const Usd_PrimFlagsConjunction &GetUsdPrimDefaultPredicate();
+#define UsdPrimDefaultPredicate (GetUsdPrimDefaultPredicate())
+USD_API extern const Usd_PrimFlagsPredicate &GetUsdPrimAllPrimsPredicate();
+#define UsdPrimAllPrimsPredicate (GetUsdPrimAllPrimsPredicate())
 
 #endif // doxygen
 

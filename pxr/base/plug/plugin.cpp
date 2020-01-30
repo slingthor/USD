@@ -69,10 +69,10 @@ static TfStaticData<_PluginMap> _allPlugins;
 static TfStaticData<_PluginMap> _allPluginsByDynamicLibraryName;
 static TfStaticData<_PluginMap> _allPluginsByModuleName;
 static TfStaticData<_PluginMap> _allPluginsByResourceName;
-static std::mutex _allPluginsMutex;
+static TfStaticData<std::mutex> _allPluginsMutex;
 
 static TfStaticData<_ClassMap> _classMap;
-static std::mutex _classMapMutex;
+static TfStaticData<std::mutex> _classMapMutex;
 
 constexpr char const *
 PlugPlugin::_GetPluginTypeDisplayName(_Type type)
@@ -95,7 +95,7 @@ PlugPlugin::_NewPlugin(const Plug_RegistrationMetadata &metadata,
 {
     PluginMap &allPluginsByName = *allPluginsByNamePtr;
     
-    std::lock_guard<std::mutex> lock(_allPluginsMutex);
+    std::lock_guard<std::mutex> lock(*_allPluginsMutex);
 
     // Already registered?
     auto iresult = _allPlugins->insert(
@@ -327,7 +327,7 @@ PlugPlugin::_LoadWithDependents(_SeenPlugins *seenPlugins)
 bool
 PlugPlugin::Load()
 {
-    static std::recursive_mutex loadMutex;
+    static TfStaticData<std::recursive_mutex> loadMutex;
 
     bool result = false;
     bool loadedInSecondaryThread = false;
@@ -336,9 +336,9 @@ PlugPlugin::Load()
         // thread has the plugin loadMutex and is waiting on the GIL (for
         // example if we're concurrently loading a python plugin in another
         // thread).
-        TF_PY_ALLOW_THREADS_IN_SCOPE();
+        void();
 
-        std::lock_guard<std::recursive_mutex> lock(loadMutex);
+        std::lock_guard<std::recursive_mutex> lock(*loadMutex);
         loadedInSecondaryThread = !_isLoaded && !ArchIsMainThread();
         _SeenPlugins seenPlugins;
         result = _LoadWithDependents(&seenPlugins);
@@ -405,7 +405,7 @@ PlugPlugin::_GetPluginWithName(const std::string& name)
     // until it's registered.
     _RegisterAllPlugins();
 
-    std::lock_guard<std::mutex> lock(_allPluginsMutex);
+    std::lock_guard<std::mutex> lock(*_allPluginsMutex);
 
     auto idso = _allPluginsByDynamicLibraryName->find(name);
     if (idso != _allPluginsByDynamicLibraryName->end()) {
@@ -430,7 +430,7 @@ PlugPlugin::_GetAllPlugins()
 {
     _RegisterAllPlugins();
 
-    std::lock_guard<std::mutex> lock(_allPluginsMutex);
+    std::lock_guard<std::mutex> lock(*_allPluginsMutex);
     PlugPluginPtrVector plugins;
     plugins.reserve(_allPlugins->size());
     TF_FOR_ALL(it, *_allPlugins) {
@@ -447,7 +447,7 @@ PlugPlugin::_GetPluginForType( const TfType & type )
     // information, if it's loaded as a regular library dependency.
     _RegisterAllPlugins();
 
-    std::lock_guard<std::mutex> lock(_classMapMutex);
+    std::lock_guard<std::mutex> lock(*_classMapMutex);
     _ClassMap::iterator it = _classMap->find(type);
     if (it != _classMap->end())
         return it->second;
@@ -498,7 +498,7 @@ PlugPlugin::_DefineType( TfType t )
 {
     PlugPluginPtr plug;
     {
-        std::lock_guard<std::mutex> lock(_classMapMutex);
+        std::lock_guard<std::mutex> lock(*_classMapMutex);
         _ClassMap::const_iterator it = _classMap->find(t);
         if (it == _classMap->end()) {
             // CODE_COVERAGE_OFF - This cannot be hit by the public API for
@@ -622,7 +622,7 @@ PlugPlugin::_DeclareType(
     // type.  This is to guard against errors in plugin metadata
     // introducing subtle cycles.
     {
-        std::lock_guard<std::mutex> lock(_classMapMutex);
+        std::lock_guard<std::mutex> lock(*_classMapMutex);
         if (_classMap->count(type)) {
             PlugPluginPtr other((*_classMap)[type]);
             TF_CODING_ERROR("Plugin '%s' defined in %s has metadata "

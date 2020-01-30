@@ -41,7 +41,10 @@ PXR_NAMESPACE_OPEN_SCOPE
 typedef TfHashMap<string, TfStopwatch*, TfHash> NameMap;
 
 static NameMap* nameMap = 0;
-static std::mutex mapMutex;
+static std::mutex& mapMutex(void) {
+    static auto mutex = new std::mutex;
+    return *mutex;
+}
 
 TfStopwatch::TfStopwatch(const string& name, bool share)
     : _nTicks(0)
@@ -51,7 +54,7 @@ TfStopwatch::TfStopwatch(const string& name, bool share)
     Reset();
 
     if (share) {
-        std::lock_guard<std::mutex> lock(mapMutex);
+        std::lock_guard<std::mutex> lock(mapMutex());
 
         if (!nameMap) {
             nameMap = new NameMap();
@@ -84,7 +87,7 @@ TfStopwatch& TfStopwatch::operator=(const TfStopwatch& other)
         // If this stopwatch was shared, it will no longer be shared
         // when it becomes a copy of other
         //
-        std::lock_guard<std::mutex> lock(mapMutex);
+        std::lock_guard<std::mutex> lock(mapMutex());
         nameMap->erase(_name);
     }
 
@@ -101,7 +104,7 @@ TfStopwatch& TfStopwatch::operator=(const TfStopwatch& other)
 TfStopwatch::~TfStopwatch()
 {
     if (_shared) {
-        std::lock_guard<std::mutex> lock(mapMutex);
+        std::lock_guard<std::mutex> lock(mapMutex());
         nameMap->erase(_name);
     }
 }
@@ -120,7 +123,7 @@ TfStopwatch TfStopwatch::GetNamedStopwatch(const std::string& name)
 
     // Make sure that the stopwatch does not disappear out from under us.
     //
-    std::lock_guard<std::mutex> lock(mapMutex);
+    std::lock_guard<std::mutex> lock(mapMutex());
 
     NameMap::iterator iter = nameMap->find(name);
 
@@ -144,7 +147,7 @@ vector<string> TfStopwatch::GetStopwatchNames()
 
     // Lock the map while we traverse it.
     //
-    std::lock_guard<std::mutex> lock(mapMutex);
+    std::lock_guard<std::mutex> lock(mapMutex());
 
     result.reserve(nameMap->size());
 

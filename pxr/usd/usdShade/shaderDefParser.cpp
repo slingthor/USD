@@ -50,7 +50,10 @@ TF_DEFINE_PRIVATE_TOKENS(
     (defaultInput)
 );
 
-UsdStageCache UsdShadeShaderDefParserPlugin::_cache;
+UsdStageCache& UsdShadeShaderDefParserPlugin::_cache() {
+    static UsdStageCache* _cache = new UsdStageCache();
+    return *_cache;
+}
 
 namespace {
 
@@ -309,10 +312,10 @@ UsdShadeShaderDefParserPlugin::Parse(
 
     SdfLayerRefPtr rootLayer = SdfLayer::FindOrOpen(rootLayerPath);
     UsdStageRefPtr stage = 
-        UsdShadeShaderDefParserPlugin::_cache.FindOneMatching(rootLayer);
+        UsdShadeShaderDefParserPlugin::_cache().FindOneMatching(rootLayer);
     if (!stage) {
         stage = UsdStage::Open(rootLayer);
-        UsdShadeShaderDefParserPlugin::_cache.Insert(stage);
+        UsdShadeShaderDefParserPlugin::_cache().Insert(stage);
     }
 
     if (!stage) {

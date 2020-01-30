@@ -79,12 +79,13 @@ public:
     }
 
     /// The default constructor creates an empty range.
-    GfRange2d() {
-        SetEmpty();
+    constexpr GfRange2d() :
+        _min(FLT_MAX, FLT_MAX),
+        _max(-FLT_MAX, -FLT_MAX) {
     }
 
     /// This constructor initializes the minimum and maximum points.
-    GfRange2d(const GfVec2d &min, const GfVec2d &max)
+    constexpr GfRange2d(const GfVec2d &min, const GfVec2d &max)
         : _min(min), _max(max)
     {
     }

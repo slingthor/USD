@@ -30,18 +30,19 @@
 #include "pxr/base/plug/registry.h"
 #include "pxr/base/tf/diagnostic.h"
 #include "pxr/base/tf/scoped.h"
+#include "pxr/base/tf/staticData.h"
 #include <mutex>
 #include <string>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-static std::mutex _initializationMutex;
+static TfStaticData<std::mutex> _initializationMutex;
 
 void
 Plug_StaticInterfaceBase::_LoadAndInstantiate(const std::type_info& type) const
 {
     // Double checked locking.
-    std::lock_guard<std::mutex> lock(_initializationMutex);
+    std::lock_guard<std::mutex> lock(*_initializationMutex);
     if (_initialized) {
         // Someone beat us to the initialization.
         return;

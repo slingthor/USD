@@ -222,13 +222,16 @@ TF_MAKE_STATIC_DATA(PcpVariantFallbackMap, _usdGlobalVariantFallbackMap)
 
     *_usdGlobalVariantFallbackMap = fallbacks;
 }
-static tbb::spin_rw_mutex _usdGlobalVariantFallbackMapMutex;
+static tbb::spin_rw_mutex &_usdGlobalVariantFallbackMapMutex(void) {
+    static auto mutex = new tbb::spin_rw_mutex;
+    return *mutex;
+}
 
 PcpVariantFallbackMap
 UsdStage::GetGlobalVariantFallbacks()
 {
     tbb::spin_rw_mutex::scoped_lock
-        lock(_usdGlobalVariantFallbackMapMutex, /*write=*/false);
+        lock(_usdGlobalVariantFallbackMapMutex(), /*write=*/false);
     return *_usdGlobalVariantFallbackMap;
 }
 
@@ -236,7 +239,7 @@ void
 UsdStage::SetGlobalVariantFallbacks(const PcpVariantFallbackMap &fallbacks)
 {
     tbb::spin_rw_mutex::scoped_lock
-        lock(_usdGlobalVariantFallbackMapMutex, /*write=*/true);
+        lock(_usdGlobalVariantFallbackMapMutex(), /*write=*/true);
     *_usdGlobalVariantFallbackMap = fallbacks;
 }
 
@@ -1719,34 +1722,35 @@ static
 bool
 _IsPrivateFieldKey(const TfToken& fieldKey)
 {
-    static TfHashSet<TfToken, TfToken::HashFunctor> ignoredKeys;
+    static TfHashSet<TfToken, TfToken::HashFunctor>* ignoredKeys = nullptr;
 
     // XXX -- Use this instead of an initializer list in case TfHashSet
     //        doesn't support initializer lists.  Should ensure that
     //        TfHashSet does support them.
     static std::once_flag once;
     std::call_once(once, [](){
+        ignoredKeys = new TfHashSet<TfToken, TfToken::HashFunctor>;
         // Composition keys.
-        ignoredKeys.insert(SdfFieldKeys->InheritPaths);
-        ignoredKeys.insert(SdfFieldKeys->Payload);
-        ignoredKeys.insert(SdfFieldKeys->References);
-        ignoredKeys.insert(SdfFieldKeys->Specializes);
-        ignoredKeys.insert(SdfFieldKeys->SubLayers);
-        ignoredKeys.insert(SdfFieldKeys->SubLayerOffsets);
-        ignoredKeys.insert(SdfFieldKeys->VariantSelection);
-        ignoredKeys.insert(SdfFieldKeys->VariantSetNames);
+        ignoredKeys->insert(SdfFieldKeys->InheritPaths);
+        ignoredKeys->insert(SdfFieldKeys->Payload);
+        ignoredKeys->insert(SdfFieldKeys->References);
+        ignoredKeys->insert(SdfFieldKeys->Specializes);
+        ignoredKeys->insert(SdfFieldKeys->SubLayers);
+        ignoredKeys->insert(SdfFieldKeys->SubLayerOffsets);
+        ignoredKeys->insert(SdfFieldKeys->VariantSelection);
+        ignoredKeys->insert(SdfFieldKeys->VariantSetNames);
         // Clip keys.
         {
             auto clipFields = UsdGetClipRelatedFields();
-            ignoredKeys.insert(clipFields.begin(), clipFields.end());
+            ignoredKeys->insert(clipFields.begin(), clipFields.end());
         }
         // Value keys.
-        ignoredKeys.insert(SdfFieldKeys->Default);
-        ignoredKeys.insert(SdfFieldKeys->TimeSamples);
+        ignoredKeys->insert(SdfFieldKeys->Default);
+        ignoredKeys->insert(SdfFieldKeys->TimeSamples);
     });
 
     // First look-up the field in the black-list table.
-    if (ignoredKeys.find(fieldKey) != ignoredKeys.end())
+    if (ignoredKeys->find(fieldKey) != ignoredKeys->end())
         return true;
 
     // Implicitly excluded fields (child containers & readonly metadata).
@@ -3304,8 +3308,8 @@ ArResolverContext
 UsdStage::GetPathResolverContext() const
 {
     if (!TF_VERIFY(_GetPcpCache())) {
-        static ArResolverContext empty;
-        return empty;
+        static auto empty = new ArResolverContext;
+        return *empty;
     }
     return _GetPcpCache()->GetLayerStackIdentifier().pathResolverContext;
 }
@@ -4202,9 +4206,9 @@ UsdStage::_ComposePrimIndexesInParallel(
     // We only want to compute prim indexes included by the stage's 
     // population mask. As an optimization, if all prims are included the 
     // name children predicate doesn't need to consider the mask at all.
-    static auto allMask = UsdStagePopulationMask::All();
+    static auto allMask = new UsdStagePopulationMask(UsdStagePopulationMask::All());
     const UsdStagePopulationMask* mask = 
-        _populationMask == allMask ? nullptr : &_populationMask;
+        _populationMask == *allMask ? nullptr : &_populationMask;
 
     // Ask Pcp to compute all the prim indexes in parallel, stopping at
     // prim indexes that won't be used by the stage.
@@ -6143,8 +6147,8 @@ UsdStage::_GetListOpMetadataImpl(const UsdObject &obj,
     // Collect all list op opinions for this field.
     std::vector<ListOpType> listOps;
 
-    static TfToken empty;
-    const TfToken &propName = obj.Is<UsdProperty>() ? obj.GetName() : empty;
+    static const auto empty = new TfToken;
+    const TfToken &propName = obj.Is<UsdProperty>() ? obj.GetName() : *empty;
     SdfPath specPath = res->GetLocalPath(propName);
 
     for (bool isNewNode = false; res->IsValid(); isNewNode = res->NextLayer()) {
@@ -6162,7 +6166,7 @@ UsdStage::_GetListOpMetadataImpl(const UsdObject &obj,
         ListOpType fallbackListOp;
         SdfAbstractDataTypedValue<ListOpType> out(&fallbackListOp);
         TypeSpecificValueComposer<ListOpType> composer(&out);
-        if (_GetFallbackMetadataImpl(obj, fieldName, empty, &composer)) {
+        if (_GetFallbackMetadataImpl(obj, fieldName, *empty, &composer)) {
             listOps.emplace_back(fallbackListOp);
         }
     }
@@ -6311,8 +6315,8 @@ UsdStage::_ComposeGeneralMetadataImpl(const UsdObject &obj,
                                       Composer *composer) const
 {
     // Main resolution loop.
-    static TfToken empty;
-    const TfToken &propName = obj.Is<UsdProperty>() ? obj.GetName() : empty;
+    static const auto empty = new TfToken;
+    const TfToken &propName = obj.Is<UsdProperty>() ? obj.GetName() : *empty;
     SdfPath specPath = res->GetLocalPath(propName);
     bool gotOpinion = false;
 
@@ -6350,8 +6354,8 @@ UsdStage::_ListMetadataFields(const UsdObject &obj, bool useFallbacks) const
 
     TfTokenVector result;
 
-    static TfToken empty;
-    const TfToken &propName = obj.Is<UsdProperty>() ? obj.GetName() : empty;
+    static const auto empty = new TfToken;
+    const TfToken &propName = obj.Is<UsdProperty>() ? obj.GetName() : *empty;
 
     Usd_Resolver res(&obj.GetPrim().GetPrimIndex());
     SdfPath specPath = res.GetLocalPath(propName);
@@ -8439,4 +8443,3 @@ template USD_API bool UsdStage::_SetMetadataImpl(
     const SdfAbstractDataConstValue &);
 
 PXR_NAMESPACE_CLOSE_SCOPE
-

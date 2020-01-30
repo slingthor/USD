@@ -78,8 +78,8 @@ public:
     static const TfTokenVector &
     GetSchemaAttributeNames(bool includeInherited=true) {
         /* This only exists for consistency */
-        static TfTokenVector names;
-        return names;
+        static const auto names = new TfTokenVector;
+        return *names;
     }
 
     /// Return a UsdTyped holding the prim adhering to this schema at \p path

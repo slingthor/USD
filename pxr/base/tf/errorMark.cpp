@@ -64,7 +64,10 @@ TfErrorMark::_ReportErrors(TfDiagnosticMgr &mgr) const
 // TF_ERROR_MARK_TRACKING is enabled, change the 'false' to 'true' below.
 static const bool _enableTfErrorMarkStackTraces = false;
 static TfHashMap<
-    TfErrorMark const *, vector<uintptr_t>, TfHash> _activeMarkStacks;
+TfErrorMark const *, vector<uintptr_t>, TfHash>& _activeMarkStacks() {
+    static auto stacks = new TfHashMap<TfErrorMark const *, vector<uintptr_t>, TfHash>;
+    return *stacks;
+}
 static tbb::spin_mutex _activeMarkStacksLock;
 
 
@@ -79,7 +82,7 @@ TfErrorMark::TfErrorMark()
         trace.reserve(64);
         ArchGetStackFrames(trace.capacity(), &trace);
         tbb::spin_mutex::scoped_lock lock(_activeMarkStacksLock);
-        _activeMarkStacks[this].swap(trace);
+        _activeMarkStacks()[this].swap(trace);
     }
 }
 
@@ -88,7 +91,7 @@ TfErrorMark::~TfErrorMark()
     if (_enableTfErrorMarkStackTraces &&
         TfDebug::IsEnabled(TF_ERROR_MARK_TRACKING)) {
         tbb::spin_mutex::scoped_lock lock(_activeMarkStacksLock);
-        _activeMarkStacks.erase(this);
+        _activeMarkStacks().erase(this);
     }
 
     TfDiagnosticMgr &mgr = TfDiagnosticMgr::GetInstance();
@@ -119,7 +122,7 @@ TfReportActiveErrorMarks()
     TfHashMap<TfErrorMark const *, vector<uintptr_t>, TfHash> localStacks;
     {
         tbb::spin_mutex::scoped_lock lock(_activeMarkStacksLock);
-        localStacks = _activeMarkStacks;
+        localStacks = _activeMarkStacks();
     }
 
     TF_FOR_ALL(i, localStacks) {

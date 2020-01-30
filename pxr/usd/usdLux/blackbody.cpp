@@ -44,7 +44,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 // boundary behavior.  The last 4 knots represent the segment starting
 // at 1.0.
 //
-static GfVec3f const _blackbodyRGB[] = {
+static constexpr GfVec3f _blackbodyRGB[] = {
     GfVec3f(1.000000f, 0.027490f, 0.000000f), //  1000 K (Approximation)
     GfVec3f(1.000000f, 0.027490f, 0.000000f), //  1000 K (Approximation)
     GfVec3f(1.000000f, 0.149664f, 0.000000f), //  1500 K (Approximation)

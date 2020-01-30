@@ -567,7 +567,7 @@ Sdf_EvalQuotedString(const char* x, size_t n, size_t trimBothSides,
 
     char *s = buf;
     for (const char *p = x + trimBothSides,
-             *end = x + trimBothSides + n; p != end; ++p) {
+             *end = x + trimBothSides + n; p < end; ++p) {
         if (*p != '\\') {
             *s++ = *p;
         } else {

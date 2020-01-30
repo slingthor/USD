@@ -40,6 +40,7 @@
 
 #include <boost/functional/hash.hpp>
 
+#include <array>
 #include <cstddef>
 #include <cmath>
 
@@ -133,8 +134,8 @@ public:
     }
 
     /// Direct data access.
-    double const *data() const { return _data; }
-    double *data() { return _data; }
+    double const *data() const { return _data.data(); }
+    double *data() { return _data.data(); }
     double const *GetArray() const { return data(); }
 
     /// Indexing.
@@ -276,7 +277,7 @@ public:
 
   
 private:
-    double _data[2];
+    std::array<double, 2> _data;
 };
 
 /// Output a GfVec2d.
