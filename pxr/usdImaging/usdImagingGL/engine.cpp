@@ -53,6 +53,9 @@
 
 #include "pxr/imaging/hdSt/tokens.h"
 
+#include "pxr/imaging/hgi/hgi.h"
+#include "pxr/imaging/hgi/tokens.h"
+
 #include "pxr/base/tf/getenv.h"
 #include "pxr/base/tf/stl.h"
 
@@ -161,8 +164,10 @@ UsdImagingGLEngine::IsHydraEnabled()
 //----------------------------------------------------------------------------
 
 UsdImagingGLEngine::UsdImagingGLEngine(const RenderAPI api)
-    : _engine(NULL)
+    : _engine(nullptr)
     , _renderIndex(nullptr)
+    , _hgi(Hgi::GetPlatformDefaultHgi())
+    , _hgiDriver{HgiTokens->renderDriver, VtValue(_hgi.get())}
     , _selTracker(new HdxSelectionTracker)
     , _delegateID(SdfPath::AbsoluteRootPath())
     , _delegate(nullptr)
@@ -232,8 +237,10 @@ UsdImagingGLEngine::UsdImagingGLEngine(
     const SdfPathVector& excludedPaths,
     const SdfPathVector& invisedPaths,
     const SdfPath& delegateID)
-    : _engine(NULL)
+    : _engine(nullptr)
     , _renderIndex(nullptr)
+    , _hgi(Hgi::GetPlatformDefaultHgi())
+    , _hgiDriver{HgiTokens->renderDriver, VtValue(_hgi.get())}
     , _selTracker(new HdxSelectionTracker)
     , _delegateID(delegateID)
     , _delegate(nullptr)
@@ -1015,7 +1022,7 @@ UsdImagingGLEngine::SetRendererPlugin(TfToken const &pluginId, bool forceReload)
     _rendererPlugin = plugin;
     _rendererId = actualId;
 
-    _renderIndex = HdRenderIndex::New(renderDelegate);
+    _renderIndex = HdRenderIndex::New(renderDelegate, {&_hgiDriver});
 
     // Create the new delegate & task controller.
     _delegate = new UsdImagingDelegate(_renderIndex, _delegateID);

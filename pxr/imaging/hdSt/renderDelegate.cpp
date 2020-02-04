@@ -45,9 +45,13 @@
 #include "pxr/imaging/hdSt/resourceRegistry.h"
 #include "pxr/imaging/hdSt/volume.h"
 
-#include "pxr/imaging/hd/engine.h"
+#include "pxr/imaging/hd/driver.h"
 #include "pxr/imaging/hd/extComputation.h"
 #include "pxr/imaging/hd/perfLog.h"
+#include "pxr/imaging/hd/tokens.h"
+
+#include "pxr/imaging/hgi/hgi.h"
+#include "pxr/imaging/hgi/tokens.h"
 
 #include "pxr/imaging/hio/glslfx.h"
 
@@ -112,12 +116,14 @@ std::atomic_int HdStRenderDelegate::_counterResourceRegistry;
 HdStResourceRegistrySharedPtr HdStRenderDelegate::_resourceRegistry;
 
 HdStRenderDelegate::HdStRenderDelegate()
+    : _hgi(nullptr)
 {
     _Initialize();
 }
 
 HdStRenderDelegate::HdStRenderDelegate(HdRenderSettingsMap const& settingsMap)
     : HdRenderDelegate(settingsMap)
+    , _hgi(nullptr)
 {
     _Initialize();
 }
@@ -198,6 +204,20 @@ HdStRenderDelegate::~HdStRenderDelegate()
     }
     
     GarchTextureRegistry::GetInstance().GarbageCollectIfNeeded();
+}
+
+void
+HdStRenderDelegate::SetDrivers(HdDriverVector const& drivers)
+{
+    // For Storm we want to use the Hgi driver, so extract it.
+    for (HdDriver* hdDriver : drivers) {
+        if (hdDriver->name == HgiTokens->renderDriver &&
+            hdDriver->driver.IsHolding<Hgi*>()) {
+            _hgi = hdDriver->driver.UncheckedGet<Hgi*>();
+            break;
+        }
+    }
+    TF_VERIFY(_hgi, "HdSt requires Hgi HdDriver");
 }
 
 const TfTokenVector &

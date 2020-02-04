@@ -39,6 +39,7 @@
 
 #include "pxr/imaging/cameraUtil/conformWindow.h"
 
+#include "pxr/imaging/hd/driver.h"
 #include "pxr/imaging/hd/engine.h"
 #include "pxr/imaging/hd/rprimCollection.h"
 
@@ -544,6 +545,9 @@ protected:
     HdStResourceFactoryInterface *_resourceFactory;
 
     HdRenderIndex *_renderIndex;
+
+    std::unique_ptr<class Hgi> _hgi;
+    HdDriver _hgiDriver;
 
     HdxSelectionTrackerSharedPtr _selTracker;
     HdRprimCollection _renderCollection;
