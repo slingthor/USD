@@ -125,7 +125,7 @@ HdStExtCompGpuComputation::Execute(
     // Prepare uniform buffer for GPU computation
     // XXX: We'd really prefer to delegate this to the resource binder.
     std::vector<int32_t> _uniforms;
-    _uniforms.push_back(outputBar->GetOffset());
+    _uniforms.push_back(outputBar->GetElementOffset());
 
     // Bind buffers as SSBOs to the indices matching the layout in the shader
     for (HdExtComputationPrimvarDescriptor const &compPrimvar: _compPrimvars) {
@@ -161,7 +161,7 @@ HdStExtCompGpuComputation::Execute(
                 HdTupleType tupleType = buffer->GetTupleType();
                 size_t componentSize =
                     HdDataSizeOfType(HdGetComponentType(tupleType.type));
-                int32_t offset = inputBar->GetOffset();
+                size_t offset = inputBar->GetByteOffset();
                 
                 if (!caps.hasBufferBindOffset) {
                     offset += buffer->GetOffset();

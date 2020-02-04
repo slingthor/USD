@@ -90,7 +90,7 @@ public:
         HDST_API
         _StripedBufferArrayRange()
          : _stripedBufferArray(nullptr),
-           _offset(0),
+           _elementOffset(0),
            _numElements(0),
            _capacity(0)
         {
@@ -125,23 +125,16 @@ public:
 
         /// Read back the buffer content
         HDST_API
-        virtual VtValue ReadData(TfToken const &name) const override;
+        virtual VtValue ReadData(TfToken const &name) const;
 
-        /// Returns the relative offset in aggregated buffer
-        HDST_API
-        virtual int GetOffset() const override {
-            return _offset;
+        /// Returns the relative element offset in aggregated buffer
+        virtual int GetElementOffset() const {
+            return _elementOffset;
         }
 
-        /// Returns the index for this range
-        HDST_API
-        virtual int GetIndex() const override {
-            // note: range doesn't store index, so we need to sweep rangeLists
-            // to find the index of this range.
-            TF_CODING_ERROR("vboMemoryManager doesn't support GetIndex() for "
-                            "memory and performance reasons\n");
-            return 0;
-        }
+        /// Returns the byte offset at which this range begins in the underlying
+        /// buffer array for the given resource.
+        virtual int GetByteOffset(TfToken const& resourceName) const;
 
         /// Returns the number of elements
         HDST_API
@@ -194,9 +187,8 @@ public:
         virtual void DebugDump(std::ostream &out) const override;
 
         /// Set the relative offset for this range.
-        HDST_API
-        void SetOffset(int offset) {
-            _offset = offset;
+        void SetElementOffset(int offset) {
+            _elementOffset = offset;
         }
 
         /// Set the number of elements for this range.
@@ -229,11 +221,15 @@ public:
         virtual const void *_GetAggregation() const override;
 
     private:
+        // Returns the byte offset at which the BAR begins for the resource.
+        size_t _GetByteOffset(HdStBufferResourceGLSharedPtr const& resource)
+            const;
+
         // holding a weak reference to container.
         // this pointer becomes null when the StripedBufferArray gets destructed,
         // in case if any drawItem still holds this bufferRange.
         _StripedBufferArray *_stripedBufferArray;
-        int _offset;
+        int _elementOffset;
         size_t _numElements;
         int _capacity;
     };

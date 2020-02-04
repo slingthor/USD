@@ -91,20 +91,21 @@ public:
 
         /// Read back the buffer content
         HDST_API
-        virtual VtValue ReadData(TfToken const &name) const override;
+        virtual VtValue ReadData(TfToken const &name) const;
 
-        /// Returns the relative offset in aggregated buffer
-        HDST_API
-        virtual int GetOffset() const override {
+        /// Returns the offset at which this range begins in the underlying  
+        /// buffer array in terms of elements.
+        virtual int GetElementOffset() const {
+            return _index;
+        }
+
+        /// Returns the byte offset at which this range begins in the underlying
+        /// buffer array for the given resource.
+        virtual int GetByteOffset(TfToken const& resourceName) const {
+            TF_UNUSED(resourceName);
             if (!TF_VERIFY(_stripedBuffer) ||
                 !TF_VERIFY(_index != NOT_ALLOCATED)) return 0;
             return _stripedBuffer->GetStride() * _index;
-        }
-
-        /// Returns the index for this range
-        HDST_API
-        virtual int GetIndex() const override {
-            return _index;
         }
 
         /// Returns the number of elements
