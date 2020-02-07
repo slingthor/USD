@@ -134,6 +134,7 @@ pxr_library(hdSt
         light      
         lightingShader
         material
+        materialNetwork
         mesh
         mixinShader
         package
@@ -177,7 +178,6 @@ pxr_library(hdSt
         immediateDrawBatch
         indirectDrawBatch
         materialBufferSourceAndTextureHelper
-        materialNetwork
         meshShaderKey
         meshTopology 
         pointsShaderKey
