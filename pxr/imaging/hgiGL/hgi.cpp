@@ -27,7 +27,8 @@
 #include "pxr/imaging/hgiGL/buffer.h"
 #include "pxr/imaging/hgiGL/conversions.h"
 #include "pxr/imaging/hgiGL/diagnostic.h"
-#include "pxr/imaging/hgiGL/buffer.h"
+#include "pxr/imaging/hgiGL/shaderFunction.h"
+#include "pxr/imaging/hgiGL/shaderProgram.h"
 #include "pxr/imaging/hgiGL/texture.h"
 
 #include "pxr/base/tf/envSetting.h"
@@ -103,18 +104,33 @@ HgiGL::DestroyBuffer(HgiBufferHandle* bufHandle)
     }
 }
 
-HgiBufferHandle
-HgiGL::CreateBuffer(HgiBufferDesc const & desc)
+HgiShaderFunctionHandle
+HgiGL::CreateShaderFunction(HgiShaderFunctionDesc const& desc)
 {
-    return new HgiGLBuffer(desc);
+    return new HgiGLShaderFunction(desc);
 }
 
 void
-HgiGL::DestroyBuffer(HgiBufferHandle* bufHandle)
+HgiGL::DestroyShaderFunction(HgiShaderFunctionHandle* shaderFunctionHandle)
 {
-    if (TF_VERIFY(bufHandle, "Invalid buffer")) {
-        delete *bufHandle;
-        bufHandle = nullptr;
+    if (TF_VERIFY(shaderFunctionHandle, "Invalid function handle")) {
+        delete *shaderFunctionHandle;
+        *shaderFunctionHandle = nullptr;
+    }
+}
+
+HgiShaderProgramHandle
+HgiGL::CreateShaderProgram(HgiShaderProgramDesc const& desc)
+{
+    return new HgiGLShaderProgram(desc);
+}
+
+void
+HgiGL::DestroyShaderProgram(HgiShaderProgramHandle* shaderProgramHandle)
+{
+    if (TF_VERIFY(shaderProgramHandle, "Invalid program handle")) {
+        delete *shaderProgramHandle;
+        *shaderProgramHandle = nullptr;
     }
 }
 
