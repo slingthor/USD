@@ -105,7 +105,6 @@ else()
             glContext
             glRawContext
             info
-            package
             ptexTexture
             resourceFactory
             simpleLightingContext

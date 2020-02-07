@@ -33,7 +33,6 @@
 
 #include "pxr/imaging/glf/simpleLightingContext.h"
 #include "pxr/imaging/glf/diagnostic.h"
-#include "pxr/imaging/glf/package.h"
 
 #include "pxr/base/arch/pragmas.h"
 #include "pxr/base/tf/stringUtils.h"
