@@ -136,6 +136,5 @@ else()
             plugInfo.json
             shaders/pcfShader.glslfx
             shaders/simpleLighting.glslfx
-            shaders/simpleShadowMapShader.glslfx
     )
 endif()
