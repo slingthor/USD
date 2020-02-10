@@ -2548,9 +2548,9 @@ if Windows():
         os.path.join(context.instDir, "lib")
     ])
 
-if args.make_relocatable and MacOS():
+if args.make_relocatable:
     from make_relocatable import make_relocatable
-    make_relocatable(context.usdInstDir, context.buildPython, verbosity > 1)
+    make_relocatable(context.usdInstDir, context.buildPython, iOS(), verbosity > 1)
 
 Print("""
 Success! To use USD, please ensure that you have:""")

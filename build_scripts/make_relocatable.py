@@ -105,11 +105,19 @@ def replace_string_in_file(path, old_string, new_string):
 
 
 
-def make_relocatable(install_path, buildPython, verbose_output=False):
+def make_relocatable(install_path, buildPython, iOS, verbose_output=False):
     files = []
     if verbose_output:
         global devout
         devout = sys.stdout
+
+    # Patch pxr build config files
+    replace_string_in_file(install_path + '/pxrConfig.cmake', install_path, "$ENV{USD_PATH}")
+    replace_string_in_file(install_path + '/cmake/pxrTargets.cmake', install_path, "$ENV{USD_PATH}")
+    replace_string_in_file(install_path + '/cmake/pxrTargets-release.cmake', install_path, "$ENV{USD_PATH}")
+
+    if iOS:
+        return
 
     #path of the usd repo folder
     file_path = os.path.abspath(__file__)
@@ -126,11 +134,6 @@ def make_relocatable(install_path, buildPython, verbose_output=False):
     add_rpath_to_files(install_path + '/lib/', files)
     change_absolute_to_relative(files, install_path)
     codesign_files(files)
-
-    replace_string_in_file(install_path + '/pxrConfig.cmake', install_path, "$ENV{USD_PATH}")
-    replace_string_in_file(install_path + '/cmake/pxrTargets.cmake', install_path, "$ENV{USD_PATH}")
-    replace_string_in_file(install_path + '/cmake/pxrTargets-release.cmake', install_path, "$ENV{USD_PATH}")
-
 
     ctest_files = []
     extract_files_recursive(install_path + '/build/', (lambda file: 'CTestTestfile' in file), ctest_files)
