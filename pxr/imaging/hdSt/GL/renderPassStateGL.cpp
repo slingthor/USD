@@ -146,6 +146,7 @@ HdStRenderPassStateGL::Bind()
     glGetIntegerv(GL_MAX_CLIP_PLANES, &glMaxClipPlanes);
     for (size_t i = 0; i < GetClipPlanes().size(); ++i) {
         if (i >= (size_t)glMaxClipPlanes) {
+            break;
         }
         glEnable(GL_CLIP_DISTANCE0 + i);
     }

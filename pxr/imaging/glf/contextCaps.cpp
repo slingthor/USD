@@ -137,7 +137,7 @@ GlfContextCaps::_LoadCaps()
 
     GLint glMaxClipPlanes;
     glGetIntegerv(GL_MAX_CLIP_PLANES, &glMaxClipPlanes);
-    glMaxClipPlanes = size_t(glMaxClipPlanes);
+    maxClipPlanes = size_t(glMaxClipPlanes);
 
     const char *glVendorStr = (const char*)glGetString(GL_VENDOR);
     const char *glRendererStr = (const char*)glGetString(GL_RENDERER);
