@@ -24,8 +24,11 @@
 #include "pxr/imaging/hdx/colorizeTask.h"
 
 #include "pxr/imaging/hd/aov.h"
+#include "pxr/imaging/hd/driver.h"
 #include "pxr/imaging/hd/renderBuffer.h"
-#include "pxr/imaging/hd/tokens.h"
+#include "pxr/imaging/hgi/tokens.h"
+
+#include "pxr/imaging/hdSt/renderDelegate.h"
 
 #include "pxr/base/work/loops.h"
 
@@ -45,6 +48,17 @@ HdxColorizeTask::HdxColorizeTask(HdSceneDelegate* delegate, SdfPath const& id)
  , _compositor()
  , _needsValidation(false)
 {
+    Hgi* hgi = nullptr;
+    HdDriverVector const& drivers = delegate->GetRenderIndex().GetDrivers();
+    for (HdDriver* hdDriver : drivers) {
+        if (hdDriver->name == HgiTokens->renderDriver &&
+            hdDriver->driver.IsHolding<Hgi*>()) {
+            hgi = hdDriver->driver.UncheckedGet<Hgi*>();
+            break;
+        }
+    }
+
+    _compositor.reset(new HdxFullscreenShader(hgi));
 }
 
 HdxColorizeTask::~HdxColorizeTask()

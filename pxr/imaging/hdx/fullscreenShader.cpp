@@ -263,62 +263,103 @@ HdxFullscreenShader::Draw(TextureMap const& textures)
     // GL 2.1 API, slightly restricting our choice of API and heavily
     // restricting our shader syntax.
 
-    GLuint programId = _program->GetProgram().GetId();
-    glUseProgram(programId);
+    _program->SetProgram();
 
-    // Setup textures
-    int textureIndex = 0;
-    for (auto const& texture : textures) {
-        glActiveTexture(GL_TEXTURE0 + textureIndex);
-        glBindTexture(GL_TEXTURE_2D, texture.second);
-        GLint loc = glGetUniformLocation(programId, texture.first.GetText());
-        glUniform1i(loc, textureIndex);
-        textureIndex++;
+    if (_isOpenGL) {
+#if defined(ARCH_GFX_OPENGL)
+        GLuint programId = boost::dynamic_pointer_cast<HdStGLSLProgram>(_program)->GetGLProgram();
+        
+        // Setup textures
+        int textureIndex = 0;
+        for (auto const& texture : textures) {
+            glActiveTexture(GL_TEXTURE0 + textureIndex);
+            glBindTexture(GL_TEXTURE_2D, texture.second);
+            GLint loc = glGetUniformLocation(programId, texture.first.GetText());
+            glUniform1i(loc, textureIndex);
+            textureIndex++;
+        }
+
+        // Set up buffers
+        GLint locPosition = glGetAttribLocation(programId, "position");
+        GLuint bufferId = static_cast<HgiGLBuffer*>(_vertexBuffer)->GetBufferId();
+        glBindBuffer(GL_ARRAY_BUFFER, bufferId);
+        glVertexAttribPointer(locPosition, 4, GL_FLOAT, GL_FALSE,
+                sizeof(float)*6, 0);
+        glEnableVertexAttribArray(locPosition);
+
+        GLint locUv = glGetAttribLocation(programId, "uvIn");
+        glVertexAttribPointer(locUv, 2, GL_FLOAT, GL_FALSE,
+                sizeof(float)*6, reinterpret_cast<void*>(sizeof(float)*4));
+        glEnableVertexAttribArray(locUv);
+
+        // Set up uniforms
+        for (auto const& uniform : _uniforms) {
+            _SetUniform(uniform.first, uniform.second);
+        }
+
+        // Set up state
+        GLboolean restoreAlphaToCoverage;
+        glGetBooleanv(GL_SAMPLE_ALPHA_TO_COVERAGE, &restoreAlphaToCoverage);
+        glDisable(GL_SAMPLE_ALPHA_TO_COVERAGE);
+
+        glDrawArrays(GL_TRIANGLES, 0, 3);
+
+        // Restore state
+        if (restoreAlphaToCoverage) {
+            glEnable(GL_SAMPLE_ALPHA_TO_COVERAGE);
+        }
+
+        // Restore buffers
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        glDisableVertexAttribArray(locPosition);
+        glDisableVertexAttribArray(locUv);
+
+        // Restore textures
+        for (int i = textureIndex-1; i >= 0; --i) {
+            glActiveTexture(GL_TEXTURE0 + i);
+            glBindTexture(GL_TEXTURE_2D, 0);
+        }
+
+        GLF_POST_PENDING_GL_ERRORS();
+#endif
     }
+    else {
+        // Setup textures
+        int textureIndex = 0;
+//        for (auto const& texture : textures) {
+//            glActiveTexture(GL_TEXTURE0 + textureIndex);
+//            glBindTexture(GL_TEXTURE_2D, texture.second);
+//            GLint loc = glGetUniformLocation(programId, texture.first.GetText());
+//            glUniform1i(loc, textureIndex);
+//            textureIndex++;
+//        }
 
-    // Set up buffers
-    GLint locPosition = glGetAttribLocation(programId, "position");
-    glBindBuffer(GL_ARRAY_BUFFER, _vertexBuffer);
-    glVertexAttribPointer(locPosition, 4, GL_FLOAT, GL_FALSE,
-            sizeof(float)*6, 0);
-    glEnableVertexAttribArray(locPosition);
+        // Set up buffers
+//        GLint locPosition = glGetAttribLocation(programId, "position");
+//        GLuint bufferId = static_cast<HgiGLBuffer*>(_vertexBuffer)->GetBufferId();
+//        glBindBuffer(GL_ARRAY_BUFFER, bufferId);
+//        glVertexAttribPointer(locPosition, 4, GL_FLOAT, GL_FALSE,
+//                sizeof(float)*6, 0);
+//        glEnableVertexAttribArray(locPosition);
+//
+//        GLint locUv = glGetAttribLocation(programId, "uvIn");
+//        glVertexAttribPointer(locUv, 2, GL_FLOAT, GL_FALSE,
+//                sizeof(float)*6, reinterpret_cast<void*>(sizeof(float)*4));
+//        glEnableVertexAttribArray(locUv);
 
-    GLint locUv = glGetAttribLocation(programId, "uvIn");
-    glVertexAttribPointer(locUv, 2, GL_FLOAT, GL_FALSE,
-            sizeof(float)*6, reinterpret_cast<void*>(sizeof(float)*4));
-    glEnableVertexAttribArray(locUv);
+        // Set up uniforms
+        for (auto const& uniform : _uniforms) {
+            _SetUniform(uniform.first, uniform.second);
+        }
 
-    // Set up uniforms
-    for (auto const& uniform : _uniforms) {
-        _SetUniform(programId, uniform.first, uniform.second);
+        // Set up state
+//        GLboolean restoreAlphaToCoverage;
+//        glGetBooleanv(GL_SAMPLE_ALPHA_TO_COVERAGE, &restoreAlphaToCoverage);
+//        glDisable(GL_SAMPLE_ALPHA_TO_COVERAGE);
+
+//        glDrawArrays(GL_TRIANGLES, 0, 3);
     }
-
-    // Set up state
-    GLboolean restoreAlphaToCoverage;
-    glGetBooleanv(GL_SAMPLE_ALPHA_TO_COVERAGE, &restoreAlphaToCoverage);
-    glDisable(GL_SAMPLE_ALPHA_TO_COVERAGE);
-
-    glDrawArrays(GL_TRIANGLES, 0, 3);
-
-    // Restore state
-    if (restoreAlphaToCoverage) {
-        glEnable(GL_SAMPLE_ALPHA_TO_COVERAGE);
-    }
-
-    // Restore buffers
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-    glDisableVertexAttribArray(locPosition);
-    glDisableVertexAttribArray(locUv);
-
-    // Restore textures
-    for (int i = textureIndex-1; i >= 0; --i) {
-        glActiveTexture(GL_TEXTURE0 + i);
-        glBindTexture(GL_TEXTURE_2D, 0);
-    }
-
-    glUseProgram(0);
-
-    GLF_POST_PENDING_GL_ERRORS();
+    _program->UnsetProgram();
 }
 
 void

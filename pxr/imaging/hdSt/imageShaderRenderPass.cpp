@@ -38,11 +38,13 @@
 #include "pxr/imaging/hdSt/immediateDrawBatch.h"
 #include "pxr/imaging/hdSt/package.h"
 #include "pxr/imaging/hd/drawingCoord.h"
+#include "pxr/imaging/hd/driver.h"
 #include "pxr/imaging/hd/vtBufferSource.h"
 #include "pxr/imaging/hgi/graphicsEncoder.h"
 #include "pxr/imaging/hgi/graphicsEncoderDesc.h"
 #include "pxr/imaging/hgi/hgi.h"
 #include "pxr/imaging/hgi/immediateCommandBuffer.h"
+#include "pxr/imaging/hgi/tokens.h"
 #include "pxr/imaging/glf/diagnostic.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -61,9 +63,14 @@ HdSt_ImageShaderRenderPass::HdSt_ImageShaderRenderPass(
     _immediateBatch = HdSt_DrawBatchSharedPtr(
         new HdSt_ImmediateDrawBatch(&_drawItemInstance));
 
-    HdStRenderDelegate* renderDelegate = 
-        static_cast<HdStRenderDelegate*>(index->GetRenderDelegate());
-    _hgi = renderDelegate->GetHgi();
+    HdDriverVector const& drivers = index->GetDrivers();
+    for (HdDriver* hdDriver : drivers) {
+        if (hdDriver->name == HgiTokens->renderDriver &&
+            hdDriver->driver.IsHolding<Hgi*>()) {
+            _hgi = hdDriver->driver.UncheckedGet<Hgi*>();
+            break;
+        }
+    }
 }
 
 HdSt_ImageShaderRenderPass::~HdSt_ImageShaderRenderPass()

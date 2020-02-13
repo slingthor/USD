@@ -26,13 +26,13 @@
 #include "pxr/imaging/hdx/colorCorrectionTask.h"
 #include "pxr/imaging/hdx/package.h"
 #include "pxr/imaging/hd/aov.h"
+#include "pxr/imaging/hd/driver.h"
 #include "pxr/imaging/hd/perfLog.h"
 #include "pxr/imaging/hd/renderBuffer.h"
 #include "pxr/imaging/hd/tokens.h"
 #include "pxr/imaging/hdSt/program.h"
 #include "pxr/imaging/hdSt/resourceFactory.h"
 #include "pxr/imaging/hdSt/renderBuffer.h"
-#include "pxr/imaging/hdSt/renderDelegate.h"
 #include "pxr/imaging/hf/perfLog.h"
 #include "pxr/imaging/glf/diagnostic.h"
 #include "pxr/imaging/hio/glslfx.h"
@@ -42,6 +42,7 @@
 #include "pxr/imaging/hgi/hgi.h"
 #include "pxr/imaging/hgi/buffer.h"
 #include "pxr/imaging/hgi/texture.h"
+#include "pxr/imaging/hgi/tokens.h"
 
 #if defined(ARCH_GFX_OPENGL)
 #include "pxr/imaging/hgiGL/buffer.h"
@@ -80,10 +81,11 @@ namespace {
 HdxColorCorrectionTask::HdxColorCorrectionTask(HdSceneDelegate* delegate, 
                                                SdfPath const& id)
     : HdTask(id)
+    , _hgi(nullptr)
     , _shaderProgram()
-    , _texture(NULL)
+    , _texture(nullptr)
     , _textureSize(0)
-    , _vertexBuffer(NULL)
+    , _vertexBuffer(nullptr)
     , _copyFramebuffer(0)
     , _framebufferSize(0)
     , _lut3dSizeOCIO(0)
@@ -95,17 +97,21 @@ HdxColorCorrectionTask::HdxColorCorrectionTask(HdSceneDelegate* delegate,
     _texture3dLUT.Clear();
     _isOpenGL = HdStResourceFactory::GetInstance()->IsOpenGL();
     
-    HdStRenderDelegate* renderDelegate =
-        static_cast<HdStRenderDelegate*>(
-            delegate->GetRenderIndex().GetRenderDelegate());
-    _hgi = renderDelegate->GetHgi();
+    HdDriverVector const& drivers = delegate->GetRenderIndex().GetDrivers();
+    for (HdDriver* hdDriver : drivers) {
+        if (hdDriver->name == HgiTokens->renderDriver &&
+            hdDriver->driver.IsHolding<Hgi*>()) {
+            _hgi = hdDriver->driver.UncheckedGet<Hgi*>();
+            break;
+        }
+    }
 }
 
 HdxColorCorrectionTask::~HdxColorCorrectionTask()
 {
-    if (_texture != NULL) {
-        delete _texture;
-        _texture = NULL;
+    if (_texture != nullptr) {
+        _hgi->DestroyTexture(&_texture);
+        _texture = nullptr;
     }
 
     if (_texture3dLUT.IsSet()) {

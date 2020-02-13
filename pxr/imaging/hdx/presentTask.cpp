@@ -24,9 +24,11 @@
 #include "pxr/imaging/hdx/presentTask.h"
 
 #include "pxr/imaging/hd/aov.h"
+#include "pxr/imaging/hd/driver.h"
 #include "pxr/imaging/hd/tokens.h"
 #include "pxr/imaging/hdSt/renderBuffer.h"
 #include "pxr/imaging/hdSt/resourceFactory.h"
+#include "pxr/imaging/hgi/tokens.h"
 #if defined(ARCH_GFX_OPENGL)
 #include "pxr/imaging/hgiGL/texture.h"
 #endif
@@ -43,6 +45,17 @@ HdxPresentTask::HdxPresentTask(HdSceneDelegate* delegate, SdfPath const& id)
  , _compositor()
 {
     _isOpenGL = HdStResourceFactory::GetInstance()->IsOpenGL();
+    
+    Hgi* hgi = nullptr;
+    HdDriverVector const& drivers = delegate->GetRenderIndex().GetDrivers();
+    for (HdDriver* hdDriver : drivers) {
+        if (hdDriver->name == HgiTokens->renderDriver &&
+            hdDriver->driver.IsHolding<Hgi*>()) {
+            hgi = hdDriver->driver.UncheckedGet<Hgi*>();
+            break;
+        }
+    }
+    _compositor.reset(new HdxFullscreenShader(hgi));
 }
 
 HdxPresentTask::~HdxPresentTask()

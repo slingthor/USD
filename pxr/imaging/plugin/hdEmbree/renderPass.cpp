@@ -23,7 +23,10 @@
 //
 #include "pxr/imaging/glf/glew.h"
 
+#include "pxr/imaging/hd/driver.h"
 #include "pxr/imaging/hd/renderPassState.h"
+#include "pxr/imaging/hgi/tokens.h"
+#include "pxr/imaging/hdSt/renderDelegate.h"
 #include "pxr/imaging/plugin/hdEmbree/renderDelegate.h"
 #include "pxr/imaging/plugin/hdEmbree/renderPass.h"
 
@@ -49,6 +52,17 @@ HdEmbreeRenderPass::HdEmbreeRenderPass(HdRenderIndex *index,
     , _depthBuffer(SdfPath::EmptyPath())
     , _converged(false)
 {
+    Hgi* hgi = nullptr;
+    HdDriverVector const& drivers = index->GetDrivers();
+    for (HdDriver* hdDriver : drivers) {
+        if (hdDriver->name == HgiTokens->renderDriver &&
+            hdDriver->driver.IsHolding<Hgi*>()) {
+            hgi = hdDriver->driver.UncheckedGet<Hgi*>();
+            break;
+        }
+    }
+
+    _compositor.reset(new HdxFullscreenShader(hgi));
 }
 
 HdEmbreeRenderPass::~HdEmbreeRenderPass()

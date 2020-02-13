@@ -25,9 +25,13 @@
 
 #include "pxr/imaging/hdx/colorizeSelectionTask.h"
 
+#include "pxr/imaging/hd/driver.h"
 #include "pxr/imaging/hd/perfLog.h"
 #include "pxr/imaging/hd/renderBuffer.h"
-#include "pxr/imaging/hd/tokens.h"
+
+#include "pxr/imaging/hgi/tokens.h"
+
+#include "pxr/imaging/hdSt/renderDelegate.h"
 
 #include "pxr/imaging/hdx/package.h"
 #include "pxr/imaging/hdx/selectionTracker.h"
@@ -59,8 +63,18 @@ HdxColorizeSelectionTask::HdxColorizeSelectionTask(
     , _outputBuffer(nullptr)
     , _outputBufferSize(0)
     , _converged(false)
-    , _compositor()
 {
+    Hgi* hgi = nullptr;
+    HdDriverVector const& drivers = delegate->GetRenderIndex().GetDrivers();
+    for (HdDriver* hdDriver : drivers) {
+        if (hdDriver->name == HgiTokens->renderDriver &&
+            hdDriver->driver.IsHolding<Hgi*>()) {
+            hgi = hdDriver->driver.UncheckedGet<Hgi*>();
+            break;
+        }
+    }
+
+    _compositor.reset(new HdxFullscreenShader(hgi));
 }
 
 HdxColorizeSelectionTask::~HdxColorizeSelectionTask()

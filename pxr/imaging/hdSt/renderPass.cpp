@@ -45,7 +45,9 @@
 #include "pxr/imaging/hgi/hgi.h"
 #include "pxr/imaging/hgi/immediateCommandBuffer.h"
 
+#include "pxr/imaging/hd/driver.h"
 #include "pxr/imaging/hd/renderDelegate.h"
+#include "pxr/imaging/hd/tokens.h"
 #include "pxr/imaging/hd/vtBufferSource.h"
 
 #include "pxr/base/gf/frustum.h"
