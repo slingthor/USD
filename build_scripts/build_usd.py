@@ -727,6 +727,9 @@ def InstallBoost(context, force, buildArgs):
             # libraries includes @rpath
             b2_settings.append("toolset=clang")
 
+        if context.static_dependencies_macOS:
+            b2_settings.append("link=static")
+
         if iOS():
             xcodeRoot = subprocess.check_output(['xcode-select', '--print-path']).strip()
             iOSSDK = subprocess.check_output(['xcrun', '--sdk', 'iphoneos', '--show-sdk-path']).strip()
@@ -839,6 +842,9 @@ def InstallTBB_LinuxOrMacOS(context, force, buildArgs):
                 [("#define __TBB_Yield()  sched_yield()",
                   "#define __TBB_Yield()  __TBB_Pause(1)")])
 
+        if context.static_dependencies_macOS:
+            buildArgs.append('extra_inc=big_iron.inc ')
+
         makeCmd = 'make -j{procs} {buildArgs}'.format(
             procs=context.numJobs, 
             buildArgs=" ".join(buildArgs))
@@ -937,10 +943,17 @@ def InstallJPEG_Turbo(jpeg_url, context, force, buildArgs):
 
 def InstallJPEG_Lib(jpeg_url, context, force, buildArgs):
     with CurrentWorkingDirectory(DownloadURL(jpeg_url, context, force)):
-        configureCmd = './configure --prefix="{instDir}" '.format(instDir=context.instDir) + \
-            '--disable-static --enable-shared ' + \
-            '{buildArgs}'.format(buildArgs=" ".join(buildArgs))
-        Run(configureCmd)
+
+        if context.static_dependencies_macOS:
+            configureCmd = './configure --prefix="{instDir}" '.format(instDir=context.instDir) + \
+                '--enable-static --enable-shared ' + \
+                '{buildArgs}'.format(buildArgs=" ".join(buildArgs))
+            Run(configureCmd)
+        else:
+            configureCmd = './configure --prefix="{instDir}" '.format(instDir=context.instDir) + \
+                '--disable-static --enable-shared ' + \
+                '{buildArgs}'.format(buildArgs=" ".join(buildArgs))
+            Run(configureCmd)
 
         makeCmd = 'make -j{procs} install'.format(procs=context.numJobs)
         Run(makeCmd)
@@ -985,7 +998,12 @@ def InstallTIFF(context, force, buildArgs):
             PatchFile("CMakeLists.txt",
                     [("add_subdirectory(contrib)", "# add_subdirectory(contrib)")])
 
-        RunCMake(context, force, buildArgs)
+        extraArgs = buildArgs
+
+        if context.static_dependencies_macOS:
+            extraArgs.append('-DBUILD_SHARED_LIBS=OFF')
+        
+        RunCMake(context, force, extraArgs)
         return os.getcwd()
 
 TIFF = Dependency("TIFF", InstallTIFF, "include/tiff.h")
@@ -1025,6 +1043,7 @@ OPENEXR_URL = "https://github.com/openexr/openexr/archive/v2.2.0.zip"
 
 def InstallOpenEXR(context, force, buildArgs):
     srcDir = DownloadURL(OPENEXR_URL, context, force)
+    extraArgs = buildArgs
 
     if iOS():
         updateOpenEXRIOS(context, srcDir)
@@ -1097,7 +1116,11 @@ def InstallOpenEXR(context, force, buildArgs):
                      '  "${CMAKE_CURRENT_BINARY_DIR}/eLut.h;${CMAKE_CURRENT_BINARY_DIR}/toFloat.h"\n'),
                 ],
                 multiLineMatches=True)
-        RunCMake(context, force, buildArgs)
+
+        if context.static_dependencies_macOS:
+            extraArgs.append("-DBUILD_SHARED_LIBS=OFF ")
+
+        RunCMake(context, force, extraArgs)
 
         # fake IlmBase src folder
         dummySrcDir = os.path.join(context.srcDir, 'IlmBase')
@@ -1111,7 +1134,7 @@ def InstallOpenEXR(context, force, buildArgs):
     with CurrentWorkingDirectory(openexrSrcDir):
         RunCMake(context, force,
                  ['-DILMBASE_PACKAGE_PREFIX="{instDir}"'
-                  .format(instDir=context.instDir)] + buildArgs)
+                  .format(instDir=context.instDir)] + extraArgs)
     
     # manually output metadata.txt
     with open(os.path.join(srcDir, 'metadata.txt'), 'wt') as file:
@@ -1299,11 +1322,18 @@ OPENVDB = Dependency("OpenVDB", InstallOpenVDB, "include/openvdb/openvdb.h")
 OIIO_URL = "https://github.com/OpenImageIO/oiio/archive/Release-1.7.18.zip"
 
 def InstallOpenImageIO(context, force, buildArgs):
+    if context.static_dependencies_macOS:
+        unexported_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'unexported_symbols_list_oiio')
+
     with CurrentWorkingDirectory(DownloadURL(OIIO_URL, context, force)):
         extraArgs = ['-DOIIO_BUILD_TOOLS=OFF',
                      '-DOIIO_BUILD_TESTS=OFF',
                      '-DUSE_PYTHON=OFF',
                      '-DSTOP_ON_WARNING=OFF']
+
+        if context.static_dependencies_macOS:
+            extraArgs.append('-DLINKSTATIC=1 ')
+            extraArgs.append('-DCMAKE_SHARED_LINKER_FLAGS="-unexported_symbols_list ' + unexported_file + ' " ')
 
         # OIIO's FindOpenEXR module circumvents CMake's normal library 
         # search order, which causes versions of OpenEXR installed in
@@ -1535,8 +1565,12 @@ def InstallAlembic(context, force, buildArgs):
             # it was built with CMake as a dynamic library.
             cmakeOptions += [
                 '-DUSE_HDF5=ON',
-                '-DHDF5_ROOT="{instDir}"'.format(instDir=context.instDir),
-                '-DCMAKE_CXX_FLAGS="-D H5_BUILT_AS_DYNAMIC_LIB"']
+                '-DHDF5_ROOT="{instDir}"'.format(instDir=context.instDir)]
+
+            if context.static_dependencies_macOS:
+                cmakeOptions += ['-DALEMBIC_SHARED_LIBS=OFF']
+            else:
+                cmakeOptions += ['-DCMAKE_CXX_FLAGS="-D H5_BUILT_AS_DYNAMIC_LIB"']
                 
             if Windows():
                 # Alembic doesn't link against HDF5 libraries on Windows 
@@ -1853,6 +1887,11 @@ group.add_argument("--make-relocatable", dest="make_relocatable",
 group.add_argument("--no-make-relocatable", dest="make_relocatable",
                    action="store_false",
                    help="MacOS only: Don't run the make_relocatable.sh script")
+group.add_argument("--build-static-dependencies-macOS", dest="static_dependencies_macOS", action="store_true",
+                   default=False,
+                   help="Build 3rd party dependencies as static libraries")
+group.add_argument("--no-build-static-dependencies-macOS", dest="static_dependencies_macOS", action="store_false",
+                   help="Don't build 3rd party dependencies as static libraries")
 
 group = parser.add_argument_group(title="Build Options")
 group.add_argument("-j", "--jobs", type=int, default=GetCPUCount(),
@@ -2083,6 +2122,7 @@ class InstallContext:
         #MacOS only
         self.use_download_cache = args.use_download_cache
         self.make_relocatable = args.make_relocatable
+        self.static_dependencies_macOS = args.static_dependencies_macOS
 
         # CMake generator
         self.cmakeGenerator = args.generator
@@ -2399,6 +2439,7 @@ Building with settings:
   MacOS:
     Use download cache          {use_download_cache}
     Make relocatable            {make_relocatable}
+    Static dependencies         {static_dependencies_macOS}
 
   Building                      {buildType}
     Cross Platform              {targetPlatform}
@@ -2450,6 +2491,7 @@ summaryMsg = summaryMsg.format(
     downloader=(context.downloaderName),
     use_download_cache=("On" if context.use_download_cache and MacOS() else "Off"),
     make_relocatable=("On" if context.make_relocatable and MacOS() else "Off"),
+    static_dependencies_macOS=("On" if context.static_dependencies_macOS and MacOS() else "Off"),
     dependencies=("None" if not dependenciesToBuild else 
                   ", ".join([d.name for d in dependenciesToBuild])),
     buildArgs=FormatBuildArguments(context.buildArgs),

@@ -32,6 +32,7 @@ pxr_library(mtlf
     LIBRARIES
         arch
         garch
+        glf
         gf
         hgiMetal
         js
