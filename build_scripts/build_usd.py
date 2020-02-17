@@ -1880,6 +1880,7 @@ group.add_argument("--cache", dest="use_download_cache", action="store_true",
                    help="Copy dependencies from repository folder instead of downloading")
 group.add_argument("--no-cache", dest="use_download_cache", action="store_false",
                    help="Download dependencies, don't use the cache download folder")
+
 group = parser.add_mutually_exclusive_group()
 group.add_argument("--make-relocatable", dest="make_relocatable",
                    action="store_true", default=True,
@@ -1887,6 +1888,8 @@ group.add_argument("--make-relocatable", dest="make_relocatable",
 group.add_argument("--no-make-relocatable", dest="make_relocatable",
                    action="store_false",
                    help="MacOS only: Don't run the make_relocatable.sh script")
+
+group = parser.add_mutually_exclusive_group()      
 group.add_argument("--build-static-dependencies-macOS", dest="static_dependencies_macOS", action="store_true",
                    default=False,
                    help="Build 3rd party dependencies as static libraries")
