@@ -32,6 +32,19 @@
 #include "pxr/imaging/hio/glslfx.h"
 #include "pxr/base/tf/staticTokens.h"
 
+#if defined(ARCH_GFX_OPENGL)
+#include "pxr/imaging/hdSt/GL/glslProgram.h"
+#include "pxr/imaging/hgiGL/buffer.h"
+#endif
+
+#if defined(ARCH_GFX_METAL)
+#include "pxr/imaging/hdSt/Metal/mslProgram.h"
+#include "pxr/imaging/hdSt/Metal/codeGenMSL.h"
+#include "pxr/imaging/hgiMetal/buffer.h"
+#include "pxr/imaging/hgiMetal/immediateCommandBuffer.h"
+#endif
+
+
 PXR_NAMESPACE_OPEN_SCOPE
 
 TF_DEFINE_PRIVATE_TOKENS(
@@ -42,9 +55,10 @@ TF_DEFINE_PRIVATE_TOKENS(
     (fullscreenShader)
 );
 
-HdxFullscreenShader::HdxFullscreenShader()
-    : _program(), _vertexBuffer(0)
+HdxFullscreenShader::HdxFullscreenShader(Hgi *hgi)
+    : _hgi(hgi), _program(), _vertexBuffer(0), _depthAware(false)
 {
+    _isOpenGL = HdStResourceFactory::GetInstance()->IsOpenGL();
 }
 
 HdxFullscreenShader::~HdxFullscreenShader()
@@ -66,6 +80,7 @@ HdxFullscreenShader::SetProgramToCompositor(bool depthAware) {
     SetProgram(HdxPackageFullscreenShader(),
         depthAware ? _tokens->compositeFragmentWithDepth
                    : _tokens->compositeFragmentNoDepth);
+    _depthAware = depthAware;
 }
 
 void
@@ -324,40 +339,87 @@ HdxFullscreenShader::Draw(TextureMap const& textures)
 #endif
     }
     else {
+        id<MTLDevice> device = static_cast<HgiMetal*>(_hgi)->GetDevice();
+
+        MTLRenderPassDescriptor *renderPassDescriptor = [[MTLRenderPassDescriptor alloc] init];
+        MTLDepthStencilDescriptor *depthStateDesc = [[MTLDepthStencilDescriptor alloc] init];
+
+        HgiMetalImmediateCommandBuffer &hgiCommandBuffer =
+            static_cast<HgiMetalImmediateCommandBuffer&>(_hgi->GetImmediateCommandBuffer());
+        id<MTLRenderCommandEncoder> renderEncoder =
+            [hgiCommandBuffer.GetCommandBuffer() renderCommandEncoderWithDescriptor:renderPassDescriptor];
         // Setup textures
         int textureIndex = 0;
-//        for (auto const& texture : textures) {
-//            glActiveTexture(GL_TEXTURE0 + textureIndex);
-//            glBindTexture(GL_TEXTURE_2D, texture.second);
-//            GLint loc = glGetUniformLocation(programId, texture.first.GetText());
-//            glUniform1i(loc, textureIndex);
-//            textureIndex++;
-//        }
+        for (auto const& texture : textures) {
+            glBindTexture(GL_TEXTURE_2D, texture.second);
+            GLint loc = 0;//glGetUniformLocation(programId, texture.first.GetText());
+            //glUniform1i(loc, textureIndex);
+            [renderEncoder setFragmentTexture:texture.second.multiTexture.forCurrentGPU() atIndex:textureIndex];
+            textureIndex++;
+        }
 
         // Set up buffers
-//        GLint locPosition = glGetAttribLocation(programId, "position");
-//        GLuint bufferId = static_cast<HgiGLBuffer*>(_vertexBuffer)->GetBufferId();
-//        glBindBuffer(GL_ARRAY_BUFFER, bufferId);
-//        glVertexAttribPointer(locPosition, 4, GL_FLOAT, GL_FALSE,
-//                sizeof(float)*6, 0);
-//        glEnableVertexAttribArray(locPosition);
-//
-//        GLint locUv = glGetAttribLocation(programId, "uvIn");
-//        glVertexAttribPointer(locUv, 2, GL_FLOAT, GL_FALSE,
-//                sizeof(float)*6, reinterpret_cast<void*>(sizeof(float)*4));
-//        glEnableVertexAttribArray(locUv);
+        MTLVertexDescriptor *_mtlVertexDescriptor;
+        _mtlVertexDescriptor = [[MTLVertexDescriptor alloc] init];
+
+        _mtlVertexDescriptor.attributes[0].format = MTLVertexFormatFloat4;
+        _mtlVertexDescriptor.attributes[0].offset = 0;
+        _mtlVertexDescriptor.attributes[0].bufferIndex = 0;
+
+        _mtlVertexDescriptor.attributes[1].format = MTLVertexFormatFloat2;
+        _mtlVertexDescriptor.attributes[1].offset = sizeof(float) * 4;
+        _mtlVertexDescriptor.attributes[1].bufferIndex = 0;
+
+        _mtlVertexDescriptor.layouts[0].stride = sizeof(float) * 6;
+        _mtlVertexDescriptor.layouts[0].stepFunction = MTLVertexStepFunctionPerVertex;
+
+        HgiMetalBuffer *metalBuffer = static_cast<HgiMetalBuffer*>(_vertexBuffer);
+        [renderEncoder setVertexBuffer:metalBuffer->GetBufferId()
+                                offset:0
+                               atIndex:0];
 
         // Set up uniforms
         for (auto const& uniform : _uniforms) {
             _SetUniform(uniform.first, uniform.second);
         }
 
-        // Set up state
-//        GLboolean restoreAlphaToCoverage;
-//        glGetBooleanv(GL_SAMPLE_ALPHA_TO_COVERAGE, &restoreAlphaToCoverage);
-//        glDisable(GL_SAMPLE_ALPHA_TO_COVERAGE);
+        depthStateDesc.depthCompareFunction = MTLCompareFunctionAlways;
+        depthStateDesc.depthWriteEnabled = _depthAware?YES:NO;
+        id <MTLDepthStencilState> _depthState = [device newDepthStencilStateWithDescriptor:depthStateDesc];
+        [renderEncoder setDepthStencilState:_depthState];
 
-//        glDrawArrays(GL_TRIANGLES, 0, 3);
+        id <MTLRenderPipelineState> _pipelineStateBlit;
+
+        HdStMSLProgramSharedPtr mslProgram = boost::dynamic_pointer_cast<HdStMSLProgram>(_program);
+        id <MTLFunction> vertexFunction = mslProgram->GetVertexFunction(0);
+        id <MTLFunction> fragmentFunction = mslProgram->GetFragmentFunction(0);
+
+        MTLRenderPipelineDescriptor *pipelineStateDescriptor = [[MTLRenderPipelineDescriptor alloc] init];
+        pipelineStateDescriptor.rasterSampleCount = 1;
+        pipelineStateDescriptor.vertexFunction = vertexFunction;
+        pipelineStateDescriptor.fragmentFunction = fragmentFunction;
+        pipelineStateDescriptor.vertexDescriptor = _mtlVertexDescriptor;
+        pipelineStateDescriptor.colorAttachments[0].pixelFormat = MTLPixelFormatRGBA32Float;
+        if (_depthAware) {
+            pipelineStateDescriptor.depthAttachmentPixelFormat = MTLPixelFormatDepth32Float;
+        }
+
+        NSError *error = NULL;
+        _pipelineStateBlit = [device newRenderPipelineStateWithDescriptor:pipelineStateDescriptor error:&error];
+        if (!_pipelineStateBlit) {
+            NSLog(@"Failed to created pipeline state, error %@", error);
+        }
+
+        [renderEncoder setRenderPipelineState:_pipelineStateBlit];
+
+        [renderEncoder drawPrimitives: MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:3];
+
+        [renderEncoder endEncoding];
+        hgiCommandBuffer.FlushEncoders();
+        
+        [renderPassDescriptor release];
+        [pipelineStateDescriptor release];
+        [depthStateDesc release];
     }
     _program->UnsetProgram();
 }

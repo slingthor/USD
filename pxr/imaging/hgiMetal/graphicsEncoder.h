@@ -30,6 +30,8 @@
 #include "pxr/imaging/hgi/graphicsEncoder.h"
 #include <cstdint>
 
+#include <Metal/Metal.h>
+
 PXR_NAMESPACE_OPEN_SCOPE
 
 struct HgiGraphicsEncoderDesc;
@@ -60,6 +62,8 @@ public:
 
     HGIMETAL_API
     void PopDebugGroup() override;
+    
+    id<MTLRenderCommandEncoder> encoder;
 
 private:
     HgiMetalGraphicsEncoder() = delete;

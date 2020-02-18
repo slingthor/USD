@@ -200,16 +200,16 @@ public:
     HDST_API
     void UpdateUniformBinding(std::string const &name, int index);
 
-//    HDST_API
-//    id<MTLFunction> GetVertexFunction() const {
-//        return _vertexFunction;
-//    }
-//
-//    HDST_API
-//    id<MTLFunction> GetFragmentFunction() const {
-//        return _fragmentFunction;
-//    }
-//
+    HDST_API
+    id<MTLFunction> GetVertexFunction(int gpuIndex) const {
+        return _vertexFunction[gpuIndex];
+    }
+
+    HDST_API
+    id<MTLFunction> GetFragmentFunction(int gpuIndex) const {
+        return _fragmentFunction[gpuIndex];
+    }
+
     HDST_API
     id<MTLFunction> GetComputeFunction(int gpuIndex) const {
         return _computeFunction[gpuIndex];

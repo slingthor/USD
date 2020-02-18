@@ -52,7 +52,21 @@ public:
 
     HGIMETAL_API
     HgiBlitEncoderUniquePtr CreateBlitEncoder() override;
+    
+    HGIMETAL_API
+    void FlushEncoders() override;
+    
+    /// Metal Specific
+    id<MTLCommandBuffer> GetCommandBuffer() {
+        return _commandBuffer;
+    }
 
+protected:
+    friend class HgiMetal;
+
+    HGIMETAL_API
+    HgiMetalImmediateCommandBuffer(id<MTLDevice> device);
+    
 private:
     HgiMetalImmediateCommandBuffer & operator=
         (const HgiMetalImmediateCommandBuffer&) = delete;

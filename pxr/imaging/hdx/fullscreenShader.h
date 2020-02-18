@@ -125,7 +125,10 @@ private:
     HdStGLSLProgramSharedPtr _program;
     TfToken _glslfx;
     TfToken _technique;
-    GLuint _vertexBuffer;
+    HgiBufferHandle _vertexBuffer;
+    
+    bool _isOpenGL;
+    bool _depthAware;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE
