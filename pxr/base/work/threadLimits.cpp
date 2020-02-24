@@ -171,7 +171,7 @@ WorkSetConcurrencyLimit(unsigned n)
     // According to the documentation that should be the case, but we should
     // make sure.  If we do decide to delete it, we have to make sure to 
     // note that it has already been initialized.
-    Work_ResetDetachedTaskGroupContext();
+    // Work_ResetDetachedTaskGroupContext();
     if (_tbbTaskSchedInit) {
         _tbbTaskSchedInit->terminate();
         _tbbTaskSchedInit->initialize(_threadLimit);
