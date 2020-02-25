@@ -174,7 +174,7 @@ HdStStripedInterleavedBufferMetal::Reallocate(
                                 "unexpectedly.");
                 continue;
             }
-            int const oldIndex = range->GetIndex();
+            int const oldIndex = range->GetElementOffset();
             if (oldIndex >= 0) {
                 // copy old data
                 ptrdiff_t const readOffset = oldIndex * _stride;

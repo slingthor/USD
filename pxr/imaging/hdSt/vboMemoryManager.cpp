@@ -512,10 +512,10 @@ HdStVBOMemoryManager::_StripedBufferArrayRange::GetByteOffset(
     TfToken const& resourceName) const
 {
     if (!TF_VERIFY(_stripedBufferArray)) return 0;
-    HdStBufferResourceGLSharedPtr VBO =
+    HdBufferResourceSharedPtr VBO =
         _stripedBufferArray->GetResource(resourceName);
 
-    if (!VBO || (VBO->GetId() == 0 && _numElements > 0)) {
+    if (!VBO || (VBO->GetId().IsSet() && _numElements > 0)) {
         TF_CODING_ERROR("VBO doesn't exist for %s", resourceName.GetText());
         return 0;
     }
@@ -615,7 +615,7 @@ HdStVBOMemoryManager::_StripedBufferArrayRange::_GetAggregation() const
 
 size_t
 HdStVBOMemoryManager::_StripedBufferArrayRange::_GetByteOffset(
-    HdStBufferResourceGLSharedPtr const& resource) const
+    HdBufferResourceSharedPtr const& resource) const
 {
     return HdDataSizeOfTupleType(resource->GetTupleType()) * _elementOffset;
 }

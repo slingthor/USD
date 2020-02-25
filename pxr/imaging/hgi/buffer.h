@@ -36,38 +36,6 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-struct HgiBufferDesc;
-
-
-///
-/// \class HgiBuffer
-///
-/// Represents a graphics platform independent GPU buffer resource.
-/// Buffers should be created via Hgi::CreateBuffer.
-/// The fill the buffer with data you supply `initialData` in the descriptor.
-/// To update the data in a buffer later, use a blitEncoder.
-///
-/// Base class for Hgi buffers.
-/// To the client (HdSt) buffer resources are referred to via
-/// opaque, stateless handles (HgBufferHandle).
-///
-class HgiBuffer {
-public:
-    HGI_API
-    virtual ~HgiBuffer();
-
-protected:
-    HGI_API
-    HgiBuffer(HgiBufferDesc const& desc);
-
-private:
-    HgiBuffer() = delete;
-    HgiBuffer & operator=(const HgiBuffer&) = delete;
-    HgiBuffer(const HgiBuffer&) = delete;
-};
-
-typedef HgiBuffer* HgiBufferHandle;
-typedef std::vector<HgiBufferHandle> HgiBufferHandleVector;
 
 
 /// \struct HgiBufferDesc
@@ -112,6 +80,38 @@ inline bool operator!=(
     const HgiBufferDesc& lhs,
     const HgiBufferDesc& rhs);
 
+
+///
+/// \class HgiBuffer
+///
+/// Represents a graphics platform independent GPU buffer resource.
+/// Buffers should be created via Hgi::CreateBuffer.
+/// The fill the buffer with data you supply `initialData` in the descriptor.
+/// To update the data in a buffer later, use a blitEncoder.
+///
+/// Base class for Hgi buffers.
+/// To the client (HdSt) buffer resources are referred to via
+/// opaque, stateless handles (HgBufferHandle).
+///
+class HgiBuffer {
+public:
+    HGI_API
+    virtual ~HgiBuffer();
+
+protected:
+    HGI_API
+    HgiBuffer(HgiBufferDesc const& desc);
+    
+    HgiBufferDesc _descriptor;
+
+private:
+    HgiBuffer() = delete;
+    HgiBuffer & operator=(const HgiBuffer&) = delete;
+    HgiBuffer(const HgiBuffer&) = delete;
+};
+
+typedef HgiBuffer* HgiBufferHandle;
+typedef std::vector<HgiBufferHandle> HgiBufferHandleVector;
 
 PXR_NAMESPACE_CLOSE_SCOPE
 

@@ -126,7 +126,7 @@ private:
 
     // A compositor utility class, for rendering the final result to the
     // viewport.
-    HdxFullscreenShader _compositor;
+    std::unique_ptr<HdxFullscreenShader> _compositor;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

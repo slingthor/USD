@@ -25,12 +25,15 @@
 
 #include "pxr/imaging/hdx/fullscreenShader.h"
 #include "pxr/imaging/hdx/package.h"
-#include "pxr/imaging/hdSt/glslProgram.h"
+#include "pxr/imaging/hdSt/program.h"
+#include "pxr/imaging/hdSt/resourceFactory.h"
 #include "pxr/imaging/hf/perfLog.h"
 #include "pxr/imaging/hd/perfLog.h"
 #include "pxr/imaging/glf/diagnostic.h"
 #include "pxr/imaging/hio/glslfx.h"
 #include "pxr/base/tf/staticTokens.h"
+
+#include "pxr/imaging/hgi/buffer.h"
 
 #if defined(ARCH_GFX_OPENGL)
 #include "pxr/imaging/hdSt/GL/glslProgram.h"
@@ -56,7 +59,7 @@ TF_DEFINE_PRIVATE_TOKENS(
 );
 
 HdxFullscreenShader::HdxFullscreenShader(Hgi *hgi)
-    : _hgi(hgi), _program(), _vertexBuffer(0), _depthAware(false)
+    : _hgi(hgi), _program(), _vertexBuffer(nullptr), _depthAware(false)
 {
     _isOpenGL = HdStResourceFactory::GetInstance()->IsOpenGL();
 }
@@ -64,10 +67,15 @@ HdxFullscreenShader::HdxFullscreenShader(Hgi *hgi)
 HdxFullscreenShader::~HdxFullscreenShader()
 {
     for (auto const& texture : _textures) {
-        glDeleteTextures(1, &texture.second);
+        if (_isOpenGL) {
+#if defined(ARCH_GFX_OPENGL)
+            GLuint t = texture.second;
+            glDeleteTextures(1, &t);
+#endif
+        }
     }
-    if (_vertexBuffer != 0) {
-        glDeleteBuffers(1, &_vertexBuffer);
+    if (_vertexBuffer) {
+        _hgi->DestroyBuffer(&_vertexBuffer);
     }
     if (_program) {
         _program.reset();
@@ -89,7 +97,8 @@ HdxFullscreenShader::SetProgram(TfToken const& glslfx, TfToken const& technique)
         return;
     }
 
-    _program.reset(new HdStGLSLProgram(_tokens->fullscreenShader));
+    _program.reset(HdStResourceFactory::GetInstance()->NewProgram(
+        _tokens->fullscreenShader));
 
     HioGlslfx vsGlslfx(HdxPackageFullscreenShader());
     HioGlslfx fsGlslfx(glslfx);
@@ -148,23 +157,28 @@ HdxFullscreenShader::_CreateBufferResources()
                                       -1, -1, -1, 1,        0, 0,
                                        3, -1, -1, 1,        2, 0 };
 
-    glGenBuffers(1, &_vertexBuffer);
-    glBindBuffer(GL_ARRAY_BUFFER, _vertexBuffer);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices),
-                 &vertices[0], GL_STATIC_DRAW);
-
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    HgiBufferDesc desc;
+    desc.usage = HgiBufferUsageVertex;
+    desc.byteSize = sizeof(vertices);
+    desc.initialData = vertices;
+    _vertexBuffer = _hgi->CreateBuffer(desc);
 }
 
 void
-HdxFullscreenShader::_CreateTextureResources(GLuint *texture)
+HdxFullscreenShader::_CreateTextureResources(GarchTextureGPUHandle *texture)
 {
-    glGenTextures(1, texture);
-    glBindTexture(GL_TEXTURE_2D, *texture);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    if (_isOpenGL) {
+#if defined(ARCH_GFX_OPENGL)
+        GLuint t;
+        glGenTextures(1, &t);
+        glBindTexture(GL_TEXTURE_2D, t);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        *texture = t;
+#endif
+    }
 }
 
 void
@@ -177,7 +191,12 @@ HdxFullscreenShader::SetTexture(TfToken const& name, int width, int height,
     if (width == 0 || height == 0 || data == nullptr) {
         auto it = _textures.find(name);
         if (it != _textures.end()) {
-            glDeleteTextures(1, &(it->second));
+            if (_isOpenGL) {
+#if defined(ARCH_GFX_OPENGL)
+                GLuint t = it->second;
+                glDeleteTextures(1, &t);
+#endif
+            }
             _textures.erase(it);
         }
         return;
@@ -185,74 +204,83 @@ HdxFullscreenShader::SetTexture(TfToken const& name, int width, int height,
 
     auto it = _textures.find(name);
     if (it == _textures.end()) {
-        GLuint tex;
+        GarchTextureGPUHandle tex;
         _CreateTextureResources(&tex);
         it = _textures.insert({name, tex}).first;
     }
-    glBindTexture(GL_TEXTURE_2D, it->second);
+    if (_isOpenGL) {
+#if defined(ARCH_GFX_OPENGL)
+        glBindTexture(GL_TEXTURE_2D, it->second);
 
-    if (format == HdFormatFloat32Vec4) {
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, width, height, 0, GL_RGBA,
-                     GL_FLOAT, data);
-    } else if (format == HdFormatFloat16Vec4) {
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA,
-                     GL_HALF_FLOAT, data);
-    } else if (format == HdFormatUNorm8Vec4) {
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA,
-                     GL_UNSIGNED_BYTE, data);
-    } else if (format == HdFormatFloat32) {
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, width, height, 0, GL_RED,
-                     GL_FLOAT, data);
-    } else {
-        TF_WARN("Unsupported texture format: %s (%s)",
-                name.GetText(), TfEnum::GetName(format).c_str());
+        if (format == HdFormatFloat32Vec4) {
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, width, height, 0, GL_RGBA,
+                         GL_FLOAT, data);
+        } else if (format == HdFormatFloat16Vec4) {
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA,
+                         GL_HALF_FLOAT, data);
+        } else if (format == HdFormatUNorm8Vec4) {
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA,
+                         GL_UNSIGNED_BYTE, data);
+        } else if (format == HdFormatFloat32) {
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, width, height, 0, GL_RED,
+                         GL_FLOAT, data);
+        } else {
+            TF_WARN("Unsupported texture format: %s (%s)",
+                    name.GetText(), TfEnum::GetName(format).c_str());
+        }
+        glBindTexture(GL_TEXTURE_2D, 0);
+
+        GLF_POST_PENDING_GL_ERRORS();
+#endif
     }
-    glBindTexture(GL_TEXTURE_2D, 0);
-
-    GLF_POST_PENDING_GL_ERRORS();
 }
 
 void
-HdxFullscreenShader::_SetUniform(GLuint programId,
-                                 TfToken const& name, VtValue const& value)
+HdxFullscreenShader::_SetUniform(TfToken const& name, VtValue const& value)
 {
-    GLint loc = glGetUniformLocation(programId, name.GetText());
-    HdTupleType type = HdGetValueTupleType(value);
-    const void* data = HdGetValueData(value);
+    if (_isOpenGL) {
+#if defined(ARCH_GFX_OPENGL)
+        GLuint programId = boost::dynamic_pointer_cast<HdStGLSLProgram>(_program)->GetGLProgram();
 
-    switch (type.type) {
-        case HdTypeInt32:
-            glUniform1iv(loc, type.count, static_cast<const GLint*>(data)); break;
-        case HdTypeInt32Vec2:
-            glUniform2iv(loc, type.count, static_cast<const GLint*>(data)); break;
-        case HdTypeInt32Vec3:
-            glUniform3iv(loc, type.count, static_cast<const GLint*>(data)); break;
-        case HdTypeInt32Vec4:
-            glUniform4iv(loc, type.count, static_cast<const GLint*>(data)); break;
-        case HdTypeUInt32:
-            glUniform1uiv(loc, type.count, static_cast<const GLuint*>(data)); break;
-        case HdTypeUInt32Vec2:
-            glUniform2uiv(loc, type.count, static_cast<const GLuint*>(data)); break;
-        case HdTypeUInt32Vec3:
-            glUniform3uiv(loc, type.count, static_cast<const GLuint*>(data)); break;
-        case HdTypeUInt32Vec4:
-            glUniform4uiv(loc, type.count, static_cast<const GLuint*>(data)); break;
-        case HdTypeFloat:
-            glUniform1fv(loc, type.count, static_cast<const GLfloat*>(data)); break;
-        case HdTypeFloatVec2:
-            glUniform2fv(loc, type.count, static_cast<const GLfloat*>(data)); break;
-        case HdTypeFloatVec3:
-            glUniform3fv(loc, type.count, static_cast<const GLfloat*>(data)); break;
-        case HdTypeFloatVec4:
-            glUniform4fv(loc, type.count, static_cast<const GLfloat*>(data)); break;
-        case HdTypeFloatMat3:
-            glUniformMatrix3fv(loc, type.count, GL_FALSE, static_cast<const GLfloat*>(data)); break;
-        case HdTypeFloatMat4:
-            glUniformMatrix4fv(loc, type.count, GL_FALSE, static_cast<const GLfloat*>(data)); break;
-        default:
-            TF_WARN("Unsupported uniform type: %s (%s)",
-                name.GetText(), value.GetTypeName().c_str());
-            break;
+        GLint loc = glGetUniformLocation(programId, name.GetText());
+        HdTupleType type = HdGetValueTupleType(value);
+        const void* data = HdGetValueData(value);
+
+        switch (type.type) {
+            case HdTypeInt32:
+                glUniform1iv(loc, type.count, static_cast<const GLint*>(data)); break;
+            case HdTypeInt32Vec2:
+                glUniform2iv(loc, type.count, static_cast<const GLint*>(data)); break;
+            case HdTypeInt32Vec3:
+                glUniform3iv(loc, type.count, static_cast<const GLint*>(data)); break;
+            case HdTypeInt32Vec4:
+                glUniform4iv(loc, type.count, static_cast<const GLint*>(data)); break;
+            case HdTypeUInt32:
+                glUniform1uiv(loc, type.count, static_cast<const GLuint*>(data)); break;
+            case HdTypeUInt32Vec2:
+                glUniform2uiv(loc, type.count, static_cast<const GLuint*>(data)); break;
+            case HdTypeUInt32Vec3:
+                glUniform3uiv(loc, type.count, static_cast<const GLuint*>(data)); break;
+            case HdTypeUInt32Vec4:
+                glUniform4uiv(loc, type.count, static_cast<const GLuint*>(data)); break;
+            case HdTypeFloat:
+                glUniform1fv(loc, type.count, static_cast<const GLfloat*>(data)); break;
+            case HdTypeFloatVec2:
+                glUniform2fv(loc, type.count, static_cast<const GLfloat*>(data)); break;
+            case HdTypeFloatVec3:
+                glUniform3fv(loc, type.count, static_cast<const GLfloat*>(data)); break;
+            case HdTypeFloatVec4:
+                glUniform4fv(loc, type.count, static_cast<const GLfloat*>(data)); break;
+            case HdTypeFloatMat3:
+                glUniformMatrix3fv(loc, type.count, GL_FALSE, static_cast<const GLfloat*>(data)); break;
+            case HdTypeFloatMat4:
+                glUniformMatrix4fv(loc, type.count, GL_FALSE, static_cast<const GLfloat*>(data)); break;
+            default:
+                TF_WARN("Unsupported uniform type: %s (%s)",
+                    name.GetText(), value.GetTypeName().c_str());
+                break;
+        }
+#endif
     }
 }
 
@@ -351,7 +379,6 @@ HdxFullscreenShader::Draw(TextureMap const& textures)
         // Setup textures
         int textureIndex = 0;
         for (auto const& texture : textures) {
-            glBindTexture(GL_TEXTURE_2D, texture.second);
             GLint loc = 0;//glGetUniformLocation(programId, texture.first.GetText());
             //glUniform1i(loc, textureIndex);
             [renderEncoder setFragmentTexture:texture.second.multiTexture.forCurrentGPU() atIndex:textureIndex];

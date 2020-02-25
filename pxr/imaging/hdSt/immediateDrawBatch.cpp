@@ -121,7 +121,7 @@ HdSt_ImmediateDrawBatch::PrepareDraw(
 }
 
 static int
-_GetElementOffset(HdStBufferArrayRangeGLSharedPtr const& range)
+_GetElementOffset(HdBufferArrayRangeSharedPtr const& range)
 {
     return range? range->GetElementOffset() : 0;
 }

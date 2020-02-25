@@ -31,12 +31,16 @@
 #include "pxr/imaging/garch/gl.h"
 #include "pxr/base/gf/vec2i.h"
 
+#include "pxr/imaging/garch/texture.h"
+#include "pxr/imaging/hgi/buffer.h"
+
 #include <boost/shared_ptr.hpp>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-class HdStGLSLProgram;
-typedef boost::shared_ptr<class HdStGLSLProgram> HdStGLSLProgramSharedPtr;
+class Hgi;
+class HdStProgram;
+typedef boost::shared_ptr<class HdStProgram> HdStProgramSharedPtr;
 
 /// \class HdxFullscreenShader
 ///
@@ -49,7 +53,7 @@ public:
     /// Create a new fullscreen shader object. Creation of GL resources is
     /// deferred...
     HDX_API
-    HdxFullscreenShader();
+    HdxFullscreenShader(Hgi *hgi);
 
     /// Destroy the fullscreen shader object, releasing GL resources.
     HDX_API
@@ -101,7 +105,7 @@ public:
     HDX_API
     void Draw();
 
-    typedef std::map<TfToken, GLuint> TextureMap;
+    typedef std::map<TfToken, GarchTextureGPUHandle> TextureMap;
 
     /// Draw the provided textures to the bound framebuffer.
     /// This will load the GLSL program on-demand.
@@ -110,19 +114,19 @@ public:
 
 private:
     // Utility function to create a GL texture.
-    void _CreateTextureResources(GLuint *texture);
+    void _CreateTextureResources(GarchTextureGPUHandle *texture);
     // Utility function to create buffer resources.
     void _CreateBufferResources();
     // Utility function to set uniform values.
-    void _SetUniform(GLuint programId,
-                     TfToken const& name, VtValue const& value);
+    void _SetUniform(TfToken const& name, VtValue const& value);
 
     typedef std::map<TfToken, VtValue> UniformMap;
 
     UniformMap _uniforms;
     TextureMap _textures;
 
-    HdStGLSLProgramSharedPtr _program;
+    Hgi* _hgi;
+    HdStProgramSharedPtr _program;
     TfToken _glslfx;
     TfToken _technique;
     HgiBufferHandle _vertexBuffer;

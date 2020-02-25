@@ -42,7 +42,6 @@ HdxPresentTask::HdxPresentTask(HdSceneDelegate* delegate, SdfPath const& id)
  , _depthBufferPath()
  , _aovBuffer(nullptr)
  , _depthBuffer(nullptr)
- , _compositor()
 {
     _isOpenGL = HdStResourceFactory::GetInstance()->IsOpenGL();
     
@@ -144,8 +143,8 @@ HdxPresentTask::Execute(HdTaskContext* ctx)
 	    HdxFullscreenShader::TextureMap textures;
 	    textures[TfToken("color")] = colorId;
 	    textures[TfToken("depth")] = depthId;
-	    _compositor.SetProgramToCompositor(/*depthAware = */true);
-	    _compositor.Draw(textures);
+	    _compositor->SetProgramToCompositor(/*depthAware = */true);
+	    _compositor->Draw(textures);
 
         if (blendEnabled) {
             glEnable(GL_BLEND);

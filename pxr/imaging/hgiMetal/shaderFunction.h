@@ -1,5 +1,5 @@
 //
-// Copyright 2019 Pixar
+// Copyright 2020 Pixar
 //
 // Licensed under the Apache License, Version 2.0 (the "Apache License")
 // with the following modification; you may not use this file except in
@@ -21,56 +21,56 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#ifndef HGIMETAL_BLIT_ENCODER_H
-#define HGIMETAL_BLIT_ENCODER_H
+#ifndef PXR_IMAGING_HGIMETAL_SHADERFUNCTION_H
+#define PXR_IMAGING_HGIMETAL_SHADERFUNCTION_H
 
-#include "pxr/pxr.h"
+#include "pxr/imaging/hgi/shaderFunction.h"
+
 #include "pxr/imaging/hgiMetal/api.h"
-#include "pxr/imaging/hgi/blitEncoder.h"
+
+#include <Metal/Metal.h>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-class HgiMetalImmediateCommandBuffer;
 
-
-/// \class HgiMetalBlitEncoder
 ///
-/// Metal implementation of HgiBlitEncoder.
+/// \class HgiMetalShaderFunction
 ///
-class HgiMetalBlitEncoder final : public HgiBlitEncoder
-{
+/// Metal implementation of HgiShaderFunction
+///
+class HgiMetalShaderFunction final : public HgiShaderFunction {
 public:
     HGIMETAL_API
-    HgiMetalBlitEncoder(HgiMetalImmediateCommandBuffer* cmdBuf);
+    virtual ~HgiMetalShaderFunction();
 
     HGIMETAL_API
-    virtual ~HgiMetalBlitEncoder();
+    bool IsValid() const override;
 
     HGIMETAL_API
-    void EndEncoding() override;
+    std::string const& GetCompileErrors() override;
+
+    /// Returns the gl resource id of the shader.
+    HGIMETAL_API
+    id<MTLFunction> GetShaderId() const;
+
+protected:
+    friend class HgiMetal;
 
     HGIMETAL_API
-    void PushDebugGroup(const char* label) override;
-
-    HGIMETAL_API
-    void PopDebugGroup() override;
-
-    HGIMETAL_API
-    void CopyTextureGpuToCpu(HgiTextureGpuToCpuOp const& copyOp) override;
-
-    HGIMETAL_API
-    void ResolveImage(HgiResolveImageOp const& resolveOp) override;
+    HgiMetalShaderFunction(HgiShaderFunctionDesc const& desc);
 
 private:
-    HgiMetalBlitEncoder() = delete;
-    HgiMetalBlitEncoder & operator=(const HgiMetalBlitEncoder&) = delete;
-    HgiMetalBlitEncoder(const HgiMetalBlitEncoder&) = delete;
+    HgiMetalShaderFunction() = delete;
+    HgiMetalShaderFunction & operator=(const HgiMetalShaderFunction&) = delete;
+    HgiMetalShaderFunction(const HgiMetalShaderFunction&) = delete;
 
-    HgiMetalImmediateCommandBuffer* _commandBuffer;
+private:
+    HgiShaderFunctionDesc _descriptor;
+    std::string _errors;
 
-    // Encoder is used only one frame so storing multi-frame state on encoder
-    // will not survive. Store onto HgiMetalImmediateCommandBuffer instead.
+    id<MTLFunction> _shaderId;
 };
+
 
 PXR_NAMESPACE_CLOSE_SCOPE
 

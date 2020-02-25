@@ -1604,7 +1604,7 @@ HdxTaskController::SetSelectionOutlineRadius(unsigned int radius)
 
 
 void
-HdxTaskController::SetLightingState(GlfSimpleLightingContextPtr const& src)
+HdxTaskController::SetLightingState(GarchSimpleLightingContextPtr const& src)
 {
     // If simpleLightTask doesn't exist, no need to process the lighting
     // context...

@@ -75,6 +75,22 @@ public:
     HGIMETAL_API
     void DestroyBuffer(HgiBufferHandle* texHandle) override;
 
+    HGIMETAL_API
+    HgiShaderFunctionHandle CreateShaderFunction(
+        HgiShaderFunctionDesc const& desc) override;
+
+    HGIMETAL_API
+    void DestroyShaderFunction(
+        HgiShaderFunctionHandle* shaderFunctionHandle) override;
+
+    HGIMETAL_API
+    HgiShaderProgramHandle CreateShaderProgram(
+        HgiShaderProgramDesc const& desc) override;
+
+    HGIMETAL_API
+    void DestroyShaderProgram(
+        HgiShaderProgramHandle* shaderProgramHandle) override;
+
     //
     // HgiMetal specific
     //

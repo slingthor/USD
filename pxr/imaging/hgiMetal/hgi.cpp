@@ -22,12 +22,17 @@
 // language governing permissions and limitations under the Apache License.
 //
 #include "pxr/imaging/hgiMetal/hgi.h"
+#include "pxr/imaging/hgiMetal/buffer.h"
 #include "pxr/imaging/hgiMetal/conversions.h"
 #include "pxr/imaging/hgiMetal/diagnostic.h"
-#include "pxr/imaging/hgiMetal/buffer.h"
+#include "pxr/imaging/hgiMetal/shaderFunction.h"
+#include "pxr/imaging/hgiMetal/shaderProgram.h"
 #include "pxr/imaging/hgiMetal/texture.h"
 
 #include "pxr/base/tf/getenv.h"
+#include "pxr/base/tf/registryManager.h"
+#include "pxr/base/tf/type.h"
+
 
 #if defined(ARCH_OS_MACOS)
 #import <Cocoa/Cocoa.h>
@@ -36,6 +41,12 @@
 #endif // ARCH_OS_MACOS
 
 PXR_NAMESPACE_OPEN_SCOPE
+
+TF_REGISTRY_FUNCTION(TfType)
+{
+    TfType t = TfType::Define<HgiMetal, TfType::Bases<Hgi> >();
+    t.SetFactory<HgiFactory<HgiMetal>>();
+}
 
 static int _GetAPIVersion()
 {
@@ -76,6 +87,7 @@ static int _GetAPIVersion()
 HgiMetal::HgiMetal(id<MTLDevice> device)
 : _device(device)
 , _apiVersion(_GetAPIVersion())
+, _immediateCommandBuffer(device)
 {
     if (!_device) {
 #if defined(ARCH_OS_MACOS)
@@ -132,5 +144,34 @@ HgiMetal::DestroyBuffer(HgiBufferHandle* bufHandle)
     }
 }
 
+HgiShaderFunctionHandle
+HgiMetal::CreateShaderFunction(HgiShaderFunctionDesc const& desc)
+{
+    return new HgiMetalShaderFunction(desc);
+}
+
+void
+HgiMetal::DestroyShaderFunction(HgiShaderFunctionHandle* shaderFunctionHandle)
+{
+    if (TF_VERIFY(shaderFunctionHandle, "Invalid function handle")) {
+        delete *shaderFunctionHandle;
+        *shaderFunctionHandle = nullptr;
+    }
+}
+
+HgiShaderProgramHandle
+HgiMetal::CreateShaderProgram(HgiShaderProgramDesc const& desc)
+{
+    return new HgiMetalShaderProgram(desc);
+}
+
+void
+HgiMetal::DestroyShaderProgram(HgiShaderProgramHandle* shaderProgramHandle)
+{
+    if (TF_VERIFY(shaderProgramHandle, "Invalid program handle")) {
+        delete *shaderProgramHandle;
+        *shaderProgramHandle = nullptr;
+    }
+}
 
 PXR_NAMESPACE_CLOSE_SCOPE

@@ -262,4 +262,10 @@ HgiGLImmediateCommandBuffer::CreateBlitEncoder()
     return HgiBlitEncoderUniquePtr(new HgiGLBlitEncoder(this));
 }
 
+void
+HgiGLImmediateCommandBuffer::FlushEncoders()
+{
+    glFlush();
+}
+
 PXR_NAMESPACE_CLOSE_SCOPE

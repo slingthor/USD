@@ -1453,7 +1453,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
                 std::stringstream arrayDecl;
 
                 arrayDecl << "[" << input.arraySizeStr << "]";
-
+                
                 if (input.arraySize) {
                     vsInputStruct << "HD_MTL_VS_ATTRIBUTE_ARRAY(";
                 }
@@ -1468,7 +1468,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
 
                 vsInputCode << "    scope." << name
                             << " = input." << name << ";\n";
-
+                
                 // MI Entry Point needs these as buffers instead of vertex
                 // attributes. And to full the MSLVsInput struct we add them to
                 // the InputCode as well.
@@ -1574,12 +1574,21 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
 
             arrayDecl << "[" << output.arraySizeStr << "]";
 
+            bool hasDefineWrapper = !output.defineWrapperStr.empty();
+            if (hasDefineWrapper) {
+                vsOutputStruct << "#if defined("
+                               << output.defineWrapperStr
+                               << ")\n";
+                vsOutputCode << "#if defined("
+                             << output.defineWrapperStr
+                             << ")\n";
+            }
             if (output.arraySize) {
                 vsOutputStruct << "#if !defined(HD_FRAGMENT_SHADER)\n"
                                << "    HD_MTL_VS_ATTRIBUTE_ARRAY(";
             }
             else {
-                vsOutputStruct  << "    HD_MTL_VS_ATTRIBUTE(";
+                vsOutputStruct << "    HD_MTL_VS_ATTRIBUTE(";
             }
 
             vsOutputStruct  << output.dataType
@@ -1587,40 +1596,59 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
                             << ", " << (output.attribute.IsEmpty() ? "[[center_perspective]]" : output.attribute.GetString())
                             << ", " << arrayDecl.str()
                             << ");\n";
-            if (output.arraySize) {
-                vsOutputStruct << "#endif\n";
-            }
             
             if (output.arraySize) {
+                vsOutputStruct << "#endif\n";
                 vsOutputCode << "    for (int i = 0; i < " << output.arraySizeStr << "; i++)\n";
                 vsOutputCode << "        vsOut." << output.name << "[i] = scope." << (output.accessorStr.IsEmpty() ? output.name : output.accessorStr) << "[i];\n";
             }
             else {
                 vsOutputCode << "    vsOut." << output.name << " = scope." << (output.accessorStr.IsEmpty() ? output.name : output.accessorStr) << ";\n";
             }
+
             //Build additional intermediate struct for the GS later as an optimization.
             if(_buildTarget == kMSL_BuildTarget_MVA_ComputeGS) {
                 bool isFlat = (output.attribute == "[[flat]]");
                 std::stringstream& intermStructStream = (isFlat ? gsVertIntermediateFlatStruct : gsVertIntermediateStruct);
-                
+                std::stringstream& intermediateVSOutput = (isFlat ? gs_IntermediateVSOutput_Flat : gs_IntermediateVSOutput);
                 std::string dataType = _GetPackedMSLType(output.dataType.GetString());
                 
+                if (hasDefineWrapper) {
+                    intermStructStream << "#if defined("
+                                       << output.defineWrapperStr
+                                       << ")\n";
+                    intermediateVSOutput << "#if defined("
+                                         << output.defineWrapperStr
+                                         << ")\n";
+                }
+
                 intermStructStream << "    " << dataType << " " << output.name;
                 if (output.arraySize) {
                     intermStructStream << "[" << output.arraySize << "]";
                 }
                 intermStructStream << ";\n";
+
                 if(isFlat)
-                    gs_IntermediateVSOutput_Flat << "            vsData_Flat." << output.name << " = vsOutput." << output.name << ";\n";
+                    intermediateVSOutput << "            vsData_Flat." << output.name << " = vsOutput." << output.name << ";\n";
                 else {
                     if (output.arraySize) {
-                        gs_IntermediateVSOutput << "        for (int j = 0; j < " << output.arraySizeStr << "; j++)\n";
-                        gs_IntermediateVSOutput << "            vsData[" << indexStr.str() << "]." << output.name << "[j] = vsOutput." << output.name << "[j];\n";
+                        intermediateVSOutput << "        for (int j = 0; j < " << output.arraySizeStr << "; j++)\n";
+                        intermediateVSOutput << "            vsData[" << indexStr.str() << "]." << output.name << "[j] = vsOutput." << output.name << "[j];\n";
                     }
                     else {
-                        gs_IntermediateVSOutput << "        vsData[" << indexStr.str() << "]." << output.name << " = vsOutput." << output.name << ";\n";
+                        intermediateVSOutput << "        vsData[" << indexStr.str() << "]." << output.name << " = vsOutput." << output.name << ";\n";
                     }
                 }
+                
+                if (hasDefineWrapper) {
+                    intermStructStream << "#endif\n";
+                    intermediateVSOutput << "#endif\n";
+                }
+            }
+            
+            if (hasDefineWrapper) {
+                vsOutputStruct << "#endif\n";
+                vsOutputCode << "#endif\n";
             }
         }
     }
@@ -2348,10 +2376,6 @@ HdSt_CodeGenMSL::Compile()
     _genFS.str(""); _genCS.str(""); _procVS.str(""); _procTCS.str("");
     _procTES.str(""); _procGS.str("");
 
-    _genVS << "#define HD_VERTEX_SHADER\n";
-    _genGS << "\n#define HD_GEOMETRY_SHADER\n";
-    _genFS << "#define HD_FRAGMENT_SHADER\n";
-
     // Metal conversion defines
 
     GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
@@ -2555,7 +2579,8 @@ HdSt_CodeGenMSL::Compile()
     
     if (_hasVS) {
         _vsSource = vsConfigString.str() + _genDefinitions.str() +
-                    _genCommon.str() + _genVS.str() + termination.str() + glueVS.str();
+                "#define HD_VERTEX_SHADER\n" + _genCommon.str() +
+                _genVS.str() + termination.str() + glueVS.str();
         _vsSource = replaceStringAll(_vsSource, "<st>", "_Vert");
         
         if (!mslProgram->CompileShader(GL_VERTEX_SHADER, _vsSource)) {
@@ -2563,8 +2588,10 @@ HdSt_CodeGenMSL::Compile()
         }
     }
     if (_buildTarget == kMSL_BuildTarget_MVA_ComputeGS) {
-        _gsSource = vsConfigString.str() + gsConfigString.str() + _genDefinitions.str() +
-                    _genOSDDefinitions.str() + _genCommon.str() + _genVS.str() + termination.str();
+        _gsSource = vsConfigString.str() + gsConfigString.str() +
+                _genDefinitions.str() + "#define HD_GEOMETRY_SHADER\n" +
+                _genOSDDefinitions.str() + _genCommon.str() + _genVS.str() +
+                termination.str();
         _gsSource = replaceStringAll(_gsSource, "<st>", "_Vert");
         _gsSource += _genCommon.str() + _genGS.str() + glueGS.str();    //Termination of Geometry ProgramScope is done in glueCS due to addition of EmitVertex/Primitive
         _gsSource = replaceStringAll(_gsSource, "<st>", "_Geometry");
@@ -2584,7 +2611,9 @@ HdSt_CodeGenMSL::Compile()
         mslProgram->SetGSOutStructsSize(_mslGSVertOutStructSize, _mslGSPrimOutStructSize);
     }
     if (_hasFS) {
-        _fsSource = fsConfigString.str() + _genDefinitions.str() + _genCommon.str() + _genFS.str() + termination.str() + gluePS.str();
+        _fsSource = fsConfigString.str() + _genDefinitions.str() +
+                "#define HD_FRAGMENT_SHADER\n" + _genCommon.str() +
+                _genFS.str() + termination.str() + gluePS.str();
         _fsSource = replaceStringAll(_fsSource, "<st>", "_Frag");
 
         if (!mslProgram->CompileShader(GL_FRAGMENT_SHADER, _fsSource)) {
@@ -3261,10 +3290,12 @@ HdSt_CodeGenMSL::_GenerateCommonCode()
         param.usage |= TParam::VertexShaderOnly;
     }
 
-    _genCommon  << "#if !defined(HD_NUM_clipPlanes)\n"
+    _genCommon  << "#if defined(HD_VERTEX_SHADER)\n"
+                << "#if !defined(HD_NUM_clipPlanes)\n"
                 << "#define HD_NUM_clipPlanes 1\n"
                 << "#endif\n"
-                << "float gl_ClipDistance [[clip_distance]] [HD_NUM_clipPlanes];\n";
+                << "float gl_ClipDistance[HD_NUM_clipPlanes];\n"
+                << "#endif\n";
     
     {
         // HD_NUM_clipPlanes
@@ -3274,6 +3305,7 @@ HdSt_CodeGenMSL::_GenerateCommonCode()
         param.usage |= TParam::VertexShaderOnly;
         param.arraySize = 1;
         param.arraySizeStr = "HD_NUM_clipPlanes";
+        param.defineWrapperStr = "HD_HAS_clipPlanes";
     }
 
     _genCommon << "uint gl_PrimitiveID = 0;\n"

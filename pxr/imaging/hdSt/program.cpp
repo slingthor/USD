@@ -37,7 +37,9 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-HdStProgram::HdStProgram(TfToken const &role) {
+HdStProgram::HdStProgram(TfToken const &role)
+: _role(role)
+{
 
 }
 

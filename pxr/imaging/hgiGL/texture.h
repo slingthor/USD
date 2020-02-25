@@ -43,10 +43,6 @@ public:
     /// Returns the internal OpenGL unique Id of the texture.
     uint32_t GetTextureId() const {return _textureId;}
 
-    /// Returns the descriptor of the texture.
-    HGIGL_API
-    HgiTextureDesc const& GetDescriptor() const;
-
 protected:
     friend class HgiGL;
 
@@ -58,7 +54,6 @@ private:
     HgiGLTexture & operator=(const HgiGLTexture&) = delete;
     HgiGLTexture(const HgiGLTexture&) = delete;
 
-    HgiTextureDesc _descriptor;
     uint32_t _textureId;
 };
 

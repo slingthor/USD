@@ -100,6 +100,7 @@ public:
         HdBinding binding;
         int arraySize;
         std::string arraySizeStr;
+        std::string defineWrapperStr;
     };
     
     typedef std::vector<TParam> InOutParams;

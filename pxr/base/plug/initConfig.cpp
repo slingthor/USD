@@ -81,24 +81,25 @@ ARCH_CONSTRUCTOR(Plug_InitConfig, 2, void)
     // is built as a static library.  In that case, fall back to using
     // ArchGetExecutablePath().  Also provide some diagnostic output if the
     // PLUG_INFO_SEARCH debug flag is enabled.
-    std::string binaryPath;
-    if (!ArchGetAddressInfo(
-        reinterpret_cast<void*>(&Plug_InitConfig), &binaryPath,
-            nullptr, nullptr, nullptr)) {
-        debugMessages.emplace_back(
-            "Failed to determine absolute path for Plug search "
-            "using using ArchGetAddressInfo().  This is expected "
-            "if pxr is linked as a static library.\n");
+    std::string binaryPath = TfGetenv(sharedLibraryLocation);
+    if (binaryPath.empty()) {
+        if (!ArchGetAddressInfo(
+            reinterpret_cast<void*>(&Plug_InitConfig), &binaryPath,
+                nullptr, nullptr, nullptr)) {
+            debugMessages.emplace_back(
+                "Failed to determine absolute path for Plug search "
+                "using using ArchGetAddressInfo().  This is expected "
+                "if pxr is linked as a static library.\n");
+        }
+        binaryPath = TfGetPathName(binaryPath);
     }
 
     if (binaryPath.empty()) {
         debugMessages.emplace_back(
             "Using ArchGetExecutablePath() to determine absolute "
             "path for Plug search location.\n");
-        binaryPath = ArchGetExecutablePath();
+        binaryPath = TfGetPathName(ArchGetExecutablePath());
     }
-
-    binaryPath = TfGetPathName(binaryPath);
 
     debugMessages.emplace_back(
         TfStringPrintf(

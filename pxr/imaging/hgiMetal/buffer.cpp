@@ -37,14 +37,27 @@ HgiMetalBuffer::HgiMetalBuffer(HgiMetal *hgi, HgiBufferDesc const & desc)
     , _bufferId(nil)
 {
 
-    if (desc.length == 0) {
+    if (desc.byteSize == 0) {
         TF_CODING_ERROR("Buffers must have a non-zero length");
     }
 
     MTLResourceOptions resourceOptions =
         MTLResourceStorageModeDefault|MTLResourceCPUCacheModeDefaultCache;
-    _bufferId = [hgi->GetDevice() newBufferWithLength:desc.length
-                                              options:resourceOptions];
+    
+    if (desc.initialData) {
+        _bufferId = [hgi->GetDevice() newBufferWithBytes:desc.initialData
+                                                  length:desc.byteSize
+                                                  options:resourceOptions];
+    }
+    else {
+        _bufferId = [hgi->GetDevice() newBufferWithLength:desc.byteSize
+                                                  options:resourceOptions];
+    }
+    
+    _descriptor.initialData = nullptr;
+
+    _bufferId.label =
+        [NSString stringWithUTF8String:_descriptor.debugName.c_str()];
 }
 
 HgiMetalBuffer::~HgiMetalBuffer()
@@ -53,13 +66,6 @@ HgiMetalBuffer::~HgiMetalBuffer()
         [_bufferId release];
         _bufferId = nil;
     }
-}
-
-void HgiMetalBuffer::Copy(void const *data, size_t offset, size_t size) {
-    memcpy((uint8_t*)[_bufferId contents] + offset, data, size);
-#if defined(ARCH_OS_MACOS)
-    [_bufferId didModifyRange:NSMakeRange(offset, size)];
-#endif
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

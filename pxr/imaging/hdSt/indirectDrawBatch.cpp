@@ -172,7 +172,7 @@ HdSt_IndirectDrawBatch::SetEnableTinyPrimCulling(bool tinyPrimCulling)
 }
 
 static int
-_GetElementOffset(HdStBufferArrayRangeGLSharedPtr const& range)
+_GetElementOffset(HdBufferArrayRangeSharedPtr const& range)
 {
     return range? range->GetElementOffset() : 0;
 }

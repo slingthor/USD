@@ -190,9 +190,9 @@ HdxColorizeSelectionTask::Execute(HdTaskContext* ctx)
     _ColorizeSelection();
 
     // Blit!
-    _compositor.SetProgram(HdxPackageOutlineShader(), _tokens->outlineFrag);
+    _compositor->SetProgram(HdxPackageOutlineShader(), _tokens->outlineFrag);
 
-    _compositor.SetTexture(
+    _compositor->SetTexture(
         _tokens->colorIn,
         _primId->GetWidth(), 
         _primId->GetHeight(),
@@ -204,15 +204,15 @@ HdxColorizeSelectionTask::Execute(HdTaskContext* ctx)
         texelSize[0] = 1.0f / _primId->GetWidth();
         texelSize[1] = 1.0f / _primId->GetHeight();
     }
-    _compositor.SetUniform(_tokens->texelSize, VtValue(texelSize));
+    _compositor->SetUniform(_tokens->texelSize, VtValue(texelSize));
 
-    _compositor.SetUniform(_tokens->enableOutline,
-                           VtValue(_params.enableOutline ? 1 : 0));
+    _compositor->SetUniform(_tokens->enableOutline,
+                            VtValue(_params.enableOutline ? 1 : 0));
 
     // Glsl version 120 does not support unsigned int, so we cast the radius to
     // a signed int - nonetheless the value will be >=0 .
-    _compositor.SetUniform(_tokens->radius,
-                           VtValue((int)_params.outlineRadius));
+    _compositor->SetUniform(_tokens->radius,
+                            VtValue((int)_params.outlineRadius));
 
     // Blend the selection color on top.  ApplySelectionColor uses the
     // calculation:
@@ -231,7 +231,7 @@ HdxColorizeSelectionTask::Execute(HdTaskContext* ctx)
     glEnable(GL_BLEND);
     glBlendFuncSeparate(GL_ONE, GL_SRC_ALPHA, GL_ZERO, GL_ONE);
 #endif
-    _compositor.Draw();
+    _compositor->Draw();
 
 #if defined(ARCH_GFX_OPENGL)
     glEnable(GL_DEPTH_TEST);

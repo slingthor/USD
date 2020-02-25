@@ -53,7 +53,6 @@ private:
     HgiGLBuffer & operator=(const HgiGLBuffer&) = delete;
     HgiGLBuffer(const HgiGLBuffer&) = delete;
 
-    HgiBufferDesc _descriptor;
     uint32_t _bufferId;
     void* _mapped;
 };

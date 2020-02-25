@@ -206,7 +206,7 @@ HdStVBOMemoryBufferMetal::Reallocate(
                 int const newSize = range->GetNumElements();
                 size_t const copySize =
                     std::min(oldSize, newSize) * bytesPerElement;
-                int const oldOffset = range->GetOffset();
+                int const oldOffset = range->GetElementOffset();
                 if (copySize > 0) {
                     ptrdiff_t const readOffset = oldOffset * bytesPerElement;
                     ptrdiff_t const writeOffset = *newOffsetIt * bytesPerElement;
@@ -248,7 +248,7 @@ HdStVBOMemoryBufferMetal::Reallocate(
             TF_CODING_ERROR("_StripedBufferArrayRange expired unexpectedly.");
             continue;
         }
-        range->SetOffset(newOffsets[idx]);
+        range->SetElementOffset(newOffsets[idx]);
         range->SetCapacity(range->GetNumElements());
     }
     _needsReallocation = false;

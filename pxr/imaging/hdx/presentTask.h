@@ -67,7 +67,7 @@ private:
     HdRenderBuffer *_aovBuffer;
     HdRenderBuffer *_depthBuffer;
 
-    HdxFullscreenShader _compositor;
+    std::unique_ptr<HdxFullscreenShader> _compositor;
     
     bool _isOpenGL;
 

@@ -396,7 +396,7 @@ HdStResourceRegistry::RegisterPersistentBuffer(
         TfToken const &role, size_t dataSize, void *data)
 {
     HdStPersistentBufferSharedPtr result(
-            new HdStPersistentBuffer(role, dataSize, data));
+        HdStResourceFactory::GetInstance()->NewPersistentBuffer(role, dataSize, data));
 
     _persistentBufferRegistry.push_back(result);
 
@@ -885,7 +885,7 @@ HdStResourceRegistry::_GarbageCollect()
 
     // Cleanup Shader registries
     _geometricShaderRegistry.GarbageCollect();
-    _glslProgramRegistry.GarbageCollect();
+    _programRegistry.GarbageCollect();
     _textureResourceHandleRegistry.GarbageCollect();
 
     // cleanup buffer array
@@ -934,8 +934,8 @@ HdStResourceRegistry::_TallyResourceAllocation(VtDictionary *result) const
             continue;
         }
 
-        std::string const & role = buffer->GetRole().GetString();
-        size_t size = size_t(buffer->GetSize());
+        std::string const & role = buffer->GetResource()->GetRole().GetString();
+        size_t size = size_t(buffer->GetResource()->GetSize());
 
         (*result)[role] = VtDictionaryGet<size_t>(*result, role,
                                                   VtDefault = 0) + size;
@@ -944,18 +944,18 @@ HdStResourceRegistry::_TallyResourceAllocation(VtDictionary *result) const
     }
 
     // glsl program & ubo allocation
-    for (auto const & it: _glslProgramRegistry) {
-        HdStGLSLProgramSharedPtr const & program = it.second.value;
+    for (auto const & it: _programRegistry) {
+        HdStProgramSharedPtr const & program = it.second.value;
         // In the event of a compile or link error, programs can be null
         if (!program) {
             continue;
         }
         size_t size =
-            program->GetProgram().GetSize() +
+            program->GetProgramSize() +
             program->GetGlobalUniformBuffer().GetSize();
 
         // the role of program and global uniform buffer is always same.
-        std::string const &role = program->GetProgram().GetRole().GetString();
+        std::string const &role = program->GetRole().GetString();
         (*result)[role] = VtDictionaryGet<size_t>(*result, role,
                                                   VtDefault = 0) + size;
 
@@ -982,7 +982,7 @@ HdStResourceRegistry::_TallyResourceAllocation(VtDictionary *result) const
 
     // Texture registry
     {
-        GlfTextureRegistry &textureReg = GlfTextureRegistry::GetInstance();
+        GarchTextureRegistry &textureReg = GarchTextureRegistry::GetInstance();
         std::vector<VtDictionary> textureInfo = textureReg.GetTextureInfos();
         size_t textureMemory = 0;
         TF_FOR_ALL (textureIt, textureInfo) {

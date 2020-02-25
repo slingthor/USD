@@ -173,10 +173,6 @@ HdxColorCorrectionTask::_CreateOpenColorIOResources()
                        config->getDefaultView(display) :
                        _viewOCIO.c_str();
 
-    const char* looks = _looksOCIO.empty() ?
-                        config->getDisplayLooks(display, view) :
-                        _looksOCIO.c_str();
-
     std::string inputColorSpace = _colorspaceOCIO;
     if (inputColorSpace.empty()) {
         OCIO::ConstColorSpaceRcPtr cs = config->getColorSpace("default");
@@ -192,43 +188,38 @@ HdxColorCorrectionTask::_CreateOpenColorIOResources()
     transform->setDisplay(display);
     transform->setView(view);
     transform->setInputColorSpaceName(inputColorSpace.c_str());
-    transform->setLooksOverride(looks);
-    transform->setLooksOverrideEnabled(true);
+    if (!_looksOCIO.empty()) {
+        transform->setLooksOverride(_looksOCIO.c_str());
+        transform->setLooksOverrideEnabled(true);
+    } else {
+        transform->setLooksOverrideEnabled(false);
+    }
 
     OCIO::ConstProcessorRcPtr processor = config->getProcessor(transform);
 
-    OCIO::GpuLanguage gpuLanguage = OCIO::GPU_LANGUAGE_GLSL_1_0;
-    if (!_isOpenGL) {
-//            gpuLanguage = OCIO::GPU_LANGUAGE_MSL;
+    // If 3D lut size is 0 then use a reasonable default size.
+    // We use 65 (0-64) samples which works well with OCIO resampling.
+    if (_lut3dSizeOCIO == 0) {
+        _lut3dSizeOCIO = 65;
     }
 
+    // Optionally override similar to KATANA_OCIO_LUT3D_EDGE_SIZE
+    int size = TfGetenvInt("USDVIEW_OCIO_LUT3D_EDGE_SIZE", 0);
+    if (size > 0) {
+        _lut3dSizeOCIO = size;
+    }
 
-        // If 3D lut size is 0 then use a reasonable default size.
-        // We use 65 (0-64) samples which works well with OCIO resampling.
-        if (_lut3dSizeOCIO == 0) {
-            _lut3dSizeOCIO = 65;
-        }
-
-        // Optionally override similar to KATANA_OCIO_LUT3D_EDGE_SIZE
-        int size = TfGetenvInt("USDVIEW_OCIO_LUT3D_EDGE_SIZE", 0);
-        if (size > 0) {
-            _lut3dSizeOCIO = size;
-        }
-
-        // Optionally override similar to KATANA_OCIO_LUT3D_EDGE_SIZE
-        int size = TfGetenvInt("USDVIEW_OCIO_LUT3D_EDGE_SIZE", 0);
-        if (size > 0) {
-            _lut3dSizeOCIO = size;
-        }
     // Create a GPU Shader Description
-    OCIO::GpuShaderDescRcPtr shaderDesc = OCIO::GpuShaderDesc::CreateLegacyShaderDesc(_lut3dSizeOCIO);
-    shaderDesc->setLanguage(gpuLanguage);
-    shaderDesc->setFunctionName("OCIODisplay");
-    shaderDesc->setResourcePrefix("ocio_");
+    OCIO::GpuShaderDesc shaderDesc;
+    shaderDesc.setLanguage(OCIO::GPU_LANGUAGE_GLSL_1_0);
+    shaderDesc.setFunctionName("OCIODisplay");
+    shaderDesc.setLut3DEdgeLen(_lut3dSizeOCIO);
 
-    OCIO::ConstGPUProcessorRcPtr gpuProcessor
-        = processor->getDefaultGPUProcessor();
-    gpuProcessor->extractGpuShaderInfo(shaderDesc);
+    // Compute and the 3D LUT
+    int num3Dentries = 3 * _lut3dSizeOCIO*_lut3dSizeOCIO*_lut3dSizeOCIO;
+    std::vector<float> lut3d;
+    lut3d.resize(num3Dentries);
+    processor->getGpuLut3D(&lut3d[0], shaderDesc);
 
     // Load the data into an OpenGL 3D Texture
     if (_texture3dLUT.IsSet()) {
@@ -251,65 +242,50 @@ HdxColorCorrectionTask::_CreateOpenColorIOResources()
         _texture3dLUT.Clear();
     }
 
-    // Compute and the 3D LUT
-    // 1. Get the information of the 3D LUT.
-    const char* name = 0x0;
-    const char* uid  = 0x0;
-    unsigned edgelen = 0;
-    OCIO::Interpolation interpolation = OCIO::INTERP_NEAREST;
-    if (shaderDesc->getNum3DTextures()) {
-        shaderDesc->get3DTexture(0, name, uid, edgelen, interpolation);
-
-        const float* values = 0x0;
-        shaderDesc->get3DTextureValues(0, values);
-
-        // 2. Allocate the 3D LUT.
-
-        if (_isOpenGL) {
+    if (_isOpenGL) {
 #if defined(ARCH_GFX_OPENGL)
-            GLint restoreTexture;
-            glGetIntegerv(GL_TEXTURE_BINDING_3D, &restoreTexture);
-            GLuint t;
-            glGenTextures(1, &t);
-            _texture3dLUT = t;
-            glBindTexture(GL_TEXTURE_3D, t);
-            glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-            glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-            glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-            glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-            glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-            glTexImage3D(GL_TEXTURE_3D, 0, GL_RGB32F,
-                         edgelen, edgelen, edgelen,
-                         0, GL_RGB, GL_FLOAT, values);
-            glBindTexture(GL_TEXTURE_3D, restoreTexture);
-            GLF_POST_PENDING_GL_ERRORS();
+        GLint restoreTexture;
+        glGetIntegerv(GL_TEXTURE_BINDING_3D, &restoreTexture);
+        GLuint t;
+        glGenTextures(1, &t);
+        _texture3dLUT = t;
+        glBindTexture(GL_TEXTURE_3D, t);
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+        glTexImage3D(GL_TEXTURE_3D, 0, GL_RGB32F,
+                     _lut3dSizeOCIO, _lut3dSizeOCIO, _lut3dSizeOCIO,
+                     0, GL_RGB, GL_FLOAT, &lut3d[0]);
+        glBindTexture(GL_TEXTURE_3D, restoreTexture);
+        GLF_POST_PENDING_GL_ERRORS();
 #endif
-        }
-        else {
+    }
+    else {
 #if defined(ARCH_GFX_METAL)
-            id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->currentDevice;
-            MTLTextureDescriptor* desc =
-                [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA16Float
-                                                                   width:edgelen
-                                                                  height:edgelen
-                                                               mipmapped:NO];
-            desc.resourceOptions = MTLResourceStorageModeDefault;
-            desc.depth = edgelen;
-            _texture3dLUT = MtlfMultiTexture(desc);
-            
-            for(int i = 0; i < GPUState::gpuCount; i++) {
-                [_texture3dLUT.multiTexture[i] replaceRegion:MTLRegionMake3D(0, 0, 0, edgelen, edgelen, edgelen)
-                                                 mipmapLevel:0
-                                                       slice:0
-                                                   withBytes:&values[edgelen*edgelen*edgelen]
-                                                 bytesPerRow:edgelen*sizeof(float)
-                                               bytesPerImage:edgelen*edgelen*sizeof(float)];
-            }
-#endif
+        id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->currentDevice;
+        MTLTextureDescriptor* desc =
+            [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA16Float
+                                                               width:_lut3dSizeOCIO
+                                                              height:_lut3dSizeOCIO
+                                                           mipmapped:NO];
+        desc.resourceOptions = MTLResourceStorageModeDefault;
+        desc.depth = _lut3dSizeOCIO;
+        _texture3dLUT = MtlfMultiTexture(desc);
+        
+        for(int i = 0; i < GPUState::gpuCount; i++) {
+            [_texture3dLUT.multiTexture[i] replaceRegion:MTLRegionMake3D(0, 0, 0, _lut3dSizeOCIO, _lut3dSizeOCIO, _lut3dSizeOCIO)
+                                             mipmapLevel:0
+                                                   slice:0
+                                               withBytes:&lut3d[0]
+                                             bytesPerRow:_lut3dSizeOCIO*sizeof(float)
+                                           bytesPerImage:_lut3dSizeOCIO*_lut3dSizeOCIO*sizeof(float)];
         }
+#endif
     }
 
-    const char* gpuShaderText = shaderDesc->getShaderText();
+    const char* gpuShaderText = processor->getGpuShaderText(shaderDesc);
 
     return std::string(gpuShaderText);
 #endif
@@ -416,10 +392,10 @@ HdxColorCorrectionTask::_CreateBufferResources()
                                        3, -1, -1, 1,        2, 0 };
     
     HgiBufferDesc desc;
-    desc.usage = HgiBufferUsageVertexData;
-    desc.length = sizeof(vertices);
+    desc.usage = HgiBufferUsageVertex;
+    desc.byteSize = sizeof(vertices);
+    desc.initialData = vertices;
     _vertexBuffer = _hgi->CreateBuffer(desc);
-    _vertexBuffer->Copy(&vertices[0], 0, sizeof(vertices));
 
     return true;
 }
@@ -502,7 +478,7 @@ HdxColorCorrectionTask::_CreateFramebufferResources()
         desc.dimensions[1] = _textureSize[1];
         desc.dimensions[2];
 
-        _texture = new HgiTexture(desc);
+        _texture = _hgi->CreateTexture(desc);
     
         if (_isOpenGL) {
 #if defined(ARCH_GFX_OPENGL)

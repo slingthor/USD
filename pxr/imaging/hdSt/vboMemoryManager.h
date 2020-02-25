@@ -222,7 +222,7 @@ public:
 
     private:
         // Returns the byte offset at which the BAR begins for the resource.
-        size_t _GetByteOffset(HdStBufferResourceGLSharedPtr const& resource)
+        size_t _GetByteOffset(HdBufferResourceSharedPtr const& resource)
             const;
 
         // holding a weak reference to container.

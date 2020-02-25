@@ -60,12 +60,12 @@ HgiMetalBlitEncoder::PopDebugGroup()
 
 void 
 HgiMetalBlitEncoder::CopyTextureGpuToCpu(
-    HgiCopyResourceOp const& copyOp)
+    HgiTextureGpuToCpuOp const& copyOp)
 {
-    HgiMetalTexture* srcTextureMetal =
+    HgiMetalTexture* srcTexture =
         static_cast<HgiMetalTexture*>(copyOp.gpuSourceTexture);
 
-    if (!TF_VERIFY(srcTextureMetal && srcTextureMetal->GetTextureId(),
+    if (!TF_VERIFY(srcTexture && srcTexture->GetTextureId(),
         "Invalid texture handle")) {
         return;
     }
@@ -75,12 +75,21 @@ HgiMetalBlitEncoder::CopyTextureGpuToCpu(
         return;
     }
 
+    HgiTextureDesc const& texDesc = srcTexture->GetDescriptor();
+
+    uint32_t layerCnt = copyOp.startLayer + copyOp.numLayers;
+    if (!TF_VERIFY(texDesc.layerCount >= layerCnt,
+        "Texture has less layers than attempted to be copied")) {
+        return;
+    }
+
+
     MTLPixelFormat metalFormat = MTLPixelFormatInvalid;
 
-    if (copyOp.usage & HgiTextureUsageBitsColorTarget) {
-        metalFormat = HgiMetalConversions::GetFormat(copyOp.format);
-    } else if (copyOp.usage & HgiTextureUsageBitsDepthTarget) {
-        TF_VERIFY(copyOp.format == HgiFormatFloat32);
+    if (texDesc.usage & HgiTextureUsageBitsColorTarget) {
+        metalFormat = HgiMetalConversions::GetFormat(texDesc.format);
+    } else if (texDesc.usage & HgiTextureUsageBitsDepthTarget) {
+        TF_VERIFY(texDesc.format == HgiFormatFloat32);
         metalFormat = MTLPixelFormatDepth32Float;
     } else {
         TF_CODING_ERROR("Unknown HgTextureUsage bit");

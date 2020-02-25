@@ -55,6 +55,9 @@ public:
     
     HDST_API
     virtual ~HdStProgram();
+    
+    /// Returns the role of the GPU data in this resource.
+    TfToken const & GetRole() const { return _role; }
 
     /// Compile shader source of type
     HDST_API
@@ -142,6 +145,8 @@ protected:
 
     HDST_API
     virtual std::string GetComputeHeader() const = 0;
+    
+    TfToken const _role;
 };
 
 

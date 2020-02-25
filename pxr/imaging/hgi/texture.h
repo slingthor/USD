@@ -38,33 +38,6 @@ PXR_NAMESPACE_OPEN_SCOPE
 struct HgiTextureDesc;
 
 
-///
-/// \class HgiTexture
-///
-/// Represents a graphics platform independent GPU texture resource.
-/// Textures should be created via Hgi::CreateTexture.
-///
-/// Base class for Hgi textures.
-/// To the client (HdSt) texture resources are referred to via
-/// opaque, stateless handles (HgTextureHandle).
-///
-class HgiTexture {
-public:
-    HGI_API
-    virtual ~HgiTexture();
-
-protected:
-    HGI_API
-    HgiTexture(HgiTextureDesc const& desc);
-
-private:
-    HgiTexture() = delete;
-    HgiTexture & operator=(const HgiTexture&) = delete;
-    HgiTexture(const HgiTexture&) = delete;
-};
-
-typedef HgiTexture* HgiTextureHandle;
-
 
 
 /// \struct HgiTextureDesc
@@ -129,6 +102,39 @@ bool operator!=(
     const HgiTextureDesc& lhs,
     const HgiTextureDesc& rhs);
 
+
+///
+/// \class HgiTexture
+///
+/// Represents a graphics platform independent GPU texture resource.
+/// Textures should be created via Hgi::CreateTexture.
+///
+/// Base class for Hgi textures.
+/// To the client (HdSt) texture resources are referred to via
+/// opaque, stateless handles (HgTextureHandle).
+///
+class HgiTexture {
+public:
+    HGI_API
+    virtual ~HgiTexture();
+
+    /// Returns the descriptor of the texture.
+    HGI_API
+    HgiTextureDesc const& GetDescriptor() const;
+
+protected:
+    HGI_API
+    HgiTexture(HgiTextureDesc const& desc);
+    
+    HgiTextureDesc _descriptor;
+    
+private:
+    HgiTexture() = delete;
+    HgiTexture & operator=(const HgiTexture&) = delete;
+    HgiTexture(const HgiTexture&) = delete;
+};
+
+typedef HgiTexture* HgiTextureHandle;
 
 PXR_NAMESPACE_CLOSE_SCOPE
 

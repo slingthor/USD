@@ -30,7 +30,6 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 HgiGLBuffer::HgiGLBuffer(HgiBufferDesc const & desc)
     : HgiBuffer(desc)
-    , _descriptor(desc)
     , _bufferId(0)
     , _mapped(nullptr)
 {

@@ -328,7 +328,7 @@ HdStLight::_SetupComputations(
                     HdSt_DomeLightComputationGPU::New(_tokens->domeLightPrefilter,
                     sourceTexture, _prefilterTexture, textureWidth, textureHeight,
                     numPrefilterLevels, mipLevel, roughness));
-            hdStResourceRegistry->AddComputation(nullptr, preFilterComputation);
+            resourceRegistry->AddComputation(nullptr, preFilterComputation);
         }
     }
     else {

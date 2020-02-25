@@ -213,8 +213,14 @@ _BindFramebuffer(HgiMetalDescriptorCacheItem* dci)
     }
 }
 
-HgiMetalImmediateCommandBuffer::HgiMetalImmediateCommandBuffer()
+HgiMetalImmediateCommandBuffer::HgiMetalImmediateCommandBuffer(id<MTLDevice> device)
+: _device(device)
+, _commandQueue(nil)
+, _commandBuffer(nil)
 {
+    _commandQueue = [_device newCommandQueue];
+    _commandBuffer = [_commandQueue commandBuffer];
+    [_commandBuffer retain];
 }
 
 HgiMetalImmediateCommandBuffer::~HgiMetalImmediateCommandBuffer()
@@ -222,6 +228,9 @@ HgiMetalImmediateCommandBuffer::~HgiMetalImmediateCommandBuffer()
     for (HgiMetalDescriptorCacheItem* dci : _descriptorCache) {
         _DestroyDescriptorCacheItem(dci);
     }
+
+    [_commandBuffer release];
+    [_commandQueue release];
 }
 
 HgiGraphicsEncoderUniquePtr
@@ -258,6 +267,17 @@ HgiBlitEncoderUniquePtr
 HgiMetalImmediateCommandBuffer::CreateBlitEncoder()
 {
     return HgiBlitEncoderUniquePtr(new HgiMetalBlitEncoder(this));
+}
+    
+void
+HgiMetalImmediateCommandBuffer::FlushEncoders()
+{
+    [_commandBuffer commit];
+    [_commandBuffer waitUntilCompleted];
+    [_commandBuffer release];
+
+    _commandBuffer = [_commandQueue commandBuffer];
+    [_commandBuffer retain];
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

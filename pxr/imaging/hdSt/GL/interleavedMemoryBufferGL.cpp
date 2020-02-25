@@ -159,7 +159,7 @@ HdStStripedInterleavedBufferGL::Reallocate(
                                     "unexpectedly.");
                     continue;
                 }
-                int oldIndex = range->GetIndex();
+                int oldIndex = range->GetElementOffset();
                 if (oldIndex >= 0) {
                     // copy old data
                     GLintptr readOffset = oldIndex * _stride;

@@ -28,6 +28,7 @@
 #include "pxr/imaging/hgi/immediateCommandBuffer.h"
 #include "pxr/imaging/hgiMetal/api.h"
 #include <vector>
+#include <Metal/Metal.h>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -40,9 +41,6 @@ typedef std::vector<struct HgiMetalDescriptorCacheItem*> HgiMetalDescriptorCache
 class HgiMetalImmediateCommandBuffer final : public HgiImmediateCommandBuffer
 {
 public:
-    HGIMETAL_API
-    HgiMetalImmediateCommandBuffer();
-
     HGIMETAL_API
     virtual ~HgiMetalImmediateCommandBuffer();
 
@@ -77,6 +75,9 @@ private:
         const HgiMetalImmediateCommandBuffer& cmdBuf);
 
     HgiMetalDescriptorCacheVec _descriptorCache;
+    id<MTLDevice> _device;
+    id<MTLCommandQueue> _commandQueue;
+    id<MTLCommandBuffer> _commandBuffer;
 };
 
 

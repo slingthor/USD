@@ -200,7 +200,7 @@ HdStVBOMemoryBufferGL::Reallocate(
                     int newSize = range->GetNumElements();
                     GLsizeiptr copySize =
                         std::min(oldSize, newSize) * bytesPerElement;
-                    int oldOffset = range->GetOffset();
+                    int oldOffset = range->GetElementOffset();
                     if (copySize > 0) {
                         GLintptr readOffset = oldOffset * bytesPerElement;
                         GLintptr writeOffset = *newOffsetIt * bytesPerElement;
@@ -237,7 +237,7 @@ HdStVBOMemoryBufferGL::Reallocate(
             TF_CODING_ERROR("_StripedBufferArrayRange expired unexpectedly.");
             continue;
         }
-        range->SetOffset(newOffsets[idx]);
+        range->SetElementOffset(newOffsets[idx]);
         range->SetCapacity(range->GetNumElements());
     }
     _needsReallocation = false;

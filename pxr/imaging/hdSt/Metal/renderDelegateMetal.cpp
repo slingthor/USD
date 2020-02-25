@@ -60,17 +60,18 @@ HdStRenderDelegateMetal::HdStRenderDelegateMetal()
     if (MtlfMetalContext::GetMetalContext()) {
         currentDevice = MtlfMetalContext::GetMetalContext()->currentDevice;
     }
+
     HgiMetal *hgi = new HgiMetal(currentDevice);
-    
+
     if (currentDevice == nil) {
-        MtlfMetalContext::CreateMetalContext(hgi);
+        MtlfMetalContext::CreateMetalContext(static_cast<HgiMetal*>(hgi));
     }
+    
+    delete hgi;
 
     _deviceDesc = TfToken(_MetalDeviceDescriptor(MtlfMetalContext::GetMetalContext()->currentDevice));
 //    _Initialize();
-    
-    _hgi = hgi;
-        
+
     _inFlightSemaphore = dispatch_semaphore_create(3);
 }
 
@@ -81,8 +82,6 @@ HdStRenderDelegateMetal::HdStRenderDelegateMetal(HdRenderSettingsMap const& sett
 {
     _deviceDesc = TfToken(_MetalDeviceDescriptor(MtlfMetalContext::GetMetalContext()->currentDevice));
     
-    _hgi = new HgiMetal();
-
     _inFlightSemaphore = dispatch_semaphore_create(3);
 }
 

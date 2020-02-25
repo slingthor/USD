@@ -45,9 +45,6 @@ public:
     HGIMETAL_API
     virtual ~HgiMetalBuffer();
 
-    HGIMETAL_API
-    virtual void Copy(void const *data, size_t offset, size_t size);
-
     id<MTLBuffer> GetBufferId() const {return _bufferId;}
 
 private:

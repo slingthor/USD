@@ -161,7 +161,7 @@ HdStExtCompGpuComputation::Execute(
                 HdTupleType tupleType = buffer->GetTupleType();
                 size_t componentSize =
                     HdDataSizeOfType(HdGetComponentType(tupleType.type));
-                size_t offset = inputBar->GetByteOffset();
+                size_t offset = inputBar->GetByteOffset(name);
                 
                 if (!caps.hasBufferBindOffset) {
                     offset += buffer->GetOffset();

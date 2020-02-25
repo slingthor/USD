@@ -69,18 +69,6 @@ public:
     void DestroyBuffer(HgiBufferHandle* bufHandle) override;
 
     HGIGL_API
-    HgiBufferHandle CreateBuffer(HgiBufferDesc const & desc) override;
-
-    HGIGL_API
-    void DestroyBuffer(HgiBufferHandle* bufHandle) override;
-
-    HGIGL_API
-    HgiBufferHandle CreateBuffer(HgiBufferDesc const & desc) override;
-
-    HGIGL_API
-    void DestroyBuffer(HgiBufferHandle* bufHandle) override;
-
-    HGIGL_API
     HgiShaderFunctionHandle CreateShaderFunction(
         HgiShaderFunctionDesc const& desc) override;
 
