@@ -661,6 +661,21 @@ def InstallBoost(context, force, buildArgs):
 
     with CurrentWorkingDirectory(DownloadURL(BOOST_URL, context, force, 
                                              dontExtract)):
+
+        # GitHub: https://github.com/boostorg/build/issues/440
+        # Incorrect comparison of version number on Darwin #440
+        if MacOS() or iOS():
+            PatchFile("tools/build/src/tools/darwin.jam",
+                [('    if $(real-version) < "4.0.0"\n    {\n'
+                  '        flags darwin.compile.c++ OPTIONS $(condition) : -fcoalesce-templates ;\n    }',
+                  '#    if $(real-version) < "4.0.0"\n#    {\n'
+                  '#        flags darwin.compile.c++ OPTIONS $(condition) : -fcoalesce-templates ;\n#    }'),
+                 ('    if $(real-version) < "4.2.0"\n    {\n'
+                  '        flags darwin.compile OPTIONS $(condition) : -Wno-long-double ;\n    }',
+                  '#    if $(real-version) < "4.2.0"\n#    {\n'
+                  '#       flags darwin.compile OPTIONS $(condition) : -Wno-long-double ;\n#    }')], True)
+
+
         bootstrap = "bootstrap.bat" if Windows() else "./bootstrap.sh"
         bootstrapCmd = '{bootstrap} --prefix="{instDir}"'.format(
             bootstrap=bootstrap, instDir=context.instDir)
@@ -2559,9 +2574,9 @@ if Windows():
         os.path.join(context.instDir, "lib")
     ])
 
-if args.make_relocatable and MacOS():
+if args.make_relocatable:
     from make_relocatable import make_relocatable
-    make_relocatable(context.usdInstDir, context.buildPython, verbosity > 1)
+    make_relocatable(context.usdInstDir, context.buildPython, iOS(), verbosity > 1)
 
 Print("""
 Success! To use USD, please ensure that you have:""")

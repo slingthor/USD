@@ -198,28 +198,30 @@ HdStCommandBuffer::ExecuteDraw(
 //            uint64_t timeStart = ArchGetTickTime();
 //            int numItems = 0;
 
-            MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
-            context->StartFrameForThread();
-            context->SetRenderPassDescriptor(rpd);
+            @autoreleasepool{
+                MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
+                context->StartFrameForThread();
+                context->SetRenderPassDescriptor(rpd);
 
-            if ((end - begin) != 1) {
-                TF_FATAL_CODING_ERROR("We're explicitly expecting one item ");
-            }
-            for(auto const& batchList : (*drawBatches)[begin]) {
-                HdSt_DrawBatch* batch = batchList->batch;
-                batch->ExecuteDraw(renderPassState, resourceRegistry);
-//                numItems += batchList->numVisible;
-            }
-            
-            if (context->GeometryShadersActive()) {
-                // Complete the GS command buffer if we have one
-                context->CommitCommandBufferForThread(false, false, METALWORKQUEUE_GEOMETRY_SHADER);
-            }
-            
-            if (context->GetWorkQueue(METALWORKQUEUE_DEFAULT).commandBuffer != nil) {
-                context->CommitCommandBufferForThread(false, false);
+                if ((end - begin) != 1) {
+                    TF_FATAL_CODING_ERROR("We're explicitly expecting one item ");
+                }
+                for(auto const& batchList : (*drawBatches)[begin]) {
+                    HdSt_DrawBatch* batch = batchList->batch;
+                    batch->ExecuteDraw(renderPassState, resourceRegistry);
+    //                numItems += batchList->numVisible;
+                }
                 
-                context->EndFrameForThread();
+                if (context->GeometryShadersActive()) {
+                    // Complete the GS command buffer if we have one
+                    context->CommitCommandBufferForThread(false, false, METALWORKQUEUE_GEOMETRY_SHADER);
+                }
+                
+                if (context->GetWorkQueue(METALWORKQUEUE_DEFAULT).commandBuffer != nil) {
+                    context->CommitCommandBufferForThread(false, false);
+                    
+                    context->EndFrameForThread();
+                }
             }
 
 //            uint64_t timeDiff = ArchGetTickTime() - timeStart;
