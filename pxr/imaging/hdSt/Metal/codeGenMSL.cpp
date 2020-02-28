@@ -2464,11 +2464,11 @@ HdSt_CodeGenMSL::Compile()
     _GenerateElementPrimvar();
     _GenerateVertexAndFaceVaryingPrimvar(_hasGS);
     
-    //generate shader parameters
-    _GenerateShaderParameters();
-    
     _GenerateTopologyVisibilityParameters();
     
+    //generate shader parameters (is going last since it has primvar redirects)
+    _GenerateShaderParameters();
+        
     // finalize buckets
     _procVS  << "}\n";
     _procGS  << "}\n";
@@ -3198,12 +3198,11 @@ HdSt_CodeGenMSL::_GenerateCommonDefinitions()
         // XXX: HdBinding::PRIMVAR_REDIRECT won't define an accessor if it's
         // an alias of like-to-like, so we want to suppress the HD_HAS_* flag
         // as well.
+        
+        // For PRIMVAR_REDIRECT, the HD_HAS_* flag will be defined after
+        // the corresponding HdGet_* function.
         HdBinding::Type bindingType = it->first.GetType();
-        if (bindingType == HdBinding::PRIMVAR_REDIRECT) {
-            if (it->second.name != it->second.inPrimvars[0]) {
-                _genDefinitions << "#define HD_HAS_" << it->second.name << " 1\n";
-            }
-        } else {
+        if (bindingType != HdBinding::PRIMVAR_REDIRECT) {
             _genDefinitions << "#define HD_HAS_" << it->second.name << " 1\n";
         }
     }
@@ -3211,7 +3210,7 @@ HdSt_CodeGenMSL::_GenerateCommonDefinitions()
     TF_FOR_ALL (it, _metaData.fieldRedirectBinding) {
         HdBinding::Type bindingType = it->first.GetType();
         if (bindingType == HdBinding::FIELD_REDIRECT) {
-            _genCommon << "#define HD_HAS_" << it->second.name << " 1\n";
+            _genDefinitions << "#define HD_HAS_" << it->second.name << " 1\n";
         }
     }
     
@@ -5238,8 +5237,10 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
                 << "  int shaderCoord = GetDrawingCoord().shaderCoord; \n"
                 << "  return " << _GetPackedTypeAccessor(it->second.dataType, false)
                 << "(GlopPtexTextureLookup("
-                << "texture2d_array<float>(materialParams[shaderCoord]." << it->second.name <<"),"
-                << "texture1d<int>(materialParams[shaderCoord]." << it->second.name << "_layout), "
+                << "sampler2DArray(shaderData[shaderCoord]."
+                << it->second.name << "),"
+                << "isamplerBuffer(shaderData[shaderCoord]."
+                << it->second.name << "_layout), "
                 << "GetPatchCoord(localIndex))" << swizzle << ");\n"
                 << "}\n"
                 << _GetUnpackedType(it->second.dataType, false)
@@ -5250,8 +5251,10 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
                 << "  int shaderCoord = GetDrawingCoord().shaderCoord; \n"
                 << "  return " << _GetPackedTypeAccessor(it->second.dataType, false)
                 << "(GlopPtexTextureLookup("
-                << "texture2d_array<float>(materialParams[shaderCoord]." << it->second.name <<"),"
-                << "texture1d<int>(materialParams[shaderCoord]." << it->second.name << "_layout), "
+                << "sampler2DArray(shaderData[shaderCoord]."
+                << it->second.name << "),"
+                << "isamplerBuffer(shaderData[shaderCoord]."
+                << it->second.name << "_layout), "
                 << "patchCoord)" << swizzle << ");\n"
                 << "}\n";
         } else if (bindingType == HdBinding::TEXTURE_PTEX_TEXEL) {
@@ -5300,40 +5303,68 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
             //accessors << _GetUnpackedType(it->second.dataType) << "(0)";
         } else if (bindingType == HdBinding::TEXTURE_PTEX_LAYOUT) {
             addScalarAccessor = false;
-            //accessors << _GetUnpackedType(it->second.dataType) << "(0)";
+//            declarations
+//                << LayoutQualifier(HdBinding(it->first.GetType(),
+//                                            it->first.GetLocation(),
+//                                            it->first.GetTextureUnit()))
+//                << "uniform isamplerBuffer isamplerbuffer_"
+//                << it->second.name << ";\n";
         } else if (bindingType == HdBinding::PRIMVAR_REDIRECT) {
+            // Create an HdGet_INPUTNAME for the shader to access a primvar
+            // for which a HdGet_PRIMVARNAME was already generated earlier.
+            
             // XXX: shader and primvar name collisions are a problem!
-            // If this shader and it's connected primvar have the same name, we
-            // are good to go, else we must alias the parameter to the primvar
-            // accessor.
+            // (see, e.g., HYD-1800).
+            if (it->second.name == it->second.inPrimvars[0]) {
+                // Avoid the following:
+                // If INPUTNAME and PRIMVARNAME are the same and the
+                // primvar exists, we would generate two functions
+                // both called HdGet_PRIMVAR, one to read the primvar
+                // (based on _metaData.constantData) and one for the
+                // primvar redirect here.
+                accessors
+                    << "#if !defined(HD_HAS_" << it->second.name << ")\n";
+            }
+
             if (it->second.name != it->second.inPrimvars[0]) {
                 accessors
                     << _GetUnpackedType(it->second.dataType, false)
                     << " HdGet_" << it->second.name << "(int localIndex) {\n"
+                    // If primvar exists, use it
                     << "#if defined(HD_HAS_" << it->second.inPrimvars[0] << ")\n"
                     << "  return HdGet_" << it->second.inPrimvars[0] << "();\n"
                     << "#else\n"
+                    // Otherwise use default value.
                     << "  int shaderCoord = GetDrawingCoord().shaderCoord;\n"
                     << "  return "
                     << _GetPackedTypeAccessor(it->second.dataType, false)
                     << "(shaderData[shaderCoord]." << it->second.name
                     << swizzle <<  ");\n"
                     << "#endif\n"
-                    << "\n}\n";
+                    << "\n}\n"
+                    << "#define HD_HAS_" << it->second.name << " 1\n";
                 
                 accessors
                     << _GetUnpackedType(it->second.dataType, false)
                     << " HdGet_" << it->second.name << "() {\n"
+                    // If primvar exists, use it
                     << "#if defined(HD_HAS_" << it->second.inPrimvars[0] << ")\n"
                     << "  return HdGet_" << it->second.inPrimvars[0] << "(0);\n"
                     << "#else\n"
+                    // Otherwise use default value.
                     << "  int shaderCoord = GetDrawingCoord().shaderCoord;\n"
                     << "  return "
                     << _GetPackedTypeAccessor(it->second.dataType, false)
                     << "(shaderData[shaderCoord]." << it->second.name
                     << swizzle <<  ");\n"
                     << "#endif\n"
-                    << "\n}\n";
+                    << "\n}\n"
+                    << "#define HD_HAS_" << it->second.name << " 1\n";
+            }
+            
+            if (it->second.name == it->second.inPrimvars[0]) {
+                accessors
+                    << "#endif\n";
             }
         }
         

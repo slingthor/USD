@@ -44,7 +44,7 @@ typedef boost::shared_ptr<class HdStFieldResource> HdStFieldResourceSharedPtr;
 /// Stores a 3d texture associated with a field. 
 ///
 /// It wraps an HdStSimpleTextureResource and exists for two reasons:
-/// 1. It also extracts the bounding box from the GlfVdbTexture.
+/// 1. It also extracts the bounding box from the GarchVdbTexture.
 /// 2. It constructs the OpenGL sampler and texture handle (if bindless)
 ///    upon creation and not lazily when GetTexels...() is called.
 ///    This has to do with the fact that the client of HdStFieldResource is

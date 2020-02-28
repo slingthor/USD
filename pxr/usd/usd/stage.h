@@ -780,6 +780,38 @@ public:
     USD_API
     UsdObject GetObjectAtPath(const SdfPath &path) const;
 
+    /// Return the UsdProperty at \p path, or an invalid UsdProperty
+    /// if none exists.
+    ///
+    /// This is equivalent to 
+    /// \code{.cpp}
+    /// stage.GetObjectAtPath(path).As<UsdProperty>();
+    /// \endcode
+    /// \sa GetObjectAtPath(const SdfPath&) const
+    USD_API
+    UsdProperty GetPropertyAtPath(const SdfPath &path) const;
+
+    /// Return the UsdAttribute at \p path, or an invalid UsdAttribute
+    /// if none exists.
+    ///
+    /// This is equivalent to 
+    /// \code{.cpp}
+    /// stage.GetObjectAtPath(path).As<UsdAttribute>();
+    /// \endcode
+    /// \sa GetObjectAtPath(const SdfPath&) const
+    USD_API
+    UsdAttribute GetAttributeAtPath(const SdfPath &path) const;
+
+    /// Return the UsdAttribute at \p path, or an invalid UsdAttribute
+    /// if none exists.
+    ///
+    /// This is equivalent to 
+    /// \code{.cpp}
+    /// stage.GetObjectAtPath(path).As<UsdRelationship>();
+    /// \endcode
+    /// \sa GetObjectAtPath(const SdfPath&) const
+    USD_API
+    UsdRelationship GetRelationshipAtPath(const SdfPath &path) const;
 private:
     // Return the primData object at \p path.
     Usd_PrimDataConstPtr _GetPrimDataAtPath(const SdfPath &path) const;
@@ -790,6 +822,9 @@ private:
     // prim in the instance's master.
     Usd_PrimDataConstPtr 
     _GetPrimDataAtPathOrInMaster(const SdfPath &path) const;
+
+    /// See documentation on UsdPrim::GetInstances()
+    std::vector<UsdPrim> _GetInstancesForMaster(const UsdPrim& master) const;
 
 public:
 
@@ -1563,20 +1598,20 @@ private:
     _GetPropertyStack(const UsdProperty &prop, UsdTimeCode time) const;
 
     SdfPropertySpecHandle
-    _GetPropertyDefinition(const UsdPrim &prim, const TfToken &propName) const;
+    _GetSchemaPropertySpec(const UsdPrim &prim, const TfToken &propName) const;
 
     SdfPropertySpecHandle
-    _GetPropertyDefinition(const UsdProperty &prop) const;
+    _GetSchemaPropertySpec(const UsdProperty &prop) const;
 
     template <class PropType>
     SdfHandle<PropType>
-    _GetPropertyDefinition(const UsdProperty &prop) const;
+    _GetSchemaPropertySpec(const UsdProperty &prop) const;
 
     SdfAttributeSpecHandle
-    _GetAttributeDefinition(const UsdAttribute &attr) const;
+    _GetSchemaAttributeSpec(const UsdAttribute &attr) const;
 
     SdfRelationshipSpecHandle
-    _GetRelationshipDefinition(const UsdRelationship &rel) const;
+    _GetSchemaRelationshipSpec(const UsdRelationship &rel) const;
 
     SdfPrimSpecHandle
     _CreatePrimSpecForEditing(const UsdPrim& prim);
@@ -1763,6 +1798,10 @@ private:
     // at \p primPath.
     Usd_PrimDataPtr _InstantiatePrim(const SdfPath &primPath);
 
+    // Instantiate a master prim and sets its parent to pseudoroot.  
+    // There must not already be a master at \p primPath.
+    Usd_PrimDataPtr _InstantiateMasterPrim(const SdfPath &primPath);
+
     // For \p prim and all of its descendants, remove from _primMap and empty
     // their _children vectors.
     void _DestroyPrim(Usd_PrimDataPtr prim);
@@ -1818,14 +1857,6 @@ private:
     template <class Iter>
     void _ComputeSubtreesToRecompose(Iter start, Iter finish,
                                      std::vector<Usd_PrimDataPtr>* recompose);
-
-    // Helper for _Recompose to remove master subtrees in \p subtreesToRecompose
-    // that would be composed when an instance subtree in the same container
-    // is composed.
-    template <class PrimIndexPathMap>
-    void _RemoveMasterSubtreesSubsumedByInstances(
-        std::vector<Usd_PrimDataPtr>* subtreesToRecompose,
-        const PrimIndexPathMap& primPathToSourceIndexPathMap) const;
 
     // return true if the path is valid for load/unload operations.
     // This method will emit errors when invalid paths are encountered.

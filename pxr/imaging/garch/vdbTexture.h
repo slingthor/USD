@@ -35,25 +35,24 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+TF_DECLARE_WEAK_AND_REF_PTRS(GarchVdbTextureContainer);
 TF_DECLARE_WEAK_AND_REF_PTRS(GarchVdbTexture);
 
 /// \class GarchVdbTexture
 ///
-/// Represents a 3-dimensional texture read from an OpenVDB file.
+/// Represents a 3-dimensional texture read from grid in an OpenVDB file.
 ///
-/// Current limitations: we always use the first grid in the OpenVDB file.
-/// The texture is always loaded at the full resolution of the OpenVDB grid,
-/// ignoring the memory request.
+/// This texture is supposed to be held by a GarchVdbTextureContainer which
+/// tells this texture also what OpenVDB file to read.
 ///
 class GarchVdbTexture : public GarchBaseTexture {
 public:
-    /// Creates a new texture instance for the OpenVDB file at \p filePath
+    /// Creates a new texture instance for the grid named \gridName in
+    /// the OpenVDB file opened by \p textureContainer.
     GARCH_API
-    static GarchVdbTextureRefPtr New(TfToken const &filePath);
-
-    /// Creates a new texture instance for the OpenVDB file at \p filePath
-    GARCH_API
-    static GarchVdbTextureRefPtr New(std::string const &filePath);
+    static GarchVdbTextureRefPtr New(
+        GarchVdbTextureContainerRefPtr const &textureContainer,
+        TfToken const &gridName);
 
     /// Returns the transform of the grid in the OpenVDB file as well as the
     /// bounding box of the samples in the corresponding OpenVDB tree.
@@ -72,14 +71,16 @@ public:
     
     GARCH_API
     virtual BindingVector GetBindings(TfToken const & identifier,
-                                      GarchSamplerGPUHandle samplerName) override
+                                      GarchSamplerGPUHandle const & samplerName) override
     {
         return _baseTexture->GetBindings(identifier, samplerName);
     }
 
 protected:
     GARCH_API
-    GarchVdbTexture(GarchBaseTexture *baseTexture, TfToken const &filePath);
+    GarchVdbTexture(
+        GarchVdbTextureContainerRefPtr const &textureContainer,
+        TfToken const &gridName);
     
     friend class GlfResourceFactory;
     friend class MtlfResourceFactory;
@@ -119,9 +120,10 @@ protected:
     }
     
 private:
+	GarchVdbTextureContainerRefPtr const _textureContainer;
+
+    const TfToken _gridName;
     GarchBaseTexture *_baseTexture;
-    
-    const TfToken _filePath;
 
     GfBBox3d _boundingBox;
 };

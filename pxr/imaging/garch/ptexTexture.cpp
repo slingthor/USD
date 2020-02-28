@@ -105,7 +105,7 @@ GarchPtexTexture::_OnMemoryRequestedDirty()
 /* virtual */
 GarchTexture::BindingVector
 GarchPtexTexture::GetBindings(TfToken const & identifier,
-                              GarchSamplerGPUHandle samplerId)
+                              GarchSamplerGPUHandle const & samplerId)
 {
     if (!_loaded) {
         _ReadImage();

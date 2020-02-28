@@ -137,7 +137,7 @@ _NumDimensionsToGlTextureTarget(const int d)
 /* virtual */
 GarchTexture::BindingVector
 GlfBaseTexture::GetBindings(TfToken const & identifier,
-                            GarchSamplerGPUHandle samplerName)
+                            GarchSamplerGPUHandle const& samplerName)
 {
     _ReadTextureIfNotLoaded();
 

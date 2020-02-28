@@ -118,9 +118,10 @@ GarchUdimTextureRefPtr MtlfResourceFactory::NewUdimTexture(
 }
 
 GarchVdbTextureRefPtr MtlfResourceFactory::NewVdbTexture(
-                            const TfToken &imageFilePath) const
+                            GarchVdbTextureContainerRefPtr const &textureContainer,
+                            TfToken const &gridName) const
 {
-    return TfCreateRefPtr(new GarchVdbTexture(NewBaseTexture(), imageFilePath));
+    return TfCreateRefPtr(new GarchVdbTexture(textureContainer, gridName));
 }
 
 

@@ -87,7 +87,7 @@ public:
     // GarchBaseTexture overrides
     GARCH_API
     virtual BindingVector GetBindings(TfToken const & identifier,
-                                      GarchSamplerGPUHandle samplerName) override = 0;
+                                      GarchSamplerGPUHandle const & samplerName) override = 0;
 
 protected:
     GARCH_API

@@ -602,9 +602,10 @@ HdSt_ResourceBinder::ResolveBindings(HdStDrawItem const *drawItem,
                     metaDataOut->shaderParameterBinding[layoutBinding] =
                         MetaData::ShaderParameterAccessor(
                             /*name=*/glLayoutName,
-                            /*type=*/TfToken("isamplerBuffer"));
+                            /*type=*/HdStGLConversions::GetGLSLTypename(
+                                HdType::HdTypeInt32));
 
-                    // XXX: same name ?
+                    // Layout for Ptex
                     TfToken layoutName = TfToken(std::string(
                                                 name.GetText()) + "_layout");
                     // used for non-bindless

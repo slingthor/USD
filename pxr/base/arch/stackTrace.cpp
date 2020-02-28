@@ -137,47 +137,139 @@ static const char* const* _sessionCrashLogArgv = nullptr;
 // Arch_InitConfig() to ArchGetExecutablePath()
 static char * _progNameForErrors = NULL;
 
+namespace {
 // Key-value map for program info. Stores additional
 // program info to be used when displaying error information.
-typedef std::map<std::string, std::string> Arch_ProgInfoMap;
-static Arch_ProgInfoMap &_progInfoMap(void) {
-    static auto infoMap = new Arch_ProgInfoMap;
-    return *infoMap;
+class Arch_ProgInfo
+{
+public:
+
+    Arch_ProgInfo() : _progInfoForErrors(NULL) {}
+
+    ~Arch_ProgInfo();
+
+    void SetProgramInfoForErrors(const std::string& key,
+                                 const std::string& value);
+
+    std::string GetProgramInfoForErrors(const std::string& key) const;
+
+    void PrintInfoForErrors() const;
+
+private:
+    typedef std::map<std::string, std::string> _MapType;
+    _MapType _progInfoMap;
+    mutable std::mutex _progInfoForErrorsMutex;
+
+    // Printed version of _progInfo map, since we can't
+    // traverse it during an error. 
+    char *_progInfoForErrors;
+};
+
+Arch_ProgInfo::~Arch_ProgInfo() 
+{
+    if (_progInfoForErrors)
+        free(_progInfoForErrors);
 }
- 
+
+void
+Arch_ProgInfo::SetProgramInfoForErrors(
+    const std::string& key, const std::string& value)
+{
+    std::lock_guard<std::mutex> lock(_progInfoForErrorsMutex);
+
+    if (value.empty()) {
+        _progInfoMap.erase(key);
+    } else {
+        _progInfoMap[key] = value;
+    }
+
+    std::ostringstream ss;
+
+    // update the error info string
+    for(_MapType::iterator iter = _progInfoMap.begin();
+        iter != _progInfoMap.end(); ++iter) {
+
+        ss << iter->first << ": " << iter->second << '\n';
+    }
+
+    if (_progInfoForErrors)
+        free(_progInfoForErrors);
+
+    _progInfoForErrors = strdup(ss.str().c_str());
+}
+
+std::string 
+Arch_ProgInfo::GetProgramInfoForErrors(const std::string& key) const
+{
+    std::lock_guard<std::mutex> lock(_progInfoForErrorsMutex);
+
+    _MapType::const_iterator iter = _progInfoMap.find(key);
+    std::string result;
+    if (iter != _progInfoMap.end())
+        result = iter->second;
+
+    return result;
+} 
+
+void 
+Arch_ProgInfo::PrintInfoForErrors() const
+{
+    std::lock_guard<std::mutex> lock(_progInfoForErrorsMutex);
+    if (_progInfoForErrors) {
+        fprintf(stderr, "%s", _progInfoForErrors);
+    }
+}
+
+} // anon-namespace
+
+static Arch_ProgInfo &
+ArchStackTrace_GetProgInfo()
+{
+    static Arch_ProgInfo progInfo;
+    return progInfo;
+}
 
 
-// Printed version of _progInfo map, since we can't
-// traverse it during an error. 
-static char *_progInfoForErrors = NULL;
-// Mutex for above:
-static std::mutex &_progInfoForErrorsMutex(void) {
-    static auto mutex = new std::mutex;
-    return *mutex;
-}
+
+namespace {
 
 // Key-value map for extra log info.  Stores unowned pointers to text to be
 // emitted in stack trace logs in case of fatal errors or crashes.
-typedef std::map<std::string, std::vector<std::string> const *> Arch_LogInfoMap;
-static Arch_LogInfoMap &_logInfoForErrors(void) {
-    static auto infoMap = new Arch_LogInfoMap;
-    return *infoMap;
-}
-// Mutex for above:
-static std::mutex &_logInfoForErrorsMutex(void) {
-    static auto mutex = new std::mutex;
-    return *mutex;
+class Arch_LogInfo
+{
+public:
+
+    void SetExtraLogInfoForErrors(const std::string &key,
+                                  std::vector<std::string> const *lines);
+    void EmitAnyExtraLogInfo(FILE *outFile, size_t max = 0) const;
+
+private:
+    typedef std::map<std::string, std::vector<std::string> const *> _LogInfoMap;
+    _LogInfoMap _logInfoForErrors;
+    mutable std::mutex _logInfoForErrorsMutex;
+};
+
+void
+Arch_LogInfo::SetExtraLogInfoForErrors(const std::string &key,
+                                       std::vector<std::string> const *lines)
+{
+    std::lock_guard<std::mutex> lock(_logInfoForErrorsMutex);
+    if (!lines || lines->empty()) {
+        _logInfoForErrors.erase(key);
+    } else {
+        _logInfoForErrors[key] = lines;
+    }
 }
 
-static void
-_EmitAnyExtraLogInfo(FILE* outFile, size_t max = 0)
+void 
+Arch_LogInfo::EmitAnyExtraLogInfo(FILE *outFile, size_t max) const
 {
     // This function can't cause any heap allocation, be careful.
     // XXX -- std::string::c_str and fprintf can do allocations.
-    std::lock_guard<std::mutex> lock(_logInfoForErrorsMutex());
+    std::lock_guard<std::mutex> lock(_logInfoForErrorsMutex);
     size_t n = 0;
-     for (Arch_LogInfoMap::const_iterator i = _logInfoForErrors().begin(),
-             end = _logInfoForErrors().end(); i != end; ++i) {
+    for (_LogInfoMap::const_iterator i = _logInfoForErrors.begin(),
+             end = _logInfoForErrors.end(); i != end; ++i) {
         fputs("\n", outFile);
         fputs(i->first.c_str(), outFile);
         fputs(":\n", outFile);
@@ -192,11 +284,21 @@ _EmitAnyExtraLogInfo(FILE* outFile, size_t max = 0)
     }
 }
 
-//static void
-//_atexitCallback()
-//{
-//    ArchLogSessionInfo();
-//}
+} // anon-namespace
+
+static Arch_LogInfo &
+ArchStackTrace_GetLogInfo()
+{
+    static Arch_LogInfo logInfo;
+    return logInfo;
+}
+
+
+static void
+_atexitCallback()
+{
+    ArchLogSessionInfo();
+}
 
 void
 ArchEnableSessionLogging()
@@ -680,52 +782,20 @@ void
 ArchSetProgramInfoForErrors(const std::string& key,
                             const std::string& value)
 {
-    std::lock_guard<std::mutex> lock(_progInfoForErrorsMutex());
-
-    if (value.empty()) {
-        _progInfoMap().erase(key);
-    } else {
-        _progInfoMap()[key] = value;
-    }
-
-    std::ostringstream ss;
-
-    // update the error info string
-    for(Arch_ProgInfoMap::iterator iter = _progInfoMap().begin();
-        iter != _progInfoMap().end(); ++iter) {
-
-        ss << iter->first << ": " << iter->second << '\n';
-    }
-
-    if (_progInfoForErrors)
-        free(_progInfoForErrors);
-
-    _progInfoForErrors = strdup(ss.str().c_str());
+    ArchStackTrace_GetProgInfo().SetProgramInfoForErrors(key, value);
 }
 
 std::string
-ArchGetProgramInfoForErrors(const std::string& key) {
-    
-    std::lock_guard<std::mutex> lock(_progInfoForErrorsMutex());
-
-    Arch_ProgInfoMap::iterator iter = _progInfoMap().find(key);
-    std::string result;
-    if (iter != _progInfoMap().end())
-        result = iter->second;
-
-    return result;
+ArchGetProgramInfoForErrors(const std::string& key) 
+{
+    return ArchStackTrace_GetProgInfo().GetProgramInfoForErrors(key);
 } 
 
 void
 ArchSetExtraLogInfoForErrors(const std::string &key,
                              std::vector<std::string> const *lines)
 {
-     std::lock_guard<std::mutex> lock(_logInfoForErrorsMutex());
-    if (!lines || lines->empty()) {
-        _logInfoForErrors().erase(key);
-    } else {
-        _logInfoForErrors()[key] = lines;
-    }
+    ArchStackTrace_GetLogInfo().SetExtraLogInfoForErrors(key, lines);
 }
 
 /*
@@ -943,7 +1013,7 @@ ArchLogPostMortem(const char* reason,
             fputs(message, stackFd);
             fputs("\n", stackFd);
         }
-        _EmitAnyExtraLogInfo(stackFd);
+        ArchStackTrace_GetLogInfo().EmitAnyExtraLogInfo(stackFd);
         if (extraLogMsg) {
             fputs(extraLogMsg, stackFd);
             fputs("\n", stackFd);
@@ -966,10 +1036,7 @@ ArchLogPostMortem(const char* reason,
 
     // print out any registered program info
     {
-        std::lock_guard<std::mutex> lock(_progInfoForErrorsMutex());
-        if (_progInfoForErrors) {
-            fprintf(stderr, "%s", _progInfoForErrors);
-        }
+        ArchStackTrace_GetProgInfo().PrintInfoForErrors();
     }
 
     if (reason) {
@@ -991,7 +1058,7 @@ ArchLogPostMortem(const char* reason,
     fputs("done.\n", stderr);
     // Additionally, print the first few lines of extra log information since
     // developers don't always think to look for it in the stack trace file.
-    _EmitAnyExtraLogInfo(stderr, 3 /* max */);
+    ArchStackTrace_GetLogInfo().EmitAnyExtraLogInfo(stderr, 3 /* max */);
     fputs("------------------------------------------------------------------\n",
           stderr);
 
@@ -1042,10 +1109,7 @@ ArchLogStackTrace(const std::string& progname, const std::string& reason,
 
     // print out any registered program info
     {
-        std::lock_guard<std::mutex> lock(_progInfoForErrorsMutex());
-        if (_progInfoForErrors) {
-            fprintf(stderr, "%s", _progInfoForErrors);
-        }
+        ArchStackTrace_GetProgInfo().PrintInfoForErrors();
     }
 
     if (fd != -1) {
@@ -1056,7 +1120,7 @@ ArchLogStackTrace(const std::string& progname, const std::string& reason,
         ArchPrintStackTrace(fout, progname, reason);
         /* If this is a fatal stack trace, attempt to add it to the db */
         if (fatal) {
-            _EmitAnyExtraLogInfo(fout);
+            ArchStackTrace_GetLogInfo().EmitAnyExtraLogInfo(fout);
         }
         fclose(fout);
         if (fatal) {
@@ -1072,7 +1136,7 @@ ArchLogStackTrace(const std::string& progname, const std::string& reason,
                 "--------------------------------------------------------------"
                 "\n");
         ArchPrintStackTrace(stderr, progname, reason);
-        _EmitAnyExtraLogInfo(stderr);
+        ArchStackTrace_GetLogInfo().EmitAnyExtraLogInfo(stderr);
     }
     fprintf(stderr,
             "--------------------------------------------------------------\n");

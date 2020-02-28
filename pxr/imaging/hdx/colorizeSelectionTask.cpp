@@ -207,12 +207,12 @@ HdxColorizeSelectionTask::Execute(HdTaskContext* ctx)
     _compositor->SetUniform(_tokens->texelSize, VtValue(texelSize));
 
     _compositor->SetUniform(_tokens->enableOutline,
-                            VtValue(_params.enableOutline ? 1 : 0));
+                           VtValue(_params.enableOutline ? 1 : 0));
 
     // Glsl version 120 does not support unsigned int, so we cast the radius to
     // a signed int - nonetheless the value will be >=0 .
     _compositor->SetUniform(_tokens->radius,
-                            VtValue((int)_params.outlineRadius));
+                           VtValue((int)_params.outlineRadius));
 
     // Blend the selection color on top.  ApplySelectionColor uses the
     // calculation:

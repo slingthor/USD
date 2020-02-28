@@ -92,7 +92,7 @@ GarchUdimTexture::New(
 GarchTexture::BindingVector
 GarchUdimTexture::GetBindings(
     TfToken const& identifier,
-    GarchSamplerGPUHandle samplerId)
+    GarchSamplerGPUHandle const & samplerId)
 {
     _ReadImage();
     BindingVector ret;

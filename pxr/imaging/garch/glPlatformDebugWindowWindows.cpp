@@ -52,6 +52,7 @@ LPCTSTR Garch_GLPlatformDebugWindow::_className = _T("GarchGLDebugWindow");
 
 Garch_GLPlatformDebugWindow::Garch_GLPlatformDebugWindow(GarchGLDebugWindow *w)
     : _running(false)
+    , _callback(w)
     , _hWND(NULL)
     , _hDC(NULL)
     , _hGLRC(NULL)

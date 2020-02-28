@@ -281,18 +281,8 @@ public:
     /// Returns a new vector of UsdUtilsSparseAttrValueWriter populated 
     /// from the attrValueWriter map.
     USDUTILS_API
-    std::vector<UsdUtilsSparseAttrValueWriter> GetSparseAttrValueWriters() const {
-        std::vector<UsdUtilsSparseAttrValueWriter> sparseValueWriterVec;
-        sparseValueWriterVec.reserve(_attrValueWriterMap.size());
-        std::transform(_attrValueWriterMap.begin(),
-                       _attrValueWriterMap.end(),
-                        back_inserter(sparseValueWriterVec),
-                        [](std::pair<UsdAttribute, UsdUtilsSparseAttrValueWriter> const& pair)
-                        {
-                            return pair.second;
-                        });
-        return sparseValueWriterVec;
-    }
+    std::vector<UsdUtilsSparseAttrValueWriter> 
+    GetSparseAttrValueWriters() const;
 
 private:
     // Templated helper method used by the two public SetAttribute() methods.

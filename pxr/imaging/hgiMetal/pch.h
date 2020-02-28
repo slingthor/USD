@@ -43,7 +43,9 @@
 #include <boost/vmd/is_empty.hpp>
 #include <boost/vmd/is_tuple.hpp>
 #endif
+#include <algorithm>
 #include <atomic>
+#include <cfloat>
 #include <cinttypes>
 #include <cmath>
 #include <cstdarg>
@@ -54,6 +56,7 @@
 #include <cstring>
 #include <deque>
 #include <functional>
+#include <initializer_list>
 #include <iosfwd>
 #include <iterator>
 #include <limits>
@@ -71,6 +74,7 @@
 #include <stdint.h>
 #include <string>
 #include <sys/types.h>
+#include <thread>
 #include <type_traits>
 #include <typeindex>
 #include <typeinfo>
@@ -78,9 +82,15 @@
 #include <unordered_set>
 #include <utility>
 #include <vector>
+#include <boost/aligned_storage.hpp>
 #include <boost/any.hpp>
+#include <boost/call_traits.hpp>
+#include <boost/enable_shared_from_this.hpp>
 #include <boost/functional/hash.hpp>
 #include <boost/functional/hash_fwd.hpp>
+#include <boost/intrusive_ptr.hpp>
+#include <boost/iterator/iterator_adaptor.hpp>
+#include <boost/mpl/and.hpp>
 #include <boost/mpl/if.hpp>
 #include <boost/mpl/or.hpp>
 #include <boost/noncopyable.hpp>
@@ -109,14 +119,32 @@
 #include <boost/preprocessor/tuple/elem.hpp>
 #include <boost/preprocessor/tuple/to_list.hpp>
 #include <boost/preprocessor/tuple/to_seq.hpp>
+#ifdef PXR_PYTHON_SUPPORT_ENABLED
+#include <boost/python/object_fwd.hpp>
+#include <boost/python/object_operators.hpp>
+#if defined(__APPLE__) // Fix breakage caused by Python's pyport.h.
+#undef tolower
+#undef toupper
+#endif
+#endif // PXR_PYTHON_SUPPORT_ENABLED
+#include <boost/shared_ptr.hpp>
+#include <boost/type_traits/decay.hpp>
+#include <boost/type_traits/has_trivial_assign.hpp>
+#include <boost/type_traits/has_trivial_constructor.hpp>
+#include <boost/type_traits/has_trivial_copy.hpp>
+#include <boost/type_traits/has_trivial_destructor.hpp>
 #include <boost/type_traits/is_base_of.hpp>
 #include <boost/type_traits/is_const.hpp>
 #include <boost/type_traits/is_convertible.hpp>
 #include <boost/type_traits/is_enum.hpp>
 #include <boost/type_traits/is_same.hpp>
+#include <boost/unordered_map.hpp>
 #include <boost/utility/enable_if.hpp>
+#include <boost/weak_ptr.hpp>
+#include <tbb/atomic.h>
 #include <tbb/cache_aligned_allocator.h>
+#include <tbb/concurrent_queue.h>
 #include <tbb/spin_mutex.h>
 #ifdef PXR_PYTHON_SUPPORT_ENABLED
-#include <Python.h>
+#include "pxr/base/tf/pySafePython.h"
 #endif // PXR_PYTHON_SUPPORT_ENABLED

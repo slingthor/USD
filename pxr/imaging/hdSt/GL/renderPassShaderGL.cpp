@@ -72,8 +72,7 @@ HdStRenderPassShaderGL::~HdStRenderPassShaderGL()
 // by \p program.
 static
 void
-_BindTexture(HdStProgram const &program,
-             const HdRenderPassAovBinding &aov,
+_BindTexture(const HdRenderPassAovBinding &aov,
              const HdBinding &binding)
 {
     if (binding.GetType() != HdBinding::TEXTURE_2D) {
@@ -112,14 +111,6 @@ _BindTexture(HdStProgram const &program,
     glActiveTexture(GL_TEXTURE0 + samplerUnit);
     glBindTexture(GL_TEXTURE_2D, (GLuint) textureId);
     glBindSampler(samplerUnit, 0);
-
-    HdStGLSLProgram const &glslProgram(
-        dynamic_cast<HdStGLSLProgram const&>(program));
-    GLuint programId = glslProgram.GetGLProgram();
-
-    // Set uniform sampler2D to sampler unit.
-    glProgramUniform1i(programId, binding.GetLocation(),
-                       samplerUnit);
 }
 
 /*virtual*/
@@ -138,8 +129,7 @@ HdStRenderPassShaderGL::BindResources(HdStProgram const &program,
         const TfToken &aovName = aovBinding.aovName;
         if (_aovReadbackRequests.count(aovName) > 0) {
             // Bind the texture.
-            _BindTexture(program,
-                         aovBinding,
+            _BindTexture(aovBinding,
                          binder.GetBinding(_GetReadbackName(aovName)));
 
             numFulfilled++;

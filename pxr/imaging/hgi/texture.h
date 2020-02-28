@@ -38,8 +38,6 @@ PXR_NAMESPACE_OPEN_SCOPE
 struct HgiTextureDesc;
 
 
-
-
 /// \struct HgiTextureDesc
 ///
 /// Describes the properties needed to create a GPU texture.
@@ -117,7 +115,7 @@ class HgiTexture {
 public:
     HGI_API
     virtual ~HgiTexture();
-
+    
     /// Returns the descriptor of the texture.
     HGI_API
     HgiTextureDesc const& GetDescriptor() const;
@@ -125,9 +123,9 @@ public:
 protected:
     HGI_API
     HgiTexture(HgiTextureDesc const& desc);
-    
-    HgiTextureDesc _descriptor;
-    
+	
+	HgiTextureDesc _descriptor;
+
 private:
     HgiTexture() = delete;
     HgiTexture & operator=(const HgiTexture&) = delete;

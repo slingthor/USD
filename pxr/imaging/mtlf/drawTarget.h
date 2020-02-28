@@ -133,7 +133,7 @@ public:
         // GarchTexture overrides
         MTLF_API
         virtual BindingVector GetBindings(TfToken const & identifier,
-                                          GarchSamplerGPUHandle samplerName) override;
+                                          GarchSamplerGPUHandle const& samplerName) override;
         MTLF_API
         virtual VtDictionary GetTextureInfo(bool forceLoad) override;
 

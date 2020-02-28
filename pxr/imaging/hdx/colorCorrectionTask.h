@@ -40,7 +40,6 @@ class HgiBuffer;
 class HgiTexture;
 
 typedef boost::shared_ptr<class HdStProgram> HdStProgramSharedPtr;
-typedef boost::shared_ptr<class GlfGLContext> GlfGLContextSharedPtr;
 
 
 /// \class HdxColorCorrectionTask
@@ -102,10 +101,6 @@ private:
     GfVec2i _textureSize;
     GLint _locations[4];
     HgiBuffer *_vertexBuffer;
-
-    // XXX: Removed due to slowness in the IsCurrent() call when multiple
-    //      gl contexts are registered in GlfGLContextRegistry.
-    // GlfGLContextSharedPtr _owningContext;
 
     GLuint _copyFramebuffer;
     GfVec2i _framebufferSize;

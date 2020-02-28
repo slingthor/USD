@@ -208,7 +208,7 @@ MtlfBaseTexture::~MtlfBaseTexture()
 /* virtual */
 GarchTexture::BindingVector
 MtlfBaseTexture::GetBindings(TfToken const & identifier,
-                             GarchSamplerGPUHandle samplerName)
+                             GarchSamplerGPUHandle const& samplerName)
 {
     _ReadTextureIfNotLoaded();
 

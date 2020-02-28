@@ -498,11 +498,11 @@ HdSt_ResourceBinderGL::IntrospectBindings(HdStProgramSharedPtr programResource) 
     }
 
     if (ARCH_UNLIKELY(!caps.explicitUniformLocation)) {
-        TF_FOR_ALL(it, _bindingMap) {
-            HdBinding binding = it->second;
+        for (auto & it: _bindingMap) {
+            HdBinding binding = it.second;
             HdBinding::Type type = binding.GetType();
-            std::string name = it->first.name;
-            int level = it->first.level;
+            std::string name = it.first.name;
+            int level = it.first.level;
             if (level >=0) {
                 // follow nested instancing naming convention.
                 std::stringstream n;
@@ -516,21 +516,39 @@ HdSt_ResourceBinderGL::IntrospectBindings(HdStProgramSharedPtr programResource) 
                 // update location in resource binder.
                 // some uniforms may be optimized out.
                 if (loc < 0) loc = HdBinding::NOT_EXIST;
-                it->second.Set(type, loc, binding.GetTextureUnit());
-            } else if (type == HdBinding::TEXTURE_2D) {
-                // note: sampler2d_ prefix is added in
-                // HdCodeGen::_GenerateShaderParameters()
-                name = "sampler2d_" + name;
-                GLint loc = glGetUniformLocation(program, name.c_str());
-                if (loc < 0) loc = HdBinding::NOT_EXIST;
-                it->second.Set(type, loc, binding.GetTextureUnit());
+                it.second.Set(type, loc, binding.GetTextureUnit());
+            }
+        }
+    }
+
+    if (ARCH_UNLIKELY(!caps.shadingLanguage420pack)) {
+        for (auto & it: _bindingMap) {
+            HdBinding binding = it.second;
+            HdBinding::Type type = binding.GetType();
+            std::string name = it.first.name;
+            std::string textureName;
+
+            // note: sampler prefix is added in
+            // HdCodeGen::_GenerateShaderParameters
+            if (type == HdBinding::TEXTURE_2D) {
+                textureName = "sampler2d_" + name;
             } else if (type == HdBinding::TEXTURE_3D) {
-                // note: sampler3d_ prefix is added in
-                // HdCodeGen::_GenerateShaderParameters()
-                name = "sampler3d_" + name;
-                GLint loc = glGetUniformLocation(program, name.c_str());
+                textureName = "sampler3d_" + name;
+            } else if (type == HdBinding::TEXTURE_PTEX_TEXEL) {
+                textureName = "sampler2darray_" + name;
+            } else if (type == HdBinding::TEXTURE_PTEX_LAYOUT) {
+                textureName = "isamplerbuffer_" + name;
+            } else if (type == HdBinding::TEXTURE_UDIM_ARRAY) {
+                textureName = "sampler2dArray_" + name;
+            } else if (type == HdBinding::TEXTURE_UDIM_LAYOUT) {
+                textureName = "sampler1d_" + name;
+            }
+
+            if (!textureName.empty()) {
+                GLint loc = glGetUniformLocation(program, textureName.c_str());
+                glProgramUniform1i(program, loc, binding.GetTextureUnit());
                 if (loc < 0) loc = HdBinding::NOT_EXIST;
-                it->second.Set(type, loc, binding.GetTextureUnit());
+                it.second.Set(type, loc, binding.GetTextureUnit());
             }
         }
     }

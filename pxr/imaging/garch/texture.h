@@ -338,7 +338,8 @@ public:
     ///
     struct Binding {
         Binding(TfToken name, TfToken role, GLenum target,
-                GarchTextureGPUHandle textureId, GarchSamplerGPUHandle samplerId)
+                GarchTextureGPUHandle const& textureId,
+                GarchSamplerGPUHandle const& samplerId)
             : name(name)
             , role(role)
             , target(target)
@@ -360,7 +361,7 @@ public:
     /// named \a identifier. If \a samplerId is specified, the bindings
     /// returned will use this samplerId for resources which can be sampled.
     virtual BindingVector GetBindings(TfToken const & identifier,
-                                      GarchSamplerGPUHandle samplerId = GarchSamplerGPUHandle()) = 0;
+                                      GarchSamplerGPUHandle const & samplerId = GarchSamplerGPUHandle()) = 0;
 
     /// Amount of memory used to store the texture
     GARCH_API
@@ -405,6 +406,11 @@ public:
 
     GARCH_API
     bool IsOriginLowerLeft() const;
+    
+    /// An opportunity to throw out unused textures if this is
+    /// a container for textures.
+    GARCH_API
+    virtual void GarbageCollect();
 
 protected:
     GARCH_API

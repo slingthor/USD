@@ -96,8 +96,9 @@ namespace {
     // The keys are original SdrPropertyTypes, and the value is another map,
     // keyed by the "role" metadata value. The value of that map is the
     // converted SdrPropertyType and array size.
-    const TokenToMapTable& _convertedSdrTypes() {
-        static const auto convertedSdrTypes = new TokenToMapTable {
+    const TokenToMapTable& _GetConvertedSdrTypes()
+    {
+        static const TokenToMapTable convertedSdrTypes = {
             {SdrPropertyTypes->Color,
                 {
                     {SdrPropertyRole->None, {SdrPropertyTypes->Float, 3}}
@@ -119,7 +120,7 @@ namespace {
                 }
             }
         };
-        return *convertedSdrTypes;
+        return convertedSdrTypes;
     }
 
     // -------------------------------------------------------------------------
@@ -254,8 +255,8 @@ namespace {
         if (!type.IsEmpty() && !role.IsEmpty()) {
             // Look up using original type and role declaration
             const TokenToMapTable::const_iterator& typeSearch =
-                _convertedSdrTypes().find(type);
-            if (typeSearch != _convertedSdrTypes().end()) {
+                _GetConvertedSdrTypes().find(type);
+            if (typeSearch != _GetConvertedSdrTypes().end()) {
                 const TokenToPairTable::const_iterator& roleSearch =
                     typeSearch->second.find(role);
                 if (roleSearch != typeSearch->second.end()) {

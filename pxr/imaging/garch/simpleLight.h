@@ -92,9 +92,9 @@ public:
     virtual void SetAttenuation(GfVec3f const & attenuation);
 
     GARCH_API
-    virtual GfMatrix4d const & GetShadowMatrix() const;
+    virtual std::vector<GfMatrix4d> const & GetShadowMatrices() const;
     GARCH_API
-    virtual void SetShadowMatrix(GfMatrix4d const &matrix);
+    virtual void SetShadowMatrices(std::vector<GfMatrix4d> const &matrix);
 
     GARCH_API
     virtual int GetShadowResolution() const;
@@ -112,9 +112,14 @@ public:
     virtual void SetShadowBlur(float blur);
 
     GARCH_API
-    virtual int GetShadowIndex() const;
+    virtual int GetShadowIndexStart() const;
     GARCH_API
-    virtual void SetShadowIndex(int shadowIndex);
+    virtual void SetShadowIndexStart(int shadowStart);
+    
+    GARCH_API
+    virtual int GetShadowIndexEnd() const;
+    GARCH_API
+    virtual void SetShadowIndexEnd(int shadowEnd);
 
     GARCH_API
     virtual bool HasShadow() const;
@@ -192,10 +197,11 @@ private:
     int _shadowResolution;
     float _shadowBias;
     float _shadowBlur;
-    int _shadowIndex;
+    int _shadowIndexStart;
+    int _shadowIndexEnd;
 
     GfMatrix4d _transform;
-    GfMatrix4d _shadowMatrix;
+    std::vector<GfMatrix4d> _shadowMatrices;
     
     // domeLight specific parameters
     bool _isDomeLight;

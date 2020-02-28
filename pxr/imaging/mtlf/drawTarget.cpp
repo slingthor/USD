@@ -730,7 +730,7 @@ MtlfDrawTarget::MtlfAttachment::ResizeTexture(const GfVec2i &size)
 /* virtual */
 GarchTexture::BindingVector
 MtlfDrawTarget::MtlfAttachment::GetBindings(TfToken const & identifier,
-                                            GarchSamplerGPUHandle samplerName)
+                                            GarchSamplerGPUHandle const& samplerName)
 {
     return BindingVector(1,
                 Binding(identifier, GarchTextureTokens->texels,

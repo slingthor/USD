@@ -225,5 +225,12 @@ GarchTexture::IsOriginLowerLeft() const
     return _originLocation == GarchImage::OriginLowerLeft;
 }
 
+void
+GarchTexture::GarbageCollect()
+{
+    // Nothing to do here.
+    // Only needed for containers of textures.
+}
+
 PXR_NAMESPACE_CLOSE_SCOPE
 

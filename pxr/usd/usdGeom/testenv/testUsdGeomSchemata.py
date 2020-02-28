@@ -37,7 +37,8 @@ class TestUsdGeomSchemata(unittest.TestCase):
         self.assertTrue(mesh)
         self.assertTrue(mesh.GetPrim())
         self.assertTrue(not mesh.GetPointsAttr().Get(1))
-        self.assertEqual(p.GetTypeName(), mesh.GetSchemaClassPrimDefinition().typeName)
+        self.assertEqual(p.GetTypeName(), 
+            Usd.SchemaRegistry().GetSchemaTypeName(mesh._GetStaticTfType()))
 
         #
         # Make sure uniform access behaves as expected.
@@ -637,9 +638,9 @@ class TestUsdGeomSchemata(unittest.TestCase):
         imageable = Tf.Type.FindByName("UsdGeomImageable")
         geomModelAPI = Tf.Type.FindByName("UsdGeomModelAPI")
 
-        self.assertTrue(Usd.SchemaRegistry.IsConcrete(xform))
-        self.assertFalse(Usd.SchemaRegistry.IsConcrete(imageable))
-        self.assertFalse(Usd.SchemaRegistry.IsConcrete(geomModelAPI))
+        self.assertTrue(Usd.SchemaRegistry().IsConcrete(xform))
+        self.assertFalse(Usd.SchemaRegistry().IsConcrete(imageable))
+        self.assertFalse(Usd.SchemaRegistry().IsConcrete(geomModelAPI))
 
     def test_Apply(self):
         s = Usd.Stage.CreateInMemory('AppliedSchemas.usd')

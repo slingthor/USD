@@ -26,6 +26,7 @@
 #include "pxr/imaging/garch/image.h"
 #include "pxr/imaging/garch/utils.h"
 #include "pxr/imaging/garch/vdbTextureData.h"
+#include "pxr/imaging/garch/vdbTextureContainer.h"
 
 #include "pxr/base/tf/fileUtils.h"
 #include "pxr/base/trace/trace.h"
@@ -36,16 +37,20 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 GarchVdbTextureDataRefPtr
-GarchVdbTextureData::New(
-    std::string const &filePath, const size_t targetMemory)
+GarchVdbTextureData::New(std::string const &filePath,
+                         std::string const &gridName,
+                         const size_t targetMemory)
 {
-    return TfCreateRefPtr(new GarchVdbTextureData(filePath, targetMemory));
+    return TfCreateRefPtr(
+        new GarchVdbTextureData(filePath, gridName, targetMemory));
 }
 
 GarchVdbTextureData::GarchVdbTextureData(
-    const std::string &filePath,
+    std::string const &filePath,
+    std::string const &gridName,
     const size_t targetMemory)
     : _filePath(filePath),
+      _gridName(gridName),
       _targetMemory(targetMemory),
       _nativeWidth(0), _nativeHeight(0), _nativeDepth(1),
       _bytesPerPixel(0),
@@ -199,7 +204,7 @@ public:
         // Allocate dense grid of given size
         : _denseGrid(bbox)
     {
-        TRACE_SCOPE("GlfVdbTextureData: Copy to dense");
+        TRACE_FUNCTION_SCOPE("GlfVdbTextureData: Copy to dense");
         openvdb::tools::copyToDense(grid->tree(), _denseGrid);
     }
 
@@ -248,44 +253,43 @@ _ExtractTransformFromGrid(const openvdb::GridBase::Ptr &grid)
     return GfMatrix4d(reinterpret_cast<const double (*)[4]>(m.asPointer()));
 }
 
-// Load the first grid from an OpenVDB file
+// Load the grid with given name from the OpenVDB file at given path
 openvdb::GridBase::Ptr
-_LoadGridFromFile(openvdb::io::File &f)
+_LoadGrid(const std::string &filePath, std::string const &gridName)
 {
     TRACE_FUNCTION();
 
-    if (f.beginName() == f.endName()) {
-        const std::string &filename = f.filename();
-        TF_WARN("OpenVDB file %s has no grid", filename.c_str());
-        return nullptr;
-    }
-
-    const std::string &gridName = f.beginName().gridName();
-    TF_DEBUG(GARCH_DEBUG_VDB_TEXTURE).Msg(
-        "[VdbTextureData] Loading first grid (name: '%s')\n",
-        gridName.c_str());
-
-    return f.readGrid(gridName);
-}
-
-// Load the first grid from the OpenVDB file at given path
-openvdb::GridBase::Ptr
-_LoadGrid(const std::string &filePath)
-{
-    TRACE_FUNCTION();
-
+    openvdb::initialize();
     openvdb::io::File f(filePath);
     
-    try {
-        f.open();
-    } catch (openvdb::IoError e) {
-        TF_WARN("Could not open OpenVDB file: %s", e.what());
+    {
+        TRACE_FUNCTION_SCOPE("Opening VDB file");
+        try {
+            f.open();
+        } catch (openvdb::IoError e) {
+            TF_WARN("Could not open OpenVDB file: %s", e.what());
+            return nullptr;
+        } catch (openvdb::LookupError e) {
+            // Occurs, e.g., when there is an unknown grid type in VDB file
+            TF_WARN("Could not parse OpenVDB file: %s", e.what());
+            return nullptr;
+        }
+    }
+        
+    if (!f.hasGrid(gridName)) {
+        TF_WARN("OpenVDB file %s has no grid %s",
+                filePath.c_str(), gridName.c_str());
         return nullptr;
     }
     
-    openvdb::GridBase::Ptr const result = _LoadGridFromFile(f);
+    openvdb::GridBase::Ptr const result = f.readGrid(gridName);
 
-    f.close();
+    {
+        TRACE_FUNCTION_SCOPE("Closing VDB file");
+        // openvdb::io::File's d'tor is probably closing the file, but this
+        // is not explicitly specified in the documentation.
+        f.close();
+    }
 
     return result;
 }
@@ -311,11 +315,11 @@ GarchVdbTextureData::Read(int degradeLevel, bool generateMipmap,
     TRACE_FUNCTION();
 
     TF_DEBUG(GARCH_DEBUG_VDB_TEXTURE).Msg(
-        "[VdbTextureData] Path: %s\n", _filePath.c_str());
+        "[VdbTextureData] Path: %s GridName: %s\n",
+        _filePath.c_str(),
+        _gridName.c_str());
 
-    openvdb::initialize();
-    
-    openvdb::GridBase::Ptr const grid = _LoadGrid(_filePath);
+    openvdb::GridBase::Ptr const grid = _LoadGrid(_filePath, _gridName);
     if (!grid) {
         return false;
     }

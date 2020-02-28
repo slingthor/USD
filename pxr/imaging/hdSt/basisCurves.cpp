@@ -490,12 +490,27 @@ HdStBasisCurves::_PopulateTopology(HdSceneDelegate *sceneDelegate,
     }
 
     // XXX: is it safe to get topology even if it's not dirty?
-    if (HdChangeTracker::IsTopologyDirty(*dirtyBits, id) ||
-        HdChangeTracker::IsDisplayStyleDirty(*dirtyBits, id)) {
+    bool dirtyTopology = HdChangeTracker::IsTopologyDirty(*dirtyBits, id);
 
+    if (dirtyTopology || HdChangeTracker::IsDisplayStyleDirty(*dirtyBits, id)) {
 
         const HdBasisCurvesTopology &srcTopology =
                                           GetBasisCurvesTopology(sceneDelegate);
+
+        // Topological visibility (of points, curves) comes in as DirtyTopology.
+        // We encode this information in a separate BAR.
+        if (dirtyTopology) {
+            HdStProcessTopologyVisibility(
+                srcTopology.GetInvisibleCurves(),
+                srcTopology.GetNumCurves(),
+                srcTopology.GetInvisiblePoints(),
+                srcTopology.CalculateNeededNumberOfControlPoints(),
+                &_sharedData,
+                drawItem,
+                &(sceneDelegate->GetRenderIndex().GetChangeTracker()),
+                resourceRegistry,
+                id);
+        }
 
         // compute id.
         _topologyId = srcTopology.ComputeHash();
@@ -651,6 +666,10 @@ HdStBasisCurves::_PopulateVertexPrimvars(HdSceneDelegate *sceneDelegate,
         primvars.insert(primvars.end(), varyingPvs.begin(), varyingPvs.end());
     }
 
+    HdExtComputationPrimvarDescriptorVector compPrimvars =
+        sceneDelegate->GetExtComputationPrimvarDescriptors(id,
+            HdInterpolationVertex);
+
     HdBufferSourceVector sources;
     HdBufferSourceVector reserveOnlySources;
     HdBufferSourceVector separateComputationSources;
@@ -660,7 +679,7 @@ HdStBasisCurves::_PopulateVertexPrimvars(HdSceneDelegate *sceneDelegate,
     HdSt_GetExtComputationPrimvarsComputations(
         id,
         sceneDelegate,
-        HdInterpolationVertex,
+        compPrimvars,
         *dirtyBits,
         &sources,
         &reserveOnlySources,

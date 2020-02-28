@@ -1,5 +1,5 @@
 //
-// Copyright 2016 Pixar
+// Copyright 2020 Pixar
 //
 // Licensed under the Apache License, Version 2.0 (the "Apache License")
 // with the following modification; you may not use this file except in
@@ -21,8 +21,6 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-/// \file package.cpp
-
 #include "pxr/imaging/mtlf/package.h"
 
 #include "pxr/base/plug/plugin.h"
@@ -46,12 +44,6 @@ _GetShaderPath(char const * shader)
 }
 
 TfToken
-MtlfPackageSimpleLightingShader()
-{
-    return _GetShaderPath("simpleLightingShader.glslfx");
-}
-
-TfToken
 MtlfPackageDefaultMetalShaders()
 {
     return _GetShaderPath("defaults.metal");
@@ -68,4 +60,3 @@ TfToken MtlfPackageInteropFragShader()
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE
-

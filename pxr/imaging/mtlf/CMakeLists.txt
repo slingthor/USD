@@ -96,7 +96,6 @@ pxr_library(mtlf
         plugInfo.json
         shaders/pcfShader.glslfx
         shaders/simpleLighting.glslfx
-        shaders/simpleShadowMapShader.glslfx
         shaders/defaults.metal
         shaders/interopFrag.glsl
         shaders/interopVtx.glsl

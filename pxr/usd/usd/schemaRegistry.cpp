@@ -23,6 +23,7 @@
 //
 #include "pxr/pxr.h"
 #include "pxr/usd/usd/schemaRegistry.h"
+#include "pxr/usd/usd/primDefinition.h"
 
 #include "pxr/usd/usd/debugCodes.h"
 #include "pxr/usd/usd/clip.h"
@@ -71,6 +72,7 @@ TF_DEFINE_PRIVATE_TOKENS(
     _tokens,
     (appliedAPISchemas)
     (multipleApplyAPISchemas)
+    (multipleApplyAPISchemaPrefixes)
 );
 
 template <class T>
@@ -138,31 +140,6 @@ _GetGeneratedSchema(const PlugPluginPtr &plugin)
 }
 
 void
-UsdSchemaRegistry::_BuildPrimTypePropNameToPathMap(
-    const TfToken &typeName, const SdfPrimSpecHandle &prim)
-{
-    if (!prim || prim->GetTypeName().IsEmpty())
-        return;
-
-    _primTypePropNameToPathMap[
-        make_pair(typeName, TfToken())] = prim->GetPath();
-
-    for (SdfPropertySpecHandle prop: prim->GetProperties()) {
-        _primTypePropNameToPathMap[
-            make_pair(typeName, prop->GetNameToken())] = prop->GetPath();
-    }
-}
-
-const SdfPath &
-UsdSchemaRegistry::_GetPath(const TfToken &primType,
-                            const TfToken &propName) const
-{
-    auto iter = _primTypePropNameToPathMap.find(make_pair(primType, propName));
-    return iter != _primTypePropNameToPathMap.end() ?
-        iter->second : SdfPath::EmptyPath();
-}
-
-void
 UsdSchemaRegistry::_FindAndAddPluginSchema()
 {
     // Get all types that derive UsdSchemaBase.
@@ -206,6 +183,7 @@ UsdSchemaRegistry::_FindAndAddPluginSchema()
               TfTokenFastArbitraryLessThan());
 
     SdfChangeBlock block;
+    TfToken::HashSet appliedAPISchemaNames;
     for (const SdfLayerRefPtr& generatedSchema : generatedSchemas) {
         if (generatedSchema) {
             VtDictionary customDataDict = generatedSchema->GetCustomLayerData();
@@ -217,17 +195,33 @@ UsdSchemaRegistry::_FindAndAddPluginSchema()
                         VtDictionaryGet<VtStringArray>(customDataDict, 
                             _tokens->appliedAPISchemas);
                 for (const auto &apiSchemaName : appliedAPISchemas) {
-                    _appliedAPISchemaNames.insert(TfToken(apiSchemaName));
+                    appliedAPISchemaNames.insert(TfToken(apiSchemaName));
                 }
             }
 
-            if (VtDictionaryIsHolding<VtStringArray>(customDataDict, 
+            // Names of multiple apply API schemas are stored in their schemas
+            // in a dictionary mapping them to their property namespace prefixes. 
+            // These will be useful in mapping schema instance property names 
+            // to the schema property specs.
+            auto it = customDataDict.find(_tokens->multipleApplyAPISchemas);
+            if (VtDictionaryIsHolding<VtDictionary>(customDataDict, 
                     _tokens->multipleApplyAPISchemas)) {
-                const VtStringArray &multipleApplyAPISchemas = 
-                        VtDictionaryGet<VtStringArray>(customDataDict, 
-                            _tokens->multipleApplyAPISchemas);
-                for (const auto &apiSchemaName : multipleApplyAPISchemas) {
-                    _multipleApplyAPISchemaNames.insert(TfToken(apiSchemaName));
+                if (!it->second.IsHolding<VtDictionary>()) {
+                    TF_CODING_ERROR("Found a non-dictionary value for layer "
+                        "metadata key '%s' in generated schema file '%s'. "
+                        "Any multiple apply API schemas from this file will "
+                        "be incorrect. This schema must be regenerated.",
+                        _tokens->multipleApplyAPISchemas.GetText(),
+                        generatedSchema->GetRealPath().c_str());
+                    continue;
+                }
+                const VtDictionary &multipleApplyAPISchemas = 
+                    it->second.UncheckedGet<VtDictionary>();
+                for (const auto &it : multipleApplyAPISchemas) {
+                    if (it.second.IsHolding<std::string>()) {
+                        _multipleApplyAPISchemaNamespaces[TfToken(it.first)] = 
+                            TfToken(it.second.UncheckedGet<std::string>());
+                    }
                 }
             }
 
@@ -243,26 +237,48 @@ UsdSchemaRegistry::_FindAndAddPluginSchema()
         if (aliases.size() == 1) {
             SdfPath primPath = SdfPath::AbsoluteRootPath().
                 AppendChild(TfToken(aliases.front()));
-            SdfPrimSpecHandle prim = _schematics->GetPrimAtPath(primPath);
-            if (prim) {
-                // Add this prim and its properties.
-                _typeToPathMap[type] = primPath;
-                // XXX: Using tokens as keys means we can look up by prim
-                //      type token, rather than converting a prim type token
-                //      to a TfType and looking up by that, which requires
-                //      an expensive lookup (including a lock).
-                //
-                //      We should be registering by name only but TfType
-                //      doesn't return the type name (or aliases) by TfToken
-                //      and we can't afford to construct a TfToken from the
-                //      string returned by TfType when looking up by
-                //      type.  TfType should be fixed/augmented.
-                TfToken typeNameToken(type.GetTypeName());
-                _typeNameToPathMap[typeNameToken] = primPath;
-                _typeNameToPathMap[primPath.GetNameToken()] = primPath;
+            // XXX: Using tokens as keys means we can look up by prim
+            //      type token, rather than converting a prim type token
+            //      to a TfType and looking up by that, which requires
+            //      an expensive lookup (including a lock).
+            //
+            //      We should be registering by name only but TfType
+            //      doesn't return the type name (or aliases) by TfToken
+            //      and we can't afford to construct a TfToken from the
+            //      string returned by TfType when looking up by
+            //      type.  TfType should be fixed/augmented.
+            TfToken typeNameToken(type.GetTypeName());
+            const TfToken &usdTypeNameToken = primPath.GetNameToken();
 
-                _BuildPrimTypePropNameToPathMap(typeNameToken, prim);
-                _BuildPrimTypePropNameToPathMap(primPath.GetNameToken(), prim);
+            // We only map type names for types that have an underlying prim
+            // spec, i.e. concrete and API schema types.
+            SdfPrimSpecHandle primSpec = _schematics->GetPrimAtPath(primPath);
+            if (primSpec) {
+                // Map TfType to the USD type name
+                _typeToUsdTypeNameMap[type] = usdTypeNameToken;
+
+                // If the prim spec doesn't have a type name, then it's an
+                // API schema
+                if (primSpec->GetTypeName().IsEmpty()) {
+                    // Non-apply API schemas also have prim specs so make sure
+                    // this is actually an applied schema before adding the 
+                    // prim definition to applied API schema map.
+                    if (appliedAPISchemaNames.find(usdTypeNameToken) != 
+                            appliedAPISchemaNames.end()) {
+                        // Add it to the map using both the USD type name and 
+                        // TfType name.
+                        _appliedAPIPrimDefinitions[typeNameToken] = 
+                            _appliedAPIPrimDefinitions[usdTypeNameToken] = 
+                            new UsdPrimDefinition(primSpec);
+                    }
+                } else {
+                    // Otherwise it's a concrete type. Add the new prim 
+                    // definition to the concrete typed schema map also using 
+                    // both the USD and TfType name.
+                    _concreteTypedPrimDefinitions[typeNameToken] = 
+                        _concreteTypedPrimDefinitions[usdTypeNameToken] = 
+                        new UsdPrimDefinition(primSpec);
+                }
             }
         }
     }
@@ -271,6 +287,7 @@ UsdSchemaRegistry::_FindAndAddPluginSchema()
 UsdSchemaRegistry::UsdSchemaRegistry()
 {
     _schematics = SdfLayer::CreateAnonymous("registry.usda");
+    _emptyPrimDefinition = new UsdPrimDefinition();
 
     // Find and load all the generated schema in plugin libraries.  We find thes
     // files adjacent to pluginfo files in libraries that provide subclasses of
@@ -281,84 +298,54 @@ UsdSchemaRegistry::UsdSchemaRegistry()
     TfRegistryManager::GetInstance().SubscribeTo<UsdSchemaRegistry>();
 }
 
-const SdfPath&
-UsdSchemaRegistry::_GetSchemaPrimPath(const TfType &primType) const
+/*static*/
+SdfPrimSpecHandle
+UsdSchemaRegistry::GetSchemaPrimSpec(const TfToken &primType)
 {
-    // Look up in registered types.
-    _TypeToPathMap::const_iterator i = _typeToPathMap.find(primType);
-    return i == _typeToPathMap.end() ? SdfPath::EmptyPath() : i->second;
-}
-
-const SdfPath&
-UsdSchemaRegistry::_GetSchemaPrimPath(const TfToken &primType) const
-{
-    _TypeNameToPathMap::const_iterator i = _typeNameToPathMap.find(primType);
-    return i == _typeNameToPathMap.end() ? SdfPath::EmptyPath() : i->second;
+    auto const &self = GetInstance();
+    const UsdPrimDefinition *primDef = 
+        self.FindConcretePrimDefinition(primType);
+    return primDef ? primDef->GetSchemaPrimSpec() : TfNullPtr;
 }
 
 /*static*/
 SdfPrimSpecHandle
-UsdSchemaRegistry::GetPrimDefinition(const TfToken &primType)
+UsdSchemaRegistry::GetSchemaPrimSpec(const TfType &primType)
 {
-    return GetSchematics()->GetPrimAtPath(
-        GetInstance()._GetSchemaPrimPath(primType));
-}
-
-/*static*/
-SdfPrimSpecHandle
-UsdSchemaRegistry::GetPrimDefinition(const TfType &primType)
-{
-    return GetSchematics()->GetPrimAtPath(
-        GetInstance()._GetSchemaPrimPath(primType));
+    return GetSchemaPrimSpec(GetInstance().GetSchemaTypeName(primType));
 }
 
 /*static*/
 SdfPropertySpecHandle
-UsdSchemaRegistry::GetPropertyDefinition(const TfToken& primType, 
+UsdSchemaRegistry::GetSchemaPropertySpec(const TfToken& primType, 
                                          const TfToken& propName)
 {
     auto const &self = GetInstance();
-    SdfPath const &path = self._GetPath(primType, propName);
-    return path.IsEmpty() ? TfNullPtr :
-        self._schematics->GetPropertyAtPath(path);
+    const UsdPrimDefinition *primDef = 
+        self.FindConcretePrimDefinition(primType);
+    return primDef ? primDef->GetSchemaPropertySpec(propName) : TfNullPtr;
 }
 
 /*static*/
 SdfAttributeSpecHandle
-UsdSchemaRegistry::GetAttributeDefinition(const TfToken& primType, 
+UsdSchemaRegistry::GetSchemaAttributeSpec(const TfToken& primType, 
                                           const TfToken& attrName)
 {
     auto const &self = GetInstance();
-    SdfPath const &path = self._GetPath(primType, attrName);
-    return path.IsEmpty() ? TfNullPtr :
-        self._schematics->GetAttributeAtPath(path);
+    const UsdPrimDefinition *primDef = 
+        self.FindConcretePrimDefinition(primType);
+    return primDef ? primDef->GetSchemaAttributeSpec(attrName) : TfNullPtr;
 }
 
 /*static*/
 SdfRelationshipSpecHandle
-UsdSchemaRegistry::GetRelationshipDefinition(const TfToken& primType, 
+UsdSchemaRegistry::GetSchemaRelationshipSpec(const TfToken& primType, 
                                              const TfToken& relName)
 {
     auto const &self = GetInstance();
-    SdfPath const &path = self._GetPath(primType, relName);
-    return path.IsEmpty() ? TfNullPtr :
-        self._schematics->GetRelationshipAtPath(path);
-}
-
-// Helper function invoked by generated Schema classes, used to avoid dynamic
-// SdfPath construction when looking up prim definitions.
-SdfPrimSpecHandle
-Usd_SchemaRegistryGetPrimDefinitionAtPath(SdfPath const &path)
-{
-    return UsdSchemaRegistry::GetInstance().
-        GetSchematics()->GetPrimAtPath(path);
-}
-
-/*static*/
-SdfPrimSpecHandle
-UsdSchemaRegistry::_GetPrimDefinitionAtPath(const SdfPath &path)
-{
-    return Usd_SchemaRegistryGetPrimDefinitionAtPath(path);
+    const UsdPrimDefinition *primDef = 
+        self.FindConcretePrimDefinition(primType);
+    return primDef ? primDef->GetSchemaRelationshipSpec(relName) : TfNullPtr;
 }
 
 /*static*/
@@ -403,48 +390,44 @@ UsdSchemaRegistry::IsTyped(const TfType& primType)
     return primType.IsA<UsdTyped>();
 }
 
-/*static*/
 bool 
-UsdSchemaRegistry::IsConcrete(const TfType& primType)
+UsdSchemaRegistry::IsConcrete(const TfType& primType) const
 {
-    auto primSpec = GetPrimDefinition(primType);
-    return (primSpec && !primSpec->GetTypeName().IsEmpty());
+    return IsConcrete(GetSchemaTypeName(primType));
 }
 
 bool 
-UsdSchemaRegistry::IsMultipleApplyAPISchema(const TfType& apiSchemaType)
+UsdSchemaRegistry::IsConcrete(const TfToken& primType) const
 {
-    // Return false if apiSchemaType is not an API schema.
-    if (!apiSchemaType.IsA(*_apiSchemaBaseType)) {
-        return false;
-    }
-
-    for (const auto& alias : _schemaBaseType->GetAliases(apiSchemaType)) {
-        if (_multipleApplyAPISchemaNames.find(TfToken(alias)) !=  
-                _multipleApplyAPISchemaNames.end()) {
-            return true;
-        }
-    }
-
-    return false;
+    return _concreteTypedPrimDefinitions.find(primType) != 
+        _concreteTypedPrimDefinitions.end();
 }
 
 bool 
-UsdSchemaRegistry::IsAppliedAPISchema(const TfType& apiSchemaType)
+UsdSchemaRegistry::IsMultipleApplyAPISchema(const TfType& apiSchemaType) const
 {
-    // Return false if apiSchemaType is not an API schema.
-    if (!apiSchemaType.IsA(*_apiSchemaBaseType)) {
-        return false;
-    }
+    return IsMultipleApplyAPISchema(GetSchemaTypeName(apiSchemaType));
+}
 
-    for (const auto& alias : _schemaBaseType->GetAliases(apiSchemaType)) {
-        if (_appliedAPISchemaNames.find(TfToken(alias)) !=  
-                _appliedAPISchemaNames.end()) {
-            return true;
-        }
-    }
+bool 
+UsdSchemaRegistry::IsMultipleApplyAPISchema(const TfToken& apiSchemaType) const
+{
+    return IsAppliedAPISchema(apiSchemaType) && 
+        (_multipleApplyAPISchemaNamespaces.find(apiSchemaType) !=
+         _multipleApplyAPISchemaNamespaces.end());
+}
 
-    return false;
+bool 
+UsdSchemaRegistry::IsAppliedAPISchema(const TfType& apiSchemaType) const
+{
+    return IsAppliedAPISchema(GetSchemaTypeName(apiSchemaType));
+}
+
+bool 
+UsdSchemaRegistry::IsAppliedAPISchema(const TfToken& apiSchemaType) const
+{
+    return _appliedAPIPrimDefinitions.find(apiSchemaType) != 
+        _appliedAPIPrimDefinitions.end();
 }
 
 TfType

@@ -34,6 +34,8 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 class Hgi;
 
+class Hgi;
+
 typedef boost::shared_ptr<class HdStResourceRegistry>
     HdStResourceRegistrySharedPtr;
 
