@@ -39,8 +39,8 @@ HdStRenderBuffer::HdStRenderBuffer(Hgi* hgi, SdfPath const& id)
     , _format(HdFormatInvalid)
     , _usage(HgiTextureUsageBitsColorTarget)
     , _multiSampled(false)
-    , _texture(nullptr)
-    , _textureMS(nullptr)
+    , _texture()
+    , _textureMS()
     , _mappers(0)
     , _mappedBuffer()
 {
@@ -185,13 +185,13 @@ HdStRenderBuffer::Resolve()
     blitEncoder->EndEncoding();
 }
 
-HgiTextureHandle 
-HdStRenderBuffer::GetHgiTextureHandle(bool multiSampled) const 
+VtValue 
+HdStRenderBuffer::GetResource(bool multiSampled) const 
 {
     if (multiSampled && _multiSampled) {
-        return _textureMS;
+        return VtValue(_textureMS);
     } else {
-        return _texture;
+        return VtValue(_texture);
     }
 }
 

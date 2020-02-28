@@ -31,12 +31,11 @@
 #include "pxr/base/gf/vec3i.h"
 #include "pxr/imaging/hgi/api.h"
 #include "pxr/imaging/hgi/enums.h"
+#include "pxr/imaging/hgi/handle.h"
 #include "pxr/imaging/hgi/types.h"
 
 
 PXR_NAMESPACE_OPEN_SCOPE
-
-
 
 /// \struct HgiBufferDesc
 ///
@@ -49,6 +48,9 @@ PXR_NAMESPACE_OPEN_SCOPE
 ///   Bits describing the intended usage and properties of the buffer.</li>
 /// <li>byteSize:
 ///   Length of buffer in bytes</li>
+/// <Li>vertexStride:
+///   The size of a vertex in a vertex buffer.
+///   This property is only required for vertex buffers.</li>
 /// <li>initialData:
 ///   CPU pointer to initialization data of buffer.
 ///   The memory is consumed immediately during the creation of the HgiBuffer.
@@ -56,17 +58,20 @@ PXR_NAMESPACE_OPEN_SCOPE
 ///   of the HgiBuffer has returned.</li>
 /// </ul>
 ///
-struct HgiBufferDesc {
+struct HgiBufferDesc
+{
     HGI_API
     HgiBufferDesc()
     : usage(HgiBufferUsageUniform)
     , byteSize(0)
+    , vertexStride(0)
     , initialData(nullptr)
     {}
 
     std::string debugName;
     HgiBufferUsage usage;
     size_t byteSize;
+    uint32_t vertexStride;
     void const* initialData;
 };
 
@@ -93,15 +98,20 @@ inline bool operator!=(
 /// To the client (HdSt) buffer resources are referred to via
 /// opaque, stateless handles (HgBufferHandle).
 ///
-class HgiBuffer {
+class HgiBuffer
+{
 public:
     HGI_API
     virtual ~HgiBuffer();
 
+    /// The descriptor describes the object.
+    HGI_API
+    HgiBufferDesc const& GetDescriptor() const;
+
 protected:
     HGI_API
     HgiBuffer(HgiBufferDesc const& desc);
-    
+
     HgiBufferDesc _descriptor;
 
 private:
@@ -110,8 +120,11 @@ private:
     HgiBuffer(const HgiBuffer&) = delete;
 };
 
-typedef HgiBuffer* HgiBufferHandle;
+/// Explicitly instantiate and define buffer handle
+template class HgiHandle<class HgiBuffer>;
+typedef HgiHandle<class HgiBuffer> HgiBufferHandle;
 typedef std::vector<HgiBufferHandle> HgiBufferHandleVector;
+
 
 PXR_NAMESPACE_CLOSE_SCOPE
 

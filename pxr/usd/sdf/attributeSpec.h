@@ -78,7 +78,6 @@ public:
 
     /// @}
 
-public:
     /// \name Connections
     /// @{
 
@@ -166,18 +165,6 @@ public:
     TfToken GetRoleName() const;
 
     /// @}
-
-private:
-    static SdfAttributeSpecHandle
-    _New(const SdfSpecHandle &owner,
-         const SdfPath& attributePath,
-         const SdfValueTypeName& typeName,
-         SdfVariability variability,
-         bool custom);
-
-    SdfPath _CanonicalizeConnectionPath(const SdfPath& connectionPath) const;
-
-    friend class Sdf_PyAttributeAccess;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

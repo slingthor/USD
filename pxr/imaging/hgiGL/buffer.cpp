@@ -66,6 +66,12 @@ HgiGLBuffer::HgiGLBuffer(HgiBufferDesc const & desc)
         TF_CODING_ERROR("Unknown HgiBufferUsage bit");
     }
 
+    // glBindVertexBuffer (graphics encoder) needs to know the stride of each
+    // vertex buffer. Make sure user provides it.
+    if (_descriptor.usage & HgiBufferUsageVertex) {
+        TF_VERIFY(desc.vertexStride > 0);
+    }
+
     // Don't hold onto buffer data ptr locally. HgiBufferDesc states that:
     // "The application may alter or free this memory as soon as the constructor
     //  of the HgiBuffer has returned."
@@ -87,5 +93,6 @@ HgiGLBuffer::~HgiGLBuffer()
 
     HGIGL_POST_PENDING_GL_ERRORS();
 }
+
 
 PXR_NAMESPACE_CLOSE_SCOPE

@@ -371,12 +371,14 @@ HdStRenderPassState::MakeGraphicsEncoderDesc() const
         }
 
         bool multiSampled= useMultiSample && aov.renderBuffer->IsMultiSampled();
-        HgiTextureHandle hgiTexHandle =
-            aov.renderBuffer->GetHgiTextureHandle(multiSampled);
+        VtValue rv = aov.renderBuffer->GetResource(multiSampled);
 
-        if (!TF_VERIFY(hgiTexHandle, "Invalid render buffer texture")) {
+        if (!TF_VERIFY(rv.IsHolding<HgiTextureHandle>(), 
+            "Invalid render buffer texture")) {
             continue;
         }
+
+        HgiTextureHandle hgiTexHandle = rv.UncheckedGet<HgiTextureHandle>();
 
         // Assume AOVs have the same dimensions so pick size of any.
         desc.width = aov.renderBuffer->GetWidth();
@@ -399,6 +401,16 @@ HdStRenderPassState::MakeGraphicsEncoderDesc() const
             const GfVec4f& col = aov.clearValue.UncheckedGet<GfVec4f>();
             attachmentDesc.clearValue = col;
         }
+
+        // HdSt expresses blending per RenderPassState, where Hgi expresses
+        // blending per-attachment. Transfer pass blend state to attachments.
+        attachmentDesc.blendEnabled = _blendEnabled;
+        attachmentDesc.srcColorBlendFactor=HgiBlendFactor(_blendColorSrcFactor);
+        attachmentDesc.dstColorBlendFactor=HgiBlendFactor(_blendColorDstFactor);
+        attachmentDesc.colorBlendOp = HgiBlendOp(_blendColorOp);
+        attachmentDesc.srcAlphaBlendFactor=HgiBlendFactor(_blendAlphaSrcFactor);
+        attachmentDesc.dstAlphaBlendFactor=HgiBlendFactor(_blendAlphaDstFactor);
+        attachmentDesc.alphaBlendOp = HgiBlendOp(_blendAlphaOp);
 
         if (aov.aovName == HdAovTokens->depth) {
             desc.depthAttachment = std::move(attachmentDesc);

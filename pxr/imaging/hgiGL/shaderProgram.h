@@ -39,7 +39,8 @@ PXR_NAMESPACE_OPEN_SCOPE
 ///
 /// OpenGL implementation of HgiShaderProgram
 ///
-class HgiGLShaderProgram final : public HgiShaderProgram {
+class HgiGLShaderProgram final : public HgiShaderProgram
+{
 public:
     HGIGL_API
     virtual ~HgiGLShaderProgram();
@@ -53,6 +54,10 @@ public:
     HGIGL_API
     HgiShaderFunctionHandleVector const& GetShaderFunctions() const override;
 
+    /// Returns the gl resource id of the program.
+    HGIGL_API
+    uint32_t GetProgramId() const;
+
 protected:
     friend class HgiGL;
 
@@ -65,7 +70,6 @@ private:
     HgiGLShaderProgram(const HgiGLShaderProgram&) = delete;
 
 private:
-    HgiShaderProgramDesc _descriptor;
     std::string _errors;
     uint32_t _programId;
 };

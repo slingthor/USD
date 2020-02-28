@@ -24,20 +24,17 @@
 #ifndef PXR_IMAGING_HGI_TEXTURE_H
 #define PXR_IMAGING_HGI_TEXTURE_H
 
-#include <string>
-
 #include "pxr/pxr.h"
 #include "pxr/base/gf/vec3i.h"
 #include "pxr/imaging/hgi/api.h"
 #include "pxr/imaging/hgi/enums.h"
+#include "pxr/imaging/hgi/handle.h"
 #include "pxr/imaging/hgi/types.h"
 
+#include <string>
+#include <vector>
 
 PXR_NAMESPACE_OPEN_SCOPE
-
-struct HgiTextureDesc;
-
-
 /// \struct HgiTextureDesc
 ///
 /// Describes the properties needed to create a GPU texture.
@@ -67,7 +64,8 @@ struct HgiTextureDesc;
 ///   Data may optionally include pixels for each mip-level.</li>
 /// </ul>
 ///
-struct HgiTextureDesc {
+struct HgiTextureDesc
+{
     HgiTextureDesc()
     : usage(HgiTextureUsageBitsColorTarget)
     , format(HgiFormatInvalid)
@@ -111,20 +109,21 @@ bool operator!=(
 /// To the client (HdSt) texture resources are referred to via
 /// opaque, stateless handles (HgTextureHandle).
 ///
-class HgiTexture {
+class HgiTexture
+{
 public:
     HGI_API
     virtual ~HgiTexture();
-    
-    /// Returns the descriptor of the texture.
+
+    /// The descriptor describes the object.
     HGI_API
     HgiTextureDesc const& GetDescriptor() const;
 
 protected:
     HGI_API
     HgiTexture(HgiTextureDesc const& desc);
-	
-	HgiTextureDesc _descriptor;
+
+    HgiTextureDesc _descriptor;
 
 private:
     HgiTexture() = delete;
@@ -132,7 +131,12 @@ private:
     HgiTexture(const HgiTexture&) = delete;
 };
 
-typedef HgiTexture* HgiTextureHandle;
+
+/// Explicitly instantiate and define texture handle
+template class HgiHandle<class HgiTexture>;
+typedef HgiHandle<class HgiTexture> HgiTextureHandle;
+typedef std::vector<HgiTextureHandle> HgiTextureHandleVector;
+
 
 PXR_NAMESPACE_CLOSE_SCOPE
 

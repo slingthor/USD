@@ -3747,6 +3747,7 @@ UsdStage::_HandleLayersDidChange(
                         if (infoKey == SdfFieldKeys->Kind ||
                             infoKey == SdfFieldKeys->TypeName ||
                             infoKey == SdfFieldKeys->Specifier ||
+                            infoKey == UsdTokens->apiSchemas ||
                             
                             // XXX: Could be more specific when recomposing due
                             //      to clip changes. E.g., only update the clip

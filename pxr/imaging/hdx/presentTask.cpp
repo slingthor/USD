@@ -111,13 +111,23 @@ HdxPresentTask::Execute(HdTaskContext* ctx)
 
     if (_isOpenGL) {
 #if defined(ARCH_GFX_OPENGL)
-        HgiGLTexture* colorTex = _aovBuffer ?
-            static_cast<HgiGLTexture*>(_aovBuffer->GetHgiTextureHandle(mulSmp)) :
-            nullptr;
+    HgiGLTexture* colorTex = nullptr;
+    if (_aovBuffer) {
+        VtValue rv = _aovBuffer->GetResource(mulSmp);
+        if (rv.IsHolding<HgiTextureHandle>()) {
+            HgiTextureHandle colorHandle = rv.UncheckedGet<HgiTextureHandle>();
+            colorTex = dynamic_cast<HgiGLTexture*>(colorHandle.Get());
+        }
+    }
 
-        HgiGLTexture* depthTex = _depthBuffer ?
-            static_cast<HgiGLTexture*>(_depthBuffer->GetHgiTextureHandle(mulSmp)):
-            nullptr;
+    HgiGLTexture* depthTex = nullptr;
+    if (_depthBuffer) {
+        VtValue rv = _depthBuffer->GetResource(mulSmp);
+        if (rv.IsHolding<HgiTextureHandle>()) {
+            HgiTextureHandle depthHandle = rv.UncheckedGet<HgiTextureHandle>();
+            depthTex = dynamic_cast<HgiGLTexture*>(depthHandle.Get());
+        }
+    }
 
         uint32_t colorId = colorTex ? colorTex->GetTextureId() : 0;
         uint32_t depthId = depthTex ? depthTex->GetTextureId() : 0;

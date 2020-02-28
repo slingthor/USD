@@ -26,34 +26,17 @@
 #include "pxr/imaging/hdx/colorCorrectionTask.h"
 #include "pxr/imaging/hdx/package.h"
 #include "pxr/imaging/hd/aov.h"
-#include "pxr/imaging/hd/driver.h"
 #include "pxr/imaging/hd/perfLog.h"
 #include "pxr/imaging/hd/renderBuffer.h"
 #include "pxr/imaging/hd/tokens.h"
-#include "pxr/imaging/hdSt/program.h"
-#include "pxr/imaging/hdSt/resourceFactory.h"
+#include "pxr/imaging/hdSt/glslProgram.h"
 #include "pxr/imaging/hdSt/renderBuffer.h"
 #include "pxr/imaging/hf/perfLog.h"
 #include "pxr/imaging/glf/diagnostic.h"
 #include "pxr/imaging/hio/glslfx.h"
 #include "pxr/imaging/glf/glContext.h"
 #include "pxr/base/tf/getenv.h"
-
-#include "pxr/imaging/hgi/hgi.h"
-#include "pxr/imaging/hgi/buffer.h"
-#include "pxr/imaging/hgi/texture.h"
-#include "pxr/imaging/hgi/tokens.h"
-
-#if defined(ARCH_GFX_OPENGL)
-#include "pxr/imaging/hgiGL/buffer.h"
 #include "pxr/imaging/hgiGL/texture.h"
-
-#include "pxr/imaging/hdSt/GL/glslProgram.h"
-#endif
-
-#if defined(ARCH_GFX_METAL)
-#include "pxr/imaging/hdSt/Metal/codeGenMSL.h"
-#endif
 
 #ifdef PXR_OCIO_PLUGIN_ENABLED
     #include <OpenColorIO/OpenColorIO.h>
@@ -81,11 +64,11 @@ namespace {
 HdxColorCorrectionTask::HdxColorCorrectionTask(HdSceneDelegate* delegate, 
                                                SdfPath const& id)
     : HdTask(id)
-    , _hgi(nullptr)
     , _shaderProgram()
-    , _texture(nullptr)
+    , _texture(0)
+    , _texture3dLUT(0)
     , _textureSize(0)
-    , _vertexBuffer(nullptr)
+    , _vertexBuffer(0)
     , _copyFramebuffer(0)
     , _framebufferSize(0)
     , _lut3dSizeOCIO(0)
@@ -94,47 +77,20 @@ HdxColorCorrectionTask::HdxColorCorrectionTask(HdSceneDelegate* delegate,
     , _aovTexture(nullptr)
     , _aovFramebuffer(0)
 {
-    _texture3dLUT.Clear();
-    _isOpenGL = HdStResourceFactory::GetInstance()->IsOpenGL();
-    
-    HdDriverVector const& drivers = delegate->GetRenderIndex().GetDrivers();
-    for (HdDriver* hdDriver : drivers) {
-        if (hdDriver->name == HgiTokens->renderDriver &&
-            hdDriver->driver.IsHolding<Hgi*>()) {
-            _hgi = hdDriver->driver.UncheckedGet<Hgi*>();
-            break;
-        }
-    }
 }
 
 HdxColorCorrectionTask::~HdxColorCorrectionTask()
 {
-    if (_texture != nullptr) {
-        _hgi->DestroyTexture(&_texture);
-        _texture = nullptr;
+    if (_texture != 0) {
+        glDeleteTextures(1, &_texture);
     }
 
-    if (_texture3dLUT.IsSet()) {
-        if (_isOpenGL) {
-#if defined(ARCH_GFX_OPENGL)
-            GLuint t = _texture3dLUT;
-            glDeleteTextures(1, &t);
-#endif
-        }
-        else {
-            for(int i = 0; i < GPUState::gpuCount; i++) {
-                id<MTLTexture> t = _texture3dLUT.multiTexture[i];
-                if (t) {
-                    [t release];
-                }
-            }
-        }
-        _texture3dLUT.Clear();
+    if (_texture3dLUT != 0) {
+        glDeleteTextures(1, &_texture3dLUT);
     }
 
     if (_vertexBuffer != 0) {
-        delete _vertexBuffer;
-        _vertexBuffer = NULL;
+        glDeleteBuffers(1, &_vertexBuffer);
     }
 
     if (_shaderProgram) {
@@ -142,114 +98,87 @@ HdxColorCorrectionTask::~HdxColorCorrectionTask()
     }
 
     if (_copyFramebuffer != 0) {
-#if defined(ARCH_GFX_OPENGL)
         glDeleteFramebuffers(1, &_copyFramebuffer);
-#endif
     }
 
     if (_aovFramebuffer != 0) {
-#if defined(ARCH_GFX_OPENGL)
         glDeleteFramebuffers(1, &_aovFramebuffer);
-#endif
     }
 
-    if (_isOpenGL) {
-        GLF_POST_PENDING_GL_ERRORS();
-    }
+    GLF_POST_PENDING_GL_ERRORS();
 }
 
 std::string
 HdxColorCorrectionTask::_CreateOpenColorIOResources()
 {
-#ifdef PXR_OCIO_PLUGIN_ENABLED
-    // Use client provided OCIO values, or use default fallback values
-    OCIO::ConstConfigRcPtr config = OCIO::GetCurrentConfig();
+    #ifdef PXR_OCIO_PLUGIN_ENABLED
+        // Use client provided OCIO values, or use default fallback values
+        OCIO::ConstConfigRcPtr config = OCIO::GetCurrentConfig();
 
-    const char* display = _displayOCIO.empty() ?
-                          config->getDefaultDisplay() :
-                          _displayOCIO.c_str();
+        const char* display = _displayOCIO.empty() ? 
+                              config->getDefaultDisplay() : 
+                              _displayOCIO.c_str();
 
-    const char* view = _viewOCIO.empty() ?
-                       config->getDefaultView(display) :
-                       _viewOCIO.c_str();
+        const char* view = _viewOCIO.empty() ? 
+                           config->getDefaultView(display) :
+                           _viewOCIO.c_str();
 
-    std::string inputColorSpace = _colorspaceOCIO;
-    if (inputColorSpace.empty()) {
-        OCIO::ConstColorSpaceRcPtr cs = config->getColorSpace("default");
-        if (cs) {
-            inputColorSpace = cs->getName();
-        } else {
-            inputColorSpace = OCIO::ROLE_SCENE_LINEAR;
-        }
-    }
-
-    // Setup the transformation we need to apply
-    OCIO::DisplayTransformRcPtr transform = OCIO::DisplayTransform::Create();
-    transform->setDisplay(display);
-    transform->setView(view);
-    transform->setInputColorSpaceName(inputColorSpace.c_str());
-    if (!_looksOCIO.empty()) {
-        transform->setLooksOverride(_looksOCIO.c_str());
-        transform->setLooksOverrideEnabled(true);
-    } else {
-        transform->setLooksOverrideEnabled(false);
-    }
-
-    OCIO::ConstProcessorRcPtr processor = config->getProcessor(transform);
-
-    // If 3D lut size is 0 then use a reasonable default size.
-    // We use 65 (0-64) samples which works well with OCIO resampling.
-    if (_lut3dSizeOCIO == 0) {
-        _lut3dSizeOCIO = 65;
-    }
-
-    // Optionally override similar to KATANA_OCIO_LUT3D_EDGE_SIZE
-    int size = TfGetenvInt("USDVIEW_OCIO_LUT3D_EDGE_SIZE", 0);
-    if (size > 0) {
-        _lut3dSizeOCIO = size;
-    }
-
-    // Create a GPU Shader Description
-    OCIO::GpuShaderDesc shaderDesc;
-    shaderDesc.setLanguage(OCIO::GPU_LANGUAGE_GLSL_1_0);
-    shaderDesc.setFunctionName("OCIODisplay");
-    shaderDesc.setLut3DEdgeLen(_lut3dSizeOCIO);
-
-    // Compute and the 3D LUT
-    int num3Dentries = 3 * _lut3dSizeOCIO*_lut3dSizeOCIO*_lut3dSizeOCIO;
-    std::vector<float> lut3d;
-    lut3d.resize(num3Dentries);
-    processor->getGpuLut3D(&lut3d[0], shaderDesc);
-
-    // Load the data into an OpenGL 3D Texture
-    if (_texture3dLUT.IsSet()) {
-        if (_isOpenGL) {
-#if defined(ARCH_GFX_OPENGL)
-            GLuint t = _texture3dLUT;
-            glDeleteTextures(1, &t);
-#endif
-        }
-        else {
-#if defined(ARCH_GFX_METAL)
-            for(int i = 0; i < GPUState::gpuCount; i++) {
-                id<MTLTexture> t = _texture3dLUT.multiTexture[i];
-                if (t) {
-                    [t release];
-                }
+        std::string inputColorSpace = _colorspaceOCIO;
+        if (inputColorSpace.empty()) {
+            OCIO::ConstColorSpaceRcPtr cs = config->getColorSpace("default");
+            if (cs) {
+                inputColorSpace = cs->getName();
+            } else {
+                inputColorSpace = OCIO::ROLE_SCENE_LINEAR;
             }
-#endif
         }
-        _texture3dLUT.Clear();
-    }
 
-    if (_isOpenGL) {
-#if defined(ARCH_GFX_OPENGL)
+        // Setup the transformation we need to apply
+        OCIO::DisplayTransformRcPtr transform = OCIO::DisplayTransform::Create();
+        transform->setDisplay(display);
+        transform->setView(view);
+        transform->setInputColorSpaceName(inputColorSpace.c_str());
+        if (!_looksOCIO.empty()) {
+            transform->setLooksOverride(_looksOCIO.c_str());
+            transform->setLooksOverrideEnabled(true);
+        } else {
+            transform->setLooksOverrideEnabled(false);
+        }
+
+        OCIO::ConstProcessorRcPtr processor = config->getProcessor(transform);
+
+        // If 3D lut size is 0 then use a reasonable default size.
+        // We use 65 (0-64) samples which works well with OCIO resampling.
+        if (_lut3dSizeOCIO == 0) {
+            _lut3dSizeOCIO = 65;
+        }
+
+        // Optionally override similar to KATANA_OCIO_LUT3D_EDGE_SIZE
+        int size = TfGetenvInt("USDVIEW_OCIO_LUT3D_EDGE_SIZE", 0);
+        if (size > 0) {
+            _lut3dSizeOCIO = size;
+        }
+
+        // Create a GPU Shader Description
+        OCIO::GpuShaderDesc shaderDesc;
+        shaderDesc.setLanguage(OCIO::GPU_LANGUAGE_GLSL_1_0);
+        shaderDesc.setFunctionName("OCIODisplay");
+        shaderDesc.setLut3DEdgeLen(_lut3dSizeOCIO);
+
+        // Compute and the 3D LUT
+        int num3Dentries = 3 * _lut3dSizeOCIO*_lut3dSizeOCIO*_lut3dSizeOCIO;
+        std::vector<float> lut3d;
+        lut3d.resize(num3Dentries);
+        processor->getGpuLut3D(&lut3d[0], shaderDesc);
+
+        // Load the data into an OpenGL 3D Texture
+        if (_texture3dLUT != 0) {
+            glDeleteTextures(1, &_texture3dLUT);
+        }
         GLint restoreTexture;
         glGetIntegerv(GL_TEXTURE_BINDING_3D, &restoreTexture);
-        GLuint t;
-        glGenTextures(1, &t);
-        _texture3dLUT = t;
-        glBindTexture(GL_TEXTURE_3D, t);
+        glGenTextures(1, &_texture3dLUT);
+        glBindTexture(GL_TEXTURE_3D, _texture3dLUT);
         glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -259,37 +188,14 @@ HdxColorCorrectionTask::_CreateOpenColorIOResources()
                      _lut3dSizeOCIO, _lut3dSizeOCIO, _lut3dSizeOCIO,
                      0, GL_RGB, GL_FLOAT, &lut3d[0]);
         glBindTexture(GL_TEXTURE_3D, restoreTexture);
+
+        const char* gpuShaderText = processor->getGpuShaderText(shaderDesc);
+
         GLF_POST_PENDING_GL_ERRORS();
-#endif
-    }
-    else {
-#if defined(ARCH_GFX_METAL)
-        id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->currentDevice;
-        MTLTextureDescriptor* desc =
-            [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA16Float
-                                                               width:_lut3dSizeOCIO
-                                                              height:_lut3dSizeOCIO
-                                                           mipmapped:NO];
-        desc.resourceOptions = MTLResourceStorageModeDefault;
-        desc.depth = _lut3dSizeOCIO;
-        _texture3dLUT = MtlfMultiTexture(desc);
-        
-        for(int i = 0; i < GPUState::gpuCount; i++) {
-            [_texture3dLUT.multiTexture[i] replaceRegion:MTLRegionMake3D(0, 0, 0, _lut3dSizeOCIO, _lut3dSizeOCIO, _lut3dSizeOCIO)
-                                             mipmapLevel:0
-                                                   slice:0
-                                               withBytes:&lut3d[0]
-                                             bytesPerRow:_lut3dSizeOCIO*sizeof(float)
-                                           bytesPerImage:_lut3dSizeOCIO*_lut3dSizeOCIO*sizeof(float)];
-        }
-#endif
-    }
-
-    const char* gpuShaderText = processor->getGpuShaderText(shaderDesc);
-
-    return std::string(gpuShaderText);
-#endif
-    return std::string();
+        return std::string(gpuShaderText);
+    #else
+        return std::string();
+    #endif
 }
 
 bool
@@ -314,33 +220,16 @@ HdxColorCorrectionTask::_CreateShaderResources()
         bool useOCIO = false;
     #endif
 
-    _shaderProgram.reset(HdStResourceFactory::GetInstance()->NewProgram(
-        _tokens->colorCorrectionShader));
+    _shaderProgram.reset(new HdStGLSLProgram(_tokens->colorCorrectionShader));
 
     HioGlslfx glslfx(HdxPackageColorCorrectionShader());
 
-    std::string commonCode;
-    std::string vtxCode;
-    std::string fragCode;
-
-    if (_isOpenGL) {
-        commonCode += "#version 120\n"
-                      "#define ARCH_GFX_OPENGL\n";
-    }
-    else {
-#if defined(ARCH_GFX_METAL)
-        commonCode += HdSt_CodeGenMSL::GetComputeHeader();
-#endif
-    }
+    std::string fragCode = "#version 120\n";
 
     if (useOCIO) {
         fragCode += "#define GLSLFX_USE_OCIO\n";
     }
 
-    vtxCode += commonCode;
-    vtxCode += glslfx.GetSource(_tokens->colorCorrectionVertex);
-
-    fragCode += commonCode;
     fragCode += glslfx.GetSource(_tokens->colorCorrectionFragment);
 
     if (useOCIO) {
@@ -348,7 +237,8 @@ HdxColorCorrectionTask::_CreateShaderResources()
         fragCode += ocioGpuShaderText;
     }
 
-    if (!_shaderProgram->CompileShader(GL_VERTEX_SHADER, vtxCode) ||
+    if (!_shaderProgram->CompileShader(GL_VERTEX_SHADER,
+            glslfx.GetSource(_tokens->colorCorrectionVertex)) ||
         !_shaderProgram->CompileShader(GL_FRAGMENT_SHADER, fragCode) ||
         !_shaderProgram->Link()) {
         TF_CODING_ERROR("Failed to load color correction shader");
@@ -356,22 +246,13 @@ HdxColorCorrectionTask::_CreateShaderResources()
         return false;
     }
 
-    if (!_isOpenGL) {
-        _locations[COLOR_IN]  = 0;
-        _locations[POSITION]  = 0;
-        _locations[UV_IN]     = 1;
-    }
-    else {
-#if defined(ARCH_GFX_OPENGL)
-        GLuint programId = boost::dynamic_pointer_cast<HdStGLSLProgram>(_shaderProgram)->GetGLProgram();
-        _locations[COLOR_IN]  = glGetUniformLocation(programId, "colorIn");
-        _locations[POSITION] = glGetAttribLocation(programId, "position");
-        _locations[UV_IN]     = glGetAttribLocation(programId, "uvIn");
-        
-        if (useOCIO) {
-            _locations[LUT3D_IN] = glGetUniformLocation(programId, "LUT3dIn");
-        }
-#endif
+    GLuint programId = _shaderProgram->GetProgram().GetId();
+    _locations[COLOR_IN]  = glGetUniformLocation(programId, "colorIn");
+    _locations[POSITION] = glGetAttribLocation(programId, "position");
+    _locations[UV_IN]     = glGetAttribLocation(programId, "uvIn");
+    
+    if (useOCIO) {
+        _locations[LUT3D_IN] = glGetUniformLocation(programId, "LUT3dIn");
     }
 
     GLF_POST_PENDING_GL_ERRORS();
@@ -390,207 +271,146 @@ HdxColorCorrectionTask::_CreateBufferResources()
     static const float vertices[] = { -1,  3, -1, 1,        0, 2,
                                       -1, -1, -1, 1,        0, 0,
                                        3, -1, -1, 1,        2, 0 };
-    
-    HgiBufferDesc desc;
-    desc.usage = HgiBufferUsageVertex;
-    desc.byteSize = sizeof(vertices);
-    desc.initialData = vertices;
-    _vertexBuffer = _hgi->CreateBuffer(desc);
 
+    glGenBuffers(1, &_vertexBuffer);
+    glBindBuffer(GL_ARRAY_BUFFER, _vertexBuffer);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices),
+                 &vertices[0], GL_STATIC_DRAW);
+
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+    GLF_POST_PENDING_GL_ERRORS();
     return true;
 }
 
 void
 HdxColorCorrectionTask::_CopyTexture()
 {
-    if (_isOpenGL) {
-#if defined(ARCH_GFX_OPENGL)
-        GLint restoreReadFB, restoreDrawFB;
-        glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &restoreReadFB);
-        glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &restoreDrawFB);
+    GLint restoreReadFB, restoreDrawFB;
+    glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &restoreReadFB);
+    glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &restoreDrawFB);
 
-        if (_aovTexture) {
-            // If we have an AOV we copy it so we can read from it while writing the
-            // color corrected pixels back into the AOV.
-            glBindFramebuffer(GL_READ_FRAMEBUFFER, _aovFramebuffer);
-            glBindFramebuffer(GL_DRAW_FRAMEBUFFER, _copyFramebuffer);
+    if (_aovTexture) {
+        // If we have an AOV we copy it so we can read from it while writing the
+        // color corrected pixels back into the AOV.
+        glBindFramebuffer(GL_READ_FRAMEBUFFER, _aovFramebuffer);
+        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, _copyFramebuffer);
 
-        } else {
-            // No AOV provided then make a copy of the default FB color attachment
-            // so we can read from the copy and write back into it corrected pixels.
-            glBindFramebuffer(GL_READ_FRAMEBUFFER, restoreDrawFB);
-            glBindFramebuffer(GL_DRAW_FRAMEBUFFER, _copyFramebuffer);
-        }
-
-        int width = _textureSize[0];
-        int height = _textureSize[1];
-
-        glBlitFramebuffer(0, 0, width, height,
-                          0, 0, width, height,
-                          GL_COLOR_BUFFER_BIT, GL_NEAREST);
-
-        glBindFramebuffer(GL_READ_FRAMEBUFFER, restoreReadFB);
-        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, restoreDrawFB);
-
-        GLF_POST_PENDING_GL_ERRORS();
-#endif
+    } else {
+        // No AOV provided then make a copy of the default FB color attachment
+        // so we can read from the copy and write back into it corrected pixels.
+        glBindFramebuffer(GL_READ_FRAMEBUFFER, restoreDrawFB);
+        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, _copyFramebuffer);
     }
+
+    int width = _textureSize[0];
+    int height = _textureSize[1];
+
+    glBlitFramebuffer(0, 0, width, height,
+                      0, 0, width, height,
+                      GL_COLOR_BUFFER_BIT, GL_NEAREST);
+
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, restoreReadFB);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, restoreDrawFB);
+
+    GLF_POST_PENDING_GL_ERRORS();
 }
 
 bool
 HdxColorCorrectionTask::_CreateFramebufferResources()
 {
-#if defined(ARCH_GFX_OPENGL)
     // If framebufferSize is not provided we use the viewport size.
     // This can be incorrect if the client/app has changed the viewport to
     // be different then the render window size. (E.g. UsdView CameraMask mode)
     GfVec2i fboSize = _framebufferSize;
-    if (_isOpenGL) {
-        if (fboSize[0] <= 0 || fboSize[1] <= 0) {
-            GLint res[4] = {0};
-            glGetIntegerv(GL_VIEWPORT, res);
-            fboSize = GfVec2i(res[2], res[3]);
-            _framebufferSize = fboSize;
-        }
+    if (fboSize[0] <= 0 || fboSize[1] <= 0) {
+        GLint res[4] = {0};
+        glGetIntegerv(GL_VIEWPORT, res);
+        fboSize = GfVec2i(res[2], res[3]);
+        _framebufferSize = fboSize;
     }
 
     bool createTexture = (_texture == 0 || fboSize != _textureSize);
 
     if (createTexture) {
         if (_texture != 0) {
-            delete _texture;
-            _texture = NULL;
+            glDeleteTextures(1, &_texture);
+            _texture = 0;
         }
 
         _textureSize = fboSize;
 
-        GLint restoreTexture = 0;
-        if (_isOpenGL) {
-#if defined(ARCH_GFX_OPENGL)
-            glGetIntegerv(GL_TEXTURE_BINDING_2D, &restoreTexture);
-#endif
-        }
+        GLint restoreTexture;
+        glGetIntegerv(GL_TEXTURE_BINDING_2D, &restoreTexture);
 
-        HgiTextureDesc desc;
-        desc.format = HgiFormatFloat16Vec4;
+        glGenTextures(1, &_texture);
+        glBindTexture(GL_TEXTURE_2D, _texture);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
-        desc.dimensions[0] = _textureSize[0];
-        desc.dimensions[1] = _textureSize[1];
-        desc.dimensions[2];
+        // XXX For now we assume we always want R16F. We could perhaps expose
+        //     this as client-API in HdxColorCorrectionTaskParams.
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, _textureSize[0], 
+                     _textureSize[1], 0, GL_RGBA, GL_FLOAT, 0);
 
-        _texture = _hgi->CreateTexture(desc);
-    
-        if (_isOpenGL) {
-#if defined(ARCH_GFX_OPENGL)
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glBindTexture(GL_TEXTURE_2D, restoreTexture);
+    }
+      
+    if (_copyFramebuffer == 0) {
+        glGenFramebuffers(1, &_copyFramebuffer);
+    }
+    if (_aovFramebuffer == 0) {
+        glGenFramebuffers(1, &_aovFramebuffer);
+    }
 
-            // XXX For now we assume we always want R16F. We could perhaps expose
-            //     this as client-API in HdxColorCorrectionTaskParams.
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, _textureSize[0],
-                         _textureSize[1], 0, GL_RGBA, GL_FLOAT, 0);
-
-            glBindTexture(GL_TEXTURE_2D, restoreTexture);
-#endif
+    HgiTextureHandle texHandle;
+    if (_aovBuffer) {
+        VtValue rv = _aovBuffer->GetResource(/*ms*/false);
+        if (rv.IsHolding<HgiTextureHandle>()) {
+            texHandle = rv.UncheckedGet<HgiTextureHandle>();
         }
     }
 
-      
-    // XXX: Removed due to slowness in the IsCurrent() call when multiple
-    //      gl contexts are registered in GlfGLContextRegistry. This code is
-    //      relevant only when there is a possibility of having context
-    //      switching between the creation of the render pass and the execution
-    //      of this task on each frame.
-    //
-    // bool switchedGLContext = !_owningContext || !_owningContext->IsCurrent();
-    // 
-    // if (switchedGLContext) {
-    //     // If we're rendering with a different context than the render pass
-    //     // was created with, recreate the FBO because FB is not shared.
-    //     // XXX we need this since we use a FBO in _CopyTexture(). Ideally we
-    //     // use HdxFullscreenShader to do the copy, but for that we need to know
-    //     // the textureId currently bound to the default framebuffer. However
-    //     // glGetFramebufferAttachmentParameteriv will return and error when
-    //     // trying to query the texture name bound to GL_BACK_LEFT.
-    //     if (_owningContext && _owningContext->IsValid()) {
-    //         GlfGLContextScopeHolder contextHolder(_owningContext);
-    //         glDeleteFramebuffers(1, &_copyFramebuffer);
-    //         glDeleteFramebuffers(1, &_aovFramebuffer);
-    //     }
-    // 
-    //     _owningContext = GlfGLContext::GetCurrentGLContext();
-    //     if (!TF_VERIFY(_owningContext, "No valid GL context")) {
-    //         return false;
-    //     }
-    // 
-    
-        if (_copyFramebuffer == 0) {
-            if (_isOpenGL) {
-#if defined(ARCH_GFX_OPENGL)
-                glGenFramebuffers(1, &_copyFramebuffer);
-#endif
-            }
-        }
-        if (_aovFramebuffer == 0) {
-            if (_isOpenGL) {
-#if defined(ARCH_GFX_OPENGL)
-                glGenFramebuffers(1, &_aovFramebuffer);
-#endif
-            }
-        }
-
-    // }
-    //
-
-    HgiTextureHandle texHandle = _aovBuffer ? 
-        _aovBuffer->GetHgiTextureHandle(/*ms*/false) : nullptr;
-
-    HgiTexture* aovTexture = static_cast<HgiTexture*>(texHandle);
-
-    // XXX: see code comment above. Here we remove switchedGLContext from the
-    //      if statement.
-    // if (createTexture || switchedGLContext || aovTexture!=_aovTexture) {
+    // XXX Since this entire task is coded for GL we can static_cast to
+    // HgiGLTexture for now. When task is re-written to use Hgi everywhere, we
+    // should no longer need this cast and can just use HgiTextureHandle.
+    HgiGLTexture* aovTexture = static_cast<HgiGLTexture*>(texHandle.Get());
 
     if (createTexture || aovTexture!=_aovTexture) {
    
         _aovTexture = aovTexture;
-        if (_isOpenGL) {
-#if defined(ARCH_GFX_OPENGL)
-            GLint restoreReadFB, restoreDrawFB;
-            glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &restoreReadFB);
-            glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &restoreDrawFB);
-            glBindFramebuffer(GL_DRAW_FRAMEBUFFER, _copyFramebuffer);
 
-            HgiGLTexture* aovTextureGL = static_cast<HgiGLTexture*>(aovTexture);
-            glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
-                                   GL_TEXTURE_2D, aovTextureGL->GetTextureId(), 0);
+        GLint restoreReadFB, restoreDrawFB;
+        glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &restoreReadFB);
+        glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &restoreDrawFB);
+        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, _copyFramebuffer);
 
-            // If an AOV is provided we'll use its texture on the read FB during
-            // CopyTexture.
-            if (aovTexture) {
-                glBindFramebuffer(GL_READ_FRAMEBUFFER, _aovFramebuffer);
-                glFramebufferTexture2D(
-                    GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
-                    GL_TEXTURE_2D, aovTextureGL->GetTextureId(), 0);
-            }
+        glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, 
+                               GL_TEXTURE_2D, _texture, 0);
 
-            glBindFramebuffer(GL_READ_FRAMEBUFFER, restoreReadFB);
-            glBindFramebuffer(GL_DRAW_FRAMEBUFFER, restoreDrawFB);
-#endif
+        // If an AOV is provided we'll use its texture on the read FB during
+        // CopyTexture.
+        if (aovTexture) {
+            glBindFramebuffer(GL_READ_FRAMEBUFFER, _aovFramebuffer);
+            glFramebufferTexture2D(
+                GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, 
+                GL_TEXTURE_2D, _aovTexture->GetTextureId(), 0);
         }
+
+        glBindFramebuffer(GL_READ_FRAMEBUFFER, restoreReadFB);
+        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, restoreDrawFB);
     }
 
     GLF_POST_PENDING_GL_ERRORS();
-#endif
     return true;
 }
 
 void
 HdxColorCorrectionTask::_ApplyColorCorrection()
 {
-    // Client can choose to use Hydra's built-in sRGB color correction or use
+    // Client can choose to use Hydra's build-in sRGB color correction or use
     // OpenColorIO for color correction in which case we insert extra OCIO code.
     #ifdef PXR_OCIO_PLUGIN_ENABLED
         bool useOCIO = 
@@ -613,104 +433,93 @@ HdxColorCorrectionTask::_ApplyColorCorrection()
     // Read from the texture-copy we made of the clients FBO and output the
     // color-corrected pixels into the clients FBO.
 
-    _shaderProgram->SetProgram();
-    
-    if (_isOpenGL) {
-#if defined(ARCH_GFX_OPENGL)
-        glActiveTexture(GL_TEXTURE0);
-        HgiGLTexture* hgiGLTexture = static_cast<HgiGLTexture*>(_texture);
-        glBindTexture(GL_TEXTURE_2D, hgiGLTexture->GetTextureId());
-        glUniform1i(_locations[COLOR_IN], 0);
+    GLuint programId = _shaderProgram->GetProgram().GetId();
+    glUseProgram(programId);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, _texture);
+    glUniform1i(_locations[COLOR_IN], 0);
 
-        if (useOCIO) {
-            glEnable(GL_TEXTURE_3D);
-            glActiveTexture(GL_TEXTURE1);
-            glBindTexture(GL_TEXTURE_3D, _texture3dLUT);
-            glUniform1i(_locations[LUT3D_IN], 1);
-        }
-
-        HgiGLBuffer* hgiGLBuffer = static_cast<HgiGLBuffer*>(_vertexBuffer);
-        glBindBuffer(GL_ARRAY_BUFFER, hgiGLBuffer->GetBufferId());
-        glVertexAttribPointer(_locations[POSITION], 4, GL_FLOAT, GL_FALSE,
-                              sizeof(float)*6, 0);
-        glEnableVertexAttribArray(_locations[POSITION]);
-        glVertexAttribPointer(_locations[UV_IN], 2, GL_FLOAT, GL_FALSE,
-                sizeof(float)*6, reinterpret_cast<void*>(sizeof(float)*4));
-        glEnableVertexAttribArray(_locations[UV_IN]);
-
-        // We are rendering a full-screen triangle, which would render to depth.
-        // Instead we want to preserve the original depth, so disable depth
-        // writes.
-        GLboolean restoreDepthWriteMask;
-        GLboolean restoreStencilWriteMask;
-        glGetBooleanv(GL_DEPTH_WRITEMASK, &restoreDepthWriteMask);
-        glGetBooleanv(GL_STENCIL_WRITEMASK, &restoreStencilWriteMask);
-        glDepthMask(GL_FALSE);
-        glStencilMask(GL_FALSE);
-
-        // Depth test must be ALWAYS instead of disabling the depth_test because
-        // we still want to write to the depth buffer. Disabling depth_test
-        // disables
-        // depth_buffer writes.
-        GLint restoreDepthFunc;
-        glGetIntegerv(GL_DEPTH_FUNC, &restoreDepthFunc);
-        glDepthFunc(GL_ALWAYS);
-
-        GLint restoreViewport[4] = {0};
-        glGetIntegerv(GL_VIEWPORT, restoreViewport);
-        glViewport(0, 0, _framebufferSize[0], _framebufferSize[1]);
-
-        // The app may have alpha blending enabled.
-        // We want to pass-through the alpha values, not alpha-blend on top of
-        // dest.
-        GLboolean restoreblendEnabled;
-        glGetBooleanv(GL_BLEND, &restoreblendEnabled);
-        glDisable(GL_BLEND);
-
-        // Alpha to coverage would prevent any pixels that have an alpha of 0.0
-        // from being written. We want to color correct all pixels. Even
-        // background pixels that were set with a clearColor alpha of 0.0
-        GLboolean restoreAlphaToCoverage;
-        glGetBooleanv(GL_SAMPLE_ALPHA_TO_COVERAGE, &restoreAlphaToCoverage);
-        glDisable(GL_SAMPLE_ALPHA_TO_COVERAGE);
-
-        glDrawArrays(GL_TRIANGLES, 0, 3);
-
-        if (restoreAlphaToCoverage) {
-            glEnable(GL_SAMPLE_ALPHA_TO_COVERAGE);
-        }
-
-        if (restoreblendEnabled) {
-            glEnable(GL_BLEND);
-        }
-
-        glViewport(restoreViewport[0], restoreViewport[1],
-                   restoreViewport[2], restoreViewport[3]);
-
-        glDepthFunc(restoreDepthFunc);
-        glDepthMask(restoreDepthWriteMask);
-        glStencilMask(restoreStencilWriteMask);
-
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
-        glDisableVertexAttribArray(_locations[POSITION]);
-        glDisableVertexAttribArray(_locations[UV_IN]);
-
-        _shaderProgram->UnsetProgram();
-
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, 0);
-
-        if (useOCIO) {
-            glActiveTexture(GL_TEXTURE1);
-            glBindTexture(GL_TEXTURE_3D, 0);
-            glDisable(GL_TEXTURE_3D);
-        }
-
-        GLF_POST_PENDING_GL_ERRORS();
-#endif
+    if (useOCIO) {
+        glEnable(GL_TEXTURE_3D);
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_3D, _texture3dLUT);
+        glUniform1i(_locations[LUT3D_IN], 1);
     }
-    
-    _shaderProgram->UnsetProgram();
+
+    glBindBuffer(GL_ARRAY_BUFFER, _vertexBuffer);
+    glVertexAttribPointer(_locations[POSITION], 4, GL_FLOAT, GL_FALSE,
+                          sizeof(float)*6, 0);
+    glEnableVertexAttribArray(_locations[POSITION]);
+    glVertexAttribPointer(_locations[UV_IN], 2, GL_FLOAT, GL_FALSE,
+            sizeof(float)*6, reinterpret_cast<void*>(sizeof(float)*4));
+    glEnableVertexAttribArray(_locations[UV_IN]);
+
+    // We are rendering a full-screen triangle, which would render to depth.
+    // Instead we want to preserve the original depth, so disable depth writes.
+    GLboolean restoreDepthWriteMask;
+    GLboolean restoreStencilWriteMask;
+    glGetBooleanv(GL_DEPTH_WRITEMASK, &restoreDepthWriteMask);
+    glGetBooleanv(GL_STENCIL_WRITEMASK, &restoreStencilWriteMask);
+    glDepthMask(GL_FALSE);
+    glStencilMask(GL_FALSE);
+
+    // Depth test must be ALWAYS instead of disabling the depth_test because
+    // we still want to write to the depth buffer. Disabling depth_test disables
+    // depth_buffer writes.
+    GLint restoreDepthFunc;
+    glGetIntegerv(GL_DEPTH_FUNC, &restoreDepthFunc);
+    glDepthFunc(GL_ALWAYS);
+
+    GLint restoreViewport[4] = {0};
+    glGetIntegerv(GL_VIEWPORT, restoreViewport);
+    glViewport(0, 0, _framebufferSize[0], _framebufferSize[1]);
+
+    // The app may have alpha blending enabled.
+    // We want to pass-through the alpha values, not alpha-blend on top of dest.
+    GLboolean restoreblendEnabled;
+    glGetBooleanv(GL_BLEND, &restoreblendEnabled);
+    glDisable(GL_BLEND);
+
+    // Alpha to coverage would prevent any pixels that have an alpha of 0.0 from
+    // being written. We want to color correct all pixels. Even background
+    // pixels that were set with a clearColor alpha of 0.0
+    GLboolean restoreAlphaToCoverage;
+    glGetBooleanv(GL_SAMPLE_ALPHA_TO_COVERAGE, &restoreAlphaToCoverage);
+    glDisable(GL_SAMPLE_ALPHA_TO_COVERAGE);
+
+    glDrawArrays(GL_TRIANGLES, 0, 3);
+
+    if (restoreAlphaToCoverage) {
+        glEnable(GL_SAMPLE_ALPHA_TO_COVERAGE);
+    }
+
+    if (restoreblendEnabled) {
+        glEnable(GL_BLEND);
+    }
+
+    glViewport(restoreViewport[0], restoreViewport[1],
+               restoreViewport[2], restoreViewport[3]);
+
+    glDepthFunc(restoreDepthFunc);
+    glDepthMask(restoreDepthWriteMask);
+    glStencilMask(restoreStencilWriteMask);
+
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glDisableVertexAttribArray(_locations[POSITION]);
+    glDisableVertexAttribArray(_locations[UV_IN]);
+
+    glUseProgram(0);
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    if (useOCIO) {
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_3D, 0);
+        glDisable(GL_TEXTURE_3D);
+    }
+
+    GLF_POST_PENDING_GL_ERRORS();
 }
 
 void
@@ -786,24 +595,16 @@ HdxColorCorrectionTask::Execute(HdTaskContext* ctx)
     // Otherwise, we render the color corrected pixels into bound FB.
     GLint restoreReadFB, restoreDrawFB;
     if (_aovTexture) {
-        if (_isOpenGL) {
-#if defined(ARCH_GFX_OPENGL)
-            glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &restoreReadFB);
-            glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &restoreDrawFB);
-            glBindFramebuffer(GL_DRAW_FRAMEBUFFER, _aovFramebuffer);
-#endif
-        }
+        glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &restoreReadFB);
+        glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &restoreDrawFB);
+        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, _aovFramebuffer);
     }
 
     _ApplyColorCorrection();
 
     if (_aovTexture) {
-        if (_isOpenGL) {
-#if defined(ARCH_GFX_OPENGL)
-            glBindFramebuffer(GL_READ_FRAMEBUFFER, restoreReadFB);
-            glBindFramebuffer(GL_DRAW_FRAMEBUFFER, restoreDrawFB);
-#endif
-        }
+        glBindFramebuffer(GL_READ_FRAMEBUFFER, restoreReadFB);
+        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, restoreDrawFB);
     }
 }
 

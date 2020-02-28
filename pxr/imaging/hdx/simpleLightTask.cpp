@@ -233,6 +233,11 @@ HdxSimpleLightTask::Sync(HdSceneDelegate* delegate,
                     lightShadowParams.shadowMatrix->Compute(_viewport,
                                                             windowPolicy);
 
+                if (shadowMatrices.size() == 0) {
+                    garchl.SetHasShadow(false);
+                    continue;
+                }
+
                 garchl.SetShadowIndexStart(shadowIndex + 1);
                 garchl.SetShadowIndexEnd(shadowIndex + shadowMatrices.size());
                 shadowIndex += shadowMatrices.size();
