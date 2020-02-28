@@ -37,7 +37,6 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 
 class GlfSimpleShadowArray : public GarchSimpleShadowArray {
-                             public TfWeakBase {
 public:
 
     // Disallow copies

@@ -91,8 +91,12 @@ _BindTexture(HdStProgram const &program,
 
     // Get texture from AOV's render buffer.
     const bool multiSampled = false;
-    HgiMetalTexture * const texture = dynamic_cast<HgiMetalTexture*>(
-        buffer->GetHgiTextureHandle(multiSampled));
+    VtValue rv = buffer->GetResource(multiSampled);
+    
+    HgiMetalTexture * const texture = rv.IsHolding<HgiTextureHandle>() ?
+        dynamic_cast<HgiMetalTexture*>(rv.Get<HgiTextureHandle>().Get()) :
+        nullptr;
+
     if (!texture) {
         TF_CODING_ERROR("When binding readback for aov '%s', AOV is not backed "
                         "by HgiGLTexture.", aov.aovName.GetString().c_str());
@@ -101,9 +105,6 @@ _BindTexture(HdStProgram const &program,
 
     // Get Metal texture Id.
     id<MTLTexture> textureId = texture->GetTextureId();
-
-    // XXX:-matthias
-    // Some of this code is duplicated, see HYD-1788.
 
     // Sampler unit was determined during binding resolution.
     // Use it to bind texture.
