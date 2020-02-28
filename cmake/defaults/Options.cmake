@@ -39,7 +39,6 @@ option(PXR_BUILD_PRMAN_PLUGIN "Build the PRMan imaging plugin" OFF)
 option(PXR_BUILD_MATERIALX_PLUGIN "Build the MaterialX plugin for USD" OFF)
 option(PXR_BUILD_DOCUMENTATION "Generate doxygen documentation" OFF)
 option(PXR_ENABLE_GL_SUPPORT "Enable OpenGL based components" ON)
-option(PXR_ENABLE_METAL_SUPPORT "Enable Metal based components" OFF)
 option(PXR_ENABLE_PYTHON_SUPPORT "Enable Python based components for USD" ON)
 option(PXR_ENABLE_MULTIVERSE_SUPPORT "Enable Multiverse backend in the Alembic plugin for USD" OFF)
 option(PXR_ENABLE_HDF5_SUPPORT "Enable HDF5 backend in the Alembic plugin for USD" ON)
@@ -47,6 +46,13 @@ option(PXR_ENABLE_OSL_SUPPORT "Enable OSL (OpenShadingLanguage) based components
 option(PXR_ENABLE_PTEX_SUPPORT "Enable Ptex support" ON)
 option(PXR_ENABLE_OPENVDB_SUPPORT "Enable OpenVDB support" OFF)
 option(PXR_ENABLE_NAMESPACES "Enable C++ namespaces." ON)
+
+# Metal only valid on Apple platforms
+set(pxr_enable_metal "OFF")
+if(APPLE)
+    set(pxr_enable_metal "ON")
+endif()
+option(PXR_ENABLE_METAL_SUPPORT "Enable Metal based components" "${pxr_enable_metal}")
 
 # Precompiled headers are a win on Windows, not on gcc.
 set(pxr_enable_pch "OFF")
