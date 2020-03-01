@@ -49,7 +49,7 @@ public:
 
     HGIGL_API
     HgiBlitEncoderUniquePtr CreateBlitEncoder() override;
-    
+
     HGIGL_API
     void FlushEncoders() override;
 

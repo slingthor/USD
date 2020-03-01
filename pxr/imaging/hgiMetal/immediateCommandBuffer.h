@@ -32,9 +32,7 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-typedef std::vector<struct HgiMetalDescriptorCacheItem*> HgiMetalDescriptorCacheVec;
-
-/// \class HgiMetalkImmediateCommandBuffer
+/// \class HgiMetalImmediateCommandBuffer
 ///
 /// Metal implementation of HgiImmediateCommandBuffer
 ///
@@ -74,7 +72,6 @@ private:
         std::ostream& out,
         const HgiMetalImmediateCommandBuffer& cmdBuf);
 
-    HgiMetalDescriptorCacheVec _descriptorCache;
     id<MTLDevice> _device;
     id<MTLCommandQueue> _commandQueue;
     id<MTLCommandBuffer> _commandBuffer;

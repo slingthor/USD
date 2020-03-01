@@ -59,7 +59,7 @@ TF_DEFINE_PRIVATE_TOKENS(
 );
 
 HdxFullscreenShader::HdxFullscreenShader(Hgi *hgi)
-    : _hgi(hgi), _program(), _vertexBuffer(nullptr), _depthAware(false)
+    : _hgi(hgi), _program(), _depthAware(false)
 {
     _isOpenGL = HdStResourceFactory::GetInstance()->IsOpenGL();
 }
@@ -324,7 +324,7 @@ HdxFullscreenShader::Draw(TextureMap const& textures)
 
         // Set up buffers
         GLint locPosition = glGetAttribLocation(programId, "position");
-        GLuint bufferId = static_cast<HgiGLBuffer*>(_vertexBuffer)->GetBufferId();
+        GLuint bufferId = static_cast<HgiGLBuffer*>(_vertexBuffer.Get())->GetBufferId();
         glBindBuffer(GL_ARRAY_BUFFER, bufferId);
         glVertexAttribPointer(locPosition, 4, GL_FLOAT, GL_FALSE,
                 sizeof(float)*6, 0);
@@ -400,7 +400,7 @@ HdxFullscreenShader::Draw(TextureMap const& textures)
         _mtlVertexDescriptor.layouts[0].stride = sizeof(float) * 6;
         _mtlVertexDescriptor.layouts[0].stepFunction = MTLVertexStepFunctionPerVertex;
 
-        HgiMetalBuffer *metalBuffer = static_cast<HgiMetalBuffer*>(_vertexBuffer);
+        HgiMetalBuffer *metalBuffer = static_cast<HgiMetalBuffer*>(_vertexBuffer.Get());
         [renderEncoder setVertexBuffer:metalBuffer->GetBufferId()
                                 offset:0
                                atIndex:0];

@@ -35,6 +35,8 @@
 #include <vector>
 
 PXR_NAMESPACE_OPEN_SCOPE
+
+
 /// \struct HgiTextureDesc
 ///
 /// Describes the properties needed to create a GPU texture.

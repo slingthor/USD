@@ -21,29 +21,31 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#include "pxr/imaging/hgiGL/buffer.h"
-#include "pxr/imaging/hgiGL/conversions.h"
-#include "pxr/imaging/hgiGL/diagnostic.h"
-#include "pxr/imaging/hgiGL/resourceBindings.h"
-#include "pxr/imaging/hgiGL/texture.h"
+#include "pxr/imaging/hgiMetal/buffer.h"
+#include "pxr/imaging/hgiMetal/conversions.h"
+#include "pxr/imaging/hgiMetal/diagnostic.h"
+#include "pxr/imaging/hgiMetal/resourceBindings.h"
+#include "pxr/imaging/hgiMetal/texture.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-HgiGLResourceBindings::HgiGLResourceBindings(
+HgiMetalResourceBindings::HgiMetalResourceBindings(
     HgiResourceBindingsDesc const& desc)
     : HgiResourceBindings(desc)
 {
-
+    MTLVertexDescriptor *_vertexDescriptor;
 }
 
-HgiGLResourceBindings::~HgiGLResourceBindings()
+HgiMetalResourceBindings::~HgiMetalResourceBindings()
 {
 }
 
 void
-HgiGLResourceBindings::BindResources()
+HgiMetalResourceBindings::BindResources(
+    id<MTLRenderCommandEncoder> renderEncoder)
 {
-    std::vector<uint32_t> textures(_descriptor.textures.size(), 0);
+
+    std::vector<id<MTLTexture>> textures(_descriptor.textures.size(), 0);
 
     for (HgiTextureBindDesc const& texDesc : _descriptor.textures) {
         // OpenGL does not support arrays-of-textures bound to a unit.
@@ -56,21 +58,20 @@ HgiGLResourceBindings::BindResources()
         }
 
         HgiTextureHandle const& texHandle = texDesc.textures.front();
-        HgiGLTexture* glTexture = static_cast<HgiGLTexture*>(texHandle.Get());
+        HgiMetalTexture* metalTexture =
+            static_cast<HgiMetalTexture*>(texHandle.Get());
 
-        textures[texDesc.bindingIndex] = glTexture->GetTextureId();
+        textures[texDesc.bindingIndex] = metalTexture->GetTextureId();
     }
 
     if (!textures.empty()) {
-        glBindTextures(0, textures.size(), textures.data());
+//        glBindTextures(0, textures.size(), textures.data());
     }
 
     // todo here we must loop through .buffers and bind UBO and SSBO buffers.
     // Note that index and vertex buffers are not bound here.
     // They are bound via the GraphicsEncoder.
     TF_VERIFY(_descriptor.buffers.empty(), "Missing implementation buffers");
-
-    HGIGL_POST_PENDING_GL_ERRORS();
 }
 
 

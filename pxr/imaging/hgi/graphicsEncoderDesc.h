@@ -57,8 +57,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 struct HgiAttachmentDesc
 {
     HgiAttachmentDesc() 
-    : texture()
-    , loadOp(HgiAttachmentLoadOpLoad)
+    : loadOp(HgiAttachmentLoadOpLoad)
     , storeOp(HgiAttachmentStoreOpStore)
     , clearValue(0)
     , blendEnabled(false)
@@ -70,7 +69,6 @@ struct HgiAttachmentDesc
     , alphaBlendOp(HgiBlendOpAdd)
     {}
 
-    HgiTextureHandle texture;
     HgiAttachmentLoadOp loadOp;
     HgiAttachmentStoreOp storeOp;
     GfVec4f clearValue;
@@ -106,10 +104,14 @@ std::ostream& operator<<(
 /// Describes the properties to begin a HgiGraphicsEncoder.
 ///
 /// <ul>
-/// <li>colorAttachments:
+/// <li>colorAttachmentDescs:
 ///   Describes each of the color attachments.</li>
-/// <li>depthAttachment:
+/// <li>depthAttachmentDesc:
 ///   Describes the depth attachment (optional)</li>
+/// <li>colorTextures:
+///   The color attachment render targets.</li>
+/// <li>depthAttachment:
+///   The depth attachment render target (optional)</li>
 /// <li>width:
 ///   Render target width (in pixels)</li>
 /// <li>height:
@@ -119,18 +121,24 @@ std::ostream& operator<<(
 struct HgiGraphicsEncoderDesc
 {
     HgiGraphicsEncoderDesc()
-    : colorAttachments()
-    , depthAttachment()
+    : colorAttachmentDescs()
+    , depthAttachmentDesc()
+    , colorTextures()
+    , depthTexture()
     , width(0)
     , height(0)
     {}
 
     inline bool HasAttachments() const {
-        return !colorAttachments.empty() || depthAttachment.texture;
+        return !colorAttachmentDescs.empty() || depthTexture;
     }
 
-    HgiAttachmentDescVector colorAttachments;
-    HgiAttachmentDesc depthAttachment;
+    HgiAttachmentDescVector colorAttachmentDescs;
+    HgiAttachmentDesc depthAttachmentDesc;
+
+    HgiTextureHandleVector colorTextures;
+    HgiTextureHandle depthTexture;
+
     uint32_t width;
     uint32_t height;
 };

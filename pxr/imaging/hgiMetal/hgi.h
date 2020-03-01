@@ -91,6 +91,20 @@ public:
     void DestroyShaderProgram(
         HgiShaderProgramHandle* shaderProgramHandle) override;
 
+    HGIMETAL_API
+    HgiResourceBindingsHandle CreateResourceBindings(
+        HgiResourceBindingsDesc const& desc) override;
+
+    HGIMETAL_API
+    void DestroyResourceBindings(HgiResourceBindingsHandle* resHandle) override;
+
+    HGIMETAL_API
+    HgiPipelineHandle CreatePipeline(
+        HgiPipelineDesc const& pipeDesc) override;
+
+    HGIMETAL_API
+    void DestroyPipeline(HgiPipelineHandle* pipeHandle) override;
+
     //
     // HgiMetal specific
     //
@@ -112,7 +126,7 @@ private:
     id<MTLDevice> _device;
     int _apiVersion;
 
-    HgiMetalImmediateCommandBuffer _immediateCommandBuffer;
+    std::unique_ptr<HgiMetalImmediateCommandBuffer> _immediateCommandBuffer;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

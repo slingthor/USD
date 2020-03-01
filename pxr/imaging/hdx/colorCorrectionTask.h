@@ -29,22 +29,20 @@
 #include "pxr/imaging/hdx/api.h"
 #include "pxr/imaging/hd/task.h"
 #include "pxr/imaging/hdx/tokens.h"
-#include "pxr/imaging/garch/gl.h"
+#include "pxr/imaging/hgi/buffer.h"
+#include "pxr/imaging/hgi/pipeline.h"
+#include "pxr/imaging/hgi/resourceBindings.h"
+#include "pxr/imaging/hgi/shaderProgram.h"
+#include "pxr/imaging/hgi/texture.h"
+
 #include <string>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-class HdStProgram;
-class Hgi;
-class HgiBuffer;
-class HgiTexture;
-
-typedef boost::shared_ptr<class HdStProgram> HdStProgramSharedPtr;
-
 
 /// \class HdxColorCorrectionTask
 ///
-/// A task for performing color correction (and optionally color grading) on a 
+/// A task for performing color correction (and optionally color grading) on a
 /// color buffer to transform its color for display.
 ///
 class HdxColorCorrectionTask : public HdTask
@@ -79,30 +77,39 @@ private:
     // Utility to create OCIO resources and returns the OCIO shadercode
     std::string _CreateOpenColorIOResources();
 
+    // Utility to check if OCIO should be used
+    bool _GetUseOcio() const;
+
     // Utility function to create the GL program for color correction
     bool _CreateShaderResources();
 
     // Utility function to create buffer resources.
     bool _CreateBufferResources();
 
-    // Utility function to setup the copy-framebuffer
-    bool _CreateFramebufferResources();
+    // Utility to create resource bindings
+    bool _CreateResourceBindings(HdTaskContext* ctx);
 
-    // Copies the client framebuffer texture into ours
-    void _CopyTexture();
+    // Utility to create a pipeline
+    bool _CreatePipeline();
 
-    /// Apply color correction to the currently bound framebuffer.
-    void _ApplyColorCorrection();
+    // Apply color correction to the currently bound framebuffer.
+    void _ApplyColorCorrection(HdTaskContext* ctx);
 
-    Hgi *_hgi;
-    HdStProgramSharedPtr _shaderProgram;
-    HgiTexture *_texture;
-    GarchTextureGPUHandle _texture3dLUT;
-    GfVec2i _textureSize;
-    GLint _locations[4];
-    HgiBuffer *_vertexBuffer;
+    // Destroy shader program and the shader functions it holds.
+    void _DestroyShaderProgram();
 
-    GLuint _copyFramebuffer;
+    // Print shader compile errors.
+    void _PrintCompileErrors();
+
+    class Hgi* _hgi;
+
+    HgiBufferHandle _indexBuffer;
+    HgiBufferHandle _vertexBuffer;
+    HgiTextureHandle _texture3dLUT;
+    HgiShaderProgramHandle _shaderProgram;
+    HgiResourceBindingsHandle _resourceBindings;
+    HgiPipelineHandle _pipeline;
+
     GfVec2i _framebufferSize;
 
     TfToken _colorCorrectionMode;
@@ -115,10 +122,6 @@ private:
     TfToken _aovName;
     SdfPath _aovBufferPath;
     HdRenderBuffer* _aovBuffer;
-    HgiTexture* _aovTexture;
-    GLuint _aovFramebuffer;
-    
-    bool _isOpenGL;
 };
 
 
@@ -129,7 +132,7 @@ private:
 struct HdxColorCorrectionTaskParams
 {
     HdxColorCorrectionTaskParams() {}
-    
+
     // Resolution of bound framebuffer we are color correcting.
     // This must be set if the viewport and framebuffer do not match.
     GfVec2i framebufferSize = GfVec2i(0);
@@ -139,7 +142,7 @@ struct HdxColorCorrectionTaskParams
     // still running with sRGB buffers.
     TfToken colorCorrectionMode = HdxColorCorrectionTokens->disabled;
 
-    // 'display', 'view', 'colorspace' and 'look' are options the client may 
+    // 'display', 'view', 'colorspace' and 'look' are options the client may
     // supply to configure OCIO. If one is not provided the default values
     // is substituted. You can find the values for these strings inside the
     // profile/config .ocio file. For example:

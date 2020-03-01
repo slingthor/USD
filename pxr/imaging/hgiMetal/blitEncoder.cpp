@@ -62,8 +62,8 @@ void
 HgiMetalBlitEncoder::CopyTextureGpuToCpu(
     HgiTextureGpuToCpuOp const& copyOp)
 {
-    HgiMetalTexture* srcTexture =
-        static_cast<HgiMetalTexture*>(copyOp.gpuSourceTexture);
+    HgiTextureHandle texHandle = copyOp.gpuSourceTexture;
+    HgiMetalTexture* srcTexture = static_cast<HgiMetalTexture*>(texHandle.Get());
 
     if (!TF_VERIFY(srcTexture && srcTexture->GetTextureId(),
         "Invalid texture handle")) {
@@ -87,7 +87,7 @@ HgiMetalBlitEncoder::CopyTextureGpuToCpu(
     MTLPixelFormat metalFormat = MTLPixelFormatInvalid;
 
     if (texDesc.usage & HgiTextureUsageBitsColorTarget) {
-        metalFormat = HgiMetalConversions::GetFormat(texDesc.format);
+        metalFormat = HgiMetalConversions::GetPixelFormat(texDesc.format);
     } else if (texDesc.usage & HgiTextureUsageBitsDepthTarget) {
         TF_VERIFY(texDesc.format == HgiFormatFloat32);
         metalFormat = MTLPixelFormatDepth32Float;

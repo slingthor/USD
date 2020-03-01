@@ -32,6 +32,7 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+class HgiMetal;
 
 ///
 /// \class HgiMetalShaderFunction
@@ -57,7 +58,7 @@ protected:
     friend class HgiMetal;
 
     HGIMETAL_API
-    HgiMetalShaderFunction(HgiShaderFunctionDesc const& desc);
+    HgiMetalShaderFunction(HgiMetal *hgi, HgiShaderFunctionDesc const& desc);
 
 private:
     HgiMetalShaderFunction() = delete;
@@ -65,7 +66,6 @@ private:
     HgiMetalShaderFunction(const HgiMetalShaderFunction&) = delete;
 
 private:
-    HgiShaderFunctionDesc _descriptor;
     std::string _errors;
 
     id<MTLFunction> _shaderId;

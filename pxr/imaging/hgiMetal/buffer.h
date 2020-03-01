@@ -33,6 +33,9 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+
+class HgiMetal;
+
 /// \class HgiMetalBuffer
 ///
 /// Represents a Metal GPU buffer resource.

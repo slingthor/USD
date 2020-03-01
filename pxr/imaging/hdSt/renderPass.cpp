@@ -165,6 +165,9 @@ HdSt_RenderPass::_Execute(HdRenderPassStateSharedPtr const &renderPassState,
         }
 #endif
     }
+    
+    // Flush commands for execution
+    icb.FlushEncoders();
 }
 
 void

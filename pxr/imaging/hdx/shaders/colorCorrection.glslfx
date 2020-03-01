@@ -43,12 +43,10 @@
 
 typedef struct {
     float4 position [[attribute(0)]];
-    float2 uvIn [[attribute(1)]];
 } Vertex;
 
 typedef struct {
     float4 position [[position]];
-    float2 uv;
 } Interpolated;
 
 // Vertex shader function
@@ -57,23 +55,19 @@ vertex Interpolated vertexEntryPoint(Vertex v [[stage_in]])
     Interpolated out;
     
     out.position = v.position;
-    out.uv = v.uvIn;
 
     return out;
 }
 
 #else
 
-attribute vec4 position;
-attribute vec2 uvIn;
-
-varying vec2 uv;
+layout(location = 0) in vec4 position;
 
 void main(void)
 {
     gl_Position = position;
-    uv = uvIn;
 }
+
 #endif
 
 -- glsl ColorCorrection.Fragment
@@ -82,12 +76,9 @@ void main(void)
 
 typedef struct {
     float4 position [[position]];
-    float2 uv;
 } Interpolated;
 
 #else
-varying vec2 uv;
-
 uniform sampler2D colorIn;
 uniform sampler3D LUT3dIn;
 #endif
@@ -112,13 +103,14 @@ vec4 OCIODisplay(vec4 inPixel, sampler3D lut3d);
 #endif
 
 #if defined(ARCH_GFX_METAL)
-constexpr sampler s = sampler(coord::normalized,
-                              address::clamp_to_edge,
-                              filter::nearest);
-
-fragment half4 fragmentEntryPoint(Interpolated input[[stage_in]], texture2d<float> colorIn[[texture(0)]], texture3d<float> LUT3dIn[[texture(1)]])
+fragment half4 fragmentEntryPoint(
+    Interpolated input[[stage_in]],
+    texture2d<float> colorIn[[texture(0)]],
+    texture3d<float> LUT3dIn[[texture(1)]])
 {
-    vec4 color = colorIn.sample(s, input.uv);
+    vec4 color = colorIn.read(
+        uint2(input.position.x * vec2(colorIn.get_width(),
+            input.position.y * colorIn.get_height())));
 
     #if defined(GLSLFX_USE_OCIO)
         color = OCIODisplay(color, LUT3dIn);
@@ -131,9 +123,11 @@ fragment half4 fragmentEntryPoint(Interpolated input[[stage_in]], texture2d<floa
 }
 #else
 
+layout(location = 0) out vec4 outputColor;
+
 void main(void)
 {
-    vec4 color = texture2D(colorIn, uv);
+    vec4 color = texelFetch(colorIn, ivec2(gl_FragCoord.xy), 0);
 
     #if defined(GLSLFX_USE_OCIO)
         color = OCIODisplay(color, LUT3dIn);
@@ -142,7 +136,7 @@ void main(void)
         color.rgb = FloatToSRGB(color.rgb);
     #endif
 
-    gl_FragColor = color;
+    outputColor = color;
 }
 
 #endif

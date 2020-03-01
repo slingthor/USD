@@ -1,5 +1,5 @@
 //
-// Copyright 2019 Pixar
+// Copyright 2020 Pixar
 //
 // Licensed under the Apache License, Version 2.0 (the "Apache License")
 // with the following modification; you may not use this file except in
@@ -21,59 +21,44 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#ifndef HDHGIMETAL_CONVERSIONS_H
-#define HDHGIMETAL_CONVERSIONS_H
+#ifndef PXR_IMAGING_HGIMETAL_RESOURCEBINDINGS_H
+#define PXR_IMAGING_HGIMETAL_RESOURCEBINDINGS_H
 
-#include <Metal/Metal.h>
 #include "pxr/pxr.h"
+#include "pxr/imaging/hgi/resourceBindings.h"
 #include "pxr/imaging/hgiMetal/api.h"
-#include "pxr/imaging/hgi/enums.h"
-#include "pxr/imaging/hgi/types.h"
+
+#include <vector>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+
 ///
-/// \class HgiMetalConversions
+/// \class HgiMetalResourceBindings
 ///
-/// Converts from Hgi types to Metal types.
+/// Metal implementation of HgiResourceBindings.
 ///
-class HgiMetalConversions final
+///
+class HgiMetalResourceBindings final : public HgiResourceBindings
 {
 public:
-    //
-    // Hgi to Metal conversions
-    //
+    HGIMETAL_API
+    HgiMetalResourceBindings(HgiResourceBindingsDesc const& desc);
 
     HGIMETAL_API
-    static MTLPixelFormat GetPixelFormat(HgiFormat inFormat);
+    virtual ~HgiMetalResourceBindings();
 
+    /// Binds the resources to GPU.
     HGIMETAL_API
-    static MTLVertexFormat GetVertexFormat(HgiFormat inFormat);
-    
-    HGIMETAL_API
-    static MTLCullMode GetCullMode(HgiCullMode cm);
+    void BindResources(id<MTLRenderCommandEncoder> renderEncoder);
 
-    HGIMETAL_API
-    static MTLTriangleFillMode GetPolygonMode(HgiPolygonMode pm);
-    
-    HGIMETAL_API
-    static MTLBlendFactor GetBlendFactor(HgiBlendFactor bf);
-
-    HGIMETAL_API
-    static MTLBlendOperation GetBlendEquation(HgiBlendOp bo);
-    
-    HGIMETAL_API
-    static MTLWinding GetWinding(HgiWinding winding);
-    
-    HGIMETAL_API
-    static MTLLoadAction GetAttachmentLoadOp(HgiAttachmentLoadOp loadOp);
-
-    HGIMETAL_API
-    static MTLStoreAction GetAttachmentStoreOp(HgiAttachmentStoreOp storeOp);
+private:
+    HgiMetalResourceBindings() = delete;
+    HgiMetalResourceBindings & operator=(const HgiMetalResourceBindings&) = delete;
+    HgiMetalResourceBindings(const HgiMetalResourceBindings&) = delete;
 };
 
 
 PXR_NAMESPACE_CLOSE_SCOPE
 
 #endif
-

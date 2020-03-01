@@ -24,6 +24,7 @@
 #ifndef PXR_IMAGING_HGIGL_PIPELINE_H
 #define PXR_IMAGING_HGIGL_PIPELINE_H
 
+#include <GL/glew.h>
 
 #include "pxr/pxr.h"
 #include "pxr/imaging/hgi/graphicsEncoderDesc.h"
@@ -39,7 +40,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 /// \class HgiGLPipeline
 ///
-/// Vulkan implementation of HgiPipeline.
+/// OpenGL implementation of HgiPipeline.
 ///
 class HgiGLPipeline final : public HgiPipeline
 {
@@ -89,6 +90,8 @@ private:
     GLint _restoreColorDstFnOp;
     GLint _restoreAlphaDstFnOp;
     GLboolean _restoreAlphaToCoverage;
+    
+    uint32_t _vao;
 };
 
 

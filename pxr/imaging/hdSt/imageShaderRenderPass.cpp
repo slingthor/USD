@@ -203,6 +203,9 @@ HdSt_ImageShaderRenderPass::_Execute(
         }
 #endif
     }
+    
+    // Flush commands for execution
+    icb.FlushEncoders();
 
 	if (context->GeometryShadersActive()) {
         // Complete the GS command buffer if we have one

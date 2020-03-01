@@ -29,34 +29,30 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 HgiMetalShaderProgram::HgiMetalShaderProgram(HgiShaderProgramDesc const& desc)
     : HgiShaderProgram(desc)
-    , _descriptor(desc)
-    , _programId(0)
+    , _vertexFunction(nil)
+    , _fragmentFunction(nil)
+    , _computeFunction(nil)
 {
-//    _programId = glCreateProgram();
-//    glObjectLabel(GL_PROGRAM, _programId, -1, _descriptor.debugName.c_str());
-//
-//    for (HgiShaderFunctionHandle const& shd : desc.shaderFunctions) {
-//        HgiGLShaderFunction* glShader = static_cast<HgiGLShaderFunction*>(shd);
-//        glAttachShader(_programId, glShader->GetShaderId());
-//    }
-//
-//    // Grab compile errors
-//    GLint status;
-//    glGetProgramiv(_programId, GL_LINK_STATUS, &status);
-//    if (status != GL_TRUE) {
-//        int logSize = 0;
-//        glGetProgramiv(_programId, GL_INFO_LOG_LENGTH, &logSize);
-//        _errors.resize(logSize+1);
-//        glGetProgramInfoLog(_programId, logSize, nullptr, &_errors[0]);
-//        glDeleteProgram(_programId);
-//        _programId = 0;
-//    }
+    HgiShaderFunctionHandleVector const &shaderFuncs = desc.shaderFunctions;
+    for (auto const& func : shaderFuncs) {
+        HgiMetalShaderFunction const *metalFunction =
+            static_cast<HgiMetalShaderFunction*>(func.Get());
+        switch (metalFunction->GetDescriptor().shaderStage) {
+            case HgiShaderStageVertex:
+                _vertexFunction = metalFunction->GetShaderId();
+                break;
+            case HgiShaderStageFragment:
+                _fragmentFunction = metalFunction->GetShaderId();
+                break;
+            case HgiShaderStageCompute:
+                _computeFunction = metalFunction->GetShaderId();
+                break;
+        }
+    }
 }
 
 HgiMetalShaderProgram::~HgiMetalShaderProgram()
 {
-//    glDeleteProgram(_programId);
-//    _programId = 0;
 }
 
 HgiShaderFunctionHandleVector const&
@@ -68,7 +64,7 @@ HgiMetalShaderProgram::GetShaderFunctions() const
 bool
 HgiMetalShaderProgram::IsValid() const
 {
-    return _errors.empty();
+    return true;
 }
 
 std::string const&

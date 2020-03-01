@@ -37,7 +37,6 @@ PXR_NAMESPACE_OPEN_SCOPE
 HgiGLPipeline::HgiGLPipeline(
     HgiPipelineDesc const& desc)
     : HgiPipeline(desc)
-    , _descriptor(desc)
     , _restoreFramebuffer(0)
     , _restoreVao(0)
     , _restoreDepthTest(false)
@@ -49,16 +48,47 @@ HgiGLPipeline::HgiGLPipeline(
     , _restoreColorOp(0)
     , _restoreAlphaOp(0)
     , _restoreAlphaToCoverage(false)
+    , _vao()
 {
+    glCreateVertexArrays(1, &_vao);
+    glObjectLabel(GL_VERTEX_ARRAY, _vao, -1, _descriptor.debugName.c_str());
+
+    // Configure the vertex buffers in the vertex array object.
+    for (HgiVertexBufferDesc const& vbo : _descriptor.vertexBuffers) {
+
+        HgiVertexAttributeDescVector const& vas = vbo.vertexAttributes;
+
+        // Describe each vertex attribute in the vertex buffer
+        for (size_t loc=0; loc<vas.size(); loc++) {
+            HgiVertexAttributeDesc const& va = vas[loc];
+
+            uint32_t idx = va.shaderBindLocation;
+            glEnableVertexArrayAttrib(_vao, idx);
+            glVertexArrayAttribBinding(_vao, idx, vbo.bindingIndex);
+            glVertexArrayAttribFormat(
+                _vao,
+                idx,
+                HgiGLConversions::GetElementCount(va.format),
+                HgiGLConversions::GetFormatType(va.format),
+                GL_FALSE,
+                va.offset);
+        }
+    }
+
+    HGIGL_POST_PENDING_GL_ERRORS();
 }
 
 HgiGLPipeline::~HgiGLPipeline()
 {
+    glBindVertexArray(0);
+    glDeleteVertexArrays(1, &_vao);
 }
 
 void
 HgiGLPipeline::BindPipeline()
 {
+    glBindVertexArray(_vao);
+
     //
     // Depth Stencil State
     //

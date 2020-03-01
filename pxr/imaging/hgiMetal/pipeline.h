@@ -1,5 +1,5 @@
 //
-// Copyright 2019 Pixar
+// Copyright 2020 Pixar
 //
 // Licensed under the Apache License, Version 2.0 (the "Apache License")
 // with the following modification; you may not use this file except in
@@ -21,59 +21,54 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#ifndef HDHGIMETAL_CONVERSIONS_H
-#define HDHGIMETAL_CONVERSIONS_H
+#ifndef PXR_IMAGING_HGIMETAL_PIPELINE_H
+#define PXR_IMAGING_HGIMETAL_PIPELINE_H
 
-#include <Metal/Metal.h>
 #include "pxr/pxr.h"
+#include "pxr/imaging/hgi/graphicsEncoderDesc.h"
+#include "pxr/imaging/hgi/pipeline.h"
+
 #include "pxr/imaging/hgiMetal/api.h"
-#include "pxr/imaging/hgi/enums.h"
-#include "pxr/imaging/hgi/types.h"
+
+#include <vector>
+
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+class HgiMetal;
+
+/// \class HgiMetalPipeline
 ///
-/// \class HgiMetalConversions
+/// Metal implementation of HgiPipeline.
 ///
-/// Converts from Hgi types to Metal types.
-///
-class HgiMetalConversions final
+class HgiMetalPipeline final : public HgiPipeline
 {
 public:
-    //
-    // Hgi to Metal conversions
-    //
+    HGIMETAL_API
+    HgiMetalPipeline(HgiMetal *hgi, HgiPipelineDesc const& desc);
 
     HGIMETAL_API
-    static MTLPixelFormat GetPixelFormat(HgiFormat inFormat);
+    virtual ~HgiMetalPipeline();
 
+    /// Apply pipeline state
     HGIMETAL_API
-    static MTLVertexFormat GetVertexFormat(HgiFormat inFormat);
+    void BindPipeline(id<MTLRenderCommandEncoder> renderEncoder);
+
+private:
+    HgiMetalPipeline() = delete;
+    HgiMetalPipeline & operator=(const HgiMetalPipeline&) = delete;
+    HgiMetalPipeline(const HgiMetalPipeline&) = delete;
     
-    HGIMETAL_API
-    static MTLCullMode GetCullMode(HgiCullMode cm);
+    void _CreateVertexDescriptor();
+    void _CreateDepthStencilState(id<MTLDevice> device);
+    void _CreateRenderPipelineState(id<MTLDevice> device);
 
-    HGIMETAL_API
-    static MTLTriangleFillMode GetPolygonMode(HgiPolygonMode pm);
-    
-    HGIMETAL_API
-    static MTLBlendFactor GetBlendFactor(HgiBlendFactor bf);
-
-    HGIMETAL_API
-    static MTLBlendOperation GetBlendEquation(HgiBlendOp bo);
-    
-    HGIMETAL_API
-    static MTLWinding GetWinding(HgiWinding winding);
-    
-    HGIMETAL_API
-    static MTLLoadAction GetAttachmentLoadOp(HgiAttachmentLoadOp loadOp);
-
-    HGIMETAL_API
-    static MTLStoreAction GetAttachmentStoreOp(HgiAttachmentStoreOp storeOp);
+    MTLVertexDescriptor *_vertexDescriptor;
+    id<MTLDepthStencilState> _depthStencilState;
+    id<MTLRenderPipelineState> _renderPipelineState;
 };
 
 
 PXR_NAMESPACE_CLOSE_SCOPE
 
 #endif
-

@@ -37,6 +37,7 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+
 /// \struct HgiBufferDesc
 ///
 /// Describes the properties needed to create a GPU buffer.

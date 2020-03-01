@@ -61,7 +61,7 @@ public:
 
     HGIGL_API
     void DestroyTexture(HgiTextureHandle* texHandle) override;
-    
+
     HGIGL_API
     HgiBufferHandle CreateBuffer(HgiBufferDesc const & desc) override;
 

@@ -55,6 +55,21 @@ public:
     HGIMETAL_API
     HgiShaderFunctionHandleVector const& GetShaderFunctions() const override;
 
+    HGIMETAL_API
+    id<MTLFunction> GetVertexFunction() const {
+        return _vertexFunction;
+    }
+
+    HGIMETAL_API
+    id<MTLFunction> GetFragmentFunction() const {
+        return _fragmentFunction;
+    }
+
+    HGIMETAL_API
+    id<MTLFunction> GetComputeFunction() const {
+        return _computeFunction;
+    }
+
 protected:
     friend class HgiMetal;
 
@@ -67,9 +82,11 @@ private:
     HgiMetalShaderProgram(const HgiMetalShaderProgram&) = delete;
 
 private:
-    HgiShaderProgramDesc _descriptor;
     std::string _errors;
-    uint32_t _programId;
+    
+    id<MTLFunction> _vertexFunction;
+    id<MTLFunction> _fragmentFunction;
+    id<MTLFunction> _computeFunction;
 };
 
 

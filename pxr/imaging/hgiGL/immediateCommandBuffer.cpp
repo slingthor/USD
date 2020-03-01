@@ -37,6 +37,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 struct HgiGLDescriptorCacheItem {
     HgiGraphicsEncoderDesc descriptor;
+    HgiTextureHandle depthTexture;
     uint32_t framebuffer = 0;
 }; 
 
@@ -48,7 +49,8 @@ std::ostream& operator<<(
         << "descriptor cache: { ";
 
     for (HgiGLDescriptorCacheItem const * d : cmdBuf._descriptorCache) {
-        out << d->descriptor;
+        out << d->descriptor << ", ";
+        out << "depthTexture: " << d->depthTexture << ", ";
     }
 
     out << "}}";
@@ -61,21 +63,25 @@ _CreateDescriptorCacheItem(const HgiGraphicsEncoderDesc& desc)
 {
     HgiGLDescriptorCacheItem* dci = new HgiGLDescriptorCacheItem();
     dci->descriptor = desc;
+    dci->depthTexture = desc.depthTexture;
 
     // Create framebuffer
     glCreateFramebuffers(1, &dci->framebuffer);
 
     // Bind color attachments
-    size_t numColorAttachments = desc.colorAttachments.size();
+    size_t numColorAttachments = desc.colorAttachmentDescs.size();
     std::vector<GLenum> drawBuffers(numColorAttachments);
 
+    TF_VERIFY(desc.colorTextures.size() == numColorAttachments,
+        "Number of attachment descriptors and textures don't match");
+    
     //
     // Color attachments
     //
     for (size_t i=0; i<numColorAttachments; i++) {
-        const HgiAttachmentDesc& attachment = desc.colorAttachments[i];
+        const HgiAttachmentDesc& attachment = desc.colorAttachmentDescs[i];
         HgiGLTexture* glTexture = static_cast<HgiGLTexture*>(
-            attachment.texture.Get());
+            desc.colorTextures[i].Get());
 
         if (!TF_VERIFY(glTexture, "Invalid attachment texture")) {
             continue;
@@ -103,7 +109,7 @@ _CreateDescriptorCacheItem(const HgiGraphicsEncoderDesc& desc)
     //
     // Depth attachment
     //
-    HgiTextureHandle depthTex = desc.depthAttachment.texture;
+    HgiTextureHandle depthTex = desc.depthTexture;
     if (depthTex) {
         HgiGLTexture* glTexture = static_cast<HgiGLTexture*>(depthTex.Get());
 
@@ -198,9 +204,9 @@ _BindFramebuffer(HgiGLDescriptorCacheItem* dci)
     bool blendEnabled = false;
 
     // Apply LoadOps
-    for (size_t i=0; i<dci->descriptor.colorAttachments.size(); i++) {
+    for (size_t i=0; i<dci->descriptor.colorAttachmentDescs.size(); i++) {
         HgiAttachmentDesc const& colorAttachment =
-            dci->descriptor.colorAttachments[i];
+            dci->descriptor.colorAttachmentDescs[i];
 
         if (colorAttachment.loadOp == HgiAttachmentLoadOpClear) {
             glClearBufferfv(GL_COLOR, i, colorAttachment.clearValue.data());
@@ -228,8 +234,8 @@ _BindFramebuffer(HgiGLDescriptorCacheItem* dci)
     }
 
     HgiAttachmentDesc const& depthAttachment =
-        dci->descriptor.depthAttachment;
-    if (depthAttachment.texture && 
+        dci->descriptor.depthAttachmentDesc;
+    if (dci->depthTexture &&
         depthAttachment.loadOp == HgiAttachmentLoadOpClear) {
         glClearBufferfv(GL_DEPTH, 0, depthAttachment.clearValue.data());
     }
@@ -269,7 +275,7 @@ HgiGLImmediateCommandBuffer::CreateGraphicsEncoder(
     }
 
     const size_t maxColorAttachments = 8;
-    if (!TF_VERIFY(desc.colorAttachments.size() <= maxColorAttachments,
+    if (!TF_VERIFY(desc.colorAttachmentDescs.size() <= maxColorAttachments,
         "Too many color attachments for OpenGL frambuffer"))
     {
         return nullptr;

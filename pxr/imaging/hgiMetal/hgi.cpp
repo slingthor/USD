@@ -25,6 +25,8 @@
 #include "pxr/imaging/hgiMetal/buffer.h"
 #include "pxr/imaging/hgiMetal/conversions.h"
 #include "pxr/imaging/hgiMetal/diagnostic.h"
+#include "pxr/imaging/hgiMetal/pipeline.h"
+#include "pxr/imaging/hgiMetal/resourceBindings.h"
 #include "pxr/imaging/hgiMetal/shaderFunction.h"
 #include "pxr/imaging/hgiMetal/shaderProgram.h"
 #include "pxr/imaging/hgiMetal/texture.h"
@@ -33,12 +35,7 @@
 #include "pxr/base/tf/registryManager.h"
 #include "pxr/base/tf/type.h"
 
-
-#if defined(ARCH_OS_MACOS)
 #import <Cocoa/Cocoa.h>
-#else
-#import <UIKit/UIKit.h>
-#endif // ARCH_OS_MACOS
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -50,21 +47,6 @@ TF_REGISTRY_FUNCTION(TfType)
 
 static int _GetAPIVersion()
 {
-#if defined(ARCH_OS_IOS)
-#define SYSTEM_VERSION_GREATER_THAN_OR_EQUAL_TO(v) ([[[UIDevice currentDevice] systemVersion] compare:v options:NSNumericSearch] != NSOrderedAscending)
-    
-    static bool sysVerGreaterThanOrEqualTo11_0 = SYSTEM_VERSION_GREATER_THAN_OR_EQUAL_TO(@"11.0");
-    static bool sysVerGreaterThanOrEqualTo12_0 = SYSTEM_VERSION_GREATER_THAN_OR_EQUAL_TO(@"12.0");
-    static bool sysVerGreaterThanOrEqualTo13_0 = SYSTEM_VERSION_GREATER_THAN_OR_EQUAL_TO(@"13.0");
-
-    if (sysVerGreaterThanOrEqualTo13_0) {
-        return APIVersion_Metal3_0;
-    }
-    else if (sysVerGreaterThanOrEqualTo11_0) {
-        return APIVersion_Metal2_0;
-    }
-    
-#else // ARCH_OS_IOS
     static NSOperatingSystemVersion minimumSupportedOSVersion13_0 = { .majorVersion = 10, .minorVersion = 13, .patchVersion = 0 };
     static NSOperatingSystemVersion minimumSupportedOSVersion14_0 = { .majorVersion = 10, .minorVersion = 14, .patchVersion = 0 };
     static NSOperatingSystemVersion minimumSupportedOSVersion15_0 = { .majorVersion = 10, .minorVersion = 15, .patchVersion = 0 };
@@ -79,26 +61,24 @@ static int _GetAPIVersion()
         return APIVersion_Metal2_0;
     }
     
-#endif // ARCH_OS_IOS
-
     return APIVersion_Metal1_0;
 }
 
 HgiMetal::HgiMetal(id<MTLDevice> device)
 : _device(device)
 , _apiVersion(_GetAPIVersion())
-, _immediateCommandBuffer(device)
 {
     if (!_device) {
-#if defined(ARCH_OS_MACOS)
         if( TfGetenvBool("USD_METAL_USE_INTEGRATED_GPU", false)) {
             _device = MTLCopyAllDevices()[1];
         }
-#endif
+
         if (!_device) {
             _device = MTLCreateSystemDefaultDevice();
         }
     }
+
+    _immediateCommandBuffer.reset(new HgiMetalImmediateCommandBuffer(_device));
 
     HgiMetalSetupMetalDebug();
 }
@@ -111,67 +91,83 @@ HgiMetal::~HgiMetal()
 HgiImmediateCommandBuffer&
 HgiMetal::GetImmediateCommandBuffer()
 {
-    return _immediateCommandBuffer;
+    return *_immediateCommandBuffer;
 }
 
 HgiTextureHandle
 HgiMetal::CreateTexture(HgiTextureDesc const & desc)
 {
-    return new HgiMetalTexture(this, desc);
+    return HgiTextureHandle(new HgiMetalTexture(this, desc), GetUniqueId());
 }
 
 void
 HgiMetal::DestroyTexture(HgiTextureHandle* texHandle)
 {
-    if (TF_VERIFY(texHandle, "Invalid texture")) {
-        delete *texHandle;
-        texHandle = nullptr;
-    }
+    DestroyObject(texHandle);
 }
 
 HgiBufferHandle
 HgiMetal::CreateBuffer(HgiBufferDesc const & desc)
 {
-    return new HgiMetalBuffer(this, desc);
+    return HgiBufferHandle(new HgiMetalBuffer(this, desc), GetUniqueId());
 }
 
 void
 HgiMetal::DestroyBuffer(HgiBufferHandle* bufHandle)
 {
-    if (TF_VERIFY(bufHandle, "Invalid buffer")) {
-        delete *bufHandle;
-        bufHandle = nullptr;
-    }
+    DestroyObject(bufHandle);
 }
 
 HgiShaderFunctionHandle
 HgiMetal::CreateShaderFunction(HgiShaderFunctionDesc const& desc)
 {
-    return new HgiMetalShaderFunction(desc);
+    return HgiShaderFunctionHandle(
+        new HgiMetalShaderFunction(this, desc), GetUniqueId());
 }
 
 void
 HgiMetal::DestroyShaderFunction(HgiShaderFunctionHandle* shaderFunctionHandle)
 {
-    if (TF_VERIFY(shaderFunctionHandle, "Invalid function handle")) {
-        delete *shaderFunctionHandle;
-        *shaderFunctionHandle = nullptr;
-    }
+    DestroyObject(shaderFunctionHandle);
 }
 
 HgiShaderProgramHandle
 HgiMetal::CreateShaderProgram(HgiShaderProgramDesc const& desc)
 {
-    return new HgiMetalShaderProgram(desc);
+    return HgiShaderProgramHandle(
+        new HgiMetalShaderProgram(desc), GetUniqueId());
 }
 
 void
 HgiMetal::DestroyShaderProgram(HgiShaderProgramHandle* shaderProgramHandle)
 {
-    if (TF_VERIFY(shaderProgramHandle, "Invalid program handle")) {
-        delete *shaderProgramHandle;
-        *shaderProgramHandle = nullptr;
-    }
+    DestroyObject(shaderProgramHandle);
+}
+
+
+HgiResourceBindingsHandle
+HgiMetal::CreateResourceBindings(HgiResourceBindingsDesc const& desc)
+{
+    return HgiResourceBindingsHandle(
+        new HgiMetalResourceBindings(desc), GetUniqueId());
+}
+
+void
+HgiMetal::DestroyResourceBindings(HgiResourceBindingsHandle* resHandle)
+{
+    DestroyObject(resHandle);
+}
+
+HgiPipelineHandle
+HgiMetal::CreatePipeline(HgiPipelineDesc const& desc)
+{
+    return HgiPipelineHandle(new HgiMetalPipeline(this, desc), GetUniqueId());
+}
+
+void
+HgiMetal::DestroyPipeline(HgiPipelineHandle* pipeHandle)
+{
+    DestroyObject(pipeHandle);
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

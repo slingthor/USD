@@ -35,183 +35,6 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-struct HgiMetalDescriptorCacheItem {
-    HgiGraphicsEncoderDesc descriptor;
-    uint32_t framebuffer = 0;
-}; 
-
-std::ostream& operator<<(
-    std::ostream& out,
-    const HgiMetalImmediateCommandBuffer& cmdBuf)
-{
-    out << "HgiMetalImmediateCommandBuffer: {"
-        << "descriptor cache: { ";
-
-    for (HgiMetalDescriptorCacheItem const * d : cmdBuf._descriptorCache) {
-        out << d->descriptor;
-    }
-
-    out << "}}";
-    return out;
-}
-
-
-static HgiMetalDescriptorCacheItem*
-_CreateDescriptorCacheItem(const HgiGraphicsEncoderDesc& desc)
-{
-    HgiMetalDescriptorCacheItem* dci = new HgiMetalDescriptorCacheItem();
-    dci->descriptor = desc;
-
-    // Create framebuffer
-//    glCreateFramebuffers(1, &dci->framebuffer);
-
-    // Bind color attachments
-    size_t numColorAttachments = desc.colorAttachments.size();
-//    std::vector<GLenum> drawBuffers(numColorAttachments);
-
-    //
-    // Color attachments
-    //
-    for (size_t i=0; i<numColorAttachments; i++) {
-        const HgiAttachmentDesc& attachment = desc.colorAttachments[i];
-        HgiMetalTexture const* metalTexture = 
-            static_cast<HgiMetalTexture const*>(attachment.texture);
-
-        if (!TF_VERIFY(metalTexture, "Invalid attachment texture")) {
-            continue;
-        }
-
-        id<MTLTexture> textureName = metalTexture->GetTextureId();
-        if (!TF_VERIFY(textureName != nil, "Attachment not a texture")) {
-            continue;
-        }
-
-//        glNamedFramebufferTexture(
-//            dci->framebuffer,
-//            GL_COLOR_ATTACHMENT0 + i,
-//            textureName,
-//            /*level*/ 0);
-//
-//        drawBuffers[i] = GL_COLOR_ATTACHMENT0 + i;
-    }
-
-//    glNamedFramebufferDrawBuffers(
-//        dci->framebuffer,
-//        numColorAttachments,
-//        drawBuffers.data());
-
-    //
-    // Depth attachment
-    //
-    if (desc.depthAttachment.texture) {
-        const HgiAttachmentDesc& attachment = desc.depthAttachment;
-        HgiMetalTexture const* metalTexture =
-            static_cast<HgiMetalTexture const*>(attachment.texture);
-
-        id<MTLTexture> textureName = metalTexture->GetTextureId();
-
-        if (TF_VERIFY(textureName != nil, "Attachment not a texture")) {
-//            glNamedFramebufferTexture(
-//                dci->framebuffer,
-//                GL_DEPTH_ATTACHMENT,
-//                textureName,
-//                0); // level
-        }
-    }
-
-    // Note that if color or depth is multi-sample, they both have to be for GL.
-//    GLenum status = glCheckNamedFramebufferStatus(
-//        dci->framebuffer,
-//        GL_FRAMEBUFFER);
-//    TF_VERIFY(status == GL_FRAMEBUFFER_COMPLETE);
-
-    return dci;
-}
-
-static void
-_DestroyDescriptorCacheItem(HgiMetalDescriptorCacheItem* dci)
-{
-    if (dci->framebuffer) {
-//        TF_VERIFY(glIsFramebuffer(dci->framebuffer),
-//            "Tried to free invalid framebuffer");
-//
-//        glDeleteFramebuffers(1, &dci->framebuffer);
-        dci->framebuffer = 0;
-    }
-
-    delete dci;
-}
-
-static HgiMetalDescriptorCacheItem*
-_AcquireDescriptorCacheItem(
-    HgiGraphicsEncoderDesc const& desc,
-    HgiMetalDescriptorCacheVec& descriptorCache)
-{
-    // We keep a small cache of descriptor / framebuffer combos since it is 
-    // potentially an expensive state change to attach textures to Metal FBs.
-
-    HgiMetalDescriptorCacheItem* dci = nullptr;
-
-    // Look for our framebuffer in cache
-    for (size_t i=0; i<descriptorCache.size(); i++) {
-        HgiMetalDescriptorCacheItem* item = descriptorCache[i];
-        if (desc == item->descriptor) {
-            // If the Metal context is changed we cannot re-use the framebuffer
-            // as framebuffers cannot be shared between contexts.
-            //if (glIsFramebuffer(item->framebuffer))
-            {
-                dci = item;
-
-                // Move descriptor to end of 'LRU cache' as it is still used.
-                if (i < descriptorCache.size()) {
-                    descriptorCache.erase(descriptorCache.begin() + i);
-                    descriptorCache.push_back(dci);
-                }
-            }
-            break;
-        }
-    }
-
-    // Create a new descriptor cache item if it was not found
-    if (!dci) {
-        dci = _CreateDescriptorCacheItem(desc);
-        descriptorCache.push_back(dci);
-
-        // Destroy oldest descriptor / FB in LRU cache vector.
-        // The size of the cache is small enough and we only store ptrs so we
-        // use a vector instead of a linked list LRU.
-        const size_t descriptorLRUsize = 32;
-        if (descriptorCache.size() == descriptorLRUsize) {
-            _DestroyDescriptorCacheItem(descriptorCache.front());
-            descriptorCache.erase(descriptorCache.begin());
-        }
-    }
-
-    return dci;
-}
-
-static void
-_BindFramebuffer(HgiMetalDescriptorCacheItem* dci)
-{
-//    glBindFramebuffer(GL_FRAMEBUFFER, dci->framebuffer);
-
-    // Apply LoadOps
-    for (size_t i=0; i<dci->descriptor.colorAttachments.size(); i++) {
-        HgiAttachmentDesc const& colorAttachment =
-            dci->descriptor.colorAttachments[i];
-
-        if (colorAttachment.loadOp == HgiAttachmentLoadOpClear) {
-//            glClearBufferfv(GL_COLOR, i, colorAttachment.clearValue.data());
-        }
-    }
-
-    HgiAttachmentDesc const& depthAttachment =
-        dci->descriptor.depthAttachment;
-    if (depthAttachment.texture && 
-        depthAttachment.loadOp == HgiAttachmentLoadOpClear) {
-//        glClearBufferfv(GL_DEPTH, 0, depthAttachment.clearValue.data());
-    }
-}
 
 HgiMetalImmediateCommandBuffer::HgiMetalImmediateCommandBuffer(id<MTLDevice> device)
 : _device(device)
@@ -225,10 +48,6 @@ HgiMetalImmediateCommandBuffer::HgiMetalImmediateCommandBuffer(id<MTLDevice> dev
 
 HgiMetalImmediateCommandBuffer::~HgiMetalImmediateCommandBuffer()
 {
-    for (HgiMetalDescriptorCacheItem* dci : _descriptorCache) {
-        _DestroyDescriptorCacheItem(dci);
-    }
-
     [_commandBuffer release];
     [_commandQueue release];
 }
@@ -247,18 +66,14 @@ HgiMetalImmediateCommandBuffer::CreateGraphicsEncoder(
     }
 
     const size_t maxColorAttachments = 8;
-    if (!TF_VERIFY(desc.colorAttachments.size() <= maxColorAttachments,
+    if (!TF_VERIFY(desc.colorAttachmentDescs.size() <= maxColorAttachments,
         "Too many color attachments for Metal frambuffer"))
     {
         return nullptr;
     }
 
-    HgiMetalDescriptorCacheItem* dci =
-        _AcquireDescriptorCacheItem(desc, _descriptorCache);
-
-    _BindFramebuffer(dci);
-
-    HgiMetalGraphicsEncoder* encoder(new HgiMetalGraphicsEncoder(desc));
+    HgiMetalGraphicsEncoder* encoder(
+        new HgiMetalGraphicsEncoder(_commandBuffer, desc));
 
     return HgiGraphicsEncoderUniquePtr(encoder);
 }

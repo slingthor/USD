@@ -32,7 +32,6 @@ bool operator==(
     return  lhs.clearValue == rhs.clearValue &&
             lhs.loadOp == rhs.loadOp &&
             lhs.storeOp == rhs.storeOp &&
-            lhs.texture == rhs.texture &&
             lhs.blendEnabled == rhs.blendEnabled;
 }
 
@@ -48,7 +47,6 @@ std::ostream& operator<<(
     const HgiAttachmentDesc& attachment)
 {
     out << "HgiAttachmentDesc: {"
-        << "has_texture: " << (attachment.texture) << ", "
         << "clearValue: " << attachment.clearValue << ", "
         << "loadOp: " << attachment.loadOp << ", "
         << "storeOp: " << attachment.storeOp << ", "
@@ -69,8 +67,10 @@ bool operator==(
 {
     return  lhs.width == rhs.width &&
             lhs.height == rhs.height &&
-            lhs.depthAttachment == rhs.depthAttachment &&
-            lhs.colorAttachments == rhs.colorAttachments;
+            lhs.depthAttachmentDesc == rhs.depthAttachmentDesc &&
+            lhs.colorAttachmentDescs == rhs.colorAttachmentDescs &&
+            lhs.depthTexture == rhs.depthTexture &&
+            lhs.colorTextures == rhs.colorTextures;
 }
 
 bool operator!=(
@@ -88,11 +88,17 @@ std::ostream& operator<<(
     out << "width: " << encoder.width << ", ";
     out << "height: " << encoder.height << ", ";
 
-    for (HgiAttachmentDesc const& a : encoder.colorAttachments) {
+    for (HgiAttachmentDesc const& a : encoder.colorAttachmentDescs) {
         out << a;
     }
+    
+    int index = 0;
+    for (HgiTextureHandle const& t : encoder.colorTextures) {
+        out << "colorTexture" << index++ << ": " << t << ", ";
+    }
 
-    out << encoder.depthAttachment;
+    out << encoder.depthAttachmentDesc;
+    out << "depthTexture: " << encoder.depthTexture << ", ";
 
     out << "}";
     return out;

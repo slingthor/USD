@@ -46,7 +46,9 @@ class HgiMetalGraphicsEncoder final : public HgiGraphicsEncoder
 {
 public:
     HGIMETAL_API
-    HgiMetalGraphicsEncoder(HgiGraphicsEncoderDesc const& desc);
+    HgiMetalGraphicsEncoder(
+        id<MTLCommandBuffer> commandBuffer,
+        HgiGraphicsEncoderDesc const& desc);
 
     HGIMETAL_API
     virtual ~HgiMetalGraphicsEncoder();
@@ -58,12 +60,36 @@ public:
     void SetViewport(GfVec4i const& vp) override;
 
     HGIMETAL_API
+    void SetScissor(GfVec4i const& sc) override;
+
+    HGIMETAL_API
+    void BindPipeline(HgiPipelineHandle pipeline) override;
+
+    HGIMETAL_API
+    void BindResources(HgiResourceBindingsHandle resources) override;
+
+    HGIMETAL_API
+    void BindVertexBuffers(
+        uint32_t firstBinding,
+        HgiBufferHandleVector const& buffers,
+        std::vector<uint32_t> const& byteOffsets) override;
+
+    HGIMETAL_API
+    void DrawIndexed(
+        HgiBufferHandle const& indexBuffer,
+        uint32_t indexCount,
+        uint32_t indexBufferByteOffset,
+        uint32_t firstIndex,
+        uint32_t vertexOffset,
+        uint32_t instanceCount) override;
+
+    HGIMETAL_API
     void PushDebugGroup(const char* label) override;
 
     HGIMETAL_API
     void PopDebugGroup() override;
     
-    id<MTLRenderCommandEncoder> encoder;
+    id<MTLRenderCommandEncoder> _encoder;
 
 private:
     HgiMetalGraphicsEncoder() = delete;

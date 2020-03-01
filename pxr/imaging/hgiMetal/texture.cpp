@@ -45,7 +45,7 @@ HgiMetalTexture::HgiMetalTexture(HgiMetal *hgi, HgiTextureDesc const & desc)
     MTLPixelFormat mtlFormat = MTLPixelFormatInvalid;
 
     if (desc.usage & HgiTextureUsageBitsColorTarget) {
-        mtlFormat = HgiMetalConversions::GetFormat(desc.format);
+        mtlFormat = HgiMetalConversions::GetPixelFormat(desc.format);
     } else if (desc.usage & HgiTextureUsageBitsDepthTarget) {
         TF_VERIFY(desc.format == HgiFormatFloat32);
         mtlFormat = MTLPixelFormatDepth32Float;

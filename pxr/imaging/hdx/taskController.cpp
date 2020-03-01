@@ -315,9 +315,7 @@ HdxTaskController::_CreateRenderGraph()
             _CreatePickFromRenderBufferTask();
         }
 
-        // METAL TEMP - Can't get an Hgi object inside Hdx Colour Correction
-        // task yet - so disabling this temporarily
-//        _CreateColorCorrectionTask();
+        _CreateColorCorrectionTask();
         _CreateColorChannelTask();
 
         // Initialize the AOV system to render color. Note:

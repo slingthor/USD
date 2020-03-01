@@ -110,6 +110,8 @@ enum HgiAttachmentLoadOp
     HgiAttachmentLoadOpDontCare = 0,
     HgiAttachmentLoadOpClear,
     HgiAttachmentLoadOpLoad,
+    
+    HgiAttachmentLoadOpCount
 };
 
 /// \enum HgiAttachmentStoreOp
@@ -127,6 +129,8 @@ enum HgiAttachmentStoreOp
 {
     HgiAttachmentStoreOpDontCare = 0,
     HgiAttachmentStoreOpStore,
+    
+    HgiAttachmentStoreOpCount
 };
 
 /// \enum HgiBufferUsageBits
