@@ -1321,10 +1321,14 @@ OIIO_URL = "https://github.com/OpenImageIO/oiio/archive/Release-1.7.18.zip"
 
 def InstallOpenImageIO(context, force, buildArgs):
     with CurrentWorkingDirectory(DownloadURL(OIIO_URL, context, force)):
-        extraArgs = ['-DOIIO_BUILD_TOOLS=OFF',
-                     '-DOIIO_BUILD_TESTS=OFF',
+        extraArgs = ['-DOIIO_BUILD_TESTS=OFF',
                      '-DUSE_PYTHON=OFF',
                      '-DSTOP_ON_WARNING=OFF']
+
+        if context.buildOIIOTools:
+            extraArgs.append('-DOIIO_BUILD_TOOLS=ON')
+        else:
+            extraArgs.append('-DOIIO_BUILD_TOOLS=OFF')
 
         # OIIO's FindOpenEXR module circumvents CMake's normal library 
         # search order, which causes versions of OpenEXR installed in
@@ -1994,6 +1998,12 @@ subgroup.add_argument("--openimageio", dest="build_oiio", action="store_true",
 subgroup.add_argument("--no-openimageio", dest="build_oiio", action="store_false",
                       help="Do not build OpenImageIO plugin for USD (default)")
 subgroup = group.add_mutually_exclusive_group()
+subgroup.add_argument("--openimageio-tools", dest="build_oiio_tools", action="store_true",
+                      default=False,
+                      help="Build OpenImageIO tools (OpenImageIO plugin must be enabled)")
+subgroup.add_argument("--no-openimageio-tools", dest="build_oiio_tools", action="store_false",
+                      help="Do not build OpenImageIO tools (default)")
+subgroup = group.add_mutually_exclusive_group()
 subgroup.add_argument("--opencolorio", dest="build_ocio", action="store_true", 
                       default=False,
                       help="Build OpenColorIO plugin for USD")
@@ -2151,6 +2161,7 @@ class InstallContext:
         self.prmanLocation = (os.path.abspath(args.prman_location)
                                if args.prman_location else None)                               
         self.buildOIIO = args.build_oiio
+        self.buildOIIOTools = args.build_oiio_tools
         self.buildOCIO = args.build_ocio
 
         # - Alembic Plugin
