@@ -29,60 +29,35 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+//
+// HgiFormat
+//
 static const MTLPixelFormat PIXEL_FORMAT_DESC[] =
 {
-    MTLPixelFormatR8Unorm,      // HdFormatUNorm8,
-    MTLPixelFormatRG8Unorm,     // HdFormatUNorm8Vec2,
-    MTLPixelFormatInvalid,      // HdFormatUNorm8Vec3,
-    MTLPixelFormatRGBA8Unorm,   // HdFormatUNorm8Vec4,
+    MTLPixelFormatR8Unorm,      // HgiFormatUNorm8,
+    MTLPixelFormatRG8Unorm,     // HgiFormatUNorm8Vec2,
+    MTLPixelFormatInvalid,      // HgiFormatUNorm8Vec3,
+    MTLPixelFormatRGBA8Unorm,   // HgiFormatUNorm8Vec4,
 
-    MTLPixelFormatR8Snorm,      // HdFormatSNorm8,
-    MTLPixelFormatRG8Snorm,     // HdFormatSNorm8Vec2,
-    MTLPixelFormatInvalid,      // HdFormatSNorm8Vec3,
-    MTLPixelFormatRGBA8Snorm,   // HdFormatSNorm8Vec4,
+    MTLPixelFormatR8Snorm,      // HgiFormatSNorm8,
+    MTLPixelFormatRG8Snorm,     // HgiFormatSNorm8Vec2,
+    MTLPixelFormatInvalid,      // HgiFormatSNorm8Vec3,
+    MTLPixelFormatRGBA8Snorm,   // HgiFormatSNorm8Vec4,
 
-    MTLPixelFormatR16Float,     // HdFormatFloat16,
-    MTLPixelFormatRG16Float,    // HdFormatFloat16Vec2,
-    MTLPixelFormatInvalid,      // HdFormatFloat16Vec3,
-    MTLPixelFormatRGBA16Float,  // HdFormatFloat16Vec4,
+    MTLPixelFormatR16Float,     // HgiFormatFloat16,
+    MTLPixelFormatRG16Float,    // HgiFormatFloat16Vec2,
+    MTLPixelFormatInvalid,      // HgiFormatFloat16Vec3,
+    MTLPixelFormatRGBA16Float,  // HgiFormatFloat16Vec4,
 
-    MTLPixelFormatR32Float,     // HdFormatFloat32,
-    MTLPixelFormatRG32Float,    // HdFormatFloat32Vec2,
-    MTLPixelFormatInvalid,      // HdFormatFloat32Vec3,
-    MTLPixelFormatRGBA32Float,  // HdFormatFloat32Vec4,
+    MTLPixelFormatR32Float,     // HgiFormatFloat32,
+    MTLPixelFormatRG32Float,    // HgiFormatFloat32Vec2,
+    MTLPixelFormatInvalid,      // HgiFormatFloat32Vec3,
+    MTLPixelFormatRGBA32Float,  // HgiFormatFloat32Vec4,
 
-    MTLPixelFormatR32Sint,      // HdFormatInt32,
-    MTLPixelFormatRG32Sint,     // HdFormatInt32Vec2,
-    MTLPixelFormatInvalid,      // HdFormatInt32Vec3,
-    MTLPixelFormatRGBA32Sint,   // HdFormatInt32Vec4,
-};
-
-static const MTLVertexFormat VERTEX_FORMAT_DESC[] =
-{
-    MTLVertexFormatUCharNormalized,     // HdFormatUNorm8,
-    MTLVertexFormatUChar2Normalized,    // HdFormatUNorm8Vec2,
-    MTLVertexFormatUChar3Normalized,    // HdFormatUNorm8Vec3,
-    MTLVertexFormatUChar4Normalized,    // HdFormatUNorm8Vec4,
-
-    MTLVertexFormatCharNormalized,      // HdFormatSNorm8,
-    MTLVertexFormatChar2Normalized,     // HdFormatSNorm8Vec2,
-    MTLVertexFormatChar3Normalized,     // HdFormatSNorm8Vec3,
-    MTLVertexFormatChar4Normalized,     // HdFormatSNorm8Vec4,
-
-    MTLVertexFormatHalf,                // HdFormatFloat16,
-    MTLVertexFormatHalf2,               // HdFormatFloat16Vec2,
-    MTLVertexFormatHalf3,               // HdFormatFloat16Vec3,
-    MTLVertexFormatHalf4,               // HdFormatFloat16Vec4,
-
-    MTLVertexFormatFloat,               // HdFormatFloat32,
-    MTLVertexFormatFloat2,              // HdFormatFloat32Vec2,
-    MTLVertexFormatFloat3,              // HdFormatFloat32Vec3,
-    MTLVertexFormatFloat4,              // HdFormatFloat32Vec4,
-
-    MTLVertexFormatInt,                 // HdFormatInt32,
-    MTLVertexFormatInt2,                // HdFormatInt32Vec2,
-    MTLVertexFormatInt3,                // HdFormatInt32Vec3,
-    MTLVertexFormatInt4,                // HdFormatInt32Vec4,
+    MTLPixelFormatR32Sint,      // HgiFormatInt32,
+    MTLPixelFormatRG32Sint,     // HgiFormatInt32Vec2,
+    MTLPixelFormatInvalid,      // HgiFormatInt32Vec3,
+    MTLPixelFormatRGBA32Sint,   // HgiFormatInt32Vec4,
 };
 
 constexpr bool _CompileTimeValidateHgiPixelFormatTable() {
@@ -96,6 +71,38 @@ constexpr bool _CompileTimeValidateHgiPixelFormatTable() {
 static_assert(_CompileTimeValidateHgiPixelFormatTable(),
               "_PixelFormatDesc array out of sync with HgiFormat enum");
 
+
+//
+// MTLVertexFormat
+//
+static const MTLVertexFormat VERTEX_FORMAT_DESC[] =
+{
+    MTLVertexFormatUCharNormalized,     // HgiFormatUNorm8,
+    MTLVertexFormatUChar2Normalized,    // HgiFormatUNorm8Vec2,
+    MTLVertexFormatUChar3Normalized,    // HgiFormatUNorm8Vec3,
+    MTLVertexFormatUChar4Normalized,    // HgiFormatUNorm8Vec4,
+
+    MTLVertexFormatCharNormalized,      // HgiFormatSNorm8,
+    MTLVertexFormatChar2Normalized,     // HgiFormatSNorm8Vec2,
+    MTLVertexFormatChar3Normalized,     // HgiFormatSNorm8Vec3,
+    MTLVertexFormatChar4Normalized,     // HgiFormatSNorm8Vec4,
+
+    MTLVertexFormatHalf,                // HgiFormatFloat16,
+    MTLVertexFormatHalf2,               // HgiFormatFloat16Vec2,
+    MTLVertexFormatHalf3,               // HgiFormatFloat16Vec3,
+    MTLVertexFormatHalf4,               // HgiFormatFloat16Vec4,
+
+    MTLVertexFormatFloat,               // HgiFormatFloat32,
+    MTLVertexFormatFloat2,              // HgiFormatFloat32Vec2,
+    MTLVertexFormatFloat3,              // HgiFormatFloat32Vec3,
+    MTLVertexFormatFloat4,              // HgiFormatFloat32Vec4,
+
+    MTLVertexFormatInt,                 // HgiFormatInt32,
+    MTLVertexFormatInt2,                // HgiFormatInt32Vec2,
+    MTLVertexFormatInt3,                // HgiFormatInt32Vec3,
+    MTLVertexFormatInt4,                // HgiFormatInt32Vec4,
+};
+
 constexpr bool _CompileTimeValidateHgiVertexFormatTable() {
     return (TfArraySize(VERTEX_FORMAT_DESC) == HgiFormatCount &&
             HgiFormatUNorm8 == 0 &&
@@ -107,10 +114,13 @@ constexpr bool _CompileTimeValidateHgiVertexFormatTable() {
 static_assert(_CompileTimeValidateHgiVertexFormatTable(),
               "_VertexFormatDesc array out of sync with HgiFormat enum");
 
+//
+// HgiCullMode
+//
 struct {
     HgiCullMode hgiCullMode;
     MTLCullMode metalCullMode;
-} static const _CullModeTable[HgiCullModeCount] =
+} static const _CullModeTable[] =
 {
     {HgiCullModeNone,         MTLCullModeNone},
     {HgiCullModeFront,        MTLCullModeFront},
@@ -121,23 +131,29 @@ struct {
 static_assert(TfArraySize(_CullModeTable) == HgiCullModeCount,
               "_CullModeTable array out of sync with HgiFormat enum");
 
+//
+// HgiPolygonMode
+//
 struct {
     HgiPolygonMode hgiFillMode;
     MTLTriangleFillMode metalFillMode;
-} static const _PolygonModeTable[HgiCullModeCount] =
+} static const _PolygonModeTable[] =
 {
     {HgiPolygonModeFill,  MTLTriangleFillModeFill},
     {HgiPolygonModeLine,  MTLTriangleFillModeLines},
     {HgiPolygonModePoint, MTLTriangleFillModeFill}, // Unsupported
 };
 
-static_assert(TfArraySize(_PolygonModeTable) == HgiCullModeCount,
+static_assert(TfArraySize(_PolygonModeTable) == HgiPolygonModeCount,
               "_PolygonModeTable array out of sync with HgiFormat enum");
 
+//
+// HgiBlendOp
+//
 struct {
     HgiBlendOp hgiBlendOp;
     MTLBlendOperation metalBlendOp;
-} static const _blendEquationTable[HgiBlendOpCount] =
+} static const _blendEquationTable[] =
 {
     {HgiBlendOpAdd,             MTLBlendOperationAdd},
     {HgiBlendOpSubtract,        MTLBlendOperationSubtract},
@@ -149,10 +165,13 @@ struct {
 static_assert(TfArraySize(_blendEquationTable) == HgiBlendOpCount,
               "_blendEquationTable array out of sync with HgiFormat enum");
 
+//
+// HgiBlendFactor
+//
 struct {
     HgiBlendFactor hgiBlendFactor;
     MTLBlendFactor metalBlendFactor;
-} static const _blendFactorTable[HgiBlendFactorCount] =
+} static const _blendFactorTable[] =
 {
     {HgiBlendFactorZero,                MTLBlendFactorZero},
     {HgiBlendFactorOne,                 MTLBlendFactorOne},
@@ -178,10 +197,13 @@ struct {
 static_assert(TfArraySize(_blendFactorTable) == HgiBlendFactorCount,
               "_blendFactorTable array out of sync with HgiFormat enum");
 
+//
+// HgiWinding
+//
 struct {
     HgiWinding hgiWinding;
     MTLWinding metalWinding;
-} static const _windingTable[HgiWindingCount] =
+} static const _windingTable[] =
 {
     {HgiWindingClockwise,           MTLWindingClockwise},
     {HgiWindingCounterClockwise,    MTLWindingCounterClockwise},
@@ -190,10 +212,13 @@ struct {
 static_assert(TfArraySize(_windingTable) == HgiWindingCount,
               "_windingTable array out of sync with HgiFormat enum");
 
+//
+// HgiAttachmentLoadOp
+//
 struct {
     HgiAttachmentLoadOp hgiAttachmentLoadOp;
     MTLLoadAction metalLoadOp;
-} static const _attachmentLoadOpTable[HgiAttachmentLoadOpCount] =
+} static const _attachmentLoadOpTable[] =
 {
     {HgiAttachmentLoadOpDontCare,   MTLLoadActionDontCare},
     {HgiAttachmentLoadOpClear,      MTLLoadActionClear},
@@ -203,10 +228,13 @@ struct {
 static_assert(TfArraySize(_attachmentLoadOpTable) == HgiAttachmentLoadOpCount,
               "_attachmentLoadOpTable array out of sync with HgiFormat enum");
 
+//
+// HgiAttachmentStoreOp
+//
 struct {
     HgiAttachmentStoreOp hgiAttachmentStoreOp;
     MTLStoreAction metalStoreOp;
-} static const _attachmentStoreOpTable[HgiAttachmentStoreOpCount] =
+} static const _attachmentStoreOpTable[] =
 {
     {HgiAttachmentStoreOpDontCare,   MTLStoreActionDontCare},
     {HgiAttachmentStoreOpStore,      MTLStoreActionStore},
@@ -215,9 +243,34 @@ struct {
 static_assert(TfArraySize(_attachmentStoreOpTable) == HgiAttachmentStoreOpCount,
               "_attachmentStoreOpTable array out of sync with HgiFormat enum");
 
+//
+// HgiCompareFunction
+//
+struct {
+    HgiCompareFunction hgiCompareFunction;
+    MTLCompareFunction metalCF;
+} static const _compareFnTable[] =
+{
+    {HgiCompareFunctionNever,       MTLCompareFunctionNever},
+    {HgiCompareFunctionLess,        MTLCompareFunctionLess},
+    {HgiCompareFunctionEqual,       MTLCompareFunctionEqual},
+    {HgiCompareFunctionLEqual,      MTLCompareFunctionLessEqual},
+    {HgiCompareFunctionGreater,     MTLCompareFunctionGreater},
+    {HgiCompareFunctionNotEqual,    MTLCompareFunctionNotEqual},
+    {HgiCompareFunctionGEqual,      MTLCompareFunctionGreaterEqual},
+    {HgiCompareFunctionAlways,      MTLCompareFunctionAlways},
+};
+
+static_assert(TfArraySize(_compareFnTable) == HgiCompareFunctionCount,
+              "_compareFnTable array out of sync with HgiFormat enum");
+
 MTLPixelFormat
 HgiMetalConversions::GetPixelFormat(HgiFormat inFormat)
 {
+    if (inFormat == HgiFormatInvalid) {
+        return MTLPixelFormatInvalid;
+    }
+
     if ((inFormat < 0) || (inFormat >= HgiFormatCount))
     {
         TF_CODING_ERROR("Unexpected HdFormat %d", inFormat);
@@ -291,6 +344,12 @@ MTLStoreAction
 HgiMetalConversions::GetAttachmentStoreOp(HgiAttachmentStoreOp storeOp)
 {
     return _attachmentStoreOpTable[storeOp].metalStoreOp;
+}
+
+MTLCompareFunction
+HgiMetalConversions::GetDepthCompareFunction(HgiCompareFunction cf)
+{
+    return _compareFnTable[cf].metalCF;
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

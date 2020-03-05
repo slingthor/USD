@@ -51,8 +51,8 @@ TF_REGISTRY_FUNCTION(TfDebug)
         "HgiMetal dump stack trace on Metal error");
 }
 
-static bool
-_HgiMetalDebugEnabled()
+bool
+HgiMetalDebugEnabled()
 {
     static bool _v = TfGetEnvSetting(HGIMETAL_DEBUG) == 1;
     return _v;
@@ -66,7 +66,7 @@ HgiMetalPostPendingMetalErrors(std::string const & where)
 void
 HgiMetalSetupMetalDebug()
 {
-    if (!_HgiMetalDebugEnabled()) return;
+    if (!HgiMetalDebugEnabled()) return;
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

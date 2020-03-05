@@ -38,6 +38,12 @@ PXR_NAMESPACE_OPEN_SCOPE
 #define HGIMETAL_POST_PENDING_METAL_ERRORS() \
         HgiMetalPostPendingMetalErrors(__ARCH_PRETTY_FUNCTION__)
 
+HGIMETAL_API
+bool HgiMetalDebugEnabled();
+
+#define HGIMETAL_DEBUG_LABEL(_obj, label) \
+    if (HgiMetalDebugEnabled()) { [_obj setLabel:@(label)]; }
+
 /// Posts diagnostic errors for all Metal errors in the current context.
 HGIMETAL_API
 void HgiMetalPostPendingErrors(std::string const & where = std::string());

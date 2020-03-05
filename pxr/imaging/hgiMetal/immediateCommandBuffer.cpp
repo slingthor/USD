@@ -36,12 +36,14 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 
-HgiMetalImmediateCommandBuffer::HgiMetalImmediateCommandBuffer(id<MTLDevice> device)
+HgiMetalImmediateCommandBuffer::HgiMetalImmediateCommandBuffer(
+    id<MTLDevice> device,
+    id<MTLCommandQueue> commandQueue)
 : _device(device)
-, _commandQueue(nil)
+, _commandQueue(commandQueue)
 , _commandBuffer(nil)
+, _workToFlush(false)
 {
-    _commandQueue = [_device newCommandQueue];
     _commandBuffer = [_commandQueue commandBuffer];
     [_commandBuffer retain];
 }
@@ -72,6 +74,7 @@ HgiMetalImmediateCommandBuffer::CreateGraphicsEncoder(
         return nullptr;
     }
 
+    _workToFlush = true;
     HgiMetalGraphicsEncoder* encoder(
         new HgiMetalGraphicsEncoder(_commandBuffer, desc));
 
@@ -81,18 +84,62 @@ HgiMetalImmediateCommandBuffer::CreateGraphicsEncoder(
 HgiBlitEncoderUniquePtr
 HgiMetalImmediateCommandBuffer::CreateBlitEncoder()
 {
+    _workToFlush = true;
     return HgiBlitEncoderUniquePtr(new HgiMetalBlitEncoder(this));
 }
-    
-void
-HgiMetalImmediateCommandBuffer::FlushEncoders()
+
+id<MTLCommandBuffer>
+HgiMetalImmediateCommandBuffer::GetCommandBuffer()
 {
+    _workToFlush = true;
+    return _commandBuffer;
+}
+
+void
+HgiMetalImmediateCommandBuffer::StartFrame()
+{
+    if ([[MTLCaptureManager sharedCaptureManager] isCapturing]) {
+        // We need to grab a new command buffer otherwise the previous one
+        // (if it was allocated at the end of the last frame) won't appear in
+        // this frame's capture, and it will confuse us!
+        _workToFlush = false;
+        [_commandBuffer release];
+
+        _commandBuffer = [_commandQueue commandBuffer];
+        [_commandBuffer retain];
+    }
+}
+
+void
+HgiMetalImmediateCommandBuffer::BlockUntilCompleted()
+{
+    if (!_workToFlush) {
+        return;
+    }
+
     [_commandBuffer commit];
     [_commandBuffer waitUntilCompleted];
     [_commandBuffer release];
 
     _commandBuffer = [_commandQueue commandBuffer];
     [_commandBuffer retain];
+    _workToFlush = false;
+}
+
+void
+HgiMetalImmediateCommandBuffer::BlockUntilSubmitted()
+{
+    if (!_workToFlush) {
+        return;
+    }
+
+    [_commandBuffer commit];
+    [_commandBuffer waitUntilScheduled];
+    [_commandBuffer release];
+
+    _commandBuffer = [_commandQueue commandBuffer];
+    [_commandBuffer retain];
+    _workToFlush = false;
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

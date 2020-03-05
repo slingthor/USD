@@ -25,6 +25,7 @@
 
 #include "pxr/imaging/hgiMetal/hgi.h"
 #include "pxr/imaging/hgiMetal/conversions.h"
+#include "pxr/imaging/hgiMetal/diagnostic.h"
 #include "pxr/imaging/hgiMetal/shaderFunction.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -297,9 +298,10 @@ HgiMetalShaderFunction::HgiMetalShaderFunction(
         NSString *err = [error localizedDescription];
         TF_WARN("Failed to compile shader: \n%s",
                 [err UTF8String]);
+        TF_WARN("%s", source.c_str());
     }
     else {
-        _shaderId.label = @(_descriptor.debugName.c_str());
+        HGIMETAL_DEBUG_LABEL(_shaderId, _descriptor.debugName.c_str());
     }
 
     [library release];

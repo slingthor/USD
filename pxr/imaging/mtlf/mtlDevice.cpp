@@ -26,9 +26,7 @@
 #include "pxr/imaging/mtlf/drawTarget.h"
 #include "pxr/base/tf/getenv.h"
 
-#if defined(ARCH_GFX_OPENGL)
-#include "pxr/imaging/mtlf/glInterop.h"
-#endif
+#include "pxr/imaging/hgiMetal/hgi.h"
 
 #import <simd/simd.h>
 #include <sys/time.h>
@@ -195,9 +193,9 @@ id<MTLDevice> MtlfMetalContext::GetMetalDevice(PREFERRED_GPU_TYPE preferredGPUTy
 // MtlfMetalContext
 //
 
-MtlfMetalContext::MtlfMetalContext(id<MTLDevice> _device, int width, int height)
+MtlfMetalContext::MtlfMetalContext(HgiMetal *hgi)
 {
-    Init(_device, width, height);
+    Init(hgi);
 }
 
 MtlfMetalContext::~MtlfMetalContext()
@@ -205,54 +203,32 @@ MtlfMetalContext::~MtlfMetalContext()
     Cleanup();
 }
 
-void MtlfMetalContext::Init(id<MTLDevice> _device, int width, int height)
+void MtlfMetalContext::Init(HgiMetal *hgi)
 {
     gsMaxConcurrentBatches = 0;
     gsMaxDataPerBatch = 0;
     points = TfToken("points");
-#if defined(ARCH_GFX_OPENGL)
-    glInterop = NULL;
-#endif
-    renderDevices = NULL;
-    
-    if( TfGetenvBool("USD_METAL_USE_INTEGRATED_GPU", false)) {
-        MtlfMetalContext::GetMetalDevice(PREFER_INTEGRATED_GPU);
-    } else {
-        MtlfMetalContext::GetMetalDevice(PREFER_DEFAULT_GPU);
-    }
 
-    if (_device != nil) {
-        currentDevice = _device;
-    }
+    currentDevice = hgi->GetDevice();
 
-    interopDevice = currentDevice;
+    renderDevices = [NSMutableArray arrayWithObjects: currentDevice, nil];
+    [renderDevices retain];
+    GPUState::renderDevices = renderDevices;
+
     currentGPU = 0;
     int i = 0;
     for (id<MTLDevice>dev in renderDevices) {
         if (dev == currentDevice)
             currentGPU = i;
-        
-        captureScopeFullFrame[i] =
-            [[MTLCaptureManager sharedCaptureManager] newCaptureScopeWithDevice:dev];
-        captureScopeFullFrame[i].label = [NSString stringWithFormat:@"Full Frame GPU %@", [dev name]];
-        
-        captureScopeSubset[i] =
-            [[MTLCaptureManager sharedCaptureManager] newCaptureScopeWithDevice:dev];
-        captureScopeSubset[i].label = [NSString stringWithFormat:@"Subset GPU %@", [dev name]];;
-
+                
         i++;
     }
     GPUState::gpuCount = i;
     GPUState::currentGPU = currentGPU;
-    
-    [[MTLCaptureManager sharedCaptureManager] setDefaultCaptureScope:captureScopeFullFrame[currentGPU]];
-    
+        
     NSLog(@"Selected %@ for Metal Device", currentDevice.name);
 
-    // Create a new command queue
-    for (int i = 0; i < renderDevices.count; i++) {
-        gpus[i].commandQueue = [renderDevices[i] newCommandQueueWithMaxCommandBufferCount:commandBufferPoolSize];
-    }
+    gpus[0].commandQueue = hgi->GetQueue();
 
 #if defined(ARCH_OS_IOS)
     gsMaxDataPerBatch = 1024 * 1024 * 32;
@@ -296,9 +272,6 @@ void MtlfMetalContext::Init(id<MTLDevice> _device, int width, int height)
     uint16_t zero[4] = {};
 
     for(int i = 0; i < renderDevices.count; i++) {
-        gpus[i].mtlColorTexture = nil;
-        gpus[i].mtlMultisampleColorTexture = nil;
-        gpus[i].mtlDepthTexture = nil;
 
         blackDesc.textureType = MTLTextureType2D;
         gpus[i].blackTexture2D = [renderDevices[i] newTextureWithDescriptor:blackDesc];
@@ -339,8 +312,6 @@ void MtlfMetalContext::Init(id<MTLDevice> _device, int width, int height)
     depthState.depthWriteEnable = true;
     depthState.depthCompareFunction = MTLCompareFunctionLessEqual;
     
-    AllocateAttachments(width, height);
-    
     drawTarget = NULL;
     outputPixelFormat = MTLPixelFormatInvalid;
     outputDepthFormat = MTLPixelFormatInvalid;
@@ -375,28 +346,13 @@ void MtlfMetalContext::Init(id<MTLDevice> _device, int width, int height)
 
 void MtlfMetalContext::Cleanup()
 {
-#if defined(ARCH_GFX_OPENGL)
-    if (glInterop) {
-        delete glInterop;
-        glInterop = NULL;
-    }
-#endif
- 
     [renderDevices release];
     renderDevices = nil;
 
     CleanupUnusedBuffers(true);
     bufferFreeList.clear();
 
-    [[MTLCaptureManager sharedCaptureManager] setDefaultCaptureScope:nil];
-
     for (int i = 0; i < renderDevices.count; i++) {
-        [captureScopeFullFrame[i] release];
-        captureScopeFullFrame[i] = nil;
-        
-        [captureScopeSubset[i] release];
-        captureScopeSubset[i] = nil;
-
         [gpus[i].blackTexture2D release];
         [gpus[i].blackTexture2DArray release];
         [gpus[i].dummySampler release];
@@ -459,107 +415,10 @@ void MtlfMetalContext::Cleanup()
 #endif
 }
 
-void MtlfMetalContext::RecreateInstance(id<MTLDevice> device, int width, int height)
-{
-    // This is all temporary, and hacky - caused by being a global state.
-    // Talk to Jason if you run into issues!
-#if defined(ARCH_GFX_OPENGL)
-    if (glInterop) {
-        delete glInterop;
-        glInterop = NULL;
-    }
-#endif
-
-    context = NULL;
-
-    context = MtlfMetalContextSharedPtr(new MtlfMetalContext(device, width, height));
-    context->interopDevice = device;
-    [context->renderDevices replaceObjectAtIndex:0 withObject:device];
-}
-
-void MtlfMetalContext::AllocateAttachments(int width, int height)
-{
-#if defined(ARCH_GFX_OPENGL)
-    if (glInterop) {
-        glInterop->AllocateAttachments(width, height);
-
-        MTLTextureDescriptor* desc = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA16Float
-                                                                                        width:width
-                                                                                       height:height
-                                                                                    mipmapped:NO];
-        desc.usage = MTLTextureUsageRenderTarget | MTLTextureUsageShaderRead;
-        desc.storageMode = MTLStorageModePrivate;
-        
-        if (mtlSampleCount > 1) {
-            desc.sampleCount = mtlSampleCount;
-            desc.textureType = MTLTextureType2DMultisample;
-        }
-        else
-            desc.textureType = MTLTextureType2D;
-        
-        for(int i = 0; i < renderDevices.count; i++) {
-            if (i) {
-                gpus[i].mtlColorTexture = glInterop->mtlLocalColorTexture[i];
-            }
-            else {
-                gpus[i].mtlColorTexture = glInterop->mtlAliasedColorTexture;
-            }
-            gpus[i].mtlDepthTexture = glInterop->mtlLocalDepthTexture[i];
-
-            if (gpus[i].mtlMultisampleColorTexture)
-                [gpus[i].mtlMultisampleColorTexture release];
-
-            gpus[i].mtlMultisampleColorTexture = [renderDevices[i] newTextureWithDescriptor:desc];
-        }
-    }
-#endif
-}
-
 bool
 MtlfMetalContext::IsInitialized()
 {
     return true;
-}
-
-void
-MtlfMetalContext::BlitToOpenGL()
-{
-#if defined(ARCH_GFX_OPENGL)
-    if (glInterop) {
-        glInterop->BlitToOpenGL();
-    }
-    else {
-        TF_FATAL_CODING_ERROR("Gl interop is disabled, must call InitGLInterop"
-                              " before rendering");
-    }
-#else
-    TF_FATAL_CODING_ERROR("Gl interop is disabled, because OpenGL is disabled");
-#endif
-}
-
-void
-MtlfMetalContext::CopyToInterop()
-{
-#if defined(ARCH_GFX_OPENGL)
-    if (glInterop) {
-        glInterop->CopyToInterop();
-    }
-    else {
-        TF_FATAL_CODING_ERROR("Gl interop is disabled, must call InitGLInterop"
-                              " before rendering");
-    }
-#else
-    TF_FATAL_CODING_ERROR("Gl interop is disabled, because OpenGL is disabled");
-#endif
-}
-
-void MtlfMetalContext::InitGLInterop() {
-#if defined(ARCH_GFX_OPENGL)
-    if (!glInterop) {
-        glInterop = new MtlfGlInterop(interopDevice, renderDevices);
-        glInterop->mtlSampleCount = mtlSampleCount;
-    }
-#endif
 }
 
 id<MTLBuffer>
@@ -1144,19 +1003,19 @@ void MtlfMetalContext::SetRenderPipelineState()
             }
         }
         else {
-            if (gpus[currentGPU].mtlColorTexture != nil) {
-                boost::hash_combine(hashVal, gpus[currentGPU].mtlColorTexture.pixelFormat);
-            }
-            else {
+//            if (gpus[currentGPU].mtlColorTexture != nil) {
+//                boost::hash_combine(hashVal, gpus[currentGPU].mtlColorTexture.pixelFormat);
+//            }
+//            else {
                 boost::hash_combine(hashVal, outputPixelFormat);
-            }
+//            }
             
-            if (gpus[currentGPU].mtlDepthTexture != nil) {
-                boost::hash_combine(hashVal, gpus[currentGPU].mtlDepthTexture.pixelFormat);
-            }
-            else {
+//            if (gpus[currentGPU].mtlDepthTexture != nil) {
+//                boost::hash_combine(hashVal, gpus[currentGPU].mtlDepthTexture.pixelFormat);
+//            }
+//            else {
                 boost::hash_combine(hashVal, outputDepthFormat);
-            }
+//            }
         }
 
         // Update colour attachments hash
@@ -1287,26 +1146,26 @@ void MtlfMetalContext::SetRenderPipelineState()
                 renderPipelineStateDescriptor.colorAttachments[0].destinationRGBBlendFactor = blendState.destColorFactor;
                 renderPipelineStateDescriptor.colorAttachments[0].destinationAlphaBlendFactor = blendState.destAlphaFactor;
                 
-                if (gpus[currentGPU].mtlMultisampleColorTexture != nil) {
-                    renderPipelineStateDescriptor.colorAttachments[0].pixelFormat =
-                        gpus[currentGPU].mtlMultisampleColorTexture.pixelFormat;
-                }
-                else if (gpus[currentGPU].mtlColorTexture != nil) {
-                    renderPipelineStateDescriptor.colorAttachments[0].pixelFormat =
-                        gpus[currentGPU].mtlColorTexture.pixelFormat;
-                }
-                else {
+//                if (gpus[currentGPU].mtlMultisampleColorTexture != nil) {
+//                    renderPipelineStateDescriptor.colorAttachments[0].pixelFormat =
+//                        gpus[currentGPU].mtlMultisampleColorTexture.pixelFormat;
+//                }
+//                else if (gpus[currentGPU].mtlColorTexture != nil) {
+//                    renderPipelineStateDescriptor.colorAttachments[0].pixelFormat =
+//                        gpus[currentGPU].mtlColorTexture.pixelFormat;
+//                }
+//                else {
                     renderPipelineStateDescriptor.colorAttachments[0].pixelFormat = outputPixelFormat;
-                }
+//                }
                 
-                if (gpus[currentGPU].mtlDepthTexture != nil) {
-                    renderPipelineStateDescriptor.depthAttachmentPixelFormat =
-                        gpus[currentGPU].mtlDepthTexture.pixelFormat;
-                }
-                else {
+//                if (gpus[currentGPU].mtlDepthTexture != nil) {
+//                    renderPipelineStateDescriptor.depthAttachmentPixelFormat =
+//                        gpus[currentGPU].mtlDepthTexture.pixelFormat;
+//                }
+//                else {
                     renderPipelineStateDescriptor.depthAttachmentPixelFormat = outputDepthFormat;
-                    renderPipelineStateDescriptor.stencilAttachmentPixelFormat = outputDepthFormat;
-                }
+//                    renderPipelineStateDescriptor.stencilAttachmentPixelFormat = outputDepthFormat;
+//                }
             }
         }
 
@@ -2239,8 +2098,6 @@ void MtlfMetalContext::StartFrame() {
     currentDevice = renderDevices[currentGPU];
 #endif
     GPUTimerResetTimer(frameCount);
-    
-    [captureScopeFullFrame[currentGPU] beginScope];
 }
 
 void MtlfMetalContext::EndFrameForThread() {
@@ -2260,8 +2117,6 @@ void MtlfMetalContext::EndFrame() {
     
     // Reset it here as OSD may get invoked before StartFrame() is called.
     OSDEnabledThisFrame = false;
-    
-    [captureScopeFullFrame[currentGPU] endScope];
 }
 
 void MtlfMetalContext::BeginCaptureSubset(int gpuIndex)

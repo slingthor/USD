@@ -50,23 +50,33 @@ public:
     HgiBlitEncoderUniquePtr CreateBlitEncoder() override;
     
     HGIMETAL_API
-    void FlushEncoders() override;
-    
+    void BlockUntilCompleted() override;
+
+    HGIMETAL_API
+    void BlockUntilSubmitted() override;
+
     /// Metal Specific
-    id<MTLCommandBuffer> GetCommandBuffer() {
-        return _commandBuffer;
+    id<MTLDevice> GetDevice() const {
+        return _device;
     }
+
+    // A contract is taken to put work on the command buffer when calling this
+    id<MTLCommandBuffer> GetCommandBuffer();
+    
+    void StartFrame();
 
 protected:
     friend class HgiMetal;
 
     HGIMETAL_API
-    HgiMetalImmediateCommandBuffer(id<MTLDevice> device);
+    HgiMetalImmediateCommandBuffer(
+        id<MTLDevice> device, id<MTLCommandQueue> commandQueue);
     
 private:
     HgiMetalImmediateCommandBuffer & operator=
         (const HgiMetalImmediateCommandBuffer&) = delete;
-    HgiMetalImmediateCommandBuffer(const HgiMetalImmediateCommandBuffer&) = delete;
+    HgiMetalImmediateCommandBuffer(const HgiMetalImmediateCommandBuffer&) =
+        delete;
 
     friend std::ostream& operator<<(
         std::ostream& out,
@@ -75,6 +85,7 @@ private:
     id<MTLDevice> _device;
     id<MTLCommandQueue> _commandQueue;
     id<MTLCommandBuffer> _commandBuffer;
+    bool _workToFlush;
 };
 
 

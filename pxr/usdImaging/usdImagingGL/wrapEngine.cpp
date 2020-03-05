@@ -150,9 +150,6 @@ void wrapEngine()
             .def("SetRendererSetting", &UsdImagingGLEngine::SetRendererSetting)
             .def("SetColorCorrectionSettings", 
                     &UsdImagingGLEngine::SetColorCorrectionSettings)
-            .def("IsColorCorrectionCapable", 
-                &UsdImagingGLEngine::IsColorCorrectionCapable)
-                .staticmethod("IsColorCorrectionCapable")
             .def("IsPauseRendererSupported", 
                 &UsdImagingGLEngine::IsPauseRendererSupported)
             .def("PauseRenderer", &UsdImagingGLEngine::PauseRenderer)

@@ -27,6 +27,8 @@
 #include "pxr/imaging/hdSt/Metal/renderDelegateMetal.h"
 #include "pxr/imaging/hdSt/tokens.h"
 
+#include "pxr/imaging/hd/driver.h"
+
 #include "pxr/imaging/garch/resourceFactory.h"
 
 #include "pxr/base/tf/envSetting.h"
@@ -55,24 +57,7 @@ HdStRenderDelegateMetal::HdStRenderDelegateMetal()
     , _mtlRenderPassDescriptorForInterop(nil)
     , _mtlRenderPassDescriptor(nil)
 {
-    id<MTLDevice> currentDevice = nil;
-    
-    if (MtlfMetalContext::GetMetalContext()) {
-        currentDevice = MtlfMetalContext::GetMetalContext()->currentDevice;
-    }
-
-    HgiMetal *hgi = new HgiMetal(currentDevice);
-
-    if (currentDevice == nil) {
-        MtlfMetalContext::CreateMetalContext(static_cast<HgiMetal*>(hgi));
-    }
-    
-    delete hgi;
-
-    _deviceDesc = TfToken(_MetalDeviceDescriptor(MtlfMetalContext::GetMetalContext()->currentDevice));
 //    _Initialize();
-
-    _inFlightSemaphore = dispatch_semaphore_create(3);
 }
 
 HdStRenderDelegateMetal::HdStRenderDelegateMetal(HdRenderSettingsMap const& settingsMap)
@@ -81,8 +66,20 @@ HdStRenderDelegateMetal::HdStRenderDelegateMetal(HdRenderSettingsMap const& sett
     , _mtlRenderPassDescriptor(nil)
 {
     _deviceDesc = TfToken(_MetalDeviceDescriptor(MtlfMetalContext::GetMetalContext()->currentDevice));
+}
+
+void
+HdStRenderDelegateMetal::SetDrivers(HdDriverVector const& drivers)
+{
+    HdStRenderDelegate::SetDrivers(drivers);
+
+    id<MTLDevice> currentDevice = nil;
+
+    if (!MtlfMetalContext::GetMetalContext()) {
+        MtlfMetalContext::CreateMetalContext(static_cast<HgiMetal*>(_hgi));
+    }
     
-    _inFlightSemaphore = dispatch_semaphore_create(3);
+    _deviceDesc = TfToken(_MetalDeviceDescriptor(MtlfMetalContext::GetMetalContext()->currentDevice));
 }
 
 HdRenderSettingDescriptorList
@@ -116,28 +113,6 @@ HdStRenderDelegateMetal::GetRenderSettingDescriptors() const
 
 void HdStRenderDelegateMetal::SetRenderSetting(TfToken const& key, VtValue const& value)
 {
-    if (key == HdStRenderSettingsTokens->graphicsAPI) {
-        _deviceDesc = TfToken(value.Get<std::string>());
-        
-#if defined(ARCH_OS_MACOS)
-        NSArray<id<MTLDevice>> *_deviceList = MTLCopyAllDevices();
-#else
-        NSMutableArray<id<MTLDevice>> *_deviceList = [[NSMutableArray alloc] init];
-        [_deviceList addObject:MTLCreateSystemDefaultDevice()];
-#endif
-        
-        for (id<MTLDevice> dev in _deviceList) {
-            if (value == _MetalDeviceDescriptor(dev)) {
-                // Recreate the underlying Metal context
-                MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
-                context->RecreateInstance(dev, context->gpus[0].mtlColorTexture.width, context->gpus[0].mtlColorTexture.height);
-                break;
-            }
-        }
-
-        return;
-    }
-
     HdStRenderDelegate::SetRenderSetting(key, value);
 }
 
@@ -216,17 +191,6 @@ void HdStRenderDelegateMetal::PrepareRender(
         GLint viewport[4];
         glGetIntegerv( GL_VIEWPORT, viewport );
         
-        dispatch_semaphore_wait(_inFlightSemaphore, DISPATCH_TIME_FOREVER);
-        
-        if (context->gpus[context->currentGPU].mtlColorTexture.width != viewport[2] ||
-            context->gpus[context->currentGPU].mtlColorTexture.height != viewport[3]) {
-            context->InitGLInterop();
-
-            NSLog(@"updated viewport: %d, %d", viewport[2], viewport[3]);
-            
-            context->AllocateAttachments(viewport[2], viewport[3]);
-        }
-    
         if (_mtlRenderPassDescriptorForInterop == nil)
             _mtlRenderPassDescriptorForInterop =
                 [[MTLRenderPassDescriptor alloc] init];
@@ -252,17 +216,14 @@ void HdStRenderDelegateMetal::PrepareRender(
         depthAttachment.storeAction = MTLStoreActionStore;
         depthAttachment.clearDepth = 1.0f;
         
-        colorAttachment.texture = context->gpus[context->currentGPU].mtlMultisampleColorTexture;
-        
         GLfloat clearColor[4];
         glGetFloatv(GL_COLOR_CLEAR_VALUE, clearColor);
-        clearColor[3] = 1.0f;
+        clearColor[3] = 0.0f;
         
         colorAttachment.clearColor = MTLClearColorMake(clearColor[0],
                                                        clearColor[1],
                                                        clearColor[2],
                                                        clearColor[3]);
-        depthAttachment.texture = context->gpus[context->currentGPU].mtlDepthTexture;
         
         _mtlRenderPassDescriptor = _mtlRenderPassDescriptorForInterop;
     }
@@ -358,53 +319,33 @@ void HdStRenderDelegateMetal::PrepareRender(
     } else if (params.enableSampleAlphaToCoverage) {
         context->SetAlphaCoverageEnable(true);
     }
-
-    // TODO:
-    //  * forceRefresh
-    //  * showGuides, showRender, showProxy
-    //  * gammaCorrectColors
 }
+
 void HdStRenderDelegateMetal::FinalizeRender()
 {
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
-
+/*
     context->StartFrameForThread();
 
     // Create a new command buffer for each render pass to the current drawable
     context->CreateCommandBuffer(METALWORKQUEUE_DEFAULT);
     context->LabelCommandBuffer(@"Post Process", METALWORKQUEUE_DEFAULT);
 
-    if (_renderOutput == DelegateParams::RenderOutput::OpenGL) {
-        context->CopyToInterop();
-    }
-
-    __block dispatch_semaphore_t block_sema = _inFlightSemaphore;
-    [context->GetWorkQueue(METALWORKQUEUE_DEFAULT).commandBuffer addCompletedHandler:^(id<MTLCommandBuffer> buffer)
-     {
-        dispatch_semaphore_signal(block_sema);
-     }];
-
     // Commit the render buffer (will wait for GS to complete if present)
     // We wait until scheduled, because we're about to consume the Metal
     // generated textures in an OpenGL blit
     context->CommitCommandBufferForThread(
-        false/*_renderOutput == DelegateParams::RenderOutput::OpenGL*/, false);
+        false, false); */
     context->CleanupUnusedBuffers(false);
 
     context->EndFrameForThread();
     context->EndFrame();
-
+    
     if (_renderOutput == DelegateParams::RenderOutput::Metal) {
         if (!context->GetDrawTarget()) {
             [_mtlRenderPassDescriptor release];
             _mtlRenderPassDescriptor = nil;
         }
-    }
-
-    // Finalize rendering here & push the command buffer to the GPU
-    if (_renderOutput == DelegateParams::RenderOutput::OpenGL) {
-        //context->BlitToOpenGL();
-        GLF_POST_PENDING_GL_ERRORS();
     }
 }
 

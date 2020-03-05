@@ -26,6 +26,7 @@
 
 #include "pxr/pxr.h"
 #include "pxr/imaging/hgi/api.h"
+#include "pxr/imaging/hgi/attachmentDesc.h"
 #include "pxr/imaging/hgi/enums.h"
 #include "pxr/imaging/hgi/handle.h"
 #include "pxr/imaging/hgi/resourceBindings.h"
@@ -177,11 +178,11 @@ bool operator!=(
 ///
 /// <ul>
 /// <li>depthTestEnabled:
-///   When enabled uses `depthCompareOp` to test if a fragment passes the 
+///   When enabled uses `depthCompareFn` to test if a fragment passes the 
 ///   depth test. Note that depth writes are automatically disabled when
 ///   depthTestEnabled is false.</li>
 /// <li>depthWriteEnabled:
-///   When enabled uses `depthCompareOp` to test if a fragment passes the 
+///   When enabled uses `depthCompareFn` to test if a fragment passes the 
 ///   depth test. Note that depth writes are automatically disabled when
 ///   depthTestEnabled is false.</li>
 /// <li>stencilTestEnabled:
@@ -195,6 +196,8 @@ struct HgiDepthStencilState
 
     bool depthTestEnabled;
     bool depthWriteEnabled;
+    HgiCompareFunction depthCompareFn;
+
     bool stencilTestEnabled;
 };
 
@@ -229,6 +232,13 @@ bool operator!=(
 /// <li>rasterizationState:
 ///   (Graphics pipeline only)
 ///   Various settings to control rasterization.</li>
+/// <li>vertexBuffers:
+///   Description of the vertex buffers (per-vertex attributes).
+///   The actual VBOs are bound via GraphicsEncoder.</li>
+/// <li>colorAttachmentDescs:
+///   Describes each of the color attachments.</li>
+/// <li>depthAttachmentDesc:
+///   Describes the depth attachment (optional)</li>
 /// </ul>
 ///
 struct HgiPipelineDesc
@@ -244,6 +254,8 @@ struct HgiPipelineDesc
     HgiMultiSampleState multiSampleState;
     HgiRasterizationState rasterizationState;
     HgiVertexBufferDescVector vertexBuffers;
+    HgiAttachmentDescVector colorAttachmentDescs;
+    HgiAttachmentDesc depthAttachmentDesc;
 };
 
 HGI_API

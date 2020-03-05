@@ -26,42 +26,6 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 bool operator==(
-    const HgiAttachmentDesc& lhs,
-    const HgiAttachmentDesc& rhs) 
-{
-    return  lhs.clearValue == rhs.clearValue &&
-            lhs.loadOp == rhs.loadOp &&
-            lhs.storeOp == rhs.storeOp &&
-            lhs.blendEnabled == rhs.blendEnabled;
-}
-
-bool operator!=(
-    const HgiAttachmentDesc& lhs,
-    const HgiAttachmentDesc& rhs)
-{
-    return !(lhs == rhs);
-}
-
-std::ostream& operator<<(
-    std::ostream& out,
-    const HgiAttachmentDesc& attachment)
-{
-    out << "HgiAttachmentDesc: {"
-        << "clearValue: " << attachment.clearValue << ", "
-        << "loadOp: " << attachment.loadOp << ", "
-        << "storeOp: " << attachment.storeOp << ", "
-        << "blendEnabled: " << attachment.blendEnabled << ", "
-        << "srcColorBlendFactor: " << attachment.srcColorBlendFactor << ", "
-        << "dstColorBlendFactor: " << attachment.dstColorBlendFactor << ", "
-        << "colorBlendOp: " << attachment.colorBlendOp << ", "
-        << "srcAlphaBlendFactor: " << attachment.srcAlphaBlendFactor << ", "
-        << "dstAlphaBlendFactor: " << attachment.dstAlphaBlendFactor << ", "
-        << "alphaBlendOp: " << attachment.alphaBlendOp <<
-    "}";
-    return out;
-}
-
-bool operator==(
     const HgiGraphicsEncoderDesc& lhs,
     const HgiGraphicsEncoderDesc& rhs) 
 {

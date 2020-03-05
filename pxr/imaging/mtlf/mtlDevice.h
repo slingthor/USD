@@ -48,7 +48,6 @@
 
 #include "pxr/imaging/mtlf/api.h"
 #include "pxr/imaging/garch/texture.h"
-#include "pxr/imaging/hgiMetal/hgi.h"
 #include "pxr/base/arch/threads.h"
 #include "pxr/base/gf/vec4f.h"
 #include "pxr/base/tf/token.h"
@@ -61,7 +60,7 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-class MtlfGlInterop;
+class HgiMetal;
 
 // How old a buffer must be before it can be reused - 0 should allow for most optimal memory footprint, higher values can be used for debugging issues
 #define METAL_SAFE_BUFFER_REUSE_AGE 1
@@ -157,11 +156,7 @@ struct MetalWorkQueue {
 
 class MtlfMetalContext : public boost::noncopyable {
 public:
-#if defined(ARCH_OS_IOS)
 #define MAX_GPUS    1
-#else
-#define MAX_GPUS    2 // Can't be bigger than the maximum number of GPUs in a MTLDevice peer group
-#endif
     struct MtlfMultiBuffer {
         
         MtlfMultiBuffer() {}
@@ -239,7 +234,7 @@ public:
 
     MTLF_API
     static MtlfMetalContextSharedPtr CreateMetalContext(HgiMetal *hgi) {
-        context = MtlfMetalContextSharedPtr(new MtlfMetalContext(hgi->GetDevice(), 256, 256));
+        context = MtlfMetalContextSharedPtr(new MtlfMetalContext(hgi));
 
         return context;
     }
@@ -253,23 +248,6 @@ public:
     /// Returns whether this interface has been initialized.
     MTLF_API
     static bool IsInitialized();
-    
-    /// Returns a reset instance for the current Metal device.
-    MTLF_API
-    void RecreateInstance(id<MTLDevice> device, int width, int height);
-
-    MTLF_API
-    void AllocateAttachments(int width, int height);
-    
-    MTLF_API
-    void InitGLInterop();
-
-    /// Blit the current render target contents to the OpenGL FBO
-    MTLF_API
-    void BlitToOpenGL();
-    
-    MTLF_API
-    void CopyToInterop();
 
     MTLF_API
     id<MTLBuffer> GetIndexBuffer() const {
@@ -515,15 +493,11 @@ public:
     void EndCaptureSubset(int gpuIndex);
 
     id<MTLDevice> currentDevice;
-    id<MTLDevice> interopDevice;
     NSMutableArray<id<MTLDevice>> *renderDevices;
     int currentGPU;
 
     struct GPUInstance {
         id<MTLCommandQueue> commandQueue;
-        id<MTLTexture> mtlColorTexture;
-        id<MTLTexture> mtlMultisampleColorTexture;
-        id<MTLTexture> mtlDepthTexture;
 
         // Dummy black texture for missing textures
         id<MTLTexture> blackTexture2D;
@@ -555,9 +529,9 @@ public:
 protected:
 
     MTLF_API
-    MtlfMetalContext(id<MTLDevice> device, int width, int height);
+    MtlfMetalContext(HgiMetal *hgi);
     
-    void Init(id<MTLDevice> device, int width, int height);
+    void Init(HgiMetal *hgi);
     void Cleanup();
 
     MTLF_API
@@ -839,12 +813,7 @@ private:
     
     bool OSDEnabledThisFrame = false;
     
-    id<MTLCaptureScope> captureScopeFullFrame[MAX_GPUS];
     id<MTLCaptureScope> captureScopeSubset[MAX_GPUS];
-
-#if defined(ARCH_GFX_OPENGL)
-    MtlfGlInterop *glInterop;
-#endif
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

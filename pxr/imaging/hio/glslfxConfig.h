@@ -35,6 +35,7 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+class Hgi;
 
 /// \class HioGlslfxConfig 
 ///
@@ -127,7 +128,8 @@ public:
     /// The \p filename parameter is only used for error reporting.
     ///
     HIO_API
-    static HioGlslfxConfig * Read(std::string const & input,
+    static HioGlslfxConfig * Read(Hgi *hgi,
+                                  std::string const & input,
                                   std::string const & filename,
                                   std::string *errorStr);
 
@@ -157,7 +159,7 @@ public:
 
 private:
     // private ctor. should only be called by ::Read
-    HioGlslfxConfig(VtDictionary const & dict, std::string *errorStr);
+    HioGlslfxConfig(Hgi *hgi, VtDictionary const & dict, std::string *errorStr);
 
     void _Init(VtDictionary const & dict, std::string *errorStr);
 
@@ -176,6 +178,7 @@ private:
     _SourceKeyMap _GetSourceKeyMap(VtDictionary const & dict,
                                    std::string *errorStr) const;
 
+    Hgi* _hgi;
     Parameters _params;
     Textures _textures;
     Attributes _attributes;

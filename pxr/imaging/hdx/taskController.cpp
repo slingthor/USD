@@ -27,7 +27,7 @@
 #include "pxr/imaging/hd/renderBuffer.h"
 #include "pxr/imaging/hd/renderDelegate.h"
 #include "pxr/imaging/hd/sceneDelegate.h"
-#include "pxr/imaging/hdx/aovResolveTask.h"
+#include "pxr/imaging/hdx/aovInputTask.h"
 #include "pxr/imaging/hdx/colorizeSelectionTask.h"
 #include "pxr/imaging/hdx/colorizeTask.h"
 #include "pxr/imaging/hdx/colorChannelTask.h"
@@ -63,6 +63,7 @@ TF_DEFINE_PRIVATE_TOKENS(
     // tasks
     (simpleLightTask)
     (shadowTask)
+    (aovInputTask)
     (selectionTask)
     (colorizeTask)
     (colorizeSelectionTask)
@@ -71,8 +72,6 @@ TF_DEFINE_PRIVATE_TOKENS(
     (colorChannelTask)
     (pickTask)
     (pickFromRenderBufferTask)
-    (aovColorResolveTask)
-    (aovDepthResolveTask)
     (presentTask)
 
     // global camera
@@ -222,6 +221,7 @@ HdxTaskController::~HdxTaskController()
     }
 
     SdfPath const tasks[] = {
+        _aovInputTaskId,
         _oitResolveTaskId,
         _selectionTaskId,
         _simpleLightTaskId,
@@ -232,8 +232,6 @@ HdxTaskController::~HdxTaskController()
         _colorChannelTaskId,
         _pickTaskId,
         _pickFromRenderBufferTaskId,
-        _aovColorResolveTaskId,
-        _aovDepthResolveTaskId,
         _presentTaskId
     };
 
@@ -265,7 +263,7 @@ HdxTaskController::_CreateRenderGraph()
     // parameter of most tasks.
     if (_CamerasSupported()) {
         _CreateCamera();
-    } 
+    }
 
     // XXX: The general assumption is that we have "stream" backends which are
     // rasterization based and have their own rules, like multipass for
@@ -273,7 +271,6 @@ HdxTaskController::_CreateRenderGraph()
     // delegate capabilities evolve, we'll need a more complicated switch
     // than this...
     if (_IsStormRenderingBackend(GetRenderIndex())) {
-        // Rendering rendergraph
         _CreateLightingTask();
         _CreateShadowTask();
         _renderTaskIds.push_back(_CreateRenderTask(
@@ -286,17 +283,14 @@ HdxTaskController::_CreateRenderGraph()
         _renderTaskIds.push_back(_CreateRenderTask(
             HdStMaterialTagTokens->volume));
 
-        _CreateOitResolveTask();
-
-        _aovColorResolveTaskId = 
-            _CreateAovResolveTask(_tokens->aovColorResolveTask);
-        _aovDepthResolveTaskId =
-            _CreateAovResolveTask(_tokens->aovDepthResolveTask);
-
-        _CreateSelectionTask();
-        _CreateColorCorrectionTask();
-        _CreateColorChannelTask();
-        _CreatePresentTask();
+        if (_AovsSupported()) {
+            _CreateAovInputTask();
+            _CreateOitResolveTask();
+            _CreateSelectionTask();
+            _CreateColorCorrectionTask();
+            _CreateColorChannelTask();
+            _CreatePresentTask();
+        }
 
         // Picking rendergraph
         _CreatePickTask();
@@ -310,18 +304,17 @@ HdxTaskController::_CreateRenderGraph()
         _renderTaskIds.push_back(_CreateRenderTask(TfToken()));
 
         if (_AovsSupported()) {
-            _CreateColorizeTask();
+            _CreateAovInputTask();
+// todo remove or make a gpu task out of it
+            //_CreateColorizeTask();
             _CreateColorizeSelectionTask();
             _CreatePickFromRenderBufferTask();
-        }
-
-        _CreateColorCorrectionTask();
-        _CreateColorChannelTask();
-
-        // Initialize the AOV system to render color. Note:
-        // SetRenderOutputs special-cases color to include support for
-        // depth-compositing and selection highlighting/picking.
-        if (_AovsSupported()) {
+            _CreateColorCorrectionTask();
+            _CreateColorChannelTask();
+            _CreatePresentTask();
+            // Initialize the AOV system to render color. Note:
+            // SetRenderOutputs special-cases color to include support for
+            // depth-compositing and selection highlighting/picking.
             SetRenderOutputs({HdAovTokens->color});
         }
     }
@@ -587,20 +580,18 @@ HdxTaskController::_CreatePickFromRenderBufferTask()
         taskParams);
 }
 
-SdfPath 
-HdxTaskController::_CreateAovResolveTask(TfToken const& aovName)
+void 
+HdxTaskController::_CreateAovInputTask()
 {
-    SdfPath aovResolveTaskId = GetControllerId().AppendChild(aovName);
+    _aovInputTaskId = GetControllerId().AppendChild(_tokens->aovInputTask);
 
-    HdxAovResolveTaskParams taskParams;
+    HdxAovInputTaskParams taskParams;
 
-    GetRenderIndex()->InsertTask<HdxAovResolveTask>(&_delegate,
-        aovResolveTaskId);
+    GetRenderIndex()->InsertTask<HdxAovInputTask>(&_delegate,
+        _aovInputTaskId);
 
-    _delegate.SetParameter(aovResolveTaskId, HdTokens->params,
-        taskParams);
-
-    return aovResolveTaskId;    
+    _delegate.SetParameter(_aovInputTaskId, HdTokens->params,
+        taskParams);   
 }
 
 void
@@ -610,6 +601,8 @@ HdxTaskController::_CreatePresentTask()
         _tokens->presentTask);
 
     HdxPresentTaskParams taskParams;
+    
+    taskParams.flipImage = !_IsStormRenderingBackend(GetRenderIndex());
 
     GetRenderIndex()->InsertTask<HdxPresentTask>(&_delegate,
         _presentTaskId);
@@ -726,7 +719,7 @@ HdxTaskController::GetRenderingTasks() const
      * - simpleLightTaskId
      * - shadowTaskId
      * - renderTaskIds (There may be more than one)
-     * - aovResolveTaskId (There may be more than one)
+     * - aovInputTaskId
      * - selectionTaskId
      * - colorizeTaskId
      * - colorizeSelectionTaskId
@@ -751,6 +744,11 @@ HdxTaskController::GetRenderingTasks() const
     if (!_renderTaskIds.empty()) {
         SdfPath volumeId = _GetRenderTaskPath(HdStMaterialTagTokens->volume);
 
+// todo Could already start rendering additive in storm?
+// So the 'renderTask' really means render opaque and additive?
+// Just not yet OIT stuff?
+// Or could we move it all?
+
         // Render opaque prims, additive and translucent blended prims.
         // Skip volume prims, because volume rendering reads from the depth
         // buffer so we must resolve depth first first.
@@ -760,14 +758,21 @@ HdxTaskController::GetRenderingTasks() const
             }
         }
 
-        // Resolve color multi-sample Aov.
-        if (!_aovColorResolveTaskId.IsEmpty()) {
-            tasks.push_back(GetRenderIndex()->GetTask(_aovColorResolveTaskId));
+// todo note for Hgi we want an 'enableResolve' option because we want 3
+// render tasks to run, but only resolve at the 3rd. But we want to use the
+// same renderpass / graphics encoder desc / attachments.
+// Just not do the resolve until the last render task.
+
+        // Take the aov results from the render tasks, resolve the multisample
+        // images and put the results into gpu textures onto shared context.
+        if (!_aovInputTaskId.IsEmpty()) {
+            tasks.push_back(GetRenderIndex()->GetTask(_aovInputTaskId));
         }
-        // Resolve depth multi-sample Aov
-        if (!_aovDepthResolveTaskId.IsEmpty()) {
-            tasks.push_back(GetRenderIndex()->GetTask(_aovDepthResolveTaskId));
-        }
+
+// todo the volume render task should use the HgiTexture for color and depth now.
+// Not use the aov buffer anymore.....
+// Perhaps do the same for translucent OIT since it uses SSBO to render into.
+// There is no benefit rendering into MSAA buffers.
 
         // Render volume prims
         if (std::find(_renderTaskIds.begin(), _renderTaskIds.end(), volumeId) 
@@ -775,6 +780,8 @@ HdxTaskController::GetRenderingTasks() const
             tasks.push_back(GetRenderIndex()->GetTask(volumeId));
         }
     }
+
+// todo use the hgi textures
 
     // Merge translucent and volume pixels into color target
     if (!_oitResolveTaskId.IsEmpty()) {
@@ -784,6 +791,11 @@ HdxTaskController::GetRenderingTasks() const
     if (!_selectionTaskId.IsEmpty() && _SelectionEnabled())
         tasks.push_back(GetRenderIndex()->GetTask(_selectionTaskId));
 
+// todo the colorize task can become a gpu task that can convert whatever is
+// in the hgi aov textures to a color-range that is more pleasant for the
+// user to look at. (e.g. put normals in 0-1 range)
+
+/*
     // Take path-tracer CPU pixels and render to screen
     if (!_colorizeTaskId.IsEmpty()) {
         // XXX Colorize already applies color quantization since it renders
@@ -793,27 +805,33 @@ HdxTaskController::GetRenderingTasks() const
         // Future work is to stop Colorize from rendering to the 8bit FB.
         // Instead it should Colorize into a render target that color correction
         // can then quantize.
+// todo remove quantization
         if (_ColorizeQuantizationEnabled() && _ColorCorrectionEnabled()) {
             tasks.push_back(GetRenderIndex()->GetTask(_colorCorrectionTaskId));
         }
 
         tasks.push_back(GetRenderIndex()->GetTask(_colorizeTaskId));
     }
+*/
 
+// todo apply on top of hgi aov?
     if (!_colorizeSelectionTaskId.IsEmpty() && _ColorizeSelectionEnabled())
         tasks.push_back(GetRenderIndex()->GetTask(_colorizeSelectionTaskId));
 
+// todo use the hgi version of color correction
     // Apply color correction / grading (convert to display colors)
     // XXX Skip is Colorize has already quantized the colors.
-    if (_ColorCorrectionEnabled() && !_ColorizeQuantizationEnabled()) {
+    if (_ColorCorrectionEnabled() /* todo && !_ColorizeQuantizationEnabled()*/) {
         tasks.push_back(GetRenderIndex()->GetTask(_colorCorrectionTaskId));
     }
 
+// todo convert to hgi
     // Apply color channel filtering
     if (_ColorChannelEnabled()) {
         tasks.push_back(GetRenderIndex()->GetTask(_colorChannelTaskId));
     }
 
+// todo use the hgi textuters and blit those to screen.
     // Render pixels to screen
     if (!_presentTaskId.IsEmpty())
         tasks.push_back(GetRenderIndex()->GetTask(_presentTaskId));
@@ -851,12 +869,11 @@ HdxTaskController::_LoadDefaultDomeLightTexture()
                 GarchImage::ImageOriginLocation::OriginUpperLeft);
 
     _defaultDomeLightTextureResource = HdTextureResourceSharedPtr(
-        HdStResourceFactory::GetInstance()->NewSimpleTextureResource(
-            texture, HdTextureType::Uv,
-            HdWrap::HdWrapRepeat, HdWrap::HdWrapRepeat,
-            HdWrap::HdWrapRepeat, HdMinFilter::HdMinFilterLinear,
-            HdMagFilter::HdMagFilterLinear,
-            0.0f));
+                HdStResourceFactory::GetInstance()->NewSimpleTextureResource(texture, HdTextureType::Uv,
+                HdWrap::HdWrapRepeat, HdWrap::HdWrapRepeat, 
+                HdWrap::HdWrapRepeat, HdMinFilter::HdMinFilterLinear, 
+                HdMagFilter::HdMagFilterLinear, 
+                0.0f));
 }
 
 void 
@@ -1073,34 +1090,22 @@ HdxTaskController::SetViewportRenderOutput(TfToken const& name)
     }
     _viewportAov = name;
 
-    if (!_aovColorResolveTaskId.IsEmpty()) {
-        HdxAovResolveTaskParams params;
-        // Only resolve color aov if we are visualizing color (+ depth)
-        if (name == HdAovTokens->color) {
+    if (!_aovInputTaskId.IsEmpty()) {
+        HdxAovInputTaskParams params;
+        if (name.IsEmpty()) {
+            params.aovBufferPath = SdfPath::EmptyPath();
+            params.depthBufferPath = SdfPath::EmptyPath();
+        } else if (name == HdAovTokens->color) {
             params.aovBufferPath = _GetAovPath(HdAovTokens->color);
+            params.depthBufferPath = _GetAovPath(HdAovTokens->depth);
         } else {
-            params.aovBufferPath = SdfPath::EmptyPath();
+            params.aovBufferPath = _GetAovPath(name);
+            params.depthBufferPath = SdfPath::EmptyPath();
         }
 
-        _delegate.SetParameter(_aovColorResolveTaskId, HdTokens->params,params);
+        _delegate.SetParameter(_aovInputTaskId, HdTokens->params, params);
         GetRenderIndex()->GetChangeTracker().MarkTaskDirty(
-            _aovColorResolveTaskId, HdChangeTracker::DirtyParams);
-    }
-
-    if (!_aovDepthResolveTaskId.IsEmpty()) {
-        HdxAovResolveTaskParams params;
-        // Only resolve depth aov if we are visualizing depth or color, since
-        // color implicitely includes depth.
-        if (name == HdAovTokens->color ||
-            name == HdAovTokens->depth) {
-            params.aovBufferPath = _GetAovPath(HdAovTokens->depth);
-        } else {
-            params.aovBufferPath = SdfPath::EmptyPath();
-        }
-
-        _delegate.SetParameter(_aovDepthResolveTaskId, HdTokens->params,params);
-        GetRenderIndex()->GetChangeTracker().MarkTaskDirty(
-            _aovDepthResolveTaskId, HdChangeTracker::DirtyParams);
+            _aovInputTaskId, HdChangeTracker::DirtyParams);
     }
 
     if (!_colorizeTaskId.IsEmpty()) {
@@ -1192,7 +1197,6 @@ HdxTaskController::SetViewportRenderOutput(TfToken const& name)
                 _colorCorrectionTaskId, HdTokens->params);
 
         colCorParams.aovName = name;
-        colCorParams.aovBufferPath = _GetAovPath(name);
 
         _delegate.SetParameter(_colorCorrectionTaskId, HdTokens->params,
             colCorParams);
@@ -1212,20 +1216,9 @@ HdxTaskController::SetViewportRenderOutput(TfToken const& name)
     }
 
     if (!_presentTaskId.IsEmpty()) {
-        HdxPresentTaskParams params;
-        if (name.IsEmpty()) {
-            // Empty token means don't colorize anything.
-            params.aovBufferPath = SdfPath::EmptyPath();
-            params.depthBufferPath = SdfPath::EmptyPath();
-        } else if (name == HdAovTokens->color) {
-            // Color is depth-composited...
-            params.aovBufferPath = _GetAovPath(name);
-            params.depthBufferPath = _GetAovPath(HdAovTokens->depth);
-        } else {
-            // But AOV visualizations are not.
-            params.aovBufferPath = _GetAovPath(name);
-            params.depthBufferPath = SdfPath::EmptyPath();
-        }
+        HdxPresentTaskParams params =
+            _delegate.GetParameter<HdxPresentTaskParams>(
+                _presentTaskId, HdTokens->params);
 
         _delegate.SetParameter(_presentTaskId, HdTokens->params, params);
         GetRenderIndex()->GetChangeTracker().MarkTaskDirty(
@@ -1894,7 +1887,6 @@ HdxTaskController::SetColorCorrectionParams(
     // correction on. (Currently this AOV is controlled via TaskController)
     HdxColorCorrectionTaskParams newParams = params;
     newParams.aovName = oldParams.aovName;
-    newParams.aovBufferPath = oldParams.aovBufferPath;
 
     if (newParams != oldParams) {
         _delegate.SetParameter(

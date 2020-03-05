@@ -37,77 +37,72 @@ HgiMetalTexture::HgiMetalTexture(HgiMetal *hgi, HgiTextureDesc const & desc)
     : HgiTexture(desc)
     , _textureId(nil)
 {
-
-    if (desc.dimensions[2] > 1) {
-        TF_CODING_ERROR("Missing implementation for texture layers");
+    MTLPixelFormat mtlFormat;
+    MTLResourceOptions resourceOptions = MTLResourceStorageModePrivate;
+    MTLTextureUsage usage = MTLTextureUsageUnknown;
+    
+    if (desc.initialData && desc.pixelsByteSize > 0) {
+        resourceOptions = MTLResourceStorageModeManaged;
     }
 
-    MTLPixelFormat mtlFormat = MTLPixelFormatInvalid;
+    mtlFormat = HgiMetalConversions::GetPixelFormat(desc.format);
 
     if (desc.usage & HgiTextureUsageBitsColorTarget) {
-        mtlFormat = HgiMetalConversions::GetPixelFormat(desc.format);
+        usage = MTLTextureUsageRenderTarget;
     } else if (desc.usage & HgiTextureUsageBitsDepthTarget) {
         TF_VERIFY(desc.format == HgiFormatFloat32);
         mtlFormat = MTLPixelFormatDepth32Float;
-    } else {
-        TF_CODING_ERROR("Unknown HgTextureUsage bit");
+        usage = MTLTextureUsageRenderTarget;
+    }
+    
+//    if (desc.usage & HgiTextureUsageBitsShaderRead) {
+        usage |= MTLTextureUsageShaderRead;
+//    }
+    if (desc.usage & HgiTextureUsageBitsShaderWrite) {
+        usage |= MTLTextureUsageShaderWrite;
     }
 
-    MTLTextureDescriptor* texDesc =
+    size_t width = desc.dimensions[0];
+    size_t height = desc.dimensions[1];
+    size_t depth = desc.dimensions[2];
+    
+    MTLTextureDescriptor* texDesc;
+    
+    texDesc =
         [MTLTextureDescriptor
          texture2DDescriptorWithPixelFormat:mtlFormat
-                                      width:desc.dimensions[0]
-                                     height:desc.dimensions[1]
+                                      width:width
+                                     height:height
                                   mipmapped:NO];
-    //texDesc.resourceOptions = MTLResourceStorageModeDefault;
-    texDesc.resourceOptions = MTLResourceStorageModePrivate;
-    texDesc.usage = MTLTextureUsageShaderRead;
-
-#if (__MAC_OS_X_VERSION_MAX_ALLOWED >= 101500) || (__IPHONE_OS_VERSION_MAX_ALLOWED >= 130000) /* __MAC_10_15 __IOS_13_00 */
-    if (hgi->GetAPIVersion() >= APIVersion_Metal3_0) {
-        texDesc.swizzle = MTLTextureSwizzleChannelsMake(
-            MTLTextureSwizzleRed,
-            MTLTextureSwizzleRed,
-            MTLTextureSwizzleRed,
-            MTLTextureSwizzleRed);
-    }
-#endif
     
-    _textureId = [hgi->GetDevice() newTextureWithDescriptor:texDesc];
+    texDesc.mipmapLevelCount = desc.mipLevels;
 
-//    if (desc.sampleCount == HgiSampleCount1) {
-//        glCreateTextures(GL_TEXTURE_2D, 1, &_textureId);
-//    } else {
-//        glCreateTextures(GL_TEXTURE_2D_MULTISAMPLE, 1, &_textureId);
-//    }    
+    texDesc.arrayLength = desc.layerCount;
+    texDesc.resourceOptions = resourceOptions;
+    texDesc.usage = usage;
 
-    if (desc.sampleCount == HgiSampleCount1) {
-        // XXX sampler state etc should all be set via tex descriptor.
-        //     (probably pass in HgiSamplerHandle in tex descriptor)
-        /*
-        glTextureParameteri(_textureId, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTextureParameteri(_textureId, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        glTextureParameteri(_textureId, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-        glTextureParameteri(_textureId, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glTextureParameteri(_textureId, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        float aniso = 2.0f;
-        glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &aniso);
-        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, aniso);
-        const uint8_t mips = 1;
-        glTextureParameteri(_textureId, GL_TEXTURE_BASE_LEVEL, 0);
-        glTextureParameteri(_textureId, GL_TEXTURE_MAX_LEVEL, mips-1);
-
-        glTextureStorage2D(_textureId, mips, glInternalFormat,
-                           desc.dimensions[0], desc.dimensions[1]);
-         */
-    } else {
-        /*
-        // Note: Setting sampler state values on multi-sample texture is invalid
-        glTextureStorage2DMultisample(
-            _textureId, desc.sampleCount, glInternalFormat,
-            desc.dimensions[0], desc.dimensions[1], GL_TRUE);
-         */
+    if (depth > 1) {
+        texDesc.depth = depth;
+        texDesc.textureType = MTLTextureType3D;
     }
+
+    // Temp pending removal of blit encoder to perform MSAA resolve
+//    if (desc.sampleCount > 1) {
+//        texDesc.sampleCount = desc.sampleCount;
+//        texDesc.textureType = MTLTextureType2DMultisample;
+//    }
+
+    _textureId = [hgi->GetDevice() newTextureWithDescriptor:texDesc];
+    
+    if (desc.initialData && desc.pixelsByteSize > 0) {
+        TF_VERIFY(desc.mipLevels == 1, "Mipmap upload not implemented");
+        [_textureId replaceRegion:MTLRegionMake2D(0, 0, width, height)
+                        mipmapLevel:0
+                          withBytes:desc.initialData
+                        bytesPerRow:desc.pixelsByteSize / height];
+    }
+    
+    HGIMETAL_DEBUG_LABEL(_textureId, _descriptor.debugName.c_str());
 }
 
 HgiMetalTexture::~HgiMetalTexture()

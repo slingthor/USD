@@ -188,12 +188,13 @@ _ComputeResolvedPath(
 
 
 HioGlslfx::HioGlslfx() :
-    _valid(false), _hash(0)
+    _hgi(nullptr), _valid(false), _hash(0)
 {
     // do nothing
 }
 
-HioGlslfx::HioGlslfx(string const & filePath) :
+HioGlslfx::HioGlslfx(string const & filePath, Hgi *hgi) :
+    _hgi(hgi),
     _globalContext(filePath),
     _valid(true), _hash(0)
 {
@@ -208,6 +209,7 @@ HioGlslfx::HioGlslfx(string const & filePath) :
 }
 
 HioGlslfx::HioGlslfx(istream &is) :
+    _hgi(nullptr),
     _globalContext("istream"),
     _valid(true), _hash(0)
 {
@@ -498,7 +500,8 @@ HioGlslfx::_ComposeConfiguration(std::string *reason)
                                         TfGetBaseName(item).c_str());
 
         string errorStr;
-        _config.reset(HioGlslfxConfig::Read(_configMap[item], item, &errorStr));
+        _config.reset(HioGlslfxConfig::Read(
+            _hgi, _configMap[item], item, &errorStr));
 
         if (!errorStr.empty()) {
             *reason = 

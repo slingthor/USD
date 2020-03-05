@@ -70,6 +70,9 @@ public:
 
     HGIMETAL_API
     static MTLStoreAction GetAttachmentStoreOp(HgiAttachmentStoreOp storeOp);
+    
+    HGIMETAL_API
+    static MTLCompareFunction GetDepthCompareFunction(HgiCompareFunction cf);
 };
 
 

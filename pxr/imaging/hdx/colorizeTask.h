@@ -67,6 +67,8 @@ public:
     virtual void Execute(HdTaskContext* ctx) override;
 
 private:
+    class Hgi* _hgi;
+
     // Incoming data
     TfToken _aovName;
     SdfPath _aovBufferPath;

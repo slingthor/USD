@@ -105,6 +105,17 @@ public:
     HGIMETAL_API
     void DestroyPipeline(HgiPipelineHandle* pipeHandle) override;
 
+    HGIMETAL_API
+    const char* GetAPIName() const override {
+        return "metal";
+    }
+    
+    HGIMETAL_API
+    void StartFrame() override;
+
+    HGIMETAL_API
+    void EndFrame() override;
+
     //
     // HgiMetal specific
     //
@@ -115,8 +126,18 @@ public:
     }
     
     HGIMETAL_API
+    id<MTLCommandQueue> GetQueue() const {
+        return _commandQueue;
+    }
+    
+    HGIMETAL_API
     int GetAPIVersion() const {
         return _apiVersion;
+    }
+    
+    HGIMETAL_API
+    bool GetConcurrentDispatch() const {
+        return _concurrentDispatchSupported;
     }
     
 private:
@@ -124,7 +145,11 @@ private:
     HgiMetal(const HgiMetal&) = delete;
 
     id<MTLDevice> _device;
+    id<MTLCommandQueue> _commandQueue;
+    id<MTLCaptureScope> _captureScopeFullFrame;
+
     int _apiVersion;
+    bool _concurrentDispatchSupported;
 
     std::unique_ptr<HgiMetalImmediateCommandBuffer> _immediateCommandBuffer;
 };

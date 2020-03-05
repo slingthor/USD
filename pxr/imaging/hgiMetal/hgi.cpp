@@ -77,15 +77,37 @@ HgiMetal::HgiMetal(id<MTLDevice> device)
             _device = MTLCreateSystemDefaultDevice();
         }
     }
+    
+    static int const commandBufferPoolSize = 256;
+    _commandQueue = [_device newCommandQueueWithMaxCommandBufferCount:
+                     commandBufferPoolSize];
 
-    _immediateCommandBuffer.reset(new HgiMetalImmediateCommandBuffer(_device));
+    _immediateCommandBuffer.reset(
+        new HgiMetalImmediateCommandBuffer(_device, _commandQueue));
 
     HgiMetalSetupMetalDebug();
+    
+    _captureScopeFullFrame =
+        [[MTLCaptureManager sharedCaptureManager]
+            newCaptureScopeWithDevice:_device];
+    _captureScopeFullFrame.label =
+        [NSString stringWithFormat:@"Full Hydra Frame"];
+    
+    [[MTLCaptureManager sharedCaptureManager]
+        setDefaultCaptureScope:_captureScopeFullFrame];
+    
+    static NSOperatingSystemVersion minimumSupportedOSVersion = { .majorVersion = 10, .minorVersion = 14, .patchVersion = 5 };
+    static bool sysVerGreaterOrEqualTo10_14_5 = [NSProcessInfo.processInfo isOperatingSystemAtLeastVersion:minimumSupportedOSVersion];
+    
+    _concurrentDispatchSupported = sysVerGreaterOrEqualTo10_14_5;
+
 }
 
 HgiMetal::~HgiMetal()
 {
-    _device = nil;
+    [_captureScopeFullFrame release];
+    [_commandQueue release];
+    [_device release];
 }
 
 HgiImmediateCommandBuffer&
@@ -168,6 +190,20 @@ void
 HgiMetal::DestroyPipeline(HgiPipelineHandle* pipeHandle)
 {
     DestroyObject(pipeHandle);
+}
+
+void
+HgiMetal::StartFrame()
+{
+    [_captureScopeFullFrame beginScope];
+    
+    _immediateCommandBuffer->StartFrame();
+}
+
+void
+HgiMetal::EndFrame()
+{
+    [_captureScopeFullFrame endScope];
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

@@ -54,6 +54,9 @@
 
 #include "pxr/imaging/glf/diagnostic.h"
 
+#include "pxr/imaging/mtlf/mtlDevice.h"
+#include "pxr/imaging/hgiMetal/texture.h"
+
 PXR_NAMESPACE_OPEN_SCOPE
 
 HdSt_RenderPass::HdSt_RenderPass(HdRenderIndex *index,
@@ -116,19 +119,21 @@ HdSt_RenderPass::_Execute(HdRenderPassStateSharedPtr const &renderPassState,
         GetRenderIndex()->GetResourceRegistry());
     TF_VERIFY(resourceRegistry);
 
-#if defined(ARCH_GFX_OPENGL)
     // XXX Non-Hgi tasks expect default FB. Remove once all tasks use Hgi.
     bool isOpenGL = HdStResourceFactory::GetInstance()->IsOpenGL();
-    GLint fb;
+    int fb;
     if (isOpenGL) {
+#if defined(ARCH_GFX_OPENGL)
         glGetIntegerv(GL_FRAMEBUFFER_BINDING, &fb);
-    }
 #endif
+    }
 
     // Create graphics encoder to render into Aovs.
     HgiGraphicsEncoderDesc desc = stRenderPassState->MakeGraphicsEncoderDesc();
     HgiImmediateCommandBuffer& icb = _hgi->GetImmediateCommandBuffer();
-    HgiGraphicsEncoderUniquePtr gfxEncoder = icb.CreateGraphicsEncoder(desc);
+    
+    // Nulled out pending Mtlf utilising command buffers from HgiMetal
+    HgiGraphicsEncoderUniquePtr gfxEncoder = nullptr;// icb.CreateGraphicsEncoder(desc);
 
     GfVec4i vp;
 
@@ -136,17 +141,76 @@ HdSt_RenderPass::_Execute(HdRenderPassStateSharedPtr const &renderPassState,
     if (gfxEncoder) {
         gfxEncoder->PushDebugGroup(__ARCH_PRETTY_FUNCTION__);
 
-#if defined(ARCH_GFX_OPENGL)
         // XXX The application may have directly called into glViewport.
         // We need to remove the offset to avoid double offset when we composite
         // the Aov back into the client framebuffer.
         // E.g. UsdView CameraMask.
         if (isOpenGL) {
+#if defined(ARCH_GFX_OPENGL)
             glGetIntegerv(GL_VIEWPORT, vp.data());
             GfVec4i aovViewport(0, 0, vp[2]+vp[0], vp[3]+vp[1]);
             gfxEncoder->SetViewport(aovViewport);
-        }
 #endif
+        }
+        else {
+            MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
+            // Set the render pass descriptor to use for the render encoders
+            MTLRenderPassDescriptor* rpd = context->GetRenderPassDescriptor();
+            MTLPixelFormat colorFormat = MTLPixelFormatInvalid;
+            MTLPixelFormat depthFormat = MTLPixelFormatInvalid;
+            size_t i;
+            for (i=0; i<desc.colorTextures.size(); i++) {
+                HgiMetalTexture *metalTexture =
+                    static_cast<HgiMetalTexture*>(desc.colorTextures[i].Get());
+                rpd.colorAttachments[i].texture = metalTexture->GetTextureId();
+                colorFormat = rpd.colorAttachments[i].texture.pixelFormat;
+            }
+            while (i<8) {
+                rpd.colorAttachments[i++].texture = nil;
+            }
+            if (desc.depthTexture) {
+                HgiMetalTexture *metalTexture =
+                    static_cast<HgiMetalTexture*>(desc.depthTexture.Get());
+                rpd.depthAttachment.texture = metalTexture->GetTextureId();
+                depthFormat = rpd.depthAttachment.texture.pixelFormat;
+            }
+            else {
+                rpd.depthAttachment.texture = nil;
+            }
+            context->SetRenderPassDescriptor(rpd);
+            context->SetOutputPixelFormats(colorFormat, depthFormat);
+        }
+    }
+    
+    // TEMPORARY - pending Mtlf integrating with HgiMetal
+    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
+    if (!context->GetDrawTarget())
+    {
+        // Set the render pass descriptor to use for the render encoders
+        MTLRenderPassDescriptor* rpd = context->GetRenderPassDescriptor();
+        MTLPixelFormat colorFormat = MTLPixelFormatInvalid;
+        MTLPixelFormat depthFormat = MTLPixelFormatInvalid;
+        size_t i;
+        for (i=0; i<desc.colorTextures.size(); i++) {
+            HgiMetalTexture *metalTexture =
+                static_cast<HgiMetalTexture*>(desc.colorTextures[i].Get());
+            rpd.colorAttachments[i].texture = metalTexture->GetTextureId();
+            colorFormat = rpd.colorAttachments[i].texture.pixelFormat;
+        }
+        while (i<8) {
+            rpd.colorAttachments[i++].texture = nil;
+        }
+        if (desc.depthTexture) {
+            HgiMetalTexture *metalTexture =
+                static_cast<HgiMetalTexture*>(desc.depthTexture.Get());
+            rpd.depthAttachment.texture = metalTexture->GetTextureId();
+            depthFormat = rpd.depthAttachment.texture.pixelFormat;
+        }
+        else {
+            rpd.depthAttachment.texture = nil;
+        }
+        context->SetRenderPassDescriptor(rpd);
+        context->SetOutputPixelFormats(colorFormat, depthFormat);
     }
 
     // Draw
@@ -154,20 +218,17 @@ HdSt_RenderPass::_Execute(HdRenderPassStateSharedPtr const &renderPassState,
     _cmdBuffer.ExecuteDraw(stRenderPassState, resourceRegistry);
 
     if (gfxEncoder) {
-        gfxEncoder->SetViewport(vp);
         gfxEncoder->PopDebugGroup();
         gfxEncoder->EndEncoding();
 
-#if defined(ARCH_GFX_OPENGL)
         if (isOpenGL) {
+#if defined(ARCH_GFX_OPENGL)
+            gfxEncoder->SetViewport(vp);
             // XXX Non-Hgi tasks expect default FB. Remove once all tasks use Hgi.
             glBindFramebuffer(GL_FRAMEBUFFER, fb);
-        }
 #endif
+        }
     }
-    
-    // Flush commands for execution
-    icb.FlushEncoders();
 }
 
 void

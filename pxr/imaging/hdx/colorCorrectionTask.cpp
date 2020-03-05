@@ -55,8 +55,9 @@ TF_DEFINE_PRIVATE_TOKENS(
     (colorCorrectionShader)
 );
 
-HdxColorCorrectionTask::HdxColorCorrectionTask(HdSceneDelegate* delegate,
-                                               SdfPath const& id)
+HdxColorCorrectionTask::HdxColorCorrectionTask(
+    HdSceneDelegate* delegate, 
+    SdfPath const& id)
     : HdTask(id)
     , _hgi(nullptr)
     , _indexBuffer()
@@ -65,10 +66,7 @@ HdxColorCorrectionTask::HdxColorCorrectionTask(HdSceneDelegate* delegate,
     , _shaderProgram()
     , _resourceBindings()
     , _pipeline()
-    , _framebufferSize(0)
     , _lut3dSizeOCIO(0)
-    , _aovBufferPath()
-    , _aovBuffer(nullptr)
 {
 }
 
@@ -107,7 +105,7 @@ HdxColorCorrectionTask::_GetUseOcio() const
     // Client can choose to use Hydra's build-in sRGB color correction or use
     // OpenColorIO for color correction in which case we insert extra OCIO code.
     #ifdef PXR_OCIO_PLUGIN_ENABLED
-        bool useOCIO =
+        bool useOCIO = 
             _colorCorrectionMode == HdxColorCorrectionTokens->openColorIO;
 
         // Only use if $OCIO environment variable is set.
@@ -129,11 +127,11 @@ HdxColorCorrectionTask::_CreateOpenColorIOResources()
         // Use client provided OCIO values, or use default fallback values
         OCIO::ConstConfigRcPtr config = OCIO::GetCurrentConfig();
 
-        const char* display = _displayOCIO.empty() ?
-                              config->getDefaultDisplay() :
+        const char* display = _displayOCIO.empty() ? 
+                              config->getDefaultDisplay() : 
                               _displayOCIO.c_str();
 
-        const char* view = _viewOCIO.empty() ?
+        const char* view = _viewOCIO.empty() ? 
                            config->getDefaultView(display) :
                            _viewOCIO.c_str();
 
@@ -218,14 +216,14 @@ HdxColorCorrectionTask::_CreateShaderResources()
     }
 
     bool useOCIO =_GetUseOcio();
-    HioGlslfx glslfx(HdxPackageColorCorrectionShader());
+    HioGlslfx glslfx(HdxPackageColorCorrectionShader(), _hgi);
 
     // Setup the vertex shader
     HgiShaderFunctionDesc vertDesc;
     vertDesc.debugName = _tokens->colorCorrectionVertex.GetString();
     vertDesc.shaderStage = HgiShaderStageVertex;
     vertDesc.languageVersion = 450;
-    vertDesc.shaderCode += glslfx.GetSource(_tokens->colorCorrectionVertex);
+    vertDesc.shaderCode = glslfx.GetSource(_tokens->colorCorrectionVertex);
     HgiShaderFunctionHandle vertFn = _hgi->CreateShaderFunction(vertDesc);
 
     // Setup the fragment shader
@@ -234,7 +232,7 @@ HdxColorCorrectionTask::_CreateShaderResources()
     fragDesc.shaderStage = HgiShaderStageFragment;
     fragDesc.languageVersion = 450;
     if (useOCIO) {
-        fragDesc.shaderCode += "#define GLSLFX_USE_OCIO\n";
+        fragDesc.shaderCode = "#define GLSLFX_USE_OCIO\n";
         // Our current version of OCIO outputs 130 glsl and texture3D is
         // removed from glsl in 140.
         fragDesc.shaderCode += "#define texture3D texture\n";
@@ -273,12 +271,12 @@ HdxColorCorrectionTask::_CreateBufferResources()
     // A larger-than screen triangle made to fit the screen.
     const size_t elementsPerVertex = 4;
     static const float vertices[elementsPerVertex * 3] =
-        { -1,  3, -1, 1,
-          -1, -1, -1, 1,
-           3, -1, -1, 1 };
+        { -1,  3, 0, 1,
+          -1, -1, 0, 1,
+           3, -1, 0, 1 };
 
     HgiBufferDesc vboDesc;
-    vboDesc.debugName = "ColorCorrectionVertexBuffer";
+    vboDesc.debugName = "HdxColorCorrectionTask VertexBuffer";
     vboDesc.usage = HgiBufferUsageVertex;
     vboDesc.initialData = vertices;
     vboDesc.byteSize = sizeof(vertices) * sizeof(vertices[0]);
@@ -288,7 +286,7 @@ HdxColorCorrectionTask::_CreateBufferResources()
     static const int32_t indices[3] = {0,1,2};
 
     HgiBufferDesc iboDesc;
-    iboDesc.debugName = "ColorCorrectionIndexBuffer";
+    iboDesc.debugName = "HdxColorCorrectionTask IndexBuffer";
     iboDesc.usage = HgiBufferUsageIndex32;
     iboDesc.initialData = indices;
     iboDesc.byteSize = sizeof(indices) * sizeof(indices[0]);
@@ -298,20 +296,10 @@ HdxColorCorrectionTask::_CreateBufferResources()
 }
 
 bool
-HdxColorCorrectionTask::_CreateResourceBindings(HdTaskContext* ctx)
+HdxColorCorrectionTask::_CreateResourceBindings(
+    HgiTextureHandle const &aovTexture)
 {
-    HgiTextureHandle aovTexture;
-
-    // Find the color aov texture in shader context.
-    VtValue const& texValue = _aovBuffer->GetResource(/*ms*/ false);
-    if (texValue.IsHolding<HgiTextureHandle>()) {
-        aovTexture = texValue.UncheckedGet<HgiTextureHandle>();
-    }
-
-    if (!TF_VERIFY(aovTexture)) {
-        return false;
-    }
-
+    // The color aov has the rendered results and we wish to color correct it.
     bool useOCIO =_GetUseOcio();
 
     // Begin the resource set
@@ -341,6 +329,8 @@ HdxColorCorrectionTask::_CreateResourceBindings(HdTaskContext* ctx)
         HgiResourceBindingsDesc const& desc= _resourceBindings->GetDescriptor();
         if (desc == resourceDesc) {
             return true;
+        } else {
+            _hgi->DestroyResourceBindings(&_resourceBindings);
         }
     }
 
@@ -350,12 +340,22 @@ HdxColorCorrectionTask::_CreateResourceBindings(HdTaskContext* ctx)
 }
 
 bool
-HdxColorCorrectionTask::_CreatePipeline()
+HdxColorCorrectionTask::_CreatePipeline(HgiTextureHandle const& aovTexture)
 {
     if (_pipeline) {
-        return true;
+        if (_attachment0.format == aovTexture->GetDescriptor().format) {
+            return true;
+        }
+        
+        _hgi->DestroyPipeline(&_pipeline);
     }
 
+    HgiPipelineDesc desc;
+    desc.debugName = "ColorCorrection Pipeline";
+    desc.pipelineType = HgiPipelineTypeGraphics;
+    desc.resourceBindings = _resourceBindings;
+    desc.shaderProgram = _shaderProgram;
+    
     // Describe the vertex buffer
     HgiVertexAttributeDesc posAttr;
     posAttr.format = HgiFormatFloat32Vec3;
@@ -367,13 +367,7 @@ HdxColorCorrectionTask::_CreatePipeline()
     vboDesc.vertexStride = sizeof(float) * 4;
     vboDesc.vertexAttributes.push_back(posAttr);
 
-    HgiPipelineDesc desc;
-    desc.debugName = "ColorCorrectionPipeline";
-    desc.pipelineType = HgiPipelineTypeGraphics;
-    desc.resourceBindings = _resourceBindings;
-    desc.shaderProgram = _shaderProgram;
     desc.vertexBuffers.emplace_back(std::move(vboDesc));
-
 
     // Depth test and write can be off since we only colorcorrect the color aov.
     desc.depthState.depthTestEnabled = false;
@@ -391,6 +385,13 @@ HdxColorCorrectionTask::_CreatePipeline()
     desc.rasterizationState.cullMode = HgiCullModeBack;
     desc.rasterizationState.polygonMode = HgiPolygonModeFill;
     desc.rasterizationState.winding = HgiWindingCounterClockwise;
+    
+    // Setup attachment descriptor
+    _attachment0.blendEnabled = false;
+    _attachment0.loadOp = HgiAttachmentLoadOpDontCare;
+    _attachment0.storeOp = HgiAttachmentStoreOpStore;
+    _attachment0.format = aovTexture->GetDescriptor().format;
+    desc.colorAttachmentDescs.emplace_back(_attachment0);
 
     _pipeline = _hgi->CreatePipeline(desc);
 
@@ -398,19 +399,9 @@ HdxColorCorrectionTask::_CreatePipeline()
 }
 
 void
-HdxColorCorrectionTask::_ApplyColorCorrection(HdTaskContext* ctx)
+HdxColorCorrectionTask::_ApplyColorCorrection(HgiTextureHandle const& aovTexture)
 {
-    HgiTextureHandle aovTexture;
-
-    // Find the color aov texture in shader context.
-    VtValue const& texValue = _aovBuffer->GetResource(/*ms*/ false);
-    if (texValue.IsHolding<HgiTextureHandle>()) {
-        aovTexture = texValue.UncheckedGet<HgiTextureHandle>();
-    }
-
-    if (!TF_VERIFY(aovTexture)) {
-        return;
-    }
+    GfVec3i const& dimensions = aovTexture->GetDescriptor().dimensions;
 
     // XXX Not everything is using Hgi yet, so we have inconsistent state
     // management in opengl. Remove when Hgi transition is complete.
@@ -420,15 +411,10 @@ HdxColorCorrectionTask::_ApplyColorCorrection(HdTaskContext* ctx)
     }
 
     // Prepare graphics encoder.
-    HgiAttachmentDesc attachment0;
-    attachment0.blendEnabled = false;
-    attachment0.loadOp = HgiAttachmentLoadOpDontCare;
-    attachment0.storeOp = HgiAttachmentStoreOpStore;
-    
     HgiGraphicsEncoderDesc gfxDesc;
-    gfxDesc.width = _framebufferSize[0];
-    gfxDesc.height = _framebufferSize[1];
-    gfxDesc.colorAttachmentDescs.emplace_back(std::move(attachment0));
+    gfxDesc.width = dimensions[0];
+    gfxDesc.height = dimensions[1];
+    gfxDesc.colorAttachmentDescs.emplace_back(_attachment0);
     gfxDesc.colorTextures.emplace_back(aovTexture);
 
     // Begin rendering
@@ -438,7 +424,7 @@ HdxColorCorrectionTask::_ApplyColorCorrection(HdTaskContext* ctx)
     gfxEncoder->BindResources(_resourceBindings);
     gfxEncoder->BindPipeline(_pipeline);
     gfxEncoder->BindVertexBuffers(0, {_vertexBuffer}, {0});
-    GfVec4i vp = GfVec4i(0, 0, _framebufferSize[0], _framebufferSize[1]);
+    GfVec4i vp = GfVec4i(0, 0, dimensions[0], dimensions[1]);
     gfxEncoder->SetViewport(vp);
     gfxEncoder->DrawIndexed(_indexBuffer, 3, 0, 0, 1, 0);
     gfxEncoder->PopDebugGroup();
@@ -446,9 +432,6 @@ HdxColorCorrectionTask::_ApplyColorCorrection(HdTaskContext* ctx)
     // Done recording commands, submit work.
     gfxEncoder->EndEncoding();
     
-    // Flush commands for execution
-    icb.FlushEncoders();
-
     // XXX Not everything is using Hgi yet, so we have inconsistent state
     // management in opengl. Remove when Hgi transition is complete.
     if (glPipeline) {
@@ -476,7 +459,6 @@ HdxColorCorrectionTask::Sync(HdSceneDelegate* delegate,
         HdxColorCorrectionTaskParams params;
 
         if (_GetTaskParams(delegate, &params)) {
-            _framebufferSize = params.framebufferSize;
             _colorCorrectionMode = params.colorCorrectionMode;
             _displayOCIO = params.displayOCIO;
             _viewOCIO = params.viewOCIO;
@@ -484,7 +466,6 @@ HdxColorCorrectionTask::Sync(HdSceneDelegate* delegate,
             _looksOCIO = params.looksOCIO;
             _lut3dSizeOCIO = params.lut3dSizeOCIO;
             _aovName = params.aovName;
-            _aovBufferPath = params.aovBufferPath;
 
             // Rebuild Hgi objects when ColorCorrection params change
             _DestroyShaderProgram();
@@ -504,11 +485,6 @@ void
 HdxColorCorrectionTask::Prepare(HdTaskContext* ctx,
                                 HdRenderIndex* renderIndex)
 {
-    // Aov path may change when visualizing a different aov (usdview)
-    if (!_aovBufferPath.IsEmpty()) {
-        _aovBuffer = static_cast<HdRenderBuffer*>(renderIndex->GetBprim(
-                HdPrimTypeTokens->renderBuffer, _aovBufferPath));
-    }
 }
 
 void
@@ -521,25 +497,27 @@ HdxColorCorrectionTask::Execute(HdTaskContext* ctx)
     if (_aovName != HdAovTokens->color) {
         return;
     }
-
-    if (_framebufferSize == GfVec2i(0)) {
-        TF_CODING_ERROR("ColorCorrection requires framebuffer size.");
+    
+    // The color aov has the rendered results and we wish to color correct it.
+    HgiTextureHandle aovTexture;
+    if (!_GetTaskContextData(ctx, HdAovTokens->color, &aovTexture)) {
         return;
     }
+
     if (!TF_VERIFY(_CreateBufferResources())) {
         return;
     }
     if (!TF_VERIFY(_CreateShaderResources())) {
         return;
     }
-    if (!TF_VERIFY(_CreateResourceBindings(ctx))) {
+    if (!TF_VERIFY(_CreateResourceBindings(aovTexture))) {
         return;
     }
-    if (!TF_VERIFY(_CreatePipeline())) {
+    if (!TF_VERIFY(_CreatePipeline(aovTexture))) {
         return;
     }
 
-    _ApplyColorCorrection(ctx);
+    _ApplyColorCorrection(aovTexture);
 }
 
 void
@@ -569,19 +547,17 @@ HdxColorCorrectionTask::_PrintCompileErrors()
 // -------------------------------------------------------------------------- //
 
 std::ostream& operator<<(
-    std::ostream& out,
+    std::ostream& out, 
     const HdxColorCorrectionTaskParams& pv)
 {
     out << "ColorCorrectionTask Params: (...) "
-        << pv.framebufferSize << " "
         << pv.colorCorrectionMode << " "
         << pv.displayOCIO << " "
         << pv.viewOCIO << " "
         << pv.colorspaceOCIO << " "
         << pv.looksOCIO << " "
         << pv.lut3dSizeOCIO << " "
-        << pv.aovName << " "
-        << pv.aovBufferPath
+        << pv.aovName
     ;
     return out;
 }
@@ -589,15 +565,13 @@ std::ostream& operator<<(
 bool operator==(const HdxColorCorrectionTaskParams& lhs,
                 const HdxColorCorrectionTaskParams& rhs)
 {
-    return lhs.framebufferSize == rhs. framebufferSize &&
-           lhs.colorCorrectionMode == rhs.colorCorrectionMode &&
+    return lhs.colorCorrectionMode == rhs.colorCorrectionMode &&
            lhs.displayOCIO == rhs.displayOCIO &&
            lhs.viewOCIO == rhs.viewOCIO &&
            lhs.colorspaceOCIO == rhs.colorspaceOCIO &&
            lhs.looksOCIO == rhs.looksOCIO &&
            lhs.lut3dSizeOCIO == rhs.lut3dSizeOCIO &&
-           lhs.aovName == rhs.aovName &&
-           lhs.aovBufferPath == rhs.aovBufferPath;
+           lhs.aovName == rhs.aovName;
 }
 
 bool operator!=(const HdxColorCorrectionTaskParams& lhs,

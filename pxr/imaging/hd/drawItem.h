@@ -54,6 +54,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 /// HdRprim might require multiple draw items.
 /// 
 /// HdDrawItem(s) are created by the HdRprim (HdMesh, HdBasisCurve, ..) for each
+/// HdRepr. The relevant compositional hierarchy is:
 /// 
 ///  HdRprim
 ///  |

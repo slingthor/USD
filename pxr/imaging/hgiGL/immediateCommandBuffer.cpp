@@ -267,13 +267,6 @@ HgiGLImmediateCommandBuffer::CreateGraphicsEncoder(
 {
     TRACE_FUNCTION();
 
-    if (!desc.HasAttachments()) {
-        // XXX For now we do not emit a warning because we have to many
-        // pieces that do not yet use Hgi fully.
-        // TF_WARN("Encoder descriptor incomplete");
-        return nullptr;
-    }
-
     const size_t maxColorAttachments = 8;
     if (!TF_VERIFY(desc.colorAttachmentDescs.size() <= maxColorAttachments,
         "Too many color attachments for OpenGL frambuffer"))
@@ -281,10 +274,18 @@ HgiGLImmediateCommandBuffer::CreateGraphicsEncoder(
         return nullptr;
     }
 
-    HgiGLDescriptorCacheItem* dci = 
-        _AcquireDescriptorCacheItem(desc, _descriptorCache);
-
-    _BindFramebuffer(dci);
+    // XXX With other API's like Metal and Vulkan having a encoder without
+    // attachments doesn't make a lot of sense.
+    // For OpenGL we will need this for Hgi transition to sometimes assume that
+    // no-attachments means rendering into the globally bound GL framebuffer.
+    // Once HgiInterop is fully in place in the PresentTask we should enable
+    // the error below when there are not attachments.
+    // XXX TF_VERIFY(desc.HasAttachments());
+    if (desc.HasAttachments()) {
+        HgiGLDescriptorCacheItem* dci = 
+            _AcquireDescriptorCacheItem(desc, _descriptorCache);
+        _BindFramebuffer(dci);
+    }
 
     HgiGLGraphicsEncoder* encoder(new HgiGLGraphicsEncoder(desc));
 
@@ -298,9 +299,17 @@ HgiGLImmediateCommandBuffer::CreateBlitEncoder()
 }
 
 void
-HgiGLImmediateCommandBuffer::FlushEncoders()
+HgiGLImmediateCommandBuffer::BlockUntilCompleted()
 {
-    glFlush();
+    // On other APIs this would be an equivalent of a glFinish()
+    //glFinish();
+}
+
+void
+HgiGLImmediateCommandBuffer::BlockUntilSubmitted()
+{
+    // On other APIs this would be an equivalent of a glFlush()
+    //glFlush();
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

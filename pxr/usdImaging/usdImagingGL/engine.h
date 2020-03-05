@@ -463,10 +463,6 @@ public:
 
     /// @}
 
-    /// Returns true if the platform is color correction capable.
-    USDIMAGINGGL_API
-    static bool IsColorCorrectionCapable();
-
     // ---------------------------------------------------------------------
     /// \name Render Statistics
     /// @{

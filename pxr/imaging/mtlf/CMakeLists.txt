@@ -21,13 +21,6 @@ if (OPENSUBDIV_HAS_METAL_COMPUTE)
     add_definitions(-DOPENSUBDIV_HAS_METAL_COMPUTE)
 endif()
 
-if (${PXR_ENABLE_GL_SUPPORT})
-    SET(GLINTEROP_PRIVATE_CLASS     glInterop)
-    set(OPENGL_LIBRARY              ${OPENGL_gl_LIBRARY}
-                                    ${OPENGL_glu_LIBRARY}
-                                    glf)
-endif()
-
 pxr_library(mtlf
     LIBRARIES
         arch
@@ -77,7 +70,6 @@ pxr_library(mtlf
 
     PRIVATE_CLASSES
         debugCodes
-        ${GLINTEROP_PRIVATE_CLASS}
 
     PUBLIC_HEADERS
         api.h

@@ -24,10 +24,13 @@
 #include <Metal/Metal.h>
 
 #include "pxr/imaging/hgiMetal/blitEncoder.h"
+#include "pxr/imaging/hgiMetal/buffer.h"
+#include "pxr/imaging/hgiMetal/immediateCommandBuffer.h"
 #include "pxr/imaging/hgiMetal/conversions.h"
 #include "pxr/imaging/hgiMetal/diagnostic.h"
 #include "pxr/imaging/hgiMetal/texture.h"
 #include "pxr/imaging/hgi/blitEncoderOps.h"
+#include "pxr/imaging/hgi/types.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -36,7 +39,8 @@ HgiMetalBlitEncoder::HgiMetalBlitEncoder(
     : HgiBlitEncoder()
     , _commandBuffer(cmdBuf)
 {
-
+    id<MTLDevice> device = _commandBuffer->GetDevice();
+    _blitEncoder = [_commandBuffer->GetCommandBuffer() blitCommandEncoder];
 }
 
 HgiMetalBlitEncoder::~HgiMetalBlitEncoder()
@@ -46,11 +50,13 @@ HgiMetalBlitEncoder::~HgiMetalBlitEncoder()
 void
 HgiMetalBlitEncoder::EndEncoding()
 {
+    [_blitEncoder endEncoding];
 }
 
 void
 HgiMetalBlitEncoder::PushDebugGroup(const char* label)
 {
+    HGIMETAL_DEBUG_LABEL(_blitEncoder, label)
 }
 
 void
@@ -83,7 +89,6 @@ HgiMetalBlitEncoder::CopyTextureGpuToCpu(
         return;
     }
 
-
     MTLPixelFormat metalFormat = MTLPixelFormatInvalid;
 
     if (texDesc.usage & HgiTextureUsageBitsColorTarget) {
@@ -102,162 +107,89 @@ HgiMetalBlitEncoder::CopyTextureGpuToCpu(
     // unneccesairy performance hit, so we should remove this when we
     // fully record fence/barrier/sempahores in command buffers / RenderPasses.
     //
-/*
-    glMemoryBarrier(GL_ALL_BARRIER_BITS);
 
-    glGetTextureSubImage(
-        srcTextureGL->GetTextureId(),
-        0, // mip level
-        copyOp.sourceByteOffset[0], // x offset
-        copyOp.sourceByteOffset[1], // y offset
-        copyOp.sourceByteOffset[2], // z offset
-        copyOp.dimensions[0], // width
-        copyOp.dimensions[1], // height
-        copyOp.dimensions[2], // layerCnt
-        glFormat,
-        glPixelType,
-        copyOp.destinationBufferByteSize,
-        copyOp.cpuDestinationBuffer);
-*/
-    /*
-    id<MTLDevice> device = nil;
-     
-    context->CreateCommandBuffer();
-    context->LabelCommandBuffer(@"Get Image");
-    id<MTLBlitCommandEncoder> blitEncoder = context->GetBlitEncoder();
+    id<MTLDevice> device = _commandBuffer->GetDevice();
+
+    size_t bytesPerPixel = HgiDataSizeOfFormat(texDesc.format);
+    id<MTLBuffer> cpuBuffer =
+        [device newBufferWithBytesNoCopy:copyOp.cpuDestinationBuffer
+                                  length:copyOp.destinationBufferByteSize
+                                 options:MTLResourceStorageModeManaged
+                             deallocator:nil];
+
+    MTLOrigin origin = MTLOriginMake(
+        copyOp.sourceTexelOffset[0],
+        copyOp.sourceTexelOffset[1],
+        copyOp.sourceTexelOffset[2]);
+    MTLSize size = MTLSizeMake(
+        texDesc.dimensions[0] - copyOp.sourceTexelOffset[0],
+        texDesc.dimensions[1] - copyOp.sourceTexelOffset[1],
+        texDesc.dimensions[2] - copyOp.sourceTexelOffset[2]);
     
-    MtlfMetalContext::MtlfMultiBuffer const &cpuBuffer = context->GetMetalBuffer((bytesPerPixel * width * height), MTLResourceStorageModeDefault);
-    
-    [blitEncoder copyFromTexture:texture sourceSlice:0 sourceLevel:0 sourceOrigin:MTLOriginMake(0, 0, 0) sourceSize:MTLSizeMake(width, height, 1) toBuffer:cpuBuffer.forCurrentGPU() destinationOffset:0 destinationBytesPerRow:(bytesPerPixel * width) destinationBytesPerImage:(bytesPerPixel * width * height) options:blitOptions];
-#if defined(ARCH_OS_MACOS)
-    [blitEncoder synchronizeResource:cpuBuffer.forCurrentGPU()];
-#endif
+    MTLBlitOption blitOptions = MTLBlitOptionNone;
 
-    context->ReleaseEncoder(true);
-    context->CommitCommandBufferForThread(false, true);
+    [_blitEncoder copyFromTexture:srcTexture->GetTextureId()
+                      sourceSlice:0
+                      sourceLevel:copyOp.startLayer
+                     sourceOrigin:origin
+                       sourceSize:size
+                         toBuffer:cpuBuffer
+                destinationOffset:0
+           destinationBytesPerRow:(bytesPerPixel * texDesc.dimensions[0])
+         destinationBytesPerImage:(bytesPerPixel * texDesc.dimensions[0] *
+                                   texDesc.dimensions[1] *
+                                   texDesc.dimensions[2])
+                          options:blitOptions];
 
-    memcpy(buffer, [cpuBuffer.forCurrentGPU() contents], bytesPerPixel * width * height);
-    context->ReleaseMetalBuffer(cpuBuffer);
-     */
+    [_blitEncoder synchronizeResource:cpuBuffer];
+    [cpuBuffer release];
+}
+
+void HgiMetalBlitEncoder::CopyBufferCpuToGpu(
+    HgiBufferCpuToGpuOp const& copyOp)
+{
+    if (copyOp.byteSize == 0 ||
+        !copyOp.cpuSourceBuffer ||
+        !copyOp.gpuDestinationBuffer)
+    {
+        return;
+    }
+
+    HgiMetalBuffer* metalBuffer = static_cast<HgiMetalBuffer*>(
+        copyOp.gpuDestinationBuffer.Get());
+
+    // Offset into the src buffer
+    const char* src = ((const char*) copyOp.cpuSourceBuffer) +
+        copyOp.sourceByteOffset;
+
+    // Offset into the dst buffer
+    size_t dstOffset = copyOp.destinationByteOffset;
+    uint8_t *dst = static_cast<uint8_t*>([metalBuffer->GetBufferId() contents]);
+    memcpy(dst + dstOffset, src, copyOp.byteSize);
+    [metalBuffer->GetBufferId()
+        didModifyRange:NSMakeRange(dstOffset, copyOp.byteSize)];
 }
 
 void 
 HgiMetalBlitEncoder::ResolveImage(
     HgiResolveImageOp const& resolveOp)
 {
-    // Create framebuffers for resolve.
-    /*
-    uint32_t readFramebuffer;
-    uint32_t writeFramebuffer;
-    glCreateFramebuffers(1, &readFramebuffer);
-    glCreateFramebuffers(1, &writeFramebuffer);
+    // This is totally temporary and only works because MSAA is actually
+    // disabled in HgiMetalTexture at present.
 
     // Gather source and destination textures
-    HgiMetalTexture const* metalSrcTexture =
-        static_cast<HgiMetalTexture const*>(resolveOp.source);
-    HgiMetalTexture const* metalDstTexture =
-        static_cast<HgiMetalTexture const*>(resolveOp.destination);
+    HgiMetalTexture* metalSrcTexture = static_cast<HgiMetalTexture*>(
+        resolveOp.source.Get());
+    HgiMetalTexture* metalDstTexture = static_cast<HgiMetalTexture*>(
+        resolveOp.destination.Get());
 
     if (!metalSrcTexture || !metalDstTexture) {
-        TF_CODING_ERROR("No textures provided for resolve");            
+        TF_CODING_ERROR("No textures provided for resolve");
         return;
     }
 
-    id<MTLTexture> readAttachment = metalSrcTexture->GetTextureId();
-    TF_VERIFY(glIsTexture(readAttachment), "Source is not a texture");
-    id<MTLTexture> writeAttachment = metalDstTexture->GetTextureId();
-    TF_VERIFY(glIsTexture(writeAttachment), "Destination is not a texture");
-
-    // Update framebuffer bindings
-    if (resolveOp.usage & HgiTextureUsageBitsDepthTarget) {
-        // Depth-only, so no color attachments for read or write
-        // Clear previous color attachment since all attachments must be
-        // written to from fragment shader or texels will be undefined.
-
-        GLenum drawBufs[1] = {GL_NONE};
-        glNamedFramebufferDrawBuffers(
-            readFramebuffer, 1, drawBufs);
-        glNamedFramebufferDrawBuffers(
-            writeFramebuffer, 1, drawBufs);
-
-        glNamedFramebufferTexture(
-            readFramebuffer, GL_COLOR_ATTACHMENT0, 0, 0);
-        glNamedFramebufferTexture(
-            writeFramebuffer, GL_COLOR_ATTACHMENT0, 0, 0);
-
-        glNamedFramebufferTexture(
-            readFramebuffer,
-            GL_DEPTH_ATTACHMENT,
-            readAttachment,
-            0);
-        glNamedFramebufferTexture(
-            writeFramebuffer,
-            GL_DEPTH_ATTACHMENT,
-            writeAttachment,
-            0);
-    } else {
-        // Color-only, so no depth attachments for read or write.
-        // Clear previous depth attachment since all attachments must be
-        // written to from fragment shader or texels will be undefined.
-
-        GLenum drawBufs[1] = {GL_COLOR_ATTACHMENT0};
-        glNamedFramebufferDrawBuffers(
-            readFramebuffer, 1, drawBufs);
-        glNamedFramebufferDrawBuffers(
-            writeFramebuffer, 1, drawBufs);
-
-        glNamedFramebufferTexture(
-            readFramebuffer, GL_DEPTH_ATTACHMENT, 0, 0);
-        glNamedFramebufferTexture(
-            writeFramebuffer, GL_DEPTH_ATTACHMENT, 0, 0);
-
-        glNamedFramebufferTexture(
-            readFramebuffer, 
-            GL_COLOR_ATTACHMENT0, 
-            readAttachment, 
-            0);
-        glNamedFramebufferTexture(
-            writeFramebuffer, 
-            GL_COLOR_ATTACHMENT0, 
-            writeAttachment,
-            0);
-    }
-
-    GLenum status = glCheckNamedFramebufferStatus(readFramebuffer,
-                                                  GL_READ_FRAMEBUFFER);
-    TF_VERIFY(status == GL_FRAMEBUFFER_COMPLETE);
-
-    status = glCheckNamedFramebufferStatus(writeFramebuffer,
-                                           GL_DRAW_FRAMEBUFFER);
-    TF_VERIFY(status == GL_FRAMEBUFFER_COMPLETE);
-
-    // Resolve MSAA fbo to a regular fbo
-    GLbitfield mask = (resolveOp.usage & HgiTextureUsageBitsDepthTarget) ? 
-            GL_DEPTH_BUFFER_BIT : GL_COLOR_BUFFER_BIT;
-
-    const GfVec4i& src = resolveOp.sourceRegion;
-    const GfVec4i& dst = resolveOp.destinationRegion;
-
-    // Bind resolve framebuffer
-    GLint restoreRead, restoreWrite;
-    glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &restoreRead);
-    glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &restoreWrite);
-
-    glBindFramebuffer(GL_READ_FRAMEBUFFER, readFramebuffer); // MS
-    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, writeFramebuffer);// regular
-
-    glBlitFramebuffer(
-        src[0], src[1], src[2], src[3], 
-        dst[0], dst[1], dst[2], dst[3], 
-        mask, 
-        GL_NEAREST);
-
-    glBindFramebuffer(GL_READ_FRAMEBUFFER, restoreRead);
-    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, restoreWrite);
-
-    glDeleteFramebuffers(1, &readFramebuffer);
-    glDeleteFramebuffers(1, &writeFramebuffer);
-*/
+    [_blitEncoder copyFromTexture:metalSrcTexture->GetTextureId()
+                        toTexture:metalDstTexture->GetTextureId()];
 }
 
 

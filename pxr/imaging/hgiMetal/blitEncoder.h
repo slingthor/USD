@@ -59,6 +59,9 @@ public:
     void CopyTextureGpuToCpu(HgiTextureGpuToCpuOp const& copyOp) override;
 
     HGIMETAL_API
+    void CopyBufferCpuToGpu(HgiBufferCpuToGpuOp const& copyOp) override;
+
+    HGIMETAL_API
     void ResolveImage(HgiResolveImageOp const& resolveOp) override;
 
 private:
@@ -67,6 +70,7 @@ private:
     HgiMetalBlitEncoder(const HgiMetalBlitEncoder&) = delete;
 
     HgiMetalImmediateCommandBuffer* _commandBuffer;
+    id<MTLBlitCommandEncoder> _blitEncoder;
 
     // Encoder is used only one frame so storing multi-frame state on encoder
     // will not survive. Store onto HgiMetalImmediateCommandBuffer instead.

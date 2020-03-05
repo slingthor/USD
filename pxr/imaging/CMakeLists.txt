@@ -7,6 +7,7 @@ set(DIRS
     glf
     hgi
     hgiGL
+    hgiInterop
     hgiMetal
     mtlf
     hd

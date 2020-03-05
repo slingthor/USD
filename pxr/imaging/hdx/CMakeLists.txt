@@ -13,6 +13,10 @@ if (PXR_BUILD_OPENCOLORIO_PLUGIN)
     list(APPEND optionalIncludeDirs ${OCIO_INCLUDE_DIRS})
 endif()
 
+if (PXR_ENABLE_GL_SUPPORT AND PXR_ENABLE_METAL_SUPPORT)
+    list(APPEND optionalLibs hgiInterop)
+endif()
+
 pxr_library(hdx
     LIBRARIES
         plug
@@ -36,7 +40,7 @@ pxr_library(hdx
         ${optionalIncludeDirs}
 
     PUBLIC_CLASSES
-        aovResolveTask
+        aovInputTask
         colorizeTask
         colorizeSelectionTask
         colorChannelTask
@@ -45,6 +49,7 @@ pxr_library(hdx
         drawTargetTask
         drawTargetResolveTask
         fullscreenShader
+        hgiConversions
         oitBufferAccessor
         oitRenderTask
         oitResolveTask

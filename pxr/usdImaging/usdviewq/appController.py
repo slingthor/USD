@@ -1140,7 +1140,6 @@ class AppController(QtCore.QObject):
 
         # configure render plugins after stageView initialized its renderer.
         self._configureRendererPlugins()
-        self._configureColorManagement()
 
         if self._mallocTags == 'stageAndImaging':
             DumpMallocTags(self._dataModel.stage,
@@ -1646,11 +1645,6 @@ class AppController(QtCore.QObject):
                 self._stageView.IsStopRendererSupported())
             self._ui.actionStop.setChecked(self._stopped and
                 self._stageView.IsStopRendererSupported())
-
-    def _configureColorManagement(self):
-        enableMenu = (not self._noRender and 
-                      UsdImagingGL.Engine.IsColorCorrectionCapable())
-        self._ui.menuColorCorrection.setEnabled(enableMenu)
 
     # Topology-dependent UI changes
     def _reloadVaryingUI(self):

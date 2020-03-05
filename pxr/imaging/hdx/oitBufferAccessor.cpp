@@ -195,6 +195,7 @@ HdxOitBufferAccessor::InitializeOitBuffersIfNecessary()
 
 #elif defined(ARCH_GFX_OPENGL)
     const GLint clearCounter = -1;
+
     // Old versions of glew may be missing glClearNamedBufferData
     if (ARCH_LIKELY(caps.directStateAccessEnabled) && glClearNamedBufferData) {
         glClearNamedBufferData(stCounterResource->GetId(),

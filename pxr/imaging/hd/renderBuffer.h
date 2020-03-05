@@ -36,7 +36,6 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 
 
-
 /// \class HdRenderBuffer
 ///
 /// A render buffer is a handle to a data resource that can be rendered into,

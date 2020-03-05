@@ -26,77 +26,11 @@
 
 #include "pxr/pxr.h"
 #include "pxr/imaging/hgi/api.h"
-#include "pxr/imaging/hgi/enums.h"
+#include "pxr/imaging/hgi/attachmentDesc.h"
 #include "pxr/imaging/hgi/texture.h"
-#include "pxr/base/gf/vec4f.h"
 #include <vector>
 
 PXR_NAMESPACE_OPEN_SCOPE
-
-
-/// \struct HgiAttachmentDesc
-///
-/// Describes the properties of a framebuffer attachment.
-///
-/// <ul>
-/// <li>texture:
-///   The texture used as render target attachment.</li>
-/// <li>loadOp:
-///   The operation to perform on the attachment pixel data prior to rendering.</li>
-/// <li>storeOp:
-///   The operation to perform on the attachment pixel data after rendering.</li>
-/// <li>clearValue:
-///   The value to clear the attachment with (r,g,b,a) or (depth,stencil,x,x)</li>
-/// <li>blendEnabled:
-///   Determines if a blend operation should be applied to the attachment.</li>
-/// <li> ***BlendFactor:
-///   The blend factors for source and destination.</li>
-/// <li> ***BlendOp: 
-///   The blending operation.</li>
-///
-struct HgiAttachmentDesc
-{
-    HgiAttachmentDesc() 
-    : loadOp(HgiAttachmentLoadOpLoad)
-    , storeOp(HgiAttachmentStoreOpStore)
-    , clearValue(0)
-    , blendEnabled(false)
-    , srcColorBlendFactor(HgiBlendFactorZero)
-    , dstColorBlendFactor(HgiBlendFactorZero)
-    , colorBlendOp(HgiBlendOpAdd)
-    , srcAlphaBlendFactor(HgiBlendFactorZero)
-    , dstAlphaBlendFactor(HgiBlendFactorZero)
-    , alphaBlendOp(HgiBlendOpAdd)
-    {}
-
-    HgiAttachmentLoadOp loadOp;
-    HgiAttachmentStoreOp storeOp;
-    GfVec4f clearValue;
-    bool blendEnabled;
-    HgiBlendFactor srcColorBlendFactor;
-    HgiBlendFactor dstColorBlendFactor;
-    HgiBlendOp colorBlendOp;
-    HgiBlendFactor srcAlphaBlendFactor;
-    HgiBlendFactor dstAlphaBlendFactor;
-    HgiBlendOp alphaBlendOp;
-};
-
-typedef std::vector<HgiAttachmentDesc> HgiAttachmentDescVector;
-
-HGI_API
-bool operator==(
-    const HgiAttachmentDesc& lhs,
-    const HgiAttachmentDesc& rhs);
-
-HGI_API
-bool operator!=(
-    const HgiAttachmentDesc& lhs,
-    const HgiAttachmentDesc& rhs);
-
-HGI_API
-std::ostream& operator<<(
-    std::ostream& out,
-    const HgiAttachmentDesc& attachment);
 
 
 /// \struct HgiGraphicsEncoderDesc

@@ -94,7 +94,9 @@ HgiGLPipeline::BindPipeline()
     //
     if (_descriptor.depthState.depthTestEnabled) {
         glEnable(GL_DEPTH_TEST);
-        TF_CODING_ERROR("Missing implementation: glDepthFunc(...)");
+        GLenum depthFn = HgiGLConversions::GetDepthCompareFunction(
+            _descriptor.depthState.depthCompareFn);
+        glDepthFunc(depthFn);
     } else {
         glDisable(GL_DEPTH_TEST);
     }
@@ -160,19 +162,21 @@ HgiGLPipeline::CaptureOpenGlState()
 {
     glGetIntegerv(GL_FRAMEBUFFER_BINDING, &_restoreFramebuffer);
     glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &_restoreVao);
-    glGetBooleanv(GL_DEPTH_TEST, &_restoreDepthTest);
-    glGetBooleanv(GL_DEPTH_WRITEMASK, &_restoreDepthWriteMask);
-    glGetBooleanv(GL_STENCIL_WRITEMASK, &_restoreStencilWriteMask);
+    glGetBooleanv(GL_DEPTH_TEST, (GLboolean*)&_restoreDepthTest);
+    glGetBooleanv(GL_DEPTH_WRITEMASK, (GLboolean*)&_restoreDepthWriteMask);
+    glGetBooleanv(GL_STENCIL_WRITEMASK, (GLboolean*)&_restoreStencilWriteMask);
     glGetIntegerv(GL_DEPTH_FUNC, &_restoreDepthFunc);
     glGetIntegerv(GL_VIEWPORT, _restoreViewport);
-    glGetBooleanv(GL_BLEND, &_restoreblendEnabled);
+    glGetBooleanv(GL_BLEND, (GLboolean*)&_restoreblendEnabled);
     glGetIntegerv(GL_BLEND_EQUATION_RGB, &_restoreColorOp);
     glGetIntegerv(GL_BLEND_EQUATION_ALPHA, &_restoreAlphaOp);
     glGetIntegerv(GL_BLEND_SRC_RGB, &_restoreColorSrcFnOp);
     glGetIntegerv(GL_BLEND_SRC_ALPHA, &_restoreAlphaSrcFnOp);
     glGetIntegerv(GL_BLEND_DST_RGB, &_restoreColorDstFnOp);
     glGetIntegerv(GL_BLEND_DST_ALPHA, &_restoreAlphaDstFnOp);
-    glGetBooleanv(GL_SAMPLE_ALPHA_TO_COVERAGE, &_restoreAlphaToCoverage);
+    glGetBooleanv(
+        GL_SAMPLE_ALPHA_TO_COVERAGE, 
+        (GLboolean*)&_restoreAlphaToCoverage);
 
     HGIGL_POST_PENDING_GL_ERRORS();
 }

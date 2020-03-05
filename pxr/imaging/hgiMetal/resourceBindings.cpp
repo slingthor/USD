@@ -44,34 +44,53 @@ void
 HgiMetalResourceBindings::BindResources(
     id<MTLRenderCommandEncoder> renderEncoder)
 {
-
-    std::vector<id<MTLTexture>> textures(_descriptor.textures.size(), 0);
+    //
+    // Bind Textures
+    //
 
     for (HgiTextureBindDesc const& texDesc : _descriptor.textures) {
-        // OpenGL does not support arrays-of-textures bound to a unit.
-        // (Which is different from texture-arrays. See Vulkan/Metal)
         if (!TF_VERIFY(texDesc.textures.size() == 1)) continue;
-
-        uint32_t unit = texDesc.bindingIndex;
-        if (textures.size() <= unit) {
-            textures.resize(unit+1, 0);
-        }
 
         HgiTextureHandle const& texHandle = texDesc.textures.front();
         HgiMetalTexture* metalTexture =
             static_cast<HgiMetalTexture*>(texHandle.Get());
 
-        textures[texDesc.bindingIndex] = metalTexture->GetTextureId();
+        if (texDesc.stageUsage & HgiShaderStageVertex) {
+            [renderEncoder setVertexTexture:metalTexture->GetTextureId()
+                                    atIndex:texDesc.bindingIndex];
+        }
+        if (texDesc.stageUsage & HgiShaderStageFragment) {
+            [renderEncoder setFragmentTexture:metalTexture->GetTextureId()
+                                      atIndex:texDesc.bindingIndex];
+        }
     }
 
-    if (!textures.empty()) {
-//        glBindTextures(0, textures.size(), textures.data());
-    }
+    //
+    // Bind Buffers
+    //
 
-    // todo here we must loop through .buffers and bind UBO and SSBO buffers.
     // Note that index and vertex buffers are not bound here.
     // They are bound via the GraphicsEncoder.
-    TF_VERIFY(_descriptor.buffers.empty(), "Missing implementation buffers");
+
+    for (HgiBufferBindDesc const& bufDesc : _descriptor.buffers) {
+        if (!TF_VERIFY(bufDesc.buffers.size() == 1)) continue;
+
+        uint32_t unit = bufDesc.bindingIndex;
+
+        HgiBufferHandle const& bufHandle = bufDesc.buffers.front();
+        HgiMetalBuffer* metalbuffer =
+            static_cast<HgiMetalBuffer*>(bufHandle.Get());
+
+        id<MTLBuffer> h = metalbuffer->GetBufferId();
+        NSUInteger offset = bufDesc.offsets.front();
+        
+        if (bufDesc.stageUsage & HgiShaderStageVertex) {
+            [renderEncoder setVertexBuffer:h offset:offset atIndex:unit];
+        }
+        if (bufDesc.stageUsage & HgiShaderStageFragment) {
+            [renderEncoder setFragmentBuffer:h offset:offset atIndex:unit];
+        }
+    }
 }
 
 

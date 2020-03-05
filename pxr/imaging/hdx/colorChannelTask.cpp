@@ -246,7 +246,7 @@ HdxColorChannelTask::_CreateFramebufferResources()
         glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &restoreDrawFB);
         glBindFramebuffer(GL_DRAW_FRAMEBUFFER, _copyFramebuffer);
 
-        glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+        glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, 
                                GL_TEXTURE_2D, _texture, 0);
 
         glBindFramebuffer(GL_READ_FRAMEBUFFER, restoreReadFB);

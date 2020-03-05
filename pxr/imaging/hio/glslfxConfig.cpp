@@ -24,6 +24,8 @@
 #include "pxr/imaging/hio/glslfxConfig.h"
 #include "pxr/imaging/hio/debugCodes.h"
 
+#include "pxr/imaging/hgi/hgi.h"
+
 #include "pxr/base/tf/staticTokens.h"
 #include "pxr/base/tf/stl.h"
 #include "pxr/base/tf/type.h"
@@ -54,13 +56,16 @@ VtDictionary Hio_GetDictionaryFromInput
     (const string &input, const string &filename, string *errorStr);
 
 HioGlslfxConfig *
-HioGlslfxConfig::Read(string const & input, string const & filename, string *errorStr)
+HioGlslfxConfig::Read(
+    Hgi *hgi, string const & input, string const & filename, string *errorStr)
 {
-    return new HioGlslfxConfig(
+    return new HioGlslfxConfig(hgi,
         Hio_GetDictionaryFromInput(input, filename, errorStr), errorStr );
 }
 
-HioGlslfxConfig::HioGlslfxConfig(VtDictionary const & dict, string * errors)
+HioGlslfxConfig::HioGlslfxConfig(
+    Hgi *hgi, VtDictionary const & dict, string * errors)
+: _hgi(hgi)
 {
     _Init(dict, errors);
 }
@@ -119,14 +124,30 @@ HioGlslfxConfig::_GetSourceKeyMap(VtDictionary const & dict,
         return ret;
     }
 
+//    if (techniquesDict.size() > 1) {
+//        *errorStr = TfStringPrintf("Expect only one entry for %s",
+//                                   _tokens->techniques.GetText());
+//        return ret;
+//    }
+
+    VtDictionary::const_iterator entry = techniquesDict.begin();
     if (techniquesDict.size() > 1) {
-        *errorStr = TfStringPrintf("Expect only one entry for %s",
+        // Look for an API specific flavour, else proceed with "default"
+        if (_hgi) {
+            entry = techniquesDict.find(_hgi->GetAPIName());
+        }
+        if (entry == techniquesDict.end()) {
+            entry = techniquesDict.find("default");
+        }
+    }
+
+    if (entry == techniquesDict.end()) {
+        *errorStr = TfStringPrintf("No Hgi-specific or 'default' entry for %s",
                                    _tokens->techniques.GetText());
         return ret;
     }
-
-    // get the value of the first technique spec
-    VtDictionary::const_iterator entry = techniquesDict.begin();
+    
+    // get the value of the technique spec
     VtValue techniqueSpec = entry->second;
     
     // verify that it also holds a VtDictionary

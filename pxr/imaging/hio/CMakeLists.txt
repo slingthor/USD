@@ -5,6 +5,7 @@ pxr_library(hio
     LIBRARIES
         arch
         garch
+        hgi
         hf
         tf
         trace

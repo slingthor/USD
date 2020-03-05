@@ -65,6 +65,9 @@ HgiMetalGraphicsEncoder::HgiMetalGraphicsEncoder(
         
         HgiMetalTexture *colorTexture =
             static_cast<HgiMetalTexture*>(desc.colorTextures[i].Get());
+
+        TF_VERIFY(
+            colorTexture->GetDescriptor().format == hgiColorAttachment.format);
         metalColorAttachment.texture = colorTexture->GetTextureId();
     }
 
@@ -86,6 +89,9 @@ HgiMetalGraphicsEncoder::HgiMetalGraphicsEncoder(
         
         HgiMetalTexture *depthTexture =
             static_cast<HgiMetalTexture*>(desc.depthTexture.Get());
+        
+        TF_VERIFY(
+            depthTexture->GetDescriptor().format == hgiDepthAttachment.format);
         metalDepthAttachment.texture = depthTexture->GetTextureId();
     }
 
@@ -160,7 +166,7 @@ HgiMetalGraphicsEncoder::BindVertexBuffers(
         
         [_encoder setVertexBuffer:buf->GetBufferId()
                            offset:byteOffsets[i]
-                          atIndex:firstBinding +i];
+                          atIndex:firstBinding + i];
     }
 }
 
@@ -191,6 +197,7 @@ HgiMetalGraphicsEncoder::DrawIndexed(
 void
 HgiMetalGraphicsEncoder::PushDebugGroup(const char* label)
 {
+    HGIMETAL_DEBUG_LABEL(_encoder, label)
 }
 
 void

@@ -87,6 +87,7 @@ bool operator!=(
 HgiDepthStencilState::HgiDepthStencilState()
     : depthTestEnabled(true)
     , depthWriteEnabled(true)
+    , depthCompareFn(HgiCompareFunctionLess)
     , stencilTestEnabled(false)
 {
 }
@@ -97,6 +98,7 @@ bool operator==(
 {
     return lhs.depthTestEnabled == rhs.depthTestEnabled &&
            lhs.depthWriteEnabled == rhs.depthWriteEnabled &&
+           lhs.depthCompareFn == rhs.depthCompareFn &&
            lhs.stencilTestEnabled == rhs.stencilTestEnabled;
 }
 
@@ -125,7 +127,9 @@ bool operator==(
            lhs.depthState == rhs.depthState &&
            lhs.multiSampleState == rhs.multiSampleState &&
            lhs.rasterizationState == rhs.rasterizationState &&
-           lhs.vertexBuffers == rhs.vertexBuffers;
+           lhs.vertexBuffers == rhs.vertexBuffers &&
+           lhs.colorAttachmentDescs == rhs.colorAttachmentDescs &&
+           lhs.depthAttachmentDesc == rhs.depthAttachmentDesc;
 }
 
 bool operator!=(

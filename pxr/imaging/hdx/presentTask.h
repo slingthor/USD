@@ -31,10 +31,12 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+class HgiInterop;
+
 /// \class HdxPresentTask
 ///
-/// A task for taking output AOV data of a HdSt render buffer and rendering it 
-/// to the current GL buffer.
+/// A task for taking the final rendered and composited result of the aovs and
+/// blit it into the viewers framebuffer.
 ///
 class HdxPresentTask : public HdTask
 {
@@ -45,35 +47,29 @@ public:
     HDX_API
     virtual ~HdxPresentTask();
 
-    /// Sync the render pass resources
     HDX_API
     virtual void Sync(HdSceneDelegate* delegate,
                       HdTaskContext* ctx,
                       HdDirtyBits* dirtyBits) override;
 
-    /// Prepare the colorize task
     HDX_API
     virtual void Prepare(HdTaskContext* ctx,
                          HdRenderIndex* renderIndex) override;
 
-    /// Execute the colorize task
     HDX_API
     virtual void Execute(HdTaskContext* ctx) override;
 
 private:
-    SdfPath _aovBufferPath;
-    SdfPath _depthBufferPath;
-
-    HdRenderBuffer *_aovBuffer;
-    HdRenderBuffer *_depthBuffer;
+    class Hgi* _hgi;
 
     std::unique_ptr<HdxFullscreenShader> _compositor;
-    
-    bool _isOpenGL;
+    HgiInterop* _interop;
 
     HdxPresentTask() = delete;
     HdxPresentTask(const HdxPresentTask &) = delete;
     HdxPresentTask &operator =(const HdxPresentTask &) = delete;
+    
+    bool _flipImage;
 };
 
 
@@ -83,13 +79,9 @@ private:
 ///
 struct HdxPresentTaskParams
 {
-    HdxPresentTaskParams()
-        : aovBufferPath()
-        , depthBufferPath()
-        {}
-
-    SdfPath aovBufferPath;
-    SdfPath depthBufferPath;
+    HdxPresentTaskParams() {}
+    
+    bool flipImage = false;
 };
 
 // VtValue requirements

@@ -40,7 +40,6 @@
 
 #include "pxr/imaging/cameraUtil/conformWindow.h"
 #include "pxr/imaging/garch/simpleLightingContext.h"
-
 #include "pxr/usd/sdf/path.h"
 #include "pxr/base/tf/staticTokens.h"
 #include "pxr/base/gf/matrix4d.h"
@@ -254,7 +253,7 @@ private:
     void _CreateColorChannelTask();
     void _CreatePickTask();
     void _CreatePickFromRenderBufferTask();
-    SdfPath _CreateAovResolveTask(TfToken const& aovName);
+    void _CreateAovInputTask();
     void _CreatePresentTask();
 
     void _SetCameraParamForTasks(SdfPath const& id);
@@ -283,7 +282,7 @@ private:
     // Helper function to set the parameters of a light, get a particular light 
     // in the scene, replace and remove Sprims from the scene 
     void _SetParameters(SdfPath const& pathName, GarchSimpleLight const& light);
-        GarchSimpleLight _GetLightAtId(size_t const& pathIdx);
+    GarchSimpleLight _GetLightAtId(size_t const& pathIdx);
     void _RemoveLightSprim(size_t const& pathIdx);
     void _ReplaceLightSprim(size_t const& pathIdx, GarchSimpleLight const& light,
                         SdfPath const& pathName);
@@ -349,6 +348,7 @@ private:
     SdfPath _simpleLightTaskId;
     SdfPath _shadowTaskId;
     SdfPathVector _renderTaskIds;
+    SdfPath _aovInputTaskId;
     SdfPath _oitResolveTaskId;
     SdfPath _selectionTaskId;
     SdfPath _colorizeSelectionTaskId;
@@ -357,8 +357,6 @@ private:
     SdfPath _colorChannelTaskId;
     SdfPath _pickTaskId;
     SdfPath _pickFromRenderBufferTaskId;
-    SdfPath _aovColorResolveTaskId;
-    SdfPath _aovDepthResolveTaskId;
     SdfPath _presentTaskId;
 
     // Generated camera (for the default/free cam)

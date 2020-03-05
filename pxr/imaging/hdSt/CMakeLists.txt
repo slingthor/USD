@@ -52,7 +52,8 @@ endif()
 
 if (PXR_ENABLE_METAL_SUPPORT)
     set(GFX             ${GFX}
-                        mtlf)
+                        mtlf
+                        hgiMetal)
     set(GFXADDITIONAL   ${GFXADDITIONAL}
                         Metal/bufferRelocatorMetal
                         Metal/bufferResourceMetal
@@ -82,6 +83,7 @@ if (PXR_ENABLE_METAL_SUPPORT)
 set(GFXADDITIONALPUBLIC ${GFXADDITIONALPUBLIC}
                         Metal/resourceFactoryMetal)
 endif()
+
 
 pxr_library(hdSt
     LIBRARIES

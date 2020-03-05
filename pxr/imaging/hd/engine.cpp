@@ -21,9 +21,6 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-
-#include "pxr/imaging/glf/glew.h"
-
 #include "pxr/imaging/hd/engine.h"
 
 #include "pxr/imaging/hd/debugCodes.h"
@@ -43,10 +40,10 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-HdEngine::HdEngine()
+
+HdEngine::HdEngine() 
  : _taskContext()
 {
-    /* Nothing */
 }
 
 HdEngine::~HdEngine()

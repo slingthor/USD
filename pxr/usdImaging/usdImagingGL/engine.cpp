@@ -1251,34 +1251,11 @@ UsdImagingGLEngine::SetColorCorrectionSettings(
         return;
     }
 
-    if (!IsColorCorrectionCapable()) {
-        return;
-    }
-
     TF_VERIFY(_taskController);
 
     HdxColorCorrectionTaskParams hdParams;
-    hdParams.framebufferSize = framebufferResolution;
     hdParams.colorCorrectionMode = id;
     _taskController->SetColorCorrectionParams(hdParams);
-}
-
-bool 
-UsdImagingGLEngine::IsColorCorrectionCapable()
-{
-    static bool first = false;
-    static bool ColorCorrectionCapable = true;
-
-    if (first) {
-        first = false;
-
-        GarchContextCaps const &caps =
-            GarchResourceFactory::GetInstance()->GetContextCaps();
-        ColorCorrectionCapable = caps.floatingPointBuffersEnabled &&
-            IsHydraEnabled();
-    }
-
-    return ColorCorrectionCapable;
 }
 
 //----------------------------------------------------------------------------
@@ -1329,6 +1306,8 @@ UsdImagingGLEngine::_Execute(const UsdImagingGLRenderParams &params,
     GarchContextCaps const &caps =
         GarchResourceFactory::GetInstance()->GetContextCaps();
 
+    _hgi->StartFrame();
+
     HdStRenderDelegate* hdStRenderDelegate =
         dynamic_cast<HdStRenderDelegate*>(_renderIndex->GetRenderDelegate());
     if (hdStRenderDelegate) {
@@ -1353,12 +1332,14 @@ UsdImagingGLEngine::_Execute(const UsdImagingGLRenderParams &params,
 #endif
         hdStRenderDelegate->PrepareRender(delegateParams);
     }
-
+    
     _engine->Execute(_renderIndex, &tasks);
 
     if (hdStRenderDelegate) {
         hdStRenderDelegate->FinalizeRender();
     }
+
+    _hgi->EndFrame();
 }
 
 bool 

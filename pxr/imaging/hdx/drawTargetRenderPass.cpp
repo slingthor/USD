@@ -24,10 +24,6 @@
 #include "pxr/imaging/glf/glew.h"
 #include "pxr/imaging/glf/glContext.h"
 
-#if defined(ARCH_GFX_METAL)
-#include "pxr/imaging/mtlf/mtlDevice.h"
-#endif
-
 #include "pxr/imaging/hdx/drawTargetRenderPass.h"
 #include "pxr/imaging/hdx/tokens.h"
 #include "pxr/imaging/hdSt/drawTargetRenderPassState.h"

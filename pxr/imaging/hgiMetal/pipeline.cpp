@@ -93,51 +93,90 @@ HgiMetalPipeline::_CreateVertexDescriptor()
 void
 HgiMetalPipeline::_CreateRenderPipelineState(id<MTLDevice> device)
 {
-    MTLRenderPipelineDescriptor *renderPipelineStateDescriptor =
+    MTLRenderPipelineDescriptor *stateDesc =
         [[MTLRenderPipelineDescriptor alloc] init];
 
     // Create a new render pipeline state object
-    renderPipelineStateDescriptor.label = @(_descriptor.debugName.c_str());
-    renderPipelineStateDescriptor.rasterSampleCount = 1;
+    HGIMETAL_DEBUG_LABEL(stateDesc, _descriptor.debugName.c_str());
+    stateDesc.rasterSampleCount = 1;
     
-    renderPipelineStateDescriptor.inputPrimitiveTopology =
-        MTLPrimitiveTopologyClassUnspecified;
-    
-    renderPipelineStateDescriptor.rasterizationEnabled = NO;
+    stateDesc.inputPrimitiveTopology = MTLPrimitiveTopologyClassUnspecified;
     
     HgiMetalShaderProgram const *metalProgram =
         static_cast<HgiMetalShaderProgram*>(_descriptor.shaderProgram.Get());
     
-    renderPipelineStateDescriptor.vertexFunction =
-        metalProgram->GetVertexFunction();
+    stateDesc.vertexFunction = metalProgram->GetVertexFunction();
     id<MTLFunction> fragmentFunction = metalProgram->GetFragmentFunction();
     if (fragmentFunction) {
-        renderPipelineStateDescriptor.fragmentFunction = fragmentFunction;
-        renderPipelineStateDescriptor.rasterizationEnabled = YES;
+        stateDesc.fragmentFunction = fragmentFunction;
+        stateDesc.rasterizationEnabled = YES;
+    }
+    else {
+        stateDesc.rasterizationEnabled = NO;
     }
 
     MTLPixelFormat depthFormat = MTLPixelFormatInvalid;
-    renderPipelineStateDescriptor.depthAttachmentPixelFormat = depthFormat;
+    stateDesc.depthAttachmentPixelFormat = depthFormat;
 
-    renderPipelineStateDescriptor.colorAttachments[0].blendingEnabled = NO;
+    // Color attachments
+    for (size_t i=0; i<_descriptor.colorAttachmentDescs.size(); i++) {
+        HgiAttachmentDesc const &hgiColorAttachment =
+            _descriptor.colorAttachmentDescs[i];
+        MTLRenderPipelineColorAttachmentDescriptor *metalColorAttachment =
+            stateDesc.colorAttachments[i];
+        
+        metalColorAttachment.pixelFormat = HgiMetalConversions::GetPixelFormat(
+            hgiColorAttachment.format);
+
+        if (hgiColorAttachment.blendEnabled) {
+            metalColorAttachment.blendingEnabled = YES;
+            
+            metalColorAttachment.sourceRGBBlendFactor =
+                HgiMetalConversions::GetBlendFactor(
+                    hgiColorAttachment.srcColorBlendFactor);
+            metalColorAttachment.destinationRGBBlendFactor =
+                HgiMetalConversions::GetBlendFactor(
+                    hgiColorAttachment.dstColorBlendFactor);
+            
+            metalColorAttachment.sourceAlphaBlendFactor =
+                HgiMetalConversions::GetBlendFactor(
+                    hgiColorAttachment.srcAlphaBlendFactor);
+            metalColorAttachment.destinationAlphaBlendFactor =
+                HgiMetalConversions::GetBlendFactor(
+                    hgiColorAttachment.dstAlphaBlendFactor);
+
+            metalColorAttachment.rgbBlendOperation =
+                HgiMetalConversions::GetBlendEquation(
+                    hgiColorAttachment.colorBlendOp);
+            metalColorAttachment.alphaBlendOperation =
+                HgiMetalConversions::GetBlendEquation(
+                    hgiColorAttachment.alphaBlendOp);
+        }
+        else {
+            metalColorAttachment.blendingEnabled = NO;
+        }
+    }
+    
+    HgiAttachmentDesc const &hgiDepthAttachment =
+        _descriptor.depthAttachmentDesc;
+
+    stateDesc.depthAttachmentPixelFormat =
+        HgiMetalConversions::GetPixelFormat(hgiDepthAttachment.format);
     
     if (_descriptor.multiSampleState.alphaToCoverageEnable) {
-        renderPipelineStateDescriptor.alphaToCoverageEnabled = YES;
+        stateDesc.alphaToCoverageEnabled = YES;
     }
     else {
-        renderPipelineStateDescriptor.alphaToCoverageEnabled = NO;
+        stateDesc.alphaToCoverageEnabled = NO;
     }
 
-    MTLPixelFormat pixelFormat = MTLPixelFormatRGBA16Float;
-    renderPipelineStateDescriptor.colorAttachments[0].pixelFormat = pixelFormat;
-
-    renderPipelineStateDescriptor.vertexDescriptor = _vertexDescriptor;
+    stateDesc.vertexDescriptor = _vertexDescriptor;
 
     NSError *error = NULL;
     _renderPipelineState = [device
-        newRenderPipelineStateWithDescriptor:renderPipelineStateDescriptor
+        newRenderPipelineStateWithDescriptor:stateDesc
         error:&error];
-    [renderPipelineStateDescriptor release];
+    [stateDesc release];
     
     if (!_renderPipelineState) {
         NSString *err = [error localizedDescription];
@@ -146,7 +185,6 @@ HgiMetalPipeline::_CreateRenderPipelineState(id<MTLDevice> device)
         if (error) {
             [error release];
         }
-        return;
     }
 }
 
@@ -156,7 +194,8 @@ HgiMetalPipeline::_CreateDepthStencilState(id<MTLDevice> device)
     MTLDepthStencilDescriptor *depthStencilStateDescriptor =
         [[MTLDepthStencilDescriptor alloc] init];
     
-    depthStencilStateDescriptor.label = @(_descriptor.debugName.c_str());
+    HGIMETAL_DEBUG_LABEL(
+        depthStencilStateDescriptor, _descriptor.debugName.c_str());
 
     if (_descriptor.depthState.depthWriteEnabled) {
         depthStencilStateDescriptor.depthWriteEnabled = YES;
@@ -165,7 +204,9 @@ HgiMetalPipeline::_CreateDepthStencilState(id<MTLDevice> device)
         depthStencilStateDescriptor.depthWriteEnabled = NO;
     }
     if (_descriptor.depthState.depthTestEnabled) {
-        TF_CODING_ERROR("Missing implementation: set depth func");
+        MTLCompareFunction depthFn = HgiMetalConversions::GetDepthCompareFunction(
+            _descriptor.depthState.depthCompareFn);
+        depthStencilStateDescriptor.depthCompareFunction = depthFn;
     }
     else {
         depthStencilStateDescriptor.depthCompareFunction =

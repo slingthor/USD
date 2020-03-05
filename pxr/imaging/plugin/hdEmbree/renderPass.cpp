@@ -23,10 +23,7 @@
 //
 #include "pxr/imaging/glf/glew.h"
 
-#include "pxr/imaging/hd/driver.h"
 #include "pxr/imaging/hd/renderPassState.h"
-#include "pxr/imaging/hgi/tokens.h"
-#include "pxr/imaging/hdSt/renderDelegate.h"
 #include "pxr/imaging/plugin/hdEmbree/renderDelegate.h"
 #include "pxr/imaging/plugin/hdEmbree/renderPass.h"
 
@@ -51,18 +48,8 @@ HdEmbreeRenderPass::HdEmbreeRenderPass(HdRenderIndex *index,
     , _colorBuffer(SdfPath::EmptyPath())
     , _depthBuffer(SdfPath::EmptyPath())
     , _converged(false)
+    , _compositor(NULL)
 {
-    Hgi* hgi = nullptr;
-    HdDriverVector const& drivers = index->GetDrivers();
-    for (HdDriver* hdDriver : drivers) {
-        if (hdDriver->name == HgiTokens->renderDriver &&
-            hdDriver->driver.IsHolding<Hgi*>()) {
-            hgi = hdDriver->driver.UncheckedGet<Hgi*>();
-            break;
-        }
-    }
-
-    _compositor.reset(new HdxFullscreenShader(hgi));
 }
 
 HdEmbreeRenderPass::~HdEmbreeRenderPass()
@@ -209,15 +196,15 @@ HdEmbreeRenderPass::_Execute(HdRenderPassStateSharedPtr const& renderPassState,
             _colorBuffer.Resolve();
             uint8_t *cdata = reinterpret_cast<uint8_t*>(_colorBuffer.Map());
             if (cdata) {
-                _compositor->SetTexture(TfToken("color"), _width, _height,
-                                        _colorBuffer.GetFormat(), cdata);
+                _compositor.SetTexture(TfToken("color"), _width, _height,
+                                       _colorBuffer.GetFormat(), cdata);
                 _colorBuffer.Unmap();
             }
             _depthBuffer.Resolve();
             uint8_t *ddata = reinterpret_cast<uint8_t*>(_depthBuffer.Map());
             if (ddata) {
-                _compositor->SetTexture(TfToken("depth"), _width, _height,
-                                        HdFormatFloat32, ddata);
+                _compositor.SetTexture(TfToken("depth"), _width, _height,
+                                       HdFormatFloat32, ddata);
                 _depthBuffer.Unmap();
             }
         }
@@ -228,8 +215,8 @@ HdEmbreeRenderPass::_Execute(HdRenderPassStateSharedPtr const& renderPassState,
         glGetBooleanv(GL_BLEND, &restoreblendEnabled);
         glDisable(GL_BLEND);
 
-        _compositor->SetProgramToCompositor(/* depthAware = */true);
-        _compositor->Draw();
+//        _compositor.SetProgramToCompositor(/* depthAware = */true);
+//        _compositor.Draw();
 
         if (restoreblendEnabled) {
             glEnable(GL_BLEND);

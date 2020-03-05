@@ -390,6 +390,7 @@ HdStRenderPassState::MakeGraphicsEncoderDesc() const
             HgiAttachmentLoadOpDontCare :
             HgiAttachmentLoadOpClear;
 
+        attachmentDesc.format = hgiTexHandle.Get()->GetDescriptor().format;
         attachmentDesc.loadOp = loadOp;
         attachmentDesc.storeOp = HgiAttachmentStoreOpStore;
 

@@ -29,6 +29,7 @@
 #include "pxr/imaging/hdx/api.h"
 #include "pxr/imaging/hd/task.h"
 #include "pxr/imaging/hdx/tokens.h"
+#include "pxr/imaging/hgi/attachmentDesc.h"
 #include "pxr/imaging/hgi/buffer.h"
 #include "pxr/imaging/hgi/pipeline.h"
 #include "pxr/imaging/hgi/resourceBindings.h"
@@ -42,7 +43,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 /// \class HdxColorCorrectionTask
 ///
-/// A task for performing color correction (and optionally color grading) on a
+/// A task for performing color correction (and optionally color grading) on a 
 /// color buffer to transform its color for display.
 ///
 class HdxColorCorrectionTask : public HdTask
@@ -87,13 +88,13 @@ private:
     bool _CreateBufferResources();
 
     // Utility to create resource bindings
-    bool _CreateResourceBindings(HdTaskContext* ctx);
+    bool _CreateResourceBindings(HgiTextureHandle const& aovTexture);
 
     // Utility to create a pipeline
-    bool _CreatePipeline();
+    bool _CreatePipeline(HgiTextureHandle const& aovTexture);
 
     // Apply color correction to the currently bound framebuffer.
-    void _ApplyColorCorrection(HdTaskContext* ctx);
+    void _ApplyColorCorrection(HgiTextureHandle const& aovTexture);
 
     // Destroy shader program and the shader functions it holds.
     void _DestroyShaderProgram();
@@ -103,14 +104,13 @@ private:
 
     class Hgi* _hgi;
 
+    HgiAttachmentDesc _attachment0;
     HgiBufferHandle _indexBuffer;
     HgiBufferHandle _vertexBuffer;
     HgiTextureHandle _texture3dLUT;
     HgiShaderProgramHandle _shaderProgram;
     HgiResourceBindingsHandle _resourceBindings;
     HgiPipelineHandle _pipeline;
-
-    GfVec2i _framebufferSize;
 
     TfToken _colorCorrectionMode;
     std::string _displayOCIO;
@@ -120,8 +120,6 @@ private:
     int _lut3dSizeOCIO = 0;
 
     TfToken _aovName;
-    SdfPath _aovBufferPath;
-    HdRenderBuffer* _aovBuffer;
 };
 
 
@@ -132,17 +130,13 @@ private:
 struct HdxColorCorrectionTaskParams
 {
     HdxColorCorrectionTaskParams() {}
-
-    // Resolution of bound framebuffer we are color correcting.
-    // This must be set if the viewport and framebuffer do not match.
-    GfVec2i framebufferSize = GfVec2i(0);
-
+    
     // Switch between HdColorCorrectionTokens.
     // We default to 'disabled' to be backwards compatible with clients that are
     // still running with sRGB buffers.
     TfToken colorCorrectionMode = HdxColorCorrectionTokens->disabled;
 
-    // 'display', 'view', 'colorspace' and 'look' are options the client may
+    // 'display', 'view', 'colorspace' and 'look' are options the client may 
     // supply to configure OCIO. If one is not provided the default values
     // is substituted. You can find the values for these strings inside the
     // profile/config .ocio file. For example:
@@ -160,10 +154,8 @@ struct HdxColorCorrectionTaskParams
     // A value of 0 indicates we should use an appropriate default size.
     int lut3dSizeOCIO = 0;
 
-    // When no AOV is provided ColorCorrection will operate on the default FB
-    // color attachment.
+    // The name of the aov to color correct
     TfToken aovName;
-    SdfPath aovBufferPath;
 };
 
 // VtValue requirements

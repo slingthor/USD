@@ -39,6 +39,9 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 
+
+
+
 /// \struct HgiBufferBindDesc
 ///
 /// Describes the binding information of one buffer (or array of buffers).
@@ -139,9 +142,6 @@ bool operator!=(
 ///   The buffers to be bound (E.g. uniform or shader storage).</li>
 /// <li>textures:
 ///   The textures to be bound.</li>
-/// <li>vertexBuffers:
-///   Description of the vertex buffers (per-vertex attributes).
-///   The actual VBOs are bound via GraphicsEncoder.</li>
 /// </ul>
 ///
 struct HgiResourceBindingsDesc

@@ -69,9 +69,12 @@ public:
     /// should be re-acquired each frame (don't hold onto it after EndEncoding).
     HGI_API
     virtual HgiBlitEncoderUniquePtr CreateBlitEncoder() = 0;
-    
+
     HGI_API
-    virtual void FlushEncoders() = 0;
+    virtual void BlockUntilSubmitted() = 0;
+
+    HGI_API
+    virtual void BlockUntilCompleted() = 0;
 
 private:
     HgiImmediateCommandBuffer & operator=

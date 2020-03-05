@@ -56,8 +56,7 @@ HgiMetalBuffer::HgiMetalBuffer(HgiMetal *hgi, HgiBufferDesc const & desc)
     
     _descriptor.initialData = nullptr;
 
-    _bufferId.label =
-        [NSString stringWithUTF8String:_descriptor.debugName.c_str()];
+    HGIMETAL_DEBUG_LABEL(_bufferId, _descriptor.debugName.c_str());
 }
 
 HgiMetalBuffer::~HgiMetalBuffer()

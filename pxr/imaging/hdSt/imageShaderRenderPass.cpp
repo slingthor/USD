@@ -156,14 +156,14 @@ HdSt_ImageShaderRenderPass::_Execute(
 	MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
     context->StartFrameForThread();
 	
-#if defined(ARCH_GFX_OPENGL)
     // XXX Non-Hgi tasks expect default FB. Remove once all tasks use Hgi.
     bool isOpenGL = HdStResourceFactory::GetInstance()->IsOpenGL();
-    GLint fb;
+    int fb;
     if (isOpenGL) {
+#if defined(ARCH_GFX_OPENGL)
         glGetIntegerv(GL_FRAMEBUFFER_BINDING, &fb);
-    }
 #endif
+    }
     // Create graphics encoder to render into Aovs.
     HgiGraphicsEncoderDesc desc = stRenderPassState->MakeGraphicsEncoderDesc();
     HgiImmediateCommandBuffer& icb = _hgi->GetImmediateCommandBuffer();
@@ -174,38 +174,23 @@ HdSt_ImageShaderRenderPass::_Execute(
     // XXX Some tasks do not yet use Aov, so gfx encoder might be null
     if (gfxEncoder) {
         gfxEncoder->PushDebugGroup(__ARCH_PRETTY_FUNCTION__);
-#if defined(ARCH_GFX_OPENGL)
+
         // XXX The application may have directly called into glViewport.
         // We need to remove the offset to avoid double offset when we composite
         // the Aov back into the client framebuffer.
         // E.g. UsdView CameraMask.
         if (isOpenGL) {
+#if defined(ARCH_GFX_OPENGL)
             glGetIntegerv(GL_VIEWPORT, vp.data());
             GfVec4i aovViewport(0, 0, vp[2]+vp[0], vp[3]+vp[1]);
             gfxEncoder->SetViewport(aovViewport);
-        }
 #endif
+        }
     }
 
     // Draw
     _immediateBatch->PrepareDraw(stRenderPassState, resourceRegistry);
     _immediateBatch->ExecuteDraw(stRenderPassState, resourceRegistry);
-
-    if (gfxEncoder) {
-        gfxEncoder->SetViewport(vp);
-        gfxEncoder->PopDebugGroup();
-        gfxEncoder->EndEncoding();
-
-#if defined(ARCH_GFX_OPENGL)
-        if (isOpenGL) {
-            // XXX Non-Hgi tasks expect default FB. Remove once all tasks use Hgi.
-            glBindFramebuffer(GL_FRAMEBUFFER, fb);
-        }
-#endif
-    }
-    
-    // Flush commands for execution
-    icb.FlushEncoders();
 
 	if (context->GeometryShadersActive()) {
         // Complete the GS command buffer if we have one
@@ -213,9 +198,22 @@ HdSt_ImageShaderRenderPass::_Execute(
     }
     
     if (context->GetWorkQueue(METALWORKQUEUE_DEFAULT).commandBuffer != nil) {
-        context->CommitCommandBufferForThread(false, false);
+        context->CommitCommandBufferForThread(true, false);
         
         context->EndFrameForThread();
+    }
+    
+    if (gfxEncoder) {
+        gfxEncoder->PopDebugGroup();
+        gfxEncoder->EndEncoding();
+
+        if (isOpenGL) {
+#if defined(ARCH_GFX_OPENGL)
+            gfxEncoder->SetViewport(vp);
+            // XXX Non-Hgi tasks expect default FB. Remove once all tasks use Hgi.
+            glBindFramebuffer(GL_FRAMEBUFFER, fb);
+#endif
+        }
     }
 }
 

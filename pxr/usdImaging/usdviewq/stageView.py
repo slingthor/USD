@@ -1646,10 +1646,6 @@ class StageView(QtOpenGL.QGLWidget):
                 self._glPrimitiveGeneratedQuery.BeginPrimitivesGenerated()
                 self._glTimeElapsedQuery.BeginTimeElapsed()
 
-            if not UsdImagingGL.Engine.IsColorCorrectionCapable():
-                from OpenGL.GL.EXT.framebuffer_sRGB import GL_FRAMEBUFFER_SRGB_EXT
-                GL.glEnable(GL_FRAMEBUFFER_SRGB_EXT)
-
             self._renderParams.clearColor = Gf.ConvertDisplayToLinear(Gf.Vec4f(self._dataModel.viewSettings.clearColor))
             GL.glClearColor(*self._renderParams.clearColor)
 
@@ -1764,9 +1760,6 @@ class StageView(QtOpenGL.QGLWidget):
                 self.renderSinglePass(
                     self._renderModeDict[self._dataModel.viewSettings.renderMode],
                     drawSelHighlights)
-
-                if not UsdImagingGL.Engine.IsColorCorrectionCapable():
-                    GL.glDisable(GL_FRAMEBUFFER_SRGB_EXT)
 
                 self.DrawAxis(viewProjectionMatrix)
 

@@ -25,17 +25,19 @@
 
 #include "pxr/imaging/hdx/colorizeSelectionTask.h"
 
-#include "pxr/imaging/hd/driver.h"
 #include "pxr/imaging/hd/perfLog.h"
 #include "pxr/imaging/hd/renderBuffer.h"
-
-#include "pxr/imaging/hgi/tokens.h"
-
-#include "pxr/imaging/hdSt/renderDelegate.h"
+#include "pxr/imaging/hd/tokens.h"
 
 #include "pxr/imaging/hdx/package.h"
 #include "pxr/imaging/hdx/selectionTracker.h"
 #include "pxr/imaging/hdx/tokens.h"
+
+#include "pxr/imaging/hgi/blitEncoder.h"
+#include "pxr/imaging/hgi/blitEncoderOps.h"
+#include "pxr/imaging/hgi/hgi.h"
+#include "pxr/imaging/hgi/immediateCommandBuffer.h"
+#include "pxr/imaging/hgi/tokens.h"
 
 #include "pxr/base/gf/vec2f.h"
 
@@ -51,8 +53,10 @@ TF_DEFINE_PRIVATE_TOKENS(
 );
 
 HdxColorizeSelectionTask::HdxColorizeSelectionTask(
-        HdSceneDelegate* delegate, SdfPath const& id)
+    HdSceneDelegate* delegate,
+    SdfPath const& id)
     : HdxProgressiveTask(id)
+    , _hgi(nullptr)
     , _params()
     , _lastVersion(-1)
     , _hasSelection(false)
@@ -63,23 +67,17 @@ HdxColorizeSelectionTask::HdxColorizeSelectionTask(
     , _outputBuffer(nullptr)
     , _outputBufferSize(0)
     , _converged(false)
+    , _compositor()
 {
-    Hgi* hgi = nullptr;
-    HdDriverVector const& drivers = delegate->GetRenderIndex().GetDrivers();
-    for (HdDriver* hdDriver : drivers) {
-        if (hdDriver->name == HgiTokens->renderDriver &&
-            hdDriver->driver.IsHolding<Hgi*>()) {
-            hgi = hdDriver->driver.UncheckedGet<Hgi*>();
-            break;
-        }
-    }
-
-    _compositor.reset(new HdxFullscreenShader(hgi));
 }
 
 HdxColorizeSelectionTask::~HdxColorizeSelectionTask()
 {
     delete[] _outputBuffer;
+
+    if (_parameterBuffer) {
+        _hgi->DestroyBuffer(&_parameterBuffer);
+    }
 }
 
 bool
@@ -95,6 +93,15 @@ HdxColorizeSelectionTask::Sync(HdSceneDelegate* delegate,
 {
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
+
+    // Find Hgi driver in task context.
+    if (!_hgi) {
+        _hgi = HdTask::_GetDriver<Hgi*>(ctx, HgiTokens->renderDriver);
+        if (!TF_VERIFY(_hgi, "Hgi driver missing from TaskContext")) {
+            return;
+        }
+        _compositor.reset(new HdxFullscreenShader(_hgi));
+    }
 
     if ((*dirtyBits) & HdChangeTracker::DirtyParams) {
         _GetTaskParams(delegate, &_params);
@@ -136,6 +143,13 @@ HdxColorizeSelectionTask::Execute(HdTaskContext* ctx)
 {
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
+
+    // The color aov has the rendered results and we wish to apply the selection
+    // colorization on top of it.
+    HgiTextureHandle aovTexture;
+    if (!_GetTaskContextData(ctx, HdAovTokens->color, &aovTexture)) {
+        return;
+    }
 
     // instance ID and element ID are optional inputs, but if we don't have
     // a prim ID buffer, skip doing anything.
@@ -199,20 +213,8 @@ HdxColorizeSelectionTask::Execute(HdTaskContext* ctx)
         HdFormatUNorm8Vec4, 
         _outputBuffer);
 
-    GfVec2f texelSize;
-    if(_primId->GetWidth() > 0 && _primId->GetHeight() > 0) {
-        texelSize[0] = 1.0f / _primId->GetWidth();
-        texelSize[1] = 1.0f / _primId->GetHeight();
-    }
-    _compositor->SetUniform(_tokens->texelSize, VtValue(texelSize));
-
-    _compositor->SetUniform(_tokens->enableOutline,
-                           VtValue(_params.enableOutline ? 1 : 0));
-
-    // Glsl version 120 does not support unsigned int, so we cast the radius to
-    // a signed int - nonetheless the value will be >=0 .
-    _compositor->SetUniform(_tokens->radius,
-                           VtValue((int)_params.outlineRadius));
+    _CreateParameterBuffer();
+    _compositor->SetBuffer(_parameterBuffer, 0);
 
     // Blend the selection color on top.  ApplySelectionColor uses the
     // calculation:
@@ -231,7 +233,7 @@ HdxColorizeSelectionTask::Execute(HdTaskContext* ctx)
     glEnable(GL_BLEND);
     glBlendFuncSeparate(GL_ONE, GL_SRC_ALPHA, GL_ZERO, GL_ONE);
 #endif
-    _compositor->Draw();
+    _compositor->Draw(aovTexture, /*no depth*/HgiTextureHandle());
 
 #if defined(ARCH_GFX_OPENGL)
     glEnable(GL_DEPTH_TEST);
@@ -338,6 +340,48 @@ HdxColorizeSelectionTask::_ColorizeSelection()
     */
     if (eiddata) {
         _elementId->Unmap();
+    }
+}
+
+void
+HdxColorizeSelectionTask::_CreateParameterBuffer()
+{
+    _ParameterBuffer pb;
+
+    if(_primId->GetWidth() > 0 && _primId->GetHeight() > 0) {
+        pb.texelSize[0] = 1.0f / _primId->GetWidth();
+        pb.texelSize[1] = 1.0f / _primId->GetHeight();
+    }
+
+    pb.enableOutline = _params.enableOutline;
+    pb.radius = (int)_params.outlineRadius;
+
+    // All data is still the same, no need to update the storage buffer
+    if (_parameterBuffer && pb == _parameterData) {
+        return;
+    }
+    _parameterData = pb;
+
+    if (!_parameterBuffer) {
+        // Create a new (storage) buffer for shader parameters
+        HgiBufferDesc bufDesc;
+        bufDesc.debugName = "HdxColorizeSelectionTask parameter buffer";
+        bufDesc.usage = HgiBufferUsageStorage;
+        bufDesc.initialData = &_parameterData;
+        bufDesc.byteSize = sizeof(_parameterData);
+        _parameterBuffer = _hgi->CreateBuffer(bufDesc);
+    } else {
+        // Update the existing storage buffer with new values.
+        HgiImmediateCommandBuffer& icb = _hgi->GetImmediateCommandBuffer();
+        HgiBlitEncoderUniquePtr blitEncoder = icb.CreateBlitEncoder();
+        HgiBufferCpuToGpuOp copyOp;
+        copyOp.byteSize = sizeof(_parameterData);
+        copyOp.cpuSourceBuffer = &_parameterData;
+        copyOp.sourceByteOffset = 0;
+        copyOp.destinationByteOffset = 0;
+        copyOp.gpuDestinationBuffer = _parameterBuffer;
+        blitEncoder->CopyBufferCpuToGpu(copyOp);
+        blitEncoder->EndEncoding();
     }
 }
 

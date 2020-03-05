@@ -345,6 +345,25 @@ enum HgiBlendFactor
     HgiBlendFactorCount
 };
 
+
+/// \enum HgiCompareFunction
+///
+/// Compare functions.
+///
+enum HgiCompareFunction
+{
+    HgiCompareFunctionNever,
+    HgiCompareFunctionLess,
+    HgiCompareFunctionEqual,
+    HgiCompareFunctionLEqual,
+    HgiCompareFunctionGreater,
+    HgiCompareFunctionNotEqual,
+    HgiCompareFunctionGEqual,
+    HgiCompareFunctionAlways,
+
+    HgiCompareFunctionCount
+};
+
 PXR_NAMESPACE_CLOSE_SCOPE
 
 #endif

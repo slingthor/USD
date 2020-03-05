@@ -42,6 +42,8 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+class Hgi;
+
 #define HIO_GLSLFX_TOKENS       \
     (glslfx)                    \
                                 \
@@ -115,6 +117,11 @@ TF_DECLARE_PUBLIC_TOKENS(HioGlslfxTokens, HIO_API, HIO_GLSLFX_TOKENS);
 ///             'fragmentShader': {
 ///                 'source': [ 'MyFragment' ]
 ///             }
+///         },
+///         'metal': {
+///             'fragmentShader': {
+///                 'source': [ 'MyFragment.Metal' ]
+///             }
 ///         }
 ///     }
 /// }
@@ -145,7 +152,7 @@ public:
 
     /// Create a glslfx object from a file
     HIO_API
-    HioGlslfx(std::string const & filePath);
+    HioGlslfx(std::string const & filePath, Hgi *hgi = nullptr);
 
     /// Create a glslfx object from a stream
     HIO_API
@@ -242,6 +249,7 @@ private:
     HioGlslfxConfig::SourceKeys _GetSourceKeys(const TfToken &shaderStageKey) const;
 
 private:
+    Hgi* _hgi;
     _ParseContext _globalContext;
 
     std::set<std::string> _importedFiles;

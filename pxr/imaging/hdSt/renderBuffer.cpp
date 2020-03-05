@@ -145,6 +145,8 @@ HdStRenderBuffer::Map()
 
         blitEncoder->CopyTextureGpuToCpu(copyOp);
         blitEncoder->EndEncoding();
+        
+        icb.BlockUntilCompleted();
     }
 
     return _mappedBuffer.data();
