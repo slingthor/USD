@@ -822,7 +822,7 @@ class StageView(QtOpenGL.QGLWidget):
     def __init__(self, parent=None, dataModel=None, printTiming=False):
 
         glFormat = QtOpenGL.QGLFormat()
-        msaa = os.getenv("USDVIEW_ENABLE_MSAA", "1")
+        msaa = os.getenv("USDVIEW_ENABLE_MSAA", "0")
         samples = 1;
         if msaa == "1":
             glFormat.setSampleBuffers(True)
