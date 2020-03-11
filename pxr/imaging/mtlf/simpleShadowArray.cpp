@@ -140,7 +140,7 @@ MtlfSimpleShadowArray::_AllocResources()
 #endif
         samplerDescriptor.minFilter = MTLSamplerMinMagFilterLinear;
         samplerDescriptor.magFilter = MTLSamplerMinMagFilterLinear;
-        _shadowDepthSampler = MtlfMultiSampler(samplerDescriptor);
+        _shadowDepthSampler = [mtlContext->currentDevice newSamplerStateWithDescriptor:samplerDescriptor];
         [samplerDescriptor release];
     }
 
@@ -161,7 +161,7 @@ MtlfSimpleShadowArray::_AllocResources()
 #endif
         samplerDescriptor.minFilter = MTLSamplerMinMagFilterLinear;
         samplerDescriptor.magFilter = MTLSamplerMinMagFilterLinear;
-        _shadowCompareSampler = MtlfMultiSampler(samplerDescriptor);
+        _shadowCompareSampler = [mtlContext->currentDevice newSamplerStateWithDescriptor:samplerDescriptor];
         [samplerDescriptor release];
     }
     
@@ -248,11 +248,11 @@ MtlfSimpleShadowArray::_FreeResources()
     }
 
     if (_shadowDepthSampler.IsSet()) {
-        _shadowDepthSampler.multiSampler.release();
+        [_shadowDepthSampler release];
         _shadowDepthSampler.Clear();
     }
     if (_shadowCompareSampler.IsSet()) {
-        _shadowCompareSampler.multiSampler.release();
+        [_shadowCompareSampler release];
         _shadowCompareSampler.Clear();
     }
 }
@@ -261,7 +261,7 @@ void
 MtlfSimpleShadowArray::_FreeBindfulTextures()
 {
     if (_bindfulTexture.IsSet()) {
-        _bindfulTexture.multiTexture.release();
+        [_bindfulTexture release];
         _bindfulTexture.Clear();
     }
 }
@@ -278,7 +278,7 @@ MtlfSimpleShadowArray::_FreeBindlessTextures()
 
     for (GarchTextureGPUHandle& id : _bindlessTextures) {
         if (id.IsSet()) {
-            id.multiTexture.release();
+            [id release];
             id.Clear();
         }
     }

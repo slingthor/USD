@@ -625,7 +625,7 @@ HdxColorizeTask::Execute(HdTaskContext* ctx)
     }
 
     // Blit!
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     GLboolean blendEnabled;
     glGetBooleanv(GL_BLEND, &blendEnabled);
     glEnable(GL_BLEND);
@@ -641,7 +641,7 @@ HdxColorizeTask::Execute(HdTaskContext* ctx)
 //    _compositor->SetProgramToCompositor(depthAware);
 //    _compositor->Draw(aovTexture);
 
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     if (!blendEnabled) {
         glDisable(GL_BLEND);
     }

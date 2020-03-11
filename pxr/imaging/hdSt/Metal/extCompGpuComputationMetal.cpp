@@ -21,8 +21,6 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#include "pxr/base/arch/defines.h"
-
 #include "pxr/imaging/garch/contextCaps.h"
 
 #include "pxr/imaging/hdSt/Metal/extCompGpuComputationMetal.h"
@@ -74,39 +72,37 @@ HdStExtCompGpuComputationMetal::_Execute(
 
     context->FlushBuffers();
 
-    for (int g = 0; g < context->renderDevices.count; g++) {
-        id<MTLCommandBuffer> commandBuffer = [context->gpus[g].commandQueue commandBuffer];
-        id<MTLComputeCommandEncoder> computeEncoder = [commandBuffer computeCommandEncoder];
-        
-        id<MTLFunction> computeFunction = mslProgram->GetComputeFunction(g);
-        id<MTLComputePipelineState> pipelineState =
-            context->GetComputeEncoderState(
-                g, computeFunction, 4, 0, immutableBufferMask,
-                @"HdStExtCompGpuComputationMetal pipeline state");
+    id<MTLCommandBuffer> commandBuffer = [context->gpus.commandQueue commandBuffer];
+    id<MTLComputeCommandEncoder> computeEncoder = [commandBuffer computeCommandEncoder];
+    
+    id<MTLFunction> computeFunction = mslProgram->GetComputeFunction();
+    id<MTLComputePipelineState> pipelineState =
+        context->GetComputeEncoderState(
+            computeFunction, 4, 0, immutableBufferMask,
+            @"HdStExtCompGpuComputationMetal pipeline state");
 
-        [computeEncoder setComputePipelineState:pipelineState];
-        
-        context->SetComputeEncoderState(computeEncoder);
-        
-        [computeEncoder setBytes:(const void *)&_uniforms[0]
-                          length:sizeof(int32_t) * _uniforms.size()
-                         atIndex:4];
+    [computeEncoder setComputePipelineState:pipelineState];
+    
+    context->SetComputeEncoderState(computeEncoder);
+    
+    [computeEncoder setBytes:(const void *)&_uniforms[0]
+                      length:sizeof(int32_t) * _uniforms.size()
+                     atIndex:4];
 
-        int maxThreadsPerThreadgroup = [pipelineState threadExecutionWidth];
-        int const maxThreadsPerGroup = 32;
-        if (maxThreadsPerThreadgroup > maxThreadsPerGroup) {
-            maxThreadsPerThreadgroup = maxThreadsPerGroup;
-        }
-        
-        MTLSize threadgroupCount =
-            MTLSizeMake(fmin(maxThreadsPerThreadgroup, GetDispatchCount()), 1, 1);
-
-        [computeEncoder dispatchThreads:MTLSizeMake(GetDispatchCount(), 1, 1)
-                  threadsPerThreadgroup:threadgroupCount];
-        
-        [computeEncoder endEncoding];
-        [commandBuffer commit];
+    int maxThreadsPerThreadgroup = [pipelineState threadExecutionWidth];
+    int const maxThreadsPerGroup = 32;
+    if (maxThreadsPerThreadgroup > maxThreadsPerGroup) {
+        maxThreadsPerThreadgroup = maxThreadsPerGroup;
     }
+    
+    MTLSize threadgroupCount =
+        MTLSizeMake(fmin(maxThreadsPerThreadgroup, GetDispatchCount()), 1, 1);
+
+    [computeEncoder dispatchThreads:MTLSizeMake(GetDispatchCount(), 1, 1)
+              threadsPerThreadgroup:threadgroupCount];
+    
+    [computeEncoder endEncoding];
+    [commandBuffer commit];
 }
 
 

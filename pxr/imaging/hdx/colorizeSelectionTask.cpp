@@ -226,7 +226,7 @@ HdxColorizeSelectionTask::Execute(HdTaskContext* ctx)
     // color, and the selection alpha is the residual value used to scale the
     // scene color. This gives us the blend func:
     // GL_ONE, GL_SRC_ALPHA, GL_ZERO, GL_ONE.
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     glDisable(GL_DEPTH_TEST);
     GLboolean blendEnabled;
     glGetBooleanv(GL_BLEND, &blendEnabled);
@@ -235,7 +235,7 @@ HdxColorizeSelectionTask::Execute(HdTaskContext* ctx)
 #endif
     _compositor->Draw(aovTexture, /*no depth*/HgiTextureHandle());
 
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     glEnable(GL_DEPTH_TEST);
     if (!blendEnabled) {
         glDisable(GL_BLEND);

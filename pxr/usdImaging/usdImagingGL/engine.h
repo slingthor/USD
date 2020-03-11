@@ -70,6 +70,7 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 class UsdPrim;
+class HdRenderBuffer;
 class HdRenderIndex;
 class HdRendererPlugin;
 class HdxTaskController;
@@ -483,6 +484,15 @@ public:
         return _resourceFactory;
     }
     
+    USDIMAGINGGL_API
+    Hgi *GetHgi() const {
+        return _hgi.get();
+    }
+    
+    
+    USDIMAGINGGL_API
+    HdRenderBuffer *GetRenderOutput(TfToken const &name) const;
+    
     struct ResourceFactoryGuard {
         ResourceFactoryGuard(HdStResourceFactoryInterface *resourceFactory);
         ~ResourceFactoryGuard();
@@ -571,7 +581,7 @@ protected:
     // backwards compatibility and may one day be deprecated.  Most of the 
     // time we expect this to be null.  When it is not null, none of the other
     // member variables of this class are used.
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     std::unique_ptr<UsdImagingGLLegacyEngine> _legacyImpl;
 #else
     void* _legacyImpl;

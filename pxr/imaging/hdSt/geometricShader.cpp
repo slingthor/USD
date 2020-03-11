@@ -111,7 +111,7 @@ HdSt_GeometricShader::BindResources(HdStProgram const &program,
     } else {
         // don't care -- use renderPass's fallback
     }
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
 //    if (GetPrimitiveMode() == GL_PATCHES) {
 //        glPatchParameteri(GL_PATCH_VERTICES, GetPrimitiveIndexSize());
 //    }
@@ -132,7 +132,7 @@ HdSt_GeometricShader::UnbindResources(HdStProgram const &program,
                                       HdSt_ResourceBinder const &binder,
                                       HdRenderPassState const &state)
 {
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
 //    if (_polygonMode == HdPolygonModeLine) {
 //        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 //    }

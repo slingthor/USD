@@ -99,7 +99,7 @@ public:
     void DestroyPipeline(HgiPipelineHandle* pipeHandle) override;
     
     HGIGL_API
-    virtual const char* GetAPIName() const {
+    const char* GetAPIName() const override {
         return "opengl";
     }
     

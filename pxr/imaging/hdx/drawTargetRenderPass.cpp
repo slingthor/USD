@@ -36,7 +36,7 @@ static
 void
 _ClearBuffer(GLenum buffer, GLint drawBuffer, const VtValue &value)
 {
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     // XXX: There has to be a better way to handle the different formats.
     if (value.IsHolding<int>()) {
         glClearBufferiv(buffer, drawBuffer, &value.UncheckedGet<int>());
@@ -150,7 +150,7 @@ HdxDrawTargetRenderPass::Execute(
     _ClearBuffers();
 
     GfVec2i const &resolution = _drawTarget->GetSize();
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     // XXX: Should the Raster State or Renderpass set and restore this?
     // save the current viewport
     GLint viewport[4];
@@ -159,7 +159,7 @@ HdxDrawTargetRenderPass::Execute(
 #endif
     // Perform actual draw
     _renderPass.Execute(renderPassState, renderTags);
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     // restore viewport
     glViewport(viewport[0], viewport[1], viewport[2], viewport[3]);
 #endif
@@ -169,7 +169,7 @@ HdxDrawTargetRenderPass::Execute(
 void 
 HdxDrawTargetRenderPass::_ClearBuffers()
 {
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     float depthValue = _drawTargetRenderPassState->GetDepthClearValue();
     glClearBufferfv(GL_DEPTH, 0, &depthValue);
 #endif

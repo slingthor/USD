@@ -646,9 +646,6 @@ HgiInteropMetal::CopyToInterop(
             &hgi->GetImmediateCommandBuffer());
     id<MTLCommandBuffer> commandBuffer = metalIcb->GetCommandBuffer();
     
-    //
-    // Depth
-    //
     id<MTLComputeCommandEncoder> computeEncoder;
     
     if (metalHgi->GetConcurrentDispatch()) {
@@ -659,53 +656,56 @@ HgiInteropMetal::CopyToInterop(
         computeEncoder = [commandBuffer computeCommandEncoder];
     }
 
-    NSUInteger exeWidth = [_computePipelineStateDepth threadExecutionWidth];
-    NSUInteger maxThreadsPerThreadgroup =
-        [_computePipelineStateDepth maxTotalThreadsPerThreadgroup];
+    //
+    // Depth
+    //
+    if (sourceDepthTexture) {
+        NSUInteger exeWidth = [_computePipelineStateDepth threadExecutionWidth];
+        NSUInteger maxThreadsPerThreadgroup =
+            [_computePipelineStateDepth maxTotalThreadsPerThreadgroup];
 
-    MTLSize threadgroupCount = MTLSizeMake(exeWidth,
-        maxThreadsPerThreadgroup / exeWidth, 1);
-    MTLSize threadsPerGrid   = MTLSizeMake(
-        (_mtlAliasedDepthRegularFloatTexture.width +
-            (threadgroupCount.width - 1)) / threadgroupCount.width,
-        (_mtlAliasedDepthRegularFloatTexture.height +
-            (threadgroupCount.height - 1)) / threadgroupCount.height,
-        1);
+        MTLSize threadgroupCount = MTLSizeMake(exeWidth,
+            maxThreadsPerThreadgroup / exeWidth, 1);
+        MTLSize threadsPerGrid   = MTLSizeMake(
+            (_mtlAliasedDepthRegularFloatTexture.width +
+                (threadgroupCount.width - 1)) / threadgroupCount.width,
+            (_mtlAliasedDepthRegularFloatTexture.height +
+                (threadgroupCount.height - 1)) / threadgroupCount.height,
+            1);
 
-    [computeEncoder setComputePipelineState:_computePipelineStateDepth];
-    [computeEncoder setTexture:sourceDepthTexture atIndex:0];
-    [computeEncoder setTexture:_mtlAliasedDepthRegularFloatTexture atIndex:1];
-    
-    [computeEncoder dispatchThreadgroups:threadsPerGrid
-                   threadsPerThreadgroup:threadgroupCount];
-
-    [computeEncoder endEncoding];
+        [computeEncoder setComputePipelineState:_computePipelineStateDepth];
+        [computeEncoder setTexture:sourceDepthTexture atIndex:0];
+        [computeEncoder setTexture:_mtlAliasedDepthRegularFloatTexture
+                           atIndex:1];
+        
+        [computeEncoder dispatchThreadgroups:threadsPerGrid
+                       threadsPerThreadgroup:threadgroupCount];
+    }
     
     //
     // Color
     //
-    computeEncoder =
-        [commandBuffer computeCommandEncoder];
+    if (sourceColorTexture) {
+        NSUInteger exeWidth = [_computePipelineStateColor threadExecutionWidth];
+        NSUInteger maxThreadsPerThreadgroup =
+            [_computePipelineStateColor maxTotalThreadsPerThreadgroup];
 
-    exeWidth = [_computePipelineStateColor threadExecutionWidth];
-    maxThreadsPerThreadgroup =
-        [_computePipelineStateColor maxTotalThreadsPerThreadgroup];
+        MTLSize threadgroupCount = MTLSizeMake(exeWidth,
+            maxThreadsPerThreadgroup / exeWidth, 1);
+        MTLSize threadsPerGrid   = MTLSizeMake(
+            (_mtlAliasedColorTexture.width +
+                (threadgroupCount.width - 1)) / threadgroupCount.width,
+            (_mtlAliasedColorTexture.height +
+                (threadgroupCount.height - 1)) / threadgroupCount.height,
+            1);
 
-    threadgroupCount = MTLSizeMake(exeWidth,
-        maxThreadsPerThreadgroup / exeWidth, 1);
-    threadsPerGrid   = MTLSizeMake(
-        (_mtlAliasedColorTexture.width +
-            (threadgroupCount.width - 1)) / threadgroupCount.width,
-        (_mtlAliasedColorTexture.height +
-            (threadgroupCount.height - 1)) / threadgroupCount.height,
-        1);
-
-    [computeEncoder setComputePipelineState:_computePipelineStateColor];
-    [computeEncoder setTexture:sourceColorTexture atIndex:0];
-    [computeEncoder setTexture:_mtlAliasedColorTexture atIndex:1];
-    
-    [computeEncoder dispatchThreadgroups:threadsPerGrid
-                   threadsPerThreadgroup:threadgroupCount];
+        [computeEncoder setComputePipelineState:_computePipelineStateColor];
+        [computeEncoder setTexture:sourceColorTexture atIndex:0];
+        [computeEncoder setTexture:_mtlAliasedColorTexture atIndex:1];
+        
+        [computeEncoder dispatchThreadgroups:threadsPerGrid
+                       threadsPerThreadgroup:threadgroupCount];
+    }
 
     [computeEncoder endEncoding];
     

@@ -35,7 +35,13 @@
 #include "pxr/base/tf/registryManager.h"
 #include "pxr/base/tf/type.h"
 
+#include "pxr/base/arch/defines.h"
+
+#if defined(ARCH_OS_MACOS)
 #import <Cocoa/Cocoa.h>
+#else
+#import <UIKit/UIKit.h>
+#endif
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -67,12 +73,14 @@ static int _GetAPIVersion()
 HgiMetal::HgiMetal(id<MTLDevice> device)
 : _device(device)
 , _apiVersion(_GetAPIVersion())
+, _useInterop(false)
 {
     if (!_device) {
+#if defined(ARCH_OS_MACOS)
         if( TfGetenvBool("USD_METAL_USE_INTEGRATED_GPU", false)) {
             _device = MTLCopyAllDevices()[1];
         }
-
+#endif
         if (!_device) {
             _device = MTLCreateSystemDefaultDevice();
         }
@@ -96,18 +104,29 @@ HgiMetal::HgiMetal(id<MTLDevice> device)
     [[MTLCaptureManager sharedCaptureManager]
         setDefaultCaptureScope:_captureScopeFullFrame];
     
+#if defined(ARCH_OS_MACOS)
     static NSOperatingSystemVersion minimumSupportedOSVersion = { .majorVersion = 10, .minorVersion = 14, .patchVersion = 5 };
     static bool sysVerGreaterOrEqualTo10_14_5 = [NSProcessInfo.processInfo isOperatingSystemAtLeastVersion:minimumSupportedOSVersion];
     
     _concurrentDispatchSupported = sysVerGreaterOrEqualTo10_14_5;
-
+#else
+    #define SYSTEM_VERSION_GREATER_THAN_OR_EQUAL_TO(v) ([[[UIDevice currentDevice] systemVersion] compare:v options:NSNumericSearch] != NSOrderedAscending)
+    
+    static bool sysVerGreaterThanOrEqualTo12_0 = SYSTEM_VERSION_GREATER_THAN_OR_EQUAL_TO(@"12.0");
+    _concurrentDispatchSupported = sysVerGreaterThanOrEqualTo12_0;
+#endif
+    
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
+    _useInterop = true;
+#endif
 }
 
 HgiMetal::~HgiMetal()
 {
+    _immediateCommandBuffer.reset();
+
     [_captureScopeFullFrame release];
     [_commandQueue release];
-    [_device release];
 }
 
 HgiImmediateCommandBuffer&

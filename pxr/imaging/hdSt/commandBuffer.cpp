@@ -237,7 +237,7 @@ HdStCommandBuffer::ExecuteDraw(
     
     // Create a new command buffer for each render pass to the current drawable
     if (renderPassDescriptor.colorAttachments[0].loadAction == MTLLoadActionClear) {
-        id <MTLCommandBuffer> commandBuffer = [context->gpus[context->currentGPU].commandQueue commandBuffer];
+        id <MTLCommandBuffer> commandBuffer = [context->gpus.commandQueue commandBuffer];
         if (TF_DEV_BUILD) {
             commandBuffer.label = @"Clear";
         }
@@ -596,7 +596,10 @@ HdStCommandBuffer::SyncDrawItemVisibility(unsigned visChangeCount)
 
 static std::atomic_ulong primCount;
 void
-HdStCommandBuffer::FrustumCull(GfMatrix4d const &viewProjMatrix)
+HdStCommandBuffer::FrustumCull(
+    GfMatrix4d const &viewProjMatrix,
+    float renderTargetWidth,
+    float renderTargetHeight)
 {
     HD_TRACE_FUNCTION();
     
@@ -607,9 +610,8 @@ HdStCommandBuffer::FrustumCull(GfMatrix4d const &viewProjMatrix)
     
     static vector_float2 dimensions;
 
-    MTLRenderPassDescriptor *rpd = MtlfMetalContext::GetMetalContext()->GetRenderPassDescriptor();
-    dimensions.x = 4.0f / float(rpd.colorAttachments[0].texture.width);
-    dimensions.y = 4.0f / float(rpd.colorAttachments[0].texture.height);
+    dimensions.x = 4.0f / renderTargetWidth;
+    dimensions.y = 4.0f / renderTargetHeight;
     
     MtlfMetalContext::GetMetalContext()->PrepareBufferFlush();
     

@@ -76,7 +76,8 @@ public:
 
     /// Cull drawItemInstances based on passed in combined view and projection matrix
     HDST_API
-    void FrustumCull(GfMatrix4d const &cullMatrix);
+    void FrustumCull(GfMatrix4d const &cullMatrix, float renderTargetWidth,
+        float renderTargetHeight);
 
     /// Sync visibility state from RprimSharedState to DrawItemInstances.
     HDST_API

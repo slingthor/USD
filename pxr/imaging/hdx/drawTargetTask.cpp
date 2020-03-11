@@ -490,7 +490,7 @@ HdxDrawTargetTask::Execute(HdTaskContext* ctx)
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
 
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     // Apply polygon offset to whole pass.
     // XXX TODO: Move to an appropriate home
     if (!_depthBiasUseDefault) {
@@ -546,7 +546,7 @@ HdxDrawTargetTask::Execute(HdTaskContext* ctx)
         }
     }
 
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     // Restore to GL defaults
     glDisable(GL_SAMPLE_ALPHA_TO_COVERAGE);
     glDisable(GL_PROGRAM_POINT_SIZE);

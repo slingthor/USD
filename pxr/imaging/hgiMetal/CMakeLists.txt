@@ -8,7 +8,11 @@ if (NOT ${PXR_ENABLE_METAL_SUPPORT})
 endif()
 
 FIND_LIBRARY(METAL_LIBRARY Metal)
-FIND_LIBRARY(APPKIT_LIBRARY AppKit)
+if (APPLEIOS)
+    FIND_LIBRARY(APPUIKIT_LIBRARY UIKit)
+else()
+    FIND_LIBRARY(APPUIKIT_LIBRARY AppKit)
+endif()
 
 # Compile cpp files as obj-c++ to allow inline use of Metal API
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -x objective-c++")
@@ -20,7 +24,7 @@ pxr_library(hgiMetal
         tf
         trace
         ${METAL_LIBRARY}
-        ${APPKIT_LIBRARY}
+        ${APPUIKIT_LIBRARY}
 
     PRIVATE_CLASSES
         conversions

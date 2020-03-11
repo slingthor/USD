@@ -46,26 +46,24 @@ HdStBufferRelocatorMetal::Commit()
 
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
     
-    for (int i = 0; i < context->renderDevices.count; i++) {
-        id<MTLCommandBuffer> commandBuffer = [context->gpus[i].commandQueue commandBuffer];
-        id<MTLBlitCommandEncoder> blitEncoder = [commandBuffer blitCommandEncoder];
-        
-        TF_FOR_ALL (it, _queue) {
-            [blitEncoder copyFromBuffer:_srcBuffer[i]
-                           sourceOffset:it->readOffset
-                               toBuffer:_dstBuffer[i]
-                      destinationOffset:it->writeOffset
-                                   size:it->copySize];
-        }
-#if defined(ARCH_OS_MACOS)
-        // Update CPU side copy so that any future CPU side didModifyRange calls
-        // don't mess us up!
-        [blitEncoder synchronizeResource:_dstBuffer[i]];
-#endif
-        [blitEncoder endEncoding];
-        [commandBuffer commit];
-        [commandBuffer waitUntilCompleted];
+    id<MTLCommandBuffer> commandBuffer = [context->gpus.commandQueue commandBuffer];
+    id<MTLBlitCommandEncoder> blitEncoder = [commandBuffer blitCommandEncoder];
+    
+    TF_FOR_ALL (it, _queue) {
+        [blitEncoder copyFromBuffer:_srcBuffer
+                       sourceOffset:it->readOffset
+                           toBuffer:_dstBuffer
+                  destinationOffset:it->writeOffset
+                               size:it->copySize];
     }
+#if defined(ARCH_OS_MACOS)
+    // Update CPU side copy so that any future CPU side didModifyRange calls
+    // don't mess us up!
+    [blitEncoder synchronizeResource:_dstBuffer];
+#endif
+    [blitEncoder endEncoding];
+    [commandBuffer commit];
+    [commandBuffer waitUntilCompleted];
 
     HD_PERF_COUNTER_ADD(HdPerfTokens->glCopyBufferSubData,
                         (double)_queue.size());

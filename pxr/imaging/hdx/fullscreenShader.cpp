@@ -35,9 +35,11 @@
 #include "pxr/imaging/hgi/immediateCommandBuffer.h"
 #include "pxr/imaging/hgi/tokens.h"
 
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
 // XXX Remove includes when entire task is using Hgi. We do not want to refer
 // to any specific Hgi implementation.
 #include "pxr/imaging/hgiGL/pipeline.h"
+#endif
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -429,12 +431,14 @@ HdxFullscreenShader::Draw(
         TF_CODING_ERROR("Could not determine the backbuffer dimensions");
     }
 
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     // XXX Not everything is using Hgi yet, so we have inconsistent state
     // management in opengl. Remove when Hgi transition is complete.
     HgiGLPipeline* glPipeline = dynamic_cast<HgiGLPipeline*>(_pipeline.Get());
     if (glPipeline) {
         glPipeline->CaptureOpenGlState();
     }
+#endif
 
     // Prepare graphics encoder.
     HgiGraphicsEncoderDesc gfxDesc;
@@ -466,11 +470,13 @@ HdxFullscreenShader::Draw(
     // Done recording commands, submit work.
     gfxEncoder->EndEncoding();
 
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     // XXX Not everything is using Hgi yet, so we have inconsistent state
     // management in opengl. Remove when Hgi transition is complete.
     if (glPipeline) {
         glPipeline->RestoreOpenGlState();
     }
+#endif
 }
 
 void

@@ -201,7 +201,7 @@ MtlfBaseTexture::MtlfBaseTexture()
 MtlfBaseTexture::~MtlfBaseTexture()
 {
     if (_textureName.IsSet()) {
-        _textureName.multiTexture.release();
+        [_textureName release];
     }
 }
 
@@ -318,7 +318,8 @@ MtlfBaseTexture::_CreateTexture(GarchBaseTextureDataConstPtr texData,
         }
         
         if (_textureName.IsSet()) {
-            _textureName.multiTexture.release();
+            [_textureName release];
+            _textureName = nil;
         }
 
         // Uncompressed textures can have cropping and other special
@@ -408,7 +409,7 @@ MtlfBaseTexture::_CreateTexture(GarchBaseTextureDataConstPtr texData,
                                                                mipmapped:genMips?YES:NO];
             desc.resourceOptions = MTLResourceStorageModeDefault;
             desc.usage = MTLTextureUsageShaderRead;
-            _textureName = MtlfMultiTexture(desc);
+            _textureName = [device newTextureWithDescriptor:desc];
             
             if (numChannels == 1) {
 #if (__MAC_OS_X_VERSION_MAX_ALLOWED >= 101500) || (__IPHONE_OS_VERSION_MAX_ALLOWED >= 130000) /* __MAC_10_15 __IOS_13_00 */
@@ -425,12 +426,10 @@ MtlfBaseTexture::_CreateTexture(GarchBaseTextureDataConstPtr texData,
                 GarchBaseTextureDataConstPtr *asyncOwnedTexData = new GarchBaseTextureDataConstPtr(texData);
                 dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0),
                    ^ {
-                       for(int i = 0; i < GPUState::gpuCount; i++) {
-                           [_textureName.multiTexture[i] replaceRegion:MTLRegionMake2D(0, 0, texDataWidth, texDataHeight)
-                                                           mipmapLevel:0
-                                                             withBytes:rawData
-                                                           bytesPerRow:pixelByteSize * unpackRowLength];
-                       }
+                       [_textureName replaceRegion:MTLRegionMake2D(0, 0, texDataWidth, texDataHeight)
+                                       mipmapLevel:0
+                                         withBytes:rawData
+                                       bytesPerRow:pixelByteSize * unpackRowLength];
                        
                        if (isThreeChannelTexture) {
                            delete[] (uint8_t*)texBuffer;
@@ -440,26 +439,22 @@ MtlfBaseTexture::_CreateTexture(GarchBaseTextureDataConstPtr texData,
                           // Blit command encoder to generate mips
                           MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
                           
-                          for(int i = 0; i < GPUState::gpuCount; i++) {
-                              id<MTLCommandBuffer> commandBuffer = [context->gpus[i].commandQueue commandBuffer];
-                              id<MTLBlitCommandEncoder> blitEncoder = [commandBuffer blitCommandEncoder];
-                              
-                              [blitEncoder generateMipmapsForTexture:_textureName.multiTexture[i]];
-                              [blitEncoder endEncoding];
-                              
-                              [commandBuffer commit];
-                          }
+                          id<MTLCommandBuffer> commandBuffer = [context->gpus.commandQueue commandBuffer];
+                          id<MTLBlitCommandEncoder> blitEncoder = [commandBuffer blitCommandEncoder];
+                          
+                          [blitEncoder generateMipmapsForTexture:_textureName];
+                          [blitEncoder endEncoding];
+                          
+                          [commandBuffer commit];
                       }
                     delete asyncOwnedTexData;
                    });
             }
             else {
-                for(int i = 0; i < GPUState::gpuCount; i++) {
-                    [_textureName.multiTexture[i] replaceRegion:MTLRegionMake2D(0, 0, texDataWidth, texDataHeight)
-                                    mipmapLevel:0
-                                      withBytes:rawData
-                                    bytesPerRow:pixelByteSize * unpackRowLength];
-                }
+                [_textureName replaceRegion:MTLRegionMake2D(0, 0, texDataWidth, texDataHeight)
+                                mipmapLevel:0
+                                  withBytes:rawData
+                                bytesPerRow:pixelByteSize * unpackRowLength];
 
                 if (isThreeChannelTexture) {
                     delete[] (uint8_t*)texBuffer;
@@ -469,15 +464,13 @@ MtlfBaseTexture::_CreateTexture(GarchBaseTextureDataConstPtr texData,
                     // Blit command encoder to generate mips
                     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
                     
-                    for(int i = 0; i < GPUState::gpuCount; i++) {
-                        id<MTLCommandBuffer> commandBuffer = [context->gpus[i].commandQueue commandBuffer];
-                        id<MTLBlitCommandEncoder> blitEncoder = [commandBuffer blitCommandEncoder];
+                    id<MTLCommandBuffer> commandBuffer = [context->gpus.commandQueue commandBuffer];
+                    id<MTLBlitCommandEncoder> blitEncoder = [commandBuffer blitCommandEncoder];
 
-                        [blitEncoder generateMipmapsForTexture:_textureName.multiTexture[i]];
-                        [blitEncoder endEncoding];
+                    [blitEncoder generateMipmapsForTexture:_textureName];
+                    [blitEncoder endEncoding];
 
-                        [commandBuffer commit];
-                    }
+                    [commandBuffer commit];
                 }
             }
         } else {
@@ -499,7 +492,7 @@ MtlfBaseTexture::_CreateTexture(GarchBaseTextureDataConstPtr texData,
             
             desc.resourceOptions = MTLResourceStorageModeDefault;
             desc.usage = MTLTextureUsageShaderRead;
-            _textureName = MtlfMultiTexture(desc);
+            _textureName = [device newTextureWithDescriptor:desc];
 
             if (useAsncTextureUploads) {
                 // Retain an active reference to the tex data for the async operation
@@ -517,7 +510,7 @@ MtlfBaseTexture::_CreateTexture(GarchBaseTextureDataConstPtr texData,
                                 texBuffer = PadImage((*asyncOwnedTexData)->GLInternalFormat(), (*asyncOwnedTexData)->GetRawBuffer(1), pixelByteSize, numPixels);
                             }
 
-                            [_textureName.multiTexture[i] replaceRegion:MTLRegionMake2D(0, 0, mipWidth, texData->ResizedHeight(i))
+                            [_textureName replaceRegion:MTLRegionMake2D(0, 0, mipWidth, texData->ResizedHeight(i))
                                             mipmapLevel:i
                                               withBytes:texBuffer
                                             bytesPerRow:pixelByteSize * mipWidth];
@@ -541,11 +534,11 @@ MtlfBaseTexture::_CreateTexture(GarchBaseTextureDataConstPtr texData,
                         texBuffer = PadImage(texData->GLInternalFormat(), texData->GetRawBuffer(1), pixelByteSize, numPixels);
                     }
                     
-                    [_textureName.multiTexture[i] replaceRegion:MTLRegionMake2D(0, 0, mipWidth, texData->ResizedHeight(i))
-                                                    mipmapLevel:i
-                                                      withBytes:texBuffer
-                                                    bytesPerRow:pixelByteSize * mipWidth];
-                    
+                    [_textureName replaceRegion:MTLRegionMake2D(0, 0, mipWidth, texData->ResizedHeight(i))
+                                    mipmapLevel:i
+                                      withBytes:texBuffer
+                                    bytesPerRow:pixelByteSize * mipWidth];
+    
                     if (isThreeChannelTexture) {
                         delete[] (uint8_t*)texBuffer;
                     }

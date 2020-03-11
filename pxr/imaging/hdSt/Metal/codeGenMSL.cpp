@@ -2654,8 +2654,8 @@ HdSt_CodeGenMSL::GetComputeHeader()
 
     GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
         header  << "#define HD_SHADER_API " << HD_SHADER_API << "\n"
-                    << "#define ARCH_GFX_METAL\n"
-                    << "#define METAL_API_VERSION " << caps.apiVersion + 1 << "\n";
+                << "#define ARCH_GFX_METAL\n"
+                << "#define METAL_API_VERSION " << caps.apiVersion + 1 << "\n";
     
     // Metal feature set defines
     id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->currentDevice;

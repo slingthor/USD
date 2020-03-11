@@ -126,6 +126,13 @@ if (${PXR_BUILD_USD_IMAGING} AND NOT ${PXR_BUILD_IMAGING})
     set(PXR_BUILD_USD_IMAGING "OFF" CACHE BOOL "" FORCE)
 endif()
 
+if (${PXR_ENABLE_GL_SUPPORT} OR PXR_ENABLE_METAL_SUPPORT)
+    set(PXR_BUILD_STORM_PLUGINS "ON")
+else()
+    set(PXR_BUILD_STORM_PLUGINS "OFF")
+endif()
+
+
 if (${PXR_BUILD_USDVIEW})
     if (NOT ${PXR_BUILD_USD_IMAGING})
         message(STATUS
@@ -137,10 +144,10 @@ if (${PXR_BUILD_USDVIEW})
             "Setting PXR_BUILD_USDVIEW=OFF because "
             "PXR_ENABLE_PYTHON_SUPPORT=OFF")
         set(PXR_BUILD_USDVIEW "OFF" CACHE BOOL "" FORCE)
-    elseif (NOT ${PXR_ENABLE_GL_SUPPORT})
+    elseif (NOT ${PXR_BUILD_STORM_PLUGINS})
         message(STATUS
             "Setting PXR_BUILD_USDVIEW=OFF because "
-            "PXR_ENABLE_GL_SUPPORT=OFF")
+            "PXR_BUILD_STORM_PLUGINS=OFF")
         set(PXR_BUILD_USDVIEW "OFF" CACHE BOOL "" FORCE)
     endif()
 endif()
@@ -150,10 +157,10 @@ if (${PXR_BUILD_EMBREE_PLUGIN})
         message(STATUS
             "Setting PXR_BUILD_EMBREE_PLUGIN=OFF because PXR_BUILD_IMAGING=OFF")
         set(PXR_BUILD_EMBREE_PLUGIN "OFF" CACHE BOOL "" FORCE)
-    elseif (NOT ${PXR_ENABLE_GL_SUPPORT})
+    elseif (NOT ${PXR_BUILD_STORM_PLUGINS})
         message(STATUS
             "Setting PXR_BUILD_EMBREE_PLUGIN=OFF because "
-            "PXR_ENABLE_GL_SUPPORT=OFF")
+            "PXR_BUILD_STORM_PLUGINS=OFF")
         set(PXR_BUILD_EMBREE_PLUGIN "OFF" CACHE BOOL "" FORCE)
     endif()
 endif()

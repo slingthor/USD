@@ -38,10 +38,10 @@
 
 #include "pxr/base/tf/staticTokens.h"
 
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
 #include "pxr/imaging/hdSt/GL/glslProgram.h"
 #endif
-#if defined(ARCH_GFX_METAL)
+#if defined(PXR_METAL_SUPPORT_ENABLED)
 #include "pxr/imaging/hdSt/Metal/mslProgram.h"
 #endif
 #include "pxr/imaging/hdSt/resourceFactory.h"
@@ -197,7 +197,7 @@ HdxSimpleLightingShader::BindResources(HdStProgram const &program,
 
     bool isOpenGL = HdStResourceFactory::GetInstance()->IsOpenGL();
 
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     GLuint programId = 0;
     
     if (isOpenGL) {
@@ -220,7 +220,7 @@ HdxSimpleLightingShader::BindResources(HdStProgram const &program,
                 int samplerUnit = irradianceBinding.GetTextureUnit();
                 
                 if (isOpenGL) {
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
                     uint32_t textureId = uint32_t(light.GetIrradianceId());
                     glActiveTexture(GL_TEXTURE0 + samplerUnit);
                     glBindTexture(GL_TEXTURE_2D, (GLuint)textureId);
@@ -247,7 +247,7 @@ HdxSimpleLightingShader::BindResources(HdStProgram const &program,
                 int samplerUnit = prefilterBinding.GetTextureUnit();
                 
                 if (isOpenGL) {
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
                     uint32_t textureId = uint32_t(light.GetPrefilterId());
                     glActiveTexture(GL_TEXTURE0 + samplerUnit);
                     glBindTexture(GL_TEXTURE_2D, (GLuint)textureId);
@@ -273,7 +273,7 @@ HdxSimpleLightingShader::BindResources(HdStProgram const &program,
                 int samplerUnit = brdfBinding.GetTextureUnit();
                 
                 if (isOpenGL) {
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
                     uint32_t textureId = uint32_t(light.GetBrdfId());
                     glActiveTexture(GL_TEXTURE0 + samplerUnit);
                     glBindTexture(GL_TEXTURE_2D, (GLuint)textureId);
@@ -296,7 +296,7 @@ HdxSimpleLightingShader::BindResources(HdStProgram const &program,
             }
         }
     }
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     if (isOpenGL) {
         glActiveTexture(GL_TEXTURE0);
     }
@@ -314,7 +314,7 @@ HdxSimpleLightingShader::UnbindResources(HdStProgram const &program,
     //
     _lightingContext->UnbindSamplers(_bindingMap);
     
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     if (HdStResourceFactory::GetInstance()->IsOpenGL()) {
        for (auto const& light : _lightingContext->GetLights()){
 

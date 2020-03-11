@@ -53,6 +53,11 @@ void HgiInterop::TransferToApp(
     HgiTextureHandle const &depth)
 {
     HgiMetal *hgiMetal = static_cast<HgiMetal*>(hgi);
+    
+    if (!hgiMetal->GetNeedsInterop()) {
+        return;
+    }
+
     HgiMetalTexture *metalColor = static_cast<HgiMetalTexture*>(color.Get());
     HgiMetalTexture *metalDepth = static_cast<HgiMetalTexture*>(depth.Get());
  

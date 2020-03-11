@@ -1,6 +1,12 @@
 set(PXR_PREFIX pxr/imaging)
 set(PXR_PACKAGE hgiInterop)
 
+if (APPLEIOS)
+    message(STATUS
+        "Skipping ${PXR_PACKAGE} on iOS")
+    return()
+endif()
+
 set(optionalLibraries "")
 set(optionalSource "")
 

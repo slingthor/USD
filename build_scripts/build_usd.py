@@ -1349,6 +1349,10 @@ def InstallOpenImageIO(context, force, buildArgs):
         if iOS():
             PatchFile("src/libutil/sysutil.cpp", 
                    [("if (system (newcmd.c_str()) != -1)", "if (true)")])
+            PatchFile("CMakeLists.txt",
+                    [("set (CMAKE_ALLOW_LOOSE_LOOP_CONSTRUCTS TRUE)",
+                        "set (CMAKE_ALLOW_LOOSE_LOOP_CONSTRUCTS TRUE)\n"
+                        "cmake_policy (SET CMP0008 NEW)")])
 
         # Add on any user-specified extra arguments.
         extraArgs += buildArgs
@@ -1385,9 +1389,9 @@ def InstallOpenColorIO(context, force, buildArgs):
                      '-DOCIO_BUILD_JNIGLUE=OFF',
                      '-DOCIO_STATIC_JNIGLUE=OFF']
 
-        #PatchFile("src/core/Config.cpp", 
-        #           [("cacheidnocontext_ = cacheidnocontext_;", 
-        #             "cacheidnocontext_ = rhs.cacheidnocontext_;")])
+        PatchFile("src/core/Config.cpp", 
+                   [("cacheidnocontext_ = cacheidnocontext_;", 
+                     "cacheidnocontext_ = rhs.cacheidnocontext_;")])
 
         if iOS() or MacOS():
             extraArgs.append('-DCMAKE_CXX_FLAGS="-Wno-unused-function -Wno-unused-const-variable -Wno-unused-private-field"')

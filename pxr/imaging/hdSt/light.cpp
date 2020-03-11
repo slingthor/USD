@@ -67,37 +67,21 @@ HdStLight::HdStLight(SdfPath const &id, TfToken const &lightType)
 HdStLight::~HdStLight()
 {
     bool isOpenGL = HdStResourceFactory::GetInstance()->IsOpenGL();
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     if (isOpenGL) {
         uint32_t t[] = { _irradianceTexture, _prefilterTexture, _brdfTexture };
         glDeleteTextures(sizeof(t) / sizeof(t[0]), t);
     }
 #endif
-#if defined(ARCH_GFX_METAL)
+#if defined(PXR_METAL_SUPPORT_ENABLED)
     if (!isOpenGL) {
-        MtlfMultiTexture mt = _irradianceTexture;
-        mt.release();
-        _irradianceTexture = mt;
-        
-        mt = _prefilterTexture;
-        mt.release();
-        _prefilterTexture = mt;
-        
-        mt = _brdfTexture;
-        mt.release();
-        _brdfTexture = mt;
+        [_irradianceTexture release];
+        [_prefilterTexture release];
+        [_brdfTexture release];
 
-        MtlfMultiSampler ms = _irradianceSampler;
-        ms.release();
-        _irradianceSampler = ms;
-        
-        ms = _prefilterSampler;
-        ms.release();
-        _prefilterSampler = ms;
-        
-        ms = _brdfSampler;
-        ms.release();
-        _brdfSampler = ms;
+        [_irradianceSampler release];
+        [_prefilterSampler release];
+        [_brdfSampler release];
     }
 #endif
 }
@@ -208,7 +192,7 @@ HdStLight::_SetupComputations(
     // get the width and height of the source texture
     int textureWidth = 0, textureHeight = 0;
     if (isOpenGL) {
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, sourceTexture);
         glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &textureWidth);
@@ -217,8 +201,8 @@ HdStLight::_SetupComputations(
 #endif
     }
     else {
-#if defined(ARCH_GFX_METAL)
-        id<MTLTexture> tex = sourceTexture.multiTexture.forCurrentGPU();
+#if defined(PXR_METAL_SUPPORT_ENABLED)
+        id<MTLTexture> tex = sourceTexture;
         textureWidth = [tex width];
         textureHeight = [tex height];
 #endif
@@ -237,7 +221,7 @@ HdStLight::_SetupComputations(
 
     // Diffuse Irradiance
     if (isOpenGL) {
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
         uint32_t t;
         glGenTextures(1, &t);
         _irradianceTexture = t;
@@ -252,7 +236,7 @@ HdStLight::_SetupComputations(
     }
     else
     {
-#if defined(ARCH_GFX_METAL)
+#if defined(PXR_METAL_SUPPORT_ENABLED)
         id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->currentDevice;
         MTLTextureDescriptor* desc =
             [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA16Float
@@ -261,14 +245,14 @@ HdStLight::_SetupComputations(
                                                            mipmapped:NO];
         desc.resourceOptions = MTLResourceStorageModeDefault;
         desc.usage = MTLTextureUsageShaderRead|MTLTextureUsageShaderWrite;
-        _irradianceTexture = MtlfMultiTexture(desc);
+        _irradianceTexture = [device newTextureWithDescriptor:desc];
         
         MTLSamplerDescriptor* samplerDescriptor = [[MTLSamplerDescriptor alloc] init];
         samplerDescriptor.sAddressMode = MTLSamplerAddressModeRepeat;
         samplerDescriptor.tAddressMode = MTLSamplerAddressModeRepeat;
         samplerDescriptor.minFilter = MTLSamplerMinMagFilterLinear;
         samplerDescriptor.magFilter = MTLSamplerMinMagFilterLinear;
-        _irradianceSampler = MtlfMultiSampler(samplerDescriptor);
+        _irradianceSampler = [device newSamplerStateWithDescriptor:samplerDescriptor];
 #endif
     }
 
@@ -281,7 +265,7 @@ HdStLight::_SetupComputations(
 
     // PreFilter
     if (isOpenGL) {
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
         uint32_t t;
         glGenTextures(1, &t);
         _prefilterTexture = t;
@@ -297,7 +281,7 @@ HdStLight::_SetupComputations(
     }
     else
     {
-#if defined(ARCH_GFX_METAL)
+#if defined(PXR_METAL_SUPPORT_ENABLED)
         id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->currentDevice;
         MTLTextureDescriptor* desc =
             [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA16Float
@@ -307,7 +291,7 @@ HdStLight::_SetupComputations(
         desc.resourceOptions = MTLResourceStorageModeDefault;
         desc.mipmapLevelCount = numPrefilterLevels;
         desc.usage = MTLTextureUsageShaderRead|MTLTextureUsageShaderWrite;
-        _prefilterTexture = MtlfMultiTexture(desc);
+        _prefilterTexture = [device newTextureWithDescriptor:desc];
         
         MTLSamplerDescriptor* samplerDescriptor = [[MTLSamplerDescriptor alloc] init];
         samplerDescriptor.sAddressMode = MTLSamplerAddressModeRepeat;
@@ -315,7 +299,7 @@ HdStLight::_SetupComputations(
         samplerDescriptor.minFilter = MTLSamplerMinMagFilterLinear;
         samplerDescriptor.magFilter = MTLSamplerMinMagFilterLinear;
         samplerDescriptor.mipFilter = MTLSamplerMipFilterLinear;
-        _prefilterSampler = MtlfMultiSampler(samplerDescriptor);
+        _prefilterSampler = [device newSamplerStateWithDescriptor:samplerDescriptor];
 #endif
     }
 
@@ -342,7 +326,7 @@ HdStLight::_SetupComputations(
 
     // BRDF LUT
     if (isOpenGL) {
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
         uint32_t t;
         glGenTextures(1, &t);
         _brdfTexture = t;
@@ -357,7 +341,7 @@ HdStLight::_SetupComputations(
     }
     else
     {
-#if defined(ARCH_GFX_METAL)
+#if defined(PXR_METAL_SUPPORT_ENABLED)
         id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->currentDevice;
         MTLTextureDescriptor* desc =
             [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA16Float
@@ -366,14 +350,14 @@ HdStLight::_SetupComputations(
                                                            mipmapped:NO];
         desc.resourceOptions = MTLResourceStorageModeDefault;
         desc.usage = MTLTextureUsageShaderRead|MTLTextureUsageShaderWrite;
-        _brdfTexture = MtlfMultiTexture(desc);
+        _brdfTexture = [device newTextureWithDescriptor:desc];
         
         MTLSamplerDescriptor* samplerDescriptor = [[MTLSamplerDescriptor alloc] init];
         samplerDescriptor.sAddressMode = MTLSamplerAddressModeClampToEdge;
         samplerDescriptor.tAddressMode = MTLSamplerAddressModeClampToEdge;
         samplerDescriptor.minFilter = MTLSamplerMinMagFilterLinear;
         samplerDescriptor.magFilter = MTLSamplerMinMagFilterLinear;
-        _brdfSampler = MtlfMultiSampler(samplerDescriptor);
+        _brdfSampler = [device newSamplerStateWithDescriptor:samplerDescriptor];
 #endif
     }
 

@@ -42,7 +42,11 @@ HgiMetalTexture::HgiMetalTexture(HgiMetal *hgi, HgiTextureDesc const & desc)
     MTLTextureUsage usage = MTLTextureUsageUnknown;
     
     if (desc.initialData && desc.pixelsByteSize > 0) {
+#if defined(ARCH_OS_MACOS)
         resourceOptions = MTLResourceStorageModeManaged;
+#else
+        resourceOptions = MTLResourceStorageModeShared;
+#endif
     }
 
     mtlFormat = HgiMetalConversions::GetPixelFormat(desc.format);

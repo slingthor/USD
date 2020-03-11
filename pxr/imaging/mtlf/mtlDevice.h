@@ -28,7 +28,7 @@
 #include "pxr/pxr.h"
 #include "pxr/base/arch/defines.h"
 
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
 #include <GL/glew.h>
 #else // ARCH_GFX_OPENGL
 // MTL_FIXME: These GL constants shouldn't be referenced by Hydra.
@@ -156,72 +156,6 @@ struct MetalWorkQueue {
 
 class MtlfMetalContext : public boost::noncopyable {
 public:
-#define MAX_GPUS    1
-    struct MtlfMultiBuffer {
-        
-        MtlfMultiBuffer() {}
-        
-        MtlfMultiBuffer(uint64_t length, MTLResourceOptions options) {
-            NSArray<id<MTLDevice>> *renderDevices = MtlfMetalContext::GetMetalContext()->renderDevices;
-            int i = 0;
-            for (id<MTLDevice>dev in renderDevices) {
-                buffer[i++] = [dev newBufferWithLength:length options:options];
-            }
-            while(i < MAX_GPUS)
-                buffer[i++] = nil;
-        }
-        MtlfMultiBuffer(void const* data, uint64_t length, MTLResourceOptions options) {
-            NSArray<id<MTLDevice>> *renderDevices = MtlfMetalContext::GetMetalContext()->renderDevices;
-            int i = 0;
-            for (id<MTLDevice>dev in renderDevices) {
-                buffer[i++] = [dev newBufferWithBytes:data length:length options:options];
-            }
-            while(i < MAX_GPUS)
-                buffer[i++] = nil;
-        }
-
-        bool IsSet() const { return buffer[0] != nil; }
-        void Clear() {
-            for (int i = 0; i < MAX_GPUS; i++) {
-                buffer[i] = nil;
-            }
-        }
-        
-        uint64_t length() const {
-            return buffer[0].length;
-        }
-        
-        void release();
-        
-        id<MTLBuffer> forCurrentGPU() const {
-#if MAX_GPUS == 1
-            return buffer[0];
-#else
-            MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
-            return buffer[context->currentGPU];
-#endif
-        }
-        
-        id<MTLBuffer> operator[](int64_t const index) const {
-            return buffer[index];
-        }
-        
-        bool operator==(MtlfMultiBuffer const &other) const {
-            return other.buffer[0] == buffer[0];
-        }
-        
-        bool operator!=(MtlfMultiBuffer const &other) const {
-            return other.buffer[0] != buffer[0];
-        }
-        
-        id<MTLBuffer> buffer[MAX_GPUS];
-    };
-
-    typedef struct {
-        float position[2];
-        float uv[2];
-    } Vertex;
-
     void PrepareBufferFlush();
     bool _FlushCachingStarted = false;
     
@@ -251,7 +185,7 @@ public:
 
     MTLF_API
     id<MTLBuffer> GetIndexBuffer() const {
-        return threadState.indexBuffer.forCurrentGPU();
+        return threadState.indexBuffer;
     }
     
     MTLF_API
@@ -261,7 +195,7 @@ public:
     id<MTLBuffer> GetPointIndexBuffer(MTLIndexType indexTypeMetal, int numIndicesNeeded, bool usingQuads);
 
     MTLF_API
-    MtlfMultiBuffer& GetTriListIndexBuffer(MTLIndexType indexTypeMetal, uint32_t numTriangles);
+    id<MTLBuffer> GetTriListIndexBuffer(MTLIndexType indexTypeMetal, uint32_t numTriangles);
 
     MTLF_API
     void CreateCommandBuffer(MetalWorkQueueType workQueueType = METALWORKQUEUE_DEFAULT, bool forceFromDevice = false);
@@ -309,7 +243,7 @@ public:
     void SetUniform(const void* _data, uint32_t _dataSize, const TfToken& _name, uint32_t index, MSL_ProgramStage stage);
     
     MTLF_API
-    void SetUniformBuffer(int index, MtlfMultiBuffer const &buffer, const TfToken& name, MSL_ProgramStage stage, int offset = 0);
+    void SetUniformBuffer(int index, id<MTLBuffer> const buffer, const TfToken& name, MSL_ProgramStage stage, int offset = 0);
     
     MTLF_API
     void SetOldStyleUniformBuffer(
@@ -318,16 +252,16 @@ public:
              int oldStyleUniformSize);
 
     MTLF_API
-    void SetBuffer(int index, MtlfMultiBuffer const &buffer, const TfToken& name);	//Implementation binds this as a vertex buffer!
+    void SetBuffer(int index, id<MTLBuffer> const buffer, const TfToken& name);	//Implementation binds this as a vertex buffer!
     
     MTLF_API
-    void SetIndexBuffer(MtlfMultiBuffer const &buffer);
+    void SetIndexBuffer(id<MTLBuffer> const buffer);
 
     MTLF_API
-    void SetTexture(int index, MtlfMultiTexture const &texture, const TfToken& name, MSL_ProgramStage stage, bool arrayTexture = false);
+    void SetTexture(int index, id<MTLTexture> const texture, const TfToken& name, MSL_ProgramStage stage, bool arrayTexture = false);
     
     MTLF_API
-    void SetSampler(int index, MtlfMultiSampler const &sampler, const TfToken& name, MSL_ProgramStage stage);
+    void SetSampler(int index, id<MTLSamplerState> const sampler, const TfToken& name, MSL_ProgramStage stage);
 
     MTLF_API
     void SetFrontFaceWinding(MTLWinding winding);
@@ -385,7 +319,6 @@ public:
     
     MTLF_API
     id<MTLComputePipelineState> GetComputeEncoderState(
-                                     int                 gpuIndex,
                                      id<MTLFunction>     computeFunction,
                                      unsigned int        bufferCount,
                                      unsigned int        textureCount,
@@ -429,10 +362,10 @@ public:
     uint64_t GetEventValue() { return threadState.currentEventValue; }
 	
     MTLF_API
-    MtlfMultiBuffer GetMetalBuffer(NSUInteger length, MTLResourceOptions options = MTLResourceStorageModeDefault, const void *pointer = NULL);
+    id<MTLBuffer> GetMetalBuffer(NSUInteger length, MTLResourceOptions options = MTLResourceStorageModeDefault, const void *pointer = NULL);
     
     MTLF_API
-    void ReleaseMetalBuffer(MtlfMultiBuffer const &buffer);
+    void ReleaseMetalBuffer(id<MTLBuffer> const buffer);
 
     MTLF_API
     void StartFrame();
@@ -493,8 +426,6 @@ public:
     void EndCaptureSubset(int gpuIndex);
 
     id<MTLDevice> currentDevice;
-    NSMutableArray<id<MTLDevice>> *renderDevices;
-    int currentGPU;
 
     struct GPUInstance {
         id<MTLCommandQueue> commandQueue;
@@ -507,7 +438,7 @@ public:
         id<MTLSamplerState> dummySampler;
     };
     
-    GPUInstance gpus[MAX_GPUS];
+    GPUInstance gpus;
 
     NSUInteger mtlSampleCount;
     
@@ -547,8 +478,8 @@ protected:
         uint8_t          *contents;
     };
     
-    struct TextureBinding { int index; MtlfMultiTexture texture; TfToken name; MSL_ProgramStage stage; bool array; };
-    struct SamplerBinding { int index; MtlfMultiSampler sampler; TfToken name; MSL_ProgramStage stage; };
+    struct TextureBinding { int index; id<MTLTexture> texture; TfToken name; MSL_ProgramStage stage; bool array; };
+    struct SamplerBinding { int index; id<MTLSamplerState> sampler; TfToken name; MSL_ProgramStage stage; };
     
     struct ThreadState {
 
@@ -577,7 +508,7 @@ protected:
                 }
                 
                 vertexDescriptor = nil;
-                indexBuffer.Clear();
+                indexBuffer = nil;
                 vertexPositionBuffer = nil;
                 
                 numVertexComponents = 0;
@@ -595,12 +526,10 @@ protected:
                 _this->ResetEncoders(METALWORKQUEUE_GEOMETRY_SHADER, true);
                 
                 MTLResourceOptions resourceOptions = MTLResourceStorageModePrivate|MTLResourceCPUCacheModeDefaultCache;
-                for(int d = 0; d < _this->renderDevices.count; d++) {
-                    for(int i = 0; i < _this->gsMaxConcurrentBatches; i++)
-                        gsBuffers[d].push_back([_this->renderDevices[d] newBufferWithLength:_this->gsMaxDataPerBatch options:resourceOptions]);
-                    remappedQuadIndexBuffer.Clear();
-                    pointIndexBuffer.Clear();
-                }
+                for(int i = 0; i < _this->gsMaxConcurrentBatches; i++)
+                    gsBuffers.push_back([_this->currentDevice newBufferWithLength:_this->gsMaxDataPerBatch options:resourceOptions]);
+                remappedQuadIndexBuffer = nil;
+                pointIndexBuffer = nil;
 
                 init = true;
             }
@@ -619,7 +548,7 @@ protected:
         std::vector<TextureBinding> textures;
         std::vector<SamplerBinding> samplers;
 
-        MtlfMultiBuffer indexBuffer;
+        id<MTLBuffer> indexBuffer;
         id<MTLBuffer> vertexPositionBuffer;
         
         id<MTLComputePipelineState> computePipelineState;
@@ -640,21 +569,21 @@ protected:
         id<MTLFunction> renderFragmentFunction;
         id<MTLFunction> renderComputeGSFunction;
         
-        uint32_t dirtyRenderState[MAX_GPUS];
+        uint32_t dirtyRenderState;
         
         //Geometry Shader Related
         int                        gsDataOffset;
         int                        gsBufferIndex;
         int                        gsEncodedBatches;
         id<MTLBuffer>              gsCurrentBuffer;
-        std::vector<id<MTLBuffer>> gsBuffers[MAX_GPUS];
+        std::vector<id<MTLBuffer>> gsBuffers;
         bool                       gsHasOpenBatch;
         
         bool tempPointsWorkaroundActive = false;
         
-        MtlfMultiBuffer remappedQuadIndexBuffer;
-        MtlfMultiBuffer remappedQuadIndexBufferSource;
-        MtlfMultiBuffer pointIndexBuffer;
+        id<MTLBuffer> remappedQuadIndexBuffer;
+        id<MTLBuffer> remappedQuadIndexBufferSource;
+        id<MTLBuffer> pointIndexBuffer;
         
         bool enableMVA;
         bool enableComputeGS;
@@ -664,8 +593,8 @@ protected:
     
     static std::mutex _commandBufferPoolMutex;
     static int const commandBufferPoolSize = 256;
-    id<MTLCommandBuffer> commandBuffers[MAX_GPUS][commandBufferPoolSize];
-    int commandBuffersStackPos[MAX_GPUS];
+    id<MTLCommandBuffer> commandBuffers[commandBufferPoolSize];
+    int commandBuffersStackPos;
 
     static std::mutex _pipelineMutex;
     boost::unordered_map<size_t, id<MTLRenderPipelineState>>  renderPipelineStateMap;
@@ -747,7 +676,7 @@ private:
     void _gsEncodeSync(bool doOpenBatch);
 
     struct MetalBufferListEntry {
-        MtlfMultiBuffer buffer;
+        id<MTLBuffer> buffer;
         unsigned int releasedOnFrame;
         unsigned int releasedOnCommandBuffer;
     };
@@ -763,9 +692,10 @@ private:
     };
     boost::unordered_map<id<MTLBuffer> const, MetalBufferFlushListEntry> modifiedBuffers;
     
-    MtlfMultiBuffer triIndexBuffer;
+    id<MTLBuffer> triIndexBuffer;
 
     int64_t frameCount;
+    
     int64_t lastCompletedFrame;
     std::atomic_int64_t committedCommandBufferCount;
     int64_t lastCompletedCommandBuffer;
@@ -813,7 +743,7 @@ private:
     
     bool OSDEnabledThisFrame = false;
     
-    id<MTLCaptureScope> captureScopeSubset[MAX_GPUS];
+    id<MTLCaptureScope> captureScopeSubset;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

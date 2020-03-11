@@ -254,8 +254,8 @@ MtlfDrawTarget::_GenFrameBuffer()
 void
 MtlfDrawTarget::_BindAttachment( MtlfAttachmentRefPtr const & a )
 {
-    id<MTLTexture> tid = a->GetTextureName().multiTexture.forCurrentGPU();
-    id<MTLTexture> tidMS = a->GetTextureMSName().multiTexture.forCurrentGPU();
+    id<MTLTexture> tid = a->GetTextureName();
+    id<MTLTexture> tidMS = a->GetTextureMSName();
 
     int attach = a->GetAttach();
 
@@ -278,9 +278,9 @@ MtlfDrawTarget::_BindAttachment( MtlfAttachmentRefPtr const & a )
             MTLRenderPassStencilAttachmentDescriptor *stencilAttachment = _mtlRenderPassDescriptor.stencilAttachment;
             
             if (HasMSAA()) {
-                stencilAttachment.texture = a->GetStencilTextureMSName().multiTexture.forCurrentGPU();
+                stencilAttachment.texture = a->GetStencilTextureMSName();
             } else {
-                stencilAttachment.texture = a->GetStencilTextureName().multiTexture.forCurrentGPU();
+                stencilAttachment.texture = a->GetStencilTextureName();
             }
             
             // make sure to clear every frame for best performance
@@ -430,7 +430,7 @@ MtlfDrawTarget::GetImage(std::string const & name, void* buffer) const
 {
     MtlfAttachmentRefPtr attachment = TfStatic_cast<TfRefPtr<MtlfDrawTarget::MtlfAttachment>>(_GetAttachments().at(name));
 
-    id<MTLTexture> texture = attachment->GetTextureName().multiTexture.forCurrentGPU();
+    id<MTLTexture> texture = attachment->GetTextureName();
     int bytesPerPixel = attachment->GetBytesPerPixel();
     int width = [texture width];
     int height = [texture height];
@@ -457,17 +457,17 @@ MtlfDrawTarget::GetImage(std::string const & name, void* buffer) const
     context->LabelCommandBuffer(@"Get Image");
     id<MTLBlitCommandEncoder> blitEncoder = context->GetBlitEncoder();
     
-    MtlfMetalContext::MtlfMultiBuffer const &cpuBuffer = context->GetMetalBuffer((bytesPerPixel * width * height), MTLResourceStorageModeDefault);
+    id<MTLBuffer> const &cpuBuffer = context->GetMetalBuffer((bytesPerPixel * width * height), MTLResourceStorageModeDefault);
     
-    [blitEncoder copyFromTexture:texture sourceSlice:0 sourceLevel:0 sourceOrigin:MTLOriginMake(0, 0, 0) sourceSize:MTLSizeMake(width, height, 1) toBuffer:cpuBuffer.forCurrentGPU() destinationOffset:0 destinationBytesPerRow:(bytesPerPixel * width) destinationBytesPerImage:(bytesPerPixel * width * height) options:blitOptions];
+    [blitEncoder copyFromTexture:texture sourceSlice:0 sourceLevel:0 sourceOrigin:MTLOriginMake(0, 0, 0) sourceSize:MTLSizeMake(width, height, 1) toBuffer:cpuBuffer destinationOffset:0 destinationBytesPerRow:(bytesPerPixel * width) destinationBytesPerImage:(bytesPerPixel * width * height) options:blitOptions];
 #if defined(ARCH_OS_MACOS)
-    [blitEncoder synchronizeResource:cpuBuffer.forCurrentGPU()];
+    [blitEncoder synchronizeResource:cpuBuffer];
 #endif
 
     context->ReleaseEncoder(true);
     context->CommitCommandBufferForThread(false, true);
 
-    memcpy(buffer, [cpuBuffer.forCurrentGPU() contents], bytesPerPixel * width * height);
+    memcpy(buffer, [cpuBuffer contents], bytesPerPixel * width * height);
 	context->ReleaseMetalBuffer(cpuBuffer);
 }
 
@@ -662,13 +662,14 @@ MtlfDrawTarget::MtlfAttachment::_GenTexture()
                                                        mipmapped:NO];
     desc.usage = MTLTextureUsageRenderTarget;
     desc.resourceOptions = MTLResourceStorageModePrivate;
-    _textureName = MtlfMultiTexture(desc);
+    _textureName = [device newTextureWithDescriptor:desc];
 
     memoryUsed += baseImageSize;
 
     if (_numSamples > 1) {
         desc.sampleCount = _numSamples;
-        _textureNameMS = MtlfMultiTexture(desc);
+        desc.textureType = MTLTextureType2DMultisample;
+        _textureNameMS = [device newTextureWithDescriptor:desc];
         memoryUsed = baseImageSize * _numSamples;
     }
     
@@ -684,25 +685,25 @@ MtlfDrawTarget::MtlfAttachment::_GenTexture()
 void
 MtlfDrawTarget::MtlfAttachment::_DeleteTexture()
 {
-    if (_textureName.IsSet()) {
-        _textureName.release();
-        _textureName.Clear();
+    if (_textureName) {
+        [_textureName release];
+        _textureName = nil;
     }
 
-    if (_textureNameMS.IsSet()) {
-        _textureNameMS.release();
-        _textureNameMS.Clear();
+    if (_textureNameMS) {
+        [_textureNameMS releas];
+        _textureNameMS = nil;
     }
     
     if (_format != GL_DEPTH_STENCIL) {
-        if (_stencilTextureName.IsSet()) {
-            _stencilTextureName.release();
-            _stencilTextureName.Clear();
+        if (_stencilTextureName) {
+            [_stencilTextureName release];
+            _stencilTextureName = nil;
         }
     
-        if (_stencilTextureNameMS.IsSet()) {
-            _stencilTextureNameMS.release();
-            _stencilTextureNameMS.Clear();
+        if (_stencilTextureNameMS) {
+            [_stencilTextureNameMS release];
+            _stencilTextureNameMS = nil;
         }
     }
 }

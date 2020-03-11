@@ -42,7 +42,11 @@ HgiMetalBuffer::HgiMetalBuffer(HgiMetal *hgi, HgiBufferDesc const & desc)
     }
 
     MTLResourceOptions resourceOptions =
+#if defined(ARCH_OS_MACOS)
         MTLResourceStorageModeManaged|MTLResourceCPUCacheModeDefaultCache;
+#else
+        MTLResourceStorageModeShared|MTLResourceCPUCacheModeDefaultCache;
+#endif
     
     if (desc.initialData) {
         _bufferId = [hgi->GetDevice() newBufferWithBytes:desc.initialData

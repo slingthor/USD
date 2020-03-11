@@ -123,7 +123,7 @@ HdSt_RenderPass::_Execute(HdRenderPassStateSharedPtr const &renderPassState,
     bool isOpenGL = HdStResourceFactory::GetInstance()->IsOpenGL();
     int fb;
     if (isOpenGL) {
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
         glGetIntegerv(GL_FRAMEBUFFER_BINDING, &fb);
 #endif
     }
@@ -146,7 +146,7 @@ HdSt_RenderPass::_Execute(HdRenderPassStateSharedPtr const &renderPassState,
         // the Aov back into the client framebuffer.
         // E.g. UsdView CameraMask.
         if (isOpenGL) {
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
             glGetIntegerv(GL_VIEWPORT, vp.data());
             GfVec4i aovViewport(0, 0, vp[2]+vp[0], vp[3]+vp[1]);
             gfxEncoder->SetViewport(aovViewport);
@@ -222,7 +222,7 @@ HdSt_RenderPass::_Execute(HdRenderPassStateSharedPtr const &renderPassState,
         gfxEncoder->EndEncoding();
 
         if (isOpenGL) {
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
             gfxEncoder->SetViewport(vp);
             // XXX Non-Hgi tasks expect default FB. Remove once all tasks use Hgi.
             glBindFramebuffer(GL_FRAMEBUFFER, fb);
@@ -356,8 +356,16 @@ HdSt_RenderPass::_Cull(
     }
     else {
         if (!freezeCulling) {
+            // Downcast render pass state
+            HdStRenderPassStateSharedPtr stRenderPassState =
+                boost::dynamic_pointer_cast<HdStRenderPassState>(
+                renderPassState);
+            TF_VERIFY(stRenderPassState);
+
+            // Create graphics encoder to render into Aovs.
+            HgiGraphicsEncoderDesc desc = stRenderPassState->MakeGraphicsEncoderDesc();
             // Re-cull the command buffer. 
-            _cmdBuffer.FrustumCull(renderPassState->GetCullMatrix());
+            _cmdBuffer.FrustumCull(renderPassState->GetCullMatrix(), desc.width, desc.height);
         }
 
         if (TfDebug::IsEnabled(HD_DRAWITEMS_CULLED)) {

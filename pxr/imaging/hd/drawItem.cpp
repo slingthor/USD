@@ -264,8 +264,7 @@ HdDrawItem::IntersectsViewVolume(matrix_float4x4 const &viewProjMatrix,
 
             if (modified) {
 #if defined(ARCH_OS_MACOS)
-                MtlfMetalContext::MtlfMultiBuffer h = culledInstanceIndexRes->GetId();
-                id<MTLBuffer> metalBuffer = h.forCurrentGPU();
+                id<MTLBuffer> metalBuffer = culledInstanceIndexRes->GetId();
 
                 uint32_t start = instanceOffset * sizeof(uint32_t);
                 uint32_t length = numVisible * sizeof(uint32_t) * instanceIndexWidth;
@@ -464,8 +463,7 @@ int HdDrawItem::BuildInstanceBuffer(uint8_t** instanceVisibility) const
         }
 
 #if defined(ARCH_OS_MACOS)
-        MtlfMetalContext::MtlfMultiBuffer h = culledInstanceIndexRes->GetId();
-        id<MTLBuffer> metalBuffer = h.forCurrentGPU();
+        id<MTLBuffer> metalBuffer = culledInstanceIndexRes->GetId();
 
         uint32_t start = instanceOffset * sizeof(uint32_t);
         uint32_t length = numVisible * sizeof(uint32_t) * 2;

@@ -67,8 +67,8 @@ HdStDispatchBufferMetal::CopyData(std::vector<GLuint> const &data)
     if (!TF_VERIFY(data.size()*sizeof(GLuint) == static_cast<size_t>(_entireResource->GetSize())))
         return;
 
-    MtlfMetalContext::MtlfMultiBuffer buffer = _entireResource->GetId();
-    memcpy([buffer.forCurrentGPU() contents], &data[0], _entireResource->GetSize());
+    id<MTLBuffer> buffer = _entireResource->GetId();
+    memcpy([buffer contents], &data[0], _entireResource->GetSize());
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

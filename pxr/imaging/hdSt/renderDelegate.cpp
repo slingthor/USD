@@ -61,10 +61,10 @@
 
 #include "pxr/imaging/glf/diagnostic.h"
 
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
 #include "pxr/imaging/glf/contextCaps.h"
 #endif
-#if defined(ARCH_GFX_METAL)
+#if defined(PXR_METAL_SUPPORT_ENABLED)
 #include "pxr/imaging/mtlf/contextCaps.h"
 #endif
 
@@ -453,11 +453,11 @@ HdStRenderDelegate::CommitResources(HdChangeTracker *tracker)
 bool
 HdStRenderDelegate::IsSupported()
 {
-#if defined(ARCH_GFX_METAL)
+#if defined(PXR_METAL_SUPPORT_ENABLED)
     if (MtlfContextCaps::GetAPIVersion() >= MtlfContextCaps::APIVersion_Metal2_0)
         return true;
 #endif
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     if (GlfContextCaps::GetAPIVersion() >= 400)
         return true;
 #endif

@@ -1,9 +1,9 @@
 set(PXR_PREFIX pxr/imaging)
 set(PXR_PACKAGE hdx)
 
-if ((NOT ${PXR_ENABLE_GL_SUPPORT}) AND (NOT ${PXR_ENABLE_METAL_SUPPORT}))
+if (NOT ${PXR_BUILD_STORM_PLUGINS})
     message(STATUS
-        "Skipping ${PXR_PACKAGE} because PXR_ENABLE_GL_SUPPORT and PXR_ENABLE_METAL_SUPPORT is OFF")
+        "Skipping ${PXR_PACKAGE} because PXR_BUILD_STORM_PLUGINS is OFF")
     return()
 endif()
 

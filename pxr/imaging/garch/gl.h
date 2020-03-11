@@ -28,7 +28,7 @@
 #include "pxr/pxr.h"
 #include "pxr/base/arch/defines.h"
 
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
 #include <GL/glew.h>
 #endif
 
@@ -51,7 +51,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 typedef GLvoid (*ArchGLCallbackType)(...);
 
-#if !defined(ARCH_GFX_OPENGL)
+#if !defined(PXR_OPENGL_SUPPORT_ENABLED)
 #define GL_RGBA16F 0x881A
 #define GL_RGB16F 0x881B
 #define GL_RGBA32F 0x8814

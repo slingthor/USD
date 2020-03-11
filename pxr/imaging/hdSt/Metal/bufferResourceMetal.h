@@ -87,7 +87,7 @@ public:
 
     /// Returns the gpu address (if available. otherwise returns 0).
     HDST_API
-    virtual uint64_t GetGPUAddress() const override { return _gpuAddr[GPUState::currentGPU][_activeBuffer]; }
+    virtual uint64_t GetGPUAddress() const override { return _gpuAddr[_activeBuffer]; }
 
     /// Returns the texture buffer view
     HDST_API
@@ -106,9 +106,9 @@ public:
     virtual uint8_t const* GetBufferContents() const override;
     
 private:
-    uint64_t         _gpuAddr[MAX_GPUS][3];
-    MtlfMultiTexture _texId[3];
-    MtlfMetalContext::MtlfMultiBuffer   _id[3];
+    uint64_t         _gpuAddr[3];
+    id<MTLTexture>   _texId[3];
+    id<MTLBuffer>    _id[3];
     int64_t          _lastFrameModified;
     int64_t          _activeBuffer;
     bool             _firstFrameBeingFilled;

@@ -22,7 +22,6 @@
 // language governing permissions and limitations under the Apache License.
 //
 #include "pxr/pxr.h"
-#include "pxr/base/arch/defines.h"
 
 #include "pxr/imaging/hdSt/Metal/renderDelegateMetal.h"
 #include "pxr/imaging/hdSt/tokens.h"
@@ -185,7 +184,7 @@ void HdStRenderDelegateMetal::PrepareRender(
     context->StartFrame();
     context->StartFrameForThread();
 
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     // Make sure the Metal render targets, and GL interop textures match the GL viewport size
     if (_renderOutput == DelegateParams::RenderOutput::OpenGL) {
         GLint viewport[4];
@@ -264,7 +263,7 @@ void HdStRenderDelegateMetal::PrepareRender(
                 MtlfDrawTarget::MtlfAttachment::MtlfAttachmentRefPtr const & a =
                     TfStatic_cast<TfRefPtr<MtlfDrawTarget::MtlfAttachment>>(it->second);
 
-                colorAttachment.texture = a->GetTextureName().multiTexture.forCurrentGPU();
+                colorAttachment.texture = a->GetTextureName();
                 colorAttachment.clearColor = MTLClearColorMake(0.0f, 0.0f, 0.0f, 0.0f);
             }
             
@@ -273,7 +272,7 @@ void HdStRenderDelegateMetal::PrepareRender(
                 MtlfDrawTarget::MtlfAttachment::MtlfAttachmentRefPtr const & a =
                     TfStatic_cast<TfRefPtr<MtlfDrawTarget::MtlfAttachment>>(it->second);
 
-                depthAttachment.texture = a->GetTextureName().multiTexture.forCurrentGPU();
+                depthAttachment.texture = a->GetTextureName();
                 depthAttachment.clearDepth = 1.0f;
             }
             
@@ -324,18 +323,6 @@ void HdStRenderDelegateMetal::PrepareRender(
 void HdStRenderDelegateMetal::FinalizeRender()
 {
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
-/*
-    context->StartFrameForThread();
-
-    // Create a new command buffer for each render pass to the current drawable
-    context->CreateCommandBuffer(METALWORKQUEUE_DEFAULT);
-    context->LabelCommandBuffer(@"Post Process", METALWORKQUEUE_DEFAULT);
-
-    // Commit the render buffer (will wait for GS to complete if present)
-    // We wait until scheduled, because we're about to consume the Metal
-    // generated textures in an OpenGL blit
-    context->CommitCommandBufferForThread(
-        false, false); */
     context->CleanupUnusedBuffers(false);
 
     context->EndFrameForThread();

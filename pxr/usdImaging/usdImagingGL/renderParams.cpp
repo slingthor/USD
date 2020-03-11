@@ -51,7 +51,7 @@ UsdImagingGLRenderParams::UsdImagingGLRenderParams() :
     renderResolution(100,100),
     sampleCount(1)
 {
-#if defined(ARCH_GFX_METAL)
+#if defined(PXR_METAL_SUPPORT_ENABLED)
     mtlRenderPassDescriptorForNativeMetal = nil;
 #endif
 }

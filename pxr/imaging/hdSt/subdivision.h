@@ -41,7 +41,7 @@
 #include "pxr/imaging/hf/perfLog.h"
 #include "pxr/usd/sdf/path.h"
 #include "pxr/base/tf/token.h"
-#if OPENSUBDIV_HAS_METAL_COMPUTE && defined(ARCH_GFX_METAL)// MTL_CHANGE
+#if OPENSUBDIV_HAS_METAL_COMPUTE && defined(PXR_METAL_SUPPORT_ENABLED)// MTL_CHANGE
 #include <opensubdiv/osd/mtlComputeEvaluator.h>
 #include "pxr/imaging/mtlf/mtlDevice.h"
 #endif
@@ -231,10 +231,9 @@ public:
         HdResourceGPUHandle BindVBO() {
             return _resource->GetId();
         }
-#if OPENSUBDIV_HAS_METAL_COMPUTE && defined(ARCH_GFX_METAL)
+#if OPENSUBDIV_HAS_METAL_COMPUTE && defined(PXR_METAL_SUPPORT_ENABLED)
         id<MTLBuffer> BindMTLBuffer(OpenSubdiv::v3_3_1::Osd::MTLContext* context) {
-            MtlfMetalContext::MtlfMultiBuffer buffer = _resource->GetId();
-            return buffer.forCurrentGPU();
+            return _resource->GetId();
         }
 #endif
         HdStBufferResourceSharedPtr _resource;
@@ -317,11 +316,11 @@ HdSt_OsdRefineComputation<VERTEX_BUFFER>::Resolve()
         return true;
     }
 
-#if OPENSUBDIV_HAS_METAL_COMPUTE && defined(ARCH_GFX_METAL) //MTL_CHANGE
+#if OPENSUBDIV_HAS_METAL_COMPUTE && defined(PXR_METAL_SUPPORT_ENABLED) //MTL_CHANGE
     OpenSubdiv::Osd::MTLContext deviceContext;
     OpenSubdiv::Osd::MTLContext *deviceContextPtr = &deviceContext;
     deviceContext.device       = MtlfMetalContext::GetMetalContext()->currentDevice;
-    deviceContext.commandQueue = MtlfMetalContext::GetMetalContext()->gpus[MtlfMetalContext::GetMetalContext()->currentGPU].commandQueue;
+    deviceContext.commandQueue = MtlfMetalContext::GetMetalContext()->gpus.commandQueue;
 #else
     void *deviceContextPtr = NULL;
 #endif

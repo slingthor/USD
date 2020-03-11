@@ -62,7 +62,7 @@ protected:
     friend class MtlfResourceFactory;
 
 private:
-    MtlfMetalContext::MtlfMultiBuffer _buffer;
+    id<MTLBuffer> _buffer;
     int _size;
 };
 

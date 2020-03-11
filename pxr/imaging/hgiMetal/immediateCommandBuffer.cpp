@@ -51,7 +51,6 @@ HgiMetalImmediateCommandBuffer::HgiMetalImmediateCommandBuffer(
 HgiMetalImmediateCommandBuffer::~HgiMetalImmediateCommandBuffer()
 {
     [_commandBuffer release];
-    [_commandQueue release];
 }
 
 HgiGraphicsEncoderUniquePtr

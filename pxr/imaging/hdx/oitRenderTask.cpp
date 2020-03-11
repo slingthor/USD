@@ -131,7 +131,7 @@ HdxOitRenderTask::Execute(HdTaskContext* ctx)
     
     // We render into a SSBO -- not MSSA compatible. On Metal we do not need to worry about setting/clearing MSAA
     // state because Multisampling is not global state but is instead a property of every attachment.
-#if defined(ARCH_GFX_OPENGL) && !defined(ARCH_GFX_METAL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED) && !defined(PXR_METAL_SUPPORT_ENABLED)
     bool isOpenGL = HdStResourceFactory::GetInstance()->IsOpenGL();
     bool oldMSAA = false;
     bool oldPointSmooth = false;
@@ -179,7 +179,7 @@ HdxOitRenderTask::Execute(HdTaskContext* ctx)
     // Post Execute Restore
     //
 
-#if defined(ARCH_GFX_OPENGL) && !defined(ARCH_GFX_METAL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED) && !defined(PXR_METAL_SUPPORT_ENABLED)
     if (isOpenGL) {
         if (oldMSAA) {
             glEnable(GL_MULTISAMPLE);

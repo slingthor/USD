@@ -51,7 +51,7 @@ Glf_BuildAvailableExtensions()
     GlfSharedGLContextScopeHolder sharedContextScopeHolder;
 
     static set<string> availableExtensions;
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     // Get the available extensions from OpenGL if we haven't yet.
     const char *extensions = (const char*) glGetString(GL_EXTENSIONS);
     if ( extensions ) {
@@ -93,7 +93,7 @@ GlfHasLegacyGraphics()
     // then we must have very limited graphics.  In
     // common usage, this should only be true for NX
     // clients.
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     return !GLEW_VERSION_2_0;
 #else
     return true;

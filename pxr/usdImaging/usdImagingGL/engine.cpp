@@ -24,12 +24,12 @@
 #include "pxr/imaging/glf/glew.h"
 #include "pxr/usdImaging/usdImagingGL/engine.h"
 
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
 #include "pxr/imaging/hdSt/GL/resourceFactoryGL.h"
 #include "pxr/usdImaging/usdImagingGL/legacyEngine.h"
 #endif
 
-#if defined(ARCH_GFX_METAL)
+#if defined(PXR_METAL_SUPPORT_ENABLED)
 #include "pxr/imaging/mtlf/mtlDevice.h"
 #include "pxr/imaging/hdSt/Metal/resourceFactoryMetal.h"
 #endif
@@ -66,7 +66,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 namespace {
 
-#if defined(ARCH_GFX_METAL)
+#if defined(PXR_METAL_SUPPORT_ENABLED)
 std::mutex engineCountMutex;
 int engineCount = 0;
 #endif
@@ -85,7 +85,7 @@ _GetHydraEnabledEnvVar()
 static
 void _InitGL()
 {
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     static std::once_flag initFlag;
 
     std::call_once(initFlag, []{
@@ -107,7 +107,7 @@ static
 bool
 _IsHydraEnabled(const UsdImagingGLEngine::RenderAPI api)
 {
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     if (api == UsdImagingGLEngine::OpenGL) {
         // Make sure there is an OpenGL context when
         // trying to initialize Hydra/Reference
@@ -179,25 +179,25 @@ UsdImagingGLEngine::UsdImagingGLEngine(const RenderAPI api)
     , _invisedPrimPaths()
     , _isPopulated(false)
     , _renderAPI(api)
-#if defined(ARCH_GFX_METAL)
+#if defined(PXR_METAL_SUPPORT_ENABLED)
     , _legacyImpl(nullptr)
 #endif
 {
 
-#if defined(ARCH_GFX_METAL)
+#if defined(PXR_METAL_SUPPORT_ENABLED)
     engineCountMutex.lock();
     engineCount++;
 #endif
 
     
     _engine = new HdEngine();
-#if defined(ARCH_GFX_METAL)
+#if defined(PXR_METAL_SUPPORT_ENABLED)
     if (_renderAPI == Metal) {
         _resourceFactory = new HdStResourceFactoryMetal();
     }
     else
 #endif
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     if (_renderAPI == OpenGL) {
     	_InitGL();
 
@@ -221,12 +221,12 @@ UsdImagingGLEngine::UsdImagingGLEngine(const RenderAPI api)
     } else {
 
         SdfPathVector excluded;
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
         _legacyImpl.reset(new UsdImagingGLLegacyEngine(excluded));
 #endif
     }
 
-#if defined(ARCH_GFX_METAL)
+#if defined(PXR_METAL_SUPPORT_ENABLED)
     engineCountMutex.unlock();
 #endif
 }
@@ -252,24 +252,24 @@ UsdImagingGLEngine::UsdImagingGLEngine(
     , _invisedPrimPaths(invisedPaths)
     , _isPopulated(false)
     , _renderAPI(api)
-#if defined(ARCH_GFX_METAL)
+#if defined(PXR_METAL_SUPPORT_ENABLED)
     , _legacyImpl(nullptr)
 #endif
 {
 
-#if defined(ARCH_GFX_METAL)
+#if defined(PXR_METAL_SUPPORT_ENABLED)
     engineCountMutex.lock();
     engineCount++;
 #endif
 
     _engine = new HdEngine();
-#if defined(ARCH_GFX_METAL)
+#if defined(PXR_METAL_SUPPORT_ENABLED)
     if (_renderAPI == Metal) {
         _resourceFactory = new HdStResourceFactoryMetal();
     }
     else
 #endif
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     if (_renderAPI == OpenGL) {
 		_InitGL();
         _resourceFactory = new HdStResourceFactoryGL();
@@ -296,12 +296,12 @@ UsdImagingGLEngine::UsdImagingGLEngine(
         SdfPathVector pathsToExclude = excludedPaths;
         pathsToExclude.insert(pathsToExclude.end(), 
             invisedPaths.begin(), invisedPaths.end());
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
         _legacyImpl.reset(new UsdImagingGLLegacyEngine(pathsToExclude));
 #endif
     }
 
-#if defined(ARCH_GFX_METAL)
+#if defined(PXR_METAL_SUPPORT_ENABLED)
     engineCountMutex.unlock();
 #endif
 }
@@ -319,7 +319,7 @@ UsdImagingGLEngine::~UsdImagingGLEngine()
     delete _resourceFactory;
     _resourceFactory = NULL;
 
-#if defined(ARCH_GFX_METAL)
+#if defined(PXR_METAL_SUPPORT_ENABLED)
     engineCountMutex.lock();
     engineCount--;
     if (MtlfMetalContext::context && engineCount == 0)  {
@@ -415,12 +415,12 @@ UsdImagingGLEngine::Render(
     const UsdPrim& root, 
     const UsdImagingGLRenderParams &params)
 {
-#if defined(ARCH_GFX_METAL)
+#if defined(PXR_METAL_SUPPORT_ENABLED)
 @autoreleasepool{
 #endif
 
     if (ARCH_UNLIKELY(_legacyImpl)) {
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
         return _legacyImpl->Render(root, params);
 #endif
     }
@@ -435,7 +435,7 @@ UsdImagingGLEngine::Render(
     SdfPathVector paths(1, _delegate->ConvertCachePathToIndexPath(cachePath));
 
     RenderBatch(paths, params);
-#if defined(ARCH_GFX_METAL)
+#if defined(PXR_METAL_SUPPORT_ENABLED)
 }
 #endif
 
@@ -445,7 +445,7 @@ void
 UsdImagingGLEngine::InvalidateBuffers()
 {
     if (ARCH_UNLIKELY(_legacyImpl)) {
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
         return _legacyImpl->InvalidateBuffers();
 #endif
     }
@@ -496,7 +496,7 @@ void
 UsdImagingGLEngine::SetRenderViewport(GfVec4d const& viewport)
 {
     if (ARCH_UNLIKELY(_legacyImpl)) {
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
         _legacyImpl->SetRenderViewport(viewport);
 #endif
         return;
@@ -510,7 +510,7 @@ void
 UsdImagingGLEngine::SetWindowPolicy(CameraUtilConformWindowPolicy policy)
 {
     if (ARCH_UNLIKELY(_legacyImpl)) {
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
         _legacyImpl->SetWindowPolicy(policy);
 #endif
         return;
@@ -528,7 +528,7 @@ void
 UsdImagingGLEngine::SetCameraPath(SdfPath const& id)
 {
     if (ARCH_UNLIKELY(_legacyImpl)) {
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
         _legacyImpl->SetCameraPath(id);
 #endif
         return;
@@ -547,13 +547,13 @@ UsdImagingGLEngine::SetCameraState(const GfMatrix4d& viewMatrix,
                                    const GfMatrix4d& projectionMatrix)
 {
     if (ARCH_UNLIKELY(_legacyImpl)) {
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
         _legacyImpl->SetFreeCameraMatrices(viewMatrix, projectionMatrix);
 #endif
         return;
     }
 
-#if defined(ARCH_GFX_METAL)
+#if defined(PXR_METAL_SUPPORT_ENABLED)
     GfMatrix4d modifiedProjMatrix;
     static GfMatrix4d zTransform;
     
@@ -578,7 +578,7 @@ UsdImagingGLEngine::SetCameraState(const GfMatrix4d& viewMatrix,
 void
 UsdImagingGLEngine::SetCameraStateFromOpenGL()
 {
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     if (_renderAPI == OpenGL) {
         GfMatrix4d viewMatrix, projectionMatrix;
         GfVec4d viewport;
@@ -631,7 +631,7 @@ UsdImagingGLEngine::SetLightingState(
     GfVec4f const &sceneAmbient)
 {
     if (ARCH_UNLIKELY(_legacyImpl)) {
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
         _legacyImpl->SetLightingState(lights, material, sceneAmbient);
 #endif
         return;
@@ -749,7 +749,7 @@ UsdImagingGLEngine::TestIntersection(
     int *outHitElementIndex)
 {
     if (ARCH_UNLIKELY(_legacyImpl)) {
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
         return _legacyImpl->TestIntersection(
             viewMatrix,
             inProjectionMatrix,
@@ -767,7 +767,7 @@ UsdImagingGLEngine::TestIntersection(
     ResourceFactoryGuard guard(_resourceFactory);
 
     TF_VERIFY(_delegate);
-#if defined(ARCH_GFX_METAL)
+#if defined(PXR_METAL_SUPPORT_ENABLED)
     GfMatrix4d projectionMatrix;
     static GfMatrix4d zTransform;
     
@@ -849,7 +849,7 @@ SdfPath
 UsdImagingGLEngine::GetRprimPathFromPrimId(int primId) const
 {
     if (ARCH_UNLIKELY(_legacyImpl)) {
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
         return _legacyImpl->GetRprimPathFromPrimId(primId);
 #endif
     }
@@ -1318,7 +1318,7 @@ UsdImagingGLEngine::_Execute(const UsdImagingGLRenderParams &params,
             params.enableSampleAlphaToCoverage,
             params.sampleCount,
             params.drawMode,
-#if defined(ARCH_GFX_METAL)
+#if defined(PXR_METAL_SUPPORT_ENABLED)
             ((_renderAPI == Metal &&
               params.mtlRenderPassDescriptorForNativeMetal) ||
              MtlfMetalContext::GetMetalContext()->GetDrawTarget()) ?
@@ -1326,7 +1326,7 @@ UsdImagingGLEngine::_Execute(const UsdImagingGLRenderParams &params,
 #endif
             HdStRenderDelegate::DelegateParams::RenderOutput::OpenGL
               );
-#if defined(ARCH_GFX_METAL)
+#if defined(PXR_METAL_SUPPORT_ENABLED)
             delegateParams.mtlRenderPassDescriptorForNativeMetal =
                 params.mtlRenderPassDescriptorForNativeMetal;
 #endif
@@ -1632,6 +1632,11 @@ UsdImagingGLEngine::GetDefaultRendererPluginId()
             defaultRendererDisplayName.c_str());
 
     return TfToken();
+}
+
+USDIMAGINGGL_API
+HdRenderBuffer *UsdImagingGLEngine::GetRenderOutput(TfToken const &name) const {
+    return _taskController->GetRenderOutput(name);
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

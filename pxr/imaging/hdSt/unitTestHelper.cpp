@@ -43,7 +43,7 @@
 #include <string>
 #include <sstream>
 
-#if defined(ARCH_GFX_METAL)
+#if defined(PXR_METAL_SUPPORT_ENABLED)
 #define HdStRenderDelegateTest HdStRenderDelegateMetal
 #include "pxr/imaging/hdSt/Metal/renderDelegateMetal.h"
 #else

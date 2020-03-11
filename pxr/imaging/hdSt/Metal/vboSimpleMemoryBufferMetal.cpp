@@ -23,8 +23,6 @@
 //
 #include "pxr/imaging/glf/glew.h"
 
-#include "pxr/base/arch/defines.h"
-
 #include "pxr/imaging/garch/contextCaps.h"
 #include "pxr/imaging/garch/resourceFactory.h"
 
@@ -116,13 +114,11 @@ HdStVBOSimpleMemoryBufferMetal::Reallocate(
         MTL_FIXE - Ideally we wouldn't be creating and committing a command buffer here but we'd need some extra call
         to know when all reallocates had been performed so could commit them. However, if this is only an initialisation step it's probably OK.
      */
-    id<MTLCommandBuffer> commandBuffer[MAX_GPUS];
-    id<MTLBlitCommandEncoder> blitEncoder[MAX_GPUS];
+    id<MTLCommandBuffer> commandBuffer;
+    id<MTLBlitCommandEncoder> blitEncoder;
 
-    for (int g = 0; g < GPUState::gpuCount; g++) {
-        commandBuffer[g] = [context->gpus[g].commandQueue commandBuffer];
-        blitEncoder[g] = [commandBuffer[g] blitCommandEncoder];
-    }
+    commandBuffer = [context->gpus.commandQueue commandBuffer];
+    blitEncoder = [commandBuffer blitCommandEncoder];
     
     TF_FOR_ALL (bresIt, GetResources()) {
         HdStBufferResourceMetalSharedPtr const &bres =
@@ -134,8 +130,8 @@ HdStVBOSimpleMemoryBufferMetal::Reallocate(
         size_t const bufferSize = bytesPerElement * numElements;
 
         // allocate new one
-        MtlfMetalContext::MtlfMultiBuffer newId[3];
-        MtlfMetalContext::MtlfMultiBuffer oldId[3];
+        id<MTLBuffer> newId[3];
+        id<MTLBuffer> oldId[3];
 
         for (int i = 0; i < 3; i++) {
             oldId[i] = bres->GetIdAtIndex(i);
@@ -156,7 +152,7 @@ HdStVBOSimpleMemoryBufferMetal::Reallocate(
                 }
             }
             else {
-                newId[i].Clear();
+                newId[i] = nil;
             }
         }
 
@@ -180,37 +176,29 @@ HdStVBOSimpleMemoryBufferMetal::Reallocate(
         if (copySize > 0) {
             HD_PERF_COUNTER_INCR(HdPerfTokens->glCopyBufferSubData);
 
-            for (int g = 0; g < GPUState::gpuCount; g++) {
-                for (int i = 0; i < 3; i++) {
-                    if (newId[i].IsSet()) {
-                        [blitEncoder[g] copyFromBuffer:oldId[i][g]
-                                          sourceOffset:0
-                                              toBuffer:newId[i][g]
-                                     destinationOffset:0
-                                                  size:copySize];
-                    }
+            for (int i = 0; i < 3; i++) {
+                if (newId[i]) {
+                    [blitEncoder copyFromBuffer:oldId[i]
+                                      sourceOffset:0
+                                          toBuffer:newId[i]
+                                 destinationOffset:0
+                                              size:copySize];
                 }
             }
         }
 
         // delete old buffer
         for (int i = 0; i < 3; i++) {
-            if (oldId[i].IsSet()) {
+            if (oldId[i]) {
                 context->ReleaseMetalBuffer(oldId[i]);
             }
         }
 
         bres->SetAllocations(newId[0], newId[1], newId[2], bufferSize);
-        
-//          static size_t size = 0;
-//          size += range->GetNumElements();
-//          NSLog(@"vboSimpleMemoryBufferMetal - %zu", size);
     }
     
-    for (int g = 0; g < GPUState::gpuCount; g++) {
-        [blitEncoder[g] endEncoding];
-        [commandBuffer[g] commit];
-    }
+    [blitEncoder endEncoding];
+    [commandBuffer commit];
 
     _capacity = numElements;
     _needsReallocation = false;

@@ -85,7 +85,7 @@ HdStSimpleTextureResourceMetal::~HdStSimpleTextureResourceMetal()
     }
 
     if (_textureType != HdTextureType::Ptex) {
-        _sampler.multiSampler.release();
+        [_sampler release];
     }
 }
 
@@ -153,7 +153,7 @@ GarchSamplerGPUHandle HdStSimpleTextureResourceMetal::GetTexelsSamplerId()
         }
 #endif
         id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->currentDevice;
-        _sampler = MtlfMultiSampler(samplerDesc);
+        _sampler = [device newSamplerStateWithDescriptor:samplerDesc];
         [samplerDesc release];
     }
     return _sampler;

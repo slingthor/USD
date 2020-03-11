@@ -35,7 +35,7 @@
 #include "pxr/imaging/hio/glslfx.h"
 #include "pxr/base/tf/setenv.h"
 
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
 #include "pxr/imaging/hgiGL/texture.h"
 
 #include "pxr/imaging/hdSt/GL/glslProgram.h"
@@ -78,13 +78,13 @@ HdxColorChannelTask::HdxColorChannelTask(HdSceneDelegate* delegate,
 HdxColorChannelTask::~HdxColorChannelTask()
 {
     if (_texture != 0) {
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
         glDeleteTextures(1, &_texture);
 #endif
     }
 
     if (_vertexBuffer != 0) {
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
         glDeleteBuffers(1, &_vertexBuffer);
 #endif
     }
@@ -94,7 +94,7 @@ HdxColorChannelTask::~HdxColorChannelTask()
     }
 
     if (_copyFramebuffer != 0) {
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
         glDeleteFramebuffers(1, &_copyFramebuffer);
 #endif
     }
@@ -127,7 +127,7 @@ HdxColorChannelTask::_CreateShaderResources()
     }
     bool isOpenGL = HdStResourceFactory::GetInstance()->IsOpenGL();
 
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     if (isOpenGL) {
         GLuint programId = boost::dynamic_pointer_cast<HdStGLSLProgram>(_shaderProgram)->GetGLProgram();
         _locations[COLOR_IN] = glGetUniformLocation(programId, "colorIn");
@@ -153,7 +153,7 @@ HdxColorChannelTask::_CreateBufferResources()
     static const float vertices[] = { -1,  3, -1, 1,        0, 2,
                                       -1, -1, -1, 1,        0, 0,
                                        3, -1, -1, 1,        2, 0 };
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     glGenBuffers(1, &_vertexBuffer);
     glBindBuffer(GL_ARRAY_BUFFER, _vertexBuffer);
     glBufferData(GL_ARRAY_BUFFER, sizeof(vertices),
@@ -168,7 +168,7 @@ HdxColorChannelTask::_CreateBufferResources()
 void
 HdxColorChannelTask::_CopyTexture()
 {
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     GLint restoreReadFB, restoreDrawFB;
     glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &restoreReadFB);
     glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &restoreDrawFB);
@@ -194,7 +194,7 @@ HdxColorChannelTask::_CopyTexture()
 bool
 HdxColorChannelTask::_CreateFramebufferResources()
 {
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     // If framebufferSize is not provided we use the viewport size.
     // This can be incorrect if the client/app has changed the viewport to
     // be different then the render window size. (E.g. UsdView CameraMask mode)
@@ -210,7 +210,7 @@ HdxColorChannelTask::_CreateFramebufferResources()
 
     if (createTexture) {
         if (_texture != 0) {
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
             glDeleteTextures(1, &_texture);
 #endif
             _texture = 0;
@@ -268,7 +268,7 @@ HdxColorChannelTask::_ApplyColorChannel()
     // Read from the texture-copy we made of the clients FBO and output the
     // color-corrected pixels into the clients FBO.
     bool isOpenGL = HdStResourceFactory::GetInstance()->IsOpenGL();
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     if (isOpenGL) {
         GLuint programId = boost::dynamic_pointer_cast<HdStGLSLProgram>(_shaderProgram)->GetGLProgram();
 
@@ -409,7 +409,7 @@ HdxColorChannelTask::Execute(HdTaskContext* ctx)
     // Disable the sRGB transformation if it is enabled to avoid a double sRGB
     // color transformation
     GLboolean srgbEnabled = 0;
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     glGetBooleanv(GL_FRAMEBUFFER_SRGB_EXT, &srgbEnabled);
     if (srgbEnabled) {
         glDisable(GL_FRAMEBUFFER_SRGB_EXT);
@@ -420,7 +420,7 @@ HdxColorChannelTask::Execute(HdTaskContext* ctx)
     _CopyTexture();
     _ApplyColorChannel();
 
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     // Restore the sRGB transformation if it was enabled
     if (srgbEnabled) {
         glEnable(GL_FRAMEBUFFER_SRGB_EXT);

@@ -140,6 +140,16 @@ public:
         return _concurrentDispatchSupported;
     }
     
+    HGIMETAL_API
+    void SetNeedsInterop(bool useInterop) {
+        _useInterop = useInterop;
+    }
+    
+    HGIMETAL_API
+    bool GetNeedsInterop() const {
+        return _useInterop;
+    }
+    
 private:
     HgiMetal & operator=(const HgiMetal&) = delete;
     HgiMetal(const HgiMetal&) = delete;
@@ -150,6 +160,7 @@ private:
 
     int _apiVersion;
     bool _concurrentDispatchSupported;
+    bool _useInterop;
 
     std::unique_ptr<HgiMetalImmediateCommandBuffer> _immediateCommandBuffer;
 };

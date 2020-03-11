@@ -239,7 +239,7 @@ HdxShadowTask::Execute(HdTaskContext* ctx)
             HdxTokens->lightingContext, &lightingContext)) {
         return;
     }
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     if (_params.depthBiasEnable) {
         glEnable(GL_POLYGON_OFFSET_FILL);
         glPolygonOffset(_params.depthBiasSlopeFactor,
@@ -274,7 +274,7 @@ HdxShadowTask::Execute(HdTaskContext* ctx)
         // Unbind the buffer and move on to the next shadow map
         shadows->EndCapture(shadowId);
     }
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     // restore GL states to default
     glDisable(GL_PROGRAM_POINT_SIZE);
     glDisable(GL_POLYGON_OFFSET_FILL);

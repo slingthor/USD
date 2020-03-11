@@ -131,7 +131,7 @@ HdxOitVolumeRenderTask::Execute(HdTaskContext* ctx)
     
     // We render into a SSBO -- not MSSA compatible
     bool oldMSAA = false;
-#if defined(ARCH_GFX_OPENGL) && !defined(ARCH_GFX_METAL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED) && !defined(PXR_METAL_SUPPORT_ENABLED)
     if (HdStResourceFactory::GetInstance()->IsOpenGL()) {
         oldMSAA = glIsEnabled(GL_MULTISAMPLE);
         glDisable(GL_MULTISAMPLE);
@@ -145,7 +145,7 @@ HdxOitVolumeRenderTask::Execute(HdTaskContext* ctx)
     //     For now we always enable GL_POINT_SMOOTH. 
     // XXX Switch points rendering to emit quad with FS that draws circle.
     bool oldPointSmooth = false;
-#if defined(ARCH_GFX_OPENGL) && !defined(ARCH_GFX_METAL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED) && !defined(PXR_METAL_SUPPORT_ENABLED)
     if (HdStResourceFactory::GetInstance()->IsOpenGL()) {
         oldPointSmooth = glIsEnabled(GL_POINT_SMOOTH);
         glEnable(GL_POINT_SMOOTH);
@@ -180,7 +180,7 @@ HdxOitVolumeRenderTask::Execute(HdTaskContext* ctx)
     //
     // Post Execute Restore
     //
-#if defined(ARCH_GFX_OPENGL) && !defined(ARCH_GFX_METAL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED) && !defined(PXR_METAL_SUPPORT_ENABLED)
     if (oldMSAA) {
         glEnable(GL_MULTISAMPLE);
     }

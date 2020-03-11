@@ -96,7 +96,7 @@ public:
     
     UsdImagingGLRenderParams();
     
-#if defined(ARCH_GFX_METAL)
+#if defined(PXR_METAL_SUPPORT_ENABLED)
     MTLRenderPassDescriptor *mtlRenderPassDescriptorForNativeMetal;
 #else
     void *_dummyPtr;

@@ -52,7 +52,7 @@
 
 #include <boost/scoped_ptr.hpp>
 
-#if OPENSUBDIV_HAS_METAL_COMPUTE && defined(ARCH_GFX_METAL)// MTL_CHANGE
+#if OPENSUBDIV_HAS_METAL_COMPUTE && defined(PXR_METAL_SUPPORT_ENABLED)// MTL_CHANGE
 #include <opensubdiv/osd/mtlVertexBuffer.h>
 #include "pxr/imaging/mtlf/mtlDevice.h"
 #include "pxr/imaging/mtlf/OSDMetalContext.h"
@@ -71,7 +71,7 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-#if OPENSUBDIV_HAS_METAL_COMPUTE  && defined(ARCH_GFX_METAL) // MTL_CHANGE
+#if OPENSUBDIV_HAS_METAL_COMPUTE  && defined(PXR_METAL_SUPPORT_ENABLED) // MTL_CHANGE
 typedef OpenSubdiv::Osd::MTLStencilTable     HdSt_OsdGpuStencilTable;
 typedef OpenSubdiv::Osd::MTLComputeEvaluator HdSt_OsdGpuEvaluator;
 typedef OpenSubdiv::Osd::CPUMTLVertexBuffer  HdSt_OsdCpuVertexBuffer;
@@ -181,7 +181,7 @@ private:
     HdSt_OsdGpuDeviceContext     _deviceContext; //MTL_CHANGE
     
     HdSt_OsdGpuDeviceContextPtr GetDeviceContextPtr() { //MTL_CHANGE
- #if OPENSUBDIV_HAS_METAL_COMPUTE && defined(ARCH_GFX_METAL)
+ #if OPENSUBDIV_HAS_METAL_COMPUTE && defined(PXR_METAL_SUPPORT_ENABLED)
         _deviceContext.Init();
         return &_deviceContext;
 #else
@@ -405,7 +405,7 @@ HdSt_Osd3Subdivision::RefineGPU(HdBufferArrayRangeSharedPtr const &range,
                                        instance,
                                        HdSt_Osd3Subdivision::GetDeviceContextPtr());
 
-#if OPENSUBDIV_HAS_METAL_COMPUTE && defined(ARCH_GFX_METAL)
+#if OPENSUBDIV_HAS_METAL_COMPUTE && defined(PXR_METAL_SUPPORT_ENABLED)
     // The Metal layer needs to know whether to generate data that might be required by OSD immediately or if it can be deferred (more performance)
     MtlfMetalContext::GetMetalContext()->SetOSDEnabledThisFrame(true);
 #endif

@@ -29,10 +29,17 @@
 #include "pxr/imaging/hgi/hgi.h"
 #include "pxr/imaging/hgi/tokens.h"
 
+#if defined(PXR_OPENGL_SUPPORT_ENABLED) && defined(PXR_METAL_SUPPORT_ENABLED)
 #include "pxr/imaging/hgiInterop/hgiInterop.h"
+#define INTEROP_ENABLED 1
+#else
+#define INTEROP_ENABLED 0
+#endif
 
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
 // todo remove when hgi transition is complete
 #include "pxr/imaging/hgiGL/texture.h"
+#endif
 
 
 
@@ -45,8 +52,10 @@ HdxPresentTask::HdxPresentTask(HdSceneDelegate* delegate, SdfPath const& id)
  , _compositor()
  , _flipImage(false)
 {
+#if INTEROP_ENABLED
     _interop = new HgiInterop();
     _interop->SetFlipOnBlit(_flipImage);
+#endif
 }
 
 HdxPresentTask::~HdxPresentTask()
@@ -77,7 +86,9 @@ HdxPresentTask::Sync(
 
         if (_GetTaskParams(delegate, &params)) {
             _flipImage = params.flipImage;
+#if INTEROP_ENABLED
             _interop->SetFlipOnBlit(_flipImage);
+#endif
         }
     }
     *dirtyBits = HdChangeTracker::Clean;
@@ -114,12 +125,16 @@ HdxPresentTask::Execute(HdTaskContext* ctx)
     // For example, it should convert from HgiMetalTexture to HgiGLTexture and
     // then blit those HgiGLTextures to the viewer.
 
-    bool useInterop = true;
+    bool useInterop = INTEROP_ENABLED;
     if (useInterop) {
+#if INTEROP_ENABLED
         _interop->TransferToApp(_hgi, aovTexture, depthTexture);
+#endif
     }
     else
-    { // XXX HgiInterop begin
+    {
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
+        // XXX HgiInterop begin
         // Depth test must be ALWAYS instead of disabling the depth_test because
         // we want to transfer the depth pixels. Disabling depth_test 
         // disables depth writes and we need to copy depth to screen FB.
@@ -154,6 +169,7 @@ HdxPresentTask::Execute(HdTaskContext* ctx)
         if (!restoreDepthEnabled) {
             glDisable(GL_DEPTH_TEST);
         }
+#endif
     } // XXX HgiInterop end
 }
 

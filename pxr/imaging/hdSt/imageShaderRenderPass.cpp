@@ -160,7 +160,7 @@ HdSt_ImageShaderRenderPass::_Execute(
     bool isOpenGL = HdStResourceFactory::GetInstance()->IsOpenGL();
     int fb;
     if (isOpenGL) {
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
         glGetIntegerv(GL_FRAMEBUFFER_BINDING, &fb);
 #endif
     }
@@ -180,7 +180,7 @@ HdSt_ImageShaderRenderPass::_Execute(
         // the Aov back into the client framebuffer.
         // E.g. UsdView CameraMask.
         if (isOpenGL) {
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
             glGetIntegerv(GL_VIEWPORT, vp.data());
             GfVec4i aovViewport(0, 0, vp[2]+vp[0], vp[3]+vp[1]);
             gfxEncoder->SetViewport(aovViewport);
@@ -208,7 +208,7 @@ HdSt_ImageShaderRenderPass::_Execute(
         gfxEncoder->EndEncoding();
 
         if (isOpenGL) {
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
             gfxEncoder->SetViewport(vp);
             // XXX Non-Hgi tasks expect default FB. Remove once all tasks use Hgi.
             glBindFramebuffer(GL_FRAMEBUFFER, fb);
