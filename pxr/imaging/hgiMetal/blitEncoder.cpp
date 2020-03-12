@@ -102,14 +102,6 @@ HgiMetalBlitEncoder::CopyTextureGpuToCpu(
         TF_CODING_ERROR("Unknown HgTextureUsage bit");
     }
 
-    // Make sure writes are finished before we read from the texture
-    //
-    // XXX If we issue all the right commands, this barrier would have already
-    // been issued by HdSt, but for now we do it here. This may introduce a
-    // unneccesairy performance hit, so we should remove this when we
-    // fully record fence/barrier/sempahores in command buffers / RenderPasses.
-    //
-
     id<MTLDevice> device = _commandBuffer->GetDevice();
 
 #if defined(ARCH_OS_MACOS)

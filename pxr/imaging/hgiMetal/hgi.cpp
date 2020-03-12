@@ -53,6 +53,21 @@ TF_REGISTRY_FUNCTION(TfType)
 
 static int _GetAPIVersion()
 {
+#if defined(ARCH_OS_IOS)
+#define SYSTEM_VERSION_GREATER_THAN_OR_EQUAL_TO(v) ([[[UIDevice currentDevice] systemVersion] compare:v options:NSNumericSearch] != NSOrderedAscending)
+    
+    static bool sysVerGreaterThanOrEqualTo11_0 = SYSTEM_VERSION_GREATER_THAN_OR_EQUAL_TO(@"11.0");
+    static bool sysVerGreaterThanOrEqualTo12_0 = SYSTEM_VERSION_GREATER_THAN_OR_EQUAL_TO(@"12.0");
+    static bool sysVerGreaterThanOrEqualTo13_0 = SYSTEM_VERSION_GREATER_THAN_OR_EQUAL_TO(@"13.0");
+
+    if (sysVerGreaterThanOrEqualTo13_0) {
+        return APIVersion_Metal3_0;
+    }
+    else if (sysVerGreaterThanOrEqualTo11_0) {
+        return APIVersion_Metal2_0;
+    }
+    
+#else // ARCH_OS_IOS
     static NSOperatingSystemVersion minimumSupportedOSVersion13_0 = { .majorVersion = 10, .minorVersion = 13, .patchVersion = 0 };
     static NSOperatingSystemVersion minimumSupportedOSVersion14_0 = { .majorVersion = 10, .minorVersion = 14, .patchVersion = 0 };
     static NSOperatingSystemVersion minimumSupportedOSVersion15_0 = { .majorVersion = 10, .minorVersion = 15, .patchVersion = 0 };
@@ -67,11 +82,14 @@ static int _GetAPIVersion()
         return APIVersion_Metal2_0;
     }
     
+#endif // ARCH_OS_IOS
+
     return APIVersion_Metal1_0;
 }
 
 HgiMetal::HgiMetal(id<MTLDevice> device)
 : _device(device)
+, _frameDepth(0)
 , _apiVersion(_GetAPIVersion())
 , _useInterop(false)
 {
@@ -214,15 +232,19 @@ HgiMetal::DestroyPipeline(HgiPipelineHandle* pipeHandle)
 void
 HgiMetal::StartFrame()
 {
-    [_captureScopeFullFrame beginScope];
-    
-    _immediateCommandBuffer->StartFrame();
+    if (_frameDepth++ == 0) {
+        [_captureScopeFullFrame beginScope];
+        
+        _immediateCommandBuffer->StartFrame();
+    }
 }
 
 void
 HgiMetal::EndFrame()
 {
-    [_captureScopeFullFrame endScope];
+    if (--_frameDepth == 0) {
+        [_captureScopeFullFrame endScope];
+    }
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

@@ -157,6 +157,7 @@ private:
     id<MTLDevice> _device;
     id<MTLCommandQueue> _commandQueue;
     id<MTLCaptureScope> _captureScopeFullFrame;
+    int _frameDepth;
 
     int _apiVersion;
     bool _concurrentDispatchSupported;

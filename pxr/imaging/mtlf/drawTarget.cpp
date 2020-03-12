@@ -691,7 +691,7 @@ MtlfDrawTarget::MtlfAttachment::_DeleteTexture()
     }
 
     if (_textureNameMS) {
-        [_textureNameMS releas];
+        [_textureNameMS release];
         _textureNameMS = nil;
     }
     
