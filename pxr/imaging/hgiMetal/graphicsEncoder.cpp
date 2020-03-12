@@ -30,6 +30,8 @@
 #include "pxr/imaging/hgiMetal/resourceBindings.h"
 #include "pxr/imaging/hgiMetal/texture.h"
 
+#include "pxr/base/arch/defines.h"
+
 PXR_NAMESPACE_OPEN_SCOPE
 
 HgiMetalGraphicsEncoder::HgiMetalGraphicsEncoder(
@@ -50,9 +52,12 @@ HgiMetalGraphicsEncoder::HgiMetalGraphicsEncoder(
         MTLRenderPassColorAttachmentDescriptor *metalColorAttachment =
             renderPassDescriptor.colorAttachments[i];
         
-        metalColorAttachment.loadAction =
+#if defined(ARCH_OS_IOS)
+        metalColorAttachment.loadAction = MTLLoadActionLoad;
+#else
             HgiMetalConversions::GetAttachmentLoadOp(
                 hgiColorAttachment.loadOp);
+#endif
         metalColorAttachment.storeAction =
             HgiMetalConversions::GetAttachmentStoreOp(
                 hgiColorAttachment.storeOp);
