@@ -1,14 +1,14 @@
 set(DIRS
     garch
     hf
-    hio
     cameraUtil
     pxOsd
     glf
     hgi
     hgiGL
-    hgiInterop
     hgiMetal
+    hgiInterop
+    hio
     mtlf
     hd
     hdSt

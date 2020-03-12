@@ -1,9 +1,9 @@
 set(PXR_PREFIX pxr/imaging)
 set(PXR_PACKAGE hgiMetal)
 
-if (NOT ${PXR_ENABLE_METAL_SUPPORT})
+if (NOT ${PXR_BUILD_STORM_PLUGINS} OR NOT ${PXR_ENABLE_METAL_SUPPORT})
     message(STATUS
-        "Skipping ${PXR_PACKAGE} because PXR_ENABLE_METAL_SUPPORT is OFF")
+        "Skipping ${PXR_PACKAGE} because PXR_BUILD_STORM_PLUGINS or PXR_ENABLE_METAL_SUPPORT is OFF")
     return()
 endif()
 
@@ -28,7 +28,7 @@ pxr_library(hgiMetal
 
     PRIVATE_CLASSES
         conversions
-        diagnostic
+        diagnostic 
 
     PUBLIC_CLASSES
         blitEncoder
