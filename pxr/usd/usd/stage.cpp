@@ -5228,9 +5228,8 @@ protected:
                            const TfToken &keyPath)
     {
         // Try to read fallback value.
-        return keyPath.IsEmpty() ?
-            primDef.HasField(propName, fieldName, _value) :
-            primDef.HasFieldDictKey(propName, fieldName, keyPath, _value);
+        return Usd_GetFallbackValue(
+            primDef, propName, fieldName, keyPath, _value);
     }
 
     // Consumes an authored dictionary value and merges it into the current 
@@ -5608,11 +5607,8 @@ struct ExistenceComposer
                             const TfToken &propName,
                             const TfToken &fieldName,
                             const TfToken &keyPath) {
-        _done = keyPath.IsEmpty() ?
-            primDef.HasField(
-                propName, fieldName, static_cast<VtValue *>(nullptr)) :
-            primDef.HasFieldDictKey(
-                propName, fieldName, keyPath, static_cast<VtValue*>(nullptr));
+        _done = Usd_GetFallbackValue(primDef, propName, fieldName, keyPath, 
+                                     static_cast<VtValue *>(nullptr));
         if (_strongestLayer)
             *_strongestLayer = TfNullPtr;
     }
@@ -5910,19 +5906,20 @@ UsdStage::_GetTypeSpecificResolvedMetadata(const UsdObject &obj,
 }
 
 template <class Composer>
-bool
-UsdStage::_GetFallbackMetadataImpl(const UsdObject &obj,
-                                   const TfToken &fieldName,
-                                   const TfToken &keyPath,
-                                   Composer *composer) const
+static bool
+_GetFallbackMetadataImpl(Usd_PrimDataConstPtr primData,
+                         const TfToken& propName,
+                         const TfToken &fieldName,
+                         const TfToken &keyPath,
+                         Composer *composer)
 {
     // Look for a fallback value in the definition.  XXX: This currently only
     // handles property definitions -- needs to be extended to prim definitions
     // as well.
-    if (obj.Is<UsdProperty>()) {
+    if (!propName.IsEmpty()) {
         // NOTE: This code is performance critical.
         composer->ConsumeUsdFallback(
-            obj._Prim()->GetPrimDefinition(), obj.GetName(), fieldName, keyPath);
+            primData->GetPrimDefinition(), propName, fieldName, keyPath);
         if (composer->IsDone()) {
             return true;
         }
@@ -6159,18 +6156,17 @@ UsdStage::_GetPrimSpecifierImpl(Usd_PrimDataConstPtr primData,
 }
 
 template <class ListOpType, class Composer>
-bool 
-UsdStage::_GetListOpMetadataImpl(const UsdObject &obj,
-                                 const TfToken &fieldName,
-                                 bool useFallbacks,
-                                 Usd_Resolver *res,
-                                 Composer *composer) const
+static bool 
+_GetListOpMetadataImpl(Usd_PrimDataConstPtr primData,
+                       const TfToken &propName,
+                       const TfToken &fieldName,
+                       bool useFallbacks,
+                       Usd_Resolver *res,
+                       Composer *composer)
 {
     // Collect all list op opinions for this field.
     std::vector<ListOpType> listOps;
 
-    static const auto empty = new TfToken;
-    const TfToken &propName = obj.Is<UsdProperty>() ? obj.GetName() : *empty;
     SdfPath specPath = res->GetLocalPath(propName);
 
     for (bool isNewNode = false; res->IsValid(); isNewNode = res->NextLayer()) {
@@ -6188,7 +6184,8 @@ UsdStage::_GetListOpMetadataImpl(const UsdObject &obj,
         ListOpType fallbackListOp;
         SdfAbstractDataTypedValue<ListOpType> out(&fallbackListOp);
         TypeSpecificValueComposer<ListOpType> composer(&out);
-        if (_GetFallbackMetadataImpl(obj, fieldName, *empty, &composer)) {
+        if (_GetFallbackMetadataImpl(
+                primData, propName, fieldName, TfToken(), &composer)) {
             listOps.emplace_back(fallbackListOp);
         }
     }
@@ -6285,9 +6282,15 @@ UsdStage::_GetGeneralMetadataImpl(const UsdObject &obj,
                                   bool useFallbacks,
                                   Composer *composer) const
 {
-    Usd_Resolver resolver(&obj._Prim()->GetPrimIndex());
+    const Usd_PrimDataConstPtr primData = get_pointer(obj._Prim());
+
+    static TfToken empty;
+    const TfToken &propName = obj.Is<UsdProperty>() ? obj.GetName() : empty;
+
+    Usd_Resolver resolver(&primData->GetPrimIndex());
     if (!_ComposeGeneralMetadataImpl(
-            obj, fieldName, keyPath, useFallbacks, &resolver, composer)) {
+            primData, propName, fieldName, keyPath, useFallbacks, &resolver, 
+            composer)) {
         return false;
     }
 
@@ -6300,27 +6303,33 @@ UsdStage::_GetGeneralMetadataImpl(const UsdObject &obj,
         const std::type_info& valueTypeId(composer->GetHeldTypeid());
         if (valueTypeId == typeid(SdfIntListOp)) {
             return _GetListOpMetadataImpl<SdfIntListOp>(
-                obj, fieldName, useFallbacks, &resolver, composer);
+                primData, propName, fieldName, useFallbacks, &resolver, 
+                composer);
         }
         else if (valueTypeId == typeid(SdfInt64ListOp)) {
             return _GetListOpMetadataImpl<SdfInt64ListOp>(
-                obj, fieldName, useFallbacks, &resolver, composer);
+                primData, propName, fieldName, useFallbacks, &resolver, 
+                composer);
         }
         else if (valueTypeId == typeid(SdfUIntListOp)) {
             return _GetListOpMetadataImpl<SdfUIntListOp>(
-                obj, fieldName, useFallbacks, &resolver, composer);
+                primData, propName, fieldName, useFallbacks, &resolver, 
+                composer);
         }
         else if (valueTypeId == typeid(SdfUInt64ListOp)) {
             return _GetListOpMetadataImpl<SdfUInt64ListOp>(
-                obj, fieldName, useFallbacks, &resolver, composer);
+                primData, propName, fieldName, useFallbacks, &resolver,
+                composer);
         }
         else if (valueTypeId == typeid(SdfStringListOp)) {
             return _GetListOpMetadataImpl<SdfStringListOp>(
-                obj, fieldName, useFallbacks, &resolver, composer);
+                primData, propName, fieldName, useFallbacks, &resolver, 
+                composer);
         }
         else if (valueTypeId == typeid(SdfTokenListOp)) {
             return _GetListOpMetadataImpl<SdfTokenListOp>(
-                obj, fieldName, useFallbacks, &resolver, composer);
+                primData, propName, fieldName, useFallbacks, &resolver, 
+                composer);
         }
     }
     
@@ -6328,34 +6337,37 @@ UsdStage::_GetGeneralMetadataImpl(const UsdObject &obj,
 }
 
 template <class Composer>
-bool
-UsdStage::_ComposeGeneralMetadataImpl(const UsdObject &obj,
-                                      const TfToken& fieldName,
-                                      const TfToken& keyPath,
-                                      bool useFallbacks,
-                                      Usd_Resolver* res,
-                                      Composer *composer) const
+static bool
+_ComposeGeneralMetadataImpl(Usd_PrimDataConstPtr primData,
+                            const TfToken& propName,
+                            const TfToken& fieldName,
+                            const TfToken& keyPath,
+                            bool useFallbacks,
+                            Usd_Resolver* res,
+                            Composer *composer)
 {
     // Main resolution loop.
-    static const auto empty = new TfToken;
-    const TfToken &propName = obj.Is<UsdProperty>() ? obj.GetName() : *empty;
     SdfPath specPath = res->GetLocalPath(propName);
     bool gotOpinion = false;
 
     for (bool isNewNode = false; res->IsValid(); isNewNode = res->NextLayer()) {
-        if (isNewNode) 
+        if (isNewNode) {
             specPath = res->GetLocalPath(propName);
+        }
 
         // Consume an authored opinion here, if one exists.
         gotOpinion |= composer->ConsumeAuthored(
             res->GetNode(), res->GetLayer(), specPath, fieldName, keyPath);
         
-        if (composer->IsDone()) 
+        if (composer->IsDone()) {
             return true;
+        }
     }
 
-    if (useFallbacks)
-        _GetFallbackMetadataImpl(obj, fieldName, keyPath, composer);
+    if (useFallbacks) {
+        _GetFallbackMetadataImpl(
+            primData, propName, fieldName, keyPath, composer);
+    }
 
     return gotOpinion || composer->IsDone();
 }
@@ -6992,8 +7004,8 @@ struct UsdStage::_ResolveInfoResolver
     ProcessFallback()
     {
         if (const bool hasFallback = 
-                _attr._Prim()->GetPrimDefinition().HasField(_attr.GetName(), 
-                SdfFieldKeys->Default, _extraInfo->defaultOrFallbackValue)) {
+                _attr._Prim()->GetPrimDefinition().GetAttributeFallbackValue(
+                    _attr.GetName(), _extraInfo->defaultOrFallbackValue)) {
             _resolveInfo->_source = UsdResolveInfoSourceFallback;
             return true;
         }
@@ -7299,8 +7311,8 @@ UsdStage::_GetValueFromResolveInfoImpl(const UsdResolveInfo &info,
     }
     else if (info._source == UsdResolveInfoSourceFallback) {
         // Get the fallback value.
-        return attr._Prim()->GetPrimDefinition().HasField(
-                attr.GetName(), SdfFieldKeys->Default, result);
+        return attr._Prim()->GetPrimDefinition().GetAttributeFallbackValue(
+                attr.GetName(), result);
     }
 
     return false;

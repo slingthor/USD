@@ -153,7 +153,6 @@ pxr_library(hdSt
         resourceRegistry
         rprimUtils
         shaderCode
-        shaderKey
         smoothNormals
         surfaceShader
         texture
@@ -185,6 +184,7 @@ pxr_library(hdSt
         pointsShaderKey
         quadrangulate
         spatialHierarchy
+	shaderKey
         subdivision
         subdivision3
         triangulate

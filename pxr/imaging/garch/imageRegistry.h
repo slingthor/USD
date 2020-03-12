@@ -29,15 +29,13 @@
 #include "pxr/base/tf/singleton.h"
 #include "pxr/base/tf/token.h"
 
-#include <boost/scoped_ptr.hpp>
-#include <boost/shared_ptr.hpp>
-
+#include <memory>
 #include <string>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
 
-typedef boost::shared_ptr<class GarchImage> GarchImageSharedPtr;
+typedef std::shared_ptr<class GarchImage> GarchImageSharedPtr;
 
 class GarchRankedTypeMap;
 
@@ -62,7 +60,7 @@ private:
     GarchImageSharedPtr _ConstructImage(std::string const & filename);
 
 private:
-    boost::scoped_ptr<GarchRankedTypeMap> _typeMap;
+    std::unique_ptr<GarchRankedTypeMap> _typeMap;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

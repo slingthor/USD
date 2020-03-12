@@ -3584,7 +3584,7 @@ HdSt_CodeGenMSL::_GenerateDrawingCoord()
                << "  return drawingCoord1.y + gl_InstanceID * HD_INSTANCE_INDEX_WIDTH; \n"
                << "}\n";
 
-        if (_geometricShader->IsCullingPass()) {
+        if (_geometricShader->IsFrustumCullingPass()) {
             // for frustum culling:  use instanceIndices.
             _genVS << "hd_instanceIndex GetInstanceIndex() {\n"
                    << "  int offset = GetInstanceIndexCoord();\n"
@@ -3615,7 +3615,7 @@ HdSt_CodeGenMSL::_GenerateDrawingCoord()
     } else {
         _genVS << "hd_instanceIndex GetInstanceIndex() {"
                << "  hd_instanceIndex r; r.indices[0] = 0; return r; }\n";
-        if (_geometricShader->IsCullingPass()) {
+        if (_geometricShader->IsFrustumCullingPass()) {
             _genVS << "void SetCulledInstanceIndex(uint instance) "
                       "{ /*no-op*/ };\n";
         }

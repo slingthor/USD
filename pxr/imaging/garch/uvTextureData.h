@@ -29,15 +29,10 @@
 #include "pxr/imaging/garch/image.h"
 #include "pxr/imaging/garch/baseTextureData.h"
 
-#include <boost/shared_ptr.hpp>
-
 #include <memory>
 #include <string>
 
 PXR_NAMESPACE_OPEN_SCOPE
-
-
-typedef boost::shared_ptr<class GarchImage> GarchImageSharedPtr;
 
 TF_DECLARE_WEAK_AND_REF_PTRS(GarchUVTextureData);
 

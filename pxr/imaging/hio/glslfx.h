@@ -43,6 +43,8 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 class Hgi;
+//
+#define HIO_GLSLFX_API_VERSION 1
 
 #define HIO_GLSLFX_TOKENS       \
     (glslfx)                    \
@@ -215,6 +217,13 @@ public:
     /// Return the computed hash value based on the string
     size_t GetHash() const { return _hash; }
 
+    /// Extract imported files from the specified glslfx file. The returned
+    /// paths are as-authored, in the order of declaration, with possible
+    /// duplicates. This function is not recursive -- it only extracts imports
+    /// from the specified \p filename.
+    HIO_API
+    static std::vector<std::string> ExtractImports(const std::string& filename);
+
 private:
     class _ParseContext {
     public:
@@ -251,8 +260,6 @@ private:
 private:
     Hgi* _hgi;
     _ParseContext _globalContext;
-
-    std::set<std::string> _importedFiles;
 
     typedef std::map<std::string, std::string> _SourceMap;
 

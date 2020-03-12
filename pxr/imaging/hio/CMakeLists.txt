@@ -6,10 +6,12 @@ pxr_library(hio
         arch
         garch
         hgi
-        hf
+        js
         tf
-        trace
         vt
+        trace
+        ar
+        hf
 
     INCLUDE_DIRS
         ${Boost_INCLUDE_DIRS}
