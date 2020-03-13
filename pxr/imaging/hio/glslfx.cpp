@@ -209,14 +209,13 @@ _ComputeResolvedPath(
 }
 
 HioGlslfx::HioGlslfx() :
-    _hgi(nullptr), _valid(false), _hash(0)
+    _technique(nullptr), _valid(false), _hash(0)
 {
     // do nothing
 }
 
-HioGlslfx::HioGlslfx(string const & filePath, Hgi *hgi) :
-    _hgi(hgi),
-    _valid(true), _hash(0)
+HioGlslfx::HioGlslfx(string const & filePath, string const *technique) :
+    _technique(technique), _valid(true), _hash(0)
 {
     // Resolve with the containingFile set to the current working directory
     // with a trailing slash. This ensures that relative paths supplied to the
@@ -247,7 +246,7 @@ HioGlslfx::HioGlslfx(string const & filePath, Hgi *hgi) :
 }
 
 HioGlslfx::HioGlslfx(istream &is) :
-    _hgi(nullptr),
+    _technique(nullptr),
     _globalContext("istream"),
     _valid(true), _hash(0)
 {
@@ -559,7 +558,7 @@ HioGlslfx::_ComposeConfiguration(std::string *reason)
 
         string errorStr;
         _config.reset(HioGlslfxConfig::Read(
-            _hgi, _configMap[item], item, &errorStr));
+            _technique, _configMap[item], item, &errorStr));
 
         if (!errorStr.empty()) {
             *reason = 

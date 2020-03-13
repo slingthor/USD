@@ -106,8 +106,9 @@ HdxFullscreenShader::SetProgram(
         _DestroyShaderProgram();
     }
 
-    HioGlslfx vsGlslfx(HdxPackageFullscreenShader(), _hgi);
-    HioGlslfx fsGlslfx(glslfx, _hgi);
+    std::string apiName(_hgi->GetAPIName());
+    HioGlslfx vsGlslfx(HdxPackageFullscreenShader(), &apiName);
+    HioGlslfx fsGlslfx(glslfx, &apiName);
 
     // Setup the vertex shader
     HgiShaderFunctionDesc vertDesc;
