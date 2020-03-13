@@ -40,13 +40,13 @@
         },
         "metal": {
             "FullscreenVertex": {
-                "source": [ "Fullscreen.Metal.Vertex" ]
+                "source": [ "Fullscreen.Metal.Common", "Fullscreen.Metal.Vertex" ]
             },
             "CompositeFragmentNoDepth": {
-                "source": [ "Composite.Metal.FragmentNoDepth" ]
+                "source": [ "Fullscreen.Metal.Common", "Composite.Metal.FragmentNoDepth" ]
             },
             "CompositeFragmentWithDepth": {
-                "source": [ "Composite.Metal.FragmentWithDepth" ]
+                "source": [ "Fullscreen.Metal.Common", "Composite.Metal.FragmentWithDepth" ]
             }
         }
 
@@ -97,16 +97,18 @@ void main(void)
     gl_FragDepth = depth;
 }
 
+-- glsl Fullscreen.Metal.Common
+
+struct Interpolated {
+    float4 position [[position]];
+    float2 uv;
+};
+
 -- glsl Fullscreen.Metal.Vertex
 
 struct Vertex {
     float4 position [[attribute(0)]];
     float2 uvIn [[attribute(1)]];
-};
-
-struct Interpolated {
-    float4 position [[position]];
-    float2 uv;
 };
 
 vertex Interpolated vertexEntryPoint(Vertex v [[stage_in]])
@@ -119,11 +121,6 @@ vertex Interpolated vertexEntryPoint(Vertex v [[stage_in]])
 
 -- glsl Composite.Metal.FragmentNoDepth
 
-struct Interpolated {
-    float4 position [[position]];
-    float2 uv;
-};
-
 constexpr sampler texSampler(address::clamp_to_edge);
 
 fragment half4 fragmentEntryPoint(
@@ -134,11 +131,6 @@ fragment half4 fragmentEntryPoint(
 }
 
 -- glsl Composite.Metal.FragmentWithDepth
-
-struct Interpolated {
-    float4 position [[position]];
-    float2 uv;
-};
 
 struct Out {
     float4 color [[color(0)]];

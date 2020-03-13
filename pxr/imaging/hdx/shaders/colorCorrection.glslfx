@@ -37,10 +37,10 @@
         },
         "metal": {
             "ColorCorrectionVertex": {
-                "source": [ "ColorCorrection.Metal.Vertex" ]
+                "source": [ "ColorCorrection.Metal.Common", "ColorCorrection.Metal.Vertex" ]
             },
             "ColorCorrectionFragment": {
-                "source": [ "ColorCorrection.Metal.Fragment" ]
+                "source": [ "ColorCorrection.Metal.Common", "ColorCorrection.Metal.Fragment" ]
             }
         }
     }
@@ -91,15 +91,17 @@ void main(void)
     outputColor = color;
 }
 
+-- glsl ColorCorrection.Metal.Common
+
+typedef struct {
+    float4 position [[position]];
+} Interpolated;
+
 -- glsl ColorCorrection.Metal.Vertex
 
 typedef struct {
     float4 position [[attribute(0)]];
 } Vertex;
-
-typedef struct {
-    float4 position [[position]];
-} Interpolated;
 
 // Vertex shader function
 vertex Interpolated vertexEntryPoint(Vertex v [[stage_in]])
@@ -112,10 +114,6 @@ vertex Interpolated vertexEntryPoint(Vertex v [[stage_in]])
 }
 
 -- glsl ColorCorrection.Metal.Fragment
-
-typedef struct {
-    float4 position [[position]];
-} Interpolated;
 
 // Similar to D3DX_DXGIFormatConvert.inl, but branchless
 // https://www.shadertoy.com/view/wds3zM
