@@ -154,7 +154,8 @@ public:
 
     /// Create a glslfx object from a file
     HIO_API
-    HioGlslfx(std::string const & filePath, Hgi *hgi = nullptr);
+    HioGlslfx(
+        std::string const & filePath, std::string const *technique = nullptr);
 
     /// Create a glslfx object from a stream
     HIO_API
@@ -258,7 +259,6 @@ private:
     HioGlslfxConfig::SourceKeys _GetSourceKeys(const TfToken &shaderStageKey) const;
 
 private:
-    Hgi* _hgi;
     _ParseContext _globalContext;
 
     typedef std::map<std::string, std::string> _SourceMap;
@@ -270,6 +270,8 @@ private:
 
     boost::scoped_ptr<HioGlslfxConfig> _config;
 
+    std::string const *_technique;
+    
     bool _valid;
     std::string _invalidReason; // if _valid is false, reason why
     size_t _hash;

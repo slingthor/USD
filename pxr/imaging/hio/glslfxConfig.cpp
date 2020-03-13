@@ -24,8 +24,6 @@
 #include "pxr/imaging/hio/glslfxConfig.h"
 #include "pxr/imaging/hio/debugCodes.h"
 
-#include "pxr/imaging/hgi/hgi.h"
-
 #include "pxr/base/tf/staticTokens.h"
 #include "pxr/base/tf/stl.h"
 #include "pxr/base/tf/type.h"
@@ -56,16 +54,19 @@ VtDictionary Hio_GetDictionaryFromInput
     (const string &input, const string &filename, string *errorStr);
 
 HioGlslfxConfig *
-HioGlslfxConfig::Read(
-    Hgi *hgi, string const & input, string const & filename, string *errorStr)
+HioGlslfxConfig::Read(string const *technique,
+                      string const & input,
+                      string const & filename,
+                      string *errorStr)
 {
-    return new HioGlslfxConfig(hgi,
+    return new HioGlslfxConfig(technique,
         Hio_GetDictionaryFromInput(input, filename, errorStr), errorStr );
 }
 
-HioGlslfxConfig::HioGlslfxConfig(
-    Hgi *hgi, VtDictionary const & dict, string * errors)
-: _hgi(hgi)
+HioGlslfxConfig::HioGlslfxConfig(string const *technique,
+                                 VtDictionary const & dict,
+                                 string * errors)
+: _technique(technique)
 {
     _Init(dict, errors);
 }
@@ -133,8 +134,8 @@ HioGlslfxConfig::_GetSourceKeyMap(VtDictionary const & dict,
     VtDictionary::const_iterator entry = techniquesDict.begin();
     if (techniquesDict.size() > 1) {
         // Look for an API specific flavour, else proceed with "default"
-        if (_hgi) {
-            entry = techniquesDict.find(_hgi->GetAPIName());
+        if (_technique) {
+            entry = techniquesDict.find(*_technique);
         }
         if (entry == techniquesDict.end()) {
             entry = techniquesDict.find("default");

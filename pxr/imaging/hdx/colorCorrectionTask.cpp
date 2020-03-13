@@ -218,7 +218,8 @@ HdxColorCorrectionTask::_CreateShaderResources()
     }
 
     bool useOCIO =_GetUseOcio();
-    HioGlslfx glslfx(HdxPackageColorCorrectionShader(), _hgi);
+    std::string apiName(_hgi->GetAPIName());
+    HioGlslfx glslfx(HdxPackageColorCorrectionShader(), &apiName);
 
     // Setup the vertex shader
     HgiShaderFunctionDesc vertDesc;

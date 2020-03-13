@@ -114,7 +114,7 @@ struct Vertex {
 vertex Interpolated vertexEntryPoint(Vertex v [[stage_in]])
 {
     Interpolated out;
-    out.position = position;
+    out.position = v.position;
     out.uv = v.uvIn;
     return out;
 }

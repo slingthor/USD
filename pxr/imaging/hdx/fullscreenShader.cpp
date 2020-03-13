@@ -106,8 +106,9 @@ HdxFullscreenShader::SetProgram(
         _DestroyShaderProgram();
     }
 
-    HioGlslfx vsGlslfx(HdxPackageFullscreenShader(), _hgi);
-    HioGlslfx fsGlslfx(glslfx, _hgi);
+    std::string apiName(_hgi->GetAPIName());
+    HioGlslfx vsGlslfx(HdxPackageFullscreenShader(), &apiName);
+    HioGlslfx fsGlslfx(glslfx, &apiName);
 
     // Setup the vertex shader
     HgiShaderFunctionDesc vertDesc;
@@ -327,6 +328,8 @@ HdxFullscreenShader::_CreatePipeline(
     desc.pipelineType = HgiPipelineTypeGraphics;
     desc.resourceBindings = _resourceBindings;
     desc.shaderProgram = _shaderProgram;
+    desc.colorAttachmentDescs.emplace_back(_attachment0);
+    desc.depthAttachmentDesc = _depthAttachment;
     
     // Describe the vertex buffer
     HgiVertexAttributeDesc posAttr;
@@ -363,7 +366,7 @@ HdxFullscreenShader::_CreatePipeline(
     // Depth test must be on because when off it also disables depth writes.
     // Instead we set the compare function to always.
     desc.depthState.depthTestEnabled = true;
-    desc.depthState.depthWriteEnabled = true;
+    desc.depthState.depthWriteEnabled = depthDst.Get() != nullptr;
     desc.depthState.depthCompareFn = HgiCompareFunctionAlways;
 
     // We don't use the stencil mask in this task.

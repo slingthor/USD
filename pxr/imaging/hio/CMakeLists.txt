@@ -5,7 +5,6 @@ pxr_library(hio
     LIBRARIES
         arch
         garch
-        hgi
         js
         tf
         vt
