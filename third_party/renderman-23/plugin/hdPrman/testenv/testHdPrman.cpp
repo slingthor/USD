@@ -126,7 +126,7 @@ void
 PrintUsage(const char* cmd, const char *err=nullptr)
 {
     if (err) {
-        fprintf(stderr, err);
+        fprintf(stderr, "%s", err);
     }
     fprintf(stderr, "Usage: %s INPUT.usd "
             "[--out OUTPUT] [--frame FRAME] [--freeCamProj CAM_PROJECTION] "
