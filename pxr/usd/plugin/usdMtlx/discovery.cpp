@@ -237,7 +237,7 @@ UsdMtlxDiscoveryPlugin::DiscoverNodes(const Context& context)
             NdrFsHelpersDiscoverNodes(
                 _searchPaths,
                 UsdMtlxStandardFileExtensions(),
-                TfGetenvBool("USDMTLX_PLUGIN_FOLLOW_SYMLINKS", false))) {
+                TfGetenvBool("USDMTLX_PLUGIN_FOLLOW_SYMLINKS", true))) {
         if (auto document = UsdMtlxGetDocument(fileResult.resolvedUri)) {
             _DiscoverNodes(&result, document, fileResult,
                            _ComputeNameMapping(document));

@@ -61,7 +61,7 @@ set(PXR_PRECOMPILED_HEADER_NAME "pch.h"
     "Default name of precompiled header files"
 )
 
-set(PXR_INSTALL_LOCATION ""
+set(PXR_INSTALL_LOCATION "../Resources/"
     CACHE
     STRING
     "Intended final location for plugin resource files."

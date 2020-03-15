@@ -1621,6 +1621,7 @@ MATERIALX = Dependency("MaterialX", InstallMaterialX, "include/MaterialXCore/Lib
 def InstallUSD(context, force, buildArgs):
     with CurrentWorkingDirectory(context.usdSrcDir):
         extraArgs = []
+        extraArgs.append('-DPXR_OVERRIDE_PLUGINPATH_NAME=../Resources/usd')
 
         if context.buildPython:
             extraArgs.append('-DPXR_ENABLE_PYTHON_SUPPORT=ON')
