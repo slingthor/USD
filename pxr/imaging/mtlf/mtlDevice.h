@@ -487,54 +487,7 @@ protected:
         
         ~ThreadState();
 
-        void PrepareThread(MtlfMetalContext *_this) {
-            if (!init)
-            {
-                gsDataOffset = 0;
-                gsBufferIndex = 0;
-                gsEncodedBatches = 0;
-                gsCurrentBuffer = nil;
-                gsHasOpenBatch = false;
-                enableMVA = false;
-                enableComputeGS = false;
-
-                size_t const defaultBufferSize = 1024;
-                
-                for(int i = 0; i < kMSL_ProgramStage_NumStages; i++) {
-                    oldStyleUniformBufferSize[i] = 0;
-                    oldStyleUniformBufferAllocatedSize[i] = defaultBufferSize;
-                    oldStyleUniformBuffer[i] = new uint8_t[defaultBufferSize];
-                    memset(oldStyleUniformBuffer[i], 0x00, defaultBufferSize);
-                }
-                
-                vertexDescriptor = nil;
-                indexBuffer = nil;
-                vertexPositionBuffer = nil;
-                
-                numVertexComponents = 0;
-                
-                currentWorkQueueType = METALWORKQUEUE_DEFAULT;
-                currentWorkQueue     = &workQueueDefault;
-                
-                workQueueDefault.lastWaitEventValue                   = 0;
-                workQueueGeometry.lastWaitEventValue                  = 0;
-
-                currentEventValue                    = 1;
-                highestExpectedEventValue            = 0;
-
-                _this->ResetEncoders(METALWORKQUEUE_DEFAULT, true);
-                _this->ResetEncoders(METALWORKQUEUE_GEOMETRY_SHADER, true);
-                
-                MTLResourceOptions resourceOptions = MTLResourceStorageModePrivate|MTLResourceCPUCacheModeDefaultCache;
-                for(int i = 0; i < _this->gsMaxConcurrentBatches; i++)
-                    gsBuffers.push_back([_this->currentDevice newBufferWithLength:_this->gsMaxDataPerBatch options:resourceOptions]);
-                remappedQuadIndexBuffer = nil;
-                pointIndexBuffer = nil;
-
-                init = true;
-            }
-            
-        }
+        void PrepareThread(MtlfMetalContext *_this);
         
         bool init = false;
         
