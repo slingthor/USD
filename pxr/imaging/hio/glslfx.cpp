@@ -396,13 +396,13 @@ HioGlslfx::_ProcessImport(_ParseContext & context)
 
     if (importFile.empty()) {
         if (!errorStr.empty()) {
-    	TF_RUNTIME_ERROR( "Syntax Error on line %d of %s. %s",
-    	    context.lineNo, context.filename.c_str(), errorStr.c_str() );
+            TF_RUNTIME_ERROR( "Syntax Error on line %d of %s. %s",
+                context.lineNo, context.filename.c_str(), errorStr.c_str() );
             return false;
         }
 
         TF_WARN("File doesn't exist: \"%s\"\n", tokens[1].c_str());
-		return false;
+        return false;
     }
 
     // stash away imports for later. top down is weakest to strongest

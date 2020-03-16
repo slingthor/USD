@@ -28,7 +28,7 @@ pxr_library(hgiMetal
 
     PRIVATE_CLASSES
         conversions
-        diagnostic 
+        diagnostic
 
     PUBLIC_CLASSES
         blitEncoder

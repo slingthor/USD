@@ -37,10 +37,16 @@
         },
         "metal": {
             "ColorCorrectionVertex": {
-                "source": [ "ColorCorrection.Metal.Common", "ColorCorrection.Metal.Vertex" ]
+                "source": [ 
+                    "ColorCorrection.Metal.Common",
+                    "ColorCorrection.Metal.Vertex"
+                ]
             },
             "ColorCorrectionFragment": {
-                "source": [ "ColorCorrection.Metal.Common", "ColorCorrection.Metal.Fragment" ]
+                "source": [
+                    "ColorCorrection.Metal.Common",
+                    "ColorCorrection.Metal.Fragment"
+                ]
             }
         }
     }

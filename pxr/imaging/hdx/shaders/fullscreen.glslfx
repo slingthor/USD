@@ -40,13 +40,22 @@
         },
         "metal": {
             "FullscreenVertex": {
-                "source": [ "Fullscreen.Metal.Common", "Fullscreen.Metal.Vertex" ]
+                "source": [
+                    "Fullscreen.Metal.Common",
+                    "Fullscreen.Metal.Vertex"
+                ]
             },
             "CompositeFragmentNoDepth": {
-                "source": [ "Fullscreen.Metal.Common", "Composite.Metal.FragmentNoDepth" ]
+                "source": [
+                    "Fullscreen.Metal.Common",
+                    "Composite.Metal.FragmentNoDepth"
+                ]
             },
             "CompositeFragmentWithDepth": {
-                "source": [ "Fullscreen.Metal.Common", "Composite.Metal.FragmentWithDepth" ]
+                "source": [
+                    "Fullscreen.Metal.Common",
+                    "Composite.Metal.FragmentWithDepth"
+                ]
             }
         }
 
