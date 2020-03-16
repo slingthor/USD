@@ -191,8 +191,21 @@ HgiMetalBlitEncoder::ResolveImage(
         return;
     }
 
+    MTLOrigin sourceOrigin = MTLOriginMake(
+        resolveOp.sourceRegion[0], resolveOp.sourceRegion[1], 0);
+    MTLOrigin destOrigin = MTLOriginMake(
+        resolveOp.destinationRegion[0], resolveOp.destinationRegion[1], 0);
+
     [_blitEncoder copyFromTexture:metalSrcTexture->GetTextureId()
-                        toTexture:metalDstTexture->GetTextureId()];
+                      sourceSlice:0
+                      sourceLevel:0
+                     sourceOrigin:sourceOrigin
+                       sourceSize:MTLSizeMake(resolveOp.sourceRegion[2],
+                                              resolveOp.sourceRegion[3], 1)
+                        toTexture:metalDstTexture->GetTextureId()
+                 destinationSlice:0
+                 destinationLevel:0
+                destinationOrigin:sourceOrigin];
 }
 
 
