@@ -17,10 +17,14 @@ if (OPENSUBDIV_HAS_METAL_COMPUTE)
     add_definitions(-DOPENSUBDIV_HAS_METAL_COMPUTE)
 endif()
 
+set(GFX "")
+set(GFXADDITIONAL "")
+set(GFXADDITIONALPUBLIC "")
+
 if (PXR_ENABLE_GL_SUPPORT)
-    set(GFX             glf
+    list(APPEND GFX     glf
     			        hgiGL)
-    set(GFXADDITIONAL   GL/bufferRelocatorGL
+    list(APPEND GFXADDITIONAL GL/bufferRelocatorGL
                         GL/bufferResourceGL
                         GL/codeGenGLSL
                         GL/dispatchBufferGL
@@ -42,20 +46,17 @@ if (PXR_ENABLE_GL_SUPPORT)
                         GL/smoothNormalsGL
                         GL/textureResourceGL
                         GL/vboMemoryBufferGL
-                        GL/vboSimpleMemoryBufferGL
-                        unitTestGLDrawing)
+                        GL/vboSimpleMemoryBufferGL)
 
-    set(GFXADDITIONALPUBLIC ${GFXADDITIONALPUBLIC}
+    list(APPEND GFXADDITIONALPUBLIC ${GFXADDITIONALPUBLIC}
                             GL/resourceFactoryGL)
 
 endif()
 
 if (PXR_ENABLE_METAL_SUPPORT)
-    set(GFX             ${GFX}
-                        mtlf
+    list(APPEND GFX     mtlf
                         hgiMetal)
-    set(GFXADDITIONAL   ${GFXADDITIONAL}
-                        Metal/bufferRelocatorMetal
+    list(APPEND GFXADDITIONAL  Metal/bufferRelocatorMetal
                         Metal/bufferResourceMetal
                         Metal/codeGenMSL
                         Metal/dispatchBufferMetal
@@ -80,8 +81,7 @@ if (PXR_ENABLE_METAL_SUPPORT)
                         Metal/vboMemoryBufferMetal
                         Metal/vboSimpleMemoryBufferMetal)
 
-set(GFXADDITIONALPUBLIC ${GFXADDITIONALPUBLIC}
-                        Metal/resourceFactoryMetal)
+    list(APPEND GFXADDITIONALPUBLIC  Metal/resourceFactoryMetal)
 endif()
 
 
@@ -184,14 +184,15 @@ pxr_library(hdSt
         pointsShaderKey
         quadrangulate
         spatialHierarchy
-	shaderKey
+	    shaderKey
         subdivision
         subdivision3
         triangulate
         unitTestDelegate
+        unitTestGLDrawing
         unitTestHelper
         volumeShader
-	volumeShaderKey
+	    volumeShaderKey
         ${GFXADDITIONAL}
 
     RESOURCE_FILES
@@ -199,7 +200,7 @@ pxr_library(hdSt
         shaders/basisCurves.glslfx
         shaders/compute.glslfx
         shaders/compute.metal
-	shaders/domeLight.glslfx
+	    shaders/domeLight.glslfx
         shaders/edgeId.glslfx
         shaders/fallbackLighting.glslfx
         shaders/fallbackLightingShader.glslfx

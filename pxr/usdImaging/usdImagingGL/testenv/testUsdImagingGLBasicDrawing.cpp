@@ -38,7 +38,7 @@
 #include "pxr/base/tf/getenv.h"
 #include "pxr/base/trace/trace.h"
 
-#include "pxr/imaging/glf/simpleLightingContext.h"
+#include "pxr/imaging/garch/simpleLightingContext.h"
 #include "pxr/imaging/hd/mesh.h"
 #include "pxr/imaging/hd/renderIndex.h"
 #include "pxr/usd/usd/stage.h"
@@ -131,11 +131,11 @@ My_TestGLDrawing::InitTest()
         _engine->SetRendererSetting(TfToken(renderSetting.first),
                                     renderSetting.second);
     }
-
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     std::cout << glGetString(GL_VENDOR) << "\n";
     std::cout << glGetString(GL_RENDERER) << "\n";
     std::cout << glGetString(GL_VERSION) << "\n";
-
+#endif
     if (_ShouldFrameAll()) {
         TfTokenVector purposes;
         purposes.push_back(UsdGeomTokens->default_);
@@ -199,6 +199,7 @@ My_TestGLDrawing::InitTest()
             _lightingContext->SetMaterial(material);
             _lightingContext->SetSceneAmbient(GfVec4f(0.2,0.2,0.2,1.0));
         } else {
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
             glEnable(GL_LIGHTING);
             glEnable(GL_LIGHT0);
             if (IsEnabledCameraLight()) {
@@ -208,6 +209,7 @@ My_TestGLDrawing::InitTest()
                 float position[4] = {0,-.5,.5,0};
                 glLightfv(GL_LIGHT0, GL_POSITION, position);
             }
+#endif
         }
     }
 }
@@ -282,11 +284,11 @@ My_TestGLDrawing::DrawTest(bool offscreen)
         params.showGuides = IsShowGuides();
         params.showRender = IsShowRender();
         params.showProxy = IsShowProxy();
-
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
         glViewport(0, 0, width, height);
 
         glEnable(GL_DEPTH_TEST);
-
+#endif
         if (!GetRendererAov().IsEmpty()) {
             _engine->SetRendererAov(GetRendererAov());
         }
@@ -298,14 +300,14 @@ My_TestGLDrawing::DrawTest(bool offscreen)
                 _engine->SetLightingStateFromOpenGL();
             }
         }
-
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
         if (!GetClipPlanes().empty()) {
             params.clipPlanes = GetClipPlanes();
             for (size_t i=0; i<GetClipPlanes().size(); ++i) {
                 glEnable(GL_CLIP_PLANE0 + i);
             }
         }
-
+#endif
         GfVec4f const &clearColor = GetClearColor();
         GLfloat clearDepth[1] = { 1.0f };
 
@@ -322,15 +324,18 @@ My_TestGLDrawing::DrawTest(bool offscreen)
                 TRACE_FUNCTION_SCOPE("iteration render convergence");
                 
                 convergenceIterations++;
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
                 glClearBufferfv(GL_COLOR, 0, clearColor.data());
                 glClearBufferfv(GL_DEPTH, 0, clearDepth);
-                
+#endif
                 _engine->Render(_stage->GetPseudoRoot(), params);
             } while (!_engine->IsConverged());
         
             {
                 TRACE_FUNCTION_SCOPE("glFinish");
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
                 glFinish();
+#endif
             }
 
             renderTime.Stop();            

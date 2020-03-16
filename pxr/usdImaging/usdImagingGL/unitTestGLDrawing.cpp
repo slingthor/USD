@@ -25,8 +25,10 @@
 #include "pxr/imaging/glf/glew.h"
 
 #include "pxr/usdImaging/usdImagingGL/unitTestGLDrawing.h"
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
 #include "pxr/imaging/glf/contextCaps.h"
 #include "pxr/imaging/glf/diagnostic.h"
+#endif
 #include "pxr/imaging/garch/drawTarget.h"
 #include "pxr/imaging/garch/glDebugWindow.h"
 
@@ -103,10 +105,11 @@ UsdImagingGL_UnitTestWindow::~UsdImagingGL_UnitTestWindow()
 void
 UsdImagingGL_UnitTestWindow::OnInitializeGL()
 {
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     GlfGlewInit();
     GlfRegisterDefaultDebugOutputMessageCallback();
     GlfContextCaps::InitInstance();
-
+#endif
 
     //
     // Create an offscreen draw target which is the same size as this
@@ -152,7 +155,7 @@ UsdImagingGL_UnitTestWindow::OnPaintGL()
     _unitTest->DrawTest(false);
 
     _drawTarget->Unbind();
-
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     //
     // Blit the resulting color buffer to the window (this is a noop
     // if we're drawing offscreen).
@@ -167,6 +170,7 @@ UsdImagingGL_UnitTestWindow::OnPaintGL()
 
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
     glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+#endif
 }
 
 void

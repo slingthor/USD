@@ -25,9 +25,11 @@
 #include "pxr/imaging/glf/diagnostic.h"
 
 #include "pxr/imaging/hdSt/unitTestGLDrawing.h"
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
 #include "pxr/imaging/glf/contextCaps.h"
+#endif
 #include "pxr/imaging/glf/diagnostic.h"
-#include "pxr/imaging/glf/drawTarget.h"
+#include "pxr/imaging/garch/drawTarget.h"
 #include "pxr/imaging/garch/glDebugWindow.h"
 
 #include "pxr/base/gf/frustum.h"
@@ -90,6 +92,7 @@ HdSt_UnitTestWindow::~HdSt_UnitTestWindow()
 void
 HdSt_UnitTestWindow::OnInitializeGL()
 {
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     GlfGlewInit();
     GlfRegisterDefaultDebugOutputMessageCallback();
     GlfContextCaps::InitInstance();
@@ -97,7 +100,7 @@ HdSt_UnitTestWindow::OnInitializeGL()
     std::cout << glGetString(GL_VENDOR) << "\n";
     std::cout << glGetString(GL_RENDERER) << "\n";
     std::cout << glGetString(GL_VERSION) << "\n";
-
+#endif
     //
     // Create an offscreen draw target which is the same size as this
     // widget and initialize the unit test with the draw target bound.
@@ -138,7 +141,7 @@ HdSt_UnitTestWindow::OnPaintGL()
     _unitTest->DrawTest();
 
     _drawTarget->Unbind();
-
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     //
     // Blit the resulting color buffer to the window (this is a noop
     // if we're drawing offscreen).
@@ -153,6 +156,7 @@ HdSt_UnitTestWindow::OnPaintGL()
 
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
     glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+#endif
 }
 
 void

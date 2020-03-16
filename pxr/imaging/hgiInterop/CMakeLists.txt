@@ -1,6 +1,12 @@
 set(PXR_PREFIX pxr/imaging)
 set(PXR_PACKAGE hgiInterop)
 
+if (NOT ${PXR_BUILD_STORM_PLUGINS} OR NOT ${PXR_ENABLE_GL_SUPPORT} OR NOT ${PXR_ENABLE_METAL_SUPPORT})
+    message(STATUS
+        "Skipping ${PXR_PACKAGE} because PXR_BUILD_STORM_PLUGINS or PXR_ENABLE_GL_SUPPORT or PXR_ENABLE_METAL_SUPPORT is OFF")
+    return()
+endif()
+
 if (APPLEIOS)
     message(STATUS
         "Skipping ${PXR_PACKAGE} on iOS")
