@@ -112,10 +112,8 @@ HgiMetalBlitEncoder::CopyTextureGpuToCpu(
 
     size_t bytesPerPixel = HgiDataSizeOfFormat(texDesc.format);
     id<MTLBuffer> cpuBuffer =
-        [device newBufferWithBytesNoCopy:copyOp.cpuDestinationBuffer
-                                  length:copyOp.destinationBufferByteSize
-                                 options:options
-                             deallocator:nil];
+        [device newBufferWithLength:copyOp.destinationBufferByteSize
+                            options:options];
 
     MTLOrigin origin = MTLOriginMake(
         copyOp.sourceTexelOffset[0],
@@ -143,6 +141,8 @@ HgiMetalBlitEncoder::CopyTextureGpuToCpu(
 #if defined(ARCH_OS_MACOS)
     [_blitEncoder synchronizeResource:cpuBuffer];
 #endif
+    memcpy(copyOp.cpuDestinationBuffer,
+        [cpuBuffer contents], copyOp.destinationBufferByteSize);
     [cpuBuffer release];
 }
 
