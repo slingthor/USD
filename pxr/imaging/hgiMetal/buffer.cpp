@@ -26,6 +26,7 @@
 #include "pxr/base/arch/defines.h"
 
 #include "pxr/imaging/hgiMetal/hgi.h"
+#include "pxr/imaging/hgiMetal/capabilities.h"
 #include "pxr/imaging/hgiMetal/diagnostic.h"
 #include "pxr/imaging/hgiMetal/buffer.h"
 
@@ -41,12 +42,8 @@ HgiMetalBuffer::HgiMetalBuffer(HgiMetal *hgi, HgiBufferDesc const & desc)
         TF_CODING_ERROR("Buffers must have a non-zero length");
     }
 
-    MTLResourceOptions resourceOptions =
-#if defined(ARCH_OS_MACOS)
-        MTLResourceStorageModeManaged|MTLResourceCPUCacheModeDefaultCache;
-#else
-        MTLResourceStorageModeShared|MTLResourceCPUCacheModeDefaultCache;
-#endif
+    MTLResourceOptions resourceOptions = MTLResourceCPUCacheModeDefaultCache |
+        hgi->GetCapabilities().GetDefaultStorageMode();
     
     if (desc.initialData) {
         _bufferId = [hgi->GetDevice() newBufferWithBytes:desc.initialData

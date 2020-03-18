@@ -32,6 +32,8 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+class HgiMetal;
+
 /// \class HgiMetalImmediateCommandBuffer
 ///
 /// Metal implementation of HgiImmediateCommandBuffer
@@ -56,21 +58,23 @@ public:
     void BlockUntilSubmitted() override;
 
     /// Metal Specific
+    HGIMETAL_API
     id<MTLDevice> GetDevice() const {
         return _device;
     }
 
     // A contract is taken to put work on the command buffer when calling this
+    HGIMETAL_API
     id<MTLCommandBuffer> GetCommandBuffer();
     
+    HGIMETAL_API
     void StartFrame();
 
 protected:
     friend class HgiMetal;
 
     HGIMETAL_API
-    HgiMetalImmediateCommandBuffer(
-        id<MTLDevice> device, id<MTLCommandQueue> commandQueue);
+    HgiMetalImmediateCommandBuffer(HgiMetal *_hgi);
     
 private:
     HgiMetalImmediateCommandBuffer & operator=
@@ -82,6 +86,7 @@ private:
         std::ostream& out,
         const HgiMetalImmediateCommandBuffer& cmdBuf);
 
+    HgiMetal *_hgi;
     id<MTLDevice> _device;
     id<MTLCommandQueue> _commandQueue;
     id<MTLCommandBuffer> _commandBuffer;

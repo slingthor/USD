@@ -27,6 +27,7 @@
 #include "pxr/imaging/hgiMetal/immediateCommandBuffer.h"
 #include "pxr/imaging/hgiMetal/blitEncoder.h"
 #include "pxr/imaging/hgiMetal/graphicsEncoder.h"
+#include "pxr/imaging/hgiMetal/hgi.h"
 #include "pxr/imaging/hgiMetal/texture.h"
 #include "pxr/imaging/hgi/graphicsEncoderDesc.h"
 #include "pxr/base/tf/diagnostic.h"
@@ -36,11 +37,10 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 
-HgiMetalImmediateCommandBuffer::HgiMetalImmediateCommandBuffer(
-    id<MTLDevice> device,
-    id<MTLCommandQueue> commandQueue)
-: _device(device)
-, _commandQueue(commandQueue)
+HgiMetalImmediateCommandBuffer::HgiMetalImmediateCommandBuffer(HgiMetal *hgi)
+: _hgi(hgi)
+, _device(hgi->GetDevice())
+, _commandQueue(hgi->GetQueue())
 , _commandBuffer(nil)
 , _workToFlush(false)
 {
@@ -84,7 +84,7 @@ HgiBlitEncoderUniquePtr
 HgiMetalImmediateCommandBuffer::CreateBlitEncoder()
 {
     _workToFlush = true;
-    return HgiBlitEncoderUniquePtr(new HgiMetalBlitEncoder(this));
+    return HgiBlitEncoderUniquePtr(new HgiMetalBlitEncoder(_hgi, this));
 }
 
 id<MTLCommandBuffer>

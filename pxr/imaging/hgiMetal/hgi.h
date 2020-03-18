@@ -33,6 +33,8 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+class HgiMetalCapabilities;
+
 enum {
     APIVersion_Metal1_0 = 0,
     APIVersion_Metal2_0,
@@ -150,6 +152,11 @@ public:
         return _useInterop;
     }
     
+    HGIMETAL_API
+    HgiMetalCapabilities const & GetCapabilities() const {
+        return *_capabilities;
+    }
+    
 private:
     HgiMetal & operator=(const HgiMetal&) = delete;
     HgiMetal(const HgiMetal&) = delete;
@@ -164,6 +171,7 @@ private:
     bool _useInterop;
 
     std::unique_ptr<HgiMetalImmediateCommandBuffer> _immediateCommandBuffer;
+    std::unique_ptr<HgiMetalCapabilities> _capabilities;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

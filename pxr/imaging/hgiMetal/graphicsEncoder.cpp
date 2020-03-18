@@ -52,12 +52,15 @@ HgiMetalGraphicsEncoder::HgiMetalGraphicsEncoder(
         MTLRenderPassColorAttachmentDescriptor *metalColorAttachment =
             renderPassDescriptor.colorAttachments[i];
         
-#if defined(ARCH_OS_IOS)
-        metalColorAttachment.loadAction = MTLLoadActionLoad;
-#else
-            HgiMetalConversions::GetAttachmentLoadOp(
-                hgiColorAttachment.loadOp);
-#endif
+        if (@available(ios 8.0, *)) {
+            metalColorAttachment.loadAction = MTLLoadActionLoad;
+        }
+        else {
+            metalColorAttachment.loadAction =
+                HgiMetalConversions::GetAttachmentLoadOp(
+                    hgiColorAttachment.loadOp);
+        }
+
         metalColorAttachment.storeAction =
             HgiMetalConversions::GetAttachmentStoreOp(
                 hgiColorAttachment.storeOp);

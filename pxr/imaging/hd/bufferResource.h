@@ -31,6 +31,8 @@
 #include "pxr/imaging/hd/version.h"
 #include "pxr/imaging/hd/types.h"
 
+#include "pxr/imaging/garch/texture.h"
+
 #include "pxr/base/tf/token.h"
 #include "pxr/base/vt/value.h"
 

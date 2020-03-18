@@ -27,6 +27,7 @@ pxr_library(hgiMetal
         ${APPUIKIT_LIBRARY}
 
     PRIVATE_CLASSES
+        capabilities
         conversions
         diagnostic
 

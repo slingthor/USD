@@ -30,6 +30,7 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+class HgiMetal;
 class HgiMetalImmediateCommandBuffer;
 
 
@@ -40,9 +41,6 @@ class HgiMetalImmediateCommandBuffer;
 class HgiMetalBlitEncoder final : public HgiBlitEncoder
 {
 public:
-    HGIMETAL_API
-    HgiMetalBlitEncoder(HgiMetalImmediateCommandBuffer* cmdBuf);
-
     HGIMETAL_API
     virtual ~HgiMetalBlitEncoder();
 
@@ -64,11 +62,19 @@ public:
     HGIMETAL_API
     void ResolveImage(HgiResolveImageOp const& resolveOp) override;
 
+protected:
+    friend class HgiMetal;
+    friend class HgiMetalImmediateCommandBuffer;
+
+    HGIMETAL_API
+    HgiMetalBlitEncoder(HgiMetal* hgi, HgiMetalImmediateCommandBuffer* cmdBuf);
+
 private:
     HgiMetalBlitEncoder() = delete;
     HgiMetalBlitEncoder & operator=(const HgiMetalBlitEncoder&) = delete;
     HgiMetalBlitEncoder(const HgiMetalBlitEncoder&) = delete;
 
+    HgiMetal* _hgi;
     HgiMetalImmediateCommandBuffer* _commandBuffer;
     id<MTLBlitCommandEncoder> _blitEncoder;
 

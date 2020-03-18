@@ -27,6 +27,7 @@
 
 #include "pxr/imaging/hgiMetal/hgi.h"
 #include "pxr/imaging/hgiMetal/diagnostic.h"
+#include "pxr/imaging/hgiMetal/capabilities.h"
 #include "pxr/imaging/hgiMetal/conversions.h"
 #include "pxr/imaging/hgiMetal/texture.h"
 
@@ -42,11 +43,7 @@ HgiMetalTexture::HgiMetalTexture(HgiMetal *hgi, HgiTextureDesc const & desc)
     MTLTextureUsage usage = MTLTextureUsageUnknown;
     
     if (desc.initialData && desc.pixelsByteSize > 0) {
-#if defined(ARCH_OS_MACOS)
-        resourceOptions = MTLResourceStorageModeManaged;
-#else
-        resourceOptions = MTLResourceStorageModeShared;
-#endif
+        resourceOptions = hgi->GetCapabilities().GetDefaultStorageMode();
     }
 
     mtlFormat = HgiMetalConversions::GetPixelFormat(desc.format);

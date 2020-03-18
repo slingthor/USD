@@ -23,6 +23,7 @@
 //
 #include "pxr/imaging/hgiMetal/hgi.h"
 #include "pxr/imaging/hgiMetal/buffer.h"
+#include "pxr/imaging/hgiMetal/capabilities.h"
 #include "pxr/imaging/hgiMetal/conversions.h"
 #include "pxr/imaging/hgiMetal/diagnostic.h"
 #include "pxr/imaging/hgiMetal/pipeline.h"
@@ -94,11 +95,11 @@ HgiMetal::HgiMetal(id<MTLDevice> device)
 , _useInterop(false)
 {
     if (!_device) {
-#if defined(ARCH_OS_MACOS)
-        if( TfGetenvBool("USD_METAL_USE_INTEGRATED_GPU", false)) {
-            _device = MTLCopyAllDevices()[1];
+        if (@available(macos 10.11, *)) {
+            if( TfGetenvBool("USD_METAL_USE_INTEGRATED_GPU", false)) {
+                _device = MTLCopyAllDevices()[1];
+            }
         }
-#endif
         if (!_device) {
             _device = MTLCreateSystemDefaultDevice();
         }
@@ -109,7 +110,9 @@ HgiMetal::HgiMetal(id<MTLDevice> device)
                      commandBufferPoolSize];
 
     _immediateCommandBuffer.reset(
-        new HgiMetalImmediateCommandBuffer(_device, _commandQueue));
+        new HgiMetalImmediateCommandBuffer(this));
+    _capabilities.reset(
+        new HgiMetalCapabilities(device));
 
     HgiMetalSetupMetalDebug();
     
