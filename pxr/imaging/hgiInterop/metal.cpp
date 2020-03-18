@@ -37,6 +37,32 @@ struct Vertex {
     float uv[2];
 };
 
+static bool _ProcessGLErrors(bool silent = false) {
+    bool foundError = false;
+    GLenum error;
+    // Protect from doing infinite looping when glGetError
+    // is called from an invalid context.
+    int watchDogCount = 0;
+    while ((watchDogCount++ < 256) &&
+            ((error = glGetError()) != GL_NO_ERROR)) {
+        foundError = true;
+        const GLubyte *errorString = gluErrorString(error);
+
+        std::ostringstream errorMessage;
+        if (!errorString) {
+            errorMessage << "GL error code: 0x" << std::hex << error
+                         << std::dec;
+        } else {
+            errorMessage << "GL error: " << errorString;
+        }
+
+        if (!silent) {
+            TF_WARN("%s", errorMessage.str().c_str());
+        }
+    }
+    return foundError;
+}
+
 static GLuint _compileShader(
     GLchar const* const shaderSource, GLuint shaderType)
 {
@@ -88,110 +114,67 @@ static GLuint _compileShader(
     return s;
 }
 
-HgiInteropMetal::HgiInteropMetal(
-    id<MTLDevice> interopDevice)
-: _device(interopDevice)
-{
-    NSError *error = NULL;
-
-    // Load our common vertex shader. This is used by both the fragment shaders
-    // below
-    GLchar const* const vertexShader =
-        "attribute vec2 inPosition;\n"
-        "attribute vec2 inTexCoord;\n"
-        "varying vec2 texCoord;\n"
-        "\n"
-        "void main()\n"
-        "{\n"
-        "    texCoord = inTexCoord;\n"
-        "    gl_Position = vec4(inPosition, 0.0, 1.0);\n"
-        "}\n";
-    
-    GLuint vs = _compileShader(vertexShader, GL_VERTEX_SHADER);
-    
-    GLchar const* const fragmentShader =
-        "varying vec2    texCoord;\n"
-        "\n"
-        // A GL_TEXTURE_RECTANGLE
-        "uniform sampler2DRect interopTexture;\n"
-        "uniform sampler2DRect depthTexture;\n"
-        "\n"
-        // The dimensions of the source texture. The sampler coordinates for
-        // a GL_TEXTURE_RECTANGLE are in pixels,
-        // rather than the usual normalised 0..1 range.
-        "uniform vec2 texSize;\n"
-        "\n"
-        "void main(void)\n"
-        "{\n"
-        "    vec2 uv = vec2(texCoord.x, 1.0 - texCoord.y) * texSize;\n"
-        "    gl_FragColor = texture2DRect(interopTexture, uv.st);\n"
-        "    gl_FragDepth = texture2DRect(depthTexture, uv.st).r;\n"
-        "}\n";
-
-    GLuint fs = _compileShader(fragmentShader, GL_FRAGMENT_SHADER);
-    
-    // Create and link our GL_TEXTURE_2D compatible program
-    _glShaderProgram = glCreateProgram();
-    glAttachShader(_glShaderProgram, fs);
-    glAttachShader(_glShaderProgram, vs);
-    glLinkProgram(_glShaderProgram);
-    
+static void _OutputShaderLog(GLint program) {
     GLint maxLength = 2048;
-    glGetProgramiv(_glShaderProgram, GL_INFO_LOG_LENGTH, &maxLength);
+    glGetProgramiv(program, GL_INFO_LOG_LENGTH, &maxLength);
     if (maxLength)
     {
         // The maxLength includes the NULL character
         GLchar *errorLog = (GLchar*)malloc(maxLength);
-        glGetProgramInfoLog(_glShaderProgram, maxLength, &maxLength, errorLog);
+        glGetProgramInfoLog(program, maxLength, &maxLength, errorLog);
         
         TF_FATAL_CODING_ERROR("%s", errorLog);
         free(errorLog);
     }
+}
+
+void HgiInteropMetal::_CreateShaderContext(
+    int32_t vertexSource,
+    int32_t fragmentSource,
+    ShaderContext &shader) {
+    GLint program;
     
-    // Release the local instance of the fragment shader. The shader program
-    // maintains a reference.
-    glDeleteShader(vs);
-    glDeleteShader(fs);
+    program = glCreateProgram();
+    glAttachShader(program, fragmentSource);
+    glAttachShader(program, vertexSource);
+    glLinkProgram(program);
     
-    glUseProgram(_glShaderProgram);
-    
-    glGenVertexArrays(1, &_glVAO);
-    glBindVertexArray(_glVAO);
-    
-    glGenBuffers(1, &_glVBO);
-    glBindBuffer(GL_ARRAY_BUFFER, _glVBO);
-    
+    _OutputShaderLog(program);
+
+    glUseProgram(program);
+
     // Set up the vertex structure description
-    _posAttrib = glGetAttribLocation(_glShaderProgram, "inPosition");
-    _texAttrib = glGetAttribLocation(_glShaderProgram, "inTexCoord");
+    shader.posAttrib = glGetAttribLocation(program, "inPosition");
+    shader.texAttrib = glGetAttribLocation(program, "inTexCoord");
     
-    glEnableVertexAttribArray(_posAttrib);
-    glVertexAttribPointer(_posAttrib,
-                          2,
-                          GL_FLOAT,
-                          GL_FALSE,
-                          sizeof(Vertex),
-                          (void*)(offsetof(Vertex, position)));
-    glEnableVertexAttribArray(_texAttrib);
-    glVertexAttribPointer(_texAttrib,
-                          2,
-                          GL_FLOAT,
-                          GL_FALSE,
-                          sizeof(Vertex),
-                          (void*)(offsetof(Vertex, uv)));
-    
-    GLint samplerColorLoc =
-        glGetUniformLocation(_glShaderProgram, "interopTexture");
-    GLint samplerDepthLoc =
-        glGetUniformLocation(_glShaderProgram, "depthTexture");
-    
-    _blitTexSizeUniform = glGetUniformLocation(_glShaderProgram, "texSize");
-    
-    // Indicate that the diffuse texture will be bound to texture unit 0
-    // and depth to unit 1
-    GLint unit = 0;
-    glUniform1i(samplerColorLoc, unit++);
-    glUniform1i(samplerDepthLoc, unit);
+    shader.samplerColorLoc = glGetUniformLocation(program, "interopTexture");
+    shader.samplerDepthLoc = glGetUniformLocation(program, "depthTexture");
+    shader.blitTexSizeUniform = glGetUniformLocation(program, "texSize");
+
+    shader.vao = 0;
+    glGenVertexArrays(1, &shader.vao);
+
+    if (shader.vao) {
+        glBindVertexArray(shader.vao);
+                
+        glEnableVertexAttribArray(shader.posAttrib);
+        glVertexAttribPointer(shader.posAttrib,
+                              2,
+                              GL_FLOAT,
+                              GL_FALSE,
+                              sizeof(Vertex),
+                              (void*)(offsetof(Vertex, position)));
+        glEnableVertexAttribArray(shader.texAttrib);
+        glVertexAttribPointer(shader.texAttrib,
+                              2,
+                              GL_FLOAT,
+                              GL_FALSE,
+                              sizeof(Vertex),
+                              (void*)(offsetof(Vertex, uv)));
+    }
+
+    glGenBuffers(1, &shader.vbo);
+    glBindBuffer(GL_ARRAY_BUFFER, shader.vbo);
     
     Vertex v[12] = {
         { {-1, -1}, {0, 0} },
@@ -213,9 +196,87 @@ HgiInteropMetal::HgiInteropMetal(
     };
     glBufferData(GL_ARRAY_BUFFER, sizeof(v), v, GL_STATIC_DRAW);
     
-    glBindVertexArray(0);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    shader.program = program;
+    
+    glUseProgram(0);
+}
 
+HgiInteropMetal::HgiInteropMetal(
+    id<MTLDevice> interopDevice)
+: _device(interopDevice)
+{
+    NSError *error = NULL;
+    
+    _CaptureOpenGlState();
+
+    // Load our common vertex shader. This is used by both the fragment shaders
+    // below
+    GLchar const* const vertexShader =
+        "attribute vec2 inPosition;\n"
+        "attribute vec2 inTexCoord;\n"
+        "varying vec2 texCoord;\n"
+        "\n"
+        "void main()\n"
+        "{\n"
+        "    texCoord = inTexCoord;\n"
+        "    gl_Position = vec4(inPosition, 0.0, 1.0);\n"
+        "}\n";
+    
+    GLuint vs = _compileShader(vertexShader, GL_VERTEX_SHADER);
+
+    GLchar const* const fragmentShaderColor =
+        "varying vec2    texCoord;\n"
+        "\n"
+        // A GL_TEXTURE_RECTANGLE
+        "uniform sampler2DRect interopTexture;\n"
+        "\n"
+        // The dimensions of the source texture. The sampler coordinates for
+        // a GL_TEXTURE_RECTANGLE are in pixels,
+        // rather than the usual normalised 0..1 range.
+        "uniform vec2 texSize;\n"
+        "\n"
+        "void main(void)\n"
+        "{\n"
+        "    vec2 uv = vec2(texCoord.x, 1.0 - texCoord.y) * texSize;\n"
+        "    gl_FragColor = texture2DRect(interopTexture, uv.st);\n"
+        "}\n";
+
+    GLchar const* const fragmentShaderColorDepth =
+        "varying vec2    texCoord;\n"
+        "\n"
+        // A GL_TEXTURE_RECTANGLE
+        "uniform sampler2DRect interopTexture;\n"
+        "uniform sampler2DRect depthTexture;\n"
+        "\n"
+        // The dimensions of the source texture. The sampler coordinates for
+        // a GL_TEXTURE_RECTANGLE are in pixels,
+        // rather than the usual normalised 0..1 range.
+        "uniform vec2 texSize;\n"
+        "\n"
+        "void main(void)\n"
+        "{\n"
+        "    vec2 uv = vec2(texCoord.x, 1.0 - texCoord.y) * texSize;\n"
+        "    gl_FragColor = texture2DRect(interopTexture, uv.st);\n"
+        "    gl_FragDepth = texture2DRect(depthTexture, uv.st).r;\n"
+        "}\n";
+
+    GLuint fsColor = _compileShader(fragmentShaderColor, GL_FRAGMENT_SHADER);
+    GLuint fsColorDepth =
+        _compileShader(fragmentShaderColorDepth, GL_FRAGMENT_SHADER);
+    
+    _CreateShaderContext(
+        vs, fsColor, _shaderProgramContext[ShaderContextColor]);
+    _CreateShaderContext(
+        vs, fsColorDepth, _shaderProgramContext[ShaderContextColorDepth]);
+    
+    // Release the local instance of the fragment shader. The shader program
+    // maintains a reference.
+    glDeleteShader(vs);
+    glDeleteShader(fsColor);
+    glDeleteShader(fsColorDepth);
+    
+    _RestoreOpenGlState();
+    
     error = NULL;
 
     // Load all the default shader files
@@ -506,6 +567,8 @@ HgiInteropMetal::_CaptureOpenGlState()
     glGetBooleanv(GL_DEPTH_TEST, (GLboolean*)&_restoreDepthTest);
     glGetBooleanv(GL_DEPTH_WRITEMASK, (GLboolean*)&_restoreDepthWriteMask);
     glGetBooleanv(GL_STENCIL_WRITEMASK, (GLboolean*)&_restoreStencilWriteMask);
+    glGetBooleanv(GL_CULL_FACE, (GLboolean*)&_restoreCullFace);
+    glGetIntegerv(GL_FRONT_FACE, &_restoreFrontFace);
     glGetIntegerv(GL_DEPTH_FUNC, &_restoreDepthFunc);
     glGetIntegerv(GL_VIEWPORT, _restoreViewport);
     glGetBooleanv(GL_BLEND, (GLboolean*)&_restoreblendEnabled);
@@ -518,6 +581,31 @@ HgiInteropMetal::_CaptureOpenGlState()
     glGetBooleanv(
         GL_SAMPLE_ALPHA_TO_COVERAGE,
         (GLboolean*)&_restoreAlphaToCoverage);
+    glGetIntegerv(GL_POLYGON_MODE, &_restorePolygonMode);
+    glGetIntegerv(GL_ACTIVE_TEXTURE, &_restoreActiveTexture);
+    glActiveTexture(GL_TEXTURE0);
+    glGetIntegerv(GL_TEXTURE_RECTANGLE, &_restoreTexture[0]);
+    glActiveTexture(GL_TEXTURE1);
+    glGetIntegerv(GL_TEXTURE_RECTANGLE, &_restoreTexture[1]);
+
+    for (int i = 0; i < 2; i++) {
+        VertexAttribState &state(_restoreVertexAttribState[i]);
+        glGetVertexAttribiv(
+            i, GL_VERTEX_ATTRIB_ARRAY_ENABLED, &state.enabled);
+        glGetVertexAttribiv(
+            i, GL_VERTEX_ATTRIB_ARRAY_SIZE, &state.size);
+        glGetVertexAttribiv(
+            i, GL_VERTEX_ATTRIB_ARRAY_TYPE, &state.type);
+        glGetVertexAttribiv(
+            i, GL_VERTEX_ATTRIB_ARRAY_NORMALIZED, &state.normalized);
+        glGetVertexAttribiv(
+            i, GL_VERTEX_ATTRIB_ARRAY_STRIDE, &state.stride);
+        glGetVertexAttribiv(
+            i, GL_VERTEX_ATTRIB_ARRAY_BUFFER_BINDING, &state.bufferBinding);
+        
+        glGetVertexAttribPointerv(
+            i, GL_VERTEX_ATTRIB_ARRAY_POINTER, &state.pointer);
+    }
 }
 
 void
@@ -544,25 +632,65 @@ HgiInteropMetal::_RestoreOpenGlState()
     glDepthFunc(_restoreDepthFunc);
     glDepthMask(_restoreDepthWriteMask);
     glStencilMask(_restoreStencilWriteMask);
+    
+    if (_restoreCullFace) {
+        glEnable(GL_CULL_FACE);
+    }
+    else {
+        glDisable(GL_CULL_FACE);
+    }
+    glFrontFace(_restoreFrontFace);
 
     if (_restoreDepthTest) {
         glEnable(GL_DEPTH_TEST);
     } else {
         glDisable(GL_DEPTH_TEST);
     }
-
-    glBindVertexArray(_restoreVao);
+    
+    glPolygonMode(GL_FRONT_AND_BACK, _restorePolygonMode);
+    
+    if (_restoreVao) {
+        glBindVertexArray(_restoreVao);
+    }
     glBindBuffer(GL_ARRAY_BUFFER, _restoreVbo);
+    
+    if (!_restoreVao) {
+        for (int i = 0; i < 2; i++) {
+            VertexAttribState &state(_restoreVertexAttribState[i]);
+            if (state.enabled) {
+                glEnableVertexAttribArray(i);
+            }
+            else {
+                glDisableVertexAttribArray(i);
+            }
+            glVertexAttribPointer(
+                i, state.size, state.type, state.normalized, state.stride,
+                state.pointer);
+        }
+    }
+    
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_RECTANGLE, _restoreTexture[0]);
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_RECTANGLE, _restoreTexture[1]);
+
+    glActiveTexture(_restoreActiveTexture);
 }
 
 void
-HgiInteropMetal::_BlitToOpenGL(bool flipY)
+HgiInteropMetal::_BlitToOpenGL(bool flipY, int shaderIndex)
 {
-    _CaptureOpenGlState();
+    // Clear GL error state
+    _ProcessGLErrors(true);
 
+    _CaptureOpenGlState();
+    
     GLint core;
     glGetIntegerv(GL_CONTEXT_PROFILE_MASK, &core);
     core &= GL_CONTEXT_CORE_PROFILE_BIT;
+    if (_ProcessGLErrors(true)) {
+        core = false;
+    }
 
     if (!core) {
         glPushAttrib(GL_ENABLE_BIT | GL_POLYGON_BIT | GL_DEPTH_BUFFER_BIT);
@@ -579,29 +707,41 @@ HgiInteropMetal::_BlitToOpenGL(bool flipY)
     glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ZERO);
     glBlendEquationSeparate(GL_FUNC_ADD, GL_FUNC_ADD);
     
-    glUseProgram(_glShaderProgram);
-    
-    glBindBuffer(GL_ARRAY_BUFFER, _glVBO);
-    
-    // Set up the vertex structure description
-    if (core) {
-        glBindVertexArray(_glVAO);
-    }
-    glEnableVertexAttribArray(_posAttrib);
-    glVertexAttribPointer(
-        _posAttrib, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex),
-        (void*)(offsetof(Vertex, position)));
-    glEnableVertexAttribArray(_texAttrib);
-    glVertexAttribPointer(
-        _texAttrib, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex),
-        (void*)(offsetof(Vertex, uv)));
+    ShaderContext &shader = _shaderProgramContext[shaderIndex];
+    glUseProgram(shader.program);
 
+    // Set up the vertex structure description
+    if (core && shader.vao) {
+        glBindVertexArray(shader.vao);
+        glBindBuffer(GL_ARRAY_BUFFER, shader.vbo);
+    }
+    else {
+        glBindBuffer(GL_ARRAY_BUFFER, shader.vbo);
+
+        glEnableVertexAttribArray(shader.posAttrib);
+        glVertexAttribPointer(
+            shader.posAttrib, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex),
+            (void*)(offsetof(Vertex, position)));
+        glEnableVertexAttribArray(shader.texAttrib);
+        glVertexAttribPointer(
+            shader.texAttrib, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex),
+            (void*)(offsetof(Vertex, uv)));
+    }
+    
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_RECTANGLE, _glColorTexture);
-    glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_RECTANGLE, _glDepthTexture);
+    if (shader.samplerDepthLoc != -1) {
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_RECTANGLE, _glDepthTexture);
+    }
+    
+    GLint unit = 0;
+    glUniform1i(shader.samplerColorLoc, unit++);
+    if (shader.samplerDepthLoc != -1) {
+        glUniform1i(shader.samplerDepthLoc, unit);
+    }
 
-    glUniform2f(_blitTexSizeUniform,
+    glUniform2f(shader.blitTexSizeUniform,
                 _mtlAliasedColorTexture.width,
                 _mtlAliasedColorTexture.height);
     
@@ -612,25 +752,12 @@ HgiInteropMetal::_BlitToOpenGL(bool flipY)
         glDrawArrays(GL_TRIANGLES, 0, 6);
     }
     
-    glBindTexture(GL_TEXTURE_RECTANGLE, 0);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_RECTANGLE, 0);
-    
-    glDisableVertexAttribArray(_posAttrib);
-    glDisableVertexAttribArray(_texAttrib);
-    glUseProgram(0);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-    
-    if (core) {
-        glBindVertexArray(0);
-    }
-    else {
+    if (!core) {
         glPopAttrib();
     }
-
-    glFlush();
     
     _RestoreOpenGlState();
+    glFlush();
 }
 
 void
@@ -656,6 +783,7 @@ HgiInteropMetal::CopyToInterop(
         computeEncoder = [commandBuffer computeCommandEncoder];
     }
 
+    int glShaderIndex = -1;
     //
     // Depth
     //
@@ -709,12 +837,22 @@ HgiInteropMetal::CopyToInterop(
 
     [computeEncoder endEncoding];
     
+    if (sourceDepthTexture && sourceColorTexture) {
+        glShaderIndex = ShaderContextColor;
+    }
+    else if (sourceColorTexture) {
+        glShaderIndex = ShaderContextColor;
+    }
+
     // We wait until the work is scheduled for execution so that future OpenGL
     // calls are guaranteed to happen after the Metal work encoded above
     metalIcb->BlockUntilSubmitted();
 
-    _BlitToOpenGL(flipImage);
-    glGetError();
+    if (glShaderIndex != -1) {
+        _BlitToOpenGL(flipImage, glShaderIndex);
+
+        _ProcessGLErrors();
+    }
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

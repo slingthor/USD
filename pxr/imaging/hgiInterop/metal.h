@@ -61,11 +61,43 @@ public:
         bool flipImage);
 
 private:
+    
+    enum {
+        ShaderContextColor,
+        ShaderContextColorDepth,
 
-    void _BlitToOpenGL(bool flipY);
+        ShaderContextCount
+    };
+
+    struct ShaderContext {
+        uint32_t                program;
+        uint32_t                vao;
+        uint32_t                vbo;
+        int32_t                 posAttrib;
+        int32_t                 texAttrib;
+        int32_t                 samplerColorLoc;
+        int32_t                 samplerDepthLoc;
+        uint32_t                blitTexSizeUniform;
+    };
+    
+    struct VertexAttribState {
+        int32_t enabled;
+        int32_t size;
+        int32_t type;
+        int32_t normalized;
+        int32_t stride;
+        int32_t bufferBinding;
+        void* pointer;
+    };
+
+    void _BlitToOpenGL(bool flipY, int shaderIndex);
     void _FreeTransientTextureCacheRefs();
     void _CaptureOpenGlState();
     void _RestoreOpenGlState();
+    void _CreateShaderContext(
+        int32_t vertexSource,
+        int32_t fragmentSource,
+        ShaderContext &shader);
 
     id<MTLDevice>               _device;
 
@@ -93,18 +125,15 @@ private:
     uint32_t                    _glColorTexture;
     uint32_t                    _glDepthTexture;
     
-    uint32_t                    _glShaderProgram;
-    uint32_t                    _glVAO;
-    uint32_t                    _glVBO;
-    int32_t                     _posAttrib;
-    int32_t                     _texAttrib;
-    uint32_t                    _blitTexSizeUniform;
-    
+    ShaderContext               _shaderProgramContext[ShaderContextCount];
+
     int32_t _restoreVao;
     int32_t _restoreVbo;
     bool _restoreDepthTest;
     bool _restoreDepthWriteMask;
     bool _restoreStencilWriteMask;
+    bool _restoreCullFace;
+    int32_t _restoreFrontFace;
     int32_t _restoreDepthFunc;
     int32_t _restoreViewport[4];
     bool _restoreblendEnabled;
@@ -115,6 +144,10 @@ private:
     int32_t _restoreColorDstFnOp;
     int32_t _restoreAlphaDstFnOp;
     bool _restoreAlphaToCoverage;
+    int32_t _restorePolygonMode;
+    int32_t _restoreActiveTexture;
+    int32_t _restoreTexture[2];
+    VertexAttribState _restoreVertexAttribState[2];
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE
