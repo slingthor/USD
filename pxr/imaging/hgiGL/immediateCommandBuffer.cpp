@@ -49,8 +49,7 @@ std::ostream& operator<<(
         << "descriptor cache: { ";
 
     for (HgiGLDescriptorCacheItem const * d : cmdBuf._descriptorCache) {
-        out << d->descriptor << ", ";
-        out << "depthTexture: " << d->depthTexture << ", ";
+        out << d->descriptor;
     }
 
     out << "}}";
@@ -79,7 +78,6 @@ _CreateDescriptorCacheItem(const HgiGraphicsEncoderDesc& desc)
     // Color attachments
     //
     for (size_t i=0; i<numColorAttachments; i++) {
-        const HgiAttachmentDesc& attachment = desc.colorAttachmentDescs[i];
         HgiGLTexture* glTexture = static_cast<HgiGLTexture*>(
             desc.colorTextures[i].Get());
 
@@ -137,10 +135,7 @@ _CreateDescriptorCacheItem(const HgiGraphicsEncoderDesc& desc)
 static void
 _DestroyDescriptorCacheItem(HgiGLDescriptorCacheItem* dci)
 {
-    if (dci->framebuffer) {
-        TF_VERIFY(glIsFramebuffer(dci->framebuffer),
-            "Tried to free invalid framebuffer");
-
+    if (dci->framebuffer && glIsFramebuffer(dci->framebuffer)) {
         glDeleteFramebuffers(1, &dci->framebuffer);
         dci->framebuffer = 0;
     }

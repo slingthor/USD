@@ -143,7 +143,7 @@ pxr_library(hdSt
         persistentBuffer
         points
         program
-	    renderBuffer
+        renderBuffer
         renderDelegate
         renderPass
         renderPassShader
@@ -153,6 +153,7 @@ pxr_library(hdSt
         resourceRegistry
         rprimUtils
         shaderCode
+        simpleLightingShader
         smoothNormals
         surfaceShader
         texture
@@ -184,7 +185,7 @@ pxr_library(hdSt
         pointsShaderKey
         quadrangulate
         spatialHierarchy
-	    shaderKey
+        shaderKey
         subdivision
         subdivision3
         triangulate
@@ -192,7 +193,7 @@ pxr_library(hdSt
         unitTestGLDrawing
         unitTestHelper
         volumeShader
-	    volumeShaderKey
+        volumeShaderKey
         ${GFXADDITIONAL}
 
     RESOURCE_FILES
@@ -200,7 +201,7 @@ pxr_library(hdSt
         shaders/basisCurves.glslfx
         shaders/compute.glslfx
         shaders/compute.metal
-	    shaders/domeLight.glslfx
+        shaders/domeLight.glslfx
         shaders/edgeId.glslfx
         shaders/fallbackLighting.glslfx
         shaders/fallbackLightingShader.glslfx
@@ -220,6 +221,7 @@ pxr_library(hdSt
         shaders/ptexTextureMetal.glslfx
         shaders/renderPass.glslfx
         shaders/renderPassShader.glslfx
+        shaders/simpleLightingShader.glslfx
         shaders/terminals.glslfx
         shaders/visibility.glslfx
         shaders/volume.glslfx

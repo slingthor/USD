@@ -71,9 +71,9 @@ private:
     HgiGLPipeline(const HgiGLPipeline&) = delete;
 
 private:
-    HgiPipelineDesc _descriptor;
-
-    int32_t _restoreFramebuffer;
+    int32_t _restoreDrawFramebuffer;
+    int32_t _restoreReadFramebuffer;
+    int32_t _restoreRenderBuffer;
     int32_t _restoreVao;
     bool _restoreDepthTest;
     bool _restoreDepthWriteMask;

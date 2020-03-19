@@ -24,17 +24,15 @@
 #include "pxr/imaging/glf/glew.h"
 
 #include "pxr/imaging/cameraUtil/conformWindow.h"
-
+#include "pxr/imaging/hd/camera.h"
 #include "pxr/imaging/hdx/drawTargetRenderPass.h"
 #include "pxr/imaging/hdx/drawTargetTask.h"
-#include "pxr/imaging/hdx/simpleLightingShader.h"
 #include "pxr/imaging/hdx/tokens.h"
 #include "pxr/imaging/hdx/debugCodes.h"
-
-#include "pxr/imaging/hd/camera.h"
 #include "pxr/imaging/hdSt/drawTarget.h"
 #include "pxr/imaging/hdSt/renderPassState.h"
 #include "pxr/imaging/hdSt/resourceFactory.h"
+#include "pxr/imaging/hdSt/simpleLightingShader.h"
 #include "pxr/imaging/garch/drawTarget.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -326,8 +324,8 @@ HdxDrawTargetTask::Sync(HdSceneDelegate* delegate,
 
                     HdStRenderPassStateSharedPtr renderPassState(
                         HdStResourceFactory::GetInstance()->NewRenderPassState());
-                    HdxSimpleLightingShaderSharedPtr simpleLightingShader(
-                        new HdxSimpleLightingShader());
+                    HdStSimpleLightingShaderSharedPtr simpleLightingShader(
+                        new HdStSimpleLightingShader());
 
                     _renderPassesInfo.emplace_back(
                             RenderPassInfo {
@@ -354,7 +352,8 @@ HdxDrawTargetTask::Sync(HdSceneDelegate* delegate,
             unsigned int targetVersion = target->GetVersion();
 
             if (renderPassInfo.version != targetVersion) {
-                _renderPasses[renderPassIdx]->SetDrawTarget(target->GetGarchDrawTarget());
+                _renderPasses[renderPassIdx]->SetDrawTarget(
+					target->GetGarchDrawTarget());
                 renderPassInfo.version = targetVersion;
             }
         }
@@ -378,18 +377,20 @@ HdxDrawTargetTask::Sync(HdSceneDelegate* delegate,
          ++renderPassIdx) {
 
         RenderPassInfo &renderPassInfo =  _renderPassesInfo[renderPassIdx];
-        HdxDrawTargetRenderPass *renderPass = _renderPasses[renderPassIdx].get();
-        HdStRenderPassStateSharedPtr &renderPassState = renderPassInfo.renderPassState;
+        HdxDrawTargetRenderPass *renderPass = 
+            _renderPasses[renderPassIdx].get();
+        HdStRenderPassStateSharedPtr &renderPassState = 
+            renderPassInfo.renderPassState;
         const HdStDrawTarget *drawTarget = renderPassInfo.target;
         const HdStDrawTargetRenderPassState *drawTargetRenderPassState =
-                                               drawTarget->GetRenderPassState();
+            drawTarget->GetRenderPassState();
         const SdfPath &cameraId = drawTargetRenderPassState->GetCamera();
 
         // XXX: Need to detect when camera changes and only update if
         // needed
         const HdCamera *camera = static_cast<const HdCamera *>(
-                                  renderIndex.GetSprim(HdPrimTypeTokens->camera,
-                                                       cameraId));
+            renderIndex.GetSprim(HdPrimTypeTokens->camera,
+                cameraId));
 
         if (camera == nullptr) {
             // Render pass should not have been added to task list.
@@ -411,7 +412,7 @@ HdxDrawTargetTask::Sync(HdSceneDelegate* delegate,
         renderPassState->SetCullStyle(_cullStyle);
         renderPassState->SetDepthFunc(depthFunc);
 
-        HdxSimpleLightingShaderSharedPtr &simpleLightingShader
+        HdStSimpleLightingShaderSharedPtr &simpleLightingShader
             = _renderPassesInfo[renderPassIdx].simpleLightingShader;
         GarchSimpleLightingContextRefPtr const& simpleLightingContext =
             simpleLightingShader->GetLightingContext();
@@ -573,9 +574,11 @@ std::ostream& operator<<(std::ostream& out, const HdxDrawTargetTaskParams& pv)
         << "         wireframeColor          = " << pv.wireframeColor << "\n"
         << "         enableLighting          = " << pv.enableLighting << "\n"
         << "         alphaThreshold          = " << pv.alphaThreshold << "\n"
-        << "         depthBiasUseDefault     = " << pv.depthBiasUseDefault << "\n"
+        << "         depthBiasUseDefault     = " 
+            << pv.depthBiasUseDefault << "\n"
         << "         depthBiasEnable         = " << pv.depthBiasEnable << "\n"
-        << "         depthBiasConstantFactor = " << pv.depthBiasConstantFactor << "\n"
+        << "         depthBiasConstantFactor = " 
+            << pv.depthBiasConstantFactor << "\n"
         << "         depthFunc               = " << pv.depthFunc << "\n"
         << "         cullStyle               = " << pv.cullStyle << "\n"
         ;
@@ -583,7 +586,9 @@ std::ostream& operator<<(std::ostream& out, const HdxDrawTargetTaskParams& pv)
     return out;
 }
 
-bool operator==(const HdxDrawTargetTaskParams& lhs, const HdxDrawTargetTaskParams& rhs)
+bool operator==(
+    const HdxDrawTargetTaskParams& lhs, 
+    const HdxDrawTargetTaskParams& rhs)
 {
     return 
         lhs.overrideColor == rhs.overrideColor                      && 
@@ -598,7 +603,9 @@ bool operator==(const HdxDrawTargetTaskParams& lhs, const HdxDrawTargetTaskParam
         lhs.cullStyle == rhs.cullStyle;
 }
 
-bool operator!=(const HdxDrawTargetTaskParams& lhs, const HdxDrawTargetTaskParams& rhs)
+bool operator!=(
+    const HdxDrawTargetTaskParams& lhs, 
+    const HdxDrawTargetTaskParams& rhs)
 {
     return !(lhs == rhs);
 }

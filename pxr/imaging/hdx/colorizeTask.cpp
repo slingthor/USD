@@ -439,7 +439,7 @@ HdxColorizeTask::Sync(HdSceneDelegate* delegate,
         if (!TF_VERIFY(_hgi, "Hgi driver missing from TaskContext")) {
             return;
         }
-        _compositor.reset(new HdxFullscreenShader(_hgi));
+        _compositor.reset(new HdxFullscreenShader(_hgi, "Colorize"));
     }
 
     if ((*dirtyBits) & HdChangeTracker::DirtyParams) {
@@ -558,7 +558,6 @@ HdxColorizeTask::Execute(HdTaskContext* ctx)
     // backends that keep renderbuffers on the GPU.
 
     // Colorize!
- // todo  bool depthAware = false;
     if (_depthBuffer && _depthBuffer->GetFormat() == HdFormatFloat32) {
         uint8_t* db = reinterpret_cast<uint8_t*>(_depthBuffer->Map());
         _compositor->SetTexture(TfToken("depth"),
@@ -566,7 +565,6 @@ HdxColorizeTask::Execute(HdTaskContext* ctx)
                                _depthBuffer->GetHeight(),
                                HdFormatFloat32, db);
         _depthBuffer->Unmap();
-//        depthAware = true;
     } else {
         // If no depth buffer is bound, don't draw with depth.
         _compositor->SetTexture(TfToken("depth"),
@@ -631,16 +629,9 @@ HdxColorizeTask::Execute(HdTaskContext* ctx)
     glEnable(GL_BLEND);
     glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 #endif
-// todo colorize needs to be re-written to just be a GPU shader that takes what
-// is in the color aov and, via texelFetch, convert the values into a range
-// that it sutiable for color-display. For example convert normals to 0-1 range.
-// For disabling this, but here it needs to:
-// -- get HdAovTokens->color and optionally HdAovTokens->depth
-// -- use HdxFullscreenShader with a custom glsl file that does the color convert.
-//
-//    _compositor->SetProgramToCompositor(depthAware);
-//    _compositor->Draw(aovTexture);
-
+    // ColorizeTask works directly on the bound gl framebuffer, so we pass
+    // invalid handles for color and depth.
+    _compositor->Draw(HgiTextureHandle(), HgiTextureHandle());
 #if defined(PXR_OPENGL_SUPPORT_ENABLED)
     if (!blendEnabled) {
         glDisable(GL_BLEND);

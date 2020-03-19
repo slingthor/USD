@@ -42,7 +42,7 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-class Hgi;
+// Version 1 - Added HioGlslfx::ExtractImports
 //
 #define HIO_GLSLFX_API_VERSION 1
 

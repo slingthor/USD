@@ -33,7 +33,13 @@ bool operator==(
             lhs.clearValue == rhs.clearValue &&
             lhs.loadOp == rhs.loadOp &&
             lhs.storeOp == rhs.storeOp &&
-            lhs.blendEnabled == rhs.blendEnabled;
+            lhs.blendEnabled == rhs.blendEnabled &&
+            lhs.srcColorBlendFactor == rhs.srcColorBlendFactor &&
+            lhs.dstColorBlendFactor == rhs.dstColorBlendFactor &&
+            lhs.colorBlendOp == rhs.colorBlendOp &&
+            lhs.srcAlphaBlendFactor == rhs.srcAlphaBlendFactor &&
+            lhs.dstAlphaBlendFactor == rhs.dstAlphaBlendFactor &&
+            lhs.alphaBlendOp == rhs.alphaBlendOp;
 }
 
 bool operator!=(

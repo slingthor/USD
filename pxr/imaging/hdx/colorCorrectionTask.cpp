@@ -37,6 +37,7 @@
 #include "pxr/imaging/hgi/immediateCommandBuffer.h"
 #include "pxr/imaging/hgi/tokens.h"
 
+#include <iostream>
 #if defined(PXR_OPENGL_SUPPORT_ENABLED)
 // XXX Remove includes when entire task is using Hgi. We do not want to refer
 // to any specific Hgi implementation.
@@ -501,12 +502,14 @@ HdxColorCorrectionTask::Execute(HdTaskContext* ctx)
     if (_aovName != HdAovTokens->color) {
         return;
     }
-    
+
     // The color aov has the rendered results and we wish to color correct it.
-    HgiTextureHandle aovTexture;
-    if (!_GetTaskContextData(ctx, HdAovTokens->color, &aovTexture)) {
+    if (!_HasTaskContextData(ctx, HdAovTokens->color)) {
         return;
     }
+
+    HgiTextureHandle aovTexture;
+    _GetTaskContextData(ctx, HdAovTokens->color, &aovTexture);
 
     if (!TF_VERIFY(_CreateBufferResources())) {
         return;
@@ -541,9 +544,9 @@ HdxColorCorrectionTask::_PrintCompileErrors()
     if (!_shaderProgram) return;
 
     for (HgiShaderFunctionHandle fn : _shaderProgram->GetShaderFunctions()) {
-        printf("%s\n", fn->GetCompileErrors().c_str());
+        std::cout << fn->GetCompileErrors() << std::endl;
     }
-    printf("%s\n", _shaderProgram->GetCompileErrors().c_str());
+    std::cout << _shaderProgram->GetCompileErrors() << std::endl;
 }
 
 // -------------------------------------------------------------------------- //

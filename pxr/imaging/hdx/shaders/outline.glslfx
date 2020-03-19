@@ -83,7 +83,7 @@ layout (std430, binding = 0) buffer ParameterBuffer
     // Size of a colorIn texel - to iterate adjacent texels.
     vec2 texelSize;
     // Draws outline when enabled, or color overlay when disabled.
-    bool enableOutline;
+    int enableOutline;
     // The outline radius (thickness). 
     int radius;
 };
@@ -171,7 +171,7 @@ void main()
     vec4 color = texture2D(colorIn, uv);
     bool isInside = color.r > EPSILON || color.g > EPSILON || color.b > EPSILON;
 
-    if (!enableOutline) { 
+    if (enableOutline==0) { 
         if (isInside) {
             // Inside the highlighted areas in colorIn : render colorIn.
             gl_FragColor = color;
@@ -234,7 +234,7 @@ struct ParameterBuffer {
     // Size of a colorIn texel - to iterate adjacent texels.
     vec2 texelSize;
     // Draws outline when enabled, or color overlay when disabled.
-    bool enableOutline;
+    int enableOutline;
     // The outline radius (thickness). 
     int radius;
 };
@@ -330,7 +330,7 @@ fragment vec4 fragmentEntryPoint(
     vec4 color = colorIn.sample(texSampler, input.uv);
     bool isInside = color.r > EPSILON || color.g > EPSILON || color.b > EPSILON;
 
-    if (!buffer->enableOutline) { 
+    if (buffer->enableOutline == 0) { 
         if (isInside) {
             // Inside the highlighted areas in colorIn : render colorIn.
             gl_FragColor = color;

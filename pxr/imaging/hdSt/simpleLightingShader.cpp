@@ -22,17 +22,18 @@
 // language governing permissions and limitations under the Apache License.
 //
 #include "pxr/imaging/glf/glew.h"
-#include "pxr/imaging/hdx/simpleLightingShader.h"
-#include "pxr/imaging/hdx/package.h"
+#include "pxr/imaging/hdSt/simpleLightingShader.h"
+#include "pxr/imaging/hdSt/textureResource.h"
+#include "pxr/imaging/hdSt/package.h"
 
 #include "pxr/imaging/hd/binding.h"
 #include "pxr/imaging/hd/perfLog.h"
-#include "pxr/imaging/hdSt/textureResource.h"
 #include "pxr/imaging/hd/tokens.h"
 
 #include "pxr/imaging/hf/perfLog.h"
 
 #include "pxr/imaging/hio/glslfx.h"
+
 #include "pxr/imaging/garch/bindingMap.h"
 #include "pxr/imaging/garch/simpleLightingContext.h"
 
@@ -61,7 +62,7 @@ TF_DEFINE_PRIVATE_TOKENS(
 );
 
 
-HdxSimpleLightingShader::HdxSimpleLightingShader()
+HdStSimpleLightingShader::HdStSimpleLightingShader() 
     : _lightingContext(GarchSimpleLightingContext::New())
     , _bindingMap(GarchBindingMap::New())
     , _useLighting(true)
@@ -69,20 +70,20 @@ HdxSimpleLightingShader::HdxSimpleLightingShader()
     _lightingContext->InitUniformBlockBindings(_bindingMap);
     _lightingContext->InitSamplerUnitBindings(_bindingMap);
 
-    _glslfx.reset(new HioGlslfx(HdxPackageSimpleLightingShader()));
+    _glslfx.reset(new HioGlslfx(HdStPackageSimpleLightingShader()));
 }
 
-HdxSimpleLightingShader::~HdxSimpleLightingShader()
+HdStSimpleLightingShader::~HdStSimpleLightingShader()
 {
 }
 
 /* virtual */
-HdxSimpleLightingShader::ID
-HdxSimpleLightingShader::ComputeHash() const
+HdStSimpleLightingShader::ID
+HdStSimpleLightingShader::ComputeHash() const
 {
     HD_TRACE_FUNCTION();
 
-    TfToken glslfxFile = HdxPackageSimpleLightingShader();
+    TfToken glslfxFile = HdStPackageSimpleLightingShader();
     size_t numLights = _useLighting ? _lightingContext->GetNumLightsUsed() : 0;
     bool useShadows = _useLighting ? _lightingContext->GetUseShadows() : false;
     size_t numShadows = useShadows ? _lightingContext->ComputeNumShadowsUsed() : 0;
@@ -97,7 +98,7 @@ HdxSimpleLightingShader::ComputeHash() const
 
 /* virtual */
 std::string
-HdxSimpleLightingShader::GetSource(TfToken const &shaderStageKey) const
+HdStSimpleLightingShader::GetSource(TfToken const &shaderStageKey) const
 {
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
@@ -125,7 +126,7 @@ HdxSimpleLightingShader::GetSource(TfToken const &shaderStageKey) const
 
 /* virtual */
 void
-HdxSimpleLightingShader::SetCamera(GfMatrix4d const &worldToViewMatrix,
+HdStSimpleLightingShader::SetCamera(GfMatrix4d const &worldToViewMatrix,
                                           GfMatrix4d const &projectionMatrix)
 {
     _lightingContext->SetCamera(worldToViewMatrix, projectionMatrix);
@@ -180,14 +181,14 @@ static void _BindToMetal(
 
 /* virtual */
 void
-HdxSimpleLightingShader::BindResources(HdStProgram const &program,
+HdStSimpleLightingShader::BindResources(HdStProgram const &program,
                                        HdSt_ResourceBinder const &binder,
                                        HdRenderPassState const &state)
 {
     static std::mutex _mutex;
     std::lock_guard<std::mutex> lock(_mutex);
 
-    // XXX: we'd like to use HdSt_ResourceBinder instead of GarchBindingMap.
+    // XXX: we'd like to use HdSt_ResourceBinder instead of GlfBindingMap.
     //
     program.AssignUniformBindings(_bindingMap);
     _lightingContext->BindUniformBlocks(_bindingMap);
@@ -214,7 +215,7 @@ HdxSimpleLightingShader::BindResources(HdStProgram const &program,
 
         if (light.IsDomeLight()) {
 
-            HdBinding irradianceBinding = 
+            HdBinding irradianceBinding =
                                 binder.GetBinding(_tokens->domeLightIrradiance);
             if (irradianceBinding.GetType() == HdBinding::TEXTURE_2D) {
                 int samplerUnit = irradianceBinding.GetTextureUnit();
@@ -224,7 +225,7 @@ HdxSimpleLightingShader::BindResources(HdStProgram const &program,
                     uint32_t textureId = uint32_t(light.GetIrradianceId());
                     glActiveTexture(GL_TEXTURE0 + samplerUnit);
                     glBindTexture(GL_TEXTURE_2D, (GLuint)textureId);
-                	glBindSampler(samplerUnit, 0);
+                    glBindSampler(samplerUnit, 0);
 #endif
                 }
                 else {
@@ -240,8 +241,8 @@ HdxSimpleLightingShader::BindResources(HdStProgram const &program,
                         light.GetIrradianceId(),
                         light.GetIrradianceSamplerId());
                 }
-            } 
-            HdBinding prefilterBinding = 
+            }
+            HdBinding prefilterBinding =
                                 binder.GetBinding(_tokens->domeLightPrefilter);
             if (prefilterBinding.GetType() == HdBinding::TEXTURE_2D) {
                 int samplerUnit = prefilterBinding.GetTextureUnit();
@@ -251,7 +252,7 @@ HdxSimpleLightingShader::BindResources(HdStProgram const &program,
                     uint32_t textureId = uint32_t(light.GetPrefilterId());
                     glActiveTexture(GL_TEXTURE0 + samplerUnit);
                     glBindTexture(GL_TEXTURE_2D, (GLuint)textureId);
-                	glBindSampler(samplerUnit, 0);
+                    glBindSampler(samplerUnit, 0);
 #endif
                 }
                 else {
@@ -267,7 +268,7 @@ HdxSimpleLightingShader::BindResources(HdStProgram const &program,
                         light.GetPrefilterId(),
                         light.GetPrefilterSamplerId());
                 }
-            } 
+            }
             HdBinding brdfBinding = binder.GetBinding(_tokens->domeLightBRDF);
             if (brdfBinding.GetType() == HdBinding::TEXTURE_2D) {
                 int samplerUnit = brdfBinding.GetTextureUnit();
@@ -277,7 +278,7 @@ HdxSimpleLightingShader::BindResources(HdStProgram const &program,
                     uint32_t textureId = uint32_t(light.GetBrdfId());
                     glActiveTexture(GL_TEXTURE0 + samplerUnit);
                     glBindTexture(GL_TEXTURE_2D, (GLuint)textureId);
-                	glBindSampler(samplerUnit, 0);
+                    glBindSampler(samplerUnit, 0);
 #endif
                 }
                 else {
@@ -306,7 +307,7 @@ HdxSimpleLightingShader::BindResources(HdStProgram const &program,
 
 /* virtual */
 void
-HdxSimpleLightingShader::UnbindResources(HdStProgram const &program,
+HdStSimpleLightingShader::UnbindResources(HdStProgram const &program,
                                          HdSt_ResourceBinder const &binder,
                                          HdRenderPassState const &state)
 {
@@ -355,7 +356,7 @@ HdxSimpleLightingShader::UnbindResources(HdStProgram const &program,
 
 /*virtual*/
 void
-HdxSimpleLightingShader::AddBindings(HdBindingRequestVector *customBindings)
+HdStSimpleLightingShader::AddBindings(HdBindingRequestVector *customBindings)
 {
     static std::mutex _mutex;
     std::lock_guard<std::mutex> lock(_mutex);
@@ -412,19 +413,19 @@ HdxSimpleLightingShader::AddBindings(HdBindingRequestVector *customBindings)
 }
 
 HdMaterialParamVector const& 
-HdxSimpleLightingShader::GetParams() const 
+HdStSimpleLightingShader::GetParams() const 
 {
     return _lightTextureParams;
 }
 
 void
-HdxSimpleLightingShader::SetLightingStateFromOpenGL()
+HdStSimpleLightingShader::SetLightingStateFromOpenGL()
 {
     _lightingContext->SetStateFromOpenGL();
 }
 
 void
-HdxSimpleLightingShader::SetLightingState(
+HdStSimpleLightingShader::SetLightingState(
     GarchSimpleLightingContextPtr const &src)
 {
     if (src) {

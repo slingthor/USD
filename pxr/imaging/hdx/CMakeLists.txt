@@ -64,7 +64,6 @@ pxr_library(hdx
         selectionTask
         selectionTracker
         shadowTask
-        simpleLightingShader
         simpleLightTask
         taskController
         tokens
@@ -94,7 +93,6 @@ pxr_library(hdx
         shaders/renderPassPickingShader.glslfx
         shaders/renderPassShadowShader.glslfx
         shaders/selection.glslfx
-        shaders/simpleLightingShader.glslfx
         shaders/renderPassOitShader.glslfx
         shaders/renderPassOitOpaqueShader.glslfx
         shaders/renderPassOitVolumeShader.glslfx

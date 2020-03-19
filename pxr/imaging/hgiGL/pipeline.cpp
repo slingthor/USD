@@ -37,7 +37,9 @@ PXR_NAMESPACE_OPEN_SCOPE
 HgiGLPipeline::HgiGLPipeline(
     HgiPipelineDesc const& desc)
     : HgiPipeline(desc)
-    , _restoreFramebuffer(0)
+    , _restoreDrawFramebuffer(0)
+    , _restoreReadFramebuffer(0)
+    , _restoreRenderBuffer(0)
     , _restoreVao(0)
     , _restoreDepthTest(false)
     , _restoreDepthWriteMask(false)
@@ -160,7 +162,9 @@ HgiGLPipeline::BindPipeline()
 void
 HgiGLPipeline::CaptureOpenGlState()
 {
-    glGetIntegerv(GL_FRAMEBUFFER_BINDING, &_restoreFramebuffer);
+    glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &_restoreDrawFramebuffer);
+    glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &_restoreReadFramebuffer);
+    glGetIntegerv(GL_RENDERBUFFER_BINDING, &_restoreRenderBuffer);
     glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &_restoreVao);
     glGetBooleanv(GL_DEPTH_TEST, (GLboolean*)&_restoreDepthTest);
     glGetBooleanv(GL_DEPTH_WRITEMASK, (GLboolean*)&_restoreDepthWriteMask);
@@ -177,7 +181,6 @@ HgiGLPipeline::CaptureOpenGlState()
     glGetBooleanv(
         GL_SAMPLE_ALPHA_TO_COVERAGE, 
         (GLboolean*)&_restoreAlphaToCoverage);
-
     HGIGL_POST_PENDING_GL_ERRORS();
 }
 
@@ -205,15 +208,15 @@ HgiGLPipeline::RestoreOpenGlState()
     glDepthFunc(_restoreDepthFunc);
     glDepthMask(_restoreDepthWriteMask);
     glStencilMask(_restoreStencilWriteMask);
-
     if (_restoreDepthTest) {
         glEnable(GL_DEPTH_TEST);
     } else {
         glDisable(GL_DEPTH_TEST);
     }
-
     glBindVertexArray(_restoreVao);
-    glBindFramebuffer(GL_FRAMEBUFFER, _restoreFramebuffer);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, _restoreDrawFramebuffer);
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, _restoreReadFramebuffer);
+    glBindRenderbuffer(GL_RENDERBUFFER, _restoreRenderBuffer);
 
     HGIGL_POST_PENDING_GL_ERRORS();
 }

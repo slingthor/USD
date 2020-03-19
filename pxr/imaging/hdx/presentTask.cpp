@@ -78,7 +78,7 @@ HdxPresentTask::Sync(
         if (!TF_VERIFY(_hgi, "Hgi driver missing from TaskContext")) {
             return;
         }
-        _compositor.reset(new HdxFullscreenShader(_hgi));
+        _compositor.reset(new HdxFullscreenShader(_hgi, "Present"));
     }
 
     if ((*dirtyBits) & HdChangeTracker::DirtyParams) {
@@ -108,13 +108,17 @@ HdxPresentTask::Execute(HdTaskContext* ctx)
     // The color and depth aovs have the results we want to blit to the
     // framebuffer. Depth is optional. When we are previewing a custom aov we
     // may not have a depth buffer.
-    HgiTextureHandle aovTexture;
-    if (!_GetTaskContextData(ctx, HdAovTokens->color, &aovTexture)) {
+    if (!_HasTaskContextData(ctx, HdAovTokens->color)) {
         return;
     }
 
+    HgiTextureHandle aovTexture;
+    _GetTaskContextData(ctx, HdAovTokens->color, &aovTexture);
+
     HgiTextureHandle depthTexture;
-    _GetTaskContextData(ctx, HdAovTokens->depth, &depthTexture, /*error*/false);
+    if (_HasTaskContextData(ctx, HdAovTokens->depth)) {
+        _GetTaskContextData(ctx, HdAovTokens->depth, &depthTexture);
+    }
 
     // XXX TODO The below GL blit code needs to be replaced by HgiInterop.
     // HgiInterop should take the aov color and depth results, which are 

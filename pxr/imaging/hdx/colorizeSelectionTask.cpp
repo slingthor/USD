@@ -21,8 +21,6 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#include "pxr/imaging/glf/glew.h"
-
 #include "pxr/imaging/hdx/colorizeSelectionTask.h"
 
 #include "pxr/imaging/hd/perfLog.h"
@@ -68,6 +66,7 @@ HdxColorizeSelectionTask::HdxColorizeSelectionTask(
     , _outputBufferSize(0)
     , _converged(false)
     , _compositor()
+    , _pipelineCreated(false)
 {
 }
 
@@ -100,7 +99,7 @@ HdxColorizeSelectionTask::Sync(HdSceneDelegate* delegate,
         if (!TF_VERIFY(_hgi, "Hgi driver missing from TaskContext")) {
             return;
         }
-        _compositor.reset(new HdxFullscreenShader(_hgi));
+        _compositor.reset(new HdxFullscreenShader(_hgi, "ColorizeSelection"));
     }
 
     if ((*dirtyBits) & HdChangeTracker::DirtyParams) {
@@ -144,12 +143,14 @@ HdxColorizeSelectionTask::Execute(HdTaskContext* ctx)
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
 
+    if (!_HasTaskContextData(ctx, HdAovTokens->color)) {
+        return;
+    }
+
     // The color aov has the rendered results and we wish to apply the selection
     // colorization on top of it.
     HgiTextureHandle aovTexture;
-    if (!_GetTaskContextData(ctx, HdAovTokens->color, &aovTexture)) {
-        return;
-    }
+    _GetTaskContextData(ctx, HdAovTokens->color, &aovTexture);
 
     // instance ID and element ID are optional inputs, but if we don't have
     // a prim ID buffer, skip doing anything.
@@ -226,21 +227,27 @@ HdxColorizeSelectionTask::Execute(HdTaskContext* ctx)
     // color, and the selection alpha is the residual value used to scale the
     // scene color. This gives us the blend func:
     // GL_ONE, GL_SRC_ALPHA, GL_ZERO, GL_ONE.
-#if defined(PXR_OPENGL_SUPPORT_ENABLED)
-    glDisable(GL_DEPTH_TEST);
-    GLboolean blendEnabled;
-    glGetBooleanv(GL_BLEND, &blendEnabled);
-    glEnable(GL_BLEND);
-    glBlendFuncSeparate(GL_ONE, GL_SRC_ALPHA, GL_ZERO, GL_ONE);
-#endif
-    _compositor->Draw(aovTexture, /*no depth*/HgiTextureHandle());
+    if (!_pipelineCreated) {
+        HgiPipelineDesc desc;
+        desc.depthState.depthTestEnabled = false;
+        desc.depthState.depthWriteEnabled = false;
+        desc.depthState.stencilTestEnabled = false;
+        desc.multiSampleState.alphaToCoverageEnable = false;
 
-#if defined(PXR_OPENGL_SUPPORT_ENABLED)
-    glEnable(GL_DEPTH_TEST);
-    if (!blendEnabled) {
-        glDisable(GL_BLEND);
+        _compositor->CreatePipeline(desc);
+        _pipelineCreated = true;
+
+        _compositor->SetBlendState(
+            /*enable blending*/true,
+            HgiBlendFactorOne,
+            HgiBlendFactorSrcAlpha,
+            HgiBlendOpAdd,
+            HgiBlendFactorZero,
+            HgiBlendFactorOne,
+            HgiBlendOpAdd);
     }
-#endif
+
+    _compositor->Draw(aovTexture, /*no depth*/HgiTextureHandle());
 }
 
 GfVec4f
@@ -353,7 +360,7 @@ HdxColorizeSelectionTask::_CreateParameterBuffer()
         pb.texelSize[1] = 1.0f / _primId->GetHeight();
     }
 
-    pb.enableOutline = _params.enableOutline;
+    pb.enableOutline = (int)_params.enableOutline;
     pb.radius = (int)_params.outlineRadius;
 
     // All data is still the same, no need to update the storage buffer

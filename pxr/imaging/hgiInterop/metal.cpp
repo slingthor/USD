@@ -212,9 +212,15 @@ HgiInteropMetal::HgiInteropMetal(
     // Load our common vertex shader. This is used by both the fragment shaders
     // below
     GLchar const* const vertexShader =
+        "#if __VERSION__ >= 140\n"
+        "in vec2 inPosition;\n"
+        "in vec2 inTexCoord;\n"
+        "out vec2 texCoord;\n"
+        "#else\n"
         "attribute vec2 inPosition;\n"
         "attribute vec2 inTexCoord;\n"
         "varying vec2 texCoord;\n"
+        "#endif\n"
         "\n"
         "void main()\n"
         "{\n"
@@ -225,7 +231,12 @@ HgiInteropMetal::HgiInteropMetal(
     GLuint vs = _compileShader(vertexShader, GL_VERTEX_SHADER);
 
     GLchar const* const fragmentShaderColor =
+        "#if __VERSION__ >= 140\n"
+        "in vec2         texCoord;\n"
+        "out vec4        fragColor;\n"
+        "#else\n"
         "varying vec2    texCoord;\n"
+        "#endif\n"
         "\n"
         // A GL_TEXTURE_RECTANGLE
         "uniform sampler2DRect interopTexture;\n"
@@ -238,7 +249,11 @@ HgiInteropMetal::HgiInteropMetal(
         "void main(void)\n"
         "{\n"
         "    vec2 uv = vec2(texCoord.x, 1.0 - texCoord.y) * texSize;\n"
+        "#if __VERSION__ >= 140\n"
+        "    fragColor = texture(interopTexture, uv.st);\n"
+        "#else\n"
         "    gl_FragColor = texture2DRect(interopTexture, uv.st);\n"
+        "#endif\n"
         "}\n";
 
     GLchar const* const fragmentShaderColorDepth =
@@ -256,8 +271,13 @@ HgiInteropMetal::HgiInteropMetal(
         "void main(void)\n"
         "{\n"
         "    vec2 uv = vec2(texCoord.x, 1.0 - texCoord.y) * texSize;\n"
+        "#if __VERSION__ >= 140\n"
+        "    fragColor = texture(interopTexture, uv.st);\n"
+        "    gl_FragDepth = texture(depthTexture, uv.st).r;\n"
+        "#else\n"
         "    gl_FragColor = texture2DRect(interopTexture, uv.st);\n"
         "    gl_FragDepth = texture2DRect(depthTexture, uv.st).r;\n"
+        "#endif\n"
         "}\n";
 
     GLuint fsColor = _compileShader(fragmentShaderColor, GL_FRAGMENT_SHADER);

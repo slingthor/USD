@@ -45,6 +45,12 @@ HdxAovInputTask::HdxAovInputTask(HdSceneDelegate* delegate, SdfPath const& id)
 
 HdxAovInputTask::~HdxAovInputTask()
 {
+    if (_aovTexture) {
+        _hgi->DestroyTexture(&_aovTexture);
+    }
+    if (_depthTexture) {
+        _hgi->DestroyTexture(&_depthTexture);
+    }
 }
 
 bool
@@ -118,12 +124,6 @@ HdxAovInputTask::Execute(HdTaskContext* ctx)
     if (_depthBuffer) {
         _converged = _converged && _depthBuffer->IsConverged();
     }
-
-// todo additive transparent objects will be rendered into non-msaa. ok?
-// todo can remove allt he hacks from Flow that disables quantization etc?
-// todo both these need to be in the _AovSupported list.
-// In fact, we cannot run anything without AOVs any more.
-// Todo how will that affect Flow / HdMotif.
 
     // Resolve the buffers before we read them.
     _aovBuffer->Resolve();

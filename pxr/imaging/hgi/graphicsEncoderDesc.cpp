@@ -56,13 +56,14 @@ std::ostream& operator<<(
         out << a;
     }
     
-    int index = 0;
-    for (HgiTextureHandle const& t : encoder.colorTextures) {
-        out << "colorTexture" << index++ << ": " << t << ", ";
+    for (size_t i=0; i<encoder.colorTextures.size(); i++) {
+        out << "colorTexture" << i << ", ";
     }
 
-    out << encoder.depthAttachmentDesc;
-    out << "depthTexture: " << encoder.depthTexture << ", ";
+    if (encoder.depthTexture) {
+        out << encoder.depthAttachmentDesc;
+        out << "depthTexture";
+    }
 
     out << "}";
     return out;

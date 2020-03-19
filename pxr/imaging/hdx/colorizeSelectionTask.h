@@ -114,9 +114,9 @@ private:
         // Size of a colorIn texel - to iterate adjacent texels.
         GfVec2f texelSize;
         // Draws outline when enabled, or color overlay when disabled.
-        bool enableOutline;
+        int enableOutline = 0;
         // The outline radius (thickness). 
-        int radius;
+        int radius = 5;
 
         bool operator==(const _ParameterBuffer& other) const {
             return texelSize == other.texelSize &&
@@ -146,6 +146,7 @@ private:
 
     _ParameterBuffer _parameterData;
     HgiBufferHandle _parameterBuffer;
+    bool _pipelineCreated;
 };
 
 // VtValue requirements

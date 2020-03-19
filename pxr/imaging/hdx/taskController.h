@@ -218,15 +218,6 @@ public:
     HDX_API
     void SetColorChannelParams(HdxColorChannelTaskParams const& params);
 
-    /// -------------------------------------------------------
-    /// Colorize API
-
-    /// Turns the colorize task color quantization on or off.
-    /// XXX: This is a temporary function that will be soon deprecated. Please
-    //       avoid calling it.
-    HDX_API
-    void SetColorizeQuantizationEnabled(bool enabled);
-
 private:
     ///
     /// This class is not intended to be copied.
@@ -247,7 +238,6 @@ private:
     SdfPath _CreateRenderTask(TfToken const& materialTag);
     void _CreateOitResolveTask();
     void _CreateSelectionTask();
-    void _CreateColorizeTask();
     void _CreateColorizeSelectionTask();
     void _CreateColorCorrectionTask();
     void _CreateColorChannelTask();
@@ -352,7 +342,6 @@ private:
     SdfPath _oitResolveTaskId;
     SdfPath _selectionTaskId;
     SdfPath _colorizeSelectionTaskId;
-    SdfPath _colorizeTaskId;
     SdfPath _colorCorrectionTaskId;
     SdfPath _colorChannelTaskId;
     SdfPath _pickTaskId;

@@ -227,7 +227,6 @@ HdxTaskController::~HdxTaskController()
         _simpleLightTaskId,
         _shadowTaskId,
         _colorizeSelectionTaskId,
-        _colorizeTaskId,
         _colorCorrectionTaskId,
         _colorChannelTaskId,
         _pickTaskId,
@@ -305,8 +304,6 @@ HdxTaskController::_CreateRenderGraph()
 
         if (_AovsSupported()) {
             _CreateAovInputTask();
-// todo remove or make a gpu task out of it
-            //_CreateColorizeTask();
             _CreateColorizeSelectionTask();
             _CreatePickFromRenderBufferTask();
             _CreateColorCorrectionTask();
@@ -507,21 +504,6 @@ HdxTaskController::_CreateShadowTask()
 }
 
 void
-HdxTaskController::_CreateColorizeTask()
-{
-    _colorizeTaskId = GetControllerId().AppendChild(
-        _tokens->colorizeTask);
-
-    HdxColorizeTaskParams taskParams;
-
-    GetRenderIndex()->InsertTask<HdxColorizeTask>(&_delegate,
-        _colorizeTaskId);
-
-    _delegate.SetParameter(_colorizeTaskId, HdTokens->params,
-        taskParams);
-}
-
-void
 HdxTaskController::_CreateColorCorrectionTask()
 {
     _colorCorrectionTaskId = GetControllerId().AppendChild(
@@ -684,19 +666,6 @@ HdxTaskController::_ColorChannelEnabled() const
 }
 
 bool
-HdxTaskController::_ColorizeQuantizationEnabled() const
-{
-    if (_colorizeTaskId.IsEmpty())
-        return false;
-
-    const HdxColorizeTaskParams& params =
-        _delegate.GetParameter<HdxColorizeTaskParams>(
-            _colorizeTaskId, HdTokens->params);
-
-    return params.applyColorQuantization;
-}
-
-bool
 HdxTaskController::_AovsSupported() const
 {
     return GetRenderIndex()->IsBprimTypeSupported(
@@ -721,7 +690,6 @@ HdxTaskController::GetRenderingTasks() const
      * - renderTaskIds (There may be more than one)
      * - aovInputTaskId
      * - selectionTaskId
-     * - colorizeTaskId
      * - colorizeSelectionTaskId
      * - colorCorrectionTaskId
      * - colorChannelTaskId
@@ -734,20 +702,17 @@ HdxTaskController::GetRenderingTasks() const
      * See _CreateRenderGraph for more details.
      */
 
-    if (!_simpleLightTaskId.IsEmpty())
+    if (!_simpleLightTaskId.IsEmpty()) {
         tasks.push_back(GetRenderIndex()->GetTask(_simpleLightTaskId));
+    }
 
-    if (!_shadowTaskId.IsEmpty() && _ShadowsEnabled())
+    if (!_shadowTaskId.IsEmpty() && _ShadowsEnabled()) {
         tasks.push_back(GetRenderIndex()->GetTask(_shadowTaskId));
+    }
 
     // Perform draw calls
     if (!_renderTaskIds.empty()) {
         SdfPath volumeId = _GetRenderTaskPath(HdStMaterialTagTokens->volume);
-
-// todo Could already start rendering additive in storm?
-// So the 'renderTask' really means render opaque and additive?
-// Just not yet OIT stuff?
-// Or could we move it all?
 
         // Render opaque prims, additive and translucent blended prims.
         // Skip volume prims, because volume rendering reads from the depth
@@ -758,21 +723,11 @@ HdxTaskController::GetRenderingTasks() const
             }
         }
 
-// todo note for Hgi we want an 'enableResolve' option because we want 3
-// render tasks to run, but only resolve at the 3rd. But we want to use the
-// same renderpass / graphics encoder desc / attachments.
-// Just not do the resolve until the last render task.
-
         // Take the aov results from the render tasks, resolve the multisample
         // images and put the results into gpu textures onto shared context.
         if (!_aovInputTaskId.IsEmpty()) {
             tasks.push_back(GetRenderIndex()->GetTask(_aovInputTaskId));
         }
-
-// todo the volume render task should use the HgiTexture for color and depth now.
-// Not use the aov buffer anymore.....
-// Perhaps do the same for translucent OIT since it uses SSBO to render into.
-// There is no benefit rendering into MSAA buffers.
 
         // Render volume prims
         if (std::find(_renderTaskIds.begin(), _renderTaskIds.end(), volumeId) 
@@ -781,60 +736,33 @@ HdxTaskController::GetRenderingTasks() const
         }
     }
 
-// todo use the hgi textures
-
     // Merge translucent and volume pixels into color target
     if (!_oitResolveTaskId.IsEmpty()) {
         tasks.push_back(GetRenderIndex()->GetTask(_oitResolveTaskId));
     }
 
-    if (!_selectionTaskId.IsEmpty() && _SelectionEnabled())
+    if (!_selectionTaskId.IsEmpty() && _SelectionEnabled()) {
         tasks.push_back(GetRenderIndex()->GetTask(_selectionTaskId));
-
-// todo the colorize task can become a gpu task that can convert whatever is
-// in the hgi aov textures to a color-range that is more pleasant for the
-// user to look at. (e.g. put normals in 0-1 range)
-
-/*
-    // Take path-tracer CPU pixels and render to screen
-    if (!_colorizeTaskId.IsEmpty()) {
-        // XXX Colorize already applies color quantization since it renders
-        // directly to 8bit framebuffer. But it does not quantize the background
-        // since it alpha-blend the aov on top of the background.
-        // Therefor we must first color correct the background.
-        // Future work is to stop Colorize from rendering to the 8bit FB.
-        // Instead it should Colorize into a render target that color correction
-        // can then quantize.
-// todo remove quantization
-        if (_ColorizeQuantizationEnabled() && _ColorCorrectionEnabled()) {
-            tasks.push_back(GetRenderIndex()->GetTask(_colorCorrectionTaskId));
-        }
-
-        tasks.push_back(GetRenderIndex()->GetTask(_colorizeTaskId));
     }
-*/
 
-// todo apply on top of hgi aov?
-    if (!_colorizeSelectionTaskId.IsEmpty() && _ColorizeSelectionEnabled())
+    if (!_colorizeSelectionTaskId.IsEmpty() && _ColorizeSelectionEnabled()) {
         tasks.push_back(GetRenderIndex()->GetTask(_colorizeSelectionTaskId));
+    }
 
-// todo use the hgi version of color correction
     // Apply color correction / grading (convert to display colors)
-    // XXX Skip is Colorize has already quantized the colors.
-    if (_ColorCorrectionEnabled() /* todo && !_ColorizeQuantizationEnabled()*/) {
+    if (_ColorCorrectionEnabled()) {
         tasks.push_back(GetRenderIndex()->GetTask(_colorCorrectionTaskId));
     }
 
-// todo convert to hgi
     // Apply color channel filtering
     if (_ColorChannelEnabled()) {
         tasks.push_back(GetRenderIndex()->GetTask(_colorChannelTaskId));
     }
 
-// todo use the hgi textuters and blit those to screen.
     // Render pixels to screen
-    if (!_presentTaskId.IsEmpty())
+    if (!_presentTaskId.IsEmpty()) {
         tasks.push_back(GetRenderIndex()->GetTask(_presentTaskId));
+    }
 
     return tasks;
 }
@@ -1106,33 +1034,6 @@ HdxTaskController::SetViewportRenderOutput(TfToken const& name)
         _delegate.SetParameter(_aovInputTaskId, HdTokens->params, params);
         GetRenderIndex()->GetChangeTracker().MarkTaskDirty(
             _aovInputTaskId, HdChangeTracker::DirtyParams);
-    }
-
-    if (!_colorizeTaskId.IsEmpty()) {
-        HdxColorizeTaskParams params =
-            _delegate.GetParameter<HdxColorizeTaskParams>(
-                _colorizeTaskId, HdTokens->params);
-
-        if (name.IsEmpty()) {
-            // Empty token means don't colorize anything.
-            params.aovName = name;
-            params.aovBufferPath = SdfPath::EmptyPath();
-            params.depthBufferPath = SdfPath::EmptyPath();
-        } else if (name == HdAovTokens->color) {
-            // Color is depth-composited...
-            params.aovName = name;
-            params.aovBufferPath = _GetAovPath(name);
-            params.depthBufferPath = _GetAovPath(HdAovTokens->depth);
-        } else {
-            // But AOV visualizations are not.
-            params.aovName = name;
-            params.aovBufferPath = _GetAovPath(name);
-            params.depthBufferPath = SdfPath::EmptyPath();
-        }
-
-        _delegate.SetParameter(_colorizeTaskId, HdTokens->params, params);
-        GetRenderIndex()->GetChangeTracker().MarkTaskDirty(
-            _colorizeTaskId, HdChangeTracker::DirtyParams);
     }
 
     if (!_colorizeSelectionTaskId.IsEmpty()) {
@@ -1894,13 +1795,6 @@ HdxTaskController::SetColorCorrectionParams(
 
         GetRenderIndex()->GetChangeTracker().MarkTaskDirty(
             _colorCorrectionTaskId, HdChangeTracker::DirtyParams);
-
-        // XXX Disable Colorize 'color quantization' when ColorCorrection is
-        // disabled. We need to retire Colorize writing to the framebuffer so we
-        // can just rely on ColorCorrection.
-        SetColorizeQuantizationEnabled(
-            !params.colorCorrectionMode.IsEmpty() &&
-            params.colorCorrectionMode != HdxColorCorrectionTokens->disabled);
     }
 }
 
@@ -1923,24 +1817,6 @@ HdxTaskController::SetColorChannelParams(
         GetRenderIndex()->GetChangeTracker().MarkTaskDirty(
             _colorChannelTaskId, HdChangeTracker::DirtyParams);
     }
-}
-
-void 
-HdxTaskController::SetColorizeQuantizationEnabled(bool enabled)
-{
-    if (_colorizeTaskId.IsEmpty()) return;
-
-    HdxColorizeTaskParams params = 
-        _delegate.GetParameter<HdxColorizeTaskParams>(
-            _colorizeTaskId, HdTokens->params);
-
-    params.applyColorQuantization = enabled;
-
-    _delegate.SetParameter(
-        _colorizeTaskId, HdTokens->params, params);
-
-    GetRenderIndex()->GetChangeTracker().MarkTaskDirty(
-        _colorizeTaskId, HdChangeTracker::DirtyParams);
 }
 
 void

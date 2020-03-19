@@ -69,8 +69,7 @@ public:
     virtual void Execute(HdTaskContext* ctx) override;
 
 private:
-void
-    _UpdateTexture(
+    void _UpdateTexture(
         HdTaskContext* ctx,
         HgiTextureHandle& texture,
         HdRenderBuffer* buffer);

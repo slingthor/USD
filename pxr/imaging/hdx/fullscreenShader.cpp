@@ -35,6 +35,7 @@
 #include "pxr/imaging/hgi/immediateCommandBuffer.h"
 #include "pxr/imaging/hgi/tokens.h"
 
+#include <iostream>
 #if defined(PXR_OPENGL_SUPPORT_ENABLED)
 // XXX Remove includes when entire task is using Hgi. We do not want to refer
 // to any specific Hgi implementation.
@@ -51,19 +52,34 @@ TF_DEFINE_PRIVATE_TOKENS(
     (fullscreenShader)
 );
 
-HdxFullscreenShader::HdxFullscreenShader(Hgi* hgi)
+HdxFullscreenShader::HdxFullscreenShader(
+    Hgi* hgi,
+    std::string const& debugName)
     : _hgi(hgi)
+    , _debugName(debugName)
     , _indexBuffer()
     , _vertexBuffer()
     , _shaderProgram()
     , _resourceBindings()
     , _pipeline()
+    , _blendingEnabled(false)
+    , _srcColorBlendFactor(HgiBlendFactorZero)
+    , _dstColorBlendFactor(HgiBlendFactorZero)
+    , _colorBlendOp(HgiBlendOpAdd)
+    , _srcAlphaBlendFactor(HgiBlendFactorZero)
+    , _dstAlphaBlendFactor(HgiBlendFactorZero)
+    , _alphaBlendOp(HgiBlendOpAdd)
 {
+    if (_debugName.empty()) {
+        _debugName = "HdxFullscreenShader";
+    }
 }
 
 HdxFullscreenShader::~HdxFullscreenShader()
 {
-    if (!_hgi) return;
+    if (!_hgi) {
+        return;
+    }
 
     if (_vertexBuffer) {
         _hgi->DestroyBuffer(&_vertexBuffer);
@@ -148,6 +164,47 @@ HdxFullscreenShader::SetBuffer(
 }
 
 void
+HdxFullscreenShader::CreatePipeline(HgiPipelineDesc pipeDesc)
+{
+    // Pipeline not changed, abort.
+    if (_pipeline && _pipeline.Get()->GetDescriptor() == pipeDesc) {
+        return;
+    }
+
+    if (pipeDesc.debugName.empty()) {
+        pipeDesc.debugName = "HdxFullscreenShader Pipeline";
+    }
+    pipeDesc.pipelineType = HgiPipelineTypeGraphics;
+    pipeDesc.resourceBindings = _resourceBindings;
+    pipeDesc.shaderProgram = _shaderProgram;
+
+    if (_pipeline) {
+        _hgi->DestroyPipeline(&_pipeline);
+    }
+
+    _pipeline = _hgi->CreatePipeline(pipeDesc);
+}
+
+void
+HdxFullscreenShader::SetBlendState(
+    bool enableBlending,
+    HgiBlendFactor srcColorBlendFactor,
+    HgiBlendFactor dstColorBlendFactor,
+    HgiBlendOp colorBlendOp,
+    HgiBlendFactor srcAlphaBlendFactor,
+    HgiBlendFactor dstAlphaBlendFactor,
+    HgiBlendOp alphaBlendOp)
+{
+    _blendingEnabled = enableBlending;
+    _srcColorBlendFactor = srcColorBlendFactor;
+    _dstColorBlendFactor = dstColorBlendFactor;
+    _colorBlendOp = colorBlendOp;
+    _srcAlphaBlendFactor = srcAlphaBlendFactor;
+    _dstAlphaBlendFactor = dstAlphaBlendFactor;
+    _alphaBlendOp = alphaBlendOp;
+}
+
+void
 HdxFullscreenShader::_CreateBufferResources()
 {
     if (_vertexBuffer) {
@@ -226,22 +283,25 @@ HdxFullscreenShader::SetTexture(
 
     size_t pixelByteSize = HdDataSizeOfFormat(format);
 
+    // If we already had the texture, destroy it since we have new pixels.
     auto it = _textures.find(name);
-    if (it == _textures.end()) {
-        HgiTextureDesc texDesc;
-        texDesc.debugName = "HdxFullscreenShader texture " + name.GetString();
-        texDesc.dimensions = GfVec3i(width, height, 1);
-        texDesc.format = HdxHgiConversions::GetHgiFormat(format);
-        texDesc.initialData = data;
-        texDesc.layerCount = 1;
-        texDesc.mipLevels = 1;
-        texDesc.pixelsByteSize = width * height * pixelByteSize;
-        texDesc.sampleCount = HgiSampleCount1;
-        texDesc.usage = HgiTextureUsageBitsShaderRead;
-        HgiTextureHandle tex = _hgi->CreateTexture(texDesc);
-
-        it = _textures.insert({name, tex}).first;
+    if (it != _textures.end()) {
+        _hgi->DestroyTexture(&it->second);
     }
+
+    HgiTextureDesc texDesc;
+    texDesc.debugName = "HdxFullscreenShader texture " + name.GetString();
+    texDesc.dimensions = GfVec3i(width, height, 1);
+    texDesc.format = HdxHgiConversions::GetHgiFormat(format);
+    texDesc.initialData = data;
+    texDesc.layerCount = 1;
+    texDesc.mipLevels = 1;
+    texDesc.pixelsByteSize = width * height * pixelByteSize;
+    texDesc.sampleCount = HgiSampleCount1;
+    texDesc.usage = HgiTextureUsageBitsShaderRead;
+    HgiTextureHandle tex = _hgi->CreateTexture(texDesc);
+
+    _textures[name] = tex;
 }
 
 bool
@@ -252,8 +312,10 @@ HdxFullscreenShader::_CreateResourceBindings(TextureMap const& textures)
     resourceDesc.debugName = "HdxFullscreenShader";
     resourceDesc.pipelineType = HgiPipelineTypeGraphics;
 
-    // todo see big note below, for now reset back to 0 since that is how our
-    // glsl is written (opengl style)
+    // XXX OpenGL / Metal both re-use slot indices between buffers and textures.
+    // Vulkan uses unique slot indices in descriptor set.
+    // We probably don't want to express bind indices in the descriptor and
+    // use codegen to produce the right values for the different APIs.
     size_t bindSlots = 0;
 
     for (auto const& texture : textures) {
@@ -294,7 +356,7 @@ HdxFullscreenShader::_CreateResourceBindings(TextureMap const& textures)
 }
 
 bool
-HdxFullscreenShader::_CreatePipeline(
+HdxFullscreenShader::_CreateDefaultPipeline(
     HgiTextureHandle const& colorDst,
     HgiTextureHandle const& depthDst)
 {
@@ -309,14 +371,19 @@ HdxFullscreenShader::_CreatePipeline(
         _hgi->DestroyPipeline(&_pipeline);
     }
     
-    _attachment0.blendEnabled = false;
+    _attachment0.blendEnabled = _blendingEnabled;
     _attachment0.loadOp = HgiAttachmentLoadOpDontCare;
     _attachment0.storeOp = HgiAttachmentStoreOpStore;
+    _attachment0.srcColorBlendFactor = _srcColorBlendFactor;
+    _attachment0.dstColorBlendFactor = _dstColorBlendFactor;
+    _attachment0.colorBlendOp = _colorBlendOp;
+    _attachment0.srcAlphaBlendFactor = _srcAlphaBlendFactor;
+    _attachment0.dstAlphaBlendFactor = _dstAlphaBlendFactor;
+    _attachment0.alphaBlendOp = _alphaBlendOp;
     if (colorDst) {
         _attachment0.format = colorDst.Get()->GetDescriptor().format;
     }
-    
-    _depthAttachment.blendEnabled = false;
+
     _depthAttachment.loadOp = HgiAttachmentLoadOpDontCare;
     _depthAttachment.storeOp = HgiAttachmentStoreOpStore;
     if (depthDst) {
@@ -382,7 +449,7 @@ HdxFullscreenShader::_CreatePipeline(
     desc.rasterizationState.polygonMode = HgiPolygonModeFill;
     desc.rasterizationState.winding = HgiWindingCounterClockwise;
 
-    _pipeline = _hgi->CreatePipeline(desc);
+    CreatePipeline(desc);
 
     return true;
 }
@@ -411,7 +478,7 @@ HdxFullscreenShader::Draw(
     _CreateResourceBindings(textures);
 
     // create pipeline (first time)
-    _CreatePipeline(colorDst, depthDst);
+    _CreateDefaultPipeline(colorDst, depthDst);
 
     // If a destination color target is provided we can use it as the
     // dimensions of the backbuffer. If not destination textures are provided
@@ -461,7 +528,7 @@ HdxFullscreenShader::Draw(
     // Begin rendering
     HgiImmediateCommandBuffer& icb = _hgi->GetImmediateCommandBuffer();
     HgiGraphicsEncoderUniquePtr gfxEncoder = icb.CreateGraphicsEncoder(gfxDesc);
-    gfxEncoder->PushDebugGroup("HdxFullscreenShader");
+    gfxEncoder->PushDebugGroup(_debugName.c_str());
     gfxEncoder->BindResources(_resourceBindings);
     gfxEncoder->BindPipeline(_pipeline);
     gfxEncoder->BindVertexBuffers(0, {_vertexBuffer}, {0});
@@ -507,9 +574,9 @@ HdxFullscreenShader::_PrintCompileErrors()
     if (!_shaderProgram) return;
 
     for (HgiShaderFunctionHandle fn : _shaderProgram->GetShaderFunctions()) {
-        printf("%s\n", fn->GetCompileErrors().c_str());
+        std::cout << fn->GetCompileErrors() << std::endl;
     }
-    printf("%s\n", _shaderProgram->GetCompileErrors().c_str());
+    std::cout << _shaderProgram->GetCompileErrors() << std::endl;
 }
 
 

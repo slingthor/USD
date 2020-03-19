@@ -164,6 +164,10 @@ public:
 
 
 protected:
+    /// Check if the shared context contains a value for the given id.
+    static bool _HasTaskContextData(HdTaskContext const* ctx,
+                                    TfToken const& id);
+
     /// Extracts a typed value out of the task context at the given id.
     /// If the id is missing and issueError is true, or the type is wrong, the 
     /// code will throw an  error, return false and outValue will be unmodified.
@@ -174,8 +178,7 @@ protected:
     template <class T>
     static bool _GetTaskContextData(HdTaskContext const* ctx,
                                     TfToken const& id,
-                                    T* outValue,
-                                    bool issueError=true);
+                                    T* outValue);
 
     /// Extracts a typed value out of the task context at the given id.
     /// If the id is missing or of the wrong type, the code will
@@ -211,8 +214,7 @@ template <class T>
 bool
 HdTask::_GetTaskContextData(HdTaskContext const* ctx,
                             TfToken const& id,
-                            T* outValue,
-                            bool issueError)
+                            T* outValue)
 {
     TF_DEV_AXIOM(outValue != nullptr);
 
@@ -222,9 +224,7 @@ HdTask::_GetTaskContextData(HdTaskContext const* ctx,
 
     HdTaskContext::const_iterator valueIt = ctx->find(id);
     if (valueIt == ctx->cend()) {
-        if (issueError) {
-            TF_CODING_ERROR("Token %s missing from task context", id.GetText());
-        }
+        TF_CODING_ERROR("Token %s missing from task context", id.GetText());
         return false;
     }
 

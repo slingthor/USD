@@ -55,8 +55,12 @@ public:
 
     /// Create a new fullscreen shader object. Creation of GPU resources is
     /// deferred...
+    /// 'debugName' is assigned to the fullscreen pass as gpu debug group that
+    /// is helpful when inspecting the frame on a gpu debugger.
     HDX_API
-    HdxFullscreenShader(Hgi* hgi);
+    HdxFullscreenShader(
+        Hgi* hgi,
+        std::string const& debugName);
 
     /// Destroy the fullscreen shader object, releasing GPU resources.
     HDX_API
@@ -95,6 +99,24 @@ public:
     void SetTexture(TfToken const& name, int width, int height,
                     HdFormat format, void *data);
 
+    /// Customize the pipeline state, such as setting the blend mode that will
+    /// by used when rendering the triangle. Note that the ShaderProgram and
+    /// ResourceBindings in the provided descriptor are ignored. Those are
+    /// internally managed based on SetProgram, SetBuffers and SetTextures.
+    HDX_API
+    void CreatePipeline(HgiPipelineDesc pipeDesc);
+
+    /// Customize the blend state that is used during draw.
+    HDX_API
+    void SetBlendState(
+        bool enableBlending,
+        HgiBlendFactor srcColorBlendFactor,
+        HgiBlendFactor dstColorBlendFactor,
+        HgiBlendOp colorBlendOp,
+        HgiBlendFactor srcAlphaBlendFactor,
+        HgiBlendFactor dstAlphaBlendFactor,
+        HgiBlendOp alphaBlendOp);
+
     /// Draw the internal textures to the provided destination textures.
     /// `depth` is optional.
     /// This will load the GLSL compositing program on-demand.
@@ -123,7 +145,7 @@ private:
     bool _CreateResourceBindings(TextureMap const& textures);
 
     // Utility to create a pipeline
-    bool _CreatePipeline(
+    bool _CreateDefaultPipeline(
         HgiTextureHandle const& colorDst,
         HgiTextureHandle const& depthDst);
 
@@ -131,6 +153,8 @@ private:
     void _PrintCompileErrors();
 
     class Hgi* _hgi;
+
+    std::string _debugName;
 
     TextureMap _textures;
     BufferMap _buffers;
@@ -143,6 +167,15 @@ private:
     HgiShaderProgramHandle _shaderProgram;
     HgiResourceBindingsHandle _resourceBindings;
     HgiPipelineHandle _pipeline;
+
+    bool _blendingEnabled;
+    HgiBlendFactor _srcColorBlendFactor;
+    HgiBlendFactor _dstColorBlendFactor;
+    HgiBlendOp _colorBlendOp;
+    HgiBlendFactor _srcAlphaBlendFactor;
+    HgiBlendFactor _dstAlphaBlendFactor;
+    HgiBlendOp _alphaBlendOp;
+
     HgiAttachmentDesc _attachment0;
     HgiAttachmentDesc _depthAttachment;
 };
