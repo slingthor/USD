@@ -45,8 +45,6 @@ public:
     ~HgiMetalCapabilities();
 
     MTLResourceOptions defaultStorageMode;
-    void synchronizeResource(id);
-    bool hasDidModifyRange;
 
 protected:
     friend class HgiMetal;

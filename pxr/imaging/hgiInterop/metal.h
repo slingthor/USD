@@ -148,6 +148,7 @@ private:
     int32_t _restoreActiveTexture;
     int32_t _restoreTexture[2];
     VertexAttribState _restoreVertexAttribState[2];
+    int32_t _restoreProgram;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

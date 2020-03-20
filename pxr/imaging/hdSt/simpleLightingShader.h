@@ -35,8 +35,8 @@
 
 #include "pxr/imaging/hio/glslfx.h"
 
-#include "pxr/imaging/glf/bindingMap.h"
-#include "pxr/imaging/glf/simpleLightingContext.h"
+#include "pxr/imaging/garch/bindingMap.h"
+#include "pxr/imaging/garch/simpleLightingContext.h"
 
 #include "pxr/base/gf/matrix4d.h"
 

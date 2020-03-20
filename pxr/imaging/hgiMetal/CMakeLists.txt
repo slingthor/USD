@@ -9,9 +9,9 @@ endif()
 
 FIND_LIBRARY(METAL_LIBRARY Metal)
 if (APPLEIOS)
-    FIND_LIBRARY(APPUIKIT_LIBRARY UIKit)
+FIND_LIBRARY(APPUIKIT_LIBRARY UIKit)
 else()
-    FIND_LIBRARY(APPUIKIT_LIBRARY AppKit)
+FIND_LIBRARY(APPUIKIT_LIBRARY AppKit)
 endif()
 
 # Compile cpp files as obj-c++ to allow inline use of Metal API

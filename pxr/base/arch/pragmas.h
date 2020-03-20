@@ -74,6 +74,9 @@
     #define ARCH_PRAGMA_INSTANTIATION_AFTER_SPECIALIZATION \
         _Pragma("clang diagnostic ignored \"-Winstantiation-after-specialization\"")
 
+    #define ARCH_PRAGMA_INSTANCE_METHOD_NOT_FOUND \
+        _Pragma("clang diagnostic ignored \"-Wobjc-method-access\"")
+
 #elif defined(ARCH_COMPILER_MSVC)
 
     #define ARCH_PRAGMA_PUSH \

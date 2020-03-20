@@ -24,6 +24,7 @@
 #include "pxr/imaging/hgiMetal/capabilities.h"
 
 #include "pxr/base/arch/defines.h"
+#include <Metal/Metal.h>
 
 PXR_NAMESPACE_OPEN_SCOPE
 

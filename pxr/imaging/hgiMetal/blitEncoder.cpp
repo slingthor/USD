@@ -23,8 +23,6 @@
 //
 #include <Metal/Metal.h>
 
-#include "pxr/base/arch/defines.h"
-
 #include "pxr/imaging/hgiMetal/hgi.h"
 #include "pxr/imaging/hgiMetal/blitEncoder.h"
 #include "pxr/imaging/hgiMetal/buffer.h"
@@ -36,7 +34,7 @@
 #include "pxr/imaging/hgi/blitEncoderOps.h"
 #include "pxr/imaging/hgi/types.h"
 
-#include "pxr/base/arch/defines.h"
+#include "pxr/base/arch/pragmas.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -143,9 +141,9 @@ HgiMetalBlitEncoder::CopyTextureGpuToCpu(
                                    texDesc.dimensions[2])
                           options:blitOptions];
 
-#if defined(ARCH_OS_MACOS)
-    [_blitEncoder synchronizeResource:cpuBuffer];
-#endif
+    if (@available(macOS 10.11, ios 100.100, *)) {
+        [_blitEncoder performSelector:@selector(synchronizeResource:) withObject:cpuBuffer];
+    }
     memcpy(copyOp.cpuDestinationBuffer,
         [cpuBuffer contents], copyOp.destinationBufferByteSize);
     [cpuBuffer release];
@@ -173,10 +171,15 @@ void HgiMetalBlitEncoder::CopyBufferCpuToGpu(
     uint8_t *dst = static_cast<uint8_t*>([metalBuffer->GetBufferId() contents]);
     memcpy(dst + dstOffset, src, copyOp.byteSize);
 
-#if defined(ARCH_OS_MACOS)
-    [metalBuffer->GetBufferId()
-        didModifyRange:NSMakeRange(dstOffset, copyOp.byteSize)];
-#endif
+    if([metalBuffer->GetBufferId() respondsToSelector:@selector(didModifyRange:)]) {
+        NSRange range = NSMakeRange(dstOffset, copyOp.byteSize);
+        id<MTLResource> resource = metalBuffer->GetBufferId();
+        
+        ARCH_PRAGMA_PUSH
+        ARCH_PRAGMA_INSTANCE_METHOD_NOT_FOUND
+        [resource didModifyRange:range];
+        ARCH_PRAGMA_POP
+    }
 }
 
 void 

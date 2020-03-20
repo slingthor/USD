@@ -631,6 +631,8 @@ HgiInteropMetal::_CaptureOpenGlState()
         glGetVertexAttribPointerv(
             i, GL_VERTEX_ATTRIB_ARRAY_POINTER, &state.pointer);
     }
+    
+    glGetIntegerv(GL_CURRENT_PROGRAM, &_restoreProgram);
 }
 
 void
@@ -700,6 +702,8 @@ HgiInteropMetal::_RestoreOpenGlState()
     glBindTexture(GL_TEXTURE_RECTANGLE, _restoreTexture[1]);
 
     glActiveTexture(_restoreActiveTexture);
+    
+    glUseProgram(_restoreProgram);
 }
 
 void
