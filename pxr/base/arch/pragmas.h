@@ -74,6 +74,9 @@
     #define ARCH_PRAGMA_INSTANTIATION_AFTER_SPECIALIZATION \
         _Pragma("clang diagnostic ignored \"-Winstantiation-after-specialization\"")
 
+    #define ARCH_PRAGMA_POTENTIALLY_EVALUATED_EXPRESSION \
+        _Pragma("clang diagnostic ignored \"-Wpotentially-evaluated-expression\"")
+
     #define ARCH_PRAGMA_INSTANCE_METHOD_NOT_FOUND \
         _Pragma("clang diagnostic ignored \"-Wobjc-method-access\"")
 
@@ -200,6 +203,14 @@
 
 #if !defined ARCH_PRAGMA_UNDEFINED_VAR_TEMPLATE
     #define ARCH_PRAGMA_UNDEFINED_VAR_TEMPLATE
+#endif
+
+#if !defined ARCH_PRAGMA_POTENTIALLY_EVALUATED_EXPRESSION
+    #define ARCH_PRAGMA_POTENTIALLY_EVALUATED_EXPRESSION
+#endif
+
+#if !defined ARCH_PRAGMA_INSTANCE_METHOD_NOT_FOUND
+    #define ARCH_PRAGMA_INSTANCE_METHOD_NOT_FOUND
 #endif
 
 #endif // PXR_BASE_ARCH_PRAGMAS_H
