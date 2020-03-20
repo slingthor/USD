@@ -850,7 +850,7 @@ def InstallTBB_LinuxOrMacOS(context, force, buildArgs):
             buildArgs.append('compiler=clang target=ios arch=arm64 extra_inc=big_iron.inc ')
 
         if MacOS() or iOS():
-            PatchFile(context.instDir + "/src/tbb-2019_U7/include/tbb/machine/macos_common.h", 
+            PatchFile("include/tbb/machine/macos_common.h", 
                 [("#define __TBB_Yield()  sched_yield()",
                   "#define __TBB_Yield()  __TBB_Pause(1)")])
 
@@ -877,7 +877,7 @@ def InstallTBB_LinuxOrMacOS(context, force, buildArgs):
         return os.getcwd()
 
 def updateTBBIOS(context):
-    filename = context.instDir + '/src/tbb-2019_U7/build/macos.clang.inc'
+    filename = 'build/macos.clang.inc'
     if os.path.isfile(filename):
         f = open(filename, 'r')
         lines = f.readlines()
@@ -889,10 +889,10 @@ def updateTBBIOS(context):
             f.write(line)
         f.close()
 
-    PatchFile(context.instDir + "/src/tbb-2019_U7/build/ios.macos.inc", 
+    PatchFile("build/ios.macos.inc", 
             [("export SDKROOT:=$(shell xcodebuild -sdk -version | grep -o -E '/.*SDKs/iPhoneOS.*' 2>/dev/null)",
               "export SDKROOT:=$(shell xcodebuild -sdk -version | grep -o -E '/.*SDKs/iPhoneOS.*' 2>/dev/null | head -1)")])
-    PatchFile(context.instDir + "/src/tbb-2019_U7/include/tbb/tbb_machine.h", 
+    PatchFile("include/tbb/tbb_machine.h", 
                     [("    inline void __TBB_Pause(int32_t) {",
                       "#include <unistd.h>\n"
                       "    inline void __TBB_Pause(int32_t) {"),
