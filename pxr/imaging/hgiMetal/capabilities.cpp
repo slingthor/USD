@@ -30,9 +30,9 @@ PXR_NAMESPACE_OPEN_SCOPE
 HgiMetalCapabilities::HgiMetalCapabilities(id<MTLDevice> device)
 {
 #if defined(ARCH_OS_MACOS)
-    _storageMode = MTLResourceStorageModeManaged;
+    defaultStorageMode = MTLResourceStorageModeManaged;
 #else
-    _storageMode = MTLResourceStorageModeShared;
+    defaultStorageMode = MTLResourceStorageModeShared;
 #endif
 }
 

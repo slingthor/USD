@@ -43,7 +43,7 @@ HgiMetalTexture::HgiMetalTexture(HgiMetal *hgi, HgiTextureDesc const & desc)
     MTLTextureUsage usage = MTLTextureUsageUnknown;
     
     if (desc.initialData && desc.pixelsByteSize > 0) {
-        resourceOptions = hgi->GetCapabilities().GetDefaultStorageMode();
+        resourceOptions = hgi->GetCapabilities().defaultStorageMode;
     }
 
     mtlFormat = HgiMetalConversions::GetPixelFormat(desc.format);

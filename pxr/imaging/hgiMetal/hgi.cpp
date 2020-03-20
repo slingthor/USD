@@ -21,6 +21,8 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
+#include "pxr/base/arch/defines.h"
+
 #include "pxr/imaging/hgiMetal/hgi.h"
 #include "pxr/imaging/hgiMetal/buffer.h"
 #include "pxr/imaging/hgiMetal/capabilities.h"
@@ -95,11 +97,11 @@ HgiMetal::HgiMetal(id<MTLDevice> device)
 , _useInterop(false)
 {
     if (!_device) {
-        if (@available(macos 10.11, *)) {
+#if defined(ARCH_OS_MACOS)
             if( TfGetenvBool("USD_METAL_USE_INTEGRATED_GPU", false)) {
                 _device = MTLCopyAllDevices()[1];
             }
-        }
+#endif
         if (!_device) {
             _device = MTLCreateSystemDefaultDevice();
         }

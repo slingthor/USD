@@ -43,22 +43,17 @@ public:
     
     HGIMETAL_API
     ~HgiMetalCapabilities();
-    
-    HGIMETAL_API
-    MTLResourceOptions GetDefaultStorageMode() const {
-        return _storageMode;
-    }
-    
+
+    MTLResourceOptions defaultStorageMode;
+    void synchronizeResource(id);
+    bool hasDidModifyRange;
+
 protected:
     friend class HgiMetal;
 
     HGIMETAL_API
     HgiMetalCapabilities(id<MTLDevice> device);
-    
-private:
-    MTLResourceOptions _storageMode;
 };
-
 
 PXR_NAMESPACE_CLOSE_SCOPE
 

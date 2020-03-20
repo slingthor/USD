@@ -23,6 +23,8 @@
 //
 #include <Metal/Metal.h>
 
+#include "pxr/base/arch/defines.h"
+
 #include "pxr/imaging/hgiMetal/hgi.h"
 #include "pxr/imaging/hgiMetal/blitEncoder.h"
 #include "pxr/imaging/hgiMetal/buffer.h"
@@ -108,7 +110,7 @@ HgiMetalBlitEncoder::CopyTextureGpuToCpu(
     id<MTLDevice> device = _commandBuffer->GetDevice();
 
     MTLResourceOptions options =
-        _hgi->GetCapabilities().GetDefaultStorageMode();
+        _hgi->GetCapabilities().defaultStorageMode;
 
     size_t bytesPerPixel = HgiDataSizeOfFormat(texDesc.format);
     id<MTLBuffer> cpuBuffer =
@@ -141,9 +143,9 @@ HgiMetalBlitEncoder::CopyTextureGpuToCpu(
                                    texDesc.dimensions[2])
                           options:blitOptions];
 
-    if (@available(macos 10.11, *)) {
-        [_blitEncoder synchronizeResource:cpuBuffer];
-    }
+#if defined(ARCH_OS_MACOS)
+    [_blitEncoder synchronizeResource:cpuBuffer];
+#endif
     memcpy(copyOp.cpuDestinationBuffer,
         [cpuBuffer contents], copyOp.destinationBufferByteSize);
     [cpuBuffer release];
@@ -171,10 +173,10 @@ void HgiMetalBlitEncoder::CopyBufferCpuToGpu(
     uint8_t *dst = static_cast<uint8_t*>([metalBuffer->GetBufferId() contents]);
     memcpy(dst + dstOffset, src, copyOp.byteSize);
 
-    if (@available(macos 10.11, *)) {
-        [metalBuffer->GetBufferId()
-            didModifyRange:NSMakeRange(dstOffset, copyOp.byteSize)];
-    }
+#if defined(ARCH_OS_MACOS)
+    [metalBuffer->GetBufferId()
+        didModifyRange:NSMakeRange(dstOffset, copyOp.byteSize)];
+#endif
 }
 
 void 
