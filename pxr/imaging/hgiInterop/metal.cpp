@@ -257,7 +257,12 @@ HgiInteropMetal::HgiInteropMetal(
         "}\n";
 
     GLchar const* const fragmentShaderColorDepth =
+        "#if __VERSION__ >= 140\n"
+        "in vec2         texCoord;\n"
+        "out vec4        fragColor;\n"
+        "#else\n"
         "varying vec2    texCoord;\n"
+        "#endif\n"
         "\n"
         // A GL_TEXTURE_RECTANGLE
         "uniform sampler2DRect interopTexture;\n"
