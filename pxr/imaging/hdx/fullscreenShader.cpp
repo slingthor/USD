@@ -358,7 +358,8 @@ HdxFullscreenShader::_CreateResourceBindings(TextureMap const& textures)
 bool
 HdxFullscreenShader::_CreateDefaultPipeline(
     HgiTextureHandle const& colorDst,
-    HgiTextureHandle const& depthDst)
+    HgiTextureHandle const& depthDst,
+    bool depthWrite)
 {
     if (_pipeline) {
         if ((!colorDst || (_attachment0.format ==
@@ -433,7 +434,7 @@ HdxFullscreenShader::_CreateDefaultPipeline(
     // Depth test must be on because when off it also disables depth writes.
     // Instead we set the compare function to always.
     desc.depthState.depthTestEnabled = true;
-    desc.depthState.depthWriteEnabled = depthDst.Get() != nullptr;
+    desc.depthState.depthWriteEnabled = depthWrite;
     desc.depthState.depthCompareFn = HgiCompareFunctionAlways;
 
     // We don't use the stencil mask in this task.
@@ -460,6 +461,46 @@ HdxFullscreenShader::Draw(
     HgiTextureHandle const& colorDst,
     HgiTextureHandle const& depthDst)
 {
+    bool depthWrite = depthDst.Get() != nullptr;
+    _Draw(textures, colorDst, depthDst, depthWrite);
+}
+
+void
+HdxFullscreenShader::Draw(
+    HgiTextureHandle const& colorDst,
+    HgiTextureHandle const& depthDst)
+{
+    bool depthWrite = depthDst.Get() != nullptr;
+    _Draw(_textures, colorDst, depthDst, depthWrite);
+}
+
+void
+HdxFullscreenShader::DrawToFramebuffer(TextureMap const& textures)
+{
+    // Destination textures are null since we are drawing into framebuffer.
+    // depthWrite is true: we want to transfer depth from aov's to framebuffer.
+    bool depthWrite = true;
+    _Draw(textures, HgiTextureHandle(), HgiTextureHandle(), depthWrite);
+}
+
+void
+HdxFullscreenShader::_DestroyShaderProgram()
+{
+    if (!_shaderProgram) return;
+
+    for (HgiShaderFunctionHandle fn : _shaderProgram->GetShaderFunctions()) {
+        _hgi->DestroyShaderFunction(&fn);
+    }
+    _hgi->DestroyShaderProgram(&_shaderProgram);
+}
+
+void 
+HdxFullscreenShader::_Draw(
+    TextureMap const& textures,
+    HgiTextureHandle const& colorDst,
+    HgiTextureHandle const& depthDst,
+    bool writeDepth)
+{
     // If the user has not set a custom shader program, pick default program.
     if (!_shaderProgram) {
         auto const& it = textures.find(TfToken("depth"));
@@ -478,7 +519,7 @@ HdxFullscreenShader::Draw(
     _CreateResourceBindings(textures);
 
     // create pipeline (first time)
-    _CreateDefaultPipeline(colorDst, depthDst);
+    _CreateDefaultPipeline(colorDst, depthDst, writeDepth);
 
     // If a destination color target is provided we can use it as the
     // dimensions of the backbuffer. If not destination textures are provided
@@ -547,25 +588,6 @@ HdxFullscreenShader::Draw(
         glPipeline->RestoreOpenGlState();
     }
 #endif
-}
-
-void
-HdxFullscreenShader::Draw(
-    HgiTextureHandle const& colorDst,
-    HgiTextureHandle const& depthDst)
-{
-    Draw(_textures, colorDst, depthDst);
-}
-
-void
-HdxFullscreenShader::_DestroyShaderProgram()
-{
-    if (!_shaderProgram) return;
-
-    for (HgiShaderFunctionHandle fn : _shaderProgram->GetShaderFunctions()) {
-        _hgi->DestroyShaderFunction(&fn);
-    }
-    _hgi->DestroyShaderProgram(&_shaderProgram);
 }
 
 void

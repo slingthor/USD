@@ -160,10 +160,8 @@ HdxPresentTask::Execute(HdTaskContext* ctx)
             textures[TfToken("depth")] = depthTexture;
         }
 
-        // XXX We pass an invalid texture handle to HdxFullscreenShader to tell
-        // it we want it to render into the globally bound gl framebuffer.
-        // This code path will be replaced by HgiInterop so this is a temp hack.
-        _compositor->Draw(textures, HgiTextureHandle(), HgiTextureHandle());
+        // Draw aov textures to framebuffer
+        _compositor->DrawToFramebuffer(textures);
 
         if (blendEnabled) {
             glEnable(GL_BLEND);

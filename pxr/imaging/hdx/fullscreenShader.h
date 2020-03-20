@@ -119,18 +119,26 @@ public:
 
     /// Draw the internal textures to the provided destination textures.
     /// `depth` is optional.
-    /// This will load the GLSL compositing program on-demand.
     HDX_API
     void Draw(HgiTextureHandle const& colorDst,
               HgiTextureHandle const& depthDst);
 
     /// Draw the provided textures into the provided destination textures.
     /// `depth` is optional.
-    /// This will load the GLSL program on-demand.
     HDX_API
     void Draw(TextureMap const& textures, 
               HgiTextureHandle const& colorDst,
               HgiTextureHandle const& depthDst);
+
+protected:
+    friend class HdxPresentTask;
+
+    /// Draw the internal textures to the global framebuffer.
+    /// This API exists to help with Hgi transition to let the PresentTask
+    /// Draw directly to the gl framebuffer. In the future this will be
+    /// handled by HgiInterop.
+    HDX_API
+    void DrawToFramebuffer(TextureMap const& textures);
 
 private:
     HdxFullscreenShader() = delete;
@@ -147,7 +155,14 @@ private:
     // Utility to create a pipeline
     bool _CreateDefaultPipeline(
         HgiTextureHandle const& colorDst,
-        HgiTextureHandle const& depthDst);
+        HgiTextureHandle const& depthDst,
+        bool depthWrite);
+
+    // Internal draw method
+    void _Draw(TextureMap const& textures, 
+              HgiTextureHandle const& colorDst,
+              HgiTextureHandle const& depthDst,
+              bool depthWrite);
 
     // Print shader compile errors.
     void _PrintCompileErrors();
