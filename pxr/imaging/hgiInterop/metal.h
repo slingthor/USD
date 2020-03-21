@@ -110,8 +110,6 @@ private:
     id<MTLComputePipelineState> _computePipelineStateColor;
     id<MTLComputePipelineState> _computePipelineStateDepth;
 
-    NSOpenGLContext*            _glInteropCtx;
-
     CVPixelBufferRef            _pixelBuffer;
     CVPixelBufferRef            _depthBuffer;
     CVMetalTextureCacheRef      _cvmtlTextureCache;

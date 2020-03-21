@@ -421,12 +421,6 @@ HgiInteropMetal::HgiInteropMetal(
         glPixelFormat, nil, &_cvglTextureCache);
     assert(cvret == kCVReturnSuccess);
     
-    _glInteropCtx = [[NSOpenGLContext alloc]
-                      initWithFormat:[[NSOpenGLContext currentContext]
-                         pixelFormat]
-                      shareContext:[NSOpenGLContext currentContext]
-                     ];
-
     _pixelBuffer = nil;
     _depthBuffer = nil;
     _cvglColorTexture = nil;
