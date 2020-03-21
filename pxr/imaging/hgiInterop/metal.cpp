@@ -609,9 +609,9 @@ HgiInteropMetal::_CaptureOpenGlState()
     glGetIntegerv(GL_POLYGON_MODE, &_restorePolygonMode);
     glGetIntegerv(GL_ACTIVE_TEXTURE, &_restoreActiveTexture);
     glActiveTexture(GL_TEXTURE0);
-    glGetIntegerv(GL_TEXTURE_RECTANGLE, &_restoreTexture[0]);
+    glGetIntegerv(GL_TEXTURE_BINDING_RECTANGLE, &_restoreTexture[0]);
     glActiveTexture(GL_TEXTURE1);
-    glGetIntegerv(GL_TEXTURE_RECTANGLE, &_restoreTexture[1]);
+    glGetIntegerv(GL_TEXTURE_BINDING_RECTANGLE, &_restoreTexture[1]);
 
     for (int i = 0; i < 2; i++) {
         VertexAttribState &state(_restoreVertexAttribState[i]);
