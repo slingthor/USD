@@ -145,7 +145,7 @@ namespace MissingFunctions {
             
             vector_float4 d = vector_abs(screenSpace[1] - screenSpace[0]);
             return (d.x < dimensions.x && d.y < dimensions.y) &&
-            (d.z < dimensions.x && d.w < dimensions.y);
+                   (d.z < dimensions.x && d.w < dimensions.y);
             return true;
         }
 
