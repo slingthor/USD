@@ -117,6 +117,10 @@ public:
         HgiBlendFactor dstAlphaBlendFactor,
         HgiBlendOp alphaBlendOp);
 
+    /// Flip the Y on draw
+    HDX_API
+    void SetFlipOnDraw(bool flip);
+    
     /// Draw the internal textures to the provided destination textures.
     /// `depth` is optional.
     HDX_API
@@ -176,6 +180,8 @@ private:
 
     TfToken _glslfx;
     TfToken _technique;
+    
+    bool _flipOnDraw;
 
     HgiBufferHandle _indexBuffer;
     HgiBufferHandle _vertexBuffer;

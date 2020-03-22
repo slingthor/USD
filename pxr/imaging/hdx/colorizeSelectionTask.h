@@ -42,6 +42,7 @@ struct HdxColorizeSelectionTaskParams
 {
     HdxColorizeSelectionTaskParams()
         : enableSelection(false)
+        , flipImage(false)
         , selectionColor(0)
         , locateColor(0)
         , enableOutline(false)
@@ -52,6 +53,7 @@ struct HdxColorizeSelectionTaskParams
         {}
 
     bool enableSelection;
+    bool flipImage;
     GfVec4f selectionColor;
     GfVec4f locateColor;
     bool enableOutline;

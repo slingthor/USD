@@ -57,6 +57,7 @@ HdxFullscreenShader::HdxFullscreenShader(
     std::string const& debugName)
     : _hgi(hgi)
     , _debugName(debugName)
+    , _flipOnDraw(false)
     , _indexBuffer()
     , _vertexBuffer()
     , _shaderProgram()
@@ -166,6 +167,27 @@ HdxFullscreenShader::SetBuffer(
 void
 HdxFullscreenShader::CreatePipeline(HgiPipelineDesc pipeDesc)
 {
+    if (pipeDesc.vertexBuffers.size() == 0) {
+        // Describe the default vertex buffer
+        HgiVertexAttributeDesc posAttr;
+        posAttr.format = HgiFormatFloat32Vec3;
+        posAttr.offset = 0;
+        posAttr.shaderBindLocation = 0;
+
+        HgiVertexAttributeDesc uvAttr;
+        uvAttr.format = HgiFormatFloat32Vec2;
+        uvAttr.offset = sizeof(float) * 4; // after posAttr
+        uvAttr.shaderBindLocation = 1;
+
+        HgiVertexBufferDesc vboDesc;
+        vboDesc.bindingIndex = 0;
+        vboDesc.vertexStride = sizeof(float) * 6; // pos, uv
+        vboDesc.vertexAttributes.push_back(posAttr);
+        vboDesc.vertexAttributes.push_back(uvAttr);
+
+        pipeDesc.vertexBuffers.emplace_back(std::move(vboDesc));
+    }
+
     // Pipeline not changed, abort.
     if (_pipeline && _pipeline.Get()->GetDescriptor() == pipeDesc) {
         return;
@@ -237,11 +259,16 @@ HdxFullscreenShader::_CreateBufferResources()
      */
     static const size_t elementsPerVertex = 6;
 
-    static const float vertices[elementsPerVertex * 3] = 
+    static const float vertices[elementsPerVertex * 6] =
     //      positions     |  uvs
         { -1,  3, 0, 1,     0, 2,
           -1, -1, 0, 1,     0, 0,
-           3, -1, 0, 1,     2, 0 };
+           3, -1, 0, 1,     2, 0,
+          
+    // Flipped Y Uvs
+          -1,  3, 0, 1,     0, -1,
+          -1, -1, 0, 1,     0, 1,
+           3, -1, 0, 1,     2, 1 };
 
     HgiBufferDesc vboDesc;
     vboDesc.debugName = "HdxFullscreenShader VertexBuffer";
@@ -455,6 +482,11 @@ HdxFullscreenShader::_CreateDefaultPipeline(
     return true;
 }
 
+void HdxFullscreenShader::SetFlipOnDraw(bool flip)
+{
+    _flipOnDraw = flip;
+}
+
 void 
 HdxFullscreenShader::Draw(
     TextureMap const& textures,
@@ -575,7 +607,12 @@ HdxFullscreenShader::_Draw(
     gfxEncoder->BindVertexBuffers(0, {_vertexBuffer}, {0});
     GfVec4i vp = GfVec4i(0, 0, dimensions[0], dimensions[1]);
     gfxEncoder->SetViewport(vp);
-    gfxEncoder->DrawIndexed(_indexBuffer, 3, 0, 0, 1, 0);
+    if (_flipOnDraw) {
+        gfxEncoder->DrawIndexed(_indexBuffer, 3, 0, 3, 1, 0);
+    }
+    else {
+        gfxEncoder->DrawIndexed(_indexBuffer, 3, 0, 0, 1, 0);
+    }
     gfxEncoder->PopDebugGroup();
 
     // Done recording commands, submit work.

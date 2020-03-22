@@ -462,6 +462,8 @@ HdxTaskController::_CreateColorizeSelectionTask()
     selectionParams.enableSelection = true;
     selectionParams.selectionColor = GfVec4f(1,1,0,1);
     selectionParams.locateColor = GfVec4f(0,0,1,1);
+    selectionParams.flipImage =
+        !_IsStormRenderingBackend(GetRenderIndex());
 
     GetRenderIndex()->InsertTask<HdxColorizeSelectionTask>(&_delegate,
         _colorizeSelectionTaskId);

@@ -216,6 +216,8 @@ HdxColorizeSelectionTask::Execute(HdTaskContext* ctx)
 
     _CreateParameterBuffer();
     _compositor->SetBuffer(_parameterBuffer, 0);
+    
+    _compositor->SetFlipOnDraw(_params.flipImage);
 
     // Blend the selection color on top.  ApplySelectionColor uses the
     // calculation:
@@ -401,6 +403,7 @@ std::ostream& operator<<(std::ostream& out,
 {
     out << "ColorizeSelectionTask Params: (...) "
         << pv.enableSelection << " "
+        << pv.flipImage << " "
         << pv.selectionColor << " "
         << pv.locateColor << " "
         << pv.primIdBufferPath << " "
@@ -413,6 +416,7 @@ bool operator==(const HdxColorizeSelectionTaskParams& lhs,
                 const HdxColorizeSelectionTaskParams& rhs)
 {
     return lhs.enableSelection      == rhs.enableSelection      &&
+           lhs.flipImage            == rhs.flipImage            &&
            lhs.selectionColor       == rhs.selectionColor       &&
            lhs.locateColor          == rhs.locateColor          &&
            lhs.primIdBufferPath     == rhs.primIdBufferPath     &&
