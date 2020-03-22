@@ -610,6 +610,12 @@ HdStCommandBuffer::FrustumCull(
     
     static vector_float2 dimensions;
 
+    // Temp workaround for selection rendertargets being small, and small object
+    // culling resulting in object selection not working
+    if (renderTargetWidth <= 256 && renderTargetHeight <= 256) {
+        renderTargetWidth = 2048;
+        renderTargetHeight = 2048;
+    }
     dimensions.x = 4.0f / renderTargetWidth;
     dimensions.y = 4.0f / renderTargetHeight;
     
