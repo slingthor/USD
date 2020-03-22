@@ -199,7 +199,10 @@ HgiMetalGraphicsEncoder::DrawIndexed(
                          indexCount:indexCount
                           indexType:MTLIndexTypeUInt32
                         indexBuffer:indexBuf->GetBufferId()
-                  indexBufferOffset:indexBufferByteOffset];
+                  indexBufferOffset:indexBufferByteOffset
+                      instanceCount:instanceCount
+                         baseVertex:vertexOffset
+                       baseInstance:firstInstance];
 }
 
 void
