@@ -51,6 +51,7 @@ pxr_library(usdImaging
         domeLightAdapter
         fieldAdapter
         gprimAdapter
+        hermiteCurvesAdapter
         implicitSurfaceMeshUtils
         instanceAdapter
         lightAdapter

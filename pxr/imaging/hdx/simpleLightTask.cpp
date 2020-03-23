@@ -196,7 +196,7 @@ HdxSimpleLightTask::Sync(HdSceneDelegate* delegate,
 
             // If the light is in camera space we need to transform
             // the position and spot direction to world space for
-            // HdxSimpleLightingShader.
+            // HdStSimpleLightingShader.
             if (garchl.IsCameraSpaceLight()) {
                 GfVec4f lightPos = garchl.GetPosition();
                 garchl.SetPosition(lightPos * viewInverseMatrix);

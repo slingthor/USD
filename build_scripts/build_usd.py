@@ -700,10 +700,10 @@ def InstallBoost(context, force, buildArgs):
         if context.buildPython:
             b2_settings.append("--with-python")
 
-        if context.buildKatana or context.buildOIIO:
+        if context.buildOIIO:
             b2_settings.append("--with-date_time")
 
-        if context.buildKatana or context.buildOIIO or context.enableOpenVDB:
+        if context.buildOIIO or context.enableOpenVDB:
             b2_settings.append("--with-system")
             b2_settings.append("--with-thread")
 
@@ -1274,12 +1274,12 @@ PTEX = Dependency("Ptex", InstallPtex, "include/PtexVersion.h")
 # Sierra (10.12) or Mojave (10.14).
 BLOSC_URL = "https://github.com/Blosc/c-blosc/archive/v1.17.0.zip"
 
-def InstallOpenVDB(context, force, buildArgs):
+def InstallBLOSC(context, force, buildArgs):
     with CurrentWorkingDirectory(DownloadURL(BLOSC_URL, context, force)):
         RunCMake(context, force, buildArgs)
         return os.getcwd()
 
-BLOSC = Dependency("Blosc", InstallOpenVDB, "include/blosc.h")
+BLOSC = Dependency("Blosc", InstallBLOSC, "include/blosc.h")
 
 ############################################################
 # OpenVDB
@@ -1299,8 +1299,11 @@ def InstallOpenVDB(context, force, buildArgs):
             '-DOPENVDB_BUILD_UNITTESTS=OFF'
         ]
 
-        extraArgs.append('-DBOOST_ROOT="{instDir}"'
-                         .format(instDir=context.instDir))
+        # Make sure to use boost installed by the build script and not any
+        # system installed boost
+        extraArgs.append('-DBoost_NO_BOOST_CMAKE=On')
+        extraArgs.append('-DBoost_NO_SYSTEM_PATHS=True')
+
         extraArgs.append('-DBLOSC_ROOT="{instDir}"'
                          .format(instDir=context.instDir))
         extraArgs.append('-DTBB_ROOT="{instDir}"'
@@ -1561,7 +1564,7 @@ HDF5 = Dependency("HDF5", InstallHDF5, "include/hdf5.h")
 ############################################################
 # Alembic
 
-ALEMBIC_URL = "https://github.com/alembic/alembic/archive/1.7.1.zip"
+ALEMBIC_URL = "https://github.com/alembic/alembic/archive/1.7.10.zip"
 
 def InstallAlembic(context, force, buildArgs):
     with CurrentWorkingDirectory(DownloadURL(ALEMBIC_URL, context, force)):
@@ -1573,14 +1576,6 @@ def InstallAlembic(context, force, buildArgs):
                 '-DUSE_HDF5=ON',
                 '-DHDF5_ROOT="{instDir}"'.format(instDir=context.instDir),
                 '-DCMAKE_CXX_FLAGS="-D H5_BUILT_AS_DYNAMIC_LIB"']
-                
-            if Windows():
-                # Alembic doesn't link against HDF5 libraries on Windows 
-                # whether or not USE_HDF5=ON or not.  There is a line to link 
-                # against HDF5 on DARWIN so we hijack it to also link on WIN32.
-                PatchFile("lib\\Alembic\\CMakeLists.txt", 
-                          [("ALEMBIC_SHARED_LIBS AND DARWIN",
-                            "ALEMBIC_SHARED_LIBS AND DARWIN OR ALEMBIC_SHARED_LIBS AND WIN32")])
         else:
            cmakeOptions += ['-DUSE_HDF5=OFF']
                  
@@ -1758,14 +1753,6 @@ def InstallUSD(context, force, buildArgs):
         else:
             extraArgs.append('-DPXR_BUILD_MATERIALX_PLUGIN=OFF')
 
-        if context.buildKatana:
-            if context.katanaApiLocation:
-                extraArgs.append('-DKATANA_API_LOCATION="{apiLocation}"'
-                                 .format(apiLocation=context.katanaApiLocation))
-            extraArgs.append('-DPXR_BUILD_KATANA_PLUGIN=ON')
-        else:
-            extraArgs.append('-DPXR_BUILD_KATANA_PLUGIN=OFF')
-
         if Windows():
             # Increase the precompiled header buffer limit.
             extraArgs.append('-DCMAKE_CXX_FLAGS="/Zm150"')
@@ -1777,6 +1764,11 @@ def InstallUSD(context, force, buildArgs):
             # some build options are implicit with this
             extraArgs.append('-G Xcode')
         
+		# Make sure to use boost installed by the build script and not any
+        # system installed boost
+        extraArgs.append('-DBoost_NO_BOOST_CMAKE=On')
+        extraArgs.append('-DBoost_NO_SYSTEM_PATHS=True')
+
         extraArgs += buildArgs
 
         RunCMake(context, force, extraArgs)
@@ -2046,16 +2038,6 @@ subgroup.add_argument("--materialx", dest="build_materialx", action="store_true"
 subgroup.add_argument("--no-materialx", dest="build_materialx", action="store_false",
                       help="Do not build MaterialX plugin for USD (default)")
 
-group = parser.add_argument_group(title="Katana Plugin Options")
-subgroup = group.add_mutually_exclusive_group()
-subgroup.add_argument("--katana", dest="build_katana", action="store_true", 
-                      default=False,
-                      help="Build Katana plugin for USD")
-subgroup.add_argument("--no-katana", dest="build_katana", action="store_false",
-                      help="Do not build Katana plugin for USD (default)")
-group.add_argument("--katana-api-location", type=str,
-                   help="Directory where the Katana SDK is installed.")
-
 subgroup = group.add_mutually_exclusive_group()
 subgroup.add_argument("--opengl", dest="enable_opengl", action="store_true", 
                       default=True,
@@ -2180,11 +2162,6 @@ class InstallContext:
         # - MaterialX Plugin
         self.buildMaterialX = args.build_materialx
 
-        # - Katana Plugin
-        self.buildKatana = args.build_katana
-        self.katanaApiLocation = (os.path.abspath(args.katana_api_location)
-                                  if args.katana_api_location else None)
-       
         self.enableOpenGL = args.enable_opengl
     def GetBuildArguments(self, dep):
         return self.buildArgs.get(dep.name.lower(), [])
@@ -2250,7 +2227,7 @@ if context.buildImaging:
     requiredDependencies += [OPENSUBDIV]
     
     if context.enableOpenVDB:
-        requiredDependencies += [BLOSC, OPENEXR, OPENVDB]
+        requiredDependencies += [BLOSC, BOOST, OPENEXR, OPENVDB, TBB]
 		
     if context.buildOIIO:
         requiredDependencies += [JPEG, TIFF, PNG, OPENEXR, OPENIMAGEIO]
@@ -2286,14 +2263,6 @@ if "--usdview" in sys.argv:
         PrintError("Cannot build usdview when Python support is disabled.")
         sys.exit(1)
 
-# Error out if we try to build any third party plugins with python disabled.
-if not context.buildPython:
-    pythonPluginErrorMsg = (
-        "%s plugin cannot be built when python support is disabled")
-    if context.buildKatana:
-        PrintError(pythonPluginErrorMsg % "Katana")
-        sys.exit(1)
-
 # Determine whether we're running in Maya's version of Python. When building
 # against Maya's Python, there are some additional restrictions on what we're
 # able to build.
@@ -2314,13 +2283,6 @@ if isMayaPython:
                    "of Python. Maya does not provide access to the 'OpenGL' "
                    "Python module. Use '--no-usdview' to disable building "
                    "usdview.")
-        sys.exit(1)
-
-    # We should not attempt to build the plugins for any other DCCs if we're
-    # building against Maya's version of Python.
-    if any([context.buildKatana]):
-        PrintError("Cannot build plugins for other DCCs when building against "
-                   "Maya's version of Python.")
         sys.exit(1)
 
 dependenciesToBuild = []
@@ -2353,7 +2315,23 @@ else:
                "PATH")
     sys.exit(1)
 
-if not find_executable("cmake"):
+if find_executable("cmake"):
+    # Check cmake requirements
+    cmake_required_version = (3, 12)
+    cmake_version = GetCMakeVersion()
+    if not cmake_version:
+        PrintError("Failed to determine CMake version")
+        sys.exit(1)
+
+    if cmake_version < cmake_required_version:
+        def _JoinVersion(v):
+            return ".".join(str(n) for n in v)
+        PrintError("CMake version {req} or later required to build USD, "
+                   "but version found was {found}".format(
+                       req=_JoinVersion(cmake_required_version),
+                       found=_JoinVersion(cmake_version)))
+        sys.exit(1)
+else:
     PrintError("CMake not found -- please install it and adjust your PATH")
     sys.exit(1)
 
@@ -2380,18 +2358,6 @@ if PYSIDE in requiredDependencies:
                    "your PATH. (Note that this program may be named {0} "
                    "depending on your platform)"
                    .format(" or ".join(pysideUic)))
-        sys.exit(1)
-
-if OPENVDB in requiredDependencies:
-    # Check OpenVDB's cmake requirements
-    cmake_required_version = (3, 3)
-    cmake_version = GetCMakeVersion()
-    if not cmake_version:
-        PrintError("Failed to determine CMake version")
-        sys.exit(1)
-    if cmake_version < cmake_required_version:
-        PrintError(("CMake version 3.3 required to build OpenVDB, but version "
-                    "found was %s") % (".".join("%d" % v for v in cmake_version)))
         sys.exit(1)
 
 if JPEG in requiredDependencies:
@@ -2435,7 +2401,6 @@ Building with settings:
       HDF5 support:             {enableHDF5}
     Draco Plugin                {buildDraco}
     MaterialX Plugin            {buildMaterialX}
-    Katana Plugin               {buildKatana}
 
   Dependencies                  {dependencies}"""
 
@@ -2487,7 +2452,6 @@ summaryMsg = summaryMsg.format(
     buildDraco=("On" if context.buildDraco else "Off"),
     buildMaterialX=("On" if context.buildMaterialX else "Off"),
     enableHDF5=("On" if context.enableHDF5 else "Off"),
-    buildKatana=("On" if context.buildKatana else "Off"),
     enableOpenGL=("On" if context.enableOpenGL else "Off"),
     enableMetal=("On" if iOS() or MacOS() else "Off"))
 
@@ -2579,10 +2543,6 @@ Print("""
     {requiredInPath}
 """.format(requiredInPath="\n    ".join(sorted(requiredInPath))))
     
-if context.buildKatana:
-    Print("See documentation at http://openusd.org/docs/Katana-USD-Plugins.html "
-          "for setting up the Katana plugin.\n")
-
 if context.buildPrman:
     Print("See documentation at http://openusd.org/docs/RenderMan-USD-Imaging-Plugin.html "
           "for setting up the RenderMan plugin.\n")

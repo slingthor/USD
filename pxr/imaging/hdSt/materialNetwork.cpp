@@ -780,6 +780,7 @@ _GatherMaterialParams(
 }
 
 HdStMaterialNetwork::HdStMaterialNetwork()
+    : _materialTag(HdStMaterialTagTokens->defaultMaterialTag)
 {
 }
 
@@ -799,6 +800,7 @@ HdStMaterialNetwork::ProcessMaterialNetwork(
     _geometrySource.clear();
     _materialMetadata.clear();
     _materialParams.clear();
+    _materialTag = HdStMaterialTagTokens->defaultMaterialTag;
 
     HdSt_MaterialNetwork surfaceNetwork;
 

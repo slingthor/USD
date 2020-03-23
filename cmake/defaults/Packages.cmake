@@ -109,6 +109,11 @@ if (PXR_BUILD_IMAGING)
     endif()
     # --OpenGL
     if (PXR_ENABLE_GL_SUPPORT)
+        # Prefer legacy GL library over GLVND libraries if both
+        # are installed.
+        if (POLICY CMP0072)
+            cmake_policy(SET CMP0072 OLD)
+        endif()
         find_package(OpenGL REQUIRED)
         find_package(GLEW REQUIRED)
         add_definitions(-DPXR_OPENGL_SUPPORT_ENABLED)
@@ -161,15 +166,6 @@ endif()
 
 # Third Party Plugin Package Requirements
 # ----------------------------------------------
-if (PXR_BUILD_KATANA_PLUGIN)
-    find_package(KatanaAPI REQUIRED)
-    find_package(Boost
-        COMPONENTS
-        thread
-        REQUIRED
-        )
-endif()
-
 if (PXR_BUILD_PRMAN_PLUGIN)
     find_package(Renderman REQUIRED)
 endif()

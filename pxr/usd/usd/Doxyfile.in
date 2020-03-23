@@ -808,28 +808,6 @@ INPUT                  = src/modules/usd/doxygen/externalOverview.dox \
                          src/modules/usdSkelImaging \
                          src/modules/usdviewq \
                                                                       \
-                         ## "houdini" package \
-                         src/modules/gusd/overview.dox \
-                         src/modules/gusd \
-                         src/modules/OP_gusd \
-                                                                      \
-                         ## "katana" package \
-                         src/modules/usdKatana/overview.dox \
-                         src/modules/katanaAttrfncApi \
-                         src/modules/katanaOpApi \
-                         src/modules/katanaPluginApi \
-                         src/modules/usdKatana \
-                         src/modules/pxrUsdIn \
-                         src/modules/pxrUsdInPrman \
-                         src/modules/pxrUsdInShipped \
-                                                                      \
-                         ## "maya" package \
-                         src/modules/usdMaya/overview.dox \
-                         src/modules/pxrUsdMayaGL \
-                         src/modules/px_vp20 \
-                         src/modules/usdMaya \
-                         src/modules/pxrUsd \
-                                                                      \
                          ## Everything else \
                          src/modules
 

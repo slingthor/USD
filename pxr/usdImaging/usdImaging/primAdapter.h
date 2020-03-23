@@ -324,12 +324,40 @@ public:
     // ---------------------------------------------------------------------- //
     /// \name Selection
     // ---------------------------------------------------------------------- //
+
+    // Add the given usdPrim to the HdSelection object, to mark it for
+    // selection highlighting. cachePath is the path of the object referencing
+    // this adapter.
+    //
+    // If an instance index is provided to Delegate::PopulateSelection, it's
+    // interpreted as a hydra instance index and left unchanged (to make
+    // picking/selection round-tripping work).  Otherwise, instance adapters
+    // will build up a composite instance index range at each level.
+    //
+    // Consider:
+    //   /World/A (2 instances)
+    //           /B (2 instances)
+    //             /C (gprim)
+    // ... to select /World/A, instance 0, you want to select cartesian
+    // coordinates (0, *) -> (0, 0) and (0, 1).  The flattened representation
+    // of this is:
+    //   index = coordinate[0] * instance_count[1] + coordinate[1]
+    // Likewise, for one more nesting level you get:
+    //   index = c[0] * count[1] * count[2] + c[1] * count[2] + c[2]
+    // ... since the adapter for /World/A has no idea what count[1+] are,
+    // this needs to be built up.  The delegate initially sets
+    // parentInstanceIndices to [].  /World/A sets this to [0].  /World/A/B,
+    // since it is selecting *, adds all possible instance indices:
+    // 0 * 2 + 0 = 0, 0 * 2 + 1 = 1. /World/A/B/C is a gprim, and adds
+    // instances [0,1] to its selection.
     USDIMAGING_API
-    virtual bool PopulateSelection(HdSelection::HighlightMode const& highlightMode,
-                                   SdfPath const &cachePath,
-                                   UsdPrim const &usdPrim,
-                                   VtIntArray const &instanceIndices,
-                                   HdSelectionSharedPtr const &result);
+    virtual bool PopulateSelection(
+        HdSelection::HighlightMode const& highlightMode,
+        SdfPath const &cachePath,
+        UsdPrim const &usdPrim,
+        int const hydraInstanceIndex,
+        VtIntArray const &parentInstanceIndices,
+        HdSelectionSharedPtr const &result) const;
 
     // ---------------------------------------------------------------------- //
     /// \name Texture resources
@@ -483,10 +511,6 @@ protected:
     USDIMAGING_API
     SdfPath _ConvertIndexPathToCachePath(SdfPath const& indexPath) const;
 
-    // Returns the rprim paths in the renderIndex rooted at \p indexPath.
-    USDIMAGING_API
-    SdfPathVector _GetRprimSubtree(SdfPath const& indexPath) const;
-
     // Returns the material binding purpose from the renderer delegate.
     USDIMAGING_API
     TfToken _GetMaterialBindingPurpose() const;
@@ -552,15 +576,42 @@ protected:
                                  HdInterpolation *interpOverride = nullptr)
                                  const;
 
-    // If a primvar is added or removed from the list of primvar descriptors,
-    // we need to do extra change processing.  This returns true if:
-    // (the primvar is in the value cache) XOR (the primvar is on the usd prim)
+    // Returns true if the property name has the "primvars:" prefix.
     USDIMAGING_API
-    bool _PrimvarChangeRequiresResync(UsdPrim const& prim,
-                                      SdfPath const& cachePath,
-                                      TfToken const& propertyName,
-                                      TfToken const& primvarName,
-                                      bool inherited = true) const;
+    static bool _HasPrimvarsPrefix(TfToken const& propertyName);
+
+    // Strips the "primvars:" prefix and returns the resulting substring as 
+    // a token.
+    USDIMAGING_API
+    static TfToken _GetStrippedPrimvarName(TfToken const& propertyName);
+
+    // Convenience methods to figure out what changed about the primvar and
+    // return the appropriate dirty bit.
+    // Caller can optionally pass in a dirty bit to set for primvar value
+    // changes. This is useful for attributes that have a special dirty bit
+    // such as normals and widths.
+    //
+    // Handle USD attributes that are treated as primvars by Hydra. This
+    // requires the interpolation to be passed in, as well as the primvar
+    // name passed to Hydra.
+    USDIMAGING_API
+    HdDirtyBits _ProcessNonPrefixedPrimvarPropertyChange(
+        UsdPrim const& prim,
+        SdfPath const& cachePath,
+        TfToken const& propertyName,
+        TfToken const& primvarName,
+        HdInterpolation const& primvarInterp,
+        HdDirtyBits valueChangeDirtyBit = HdChangeTracker::DirtyPrimvar) const;
+
+    // Handle UsdGeomPrimvars that use the "primvars:" prefix, while also
+    // accommodating inheritance.
+    USDIMAGING_API
+    HdDirtyBits _ProcessPrefixedPrimvarPropertyChange(
+        UsdPrim const& prim,
+        SdfPath const& cachePath,
+        TfToken const& propertyName,
+        HdDirtyBits valueChangeDirtyBit = HdChangeTracker::DirtyPrimvar,
+        bool inherited = true) const;
 
     virtual void _RemovePrim(SdfPath const& cachePath,
                              UsdImagingIndexProxy* index) = 0;
