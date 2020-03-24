@@ -55,12 +55,6 @@ from .selectionDataModel import ALL_INSTANCES, SelectionDataModel
 from .viewSettingsDataModel import ViewSettingsDataModel
 from .freeCamera import FreeCamera
 
-if hasattr(QtCore.Qt, 'AA_EnableHighDpiScaling'):
-    QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling, True)
-
-if hasattr(QtCore.Qt, 'AA_UseHighDpiPixmaps'):
-    QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_UseHighDpiPixmaps, True)
-
 # A viewport rectangle to be used for GL must be integer values.
 # In order to loose the least amount of precision the viewport
 # is centered and adjusted to initially contain entirely the
@@ -953,6 +947,9 @@ class StageView(QtOpenGL.QGLWidget):
         # Presto, so we default AOVs OFF until everything is AOV ready.
         self.SetRendererAov(self.rendererAovName)
 
+    def _scaleMouseCoords(self, point):
+        return point * QtWidgets.QApplication.instance().devicePixelRatio()
+
     def closeRenderer(self):
         '''Close the current renderer.'''
         with Timer() as t:
@@ -1481,7 +1478,7 @@ class StageView(QtOpenGL.QGLWidget):
         return windowPolicy
     
     def computeWindowSize(self):
-         size = self.size() * QtWidgets.QApplication.instance().devicePixelRatio()
+         size = self._scaleMouseCoords(self.size())
          return (int(size.width()), int(size.height()))
 
     def computeWindowViewport(self):
@@ -1985,8 +1982,7 @@ class StageView(QtOpenGL.QGLWidget):
         # initiated by this mouse-press
         self._dragActive = True
 
-        x = event.x() * QtWidgets.QApplication.instance().devicePixelRatio()
-        y = event.y() * QtWidgets.QApplication.instance().devicePixelRatio()
+        coord = self._scaleMouseCoords(event.pos())
 
 		# Allow for either meta or alt key, since meta maps to Windows and Apple
         # keys on various hardware/os combos, and some windowing systems consume
@@ -2003,10 +1999,10 @@ class StageView(QtOpenGL.QGLWidget):
                 self._cameraMode = "zoom"
         else:
             self._cameraMode = "pick"
-            self.pickObject(x, y, event.button(), event.modifiers())
+            self.pickObject(coord.x(), coord.y(), event.button(), event.modifiers())
 
-        self._lastX = x
-        self._lastY = y
+        self._lastX = coord.x
+        self._lastY = coord.y
 
     def mouseReleaseEvent(self, event):
         self._cameraMode = "none"
@@ -2014,12 +2010,11 @@ class StageView(QtOpenGL.QGLWidget):
 
     def mouseMoveEvent(self, event):
 
-        x = event.x() * QtWidgets.QApplication.instance().devicePixelRatio()
-        y = event.y() * QtWidgets.QApplication.instance().devicePixelRatio()
+        coord = self._scaleMouseCoords(event.pos())
 
         if self._dragActive:
-            dx = x - self._lastX
-            dy = y - self._lastY
+            dx = coord.x() - self._lastX
+            dy = coord.y() - self._lastY
             if dx == 0 and dy == 0:
                 return
 
@@ -2045,8 +2040,8 @@ class StageView(QtOpenGL.QGLWidget):
                         -dx * pixelsToWorld, 
                          dy * pixelsToWorld)
 
-            self._lastX = x
-            self._lastY = y
+            self._lastX = coord.x()
+            self._lastY = coord.y()
             self.updateGL()
 
             self.signalMouseDrag.emit()
@@ -2054,7 +2049,7 @@ class StageView(QtOpenGL.QGLWidget):
             # Mouse tracking is only enabled when rolloverPicking is enabled,
             # and this function only gets called elsewise when mouse-tracking
             # is enabled
-            self.pickObject(x, y, None, event.modifiers())
+            self.pickObject(coord.x(), coord.y(), None, event.modifiers())
         else:
             event.ignore()
 
@@ -2241,8 +2236,10 @@ class StageView(QtOpenGL.QGLWidget):
                     None, Sdf.Path.emptyPath, None, None, None
         
 			# Correct for high DPI displays
-        	selectedPoint[0] = selectedPoint[0] / QtWidgets.QApplication.instance().devicePixelRatio()
-        	selectedPoint[1] = selectedPoint[1] / QtWidgets.QApplication.instance().devicePixelRatio()
+            pixelRatio = \
+                QtWidgets.QApplication.instance().devicePixelRatio()
+            selectedPoint[0] = selectedPoint[0] / pixelRatio
+            selectedPoint[1] = selectedPoint[1] / pixelRatio
 
             # The call to TestIntersection will return the path to a master prim
             # (selectedPrimPath) and its instancer (selectedInstancerPath) if 

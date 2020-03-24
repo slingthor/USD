@@ -81,6 +81,12 @@ from .viewSettingsDataModel import ViewSettingsDataModel
 from . import plugin
 from .pythonInterpreter import Myconsole
 
+if hasattr(QtCore.Qt, 'AA_EnableHighDpiScaling'):
+    QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling, True)
+
+if hasattr(QtCore.Qt, 'AA_UseHighDpiPixmaps'):
+    QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_UseHighDpiPixmaps, True)
+
 SETTINGS_VERSION = "1"
 
 class HUDEntries(ConstantGroup):
