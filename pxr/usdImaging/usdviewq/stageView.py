@@ -2236,10 +2236,10 @@ class StageView(QtOpenGL.QGLWidget):
                     None, Sdf.Path.emptyPath, None, None, None
         
 			# Correct for high DPI displays
-            pixelRatio = \
-                QtWidgets.QApplication.instance().devicePixelRatio()
-            selectedPoint[0] = selectedPoint[0] / pixelRatio
-            selectedPoint[1] = selectedPoint[1] / pixelRatio
+            coord = self._scaleMouseCoords( \
+                QtCore.QPoint(selectedPoint[0], selectedPoint[1]))
+            selectedPoint[0] = coord.x()
+            selectedPoint[1] = coord.y()
 
             # The call to TestIntersection will return the path to a master prim
             # (selectedPrimPath) and its instancer (selectedInstancerPath) if 
