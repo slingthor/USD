@@ -38,7 +38,6 @@ if (PXR_ENABLE_GL_SUPPORT)
                         GL/interleavedMemoryBufferGL
                         GL/persistentBufferGL
                         GL/quadrangulateGL
-                        GL/renderDelegateGL
                         GL/renderPassShaderGL
                         GL/renderPassStateGL
                         GL/resourceBinderGL
@@ -48,8 +47,9 @@ if (PXR_ENABLE_GL_SUPPORT)
                         GL/vboMemoryBufferGL
                         GL/vboSimpleMemoryBufferGL)
 
-    list(APPEND GFXADDITIONALPUBLIC ${GFXADDITIONALPUBLIC}
-                            GL/resourceFactoryGL)
+    list(APPEND GFXADDITIONALPUBLIC
+                        GL/renderDelegateGL
+                        GL/resourceFactoryGL)
 
 endif()
 
@@ -71,7 +71,6 @@ if (PXR_ENABLE_METAL_SUPPORT)
                         Metal/mtlUtils
                         Metal/persistentBufferMetal
                         Metal/quadrangulateMetal
-                        Metal/renderDelegateMetal
                         Metal/renderPassShaderMetal
                         Metal/renderPassStateMetal
                         Metal/resourceBinderMetal
@@ -81,7 +80,9 @@ if (PXR_ENABLE_METAL_SUPPORT)
                         Metal/vboMemoryBufferMetal
                         Metal/vboSimpleMemoryBufferMetal)
 
-    list(APPEND GFXADDITIONALPUBLIC  Metal/resourceFactoryMetal)
+    list(APPEND GFXADDITIONALPUBLIC
+                        Metal/renderDelegateMetal
+                        Metal/resourceFactoryMetal)
 endif()
 
 
@@ -162,7 +163,7 @@ pxr_library(hdSt
         tokens
         vboMemoryManager
         vboSimpleMemoryManager
-	volume
+        volume
         ${GFXADDITIONALPUBLIC}
 
     PUBLIC_HEADERS
