@@ -31,6 +31,12 @@
 #import <simd/simd.h>
 #include <sys/time.h>
 
+#if defined(ARCH_OS_MACOS)
+#import <Cocoa/Cocoa.h>
+#else
+#import <UIKit/UIKit.h>
+#endif // ARCH_OS_MACOS
+
 #define METAL_TESSELLATION_SUPPORT 0
 
 enum {

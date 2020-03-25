@@ -1,4 +1,3 @@
-#line 1 "/Volumes/Data/USDMetal/pxr/imaging/lib/mtlf/mtlDevice.h"
 //
 // Copyright 2016 Pixar
 //
@@ -40,11 +39,6 @@
 #endif // PXR_OPENGL_SUPPORT_ENABLED
 
 #import <Metal/Metal.h>
-#if defined(ARCH_OS_MACOS)
-#import <Cocoa/Cocoa.h>
-#else
-#import <UIKit/UIKit.h>
-#endif // ARCH_OS_MACOS
 
 #include "pxr/imaging/mtlf/api.h"
 #include "pxr/imaging/garch/texture.h"

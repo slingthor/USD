@@ -30,6 +30,12 @@
 #include <iostream>
 #include <mutex>
 
+#if defined(ARCH_OS_MACOS)
+#import <Cocoa/Cocoa.h>
+#else
+#import <UIKit/UIKit.h>
+#endif // ARCH_OS_MACOS
+
 PXR_NAMESPACE_OPEN_SCOPE
 
 // Initialize members to ensure a sane starting state.
