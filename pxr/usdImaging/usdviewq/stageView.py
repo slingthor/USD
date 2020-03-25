@@ -2001,8 +2001,8 @@ class StageView(QtOpenGL.QGLWidget):
             self._cameraMode = "pick"
             self.pickObject(coord.x(), coord.y(), event.button(), event.modifiers())
 
-        self._lastX = coord.x
-        self._lastY = coord.y
+        self._lastX = coord.x()
+        self._lastY = coord.y()
 
     def mouseReleaseEvent(self, event):
         self._cameraMode = "none"
