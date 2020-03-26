@@ -637,18 +637,15 @@ elif MacOS() or iOS():
     BOOST_URL = "https://downloads.sourceforge.net/project/boost/boost/1.61.0/boost_1_61_0.tar.bz2"
     BOOST_VERSION_FILE = "include/boost/version.hpp"
 elif Windows():
-    # On Visual Studio 2017 we need at least boost 1.65.1
     # The default installation of boost on Windows puts headers in a versioned 
     # subdirectory, which we have to account for here. In theory, specifying 
     # "layout=system" would make the Windows install match Linux/MacOS, but that 
     # causes problems for other dependencies that look for boost.
-    if IsVisualStudio2017OrGreater():
-        BOOST_URL = "https://downloads.sourceforge.net/project/boost/boost/1.65.1/boost_1_65_1.tar.gz"
-        BOOST_VERSION_FILE = "include/boost-1_65_1/boost/version.hpp"
-    else:
-        BOOST_URL = "https://downloads.sourceforge.net/project/boost/boost/1.61.0/boost_1_61_0.tar.gz"
-        BOOST_VERSION_FILE = "include/boost-1_61/boost/version.hpp"
-
+    #
+    # boost 1.70 is required for Visual Studio 2019. For simplicity, we use
+    # this version for all older Visual Studio versions as well.
+    BOOST_URL = "https://downloads.sourceforge.net/project/boost/boost/1.70.0/boost_1_70_0.tar.gz"
+    BOOST_VERSION_FILE = "include/boost-1_70/boost/version.hpp"
 
 def InstallBoost(context, force, buildArgs):
     # Documentation files in the boost archive can have exceptionally
@@ -730,9 +727,11 @@ def InstallBoost(context, force, buildArgs):
             b2_settings.append("-a")
 
         if Windows():
+            # toolset parameter for Visual Studio documented here:
+            # https://github.com/boostorg/build/blob/develop/src/tools/msvc.jam
             if IsVisualStudio2019OrGreater():
-                pass
-            if IsVisualStudio2017OrGreater():
+                b2_settings.append("toolset=msvc-14.2")
+            elif IsVisualStudio2017OrGreater():
                 b2_settings.append("toolset=msvc-14.1")
             else:
                 b2_settings.append("toolset=msvc-14.0")
@@ -1524,22 +1523,21 @@ PYOPENGL = PythonDependency("PyOpenGL", GetPyOpenGLInstructions,
 
 def GetPySideInstructions():
     # For licensing reasons, this script cannot install PySide itself.
-    if MacOS():
-        # There are issues with the PySide package available via pip, so
-        # we direct users to installing PySide2 instead.
-        return ('PySide is not installed. If you have pip '
-                'installed, follow the instructions at '
-                'https://wiki.qt.io/Qt_for_Python/GettingStarted '
-                'to install PySide2 from published wheels, '
-                'then re-run this script.\n'
-                'If PySide is already installed, you may need to '
-                'update your PYTHONPATH to indicate where it is '
-                'located.')
-    else:                       
+    if Windows():
+        # There is no distribution of PySide2 for Windows for Python 2.7.
+        # So use PySide instead. See the following for more details:
+        # https://wiki.qt.io/Qt_for_Python/Considerations#Missing_Windows_.2F_Python_2.7_release
         return ('PySide is not installed. If you have pip '
                 'installed, run "pip install PySide" '
                 'to install it, then re-run this script.\n'
                 'If PySide is already installed, you may need to '
+                'update your PYTHONPATH to indicate where it is '
+                'located.')
+    else:                       
+        return ('PySide2 is not installed. If you have pip '
+                'installed, run "pip install PySide2" '
+                'to install it, then re-run this script.\n'
+                'If PySide2 is already installed, you may need to '
                 'update your PYTHONPATH to indicate where it is '
                 'located.')
 
@@ -2346,18 +2344,25 @@ if context.buildDocs:
         sys.exit(1)
 
 if PYSIDE in requiredDependencies:
-    # The USD build will skip building usdview if pyside-uic or pyside2-uic is 
+    # The USD build will skip building usdview if pyside2-uic or pyside-uic is
     # not found, so check for it here to avoid confusing users. This list of 
     # PySide executable names comes from cmake/modules/FindPySide.cmake
-    pysideUic = ["pyside-uic", "python2-pyside-uic", "pyside-uic-2.7"]
-    found_pysideUic = any([find_executable(p) for p in pysideUic])
     pyside2Uic = ["pyside2-uic", "python2-pyside2-uic", "pyside2-uic-2.7"]
     found_pyside2Uic = any([find_executable(p) for p in pyside2Uic])
-    if not found_pysideUic and not found_pyside2Uic:
-        PrintError("pyside-uic not found -- please install PySide and adjust "
-                   "your PATH. (Note that this program may be named {0} "
-                   "depending on your platform)"
+    pysideUic = ["pyside-uic", "python2-pyside-uic", "pyside-uic-2.7"]
+    found_pysideUic = any([find_executable(p) for p in pysideUic])
+    if not found_pyside2Uic and not found_pysideUic:
+        if Windows():
+            # Windows does not support PySide2 with Python2.7
+            PrintError("pyside-uic not found -- please install PySide and"
+                       " adjust your PATH. (Note that this program may be named"
+                       " {0} depending on your platform)"
                    .format(" or ".join(pysideUic)))
+        else:
+            PrintError("pyside2-uic not found -- please install PySide2 and"
+                       " adjust your PATH. (Note that this program may be"
+                       " named {0} depending on your platform)"
+                       .format(" or ".join(pyside2Uic)))
         sys.exit(1)
 
 if JPEG in requiredDependencies:

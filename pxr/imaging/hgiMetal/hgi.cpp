@@ -234,6 +234,11 @@ HgiMetal::DestroyPipeline(HgiPipelineHandle* pipeHandle)
     DestroyObject(pipeHandle);
 }
 
+TfToken const&
+HgiMetal::GetAPIName() const {
+    return HgiTokens->Metal;
+}
+
 void
 HgiMetal::StartFrame()
 {

@@ -262,6 +262,15 @@ HgiGLImmediateCommandBuffer::CreateGraphicsEncoder(
 {
     TRACE_FUNCTION();
 
+    // XXX This check should be removed once the tasks have switched over to
+    // Hgi so that the PresentTask can render to framebuffer (see XXX below).
+    if (!desc.HasAttachments()) {
+        // XXX For now we do not emit a warning because we have to many
+        // pieces that do not yet use Hgi fully.
+        // TF_WARN("Encoder descriptor incomplete");
+        return nullptr;
+    }
+
     const size_t maxColorAttachments = 8;
     if (!TF_VERIFY(desc.colorAttachmentDescs.size() <= maxColorAttachments,
         "Too many color attachments for OpenGL frambuffer"))

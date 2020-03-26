@@ -417,7 +417,7 @@ HdStRenderPassState::MakeGraphicsEncoderDesc() const
             desc.depthTexture = hgiTexHandle;
         } else if (TF_VERIFY(
             desc.colorAttachmentDescs.size() < maxColorAttachments,
-            "Too many aov bindings for color attachments")) 
+            "Too many aov bindings for color attachments"))
         {
             desc.colorAttachmentDescs.emplace_back(std::move(attachmentDesc));
             desc.colorTextures.emplace_back(hgiTexHandle);

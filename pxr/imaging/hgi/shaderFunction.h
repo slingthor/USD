@@ -42,8 +42,12 @@ PXR_NAMESPACE_OPEN_SCOPE
 /// Describes the properties needed to create a GPU shader function.
 ///
 /// <ul>
+/// <li>debugName:
+///   This label can be applied as debug label for gpu debugging.</li>
 /// <li>shaderCode:
 ///   The ascii shader code.</li>
+/// <li>shaderStage:
+///   The shader stage this function represents (e.g. vertex or fragment shader).</li>
 /// </ul>
 ///
 struct HgiShaderFunctionDesc

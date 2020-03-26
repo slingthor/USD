@@ -38,7 +38,7 @@
                 "source": [ "Composite.FragmentWithDepth" ]
             }
         },
-        "metal": {
+        "Metal": {
             "FullscreenVertex": {
                 "source": [
                     "Fullscreen.Metal.Common",

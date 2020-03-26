@@ -35,7 +35,7 @@
                 "source": [ "Outline.Fragment" ]
             }
         },
-        "metal": {
+        "Metal": {
             "OutlineVertex": {
                 "source": [ 
                     "Outline.Metal.Common", 

@@ -71,6 +71,8 @@ private:
     HgiGLPipeline(const HgiGLPipeline&) = delete;
 
 private:
+    HgiPipelineDesc _descriptor;
+
     int32_t _restoreDrawFramebuffer;
     int32_t _restoreReadFramebuffer;
     int32_t _restoreRenderBuffer;
@@ -89,7 +91,7 @@ private:
     int32_t _restoreAlphaDstFnOp;
     bool _restoreAlphaToCoverage;
 
-	uint32_t _vao;
+    uint32_t _vao;
 };
 
 

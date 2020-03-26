@@ -28,6 +28,7 @@
 #include "pxr/imaging/hgiMetal/api.h"
 #include "pxr/imaging/hgiMetal/immediateCommandBuffer.h"
 #include "pxr/imaging/hgi/hgi.h"
+#include "pxr/imaging/hgi/tokens.h"
 
 #import <Metal/Metal.h>
 
@@ -108,9 +109,7 @@ public:
     void DestroyPipeline(HgiPipelineHandle* pipeHandle) override;
 
     HGIMETAL_API
-    const char* GetAPIName() const override {
-        return "metal";
-    }
+    TfToken const& GetAPIName() const override;
     
     HGIMETAL_API
     void StartFrame() override;
