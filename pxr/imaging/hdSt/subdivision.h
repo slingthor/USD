@@ -316,21 +316,11 @@ HdSt_OsdRefineComputation<VERTEX_BUFFER>::Resolve()
         return true;
     }
 
-#if OPENSUBDIV_HAS_METAL_COMPUTE && defined(PXR_METAL_SUPPORT_ENABLED) //MTL_CHANGE
-    OpenSubdiv::Osd::MTLContext deviceContext;
-    OpenSubdiv::Osd::MTLContext *deviceContextPtr = &deviceContext;
-    deviceContext.device       = MtlfMetalContext::GetMetalContext()->currentDevice;
-    deviceContext.commandQueue = MtlfMetalContext::GetMetalContext()->gpus.commandQueue;
-#else
-    void *deviceContextPtr = NULL;
-#endif
-    
     // prepare cpu vertex buffer including refined vertices
     TF_VERIFY(!_cpuVertexBuffer);
     _cpuVertexBuffer = VERTEX_BUFFER::Create(
         HdGetComponentCount(_source->GetTupleType().type),
-        subdivision->GetNumVertices(),
-        deviceContextPtr);  // MTL_CHANGE
+        subdivision->GetNumVertices());
 
     subdivision->RefineCPU(_source, _varying, _cpuVertexBuffer);
 

@@ -74,7 +74,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 #if OPENSUBDIV_HAS_METAL_COMPUTE  && defined(PXR_METAL_SUPPORT_ENABLED) // MTL_CHANGE
 typedef OpenSubdiv::Osd::MTLStencilTable     HdSt_OsdGpuStencilTable;
 typedef OpenSubdiv::Osd::MTLComputeEvaluator HdSt_OsdGpuEvaluator;
-typedef OpenSubdiv::Osd::CPUMTLVertexBuffer  HdSt_OsdCpuVertexBuffer;
+typedef OpenSubdiv::Osd::CpuVertexBuffer     HdSt_OsdCpuVertexBuffer;
 typedef pxr::OSDMetalContext                 HdSt_OsdGpuDeviceContext;
 typedef pxr::OSDMetalContext*                HdSt_OsdGpuDeviceContextPtr;
 #pragma message("Building for Metal OpenSubDiv")
