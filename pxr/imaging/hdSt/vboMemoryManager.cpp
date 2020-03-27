@@ -211,9 +211,9 @@ HdStVBOMemoryManager::_StripedBufferArray::_StripedBufferArray(
 
 HdBufferResourceSharedPtr
 HdStVBOMemoryManager::_StripedBufferArray::_AddResource(TfToken const& name,
-                                                        HdTupleType tupleType,
-                                                        int offset,
-                                                        int stride)
+                                                   HdTupleType tupleType,
+                                                   int offset,
+                                                   int stride)
 {
     HD_TRACE_FUNCTION();
     if (TfDebug::IsEnabled(HD_SAFE_MODE)) {

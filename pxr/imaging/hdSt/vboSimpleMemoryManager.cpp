@@ -180,7 +180,7 @@ HdStVBOSimpleMemoryManager::_SimpleBufferArray::_AddResource(
         // duplication check
         HdBufferResourceSharedPtr bufferRes = GetResource(name);
         if (!TF_VERIFY(!bufferRes)) {
-            return dynamic_pointer_cast<HdStBufferResource>(bufferRes);
+            return bufferRes;
         }
     }
 
