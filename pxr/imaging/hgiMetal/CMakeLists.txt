@@ -27,13 +27,13 @@ pxr_library(hgiMetal
         ${APPUIKIT_LIBRARY}
 
     PRIVATE_CLASSES
-        capabilities
         conversions
         diagnostic
 
     PUBLIC_CLASSES
         blitEncoder
         buffer
+        capabilities
         graphicsEncoder
         hgi
         immediateCommandBuffer

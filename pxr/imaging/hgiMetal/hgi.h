@@ -135,12 +135,7 @@ public:
     int GetAPIVersion() const {
         return _apiVersion;
     }
-    
-    HGIMETAL_API
-    bool GetConcurrentDispatch() const {
-        return _concurrentDispatchSupported;
-    }
-    
+
     HGIMETAL_API
     void SetNeedsInterop(bool useInterop) {
         _useInterop = useInterop;
@@ -166,7 +161,6 @@ private:
     int _frameDepth;
 
     int _apiVersion;
-    bool _concurrentDispatchSupported;
     bool _useInterop;
 
     std::unique_ptr<HgiMetalImmediateCommandBuffer> _immediateCommandBuffer;

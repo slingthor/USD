@@ -24,6 +24,7 @@
 
 #include "pxr/imaging/hgiInterop/metal.h"
 
+#include "pxr/imaging/hgiMetal/capabilities.h"
 #include "pxr/imaging/hgiMetal/diagnostic.h"
 #include "pxr/imaging/hgiMetal/hgi.h"
 #include "pxr/imaging/hgiMetal/immediateCommandBuffer.h"
@@ -798,7 +799,7 @@ HgiInteropMetal::CopyToInterop(
     
     id<MTLComputeCommandEncoder> computeEncoder;
     
-    if (metalHgi->GetConcurrentDispatch()) {
+    if (metalHgi->GetCapabilities().concurrentDispatchSupported) {
         computeEncoder = [commandBuffer
          computeCommandEncoderWithDispatchType:MTLDispatchTypeConcurrent];
     }
