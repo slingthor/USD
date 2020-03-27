@@ -324,7 +324,6 @@ GlfContextCaps::_LoadCaps()
     // GPU Compute
     if (IsGPUComputeEnabled()) {
         gpuComputeEnabled = true;
-        gpuComputeNormalsEnabled = true;
 
 #if OPENSUBDIV_HAS_GLSL_COMPUTE
         if (glslVersion < 430) {

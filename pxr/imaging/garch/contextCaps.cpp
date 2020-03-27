@@ -100,7 +100,6 @@ GarchContextCaps::GarchContextCaps()
 
     , copyBufferEnabled(true)
     , gpuComputeEnabled(false)
-    , gpuComputeNormalsEnabled(false)
 
     , flipTexturesOnLoad(true)
     , hasSubDataCopy(false)

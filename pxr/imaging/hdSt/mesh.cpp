@@ -629,10 +629,8 @@ HdStMesh::_PopulateVertexPrimvars(HdSceneDelegate *sceneDelegate,
     int numPoints = _topology ? _topology->GetNumPoints() : 0;
     int refineLevel = _topology ? _topology->GetRefineLevel() : 0;
 
-    bool cpuSmoothNormals =
-        (!GarchResourceFactory::GetInstance()->GetContextCaps().gpuComputeNormalsEnabled);
-    bool cpuRefinement =
-        (!GarchResourceFactory::GetInstance()->GetContextCaps().gpuComputeEnabled);
+    bool cpuNormals = (!GarchResourceFactory::GetInstance()->
+                            GetContextCaps().gpuComputeEnabled);
 
     // Don't call _GetRefineLevelForDesc(desc) instead of GetRefineLevel(). Why?
     //
@@ -811,7 +809,7 @@ HdStMesh::_PopulateVertexPrimvars(HdSceneDelegate *sceneDelegate,
         
         // The smooth normals computation uses the points primvar as a source.
         //
-        if (cpuSmoothNormals) {
+        if (cpuNormals) {
             // CPU smooth normals require the points source data
             // So it is expected to be dirty.  So if the
             // points variable is not set it means the points primvar is
@@ -825,29 +823,22 @@ HdStMesh::_PopulateVertexPrimvars(HdSceneDelegate *sceneDelegate,
                             _vertexAdjacency.get(), points, normalsName,
                             _vertexAdjacency->GetSharedAdjacencyBuilderComputation(
                                 _topology.get()),
-                                usePackedSmoothNormals));
-                
-                if (cpuRefinement)
-                {
-                    if (doRefine) {
-                        normal = _RefinePrimvar(normal, /*varying=*/false,
-                                                &computations, _topology);
-                    } else if (doQuadrangulate) {
-                        normal = _QuadrangulatePrimvar(normal,
-                                                       &computations,
-                                                       _topology,
-                                                       id,
-                                                       resourceRegistry);
-                    }
+                            usePackedSmoothNormals));
+
+                if (doRefine) {
+                    normal = _RefinePrimvar(normal, /*varying=*/false,
+                                                      &computations, _topology);
+                } else if (doQuadrangulate) {
+                    normal = _QuadrangulatePrimvar(normal,
+                                                   &computations,
+                                                   _topology,
+                                                   id,
+                                                   resourceRegistry);
                 }
 
                 sources.push_back(normal);
             }
-        }
-        
-		// It's possible we're going to mix and match CPU normals and GPU refinement
-        if (!cpuSmoothNormals || !cpuRefinement)
-        {
+        } else {
             // If we don't have the buffer source, we can get the points
             // data type from the bufferspec in the vertex bar. We need it
             // so we know what type normals should be.
@@ -862,17 +853,14 @@ HdStMesh::_PopulateVertexPrimvars(HdSceneDelegate *sceneDelegate,
                 // Smooth normals will compute normals as the same datatype
                 // as points, unless we ask for packed normals.
                 // This is unfortunate; can we force them to be float?
-				// If we didn't calcuate normals on the CPU then need to do it here
-                if (!cpuSmoothNormals) {
-                	HdComputationSharedPtr smoothNormalsComputation(
-                        HdStResourceFactory::GetInstance()->NewSmoothNormalsComputationGPU(
-                        	_vertexAdjacency.get(),
-                        	HdTokens->points,
-                        	normalsName,
-                        	pointsDataType,
-                        	usePackedSmoothNormals));
-                	computations.push_back(smoothNormalsComputation);
-				}
+                HdComputationSharedPtr smoothNormalsComputation(
+                    HdStResourceFactory::GetInstance()->NewSmoothNormalsComputationGPU(
+                        _vertexAdjacency.get(),
+                        HdTokens->points,
+                        normalsName,
+                        pointsDataType,
+                        usePackedSmoothNormals));
+                computations.push_back(smoothNormalsComputation);
 
                 // note: we haven't had explicit dependency for GPU
                 // computations just yet. Currently they are executed
@@ -1867,7 +1855,7 @@ HdStMesh::_PropagateDirtyBits(HdDirtyBits bits) const
     // so mark points as dirty, so that the scene delegate will provide
     // the data.
     if ((bits & (DirtySmoothNormals | DirtyFlatNormals)) &&
-        !GarchResourceFactory::GetInstance()->GetContextCaps().gpuComputeNormalsEnabled) {
+        !GarchResourceFactory::GetInstance()->GetContextCaps().gpuComputeEnabled) {
         bits |= HdChangeTracker::DirtyPoints;
     }
 

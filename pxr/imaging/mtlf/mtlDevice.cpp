@@ -27,15 +27,10 @@
 #include "pxr/base/tf/getenv.h"
 
 #include "pxr/imaging/hgiMetal/hgi.h"
+#include "pxr/imaging/hgiMetal/capabilities.h"
 
 #import <simd/simd.h>
 #include <sys/time.h>
-
-#if defined(ARCH_OS_MACOS)
-#import <Cocoa/Cocoa.h>
-#else
-#import <UIKit/UIKit.h>
-#endif // ARCH_OS_MACOS
 
 #define METAL_TESSELLATION_SUPPORT 0
 
@@ -83,7 +78,7 @@ void MtlfMetalContext::ThreadState::PrepareThread(MtlfMetalContext *_this) {
             oldStyleUniformBuffer[i] = new uint8_t[defaultBufferSize];
             memset(oldStyleUniformBuffer[i], 0x00, defaultBufferSize);
         }
-        
+    
         vertexDescriptor = nil;
         indexBuffer = nil;
         vertexPositionBuffer = nil;
@@ -256,19 +251,7 @@ void MtlfMetalContext::Init(HgiMetal *hgi)
     memset(commandBuffers, 0x00, sizeof(commandBuffers));
     commandBuffersStackPos = 0;
 
-#if defined(ARCH_OS_IOS)
-#define SYSTEM_VERSION_GREATER_THAN_OR_EQUAL_TO(v) ([[[UIDevice currentDevice] systemVersion] compare:v options:NSNumericSearch] != NSOrderedAscending)
-    
-    static bool sysVerGreaterThanOrEqualTo12_0 = SYSTEM_VERSION_GREATER_THAN_OR_EQUAL_TO(@"12.0");
-    concurrentDispatchSupported = sysVerGreaterThanOrEqualTo12_0;
-    
-#else // ARCH_OS_IOS
-    static NSOperatingSystemVersion minimumSupportedOSVersion = { .majorVersion = 10, .minorVersion = 14, .patchVersion = 5 };
-    static bool sysVerGreaterOrEqualTo10_14_5 = [NSProcessInfo.processInfo isOperatingSystemAtLeastVersion:minimumSupportedOSVersion];
-    
-    concurrentDispatchSupported = sysVerGreaterOrEqualTo10_14_5;
-#endif // ARCH_OS_IOS
-
+    concurrentDispatchSupported = hgi->GetCapabilities().concurrentDispatchSupported;
 
     MTLTextureDescriptor* blackDesc = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA16Float
                                                                                     width:1
