@@ -852,6 +852,9 @@ def InstallTBB_LinuxOrMacOS(context, force, buildArgs):
             PatchFile("include/tbb/machine/macos_common.h", 
                 [("#define __TBB_Yield()  sched_yield()",
                   "#define __TBB_Yield()  __TBB_Pause(1)")])
+            PatchFile("src/tbb/custom_scheduler.h", 
+                [("const int yield_threshold = 100;",
+                  "const int yield_threshold = 10;")])
 
         makeCmd = 'make -j{procs} {buildArgs}'.format(
             procs=context.numJobs, 
