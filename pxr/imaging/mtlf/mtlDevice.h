@@ -405,12 +405,6 @@ public:
     void SetTempPointWorkaround(bool activate) { threadState.tempPointsWorkaroundActive = activate; }
     
     MTLF_API
-    void SetOSDEnabledThisFrame(bool OSDStatus) { OSDEnabledThisFrame = OSDStatus; }
-    
-    MTLF_API
-    bool IsOSDEnabledThisFrame() const { return OSDEnabledThisFrame; }
-
-    MTLF_API
     int64_t GetCurrentFrame() const { return frameCount; }
 
     MTLF_API
@@ -687,8 +681,6 @@ private:
     void  GPUTimerResetTimer(unsigned long frameNumber);
     
     std::atomic_ulong numPrimsDrawn;
-    
-    bool OSDEnabledThisFrame = false;
     
     id<MTLCaptureScope> captureScopeSubset;
 };

@@ -33,6 +33,9 @@ HgiMetalCapabilities::HgiMetalCapabilities(id<MTLDevice> device)
     if (@available(macOS 10.14.5, ios 12.0, *)) {
         concurrentDispatchSupported = true;
     }
+    else {
+        concurrentDispatchSupported = false;
+    }
 #if defined(ARCH_OS_MACOS)
     defaultStorageMode = MTLResourceStorageModeManaged;
 #else

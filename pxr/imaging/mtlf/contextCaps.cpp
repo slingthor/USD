@@ -87,9 +87,7 @@ MtlfContextCaps::_LoadCaps()
     hasMipLevelTextureWrite      = false;
 #endif
 
-#if OPENSUBDIV_HAS_METAL_COMPUTE
-    gpuComputeEnabled            = false;//IsGPUComputeEnabled();
-#endif
+    gpuComputeEnabled            = IsGPUComputeEnabled();
 }
 
 

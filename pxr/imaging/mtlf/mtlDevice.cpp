@@ -1983,7 +1983,8 @@ void MtlfMetalContext::FlushBuffers() {
     _FlushCachingStarted = false;
 }
 
-void MtlfMetalContext::QueueBufferFlush(id<MTLBuffer> const &buffer, uint64_t start, uint64_t end) {
+void MtlfMetalContext::QueueBufferFlush(
+    id<MTLBuffer> const &buffer, uint64_t start, uint64_t end) {
 #if defined(ARCH_OS_MACOS)
     if (!_FlushCachingStarted) {
         [buffer didModifyRange:NSMakeRange(start, end - start)];
@@ -1996,8 +1997,15 @@ void MtlfMetalContext::QueueBufferFlush(id<MTLBuffer> const &buffer, uint64_t st
     auto const &it = modifiedBuffers.find(buffer);
     if (it != modifiedBuffers.end()) {
         auto &bufferEntry = it->second;
-        bufferEntry.start = std::min(bufferEntry.start, start);
-        bufferEntry.end = std::max(bufferEntry.end, end);
+        if (start == bufferEntry.end) {
+            bufferEntry.end = end;
+        }
+        else {
+            [buffer didModifyRange:NSMakeRange(
+                bufferEntry.start, bufferEntry.end - bufferEntry.start)];
+            bufferEntry.start = start;
+            bufferEntry.end = end;
+        }
     }
     else
     {
@@ -2068,9 +2076,6 @@ void MtlfMetalContext::EndFrame() {
     //NSLog(@"Time: %3.3f (%lu)", GetGPUTimeInMs(), frameCount);
     
     frameCount++;
-    
-    // Reset it here as OSD may get invoked before StartFrame() is called.
-    OSDEnabledThisFrame = false;
 }
 
 void MtlfMetalContext::BeginCaptureSubset(int gpuIndex)
