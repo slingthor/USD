@@ -975,6 +975,7 @@ JPEG = Dependency("JPEG", InstallJPEG, "include/jpeglib.h")
 TIFF_URL = "https://download.osgeo.org/libtiff/tiff-4.0.7.zip"
 
 def InstallTIFF(context, force, buildArgs):
+    scriptFolder = os.path.dirname(os.path.abspath(__file__))
     with CurrentWorkingDirectory(DownloadURL(TIFF_URL, context, force)):
         # libTIFF has a build issue on Windows where tools/tiffgt.c
         # unconditionally includes unistd.h, which does not exist.
@@ -989,6 +990,25 @@ def InstallTIFF(context, force, buildArgs):
                     ("add_subdirectory(test)", "# add_subdirectory(test)")])
 
         if MacOS() or iOS():
+            patchPath = os.path.join(os.path.dirname(scriptFolder), 'patches')
+
+            devout = open(os.devnull, 'w')
+            subprocess.call(['git', 'apply', '--reject', '--whitespace=fix', 
+                patchPath + '/0001-tif_fax3.h-allow-0-length-run-in-DECODE2D.patch'],
+                stdout=devout, stderr=devout)
+
+            subprocess.call(['git', 'apply', '--reject', '--whitespace=fix', 
+                patchPath + '/0001-tif_fax3-better-fix-for-CVE-2011-0192.patch'],
+                stdout=devout, stderr=devout)
+
+            subprocess.call(['git', 'apply', '--reject', '--whitespace=fix', 
+                patchPath + '/0001-tif_fax3.h-check-for-buffer-overflow-in-EXPAND2D-bef.patch'],
+                stdout=devout, stderr=devout)
+
+            subprocess.call(['git', 'apply', '--reject', '--whitespace=fix', 
+                patchPath + '/0001-tif_fax3-more-buffer-overflow-checks-in-Fax3Decode2D.patch'],
+                stdout=devout, stderr=devout)
+
             PatchFile("CMakeLists.txt",
                    [("option(ld-version-script \"Enable linker version script\" ON)",
                      "option(ld-version-script \"Enable linker version script\" OFF)")])
