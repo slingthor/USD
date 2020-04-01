@@ -154,6 +154,12 @@ void HgiInteropMetal::_CreateShaderContext(
 
     shader.vao = 0;
     glGenVertexArrays(1, &shader.vao);
+    if (shader.vao) {
+        glBindVertexArray(shader.vao);
+    }
+
+    glGenBuffers(1, &shader.vbo);
+    glBindBuffer(GL_ARRAY_BUFFER, shader.vbo);
 
     if (shader.vao) {
         glBindVertexArray(shader.vao);
@@ -173,9 +179,6 @@ void HgiInteropMetal::_CreateShaderContext(
                               sizeof(Vertex),
                               (void*)(offsetof(Vertex, uv)));
     }
-
-    glGenBuffers(1, &shader.vbo);
-    glBindBuffer(GL_ARRAY_BUFFER, shader.vbo);
     
     Vertex v[12] = {
         { {-1, -1}, {0, 0} },
@@ -198,7 +201,8 @@ void HgiInteropMetal::_CreateShaderContext(
     glBufferData(GL_ARRAY_BUFFER, sizeof(v), v, GL_STATIC_DRAW);
     
     shader.program = program;
-    
+
+    glBindVertexArray(0);
     glUseProgram(0);
 }
 
@@ -208,6 +212,7 @@ HgiInteropMetal::HgiInteropMetal(
 {
     NSError *error = NULL;
     
+    _ProcessGLErrors(true);
     _CaptureOpenGlState();
 
     // Load our common vertex shader. This is used by both the fragment shaders
@@ -499,8 +504,8 @@ void HgiInteropMetal::AllocateAttachments(int width, int height)
         kCFAllocatorDefault,
         width,
         height,
-        //kCVPixelFormatType_32BGRA,
-        kCVPixelFormatType_64RGBAHalf,
+        kCVPixelFormatType_32BGRA,
+        //kCVPixelFormatType_64RGBAHalf,
         (__bridge CFDictionaryRef)cvBufferProperties,
         &_pixelBuffer);
     
@@ -540,7 +545,8 @@ void HgiInteropMetal::AllocateAttachments(int width, int height)
         _cvmtlTextureCache,
         _pixelBuffer,
         (__bridge CFDictionaryRef)metalTextureProperties,
-        MTLPixelFormatRGBA16Float,
+        //MTLPixelFormatRGBA16Float,
+        MTLPixelFormatBGRA8Unorm,
         width,
         height,
         0,
@@ -608,23 +614,26 @@ HgiInteropMetal::_CaptureOpenGlState()
     glActiveTexture(GL_TEXTURE1);
     glGetIntegerv(GL_TEXTURE_BINDING_RECTANGLE, &_restoreTexture[1]);
 
-    for (int i = 0; i < 2; i++) {
-        VertexAttribState &state(_restoreVertexAttribState[i]);
-        glGetVertexAttribiv(
-            i, GL_VERTEX_ATTRIB_ARRAY_ENABLED, &state.enabled);
-        glGetVertexAttribiv(
-            i, GL_VERTEX_ATTRIB_ARRAY_SIZE, &state.size);
-        glGetVertexAttribiv(
-            i, GL_VERTEX_ATTRIB_ARRAY_TYPE, &state.type);
-        glGetVertexAttribiv(
-            i, GL_VERTEX_ATTRIB_ARRAY_NORMALIZED, &state.normalized);
-        glGetVertexAttribiv(
-            i, GL_VERTEX_ATTRIB_ARRAY_STRIDE, &state.stride);
-        glGetVertexAttribiv(
-            i, GL_VERTEX_ATTRIB_ARRAY_BUFFER_BINDING, &state.bufferBinding);
-        
-        glGetVertexAttribPointerv(
-            i, GL_VERTEX_ATTRIB_ARRAY_POINTER, &state.pointer);
+    if (!_restoreVao && _restoreVbo) {
+        for (int i = 0; i < 2; i++) {
+            VertexAttribState &state(_restoreVertexAttribState[i]);
+    
+            glGetVertexAttribiv(
+                i, GL_VERTEX_ATTRIB_ARRAY_ENABLED, &state.enabled);
+            glGetVertexAttribiv(
+                i, GL_VERTEX_ATTRIB_ARRAY_SIZE, &state.size);
+            glGetVertexAttribiv(
+                i, GL_VERTEX_ATTRIB_ARRAY_TYPE, &state.type);
+            glGetVertexAttribiv(
+                i, GL_VERTEX_ATTRIB_ARRAY_NORMALIZED, &state.normalized);
+            glGetVertexAttribiv(
+                i, GL_VERTEX_ATTRIB_ARRAY_STRIDE, &state.stride);
+            glGetVertexAttribiv(
+                i, GL_VERTEX_ATTRIB_ARRAY_BUFFER_BINDING, &state.bufferBinding);
+            
+            glGetVertexAttribPointerv(
+                i, GL_VERTEX_ATTRIB_ARRAY_POINTER, &state.pointer);
+        }
     }
     
     glGetIntegerv(GL_CURRENT_PROGRAM, &_restoreProgram);
@@ -679,15 +688,7 @@ HgiInteropMetal::_RestoreOpenGlState()
     if (!_restoreVao) {
         for (int i = 0; i < 2; i++) {
             VertexAttribState &state(_restoreVertexAttribState[i]);
-            if (state.enabled) {
-                glEnableVertexAttribArray(i);
-            }
-            else {
-                glDisableVertexAttribArray(i);
-            }
-            glVertexAttribPointer(
-                i, state.size, state.type, state.normalized, state.stride,
-                state.pointer);
+            
         }
     }
     
@@ -709,17 +710,6 @@ HgiInteropMetal::_BlitToOpenGL(bool flipY, int shaderIndex)
 
     _CaptureOpenGlState();
     
-    GLint core;
-    glGetIntegerv(GL_CONTEXT_PROFILE_MASK, &core);
-    core &= GL_CONTEXT_CORE_PROFILE_BIT;
-    if (_ProcessGLErrors(true)) {
-        core = false;
-    }
-
-    if (!core) {
-        glPushAttrib(GL_ENABLE_BIT | GL_POLYGON_BIT | GL_DEPTH_BUFFER_BIT);
-    }
-    
     glDepthFunc(GL_LEQUAL);
     glDepthMask(GL_TRUE);
     glEnable(GL_DEPTH_TEST);
@@ -735,9 +725,8 @@ HgiInteropMetal::_BlitToOpenGL(bool flipY, int shaderIndex)
     glUseProgram(shader.program);
 
     // Set up the vertex structure description
-    if (core && shader.vao) {
+    if (shader.vao) {
         glBindVertexArray(shader.vao);
-        glBindBuffer(GL_ARRAY_BUFFER, shader.vbo);
     }
     else {
         glBindBuffer(GL_ARRAY_BUFFER, shader.vbo);
@@ -775,11 +764,7 @@ HgiInteropMetal::_BlitToOpenGL(bool flipY, int shaderIndex)
     else {
         glDrawArrays(GL_TRIANGLES, 0, 6);
     }
-    
-    if (!core) {
-        glPopAttrib();
-    }
-    
+
     _RestoreOpenGlState();
     glFlush();
 }

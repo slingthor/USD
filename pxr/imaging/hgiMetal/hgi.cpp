@@ -201,8 +201,13 @@ void
 HgiMetal::StartFrame()
 {
     if (_frameDepth++ == 0) {
+        MTLCaptureDescriptor *desc = [[MTLCaptureDescriptor alloc] init];
+        desc.captureObject = _captureScopeFullFrame;
+        desc.destination = MTLCaptureDestinationDeveloperTools;
+//        [[MTLCaptureManager sharedCaptureManager] startCaptureWithDescriptor:desc error:nil];
+
         [_captureScopeFullFrame beginScope];
-        
+                
         _immediateCommandBuffer->StartFrame();
     }
 }
@@ -212,6 +217,7 @@ HgiMetal::EndFrame()
 {
     if (--_frameDepth == 0) {
         [_captureScopeFullFrame endScope];
+//        [[MTLCaptureManager sharedCaptureManager] stopCapture];
     }
 }
 
