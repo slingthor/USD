@@ -322,10 +322,10 @@ void MtlfMetalContext::Init(HgiMetal *hgi)
     resourceStats.renderPipelineStates.store(0, std::memory_order_relaxed);
     resourceStats.depthStencilStates.store(0, std::memory_order_relaxed);
     resourceStats.computePipelineStates.store(0, std::memory_order_relaxed);
-    resourceStats.currentBufferAllocation.store(0, std::memory_order_relaxed);
     resourceStats.peakBufferAllocation.store(0, std::memory_order_relaxed);
     resourceStats.GSBatchesStarted.store(0, std::memory_order_relaxed);
 #endif
+    currentBufferAllocation.store(0, std::memory_order_relaxed);
     
     frameCount = 0;
     lastCompletedFrame = -1;
@@ -1940,11 +1940,11 @@ id<MTLBuffer> MtlfMetalContext::GetMetalBuffer(NSUInteger length, MTLResourceOpt
     if (pointer) {
         buffer  = [currentDevice newBufferWithBytes:pointer length:length options:options];
     } else {
-        buffer  =  [currentDevice newBufferWithLength:length options:options];
+        buffer  = [currentDevice newBufferWithLength:length options:options];
     }
     METAL_INC_STAT(resourceStats.buffersCreated);
-    METAL_INC_STAT_VAL(resourceStats.currentBufferAllocation, length);
-    METAL_MAX_STAT_VAL(resourceStats.peakBufferAllocation, resourceStats.currentBufferAllocation);
+    currentBufferAllocation.fetch_add(length, std::memory_order_relaxed);
+    METAL_MAX_STAT_VAL(resourceStats.peakBufferAllocation, currentBufferAllocation);
 
     return buffer;
 }
@@ -2027,13 +2027,13 @@ void MtlfMetalContext::CleanupUnusedBuffers(bool forceClean)
         // c) Memory threshold higher than z
         bool bReleaseBuffer = (frameCount > (bufferEntry.releasedOnFrame + METAL_MAX_BUFFER_AGE_IN_FRAMES)  ||
                                lastCompletedCommandBuffer > (bufferEntry.releasedOnCommandBuffer +  METAL_MAX_BUFFER_AGE_IN_COMMAND_BUFFERS) ||
-                               resourceStats.currentBufferAllocation.load(std::memory_order_relaxed) > METAL_HIGH_MEMORY_THRESHOLD ||
+                               currentBufferAllocation.load(std::memory_order_relaxed) > METAL_HIGH_MEMORY_THRESHOLD ||
                                forceClean);
                                
         if (bReleaseBuffer) {
             id<MTLBuffer> buffer = bufferEntry.buffer;
             //NSLog(@"Releasing buffer of length %lu (%lu) (%lu outstanding)", buffer.length, frameCount, bufferFreeList.size());
-            METAL_INC_STAT_VAL(resourceStats.currentBufferAllocation, -buffer.length);
+            currentBufferAllocation.fetch_add(-buffer.length, std::memory_order_relaxed);
             [buffer release];
             entry = bufferFreeList.erase(entry);
         }

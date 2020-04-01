@@ -69,7 +69,9 @@ class HgiMetal;
 #endif
 
 // Enable stats gathering
+#if !defined(NDEBUG)
 #define METAL_ENABLE_STATS
+#endif
 #if defined(METAL_ENABLE_STATS)
 #define METAL_INC_STAT(STAT) STAT++
 #define METAL_INC_STAT_VAL(STAT, VAL) STAT.fetch_add(VAL, std::memory_order_relaxed)
@@ -650,7 +652,6 @@ private:
         std::atomic_ulong buffersCreated;
         std::atomic_ulong buffersReused;
         std::atomic_ulong bufferSearches;
-        std::atomic_ulong currentBufferAllocation;
         std::atomic_ulong peakBufferAllocation;
         std::atomic_ulong renderEncodersCreated;
         std::atomic_ulong computeEncodersCreated;
@@ -664,7 +665,8 @@ private:
         std::atomic_ulong GSBatchesStarted;
     } resourceStats;
 #endif
-    
+    std::atomic_ulong currentBufferAllocation;
+
     struct GPUFrameTime {
         unsigned long  startingFrame;
         struct timeval frameStartTime;
