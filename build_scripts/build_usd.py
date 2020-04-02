@@ -328,10 +328,9 @@ def RunCMake(context, force, buildArgs = None, hostPlatform = False):
                 '-DCMAKE_TOOLCHAIN_FILE={usdSrcDir}/cmake/toolchains/ios.toolchain.cmake '
                 .format(usdSrcDir=context.usdSrcDir))
 
-        SDKVersion = subprocess.check_output(['xcodebuild', '-version']).strip()[6:10]
-
         CODE_SIGN_ID = os.environ.get('XCODE_ATTRIBUTE_CODE_SIGN_ID')
         if CODE_SIGN_ID is None:
+            SDKVersion = subprocess.check_output(['xcodebuild', '-version']).strip()[6:10]
             if SDKVersion >= "11.0":
                 CODE_SIGN_ID="Apple Development"
             else:
@@ -2536,6 +2535,7 @@ if Windows():
 if args.make_relocatable:
     CODE_SIGN_ID = os.environ.get('XCODE_ATTRIBUTE_CODE_SIGN_ID')
     if CODE_SIGN_ID is None:
+        SDKVersion = subprocess.check_output(['xcodebuild', '-version']).strip()[6:10]
         if SDKVersion >= "11.0":
             CODE_SIGN_ID="Apple Development"
         else:
