@@ -229,7 +229,9 @@ void MtlfMetalContext::Init(HgiMetal *hgi)
 
     currentDevice = hgi->GetDevice();
 
+#if defined(METAL_ENABLE_STATS)
     NSLog(@"Selected %@ for Metal Device", currentDevice.name);
+#endif
 
     gpus.commandQueue = hgi->GetQueue();
     [gpus.commandQueue retain];

@@ -524,7 +524,7 @@ void BVH::BuildBVH(std::vector<HdStDrawItemInstance> *drawables)
 
     buildTimeMS = (ArchGetTickTime() - buildStart) / 1000.0f;
     
-    NSLog(@"Building BVH done: MaxDepth=%u, %fms, %zu items", depth, buildTimeMS, drawableItems.size());
+//    NSLog(@"Building BVH done: MaxDepth=%u, %fms, %zu items", depth, buildTimeMS, drawableItems.size());
 }
 
 void BVH::Bake()
