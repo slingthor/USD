@@ -330,12 +330,12 @@ def RunCMake(context, force, buildArgs = None, hostPlatform = False):
 
         SDKVersion = subprocess.check_output(['xcodebuild', '-version']).strip()[6:10]
 
-        if os.environ.get('XCODE_ATTRIBUTE_CODE_SIGN_ID') == "-":
-            CODE_SIGN_ID="-"
-        elif SDKVersion >= "11.0":
-            CODE_SIGN_ID="Apple Development"
-        else:
-            CODE_SIGN_ID="iPhone Developer"
+        CODE_SIGN_ID = os.environ.get('XCODE_ATTRIBUTE_CODE_SIGN_ID')
+        if CODE_SIGN_ID is None:
+            if SDKVersion >= "11.0":
+                CODE_SIGN_ID="Apple Development"
+            else:
+                CODE_SIGN_ID="iPhone Developer"
 
         extraArgs.append(
                 '-DIOS_PLATFORM=OS '
@@ -2534,6 +2534,14 @@ if Windows():
     ])
 
 if args.make_relocatable:
+    CODE_SIGN_ID = os.environ.get('XCODE_ATTRIBUTE_CODE_SIGN_ID')
+    if CODE_SIGN_ID is None:
+        if SDKVersion >= "11.0":
+            CODE_SIGN_ID="Apple Development"
+        else:
+            CODE_SIGN_ID="iPhone Developer"
+    os.environ['CODE_SIGN_ID'] = CODE_SIGN_ID
+
     from make_relocatable import make_relocatable
     make_relocatable(context.usdInstDir, context.buildPython, iOS(), verbosity > 1)
 
