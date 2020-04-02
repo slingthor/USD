@@ -86,7 +86,7 @@ def codesign_files(files):
 
 def is_object_file(file):
     first_line = open(file).readline().rstrip()
-    return first_line.startswith("#!")
+    return not first_line.startswith("#!")
 
 
 
