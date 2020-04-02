@@ -201,10 +201,12 @@ void
 HgiMetal::StartFrame()
 {
     if (_frameDepth++ == 0) {
-        MTLCaptureDescriptor *desc = [[MTLCaptureDescriptor alloc] init];
-        desc.captureObject = _captureScopeFullFrame;
-        desc.destination = MTLCaptureDestinationDeveloperTools;
-//        [[MTLCaptureManager sharedCaptureManager] startCaptureWithDescriptor:desc error:nil];
+        if (@available(macos 10.15, ios 13.0, *)) {
+            MTLCaptureDescriptor *desc = [[MTLCaptureDescriptor alloc] init];
+            desc.captureObject = _captureScopeFullFrame;
+            desc.destination = MTLCaptureDestinationDeveloperTools;
+            //[[MTLCaptureManager sharedCaptureManager] startCaptureWithDescriptor:desc error:nil];
+        }
 
         [_captureScopeFullFrame beginScope];
                 
