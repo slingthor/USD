@@ -29,6 +29,8 @@
 #include "pxr/imaging/mtlf/diagnostic.h"
 #include "pxr/imaging/mtlf/utils.h"
 
+#include "pxr/imaging/hgiMetal/hgi.h"
+
 #include "pxr/imaging/garch/image.h"
 #include "pxr/imaging/garch/utils.h"
 
@@ -357,15 +359,6 @@ MtlfDrawTarget::Unbind()
     }
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
     context->SetDrawTarget(NULL);
-
-    // Terminate the render encoder containing all the draw commands
-//    context->GetRenderEncoder();
-//    context->ReleaseEncoder(true);
-
-    // Generate an event to indicate that the GS buffer has completed then commit it
-    //context->CommitCommandBufferForThread(false, false, METALWORKQUEUE_GEOMETRY_SHADER);
-    
-//    context->CommitCommandBufferForThread(false, false);
     
     TouchContents();
 }
@@ -452,20 +445,41 @@ MtlfDrawTarget::GetImage(std::string const & name, void* buffer) const
     }
     
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
+
     id<MTLDevice> device = context->currentDevice;
-    context->CreateCommandBuffer();
-    context->LabelCommandBuffer(@"Get Image");
-    id<MTLBlitCommandEncoder> blitEncoder = context->GetBlitEncoder();
+    HgiMetal* hgiMetal = context->GetHgi();
     
-    id<MTLBuffer> const &cpuBuffer = context->GetMetalBuffer((bytesPerPixel * width * height), MTLResourceStorageModeDefault);
+    // While Mtlf exists, we need to force a flush and generation of a new
+    // command buffer, to ensure the blit happens after any work Mtlf has
+    // queued
+    hgiMetal->CommitCommandBuffer(HgiMetal::CommitCommandBuffer_NoWait, true);
     
-    [blitEncoder copyFromTexture:texture sourceSlice:0 sourceLevel:0 sourceOrigin:MTLOriginMake(0, 0, 0) sourceSize:MTLSizeMake(width, height, 1) toBuffer:cpuBuffer destinationOffset:0 destinationBytesPerRow:(bytesPerPixel * width) destinationBytesPerImage:(bytesPerPixel * width * height) options:blitOptions];
+    id<MTLCommandBuffer> commandBuffer = hgiMetal->GetCommandBuffer();
+    id<MTLBlitCommandEncoder> blitEncoder =
+        [commandBuffer blitCommandEncoder];
+    
+    id<MTLBuffer> const &cpuBuffer =
+        context->GetMetalBuffer((bytesPerPixel * width * height),
+                                MTLResourceStorageModeDefault);
+    
+    [blitEncoder copyFromTexture:texture
+                     sourceSlice:0
+                     sourceLevel:0
+                    sourceOrigin:MTLOriginMake(0, 0, 0)
+                      sourceSize:MTLSizeMake(width, height, 1)
+                        toBuffer:cpuBuffer
+               destinationOffset:0
+          destinationBytesPerRow:(bytesPerPixel * width)
+        destinationBytesPerImage:(bytesPerPixel * width * height)
+                         options:blitOptions];
+
 #if defined(ARCH_OS_MACOS)
     [blitEncoder synchronizeResource:cpuBuffer];
 #endif
+    [blitEncoder endEncoding];
 
-    context->ReleaseEncoder(true);
-    context->CommitCommandBufferForThread(false, true);
+    hgiMetal->CommitCommandBuffer(
+        HgiMetal::CommitCommandBuffer_WaitUntilCompleted);
 
     memcpy(buffer, [cpuBuffer contents], bytesPerPixel * width * height);
 	context->ReleaseMetalBuffer(cpuBuffer);

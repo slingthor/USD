@@ -41,10 +41,11 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 class HdStBufferResourceMetal;
 
-typedef boost::shared_ptr<HdStBufferResourceMetal> HdStBufferResourceMetalSharedPtr;
+using HdStBufferResourceMetalSharedPtr =
+    std::shared_ptr<HdStBufferResourceMetal>;
 
-typedef std::vector<
-    std::pair<TfToken, HdStBufferResourceMetalSharedPtr> > HdStBufferResourceMetalNamedList;
+using HdStBufferResourceMetalNamedList =
+    std::vector< std::pair<TfToken, HdStBufferResourceMetalSharedPtr> >;
 
 /// \class HdStBufferResourceGL
 ///

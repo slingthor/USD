@@ -28,6 +28,7 @@
 #include "pxr/imaging/hd/engine.h"
 #include "pxr/imaging/hd/renderDelegate.h"
 
+#include <memory>
 #include <mutex>
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -36,8 +37,8 @@ class Hgi;
 
 class Hgi;
 
-typedef boost::shared_ptr<class HdStResourceRegistry>
-    HdStResourceRegistrySharedPtr;
+using HdStResourceRegistrySharedPtr = 
+    std::shared_ptr<class HdStResourceRegistry>;
 
 enum class HdStDrawMode
 {

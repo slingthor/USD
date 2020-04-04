@@ -37,7 +37,7 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 class HdResourceRegistry;
-typedef boost::shared_ptr<class HdStMSLProgram> HdStMSLProgramSharedPtr;
+using HdStMSLProgramSharedPtr = std::shared_ptr<class HdStMSLProgram>;
 
 enum MSL_BindingType
 {

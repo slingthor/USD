@@ -428,7 +428,7 @@ class Reticles(Prim2DDrawTask):
         for i in range(5):
             w = 2.6
             h = ascenders[i & 1] + descenders[i & 1]
-            x = croppedViewport[0] - (w / 2) + ((i + 1) * croppedViewport[2]) / 6
+            x = croppedViewport[0] - (w // 2) + ((i + 1) * croppedViewport[2]) // 6
             bottomY = croppedViewport[1] - ascenders[i & 1]
             topY = croppedViewport[1] + croppedViewport[3] - descenders[i & 1]
             prims.append(FilledRect.fromXYWH((x, bottomY, w, h)))
@@ -439,7 +439,7 @@ class Reticles(Prim2DDrawTask):
             h = 2.6
             leftX = croppedViewport[0] - ascenders[i & 1]
             rightX = croppedViewport[0] + croppedViewport[2] - descenders[i & 1]
-            y = croppedViewport[1] - (h / 2) + ((i + 1) * croppedViewport[3]) / 6
+            y = croppedViewport[1] - (h // 2) + ((i + 1) * croppedViewport[3]) // 6
             prims.append(FilledRect.fromXYWH((leftX, y, w, h)))
             prims.append(FilledRect.fromXYWH((rightX, y, w, h)))
 
@@ -548,7 +548,7 @@ class HUD():
 
         # find the longest key so we know how far from the edge to print
         # add [0] at the end so that max() never gets an empty sequence
-        longestKeyLen = max([len(k) for k in dic.iterkeys()]+[0])
+        longestKeyLen = max([len(k) for k in dic.keys()]+[0])
         margin = int(longestKeyLen*1.4)
 
         painter.setFont(self._HUDFont)
@@ -1227,7 +1227,7 @@ class StageView(QtOpenGL.QGLWidget):
         GL.glUniform4f(glslProgram.uniformLocations["color"],
                        0.82745, 0.39608, 0.1647, 1)
 
-        GL.glDrawArrays(GL.GL_LINES, 0, len(data)/3)
+        GL.glDrawArrays(GL.GL_LINES, 0, len(data)//3)
 
         GL.glDisableVertexAttribArray(0)
         GL.glUseProgram(0)
@@ -2139,9 +2139,9 @@ class StageView(QtOpenGL.QGLWidget):
     def pick(self, pickFrustum):
         '''
         Find closest point in scene rendered through 'pickFrustum'.
-        Returns a quintuple:
+        Returns a quartuple:
           selectedPoint, selectedPrimPath, selectedInstancerPath,
-          selectedInstanceIndex, selectedElementIndex
+          selectedInstanceIndex
         '''
         renderer = self._getRenderer()
         if not self._dataModel.stage or not renderer:
@@ -2175,7 +2175,6 @@ class StageView(QtOpenGL.QGLWidget):
         results = renderer.TestIntersection(
                 pickFrustum.ComputeViewMatrix(),
                 pickFrustum.ComputeProjectionMatrix(),
-                Gf.Matrix4d(1.0),
                 self._dataModel.stage.GetPseudoRoot(), self._renderParams)
         if Tf.Debug.IsDebugSymbolNameEnabled(DEBUG_CLIPPING):
             print("Pick results = {}".format(results))
@@ -2226,35 +2225,19 @@ class StageView(QtOpenGL.QGLWidget):
 
             if inImageBounds:
                 selectedPoint, selectedPrimPath, selectedInstancerPath, \
-                selectedInstanceIndex, selectedElementIndex = self.pick(
-                                                                pickFrustum)
+                selectedInstanceIndex = self.pick(pickFrustum)
             else:
                 # If we're picking outside the image viewport (maybe because
                 # camera guides are on), treat that as a de-select.
                 selectedPoint, selectedPrimPath, selectedInstancerPath, \
-                selectedInstanceIndex, selectedElementIndex = \
-                    None, Sdf.Path.emptyPath, None, None, None
+                selectedInstanceIndex = \
+                    None, Sdf.Path.emptyPath, None, None
         
 			# Correct for high DPI displays
             coord = self._scaleMouseCoords( \
                 QtCore.QPoint(selectedPoint[0], selectedPoint[1]))
             selectedPoint[0] = coord.x()
             selectedPoint[1] = coord.y()
-
-            # The call to TestIntersection will return the path to a master prim
-            # (selectedPrimPath) and its instancer (selectedInstancerPath) if 
-            # the prim is instanced.
-            # Figure out which instance was actually picked and use that as our 
-            # selection in this case.
-            if selectedInstancerPath:
-                instancePrimPath, absInstanceIndex = \
-                    renderer.GetPrimPathFromInstanceIndex(
-                        selectedPrimPath, selectedInstanceIndex)
-                if instancePrimPath:
-                    selectedPrimPath = instancePrimPath
-                    selectedInstanceIndex = absInstanceIndex
-            else:
-                selectedInstanceIndex = ALL_INSTANCES
 
             if button:
                 self.signalPrimSelected.emit(

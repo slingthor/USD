@@ -31,17 +31,18 @@
 #include "pxr/base/tf/token.h"
 
 #include "pxr/imaging/garch/texture.h"
+#include <memory>
 
 PXR_NAMESPACE_OPEN_SCOPE
-
-
-typedef boost::shared_ptr<class HdStProgram> HdStProgramSharedPtr;
 
 /// Dome Light texture computations GPU
 ///
 ///
-typedef boost::shared_ptr<class HdSt_DomeLightComputationGPU> 
-                            HdSt_DomeLightComputationGPUSharedPtr;
+using HdSt_DomeLightComputationGPUSharedPtr =
+    std::shared_ptr<class HdSt_DomeLightComputationGPU>;
+using HdStProgramSharedPtr =
+    std::shared_ptr<class HdStProgram>;
+
                             
 class HdSt_DomeLightComputationGPU : public HdComputation {
 public:

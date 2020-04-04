@@ -67,7 +67,7 @@ _InitIdRenderPassState(HdRenderIndex *index)
             dynamic_cast<HdStRenderPassState*>(
                 rps.get())) {
         extendedState->SetRenderPassShader(
-            boost::make_shared<HdStRenderPassShader>(
+            std::make_shared<HdStRenderPassShader>(
                 HdxPackageRenderPassPickingShader()));
     }
 

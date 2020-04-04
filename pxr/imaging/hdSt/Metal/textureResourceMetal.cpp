@@ -85,7 +85,9 @@ HdStSimpleTextureResourceMetal::~HdStSimpleTextureResourceMetal()
     }
 
     if (_textureType != HdTextureType::Ptex) {
-        [_sampler release];
+        if (_sampler.IsSet()) {
+            [_sampler release];
+        }
     }
 }
 

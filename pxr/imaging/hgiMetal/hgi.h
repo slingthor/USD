@@ -26,7 +26,6 @@
 
 #include "pxr/pxr.h"
 #include "pxr/imaging/hgiMetal/api.h"
-#include "pxr/imaging/hgiMetal/immediateCommandBuffer.h"
 #include "pxr/imaging/hgi/hgi.h"
 #include "pxr/imaging/hgi/tokens.h"
 
@@ -35,6 +34,7 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 class HgiMetalCapabilities;
+class HgiMetalGraphicsEncoder; // TEMP
 
 enum {
     APIVersion_Metal1_0 = 0,
@@ -53,18 +53,14 @@ public:
     HgiMetal(id<MTLDevice> device = nil);
 
     HGIMETAL_API
-    ~HgiMetal();
-
-    //
-    // Command Buffers
-    //
+    ~HgiMetal() override;
 
     HGIMETAL_API
-    HgiImmediateCommandBuffer& GetImmediateCommandBuffer() override;
+    HgiGraphicsEncoderUniquePtr CreateGraphicsEncoder(
+        HgiGraphicsEncoderDesc const& desc) override;
 
-    //
-    // Resources
-    //
+    HGIMETAL_API
+    HgiBlitEncoderUniquePtr CreateBlitEncoder() override;
 
     HGIMETAL_API
     HgiTextureHandle CreateTexture(HgiTextureDesc const & desc) override;
@@ -130,7 +126,13 @@ public:
     id<MTLCommandQueue> GetQueue() const {
         return _commandQueue;
     }
-    
+
+    HGIMETAL_API
+    id<MTLCommandBuffer> GetCommandBuffer() {
+        _workToFlush = true;
+        return _commandBuffer;
+    }
+
     HGIMETAL_API
     int GetAPIVersion() const {
         return _apiVersion;
@@ -150,6 +152,21 @@ public:
     HgiMetalCapabilities const & GetCapabilities() const {
         return *_capabilities;
     }
+
+    enum CommitCommandBufferWaitType {
+        CommitCommandBuffer_NoWait = 0,
+        CommitCommandBuffer_WaitUntilScheduled,
+        CommitCommandBuffer_WaitUntilCompleted,
+    };
+    
+    HGIMETAL_API
+    void CommitCommandBuffer(
+        CommitCommandBufferWaitType waitType = CommitCommandBuffer_NoWait,
+        bool forceNewBuffer = false);
+    
+    // TEMP
+    HGIMETAL_API
+    void BeginMtlf();
     
 private:
     HgiMetal & operator=(const HgiMetal&) = delete;
@@ -157,14 +174,18 @@ private:
 
     id<MTLDevice> _device;
     id<MTLCommandQueue> _commandQueue;
+    id<MTLCommandBuffer> _commandBuffer;
     id<MTLCaptureScope> _captureScopeFullFrame;
-    int _frameDepth;
 
+    std::unique_ptr<HgiMetalCapabilities> _capabilities;
+
+    int _frameDepth;
     int _apiVersion;
     bool _useInterop;
-
-    std::unique_ptr<HgiMetalImmediateCommandBuffer> _immediateCommandBuffer;
-    std::unique_ptr<HgiMetalCapabilities> _capabilities;
+    bool _workToFlush;
+    
+    // TEMP for Mtlf handoff
+    HgiMetalGraphicsEncoder* _encoder;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

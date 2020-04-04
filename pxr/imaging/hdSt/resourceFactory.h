@@ -60,23 +60,23 @@ class HdStSimpleTextureResource;
 class HdStExtCompGpuComputation;
 class HdSt_DomeLightComputation;
 
-typedef boost::shared_ptr<class HdBufferArrayRange> HdBufferArrayRangeSharedPtr;
-typedef boost::shared_ptr<class HdBufferArray> HdBufferArraySharedPtr;
-typedef boost::shared_ptr<class HdStTextureResource> HdStTextureResourceSharedPtr;
+using HdBufferArrayRangeSharedPtr = std::shared_ptr<class HdBufferArrayRange>;
+using HdBufferArraySharedPtr = std::shared_ptr<class HdBufferArray>;
+using HdStTextureResourceSharedPtr = std::shared_ptr<class HdStTextureResource>;
 
-typedef boost::shared_ptr<class HdSt_DrawBatch> HdSt_DrawBatchSharedPtr;
-typedef boost::shared_ptr<class HdSt_GeometricShader> HdSt_GeometricShaderPtr;
-typedef boost::shared_ptr<class HdStRenderPassShader>
-                            HdStRenderPassShaderSharedPtr;
-typedef boost::shared_ptr<class HdStShaderCode> HdStShaderCodeSharedPtr;
-typedef boost::shared_ptr<class HdSt_DomeLightComputationGPU>
-                            HdSt_DomeLightComputationGPUSharedPtr;
-typedef std::vector<HdStShaderCodeSharedPtr> HdStShaderCodeSharedPtrVector;
+using HdSt_DrawBatchSharedPtr = std::shared_ptr<class HdSt_DrawBatch>;
+using HdSt_GeometricShaderPtr = std::shared_ptr<class HdSt_GeometricShader>;
+using HdStRenderPassShaderSharedPtr =
+    std::shared_ptr<class HdStRenderPassShader>;
+using HdStShaderCodeSharedPtr = std::shared_ptr<class HdStShaderCode>;
+using HdSt_DomeLightComputationGPUSharedPtr =
+    std::shared_ptr<class HdSt_DomeLightComputationGPU>;
+using HdStShaderCodeSharedPtrVector = std::vector<HdStShaderCodeSharedPtr>;
 
-typedef boost::shared_ptr<class HdStExtCompGpuComputationResource>
-                            HdStExtCompGpuComputationResourceSharedPtr;
-typedef std::vector<HdExtComputationPrimvarDescriptor>
-                            HdExtComputationPrimvarDescriptorVector;
+using HdStExtCompGpuComputationResourceSharedPtr =
+    std::shared_ptr<class HdStExtCompGpuComputationResource>;
+using HdExtComputationPrimvarDescriptorVector =
+    std::vector<HdExtComputationPrimvarDescriptor>;
 
 class HdStResourceFactoryInterface {
 public:

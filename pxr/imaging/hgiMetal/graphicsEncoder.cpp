@@ -26,6 +26,7 @@
 #include "pxr/imaging/hgiMetal/conversions.h"
 #include "pxr/imaging/hgiMetal/diagnostic.h"
 #include "pxr/imaging/hgiMetal/graphicsEncoder.h"
+#include "pxr/imaging/hgiMetal/hgi.h"
 #include "pxr/imaging/hgiMetal/pipeline.h"
 #include "pxr/imaging/hgiMetal/resourceBindings.h"
 #include "pxr/imaging/hgiMetal/texture.h"
@@ -35,9 +36,10 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 HgiMetalGraphicsEncoder::HgiMetalGraphicsEncoder(
-    id<MTLCommandBuffer> commandBuffer,
+    HgiMetal* hgi,
     HgiGraphicsEncoderDesc const& desc)
     : HgiGraphicsEncoder()
+    , _hgi(hgi)
 {
     TF_VERIFY(desc.width>0 && desc.height>0);
     TF_VERIFY(desc.colorTextures.size() == desc.colorAttachmentDescs.size());
@@ -103,19 +105,25 @@ HgiMetalGraphicsEncoder::HgiMetalGraphicsEncoder(
         metalDepthAttachment.texture = depthTexture->GetTextureId();
     }
 
-    _encoder = [commandBuffer
+    _encoder = [_hgi->GetCommandBuffer()
         renderCommandEncoderWithDescriptor:renderPassDescriptor];
     [renderPassDescriptor release];
 }
 
 HgiMetalGraphicsEncoder::~HgiMetalGraphicsEncoder()
 {
+    TF_VERIFY(_encoder == nil, "Encoder created, but never commited.");
 }
 
 void
-HgiMetalGraphicsEncoder::EndEncoding()
+HgiMetalGraphicsEncoder::Commit()
 {
-    [_encoder endEncoding];
+    if (_encoder) {
+        [_encoder endEncoding];
+        _encoder = nil;
+    }
+
+    _hgi->CommitCommandBuffer();
 }
 
 void

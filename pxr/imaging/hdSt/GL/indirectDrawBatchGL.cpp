@@ -306,7 +306,7 @@ HdSt_IndirectDrawBatchGL::_BeginGPUCountVisibleInstances(
     HdStResourceRegistrySharedPtr const &resourceRegistry)
 {
     if (!_resultBuffer) {
-        _resultBuffer = boost::dynamic_pointer_cast<HdStPersistentBufferGL>(
+        _resultBuffer = std::dynamic_pointer_cast<HdStPersistentBufferGL>(
             resourceRegistry->RegisterPersistentBuffer(
                 _tokens->drawIndirectResult, sizeof(GLint), 0));
     }
@@ -416,7 +416,7 @@ HdSt_IndirectDrawBatchGL::_CullingProgramGL::_Link(
                       == nOutputs,
                       "Size of drawElementsOutputs element must equal nOutputs.");
         
-        glTransformFeedbackVaryings(boost::dynamic_pointer_cast<HdStGLSLProgram>(program)->GetGLProgram(),
+        glTransformFeedbackVaryings(std::dynamic_pointer_cast<HdStGLSLProgram>(program)->GetGLProgram(),
                                     nOutputs,
                                     outputs, GL_INTERLEAVED_ATTRIBS);
     }

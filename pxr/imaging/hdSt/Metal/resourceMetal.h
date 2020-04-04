@@ -37,7 +37,7 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 
-typedef boost::shared_ptr<class HdStResourceMetal> HdStResourceMetalSharedPtr;
+using HdStResourceMetalSharedPtr = std::shared_ptr<class HdStResourceMetal>;
 
 /// \class HdStResourceMetal
 ///

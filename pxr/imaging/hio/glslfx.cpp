@@ -40,10 +40,11 @@
 #include "pxr/base/tf/pathUtils.h"
 
 #include <boost/functional/hash.hpp>
-#include <boost/unordered_map.hpp>
+
 #include <iostream>
 #include <istream>
 #include <fstream>
+#include <unordered_map>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -89,8 +90,7 @@ public:
         std::string const & shaderAssetPath) const;
 
 private:
-    typedef boost::unordered_map< std::string, std::string > ResourceMap;
-    ResourceMap _resourceMap;
+    std::unordered_map< std::string, std::string > _resourceMap;
 };
 
 ShaderResourceRegistry::ShaderResourceRegistry()

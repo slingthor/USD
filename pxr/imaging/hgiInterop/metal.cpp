@@ -27,7 +27,6 @@
 #include "pxr/imaging/hgiMetal/capabilities.h"
 #include "pxr/imaging/hgiMetal/diagnostic.h"
 #include "pxr/imaging/hgiMetal/hgi.h"
-#include "pxr/imaging/hgiMetal/immediateCommandBuffer.h"
 
 #include "pxr/base/tf/diagnostic.h"
 
@@ -777,10 +776,7 @@ HgiInteropMetal::CopyToInterop(
     bool flipImage)
 {
     HgiMetal* metalHgi = static_cast<HgiMetal*>(hgi);
-    HgiMetalImmediateCommandBuffer* metalIcb =
-        static_cast<HgiMetalImmediateCommandBuffer*>(
-            &hgi->GetImmediateCommandBuffer());
-    id<MTLCommandBuffer> commandBuffer = metalIcb->GetCommandBuffer();
+    id<MTLCommandBuffer> commandBuffer = metalHgi->GetCommandBuffer();
     
     id<MTLComputeCommandEncoder> computeEncoder;
     
@@ -855,7 +851,8 @@ HgiInteropMetal::CopyToInterop(
 
     // We wait until the work is scheduled for execution so that future OpenGL
     // calls are guaranteed to happen after the Metal work encoded above
-    metalIcb->BlockUntilSubmitted();
+    metalHgi->CommitCommandBuffer(
+        HgiMetal::CommitCommandBuffer_WaitUntilScheduled);
 
     if (glShaderIndex != -1) {
         _BlitToOpenGL(flipImage, glShaderIndex);

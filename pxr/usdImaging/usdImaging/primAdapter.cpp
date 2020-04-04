@@ -373,35 +373,13 @@ UsdImagingPrimAdapter::SamplePrimvar(
 
 /*virtual*/
 SdfPath 
-UsdImagingPrimAdapter::GetPathForInstanceIndex(
-    SdfPath const &protoCachePath,
-    int protoIndex,
-    int *instanceCount,
-    int *instancerIndex,
-    SdfPath *masterCachePath,
-    SdfPathVector *instanceContext)
+UsdImagingPrimAdapter::GetScenePrimPath(
+    SdfPath const& cachePath,
+    int instanceIndex) const
 {
-    if (instancerIndex) {
-        *instancerIndex = UsdImagingDelegate::ALL_INSTANCES;
-    }
-    return SdfPath();
-}
-
-/*virtual*/
-SdfPath
-UsdImagingPrimAdapter::GetPathForInstanceIndex(
-    SdfPath const &instancerCachePath,
-    SdfPath const &protoCachePath,
-    int protoIndex,
-    int *instanceCountForThisLevel,
-    int *instancerIndex,
-    SdfPath *masterCachePath,
-    SdfPathVector *instanceContext)
-{
-    if (instancerIndex) {
-        *instancerIndex = UsdImagingDelegate::ALL_INSTANCES;
-    }
-    return SdfPath();
+    // Note: if we end up here, we're not instanced, since primInfo
+    // holds the instance adapter for instanced gprims.
+    return cachePath;
 }
 
 /*virtual*/
@@ -1044,6 +1022,12 @@ GfInterval
 UsdImagingPrimAdapter::_GetCurrentTimeSamplingInterval()
 {
     return _delegate->GetCurrentTimeSamplingInterval();
+}
+
+Usd_PrimFlagsConjunction
+UsdImagingPrimAdapter::_GetDisplayPredicate() const
+{
+    return _delegate->_GetDisplayPredicate();
 }
 
 size_t

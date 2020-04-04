@@ -129,7 +129,7 @@ HdxColorChannelTask::_CreateShaderResources()
 
 #if defined(PXR_OPENGL_SUPPORT_ENABLED)
     if (isOpenGL) {
-        GLuint programId = boost::dynamic_pointer_cast<HdStGLSLProgram>(_shaderProgram)->GetGLProgram();
+        GLuint programId = std::dynamic_pointer_cast<HdStGLSLProgram>(_shaderProgram)->GetGLProgram();
         _locations[COLOR_IN] = glGetUniformLocation(programId, "colorIn");
         _locations[POSITION] = glGetAttribLocation(programId, "position");
         _locations[UV_IN]    = glGetAttribLocation(programId, "uvIn");
@@ -270,7 +270,7 @@ HdxColorChannelTask::_ApplyColorChannel()
     bool isOpenGL = HdStResourceFactory::GetInstance()->IsOpenGL();
 #if defined(PXR_OPENGL_SUPPORT_ENABLED)
     if (isOpenGL) {
-        GLuint programId = boost::dynamic_pointer_cast<HdStGLSLProgram>(_shaderProgram)->GetGLProgram();
+        GLuint programId = std::dynamic_pointer_cast<HdStGLSLProgram>(_shaderProgram)->GetGLProgram();
 
         glUseProgram(programId);
 

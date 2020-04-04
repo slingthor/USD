@@ -27,12 +27,15 @@
 #include "pxr/pxr.h"
 #include "pxr/imaging/hd/basisCurvesTopology.h"
 
+#include <memory>
+
 PXR_NAMESPACE_OPEN_SCOPE
 
 
-typedef boost::shared_ptr<class HdSt_BasisCurvesTopology>
-                                              HdSt_BasisCurvesTopologySharedPtr;
-typedef boost::shared_ptr<class HdBufferSource> HdBufferSourceSharedPtr;
+using HdSt_BasisCurvesTopologySharedPtr =
+    std::shared_ptr<class HdSt_BasisCurvesTopology>;
+
+using HdBufferSourceSharedPtr = std::shared_ptr<class HdBufferSource>;
 
 
 // HdSt_BasisCurvesTopology

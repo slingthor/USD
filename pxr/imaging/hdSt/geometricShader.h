@@ -27,19 +27,20 @@
 #include "pxr/pxr.h"
 #include "pxr/imaging/hdSt/api.h"
 #include "pxr/imaging/hd/version.h"
+#include "pxr/imaging/hd/enums.h"
 #include "pxr/imaging/hdSt/shaderCode.h"
 #include "pxr/imaging/hdSt/resourceRegistry.h"
 #include "pxr/usd/sdf/path.h"
 #include "pxr/imaging/garch/gl.h"
 #include "pxr/imaging/hio/glslfx.h"
 
-#include <boost/scoped_ptr.hpp>
+#include <memory>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
 
-typedef boost::shared_ptr<class HdSt_GeometricShader>
-                                        HdSt_GeometricShaderSharedPtr;
+using HdSt_GeometricShaderSharedPtr =
+    std::shared_ptr<class HdSt_GeometricShader>;
 struct HdSt_ShaderKey;
 
 /// \class HdSt_GeometricShader
@@ -204,7 +205,7 @@ private:
     HdPolygonMode _polygonMode;
     float _lineWidth;
 
-    boost::scoped_ptr<HioGlslfx> _glslfx;
+    std::unique_ptr<HioGlslfx> _glslfx;
     bool _frustumCullingPass;
     ID _hash;
 

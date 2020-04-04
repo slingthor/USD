@@ -38,8 +38,8 @@
 #include "pxr/base/gf/vec4d.h"
 #include "pxr/base/gf/matrix4d.h"
 
+#include <memory>
 #include <vector>
-#include <boost/scoped_ptr.hpp>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -113,7 +113,8 @@ private:
 ///
 /// A custom lighting shader for unit tests.
 ///
-typedef boost::shared_ptr<class HdSt_TestLightingShader> HdSt_TestLightingShaderSharedPtr;
+using HdSt_TestLightingShaderSharedPtr =
+    std::shared_ptr<class HdSt_TestLightingShader>;
 
 class HdSt_TestLightingShader : public HdStLightingShader {
 public:
@@ -148,7 +149,7 @@ private:
     };
     Light _lights[2];
     GfVec3f _sceneAmbient;
-    boost::scoped_ptr<HioGlslfx> _glslfx;
+    std::unique_ptr<HioGlslfx> _glslfx;
 };
 
 

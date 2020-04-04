@@ -28,7 +28,6 @@
 #include "pxr/imaging/garch/contextCaps.h"
 #include "pxr/imaging/garch/resourceFactory.h"
 
-#include <boost/make_shared.hpp>
 #include <vector>
 
 #include "pxr/base/arch/hash.h"
@@ -80,7 +79,7 @@ HdStVBOMemoryBufferGL::Reallocate(
     HD_PERF_COUNTER_INCR(HdPerfTokens->vboRelocated);
 
     HdStVBOMemoryManager::_StripedBufferArraySharedPtr curRangeOwner_ =
-        boost::static_pointer_cast<_StripedBufferArray> (curRangeOwner);
+        std::static_pointer_cast<_StripedBufferArray> (curRangeOwner);
 
     if (!TF_VERIFY(GetResources().size() ==
                       curRangeOwner_->GetResources().size())) {
@@ -171,11 +170,11 @@ HdStVBOMemoryBufferGL::Reallocate(
                 std::vector<size_t>::iterator newOffsetIt = newOffsets.begin();
 
                 // pre-pass to combine consecutive buffer range relocation
-                boost::scoped_ptr<HdStBufferRelocator> relocator(
+                std::unique_ptr<HdStBufferRelocator> const relocator(
                     HdStResourceFactory::GetInstance()->NewBufferRelocator(curId, newId));
                 TF_FOR_ALL (it, ranges) {
                     HdStVBOMemoryManager::_StripedBufferArrayRangeSharedPtr range =
-                        boost::static_pointer_cast<HdStVBOMemoryManager::_StripedBufferArrayRange>(*it);
+                        std::static_pointer_cast<HdStVBOMemoryManager::_StripedBufferArrayRange>(*it);
                     if (!range) {
                         TF_CODING_ERROR("_StripedBufferArrayRange "
                                         "expired unexpectedly.");
@@ -232,7 +231,7 @@ HdStVBOMemoryBufferGL::Reallocate(
     // update ranges
     for (size_t idx = 0; idx < ranges.size(); ++idx) {
         HdStVBOMemoryManager::_StripedBufferArrayRangeSharedPtr range =
-            boost::static_pointer_cast<HdStVBOMemoryManager::_StripedBufferArrayRange>(ranges[idx]);
+            std::static_pointer_cast<HdStVBOMemoryManager::_StripedBufferArrayRange>(ranges[idx]);
         if (!range) {
             TF_CODING_ERROR("_StripedBufferArrayRange expired unexpectedly.");
             continue;

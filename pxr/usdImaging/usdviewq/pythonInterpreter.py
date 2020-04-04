@@ -474,9 +474,9 @@ class Controller(QtCore.QObject):
             maxLength = maxLength + self._GetStringLengthInPixels(cf, '  ')
 
             # how many columns can we fit on screen?
-            numCols = max(1,width / maxLength)
+            numCols = max(1,width // maxLength)
             # how many rows do we need to fit our data
-            numRows = (len(completions) / numCols) + 1
+            numRows = (len(completions) // numCols) + 1
 
             columnWidth = QtGui.QTextLength(QtGui.QTextLength.FixedLength,
                                             maxLength)
@@ -498,8 +498,8 @@ class Controller(QtCore.QObject):
             index = 0
             completionsLength = len(completions)
 
-            for col in xrange(0,numCols):
-                for row in xrange(0,numRows):
+            for col in range(0,numCols):
+                for row in range(0,numRows):
                     cellNum = (row * numCols) + col
                     if (cellNum >= completionsLength):
                         continue
@@ -772,7 +772,21 @@ class View(QtWidgets.QTextEdit):
     def insertFromMimeData(self, source):
         if not self._CursorIsInInputArea():
             self._MoveCursorToEndOfInput()
-        super(View, self).insertFromMimeData(source)
+
+        if source.hasText():
+            text = source.text().replace('\r', '')
+            textLines = text.split('\n')
+            if (textLines[-1] == ''):
+                textLines = textLines[:-1]
+            for i in range(len(textLines)):
+                line = textLines[i]
+                cursor = self.textCursor()
+                cursor.movePosition(QtGui.QTextCursor.End)        
+                cursor.insertText(line)
+                cursor.movePosition(QtGui.QTextCursor.End)        
+                self.setTextCursor(cursor)
+                if i < len(textLines) - 1:
+                    self.returnPressed.emit()
 
     def keyPressEvent(self, e):
         """

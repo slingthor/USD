@@ -73,6 +73,10 @@ public:
     
     HGIMETAL_API
     static MTLCompareFunction GetDepthCompareFunction(HgiCompareFunction cf);
+    
+    HGIMETAL_API
+    static MTLTextureType GetTextureType(HgiTextureType tt);
+
 };
 
 

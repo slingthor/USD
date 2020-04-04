@@ -32,7 +32,8 @@
 #include "pxr/base/tf/token.h"
 #include "pxr/base/tf/stl.h"
 
-#include "pxr/base/tf/hashmap.h"
+#include <boost/shared_ptr.hpp>
+#include <memory>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -41,14 +42,14 @@ class HdStDrawItem;
 class HdStShaderCode;
 class HdResource;
 
-typedef boost::shared_ptr<class HdBufferResource> HdBufferResourceSharedPtr;
-typedef boost::shared_ptr<class HdBufferArrayRange> HdBufferArrayRangeSharedPtr;
-typedef boost::shared_ptr<class HdSt_ResourceBinder> HdSt_ResourceBinderSharedPtr;
-typedef boost::shared_ptr<class HdStProgram> HdStProgramSharedPtr;
+using HdBufferResourceSharedPtr = std::shared_ptr<class HdBufferResource>;
+using HdBufferArrayRangeSharedPtr = std::shared_ptr<class HdBufferArrayRange>;
+using HdSt_ResourceBinderSharedPtr = std::shared_ptr<class HdSt_ResourceBinder>;
+using HdStProgramSharedPtr = std::shared_ptr<class HdStProgram>;
 
-typedef boost::shared_ptr<class HdStShaderCode> HdStShaderCodeSharedPtr;
-typedef std::vector<HdStShaderCodeSharedPtr> HdStShaderCodeSharedPtrVector;
-typedef std::vector<class HdBindingRequest> HdBindingRequestVector;
+using HdStShaderCodeSharedPtr = std::shared_ptr<class HdStShaderCode>;
+using HdStShaderCodeSharedPtrVector = std::vector<HdStShaderCodeSharedPtr>;
+using HdBindingRequestVector = std::vector<class HdBindingRequest>;
 
 
 /// \class HdSt_ResourceBinder
@@ -203,10 +204,13 @@ public:
              ShaderParameterAccessor() {}
              ShaderParameterAccessor(TfToken const &name,
                                      TfToken const &dataType,
+                                     std::string const &swizzle=std::string(),
                                      TfTokenVector const &inPrimvars=TfTokenVector())
-                 : name(name), dataType(dataType), inPrimvars(inPrimvars) {}
+                 : name(name), dataType(dataType), swizzle(swizzle),
+                   inPrimvars(inPrimvars) {}
              TfToken name;        // e.g. Kd
              TfToken dataType;    // e.g. vec4
+             std::string swizzle; // e.g. xyzw
              TfTokenVector inPrimvars;  // for primvar renaming and texture coordinates,
         };
         typedef std::map<HdBinding, ShaderParameterAccessor> ShaderParameterBinding;

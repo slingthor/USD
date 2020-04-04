@@ -34,7 +34,8 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 
-typedef boost::shared_ptr<class HdStPersistentBufferMetal> HdStPersistentBufferMetalSharedPtr;
+using HdStPersistentBufferMetalSharedPtr =
+    std::shared_ptr<class HdStPersistentBufferMetal>;
 
 /// \class HdStPersistentBufferMetal
 ///

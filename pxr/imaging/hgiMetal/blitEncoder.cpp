@@ -26,7 +26,6 @@
 #include "pxr/imaging/hgiMetal/hgi.h"
 #include "pxr/imaging/hgiMetal/blitEncoder.h"
 #include "pxr/imaging/hgiMetal/buffer.h"
-#include "pxr/imaging/hgiMetal/immediateCommandBuffer.h"
 #include "pxr/imaging/hgiMetal/capabilities.h"
 #include "pxr/imaging/hgiMetal/conversions.h"
 #include "pxr/imaging/hgiMetal/diagnostic.h"
@@ -39,23 +38,26 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 HgiMetalBlitEncoder::HgiMetalBlitEncoder(
-    HgiMetal *hgi, HgiMetalImmediateCommandBuffer* cmdBuf)
+    HgiMetal *hgi)
     : HgiBlitEncoder()
     , _hgi(hgi)
-    , _commandBuffer(cmdBuf)
 {
-    id<MTLDevice> device = _commandBuffer->GetDevice();
-    _blitEncoder = [_commandBuffer->GetCommandBuffer() blitCommandEncoder];
+    id<MTLDevice> device = _hgi->GetDevice();
+    _blitEncoder = [_hgi->GetCommandBuffer() blitCommandEncoder];
 }
 
 HgiMetalBlitEncoder::~HgiMetalBlitEncoder()
 {
+    TF_VERIFY(_blitEncoder == nil, "Encoder created, but never commited.");
 }
 
 void
-HgiMetalBlitEncoder::EndEncoding()
+HgiMetalBlitEncoder::Commit()
 {
     [_blitEncoder endEncoding];
+    _blitEncoder = nil;
+    
+    _hgi->CommitCommandBuffer();
 }
 
 void
@@ -105,7 +107,7 @@ HgiMetalBlitEncoder::CopyTextureGpuToCpu(
         TF_CODING_ERROR("Unknown HgTextureUsage bit");
     }
 
-    id<MTLDevice> device = _commandBuffer->GetDevice();
+    id<MTLDevice> device = _hgi->GetDevice();
 
     MTLResourceOptions options =
         _hgi->GetCapabilities().defaultStorageMode;

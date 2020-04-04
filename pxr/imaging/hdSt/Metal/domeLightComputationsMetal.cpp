@@ -50,7 +50,7 @@ void
 HdSt_DomeLightComputationGPUMetal::_Execute(HdStProgramSharedPtr computeProgram)
 {
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
-    HdStMSLProgramSharedPtr const &mslProgram(boost::dynamic_pointer_cast<HdStMSLProgram>(computeProgram));
+    HdStMSLProgramSharedPtr const &mslProgram(std::dynamic_pointer_cast<HdStMSLProgram>(computeProgram));
 
     struct Uniforms {
         Uniforms(float _roughness, int _level)

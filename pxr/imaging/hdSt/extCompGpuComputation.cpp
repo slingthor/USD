@@ -48,8 +48,6 @@
 
 #include <limits>
 
-using namespace boost;
-
 PXR_NAMESPACE_OPEN_SCOPE
 
 
@@ -117,7 +115,7 @@ HdStExtCompGpuComputation::Execute(
     computeProgram->SetProgram();
 
     HdBufferArrayRangeSharedPtr outputBar =
-        boost::static_pointer_cast<HdBufferArrayRange>(outputRange);
+        std::static_pointer_cast<HdBufferArrayRange>(outputRange);
     TF_VERIFY(outputBar);
 
     // Prepare uniform buffer for GPU computation
@@ -139,14 +137,14 @@ HdStExtCompGpuComputation::Execute(
             _uniforms.push_back(buffer->GetOffset() / componentSize);
             // Assumes non-SSBO allocator for the stride
             _uniforms.push_back(buffer->GetStride() / componentSize);
-            binder.BindBuffer(name, dynamic_pointer_cast<HdStBufferResource>(buffer));
+            binder.BindBuffer(name, std::dynamic_pointer_cast<HdStBufferResource>(buffer));
         } 
     }
 
     GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
     for (HdBufferArrayRangeSharedPtr const & input: _resource->GetInputs()) {
         HdBufferArrayRangeSharedPtr const & inputBar =
-            boost::static_pointer_cast<HdBufferArrayRange>(input);
+            std::static_pointer_cast<HdBufferArrayRange>(input);
 
         for (HdStBufferResourceNamedPair const & it:
                         inputBar->GetResources()) {
@@ -220,7 +218,7 @@ HdStExtCompGpuComputation::CreateGpuComputation(
     // Downcast the resource registry
     HdRenderIndex &renderIndex = sceneDelegate->GetRenderIndex();
     HdStResourceRegistrySharedPtr const& resourceRegistry = 
-        boost::dynamic_pointer_cast<HdStResourceRegistry>(
+        std::dynamic_pointer_cast<HdStResourceRegistry>(
                               renderIndex.GetResourceRegistry());
 
     HdStComputeShaderSharedPtr shader(new HdStComputeShader());
@@ -284,10 +282,10 @@ HdSt_GetExtComputationPrimvarsComputations(
     HdSceneDelegate *sceneDelegate,
     HdExtComputationPrimvarDescriptorVector const& allCompPrimvars,
     HdDirtyBits dirtyBits,
-    HdBufferSourceVector *sources,
-    HdBufferSourceVector *reserveOnlySources,
-    HdBufferSourceVector *separateComputationSources,
-    HdComputationVector *computations)
+    HdBufferSourceSharedPtrVector *sources,
+    HdBufferSourceSharedPtrVector *reserveOnlySources,
+    HdBufferSourceSharedPtrVector *separateComputationSources,
+    HdComputationSharedPtrVector *computations)
 {
     TF_VERIFY(sources);
     TF_VERIFY(reserveOnlySources);
@@ -341,7 +339,7 @@ HdSt_GetExtComputationPrimvarsComputations(
 
                         HdBufferSourceSharedPtr gpuComputationSource(
                                 new HdStExtCompGpuComputationBufferSource(
-                                    HdBufferSourceVector(),
+                                    HdBufferSourceSharedPtrVector(),
                                     gpuComputation->GetResource()));
 
                         separateComputationSources->push_back(

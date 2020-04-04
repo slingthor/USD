@@ -211,9 +211,10 @@ id<MTLDevice> MtlfMetalContext::GetMetalDevice(PREFERRED_GPU_TYPE preferredGPUTy
 // MtlfMetalContext
 //
 
-MtlfMetalContext::MtlfMetalContext(HgiMetal *hgi)
+MtlfMetalContext::MtlfMetalContext(HgiMetal *hgi_)
+: hgi(hgi_)
 {
-    Init(hgi);
+    Init();
 }
 
 MtlfMetalContext::~MtlfMetalContext()
@@ -221,7 +222,7 @@ MtlfMetalContext::~MtlfMetalContext()
     Cleanup();
 }
 
-void MtlfMetalContext::Init(HgiMetal *hgi)
+void MtlfMetalContext::Init()
 {
     gsMaxConcurrentBatches = 0;
     gsMaxDataPerBatch = 0;
@@ -1638,16 +1639,12 @@ void MtlfMetalContext::ResetEncoders(MetalWorkQueueType workQueueType, bool isIn
     wq->currentComputePipelineState          = nil;
 }
 
-void MtlfMetalContext::CommitCommandBufferForThread(bool waituntilScheduled, bool waitUntilCompleted, MetalWorkQueueType workQueueType)
+void MtlfMetalContext::CommitCommandBufferForThread(bool waituntilScheduled, MetalWorkQueueType workQueueType)
 {
     MetalWorkQueue *wq = &GetWorkQueue(workQueueType);
     
     //NSLog(@"Committing command buffer %d %@", (int)workQueueType, wq->commandBuffer.label);
-    
-    if (waituntilScheduled && waitUntilCompleted) {
-        TF_FATAL_CODING_ERROR("Just pick one please!");
-    }
-    
+        
     // Check if there was any work to submit on this queue
     if (wq->commandBuffer == nil) {
         TF_FATAL_CODING_ERROR("Can't commit command buffer if it was never created");
@@ -1706,11 +1703,8 @@ void MtlfMetalContext::CommitCommandBufferForThread(bool waituntilScheduled, boo
         }];
     }
     [wq->commandBuffer commit];
-    
-    if (waitUntilCompleted) {
-        [wq->commandBuffer waitUntilCompleted];
-    }
-    else if (waituntilScheduled && wq->encoderHasWork) {
+
+    if (waituntilScheduled && wq->encoderHasWork) {
         [wq->commandBuffer waitUntilScheduled];
     }
     [wq->commandBuffer release];
@@ -2160,10 +2154,10 @@ void MtlfMetalContext::_gsEncodeSync(bool doOpenBatch) {
             threadState.gsEncodedBatches++;
             if (threadState.gsEncodedBatches == gsMaxConcurrentBatches) {
                 [GetWorkQueue(METALWORKQUEUE_GEOMETRY_SHADER).commandBuffer enqueue];
-                CommitCommandBufferForThread(false, false, METALWORKQUEUE_GEOMETRY_SHADER);
+                CommitCommandBufferForThread(false, METALWORKQUEUE_GEOMETRY_SHADER);
                 
                 [GetWorkQueue(METALWORKQUEUE_DEFAULT).commandBuffer enqueue];
-                CommitCommandBufferForThread(false, false, METALWORKQUEUE_DEFAULT);
+                CommitCommandBufferForThread(false, METALWORKQUEUE_DEFAULT);
 
                 CreateCommandBuffer(METALWORKQUEUE_GEOMETRY_SHADER);
                 CreateCommandBuffer(METALWORKQUEUE_DEFAULT);

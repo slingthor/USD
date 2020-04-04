@@ -36,7 +36,6 @@ pxr_library(hgiMetal
         capabilities
         graphicsEncoder
         hgi
-        immediateCommandBuffer
         pipeline
         resourceBindings
         shaderFunction

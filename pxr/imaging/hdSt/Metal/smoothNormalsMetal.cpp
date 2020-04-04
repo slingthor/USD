@@ -81,7 +81,7 @@ HdSt_SmoothNormalsComputationMetal::_Execute(
     
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
     HdStMSLProgramSharedPtr const &mslProgram(
-        boost::dynamic_pointer_cast<HdStMSLProgram>(computeProgram));
+        std::dynamic_pointer_cast<HdStMSLProgram>(computeProgram));
 
     // Only the normals are writebale
     unsigned long immutableBufferMask = (1 << 0) | (1 << 2) | (1 << 3);

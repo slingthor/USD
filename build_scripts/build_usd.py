@@ -21,9 +21,12 @@
 # KIND, either express or implied. See the Apache License for the specific
 # language governing permissions and limitations under the Apache License.
 #
+from __future__ import print_function
+
 from distutils.spawn import find_executable
 
 import argparse
+import codecs
 import contextlib
 import copy
 import ctypes
@@ -39,28 +42,33 @@ import shlex
 import shutil
 import subprocess
 import sys
+import sysconfig
 import tarfile
-import urllib2
 import zipfile
+
+if sys.version_info.major >= 3:
+    from urllib.request import urlopen
+else:
+    from urllib2 import urlopen
 
 # Helpers for printing output
 verbosity = 1
 
 def Print(msg):
     if verbosity > 0:
-        print msg
+        print(msg)
 
 def PrintWarning(warning):
     if verbosity > 0:
-        print "WARNING:", warning
+        print("WARNING:", warning)
 
 def PrintStatus(status):
     if verbosity >= 1:
-        print "STATUS:", status
+        print("STATUS:", status)
 
 def PrintInfo(info):
     if verbosity >= 2:
-        print "INFO:", info
+        print("INFO:", info)
 
 def PrintCommandOutput(output):
     if verbosity >= 3:
@@ -70,7 +78,7 @@ def PrintError(error):
     if verbosity >= 3 and sys.exc_info()[1] is not None:
         import traceback
         traceback.print_exc()
-    print "ERROR:", error
+    print ("ERROR:", error)
 
 # cross platform defaults
 # macOS can target macOS and iOS platforms
@@ -86,11 +94,15 @@ def MacOS():
 def iOS():
     return (platform.system() == "Darwin") and crossPlatform is "iOS"
 
+def Python3():
+    return sys.version_info.major == 3
+
 def GetCommandOutput(command):
     """Executes the specified command and returns output or None."""
     try:
         return subprocess.check_output(
-            shlex.split(command), stderr=subprocess.STDOUT).strip()
+            shlex.split(command), 
+            stderr=subprocess.STDOUT).decode('utf-8').strip()
     except subprocess.CalledProcessError:
         pass
     return None
@@ -146,52 +158,56 @@ def IsVisualStudio2017OrGreater():
 def GetPythonInfo():
     """Returns a tuple containing the path to the Python executable, shared
     library, and include directory corresponding to the version of Python
-    currently running. Returns None if any path could not be determined. This
-    function always returns None on Windows or Linux.
+    currently running. Returns None if any path could not be determined.
 
-    This function is primarily used to determine which version of
-    Python USD should link against when multiple versions are installed.
+    This function is used to extract build information from the Python 
+    interpreter used to launch this script. This information is used
+    in the Boost and USD builds. By taking this approach we can support
+    having USD builds for different Python versions built on the same
+    machine. This is very useful, especially when developers have multiple
+    versions installed on their machine, which is quite common now with 
+    Python2 and Python3 co-existing.
     """
-    # We just skip all this on Windows. Users on Windows are unlikely to have
-    # multiple copies of the same version of Python, so the problem this
-    # function is intended to solve doesn't arise on that platform.
+    # First we extract the information that can be uniformly dealt with across
+    # the platforms:
+    pythonExecPath = sys.executable
+    pythonVersion = sysconfig.get_config_var("py_version_short") 
+    pythonIncludeDir = sysconfig.get_config_var("INCLUDEPY")
+
+    # Lib path is unfortunately special for each platform and there is no
+    # config_var for it. But we can deduce it for each platform, and this
+    # logic works for any Python version.
     if Windows():
-        return None
+        pythonBaseDir = sysconfig.get_config_var("base")
+        pythonVersionNoDot = sysconfig.get_config_var("py_version_nodot")
+        pythonLibPath = os.path.join(pythonBaseDir, "libs",
+                                     "python" + pythonVersionNoDot + ".lib" )
+    elif Linux():
+        pythonLibDir = sysconfig.get_config_var("LIBDIR")
+        pythonLibName = sysconfig.get_config_var("LDLIBRARY")
+        pythonMultiarchSubdir = sysconfig.get_config_var("multiarchsubdir")
+        if pythonMultiarchSubdir:
+            pythonLibDir = pythonLibDir + pythonMultiarchSubdir
+        pythonLibPath = os.path.join(pythonLibDir, pythonLibName)
+    elif MacOS():
+        pythonBaseDir = sysconfig.get_config_var("base")
+        pythonLibPath = os.path.join(pythonBaseDir, "lib",
+                                     "libpython" + pythonVersion + ".dylib")
 
-    # We also skip all this on Linux. The below code gets the wrong answer on
-    # certain distributions like Ubuntu, which organizes libraries based on
-    # multiarch. The below code yields /usr/lib/libpython2.7.so, but
-    # the library is actually in /usr/lib/x86_64-linux-gnu. Since the problem
-    # this function is intended to solve primarily occurs on macOS, so it's
-    # simpler to just skip this for now.
-    if Linux():
-        return None
+        if not os.path.exists(pythonIncludeDir):
+            # fallback method
+            try:
+                import distutils.sysconfig
+                pythonIncludeDir = distutils.sysconfig.get_python_inc()
+            except:
+                return None
 
-    try:
-        import distutils.sysconfig
+        if pythonIncludeDir:
+            pythonIncludeDir = os.path.abspath(pythonIncludeDir)
+    else:
+        raise RuntimeError("Platform not supported")
 
-        pythonExecPath = None
-        pythonLibPath = None
-
-        pythonPrefix = distutils.sysconfig.PREFIX
-        if pythonPrefix:
-            pythonExecPath = os.path.join(pythonPrefix, 'bin', 'python')
-            pythonLibPath = os.path.join(pythonPrefix, 'lib', 'libpython2.7.dylib')
-
-        pythonIncludeDir = distutils.sysconfig.get_python_inc()
-    except:
-        return None
-
-    if pythonExecPath and pythonIncludeDir and pythonLibPath:
-        # Ensure that the paths are absolute, since depending on the version of
-        # Python being run and the path used to invoke it, we may have gotten a
-        # relative path from distutils.sysconfig.PREFIX.
-        return (
-            os.path.abspath(pythonExecPath),
-            os.path.abspath(pythonLibPath),
-            os.path.abspath(pythonIncludeDir))
-
-    return None
+    return (pythonExecPath, pythonLibPath, pythonIncludeDir, pythonVersion)
 
 def GetCPUCount():
     try:
@@ -203,7 +219,7 @@ def Run(cmd, logCommandOutput = True):
     """Run the specified command in a subprocess."""
     PrintInfo('Running "{cmd}"'.format(cmd=cmd))
 
-    with open("log.txt", "a") as logfile:
+    with codecs.open("log.txt", "a", "utf-8") as logfile:
         logfile.write(datetime.datetime.now().strftime("%Y-%m-%d %H:%M"))
         logfile.write("\n")
         logfile.write(cmd)
@@ -214,9 +230,10 @@ def Run(cmd, logCommandOutput = True):
         if logCommandOutput:
             p = subprocess.Popen(shlex.split(cmd), stdout=subprocess.PIPE, 
                                  stderr=subprocess.STDOUT)
+            encoding = sys.stdout.encoding or "UTF-8"
             while True:
-                l = p.stdout.readline()
-                if l != "":
+                l = p.stdout.readline().decode(encoding)
+                if l:
                     logfile.write(l)
                     PrintCommandOutput(l)
                 elif p.poll() is not None:
@@ -436,7 +453,7 @@ def DownloadFileWithPowershell(url, outputFilename):
     Run(cmd,logCommandOutput=False)
 
 def DownloadFileWithUrllib(url, outputFilename):
-    r = urllib2.urlopen(url)
+    r = urlopen(url)
     with open(outputFilename, "wb") as outfile:
         outfile.write(r.read())
 
@@ -482,7 +499,7 @@ def DownloadURL(url, context, force, dontExtract = None):
             if os.path.exists(tmpFilename):
                 os.remove(tmpFilename)
 
-            for i in xrange(maxRetries):
+            for i in range(maxRetries):
                 try:
                     if context.downloader == DownloadFromCache:
                         context.downloader(context.usdSrcDir, url, tmpFilename)
@@ -629,11 +646,11 @@ ZLIB = Dependency("zlib", InstallZlib, "include/zlib.h")
 ############################################################
 # boost
 
-if Linux():
-    BOOST_URL = "https://downloads.sourceforge.net/project/boost/boost/1.61.0/boost_1_61_0.tar.gz"
-    BOOST_VERSION_FILE = "include/boost/version.hpp"
-elif MacOS() or iOS():
-    BOOST_URL = "https://downloads.sourceforge.net/project/boost/boost/1.61.0/boost_1_61_0.tar.bz2"
+if Linux() or MacOS() or iOS():
+    if Python3():
+        BOOST_URL = "https://downloads.sourceforge.net/project/boost/boost/1.70.0/boost_1_70_0.tar.gz"
+    else:
+        BOOST_URL = "https://downloads.sourceforge.net/project/boost/boost/1.61.0/boost_1_61_0.tar.gz"
     BOOST_VERSION_FILE = "include/boost/version.hpp"
 elif Windows():
     # The default installation of boost on Windows puts headers in a versioned 
@@ -695,6 +712,30 @@ def InstallBoost(context, force, buildArgs):
 
         if context.buildPython:
             b2_settings.append("--with-python")
+            pythonInfo = GetPythonInfo()
+            if Windows():
+                # Unfortunately Boost build scripts require the Python folder 
+                # that contains the executable on Windows
+                pythonPath = os.path.dirname(pythonInfo[0])
+            else:
+                # While other platforms want the complete executable path
+                pythonPath = pythonInfo[0]
+            # This is the only platform-independent way to configure these
+            # settings correctly and robustly for the Boost jam build system.
+            # There are Python config arguments that can be passed to bootstrap 
+            # but those are not available in boostrap.bat (Windows) so we must 
+            # take the following approach:
+            projectPath = 'python-config.jam'
+            with open(projectPath, 'w') as projectFile:
+                # Note that we must escape any special characters, like 
+                # backslashes for jam, hence the mods below for the path 
+                # arguments. Also, if the path contains spaces jam will not
+                # handle them well. Surround the path parameters in quotes.
+                line = 'using python : %s : "%s" : "%s" ;\n' % (pythonInfo[3], 
+                       pythonPath.replace('\\', '\\\\'), 
+                       pythonInfo[2].replace('\\', '\\\\'))
+                projectFile.write(line)
+            b2_settings.append("--user-config=python-config.jam")
 
         if context.buildOIIO:
             b2_settings.append("--with-date_time")
@@ -806,11 +847,11 @@ BOOST = Dependency("boost", InstallBoost, BOOST_VERSION_FILE)
 # Intel TBB
 
 if Windows():
-    TBB_URL = "https://github.com/01org/tbb/releases/download/2017_U5/tbb2017_20170226oss_win.zip"
+    TBB_URL = "https://github.com/oneapi-src/oneTBB/releases/download/2017_U6/tbb2017_20170412oss_win.zip"
 elif MacOS() or iOS():
-    TBB_URL = "https://github.com/01org/tbb/archive/2019_U7.tar.gz"
+    TBB_URL = "https://github.com/oneapi-src/oneTBB/archive/2019_U7.tar.gz"
 else:
-    TBB_URL = "https://github.com/01org/tbb/archive/4.4.6.tar.gz"
+    TBB_URL = "https://github.com/oneapi-src/oneTBB/archive/2017_U6.tar.gz"
 
 def InstallTBB(context, force, buildArgs):
     if Windows():
@@ -1321,7 +1362,7 @@ OPENVDB = Dependency("OpenVDB", InstallOpenVDB, "include/openvdb/openvdb.h")
 ############################################################
 # OpenImageIO
 
-OIIO_URL = "https://github.com/OpenImageIO/oiio/archive/Release-1.7.18.zip"
+OIIO_URL = "https://github.com/OpenImageIO/oiio/archive/Release-1.8.9.zip"
 
 def InstallOpenImageIO(context, force, buildArgs):
     with CurrentWorkingDirectory(DownloadURL(OIIO_URL, context, force)):
@@ -1350,6 +1391,11 @@ def InstallOpenImageIO(context, force, buildArgs):
         if not context.enablePtex:
             extraArgs.append('-DUSE_PTEX=OFF')
 
+        # Make sure to use boost installed by the build script and not any
+        # system installed boost
+        extraArgs.append('-DBoost_NO_BOOST_CMAKE=On')
+        extraArgs.append('-DBoost_NO_SYSTEM_PATHS=True')
+
         if iOS():
             PatchFile("src/libutil/sysutil.cpp", 
                    [("if (system (newcmd.c_str()) != -1)", "if (true)")])
@@ -1370,10 +1416,6 @@ OPENIMAGEIO = Dependency("OpenImageIO", InstallOpenImageIO,
 ############################################################
 # OpenColorIO
 
-# Use v1.0.9 on Linux to avoid issues with gcc6: the OCIO build runs into
-# several warnings (unused functions, deprecated auto_ptr usage) that are
-# treated as errors and cause the build to fail.
-#
 # Use v1.1.0 on MacOS and Windows since v1.0.9 doesn't build properly on
 # those platforms.
 if Linux():
@@ -1392,6 +1434,24 @@ def InstallOpenColorIO(context, force, buildArgs):
                      '-DOCIO_BUILD_PYGLUE=OFF',
                      '-DOCIO_BUILD_JNIGLUE=OFF',
                      '-DOCIO_STATIC_JNIGLUE=OFF']
+
+        # The OCIO build treats all warnings as errors but several come up
+        # on various platforms, including:
+        # - On gcc6, v1.1.0 emits many -Wdeprecated-declaration warnings for
+        #   std::auto_ptr
+        # - On clang, v1.1.0 emits a -Wself-assign-field warning. This is fixed
+        #   in https://github.com/AcademySoftwareFoundation/OpenColorIO/commit/0be465feb9ac2d34bd8171f30909b276c1efa996
+        #
+        # To avoid build failures we force all warnings off for this build.
+        if GetVisualStudioCompilerAndVersion():
+            # This doesn't work because CMake stores default flags for
+            # MSVC in CMAKE_CXX_FLAGS and this would overwrite them.
+            # However, we don't seem to get any warnings on Windows
+            # (at least with VS2015 and 2017).
+            # extraArgs.append('-DCMAKE_CXX_FLAGS=/w') 
+            pass
+        else:
+            extraArgs.append('-DCMAKE_CXX_FLAGS=-w')
 
         PatchFile("src/core/Config.cpp", 
                    [("cacheidnocontext_ = cacheidnocontext_;", 
@@ -1621,6 +1681,8 @@ def InstallUSD(context, force, buildArgs):
 
         if context.buildPython:
             extraArgs.append('-DPXR_ENABLE_PYTHON_SUPPORT=ON')
+            if Python3():
+                extraArgs.append('-DPXR_USE_PYTHON_3=ON')
 
             # CMake has trouble finding the executable, library, and include
             # directories when there are multiple versions of Python installed.
@@ -1662,6 +1724,16 @@ def InstallUSD(context, force, buildArgs):
             extraArgs.append('-DPXR_BUILD_TESTS=ON')
         else:
             extraArgs.append('-DPXR_BUILD_TESTS=OFF')
+
+        if context.buildExamples:
+            extraArgs.append('-DPXR_BUILD_EXAMPLES=ON')
+        else:
+            extraArgs.append('-DPXR_BUILD_EXAMPLES=OFF')
+
+        if context.buildTutorials:
+            extraArgs.append('-DPXR_BUILD_TUTORIALS=ON')
+        else:
+            extraArgs.append('-DPXR_BUILD_TUTORIALS=OFF')
             
         if context.buildImaging:
             extraArgs.append('-DPXR_BUILD_IMAGING=ON')
@@ -1924,6 +1996,16 @@ subgroup.add_argument("--tests", dest="build_tests", action="store_true",
 subgroup.add_argument("--no-tests", dest="build_tests", action="store_false",
                       help="Do not build unit tests (default)")
 subgroup = group.add_mutually_exclusive_group()
+subgroup.add_argument("--examples", dest="build_examples", action="store_true",
+                      default=True, help="Build examples (default)")
+subgroup.add_argument("--no-examples", dest="build_examples", action="store_false",
+                      help="Do not build examples")
+subgroup = group.add_mutually_exclusive_group()
+subgroup.add_argument("--tutorials", dest="build_tutorials", action="store_true",
+                      default=True, help="Build tutorials (default)")
+subgroup.add_argument("--no-tutorials", dest="build_tutorials", action="store_false",
+                      help="Do not build tutorials")
+subgroup = group.add_mutually_exclusive_group()
 subgroup.add_argument("--docs", dest="build_docs", action="store_true",
                       default=False, help="Build documentation")
 subgroup.add_argument("--no-docs", dest="build_docs", action="store_false",
@@ -2124,6 +2206,8 @@ class InstallContext:
         self.buildTests = args.build_tests
         self.buildDocs = args.build_docs
         self.buildPython = args.build_python
+        self.buildExamples = args.build_examples
+        self.buildTutorials = args.build_tutorials
 
         # - Imaging
         self.buildImaging = (args.build_imaging == IMAGING or
@@ -2228,9 +2312,9 @@ if context.buildImaging:
     
     if context.enableOpenVDB:
         requiredDependencies += [BLOSC, BOOST, OPENEXR, OPENVDB, TBB]
-		
+    
     if context.buildOIIO:
-        requiredDependencies += [JPEG, TIFF, PNG, OPENEXR, OPENIMAGEIO]
+        requiredDependencies += [BOOST, JPEG, TIFF, PNG, OPENEXR, OPENIMAGEIO]
 
     if context.buildOCIO:
         requiredDependencies += [OPENCOLORIO]
@@ -2402,8 +2486,11 @@ Building with settings:
     UsdImaging                  {buildUsdImaging}
       usdview:                  {buildUsdview}
     Python support              {buildPython}
+      Python 3:                 {enablePython3}
     Documentation               {buildDocs}
     Tests                       {buildTests}
+    Examples                    {buildExamples}
+    Tutorials                   {buildTutorials}
     Alembic Plugin              {buildAlembic}
       HDF5 support:             {enableHDF5}
     Draco Plugin                {buildDraco}
@@ -2417,7 +2504,7 @@ if context.buildArgs:
 
 def FormatBuildArguments(buildArgs):
     s = ""
-    for depName in sorted(buildArgs.iterkeys()):
+    for depName in sorted(buildArgs.keys()):
         args = buildArgs[depName]
         s += """
                                 {name}: {args}""".format(
@@ -2453,8 +2540,11 @@ summaryMsg = summaryMsg.format(
     buildUsdImaging=("On" if context.buildUsdImaging else "Off"),
     buildUsdview=("On" if context.buildUsdview else "Off"),
     buildPython=("On" if context.buildPython else "Off"),
+    enablePython3=("On" if Python3() else "Off"),
     buildDocs=("On" if context.buildDocs else "Off"),
     buildTests=("On" if context.buildTests else "Off"),
+    buildExamples=("On" if context.buildExamples else "Off"),
+    buildTutorials=("On" if context.buildTutorials else "Off"),
     buildAlembic=("On" if context.buildAlembic else "Off"),
     buildDraco=("On" if context.buildDraco else "Off"),
     buildMaterialX=("On" if context.buildMaterialX else "Off"),

@@ -213,27 +213,25 @@ namespace {
 HdStShaderCodeSharedPtr
 _MakeFallbackVolumeShader()
 {
-    using HioGlslfxSharedPtr = boost::shared_ptr<class HioGlslfx>;
-
     const HioGlslfx glslfx(HdStPackageFallbackVolumeShader());
 
     // Note that we use HdStSurfaceShader for a volume shader.
     // Despite its name, HdStSurfaceShader is really just a pair of
     // GLSL code and bindings and not specific to surface shading.
     HdStSurfaceShaderSharedPtr const result =
-        boost::make_shared<HdStSurfaceShader>();
+        std::make_shared<HdStSurfaceShader>();
     
     result->SetFragmentSource(glslfx.GetVolumeSource());
     result->SetParams(
         {
-            HdMaterialParam(
-                HdMaterialParam::ParamTypeField,
+            HdSt_MaterialParam(
+                HdSt_MaterialParam::ParamTypeField,
                 _fallbackShaderTokens->density,
                 VtValue(GfVec3f(0.0, 0.0, 0.0)),
                 SdfPath(),
                 { _fallbackShaderTokens->density }),
-            HdMaterialParam(
-                HdMaterialParam::ParamTypeField,
+            HdSt_MaterialParam(
+                HdSt_MaterialParam::ParamTypeField,
                 _fallbackShaderTokens->emission,
                 VtValue(GfVec3f(0.0, 0.0, 0.0)),
                 SdfPath(),
@@ -301,7 +299,7 @@ _ComputeSamplingTransform(const GfBBox3d &bbox)
 // Add GLSL code such as "HdGet_density(vec3 p)" for sampling the fields
 // to the volume shader code and add necessary 3d textures and other
 // parameters to the result HdStSurfaceShader.
-// HdMaterialParam's are consulted to figure out the names of the fields
+// HdSt_MaterialParam's are consulted to figure out the names of the fields
 // to sample and the names of the associated sampling functions to generate.
 //
 HdStShaderCodeSharedPtr
@@ -316,16 +314,16 @@ HdStVolume::_ComputeMaterialShaderAndBBox(
     GfBBox3d totalFieldBbox;
 
     HdStResourceRegistrySharedPtr resourceRegistry =
-        boost::static_pointer_cast<HdStResourceRegistry>(
+        std::static_pointer_cast<HdStResourceRegistry>(
             sceneDelegate->GetRenderIndex().GetResourceRegistry());
 
     // Generate new shader from volume shader
     HdSt_VolumeShaderSharedPtr const result =
-        boost::make_shared<HdSt_VolumeShader>(
+        std::make_shared<HdSt_VolumeShader>(
             sceneDelegate->GetRenderIndex().GetRenderDelegate());
 
     // The params for the new shader
-    HdMaterialParamVector materialParams;
+    HdSt_MaterialParamVector materialParams;
     // The sources and texture descriptors for the new shader
     HdSt_MaterialBufferSourceAndTextureHelper sourcesAndTextures;
 
@@ -350,15 +348,15 @@ HdStVolume::_ComputeMaterialShaderAndBBox(
             requestedFieldNames.insert(fieldName);
 
             {
-                // Add HdMaterialParam such that codegen will give us an
+                // Add HdSt_MaterialParam such that codegen will give us an
                 // accessor
                 //     vec3 HdGet_NAMEFallback()
                 // to get the fallback value.
                 const TfToken fallbackName(
                     param.name.GetString() + "Fallback");
 
-                const HdMaterialParam fallbackParam(
-                    HdMaterialParam::ParamTypeFallback,
+                const HdSt_MaterialParam fallbackParam(
+                    HdSt_MaterialParam::ParamTypeFallback,
                     fallbackName,
                     param.fallbackValue);
 
@@ -369,14 +367,14 @@ HdStVolume::_ComputeMaterialShaderAndBBox(
             }
 
             {
-                // Add HdMaterialParam such that codegen will give us an
+                // Add HdSt_MaterialParam such that codegen will give us an
                 // acccesor
                 //    vec3 HdGet_NAME(vec3 p)
                 // which will apply the field transform and sample the
                 // field or return the default if the requested field does
                 // not exist.
-                const HdMaterialParam fieldRedirectParam(
-                    HdMaterialParam::ParamTypeFieldRedirect,
+                const HdSt_MaterialParam fieldRedirectParam(
+                    HdSt_MaterialParam::ParamTypeFieldRedirect,
                     param.name,
                     param.fallbackValue,
                     SdfPath(),
@@ -411,7 +409,7 @@ HdStVolume::_ComputeMaterialShaderAndBBox(
             it->second;
 
         {
-            // Add HdMaterialParam such that the resource binder
+            // Add HdSt_MaterialParam such that the resource binder
             // will bind the 3d texture underling the field resource
             // and codegen will give us an accessor
             //     vec3 HdGet_FIELDNAMETexture(vec3)
@@ -419,8 +417,8 @@ HdStVolume::_ComputeMaterialShaderAndBBox(
             const TfToken textureName(
                 fieldName.GetString() + "Texture");
 
-            const HdMaterialParam textureParam(
-                HdMaterialParam::ParamTypeTexture,
+            const HdSt_MaterialParam textureParam(
+                HdSt_MaterialParam::ParamTypeTexture,
                 textureName,
                 VtValue(GfVec4f(0)),
                 SdfPath(),
@@ -429,14 +427,14 @@ HdStVolume::_ComputeMaterialShaderAndBBox(
 
             sourcesAndTextures.ProcessTextureMaterialParam(
                 textureParam,
-                boost::make_shared<HdStTextureResourceHandle>(
+                std::make_shared<HdStTextureResourceHandle>(
                     fieldResource));
 
             materialParams.push_back(textureParam);
         }
 
         {
-            // Add HdMaterialParam so that we get an accessor
+            // Add HdSt_MaterialParam so that we get an accessor
             //     mat4 HdGet_FIELDNAMESamplingTransform()
             // converting local space to the coordinate at which
             // we need to sample the 3d texture.
@@ -466,8 +464,8 @@ HdStVolume::_ComputeMaterialShaderAndBBox(
             const VtValue samplingTransform(
                 _ComputeSamplingTransform(fieldBoundingBox));
 
-            const HdMaterialParam samplingTransformParam(
-                HdMaterialParam::ParamTypeFallback,
+            const HdSt_MaterialParam samplingTransformParam(
+                HdSt_MaterialParam::ParamTypeFallback,
                 samplingTransformName,
                 samplingTransform);
 
@@ -493,8 +491,8 @@ HdStVolume::_ComputeMaterialShaderAndBBox(
     {
         // volume bounding box transform
 
-        const HdMaterialParam transformParam(
-            HdMaterialParam::ParamTypeFallback,
+        const HdSt_MaterialParam transformParam(
+            HdSt_MaterialParam::ParamTypeFallback,
             _tokens->volumeBBoxInverseTransform,
             VtValue(localVolumeBBox->GetMatrix().GetInverse()));
         
@@ -507,8 +505,8 @@ HdStVolume::_ComputeMaterialShaderAndBBox(
     {
         // volume bounding box min
 
-        const HdMaterialParam minParam(
-            HdMaterialParam::ParamTypeFallback,
+        const HdSt_MaterialParam minParam(
+            HdSt_MaterialParam::ParamTypeFallback,
             _tokens->volumeBBoxLocalMin,
             VtValue(localVolumeBBox->GetRange().GetMin()));
         
@@ -521,8 +519,8 @@ HdStVolume::_ComputeMaterialShaderAndBBox(
     {
         // volume bounding box max
 
-        const HdMaterialParam maxParam(
-            HdMaterialParam::ParamTypeFallback,
+        const HdSt_MaterialParam maxParam(
+            HdSt_MaterialParam::ParamTypeFallback,
             _tokens->volumeBBoxLocalMax,
             VtValue(localVolumeBBox->GetRange().GetMax()));
         
@@ -689,7 +687,7 @@ HdStVolume::_UpdateDrawItem(HdSceneDelegate *sceneDelegate,
     
     HdSt_VolumeShaderKey shaderKey;
     HdStResourceRegistrySharedPtr resourceRegistry =
-        boost::static_pointer_cast<HdStResourceRegistry>(
+        std::static_pointer_cast<HdStResourceRegistry>(
             sceneDelegate->GetRenderIndex().GetResourceRegistry());
     drawItem->SetGeometricShader(
         HdSt_GeometricShader::Create(shaderKey, resourceRegistry));
@@ -697,10 +695,10 @@ HdStVolume::_UpdateDrawItem(HdSceneDelegate *sceneDelegate,
     /* VERTICES */
     {
         HdBufferSourceSharedPtr const source =
-            boost::make_shared<HdVtBufferSource>(
+            std::make_shared<HdVtBufferSource>(
                 HdTokens->points, _GetCubeVertices(localVolumeBBox));
 
-        HdBufferSourceVector sources = { source };
+        HdBufferSourceSharedPtrVector sources = { source };
 
         if (!HdStIsValidBAR(drawItem->GetVertexPrimvarRange())) {
             HdBufferSpecVector bufferSpecs;
@@ -725,7 +723,7 @@ HdStVolume::_UpdateDrawItem(HdSceneDelegate *sceneDelegate,
         HdBufferSourceSharedPtr source(
             new HdVtBufferSource(HdTokens->indices, _GetCubeTriangleIndices()));
 
-        HdBufferSourceVector sources = { source };
+        HdBufferSourceSharedPtrVector sources = { source };
 
         if (!HdStIsValidBAR(drawItem->GetTopologyRange())) {
             HdBufferSpecVector bufferSpecs;

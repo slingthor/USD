@@ -72,7 +72,7 @@ TF_DECLARE_PUBLIC_TOKENS(HdxPickTokens, HDX_API, HDX_PICK_TOKENS);
 
 class HdStRenderPassState;
 class HdStShaderCode;
-typedef boost::shared_ptr<HdStShaderCode> HdStShaderCodeSharedPtr;
+using HdStShaderCodeSharedPtr = std::shared_ptr<HdStShaderCode>;
 
 /// Pick task params. This contains render-style state (for example), but is
 /// augmented by HdxPickTaskContextParams, which is passed in on the task

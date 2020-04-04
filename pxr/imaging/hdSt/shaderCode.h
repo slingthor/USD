@@ -31,29 +31,30 @@
 
 #include "pxr/imaging/hdSt/api.h"
 #include "pxr/imaging/hdSt/program.h"
-#include "pxr/imaging/hdSt/resourceBinder.h"  // XXX: including a private class
-
-#include "pxr/imaging/hd/materialParam.h"
+#include "pxr/imaging/hd/bufferArrayRange.h" // Could forward declare
 #include "pxr/imaging/hd/version.h"
 
 #include "pxr/base/tf/token.h"
 
 #include <boost/shared_ptr.hpp>
 
+#include <memory>
 #include <string>
 #include <vector>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
 
-typedef std::vector<class HdBindingRequest> HdBindingRequestVector;
+using HdBindingRequestVector = std::vector<class HdBindingRequest>;
 
-typedef boost::shared_ptr<class HdStShaderCode> HdStShaderCodeSharedPtr;
-typedef std::vector<HdStShaderCodeSharedPtr> HdStShaderCodeSharedPtrVector;
+using HdStShaderCodeSharedPtr = std::shared_ptr<class HdStShaderCode>;
+using HdStShaderCodeSharedPtrVector =
+    std::vector<HdStShaderCodeSharedPtr>;
 
-typedef boost::shared_ptr<class HdStTextureResourceHandle>
-                HdStTextureResourceHandleSharedPtr;
-
+using HdStTextureResourceHandleSharedPtr =
+    std::shared_ptr<class HdStTextureResourceHandle>;
+using HdSt_MaterialParamVector = std::vector<class HdSt_MaterialParam>;
+class HdSt_ResourceBinder;
 class HdRenderPassState;
 
 
@@ -87,7 +88,7 @@ public:
     // XXX: Should be pure-virtual
     /// Returns the shader parameters for this shader.
     HDST_API
-    virtual HdMaterialParamVector const& GetParams() const;
+    virtual HdSt_MaterialParamVector const& GetParams() const;
 
     /// Returns whether primvar filtering is enabled for this shader.
     HDST_API

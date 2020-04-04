@@ -36,8 +36,8 @@
 #include "pxr/base/tf/token.h"
 #include "pxr/base/vt/value.h"
 
-#include <boost/shared_ptr.hpp>
 #include <cstddef>
+#include <memory>
 #include <utility>
 #include <vector>
 
@@ -46,10 +46,9 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 class HdBufferResource;
 
-typedef boost::shared_ptr<HdBufferResource> HdBufferResourceSharedPtr;
-
-typedef std::vector<
-    std::pair<TfToken, HdBufferResourceSharedPtr> > HdBufferResourceNamedList;
+using HdBufferResourceSharedPtr = std::shared_ptr<HdBufferResource>;
+using HdBufferResourceNamedList = std::vector<
+    std::pair<TfToken, HdBufferResourceSharedPtr> >;
 
 /// \class HdBufferResource
 ///

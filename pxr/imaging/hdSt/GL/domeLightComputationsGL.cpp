@@ -53,7 +53,7 @@ void
 HdSt_DomeLightComputationGPUGL::_Execute(HdStProgramSharedPtr computeProgram)
 {
     HdStGLSLProgramSharedPtr const &glslProgram(
-        boost::dynamic_pointer_cast<HdStGLSLProgram>(computeProgram));
+        std::dynamic_pointer_cast<HdStGLSLProgram>(computeProgram));
     GLuint programId = glslProgram->GetGLProgram();
 
     // bind the input and output textures

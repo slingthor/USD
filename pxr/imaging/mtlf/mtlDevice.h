@@ -205,7 +205,7 @@ public:
     void LabelCommandBuffer(NSString *label, MetalWorkQueueType workQueueType = METALWORKQUEUE_DEFAULT);
     
     MTLF_API
-    void CommitCommandBufferForThread(bool waituntilScheduled, bool waitUntilCompleted, MetalWorkQueueType workQueueType = METALWORKQUEUE_DEFAULT);
+    void CommitCommandBufferForThread(bool waituntilScheduled, MetalWorkQueueType workQueueType = METALWORKQUEUE_DEFAULT);
 
     MTLF_API
     void CleanupUnusedBuffers(bool forceClean);
@@ -416,6 +416,10 @@ public:
     void EndCaptureSubset(int gpuIndex);
 
     id<MTLDevice> currentDevice;
+    
+    HgiMetal* GetHgi() {
+        return hgi;
+    }
 
     struct GPUInstance {
         id<MTLCommandQueue> commandQueue;
@@ -450,9 +454,9 @@ public:
 protected:
 
     MTLF_API
-    MtlfMetalContext(HgiMetal *hgi);
+    MtlfMetalContext(HgiMetal* hgi);
     
-    void Init(HgiMetal *hgi);
+    void Init();
     void Cleanup();
 
     MTLF_API
@@ -685,6 +689,7 @@ private:
     std::atomic_ulong numPrimsDrawn;
     
     id<MTLCaptureScope> captureScopeSubset;
+    HgiMetal* hgi;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

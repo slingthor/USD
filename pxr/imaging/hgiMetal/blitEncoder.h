@@ -31,7 +31,6 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 class HgiMetal;
-class HgiMetalImmediateCommandBuffer;
 
 
 /// \class HgiMetalBlitEncoder
@@ -45,7 +44,7 @@ public:
     virtual ~HgiMetalBlitEncoder();
 
     HGIMETAL_API
-    void EndEncoding() override;
+    void Commit() override;
 
     HGIMETAL_API
     void PushDebugGroup(const char* label) override;
@@ -64,10 +63,9 @@ public:
 
 protected:
     friend class HgiMetal;
-    friend class HgiMetalImmediateCommandBuffer;
 
     HGIMETAL_API
-    HgiMetalBlitEncoder(HgiMetal* hgi, HgiMetalImmediateCommandBuffer* cmdBuf);
+    HgiMetalBlitEncoder(HgiMetal* hgi);
 
 private:
     HgiMetalBlitEncoder() = delete;
@@ -75,11 +73,10 @@ private:
     HgiMetalBlitEncoder(const HgiMetalBlitEncoder&) = delete;
 
     HgiMetal* _hgi;
-    HgiMetalImmediateCommandBuffer* _commandBuffer;
     id<MTLBlitCommandEncoder> _blitEncoder;
 
     // Encoder is used only one frame so storing multi-frame state on encoder
-    // will not survive. Store onto HgiMetalImmediateCommandBuffer instead.
+    // will not survive.
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

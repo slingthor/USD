@@ -144,7 +144,7 @@ HdSt_QuadIndexBuilderComputation::HasChainedBuffer() const
     return true;
 }
 
-HdBufferSourceVector
+HdBufferSourceSharedPtrVector
 HdSt_QuadIndexBuilderComputation::GetChainedBuffers() const
 {
     return { _primitiveParam, _quadsEdgeIndices };

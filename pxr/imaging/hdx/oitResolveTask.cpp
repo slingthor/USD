@@ -91,7 +91,7 @@ HdxOitResolveTask::_PrepareOitBuffers(
     const int numSamples = 8; // Should match glslfx files
 
      HdStResourceRegistrySharedPtr const& hdStResourceRegistry =
-        boost::static_pointer_cast<HdStResourceRegistry>(
+        std::static_pointer_cast<HdStResourceRegistry>(
             renderIndex->GetResourceRegistry());
 
     bool createOitBuffers = !_counterBar;
@@ -235,12 +235,12 @@ HdxOitResolveTask::Prepare(HdTaskContext* ctx,
             return;
         }
 
-        _renderPass = boost::make_shared<HdSt_ImageShaderRenderPass>(
+        _renderPass = std::make_shared<HdSt_ImageShaderRenderPass>(
             renderIndex, collection);
 
         // We do not use renderDelegate->CreateRenderPassState because
         // ImageShaders always use HdSt
-        _renderPassState = boost::shared_ptr<HdStRenderPassState>(HdStResourceFactory::GetInstance()->NewRenderPassState());
+        _renderPassState = std::shared_ptr<HdStRenderPassState>(HdStResourceFactory::GetInstance()->NewRenderPassState());
         _renderPassState->SetEnableDepthMask(false);
         _renderPassState->SetColorMask(HdRenderPassState::ColorMaskRGBA);
         _renderPassState->SetBlendEnabled(true);
@@ -248,11 +248,11 @@ HdxOitResolveTask::Prepare(HdTaskContext* ctx,
             HdBlendOp::HdBlendOpAdd,
             HdBlendFactor::HdBlendFactorOne,
             HdBlendFactor::HdBlendFactorOneMinusSrcAlpha,
-            HdBlendOp::HdBlendOpAdd,
+            HdBlendOp::HdBlendOpAdd, 
             HdBlendFactor::HdBlendFactorOne,
             HdBlendFactor::HdBlendFactorOne);
 
-        _renderPassShader = boost::make_shared<HdStRenderPassShader>(
+        _renderPassShader = std::make_shared<HdStRenderPassShader>(
             HdxPackageOitResolveImageShader());
         _renderPassState->SetRenderPassShader(_renderPassShader);
 

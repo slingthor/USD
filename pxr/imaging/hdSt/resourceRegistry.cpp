@@ -54,7 +54,7 @@ _CopyChainedBuffers(HdBufferSourceSharedPtr const&  src,
                     HdBufferArrayRangeSharedPtr const& range)
 {
     if (src->HasChainedBuffer()) {
-        HdBufferSourceVector chainedSrcs = src->GetChainedBuffers();
+        HdBufferSourceSharedPtrVector chainedSrcs = src->GetChainedBuffers();
         // traverse the tree in a DFS fashion
         for(auto& c : chainedSrcs) {
             range->CopyData(c);
@@ -91,7 +91,8 @@ _Register(ID id, HdInstanceRegistry<T> &registry, TfToken const &perfToken)
 }
 
 HdStResourceRegistry::HdStResourceRegistry()
-    : _numBufferSourcesToResolve(0)
+    : _hgi(nullptr)
+    , _numBufferSourcesToResolve(0)
     , _nonUniformAggregationStrategy()
     , _nonUniformImmutableAggregationStrategy()
     , _uniformUboAggregationStrategy()
@@ -171,6 +172,12 @@ HdStResourceRegistry::GetResourceAllocation() const
     HD_PERF_COUNTER_SET(HdPerfTokens->gpuMemoryUsed, gpuMemoryUsed);
 
     return result;
+}
+
+void
+HdStResourceRegistry::SetHgi(Hgi* hgi)
+{
+    _hgi = hgi;
 }
 
 /// ------------------------------------------------------------------------
@@ -322,7 +329,7 @@ HdStResourceRegistry::UpdateShaderStorageBufferArrayRange(
 /// ------------------------------------------------------------------------
 void
 HdStResourceRegistry::AddSources(HdBufferArrayRangeSharedPtr const &range,
-                               HdBufferSourceVector &sources)
+                                 HdBufferSourceSharedPtrVector &sources)
 {
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();

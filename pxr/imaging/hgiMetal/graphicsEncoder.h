@@ -35,7 +35,6 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 struct HgiGraphicsEncoderDesc;
-class HgiMetalImmediateCommandBuffer;
 
 
 /// \class HgiMetalGraphicsEncoder
@@ -46,15 +45,10 @@ class HgiMetalGraphicsEncoder final : public HgiGraphicsEncoder
 {
 public:
     HGIMETAL_API
-    HgiMetalGraphicsEncoder(
-        id<MTLCommandBuffer> commandBuffer,
-        HgiGraphicsEncoderDesc const& desc);
+    ~HgiMetalGraphicsEncoder() override;
 
     HGIMETAL_API
-    virtual ~HgiMetalGraphicsEncoder();
-
-    HGIMETAL_API
-    void EndEncoding() override;
+    void Commit() override;
 
     HGIMETAL_API
     void SetViewport(GfVec4i const& vp) override;
@@ -91,13 +85,20 @@ public:
     
     id<MTLRenderCommandEncoder> _encoder;
 
+protected:
+    friend class HgiMetal;
+
+    HGIMETAL_API
+    HgiMetalGraphicsEncoder(
+        HgiMetal* hgi,
+        HgiGraphicsEncoderDesc const& desc);
+    
 private:
     HgiMetalGraphicsEncoder() = delete;
     HgiMetalGraphicsEncoder & operator=(const HgiMetalGraphicsEncoder&) = delete;
     HgiMetalGraphicsEncoder(const HgiMetalGraphicsEncoder&) = delete;
 
-    // Encoder is used only one frame so storing multi-frame state on encoder
-    // will not survive. Store onto HgiMetalImmediateCommandBuffer instead.
+    HgiMetal* _hgi;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

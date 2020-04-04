@@ -28,6 +28,7 @@
 
 #include "pxr/imaging/mtlf/drawTarget.h"
 #include "pxr/imaging/mtlf/mtlDevice.h"
+#include "pxr/imaging/hgiMetal/hgi.h"
 
 #include "pxr/imaging/hdSt/commandBuffer.h"
 #include "pxr/imaging/hdSt/debugCodes.h"
@@ -36,6 +37,7 @@
 #include "pxr/imaging/hdSt/indirectDrawBatch.h"
 #include "pxr/imaging/hdSt/resourceFactory.h"
 #include "pxr/imaging/hdSt/resourceRegistry.h"
+#include "pxr/imaging/hdSt/materialParam.h"
 
 #include "pxr/imaging/hd/bufferArrayRange.h"
 #include "pxr/imaging/hd/perfLog.h"
@@ -145,11 +147,11 @@ HdStCommandBuffer::ExecuteDraw(
 
             if (context->GeometryShadersActive()) {
                 // Complete the GS command buffer if we have one
-                context->CommitCommandBufferForThread(false, false, METALWORKQUEUE_GEOMETRY_SHADER);
+                context->CommitCommandBufferForThread(false, METALWORKQUEUE_GEOMETRY_SHADER);
             }
 
             if (context->GetWorkQueue(METALWORKQUEUE_DEFAULT).commandBuffer != nil) {
-                context->CommitCommandBufferForThread(false, false);
+                context->CommitCommandBufferForThread(false);
 
                 context->EndFrameForThread();
             }
@@ -178,11 +180,11 @@ HdStCommandBuffer::ExecuteDraw(
             
             if (context->GeometryShadersActive()) {
                 // Complete the GS command buffer if we have one
-                context->CommitCommandBufferForThread(false, false, METALWORKQUEUE_GEOMETRY_SHADER);
+                context->CommitCommandBufferForThread(false, METALWORKQUEUE_GEOMETRY_SHADER);
             }
             
             if (context->GetWorkQueue(METALWORKQUEUE_DEFAULT).commandBuffer != nil) {
-                context->CommitCommandBufferForThread(false, false);
+                context->CommitCommandBufferForThread(false);
                 
                 context->EndFrameForThread();
             }
@@ -214,11 +216,11 @@ HdStCommandBuffer::ExecuteDraw(
                 
                 if (context->GeometryShadersActive()) {
                     // Complete the GS command buffer if we have one
-                    context->CommitCommandBufferForThread(false, false, METALWORKQUEUE_GEOMETRY_SHADER);
+                    context->CommitCommandBufferForThread(false, METALWORKQUEUE_GEOMETRY_SHADER);
                 }
                 
                 if (context->GetWorkQueue(METALWORKQUEUE_DEFAULT).commandBuffer != nil) {
-                    context->CommitCommandBufferForThread(false, false);
+                    context->CommitCommandBufferForThread(false);
                     
                     context->EndFrameForThread();
                 }
@@ -237,13 +239,7 @@ HdStCommandBuffer::ExecuteDraw(
     
     // Create a new command buffer for each render pass to the current drawable
     if (renderPassDescriptor.colorAttachments[0].loadAction == MTLLoadActionClear) {
-        id <MTLCommandBuffer> commandBuffer = [context->gpus.commandQueue commandBuffer];
-        if (TF_DEV_BUILD) {
-            commandBuffer.label = @"Clear";
-        }
-        id <MTLRenderCommandEncoder> renderEncoder =
-            [commandBuffer renderCommandEncoderWithDescriptor:renderPassDescriptor];
-        [renderEncoder endEncoding];
+        id <MTLCommandBuffer> commandBuffer = context->GetHgi()->GetCommandBuffer();
         int frameNumber = context->GetCurrentFrame();
         [commandBuffer addScheduledHandler:^(id<MTLCommandBuffer> buffer)
          {
@@ -253,10 +249,9 @@ HdStCommandBuffer::ExecuteDraw(
         {
            context->GPUTimerEndTimer(frameNumber);
         }];
-        [commandBuffer commit];
+        context->GetHgi()->BeginMtlf();
 
         int numAttachments = 1;
-        
         if (context->GetDrawTarget()) {
             numAttachments = context->GetDrawTarget()->GetAttachments().size();
         }
@@ -492,7 +487,7 @@ HdStCommandBuffer::_RebuildDrawBatches()
             // Geometric, RenderPass and Lighting shaders should never break
             // batches, however materials can. We consider the material 
             // parameters to be part of the batch key here for that reason.
-            boost::hash_combine(key, HdMaterialParam::ComputeHash(
+            boost::hash_combine(key, HdSt_MaterialParam::ComputeHash(
                             drawItem->GetMaterialShader()->GetParams()));
         }
 

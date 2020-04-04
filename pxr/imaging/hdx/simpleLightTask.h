@@ -40,16 +40,18 @@
 
 #include <boost/shared_ptr.hpp>
 
+#include <memory>
+
 PXR_NAMESPACE_OPEN_SCOPE
 
 class HdRenderIndex;
 class HdSceneDelegate;
 
-typedef boost::shared_ptr<class HdRenderPass> HdRenderPassSharedPtr;
-typedef boost::shared_ptr<class HdStSimpleLightingShader> 
-    HdStSimpleLightingShaderSharedPtr;
-typedef boost::shared_ptr<class HdxShadowMatrixComputation> 
-    HdxShadowMatrixComputationSharedPtr;
+using HdRenderPassSharedPtr = std::shared_ptr<class HdRenderPass>;
+using HdStSimpleLightingShaderSharedPtr =
+    std::shared_ptr<class HdStSimpleLightingShader>;
+using HdxShadowMatrixComputationSharedPtr =
+    std::shared_ptr<class HdxShadowMatrixComputation>;
 
 TF_DECLARE_REF_PTRS(GarchSimpleShadowArray);
 

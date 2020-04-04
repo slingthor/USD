@@ -221,7 +221,7 @@ HdSt_IndirectDrawBatchMetal::_BeginGPUCountVisibleInstances(
     HdStResourceRegistrySharedPtr const &resourceRegistry)
 {
     if (!_resultBuffer) {
-        _resultBuffer = boost::dynamic_pointer_cast<HdStPersistentBufferMetal>(
+        _resultBuffer = std::dynamic_pointer_cast<HdStPersistentBufferMetal>(
             resourceRegistry->RegisterPersistentBuffer(
                 _tokens->drawIndirectResult, sizeof(GLint), 0));
     }

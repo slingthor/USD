@@ -137,7 +137,7 @@ HdStRenderDelegate::_Initialize()
     std::lock_guard<std::mutex> guard(_mutexResourceRegistry);
     
     if (_counterResourceRegistry.fetch_add(1) == 0) {
-        _resourceRegistry.reset( new HdStResourceRegistry() );
+        _resourceRegistry = std::make_shared<HdStResourceRegistry>();
         HdPerfLog::GetInstance().AddResourceRegistry(_resourceRegistry);
     }
 
@@ -214,6 +214,11 @@ HdStRenderDelegate::SetDrivers(HdDriverVector const& drivers)
             break;
         }
     }
+    
+    if (_resourceRegistry) {
+        _resourceRegistry->SetHgi(_hgi);
+    }
+
     TF_VERIFY(_hgi, "HdSt requires Hgi HdDriver");
 }
 

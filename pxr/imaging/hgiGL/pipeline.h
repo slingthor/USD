@@ -44,10 +44,7 @@ class HgiGLPipeline final : public HgiPipeline
 {
 public:
     HGIGL_API
-    HgiGLPipeline(HgiPipelineDesc const& desc);
-
-    HGIGL_API
-    virtual ~HgiGLPipeline();
+    ~HgiGLPipeline() override;
 
     /// Apply pipeline state
     HGIGL_API
@@ -65,13 +62,16 @@ public:
     HGIGL_API
     void RestoreOpenGlState();
 
+protected:
+    friend class HgiGL;
+
+    HGIGL_API
+    HgiGLPipeline(HgiPipelineDesc const& desc);
+
 private:
     HgiGLPipeline() = delete;
     HgiGLPipeline & operator=(const HgiGLPipeline&) = delete;
     HgiGLPipeline(const HgiGLPipeline&) = delete;
-
-private:
-    HgiPipelineDesc _descriptor;
 
     int32_t _restoreDrawFramebuffer;
     int32_t _restoreReadFramebuffer;

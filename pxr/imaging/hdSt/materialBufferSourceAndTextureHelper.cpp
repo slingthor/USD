@@ -39,10 +39,10 @@ PXR_NAMESPACE_OPEN_SCOPE
 void
 HdSt_MaterialBufferSourceAndTextureHelper::
                                     ProcessPrimvarOrFallbackMaterialParam(
-    HdMaterialParam const &param)
+    HdSt_MaterialParam const &param)
 {
     sources.push_back(
-        boost::make_shared<HdVtBufferSource>(
+        std::make_shared<HdVtBufferSource>(
             param.name, param.fallbackValue));
 }
 
@@ -51,7 +51,8 @@ namespace {
 // A bindless GL sampler buffer.
 // This identifies a texture as a 64-bit handle, passed to GLSL as "uvec2".
 // See https://www.khronos.org/opengl/wiki/Bindless_Texture
-class HdSt_BindlessSamplerBufferSource : public HdBufferSource {
+class HdSt_BindlessSamplerBufferSource final : public HdBufferSource
+{
 public:
     HdSt_BindlessSamplerBufferSource(TfToken const &name,
                                      GarchTextureGPUHandle const &value)
@@ -102,9 +103,8 @@ private:
 
 void
 HdSt_MaterialBufferSourceAndTextureHelper::ProcessTextureMaterialParam(
-    HdMaterialParam const &param,
-    HdStTextureResourceHandleSharedPtr const &handle,
-    bool * isPtex)
+    HdSt_MaterialParam const &param,
+    HdStTextureResourceHandleSharedPtr const &handle)
 {
     if (!(handle && handle->GetTextureResource())) {
         // we were unable to get the requested resource or
@@ -125,16 +125,13 @@ HdSt_MaterialBufferSourceAndTextureHelper::ProcessTextureMaterialParam(
 
     const HdTextureType textureType = texResource->GetTextureType();
     if (textureType == HdTextureType::Ptex) {
-        if (isPtex) {
-            *isPtex = true;
-        }
         tex.type =
             HdStShaderCode::TextureDescriptor::TEXTURE_PTEX_TEXEL;
         textures.push_back(tex);
 
         if (bindless) {
             sources.push_back(
-                boost::make_shared<HdSt_BindlessSamplerBufferSource>(
+                std::make_shared<HdSt_BindlessSamplerBufferSource>(
                     tex.name,
                     texResource->GetTexelsTextureHandle()));
         }
@@ -147,7 +144,7 @@ HdSt_MaterialBufferSourceAndTextureHelper::ProcessTextureMaterialParam(
         
         if (bindless) {
             sources.push_back(
-                boost::make_shared<HdSt_BindlessSamplerBufferSource>(
+                std::make_shared<HdSt_BindlessSamplerBufferSource>(
                     tex.name,
                     texResource->GetLayoutTextureHandle()));
         }
@@ -157,7 +154,7 @@ HdSt_MaterialBufferSourceAndTextureHelper::ProcessTextureMaterialParam(
         
         if (bindless) {
             sources.push_back(
-                boost::make_shared<HdSt_BindlessSamplerBufferSource>(
+                std::make_shared<HdSt_BindlessSamplerBufferSource>(
                     tex.name,
                     texResource->GetTexelsTextureHandle()));
         }
@@ -170,7 +167,7 @@ HdSt_MaterialBufferSourceAndTextureHelper::ProcessTextureMaterialParam(
         
         if (bindless) {
             sources.push_back(
-                boost::make_shared<HdSt_BindlessSamplerBufferSource>(
+                std::make_shared<HdSt_BindlessSamplerBufferSource>(
                     tex.name,
                     texResource->GetLayoutTextureHandle()));
         }
@@ -180,7 +177,7 @@ HdSt_MaterialBufferSourceAndTextureHelper::ProcessTextureMaterialParam(
         
         if (bindless) {
             sources.push_back(
-                boost::make_shared<HdSt_BindlessSamplerBufferSource>(
+                std::make_shared<HdSt_BindlessSamplerBufferSource>(
                     tex.name,
                     texResource->GetTexelsTextureHandle()));
         }
@@ -190,7 +187,7 @@ HdSt_MaterialBufferSourceAndTextureHelper::ProcessTextureMaterialParam(
         
         if (bindless) {
             sources.push_back(
-                boost::make_shared<HdSt_BindlessSamplerBufferSource>(
+                std::make_shared<HdSt_BindlessSamplerBufferSource>(
                     tex.name,
                     texResource->GetTexelsTextureHandle()));
         }

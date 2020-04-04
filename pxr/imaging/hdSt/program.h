@@ -39,7 +39,8 @@ class HdStResourceRegistry;
 class HdResource;
 class HdStSurfaceShader;
 
-typedef boost::shared_ptr<class HdStProgram> HdStProgramSharedPtr;
+using HdStProgramSharedPtr =
+    std::shared_ptr<class HdStProgram>;
 
 TF_DECLARE_WEAK_AND_REF_PTRS(GarchBindingMap);
 

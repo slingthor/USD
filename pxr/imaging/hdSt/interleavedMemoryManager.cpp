@@ -44,8 +44,6 @@
 
 #include "pxr/imaging/hf/perfLog.h"
 
-using namespace boost;
-#include <boost/make_shared.hpp>
 #include <boost/scoped_ptr.hpp>
 #include <vector>
 
@@ -57,7 +55,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 HdBufferArrayRangeSharedPtr
 HdStInterleavedMemoryManager::CreateBufferArrayRange()
 {
-    return (boost::make_shared<_StripedInterleavedBufferRange>());
+    return (std::make_shared<_StripedInterleavedBufferRange>());
 }
 
 /// Returns the buffer specs from a given buffer array
@@ -66,7 +64,7 @@ HdStInterleavedMemoryManager::GetBufferSpecs(
     HdBufferArraySharedPtr const &bufferArray) const
 {
     _StripedInterleavedBufferSharedPtr bufferArray_ =
-        boost::static_pointer_cast<_StripedInterleavedBuffer> (bufferArray);
+        std::static_pointer_cast<_StripedInterleavedBuffer> (bufferArray);
     return bufferArray_->GetBufferSpecs();
 }
 
@@ -80,7 +78,7 @@ HdStInterleavedMemoryManager::GetResourceAllocation(
     size_t gpuMemoryUsed = 0;
 
     _StripedInterleavedBufferSharedPtr bufferArray_ =
-        boost::static_pointer_cast<_StripedInterleavedBuffer> (bufferArray);
+        std::static_pointer_cast<_StripedInterleavedBuffer> (bufferArray);
 
     TF_FOR_ALL(resIt, bufferArray_->GetResources()) {
         HdBufferResourceSharedPtr const & resource = resIt->second;
@@ -437,7 +435,7 @@ HdStInterleavedMemoryManager::_StripedInterleavedBuffer::GetResource() const
     }
 
     // returns the first item
-    return dynamic_pointer_cast<HdStBufferResource>(_resourceList.begin()->second);
+    return std::dynamic_pointer_cast<HdStBufferResource>(_resourceList.begin()->second);
 }
 
 HdStBufferResourceSharedPtr
@@ -449,7 +447,7 @@ HdStInterleavedMemoryManager::_StripedInterleavedBuffer::GetResource(TfToken con
     // The number of buffer resources should be small (<10 or so).
     for (HdBufferResourceNamedList::iterator it = _resourceList.begin();
          it != _resourceList.end(); ++it) {
-        if (it->first == name) return dynamic_pointer_cast<HdStBufferResource>(it->second);
+        if (it->first == name) return std::dynamic_pointer_cast<HdStBufferResource>(it->second);
     }
     return HdStBufferResourceSharedPtr();
 }

@@ -50,8 +50,6 @@
 #include <opensubdiv/osd/cpuEvaluator.h>
 #include <opensubdiv/osd/mesh.h>
 
-#include <boost/scoped_ptr.hpp>
-
 #if OPENSUBDIV_HAS_METAL_COMPUTE && defined(PXR_METAL_SUPPORT_ENABLED)// MTL_CHANGE
 #include <opensubdiv/osd/mtlVertexBuffer.h>
 #include "pxr/imaging/mtlf/mtlDevice.h"
@@ -355,7 +353,7 @@ HdSt_Osd3Subdivision::RefineGPU(HdBufferArrayRangeSharedPtr const &range,
     // filling coarse vertices has been done at resource registry.
 
     HdBufferArrayRangeSharedPtr range_ =
-        boost::static_pointer_cast<HdBufferArrayRange> (range);
+        std::static_pointer_cast<HdBufferArrayRange> (range);
 
     // vertex buffer wrapper for OpenSubdiv API
     HdSt_OsdRefineComputationGPU::VertexBuffer vertexBuffer(

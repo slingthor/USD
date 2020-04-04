@@ -122,7 +122,7 @@ HdStVBOSimpleMemoryBufferMetal::Reallocate(
     
     TF_FOR_ALL (bresIt, GetResources()) {
         HdStBufferResourceMetalSharedPtr const &bres =
-            boost::static_pointer_cast<HdStBufferResourceMetal>(bresIt->second);
+            std::static_pointer_cast<HdStBufferResourceMetal>(bresIt->second);
 
         // XXX:Arrays: We should use HdDataSizeOfTupleType() here, to
         // add support for array types.
@@ -212,7 +212,7 @@ HdStVBOSimpleMemoryBufferMetal::_DeallocateResources()
 {
     TF_FOR_ALL (it, GetResources()) {
         HdStBufferResourceMetalSharedPtr const &bres =
-            boost::static_pointer_cast<HdStBufferResourceMetal>(it->second);
+            std::static_pointer_cast<HdStBufferResourceMetal>(it->second);
 
         for (int i = 0; i < 3; i++) {
             HdResourceGPUHandle oldId(bres->GetIdAtIndex(i));

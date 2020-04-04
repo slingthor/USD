@@ -25,9 +25,11 @@
 
 #include "pxr/imaging/hgiMetal/hgi.h"
 #include "pxr/imaging/hgiMetal/buffer.h"
+#include "pxr/imaging/hgiMetal/blitEncoder.h"
 #include "pxr/imaging/hgiMetal/capabilities.h"
 #include "pxr/imaging/hgiMetal/conversions.h"
 #include "pxr/imaging/hgiMetal/diagnostic.h"
+#include "pxr/imaging/hgiMetal/graphicsEncoder.h"
 #include "pxr/imaging/hgiMetal/pipeline.h"
 #include "pxr/imaging/hgiMetal/resourceBindings.h"
 #include "pxr/imaging/hgiMetal/shaderFunction.h"
@@ -65,6 +67,7 @@ HgiMetal::HgiMetal(id<MTLDevice> device)
 , _frameDepth(0)
 , _apiVersion(_GetAPIVersion())
 , _useInterop(false)
+, _workToFlush(false)
 {
     if (!_device) {
 #if defined(ARCH_OS_MACOS)
@@ -80,9 +83,10 @@ HgiMetal::HgiMetal(id<MTLDevice> device)
     static int const commandBufferPoolSize = 256;
     _commandQueue = [_device newCommandQueueWithMaxCommandBufferCount:
                      commandBufferPoolSize];
+    _commandBuffer = [_commandQueue commandBuffer];
+    [_commandBuffer retain];
+//    [_commandBuffer enqueue];
 
-    _immediateCommandBuffer.reset(
-        new HgiMetalImmediateCommandBuffer(this));
     _capabilities.reset(
         new HgiMetalCapabilities(device));
 
@@ -104,16 +108,38 @@ HgiMetal::HgiMetal(id<MTLDevice> device)
 
 HgiMetal::~HgiMetal()
 {
-    _immediateCommandBuffer.reset();
-
+    [_commandBuffer commit];
+    [_commandBuffer release];
     [_captureScopeFullFrame release];
     [_commandQueue release];
 }
 
-HgiImmediateCommandBuffer&
-HgiMetal::GetImmediateCommandBuffer()
+HgiGraphicsEncoderUniquePtr
+HgiMetal::CreateGraphicsEncoder(
+    HgiGraphicsEncoderDesc const& desc)
 {
-    return *_immediateCommandBuffer;
+    // XXX We should TF_CODING_ERROR here when there are no attachments, but
+    // during the Hgi transition we allow it to render to global gl framebuffer.
+    if (!desc.HasAttachments()) {
+        // TF_CODING_ERROR("Graphics encoder desc has no attachments");
+        return nullptr;
+    }
+
+    _workToFlush = true;
+    HgiMetalGraphicsEncoder* encoder(
+        new HgiMetalGraphicsEncoder(this, desc));
+
+    // TEMP
+    _encoder = encoder;
+    
+    return HgiGraphicsEncoderUniquePtr(encoder);
+}
+
+HgiBlitEncoderUniquePtr
+HgiMetal::CreateBlitEncoder()
+{
+    _workToFlush = true;
+    return HgiBlitEncoderUniquePtr(new HgiMetalBlitEncoder(this));
 }
 
 HgiTextureHandle
@@ -200,17 +226,28 @@ HgiMetal::GetAPIName() const {
 void
 HgiMetal::StartFrame()
 {
+    _encoder = nil;
+
     if (_frameDepth++ == 0) {
         if (@available(macos 10.15, ios 13.0, *)) {
+#if defined(ARCH_OS_IOS) || \
+ (defined(__MAC_10_15) && __MAC_OS_X_VERSION_MAX_ALLOWED >= __MAC_10_15)
             MTLCaptureDescriptor *desc = [[MTLCaptureDescriptor alloc] init];
             desc.captureObject = _captureScopeFullFrame;
             desc.destination = MTLCaptureDestinationDeveloperTools;
-            //[[MTLCaptureManager sharedCaptureManager] startCaptureWithDescriptor:desc error:nil];
+//            [[MTLCaptureManager sharedCaptureManager]
+//                startCaptureWithDescriptor:desc error:nil];
+#endif
         }
 
         [_captureScopeFullFrame beginScope];
-                
-        _immediateCommandBuffer->StartFrame();
+
+        if ([[MTLCaptureManager sharedCaptureManager] isCapturing]) {
+            // We need to grab a new command buffer otherwise the previous one
+            // (if it was allocated at the end of the last frame) won't appear in
+            // this frame's capture, and it will confuse us!
+            CommitCommandBuffer(CommitCommandBuffer_NoWait, true);
+        }
     }
 }
 
@@ -220,6 +257,38 @@ HgiMetal::EndFrame()
     if (--_frameDepth == 0) {
         [_captureScopeFullFrame endScope];
 //        [[MTLCaptureManager sharedCaptureManager] stopCapture];
+    }
+}
+
+void
+HgiMetal::CommitCommandBuffer(CommitCommandBufferWaitType waitType,
+                              bool forceNewBuffer)
+{
+    if (!_workToFlush && !forceNewBuffer) {
+        return;
+    }
+
+    [_commandBuffer commit];
+    if (waitType == CommitCommandBuffer_WaitUntilScheduled) {
+        [_commandBuffer waitUntilScheduled];
+    }
+    else if (waitType == CommitCommandBuffer_WaitUntilCompleted) {
+        [_commandBuffer waitUntilCompleted];
+    }
+    [_commandBuffer release];
+
+    _commandBuffer = [_commandQueue commandBuffer];
+    [_commandBuffer retain];
+//    [_commandBuffer enqueue];
+    _workToFlush = false;
+}
+
+void
+HgiMetal::BeginMtlf()
+{
+    // SOOOO TEMP and specialised!
+    if (_encoder) {
+        _encoder->Commit();
     }
 }
 

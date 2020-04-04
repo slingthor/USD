@@ -43,7 +43,7 @@
 #include "pxr/imaging/hgi/graphicsEncoder.h"
 #include "pxr/imaging/hgi/graphicsEncoderDesc.h"
 #include "pxr/imaging/hgi/hgi.h"
-#include "pxr/imaging/hgi/immediateCommandBuffer.h"
+#include "pxr/imaging/hgi/tokens.h"
 
 #include "pxr/imaging/hd/driver.h"
 #include "pxr/imaging/hd/renderDelegate.h"
@@ -57,7 +57,23 @@
 #include "pxr/imaging/mtlf/mtlDevice.h"
 #include "pxr/imaging/hgiMetal/texture.h"
 
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
+// XXX We do not want to include specific HgiXX backends, but we need to do
+// this temporarily until Storm has transitioned fully to Hgi.
+#include "pxr/imaging/hgiGL/graphicsEncoder.h"
+#endif
+
 PXR_NAMESPACE_OPEN_SCOPE
+
+void
+_ExecuteDraw(
+    HdStCommandBuffer* cmdBuffer,
+    HdStRenderPassStateSharedPtr const& stRenderPassState,
+    HdStResourceRegistrySharedPtr const& resourceRegistry)
+{
+    cmdBuffer->PrepareDraw(stRenderPassState, resourceRegistry);
+    cmdBuffer->ExecuteDraw(stRenderPassState, resourceRegistry);
+}
 
 HdSt_RenderPass::HdSt_RenderPass(HdRenderIndex *index,
                                  HdRprimCollection const &collection)
@@ -70,7 +86,7 @@ HdSt_RenderPass::HdSt_RenderPass(HdRenderIndex *index,
     , _drawItemsChanged(false)
     , _hgi(nullptr)
 {
-    HdStRenderDelegate* renderDelegate = 
+    HdStRenderDelegate* renderDelegate =
         static_cast<HdStRenderDelegate*>(index->GetRenderDelegate());
     _hgi = renderDelegate->GetHgi();
 }
@@ -104,18 +120,18 @@ HdSt_RenderPass::_Execute(HdRenderPassStateSharedPtr const &renderPassState,
 
     // Downcast render pass state
     HdStRenderPassStateSharedPtr stRenderPassState =
-        boost::dynamic_pointer_cast<HdStRenderPassState>(
+        std::dynamic_pointer_cast<HdStRenderPassState>(
         renderPassState);
     TF_VERIFY(stRenderPassState);
 
     _PrepareCommandBuffer(renderTags);
-    
+
     // CPU frustum culling (if chosen)
     _Cull(stRenderPassState);
 
     // Downcast the resource registry
     HdStResourceRegistrySharedPtr const& resourceRegistry = 
-        boost::dynamic_pointer_cast<HdStResourceRegistry>(
+        std::dynamic_pointer_cast<HdStResourceRegistry>(
         GetRenderIndex()->GetResourceRegistry());
     TF_VERIFY(resourceRegistry);
 
@@ -130,14 +146,15 @@ HdSt_RenderPass::_Execute(HdRenderPassStateSharedPtr const &renderPassState,
 
     // Create graphics encoder to render into Aovs.
     HgiGraphicsEncoderDesc desc = stRenderPassState->MakeGraphicsEncoderDesc();
-    HgiImmediateCommandBuffer& icb = _hgi->GetImmediateCommandBuffer();
-    
-    // Nulled out pending Mtlf utilising command buffers from HgiMetal
-    HgiGraphicsEncoderUniquePtr gfxEncoder = nullptr;// icb.CreateGraphicsEncoder(desc);
+    HgiGraphicsEncoderUniquePtr gfxEncoder = _hgi->CreateGraphicsEncoder(desc);
 
     GfVec4i vp;
 
-    // XXX Some tasks do not yet use Aov, so gfx encoder might be null
+    // XXX When there are no aovBindings we get a null encoder.
+    // This would ideally never happen, but currently happens for some
+    // custom prims that spawn an imagingGLengine  with a task controller that
+    // has no aovBindings.
+ 
     if (gfxEncoder) {
         gfxEncoder->PushDebugGroup(__ARCH_PRETTY_FUNCTION__);
 
@@ -214,16 +231,37 @@ HdSt_RenderPass::_Execute(HdRenderPassStateSharedPtr const &renderPassState,
     }
 
     // Draw
-    _cmdBuffer.PrepareDraw(stRenderPassState, resourceRegistry);
-    _cmdBuffer.ExecuteDraw(stRenderPassState, resourceRegistry);
+    HdStCommandBuffer* cmdBuffer = &_cmdBuffer;
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
+    HgiGLGraphicsEncoder* glGfxEncoder = 
+        dynamic_cast<HgiGLGraphicsEncoder*>(gfxEncoder.get());
+
+    if (gfxEncoder && glGfxEncoder) {
+        // XXX Tmp code path to allow non-hgi code to insert functions into
+        // HgiGL ops-stack. Will be removed once Storms uses Hgi everywhere
+        auto executeDrawOp = [cmdBuffer, stRenderPassState, resourceRegistry] {
+            _ExecuteDraw(cmdBuffer, stRenderPassState, resourceRegistry);
+        };
+        glGfxEncoder->InsertFunctionOp(executeDrawOp);
+    } else {
+        _ExecuteDraw(cmdBuffer, stRenderPassState, resourceRegistry);
+    }
+#else
+    _ExecuteDraw(cmdBuffer, stRenderPassState, resourceRegistry);
+#endif
 
     if (gfxEncoder) {
-        gfxEncoder->PopDebugGroup();
-        gfxEncoder->EndEncoding();
-
         if (isOpenGL) {
 #if defined(PXR_OPENGL_SUPPORT_ENABLED)
             gfxEncoder->SetViewport(vp);
+#endif
+        }
+
+        gfxEncoder->PopDebugGroup();
+        gfxEncoder->Commit();
+
+        if (isOpenGL) {
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
             // XXX Non-Hgi tasks expect default FB. Remove once all tasks use Hgi.
             glBindFramebuffer(GL_FRAMEBUFFER, fb);
 #endif
@@ -263,7 +301,7 @@ HdSt_RenderPass::_PrepareDrawItems(TfTokenVector const& renderTags)
         HD_PERF_COUNTER_INCR(HdPerfTokens->collectionsRefreshed);
         TF_DEBUG(HD_COLLECTION_CHANGED).Msg("CollectionChanged: %s "
                                             "(repr = %s)"
-                                            "version: %d -> %d\n", 
+                                            "version: %d -> %d\n",
                                              collection.GetName().GetText(),
                                              collection.GetReprSelector().GetText(),
                                              _collectionVersion,
@@ -289,7 +327,7 @@ HdSt_RenderPass::_PrepareCommandBuffer(TfTokenVector const& renderTags)
     // -------------------------------------------------------------------
     // SCHEDULE PREPARATION
     // -------------------------------------------------------------------
-    // We know what must be drawn and that the stream needs to be updated, 
+    // We know what must be drawn and that the stream needs to be updated,
     // so iterate over each prim, cull it and schedule it to be drawn.
 
     HdChangeTracker const &tracker = GetRenderIndex()->GetChangeTracker();
@@ -341,7 +379,7 @@ HdSt_RenderPass::_Cull(
         GarchResourceFactory::GetInstance()->GetContextCaps();
     HdChangeTracker const &tracker = GetRenderIndex()->GetChangeTracker();
 
-    const bool 
+    const bool
        skipCulling = TfDebug::IsEnabled(HDST_DISABLE_FRUSTUM_CULLING) ||
            (caps.multiDrawIndirectEnabled
                && caps.IsEnabledGPUFrustumCulling());
@@ -358,13 +396,13 @@ HdSt_RenderPass::_Cull(
         if (!freezeCulling) {
             // Downcast render pass state
             HdStRenderPassStateSharedPtr stRenderPassState =
-                boost::dynamic_pointer_cast<HdStRenderPassState>(
+                std::dynamic_pointer_cast<HdStRenderPassState>(
                 renderPassState);
             TF_VERIFY(stRenderPassState);
 
             // Create graphics encoder to render into Aovs.
             HgiGraphicsEncoderDesc desc = stRenderPassState->MakeGraphicsEncoderDesc();
-            // Re-cull the command buffer. 
+            // Re-cull the command buffer.
             _cmdBuffer.FrustumCull(renderPassState->GetCullMatrix(), desc.width, desc.height);
         }
 

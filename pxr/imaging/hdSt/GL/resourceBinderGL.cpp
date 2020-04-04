@@ -475,7 +475,7 @@ void
 HdSt_ResourceBinderGL::IntrospectBindings(HdStProgramSharedPtr programResource) const
 {
     GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
-    GLuint program = boost::dynamic_pointer_cast<HdStGLSLProgram>(programResource)->GetGLProgram();
+    GLuint program = std::dynamic_pointer_cast<HdStGLSLProgram>(programResource)->GetGLProgram();
 
     if (ARCH_UNLIKELY(!caps.shadingLanguage420pack)) {
         GLint numUBO = 0;

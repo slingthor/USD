@@ -35,7 +35,7 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 class HdStProgram;
-typedef boost::shared_ptr<class HdStProgram> HdStProgramSharedPtr;
+using HdStProgramSharedPtr = std::shared_ptr<class HdStProgram>;
 
 
 /// \class HdxColorChannelTask

@@ -34,7 +34,6 @@
 #include "pxr/imaging/hgi/blitEncoder.h"
 #include "pxr/imaging/hgi/blitEncoderOps.h"
 #include "pxr/imaging/hgi/hgi.h"
-#include "pxr/imaging/hgi/immediateCommandBuffer.h"
 #include "pxr/imaging/hgi/tokens.h"
 
 #include "pxr/base/gf/vec2f.h"
@@ -384,8 +383,7 @@ HdxColorizeSelectionTask::_CreateParameterBuffer()
         _parameterBuffer = _hgi->CreateBuffer(bufDesc);
     } else {
         // Update the existing storage buffer with new values.
-        HgiImmediateCommandBuffer& icb = _hgi->GetImmediateCommandBuffer();
-        HgiBlitEncoderUniquePtr blitEncoder = icb.CreateBlitEncoder();
+        HgiBlitEncoderUniquePtr blitEncoder = _hgi->CreateBlitEncoder();
         HgiBufferCpuToGpuOp copyOp;
         copyOp.byteSize = sizeof(_parameterData);
         copyOp.cpuSourceBuffer = &_parameterData;
@@ -393,7 +391,7 @@ HdxColorizeSelectionTask::_CreateParameterBuffer()
         copyOp.destinationByteOffset = 0;
         copyOp.gpuDestinationBuffer = _parameterBuffer;
         blitEncoder->CopyBufferCpuToGpu(copyOp);
-        blitEncoder->EndEncoding();
+        blitEncoder->Commit();
     }
 }
 

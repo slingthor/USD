@@ -43,8 +43,6 @@
 
 #include <limits>
 
-using namespace boost;
-
 PXR_NAMESPACE_OPEN_SCOPE
 
 
@@ -66,7 +64,7 @@ HdStExtCompGpuComputationMetal::_Execute(
      HdBufferArrayRangeSharedPtr outputBar)
 {
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
-    HdStMSLProgramSharedPtr const &mslProgram(boost::dynamic_pointer_cast<HdStMSLProgram>(computeProgram));
+    HdStMSLProgramSharedPtr const &mslProgram(std::dynamic_pointer_cast<HdStMSLProgram>(computeProgram));
     
     unsigned long immutableBufferMask = 0;//(1 << 0) | (1 << 2) | (1 << 3);
 

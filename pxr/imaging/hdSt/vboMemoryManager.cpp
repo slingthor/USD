@@ -27,7 +27,6 @@
 #include "pxr/imaging/garch/contextCaps.h"
 #include "pxr/imaging/garch/resourceFactory.h"
 
-#include <boost/make_shared.hpp>
 #include <vector>
 
 #include "pxr/base/arch/hash.h"
@@ -70,7 +69,7 @@ HdStVBOMemoryManager::CreateBufferArray(
 HdBufferArrayRangeSharedPtr
 HdStVBOMemoryManager::CreateBufferArrayRange()
 {
-    return boost::make_shared<_StripedBufferArrayRange>();
+    return std::make_shared<_StripedBufferArrayRange>();
 }
 
 
@@ -104,7 +103,7 @@ HdStVBOMemoryManager::GetBufferSpecs(
     HdBufferArraySharedPtr const &bufferArray) const
 {
     _StripedBufferArraySharedPtr bufferArray_ =
-        boost::static_pointer_cast<_StripedBufferArray> (bufferArray);
+        std::static_pointer_cast<_StripedBufferArray> (bufferArray);
     return bufferArray_->GetBufferSpecs();
 }
 
@@ -119,7 +118,7 @@ HdStVBOMemoryManager::GetResourceAllocation(
     size_t gpuMemoryUsed = 0;
 
     _StripedBufferArraySharedPtr bufferArray_ =
-        boost::static_pointer_cast<_StripedBufferArray> (bufferArray);
+        std::static_pointer_cast<_StripedBufferArray> (bufferArray);
 
     TF_FOR_ALL(resIt, bufferArray_->GetResources()) {
         HdBufferResourceSharedPtr const & resource = resIt->second;

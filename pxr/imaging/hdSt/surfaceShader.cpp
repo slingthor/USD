@@ -28,6 +28,7 @@
 #include "pxr/imaging/hdSt/resourceRegistry.h"
 #include "pxr/imaging/hdSt/textureResource.h"
 #include "pxr/imaging/hdSt/textureResourceHandle.h"
+#include "pxr/imaging/hdSt/materialParam.h"
 
 #include "pxr/imaging/hd/binding.h"
 #include "pxr/imaging/hd/bufferArrayRange.h"
@@ -54,7 +55,7 @@ _IsEnabledMaterialPrimvarFiltering() {
 }
 
 static TfTokenVector
-_CollectPrimvarNames(const HdMaterialParamVector &params);
+_CollectPrimvarNames(const HdSt_MaterialParamVector &params);
 
 HdStSurfaceShader::HdStSurfaceShader()
  : HdStShaderCode()
@@ -72,9 +73,7 @@ HdStSurfaceShader::HdStSurfaceShader()
 {
 }
 
-HdStSurfaceShader::~HdStSurfaceShader()
-{
-}
+HdStSurfaceShader::~HdStSurfaceShader() = default;
 
 void
 HdStSurfaceShader::_SetSource(TfToken const &shaderStageKey, std::string const &source)
@@ -105,7 +104,7 @@ HdStSurfaceShader::GetSource(TfToken const &shaderStageKey) const
     return std::string();
 }
 /*virtual*/
-HdMaterialParamVector const&
+HdSt_MaterialParamVector const&
 HdStSurfaceShader::GetParams() const
 {
     return _params;
@@ -182,7 +181,7 @@ HdStSurfaceShader::_ComputeHash() const
 {
     size_t hash = 0;
     
-    for (HdMaterialParam const& param : _params) {
+    for (HdSt_MaterialParam const& param : _params) {
         if (param.IsFallback())
             boost::hash_combine(hash, param.name.Hash());
     }
@@ -224,7 +223,7 @@ HdStSurfaceShader::SetGeometrySource(const std::string &source)
 }
 
 void
-HdStSurfaceShader::SetParams(const HdMaterialParamVector &params)
+HdStSurfaceShader::SetParams(const HdSt_MaterialParamVector &params)
 {
     _params = params;
     _primvarNames = _CollectPrimvarNames(_params);
@@ -240,7 +239,7 @@ HdStSurfaceShader::SetTextureDescriptors(const TextureDescriptorVector &texDesc)
 
 void
 HdStSurfaceShader::SetBufferSources(
-    HdBufferSourceVector &bufferSources,
+    HdBufferSourceSharedPtrVector &bufferSources,
     HdStResourceRegistrySharedPtr const &resourceRegistry)
 {
     if (bufferSources.empty()) {
@@ -395,11 +394,11 @@ _GetExtraWhitelistedShaderPrimvarNames()
 }
 
 static TfTokenVector
-_CollectPrimvarNames(const HdMaterialParamVector &params)
+_CollectPrimvarNames(const HdSt_MaterialParamVector &params)
 {
     TfTokenVector primvarNames = _GetExtraWhitelistedShaderPrimvarNames();
 
-    for (HdMaterialParam const &param: params) {
+    for (HdSt_MaterialParam const &param: params) {
         if (param.IsFallback()) {
             primvarNames.push_back(param.name);
         } else if (param.IsPrimvar()) {

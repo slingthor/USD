@@ -48,8 +48,6 @@
 
 #include <limits>
 
-using namespace boost;
-
 PXR_NAMESPACE_OPEN_SCOPE
 
 
@@ -111,7 +109,7 @@ HdStExtCompGpuComputationGL::_Execute(
     }
     for (HdBufferArrayRangeSharedPtr const & input: _resource->GetInputs()) {
         HdBufferArrayRangeSharedPtr const & inputBar =
-            boost::static_pointer_cast<HdBufferArrayRange>(input);
+            std::static_pointer_cast<HdBufferArrayRange>(input);
 
         for (HdStBufferResourceNamedPair const & it:
                         inputBar->GetResources()) {

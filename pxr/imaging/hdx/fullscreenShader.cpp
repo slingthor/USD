@@ -32,7 +32,6 @@
 #include "pxr/imaging/hgi/graphicsEncoder.h"
 #include "pxr/imaging/hgi/graphicsEncoderDesc.h"
 #include "pxr/imaging/hgi/hgi.h"
-#include "pxr/imaging/hgi/immediateCommandBuffer.h"
 #include "pxr/imaging/hgi/tokens.h"
 
 #include <iostream>
@@ -599,8 +598,8 @@ HdxFullscreenShader::_Draw(
     }
 
     // Begin rendering
-    HgiImmediateCommandBuffer& icb = _hgi->GetImmediateCommandBuffer();
-    HgiGraphicsEncoderUniquePtr gfxEncoder = icb.CreateGraphicsEncoder(gfxDesc);
+    HgiGraphicsEncoderUniquePtr gfxEncoder =
+        _hgi->CreateGraphicsEncoder(gfxDesc);
     gfxEncoder->PushDebugGroup(_debugName.c_str());
     gfxEncoder->BindResources(_resourceBindings);
     gfxEncoder->BindPipeline(_pipeline);
@@ -616,7 +615,7 @@ HdxFullscreenShader::_Draw(
     gfxEncoder->PopDebugGroup();
 
     // Done recording commands, submit work.
-    gfxEncoder->EndEncoding();
+    gfxEncoder->Commit();
 
 #if defined(PXR_OPENGL_SUPPORT_ENABLED)
     // XXX Not everything is using Hgi yet, so we have inconsistent state

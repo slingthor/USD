@@ -58,9 +58,9 @@ HdStCopyComputationGPU::Execute(HdBufferArrayRangeSharedPtr const &range_,
     }
 
     HdBufferArrayRangeSharedPtr srcRange =
-        boost::static_pointer_cast<HdBufferArrayRange> (_src);
+        std::static_pointer_cast<HdBufferArrayRange> (_src);
     HdBufferArrayRangeSharedPtr dstRange =
-        boost::static_pointer_cast<HdBufferArrayRange> (range_);
+        std::static_pointer_cast<HdBufferArrayRange> (range_);
 
     HdBufferResourceSharedPtr srcRes = srcRange->GetResource(_name);
     HdBufferResourceSharedPtr dstRes = dstRange->GetResource(_name);
@@ -145,7 +145,7 @@ void
 HdStCopyComputationGPU::GetBufferSpecs(HdBufferSpecVector *specs) const
 {
     HdBufferArrayRangeSharedPtr srcRange =
-        boost::static_pointer_cast<HdBufferArrayRange> (_src);
+        std::static_pointer_cast<HdBufferArrayRange> (_src);
 
     specs->emplace_back(_name, srcRange->GetResource(_name)->GetTupleType());
 }

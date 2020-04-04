@@ -125,7 +125,7 @@ HdStStripedInterleavedBufferGL::Reallocate(
     HdResourceGPUHandle oldId = (GLuint)(uint64_t)GetResources().begin()->second->GetId();
 
     HdStInterleavedMemoryManager::_StripedInterleavedBufferSharedPtr curRangeOwner_ =
-        boost::static_pointer_cast<HdStInterleavedMemoryManager::_StripedInterleavedBuffer> (curRangeOwner);
+        std::static_pointer_cast<HdStInterleavedMemoryManager::_StripedInterleavedBuffer> (curRangeOwner);
 
     HdResourceGPUHandle curId = (GLuint)(uint64_t)curRangeOwner_->GetResources().begin()->second->GetId();
 

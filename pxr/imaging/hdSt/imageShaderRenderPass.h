@@ -31,14 +31,16 @@
 
 #include <boost/shared_ptr.hpp>
 
+#include <memory>
+
 PXR_NAMESPACE_OPEN_SCOPE
 
-typedef boost::shared_ptr<class HdStResourceRegistry>
-    HdStResourceRegistrySharedPtr;
-typedef boost::shared_ptr<class HdSt_ImageShaderRenderPass> 
-    HdSt_ImageShaderRenderPassSharedPtr;
-typedef boost::shared_ptr<class HdSt_DrawBatch> 
-    HdSt_DrawBatchSharedPtr;
+using HdStResourceRegistrySharedPtr = 
+    std::shared_ptr<class HdStResourceRegistry>;
+
+using HdSt_ImageShaderRenderPassSharedPtr =
+    std::shared_ptr<class HdSt_ImageShaderRenderPass>;
+using HdSt_DrawBatchSharedPtr = std::shared_ptr<class HdSt_DrawBatch>;
 
 class Hgi;
 
@@ -50,7 +52,7 @@ class Hgi;
 /// The benefit of using RenderPassShader is that it participates in codegen.
 /// This means your full-screen shader can use buffers created by other tasks.
 ///
-class HdSt_ImageShaderRenderPass : public HdRenderPass {
+class HdSt_ImageShaderRenderPass final : public HdRenderPass {
 public:
     HDST_API
     HdSt_ImageShaderRenderPass(HdRenderIndex *index, 

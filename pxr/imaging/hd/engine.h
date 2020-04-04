@@ -30,11 +30,13 @@
 
 #include "pxr/imaging/hd/task.h"
 
-#include <boost/shared_ptr.hpp>
+#include <memory>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
 TF_DECLARE_WEAK_AND_REF_PTRS(GarchDrawTarget);
+using HdRenderPassSharedPtr = std::shared_ptr<class HdRenderPass>;
+using HdRenderPassStateSharedPtr = std::shared_ptr<class HdRenderPassState>;
 
 /// \class HdEngine
 ///

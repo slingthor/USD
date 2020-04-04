@@ -27,9 +27,7 @@
 #include "pxr/pxr.h"
 #include "pxr/imaging/hdSt/api.h"
 #include "pxr/imaging/hdSt/lightingShader.h"
-#include "pxr/imaging/hdSt/resourceBinder.h"
 
-#include "pxr/imaging/hd/materialParam.h"
 #include "pxr/imaging/hd/resource.h"
 #include "pxr/imaging/hd/version.h"
 
@@ -44,18 +42,16 @@
 #include "pxr/base/tf/declarePtrs.h"
 #include "pxr/base/tf/token.h"
 
-#include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
 
+#include <memory>
 #include <string>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
 
-typedef boost::shared_ptr<class HdStSimpleLightingShader> 
-    HdStSimpleLightingShaderSharedPtr;
-typedef boost::shared_ptr<class HdStTextureResource> 
-    HdStTextureResourceSharedPtr;
+using HdStSimpleLightingShaderSharedPtr =
+    std::shared_ptr<class HdStSimpleLightingShader>;
 
 /// \class HdStSimpleLightingShader
 ///
@@ -67,7 +63,7 @@ public:
     HDST_API
     HdStSimpleLightingShader();
     HDST_API
-    virtual ~HdStSimpleLightingShader();
+    ~HdStSimpleLightingShader() override;
 
     /// HdShader overrides
     HDST_API
@@ -87,7 +83,7 @@ public:
 
     /// HdStShaderCode overrides
     HDST_API
-    HdMaterialParamVector const& GetParams() const override;
+    HdSt_MaterialParamVector const& GetParams() const override;
 
     /// HdStLightingShader overrides
     HDST_API
@@ -107,9 +103,9 @@ private:
     GarchSimpleLightingContextRefPtr _lightingContext;
     GarchBindingMapRefPtr _bindingMap;
     bool _useLighting;
-    boost::scoped_ptr<HioGlslfx> _glslfx;
+    std::unique_ptr<HioGlslfx> _glslfx;
 
-    HdMaterialParamVector _lightTextureParams;
+    HdSt_MaterialParamVector _lightTextureParams;
 };
 
 

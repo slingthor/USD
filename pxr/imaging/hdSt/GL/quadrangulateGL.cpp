@@ -99,20 +99,20 @@ HdSt_QuadrangulateComputationGPUGL::Execute(
     if (!computeProgram) return;
 
     HdBufferArrayRangeSharedPtr range_ =
-        boost::static_pointer_cast<HdBufferArrayRange> (range);
+        std::static_pointer_cast<HdBufferArrayRange> (range);
 
     // buffer resources for GPU computation
     HdBufferResourceSharedPtr primvar_ = range_->GetResource(_name);
     HdStBufferResourceSharedPtr primvar =
-        boost::static_pointer_cast<HdStBufferResource> (primvar_);
+        std::static_pointer_cast<HdStBufferResource> (primvar_);
 
     HdBufferArrayRangeSharedPtr quadrangulateTableRange_ =
-        boost::static_pointer_cast<HdBufferArrayRange> (quadrangulateTableRange);
+        std::static_pointer_cast<HdBufferArrayRange> (quadrangulateTableRange);
 
     HdBufferResourceSharedPtr quadrangulateTable_ =
         quadrangulateTableRange_->GetResource();
     HdStBufferResourceSharedPtr quadrangulateTable =
-        boost::static_pointer_cast<HdStBufferResource> (quadrangulateTable_);
+        std::static_pointer_cast<HdStBufferResource> (quadrangulateTable_);
 
     // prepare uniform buffer for GPU computation
     struct Uniform {

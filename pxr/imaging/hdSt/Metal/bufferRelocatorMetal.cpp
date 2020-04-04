@@ -63,7 +63,6 @@ HdStBufferRelocatorMetal::Commit()
 #endif
     [blitEncoder endEncoding];
     [commandBuffer commit];
-    [commandBuffer waitUntilCompleted];
 
     HD_PERF_COUNTER_ADD(HdPerfTokens->glCopyBufferSubData,
                         (double)_queue.size());

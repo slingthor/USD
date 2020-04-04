@@ -264,6 +264,19 @@ struct {
 static_assert(TfArraySize(_compareFnTable) == HgiCompareFunctionCount,
               "_compareFnTable array out of sync with HgiFormat enum");
 
+struct {
+    HgiTextureType hgiTextureType;
+    MTLTextureType metalTT;
+} static const _textureTypeTable[HgiTextureTypeCount] =
+{
+    {HgiTextureType1D,           MTLTextureType1D},
+    {HgiTextureType2D,           MTLTextureType2D},
+    {HgiTextureType3D,           MTLTextureType3D}
+};
+
+static_assert(TfArraySize(_compareFnTable) == HgiCompareFunctionCount,
+              "_compareFnTable array out of sync with HgiFormat enum");
+
 MTLPixelFormat
 HgiMetalConversions::GetPixelFormat(HgiFormat inFormat)
 {
@@ -351,5 +364,12 @@ HgiMetalConversions::GetDepthCompareFunction(HgiCompareFunction cf)
 {
     return _compareFnTable[cf].metalCF;
 }
+
+MTLTextureType
+HgiMetalConversions::GetTextureType(HgiTextureType tt)
+{
+    return _textureTypeTable[tt].metalTT;
+}
+
 
 PXR_NAMESPACE_CLOSE_SCOPE

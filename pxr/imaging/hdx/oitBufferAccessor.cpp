@@ -162,7 +162,7 @@ HdxOitBufferAccessor::InitializeOitBuffersIfNecessary()
     // finding -1 in the counter buffer. We can skip clearing the other buffers.
 
     HdBufferArrayRangeSharedPtr stCounterBar =
-        boost::dynamic_pointer_cast<HdBufferArrayRange>(
+        std::dynamic_pointer_cast<HdBufferArrayRange>(
             _GetBar(HdxTokens->oitCounterBufferBar));
 
     if (!stCounterBar) {
