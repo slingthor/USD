@@ -49,6 +49,12 @@ enum {
 class HgiMetal final : public Hgi
 {
 public:
+    enum CommitCommandBufferWaitType {
+        CommitCommandBuffer_NoWait = 0,
+        CommitCommandBuffer_WaitUntilScheduled,
+        CommitCommandBuffer_WaitUntilCompleted,
+    };
+    
     HGIMETAL_API
     HgiMetal(id<MTLDevice> device = nil);
 
@@ -126,18 +132,18 @@ public:
     id<MTLCommandQueue> GetQueue() const {
         return _commandQueue;
     }
-
+    
     HGIMETAL_API
     id<MTLCommandBuffer> GetCommandBuffer() {
         _workToFlush = true;
         return _commandBuffer;
     }
-
+    
     HGIMETAL_API
     int GetAPIVersion() const {
         return _apiVersion;
     }
-
+    
     HGIMETAL_API
     void SetNeedsInterop(bool useInterop) {
         _useInterop = useInterop;
@@ -152,12 +158,6 @@ public:
     HgiMetalCapabilities const & GetCapabilities() const {
         return *_capabilities;
     }
-
-    enum CommitCommandBufferWaitType {
-        CommitCommandBuffer_NoWait = 0,
-        CommitCommandBuffer_WaitUntilScheduled,
-        CommitCommandBuffer_WaitUntilCompleted,
-    };
     
     HGIMETAL_API
     void CommitCommandBuffer(

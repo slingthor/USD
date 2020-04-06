@@ -42,8 +42,7 @@ _CLEAR_COLORS_DICT = {
     ClearColors.BLACK:       (0.0, 0.0, 0.0, 0.0),
     ClearColors.DARK_GREY:   (0.3, 0.3, 0.3, 0.0),
     ClearColors.LIGHT_GREY:  (0.7, 0.7, 0.7, 0.0),
-    ClearColors.WHITE:       (1.0, 1.0, 1.0, 0.0),
-    ClearColors.DEMO_BLUE:   (0.463, 0.635, 0.882, 0.0)}
+    ClearColors.WHITE:       (1.0, 1.0, 1.0, 0.0)}
 
 
 # Map of highlight color names to rgba color tuples.

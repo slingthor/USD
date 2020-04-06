@@ -54,7 +54,7 @@ HgiMetalGraphicsEncoder::HgiMetalGraphicsEncoder(
         MTLRenderPassColorAttachmentDescriptor *metalColorAttachment =
             renderPassDescriptor.colorAttachments[i];
 
-        if (@available(macos 99.99, ios 8.0, *)) {
+        if (@available(macos 100.100, ios 8.0, *)) {
             metalColorAttachment.loadAction = MTLLoadActionLoad;
         }
         else {

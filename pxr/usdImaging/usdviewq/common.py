@@ -37,7 +37,6 @@ class ClearColors(ConstantGroup):
     DARK_GREY = "Grey (Dark)"
     LIGHT_GREY = "Grey (Light)"
     WHITE = "White"
-    DEMO_BLUE = "Demo Blue"
 
 class HighlightColors(ConstantGroup):
     """Names of available highlight colors for selected objects."""

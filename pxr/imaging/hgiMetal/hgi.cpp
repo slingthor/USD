@@ -40,8 +40,6 @@
 #include "pxr/base/tf/registryManager.h"
 #include "pxr/base/tf/type.h"
 
-#include "pxr/base/arch/defines.h"
-
 PXR_NAMESPACE_OPEN_SCOPE
 
 TF_REGISTRY_FUNCTION(TfType)
@@ -85,7 +83,6 @@ HgiMetal::HgiMetal(id<MTLDevice> device)
                      commandBufferPoolSize];
     _commandBuffer = [_commandQueue commandBuffer];
     [_commandBuffer retain];
-//    [_commandBuffer enqueue];
 
     _capabilities.reset(
         new HgiMetalCapabilities(device));
@@ -279,8 +276,9 @@ HgiMetal::CommitCommandBuffer(CommitCommandBufferWaitType waitType,
 
     _commandBuffer = [_commandQueue commandBuffer];
     [_commandBuffer retain];
-//    [_commandBuffer enqueue];
+    
     _workToFlush = false;
+    _encoder = nil;
 }
 
 void

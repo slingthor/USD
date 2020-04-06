@@ -386,11 +386,12 @@ HdStRenderPassState::MakeGraphicsEncoderDesc() const
 
         HgiAttachmentDesc attachmentDesc;
 
+        attachmentDesc.format = hgiTexHandle.Get()->GetDescriptor().format;
+
         HgiAttachmentLoadOp loadOp = aov.clearValue.IsEmpty() ?
             HgiAttachmentLoadOpLoad :
             HgiAttachmentLoadOpClear;
 
-        attachmentDesc.format = hgiTexHandle.Get()->GetDescriptor().format;
         attachmentDesc.loadOp = loadOp;
         attachmentDesc.storeOp = HgiAttachmentStoreOpStore;
 
