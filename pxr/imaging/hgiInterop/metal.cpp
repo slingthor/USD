@@ -211,6 +211,9 @@ HgiInteropMetal::HgiInteropMetal(
 {
     NSError *error = NULL;
     
+    glewExperimental = true;
+    glewInit();
+    
     _ProcessGLErrors(true);
     _CaptureOpenGlState();
 

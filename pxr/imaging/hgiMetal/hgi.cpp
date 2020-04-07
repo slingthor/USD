@@ -66,6 +66,7 @@ HgiMetal::HgiMetal(id<MTLDevice> device)
 , _apiVersion(_GetAPIVersion())
 , _useInterop(false)
 , _workToFlush(false)
+, _encoder(nil)
 {
     if (!_device) {
 #if defined(ARCH_OS_MACOS)
