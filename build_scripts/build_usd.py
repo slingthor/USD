@@ -1472,7 +1472,7 @@ OPENCOLORIO = Dependency("OpenColorIO", InstallOpenColorIO,
 ############################################################
 # OpenSubdiv
 
-OPENSUBDIV_URL = "https://github.com/PixarAnimationStudios/OpenSubdiv/archive/v3_3_1.zip"
+OPENSUBDIV_URL = "https://github.com/PixarAnimationStudios/OpenSubdiv/archive/v3_4_3.zip"
 
 def InstallOpenSubdiv(context, force, buildArgs):
     srcOSDDir = DownloadURL(OPENSUBDIV_URL, context, force)
@@ -1487,12 +1487,9 @@ def InstallOpenSubdiv(context, force, buildArgs):
             '-DNO_OPENCL=ON',
             '-DNO_DX=ON',
             '-DNO_TESTS=ON',
+            '-DNO_GLEW=ON',
+            '-DNO_GLFW=ON',
         ]
-
-        # OpenSubdiv's FindGLEW module won't look in CMAKE_PREFIX_PATH, so
-        # we need to explicitly specify GLEW_LOCATION here.
-        extraArgs.append('-DGLEW_LOCATION="{instDir}"'
-                         .format(instDir=context.instDir))
 
         # If Ptex support is disabled in USD, disable support in OpenSubdiv
         # as well. This ensures OSD doesn't accidentally pick up a Ptex
@@ -1543,19 +1540,27 @@ def InstallOpenSubdiv(context, force, buildArgs):
 
             os.environ['SDKROOT'] = subprocess.check_output(['xcrun', '--sdk', 'iphoneos', '--show-sdk-path']).strip()
 
-        oldGenerator = context.cmakeGenerator
-
+    
         # OpenSubdiv seems to error when building on windows w/ Ninja...
         # ...so just use the default generator (ie, Visual Studio on Windows)
         # until someone can sort it out
-
+        oldGenerator = context.cmakeGenerator
         if oldGenerator == "Ninja" and Windows():
             context.cmakeGenerator = None
+
+        # OpenSubdiv 3.3 and later on MacOS occasionally runs into build
+        # failures with multiple build jobs. Workaround this by using
+        # just 1 job for now. See:
+        # https://github.com/PixarAnimationStudios/OpenSubdiv/issues/1194
+        oldNumJobs = context.numJobs
+        if MacOS():
+            context.numJobs = 1
+
         try:
             RunCMake(context, force, extraArgs)
         finally:
             context.cmakeGenerator = oldGenerator
-
+            context.numJobs = oldNumJobs
 
         if sdkroot is None:
             os.unsetenv('SDKROOT')

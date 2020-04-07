@@ -232,7 +232,7 @@ public:
             return _resource->GetId();
         }
 #if OPENSUBDIV_HAS_METAL_COMPUTE && defined(PXR_METAL_SUPPORT_ENABLED)
-        id<MTLBuffer> BindMTLBuffer(OpenSubdiv::v3_3_1::Osd::MTLContext* context) {
+        id<MTLBuffer> BindMTLBuffer(OpenSubdiv::v3_4_3::Osd::MTLContext* context) {
             return _resource->GetId();
         }
 #endif
