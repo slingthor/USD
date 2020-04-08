@@ -756,9 +756,9 @@ def InstallBoost(context, force, buildArgs):
             b2_settings.append("macosx-version=iphone-{IOS_SDK_VERSION}".format(IOS_SDK_VERSION=iOSVersion))
 
             open(context.instDir + '/src/boost_1_61_0/tools/build/src/user-config.jam', 'w').writelines(newLines)
-        else:
-            b2_settings.append("link=shared")
-            b2_settings.append("runtime-link=shared")
+        # else:
+        #     b2_settings.append("link=shared")
+        #     b2_settings.append("runtime-link=shared")
 
         # Add on any user-specified extra arguments.
         b2_settings += buildArgs
@@ -1342,8 +1342,8 @@ OPENVDB = Dependency("OpenVDB", InstallOpenVDB, "include/openvdb/openvdb.h")
 OIIO_URL = "https://github.com/OpenImageIO/oiio/archive/Release-1.7.18.zip"
 
 def InstallOpenImageIO(context, force, buildArgs):
-    if context.static_dependencies_macOS:
-        unexported_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'unexported_symbols_list_oiio')
+    # if context.static_dependencies_macOS:
+    #     unexported_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'unexported_symbols_list_oiio')
 
     with CurrentWorkingDirectory(DownloadURL(OIIO_URL, context, force)):
         extraArgs = ['-DOIIO_BUILD_TOOLS=OFF',
@@ -1353,7 +1353,8 @@ def InstallOpenImageIO(context, force, buildArgs):
 
         if context.static_dependencies_macOS:
             extraArgs.append('-DLINKSTATIC=1 ')
-            extraArgs.append('-DCMAKE_SHARED_LINKER_FLAGS="-unexported_symbols_list ' + unexported_file + ' " ')
+            extraArgs.append('-DBUILDSTATIC=1 ')
+            # extraArgs.append('-DCMAKE_SHARED_LINKER_FLAGS="-unexported_symbols_list ' + unexported_file + ' " ')
 
         # OIIO's FindOpenEXR module circumvents CMake's normal library 
         # search order, which causes versions of OpenEXR installed in
