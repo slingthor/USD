@@ -40,6 +40,8 @@
 
 #include "pxr/imaging/cameraUtil/conformWindow.h"
 
+#include "pxr/imaging/hgi/hgi.h"
+
 #include "pxr/imaging/hd/driver.h"
 #include "pxr/imaging/hd/engine.h"
 #include "pxr/imaging/hd/rprimCollection.h"
@@ -115,14 +117,16 @@ public:
     /// @{
     // ---------------------------------------------------------------------
     USDIMAGINGGL_API
-    UsdImagingGLEngine(const RenderAPI api);
+    UsdImagingGLEngine(const RenderAPI api,
+                       Hgi* hgi = Hgi::GetPlatformDefaultHgi());
 
     USDIMAGINGGL_API
     UsdImagingGLEngine(const RenderAPI api,
                        const SdfPath& rootPath,
                        const SdfPathVector& excludedPaths,
                        const SdfPathVector& invisedPaths=SdfPathVector(),
-                       const SdfPath& delegateID = SdfPath::AbsoluteRootPath());
+                       const SdfPath& delegateID = SdfPath::AbsoluteRootPath(),
+                       Hgi* hgi = Hgi::GetPlatformDefaultHgi());
 
     // Disallow copies
     UsdImagingGLEngine(const UsdImagingGLEngine&) = delete;
