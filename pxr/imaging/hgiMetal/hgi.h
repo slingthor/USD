@@ -34,7 +34,6 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 class HgiMetalCapabilities;
-class HgiMetalGraphicsEncoder; // TEMP
 
 enum {
     APIVersion_Metal1_0 = 0,
@@ -163,11 +162,6 @@ public:
     void CommitCommandBuffer(
         CommitCommandBufferWaitType waitType = CommitCommandBuffer_NoWait,
         bool forceNewBuffer = false);
-    
-    // TEMP
-    HGIMETAL_API
-    void BeginMtlf();
-    
 private:
     HgiMetal & operator=(const HgiMetal&) = delete;
     HgiMetal(const HgiMetal&) = delete;
@@ -185,7 +179,12 @@ private:
     bool _workToFlush;
     
     // TEMP for Mtlf handoff
-    HgiMetalGraphicsEncoder* _encoder;
+public:
+    
+    HGIMETAL_API
+    void BeginMtlf();
+    
+    class HgiMetalGraphicsEncoder* _encoder;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE
