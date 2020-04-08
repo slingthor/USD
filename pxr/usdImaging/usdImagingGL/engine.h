@@ -444,7 +444,7 @@ public:
     
     USDIMAGINGGL_API
     Hgi *GetHgi() const {
-        return _hgi.get();
+        return _hgi;
     }
     
     
@@ -508,7 +508,7 @@ protected:
 
     HdRenderIndex *_renderIndex;
 
-    std::unique_ptr<class Hgi> _hgi;
+    Hgi* _hgi;
     HdDriver _hgiDriver;
 
     HdxSelectionTrackerSharedPtr _selTracker;

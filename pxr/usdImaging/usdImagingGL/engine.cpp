@@ -167,7 +167,7 @@ UsdImagingGLEngine::UsdImagingGLEngine(const RenderAPI api, Hgi* hgi)
     : _engine(nullptr)
     , _renderIndex(nullptr)
     , _hgi(hgi)
-    , _hgiDriver{HgiTokens->renderDriver, VtValue(_hgi.get())}
+    , _hgiDriver{HgiTokens->renderDriver, VtValue(_hgi)}
     , _selTracker(new HdxSelectionTracker)
     , _delegateID(SdfPath::AbsoluteRootPath())
     , _delegate(nullptr)
@@ -241,7 +241,7 @@ UsdImagingGLEngine::UsdImagingGLEngine(
     : _engine(nullptr)
     , _renderIndex(nullptr)
     , _hgi(hgi)
-    , _hgiDriver{HgiTokens->renderDriver, VtValue(_hgi.get())}
+    , _hgiDriver{HgiTokens->renderDriver, VtValue(_hgi)}
     , _selTracker(new HdxSelectionTracker)
     , _delegateID(delegateID)
     , _delegate(nullptr)
