@@ -1982,6 +1982,10 @@ void MtlfMetalContext::FlushBuffers() {
 void MtlfMetalContext::QueueBufferFlush(
     id<MTLBuffer> const &buffer, uint64_t start, uint64_t end) {
 #if defined(ARCH_OS_MACOS)
+    if ([buffer storageMode] != MTLStorageModeManaged) {
+        return;
+    }
+
     if (!_FlushCachingStarted) {
         [buffer didModifyRange:NSMakeRange(start, end - start)];
         return;
