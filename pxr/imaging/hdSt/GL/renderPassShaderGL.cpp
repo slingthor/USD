@@ -31,6 +31,7 @@
 #include "pxr/imaging/hd/renderBuffer.h"
 #include "pxr/imaging/hd/renderPassState.h"
 #include "pxr/imaging/hgiGL/texture.h"
+#include "pxr/imaging/hdSt/resourceBinder.h"
 #include "pxr/imaging/hdSt/package.h"
 #include "pxr/imaging/hdSt/GL/renderPassShaderGL.h"
 #include "pxr/imaging/hdSt/GL/glslProgram.h"

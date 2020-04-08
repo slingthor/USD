@@ -26,7 +26,6 @@
 
 #include "pxr/pxr.h"
 #include "pxr/imaging/hdSt/api.h"
-#include "pxr/imaging/hdSt/resourceBinder.h"
 
 #include "pxr/base/tf/declarePtrs.h"
 #include "pxr/base/tf/token.h"
@@ -38,6 +37,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 class HdStResourceRegistry;
 class HdResource;
 class HdStSurfaceShader;
+class HdSt_ResourceBinder;
 
 using HdStProgramSharedPtr =
     std::shared_ptr<class HdStProgram>;
@@ -107,23 +107,23 @@ public:
     virtual void UnsetProgram() = 0;
     
     HDST_API
-    virtual void DrawElementsInstancedBaseVertex(GLenum primitiveMode,
+    virtual void DrawElementsInstancedBaseVertex(int primitiveMode,
                                                  int indexCount,
-                                                 GLint indexType,
-                                                 GLint firstIndex,
-                                                 GLint instanceCount,
-                                                 GLint baseVertex) const = 0;
+                                                 int indexType,
+                                                 int firstIndex,
+                                                 int instanceCount,
+                                                 int baseVertex) const = 0;
 
     HDST_API
-    virtual void DrawArraysInstanced(GLenum primitiveMode,
-                                     GLint baseVertex,
-                                     GLint vertexCount,
-                                     GLint instanceCount) const = 0;
+    virtual void DrawArraysInstanced(int primitiveMode,
+                                     int baseVertex,
+                                     int vertexCount,
+                                     int instanceCount) const = 0;
     
     HDST_API
-    virtual void DrawArrays(GLenum primitiveMode,
-                            GLint baseVertex,
-                            GLint vertexCount) const = 0;
+    virtual void DrawArrays(int primitiveMode,
+                            int baseVertex,
+                            int vertexCount) const = 0;
     
     /// Returns the hash value of the program for \a sourceFile
     HDST_API

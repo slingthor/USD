@@ -28,6 +28,7 @@
 
 #include "pxr/imaging/hdSt/debugCodes.h"
 #include "pxr/imaging/hdSt/package.h"
+#include "pxr/imaging/hdSt/resourceBinder.h"
 #include "pxr/imaging/hdSt/surfaceShader.h"
 #include "pxr/imaging/hdSt/textureResource.h"
 #include "pxr/imaging/hdSt/textureResourceHandle.h"
@@ -580,12 +581,12 @@ void HdStGLSLProgram::UnsetProgram() {
     glUseProgram(0);
 }
 
-void HdStGLSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
+void HdStGLSLProgram::DrawElementsInstancedBaseVertex(int primitiveMode,
                                                       int indexCount,
-                                                      GLint indexType,
-                                                      GLint firstIndex,
-                                                      GLint instanceCount,
-                                                      GLint baseVertex) const {
+                                                      int indexType,
+                                                      int firstIndex,
+                                                      int instanceCount,
+                                                      int baseVertex) const {
     uint64_t size;
     
     switch(indexType) {
@@ -607,16 +608,16 @@ void HdStGLSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
                                       baseVertex);
 }
 
-void HdStGLSLProgram::DrawArraysInstanced(GLenum primitiveMode,
-                                          GLint baseVertex,
-                                          GLint vertexCount,
-                                          GLint instanceCount) const {
+void HdStGLSLProgram::DrawArraysInstanced(int primitiveMode,
+                                          int baseVertex,
+                                          int vertexCount,
+                                          int instanceCount) const {
     glDrawArraysInstanced(primitiveMode, baseVertex, vertexCount, instanceCount);
 }
 
-void HdStGLSLProgram::DrawArrays(GLenum primitiveMode,
-                                 GLint baseVertex,
-                                 GLint vertexCount) const {
+void HdStGLSLProgram::DrawArrays(int primitiveMode,
+                                 int baseVertex,
+                                 int vertexCount) const {
     glDrawArrays(primitiveMode, baseVertex, vertexCount);
 }
 

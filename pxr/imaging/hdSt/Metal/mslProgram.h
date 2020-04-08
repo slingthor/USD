@@ -32,6 +32,8 @@
 #include "pxr/imaging/hdSt/Metal/resourceMetal.h"
 #include "pxr/imaging/mtlf/mtlDevice.h"
 
+#include "pxr/imaging/hd/binding.h"
+
 #include <boost/shared_ptr.hpp>
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -163,23 +165,23 @@ public:
     virtual void UnsetProgram() override;
     
     HDST_API
-    virtual void DrawElementsInstancedBaseVertex(GLenum primitiveMode,
+    virtual void DrawElementsInstancedBaseVertex(int primitiveMode,
                                                  int indexCount,
-                                                 GLint indexType,
-                                                 GLint firstIndex,
-                                                 GLint instanceCount,
-                                                 GLint baseVertex) const override;
+                                                 int indexType,
+                                                 int firstIndex,
+                                                 int instanceCount,
+                                                 int baseVertex) const override;
 
     HDST_API
-    virtual void DrawArraysInstanced(GLenum primitiveMode,
-                                     GLint baseVertex,
-                                     GLint vertexCount,
-                                     GLint instanceCount) const override;
+    virtual void DrawArraysInstanced(int primitiveMode,
+                                     int baseVertex,
+                                     int vertexCount,
+                                     int instanceCount) const override;
     
     HDST_API
-    virtual void DrawArrays(GLenum primitiveMode,
-                            GLint baseVertex,
-                            GLint vertexCount) const override;
+    virtual void DrawArrays(int primitiveMode,
+                            int baseVertex,
+                            int vertexCount) const override;
     
     HDST_API
     BindingLocationMap const &GetBindingLocations() const {

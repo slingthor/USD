@@ -56,6 +56,7 @@ HdSt_MaterialParam::ComputeHash(HdSt_MaterialParamVector const &params)
         boost::hash_combine(hash, param.paramType);
         boost::hash_combine(hash, param.name.Hash());
         boost::hash_combine(hash, param.connection.GetHash());
+        boost::hash_combine(hash, param.fallbackValue.GetHash());
         for (TfToken const& coord : param.samplerCoords) {
             boost::hash_combine(hash, coord.Hash());
         }
