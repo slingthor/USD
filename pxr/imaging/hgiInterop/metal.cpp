@@ -846,7 +846,7 @@ HgiInteropMetal::CopyToInterop(
     [computeEncoder endEncoding];
     
     if (sourceDepthTexture && sourceColorTexture) {
-        glShaderIndex = ShaderContextColor;
+        glShaderIndex = ShaderContextColorDepth;
     }
     else if (sourceColorTexture) {
         glShaderIndex = ShaderContextColor;
