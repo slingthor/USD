@@ -2509,7 +2509,7 @@ HdSt_CodeGenMSL::Compile()
             std::string osdCode = OpenSubdiv::Osd::MTLPatchShaderSource::GetCommonShaderSource();
             _genOSDDefinitions  << "#define CONTROL_INDICES_BUFFER_INDEX <cibi>\n"
                                 << "#define OSD_PATCHPARAM_BUFFER_INDEX <osd_ppbi>\n"
-                                << "#define OSD_PERPATCHVERTEXBEZIER_BUFFER_INDEX <osd_ppvbbi>\n"
+                                << "#define OSD_PERPATCHVERTEX_BUFFER_INDEX <osd_ppvbbi>\n"
                                 << "#define OSD_PERPATCHTESSFACTORS_BUFFER_INDEX <osd_pptfbi>\n"
                                 << "#define OSD_KERNELLIMIT_BUFFER_INDEX <osd_klbi>\n"
                                 << "#define OSD_PATCHPARAM_BUFFER_INDEX <osd_ppbi>\n"
