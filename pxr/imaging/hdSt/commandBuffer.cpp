@@ -600,6 +600,13 @@ HdStCommandBuffer::FrustumCull(
     HD_TRACE_FUNCTION();
     
     const bool
+    skipCull = false;
+    
+    if (skipCull) {
+        return;
+    }
+    
+    const bool
     mtCullingDisabled = TfDebug::IsEnabled(HDST_DISABLE_MULTITHREADED_CULLING);
 
     primCount.store(0);
