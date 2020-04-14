@@ -182,7 +182,7 @@ private:
 public:
     
     HGIMETAL_API
-    void BeginMtlf();
+    bool BeginMtlf();
     
     class HgiMetalGraphicsEncoder* _encoder;
 };

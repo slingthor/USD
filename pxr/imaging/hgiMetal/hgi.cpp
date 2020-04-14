@@ -282,13 +282,16 @@ HgiMetal::CommitCommandBuffer(CommitCommandBufferWaitType waitType,
     _encoder = nil;
 }
 
-void
+bool
 HgiMetal::BeginMtlf()
 {
     // SOOOO TEMP and specialised!
     if (_encoder) {
         _encoder->Commit();
+        return true;
     }
+    
+    return false;
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE
