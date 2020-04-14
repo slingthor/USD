@@ -436,7 +436,7 @@ HgiInteropMetal::HgiInteropMetal(
     _glColorTexture = 0;
     _glDepthTexture = 0;
     
-    AllocateAttachments(256, 256);
+    SetAttachmentSize(256, 256);
 }
 
 HgiInteropMetal::~HgiInteropMetal()
@@ -489,8 +489,14 @@ void HgiInteropMetal::_FreeTransientTextureCacheRefs()
     }
 }
 
-void HgiInteropMetal::AllocateAttachments(int width, int height)
+void HgiInteropMetal::SetAttachmentSize(int width, int height)
 {
+    if (_mtlAliasedColorTexture != nil) {
+        if (_mtlAliasedColorTexture.width == width &&
+            _mtlAliasedColorTexture.height == height) {
+            return;
+        }
+    }
     NSDictionary* cvBufferProperties = @{
         (__bridge NSString*)kCVPixelBufferOpenGLCompatibilityKey : @(TRUE),
         (__bridge NSString*)kCVPixelBufferMetalCompatibilityKey : @(TRUE),
