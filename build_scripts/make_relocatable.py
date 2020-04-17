@@ -94,7 +94,7 @@ def change_absolute_to_relative(files, path_to_replace, custom_path=""):
         returncode = p.returncode
 
         if returncode != 0:
-            return
+            continue
         for line in otool_output.splitlines():
             extracted_path = line.split()[0]
             replace_path_idx = extracted_path.find(path_to_replace)
