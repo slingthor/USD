@@ -359,7 +359,7 @@ MtlfDrawTarget::Unbind()
     }
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
     context->SetDrawTarget(NULL);
-    
+        
     TouchContents();
 }
 
@@ -460,7 +460,7 @@ MtlfDrawTarget::GetImage(std::string const & name, void* buffer) const
     
     id<MTLBuffer> const &cpuBuffer =
         context->GetMetalBuffer((bytesPerPixel * width * height),
-                                MTLResourceStorageModeDefault);
+                                MTLResourceStorageModeShared);
     
     [blitEncoder copyFromTexture:texture
                      sourceSlice:0
@@ -473,9 +473,6 @@ MtlfDrawTarget::GetImage(std::string const & name, void* buffer) const
         destinationBytesPerImage:(bytesPerPixel * width * height)
                          options:blitOptions];
 
-#if defined(ARCH_OS_MACOS)
-    [blitEncoder synchronizeResource:cpuBuffer];
-#endif
     [blitEncoder endEncoding];
 
     hgiMetal->CommitCommandBuffer(

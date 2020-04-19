@@ -36,10 +36,23 @@ HgiMetalCapabilities::HgiMetalCapabilities(id<MTLDevice> device)
     else {
         concurrentDispatchSupported = false;
     }
-#if defined(ARCH_OS_MACOS)
-    defaultStorageMode = MTLResourceStorageModeManaged;
-#else
+
     defaultStorageMode = MTLResourceStorageModeShared;
+    if (@available(macOS 100.100, ios 12.0, *)) {
+        unifiedMemory = true;
+    }
+    else {
+#if defined(__MAC_10_15) && __MAC_OS_X_VERSION_MAX_ALLOWED >= __MAC_10_15
+        unifiedMemory = [device hasUnifiedMemory];
+#else
+        unifiedMemory = [device lowPower];
+#endif
+    }
+
+#if defined(ARCH_OS_MACOS)
+	if (!unifiedMemory) {
+	    defaultStorageMode = MTLResourceStorageModeManaged;
+	}
 #endif
 }
 

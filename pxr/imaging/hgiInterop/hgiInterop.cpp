@@ -64,10 +64,11 @@ void HgiInterop::TransferToApp(
     if (!_metalToOpenGL) {
         _metalToOpenGL.reset(
             new HgiInteropMetal(hgiMetal->GetDevice()));
-        _metalToOpenGL->AllocateAttachments(
-            metalColor->GetDescriptor().dimensions[0],
-            metalColor->GetDescriptor().dimensions[1]);
     }
+    
+    _metalToOpenGL->SetAttachmentSize(
+    metalColor->GetDescriptor().dimensions[0],
+    metalColor->GetDescriptor().dimensions[1]);
     
     id<MTLTexture> colorTexture = nil;
     id<MTLTexture> depthTexture = nil;

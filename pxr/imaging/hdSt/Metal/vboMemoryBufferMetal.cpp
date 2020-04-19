@@ -154,7 +154,8 @@ HdStVBOMemoryBufferMetal::Reallocate(
             
             // Disable triple buffering
             if (i == 0) {
-                newId[i] = context->GetMetalBuffer(bufferSize, MTLResourceStorageModeDefault);
+//                newId[i] = context->GetMetalBuffer(bufferSize, MTLResourceStorageModeDefault);
+                newId[i] = context->GetMetalBuffer(bufferSize, MTLResourceStorageModeShared);
             }
             else {
                 newId[i].Clear();

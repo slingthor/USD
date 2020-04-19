@@ -10,7 +10,7 @@ from shutil import copy, copyfile
 SDKVersion  = subprocess.check_output(['xcodebuild', '-version']).strip()[6:10]
 codeSignIDs = subprocess.check_output(['security', 'find-identity', '-v', '-p', 'codesigning'])
 
-codeSignID = "-"
+codeSignID = None
 if os.environ.get('CODE_SIGN_ID'):
     codeSignID = os.environ.get('CODE_SIGN_ID')
 elif SDKVersion >= "11.0" and codeSignIDs.find("Apple Development") != -1:
@@ -19,7 +19,7 @@ elif codeSignIDs.find("Mac Developer") != -1:
     codeSignID = "Mac Developer"
 
 # Validate that we have a codesign ID that both exists and isn't ambiguous
-if codeSignIDs.count(codeSignID) != 1:
+if codeSignIDs.count(codeSignID) != 1 and codeSignID != "-":
     print("Codesign Error: Unable to identify signing identity. " +
         "Pleas specify by setting the XCODE_ATTRIBUTE_CODE_SIGN_ID environment " +
         "variable to the one you'd like to use. Options are:\n" + codeSignIDs +
@@ -94,7 +94,7 @@ def change_absolute_to_relative(files, path_to_replace, custom_path=""):
         returncode = p.returncode
 
         if returncode != 0:
-            return
+            continue
         for line in otool_output.splitlines():
             extracted_path = line.split()[0]
             replace_path_idx = extracted_path.find(path_to_replace)

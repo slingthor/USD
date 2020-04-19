@@ -126,7 +126,7 @@ HdxColorChannelTask::_CreateShaderResources()
         return false;
     }
     bool isOpenGL = HdStResourceFactory::GetInstance()->IsOpenGL();
-    
+
 #if defined(PXR_OPENGL_SUPPORT_ENABLED)
     if (isOpenGL) {
         GLuint programId = std::dynamic_pointer_cast<HdStGLSLProgram>(_shaderProgram)->GetGLProgram();

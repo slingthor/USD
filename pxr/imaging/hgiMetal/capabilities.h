@@ -46,6 +46,7 @@ public:
 
     MTLResourceOptions defaultStorageMode;
     bool concurrentDispatchSupported;
+    bool unifiedMemory;
 
 protected:
     friend class HgiMetal;

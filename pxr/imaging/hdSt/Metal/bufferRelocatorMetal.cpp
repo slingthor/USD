@@ -49,6 +49,10 @@ HdStBufferRelocatorMetal::Commit()
     id<MTLCommandBuffer> commandBuffer = [context->gpus.commandQueue commandBuffer];
     id<MTLBlitCommandEncoder> blitEncoder = [commandBuffer blitCommandEncoder];
     
+#if !defined(NDEBUG)
+    commandBuffer.label = @"HdStBufferRelocatorMetal";
+#endif
+    
     TF_FOR_ALL (it, _queue) {
         [blitEncoder copyFromBuffer:_srcBuffer
                        sourceOffset:it->readOffset
@@ -56,13 +60,19 @@ HdStBufferRelocatorMetal::Commit()
                   destinationOffset:it->writeOffset
                                size:it->copySize];
     }
+    
+    bool isManaged = false;
 #if defined(ARCH_OS_MACOS)
-    // Update CPU side copy so that any future CPU side didModifyRange calls
-    // don't mess us up!
-    [blitEncoder synchronizeResource:_dstBuffer];
+    isManaged = [_dstBuffer storageMode] == MTLStorageModeManaged;
+    if (isManaged) {
+        [blitEncoder synchronizeResource:_dstBuffer];
+    }
 #endif
     [blitEncoder endEncoding];
     [commandBuffer commit];
+    if (isManaged) {
+        [commandBuffer waitUntilCompleted];
+    }
 
     HD_PERF_COUNTER_ADD(HdPerfTokens->glCopyBufferSubData,
                         (double)_queue.size());

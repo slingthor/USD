@@ -22,17 +22,17 @@
 // language governing permissions and limitations under the Apache License.
 //
 
-#include "pxr/imaging/hdSt/program.h"
-#include "pxr/imaging/hdSt/resourceRegistry.h"
-#include "pxr/imaging/hdSt/flatNormals.h"
-#include "pxr/imaging/hdSt/tokens.h"
-
 #include "pxr/imaging/hd/bufferArrayRange.h"
 #include "pxr/imaging/hd/bufferResource.h"
 #include "pxr/imaging/hd/engine.h"
 #include "pxr/imaging/hd/perfLog.h"
 #include "pxr/imaging/hd/tokens.h"
 #include "pxr/imaging/hd/vtBufferSource.h"
+
+#include "pxr/imaging/hdSt/program.h"
+#include "pxr/imaging/hdSt/resourceRegistry.h"
+#include "pxr/imaging/hdSt/flatNormals.h"
+#include "pxr/imaging/hdSt/tokens.h"
 
 #include "pxr/imaging/hf/perfLog.h"
 

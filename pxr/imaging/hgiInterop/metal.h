@@ -51,7 +51,7 @@ public:
     virtual ~HgiInteropMetal();
     
     HGIINTEROP_API
-    void AllocateAttachments(int width, int height);
+    void SetAttachmentSize(int width, int height);
         
     HGIINTEROP_API
     void CopyToInterop(

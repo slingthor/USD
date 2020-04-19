@@ -163,11 +163,11 @@ UsdImagingGLEngine::IsHydraEnabled()
 // Construction
 //----------------------------------------------------------------------------
 
-UsdImagingGLEngine::UsdImagingGLEngine(const RenderAPI api)
+UsdImagingGLEngine::UsdImagingGLEngine(const RenderAPI api, Hgi* hgi)
     : _engine(nullptr)
     , _renderIndex(nullptr)
-    , _hgi(Hgi::GetPlatformDefaultHgi())
-    , _hgiDriver{HgiTokens->renderDriver, VtValue(_hgi.get())}
+    , _hgi(hgi)
+    , _hgiDriver{HgiTokens->renderDriver, VtValue(_hgi)}
     , _selTracker(new HdxSelectionTracker)
     , _delegateID(SdfPath::AbsoluteRootPath())
     , _delegate(nullptr)
@@ -236,11 +236,12 @@ UsdImagingGLEngine::UsdImagingGLEngine(
     const SdfPath& rootPath,
     const SdfPathVector& excludedPaths,
     const SdfPathVector& invisedPaths,
-    const SdfPath& delegateID)
+    const SdfPath& delegateID,
+    Hgi* hgi)
     : _engine(nullptr)
     , _renderIndex(nullptr)
-    , _hgi(Hgi::GetPlatformDefaultHgi())
-    , _hgiDriver{HgiTokens->renderDriver, VtValue(_hgi.get())}
+    , _hgi(hgi)
+    , _hgiDriver{HgiTokens->renderDriver, VtValue(_hgi)}
     , _selTracker(new HdxSelectionTracker)
     , _delegateID(delegateID)
     , _delegate(nullptr)

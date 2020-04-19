@@ -232,11 +232,11 @@ HdStCommandBuffer::ExecuteDraw(
         }
     };
 
-    bool setAlpha = false;
-
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
     MTLRenderPassDescriptor *renderPassDescriptor = context->GetRenderPassDescriptor();
     
+    bool mtBatchDrawing = true;
+
     // Create a new command buffer for each render pass to the current drawable
     if (renderPassDescriptor.colorAttachments[0].loadAction == MTLLoadActionClear) {
         id <MTLCommandBuffer> commandBuffer = context->GetHgi()->GetCommandBuffer();
@@ -249,25 +249,26 @@ HdStCommandBuffer::ExecuteDraw(
         {
            context->GPUTimerEndTimer(frameNumber);
         }];
-        context->GetHgi()->BeginMtlf();
 
         int numAttachments = 1;
         if (context->GetDrawTarget()) {
             numAttachments = context->GetDrawTarget()->GetAttachments().size();
         }
-        else
-            setAlpha = true;
 
-        renderPassDescriptor.depthAttachment.loadAction = MTLLoadActionLoad;
-        renderPassDescriptor.stencilAttachment.loadAction = MTLLoadActionLoad;
+        if (context->GetHgi()->BeginMtlf()) {
+            renderPassDescriptor.depthAttachment.loadAction = MTLLoadActionLoad;
+            renderPassDescriptor.stencilAttachment.loadAction = MTLLoadActionLoad;
 
-        for (int i = 0; i < numAttachments; i++) {
-            renderPassDescriptor.colorAttachments[i].loadAction = MTLLoadActionLoad;
+            for (int i = 0; i < numAttachments; i++) {
+                renderPassDescriptor.colorAttachments[i].loadAction = MTLLoadActionLoad;
+            }
+        }
+        else {
+            mtBatchDrawing = false;
         }
     }
 
     uint64_t timeStart = ArchGetTickTime();
-    static bool mtBatchDrawing = true;
 
     static os_log_t encodingLog = os_log_create("hydra.metal", "Drawing");
     os_signpost_id_t issueEncoding = os_signpost_id_generate(encodingLog);
@@ -597,6 +598,13 @@ HdStCommandBuffer::FrustumCull(
     float renderTargetHeight)
 {
     HD_TRACE_FUNCTION();
+    
+    const bool
+    skipCull = false;
+    
+    if (skipCull) {
+        return;
+    }
     
     const bool
     mtCullingDisabled = TfDebug::IsEnabled(HDST_DISABLE_MULTITHREADED_CULLING);

@@ -586,12 +586,12 @@ void HdStMSLProgram::UnsetProgram() {
 }
 
 
-void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
+void HdStMSLProgram::DrawElementsInstancedBaseVertex(int primitiveMode,
                                                      int indexCount,
-                                                     GLint indexType,
-                                                     GLint firstIndex,
-                                                     GLint instanceCount,
-                                                     GLint baseVertex) const {
+                                                     int indexType,
+                                                     int firstIndex,
+                                                     int instanceCount,
+                                                     int baseVertex) const {
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
     id<MTLBuffer> indexBuffer = context->GetIndexBuffer();
     const bool doMVAComputeGS = _buildTarget == kMSL_BuildTarget_MVA_ComputeGS;
@@ -782,10 +782,10 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
     context->IncNumberPrimsDrawn((indexCount / 3) * instanceCount, false);
 }
 
-void HdStMSLProgram::DrawArraysInstanced(GLenum primitiveMode,
-                                          GLint baseVertex,
-                                          GLint vertexCount,
-                                          GLint instanceCount) const {
+void HdStMSLProgram::DrawArraysInstanced(int primitiveMode,
+                                         int baseVertex,
+                                         int vertexCount,
+                                         int instanceCount) const {
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
     context->SetIndexBuffer(context->GetTriListIndexBuffer(MTLIndexTypeUInt32, vertexCount / 3));
 
@@ -816,9 +816,9 @@ void HdStMSLProgram::DrawArraysInstanced(GLenum primitiveMode,
     context->ReleaseEncoder(false);
 }
 
-void HdStMSLProgram::DrawArrays(GLenum primitiveMode,
-                                GLint baseVertex,
-                                GLint vertexCount) const {
+void HdStMSLProgram::DrawArrays(int primitiveMode,
+                                int baseVertex,
+                                int vertexCount) const {
     
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
     
