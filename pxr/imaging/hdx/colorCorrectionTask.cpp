@@ -58,7 +58,7 @@ TF_DEFINE_PRIVATE_TOKENS(
 );
 
 HdxColorCorrectionTask::HdxColorCorrectionTask(
-    HdSceneDelegate* delegate, 
+    HdSceneDelegate* delegate,
     SdfPath const& id)
     : HdTask(id)
     , _hgi(nullptr)
@@ -107,18 +107,20 @@ HdxColorCorrectionTask::_GetUseOcio() const
     // Client can choose to use Hydra's build-in sRGB color correction or use
     // OpenColorIO for color correction in which case we insert extra OCIO code.
     #ifdef PXR_OCIO_PLUGIN_ENABLED
-        bool useOCIO = 
+        bool useOCIO =
             _colorCorrectionMode == HdxColorCorrectionTokens->openColorIO;
-
+        useOCIO = true;
         // Only use if $OCIO environment variable is set.
         // (Otherwise this option should be disabled.)
+    
         if (TfGetenv("OCIO") == "") {
             useOCIO = false;
         }
+     
     #else
         bool useOCIO = false;
     #endif
-
+    //useOCIO = true;
     return useOCIO;
 }
 
@@ -129,15 +131,16 @@ HdxColorCorrectionTask::_CreateOpenColorIOResources()
         // Use client provided OCIO values, or use default fallback values
         OCIO::ConstConfigRcPtr config = OCIO::GetCurrentConfig();
 
-        const char* display = _displayOCIO.empty() ? 
-                              config->getDefaultDisplay() : 
+        const char* display = _displayOCIO.empty() ?
+                              config->getDefaultDisplay() :
                               _displayOCIO.c_str();
 
-        const char* view = _viewOCIO.empty() ? 
+        const char* view = _viewOCIO.empty() ?
                            config->getDefaultView(display) :
                            _viewOCIO.c_str();
 
-        std::string inputColorSpace = _colorspaceOCIO;
+        //std::string inputColorSpace = _colorspaceOCIO;
+        std::string inputColorSpace = "p3dci8";
         if (inputColorSpace.empty()) {
             OCIO::ConstColorSpaceRcPtr cs = config->getColorSpace("default");
             if (cs) {
@@ -152,6 +155,7 @@ HdxColorCorrectionTask::_CreateOpenColorIOResources()
         transform->setDisplay(display);
         transform->setView(view);
         transform->setInputColorSpaceName(inputColorSpace.c_str());
+    
         if (!_looksOCIO.empty()) {
             transform->setLooksOverride(_looksOCIO.c_str());
             transform->setLooksOverrideEnabled(true);
@@ -160,6 +164,7 @@ HdxColorCorrectionTask::_CreateOpenColorIOResources()
         }
 
         OCIO::ConstProcessorRcPtr processor = config->getProcessor(transform);
+        auto gpuProcessor = processor->getDefaultGPUProcessor();
 
         // If 3D lut size is 0 then use a reasonable default size.
         // We use 65 (0-64) samples which works well with OCIO resampling.
@@ -172,19 +177,45 @@ HdxColorCorrectionTask::_CreateOpenColorIOResources()
         if (size > 0) {
             _lut3dSizeOCIO = size;
         }
-
+        
         // Create a GPU Shader Description
-        OCIO::GpuShaderDesc shaderDesc;
-        shaderDesc.setLanguage(OCIO::GPU_LANGUAGE_GLSL_1_3);
-        shaderDesc.setFunctionName("OCIODisplay");
-        shaderDesc.setLut3DEdgeLen(_lut3dSizeOCIO);
+        auto shaderDesc = OpenColorIO_v2_0dev::GpuShaderDesc::CreateLegacyShaderDesc(_lut3dSizeOCIO);
+        
+        //shaderDesc->
+        //TODO read curernt language from USD
+        shaderDesc->setLanguage(OCIO::GPU_LANGUAGE_METAL);
+        shaderDesc->setFunctionName("OCIODisplay");
+    /*
+        const char * textureName = nullptr;
+        const char * samplerName = nullptr;
+        const char * uid         = nullptr;
+        unsigned edgelen = _lut3dSizeOCIO;
+        OpenColorIO_v2_0dev::Interpolation interpolation = OpenColorIO_v2_0dev::INTERP_LINEAR;
+    static char count = 'a';
+    const char c = count;
+    count++;
+    //shaderDesc->add3DTexture("lut3d", "lut3dsampler", &c, edgelen, interpolation, nullptr);
+    shaderDesc->get3DTexture(1, textureName, samplerName, uid, edgelen, interpolation);
 
+        if(!textureName || !*textureName
+            || !samplerName || !*samplerName
+            || !uid || !*uid
+            || edgelen==0)
+        {
+            //TODO add throw or a failure
+        }
+        
         // Compute and the 3D LUT
         int num3Dentries = 3 * _lut3dSizeOCIO*_lut3dSizeOCIO*_lut3dSizeOCIO;
         std::vector<float> lut3d;
         lut3d.resize(num3Dentries);
-        processor->getGpuLut3D(&lut3d[0], shaderDesc);
-
+         processor->getGpuLut3D(&lut3d[0], shaderDesc);
+         
+    */
+        gpuProcessor->extractGpuShaderInfo(shaderDesc);
+        //const float *lutValues = nullptr;
+        //shaderDesc->get3DTextureValues(0, lutValues);
+    
         // Load the data into an OpenGL 3D Texture
         if (_texture3dLUT) {
             _hgi->DestroyTexture(&_texture3dLUT);
@@ -194,17 +225,28 @@ HdxColorCorrectionTask::_CreateOpenColorIOResources()
         lutDesc.debugName = "OCIO 3d LUT";
         lutDesc.dimensions = GfVec3i(_lut3dSizeOCIO);
         lutDesc.format = HgiFormatFloat32Vec3;
-        lutDesc.initialData = lut3d.data();
+        //lutDesc.initialData = lutValues;
         lutDesc.layerCount = 1;
         lutDesc.mipLevels = 1;
-        lutDesc.pixelsByteSize = lut3d.size() * sizeof(lut3d[0]);
+        lutDesc.pixelsByteSize = sizeof(float) * 3 * _lut3dSizeOCIO*_lut3dSizeOCIO*_lut3dSizeOCIO;
         lutDesc.sampleCount = HgiSampleCount1;
         lutDesc.usage = HgiTextureUsageBitsShaderRead;
         _texture3dLUT = _hgi->CreateTexture(lutDesc);
-
-        const char* gpuShaderText = processor->getGpuShaderText(shaderDesc);
-
-        return std::string(gpuShaderText);
+        
+        
+        const char* ocioGeneratedShaderText = shaderDesc->getShaderText();
+        std::stringstream shaderTextStream;
+        //for Metal we want to wrap OCIO in a class
+        //TODO check if metal
+        shaderTextStream << "struct OcioGenWrapper {" << std::endl;
+        shaderTextStream << ocioGeneratedShaderText;
+        shaderTextStream << "};" << std::endl;
+        shaderTextStream << "float4 callOcioDisplay(vec4 inPixel, texture3d<float> lut3d) {" << std::endl;
+        shaderTextStream << "OcioGenWrapper ocioGen;" << std::endl;
+        shaderTextStream << "ocioGen.ocio_lut3d_0 = lut3d;" << std::endl;
+//        shaderTextStream << "return ocioGen.OCIODisplay(color);" << std::endl;
+        shaderTextStream << "}" << std::endl;
+        return shaderTextStream.str();
     #else
         return std::string();
     #endif
@@ -216,7 +258,6 @@ HdxColorCorrectionTask::_CreateShaderResources()
     if (_shaderProgram) {
         return true;
     }
-
     bool useOCIO =_GetUseOcio();
     std::string apiName(_hgi->GetAPIName());
     HioGlslfx glslfx(HdxPackageColorCorrectionShader(), &apiName);
@@ -238,7 +279,7 @@ HdxColorCorrectionTask::_CreateShaderResources()
         fragDesc.shaderCode = "#define GLSLFX_USE_OCIO\n";
         // Our current version of OCIO outputs 130 glsl and texture3D is
         // removed from glsl in 140.
-        fragDesc.shaderCode += "#define texture3D texture\n";
+        //fragDesc.shaderCode += "#define texture3D texture\n";
     }
     fragDesc.shaderCode += glslfx.GetSource(_tokens->colorCorrectionFragment);
     if (useOCIO) {
@@ -553,7 +594,7 @@ HdxColorCorrectionTask::_PrintCompileErrors()
 // -------------------------------------------------------------------------- //
 
 std::ostream& operator<<(
-    std::ostream& out, 
+    std::ostream& out,
     const HdxColorCorrectionTaskParams& pv)
 {
     out << "ColorCorrectionTask Params: (...) "
