@@ -744,6 +744,9 @@ def InstallBoost(context, force, buildArgs):
         if os.path.exists(projectPath): 
             os.remove(projectPath)
 
+        with open(projectPath, 'w') as projectFile:
+            projectFile.write('\n')
+
         if context.buildPython:
             b2_settings.append("--with-python")
             pythonInfo = GetPythonInfo()
@@ -759,7 +762,7 @@ def InstallBoost(context, force, buildArgs):
             # There are Python config arguments that can be passed to bootstrap 
             # but those are not available in boostrap.bat (Windows) so we must 
             # take the following approach:
-            with open(projectPath, 'w') as projectFile:
+            with open(projectPath, 'a') as projectFile:
                 # Note that we must escape any special characters, like 
                 # backslashes for jam, hence the mods below for the path 
                 # arguments. Also, if the path contains spaces jam will not
@@ -843,7 +846,9 @@ def InstallBoost(context, force, buildArgs):
                 ': <architecture>arm <target-os>iphone <address-model>64\n',
                 ';'
             ]
-            b2_settings.append("macosx-version=iphone-12.0")
+            iOSVersion = subprocess.check_output(['xcodebuild', '-sdk', sdkPath, '-version', 'SDKVersion']).strip()
+            b2_settings.append("macosx-version=iphone-{IOS_SDK_VERSION}".format(
+                IOS_SDK_VERSION=iOSVersion))
 
             with open(projectPath, 'w') as projectFile:
                 projectFile.writelines(newLines)
