@@ -71,6 +71,8 @@ void ProcessPointId(int);
 
 void main(void)
 {
+    ProcessPrimvars();
+
     MAT4 transform    = ApplyInstanceTransform(HdGet_transform());
     MAT4 transformInv = ApplyInstanceTransformInverse(HdGet_transformInverse());
 
@@ -78,8 +80,6 @@ void main(void)
                         vec4(HdGet_points(), 1));
     outData.Neye = getNormal(transpose(transformInv *
                                   GetWorldToViewInverseMatrix()));
-
-    ProcessPrimvars();
 
     gl_Position = vec4(GetProjectionMatrix() * outData.Peye);
     ApplyClipPlanes(outData.Peye);
@@ -124,12 +124,12 @@ void ProcessPointId(int);
 
 void main(void)
 {
+    ProcessPrimvars();
+
     MAT4 transform  = ApplyInstanceTransform(HdGet_transform());
 
     outData.Peye = vec4(GetWorldToViewMatrix() * transform *
                         vec4(HdGet_points(), 1));
-
-    ProcessPrimvars();
 
     gl_Position = vec4(GetProjectionMatrix() * outData.Peye);
     ApplyClipPlanes(outData.Peye);
@@ -180,14 +180,14 @@ out CurveVertexData
 void determineLODSettings();
 void main(void)
 {
+    ProcessPrimvars();
+
     if(gl_InvocationID == 0) {
        determineLODSettings();
     }
 
     outData[gl_InvocationID].Peye = inData[gl_InvocationID].Peye;
     outData[gl_InvocationID].Neye = inData[gl_InvocationID].Neye;
-
-    ProcessPrimvars();
 }
 
 
@@ -265,13 +265,13 @@ out CurveVertexData
 void determineLODSettings();
 void main(void)
 {
+    ProcessPrimvars();
+
     if(gl_InvocationID == 0) {
        determineLODSettings();
     }
 
     outData[gl_InvocationID].Peye = inData[gl_InvocationID].Peye;
-
-    ProcessPrimvars();
 }
 
 // Use the length of the control points in screen space to determine how many 
@@ -317,14 +317,14 @@ out CurveVertexData
 void determineLODSettings();
 void main(void)
 {
+    ProcessPrimvars();
+
     if(gl_InvocationID == 0) {
 	     determineLODSettings();
     }
 
     outData[gl_InvocationID].Peye = inData[gl_InvocationID].Peye;
     outData[gl_InvocationID].Neye = inData[gl_InvocationID].Neye;
-
-    ProcessPrimvars();
 }
 
 --- --------------------------------------------------------------------------

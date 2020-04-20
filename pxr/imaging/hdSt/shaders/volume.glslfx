@@ -41,6 +41,8 @@ out VertexData
 
 void main(void)
 {
+    ProcessPrimvars();
+
     // Bounding box vertex in local spce
     const vec4 point = vec4(HdGet_points().xyz, 1);
 
@@ -52,8 +54,6 @@ void main(void)
     outData.Peye = pointEye.xyz / pointEye.w;
 
     gl_Position = vec4(GetProjectionMatrix() * pointEye);
-
-    ProcessPrimvars();
 }
 
 --- --------------------------------------------------------------------------
