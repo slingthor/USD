@@ -943,6 +943,7 @@ def InstallTBB_LinuxOrMacOS(context, force, buildArgs):
                               "        usleep(1);")])
             buildArgs.append('compiler=clang target=ios arch=arm64 extra_inc=big_iron.inc ')
 
+
         if MacOS() or iOS():
             PatchFile("include/tbb/machine/macos_common.h", 
                 [("#define __TBB_Yield()  sched_yield()",
@@ -950,13 +951,14 @@ def InstallTBB_LinuxOrMacOS(context, force, buildArgs):
             PatchFile("src/tbb/custom_scheduler.h", 
                 [("const int yield_threshold = 100;",
                   "const int yield_threshold = 10;")])
-            PatchFile("build/macos.clang.inc", 
-                [("LIBDL = -ldl",
-                  "LIBDL = -ldl\n"
-                  "export SDKROOT:=$(shell xcodebuild -sdk -version | grep -o -E '/.*SDKs/MacOSX.*' 2>/dev/null | head -1)")])
             PatchFile("build/ios.macos.inc", 
                 [("export SDKROOT:=$(shell xcodebuild -sdk -version | grep -o -E '/.*SDKs/iPhoneOS.*' 2>/dev/null)",
                   "export SDKROOT:=$(shell xcodebuild -sdk -version | grep -o -E '/.*SDKs/iPhoneOS.*' 2>/dev/null | head -1)")])
+            if MacOS():
+                PatchFile("build/macos.clang.inc", 
+                    [("LIBDL = -ldl",
+                      "LIBDL = -ldl\n"
+                      "export SDKROOT:=$(shell xcodebuild -sdk -version | grep -o -E '/.*SDKs/MacOSX.*' 2>/dev/null | head -1)")])
 
         makeTBBCmd = 'make -j{procs} {buildArgs}'.format(
             procs=context.numJobs, 
