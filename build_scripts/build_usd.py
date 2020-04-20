@@ -1000,7 +1000,7 @@ def InstallJPEG_Turbo(jpeg_url, context, force, buildArgs):
     with CurrentWorkingDirectory(DownloadURL(jpeg_url, context, force)):
         extraJPEGArgs = buildArgs;
 
-        if (MacOS()):
+        if MacOS():
             extraJPEGArgs.append("-DWITH_SIMD=FALSE")
 
         if iOS():
