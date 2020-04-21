@@ -1448,10 +1448,10 @@ OPENIMAGEIO = Dependency("OpenImageIO", InstallOpenImageIO,
 OCIO_URL = "ocio.zip"
 
 def InstallOpenColorIO(context, force, buildArgs):
-    globalDownloader = self.downloader
-    globalDownloaderName = self.downloaderName
-    self.downloader = DownloadFromCache
-    self.downloaderName = "cache"
+    globalDownloader = context.downloader
+    globalDownloaderName = context.downloaderName
+    context.downloader = DownloadFromCache
+    context.downloaderName = "cache"
     with CurrentWorkingDirectory(DownloadURL(OCIO_URL, context, force)):
         extraArgs = ['-DOCIO_BUILD_TRUELIGHT=OFF',
                      '-DOCIO_BUILD_APPS=OFF',
@@ -1492,8 +1492,8 @@ def InstallOpenColorIO(context, force, buildArgs):
 
         RunCMake(context, force, extraArgs)
         #Set downloader back to the global one
-        self.downloader = globalDownloader
-        self.downloaderName = globalDownloaderName
+        context.downloader = globalDownloader
+        context.downloaderName = globalDownloaderName
         return os.getcwd()
 
 OPENCOLORIO = Dependency("OpenColorIO", InstallOpenColorIO,
