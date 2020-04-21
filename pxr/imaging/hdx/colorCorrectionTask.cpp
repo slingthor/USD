@@ -128,6 +128,7 @@ std::string
 HdxColorCorrectionTask::_CreateOpenColorIOResources()
 {
     #ifdef PXR_OCIO_PLUGIN_ENABLED
+    #if OCIO_VERSION_MAJOR > 1
         // Use client provided OCIO values, or use default fallback values
         OCIO::ConstConfigRcPtr config = OCIO::GetCurrentConfig();
 
@@ -177,45 +178,31 @@ HdxColorCorrectionTask::_CreateOpenColorIOResources()
         if (size > 0) {
             _lut3dSizeOCIO = size;
         }
-        
-        // Create a GPU Shader Description
+
         auto shaderDesc = OpenColorIO_v2_0dev::GpuShaderDesc::CreateLegacyShaderDesc(_lut3dSizeOCIO);
-        
-        //shaderDesc->
-        //TODO read curernt language from USD
+
         shaderDesc->setLanguage(OCIO::GPU_LANGUAGE_METAL);
         shaderDesc->setFunctionName("OCIODisplay");
-    /*
-        const char * textureName = nullptr;
-        const char * samplerName = nullptr;
-        const char * uid         = nullptr;
-        unsigned edgelen = _lut3dSizeOCIO;
-        OpenColorIO_v2_0dev::Interpolation interpolation = OpenColorIO_v2_0dev::INTERP_LINEAR;
-    static char count = 'a';
-    const char c = count;
-    count++;
-    //shaderDesc->add3DTexture("lut3d", "lut3dsampler", &c, edgelen, interpolation, nullptr);
-    shaderDesc->get3DTexture(1, textureName, samplerName, uid, edgelen, interpolation);
-
-        if(!textureName || !*textureName
-            || !samplerName || !*samplerName
-            || !uid || !*uid
-            || edgelen==0)
+        gpuProcessor->extractGpuShaderInfo(shaderDesc);
+        const Float32 *lutValues = nullptr;
+        Float32 *float4AdaptedLutValues = nullptr;
+        shaderDesc->get3DTextureValues(0, lutValues);
+        auto valueCount =  4 * _lut3dSizeOCIO*_lut3dSizeOCIO*_lut3dSizeOCIO;
+        if(lutValues != nullptr)
         {
-            //TODO add throw or a failure
+            float4AdaptedLutValues = (float*)malloc(sizeof(Float32) * valueCount);
+            Float32 *rgbLutValuesIt = const_cast<Float32*>(lutValues);
+            Float32 *rgbaLutValuesIt = float4AdaptedLutValues;
+            Float32 *end = rgbaLutValuesIt + valueCount;
+            do
+            {
+                *rgbaLutValuesIt++ = *rgbLutValuesIt++;
+                *rgbaLutValuesIt++ = *rgbLutValuesIt++;
+                *rgbaLutValuesIt++ = *rgbLutValuesIt++;
+                *rgbaLutValuesIt++ = 1.0f;
+            } while(rgbaLutValuesIt != end);
         }
         
-        // Compute and the 3D LUT
-        int num3Dentries = 3 * _lut3dSizeOCIO*_lut3dSizeOCIO*_lut3dSizeOCIO;
-        std::vector<float> lut3d;
-        lut3d.resize(num3Dentries);
-         processor->getGpuLut3D(&lut3d[0], shaderDesc);
-         
-    */
-        gpuProcessor->extractGpuShaderInfo(shaderDesc);
-        //const float *lutValues = nullptr;
-        //shaderDesc->get3DTextureValues(0, lutValues);
-    
         // Load the data into an OpenGL 3D Texture
         if (_texture3dLUT) {
             _hgi->DestroyTexture(&_texture3dLUT);
@@ -224,15 +211,17 @@ HdxColorCorrectionTask::_CreateOpenColorIOResources()
         HgiTextureDesc lutDesc;
         lutDesc.debugName = "OCIO 3d LUT";
         lutDesc.dimensions = GfVec3i(_lut3dSizeOCIO);
-        lutDesc.format = HgiFormatFloat32Vec3;
-        //lutDesc.initialData = lutValues;
+        //Only use this format if metal
+        lutDesc.format = HgiFormatFloat32Vec4;
+        //lutDesc.format = HgiFormatFloat32Vec3;
+        lutDesc.initialData = float4AdaptedLutValues;
         lutDesc.layerCount = 1;
         lutDesc.mipLevels = 1;
-        lutDesc.pixelsByteSize = sizeof(float) * 3 * _lut3dSizeOCIO*_lut3dSizeOCIO*_lut3dSizeOCIO;
+        lutDesc.pixelsByteSize = sizeof(Float32) * valueCount;
         lutDesc.sampleCount = HgiSampleCount1;
         lutDesc.usage = HgiTextureUsageBitsShaderRead;
         _texture3dLUT = _hgi->CreateTexture(lutDesc);
-        
+        free(float4AdaptedLutValues);
         
         const char* ocioGeneratedShaderText = shaderDesc->getShaderText();
         std::stringstream shaderTextStream;
@@ -244,9 +233,11 @@ HdxColorCorrectionTask::_CreateOpenColorIOResources()
         shaderTextStream << "float4 callOcioDisplay(vec4 inPixel, texture3d<float> lut3d) {" << std::endl;
         shaderTextStream << "OcioGenWrapper ocioGen;" << std::endl;
         shaderTextStream << "ocioGen.ocio_lut3d_0 = lut3d;" << std::endl;
-//        shaderTextStream << "return ocioGen.OCIODisplay(color);" << std::endl;
+        shaderTextStream << "return ocioGen.OCIODisplay(inPixel);" << std::endl;
         shaderTextStream << "}" << std::endl;
+        
         return shaderTextStream.str();
+    #endif // OCIO_VERSION_MAJOR > 1
     #else
         return std::string();
     #endif
@@ -432,7 +423,7 @@ HdxColorCorrectionTask::_CreatePipeline(HgiTextureHandle const& aovTexture)
     
     // Setup attachment descriptor
     _attachment0.blendEnabled = false;
-    _attachment0.loadOp = HgiAttachmentLoadOpDontCare;
+    _attachment0.loadOp = HgiAttachmentLoadOpLoad;
     _attachment0.storeOp = HgiAttachmentStoreOpStore;
     _attachment0.format = aovTexture->GetDescriptor().format;
     desc.colorAttachmentDescs.emplace_back(_attachment0);
