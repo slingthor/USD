@@ -104,7 +104,10 @@ HgiMetalTexture::HgiMetalTexture(HgiMetal *hgi, HgiTextureDesc const & desc)
                             bytesPerRow:desc.pixelsByteSize / height];
         }
         else {
-            [_textureId replaceRegion:MTLRegionMake3D(0, 0, 0, width, height, depth) mipmapLevel:0 slice:0 withBytes:desc.initialData bytesPerRow:desc.pixelsByteSize / height / width bytesPerImage:desc.pixelsByteSize / depth];
+            [_textureId replaceRegion:MTLRegionMake3D(0, 0, 0, width, height, depth)
+                            mipmapLevel:0 slice:0 withBytes:desc.initialData
+                          bytesPerRow:desc.pixelsByteSize / height / width
+                        bytesPerImage:desc.pixelsByteSize / depth];
         }
     }
     
