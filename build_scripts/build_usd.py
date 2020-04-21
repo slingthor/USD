@@ -374,7 +374,7 @@ def RunCMake(context, force, buildArgs = None, hostPlatform = False):
                 '-DCMAKE_TOOLCHAIN_FILE={usdSrcDir}/cmake/toolchains/ios.toolchain.cmake '
                 .format(usdSrcDir=context.usdSrcDir))
 
-        CODE_SIGN_ID = "34D2B9DA670E985478F30268EB742AB1BB52E59A"
+        CODE_SIGN_ID = os.environ.get('XCODE_ATTRIBUTE_CODE_SIGN_ID')
         if CODE_SIGN_ID is None:
             SDKVersion = subprocess.check_output(['xcodebuild', '-version']).strip()[6:10]
             if SDKVersion >= "11.0":
@@ -1444,19 +1444,14 @@ OPENIMAGEIO = Dependency("OpenImageIO", InstallOpenImageIO,
 
 ############################################################
 # OpenColorIO
-OPEN_COLOR_IO_VERSION = 2
-# Use v1.1.0 on MacOS and Windows since v1.0.9 doesn't build properly on
-# those platforms.
-if OPEN_COLOR_IO_VERSION is 1:
-    if Linux():
-        OCIO_URL = "https://github.com/imageworks/OpenColorIO/archive/v1.0.9.zip"
-    else:
-        OCIO_URL = "https://github.com/imageworks/OpenColorIO/archive/v1.1.0.zip"
-else:
-    OCIO_URL = "https://s3.eu-central-1.amazonaws.com/www.ingthorh.com/ocio.zip"
-# OCIO_URL = "https://github.com/AcademySoftwareFoundation/OpenColorIO/archive/master.tar.gz"
+# For USD on mac, supply a version in the cache folder
+OCIO_URL = "ocio.zip"
 
 def InstallOpenColorIO(context, force, buildArgs):
+    globalDownloader = self.downloader
+    globalDownloaderName = self.downloaderName
+    self.downloader = DownloadFromCache
+    self.downloaderName = "cache"
     with CurrentWorkingDirectory(DownloadURL(OCIO_URL, context, force)):
         extraArgs = ['-DOCIO_BUILD_TRUELIGHT=OFF',
                      '-DOCIO_BUILD_APPS=OFF',
@@ -1496,6 +1491,9 @@ def InstallOpenColorIO(context, force, buildArgs):
         extraArgs += buildArgs
 
         RunCMake(context, force, extraArgs)
+        #Set downloader back to the global one
+        self.downloader = globalDownloader
+        self.downloaderName = globalDownloaderName
         return os.getcwd()
 
 OPENCOLORIO = Dependency("OpenColorIO", InstallOpenColorIO,
@@ -2648,7 +2646,7 @@ if Windows():
     ])
 
 if args.make_relocatable:
-    CODE_SIGN_ID = "34D2B9DA670E985478F30268EB742AB1BB52E59A"
+    CODE_SIGN_ID = os.environ.get('XCODE_ATTRIBUTE_CODE_SIGN_ID')
     if CODE_SIGN_ID is None:
         SDKVersion = subprocess.check_output(['xcodebuild', '-version']).strip()[6:10]
         if SDKVersion >= "11.0":
