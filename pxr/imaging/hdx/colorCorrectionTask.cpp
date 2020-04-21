@@ -109,7 +109,6 @@ HdxColorCorrectionTask::_GetUseOcio() const
     #ifdef PXR_OCIO_PLUGIN_ENABLED
         bool useOCIO =
             _colorCorrectionMode == HdxColorCorrectionTokens->openColorIO;
-        useOCIO = true;
         // Only use if $OCIO environment variable is set.
         // (Otherwise this option should be disabled.)
     
@@ -120,7 +119,6 @@ HdxColorCorrectionTask::_GetUseOcio() const
     #else
         bool useOCIO = false;
     #endif
-    //useOCIO = true;
     return useOCIO;
 }
 
@@ -140,8 +138,7 @@ HdxColorCorrectionTask::_CreateOpenColorIOResources()
                            config->getDefaultView(display) :
                            _viewOCIO.c_str();
 
-        //std::string inputColorSpace = _colorspaceOCIO;
-        std::string inputColorSpace = "p3dci8";
+        std::string inputColorSpace = _colorspaceOCIO;
         if (inputColorSpace.empty()) {
             OCIO::ConstColorSpaceRcPtr cs = config->getColorSpace("default");
             if (cs) {
@@ -178,32 +175,45 @@ HdxColorCorrectionTask::_CreateOpenColorIOResources()
         if (size > 0) {
             _lut3dSizeOCIO = size;
         }
-
+        
         auto shaderDesc = OpenColorIO_v2_0dev::GpuShaderDesc::CreateLegacyShaderDesc(_lut3dSizeOCIO);
-
+        
+    #if defined(PXR_METAL_SUPPORT_ENABLED)
         shaderDesc->setLanguage(OCIO::GPU_LANGUAGE_METAL);
+    #else
+        shaderDesc->setLanguage(OCIO::GPU_LANGUAGE_GLSL_4_0);
+    #endif
         shaderDesc->setFunctionName("OCIODisplay");
         gpuProcessor->extractGpuShaderInfo(shaderDesc);
         const Float32 *lutValues = nullptr;
-        Float32 *float4AdaptedLutValues = nullptr;
         shaderDesc->get3DTextureValues(0, lutValues);
-        auto valueCount =  4 * _lut3dSizeOCIO*_lut3dSizeOCIO*_lut3dSizeOCIO;
-        if(lutValues != nullptr)
-        {
+    
+    #if defined(PXR_METAL_SUPPORT_ENABLED)
+        const int channelPerPix = 4;
+    #else
+        const int channelPerPix = 3;
+    #endif
+        auto valueCount =  channelPerPix * _lut3dSizeOCIO*_lut3dSizeOCIO*_lut3dSizeOCIO;
+    
+    #if defined(PXR_METAL_SUPPORT_ENABLED)
+        //HgiFormatFloat32Vec3 not supported on metal. Adapt to HgiFormatFloat32Vec4
+        Float32 *float4AdaptedLutValues = nullptr;
+        if(lutValues != nullptr) {
             float4AdaptedLutValues = (float*)malloc(sizeof(Float32) * valueCount);
             Float32 *rgbLutValuesIt = const_cast<Float32*>(lutValues);
             Float32 *rgbaLutValuesIt = float4AdaptedLutValues;
             Float32 *end = rgbaLutValuesIt + valueCount;
-            do
-            {
+            
+            while(rgbaLutValuesIt != end); {
                 *rgbaLutValuesIt++ = *rgbLutValuesIt++;
                 *rgbaLutValuesIt++ = *rgbLutValuesIt++;
                 *rgbaLutValuesIt++ = *rgbLutValuesIt++;
                 *rgbaLutValuesIt++ = 1.0f;
-            } while(rgbaLutValuesIt != end);
+            }
         }
+    #endif
         
-        // Load the data into an OpenGL 3D Texture
+        // Load the data into a hgi texture
         if (_texture3dLUT) {
             _hgi->DestroyTexture(&_texture3dLUT);
         }
@@ -211,22 +221,26 @@ HdxColorCorrectionTask::_CreateOpenColorIOResources()
         HgiTextureDesc lutDesc;
         lutDesc.debugName = "OCIO 3d LUT";
         lutDesc.dimensions = GfVec3i(_lut3dSizeOCIO);
-        //Only use this format if metal
+    #if defined(PXR_METAL_SUPPORT_ENABLED)
         lutDesc.format = HgiFormatFloat32Vec4;
-        //lutDesc.format = HgiFormatFloat32Vec3;
         lutDesc.initialData = float4AdaptedLutValues;
+    #else
+        lutDesc.format = HgiFormatFloat32Vec3;
+        lutDesc.initialData = lutValues;
+    #endif
         lutDesc.layerCount = 1;
         lutDesc.mipLevels = 1;
         lutDesc.pixelsByteSize = sizeof(Float32) * valueCount;
         lutDesc.sampleCount = HgiSampleCount1;
         lutDesc.usage = HgiTextureUsageBitsShaderRead;
         _texture3dLUT = _hgi->CreateTexture(lutDesc);
-        free(float4AdaptedLutValues);
         
         const char* ocioGeneratedShaderText = shaderDesc->getShaderText();
+    #if defined(PXR_METAL_SUPPORT_ENABLED)
+        free(float4AdaptedLutValues);
+        //for Metal we want to wrap OCIO in a class to adapt global scope texture to Metal texture passing interfaces
+        //Assumption: Config always includes a LUT operation
         std::stringstream shaderTextStream;
-        //for Metal we want to wrap OCIO in a class
-        //TODO check if metal
         shaderTextStream << "struct OcioGenWrapper {" << std::endl;
         shaderTextStream << ocioGeneratedShaderText;
         shaderTextStream << "};" << std::endl;
@@ -237,10 +251,94 @@ HdxColorCorrectionTask::_CreateOpenColorIOResources()
         shaderTextStream << "}" << std::endl;
         
         return shaderTextStream.str();
+    #else
+        return ocioGeneratedShaderText;
+    #endif // PXR_METAL_SUPPORT_ENABLED
     #endif // OCIO_VERSION_MAJOR > 1
+    #if OCIO_VERSION_MAJOR < 2
+    // Use client provided OCIO values, or use default fallback values
+    OCIO::ConstConfigRcPtr config = OCIO::GetCurrentConfig();
+
+    const char* display = _displayOCIO.empty() ?
+                          config->getDefaultDisplay() :
+                          _displayOCIO.c_str();
+
+    const char* view = _viewOCIO.empty() ?
+                       config->getDefaultView(display) :
+                       _viewOCIO.c_str();
+
+    std::string inputColorSpace = _colorspaceOCIO;
+    if (inputColorSpace.empty()) {
+        OCIO::ConstColorSpaceRcPtr cs = config->getColorSpace("default");
+        if (cs) {
+            inputColorSpace = cs->getName();
+        } else {
+            inputColorSpace = OCIO::ROLE_SCENE_LINEAR;
+        }
+    }
+
+    // Setup the transformation we need to apply
+    OCIO::DisplayTransformRcPtr transform = OCIO::DisplayTransform::Create();
+    transform->setDisplay(display);
+    transform->setView(view);
+    transform->setInputColorSpaceName(inputColorSpace.c_str());
+    if (!_looksOCIO.empty()) {
+        transform->setLooksOverride(_looksOCIO.c_str());
+        transform->setLooksOverrideEnabled(true);
+    } else {
+        transform->setLooksOverrideEnabled(false);
+    }
+
+    OCIO::ConstProcessorRcPtr processor = config->getProcessor(transform);
+
+    // If 3D lut size is 0 then use a reasonable default size.
+    // We use 65 (0-64) samples which works well with OCIO resampling.
+    if (_lut3dSizeOCIO == 0) {
+        _lut3dSizeOCIO = 65;
+    }
+
+    // Optionally override similar to KATANA_OCIO_LUT3D_EDGE_SIZE
+    int size = TfGetenvInt("USDVIEW_OCIO_LUT3D_EDGE_SIZE", 0);
+    if (size > 0) {
+        _lut3dSizeOCIO = size;
+    }
+
+    // Create a GPU Shader Description
+    OCIO::GpuShaderDesc shaderDesc;
+    shaderDesc.setLanguage(OCIO::GPU_LANGUAGE_GLSL_1_3);
+    shaderDesc.setFunctionName("OCIODisplay");
+    shaderDesc.setLut3DEdgeLen(_lut3dSizeOCIO);
+
+    // Compute and the 3D LUT
+    int num3Dentries = 3 * _lut3dSizeOCIO*_lut3dSizeOCIO*_lut3dSizeOCIO;
+    std::vector<float> lut3d;
+    lut3d.resize(num3Dentries);
+    processor->getGpuLut3D(&lut3d[0], shaderDesc);
+
+    // Load the data into an OpenGL 3D Texture
+    if (_texture3dLUT) {
+        _hgi->DestroyTexture(&_texture3dLUT);
+    }
+
+    HgiTextureDesc lutDesc;
+    lutDesc.debugName = "OCIO 3d LUT";
+    lutDesc.dimensions = GfVec3i(_lut3dSizeOCIO);
+    lutDesc.format = HgiFormatFloat32Vec3;
+    lutDesc.initialData = lut3d.data();
+    lutDesc.layerCount = 1;
+    lutDesc.mipLevels = 1;
+    lutDesc.pixelsByteSize = lut3d.size() * sizeof(lut3d[0]);
+    lutDesc.sampleCount = HgiSampleCount1;
+    lutDesc.usage = HgiTextureUsageBitsShaderRead;
+    _texture3dLUT = _hgi->CreateTexture(lutDesc);
+
+    const char* gpuShaderText = processor->getGpuShaderText(shaderDesc);
+
+    return std::string(gpuShaderText);
+    #endif // OCIO_VERSION_MAJOR < 2
     #else
         return std::string();
-    #endif
+    #endif // PXR_OCIO_PLUGIN_ENABLED
 }
 
 bool
@@ -270,7 +368,7 @@ HdxColorCorrectionTask::_CreateShaderResources()
         fragDesc.shaderCode = "#define GLSLFX_USE_OCIO\n";
         // Our current version of OCIO outputs 130 glsl and texture3D is
         // removed from glsl in 140.
-        //fragDesc.shaderCode += "#define texture3D texture\n";
+        fragDesc.shaderCode += "#define texture3D texture\n";
     }
     fragDesc.shaderCode += glslfx.GetSource(_tokens->colorCorrectionFragment);
     if (useOCIO) {
