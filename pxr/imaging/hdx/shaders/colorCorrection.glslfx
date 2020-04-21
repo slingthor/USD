@@ -134,8 +134,6 @@ vec3 FloatToSRGB(vec3 val)
 // Forward declare because C++ code will append the OCIO fn at end of shader
 #if defined(GLSLFX_USE_OCIO)
 float4 callOcioDisplay(vec4 inPixel, texture3d<float> lut3d);
-//vec4 OCIODisplay(vec4 inPixel, texture3d<float> lut3d);
-//TODO This is only needed for metal
 #endif
 
 fragment half4 fragmentEntryPoint(
