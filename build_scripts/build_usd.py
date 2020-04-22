@@ -1536,8 +1536,13 @@ def InstallOpenColorIO(context, force, buildArgs):
             pass
         else:
             extraArgs.append('-DCMAKE_CXX_FLAGS=-w')
-
-        PatchFile("src/OpenColorIO/Config.cpp",
+        #if using version 2 of OCIO we patch a different config path as it resides elsewere
+        cfgPath = None
+        if not BUILD_OCIO_WITH_CACHE_ONLY: 
+            cfgPath = "src/core/Config.cpp"
+        else:
+            cfgPath = "src/OpenColorIO/Config.cpp"
+        PatchFile(cfgPath,
                    [("cacheidnocontext_ = cacheidnocontext_;", 
                      "cacheidnocontext_ = rhs.cacheidnocontext_;")])
 
