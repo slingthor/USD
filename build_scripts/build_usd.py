@@ -739,6 +739,14 @@ def InstallBoost(context, force, buildArgs):
             '--with-regex'
         ]
 
+        projectPath = 'user-config.jam'
+        b2_settings.append("--user-config=user-config.jam")
+        if os.path.exists(projectPath): 
+            os.remove(projectPath)
+
+        with open(projectPath, 'w') as projectFile:
+            projectFile.write('\n')
+
         if context.buildPython:
             b2_settings.append("--with-python")
             pythonInfo = GetPythonInfo()
@@ -754,17 +762,15 @@ def InstallBoost(context, force, buildArgs):
             # There are Python config arguments that can be passed to bootstrap 
             # but those are not available in boostrap.bat (Windows) so we must 
             # take the following approach:
-            projectPath = 'python-config.jam'
-            with open(projectPath, 'w') as projectFile:
+            with open(projectPath, 'a') as projectFile:
                 # Note that we must escape any special characters, like 
                 # backslashes for jam, hence the mods below for the path 
                 # arguments. Also, if the path contains spaces jam will not
                 # handle them well. Surround the path parameters in quotes.
-                line = 'using python : %s : "%s" : "%s" ;\n' % (pythonInfo[3], 
+                line = 'using python : %s : "%s" : "%s" ;\n\n' % (pythonInfo[3], 
                        pythonPath.replace('\\', '\\\\'), 
                        pythonInfo[2].replace('\\', '\\\\'))
                 projectFile.write(line)
-            b2_settings.append("--user-config=python-config.jam")
 
         if context.buildOIIO:
             b2_settings.append("--with-date_time")
@@ -795,27 +801,34 @@ def InstallBoost(context, force, buildArgs):
         if force:
             b2_settings.append("-a")
 
+        b2_toolset = ''
+
         if Windows():
             # toolset parameter for Visual Studio documented here:
             # https://github.com/boostorg/build/blob/develop/src/tools/msvc.jam
             if IsVisualStudio2019OrGreater():
-                b2_settings.append("toolset=msvc-14.2")
+                b2_toolset = "toolset=msvc-14.2"
             elif IsVisualStudio2017OrGreater():
-                b2_settings.append("toolset=msvc-14.1")
+                b2_toolset = "toolset=msvc-14.1"
             else:
-                b2_settings.append("toolset=msvc-14.0")
+                b2_toolset = "toolset=msvc-14.0"
 
         if MacOS():
             # Must specify toolset=clang to ensure install_name for boost
             # libraries includes @rpath
-            b2_settings.append("toolset=clang")
+            b2_toolset = "toolset=clang"
+
+        sdkPath = ''
+        if MacOS() or iOS():
+            xcodeRoot = subprocess.check_output(['xcode-select', '--print-path']).strip()
+            if MacOS():
+                sdkPath = subprocess.check_output(['xcrun', '--sdk', 'macosx', '--show-sdk-path']).strip()
+            else:
+                sdkPath = subprocess.check_output(['xcrun', '--sdk', 'iphoneos', '--show-sdk-path']).strip()
 
         if iOS():
-            xcodeRoot = subprocess.check_output(['xcode-select', '--print-path']).strip()
-            iOSSDK = subprocess.check_output(['xcrun', '--sdk', 'iphoneos', '--show-sdk-path']).strip()
-            iOSVersion = subprocess.check_output(['xcodebuild', '-sdk', iOSSDK, '-version', 'SDKVersion']).strip()
+            b2_toolset = "toolset=darwin-iphone"
 
-            b2_settings.append("toolset=darwin-{IOS_SDK_VERSION}~iphone".format(IOS_SDK_VERSION=iOSVersion))
             b2_settings.append("architecture=arm")
             b2_settings.append("target-os=iphone")
             b2_settings.append("define=_LITTLE_ENDIAN")
@@ -824,7 +837,7 @@ def InstallBoost(context, force, buildArgs):
             b2_settings.append("link=static")
 
             newLines = [
-                'using darwin : {IOS_SDK_VERSION}~iphone\n'.format(IOS_SDK_VERSION=iOSVersion),
+                'using darwin : iphone\n',
                 ': {XCODE_ROOT}/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang++'
                     .format(XCODE_ROOT=xcodeRoot),
                 ' -arch arm64 -mios-version-min=10.0 -fembed-bitcode -Wno-unused-local-typedef -Wno-nullability-completeness -DBOOST_AC_USE_PTHREADS -DBOOST_SP_USE_PTHREADS -g -DNDEBUG\n',
@@ -833,9 +846,12 @@ def InstallBoost(context, force, buildArgs):
                 ': <architecture>arm <target-os>iphone <address-model>64\n',
                 ';'
             ]
-            b2_settings.append("macosx-version=iphone-{IOS_SDK_VERSION}".format(IOS_SDK_VERSION=iOSVersion))
+            iOSVersion = subprocess.check_output(['xcodebuild', '-sdk', sdkPath, '-version', 'SDKVersion']).strip()
+            b2_settings.append("macosx-version=iphone-{IOS_SDK_VERSION}".format(
+                IOS_SDK_VERSION=iOSVersion))
 
-            open(context.instDir + '/src/boost_1_61_0/tools/build/src/user-config.jam', 'w').writelines(newLines)
+            with open(projectPath, 'w') as projectFile:
+                projectFile.writelines(newLines)
         else:
             b2_settings.append("link=shared")
             b2_settings.append("runtime-link=shared")
@@ -844,8 +860,8 @@ def InstallBoost(context, force, buildArgs):
         b2_settings += buildArgs
 
         b2 = "b2" if Windows() else "./b2"
-        b2Cmd = '{b2} {options} install'.format(
-            b2=b2, options=" ".join(b2_settings))
+        b2Cmd = '{b2} {toolset} {options} install'.format(
+            b2=b2, toolset=b2_toolset, options=" ".join(b2_settings))
         Run(b2Cmd)
 
         # Output paths that are of interest
@@ -914,8 +930,19 @@ def InstallTBB_LinuxOrMacOS(context, force, buildArgs):
                     [("shell clang -v ", "shell clang --version ")])
         # TBB does not support out-of-source builds in a custom location.
         if iOS():
-            updateTBBIOS(context)
+            PatchFile("build/macos.clang.inc", 
+                [("ifeq ($(arch),$(filter $(arch),armv7 armv7s arm64))",
+                  "ifeq ($(arch),$(filter $(arch),armv7 armv7s arm64))\n"
+                  "    CPLUS_FLAGS += -mios-version-min=10.0 -fembed-bitcode\n")])
+
+            PatchFile("include/tbb/tbb_machine.h", 
+                            [("    inline void __TBB_Pause(int32_t) {",
+                              "#include <unistd.h>\n"
+                              "    inline void __TBB_Pause(int32_t) {"),
+                             ("        __TBB_Yield();",
+                              "        usleep(1);")])
             buildArgs.append('compiler=clang target=ios arch=arm64 extra_inc=big_iron.inc ')
+
 
         if MacOS() or iOS():
             PatchFile("include/tbb/machine/macos_common.h", 
@@ -924,17 +951,25 @@ def InstallTBB_LinuxOrMacOS(context, force, buildArgs):
             PatchFile("src/tbb/custom_scheduler.h", 
                 [("const int yield_threshold = 100;",
                   "const int yield_threshold = 10;")])
+            PatchFile("build/ios.macos.inc", 
+                [("export SDKROOT:=$(shell xcodebuild -sdk -version | grep -o -E '/.*SDKs/iPhoneOS.*' 2>/dev/null)",
+                  "export SDKROOT:=$(shell xcodebuild -sdk -version | grep -o -E '/.*SDKs/iPhoneOS.*' 2>/dev/null | head -1)")])
+            if MacOS():
+                PatchFile("build/macos.clang.inc", 
+                    [("LIBDL = -ldl",
+                      "LIBDL = -ldl\n"
+                      "export SDKROOT:=$(shell xcodebuild -sdk -version | grep -o -E '/.*SDKs/MacOSX.*' 2>/dev/null | head -1)")])
 
-        makeCmd = 'make -j{procs} {buildArgs}'.format(
+        makeTBBCmd = 'make -j{procs} {buildArgs}'.format(
             procs=context.numJobs, 
             buildArgs=" ".join(buildArgs))
-        Run(makeCmd)
+        Run(makeTBBCmd)
 
         # Output paths that are of interest
         with open(os.path.join(context.usdInstDir, 'tbbBuild.txt'), 'wt') as file:
             file.write('ARCHIVE:' + TBB_URL.split("/")[-1] + '\n')
             file.write('BUILDFOLDER:' + os.path.split(os.getcwd())[1] + '\n')
-            file.write('MAKE:' + makeCmd + '\n')
+            file.write('MAKE:' + makeTBBCmd + '\n')
 
         # Install both release and debug builds. USD requires the debug
         # libraries when building in debug mode, and installing both
@@ -947,29 +982,6 @@ def InstallTBB_LinuxOrMacOS(context, force, buildArgs):
         CopyDirectory(context, "include/tbb", "include/tbb")
         return os.getcwd()
 
-def updateTBBIOS(context):
-    filename = 'build/macos.clang.inc'
-    if os.path.isfile(filename):
-        f = open(filename, 'r')
-        lines = f.readlines()
-        f.close()   
-        i = lines.index("ifeq ($(arch),$(filter $(arch),armv7 armv7s arm64))\n")    
-        lines.insert(i+1, "    CPLUS_FLAGS += -mios-version-min=10.0 -fembed-bitcode\n")
-        f = open(filename,'w')
-        for line in lines:
-            f.write(line)
-        f.close()
-
-    PatchFile("build/ios.macos.inc", 
-            [("export SDKROOT:=$(shell xcodebuild -sdk -version | grep -o -E '/.*SDKs/iPhoneOS.*' 2>/dev/null)",
-              "export SDKROOT:=$(shell xcodebuild -sdk -version | grep -o -E '/.*SDKs/iPhoneOS.*' 2>/dev/null | head -1)")])
-    PatchFile("include/tbb/tbb_machine.h", 
-                    [("    inline void __TBB_Pause(int32_t) {",
-                      "#include <unistd.h>\n"
-                      "    inline void __TBB_Pause(int32_t) {"),
-                     ("        __TBB_Yield();",
-                      "        usleep(1);")])
-
 TBB = Dependency("TBB", InstallTBB, "include/tbb/tbb.h")
 
 ############################################################
@@ -979,7 +991,7 @@ def InstallJPEG(context, force, buildArgs):
     if Windows():
         return InstallJPEG_Turbo("https://github.com/libjpeg-turbo/libjpeg-turbo/archive/1.5.1.zip",
             context, force, buildArgs)
-    elif iOS():
+    elif MacOS() or iOS():
         return InstallJPEG_Turbo("https://github.com/libjpeg-turbo/libjpeg-turbo/archive/2.0.1.zip",
             context, force, buildArgs)
     else:
@@ -988,9 +1000,13 @@ def InstallJPEG(context, force, buildArgs):
 
 def InstallJPEG_Turbo(jpeg_url, context, force, buildArgs):
     with CurrentWorkingDirectory(DownloadURL(jpeg_url, context, force)):
-        extraArgs = buildArgs;
+        extraJPEGArgs = buildArgs;
+
+        if MacOS():
+            extraJPEGArgs.append("-DWITH_SIMD=FALSE")
+
         if iOS():
-            extraArgs.append('-DCMAKE_SYSTEM_PROCESSOR=aarch64');
+            extraJPEGArgs.append('-DCMAKE_SYSTEM_PROCESSOR=aarch64');
 
             # Replace test and utility executables with static libraries to avoid issues with code signing.
             PatchFile("CMakeLists.txt",
@@ -1024,7 +1040,7 @@ def InstallJPEG_Turbo(jpeg_url, context, force, buildArgs):
                  ("add_executable(jcstest ../jcstest.c)",
                   "add_library(jcstest STATIC ../jcstest.c)")])
 
-        RunCMake(context, force, extraArgs)
+        RunCMake(context, force, extraJPEGArgs)
         return os.getcwd()
 
 def InstallJPEG_Lib(jpeg_url, context, force, buildArgs):
@@ -1089,11 +1105,11 @@ PNG_URL = "https://downloads.sourceforge.net/project/libpng/libpng16/older-relea
 
 def InstallPNG(context, force, buildArgs):
     with CurrentWorkingDirectory(DownloadURL(PNG_URL, context, force)):
-        extraArgs = buildArgs;
+        extraPNGArgs = buildArgs;
 
         if iOS():
-            extraArgs.append('-DCMAKE_SYSTEM_PROCESSOR=aarch64');
-            extraArgs.append('-DPNG_ARM_NEON=off');
+            extraPNGArgs.append('-DCMAKE_SYSTEM_PROCESSOR=aarch64');
+            extraPNGArgs.append('-DPNG_ARM_NEON=off');
 
             # Skip tests to avoid issues with code signing.
             # Replace utility executables with static libraries to avoid issues with code signing.
@@ -1105,7 +1121,7 @@ def InstallPNG(context, force, buildArgs):
                  ("add_executable(png-fix-itxt ${png_fix_itxt_sources})",
                   "add_library(png-fix-itxt STATIC ${png_fix_itxt_sources})")])
 
-        RunCMake(context, force, extraArgs)
+        RunCMake(context, force, extraPNGArgs)
         return os.getcwd()
 
 PNG = Dependency("PNG", InstallPNG, "include/png.h")
@@ -1287,7 +1303,8 @@ def InstallGLEW_LinuxOrMacOS(context, force, buildArgs):
             .format(instDir=context.instDir,
                     procs=context.numJobs,
                     buildArgs=" ".join(buildArgs)))
-        return os.getcwd()
+        glewCWD = os.getcwd()
+        return glewCWD
 
 GLEW = Dependency("GLEW", InstallGLEW, "include/GL/glew.h")
 
@@ -1347,7 +1364,20 @@ BLOSC_URL = "https://github.com/Blosc/c-blosc/archive/v1.17.0.zip"
 
 def InstallBLOSC(context, force, buildArgs):
     with CurrentWorkingDirectory(DownloadURL(BLOSC_URL, context, force)):
-        RunCMake(context, force, buildArgs)
+        extraArgs = []
+
+        skip_x86_intrinsics = False
+        if iOS():
+            skip_x86_intrinsics = True
+
+        if skip_x86_intrinsics:
+            extraArgs.append('-DDEACTIVATE_SSE2=ON')
+            extraArgs.append('-DDEACTIVATE_AVX2=ON')
+
+        # Add on any user-specified extra arguments.
+        extraArgs += buildArgs
+
+        RunCMake(context, force, extraArgs)
         return os.getcwd()
 
 BLOSC = Dependency("Blosc", InstallBLOSC, "include/blosc.h")

@@ -47,12 +47,12 @@ void ProcessPointId(int);
 
 void main(void)
 {
+    ProcessPrimvars();
+
     MAT4 transform  = ApplyInstanceTransform(HdGet_transform());
     vec4 point     = vec4(HdGet_points().xyz, 1);
 
     outData.Peye = vec4(GetWorldToViewMatrix() * transform * point);
-
-    ProcessPrimvars();
 
     gl_Position = vec4(GetProjectionMatrix() * outData.Peye);
     ApplyClipPlanes(outData.Peye);
