@@ -87,6 +87,7 @@ TF_DEFINE_PRIVATE_TOKENS(
     (PreviewDomeLight)
     (MaterialTexture)
     (lightFilterType)
+    (textureMemory)
 );
 
 // This environment variable matches a set of similar ones in
@@ -125,6 +126,8 @@ UsdImagingDelegate::UsdImagingDelegate(
     , _purposeCache() // note that purpose is uniform, so no GetTime()
     , _drawModeCache(GetTime())
     , _inheritedPrimvarCache()
+    , _displayRender(true)
+    , _displayProxy(true)
     , _displayGuides(true)
     , _enableUsdDrawModes(true)
     , _hasDrawModeAdapter( UsdImagingAdapterRegistry::GetInstance()
@@ -241,7 +244,7 @@ UsdImagingDelegate::_AdapterLookup(UsdPrim const& prim, bool ignoreInstancing)
                _IsDrawModeApplied(prim)) {
         adapterKey = UsdImagingAdapterKeyTokens->drawModeAdapterKey;
     } else {
-        adapterKey = prim.GetTypeName();
+        adapterKey = prim.GetPrimTypeInfo().GetSchemaTypeName();
 
         // XXX Checking for preview binding purpose here is wrong.
         // What we really want to do is check for Storm specifically, because
@@ -1407,22 +1410,15 @@ UsdImagingDelegate::GetPickabilityMap() const
 }
 
 void
-UsdImagingDelegate::SetDisplayGuides(bool displayGuides)
+UsdImagingDelegate::_MarkRenderTagsDirty()
 {
-    _displayGuides = displayGuides;
-    
     UsdImagingIndexProxy indexProxy(this, nullptr);
 
-    // _displayGuides changes a prims render tag.
-    // So we need to make sure all prims render tags get re-evaluated.
-    // XXX: Should be smarted and only invalidate prims whose
-    // purpose == UsdGeomTokens->guide.
-    // Look at GetRenderTag for complixity with this.
-    for (_HdPrimInfoMap::iterator it  = _hdPrimInfoMap.begin();
-                                it != _hdPrimInfoMap.end();
-                              ++it) {
-        const SdfPath &cachePath = it->first;
-        _HdPrimInfo &primInfo = it->second;
+    for (_HdPrimInfoMap::iterator it = _hdPrimInfoMap.begin();
+            it != _hdPrimInfoMap.end();
+            ++it) {
+        const SdfPath& cachePath = it->first;
+        _HdPrimInfo& primInfo = it->second;
 
         if (TF_VERIFY(primInfo.adapter, "%s", cachePath.GetText())) {
             primInfo.adapter->MarkRenderTagDirty(primInfo.usdPrim,
@@ -1430,6 +1426,57 @@ UsdImagingDelegate::SetDisplayGuides(bool displayGuides)
                                                  &indexProxy);
         }
     }
+}
+
+void
+UsdImagingDelegate::SetDisplayRender(const bool displayRender)
+{
+    if (_displayRender == displayRender) {
+        return;
+    }
+
+    _displayRender = displayRender;
+
+    // _displayRender changes a prims render tag.
+    // So we need to make sure all prims render tags get re-evaluated.
+    // XXX: Should be smarter and only invalidate prims whose
+    // purpose == UsdGeomTokens->render.
+    // Look at GetRenderTag for complexity with this.
+    _MarkRenderTagsDirty();
+}
+
+void
+UsdImagingDelegate::SetDisplayProxy(const bool displayProxy)
+{
+    if (_displayProxy == displayProxy) {
+        return;
+    }
+
+    _displayProxy = displayProxy;
+
+    // _displayProxy changes a prims render tag.
+    // So we need to make sure all prims render tags get re-evaluated.
+    // XXX: Should be smarter and only invalidate prims whose
+    // purpose == UsdGeomTokens->proxy.
+    // Look at GetRenderTag for complexity with this.
+    _MarkRenderTagsDirty();
+}
+
+void
+UsdImagingDelegate::SetDisplayGuides(const bool displayGuides)
+{
+    if (_displayGuides == displayGuides) {
+        return;
+    }
+
+    _displayGuides = displayGuides;
+
+    // _displayGuides changes a prims render tag.
+    // So we need to make sure all prims render tags get re-evaluated.
+    // XXX: Should be smarter and only invalidate prims whose
+    // purpose == UsdGeomTokens->guide.
+    // Look at GetRenderTag for complexity with this.
+    _MarkRenderTagsDirty();
 }
 
 void
@@ -1572,7 +1619,9 @@ UsdImagingDelegate::GetRenderTag(SdfPath const& id)
     if (purpose == UsdGeomTokens->default_) {
         // Simple mapping so all render tags in multiple delegates match
         purpose = HdRenderTagTokens->geometry;
-    } else if (purpose == UsdGeomTokens->guide && !_displayGuides) {
+    } else if ((purpose == UsdGeomTokens->render && !_displayRender) ||
+            (purpose == UsdGeomTokens->proxy && !_displayProxy) ||
+            (purpose == UsdGeomTokens->guide && !_displayGuides)) {
         // When guides are disabled on the delegate we move the
         // guide prims to the hidden command buffer
         purpose = HdRenderTagTokens->hidden;
@@ -2210,6 +2259,12 @@ UsdImagingDelegate::Get(SdfPath const& id, TfToken const& key)
                 VtFloatArray vec(1, 1.0f);
                 value = VtValue(vec);
             }
+        } else if (key == HdTokens->normals) {
+            _UpdateSingleValue(cachePath,HdChangeTracker::DirtyNormals);
+            if (!TF_VERIFY(_valueCache.ExtractNormals(cachePath, &value))){
+                VtVec3fArray vec(1, GfVec3f(0,0,0));
+                value = VtValue(vec);
+            }
         } else if (key == HdTokens->transform) {
             // XXX(UsdImaging): We use cachePath directly as usdPath here
             // but should do the proper transformation.  Maybe we can use
@@ -2226,8 +2281,16 @@ UsdImagingDelegate::Get(SdfPath const& id, TfToken const& key)
 
             // Note here that Hydra requested "color" (e.g.) and we've converted
             // it to primvars:color automatically by virtue of UsdGeomPrimvar.
-            TF_VERIFY(pv.ComputeFlattened(&value, _time), "%s, %s\n",
+            TF_VERIFY(pv.ComputeFlattened(&value, _time), "%s, %s\n", 
                       id.GetText(), key.GetText());
+        } else if (key == _tokens->textureMemory) {
+            // XXX: This is for volume fields only should be done in
+            // UsdImagingFieldAdapter::UpdateForTime but cannot right now since
+            // UpdateForTime is never called on a bprim (HdSyncRequestVector
+            // is only requested for rprims).
+            if (!_GetUsdPrim(cachePath).GetAttribute(key).Get(&value, _time)) {
+                value = VtValue(0.0f);
+            }
         } else {
             // XXX: This does not work for point instancer child prims; while we
             // do not hit this code path given the current state of the
@@ -2561,7 +2624,9 @@ UsdImagingDelegate::GetLightParamValue(SdfPath const &id,
         // Asking for the lightFilterType is the render delegates way of
         // determining the type of the light filter.
         if (paramName == _tokens->lightFilterType) {
-            return VtValue(prim.GetTypeName());
+            // Use the schema type name from the prim type info which is the
+            // official type of the prim.
+            return VtValue(prim.GetPrimTypeInfo().GetSchemaTypeName());
         }
         if (paramName == HdTokens->lightFilterLink) {
             UsdLuxLightFilter lightFilter = UsdLuxLightFilter(prim);

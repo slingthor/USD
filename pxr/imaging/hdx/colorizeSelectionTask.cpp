@@ -27,12 +27,13 @@
 #include "pxr/imaging/hd/renderBuffer.h"
 #include "pxr/imaging/hd/tokens.h"
 
+#include "pxr/imaging/hdx/hgiConversions.h"
 #include "pxr/imaging/hdx/package.h"
 #include "pxr/imaging/hdx/selectionTracker.h"
 #include "pxr/imaging/hdx/tokens.h"
 
-#include "pxr/imaging/hgi/blitEncoder.h"
-#include "pxr/imaging/hgi/blitEncoderOps.h"
+#include "pxr/imaging/hgi/blitCmds.h"
+#include "pxr/imaging/hgi/blitCmdsOps.h"
 #include "pxr/imaging/hgi/hgi.h"
 #include "pxr/imaging/hgi/tokens.h"
 
@@ -52,8 +53,7 @@ TF_DEFINE_PRIVATE_TOKENS(
 HdxColorizeSelectionTask::HdxColorizeSelectionTask(
     HdSceneDelegate* delegate,
     SdfPath const& id)
-    : HdxProgressiveTask(id)
-    , _hgi(nullptr)
+    : HdxTask(id)
     , _params()
     , _lastVersion(-1)
     , _hasSelection(false)
@@ -74,7 +74,10 @@ HdxColorizeSelectionTask::~HdxColorizeSelectionTask()
     delete[] _outputBuffer;
 
     if (_parameterBuffer) {
-        _hgi->DestroyBuffer(&_parameterBuffer);
+        _GetHgi()->DestroyBuffer(&_parameterBuffer);
+    }
+    if (_texture) {
+        _GetHgi()->DestroyTexture(&_texture);
     }
 }
 
@@ -85,20 +88,15 @@ HdxColorizeSelectionTask::IsConverged() const
 }
 
 void
-HdxColorizeSelectionTask::Sync(HdSceneDelegate* delegate,
-                               HdTaskContext* ctx,
-                               HdDirtyBits* dirtyBits)
+HdxColorizeSelectionTask::_Sync(HdSceneDelegate* delegate,
+                                HdTaskContext* ctx,
+                                HdDirtyBits* dirtyBits)
 {
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
 
-    // Find Hgi driver in task context.
-    if (!_hgi) {
-        _hgi = HdTask::_GetDriver<Hgi*>(ctx, HgiTokens->renderDriver);
-        if (!TF_VERIFY(_hgi, "Hgi driver missing from TaskContext")) {
-            return;
-        }
-        _compositor.reset(new HdxFullscreenShader(_hgi, "ColorizeSelection"));
+    if (!_compositor) {
+        _compositor.reset(new HdxFullscreenShader(_GetHgi(), "ColorizeSelection"));
     }
 
     if ((*dirtyBits) & HdChangeTracker::DirtyParams) {
@@ -132,7 +130,8 @@ HdxColorizeSelectionTask::Prepare(HdTaskContext* ctx,
     if (sel && sel->GetVersion() != _lastVersion) {
         _lastVersion = sel->GetVersion();
         _hasSelection =
-            sel->GetSelectionOffsetBuffer(renderIndex, &_selectionOffsets);
+            sel->GetSelectionOffsetBuffer(renderIndex, _params.enableSelection,
+                                          &_selectionOffsets);
     }
 }
 
@@ -143,6 +142,7 @@ HdxColorizeSelectionTask::Execute(HdTaskContext* ctx)
     HF_MALLOC_TAG_FUNCTION();
 
     if (!_HasTaskContextData(ctx, HdAovTokens->color)) {
+        _converged = true;
         return;
     }
 
@@ -206,16 +206,17 @@ HdxColorizeSelectionTask::Execute(HdTaskContext* ctx)
     // Blit!
     _compositor->SetProgram(HdxPackageOutlineShader(), _tokens->outlineFrag);
 
-    _compositor->SetTexture(
-        _tokens->colorIn,
+    _CreateTexture(
         _primId->GetWidth(), 
         _primId->GetHeight(),
         HdFormatUNorm8Vec4, 
         _outputBuffer);
 
+    _compositor->BindTextures({_tokens->colorIn}, {_texture});
+
     _CreateParameterBuffer();
-    _compositor->SetBuffer(_parameterBuffer, 0);
-    
+    _compositor->BindBuffer(_parameterBuffer, 0);
+
     _compositor->SetFlipOnDraw(_params.flipImage);
 
     // Blend the selection color on top.  ApplySelectionColor uses the
@@ -234,6 +235,27 @@ HdxColorizeSelectionTask::Execute(HdTaskContext* ctx)
         desc.depthState.depthWriteEnabled = false;
         desc.depthState.stencilTestEnabled = false;
         desc.multiSampleState.alphaToCoverageEnable = false;
+        
+        // Describe the vertex buffer
+        HgiVertexAttributeDesc posAttr;
+        posAttr.format = HgiFormatFloat32Vec3;
+        posAttr.offset = 0;
+        posAttr.shaderBindLocation = 0;
+
+        HgiVertexAttributeDesc uvAttr;
+        uvAttr.format = HgiFormatFloat32Vec2;
+        uvAttr.offset = sizeof(float) * 4; // after posAttr
+        uvAttr.shaderBindLocation = 1;
+
+        size_t bindSlots = 0;
+
+        HgiVertexBufferDesc vboDesc;
+        vboDesc.bindingIndex = bindSlots++;
+        vboDesc.vertexStride = sizeof(float) * 6; // pos, uv
+        vboDesc.vertexAttributes.push_back(posAttr);
+        vboDesc.vertexAttributes.push_back(uvAttr);
+        
+        desc.vertexBuffers.emplace_back(std::move(vboDesc));
 
         _compositor->CreatePipeline(desc);
         _pipelineCreated = true;
@@ -380,19 +402,54 @@ HdxColorizeSelectionTask::_CreateParameterBuffer()
         bufDesc.usage = HgiBufferUsageStorage;
         bufDesc.initialData = &_parameterData;
         bufDesc.byteSize = sizeof(_parameterData);
-        _parameterBuffer = _hgi->CreateBuffer(bufDesc);
+        _parameterBuffer = _GetHgi()->CreateBuffer(bufDesc);
     } else {
         // Update the existing storage buffer with new values.
-        HgiBlitEncoderUniquePtr blitEncoder = _hgi->CreateBlitEncoder();
+        HgiBlitCmdsUniquePtr blitCmds = _GetHgi()->CreateBlitCmds();
         HgiBufferCpuToGpuOp copyOp;
         copyOp.byteSize = sizeof(_parameterData);
         copyOp.cpuSourceBuffer = &_parameterData;
         copyOp.sourceByteOffset = 0;
         copyOp.destinationByteOffset = 0;
         copyOp.gpuDestinationBuffer = _parameterBuffer;
-        blitEncoder->CopyBufferCpuToGpu(copyOp);
-        blitEncoder->Commit();
+        blitCmds->CopyBufferCpuToGpu(copyOp);
+        _GetHgi()->SubmitCmds(blitCmds.get(), 1);
     }
+}
+
+void
+HdxColorizeSelectionTask::_CreateTexture(
+    int width, 
+    int height,
+    HdFormat format,
+    void *data)
+{
+    HD_TRACE_FUNCTION();
+    HF_MALLOC_TAG_FUNCTION();
+
+    // Destroy the old texture (if any) if we received new pixels.
+    if (_texture) {
+        _GetHgi()->DestroyTexture(&_texture);
+    }
+
+    // Texture was removed, exit.
+    if (width == 0 || height == 0 || data == nullptr) {
+        return;
+    }
+
+    size_t pixelByteSize = HdDataSizeOfFormat(format);
+
+    HgiTextureDesc texDesc;
+    texDesc.debugName = "HdxColorizeSelectionTask texture";
+    texDesc.dimensions = GfVec3i(width, height, 1);
+    texDesc.format = HdxHgiConversions::GetHgiFormat(format);
+    texDesc.initialData = data;
+    texDesc.layerCount = 1;
+    texDesc.mipLevels = 1;
+    texDesc.pixelsByteSize = width * height * pixelByteSize;
+    texDesc.sampleCount = HgiSampleCount1;
+    texDesc.usage = HgiTextureUsageBitsShaderRead;
+    _texture = _hgi->CreateTexture(texDesc);
 }
 
 // -------------------------------------------------------------------------- //

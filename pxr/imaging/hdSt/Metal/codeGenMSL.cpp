@@ -766,8 +766,8 @@ namespace {
         case HdBinding::BINDLESS_UNIFORM:
         case HdBinding::TEXTURE_2D:
         case HdBinding::BINDLESS_TEXTURE_2D:
-        case HdBinding::TEXTURE_3D:
-        case HdBinding::BINDLESS_TEXTURE_3D:
+        case HdBinding::TEXTURE_FIELD:
+        case HdBinding::BINDLESS_TEXTURE_FIELD:
         case HdBinding::TEXTURE_UDIM_ARRAY:
         case HdBinding::BINDLESS_TEXTURE_UDIM_ARRAY:
         case HdBinding::TEXTURE_UDIM_LAYOUT:
@@ -3205,19 +3205,27 @@ HdSt_CodeGenMSL::_GenerateCommonDefinitions()
         // XXX: HdBinding::PRIMVAR_REDIRECT won't define an accessor if it's
         // an alias of like-to-like, so we want to suppress the HD_HAS_* flag
         // as well.
-        
+
         // For PRIMVAR_REDIRECT, the HD_HAS_* flag will be defined after
         // the corresponding HdGet_* function.
+        
+        // XXX: (HYD-1882) The #define HD_HAS_... for a primvar
+        // redirect will be defined immediately after the primvar
+        // redirect HdGet_... in the loop over
+        // _metaData.shaderParameterBinding below.  Given that this
+        // loop is not running in a canonical order (e.g., textures
+        // first, then primvar redirects, ...) and that the texture is
+        // picking up the HD_HAS_... flag, the answer to the following
+        // question is random:
+        //
+        // If there is a texture trying to use a primvar called NAME
+        // for coordinates and there is a primvar redirect called NAME,
+        // will the texture use it or not?
+        // 
+
         HdBinding::Type bindingType = it->first.GetType();
         if (bindingType != HdBinding::PRIMVAR_REDIRECT) {
-            _genDefinitions << "#define HD_HAS_" << it->second.name << " 1\n";
-        }
-    }
-    
-    TF_FOR_ALL (it, _metaData.fieldRedirectBinding) {
-        HdBinding::Type bindingType = it->first.GetType();
-        if (bindingType == HdBinding::FIELD_REDIRECT) {
-            _genDefinitions << "#define HD_HAS_" << it->second.name << " 1\n";
+            _genCommon << "#define HD_HAS_" << it->second.name << " 1\n";
         }
     }
     
@@ -4878,7 +4886,7 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
     _genVS << declarations.str()
            << accessors.str();
 
-    // accessors.
+    // Non-field redirect accessors.
     TF_FOR_ALL (it, _metaData.shaderParameterBinding) {
 
         bool dup = false;
@@ -5037,7 +5045,7 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
                 << " HdGet_" << it->second.name
                 << "() { return HdGet_" << it->second.name << "(0); }\n";
             isTextureSource = true;
-        } else if (bindingType == HdBinding::BINDLESS_TEXTURE_3D) {
+        } else if (bindingType == HdBinding::BINDLESS_TEXTURE_FIELD) {
             // vec4 HdGet_name(vec3 coord)
             accessors
                 << _GetUnpackedType(it->second.dataType, false)
@@ -5080,7 +5088,7 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
                 << " HdGet_" << it->second.name
                 << "() { return HdGet_" << it->second.name << "(0); }\n";
             isTextureSource = true;
-        } else if (bindingType == HdBinding::TEXTURE_3D) {
+        } else if (bindingType == HdBinding::TEXTURE_FIELD) {
             declarations
                 << "sampler samplerBind_" << it->second.name << ";\n"
                 << "texture3d<float> textureBind_" << it->second.name << ";\n";
@@ -5129,7 +5137,9 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
                 accessors
                     << "vec3(0.0, 0.0, 0.0)";
             }
-            accessors << ");\n}\n";
+            accessors
+                << ")" << swizzle << ");\n"
+                << "}\n";
                 
             // vec4 HdGet_name()
             accessors
@@ -5410,31 +5420,40 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
             << "}\n";
     }
     
-    TF_FOR_ALL (it, _metaData.fieldRedirectBinding) {
+    // Field redirect accessors, need to access above field textures.
+    TF_FOR_ALL (it, _metaData.shaderParameterBinding) {
         HdBinding::Type bindingType = it->first.GetType();
+
         if (bindingType == HdBinding::FIELD_REDIRECT) {
             
+            // adjust datatype
+            std::string swizzle = _GetSwizzleString(it->second.dataType);
+
+            const TfToken fieldName =
+                it->second.inPrimvars.empty()
+                ? TfToken("FIELDNAME_WAS_NOT_SPECIFIED")
+                : it->second.inPrimvars[0];
+
+            // Create an HdGet_INPUTNAME(vec3) for the shader to access a
+            // field texture HdGet_FIELDNAMETexture(vec3).
+
             accessors
-                << "vec3 HdGet_" << it->second.name << "(vec3 p) {\n"
-                << "#if defined(HD_HAS_" << it->second.fieldName << "Texture)\n"
-                << "\n"
-                << "#if defined(HD_HAS_" << it->second.fieldName << "SamplingTransform)\n"
-                << "    vec4 q = vec4(HdGet_" << it->second.fieldName << "SamplingTransform() * vec4(p.xyz, 1));\n"
-                << "    vec3 s = q.xyz/q.w;\n"
+                << _GetUnpackedType(it->second.dataType, false)
+                << " HdGet_" << it->second.name << "(vec3 coord) {\n"
+                << "    return vec3(\n"
+                // If field exists, use it
+                << "#if defined(HD_HAS_" << fieldName << "Texture)\n"
+                << "  return HdGet_" << fieldName << "Texture(coord)"
+                << swizzle << ";\n"
                 << "#else\n"
-                << "    vec3 s = p;\n"
+                // Otherwise use default value.
+                << "  int shaderCoord = GetDrawingCoord().shaderCoord;\n"
+                << "  return "
+                << _GetPackedTypeAccessor(it->second.dataType, false)
+                << "(shaderData[shaderCoord]." << it->second.name
+                << swizzle <<  ");\n"
                 << "#endif\n"
-                << "\n"
-                << "    return vec3(HdGet_" << it->second.fieldName << "Texture(s).xyz);\n"
-                << "#else\n"
-                << "#if defined(HD_HAS_" << it->second.name << "Fallback)\n"
-                << "    return vec3(HdGet_" << it->second.name << "Fallback().xyz);\n"
-                << "#else\n"
-                << "    return vec3(0.0);\n"
-                << "#endif\n"
-                << "#endif\n"
-                << "};\n"
-                ;
+                << "\n}\n";
         }
     }
     

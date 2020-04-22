@@ -41,10 +41,9 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 class HdSceneDelegate;
 class HdExtComputation;
-using HdStProgramSharedPtr =
-    std::shared_ptr<class HdStProgram>;
-typedef std::vector<struct HdExtComputationPrimvarDescriptor>
-                          HdExtComputationPrimvarDescriptorVector;
+using HdStProgramSharedPtr= std::shared_ptr<class HdStProgram>;
+using HdExtComputationPrimvarDescriptorVector =
+    std::vector<struct HdExtComputationPrimvarDescriptor>;
 
 using HdStExtCompGpuComputationSharedPtr = 
     std::shared_ptr<class HdStExtCompGpuComputation>;

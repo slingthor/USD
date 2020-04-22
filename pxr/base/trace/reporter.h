@@ -159,10 +159,7 @@ public:
     /// If we want to have multiple reporters per collector, this will need to
     /// be changed so that all reporters reporting on a collector update their
     /// respective trees. 
-    TRACE_API void UpdateAggregateTree();
-
-    /// Placeholder for UpdateAggregateTree().
-    TRACE_API void UpdateEventTree();
+    TRACE_API void UpdateTraceTrees();
     
     /// Clears event tree and counters.
     TRACE_API void ClearTree();

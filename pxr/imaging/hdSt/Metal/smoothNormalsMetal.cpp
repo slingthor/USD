@@ -80,8 +80,11 @@ HdSt_SmoothNormalsComputationMetal::_Execute(
     if(numPoints == 0) return;
     
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
-    HdStMSLProgramSharedPtr const &mslProgram(
-        std::dynamic_pointer_cast<HdStMSLProgram>(computeProgram));
+    
+    // temp fix for Storm recompiling the shader every frame due to resource
+    // management bug. Remove static in the future
+    static HdStMSLProgramSharedPtr mslProgram;
+    mslProgram = std::dynamic_pointer_cast<HdStMSLProgram>(computeProgram);
 
     // Only the normals are writebale
     unsigned long immutableBufferMask = (1 << 0) | (1 << 2) | (1 << 3);

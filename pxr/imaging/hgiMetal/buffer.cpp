@@ -42,17 +42,17 @@ HgiMetalBuffer::HgiMetalBuffer(HgiMetal *hgi, HgiBufferDesc const & desc)
         TF_CODING_ERROR("Buffers must have a non-zero length");
     }
 
-    MTLResourceOptions resourceOptions = MTLResourceCPUCacheModeDefaultCache |
+    MTLResourceOptions options = MTLResourceCPUCacheModeDefaultCache |
         hgi->GetCapabilities().defaultStorageMode;
     
     if (desc.initialData) {
-        _bufferId = [hgi->GetDevice() newBufferWithBytes:desc.initialData
-                                                  length:desc.byteSize
-                                                  options:resourceOptions];
+        _bufferId = [hgi->GetPrimaryDevice() newBufferWithBytes:desc.initialData
+                                                         length:desc.byteSize
+                                                        options:options];
     }
     else {
-        _bufferId = [hgi->GetDevice() newBufferWithLength:desc.byteSize
-                                                  options:resourceOptions];
+        _bufferId = [hgi->GetPrimaryDevice() newBufferWithLength:desc.byteSize
+                                                         options:options];
     }
     
     _descriptor.initialData = nullptr;

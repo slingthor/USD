@@ -36,8 +36,6 @@
 #include "pxr/base/gf/vec4d.h"
 #include "pxr/base/tf/declarePtrs.h"
 
-#include <boost/shared_ptr.hpp>
-
 #include <memory>
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -49,7 +47,8 @@ class HdStRenderPassState;
 
 using HdStRenderPassShaderSharedPtr =
     std::shared_ptr<class HdStRenderPassShader>;
-using HdStShaderCodeSharedPtr = std::shared_ptr<class HdStShaderCode>;
+using HdStShaderCodeSharedPtr =
+    std::shared_ptr<class HdStShaderCode>;
 
 using HdRenderPassSharedPtr = std::shared_ptr<class HdRenderPass>;
 using HdRenderPassSharedPtrVector = std::vector<HdRenderPassSharedPtr>;

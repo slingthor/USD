@@ -25,16 +25,18 @@
 
 #include "pxr/imaging/hgiMetal/hgi.h"
 #include "pxr/imaging/hgiMetal/buffer.h"
-#include "pxr/imaging/hgiMetal/blitEncoder.h"
+#include "pxr/imaging/hgiMetal/blitCmds.h"
 #include "pxr/imaging/hgiMetal/capabilities.h"
 #include "pxr/imaging/hgiMetal/conversions.h"
 #include "pxr/imaging/hgiMetal/diagnostic.h"
-#include "pxr/imaging/hgiMetal/graphicsEncoder.h"
+#include "pxr/imaging/hgiMetal/graphicsCmds.h"
 #include "pxr/imaging/hgiMetal/pipeline.h"
 #include "pxr/imaging/hgiMetal/resourceBindings.h"
 #include "pxr/imaging/hgiMetal/shaderFunction.h"
 #include "pxr/imaging/hgiMetal/shaderProgram.h"
 #include "pxr/imaging/hgiMetal/texture.h"
+
+#include "pxr/base/trace/trace.h"
 
 #include "pxr/base/tf/getenv.h"
 #include "pxr/base/tf/registryManager.h"
@@ -67,10 +69,11 @@ HgiMetal::HgiMetal(id<MTLDevice> device)
 , _useInterop(false)
 , _workToFlush(false)
 , _encoder(nil)
+, _sampleCount(1)
 {
     if (!_device) {
 #if defined(ARCH_OS_MACOS)
-            if( TfGetenvBool("USD_METAL_USE_INTEGRATED_GPU", false)) {
+            if( TfGetenvBool("HGIMETAL_USE_INTEGRATED_GPU", false)) {
                 _device = MTLCopyAllDevices()[1];
             }
 #endif
@@ -112,9 +115,37 @@ HgiMetal::~HgiMetal()
     [_commandQueue release];
 }
 
-HgiGraphicsEncoderUniquePtr
-HgiMetal::CreateGraphicsEncoder(
-    HgiGraphicsEncoderDesc const& desc)
+id<MTLDevice>
+HgiMetal::GetPrimaryDevice() const
+{
+    return _device;
+}
+
+void
+HgiMetal::SubmitCmds(HgiCmds* cmdsptr, uint32_t count)
+{
+    TRACE_FUNCTION();
+
+    if (!cmdsptr || count==0) {
+        return;
+    }
+
+    for (uint32_t i=0; i<count; i++) {
+        HgiCmds* w = cmdsptr + i;
+
+        if (HgiMetalGraphicsCmds* gw = dynamic_cast<HgiMetalGraphicsCmds*>(w)) {
+            gw->Commit();
+        } else if (HgiMetalBlitCmds* bw = dynamic_cast<HgiMetalBlitCmds*>(w)) {
+            bw->Commit();
+        }
+    }
+    
+    CommitCommandBuffer();
+}
+
+HgiGraphicsCmdsUniquePtr
+HgiMetal::CreateGraphicsCmds(
+    HgiGraphicsCmdsDesc const& desc)
 {
     // XXX We should TF_CODING_ERROR here when there are no attachments, but
     // during the Hgi transition we allow it to render to global gl framebuffer.
@@ -124,20 +155,20 @@ HgiMetal::CreateGraphicsEncoder(
     }
 
     _workToFlush = true;
-    HgiMetalGraphicsEncoder* encoder(
-        new HgiMetalGraphicsEncoder(this, desc));
+    HgiMetalGraphicsCmds* encoder(
+        new HgiMetalGraphicsCmds(this, desc));
 
     // TEMP
     _encoder = encoder;
     
-    return HgiGraphicsEncoderUniquePtr(encoder);
+    return HgiGraphicsCmdsUniquePtr(encoder);
 }
 
-HgiBlitEncoderUniquePtr
-HgiMetal::CreateBlitEncoder()
+HgiBlitCmdsUniquePtr
+HgiMetal::CreateBlitCmds()
 {
     _workToFlush = true;
-    return HgiBlitEncoderUniquePtr(new HgiMetalBlitEncoder(this));
+    return HgiBlitCmdsUniquePtr(new HgiMetalBlitCmds(this));
 }
 
 HgiTextureHandle
@@ -286,8 +317,12 @@ bool
 HgiMetal::BeginMtlf()
 {
     // SOOOO TEMP and specialised!
+    _sampleCount = 1;
+
     if (_encoder) {
+        _sampleCount = _encoder->_descriptor.colorTextures[0]->GetDescriptor().sampleCount;
         _encoder->Commit();
+        CommitCommandBuffer();
         return true;
     }
     

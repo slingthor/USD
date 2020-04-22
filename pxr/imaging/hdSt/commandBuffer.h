@@ -34,8 +34,6 @@
 #include "pxr/base/gf/matrix4f.h"
 #include "pxr/base/gf/matrix4d.h"
 
-#include <boost/shared_ptr.hpp>
-
 #include <memory>
 #include <vector>
 

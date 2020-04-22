@@ -32,26 +32,15 @@
 #include "pxr/imaging/garch/simpleLight.h"
 #include "pxr/imaging/garch/texture.h"
 
-#include "pxr/base/tf/staticTokens.h"
-#include "pxr/base/vt/dictionary.h"
 #include "pxr/base/vt/value.h"
 
-#include <boost/shared_ptr.hpp>
-
 #include <memory>
-#include <vector>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-class HdResourceRegistry;
-class HdSceneDelegate;
-typedef boost::shared_ptr<class HdStLight> HdStLightSharedPtr;
-typedef std::vector<class HdStLight const *> HdStLightPtrConstVector;
+class HdStResourceRegistry;
 
 using HdStTextureResourceSharedPtr = std::shared_ptr<class HdStTextureResource>;
-
-using HdStResourceRegistrySharedPtr = 
-    std::shared_ptr<class HdStResourceRegistry>;
 
 /// \class HdStLight
 ///

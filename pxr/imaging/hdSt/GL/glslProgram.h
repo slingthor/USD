@@ -35,8 +35,8 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 class HdResourceRegistry;
-using HdStGLSLProgramSharedPtr =
-    std::shared_ptr<class HdStGLSLProgram>;
+using HdStProgramSharedPtr =
+    std::shared_ptr<class HdStProgram>;
 
 /// \class HdGLSLProgram
 ///

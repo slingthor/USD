@@ -60,12 +60,19 @@ public:
     HGIMETAL_API
     ~HgiMetal() override;
 
+    /// Returns the Metal device.
     HGIMETAL_API
-    HgiGraphicsEncoderUniquePtr CreateGraphicsEncoder(
-        HgiGraphicsEncoderDesc const& desc) override;
+    id<MTLDevice> GetPrimaryDevice() const;
 
     HGIMETAL_API
-    HgiBlitEncoderUniquePtr CreateBlitEncoder() override;
+    void SubmitCmds(HgiCmds* cmds, uint32_t count=1) override;
+
+    HGIMETAL_API
+    HgiGraphicsCmdsUniquePtr CreateGraphicsCmds(
+        HgiGraphicsCmdsDesc const& desc) override;
+
+    HGIMETAL_API
+    HgiBlitCmdsUniquePtr CreateBlitCmds() override;
 
     HGIMETAL_API
     HgiTextureHandle CreateTexture(HgiTextureDesc const & desc) override;
@@ -121,12 +128,7 @@ public:
     //
     // HgiMetal specific
     //
-    
-    HGIMETAL_API
-    id<MTLDevice> GetDevice() const {
-        return _device;
-    }
-    
+        
     HGIMETAL_API
     id<MTLCommandQueue> GetQueue() const {
         return _commandQueue;
@@ -162,6 +164,7 @@ public:
     void CommitCommandBuffer(
         CommitCommandBufferWaitType waitType = CommitCommandBuffer_NoWait,
         bool forceNewBuffer = false);
+
 private:
     HgiMetal & operator=(const HgiMetal&) = delete;
     HgiMetal(const HgiMetal&) = delete;
@@ -184,7 +187,9 @@ public:
     HGIMETAL_API
     bool BeginMtlf();
     
-    class HgiMetalGraphicsEncoder* _encoder;
+    class HgiMetalGraphicsCmds* _encoder;
+    
+    int _sampleCount;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

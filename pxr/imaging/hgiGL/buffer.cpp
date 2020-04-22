@@ -60,13 +60,14 @@ HgiGLBuffer::HgiGLBuffer(HgiBufferDesc const & desc)
             _bufferId,
             _descriptor.byteSize,
             _descriptor.initialData,
-            flags);
+            flags | GL_DYNAMIC_STORAGE_BIT);
+
         _mapped = glMapNamedBufferRange(_bufferId, 0, desc.byteSize, flags);
     } else {
         TF_CODING_ERROR("Unknown HgiBufferUsage bit");
     }
 
-    // glBindVertexBuffer (graphics encoder) needs to know the stride of each
+    // glBindVertexBuffer (graphics cmds) needs to know the stride of each
     // vertex buffer. Make sure user provides it.
     if (_descriptor.usage & HgiBufferUsageVertex) {
         TF_VERIFY(desc.vertexStride > 0);

@@ -27,16 +27,12 @@
 #include "pxr/imaging/hd/renderBuffer.h"
 #include "pxr/imaging/hd/tokens.h"
 
-#include "pxr/imaging/hgi/hgi.h"
-#include "pxr/imaging/hgi/tokens.h"
-
 #include "pxr/base/work/loops.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
 HdxColorizeTask::HdxColorizeTask(HdSceneDelegate* delegate, SdfPath const& id)
- : HdxProgressiveTask(id)
- , _hgi(nullptr)
+ : HdxTask(id)
  , _aovName()
  , _aovBufferPath()
  , _depthBufferPath()
@@ -46,7 +42,9 @@ HdxColorizeTask::HdxColorizeTask(HdSceneDelegate* delegate, SdfPath const& id)
  , _outputBuffer(nullptr)
  , _outputBufferSize(0)
  , _converged(false)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
  , _compositor()
+#endif
  , _needsValidation(false)
 {
 }
@@ -426,21 +424,12 @@ static _Colorizer _colorizerTable[] = {
 };
 
 void
-HdxColorizeTask::Sync(HdSceneDelegate* delegate,
-                      HdTaskContext* ctx,
-                      HdDirtyBits* dirtyBits)
+HdxColorizeTask::_Sync(HdSceneDelegate* delegate,
+                       HdTaskContext* ctx,
+                       HdDirtyBits* dirtyBits)
 {
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
-
-    // Find Hgi driver in task context.
-    if (!_hgi) {
-        _hgi = HdTask::_GetDriver<Hgi*>(ctx, HgiTokens->renderDriver);
-        if (!TF_VERIFY(_hgi, "Hgi driver missing from TaskContext")) {
-            return;
-        }
-        _compositor.reset(new HdxFullscreenShader(_hgi, "Colorize"));
-    }
 
     if ((*dirtyBits) & HdChangeTracker::DirtyParams) {
         HdxColorizeTaskParams params;
@@ -558,27 +547,35 @@ HdxColorizeTask::Execute(HdTaskContext* ctx)
     // backends that keep renderbuffers on the GPU.
 
     // Colorize!
+    bool depthAware = false;
     if (_depthBuffer && _depthBuffer->GetFormat() == HdFormatFloat32) {
         uint8_t* db = reinterpret_cast<uint8_t*>(_depthBuffer->Map());
-        _compositor->SetTexture(TfToken("depth"),
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
+        _compositor.SetTexture(TfToken("depth"),
                                _depthBuffer->GetWidth(),
                                _depthBuffer->GetHeight(),
                                HdFormatFloat32, db);
+#endif
         _depthBuffer->Unmap();
+        depthAware = true;
     } else {
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
         // If no depth buffer is bound, don't draw with depth.
-        _compositor->SetTexture(TfToken("depth"),
+        _compositor.SetTexture(TfToken("depth"),
                                0, 0, HdFormatInvalid, nullptr);
+#endif
     }
 
     if (!_applyColorQuantization && _aovName == HdAovTokens->color) {
         // Special handling for color: to avoid a copy, just read the data
         // from the render buffer if no quantization is requested.
-        _compositor->SetTexture(TfToken("color"),
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
+        _compositor.SetTexture(TfToken("color"),
                                _aovBuffer->GetWidth(),
                                _aovBuffer->GetHeight(),
                                _aovBuffer->GetFormat(),
                                _aovBuffer->Map());
+#endif
         _aovBuffer->Unmap();
     } else {
 
@@ -611,11 +608,13 @@ HdxColorizeTask::Execute(HdTaskContext* ctx)
 
         // Upload the scratch buffer.
         if (colorized) {
-            _compositor->SetTexture(TfToken("color"),
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
+            _compositor.SetTexture(TfToken("color"),
                                    _aovBuffer->GetWidth(),
                                    _aovBuffer->GetHeight(),
                                    HdFormatUNorm8Vec4,
                                    _outputBuffer);
+#endif
         } else {
             // Skip the compositor if we have no color data.
             return;
@@ -628,11 +627,10 @@ HdxColorizeTask::Execute(HdTaskContext* ctx)
     glGetBooleanv(GL_BLEND, &blendEnabled);
     glEnable(GL_BLEND);
     glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-#endif
-    // ColorizeTask works directly on the bound gl framebuffer, so we pass
-    // invalid handles for color and depth.
-    _compositor->Draw(HgiTextureHandle(), HgiTextureHandle());
-#if defined(PXR_OPENGL_SUPPORT_ENABLED)
+
+    _compositor.SetProgramToCompositor(depthAware);
+    _compositor.Draw();
+
     if (!blendEnabled) {
         glDisable(GL_BLEND);
     }

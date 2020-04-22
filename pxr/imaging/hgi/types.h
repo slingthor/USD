@@ -41,20 +41,20 @@ PXR_NAMESPACE_OPEN_SCOPE
 ///   https://www.khronos.org/registry/vulkan/specs/1.1/html/vkspec.html#VkFormat
 enum HgiFormat
 {
-    HgiFormatInvalid=-1,
+    HgiFormatInvalid = -1,
 
     // UNorm8 - a 1-byte value representing a float between 0 and 1.
     // float value = (unorm / 255.0f);
-    HgiFormatUNorm8=0,
+    HgiFormatUNorm8 = 0,
     HgiFormatUNorm8Vec2,
-    HgiFormatUNorm8Vec3,
+    /* HgiFormatUNorm8Vec3 */ // Unsupported Metal (MTLPixelFormat)
     HgiFormatUNorm8Vec4,
 
     // SNorm8 - a 1-byte value representing a float between -1 and 1.
     // float value = max(snorm / 127.0f, -1.0f);
     HgiFormatSNorm8,
     HgiFormatSNorm8Vec2,
-    HgiFormatSNorm8Vec3,
+    /* HgiFormatSNorm8Vec3 */ // Unsupported Metal (MTLPixelFormat)
     HgiFormatSNorm8Vec4,
 
     // Float16 - a 2-byte IEEE half-precision float.
@@ -74,6 +74,14 @@ enum HgiFormat
     HgiFormatInt32Vec2,
     HgiFormatInt32Vec3,
     HgiFormatInt32Vec4,
+
+    // UNorm8 SRGB - a 1-byte value representing a float between 0 and 1.
+    // Gamma compression/decompression happens during read/write.
+    // Alpha component is linear.
+    /* HgiFormatUNorm8srgb */     // Unsupported by OpenGL
+    /* HgiFormatUNorm8Vec2srgb */ // Unsupported by OpenGL
+    /* HgiFormatUNorm8Vec3srgb */ // Unsupported Metal (MTLPixelFormat)
+    HgiFormatUNorm8Vec4srgb,
 
     HgiFormatCount
 };

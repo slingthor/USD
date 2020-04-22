@@ -28,8 +28,6 @@
 #include "pxr/imaging/hdSt/api.h"
 #include "pxr/imaging/hd/sceneDelegate.h"
 
-#include <boost/shared_ptr.hpp>
-
 #include <memory>
 #include <string>
 #include <vector>

@@ -32,59 +32,64 @@ PXR_NAMESPACE_OPEN_SCOPE
 //
 // HgiFormat
 //
-static const MTLPixelFormat PIXEL_FORMAT_DESC[] =
+static const MTLPixelFormat _PIXEL_FORMAT_DESC[] =
 {
     MTLPixelFormatR8Unorm,      // HgiFormatUNorm8,
     MTLPixelFormatRG8Unorm,     // HgiFormatUNorm8Vec2,
-    MTLPixelFormatInvalid,      // HgiFormatUNorm8Vec3,
+    //MTLPixelFormatInvalid,    // Unsupported by HgiFormat
     MTLPixelFormatRGBA8Unorm,   // HgiFormatUNorm8Vec4,
 
     MTLPixelFormatR8Snorm,      // HgiFormatSNorm8,
     MTLPixelFormatRG8Snorm,     // HgiFormatSNorm8Vec2,
-    MTLPixelFormatInvalid,      // HgiFormatSNorm8Vec3,
+    //MTLPixelFormatInvalid,    // Unsupported by HgiFormat
     MTLPixelFormatRGBA8Snorm,   // HgiFormatSNorm8Vec4,
 
     MTLPixelFormatR16Float,     // HgiFormatFloat16,
     MTLPixelFormatRG16Float,    // HgiFormatFloat16Vec2,
-    MTLPixelFormatInvalid,      // HgiFormatFloat16Vec3,
+    MTLPixelFormatInvalid,      // Unsupported by Metal
     MTLPixelFormatRGBA16Float,  // HgiFormatFloat16Vec4,
 
     MTLPixelFormatR32Float,     // HgiFormatFloat32,
     MTLPixelFormatRG32Float,    // HgiFormatFloat32Vec2,
-    MTLPixelFormatInvalid,      // HgiFormatFloat32Vec3,
+    MTLPixelFormatInvalid,      // Unsupported by Metal
     MTLPixelFormatRGBA32Float,  // HgiFormatFloat32Vec4,
 
     MTLPixelFormatR32Sint,      // HgiFormatInt32,
     MTLPixelFormatRG32Sint,     // HgiFormatInt32Vec2,
-    MTLPixelFormatInvalid,      // HgiFormatInt32Vec3,
+    MTLPixelFormatInvalid,      // Unsupported by Metal
     MTLPixelFormatRGBA32Sint,   // HgiFormatInt32Vec4,
+    
+    //MTLPixelFormatRGB8Unorm_sRGB,       // Unsupported by HgiFormat
+    MTLPixelFormatRGBA8Unorm_sRGB, // HgiFormatUNorm8Vec4sRGB,
 };
 
-constexpr bool _CompileTimeValidateHgiPixelFormatTable() {
-    return (TfArraySize(PIXEL_FORMAT_DESC) == HgiFormatCount &&
+// A few random format validations to make sure out GL table stays aligned
+// with the HgiFormat table.
+constexpr bool _CompileTimeValidateHgiFormatTable() {
+    return (TfArraySize(_PIXEL_FORMAT_DESC) == HgiFormatCount &&
             HgiFormatUNorm8 == 0 &&
-            HgiFormatFloat16Vec4 == 11 &&
-            HgiFormatFloat32Vec4 == 15 &&
-            HgiFormatInt32Vec4 == 19) ? true : false;
+            HgiFormatFloat16Vec4 == 9 &&
+            HgiFormatFloat32Vec4 == 13 &&
+            HgiFormatUNorm8Vec4srgb == 18) ? true : false;
 }
 
-static_assert(_CompileTimeValidateHgiPixelFormatTable(),
-              "_PixelFormatDesc array out of sync with HgiFormat enum");
+static_assert(_CompileTimeValidateHgiFormatTable(),
+              "_PIXEL_FORMAT_DESC array out of sync with HgiFormat enum");
 
 
 //
 // MTLVertexFormat
 //
-static const MTLVertexFormat VERTEX_FORMAT_DESC[] =
+static const MTLVertexFormat _VERTEX_FORMAT_DESC[] =
 {
     MTLVertexFormatUCharNormalized,     // HgiFormatUNorm8,
     MTLVertexFormatUChar2Normalized,    // HgiFormatUNorm8Vec2,
-    MTLVertexFormatUChar3Normalized,    // HgiFormatUNorm8Vec3,
+    //MTLVertexFormatUChar3Normalized,    // Unsupported by HgiFormat,
     MTLVertexFormatUChar4Normalized,    // HgiFormatUNorm8Vec4,
 
     MTLVertexFormatCharNormalized,      // HgiFormatSNorm8,
     MTLVertexFormatChar2Normalized,     // HgiFormatSNorm8Vec2,
-    MTLVertexFormatChar3Normalized,     // HgiFormatSNorm8Vec3,
+    //MTLVertexFormatChar3Normalized,     // Unsupported by HgiFormat,
     MTLVertexFormatChar4Normalized,     // HgiFormatSNorm8Vec4,
 
     MTLVertexFormatHalf,                // HgiFormatFloat16,
@@ -101,14 +106,17 @@ static const MTLVertexFormat VERTEX_FORMAT_DESC[] =
     MTLVertexFormatInt2,                // HgiFormatInt32Vec2,
     MTLVertexFormatInt3,                // HgiFormatInt32Vec3,
     MTLVertexFormatInt4,                // HgiFormatInt32Vec4,
+    
+    //MTLVertexFormatUChar4Normalized,       // Unsupported by HgiFormat
+    MTLVertexFormatUChar4Normalized, // HgiFormatUNorm8Vec4sRGB,
 };
 
 constexpr bool _CompileTimeValidateHgiVertexFormatTable() {
-    return (TfArraySize(VERTEX_FORMAT_DESC) == HgiFormatCount &&
+    return (TfArraySize(_VERTEX_FORMAT_DESC) == HgiFormatCount &&
             HgiFormatUNorm8 == 0 &&
-            HgiFormatFloat16Vec4 == 11 &&
-            HgiFormatFloat32Vec4 == 15 &&
-            HgiFormatInt32Vec4 == 19) ? true : false;
+            HgiFormatFloat16Vec4 == 9 &&
+            HgiFormatFloat32Vec4 == 13 &&
+            HgiFormatUNorm8Vec4srgb == 18) ? true : false;
 }
 
 static_assert(_CompileTimeValidateHgiVertexFormatTable(),
@@ -290,7 +298,7 @@ HgiMetalConversions::GetPixelFormat(HgiFormat inFormat)
         return MTLPixelFormatRGBA8Unorm;
     }
 
-    MTLPixelFormat outFormat = PIXEL_FORMAT_DESC[inFormat];
+    MTLPixelFormat outFormat = _PIXEL_FORMAT_DESC[inFormat];
     if (outFormat == MTLPixelFormatInvalid)
     {
         TF_CODING_ERROR("Unsupported HdFormat %d", inFormat);
@@ -308,7 +316,7 @@ HgiMetalConversions::GetVertexFormat(HgiFormat inFormat)
         return MTLVertexFormatFloat4;
     }
 
-    MTLVertexFormat outFormat = VERTEX_FORMAT_DESC[inFormat];
+    MTLVertexFormat outFormat = _VERTEX_FORMAT_DESC[inFormat];
     if (outFormat == MTLVertexFormatInvalid)
     {
         TF_CODING_ERROR("Unsupported HdFormat %d", inFormat);

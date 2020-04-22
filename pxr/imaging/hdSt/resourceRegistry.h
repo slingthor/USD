@@ -35,10 +35,10 @@
 #include "pxr/imaging/hd/bufferArrayRegistry.h"
 #include "pxr/imaging/hd/bufferSource.h"
 #include "pxr/imaging/hd/bufferSpec.h"
+#include "pxr/imaging/hd/enums.h"
 #include "pxr/imaging/hd/instanceRegistry.h"
 #include "pxr/imaging/hd/resourceRegistry.h"
 
-#include <boost/shared_ptr.hpp>
 #include <tbb/concurrent_vector.h>
 
 #include <atomic>
@@ -48,13 +48,14 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 using HdComputationSharedPtr = std::shared_ptr<class HdComputation>;
-
 using HdStDispatchBufferSharedPtr = std::shared_ptr<class HdStDispatchBuffer>;
+using HdStProgramSharedPtr = std::shared_ptr<class HdStProgram>;
 
-using HdStProgramSharedPtr =
-    std::shared_ptr<class HdStProgram>;
 using HdSt_BasisCurvesTopologySharedPtr =
     std::shared_ptr<class HdSt_BasisCurvesTopology>;
+
+using HdStShaderCodePtr =
+    std::weak_ptr<class HdStShaderCode>;
 using HdSt_GeometricShaderSharedPtr =
     std::shared_ptr<class HdSt_GeometricShader>;
 
@@ -63,15 +64,18 @@ using HdStTextureResourceSharedPtr =
 using HdStTextureResourceHandleSharedPtr =
     std::shared_ptr<class HdStTextureResourceHandle>;
 
+using HdStTextureHandleSharedPtr =
+    std::shared_ptr<class HdStTextureHandle>;
 using HdStPersistentBufferSharedPtr =
     std::shared_ptr<class HdStPersistentBuffer>; 
-
 using HdStResourceRegistrySharedPtr = 
     std::shared_ptr<class HdStResourceRegistry>;
 using Hd_VertexAdjacencySharedPtr = 
     std::shared_ptr<class Hd_VertexAdjacency>;
-using HdSt_MeshTopologySharedPtr =
+using HdSt_MeshTopologySharedPtr = 
     std::shared_ptr<class HdSt_MeshTopology>;
+class HdStTextureIdentifier;
+class HdSamplerParameters;
 
 /// \class HdStResourceRegistry
 ///
@@ -95,6 +99,39 @@ public:
 
     HDST_API
     void SetHgi(Hgi* hgi);
+
+    /// ------------------------------------------------------------------------
+    /// Texture allocation API
+    /// ------------------------------------------------------------------------
+    ///
+
+    /// Allocate texture handle. The actual allocation of the
+    /// associated GPU texture and sampler resources and loading of
+    /// the texture file is delayed until the commit phase.
+    HDST_API
+    HdStTextureHandleSharedPtr AllocateTextureHandle(
+        /// Path to file and information to identify a texture if the
+        /// file is a container for several textures (e.g., OpenVDB
+        /// file containing several grids, movie file containing frames).
+        const HdStTextureIdentifier &textureId,
+        /// Texture type, e.g., uv, ptex, ...
+        HdTextureType textureType,
+        /// Sampling parameters such as wrapS, ...
+        /// wrapS, wrapT, wrapR mode, min filer, mag filter
+        const HdSamplerParameters &samplerParams,
+        /// Memory request. The texture is down-sampled to meet the
+        /// target memory which is the maximum of all memory requests
+        /// associated to the texture.
+        /// If all memory requests are 0, no down-sampling will happen.
+        size_t memoryRequest,
+        /// Also create a GL texture sampler handle for bindless
+        /// textures.
+        bool createBindlessHandle,
+        /// After the texture is committed (or after it has been
+        /// changed) the given shader code can add additional buffer
+        /// sources using the texture metadata with
+        /// ComputeBufferSourcesFromTextures.
+        HdStShaderCodePtr const &shaderCode);
 
     /// ------------------------------------------------------------------------
     /// BAR allocation API
@@ -383,6 +420,7 @@ protected:
     void _GarbageCollectBprims() override;
 
 private:
+    void _CommitTextures();
     // Wrapper function for BAR allocation
     HdBufferArrayRangeSharedPtr _AllocateBufferArrayRange(
         HdAggregationStrategy *strategy,
@@ -511,6 +549,8 @@ private:
     HdInstanceRegistry<HdStTextureResourceHandleSharedPtr>
         _textureResourceHandleRegistry;
 
+    // texture handle registry
+    std::unique_ptr<class HdSt_TextureHandleRegistry> _textureHandleRegistry;
 };
 
 

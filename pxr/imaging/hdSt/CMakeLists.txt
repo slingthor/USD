@@ -125,7 +125,6 @@ pxr_library(hdSt
         extCompGpuPrimvarBufferSource
         fallbackLightingShader
         field
-        fieldResource
         flatNormals
         geometricShader
         glConversions
@@ -152,11 +151,20 @@ pxr_library(hdSt
         resourceFactory
         resourceRegistry
         rprimUtils
+        samplerObject
+        samplerObjectRegistry
         shaderCode
         simpleLightingShader
         smoothNormals
+        subtextureIdentifier
         surfaceShader
         texture
+        textureBinder
+        textureHandle
+        textureHandleRegistry
+        textureIdentifier
+        textureObject
+        textureObjectRegistry
         textureResource
         textureResourceHandle
         tokens

@@ -36,6 +36,7 @@
 #include "pxr/usd/usd/prim.h"
 #include "pxr/usd/usd/primDefinition.h"
 #include "pxr/usd/usd/primRange.h"
+#include "pxr/usd/usd/primTypeInfoCache.h"
 #include "pxr/usd/usd/relationship.h"
 #include "pxr/usd/usd/resolver.h"
 #include "pxr/usd/usd/resolveInfo.h"
@@ -2824,6 +2825,57 @@ UsdStage::_ReportErrors(const PcpErrorVector &errors,
     }
 }
 
+// Static prim type info cache
+static Usd_PrimTypeInfoCache &
+_GetPrimTypeInfoCache()
+{
+    static Usd_PrimTypeInfoCache cache;
+    return cache;
+}
+
+// Iterate over a prim's specs until we get a non-empty, non-any-type typeName.
+static TfToken
+_ComposeTypeName(const PcpPrimIndex *primIndex)
+{
+    for (Usd_Resolver res(primIndex); res.IsValid(); res.NextLayer()) {
+        TfToken tok;
+        if (res.GetLayer()->HasField(
+                res.GetLocalPath(), SdfFieldKeys->TypeName, &tok)) {
+            if (!tok.IsEmpty() && tok != SdfTokens->AnyTypeToken)
+                return tok;
+        }
+    }
+    return TfToken();
+}
+
+static void
+_ComposeAuthoredAppliedSchemas(
+    const PcpPrimIndex *primIndex, TfTokenVector *schemas)
+{
+    // Collect all list op opinions for the API schemas field from strongest to
+    // weakest. Then we apply them from weakest to strongest.
+    std::vector<SdfTokenListOp> listOps;
+
+    SdfTokenListOp listOp;
+    for (Usd_Resolver res(primIndex); res.IsValid(); res.NextLayer()) {
+        if (res.GetLayer()->HasField(
+                res.GetLocalPath(), UsdTokens->apiSchemas, &listOp)) {
+            // Add the populated list op to the end of the list.
+            listOps.emplace_back();
+            listOps.back().Swap(listOp);
+            // An explicit list op overwrites anything weaker so we can just
+            // stop here if it's explicit.
+            if (listOps.back().IsExplicit()) {
+                break;
+            }
+        }
+    }
+
+    // Apply the listops to our output in reverse order (weakest to strongest).
+    std::for_each(listOps.crbegin(), listOps.crend(),
+        [&schemas](const SdfTokenListOp& op) { op.ApplyOperations(schemas); });
+}
+
 void
 UsdStage::_ComposeSubtreeInParallel(Usd_PrimDataPtr prim)
 {
@@ -2923,8 +2975,28 @@ UsdStage::_ComposeSubtreeImpl(
         (parent == _pseudoRoot 
          && prim->_primIndex->GetPath() != prim->GetPath());
 
+    if (parent && !isMasterPrim) {
+        // Compose the type info full type ID for the prim which includes
+        // the type name, applied schemas, and a possible mapped fallback type 
+        // if the stage specifies it.
+        Usd_PrimTypeInfoCache::TypeId typeId(
+            _ComposeTypeName(prim->_primIndex));
+        _ComposeAuthoredAppliedSchemas(
+            prim->_primIndex, &typeId.appliedAPISchemas);
+        if (const TfToken *fallbackType = TfMapLookupPtr(
+                _invalidPrimTypeToFallbackMap, typeId.primTypeName)) {
+            typeId.mappedTypeName = *fallbackType;
+        }
+
+        // Ask the type info cache for the type info for our type.
+        prim->_primTypeInfo = 
+            _GetPrimTypeInfoCache().FindOrCreatePrimTypeInfo(std::move(typeId));
+    } else {
+        prim->_primTypeInfo = _GetPrimTypeInfoCache().GetEmptyPrimTypeInfo();
+    }
+
     // Compose type info and flags for prim.
-    prim->_ComposeAndCacheTypeAndFlags(parent, isMasterPrim);
+    prim->_ComposeAndCacheFlags(parent, isMasterPrim);
 
     // Pre-compute clip information for this prim to avoid doing so
     // at value resolution time.
@@ -2933,6 +3005,18 @@ UsdStage::_ComposeSubtreeImpl(
             prim->GetPath(), prim->GetPrimIndex());
         prim->_SetMayHaveOpinionsInClips(
             primHasAuthoredClips || parent->MayHaveOpinionsInClips());
+    } else {
+        // When composing the pseudoroot we also determine any fallback type
+        // mappings that the stage defines for type names that don't have a 
+        // valid schema. The possible mappings are defined in the root layer
+        // metadata and are needed to compose type info for all the other prims,
+        // thus why we do this here.
+        _invalidPrimTypeToFallbackMap.clear();
+        VtDictionary fallbackPrimTypes;
+        if (GetMetadata(UsdTokens->fallbackPrimTypes, &fallbackPrimTypes)) {
+            _GetPrimTypeInfoCache().ComputeInvalidPrimTypeToFallbackMap(
+                fallbackPrimTypes, &_invalidPrimTypeToFallbackMap);
+        }
     }
 
     // Compose the set of children on this prim.
@@ -3707,12 +3791,24 @@ UsdStage::_HandleLayersDidChange(
 
     SdfPathVector changedActivePaths;
 
+    // A fallback prim types change occurs when the fallbackPrimTypes metadata
+    // changes on the root or session layer. 
+    auto _IsFallbackPrimTypesChange = 
+        [this](const SdfLayerHandle &layer, const SdfPath &sdfPath,
+               const TfToken &infoKey)
+    {
+        return infoKey == UsdTokens->fallbackPrimTypes &&
+               sdfPath == SdfPath::AbsoluteRootPath() &&
+               (layer == this->GetRootLayer() || 
+                layer == this->GetSessionLayer());
+    };
+
     // Add dependent paths for any PrimSpecs whose fields have changed that may
     // affect cached prim information.
     for(const auto& layerAndChangelist : n.GetChangeListVec()) {
         // If this layer does not pertain to us, skip.
-        if (_cache->FindAllLayerStacksUsingLayer(
-                layerAndChangelist.first).empty()) {
+        const SdfLayerHandle &layer = layerAndChangelist.first;
+        if (_cache->FindAllLayerStacksUsingLayer(layer).empty()) {
             continue;
         }
 
@@ -3737,7 +3833,7 @@ UsdStage::_HandleLayersDidChange(
             TF_DEBUG(USD_CHANGES).Msg(
                 "<%s> in @%s@ changed.\n",
                 sdfPath.GetText(), 
-                layerAndChangelist.first->GetIdentifier().c_str());
+                layer->GetIdentifier().c_str());
 
             bool willRecompose = false;
             if (sdfPath == SdfPath::AbsoluteRootPath() ||
@@ -3766,7 +3862,13 @@ UsdStage::_HandleLayersDidChange(
                             // XXX: Could be more specific when recomposing due
                             //      to clip changes. E.g., only update the clip
                             //      resolver and bits on each prim.
-                            UsdIsClipRelatedField(infoKey)) {
+                            UsdIsClipRelatedField(infoKey) ||
+                            // Fallback prim type changes may potentially only 
+                            // affect a small number or prims, but this type of
+                            // change should be so rare that it's not really
+                            // worth parsing the minimal set of prims to 
+                            // recompose.
+                            _IsFallbackPrimTypesChange(layer, sdfPath, infoKey)) {
 
                             TF_DEBUG(USD_CHANGES).Msg(
                                 "Changed field: %s\n", infoKey.GetText());
@@ -3778,11 +3880,11 @@ UsdStage::_HandleLayersDidChange(
                 }
 
                 if (willRecompose) {
-                    _AddAffectedStagePaths(layerAndChangelist.first, sdfPath, 
+                    _AddAffectedStagePaths(layer, sdfPath, 
                                            *_cache, &recomposeChanges, &entry);
                 }
                 if (didChangeActive) {
-                    _AddAffectedStagePaths(layerAndChangelist.first, sdfPath, 
+                    _AddAffectedStagePaths(layer, sdfPath, 
                                            *_cache, &changedActivePaths);
                 }
             }
@@ -3795,8 +3897,7 @@ UsdStage::_HandleLayersDidChange(
 
                 if (willRecompose) {
                     _AddAffectedStagePaths(
-                        layerAndChangelist.first, sdfPath, 
-                                       *_cache, &otherResyncChanges, &entry);
+                        layer, sdfPath, *_cache, &otherResyncChanges, &entry);
                 }
             }
 
@@ -3804,7 +3905,7 @@ UsdStage::_HandleLayersDidChange(
             // scene paths separately so we can notify clients about the
             // changes.
             if (!willRecompose) {
-                _AddAffectedStagePaths(layerAndChangelist.first, sdfPath, 
+                _AddAffectedStagePaths(layer, sdfPath, 
                                   *_cache, &otherInfoChanges, &entry);
             }
         }

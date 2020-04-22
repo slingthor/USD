@@ -44,8 +44,8 @@ HgiMetalPipeline::HgiMetalPipeline(
     , _renderPipelineState(nil)
 {
     _CreateVertexDescriptor();
-    _CreateDepthStencilState(hgi->GetDevice());
-    _CreateRenderPipelineState(hgi->GetDevice());
+    _CreateDepthStencilState(hgi->GetPrimaryDevice());
+    _CreateRenderPipelineState(hgi->GetPrimaryDevice());
 }
 
 HgiMetalPipeline::~HgiMetalPipeline()

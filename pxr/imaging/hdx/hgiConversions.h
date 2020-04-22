@@ -24,7 +24,7 @@
 #ifndef PXR_IMAGING_HDX_HGI_CONVERSIONS_H
 #define PXR_IMAGING_HDX_HGI_CONVERSIONS_H
 
-#include "pxr/imaging/hdSt/api.h"
+#include "pxr/imaging/hdx/api.h"
 #include "pxr/imaging/hd/types.h"
 #include "pxr/imaging/hgi/types.h"
 
@@ -39,7 +39,7 @@ class HdxHgiConversions
 {
 public:
 
-    HDST_API
+    HDX_API
     static HgiFormat GetHgiFormat(HdFormat hdFormat);
 };
 

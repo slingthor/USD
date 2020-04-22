@@ -42,13 +42,10 @@
 #include "pxr/base/tf/declarePtrs.h"
 #include "pxr/base/tf/token.h"
 
-#include <boost/shared_ptr.hpp>
-
 #include <memory>
 #include <string>
 
 PXR_NAMESPACE_OPEN_SCOPE
-
 
 using HdStSimpleLightingShaderSharedPtr =
     std::shared_ptr<class HdStSimpleLightingShader>;

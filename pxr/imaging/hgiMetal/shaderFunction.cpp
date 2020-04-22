@@ -175,7 +175,7 @@ HgiMetalShaderFunction::HgiMetalShaderFunction(
     : HgiShaderFunction(desc)
     , _shaderId(nil)
 {
-    id<MTLDevice> device = hgi->GetDevice();
+    id<MTLDevice> device = hgi->GetPrimaryDevice();
     
     static std::stringstream header;
     static std::once_flag versionOnce;
@@ -302,9 +302,9 @@ HgiMetalShaderFunction::HgiMetalShaderFunction(
     
     NSError *error = NULL;
     id<MTLLibrary> library =
-        [hgi->GetDevice() newLibraryWithSource:@(source.c_str())
-                                       options:options
-                                         error:&error];
+        [hgi->GetPrimaryDevice() newLibraryWithSource:@(source.c_str())
+                                              options:options
+                                                error:&error];
 
     NSString *entryPoint;
     switch (_descriptor.shaderStage) {

@@ -38,8 +38,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 using HdStExtCompGpuComputationResourceSharedPtr =
     std::shared_ptr<class HdStExtCompGpuComputationResource>;
-using HdStProgramSharedPtr =
-    std::shared_ptr<class HdStProgram>;
+using HdStProgramSharedPtr= std::shared_ptr<class HdStProgram>;
 using HdBufferArrayRangeSharedPtrVector =
     std::vector<HdBufferArrayRangeSharedPtr>;
 

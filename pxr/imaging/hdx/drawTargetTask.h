@@ -38,7 +38,6 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 class HdStDrawTarget;
 
-
 using HdxDrawTargetRenderPassUniquePtr =
     std::unique_ptr<HdxDrawTargetRenderPass>;
 using HdStSimpleLightingShaderSharedPtr =

@@ -38,10 +38,9 @@
 #include "pxr/imaging/hdSt/immediateDrawBatch.h"
 #include "pxr/imaging/hdSt/package.h"
 #include "pxr/imaging/hd/drawingCoord.h"
-#include "pxr/imaging/hd/driver.h"
 #include "pxr/imaging/hd/vtBufferSource.h"
-#include "pxr/imaging/hgi/graphicsEncoder.h"
-#include "pxr/imaging/hgi/graphicsEncoderDesc.h"
+#include "pxr/imaging/hgi/graphicsCmds.h"
+#include "pxr/imaging/hgi/graphicsCmdsDesc.h"
 #include "pxr/imaging/hgi/hgi.h"
 #include "pxr/imaging/hgi/tokens.h"
 #include "pxr/imaging/glf/diagnostic.h"
@@ -49,7 +48,7 @@
 #if defined(PXR_OPENGL_SUPPORT_ENABLED)
 // XXX We do not want to include specific HgiXX backends, but we need to do
 // this temporarily until Storm has transitioned fully to Hgi.
-#include "pxr/imaging/hgiGL/graphicsEncoder.h"
+#include "pxr/imaging/hgiGL/graphicsCmds.h"
 #endif
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -166,54 +165,32 @@ HdSt_ImageShaderRenderPass::_Execute(
 	MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
     context->StartFrameForThread();
 	
-    // XXX Non-Hgi tasks expect default FB. Remove once all tasks use Hgi.
-    bool isOpenGL = HdStResourceFactory::GetInstance()->IsOpenGL();
-    int fb;
-    if (isOpenGL) {
-#if defined(PXR_OPENGL_SUPPORT_ENABLED)
-        glGetIntegerv(GL_FRAMEBUFFER_BINDING, &fb);
-#endif
-    }
-    // Create graphics encoder to render into Aovs.
-    HgiGraphicsEncoderDesc desc = stRenderPassState->MakeGraphicsEncoderDesc();
-    HgiGraphicsEncoderUniquePtr gfxEncoder = _hgi->CreateGraphicsEncoder(desc);
+    // Create graphics work to render into aovs.
+    HgiGraphicsCmdsDesc desc = stRenderPassState->MakeGraphicsCmdsDesc();
+    HgiGraphicsCmdsUniquePtr gfxCmds = _hgi->CreateGraphicsCmds(desc);
 
-    GfVec4i vp;
-
-    // XXX When there are no aovBindings we get a null encoder.
+    // XXX When there are no aovBindings we get a null work object.
     // This would ideally never happen, but currently happens for some
     // custom prims that spawn an imagingGLengine  with a task controller that
     // has no aovBindings.
 
-    if (gfxEncoder) {
-        gfxEncoder->PushDebugGroup(__ARCH_PRETTY_FUNCTION__);
-
-        // XXX The application may have directly called into glViewport.
-        // We need to remove the offset to avoid double offset when we composite
-        // the Aov back into the client framebuffer.
-        // E.g. UsdView CameraMask.
-        if (isOpenGL) {
-#if defined(PXR_OPENGL_SUPPORT_ENABLED)
-            glGetIntegerv(GL_VIEWPORT, vp.data());
-            GfVec4i aovViewport(0, 0, vp[2]+vp[0], vp[3]+vp[1]);
-            gfxEncoder->SetViewport(aovViewport);
-#endif
-        }
+    if (gfxCmds) {
+        gfxCmds->PushDebugGroup(__ARCH_PRETTY_FUNCTION__);
     }
 
     // Draw
     HdSt_DrawBatchSharedPtr const& batch = _immediateBatch;
 #if defined(PXR_OPENGL_SUPPORT_ENABLED)
-    HgiGLGraphicsEncoder* glGfxEncoder = 
-        dynamic_cast<HgiGLGraphicsEncoder*>(gfxEncoder.get());
+    HgiGLGraphicsCmds* glGfxCmds = 
+        dynamic_cast<HgiGLGraphicsCmds*>(gfxCmds.get());
 
-    if (gfxEncoder && glGfxEncoder) {
+    if (gfxCmds && glGfxCmds) {
         // XXX Tmp code path to allow non-hgi code to insert functions into
         // HgiGL ops-stack. Will be removed once Storms uses Hgi everywhere
         auto executeDrawOp = [batch, stRenderPassState, resourceRegistry] {
             _ExecuteDraw(batch, stRenderPassState, resourceRegistry);
         };
-        glGfxEncoder->InsertFunctionOp(executeDrawOp);
+        glGfxCmds->InsertFunctionOp(executeDrawOp);
     } else {
         _ExecuteDraw(batch, stRenderPassState, resourceRegistry);
     }
@@ -232,21 +209,9 @@ HdSt_ImageShaderRenderPass::_Execute(
         context->EndFrameForThread();
     }
     
-    if (gfxEncoder) {
-        if (isOpenGL) {
-#if defined(PXR_OPENGL_SUPPORT_ENABLED)
-            gfxEncoder->SetViewport(vp);
-#endif
-        }
-        gfxEncoder->PopDebugGroup();
-        gfxEncoder->Commit();
-
-        if (isOpenGL) {
-#if defined(PXR_OPENGL_SUPPORT_ENABLED)
-            // XXX Non-Hgi tasks expect default FB. Remove once all tasks use Hgi.
-            glBindFramebuffer(GL_FRAMEBUFFER, fb);
-#endif
-        }
+    if (gfxCmds) {
+        gfxCmds->PopDebugGroup();
+        _hgi->SubmitCmds(gfxCmds.get(), 1);
     }
 }
 

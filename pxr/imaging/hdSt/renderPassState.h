@@ -27,7 +27,9 @@
 #include "pxr/pxr.h"
 #include "pxr/imaging/hdSt/api.h"
 #include "pxr/imaging/hd/renderPassState.h"
-#include "pxr/imaging/hgi/graphicsEncoderDesc.h"
+#include "pxr/imaging/hgi/graphicsCmdsDesc.h"
+
+#include "pxr/base/gf/vec2f.h"
 
 #include <memory>
 
@@ -38,15 +40,13 @@ using HdStRenderPassStateSharedPtr = std::shared_ptr<class HdStRenderPassState>;
 
 using HdBufferArrayRangeSharedPtr = std::shared_ptr<class HdBufferArrayRange>;
 
-using HdStShaderCodeSharedPtr =
-    std::shared_ptr<class HdStShaderCode>;
-using HdStLightingShaderSharedPtr =
-    std::shared_ptr<class HdStLightingShader>;
+using HdStShaderCodeSharedPtr = std::shared_ptr<class HdStShaderCode>;
+using HdStLightingShaderSharedPtr = std::shared_ptr<class HdStLightingShader>;
 using HdStRenderPassShaderSharedPtr =
     std::shared_ptr<class HdStRenderPassShader>;
 using HdSt_FallbackLightingShaderSharedPtr =
     std::shared_ptr<class HdSt_FallbackLightingShader>;
-typedef std::vector<HdStShaderCodeSharedPtr> HdStShaderCodeSharedPtrVector;
+using HdStShaderCodeSharedPtrVector = std::vector<HdStShaderCodeSharedPtr>;
 
 /// \class HdStRenderPassState
 ///
@@ -97,9 +97,12 @@ public:
     HDST_API
     size_t GetShaderHash() const;
 
-    // Helper to convert AOV bindings to HgiGraphicsEncoder descriptor
-    HgiGraphicsEncoderDesc MakeGraphicsEncoderDesc() const;
+    // Helper to convert AOV bindings to HgiGraphicsCmds descriptor
+    HgiGraphicsCmdsDesc MakeGraphicsCmdsDesc() const;
     
+    GfVec2f
+    GetAovDimensions() const;
+
 protected:
     HdStRenderPassState();
     HDST_API

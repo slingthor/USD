@@ -17,6 +17,11 @@ if (PXR_ENABLE_GL_SUPPORT AND PXR_ENABLE_METAL_SUPPORT)
     list(APPEND optionalLibs hgiInterop)
 endif()
 
+set (optionalPublicClasses "")
+if (PXR_ENABLE_GL_SUPPORT)
+    list(APPEND optionalPublicClasses fullscreenShaderGL)
+endif()
+
 pxr_library(hdx
     LIBRARIES
         plug
@@ -58,16 +63,17 @@ pxr_library(hdx
         pickTask
         pickFromRenderBufferTask
         presentTask
-        progressiveTask
         renderTask
         renderSetupTask
         selectionTask
         selectionTracker
         shadowTask
         simpleLightTask
+        task
         taskController
         tokens
         types
+        ${optionalPublicClasses}
 
     PUBLIC_HEADERS
         shadowMatrixComputation.h

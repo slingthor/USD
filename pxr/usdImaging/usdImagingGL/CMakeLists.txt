@@ -45,7 +45,7 @@ pxr_library(usdImagingGL
         ${Boost_PYTHON_LIBRARY}
         ${OPENGL_LIBRARY}
         ${METAL_LIBRARY}
-        ${PYTHON_LIBRARY}
+        ${PYTHON_LIBRARIES}
         ${GLEW_LIBRARY}
         ${TBB_tbb_LIBRARY}
 

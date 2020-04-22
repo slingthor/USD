@@ -51,7 +51,7 @@ protected:
                           HdBufferResourceSharedPtr normals,
                           HdBufferResourceSharedPtr adjacency,
                           int numPoints) override;
-};
+    };
 
 
 PXR_NAMESPACE_CLOSE_SCOPE

@@ -133,27 +133,27 @@ def GetVisualStudioCompilerAndVersion():
             return (msvcCompiler, tuple(int(v) for v in match.groups()))
     return None
 
-def IsVisualStudio2019OrGreater():
+def IsVisualStudioVersionOrGreater(desiredVersion):
     if not Windows():
         return False
 
-    VISUAL_STUDIO_2019_VERSION = (16, 0)
     msvcCompilerAndVersion = GetVisualStudioCompilerAndVersion()
     if msvcCompilerAndVersion:
         _, version = msvcCompilerAndVersion
-        return version >= VISUAL_STUDIO_2019_VERSION
+        return version >= desiredVersion
     return False
+
+def IsVisualStudio2019OrGreater():
+    VISUAL_STUDIO_2019_VERSION = (16, 0)
+    return IsVisualStudioVersionOrGreater(VISUAL_STUDIO_2019_VERSION)
 
 def IsVisualStudio2017OrGreater():
-    if not Windows():
-        return False
-
     VISUAL_STUDIO_2017_VERSION = (15, 0)
-    msvcCompilerAndVersion = GetVisualStudioCompilerAndVersion()
-    if msvcCompilerAndVersion:
-        _, version = msvcCompilerAndVersion
-        return version >= VISUAL_STUDIO_2017_VERSION
-    return False
+    return IsVisualStudioVersionOrGreater(VISUAL_STUDIO_2017_VERSION)
+
+def IsVisualStudio2015OrGreater():
+    VISUAL_STUDIO_2015_VERSION = (14, 0)
+    return IsVisualStudioVersionOrGreater(VISUAL_STUDIO_2015_VERSION)
 
 def IsMayaPython():
     """Determine whether we're running in Maya's version of Python. When 
@@ -195,7 +195,14 @@ def GetPythonInfo():
         elif Linux():
             return sysconfig.get_config_var("LDLIBRARY")
         elif MacOS():
-            return "libpython" + pythonVersion + ".dylib"
+            pythonFramework = sysconfig.get_config_var("PYTHONFRAMEWORK")
+            if pythonFramework:
+                return pythonFramework
+
+            # Note that for non-framework installs of Python on Mac, this will
+            # probably return the name of a static library ".a" file, as it's
+            # likely that no SO exists in the installation.
+            return sysconfig.get_config_var("LDLIBRARY")
         else:
             raise RuntimeError("Platform not supported")
 
@@ -230,8 +237,14 @@ def GetPythonInfo():
             pythonLibPath = os.path.join(pythonLibDir,
                                          _GetPythonLibraryFilename())
         elif MacOS():
-            pythonBaseDir = sysconfig.get_config_var("base")
-            pythonLibPath = os.path.join(pythonBaseDir, "lib",
+            if sysconfig.get_config_var("PYTHONFRAMEWORK"):
+                pythonLibDir = sysconfig.get_config_var(
+                    "PYTHONFRAMEWORKINSTALLDIR")
+            else:
+                pythonLibDir = os.path.join(
+                    sysconfig.get_config_var("prefix"), "lib")
+
+            pythonLibPath = os.path.join(pythonLibDir,
                                          _GetPythonLibraryFilename())
         else:
             raise RuntimeError("Platform not supported")
@@ -1737,6 +1750,32 @@ def InstallMaterialX(context, force, buildArgs):
 MATERIALX = Dependency("MaterialX", InstallMaterialX, "include/MaterialXCore/Library.h")
 
 ############################################################
+# Embree
+
+EMBREE_URL = "https://github.com/embree/embree/archive/v3.2.2.tar.gz"
+
+def InstallEmbree(context, force, buildArgs):
+    with CurrentWorkingDirectory(DownloadURL(EMBREE_URL, context, force)):
+        extraArgs = [
+            '-DTBB_ROOT={instDir}'.format(instDir=context.instDir),
+            '-DEMBREE_TUTORIALS=OFF',
+            '-DEMBREE_ISPC_SUPPORT=OFF'
+        ]
+
+        # By default Embree fails to build on Visual Studio 2015 due
+        # to an internal compiler issue that is worked around via the
+        # following flag. For more details see:
+        # https://github.com/embree/embree/issues/157
+        if IsVisualStudio2015OrGreater() and not IsVisualStudio2017OrGreater():
+            extraArgs.append('-DCMAKE_CXX_FLAGS=/d2SSAOptimizer-')
+
+        extraArgs += buildArgs
+
+        RunCMake(context, force, extraArgs)
+
+EMBREE = Dependency("Embree", InstallEmbree, "include/embree3/rtcore.h")                  
+
+############################################################
 # USD
 
 def InstallUSD(context, force, buildArgs):
@@ -1812,9 +1851,6 @@ def InstallUSD(context, force, buildArgs):
                 extraArgs.append('-DPXR_ENABLE_OPENVDB_SUPPORT=OFF')
 
             if context.buildEmbree:
-                if context.embreeLocation:
-                    extraArgs.append('-DEMBREE_LOCATION="{location}"'
-                                     .format(location=context.embreeLocation))
                 extraArgs.append('-DPXR_BUILD_EMBREE_PLUGIN=ON')
             else:
                 extraArgs.append('-DPXR_BUILD_EMBREE_PLUGIN=OFF')
@@ -2123,8 +2159,6 @@ subgroup.add_argument("--embree", dest="build_embree", action="store_true",
                       help="Build Embree sample imaging plugin")
 subgroup.add_argument("--no-embree", dest="build_embree", action="store_false",
                       help="Do not build Embree sample imaging plugin (default)")
-group.add_argument("--embree-location", type=str,
-                   help="Directory where Embree is installed.")
 subgroup = group.add_mutually_exclusive_group()
 subgroup.add_argument("--prman", dest="build_prman", action="store_true",
                       default=False,
@@ -2289,8 +2323,6 @@ class InstallContext:
 
         # - Imaging plugins
         self.buildEmbree = self.buildImaging and args.build_embree
-        self.embreeLocation = (os.path.abspath(args.embree_location)
-                               if args.embree_location else None)
         self.buildPrman = self.buildImaging and args.build_prman
         self.prmanLocation = (os.path.abspath(args.prman_location)
                                if args.prman_location else None)                               
@@ -2382,6 +2414,9 @@ if context.buildImaging:
 
     if context.buildOCIO:
         requiredDependencies += [OPENCOLORIO]
+
+    if context.buildEmbree:
+        requiredDependencies += [TBB, EMBREE]
                              
 if context.buildUsdview:
     requiredDependencies += [PYOPENGL, PYSIDE]

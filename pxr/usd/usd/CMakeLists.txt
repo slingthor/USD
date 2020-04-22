@@ -83,6 +83,7 @@ pxr_library(usd
         instanceKey
         integerCoding
         interpolators
+        primTypeInfoCache
         usdzResolver
         valueUtils
 
@@ -122,6 +123,7 @@ pxr_library(usd
         wrapPrimDefinition.cpp
         wrapPrimFlags.cpp
         wrapPrimRange.cpp
+        wrapPrimTypeInfo.cpp
         wrapProperty.cpp
         wrapReferences.cpp
         wrapRelationship.cpp
@@ -150,7 +152,7 @@ pxr_library(usd
         generatedSchema.usda
         schema.usda:usd/schema.usda
         codegenTemplates/api.h
-        codegenTemplates/plugInfo.json
+        codegenTemplates/plugInfo.json:no_subst
         codegenTemplates/schemaClass.cpp
         codegenTemplates/schemaClass.h
         codegenTemplates/tokens.cpp
@@ -185,6 +187,7 @@ pxr_test_scripts(
     testenv/testUsdCratePayloadConversionFromVersion07.py
     testenv/testUsdCreateProperties.py
     testenv/testUsdDataFormats.py
+    testenv/testUsdFallbackPrimTypes.py
     testenv/testUsdFileFormats.py
     testenv/testUsdFlatten.py
     testenv/testUsdFlatten2.py
@@ -376,6 +379,11 @@ pxr_install_test_dir(
 pxr_install_test_dir(
     SRC testenv/testUsdCratePayloadConversionFromVersion07.testenv
     DEST testUsdCratePayloadConversionFromVersion07
+)
+
+pxr_install_test_dir(
+    SRC testenv/testUsdFallbackPrimTypes
+    DEST testUsdFallbackPrimTypes
 )
 
 pxr_install_test_dir(
@@ -659,6 +667,12 @@ pxr_register_test(testUsdCreateProperties
 
 pxr_register_test(testUsdCreateAttributeCpp
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdCreateAttributeCpp"
+    EXPECTED_RETURN_CODE 0
+)
+
+pxr_register_test(testUsdFallbackPrimTypes
+    PYTHON
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdFallbackPrimTypes"
     EXPECTED_RETURN_CODE 0
 )
 

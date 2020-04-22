@@ -28,43 +28,18 @@
 {
     "techniques": {
         "default": {
-            "OutlineVertex": {
-                "source": [ "Outline.Vertex" ]
-            },
             "OutlineFragment": {
                 "source": [ "Outline.Fragment" ]
             }
         },
         "Metal": {
-            "OutlineVertex": {
-                "source": [ 
-                    "Outline.Metal.Common", 
-                    "Outline.Metal.Vertex"
-                ]
-            },
             "OutlineFragment": {
                 "source": [ 
-                    "Outline.Metal.Common",
                     "Outline.Metal.Fragment"
                 ]
             }
         }
     }
-}
-
--- glsl Outline.Vertex
-
-#version 450
-
-layout(location = 0) in vec4 position;
-layout(location = 1) in vec2 uvIn;
-
-layout(location = 0) out vec2 uv;
-
-void main(void)
-{
-    gl_Position = position;
-    uv = uvIn;
 }
 
 -- glsl Outline.Fragment
@@ -201,29 +176,12 @@ void main()
     }
 }
 
--- glsl Outline.Metal.Common
+-- glsl Outline.Metal.Fragment
 
 struct Interpolated {
     float4 position [[position]];
     float2 uv;
 };
-
--- glsl Outline.Metal.Vertex
-
-struct Vertex {
-    float4 position [[attribute(0)]];
-    float2 uvIn [[attribute(1)]];
-};
-
-vertex Interpolated vertexEntryPoint(Vertex v [[stage_in]])
-{
-    Interpolated out;
-    out.position = v.position;
-    out.uv = v.uvIn;
-    return out;
-}
-
--- glsl Outline.Metal.Fragment
 
 #define EPSILON 0.0001
 #define LARGE 100000

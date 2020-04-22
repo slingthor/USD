@@ -56,13 +56,19 @@
 #include "pxr/imaging/hgi/hgi.h"
 #include "pxr/imaging/hgi/tokens.h"
 
+#include "pxr/base/tf/envSetting.h"
 #include "pxr/base/tf/getenv.h"
 #include "pxr/base/tf/stl.h"
 
 #include "pxr/base/gf/matrix4d.h"
 #include "pxr/base/gf/vec3d.h"
 
+#include <string>
+
 PXR_NAMESPACE_OPEN_SCOPE
+
+TF_DEFINE_ENV_SETTING(USDIMAGINGGL_ENGINE_DEBUG_SCENE_DELEGATE_ID, "/",
+                      "Default usdImaging scene delegate id");
 
 namespace {
 
@@ -80,6 +86,16 @@ _GetHydraEnabledEnvVar()
     // be cleaned up, and the new class hierarchy around UsdImagingGLEngine
     // makes it much easier to do so.
     return TfGetenv("HD_ENABLED", "1") == "1";
+}
+
+static
+SdfPath const&
+_GetUsdImagingDelegateId()
+{
+    static SdfPath const delegateId =
+        SdfPath(TfGetEnvSetting(USDIMAGINGGL_ENGINE_DEBUG_SCENE_DELEGATE_ID));
+
+    return delegateId;
 }
 
 static
@@ -169,7 +185,7 @@ UsdImagingGLEngine::UsdImagingGLEngine(const RenderAPI api, Hgi* hgi)
     , _hgi(hgi)
     , _hgiDriver{HgiTokens->renderDriver, VtValue(_hgi)}
     , _selTracker(new HdxSelectionTracker)
-    , _delegateID(SdfPath::AbsoluteRootPath())
+    , _delegateID(_GetUsdImagingDelegateId())
     , _delegate(nullptr)
     , _rendererPlugin(nullptr)
     , _taskController(nullptr)
@@ -389,8 +405,7 @@ UsdImagingGLEngine::RenderBatch(
     _taskController->SetRenderParams(hdParams);
     _taskController->SetEnableSelection(params.highlight);
 
-    SetColorCorrectionSettings(params.colorCorrectionMode, 
-                               params.renderResolution);
+    SetColorCorrectionSettings(params.colorCorrectionMode);
 
     // XXX App sets the clear color via 'params' instead of setting up Aovs 
     // that has clearColor in their descriptor. So for now we must pass this
@@ -1224,8 +1239,7 @@ UsdImagingGLEngine::RestartRenderer()
 //----------------------------------------------------------------------------
 void 
 UsdImagingGLEngine::SetColorCorrectionSettings(
-    TfToken const& id,
-    GfVec2i const& framebufferResolution)
+    TfToken const& id)
 {
     if (ARCH_UNLIKELY(_legacyImpl)) {
         return;
@@ -1277,8 +1291,7 @@ UsdImagingGLEngine::_Execute(const UsdImagingGLRenderParams &params,
 
     TF_VERIFY(_delegate);
 
-    SetColorCorrectionSettings(params.colorCorrectionMode, 
-                               params.renderResolution);
+    SetColorCorrectionSettings(params.colorCorrectionMode);
 
     // Forward scene materials enable option to delegate
     _delegate->SetSceneMaterialsEnabled(params.enableSceneMaterials);

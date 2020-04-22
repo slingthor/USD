@@ -31,17 +31,12 @@
 #include "pxr/imaging/hio/glslfx.h"
 #include "pxr/base/tf/getenv.h"
 
-#include "pxr/imaging/hgi/graphicsEncoder.h"
-#include "pxr/imaging/hgi/graphicsEncoderDesc.h"
+#include "pxr/imaging/hgi/graphicsCmds.h"
+#include "pxr/imaging/hgi/graphicsCmdsDesc.h"
 #include "pxr/imaging/hgi/hgi.h"
 #include "pxr/imaging/hgi/tokens.h"
 
 #include <iostream>
-#if defined(PXR_OPENGL_SUPPORT_ENABLED)
-// XXX Remove includes when entire task is using Hgi. We do not want to refer
-// to any specific Hgi implementation.
-#include "pxr/imaging/hgiGL/pipeline.h"
-#endif
 
 #ifdef PXR_OCIO_PLUGIN_ENABLED
     #include <OpenColorIO/OpenColorIO.h>
@@ -60,8 +55,7 @@ TF_DEFINE_PRIVATE_TOKENS(
 HdxColorCorrectionTask::HdxColorCorrectionTask(
     HdSceneDelegate* delegate, 
     SdfPath const& id)
-    : HdTask(id)
-    , _hgi(nullptr)
+    : HdxTask(id)
     , _indexBuffer()
     , _vertexBuffer()
     , _texture3dLUT()
@@ -74,18 +68,16 @@ HdxColorCorrectionTask::HdxColorCorrectionTask(
 
 HdxColorCorrectionTask::~HdxColorCorrectionTask()
 {
-    if (!_hgi) return;
-
     if (_texture3dLUT) {
-        _hgi->DestroyTexture(&_texture3dLUT);
+        _GetHgi()->DestroyTexture(&_texture3dLUT);
     }
 
     if (_vertexBuffer) {
-        _hgi->DestroyBuffer(&_vertexBuffer);
+        _GetHgi()->DestroyBuffer(&_vertexBuffer);
     }
 
     if (_indexBuffer) {
-        _hgi->DestroyBuffer(&_indexBuffer);
+        _GetHgi()->DestroyBuffer(&_indexBuffer);
     }
 
     if (_shaderProgram) {
@@ -93,11 +85,11 @@ HdxColorCorrectionTask::~HdxColorCorrectionTask()
     }
 
     if (_resourceBindings) {
-        _hgi->DestroyResourceBindings(&_resourceBindings);
+        _GetHgi()->DestroyResourceBindings(&_resourceBindings);
     }
 
     if (_pipeline) {
-        _hgi->DestroyPipeline(&_pipeline);
+        _GetHgi()->DestroyPipeline(&_pipeline);
     }
 }
 
@@ -187,11 +179,12 @@ HdxColorCorrectionTask::_CreateOpenColorIOResources()
 
         // Load the data into an OpenGL 3D Texture
         if (_texture3dLUT) {
-            _hgi->DestroyTexture(&_texture3dLUT);
+            _GetHgi()->DestroyTexture(&_texture3dLUT);
         }
 
         HgiTextureDesc lutDesc;
         lutDesc.debugName = "OCIO 3d LUT";
+        lutDesc.type = HgiTextureType3D;
         lutDesc.dimensions = GfVec3i(_lut3dSizeOCIO);
         lutDesc.format = HgiFormatFloat32Vec3;
         lutDesc.initialData = lut3d.data();
@@ -200,7 +193,7 @@ HdxColorCorrectionTask::_CreateOpenColorIOResources()
         lutDesc.pixelsByteSize = lut3d.size() * sizeof(lut3d[0]);
         lutDesc.sampleCount = HgiSampleCount1;
         lutDesc.usage = HgiTextureUsageBitsShaderRead;
-        _texture3dLUT = _hgi->CreateTexture(lutDesc);
+        _texture3dLUT = _GetHgi()->CreateTexture(lutDesc);
 
         const char* gpuShaderText = processor->getGpuShaderText(shaderDesc);
 
@@ -218,24 +211,21 @@ HdxColorCorrectionTask::_CreateShaderResources()
     }
 
     bool useOCIO =_GetUseOcio();
-    std::string apiName(_hgi->GetAPIName());
-    HioGlslfx glslfx(HdxPackageColorCorrectionShader(), &apiName);
+    HioGlslfx glslfx(HdxPackageColorCorrectionShader());
 
     // Setup the vertex shader
     HgiShaderFunctionDesc vertDesc;
     vertDesc.debugName = _tokens->colorCorrectionVertex.GetString();
     vertDesc.shaderStage = HgiShaderStageVertex;
-    vertDesc.languageVersion = 450;
     vertDesc.shaderCode = glslfx.GetSource(_tokens->colorCorrectionVertex);
-    HgiShaderFunctionHandle vertFn = _hgi->CreateShaderFunction(vertDesc);
+    HgiShaderFunctionHandle vertFn = _GetHgi()->CreateShaderFunction(vertDesc);
 
     // Setup the fragment shader
     HgiShaderFunctionDesc fragDesc;
     fragDesc.debugName = _tokens->colorCorrectionFragment.GetString();
     fragDesc.shaderStage = HgiShaderStageFragment;
-    fragDesc.languageVersion = 450;
     if (useOCIO) {
-        fragDesc.shaderCode = "#define GLSLFX_USE_OCIO\n";
+        fragDesc.shaderCode += "#define GLSLFX_USE_OCIO\n";
         // Our current version of OCIO outputs 130 glsl and texture3D is
         // removed from glsl in 140.
         fragDesc.shaderCode += "#define texture3D texture\n";
@@ -245,14 +235,14 @@ HdxColorCorrectionTask::_CreateShaderResources()
         std::string ocioGpuShaderText = _CreateOpenColorIOResources();
         fragDesc.shaderCode += ocioGpuShaderText;
     }
-    HgiShaderFunctionHandle fragFn = _hgi->CreateShaderFunction(fragDesc);
+    HgiShaderFunctionHandle fragFn = _GetHgi()->CreateShaderFunction(fragDesc);
 
     // Setup the shader program
     HgiShaderProgramDesc programDesc;
     programDesc.debugName =_tokens->colorCorrectionShader.GetString();
     programDesc.shaderFunctions.emplace_back(std::move(vertFn));
     programDesc.shaderFunctions.emplace_back(std::move(fragFn));
-    _shaderProgram = _hgi->CreateShaderProgram(programDesc);
+    _shaderProgram = _GetHgi()->CreateShaderProgram(programDesc);
 
     if (!_shaderProgram->IsValid() || !vertFn->IsValid() || !fragFn->IsValid()){
         TF_CODING_ERROR("Failed to create color correction shader");
@@ -284,7 +274,7 @@ HdxColorCorrectionTask::_CreateBufferResources()
     vboDesc.initialData = vertices;
     vboDesc.byteSize = sizeof(vertices) * sizeof(vertices[0]);
     vboDesc.vertexStride = elementsPerVertex * sizeof(vertices[0]);
-    _vertexBuffer = _hgi->CreateBuffer(vboDesc);
+    _vertexBuffer = _GetHgi()->CreateBuffer(vboDesc);
 
     static const int32_t indices[3] = {0,1,2};
 
@@ -293,7 +283,7 @@ HdxColorCorrectionTask::_CreateBufferResources()
     iboDesc.usage = HgiBufferUsageIndex32;
     iboDesc.initialData = indices;
     iboDesc.byteSize = sizeof(indices) * sizeof(indices[0]);
-    _indexBuffer = _hgi->CreateBuffer(iboDesc);
+    _indexBuffer = _GetHgi()->CreateBuffer(iboDesc);
 
     return true;
 }
@@ -333,11 +323,11 @@ HdxColorCorrectionTask::_CreateResourceBindings(
         if (desc == resourceDesc) {
             return true;
         } else {
-            _hgi->DestroyResourceBindings(&_resourceBindings);
+            _GetHgi()->DestroyResourceBindings(&_resourceBindings);
         }
     }
 
-    _resourceBindings = _hgi->CreateResourceBindings(resourceDesc);
+    _resourceBindings = _GetHgi()->CreateResourceBindings(resourceDesc);
 
     return true;
 }
@@ -350,7 +340,7 @@ HdxColorCorrectionTask::_CreatePipeline(HgiTextureHandle const& aovTexture)
             return true;
         }
         
-        _hgi->DestroyPipeline(&_pipeline);
+        _GetHgi()->DestroyPipeline(&_pipeline);
     }
 
     HgiPipelineDesc desc;
@@ -396,68 +386,46 @@ HdxColorCorrectionTask::_CreatePipeline(HgiTextureHandle const& aovTexture)
     _attachment0.format = aovTexture->GetDescriptor().format;
     desc.colorAttachmentDescs.emplace_back(_attachment0);
 
-    _pipeline = _hgi->CreatePipeline(desc);
+    _pipeline = _GetHgi()->CreatePipeline(desc);
 
     return true;
 }
 
 void
-HdxColorCorrectionTask::_ApplyColorCorrection(HgiTextureHandle const& aovTexture)
+HdxColorCorrectionTask::_ApplyColorCorrection(
+    HgiTextureHandle const& aovTexture)
 {
     GfVec3i const& dimensions = aovTexture->GetDescriptor().dimensions;
-#if defined(PXR_OPENGL_SUPPORT_ENABLED)
-    // XXX Not everything is using Hgi yet, so we have inconsistent state
-    // management in opengl. Remove when Hgi transition is complete.
-    HgiGLPipeline* glPipeline = dynamic_cast<HgiGLPipeline*>(_pipeline.Get());
-    if (glPipeline) {
-        glPipeline->CaptureOpenGlState();
-    }
-#endif
-    // Prepare graphics encoder.
-    HgiGraphicsEncoderDesc gfxDesc;
+
+    // Prepare graphics cmds.
+    HgiGraphicsCmdsDesc gfxDesc;
     gfxDesc.width = dimensions[0];
     gfxDesc.height = dimensions[1];
     gfxDesc.colorAttachmentDescs.emplace_back(_attachment0);
     gfxDesc.colorTextures.emplace_back(aovTexture);
 
     // Begin rendering
-    HgiGraphicsEncoderUniquePtr gfxEncoder =
-        _hgi->CreateGraphicsEncoder(gfxDesc);
-    gfxEncoder->PushDebugGroup("ColorCorrection");
-    gfxEncoder->BindResources(_resourceBindings);
-    gfxEncoder->BindPipeline(_pipeline);
-    gfxEncoder->BindVertexBuffers(0, {_vertexBuffer}, {0});
+    HgiGraphicsCmdsUniquePtr gfxCmds = _GetHgi()->CreateGraphicsCmds(gfxDesc);
+    gfxCmds->PushDebugGroup("ColorCorrection");
+    gfxCmds->BindResources(_resourceBindings);
+    gfxCmds->BindPipeline(_pipeline);
+    gfxCmds->BindVertexBuffers(0, {_vertexBuffer}, {0});
     GfVec4i vp = GfVec4i(0, 0, dimensions[0], dimensions[1]);
-    gfxEncoder->SetViewport(vp);
-    gfxEncoder->DrawIndexed(_indexBuffer, 3, 0, 0, 1, 0);
-    gfxEncoder->PopDebugGroup();
+    gfxCmds->SetViewport(vp);
+    gfxCmds->DrawIndexed(_indexBuffer, 3, 0, 0, 1, 0);
+    gfxCmds->PopDebugGroup();
 
     // Done recording commands, submit work.
-    gfxEncoder->Commit();
-#if defined(PXR_OPENGL_SUPPORT_ENABLED)
-    // XXX Not everything is using Hgi yet, so we have inconsistent state
-    // management in opengl. Remove when Hgi transition is complete.
-    if (glPipeline) {
-        glPipeline->RestoreOpenGlState();
-    }
-#endif
+    _GetHgi()->SubmitCmds(gfxCmds.get(), 1);
 }
 
 void
-HdxColorCorrectionTask::Sync(HdSceneDelegate* delegate,
-                             HdTaskContext* ctx,
-                             HdDirtyBits* dirtyBits)
+HdxColorCorrectionTask::_Sync(HdSceneDelegate* delegate,
+                              HdTaskContext* ctx,
+                              HdDirtyBits* dirtyBits)
 {
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
-
-    // Find Hgi driver in task context.
-    if (!_hgi) {
-        _hgi = HdTask::_GetDriver<Hgi*>(ctx, HgiTokens->renderDriver);
-        if (!TF_VERIFY(_hgi, "Hgi driver missing from TaskContext")) {
-            return;
-        }
-    }
 
     if ((*dirtyBits) & HdChangeTracker::DirtyParams) {
         HdxColorCorrectionTaskParams params;
@@ -474,10 +442,10 @@ HdxColorCorrectionTask::Sync(HdSceneDelegate* delegate,
             // Rebuild Hgi objects when ColorCorrection params change
             _DestroyShaderProgram();
             if (_resourceBindings) {
-                _hgi->DestroyResourceBindings(&_resourceBindings);
+                _GetHgi()->DestroyResourceBindings(&_resourceBindings);
             }
             if (_pipeline) {
-                _hgi->DestroyPipeline(&_pipeline);
+                _GetHgi()->DestroyPipeline(&_pipeline);
             }
         }
     }
@@ -532,9 +500,9 @@ HdxColorCorrectionTask::_DestroyShaderProgram()
     if (!_shaderProgram) return;
 
     for (HgiShaderFunctionHandle fn : _shaderProgram->GetShaderFunctions()) {
-        _hgi->DestroyShaderFunction(&fn);
+        _GetHgi()->DestroyShaderFunction(&fn);
     }
-    _hgi->DestroyShaderProgram(&_shaderProgram);
+    _GetHgi()->DestroyShaderProgram(&_shaderProgram);
 }
 
 void

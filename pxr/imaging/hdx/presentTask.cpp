@@ -26,8 +26,7 @@
 #include "pxr/imaging/hd/aov.h"
 #include "pxr/imaging/hd/tokens.h"
 
-#include "pxr/imaging/hgi/hgi.h"
-#include "pxr/imaging/hgi/tokens.h"
+
 
 #if defined(PXR_OPENGL_SUPPORT_ENABLED) && defined(PXR_METAL_SUPPORT_ENABLED)
 #include "pxr/imaging/hgiInterop/hgiInterop.h"
@@ -36,35 +35,38 @@
 #define INTEROP_ENABLED 0
 #endif
 
-#if defined(PXR_OPENGL_SUPPORT_ENABLED)
-// todo remove when hgi transition is complete
-#include "pxr/imaging/hgiGL/texture.h"
-#endif
-
-
+#include "pxr/imaging/hgi/hgi.h"
+#include "pxr/imaging/hgi/tokens.h"
 
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+TF_DEFINE_PRIVATE_TOKENS(
+    _tokens,
+    (color)
+    (depth)
+);
+
 HdxPresentTask::HdxPresentTask(HdSceneDelegate* delegate, SdfPath const& id)
- : HdTask(id)
- , _hgi(nullptr)
+ : HdxTask(id)
  , _compositor()
+ , _interop(nullptr)
  , _flipImage(false)
 {
-#if INTEROP_ENABLED
-    _interop = new HgiInterop();
-    _interop->SetFlipOnBlit(_flipImage);
-#endif
 }
 
 HdxPresentTask::~HdxPresentTask()
 {
-    delete _interop;
+#if INTEROP_ENABLED
+    if (_interop) {
+        delete _interop;
+        _interop = nullptr;
+    }
+#endif
 }
 
 void
-HdxPresentTask::Sync(
+HdxPresentTask::_Sync(
     HdSceneDelegate* delegate,
     HdTaskContext* ctx,
     HdDirtyBits* dirtyBits)
@@ -72,14 +74,15 @@ HdxPresentTask::Sync(
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
 
-    // Find Hgi driver in task context.
-    if (!_hgi) {
-        _hgi = HdTask::_GetDriver<Hgi*>(ctx, HgiTokens->renderDriver);
-        if (!TF_VERIFY(_hgi, "Hgi driver missing from TaskContext")) {
-            return;
-        }
-        _compositor.reset(new HdxFullscreenShader(_hgi, "Present"));
+    if (!_compositor) {
+        _compositor.reset(new HdxFullscreenShader(_GetHgi(), "Present"));
     }
+#if INTEROP_ENABLED
+    if (!_interop) {
+        _interop = new HgiInterop();
+        _interop->SetFlipOnBlit(_flipImage);
+    }
+#endif
 
     if ((*dirtyBits) & HdChangeTracker::DirtyParams) {
         HdxPresentTaskParams params;
@@ -136,9 +139,8 @@ HdxPresentTask::Execute(HdTaskContext* ctx)
 #endif
     }
     else
-    {
+    { // XXX HgiInterop begin
 #if defined(PXR_OPENGL_SUPPORT_ENABLED)
-        // XXX HgiInterop begin
         // Depth test must be ALWAYS instead of disabling the depth_test because
         // we want to transfer the depth pixels. Disabling depth_test 
         // disables depth writes and we need to copy depth to screen FB.
@@ -155,9 +157,11 @@ HdxPresentTask::Execute(HdTaskContext* ctx)
         glDisable(GL_BLEND);
 
         HdxFullscreenShader::TextureMap textures;
-        textures[TfToken("color")] = aovTexture;
+
+        textures[_tokens->color] = aovTexture;
+
         if (depthTexture) {
-            textures[TfToken("depth")] = depthTexture;
+            textures[_tokens->depth] = depthTexture;
         }
 
         // Draw aov textures to framebuffer

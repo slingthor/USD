@@ -25,17 +25,20 @@
 
 #include "pxr/imaging/hgi/handle.h"
 #include "pxr/imaging/hgiGL/hgi.h"
-#include "pxr/imaging/hgiGL/blitEncoder.h"
+#include "pxr/imaging/hgiGL/blitCmds.h"
 #include "pxr/imaging/hgiGL/buffer.h"
 #include "pxr/imaging/hgiGL/conversions.h"
 #include "pxr/imaging/hgiGL/device.h"
 #include "pxr/imaging/hgiGL/diagnostic.h"
-#include "pxr/imaging/hgiGL/graphicsEncoder.h"
+#include "pxr/imaging/hgiGL/graphicsCmds.h"
 #include "pxr/imaging/hgiGL/pipeline.h"
 #include "pxr/imaging/hgiGL/resourceBindings.h"
+#include "pxr/imaging/hgiGL/scopedStateHolder.h"
 #include "pxr/imaging/hgiGL/shaderFunction.h"
 #include "pxr/imaging/hgiGL/shaderProgram.h"
 #include "pxr/imaging/hgiGL/texture.h"
+
+#include "pxr/base/trace/trace.h"
 
 #include "pxr/base/tf/envSetting.h"
 #include "pxr/base/tf/registryManager.h"
@@ -83,26 +86,46 @@ HgiGL::GetPrimaryDevice() const
     return _device;
 }
 
-HgiGraphicsEncoderUniquePtr
-HgiGL::CreateGraphicsEncoder(
-    HgiGraphicsEncoderDesc const& desc)
+void
+HgiGL::SubmitCmds(HgiCmds* cmdsptr, uint32_t count)
 {
-    // XXX We should TF_CODING_ERROR here when there are no attachments, but
-    // during the Hgi transition we allow it to render to global gl framebuffer.
-    if (!desc.HasAttachments()) {
-        // TF_CODING_ERROR("Graphics encoder desc has no attachments");
-        return nullptr;
+    TRACE_FUNCTION();
+
+    if (!cmdsptr || count==0) {
+        return;
     }
 
-    HgiGLGraphicsEncoder* encoder(new HgiGLGraphicsEncoder(_device, desc));
+    // Capture OpenGL state before executing the 'ops' and restore it when this
+    // function ends. We do this defensively during hgi transition to make sure
+    // non-hgi code that directly manipulates global opengl state continues to
+    // work. Our end goal is that we always set a HgiPipeline instead, but for
+    // that to work we need to first complete the transition to Hgi.
+    HgiGL_ScopedStateHolder openglStateGuard;
 
-    return HgiGraphicsEncoderUniquePtr(encoder);
+    for (uint32_t i=0; i<count; i++) {
+        HgiCmds* w = cmdsptr + i;
+
+        if (HgiGLGraphicsCmds* gw = dynamic_cast<HgiGLGraphicsCmds*>(w)) {
+            gw->EndRecording();
+            _device->SubmitOps(gw->GetOps());
+        } else if (HgiGLBlitCmds* bw = dynamic_cast<HgiGLBlitCmds*>(w)) {
+            _device->SubmitOps(bw->GetOps());
+        }
+    }
 }
 
-HgiBlitEncoderUniquePtr
-HgiGL::CreateBlitEncoder()
+HgiGraphicsCmdsUniquePtr
+HgiGL::CreateGraphicsCmds(
+    HgiGraphicsCmdsDesc const& desc)
 {
-    return HgiBlitEncoderUniquePtr(new HgiGLBlitEncoder());
+    HgiGLGraphicsCmds* cmds(new HgiGLGraphicsCmds(_device, desc));
+    return HgiGraphicsCmdsUniquePtr(cmds);
+}
+
+HgiBlitCmdsUniquePtr
+HgiGL::CreateBlitCmds()
+{
+    return HgiBlitCmdsUniquePtr(new HgiGLBlitCmds());
 }
 
 HgiTextureHandle

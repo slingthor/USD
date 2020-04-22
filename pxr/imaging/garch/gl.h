@@ -104,6 +104,7 @@ typedef GLvoid (*ArchGLCallbackType)(...);
 #define GL_UNSIGNED_INT64_ARB 0x140F
 #define GL_INT_SAMPLER_BUFFER 0x8DD0
 #define GL_CLAMP_TO_BORDER 0x812D
+#define GL_CLAMP 0x2900
 #define GL_SAMPLER_1D 0x8B5D
 #define GL_SRC1_ALPHA 0x8589
 #define GL_PROGRAM_POINT_SIZE 0x8642

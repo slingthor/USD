@@ -248,7 +248,7 @@ HdSt_ResourceBinderGL::BindBuffer(TfToken const &name,
         }
         break;
     case HdBinding::TEXTURE_2D:
-    case HdBinding::TEXTURE_3D:
+    case HdBinding::TEXTURE_FIELD:
         // nothing
         break;
     default:
@@ -322,7 +322,7 @@ HdSt_ResourceBinderGL::UnbindBuffer(TfToken const &name,
         }
         break;
     case HdBinding::TEXTURE_2D:
-    case HdBinding::TEXTURE_3D:
+    case HdBinding::TEXTURE_FIELD:
         // nothing
         break;
     default:
@@ -347,9 +347,9 @@ HdSt_ResourceBinderGL::BindShaderResources(HdStShaderCode const *shader) const
         HdBinding::Type type = binding.GetType();
 
         if (type == HdBinding::TEXTURE_2D ||
-            type == HdBinding::TEXTURE_3D) {
+            type == HdBinding::TEXTURE_FIELD) {
         } else if (type == HdBinding::BINDLESS_TEXTURE_2D
-                || type == HdBinding::BINDLESS_TEXTURE_3D
+                || type == HdBinding::BINDLESS_TEXTURE_FIELD
                 || type == HdBinding::BINDLESS_TEXTURE_PTEX_TEXEL
                 || type == HdBinding::BINDLESS_TEXTURE_PTEX_LAYOUT) {
             // nothing? or make it resident?? but it only binds the first one.
@@ -373,9 +373,9 @@ HdSt_ResourceBinderGL::UnbindShaderResources(HdStShaderCode const *shader) const
         HdBinding::Type type = binding.GetType();
 
         if (type == HdBinding::TEXTURE_2D ||
-            type == HdBinding::TEXTURE_3D) {
+            type == HdBinding::TEXTURE_FIELD) {
         } else if (type == HdBinding::BINDLESS_TEXTURE_2D
-                || type == HdBinding::BINDLESS_TEXTURE_3D
+                || type == HdBinding::BINDLESS_TEXTURE_FIELD
                 || type == HdBinding::BINDLESS_TEXTURE_PTEX_TEXEL
                 || type == HdBinding::BINDLESS_TEXTURE_PTEX_LAYOUT) {
 //            if (glIsTextureHandleResidentNV(it->handle)) {
@@ -532,7 +532,7 @@ HdSt_ResourceBinderGL::IntrospectBindings(HdStProgramSharedPtr programResource) 
             // HdCodeGen::_GenerateShaderParameters
             if (type == HdBinding::TEXTURE_2D) {
                 textureName = "sampler2d_" + name;
-            } else if (type == HdBinding::TEXTURE_3D) {
+            } else if (type == HdBinding::TEXTURE_FIELD) {
                 textureName = "sampler3d_" + name;
             } else if (type == HdBinding::TEXTURE_PTEX_TEXEL) {
                 textureName = "sampler2darray_" + name;

@@ -26,7 +26,7 @@
 
 #include "pxr/pxr.h"
 #include "pxr/imaging/hdx/api.h"
-#include "pxr/imaging/hdx/progressiveTask.h"
+#include "pxr/imaging/hdx/task.h"
 #include "pxr/imaging/hgi/texture.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -42,7 +42,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 /// maybe operate on this HgiTexture without having to worry about converting
 /// the aov data from CPU to GPU.
 ///
-class HdxAovInputTask : public HdxProgressiveTask
+class HdxAovInputTask : public HdxTask
 {
 public:
     HDX_API
@@ -55,12 +55,6 @@ public:
     virtual bool IsConverged() const override;
 
     HDX_API
-    virtual void Sync(
-        HdSceneDelegate* delegate,
-        HdTaskContext* ctx,
-        HdDirtyBits* dirtyBits) override;
-
-    HDX_API
     virtual void Prepare(
         HdTaskContext* ctx,
         HdRenderIndex* renderIndex) override;
@@ -68,13 +62,18 @@ public:
     HDX_API
     virtual void Execute(HdTaskContext* ctx) override;
 
+protected:
+    HDX_API
+    virtual void _Sync(
+        HdSceneDelegate* delegate,
+        HdTaskContext* ctx,
+        HdDirtyBits* dirtyBits) override;
+
 private:
     void _UpdateTexture(
         HdTaskContext* ctx,
         HgiTextureHandle& texture,
         HdRenderBuffer* buffer);
-
-    class Hgi* _hgi;
 
     bool _converged;
 

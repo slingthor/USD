@@ -27,7 +27,6 @@
 
 #include "pxr/imaging/garch/contextCaps.h"
 #include "pxr/imaging/garch/resourceFactory.h"
-#include "pxr/imaging/glf/glContext.h"
 
 #include "pxr/imaging/hdSt/debugCodes.h"
 #include "pxr/imaging/hdSt/indirectDrawBatch.h"
@@ -40,8 +39,8 @@
 #include "pxr/imaging/hdSt/shaderCode.h"
 #include "pxr/imaging/hdSt/tokens.h"
 
-#include "pxr/imaging/hgi/graphicsEncoder.h"
-#include "pxr/imaging/hgi/graphicsEncoderDesc.h"
+#include "pxr/imaging/hgi/graphicsCmds.h"
+#include "pxr/imaging/hgi/graphicsCmdsDesc.h"
 #include "pxr/imaging/hgi/hgi.h"
 #include "pxr/imaging/hgi/tokens.h"
 
@@ -60,7 +59,7 @@
 #if defined(PXR_OPENGL_SUPPORT_ENABLED)
 // XXX We do not want to include specific HgiXX backends, but we need to do
 // this temporarily until Storm has transitioned fully to Hgi.
-#include "pxr/imaging/hgiGL/graphicsEncoder.h"
+#include "pxr/imaging/hgiGL/graphicsCmds.h"
 #endif
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -135,70 +134,75 @@ HdSt_RenderPass::_Execute(HdRenderPassStateSharedPtr const &renderPassState,
         GetRenderIndex()->GetResourceRegistry());
     TF_VERIFY(resourceRegistry);
 
-    // XXX Non-Hgi tasks expect default FB. Remove once all tasks use Hgi.
-    bool isOpenGL = HdStResourceFactory::GetInstance()->IsOpenGL();
-    int fb;
-    if (isOpenGL) {
-#if defined(PXR_OPENGL_SUPPORT_ENABLED)
-        glGetIntegerv(GL_FRAMEBUFFER_BINDING, &fb);
-#endif
-    }
+    // Create graphics work to render into aovs.
+    HgiGraphicsCmdsDesc desc = stRenderPassState->MakeGraphicsCmdsDesc();
+    HgiGraphicsCmdsUniquePtr gfxCmds = _hgi->CreateGraphicsCmds(desc);
 
-    // Create graphics encoder to render into Aovs.
-    HgiGraphicsEncoderDesc desc = stRenderPassState->MakeGraphicsEncoderDesc();
-    HgiGraphicsEncoderUniquePtr gfxEncoder = _hgi->CreateGraphicsEncoder(desc);
-
-    GfVec4i vp;
-
-    // XXX When there are no aovBindings we get a null encoder.
+    // XXX When there are no aovBindings we get a null work object.
     // This would ideally never happen, but currently happens for some
     // custom prims that spawn an imagingGLengine  with a task controller that
     // has no aovBindings.
  
-    if (gfxEncoder) {
-        gfxEncoder->PushDebugGroup(__ARCH_PRETTY_FUNCTION__);
+    if (gfxCmds) {
+        HdRprimCollection const &collection = GetRprimCollection();
+        std::string passName = "HdSt_RenderPass: " +
+            collection.GetMaterialTag().GetString();
+        gfxCmds->PushDebugGroup(passName.c_str());
 
-        // XXX The application may have directly called into glViewport.
-        // We need to remove the offset to avoid double offset when we composite
-        // the Aov back into the client framebuffer.
-        // E.g. UsdView CameraMask.
-        if (isOpenGL) {
-#if defined(PXR_OPENGL_SUPPORT_ENABLED)
-            glGetIntegerv(GL_VIEWPORT, vp.data());
-            GfVec4i aovViewport(0, 0, vp[2]+vp[0], vp[3]+vp[1]);
-            gfxEncoder->SetViewport(aovViewport);
-#endif
-        }
-        else {
+        if (!HdStResourceFactory::GetInstance()->IsOpenGL()) {
             MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
             // Set the render pass descriptor to use for the render encoders
             MTLRenderPassDescriptor* rpd = context->GetRenderPassDescriptor();
             MTLPixelFormat colorFormat = MTLPixelFormatInvalid;
             MTLPixelFormat depthFormat = MTLPixelFormatInvalid;
             size_t i;
+            bool resolve = !desc.colorResolveTextures.empty();
             for (i=0; i<desc.colorTextures.size(); i++) {
                 HgiMetalTexture *metalTexture =
                     static_cast<HgiMetalTexture*>(desc.colorTextures[i].Get());
                 rpd.colorAttachments[i].texture = metalTexture->GetTextureId();
                 colorFormat = rpd.colorAttachments[i].texture.pixelFormat;
+
+                if (resolve) {
+                    metalTexture =
+                        static_cast<HgiMetalTexture*>(desc.colorResolveTextures[i].Get());
+                    rpd.colorAttachments[i].resolveTexture = metalTexture->GetTextureId();
+                    rpd.colorAttachments[i].storeAction = MTLStoreActionMultisampleResolve;
+                }
+                else {
+                    rpd.colorAttachments[i].storeAction = MTLStoreActionStore;
+                }
             }
             while (i<8) {
-                rpd.colorAttachments[i++].texture = nil;
+                rpd.colorAttachments[i].texture = nil;
+                rpd.colorAttachments[i].resolveTexture = nil;
+                i++;
             }
             if (desc.depthTexture) {
                 HgiMetalTexture *metalTexture =
                     static_cast<HgiMetalTexture*>(desc.depthTexture.Get());
                 rpd.depthAttachment.texture = metalTexture->GetTextureId();
                 depthFormat = rpd.depthAttachment.texture.pixelFormat;
+                
+                if (resolve) {
+                    metalTexture =
+                        static_cast<HgiMetalTexture*>(desc.depthResolveTexture.Get());
+                    rpd.depthAttachment.resolveTexture = metalTexture->GetTextureId();
+                    rpd.depthAttachment.storeAction = MTLStoreActionMultisampleResolve;
+                }
+                else {
+                    rpd.depthAttachment.storeAction = MTLStoreActionStore;
+                }
             }
             else {
                 rpd.depthAttachment.texture = nil;
+                rpd.depthAttachment.resolveTexture = nil;
             }
             context->SetRenderPassDescriptor(rpd);
             context->SetOutputPixelFormats(colorFormat, depthFormat);
         }
     }
-    
+    /*
     // TEMPORARY - pending Mtlf integrating with HgiMetal
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
     if (!context->GetDrawTarget())
@@ -229,20 +233,20 @@ HdSt_RenderPass::_Execute(HdRenderPassStateSharedPtr const &renderPassState,
         context->SetRenderPassDescriptor(rpd);
         context->SetOutputPixelFormats(colorFormat, depthFormat);
     }
-
+*/
     // Draw
     HdStCommandBuffer* cmdBuffer = &_cmdBuffer;
 #if defined(PXR_OPENGL_SUPPORT_ENABLED)
-    HgiGLGraphicsEncoder* glGfxEncoder = 
-        dynamic_cast<HgiGLGraphicsEncoder*>(gfxEncoder.get());
+    HgiGLGraphicsCmds* glGfxCmds = 
+        dynamic_cast<HgiGLGraphicsCmds*>(gfxCmds.get());
 
-    if (gfxEncoder && glGfxEncoder) {
+    if (gfxCmds && glGfxCmds) {
         // XXX Tmp code path to allow non-hgi code to insert functions into
         // HgiGL ops-stack. Will be removed once Storms uses Hgi everywhere
         auto executeDrawOp = [cmdBuffer, stRenderPassState, resourceRegistry] {
             _ExecuteDraw(cmdBuffer, stRenderPassState, resourceRegistry);
         };
-        glGfxEncoder->InsertFunctionOp(executeDrawOp);
+        glGfxCmds->InsertFunctionOp(executeDrawOp);
     } else {
         _ExecuteDraw(cmdBuffer, stRenderPassState, resourceRegistry);
     }
@@ -250,22 +254,9 @@ HdSt_RenderPass::_Execute(HdRenderPassStateSharedPtr const &renderPassState,
     _ExecuteDraw(cmdBuffer, stRenderPassState, resourceRegistry);
 #endif
 
-    if (gfxEncoder) {
-        if (isOpenGL) {
-#if defined(PXR_OPENGL_SUPPORT_ENABLED)
-            gfxEncoder->SetViewport(vp);
-#endif
-        }
-
-        gfxEncoder->PopDebugGroup();
-        gfxEncoder->Commit();
-
-        if (isOpenGL) {
-#if defined(PXR_OPENGL_SUPPORT_ENABLED)
-            // XXX Non-Hgi tasks expect default FB. Remove once all tasks use Hgi.
-            glBindFramebuffer(GL_FRAMEBUFFER, fb);
-#endif
-        }
+    if (gfxCmds) {
+        gfxCmds->PopDebugGroup();
+        _hgi->SubmitCmds(gfxCmds.get(), 1);
     }
 }
 
@@ -400,10 +391,10 @@ HdSt_RenderPass::_Cull(
                 renderPassState);
             TF_VERIFY(stRenderPassState);
 
-            // Create graphics encoder to render into Aovs.
-            HgiGraphicsEncoderDesc desc = stRenderPassState->MakeGraphicsEncoderDesc();
             // Re-cull the command buffer.
-            _cmdBuffer.FrustumCull(renderPassState->GetCullMatrix(), desc.width, desc.height);
+            GfVec2f dimensions = stRenderPassState->GetAovDimensions();
+            _cmdBuffer.FrustumCull(renderPassState->GetCullMatrix(),
+                                   dimensions[0], dimensions[1]);
         }
 
         if (TfDebug::IsEnabled(HD_DRAWITEMS_CULLED)) {

@@ -87,13 +87,12 @@ HgiMetalTexture::HgiMetalTexture(HgiMetal *hgi, HgiTextureDesc const & desc)
         texDesc.textureType = MTLTextureType3D;
     }
 
-    // Temp pending removal of blit encoder to perform MSAA resolve
-//    if (desc.sampleCount > 1) {
-//        texDesc.sampleCount = desc.sampleCount;
-//        texDesc.textureType = MTLTextureType2DMultisample;
-//    }
+    if (desc.sampleCount > 1) {
+        texDesc.sampleCount = desc.sampleCount;
+        texDesc.textureType = MTLTextureType2DMultisample;
+    }
 
-    _textureId = [hgi->GetDevice() newTextureWithDescriptor:texDesc];
+    _textureId = [hgi->GetPrimaryDevice() newTextureWithDescriptor:texDesc];
     
     if (desc.initialData && desc.pixelsByteSize > 0) {
         TF_VERIFY(desc.mipLevels == 1, "Mipmap upload not implemented");

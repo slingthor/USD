@@ -99,7 +99,7 @@ HdStExtCompGpuComputationResource::Resolve()
     if (!_computeProgram || _shaderSourceHash != shaderSourceHash) {
         HdStShaderCodeSharedPtrVector shaders;
         shaders.push_back(_kernel);
-        boost::scoped_ptr<HdSt_CodeGen> codeGen(
+        std::unique_ptr<HdSt_CodeGen> codeGen(
             HdStResourceFactory::GetInstance()->NewCodeGen(shaders));
         // let resourcebinder resolve bindings and populate metadata
         // which is owned by codegen.

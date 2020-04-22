@@ -32,20 +32,22 @@
 #include "pxr/base/tf/token.h"
 #include "pxr/base/tf/stl.h"
 
-#include <boost/shared_ptr.hpp>
 #include <memory>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
 
 class HdStDrawItem;
-class HdStShaderCode;
-class HdResource;
+class HdStResource;
 
-using HdBufferResourceSharedPtr = std::shared_ptr<class HdBufferResource>;
-using HdBufferArrayRangeSharedPtr = std::shared_ptr<class HdBufferArrayRange>;
-using HdSt_ResourceBinderSharedPtr = std::shared_ptr<class HdSt_ResourceBinder>;
-using HdStProgramSharedPtr = std::shared_ptr<class HdStProgram>;
+using HdStBufferResourceSharedPtr =
+    std::shared_ptr<class HdStBufferResource>;
+using HdBufferArrayRangeSharedPtr =
+    std::shared_ptr<class HdBufferArrayRange>;
+using HdStProgramSharedPtr =
+    std::shared_ptr<class HdStProgram>;
+using HdSt_ResourceBinderSharedPtr =
+    std::shared_ptr<class HdSt_ResourceBinder>;
 
 using HdStShaderCodeSharedPtr = std::shared_ptr<class HdStShaderCode>;
 using HdStShaderCodeSharedPtrVector = std::vector<HdStShaderCodeSharedPtr>;
@@ -216,24 +218,6 @@ public:
         typedef std::map<HdBinding, ShaderParameterAccessor> ShaderParameterBinding;
 
         // -------------------------------------------------------------------
-        // for accessor with fallback value sampling a 3d texture at
-        // coordinates transformed by an associated matrix
-        // 
-        // The accessor will be named NAME (i.e., vec3 HdGet_NAME(vec3 p)) and
-        // will sample FIELDNAMETexture at the coordinate obtained by transforming
-        // p by FIELDNAMESamplineTransform. If FIELDNAMETexture does not exist,
-        // NAMEFallback is used.
-        struct FieldRedirectAccessor {
-            FieldRedirectAccessor() {}
-            FieldRedirectAccessor(TfToken const &name,
-                                  TfToken const &fieldName)
-                : name(name), fieldName(fieldName) {}
-            TfToken name;
-            TfToken fieldName;
-        };
-        typedef std::map<HdBinding, FieldRedirectAccessor> FieldRedirectBinding;
-
-        // -------------------------------------------------------------------
         // for specific buffer array (drawing coordinate, instance indices)
         struct BindingDeclaration {
             BindingDeclaration() {}
@@ -270,7 +254,6 @@ public:
         int instancerNumLevels;
 
         ShaderParameterBinding shaderParameterBinding;
-        FieldRedirectBinding fieldRedirectBinding;
 
         BindingDeclaration drawingCoord0Binding;
         BindingDeclaration drawingCoord1Binding;

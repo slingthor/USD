@@ -29,17 +29,12 @@
 #include "pxr/imaging/hio/glslfx.h"
 #include "pxr/base/tf/staticTokens.h"
 
-#include "pxr/imaging/hgi/graphicsEncoder.h"
-#include "pxr/imaging/hgi/graphicsEncoderDesc.h"
+#include "pxr/imaging/hgi/graphicsCmds.h"
+#include "pxr/imaging/hgi/graphicsCmdsDesc.h"
 #include "pxr/imaging/hgi/hgi.h"
 #include "pxr/imaging/hgi/tokens.h"
 
 #include <iostream>
-#if defined(PXR_OPENGL_SUPPORT_ENABLED)
-// XXX Remove includes when entire task is using Hgi. We do not want to refer
-// to any specific Hgi implementation.
-#include "pxr/imaging/hgiGL/pipeline.h"
-#endif
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -49,6 +44,7 @@ TF_DEFINE_PRIVATE_TOKENS(
     ((compositeFragmentNoDepth,      "CompositeFragmentNoDepth"))
     ((compositeFragmentWithDepth,    "CompositeFragmentWithDepth"))
     (fullscreenShader)
+    (color)
 );
 
 HdxFullscreenShader::HdxFullscreenShader(
@@ -89,9 +85,10 @@ HdxFullscreenShader::~HdxFullscreenShader()
         _hgi->DestroyBuffer(&_indexBuffer);
     }
 
-    for (auto& texture : _textures) {
-        _hgi->DestroyTexture(&texture.second);
-    }
+    // We don't own these textures
+//    for (auto& texture : _textures) {
+//        _hgi->DestroyTexture(&texture.second);
+//    }
 
     if (_shaderProgram) {
         _DestroyShaderProgram();
@@ -138,6 +135,7 @@ HdxFullscreenShader::SetProgram(
     fragDesc.debugName = technique.GetString();
     fragDesc.shaderStage = HgiShaderStageFragment;
     fragDesc.shaderCode = fsGlslfx.GetSource(technique);
+    TF_VERIFY(!fragDesc.shaderCode.empty());
     HgiShaderFunctionHandle fragFn = _hgi->CreateShaderFunction(fragDesc);
 
     // Setup the shader program
@@ -156,7 +154,7 @@ HdxFullscreenShader::SetProgram(
 }
 
 void
-HdxFullscreenShader::SetBuffer(
+HdxFullscreenShader::BindBuffer(
     HgiBufferHandle const& buffer,
     uint32_t bindingIndex)
 {
@@ -166,27 +164,6 @@ HdxFullscreenShader::SetBuffer(
 void
 HdxFullscreenShader::CreatePipeline(HgiPipelineDesc pipeDesc)
 {
-    if (pipeDesc.vertexBuffers.size() == 0) {
-        // Describe the default vertex buffer
-        HgiVertexAttributeDesc posAttr;
-        posAttr.format = HgiFormatFloat32Vec3;
-        posAttr.offset = 0;
-        posAttr.shaderBindLocation = 0;
-
-        HgiVertexAttributeDesc uvAttr;
-        uvAttr.format = HgiFormatFloat32Vec2;
-        uvAttr.offset = sizeof(float) * 4; // after posAttr
-        uvAttr.shaderBindLocation = 1;
-
-        HgiVertexBufferDesc vboDesc;
-        vboDesc.bindingIndex = 0;
-        vboDesc.vertexStride = sizeof(float) * 6; // pos, uv
-        vboDesc.vertexAttributes.push_back(posAttr);
-        vboDesc.vertexAttributes.push_back(uvAttr);
-
-        pipeDesc.vertexBuffers.emplace_back(std::move(vboDesc));
-    }
-
     // Pipeline not changed, abort.
     if (_pipeline && _pipeline.Get()->GetDescriptor() == pipeDesc) {
         return;
@@ -288,46 +265,23 @@ HdxFullscreenShader::_CreateBufferResources()
 }
 
 void
-HdxFullscreenShader::SetTexture(
-    TfToken const& name, 
-    int width, 
-    int height,
-    HdFormat format,
-    void *data)
+HdxFullscreenShader::BindTextures(
+    TfTokenVector const& names,
+    HgiTextureHandleVector const& textures)
 {
-    HD_TRACE_FUNCTION();
-    HF_MALLOC_TAG_FUNCTION();
-
-    if (width == 0 || height == 0 || data == nullptr) {
-        auto it = _textures.find(name);
-        if (it != _textures.end()) {
-            _hgi->DestroyTexture(&it->second);
-            _textures.erase(it);
-        }
+    if (!TF_VERIFY(names.size() == textures.size())) {
         return;
     }
 
-    size_t pixelByteSize = HdDataSizeOfFormat(format);
-
-    // If we already had the texture, destroy it since we have new pixels.
-    auto it = _textures.find(name);
-    if (it != _textures.end()) {
-        _hgi->DestroyTexture(&it->second);
+    for (size_t i=0; i<names.size(); i++) {
+        TfToken const& name = names[i];
+        HgiTextureHandle const& tex = textures[i];
+        if (tex) {
+            _textures[name] = tex;
+        } else {
+            _textures.erase(name);
+        }
     }
-
-    HgiTextureDesc texDesc;
-    texDesc.debugName = "HdxFullscreenShader texture " + name.GetString();
-    texDesc.dimensions = GfVec3i(width, height, 1);
-    texDesc.format = HdxHgiConversions::GetHgiFormat(format);
-    texDesc.initialData = data;
-    texDesc.layerCount = 1;
-    texDesc.mipLevels = 1;
-    texDesc.pixelsByteSize = width * height * pixelByteSize;
-    texDesc.sampleCount = HgiSampleCount1;
-    texDesc.usage = HgiTextureUsageBitsShaderRead;
-    HgiTextureHandle tex = _hgi->CreateTexture(texDesc);
-
-    _textures[name] = tex;
 }
 
 bool
@@ -394,10 +348,10 @@ HdxFullscreenShader::_CreateDefaultPipeline(
                            depthDst.Get()->GetDescriptor().format))) {
             return true;
         }
-             
+
         _hgi->DestroyPipeline(&_pipeline);
     }
-    
+
     _attachment0.blendEnabled = _blendingEnabled;
     _attachment0.loadOp = HgiAttachmentLoadOpDontCare;
     _attachment0.storeOp = HgiAttachmentStoreOpStore;
@@ -424,7 +378,7 @@ HdxFullscreenShader::_CreateDefaultPipeline(
     desc.shaderProgram = _shaderProgram;
     desc.colorAttachmentDescs.emplace_back(_attachment0);
     desc.depthAttachmentDesc = _depthAttachment;
-    
+
     // Describe the vertex buffer
     HgiVertexAttributeDesc posAttr;
     posAttr.format = HgiFormatFloat32Vec3;
@@ -486,16 +440,6 @@ void HdxFullscreenShader::SetFlipOnDraw(bool flip)
     _flipOnDraw = flip;
 }
 
-void 
-HdxFullscreenShader::Draw(
-    TextureMap const& textures,
-    HgiTextureHandle const& colorDst,
-    HgiTextureHandle const& depthDst)
-{
-    bool depthWrite = depthDst.Get() != nullptr;
-    _Draw(textures, colorDst, depthDst, depthWrite);
-}
-
 void
 HdxFullscreenShader::Draw(
     HgiTextureHandle const& colorDst,
@@ -511,7 +455,8 @@ HdxFullscreenShader::DrawToFramebuffer(TextureMap const& textures)
     // Destination textures are null since we are drawing into framebuffer.
     // depthWrite is true: we want to transfer depth from aov's to framebuffer.
     bool depthWrite = true;
-    _Draw(textures, HgiTextureHandle(), HgiTextureHandle(), depthWrite);
+    TextureMap const& texs = textures.empty() ? _textures : textures;
+    _Draw(texs, HgiTextureHandle(), HgiTextureHandle(), depthWrite);
 }
 
 void
@@ -560,7 +505,7 @@ HdxFullscreenShader::_Draw(
     // error out if 'colorDst' is not provided.
     HgiTextureHandle dimensionSrc = colorDst;
     if (!dimensionSrc) {
-        auto const& it = textures.find(TfToken("color"));
+        auto const& it = textures.find(_tokens->color);
         if (it != textures.end()) {
             dimensionSrc = it->second;
         }
@@ -573,17 +518,8 @@ HdxFullscreenShader::_Draw(
         TF_CODING_ERROR("Could not determine the backbuffer dimensions");
     }
 
-#if defined(PXR_OPENGL_SUPPORT_ENABLED)
-    // XXX Not everything is using Hgi yet, so we have inconsistent state
-    // management in opengl. Remove when Hgi transition is complete.
-    HgiGLPipeline* glPipeline = dynamic_cast<HgiGLPipeline*>(_pipeline.Get());
-    if (glPipeline) {
-        glPipeline->CaptureOpenGlState();
-    }
-#endif
-
-    // Prepare graphics encoder.
-    HgiGraphicsEncoderDesc gfxDesc;
+    // Prepare graphics cmds.
+    HgiGraphicsCmdsDesc gfxDesc;
     gfxDesc.width = dimensions[0];
     gfxDesc.height = dimensions[1];
 
@@ -598,32 +534,23 @@ HdxFullscreenShader::_Draw(
     }
 
     // Begin rendering
-    HgiGraphicsEncoderUniquePtr gfxEncoder =
-        _hgi->CreateGraphicsEncoder(gfxDesc);
-    gfxEncoder->PushDebugGroup(_debugName.c_str());
-    gfxEncoder->BindResources(_resourceBindings);
-    gfxEncoder->BindPipeline(_pipeline);
-    gfxEncoder->BindVertexBuffers(0, {_vertexBuffer}, {0});
+    HgiGraphicsCmdsUniquePtr gfxCmds = _hgi->CreateGraphicsCmds(gfxDesc);
+    gfxCmds->PushDebugGroup(_debugName.c_str());
+    gfxCmds->BindResources(_resourceBindings);
+    gfxCmds->BindPipeline(_pipeline);
+    gfxCmds->BindVertexBuffers(0, {_vertexBuffer}, {0});
     GfVec4i vp = GfVec4i(0, 0, dimensions[0], dimensions[1]);
-    gfxEncoder->SetViewport(vp);
+    gfxCmds->SetViewport(vp);
     if (_flipOnDraw) {
-        gfxEncoder->DrawIndexed(_indexBuffer, 3, 0, 3, 1, 0);
+        gfxCmds->DrawIndexed(_indexBuffer, 3, 0, 3, 1, 0);
     }
     else {
-        gfxEncoder->DrawIndexed(_indexBuffer, 3, 0, 0, 1, 0);
+        gfxCmds->DrawIndexed(_indexBuffer, 3, 0, 0, 1, 0);
     }
-    gfxEncoder->PopDebugGroup();
+    gfxCmds->PopDebugGroup();
 
     // Done recording commands, submit work.
-    gfxEncoder->Commit();
-
-#if defined(PXR_OPENGL_SUPPORT_ENABLED)
-    // XXX Not everything is using Hgi yet, so we have inconsistent state
-    // management in opengl. Remove when Hgi transition is complete.
-    if (glPipeline) {
-        glPipeline->RestoreOpenGlState();
-    }
-#endif
+    _hgi->SubmitCmds(gfxCmds.get(), 1);
 }
 
 void

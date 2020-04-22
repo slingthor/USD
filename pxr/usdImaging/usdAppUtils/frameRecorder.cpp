@@ -178,6 +178,8 @@ UsdAppUtilsFrameRecorder::Record(
     const GfFrustum frustum = gfCamera.GetFrustum();
     const GfVec3d cameraPos = frustum.GetPosition();
 
+    _imagingEngine.SetRendererAov(HdAovTokens->color);
+
     _imagingEngine.SetCameraState(
         frustum.ComputeViewMatrix(),
         frustum.ComputeProjectionMatrix());
@@ -212,6 +214,7 @@ UsdAppUtilsFrameRecorder::Record(
     renderParams.showProxy = _HasPurpose(_purposes, UsdGeomTokens->proxy);
     renderParams.showRender = _HasPurpose(_purposes, UsdGeomTokens->render);
     renderParams.showGuides = _HasPurpose(_purposes, UsdGeomTokens->guide);
+
 #if defined(ARCH_GFX_OPENGL)
     glEnable(GL_DEPTH_TEST);
 #endif

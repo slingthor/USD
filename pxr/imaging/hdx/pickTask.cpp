@@ -51,6 +51,8 @@
 #endif
 #include "pxr/imaging/glf/info.h"
 
+#include <boost/functional/hash.hpp>
+
 #include <iostream>
 
 PXR_NAMESPACE_OPEN_SCOPE

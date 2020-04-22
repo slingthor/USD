@@ -49,10 +49,10 @@ PXR_NAMESPACE_OPEN_SCOPE
 HdxOitRenderTask::HdxOitRenderTask(HdSceneDelegate* delegate, SdfPath const& id)
     : HdxRenderTask(delegate, id)
     , _oitTranslucentRenderPassShader(
-        HdStResourceFactory::GetInstance()->NewRenderPassShader(
+        std::make_shared<HdStRenderPassShader>(
             HdxPackageRenderPassOitShader()))
     , _oitOpaqueRenderPassShader(
-        HdStResourceFactory::GetInstance()->NewRenderPassShader(
+        std::make_shared<HdStRenderPassShader>(
             HdxPackageRenderPassOitOpaqueShader()))
     , _isOitEnabled(HdxOitBufferAccessor::IsOitEnabled())
 {
@@ -63,7 +63,7 @@ HdxOitRenderTask::~HdxOitRenderTask()
 }
 
 void
-HdxOitRenderTask::Sync(
+HdxOitRenderTask::_Sync(
     HdSceneDelegate* delegate,
     HdTaskContext* ctx,
     HdDirtyBits* dirtyBits)
@@ -72,7 +72,7 @@ HdxOitRenderTask::Sync(
     HF_MALLOC_TAG_FUNCTION();
 
     if (_isOitEnabled) {
-        HdxRenderTask::Sync(delegate, ctx, dirtyBits);
+        HdxRenderTask::_Sync(delegate, ctx, dirtyBits);
     }
 }
 

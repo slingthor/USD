@@ -167,7 +167,7 @@ void HdStRenderDelegateMetal::PrepareRender(
 
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
 
-    context->mtlSampleCount = params.sampleCount;
+//    context->mtlSampleCount = params.sampleCount;
 
     _renderOutput = params.renderOutput;
 

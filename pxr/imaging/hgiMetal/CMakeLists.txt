@@ -31,10 +31,10 @@ pxr_library(hgiMetal
         diagnostic
 
     PUBLIC_CLASSES
-        blitEncoder
+        blitCmds
         buffer
         capabilities
-        graphicsEncoder
+        graphicsCmds
         hgi
         pipeline
         resourceBindings

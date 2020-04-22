@@ -28,6 +28,7 @@
 
 #include "pxr/imaging/hgiMetal/hgi.h"
 #include "pxr/imaging/hgiMetal/capabilities.h"
+#include "pxr/imaging/hgi/texture.h"
 
 #import <simd/simd.h>
 #include <sys/time.h>
@@ -228,7 +229,7 @@ void MtlfMetalContext::Init()
     gsMaxDataPerBatch = 0;
     points = TfToken("points");
 
-    currentDevice = hgi->GetDevice();
+    currentDevice = hgi->GetPrimaryDevice();
 
 #if defined(METAL_ENABLE_STATS)
     NSLog(@"Selected %@ for Metal Device", currentDevice.name);
@@ -307,8 +308,6 @@ void MtlfMetalContext::Init()
     drawTarget = NULL;
     outputPixelFormat = MTLPixelFormatInvalid;
     outputDepthFormat = MTLPixelFormatInvalid;
-    
-    mtlSampleCount = 1;
     
 #if defined(METAL_ENABLE_STATS)
     resourceStats.commandBuffersCreated.store(0, std::memory_order_relaxed);
@@ -995,6 +994,14 @@ void MtlfMetalContext::SetRenderPipelineState()
         wq->currentColourAttachmentsHash = hashVal;
     }
     
+    int sampleCount = 1;
+    if (drawTarget) {
+        sampleCount = drawTarget->GetNumSamples();
+    }
+    else {
+        sampleCount = hgi->_sampleCount;
+    }
+    
     // Always call this because currently we're not tracking changes to its state
     size_t hashVal = 0;
     
@@ -1011,6 +1018,7 @@ void MtlfMetalContext::SetRenderPipelineState()
     boost::hash_combine(hashVal, blendState.sourceAlphaFactor);
     boost::hash_combine(hashVal, blendState.destColorFactor);
     boost::hash_combine(hashVal, blendState.destAlphaFactor);
+    boost::hash_combine(hashVal, sampleCount);
 
     // If this matches the current pipeline state then we should already have the correct pipeline bound
     if (hashVal == wq->currentRenderPipelineDescriptorHash && wq->currentRenderPipelineState != nil) {
@@ -1045,10 +1053,7 @@ void MtlfMetalContext::SetRenderPipelineState()
 
         // Create a new render pipeline state object
         renderPipelineStateDescriptor.label = @"SetRenderEncoderState";
-        if (drawTarget)
-            renderPipelineStateDescriptor.rasterSampleCount = drawTarget->GetNumSamples();
-        else
-            renderPipelineStateDescriptor.rasterSampleCount = mtlSampleCount;
+        renderPipelineStateDescriptor.rasterSampleCount = sampleCount;
         
         renderPipelineStateDescriptor.inputPrimitiveTopology = MTLPrimitiveTopologyClassUnspecified;
         

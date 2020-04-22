@@ -36,8 +36,6 @@
 #include "pxr/imaging/hgi/shaderProgram.h"
 #include "pxr/imaging/hgi/texture.h"
 
-#include <boost/shared_ptr.hpp>
-
 PXR_NAMESPACE_OPEN_SCOPE
 
 class Hgi;
@@ -50,17 +48,11 @@ class Hgi;
 ///
 class HdxFullscreenShader {
 public:
-    typedef std::map<TfToken, HgiTextureHandle> TextureMap;
-    typedef std::map<uint32_t, HgiBufferHandle> BufferMap;
-
-    /// Create a new fullscreen shader object. Creation of GPU resources is
-    /// deferred...
+    /// Create a new fullscreen shader object.
     /// 'debugName' is assigned to the fullscreen pass as gpu debug group that
     /// is helpful when inspecting the frame on a gpu debugger.
     HDX_API
-    HdxFullscreenShader(
-        Hgi* hgi,
-        std::string const& debugName);
+    HdxFullscreenShader(Hgi* hgi, std::string const& debugName);
 
     /// Destroy the fullscreen shader object, releasing GPU resources.
     HDX_API
@@ -81,28 +73,28 @@ public:
     /// This function can be used to bind buffers to a custom shader program.
     /// The lifetime of the buffer is managed by the caller. HdxFullscreenShader
     /// does not take ownership. To update values in the buffer, the client can
-    /// use a blitEncoder to copy new data into their buffer.
+    /// use a blitCmds to copy new data into their buffer.
     /// If an invalid 'buffer' is passed, the binding will be cleared.
     HDX_API
-    void SetBuffer(HgiBufferHandle const& buffer, uint32_t bindingIndex);
+    void BindBuffer(HgiBufferHandle const& buffer, uint32_t bindingIndex);
 
-    /// Upload a named texture with a given format. These textures will
-    /// be used by Draw() called with no arguments. If width == 0,
-    /// height == 0, or data == nullptr, the image is removed from the bindings.
-    ///   \param name The name of the texture (used to look up GLSL binding).
-    ///   \param width The width of the image.
-    ///   \param height The height of the image.
-    ///   \param format The data format. Currently supported are:
-    ///                 F32x4, F16x4, Unorm8x4, F32x1.
-    ///   \param data The image data to upload.
+    /// Bind (externally managed) textures to the shader program.
+    /// This function can be used to bind textures to a custom shader program.
+    /// The lifetime of textures is managed by the caller. HdxFullscreenShader
+    /// does not take ownership.
+    /// If an invalid 'texture' is passed, the binding will be cleared.
     HDX_API
-    void SetTexture(TfToken const& name, int width, int height,
-                    HdFormat format, void *data);
+    void BindTextures(
+        TfTokenVector const& names,
+        HgiTextureHandleVector const& textures);
 
-    /// Customize the pipeline state, such as setting the blend mode that will
-    /// by used when rendering the triangle. Note that the ShaderProgram and
-    /// ResourceBindings in the provided descriptor are ignored. Those are
-    /// internally managed based on SetProgram, SetBuffers and SetTextures.
+    /// By default HdxFullscreenShader creates a pipeline object that enables
+    /// depth testing and enables depth write if there is a depth texture.
+    /// This function allows you to override the pipeline state by providing
+    /// a custom pipeline descriptor.
+    /// Note that the ShaderProgram and ResourceBindings in the provided 
+    /// descriptor are ignored. Those are set via SetProgram, BindBuffer and
+    /// BindTextures.
     HDX_API
     void CreatePipeline(HgiPipelineDesc pipeDesc);
 
@@ -120,29 +112,29 @@ public:
     /// Flip the Y on draw
     HDX_API
     void SetFlipOnDraw(bool flip);
-    
+
     /// Draw the internal textures to the provided destination textures.
     /// `depth` is optional.
     HDX_API
     void Draw(HgiTextureHandle const& colorDst,
               HgiTextureHandle const& depthDst);
 
-    /// Draw the provided textures into the provided destination textures.
-    /// `depth` is optional.
-    HDX_API
-    void Draw(TextureMap const& textures, 
-              HgiTextureHandle const& colorDst,
-              HgiTextureHandle const& depthDst);
-
 protected:
+    // XXX We don't want tasks to use DrawToFramebuffer, but during hgi
+    // transition we need to make a few exceptions.
+    // This will be deprecated once HgiInterop is in place
     friend class HdxPresentTask;
+    friend class HdxColorizeTask;
+
+    using TextureMap = std::map<TfToken, HgiTextureHandle>;
+    using BufferMap = std::map<uint32_t, HgiBufferHandle>;
 
     /// Draw the internal textures to the global framebuffer.
     /// This API exists to help with Hgi transition to let the PresentTask
     /// Draw directly to the gl framebuffer. In the future this will be
     /// handled by HgiInterop.
     HDX_API
-    void DrawToFramebuffer(TextureMap const& textures);
+    void DrawToFramebuffer(TextureMap const& textures = TextureMap());
 
 private:
     HdxFullscreenShader() = delete;

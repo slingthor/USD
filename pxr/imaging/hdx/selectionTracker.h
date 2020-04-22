@@ -30,20 +30,16 @@
 #include "pxr/imaging/hd/selection.h"
 #include "pxr/base/vt/array.h"
 #include "pxr/usd/sdf/path.h"
-#include <boost/smart_ptr.hpp>
 #include <vector>
+#include <memory>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
 
 class HdRenderIndex;
-class TfToken;
-class SdfPath;
-class VtValue;
 
-typedef boost::shared_ptr<class HdxSelectionTracker> HdxSelectionTrackerSharedPtr;
-typedef boost::weak_ptr<class HdxSelectionTracker> HdxSelectionTrackerWeakPtr;
-
+using HdxSelectionTrackerSharedPtr =
+    std::shared_ptr<class HdxSelectionTracker>;
 
 /// ----------------------------------------------------------------------------
 /// Selection highlighting in Hydra:
@@ -117,8 +113,11 @@ public:
     /// uploaded to the GPU and decoded in the fragment shader to provide
     /// selection highlighting behavior. See HdxSelectionTask.
     /// Returns true if offsets has anything selected.
+    /// \p enableSelection is a global on/off switch for selection; if it's
+    /// false, nothing will be encoded.
     HDX_API
     virtual bool GetSelectionOffsetBuffer(HdRenderIndex const *index,
+                                          bool enableSelection,
                                           VtIntArray *offsets) const;
 
     HDX_API

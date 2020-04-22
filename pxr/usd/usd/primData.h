@@ -102,6 +102,11 @@ public:
         return _primTypeInfo->GetTypeName(); 
     }
 
+    /// Returns the full type info for the prim.
+    const UsdPrimTypeInfo &GetPrimTypeInfo() const {
+        return *_primTypeInfo;
+    }
+
     /// Return true if this prim is active, meaning neither it nor any of its
     /// ancestors have active=false.  Return false otherwise.
     bool IsActive() const { return _flags[Usd_PrimActiveFlag]; }
@@ -255,7 +260,7 @@ private:
     ~Usd_PrimData();
 
     // Compute and store type info and cached flags.
-    void _ComposeAndCacheTypeAndFlags(
+    void _ComposeAndCacheFlags(
         Usd_PrimDataConstPtr parent, bool isMasterPrim);
 
     // Flags direct access for Usd_PrimFlagsPredicate.
@@ -314,7 +319,7 @@ private:
     UsdStage *_stage;
     const PcpPrimIndex *_primIndex;
     SdfPath _path;
-    const Usd_PrimTypeInfo *_primTypeInfo;
+    const UsdPrimTypeInfo *_primTypeInfo;
     Usd_PrimData *_firstChild;
     TfPointerAndBits<Usd_PrimData> _nextSiblingOrParent;
     mutable std::atomic<int64_t> _refCount;

@@ -40,10 +40,10 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-
+using HdxRenderSetupTaskSharedPtr =
+    std::shared_ptr<class HdxRenderSetupTask>;
 using HdStRenderPassShaderSharedPtr =
     std::shared_ptr<class HdStRenderPassShader>;
-using HdxRenderSetupTaskSharedPtr = std::shared_ptr<class HdxRenderSetupTask>;
 using HdStShaderCodeSharedPtr = std::shared_ptr<class HdStShaderCode>;
 
 using HdRenderPassStateSharedPtr = std::shared_ptr<class HdRenderPassState>;

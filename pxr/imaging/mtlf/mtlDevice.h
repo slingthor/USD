@@ -434,8 +434,6 @@ public:
     
     GPUInstance gpus;
 
-    NSUInteger mtlSampleCount;
-    
     MTLF_API MetalWorkQueue& GetWorkQueue(MetalWorkQueueType workQueueType) {
         if (workQueueType == METALWORKQUEUE_DEFAULT)
             return threadState.workQueueDefault;
