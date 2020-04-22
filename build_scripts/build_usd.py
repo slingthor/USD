@@ -1487,16 +1487,14 @@ OPENIMAGEIO = Dependency("OpenImageIO", InstallOpenImageIO,
 
 ############################################################
 # OpenColorIO
-
-# Use v1.1.0 on MacOS and Windows since v1.0.9 doesn't build properly on
-# those platforms.
-if Linux():
-    OCIO_URL = "https://github.com/imageworks/OpenColorIO/archive/v1.0.9.zip"
-else:
-    OCIO_URL = "https://github.com/imageworks/OpenColorIO/archive/v1.1.0.zip"
-# OCIO_URL = "https://github.com/AcademySoftwareFoundation/OpenColorIO/archive/master.tar.gz"
+# For USD on mac, supply a version in the cache folder
+OCIO_URL = "ocio.zip"
 
 def InstallOpenColorIO(context, force, buildArgs):
+    globalDownloader = context.downloader
+    globalDownloaderName = context.downloaderName
+    context.downloader = DownloadFromCache
+    context.downloaderName = "cache"
     with CurrentWorkingDirectory(DownloadURL(OCIO_URL, context, force)):
         extraArgs = ['-DOCIO_BUILD_TRUELIGHT=OFF',
                      '-DOCIO_BUILD_APPS=OFF',
@@ -1525,7 +1523,7 @@ def InstallOpenColorIO(context, force, buildArgs):
         else:
             extraArgs.append('-DCMAKE_CXX_FLAGS=-w')
 
-        PatchFile("src/core/Config.cpp", 
+        PatchFile("src/OpenColorIO/Config.cpp",
                    [("cacheidnocontext_ = cacheidnocontext_;", 
                      "cacheidnocontext_ = rhs.cacheidnocontext_;")])
 
@@ -1536,6 +1534,9 @@ def InstallOpenColorIO(context, force, buildArgs):
         extraArgs += buildArgs
 
         RunCMake(context, force, extraArgs)
+        #Set downloader back to the global one
+        context.downloader = globalDownloader
+        context.downloaderName = globalDownloaderName
         return os.getcwd()
 
 OPENCOLORIO = Dependency("OpenColorIO", InstallOpenColorIO,
