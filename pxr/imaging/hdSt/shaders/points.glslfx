@@ -58,7 +58,7 @@ void main(void)
     ApplyClipPlanes(outData.Peye);
 
     // scale width following prman's behavior
-    vec4 w = vec4(transform * (HdGet_widths() * normalize(vec4(1,1,1,0)));
+    vec4 w = vec4(transform * (HdGet_widths() * normalize(vec4(1,1,1,0))));
     float width = length(w.xyz);
 
     // compute screenspace width
