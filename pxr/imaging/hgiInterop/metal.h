@@ -98,6 +98,7 @@ private:
         int32_t vertexSource,
         int32_t fragmentSource,
         ShaderContext &shader);
+    void _ValidateGLContext();
 
     id<MTLDevice>               _device;
 
@@ -124,6 +125,8 @@ private:
     uint32_t                    _glDepthTexture;
     
     ShaderContext               _shaderProgramContext[ShaderContextCount];
+    
+    NSOpenGLContext* _currentOpenGLContext;
 
     int32_t _restoreVao;
     int32_t _restoreVbo;

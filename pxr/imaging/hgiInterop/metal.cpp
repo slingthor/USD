@@ -105,10 +105,9 @@ static GLuint _compileShader(
         GLchar *errorLog = (GLchar*)malloc(maxLength);
         glGetShaderInfoLog(s, maxLength, &maxLength, errorLog);
         
-        TF_WARN("%s", errorLog);
+        TF_FATAL_CODING_ERROR("Failed to compile Metal/GL interop shader %s",
+                              errorLog);
         free(errorLog);
-        
-        assert(0);
     }
     
     return s;
@@ -123,7 +122,8 @@ static void _OutputShaderLog(GLint program) {
         GLchar *errorLog = (GLchar*)malloc(maxLength);
         glGetProgramInfoLog(program, maxLength, &maxLength, errorLog);
         
-        TF_FATAL_CODING_ERROR("%s", errorLog);
+        TF_FATAL_CODING_ERROR(
+            "Failed to link GL program for Metal/GL interop:\n%s", errorLog);
         free(errorLog);
     }
 }
@@ -161,8 +161,6 @@ void HgiInteropMetal::_CreateShaderContext(
     glBindBuffer(GL_ARRAY_BUFFER, shader.vbo);
 
     if (shader.vao) {
-        glBindVertexArray(shader.vao);
-                
         glEnableVertexAttribArray(shader.posAttrib);
         glVertexAttribPointer(shader.posAttrib,
                               2,
@@ -213,6 +211,8 @@ HgiInteropMetal::HgiInteropMetal(
     
     glewExperimental = true;
     glewInit();
+    
+    _currentOpenGLContext = [NSOpenGLContext currentContext];
     
     _ProcessGLErrors(true);
     _CaptureOpenGlState();
@@ -413,7 +413,10 @@ HgiInteropMetal::HgiInteropMetal(
     // Create the texture caches
     cvret = CVMetalTextureCacheCreate(
         kCFAllocatorDefault, nil, _device, nil, &_cvmtlTextureCache);
-    assert(cvret == kCVReturnSuccess);
+    if (cvret != kCVReturnSuccess) {
+        TF_FATAL_CODING_ERROR(
+            "Failed to create a Metal texture cache for Metal/GL interop");
+    }
 
     _cvmtlColorTexture = nil;
     _cvmtlDepthTexture = nil;
@@ -421,13 +424,16 @@ HgiInteropMetal::HgiInteropMetal(
     _mtlAliasedColorTexture = nil;
     _mtlAliasedDepthRegularFloatTexture = nil;
     
-    CGLContextObj glctx = [[NSOpenGLContext currentContext] CGLContextObj];
+    CGLContextObj glctx = [_currentOpenGLContext CGLContextObj];
     CGLPixelFormatObj glPixelFormat =
         [[[NSOpenGLContext currentContext] pixelFormat] CGLPixelFormatObj];
     cvret = CVOpenGLTextureCacheCreate(
         kCFAllocatorDefault, nil, (__bridge CGLContextObj _Nonnull)(glctx),
         glPixelFormat, nil, &_cvglTextureCache);
-    assert(cvret == kCVReturnSuccess);
+    if (cvret != kCVReturnSuccess) {
+        TF_FATAL_CODING_ERROR(
+            "Failed to create an OpenGL texture cache for Metal/GL interop");
+    }
     
     _pixelBuffer = nil;
     _depthBuffer = nil;
@@ -489,6 +495,15 @@ void HgiInteropMetal::_FreeTransientTextureCacheRefs()
     }
 }
 
+void HgiInteropMetal::_ValidateGLContext()
+{
+    if (_currentOpenGLContext != [NSOpenGLContext currentContext]) {
+        TF_FATAL_CODING_ERROR(
+            "Current OpenGL context does not match that when HgiInteropMetal "
+            "was created");
+    }
+}
+
 void HgiInteropMetal::SetAttachmentSize(int width, int height)
 {
     if (_mtlAliasedColorTexture != nil) {
@@ -497,11 +512,14 @@ void HgiInteropMetal::SetAttachmentSize(int width, int height)
             return;
         }
     }
+    
+    _ValidateGLContext();
+
     NSDictionary* cvBufferProperties = @{
         (__bridge NSString*)kCVPixelBufferOpenGLCompatibilityKey : @(TRUE),
         (__bridge NSString*)kCVPixelBufferMetalCompatibilityKey : @(TRUE),
     };
-
+    
     _FreeTransientTextureCacheRefs();
     
     CVReturn cvret;
@@ -521,7 +539,7 @@ void HgiInteropMetal::SetAttachmentSize(int width, int height)
         kCFAllocatorDefault,
         width,
         height,
-        kCVPixelFormatType_DepthFloat32,
+        kCVPixelFormatType_OneComponent32Float,
         (__bridge CFDictionaryRef)cvBufferProperties,
         &_depthBuffer);
     
@@ -532,16 +550,25 @@ void HgiInteropMetal::SetAttachmentSize(int width, int height)
         _pixelBuffer,
         nil,
         &_cvglColorTexture);
-    assert(cvret == kCVReturnSuccess);
+    if (cvret != kCVReturnSuccess) {
+        TF_FATAL_CODING_ERROR(
+            "Failed to create the shared OpenGL color texture "
+            "for Metal/GL interop");
+    }
     _glColorTexture = CVOpenGLTextureGetName(_cvglColorTexture);
     
     // Create the OpenGL texture for the depth buffer
-    cvret = CVOpenGLTextureCacheCreateTextureFromImage(kCFAllocatorDefault,
-                                                       _cvglTextureCache,
-                                                       _depthBuffer,
-                                                       nil,
-                                                       &_cvglDepthTexture);
-    assert(cvret == kCVReturnSuccess);
+    cvret = CVOpenGLTextureCacheCreateTextureFromImage(
+       kCFAllocatorDefault,
+       _cvglTextureCache,
+       _depthBuffer,
+       nil,
+       &_cvglDepthTexture);
+    if (cvret != kCVReturnSuccess) {
+        TF_FATAL_CODING_ERROR(
+            "Failed to create the shared OpenGL depth texture "
+            "for Metal/GL interop");
+    }
     _glDepthTexture = CVOpenGLTextureGetName(_cvglDepthTexture);
     
     // Create the metal texture for the color buffer
@@ -559,7 +586,11 @@ void HgiInteropMetal::SetAttachmentSize(int width, int height)
         height,
         0,
         &_cvmtlColorTexture);
-    assert(cvret == kCVReturnSuccess);
+    if (cvret != kCVReturnSuccess) {
+        TF_FATAL_CODING_ERROR(
+            "Failed to create the shared Metal color texture "
+            "for Metal/GL interop");
+    }
     _mtlAliasedColorTexture = CVMetalTextureGetTexture(_cvmtlColorTexture);
     
     // Create the Metal texture for the depth buffer
@@ -573,7 +604,11 @@ void HgiInteropMetal::SetAttachmentSize(int width, int height)
         height,
         0,
         &_cvmtlDepthTexture);
-    assert(cvret == kCVReturnSuccess);
+    if (cvret != kCVReturnSuccess) {
+        TF_FATAL_CODING_ERROR(
+            "Failed to create the shared Metal depth texture "
+            "for Metal/GL interop");
+    }
     _mtlAliasedDepthRegularFloatTexture =
         CVMetalTextureGetTexture(_cvmtlDepthTexture);
 
@@ -748,17 +783,16 @@ HgiInteropMetal::_BlitToOpenGL(bool flipY, int shaderIndex)
             shader.texAttrib, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex),
             (void*)(offsetof(Vertex, uv)));
     }
-    
+
+    GLint unit = 0;
+
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_RECTANGLE, _glColorTexture);
+    glUniform1i(shader.samplerColorLoc, unit++);
+
     if (shader.samplerDepthLoc != -1) {
         glActiveTexture(GL_TEXTURE1);
         glBindTexture(GL_TEXTURE_RECTANGLE, _glDepthTexture);
-    }
-    
-    GLint unit = 0;
-    glUniform1i(shader.samplerColorLoc, unit++);
-    if (shader.samplerDepthLoc != -1) {
         glUniform1i(shader.samplerDepthLoc, unit);
     }
 
@@ -784,6 +818,8 @@ HgiInteropMetal::CopyToInterop(
     id<MTLTexture> sourceDepthTexture,
     bool flipImage)
 {
+    _ValidateGLContext();
+
     HgiMetal* metalHgi = static_cast<HgiMetal*>(hgi);
     id<MTLCommandBuffer> commandBuffer = metalHgi->GetCommandBuffer();
     
