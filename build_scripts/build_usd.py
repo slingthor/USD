@@ -1796,6 +1796,7 @@ def InstallEmbree(context, force, buildArgs):
         extraArgs += buildArgs
 
         RunCMake(context, force, extraArgs)
+        return os.getcwd()
 
 EMBREE = Dependency("Embree", InstallEmbree, "include/embree3/rtcore.h")                  
 
