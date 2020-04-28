@@ -1773,8 +1773,10 @@ MATERIALX = Dependency("MaterialX", InstallMaterialX, "include/MaterialXCore/Lib
 
 ############################################################
 # Embree
-
-EMBREE_URL = "https://github.com/embree/embree/archive/v3.2.2.tar.gz"
+if MacOS():
+    EMBREE_URL = "https://github.com/embree/embree/archive/v3.7.0.tar.gz"
+else:
+    EMBREE_URL = "https://github.com/embree/embree/archive/v3.2.2.tar.gz"
 
 def InstallEmbree(context, force, buildArgs):
     with CurrentWorkingDirectory(DownloadURL(EMBREE_URL, context, force)):
