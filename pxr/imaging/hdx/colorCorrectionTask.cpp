@@ -233,17 +233,6 @@ HdxColorCorrectionTask::_CreateOpenColorIOResources()
         free(float4AdaptedLutValues);
         //for Metal we want to wrap OCIO in a class to adapt global scope texture to Metal texture passing interfaces
         //Assumption: Config always includes a LUT operation
-        std::stringstream shaderTextStream;
-        shaderTextStream << "struct OcioGenWrapper {" << std::endl;
-        shaderTextStream << ocioGeneratedShaderText;
-        shaderTextStream << "};" << std::endl;
-        shaderTextStream << "float4 callOcioDisplay(vec4 inPixel, texture3d<float> lut3d) {" << std::endl;
-        shaderTextStream << "OcioGenWrapper ocioGen;" << std::endl;
-        shaderTextStream << "ocioGen.ocio_lut3d_0 = lut3d;" << std::endl;
-        shaderTextStream << "return ocioGen.OCIODisplay(inPixel);" << std::endl;
-        shaderTextStream << "}" << std::endl;
-        
-        return shaderTextStream.str();
     #else
         return ocioGeneratedShaderText;
     #endif // PXR_METAL_SUPPORT_ENABLED
@@ -365,7 +354,7 @@ HdxColorCorrectionTask::_CreateShaderResources()
     fragDesc.shaderCode += glslfx.GetSource(_tokens->colorCorrectionFragment);
     if (useOCIO) {
         std::string ocioGpuShaderText = _CreateOpenColorIOResources();
-        fragDesc.shaderCode += ocioGpuShaderText;
+        fragDesc.shaderCode = ocioGpuShaderText + fragDesc.shaderCode;
     }
     HgiShaderFunctionHandle fragFn = _GetHgi()->CreateShaderFunction(fragDesc);
 
