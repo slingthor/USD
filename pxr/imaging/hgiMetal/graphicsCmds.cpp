@@ -41,6 +41,7 @@ HgiMetalGraphicsCmds::HgiMetalGraphicsCmds(
     : HgiGraphicsCmds()
     , _descriptor(desc)
     , _hgi(hgi)
+    , _hasWork(false)
 {
     TF_VERIFY(desc.width>0 && desc.height>0);
     TF_VERIFY(desc.colorTextures.size() == desc.colorAttachmentDescs.size());
@@ -153,7 +154,7 @@ HgiMetalGraphicsCmds::HgiMetalGraphicsCmds(
         }
     }
 
-    _encoder = [_hgi->GetCommandBuffer()
+    _encoder = [_hgi->GetCommandBuffer(false)
         renderCommandEncoderWithDescriptor:renderPassDescriptor];
     [renderPassDescriptor release];
 }
@@ -163,13 +164,15 @@ HgiMetalGraphicsCmds::~HgiMetalGraphicsCmds()
     TF_VERIFY(_encoder == nil, "Encoder created, but never commited.");
 }
 
-void
+bool
 HgiMetalGraphicsCmds::Commit()
 {
     if (_encoder) {
         [_encoder endEncoding];
         _encoder = nil;
     }
+    
+    return _hasWork;
 }
 
 void
@@ -257,6 +260,8 @@ HgiMetalGraphicsCmds::DrawIndexed(
                       instanceCount:instanceCount
                          baseVertex:vertexOffset
                        baseInstance:firstInstance];
+    
+    _hasWork = true;
 }
 
 void

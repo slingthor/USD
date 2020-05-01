@@ -115,9 +115,6 @@ HgiMetalPipeline::_CreateRenderPipelineState(id<MTLDevice> device)
         stateDesc.rasterizationEnabled = NO;
     }
 
-    MTLPixelFormat depthFormat = MTLPixelFormatInvalid;
-    stateDesc.depthAttachmentPixelFormat = depthFormat;
-
     // Color attachments
     for (size_t i=0; i<_descriptor.colorAttachmentDescs.size(); i++) {
         HgiAttachmentDesc const &hgiColorAttachment =
@@ -163,6 +160,10 @@ HgiMetalPipeline::_CreateRenderPipelineState(id<MTLDevice> device)
     stateDesc.depthAttachmentPixelFormat =
         HgiMetalConversions::GetPixelFormat(hgiDepthAttachment.format);
     
+//    if (stateDesc.depthAttachmentPixelFormat == MTLPixelFormatInvalid) {
+//        stateDesc.depthAttachmentPixelFormat = MTLPixelFormatDepth32Float;
+//    }
+
     if (_descriptor.multiSampleState.alphaToCoverageEnable) {
         stateDesc.alphaToCoverageEnabled = YES;
     }

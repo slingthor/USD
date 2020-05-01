@@ -79,7 +79,7 @@ public:
 
     HGIMETAL_API
     void PopDebugGroup() override;
-    
+        
     id<MTLRenderCommandEncoder> _encoder;
     HgiGraphicsCmdsDesc _descriptor;
 
@@ -92,7 +92,7 @@ protected:
         HgiGraphicsCmdsDesc const& desc);
     
     HGIMETAL_API
-    void Commit();
+    bool Commit();
     
 private:
     HgiMetalGraphicsCmds() = delete;
@@ -100,6 +100,7 @@ private:
     HgiMetalGraphicsCmds(const HgiMetalGraphicsCmds&) = delete;
 
     HgiMetal* _hgi;
+    bool _hasWork;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

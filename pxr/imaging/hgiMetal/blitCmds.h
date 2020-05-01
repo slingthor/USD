@@ -62,8 +62,8 @@ protected:
     HgiMetalBlitCmds(HgiMetal* hgi);
     
     HGIMETAL_API
-    void Commit();
-
+    bool Commit();
+    
 private:
     HgiMetalBlitCmds() = delete;
     HgiMetalBlitCmds & operator=(const HgiMetalBlitCmds&) = delete;

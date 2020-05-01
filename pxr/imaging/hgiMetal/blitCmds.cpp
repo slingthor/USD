@@ -57,13 +57,15 @@ HgiMetalBlitCmds::~HgiMetalBlitCmds()
     }
 }
 
-void
+bool
 HgiMetalBlitCmds::Commit()
 {
     if (_blitEncoder) {
         [_blitEncoder endEncoding];
         _blitEncoder = nil;
+        return true;
     }
+    return false;
 }
 
 void

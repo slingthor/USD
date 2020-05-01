@@ -15,7 +15,7 @@ FIND_LIBRARY(APPUIKIT_LIBRARY AppKit)
 endif()
 
 # Compile cpp files as obj-c++ to allow inline use of Metal API
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -x objective-c++")
+add_compile_options(-x objective-c++)
 
 pxr_library(hgiMetal
     LIBRARIES
