@@ -1491,25 +1491,21 @@ OPENIMAGEIO = Dependency("OpenImageIO", InstallOpenImageIO,
 # Use v1.1.0 on MacOS and Windows since v1.0.9 doesn't build properly on
 # those platforms.
 
-BUILD_OCIO_WITH_CACHE_ONLY = False
 OCIO_URL = None
-
-if not BUILD_OCIO_WITH_CACHE_ONLY:
-    if Linux():
-        OCIO_URL = "https://github.com/imageworks/OpenColorIO/archive/v1.0.9.zip"
-    else:
-        OCIO_URL = "https://github.com/imageworks/OpenColorIO/archive/v1.1.0.zip"
-    # OCIO_URL = "https://github.com/AcademySoftwareFoundation/OpenColorIO/archive/master.tar.gz"
+if Linux():
+    OCIO_URL = "https://github.com/imageworks/OpenColorIO/archive/v1.0.9.zip"
 else:
-    OCIO_URL = "ocio.zip"
+    OCIO_URL = "https://github.com/imageworks/OpenColorIO/archive/v1.1.0.zip"
 
 def InstallOpenColorIO(context, force, buildArgs):
-    if BUILD_OCIO_WITH_CACHE_ONLY:
+    forceBuildFromCache = context.buildOCIOCached
+    usedURL = "ocio.zip" if forceBuildFromCache else OCIO_URL
+    if forceBuildFromCache:
         globalDownloader = context.downloader
         globalDownloaderName = context.downloaderName
         context.downloader = DownloadFromCache
         context.downloaderName = "cache"
-    with CurrentWorkingDirectory(DownloadURL(OCIO_URL, context, force)):
+    with CurrentWorkingDirectory(DownloadURL(usedURL, context, force)):
         extraArgs = ['-DOCIO_BUILD_TRUELIGHT=OFF',
                      '-DOCIO_BUILD_APPS=OFF',
                      '-DOCIO_BUILD_NUKE=OFF',
@@ -1538,7 +1534,7 @@ def InstallOpenColorIO(context, force, buildArgs):
             extraArgs.append('-DCMAKE_CXX_FLAGS=-w')
         #if using version 2 of OCIO we patch a different config path as it resides elsewere
         cfgPath = None
-        if not BUILD_OCIO_WITH_CACHE_ONLY: 
+        if not forceBuildFromCache: 
             cfgPath = "src/core/Config.cpp"
         else:
             cfgPath = "src/OpenColorIO/Config.cpp"
@@ -1553,7 +1549,7 @@ def InstallOpenColorIO(context, force, buildArgs):
         extraArgs += buildArgs
 
         RunCMake(context, force, extraArgs)
-        if BUILD_OCIO_WITH_CACHE_ONLY:
+        if forceBuildFromCache:
             #Set downloader back to the global one
             context.downloader = globalDownloader
             context.downloaderName = globalDownloaderName
@@ -2208,6 +2204,9 @@ subgroup = group.add_mutually_exclusive_group()
 subgroup.add_argument("--opencolorio", dest="build_ocio", action="store_true", 
                       default=False,
                       help="Build OpenColorIO plugin for USD")
+subgroup.add_argument("--opencoloriocached", dest="build_ocio_cached", action="store_true", 
+                      default=False,
+                      help="Build OpenColorIO plugin for USD from cache")
 subgroup.add_argument("--no-opencolorio", dest="build_ocio", action="store_false",
                       help="Do not build OpenColorIO plugin for USD (default)")
 
@@ -2353,7 +2352,9 @@ class InstallContext:
                                if args.prman_location else None)                               
         self.buildOIIO = args.build_oiio
         self.buildOIIOTools = args.build_oiio_tools
-        self.buildOCIO = args.build_ocio
+        self.buildOCIO = args.build_ocio or args.build_ocio_cached
+        self.buildOCIOCached = args.build_ocio_cached
+
 
         # - Alembic Plugin
         self.buildAlembic = args.build_alembic
@@ -2647,7 +2648,7 @@ summaryMsg = summaryMsg.format(
     enablePtex=("On" if context.enablePtex else "Off"),
     enableOpenVDB=("On" if context.enableOpenVDB else "Off"),
     buildOIIO=("On" if context.buildOIIO else "Off"),
-    buildOCIO=("On" if context.buildOCIO else "Off"),
+    buildOCIO=("On" if (context.buildOCIO or context.buildOCIOCached) else "Off"),
     buildPrman=("On" if context.buildPrman else "Off"),
     buildUsdImaging=("On" if context.buildUsdImaging else "Off"),
     buildUsdview=("On" if context.buildUsdview else "Off"),
