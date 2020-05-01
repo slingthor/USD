@@ -42,7 +42,7 @@ HgiMetalCapabilities::HgiMetalCapabilities(id<MTLDevice> device)
         unifiedMemory = true;
     }
     else {
-#if defined(__MAC_10_15) && __MAC_OS_X_VERSION_MAX_ALLOWED >= __MAC_10_15
+#if defined(ARCH_OS_IOS) || (defined(__MAC_10_15) && __MAC_OS_X_VERSION_MAX_ALLOWED >= __MAC_10_15)
         unifiedMemory = [device hasUnifiedMemory];
 #else
         unifiedMemory = [device isLowPower];
