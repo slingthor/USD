@@ -21,8 +21,8 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#ifndef HGIMETAL_GRAPHICS_ENCODER_H
-#define HGIMETAL_GRAPHICS_ENCODER_H
+#ifndef PXR_IMAGING_HGI_METAL_GRAPHICS_ENCODER_H
+#define PXR_IMAGING_HGI_METAL_GRAPHICS_ENCODER_H
 
 #include "pxr/pxr.h"
 #include "pxr/base/gf/vec4i.h"

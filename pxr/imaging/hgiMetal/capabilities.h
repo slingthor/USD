@@ -21,8 +21,8 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#ifndef HDHGIMETAL_CAPABILITIES_H
-#define HDHGIMETAL_CAPABILITIES_H
+#ifndef PXR_IMAGING_HGI_METAL_CAPABILITIES_H
+#define PXR_IMAGING_HGI_METAL_CAPABILITIES_H
 
 #include <Metal/Metal.h>
 #include "pxr/pxr.h"

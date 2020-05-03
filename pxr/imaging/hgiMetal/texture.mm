@@ -1,5 +1,5 @@
 //
-// Copyright 2019 Pixar
+// Copyright 2020 Pixar
 //
 // Licensed under the Apache License, Version 2.0 (the "Apache License")
 // with the following modification; you may not use this file except in
@@ -22,8 +22,6 @@
 // language governing permissions and limitations under the Apache License.
 //
 #include <Metal/Metal.h>
-
-#include "pxr/base/arch/defines.h"
 
 #include "pxr/imaging/hgiMetal/hgi.h"
 #include "pxr/imaging/hgiMetal/diagnostic.h"
