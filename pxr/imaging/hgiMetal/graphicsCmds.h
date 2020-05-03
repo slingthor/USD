@@ -1,5 +1,5 @@
 //
-// Copyright 2019 Pixar
+// Copyright 2020 Pixar
 //
 // Licensed under the Apache License, Version 2.0 (the "Apache License")
 // with the following modification; you may not use this file except in
@@ -79,9 +79,6 @@ public:
 
     HGIMETAL_API
     void PopDebugGroup() override;
-        
-    id<MTLRenderCommandEncoder> _encoder;
-    HgiGraphicsCmdsDesc _descriptor;
 
 protected:
     friend class HgiMetal;
@@ -100,7 +97,9 @@ private:
     HgiMetalGraphicsCmds(const HgiMetalGraphicsCmds&) = delete;
 
     HgiMetal* _hgi;
-    bool _hasWork;
+    id<MTLRenderCommandEncoder> _encoder;
+    HgiGraphicsCmdsDesc _descriptor;
+	bool _hasWork;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

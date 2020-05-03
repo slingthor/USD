@@ -169,6 +169,130 @@ _GetPackedTypeDefinitions()
 
 }
 
+static std::string
+_ComputeHeader(id<MTLDevice> device)
+{
+    static std::stringstream header;
+
+    // Metal feature set defines
+    // Define all macOS 10.13 feature set enums onwards
+    if (@available(macos 10.13, ios 100.100, *)) {
+        header  << "#define ARCH_OS_MACOS\n";
+        if ([device supportsFeatureSet:MTLFeatureSet(10003)])
+            header << "#define METAL_FEATURESET_MACOS_GPUFAMILY1_v3\n";
+    }
+    if (@available(macos 10.14, ios 100.100, *)) {
+        if ([device supportsFeatureSet:MTLFeatureSet(10004)])
+            header << "#define METAL_FEATURESET_MACOS_GPUFAMILY1_v4\n";
+    }
+    if (@available(macos 10.14, ios 100.100, *)) {
+        if ([device supportsFeatureSet:MTLFeatureSet(10005)])
+            header << "#define METAL_FEATURESET_MACOS_GPUFAMILY2_v1\n";
+    }
+
+    if (@available(macos 100.100, ios 12.0, *)) {
+        header  << "#define ARCH_OS_IOS\n";
+        // Define all iOS 12 feature set enums onwards
+        if ([device supportsFeatureSet:MTLFeatureSet(12)])
+            header << "#define METAL_FEATURESET_IOS_GPUFAMILY1_v5\n";
+    }
+    if (@available(macos 100.100, ios 12.0, *)) {
+        if ([device supportsFeatureSet:MTLFeatureSet(12)])
+            header << "#define METAL_FEATURESET_IOS_GPUFAMILY2_v5\n";
+    }
+    if (@available(macos 100.100, ios 12.0, *)) {
+        if ([device supportsFeatureSet:MTLFeatureSet(13)])
+            header << "#define METAL_FEATURESET_IOS_GPUFAMILY3_v4\n";
+    }
+    if (@available(macos 100.100, ios 12.0, *)) {
+        if ([device supportsFeatureSet:MTLFeatureSet(14)])
+            header << "#define METAL_FEATURESET_IOS_GPUFAMILY4_v2\n";
+    }
+
+    header  << "#include <metal_stdlib>\n"
+            << "#include <simd/simd.h>\n"
+            << "#include <metal_pack>\n"
+            << "using namespace metal;\n";
+    
+    header  << "#define double float\n"
+            << "#define vec2 float2\n"
+            << "#define vec3 float3\n"
+            << "#define vec4 float4\n"
+            << "#define mat3 float3x3\n"
+            << "#define mat4 float4x4\n"
+            << "#define ivec2 int2\n"
+            << "#define ivec3 int3\n"
+            << "#define ivec4 int4\n"
+            << "#define bvec2 bool2\n"
+            << "#define bvec3 bool3\n"
+            << "#define bvec4 bool4\n"
+            << "#define dvec2 float2\n"
+            << "#define dvec3 float3\n"
+            << "#define dvec4 float4\n"
+            << "#define dmat3 float3x3\n"
+            << "#define dmat4 float4x4\n";
+    
+    // XXX: this macro is still used in GlobalUniform.
+    header  << "#define MAT4 mat4\n";
+    
+    // a trick to tightly pack vec3 into SSBO/UBO.
+    header  << _GetPackedTypeDefinitions();
+    
+    header  << "#define in /*in*/\n"
+            << "#define discard discard_fragment();\n"
+            << "#define radians(d) (d * 0.01745329252)\n"
+            << "#define noperspective /*center_no_perspective MTL_FIXME*/\n"
+            << "#define greaterThan(a,b) (a > b)\n"
+            << "#define lessThan(a,b)    (a < b)\n"
+            << "#define dFdx    dfdx\n"
+            << "#define dFdy    dfdy\n";
+    
+    // wrapper for type float and int to deal with .x accessors and the
+    // like that are valid in GLSL
+    header  << "struct wrapped_float {\n"
+            << "    union {\n"
+            << "        float x;\n"
+            << "        float xx;\n"
+            << "        float xxx;\n"
+            << "        float xxxx;\n"
+            << "        float r;\n"
+            << "        float rr;\n"
+            << "        float rrr;\n"
+            << "        float rrrr;\n"
+            << "    };\n"
+            << "    wrapped_float(float _x) { x = _x;}\n"
+            << "    operator float () {\n"
+            << "        return x;\n"
+            << "    }\n"
+            << "};\n";
+    
+    header  << "struct wrapped_int {\n"
+            << "    union {\n"
+            << "        int x;\n"
+            << "        int xx;\n"
+            << "        int xxx;\n"
+            << "        int xxxx;\n"
+            << "        int r;\n"
+            << "        int rr;\n"
+            << "        int rrr;\n"
+            << "        int rrrr;\n"
+            << "    };\n"
+            << "    wrapped_int(int _x) { x = _x;}\n"
+            << "    operator int () {\n"
+            << "        return x;\n"
+            << "    }\n"
+            << "};\n";
+
+    return header.str();
+}
+
+static std::string const&
+_GetHeader(id<MTLDevice> device)
+{
+    static std::string header = _ComputeHeader(device);
+    return header;
+}
+
 HgiMetalShaderFunction::HgiMetalShaderFunction(
     HgiMetal *hgi,
     HgiShaderFunctionDesc const& desc)
@@ -176,122 +300,8 @@ HgiMetalShaderFunction::HgiMetalShaderFunction(
     , _shaderId(nil)
 {
     id<MTLDevice> device = hgi->GetPrimaryDevice();
-    
-    static std::stringstream header;
-    static std::once_flag versionOnce;
-    std::call_once(versionOnce, [device](){
-        header.str("");
-        // Metal feature set defines
-        // Define all macOS 10.13 feature set enums onwards
-        if (@available(macos 10.13, ios 100.100, *)) {
-            header  << "#define ARCH_OS_MACOS\n";
-            if ([device supportsFeatureSet:MTLFeatureSet(10003)])
-                header << "#define METAL_FEATURESET_MACOS_GPUFAMILY1_v3\n";
-        }
-        if (@available(macos 10.14, ios 100.100, *)) {
-            if ([device supportsFeatureSet:MTLFeatureSet(10004)])
-                header << "#define METAL_FEATURESET_MACOS_GPUFAMILY1_v4\n";
-        }
-        if (@available(macos 10.14, ios 100.100, *)) {
-            if ([device supportsFeatureSet:MTLFeatureSet(10005)])
-                header << "#define METAL_FEATURESET_MACOS_GPUFAMILY2_v1\n";
-        }
 
-        if (@available(macos 100.100, ios 12.0, *)) {
-            header  << "#define ARCH_OS_IOS\n";
-            // Define all iOS 12 feature set enums onwards
-            if ([device supportsFeatureSet:MTLFeatureSet(12)])
-                header << "#define METAL_FEATURESET_IOS_GPUFAMILY1_v5\n";
-        }
-        if (@available(macos 100.100, ios 12.0, *)) {
-            if ([device supportsFeatureSet:MTLFeatureSet(12)])
-                header << "#define METAL_FEATURESET_IOS_GPUFAMILY2_v5\n";
-        }
-        if (@available(macos 100.100, ios 12.0, *)) {
-            if ([device supportsFeatureSet:MTLFeatureSet(13)])
-                header << "#define METAL_FEATURESET_IOS_GPUFAMILY3_v4\n";
-        }
-        if (@available(macos 100.100, ios 12.0, *)) {
-            if ([device supportsFeatureSet:MTLFeatureSet(14)])
-                header << "#define METAL_FEATURESET_IOS_GPUFAMILY4_v2\n";
-        }
-
-        header  << "#include <metal_stdlib>\n"
-                << "#include <simd/simd.h>\n"
-                << "#include <metal_pack>\n"
-                << "using namespace metal;\n";
-        
-        header  << "#define double float\n"
-                << "#define vec2 float2\n"
-                << "#define vec3 float3\n"
-                << "#define vec4 float4\n"
-                << "#define mat3 float3x3\n"
-                << "#define mat4 float4x4\n"
-                << "#define ivec2 int2\n"
-                << "#define ivec3 int3\n"
-                << "#define ivec4 int4\n"
-                << "#define bvec2 bool2\n"
-                << "#define bvec3 bool3\n"
-                << "#define bvec4 bool4\n"
-                << "#define dvec2 float2\n"
-                << "#define dvec3 float3\n"
-                << "#define dvec4 float4\n"
-                << "#define dmat3 float3x3\n"
-                << "#define dmat4 float4x4\n";
-        
-        // XXX: this macro is still used in GlobalUniform.
-        header  << "#define MAT4 mat4\n";
-        
-        // a trick to tightly pack vec3 into SSBO/UBO.
-        header  << _GetPackedTypeDefinitions();
-        
-        header  << "#define in /*in*/\n"
-                << "#define discard discard_fragment();\n"
-                << "#define radians(d) (d * 0.01745329252)\n"
-                << "#define noperspective /*center_no_perspective MTL_FIXME*/\n"
-                << "#define greaterThan(a,b) (a > b)\n"
-                << "#define lessThan(a,b)    (a < b)\n"
-                << "#define dFdx    dfdx\n"
-                << "#define dFdy    dfdy\n";
-        
-        // wrapper for type float and int to deal with .x accessors and the
-        // like that are valid in GLSL
-        header  << "struct wrapped_float {\n"
-                << "    union {\n"
-                << "        float x;\n"
-                << "        float xx;\n"
-                << "        float xxx;\n"
-                << "        float xxxx;\n"
-                << "        float r;\n"
-                << "        float rr;\n"
-                << "        float rrr;\n"
-                << "        float rrrr;\n"
-                << "    };\n"
-                << "    wrapped_float(float _x) { x = _x;}\n"
-                << "    operator float () {\n"
-                << "        return x;\n"
-                << "    }\n"
-                << "};\n";
-        
-        header  << "struct wrapped_int {\n"
-                << "    union {\n"
-                << "        int x;\n"
-                << "        int xx;\n"
-                << "        int xxx;\n"
-                << "        int xxxx;\n"
-                << "        int r;\n"
-                << "        int rr;\n"
-                << "        int rrr;\n"
-                << "        int rrrr;\n"
-                << "    };\n"
-                << "    wrapped_int(int _x) { x = _x;}\n"
-                << "    operator int () {\n"
-                << "        return x;\n"
-                << "    }\n"
-                << "};\n";
-    });
-
-    std::string source = header.str() + desc.shaderCode;
+    std::string source = _GetHeader(device) + desc.shaderCode;
 
     MTLCompileOptions *options = [[MTLCompileOptions alloc] init];
     options.fastMathEnabled = YES;

@@ -42,7 +42,7 @@ class HgiMetal;
 class HgiMetalShaderFunction final : public HgiShaderFunction {
 public:
     HGIMETAL_API
-    virtual ~HgiMetalShaderFunction();
+    ~HgiMetalShaderFunction() override;
 
     HGIMETAL_API
     bool IsValid() const override;

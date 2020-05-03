@@ -33,7 +33,6 @@ HgiMetalResourceBindings::HgiMetalResourceBindings(
     HgiResourceBindingsDesc const& desc)
     : HgiResourceBindings(desc)
 {
-    MTLVertexDescriptor *_vertexDescriptor;
 }
 
 HgiMetalResourceBindings::~HgiMetalResourceBindings()

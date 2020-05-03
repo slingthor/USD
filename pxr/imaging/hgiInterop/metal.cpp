@@ -754,9 +754,6 @@ HgiInteropMetal::_RestoreOpenGlState()
 void
 HgiInteropMetal::_BlitToOpenGL(bool flipY, int shaderIndex)
 {
-    CVOpenGLTextureCacheFlush(_cvglTextureCache, 0);
-    CVMetalTextureCacheFlush(_cvmtlTextureCache, 0);
-
     // Clear GL error state
     _ProcessGLErrors(true);
 

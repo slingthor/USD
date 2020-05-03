@@ -63,9 +63,9 @@ HgiMetalTexture::HgiMetalTexture(HgiMetal *hgi, HgiTextureDesc const & desc)
         usage |= MTLTextureUsageShaderWrite;
     }
 
-    size_t width = desc.dimensions[0];
-    size_t height = desc.dimensions[1];
-    size_t depth = desc.dimensions[2];
+    const size_t width = desc.dimensions[0];
+    const size_t height = desc.dimensions[1];
+    const size_t depth = desc.dimensions[2];
     
     MTLTextureDescriptor* texDesc;
     
@@ -96,7 +96,7 @@ HgiMetalTexture::HgiMetalTexture(HgiMetal *hgi, HgiTextureDesc const & desc)
     
     if (desc.initialData && desc.pixelsByteSize > 0) {
         TF_VERIFY(desc.mipLevels == 1, "Mipmap upload not implemented");
-        if(depth < 1) {
+        if(depth <= 1) {
             [_textureId replaceRegion:MTLRegionMake2D(0, 0, width, height)
                             mipmapLevel:0
                               withBytes:desc.initialData

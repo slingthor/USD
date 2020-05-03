@@ -48,7 +48,7 @@ public:
     HgiMetalPipeline(HgiMetal *hgi, HgiPipelineDesc const& desc);
 
     HGIMETAL_API
-    virtual ~HgiMetalPipeline();
+    ~HgiMetalPipeline() override;
 
     /// Apply pipeline state
     HGIMETAL_API

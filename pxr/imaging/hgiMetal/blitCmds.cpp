@@ -1,5 +1,5 @@
 //
-// Copyright 2019 Pixar
+// Copyright 2020 Pixar
 //
 // Licensed under the Apache License, Version 2.0 (the "Apache License")
 // with the following modification; you may not use this file except in
@@ -44,7 +44,6 @@ HgiMetalBlitCmds::HgiMetalBlitCmds(
     , _blitEncoder(nil)
     , _label(nil)
 {
-    id<MTLDevice> device = _hgi->GetPrimaryDevice();
 }
 
 HgiMetalBlitCmds::~HgiMetalBlitCmds()
@@ -54,6 +53,19 @@ HgiMetalBlitCmds::~HgiMetalBlitCmds()
     if (_label) {
         [_label release];
         _label = nil;
+    }
+}
+
+void
+HgiMetalBlitCmds::_CreateEncoder()
+{
+    if (!_blitEncoder) {
+        _blitEncoder = [_hgi->GetCommandBuffer() blitCommandEncoder];
+        if (_label) {
+            if (HgiMetalDebugEnabled()) {
+                _blitEncoder.label = _label;
+            }
+        }
     }
 }
 
@@ -89,7 +101,7 @@ HgiMetalBlitCmds::CopyTextureGpuToCpu(
     HgiTextureGpuToCpuOp const& copyOp)
 {
     HgiTextureHandle texHandle = copyOp.gpuSourceTexture;
-    HgiMetalTexture* srcTexture = static_cast<HgiMetalTexture*>(texHandle.Get());
+    HgiMetalTexture* srcTexture =static_cast<HgiMetalTexture*>(texHandle.Get());
 
     if (!TF_VERIFY(srcTexture && srcTexture->GetTextureId(),
         "Invalid texture handle")) {
@@ -143,14 +155,8 @@ HgiMetalBlitCmds::CopyTextureGpuToCpu(
     
     MTLBlitOption blitOptions = MTLBlitOptionNone;
 
-    if (!_blitEncoder) {
-        _blitEncoder = [_hgi->GetCommandBuffer() blitCommandEncoder];
-        if (_label) {
-            if (HgiMetalDebugEnabled()) {
-                _blitEncoder.label = _label;
-            }
-        }
-    }
+    _CreateEncoder();
+
     [_blitEncoder copyFromTexture:srcTexture->GetTextureId()
                       sourceSlice:0
                       sourceLevel:copyOp.startLayer
@@ -165,7 +171,8 @@ HgiMetalBlitCmds::CopyTextureGpuToCpu(
                           options:blitOptions];
 
     if (@available(macOS 10.11, ios 100.100, *)) {
-        [_blitEncoder performSelector:@selector(synchronizeResource:) withObject:cpuBuffer];
+        [_blitEncoder performSelector:@selector(synchronizeResource:)
+                           withObject:cpuBuffer];
     }
     memcpy(copyOp.cpuDestinationBuffer,
         [cpuBuffer contents], copyOp.destinationBufferByteSize);
@@ -194,7 +201,8 @@ void HgiMetalBlitCmds::CopyBufferCpuToGpu(
     uint8_t *dst = static_cast<uint8_t*>([metalBuffer->GetBufferId() contents]);
     memcpy(dst + dstOffset, src, copyOp.byteSize);
 
-    if([metalBuffer->GetBufferId() respondsToSelector:@selector(didModifyRange:)]) {
+    if([metalBuffer->GetBufferId()
+            respondsToSelector:@selector(didModifyRange:)]) {
         NSRange range = NSMakeRange(dstOffset, copyOp.byteSize);
         id<MTLResource> resource = metalBuffer->GetBufferId();
         
@@ -202,6 +210,17 @@ void HgiMetalBlitCmds::CopyBufferCpuToGpu(
         ARCH_PRAGMA_INSTANCE_METHOD_NOT_FOUND
         [resource didModifyRange:range];
         ARCH_PRAGMA_POP
+    }
+}
+
+void
+HgiMetalBlitCmds::GenerateMipMaps(HgiTextureHandle const& texture)
+{
+    HgiMetalTexture* metalTex = static_cast<HgiMetalTexture*>(texture.Get());
+    if (metalTex) {
+        _CreateEncoder();
+        
+        [_blitEncoder generateMipmapsForTexture:metalTex->GetTextureId()];
     }
 }
 

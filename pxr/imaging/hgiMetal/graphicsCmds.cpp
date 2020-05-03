@@ -1,5 +1,5 @@
 //
-// Copyright 2019 Pixar
+// Copyright 2020 Pixar
 //
 // Licensed under the Apache License, Version 2.0 (the "Apache License")
 // with the following modification; you may not use this file except in
@@ -39,9 +39,8 @@ HgiMetalGraphicsCmds::HgiMetalGraphicsCmds(
     HgiMetal* hgi,
     HgiGraphicsCmdsDesc const& desc)
     : HgiGraphicsCmds()
-    , _descriptor(desc)
     , _hgi(hgi)
-    , _hasWork(false)
+    , _descriptor(desc)
 {
     TF_VERIFY(desc.width>0 && desc.height>0);
     TF_VERIFY(desc.colorTextures.size() == desc.colorAttachmentDescs.size());

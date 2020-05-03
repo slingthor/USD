@@ -1,5 +1,5 @@
 //
-// Copyright 2019 Pixar
+// Copyright 2020 Pixar
 //
 // Licensed under the Apache License, Version 2.0 (the "Apache License")
 // with the following modification; you may not use this file except in
@@ -55,6 +55,9 @@ public:
     HGIMETAL_API
     void CopyBufferCpuToGpu(HgiBufferCpuToGpuOp const& copyOp) override;
 
+    HGIMETAL_API
+    void GenerateMipMaps(HgiTextureHandle const& texture) override;
+
 protected:
     friend class HgiMetal;
 
@@ -69,6 +72,8 @@ private:
     HgiMetalBlitCmds & operator=(const HgiMetalBlitCmds&) = delete;
     HgiMetalBlitCmds(const HgiMetalBlitCmds&) = delete;
 
+    void _CreateEncoder();
+    
     HgiMetal* _hgi;
     id<MTLBlitCommandEncoder> _blitEncoder;
     NSString* _label;

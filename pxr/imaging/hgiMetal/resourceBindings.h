@@ -46,7 +46,7 @@ public:
     HgiMetalResourceBindings(HgiResourceBindingsDesc const& desc);
 
     HGIMETAL_API
-    virtual ~HgiMetalResourceBindings();
+    ~HgiMetalResourceBindings() override;
 
     /// Binds the resources to GPU.
     HGIMETAL_API

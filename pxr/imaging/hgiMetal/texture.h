@@ -46,7 +46,7 @@ public:
                     HgiTextureDesc const & desc);
 
     HGIMETAL_API
-    virtual ~HgiMetalTexture();
+    ~HgiMetalTexture() override;
 
     id<MTLTexture> GetTextureId() const {return _textureId;}
 

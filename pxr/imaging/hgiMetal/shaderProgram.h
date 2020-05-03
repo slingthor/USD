@@ -44,7 +44,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 class HgiMetalShaderProgram final : public HgiShaderProgram {
 public:
     HGIMETAL_API
-    virtual ~HgiMetalShaderProgram();
+    ~HgiMetalShaderProgram() override;
 
     HGIMETAL_API
     bool IsValid() const override;

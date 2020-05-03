@@ -183,6 +183,7 @@ struct Interpolated {
     float2 uv;
 };
 
+
 #define EPSILON 0.0001
 #define LARGE 100000
 
@@ -288,7 +289,7 @@ fragment vec4 fragmentEntryPoint(
     vec4 color = colorIn.sample(texSampler, input.uv);
     bool isInside = color.r > EPSILON || color.g > EPSILON || color.b > EPSILON;
 
-    if (buffer->enableOutline == 0) { 
+    if (buffer->enableOutline==0) { 
         if (isInside) {
             // Inside the highlighted areas in colorIn : render colorIn.
             gl_FragColor = color;

@@ -502,7 +502,7 @@ HdxColorCorrectionTask::_CreatePipeline(HgiTextureHandle const& aovTexture)
     
     // Setup attachment descriptor
     _attachment0.blendEnabled = false;
-    _attachment0.loadOp = HgiAttachmentLoadOpLoad;
+    _attachment0.loadOp = HgiAttachmentLoadOpDontCare;
     _attachment0.storeOp = HgiAttachmentStoreOpStore;
     _attachment0.format = aovTexture->GetDescriptor().format;
     desc.colorAttachmentDescs.emplace_back(_attachment0);

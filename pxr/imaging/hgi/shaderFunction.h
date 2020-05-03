@@ -57,7 +57,6 @@ struct HgiShaderFunctionDesc
 
     std::string debugName;
     HgiShaderStage shaderStage;
-    uint32_t languageVersion;
     std::string shaderCode;
 };
 
