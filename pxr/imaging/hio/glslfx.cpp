@@ -214,8 +214,10 @@ HioGlslfx::HioGlslfx() :
     // do nothing
 }
 
-HioGlslfx::HioGlslfx(string const & filePath, string const *technique) :
-    _technique(technique), _valid(true), _hash(0)
+HioGlslfx::HioGlslfx(string const & filePath, TfToken const & technique)
+    : _technique(technique)
+    , _valid(true)
+    , _hash(0)
 {
     // Resolve with the containingFile set to the current working directory
     // with a trailing slash. This ensures that relative paths supplied to the
@@ -245,10 +247,11 @@ HioGlslfx::HioGlslfx(string const & filePath, string const *technique) :
     }
 }
 
-HioGlslfx::HioGlslfx(istream &is) :
-    _globalContext("istream"),
-    _technique(nullptr),
-    _valid(true), _hash(0)
+HioGlslfx::HioGlslfx(istream &is, TfToken const & technique)
+    : _globalContext("istream")
+    , _technique(technique)
+    , _valid(true)
+    , _hash(0)
 {
     TF_DEBUG(HIO_DEBUG_GLSLFX).Msg("Creating GLSLFX data from istream\n");
 

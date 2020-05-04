@@ -54,7 +54,7 @@ VtDictionary Hio_GetDictionaryFromInput
     (const string &input, const string &filename, string *errorStr);
 
 HioGlslfxConfig *
-HioGlslfxConfig::Read(string const *technique,
+HioGlslfxConfig::Read(TfToken const & technique,
                       string const & input,
                       string const & filename,
                       string *errorStr)
@@ -63,7 +63,7 @@ HioGlslfxConfig::Read(string const *technique,
         Hio_GetDictionaryFromInput(input, filename, errorStr), errorStr );
 }
 
-HioGlslfxConfig::HioGlslfxConfig(string const *technique,
+HioGlslfxConfig::HioGlslfxConfig(TfToken const & technique,
                                  VtDictionary const & dict,
                                  string * errors)
 : _technique(technique)
@@ -125,26 +125,11 @@ HioGlslfxConfig::_GetSourceKeyMap(VtDictionary const & dict,
         return ret;
     }
 
-//    if (techniquesDict.size() > 1) {
-//        *errorStr = TfStringPrintf("Expect only one entry for %s",
-//                                   _tokens->techniques.GetText());
-//        return ret;
-//    }
-
-    VtDictionary::const_iterator entry = techniquesDict.begin();
-    if (techniquesDict.size() > 1) {
-        // Look for an API specific flavour, else proceed with "default"
-        if (_technique) {
-            entry = techniquesDict.find(*_technique);
-        }
-        if (entry == techniquesDict.end()) {
-            entry = techniquesDict.find("default");
-        }
-    }
-
+    VtDictionary::const_iterator entry = techniquesDict.find(_technique);
     if (entry == techniquesDict.end()) {
-        *errorStr = TfStringPrintf("No Hgi-specific or 'default' entry for %s",
-                                   _tokens->techniques.GetText());
+        *errorStr = TfStringPrintf("No entry for %s: %s",
+                                   _tokens->techniques.GetText(), 
+                                   _technique.GetText());
         return ret;
     }
     

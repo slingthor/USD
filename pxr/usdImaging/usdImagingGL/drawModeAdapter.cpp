@@ -32,9 +32,9 @@
 #include "pxr/usdImaging/usdImaging/instancerContext.h"
 #include "pxr/usdImaging/usdImaging/tokens.h"
 
+#include "pxr/imaging/hdSt/material.h"
 #include "pxr/imaging/hd/enums.h"
 #include "pxr/imaging/hd/perfLog.h"
-#include "pxr/imaging/hd/material.h"
 
 #include "pxr/imaging/hio/glslfx.h"
 #include "pxr/imaging/glf/image.h"
@@ -72,6 +72,10 @@ TF_DEFINE_PRIVATE_TOKENS(
     (st)
     (rgba)
     (fallback)
+    (minFilter)
+    (magFilter)
+    (linear)
+    (linearMipmapLinear)
 
     (varname)
     (result)
@@ -420,6 +424,10 @@ UsdImagingGLDrawModeAdapter::UpdateForTime(UsdPrim const& prim,
                     textureNode.parameters[_tokens->st] = _tokens->cardsUv;
                     textureNode.parameters[_tokens->fallback] = fallback;
                     textureNode.parameters[_tokens->file] = textureFile;
+                    textureNode.parameters[_tokens->minFilter] =
+                        _tokens->linearMipmapLinear;
+                    textureNode.parameters[_tokens->magFilter] =
+                        _tokens->linear;
 
                     // Insert connection between texture node and terminal
                     HdMaterialRelationship rel;
@@ -930,10 +938,15 @@ UsdImagingGLDrawModeAdapter::_GenerateCardsFromTextureGeometry(
     VtIntArray faceCounts = VtIntArray(faces.size());
     VtIntArray faceIndices = VtIntArray(faces.size() * 4);
 
-    GfVec3f corners[4] = { GfVec3f(-1, -1, 0), GfVec3f(-1, 1, 0),
-                           GfVec3f(1, 1, 0), GfVec3f(1, -1, 0) };
-    GfVec2f std_uvs[4] = { GfVec2f(0,0), GfVec2f(0,1),
-                           GfVec2f(1,1), GfVec2f(1,0) };
+    static const std::array<GfVec3f, 4> corners = {
+        GfVec3f(-1, -1,  0), GfVec3f(-1,  1,  0),
+        GfVec3f( 1,  1,  0), GfVec3f( 1, -1,  0) };
+    static const std::array<GfVec2f, 4> std_uvs = 
+        TfGetEnvSetting(HDST_USE_NEW_TEXTURE_SYSTEM)
+        ? std::array<GfVec2f, 4>(
+            {GfVec2f(0,1), GfVec2f(0,0), GfVec2f(1,0), GfVec2f(1,1) })
+        : std::array<GfVec2f, 4>(
+            {GfVec2f(0,0), GfVec2f(0,1), GfVec2f(1,1), GfVec2f(1,0) });
 
     for(size_t i = 0; i < faces.size(); ++i) {
         GfMatrix4d screenToWorld = faces[i].first.GetInverse();
@@ -1043,6 +1056,19 @@ UsdImagingGLDrawModeAdapter::_GetMatrixFromImageMetadata(
     return false;
 }
 
+static
+std::array<GfVec2f, 4>
+_GetUVsForQuad(const bool flipU, bool flipV)
+{
+    flipV ^= !TfGetEnvSetting(HDST_USE_NEW_TEXTURE_SYSTEM);
+
+    return {
+        GfVec2f(flipU ? 0.0 : 1.0, flipV ? 0.0 : 1.0),
+        GfVec2f(flipU ? 1.0 : 0.0, flipV ? 0.0 : 1.0),
+        GfVec2f(flipU ? 1.0 : 0.0, flipV ? 1.0 : 0.0),
+        GfVec2f(flipU ? 0.0 : 1.0, flipV ? 1.0 : 0.0) };
+}
+
 void
 UsdImagingGLDrawModeAdapter::_GenerateTextureCoordinates(
         VtValue *uv, VtValue *assign, uint8_t axes_mask) const
@@ -1053,35 +1079,41 @@ UsdImagingGLDrawModeAdapter::_GenerateTextureCoordinates(
     // This function generates face-varying UVs, and also uniform indices
     // for each face specifying which texture to sample.
 
-    const GfVec2f uv_normal[4] =
-        { GfVec2f(1,0), GfVec2f(0,0), GfVec2f(0,1), GfVec2f(1,1) };
-    const GfVec2f uv_flipped_s[4] =
-        { GfVec2f(0,0), GfVec2f(1,0), GfVec2f(1,1), GfVec2f(0,1) };
-    const GfVec2f uv_flipped_t[4] =
-        { GfVec2f(1,1), GfVec2f(0,1), GfVec2f(0,0), GfVec2f(1,0) };
-    const GfVec2f uv_flipped_st[4] =
-        { GfVec2f(0,1), GfVec2f(1,1), GfVec2f(1,0), GfVec2f(0,0) };
+    static const std::array<GfVec2f, 4> uv_normal =
+        _GetUVsForQuad(false, false);
+    static const std::array<GfVec2f, 4> uv_flipped_s =
+        _GetUVsForQuad(true, false);
+    static const std::array<GfVec2f, 4> uv_flipped_t =
+        _GetUVsForQuad(false, true);
+    static const std::array<GfVec2f, 4> uv_flipped_st =
+        _GetUVsForQuad(true, true);
 
-    std::vector<const GfVec2f*> uv_faces;
+    std::vector<const GfVec2f *> uv_faces;
     std::vector<int> face_assign;
     if (axes_mask & xAxis) {
-        uv_faces.push_back((axes_mask & xPos) ? uv_normal : uv_flipped_s);
+        uv_faces.push_back(
+            (axes_mask & xPos) ? uv_normal.data() : uv_flipped_s.data());
         face_assign.push_back((axes_mask & xPos) ? xPos : xNeg);
-        uv_faces.push_back((axes_mask & xNeg) ? uv_normal : uv_flipped_s);
+        uv_faces.push_back(
+            (axes_mask & xNeg) ? uv_normal.data() : uv_flipped_s.data());
         face_assign.push_back((axes_mask & xNeg) ? xNeg : xPos);
     }
     if (axes_mask & yAxis) {
-        uv_faces.push_back((axes_mask & yPos) ? uv_normal : uv_flipped_s);
+        uv_faces.push_back(
+            (axes_mask & yPos) ? uv_normal.data() : uv_flipped_s.data());
         face_assign.push_back((axes_mask & yPos) ? yPos : yNeg);
-        uv_faces.push_back((axes_mask & yNeg) ? uv_normal : uv_flipped_s);
+        uv_faces.push_back(
+            (axes_mask & yNeg) ? uv_normal.data() : uv_flipped_s.data());
         face_assign.push_back((axes_mask & yNeg) ? yNeg : yPos);
     }
     if (axes_mask & zAxis) {
         // (Z+) and (Z-) need to be flipped on the (t) axis instead of the (s)
         // axis when we're borrowing a texture from the other side of the axis.
-        uv_faces.push_back((axes_mask & zPos) ? uv_normal : uv_flipped_t);
+        uv_faces.push_back(
+            (axes_mask & zPos) ? uv_normal.data() : uv_flipped_t.data());
         face_assign.push_back((axes_mask & zPos) ? zPos : zNeg);
-        uv_faces.push_back((axes_mask & zNeg) ? uv_flipped_st : uv_flipped_s);
+        uv_faces.push_back(
+            (axes_mask & zNeg) ? uv_flipped_st.data() : uv_flipped_s.data());
         face_assign.push_back((axes_mask & zNeg) ? zNeg : zPos);
     }
 

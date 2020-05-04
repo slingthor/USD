@@ -47,6 +47,13 @@ HdSt_TextureBinder::UsesBindlessTextures()
 
 static const HdTupleType _bindlessHandleTupleType{ HdTypeUInt32Vec2, 1 };
 
+static
+TfToken
+_Concat(const TfToken &a, const TfToken &b)
+{
+    return TfToken(a.GetString() + b.GetString());
+}
+
 void
 HdSt_TextureBinder::GetBufferSpecs(
     const NamedTextureHandleVector &textures,
@@ -59,6 +66,12 @@ HdSt_TextureBinder::GetBufferSpecs(
                 specs->emplace_back(
                     texture.name,
                     _bindlessHandleTupleType);
+            } else {
+                specs->emplace_back(
+                    _Concat(
+                        texture.name,
+                        HdSt_ResourceBindingSuffixTokens->valid),
+                    HdTupleType{HdTypeUInt32, 1});
             }
             break;
         case HdTextureType::Field:
@@ -66,9 +79,17 @@ HdSt_TextureBinder::GetBufferSpecs(
                 specs->emplace_back(
                     texture.name,
                     _bindlessHandleTupleType);
+            } else {
+                specs->emplace_back(
+                    _Concat(
+                        texture.name,
+                        HdSt_ResourceBindingSuffixTokens->valid),
+                    HdTupleType{HdTypeUInt32, 1});
             }
             specs->emplace_back(
-                TfToken(texture.name.GetString() + "SamplingTransform"),
+                _Concat(
+                    texture.name,
+                    HdSt_ResourceBindingSuffixTokens->samplingTransform),
                 HdTupleType{HdTypeDoubleMat4, 1});
             break;
         case HdTextureType::Ptex:
@@ -77,12 +98,24 @@ HdSt_TextureBinder::GetBufferSpecs(
                     texture.name,
                     _bindlessHandleTupleType);
                 specs->emplace_back(
-                    TfToken(texture.name.GetString() + "_layout"),
+                    _Concat(
+                        texture.name,
+                        HdSt_ResourceBindingSuffixTokens->layout),
                     _bindlessHandleTupleType);
             }
             break;
-        default:
-            TF_CODING_ERROR("Unsupported texture type");
+        case HdTextureType::Udim:
+            if (UsesBindlessTextures()) {
+                specs->emplace_back(
+                    texture.name,
+                    _bindlessHandleTupleType);
+                specs->emplace_back(
+                    _Concat(
+                        texture.name,
+                        HdSt_ResourceBindingSuffixTokens->layout),
+                    _bindlessHandleTupleType);
+            }
+            break;
         }
     }
 }
@@ -100,10 +133,6 @@ public:
     , _name(name)
     , _value(value)
     {
-        if (_value == 0) {
-            TF_CODING_ERROR("Invalid texture handle: %s: %ld\n",
-                            name.GetText(), value);
-        }
     }
 
     ~HdSt_BindlessSamplerBufferSource() override = default;
@@ -147,14 +176,19 @@ public:
         HdStUvSamplerObject const &sampler,
         HdBufferSourceSharedPtrVector * const sources)
     {
-        if (!HdSt_TextureBinder::UsesBindlessTextures()) {
-            return;
+        if (HdSt_TextureBinder::UsesBindlessTextures()) {
+            sources->push_back(
+                std::make_shared<HdSt_BindlessSamplerBufferSource>(
+                    name,
+                    sampler.GetGLTextureSamplerHandle()));
+        } else {
+            sources->push_back(
+                std::make_shared<HdVtBufferSource>(
+                    _Concat(
+                        name,
+                        HdSt_ResourceBindingSuffixTokens->valid),
+                    VtValue((uint32_t)texture.IsValid())));
         }
-
-        sources->push_back(
-            std::make_shared<HdSt_BindlessSamplerBufferSource>(
-                name,
-                sampler.GetGLTextureSamplerHandle()));
     }
 
     static void Compute(
@@ -165,17 +199,24 @@ public:
     {
         sources->push_back(
             std::make_shared<HdVtBufferSource>(
-                TfToken(name.GetString() + "SamplingTransform"),
+                _Concat(
+                    name,
+                    HdSt_ResourceBindingSuffixTokens->samplingTransform),
                 VtValue(texture.GetSamplingTransform())));
 
-        if (!HdSt_TextureBinder::UsesBindlessTextures()) {
-            return;
+        if (HdSt_TextureBinder::UsesBindlessTextures()) {
+            sources->push_back(
+                std::make_shared<HdSt_BindlessSamplerBufferSource>(
+                    name,
+                    sampler.GetGLTextureSamplerHandle()));
+        } else {
+            sources->push_back(
+                std::make_shared<HdVtBufferSource>(
+                    _Concat(
+                        name,
+                        HdSt_ResourceBindingSuffixTokens->valid),
+                    VtValue((uint32_t)texture.IsValid())));
         }
-
-        sources->push_back(
-            std::make_shared<HdSt_BindlessSamplerBufferSource>(
-                name,
-                sampler.GetGLTextureSamplerHandle()));
     }
 
     static void Compute(
@@ -195,7 +236,32 @@ public:
 
         sources->push_back(
             std::make_shared<HdSt_BindlessSamplerBufferSource>(
-                TfToken(name.GetString() + "_layout"),
+                _Concat(
+                    name,
+                    HdSt_ResourceBindingSuffixTokens->layout),
+                sampler.GetLayoutGLTextureHandle()));
+    }
+
+    static void Compute(
+        TfToken const &name,
+        HdStUdimTextureObject const &texture,
+        HdStUdimSamplerObject const &sampler,
+        HdBufferSourceSharedPtrVector * const sources)
+    {
+        if (!HdSt_TextureBinder::UsesBindlessTextures()) {
+            return;
+        }
+
+        sources->push_back(
+            std::make_shared<HdSt_BindlessSamplerBufferSource>(
+                name,
+                sampler.GetTexelsGLTextureHandle()));
+
+        sources->push_back(
+            std::make_shared<HdSt_BindlessSamplerBufferSource>(
+                _Concat(
+                    name,
+                    HdSt_ResourceBindingSuffixTokens->layout),
                 sampler.GetLayoutGLTextureHandle()));
     }
 };
@@ -275,11 +341,37 @@ public:
                       bind ? (GLuint)texture.GetTexelGLTextureName() : 0);
 
         const HdBinding layoutBinding = binder.GetBinding(
-            TfToken(name.GetString() + "_layout"));
+            _Concat(name, HdSt_ResourceBindingSuffixTokens->layout));
         const int layoutSamplerUnit = layoutBinding.GetTextureUnit();
 
         glActiveTexture(GL_TEXTURE0 + layoutSamplerUnit);
         glBindTexture(GL_TEXTURE_BUFFER,
+                      bind ? (GLuint)texture.GetLayoutGLTextureName() : 0);
+#endif
+    }
+
+    static void Compute(
+        TfToken const &name,
+        HdStUdimTextureObject const &texture,
+        HdStUdimSamplerObject const &sampler,
+        HdSt_ResourceBinder const &binder,
+        const bool bind)
+    {
+        const HdBinding texelBinding = binder.GetBinding(name);
+        const int texelSamplerUnit = texelBinding.GetTextureUnit();
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
+        glActiveTexture(GL_TEXTURE0 + texelSamplerUnit);
+        glBindTexture(GL_TEXTURE_2D_ARRAY,
+                      bind ? (GLuint)texture.GetTexelGLTextureName() : 0);
+        glBindSampler(texelSamplerUnit,
+                      bind ? (GLuint)sampler.GetTexelsGLSamplerName() : 0);
+
+        const HdBinding layoutBinding = binder.GetBinding(
+            _Concat(name, HdSt_ResourceBindingSuffixTokens->layout));
+        const int layoutSamplerUnit = layoutBinding.GetTextureUnit();
+
+        glActiveTexture(GL_TEXTURE0 + layoutSamplerUnit);
+        glBindTexture(GL_TEXTURE_1D,
                       bind ? (GLuint)texture.GetLayoutGLTextureName() : 0);
 #endif
     }
@@ -333,8 +425,10 @@ void _Dispatch(
         _CastAndCompute<HdTextureType::Ptex, Functor>(
             namedTextureHandle, std::forward<Args>(args)...);
         break;
-    default:
-        TF_CODING_ERROR("Unsupported texture type");
+    case HdTextureType::Udim:
+        _CastAndCompute<HdTextureType::Udim, Functor>(
+            namedTextureHandle, std::forward<Args>(args)...);
+        break;
     }
 }
 

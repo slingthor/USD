@@ -29,31 +29,47 @@
 #include "pxr/usd/usd/prim.h"
 #include "pxr/usd/usd/timeCode.h"
 #include "pxr/imaging/hdSt/textureResource.h"
+#include "pxr/usdImaging/usdImaging/api.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-HdStTextureResource::ID
-UsdImaging_GetTextureResourceID(UsdPrim const& usdPrim,
-                                SdfPath const& usdPath,
-                                UsdTimeCode time,
-                                size_t salt);
-
-HdTextureResourceSharedPtr
-UsdImaging_GetTextureResource(UsdPrim const& usdPrim,
-                              SdfPath const& usdPath,
-                              UsdTimeCode time);
-
+/// The functions below are used by the old texture system where the
+/// scene delegates creates the texture resource in
+/// GetTextureResource.
+///
+/// Note: these functions are also not binding the Usd stage's
+/// resolver context and thus don't handle some cases (e.g., model
+/// search paths) correctly.
+///
+/// The corresponding functions for the new texture system are in
+/// usdImaging/materialParamUtils.cpp and HdStUdimTextureObject.
+///
+USDIMAGING_API
 std::vector<std::tuple<int, TfToken>>
 UsdImaging_GetUdimTiles(
     std::string const& basePath,
     int tileLimit,
     SdfLayerHandle const& layerHandle = SdfLayerHandle());
 
+USDIMAGING_API
 bool
 UsdImaging_UdimTilesExist(
     std::string const& basePath,
     int tileLimit,
     SdfLayerHandle const& layerHandle = SdfLayerHandle());
+
+USDIMAGING_API
+HdTextureResource::ID
+UsdImaging_GetTextureResourceID(UsdPrim const& usdPrim,
+                                  SdfPath const& usdPath,
+                                  UsdTimeCode time,
+                                  size_t salt);
+
+USDIMAGING_API
+HdTextureResourceSharedPtr
+UsdImaging_GetTextureResource(UsdPrim const& usdPrim,
+                                SdfPath const& usdPath,
+                                UsdTimeCode time);
 
 PXR_NAMESPACE_CLOSE_SCOPE
 

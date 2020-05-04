@@ -332,7 +332,12 @@ HdxColorCorrectionTask::_CreateShaderResources()
     }
 
     bool useOCIO =_GetUseOcio();
-    HioGlslfx glslfx(HdxPackageColorCorrectionShader());
+    
+    // For Metal shaders we grab a different technique from the glslfx.
+    TfToken const& technique = _hgi->GetAPIName() == HgiTokens->Metal ?
+        HgiTokens->Metal : HioGlslfxTokens->defVal;
+
+    HioGlslfx glslfx(HdxPackageColorCorrectionShader(), technique);
 
     // Setup the vertex shader
     HgiShaderFunctionDesc vertDesc;

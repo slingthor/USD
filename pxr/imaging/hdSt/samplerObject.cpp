@@ -46,8 +46,13 @@ HdStSamplerObject::~HdStSamplerObject() = default;
 // Generate GL sampler
 static
 GLuint
-_GenGLSampler(HdSamplerParameters const &samplerParameters)
+_GenGLSampler(HdSamplerParameters const &samplerParameters,
+              const bool createSampler)
 {
+    if (!createSampler) {
+        return 0;
+    }
+
     GLuint result = 0;
 #if defined(PXR_OPENGL_SUPPORT_ENABLED)
     glGenSamplers(1, &result);
@@ -97,6 +102,39 @@ _GenGLSampler(HdSamplerParameters const &samplerParameters)
 
 // Get texture sampler handle for bindless textures.
 static
+GLuint64EXT
+_GenGLTextureSamplerHandle(const GLuint textureName,
+                           const GLuint samplerName,
+                           const bool createBindlessHandle)
+{
+    if (!createBindlessHandle) {
+        return 0;
+    }
+
+    if (textureName == 0) {
+        return 0;
+    }
+
+    if (samplerName == 0) {
+        return 0;
+    }
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
+    const GLuint64EXT result =
+        glGetTextureSamplerHandleARB(textureName, samplerName);
+
+    glMakeTextureHandleResidentARB(result);
+
+    GLF_POST_PENDING_GL_ERRORS();
+
+    return result;
+#else
+    TF_CODING_ERROR("OpenGL not enabled");
+    return 0;
+#endif
+}
+
+// Get texture sampler handle for bindless textures.
+static
 GLuint64EXT 
 _GenGLTextureSamplerHandle(HgiTextureHandle const &textureHandle,
                            const GLuint samplerName,
@@ -117,24 +155,8 @@ _GenGLTextureSamplerHandle(HgiTextureHandle const &textureHandle,
         return 0;
     }
 
-    const GLuint textureName = glTexture->GetTextureId();
-
-    if (textureName == 0) {
-        return 0;
-    }
-
-    if (samplerName == 0) {
-        return 0;
-    }
-
-    const GLuint64EXT result =
-        glGetTextureSamplerHandleARB(textureName, samplerName);
-
-    glMakeTextureHandleResidentARB(result);
-
-    GLF_POST_PENDING_GL_ERRORS();
-
-    return result;
+    return _GenGLTextureSamplerHandle(
+        glTexture->GetTextureId(), samplerName, createBindlessHandle);
 #else
     TF_CODING_ERROR("OpenGL not enabled");
     return 0;
@@ -221,12 +243,13 @@ HdStUvSamplerObject::HdStUvSamplerObject(
   : _glSamplerName(
       _GenGLSampler(
           _ResolveUvSamplerParameters(
-              texture, samplerParameters)))
+              texture, samplerParameters),
+          texture.IsValid()))
   , _glTextureSamplerHandle(
       _GenGLTextureSamplerHandle(
           texture.GetTexture(),
           _glSamplerName,
-          createBindlessHandle))
+          createBindlessHandle && texture.IsValid()))
 {
 }
 
@@ -259,12 +282,13 @@ HdStFieldSamplerObject::HdStFieldSamplerObject(
     const bool createBindlessHandle)
   : _glSamplerName(
       _GenGLSampler(
-          samplerParameters))
+          samplerParameters,
+          texture.IsValid()))
   , _glTextureSamplerHandle(
       _GenGLTextureSamplerHandle(
           texture.GetTexture(),
           _glSamplerName,
-          createBindlessHandle))
+          createBindlessHandle && texture.IsValid()))
 {
 }
 
@@ -293,7 +317,7 @@ HdStPtexSamplerObject::HdStPtexSamplerObject(
 #else
           0,
 #endif
-          createBindlessHandle))
+          createBindlessHandle && ptexTexture.IsValid()))
   , _layoutGLTextureHandle(
       _GenGlTextureHandle(
 #if defined(PXR_OPENGL_SUPPORT_ENABLED)
@@ -301,20 +325,67 @@ HdStPtexSamplerObject::HdStPtexSamplerObject(
 #else
           0,
 #endif
-          createBindlessHandle))
+          createBindlessHandle && ptexTexture.IsValid()))
 {
 }
 
-HdStPtexSamplerObject::~HdStPtexSamplerObject()
-{
+// See above comment about destroying bindless texture handles
+HdStPtexSamplerObject::~HdStPtexSamplerObject() = default;
+
+///////////////////////////////////////////////////////////////////////////////
+// Udim sampler
+
+// Wrap modes such as repeat or mirror do not make sense for udim, so set them
+// to clamp.
+//
+// Mipmaps would make sense for udim up to a certain level, but
+// GlfUdimTexture produces broken mipmaps, so forcing HdMinFilterLinear.
+// The old texture system apparently never exercised the case of using
+// mipmaps for a udim.
+static
+HdSamplerParameters UDIM_SAMPLER_PARAMETERS{
+    HdWrapClamp,
+    HdWrapClamp,
+    HdWrapClamp,
+    HdMinFilterLinear,
+    HdMagFilterLinear};
+
+HdStUdimSamplerObject::HdStUdimSamplerObject(
+    HdStUdimTextureObject const &udimTexture,
+    HdSamplerParameters const &samplerParameters,
+    const bool createBindlessHandle)
+  : _glTexelsSamplerName(
+      _GenGLSampler(
+          UDIM_SAMPLER_PARAMETERS,
+          udimTexture.IsValid()))
+  , _texelsGLTextureHandle(
+      _GenGLTextureSamplerHandle(
 #if defined(PXR_OPENGL_SUPPORT_ENABLED)
-    if (_texelsGLTextureHandle) {
-        glMakeTextureHandleNonResidentARB(_texelsGLTextureHandle);
-    }
-    if (_layoutGLTextureHandle) {
-        glMakeTextureHandleNonResidentARB(_layoutGLTextureHandle);
+          udimTexture.GetTexelGLTextureName(),
+#else
+          0,
+#endif
+          _glTexelsSamplerName,
+          createBindlessHandle && udimTexture.IsValid()))
+  , _layoutGLTextureHandle(
+      _GenGlTextureHandle(
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
+          udimTexture.GetLayoutGLTextureName(),
+#else
+          0,
+#endif
+          createBindlessHandle && udimTexture.IsValid()))
+{
+}
+
+HdStUdimSamplerObject::~HdStUdimSamplerObject()
+{
+    // See above comment about destroying bindless texture handles
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
+    if (_glTexelsSamplerName) {
+        glDeleteSamplers(1, &_glTexelsSamplerName);
     }
 #endif
 }
-    
+   
 PXR_NAMESPACE_CLOSE_SCOPE

@@ -2689,7 +2689,9 @@ HdSt_CodeGenGLSL::_GenerateShaderParameters()
                 << "  int shaderCoord = GetDrawingCoord().shaderCoord; \n"
                 << "  return "
                 << _GetPackedTypeAccessor(it->second.dataType, false)
-                << "(shaderData[shaderCoord]." << it->second.name << swizzle
+                << "(shaderData[shaderCoord]."
+                << it->second.name << HdSt_ResourceBindingSuffixTokens->fallback
+                << swizzle
                 << ");\n"
                 << "}\n";
             // vec4 HdGet_name()
@@ -2705,28 +2707,55 @@ HdSt_CodeGenGLSL::_GenerateShaderParameters()
                     << "HdGetSampler_" << it->second.name << "() {\n"
                     << "  int shaderCoord = GetDrawingCoord().shaderCoord; \n"
                     << "  return sampler2D(shaderData[shaderCoord]." << it->second.name << ");\n"
-                    << "  }\n";
+                    << "}\n";
             }
+
             // vec4 HdGet_name(vec2 coord)
             accessors
                 << _GetUnpackedType(it->second.dataType, false)
                 << " HdGet_" << it->second.name << "(vec2 coord) {\n"
                 << "  int shaderCoord = GetDrawingCoord().shaderCoord;\n"
-                << "  return "
+                << "  uvec2 samplerHandle = shaderData[shaderCoord]."
+                << it->second.name << ";\n"
+                << "  " << _GetUnpackedType(it->second.dataType, false)
+                << " result = "
                 << _GetPackedTypeAccessor(it->second.dataType, false)
-                << "(texture(sampler2D(shaderData[shaderCoord]."
-                << it->second.name << "), coord)" << swizzle
-                << ");\n}\n";
+                << "(texture(sampler2D(samplerHandle), coord)" << swizzle
+                << ");";
+
+            if (it->second.processTextureFallbackValue) {
+                // Check whether texture is valid (using bindless handle)
+                //
+                // Note that the OpenGL standard says that the
+                // implicit derivatives (for accessing the right
+                // mip-level) are undefined if the texture look-up
+                // happens in a non-uniform control block, thus the
+                // texture lookup is unconditionally assigned to
+                // result outside of the if-block.
+                //
+                accessors
+                    << "  if (samplerHandle != uvec2(0,0)) {\n"
+                    << "    return result;\n"
+                    << "  } else {\n"
+                    << "    return "
+                    << _GetPackedTypeAccessor(it->second.dataType, false)
+                    << "(shaderData[shaderCoord]."
+                    << it->second.name
+                    << HdSt_ResourceBindingSuffixTokens->fallback << ");\n"
+                    << "  }\n";
+            } else {
+                accessors
+                    << "  return result;\n";
+            }
+            
+            accessors
+                << "}\n";
 
             // vec4 HdGet_name(int localIndex)
             accessors
                 << _GetUnpackedType(it->second.dataType, false)
                 << " HdGet_" << it->second.name << "(int localIndex) {\n"
-                << "  int shaderCoord = GetDrawingCoord().shaderCoord; \n"
-                << "  return "
-                << _GetPackedTypeAccessor(it->second.dataType, false) << "("
-                << "texture(sampler2D(shaderData[shaderCoord]."
-                << it->second.name << "), ";
+                << "   return HdGet_" << it->second.name << "(\n";
             if (!it->second.inPrimvars.empty()) {
                 accessors
                     << "\n"
@@ -2737,18 +2766,20 @@ HdSt_CodeGenGLSL::_GenerateShaderParameters()
                     << "vec2(0.0, 0.0)\n"
                     << "#endif\n";
             } else {
-                // allow to fetch uv texture without sampler coordinate for convenience.
+            // allow to fetch uv texture without sampler coordinate for convenience.
                 accessors
                     << " vec2(0.0, 0.0)";
             }
             accessors
-                << ")" << swizzle << ");\n"
+                << ");\n"
                 << "}\n";
+
             // vec4 HdGet_name()
             accessors
                 << _GetUnpackedType(it->second.dataType, false)
                 << " HdGet_" << it->second.name
                 << "() { return HdGet_" << it->second.name << "(0); }\n";
+
         } else if (bindingType == HdBinding::TEXTURE_2D) {
             declarations
                 << LayoutQualifier(it->first)
@@ -2765,13 +2796,49 @@ HdSt_CodeGenGLSL::_GenerateShaderParameters()
                     << "#define HdGetSampler_" << it->second.name << "()"
                     << " sampler2d_" << it->second.name << "\n";
             }
+
             // vec4 HdGet_name(vec2 coord)
             accessors
                 << _GetUnpackedType(it->second.dataType, false)
-                << " HdGet_" << it->second.name << "(vec2 coord) { return "
+                << " HdGet_" << it->second.name << "(vec2 coord) {\n"
+                << "  " << _GetUnpackedType(it->second.dataType, false)
+                << " result = "
                 << _GetPackedTypeAccessor(it->second.dataType, false)
                 << "(texture(sampler2d_" << it->second.name << ", coord)"
-                << swizzle << ");}\n";
+                << swizzle << ");\n";
+
+            if (it->second.processTextureFallbackValue) {
+                // Check whether texture is valid (using NAME_valid)
+                //
+                // Note that the OpenGL standard says that the
+                // implicit derivatives (for accessing the right
+                // mip-level) are undefined if the texture look-up
+                // happens in a non-uniform control block, thus the
+                // texture lookup is unconditionally assigned to
+                // result outside of the if-block.
+                //
+                accessors
+                    << "  int shaderCoord = GetDrawingCoord().shaderCoord; \n"
+                    << "  if (shaderData[shaderCoord]."
+                    << it->second.name
+                    << HdSt_ResourceBindingSuffixTokens->valid
+                    << ") {\n"
+                    << "    return result;\n"
+                    << "  } else {\n"
+                    << "    return "
+                    << _GetPackedTypeAccessor(it->second.dataType, false)
+                    << "(shaderData[shaderCoord]."
+                    << it->second.name
+                    << HdSt_ResourceBindingSuffixTokens->fallback << ");\n"
+                    << "  }\n";
+            } else {
+                accessors
+                    << "  return result;\n";
+            }
+            
+            accessors
+                << "}\n";
+
             // vec4 HdGet_name(int localIndex)
             accessors
                 << _GetUnpackedType(it->second.dataType, false)
@@ -2800,12 +2867,14 @@ HdSt_CodeGenGLSL::_GenerateShaderParameters()
             // a function returning sampler requires bindless_texture
             if (caps.bindlessTextureEnabled) {
                 accessors
-                << "sampler3D\n"
-                << "HdGetSampler_" << it->second.name << "() {\n"
-                << "  int shaderCoord = GetDrawingCoord().shaderCoord; \n"
-                << "  return sampler3D(shaderData[shaderCoord]." << it->second.name << ");\n"
-                << "}\n";
+                    << "sampler3D\n"
+                    << "HdGetSampler_" << it->second.name << "() {\n"
+                    << "  int shaderCoord = GetDrawingCoord().shaderCoord; \n"
+                    << "  return sampler3D(shaderData[shaderCoord]."
+                    << it->second.name << ");\n"
+                    << "}\n";
             }
+
             // vec4 HdGet_name(vec3 coord)
             //
             // Applying nameSamplingTransform before sampling.
@@ -2813,15 +2882,46 @@ HdSt_CodeGenGLSL::_GenerateShaderParameters()
                 << _GetUnpackedType(it->second.dataType, false)
                 << " HdGet_" << it->second.name << "(vec3 coord) { \n"
                 << "  int shaderCoord = GetDrawingCoord().shaderCoord; \n"
+                << "  uvec2 samplerHandle = shaderData[shaderCoord]."
+                << it->second.name << ";\n"
                 << "   vec4 c = vec4(\n"
                 << "     shaderData[shaderCoord]."
-                << it->second.name << "SamplingTransform * vec4(coord, 1));\n"
+                << it->second.name
+                << HdSt_ResourceBindingSuffixTokens->samplingTransform
+                << " * vec4(coord, 1));\n"
                 << "   vec3 sampleCoord = c.xyz / c.w;\n"
-                << "  return "
-                << _GetPackedTypeAccessor(it->second.dataType, false) << "("
-                << "texture(sampler3D(shaderData[shaderCoord]."
-                << it->second.name << "), sampleCoord)"
-                << swizzle << ");\n}\n";
+                << "  " << _GetUnpackedType(it->second.dataType, false)
+                << " result = "
+                << _GetPackedTypeAccessor(it->second.dataType, false)
+                << "(texture(sampler3D(samplerHandle), sampleCoord)"
+                << swizzle << ");\n";
+
+            if (it->second.processTextureFallbackValue) {
+                // Check whether texture is valid (using bindless handle)
+                //
+                // Note that the OpenGL standard says that the
+                // implicit derivatives (for accessing the right
+                // mip-level) are undefined if the texture look-up
+                // happens in a non-uniform control block, thus the
+                // texture lookup is unconditionally assigned to
+                // result outside of the if-block.
+                //
+                accessors
+                    << "  if (samplerHandle != uvec2(0,0)) {\n"
+                    << "    return result;\n"
+                    << "  } else {\n"
+                    << "    return "
+                    << _GetPackedTypeAccessor(it->second.dataType, false)
+                    << "(shaderData[shaderCoord]."
+                    << it->second.name
+                    << HdSt_ResourceBindingSuffixTokens->fallback << ");\n"
+                    << "  }\n";
+            } else {
+                accessors
+                    << "  return result;\n";
+            }
+            accessors
+                << "}\n";
 
             // vec4 HdGet_name(int localIndex)
             accessors
@@ -2878,12 +2978,46 @@ HdSt_CodeGenGLSL::_GenerateShaderParameters()
                 << "   int shaderCoord = GetDrawingCoord().shaderCoord; \n"
                 << "   vec4 c = vec4(\n"
                 << "     shaderData[shaderCoord]."
-                << it->second.name << "SamplingTransform * vec4(coord, 1));\n"
+                << it->second.name
+                << HdSt_ResourceBindingSuffixTokens->samplingTransform
+                << " * vec4(coord, 1));\n"
                 << "   vec3 sampleCoord = c.xyz / c.w;\n"
-                << "   return "
+                << "  " << _GetUnpackedType(it->second.dataType, false)
+                << " result = "
                 << _GetPackedTypeAccessor(it->second.dataType, false)
                 << "(texture(sampler3d_" << it->second.name << ", sampleCoord)"
-                << swizzle << ");}\n";
+                << swizzle << ");\n";
+
+            if (it->second.processTextureFallbackValue) {
+                // Use fallback value NAME_fallback
+                //
+                // Note that the OpenGL standard says that the
+                // implicit derivatives (for accessing the right
+                // mip-level) are undefined if the texture look-up
+                // happens in a non-uniform control block, thus the
+                // texture lookup is unconditionally assigned to
+                // result outside of the if-block.
+                //
+                accessors
+                    << "  if (shaderData[shaderCoord]."
+                    << it->second.name
+                    << HdSt_ResourceBindingSuffixTokens->valid
+                    << ") {\n"
+                    << "    return result;\n"
+                    << "  } else {\n"
+                    << "    return "
+                    << _GetPackedTypeAccessor(it->second.dataType, false)
+                    << "(shaderData[shaderCoord]."
+                    << it->second.name
+                    << HdSt_ResourceBindingSuffixTokens->fallback << ");\n"
+                    << "  }\n";
+            } else {
+                accessors
+                    << "  return result;\n";
+            }
+            
+            accessors
+                << "}\n";
 
             // vec4 HdGet_name(int localIndex)
             accessors
@@ -2935,7 +3069,9 @@ HdSt_CodeGenGLSL::_GenerateShaderParameters()
                     << "  vec3 c = hd_sample_udim(HdGet_"
                     << it->second.inPrimvars[0] << "().xy);\n"
                     << "  c.z = texelFetch(sampler1D(shaderData[shaderCoord]."
-                    << it->second.name << "_layout), int(c.z), 0).x - 1;\n"
+                    << it->second.name
+                    << HdSt_ResourceBindingSuffixTokens->layout
+                    << "), int(c.z), 0).x - 1;\n"
                     << "#else\n"
                     << "  vec3 c = vec3(0.0, 0.0, 0.0);\n"
                     << "#endif\n";
@@ -2974,8 +3110,9 @@ HdSt_CodeGenGLSL::_GenerateShaderParameters()
                 << it->second.dataType
                 << " HdGet_" << it->second.name
                 << "(vec2 coord) { vec3 c = hd_sample_udim(coord);\n"
-                << "  c.z = texelFetch(sampler1d_" << it->second.name
-                << "_layout" << ", int(c.z), 0).x - 1;\n"
+                << "  c.z = texelFetch(sampler1d_"
+                << it->second.name << HdSt_ResourceBindingSuffixTokens->layout
+                << ", int(c.z), 0).x - 1;\n"
                 << "if (c.z < -0.5) { return vec4(0, 0, 0, 0)"
                 << swizzle << "; } else {\n"
                 << "  return texture(sampler2dArray_"
@@ -3014,7 +3151,8 @@ HdSt_CodeGenGLSL::_GenerateShaderParameters()
                 << "sampler2DArray(shaderData[shaderCoord]."
                 << it->second.name << "),"
                 << "isamplerBuffer(shaderData[shaderCoord]."
-                << it->second.name << "_layout), "
+                << it->second.name << HdSt_ResourceBindingSuffixTokens->layout
+                <<"), "
                 << "GetPatchCoord(localIndex))" << swizzle << ");\n"
                 << "}\n"
                 << _GetUnpackedType(it->second.dataType, false)
@@ -3028,7 +3166,8 @@ HdSt_CodeGenGLSL::_GenerateShaderParameters()
                 << "sampler2DArray(shaderData[shaderCoord]."
                 << it->second.name << "),"
                 << "isamplerBuffer(shaderData[shaderCoord]."
-                << it->second.name << "_layout), "
+                << it->second.name << HdSt_ResourceBindingSuffixTokens->layout
+                << "), "
                 << "patchCoord)" << swizzle << ");\n"
                 << "}\n";
         } else if (bindingType == HdBinding::TEXTURE_PTEX_TEXEL) {
@@ -3043,7 +3182,9 @@ HdSt_CodeGenGLSL::_GenerateShaderParameters()
                 << "  return " << _GetPackedTypeAccessor(it->second.dataType, false)
                 << "(GlopPtexTextureLookup("
                 << "sampler2darray_" << it->second.name << ","
-                << "isamplerbuffer_" << it->second.name << "_layout,"
+                << "isamplerbuffer_"
+                << it->second.name << HdSt_ResourceBindingSuffixTokens->layout
+                << ","
                 << "GetPatchCoord(localIndex))" << swizzle << ");\n"
                 << "}\n"
                 << _GetUnpackedType(it->second.dataType, false)
@@ -3054,7 +3195,9 @@ HdSt_CodeGenGLSL::_GenerateShaderParameters()
                 << "  return " << _GetPackedTypeAccessor(it->second.dataType, false)
                 << "(GlopPtexTextureLookup("
                 << "sampler2darray_" << it->second.name << ","
-                << "isamplerbuffer_" << it->second.name << "_layout,"
+                << "isamplerbuffer_"
+                << it->second.name << HdSt_ResourceBindingSuffixTokens->layout
+                << ","
                 << "patchCoord)" << swizzle << ");\n"
                 << "}\n";
         } else if (bindingType == HdBinding::BINDLESS_TEXTURE_PTEX_LAYOUT) {
@@ -3096,7 +3239,8 @@ HdSt_CodeGenGLSL::_GenerateShaderParameters()
                     << "  int shaderCoord = GetDrawingCoord().shaderCoord;\n"
                     << "  return "
                     << _GetPackedTypeAccessor(it->second.dataType, false)
-                    << "(shaderData[shaderCoord]." << it->second.name
+                    << "(shaderData[shaderCoord]."
+                    << it->second.name << HdSt_ResourceBindingSuffixTokens->fallback
                     << swizzle <<  ");\n"
                     << "#endif\n"
                     << "\n}\n"
@@ -3132,16 +3276,21 @@ HdSt_CodeGenGLSL::_GenerateShaderParameters()
                 << " HdGet_" << it->second.name << "(vec3 coord) {\n"
                 << "    return vec3(\n"
                 // If field exists, use it
-                << "#if defined(HD_HAS_" << fieldName << "Texture)\n"
-                << "  return HdGet_" << fieldName << "Texture(coord)"
+                << "#if defined(HD_HAS_"
+                << fieldName << HdSt_ResourceBindingSuffixTokens->texture
+                << ")\n"
+                << "  return HdGet_"
+                << fieldName << HdSt_ResourceBindingSuffixTokens->texture
+                << "(coord)"
                 << swizzle << ";\n"
                 << "#else\n"
                 // Otherwise use default value.
                 << "  int shaderCoord = GetDrawingCoord().shaderCoord;\n"
                 << "  return "
                 << _GetPackedTypeAccessor(it->second.dataType, false)
-                << "(shaderData[shaderCoord]." << it->second.name
-                << swizzle <<  ");\n"
+                << "(shaderData[shaderCoord]."
+                << it->second.name << HdSt_ResourceBindingSuffixTokens->fallback
+                <<  ");\n"
                 << "#endif\n"
                 << "\n}\n";
         }

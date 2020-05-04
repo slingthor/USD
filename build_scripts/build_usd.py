@@ -1769,6 +1769,8 @@ MATERIALX = Dependency("MaterialX", InstallMaterialX, "include/MaterialXCore/Lib
 
 ############################################################
 # Embree
+# For MacOS we use version 3.7.0 to include a fix from Intel
+# to build on Catalina.
 if MacOS():
     EMBREE_URL = "https://github.com/embree/embree/archive/v3.7.0.tar.gz"
 else:

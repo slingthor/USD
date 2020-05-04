@@ -1,5 +1,5 @@
 //
-// Copyright 2019 Pixar
+// Copyright 2020 Pixar
 //
 // Licensed under the Apache License, Version 2.0 (the "Apache License")
 // with the following modification; you may not use this file except in
@@ -21,15 +21,30 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
+#ifndef PXR_USD_IMAGING_MATERIAL_PARAM_UTILS_H
+#define PXR_USD_IMAGING_MATERIAL_PARAM_UTILS_H
+
 #include "pxr/pxr.h"
-#include "pxr/base/tf/pyModule.h"
 
-PXR_NAMESPACE_USING_DIRECTIVE
+PXR_NAMESPACE_OPEN_SCOPE
 
-TF_WRAP_MODULE
-{
-    TF_WRAP(Tokens);
-    TF_WRAP(MeshTopologyValidation);
-    TF_WRAP(MeshTopology);
-    TF_WRAP(SubdivTags);
-}
+class UsdAttribute;
+class UsdTimeCode;
+class VtValue;
+
+/// Get the value from the usd attribute at given time. If it is an
+/// SdfAssetPath containing a UDIM pattern, e.g., //SHOW/myImage.<UDIM>.exr,
+/// the resolved path of the SdfAssetPath will be updated to a file path
+/// with a UDIM pattern, e.g., /filePath/myImage.<UDIM>.exr.
+/// There might be support for different patterns, e.g., myImage._MAPID_.exr,
+/// but this function always normalizes it to myImage.<UDIM>.exr.
+///
+/// The function assumes that the correct ArResolverContext is bound.
+///
+VtValue
+UsdImaging_ResolveMaterialParamValue(
+    const UsdAttribute& attr, const UsdTimeCode& time);
+
+PXR_NAMESPACE_CLOSE_SCOPE
+
+#endif // PXR_USD_IMAGING_MATERIAL_PARAM_UTILS_H
