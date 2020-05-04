@@ -175,7 +175,6 @@ HdxColorCorrectionTask::_CreateOpenColorIOResources()
     #else
         shaderDesc->setLanguage(OCIO::GPU_LANGUAGE_GLSL_4_0);
     #endif
-        shaderDesc->setFunctionName("OCIODisplay");
         gpuProcessor->extractGpuShaderInfo(shaderDesc);
         const Float32 *lutValues = nullptr;
         shaderDesc->get3DTextureValues(0, lutValues);
