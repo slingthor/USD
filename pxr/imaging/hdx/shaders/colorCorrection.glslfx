@@ -140,7 +140,7 @@ fragment half4 fragmentEntryPoint(
     vec4 color = colorIn.read(uint2(input.position.xy));
 
     #if defined(GLSLFX_USE_OCIO)
-        color = ocioClassWrapper().OCIODisplay(LUT3dIn, color);
+        color = OCIO(LUT3dIn).Display(color);
     #else
         // Only color, not alpha is gamma corrected!
         color.rgb = FloatToSRGB(color.rgb);
