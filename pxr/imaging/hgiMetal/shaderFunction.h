@@ -21,8 +21,8 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#ifndef PXR_IMAGING_HGIMETAL_SHADERFUNCTION_H
-#define PXR_IMAGING_HGIMETAL_SHADERFUNCTION_H
+#ifndef PXR_IMAGING_HGI_METAL_SHADERFUNCTION_H
+#define PXR_IMAGING_HGI_METAL_SHADERFUNCTION_H
 
 #include "pxr/imaging/hgi/shaderFunction.h"
 
@@ -42,7 +42,7 @@ class HgiMetal;
 class HgiMetalShaderFunction final : public HgiShaderFunction {
 public:
     HGIMETAL_API
-    virtual ~HgiMetalShaderFunction();
+    ~HgiMetalShaderFunction() override;
 
     HGIMETAL_API
     bool IsValid() const override;

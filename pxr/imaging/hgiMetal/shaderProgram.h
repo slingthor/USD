@@ -21,8 +21,8 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#ifndef PXR_IMAGING_HGIMETAL_SHADERPROGRAM_H
-#define PXR_IMAGING_HGIMETAL_SHADERPROGRAM_H
+#ifndef PXR_IMAGING_HGI_METAL_SHADERPROGRAM_H
+#define PXR_IMAGING_HGI_METAL_SHADERPROGRAM_H
 
 #include "pxr/imaging/hgi/shaderProgram.h"
 
@@ -44,7 +44,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 class HgiMetalShaderProgram final : public HgiShaderProgram {
 public:
     HGIMETAL_API
-    virtual ~HgiMetalShaderProgram();
+    ~HgiMetalShaderProgram() override;
 
     HGIMETAL_API
     bool IsValid() const override;

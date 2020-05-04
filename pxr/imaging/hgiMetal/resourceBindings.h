@@ -21,14 +21,12 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#ifndef PXR_IMAGING_HGIMETAL_RESOURCEBINDINGS_H
-#define PXR_IMAGING_HGIMETAL_RESOURCEBINDINGS_H
+#ifndef PXR_IMAGING_HGI_METAL_RESOURCEBINDINGS_H
+#define PXR_IMAGING_HGI_METAL_RESOURCEBINDINGS_H
 
 #include "pxr/pxr.h"
 #include "pxr/imaging/hgi/resourceBindings.h"
 #include "pxr/imaging/hgiMetal/api.h"
-
-#include <vector>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -46,7 +44,7 @@ public:
     HgiMetalResourceBindings(HgiResourceBindingsDesc const& desc);
 
     HGIMETAL_API
-    virtual ~HgiMetalResourceBindings();
+    ~HgiMetalResourceBindings() override;
 
     /// Binds the resources to GPU.
     HGIMETAL_API

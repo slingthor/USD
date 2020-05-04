@@ -27,6 +27,7 @@
 
 #include "pxr/imaging/hdSt/textureResource.h"
 #include "pxr/imaging/hdSt/textureResourceHandle.h"
+#include "pxr/imaging/hdSt/resourceBinder.h"
 
 #include "pxr/imaging/hd/vtBufferSource.h"
 
@@ -102,7 +103,7 @@ private:
 
 void
 HdSt_MaterialBufferSourceAndTextureHelper::ProcessTextureMaterialParam(
-    HdSt_MaterialParam const &param,
+    TfToken const &name,
     HdStTextureResourceHandleSharedPtr const &handle,
     HdBufferSpecVector * const specs,
     HdBufferSourceSharedPtrVector * const sources,
@@ -122,7 +123,7 @@ HdSt_MaterialBufferSourceAndTextureHelper::ProcessTextureMaterialParam(
         .bindlessTextureEnabled;
 
     HdStShaderCode::TextureDescriptor tex;
-    tex.name = param.name;
+    tex.name = name;
     tex.handle = handle;
 
     const HdTextureType textureType = texResource->GetTextureType();
@@ -140,8 +141,9 @@ HdSt_MaterialBufferSourceAndTextureHelper::ProcessTextureMaterialParam(
                 sources);
         }
         
-        tex.name =
-            TfToken(param.name.GetString() + "_layout");
+        tex.name = TfToken(
+            name.GetString() +
+            HdSt_ResourceBindingSuffixTokens->layout.GetString());
         tex.type =
             HdStShaderCode::TextureDescriptor::TEXTURE_PTEX_LAYOUT;
         textureDescriptors->push_back(tex);
@@ -167,8 +169,9 @@ HdSt_MaterialBufferSourceAndTextureHelper::ProcessTextureMaterialParam(
                 sources);
         }
         
-        tex.name =
-            TfToken(param.name.GetString() + "_layout");
+        tex.name = TfToken(
+            name.GetString() +
+            HdSt_ResourceBindingSuffixTokens->layout.GetString());
         tex.type =
             HdStShaderCode::TextureDescriptor::TEXTURE_UDIM_LAYOUT;
         textureDescriptors->push_back(tex);
@@ -192,19 +195,22 @@ HdSt_MaterialBufferSourceAndTextureHelper::ProcessTextureMaterialParam(
                     texResource->GetTexelsTextureHandle()),
                 specs,
                 sources);
+        } else {
+            _AddSource(
+                std::make_shared<HdVtBufferSource>(
+                    TfToken(
+                        name.GetString() +
+                        HdSt_ResourceBindingSuffixTokens->valid.GetString()),
+                    VtValue((uint32_t)1)),
+                specs,
+                sources);
         }
     } else if (textureType == HdTextureType::Field) {
         tex.type = HdStShaderCode::TextureDescriptor::TEXTURE_FIELD;
         textureDescriptors->push_back(tex);
         
-        if (bindless) {
-            _AddSource(
-                std::make_shared<HdSt_BindlessSamplerBufferSource>(
-                    tex.name,
-                    texResource->GetTexelsTextureHandle()),
-                specs,
-                sources);
-        }
+        TF_CODING_ERROR(
+            "Field textures no longer supported by old texture system");
     }
 }
 

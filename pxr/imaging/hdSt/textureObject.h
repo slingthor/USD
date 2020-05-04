@@ -44,6 +44,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 #ifdef PXR_PTEX_SUPPORT_ENABLED
 TF_DECLARE_WEAK_AND_REF_PTRS(GarchPtexTexture);
 #endif
+TF_DECLARE_WEAK_AND_REF_PTRS(GarchUdimTexture);
 
 class Hgi;
 using HgiTextureHandle = HgiHandle<class HgiTexture>;
@@ -79,6 +80,14 @@ public:
     HDST_API
     void SetTargetMemory(size_t);
 
+    /// Is texture valid? Only correct after commit phase.
+    ///
+    /// E.g., no file at given file path. Consulted by clients to
+    /// determine whether to use the fallback value.
+    ///
+    HDST_API
+    virtual bool IsValid() const = 0;
+
     /// Get texture type
     ///
     HDST_API
@@ -111,9 +120,6 @@ private:
     const HdStTextureIdentifier _textureId;
     size_t _targetMemory;
 };
-
-using HdStUvTextureObjectSharedPtr =
-    std::shared_ptr<class HdStUvTextureObject>;
 
 /// \class HdStUvTextureObject
 ///
@@ -148,6 +154,9 @@ public:
     }
 
     HDST_API
+    bool IsValid() const override;
+
+    HDST_API
     HdTextureType GetTextureType() const override;
 
 protected:
@@ -162,9 +171,6 @@ private:
     HgiTextureHandle _gpuTexture;
     std::pair<HdWrap, HdWrap> _wrapParameters;
 };
-
-using HdStFieldTextureObjectSharedPtr =
-    std::shared_ptr<class HdStFieldTextureObject>;
 
 /// \class HdStFieldTextureObject
 ///
@@ -207,6 +213,9 @@ public:
     }
 
     HDST_API
+    bool IsValid() const override;
+
+    HDST_API
     HdTextureType GetTextureType() const override;
 
 protected:
@@ -223,16 +232,13 @@ private:
     HgiTextureHandle _gpuTexture;
 };
 
-using HdStPtexTextureObjectSharedPtr =
-    std::shared_ptr<class HdStPtexTextureObject>;
-
 /// \class HdStPtexTextureObject
 ///
 /// A ptex texture - it is using Garch to both load the texture
 /// and allocate the GPU resources (unlike the other texture
 /// types).
 ///
-class HdStPtexTextureObject : public HdStTextureObject
+class HdStPtexTextureObject final : public HdStTextureObject
 {
 public:
     HDST_API
@@ -258,6 +264,9 @@ public:
     GarchTextureGPUHandle GetLayoutGLTextureName() const { return _layoutGLTextureName; }
 
     HDST_API
+    bool IsValid() const override;
+
+    HDST_API
     HdTextureType GetTextureType() const override;
 
 protected:
@@ -271,6 +280,59 @@ private:
 #ifdef PXR_PTEX_SUPPORT_ENABLED
     GarchPtexTextureRefPtr _gpuTexture;
 #endif
+
+    GarchTextureGPUHandle _texelGLTextureName;
+    GarchTextureGPUHandle _layoutGLTextureName;
+};
+
+/// \class HdStUdimTextureObject
+///
+/// A udim texture - it is using Glf to both load the texture
+/// and allocate the GPU resources (unlike the other texture
+/// types).
+///
+class HdStUdimTextureObject final : public HdStTextureObject
+{
+public:
+    HDST_API
+    HdStUdimTextureObject(
+        const HdStTextureIdentifier &textureId,
+        HdSt_TextureObjectRegistry *textureObjectRegistry);
+
+    HDST_API
+    ~HdStUdimTextureObject() override;
+
+    /// Get the GL texture name for the texels
+    ///
+    /// Only valid after commit phase.
+    ///
+    HDST_API
+    GarchTextureGPUHandle GetTexelGLTextureName() const { return _texelGLTextureName; }
+
+    /// Get the GL texture name for the layout
+    ///
+    /// Only valid after commit phase.
+    ///
+    HDST_API
+    GarchTextureGPUHandle GetLayoutGLTextureName() const { return _layoutGLTextureName; }
+
+    HDST_API
+    bool IsValid() const override;
+
+    HDST_API
+    HdTextureType GetTextureType() const override;
+
+protected:
+    HDST_API
+    void _Load() override;
+
+    HDST_API
+    void _Commit() override;
+
+private:
+    std::vector<std::tuple<int, TfToken>> _tiles;
+
+    GarchUdimTextureRefPtr _gpuTexture;
 
     GarchTextureGPUHandle _texelGLTextureName;
     GarchTextureGPUHandle _layoutGLTextureName;
@@ -301,6 +363,11 @@ struct HdSt_TypedTextureObjectHelper<HdTextureType::Field> {
 template<>
 struct HdSt_TypedTextureObjectHelper<HdTextureType::Ptex> {
     using type = HdStPtexTextureObject;
+};
+
+template<>
+struct HdSt_TypedTextureObjectHelper<HdTextureType::Udim> {
+    using type = HdStUdimTextureObject;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

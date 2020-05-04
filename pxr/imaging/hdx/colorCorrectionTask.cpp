@@ -175,7 +175,6 @@ HdxColorCorrectionTask::_CreateOpenColorIOResources()
     #else
         shaderDesc->setLanguage(OCIO::GPU_LANGUAGE_GLSL_4_0);
     #endif
-        shaderDesc->setFunctionName("OCIODisplay");
         gpuProcessor->extractGpuShaderInfo(shaderDesc);
         const Float32 *lutValues = nullptr;
         shaderDesc->get3DTextureValues(0, lutValues);
@@ -233,17 +232,6 @@ HdxColorCorrectionTask::_CreateOpenColorIOResources()
         free(float4AdaptedLutValues);
         //for Metal we want to wrap OCIO in a class to adapt global scope texture to Metal texture passing interfaces
         //Assumption: Config always includes a LUT operation
-        std::stringstream shaderTextStream;
-        shaderTextStream << "struct OcioGenWrapper {" << std::endl;
-        shaderTextStream << ocioGeneratedShaderText;
-        shaderTextStream << "};" << std::endl;
-        shaderTextStream << "float4 callOcioDisplay(vec4 inPixel, texture3d<float> lut3d) {" << std::endl;
-        shaderTextStream << "OcioGenWrapper ocioGen;" << std::endl;
-        shaderTextStream << "ocioGen.ocio_lut3d_0 = lut3d;" << std::endl;
-        shaderTextStream << "return ocioGen.OCIODisplay(inPixel);" << std::endl;
-        shaderTextStream << "}" << std::endl;
-        
-        return shaderTextStream.str();
     #else
         return ocioGeneratedShaderText;
     #endif // PXR_METAL_SUPPORT_ENABLED
@@ -343,7 +331,12 @@ HdxColorCorrectionTask::_CreateShaderResources()
     }
 
     bool useOCIO =_GetUseOcio();
-    HioGlslfx glslfx(HdxPackageColorCorrectionShader());
+    
+    // For Metal shaders we grab a different technique from the glslfx.
+    TfToken const& technique = _hgi->GetAPIName() == HgiTokens->Metal ?
+        HgiTokens->Metal : HioGlslfxTokens->defVal;
+
+    HioGlslfx glslfx(HdxPackageColorCorrectionShader(), technique);
 
     // Setup the vertex shader
     HgiShaderFunctionDesc vertDesc;
@@ -365,7 +358,7 @@ HdxColorCorrectionTask::_CreateShaderResources()
     fragDesc.shaderCode += glslfx.GetSource(_tokens->colorCorrectionFragment);
     if (useOCIO) {
         std::string ocioGpuShaderText = _CreateOpenColorIOResources();
-        fragDesc.shaderCode += ocioGpuShaderText;
+        fragDesc.shaderCode = ocioGpuShaderText + fragDesc.shaderCode;
     }
     HgiShaderFunctionHandle fragFn = _GetHgi()->CreateShaderFunction(fragDesc);
 
@@ -513,7 +506,7 @@ HdxColorCorrectionTask::_CreatePipeline(HgiTextureHandle const& aovTexture)
     
     // Setup attachment descriptor
     _attachment0.blendEnabled = false;
-    _attachment0.loadOp = HgiAttachmentLoadOpLoad;
+    _attachment0.loadOp = HgiAttachmentLoadOpDontCare;
     _attachment0.storeOp = HgiAttachmentStoreOpStore;
     _attachment0.format = aovTexture->GetDescriptor().format;
     desc.colorAttachmentDescs.emplace_back(_attachment0);

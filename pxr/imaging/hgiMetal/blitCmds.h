@@ -1,5 +1,5 @@
 //
-// Copyright 2019 Pixar
+// Copyright 2020 Pixar
 //
 // Licensed under the Apache License, Version 2.0 (the "Apache License")
 // with the following modification; you may not use this file except in
@@ -21,8 +21,8 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#ifndef HGIMETAL_BLIT_ENCODER_H
-#define HGIMETAL_BLIT_ENCODER_H
+#ifndef PXR_IMAGING_HGI_METAL_BLIT_ENCODER_H
+#define PXR_IMAGING_HGI_METAL_BLIT_ENCODER_H
 
 #include "pxr/pxr.h"
 #include "pxr/imaging/hgiMetal/api.h"
@@ -55,6 +55,9 @@ public:
     HGIMETAL_API
     void CopyBufferCpuToGpu(HgiBufferCpuToGpuOp const& copyOp) override;
 
+    HGIMETAL_API
+    void GenerateMipMaps(HgiTextureHandle const& texture) override;
+
 protected:
     friend class HgiMetal;
 
@@ -62,13 +65,15 @@ protected:
     HgiMetalBlitCmds(HgiMetal* hgi);
     
     HGIMETAL_API
-    void Commit();
-
+    bool Commit();
+    
 private:
     HgiMetalBlitCmds() = delete;
     HgiMetalBlitCmds & operator=(const HgiMetalBlitCmds&) = delete;
     HgiMetalBlitCmds(const HgiMetalBlitCmds&) = delete;
 
+    void _CreateEncoder();
+    
     HgiMetal* _hgi;
     id<MTLBlitCommandEncoder> _blitEncoder;
     NSString* _label;

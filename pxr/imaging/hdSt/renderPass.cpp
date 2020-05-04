@@ -202,38 +202,7 @@ HdSt_RenderPass::_Execute(HdRenderPassStateSharedPtr const &renderPassState,
             context->SetOutputPixelFormats(colorFormat, depthFormat);
         }
     }
-    /*
-    // TEMPORARY - pending Mtlf integrating with HgiMetal
-    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
-    if (!context->GetDrawTarget())
-    {
-        // Set the render pass descriptor to use for the render encoders
-        MTLRenderPassDescriptor* rpd = context->GetRenderPassDescriptor();
-        MTLPixelFormat colorFormat = MTLPixelFormatInvalid;
-        MTLPixelFormat depthFormat = MTLPixelFormatInvalid;
-        size_t i;
-        for (i=0; i<desc.colorTextures.size(); i++) {
-            HgiMetalTexture *metalTexture =
-                static_cast<HgiMetalTexture*>(desc.colorTextures[i].Get());
-            rpd.colorAttachments[i].texture = metalTexture->GetTextureId();
-            colorFormat = rpd.colorAttachments[i].texture.pixelFormat;
-        }
-        while (i<8) {
-            rpd.colorAttachments[i++].texture = nil;
-        }
-        if (desc.depthTexture) {
-            HgiMetalTexture *metalTexture =
-                static_cast<HgiMetalTexture*>(desc.depthTexture.Get());
-            rpd.depthAttachment.texture = metalTexture->GetTextureId();
-            depthFormat = rpd.depthAttachment.texture.pixelFormat;
-        }
-        else {
-            rpd.depthAttachment.texture = nil;
-        }
-        context->SetRenderPassDescriptor(rpd);
-        context->SetOutputPixelFormats(colorFormat, depthFormat);
-    }
-*/
+
     // Draw
     HdStCommandBuffer* cmdBuffer = &_cmdBuffer;
 #if defined(PXR_OPENGL_SUPPORT_ENABLED)

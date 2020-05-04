@@ -148,6 +148,9 @@ private:
     // Utility to create resource bindings
     bool _CreateResourceBindings(TextureMap const& textures);
 
+    // Utility to create default vertex buffer descriptor
+    void _CreateVertexBufferDescriptor();
+
     // Utility to create a pipeline
     bool _CreateDefaultPipeline(
         HgiTextureHandle const& colorDst,
@@ -171,7 +174,7 @@ private:
     BufferMap _buffers;
 
     TfToken _glslfx;
-    TfToken _technique;
+    TfToken _shaderName;
     
     bool _flipOnDraw;
 
@@ -180,6 +183,7 @@ private:
     HgiShaderProgramHandle _shaderProgram;
     HgiResourceBindingsHandle _resourceBindings;
     HgiPipelineHandle _pipeline;
+    HgiVertexBufferDesc _vboDesc;
 
     bool _blendingEnabled;
     HgiBlendFactor _srcColorBlendFactor;

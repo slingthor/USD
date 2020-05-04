@@ -126,7 +126,7 @@ public:
     /// The \p filename parameter is only used for error reporting.
     ///
     HIO_API
-    static HioGlslfxConfig * Read(std::string const *technique,
+    static HioGlslfxConfig * Read(TfToken const & technique,
                                   std::string const & input,
                                   std::string const & filename,
                                   std::string *errorStr);
@@ -157,7 +157,7 @@ public:
 
 private:
     // private ctor. should only be called by ::Read
-    HioGlslfxConfig(std::string const *technique,
+    HioGlslfxConfig(TfToken const& technique,
                     VtDictionary const & dict,
                     std::string *errorStr);
 
@@ -178,7 +178,7 @@ private:
     _SourceKeyMap _GetSourceKeyMap(VtDictionary const & dict,
                                    std::string *errorStr) const;
 
-    std::string const* _technique;
+    TfToken _technique;
     Parameters _params;
     Textures _textures;
     Attributes _attributes;

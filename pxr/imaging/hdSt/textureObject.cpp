@@ -34,8 +34,12 @@
 #include "pxr/imaging/garch/vdbTextureData.h"
 #endif
 #include "pxr/imaging/garch/ptexTexture.h"
+#include "pxr/imaging/garch/udimTexture.h"
 
 #include "pxr/imaging/hgi/hgi.h"
+#include "pxr/imaging/hgi/blitCmds.h"
+
+#include "pxr/usd/ar/resolver.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -83,12 +87,21 @@ static
 std::string
 _GetDebugName(const HdStTextureIdentifier &textureId)
 {
-    if (HdStVdbSubtextureIdentifier const * vdbSubtextureId =
+    if (const HdStVdbSubtextureIdentifier * const vdbSubtextureId =
             dynamic_cast<const HdStVdbSubtextureIdentifier*>(
                 textureId.GetSubtextureIdentifier())) {
         return
             textureId.GetFilePath().GetString() + " - " +
             vdbSubtextureId->GetGridName().GetString();
+    }
+
+    if (const HdStUvOrientationSubtextureIdentifier * const subId =
+            dynamic_cast<const HdStUvOrientationSubtextureIdentifier*>(
+                textureId.GetSubtextureIdentifier())) {
+        return
+            textureId.GetFilePath().GetString()
+            + " - flipVertically="
+            + std::to_string(int(subId->GetFlipVertically()));
     }
      
     return
@@ -112,9 +125,9 @@ _GetTextureType(int numDimensions)
 
 // A helper class that creates an HgiTextureDesc from GlfBaseTextureData.
 //
-// It will convert RGB to RGBA if necessary, creates a 1x1(x1) black texture
-// if the texture has 0 extents and manages the life time of the CPU buffers
-// (either by keeping GarchBaseTextureData or its own buffer alive).
+// It will convert RGB to RGBA if necessary and manages the life time
+// of the CPU buffers (either by keeping GarchBaseTextureData or its own
+// buffer alive).
 // 
 class HdSt_TextureObjectCpuData
 {
@@ -122,28 +135,33 @@ public:
     // Created using texture data and a debug name used for the
     // texture descriptor.
     HdSt_TextureObjectCpuData(GarchBaseTextureDataRefPtr const &textureData,
-                              const std::string &debugName);
+                              const std::string &debugName,
+                              bool generateMips = false,
+                              GarchImage::ImageOriginLocation originLocation
+                                          = GarchImage::OriginUpperLeft);
 
     ~HdSt_TextureObjectCpuData() = default;
 
     // Texture descriptor, including initialData pointer.
     const HgiTextureDesc &GetTextureDesc() const { return _textureDesc; }
 
-private:
-    // Computes dimension ensuring they are at least 1
-    // in each direction.
-    // Returns true if the texture had non-zero extents.
-    bool _ComputeDimensions(
-        GarchBaseTextureDataRefPtr const &textureData);
-    // Fill texture descriptor's dimension, format and
-    // initialData.
-    // The initialData can come either directly from the
-    // provided texture data or from our own buffer if
-    // a conversion was necessary.
-    void _ConvertFormatIfNecessary(
-        GarchBaseTextureDataRefPtr const &textureData);
+    // Texture data valid? False if, e.g., no file at given path.
+    bool IsValid() const { return _textureDesc.initialData; }
 
-    // The result!
+private:
+    // Determine format for texture descriptor.
+    //
+    // If necessary, converts the RGB to RGBA data updating 
+    // _textureDesc.initialData to point to the newly allocated data
+    // (and dropping _textureData).
+    //
+    HgiFormat _DetermineFormatAndConvertIfNecessary(
+        const GLenum glFormat,
+        const GLenum glType,
+        const GLenum glInternalFormat);
+
+    // The result, including a pointer to the potentially
+    // converted texture data in _textureDesc.initialData.
     HgiTextureDesc _textureDesc;
 
     // To avoid a copy, hold on to original data if we
@@ -153,44 +171,87 @@ private:
     std::unique_ptr<const unsigned char[]> _convertedRawData;
 };
 
+// Compute the number of mip levels given the dimensions of a texture using
+// the same formula as OpenGL.
+static
+uint16_t _ComputeNumMipLevels(const GfVec3i &dimensions)
+{
+    const int dim = std::max({dimensions[0], dimensions[1], dimensions[2]});
+
+    for (uint16_t i = 1; i < 8 * sizeof(int) - 1; i++) {
+        const int powerTwo = 1 << i;
+        if (powerTwo > dim) {
+            return i;
+        }
+    }
+    
+    // Can never be reached, but compiler doesn't know that.
+    return 1;
+}
+
+static
+bool
+_IsValid(GarchBaseTextureDataRefPtr const &textureData)
+{
+    return
+        textureData->ResizedWidth() > 0 &&
+        textureData->ResizedHeight() > 0 &&
+        textureData->ResizedDepth() > 0 &&
+        textureData->HasRawBuffer();
+}
+
 HdSt_TextureObjectCpuData::HdSt_TextureObjectCpuData(
     GarchBaseTextureDataRefPtr const &textureData,
-    const std::string &debugName)
+    const std::string &debugName,
+    const bool generateMips,
+    const GarchImage::ImageOriginLocation originLocation)
+  : _textureData(textureData)
 {
     TRACE_FUNCTION();
 
     _textureDesc.debugName = debugName;
 
+    // Bail if we don't have texture data.
     if (!textureData) {
         return;
     }
 
     // Read texture file
-    textureData->Read(0, false);
-
-    // Fill texture descriptor's dimension, format and
-    // initialData.
-    _ConvertFormatIfNecessary(textureData);
-
-    _textureDesc.type = _GetTextureType(textureData->NumDimensions());
-    _textureDesc.pixelsByteSize = HgiDataSizeOfFormat(_textureDesc.format);
-}
-
-bool
-HdSt_TextureObjectCpuData::_ComputeDimensions(
-    GarchBaseTextureDataRefPtr const &textureData)
-{
-    const GfVec3i dims(textureData->ResizedWidth(),
-                       textureData->ResizedHeight(),
-                       textureData->ResizedDepth());
-
-    if (dims[0] * dims[1] * dims[2] > 0) {
-        _textureDesc.dimensions = dims;
-        return true;
-    } else {
-        _textureDesc.dimensions = GfVec3i(1,1,1);
-        return false;
+    if (!textureData->Read(0, false, originLocation)) {
+        return;
     }
+
+    // Sanity checks
+    if (!_IsValid(textureData)) {
+        return;
+    }
+
+    // If there is no file at the given path, we should have bailed
+    // by now and left _textureDesc.initalData null indicating to
+    // our clients that the texture is invalid.
+
+    // Is this 2D or 3D texture?
+    _textureDesc.type = _GetTextureType(textureData->NumDimensions());
+    _textureDesc.dimensions = GfVec3i(
+        textureData->ResizedWidth(),
+        textureData->ResizedHeight(),
+        textureData->ResizedDepth());
+    // Image data - might need RGB to RGBA conversion.
+    _textureDesc.initialData = textureData->GetRawBuffer();
+
+    if (generateMips) {
+        _textureDesc.mipLevels = _ComputeNumMipLevels(_textureDesc.dimensions);
+    }
+
+    // Determine the format (e.g., float/byte, RED/RGBA).
+    // Convert data if necessary, setting initialData to the buffer
+    // with the new data and freeing _textureData
+    _textureDesc.format = _DetermineFormatAndConvertIfNecessary(
+        textureData->GLFormat(),
+        textureData->GLType(),
+        textureData->GLInternalFormat());
+
+    _textureDesc.pixelsByteSize = HgiDataSizeOfFormat(_textureDesc.format);
 }
 
 template<typename T>
@@ -233,114 +294,88 @@ constexpr HgiFormat _CheckValid()
     return f;
 }
 
-void
-HdSt_TextureObjectCpuData::_ConvertFormatIfNecessary(
-    GarchBaseTextureDataRefPtr const &textureData)
+HgiFormat
+HdSt_TextureObjectCpuData::_DetermineFormatAndConvertIfNecessary(
+    const GLenum glFormat,
+    const GLenum glType,
+    const GLenum glInternalFormat)
 {
-    // Whether we need to keep the ref ptr to texture data alive because
-    // we are using its CPU buffer.
-    bool keepTextureDataAlive = true;
-
-    static const unsigned char zeros[256] = {};
-
-    const bool nonEmpty = _ComputeDimensions(textureData);
-
-    // Use zero-initialized data when texture has no extent.
-    const unsigned char * const unconvertedData =
-        nonEmpty ? textureData->GetRawBuffer() : zeros;
-
-    if (!nonEmpty) {
-        // If using zero-initialized data, no need to keep texture data
-        // around.
-        keepTextureDataAlive = false;
-    }
-
-    const GLenum glFormat = textureData->GLFormat();
-    const GLenum glType = textureData->GLType();
-
     // Format dispatch, mostly we can just use the CPU buffer from
     // the texture data provided.
     switch(glFormat) {
     case GL_RED:
         switch(glType) {
         case GL_UNSIGNED_BYTE:
-            _textureDesc.format = _CheckValid<HgiFormatUNorm8>();
-            _textureDesc.initialData = unconvertedData;
-            break;
+            return _CheckValid<HgiFormatUNorm8>();
         case GL_FLOAT:
-            _textureDesc.format = _CheckValid<HgiFormatFloat32>();
-            _textureDesc.initialData = unconvertedData;
-            break;
+            return _CheckValid<HgiFormatFloat32>();
         default:
             TF_CODING_ERROR("Unsupported texture format GL_RGBA %d",
                             glType);
+            return HgiFormatInvalid;
         }
-        break;
     case GL_RG:
         switch(glType) {
         case GL_UNSIGNED_BYTE:
-            _textureDesc.format = _CheckValid<HgiFormatUNorm8Vec2>();
-            _textureDesc.initialData = unconvertedData;
-            break;
+            return _CheckValid<HgiFormatUNorm8Vec2>();
         case GL_FLOAT:
-            _textureDesc.format = _CheckValid<HgiFormatFloat32Vec2>();
-            _textureDesc.initialData = unconvertedData;
-            break;
+            return _CheckValid<HgiFormatFloat32Vec2>();
         default:
             TF_CODING_ERROR("Unsupported texture format GL_RGBA %d",
                             glType);
+            return HgiFormatInvalid;
         }
-        break;
     case GL_RGB:
         switch(glType) {
         case GL_UNSIGNED_BYTE:
-            // RGB (24bit) is not supported on MTL, so we can convert
-            // it and use it here.
+            // RGB (24bit) is not supported on MTL, so we need to convert it.
             _convertedRawData = 
                 _ConvertRGBToRGBA<unsigned char>(
-                    unconvertedData,
+                    reinterpret_cast<const unsigned char *>(
+                        _textureDesc.initialData),
                     _textureDesc.dimensions,
                     255);
-            _textureDesc.format = _CheckValid<HgiFormatUNorm8Vec4>();
+            // Point to the buffer with the converted data.
             _textureDesc.initialData = _convertedRawData.get();
-            // texture data can be dropped because data have been
-            // copied/converted into our own buffer.
-            keepTextureDataAlive = false;
-            break;
+            // Drop the old buffer.
+            _textureData = TfNullPtr;
+
+            if (glInternalFormat == GL_SRGB8) {
+                return _CheckValid<HgiFormatUNorm8Vec4srgb>();
+            } else {
+                return _CheckValid<HgiFormatUNorm8Vec4>();
+            }
         case GL_FLOAT:
-            _textureDesc.format = _CheckValid<HgiFormatFloat32Vec3>();
-            _textureDesc.initialData = unconvertedData;
-            break;
+            return _CheckValid<HgiFormatFloat32Vec3>();
         default:
             TF_CODING_ERROR("Unsupported texture format GL_RGBA %d",
                             glType);
+            return HgiFormatInvalid;
         }
-        break;
     case GL_RGBA:
         switch(glType) {
         case GL_UNSIGNED_BYTE:
-            _textureDesc.format = _CheckValid<HgiFormatUNorm8Vec4>();
-            _textureDesc.initialData = unconvertedData;
-            break;
+            if (glInternalFormat == GL_SRGB8_ALPHA8) {
+                return _CheckValid<HgiFormatUNorm8Vec4srgb>();
+            } else {
+                return _CheckValid<HgiFormatUNorm8Vec4>();
+            }
         case GL_FLOAT:
-            _textureDesc.format = _CheckValid<HgiFormatFloat32Vec4>();
-            _textureDesc.initialData = unconvertedData;
-            break;
+            return _CheckValid<HgiFormatFloat32Vec4>();
         default:
             TF_CODING_ERROR("Unsupported texture format GL_RGBA %d",
                             glType);
+            return HgiFormatInvalid;
         }
-        break;
     default:
         TF_CODING_ERROR("Unsupported texture format %d %d",
                         glFormat, glType);
-    }
-    
-
-    if (keepTextureDataAlive) {
-        _textureData = textureData;
+        return HgiFormatInvalid;
     }
 }
+
+///////////////////////////////////////////////////////////////////////////////
+// Uv texture
 
 static
 HdWrap
@@ -382,8 +417,25 @@ _GetWrapParameters(GarchUVTextureDataRefPtr const &uvTexture)
              _GetWrapParameter(wrapInfo.hasWrapModeT, wrapInfo.wrapModeT) };
 }
 
-///////////////////////////////////////////////////////////////////////////////
-// Uv texture
+// Read from the HdStUvOrientationSubtextureIdentifier whether we need
+// to flip the image.
+//
+// This is to support the legacy HwUvTexture_1 shader node which has the
+// vertical orientation opposite to UsdUvTexture.
+//
+static
+GarchImage::ImageOriginLocation
+_GetImageOriginLocation(const HdStSubtextureIdentifier * const subId)
+{
+    using SubId = const HdStUvOrientationSubtextureIdentifier;
+    
+    if (SubId* const uvSubId = dynamic_cast<SubId*>(subId)) {
+        if (uvSubId->GetFlipVertically()) {
+            return GarchImage::OriginUpperLeft;
+        }
+    }
+    return GarchImage::OriginLowerLeft;
+}
 
 HdStUvTextureObject::HdStUvTextureObject(
     const HdStTextureIdentifier &textureId,
@@ -412,10 +464,16 @@ HdStUvTextureObject::_Load()
             /* borders */ 0, 0, 0, 0);
 
     _cpuData = std::make_unique<HdSt_TextureObjectCpuData>(
-        textureData, _GetDebugName(GetTextureIdentifier()));
+        textureData,
+        _GetDebugName(GetTextureIdentifier()),
+        /* generateMips = */ true,
+        _GetImageOriginLocation(
+            GetTextureIdentifier().GetSubtextureIdentifier()));
 
-    if (_cpuData->GetTextureDesc().type != HgiTextureType2D) {
-        TF_CODING_ERROR("Wrong texture type for uv");
+    if (_cpuData->IsValid()) {
+        if (_cpuData->GetTextureDesc().type != HgiTextureType2D) {
+            TF_CODING_ERROR("Wrong texture type for uv");
+        }
     }
 
     // _GetWrapParameters can only be called after the texture has
@@ -436,15 +494,27 @@ HdStUvTextureObject::_Commit()
     // Free previously allocated texture
     hgi->DestroyTexture(&_gpuTexture);
 
-    if (!_cpuData) {
-        return;
-    }
+    // Upload to GPU only if we have valid CPU data
+    if (_cpuData && _cpuData->IsValid()) {
+        const HgiTextureDesc &desc = _cpuData->GetTextureDesc();
 
-    // Upload to GPU
-    _gpuTexture = hgi->CreateTexture(_cpuData->GetTextureDesc());
+        // Upload to GPU
+        _gpuTexture = hgi->CreateTexture(desc);
+        if (desc.mipLevels > 1) {
+            HgiBlitCmdsUniquePtr const blitCmds = hgi->CreateBlitCmds();
+            blitCmds->GenerateMipMaps(_gpuTexture);
+            hgi->SubmitCmds(blitCmds.get(), 1);
+        }
+    }
 
     // Free CPU memory after transfer to GPU
     _cpuData.reset();
+}
+
+bool
+HdStUvTextureObject::IsValid() const
+{
+    return _gpuTexture;
 }
 
 HdTextureType
@@ -528,7 +598,11 @@ HdStFieldTextureObject::_Load()
         texData,
         _GetDebugName(GetTextureIdentifier()));
 
-    if (texData) {
+    if (_cpuData->IsValid()) {
+        if (_cpuData->GetTextureDesc().type != HgiTextureType3D) {
+            TF_CODING_ERROR("Wrong texture type for field");
+        }
+
         _bbox = texData->GetBoundingBox();
         _samplingTransform = _ComputeSamplingTransform(_bbox);
     } else {
@@ -536,9 +610,6 @@ HdStFieldTextureObject::_Load()
         _samplingTransform = GfMatrix4d(1.0);
     }
 
-    if (_cpuData->GetTextureDesc().type != HgiTextureType3D) {
-        TF_CODING_ERROR("Wrong texture type for field");
-    }
 #endif
 }
 
@@ -555,15 +626,19 @@ HdStFieldTextureObject::_Commit()
     // Free previously allocated texture
     hgi->DestroyTexture(&_gpuTexture);
 
-    if (!_cpuData) {
-        return;
+    // Upload to GPU only if we have valid CPU data
+    if (_cpuData && _cpuData->IsValid()) {
+        _gpuTexture = hgi->CreateTexture(_cpuData->GetTextureDesc());
     }
-    
-    // Upload to GPU
-    _gpuTexture = hgi->CreateTexture(_cpuData->GetTextureDesc());
 
     // Free CPU memory after transfer to GPU
     _cpuData.reset();
+}
+
+bool
+HdStFieldTextureObject::IsValid() const
+{
+    return _gpuTexture;
 }
 
 HdTextureType
@@ -605,10 +680,137 @@ HdStPtexTextureObject::_Commit()
 #endif
 }
 
+bool
+HdStPtexTextureObject::IsValid() const
+{
+    // Checking whether ptex texture is valid not supported yet.
+    return true;
+}
+
 HdTextureType
 HdStPtexTextureObject::GetTextureType() const
 {
     return HdTextureType::Ptex;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// Udim texture
+
+static const char UDIM_PATTERN[] = "<UDIM>";
+static const int UDIM_START_TILE = 1001;
+static const int UDIM_END_TILE = 1100;
+
+// Split a udim file path such as /someDir/myFile.<UDIM>.exr into a
+// prefix (/someDir/myFile.) and suffix (.exr).
+static
+std::pair<std::string, std::string>
+_SplitUdimPattern(const std::string &path)
+{
+    static const std::string pattern(UDIM_PATTERN);
+
+    const std::string::size_type pos = path.find(pattern);
+
+    if (pos != std::string::npos) {
+        return { path.substr(0, pos), path.substr(pos + pattern.size()) };
+    }
+    
+    return { std::string(), std::string() };
+}
+
+// Find all udim tiles for a given udim file path /someDir/myFile.<UDIM>.exr as
+// pairs, e.g., (0, /someDir/myFile.1001.exr), ...
+//
+// The scene delegate is assumed to already have resolved the asset path with
+// the <UDIM> pattern to a "file path" with the <UDIM> pattern as above.
+// This function will replace <UDIM> by different integers and check whether
+// the "file" exists using an ArGetResolver.
+//
+// Note that the ArGetResolver is still needed, for, e.g., usdz file
+// where the path we get from the scene delegate is
+// /someDir/myFile.usdz[myImage.<UDIM>.EXR] and we need to use the
+// ArGetResolver to check whether, e.g., myImage.1001.EXR exists in
+// the zip file /someDir/myFile.usdz by calling
+// resolver.Resolve(/someDir/myFile.usdz[myImage.1001.EXR]).
+// However, we don't need to bind, e.g., the usd stage's resolver context
+// because that part of the resolution will be done by the scene delegate
+// for us already.
+//
+static
+std::vector<std::tuple<int, TfToken>>
+_FindUdimTiles(const std::string &filePath)
+{
+    std::vector<std::tuple<int, TfToken>> result;
+
+    // Get prefix and suffix from udim pattern.
+    const std::pair<std::string, std::string>
+        splitPath = _SplitUdimPattern(filePath);
+    if (splitPath.first.empty() && splitPath.second.empty()) {
+        TF_WARN("Expected udim pattern but got '%s'.",
+                filePath.c_str());
+        return result;
+    }
+
+    ArResolver& resolver = ArGetResolver();
+    
+    for (int i = UDIM_START_TILE; i < UDIM_END_TILE; i++) {
+        // Add integer between prefix and suffix and see whether
+        // the tile exists by consulting the resolver.
+        const std::string resolvedPath =
+            resolver.Resolve(
+                splitPath.first + std::to_string(i) + splitPath.second);
+        if (!resolvedPath.empty()) {
+            // Record pair in result.
+            result.emplace_back(i - UDIM_START_TILE, resolvedPath);
+        }
+    }
+
+    return result;
+}
+
+HdStUdimTextureObject::HdStUdimTextureObject(
+    const HdStTextureIdentifier &textureId,
+    HdSt_TextureObjectRegistry * const textureObjectRegistry)
+  : HdStTextureObject(textureId, textureObjectRegistry)
+{
+}
+
+HdStUdimTextureObject::~HdStUdimTextureObject() = default;
+
+void
+HdStUdimTextureObject::_Load()
+{
+    // Glf is both loading the tiles and creating the GL resources, so
+    // not thread-safe.
+    //
+    // The only thing we can do here is determine the tiles.
+    _tiles = _FindUdimTiles(GetTextureIdentifier().GetFilePath());
+}
+
+void
+HdStUdimTextureObject::_Commit()
+{
+    // Load tiles.
+    _gpuTexture = GarchUdimTexture::New(
+        GetTextureIdentifier().GetFilePath(),
+        GarchImage::OriginLowerLeft,
+        std::move(_tiles));
+    _gpuTexture->SetMemoryRequested(GetTargetMemory());
+
+    _layoutGLTextureName = _gpuTexture->GetLayoutName();
+    _texelGLTextureName = _gpuTexture->GetTextureName();
+}
+
+bool
+HdStUdimTextureObject::IsValid() const
+{
+    // Checking whether ptex texture is valid not supported yet.
+    return true;
+}
+
+HdTextureType
+HdStUdimTextureObject::GetTextureType() const
+{
+    return HdTextureType::Udim;
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

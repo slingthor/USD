@@ -1,5 +1,5 @@
 //
-// Copyright 2019 Pixar
+// Copyright 2020 Pixar
 //
 // Licensed under the Apache License, Version 2.0 (the "Apache License")
 // with the following modification; you may not use this file except in
@@ -46,7 +46,7 @@ public:
     HgiMetalBuffer(HgiMetal *hgi, HgiBufferDesc const & desc);
 
     HGIMETAL_API
-    virtual ~HgiMetalBuffer();
+    ~HgiMetalBuffer() override;
 
     id<MTLBuffer> GetBufferId() const {return _bufferId;}
 

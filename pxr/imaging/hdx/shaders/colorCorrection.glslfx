@@ -131,10 +131,6 @@ vec3 FloatToSRGB(vec3 val)
     return val;
 }
 
-// Forward declare because C++ code will append the OCIO fn at end of shader
-#if defined(GLSLFX_USE_OCIO)
-float4 callOcioDisplay(vec4 inPixel, texture3d<float> lut3d);
-#endif
 
 fragment half4 fragmentEntryPoint(
     Interpolated input[[stage_in]],
@@ -144,7 +140,7 @@ fragment half4 fragmentEntryPoint(
     vec4 color = colorIn.read(uint2(input.position.xy));
 
     #if defined(GLSLFX_USE_OCIO)
-        color = callOcioDisplay(color, LUT3dIn);
+        color = OCIO(LUT3dIn).Display(color);
     #else
         // Only color, not alpha is gamma corrected!
         color.rgb = FloatToSRGB(color.rgb);

@@ -21,8 +21,8 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#ifndef PXR_IMAGING_HGIMETAL_PIPELINE_H
-#define PXR_IMAGING_HGIMETAL_PIPELINE_H
+#ifndef PXR_IMAGING_HGI_METAL_PIPELINE_H
+#define PXR_IMAGING_HGI_METAL_PIPELINE_H
 
 #include "pxr/pxr.h"
 #include "pxr/imaging/hgi/graphicsCmdsDesc.h"
@@ -48,7 +48,7 @@ public:
     HgiMetalPipeline(HgiMetal *hgi, HgiPipelineDesc const& desc);
 
     HGIMETAL_API
-    virtual ~HgiMetalPipeline();
+    ~HgiMetalPipeline() override;
 
     /// Apply pipeline state
     HGIMETAL_API

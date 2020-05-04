@@ -14,9 +14,6 @@ else()
 FIND_LIBRARY(APPUIKIT_LIBRARY AppKit)
 endif()
 
-# Compile cpp files as obj-c++ to allow inline use of Metal API
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -x objective-c++")
-
 pxr_library(hgiMetal
     LIBRARIES
         arch
@@ -26,24 +23,36 @@ pxr_library(hgiMetal
         ${METAL_LIBRARY}
         ${APPUIKIT_LIBRARY}
 
-    PRIVATE_CLASSES
-        conversions
-        diagnostic
-
-    PUBLIC_CLASSES
-        blitCmds
-        buffer
-        capabilities
-        graphicsCmds
-        hgi
-        pipeline
-        resourceBindings
-        shaderFunction
-        shaderProgram
-        texture
-
     PUBLIC_HEADERS
         api.h
+        capabilities.h
+        diagnostic.h
+        hgi.h
+        texture.h
+
+    PRIVATE_HEADERS
+        blitCmds.h
+        buffer.h
+        conversions.h
+        graphicsCmds.h
+        pipeline.h
+        resourceBindings.h
+        shaderFunction.h
+        shaderProgram.h
+
+    CPPFILES
+        blitCmds.mm
+        buffer.mm
+        capabilities.mm
+        conversions.mm
+        diagnostic.mm
+        graphicsCmds.mm
+        hgi.mm
+        pipeline.mm
+        resourceBindings.mm
+        shaderFunction.mm
+        shaderProgram.mm
+        texture.mm
 
     RESOURCE_FILES
         plugInfo.json

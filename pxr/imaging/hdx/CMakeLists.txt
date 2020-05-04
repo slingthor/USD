@@ -85,7 +85,6 @@ pxr_library(hdx
         unitTestDelegate
 
     PRIVATE_HEADERS
-        unitTestGLDrawing.h
         unitTestUtils.h
 
     RESOURCE_FILES
@@ -136,26 +135,26 @@ pxr_build_test(testHdxIdRender
     LIBRARIES
         hdx
         hd
+        hdSt
         sdf
         glf
         garch
         arch
         tf
     CPPFILES
-        unitTestGLDrawing.cpp
         testenv/testHdxIdRender.cpp
 )
 pxr_build_test(testHdxPickAndHighlight
     LIBRARIES
         hdx
         hd
+        hdSt
         sdf
         glf
         garch
         arch
         tf
     CPPFILES
-        unitTestGLDrawing.cpp
         unitTestUtils.cpp
         testenv/testHdxPickAndHighlight.cpp
 )
@@ -187,13 +186,13 @@ pxr_build_test(testHdxPickingWithReprAndRefineChanges
     LIBRARIES
         hdx
         hd
+        hdSt
         sdf
         glf
         garch
         arch
         tf
     CPPFILES
-        unitTestGLDrawing.cpp
         unitTestUtils.cpp
         testenv/testHdxPickingWithReprAndRefineChanges.cpp
 )
@@ -201,13 +200,13 @@ pxr_build_test(testHdxUnpickablesAsOccluders
     LIBRARIES
         hdx
         hd
+        hdSt
         sdf
         glf
         garch
         arch
         tf
     CPPFILES
-        unitTestGLDrawing.cpp
         unitTestUtils.cpp
         testenv/testHdxUnpickablesAsOccluders.cpp
 )
@@ -215,13 +214,13 @@ pxr_build_test(testHdxPickSubprims
     LIBRARIES
         hdx
         hd
+        hdSt
         sdf
         glf
         garch
         arch
         tf
     CPPFILES
-        unitTestGLDrawing.cpp
         unitTestUtils.cpp
         testenv/testHdxPickSubprims.cpp
 )
