@@ -6,6 +6,7 @@ import threading
 from distutils.dir_util import copy_tree
 from os.path import isdir, isfile, join
 from shutil import copy, copyfile
+import multiprocessing as mp
 
 SDKVersion  = subprocess.check_output(['xcodebuild', '-version']).strip()[6:10]
 codeSignIDs = subprocess.check_output(['security', 'find-identity', '-v', '-p', 'codesigning'])
@@ -55,78 +56,56 @@ def Run(cmd):
     subprocess.call(cmd, stdout=devout, stderr=devout)
 
 
-def add_rpath_to_files(path, files):
-    threads = []
-    for f in files:
-        dir_path=os.path.dirname(f)
-        path_between = os.path.relpath(path, dir_path)
-        if path_between != ".":
-            t = threading.Thread(target=Run, args=(['install_name_tool', '-add_rpath', '@loader_path/' + path_between, f],))
-#            subprocess.call(['install_name_tool', '-add_rpath', '@loader_path/' + path_between, f],
-#                stdout=devout, stderr=devout)
-            t.start()
-            threads.append(t)
-
-    for t in threads:
-        t.join()
+def add_rpath_to_file(args):
+    path = args[0]
+    f = args[1]
+    dir_path=os.path.dirname(f)
+    path_between = os.path.relpath(path, dir_path)
+    if path_between != ".":
+        subprocess.call(['install_name_tool', '-add_rpath', '@loader_path/' + path_between, f],
+            stdout=devout, stderr=devout)
 
 
-def remove_rpath(path, files):
-    threads = []
-    for f in files:
-#        subprocess.call(['install_name_tool', '-delete_rpath', path, f],
-#            stdout=devout, stderr=devout)
-        t = threading.Thread(target=Run, args=(['install_name_tool', '-delete_rpath', path, f],))
-        t.start()
-        threads.append(t)
-
-    for t in threads:
-        t.join()
+def remove_rpath(args):
+    path = args[0]
+    f = args[1]
+    subprocess.call(['install_name_tool', '-delete_rpath', path, f],
+        stdout=devout, stderr=devout)
 
 
-def change_absolute_to_relative(files, path_to_replace, custom_path=""):
-    threads = []
-    for f in files:
-        otool_output = ""
+def change_absolute_to_relative(args):
+    file = args[0]
+    path_to_replace = args[1]
+    custom_path = args[2]
+    
+    otool_output = ""
 
-        p = subprocess.Popen(['otool', '-L', f], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        otool_output, err = p.communicate(b"")
-        returncode = p.returncode
+    p = subprocess.Popen(['otool', '-L', file], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    otool_output, err = p.communicate(b"")
+    returncode = p.returncode
 
-        if returncode != 0:
-            continue
-        for line in otool_output.splitlines():
-            extracted_path = line.split()[0]
-            replace_path_idx = extracted_path.find(path_to_replace)
-            if replace_path_idx != -1:
-                cur_dir_path=os.path.dirname(f)
-                if custom_path == "":
-                    path_between = os.path.relpath(extracted_path, cur_dir_path)
-                else:
-                    inside_idx = replace_path_idx + len(path_to_replace)
-                    suffix_path = extracted_path[inside_idx:]
-                    path_between = os.path.relpath(custom_path+suffix_path, cur_dir_path)
-#                subprocess.call(['install_name_tool', '-change', extracted_path, '@loader_path/' + path_between, f],
-#                    stdout=devout, stderr=devout)
-                t = threading.Thread(target=Run, args=(['install_name_tool', '-change', extracted_path, '@loader_path/' + path_between, f],))
-                t.start()
-                threads.append(t)
-
-    for t in threads:
-        t.join()
+    if returncode != 0:
+        return
+    for line in otool_output.splitlines():
+        extracted_path = line.split()[0]
+        replace_path_idx = extracted_path.find(path_to_replace)
+        if replace_path_idx != -1:
+            cur_dir_path=os.path.dirname(file)
+            if custom_path == "":
+                path_between = os.path.relpath(extracted_path, cur_dir_path)
+            else:
+                inside_idx = replace_path_idx + len(path_to_replace)
+                suffix_path = extracted_path[inside_idx:]
+                path_between = os.path.relpath(custom_path+suffix_path, cur_dir_path)
+            
+            subprocess.call(['install_name_tool', '-change', extracted_path, '@loader_path/' + path_between, file],
+                stdout=devout, stderr=devout)
 
 
-def codesign_files(files):
-    threads = []
-    for f in files:
-        t = threading.Thread(target=Run, args=(['codesign', '-f', '-s', '{codesignid}'.format(codesignid=codeSignID), f],))
-        t.start()
-        threads.append(t)
-#        subprocess.call(['codesign', '-f', '-s', '{codesignid}'.format(codesignid=codeSignID), f],
-#            stdout=devout, stderr=devout)
 
-    for t in threads:
-        t.join()
+def codesign_file(file):
+    subprocess.call(['codesign', '-f', '-s', '{codesignid}'.format(codesignid=codeSignID), file],
+        stdout=devout, stderr=devout)
 
 
 def is_object_file(file):
@@ -209,10 +188,12 @@ def make_relocatable(install_path, buildPython, iOS, verbose_output=False):
     extract_files_recursive(install_path + '/tests', file_check, files)
     extract_files(install_path + '/tests', (lambda file: isfile(file) and open(file).readline().rstrip()[0] != "#"), files)
 
-    remove_rpath(install_path + '/lib', files)
-    add_rpath_to_files(install_path + '/lib/', files)
-    change_absolute_to_relative(files, install_path)
-    codesign_files(files)
+    pool = mp.Pool(mp.cpu_count())
+    pool.map(remove_rpath, [(install_path + '/lib', file) for file in files])
+    pool.map(add_rpath_to_file, [(install_path + '/lib', file) for file in files])
+    pool.map(change_absolute_to_relative, [(file, install_path, "") for file in files])
+    pool.map(codesign_file, files)
+    pool.close()
 
     ctest_files = []
     extract_files_recursive(install_path + '/build/', (lambda file: 'CTestTestfile' in file), ctest_files)
