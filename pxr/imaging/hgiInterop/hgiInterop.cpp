@@ -53,6 +53,9 @@ void HgiInterop::TransferToApp(
     HgiTextureHandle const &depth)
 {
     HgiMetal *hgiMetal = static_cast<HgiMetal*>(hgi);
+
+    // TEMP
+    hgiMetal->finalOutput = color;
     
     if (!hgiMetal->GetNeedsInterop()) {
         return;

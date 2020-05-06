@@ -27,6 +27,7 @@
 #include "pxr/pxr.h"
 #include "pxr/imaging/hgiMetal/api.h"
 #include "pxr/imaging/hgi/hgi.h"
+#include "pxr/imaging/hgi/texture.h"
 #include "pxr/imaging/hgi/tokens.h"
 
 #import <Metal/Metal.h>
@@ -190,6 +191,7 @@ public:
     bool BeginMtlf();
     
     class HgiMetalGraphicsCmds* _encoder;
+    HgiTextureHandle finalOutput;
     
     int _sampleCount;
 };
