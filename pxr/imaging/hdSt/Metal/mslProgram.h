@@ -52,6 +52,7 @@ enum MSL_BindingType
     kMSL_BindingType_GSVertOutput    = (1 << 6),
     kMSL_BindingType_GSPrimOutput    = (1 << 7),
     kMSL_BindingType_DrawArgs        = (1 << 8),
+    kMSL_BindingType_FragExtras      = (1 << 9)
 };
 
 enum MSL_BuildTarget
@@ -254,6 +255,7 @@ private:
     int _gsPrimOutStructSize;
     int _drawArgsSlot;
     int _indicesSlot;
+    int _fragExtrasSlot;
     
     bool _currentlySet;
     mutable bool _reapplyIndexBuffer;

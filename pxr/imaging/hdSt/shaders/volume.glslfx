@@ -33,9 +33,10 @@
 --- --------------------------------------------------------------------------
 -- glsl Volume.Vertex
 
+
+// Relying on perspectively correct interpolation.
 out VertexData
 {
-    // Relying on perspectively correct interpolation.
     vec3 Peye;
 } outData;
 
@@ -231,7 +232,7 @@ volumeIntegrator(vec3 rayStartEye, vec3 rayDirectionEye, float rayLength)
     result.color = vec3(0.0);
     result.transmittance = 1.0;
 
-    const int numSteps = int(floor(min(maxNumSteps, rayLength / stepSize)));
+    const int numSteps = int(floor(min((float)maxNumSteps, rayLength / stepSize)));
 
     // integrate transmittance and light along ray for bounding box
     while(i < numSteps) {
@@ -246,7 +247,7 @@ volumeIntegrator(vec3 rayStartEye, vec3 rayDirectionEye, float rayLength)
 
         // If this is the first time the ray is hitting a non-empty voxel,
         // record the coordinates.
-        if (result.firstHitPeye == vec3(0.0)) {
+        if (all(equal(result.firstHitPeye, vec3(0.0)))) {
             if (  extinctionValue > 0 ||
                   scatteringValue > 0 ||
                   any(greaterThan(emissionValue, vec3(0)))) {
@@ -531,7 +532,11 @@ void main(void)
     // Discard front faces - ray marching stops at fragment eye position
     // and starts at the intersection of ray with volume bounding box or
     // near plane.
+#if defined(ARCH_GFX_METAL)
+    if (gl_FrontFacing ^ (determinant(instanceModelViewInverse) < 0.0)) {
+#else
     if (gl_FrontFacing ^^ (determinant(instanceModelViewInverse) < 0.0)) {
+#endif
         discard;
     }
 

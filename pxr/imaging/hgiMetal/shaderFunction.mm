@@ -148,25 +148,7 @@ _GetPackedTypeDefinitions()
     "                a[0][0] * b09 - a[0][1] * b07 + a[0][2] * b06,\n"
     "                a[3][1] * b01 - a[3][0] * b03 - a[3][2] * b00,\n"
     "                a[2][0] * b03 - a[2][1] * b01 + a[2][2] * b00) * invdet;\n"
-    "}\n\n"
-    "template <typename T>\n"
-    "T atan(T y, T x) { return atan2(y, x); }\n\n"
-    "template <typename T>\n"
-    "T bitfieldReverse(T x) { return reverse_bits(x); }\n\n"
-    "template <typename T>\n"
-    "ivec2 imageSize(T texture) {\n"
-    "    return ivec2(texture.get_width(), texture.get_height());\n"
-    "}\n\n"
-
-    "template <typename T>\n"
-    "ivec2 textureSize(T texture, int lod) {\n"
-    "    return ivec2(texture.get_width(lod), texture.get_height(lod));\n"
-    "}\n\n"
-
-
-    "constexpr sampler texelSampler(address::clamp_to_edge,\n"
-    "                               filter::linear);\n";
-
+    "}\n\n";
 }
 
 static std::string
@@ -242,10 +224,32 @@ _ComputeHeader(id<MTLDevice> device)
             << "#define discard discard_fragment();\n"
             << "#define radians(d) (d * 0.01745329252)\n"
             << "#define noperspective /*center_no_perspective MTL_FIXME*/\n"
-            << "#define greaterThan(a,b) (a > b)\n"
-            << "#define lessThan(a,b)    (a < b)\n"
             << "#define dFdx    dfdx\n"
-            << "#define dFdy    dfdy\n";
+            << "#define dFdy    dfdy\n"
+    
+            << "#define lessThan(a, b) ((a) < (b))\n"
+            << "#define lessThanEqual(a, b) ((a) <= (b))\n"
+            << "#define greaterThan(a, b) ((a) > (b))\n"
+            << "#define greaterThanEqual(a, b) ((a) >= (b))\n"
+            << "#define equal(a, b) ((a) == (b))\n"
+            << "#define notEqual(a, b) ((a) != (b))\n"
+
+            << "template <typename T>\n"
+            << "T atan(T y, T x) { return atan2(y, x); }\n\n"
+            << "template <typename T>\n"
+            << "T bitfieldReverse(T x) { return reverse_bits(x); }\n\n"
+            << "template <typename T>\n"
+            << "ivec2 imageSize(T texture) {\n"
+            << "    return ivec2(texture.get_width(), texture.get_height());\n"
+            << "}\n\n"
+
+            << "template <typename T>\n"
+            << "ivec2 textureSize(T texture, int lod) {\n"
+            << "    return ivec2(texture.get_width(lod), texture.get_height(lod));\n"
+            << "}\n\n"
+
+            << "constexpr sampler texelSampler(address::clamp_to_edge,\n"
+            << "                               filter::linear);\n";
     
     // wrapper for type float and int to deal with .x accessors and the
     // like that are valid in GLSL

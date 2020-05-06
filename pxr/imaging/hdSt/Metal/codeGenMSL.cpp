@@ -282,8 +282,8 @@ _GetPackedTypeDefinitions()
     "    return *(thread int*)&pi;\n"
     "}\n"
     
-    "mat4 inverse(float4x4 a) { return transpose(a); }\n"
-    "mat4 _inverse(float4x4 a) {\n"
+    "mat4 inverse(float4x4 const a) { return transpose(a); }\n"
+    "mat4 _inverse(float4x4 const a) {\n"
     "    float b00 = a[0][0] * a[1][1] - a[0][1] * a[1][0];\n"
     "    float b01 = a[0][0] * a[1][2] - a[0][2] * a[1][0];\n"
     "    float b02 = a[0][0] * a[1][3] - a[0][3] * a[1][0];\n"
@@ -315,25 +315,38 @@ _GetPackedTypeDefinitions()
     "                a[0][0] * b09 - a[0][1] * b07 + a[0][2] * b06,\n"
     "                a[3][1] * b01 - a[3][0] * b03 - a[3][2] * b00,\n"
     "                a[2][0] * b03 - a[2][1] * b01 + a[2][2] * b00) * invdet;\n"
-    "}\n\n"
-    "template <typename T>\n"
-    "T atan(T y, T x) { return atan2(y, x); }\n\n"
-    "template <typename T>\n"
-    "T bitfieldReverse(T x) { return reverse_bits(x); }\n\n"
-    "template <typename T>\n"
-    "ivec2 imageSize(T texture) {\n"
-    "    return ivec2(texture.get_width(), texture.get_height());\n"
-    "}\n\n"
+    "}\n"
+    
+    "float determinant(float const f) {\n"
+    "  return f;\n"
+    "}\n"
 
-    "template <typename T>\n"
-    "ivec2 textureSize(T texture, int lod) {\n"
-    "    return ivec2(texture.get_width(lod), texture.get_height(lod));\n"
-    "}\n\n"
+    "float determinant(float2x2 const m) {\n"
+    "  return m[0][0] * m[1][1] - m[0][1] * m[1][0];\n"
+    "}\n"
 
+    "float determinant(float3x3 const m) {\n"
+    "  return m[0][0] * ((m[2][2] * m[1][1]) - (m[1][2] * m[2][1]))\n"
+    "       + m[0][1] * ((m[1][2] * m[2][0]) - (m[2][2] * m[1][0]))\n"
+    "       + m[0][2] * ((m[2][1] * m[1][0]) - (m[1][1] * m[2][0]));\n"
+    "}\n"
 
-    "constexpr sampler texelSampler(address::clamp_to_edge,\n"
-    "                               filter::linear);\n";
-
+    "float determinant(float4x4 const m) {\n"
+    "    float b00 = m[0][0] * m[1][1] - m[0][1] * m[1][0];\n"
+    "    float b01 = m[0][0] * m[1][2] - m[0][2] * m[1][0];\n"
+    "    float b02 = m[0][0] * m[1][3] - m[0][3] * m[1][0];\n"
+    "    float b03 = m[0][1] * m[1][2] - m[0][2] * m[1][1];\n"
+    "    float b04 = m[0][1] * m[1][3] - m[0][3] * m[1][1];\n"
+    "    float b05 = m[0][2] * m[1][3] - m[0][3] * m[1][2];\n"
+    "    float b06 = m[2][0] * m[3][1] - m[2][1] * m[3][0];\n"
+    "    float b07 = m[2][0] * m[3][2] - m[2][2] * m[3][0];\n"
+    "    float b08 = m[2][0] * m[3][3] - m[2][3] * m[3][0];\n"
+    "    float b09 = m[2][1] * m[3][2] - m[2][2] * m[3][1];\n"
+    "    float b10 = m[2][1] * m[3][3] - m[2][3] * m[3][1];\n"
+    "    float b11 = m[2][2] * m[3][3] - m[2][3] * m[3][2];\n"
+    "  return (b00 * b11) - (b01 * b10) + (b02 * b09) +\n"
+    "         (b03 * b08) - (b04 * b07) + (b05 * b06);\n"
+    "}\n\n";
 }
 
 static TfToken const &
@@ -1173,7 +1186,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
                                     HdStMSLProgramSharedPtr mslProgram)
 {
     std::stringstream   glueCommon, copyInputsVtx, copyOutputsVtx, copyInputsVtxStruct_Compute,
-                        copyInputsVtx_Compute, copyGSOutputsIntoVSOutputs;
+                        copyInputsVtx_Compute, copyGSOutputsIntoVSOutputs, fragExtrasStruct;
     std::stringstream   copyInputsFrag, copyOutputsFrag;
 
     std::stringstream   vsInputStruct, vsOutputStruct, vsAttributeDefineEnabled, vsAttributeDefineDisabled, vsAttributeDefineUndef,
@@ -1232,7 +1245,8 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
     
     //////////////////////////// Additional Buffer Binding /////////////////////////////////
     
-    int vsUniformsBufferSlot(-1), fsUniformsBufferSlot(-1), drawArgsSlot(-1), currentUniformBufferSlot(-1), indexBufferSlot(-1);
+    int vsUniformsBufferSlot(-1), fsUniformsBufferSlot(-1), drawArgsSlot(-1);
+    int fragExtrasSlot(-1), currentUniformBufferSlot(-1), indexBufferSlot(-1);
 
     mslProgram->AddBinding("indices", -1, HdBinding(),
         kMSL_BindingType_IndexBuffer, kMSL_ProgramStage_Vertex);
@@ -1296,7 +1310,9 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
         _AddInputParam(_mslPSInputParams, TfToken("*fsUniforms"), TfToken("MSLFsUniforms"), TfToken()).usage
             |= HdSt_CodeGenMSL::TParam::EntryFuncArgument;
     }
-    
+    _AddInputParam(_mslPSInputParams, TfToken("*fragExtras"), TfToken("MSLFragExtras"), TfToken()).usage
+        |= HdSt_CodeGenMSL::TParam::EntryFuncArgument;
+
     ///////////////////////// Vertex Input ////////////////////////////
     
     std::stringstream computeBufferArguments;
@@ -2079,6 +2095,15 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
                     isScopeMember = false;
                     currentUniformBufferSlot++;
                 }
+                else if(bindingName == "fragExtras") {
+                    fragExtrasSlot = assignedSlot;
+                    isScopeMember = false;
+                    currentUniformBufferSlot++;
+                    
+                    mslProgram->AddBinding(bindingName, assignedSlot,
+                        it->binding, kMSL_BindingType_FragExtras,
+                        kMSL_ProgramStage_Fragment);
+                }
                 else {
                     //Attempt to find the same buffer in the VS inputs. If found, assign this buffer to the same slot.
                     TfToken bindingNameToken(bindingName);
@@ -2245,6 +2270,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
         if(isScopeMember)
             fsInputCode << "    scope." << destPrefix.str() << (accessor.empty() ? name : accessor) << " = " << sourcePrefix.str() << name << ";\n";
     }
+    fsInputCode << "    scope.gl_FragCoord = scope.gl_Position * vec4(fragExtras->renderTargetWidth, fragExtras->renderTargetHeight, 1.0f, 1.0f);\n";
     fsTexturingStruct << "};\n\n";
     fsUniformStruct << "};\n\n";
     fsFuncDef << ")\n{\n";
@@ -2259,6 +2285,10 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
     
     bool usesTexturingStruct = (fsCurrentSamplerSlot != 0 || fsCurrentTextureSlot != 0);
     
+    fragExtrasStruct << "//////////////////////////////////////////////////////////////////////////\n"
+                     << "// MSL Frag Extras Struct ////////////////////////////////////////////////\n\n"
+                     << "struct MSLFragExtras { float renderTargetWidth, renderTargetHeight; };\n\n";
+
     ////////////////////////////////// Fragment Outputs ////////////////////////
     
     int fsCurrentOutputSlot = 0;
@@ -2279,7 +2309,8 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
     if(hasFSUniformBuffer)
         fsCode << fsUniformStruct.str();
     
-    fsCode  << (usesTexturingStruct ? fsTexturingStruct.str() : "");
+    fsCode  << fragExtrasStruct.str()
+            << (usesTexturingStruct ? fsTexturingStruct.str() : "");
     
     fsCode  << "////////////////////////////////////////////////////////////////////////////////////////////////////////////////////\n"
             << "// MSL Vertex Output Struct ////////////////////////////////////////////////////////////////////////////////////////\n\n"
@@ -2716,10 +2747,34 @@ HdSt_CodeGenMSL::GetComputeHeader()
             << "#define discard discard_fragment();\n"
             << "#define radians(d) (d * 0.01745329252)\n"
             << "#define noperspective /*center_no_perspective MTL_FIXME*/\n"
-            << "#define greaterThan(a,b) (a > b)\n"
-            << "#define lessThan(a,b)    (a < b)\n"
             << "#define dFdx    dfdx\n"
-            << "#define dFdy    dfdy\n";
+            << "#define dFdy    dfdy\n"
+    
+            << "#define lessThan(a, b) ((a) < (b))\n"
+            << "#define lessThanEqual(a, b) ((a) <= (b))\n"
+            << "#define greaterThan(a, b) ((a) > (b))\n"
+            << "#define greaterThanEqual(a, b) ((a) >= (b))\n"
+            << "#define equal(a, b) ((a) == (b))\n"
+            << "#define notEqual(a, b) ((a) != (b))\n"
+
+            << "template <typename T>\n"
+            << "T atan(T y, T x) { return atan2(y, x); }\n\n"
+            << "template <typename T>\n"
+            << "T bitfieldReverse(T x) { return reverse_bits(x); }\n\n"
+            << "template <typename T>\n"
+            << "ivec2 imageSize(T texture) {\n"
+            << "    return ivec2(texture.get_width(), texture.get_height());\n"
+            << "}\n\n"
+
+            << "template <typename T>\n"
+            << "ivec2 textureSize(T texture, int lod) {\n"
+            << "    return ivec2(texture.get_width(lod), texture.get_height(lod));\n"
+            << "}\n\n"
+    
+            << "#define texelFetch(sampler, coords, lod) sampler.read(uint2(coords.x, coords.y))\n"
+
+            << "constexpr sampler texelSampler(address::clamp_to_edge,\n"
+            << "                               filter::linear);\n";
     
     // wrapper for type float and int to deal with .x accessors and the like that are valid in GLSL
     header  << "struct wrapped_float {\n"
@@ -3324,7 +3379,10 @@ HdSt_CodeGenMSL::_GenerateCommonCode()
 
     _genCommon << "uint gl_PrimitiveID = 0;\n"
                << "uint gl_PrimitiveIDIn = 0;\n"
-               << "int gl_MaxTessGenLevel = 64;\n";
+               << "int gl_MaxTessGenLevel = 64;\n"
+               << "#if defined(HD_FRAGMENT_SHADER)\n"
+               << "vec4 gl_FragCoord;\n"
+               << "#endif\n";
     
     METAL_DEBUG_COMMENT(&_genCommon, "End of vertex/fragment interface\n"); //MTL_FIXME
    
@@ -4948,14 +5006,14 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
             // a function returning sampler requires bindless_texture
             if (caps.bindlessTextureEnabled) {
                 accessors
-                    << "sampler\n"
+                    << "texture2d<float>\n"
                     << "HdGetSampler_" << it->second.name << "() {\n"
-                    << "  return samplerBind_" << it->second.name << ";"
+                    << "  return textureBind_" << it->second.name << ";"
                     << "}\n";
             } else {
                 accessors
                     << "#define HdGetSampler_" << it->second.name << "()"
-                    << " sampler2d_" << it->second.name << "\n";
+                    << " textureBind_" << it->second.name << "\n";
             }
             // vec4 HdGet_name(vec2 coord)
             accessors
@@ -5076,14 +5134,14 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
             // a function returning sampler requires bindless_texture
             if (caps.bindlessTextureEnabled) {
                 accessors
-                    << "sampler\n"
+                    << "texture3d<float>\n"
                     << "HdGetSampler_" << it->second.name << "() {\n"
-                    << "  return samplerBind_" << it->second.name << ";"
+                    << "  return textureBind_" << it->second.name << ";"
                     << "}\n";
             } else {
                 accessors
                     << "#define HdGetSampler_" << it->second.name << "()"
-                    << " sampler3d_" << it->second.name << "\n";
+                    << " textureBind_" << it->second.name << "\n";
             }
 
             // vec4 HdGet_name(vec3 coord)
@@ -5214,9 +5272,9 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
             
             if (caps.glslVersion >= 430) {
                 accessors
-                    << "sampler2DArray\n"
+                    << "texture2d<float>\n"
                     << "HdGetSampler_" << it->second.name << "() {\n"
-                    << "  return sampler2dArray_" << it->second.name << ";"
+                    << "  return textureBind_" << it->second.name << ";"
                     << "}\n";
             }
             // vec4 HdGet_name(vec2 coord) { vec3 c = hd_sample_udim(coord);
@@ -5458,14 +5516,14 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
             accessors
                 << _GetUnpackedType(it->second.dataType, false)
                 << " HdGet_" << it->second.name << "(vec3 coord) {\n"
-                << "    return vec3(\n"
                 // If field exists, use it
                 << "#if defined(HD_HAS_"
                 << fieldName << HdSt_ResourceBindingSuffixTokens->texture
                 << ")\n"
                 << "  return HdGet_"
                 << fieldName << HdSt_ResourceBindingSuffixTokens->texture
-                << "(coord)"                << swizzle << ";\n"
+                << "(coord)"
+                << swizzle << ";\n"
                 << "#else\n"
                 // Otherwise use default value.
                 << "  int shaderCoord = GetDrawingCoord().shaderCoord;\n"

@@ -142,7 +142,7 @@ HdStMSLProgram::HdStMSLProgram(TfToken const &role)
 , _uniformBuffer(role)
 , _buildTarget(kMSL_BuildTarget_Regular)
 , _gsVertOutBufferSlot(-1), _gsPrimOutBufferSlot(-1), _gsVertOutStructSize(-1), _gsPrimOutStructSize(-1)
-, _drawArgsSlot(-1), _indicesSlot(-1)
+, _drawArgsSlot(-1), _indicesSlot(-1), _fragExtrasSlot(-1)
 {
     _currentlySet = false;
     _reapplyIndexBuffer = false;
@@ -397,6 +397,10 @@ HdStMSLProgram::Link()
             else if(binding._type == kMSL_BindingType_GSPrimOutput) _gsPrimOutBufferSlot = binding._index;
             else if(binding._type == kMSL_BindingType_UniformBuffer &&
                     binding._name == "indices") _indicesSlot = binding._index;
+        }
+        else if(binding._stage == kMSL_ProgramStage_Fragment) {
+            if(binding._type == kMSL_BindingType_FragExtras)
+                _fragExtrasSlot = binding._index;
         }
     }
 
@@ -659,6 +663,10 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(int primitiveMode,
         maxThreadsPerThreadgroup = maxThreadsPerGroup;
     }
 
+    id<MTLTexture> texture = context->GetRenderPassDescriptor().colorAttachments[0].texture;
+    float renderTargetWidth = texture.width;
+    float renderTargetHeight = texture.height;
+    
     uint32_t partIndexOffset = 0;
     while(numPrimitives > 0) {
         uint32_t numPrimitivesInPart = MIN(numPrimitives, maxPrimitivesPerPart);
@@ -719,6 +727,13 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(int primitiveMode,
                 }
             }
         }
+        
+        //Setup Frag Extras on the render context
+        struct { float _renderTargetWidth, _renderTargetHeight; }
+        fragExtraArgs = { renderTargetWidth, renderTargetHeight };
+        [renderEncoder setFragmentBytes:(const void*)&fragExtraArgs
+                                 length:sizeof(fragExtraArgs)
+                                atIndex:_fragExtrasSlot];
         
         if(doMVAComputeGS) {
             if (useDispatchThreads) {
