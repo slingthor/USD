@@ -2738,14 +2738,32 @@ if Windows():
     ])
 
 if args.make_relocatable:
-    CODE_SIGN_ID = os.environ.get('XCODE_ATTRIBUTE_CODE_SIGN_ID')
-    if CODE_SIGN_ID is None:
-        SDKVersion = subprocess.check_output(['xcodebuild', '-version']).strip()[6:10]
-        if SDKVersion >= "11.0":
-            CODE_SIGN_ID="Apple Development"
-        else:
-            CODE_SIGN_ID="iPhone Developer"
-    os.environ['CODE_SIGN_ID'] = CODE_SIGN_ID
+    SDKVersion  = subprocess.check_output(['xcodebuild', '-version']).strip()[6:10]
+    codeSignIDs = subprocess.check_output(['security', 'find-identity', '-v', '-p', 'codesigning'])
+
+    codeSignID = None
+    if os.environ.get('XCODE_ATTRIBUTE_CODE_SIGN_ID'):
+        codeSignID = os.environ.get('XCODE_ATTRIBUTE_CODE_SIGN_ID')
+    elif SDKVersion >= "11.0" and codeSignIDs.find("Apple Development") != -1:
+        codeSignID = "Apple Development"
+    elif codeSignIDs.find("Mac Developer") != -1:
+        codeSignID = "Mac Developer"
+    else:
+        PrintError("Unable to identify code signing identity. " +
+            "Please specify by setting the XCODE_ATTRIBUTE_CODE_SIGN_ID environment " +
+            "variable to the one you'd like to use. \n" +
+            "If you don't have a code signing identity, you can create one using Xcode:\n" +
+            "https://help.apple.com/xcode/mac/current/#/dev154b28f09 \n")
+        sys.exit(1)
+
+    # Validate that we have a codesign ID that both exists and isn't ambiguous
+    if codeSignIDs.count(codeSignID) != 1 and codeSignID != "-":
+        PrintError("Unable to identify code signing identity. " +
+            "Please specify by setting the XCODE_ATTRIBUTE_CODE_SIGN_ID environment " +
+            "variable to the one you'd like to use. Options are:\n" + codeSignIDs)
+        sys.exit(1)
+
+    os.environ['CODE_SIGN_ID'] = codeSignID
 
     from make_relocatable import make_relocatable
     make_relocatable(context.usdInstDir, context.buildPython, iOS(), verbosity > 1)

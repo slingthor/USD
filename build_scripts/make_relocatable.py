@@ -8,25 +8,7 @@ from os.path import isdir, isfile, join
 from shutil import copy, copyfile
 import multiprocessing as mp
 
-SDKVersion  = subprocess.check_output(['xcodebuild', '-version']).strip()[6:10]
-codeSignIDs = subprocess.check_output(['security', 'find-identity', '-v', '-p', 'codesigning'])
-
-codeSignID = None
-if os.environ.get('CODE_SIGN_ID'):
-    codeSignID = os.environ.get('CODE_SIGN_ID')
-elif SDKVersion >= "11.0" and codeSignIDs.find("Apple Development") != -1:
-    codeSignID = "Apple Development"
-elif codeSignIDs.find("Mac Developer") != -1:
-    codeSignID = "Mac Developer"
-
-# Validate that we have a codesign ID that both exists and isn't ambiguous
-if codeSignIDs.count(codeSignID) != 1 and codeSignID != "-":
-    print("Codesign Error: Unable to identify signing identity. " +
-        "Pleas specify by setting the XCODE_ATTRIBUTE_CODE_SIGN_ID environment " +
-        "variable to the one you'd like to use. Options are:\n" + codeSignIDs +
-        "Skipping make_relocatable")
-    codeSignID = None
-
+codeSignID = os.environ.get('CODE_SIGN_ID')
 devout = open(os.devnull, 'w')
 
 def extract_files(path, cond, files):
