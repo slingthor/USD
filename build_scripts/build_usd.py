@@ -92,7 +92,7 @@ def Linux():
 def MacOS():
     return (platform.system() == "Darwin") and crossPlatform is None
 def iOS():
-    return (platform.system() == "Darwin") and crossPlatform is "iOS"
+    return (platform.system() == "Darwin") and crossPlatform == "iOS"
 
 def Python3():
     return sys.version_info.major == 3
@@ -389,7 +389,11 @@ def RunCMake(context, force, buildArgs = None, hostPlatform = False):
 
         CODE_SIGN_ID = os.environ.get('XCODE_ATTRIBUTE_CODE_SIGN_ID')
         if CODE_SIGN_ID is None:
-            SDKVersion = subprocess.check_output(['xcodebuild', '-version']).strip()[6:10]
+            if Python3():
+                SDKVersion = subprocess.check_output(['xcodebuild', '-version'], text=True).strip()[6:10]
+            else:
+                SDKVersion = subprocess.check_output(['xcodebuild', '-version']).strip()[6:10]
+
             if SDKVersion >= "11.0":
                 CODE_SIGN_ID="Apple Development"
             else:
@@ -833,11 +837,17 @@ def InstallBoost(context, force, buildArgs):
 
         sdkPath = ''
         if MacOS() or iOS():
-            xcodeRoot = subprocess.check_output(['xcode-select', '--print-path']).strip()
             if MacOS():
-                sdkPath = subprocess.check_output(['xcrun', '--sdk', 'macosx', '--show-sdk-path']).strip()
+                platformOS = 'macosx'
             else:
-                sdkPath = subprocess.check_output(['xcrun', '--sdk', 'iphoneos', '--show-sdk-path']).strip()
+                platformOS = 'iphoneos'
+
+            if Python3():
+                xcodeRoot = subprocess.check_output(['xcode-select', '--print-path'], text=True).strip()
+                sdkPath = subprocess.check_output(['xcrun', '--sdk', platformOS, '--show-sdk-path'], text=True).strip()
+            else:
+                xcodeRoot = subprocess.check_output(['xcode-select', '--print-path']).strip()
+                sdkPath = subprocess.check_output(['xcrun', '--sdk', platformOS, '--show-sdk-path']).strip()
 
         if iOS():
             b2_toolset = "toolset=darwin-iphone"
@@ -859,7 +869,12 @@ def InstallBoost(context, force, buildArgs):
                 ': <architecture>arm <target-os>iphone <address-model>64\n',
                 ';'
             ]
-            iOSVersion = subprocess.check_output(['xcodebuild', '-sdk', sdkPath, '-version', 'SDKVersion']).strip()
+
+            if Python3():
+                iOSVersion = subprocess.check_output(['xcodebuild', '-sdk', sdkPath, '-version', 'SDKVersion'], text=True).strip()
+            else:
+                iOSVersion = subprocess.check_output(['xcodebuild', '-sdk', sdkPath, '-version', 'SDKVersion']).strip()
+
             b2_settings.append("macosx-version=iphone-{IOS_SDK_VERSION}".format(
                 IOS_SDK_VERSION=iOSVersion))
 
@@ -1628,9 +1643,11 @@ def InstallOpenSubdiv(context, force, buildArgs):
             extraArgs.append('-DCMAKE_TOOLCHAIN_FILE={srcOSDDir}/cmake/iOSToolchain.cmake'
                              .format(srcOSDDir=srcOSDDir))
 
-            os.environ['SDKROOT'] = subprocess.check_output(['xcrun', '--sdk', 'iphoneos', '--show-sdk-path']).strip()
+            if Python3():
+                os.environ['SDKROOT'] = subprocess.check_output(['xcrun', '--sdk', 'iphoneos', '--show-sdk-path'], text=True).strip()
+            else:
+                os.environ['SDKROOT'] = subprocess.check_output(['xcrun', '--sdk', 'iphoneos', '--show-sdk-path']).strip()
 
-    
         # OpenSubdiv seems to error when building on windows w/ Ninja...
         # ...so just use the default generator (ie, Visual Studio on Windows)
         # until someone can sort it out
@@ -2738,8 +2755,12 @@ if Windows():
     ])
 
 if args.make_relocatable:
-    SDKVersion  = subprocess.check_output(['xcodebuild', '-version']).strip()[6:10]
-    codeSignIDs = subprocess.check_output(['security', 'find-identity', '-v', '-p', 'codesigning'])
+    if Python3():
+        SDKVersion  = subprocess.check_output(['xcodebuild', '-version'], text=True).strip()[6:10]
+        codeSignIDs = subprocess.check_output(['security', 'find-identity', '-v', '-p', 'codesigning'], text=True)
+    else:
+        SDKVersion  = subprocess.check_output(['xcodebuild', '-version']).strip()[6:10]
+        codeSignIDs = subprocess.check_output(['security', 'find-identity', '-v', '-p', 'codesigning'])
 
     codeSignID = None
     if os.environ.get('XCODE_ATTRIBUTE_CODE_SIGN_ID'):
