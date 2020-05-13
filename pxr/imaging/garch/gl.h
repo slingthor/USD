@@ -108,6 +108,8 @@ typedef GLvoid (*ArchGLCallbackType)(...);
 #define GL_SAMPLER_1D 0x8B5D
 #define GL_SRC1_ALPHA 0x8589
 #define GL_PROGRAM_POINT_SIZE 0x8642
+#define GL_COMPRESSED_RGB_BPTC_SIGNED_FLOAT 0x8E8E
+#define GL_COMPRESSED_RGB_BPTC_UNSIGNED_FLOAT 0x8E8F
 //#define GL_MULTISAMPLE 0x809D
 typedef double GLdouble;
 typedef int64_t GLint64EXT;

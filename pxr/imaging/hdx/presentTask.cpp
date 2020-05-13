@@ -26,15 +26,6 @@
 #include "pxr/imaging/hd/aov.h"
 #include "pxr/imaging/hd/tokens.h"
 
-
-
-#if defined(PXR_OPENGL_SUPPORT_ENABLED) && defined(PXR_METAL_SUPPORT_ENABLED)
-#include "pxr/imaging/hgiInterop/hgiInterop.h"
-#define INTEROP_ENABLED 1
-#else
-#define INTEROP_ENABLED 0
-#endif
-
 #include "pxr/imaging/hgi/hgi.h"
 #include "pxr/imaging/hgi/tokens.h"
 

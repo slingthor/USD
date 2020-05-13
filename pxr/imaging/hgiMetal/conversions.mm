@@ -21,7 +21,10 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
+
 #include "pxr/imaging/hgiMetal/conversions.h"
+
+#include "pxr/base/arch/defines.h"
 
 #include "pxr/base/tf/iterator.h"
 #include "pxr/base/tf/staticTokens.h"
@@ -62,8 +65,13 @@ static const MTLPixelFormat _PIXEL_FORMAT_DESC[] =
     //MTLPixelFormatRGB8Unorm_sRGB, // Unsupported by HgiFormat
     MTLPixelFormatRGBA8Unorm_sRGB,  // HgiFormatUNorm8Vec4sRGB,
 
+#if defined(ARCH_OS_IOS)
+    MTLPixelFormatInvalid,      // Unsupported by iOS Metal
+    MTLPixelFormatInvalid,      // Unsupported by iOS Metal
+#else
     MTLPixelFormatBC6H_RGBFloat,  // HgiFormatBC6FloatVec3
     MTLPixelFormatBC6H_RGBUfloat, // HgiFormatBC6UFloatVec3
+#endif
 };
 
 // A few random format validations to make sure out GL table stays aligned

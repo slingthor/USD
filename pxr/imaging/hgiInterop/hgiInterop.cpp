@@ -26,10 +26,10 @@
 #include "pxr/imaging/hgi/tokens.h"
 
 
-#if defined(PXR_METAL_SUPPORT_ENABLED)
+#if defined(HGIINTEROP_METAL_TO_GL_ENABLED)
     #include "pxr/imaging/hgiMetal/hgi.h"
     #include "pxr/imaging/hgiInterop/metal.h"
-#else
+#elif defined(HGIINTEROP_GL_TO_GL_ENABLED)
     #include "pxr/imaging/hgiGL/hgi.h"
     #include "pxr/imaging/hgiInterop/opengl.h"
 #endif
@@ -52,7 +52,7 @@ void HgiInterop::TransferToApp(
 {
     TfToken const& gfxApi = hgi->GetAPIName();
 
-#if defined(PXR_METAL_SUPPORT_ENABLED)
+#if defined(HGIINTEROP_METAL_TO_GL_ENABLED)
     if (gfxApi==HgiTokens->Metal && interopDst==HgiTokens->OpenGL) {
         // Transfer Metal textures to OpenGL application
         if (!_metalToOpenGL) {
@@ -62,7 +62,7 @@ void HgiInterop::TransferToApp(
     } else {
         TF_CODING_ERROR("Unsupported Hgi backed: %s", gfxApi.GetText());
     }
-#else
+#elif defined(HGIINTEROP_GL_TO_GL_ENABLED)
     if (gfxApi==HgiTokens->OpenGL && interopDst==HgiTokens->OpenGL) {
         // Transfer OpenGL textures to OpenGL application
         if (!_openGLToOpenGL) {

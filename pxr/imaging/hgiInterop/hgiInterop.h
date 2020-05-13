@@ -31,6 +31,12 @@
 
 #include <memory>
 
+#if defined(PXR_METAL_SUPPORT_ENABLED) && defined(PXR_GL_SUPPORT_ENABLED)
+    #define HGIINTEROP_METAL_TO_GL_ENABLED
+#elif defined(PXR_GL_SUPPORT_ENABLED)
+    #define HGIINTEROP_GL_TO_GL_ENABLED
+#endif
+
 PXR_NAMESPACE_OPEN_SCOPE
 
 class Hgi;
@@ -74,9 +80,9 @@ private:
     HgiInterop & operator=(const HgiInterop&) = delete;
     HgiInterop(const HgiInterop&) = delete;
 
-#if defined(PXR_METAL_SUPPORT_ENABLED)
+#if defined(HGIINTEROP_METAL_TO_GL_ENABLED)
     std::unique_ptr<HgiInteropMetal> _metalToOpenGL;
-#else
+#elif defined(HGIINTEROP_GL_TO_GL_ENABLED)
     std::unique_ptr<HgiInteropOpenGL> _openGLToOpenGL;
 #endif
 };
