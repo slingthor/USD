@@ -170,7 +170,7 @@ HgiMetalGraphicsCmds::Commit()
         [_encoder endEncoding];
         _encoder = nil;
     }
-    
+
     return _hasWork;
 }
 
@@ -259,7 +259,7 @@ HgiMetalGraphicsCmds::DrawIndexed(
                       instanceCount:instanceCount
                          baseVertex:vertexOffset
                        baseInstance:firstInstance];
-    
+
     _hasWork = true;
 }
 

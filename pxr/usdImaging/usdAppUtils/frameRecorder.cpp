@@ -210,7 +210,6 @@ UsdAppUtilsFrameRecorder::Record(
     renderParams.complexity = _complexity;
     renderParams.colorCorrectionMode = _colorCorrectionMode;
     renderParams.clearColor = CLEAR_COLOR;
-    renderParams.renderResolution = renderResolution;
     renderParams.showProxy = _HasPurpose(_purposes, UsdGeomTokens->proxy);
     renderParams.showRender = _HasPurpose(_purposes, UsdGeomTokens->render);
     renderParams.showGuides = _HasPurpose(_purposes, UsdGeomTokens->guide);
@@ -219,6 +218,9 @@ UsdAppUtilsFrameRecorder::Record(
     glEnable(GL_DEPTH_TEST);
 #endif
 
+    UsdImagingGLEngine::ResourceFactoryGuard guard(
+        _imagingEngine.GetResourceFactory());
+    
     GarchDrawTargetRefPtr drawTarget = GarchDrawTarget::New(renderResolution);
 
     std::vector<GarchDrawTarget::AttachmentDesc> attachmentDesc;

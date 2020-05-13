@@ -586,8 +586,6 @@ HdxTaskController::_CreatePresentTask()
 
     HdxPresentTaskParams taskParams;
     
-    taskParams.flipImage = !_IsStormRenderingBackend(GetRenderIndex());
-
     GetRenderIndex()->InsertTask<HdxPresentTask>(&_delegate,
         _presentTaskId);
 

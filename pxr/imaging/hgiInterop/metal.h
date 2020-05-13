@@ -1,5 +1,5 @@
 //
-// Copyright 2016 Pixar
+// Copyright 2020 Pixar
 //
 // Licensed under the Apache License, Version 2.0 (the "Apache License")
 // with the following modification; you may not use this file except in
@@ -29,39 +29,37 @@
 #include <AppKit/AppKit.h>
 
 #include "pxr/pxr.h"
+#include "pxr/imaging/hgi/texture.h"
 #include "pxr/imaging/hgiInterop/api.h"
 
 
 PXR_NAMESPACE_OPEN_SCOPE
 
 class Hgi;
+class HgiMetal;
 
 /// \class HgiInteropMetal
 ///
 /// Provides Metal/GL interop
 ///
-class HgiInteropMetal {
+class HgiInteropMetal final {
 public:
-    
-    HGIINTEROP_API
-    HgiInteropMetal(
-        id<MTLDevice> interopDevice);
 
     HGIINTEROP_API
-    virtual ~HgiInteropMetal();
-    
+    HgiInteropMetal(Hgi* hgi);
+
     HGIINTEROP_API
-    void SetAttachmentSize(int width, int height);
-        
+    ~HgiInteropMetal();
+
+    /// Copy/Present provided color (and optional depth) textures to app.
     HGIINTEROP_API
     void CopyToInterop(
-        Hgi* hgi,
-        id<MTLTexture> sourceColorTexture,
-        id<MTLTexture> sourceDepthTexture,
-        bool flipImage);
+        HgiTextureHandle const &color,
+        HgiTextureHandle const &depth);
 
 private:
-    
+    HgiInteropMetal() = delete;
+
     enum {
         ShaderContextColor,
         ShaderContextColorDepth,
@@ -70,16 +68,16 @@ private:
     };
 
     struct ShaderContext {
-        uint32_t                program;
-        uint32_t                vao;
-        uint32_t                vbo;
-        int32_t                 posAttrib;
-        int32_t                 texAttrib;
-        int32_t                 samplerColorLoc;
-        int32_t                 samplerDepthLoc;
-        uint32_t                blitTexSizeUniform;
+        uint32_t program;
+        uint32_t vao;
+        uint32_t vbo;
+        int32_t posAttrib;
+        int32_t texAttrib;
+        int32_t samplerColorLoc;
+        int32_t samplerDepthLoc;
+        uint32_t blitTexSizeUniform;
     };
-    
+
     struct VertexAttribState {
         int32_t enabled;
         int32_t size;
@@ -98,33 +96,36 @@ private:
         int32_t vertexSource,
         int32_t fragmentSource,
         ShaderContext &shader);
+    void _SetAttachmentSize(int width, int height);
     void _ValidateGLContext();
 
-    id<MTLDevice>               _device;
+    HgiMetal* _hgiMetal;
 
-    id<MTLTexture>              _mtlAliasedColorTexture;
-    id<MTLTexture>              _mtlAliasedDepthRegularFloatTexture;
+    id<MTLDevice> _device;
 
-    id<MTLLibrary>              _defaultLibrary;
-    id<MTLFunction>             _computeDepthCopyProgram;
-    id<MTLFunction>             _computeColorCopyProgram;
+    id<MTLTexture> _mtlAliasedColorTexture;
+    id<MTLTexture> _mtlAliasedDepthRegularFloatTexture;
+
+    id<MTLLibrary> _defaultLibrary;
+    id<MTLFunction> _computeDepthCopyProgram;
+    id<MTLFunction> _computeColorCopyProgram;
     id<MTLComputePipelineState> _computePipelineStateColor;
     id<MTLComputePipelineState> _computePipelineStateDepth;
 
-    CVPixelBufferRef            _pixelBuffer;
-    CVPixelBufferRef            _depthBuffer;
-    CVMetalTextureCacheRef      _cvmtlTextureCache;
-    CVMetalTextureRef           _cvmtlColorTexture;
-    CVMetalTextureRef           _cvmtlDepthTexture;
+    CVPixelBufferRef _pixelBuffer;
+    CVPixelBufferRef _depthBuffer;
+    CVMetalTextureCacheRef _cvmtlTextureCache;
+    CVMetalTextureRef _cvmtlColorTexture;
+    CVMetalTextureRef _cvmtlDepthTexture;
 
-    CVOpenGLTextureCacheRef     _cvglTextureCache;
-    CVOpenGLTextureRef          _cvglColorTexture;
-    CVOpenGLTextureRef          _cvglDepthTexture;
+    CVOpenGLTextureCacheRef _cvglTextureCache;
+    CVOpenGLTextureRef _cvglColorTexture;
+    CVOpenGLTextureRef _cvglDepthTexture;
 
-    uint32_t                    _glColorTexture;
-    uint32_t                    _glDepthTexture;
+    uint32_t _glColorTexture;
+    uint32_t _glDepthTexture;
     
-    ShaderContext               _shaderProgramContext[ShaderContextCount];
+    ShaderContext _shaderProgramContext[ShaderContextCount];
     
     NSOpenGLContext* _currentOpenGLContext;
 

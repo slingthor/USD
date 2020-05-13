@@ -138,7 +138,7 @@ HgiMetal::SubmitCmds(HgiCmds* cmdsptr, uint32_t count)
                 _workToFlush = true;
             }
         } else if (HgiMetalBlitCmds* bw = dynamic_cast<HgiMetalBlitCmds*>(w)) {
-            if (gw->Commit()) {
+            if (bw->Commit()) {
                 _workToFlush = true;
             }
         }

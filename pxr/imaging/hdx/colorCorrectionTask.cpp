@@ -52,6 +52,14 @@ TF_DEFINE_PRIVATE_TOKENS(
     (colorCorrectionShader)
 );
 
+static const int HDX_DEFAULT_LUT3D_SIZE_OCIO = 65;
+
+HdxColorCorrectionTaskParams::HdxColorCorrectionTaskParams()
+    : colorCorrectionMode(HdxColorCorrectionTokens->disabled)
+    , lut3dSizeOCIO(HDX_DEFAULT_LUT3D_SIZE_OCIO)
+{
+}
+
 HdxColorCorrectionTask::HdxColorCorrectionTask(
     HdSceneDelegate* delegate, 
     SdfPath const& id)
@@ -62,7 +70,7 @@ HdxColorCorrectionTask::HdxColorCorrectionTask(
     , _shaderProgram()
     , _resourceBindings()
     , _pipeline()
-    , _lut3dSizeOCIO(0)
+    , _lut3dSizeOCIO(HDX_DEFAULT_LUT3D_SIZE_OCIO)
 {
 }
 
@@ -99,19 +107,16 @@ HdxColorCorrectionTask::_GetUseOcio() const
     // Client can choose to use Hydra's build-in sRGB color correction or use
     // OpenColorIO for color correction in which case we insert extra OCIO code.
     #ifdef PXR_OCIO_PLUGIN_ENABLED
-        bool useOCIO = 
-            _colorCorrectionMode == HdxColorCorrectionTokens->openColorIO;
-
         // Only use if $OCIO environment variable is set.
         // (Otherwise this option should be disabled.)
         if (TfGetenv("OCIO") == "") {
-            useOCIO = false;
+            return false;
         }
-    #else
-        bool useOCIO = false;
-    #endif
 
-    return useOCIO;
+        return _colorCorrectionMode == HdxColorCorrectionTokens->openColorIO;
+    #else
+        return false;
+    #endif
 }
 
 std::string
@@ -156,17 +161,6 @@ HdxColorCorrectionTask::_CreateOpenColorIOResources()
         OCIO::ConstProcessorRcPtr processor = config->getProcessor(transform);
         auto gpuProcessor = processor->getDefaultGPUProcessor();
 
-        // If 3D lut size is 0 then use a reasonable default size.
-        // We use 65 (0-64) samples which works well with OCIO resampling.
-        if (_lut3dSizeOCIO == 0) {
-            _lut3dSizeOCIO = 65;
-        }
-
-        // Optionally override similar to KATANA_OCIO_LUT3D_EDGE_SIZE
-        int size = TfGetenvInt("USDVIEW_OCIO_LUT3D_EDGE_SIZE", 0);
-        if (size > 0) {
-            _lut3dSizeOCIO = size;
-        }
         
         auto shaderDesc = OpenColorIO_v2_0dev::GpuShaderDesc::CreateLegacyShaderDesc(_lut3dSizeOCIO);
         
@@ -208,7 +202,6 @@ HdxColorCorrectionTask::_CreateOpenColorIOResources()
         if (_texture3dLUT) {
             _GetHgi()->DestroyTexture(&_texture3dLUT);
         }
-
         HgiTextureDesc lutDesc;
         lutDesc.debugName = "OCIO 3d LUT";
         lutDesc.type = HgiTextureType3D;
@@ -291,10 +284,10 @@ HdxColorCorrectionTask::_CreateOpenColorIOResources()
     shaderDesc.setLut3DEdgeLen(_lut3dSizeOCIO);
 
     // Compute and the 3D LUT
-    int num3Dentries = 3 * _lut3dSizeOCIO*_lut3dSizeOCIO*_lut3dSizeOCIO;
-    std::vector<float> lut3d;
-    lut3d.resize(num3Dentries);
-    processor->getGpuLut3D(&lut3d[0], shaderDesc);
+    const int num3Dentries =
+        3 * _lut3dSizeOCIO * _lut3dSizeOCIO * _lut3dSizeOCIO;
+    std::vector<float> lut3d(num3Dentries);
+    processor->getGpuLut3D(lut3d.data(), shaderDesc);
 
     // Load the data into an OpenGL 3D Texture
     if (_texture3dLUT) {
@@ -342,13 +335,20 @@ HdxColorCorrectionTask::_CreateShaderResources()
     HgiShaderFunctionDesc vertDesc;
     vertDesc.debugName = _tokens->colorCorrectionVertex.GetString();
     vertDesc.shaderStage = HgiShaderStageVertex;
-    vertDesc.shaderCode = glslfx.GetSource(_tokens->colorCorrectionVertex);
+    if (technique != HgiTokens->Metal) {
+        vertDesc.shaderCode = "#version 450 \n";
+    }
+    vertDesc.shaderCode += glslfx.GetSource(_tokens->colorCorrectionVertex);
     HgiShaderFunctionHandle vertFn = _GetHgi()->CreateShaderFunction(vertDesc);
 
     // Setup the fragment shader
     HgiShaderFunctionDesc fragDesc;
     fragDesc.debugName = _tokens->colorCorrectionFragment.GetString();
     fragDesc.shaderStage = HgiShaderStageFragment;
+    if (technique != HgiTokens->Metal) {
+        fragDesc.shaderCode = "#version 450 \n";
+    }
+
     if (useOCIO) {
         fragDesc.shaderCode += "#define GLSLFX_USE_OCIO\n";
         // Our current version of OCIO outputs 130 glsl and texture3D is
@@ -358,7 +358,7 @@ HdxColorCorrectionTask::_CreateShaderResources()
     fragDesc.shaderCode += glslfx.GetSource(_tokens->colorCorrectionFragment);
     if (useOCIO) {
         std::string ocioGpuShaderText = _CreateOpenColorIOResources();
-        fragDesc.shaderCode = ocioGpuShaderText + fragDesc.shaderCode;
+        fragDesc.shaderCode += ocioGpuShaderText + fragDesc.shaderCode;
     }
     HgiShaderFunctionHandle fragFn = _GetHgi()->CreateShaderFunction(fragDesc);
 
@@ -563,6 +563,11 @@ HdxColorCorrectionTask::_Sync(HdSceneDelegate* delegate,
             _looksOCIO = params.looksOCIO;
             _lut3dSizeOCIO = params.lut3dSizeOCIO;
             _aovName = params.aovName;
+
+            if (_lut3dSizeOCIO <= 0) {
+                TF_CODING_ERROR("Invalid OCIO LUT size.");
+                _lut3dSizeOCIO = 65;
+            }
 
             // Rebuild Hgi objects when ColorCorrection params change
             _DestroyShaderProgram();

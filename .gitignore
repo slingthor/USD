@@ -1,5 +1,6 @@
 .p4*
 .DS_Store
+.AppleDouble
 /build_scripts/make_relocatable.pyc
 /lib/python/OpenGL/__init__.pyc
 /lib/python/OpenGL/plugins.pyc

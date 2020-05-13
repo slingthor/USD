@@ -34,6 +34,8 @@
 #include "pxr/imaging/hd/enums.h"
 #include "pxr/imaging/hd/version.h"
 
+#include "pxr/usd/sdf/path.h"
+
 #include "pxr/base/tf/token.h"
 
 #include <memory>
@@ -74,7 +76,8 @@ class HdSt_ResourceBinder;
 ///
 /// This interface provides a simple way for clients to affect the
 /// composition of shading programs used for a render pass.
-class HdStShaderCode {
+class HdStShaderCode : public std::enable_shared_from_this<HdStShaderCode>
+{
 public:
     typedef size_t ID;
 
@@ -83,12 +86,30 @@ public:
     HDST_API
     virtual ~HdStShaderCode();
 
-    /// Returns the hash value of this shader.
+    /// Returns the hash value of the shader code and configuration.
+    ///
+    /// It is computed from the the GLSL code as well as the resource
+    /// signature of the shader (as determined from its parameters).
+    /// If two shaders have the same hash, the GLSL code as expanded
+    /// by codegen should also be the same.
+    /// 
     virtual ID ComputeHash() const = 0;
 
     /// Returns the combined hash values of multiple shaders.
     HDST_API
     static ID ComputeHash(HdStShaderCodeSharedPtrVector const &shaders);
+
+    /// Returns the hash value of the paths of the texture prims
+    /// consumed by this shader.
+    ///
+    /// Unless textures are bindless, shaders using different textures
+    /// cannot be used in the same draw batch. Since textures can be
+    /// animated, it can happen that two texture prims use the same
+    /// texture at some time but different textures at other times. To
+    /// avoid re-computing the draw batches over time, we use the this
+    /// hash when grouping the draw batches.
+    ///
+    virtual ID ComputeTextureSourceHash() const;
 
     /// Returns the shader source provided by this shader
     /// for \a shaderStageKey
@@ -118,6 +139,7 @@ public:
                TEXTURE_UDIM_ARRAY, TEXTURE_UDIM_LAYOUT,
                TEXTURE_PTEX_TEXEL, TEXTURE_PTEX_LAYOUT };
         int type;
+        SdfPath textureSourcePath;
     };
     typedef std::vector<TextureDescriptor> TextureDescriptorVector;
 
@@ -160,6 +182,10 @@ public:
         HdTextureType type;
         /// The texture.
         HdStTextureHandleSharedPtr handle;
+
+        /// The path of the corresponding texture prim - used to
+        /// compute the hash for draw batches when not using bindless textures.
+        SdfPath textureSourcePath;
     };
     using NamedTextureHandleVector = std::vector<NamedTextureHandle>;
 

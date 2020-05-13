@@ -208,7 +208,6 @@ HdStRenderPassShader::AddAovReadback(TfToken const &name)
         HdSt_MaterialParam::ParamTypeTexture,
         _GetReadbackName(name),
         VtValue(GfVec4f(0.0)),
-        SdfPath(),
         TfTokenVector(),
         HdTextureType::Uv);
 }

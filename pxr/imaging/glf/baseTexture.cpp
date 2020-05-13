@@ -272,6 +272,8 @@ GlfBaseTexture::_CreateTexture(GarchBaseTextureDataConstPtr texData,
 
         glBindTexture(textureTarget, _textureName);
 
+        bool generateMipMaps = false;
+
         // Check if mip maps have been requested, if so, it will either
         // enable automatic generation or use the ones loaded in cpu memory
         int numMipLevels = 1;
@@ -289,10 +291,10 @@ GlfBaseTexture::_CreateTexture(GarchBaseTextureDataConstPtr texData,
             if (numMipLevels > 1) {
                 glTexParameteri(textureTarget, GL_TEXTURE_MAX_LEVEL, numMipLevels-1);
             } else {
-                glTexParameteri(textureTarget, GL_GENERATE_MIPMAP, GL_TRUE);
+                generateMipMaps = true;
             }
         } else {
-            glTexParameteri(textureTarget, GL_GENERATE_MIPMAP, GL_FALSE);
+            glTexParameteri(textureTarget, GL_TEXTURE_MAX_LEVEL, 0);
         }
 
         if (texData->IsCompressed()) {
@@ -414,6 +416,10 @@ GlfBaseTexture::_CreateTexture(GarchBaseTextureDataConstPtr texData,
                                   texData->GetRawBuffer(i));
                 }
             }
+        }
+
+        if (generateMipMaps) {
+            glGenerateMipmap(textureTarget);
         }
 
         glBindTexture(textureTarget, 0);

@@ -1,5 +1,5 @@
 //
-// Copyright 2019 Pixar
+// Copyright 2020 Pixar
 //
 // Licensed under the Apache License, Version 2.0 (the "Apache License")
 // with the following modification; you may not use this file except in
@@ -22,19 +22,21 @@
 // language governing permissions and limitations under the Apache License.
 //
 #include "pxr/imaging/hgiInterop/hgiInterop.h"
-#include "pxr/base/arch/defines.h"
-#include "pxr/base/plug/plugin.h"
-#include "pxr/base/plug/registry.h"
+#include "pxr/imaging/hgi/hgi.h"
+#include "pxr/imaging/hgi/tokens.h"
 
-#include "pxr/imaging/hgiMetal/hgi.h"
-#include "pxr/imaging/hgiMetal/texture.h"
 
-#include "pxr/imaging/hgiInterop/metal.h"
+#if defined(PXR_METAL_SUPPORT_ENABLED)
+    #include "pxr/imaging/hgiMetal/hgi.h"
+    #include "pxr/imaging/hgiInterop/metal.h"
+#else
+    #include "pxr/imaging/hgiGL/hgi.h"
+    #include "pxr/imaging/hgiInterop/opengl.h"
+#endif
 
 PXR_NAMESPACE_OPEN_SCOPE
 
 HgiInterop::HgiInterop()
-: _flipImage(false)
 {
 }
 
@@ -42,51 +44,38 @@ HgiInterop::~HgiInterop()
 {
 }
 
-void HgiInterop::SetFlipOnBlit(bool flipY)
-{
-    _flipImage = flipY;
-}
-
 void HgiInterop::TransferToApp(
     Hgi *hgi,
+    TfToken const& interopDst,
     HgiTextureHandle const &color,
     HgiTextureHandle const &depth)
 {
-    HgiMetal *hgiMetal = static_cast<HgiMetal*>(hgi);
+    TfToken const& gfxApi = hgi->GetAPIName();
 
-    // TEMP
-    hgiMetal->finalOutput = color;
-    
-    if (!hgiMetal->GetNeedsInterop()) {
-        return;
+#if defined(PXR_METAL_SUPPORT_ENABLED)
+    if (gfxApi==HgiTokens->Metal && interopDst==HgiTokens->OpenGL) {
+        // Transfer Metal textures to OpenGL application
+        if (!_metalToOpenGL) {
+            _metalToOpenGL.reset(new HgiInteropMetal(hgi));
+        }
+        _metalToOpenGL->CopyToInterop(color, depth);
+    } else {
+        TF_CODING_ERROR("Unsupported Hgi backed: %s", gfxApi.GetText());
     }
-
-    HgiMetalTexture *metalColor = static_cast<HgiMetalTexture*>(color.Get());
-    HgiMetalTexture *metalDepth = static_cast<HgiMetalTexture*>(depth.Get());
- 
-    if (!_metalToOpenGL) {
-        _metalToOpenGL.reset(
-            new HgiInteropMetal(hgiMetal->GetPrimaryDevice()));
+#else
+    if (gfxApi==HgiTokens->OpenGL && interopDst==HgiTokens->OpenGL) {
+        // Transfer OpenGL textures to OpenGL application
+        if (!_openGLToOpenGL) {
+            _openGLToOpenGL.reset(new HgiInteropOpenGL());
+        }
+        _openGLToOpenGL->CopyToInterop(color, depth);
+    } else if (gfxApi==HgiTokens->Vulkan && interopDst==HgiTokens->OpenGL) {
+        // Transfer Vulkan textures to OpenGL application
+        TF_CODING_ERROR("TODO Implement Vulkan/GL interop");
+    } else {
+        TF_CODING_ERROR("Unsupported Hgi backed: %s", gfxApi.GetText());
     }
-    
-    _metalToOpenGL->SetAttachmentSize(
-        metalColor->GetDescriptor().dimensions[0],
-        metalColor->GetDescriptor().dimensions[1]);
-
-    id<MTLTexture> colorTexture = nil;
-    id<MTLTexture> depthTexture = nil;
-    if (metalColor) {
-        colorTexture = metalColor->GetTextureId();
-    }
-    if (metalDepth) {
-        depthTexture = metalDepth->GetTextureId();
-    }
-
-    _metalToOpenGL->CopyToInterop(
-        hgi,
-        colorTexture,
-        depthTexture,
-        _flipImage);
+#endif
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

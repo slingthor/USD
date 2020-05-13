@@ -195,14 +195,7 @@ def GetPythonInfo():
         elif Linux():
             return sysconfig.get_config_var("LDLIBRARY")
         elif MacOS():
-            pythonFramework = sysconfig.get_config_var("PYTHONFRAMEWORK")
-            if pythonFramework:
-                return pythonFramework
-
-            # Note that for non-framework installs of Python on Mac, this will
-            # probably return the name of a static library ".a" file, as it's
-            # likely that no SO exists in the installation.
-            return sysconfig.get_config_var("LDLIBRARY")
+            return "libpython" + pythonVersion + ".dylib"
         else:
             raise RuntimeError("Platform not supported")
 
@@ -237,14 +230,8 @@ def GetPythonInfo():
             pythonLibPath = os.path.join(pythonLibDir,
                                          _GetPythonLibraryFilename())
         elif MacOS():
-            if sysconfig.get_config_var("PYTHONFRAMEWORK"):
-                pythonLibDir = sysconfig.get_config_var(
-                    "PYTHONFRAMEWORKINSTALLDIR")
-            else:
-                pythonLibDir = os.path.join(
-                    sysconfig.get_config_var("prefix"), "lib")
-
-            pythonLibPath = os.path.join(pythonLibDir,
+            pythonBaseDir = sysconfig.get_config_var("base")
+            pythonLibPath = os.path.join(pythonBaseDir, "lib",
                                          _GetPythonLibraryFilename())
         else:
             raise RuntimeError("Platform not supported")
@@ -2519,7 +2506,12 @@ else:
 
 if find_executable("cmake"):
     # Check cmake requirements
-    cmake_required_version = (3, 12)
+    if Windows():
+        # Windows build depend on boost 1.70, which is not supported before
+        # cmake version 3.14
+        cmake_required_version = (3, 14)
+    else:
+        cmake_required_version = (3, 12)
     cmake_version = GetCMakeVersion()
     if not cmake_version:
         PrintError("Failed to determine CMake version")

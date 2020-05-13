@@ -1,10 +1,10 @@
 set(DIRS
     garch
     hf
+    hio
     cameraUtil
     pxOsd
     glf
-    hio
     hgi
     hgiGL
     hgiMetal

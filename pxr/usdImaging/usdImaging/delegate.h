@@ -389,11 +389,19 @@ public:
 
     // Picking path resolution
     // Resolves a \p rprimId and \p instanceIndex back to the original USD
-    // gprim and instance index.
+    // gprim and instance index.  For point-instanced prims, \p instanceContext
+    // returns extra information about which instance this is of which level of
+    // point-instancer.  For example:
+    //   /World/PI instances /World/PI/proto/PI
+    //   /World/PI/proto/PI instances /World/PI/proto/PI/proto/Gprim
+    //   instancerContext = [/World/PI, 0], [/World/PI/proto/PI, 1] means that
+    //   this instance represents "protoIndex = 0" of /World/PI, etc.
+
     USDIMAGING_API
     virtual SdfPath
     GetScenePrimPath(SdfPath const& rprimId,
-                     int instanceIndex) override;
+                     int instanceIndex,
+                     HdInstancerContext *instancerContext = nullptr) override;
 
     // ExtComputation support
     USDIMAGING_API
@@ -617,8 +625,7 @@ private:
     _DependencyMap _dependencyInfo;
 
     void _GatherDependencies(SdfPath const& subtree,
-                             SdfPathVector *affectedCachePaths,
-                             SdfPathVector *affectedUsdPaths = nullptr);
+                             SdfPathVector *affectedCachePaths);
 
     // SdfPath::ReplacePrefix() is used frequently to convert between
     // cache path and Hydra render index path and is a performance bottleneck.
@@ -681,6 +688,10 @@ private:
     int _refineLevelFallback;
     HdReprSelector _reprFallback;
     HdCullStyle _cullStyleFallback;
+
+    // Cache of which prims are time-varying.
+    SdfPathVector _timeVaryingPrimCache;
+    bool _timeVaryingPrimCacheValid;
 
     // Change processing
     TfNotice::Key _objectsChangedNoticeKey;

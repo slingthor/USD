@@ -1,5 +1,5 @@
 //
-// Copyright 2016 Pixar
+// Copyright 2020 Pixar
 //
 // Licensed under the Apache License, Version 2.0 (the "Apache License")
 // with the following modification; you may not use this file except in
@@ -27,17 +27,22 @@
 #include "pxr/imaging/hgiMetal/capabilities.h"
 #include "pxr/imaging/hgiMetal/diagnostic.h"
 #include "pxr/imaging/hgiMetal/hgi.h"
+#include "pxr/imaging/hgiMetal/texture.h"
 
 #include "pxr/base/tf/diagnostic.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-struct Vertex {
-    float position[2];
-    float uv[2];
-};
+namespace {
+    struct Vertex {
+        float position[2];
+        float uv[2];
+    };
+}
 
-static bool _ProcessGLErrors(bool silent = false) {
+static bool
+_ProcessGLErrors(bool silent = false)
+{
     bool foundError = false;
     GLenum error;
     // Protect from doing infinite looping when glGetError
@@ -63,8 +68,9 @@ static bool _ProcessGLErrors(bool silent = false) {
     return foundError;
 }
 
-static GLuint _compileShader(
-    GLchar const* const shaderSource, GLuint shaderType)
+static GLuint
+_compileShader(
+    GLchar const* const shaderSource, GLenum shaderType)
 {
     GLint status;
     
@@ -105,15 +111,17 @@ static GLuint _compileShader(
         GLchar *errorLog = (GLchar*)malloc(maxLength);
         glGetShaderInfoLog(s, maxLength, &maxLength, errorLog);
         
-        TF_FATAL_CODING_ERROR("Failed to compile Metal/GL interop shader %s",
-                              errorLog);
+        TF_CODING_ERROR("Failed to compile Metal/GL interop shader %s",
+                        errorLog);
         free(errorLog);
     }
     
     return s;
 }
 
-static void _OutputShaderLog(GLint program) {
+static void
+_OutputShaderLog(GLuint program)
+{
     GLint maxLength = 2048;
     glGetProgramiv(program, GL_INFO_LOG_LENGTH, &maxLength);
     if (maxLength)
@@ -128,11 +136,13 @@ static void _OutputShaderLog(GLint program) {
     }
 }
 
-void HgiInteropMetal::_CreateShaderContext(
+void
+HgiInteropMetal::_CreateShaderContext(
     int32_t vertexSource,
     int32_t fragmentSource,
-    ShaderContext &shader) {
-    GLint program;
+    ShaderContext &shader) 
+{
+    GLuint program;
     
     program = glCreateProgram();
     glAttachShader(program, fragmentSource);
@@ -203,10 +213,12 @@ void HgiInteropMetal::_CreateShaderContext(
     glUseProgram(0);
 }
 
-HgiInteropMetal::HgiInteropMetal(
-    id<MTLDevice> interopDevice)
-: _device(interopDevice)
+HgiInteropMetal::HgiInteropMetal(Hgi* hgi)
+    : _hgiMetal(nullptr)
 {
+    _hgiMetal = static_cast<HgiMetal*>(hgi);
+    _device = _hgiMetal->GetPrimaryDevice();
+
     NSError *error = NULL;
     
     glewExperimental = true;
@@ -219,7 +231,7 @@ HgiInteropMetal::HgiInteropMetal(
 
     // Load our common vertex shader. This is used by both the fragment shaders
     // below
-    GLchar const* const vertexShader =
+    static GLchar const* const vertexShader =
         "#if __VERSION__ >= 140\n"
         "in vec2 inPosition;\n"
         "in vec2 inTexCoord;\n"
@@ -238,7 +250,7 @@ HgiInteropMetal::HgiInteropMetal(
     
     GLuint vs = _compileShader(vertexShader, GL_VERTEX_SHADER);
 
-    GLchar const* const fragmentShaderColor =
+    static GLchar const* const fragmentShaderColor =
         "#if __VERSION__ >= 140\n"
         "in vec2         texCoord;\n"
         "out vec4        fragColor;\n"
@@ -264,7 +276,7 @@ HgiInteropMetal::HgiInteropMetal(
         "#endif\n"
         "}\n";
 
-    GLchar const* const fragmentShaderColorDepth =
+    static GLchar const* const fragmentShaderColorDepth =
         "#if __VERSION__ >= 140\n"
         "in vec2         texCoord;\n"
         "out vec4        fragColor;\n"
@@ -293,10 +305,11 @@ HgiInteropMetal::HgiInteropMetal(
         "        vec4(1.0, 1 / 255.0, 1 / 65025.0, 1 / 16581375.0) );\n"
         "#if __VERSION__ >= 140\n"
         "    fragColor = texture(interopTexture, uv.st);\n"
+        "    gl_FragDepth = texture(depthTexture, uv.st).r;\n"
         "#else\n"
         "    gl_FragColor = texture2DRect(interopTexture, uv.st);\n"
+        "    gl_FragDepth = texture2DRect(depthTexture, uv.st).r;\n"
         "#endif\n"
-        "    gl_FragDepth = depth;\n"
         "}\n";
 
     GLuint fsColor = _compileShader(fragmentShaderColor, GL_FRAGMENT_SHADER);
@@ -332,18 +345,7 @@ HgiInteropMetal::HgiInteropMetal(
         "{\n"
         "    if(gid.x >= texOut.get_width() || gid.y >= texOut.get_height())\n"
         "        return;\n"
-        "    float depth = texIn.read(gid);\n"
-        // This works around an issue with AMD Vega incorrectly resolving
-        // depth buffers when there's an empty render target performing the
-        // load/resolve
-        "    float maxDepth = 1.0f - FLT_EPSILON;\n"
-        "    depth = depth == 0.0f?maxDepth:min(maxDepth, depth);\n"
-        "    float4 encodedDepth =\n"
-        "        float4(1.0f, 255.0f, 65025.0f, 16581375.0f) * depth;\n"
-        "    encodedDepth = fract(encodedDepth);\n"
-        "    encodedDepth -= encodedDepth.yzww *\n"
-        "        float4(1.0 / 255.0, 1.0 / 255.0, 1.0 / 255.0, 0.0);\n"
-        "    texOut.write(encodedDepth, gid);\n"
+        "    texOut.write(float(texIn.read(gid)), gid);\n"
         "}\n"
         "\n"
         "kernel void copyColour(\n"
@@ -459,7 +461,7 @@ HgiInteropMetal::HgiInteropMetal(
     _glColorTexture = 0;
     _glDepthTexture = 0;
     
-    SetAttachmentSize(256, 256);
+    _SetAttachmentSize(256, 256);
 }
 
 HgiInteropMetal::~HgiInteropMetal()
@@ -476,7 +478,8 @@ HgiInteropMetal::~HgiInteropMetal()
     }
 }
 
-void HgiInteropMetal::_FreeTransientTextureCacheRefs()
+void
+HgiInteropMetal::_FreeTransientTextureCacheRefs()
 {
     if (_glColorTexture) {
         glDeleteTextures(1, &_glColorTexture);
@@ -512,7 +515,8 @@ void HgiInteropMetal::_FreeTransientTextureCacheRefs()
     }
 }
 
-void HgiInteropMetal::_ValidateGLContext()
+void
+HgiInteropMetal::_ValidateGLContext()
 {
     if (_currentOpenGLContext != [NSOpenGLContext currentContext]) {
         TF_FATAL_CODING_ERROR(
@@ -521,7 +525,8 @@ void HgiInteropMetal::_ValidateGLContext()
     }
 }
 
-void HgiInteropMetal::SetAttachmentSize(int width, int height)
+void
+HgiInteropMetal::_SetAttachmentSize(int width, int height)
 {
     if (_mtlAliasedColorTexture != nil) {
         if (_mtlAliasedColorTexture.width == width &&
@@ -556,7 +561,7 @@ void HgiInteropMetal::SetAttachmentSize(int width, int height)
         kCFAllocatorDefault,
         width,
         height,
-        kCVPixelFormatType_32BGRA,
+        kCVPixelFormatType_OneComponent32Float,
         (__bridge CFDictionaryRef)cvBufferProperties,
         &_depthBuffer);
     
@@ -616,7 +621,7 @@ void HgiInteropMetal::SetAttachmentSize(int width, int height)
         _cvmtlTextureCache,
         _depthBuffer,
         (__bridge CFDictionaryRef)metalTextureProperties,
-        MTLPixelFormatBGRA8Unorm,
+        MTLPixelFormatR32Float,
         width,
         height,
         0,
@@ -628,6 +633,17 @@ void HgiInteropMetal::SetAttachmentSize(int width, int height)
     }
     _mtlAliasedDepthRegularFloatTexture =
         CVMetalTextureGetTexture(_cvmtlDepthTexture);
+
+    MTLTextureDescriptor *depthTexDescriptor =
+        [MTLTextureDescriptor
+         texture2DDescriptorWithPixelFormat:MTLPixelFormatR32Float
+         width:width
+         height:height
+         mipmapped:false];
+    depthTexDescriptor.usage =
+        MTLTextureUsageShaderRead|MTLTextureUsageShaderWrite;
+    depthTexDescriptor.resourceOptions =
+        MTLResourceCPUCacheModeDefaultCache | MTLResourceStorageModePrivate;
     
     // Flush the caches
     CVOpenGLTextureCacheFlush(_cvglTextureCache, 0);
@@ -819,19 +835,50 @@ HgiInteropMetal::_BlitToOpenGL(bool flipY, int shaderIndex)
 
 void
 HgiInteropMetal::CopyToInterop(
-    Hgi* hgi,
-    id<MTLTexture> sourceColorTexture,
-    id<MTLTexture> sourceDepthTexture,
-    bool flipImage)
+    HgiTextureHandle const &color,
+    HgiTextureHandle const &depth)
 {
+    if (!ARCH_UNLIKELY(color)) {
+        TF_WARN("No valid color texture provided");
+        return;
+    }
+
     _ValidateGLContext();
 
-    HgiMetal* metalHgi = static_cast<HgiMetal*>(hgi);
-    id<MTLCommandBuffer> commandBuffer = metalHgi->GetCommandBuffer();
+    // XXX We need to flip all renderers (Embree, Prman, ...) for now as we
+    // assume they all output gl coords. That may not always be the case if
+    // Storm renders with Metal directly.
+    bool flipImage = true;
+
+    HgiMetalTexture *metalColor = static_cast<HgiMetalTexture*>(color.Get());
+    HgiMetalTexture *metalDepth = static_cast<HgiMetalTexture*>(depth.Get());
+
+    int width = 
+        metalColor ? metalColor->GetDescriptor().dimensions[0] :
+        metalDepth ? metalDepth->GetDescriptor().dimensions[0] :
+        256;
+
+    int height = 
+        metalColor ? metalColor->GetDescriptor().dimensions[1] :
+        metalDepth ? metalDepth->GetDescriptor().dimensions[1] :
+        256;
+
+    _SetAttachmentSize(width, height);
+
+    id<MTLTexture> colorTexture = nil;
+    id<MTLTexture> depthTexture = nil;
+    if (metalColor) {
+        colorTexture = metalColor->GetTextureId();
+    }
+    if (metalDepth) {
+        depthTexture = metalDepth->GetTextureId();
+    }
+
+    id<MTLCommandBuffer> commandBuffer = _hgiMetal->GetCommandBuffer();
     
     id<MTLComputeCommandEncoder> computeEncoder;
     
-    if (metalHgi->GetCapabilities().concurrentDispatchSupported) {
+    if (_hgiMetal->GetCapabilities().concurrentDispatchSupported) {
         computeEncoder = [commandBuffer
          computeCommandEncoderWithDispatchType:MTLDispatchTypeConcurrent];
     }
@@ -843,7 +890,7 @@ HgiInteropMetal::CopyToInterop(
     //
     // Depth
     //
-    if (sourceDepthTexture) {
+    if (depthTexture) {
         NSUInteger exeWidth = [_computePipelineStateDepth threadExecutionWidth];
         NSUInteger maxThreadsPerThreadgroup =
             [_computePipelineStateDepth maxTotalThreadsPerThreadgroup];
@@ -858,7 +905,7 @@ HgiInteropMetal::CopyToInterop(
             1);
 
         [computeEncoder setComputePipelineState:_computePipelineStateDepth];
-        [computeEncoder setTexture:sourceDepthTexture atIndex:0];
+        [computeEncoder setTexture:depthTexture atIndex:0];
         [computeEncoder setTexture:_mtlAliasedDepthRegularFloatTexture
                            atIndex:1];
         
@@ -869,7 +916,7 @@ HgiInteropMetal::CopyToInterop(
     //
     // Color
     //
-    if (sourceColorTexture) {
+    if (colorTexture) {
         NSUInteger exeWidth = [_computePipelineStateColor threadExecutionWidth];
         NSUInteger maxThreadsPerThreadgroup =
             [_computePipelineStateColor maxTotalThreadsPerThreadgroup];
@@ -884,7 +931,7 @@ HgiInteropMetal::CopyToInterop(
             1);
 
         [computeEncoder setComputePipelineState:_computePipelineStateColor];
-        [computeEncoder setTexture:sourceColorTexture atIndex:0];
+        [computeEncoder setTexture:colorTexture atIndex:0];
         [computeEncoder setTexture:_mtlAliasedColorTexture atIndex:1];
         
         [computeEncoder dispatchThreadgroups:threadsPerGrid
@@ -893,16 +940,16 @@ HgiInteropMetal::CopyToInterop(
 
     [computeEncoder endEncoding];
     
-    if (sourceDepthTexture && sourceColorTexture) {
+    if (depthTexture && colorTexture) {
         glShaderIndex = ShaderContextColorDepth;
     }
-    else if (sourceColorTexture) {
+    else if (colorTexture) {
         glShaderIndex = ShaderContextColor;
     }
 
     // We wait until the work is scheduled for execution so that future OpenGL
     // calls are guaranteed to happen after the Metal work encoded above
-    metalHgi->CommitCommandBuffer(
+    _hgiMetal->CommitCommandBuffer(
         HgiMetal::CommitCommandBuffer_WaitUntilScheduled);
 
     if (glShaderIndex != -1) {

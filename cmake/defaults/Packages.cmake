@@ -191,6 +191,10 @@ if (PXR_BUILD_IMAGING)
         FIND_LIBRARY(COREVIDEO_LIBRARY CoreVideo)
         add_definitions(-DPXR_METAL_SUPPORT_ENABLED)
     endif()
+    # --Metal
+    if (PXR_ENABLE_METAL_SUPPORT)
+        add_definitions(-DPXR_METAL_SUPPORT_ENABLED)
+    endif()
     # --Opensubdiv
     set(OPENSUBDIV_USE_GPU ${PXR_ENABLE_GL_SUPPORT} OR ${PXR_ENABLE_METAL_SUPPORT})
     find_package(OpenSubdiv 3 REQUIRED)

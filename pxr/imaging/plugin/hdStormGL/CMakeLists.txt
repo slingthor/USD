@@ -1,5 +1,11 @@
 set(PXR_PREFIX pxr/imaging)
-set(PXR_PACKAGE hdStormGL)
+set(PXR_PACKAGE hdStorm)
+
+if (NOT ${PXR_BUILD_GPU_SUPPORT})
+    message(STATUS
+        "Skipping ${PXR_PACKAGE} because PXR_BUILD_GPU_SUPPORT is OFF")
+    return()
+endif()
 
 set(optionalPublicClasses "")
 

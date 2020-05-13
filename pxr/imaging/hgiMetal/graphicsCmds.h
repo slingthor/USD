@@ -99,7 +99,7 @@ private:
     HgiMetal* _hgi;
     id<MTLRenderCommandEncoder> _encoder;
     HgiGraphicsCmdsDesc _descriptor;
-	bool _hasWork;
+    bool _hasWork;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

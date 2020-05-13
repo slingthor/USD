@@ -230,34 +230,12 @@ HdxColorizeSelectionTask::Execute(HdTaskContext* ctx)
     // scene color. This gives us the blend func:
     // GL_ONE, GL_SRC_ALPHA, GL_ZERO, GL_ONE.
     if (!_pipelineCreated) {
-        HgiPipelineDesc desc;
-        desc.depthState.depthTestEnabled = false;
-        desc.depthState.depthWriteEnabled = false;
-        desc.depthState.stencilTestEnabled = false;
-        desc.multiSampleState.alphaToCoverageEnable = false;
-        
-        // Describe the vertex buffer
-        HgiVertexAttributeDesc posAttr;
-        posAttr.format = HgiFormatFloat32Vec3;
-        posAttr.offset = 0;
-        posAttr.shaderBindLocation = 0;
+        HgiDepthStencilState depthState;
+        depthState.depthTestEnabled = false;
+        depthState.depthWriteEnabled = false;
+        depthState.stencilTestEnabled = false;
 
-        HgiVertexAttributeDesc uvAttr;
-        uvAttr.format = HgiFormatFloat32Vec2;
-        uvAttr.offset = sizeof(float) * 4; // after posAttr
-        uvAttr.shaderBindLocation = 1;
-
-        size_t bindSlots = 0;
-
-        HgiVertexBufferDesc vboDesc;
-        vboDesc.bindingIndex = bindSlots++;
-        vboDesc.vertexStride = sizeof(float) * 6; // pos, uv
-        vboDesc.vertexAttributes.push_back(posAttr);
-        vboDesc.vertexAttributes.push_back(uvAttr);
-        
-        desc.vertexBuffers.emplace_back(std::move(vboDesc));
-
-        _compositor->CreatePipeline(desc);
+        _compositor->SetDepthState(depthState);
         _pipelineCreated = true;
 
         _compositor->SetBlendState(

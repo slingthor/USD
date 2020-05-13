@@ -26,6 +26,7 @@
 #include "pxr/imaging/hdx/package.h"
 #include "pxr/imaging/hf/perfLog.h"
 #include "pxr/imaging/hd/perfLog.h"
+#include "pxr/imaging/hd/tokens.h"
 #include "pxr/imaging/hio/glslfx.h"
 #include "pxr/base/tf/staticTokens.h"
 
@@ -44,7 +45,6 @@ TF_DEFINE_PRIVATE_TOKENS(
     ((compositeFragmentNoDepth,      "CompositeFragmentNoDepth"))
     ((compositeFragmentWithDepth,    "CompositeFragmentWithDepth"))
     (fullscreenShader)
-    (color)
 );
 
 HdxFullscreenShader::HdxFullscreenShader(
@@ -69,6 +69,18 @@ HdxFullscreenShader::HdxFullscreenShader(
     if (_debugName.empty()) {
         _debugName = "HdxFullscreenShader";
     }
+
+    // Create descriptor for vertex pos and uvs
+    _CreateVertexBufferDescriptor();
+
+    // Depth test and write must be on since we may want to transfer depth.
+    // Depth test must be on because when off it also disables depth writes.
+    // Instead we set the compare function to always.
+    _depthState.depthTestEnabled = true;
+    _depthState.depthCompareFn = HgiCompareFunctionAlways;
+
+    // We don't use the stencil mask in this task.
+    _depthState.stencilTestEnabled = false;
 }
 
 HdxFullscreenShader::~HdxFullscreenShader()
@@ -166,31 +178,17 @@ HdxFullscreenShader::BindBuffer(
 }
 
 void
-HdxFullscreenShader::CreatePipeline(HgiPipelineDesc pipeDesc)
+HdxFullscreenShader::SetDepthState(HgiDepthStencilState const& state)
 {
-    // Pipeline not changed, abort.
-    if (_pipeline && _pipeline.Get()->GetDescriptor() == pipeDesc) {
+    if (_depthState == state) {
         return;
     }
-
-    if (pipeDesc.debugName.empty()) {
-        pipeDesc.debugName = "HdxFullscreenShader Pipeline";
-    }
-
-    // CreatePipeline call lets the caller set blend and raster state, but
-    // we always override resources, shader program and vertex descriptor since
-    // those either use the internal shader and textures or are already set
-    // via other functions on this class.
-    pipeDesc.pipelineType = HgiPipelineTypeGraphics;
-    pipeDesc.resourceBindings = _resourceBindings;
-    pipeDesc.shaderProgram = _shaderProgram;
-    pipeDesc.vertexBuffers.push_back(_vboDesc);
 
     if (_pipeline) {
         _hgi->DestroyPipeline(&_pipeline);
     }
 
-    _pipeline = _hgi->CreatePipeline(pipeDesc);
+    _depthState = state;
 }
 
 void
@@ -203,6 +201,21 @@ HdxFullscreenShader::SetBlendState(
     HgiBlendFactor dstAlphaBlendFactor,
     HgiBlendOp alphaBlendOp)
 {
+    if (_blendingEnabled == enableBlending &&
+        _srcColorBlendFactor == srcColorBlendFactor &&
+        _dstColorBlendFactor == dstColorBlendFactor &&
+        _colorBlendOp == colorBlendOp &&
+        _srcAlphaBlendFactor == srcAlphaBlendFactor &&
+        _dstAlphaBlendFactor == dstAlphaBlendFactor &&
+        _alphaBlendOp == alphaBlendOp) 
+    {
+        return;
+    }
+
+    if (_pipeline) {
+        _hgi->DestroyPipeline(&_pipeline);
+    }
+
     _blendingEnabled = enableBlending;
     _srcColorBlendFactor = srcColorBlendFactor;
     _dstColorBlendFactor = dstColorBlendFactor;
@@ -348,10 +361,6 @@ HdxFullscreenShader::_CreateResourceBindings(TextureMap const& textures)
 void
 HdxFullscreenShader::_CreateVertexBufferDescriptor()
 {
-    if (!_vboDesc.vertexAttributes.empty()) {
-        return;
-    }
-
     // Describe the vertex buffer
     HgiVertexAttributeDesc posAttr;
     posAttr.format = HgiFormatFloat32Vec3;
@@ -363,26 +372,17 @@ HdxFullscreenShader::_CreateVertexBufferDescriptor()
     uvAttr.offset = sizeof(float) * 4; // after posAttr
     uvAttr.shaderBindLocation = 1;
 
-// todo OpenGL and Metal both re-use slot indices between buffers and textures.
-// Vulkan does not allow this and each bound resource must have a unique index.
-// We need to clarify the Hgi API. We probably want to follow the Vulkan rules,
-// because when we do we still have both pieces of information.
-// Metal and GL can look in the 'textures' vector to find the bindIndex.
-// Vulkan can use the provided 'bindIndex' to determine the index in the
-// descriptor set.
-// However we still have a problem with the glsl.
-// In there we will have written the 'binding=xx' value and it the same glsl
-// won't be compatible between opengl and vulkan...
     size_t bindSlots = 0;
 
     _vboDesc.bindingIndex = bindSlots++;
     _vboDesc.vertexStride = sizeof(float) * 6; // pos, uv
+    _vboDesc.vertexAttributes.clear();
     _vboDesc.vertexAttributes.push_back(posAttr);
     _vboDesc.vertexAttributes.push_back(uvAttr);
 }
 
 bool
-HdxFullscreenShader::_CreateDefaultPipeline(
+HdxFullscreenShader::_CreatePipeline(
     HgiTextureHandle const& colorDst,
     HgiTextureHandle const& depthDst,
     bool depthWrite)
@@ -398,6 +398,7 @@ HdxFullscreenShader::_CreateDefaultPipeline(
         _hgi->DestroyPipeline(&_pipeline);
     }
 
+    // Setup attachments
     _attachment0.blendEnabled = _blendingEnabled;
     _attachment0.loadOp = HgiAttachmentLoadOpDontCare;
     _attachment0.storeOp = HgiAttachmentStoreOpStore;
@@ -418,24 +419,19 @@ HdxFullscreenShader::_CreateDefaultPipeline(
     }
 
     HgiPipelineDesc desc;
-    desc.debugName = "HdxFullscreenShader Pipeline";
+    desc.debugName = _debugName + " Pipeline";
     desc.pipelineType = HgiPipelineTypeGraphics;
     desc.resourceBindings = _resourceBindings;
     desc.shaderProgram = _shaderProgram;
-    desc.colorAttachmentDescs.emplace_back(_attachment0);
+    desc.colorAttachmentDescs.push_back(_attachment0);
     desc.depthAttachmentDesc = _depthAttachment;
 
     desc.vertexBuffers.push_back(_vboDesc);
 
-    // Depth test and write must be on since we may want to transfer depth.
-    // Depth test must be on because when off it also disables depth writes.
-    // Instead we set the compare function to always.
-    desc.depthState.depthTestEnabled = true;
+    // User can provide custom depth state, but DepthWrite is controlled by the
+    // presence of the depth attachment.
+    desc.depthState = _depthState;
     desc.depthState.depthWriteEnabled = depthWrite;
-    desc.depthState.depthCompareFn = HgiCompareFunctionAlways;
-
-    // We don't use the stencil mask in this task.
-    desc.depthState.stencilTestEnabled = false;
 
     // Alpha to coverage would prevent any pixels that have an alpha of 0.0 from
     // being written. We want to transfer all pixels. Even background
@@ -447,7 +443,17 @@ HdxFullscreenShader::_CreateDefaultPipeline(
     desc.rasterizationState.polygonMode = HgiPolygonModeFill;
     desc.rasterizationState.winding = HgiWindingCounterClockwise;
 
-    CreatePipeline(desc);
+    // Set resource bindings (texture, buffers) and shader
+    desc.pipelineType = HgiPipelineTypeGraphics;
+    desc.resourceBindings = _resourceBindings;
+    desc.shaderProgram = _shaderProgram;
+
+    // Ignore user provided vertex buffers. The VBO must always match the
+    // vertex attributes we setup for the fullscreen triangle.
+    desc.vertexBuffers.clear();
+    desc.vertexBuffers.push_back(_vboDesc);
+
+    _pipeline = _hgi->CreatePipeline(desc);
 
     return true;
 }
@@ -464,16 +470,6 @@ HdxFullscreenShader::Draw(
 {
     bool depthWrite = depthDst.Get() != nullptr;
     _Draw(_textures, colorDst, depthDst, depthWrite);
-}
-
-void
-HdxFullscreenShader::DrawToFramebuffer(TextureMap const& textures)
-{
-    // Destination textures are null since we are drawing into framebuffer.
-    // depthWrite is true: we want to transfer depth from aov's to framebuffer.
-    bool depthWrite = true;
-    TextureMap const& texs = textures.empty() ? _textures : textures;
-    _Draw(texs, HgiTextureHandle(), HgiTextureHandle(), depthWrite);
 }
 
 void
@@ -496,7 +492,7 @@ HdxFullscreenShader::_Draw(
 {
     // If the user has not set a custom shader program, pick default program.
     if (!_shaderProgram) {
-        auto const& it = textures.find(TfToken("depth"));
+        auto const& it = textures.find(HdAovTokens->depth);
         bool depthAware = it != textures.end();
         SetProgram(HdxPackageFullscreenShader(),
             depthAware ? _tokens->compositeFragmentWithDepth :
@@ -508,14 +504,11 @@ HdxFullscreenShader::_Draw(
         _CreateBufferResources();
     }
 
-    // Create descriptor for vertex pos and uvs
-    _CreateVertexBufferDescriptor();
-
     // Create or update the resource bindings (textures may have changed)
     _CreateResourceBindings(textures);
 
     // create pipeline (first time)
-    _CreateDefaultPipeline(colorDst, depthDst, writeDepth);
+    _CreatePipeline(colorDst, depthDst, writeDepth);
 
     // If a destination color target is provided we can use it as the
     // dimensions of the backbuffer. If not destination textures are provided
@@ -525,7 +518,7 @@ HdxFullscreenShader::_Draw(
     // error out if 'colorDst' is not provided.
     HgiTextureHandle dimensionSrc = colorDst;
     if (!dimensionSrc) {
-        auto const& it = textures.find(_tokens->color);
+        auto const& it = textures.find(HdAovTokens->color);
         if (it != textures.end()) {
             dimensionSrc = it->second;
         }

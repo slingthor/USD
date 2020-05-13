@@ -291,19 +291,13 @@ class MainWindow(QtWidgets.QMainWindow):
     "This class exists to simplify and streamline the shutdown process."
     "The application may be closed via the File menu, or by closing the main"
     "window, both of which result in the same behavior."
-    def __init__(self, closeFunc, printCloseTiming):
+    def __init__(self, closeFunc):
         super(MainWindow, self).__init__(None) # no parent widget
         self._closeFunc = closeFunc
-        self._printCloseTiming = printCloseTiming
 
     def closeEvent(self, event):
         self._closeFunc()
         
-        with Timer() as t:
-            self.close() # Close the MainWindow widget.
-        if self._printCloseTiming:
-            t.PrintTime('tear down the UI')
-
 class AppController(QtCore.QObject):
 
     HYDRA_DISABLED_OPTION_STRING = "HydraDisabled"
@@ -443,8 +437,7 @@ class AppController(QtCore.QObject):
             # start listening for style-related changes.
             self._setStyleSheetUsingState()
 
-            self._mainWindow = MainWindow(lambda: self._cleanAndClose(),
-                                          self._printTiming)
+            self._mainWindow = MainWindow(lambda: self._cleanAndClose())
             self._ui = Ui_MainWindow()
             self._ui.setupUi(self._mainWindow)
 
@@ -887,10 +880,17 @@ class AppController(QtCore.QObject):
             self._ui.actionStop.triggered.connect(
                 self._toggleStop)
 
-            # Setup quit actions to ensure _cleanAndClose is only invoked once.
-            # Don't register a handler for the 'aboutToQuit' signal,
-            # since the mainWindow's closeEvent handler triggers _cleanAndClose.
+            # Typically, a handler is registered to the 'aboutToQuit' signal
+            # to handle cleanup. However, with PySide2, stageView's GL context
+            # is destroyed by then, making it too late in the shutdown process
+            # to release any GL resources used by the renderer (relevant for 
+            # Storm's GL renderer).
+            # To work around this, orchestrate shutdown via the main window's
+            # closeEvent() handler.
             self._ui.actionQuit.triggered.connect(QtWidgets.QApplication.instance().closeAllWindows)
+
+            # To measure Qt shutdown time, register a handler to stop the timer.
+            QtWidgets.QApplication.instance().aboutToQuit.connect(self._stopQtShutdownTimer)
 
             self._ui.actionReopen_Stage.triggered.connect(self._reopenStage)
 
@@ -1258,6 +1258,15 @@ class AppController(QtCore.QObject):
         if self._stageView:
             self._stageView.closeRenderer()
         self._dataModel.stage = None
+
+    def _startQtShutdownTimer(self):
+        self._qtShutdownTimer = Timer()
+        self._qtShutdownTimer.__enter__()
+
+    def _stopQtShutdownTimer(self):
+        self._qtShutdownTimer.__exit__()
+        if self._printTiming:
+            self._qtShutdownTimer.PrintTime('tear down the UI')
 
     def _setPlayShortcut(self):
         self._ui.playButton.setShortcut(QtGui.QKeySequence(QtCore.Qt.Key_Space))
@@ -2622,6 +2631,9 @@ class AppController(QtCore.QObject):
         # Close stage and release renderer resources (if applicable).
         self._closeStage()
 
+        # Start timer to measure Qt shutdown time
+        self._startQtShutdownTimer()
+
     def _openFile(self):
         extensions = Sdf.FileFormat.FindAllFileFormatExtensions()
         builtInFiles = lambda f: f.startswith(".usd")
@@ -2738,7 +2750,8 @@ class AppController(QtCore.QObject):
 
         try:
             # Pause the stage view while we update
-            self._stageView.setUpdatesEnabled(False)
+            if self._stageView:
+                self._stageView.setUpdatesEnabled(False)
 
             # Clear out any Usd objects that may become invalid.
             self._dataModel.selection.clear()
@@ -2762,8 +2775,8 @@ class AppController(QtCore.QObject):
             self._resetView()
 
             self._stepSizeChanged()
-            self._stepSizeChanged()
-            self._stageView.setUpdatesEnabled(True)
+            if self._stageView:
+                self._stageView.setUpdatesEnabled(True)
         except Exception as err:
             self.statusMessage('Error occurred reopening Stage: %s' % err)
             traceback.print_exc()
@@ -3963,16 +3976,7 @@ class AppController(QtCore.QObject):
         # this.
         compKeys = [# composition related metadata
                     "references", "inheritPaths", "specializes",
-                    "payload", "subLayers",
-
-                    # non-template clip metadata
-                    "clipAssetPaths", "clipTimes", "clipManifestAssetPath",
-                    "clipActive", "clipPrimPath",
-
-                    # template clip metadata
-                    "clipTemplateAssetPath",
-                    "clipTemplateStartTime", "clipTemplateEndTime",
-                    "clipTemplateStride"]
+                    "payload", "subLayers"]
 
 
         for k in compKeys:
@@ -4080,7 +4084,7 @@ class AppController(QtCore.QObject):
         for key in sortedKeys:
             if key == "clips":
                 for (clip, metadataGroup) in m[key].items():
-                    attrName = QtWidgets.QTableWidgetItem(str('clip:' + clip))
+                    attrName = QtWidgets.QTableWidgetItem(str('clips:' + clip))
                     tableWidget.setItem(rowIndex, 0, attrName)
                     for metadata in metadataGroup.keys():
                         dataPair = (metadata, metadataGroup[metadata])

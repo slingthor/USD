@@ -1,9 +1,9 @@
 set(PXR_PREFIX pxr/imaging)
 set(PXR_PACKAGE hgiInterop)
 
-if (NOT ${PXR_BUILD_STORM_PLUGINS} OR NOT ${PXR_ENABLE_GL_SUPPORT} OR NOT ${PXR_ENABLE_METAL_SUPPORT})
+if (NOT ${PXR_BUILD_GPU_SUPPORT})
     message(STATUS
-        "Skipping ${PXR_PACKAGE} because PXR_BUILD_STORM_PLUGINS or PXR_ENABLE_GL_SUPPORT or PXR_ENABLE_METAL_SUPPORT is OFF")
+        "Skipping ${PXR_PACKAGE} because PXR_BUILD_GPU_SUPPORT is OFF")
     return()
 endif()
 
@@ -14,16 +14,19 @@ if (APPLEIOS)
 endif()
 
 set(optionalLibraries "")
-set(optionalSource "")
+set(optionalCppFiles "")
+set(optionalPrivateHeaders "")
 
-if (APPLE)
-    # Compile cpp files as obj-c++ to allow inline use of Metal API
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -x objective-c++")
-
+if (PXR_ENABLE_METAL_SUPPORT)
+    add_compile_options(-x objective-c++)
     FIND_LIBRARY(COREVIDEO_LIBRARY CoreVideo)
-
     list(APPEND optionalLibraries ${COREVIDEO_LIBRARY} hgiMetal)
-    list(APPEND optionalSource metal)
+    list(APPEND optionalCppFiles metal.mm)
+    list(APPEND optionalPrivateHeaders metal.h)
+else()
+    list(APPEND optionalLibraries hgiGL)
+    list(APPEND optionalCppFiles opengl.cpp)
+    list(APPEND optionalPrivateHeaders opengl.h)
 endif()
 
 pxr_library(hgiInterop
@@ -32,15 +35,19 @@ pxr_library(hgiInterop
         plug
         tf
         hgi
-        hgiGL
+        ${GLEW_LIBRARY}
+        ${OPENGL_gl_LIBRARY}
+        ${OPENGL_glu_LIBRARY}
         ${optionalLibraries}
-
-    PRIVATE_CLASSES
-        ${optionalSource}
-
-    PUBLIC_CLASSES
-        hgiInterop
 
     PUBLIC_HEADERS
         api.h
+        hgiInterop.h
+
+    PRIVATE_HEADERS
+        ${optionalPrivateHeaders}
+
+    CPPFILES
+        hgiInterop.cpp
+        ${optionalCppFiles}
 )

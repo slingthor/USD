@@ -1,9 +1,9 @@
 set(PXR_PREFIX pxr/imaging)
 set(PXR_PACKAGE hgiMetal)
 
-if (NOT ${PXR_BUILD_STORM_PLUGINS} OR NOT ${PXR_ENABLE_METAL_SUPPORT})
+if (NOT ${PXR_BUILD_GPU_SUPPORT} OR NOT ${PXR_ENABLE_METAL_SUPPORT})
     message(STATUS
-        "Skipping ${PXR_PACKAGE} because PXR_BUILD_STORM_PLUGINS or PXR_ENABLE_METAL_SUPPORT is OFF")
+        "Skipping ${PXR_PACKAGE} because PXR_BUILD_GPU_SUPPORT or PXR_ENABLE_METAL_SUPPORT is OFF")
     return()
 endif()
 
@@ -39,6 +39,9 @@ pxr_library(hgiMetal
         resourceBindings.h
         shaderFunction.h
         shaderProgram.h
+
+    PRIVATE_HEADERS
+        conversions.h
 
     CPPFILES
         blitCmds.mm

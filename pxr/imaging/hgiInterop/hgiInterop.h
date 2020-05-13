@@ -1,5 +1,5 @@
 //
-// Copyright 2019 Pixar
+// Copyright 2020 Pixar
 //
 // Licensed under the Apache License, Version 2.0 (the "Apache License")
 // with the following modification; you may not use this file except in
@@ -25,15 +25,17 @@
 #define PXR_IMAGING_HGIINTEROP_HGIINTEROP_H
 
 #include "pxr/pxr.h"
-#include "pxr/base/tf/type.h"
-
+#include "pxr/base/tf/token.h"
 #include "pxr/imaging/hgiInterop/api.h"
 #include "pxr/imaging/hgi/texture.h"
+
+#include <memory>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
 class Hgi;
 class HgiInteropMetal;
+class HgiInteropOpenGL;
 
 /// \class HgiInterop
 ///
@@ -42,28 +44,41 @@ class HgiInteropMetal;
 /// HgiInterop provides functionality to transfer render targets between
 /// supported APIs as efficiently as possible.
 ///
-class HgiInterop 
+class HgiInterop final
 {
 public:
     HGIINTEROP_API
     HgiInterop();
 
     HGIINTEROP_API
-    virtual ~HgiInterop();
-    
-    void SetFlipOnBlit(bool flipY);
-    
+    ~HgiInterop();
+
+    /// Transfer (blit) the provided textures to the application / viewer.
+    /// `hgi`: 
+    ///     Determines the source format/platform of the textures.
+    ///     Eg. if hgi is of type HgiMetal, the textures are HgiMetalTexture.
+    /// `interopDst`: 
+    ///     Determines what target format/platform the application is using.
+    ///     E.g. If hgi==HgiMetal and interopDst==OpenGL then TransferToApp
+    ///     will present the metal textures to the gl application.
+    /// `color`: is the source color aov texture to present to screen.
+    /// `depth`: (optional) is the depth aov texture to present to screen.
+    HGIINTEROP_API
     void TransferToApp(
         Hgi *hgi,
+        TfToken const& interopDst,
         HgiTextureHandle const &color,
         HgiTextureHandle const &depth);
 
 private:
     HgiInterop & operator=(const HgiInterop&) = delete;
     HgiInterop(const HgiInterop&) = delete;
-    
-    bool _flipImage;
+
+#if defined(PXR_METAL_SUPPORT_ENABLED)
     std::unique_ptr<HgiInteropMetal> _metalToOpenGL;
+#else
+    std::unique_ptr<HgiInteropOpenGL> _openGLToOpenGL;
+#endif
 };
 
 

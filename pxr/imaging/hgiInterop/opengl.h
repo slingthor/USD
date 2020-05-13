@@ -1,5 +1,5 @@
 //
-// Copyright 2017 Pixar
+// Copyright 2020 Pixar
 //
 // Licensed under the Apache License, Version 2.0 (the "Apache License")
 // with the following modification; you may not use this file except in
@@ -21,14 +21,45 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#ifndef PXR_USD_IMAGING_USD_IMAGING_GL_VERSION_H
-#define PXR_USD_IMAGING_USD_IMAGING_GL_VERSION_H
+#ifndef PXR_IMAGING_HGIINTEROP_HGIINTEROPOPENGL_H
+#define PXR_IMAGING_HGIINTEROP_HGIINTEROPOPENGL_H
 
-// 0 -> 1: added IDRenderColor decode and direct Rprim path fetching.
-// 1 -> 2: added RenderParams::enableUsdDrawModes
-// 2 -> 3: refactor picking API.
-// 3 -> 4: Add "instancerContext" to new picking API.
-#define USDIMAGINGGL_API_VERSION 4
+#include "pxr/pxr.h"
+#include "pxr/imaging/hgi/texture.h"
+#include "pxr/imaging/hgiInterop/api.h"
 
-#endif // PXR_USD_IMAGING_USD_IMAGING_GL_VERSION_H
 
+PXR_NAMESPACE_OPEN_SCOPE
+
+
+/// \class HgiInteropOpenGL
+///
+/// Provides GL/GL interop.
+///
+class HgiInteropOpenGL final
+{
+public:
+    HGIINTEROP_API
+    HgiInteropOpenGL();
+
+    HGIINTEROP_API
+    ~HgiInteropOpenGL();
+
+    /// Copy/Present provided color (and optional depth) textures to app.
+    HGIINTEROP_API
+    void CopyToInterop(
+        HgiTextureHandle const &color,
+        HgiTextureHandle const &depth);
+
+private:
+    uint32_t _vs;
+    uint32_t _fsNoDepth;
+    uint32_t _fsDepth;
+    uint32_t _prgNoDepth;
+    uint32_t _prgDepth;
+    uint32_t _vertexBuffer;
+};
+
+PXR_NAMESPACE_CLOSE_SCOPE
+
+#endif
