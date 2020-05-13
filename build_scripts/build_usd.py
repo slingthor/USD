@@ -92,7 +92,7 @@ def Linux():
 def MacOS():
     return (platform.system() == "Darwin") and crossPlatform is None
 def iOS():
-    return (platform.system() == "Darwin") and crossPlatform is "iOS"
+    return (platform.system() == "Darwin") and crossPlatform == "iOS"
 
 def Python3():
     return sys.version_info.major == 3
@@ -389,7 +389,8 @@ def RunCMake(context, force, buildArgs = None, hostPlatform = False):
 
         CODE_SIGN_ID = os.environ.get('XCODE_ATTRIBUTE_CODE_SIGN_ID')
         if CODE_SIGN_ID is None:
-            SDKVersion = subprocess.check_output(['xcodebuild', '-version']).strip()[6:10]
+            SDKVersion = GetCommandOutput('xcodebuild -version').strip()[6:10]
+
             if SDKVersion >= "11.0":
                 CODE_SIGN_ID="Apple Development"
             else:
@@ -833,11 +834,12 @@ def InstallBoost(context, force, buildArgs):
 
         sdkPath = ''
         if MacOS() or iOS():
-            xcodeRoot = subprocess.check_output(['xcode-select', '--print-path']).strip()
+            xcodeRoot = GetCommandOutput('xcode-select --print-path').strip()
+
             if MacOS():
-                sdkPath = subprocess.check_output(['xcrun', '--sdk', 'macosx', '--show-sdk-path']).strip()
+                sdkPath = GetCommandOutput('xcrun --sdk macosx --show-sdk-path').strip()
             else:
-                sdkPath = subprocess.check_output(['xcrun', '--sdk', 'iphoneos', '--show-sdk-path']).strip()
+                sdkPath = GetCommandOutput('xcrun --sdk iphoneos --show-sdk-path').strip()
 
         if iOS():
             b2_toolset = "toolset=darwin-iphone"
@@ -859,7 +861,9 @@ def InstallBoost(context, force, buildArgs):
                 ': <architecture>arm <target-os>iphone <address-model>64\n',
                 ';'
             ]
-            iOSVersion = subprocess.check_output(['xcodebuild', '-sdk', sdkPath, '-version', 'SDKVersion']).strip()
+
+            iOSVersion = subprocess.GetCommandOutput('xcodebuild -sdk ' + sdkPath + ' -version  SDKVersion').strip()
+
             b2_settings.append("macosx-version=iphone-{IOS_SDK_VERSION}".format(
                 IOS_SDK_VERSION=iOSVersion))
 
@@ -1628,9 +1632,8 @@ def InstallOpenSubdiv(context, force, buildArgs):
             extraArgs.append('-DCMAKE_TOOLCHAIN_FILE={srcOSDDir}/cmake/iOSToolchain.cmake'
                              .format(srcOSDDir=srcOSDDir))
 
-            os.environ['SDKROOT'] = subprocess.check_output(['xcrun', '--sdk', 'iphoneos', '--show-sdk-path']).strip()
+            os.environ['SDKROOT'] = GetCommandOutput('xcrun --sdk iphoneos --show-sdk-path').strip()
 
-    
         # OpenSubdiv seems to error when building on windows w/ Ninja...
         # ...so just use the default generator (ie, Visual Studio on Windows)
         # until someone can sort it out
@@ -2738,14 +2741,32 @@ if Windows():
     ])
 
 if args.make_relocatable:
-    CODE_SIGN_ID = os.environ.get('XCODE_ATTRIBUTE_CODE_SIGN_ID')
-    if CODE_SIGN_ID is None:
-        SDKVersion = subprocess.check_output(['xcodebuild', '-version']).strip()[6:10]
-        if SDKVersion >= "11.0":
-            CODE_SIGN_ID="Apple Development"
-        else:
-            CODE_SIGN_ID="iPhone Developer"
-    os.environ['CODE_SIGN_ID'] = CODE_SIGN_ID
+    SDKVersion  = GetCommandOutput('xcodebuild -version').strip()[6:10]
+    codeSignIDs = GetCommandOutput('security find-identity -v -p codesigning')
+
+    codeSignID = None
+    if os.environ.get('XCODE_ATTRIBUTE_CODE_SIGN_ID'):
+        codeSignID = os.environ.get('XCODE_ATTRIBUTE_CODE_SIGN_ID')
+    elif SDKVersion >= "11.0" and codeSignIDs.find("Apple Development") != -1:
+        codeSignID = "Apple Development"
+    elif codeSignIDs.find("Mac Developer") != -1:
+        codeSignID = "Mac Developer"
+    else:
+        PrintError("Unable to identify code signing identity. " +
+            "Please specify by setting the XCODE_ATTRIBUTE_CODE_SIGN_ID environment " +
+            "variable to the one you'd like to use. \n" +
+            "If you don't have a code signing identity, you can create one using Xcode:\n" +
+            "https://help.apple.com/xcode/mac/current/#/dev154b28f09 \n")
+        sys.exit(1)
+
+    # Validate that we have a codesign ID that both exists and isn't ambiguous
+    if codeSignIDs.count(codeSignID) != 1 and codeSignID != "-":
+        PrintError("Unable to identify code signing identity. " +
+            "Please specify by setting the XCODE_ATTRIBUTE_CODE_SIGN_ID environment " +
+            "variable to the one you'd like to use. Options are:\n" + codeSignIDs)
+        sys.exit(1)
+
+    os.environ['CODE_SIGN_ID'] = codeSignID
 
     from make_relocatable import make_relocatable
     make_relocatable(context.usdInstDir, context.buildPython, iOS(), verbosity > 1)

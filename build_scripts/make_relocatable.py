@@ -6,28 +6,13 @@ import threading
 from distutils.dir_util import copy_tree
 from os.path import isdir, isfile, join
 from shutil import copy, copyfile
-import multiprocessing as mp
+# import multiprocessing as mp
 
-SDKVersion  = subprocess.check_output(['xcodebuild', '-version']).strip()[6:10]
-codeSignIDs = subprocess.check_output(['security', 'find-identity', '-v', '-p', 'codesigning'])
-
-codeSignID = None
-if os.environ.get('CODE_SIGN_ID'):
-    codeSignID = os.environ.get('CODE_SIGN_ID')
-elif SDKVersion >= "11.0" and codeSignIDs.find("Apple Development") != -1:
-    codeSignID = "Apple Development"
-elif codeSignIDs.find("Mac Developer") != -1:
-    codeSignID = "Mac Developer"
-
-# Validate that we have a codesign ID that both exists and isn't ambiguous
-if codeSignIDs.count(codeSignID) != 1 and codeSignID != "-":
-    print("Codesign Error: Unable to identify signing identity. " +
-        "Pleas specify by setting the XCODE_ATTRIBUTE_CODE_SIGN_ID environment " +
-        "variable to the one you'd like to use. Options are:\n" + codeSignIDs +
-        "Skipping make_relocatable")
-    codeSignID = None
-
+codeSignID = os.environ.get('CODE_SIGN_ID')
 devout = open(os.devnull, 'w')
+
+def Python3():
+    return sys.version_info.major == 3
 
 def extract_files(path, cond, files):
     if not os.path.exists(path):
@@ -80,8 +65,13 @@ def change_absolute_to_relative(args):
     
     otool_output = ""
 
-    p = subprocess.Popen(['otool', '-L', file], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    otool_output, err = p.communicate(b"")
+    if Python3():
+        p = subprocess.Popen(['otool', '-L', file], text=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        otool_output, err = p.communicate("")
+    else:
+        p = subprocess.Popen(['otool', '-L', file], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        otool_output, err = p.communicate(b"")
+
     returncode = p.returncode
 
     if returncode != 0:
@@ -111,8 +101,13 @@ def codesign_file(file):
 def is_object_file(file):
     if os.path.isdir(file):
         return False
-    first_line = open(file).readline().rstrip()
-    return not first_line.startswith("#!")
+
+    try:
+        with open(file, "r") as f:
+            first_line = f.readline().rstrip()
+            return not first_line.startswith("#!")
+    except UnicodeDecodeError:
+        return True
 
 
 
@@ -188,12 +183,11 @@ def make_relocatable(install_path, buildPython, iOS, verbose_output=False):
     extract_files_recursive(install_path + '/tests', file_check, files)
     extract_files(install_path + '/tests', (lambda file: isfile(file) and open(file).readline().rstrip()[0] != "#"), files)
 
-    pool = mp.Pool(mp.cpu_count())
-    pool.map(remove_rpath, [(install_path + '/lib', file) for file in files])
-    pool.map(add_rpath_to_file, [(install_path + '/lib', file) for file in files])
-    pool.map(change_absolute_to_relative, [(file, install_path, "") for file in files])
-    pool.map(codesign_file, files)
-    pool.close()
+    for file in files:
+        remove_rpath((install_path + '/lib', file))
+        add_rpath_to_file((install_path + '/lib', file))
+        change_absolute_to_relative((file, install_path, ""))
+        codesign_file(file)
 
     ctest_files = []
     extract_files_recursive(install_path + '/build/', (lambda file: 'CTestTestfile' in file), ctest_files)
