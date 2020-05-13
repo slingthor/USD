@@ -70,6 +70,7 @@ HgiMetal::HgiMetal(id<MTLDevice> device)
 , _workToFlush(false)
 , _encoder(nil)
 , _sampleCount(1)
+, _needsFlip(true)
 {
     if (!_device) {
 #if defined(ARCH_OS_MACOS)
@@ -280,6 +281,8 @@ HgiMetal::StartFrame()
             CommitCommandBuffer(CommitCommandBuffer_NoWait, true);
         }
     }
+    
+    _needsFlip = true;
 }
 
 void
@@ -320,6 +323,7 @@ HgiMetal::BeginMtlf()
 {
     // SOOOO TEMP and specialised!
     _sampleCount = 1;
+    _needsFlip = false;
 
     if (_encoder) {
         _sampleCount = _encoder->_descriptor.colorTextures[0]->GetDescriptor().sampleCount;

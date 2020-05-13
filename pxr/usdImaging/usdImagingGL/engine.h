@@ -41,6 +41,7 @@
 #include "pxr/imaging/cameraUtil/conformWindow.h"
 
 #include "pxr/imaging/hgi/hgi.h"
+#include "pxr/imaging/hgi/tokens.h"
 
 #include "pxr/imaging/hd/driver.h"
 #include "pxr/imaging/hd/engine.h"
@@ -352,7 +353,8 @@ public:
 
     /// Set the current renderer AOV to \p id.
     USDIMAGINGGL_API
-    bool SetRendererAov(TfToken const& id);
+    bool SetRendererAov(TfToken const& id,
+                        TfToken const& interopDst = HgiTokens->OpenGL);
 
     /// Returns the list of renderer settings.
     USDIMAGINGGL_API
@@ -445,9 +447,8 @@ public:
         return _hgi;
     }
     
-    
     USDIMAGINGGL_API
-    HdRenderBuffer *GetRenderOutput(TfToken const &name) const;
+    HgiTextureHandle GetPresentationTextureHandle(TfToken const &name) const;
     
     struct ResourceFactoryGuard {
         ResourceFactoryGuard(HdStResourceFactoryInterface *resourceFactory);

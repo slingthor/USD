@@ -149,16 +149,6 @@ public:
     }
     
     HGIMETAL_API
-    void SetNeedsInterop(bool useInterop) {
-        _useInterop = useInterop;
-    }
-    
-    HGIMETAL_API
-    bool GetNeedsInterop() const {
-        return _useInterop;
-    }
-    
-    HGIMETAL_API
     HgiMetalCapabilities const & GetCapabilities() const {
         return *_capabilities;
     }
@@ -191,9 +181,9 @@ public:
     bool BeginMtlf();
     
     class HgiMetalGraphicsCmds* _encoder;
-    HgiTextureHandle finalOutput;
     
     int _sampleCount;
+    bool _needsFlip;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

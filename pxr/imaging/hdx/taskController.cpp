@@ -312,7 +312,7 @@ HdxTaskController::_CreateRenderGraph()
             // Initialize the AOV system to render color. Note:
             // SetRenderOutputs special-cases color to include support for
             // depth-compositing and selection highlighting/picking.
-            SetRenderOutputs({HdAovTokens->color});
+            SetRenderOutputs({HdAovTokens->color}, HgiTokens->OpenGL);
         }
     }
 }
@@ -462,8 +462,6 @@ HdxTaskController::_CreateColorizeSelectionTask()
     selectionParams.enableSelection = true;
     selectionParams.selectionColor = GfVec4f(1,1,0,1);
     selectionParams.locateColor = GfVec4f(0,0,1,1);
-    selectionParams.flipImage =
-        !_IsStormRenderingBackend(GetRenderIndex());
 
     GetRenderIndex()->InsertTask<HdxColorizeSelectionTask>(&_delegate,
         _colorizeSelectionTaskId);
@@ -868,13 +866,26 @@ HdxTaskController::_ReplaceLightSprim(size_t const& pathIdx,
 }
 
 void
-HdxTaskController::SetRenderOutputs(TfTokenVector const& outputs)
+HdxTaskController::SetRenderOutputs(TfTokenVector const& outputs,
+                                    TfToken const& interopDst)
 {
     if (!_AovsSupported() || _renderTaskIds.empty()) {
         return;
     }
 
     if (_aovOutputs == outputs) {
+        HdxPresentTaskParams presentParams =
+            _delegate.GetParameter<HdxPresentTaskParams>(_presentTaskId,
+                HdTokens->params);
+
+        if (presentParams.interopDst != interopDst) {
+            presentParams.interopDst = interopDst;
+
+            _delegate.SetParameter(_presentTaskId, HdTokens->params, presentParams);
+            GetRenderIndex()->GetChangeTracker().MarkTaskDirty(
+                _presentTaskId, HdChangeTracker::DirtyParams);
+        }
+
         return;
     }
     _aovOutputs = outputs;
@@ -997,6 +1008,16 @@ HdxTaskController::SetRenderOutputs(TfTokenVector const& outputs)
             renderTaskId, HdChangeTracker::DirtyParams);
     }
 
+    HdxPresentTaskParams presentParams =
+        _delegate.GetParameter<HdxPresentTaskParams>(_presentTaskId,
+            HdTokens->params);
+
+    presentParams.interopDst = interopDst;
+
+    _delegate.SetParameter(_presentTaskId, HdTokens->params, presentParams);
+    GetRenderIndex()->GetChangeTracker().MarkTaskDirty(
+        _presentTaskId, HdChangeTracker::DirtyParams);
+    
     // For AOV visualization, if only one output was specified, send it
     // to the viewer; otherwise, disable colorization.
     if (outputs.size() == 1) {

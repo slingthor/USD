@@ -1078,7 +1078,7 @@ UsdImagingGLEngine::GetRendererAovs() const
 }
 
 bool
-UsdImagingGLEngine::SetRendererAov(TfToken const &id)
+UsdImagingGLEngine::SetRendererAov(TfToken const &id, TfToken const& interopDst)
 {
     if (ARCH_UNLIKELY(_legacyImpl)) {
         return false;
@@ -1088,7 +1088,7 @@ UsdImagingGLEngine::SetRendererAov(TfToken const &id)
 
     TF_VERIFY(_renderIndex);
     if (_renderIndex->IsBprimTypeSupported(HdPrimTypeTokens->renderBuffer)) {
-        _taskController->SetRenderOutputs({id});
+        _taskController->SetRenderOutputs({id}, interopDst);
         return true;
     }
     return false;
@@ -1304,7 +1304,7 @@ UsdImagingGLEngine::_Execute(const UsdImagingGLRenderParams &params,
         GarchResourceFactory::GetInstance()->GetContextCaps();
 
     _hgi->StartFrame();
-
+    
     HdStRenderDelegate* hdStRenderDelegate =
         dynamic_cast<HdStRenderDelegate*>(_renderIndex->GetRenderDelegate());
     if (hdStRenderDelegate) {
@@ -1632,8 +1632,17 @@ UsdImagingGLEngine::GetDefaultRendererPluginId()
 }
 
 USDIMAGINGGL_API
-HdRenderBuffer *UsdImagingGLEngine::GetRenderOutput(TfToken const &name) const {
-    return _taskController->GetRenderOutput(name);
+HgiTextureHandle UsdImagingGLEngine::GetPresentationTextureHandle(
+    TfToken const &name) const
+{
+    VtValue aov;
+    _engine->GetTaskContextData(name, &aov);
+    
+    HgiTextureHandle aovTexture;
+    if (aov.IsHolding<HgiTextureHandle>()) {
+        aovTexture = aov.Get<HgiTextureHandle>();
+    }
+    return aovTexture;
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

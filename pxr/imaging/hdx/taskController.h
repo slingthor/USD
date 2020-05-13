@@ -38,6 +38,8 @@
 #include "pxr/imaging/hd/sceneDelegate.h"
 #include "pxr/imaging/hd/task.h"
 
+#include "pxr/imaging/hgi/texture.h"
+
 #include "pxr/imaging/cameraUtil/conformWindow.h"
 #include "pxr/imaging/garch/simpleLightingContext.h"
 #include "pxr/usd/sdf/path.h"
@@ -107,9 +109,11 @@ public:
 
     /// Set the list of outputs to be rendered. If outputs.size() == 1,
     /// this will send that output to the viewport via a colorizer task.
+    /// interopDst is either HgiTokens->Metal or HgiTokens->OpenGL
     /// Note: names should come from HdAovTokens.
     HDX_API
-    void SetRenderOutputs(TfTokenVector const& names);
+    void SetRenderOutputs(TfTokenVector const& names,
+                          TfToken const& interopDst);
 
     /// Set which output should be rendered to the viewport. The empty token
     /// disables viewport rendering.
@@ -217,7 +221,7 @@ public:
     /// Configure color channel by settings params.
     HDX_API
     void SetColorChannelParams(HdxColorChannelTaskParams const& params);
-
+    
 private:
     ///
     /// This class is not intended to be copied.

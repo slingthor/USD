@@ -856,7 +856,7 @@ HgiInteropMetal::CopyToInterop(
     // XXX We need to flip all renderers (Embree, Prman, ...) for now as we
     // assume they all output gl coords. That may not always be the case if
     // Storm renders with Metal directly.
-    bool flipImage = true;
+    bool flipImage = _hgiMetal->_needsFlip;
 
     HgiMetalTexture *metalColor = static_cast<HgiMetalTexture*>(color.Get());
     HgiMetalTexture *metalDepth = static_cast<HgiMetalTexture*>(depth.Get());
