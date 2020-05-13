@@ -794,7 +794,7 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(int primitiveMode,
         partIndexOffset += numIndicesInPart;
     }
     
-    context->IncNumberPrimsDrawn((indexCount / 3) * instanceCount, false);
+    context->IncNumberPrimsDrawn((indexCount / vertsPerPrimitive) * instanceCount, false);
 }
 
 void HdStMSLProgram::DrawArraysInstanced(int primitiveMode,
@@ -809,26 +809,6 @@ void HdStMSLProgram::DrawArraysInstanced(int primitiveMode,
     _reapplyIndexBuffer = false;
 
     return;
-
-    MTLPrimitiveType primType = GetMetalPrimType(primitiveMode);
-    
-    // Possibly move this outside this function as we shouldn't need to get a render encoder every draw call
-    id <MTLRenderCommandEncoder> renderEncoder = context->GetRenderEncoder();
-    
-    const_cast<HdStMSLProgram*>(this)->BakeState();
-    
-    if (instanceCount == 1) {
-        [renderEncoder drawPrimitives:primType
-                          vertexStart:baseVertex
-                          vertexCount:vertexCount];
-    }
-    else {
-        [renderEncoder drawPrimitives:primType
-                          vertexStart:baseVertex
-                          vertexCount:vertexCount
-                        instanceCount:instanceCount];
-    }
-    context->ReleaseEncoder(false);
 }
 
 void HdStMSLProgram::DrawArrays(int primitiveMode,
@@ -847,6 +827,11 @@ void HdStMSLProgram::DrawArrays(int primitiveMode,
     [renderEncoder drawPrimitives:primType vertexStart:baseVertex vertexCount:vertexCount];
     
     context->ReleaseEncoder(false);
+    
+    bool const drawingQuads = (primitiveMode == GL_LINES_ADJACENCY);
+    uint32_t const vertsPerPrimitive = drawingQuads ? 4:3;
+
+    context->IncNumberPrimsDrawn(vertexCount / vertsPerPrimitive, false);
 }
 
 void HdStMSLProgram::BakeState()
