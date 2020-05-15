@@ -59,6 +59,9 @@ void HgiInterop::TransferToApp(
             _metalToOpenGL.reset(new HgiInteropMetal(hgi));
         }
         _metalToOpenGL->CopyToInterop(color, depth);
+    } else if (gfxApi==HgiTokens->Metal && interopDst==HgiTokens->Metal) {
+        // This is fine - we assume host App will reach in and grab presentation
+        // texture
     } else {
         TF_CODING_ERROR("Unsupported Hgi backed: %s", gfxApi.GetText());
     }

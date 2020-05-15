@@ -352,9 +352,10 @@ public:
     TfTokenVector GetRendererAovs() const;
 
     /// Set the current renderer AOV to \p id.
+    /// Pass in interopDst = HgiTokens->OpenGL or interopDst = HgiTokens->Metal depending on host App
     USDIMAGINGGL_API
     bool SetRendererAov(TfToken const& id,
-                        TfToken const& interopDst = HgiTokens->OpenGL);
+                        TfToken const& interopDst);
 
     /// Returns the list of renderer settings.
     USDIMAGINGGL_API

@@ -288,7 +288,7 @@ My_TestGLDrawing::DrawTest(bool offscreen)
         glEnable(GL_DEPTH_TEST);
 #endif
         if (!GetRendererAov().IsEmpty()) {
-            _engine->SetRendererAov(GetRendererAov());
+            _engine->SetRendererAov(GetRendererAov(), HgiTokens->OpenGL);
         }
 
         if(IsEnabledTestLighting()) {
