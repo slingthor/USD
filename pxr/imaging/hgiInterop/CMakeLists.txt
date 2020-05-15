@@ -11,6 +11,11 @@ set(optionalLibraries "")
 set(optionalCppFiles "")
 set(optionalPrivateHeaders "")
 
+if (APPLEIOS)
+    add_compile_options(-x objective-c++)
+    list(APPEND optionalLibraries hgiMetal)
+endif()
+
 if (PXR_ENABLE_METAL_SUPPORT AND PXR_ENABLE_GL_SUPPORT)
     add_compile_options(-x objective-c++)
     FIND_LIBRARY(COREVIDEO_LIBRARY CoreVideo)

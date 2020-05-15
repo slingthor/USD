@@ -995,12 +995,7 @@ void MtlfMetalContext::SetRenderPipelineState()
     }
     
     int sampleCount = 1;
-    if (drawTarget) {
-        sampleCount = drawTarget->GetNumSamples();
-    }
-    else {
-        sampleCount = hgi->_sampleCount;
-    }
+    sampleCount = hgi->_sampleCount;
     
     // Always call this because currently we're not tracking changes to its state
     size_t hashVal = 0;

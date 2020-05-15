@@ -48,6 +48,8 @@
 #include "pxr/usd/usdGeom/metrics.h"
 #include "pxr/usd/usdGeom/tokens.h"
 
+#include "pxr/imaging/hgiMetal/hgi.h"
+
 #include <string>
 
 
@@ -224,6 +226,9 @@ UsdAppUtilsFrameRecorder::Record(
 
     UsdImagingGLEngine::ResourceFactoryGuard guard(
         _imagingEngine.GetResourceFactory());
+
+    HgiMetal *hgiMetal = static_cast<HgiMetal*>(_imagingEngine.GetHgi());
+    hgiMetal->_useFinalTextureForGetImage = true;
     
     GarchDrawTargetRefPtr drawTarget = GarchDrawTarget::New(renderResolution);
 

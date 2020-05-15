@@ -423,7 +423,16 @@ MtlfDrawTarget::GetImage(std::string const & name, void* buffer) const
 {
     MtlfAttachmentRefPtr attachment = TfStatic_cast<TfRefPtr<MtlfDrawTarget::MtlfAttachment>>(_GetAttachments().at(name));
 
+    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
+
+    id<MTLDevice> device = context->currentDevice;
+    HgiMetal* hgiMetal = context->GetHgi();
+    
     id<MTLTexture> texture = attachment->GetTextureName();
+ 
+    if (hgiMetal->_useFinalTextureForGetImage) {
+        texture = hgiMetal->_finalTexture;
+    }
     int bytesPerPixel = attachment->GetBytesPerPixel();
     int width = [texture width];
     int height = [texture height];
@@ -443,12 +452,7 @@ MtlfDrawTarget::GetImage(std::string const & name, void* buffer) const
     if (mtlFormat == MTLPixelFormatDepth32Float) {
         bytesPerPixel = 4;
     }
-    
-    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
 
-    id<MTLDevice> device = context->currentDevice;
-    HgiMetal* hgiMetal = context->GetHgi();
-    
     // While Mtlf exists, we need to force a flush and generation of a new
     // command buffer, to ensure the blit happens after any work Mtlf has
     // queued
@@ -506,6 +510,30 @@ MtlfDrawTarget::WriteToFile(std::string const & name,
 
     void * buf = malloc( bufsize );
     GetImage(name, buf);
+    
+    if (a->GetFormat() == GL_RGBA && a->GetType() == GL_FLOAT) {
+        // The data we just got is actually halfs rather than floats. Convert.
+        union float32 {
+            float f;
+            uint32_t u;
+        };
+        float32 *floats = static_cast<float32*>(buf);
+        uint16_t *halfs = static_cast<uint16_t*>(buf);
+        float32 convert;
+        convert.u = (254 - 15) << 23;
+
+        int pixel = _size[0] * _size[1] * 4;
+        do {
+            float32 out;
+            uint16_t in = halfs[pixel];
+
+            out.u = (in & 0x7fff) << 13;
+            out.f *= convert.f;
+            out.u |= (in & 0x8000) << 16;
+            
+            floats[pixel] = out;
+        } while(pixel--);
+    }
 
     VtDictionary metadata;
 
@@ -528,12 +556,14 @@ MtlfDrawTarget::WriteToFile(std::string const & name,
         metadata["NP"] = worldToScreenTransform;
     }
 
+    HgiMetal* hgiMetal = MtlfMetalContext::GetMetalContext()->GetHgi();
+
     GarchImage::StorageSpec storage;
     storage.width = _size[0];
     storage.height = _size[1];
     storage.format = a->GetFormat();
     storage.type = a->GetType();
-    storage.flipped = false;
+    storage.flipped = hgiMetal->_needsFlip;
     storage.data = buf;
 
     GarchImageSharedPtr image = GarchImage::OpenForWriting(filename);
@@ -601,6 +631,8 @@ MtlfDrawTarget::MtlfAttachment::_GenTexture()
 
     int numChannel;
     bool depth24stencil8 = false;
+    uint32_t bytesPerValue = 1;
+
     MTLPixelFormat mtlFormat = MTLPixelFormatInvalid;
     id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->currentDevice;
 
@@ -609,7 +641,8 @@ MtlfDrawTarget::MtlfAttachment::_GenTexture()
         case GL_RG:
             numChannel = 2;
             if (type == GL_FLOAT) {
-                mtlFormat = MTLPixelFormatRG32Float;
+                mtlFormat = MTLPixelFormatRG16Float;
+                bytesPerValue = 2;
             }
             break;
 
@@ -620,7 +653,8 @@ MtlfDrawTarget::MtlfAttachment::_GenTexture()
         case GL_RGBA:
             numChannel = 4;
             if (type == GL_FLOAT) {
-                mtlFormat = MTLPixelFormatRGBA32Float;
+                mtlFormat = MTLPixelFormatRGBA16Float;
+                bytesPerValue = 2;
             }
             else if (type == GL_UNSIGNED_BYTE) {
                 mtlFormat = MTLPixelFormatRGBA8Unorm;
@@ -634,6 +668,7 @@ MtlfDrawTarget::MtlfAttachment::_GenTexture()
                     mtlFormat = MTLPixelFormatDepth32Float;
                 else
                     mtlFormat = MTLPixelFormatR32Float;
+                bytesPerValue = 4;
             }
             else if (type == GL_UNSIGNED_INT_24_8) {
 #if defined(ARCH_OS_MACOS)
@@ -644,6 +679,7 @@ MtlfDrawTarget::MtlfAttachment::_GenTexture()
 //                else
 #endif
                     mtlFormat = MTLPixelFormatDepth32Float_Stencil8;
+                bytesPerValue = 5;
             }
             else if (type == GL_UNSIGNED_BYTE) {
                 mtlFormat = MTLPixelFormatR8Unorm;
@@ -651,11 +687,6 @@ MtlfDrawTarget::MtlfAttachment::_GenTexture()
             break;
     }
     
-    uint32_t bytesPerValue = 1;
-    if(_type == GL_FLOAT || depth24stencil8)
-        bytesPerValue = 4;
-    else if(mtlFormat == MTLPixelFormatDepth32Float_Stencil8)
-        bytesPerValue = 5;
     _bytesPerPixel = numChannel * bytesPerValue;
 
     if (mtlFormat == MTLPixelFormatInvalid) {

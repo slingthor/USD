@@ -25,9 +25,13 @@
 #include "pxr/imaging/hgi/hgi.h"
 #include "pxr/imaging/hgi/tokens.h"
 
+#include "pxr/imaging/hgiMetal/texture.h"
+
+#if defined(PXR_METAL_SUPPORT_ENABLED)
+#include "pxr/imaging/hgiMetal/hgi.h"
+#endif
 
 #if defined(HGIINTEROP_METAL_TO_GL_ENABLED)
-    #include "pxr/imaging/hgiMetal/hgi.h"
     #include "pxr/imaging/hgiInterop/metal.h"
 #elif defined(HGIINTEROP_GL_TO_GL_ENABLED)
     #include "pxr/imaging/hgiGL/hgi.h"
@@ -52,6 +56,15 @@ void HgiInterop::TransferToApp(
 {
     TfToken const& gfxApi = hgi->GetAPIName();
 
+    // Temp
+#if defined(PXR_METAL_SUPPORT_ENABLED)
+    if (gfxApi==HgiTokens->Metal) {
+        HgiMetal *hgiMetal = dynamic_cast<HgiMetal*>(hgi);
+        HgiMetalTexture *metalColor = static_cast<HgiMetalTexture*>(color.Get());
+        hgiMetal->_finalTexture = metalColor->GetTextureId();
+    }
+#endif
+    
 #if defined(HGIINTEROP_METAL_TO_GL_ENABLED)
     if (gfxApi==HgiTokens->Metal && interopDst==HgiTokens->OpenGL) {
         // Transfer Metal textures to OpenGL application
