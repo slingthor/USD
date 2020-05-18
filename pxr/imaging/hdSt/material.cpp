@@ -116,14 +116,14 @@ HdStMaterial::_ProcessTextureDescriptors(
                     textureResource,
                     specs, sources, texturesFromSceneDelegate);
         } else {
-        HdStTextureHandleSharedPtr const textureHandle =
-            resourceRegistry->AllocateTextureHandle(
-                desc.textureId,
-                desc.type,
-                desc.samplerParameters,
-                desc.memoryRequest,
-                usesBindlessTextures,
-                shaderCode);
+            HdStTextureHandleSharedPtr const textureHandle =
+                resourceRegistry->AllocateTextureHandle(
+                    desc.textureId,
+                    desc.type,
+                    desc.samplerParameters,
+                    desc.memoryRequest,
+                    usesBindlessTextures,
+                    shaderCode);
         
             texturesFromStorm->push_back({ desc.name,
                            desc.type,
@@ -170,13 +170,13 @@ HdStMaterial::Sync(HdSceneDelegate *sceneDelegate,
     if (vtMat.IsHolding<HdMaterialNetworkMap>()) {
         HdMaterialNetworkMap const& hdNetworkMap =
             vtMat.UncheckedGet<HdMaterialNetworkMap>();
-        if (!hdNetworkMap.terminals.empty() && !hdNetworkMap.map.empty()) {
-            _networkProcessor.ProcessMaterialNetwork(GetId(), hdNetworkMap);
-            fragmentSource = _networkProcessor.GetFragmentCode();
-            geometrySource = _networkProcessor.GetGeometryCode();
-            materialMetadata = _networkProcessor.GetMetadata();
-            materialTag = _networkProcessor.GetMaterialTag();
-            params = _networkProcessor.GetMaterialParams();
+            if (!hdNetworkMap.terminals.empty() && !hdNetworkMap.map.empty()) {
+                _networkProcessor.ProcessMaterialNetwork(GetId(), hdNetworkMap);
+                fragmentSource = _networkProcessor.GetFragmentCode();
+                geometrySource = _networkProcessor.GetGeometryCode();
+                materialMetadata = _networkProcessor.GetMetadata();
+                materialTag = _networkProcessor.GetMaterialTag();
+                params = _networkProcessor.GetMaterialParams();
                 textureDescriptors = _networkProcessor.GetTextureDescriptors();
             }
         }
@@ -283,14 +283,14 @@ HdStMaterial::Sync(HdSceneDelegate *sceneDelegate,
     _ProcessTextureDescriptors(
         sceneDelegate,
         resourceRegistry,
-                _surfaceShader,
+        _surfaceShader,
         textureDescriptors,
         &textures,
         &textureResourceDescriptors,
         &specs,
         &sources);
 
-        _surfaceShader->SetNamedTextureHandles(textures);
+    _surfaceShader->SetNamedTextureHandles(textures);
     _surfaceShader->SetTextureDescriptors(textureResourceDescriptors);    
     _surfaceShader->SetBufferSources(specs, sources, resourceRegistry);
 
