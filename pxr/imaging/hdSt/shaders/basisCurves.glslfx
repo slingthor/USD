@@ -30,6 +30,7 @@
 #import $TOOLS/hdSt/shaders/instancing.glslfx
 #import $TOOLS/hdSt/shaders/terminals.glslfx
 #import $TOOLS/hdSt/shaders/pointId.glslfx
+#import $TOOLS/hdSt/shaders/visibility.glslfx
 
 // Known issues:
 // * The direction of the 'v' post tessellation is inconsistent between 
@@ -70,14 +71,18 @@ void ProcessPointId(int);
 
 void main(void)
 {
+    ProcessPrimvars();
+
     MAT4 transform    = ApplyInstanceTransform(HdGet_transform());
     MAT4 transformInv = ApplyInstanceTransformInverse(HdGet_transformInverse());
 
-    outData.Peye = GetWorldToViewMatrix() * transform * vec4(HdGet_points(), 1);
+    outData.Peye = vec4(GetWorldToViewMatrix() * transform *
+                        vec4(HdGet_points(), 1));
     outData.Neye = getNormal(transpose(transformInv *
                                   GetWorldToViewInverseMatrix()));
 
-    ProcessPrimvars();
+    gl_Position = vec4(GetProjectionMatrix() * outData.Peye);
+    ApplyClipPlanes(outData.Peye);
 
     int pointId = GetPointId();
     gl_PointSize = GetPointRasterSize(pointId);
@@ -119,12 +124,12 @@ void ProcessPointId(int);
 
 void main(void)
 {
-    MAT4 transform  = ApplyInstanceTransform(HdGet_transform());
-    vec4 point     = vec4(HdGet_points().xyz, 1);
-
-    outData.Peye = vec4(GetWorldToViewMatrix() * transform * point);
-
     ProcessPrimvars();
+
+    MAT4 transform  = ApplyInstanceTransform(HdGet_transform());
+
+    outData.Peye = vec4(GetWorldToViewMatrix() * transform *
+                        vec4(HdGet_points(), 1));
 
     gl_Position = vec4(GetProjectionMatrix() * outData.Peye);
     ApplyClipPlanes(outData.Peye);
@@ -175,14 +180,14 @@ out CurveVertexData
 void determineLODSettings();
 void main(void)
 {
+    ProcessPrimvars();
+
     if(gl_InvocationID == 0) {
        determineLODSettings();
     }
 
     outData[gl_InvocationID].Peye = inData[gl_InvocationID].Peye;
     outData[gl_InvocationID].Neye = inData[gl_InvocationID].Neye;
-
-    ProcessPrimvars();
 }
 
 
@@ -260,13 +265,13 @@ out CurveVertexData
 void determineLODSettings();
 void main(void)
 {
+    ProcessPrimvars();
+
     if(gl_InvocationID == 0) {
        determineLODSettings();
     }
 
     outData[gl_InvocationID].Peye = inData[gl_InvocationID].Peye;
-
-    ProcessPrimvars();
 }
 
 // Use the length of the control points in screen space to determine how many 
@@ -312,14 +317,14 @@ out CurveVertexData
 void determineLODSettings();
 void main(void)
 {
+    ProcessPrimvars();
+
     if(gl_InvocationID == 0) {
 	     determineLODSettings();
     }
 
     outData[gl_InvocationID].Peye = inData[gl_InvocationID].Peye;
     outData[gl_InvocationID].Neye = inData[gl_InvocationID].Neye;
-
-    ProcessPrimvars();
 }
 
 --- --------------------------------------------------------------------------
@@ -636,7 +641,7 @@ vec3 orient(float v, vec4 position, vec4 tangent, vec3 normal){
 vec3 evaluateNormal(vec4 basis, float u)
 {   
     vec3 n0 = inData[0].Neye;
-    vec3 n1 = inData[2].Neye;
+    vec3 n1 = inData[1].Neye;
     vec3 n2 = inData[2].Neye;
     vec3 n3 = inData[3].Neye;
     return n0 * basis.x 
@@ -773,6 +778,8 @@ in CurveVertexData
 
 void main(void)
 {
+    DiscardBasedOnTopologicalVisibility();
+    
     vec4 color = vec4(0.5, 0.5, 0.5, 1);
 #ifdef HD_HAS_displayColor
     color.rgb = HdGet_displayColor().rgb;
@@ -780,6 +787,7 @@ void main(void)
 #ifdef HD_HAS_displayOpacity
     color.a = HdGet_displayOpacity().r;
 #endif
+    color.rgb = ApplyColorOverrides(color).rgb;
 
     vec3 Peye = inData.Peye.xyz / inData.Peye.w;
 
@@ -789,7 +797,9 @@ void main(void)
 
     vec4 patchCoord = vec4(0);
 
-    color.rgb = ShadingTerminal(vec4(Peye, 1), Neye, color, patchCoord).rgb;
+    color.rgb = mix(color.rgb,
+                    ShadingTerminal(vec4(Peye, 1), Neye, color, patchCoord).rgb,
+                    GetLightingBlendAmount());
 
     if (ShouldDiscardByAlpha(color)) {
         discard;
@@ -817,6 +827,8 @@ vec3 fragmentNormal(vec3 position, vec3 normal, float v);
 #endif
 void main(void)
 {
+    DiscardBasedOnTopologicalVisibility();
+
     vec4 color = vec4(0.5, 0.5, 0.5, 1);
 #ifdef HD_HAS_displayColor
     color.rgb = HdGet_displayColor().rgb;

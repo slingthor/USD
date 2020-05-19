@@ -1,5 +1,5 @@
 //
-// Copyright 2019 Pixar
+// Copyright 2020 Pixar
 //
 // Licensed under the Apache License, Version 2.0 (the "Apache License")
 // with the following modification; you may not use this file except in
@@ -21,8 +21,8 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#ifndef HGIMETAL_DIAGNOSTIC_H
-#define HGIMETAL_DIAGNOSTIC_H
+#ifndef PXR_IMAGING_HGI_METAL_DIAGNOSTIC_H
+#define PXR_IMAGING_HGI_METAL_DIAGNOSTIC_H
 
 #include "pxr/pxr.h"
 #include "pxr/imaging/hgiMetal/api.h"
@@ -37,6 +37,12 @@ PXR_NAMESPACE_OPEN_SCOPE
 /// function.
 #define HGIMETAL_POST_PENDING_METAL_ERRORS() \
         HgiMetalPostPendingMetalErrors(__ARCH_PRETTY_FUNCTION__)
+
+HGIMETAL_API
+bool HgiMetalDebugEnabled();
+
+#define HGIMETAL_DEBUG_LABEL(_obj, label) \
+    if (HgiMetalDebugEnabled()) { [_obj setLabel:@(label)]; }
 
 /// Posts diagnostic errors for all Metal errors in the current context.
 HGIMETAL_API

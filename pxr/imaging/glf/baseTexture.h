@@ -79,7 +79,7 @@ public:
     // GarchTexture overrides
     GLF_API
     virtual BindingVector GetBindings(TfToken const & identifier,
-                                      GarchSamplerGPUHandle samplerName) override;
+                                      GarchSamplerGPUHandle const& samplerName) override;
 
 protected:
     

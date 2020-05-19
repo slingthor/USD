@@ -100,7 +100,9 @@ public:
     
     // Vdb Texture
     MTLF_API
-    virtual GarchVdbTextureRefPtr NewVdbTexture(const TfToken &imageFilePath) const override;
+    virtual GarchVdbTextureRefPtr NewVdbTexture(
+                GarchVdbTextureContainerRefPtr const &textureContainer,
+                TfToken const &gridName) const override;
 
 private:
     MtlfContextCaps contextCaps;

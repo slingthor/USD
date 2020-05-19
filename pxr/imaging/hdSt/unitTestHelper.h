@@ -30,6 +30,7 @@
 #include "pxr/imaging/hdSt/renderPassState.h"
 #include "pxr/imaging/hdSt/unitTestDelegate.h"
 
+#include "pxr/imaging/hd/driver.h"
 #include "pxr/imaging/hd/engine.h"
 #include "pxr/imaging/hd/renderPass.h"
 #include "pxr/imaging/hio/glslfx.h"
@@ -37,8 +38,8 @@
 #include "pxr/base/gf/vec4d.h"
 #include "pxr/base/gf/matrix4d.h"
 
+#include <memory>
 #include <vector>
-#include <boost/scoped_ptr.hpp>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -92,6 +93,9 @@ private:
 
     void _Init(HdReprSelector const &reprToken);
 
+    std::unique_ptr<class Hgi> _hgi;
+    HdDriver _hgiDriver;
+
     HdEngine _engine;
     HdStRenderDelegate   *_renderDelegate;
     HdRenderIndex       *_renderIndex;
@@ -109,7 +113,8 @@ private:
 ///
 /// A custom lighting shader for unit tests.
 ///
-typedef boost::shared_ptr<class HdSt_TestLightingShader> HdSt_TestLightingShaderSharedPtr;
+using HdSt_TestLightingShaderSharedPtr =
+    std::shared_ptr<class HdSt_TestLightingShader>;
 
 class HdSt_TestLightingShader : public HdStLightingShader {
 public:
@@ -144,7 +149,7 @@ private:
     };
     Light _lights[2];
     GfVec3f _sceneAmbient;
-    boost::scoped_ptr<HioGlslfx> _glslfx;
+    std::unique_ptr<HioGlslfx> _glslfx;
 };
 
 

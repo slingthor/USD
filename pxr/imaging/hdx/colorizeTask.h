@@ -26,8 +26,11 @@
 
 #include "pxr/pxr.h"
 #include "pxr/imaging/hdx/api.h"
-#include "pxr/imaging/hdx/compositor.h"
-#include "pxr/imaging/hdx/progressiveTask.h"
+
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
+#include "pxr/imaging/hdx/fullscreenShaderGL.h"
+#endif
+#include "pxr/imaging/hdx/task.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -39,7 +42,7 @@ class HdRenderBuffer;
 /// GL buffer, possibly with a "colorizing" step (for example, mapping
 /// normals to RGB, or texture coords to RG).
 ///
-class HdxColorizeTask : public HdxProgressiveTask
+class HdxColorizeTask : public HdxTask
 {
 public:
     HDX_API
@@ -51,12 +54,6 @@ public:
     /// Hooks for progressive rendering.
     virtual bool IsConverged() const override;
 
-    /// Sync the render pass resources
-    HDX_API
-    virtual void Sync(HdSceneDelegate* delegate,
-                      HdTaskContext* ctx,
-                      HdDirtyBits* dirtyBits) override;
-
     /// Prepare the colorize task
     HDX_API
     virtual void Prepare(HdTaskContext* ctx,
@@ -66,7 +63,16 @@ public:
     HDX_API
     virtual void Execute(HdTaskContext* ctx) override;
 
+protected:
+    /// Sync the render pass resources
+    HDX_API
+    virtual void _Sync(HdSceneDelegate* delegate,
+                       HdTaskContext* ctx,
+                       HdDirtyBits* dirtyBits) override;
+
 private:
+    class Hgi* _hgi;
+
     // Incoming data
     TfToken _aovName;
     SdfPath _aovBufferPath;
@@ -80,8 +86,9 @@ private:
     uint8_t *_outputBuffer;
     size_t _outputBufferSize;
     bool _converged;
-
-    HdxCompositor _compositor;
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
+    HdxFullscreenShaderGL _compositor;
+#endif
     bool _needsValidation;
 
     HdxColorizeTask() = delete;

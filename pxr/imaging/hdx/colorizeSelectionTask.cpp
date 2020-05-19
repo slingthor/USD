@@ -21,22 +21,39 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#include "pxr/imaging/glf/glew.h"
-
 #include "pxr/imaging/hdx/colorizeSelectionTask.h"
 
 #include "pxr/imaging/hd/perfLog.h"
 #include "pxr/imaging/hd/renderBuffer.h"
 #include "pxr/imaging/hd/tokens.h"
 
+#include "pxr/imaging/hdx/hgiConversions.h"
+#include "pxr/imaging/hdx/package.h"
 #include "pxr/imaging/hdx/selectionTracker.h"
 #include "pxr/imaging/hdx/tokens.h"
 
+#include "pxr/imaging/hgi/blitCmds.h"
+#include "pxr/imaging/hgi/blitCmdsOps.h"
+#include "pxr/imaging/hgi/hgi.h"
+#include "pxr/imaging/hgi/tokens.h"
+
+#include "pxr/base/gf/vec2f.h"
+
 PXR_NAMESPACE_OPEN_SCOPE
 
+TF_DEFINE_PRIVATE_TOKENS(
+    _tokens,
+    ((outlineFrag, "OutlineFragment"))
+    (colorIn)
+    (enableOutline)
+    (radius)
+    (texelSize)    
+);
+
 HdxColorizeSelectionTask::HdxColorizeSelectionTask(
-        HdSceneDelegate* delegate, SdfPath const& id)
-    : HdxProgressiveTask(id)
+    HdSceneDelegate* delegate,
+    SdfPath const& id)
+    : HdxTask(id)
     , _params()
     , _lastVersion(-1)
     , _hasSelection(false)
@@ -48,12 +65,20 @@ HdxColorizeSelectionTask::HdxColorizeSelectionTask(
     , _outputBufferSize(0)
     , _converged(false)
     , _compositor()
+    , _pipelineCreated(false)
 {
 }
 
 HdxColorizeSelectionTask::~HdxColorizeSelectionTask()
 {
     delete[] _outputBuffer;
+
+    if (_parameterBuffer) {
+        _GetHgi()->DestroyBuffer(&_parameterBuffer);
+    }
+    if (_texture) {
+        _GetHgi()->DestroyTexture(&_texture);
+    }
 }
 
 bool
@@ -63,12 +88,16 @@ HdxColorizeSelectionTask::IsConverged() const
 }
 
 void
-HdxColorizeSelectionTask::Sync(HdSceneDelegate* delegate,
-                               HdTaskContext* ctx,
-                               HdDirtyBits* dirtyBits)
+HdxColorizeSelectionTask::_Sync(HdSceneDelegate* delegate,
+                                HdTaskContext* ctx,
+                                HdDirtyBits* dirtyBits)
 {
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
+
+    if (!_compositor) {
+        _compositor.reset(new HdxFullscreenShader(_GetHgi(), "ColorizeSelection"));
+    }
 
     if ((*dirtyBits) & HdChangeTracker::DirtyParams) {
         _GetTaskParams(delegate, &_params);
@@ -101,7 +130,8 @@ HdxColorizeSelectionTask::Prepare(HdTaskContext* ctx,
     if (sel && sel->GetVersion() != _lastVersion) {
         _lastVersion = sel->GetVersion();
         _hasSelection =
-            sel->GetSelectionOffsetBuffer(renderIndex, &_selectionOffsets);
+            sel->GetSelectionOffsetBuffer(renderIndex, _params.enableSelection,
+                                          &_selectionOffsets);
     }
 }
 
@@ -110,6 +140,16 @@ HdxColorizeSelectionTask::Execute(HdTaskContext* ctx)
 {
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
+
+    if (!_HasTaskContextData(ctx, HdAovTokens->color)) {
+        _converged = true;
+        return;
+    }
+
+    // The color aov has the rendered results and we wish to apply the selection
+    // colorization on top of it.
+    HgiTextureHandle aovTexture;
+    _GetTaskContextData(ctx, HdAovTokens->color, &aovTexture);
 
     // instance ID and element ID are optional inputs, but if we don't have
     // a prim ID buffer, skip doing anything.
@@ -164,11 +204,18 @@ HdxColorizeSelectionTask::Execute(HdTaskContext* ctx)
     _ColorizeSelection();
 
     // Blit!
-    _compositor.UpdateColor(
+    _compositor->SetProgram(HdxPackageOutlineShader(), _tokens->outlineFrag);
+
+    _CreateTexture(
         _primId->GetWidth(), 
         _primId->GetHeight(),
         HdFormatUNorm8Vec4, 
         _outputBuffer);
+
+    _compositor->BindTextures({_tokens->colorIn}, {_texture});
+
+    _CreateParameterBuffer();
+    _compositor->BindBuffer(_parameterBuffer, 0);
 
     // Blend the selection color on top.  ApplySelectionColor uses the
     // calculation:
@@ -180,22 +227,26 @@ HdxColorizeSelectionTask::Execute(HdTaskContext* ctx)
     // color, and the selection alpha is the residual value used to scale the
     // scene color. This gives us the blend func:
     // GL_ONE, GL_SRC_ALPHA, GL_ZERO, GL_ONE.
-#if defined(ARCH_GFX_OPENGL)
-    glDisable(GL_DEPTH_TEST);
-    GLboolean blendEnabled;
-    glGetBooleanv(GL_BLEND, &blendEnabled);
-    glEnable(GL_BLEND);
-    glBlendFuncSeparate(GL_ONE, GL_SRC_ALPHA, GL_ZERO, GL_ONE);
-#endif
+    if (!_pipelineCreated) {
+        HgiDepthStencilState depthState;
+        depthState.depthTestEnabled = false;
+        depthState.depthWriteEnabled = false;
+        depthState.stencilTestEnabled = false;
 
-    _compositor.Draw();
+        _compositor->SetDepthState(depthState);
+        _pipelineCreated = true;
 
-#if defined(ARCH_GFX_OPENGL)
-    glEnable(GL_DEPTH_TEST);
-    if (!blendEnabled) {
-        glDisable(GL_BLEND);
+        _compositor->SetBlendState(
+            /*enable blending*/true,
+            HgiBlendFactorOne,
+            HgiBlendFactorSrcAlpha,
+            HgiBlendOpAdd,
+            HgiBlendFactorZero,
+            HgiBlendFactorOne,
+            HgiBlendOpAdd);
     }
-#endif
+
+    _compositor->Draw(aovTexture, /*no depth*/HgiTextureHandle());
 }
 
 GfVec4f
@@ -218,14 +269,14 @@ HdxColorizeSelectionTask::_ColorizeSelection()
         // Skip the colorizing if we can't look up prim ID
         return;
     }
-    //int32_t *iiddata = reinterpret_cast<int32_t*>(_instanceId->Map());
+    int32_t *iiddata = reinterpret_cast<int32_t*>(_instanceId->Map());
     int32_t *eiddata = reinterpret_cast<int32_t*>(_elementId->Map());
 
     for (size_t i = 0; i < _outputBufferSize; ++i) {
         GfVec4f output = GfVec4f(0,0,0,1);
 
         int primId = piddata ? piddata[i] : -1;
-        //int instanceId = iiddata ? iiddata[i] : -1;
+        int instanceId = iiddata ? iiddata[i] : -1;
         int elementId = eiddata ? eiddata[i] : -1;
 
         for (int mode = 0; mode < _selectionOffsets[0]; ++mode) {
@@ -247,15 +298,19 @@ HdxColorizeSelectionTask::_ColorizeSelection()
                 bool sel = bool(selectionData & 0x1);
                 int nextOffset = selectionData >> 1;
 
-                // XXX: Instance highlighting? We currently encode it
-                // per-level, and it's too expensive to look up rprims here
-                // to find out how many levels of instancing they have.
-                // We should change the encoding to flattened index.
-
-                // See if the next block is the ELEMENT block; it should be,
-                // unless there's an instance selection.
                 if (nextOffset != 0 && !sel) {
                     int subprimType = _selectionOffsets[nextOffset];
+                    if (subprimType == 3 /* INSTANCE */) {
+                        int imin = _selectionOffsets[nextOffset+1];
+                        int imax = _selectionOffsets[nextOffset+2];
+                        if (instanceId >= imin && instanceId < imax) {
+                            offset = nextOffset + 3 + instanceId - imin;
+                            selectionData = _selectionOffsets[offset];
+                            sel = sel || bool(selectionData & 0x1);
+                            nextOffset = selectionData >> 1;
+                        }
+                    }
+                    subprimType = _selectionOffsets[nextOffset];
                     if (subprimType == 0 /* ELEMENT */) {
                         int emin = _selectionOffsets[nextOffset+1];
                         int emax = _selectionOffsets[nextOffset+2];
@@ -263,6 +318,7 @@ HdxColorizeSelectionTask::_ColorizeSelection()
                             offset = nextOffset + 3 + elementId - emin;
                             selectionData = _selectionOffsets[offset];
                             sel = sel || bool(selectionData & 0x1);
+                            nextOffset = selectionData >> 1;
                         }
                     }
                 }
@@ -288,14 +344,88 @@ HdxColorizeSelectionTask::_ColorizeSelection()
     }
 
     _primId->Unmap();
-    /*
     if (iiddata) {
         _instanceId->Unmap();
     }
-    */
     if (eiddata) {
         _elementId->Unmap();
     }
+}
+
+void
+HdxColorizeSelectionTask::_CreateParameterBuffer()
+{
+    _ParameterBuffer pb;
+
+    if(_primId->GetWidth() > 0 && _primId->GetHeight() > 0) {
+        pb.texelSize[0] = 1.0f / _primId->GetWidth();
+        pb.texelSize[1] = 1.0f / _primId->GetHeight();
+    }
+
+    pb.enableOutline = (int)_params.enableOutline;
+    pb.radius = (int)_params.outlineRadius;
+
+    // All data is still the same, no need to update the storage buffer
+    if (_parameterBuffer && pb == _parameterData) {
+        return;
+    }
+    _parameterData = pb;
+
+    if (!_parameterBuffer) {
+        // Create a new (storage) buffer for shader parameters
+        HgiBufferDesc bufDesc;
+        bufDesc.debugName = "HdxColorizeSelectionTask parameter buffer";
+        bufDesc.usage = HgiBufferUsageStorage;
+        bufDesc.initialData = &_parameterData;
+        bufDesc.byteSize = sizeof(_parameterData);
+        _parameterBuffer = _GetHgi()->CreateBuffer(bufDesc);
+    } else {
+        // Update the existing storage buffer with new values.
+        HgiBlitCmdsUniquePtr blitCmds = _GetHgi()->CreateBlitCmds();
+        HgiBufferCpuToGpuOp copyOp;
+        copyOp.byteSize = sizeof(_parameterData);
+        copyOp.cpuSourceBuffer = &_parameterData;
+        copyOp.sourceByteOffset = 0;
+        copyOp.destinationByteOffset = 0;
+        copyOp.gpuDestinationBuffer = _parameterBuffer;
+        blitCmds->CopyBufferCpuToGpu(copyOp);
+        _GetHgi()->SubmitCmds(blitCmds.get(), 1);
+    }
+}
+
+void
+HdxColorizeSelectionTask::_CreateTexture(
+    int width, 
+    int height,
+    HdFormat format,
+    void *data)
+{
+    HD_TRACE_FUNCTION();
+    HF_MALLOC_TAG_FUNCTION();
+
+    // Destroy the old texture (if any) if we received new pixels.
+    if (_texture) {
+        _GetHgi()->DestroyTexture(&_texture);
+    }
+
+    // Texture was removed, exit.
+    if (width == 0 || height == 0 || data == nullptr) {
+        return;
+    }
+
+    size_t pixelByteSize = HdDataSizeOfFormat(format);
+
+    HgiTextureDesc texDesc;
+    texDesc.debugName = "HdxColorizeSelectionTask texture";
+    texDesc.dimensions = GfVec3i(width, height, 1);
+    texDesc.format = HdxHgiConversions::GetHgiFormat(format);
+    texDesc.initialData = data;
+    texDesc.layerCount = 1;
+    texDesc.mipLevels = 1;
+    texDesc.pixelsByteSize = width * height * pixelByteSize;
+    texDesc.sampleCount = HgiSampleCount1;
+    texDesc.usage = HgiTextureUsageBitsShaderRead;
+    _texture = _hgi->CreateTexture(texDesc);
 }
 
 // -------------------------------------------------------------------------- //

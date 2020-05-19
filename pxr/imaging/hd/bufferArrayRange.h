@@ -29,18 +29,16 @@
 #include "pxr/imaging/hd/version.h"
 #include "pxr/base/tf/token.h"
 #include "pxr/base/vt/value.h"
-#include "pxr/imaging/hd/bufferResource.h"
 #include "pxr/imaging/hd/bufferArray.h"
 
-#include <boost/noncopyable.hpp>
-#include <boost/shared_ptr.hpp>
+#include <memory>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
 
-typedef std::vector<struct HdBufferSpec> HdBufferSpecVector;
-typedef boost::shared_ptr<class HdBufferSource> HdBufferSourceSharedPtr;
-typedef boost::shared_ptr<class HdBufferArrayRange> HdBufferArrayRangeSharedPtr;
+using HdBufferSpecVector = std::vector<struct HdBufferSpec>;
+using HdBufferArrayRangeSharedPtr = std::shared_ptr<class HdBufferArrayRange>;
+using HdBufferSourceSharedPtr = std::shared_ptr<class HdBufferSource>;
 
 /// \class HdBufferArrayRange
 ///
@@ -50,8 +48,13 @@ typedef boost::shared_ptr<class HdBufferArrayRange> HdBufferArrayRangeSharedPtr;
 /// inherited of this interface so that client (drawItem) can be agnostic about
 /// the implementation detail of aggregation.
 ///
-class HdBufferArrayRange : boost::noncopyable {
+class HdBufferArrayRange 
+{
 public:
+
+    HD_API
+    HdBufferArrayRange();
+
     /// Destructor (do nothing).
     /// The specialized range class may want to do something for garbage
     /// collection in its destructor. However, be careful not do any
@@ -79,12 +82,14 @@ public:
     /// Read back the buffer content
     virtual VtValue ReadData(TfToken const &name) const = 0;
 
-    /// Returns the relative offset for this range
-    virtual int GetOffset() const = 0;
-
-    /// Returns the index for this range
-    virtual int GetIndex() const = 0;
-
+    /// Returns the offset at which this range begins in the underlying buffer 
+    /// array in terms of elements.
+    virtual int GetElementOffset() const = 0;
+    
+    /// Returns the byte offset at which this range begins in the underlying
+    /// buffer array for the given resource.
+    virtual int GetByteOffset(TfToken const& resourceName) const = 0;
+    
     /// Returns the number of elements
     virtual size_t GetNumElements() const = 0;
 
@@ -131,6 +136,10 @@ public:
 protected:
     /// Returns the aggregation container to be used in IsAggregatedWith()
     virtual const void *_GetAggregation() const = 0;
+
+    // Don't allow copies
+    HdBufferArrayRange(const HdBufferArrayRange &) = delete;
+    HdBufferArrayRange &operator=(const HdBufferArrayRange &) = delete;
 
 };
 

@@ -4,20 +4,28 @@ set(PXR_PACKAGE hgi)
 pxr_library(hgi
     LIBRARIES
         gf
+        plug
         tf
 
     PUBLIC_CLASSES
-        blitEncoder
+        attachmentDesc
+        blitCmds
         buffer
-        graphicsEncoder
-        graphicsEncoderDesc
+        graphicsCmds
+        graphicsCmdsDesc
         hgi
-        immediateCommandBuffer
+        pipeline
+        resourceBindings
+        shaderFunction
+        shaderProgram
         texture
+        tokens
+        types
+        cmds
 
     PUBLIC_HEADERS
         api.h
-        blitEncoderOps.h
+        blitCmdsOps.h
         enums.h
-        types.h
+        handle.h
 )

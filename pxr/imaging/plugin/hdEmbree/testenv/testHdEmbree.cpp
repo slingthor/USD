@@ -42,7 +42,7 @@
 
 #include "pxr/base/tf/errorMark.h"
 
-#include <embree2/rtcore.h>
+#include <embree3/rtcore.h>
 #include <iostream>
 
 PXR_NAMESPACE_USING_DIRECTIVE
@@ -150,7 +150,7 @@ void HdEmbree_TestGLDrawing::InitTest()
     _renderDelegate = _rendererPlugin->CreateRenderDelegate();
     TF_VERIFY(_renderDelegate != nullptr);
 
-    _renderIndex = HdRenderIndex::New(_renderDelegate);
+    _renderIndex = HdRenderIndex::New(_renderDelegate, HdDriverVector());
     TF_VERIFY(_renderIndex != nullptr);
 
     // Construct a new scene delegate to populate the render index.
@@ -298,9 +298,10 @@ void HdEmbree_TestGLDrawing::InitTest()
 
 void HdEmbree_TestGLDrawing::DrawTest()
 {
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     // The GL viewport needs to be set before calling execute.
     glViewport(0, 0, GetWidth(), GetHeight());
-
+#endif
     // XXX: We don't plumb changes to window size to the task.
 
     // Ask hydra to execute our render task (producing an image).
@@ -358,12 +359,13 @@ void HdEmbree_TestGLDrawing::_ColorizeId(int32_t *buffer, int size)
 
 void HdEmbree_TestGLDrawing::OffscreenTest()
 {
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     // Render and write out to a file.
     glViewport(0, 0, GetWidth(), GetHeight());
-
+#endif
     // Ask hydra to execute our render task (producing an image).
-    boost::shared_ptr<HdxRenderTask> renderTask =
-        boost::static_pointer_cast<HdxRenderTask>(
+    std::shared_ptr<HdxRenderTask> renderTask =
+        std::static_pointer_cast<HdxRenderTask>(
             _renderIndex->GetTask(SdfPath("/renderTask")));
 
     // For offline rendering, make sure we render to convergence.

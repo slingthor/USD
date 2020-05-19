@@ -21,9 +21,7 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#include "pxr/base/arch/defines.h"
-
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
 #include "pxr/imaging/glf/glew.h"
 #include "pxr/imaging/glf/diagnostic.h"
 #endif
@@ -49,8 +47,6 @@
 #include "pxr/imaging/hd/vtBufferSource.h"
 
 #include <limits>
-
-using namespace boost;
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -119,13 +115,13 @@ HdStExtCompGpuComputation::Execute(
     computeProgram->SetProgram();
 
     HdBufferArrayRangeSharedPtr outputBar =
-        boost::static_pointer_cast<HdBufferArrayRange>(outputRange);
+        std::static_pointer_cast<HdBufferArrayRange>(outputRange);
     TF_VERIFY(outputBar);
 
     // Prepare uniform buffer for GPU computation
     // XXX: We'd really prefer to delegate this to the resource binder.
     std::vector<int32_t> _uniforms;
-    _uniforms.push_back(outputBar->GetOffset());
+    _uniforms.push_back(outputBar->GetElementOffset());
 
     // Bind buffers as SSBOs to the indices matching the layout in the shader
     for (HdExtComputationPrimvarDescriptor const &compPrimvar: _compPrimvars) {
@@ -141,14 +137,14 @@ HdStExtCompGpuComputation::Execute(
             _uniforms.push_back(buffer->GetOffset() / componentSize);
             // Assumes non-SSBO allocator for the stride
             _uniforms.push_back(buffer->GetStride() / componentSize);
-            binder.BindBuffer(name, dynamic_pointer_cast<HdStBufferResource>(buffer));
+            binder.BindBuffer(name, std::dynamic_pointer_cast<HdStBufferResource>(buffer));
         } 
     }
 
     GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
     for (HdBufferArrayRangeSharedPtr const & input: _resource->GetInputs()) {
         HdBufferArrayRangeSharedPtr const & inputBar =
-            boost::static_pointer_cast<HdBufferArrayRange>(input);
+            std::static_pointer_cast<HdBufferArrayRange>(input);
 
         for (HdStBufferResourceNamedPair const & it:
                         inputBar->GetResources()) {
@@ -161,7 +157,7 @@ HdStExtCompGpuComputation::Execute(
                 HdTupleType tupleType = buffer->GetTupleType();
                 size_t componentSize =
                     HdDataSizeOfType(HdGetComponentType(tupleType.type));
-                int32_t offset = inputBar->GetOffset();
+                size_t offset = inputBar->GetByteOffset(name);
                 
                 if (!caps.hasBufferBindOffset) {
                     offset += buffer->GetOffset();
@@ -222,7 +218,7 @@ HdStExtCompGpuComputation::CreateGpuComputation(
     // Downcast the resource registry
     HdRenderIndex &renderIndex = sceneDelegate->GetRenderIndex();
     HdStResourceRegistrySharedPtr const& resourceRegistry = 
-        boost::dynamic_pointer_cast<HdStResourceRegistry>(
+        std::dynamic_pointer_cast<HdStResourceRegistry>(
                               renderIndex.GetResourceRegistry());
 
     HdStComputeShaderSharedPtr shader(new HdStComputeShader());
@@ -284,12 +280,12 @@ void
 HdSt_GetExtComputationPrimvarsComputations(
     SdfPath const &id,
     HdSceneDelegate *sceneDelegate,
-    HdInterpolation interpolationMode,
+    HdExtComputationPrimvarDescriptorVector const& allCompPrimvars,
     HdDirtyBits dirtyBits,
-    HdBufferSourceVector *sources,
-    HdBufferSourceVector *reserveOnlySources,
-    HdBufferSourceVector *separateComputationSources,
-    HdComputationVector *computations)
+    HdBufferSourceSharedPtrVector *sources,
+    HdBufferSourceSharedPtrVector *reserveOnlySources,
+    HdBufferSourceSharedPtrVector *separateComputationSources,
+    HdComputationSharedPtrVector *computations)
 {
     TF_VERIFY(sources);
     TF_VERIFY(reserveOnlySources);
@@ -297,10 +293,6 @@ HdSt_GetExtComputationPrimvarsComputations(
     TF_VERIFY(computations);
 
     HdRenderIndex &renderIndex = sceneDelegate->GetRenderIndex();
-
-    HdExtComputationPrimvarDescriptorVector allCompPrimvars =
-            sceneDelegate->GetExtComputationPrimvarDescriptors(
-                        id, interpolationMode);
 
     // Group computation primvars by source computation
     typedef std::map<SdfPath, HdExtComputationPrimvarDescriptorVector>
@@ -347,7 +339,7 @@ HdSt_GetExtComputationPrimvarsComputations(
 
                         HdBufferSourceSharedPtr gpuComputationSource(
                                 new HdStExtCompGpuComputationBufferSource(
-                                    HdBufferSourceVector(),
+                                    HdBufferSourceSharedPtrVector(),
                                     gpuComputation->GetResource()));
 
                         separateComputationSources->push_back(

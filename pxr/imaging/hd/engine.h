@@ -30,11 +30,13 @@
 
 #include "pxr/imaging/hd/task.h"
 
-#include <boost/shared_ptr.hpp>
+#include <memory>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
 TF_DECLARE_WEAK_AND_REF_PTRS(GarchDrawTarget);
+using HdRenderPassSharedPtr = std::shared_ptr<class HdRenderPass>;
+using HdRenderPassStateSharedPtr = std::shared_ptr<class HdRenderPassState>;
 
 /// \class HdEngine
 ///
@@ -58,7 +60,12 @@ public:
     /// Adds or updates the value associated with the token.
     /// Only one is supported for each token.
     HD_API
-    void SetTaskContextData(const TfToken &id, VtValue &data);
+    void SetTaskContextData(const TfToken &id, const VtValue &data);
+
+    /// If found, will return the value from the task context data associated
+    /// with the token. Returns false if the data could not be found.
+    HD_API
+    bool GetTaskContextData(const TfToken &id, VtValue *data);
 
     /// Removes the specified token.
     HD_API

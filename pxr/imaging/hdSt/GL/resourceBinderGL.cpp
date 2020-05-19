@@ -248,7 +248,7 @@ HdSt_ResourceBinderGL::BindBuffer(TfToken const &name,
         }
         break;
     case HdBinding::TEXTURE_2D:
-    case HdBinding::TEXTURE_3D:
+    case HdBinding::TEXTURE_FIELD:
         // nothing
         break;
     default:
@@ -322,7 +322,7 @@ HdSt_ResourceBinderGL::UnbindBuffer(TfToken const &name,
         }
         break;
     case HdBinding::TEXTURE_2D:
-    case HdBinding::TEXTURE_3D:
+    case HdBinding::TEXTURE_FIELD:
         // nothing
         break;
     default:
@@ -347,9 +347,9 @@ HdSt_ResourceBinderGL::BindShaderResources(HdStShaderCode const *shader) const
         HdBinding::Type type = binding.GetType();
 
         if (type == HdBinding::TEXTURE_2D ||
-            type == HdBinding::TEXTURE_3D) {
+            type == HdBinding::TEXTURE_FIELD) {
         } else if (type == HdBinding::BINDLESS_TEXTURE_2D
-                || type == HdBinding::BINDLESS_TEXTURE_3D
+                || type == HdBinding::BINDLESS_TEXTURE_FIELD
                 || type == HdBinding::BINDLESS_TEXTURE_PTEX_TEXEL
                 || type == HdBinding::BINDLESS_TEXTURE_PTEX_LAYOUT) {
             // nothing? or make it resident?? but it only binds the first one.
@@ -373,9 +373,9 @@ HdSt_ResourceBinderGL::UnbindShaderResources(HdStShaderCode const *shader) const
         HdBinding::Type type = binding.GetType();
 
         if (type == HdBinding::TEXTURE_2D ||
-            type == HdBinding::TEXTURE_3D) {
+            type == HdBinding::TEXTURE_FIELD) {
         } else if (type == HdBinding::BINDLESS_TEXTURE_2D
-                || type == HdBinding::BINDLESS_TEXTURE_3D
+                || type == HdBinding::BINDLESS_TEXTURE_FIELD
                 || type == HdBinding::BINDLESS_TEXTURE_PTEX_TEXEL
                 || type == HdBinding::BINDLESS_TEXTURE_PTEX_LAYOUT) {
 //            if (glIsTextureHandleResidentNV(it->handle)) {
@@ -475,7 +475,7 @@ void
 HdSt_ResourceBinderGL::IntrospectBindings(HdStProgramSharedPtr programResource) const
 {
     GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
-    GLuint program = boost::dynamic_pointer_cast<HdStGLSLProgram>(programResource)->GetGLProgram();
+    GLuint program = std::dynamic_pointer_cast<HdStGLSLProgram>(programResource)->GetGLProgram();
 
     if (ARCH_UNLIKELY(!caps.shadingLanguage420pack)) {
         GLint numUBO = 0;
@@ -498,11 +498,11 @@ HdSt_ResourceBinderGL::IntrospectBindings(HdStProgramSharedPtr programResource) 
     }
 
     if (ARCH_UNLIKELY(!caps.explicitUniformLocation)) {
-        TF_FOR_ALL(it, _bindingMap) {
-            HdBinding binding = it->second;
+        for (auto & it: _bindingMap) {
+            HdBinding binding = it.second;
             HdBinding::Type type = binding.GetType();
-            std::string name = it->first.name;
-            int level = it->first.level;
+            std::string name = it.first.name;
+            int level = it.first.level;
             if (level >=0) {
                 // follow nested instancing naming convention.
                 std::stringstream n;
@@ -516,21 +516,39 @@ HdSt_ResourceBinderGL::IntrospectBindings(HdStProgramSharedPtr programResource) 
                 // update location in resource binder.
                 // some uniforms may be optimized out.
                 if (loc < 0) loc = HdBinding::NOT_EXIST;
-                it->second.Set(type, loc, binding.GetTextureUnit());
-            } else if (type == HdBinding::TEXTURE_2D) {
-                // note: sampler2d_ prefix is added in
-                // HdCodeGen::_GenerateShaderParameters()
-                name = "sampler2d_" + name;
-                GLint loc = glGetUniformLocation(program, name.c_str());
+                it.second.Set(type, loc, binding.GetTextureUnit());
+            }
+        }
+    }
+
+    if (ARCH_UNLIKELY(!caps.shadingLanguage420pack)) {
+        for (auto & it: _bindingMap) {
+            HdBinding binding = it.second;
+            HdBinding::Type type = binding.GetType();
+            std::string name = it.first.name;
+            std::string textureName;
+
+            // note: sampler prefix is added in
+            // HdCodeGen::_GenerateShaderParameters
+            if (type == HdBinding::TEXTURE_2D) {
+                textureName = "sampler2d_" + name;
+            } else if (type == HdBinding::TEXTURE_FIELD) {
+                textureName = "sampler3d_" + name;
+            } else if (type == HdBinding::TEXTURE_PTEX_TEXEL) {
+                textureName = "sampler2darray_" + name;
+            } else if (type == HdBinding::TEXTURE_PTEX_LAYOUT) {
+                textureName = "isamplerbuffer_" + name;
+            } else if (type == HdBinding::TEXTURE_UDIM_ARRAY) {
+                textureName = "sampler2dArray_" + name;
+            } else if (type == HdBinding::TEXTURE_UDIM_LAYOUT) {
+                textureName = "sampler1d_" + name;
+            }
+
+            if (!textureName.empty()) {
+                GLint loc = glGetUniformLocation(program, textureName.c_str());
+                glProgramUniform1i(program, loc, binding.GetTextureUnit());
                 if (loc < 0) loc = HdBinding::NOT_EXIST;
-                it->second.Set(type, loc, binding.GetTextureUnit());
-            } else if (type == HdBinding::TEXTURE_3D) {
-                // note: sampler3d_ prefix is added in
-                // HdCodeGen::_GenerateShaderParameters()
-                name = "sampler3d_" + name;
-                GLint loc = glGetUniformLocation(program, name.c_str());
-                if (loc < 0) loc = HdBinding::NOT_EXIST;
-                it->second.Set(type, loc, binding.GetTextureUnit());
+                it.second.Set(type, loc, binding.GetTextureUnit());
             }
         }
     }

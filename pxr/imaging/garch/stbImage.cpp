@@ -117,9 +117,9 @@ TF_REGISTRY_FUNCTION(TfType)
 }
 
 static GLenum
-_GLFormatFromImageData(unsigned int nchannels)
+_FormatFromImageData(unsigned int nchannels)
 {
-    return (nchannels == 1) ? GL_RED : ((nchannels == 4) ? GL_RGBA : GL_RGB);
+    return GarchGetBaseFormat(nchannels);
 }
 
 /// Returns the bpc (bits per channel) based on the GLType stored in storage
@@ -140,17 +140,7 @@ _GetBytesPerChannelFromType(GLenum const & type)
 static int 
 _GetNumChannelsFromGLFormat(GLenum const & format)
 {
-    switch(format) {
-    case GL_RED :
-        return 1;
-    case GL_RGB :
-        return 3;
-    case GL_RGBA :
-        return 4;
-    default:
-        TF_CODING_ERROR("Unsupported format");
-        return 4;
-    }
+    return GarchGetNumElements(format);
 }
 
 bool 
@@ -317,7 +307,7 @@ Garch_StbImage::GetHeight() const
 GLenum
 Garch_StbImage::GetFormat() const
 {
-    return _GLFormatFromImageData(_nchannels);
+    return _FormatFromImageData(_nchannels);
 }
 
 /* virtual */
@@ -439,12 +429,9 @@ Garch_StbImage::ReadCropped(int const cropTop,
     //Read based on the storage type (8-bit, 16-bit, or float)
     void* imageData = NULL;
   
-    //If image needs to be flipped, configure stb to flip image after load
-    if (storage.flipped) {
-        stbi_set_flip_vertically_on_load(true);
-    } else {
-        stbi_set_flip_vertically_on_load(false);
-    }
+    // Calling stbi_set_flip_vertically_on_load(...) is not thread-safe,
+    // thus we explicitly call stbi__vertical_flip below - assuming
+    // that no other client called stbi_set_flip_vertically_on_load(true).
     
 #if defined(ARCH_OS_IOS)
     stbi_convert_iphone_png_to_rgb(true);
@@ -464,12 +451,21 @@ Garch_StbImage::ReadCropped(int const cropTop,
             imageData = stbi_loadf_from_memory(
                 reinterpret_cast<stbi_uc const *>(buffer.get()), bufferSize,
                 &_width, &_height, &_nchannels, 0);
+            if (storage.flipped) {
+                stbi__vertical_flip(
+                    imageData, _width, _height, _nchannels * sizeof(float));
+            }
         }
         else {
             imageData = stbi_load_from_memory(
                 reinterpret_cast<stbi_uc const *>(buffer.get()), bufferSize,
                 &_width, &_height, &_nchannels, 0);
+            if (storage.flipped) {
+                stbi__vertical_flip(
+                    imageData, _width, _height, _nchannels * sizeof(stbi_uc));
+            }
         }
+
     }
 
     //// Read pixel data

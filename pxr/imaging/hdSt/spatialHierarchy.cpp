@@ -145,7 +145,7 @@ namespace MissingFunctions {
             
             vector_float4 d = vector_abs(screenSpace[1] - screenSpace[0]);
             return (d.x < dimensions.x && d.y < dimensions.y) &&
-            (d.z < dimensions.x && d.w < dimensions.y);
+                   (d.z < dimensions.x && d.w < dimensions.y);
             return true;
         }
 
@@ -416,9 +416,8 @@ GfRange3f DrawableItem::ConvertDrawablesToItems(std::vector<HdStDrawItemInstance
                 aabb.ExtendBy(ooRange.GetMin());
                 aabb.ExtendBy(ooRange.GetMax());
 
-                boundingBox.ExtendBy(aabb);
-
                 if (aabb.GetMax()[0] != FLT_MAX) {
+                    boundingBox.ExtendBy(aabb);
                     DrawableItem *newItem = new DrawableItem(drawable, aabb, oobb, i, numItems);
                     items->push_back(newItem);
                     if (i == 0) {
@@ -438,9 +437,8 @@ GfRange3f DrawableItem::ConvertDrawablesToItems(std::vector<HdStDrawItemInstance
             aabb.ExtendBy(ooRange.GetMin());
             aabb.ExtendBy(ooRange.GetMax());
 
-            boundingBox.ExtendBy(aabb);
-
             if (aabb.GetMax()[0] != FLT_MAX) {
+                boundingBox.ExtendBy(aabb);
                 DrawableItem* drawableItem = new DrawableItem(drawable, aabb, oobb);
                 
                 items->push_back(drawableItem);
@@ -526,7 +524,7 @@ void BVH::BuildBVH(std::vector<HdStDrawItemInstance> *drawables)
 
     buildTimeMS = (ArchGetTickTime() - buildStart) / 1000.0f;
     
-    NSLog(@"Building BVH done: MaxDepth=%u, %fms, %zu items", depth, buildTimeMS, drawableItems.size());
+//    NSLog(@"Building BVH done: MaxDepth=%u, %fms, %zu items", depth, buildTimeMS, drawableItems.size());
 }
 
 void BVH::Bake()

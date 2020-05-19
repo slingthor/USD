@@ -30,8 +30,8 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 void OSDMetalContext::Init()
 {
-    device       = MtlfMetalContext::GetMetalContext()->renderDevices[0];
-    commandQueue = MtlfMetalContext::GetMetalContext()->gpus[0].commandQueue;
+    device       = MtlfMetalContext::GetMetalContext()->currentDevice;
+    commandQueue = MtlfMetalContext::GetMetalContext()->gpus.commandQueue;
 }
 
 #if OSD_METAL_DEFERRED

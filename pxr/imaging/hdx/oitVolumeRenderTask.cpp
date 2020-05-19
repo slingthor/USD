@@ -48,7 +48,7 @@ HdxOitVolumeRenderTask::HdxOitVolumeRenderTask(
                 HdSceneDelegate* delegate, SdfPath const& id)
     : HdxRenderTask(delegate, id)
     , _oitVolumeRenderPassShader(
-        HdStResourceFactory::GetInstance()->NewRenderPassShader(
+        std::make_shared<HdStRenderPassShader>(
             HdxPackageRenderPassOitVolumeShader()))
     , _isOitEnabled(HdxOitBufferAccessor::IsOitEnabled())
 {
@@ -60,7 +60,7 @@ HdxOitVolumeRenderTask::HdxOitVolumeRenderTask(
 HdxOitVolumeRenderTask::~HdxOitVolumeRenderTask() = default;
 
 void
-HdxOitVolumeRenderTask::Sync(
+HdxOitVolumeRenderTask::_Sync(
     HdSceneDelegate* delegate,
     HdTaskContext* ctx,
     HdDirtyBits* dirtyBits)
@@ -69,7 +69,7 @@ HdxOitVolumeRenderTask::Sync(
     HF_MALLOC_TAG_FUNCTION();
 
     if (_isOitEnabled) {
-        HdxRenderTask::Sync(delegate, ctx, dirtyBits);
+        HdxRenderTask::_Sync(delegate, ctx, dirtyBits);
     }
 }
 
@@ -118,6 +118,10 @@ HdxOitVolumeRenderTask::Execute(HdTaskContext* ctx)
     }
 
     extendedState->SetOverrideShader(HdStShaderCodeSharedPtr());
+    renderPassState->SetDepthFunc(HdCmpFuncAlways);
+    // Setting cull style for consistency even though it is hard-coded in
+    // shaders/volume.glslfx.
+    renderPassState->SetCullStyle(HdCullStyleBack);
 
     if(!oitBufferAccessor.AddOitBufferBindings(_oitVolumeRenderPassShader)) {
         TF_CODING_ERROR(
@@ -127,7 +131,7 @@ HdxOitVolumeRenderTask::Execute(HdTaskContext* ctx)
     
     // We render into a SSBO -- not MSSA compatible
     bool oldMSAA = false;
-#if defined(ARCH_GFX_OPENGL) && !defined(ARCH_GFX_METAL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED) && !defined(PXR_METAL_SUPPORT_ENABLED)
     if (HdStResourceFactory::GetInstance()->IsOpenGL()) {
         oldMSAA = glIsEnabled(GL_MULTISAMPLE);
         glDisable(GL_MULTISAMPLE);
@@ -141,12 +145,17 @@ HdxOitVolumeRenderTask::Execute(HdTaskContext* ctx)
     //     For now we always enable GL_POINT_SMOOTH. 
     // XXX Switch points rendering to emit quad with FS that draws circle.
     bool oldPointSmooth = false;
-#if defined(ARCH_GFX_OPENGL) && !defined(ARCH_GFX_METAL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED) && !defined(PXR_METAL_SUPPORT_ENABLED)
     if (HdStResourceFactory::GetInstance()->IsOpenGL()) {
         oldPointSmooth = glIsEnabled(GL_POINT_SMOOTH);
         glEnable(GL_POINT_SMOOTH);
     }
 #endif
+
+    // XXX
+    //
+    // To show volumes that intersect the far clipping plane, we might consider
+    // calling glEnable(GL_DEPTH_CLAMP) here.
 
     // XXX HdxRenderTask::Prepare calls HdStRenderPassState::Prepare.
     // This sets the cullStyle for the render pass shader.
@@ -171,7 +180,7 @@ HdxOitVolumeRenderTask::Execute(HdTaskContext* ctx)
     //
     // Post Execute Restore
     //
-#if defined(ARCH_GFX_OPENGL) && !defined(ARCH_GFX_METAL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED) && !defined(PXR_METAL_SUPPORT_ENABLED)
     if (oldMSAA) {
         glEnable(GL_MULTISAMPLE);
     }

@@ -32,6 +32,7 @@
 #include "pxr/base/gf/pyBufferUtils.h"
 
 
+#include "pxr/base/tf/py3Compat.h"
 #include "pxr/base/tf/pyUtils.h"
 #include "pxr/base/tf/pyContainerConversions.h"
 #include "pxr/base/tf/wrapTypeHelpers.h"
@@ -60,6 +61,7 @@ namespace {
 ////////////////////////////////////////////////////////////////////////
 // Python buffer protocol support.
 
+#if PY_MAJOR_VERSION == 2
 // Python's getreadbuf interface function.
 static Py_ssize_t
 getreadbuf(PyObject *self, Py_ssize_t segment, void **ptrptr) {
@@ -95,6 +97,7 @@ static Py_ssize_t
 getcharbuf(PyObject *self, Py_ssize_t segment, const char **ptrptr) {
     return getreadbuf(self, segment, (void **) ptrptr);
 }
+#endif
 
 // Python's getbuffer interface function.
 static int
@@ -147,10 +150,12 @@ getbuffer(PyObject *self, Py_buffer *view, int flags) {
 // This structure serves to instantiate a PyBufferProcs instance with pointers
 // to the right buffer protocol functions.
 static PyBufferProcs bufferProcs = {
+#if PY_MAJOR_VERSION == 2
     (readbufferproc) getreadbuf,   /*bf_getreadbuffer*/
     (writebufferproc) getwritebuf, /*bf_getwritebuffer*/
     (segcountproc) getsegcount,    /*bf_getsegcount*/
     (charbufferproc) getcharbuf,   /*bf_getcharbuffer*/
+#endif
     (getbufferproc) getbuffer,
     (releasebufferproc) 0,
 };
@@ -234,6 +239,13 @@ static bool __contains__vector( const GfMatrix2f &self, GfVec2f value ) {
     return false;
 }
 
+#if PY_MAJOR_VERSION == 2
+static GfMatrix2f __truediv__(const GfMatrix2f &self, GfMatrix2f value)
+{
+    return self / value;
+}
+#endif
+
 static GfMatrix2f *__init__() {
     // Default constructor produces identity from python.
     return new GfMatrix2f(1);
@@ -255,13 +267,24 @@ struct GfMatrix2f_Pickle_Suite : boost::python::pickle_suite
 
 static size_t __hash__(GfMatrix2f const &m) { return hash_value(m); }
 
+static boost::python::tuple get_dimension()
+{
+    // At one time this was a constant static tuple we returned for
+    // dimension. With boost building for python 3 that results in
+    // a segfault at shutdown. Building for python 2 with a static
+    // tuple returned here seems to work fine.
+    //
+    // It seems likely that this has to do with the order of
+    // destruction of these objects when deinitializing, but we did
+    // not dig deeply into this difference.
+    return make_tuple(2, 2);
+}
+
 } // anonymous namespace 
 
 void wrapMatrix2f()
 {    
     typedef GfMatrix2f This;
-
-    static const tuple _dimension = make_tuple(2, 2);
 
     def("IsClose", (bool (*)(const GfMatrix2f &m1, const GfMatrix2f &m2, double))
         GfIsClose);
@@ -284,7 +307,7 @@ void wrapMatrix2f()
 
         .def( TfTypePythonClass() )
 
-        .def_readonly( "dimension", _dimension )
+        .add_static_property("dimension", get_dimension)
         .def( "__len__", __len__, "Return number of rows" )
 
         .def( "__getitem__", __getitem__float )
@@ -337,6 +360,12 @@ void wrapMatrix2f()
         .def( self * GfVec2f() )
         .def( GfVec2f() * self )
 
+#if PY_MAJOR_VERSION == 2
+        // Needed only to support "from __future__ import division" in
+        // python 2. In python 3 builds boost::python adds this for us.
+        .def("__truediv__", __truediv__ )
+#endif
+
         .def("__repr__", _Repr)
         .def("__hash__", __hash__)
 
@@ -350,7 +379,6 @@ void wrapMatrix2f()
     // buffer protocol.
     auto *typeObj = reinterpret_cast<PyTypeObject *>(cls.ptr());
     typeObj->tp_as_buffer = &bufferProcs;
-    typeObj->tp_flags |= (Py_TPFLAGS_HAVE_NEWBUFFER |
-                          Py_TPFLAGS_HAVE_GETCHARBUFFER);
-
+    typeObj->tp_flags |= (TfPy_TPFLAGS_HAVE_NEWBUFFER |
+                          TfPy_TPFLAGS_HAVE_GETCHARBUFFER);
 }

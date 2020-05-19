@@ -19,7 +19,7 @@
                         "precedence": 0
                     },
                     "GarchVdbTexture" : {
-                        "bases": ["GarchBaseTexture"],
+                        "bases": ["GarchTexture"],
                         "textureTypes": ["vdb"],
                         "precedence": 0
                     },

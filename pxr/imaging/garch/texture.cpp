@@ -30,6 +30,35 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+#if defined(PXR_METAL_SUPPORT_ENABLED)
+GarchTextureGPUHandle::GarchTextureGPUHandle(GarchTextureGPUHandle const & _gpuHandle) {
+    handle = _gpuHandle.handle;
+}
+GarchTextureGPUHandle::GarchTextureGPUHandle(id<MTLTexture> _texture) {
+    handle = (void*)_texture;
+}
+GarchTextureGPUHandle& GarchTextureGPUHandle::operator =(id<MTLTexture> _texture) {
+    handle = (void*)_texture;
+    return *this;
+}
+GarchTextureGPUHandle::operator id<MTLTexture>() const {
+    return id<MTLTexture>(handle);
+}
+
+GarchSamplerGPUHandle::GarchSamplerGPUHandle(GarchSamplerGPUHandle const & _gpuHandle) {
+    handle = _gpuHandle.handle;
+}
+GarchSamplerGPUHandle::GarchSamplerGPUHandle(id<MTLSamplerState> _sampler) {
+    handle = (void*)_sampler;
+}
+GarchSamplerGPUHandle& GarchSamplerGPUHandle::operator =(id<MTLSamplerState> _sampler) {
+    handle = (void*)_sampler;
+    return *this;
+}
+GarchSamplerGPUHandle::operator id<MTLSamplerState>() const {
+    return id<MTLSamplerState>(handle);
+}
+#endif
 
 TF_REGISTRY_FUNCTION(TfType)
 {
@@ -40,86 +69,6 @@ TF_DEFINE_PUBLIC_TOKENS(GarchTextureTokens, GARCH_TEXTURE_TOKENS);
 
 static size_t _TextureMemoryAllocated=0;
 static size_t _TextureContentsID=0;
-
-NSArray<id<MTLDevice>> *GPUState::renderDevices = nil;
-int GPUState::gpuCount = 0;
-int GPUState::currentGPU = 0;
-
-MtlfMultiSampler::MtlfMultiSampler() {
-    for(int i = 0; i < MAX_GPUS; i++)
-        sampler[i++] = nil;
-}
-
-MtlfMultiSampler::MtlfMultiSampler(MTLSamplerDescriptor* samplerDescriptor) {
-    int i = 0;
-    if (samplerDescriptor) {
-        for (id<MTLDevice>dev in GPUState::renderDevices) {
-            sampler[i++] = [dev newSamplerStateWithDescriptor:samplerDescriptor];
-        }
-    }
-    while(i < MAX_GPUS)
-        sampler[i++] = nil;
-}
-
-MtlfMultiSampler& MtlfMultiSampler::operator=(const MtlfMultiSampler& rhs) {
-    for(int i = 0; i < MAX_GPUS; i++)
-        sampler[i] = rhs.sampler[i];
-    return *this;
-}
-
-void MtlfMultiSampler::Clear() {
-    for (int i = 0; i < MAX_GPUS; i++) {
-        sampler[i] = nil;
-    }
-}
-
-void MtlfMultiSampler::release() {
-    for (int i = 0; i < MAX_GPUS; i++) {
-        if (!sampler[i])
-            break;
-        
-        [sampler[i] release];
-    }
-    Clear();
-}
-
-MtlfMultiTexture::MtlfMultiTexture() {
-    for(int i = 0; i < MAX_GPUS; i++)
-        texture[i++] = nil;
-}
-
-MtlfMultiTexture::MtlfMultiTexture(MTLTextureDescriptor* textureDescriptor) {
-    int i = 0;
-    if (textureDescriptor) {
-        for (id<MTLDevice>dev in GPUState::renderDevices) {
-            texture[i++] = [dev newTextureWithDescriptor:textureDescriptor];
-        }
-    }
-    while(i < MAX_GPUS)
-        texture[i++] = nil;
-}
-
-MtlfMultiTexture& MtlfMultiTexture::operator=(const MtlfMultiTexture& rhs) {
-    for(int i = 0; i < MAX_GPUS; i++)
-        texture[i] = rhs.texture[i];
-    return *this;
-}
-
-void MtlfMultiTexture::Clear() {
-    for (int i = 0; i < MAX_GPUS; i++) {
-        texture[i] = nil;
-    }
-}
-
-void MtlfMultiTexture::release() {
-    for (int i = 0; i < MAX_GPUS; i++) {
-        if (!texture[i])
-            break;
-        
-        [texture[i] release];
-    }
-    Clear();
-}
 
 static size_t
 _GetNewContentsID()
@@ -223,6 +172,13 @@ bool
 GarchTexture::IsOriginLowerLeft() const
 {
     return _originLocation == GarchImage::OriginLowerLeft;
+}
+
+void
+GarchTexture::GarbageCollect()
+{
+    // Nothing to do here.
+    // Only needed for containers of textures.
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

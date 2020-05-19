@@ -63,7 +63,7 @@ MtlfArrayTexture::MtlfArrayTexture(TfTokenVector const &imageFilePaths,
 /* virtual */
 GarchTexture::BindingVector
 MtlfArrayTexture::GetBindings(TfToken const & identifier,
-                              GarchSamplerGPUHandle samplerName)
+                              GarchSamplerGPUHandle const& samplerName)
 {
     TF_FATAL_CODING_ERROR("Not Implemented");
 

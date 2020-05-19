@@ -134,7 +134,7 @@ HdDrawItem::IntersectsViewVolume(matrix_float4x4 const &viewProjMatrix,
         int numInstances = instanceIndexRange->GetNumElements() / instanceIndexWidth;
         
         if (instancerNumLevels == 1) {
-            int instanceOffset = instanceIndexRange->GetOffset();
+            int instanceOffset = instanceIndexRange->GetElementOffset();
 
             HdBufferResourceSharedPtr const & instanceIndexRes = instanceIndexRange->GetResource(HdInstancerTokens->instanceIndices);
             
@@ -158,16 +158,16 @@ HdDrawItem::IntersectsViewVolume(matrix_float4x4 const &viewProjMatrix,
                 size_t stride = transformRes->GetStride();
                 uint8_t const* rawBuffer = transformRes->GetBufferContents();
                 GfMatrix4f const *itemTransform =
-                    (GfMatrix4f const*)&rawBuffer[stride * primvar->GetIndex() + transformRes->GetOffset()];
+                    (GfMatrix4f const*)&rawBuffer[stride * primvar->GetElementOffset() + transformRes->GetOffset()];
 
                 // Instancer transform
                 stride = instancerTransformRes->GetStride();
                 rawBuffer = instancerTransformRes->GetBufferContents();
                 GfMatrix4f const *instancerTransform =
-                    (GfMatrix4f const*)&rawBuffer[stride * primvar->GetIndex() + instancerTransformRes->GetOffset()];
+                    (GfMatrix4f const*)&rawBuffer[stride * primvar->GetElementOffset() + instancerTransformRes->GetOffset()];
                 GfMatrix4f m;
 
-                int instanceDrawingCoord = instanceBar->GetOffset();
+                int instanceDrawingCoord = instanceBar->GetElementOffset();
 
                 for (int i = 0; i < numInstances; i++) {
                     
@@ -264,8 +264,7 @@ HdDrawItem::IntersectsViewVolume(matrix_float4x4 const &viewProjMatrix,
 
             if (modified) {
 #if defined(ARCH_OS_MACOS)
-                MtlfMetalContext::MtlfMultiBuffer h = culledInstanceIndexRes->GetId();
-                id<MTLBuffer> metalBuffer = h.forCurrentGPU();
+                id<MTLBuffer> metalBuffer = culledInstanceIndexRes->GetId();
 
                 uint32_t start = instanceOffset * sizeof(uint32_t);
                 uint32_t length = numVisible * sizeof(uint32_t) * instanceIndexWidth;
@@ -307,7 +306,7 @@ HdDrawItem::CalculateCullingBounds() const
         int numInstances = instanceIndexRange->GetNumElements() / instanceIndexWidth;
         
         if (instancerNumLevels == 1) {
-            int instanceOffset = instanceIndexRange->GetOffset();
+            int instanceOffset = instanceIndexRange->GetElementOffset();
             
             HdBufferResourceSharedPtr const & instanceIndexRes = instanceIndexRange->GetResource(HdInstancerTokens->instanceIndices);
             
@@ -328,16 +327,16 @@ HdDrawItem::CalculateCullingBounds() const
             size_t stride = transformRes->GetStride();
             uint8_t const* rawBuffer = transformRes->GetBufferContents();
             GfMatrix4f const *itemTransform =
-            (GfMatrix4f const*)&rawBuffer[stride * primvar->GetIndex() + transformRes->GetOffset()];
+            (GfMatrix4f const*)&rawBuffer[stride * primvar->GetElementOffset() + transformRes->GetOffset()];
             
             // Instancer transform
             stride = instancerTransformRes->GetStride();
             rawBuffer = instancerTransformRes->GetBufferContents();
             GfMatrix4f const *instancerTransform =
-            (GfMatrix4f const*)&rawBuffer[stride * primvar->GetIndex() + instancerTransformRes->GetOffset()];
+            (GfMatrix4f const*)&rawBuffer[stride * primvar->GetElementOffset() + instancerTransformRes->GetOffset()];
             GfMatrix4f m;
             
-            int instanceDrawingCoord = instanceBar->GetOffset();
+            int instanceDrawingCoord = instanceBar->GetElementOffset();
             
             _instancedCullingBounds.clear();
                 
@@ -418,7 +417,7 @@ int HdDrawItem::BuildInstanceBuffer(uint8_t** instanceVisibility) const
     }
 
     HdBufferArrayRangeSharedPtr const & instanceIndexRange = GetInstanceIndexRange();
-    int instanceOffset = instanceIndexRange->GetOffset();
+    int instanceOffset = instanceIndexRange->GetElementOffset();
     
     HdBufferResourceSharedPtr const & instanceIndexRes = instanceIndexRange->GetResource(HdInstancerTokens->instanceIndices);
     
@@ -464,8 +463,7 @@ int HdDrawItem::BuildInstanceBuffer(uint8_t** instanceVisibility) const
         }
 
 #if defined(ARCH_OS_MACOS)
-        MtlfMetalContext::MtlfMultiBuffer h = culledInstanceIndexRes->GetId();
-        id<MTLBuffer> metalBuffer = h.forCurrentGPU();
+        id<MTLBuffer> metalBuffer = culledInstanceIndexRes->GetId();
 
         uint32_t start = instanceOffset * sizeof(uint32_t);
         uint32_t length = numVisible * sizeof(uint32_t) * 2;

@@ -32,7 +32,8 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 
-typedef boost::shared_ptr<class HdStRenderPassShader> HdStRenderPassShaderSharedPtr;
+using HdStRenderPassShaderSharedPtr =
+    std::shared_ptr<class HdStRenderPassShader>;
 
 /// \class HdStRenderPassShader
 ///
@@ -61,8 +62,8 @@ protected:
 private:
 
     // No copying
-    HdStRenderPassShaderMetal(const HdStRenderPassShader &)                     = delete;
-    HdStRenderPassShaderMetal &operator =(const HdStRenderPassShader &)         = delete;
+    HdStRenderPassShaderMetal(const HdStRenderPassShader &) = delete;
+    HdStRenderPassShaderMetal &operator =(const HdStRenderPassShader &)=delete;
 };
 
 

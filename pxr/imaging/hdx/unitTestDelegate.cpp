@@ -94,9 +94,9 @@ public:
             frustum.ComputeViewMatrix() * frustum.ComputeProjectionMatrix();
     }
 
-    virtual GfMatrix4d Compute(const GfVec4f &viewport,
-                               CameraUtilConformWindowPolicy policy) {
-        return _shadowMatrix;
+    virtual std::vector<GfMatrix4d> Compute(
+        const GfVec4f &viewport, CameraUtilConformWindowPolicy policy) {
+        return std::vector<GfMatrix4d>(1, _shadowMatrix);
     }
 private:
     GfMatrix4d _shadowMatrix;
@@ -732,7 +732,7 @@ Hdx_UnitTestDelegate::GetMeshTopology(SdfPath const& id)
     HdMeshTopology topology;
     const _Mesh &mesh = _meshes[id];
 
-    return HdMeshTopology(PxOsdOpenSubdivTokens->catmark,
+    return HdMeshTopology(PxOsdOpenSubdivTokens->catmullClark,
                           HdTokens->rightHanded,
                           mesh.numVerts,
                           mesh.verts);
@@ -929,7 +929,17 @@ Hdx_UnitTestDelegate::GetTextureResourceID(SdfPath const& textureId)
 TfTokenVector
 Hdx_UnitTestDelegate::GetTaskRenderTags(SdfPath const& taskId)
 {
-    return _valueCacheMap[taskId][HdTokens->renderTags].Get<TfTokenVector>();
+    const auto it1 = _valueCacheMap.find(taskId);
+    if (it1 == _valueCacheMap.end()) {
+        return {};
+    }
+
+    const auto it2 = it1->second.find(HdTokens->renderTags);
+    if (it2 == it1->second.end()) {
+        return {};
+    }
+
+    return it2->second.Get<TfTokenVector>();
 }
 
 

@@ -28,13 +28,15 @@
 #include "pxr/imaging/hdSt/api.h"
 #include "pxr/base/tf/token.h"
 
-#include <boost/shared_ptr.hpp>
+#include <memory>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
 
-typedef boost::shared_ptr<class HdStPersistentBuffer> HdStPersistentBufferSharedPtr;
-typedef boost::shared_ptr<class HdResource> HdResourceSharedPtr;
+using HdStPersistentBufferSharedPtr = 
+    std::shared_ptr<class HdStPersistentBuffer>;
+using HdResourceSharedPtr =
+	std::shared_ptr<class HdResource>;
 
 
 /// \class HdStPersistentBuffer

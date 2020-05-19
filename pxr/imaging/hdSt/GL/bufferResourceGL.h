@@ -37,8 +37,8 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-typedef boost::shared_ptr<class HdStBufferResourceGL>
-                                HdStBufferResourceGLSharedPtr;
+using HdStBufferResourceGLSharedPtr =
+    std::shared_ptr<class HdStBufferResourceGL>;
 
 /// \class HdStBufferResourceGL
 ///

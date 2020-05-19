@@ -47,18 +47,18 @@ void ProcessPointId(int);
 
 void main(void)
 {
+    ProcessPrimvars();
+
     MAT4 transform  = ApplyInstanceTransform(HdGet_transform());
     vec4 point     = vec4(HdGet_points().xyz, 1);
 
     outData.Peye = vec4(GetWorldToViewMatrix() * transform * point);
 
-    ProcessPrimvars();
-
     gl_Position = vec4(GetProjectionMatrix() * outData.Peye);
     ApplyClipPlanes(outData.Peye);
 
     // scale width following prman's behavior
-    vec4 w = vec4(transform * HdGet_widths() * normalize(vec4(1,1,1,0)));
+    vec4 w = vec4(transform * (HdGet_widths() * normalize(vec4(1,1,1,0))));
     float width = length(w.xyz);
 
     // compute screenspace width
@@ -69,14 +69,7 @@ void main(void)
                          HD_GL_POINT_SIZE_MIN, HD_GL_POINT_SIZE_MAX);
 
     ProcessPointId(GetPointId());
-}[8]    float   -0.0568419769
-[9] float   -0.237548724
-[10]    float   -0.565322459
-[11]    float   -0.0106954053
-[12]    float   0.117521353
-[13]    float   0.581208169
-[14]    float   0.331320405
-[15]    float   0.0251874141
+}
 
 --- --------------------------------------------------------------------------
 -- glsl Point.Fragment

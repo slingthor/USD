@@ -47,4 +47,4 @@ void wrapVdbTexture()
         ;
 }
 
-TF_REFPTR_CONST_VOLATILE_GET(GlfVdbTexture)
+TF_REFPTR_CONST_VOLATILE_GET(GarchVdbTexture)

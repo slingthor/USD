@@ -52,7 +52,6 @@
 #include <algorithm>
 
 using std::string;
-using namespace boost;
 
 PXR_NAMESPACE_OPEN_SCOPE
 

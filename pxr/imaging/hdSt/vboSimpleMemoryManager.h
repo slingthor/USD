@@ -117,17 +117,18 @@ public:
 
         /// Read back the buffer content
         HDST_API
-        virtual VtValue ReadData(TfToken const &name) const override;
+        virtual VtValue ReadData(TfToken const &name) const;
 
-        /// Returns the relative offset in aggregated buffer
-        HDST_API
-        virtual int GetOffset() const override {
+        /// Returns the offset at which this range begins in the underlying
+        /// buffer array in terms of elements.
+        virtual int GetElementOffset() const {
             return 0;
         }
 
-        /// Returns the index in aggregated buffer
-        HDST_API
-        virtual int GetIndex() const override {
+        /// Returns the byte offset at which this range begins in the underlying
+        /// buffer array for the given resource.
+        virtual int GetByteOffset(TfToken const& resourceName) const {
+            TF_UNUSED(resourceName);
             return 0;
         }
 
@@ -210,12 +211,12 @@ public:
         size_t _numElements;
     };
 
-    typedef boost::shared_ptr<_SimpleBufferArray>
-        _SimpleBufferArraySharedPtr;
-    typedef boost::shared_ptr<_SimpleBufferArrayRange>
-        _SimpleBufferArrayRangeSharedPtr;
-    typedef boost::weak_ptr<_SimpleBufferArrayRange>
-        _SimpleBufferArrayRangePtr;
+    using _SimpleBufferArraySharedPtr =
+        std::shared_ptr<_SimpleBufferArray>;
+    using _SimpleBufferArrayRangeSharedPtr =
+        std::shared_ptr<_SimpleBufferArrayRange>;
+    using _SimpleBufferArrayRangePtr =
+        std::weak_ptr<_SimpleBufferArrayRange>;
 
     /// \class _SimpleBufferArray
     ///
@@ -306,7 +307,7 @@ public:
         HDST_API
         _SimpleBufferArrayRangeSharedPtr _GetRangeSharedPtr() const {
             return GetRangeCount() > 0
-                ? boost::static_pointer_cast<_SimpleBufferArrayRange>(GetRange(0).lock())
+                ? std::static_pointer_cast<_SimpleBufferArrayRange>(GetRange(0).lock())
                 : _SimpleBufferArrayRangeSharedPtr();
         }
     };

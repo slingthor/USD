@@ -143,7 +143,7 @@ HdSt_ResourceBinderMetal::BindBuffer(TfToken const &name,
         return;
     
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
-    HdStBufferResourceMetalSharedPtr const metalBuffer = boost::dynamic_pointer_cast<HdStBufferResourceMetal>(buffer);
+    HdStBufferResourceMetalSharedPtr const metalBuffer = std::dynamic_pointer_cast<HdStBufferResourceMetal>(buffer);
     HdTupleType tupleType = buffer->GetTupleType();
 
     auto shaderBindings = MSL_FindBinding(_shaderBindingMap, name, level);
@@ -264,7 +264,7 @@ HdSt_ResourceBinderMetal::BindUniformf(TfToken const &name,
 void
 HdSt_ResourceBinderMetal::IntrospectBindings(HdStProgramSharedPtr programResource) const
 {
-    HdStMSLProgramSharedPtr program(boost::dynamic_pointer_cast<HdStMSLProgram>(programResource));
+    HdStMSLProgramSharedPtr program(std::dynamic_pointer_cast<HdStMSLProgram>(programResource));
     
     //Copy the all shader bindings from the program.
     _shaderBindingMap = program->GetBindingMap();

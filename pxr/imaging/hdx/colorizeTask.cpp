@@ -32,7 +32,7 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 HdxColorizeTask::HdxColorizeTask(HdSceneDelegate* delegate, SdfPath const& id)
- : HdxProgressiveTask(id)
+ : HdxTask(id)
  , _aovName()
  , _aovBufferPath()
  , _depthBufferPath()
@@ -42,7 +42,9 @@ HdxColorizeTask::HdxColorizeTask(HdSceneDelegate* delegate, SdfPath const& id)
  , _outputBuffer(nullptr)
  , _outputBufferSize(0)
  , _converged(false)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
  , _compositor()
+#endif
  , _needsValidation(false)
 {
 }
@@ -422,9 +424,9 @@ static _Colorizer _colorizerTable[] = {
 };
 
 void
-HdxColorizeTask::Sync(HdSceneDelegate* delegate,
-                      HdTaskContext* ctx,
-                      HdDirtyBits* dirtyBits)
+HdxColorizeTask::_Sync(HdSceneDelegate* delegate,
+                       HdTaskContext* ctx,
+                       HdDirtyBits* dirtyBits)
 {
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
@@ -541,29 +543,39 @@ HdxColorizeTask::Execute(HdTaskContext* ctx)
 
     // XXX: Right now, we colorize on the CPU, before uploading data to the
     // fullscreen pass.  It would be much better if the colorizer callbacks
-    // were pluggable fragment shaders. This is particularly important for
+    // were done in fragment shaders. This is particularly important for
     // backends that keep renderbuffers on the GPU.
 
     // Colorize!
-
+    bool depthAware = false;
     if (_depthBuffer && _depthBuffer->GetFormat() == HdFormatFloat32) {
         uint8_t* db = reinterpret_cast<uint8_t*>(_depthBuffer->Map());
-        _compositor.UpdateDepth(_depthBuffer->GetWidth(),
-                                _depthBuffer->GetHeight(),
-                                db);
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
+        _compositor.SetTexture(HdAovTokens->depth,
+                               _depthBuffer->GetWidth(),
+                               _depthBuffer->GetHeight(),
+                               HdFormatFloat32, db);
+#endif
         _depthBuffer->Unmap();
+        depthAware = true;
     } else {
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
         // If no depth buffer is bound, don't draw with depth.
-        _compositor.UpdateDepth(0, 0, nullptr);
+        _compositor.SetTexture(HdAovTokens->depth,
+                               0, 0, HdFormatInvalid, nullptr);
+#endif
     }
 
     if (!_applyColorQuantization && _aovName == HdAovTokens->color) {
         // Special handling for color: to avoid a copy, just read the data
         // from the render buffer if no quantization is requested.
-        _compositor.UpdateColor(_aovBuffer->GetWidth(),
-                                _aovBuffer->GetHeight(),
-                                _aovBuffer->GetFormat(),
-                                _aovBuffer->Map());
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
+        _compositor.SetTexture(HdAovTokens->color,
+                               _aovBuffer->GetWidth(),
+                               _aovBuffer->GetHeight(),
+                               _aovBuffer->GetFormat(),
+                               _aovBuffer->Map());
+#endif
         _aovBuffer->Unmap();
     } else {
 
@@ -596,26 +608,29 @@ HdxColorizeTask::Execute(HdTaskContext* ctx)
 
         // Upload the scratch buffer.
         if (colorized) {
-            _compositor.UpdateColor(_aovBuffer->GetWidth(),
-                                    _aovBuffer->GetHeight(),
-                                    HdFormatUNorm8Vec4,
-                                    _outputBuffer);
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
+            _compositor.SetTexture(HdAovTokens->color,
+                                   _aovBuffer->GetWidth(),
+                                   _aovBuffer->GetHeight(),
+                                   HdFormatUNorm8Vec4,
+                                   _outputBuffer);
+#endif
         } else {
-            _compositor.UpdateColor(0, 0, HdFormatInvalid, nullptr);
+            // Skip the compositor if we have no color data.
+            return;
         }
     }
 
     // Blit!
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     GLboolean blendEnabled;
     glGetBooleanv(GL_BLEND, &blendEnabled);
     glEnable(GL_BLEND);
     glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-#endif
 
+    _compositor.SetProgramToCompositor(depthAware);
     _compositor.Draw();
 
-#if defined(ARCH_GFX_OPENGL)
     if (!blendEnabled) {
         glDisable(GL_BLEND);
     }

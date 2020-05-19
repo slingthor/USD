@@ -129,6 +129,7 @@ private:
     float _complexity;
     TfToken _colorCorrectionMode;
     TfTokenVector _purposes;
+    UsdImagingGLEngine::RenderAPI _api;
 };
 
 

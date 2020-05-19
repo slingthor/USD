@@ -87,13 +87,11 @@ else()
             ${OPENGL_glu_LIBRARY}
             ${GLEW_LIBRARY}
             ${X11_LIBRARIES}
-            ${OPENEXR_LIBRARY}
             ${optionalLibs}
 
         INCLUDE_DIRS
             ${Boost_INCLUDE_DIRS}
             ${GLEW_INCLUDE_DIR}
-            ${OPENEXR_INCLUDE_DIRS}
             ${optionalIncludeDirs}
 
         PUBLIC_CLASSES
@@ -107,7 +105,6 @@ else()
             glContext
             glRawContext
             info
-            package
             ptexTexture
             resourceFactory
             simpleLightingContext
@@ -139,6 +136,5 @@ else()
             plugInfo.json
             shaders/pcfShader.glslfx
             shaders/simpleLighting.glslfx
-            shaders/simpleShadowMapShader.glslfx
     )
 endif()

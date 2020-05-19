@@ -31,15 +31,13 @@
 #include "pxr/imaging/hd/renderThread.h"
 #include "pxr/imaging/plugin/hdEmbree/renderer.h"
 #include "pxr/imaging/plugin/hdEmbree/renderBuffer.h"
-#include "pxr/imaging/hdx/compositor.h"
+#include "pxr/imaging/hdx/fullscreenShader.h"
 
 #include "pxr/base/gf/matrix4d.h"
 
 #include <atomic>
 
 PXR_NAMESPACE_OPEN_SCOPE
-
-typedef boost::shared_ptr<class GlfGLContext> GlfGLContextSharedPtr;
 
 /// \class HdEmbreeRenderPass
 ///
@@ -123,10 +121,6 @@ private:
 
     // Were the color/depth buffer converged the last time we blitted them?
     bool _converged;
-
-    // A compositor utility class, for rendering the final result to the
-    // viewport.
-    HdxCompositor _compositor;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

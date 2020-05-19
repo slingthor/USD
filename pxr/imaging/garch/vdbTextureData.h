@@ -45,13 +45,16 @@ class GarchVdbTextureData_DenseGridHolderBase;
 
 /// \class GlfVdbTextureData
 ///
-/// Implements GlfBaseTextureData to load an OpenVDB file
+/// Implements GlfBaseTextureData to read grid with given name from
+/// OpenVDB file at given path.
 ///
 class GarchVdbTextureData : public GarchBaseTextureData {
 public:
     GARCH_API
     static GarchVdbTextureDataRefPtr
-    New(std::string const &filePath, size_t targetMemory);
+    New(std::string const &filePath,
+        std::string const &gridName,
+        size_t targetMemory);
 
     /// See GarchVdbTexture for details
     const GfBBox3d &GetBoundingBox() const { return _boundingBox; }
@@ -94,14 +97,18 @@ public:
     int GetNumMipLevels() const override;
 
 private:
-    GarchVdbTextureData(std::string const &filePath, size_t targetMemory);
+    GarchVdbTextureData(std::string const &filePath,
+                        std::string const &gridName,
+                        size_t targetMemory);
     ~GarchVdbTextureData() override;
 
     const std::string _filePath;
+    const std::string _gridName;
 
     size_t _targetMemory;
 
     int _nativeWidth, _nativeHeight, _nativeDepth;
+    int _resizedWidth, _resizedHeight, _resizedDepth;
     int _bytesPerPixel;
 
     GLenum  _glInternalFormat, _glFormat, _glType;

@@ -398,7 +398,7 @@ set(CMAKE_SHARED_LIBRARY_CREATE_C_FLAGS "-dynamiclib ${HEADER_PAD}")
 set(CMAKE_SHARED_MODULE_CREATE_C_FLAGS "-bundle ${HEADER_PAD}")
 set(CMAKE_SHARED_MODULE_LOADER_C_FLAG "-Wl,-bundle_loader,")
 set(CMAKE_SHARED_MODULE_LOADER_CXX_FLAG "-Wl,-bundle_loader,")
-set(CMAKE_FIND_LIBRARY_SUFFIXES ".dylib" ".so" ".a")
+set(CMAKE_FIND_LIBRARY_SUFFIXES ".tbd" ".dylib" ".so" ".a")
 set(CMAKE_SHARED_LIBRARY_RUNTIME_C_FLAG "-Wl,-rpath,")
 
 # Hack: if a new cmake (which uses CMAKE_INSTALL_NAME_TOOL) runs on an old

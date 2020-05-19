@@ -80,7 +80,7 @@ public:
     GARCH_API
     GarchTexture::BindingVector GetBindings(
         TfToken const& identifier,
-        GarchSamplerGPUHandle samplerId) override;
+        GarchSamplerGPUHandle const & samplerId) override;
 
     GARCH_API
     VtDictionary GetTextureInfo(bool forceLoad) override;

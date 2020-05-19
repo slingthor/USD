@@ -34,7 +34,8 @@ if (OPENSUBDIV_HAS_METAL_COMPUTE)
     add_definitions(-DOPENSUBDIV_HAS_METAL_COMPUTE)
 endif()
 if (${PXR_ENABLE_GL_SUPPORT})
-    list(APPEND optionalLibs      ${OPENGL_gl_LIBRARY})
+    list(APPEND optionalIncludeDirs     ${GLEW_INCLUDE_DIR})
+    list(APPEND optionalLibs            ${OPENGL_gl_LIBRARY})
 endif()
 if (${PXR_ENABLE_METAL_SUPPORT})
     # On Apple, we add the gl framework anyway, to ensure the header files
@@ -106,6 +107,7 @@ pxr_library(garch
         uvTextureStorage
         uvTextureStorageData
         vdbTexture
+        vdbTextureContainer
         ${optionalPublicClasses}
 
     PRIVATE_CLASSES
@@ -115,6 +117,7 @@ pxr_library(garch
         api.h
         gl.h
         glPlatformContext.h
+        textureContainer.h
         ${GARCH_GLPLATFORMCONTEXT}.h
 
     PRIVATE_HEADERS
@@ -123,6 +126,7 @@ pxr_library(garch
         stb/stb_image.h
         stb/stb_image_resize.h
         stb/stb_image_write.h
+        textureContainerImpl.h
 
     PYTHON_CPPFILES
         moduleDeps.cpp

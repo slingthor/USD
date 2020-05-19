@@ -37,8 +37,7 @@
 #include "pxr/usd/sdf/path.h"
 #include "pxr/base/tf/staticTokens.h"
 
-#include <boost/shared_ptr.hpp>
-
+#include <memory>
 #include <vector>
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -60,7 +59,7 @@ class HdRenderIndex;
 class HdCamera;
 class HdStDrawTargetAttachmentDescArray;
 
-typedef boost::shared_ptr<class GlfGLContext> GlfGLContextSharedPtr;
+typedef std::shared_ptr<class GlfGLContext> GlfGLContextSharedPtr;
 
 typedef std::vector<class HdStDrawTarget const *> HdStDrawTargetPtrConstVector;
 
@@ -126,6 +125,10 @@ public:
     {
         return &_renderPassState;
     }
+
+    /// Returns collection of rprims the draw target draws.
+    HDST_API
+    HdRprimCollection const &GetCollection() const { return _collection; }
 
     /// Debug api to output the contents of the draw target to a png file.
     HDST_API

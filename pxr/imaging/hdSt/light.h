@@ -32,22 +32,15 @@
 #include "pxr/imaging/garch/simpleLight.h"
 #include "pxr/imaging/garch/texture.h"
 
-#include "pxr/base/tf/staticTokens.h"
-#include "pxr/base/vt/dictionary.h"
 #include "pxr/base/vt/value.h"
 
-#include <boost/shared_ptr.hpp>
-
-#include <vector>
+#include <memory>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-class HdResourceRegistry;
-class HdSceneDelegate;
-typedef boost::shared_ptr<class HdStLight> HdStLightSharedPtr;
-typedef std::vector<class HdStLight const *> HdStLightPtrConstVector;
-typedef boost::shared_ptr<class HdStTextureResource> 
-                                                HdStTextureResourceSharedPtr;
+class HdStResourceRegistry;
+
+using HdStTextureResourceSharedPtr = std::shared_ptr<class HdStTextureResource>;
 
 /// \class HdStLight
 ///
@@ -92,7 +85,7 @@ private:
     
     /// called by _CreateDomeLight to add the compute tasks
     void _SetupComputations(GarchTextureGPUHandle const &sourceTexture,
-                            HdResourceRegistry *resourceRegistry);
+                            HdStResourceRegistry *resourceRegistry);
 
 private:
     // Stores the internal light type of this light.

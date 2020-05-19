@@ -24,7 +24,7 @@
 #ifndef PXR_BASE_TF_PY_TRACING_H
 #define PXR_BASE_TF_PY_TRACING_H
 
-#include <Python.h>
+#include "pxr/base/tf/pySafePython.h"
 
 #include "pxr/pxr.h"
 
@@ -55,10 +55,10 @@ typedef std::shared_ptr<TfPyTraceFn> TfPyTraceFnId;
 TF_API TfPyTraceFnId TfPyRegisterTraceFn(TfPyTraceFn const &f);
 
 // For internal use only.  Do not use.
-TF_API void Tf_PyFabricateTraceEvent(TfPyTraceInfo const &info);
+void Tf_PyFabricateTraceEvent(TfPyTraceInfo const &info);
 
 // For internal use only.  Do not use.
-TF_API void Tf_PyTracingPythonInitialized();
+void Tf_PyTracingPythonInitialized();
 
 PXR_NAMESPACE_CLOSE_SCOPE
 

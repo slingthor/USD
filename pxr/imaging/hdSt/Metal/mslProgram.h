@@ -1,5 +1,3 @@
-#line 1 "/Volumes/Data/USDMetal/pxr/imaging/lib/hdSt/Metal/mslProgram.h"
-#line 1 "/Volumes/Data/USDMetal/pxr/imaging/lib/hdSt/Metal/mslProgram.h"
 //
 // Copyright 2016 Pixar
 //
@@ -34,12 +32,14 @@
 #include "pxr/imaging/hdSt/Metal/resourceMetal.h"
 #include "pxr/imaging/mtlf/mtlDevice.h"
 
+#include "pxr/imaging/hd/binding.h"
+
 #include <boost/shared_ptr.hpp>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
 class HdResourceRegistry;
-typedef boost::shared_ptr<class HdStMSLProgram> HdStMSLProgramSharedPtr;
+using HdStMSLProgramSharedPtr = std::shared_ptr<class HdStMSLProgram>;
 
 enum MSL_BindingType
 {
@@ -52,6 +52,7 @@ enum MSL_BindingType
     kMSL_BindingType_GSVertOutput    = (1 << 6),
     kMSL_BindingType_GSPrimOutput    = (1 << 7),
     kMSL_BindingType_DrawArgs        = (1 << 8),
+    kMSL_BindingType_FragExtras      = (1 << 9)
 };
 
 enum MSL_BuildTarget
@@ -165,23 +166,23 @@ public:
     virtual void UnsetProgram() override;
     
     HDST_API
-    virtual void DrawElementsInstancedBaseVertex(GLenum primitiveMode,
+    virtual void DrawElementsInstancedBaseVertex(int primitiveMode,
                                                  int indexCount,
-                                                 GLint indexType,
-                                                 GLint firstIndex,
-                                                 GLint instanceCount,
-                                                 GLint baseVertex) const override;
+                                                 int indexType,
+                                                 int firstIndex,
+                                                 int instanceCount,
+                                                 int baseVertex) const override;
 
     HDST_API
-    virtual void DrawArraysInstanced(GLenum primitiveMode,
-                                     GLint baseVertex,
-                                     GLint vertexCount,
-                                     GLint instanceCount) const override;
+    virtual void DrawArraysInstanced(int primitiveMode,
+                                     int baseVertex,
+                                     int vertexCount,
+                                     int instanceCount) const override;
     
     HDST_API
-    virtual void DrawArrays(GLenum primitiveMode,
-                            GLint baseVertex,
-                            GLint vertexCount) const override;
+    virtual void DrawArrays(int primitiveMode,
+                            int baseVertex,
+                            int vertexCount) const override;
     
     HDST_API
     BindingLocationMap const &GetBindingLocations() const {
@@ -202,19 +203,19 @@ public:
     HDST_API
     void UpdateUniformBinding(std::string const &name, int index);
 
-//    HDST_API
-//    id<MTLFunction> GetVertexFunction() const {
-//        return _vertexFunction;
-//    }
-//
-//    HDST_API
-//    id<MTLFunction> GetFragmentFunction() const {
-//        return _fragmentFunction;
-//    }
-//
     HDST_API
-    id<MTLFunction> GetComputeFunction(int gpuIndex) const {
-        return _computeFunction[gpuIndex];
+    id<MTLFunction> GetVertexFunction() const {
+        return _vertexFunction;
+    }
+
+    HDST_API
+    id<MTLFunction> GetFragmentFunction() const {
+        return _fragmentFunction;
+    }
+
+    HDST_API
+    id<MTLFunction> GetComputeFunction() const {
+        return _computeFunction;
     }
     
     HDST_API
@@ -235,12 +236,12 @@ protected:
 private:
     TfToken const _role;
     
-    id<MTLFunction> _vertexFunction[MAX_GPUS];
-    id<MTLFunction> _fragmentFunction[MAX_GPUS];
-    id<MTLFunction> _computeFunction[MAX_GPUS];
-    id<MTLFunction> _computeGeometryFunction[MAX_GPUS];
+    id<MTLFunction> _vertexFunction;
+    id<MTLFunction> _fragmentFunction;
+    id<MTLFunction> _computeFunction;
+    id<MTLFunction> _computeGeometryFunction;
     
-    id<MTLRenderPipelineState> _pipelineState[MAX_GPUS];
+    id<MTLRenderPipelineState> _pipelineState;
 
     bool _valid;
     HdStResourceMetal  _uniformBuffer;
@@ -254,6 +255,7 @@ private:
     int _gsPrimOutStructSize;
     int _drawArgsSlot;
     int _indicesSlot;
+    int _fragExtrasSlot;
     
     bool _currentlySet;
     mutable bool _reapplyIndexBuffer;

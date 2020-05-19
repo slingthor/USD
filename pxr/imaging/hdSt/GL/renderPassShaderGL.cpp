@@ -31,6 +31,7 @@
 #include "pxr/imaging/hd/renderBuffer.h"
 #include "pxr/imaging/hd/renderPassState.h"
 #include "pxr/imaging/hgiGL/texture.h"
+#include "pxr/imaging/hdSt/resourceBinder.h"
 #include "pxr/imaging/hdSt/package.h"
 #include "pxr/imaging/hdSt/GL/renderPassShaderGL.h"
 #include "pxr/imaging/hdSt/GL/glslProgram.h"
@@ -72,8 +73,7 @@ HdStRenderPassShaderGL::~HdStRenderPassShaderGL()
 // by \p program.
 static
 void
-_BindTexture(HdStProgram const &program,
-             const HdRenderPassAovBinding &aov,
+_BindTexture(const HdRenderPassAovBinding &aov,
              const HdBinding &binding)
 {
     if (binding.GetType() != HdBinding::TEXTURE_2D) {
@@ -92,8 +92,12 @@ _BindTexture(HdStProgram const &program,
 
     // Get texture from AOV's render buffer.
     const bool multiSampled = false;
-    HgiGLTexture * const texture = dynamic_cast<HgiGLTexture*>(
-        buffer->GetHgiTextureHandle(multiSampled));
+    VtValue rv = buffer->GetResource(multiSampled);
+    
+    HgiGLTexture * const texture = rv.IsHolding<HgiTextureHandle>() ?
+        dynamic_cast<HgiGLTexture*>(rv.Get<HgiTextureHandle>().Get()) :
+        nullptr;
+
     if (!texture) {
         TF_CODING_ERROR("When binding readback for aov '%s', AOV is not backed "
                         "by HgiGLTexture.", aov.aovName.GetString().c_str());
@@ -112,14 +116,6 @@ _BindTexture(HdStProgram const &program,
     glActiveTexture(GL_TEXTURE0 + samplerUnit);
     glBindTexture(GL_TEXTURE_2D, (GLuint) textureId);
     glBindSampler(samplerUnit, 0);
-
-    HdStGLSLProgram const &glslProgram(
-        dynamic_cast<HdStGLSLProgram const&>(program));
-    GLuint programId = glslProgram.GetGLProgram();
-
-    // Set uniform sampler2D to sampler unit.
-    glProgramUniform1i(programId, binding.GetLocation(),
-                       samplerUnit);
 }
 
 /*virtual*/
@@ -138,8 +134,7 @@ HdStRenderPassShaderGL::BindResources(HdStProgram const &program,
         const TfToken &aovName = aovBinding.aovName;
         if (_aovReadbackRequests.count(aovName) > 0) {
             // Bind the texture.
-            _BindTexture(program,
-                         aovBinding,
+            _BindTexture(aovBinding,
                          binder.GetBinding(_GetReadbackName(aovName)));
 
             numFulfilled++;

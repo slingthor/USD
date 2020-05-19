@@ -142,14 +142,14 @@ HdStMSLProgram::HdStMSLProgram(TfToken const &role)
 , _uniformBuffer(role)
 , _buildTarget(kMSL_BuildTarget_Regular)
 , _gsVertOutBufferSlot(-1), _gsPrimOutBufferSlot(-1), _gsVertOutStructSize(-1), _gsPrimOutStructSize(-1)
-, _drawArgsSlot(-1), _indicesSlot(-1)
+, _drawArgsSlot(-1), _indicesSlot(-1), _fragExtrasSlot(-1)
 {
     _currentlySet = false;
     _reapplyIndexBuffer = false;
-    memset(_vertexFunction, 0x00, sizeof(_vertexFunction));
-    memset(_fragmentFunction, 0x00, sizeof(_fragmentFunction));
-    memset(_computeFunction, 0x00, sizeof(_computeFunction));
-    memset(_computeGeometryFunction, 0x00, sizeof(_computeGeometryFunction));
+    _vertexFunction = 0;
+    _fragmentFunction = 0;
+    _computeFunction = 0;
+    _computeGeometryFunction = 0;
 }
 
 HdStMSLProgram::~HdStMSLProgram()
@@ -158,16 +158,14 @@ HdStMSLProgram::~HdStMSLProgram()
         delete (*it).second;
     _bindingMap.clear();
     
-    for (int i = 0; i < GPUState::gpuCount; i++) {
-        if (_vertexFunction[i])
-            [_vertexFunction[i] release];
-        if (_fragmentFunction[i])
-            [_fragmentFunction[i] release];
-        if (_computeFunction[i])
-            [_computeFunction[i] release];
-        if (_computeGeometryFunction[i])
-            [_computeGeometryFunction[i] release];
-    }
+    if (_vertexFunction)
+        [_vertexFunction release];
+    if (_fragmentFunction)
+        [_fragmentFunction release];
+    if (_computeFunction)
+        [_computeFunction release];
+    if (_computeGeometryFunction)
+        [_computeGeometryFunction release];
 }
 
 #if defined(GENERATE_METAL_DEBUG_SOURCE_CODE)
@@ -326,37 +324,35 @@ HdStMSLProgram::CompileShader(GLenum type,
         @"HD_MTL_FRAGMENTSHADER":(type==GL_FRAGMENT_SHADER)?@1:@0,
     };
 
-    for (int i = 0; i < context->renderDevices.count; i++) {
-        id<MTLLibrary> library = [context->renderDevices[i] newLibraryWithSource:@(shaderSource.c_str())
-                                                      options:options
-                                                        error:&error];
-        
-        // Load the function into the library
-        id <MTLFunction> function = [library newFunctionWithName:entryPoint];
-        if (!function) {
-            NSString *err = [error localizedDescription];
-            err = [err stringByReplacingOccurrencesOfString:@"error: use of undeclared identifier 'surfaceShader'" withString:@"redacted"];
-            NSUInteger loc = [err rangeOfString:@"error: "].location;
-            if (loc != NSNotFound) {
-                // XXX:validation
-                TF_WARN("Failed to compile shader (%s): \n%s",
-                        shaderType, [err UTF8String]);
-                filePostFix += "_Fail";
-            }
-            success = false;
+    id<MTLLibrary> library = [context->currentDevice newLibraryWithSource:@(shaderSource.c_str())
+                                                  options:options
+                                                    error:&error];
+    
+    // Load the function into the library
+    id <MTLFunction> function = [library newFunctionWithName:entryPoint];
+    if (!function) {
+        NSString *err = [error localizedDescription];
+        err = [err stringByReplacingOccurrencesOfString:@"error: use of undeclared identifier 'surfaceShader'" withString:@"redacted"];
+        NSUInteger loc = [err rangeOfString:@"error: "].location;
+        if (loc != NSNotFound) {
+            // XXX:validation
+            TF_WARN("Failed to compile shader (%s): \n%s",
+                    shaderType, [err UTF8String]);
+            filePostFix += "_Fail";
         }
-        
-        if (type == GL_VERTEX_SHADER) {
-            _vertexFunction[i] = function;
-        } else if (type == GL_FRAGMENT_SHADER) {
-            _fragmentFunction[i] = function;
-        } else if (type == GL_COMPUTE_SHADER) {
-            _computeFunction[i] = function;
-        } else if (type == GL_GEOMETRY_SHADER) {
-            _computeGeometryFunction[i] = function;
-        }
-        [library release];
+        success = false;
     }
+    
+    if (type == GL_VERTEX_SHADER) {
+        _vertexFunction = function;
+    } else if (type == GL_FRAGMENT_SHADER) {
+        _fragmentFunction = function;
+    } else if (type == GL_COMPUTE_SHADER) {
+        _computeFunction = function;
+    } else if (type == GL_GEOMETRY_SHADER) {
+        _computeGeometryFunction = function;
+    }
+    [library release];
 
     [options release];
     options = nil;
@@ -373,10 +369,10 @@ HdStMSLProgram::Link()
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
 
-    bool vertexFuncPresent = _vertexFunction[0] != nil;
-    bool fragmentFuncPresent = _fragmentFunction[0] != nil;
-    bool computeFuncPresent = _computeFunction[0] != nil;
-    bool computeGeometryFuncPresent = _computeGeometryFunction[0] != nil;
+    bool vertexFuncPresent = _vertexFunction != nil;
+    bool fragmentFuncPresent = _fragmentFunction != nil;
+    bool computeFuncPresent = _computeFunction != nil;
+    bool computeGeometryFuncPresent = _computeGeometryFunction != nil;
     
     if (computeFuncPresent && (vertexFuncPresent ^ fragmentFuncPresent)) {
         TF_CODING_ERROR("A compute shader can't be set with a vertex shader or fragment shader also set.");
@@ -401,6 +397,10 @@ HdStMSLProgram::Link()
             else if(binding._type == kMSL_BindingType_GSPrimOutput) _gsPrimOutBufferSlot = binding._index;
             else if(binding._type == kMSL_BindingType_UniformBuffer &&
                     binding._name == "indices") _indicesSlot = binding._index;
+        }
+        else if(binding._stage == kMSL_ProgramStage_Fragment) {
+            if(binding._type == kMSL_BindingType_FragExtras)
+                _fragExtrasSlot = binding._index;
         }
     }
 
@@ -541,16 +541,16 @@ void HdStMSLProgram::SetProgram(char const* const label) {
     
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
     
-    context->SetShadingPrograms(_vertexFunction[context->currentGPU],
-                                _fragmentFunction[context->currentGPU],
+    context->SetShadingPrograms(_vertexFunction,
+                                _fragmentFunction,
                                 (_buildTarget == kMSL_BuildTarget_MVA || _buildTarget == kMSL_BuildTarget_MVA_ComputeGS));
     
     if (_buildTarget == kMSL_BuildTarget_MVA_ComputeGS) {
-         context->SetGSProgram(_computeGeometryFunction[context->currentGPU]);
+         context->SetGSProgram(_computeGeometryFunction);
     }
     
     // Ignore a compute program being set as it will be provided directly to SetComputeEncoderState (may revisit later)
-    if (_computeFunction[context->currentGPU]) {
+    if (_computeFunction) {
         return;
     }
     
@@ -590,12 +590,12 @@ void HdStMSLProgram::UnsetProgram() {
 }
 
 
-void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
+void HdStMSLProgram::DrawElementsInstancedBaseVertex(int primitiveMode,
                                                      int indexCount,
-                                                     GLint indexType,
-                                                     GLint firstIndex,
-                                                     GLint instanceCount,
-                                                     GLint baseVertex) const {
+                                                     int indexType,
+                                                     int firstIndex,
+                                                     int instanceCount,
+                                                     int baseVertex) const {
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
     id<MTLBuffer> indexBuffer = context->GetIndexBuffer();
     const bool doMVAComputeGS = _buildTarget == kMSL_BuildTarget_MVA_ComputeGS;
@@ -663,6 +663,10 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
         maxThreadsPerThreadgroup = maxThreadsPerGroup;
     }
 
+    id<MTLTexture> texture = context->GetRenderPassDescriptor().colorAttachments[0].texture;
+    float renderTargetWidth = texture.width;
+    float renderTargetHeight = texture.height;
+    
     uint32_t partIndexOffset = 0;
     while(numPrimitives > 0) {
         uint32_t numPrimitivesInPart = MIN(numPrimitives, maxPrimitivesPerPart);
@@ -724,6 +728,13 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
             }
         }
         
+        //Setup Frag Extras on the render context
+        struct { float _renderTargetWidth, _renderTargetHeight; }
+        fragExtraArgs = { renderTargetWidth, renderTargetHeight };
+        [renderEncoder setFragmentBytes:(const void*)&fragExtraArgs
+                                 length:sizeof(fragExtraArgs)
+                                atIndex:_fragExtrasSlot];
+        
         if(doMVAComputeGS) {
             if (useDispatchThreads) {
                 [computeEncoder dispatchThreads:MTLSizeMake(numPrimitivesInPart, 1, 1)
@@ -783,13 +794,13 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
         partIndexOffset += numIndicesInPart;
     }
     
-    context->IncNumberPrimsDrawn((indexCount / 3) * instanceCount, false);
+    context->IncNumberPrimsDrawn((indexCount / vertsPerPrimitive) * instanceCount, false);
 }
 
-void HdStMSLProgram::DrawArraysInstanced(GLenum primitiveMode,
-                                          GLint baseVertex,
-                                          GLint vertexCount,
-                                          GLint instanceCount) const {
+void HdStMSLProgram::DrawArraysInstanced(int primitiveMode,
+                                         int baseVertex,
+                                         int vertexCount,
+                                         int instanceCount) const {
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
     context->SetIndexBuffer(context->GetTriListIndexBuffer(MTLIndexTypeUInt32, vertexCount / 3));
 
@@ -798,31 +809,11 @@ void HdStMSLProgram::DrawArraysInstanced(GLenum primitiveMode,
     _reapplyIndexBuffer = false;
 
     return;
-
-    MTLPrimitiveType primType = GetMetalPrimType(primitiveMode);
-    
-    // Possibly move this outside this function as we shouldn't need to get a render encoder every draw call
-    id <MTLRenderCommandEncoder> renderEncoder = context->GetRenderEncoder();
-    
-    const_cast<HdStMSLProgram*>(this)->BakeState();
-    
-    if (instanceCount == 1) {
-        [renderEncoder drawPrimitives:primType
-                          vertexStart:baseVertex
-                          vertexCount:vertexCount];
-    }
-    else {
-        [renderEncoder drawPrimitives:primType
-                          vertexStart:baseVertex
-                          vertexCount:vertexCount
-                        instanceCount:instanceCount];
-    }
-    context->ReleaseEncoder(false);
 }
 
-void HdStMSLProgram::DrawArrays(GLenum primitiveMode,
-                                GLint baseVertex,
-                                GLint vertexCount) const {
+void HdStMSLProgram::DrawArrays(int primitiveMode,
+                                int baseVertex,
+                                int vertexCount) const {
     
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
     
@@ -836,6 +827,11 @@ void HdStMSLProgram::DrawArrays(GLenum primitiveMode,
     [renderEncoder drawPrimitives:primType vertexStart:baseVertex vertexCount:vertexCount];
     
     context->ReleaseEncoder(false);
+    
+    bool const drawingQuads = (primitiveMode == GL_LINES_ADJACENCY);
+    uint32_t const vertsPerPrimitive = drawingQuads ? 4:3;
+
+    context->IncNumberPrimsDrawn(vertexCount / vertsPerPrimitive, false);
 }
 
 void HdStMSLProgram::BakeState()

@@ -124,7 +124,7 @@ HdStResourceFactoryGL::NewStripedInterleavedBuffer(
     size_t maxSize,
     TfToken const &garbageCollectionPerfToken) const
 {
-    return boost::make_shared<
+    return std::make_shared<
     HdStStripedInterleavedBufferGL>(role,
                                     bufferSpecs,
                                     usageHint,
@@ -216,7 +216,7 @@ HdBufferArraySharedPtr HdStResourceFactoryGL::NewVBOMemoryBuffer(
     HdBufferSpecVector const &bufferSpecs,
     HdBufferArrayUsageHint usageHint) const
 {
-    return boost::make_shared<HdStVBOMemoryBufferGL>(
+    return std::make_shared<HdStVBOMemoryBufferGL>(
                                 role, bufferSpecs, usageHint);
 }
 
@@ -225,7 +225,7 @@ HdBufferArraySharedPtr HdStResourceFactoryGL::NewVBOSimpleMemoryBuffer(
     HdBufferSpecVector const &bufferSpecs,
     HdBufferArrayUsageHint usageHint) const
 {
-    return boost::make_shared<HdStVBOSimpleMemoryBufferGL>(
+    return std::make_shared<HdStVBOSimpleMemoryBufferGL>(
                                 role, bufferSpecs, usageHint);
 }
 
@@ -263,13 +263,13 @@ HdStResourceFactoryGL::NewDomeLightComputationGPU(
 
 HdStRenderPassShaderSharedPtr HdStResourceFactoryGL::NewRenderPassShader() const
 {
-    return boost::make_shared<HdStRenderPassShaderGL>();
+    return std::make_shared<HdStRenderPassShaderGL>();
 }
 
 HdStRenderPassShaderSharedPtr HdStResourceFactoryGL::NewRenderPassShader(
     TfToken const &glslfxFile) const
 {
-    return boost::make_shared<HdStRenderPassShaderGL>(glslfxFile);
+    return std::make_shared<HdStRenderPassShaderGL>(glslfxFile);
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

@@ -62,7 +62,6 @@ PXR_NAMESPACE_CLOSE_SCOPE
 #include <algorithm>
 
 using std::string;
-using namespace boost;
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -105,7 +104,7 @@ GarchPtexTexture::_OnMemoryRequestedDirty()
 /* virtual */
 GarchTexture::BindingVector
 GarchPtexTexture::GetBindings(TfToken const & identifier,
-                              GarchSamplerGPUHandle samplerId)
+                              GarchSamplerGPUHandle const & samplerId)
 {
     if (!_loaded) {
         _ReadImage();

@@ -41,7 +41,7 @@
 typedef uint64_t GLuint64;
 #endif
 
-#if defined(ARCH_GFX_METAL)
+#if defined(PXR_METAL_SUPPORT_ENABLED)
 #include <Metal/Metal.h>
 #endif
 
@@ -61,94 +61,6 @@ TF_DECLARE_PUBLIC_TOKENS(GarchTextureTokens, GARCH_API, GARCH_TEXTURE_TOKENS);
 
 TF_DECLARE_WEAK_AND_REF_PTRS(GarchTexture);
 
-#if defined(ARCH_OS_IOS)
-#define MAX_GPUS    1
-#else
-#define MAX_GPUS    2 // Can't be bigger than the maximum number of GPUs in a MTLDevice peer group
-#endif
-
-struct GPUState {
-    static NSArray<id<MTLDevice>> *renderDevices;
-    static int gpuCount;
-    static int currentGPU;
-};
-
-struct MtlfMultiSampler {
-    
-    MtlfMultiSampler();
-    
-    MtlfMultiSampler(MTLSamplerDescriptor* samplerDescriptor);
-    
-    bool IsSet() const { return sampler[0] != nil; }
-    void Clear();
-    
-    void release();
-    
-    id<MTLSamplerState> forCurrentGPU() const {
-#if MAX_GPUS == 1
-        return sampler[0];
-#else
-        return sampler[GPUState::currentGPU];
-#endif
-    }
-    
-    id<MTLSamplerState> operator[](int64_t const index) const {
-        return sampler[index];
-    }
-    
-    bool operator==(MtlfMultiSampler const &other) const {
-        return other.sampler[0] == sampler[0];
-    }
-    
-    bool operator!=(MtlfMultiSampler const &other) const {
-        return other.sampler[0] != sampler[0];
-    }
-    
-    MtlfMultiSampler& operator=(const MtlfMultiSampler&);
-    
-    id<MTLSamplerState> sampler[MAX_GPUS];
-};
-
-struct MtlfMultiTexture {
-    
-    MtlfMultiTexture();
-    
-    MtlfMultiTexture(MTLTextureDescriptor* textureDescriptor);
-
-    bool IsSet() const { return texture[0] != nil; }
-    void Clear();
-    
-    void release();
-    
-    void Set(int index, id<MTLTexture> _texture) {
-        texture[index] = _texture;
-    }
-    
-    id<MTLTexture> forCurrentGPU() const {
-#if MAX_GPUS == 1
-        return texture[0];
-#else
-        return texture[GPUState::currentGPU];
-#endif
-    }
-    
-    id<MTLTexture> operator[](int64_t const index) const {
-        return texture[index];
-    }
-    
-    bool operator==(MtlfMultiTexture const &other) const {
-        return other.texture[0] == texture[0];
-    }
-    
-    bool operator!=(MtlfMultiTexture const &other) const {
-        return other.texture[0] != texture[0];
-    }
-    
-    MtlfMultiTexture& operator=(const MtlfMultiTexture&);
-
-    id<MTLTexture> texture[MAX_GPUS];
-};
-
 struct GarchTextureGPUHandle {
     
     ~GarchTextureGPUHandle() {}
@@ -157,15 +69,11 @@ struct GarchTextureGPUHandle {
     bool IsSet() const { return handle != 0; }
 
     GarchTextureGPUHandle() {
-#if defined(ARCH_GFX_METAL)
-        multiTexture.Clear();
-#else
         handle = NULL;
-#endif
     }
 
     // OpenGL
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     GarchTextureGPUHandle(GLuint const _handle) {
         handle = (void*)uint64_t(_handle);
     }
@@ -184,30 +92,14 @@ struct GarchTextureGPUHandle {
     operator GLuint64() const { return (GLuint64)uint64_t(handle); }
 #endif
     
-#if defined(ARCH_GFX_METAL)
+#if defined(PXR_METAL_SUPPORT_ENABLED)
     // Metal
-    GarchTextureGPUHandle(GarchTextureGPUHandle const & _gpuHandle) {
-        multiTexture = _gpuHandle.multiTexture;
-    }
-    GarchTextureGPUHandle(MtlfMultiTexture const & _multiTexture) {
-        multiTexture = _multiTexture;
-    }
-    GarchTextureGPUHandle& operator =(MtlfMultiTexture const _handle) {
-        multiTexture = _handle;
-        return *this;
-    }
-    operator MtlfMultiTexture() const { return multiTexture; }
+    GarchTextureGPUHandle(GarchTextureGPUHandle const & _gpuHandle);
+    GarchTextureGPUHandle(id<MTLTexture> _texture);
+    GarchTextureGPUHandle& operator =(id<MTLTexture> _texture);
+    operator id<MTLTexture>() const;
 #endif
 
-#if defined(ARCH_GFX_METAL)
-    bool operator==(GarchTextureGPUHandle const &other) const {
-        return other.multiTexture == multiTexture;
-    }
-    
-    bool operator!=(GarchTextureGPUHandle const &other) const {
-        return other.multiTexture != multiTexture;
-    }
-#else
     bool operator==(GarchTextureGPUHandle const &other) const {
         return other.handle == handle;
     }
@@ -215,25 +107,14 @@ struct GarchTextureGPUHandle {
     bool operator!=(GarchTextureGPUHandle const &other) const {
         return other.handle != handle;
     }
-#endif
 
     GarchTextureGPUHandle& operator=(const GarchTextureGPUHandle& rhs) {
-#if defined(ARCH_GFX_METAL)
-        multiTexture = rhs.multiTexture;
-#else
         handle = rhs.handle;
-#endif
         return *this;
     }
 
     // Storage
-    union {
-        void* handle;
-#if defined(ARCH_GFX_METAL)
-        MtlfMultiTexture multiTexture;
-#endif
-    };
-
+    void* handle;
 };
 
 struct GarchSamplerGPUHandle {
@@ -244,15 +125,11 @@ struct GarchSamplerGPUHandle {
     bool IsSet() const { return handle != 0; }
     
     GarchSamplerGPUHandle() {
-#if defined(ARCH_GFX_METAL)
-        multiSampler.Clear();
-#else
         handle = NULL;
-#endif
     }
 
     // OpenGL
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     GarchSamplerGPUHandle(GLuint const _handle) {
         handle = (void*)uint64_t(_handle);
     }
@@ -271,27 +148,14 @@ struct GarchSamplerGPUHandle {
     operator GLuint64() const { return (GLuint64)handle; }
 #endif
 
-#if defined(ARCH_GFX_METAL)
+#if defined(PXR_METAL_SUPPORT_ENABLED)
     // Metal
-    GarchSamplerGPUHandle(GarchSamplerGPUHandle const & _gpuHandle) {
-        multiSampler = _gpuHandle.multiSampler;
-    }
-    GarchSamplerGPUHandle& operator =(MtlfMultiSampler const _handle) {
-        multiSampler = _handle;
-        return *this;
-    }
-    operator MtlfMultiSampler() const { return multiSampler; }
+    GarchSamplerGPUHandle(GarchSamplerGPUHandle const & _gpuHandle);
+    GarchSamplerGPUHandle(id<MTLSamplerState> _sampler);
+    GarchSamplerGPUHandle& operator =(id<MTLSamplerState> _sampler);
+    operator id<MTLSamplerState>() const;
 #endif
     
-#if defined(ARCH_GFX_METAL)
-    bool operator==(GarchSamplerGPUHandle const &other) const {
-        return other.multiSampler == multiSampler;
-    }
-    
-    bool operator!=(GarchSamplerGPUHandle const &other) const {
-        return other.multiSampler != multiSampler;
-    }
-#else
     bool operator==(GarchSamplerGPUHandle const &other) const {
         return other.handle == handle;
     }
@@ -299,24 +163,14 @@ struct GarchSamplerGPUHandle {
     bool operator!=(GarchSamplerGPUHandle const &other) const {
         return other.handle != handle;
     }
-#endif
     
     GarchSamplerGPUHandle& operator=(const GarchSamplerGPUHandle& rhs) {
-#if defined(ARCH_GFX_METAL)
-        multiSampler = rhs.multiSampler;
-#else
         handle = rhs.handle;
-#endif
         return *this;
     }
 
     // Storage
-    union {
-        void* handle;
-#if defined(ARCH_GFX_METAL)
-        MtlfMultiSampler multiSampler;
-#endif
-    };
+    void* handle;
 };
 
 /// \class GarchTexture
@@ -338,7 +192,8 @@ public:
     ///
     struct Binding {
         Binding(TfToken name, TfToken role, GLenum target,
-                GarchTextureGPUHandle textureId, GarchSamplerGPUHandle samplerId)
+                GarchTextureGPUHandle const& textureId,
+                GarchSamplerGPUHandle const& samplerId)
             : name(name)
             , role(role)
             , target(target)
@@ -360,7 +215,7 @@ public:
     /// named \a identifier. If \a samplerId is specified, the bindings
     /// returned will use this samplerId for resources which can be sampled.
     virtual BindingVector GetBindings(TfToken const & identifier,
-                                      GarchSamplerGPUHandle samplerId = GarchSamplerGPUHandle()) = 0;
+                                      GarchSamplerGPUHandle const & samplerId = GarchSamplerGPUHandle()) = 0;
 
     /// Amount of memory used to store the texture
     GARCH_API
@@ -405,6 +260,11 @@ public:
 
     GARCH_API
     bool IsOriginLowerLeft() const;
+    
+    /// An opportunity to throw out unused textures if this is
+    /// a container for textures.
+    GARCH_API
+    virtual void GarbageCollect();
 
 protected:
     GARCH_API

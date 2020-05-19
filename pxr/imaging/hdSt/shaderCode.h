@@ -31,30 +31,42 @@
 
 #include "pxr/imaging/hdSt/api.h"
 #include "pxr/imaging/hdSt/program.h"
-#include "pxr/imaging/hdSt/resourceBinder.h"  // XXX: including a private class
-
-#include "pxr/imaging/hd/materialParam.h"
+#include "pxr/imaging/hd/enums.h"
 #include "pxr/imaging/hd/version.h"
+
+#include "pxr/usd/sdf/path.h"
 
 #include "pxr/base/tf/token.h"
 
-#include <boost/shared_ptr.hpp>
-
+#include <memory>
 #include <string>
 #include <vector>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
 
-typedef std::vector<class HdBindingRequest> HdBindingRequestVector;
+using HdBindingRequestVector = std::vector<class HdBindingRequest>;
 
-typedef boost::shared_ptr<class HdStShaderCode> HdStShaderCodeSharedPtr;
-typedef std::vector<HdStShaderCodeSharedPtr> HdStShaderCodeSharedPtrVector;
+using HdStShaderCodeSharedPtr =
+    std::shared_ptr<class HdStShaderCode>;
+using HdStShaderCodeSharedPtrVector =
+    std::vector<HdStShaderCodeSharedPtr>;
 
-typedef boost::shared_ptr<class HdStTextureResourceHandle>
-                HdStTextureResourceHandleSharedPtr;
+using HdStTextureResourceHandleSharedPtr =
+    std::shared_ptr<class HdStTextureResourceHandle>;
+using HdSt_MaterialParamVector =
+    std::vector<class HdSt_MaterialParam>;
+using HdBufferSourceSharedPtr =
+    std::shared_ptr<class HdBufferSource>;
+using HdBufferSourceSharedPtrVector =
+    std::vector<HdBufferSourceSharedPtr>;
+using HdBufferArrayRangeSharedPtr =
+    std::shared_ptr<class HdBufferArrayRange>;
+using HdStTextureHandleSharedPtr =
+    std::shared_ptr<class HdStTextureHandle>;
 
 class HdRenderPassState;
+class HdSt_ResourceBinder;
 
 
 /// \class HdStShaderCode
@@ -64,7 +76,8 @@ class HdRenderPassState;
 ///
 /// This interface provides a simple way for clients to affect the
 /// composition of shading programs used for a render pass.
-class HdStShaderCode {
+class HdStShaderCode : public std::enable_shared_from_this<HdStShaderCode>
+{
 public:
     typedef size_t ID;
 
@@ -73,12 +86,30 @@ public:
     HDST_API
     virtual ~HdStShaderCode();
 
-    /// Returns the hash value of this shader.
+    /// Returns the hash value of the shader code and configuration.
+    ///
+    /// It is computed from the the GLSL code as well as the resource
+    /// signature of the shader (as determined from its parameters).
+    /// If two shaders have the same hash, the GLSL code as expanded
+    /// by codegen should also be the same.
+    /// 
     virtual ID ComputeHash() const = 0;
 
     /// Returns the combined hash values of multiple shaders.
     HDST_API
     static ID ComputeHash(HdStShaderCodeSharedPtrVector const &shaders);
+
+    /// Returns the hash value of the paths of the texture prims
+    /// consumed by this shader.
+    ///
+    /// Unless textures are bindless, shaders using different textures
+    /// cannot be used in the same draw batch. Since textures can be
+    /// animated, it can happen that two texture prims use the same
+    /// texture at some time but different textures at other times. To
+    /// avoid re-computing the draw batches over time, we use the this
+    /// hash when grouping the draw batches.
+    ///
+    virtual ID ComputeTextureSourceHash() const;
 
     /// Returns the shader source provided by this shader
     /// for \a shaderStageKey
@@ -87,7 +118,7 @@ public:
     // XXX: Should be pure-virtual
     /// Returns the shader parameters for this shader.
     HDST_API
-    virtual HdMaterialParamVector const& GetParams() const;
+    virtual HdSt_MaterialParamVector const& GetParams() const;
 
     /// Returns whether primvar filtering is enabled for this shader.
     HDST_API
@@ -97,19 +128,73 @@ public:
     HDST_API
     virtual TfTokenVector const& GetPrimvarNames() const;
 
+    ///
+    /// \name Old texture system
+    /// @{
     struct TextureDescriptor {
         TfToken name;
         HdStTextureResourceHandleSharedPtr handle;
         GarchSamplerGPUHandle sampler;
-        enum { TEXTURE_2D, TEXTURE_3D, TEXTURE_UDIM_ARRAY, TEXTURE_UDIM_LAYOUT,
+        enum { TEXTURE_2D, TEXTURE_FIELD,
+               TEXTURE_UDIM_ARRAY, TEXTURE_UDIM_LAYOUT,
                TEXTURE_PTEX_TEXEL, TEXTURE_PTEX_LAYOUT };
         int type;
+        SdfPath textureSourcePath;
     };
     typedef std::vector<TextureDescriptor> TextureDescriptorVector;
 
     // XXX: DOC
     HDST_API
     virtual TextureDescriptorVector GetTextures() const;
+
+    /// @}
+
+    ///
+    /// \name New texture system
+    /// @{
+
+    /// The old texture system relied on the scene delegate to load
+    /// textures. This system will soon be deprecated (including
+    /// HdTextureResource and HdSceneDelegate::GetTextureResource) in
+    /// favor of a new system where the render delegate is loading
+    /// textures (by allocating HdStTextureHandle).
+
+    /// During the transition period, both, HdTextureResource and
+    /// HdStTextureHandle can be used at the same time by populating
+    /// both GetTextures() and GetNamedTextureHandles() - in
+    /// particular, we can use the new texture system for texture
+    /// types that it already supports and keep using the old
+    /// texture system for the unsupported texture types.
+
+    /// Information necessary to bind textures and create accessor
+    /// for the texture.
+    ///
+    struct NamedTextureHandle {
+        /// Name by which the texture will be accessed, i.e., the name
+        /// of the accesor for thexture will be HdGet_name(...).
+        ///
+        TfToken name;
+        /// Equal to handle->GetTextureObject()->GetTextureType().
+        /// Saved here for convenience (note that name and type
+        /// completely determine the creation of the texture accesor
+        /// HdGet_name(...)).
+        ///
+        HdTextureType type;
+        /// The texture.
+        HdStTextureHandleSharedPtr handle;
+
+        /// The path of the corresponding texture prim - used to
+        /// compute the hash for draw batches when not using bindless textures.
+        SdfPath textureSourcePath;
+    };
+    using NamedTextureHandleVector = std::vector<NamedTextureHandle>;
+
+    /// Textures that need to be bound for this shader.
+    ///
+    HDST_API
+    virtual NamedTextureHandleVector const & GetNamedTextureHandles() const;
+
+    /// @}
 
     // XXX: Should be pure-virtual
     /// Returns a buffer which stores parameter fallback values and texture
@@ -139,6 +224,27 @@ public:
     /// token is returned.
     HDST_API
     virtual TfToken GetMaterialTag() const;
+
+    using BarAndSources = std::pair<HdBufferArrayRangeSharedPtr,
+                                    HdBufferSourceSharedPtrVector>;
+
+    /// This function is called after textures have been allocated and loaded
+    /// to return buffer sources that require texture meta data not
+    /// available until the texture is allocated or loaded. For example, the
+    /// OpenGl texture sampler handle (in the bindless case) is not available
+    /// until after the texture commit phase.
+    ///
+    /// Note: this can be simplified and just return an
+    /// HdBufferSourceSharedPtrVector intended for the shader bar
+    /// instead of returning buffer sources that are intended for
+    /// other bars as well.  The impediment is that the points of a
+    /// volume are in a different bar and dependent on the loading the
+    /// textures. This could be overcome if the vertex shader could
+    /// access the shader parameters and compute the points from the
+    /// bounding box corners and transform.
+    HDST_API
+    virtual std::vector<BarAndSources>
+    ComputeBufferSourcesFromTextures() const;
 
 private:
 

@@ -36,7 +36,7 @@
 #include "pxr/base/tf/token.h"
 #include "pxr/base/tf/weakBase.h"
 
-#if defined(ARCH_GFX_METAL)
+#if defined(PXR_METAL_SUPPORT_ENABLED)
 #include <Metal/Metal.h>
 #endif
 
@@ -66,7 +66,7 @@ struct GarchProgramGPUHandle {
     }
     operator GLuint() const { return (GLuint)handle; }
 
-#if defined(ARCH_GFX_METAL)
+#if defined(PXR_METAL_SUPPORT_ENABLED)
     // Metal
     GarchProgramGPUHandle(id<MTLFunction> const _handle) {
         handle = (__bridge uint64_t)_handle;

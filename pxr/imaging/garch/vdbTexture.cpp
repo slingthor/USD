@@ -25,6 +25,7 @@
 // 
 
 #include "pxr/imaging/garch/vdbTexture.h"
+#include "pxr/imaging/garch/vdbTextureContainer.h"
 #ifdef PXR_OPENVDB_SUPPORT_ENABLED
 #include "pxr/imaging/garch/vdbTextureData.h"
 #else
@@ -36,23 +37,12 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-TF_REGISTRY_FUNCTION(TfType)
-{
-    using Type = GarchVdbTexture;
-    TfType t = TfType::Define<Type, TfType::Bases<GarchBaseTexture> >();
-    t.SetFactory< GarchTextureFactory<GarchVdbTexture> >();
-}
-
 GarchVdbTextureRefPtr
-GarchVdbTexture::New(TfToken const &filePath)
+GarchVdbTexture::New(
+    GarchVdbTextureContainerRefPtr const &textureContainer,
+    TfToken const &gridName)
 {
-    return GarchResourceFactory::GetInstance()->NewVdbTexture(filePath);
-}
-
-GarchVdbTextureRefPtr
-GarchVdbTexture::New(std::string const &filePath)
-{
-    return New(TfToken(filePath));
+    return TfCreateRefPtr(new GarchVdbTexture(textureContainer, gridName));
 }
 
 int
@@ -62,10 +52,10 @@ GarchVdbTexture::GetNumDimensions() const
 }
 
 GarchVdbTexture::GarchVdbTexture(
-    GarchBaseTexture *baseTexture, TfToken const &filePath)
-    : GarchBaseTexture()
-    , _baseTexture(baseTexture)
-    , _filePath(filePath)
+    GarchVdbTextureContainerRefPtr const &textureContainer,
+    TfToken const &gridName)
+    : _textureContainer(textureContainer)
+    , _gridName(gridName)
 {
 }
 
@@ -74,7 +64,7 @@ GarchVdbTexture::GetTextureInfo(bool forceLoad)
 {
     VtDictionary info = GarchBaseTexture::GetTextureInfo(forceLoad);
 
-    info["imageFilePath"] = _filePath;
+    info["imageFilePath"] = _textureContainer->GetFilePath().GetString();
 
     return info;
 }
@@ -92,7 +82,10 @@ GarchVdbTexture::_ReadTexture()
 #ifdef PXR_OPENVDB_SUPPORT_ENABLED
 
     GarchVdbTextureDataRefPtr const texData =
-        GarchVdbTextureData::New(_filePath, GetMemoryRequested());
+        GarchVdbTextureData::New(
+            _textureContainer->GetFilePath().GetString(),
+            _gridName,
+            GetMemoryRequested());
 
     if (texData) {
         texData->Read(0, _GenerateMipmap());

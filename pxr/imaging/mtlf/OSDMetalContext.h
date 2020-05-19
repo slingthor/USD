@@ -53,7 +53,8 @@ public:
 #endif
     
 };
-#endif
-#endif // MTLF_MTLOSD_H
 
 PXR_NAMESPACE_CLOSE_SCOPE
+
+#endif
+#endif // MTLF_MTLOSD_H

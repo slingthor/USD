@@ -42,9 +42,10 @@ GarchSimpleLight::GarchSimpleLight(GfVec4f const & position) :
     _shadowResolution(512),
     _shadowBias(0.0),
     _shadowBlur(0.0),
-    _shadowIndex(0),
+    _shadowIndexStart(0),
+    _shadowIndexEnd(0),
     _transform(GfMatrix4d().SetIdentity()),
-    _shadowMatrix(GfMatrix4d().SetIdentity()),
+    _shadowMatrices(std::vector<GfMatrix4d>(1, GfMatrix4d().SetIdentity())),
     _isDomeLight(false),
     _id()
 {
@@ -220,27 +221,39 @@ GarchSimpleLight::SetShadowBlur(float blur)
 }
 
 int
-GarchSimpleLight::GetShadowIndex() const
+GarchSimpleLight::GetShadowIndexStart() const
 {
-    return _shadowIndex;
+    return _shadowIndexStart;
 }
 
 void
-GarchSimpleLight::SetShadowIndex(int index)
+GarchSimpleLight::SetShadowIndexStart(int shadowStart)
 {
-    _shadowIndex = index;
+    _shadowIndexStart = shadowStart;
 }
 
-GfMatrix4d const &
-GarchSimpleLight::GetShadowMatrix() const
+int
+GarchSimpleLight::GetShadowIndexEnd() const
 {
-    return _shadowMatrix;
+    return _shadowIndexEnd;
 }
 
 void
-GarchSimpleLight::SetShadowMatrix(GfMatrix4d const & matrix)
+GarchSimpleLight::SetShadowIndexEnd(int shadowEnd)
 {
-    _shadowMatrix = matrix;
+    _shadowIndexEnd = shadowEnd;
+}
+
+std::vector<GfMatrix4d> const &
+GarchSimpleLight::GetShadowMatrices() const
+{
+    return _shadowMatrices;
+}
+
+void
+GarchSimpleLight::SetShadowMatrices(std::vector<GfMatrix4d> const & matrices)
+{
+    _shadowMatrices = matrices;
 }
 
 bool
@@ -357,9 +370,10 @@ GarchSimpleLight::operator==(const GarchSimpleLight& other) const
         &&  _shadowResolution == other._shadowResolution
         &&  _shadowBias == other._shadowBias
         &&  _shadowBlur == other._shadowBlur
-        &&  _shadowIndex == other._shadowIndex
+        &&  _shadowIndexStart == other._shadowIndexStart
+        &&  _shadowIndexEnd == other._shadowIndexEnd
         &&  _transform == other._transform
-        &&  _shadowMatrix == other._shadowMatrix
+        &&  _shadowMatrices == other._shadowMatrices
         &&  _isCameraSpaceLight == other._isCameraSpaceLight
         &&  _isDomeLight == other._isDomeLight
         &&  _irradianceId == other._irradianceId
@@ -390,16 +404,18 @@ std::ostream& operator<<(std::ostream& out, const GarchSimpleLight& v)
         << v._hasShadow
         << v._shadowResolution
         << v._shadowBias
-        << v._shadowBlur
-        << v._shadowIndex
+        << v._shadowIndexStart
+        << v._shadowIndexEnd
         << v._transform
-        << v._shadowMatrix
         << v._isCameraSpaceLight
         << v._isDomeLight
         << (uint64_t)v._irradianceId.handle
         << (uint64_t)v._prefilterId.handle
         << (uint64_t)v._brdfId.handle
         << v._id;
+    for (auto const& m : v._shadowMatrices) {
+        out << m;
+    }
     return out;
 }
 

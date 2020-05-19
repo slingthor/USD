@@ -65,20 +65,25 @@ public:
                 // shader parameter bindings
                 FALLBACK,             // fallback value
                 TEXTURE_2D,           // non-bindless uv texture
-                TEXTURE_3D,
+                TEXTURE_FIELD,        // non-bindless field texture
+                                      // creates accessor that samples uvw
+                                      // texture after transforming coordinates
+                                      // by a sampling transform
                 TEXTURE_UDIM_ARRAY,   // non-bindless udim texture array
                 TEXTURE_UDIM_LAYOUT,  // non-bindless udim layout
                 TEXTURE_PTEX_TEXEL,   // non-bindless ptex texels
                 TEXTURE_PTEX_LAYOUT,  // non-bindless ptex layout
                 BINDLESS_TEXTURE_2D,          // bindless uv texture
-                BINDLESS_TEXTURE_3D,
+                BINDLESS_TEXTURE_FIELD,       // bindless field texture
+                                              // (see above)
                 BINDLESS_TEXTURE_UDIM_ARRAY,  // bindless uv texture array
                 BINDLESS_TEXTURE_UDIM_LAYOUT, // bindless udim layout
                 BINDLESS_TEXTURE_PTEX_TEXEL,  // bindless ptex texels
                 BINDLESS_TEXTURE_PTEX_LAYOUT, // bindless ptex layout
                 PRIMVAR_REDIRECT,    // primvar redirection
-                FIELD_REDIRECT,  // accesses 3d texture with potential
-                                // transform and fallback under different name
+                FIELD_REDIRECT,      // accesses a field texture by name and
+                                     // uses fallbackValue if no accessor for
+                                     // the texture exists.
                 VERTEX_ID,           // vertex ID
                 BASE_VERTEX_ID,      // base vertex ID
                 FRONT_FACING,        // boolean indicating if fragment belongs to a front-facing primitive
@@ -236,9 +241,13 @@ public:
         return _resource;
     }
     /// Returns the resource or buffer array range offset, defaults to zero.
-    int GetOffset() const {
+    int GetByteOffset() const {
+        // buffer resource binding
         if (_resource) return _resource->GetOffset();
-        if (_bar) return _bar->GetOffset();
+
+        // named struct binding (interleaved) - the resource name doesn't matter
+        // since a single binding point is used.
+        if (_bar) return _bar->GetByteOffset(TfToken());
         return 0;
     }
     /// Returns the buffer array range associated with this binding request or

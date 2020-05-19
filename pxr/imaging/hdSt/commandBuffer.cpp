@@ -28,6 +28,7 @@
 
 #include "pxr/imaging/mtlf/drawTarget.h"
 #include "pxr/imaging/mtlf/mtlDevice.h"
+#include "pxr/imaging/hgiMetal/hgi.h"
 
 #include "pxr/imaging/hdSt/commandBuffer.h"
 #include "pxr/imaging/hdSt/debugCodes.h"
@@ -36,6 +37,7 @@
 #include "pxr/imaging/hdSt/indirectDrawBatch.h"
 #include "pxr/imaging/hdSt/resourceFactory.h"
 #include "pxr/imaging/hdSt/resourceRegistry.h"
+#include "pxr/imaging/hdSt/materialParam.h"
 
 #include "pxr/imaging/hd/bufferArrayRange.h"
 #include "pxr/imaging/hd/perfLog.h"
@@ -145,11 +147,11 @@ HdStCommandBuffer::ExecuteDraw(
 
             if (context->GeometryShadersActive()) {
                 // Complete the GS command buffer if we have one
-                context->CommitCommandBufferForThread(false, false, METALWORKQUEUE_GEOMETRY_SHADER);
+                context->CommitCommandBufferForThread(false, METALWORKQUEUE_GEOMETRY_SHADER);
             }
 
             if (context->GetWorkQueue(METALWORKQUEUE_DEFAULT).commandBuffer != nil) {
-                context->CommitCommandBufferForThread(false, false);
+                context->CommitCommandBufferForThread(false);
 
                 context->EndFrameForThread();
             }
@@ -178,11 +180,11 @@ HdStCommandBuffer::ExecuteDraw(
             
             if (context->GeometryShadersActive()) {
                 // Complete the GS command buffer if we have one
-                context->CommitCommandBufferForThread(false, false, METALWORKQUEUE_GEOMETRY_SHADER);
+                context->CommitCommandBufferForThread(false, METALWORKQUEUE_GEOMETRY_SHADER);
             }
             
             if (context->GetWorkQueue(METALWORKQUEUE_DEFAULT).commandBuffer != nil) {
-                context->CommitCommandBufferForThread(false, false);
+                context->CommitCommandBufferForThread(false);
                 
                 context->EndFrameForThread();
             }
@@ -214,11 +216,11 @@ HdStCommandBuffer::ExecuteDraw(
                 
                 if (context->GeometryShadersActive()) {
                     // Complete the GS command buffer if we have one
-                    context->CommitCommandBufferForThread(false, false, METALWORKQUEUE_GEOMETRY_SHADER);
+                    context->CommitCommandBufferForThread(false, METALWORKQUEUE_GEOMETRY_SHADER);
                 }
                 
                 if (context->GetWorkQueue(METALWORKQUEUE_DEFAULT).commandBuffer != nil) {
-                    context->CommitCommandBufferForThread(false, false);
+                    context->CommitCommandBufferForThread(false);
                     
                     context->EndFrameForThread();
                 }
@@ -230,20 +232,14 @@ HdStCommandBuffer::ExecuteDraw(
         }
     };
 
-    bool setAlpha = false;
-
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
     MTLRenderPassDescriptor *renderPassDescriptor = context->GetRenderPassDescriptor();
     
+    bool mtBatchDrawing = true;
+
     // Create a new command buffer for each render pass to the current drawable
     if (renderPassDescriptor.colorAttachments[0].loadAction == MTLLoadActionClear) {
-        id <MTLCommandBuffer> commandBuffer = [context->gpus[context->currentGPU].commandQueue commandBuffer];
-        if (TF_DEV_BUILD) {
-            commandBuffer.label = @"Clear";
-        }
-        id <MTLRenderCommandEncoder> renderEncoder =
-            [commandBuffer renderCommandEncoderWithDescriptor:renderPassDescriptor];
-        [renderEncoder endEncoding];
+        id <MTLCommandBuffer> commandBuffer = context->GetHgi()->GetCommandBuffer();
         int frameNumber = context->GetCurrentFrame();
         [commandBuffer addScheduledHandler:^(id<MTLCommandBuffer> buffer)
          {
@@ -253,26 +249,26 @@ HdStCommandBuffer::ExecuteDraw(
         {
            context->GPUTimerEndTimer(frameNumber);
         }];
-        [commandBuffer commit];
 
         int numAttachments = 1;
-        
         if (context->GetDrawTarget()) {
             numAttachments = context->GetDrawTarget()->GetAttachments().size();
         }
-        else
-            setAlpha = true;
 
-        renderPassDescriptor.depthAttachment.loadAction = MTLLoadActionLoad;
-        renderPassDescriptor.stencilAttachment.loadAction = MTLLoadActionLoad;
+        if (context->GetHgi()->BeginMtlf()) {
+            renderPassDescriptor.depthAttachment.loadAction = MTLLoadActionLoad;
+            renderPassDescriptor.stencilAttachment.loadAction = MTLLoadActionLoad;
 
-        for (int i = 0; i < numAttachments; i++) {
-            renderPassDescriptor.colorAttachments[i].loadAction = MTLLoadActionLoad;
+            for (int i = 0; i < numAttachments; i++) {
+                renderPassDescriptor.colorAttachments[i].loadAction = MTLLoadActionLoad;
+            }
+        }
+        else {
+            mtBatchDrawing = false;
         }
     }
 
     uint64_t timeStart = ArchGetTickTime();
-    static bool mtBatchDrawing = true;
 
     static os_log_t encodingLog = os_log_create("hydra.metal", "Drawing");
     os_signpost_id_t issueEncoding = os_signpost_id_generate(encodingLog);
@@ -449,8 +445,9 @@ HdStCommandBuffer::_RebuildDrawBatches()
 
     HD_PERF_COUNTER_INCR(HdPerfTokens->rebuildBatches);
 
-    bool bindlessTexture = GarchResourceFactory::GetInstance()->GetContextCaps()
-                                               .bindlessTextureEnabled;
+    bool const bindlessTexture =
+        GarchResourceFactory::GetInstance()->
+            GetContextCaps().bindlessTextureEnabled;
 
     // Use a cheap bucketing strategy to reduce to number of comparison tests
     // required to figure out if a draw item can be batched.
@@ -491,10 +488,15 @@ HdStCommandBuffer::_RebuildDrawBatches()
         boost::hash_combine(key, drawItem->GetBufferArraysHash());
         if (!bindlessTexture) {
             // Geometric, RenderPass and Lighting shaders should never break
-            // batches, however materials can. We consider the material 
-            // parameters to be part of the batch key here for that reason.
-            boost::hash_combine(key, HdMaterialParam::ComputeHash(
-                            drawItem->GetMaterialShader()->GetParams()));
+            // batches, however materials can. We consider the textures
+            // used by the material to be part of the batch key for that
+            // reason.
+            // Since textures can be animated and thus materials can be batched
+            // at some times but not other times, we use the texture prim path
+            // for the hash which does not vary over time.
+            // 
+            boost::hash_combine(
+                key, drawItem->GetMaterialShader()->ComputeTextureSourceHash());
         }
 
         // Do a quick check to see if the draw item can be batched with the
@@ -597,9 +599,19 @@ HdStCommandBuffer::SyncDrawItemVisibility(unsigned visChangeCount)
 
 static std::atomic_ulong primCount;
 void
-HdStCommandBuffer::FrustumCull(GfMatrix4d const &viewProjMatrix)
+HdStCommandBuffer::FrustumCull(
+    GfMatrix4d const &viewProjMatrix,
+    float renderTargetWidth,
+    float renderTargetHeight)
 {
     HD_TRACE_FUNCTION();
+    
+    const bool
+    skipCull = false;
+    
+    if (skipCull) {
+        return;
+    }
     
     const bool
     mtCullingDisabled = TfDebug::IsEnabled(HDST_DISABLE_MULTITHREADED_CULLING);
@@ -608,9 +620,14 @@ HdStCommandBuffer::FrustumCull(GfMatrix4d const &viewProjMatrix)
     
     static vector_float2 dimensions;
 
-    MTLRenderPassDescriptor *rpd = MtlfMetalContext::GetMetalContext()->GetRenderPassDescriptor();
-    dimensions.x = 4.0f / float(rpd.colorAttachments[0].texture.width);
-    dimensions.y = 4.0f / float(rpd.colorAttachments[0].texture.height);
+    // Temp workaround for selection rendertargets being small, and small object
+    // culling resulting in object selection not working
+    if (renderTargetWidth <= 256 && renderTargetHeight <= 256) {
+        renderTargetWidth = 2048;
+        renderTargetHeight = 2048;
+    }
+    dimensions.x = 4.0f / renderTargetWidth;
+    dimensions.y = 4.0f / renderTargetHeight;
     
     MtlfMetalContext::GetMetalContext()->PrepareBufferFlush();
     

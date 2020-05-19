@@ -81,7 +81,7 @@ public:
 
     GARCH_API
     virtual BindingVector GetBindings(TfToken const & identifier,
-                                      GarchSamplerGPUHandle samplerName) override = 0;
+                                      GarchSamplerGPUHandle const & samplerName) override = 0;
 
     GARCH_API
     virtual VtDictionary GetTextureInfo(bool forceLoad) override;

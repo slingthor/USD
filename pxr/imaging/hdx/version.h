@@ -28,6 +28,8 @@
 // 2  -> 3 : move simpleLightingShader to Hdx.
 // 3  -> 4 : move camera and light to Hdx.
 // 4  -> 5 : move drawTarget to Hdx.
-#define HDX_API_VERSION  5
+// 5  -> 6 : change HdxShadowMatrixComputation signature.
+// 6  -> 7 : make HdxShadowMatrixComputationSharedPtr std::shared_ptr instead of boost::shared_ptr
+#define HDX_API_VERSION  7
 
 #endif // PXR_IMAGING_HDX_VERSION_H

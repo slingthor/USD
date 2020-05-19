@@ -28,7 +28,7 @@
 
 #include "pxr/base/arch/defines.h"
 
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
 #include <GL/glew.h>
 #endif
 

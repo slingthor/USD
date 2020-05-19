@@ -22,19 +22,19 @@
 # language governing permissions and limitations under the Apache License.
 #
 
-from qt import QtCore
+from .qt import QtCore
 from pxr import UsdGeom, Sdf
 from pxr.UsdAppUtils.complexityArgs import RefinementComplexities
 
-from common import (RenderModes, ColorCorrectionModes, PickModes, 
-                    SelectionHighlightModes, CameraMaskModes, 
-                    PrintWarning)
+from .common import (RenderModes, ColorCorrectionModes, PickModes, 
+                     SelectionHighlightModes, CameraMaskModes, 
+                     PrintWarning)
 
-import settings2
-from settings2 import StateSource
-from constantGroup import ConstantGroup
-from freeCamera import FreeCamera
-from common import ClearColors, HighlightColors
+from . import settings2
+from .settings2 import StateSource
+from .constantGroup import ConstantGroup
+from .freeCamera import FreeCamera
+from .common import ClearColors, HighlightColors
 
 
 # Map of clear color names to rgba color tuples.
@@ -42,8 +42,7 @@ _CLEAR_COLORS_DICT = {
     ClearColors.BLACK:       (0.0, 0.0, 0.0, 0.0),
     ClearColors.DARK_GREY:   (0.3, 0.3, 0.3, 0.0),
     ClearColors.LIGHT_GREY:  (0.7, 0.7, 0.7, 0.0),
-    ClearColors.WHITE:       (1.0, 1.0, 1.0, 0.0),
-    ClearColors.DEMO_BLUE:   (0.463, 0.635, 0.882, 0.0)}
+    ClearColors.WHITE:       (1.0, 1.0, 1.0, 0.0)}
 
 
 # Map of highlight color names to rgba color tuples.
@@ -89,6 +88,9 @@ class ViewSettingsDataModel(QtCore.QObject, StateSource):
     # emitted when any aspect of the defaultMaterial changes
     signalDefaultMaterialChanged = QtCore.Signal()
 
+    # emitted when any setting affecting the GUI style changes
+    signalStyleSettingsChanged = QtCore.Signal()
+
     def __init__(self, rootDataModel, parent):
         QtCore.QObject.__init__(self)
         StateSource.__init__(self, parent, "model")
@@ -101,6 +103,7 @@ class ViewSettingsDataModel(QtCore.QObject, StateSource):
         self._defaultMaterialSpecular = self.stateProperty("defaultMaterialSpecular", default=DEFAULT_SPECULAR)
         self._redrawOnScrub = self.stateProperty("redrawOnScrub", default=True)
         self._renderMode = self.stateProperty("renderMode", default=RenderModes.SMOOTH_SHADED)
+        self._freeCameraFOV = self.stateProperty("freeCameraFOV", default=60.0)
         self._colorCorrectionMode = self.stateProperty("colorCorrectionMode", default=ColorCorrectionModes.SRGB)
         self._pickMode = self.stateProperty("pickMode", default=PickModes.PRIMS)
 
@@ -150,6 +153,7 @@ class ViewSettingsDataModel(QtCore.QObject, StateSource):
         self._complexity = RefinementComplexities.LOW
         self._freeCamera = None
         self._cameraPath = None
+        self._fontSize = self.stateProperty("fontSize", default=10)
 
     def onSaveState(self, state):
         state["cameraMaskColor"] = list(self._cameraMaskColor)
@@ -158,6 +162,7 @@ class ViewSettingsDataModel(QtCore.QObject, StateSource):
         state["defaultMaterialSpecular"] = self._defaultMaterialSpecular
         state["redrawOnScrub"] = self._redrawOnScrub
         state["renderMode"] = self._renderMode
+        state["freeCameraFOV"] = self._freeCameraFOV
         state["colorCorrectionMode"] = self._colorCorrectionMode
         state["pickMode"] = self._pickMode
         state["selectionHighlightMode"] = self._selHighlightMode
@@ -191,6 +196,7 @@ class ViewSettingsDataModel(QtCore.QObject, StateSource):
         state["showHUDComplexity"] = self._showHUD_Complexity
         state["showHUDPerformance"] = self._showHUD_Performance
         state["showHUDGPUStats"] = self._showHUD_GPUstats
+        state["fontSize"] = self._fontSize
 
     @property
     def cameraMaskColor(self):
@@ -262,6 +268,42 @@ class ViewSettingsDataModel(QtCore.QObject, StateSource):
     @visibleViewSetting
     def renderMode(self, value):
         self._renderMode = value
+
+    @property
+    def freeCameraFOV(self):
+        return self._freeCameraFOV
+
+    @freeCameraFOV.setter
+    @visibleViewSetting
+    def freeCameraFOV(self, value):
+        if self._freeCamera:
+            # Setting the freeCamera's fov will trigger our own update
+            self._freeCamera.fov = value
+        else:
+            self._freeCameraFOV = value
+
+    @visibleViewSetting
+    def _updateFOV(self):
+        if self._freeCamera:
+            self._freeCameraFOV = self.freeCamera.fov
+
+    @property
+    def freeCameraFOV(self):
+        return self._freeCameraFOV
+
+    @freeCameraFOV.setter
+    @visibleViewSetting
+    def freeCameraFOV(self, value):
+        if self._freeCamera:
+            # Setting the freeCamera's fov will trigger our own update
+            self._freeCamera.fov = value
+        else:
+            self._freeCameraFOV = value
+
+    @visibleViewSetting
+    def _updateFOV(self):
+        if self._freeCamera:
+            self._freeCameraFOV = self.freeCamera.fov
 
     @property
     def colorCorrectionMode(self):
@@ -598,9 +640,18 @@ class ViewSettingsDataModel(QtCore.QObject, StateSource):
     @freeCamera.setter
     @visibleViewSetting
     def freeCamera(self, value):
-        if not isinstance(value, FreeCamera):
+        # ViewSettingsDataModel does not guarantee it will hold a valid
+        # FreeCamera, but if one is set, we will keep the dataModel's stateful
+        # FOV ('freeCameraFOV') in sync with the FreeCamera
+
+        if not isinstance(value, FreeCamera) and value != None:
             raise TypeError("Free camera must be a FreeCamera object.")
+        if self._freeCamera:
+            self._freeCamera.signalFrustumChanged.disconnect(self._updateFOV)
         self._freeCamera = value
+        if self._freeCamera:
+            self._freeCamera.signalFrustumChanged.connect(self._updateFOV)
+            self._freeCameraFOV = self._freeCamera.fov
 
     @property
     def cameraPath(self):
@@ -632,3 +683,15 @@ class ViewSettingsDataModel(QtCore.QObject, StateSource):
                     "the prim is not a UsdGeom.Camera." % (value.GetName()))
         else:
             self.cameraPath = None
+
+    @property
+    def fontSize(self):
+        return self._fontSize
+
+    @fontSize.setter
+    @visibleViewSetting
+    def fontSize(self, value):
+        if value != self._fontSize:
+            self._fontSize = value
+            self.signalStyleSettingsChanged.emit()
+

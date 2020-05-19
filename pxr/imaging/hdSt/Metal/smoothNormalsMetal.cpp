@@ -80,53 +80,52 @@ HdSt_SmoothNormalsComputationMetal::_Execute(
     if(numPoints == 0) return;
     
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
-    HdStMSLProgramSharedPtr const &mslProgram(
-        boost::dynamic_pointer_cast<HdStMSLProgram>(computeProgram));
+    
+    // temp fix for Storm recompiling the shader every frame due to resource
+    // management bug. Remove static in the future
+    static HdStMSLProgramSharedPtr mslProgram;
+    mslProgram = std::dynamic_pointer_cast<HdStMSLProgram>(computeProgram);
 
     // Only the normals are writebale
     unsigned long immutableBufferMask = (1 << 0) | (1 << 2) | (1 << 3);
 
-    MtlfMetalContext::MtlfMultiBuffer const& pointsBuffer = points->GetId();
-    MtlfMetalContext::MtlfMultiBuffer const& normalsBuffer = normals->GetId();
-    MtlfMetalContext::MtlfMultiBuffer const& adjacencyBuffer = adjacency->GetId();
+    id<MTLBuffer> const& pointsBuffer = points->GetId();
+    id<MTLBuffer> const& normalsBuffer = normals->GetId();
+    id<MTLBuffer> const& adjacencyBuffer = adjacency->GetId();
 
     context->FlushBuffers();
     context->PrepareBufferFlush();
     
-    for (int g = 0; g < context->renderDevices.count; g++) {
-        id<MTLCommandBuffer> commandBuffer = [context->gpus[g].commandQueue commandBuffer];
-        id<MTLComputeCommandEncoder> computeEncoder = [commandBuffer computeCommandEncoder];
-        
-        id<MTLFunction> computeFunction = mslProgram->GetComputeFunction(g);
-        id<MTLComputePipelineState> pipelineState =
-            context->GetComputeEncoderState(g, computeFunction, 4, 0, immutableBufferMask,
-                                            @"GPU Smooth Normals pipeline state");
+    id<MTLCommandBuffer> commandBuffer = [context->gpus.commandQueue commandBuffer];
+    id<MTLComputeCommandEncoder> computeEncoder = [commandBuffer computeCommandEncoder];
+    
+    id<MTLFunction> computeFunction = mslProgram->GetComputeFunction();
+    id<MTLComputePipelineState> pipelineState =
+        context->GetComputeEncoderState(computeFunction, 4, 0, immutableBufferMask,
+                                        @"GPU Smooth Normals pipeline state");
 
-        id<MTLBuffer> p = pointsBuffer[g];
-        
-        [computeEncoder setComputePipelineState:pipelineState];
-        [computeEncoder setBuffer:p    offset:0 atIndex:0];
-        [computeEncoder setBuffer:normalsBuffer[g]   offset:0 atIndex:1];
-        [computeEncoder setBuffer:adjacencyBuffer[g] offset:0 atIndex:2];
-        [computeEncoder setBytes:(const void *)&uniform
-                          length:sizeof(uniform)
-                         atIndex:3];
-        
-        int maxThreadsPerThreadgroup = [pipelineState threadExecutionWidth];
-        int const maxThreadsPerGroup = 32;
-        if (maxThreadsPerThreadgroup > maxThreadsPerGroup) {
-            maxThreadsPerThreadgroup = maxThreadsPerGroup;
-        }
-
-        MTLSize threadgroupCount =
-            MTLSizeMake(fmin(maxThreadsPerThreadgroup, numPoints), 1, 1);
-        
-        [computeEncoder dispatchThreads:MTLSizeMake(numPoints, 1, 1)
-                  threadsPerThreadgroup:threadgroupCount];
-        
-        [computeEncoder endEncoding];
-        [commandBuffer commit];
+    [computeEncoder setComputePipelineState:pipelineState];
+    [computeEncoder setBuffer:pointsBuffer    offset:0 atIndex:0];
+    [computeEncoder setBuffer:normalsBuffer   offset:0 atIndex:1];
+    [computeEncoder setBuffer:adjacencyBuffer offset:0 atIndex:2];
+    [computeEncoder setBytes:(const void *)&uniform
+                      length:sizeof(uniform)
+                     atIndex:3];
+    
+    int maxThreadsPerThreadgroup = [pipelineState threadExecutionWidth];
+    int const maxThreadsPerGroup = 32;
+    if (maxThreadsPerThreadgroup > maxThreadsPerGroup) {
+        maxThreadsPerThreadgroup = maxThreadsPerGroup;
     }
+
+    MTLSize threadgroupCount =
+        MTLSizeMake(fmin(maxThreadsPerThreadgroup, numPoints), 1, 1);
+    
+    [computeEncoder dispatchThreads:MTLSizeMake(numPoints, 1, 1)
+              threadsPerThreadgroup:threadgroupCount];
+    
+    [computeEncoder endEncoding];
+    [commandBuffer commit];
 }
 
 

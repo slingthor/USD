@@ -50,7 +50,7 @@ void
 HdSt_DomeLightComputationGPUMetal::_Execute(HdStProgramSharedPtr computeProgram)
 {
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
-    HdStMSLProgramSharedPtr const &mslProgram(boost::dynamic_pointer_cast<HdStMSLProgram>(computeProgram));
+    HdStMSLProgramSharedPtr const &mslProgram(std::dynamic_pointer_cast<HdStMSLProgram>(computeProgram));
 
     struct Uniforms {
         Uniforms(float _roughness, int _level)
@@ -64,57 +64,54 @@ HdSt_DomeLightComputationGPUMetal::_Execute(HdStProgramSharedPtr computeProgram)
         int rowOffset;
     } _uniforms(_roughness, _level);
 
-    for (int g = 0; g < context->renderDevices.count; g++) {
-        id<MTLFunction> computeFunction = mslProgram->GetComputeFunction(g);
-        id<MTLComputePipelineState> pipelineState =
-            context->GetComputeEncoderState(
-                g, computeFunction, 1, 2, 1,
-                @"HdSt_DomeLightComputationGPUMetal pipeline state");
+    id<MTLFunction> computeFunction = mslProgram->GetComputeFunction();
+    id<MTLComputePipelineState> pipelineState =
+        context->GetComputeEncoderState(computeFunction, 1, 2, 1,
+            @"HdSt_DomeLightComputationGPUMetal pipeline state");
 
-        NSUInteger exeWidth = [pipelineState threadExecutionWidth];
-        NSUInteger maxThreadsPerThreadgroup = [pipelineState maxTotalThreadsPerThreadgroup];
-        MTLSize threadgroupCount = MTLSizeMake(exeWidth, maxThreadsPerThreadgroup / exeWidth, 1);
-        MTLSize threadsPerGrid   = MTLSizeMake((_destTextureId.multiTexture[g].width + (threadgroupCount.width - 1)) / threadgroupCount.width,
-                                               1,
-                                               1);
+    NSUInteger exeWidth = [pipelineState threadExecutionWidth];
+    NSUInteger maxThreadsPerThreadgroup = [pipelineState maxTotalThreadsPerThreadgroup];
+    MTLSize threadgroupCount = MTLSizeMake(exeWidth, maxThreadsPerThreadgroup / exeWidth, 1);
+    MTLSize threadsPerGrid   = MTLSizeMake(([_destTextureId width] + (threadgroupCount.width - 1)) / threadgroupCount.width,
+                                           1,
+                                           1);
 
-        int numRows = (_destTextureId.multiTexture[g].height + (threadgroupCount.height - 1)) / threadgroupCount.height;
+    int numRows = ([_destTextureId height] + (threadgroupCount.height - 1)) / threadgroupCount.height;
+    
+    for (int i = 0; i < numRows; i++) {
+        id<MTLCommandBuffer> commandBuffer = [context->gpus.commandQueue commandBuffer];
+        id<MTLComputeCommandEncoder> computeEncoder = [commandBuffer computeCommandEncoder];
         
-        for (int i = 0; i < numRows; i++) {
-            id<MTLCommandBuffer> commandBuffer = [context->gpus[g].commandQueue commandBuffer];
-            id<MTLComputeCommandEncoder> computeEncoder = [commandBuffer computeCommandEncoder];
-            
-            [computeEncoder setComputePipelineState:pipelineState];
-            
-            context->SetComputeEncoderState(computeEncoder);
-
-            _uniforms.rowOffset = i * threadgroupCount.height;
-            [computeEncoder setBytes:(const void *)&_uniforms
-                              length:sizeof(_uniforms)
-                             atIndex:0];
-            
-            [computeEncoder setTexture:_sourceTextureId.multiTexture[g]
-                               atIndex:0];
-            [computeEncoder setTexture:_destTextureId.multiTexture[g]
-                               atIndex:1];
-
-            [computeEncoder dispatchThreadgroups:threadsPerGrid threadsPerThreadgroup:threadgroupCount];
-            
-            [computeEncoder endEncoding];
-            [commandBuffer commit];
-        }
+        [computeEncoder setComputePipelineState:pipelineState];
         
-        if (_numLevels > 1) {
-            id<MTLCommandBuffer> commandBuffer = [context->gpus[g].commandQueue commandBuffer];
+        context->SetComputeEncoderState(computeEncoder);
 
-            // Generate the rest of the mip chain
-            id<MTLBlitCommandEncoder> blitEncoder = [commandBuffer blitCommandEncoder];
-            
-            [blitEncoder generateMipmapsForTexture:_destTextureId.multiTexture[g]];
-            [blitEncoder endEncoding];
+        _uniforms.rowOffset = i * threadgroupCount.height;
+        [computeEncoder setBytes:(const void *)&_uniforms
+                          length:sizeof(_uniforms)
+                         atIndex:0];
+        
+        [computeEncoder setTexture:_sourceTextureId
+                           atIndex:0];
+        [computeEncoder setTexture:_destTextureId
+                           atIndex:1];
 
-            [commandBuffer commit];
-        }
+        [computeEncoder dispatchThreadgroups:threadsPerGrid threadsPerThreadgroup:threadgroupCount];
+        
+        [computeEncoder endEncoding];
+        [commandBuffer commit];
+    }
+    
+    if (_numLevels > 1) {
+        id<MTLCommandBuffer> commandBuffer = [context->gpus.commandQueue commandBuffer];
+
+        // Generate the rest of the mip chain
+        id<MTLBlitCommandEncoder> blitEncoder = [commandBuffer blitCommandEncoder];
+        
+        [blitEncoder generateMipmapsForTexture:_destTextureId];
+        [blitEncoder endEncoding];
+
+        [commandBuffer commit];
     }
 }
 

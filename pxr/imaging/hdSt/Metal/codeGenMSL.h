@@ -88,15 +88,19 @@ public:
         , usage(_usage)
         , binding(_binding)
         , arraySize(_arraySize)
-        {}
-          
+        {
+            arraySizeStr = std::to_string(arraySize);
+        }
+
         TfToken const name;
         TfToken const dataType;
-        TfToken const accessorStr;
-        TfToken const attribute;
+        TfToken accessorStr;
+        TfToken attribute;
         Usage usage;
-        HdBinding const binding;
-        int const arraySize;
+        HdBinding binding;
+        int arraySize;
+        std::string arraySizeStr;
+        std::string defineWrapperStr;
     };
     
     typedef std::vector<TParam> InOutParams;

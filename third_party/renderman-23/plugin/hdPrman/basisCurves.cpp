@@ -130,10 +130,6 @@ HdPrman_BasisCurves::_ConvertGeometry(HdPrman_Context *context,
             primvars.SetString(RixStr.k_Ri_Basis, RixStr.k_bezier);
         } else if (curveBasis == HdTokens->catmullRom) {
             primvars.SetString(RixStr.k_Ri_Basis, RixStr.k_catmullrom);
-        } else if (curveBasis == HdTokens->hermite) {
-            primvars.SetString(RixStr.k_Ri_Basis, RixStr.k_hermite);
-        } else if (curveBasis == HdTokens->power) {
-            primvars.SetString(RixStr.k_Ri_Basis, RixStr.k_power);
         } else {
             TF_CODING_ERROR("Unknown curveBasis %s\n", curveBasis.GetText());
         }
@@ -171,7 +167,7 @@ HdPrman_BasisCurves::_ConvertGeometry(HdPrman_Context *context,
     HdPrman_ConvertPrimvars(sceneDelegate, id, primvars, numCurves,
         vertexPrimvarCount, varyingPrimvarCount, facevaryingPrimvarCount);
 
-    return std::move(primvars);
+    return primvars;
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

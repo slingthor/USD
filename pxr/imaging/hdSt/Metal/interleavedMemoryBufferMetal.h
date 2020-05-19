@@ -34,7 +34,8 @@ PXR_NAMESPACE_OPEN_SCOPE
 ///
 /// Interleaved memory buffer for Metal.
 ///
-class HdStStripedInterleavedBufferMetal : public HdStInterleavedMemoryManager::_StripedInterleavedBuffer {
+class HdStStripedInterleavedBufferMetal : public
+    HdStInterleavedMemoryManager::_StripedInterleavedBuffer {
 public:
     /// Constructor
     HDST_API

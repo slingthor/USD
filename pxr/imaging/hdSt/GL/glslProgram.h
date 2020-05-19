@@ -35,7 +35,8 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 class HdResourceRegistry;
-typedef boost::shared_ptr<class HdStGLSLProgram> HdStGLSLProgramSharedPtr;
+using HdStProgramSharedPtr =
+    std::shared_ptr<class HdStProgram>;
 
 /// \class HdGLSLProgram
 ///
@@ -99,23 +100,23 @@ public:
     virtual void UnsetProgram() override;
     
     HDST_API
-    virtual void DrawElementsInstancedBaseVertex(GLenum primitiveMode,
+    virtual void DrawElementsInstancedBaseVertex(int primitiveMode,
                                                  int indexCount,
-                                                 GLint indexType,
-                                                 GLint firstIndex,
-                                                 GLint instanceCount,
-                                                 GLint baseVertex) const override;
+                                                 int indexType,
+                                                 int firstIndex,
+                                                 int instanceCount,
+                                                 int baseVertex) const override;
     
     HDST_API
-    virtual void DrawArraysInstanced(GLenum primitiveMode,
-                                     GLint baseVertex,
-                                     GLint vertexCount,
-                                     GLint instanceCount) const override;
+    virtual void DrawArraysInstanced(int primitiveMode,
+                                     int baseVertex,
+                                     int vertexCount,
+                                     int instanceCount) const override;
     
     HDST_API
-    virtual void DrawArrays(GLenum primitiveMode,
-                            GLint baseVertex,
-                            GLint vertexCount) const override;
+    virtual void DrawArrays(int primitiveMode,
+                            int baseVertex,
+                            int vertexCount) const override;
     
     /// Returns the GL program object.
     HDST_API

@@ -1,5 +1,5 @@
 //
-// Copyright 2019 Pixar
+// Copyright 2020 Pixar
 //
 // Licensed under the Apache License, Version 2.0 (the "Apache License")
 // with the following modification; you may not use this file except in
@@ -21,17 +21,20 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#ifndef HGIMETAL_HGIMETAL_H
-#define HGIMETAL_HGIMETAL_H
+#ifndef PXR_IMAGING_HGI_METAL_HGIMETAL_H
+#define PXR_IMAGING_HGI_METAL_HGIMETAL_H
 
 #include "pxr/pxr.h"
 #include "pxr/imaging/hgiMetal/api.h"
-#include "pxr/imaging/hgiMetal/immediateCommandBuffer.h"
 #include "pxr/imaging/hgi/hgi.h"
+#include "pxr/imaging/hgi/texture.h"
+#include "pxr/imaging/hgi/tokens.h"
 
 #import <Metal/Metal.h>
 
 PXR_NAMESPACE_OPEN_SCOPE
+
+class HgiMetalCapabilities;
 
 enum {
     APIVersion_Metal1_0 = 0,
@@ -46,22 +49,31 @@ enum {
 class HgiMetal final : public Hgi
 {
 public:
+    enum CommitCommandBufferWaitType {
+        CommitCommandBuffer_NoWait = 0,
+        CommitCommandBuffer_WaitUntilScheduled,
+        CommitCommandBuffer_WaitUntilCompleted,
+    };
+    
     HGIMETAL_API
     HgiMetal(id<MTLDevice> device = nil);
 
     HGIMETAL_API
-    ~HgiMetal();
+    ~HgiMetal() override;
 
-    //
-    // Command Buffers
-    //
+    /// Returns the Metal device.
+    HGIMETAL_API
+    id<MTLDevice> GetPrimaryDevice() const;
 
     HGIMETAL_API
-    HgiImmediateCommandBuffer& GetImmediateCommandBuffer() override;
+    void SubmitCmds(HgiCmds* cmds, uint32_t count=1) override;
 
-    //
-    // Resources
-    //
+    HGIMETAL_API
+    HgiGraphicsCmdsUniquePtr CreateGraphicsCmds(
+        HgiGraphicsCmdsDesc const& desc) override;
+
+    HGIMETAL_API
+    HgiBlitCmdsUniquePtr CreateBlitCmds() override;
 
     HGIMETAL_API
     HgiTextureHandle CreateTexture(HgiTextureDesc const & desc) override;
@@ -75,13 +87,60 @@ public:
     HGIMETAL_API
     void DestroyBuffer(HgiBufferHandle* texHandle) override;
 
+    HGIMETAL_API
+    HgiShaderFunctionHandle CreateShaderFunction(
+        HgiShaderFunctionDesc const& desc) override;
+
+    HGIMETAL_API
+    void DestroyShaderFunction(
+        HgiShaderFunctionHandle* shaderFunctionHandle) override;
+
+    HGIMETAL_API
+    HgiShaderProgramHandle CreateShaderProgram(
+        HgiShaderProgramDesc const& desc) override;
+
+    HGIMETAL_API
+    void DestroyShaderProgram(
+        HgiShaderProgramHandle* shaderProgramHandle) override;
+
+    HGIMETAL_API
+    HgiResourceBindingsHandle CreateResourceBindings(
+        HgiResourceBindingsDesc const& desc) override;
+
+    HGIMETAL_API
+    void DestroyResourceBindings(HgiResourceBindingsHandle* resHandle) override;
+
+    HGIMETAL_API
+    HgiPipelineHandle CreatePipeline(
+        HgiPipelineDesc const& pipeDesc) override;
+
+    HGIMETAL_API
+    void DestroyPipeline(HgiPipelineHandle* pipeHandle) override;
+
+    HGIMETAL_API
+    TfToken const& GetAPIName() const override;
+    
+    HGIMETAL_API
+    void StartFrame() override;
+
+    HGIMETAL_API
+    void EndFrame() override;
+
     //
     // HgiMetal specific
     //
+        
+    HGIMETAL_API
+    id<MTLCommandQueue> GetQueue() const {
+        return _commandQueue;
+    }
     
     HGIMETAL_API
-    id<MTLDevice> GetDevice() const {
-        return _device;
+    id<MTLCommandBuffer> GetCommandBuffer(bool flush = true) {
+        if (flush) {
+            _workToFlush = true;
+        }
+        return _commandBuffer;
     }
     
     HGIMETAL_API
@@ -89,14 +148,44 @@ public:
         return _apiVersion;
     }
     
+    HGIMETAL_API
+    HgiMetalCapabilities const & GetCapabilities() const {
+        return *_capabilities;
+    }
+    
+    HGIMETAL_API
+    void CommitCommandBuffer(
+        CommitCommandBufferWaitType waitType = CommitCommandBuffer_NoWait,
+        bool forceNewBuffer = false);
+
 private:
     HgiMetal & operator=(const HgiMetal&) = delete;
     HgiMetal(const HgiMetal&) = delete;
 
     id<MTLDevice> _device;
-    int _apiVersion;
+    id<MTLCommandQueue> _commandQueue;
+    id<MTLCommandBuffer> _commandBuffer;
+    id<MTLCaptureScope> _captureScopeFullFrame;
 
-    HgiMetalImmediateCommandBuffer _immediateCommandBuffer;
+    std::unique_ptr<HgiMetalCapabilities> _capabilities;
+
+    int _frameDepth;
+    int _apiVersion;
+    bool _useInterop;
+    bool _workToFlush;
+    
+    // TEMP for Mtlf handoff
+public:
+    
+    HGIMETAL_API
+    bool BeginMtlf();
+    
+    class HgiMetalGraphicsCmds* _encoder;
+    
+    int _sampleCount;
+    bool _needsFlip;
+    bool _useFinalTextureForGetImage;
+    id<MTLTexture> _finalTexture;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

@@ -24,17 +24,21 @@
 #define PXR_IMAGING_HD_ST_RENDER_DELEGATE_H
 
 #include "pxr/pxr.h"
-#include "pxr/imaging/hgi/hgi.h"
 #include "pxr/imaging/hdSt/api.h"
 #include "pxr/imaging/hd/engine.h"
 #include "pxr/imaging/hd/renderDelegate.h"
 
+#include <memory>
 #include <mutex>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-typedef boost::shared_ptr<class HdStResourceRegistry>
-    HdStResourceRegistrySharedPtr;
+class Hgi;
+
+class Hgi;
+
+using HdStResourceRegistrySharedPtr = 
+    std::shared_ptr<class HdStResourceRegistry>;
 
 enum class HdStDrawMode
 {
@@ -78,7 +82,7 @@ public:
         HdStDrawMode drawMode;
         RenderOutput renderOutput;
         
-#if defined(ARCH_GFX_METAL)
+#if defined(PXR_METAL_SUPPORT_ENABLED)
         MTLRenderPassDescriptor *mtlRenderPassDescriptorForNativeMetal;
 #endif
         
@@ -97,7 +101,7 @@ public:
         , drawMode(_drawMode)
         , renderOutput(_renderOutput)
         {
-#if defined(ARCH_GFX_METAL)
+#if defined(PXR_METAL_SUPPORT_ENABLED)
             mtlRenderPassDescriptorForNativeMetal = nil;
 #endif
         }
@@ -108,6 +112,9 @@ public:
     
     HDST_API
     virtual ~HdStRenderDelegate();
+
+    HDST_API
+    virtual void SetDrivers(HdDriverVector const& drivers) override;
 
     HDST_API
     virtual HdRenderParam *GetRenderParam() const override;
@@ -207,7 +214,6 @@ protected:
 private:
     static const TfTokenVector SUPPORTED_RPRIM_TYPES;
     static const TfTokenVector SUPPORTED_SPRIM_TYPES;
-    static const TfTokenVector SUPPORTED_BPRIM_TYPES;
 
     /// Resource registry used in this render delegate
     static std::mutex _mutexResourceRegistry;

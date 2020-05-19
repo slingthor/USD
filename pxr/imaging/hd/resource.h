@@ -33,19 +33,17 @@
 
 #include "pxr/imaging/garch/gl.h"
 
-#if defined(ARCH_GFX_METAL)
+#if defined(PXR_METAL_SUPPORT_ENABLED)
 #include "pxr/imaging/mtlf/mtlDevice.h"
 #endif
 
-#include <boost/noncopyable.hpp>
-#include <boost/shared_ptr.hpp>
-
 #include <cstddef>
+#include <memory>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
 
-typedef boost::shared_ptr<class HdResource> HdResourceSharedPtr;
+using HdResourceSharedPtr = std::shared_ptr<class HdResource>;
 
 struct HdResourceGPUHandle {
 
@@ -54,7 +52,7 @@ struct HdResourceGPUHandle {
     }
     bool IsSet() const { return handle != 0; }
 
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     // OpenGL
     HdResourceGPUHandle(GLuint const _handle) {
         handle = (void*)uint64_t(_handle);
@@ -83,30 +81,30 @@ struct HdResourceGPUHandle {
     }
 
 
-#if defined(ARCH_GFX_METAL)
+#if defined(PXR_METAL_SUPPORT_ENABLED)
     HdResourceGPUHandle() {
-        multiBuffer.Clear();
+        buffer = nil;
     }
     HdResourceGPUHandle(HdResourceGPUHandle const & _gpuHandle) {
-        multiBuffer = _gpuHandle.multiBuffer;
+        buffer = _gpuHandle.buffer;
     }
 
-    HdResourceGPUHandle(MtlfMetalContext::MtlfMultiBuffer const _handle) {
-        multiBuffer = _handle;
+    HdResourceGPUHandle(id<MTLBuffer> const _handle) {
+        buffer = _handle;
     }
-    HdResourceGPUHandle& operator =(MtlfMetalContext::MtlfMultiBuffer const _handle) {
-        multiBuffer = _handle;
+    HdResourceGPUHandle& operator =(id<MTLBuffer> const _handle) {
+        buffer = _handle;
         return *this;
     }
-    operator MtlfMetalContext::MtlfMultiBuffer() const { return multiBuffer; }
+    operator id<MTLBuffer>() const { return buffer; }
 
-#endif // ARCH_GFX_METAL
+#endif // PXR_METAL_SUPPORT_ENABLED
 
     // Storage
     union {
         void* handle;
-#if defined(ARCH_GFX_METAL)
-        MtlfMetalContext::MtlfMultiBuffer multiBuffer;
+#if defined(PXR_METAL_SUPPORT_ENABLED)
+        id<MTLBuffer> buffer;
 #endif
     };
 };
@@ -114,7 +112,7 @@ struct HdResourceGPUHandle {
 ///
 /// Base class for all GPU resource objects.
 ///
-class HdResource : boost::noncopyable 
+class HdResource
 {
 public:
     HD_API
@@ -144,6 +142,12 @@ protected:
     void SetSize(size_t size);
 
 private:
+
+    // Don't allow copies.
+    HdResource(const HdResource &) = delete;
+    HdResource &operator=(const HdResource &) = delete;
+
+
     const TfToken _role;
     size_t _size;
 };

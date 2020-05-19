@@ -57,7 +57,7 @@ protected:
                       HdBufferResourceSharedPtr indices,
                       HdBufferResourceSharedPtr primitiveParam,
                       int numPrims) override;
-};
+    };
 
 
 PXR_NAMESPACE_CLOSE_SCOPE

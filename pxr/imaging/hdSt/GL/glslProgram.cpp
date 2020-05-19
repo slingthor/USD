@@ -28,6 +28,7 @@
 
 #include "pxr/imaging/hdSt/debugCodes.h"
 #include "pxr/imaging/hdSt/package.h"
+#include "pxr/imaging/hdSt/resourceBinder.h"
 #include "pxr/imaging/hdSt/surfaceShader.h"
 #include "pxr/imaging/hdSt/textureResource.h"
 #include "pxr/imaging/hdSt/textureResourceHandle.h"
@@ -365,9 +366,9 @@ HdStGLSLProgram::Link()
         // XXX:validation
         TF_WARN("Failed to link shader: %s", logString.c_str());
         success = false;
-        
+
         if (TfDebug::IsEnabled(HDST_DUMP_FAILING_SHADER_SOURCE)) {
-            _DebugLinkSource(_program);
+            std::cout << _DebugLinkSource(_program) << std::flush;
         }
     }
 
@@ -494,7 +495,7 @@ void HdStGLSLProgram::BindResources(HdStSurfaceShader* surfaceShader, HdSt_Resou
             glBindSampler(samplerUnit, resource->GetTexelsSamplerId());
             
             glProgramUniform1i(_program, binding.GetLocation(), samplerUnit);
-        } else if (binding.GetType() == HdBinding::TEXTURE_3D) {
+        } else if (binding.GetType() == HdBinding::TEXTURE_FIELD) {
             int samplerUnit = binding.GetTextureUnit();
             glActiveTexture(GL_TEXTURE0 + samplerUnit);
             glBindTexture(GL_TEXTURE_3D, resource->GetTexelsTextureId());
@@ -542,7 +543,7 @@ void HdStGLSLProgram::UnbindResources(HdStSurfaceShader* surfaceShader, HdSt_Res
             glActiveTexture(GL_TEXTURE0 + samplerUnit);
             glBindTexture(GL_TEXTURE_2D, 0);
             glBindSampler(samplerUnit, 0);
-        } else if (binding.GetType() == HdBinding::TEXTURE_3D) {
+        } else if (binding.GetType() == HdBinding::TEXTURE_FIELD) {
             int samplerUnit = binding.GetTextureUnit();
             glActiveTexture(GL_TEXTURE0 + samplerUnit);
             glBindTexture(GL_TEXTURE_3D, 0);
@@ -580,12 +581,12 @@ void HdStGLSLProgram::UnsetProgram() {
     glUseProgram(0);
 }
 
-void HdStGLSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
+void HdStGLSLProgram::DrawElementsInstancedBaseVertex(int primitiveMode,
                                                       int indexCount,
-                                                      GLint indexType,
-                                                      GLint firstIndex,
-                                                      GLint instanceCount,
-                                                      GLint baseVertex) const {
+                                                      int indexType,
+                                                      int firstIndex,
+                                                      int instanceCount,
+                                                      int baseVertex) const {
     uint64_t size;
     
     switch(indexType) {
@@ -607,16 +608,16 @@ void HdStGLSLProgram::DrawElementsInstancedBaseVertex(GLenum primitiveMode,
                                       baseVertex);
 }
 
-void HdStGLSLProgram::DrawArraysInstanced(GLenum primitiveMode,
-                                          GLint baseVertex,
-                                          GLint vertexCount,
-                                          GLint instanceCount) const {
+void HdStGLSLProgram::DrawArraysInstanced(int primitiveMode,
+                                          int baseVertex,
+                                          int vertexCount,
+                                          int instanceCount) const {
     glDrawArraysInstanced(primitiveMode, baseVertex, vertexCount, instanceCount);
 }
 
-void HdStGLSLProgram::DrawArrays(GLenum primitiveMode,
-                                 GLint baseVertex,
-                                 GLint vertexCount) const {
+void HdStGLSLProgram::DrawArrays(int primitiveMode,
+                                 int baseVertex,
+                                 int vertexCount) const {
     glDrawArrays(primitiveMode, baseVertex, vertexCount);
 }
 

@@ -43,7 +43,7 @@
 #include "pxr/imaging/hd/tokens.h"
 #include "pxr/imaging/hd/vtBufferSource.h"
 
-#include "pxr/imaging/hgi/graphicsEncoderDesc.h"
+#include "pxr/imaging/hgi/graphicsCmdsDesc.h"
 
 #include "pxr/base/gf/frustum.h"
 #include "pxr/base/tf/staticTokens.h"
@@ -101,6 +101,9 @@ HdStRenderPassState::Prepare(
     GLF_GROUP_FUNCTION();
 
     HdRenderPassState::Prepare(resourceRegistry);
+
+    HdStResourceRegistrySharedPtr const& hdStResourceRegistry =
+        std::static_pointer_cast<HdStResourceRegistry>(resourceRegistry);
 
     VtVec4fArray clipPlanes;
     TF_FOR_ALL(it, GetClipPlanes()) {
@@ -179,11 +182,12 @@ HdStRenderPassState::Prepare(
         _clipPlanesBufferSize = clipPlanes.size();
 
         // allocate interleaved buffer
-        _renderPassStateBar = resourceRegistry->AllocateUniformBufferArrayRange(
-            HdTokens->drawingShader, bufferSpecs, HdBufferArrayUsageHint());
+        _renderPassStateBar = 
+            hdStResourceRegistry->AllocateUniformBufferArrayRange(
+                HdTokens->drawingShader, bufferSpecs, HdBufferArrayUsageHint());
 
         HdBufferArrayRangeSharedPtr _renderPassStateBar_ =
-            boost::static_pointer_cast<HdBufferArrayRange> (_renderPassStateBar);
+            std::static_pointer_cast<HdBufferArrayRange> (_renderPassStateBar);
 
         // add buffer binding request
         _renderPassShader->AddBufferBinding(
@@ -198,7 +202,7 @@ HdStRenderPassState::Prepare(
     GfMatrix4d const& worldToViewMatrix = GetWorldToViewMatrix();
     GfMatrix4d projMatrix = GetProjectionMatrix();
 
-    HdBufferSourceVector sources;
+    HdBufferSourceSharedPtrVector sources;
     sources.push_back(HdBufferSourceSharedPtr(
                          new HdVtBufferSource(HdShaderTokens->worldToViewMatrix,
                                               worldToViewMatrix)));
@@ -257,7 +261,7 @@ HdStRenderPassState::Prepare(
                                   clipPlanes.size())));
     }
 
-    resourceRegistry->AddSources(_renderPassStateBar, sources);
+    hdStResourceRegistry->AddSources(_renderPassStateBar, sources);
 
     // notify view-transform to the lighting shader to update its uniform block
     _lightingShader->SetCamera(worldToViewMatrix, projMatrix);
@@ -288,7 +292,7 @@ HdStRenderPassState::SetRenderPassShader(HdStRenderPassShaderSharedPtr const &re
     if (_renderPassStateBar) {
 
         HdBufferArrayRangeSharedPtr _renderPassStateBar_ =
-            boost::static_pointer_cast<HdBufferArrayRange> (_renderPassStateBar);
+            std::static_pointer_cast<HdBufferArrayRange> (_renderPassStateBar);
 
         _renderPassShader->AddBufferBinding(
             HdBindingRequest(HdBinding::UBO, _tokens->renderPassState,
@@ -347,17 +351,31 @@ HdStRenderPassState::GetShaderHash() const
     return hash;
 }
 
-HgiGraphicsEncoderDesc
-HdStRenderPassState::MakeGraphicsEncoderDesc() const
+GfVec2f
+HdStRenderPassState::GetAovDimensions() const
 {
-    const size_t maxColorAttachments = 8;
+    const HdRenderPassAovBindingVector& aovBindings = GetAovBindings();
+    if (aovBindings.empty()) {
+        return GfVec2f(0, 0);
+    }
+
+    // Assume AOVs have the same dimensions so pick size of any.
+    auto aov = aovBindings[0];
+
+    return GfVec2f(aov.renderBuffer->GetWidth(), aov.renderBuffer->GetHeight());
+}
+
+HgiGraphicsCmdsDesc
+HdStRenderPassState::MakeGraphicsCmdsDesc() const
+{
+    const size_t maxColorTex = 8;
     const HdRenderPassAovBindingVector& aovBindings = GetAovBindings();
     const bool useMultiSample = GetUseAovMultiSample();
 
-    HgiGraphicsEncoderDesc desc;
+    HgiGraphicsCmdsDesc desc;
 
     // If the AOV bindings have not changed that does NOT mean the
-    // graphicsEncoderDescriptor will not change. The HdRenderBuffer may be
+    // graphicsCmdsDescriptor will not change. The HdRenderBuffer may be
     // resized at any time, which will destroy and recreate the HgiTextureHandle
     // that backs the render buffer and was attached for graphics encoding.
 
@@ -367,11 +385,24 @@ HdStRenderPassState::MakeGraphicsEncoderDesc() const
         }
 
         bool multiSampled= useMultiSample && aov.renderBuffer->IsMultiSampled();
-        HgiTextureHandle hgiTexHandle =
-            aov.renderBuffer->GetHgiTextureHandle(multiSampled);
+        VtValue rv = aov.renderBuffer->GetResource(multiSampled);
 
-        if (!TF_VERIFY(hgiTexHandle, "Invalid render buffer texture")) {
+        if (!TF_VERIFY(rv.IsHolding<HgiTextureHandle>(), 
+            "Invalid render buffer texture")) {
             continue;
+        }
+
+        // Get render target texture
+        HgiTextureHandle hgiTexHandle = rv.UncheckedGet<HgiTextureHandle>();
+
+        // Get resolve texture target.
+        HgiTextureHandle hgiResolveHandle;
+        if (multiSampled) {
+            VtValue resolveRes = aov.renderBuffer->GetResource(/*ms*/false);
+            if (!TF_VERIFY(resolveRes.IsHolding<HgiTextureHandle>())) {
+                continue;
+            }
+            hgiResolveHandle = resolveRes.UncheckedGet<HgiTextureHandle>();
         }
 
         // Assume AOVs have the same dimensions so pick size of any.
@@ -380,13 +411,23 @@ HdStRenderPassState::MakeGraphicsEncoderDesc() const
 
         HgiAttachmentDesc attachmentDesc;
 
+        attachmentDesc.format = hgiTexHandle.Get()->GetDescriptor().format;
+
+        // We need to use LoadOpLoad instead of DontCare because we can have
+        // multiple render passes that use the same attachments.
+        // For example, translucent renders after opaque so we must load the
+        // opaque results before rendering translucent objects.
         HgiAttachmentLoadOp loadOp = aov.clearValue.IsEmpty() ?
-            HgiAttachmentLoadOpDontCare :
+            HgiAttachmentLoadOpLoad :
             HgiAttachmentLoadOpClear;
 
-        attachmentDesc.texture = hgiTexHandle;
         attachmentDesc.loadOp = loadOp;
-        attachmentDesc.storeOp = HgiAttachmentStoreOpStore;
+
+        // Don't store multisample images. Only store the resolved versions.
+        // This saves a bunch of bandwith (especially on tiled gpu's).
+        attachmentDesc.storeOp = multiSampled ?
+            HgiAttachmentStoreOpDontCare :
+            HgiAttachmentStoreOpStore;
 
         if (aov.clearValue.IsHolding<float>()) {
             float depth = aov.clearValue.UncheckedGet<float>();
@@ -396,12 +437,30 @@ HdStRenderPassState::MakeGraphicsEncoderDesc() const
             attachmentDesc.clearValue = col;
         }
 
+        // HdSt expresses blending per RenderPassState, where Hgi expresses
+        // blending per-attachment. Transfer pass blend state to attachments.
+        attachmentDesc.blendEnabled = _blendEnabled;
+        attachmentDesc.srcColorBlendFactor=HgiBlendFactor(_blendColorSrcFactor);
+        attachmentDesc.dstColorBlendFactor=HgiBlendFactor(_blendColorDstFactor);
+        attachmentDesc.colorBlendOp = HgiBlendOp(_blendColorOp);
+        attachmentDesc.srcAlphaBlendFactor=HgiBlendFactor(_blendAlphaSrcFactor);
+        attachmentDesc.dstAlphaBlendFactor=HgiBlendFactor(_blendAlphaDstFactor);
+        attachmentDesc.alphaBlendOp = HgiBlendOp(_blendAlphaOp);
+
         if (aov.aovName == HdAovTokens->depth) {
-            desc.depthAttachment = std::move(attachmentDesc);
-        } else if (TF_VERIFY(desc.colorAttachments.size() < maxColorAttachments, 
-                            "Too many aov bindings for color attachments")) 
+            desc.depthAttachmentDesc = std::move(attachmentDesc);
+            desc.depthTexture = hgiTexHandle;
+            if (hgiResolveHandle) {
+                desc.depthResolveTexture = hgiResolveHandle;
+            }
+        } else if (TF_VERIFY(desc.colorAttachmentDescs.size() < maxColorTex,
+                   "Too many aov bindings for color attachments"))
         {
-            desc.colorAttachments.emplace_back(std::move(attachmentDesc));
+            desc.colorAttachmentDescs.push_back(std::move(attachmentDesc));
+            desc.colorTextures.push_back(hgiTexHandle);
+            if (hgiResolveHandle) {
+                desc.colorResolveTextures.push_back(hgiResolveHandle);
+            }
         }
     }
 

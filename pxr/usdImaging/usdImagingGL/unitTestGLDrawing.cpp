@@ -25,19 +25,25 @@
 #include "pxr/imaging/glf/glew.h"
 
 #include "pxr/usdImaging/usdImagingGL/unitTestGLDrawing.h"
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
 #include "pxr/imaging/glf/contextCaps.h"
 #include "pxr/imaging/glf/diagnostic.h"
+#endif
 #include "pxr/imaging/garch/drawTarget.h"
 #include "pxr/imaging/garch/glDebugWindow.h"
 
 #include "pxr/base/arch/attributes.h"
 #include "pxr/base/gf/vec2i.h"
+#include "pxr/base/trace/collector.h"
+#include "pxr/base/trace/reporter.h"
 
 #include "pxr/base/plug/registry.h"
 #include "pxr/base/arch/systemInfo.h"
 
 #include <stdio.h>
 #include <stdarg.h>
+
+#include <fstream>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -99,10 +105,11 @@ UsdImagingGL_UnitTestWindow::~UsdImagingGL_UnitTestWindow()
 void
 UsdImagingGL_UnitTestWindow::OnInitializeGL()
 {
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     GlfGlewInit();
     GlfRegisterDefaultDebugOutputMessageCallback();
     GlfContextCaps::InitInstance();
-
+#endif
 
     //
     // Create an offscreen draw target which is the same size as this
@@ -148,7 +155,7 @@ UsdImagingGL_UnitTestWindow::OnPaintGL()
     _unitTest->DrawTest(false);
 
     _drawTarget->Unbind();
-
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     //
     // Blit the resulting color buffer to the window (this is a noop
     // if we're drawing offscreen).
@@ -163,6 +170,7 @@ UsdImagingGL_UnitTestWindow::OnPaintGL()
 
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
     glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+#endif
 }
 
 void
@@ -240,6 +248,9 @@ UsdImagingGL_UnitTestGLDrawing::UsdImagingGL_UnitTestGLDrawing()
     , _drawMode(HdStDrawMode::DRAW_SHADED_SMOOTH)
     , _shouldFrameAll(false)
     , _cullBackfaces(false)
+    , _showGuides(UsdImagingGLRenderParams().showGuides)
+    , _showRender(UsdImagingGLRenderParams().showRender)
+    , _showProxy(UsdImagingGLRenderParams().showProxy)
 {
 }
 
@@ -328,7 +339,9 @@ static void Usage(int argc, char *argv[])
 "                           [-times times1 times2 ...] [-cullBackfaces]\n"
 "                           [-clear r g b a] [-translate x y z]\n"
 "                           [-renderSetting name type value]\n"
-"                           [-rendererAov name] [...]\n"
+"                           [-rendererAov name]\n"
+"                           [-perfStatsFile path]\n"
+"                           [-traceFile path] [...]\n"
 "\n"
 "  usdImaging basic drawing test\n"
 "\n"
@@ -361,11 +374,19 @@ static void Usage(int argc, char *argv[])
 "  -clear r g b a      clear color\n"
 "  -translate x y z    default camera translation\n"
 "  -rendererAov name   Name of AOV to display or write out\n"
+"  -perfStatsFile path Path to file performance stats are written to\n"
+"  -traceFile path     Path to trace file to write\n"
 "  -renderSetting name type value\n"
 "                      Specifies a setting with given name, type (such as\n"
 "                      float) and value passed to renderer. -renderSetting\n"
 "                      can be given multiple times to specify different\n"
 "                      settings\n"
+"  -guidesPurpose [show|hide]\n"
+"                      force prims of purpose 'guide' to be shown or hidden\n"
+"  -renderPurpose [show|hide]\n"
+"                      force prims of purpose 'render' to be shown or hidden\n"
+"  -proxyPurpose [show|hide]\n"
+"                      force prims of purpose 'proxy' to be shown or hidden\n"
 ;
 
     Die(usage, TfGetBaseName(argv[0]).c_str());
@@ -408,6 +429,28 @@ static double ParseDouble(int& i, int argc, char *argv[],
         *invalid = false;
     }
     return result;
+}
+
+static bool ParseShowHide(int& i, int argc, char *argv[],
+                          bool* result)
+{
+    if (i + 1 == argc) {
+        ParseError(argv[0], "missing parameter for '%s'", argv[i]);
+        return false;
+    }
+    if (strcmp(argv[i + 1], "show") == 0) {
+        *result = true;
+    } else if (strcmp(argv[i + 1], "hide") == 0) {
+        *result = false;
+    } else {
+        ParseError(argv[0], "invalid parameter for '%s': %s. Must be either "
+                            "'show' or 'hide'",
+                   argv[i], argv[i + 1]);
+        return false;
+    }
+
+    ++i;
+    return true;
 }
 
 static const char * ParseString(int &i, int argc, char *argv[],
@@ -512,6 +555,14 @@ UsdImagingGL_UnitTestGLDrawing::_Parse(int argc, char *argv[], _Args* args)
             CheckForMissingArguments(i, 1, argc, argv);
             _rendererAov = TfToken(argv[++i]);
         }
+        else if (strcmp(argv[i], "-perfStatsFile") == 0) {
+            CheckForMissingArguments(i, 1, argc, argv);
+            _perfStatsFile = argv[++i];
+        }
+        else if (strcmp(argv[i], "-traceFile") == 0) {
+            CheckForMissingArguments(i, 1, argc, argv);
+            _traceFile = argv[++i];
+        }
         else if (strcmp(argv[i], "-clipPlane") == 0) {
             CheckForMissingArguments(i, 4, argc, argv);
             args->clipPlaneCoords.push_back(ParseDouble(i, argc, argv));
@@ -542,6 +593,15 @@ UsdImagingGL_UnitTestGLDrawing::_Parse(int argc, char *argv[], _Args* args)
             CheckForMissingArguments(i, 2, argc, argv);
             const char * const key = ParseString(i, argc, argv);
             _renderSettings[key] = ParseVtValue(i, argc, argv);
+        }
+        else if (strcmp(argv[i], "-guidesPurpose") == 0) {
+            ParseShowHide(i, argc, argv, &_showGuides);
+        }
+        else if (strcmp(argv[i], "-renderPurpose") == 0) {
+            ParseShowHide(i, argc, argv, &_showRender);
+        }
+        else if (strcmp(argv[i], "-proxyPurpose") == 0) {
+            ParseShowHide(i, argc, argv, &_showProxy);
         }
         else {
             ParseError(argv[0], "unknown argument %s", argv[i]);
@@ -575,10 +635,14 @@ UsdImagingGL_UnitTestGLDrawing::KeyRelease(int key)
 void
 UsdImagingGL_UnitTestGLDrawing::RunTest(int argc, char *argv[])
 {
-    UsdImagingGL_UnitTestHelper_InitPlugins();
-
     _Args args;
     _Parse(argc, argv, &args);
+
+    if (!_traceFile.empty()) {
+        TraceCollector::GetInstance().SetEnabled(true);
+    }
+
+    UsdImagingGL_UnitTestHelper_InitPlugins();
 
     for (size_t i=0; i<args.clipPlaneCoords.size()/4; ++i) {
         _clipPlanes.push_back(GfVec4d(&args.clipPlaneCoords[i*4]));
@@ -625,6 +689,20 @@ UsdImagingGL_UnitTestGLDrawing::RunTest(int argc, char *argv[])
         _widget->DrawOffscreen();
     } else {
         _widget->Run();
+    }
+    
+    if(!_traceFile.empty()) {
+        TraceCollector::GetInstance().SetEnabled(false);
+
+        {
+            std::ofstream traceOutFile(_traceFile);
+            if (TF_VERIFY(traceOutFile)) {
+                TraceReporter::GetGlobalReporter()->Report(traceOutFile);
+            }
+        }
+
+        TraceCollector::GetInstance().Clear();
+        TraceReporter::GetGlobalReporter()->ClearTree();
     }
 }
 

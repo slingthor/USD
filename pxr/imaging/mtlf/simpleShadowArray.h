@@ -44,6 +44,10 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 class MtlfSimpleShadowArray : public GarchSimpleShadowArray {
 public:
+    
+    // Disallow copies
+    MtlfSimpleShadowArray(const MtlfSimpleShadowArray&) = delete;
+    MtlfSimpleShadowArray& operator=(const MtlfSimpleShadowArray&) = delete;
 
     MTLF_API
     virtual void SetSize(GfVec2i const & size) override;

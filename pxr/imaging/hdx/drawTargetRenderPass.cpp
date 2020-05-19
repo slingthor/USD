@@ -24,10 +24,6 @@
 #include "pxr/imaging/glf/glew.h"
 #include "pxr/imaging/glf/glContext.h"
 
-#if defined(ARCH_GFX_METAL)
-#include "pxr/imaging/mtlf/mtlDevice.h"
-#endif
-
 #include "pxr/imaging/hdx/drawTargetRenderPass.h"
 #include "pxr/imaging/hdx/tokens.h"
 #include "pxr/imaging/hdSt/drawTargetRenderPassState.h"
@@ -40,7 +36,7 @@ static
 void
 _ClearBuffer(GLenum buffer, GLint drawBuffer, const VtValue &value)
 {
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     // XXX: There has to be a better way to handle the different formats.
     if (value.IsHolding<int>()) {
         glClearBufferiv(buffer, drawBuffer, &value.UncheckedGet<int>());
@@ -72,6 +68,7 @@ HdxDrawTargetRenderPass::HdxDrawTargetRenderPass(HdRenderIndex *index)
  , _drawTarget()
  , _drawTargetContext()
  , _collectionObjectVersion(0)
+ , _hasDependentDrawTargets(false)
 {
 }
 
@@ -100,6 +97,18 @@ void
 HdxDrawTargetRenderPass::SetRprimCollection(HdRprimCollection const& col)
 {
     _renderPass.SetRprimCollection(col);
+}
+
+bool
+HdxDrawTargetRenderPass::HasDependentDrawTargets() const
+{
+    return _hasDependentDrawTargets;
+}
+
+void
+HdxDrawTargetRenderPass::SetHasDependentDrawTargets(bool value)
+{
+    _hasDependentDrawTargets = value;
 }
 
 void
@@ -141,7 +150,7 @@ HdxDrawTargetRenderPass::Execute(
     _ClearBuffers();
 
     GfVec2i const &resolution = _drawTarget->GetSize();
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     // XXX: Should the Raster State or Renderpass set and restore this?
     // save the current viewport
     GLint viewport[4];
@@ -150,7 +159,7 @@ HdxDrawTargetRenderPass::Execute(
 #endif
     // Perform actual draw
     _renderPass.Execute(renderPassState, renderTags);
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     // restore viewport
     glViewport(viewport[0], viewport[1], viewport[2], viewport[3]);
 #endif
@@ -160,7 +169,7 @@ HdxDrawTargetRenderPass::Execute(
 void 
 HdxDrawTargetRenderPass::_ClearBuffers()
 {
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     float depthValue = _drawTargetRenderPassState->GetDepthClearValue();
     glClearBufferfv(GL_DEPTH, 0, &depthValue);
 #endif

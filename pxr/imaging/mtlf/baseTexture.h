@@ -76,7 +76,7 @@ public:
     /// Returns the Metal texture object for the texture.
     MTLF_API
     virtual BindingVector GetBindings(TfToken const & identifier,
-                                      GarchSamplerGPUHandle samplerName) override;
+                                      GarchSamplerGPUHandle const& samplerName) override;
     
     MTLF_API
     static void *PadImage(uint32_t glFormat, void const* rawData, size_t pixelByteSize, int numPixels);
