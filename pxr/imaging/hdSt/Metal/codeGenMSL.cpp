@@ -315,37 +315,6 @@ _GetPackedTypeDefinitions()
     "                a[0][0] * b09 - a[0][1] * b07 + a[0][2] * b06,\n"
     "                a[3][1] * b01 - a[3][0] * b03 - a[3][2] * b00,\n"
     "                a[2][0] * b03 - a[2][1] * b01 + a[2][2] * b00) * invdet;\n"
-    "}\n"
-    
-    "float determinant(float const f) {\n"
-    "  return f;\n"
-    "}\n"
-
-    "float determinant(float2x2 const m) {\n"
-    "  return m[0][0] * m[1][1] - m[0][1] * m[1][0];\n"
-    "}\n"
-
-    "float determinant(float3x3 const m) {\n"
-    "  return m[0][0] * ((m[2][2] * m[1][1]) - (m[1][2] * m[2][1]))\n"
-    "       + m[0][1] * ((m[1][2] * m[2][0]) - (m[2][2] * m[1][0]))\n"
-    "       + m[0][2] * ((m[2][1] * m[1][0]) - (m[1][1] * m[2][0]));\n"
-    "}\n"
-
-    "float determinant(float4x4 const m) {\n"
-    "    float b00 = m[0][0] * m[1][1] - m[0][1] * m[1][0];\n"
-    "    float b01 = m[0][0] * m[1][2] - m[0][2] * m[1][0];\n"
-    "    float b02 = m[0][0] * m[1][3] - m[0][3] * m[1][0];\n"
-    "    float b03 = m[0][1] * m[1][2] - m[0][2] * m[1][1];\n"
-    "    float b04 = m[0][1] * m[1][3] - m[0][3] * m[1][1];\n"
-    "    float b05 = m[0][2] * m[1][3] - m[0][3] * m[1][2];\n"
-    "    float b06 = m[2][0] * m[3][1] - m[2][1] * m[3][0];\n"
-    "    float b07 = m[2][0] * m[3][2] - m[2][2] * m[3][0];\n"
-    "    float b08 = m[2][0] * m[3][3] - m[2][3] * m[3][0];\n"
-    "    float b09 = m[2][1] * m[3][2] - m[2][2] * m[3][1];\n"
-    "    float b10 = m[2][1] * m[3][3] - m[2][3] * m[3][1];\n"
-    "    float b11 = m[2][2] * m[3][3] - m[2][3] * m[3][2];\n"
-    "  return (b00 * b11) - (b01 * b10) + (b02 * b09) +\n"
-    "         (b03 * b08) - (b04 * b07) + (b05 * b06);\n"
     "}\n\n";
 }
 
