@@ -35,7 +35,7 @@ bool GlfGlewInit()
     static std::once_flag once;
     std::call_once(once, [](){
         GlfSharedGLContextScopeHolder sharedGLContext;
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
 #if defined(ARCH_OS_MACOS)
         // we'd like to discover all extensions with valid entry points
         glewExperimental = true;

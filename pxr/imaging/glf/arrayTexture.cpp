@@ -80,7 +80,7 @@ GlfArrayTexture::_GetImageFilePath(size_t index) const
 /* virtual */
 GarchTexture::BindingVector
 GlfArrayTexture::GetBindings(TfToken const & identifier,
-                              GarchSamplerGPUHandle samplerName)
+                              GarchSamplerGPUHandle const& samplerName)
 {
     return BindingVector(1,
                 Binding(identifier, GarchTextureTokens->texels,

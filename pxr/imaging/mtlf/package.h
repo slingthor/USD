@@ -31,7 +31,6 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-TfToken MtlfPackageSimpleLightingShader();
 TfToken MtlfPackageDefaultMetalShaders();
 TfToken MtlfPackageInteropVtxShader();
 TfToken MtlfPackageInteropFragShader();

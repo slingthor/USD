@@ -21,7 +21,6 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-
 #include "pxr/imaging/glf/glew.h"
 
 #include "pxr/imaging/garch/contextCaps.h"
@@ -50,10 +49,10 @@ PXR_NAMESPACE_OPEN_SCOPE
 HdxOitRenderTask::HdxOitRenderTask(HdSceneDelegate* delegate, SdfPath const& id)
     : HdxRenderTask(delegate, id)
     , _oitTranslucentRenderPassShader(
-        HdStResourceFactory::GetInstance()->NewRenderPassShader(
+        std::make_shared<HdStRenderPassShader>(
             HdxPackageRenderPassOitShader()))
     , _oitOpaqueRenderPassShader(
-        HdStResourceFactory::GetInstance()->NewRenderPassShader(
+        std::make_shared<HdStRenderPassShader>(
             HdxPackageRenderPassOitOpaqueShader()))
     , _isOitEnabled(HdxOitBufferAccessor::IsOitEnabled())
 {
@@ -64,7 +63,7 @@ HdxOitRenderTask::~HdxOitRenderTask()
 }
 
 void
-HdxOitRenderTask::Sync(
+HdxOitRenderTask::_Sync(
     HdSceneDelegate* delegate,
     HdTaskContext* ctx,
     HdDirtyBits* dirtyBits)
@@ -73,7 +72,7 @@ HdxOitRenderTask::Sync(
     HF_MALLOC_TAG_FUNCTION();
 
     if (_isOitEnabled) {
-        HdxRenderTask::Sync(delegate, ctx, dirtyBits);
+        HdxRenderTask::_Sync(delegate, ctx, dirtyBits);
     }
 }
 
@@ -132,7 +131,7 @@ HdxOitRenderTask::Execute(HdTaskContext* ctx)
     
     // We render into a SSBO -- not MSSA compatible. On Metal we do not need to worry about setting/clearing MSAA
     // state because Multisampling is not global state but is instead a property of every attachment.
-#if defined(ARCH_GFX_OPENGL) && !defined(ARCH_GFX_METAL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED) && !defined(PXR_METAL_SUPPORT_ENABLED)
     bool isOpenGL = HdStResourceFactory::GetInstance()->IsOpenGL();
     bool oldMSAA = false;
     bool oldPointSmooth = false;
@@ -180,7 +179,7 @@ HdxOitRenderTask::Execute(HdTaskContext* ctx)
     // Post Execute Restore
     //
 
-#if defined(ARCH_GFX_OPENGL) && !defined(ARCH_GFX_METAL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED) && !defined(PXR_METAL_SUPPORT_ENABLED)
     if (isOpenGL) {
         if (oldMSAA) {
             glEnable(GL_MULTISAMPLE);

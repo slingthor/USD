@@ -51,6 +51,7 @@ pxr_library(usdImaging
         domeLightAdapter
         fieldAdapter
         gprimAdapter
+        hermiteCurvesAdapter
         implicitSurfaceMeshUtils
         instanceAdapter
         lightAdapter
@@ -67,6 +68,9 @@ pxr_library(usdImaging
         sphereLightAdapter
         textureUtils
         volumeAdapter
+
+    PRIVATE_CLASSES
+        materialParamUtils
 
     PUBLIC_HEADERS
         api.h

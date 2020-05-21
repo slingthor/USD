@@ -22,12 +22,14 @@
 # KIND, either express or implied. See the Apache License for the specific
 # language governing permissions and limitations under the Apache License.
 
+from __future__ import print_function
+
 from pxr import Sdf, Tf
 import unittest
 
 class TestSdfFileFormat(unittest.TestCase):
     def test_StaticMethods(self):
-        print 'Testing static methods on SdfFileFormat...'
+        print('Testing static methods on SdfFileFormat...')
 
         # FindById
         # Note that the id and extension are the same in our case
@@ -39,6 +41,10 @@ class TestSdfFileFormat(unittest.TestCase):
         sdfFileFormat = Sdf.FileFormat.FindByExtension('sdf')
         self.assertTrue(sdfFileFormat)
         self.assertEqual(sdfFileFormat.GetFileExtensions(), ['sdf'])
+        sdfFileFormatWithArgs = Sdf.FileFormat.FindByExtension(
+            'foo.sdf', {'target': 'sdf', 'documentation': 'doc string'})
+        self.assertTrue(sdfFileFormatWithArgs)
+        self.assertEqual(sdfFileFormatWithArgs.GetFileExtensions(), ['sdf'])
 
         # GetFileExtension
         self.assertEqual(Sdf.FileFormat.GetFileExtension('foo.sdf'), 'sdf')

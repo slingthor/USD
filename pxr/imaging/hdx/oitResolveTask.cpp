@@ -23,7 +23,7 @@
 //
 #include "pxr/imaging/glf/glew.h"
 
-#if defined(ARCH_GFX_METAL)
+#if defined(PXR_METAL_SUPPORT_ENABLED)
 #include "pxr/imaging/mtlf/mtlDevice.h"
 #include "pxr/imaging/mtlf/drawTarget.h"
 #endif
@@ -50,6 +50,7 @@
 #include "pxr/imaging/hdSt/renderPassState.h"
 #include "pxr/imaging/hdSt/renderDelegate.h"
 #include "pxr/imaging/hdSt/resourceFactory.h"
+#include "pxr/imaging/hdSt/resourceRegistry.h"
 #include "pxr/imaging/hdSt/imageShaderRenderPass.h"
 
 #include "pxr/imaging/hdx/oitBufferAccessor.h"
@@ -89,8 +90,9 @@ HdxOitResolveTask::_PrepareOitBuffers(
 {
     const int numSamples = 8; // Should match glslfx files
 
-    HdResourceRegistrySharedPtr const& resourceRegistry = 
-        renderIndex->GetResourceRegistry();
+     HdStResourceRegistrySharedPtr const& hdStResourceRegistry =
+        std::static_pointer_cast<HdStResourceRegistry>(
+            renderIndex->GetResourceRegistry());
 
     bool createOitBuffers = !_counterBar;
     if (createOitBuffers) { 
@@ -101,7 +103,7 @@ HdxOitResolveTask::_PrepareOitBuffers(
         counterSpecs.push_back(HdBufferSpec(
             HdxTokens->hdxOitCounterBuffer, 
             HdTupleType {HdTypeInt32_Atomic, 1}));
-        _counterBar = resourceRegistry->AllocateSingleBufferArrayRange(
+        _counterBar = hdStResourceRegistry->AllocateSingleBufferArrayRange(
                                             /*role*/HdxTokens->oitCounter,
                                             counterSpecs,
                                             HdBufferArrayUsageHint());
@@ -112,7 +114,7 @@ HdxOitResolveTask::_PrepareOitBuffers(
         indexSpecs.push_back(HdBufferSpec(
             HdxTokens->hdxOitIndexBuffer,
             HdTupleType {HdTypeInt32, 1}));
-        _indexBar = resourceRegistry->AllocateSingleBufferArrayRange(
+        _indexBar = hdStResourceRegistry->AllocateSingleBufferArrayRange(
                                             /*role*/HdxTokens->oitIndices,
                                             indexSpecs,
                                             HdBufferArrayUsageHint());
@@ -124,7 +126,7 @@ HdxOitResolveTask::_PrepareOitBuffers(
         dataSpecs.push_back(HdBufferSpec(
             HdxTokens->hdxOitDataBuffer, 
             HdTupleType {HdTypeFloatVec4, 1}));
-        _dataBar = resourceRegistry->AllocateSingleBufferArrayRange(
+        _dataBar = hdStResourceRegistry->AllocateSingleBufferArrayRange(
                                             /*role*/HdxTokens->oitData,
                                             dataSpecs,
                                             HdBufferArrayUsageHint());
@@ -136,7 +138,7 @@ HdxOitResolveTask::_PrepareOitBuffers(
         depthSpecs.push_back(HdBufferSpec(
             HdxTokens->hdxOitDepthBuffer, 
             HdTupleType {HdTypeFloat, 1}));
-        _depthBar = resourceRegistry->AllocateSingleBufferArrayRange(
+        _depthBar = hdStResourceRegistry->AllocateSingleBufferArrayRange(
                                             /*role*/HdxTokens->oitDepth,
                                             depthSpecs,
                                             HdBufferArrayUsageHint());
@@ -148,7 +150,7 @@ HdxOitResolveTask::_PrepareOitBuffers(
         uniformSpecs.push_back( HdBufferSpec(
             HdxTokens->oitScreenSize,HdTupleType{HdTypeInt32Vec2, 1}));
 
-        _uniformBar = resourceRegistry->AllocateUniformBufferArrayRange(
+        _uniformBar = hdStResourceRegistry->AllocateUniformBufferArrayRange(
                                             /*role*/HdxTokens->oitUniforms,
                                             uniformSpecs,
                                             HdBufferArrayUsageHint());
@@ -183,7 +185,7 @@ HdxOitResolveTask::_PrepareOitBuffers(
         uniformSources.push_back(HdBufferSourceSharedPtr(
                               new HdVtBufferSource(HdxTokens->oitScreenSize,
                                                    VtValue(screenSize))));
-        resourceRegistry->AddSources(_uniformBar, uniformSources);
+        hdStResourceRegistry->AddSources(_uniformBar, uniformSources);
     }
 }
 
@@ -233,12 +235,12 @@ HdxOitResolveTask::Prepare(HdTaskContext* ctx,
             return;
         }
 
-        _renderPass = boost::make_shared<HdSt_ImageShaderRenderPass>(
+        _renderPass = std::make_shared<HdSt_ImageShaderRenderPass>(
             renderIndex, collection);
 
         // We do not use renderDelegate->CreateRenderPassState because
         // ImageShaders always use HdSt
-        _renderPassState = boost::shared_ptr<HdStRenderPassState>(HdStResourceFactory::GetInstance()->NewRenderPassState());
+        _renderPassState = std::shared_ptr<HdStRenderPassState>(HdStResourceFactory::GetInstance()->NewRenderPassState());
         _renderPassState->SetEnableDepthMask(false);
         _renderPassState->SetColorMask(HdRenderPassState::ColorMaskRGBA);
         _renderPassState->SetBlendEnabled(true);
@@ -246,11 +248,11 @@ HdxOitResolveTask::Prepare(HdTaskContext* ctx,
             HdBlendOp::HdBlendOpAdd,
             HdBlendFactor::HdBlendFactorOne,
             HdBlendFactor::HdBlendFactorOneMinusSrcAlpha,
-            HdBlendOp::HdBlendOpAdd,
+            HdBlendOp::HdBlendOpAdd, 
             HdBlendFactor::HdBlendFactorOne,
             HdBlendFactor::HdBlendFactorOne);
 
-        _renderPassShader = boost::make_shared<HdStRenderPassShader>(
+        _renderPassShader = std::make_shared<HdStRenderPassShader>(
             HdxPackageOitResolveImageShader());
         _renderPassState->SetRenderPassShader(_renderPassShader);
 
@@ -312,10 +314,10 @@ HdxOitResolveTask::Execute(HdTaskContext* ctx)
     }
 
     _renderPassState->Bind(); 
-#if defined(ARCH_GFX_METAL)
+#if defined(PXR_METAL_SUPPORT_ENABLED)
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext()->GetMetalContext();
     context->SetDepthWriteEnable(false);
-#elif defined(ARCH_GFX_OPENGL)
+#elif defined(PXR_OPENGL_SUPPORT_ENABLED)
     bool isOpenGL = HdStResourceFactory::GetInstance()->IsOpenGL();
     if (isOpenGL) {
         glDisable(GL_DEPTH_TEST);
@@ -324,9 +326,9 @@ HdxOitResolveTask::Execute(HdTaskContext* ctx)
 
     _renderPass->Execute(_renderPassState, GetRenderTags());
 
-#if defined(ARCH_GFX_METAL)
+#if defined(PXR_METAL_SUPPORT_ENABLED)
     context->SetDepthWriteEnable(true);
-#elif defined(ARCH_GFX_OPENGL)
+#elif defined(PXR_OPENGL_SUPPORT_ENABLED)
     if (isOpenGL) {
         glEnable(GL_DEPTH_TEST);
     }

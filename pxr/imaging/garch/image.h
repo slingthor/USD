@@ -36,14 +36,14 @@
 #include "pxr/base/vt/value.h"
 
 #include <boost/noncopyable.hpp>
-#include <boost/shared_ptr.hpp>
 
+#include <memory>
 #include <string>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
 
-typedef boost::shared_ptr<class GarchImage> GarchImageSharedPtr;
+typedef std::shared_ptr<class GarchImage> GarchImageSharedPtr;
 
 /// \class GarchImage
 ///

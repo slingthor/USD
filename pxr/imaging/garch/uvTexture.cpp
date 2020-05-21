@@ -44,6 +44,7 @@ public:
                                    GarchImage::ImageOriginLocation originLocation =
                                                 GarchImage::OriginUpperLeft) const
     {
+        
         return GarchUVTexture::New(texturePath,
                                    /*cropTop*/ 0,
                                    /*cropBottom*/ 0,

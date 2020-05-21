@@ -43,8 +43,10 @@ pxr_library(usd
         primCompositionQuery
         primData
         primDataHandle
+        primDefinition
         primFlags
         primRange
+        primTypeInfo
         property
         references
         relationship
@@ -81,6 +83,7 @@ pxr_library(usd
         instanceKey
         integerCoding
         interpolators
+        primTypeInfoCache
         usdzResolver
         valueUtils
 
@@ -117,8 +120,10 @@ pxr_library(usd
         wrapPayloads.cpp
         wrapPrim.cpp
         wrapPrimCompositionQuery.cpp
+        wrapPrimDefinition.cpp
         wrapPrimFlags.cpp
         wrapPrimRange.cpp
+        wrapPrimTypeInfo.cpp
         wrapProperty.cpp
         wrapReferences.cpp
         wrapRelationship.cpp
@@ -147,7 +152,7 @@ pxr_library(usd
         generatedSchema.usda
         schema.usda:usd/schema.usda
         codegenTemplates/api.h
-        codegenTemplates/plugInfo.json
+        codegenTemplates/plugInfo.json:no_subst
         codegenTemplates/schemaClass.cpp
         codegenTemplates/schemaClass.h
         codegenTemplates/tokens.cpp
@@ -170,6 +175,7 @@ else()
 endif()
 
 pxr_test_scripts(
+    testenv/testUsdAppliedAPISchemas.py
     testenv/testUsdAttributeBlocking.py
     testenv/testUsdAttributeConnections.py
     testenv/testUsdBugs.py
@@ -181,6 +187,7 @@ pxr_test_scripts(
     testenv/testUsdCratePayloadConversionFromVersion07.py
     testenv/testUsdCreateProperties.py
     testenv/testUsdDataFormats.py
+    testenv/testUsdFallbackPrimTypes.py
     testenv/testUsdFileFormats.py
     testenv/testUsdFlatten.py
     testenv/testUsdFlatten2.py
@@ -189,6 +196,7 @@ pxr_test_scripts(
     testenv/testUsdInherits.py
     testenv/testUsdInstanceProxy.py
     testenv/testUsdInstancing.py
+    testenv/testUsdLoadUnloadDeepNestedInstancing.py
     testenv/testUsdMetadata.py
     testenv/testUsdModel.py
     testenv/testUsdNotices.py
@@ -259,6 +267,15 @@ pxr_build_test(testUsdMetadataCpp
         usd
     CPPFILES
         testenv/testUsdMetadata.cpp
+)
+
+pxr_build_test(testUsdInstancingCpp
+    LIBRARIES
+        tf
+        usd
+        sdf
+    CPPFILES
+        testenv/testUsdInstancingCpp.cpp
 )
 
 pxr_build_test(testUsdPrimGetDescendants
@@ -350,6 +367,11 @@ pxr_build_test(testUsdUsdzResolver
 )
 
 pxr_install_test_dir(
+    SRC testenv/testUsdAppliedAPISchemas
+    DEST testUsdAppliedAPISchemas
+)
+
+pxr_install_test_dir(
     SRC testenv/testUsdStageThreading
     DEST testUsdStageThreading
 )
@@ -357,6 +379,11 @@ pxr_install_test_dir(
 pxr_install_test_dir(
     SRC testenv/testUsdCratePayloadConversionFromVersion07.testenv
     DEST testUsdCratePayloadConversionFromVersion07
+)
+
+pxr_install_test_dir(
+    SRC testenv/testUsdFallbackPrimTypes
+    DEST testUsdFallbackPrimTypes
 )
 
 pxr_install_test_dir(
@@ -440,6 +467,11 @@ pxr_install_test_dir(
 )
 
 pxr_install_test_dir(
+    SRC testenv/testUsdInstancingCpp.testenv
+    DEST testUsdInstancingCpp
+)
+
+pxr_install_test_dir(
     SRC testenv/testUsdVariantEditing.testenv
     DEST testUsdVariantEditing
 )
@@ -480,6 +512,11 @@ pxr_install_test_dir(
 )
 
 pxr_install_test_dir(
+    SRC testenv/testUsdLoadUnloadDeepNestedInstancing.testenv
+    DEST testUsdLoadUnloadDeepNestedInstancing
+)
+
+pxr_install_test_dir(
     SRC testenv/testUsdStageNoPython.testenv
     DEST testUsdStageNoPython
 )
@@ -492,11 +529,6 @@ pxr_install_test_dir(
 pxr_install_test_dir(
     SRC testenv/testUsdValueClips
     DEST testUsdValueClips
-)
-
-pxr_install_test_dir(
-    SRC testenv/testUsdValueClips_Legacy
-    DEST testUsdValueClips_Legacy
 )
 
 pxr_install_test_dir(
@@ -515,6 +547,11 @@ pxr_install_test_dir(
 )
 
 pxr_install_test_dir(
+    SRC testenv/testUsdUsdzFileFormat
+    DEST testUsdUsdzFileFormat_pread
+)
+
+pxr_install_test_dir(
     SRC testenv/testUsdUsdzResolver
     DEST testUsdUsdzResolver
 )
@@ -522,6 +559,12 @@ pxr_install_test_dir(
 pxr_install_test_dir(
     SRC testenv/testUsdZipFile.testenv
     DEST testUsdZipFile
+)
+
+pxr_register_test(testUsdAppliedAPISchemas
+    PYTHON
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdAppliedAPISchemas"
+    EXPECTED_RETURN_CODE 0
 )
 
 pxr_register_test(testUsdAttributeBlocking
@@ -545,17 +588,6 @@ pxr_register_test(testUsdValueClips
     PYTHON
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdValueClips"
     EXPECTED_RETURN_CODE 0
-)
-
-# This test runs the same test script as testUsdValueClips
-# but uses a different set of test assets that are installed above.
-pxr_register_test(testUsdValueClips_Legacy
-    PYTHON
-    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdValueClips"
-    EXPECTED_RETURN_CODE 0
-    ENV
-        USD_AUTHOR_LEGACY_CLIPS=1
-        USD_READ_LEGACY_CLIPS=1
 )
 
 pxr_register_test(testUsdVariantEditing
@@ -622,6 +654,12 @@ pxr_register_test(testUsdCreateAttributeCpp
     EXPECTED_RETURN_CODE 0
 )
 
+pxr_register_test(testUsdFallbackPrimTypes
+    PYTHON
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdFallbackPrimTypes"
+    EXPECTED_RETURN_CODE 0
+)
+
 pxr_register_test(testUsdHardToReach
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdHardToReach"
     EXPECTED_RETURN_CODE 0
@@ -651,6 +689,12 @@ pxr_register_test(testUsdDataFormats
     EXPECTED_RETURN_CODE 0
 )
 
+pxr_register_test(testUsdLoadUnloadDeepNestedInstancing
+    PYTHON
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdLoadUnloadDeepNestedInstancing"
+    EXPECTED_RETURN_CODE 0
+)
+
 pxr_register_test(testUsdTimeSamples
     PYTHON
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdTimeSamples"
@@ -676,6 +720,11 @@ pxr_register_test(testUsdPrimCompositionQuery
 
 pxr_register_test(testUsdPrimGetDescendants
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdPrimGetDescendants"
+    EXPECTED_RETURN_CODE 0
+)
+
+pxr_register_test(testUsdInstancingCpp
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdInstancingCpp"
     EXPECTED_RETURN_CODE 0
 )
 
@@ -872,6 +921,14 @@ pxr_register_test(testUsdTimeValueAuthoringCpp
 pxr_register_test(testUsdUsdzFileFormat
     PYTHON
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdUsdzFileFormat"
+    EXPECTED_RETURN_CODE 0
+)
+
+pxr_register_test(testUsdUsdzFileFormat_pread
+    PYTHON
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdUsdzFileFormat"
+    ENV
+        USDC_USE_PREAD=1
     EXPECTED_RETURN_CODE 0
 )
 

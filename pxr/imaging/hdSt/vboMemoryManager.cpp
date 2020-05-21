@@ -27,7 +27,6 @@
 #include "pxr/imaging/garch/contextCaps.h"
 #include "pxr/imaging/garch/resourceFactory.h"
 
-#include <boost/make_shared.hpp>
 #include <vector>
 
 #include "pxr/base/arch/hash.h"
@@ -70,7 +69,7 @@ HdStVBOMemoryManager::CreateBufferArray(
 HdBufferArrayRangeSharedPtr
 HdStVBOMemoryManager::CreateBufferArrayRange()
 {
-    return boost::make_shared<_StripedBufferArrayRange>();
+    return std::make_shared<_StripedBufferArrayRange>();
 }
 
 
@@ -82,13 +81,7 @@ HdStVBOMemoryManager::ComputeAggregationId(
     static size_t salt = ArchHash(__FUNCTION__, sizeof(__FUNCTION__));
     size_t result = salt;
     for (HdBufferSpec const &spec : bufferSpecs) {
-        size_t const params[] = { 
-            spec.name.Hash(),
-            (size_t) spec.tupleType.type,
-            spec.tupleType.count
-        };
-        boost::hash_combine(result,
-                ArchHash((char const*)params, sizeof(size_t) * 3));
+        boost::hash_combine(result, spec.Hash());
     }
 
     boost::hash_combine(result, usageHint.value);
@@ -104,7 +97,7 @@ HdStVBOMemoryManager::GetBufferSpecs(
     HdBufferArraySharedPtr const &bufferArray) const
 {
     _StripedBufferArraySharedPtr bufferArray_ =
-        boost::static_pointer_cast<_StripedBufferArray> (bufferArray);
+        std::static_pointer_cast<_StripedBufferArray> (bufferArray);
     return bufferArray_->GetBufferSpecs();
 }
 
@@ -119,7 +112,7 @@ HdStVBOMemoryManager::GetResourceAllocation(
     size_t gpuMemoryUsed = 0;
 
     _StripedBufferArraySharedPtr bufferArray_ =
-        boost::static_pointer_cast<_StripedBufferArray> (bufferArray);
+        std::static_pointer_cast<_StripedBufferArray> (bufferArray);
 
     TF_FOR_ALL(resIt, bufferArray_->GetResources()) {
         HdBufferResourceSharedPtr const & resource = resIt->second;
@@ -211,9 +204,9 @@ HdStVBOMemoryManager::_StripedBufferArray::_StripedBufferArray(
 
 HdBufferResourceSharedPtr
 HdStVBOMemoryManager::_StripedBufferArray::_AddResource(TfToken const& name,
-                                                        HdTupleType tupleType,
-                                                        int offset,
-                                                        int stride)
+                                                   HdTupleType tupleType,
+                                                   int offset,
+                                                   int stride)
 {
     HD_TRACE_FUNCTION();
     if (TfDebug::IsEnabled(HD_SAFE_MODE)) {
@@ -496,7 +489,7 @@ HdStVBOMemoryManager::_StripedBufferArrayRange::CopyData(
                     bufferSource->GetName().GetText(), srcSize, dstSize);
             srcSize = dstSize;
         }
-        GLintptr vboOffset = bytesPerElement * _offset;
+        GLintptr vboOffset = bytesPerElement * _elementOffset;
 
         HD_PERF_COUNTER_INCR(HdPerfTokens->glBufferSubData);
 
@@ -505,6 +498,22 @@ HdStVBOMemoryManager::_StripedBufferArrayRange::CopyData(
             VBO->CopyData(vboOffset, srcSize, data);
         }
     }
+}
+
+int
+HdStVBOMemoryManager::_StripedBufferArrayRange::GetByteOffset(
+    TfToken const& resourceName) const
+{
+    if (!TF_VERIFY(_stripedBufferArray)) return 0;
+    HdBufferResourceSharedPtr VBO =
+        _stripedBufferArray->GetResource(resourceName);
+
+    if (!VBO || (VBO->GetId().IsSet() && _numElements > 0)) {
+        TF_CODING_ERROR("VBO doesn't exist for %s", resourceName.GetText());
+        return 0;
+    }
+
+    return (int) _GetByteOffset(VBO);
 }
 
 VtValue
@@ -523,7 +532,7 @@ HdStVBOMemoryManager::_StripedBufferArrayRange::ReadData(TfToken const &name) co
         return result;
     }
 
-    GLintptr vboOffset = HdDataSizeOfTupleType(VBO->GetTupleType()) * _offset;
+    GLintptr vboOffset = _GetByteOffset(VBO);
 
     result = VBO->ReadBuffer(VBO->GetTupleType(),
                              vboOffset,
@@ -585,7 +594,7 @@ HdStVBOMemoryManager::_StripedBufferArrayRange::SetBufferArray(HdBufferArray *bu
 void
 HdStVBOMemoryManager::_StripedBufferArrayRange::DebugDump(std::ostream &out) const
 {
-    out << "[StripedBAR] offset = " << _offset
+    out << "[StripedBAR] offset = " << _elementOffset
         << ", numElements = " << _numElements
         << ", capacity = " << _capacity
         << "\n";
@@ -595,6 +604,13 @@ const void *
 HdStVBOMemoryManager::_StripedBufferArrayRange::_GetAggregation() const
 {
     return _stripedBufferArray;
+}
+
+size_t
+HdStVBOMemoryManager::_StripedBufferArrayRange::_GetByteOffset(
+    HdBufferResourceSharedPtr const& resource) const
+{
+    return HdDataSizeOfTupleType(resource->GetTupleType()) * _elementOffset;
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

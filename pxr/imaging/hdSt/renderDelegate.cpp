@@ -45,9 +45,13 @@
 #include "pxr/imaging/hdSt/resourceRegistry.h"
 #include "pxr/imaging/hdSt/volume.h"
 
-#include "pxr/imaging/hd/engine.h"
+#include "pxr/imaging/hd/driver.h"
 #include "pxr/imaging/hd/extComputation.h"
 #include "pxr/imaging/hd/perfLog.h"
+#include "pxr/imaging/hd/tokens.h"
+
+#include "pxr/imaging/hgi/hgi.h"
+#include "pxr/imaging/hgi/tokens.h"
 
 #include "pxr/imaging/hio/glslfx.h"
 
@@ -57,10 +61,10 @@
 
 #include "pxr/imaging/glf/diagnostic.h"
 
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
 #include "pxr/imaging/glf/contextCaps.h"
 #endif
-#if defined(ARCH_GFX_METAL)
+#if defined(PXR_METAL_SUPPORT_ENABLED)
 #include "pxr/imaging/mtlf/contextCaps.h"
 #endif
 
@@ -72,13 +76,6 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 TF_DEFINE_ENV_SETTING(HD_ENABLE_GPU_TINY_PRIM_CULLING, false,
                       "Enable tiny prim culling");
-
-// This token is repeated from usdVolImaging which we cannot access from here.
-// Should we even instantiate bprims of different types for OpenVDB vs Field3d?
-TF_DEFINE_PRIVATE_TOKENS(
-    _tokens,
-    (openvdbAsset)
-);
 
 const TfTokenVector HdStRenderDelegate::SUPPORTED_RPRIM_TYPES =
 {
@@ -100,24 +97,19 @@ const TfTokenVector HdStRenderDelegate::SUPPORTED_SPRIM_TYPES =
     HdPrimTypeTokens->sphereLight
 };
 
-const TfTokenVector HdStRenderDelegate::SUPPORTED_BPRIM_TYPES =
-{
-    HdPrimTypeTokens->texture,
-    _tokens->openvdbAsset,
-    HdPrimTypeTokens->renderBuffer
-};
-
 std::mutex HdStRenderDelegate::_mutexResourceRegistry;
 std::atomic_int HdStRenderDelegate::_counterResourceRegistry;
 HdStResourceRegistrySharedPtr HdStRenderDelegate::_resourceRegistry;
 
 HdStRenderDelegate::HdStRenderDelegate()
+    : _hgi(nullptr)
 {
     _Initialize();
 }
 
 HdStRenderDelegate::HdStRenderDelegate(HdRenderSettingsMap const& settingsMap)
     : HdRenderDelegate(settingsMap)
+    , _hgi(nullptr)
 {
     _Initialize();
 }
@@ -131,7 +123,7 @@ HdStRenderDelegate::_Initialize()
     std::lock_guard<std::mutex> guard(_mutexResourceRegistry);
     
     if (_counterResourceRegistry.fetch_add(1) == 0) {
-        _resourceRegistry.reset( new HdStResourceRegistry() );
+        _resourceRegistry = std::make_shared<HdStResourceRegistry>();
         HdPerfLog::GetInstance().AddResourceRegistry(_resourceRegistry);
     }
 
@@ -184,9 +176,6 @@ HdStRenderDelegate::GetRenderStats() const
 
 HdStRenderDelegate::~HdStRenderDelegate()
 {
-    if (_hgi) {
-        delete _hgi;
-    }
     // Here we could destroy the resource registry when the last render
     // delegate HdSt is destroyed, however we prefer to keep the resources
     // around to match previous singleton behaviour (for now).
@@ -198,6 +187,25 @@ HdStRenderDelegate::~HdStRenderDelegate()
     }
     
     GarchTextureRegistry::GetInstance().GarbageCollectIfNeeded();
+}
+
+void
+HdStRenderDelegate::SetDrivers(HdDriverVector const& drivers)
+{
+    // For Storm we want to use the Hgi driver, so extract it.
+    for (HdDriver* hdDriver : drivers) {
+        if (hdDriver->name == HgiTokens->renderDriver &&
+            hdDriver->driver.IsHolding<Hgi*>()) {
+            _hgi = hdDriver->driver.UncheckedGet<Hgi*>();
+            break;
+        }
+    }
+    
+    if (_resourceRegistry) {
+        _resourceRegistry->SetHgi(_hgi);
+    }
+
+    TF_VERIFY(_hgi, "HdSt requires Hgi HdDriver");
 }
 
 const TfTokenVector &
@@ -212,10 +220,26 @@ HdStRenderDelegate::GetSupportedSprimTypes() const
     return SUPPORTED_SPRIM_TYPES;
 }
 
+static
+TfTokenVector
+_ComputeSupportedBprimTypes()
+{
+    TfTokenVector result;
+    result.push_back(HdPrimTypeTokens->texture);
+    result.push_back(HdPrimTypeTokens->renderBuffer);
+
+    for (const TfToken &primType : HdStField::GetSupportedBprimTypes()) {
+        result.push_back(primType);
+    }
+
+    return result;
+}
+
 const TfTokenVector &
 HdStRenderDelegate::GetSupportedBprimTypes() const
 {
-    return SUPPORTED_BPRIM_TYPES;
+    static const TfTokenVector result = _ComputeSupportedBprimTypes();
+    return result;
 }
 
 HdRenderParam *
@@ -359,7 +383,7 @@ HdStRenderDelegate::CreateBprim(TfToken const& typeId,
 {
     if (typeId == HdPrimTypeTokens->texture) {
         return new HdStTexture(bprimId);
-    } else if (typeId == _tokens->openvdbAsset) {
+    } else if (HdStField::IsSupportedBprimType(typeId)) {
         return new HdStField(bprimId, typeId);
     } else if (typeId == HdPrimTypeTokens->renderBuffer) {
         return new HdStRenderBuffer(_hgi, bprimId);
@@ -375,7 +399,7 @@ HdStRenderDelegate::CreateFallbackBprim(TfToken const& typeId)
 {
     if (typeId == HdPrimTypeTokens->texture) {
         return new HdStTexture(SdfPath::EmptyPath());
-    } else if (typeId == _tokens->openvdbAsset) {
+    } else if (HdStField::IsSupportedBprimType(typeId)) {
         return new HdStField(SdfPath::EmptyPath(), typeId);
     } else if (typeId == HdPrimTypeTokens->renderBuffer) {
         return new HdStRenderBuffer(_hgi, SdfPath::EmptyPath());
@@ -436,11 +460,11 @@ HdStRenderDelegate::CommitResources(HdChangeTracker *tracker)
 bool
 HdStRenderDelegate::IsSupported()
 {
-#if defined(ARCH_GFX_METAL)
+#if defined(PXR_METAL_SUPPORT_ENABLED)
     if (MtlfContextCaps::GetAPIVersion() >= MtlfContextCaps::APIVersion_Metal2_0)
         return true;
 #endif
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     if (GlfContextCaps::GetAPIVersion() >= 400)
         return true;
 #endif

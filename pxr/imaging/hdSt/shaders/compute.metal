@@ -33,79 +33,79 @@
         "default": {
             "smoothNormalsFloatToFloat": {
                 "source": [ "Compute.NormalsSrcFloat",
-                           "Compute.NormalsDstFloat",
-                           "Compute.SmoothNormals" ]
+                            "Compute.NormalsDstFloat",
+                            "Compute.SmoothNormals" ]
             },
             "smoothNormalsDoubleToDouble": {
                 "source": [ "Compute.NormalsSrcDouble",
-                           "Compute.NormalsDstDouble",
-                           "Compute.SmoothNormals" ]
+                            "Compute.NormalsDstDouble",
+                            "Compute.SmoothNormals" ]
             },
             "smoothNormalsFloatToPacked": {
                 "source": [ "Compute.NormalsSrcFloat",
-                           "Compute.NormalsDstPacked",
-                           "Compute.SmoothNormals" ]
+                            "Compute.NormalsDstPacked",
+                            "Compute.SmoothNormals" ]
             },
             "smoothNormalsDoubleToPacked": {
                 "source": [ "Compute.NormalsSrcDouble",
-                           "Compute.NormalsDstPacked",
-                           "Compute.SmoothNormals" ]
+                            "Compute.NormalsDstPacked",
+                            "Compute.SmoothNormals" ]
             },
             "flatNormalsTriFloatToFloat": {
                 "source": [ "Compute.NormalsSrcFloat",
-                           "Compute.NormalsDstFloat",
-                           "Compute.FlatNormals",
-                           "Compute.FlatNormalsTri" ]
+                            "Compute.NormalsDstFloat",
+                            "Compute.FlatNormals",
+                            "Compute.FlatNormalsTri" ]
             },
             "flatNormalsTriDoubleToDouble": {
                 "source": [ "Compute.NormalsSrcDouble",
-                           "Compute.NormalsDstDouble",
-                           "Compute.FlatNormals",
-                           "Compute.FlatNormalsTri" ]
+                            "Compute.NormalsDstDouble",
+                            "Compute.FlatNormals",
+                            "Compute.FlatNormalsTri" ]
             },
             "flatNormalsTriFloatToPacked": {
                 "source": [ "Compute.NormalsSrcFloat",
-                           "Compute.NormalsDstPacked",
-                           "Compute.FlatNormals",
-                           "Compute.FlatNormalsTri" ]
+                            "Compute.NormalsDstPacked",
+                            "Compute.FlatNormals",
+                            "Compute.FlatNormalsTri" ]
             },
             "flatNormalsTriDoubleToPacked": {
                 "source": [ "Compute.NormalsSrcDouble",
-                           "Compute.NormalsDstPacked",
-                           "Compute.FlatNormals",
-                           "Compute.FlatNormalsTri" ]
+                            "Compute.NormalsDstPacked",
+                            "Compute.FlatNormals",
+                            "Compute.FlatNormalsTri" ]
             },
             "flatNormalsQuadFloatToFloat": {
                 "source": [ "Compute.NormalsSrcFloat",
-                           "Compute.NormalsDstFloat",
-                           "Compute.FlatNormals",
-                           "Compute.FlatNormalsQuad" ]
+                            "Compute.NormalsDstFloat",
+                            "Compute.FlatNormals",
+                            "Compute.FlatNormalsQuad" ]
             },
             "flatNormalsQuadDoubleToDouble": {
                 "source": [ "Compute.NormalsSrcDouble",
-                           "Compute.NormalsDstDouble",
-                           "Compute.FlatNormals",
-                           "Compute.FlatNormalsQuad" ]
+                            "Compute.NormalsDstDouble",
+                            "Compute.FlatNormals",
+                            "Compute.FlatNormalsQuad" ]
             },
             "flatNormalsQuadFloatToPacked": {
                 "source": [ "Compute.NormalsSrcFloat",
-                           "Compute.NormalsDstPacked",
-                           "Compute.FlatNormals",
-                           "Compute.FlatNormalsQuad" ]
+                            "Compute.NormalsDstPacked",
+                            "Compute.FlatNormals",
+                            "Compute.FlatNormalsQuad" ]
             },
             "flatNormalsQuadDoubleToPacked": {
                 "source": [ "Compute.NormalsSrcDouble",
-                           "Compute.NormalsDstPacked",
-                           "Compute.FlatNormals",
-                           "Compute.FlatNormalsQuad" ]
+                            "Compute.NormalsDstPacked",
+                            "Compute.FlatNormals",
+                            "Compute.FlatNormalsQuad" ]
             },
             "quadrangulateFloat": {
                 "source": [ "Compute.QuadrangulateFloat",
-                           "Compute.Quadrangulate" ]
+                            "Compute.Quadrangulate" ]
             },
             "quadrangulateDouble": {
                 "source": [ "Compute.QuadrangulateDouble",
-                           "Compute.Quadrangulate" ]
+                            "Compute.Quadrangulate" ]
             }
         }
     }
@@ -358,7 +358,7 @@ int4 getIndices(device const int *indices, int idx)
 
 float3 computeNormalForPrimIndex(device const POINTS_INPUT_TYPE* points, device const int *indices, device const Uniforms *uniforms, int primIndex)
 {
-    int4 primIndices = getIndices(getIndicesIndex(uniforms, primIndex));
+    int4 primIndices = getIndices(indices, getIndicesIndex(uniforms, primIndex));
 
     float3 p0 = getPoint(points, getPointsIndex(uniforms, primIndices.x));
     float3 p1 = getPoint(points, getPointsIndex(uniforms, primIndices.y));

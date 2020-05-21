@@ -23,6 +23,8 @@
 //
 #include "pxr/imaging/hdSt/shaderCode.h"
 
+#include "pxr/imaging/hdSt/materialParam.h"
+
 #include "pxr/imaging/hd/tokens.h"
 
 #include "pxr/base/tf/iterator.h"
@@ -32,16 +34,10 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 
-HdStShaderCode::HdStShaderCode()
-{
-    /*NOTHING*/
-}
+HdStShaderCode::HdStShaderCode() = default;
 
 /*virtual*/
-HdStShaderCode::~HdStShaderCode()
-{
-    /*NOTHING*/
-}
+HdStShaderCode::~HdStShaderCode() = default;
 
 /* static */
 size_t
@@ -64,10 +60,10 @@ HdStShaderCode::GetMaterialTag() const
 }
 
 /*virtual*/
-HdMaterialParamVector const&
+HdSt_MaterialParamVector const&
 HdStShaderCode::GetParams() const
 {
-    static HdMaterialParamVector const empty;
+    static HdSt_MaterialParamVector const empty;
     return empty;
 }
 
@@ -101,5 +97,24 @@ HdStShaderCode::GetTextures() const
     return HdStShaderCode::TextureDescriptorVector();
 }
 
+/* virtual */
+HdStShaderCode::NamedTextureHandleVector const &
+HdStShaderCode::GetNamedTextureHandles() const
+{
+    static HdStShaderCode::NamedTextureHandleVector empty;
+    return empty;
+}
+
+/*virtual*/
+std::vector<HdStShaderCode::BarAndSources>
+HdStShaderCode::ComputeBufferSourcesFromTextures() const
+{
+    return {};
+}
+
+HdStShaderCode::ID
+HdStShaderCode::ComputeTextureSourceHash() const {
+    return 0;
+}
 
 PXR_NAMESPACE_CLOSE_SCOPE

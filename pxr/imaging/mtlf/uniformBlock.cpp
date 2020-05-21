@@ -34,14 +34,14 @@ PXR_NAMESPACE_OPEN_SCOPE
 MtlfUniformBlock::MtlfUniformBlock(char const *label) :
     _size(0)
 {
-    _buffer.Clear();
+    _buffer = nil;
 }
 
 MtlfUniformBlock::~MtlfUniformBlock()
 {
-    if (_buffer.IsSet()) {
+    if (_buffer) {
         MtlfMetalContext::GetMetalContext()->ReleaseMetalBuffer(_buffer);
-        _buffer.Clear();
+        _buffer = nil;
     }
 }
 
@@ -63,7 +63,7 @@ void
 MtlfUniformBlock::Update(const void *data, int size)
 {
     // Only recreate buffer if one doesn't already exist or the size has changed
-    if (!_buffer.IsSet() || _buffer.length() != size) {
+    if (!_buffer || _buffer.length != size) {
         _buffer = MtlfMetalContext::GetMetalContext()->GetMetalBuffer(size, MTLResourceStorageModeDefault, data);
     }
     

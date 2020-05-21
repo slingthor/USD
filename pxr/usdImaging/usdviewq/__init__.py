@@ -21,11 +21,14 @@
 # KIND, either express or implied. See the Apache License for the specific
 # language governing permissions and limitations under the Apache License.
 #
+
+from __future__ import print_function
+
 import sys, argparse, os
 
-from qt import QtWidgets
-from common import Timer
-from appController import AppController
+from .qt import QtWidgets, QtCore
+from .common import Timer
+from .appController import AppController
 
 from pxr import UsdAppUtils
 
@@ -246,10 +249,9 @@ class Launcher(object):
                     # perhaps we should error here? For now just pre-pending
                     # root, and printing warning...
                     from pxr import Sdf
-                    print >> sys.stderr, (
-                        "WARNING: camera path %r was not absolute, prepending "
-                        "%r to make it absolute" % (str(camPath),
-                            str(Sdf.Path.absoluteRootPath)))
+                    print("WARNING: camera path %r was not absolute, prepending "
+                          "%r to make it absolute" % (str(camPath),
+                              str(Sdf.Path.absoluteRootPath)), file=sys.stderr)
                     arg_parse_result.camera = camPath.MakeAbsolutePath(
                         Sdf.Path.absoluteRootPath)
 
@@ -288,19 +290,8 @@ class Launcher(object):
         if arg_parse_result.clearSettings:
             AppController.clearSettings()
 
-        # Find the resource directory
-        resourceDir = os.path.dirname(os.path.realpath(__file__)) + "/"
-
         # Create the Qt application
         app = QtWidgets.QApplication(sys.argv)
-
-        # Apply the style sheet to it
-        sheet = open(os.path.join(resourceDir, 'usdviewstyle.qss'), 'r')
-
-        # Qt style sheet accepts only forward slashes as path separators
-        sheetString = sheet.read().replace('RESOURCE_DIR',
-                                           resourceDir.replace("\\", "/"))
-        app.setStyleSheet(sheetString)
 
         contextCreator = lambda usdFile: self.GetResolverContext(usdFile)
         appController = AppController(arg_parse_result, contextCreator)
@@ -316,12 +307,10 @@ class Launcher(object):
         (app, appController) = self.LaunchPreamble(arg_parse_result)
         
         if arg_parse_result.quitAfterStartup:
-            # Before we quit, process events one more time to make sure the
-            # UI is fully populated (and to capture all the timing information
-            # we'd want).
-            app.processEvents()
-            appController._cleanAndClose()
-            return
+            # Enqueue event to shutdown application. We don't use quit() because
+            # it doesn't trigger the closeEvent() on the main window which is
+            # used to orchestrate the shutdown.
+            QtCore.QTimer.singleShot(0, app.instance().closeAllWindows)
 
         app.exec_()
 

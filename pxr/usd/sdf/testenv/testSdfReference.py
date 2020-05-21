@@ -22,6 +22,8 @@
 # KIND, either express or implied. See the Apache License for the specific
 # language governing permissions and limitations under the Apache License.
 
+from __future__ import print_function
+
 from pxr import Sdf, Tf
 import unittest
 
@@ -42,17 +44,17 @@ class TestSdfReferences(unittest.TestCase):
                     kw[args[i][0]] = args[i][1]
         
             ref = Sdf.Reference(**kw)
-            print '  Testing Repr for: ' + repr(ref)
+            print('  Testing Repr for: ' + repr(ref))
         
             self.assertEqual(ref, eval(repr(ref)))
             for arg, value in args:
-                if kw.has_key(arg):
+                if arg in kw:
                     self.assertEqual(eval('ref.' + arg), value)
                 else:
                     self.assertEqual(eval('ref.' + arg), eval('Sdf.Reference().' + arg))
         
         
-        print "\nTesting Sdf.Reference immutability."
+        print("\nTesting Sdf.Reference immutability.")
         
         # There is no proxy for the Reference yet (we don't have a good
         # way to support nested proxies).  Make sure the user can't modify
@@ -84,6 +86,13 @@ class TestSdfReferences(unittest.TestCase):
         self.assertTrue(ref1 > ref0)
         self.assertTrue(ref0 <= ref1)
         self.assertTrue(ref1 >= ref0)
+
+        # Regression test for bug USD-5000 where less than operator was not 
+        # fully anti-symmetric
+        r1 = Sdf.Reference()
+        r2 = Sdf.Reference('//test/layer.sdf', layerOffset=Sdf.LayerOffset(48, -2))
+        self.assertTrue(r1 < r2)
+        self.assertFalse(r2 < r1)
 
 if __name__ == "__main__":
     unittest.main()

@@ -58,40 +58,24 @@ ARCH_PRAGMA_MAYBE_UNINITIALIZED
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-TF_DEFINE_ENV_SETTING(
-    USD_READ_LEGACY_CLIPS, true,
-    "If on, legacy clip metadata will be respected when populating "
-    "clips. Otherwise, legacy clip metadata will be ignored.");
-
 // offset is an optional metadata in template clips, this value is
 // used to signify that it was not specified.
 constexpr double _DefaultClipOffsetValue = std::numeric_limits<double>::max();
 
-static bool
-_IsClipRelatedField(const TfToken& fieldName)
-{
-    return TfStringStartsWith(fieldName.GetString(), "clip");
-}
-
 bool
 UsdIsClipRelatedField(const TfToken& fieldName)
 {
-    return _IsClipRelatedField(fieldName) && 
-           std::find(UsdTokens->allTokens.begin(), 
-                     UsdTokens->allTokens.end(), 
-                     fieldName) != UsdTokens->allTokens.end();
+    return fieldName == UsdTokens->clips
+        || fieldName == UsdTokens->clipSets;
 }
 
 std::vector<TfToken>
 UsdGetClipRelatedFields()
 {
-    std::vector<TfToken> result = UsdTokens->allTokens;
-    result.erase(
-        std::remove_if(
-            result.begin(), result.end(),
-            [](const TfToken& field) { return !_IsClipRelatedField(field); }),
-        result.end());
-    return result;
+    return std::vector<TfToken>{ 
+        UsdTokens->clips, 
+        UsdTokens->clipSets 
+    };
 }
 
 struct Usd_SortByExternalTime
@@ -178,21 +162,6 @@ _ApplyLayerOffsetToExternalTimes(
     }
 }
 
-static void
-_ClipDebugMsg(const PcpNodeRef& node,
-              const SdfLayerRefPtr& layer,
-              const TfToken& metadataName) 
-{
-    TF_DEBUG(USD_CLIPS).Msg(
-        "%s for prim <%s> found in LayerStack %s "
-        "at spec @%s@<%s>\n",
-        metadataName.GetText(),
-        node.GetRootNode().GetPath().GetString().c_str(),
-        TfStringify(node.GetLayerStack()).c_str(),
-        layer->GetIdentifier().c_str(), 
-        node.GetPath().GetString().c_str());
-}
-
 template <typename V>
 static void
 _ClipDerivationMsg(const TfToken& metadataName,
@@ -253,18 +222,21 @@ _DeriveClipInfo(const std::string& templateAssetPath,
                 const size_t indexOfSourceLayer)
 {
     if (stride <= 0) {
-        TF_WARN("Invalid clipTemplateStride %f for prim <%s>. "
-                "clipTemplateStride must be greater than 0.", 
-                stride, usdPrimPath.GetText());
+        TF_WARN("Invalid %s %f for prim <%s>. %s must be greater than 0.", 
+                UsdClipsAPIInfoKeys->templateStride.GetText(), stride,
+                usdPrimPath.GetText(),
+                UsdClipsAPIInfoKeys->templateStride.GetText());
         return;
     }
 
     bool activeOffsetProvided = activeOffset != _DefaultClipOffsetValue;
     if (activeOffsetProvided && (std::abs(activeOffset) > stride)) {
-        TF_WARN("Invalid clipTemplateOffset %f for prim <%s>. "
-                "absolute value of clipTemplateOffset must not exceed "
-                "clipTemplateStride %f.",
-                activeOffset, usdPrimPath.GetText(), stride);
+        TF_WARN("Invalid %s %f for prim <%s>. "
+                "Absolute value of %s must not exceed %s %f.",
+                UsdClipsAPIInfoKeys->templateActiveOffset.GetText(), 
+                activeOffset, usdPrimPath.GetText(),
+                UsdClipsAPIInfoKeys->templateActiveOffset.GetText(), 
+                UsdClipsAPIInfoKeys->templateStride.GetText(), stride);
         return;
     }
 
@@ -301,19 +273,23 @@ _DeriveClipInfo(const std::string& templateAssetPath,
     if ((matchingGroups != 1 && matchingGroups != 2)
         || (matchingGroups == 2 
             && (integerHashSectionIndex != decimalHashSectionIndex - 1))) {
-        TF_WARN("Invalid template string specified %s, must be "
+        TF_WARN("Invalid %s '%s' for prim <%s>. It must be "
                 "of the form path/basename.###.usd or "
                 "path/basename.###.###.usd. Note that the number "
                 "of hash marks is variable in each group.",
-                templateAssetPath.c_str());
+                UsdClipsAPIInfoKeys->templateAssetPath.GetText(),
+                templateAssetPath.c_str(),
+                usdPrimPath.GetText());
         return;
     }
 
     if (startTimeCode > endTimeCode) {
-        TF_WARN("Invalid range specified in template clip metadata. "
-                "clipTemplateEndTime (%f) cannot be greater than "
-                "clipTemplateStartTime (%f).",
+        TF_WARN("Invalid time range specified for prim <%s>. "
+                "%s (%f) cannot be greater than %s (%f).",
+                usdPrimPath.GetText(),
+                UsdClipsAPIInfoKeys->templateEndTime.GetText(), 
                 endTimeCode,
+                UsdClipsAPIInfoKeys->templateStartTime.GetText(), 
                 startTimeCode);
         return;
     }
@@ -337,7 +313,7 @@ _DeriveClipInfo(const std::string& templateAssetPath,
     size_t clipActiveIndex = 0;
 
     // If we have an activeOffset, we author a knot on the front so users can query
-    // at time t where t is the first sample - the clipActiveOffset
+    // at time t where t is the first sample - the active offset
     if (activeOffsetProvided) {
         const double promotedStart = startTimeCode*promotion;
         const double promotedOffset = std::abs(activeOffset)*promotion;
@@ -376,7 +352,7 @@ _DeriveClipInfo(const std::string& templateAssetPath,
     }
 
     // If we have an offset, we author a knot on the end so users can query
-    // at time t where t is the last sample + the clipActiveOffset
+    // at time t where t is the last sample + the active offset
     if (activeOffsetProvided) {
         const double promotedEnd = endTimeCode*promotion;
         const double promotedOffset = std::abs(activeOffset)*promotion;
@@ -384,199 +360,12 @@ _DeriveClipInfo(const std::string& templateAssetPath,
         (*clipTimes)->push_back(GfVec2d(clipTime, clipTime));
     }
 
-    _ClipDerivationMsg(UsdTokens->clipAssetPaths, **clipAssetPaths, usdPrimPath);
-    _ClipDerivationMsg(UsdTokens->clipTimes, **clipTimes, usdPrimPath);
-    _ClipDerivationMsg(UsdTokens->clipActive, **clipActive, usdPrimPath);
-}
-
-static bool
-_ResolveLegacyClipInfo(
-    const PcpPrimIndex& primIndex,
-    Usd_ResolvedClipInfo* clipInfo) 
-{
-    bool nontemplateMetadataSeen = false;
-    bool templateMetadataSeen    = false;
-
-    std::string templateAssetPath;
-
-    // find our anchor(clipAssetPaths/clipTemplateAssetPath) if it exists.
-    for (Usd_Resolver res(&primIndex); res.IsValid(); res.NextNode()) {
-        const PcpNodeRef& node = res.GetNode();
-        const SdfPath& primPath = node.GetPath();
-        const PcpLayerStackPtr& layerStack = node.GetLayerStack();
-        const SdfLayerRefPtrVector& layers = layerStack->GetLayers();
-
-        for (size_t i = 0, j = layers.size(); i != j; ++i) {
-            const SdfLayerRefPtr& layer = layers[i];
-            VtArray<SdfAssetPath> clipAssetPaths;
-            if (layer->HasField(primPath, UsdTokens->clipAssetPaths, 
-                                &clipAssetPaths)){
-                nontemplateMetadataSeen = true;
-                _ClipDebugMsg(node, layer, UsdTokens->clipAssetPaths);
-                clipInfo->sourceLayerStack = layerStack;
-                clipInfo->sourcePrimPath = primPath;
-                clipInfo->indexOfLayerWhereAssetPathsFound = i;
-                clipInfo->clipAssetPaths = boost::in_place();
-                clipInfo->clipAssetPaths->swap(clipAssetPaths);
-                break;
-            }
-
-            if (layer->HasField(primPath, UsdTokens->clipTemplateAssetPath,
-                                &templateAssetPath)) {
-                templateMetadataSeen = true;
-                clipInfo->sourceLayerStack = layerStack;
-                clipInfo->sourcePrimPath = primPath;
-                clipInfo->indexOfLayerWhereAssetPathsFound = i;
-                break;
-            }
-
-            if (templateMetadataSeen && nontemplateMetadataSeen) {
-                TF_WARN("Both template and non-template clip metadata are "
-                        "authored for prim <%s> in layerStack %s "
-                        "at spec @%s@<%s>",
-                        primPath.GetText(),
-                        TfStringify(node.GetLayerStack()).c_str(),
-                        layer->GetIdentifier().c_str(),
-                        node.GetPath().GetString().c_str());
-            }
-        }
-
-        if (templateMetadataSeen || nontemplateMetadataSeen) {
-            break;
-        }
-    }
-
-    // we need not complete resolution if there are no clip
-    // asset paths available, as they are a necessary component for clips.
-    if (!templateMetadataSeen && !nontemplateMetadataSeen) {
-        return false;
-    }
-
-    boost::optional<double> templateStartTime;
-    boost::optional<double> templateEndTime;
-    boost::optional<double> templateStride;
-
-    for (Usd_Resolver res(&primIndex); res.IsValid(); res.NextNode()) {
-        const PcpNodeRef& node = res.GetNode();
-        const SdfPath& primPath = node.GetPath();
-        const SdfLayerRefPtrVector& layers = node.GetLayerStack()->GetLayers();
-
-        // Compose the various pieces of clip metadata; iterate the LayerStack
-        // from strong-to-weak and save the strongest opinion.
-        for (size_t i = 0, j = layers.size(); i != j; ++i) {
-            const SdfLayerRefPtr& layer = layers[i];
-
-            if (!clipInfo->clipManifestAssetPath) {
-                SdfAssetPath clipManifestAssetPath;
-                if (layer->HasField(primPath, UsdTokens->clipManifestAssetPath, 
-                                    &clipManifestAssetPath)) {
-                    _ClipDebugMsg(node, layer, UsdTokens->clipManifestAssetPath);
-                    clipInfo->clipManifestAssetPath = clipManifestAssetPath;
-                }
-            }
-
-            if (!clipInfo->clipPrimPath) {
-                std::string clipPrimPath;
-                if (layer->HasField(primPath, UsdTokens->clipPrimPath, 
-                            &clipPrimPath)) {
-                    _ClipDebugMsg(node, layer, UsdTokens->clipPrimPath);
-                    clipInfo->clipPrimPath = boost::in_place();
-                    clipInfo->clipPrimPath->swap(clipPrimPath);
-                }
-            }
-
-            if (nontemplateMetadataSeen) {
-                if (!clipInfo->clipActive) {
-                    VtVec2dArray clipActive;
-                    if (layer->HasField(primPath, UsdTokens->clipActive, 
-                                        &clipActive)) {
-                        _ClipDebugMsg(node, layer, UsdTokens->clipActive);
-                        _ApplyLayerOffsetToExternalTimes(
-                            _GetLayerOffsetToRoot(node, layer), &clipActive);
-                        clipInfo->clipActive = boost::in_place();
-                        clipInfo->clipActive->swap(clipActive);
-                    }
-                }
-
-                if (!clipInfo->clipTimes) {
-                    VtVec2dArray clipTimes;
-                    if (layer->HasField(primPath, UsdTokens->clipTimes, 
-                                        &clipTimes)) {
-                        _ClipDebugMsg(node, layer, UsdTokens->clipTimes);
-                        _ApplyLayerOffsetToExternalTimes(
-                            _GetLayerOffsetToRoot(node, layer), &clipTimes);
-                        clipInfo->clipTimes = boost::in_place();
-                        clipInfo->clipTimes->swap(clipTimes);
-                    }
-                }
-            } else {
-                if (!templateStride) {
-                    double clipTemplateStride;
-                    if (layer->HasField(primPath, UsdTokens->clipTemplateStride,
-                                        &clipTemplateStride)) {
-                        _ClipDebugMsg(node, layer, UsdTokens->clipTemplateStride); 
-                        templateStride = clipTemplateStride;
-                    }
-                }
-
-                if (!templateStartTime) {
-                    double clipTemplateStartTime;
-                    if (layer->HasField(primPath, UsdTokens->clipTemplateStartTime,
-                                        &clipTemplateStartTime)) {
-                        _ClipDebugMsg(node, layer, UsdTokens->clipTemplateStartTime); 
-                        templateStartTime = clipTemplateStartTime;
-                    }
-                }
-
-                if (!templateEndTime) {
-                    double clipTemplateEndTime;
-                    if (layer->HasField(primPath, UsdTokens->clipTemplateEndTime,
-                                        &clipTemplateEndTime)) {
-                        _ClipDebugMsg(node, layer, UsdTokens->clipTemplateEndTime); 
-                        templateEndTime = clipTemplateEndTime;
-                    }
-                }
-
-                // XXX: This code is mostly duplicated in _ResolveClipInfo
-                if (templateStride && templateStartTime && templateEndTime) {
-                    auto sourceLayer = clipInfo->sourceLayerStack->GetLayers()[
-                        clipInfo->indexOfLayerWhereAssetPathsFound];
-
-                    // Note that we supply _DefaultClipOffsetValue 
-                    // for the templateActiveOffset here. This is because offset
-                    // is only available in the new, dictionary style clips, 
-                    // and was not backported to the legacy clips.
-                    _DeriveClipInfo(templateAssetPath, *templateStride,
-                                    _DefaultClipOffsetValue,
-                                    *templateStartTime, *templateEndTime,
-                                    &clipInfo->clipTimes, &clipInfo->clipActive,
-                                    &clipInfo->clipAssetPaths, 
-                                    primIndex.GetPath(),
-                                    clipInfo->sourceLayerStack,
-                                    clipInfo->indexOfLayerWhereAssetPathsFound);
-
-                    // Apply layer offsets to clipActive and clipTimes afterwards
-                    // so that they don't affect the derived asset paths. Consumers
-                    // expect offsets to affect what clip is being used at a given
-                    // time, not the set of clips that are available.
-                    //
-                    // We use the layer offset for the layer where the template
-                    // asset path pattern was found. Although the start/end/stride
-                    // values may be authored on different layers with different
-                    // offsets, this is an uncommon situation -- consumers usually
-                    // author all clip metadata in the same layer -- and it's not
-                    // clear what the desired result in that case would be anyway.
-                    auto offset = _GetLayerOffsetToRoot(node, sourceLayer);
-                    _ApplyLayerOffsetToExternalTimes(offset, &*clipInfo->clipTimes);
-                    _ApplyLayerOffsetToExternalTimes(offset, &*clipInfo->clipActive);
-
-                    break;
-                }
-            }
-        }
-    }
-
-    return true;
+    _ClipDerivationMsg(
+        UsdClipsAPIInfoKeys->assetPaths, **clipAssetPaths, usdPrimPath);
+    _ClipDerivationMsg(
+        UsdClipsAPIInfoKeys->times, **clipTimes, usdPrimPath);
+    _ClipDerivationMsg(
+        UsdClipsAPIInfoKeys->active, **clipActive, usdPrimPath);
 }
 
 namespace 
@@ -770,8 +559,8 @@ _ResolveClipSetsInNode(
     result->swap(clipSetsInNode);
 }
 
-static bool
-_ResolveClipInfo(
+bool
+Usd_ResolveClipInfo(
     const PcpPrimIndex& primIndex,
     std::vector<Usd_ResolvedClipInfo>* resolvedClipInfo)
 {
@@ -859,7 +648,6 @@ _ResolveClipInfo(
             const double* templateEndTime = _GetInfo<double>(
                 clipInfo, UsdClipsAPIInfoKeys->templateEndTime);
 
-            // XXX: This code is mostly duplicated in _ResolveLegacyClipInfo
             if (templateStride && templateStartTime && templateEndTime) {
                 _DeriveClipInfo(
                     *templateAssetPath, *templateStride,
@@ -894,22 +682,6 @@ _ResolveClipInfo(
     }
 
     return true;
-}
-
-bool
-Usd_ResolveClipInfo(
-    const PcpPrimIndex& primIndex,
-    std::vector<Usd_ResolvedClipInfo>* clipInfo)
-{
-    if (TfGetEnvSetting(USD_READ_LEGACY_CLIPS)) {
-        Usd_ResolvedClipInfo legacyClipInfo;
-        if (_ResolveLegacyClipInfo(primIndex, &legacyClipInfo)) {
-            clipInfo->push_back(legacyClipInfo);
-            return true;
-        }
-    }
-
-    return _ResolveClipInfo(primIndex, clipInfo);
 }
 
 // ------------------------------------------------------------

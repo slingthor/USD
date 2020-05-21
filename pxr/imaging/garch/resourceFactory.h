@@ -48,6 +48,7 @@ class GarchSimpleShadowArray;
 class GarchUdimTexture;
 class GarchUniformBlock;
 class GarchVdbTexture;
+class GarchVdbTextureContainer;
 
 TF_DECLARE_WEAK_AND_REF_PTRS(GarchArrayTexture);
 TF_DECLARE_WEAK_AND_REF_PTRS(GarchDrawTarget);
@@ -55,6 +56,7 @@ TF_DECLARE_WEAK_AND_REF_PTRS(GarchPtexTexture);
 TF_DECLARE_WEAK_AND_REF_PTRS(GarchUniformBlock);
 TF_DECLARE_WEAK_AND_REF_PTRS(GarchUdimTexture);
 TF_DECLARE_WEAK_AND_REF_PTRS(GarchVdbTexture);
+TF_DECLARE_WEAK_AND_REF_PTRS(GarchVdbTextureContainer);
 
 class GarchResourceFactoryInterface {
 public:
@@ -119,7 +121,9 @@ public:
 
     // Vdb Texture
     GARCH_API
-    virtual GarchVdbTextureRefPtr NewVdbTexture(const TfToken &imageFilePath) const = 0;
+    virtual GarchVdbTextureRefPtr NewVdbTexture(
+                GarchVdbTextureContainerRefPtr const &textureContainer,
+                TfToken const &gridName) const = 0;
 
 protected:
 	GARCH_API

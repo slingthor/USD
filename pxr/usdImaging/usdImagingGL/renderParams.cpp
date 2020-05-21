@@ -48,10 +48,10 @@ UsdImagingGLRenderParams::UsdImagingGLRenderParams() :
     enableSceneMaterials(true),
     enableUsdDrawModes(true),
     clearColor(0,0,0,1),
-    renderResolution(100,100),
+    lut3dSizeOCIO(65),
     sampleCount(1)
 {
-#if defined(ARCH_GFX_METAL)
+#if defined(PXR_METAL_SUPPORT_ENABLED)
     mtlRenderPassDescriptorForNativeMetal = nil;
 #endif
 }

@@ -39,7 +39,6 @@
 
 #if defined(HD_HAS_hdxOitDataBuffer)
 #if defined(ARCH_GFX_METAL)
-    #define gl_FragCoord gl_Position
 	#define atomic_load(target) atomic_load_explicit(&target, memory_order_relaxed)
 #else
 	#define atomic_load(target) target

@@ -28,6 +28,9 @@
 #include "pxr/imaging/hdSt/resourceRegistry.h"
 #include "pxr/imaging/hdSt/textureResource.h"
 #include "pxr/imaging/hdSt/textureResourceHandle.h"
+#include "pxr/imaging/hdSt/textureBinder.h"
+#include "pxr/imaging/hdSt/textureHandle.h"
+#include "pxr/imaging/hdSt/materialParam.h"
 
 #include "pxr/imaging/hd/binding.h"
 #include "pxr/imaging/hd/bufferArrayRange.h"
@@ -54,7 +57,7 @@ _IsEnabledMaterialPrimvarFiltering() {
 }
 
 static TfTokenVector
-_CollectPrimvarNames(const HdMaterialParamVector &params);
+_CollectPrimvarNames(const HdSt_MaterialParamVector &params);
 
 HdStSurfaceShader::HdStSurfaceShader()
  : HdStShaderCode()
@@ -67,14 +70,14 @@ HdStSurfaceShader::HdStSurfaceShader()
  , _isEnabledPrimvarFiltering(_IsEnabledMaterialPrimvarFiltering())
  , _computedHash(0)
  , _isValidComputedHash(false)
+ , _computedTextureSourceHash(0)
+ , _isValidComputedTextureSourceHash(false)
  , _textureDescriptors()
  , _materialTag()
 {
 }
 
-HdStSurfaceShader::~HdStSurfaceShader()
-{
-}
+HdStSurfaceShader::~HdStSurfaceShader() = default;
 
 void
 HdStSurfaceShader::_SetSource(TfToken const &shaderStageKey, std::string const &source)
@@ -105,7 +108,7 @@ HdStSurfaceShader::GetSource(TfToken const &shaderStageKey) const
     return std::string();
 }
 /*virtual*/
-HdMaterialParamVector const&
+HdSt_MaterialParamVector const&
 HdStSurfaceShader::GetParams() const
 {
     return _params;
@@ -140,6 +143,13 @@ HdStSurfaceShader::GetTextures() const
 {
     return _textureDescriptors;
 }
+
+HdStShaderCode::NamedTextureHandleVector const &
+HdStSurfaceShader::GetNamedTextureHandles() const
+{
+    return _namedTextureHandles;
+}
+
 /*virtual*/
 void
 HdStSurfaceShader::BindResources(HdStProgram const &program,
@@ -147,6 +157,10 @@ HdStSurfaceShader::BindResources(HdStProgram const &program,
                                  HdRenderPassState const &state)
 {
     program.BindResources(this, binder);
+
+
+    HdSt_TextureBinder::BindResources(binder, _namedTextureHandles);
+
 
     binder.BindShaderResources(this);
 }
@@ -158,6 +172,9 @@ HdStSurfaceShader::UnbindResources(HdStProgram const &program,
 {
     binder.UnbindShaderResources(this);
     program.UnbindResources(this, binder);
+
+    HdSt_TextureBinder::UnbindResources(binder, _namedTextureHandles);
+
 }
 /*virtual*/
 void
@@ -177,35 +194,59 @@ HdStSurfaceShader::ComputeHash() const
     return _computedHash;
 }
 
+/*virtual*/
+HdStShaderCode::ID
+HdStSurfaceShader::ComputeTextureSourceHash() const
+{
+    if (!_isValidComputedTextureSourceHash) {
+        _computedTextureSourceHash = _ComputeTextureSourceHash();
+        _isValidComputedTextureSourceHash = true;
+    }
+    return _computedTextureSourceHash;
+}
+
 HdStShaderCode::ID
 HdStSurfaceShader::_ComputeHash() const
 {
-    size_t hash = 0;
-    
-    for (HdMaterialParam const& param : _params) {
-        if (param.IsFallback())
-            boost::hash_combine(hash, param.name.Hash());
-    }
+    size_t hash = HdSt_MaterialParam::ComputeHash(_params);
+
     boost::hash_combine(hash, 
         ArchHash(_fragmentSource.c_str(), _fragmentSource.size()));
     boost::hash_combine(hash, 
         ArchHash(_geometrySource.c_str(), _geometrySource.size()));
 
-    // Add in texture format that effects shader (ignore handles)
-    boost::hash_combine(hash, _textureDescriptors.size());
-    for (TextureDescriptorVector::const_iterator
-                                        texIt  = _textureDescriptors.cbegin();
-                                        texIt != _textureDescriptors.cend();
-                                      ++texIt)
-    {
-        const TextureDescriptor &texDesc = *texIt;
+    // Codegen is inspecting the shader bar spec to generate some
+    // of the struct's, so we should probably use _paramSpec
+    // in the hash computation as well.
+    //
+    // In practise, _paramSpec is generated from the
+    // HdSt_MaterialParam's so the above is sufficient.
 
-        boost::hash_combine(hash, texDesc.name);
-        boost::hash_combine(hash, texDesc.type);
+    return hash;
+}
+
+HdStShaderCode::ID
+HdStSurfaceShader::_ComputeTextureSourceHash() const
+{
+    TRACE_FUNCTION();
+
+    size_t hash = 0;
+
+    // Old texture system
+    for (const HdStShaderCode::TextureDescriptor &desc : _textureDescriptors) {
+        boost::hash_combine(hash, desc.name);
+        boost::hash_combine(hash, desc.textureSourcePath);
     }
 
-    boost::hash_combine(hash, _materialTag.Hash());
+    // New texture system
+    for (const HdStShaderCode::NamedTextureHandle &namedHandle :
+             _namedTextureHandles) {
 
+        // Use name, texture object and sampling parameters.
+        boost::hash_combine(hash, namedHandle.name);
+        boost::hash_combine(hash, namedHandle.textureSourcePath);
+    }
+    
     return hash;
 }
 
@@ -224,7 +265,7 @@ HdStSurfaceShader::SetGeometrySource(const std::string &source)
 }
 
 void
-HdStSurfaceShader::SetParams(const HdMaterialParamVector &params)
+HdStSurfaceShader::SetParams(const HdSt_MaterialParamVector &params)
 {
     _params = params;
     _primvarNames = _CollectPrimvarNames(_params);
@@ -235,42 +276,55 @@ void
 HdStSurfaceShader::SetTextureDescriptors(const TextureDescriptorVector &texDesc)
 {
     _textureDescriptors = texDesc;
-    _isValidComputedHash = false;
+    _isValidComputedTextureSourceHash = false;
 }
 
 void
-HdStSurfaceShader::SetBufferSources(HdBufferSourceVector &bufferSources,
-                                  HdResourceRegistrySharedPtr const &resourceRegistry)
+HdStSurfaceShader::SetNamedTextureHandles(
+    const NamedTextureHandleVector &namedTextureHandles)
 {
-    if (bufferSources.empty()) {
+    _namedTextureHandles = namedTextureHandles;
+    _isValidComputedTextureSourceHash = false;
+}
+
+void
+HdStSurfaceShader::SetBufferSources(
+    HdBufferSpecVector const &bufferSpecs,
+    HdBufferSourceSharedPtrVector &bufferSources,
+    HdStResourceRegistrySharedPtr const &resourceRegistry)
+{
+    if (bufferSpecs.empty()) {
+        if (!_paramSpec.empty()) {
+            _isValidComputedHash = false;
+        }
+
+        _paramSpec.clear();
         _paramArray.reset();
     } else {
-        // Build the buffer Spec to see if its changed.
-        HdBufferSpecVector bufferSpecs;
-        HdBufferSpec::GetBufferSpecs(bufferSources, &bufferSpecs);
-
         if (!_paramArray || _paramSpec != bufferSpecs) {
             _paramSpec = bufferSpecs;
 
             // establish a buffer range
             HdBufferArrayRangeSharedPtr range =
-                    resourceRegistry->AllocateShaderStorageBufferArrayRange(
-                                                  HdTokens->materialParams,
-                                                  bufferSpecs,
-                                                  HdBufferArrayUsageHint());
+                resourceRegistry->AllocateShaderStorageBufferArrayRange(
+                    HdTokens->materialParams,
+                    bufferSpecs,
+                    HdBufferArrayUsageHint());
 
             if (!TF_VERIFY(range->IsValid())) {
                 _paramArray.reset();
             } else {
                 _paramArray = range;
             }
+            _isValidComputedHash = false;
         }
 
         if (_paramArray->IsValid()) {
-            resourceRegistry->AddSources(_paramArray, bufferSources);
+            if (!bufferSources.empty()) {
+                resourceRegistry->AddSources(_paramArray, bufferSources);
+            }
         }
     }
-    _isValidComputedHash = false;
 }
 
 TfToken
@@ -291,15 +345,6 @@ void
 HdStSurfaceShader::Reload()
 {
     // Nothing to do, this shader's sources are externally managed.
-}
-
-static bool
-operator== (HdStShaderCode::TextureDescriptor const & a,
-            HdStShaderCode::TextureDescriptor const & b)
-{
-    return a.name == b.name &&
-           a.handle == b.handle &&
-           a.type == b.type;
 }
 
 /*static*/
@@ -324,17 +369,13 @@ HdStSurfaceShader::CanAggregate(HdStShaderCodeSharedPtr const &shaderA,
         return false;
     }
 
-    bool bindlessTexture = GarchResourceFactory::GetInstance()->GetContextCaps()
-                                                .bindlessTextureEnabled;
-
-    // Without bindless textures, we can't aggregate unless textures also match.
-    if (!bindlessTexture) {
-        bool texturesMatch = shaderA->GetTextures() == shaderB->GetTextures();
-        if (!texturesMatch) {
+    if (!GarchResourceFactory::GetInstance()->GetContextCaps().bindlessTextureEnabled) {
+        if (shaderA->ComputeTextureSourceHash() !=
+                shaderB->ComputeTextureSourceHash()) {
             return false;
         }
     }
-     
+
     return true;
 }
 
@@ -394,14 +435,14 @@ _GetExtraWhitelistedShaderPrimvarNames()
 }
 
 static TfTokenVector
-_CollectPrimvarNames(const HdMaterialParamVector &params)
+_CollectPrimvarNames(const HdSt_MaterialParamVector &params)
 {
     TfTokenVector primvarNames = _GetExtraWhitelistedShaderPrimvarNames();
 
-    for (HdMaterialParam const &param: params) {
+    for (HdSt_MaterialParam const &param: params) {
         if (param.IsFallback()) {
             primvarNames.push_back(param.name);
-        } else if (param.IsPrimvar()) {
+        } else if (param.IsPrimvarRedirect()) {
             primvarNames.push_back(param.name);
             // primvar redirect connections are encoded as sampler coords
             primvarNames.insert(primvarNames.end(),
@@ -419,5 +460,38 @@ _CollectPrimvarNames(const HdMaterialParamVector &params)
     return primvarNames;
 }
 
+std::vector<HdStShaderCode::BarAndSources>
+HdStSurfaceShader::ComputeBufferSourcesFromTextures() const
+{
+    // Add buffer sources for bindless texture handles (and
+    // other texture metadata such as the sampling transform for
+    // a field texture).
+    HdBufferSourceSharedPtrVector result;
+    HdSt_TextureBinder::ComputeBufferSources(
+        GetNamedTextureHandles(), &result);
+
+    if (result.empty()) {
+        return { };
+    } else {
+        return { { GetShaderData(), std::move(result) } };
+    }
+}
+
+void
+HdStSurfaceShader::AddFallbackValueToSpecsAndSources(
+    const HdSt_MaterialParam &param,
+    HdBufferSpecVector * const specs,
+    HdBufferSourceSharedPtrVector * const sources)
+{
+    const TfToken sourceName(
+        param.name.GetString()
+        + HdSt_ResourceBindingSuffixTokens->fallback.GetString());
+
+    HdBufferSourceSharedPtr const source =
+        std::make_shared<HdVtBufferSource>(
+            sourceName, param.fallbackValue);
+    source->GetBufferSpecs(specs);
+    sources->push_back(std::move(source));
+}
 
 PXR_NAMESPACE_CLOSE_SCOPE

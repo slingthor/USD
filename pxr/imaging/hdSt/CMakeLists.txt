@@ -1,9 +1,11 @@
 set(PXR_PREFIX pxr/imaging)
 set(PXR_PACKAGE hdSt)
 
-if ((NOT ${PXR_ENABLE_GL_SUPPORT}) AND (NOT ${PXR_ENABLE_METAL_SUPPORT}))
+# XXX We tmp check for PXR_ENABLE_GL_SUPPORT since Storm currently still only
+# runs on OpenGL. Once Storm uses only Hgi, remove GL_SUPPORT check.
+if (NOT ${PXR_BUILD_GPU_SUPPORT})
     message(STATUS
-        "Skipping ${PXR_PACKAGE} because PXR_ENABLE_GL_SUPPORT and PXR_ENABLE_METAL_SUPPORT is OFF")
+        "Skipping ${PXR_PACKAGE} because PXR_BUILD_GPU_SUPPORT is OFF")
     return()
 endif()
 
@@ -17,10 +19,14 @@ if (OPENSUBDIV_HAS_METAL_COMPUTE)
     add_definitions(-DOPENSUBDIV_HAS_METAL_COMPUTE)
 endif()
 
+set(GFX "")
+set(GFXADDITIONAL "")
+set(GFXADDITIONALPUBLIC "")
+
 if (PXR_ENABLE_GL_SUPPORT)
-    set(GFX             glf
+    list(APPEND GFX     glf
     			        hgiGL)
-    set(GFXADDITIONAL   GL/bufferRelocatorGL
+    list(APPEND GFXADDITIONAL GL/bufferRelocatorGL
                         GL/bufferResourceGL
                         GL/codeGenGLSL
                         GL/dispatchBufferGL
@@ -34,7 +40,6 @@ if (PXR_ENABLE_GL_SUPPORT)
                         GL/interleavedMemoryBufferGL
                         GL/persistentBufferGL
                         GL/quadrangulateGL
-                        GL/renderDelegateGL
                         GL/renderPassShaderGL
                         GL/renderPassStateGL
                         GL/resourceBinderGL
@@ -42,19 +47,18 @@ if (PXR_ENABLE_GL_SUPPORT)
                         GL/smoothNormalsGL
                         GL/textureResourceGL
                         GL/vboMemoryBufferGL
-                        GL/vboSimpleMemoryBufferGL
-                        unitTestGLDrawing)
+                        GL/vboSimpleMemoryBufferGL)
 
-    set(GFXADDITIONALPUBLIC ${GFXADDITIONALPUBLIC}
-                            GL/resourceFactoryGL)
+    list(APPEND GFXADDITIONALPUBLIC
+                        GL/renderDelegateGL
+                        GL/resourceFactoryGL)
 
 endif()
 
 if (PXR_ENABLE_METAL_SUPPORT)
-    set(GFX             ${GFX}
-                        mtlf)
-    set(GFXADDITIONAL   ${GFXADDITIONAL}
-                        Metal/bufferRelocatorMetal
+    list(APPEND GFX     mtlf
+                        hgiMetal)
+    list(APPEND GFXADDITIONAL  Metal/bufferRelocatorMetal
                         Metal/bufferResourceMetal
                         Metal/codeGenMSL
                         Metal/dispatchBufferMetal
@@ -69,7 +73,6 @@ if (PXR_ENABLE_METAL_SUPPORT)
                         Metal/mtlUtils
                         Metal/persistentBufferMetal
                         Metal/quadrangulateMetal
-                        Metal/renderDelegateMetal
                         Metal/renderPassShaderMetal
                         Metal/renderPassStateMetal
                         Metal/resourceBinderMetal
@@ -79,9 +82,11 @@ if (PXR_ENABLE_METAL_SUPPORT)
                         Metal/vboMemoryBufferMetal
                         Metal/vboSimpleMemoryBufferMetal)
 
-set(GFXADDITIONALPUBLIC ${GFXADDITIONALPUBLIC}
+    list(APPEND GFXADDITIONALPUBLIC
+                        Metal/renderDelegateMetal
                         Metal/resourceFactoryMetal)
 endif()
+
 
 pxr_library(hdSt
     LIBRARIES
@@ -122,7 +127,6 @@ pxr_library(hdSt
         extCompGpuPrimvarBufferSource
         fallbackLightingShader
         field
-        fieldResource
         flatNormals
         geometricShader
         glConversions
@@ -134,32 +138,41 @@ pxr_library(hdSt
         light      
         lightingShader
         material
+        materialNetwork
         mesh
         mixinShader
         package
         persistentBuffer
         points
         program
-	    renderBuffer
+        renderBuffer
         renderDelegate
         renderPass
         renderPassShader
         renderPassState
-        resourceBinder
         resourceFactory
         resourceRegistry
         rprimUtils
+        samplerObject
+        samplerObjectRegistry
         shaderCode
-        shaderKey
+        simpleLightingShader
         smoothNormals
+        subtextureIdentifier
         surfaceShader
         texture
+        textureBinder
+        textureHandle
+        textureHandleRegistry
+        textureIdentifier
+        textureObject
+        textureObjectRegistry
         textureResource
         textureResourceHandle
         tokens
         vboMemoryManager
         vboSimpleMemoryManager
-	volume
+        volume
         ${GFXADDITIONALPUBLIC}
 
     PUBLIC_HEADERS
@@ -177,19 +190,22 @@ pxr_library(hdSt
         immediateDrawBatch
         indirectDrawBatch
         materialBufferSourceAndTextureHelper
-        materialNetwork
+        materialParam
         meshShaderKey
         meshTopology 
         pointsShaderKey
         quadrangulate
         spatialHierarchy
+        resourceBinder
+        shaderKey
         subdivision
         subdivision3
         triangulate
         unitTestDelegate
+        unitTestGLDrawing
         unitTestHelper
         volumeShader
-	volumeShaderKey
+        volumeShaderKey
         ${GFXADDITIONAL}
 
     RESOURCE_FILES
@@ -197,7 +213,7 @@ pxr_library(hdSt
         shaders/basisCurves.glslfx
         shaders/compute.glslfx
         shaders/compute.metal
-	shaders/domeLight.glslfx
+        shaders/domeLight.glslfx
         shaders/edgeId.glslfx
         shaders/fallbackLighting.glslfx
         shaders/fallbackLightingShader.glslfx
@@ -217,6 +233,7 @@ pxr_library(hdSt
         shaders/ptexTextureMetal.glslfx
         shaders/renderPass.glslfx
         shaders/renderPassShader.glslfx
+        shaders/simpleLightingShader.glslfx
         shaders/terminals.glslfx
         shaders/visibility.glslfx
         shaders/volume.glslfx

@@ -90,12 +90,12 @@ My_TestGLDrawing::InitTest()
 
     // center camera
     SetCameraTranslate(GetCameraTranslate() - center);
-
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     // XXX: Setup a VAO, the current drawing engine will not yet do this.
     glGenVertexArrays(1, &vao);
     glBindVertexArray(vao);
     glBindVertexArray(0);
-
+#endif
     if (_testLighting) {
         _lightingShader.reset(new HdSt_TestLightingShader());
         _driver->GetRenderPassState()->SetLightingShader(
@@ -109,10 +109,13 @@ void
 My_TestGLDrawing::DrawTest()
 {
     GLfloat clearColor[4] = { 0.1f, 0.1f, 0.1f, 1.0f };
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     glClearBufferfv(GL_COLOR, 0, clearColor);
-
+#endif
     GLfloat clearDepth[1] = { 1.0f };
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     glClearBufferfv(GL_DEPTH, 0, clearDepth);
+#endif
 
     int width = GetWidth(), height = GetHeight();
     GfMatrix4d viewMatrix = GetViewMatrix();
@@ -122,16 +125,17 @@ My_TestGLDrawing::DrawTest()
 
     // camera
     _driver->SetCamera(viewMatrix, projMatrix, GfVec4d(0, 0, width, height));
-
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     glViewport(0, 0, width, height);
 
     glEnable(GL_DEPTH_TEST);
 
     glBindVertexArray(vao);
-
+#endif
     _driver->Draw();
-
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     glBindVertexArray(0);
+#endif
 }
 
 void

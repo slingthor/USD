@@ -74,6 +74,9 @@ public:
 
     HDST_API
     virtual void CommitResources(HdChangeTracker *tracker) override;
+    
+    HDST_API
+    virtual void SetDrivers(HdDriverVector const& drivers) override;
 
 private:
     

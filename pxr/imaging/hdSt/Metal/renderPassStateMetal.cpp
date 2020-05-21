@@ -164,13 +164,6 @@ HdStRenderPassStateMetal::Bind()
         }
     }
     glEnable(GL_PROGRAM_POINT_SIZE);
-    GLint glMaxClipPlanes;
-    glGetIntegerv(GL_MAX_CLIP_PLANES, &glMaxClipPlanes);
-    for (size_t i = 0; i < GetClipPlanes().size(); ++i) {
-        if (i >= (size_t)glMaxClipPlanes) {
-        }
-        glEnable(GL_CLIP_DISTANCE0 + i);
-    }
 
     if (!_colorMaskUseDefault) {
         switch(_colorMask) {
@@ -206,10 +199,6 @@ HdStRenderPassStateMetal::Unbind()
     glBlendFuncSeparate(GL_ONE, GL_ZERO, GL_ONE, GL_ZERO);
     glBlendColor(0.0f, 0.0f, 0.0f, 0.0f);
  
-    for (size_t i = 0; i < GetClipPlanes().size(); ++i) {
-        glDisable(GL_CLIP_DISTANCE0 + i);
-    }
-
     glColorMask(true, true, true, true);
  */
 }

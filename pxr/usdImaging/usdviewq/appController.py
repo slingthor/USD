@@ -21,14 +21,18 @@
 # KIND, either express or implied. See the Apache License for the specific
 # language governing permissions and limitations under the Apache License.
 #
+
+from __future__ import print_function
+
 # Qt Components
-from qt import QtCore, QtGui, QtWidgets
+from .qt import QtCore, QtGui, QtWidgets
 
 # Stdlib components
 import re, sys, os, cProfile, pstats, traceback
 from itertools import groupby
 from time import time, sleep
 from collections import deque, OrderedDict
+from functools import cmp_to_key
 
 # Usd Library Components
 from pxr import Usd, UsdGeom, UsdShade, UsdUtils, UsdImagingGL, Garch, Sdf, Tf, Ar
@@ -37,45 +41,51 @@ from pxr.UsdAppUtils.complexityArgs import RefinementComplexities
 
 # UI Components
 from ._usdviewq import Utils
-from stageView import StageView
-from mainWindowUI import Ui_MainWindow
-from primContextMenu import PrimContextMenu
-from headerContextMenu import HeaderContextMenu
-from layerStackContextMenu import LayerStackContextMenu
-from attributeViewContextMenu import AttributeViewContextMenu
-from customAttributes import (_GetCustomAttributes, CustomAttribute,
-                              BoundingBoxAttribute, LocalToWorldXformAttribute,
-                              ResolvedBoundMaterial)
-from primTreeWidget import PrimTreeWidget, PrimViewColumnIndex
-from primViewItem import PrimViewItem
-from variantComboBox import VariantComboBox
-from legendUtil import ToggleLegendWithBrowser
-import prettyPrint, adjustClipping, adjustDefaultMaterial, settings
-from constantGroup import ConstantGroup
-from selectionDataModel import ALL_INSTANCES, SelectionDataModel
+from .stageView import StageView
+from .mainWindowUI import Ui_MainWindow
+from .primContextMenu import PrimContextMenu
+from .headerContextMenu import HeaderContextMenu
+from .layerStackContextMenu import LayerStackContextMenu
+from .attributeViewContextMenu import AttributeViewContextMenu
+from .customAttributes import (_GetCustomAttributes, CustomAttribute,
+                               BoundingBoxAttribute, LocalToWorldXformAttribute,
+                               ResolvedBoundMaterial)
+from .primTreeWidget import PrimTreeWidget, PrimViewColumnIndex
+from .primViewItem import PrimViewItem
+from .variantComboBox import VariantComboBox
+from .legendUtil import ToggleLegendWithBrowser
+from . import prettyPrint, adjustClipping, adjustDefaultMaterial, preferences, settings
+from .constantGroup import ConstantGroup
+from .selectionDataModel import ALL_INSTANCES, SelectionDataModel
 
 # Common Utilities
-from common import (UIBaseColors, UIPropertyValueSourceColors, UIFonts,
-                    GetPropertyColor, GetPropertyTextFont,
-                    Timer, Drange, BusyContext, DumpMallocTags, 
-                    GetValueAtFrame, GetShortStringForValue,
-                    GetInstanceIdForIndex,
-                    ResetSessionVisibility, InvisRootPrims, GetAssetCreationTime,
-                    PropertyViewIndex, PropertyViewIcons, PropertyViewDataRoles, 
-                    RenderModes, ColorCorrectionModes, ShadedRenderModes,
-                    PickModes, SelectionHighlightModes, CameraMaskModes,
-                    PropTreeWidgetTypeIsRel, PrimNotFoundException,
-                    GetRootLayerStackInfo, HasSessionVis, GetEnclosingModelPrim,
-                    GetPrimsLoadability, ClearColors,
-                    HighlightColors, KeyboardShortcuts)
+from .common import (UIBaseColors, UIPropertyValueSourceColors, UIFonts,
+                     GetPropertyColor, GetPropertyTextFont,
+                     Timer, Drange, BusyContext, DumpMallocTags,
+                     GetValueAtFrame, GetShortStringForValue,
+                     GetInstanceIdForIndex,
+                     ResetSessionVisibility, InvisRootPrims, GetAssetCreationTime,
+                     PropertyViewIndex, PropertyViewIcons, PropertyViewDataRoles,
+                     RenderModes, ColorCorrectionModes, ShadedRenderModes,
+                     PickModes, SelectionHighlightModes, CameraMaskModes,
+                     PropTreeWidgetTypeIsRel, PrimNotFoundException,
+                     GetRootLayerStackInfo, HasSessionVis, GetEnclosingModelPrim,
+                     GetPrimsLoadability, ClearColors,
+                     HighlightColors, KeyboardShortcuts)
 
-import settings2
-from settings2 import StateSource
-from usdviewApi import UsdviewApi
-from rootDataModel import RootDataModel, ChangeNotice
-from viewSettingsDataModel import ViewSettingsDataModel
-import plugin
-from pythonInterpreter import Myconsole
+from . import settings2
+from .settings2 import StateSource
+from .usdviewApi import UsdviewApi
+from .rootDataModel import RootDataModel, ChangeNotice
+from .viewSettingsDataModel import ViewSettingsDataModel
+from . import plugin
+from .pythonInterpreter import Myconsole
+
+if hasattr(QtCore.Qt, 'AA_EnableHighDpiScaling'):
+    QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling, True)
+
+if hasattr(QtCore.Qt, 'AA_UseHighDpiPixmaps'):
+    QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_UseHighDpiPixmaps, True)
 
 SETTINGS_VERSION = "1"
 
@@ -277,7 +287,17 @@ class Blocker:
 
         return self._count > 0
 
+class MainWindow(QtWidgets.QMainWindow):
+    "This class exists to simplify and streamline the shutdown process."
+    "The application may be closed via the File menu, or by closing the main"
+    "window, both of which result in the same behavior."
+    def __init__(self, closeFunc):
+        super(MainWindow, self).__init__(None) # no parent widget
+        self._closeFunc = closeFunc
 
+    def closeEvent(self, event):
+        self._closeFunc()
+        
 class AppController(QtCore.QObject):
 
     HYDRA_DISABLED_OPTION_STRING = "HydraDisabled"
@@ -294,17 +314,17 @@ class AppController(QtCore.QObject):
         else:
             settingsPath = os.path.join(settingsPath, 'state')
             if not os.path.exists(settingsPath):
-                print 'INFO: ClearSettings requested, but there ' \
-                      'were no settings currently stored.'
+                print('INFO: ClearSettings requested, but there '
+                      'were no settings currently stored.')
                 return None
 
             if not os.access(settingsPath, os.W_OK):
-                print 'ERROR: Could not remove settings file.'
+                print('ERROR: Could not remove settings file.')
                 return None
             else:
                 os.remove(settingsPath)
 
-        print 'INFO: Settings restored to default.'
+        print('INFO: Settings restored to default.')
 
     def _configurePlugins(self):
 
@@ -325,8 +345,38 @@ class AppController(QtCore.QObject):
             settings2Path = os.path.join(settingsPathDir, "state.json")
             self._settings2 = settings2.Settings(SETTINGS_VERSION, settings2Path)
 
-        uiProxy = UIStateProxySource(self, self._settings2, "ui")
 
+    def _setStyleSheetUsingState(self):
+        # We use a style file that is actually a template, which we fill
+        # in from state, and is how we change app font sizes, for example.
+
+        # Find the resource directory
+        resourceDir = os.path.dirname(os.path.realpath(__file__)) + "/"
+        # Qt style sheet accepts only forward slashes as path separators
+        resourceDir = resourceDir.replace("\\", "/")
+
+        fontSize = self._dataModel.viewSettings.fontSize
+        baseFontSizeStr = "%spt" % str(fontSize)
+        
+        # The choice of 8 for smallest smallSize is for performance reasons,
+        # based on the "Gotham Rounded" font used by usdviewstyle.qss . If we
+        # allow it to float, we get a 2-3 hundred millisecond hit in startup
+        # time as Qt (apparently) manufactures a suitably sized font.  
+        # Mysteriously, we don't see this cost for larger font sizes.
+        smallSize = 8 if fontSize < 12 else int(round(fontSize * 0.8))
+        smallFontSizeStr = "%spt" % str(smallSize)
+
+        # Apply the style sheet to it
+        sheet = open(os.path.join(resourceDir, 'usdviewstyle.qss'), 'r')
+        sheetString = sheet.read() % {
+            'RESOURCE_DIR'  : resourceDir,
+            'BASE_FONT_SZ'  : baseFontSizeStr,
+            'SMALL_FONT_SZ' : smallFontSizeStr }
+
+        app = QtWidgets.QApplication.instance()
+        app.setStyleSheet(sheetString)
+
+        
     def __del__(self):
         # This is needed to free Qt items before exit; Qt hits failed GTK
         # assertions without it.
@@ -353,6 +403,7 @@ class AppController(QtCore.QObject):
             self._printTiming = parserData.timing or self._debug
             self._lastViewContext = {}
             self._paused = False
+            self._stopped = False
             if QT_BINDING == 'PySide':
                 self._statusFileName = 'state'
                 self._deprecatedStatusFileNames = ('.usdviewrc')
@@ -376,10 +427,17 @@ class AppController(QtCore.QObject):
                 else:
                     os.environ['HD_DEFAULT_RENDERER'] = self._rendererNameOpt
 
-            self._mainWindow = QtWidgets.QMainWindow(None)
-            # Showing the window immediately prevents UI flashing.
-            self._mainWindow.show()
+            self._openSettings2(parserData.defaultSettings)
 
+            self._dataModel = UsdviewDataModel(
+                self._printTiming, self._settings2)
+
+            # Now that we've read in our state and applied parserData
+            # overrides, we can process our styleSheet... *before* we
+            # start listening for style-related changes.
+            self._setStyleSheetUsingState()
+
+            self._mainWindow = MainWindow(lambda: self._cleanAndClose())
             self._ui = Ui_MainWindow()
             self._ui.setupUi(self._mainWindow)
 
@@ -387,9 +445,14 @@ class AppController(QtCore.QObject):
             self._statusBar = QtWidgets.QStatusBar(self._mainWindow)
             self._mainWindow.setStatusBar(self._statusBar)
 
+            # Waiting to show the mainWindow till after setting the
+            # statusBar saves considerable GUI configuration time.
+            self._mainWindow.show()
+            self._mainWindow.setFocus()
+            
             # Install our custom event filter.  The member assignment of the
             # filter is just for lifetime management
-            from appEventFilter import AppEventFilter
+            from .appEventFilter import AppEventFilter
             self._filterObj = AppEventFilter(self)
             QtWidgets.QApplication.instance().installEventFilter(self._filterObj)
 
@@ -409,20 +472,16 @@ class AppController(QtCore.QObject):
                 sys.exit(0)
 
             if not stage.GetPseudoRoot():
-                print parserData.usdFile, 'has no prims; exiting.'
+                print(parserData.usdFile, 'has no prims; exiting.')
                 sys.exit(0)
 
-            self._openSettings2(parserData.defaultSettings)
-
-            self._dataModel = UsdviewDataModel(
-                self._printTiming, self._settings2)
+            # We instantiate a UIStateProxySource only for its side-effects
+            uiProxy = UIStateProxySource(self, self._settings2, "ui")
 
 
             if parserData.renderStatsFile is not None:
                 self._dataModel.renderStatsFile = parserData.renderStatsFile
 
-            self._dataModel.signalPrimsChanged.connect(
-                self._onPrimsChanged)
 
             self._dataModel.stage = stage
 
@@ -439,8 +498,8 @@ class AppController(QtCore.QObject):
             self._initialSelectPrim = self._dataModel.stage.GetPrimAtPath(
                 parserData.primPath)
             if not self._initialSelectPrim:
-                print 'Could not find prim at path <%s> to select. '\
-                    'Ignoring...' % parserData.primPath
+                print('Could not find prim at path <%s> to select. '\
+                    'Ignoring...' % parserData.primPath)
                 self._initialSelectPrim = None
 
             try:
@@ -480,7 +539,7 @@ class AppController(QtCore.QObject):
                                 + 'These settings are not being used, the new '
                                 + 'settings file will be located at: '
                                 + str(settingsPath) + '.\n')
-                        print warning
+                        print(warning)
                         break
 
                 self._settings = settings.Settings(settingsPath)
@@ -502,6 +561,12 @@ class AppController(QtCore.QObject):
                         settings.EmitWarning(settingsPath)
                 except:
                     settings.EmitWarning(settingsPath)
+
+
+            self._dataModel.viewSettings.signalStyleSettingsChanged.connect(
+                self._setStyleSheetUsingState)
+            self._dataModel.signalPrimsChanged.connect(
+                self._onPrimsChanged)
 
             QtWidgets.QApplication.setOverrideCursor(QtCore.Qt.BusyCursor)
 
@@ -580,8 +645,7 @@ class AppController(QtCore.QObject):
                 self._ui.actionBlack,
                 self._ui.actionGrey_Dark,
                 self._ui.actionGrey_Light,
-                self._ui.actionWhite,
-                self._ui.actionDemo_Blue)
+                self._ui.actionWhite)
             for action in self._clearColorActions:
                 self._ui.colorGroup.addAction(action)
 
@@ -613,8 +677,8 @@ class AppController(QtCore.QObject):
             if self._dataModel.viewSettings.renderMode not in RenderModes:
                 fallback = str(
                     self._ui.renderModeActionGroup.actions()[0].text())
-                print "Warning: Unknown render mode '%s', falling back to '%s'" % (
-                            self._dataModel.viewSettings.renderMode, fallback)
+                print("Warning: Unknown render mode '%s', falling back to '%s'" % (
+                            self._dataModel.viewSettings.renderMode, fallback))
                 self._dataModel.viewSettings.renderMode = fallback
 
             self._ui.pickModeActionGroup = QtWidgets.QActionGroup(self)
@@ -629,8 +693,8 @@ class AppController(QtCore.QObject):
             # XXX This should be a validator in ViewSettingsDataModel.
             if self._dataModel.viewSettings.pickMode not in PickModes:
                 fallback = str(self._ui.pickModeActionGroup.actions()[0].text())
-                print "Warning: Unknown pick mode '%s', falling back to '%s'" % (
-                            self._dataModel.viewSettings.pickMode, fallback)
+                print("Warning: Unknown pick mode '%s', falling back to '%s'" % (
+                            self._dataModel.viewSettings.pickMode, fallback))
                 self._dataModel.viewSettings.pickMode = fallback
 
             self._ui.selHighlightModeActionGroup = QtWidgets.QActionGroup(self)
@@ -667,9 +731,9 @@ class AppController(QtCore.QObject):
 
             # setup animation objects for the primView and propertyView
             self._propertyLegendAnim = QtCore.QPropertyAnimation(
-                self._ui.propertyLegendContainer, "maximumHeight")
+                self._ui.propertyLegendContainer, b"maximumHeight")
             self._primLegendAnim = QtCore.QPropertyAnimation(
-                self._ui.primLegendContainer, "maximumHeight")
+                self._ui.primLegendContainer, b"maximumHeight")
 
             # set the context menu policy for the prim browser and attribute
             # inspector headers. This is so we can have a context menu on the
@@ -800,6 +864,9 @@ class AppController(QtCore.QObject):
             self._ui.actionAdjust_Default_Material.triggered[bool].connect(
                 self._adjustDefaultMaterial)
 
+            self._ui.actionPreferences.triggered[bool].connect(
+                self._togglePreferences)
+
             self._ui.actionOpen.triggered.connect(self._openFile)
 
             self._ui.actionSave_Overrides_As.triggered.connect(
@@ -810,11 +877,20 @@ class AppController(QtCore.QObject):
 
             self._ui.actionPause.triggered.connect(
                 self._togglePause)
+            self._ui.actionStop.triggered.connect(
+                self._toggleStop)
 
-            # Setup quit actions to ensure _cleanAndClose is only invoked once.
-            self._ui.actionQuit.triggered.connect(QtWidgets.QApplication.instance().quit)
+            # Typically, a handler is registered to the 'aboutToQuit' signal
+            # to handle cleanup. However, with PySide2, stageView's GL context
+            # is destroyed by then, making it too late in the shutdown process
+            # to release any GL resources used by the renderer (relevant for 
+            # Storm's GL renderer).
+            # To work around this, orchestrate shutdown via the main window's
+            # closeEvent() handler.
+            self._ui.actionQuit.triggered.connect(QtWidgets.QApplication.instance().closeAllWindows)
 
-            QtWidgets.QApplication.instance().aboutToQuit.connect(self._cleanAndClose)
+            # To measure Qt shutdown time, register a handler to stop the timer.
+            QtWidgets.QApplication.instance().aboutToQuit.connect(self._stopQtShutdownTimer)
 
             self._ui.actionReopen_Stage.triggered.connect(self._reopenStage)
 
@@ -1090,7 +1166,6 @@ class AppController(QtCore.QObject):
 
         # configure render plugins after stageView initialized its renderer.
         self._configureRendererPlugins()
-        self._configureColorManagement()
 
         if self._mallocTags == 'stageAndImaging':
             DumpMallocTags(self._dataModel.stage,
@@ -1183,6 +1258,15 @@ class AppController(QtCore.QObject):
         if self._stageView:
             self._stageView.closeRenderer()
         self._dataModel.stage = None
+
+    def _startQtShutdownTimer(self):
+        self._qtShutdownTimer = Timer()
+        self._qtShutdownTimer.__enter__()
+
+    def _stopQtShutdownTimer(self):
+        self._qtShutdownTimer.__exit__()
+        if self._printTiming:
+            self._qtShutdownTimer.PrintTime('tear down the UI')
 
     def _setPlayShortcut(self):
         self._ui.playButton.setShortcut(QtGui.QKeySequence(QtCore.Qt.Key_Space))
@@ -1334,6 +1418,7 @@ class AppController(QtCore.QObject):
                 self._configureRendererAovs()
                 self._configureRendererSettings()
                 self._configurePauseAction()
+                self._configureStopAction()
 
     def _configureRendererPlugins(self):
         if self._stageView:
@@ -1370,6 +1455,7 @@ class AppController(QtCore.QObject):
             self._configureRendererAovs()
             self._configureRendererSettings()
             self._configurePauseAction()
+            self._configureStopAction()
 
     # Renderer AOV support
     def _rendererAovChanged(self, aov):
@@ -1536,13 +1622,16 @@ class AppController(QtCore.QObject):
         buttonBox = QtWidgets.QDialogButtonBox(
             QtWidgets.QDialogButtonBox.Ok |
             QtWidgets.QDialogButtonBox.Cancel |
-            QtWidgets.QDialogButtonBox.RestoreDefaults)
+            QtWidgets.QDialogButtonBox.RestoreDefaults |
+            QtWidgets.QDialogButtonBox.Apply)
         layout.addWidget(buttonBox)
         buttonBox.rejected.connect(self._ui.settingsMoreDialog.reject)
         buttonBox.accepted.connect(self._ui.settingsMoreDialog.accept)
         self._ui.settingsMoreDialog.accepted.connect(self._applyMoreRendererSettings)
         defaultButton = buttonBox.button(QtWidgets.QDialogButtonBox.RestoreDefaults)
         defaultButton.clicked.connect(self._resetMoreRendererSettings)
+        applyButton = buttonBox.button(QtWidgets.QDialogButtonBox.Apply)
+        applyButton.clicked.connect(self._applyMoreRendererSettings)
 
         self._ui.settingsMoreDialog.setLayout(layout)
         self._ui.settingsMoreDialog.show()
@@ -1582,10 +1671,15 @@ class AppController(QtCore.QObject):
             self._ui.actionPause.setChecked(self._paused and
                 self._stageView.IsPauseRendererSupported())
 
-    def _configureColorManagement(self):
-        enableMenu = (not self._noRender and 
-                      UsdImagingGL.Engine.IsColorCorrectionCapable())
-        self._ui.menuColorCorrection.setEnabled(enableMenu)
+    def _configureStopAction(self):
+        if self._stageView:
+            # This is called when the user picks a new renderer, which
+            # always starts in an unstopped state.
+            self._stopped = False
+            self._ui.actionStop.setEnabled(
+                self._stageView.IsStopRendererSupported())
+            self._ui.actionStop.setChecked(self._stopped and
+                self._stageView.IsStopRendererSupported())
 
     # Topology-dependent UI changes
     def _reloadVaryingUI(self):
@@ -1783,11 +1877,9 @@ class AppController(QtCore.QObject):
 
     def _adjustFOV(self):
         fov = QtWidgets.QInputDialog.getDouble(self._mainWindow, "Adjust FOV",
-            "Enter a value between 0 and 180", self._dataModel.viewSettings.freeCamera.fov, 0, 180)
+            "Enter a value between 0 and 180", self._dataModel.viewSettings.freeCameraFOV, 0, 180)
         if (fov[1]):
-            self._dataModel.viewSettings.freeCamera.fov = fov[0]
-            if self._stageView:
-                self._stageView.update()
+            self._dataModel.viewSettings.freeCameraFOV = fov[0]
 
     def _adjustClippingPlanes(self, checked):
         # Eventually, this will not be accessible when _stageView is None.
@@ -1813,6 +1905,17 @@ class AppController(QtCore.QObject):
             self._adjustDefaultMaterialDlg.show()
         else:
             self._adjustDefaultMaterialDlg.close()
+
+    def _togglePreferences(self, checked):
+        if (checked):
+            self._preferencesDlg = preferences.Preferences(
+                self._mainWindow, self._dataModel)
+            self._preferencesDlg.finished.connect(lambda status :
+                self._ui.actionPreferences.setChecked(False))
+
+            self._preferencesDlg.show()
+        else:
+            self._preferencesDlg.close()
 
     def _redrawOptionToggled(self, checked):
         self._dataModel.viewSettings.redrawOnScrub = checked
@@ -2144,6 +2247,9 @@ class AppController(QtCore.QObject):
 
     @classmethod
     def _outputBaseDirectory(cls):
+        if os.getenv('PXR_USDVIEW_SUPPRESS_STATE_SAVING', "0") == "1":
+            return None
+
         homeDirRoot = os.getenv('HOME') or os.path.expanduser('~')
         baseDir = os.path.join(homeDirRoot, '.usdview')
 
@@ -2153,8 +2259,9 @@ class AppController(QtCore.QObject):
             return baseDir
 
         except OSError:
-            sys.stderr.write('ERROR: Unable to create base directory '
-                             'for settings file, settings will not be saved.\n')
+            sys.stderr.write("ERROR: Unable to create base directory '%s' "
+                             "for settings file, settings will not be saved.\n"
+                             % baseDir)
             return None
 
     # View adjustment functionality ===========================================
@@ -2392,7 +2499,7 @@ class AppController(QtCore.QObject):
         # dock the interpreter window next to the main usdview window
         self._interpreter.move(self._mainWindow.x() + self._mainWindow.frameGeometry().width(),
                                self._mainWindow.y())
-        self._interpreter.resize(600, self._mainWindow.size().height()/2)
+        self._interpreter.resize(600, self._mainWindow.size().height()//2)
 
         self._interpreter.show()
         self._interpreter.activateWindow()
@@ -2400,7 +2507,7 @@ class AppController(QtCore.QObject):
 
     def _showDebugFlags(self):
         if self._debugFlagsWindow is None:
-            from debugFlagsWidget import DebugFlagsWidget
+            from .debugFlagsWidget import DebugFlagsWidget
             self._debugFlagsWindow = DebugFlagsWidget()
 
         self._debugFlagsWindow.show()
@@ -2436,7 +2543,7 @@ class AppController(QtCore.QObject):
     # File handling functionality =============================================
     def  _exportRenderStatsAsCSV(self, statsFile, stats):
         if len(stats) < 1:
-            print "empty stats data"
+            print("empty stats data")
             return 
         import csv
         with open(statsFile, 'w') as f:
@@ -2475,11 +2582,11 @@ class AppController(QtCore.QObject):
     def _exportRenderStats(self):
         statsFile = self._dataModel.renderStatsFile
         if statsFile == None:
-            print "no stats file"
+            print("no stats file")
             return
         stats = self._dataModel.renderStats
         if stats == None:
-            print "no stats data"
+            print("no stats data")
             return
         # default to json, but if the extension is .csv, use that instead
         parts = os.path.splitext(statsFile)
@@ -2491,7 +2598,8 @@ class AppController(QtCore.QObject):
                 json.dump(stats, f, indent=2, sort_keys=True)
 
     def _cleanAndClose(self):
-
+        # This function is called by the main window's closeEvent handler.
+        
         self._settings2.save()
 
         if self._dataModel.renderStatsFile is not None:
@@ -2520,20 +2628,18 @@ class AppController(QtCore.QObject):
         if self._timer.isActive():
             self._timer.stop()
 
-        # Close the stage.
+        # Close stage and release renderer resources (if applicable).
         self._closeStage()
 
-        # Tear down the UI window.
-        with Timer() as t:
-            self._mainWindow.close()
-        if self._printTiming:
-            t.PrintTime('tear down the UI')
+        # Start timer to measure Qt shutdown time
+        self._startQtShutdownTimer()
 
     def _openFile(self):
         extensions = Sdf.FileFormat.FindAllFileFormatExtensions()
         builtInFiles = lambda f: f.startswith(".usd")
         notBuiltInFiles = lambda f: not f.startswith(".usd")
-        extensions = filter(builtInFiles, extensions) + filter(notBuiltInFiles, extensions)
+        extensions = list(filter(builtInFiles, extensions)) + \
+                     list(filter(notBuiltInFiles, extensions))
         fileFilter = "USD Compatible Files (" + " ".join("*." + e for e in extensions) + ")" 
         (filename, _) = QtWidgets.QFileDialog.getOpenFileName(
             self._mainWindow,
@@ -2629,12 +2735,23 @@ class AppController(QtCore.QObject):
             self._stageView.SetRendererPaused(self._paused)
             self._ui.actionPause.setChecked(self._paused)
 
+    def _toggleStop(self):
+        if self._stageView.IsStopRendererSupported():
+            # Ask the renderer whether its currently stopped or not
+            # as the value of the _stopped variable can become out of
+            # date if for example any camera munging happens
+            self._stopped = self._stageView.IsRendererConverged()
+            self._stopped = not self._stopped
+            self._stageView.SetRendererStopped(self._stopped)
+            self._ui.actionStop.setChecked(self._stopped)
+
     def _reopenStage(self):
         QtWidgets.QApplication.setOverrideCursor(QtCore.Qt.BusyCursor)
 
         try:
             # Pause the stage view while we update
-            self._stageView.setUpdatesEnabled(False)
+            if self._stageView:
+                self._stageView.setUpdatesEnabled(False)
 
             # Clear out any Usd objects that may become invalid.
             self._dataModel.selection.clear()
@@ -2658,8 +2775,8 @@ class AppController(QtCore.QObject):
             self._resetView()
 
             self._stepSizeChanged()
-            self._stepSizeChanged()
-            self._stageView.setUpdatesEnabled(True)
+            if self._stageView:
+                self._stageView.setUpdatesEnabled(True)
         except Exception as err:
             self.statusMessage('Error occurred reopening Stage: %s' % err)
             traceback.print_exc()
@@ -2713,14 +2830,13 @@ class AppController(QtCore.QObject):
                     self._startingPrimCameraPath)
                 if not prim.IsValid():
                     msg = sys.stderr
-                    print >> msg, "WARNING: Camera path %r did not exist in " \
-                                  "stage" % (str(self._startingPrimCameraPath),)
+                    print("WARNING: Camera path %r did not exist in stage"
+                          % self._startingPrimCameraPath, file=msg)
                     self._startingPrimCameraPath = None
                 elif not prim.IsA(UsdGeom.Camera):
                     msg = sys.stderr
-                    print >> msg, "WARNING: Camera path %r was not a " \
-                                  "UsdGeom.Camera" % \
-                                  (str(self._startingPrimCameraPath),)
+                    print("WARNING: Camera path %r was not a UsdGeom.Camera"
+                          % self._startingPrimCameraPath, file=msg)
                     self._startingPrimCameraPath = None
                 else:
                     setCamera(prim)
@@ -3011,7 +3127,7 @@ class AppController(QtCore.QObject):
                                                     for child in childrenToAdd])
             elif depth + 1 < maxDepth:
                 # The children already exist but we're recursing deeper.
-                for i in xrange(item.childCount()):
+                for i in range(item.childCount()):
                     self._populateChildren(item.child(i), depth+1, maxDepth)
 
     def _populateItem(self, prim, depth=0, maxDepth=0):
@@ -3252,13 +3368,13 @@ class AppController(QtCore.QObject):
         """Called when the currentPathWidget text is changed"""
         newPaths = self._ui.currentPathWidget.text()
         pathList = re.split(", ?", newPaths)
-        pathList = filter(lambda path: len(path) != 0, pathList)
+        pathList = [path for path in pathList if len(path) != 0]
 
         try:
             prims = self._getPrimsFromPaths(pathList)
         except PrimNotFoundException as ex:
             # _getPrimsFromPaths couldn't find one of the prims
-            sys.stderr.write("ERROR: %s\n" % ex.message)
+            sys.stderr.write("ERROR: %s\n" % str(ex))
             self._updatePrimPathText()
             return
 
@@ -3499,12 +3615,19 @@ class AppController(QtCore.QObject):
         inheritedProps = [primvar.GetAttr() for primvar in inheritedPrimvars]
         props = prim.GetAttributes() + prim.GetRelationships()  + inheritedProps
 
+        def _cmp(v1, v2):
+            if v1 < v2:
+                return -1
+            if v2 < v1:
+                return 1
+            return 0
+
         def cmpFunc(propA, propB):
             aName = propA.GetName()
             bName = propB.GetName()
-            return cmp(aName.lower(), bName.lower())
+            return _cmp(aName.lower(), bName.lower())
 
-        props.sort(cmp=cmpFunc)
+        props.sort(key=cmp_to_key(cmpFunc))
 
         # Add the special composed attributes usdview generates
         # at the top of our property list.
@@ -3569,7 +3692,7 @@ class AppController(QtCore.QObject):
         curPrimSelection = self._dataModel.selection.getFocusPrim()
 
         currRow = 0
-        for key, primProperty in self._propertiesDict.iteritems():
+        for key, primProperty in self._propertiesDict.items():
             targets = None
             isInheritedProperty = isinstance(primProperty, Usd.Property) and \
                 (primProperty.GetPrim() != curPrimSelection)
@@ -3680,7 +3803,7 @@ class AppController(QtCore.QObject):
         try:
             self._updatePropertyViewInternal()
         except Exception as err:
-            print "Problem encountered updating attribute view: %s" % err
+            print("Problem encountered updating attribute view: %s" % err)
             raise
         finally:
             if cursorOverride:
@@ -3853,16 +3976,7 @@ class AppController(QtCore.QObject):
         # this.
         compKeys = [# composition related metadata
                     "references", "inheritPaths", "specializes",
-                    "payload", "subLayers",
-
-                    # non-template clip metadata
-                    "clipAssetPaths", "clipTimes", "clipManifestAssetPath",
-                    "clipActive", "clipPrimPath",
-
-                    # template clip metadata
-                    "clipTemplateAssetPath",
-                    "clipTemplateStartTime", "clipTemplateEndTime",
-                    "clipTemplateStride"]
+                    "payload", "subLayers"]
 
 
         for k in compKeys:
@@ -3943,7 +4057,7 @@ class AppController(QtCore.QObject):
         populateMetadataTable("[path]", str(obj.GetPath()), rowIndex)
         rowIndex += 1
 
-        for variantSetName, combo in variantSets.iteritems():
+        for variantSetName, combo in variantSets.items():
             attrName = QtWidgets.QTableWidgetItem(str(variantSetName+ ' variant'))
             tableWidget.setItem(rowIndex, 0, attrName)
             tableWidget.setCellWidget(rowIndex, 1, combo)
@@ -3954,7 +4068,7 @@ class AppController(QtCore.QObject):
 
         # Add all the setless variant selections directly after the variant 
         # combo boxes
-        for variantSetName, variantSelection in setlessVariantSelections.iteritems():
+        for variantSetName, variantSelection in setlessVariantSelections.items():
             attrName = QtWidgets.QTableWidgetItem(str(variantSetName+ ' variant'))
             tableWidget.setItem(rowIndex, 0, attrName)
 
@@ -3970,7 +4084,7 @@ class AppController(QtCore.QObject):
         for key in sortedKeys:
             if key == "clips":
                 for (clip, metadataGroup) in m[key].items():
-                    attrName = QtWidgets.QTableWidgetItem(str('clip:' + clip))
+                    attrName = QtWidgets.QTableWidgetItem(str('clips:' + clip))
                     tableWidget.setItem(rowIndex, 0, attrName)
                     for metadata in metadataGroup.keys():
                         dataPair = (metadata, metadataGroup[metadata])
@@ -4255,15 +4369,15 @@ class AppController(QtCore.QObject):
                 count,types = self._tallyPrimStats(
                     self._dataModel.stage.GetPrimAtPath(pth))
                 # no entry for Prim counts? initilize it
-                if not self._upperHUDInfo.has_key(HUDEntries.PRIM):
+                if HUDEntries.PRIM not in self._upperHUDInfo:
                     self._upperHUDInfo[HUDEntries.PRIM] = 0
                 self._upperHUDInfo[HUDEntries.PRIM] += count
 
-                for type in types.iterkeys():
+                for typeKey in types.keys():
                     # no entry for this prim type? initilize it
-                    if not self._upperHUDInfo.has_key(type):
-                        self._upperHUDInfo[type] = 0
-                    self._upperHUDInfo[type] += types[type]
+                    if typeKey not in self._upperHUDInfo:
+                        self._upperHUDInfo[typeKey] = 0
+                    self._upperHUDInfo[typeKey] += types[typeKey]
 
             if self._stageView:
                 self._stageView.upperHUDInfo = self._upperHUDInfo
@@ -4300,7 +4414,7 @@ class AppController(QtCore.QObject):
 
     def _getGeomCounts( self, prim, frame ):
         """returns cached geom counts if available, or calls _calculateGeomCounts()"""
-        if not self._geomCounts.has_key((prim,frame)):
+        if (prim,frame) not in self._geomCounts:
             self._calculateGeomCounts( prim, frame )
 
         return self._geomCounts[(prim,frame)]
@@ -4308,7 +4422,7 @@ class AppController(QtCore.QObject):
     def _accountForFlattening(self,shape):
         """Helper function for computing geomCounts"""
         if len(shape) == 1:
-            return shape[0] / 3
+            return shape[0] // 3
         else:
             return shape[0]
 
@@ -4347,7 +4461,7 @@ class AppController(QtCore.QObject):
                 for key in (HUDEntries.CV, HUDEntries.VERT, HUDEntries.FACE):
                     self._geomCounts[(prim,frame)][key] += childResult[key]
         except Exception as err:
-            print "Error encountered while computing prim subtree HUD info: %s" % err
+            print("Error encountered while computing prim subtree HUD info: %s" % err)
         finally:
             QtWidgets.QApplication.restoreOverrideCursor()
 
@@ -4645,7 +4759,7 @@ class AppController(QtCore.QObject):
                     specs = model.GetPrimStack()
                     name, time, owner = GetAssetCreationTime(specs,
                                                    mAPI.GetAssetIdentifier())
-                    for key, value in assetInfo.iteritems():
+                    for key, value in assetInfo.items():
                         aiStr += "<br> -- <em>%s</em> : %s" % (key, _HTMLEscape(str(value)))
                     aiStr += "<br><em><small>%s created on %s by %s</small></em>" % \
                         (_HTMLEscape(name), _HTMLEscape(time), 
@@ -4729,7 +4843,7 @@ class AppController(QtCore.QObject):
                     materialPurpose=UsdShade.Tokens.full)
 
             gotValidMaterial = False
-            for purpose, materialAssign in materialAssigns.iteritems():
+            for purpose, materialAssign in materialAssigns.items():
                 (material, bindingRel) = materialAssign
                 if not material:
                     continue
@@ -4965,6 +5079,6 @@ class AppController(QtCore.QObject):
 
     def _onPrimsChanged(self, primsChange, propertiesChange):
         """Called when prims in the USD stage have changed."""
-        from rootDataModel import ChangeNotice
+        from .rootDataModel import ChangeNotice
         self._updateForStageChanges(
             hasPrimResync=(primsChange==ChangeNotice.RESYNC))

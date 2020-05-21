@@ -36,7 +36,7 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-#if !defined(ARCH_GFX_OPENGL)
+#if !defined(PXR_OPENGL_SUPPORT_ENABLED)
 
 // Define the debug defines, to remove the need to protect these in API
 // agnostic code

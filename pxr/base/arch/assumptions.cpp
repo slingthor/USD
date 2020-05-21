@@ -125,11 +125,9 @@ Arch_ValidateAssumptions()
      * Make sure that the ARCH_CACHE_LINE_SIZE constant is set as expected
      * on the current hardware architecture.
      */
-#if !defined(ARCH_OS_IOS)
-    if (ARCH_CACHE_LINE_SIZE != Arch_ObtainCacheLineSize()) {
-        ARCH_WARNING("ARCH_CACHE_LINE_SIZE != Arch_ObtainCacheLineSize()");
+    if ((ARCH_CACHE_LINE_SIZE % Arch_ObtainCacheLineSize() != 0)) {
+        ARCH_WARNING("(ARCH_CACHE_LINE_SIZE % Arch_ObtainCacheLineSize()) != 0");
     }
-#endif
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

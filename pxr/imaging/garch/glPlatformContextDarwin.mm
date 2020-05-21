@@ -27,7 +27,7 @@
 
 #import <Foundation/Foundation.h>
 
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
 #ifdef ARCH_OS_MACOS
 #import <AppKit/NSOpenGL.h>
 typedef NSOpenGLContext NSGLContext;
@@ -45,7 +45,7 @@ class GarchNSGLContextState::Detail
 {
 public:
     Detail() {
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
         context = [NSGLContext currentContext];
 #else
         context = nil;
@@ -100,7 +100,7 @@ GarchNSGLContextState::IsValid() const
 void
 GarchNSGLContextState::MakeCurrent()
 {
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
 #if defined(ARCH_OS_IOS)
     [EAGLContext setCurrentContext:_detail->context];
 #else
@@ -113,7 +113,7 @@ GarchNSGLContextState::MakeCurrent()
 void
 GarchNSGLContextState::DoneCurrent()
 {
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
 #if defined(ARCH_OS_IOS)
     [EAGLContext setCurrentContext:nil];
 #else
@@ -131,7 +131,7 @@ GarchGetNullGLPlatformContextState()
 void *
 GarchSelectCoreProfileMacVisual()
 {
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
 #if defined(ARCH_OS_MACOS)
     NSOpenGLPixelFormatAttribute attribs[10];
     int c = 0;

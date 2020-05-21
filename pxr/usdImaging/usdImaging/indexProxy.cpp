@@ -132,6 +132,9 @@ UsdImagingIndexProxy::_RemovePrimInfoDependency(SdfPath const& cachePath)
         primInfo->usdPrim.GetPath());
     for (auto it = range.first; it != range.second; ++it) {
         if (it->second == cachePath) {
+            TF_DEBUG(USDIMAGING_CHANGES).
+                Msg("[Revert dependency] <%s> -> <%s>\n",
+                    it->first.GetText(), it->second.GetText());
             _delegate->_dependencyInfo.erase(it);
             break;
         }
@@ -149,9 +152,7 @@ UsdImagingIndexProxy::AddDependency(SdfPath const& cachePath,
     }
 
     SdfPath usdPath = usdPrim.GetPath();
-    if (std::find(primInfo->extraDependencies.cbegin(),
-                  primInfo->extraDependencies.cend(),
-                  usdPath) != primInfo->extraDependencies.cend()) {
+    if (primInfo->extraDependencies.count(usdPath) != 0) {
         // XXX: Ideally, we'd TF_VERIFY here, but usd resyncs can
         // sometimes cause double-inserts (see _AddHdPrimInfo), so we need to
         // silently guard against this.
@@ -160,7 +161,7 @@ UsdImagingIndexProxy::AddDependency(SdfPath const& cachePath,
 
     _delegate->_dependencyInfo.insert(
         UsdImagingDelegate::_DependencyMap::value_type(usdPath, cachePath));
-    primInfo->extraDependencies.push_back(usdPath);
+    primInfo->extraDependencies.insert(usdPath);
 
     TF_DEBUG(USDIMAGING_CHANGES).Msg("[Add dependency] <%s> -> <%s>\n",
         usdPath.GetText(), cachePath.GetText());
@@ -242,6 +243,28 @@ UsdImagingIndexProxy::Repopulate(SdfPath const& usdPath)
 { 
     // Repopulation is deferred to enable batch processing in parallel.
     _usdPathsToRepopulate.push_back(usdPath); 
+}
+
+void
+UsdImagingIndexProxy::Refresh(SdfPath const& cachePath)
+{
+    _AddTask(cachePath);
+}
+
+void
+UsdImagingIndexProxy::_UniqueifyPathsToRepopulate()
+{
+    if (_usdPathsToRepopulate.empty()) {
+        return;
+    }
+
+    std::sort(_usdPathsToRepopulate.begin(), _usdPathsToRepopulate.end());
+    auto last = std::unique(_usdPathsToRepopulate.begin(),
+                            _usdPathsToRepopulate.end(),
+                            [](SdfPath const &l, SdfPath const &r) {
+                                return r.HasPrefix(l);
+                            });
+    _usdPathsToRepopulate.erase(last, _usdPathsToRepopulate.end());
 }
 
 void
@@ -385,6 +408,12 @@ UsdImagingIndexProxy::_ProcessRemovals()
                               _delegate->ConvertCachePathToIndexPath(cachePath));
         }
         _bprimsToRemove.clear();
+    }
+
+    // If we're removing hdPrimInfo entries, we need to rebuild the
+    // time-varying cache.
+    if (_hdPrimInfoToRemove.size() > 0) {
+        _delegate->_timeVaryingPrimCacheValid = false;
     }
 
     {

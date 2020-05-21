@@ -133,7 +133,7 @@ public:
         // GarchTexture overrides
         MTLF_API
         virtual BindingVector GetBindings(TfToken const & identifier,
-                                          GarchSamplerGPUHandle samplerName) override;
+                                          GarchSamplerGPUHandle const& samplerName) override;
         MTLF_API
         virtual VtDictionary GetTextureInfo(bool forceLoad) override;
 
@@ -150,11 +150,11 @@ public:
         void _GenTexture();
         void _DeleteTexture();
 
-        MtlfMultiTexture _textureName;
-        MtlfMultiTexture _textureNameMS;
+        id<MTLTexture>   _textureName;
+        id<MTLTexture>   _textureNameMS;
         
-        MtlfMultiTexture _stencilTextureName;
-        MtlfMultiTexture _stencilTextureNameMS;
+        id<MTLTexture>   _stencilTextureName;
+        id<MTLTexture>   _stencilTextureNameMS;
 
         GLenum           _format,
                          _type;

@@ -117,6 +117,18 @@ GarchSimpleLightingContext::GetNumLightsUsed() const
     return std::min((int)_lights.size(), _maxLightsUsed);
 }
 
+int
+GarchSimpleLightingContext::ComputeNumShadowsUsed() const
+{
+    int numShadows = 0;
+    for (auto const& light : _lights) {
+        if (light.HasShadow() && numShadows <= light.GetShadowIndexEnd()) {
+            numShadows = light.GetShadowIndexEnd() + 1;
+        }
+    }
+    return numShadows;
+}
+
 void
 GarchSimpleLightingContext::SetShadows(GarchSimpleShadowArrayRefPtr const & shadows)
 {
@@ -281,6 +293,7 @@ GarchSimpleLightingContext::BindUniformBlocks(GarchBindingMapPtr const &bindingM
     if ((!_lightingUniformBlockValid || !_shadowUniformBlockValid) &&
         ((_lights.size() > 0) || bAlwaysNeedsBinding)) {
         int numLights = GetNumLightsUsed();
+        int numShadows = ComputeNumShadowsUsed();
 
         // 16byte aligned
         struct LightSource {
@@ -294,10 +307,10 @@ GarchSimpleLightingContext::BindUniformBlocks(GarchBindingMapPtr const &bindingM
             float padding[2];
             float attenuation[4];
             float worldToLightTransform[16];
-            bool hasShadow;
-            int32_t shadowIndex;
-            bool isIndirectLight;
-            float padding0;
+            int32_t shadowIndexStart;
+            int32_t shadowIndexEnd;
+            int32_t hasShadow;
+            int32_t isIndirectLight;
         };
 
         struct Lighting {
@@ -313,11 +326,10 @@ GarchSimpleLightingContext::BindUniformBlocks(GarchBindingMapPtr const &bindingM
         // 16byte aligned
         struct ShadowMatrix {
             float viewToShadowMatrix[16];
-            float basis0[4];
-            float basis1[4];
-            float basis2[4];
+            float shadowToViewMatrix[16];
+            float blur;
             float bias;
-            float padding[3];
+            float padding[2];
         };
 
         struct Shadow {
@@ -351,11 +363,16 @@ GarchSimpleLightingContext::BindUniformBlocks(GarchBindingMapPtr const &bindingM
 
         if (numLights == 0) {
             lightingSize = sizeof(Lighting) + sizeof(LightSource);
-            shadowSize = sizeof(ShadowMatrix);
         }
         else {
             lightingSize = sizeof(Lighting) + sizeof(LightSource) * numLights;
-            shadowSize = sizeof(ShadowMatrix) * numLights;
+        }
+        
+        if (numShadows == 0) {
+            shadowSize = sizeof(ShadowMatrix);
+        }
+        else {
+            shadowSize = sizeof(ShadowMatrix) * numShadows;
         }
         
         Lighting *lightingData = (Lighting *)alloca(lightingSize);
@@ -367,7 +384,7 @@ GarchSimpleLightingContext::BindUniformBlocks(GarchBindingMapPtr const &bindingM
         BindlessShadowSamplers *bindlessHandlesData = nullptr;
         size_t bindlessHandlesSize = 0;
         if (usingBindlessShadowMaps) {
-            bindlessHandlesSize = sizeof(PaddedHandle) * numLights;
+            bindlessHandlesSize = sizeof(PaddedHandle) * numShadows;
             bindlessHandlesData =
                 (BindlessShadowSamplers*)alloca(bindlessHandlesSize);
             memset(bindlessHandlesData, 0, bindlessHandlesSize);
@@ -398,24 +415,29 @@ GarchSimpleLightingContext::BindUniformBlocks(GarchBindingMapPtr const &bindingM
             lightingData->lightSource[i].isIndirectLight = light.IsDomeLight();
 
             if (lightingData->lightSource[i].hasShadow) {
-                int shadowIndex = light.GetShadowIndex();
-                lightingData->lightSource[i].shadowIndex = shadowIndex;
+                int shadowIndexStart = light.GetShadowIndexStart();
+                lightingData->lightSource[i].shadowIndexStart =
+                    shadowIndexStart;
+                int shadowIndexEnd = light.GetShadowIndexEnd();
+                lightingData->lightSource[i].shadowIndexEnd = shadowIndexEnd;
 
-                GfMatrix4d viewToShadowMatrix = viewToWorldMatrix *
-                    _shadows->GetWorldToShadowMatrix(shadowIndex);
+                for (int shadowIndex = shadowIndexStart;
+                     shadowIndex <= shadowIndexEnd; ++shadowIndex) {
+                    GfMatrix4d viewToShadowMatrix = viewToWorldMatrix *
+                        _shadows->GetWorldToShadowMatrix(shadowIndex);
+                    GfMatrix4d shadowToViewMatrix =
+                        viewToShadowMatrix.GetInverse();
 
-                double invBlur = 1.0/(std::max(0.0001F, light.GetShadowBlur()));
-                GfMatrix4d mat = viewToShadowMatrix.GetInverse();
-                GfVec4f xVec = GfVec4f(mat.GetRow(0) * invBlur);
-                GfVec4f yVec = GfVec4f(mat.GetRow(1) * invBlur);
-                GfVec4f zVec = GfVec4f(mat.GetRow(2));
-
-                shadowData->shadow[shadowIndex].bias = light.GetShadowBias();
-                setMatrix(shadowData->shadow[shadowIndex].viewToShadowMatrix,
-                          viewToShadowMatrix);
-                setVec4(shadowData->shadow[shadowIndex].basis0, xVec);
-                setVec4(shadowData->shadow[shadowIndex].basis1, yVec);
-                setVec4(shadowData->shadow[shadowIndex].basis2, zVec);
+                    shadowData->shadow[shadowIndex].bias = light.GetShadowBias();
+                    shadowData->shadow[shadowIndex].blur = light.GetShadowBlur();
+                    
+                    setMatrix(
+                        shadowData->shadow[shadowIndex].viewToShadowMatrix,
+                        viewToShadowMatrix);
+                    setMatrix(
+                        shadowData->shadow[shadowIndex].shadowToViewMatrix,
+                        shadowToViewMatrix);
+                }
 
                 shadowExists = true;
             }

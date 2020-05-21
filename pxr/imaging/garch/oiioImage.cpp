@@ -126,14 +126,14 @@ TF_REGISTRY_FUNCTION(TfType)
 }
 
 static GLenum
-_MTLFormatFromImageData(unsigned int nchannels)
+_FormatFromImageData(unsigned int nchannels)
 {
-    return (nchannels == 1) ? GL_RED : ((nchannels == 4) ? GL_RGBA : GL_RGB);
+    return GarchGetBaseFormat(nchannels);
 }
 
 /// Converts an OpenImageIO component type to its GL equivalent.
 static GLenum
-_GLTypeFromImageData(TypeDesc typedesc)
+_TypeFromImageData(TypeDesc typedesc)
 {
     switch (typedesc.basetype) {
     case TypeDesc::UINT:
@@ -333,14 +333,14 @@ Garch_OIIOImage::GetHeight() const
 GLenum
 Garch_OIIOImage::GetFormat() const
 {
-    return _MTLFormatFromImageData(_imagespec.nchannels);
+    return _FormatFromImageData(_imagespec.nchannels);
 }
 
 /* virtual */
 GLenum
 Garch_OIIOImage::GetType() const
 {
-    return _GLTypeFromImageData(_imagespec.format);
+    return _TypeFromImageData(_imagespec.format);
 }
 
 /* virtual */
@@ -577,7 +577,8 @@ Garch_OIIOImage::ReadCropped(int const cropTop,
         return false;
     }
    
-    int strideLength = imageInput->spec().width * GetBytesPerPixel();
+    int strideLength = imageInput->spec().width * 
+                       imageInput->spec().pixel_bytes();
     int readStride = (storage.flipped)? 
                      (-strideLength) : (strideLength);
     int size = imageInput->spec().height * strideLength;

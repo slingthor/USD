@@ -39,7 +39,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 void
 MtlfPostPendingGLErrors(std::string const & where)
 {
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     bool foundError = false;
     GLenum error;
     // Protect from doing infinite looping when glGetError
@@ -82,7 +82,7 @@ MtlfDefaultDebugOutputMessageCallback(
 char const *
 MtlfDebugEnumToString(GLenum debugEnum)
 {
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
 #if defined(GL_ARB_debug_output) || defined(GL_VERSION_4_3)
     switch (debugEnum) {
     case GL_DEBUG_SOURCE_API_ARB:
@@ -138,7 +138,7 @@ MtlfDebugEnumToString(GLenum debugEnum)
 
 static void _MtlfPushDebugGroup(char const * message)
 {
-#if defined(ARCH_GFX_OPENGL) && defined(GL_KHR_debug)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED) && defined(GL_KHR_debug)
     if (GLEW_KHR_debug) {
         glPushDebugGroup(GL_DEBUG_SOURCE_THIRD_PARTY, 0, -1, message);
     }
@@ -147,7 +147,7 @@ static void _MtlfPushDebugGroup(char const * message)
 
 static void _MtlfPopDebugGroup()
 {
-#if defined(ARCH_GFX_OPENGL) && defined(GL_KHR_debug)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED) && defined(GL_KHR_debug)
     if (GLEW_KHR_debug) {
         glPopDebugGroup();
     }

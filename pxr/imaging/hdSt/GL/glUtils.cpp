@@ -21,12 +21,12 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-
 #include "pxr/imaging/glf/glew.h"
+#include "pxr/imaging/hdSt/GL/glUtils.h"
+
 #include "pxr/imaging/glf/contextCaps.h"
 #include "pxr/imaging/glf/resourceFactory.h"
 
-#include "pxr/imaging/hdSt/GL/glUtils.h"
 
 #include "pxr/base/gf/vec2d.h"
 #include "pxr/base/gf/vec2f.h"

@@ -52,6 +52,7 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 class UsdPrim;
+class UsdPrimDefinition;
 class UsdPrimRange;
 class Usd_PrimData;
 
@@ -140,12 +141,26 @@ public:
     typedef UsdPrimSubtreeRange SubtreeRange;
 
     /// Construct an invalid prim.
-    UsdPrim() : UsdObject() {}
+    UsdPrim() : UsdObject(_Null<UsdPrim>()) {}
 
-    /// Return this prim's definition from the UsdSchemaRegistry based on the
-    /// prim's type if one exists, otherwise return null.
-    USD_API
-    SdfPrimSpecHandle GetPrimDefinition() const;
+    /// Return the prim's full type info composed from its type name, applied
+    /// API schemas, and any fallback types defined on the stage for 
+    /// unrecognized prim type names. The returned type structure contains the 
+    /// "true" schema type used to create this prim's prim definition and answer
+    /// the IsA query. This value is cached and efficient to query.
+    /// \sa GetTypeName
+    /// \sa GetAppliedSchemas
+    /// \sa \ref Usd_OM_FallbackPrimTypes
+    const UsdPrimTypeInfo &GetPrimTypeInfo() const {
+        return _Prim()->GetPrimTypeInfo();
+    }
+
+    /// Return this prim's definition based on the prim's type if the type
+    /// is a registered prim type. Returns an empty prim definition if it is 
+    /// not.
+    const UsdPrimDefinition &GetPrimDefinition() const {
+        return _Prim()->GetPrimDefinition();
+    }
 
     /// Return this prim's composed specifier.
     SdfSpecifier GetSpecifier() const { return _Prim()->GetSpecifier(); };
@@ -168,8 +183,13 @@ public:
         return SetMetadata(SdfFieldKeys->Specifier, specifier);
     }
 
-    /// Return this prim's composed type name.  Note that this value is
-    /// cached and is efficient to query.
+    /// Return this prim's composed type name. This value is cached and is 
+    /// efficient to query. 
+    /// Note that this is just the composed type name as authored and may not 
+    /// represent the full type of the prim and its prim definition. If you 
+    /// need to reason about the actual type of the prim, use GetPrimTypeInfo 
+    /// instead as it accounts for recognized schemas, applied API schemas,
+    /// fallback types, etc.
     const TfToken &GetTypeName() const { return _Prim()->GetTypeName(); };
 
     /// Author this Prim's typeName at the current EditTarget.
@@ -247,8 +267,11 @@ public:
     }
 
     /// Return a vector containing the names of API schemas which have
-    /// been applied to this prim, using the Apply() method on
-    /// the particular schema class. 
+    /// been applied to this prim. This includes both the authored API schemas
+    /// applied using the Apply() method on the particular schema class as 
+    /// well as any built-in API schemas that are automatically included 
+    /// through the prim type's prim definition.
+    /// To get only the authored API schemas use GetPrimTypeInfo instead.
     USD_API
     TfTokenVector GetAppliedSchemas() const;
 
@@ -450,10 +473,10 @@ private:
                  const TfToken &instanceName) const;
 
 public:
-    /// Return true if the UsdPrim is/inherits a Schema of type T.
-    ///
-    /// This will also return true if the UsdPrim is a schema that inherits
-    /// from schema \c T.
+    /// Return true if the prim's schema type, is or inherits schema type T.
+    /// \sa GetPrimTypeInfo 
+    /// \sa UsdPrimTypeInfo::GetSchemaType
+    /// \sa \ref Usd_OM_FallbackPrimTypes
     template <typename T>
     bool IsA() const {
         static_assert(std::is_base_of<UsdSchemaBase, T>::value,
@@ -461,7 +484,10 @@ public:
         return _IsA(TfType::Find<T>(), /*validateSchemaType=*/false);
     };
     
-    /// Return true if prim type is/inherits a Schema with TfType \p schemaType
+    /// Return true if the prim's schema type is or inherits \p schemaType.
+    /// \sa GetPrimTypeInfo 
+    /// \sa UsdPrimTypeInfo::GetSchemaType
+    /// \sa \ref Usd_OM_FallbackPrimTypes
     USD_API
     bool IsA(const TfType& schemaType) const;
 
@@ -676,6 +702,46 @@ public:
     /// \endcode
     USD_API
     bool IsPseudoRoot() const;
+
+    /// Returns the prim at \p path on the same stage as this prim.
+    /// If path is is relative, it will be anchored to the path of this prim.
+    /// \sa UsdStage::GetPrimAtPath(const SdfPath&) const
+    USD_API UsdPrim GetPrimAtPath(const SdfPath& path) const;
+
+    /// Returns the object at \p path on the same stage as this prim.
+    /// If path is is relative, it will be anchored to the path of this prim.
+    /// \sa UsdStage::GetObjectAtPath(const SdfPath&) const
+    USD_API UsdObject GetObjectAtPath(const SdfPath& path) const;
+
+    /// Returns the property at \p path on the same stage as this prim.
+    /// If path is relative, it will be anchored to the path of this prim.
+    ///
+    /// \note There is no guarantee that this method returns a property on
+    /// this prim. This is only guaranteed if path is a purely relative
+    /// property path.
+    /// \sa GetProperty(const TfToken&) const
+    /// \sa UsdStage::GetPropertyAtPath(const SdfPath&) const
+    USD_API UsdProperty GetPropertyAtPath(const SdfPath& path) const;
+    
+    /// Returns the attribute at \p path on the same stage as this prim.
+    /// If path is relative, it will be anchored to the path of this prim.
+    ///
+    /// \note There is no guarantee that this method returns an attribute on
+    /// this prim. This is only guaranteed if path is a purely relative
+    /// property path.
+    /// \sa GetAttribute(const TfToken&) const
+    /// \sa UsdStage::GetAttributeAtPath(const SdfPath&) const
+    USD_API UsdAttribute GetAttributeAtPath(const SdfPath& path) const;
+
+    /// Returns the relationship at \p path on the same stage as this prim.
+    /// If path is relative, it will be anchored to the path of this prim.
+    ///
+    /// \note There is no guarantee that this method returns a relationship on
+    /// this prim. This is only guaranteed if path is a purely relative
+    /// property path.
+    /// \sa GetRelationship(const TfToken&) const
+    /// \sa UsdStage::GetRelationshipAtPath(const SdfPath&) const
+    USD_API UsdRelationship GetRelationshipAtPath(const SdfPath& path) const;
 
     // --------------------------------------------------------------------- //
     /// \name Variants 
@@ -1121,6 +1187,13 @@ public:
         return UsdPrim();
     }
 
+    /// If this prim is a master prim, returns all prims that are instances of 
+    /// this master. Otherwise, returns an empty vector.
+    ///
+    /// Note that this function will return prims in masters for instances that 
+    /// are nested beneath other instances.
+    USD_API
+    std::vector<UsdPrim> GetInstances() const;
     /// @}
 
     // --------------------------------------------------------------------- //

@@ -1,9 +1,11 @@
 set(PXR_PREFIX pxr/imaging)
 set(PXR_PACKAGE hdx)
 
-if ((NOT ${PXR_ENABLE_GL_SUPPORT}) AND (NOT ${PXR_ENABLE_METAL_SUPPORT}))
+# XXX We tmp check for PXR_ENABLE_GL_SUPPORT since Hdx currently still uses
+# OpenGL directly. Once Hdx uses only Hgi, remove GL_SUPPORT check.
+if (NOT ${PXR_BUILD_GPU_SUPPORT})
     message(STATUS
-        "Skipping ${PXR_PACKAGE} because PXR_ENABLE_GL_SUPPORT and PXR_ENABLE_METAL_SUPPORT is OFF")
+        "Skipping ${PXR_PACKAGE} because PXR_BUILD_GPU_SUPPORT is OFF")
     return()
 endif()
 
@@ -11,6 +13,15 @@ set (optionalCppFiles "")
 if (PXR_BUILD_OPENCOLORIO_PLUGIN)
     list(APPEND optionalLibs ${OCIO_LIBRARIES})
     list(APPEND optionalIncludeDirs ${OCIO_INCLUDE_DIRS})
+endif()
+
+if (PXR_ENABLE_GL_SUPPORT AND PXR_ENABLE_METAL_SUPPORT)
+    list(APPEND optionalLibs hgiInterop)
+endif()
+
+set (optionalPublicClasses "")
+if (PXR_ENABLE_GL_SUPPORT)
+    list(APPEND optionalPublicClasses fullscreenShaderGL)
 endif()
 
 pxr_library(hdx
@@ -26,6 +37,7 @@ pxr_library(hdx
         hd
         hdSt
         hgi
+        hgiInterop
         cameraUtil
         sdf
         ${GLEW_LIBRARY}
@@ -36,15 +48,16 @@ pxr_library(hdx
         ${optionalIncludeDirs}
 
     PUBLIC_CLASSES
-        aovResolveTask
+        aovInputTask
         colorizeTask
         colorizeSelectionTask
         colorChannelTask
         colorCorrectionTask
-        compositor
         drawTargetRenderPass
         drawTargetTask
         drawTargetResolveTask
+        fullscreenShader
+        hgiConversions
         oitBufferAccessor
         oitRenderTask
         oitResolveTask
@@ -53,17 +66,17 @@ pxr_library(hdx
         pickTask
         pickFromRenderBufferTask
         presentTask
-        progressiveTask
         renderTask
         renderSetupTask
         selectionTask
         selectionTracker
         shadowTask
-        simpleLightingShader
         simpleLightTask
+        task
         taskController
         tokens
         types
+        ${optionalPublicClasses}
 
     PUBLIC_HEADERS
         shadowMatrixComputation.h
@@ -75,7 +88,6 @@ pxr_library(hdx
         unitTestDelegate
 
     PRIVATE_HEADERS
-        unitTestGLDrawing.h
         unitTestUtils.h
 
     RESOURCE_FILES
@@ -89,11 +101,11 @@ pxr_library(hdx
         shaders/renderPassPickingShader.glslfx
         shaders/renderPassShadowShader.glslfx
         shaders/selection.glslfx
-        shaders/simpleLightingShader.glslfx
         shaders/renderPassOitShader.glslfx
         shaders/renderPassOitOpaqueShader.glslfx
         shaders/renderPassOitVolumeShader.glslfx
         shaders/oitResolveImageShader.glslfx
+        shaders/outline.glslfx
         textures/StinsonBeach.exr
 )
 
@@ -126,26 +138,26 @@ pxr_build_test(testHdxIdRender
     LIBRARIES
         hdx
         hd
+        hdSt
         sdf
         glf
         garch
         arch
         tf
     CPPFILES
-        unitTestGLDrawing.cpp
         testenv/testHdxIdRender.cpp
 )
 pxr_build_test(testHdxPickAndHighlight
     LIBRARIES
         hdx
         hd
+        hdSt
         sdf
         glf
         garch
         arch
         tf
     CPPFILES
-        unitTestGLDrawing.cpp
         unitTestUtils.cpp
         testenv/testHdxPickAndHighlight.cpp
 )
@@ -161,7 +173,7 @@ pxr_build_test(testHdxCameraAndLight
     CPPFILES
         testenv/testHdxCameraAndLight.cpp
 )
-pxr_build_test(testHdxPickingWithReprAndRefineChanges
+pxr_build_test(testHdxDrawTarget
     LIBRARIES
         hdx
         hd
@@ -171,7 +183,19 @@ pxr_build_test(testHdxPickingWithReprAndRefineChanges
         arch
         tf
     CPPFILES
-        unitTestGLDrawing.cpp
+        testenv/testHdxDrawTarget.cpp
+)
+pxr_build_test(testHdxPickingWithReprAndRefineChanges
+    LIBRARIES
+        hdx
+        hd
+        hdSt
+        sdf
+        glf
+        garch
+        arch
+        tf
+    CPPFILES
         unitTestUtils.cpp
         testenv/testHdxPickingWithReprAndRefineChanges.cpp
 )
@@ -179,14 +203,28 @@ pxr_build_test(testHdxUnpickablesAsOccluders
     LIBRARIES
         hdx
         hd
+        hdSt
         sdf
         glf
         garch
         arch
         tf
     CPPFILES
-        unitTestGLDrawing.cpp
         unitTestUtils.cpp
         testenv/testHdxUnpickablesAsOccluders.cpp
+)
+pxr_build_test(testHdxPickSubprims
+    LIBRARIES
+        hdx
+        hd
+        hdSt
+        sdf
+        glf
+        garch
+        arch
+        tf
+    CPPFILES
+        unitTestUtils.cpp
+        testenv/testHdxPickSubprims.cpp
 )
 endif()

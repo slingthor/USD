@@ -26,7 +26,9 @@
 
 // 0 -> 1: added IDRenderColor decode and direct Rprim path fetching.
 // 1 -> 2: added RenderParams::enableUsdDrawModes
-#define USDIMAGINGGL_API_VERSION 2
+// 2 -> 3: refactor picking API.
+// 3 -> 4: Add "instancerContext" to new picking API.
+#define USDIMAGINGGL_API_VERSION 4
 
 #endif // PXR_USD_IMAGING_USD_IMAGING_GL_VERSION_H
 

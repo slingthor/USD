@@ -42,7 +42,8 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 class HdStBufferResource;
 
-typedef boost::shared_ptr<HdStBufferResource> HdStBufferResourceSharedPtr;
+using HdStBufferResourceSharedPtr =
+    std::shared_ptr<HdStBufferResource>;
 
 typedef std::vector<
     std::pair<TfToken, HdBufferResourceSharedPtr> > HdStBufferResourceNamedList;

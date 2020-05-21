@@ -1,5 +1,5 @@
 //
-// Copyright 2019 Pixar
+// Copyright 2020 Pixar
 //
 // Licensed under the Apache License, Version 2.0 (the "Apache License")
 // with the following modification; you may not use this file except in
@@ -24,46 +24,18 @@
 #ifndef PXR_IMAGING_HGI_BUFFER_H
 #define PXR_IMAGING_HGI_BUFFER_H
 
+#include <string>
+#include <vector>
+
 #include "pxr/pxr.h"
 #include "pxr/base/gf/vec3i.h"
 #include "pxr/imaging/hgi/api.h"
 #include "pxr/imaging/hgi/enums.h"
+#include "pxr/imaging/hgi/handle.h"
 #include "pxr/imaging/hgi/types.h"
 
 
 PXR_NAMESPACE_OPEN_SCOPE
-
-struct HgiBufferDesc;
-
-
-///
-/// \class HgiBuffer
-///
-/// Represents a graphics platform independent GPU buffer resource.
-///
-/// Base class for Hgi buffers.
-/// To the client (HdSt) buffer resources are referred to via
-/// opaque, stateless handles (HgBufferHandle).
-///
-class HgiBuffer {
-public:
-    HGI_API
-    HgiBuffer(HgiBufferDesc const& desc);
-
-    HGI_API
-    virtual ~HgiBuffer();
-    
-    HGI_API
-    virtual void Copy(void const *data, size_t offset, size_t size) = 0;
-
-private:
-    HgiBuffer() = delete;
-    HgiBuffer & operator=(const HgiBuffer&) = delete;
-    HgiBuffer(const HgiBuffer&) = delete;
-};
-
-typedef HgiBuffer* HgiBufferHandle;
-
 
 
 /// \struct HgiBufferDesc
@@ -71,18 +43,37 @@ typedef HgiBuffer* HgiBufferHandle;
 /// Describes the properties needed to create a GPU buffer.
 ///
 /// <ul>
-/// <li>length:
-///   The size of the buffer in bytes.</li>
+/// <li>debugName:
+///   This label can be applied as debug label for gpu debugging.</li>
+/// <li>usage:
+///   Bits describing the intended usage and properties of the buffer.</li>
+/// <li>byteSize:
+///   Length of buffer in bytes</li>
+/// <Li>vertexStride:
+///   The size of a vertex in a vertex buffer.
+///   This property is only required for vertex buffers.</li>
+/// <li>initialData:
+///   CPU pointer to initialization data of buffer.
+///   The memory is consumed immediately during the creation of the HgiBuffer.
+///   The application may alter or free this memory as soon as the constructor
+///   of the HgiBuffer has returned.</li>
 /// </ul>
 ///
-struct HgiBufferDesc {
+struct HgiBufferDesc
+{
+    HGI_API
     HgiBufferDesc()
-    : usage(HgiBufferUsageUniforms)
-    , length(0)
+    : usage(HgiBufferUsageUniform)
+    , byteSize(0)
+    , vertexStride(0)
+    , initialData(nullptr)
     {}
 
+    std::string debugName;
     HgiBufferUsage usage;
-    size_t length;
+    size_t byteSize;
+    uint32_t vertexStride;
+    void const* initialData;
 };
 
 HGI_API
@@ -94,6 +85,42 @@ HGI_API
 inline bool operator!=(
     const HgiBufferDesc& lhs,
     const HgiBufferDesc& rhs);
+
+
+///
+/// \class HgiBuffer
+///
+/// Represents a graphics platform independent GPU buffer resource (base class).
+/// Buffers should be created via Hgi::CreateBuffer.
+/// The fill the buffer with data you supply `initialData` in the descriptor.
+/// To update the data inside the buffer later on, use blitCmds.
+///
+class HgiBuffer
+{
+public:
+    HGI_API
+    virtual ~HgiBuffer();
+
+    /// The descriptor describes the object.
+    HGI_API
+    HgiBufferDesc const& GetDescriptor() const;
+
+protected:
+    HGI_API
+    HgiBuffer(HgiBufferDesc const& desc);
+
+    HgiBufferDesc _descriptor;
+
+private:
+    HgiBuffer() = delete;
+    HgiBuffer & operator=(const HgiBuffer&) = delete;
+    HgiBuffer(const HgiBuffer&) = delete;
+};
+
+/// Explicitly instantiate and define buffer handle
+template class HgiHandle<class HgiBuffer>;
+using HgiBufferHandle = HgiHandle<class HgiBuffer>;
+using HgiBufferHandleVector = std::vector<HgiBufferHandle>;
 
 
 PXR_NAMESPACE_CLOSE_SCOPE

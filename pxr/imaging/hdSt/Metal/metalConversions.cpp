@@ -284,6 +284,7 @@ HdStMetalConversions::GetWrap(HdWrap wrap)
         case HdWrapUseMetadata : return MTLSamplerAddressModeClampToEdge;
 #endif
         case HdWrapLegacy : return MTLSamplerAddressModeRepeat;
+        case HdWrapLegacyClamp : return MTLSamplerAddressModeClampToEdge;
     }
 
     TF_CODING_ERROR("Unexpected HdWrap type %d", wrap);

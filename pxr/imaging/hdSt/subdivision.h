@@ -41,7 +41,7 @@
 #include "pxr/imaging/hf/perfLog.h"
 #include "pxr/usd/sdf/path.h"
 #include "pxr/base/tf/token.h"
-#if OPENSUBDIV_HAS_METAL_COMPUTE && defined(ARCH_GFX_METAL)// MTL_CHANGE
+#if OPENSUBDIV_HAS_METAL_COMPUTE && defined(PXR_METAL_SUPPORT_ENABLED)// MTL_CHANGE
 #include <opensubdiv/osd/mtlComputeEvaluator.h>
 #include "pxr/imaging/mtlf/mtlDevice.h"
 #endif
@@ -145,7 +145,7 @@ public:
     /// overrides
     virtual bool HasChainedBuffer() const override;
     virtual void GetBufferSpecs(HdBufferSpecVector *specs) const override;
-    virtual HdBufferSourceVector GetChainedBuffers() const override;
+    virtual HdBufferSourceSharedPtrVector GetChainedBuffers() const override;
     virtual bool Resolve() = 0;
 
 protected:
@@ -169,7 +169,7 @@ protected:
 /// so that reducing data copy between osd buffer and HdBufferSource.
 ///
 template <typename VERTEX_BUFFER>
-class HdSt_OsdRefineComputation : public HdBufferSource {
+class HdSt_OsdRefineComputation final : public HdBufferSource {
 public:
     HdSt_OsdRefineComputation(HdSt_MeshTopology *topology,
                             HdBufferSourceSharedPtr const &source,
@@ -220,7 +220,7 @@ public:
     public:
         VertexBuffer(HdBufferResourceSharedPtr const &resource) { 
             _resource =
-                boost::static_pointer_cast<HdStBufferResource> (resource);
+                std::static_pointer_cast<HdStBufferResource> (resource);
         }
 
         // bit confusing, osd expects 'GetNumElements()' returns the num 
@@ -231,10 +231,9 @@ public:
         HdResourceGPUHandle BindVBO() {
             return _resource->GetId();
         }
-#if OPENSUBDIV_HAS_METAL_COMPUTE && defined(ARCH_GFX_METAL)
-        id<MTLBuffer> BindMTLBuffer(OpenSubdiv::v3_3_1::Osd::MTLContext* context) {
-            MtlfMetalContext::MtlfMultiBuffer buffer = _resource->GetId();
-            return buffer.forCurrentGPU();
+#if OPENSUBDIV_HAS_METAL_COMPUTE && defined(PXR_METAL_SUPPORT_ENABLED)
+        id<MTLBuffer> BindMTLBuffer(OpenSubdiv::v3_4_3::Osd::MTLContext* context) {
+            return _resource->GetId();
         }
 #endif
         HdStBufferResourceSharedPtr _resource;
@@ -317,21 +316,11 @@ HdSt_OsdRefineComputation<VERTEX_BUFFER>::Resolve()
         return true;
     }
 
-#if OPENSUBDIV_HAS_METAL_COMPUTE && defined(ARCH_GFX_METAL) //MTL_CHANGE
-    OpenSubdiv::Osd::MTLContext deviceContext;
-    OpenSubdiv::Osd::MTLContext *deviceContextPtr = &deviceContext;
-    deviceContext.device       = MtlfMetalContext::GetMetalContext()->currentDevice;
-    deviceContext.commandQueue = MtlfMetalContext::GetMetalContext()->gpus[MtlfMetalContext::GetMetalContext()->currentGPU].commandQueue;
-#else
-    void *deviceContextPtr = NULL;
-#endif
-    
     // prepare cpu vertex buffer including refined vertices
     TF_VERIFY(!_cpuVertexBuffer);
     _cpuVertexBuffer = VERTEX_BUFFER::Create(
         HdGetComponentCount(_source->GetTupleType().type),
-        subdivision->GetNumVertices(),
-        deviceContextPtr);  // MTL_CHANGE
+        subdivision->GetNumVertices());
 
     subdivision->RefineCPU(_source, _varying, _cpuVertexBuffer);
 

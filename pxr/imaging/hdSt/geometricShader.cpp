@@ -26,6 +26,8 @@
 #include "pxr/imaging/hdSt/geometricShader.h"
 
 #include "pxr/imaging/hdSt/debugCodes.h"
+#include "pxr/imaging/hdSt/shaderKey.h"
+#include "pxr/imaging/hdSt/resourceBinder.h"
 
 #include "pxr/imaging/hd/binding.h"
 #include "pxr/imaging/hd/engine.h"
@@ -54,7 +56,7 @@ HdSt_GeometricShader::HdSt_GeometricShader(std::string const &glslfxString,
     , _cullStyle(cullStyle)
     , _polygonMode(polygonMode)
     , _lineWidth(lineWidth)
-    , _cullingPass(cullingPass)
+    , _frustumCullingPass(cullingPass)
     , _hash(0)
 {
     HD_TRACE_FUNCTION();
@@ -111,7 +113,7 @@ HdSt_GeometricShader::BindResources(HdStProgram const &program,
     } else {
         // don't care -- use renderPass's fallback
     }
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
 //    if (GetPrimitiveMode() == GL_PATCHES) {
 //        glPatchParameteri(GL_PATCH_VERTICES, GetPrimitiveIndexSize());
 //    }
@@ -132,7 +134,7 @@ HdSt_GeometricShader::UnbindResources(HdStProgram const &program,
                                       HdSt_ResourceBinder const &binder,
                                       HdRenderPassState const &state)
 {
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
 //    if (_polygonMode == HdPolygonModeLine) {
 //        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 //    }
@@ -246,6 +248,31 @@ HdSt_GeometricShader::GetNumPrimitiveVertsForGeometryShader() const
     }
 
     return numPrimVerts;
+}
+
+/*static*/
+ HdSt_GeometricShaderSharedPtr
+ HdSt_GeometricShader::Create(
+     HdSt_ShaderKey const &shaderKey, 
+    HdStResourceRegistrySharedPtr const &resourceRegistry)
+{
+    // Use the shaderKey hash to deduplicate geometric shaders.
+    HdInstance<HdSt_GeometricShaderSharedPtr> geometricShaderInstance =
+        resourceRegistry->RegisterGeometricShader(shaderKey.ComputeHash());
+
+    if (geometricShaderInstance.IsFirstInstance()) {
+        geometricShaderInstance.SetValue(
+            HdSt_GeometricShaderSharedPtr(
+                new HdSt_GeometricShader(
+                    shaderKey.GetGlslfxString(),
+                    shaderKey.GetPrimitiveType(),
+                    shaderKey.GetCullStyle(),
+                    shaderKey.GetPolygonMode(),
+                    shaderKey.IsFrustumCullingPass(),
+                    /*debugId=*/SdfPath(),
+                    shaderKey.GetLineWidth())));
+    }
+    return geometricShaderInstance.GetValue();
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

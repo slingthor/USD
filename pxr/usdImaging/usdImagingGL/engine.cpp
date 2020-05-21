@@ -24,12 +24,12 @@
 #include "pxr/imaging/glf/glew.h"
 #include "pxr/usdImaging/usdImagingGL/engine.h"
 
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
 #include "pxr/imaging/hdSt/GL/resourceFactoryGL.h"
 #include "pxr/usdImaging/usdImagingGL/legacyEngine.h"
 #endif
 
-#if defined(ARCH_GFX_METAL)
+#if defined(PXR_METAL_SUPPORT_ENABLED)
 #include "pxr/imaging/mtlf/mtlDevice.h"
 #include "pxr/imaging/hdSt/Metal/resourceFactoryMetal.h"
 #endif
@@ -53,17 +53,26 @@
 
 #include "pxr/imaging/hdSt/tokens.h"
 
+#include "pxr/imaging/hgi/hgi.h"
+#include "pxr/imaging/hgi/tokens.h"
+
+#include "pxr/base/tf/envSetting.h"
 #include "pxr/base/tf/getenv.h"
 #include "pxr/base/tf/stl.h"
 
 #include "pxr/base/gf/matrix4d.h"
 #include "pxr/base/gf/vec3d.h"
 
+#include <string>
+
 PXR_NAMESPACE_OPEN_SCOPE
+
+TF_DEFINE_ENV_SETTING(USDIMAGINGGL_ENGINE_DEBUG_SCENE_DELEGATE_ID, "/",
+                      "Default usdImaging scene delegate id");
 
 namespace {
 
-#if defined(ARCH_GFX_METAL)
+#if defined(PXR_METAL_SUPPORT_ENABLED)
 std::mutex engineCountMutex;
 int engineCount = 0;
 #endif
@@ -80,9 +89,19 @@ _GetHydraEnabledEnvVar()
 }
 
 static
+SdfPath const&
+_GetUsdImagingDelegateId()
+{
+    static SdfPath const delegateId =
+        SdfPath(TfGetEnvSetting(USDIMAGINGGL_ENGINE_DEBUG_SCENE_DELEGATE_ID));
+
+    return delegateId;
+}
+
+static
 void _InitGL()
 {
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     static std::once_flag initFlag;
 
     std::call_once(initFlag, []{
@@ -104,7 +123,7 @@ static
 bool
 _IsHydraEnabled(const UsdImagingGLEngine::RenderAPI api)
 {
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     if (api == UsdImagingGLEngine::OpenGL) {
         // Make sure there is an OpenGL context when
         // trying to initialize Hydra/Reference
@@ -160,11 +179,13 @@ UsdImagingGLEngine::IsHydraEnabled()
 // Construction
 //----------------------------------------------------------------------------
 
-UsdImagingGLEngine::UsdImagingGLEngine(const RenderAPI api)
-    : _engine(NULL)
+UsdImagingGLEngine::UsdImagingGLEngine(const RenderAPI api, Hgi* hgi)
+    : _engine(nullptr)
     , _renderIndex(nullptr)
+    , _hgi(hgi)
+    , _hgiDriver{HgiTokens->renderDriver, VtValue(_hgi)}
     , _selTracker(new HdxSelectionTracker)
-    , _delegateID(SdfPath::AbsoluteRootPath())
+    , _delegateID(_GetUsdImagingDelegateId())
     , _delegate(nullptr)
     , _rendererPlugin(nullptr)
     , _taskController(nullptr)
@@ -174,25 +195,25 @@ UsdImagingGLEngine::UsdImagingGLEngine(const RenderAPI api)
     , _invisedPrimPaths()
     , _isPopulated(false)
     , _renderAPI(api)
-#if defined(ARCH_GFX_METAL)
+#if defined(PXR_METAL_SUPPORT_ENABLED)
     , _legacyImpl(nullptr)
 #endif
 {
 
-#if defined(ARCH_GFX_METAL)
+#if defined(PXR_METAL_SUPPORT_ENABLED)
     engineCountMutex.lock();
     engineCount++;
 #endif
 
     
     _engine = new HdEngine();
-#if defined(ARCH_GFX_METAL)
+#if defined(PXR_METAL_SUPPORT_ENABLED)
     if (_renderAPI == Metal) {
         _resourceFactory = new HdStResourceFactoryMetal();
     }
     else
 #endif
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     if (_renderAPI == OpenGL) {
     	_InitGL();
 
@@ -216,12 +237,12 @@ UsdImagingGLEngine::UsdImagingGLEngine(const RenderAPI api)
     } else {
 
         SdfPathVector excluded;
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
         _legacyImpl.reset(new UsdImagingGLLegacyEngine(excluded));
 #endif
     }
 
-#if defined(ARCH_GFX_METAL)
+#if defined(PXR_METAL_SUPPORT_ENABLED)
     engineCountMutex.unlock();
 #endif
 }
@@ -231,9 +252,12 @@ UsdImagingGLEngine::UsdImagingGLEngine(
     const SdfPath& rootPath,
     const SdfPathVector& excludedPaths,
     const SdfPathVector& invisedPaths,
-    const SdfPath& delegateID)
-    : _engine(NULL)
+    const SdfPath& delegateID,
+    Hgi* hgi)
+    : _engine(nullptr)
     , _renderIndex(nullptr)
+    , _hgi(hgi)
+    , _hgiDriver{HgiTokens->renderDriver, VtValue(_hgi)}
     , _selTracker(new HdxSelectionTracker)
     , _delegateID(delegateID)
     , _delegate(nullptr)
@@ -245,24 +269,24 @@ UsdImagingGLEngine::UsdImagingGLEngine(
     , _invisedPrimPaths(invisedPaths)
     , _isPopulated(false)
     , _renderAPI(api)
-#if defined(ARCH_GFX_METAL)
+#if defined(PXR_METAL_SUPPORT_ENABLED)
     , _legacyImpl(nullptr)
 #endif
 {
 
-#if defined(ARCH_GFX_METAL)
+#if defined(PXR_METAL_SUPPORT_ENABLED)
     engineCountMutex.lock();
     engineCount++;
 #endif
 
     _engine = new HdEngine();
-#if defined(ARCH_GFX_METAL)
+#if defined(PXR_METAL_SUPPORT_ENABLED)
     if (_renderAPI == Metal) {
         _resourceFactory = new HdStResourceFactoryMetal();
     }
     else
 #endif
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     if (_renderAPI == OpenGL) {
 		_InitGL();
         _resourceFactory = new HdStResourceFactoryGL();
@@ -289,12 +313,12 @@ UsdImagingGLEngine::UsdImagingGLEngine(
         SdfPathVector pathsToExclude = excludedPaths;
         pathsToExclude.insert(pathsToExclude.end(), 
             invisedPaths.begin(), invisedPaths.end());
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
         _legacyImpl.reset(new UsdImagingGLLegacyEngine(pathsToExclude));
 #endif
     }
 
-#if defined(ARCH_GFX_METAL)
+#if defined(PXR_METAL_SUPPORT_ENABLED)
     engineCountMutex.unlock();
 #endif
 }
@@ -312,7 +336,7 @@ UsdImagingGLEngine::~UsdImagingGLEngine()
     delete _resourceFactory;
     _resourceFactory = NULL;
 
-#if defined(ARCH_GFX_METAL)
+#if defined(PXR_METAL_SUPPORT_ENABLED)
     engineCountMutex.lock();
     engineCount--;
     if (MtlfMetalContext::context && engineCount == 0)  {
@@ -381,8 +405,7 @@ UsdImagingGLEngine::RenderBatch(
     _taskController->SetRenderParams(hdParams);
     _taskController->SetEnableSelection(params.highlight);
 
-    SetColorCorrectionSettings(params.colorCorrectionMode, 
-                               params.renderResolution);
+    SetColorCorrectionSettings(params.colorCorrectionMode);
 
     // XXX App sets the clear color via 'params' instead of setting up Aovs 
     // that has clearColor in their descriptor. So for now we must pass this
@@ -408,12 +431,12 @@ UsdImagingGLEngine::Render(
     const UsdPrim& root, 
     const UsdImagingGLRenderParams &params)
 {
-#if defined(ARCH_GFX_METAL)
+#if defined(PXR_METAL_SUPPORT_ENABLED)
 @autoreleasepool{
 #endif
 
     if (ARCH_UNLIKELY(_legacyImpl)) {
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
         return _legacyImpl->Render(root, params);
 #endif
     }
@@ -428,7 +451,7 @@ UsdImagingGLEngine::Render(
     SdfPathVector paths(1, _delegate->ConvertCachePathToIndexPath(cachePath));
 
     RenderBatch(paths, params);
-#if defined(ARCH_GFX_METAL)
+#if defined(PXR_METAL_SUPPORT_ENABLED)
 }
 #endif
 
@@ -438,7 +461,7 @@ void
 UsdImagingGLEngine::InvalidateBuffers()
 {
     if (ARCH_UNLIKELY(_legacyImpl)) {
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
         return _legacyImpl->InvalidateBuffers();
 #endif
     }
@@ -489,7 +512,7 @@ void
 UsdImagingGLEngine::SetRenderViewport(GfVec4d const& viewport)
 {
     if (ARCH_UNLIKELY(_legacyImpl)) {
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
         _legacyImpl->SetRenderViewport(viewport);
 #endif
         return;
@@ -503,7 +526,7 @@ void
 UsdImagingGLEngine::SetWindowPolicy(CameraUtilConformWindowPolicy policy)
 {
     if (ARCH_UNLIKELY(_legacyImpl)) {
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
         _legacyImpl->SetWindowPolicy(policy);
 #endif
         return;
@@ -521,7 +544,7 @@ void
 UsdImagingGLEngine::SetCameraPath(SdfPath const& id)
 {
     if (ARCH_UNLIKELY(_legacyImpl)) {
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
         _legacyImpl->SetCameraPath(id);
 #endif
         return;
@@ -540,13 +563,13 @@ UsdImagingGLEngine::SetCameraState(const GfMatrix4d& viewMatrix,
                                    const GfMatrix4d& projectionMatrix)
 {
     if (ARCH_UNLIKELY(_legacyImpl)) {
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
         _legacyImpl->SetFreeCameraMatrices(viewMatrix, projectionMatrix);
 #endif
         return;
     }
 
-#if defined(ARCH_GFX_METAL)
+#if defined(PXR_METAL_SUPPORT_ENABLED)
     GfMatrix4d modifiedProjMatrix;
     static GfMatrix4d zTransform;
     
@@ -571,7 +594,7 @@ UsdImagingGLEngine::SetCameraState(const GfMatrix4d& viewMatrix,
 void
 UsdImagingGLEngine::SetCameraStateFromOpenGL()
 {
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     if (_renderAPI == OpenGL) {
         GfMatrix4d viewMatrix, projectionMatrix;
         GfVec4d viewport;
@@ -624,7 +647,7 @@ UsdImagingGLEngine::SetLightingState(
     GfVec4f const &sceneAmbient)
 {
     if (ARCH_UNLIKELY(_legacyImpl)) {
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
         _legacyImpl->SetLightingState(lights, material, sceneAmbient);
 #endif
         return;
@@ -732,35 +755,32 @@ bool
 UsdImagingGLEngine::TestIntersection(
     const GfMatrix4d &viewMatrix,
     const GfMatrix4d &inProjectionMatrix,
-    const GfMatrix4d &worldToLocalSpace,
     const UsdPrim& root,
     const UsdImagingGLRenderParams& params,
     GfVec3d *outHitPoint,
     SdfPath *outHitPrimPath,
     SdfPath *outHitInstancerPath,
     int *outHitInstanceIndex,
-    int *outHitElementIndex)
+    HdInstancerContext *outInstancerContext)
 {
     if (ARCH_UNLIKELY(_legacyImpl)) {
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
         return _legacyImpl->TestIntersection(
             viewMatrix,
             inProjectionMatrix,
-            worldToLocalSpace,
             root,
             params,
             outHitPoint,
             outHitPrimPath,
             outHitInstancerPath,
-            outHitInstanceIndex,
-            outHitElementIndex);
+            outHitInstanceIndex);
 #endif
     }
 
     ResourceFactoryGuard guard(_resourceFactory);
 
     TF_VERIFY(_delegate);
-#if defined(ARCH_GFX_METAL)
+#if defined(PXR_METAL_SUPPORT_ENABLED)
     GfMatrix4d projectionMatrix;
     static GfMatrix4d zTransform;
     
@@ -780,8 +800,9 @@ UsdImagingGLEngine::TestIntersection(
 
     TF_VERIFY(_taskController);
 
-    // XXX(UsdImagingPaths): Is it correct to map USD root path directly
-    // to the cachePath here?
+    // XXX(UsdImagingPaths): This is incorrect...  "Root" points to a USD
+    // subtree, but the subtree in the hydra namespace might be very different
+    // (e.g. for native instancing).  We need a translation step.
     SdfPath cachePath = root.GetPath();
     SdfPathVector roots(1, _delegate->ConvertCachePathToIndexPath(cachePath));
     _UpdateHydraCollection(&_intersectCollection, roots, params);
@@ -799,7 +820,7 @@ UsdImagingGLEngine::TestIntersection(
     HdxPickHitVector allHits;
     HdxPickTaskContextParams pickParams;
     pickParams.resolveMode = HdxPickTokens->resolveNearestToCenter;
-    pickParams.viewMatrix = worldToLocalSpace * viewMatrix;
+    pickParams.viewMatrix = viewMatrix;
     pickParams.projectionMatrix = projectionMatrix;
     pickParams.clipPlanes = params.clipPlanes;
     pickParams.collection = _intersectCollection;
@@ -822,6 +843,12 @@ UsdImagingGLEngine::TestIntersection(
                                hit.worldSpaceHitPoint[1],
                                hit.worldSpaceHitPoint[2]);
     }
+
+    hit.objectId = _delegate->GetScenePrimPath(hit.objectId, hit.instanceIndex,
+                   outInstancerContext);
+    hit.instancerId = _delegate->ConvertIndexPathToCachePath(hit.instancerId)
+                      .GetAbsoluteRootOrPrimPath();
+
     if (outHitPrimPath) {
         *outHitPrimPath = hit.objectId;
     }
@@ -831,72 +858,51 @@ UsdImagingGLEngine::TestIntersection(
     if (outHitInstanceIndex) {
         *outHitInstanceIndex = hit.instanceIndex;
     }
-    if (outHitElementIndex) {
-        *outHitElementIndex = hit.elementIndex;
-    }
 
     return true;
 }
 
-SdfPath
-UsdImagingGLEngine::GetRprimPathFromPrimId(int primId) const
+bool
+UsdImagingGLEngine::DecodeIntersection(
+    unsigned char const primIdColor[4],
+    unsigned char const instanceIdColor[4],
+    SdfPath *outHitPrimPath,
+    SdfPath *outHitInstancerPath,
+    int *outHitInstanceIndex,
+    HdInstancerContext *outInstancerContext)
 {
     if (ARCH_UNLIKELY(_legacyImpl)) {
-#if defined(ARCH_GFX_OPENGL)
-        return _legacyImpl->GetRprimPathFromPrimId(primId);
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
+        return false;
 #endif
     }
 
     TF_VERIFY(_delegate);
-    return _delegate->GetRenderIndex().GetRprimPathFromPrimId(primId);
-}
 
-SdfPath
-UsdImagingGLEngine::GetPrimPathFromPrimIdColor(
-    GfVec4i const &primIdColor,
-    GfVec4i const &instanceIdColor,
-    int * instanceIndexOut)
-{
-    unsigned char primIdColorBytes[] =  {
-        uint8_t(primIdColor[0]),
-        uint8_t(primIdColor[1]),
-        uint8_t(primIdColor[2]),
-        uint8_t(primIdColor[3])
-    };
+    int primId = HdxPickTask::DecodeIDRenderColor(primIdColor);
+    int instanceIdx = HdxPickTask::DecodeIDRenderColor(instanceIdColor);
+    SdfPath primPath =
+        _delegate->GetRenderIndex().GetRprimPathFromPrimId(primId);
+    SdfPath delegateId, instancerId;
+    _delegate->GetRenderIndex().GetSceneDelegateAndInstancerIds(primPath,
+        &delegateId, &instancerId);
 
-    int primId = DecodeIDRenderColor(primIdColorBytes);
-    SdfPath result = GetRprimPathFromPrimId(primId);
-    if (!result.IsEmpty()) {
-        if (instanceIndexOut) {
-            unsigned char instanceIdColorBytes[] =  {
-                uint8_t(instanceIdColor[0]),
-                uint8_t(instanceIdColor[1]),
-                uint8_t(instanceIdColor[2]),
-                uint8_t(instanceIdColor[3])
-            };
-            *instanceIndexOut = DecodeIDRenderColor(instanceIdColorBytes);
-        }
+    primPath = _delegate->GetScenePrimPath(primPath, instanceIdx,
+               outInstancerContext);
+    instancerId = _delegate->ConvertIndexPathToCachePath(instancerId)
+                  .GetAbsoluteRootOrPrimPath();
+
+    if (outHitPrimPath) {
+        *outHitPrimPath = primPath;
     }
-    return result;
-}
-
-SdfPath 
-UsdImagingGLEngine::GetPrimPathFromInstanceIndex(
-        const SdfPath &protoRprimId,
-        int protoIndex,
-        int *instancerIndex,
-        SdfPath *masterCachePath,
-        SdfPathVector *instanceContext)
-{
-    if (ARCH_UNLIKELY(_legacyImpl)) {
-        return SdfPath();
+    if (outHitInstancerPath) {
+        *outHitInstancerPath = instancerId;
+    }
+    if (outHitInstanceIndex) {
+        *outHitInstanceIndex = instanceIdx;
     }
 
-    TF_VERIFY(_delegate);
-
-    return _delegate->GetPathForInstanceIndex(protoRprimId, protoIndex,
-                                              instancerIndex, masterCachePath,
-                                              instanceContext);
+    return !primPath.IsEmpty();
 }
 
 //----------------------------------------------------------------------------
@@ -1015,7 +1021,7 @@ UsdImagingGLEngine::SetRendererPlugin(TfToken const &pluginId, bool forceReload)
     _rendererPlugin = plugin;
     _rendererId = actualId;
 
-    _renderIndex = HdRenderIndex::New(renderDelegate);
+    _renderIndex = HdRenderIndex::New(renderDelegate, {&_hgiDriver});
 
     // Create the new delegate & task controller.
     _delegate = new UsdImagingDelegate(_renderIndex, _delegateID);
@@ -1072,7 +1078,7 @@ UsdImagingGLEngine::GetRendererAovs() const
 }
 
 bool
-UsdImagingGLEngine::SetRendererAov(TfToken const &id)
+UsdImagingGLEngine::SetRendererAov(TfToken const &id, TfToken const& interopDst)
 {
     if (ARCH_UNLIKELY(_legacyImpl)) {
         return false;
@@ -1082,7 +1088,7 @@ UsdImagingGLEngine::SetRendererAov(TfToken const &id)
 
     TF_VERIFY(_renderIndex);
     if (_renderIndex->IsBprimTypeSupported(HdPrimTypeTokens->renderBuffer)) {
-        _taskController->SetRenderOutputs({id});
+        _taskController->SetRenderOutputs({id}, interopDst);
         return true;
     }
     return false;
@@ -1199,46 +1205,55 @@ UsdImagingGLEngine::ResumeRenderer()
     return _renderIndex->GetRenderDelegate()->Resume();
 }
 
+bool
+UsdImagingGLEngine::IsStopRendererSupported() const
+{
+    if (ARCH_UNLIKELY(_legacyImpl)) {
+        return false;
+    }
+
+    TF_VERIFY(_renderIndex);
+    return _renderIndex->GetRenderDelegate()->IsStopSupported();
+}
+
+bool
+UsdImagingGLEngine::StopRenderer()
+{
+    if (ARCH_UNLIKELY(_legacyImpl)) {
+        return false;
+    }
+
+    TF_VERIFY(_renderIndex);
+    return _renderIndex->GetRenderDelegate()->Stop();
+}
+
+bool
+UsdImagingGLEngine::RestartRenderer()
+{
+    if (ARCH_UNLIKELY(_legacyImpl)) {
+        return false;
+    }
+
+    TF_VERIFY(_renderIndex);
+    return _renderIndex->GetRenderDelegate()->Restart();
+}
+
 //----------------------------------------------------------------------------
 // Color Correction
 //----------------------------------------------------------------------------
 void 
 UsdImagingGLEngine::SetColorCorrectionSettings(
-    TfToken const& id,
-    GfVec2i const& framebufferResolution)
+    TfToken const& id)
 {
     if (ARCH_UNLIKELY(_legacyImpl)) {
-        return;
-    }
-
-    if (!IsColorCorrectionCapable()) {
         return;
     }
 
     TF_VERIFY(_taskController);
 
     HdxColorCorrectionTaskParams hdParams;
-    hdParams.framebufferSize = framebufferResolution;
     hdParams.colorCorrectionMode = id;
     _taskController->SetColorCorrectionParams(hdParams);
-}
-
-bool 
-UsdImagingGLEngine::IsColorCorrectionCapable()
-{
-    static bool first = false;
-    static bool ColorCorrectionCapable = true;
-
-    if (first) {
-        first = false;
-
-        GarchContextCaps const &caps =
-            GarchResourceFactory::GetInstance()->GetContextCaps();
-        ColorCorrectionCapable = caps.floatingPointBuffersEnabled &&
-            IsHydraEnabled();
-    }
-
-    return ColorCorrectionCapable;
 }
 
 //----------------------------------------------------------------------------
@@ -1280,8 +1295,7 @@ UsdImagingGLEngine::_Execute(const UsdImagingGLRenderParams &params,
 
     TF_VERIFY(_delegate);
 
-    SetColorCorrectionSettings(params.colorCorrectionMode, 
-                               params.renderResolution);
+    SetColorCorrectionSettings(params.colorCorrectionMode);
 
     // Forward scene materials enable option to delegate
     _delegate->SetSceneMaterialsEnabled(params.enableSceneMaterials);
@@ -1289,6 +1303,8 @@ UsdImagingGLEngine::_Execute(const UsdImagingGLRenderParams &params,
     GarchContextCaps const &caps =
         GarchResourceFactory::GetInstance()->GetContextCaps();
 
+    _hgi->StartFrame();
+    
     HdStRenderDelegate* hdStRenderDelegate =
         dynamic_cast<HdStRenderDelegate*>(_renderIndex->GetRenderDelegate());
     if (hdStRenderDelegate) {
@@ -1299,7 +1315,7 @@ UsdImagingGLEngine::_Execute(const UsdImagingGLRenderParams &params,
             params.enableSampleAlphaToCoverage,
             params.sampleCount,
             params.drawMode,
-#if defined(ARCH_GFX_METAL)
+#if defined(PXR_METAL_SUPPORT_ENABLED)
             ((_renderAPI == Metal &&
               params.mtlRenderPassDescriptorForNativeMetal) ||
              MtlfMetalContext::GetMetalContext()->GetDrawTarget()) ?
@@ -1307,18 +1323,20 @@ UsdImagingGLEngine::_Execute(const UsdImagingGLRenderParams &params,
 #endif
             HdStRenderDelegate::DelegateParams::RenderOutput::OpenGL
               );
-#if defined(ARCH_GFX_METAL)
+#if defined(PXR_METAL_SUPPORT_ENABLED)
             delegateParams.mtlRenderPassDescriptorForNativeMetal =
                 params.mtlRenderPassDescriptorForNativeMetal;
 #endif
         hdStRenderDelegate->PrepareRender(delegateParams);
     }
-
+    
     _engine->Execute(_renderIndex, &tasks);
 
     if (hdStRenderDelegate) {
         hdStRenderDelegate->FinalizeRender();
     }
+
+    _hgi->EndFrame();
 }
 
 bool 
@@ -1611,6 +1629,20 @@ UsdImagingGLEngine::GetDefaultRendererPluginId()
             defaultRendererDisplayName.c_str());
 
     return TfToken();
+}
+
+USDIMAGINGGL_API
+HgiTextureHandle UsdImagingGLEngine::GetPresentationTextureHandle(
+    TfToken const &name) const
+{
+    VtValue aov;
+    _engine->GetTaskContextData(name, &aov);
+    
+    HgiTextureHandle aovTexture;
+    if (aov.IsHolding<HgiTextureHandle>()) {
+        aovTexture = aov.Get<HgiTextureHandle>();
+    }
+    return aovTexture;
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

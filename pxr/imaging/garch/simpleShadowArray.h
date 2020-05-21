@@ -36,13 +36,12 @@
 #include "pxr/base/gf/vec2i.h"
 #include "pxr/base/gf/vec4d.h"
 
-#include <boost/noncopyable.hpp>
 #include <vector>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
 
-class GarchSimpleShadowArray : public TfRefBase, public TfWeakBase, boost::noncopyable {
+class GarchSimpleShadowArray : public TfRefBase, public TfWeakBase {
 public:
     static GARCH_API
     GarchSimpleShadowArray* New();
@@ -151,6 +150,10 @@ protected:
 protected:
     GARCH_API
     GarchSimpleShadowArray();
+    
+    // Disallow copies
+    GarchSimpleShadowArray(const GarchSimpleShadowArray&) = delete;
+    GarchSimpleShadowArray& operator=(const GarchSimpleShadowArray&) = delete;
 
     // bindful state
     GfVec2i _size;

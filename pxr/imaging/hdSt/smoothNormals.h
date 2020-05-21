@@ -35,8 +35,10 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 class Hd_VertexAdjacency;
 
-typedef boost::shared_ptr<class HdStProgram> HdStProgramSharedPtr;
-typedef boost::shared_ptr<class HdBufferResource> HdBufferResourceSharedPtr;
+using HdStProgramSharedPtr =
+    std::shared_ptr<class HdStProgram>;
+using HdBufferResourceSharedPtr =
+    std::shared_ptr<class HdBufferResource>;
 
 
 /// smooth normal computation GPU

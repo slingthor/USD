@@ -40,15 +40,15 @@
 #include "pxr/imaging/garch/gl.h"
 
 #include <map>
+#include <memory>
 #include <set>
 #include <string>
 
-#include <boost/shared_ptr.hpp>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
 TF_DECLARE_WEAK_AND_REF_PTRS(GlfDrawTarget);
-typedef boost::shared_ptr<class GlfGLContext> GlfGLContextSharedPtr;
+typedef std::shared_ptr<class GlfGLContext> GlfGLContextSharedPtr;
 
 /// \class GlfDrawTarget
 ///
@@ -110,7 +110,7 @@ public:
         // GarchTexture overrides
         GLF_API
         virtual BindingVector GetBindings(TfToken const & identifier,
-                                          GarchSamplerGPUHandle samplerName) override;
+                                          GarchSamplerGPUHandle const& samplerName) override;
         GLF_API
         virtual VtDictionary GetTextureInfo(bool forceLoad) override;
         

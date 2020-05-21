@@ -115,13 +115,13 @@ HdStStripedInterleavedBufferMetal::Reallocate(
     // from another buffer array.
 
     HdStInterleavedMemoryManager::_StripedInterleavedBufferSharedPtr curRangeOwner_ =
-        boost::static_pointer_cast<_StripedInterleavedBuffer> (curRangeOwner);
+        std::static_pointer_cast<_StripedInterleavedBuffer> (curRangeOwner);
 
     HdStBufferResourceMetalSharedPtr oldBuffer =
-        boost::static_pointer_cast<HdStBufferResourceMetal>(
+        std::static_pointer_cast<HdStBufferResourceMetal>(
             GetResources().begin()->second);
     HdStBufferResourceMetalSharedPtr currentBuffer =
-        boost::static_pointer_cast<HdStBufferResourceMetal>(
+        std::static_pointer_cast<HdStBufferResourceMetal>(
             curRangeOwner_->GetResources().begin()->second);
 
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
@@ -174,7 +174,7 @@ HdStStripedInterleavedBufferMetal::Reallocate(
                                 "unexpectedly.");
                 continue;
             }
-            int const oldIndex = range->GetIndex();
+            int const oldIndex = range->GetElementOffset();
             if (oldIndex >= 0) {
                 // copy old data
                 ptrdiff_t const readOffset = oldIndex * _stride;
@@ -230,7 +230,7 @@ HdStStripedInterleavedBufferMetal::Reallocate(
     // update id to all buffer resources
     TF_FOR_ALL(it, GetResources()) {
         HdStBufferResourceMetalSharedPtr resource =
-            boost::static_pointer_cast<HdStBufferResourceMetal>(it->second);
+            std::static_pointer_cast<HdStBufferResourceMetal>(it->second);
         resource->SetAllocations(newId[0], newId[1], newId[2], totalSize);
     }
 
@@ -245,11 +245,11 @@ void
 HdStStripedInterleavedBufferMetal::_DeallocateResources()
 {
     HdStBufferResourceMetalSharedPtr resource =
-        boost::static_pointer_cast<HdStBufferResourceMetal>(GetResource());
+        std::static_pointer_cast<HdStBufferResourceMetal>(GetResource());
     if (resource) {
         for(int i = 0; i < 3; i++) {
-            MtlfMetalContext::MtlfMultiBuffer _id = resource->GetIdAtIndex(i);
-            if (_id.IsSet()) {
+            id<MTLBuffer> _id = resource->GetIdAtIndex(i);
+            if (_id) {
                 MtlfMetalContext::GetMetalContext()->ReleaseMetalBuffer(_id);
             }
         }

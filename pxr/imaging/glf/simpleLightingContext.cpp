@@ -33,7 +33,6 @@
 
 #include "pxr/imaging/glf/simpleLightingContext.h"
 #include "pxr/imaging/glf/diagnostic.h"
-#include "pxr/imaging/glf/package.h"
 
 #include "pxr/base/arch/pragmas.h"
 #include "pxr/base/tf/stringUtils.h"
@@ -77,8 +76,8 @@ GlfSimpleLightingContext::BindSamplers(GarchBindingMapPtr const &bindingMap)
     
     GLuint _shadowMapTexture = _shadows->GetShadowMapTexture();
     
-    GLuint _shadowMapDepthSampler = (GLuint)(uint64_t)_shadows->GetShadowMapDepthSampler();
-    GLuint _shadowMapCompareSampler = (GLuint)(uint64_t)_shadows->GetShadowMapCompareSampler();
+    GLuint _shadowMapDepthSampler = _shadows->GetShadowMapDepthSampler();
+    GLuint _shadowMapCompareSampler = _shadows->GetShadowMapCompareSampler();
 
     glActiveTexture(GL_TEXTURE0 + shadowSampler);
     glBindTexture(GL_TEXTURE_2D_ARRAY, _shadowMapTexture);

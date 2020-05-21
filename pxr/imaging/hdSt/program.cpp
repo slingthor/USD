@@ -37,7 +37,9 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-HdStProgram::HdStProgram(TfToken const &role) {
+HdStProgram::HdStProgram(TfToken const &role)
+: _role(role)
+{
 
 }
 
@@ -74,19 +76,17 @@ HdStProgram::GetComputeProgram(
     HdStResourceRegistry *resourceRegistry)
 {
     // Find the program from registry
-    // Find the program from registry
     HdInstance<HdStProgramSharedPtr> programInstance =
                 resourceRegistry->RegisterProgram(
                         HdStProgram::ComputeHash(shaderToken));
 
     if (programInstance.IsFirstInstance()) {
         // if not exists, create new one
-        
         HdStProgramSharedPtr newProgram(
             HdStResourceFactory::GetInstance()->NewProgram(
                 HdTokens->computeShader));
         
-        boost::scoped_ptr<HioGlslfx> glslfx(
+        std::unique_ptr<HioGlslfx> glslfx(
             new HioGlslfx(shaderFileName));
         std::string errorString;
         if (!glslfx->IsValid(&errorString)){

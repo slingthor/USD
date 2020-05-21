@@ -25,7 +25,7 @@
 
 #include "pxr/imaging/glf/glew.h"
 
-#if defined(ARCH_GFX_METAL)
+#if defined(PXR_METAL_SUPPORT_ENABLED)
 #include "pxr/imaging/mtlf/mtlDevice.h"
 #include "pxr/imaging/mtlf/drawTarget.h"
 #endif
@@ -162,7 +162,7 @@ HdxOitBufferAccessor::InitializeOitBuffersIfNecessary()
     // finding -1 in the counter buffer. We can skip clearing the other buffers.
 
     HdBufferArrayRangeSharedPtr stCounterBar =
-        boost::dynamic_pointer_cast<HdBufferArrayRange>(
+        std::dynamic_pointer_cast<HdBufferArrayRange>(
             _GetBar(HdxTokens->oitCounterBufferBar));
 
     if (!stCounterBar) {
@@ -176,25 +176,23 @@ HdxOitBufferAccessor::InitializeOitBuffersIfNecessary()
 
     GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
 
-#if defined(ARCH_GFX_METAL)
+#if defined(PXR_METAL_SUPPORT_ENABLED)
     uint8_t clearCounter = 255; // -1
 
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
-    MtlfMetalContext::MtlfMultiBuffer mtlMultiBuffer = stCounterResource->GetId();
+    id<MTLBuffer> mtlBuffer = stCounterResource->GetId();
 
-    for(int iGPU = 0; iGPU < GPUState::gpuCount; iGPU++) {
-        id<MTLCommandBuffer> commandBuffer = [context->gpus[iGPU].commandQueue commandBuffer];
-        id<MTLBlitCommandEncoder> blitEncoder = [commandBuffer blitCommandEncoder];
+    id<MTLCommandBuffer> commandBuffer = [context->gpus.commandQueue commandBuffer];
+    id<MTLBlitCommandEncoder> blitEncoder = [commandBuffer blitCommandEncoder];
 
-        auto mtlBuffer = mtlMultiBuffer[iGPU];
-        [blitEncoder fillBuffer:mtlBuffer range:NSMakeRange(0, mtlBuffer.length) value:clearCounter];
+    [blitEncoder fillBuffer:mtlBuffer range:NSMakeRange(0, mtlBuffer.length) value:clearCounter];
 
-        [blitEncoder endEncoding];
-        [commandBuffer commit];
-    }
+    [blitEncoder endEncoding];
+    [commandBuffer commit];
 
-#elif defined(ARCH_GFX_OPENGL)
+#elif defined(PXR_OPENGL_SUPPORT_ENABLED)
     const GLint clearCounter = -1;
+
     // Old versions of glew may be missing glClearNamedBufferData
     if (ARCH_LIKELY(caps.directStateAccessEnabled) && glClearNamedBufferData) {
         glClearNamedBufferData(stCounterResource->GetId(),

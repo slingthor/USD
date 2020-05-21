@@ -35,12 +35,19 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 
+/// Base image format
+///
+/// Returns the base image format for the given number of components
+///
+/// Supported number of components: 1, 2, 3, 4
+GLenum GarchGetBaseFormat(int numComponents);
+
 /// Number of elements.
 ///
 /// Returns the number of elements (channels) in a given GL enum format.
 ///
-/// Supported formats are : GL_DEPTH_COMPONENT, GL_COLOR_INDEX, GL_ALPHA, 
-/// GL_LUMINANCE, GL_LUMINANCE_ALPHA, GL_RGB, GL_RGBA
+/// Supported formats are : GL_DEPTH_COMPONENT, GL_COLOR_INDEX, GL_ALPHA,
+/// GL_RED, GL_LUMINANCE, GL_RG, GL_LUMINANCE_ALPHA, GL_RGB, GL_RGBA
 GARCH_API
 int GarchGetNumElements(GLenum format);
 

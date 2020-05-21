@@ -21,12 +21,10 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-
-#include "pxr/imaging/glf/glew.h"
-
 #include "pxr/imaging/hd/engine.h"
 
 #include "pxr/imaging/hd/debugCodes.h"
+#include "pxr/imaging/hd/driver.h"
 #include "pxr/imaging/hd/material.h"
 #include "pxr/imaging/hd/perfLog.h"
 #include "pxr/imaging/hd/renderDelegate.h"
@@ -42,10 +40,10 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-HdEngine::HdEngine()
+
+HdEngine::HdEngine() 
  : _taskContext()
 {
-    /* Nothing */
 }
 
 HdEngine::~HdEngine()
@@ -53,7 +51,7 @@ HdEngine::~HdEngine()
 }
 
 void 
-HdEngine::SetTaskContextData(const TfToken &id, VtValue &data)
+HdEngine::SetTaskContextData(const TfToken &id, const VtValue &data)
 {
     // See if the token exists in the context and if not add it.
     std::pair<HdTaskContext::iterator, bool> result =
@@ -62,6 +60,22 @@ HdEngine::SetTaskContextData(const TfToken &id, VtValue &data)
         // Item wasn't new, so need to update it
         result.first->second = data;
     }
+}
+
+bool
+HdEngine::GetTaskContextData(const TfToken &id, VtValue *data)
+{
+    if (!TF_VERIFY(data)) {
+        return false;
+    }
+
+    auto const& it = _taskContext.find(id);
+    if (it != _taskContext.end()) {
+        *data = it->second;
+        return true;
+    }
+
+    return false;
 }
 
 void
@@ -78,6 +92,9 @@ HdEngine::Execute(HdRenderIndex *index, HdTaskSharedPtrVector *tasks)
         return;
     }
 
+    // Some render tasks may need access to the same rendering context / driver
+    // as the render delegate. For example some tasks use Hgi.
+    _taskContext[HdTokens->drivers] = VtValue(index->GetDrivers());
 
     // --------------------------------------------------------------------- //
     // DATA DISCOVERY PHASE

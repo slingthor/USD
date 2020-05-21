@@ -54,11 +54,6 @@
     #define ARCH_PRAGMA_WRITE_STRINGS \
         _Pragma("GCC diagnostic ignored \"-Wwrite-strings\"")
 
-#if ARCH_COMPILER_GCC_MAJOR >= 6
-    #define ARCH_PRAGMA_PLACEMENT_NEW \
-        _Pragma("GCC diagnostic ignored \"-Wplacement-new\"")
-#endif
-
 #elif defined(ARCH_COMPILER_CLANG)
 
     #define ARCH_PRAGMA_PUSH \
@@ -78,6 +73,12 @@
 
     #define ARCH_PRAGMA_INSTANTIATION_AFTER_SPECIALIZATION \
         _Pragma("clang diagnostic ignored \"-Winstantiation-after-specialization\"")
+
+    #define ARCH_PRAGMA_POTENTIALLY_EVALUATED_EXPRESSION \
+        _Pragma("clang diagnostic ignored \"-Wpotentially-evaluated-expression\"")
+
+    #define ARCH_PRAGMA_INSTANCE_METHOD_NOT_FOUND \
+        _Pragma("clang diagnostic ignored \"-Wobjc-method-access\"")
 
 #elif defined(ARCH_COMPILER_MSVC)
 
@@ -204,8 +205,12 @@
     #define ARCH_PRAGMA_UNDEFINED_VAR_TEMPLATE
 #endif
 
-#if !defined ARCH_PRAGMA_PLACEMENT_NEW
-    #define ARCH_PRAGMA_PLACEMENT_NEW
+#if !defined ARCH_PRAGMA_POTENTIALLY_EVALUATED_EXPRESSION
+    #define ARCH_PRAGMA_POTENTIALLY_EVALUATED_EXPRESSION
+#endif
+
+#if !defined ARCH_PRAGMA_INSTANCE_METHOD_NOT_FOUND
+    #define ARCH_PRAGMA_INSTANCE_METHOD_NOT_FOUND
 #endif
 
 #endif // PXR_BASE_ARCH_PRAGMAS_H

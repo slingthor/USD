@@ -38,10 +38,10 @@
 #include "pxr/imaging/hd/sceneDelegate.h"
 #include "pxr/imaging/hd/task.h"
 
+#include "pxr/imaging/hgi/texture.h"
+
 #include "pxr/imaging/cameraUtil/conformWindow.h"
-
 #include "pxr/imaging/garch/simpleLightingContext.h"
-
 #include "pxr/usd/sdf/path.h"
 #include "pxr/base/tf/staticTokens.h"
 #include "pxr/base/gf/matrix4d.h"
@@ -109,9 +109,11 @@ public:
 
     /// Set the list of outputs to be rendered. If outputs.size() == 1,
     /// this will send that output to the viewport via a colorizer task.
+    /// interopDst is either HgiTokens->Metal or HgiTokens->OpenGL
     /// Note: names should come from HdAovTokens.
     HDX_API
-    void SetRenderOutputs(TfTokenVector const& names);
+    void SetRenderOutputs(TfTokenVector const& names,
+                          TfToken const& interopDst);
 
     /// Set which output should be rendered to the viewport. The empty token
     /// disables viewport rendering.
@@ -176,6 +178,17 @@ public:
     HDX_API
     void SetSelectionColor(GfVec4f const& color);
 
+    /// Set if the selection highlight should be rendered as an outline around
+    /// the selected objects or as a solid color overlaid on top of them.
+    HDX_API
+    void SetSelectionEnableOutline(bool enableOutline);
+
+    /// Set the selection outline radius (thickness) in pixels. This is only
+    /// relevant if the highlight is meant to be rendered as an outline (if
+    /// SetSelectionRenderOutline(true) is called).
+    HDX_API
+    void SetSelectionOutlineRadius(unsigned int radius);
+
     /// -------------------------------------------------------
     /// Shadow API
 
@@ -208,16 +221,7 @@ public:
     /// Configure color channel by settings params.
     HDX_API
     void SetColorChannelParams(HdxColorChannelTaskParams const& params);
-
-    /// -------------------------------------------------------
-    /// Colorize API
-
-    /// Turns the colorize task color quantization on or off.
-    /// XXX: This is a temporary function that will be soon deprecated. Please
-    //       avoid calling it.
-    HDX_API
-    void SetColorizeQuantizationEnabled(bool enabled);
-
+    
 private:
     ///
     /// This class is not intended to be copied.
@@ -238,13 +242,12 @@ private:
     SdfPath _CreateRenderTask(TfToken const& materialTag);
     void _CreateOitResolveTask();
     void _CreateSelectionTask();
-    void _CreateColorizeTask();
     void _CreateColorizeSelectionTask();
     void _CreateColorCorrectionTask();
     void _CreateColorChannelTask();
     void _CreatePickTask();
     void _CreatePickFromRenderBufferTask();
-    SdfPath _CreateAovResolveTask(TfToken const& aovName);
+    void _CreateAovInputTask();
     void _CreatePresentTask();
 
     void _SetCameraParamForTasks(SdfPath const& id);
@@ -260,6 +263,7 @@ private:
     bool _ColorChannelEnabled() const;
     bool _ColorizeQuantizationEnabled() const;
     bool _AovsSupported() const;
+    bool _CamerasSupported() const;
 
     // Helper function for renderbuffer management.
     SdfPath _GetRenderTaskPath(TfToken const& materialTag) const;
@@ -272,7 +276,7 @@ private:
     // Helper function to set the parameters of a light, get a particular light 
     // in the scene, replace and remove Sprims from the scene 
     void _SetParameters(SdfPath const& pathName, GarchSimpleLight const& light);
-        GarchSimpleLight _GetLightAtId(size_t const& pathIdx);
+    GarchSimpleLight _GetLightAtId(size_t const& pathIdx);
     void _RemoveLightSprim(size_t const& pathIdx);
     void _ReplaceLightSprim(size_t const& pathIdx, GarchSimpleLight const& light,
                         SdfPath const& pathName);
@@ -338,16 +342,14 @@ private:
     SdfPath _simpleLightTaskId;
     SdfPath _shadowTaskId;
     SdfPathVector _renderTaskIds;
+    SdfPath _aovInputTaskId;
     SdfPath _oitResolveTaskId;
     SdfPath _selectionTaskId;
     SdfPath _colorizeSelectionTaskId;
-    SdfPath _colorizeTaskId;
     SdfPath _colorCorrectionTaskId;
     SdfPath _colorChannelTaskId;
     SdfPath _pickTaskId;
     SdfPath _pickFromRenderBufferTaskId;
-    SdfPath _aovColorResolveTaskId;
-    SdfPath _aovDepthResolveTaskId;
     SdfPath _presentTaskId;
 
     // Generated camera (for the default/free cam)

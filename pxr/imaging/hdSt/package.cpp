@@ -35,7 +35,7 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 
-TfToken
+static TfToken
 _GetShaderPath(char const * shader)
 {
     static PlugPluginPtr plugin = PLUG_THIS_PLUGIN;
@@ -49,7 +49,8 @@ _GetShaderPath(char const * shader)
 TfToken
 HdStPackageComputeShader()
 {
-    return _GetShaderPath(HdStResourceFactory::GetInstance()->GetComputeShaderFilename());
+    static TfToken s = _GetShaderPath(HdStResourceFactory::GetInstance()->GetComputeShaderFilename());
+    return s;
 }
 
 TfToken
@@ -62,7 +63,8 @@ HdStPackageDomeLightShader()
 TfToken
 HdStPackagePtexTextureShader()
 {
-    return _GetShaderPath(HdStResourceFactory::GetInstance()->GetPtexTextureShaderFilename());
+    static TfToken s = _GetShaderPath(HdStResourceFactory::GetInstance()->GetPtexTextureShaderFilename());
+    return s;
 }
 
 TfToken
@@ -105,6 +107,14 @@ HdStPackageImageShader()
 {
     static TfToken s = _GetShaderPath("imageShader.glslfx");
     return s;
+}
+
+TfToken
+HdStPackageSimpleLightingShader()
+{
+    static TfToken simpleLightingShader = 
+        _GetShaderPath("simpleLightingShader.glslfx");
+    return simpleLightingShader;
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

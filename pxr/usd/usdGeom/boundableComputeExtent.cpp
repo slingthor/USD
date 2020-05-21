@@ -35,6 +35,7 @@
 #include "pxr/base/tf/weakBase.h"
 
 #include <tbb/queuing_rw_mutex.h>
+#include <memory>
 #include <unordered_map>
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -52,12 +53,16 @@ public:
     }
 
     _FunctionRegistry()
+        : _initialized(false)
     {
         // Calling SubscribeTo may cause functions to be registered
         // while we're still in the c'tor, so make sure to call
         // SetInstanceConstructed to allow reentrancy.
         TfSingleton<_FunctionRegistry>::SetInstanceConstructed(*this);
         TfRegistryManager::GetInstance().SubscribeTo<UsdGeomBoundable>();
+
+        // Mark initialization as completed for waiting consumers.
+        _initialized.store(true, std::memory_order_release);
 
         // Register for new plugins being registered so we can invalidate
         // this registry.
@@ -87,9 +92,10 @@ public:
     UsdGeomComputeExtentFunction
     GetComputeFunction(const UsdPrim& prim)
     {
-        static const TfType schemaBaseType = TfType::Find<UsdSchemaBase>();
-        const TfType primSchemaType = schemaBaseType.FindDerivedByName(
-            prim.GetTypeName().GetString());
+        _WaitUntilInitialized();
+
+        // Get the actual schema type from the prim definition.
+        const TfType &primSchemaType = prim.GetPrimTypeInfo().GetSchemaType();
         if (!primSchemaType) {
             TF_CODING_ERROR(
                 "Could not find prim type '%s' for prim %s",
@@ -134,6 +140,14 @@ public:
     }
 
 private:
+    // Wait until initialization of the singleton is completed. 
+    void _WaitUntilInitialized()
+    {
+        while (ARCH_UNLIKELY(!_initialized.load(std::memory_order_acquire))) {
+            std::this_thread::yield(); 
+        }
+    }
+
     // Return a list of TfTypes that should be examined to find a compute
     // function for the given type.
     std::vector<TfType> 
@@ -199,6 +213,8 @@ private:
     using _Registry = 
         std::unordered_map<TfType, UsdGeomComputeExtentFunction, TfHash>;
     _Registry _registry;
+
+    std::atomic<bool> _initialized;
 };
 
 }

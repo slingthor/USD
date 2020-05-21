@@ -36,8 +36,9 @@
 #include "pxr/base/gf/rotation.h"
 #include "pxr/base/gf/vec3d.h"
 #include "pxr/base/tf/getenv.h"
+#include "pxr/base/trace/trace.h"
 
-#include "pxr/imaging/glf/simpleLightingContext.h"
+#include "pxr/imaging/garch/simpleLightingContext.h"
 #include "pxr/imaging/hd/mesh.h"
 #include "pxr/imaging/hd/renderIndex.h"
 #include "pxr/usd/usd/stage.h"
@@ -50,15 +51,14 @@
 
 #include "pxr/usdImaging/usdImagingGL/engine.h"
 
-#include <boost/shared_ptr.hpp>
-
 #include <iomanip>
 #include <iostream>
 #include <sstream>
+#include <fstream>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
-typedef boost::shared_ptr<class UsdImagingGLEngine> UsdImagingGLEngineSharedPtr;
+using UsdImagingGLEngineSharedPtr = std::shared_ptr<class UsdImagingGLEngine>;
 
 class My_TestGLDrawing : public UsdImagingGL_UnitTestGLDrawing {
 public:
@@ -94,6 +94,8 @@ GLuint vao;
 void
 My_TestGLDrawing::InitTest()
 {
+    TRACE_FUNCTION();
+    
     std::cout << "My_TestGLDrawing::InitTest()\n";
     _stage = UsdStage::Open(GetStageFilePath());
     SdfPathVector excludedPaths;
@@ -127,11 +129,11 @@ My_TestGLDrawing::InitTest()
         _engine->SetRendererSetting(TfToken(renderSetting.first),
                                     renderSetting.second);
     }
-
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     std::cout << glGetString(GL_VENDOR) << "\n";
     std::cout << glGetString(GL_RENDERER) << "\n";
     std::cout << glGetString(GL_VERSION) << "\n";
-
+#endif
     if (_ShouldFrameAll()) {
         TfTokenVector purposes;
         purposes.push_back(UsdGeomTokens->default_);
@@ -195,6 +197,7 @@ My_TestGLDrawing::InitTest()
             _lightingContext->SetMaterial(material);
             _lightingContext->SetSceneAmbient(GfVec4f(0.2,0.2,0.2,1.0));
         } else {
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
             glEnable(GL_LIGHTING);
             glEnable(GL_LIGHT0);
             if (IsEnabledCameraLight()) {
@@ -204,6 +207,7 @@ My_TestGLDrawing::InitTest()
                 float position[4] = {0,-.5,.5,0};
                 glLightfv(GL_LIGHT0, GL_POSITION, position);
             }
+#endif
         }
     }
 }
@@ -211,7 +215,11 @@ My_TestGLDrawing::InitTest()
 void
 My_TestGLDrawing::DrawTest(bool offscreen)
 {
+    TRACE_FUNCTION();
+
     std::cout << "My_TestGLDrawing::DrawTest()\n";
+
+    TfStopwatch renderTime;
 
     HdPerfLog& perfLog = HdPerfLog::GetInstance();
     perfLog.Enable();
@@ -256,8 +264,7 @@ My_TestGLDrawing::DrawTest(bool offscreen)
         _engine->SetCameraPath(SdfPath(GetCameraPath()));
     }
     _engine->SetRenderViewport(viewport);
-
-    size_t i = 0;
+ 
     TF_FOR_ALL(timeIt, GetTimes()) {
         UsdTimeCode time = *timeIt;
         if (*timeIt == -999) {
@@ -272,13 +279,16 @@ My_TestGLDrawing::DrawTest(bool offscreen)
         params.cullStyle = IsEnabledCullBackfaces() ?
                             UsdImagingGLCullStyle::CULL_STYLE_BACK :
                             UsdImagingGLCullStyle::CULL_STYLE_NOTHING;
-
+        params.showGuides = IsShowGuides();
+        params.showRender = IsShowRender();
+        params.showProxy = IsShowProxy();
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
         glViewport(0, 0, width, height);
 
         glEnable(GL_DEPTH_TEST);
-
+#endif
         if (!GetRendererAov().IsEmpty()) {
-            _engine->SetRendererAov(GetRendererAov());
+            _engine->SetRendererAov(GetRendererAov(), HgiTokens->OpenGL);
         }
 
         if(IsEnabledTestLighting()) {
@@ -288,26 +298,50 @@ My_TestGLDrawing::DrawTest(bool offscreen)
                 _engine->SetLightingStateFromOpenGL();
             }
         }
-
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
         if (!GetClipPlanes().empty()) {
             params.clipPlanes = GetClipPlanes();
             for (size_t i=0; i<GetClipPlanes().size(); ++i) {
                 glEnable(GL_CLIP_PLANE0 + i);
             }
         }
-
+#endif
         GfVec4f const &clearColor = GetClearColor();
         GLfloat clearDepth[1] = { 1.0f };
 
         // Make sure we render to convergence.
         TfErrorMark mark;
-        do {
-            glClearBufferfv(GL_COLOR, 0, clearColor.data());
-            glClearBufferfv(GL_DEPTH, 0, clearDepth);
-            _engine->Render(_stage->GetPseudoRoot(), params);
-        } while (!_engine->IsConverged());
+        int convergenceIterations = 0;
+
+        {
+            TRACE_FUNCTION_SCOPE("test profile: renderTime");
+
+            renderTime.Start();
+
+            do {
+                TRACE_FUNCTION_SCOPE("iteration render convergence");
+                
+                convergenceIterations++;
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
+                glClearBufferfv(GL_COLOR, 0, clearColor.data());
+                glClearBufferfv(GL_DEPTH, 0, clearDepth);
+#endif
+                _engine->Render(_stage->GetPseudoRoot(), params);
+            } while (!_engine->IsConverged());
+        
+            {
+                TRACE_FUNCTION_SCOPE("glFinish");
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
+                glFinish();
+#endif
+            }
+
+            renderTime.Stop();            
+        }
+
         TF_VERIFY(mark.IsClean(), "Errors occurred while rendering!");
 
+        std::cout << "Iterations to convergence: " << convergenceIterations << std::endl;
         std::cout << "itemsDrawn " << perfLog.GetCounter(HdTokens->itemsDrawn) << std::endl;
         std::cout << "totalItemCount " << perfLog.GetCounter(HdTokens->totalItemCount) << std::endl;
 
@@ -321,7 +355,16 @@ My_TestGLDrawing::DrawTest(bool offscreen)
             std::cout << imageFilePath << "\n";
             WriteToFile("color", imageFilePath);
         }
-        i++;
+    }
+
+    if (!GetPerfStatsFile().empty()) {
+        std::ofstream perfstatsRaw(GetPerfStatsFile(), std::ofstream::out);
+        if (TF_VERIFY(perfstatsRaw)) {
+            perfstatsRaw << "{ 'profile'  : 'renderTime', "
+                         << "   'metric'  : 'time', "
+                         << "   'value'   : " << renderTime.GetSeconds() << ", "
+                         << "   'samples' : " << GetTimes().size() << " }" << std::endl;
+        }
     }
 }
 

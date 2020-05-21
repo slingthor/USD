@@ -47,10 +47,6 @@
 #include <atomic>
 
 #include <boost/functional/hash.hpp>
-#include <boost/shared_ptr.hpp>
-#include <boost/make_shared.hpp>
-
-using namespace boost;
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -74,7 +70,7 @@ HdStVBOSimpleMemoryManager::CreateBufferArray(
 HdBufferArrayRangeSharedPtr
 HdStVBOSimpleMemoryManager::CreateBufferArrayRange()
 {
-    return boost::make_shared<HdStVBOSimpleMemoryManager::_SimpleBufferArrayRange>();
+    return std::make_shared<HdStVBOSimpleMemoryManager::_SimpleBufferArrayRange>();
 }
 
 HdAggregationStrategy::AggregationId
@@ -96,7 +92,7 @@ HdStVBOSimpleMemoryManager::GetBufferSpecs(
     HdBufferArraySharedPtr const &bufferArray) const
 {
     _SimpleBufferArraySharedPtr bufferArray_ =
-        boost::static_pointer_cast<_SimpleBufferArray> (bufferArray);
+        std::static_pointer_cast<_SimpleBufferArray> (bufferArray);
     return bufferArray_->GetBufferSpecs();
 }
 
@@ -110,7 +106,7 @@ HdStVBOSimpleMemoryManager::GetResourceAllocation(
     size_t gpuMemoryUsed = 0;
 
     _SimpleBufferArraySharedPtr bufferArray_ =
-        boost::static_pointer_cast<_SimpleBufferArray> (bufferArray);
+        std::static_pointer_cast<_SimpleBufferArray> (bufferArray);
 
     TF_FOR_ALL(resIt, bufferArray_->GetResources()) {
         HdBufferResourceSharedPtr const & resource = resIt->second;
@@ -180,7 +176,7 @@ HdStVBOSimpleMemoryManager::_SimpleBufferArray::_AddResource(
         // duplication check
         HdBufferResourceSharedPtr bufferRes = GetResource(name);
         if (!TF_VERIFY(!bufferRes)) {
-            return dynamic_pointer_cast<HdStBufferResource>(bufferRes);
+            return bufferRes;
         }
     }
 

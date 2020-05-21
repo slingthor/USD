@@ -46,10 +46,12 @@
 
 #include "pxr/imaging/garch/drawTarget.h"
 #include "pxr/imaging/glf/diagnostic.h"
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
 #include "pxr/imaging/glf/glContext.h"
 #endif
 #include "pxr/imaging/glf/info.h"
+
+#include <boost/functional/hash.hpp>
 
 #include <iostream>
 
@@ -67,7 +69,7 @@ _InitIdRenderPassState(HdRenderIndex *index)
             dynamic_cast<HdStRenderPassState*>(
                 rps.get())) {
         extendedState->SetRenderPassShader(
-            boost::make_shared<HdStRenderPassShader>(
+            std::make_shared<HdStRenderPassShader>(
                 HdxPackageRenderPassPickingShader()));
     }
 
@@ -75,9 +77,9 @@ _InitIdRenderPassState(HdRenderIndex *index)
 }
 
 static bool
-_IsStreamRenderingBackend(HdRenderIndex *index)
+_IsStormRenderer(HdRenderDelegate *renderDelegate)
 {
-    if(!dynamic_cast<HdStRenderDelegate*>(index->GetRenderDelegate())) {
+    if(!dynamic_cast<HdStRenderDelegate*>(renderDelegate)) {
         return false;
     }
 
@@ -119,7 +121,7 @@ HdxPickTask::_Init(GfVec2i const& size)
 
     // Make sure master draw target is always modified on the shared context,
     // so we access it consistently.
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     GlfSharedGLContextScopeHolder sharedContextHolder;
 #endif
     {
@@ -197,7 +199,7 @@ HdxPickTask::_SetResolution(GfVec2i const& widthHeight)
 
     // Make sure master draw target is always modified on the shared context,
     // so we access it consistently.
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     GlfSharedGLContextScopeHolder sharedContextHolder;
 #endif
     {
@@ -215,7 +217,7 @@ HdxPickTask::_ConditionStencilWithGLCallback(
     // We don't use the pickable/unpickable render pass state below, since
     // the callback uses immediate mode GL, and doesn't conform to Hydra's
     // command buffer based execution philosophy.
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     {
         glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
         glEnable(GL_STENCIL_TEST);
@@ -230,7 +232,7 @@ HdxPickTask::_ConditionStencilWithGLCallback(
     //
     maskCallback();
 
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     // We expect any GL state changes are restored.
     {
         // Clear depth incase the depthMaskCallback pollutes the depth buffer.
@@ -256,7 +258,9 @@ HdxPickTask::Sync(HdSceneDelegate* delegate,
                   HdTaskContext* ctx,
                   HdDirtyBits* dirtyBits)
 {
-    if (!_IsStreamRenderingBackend(&(delegate->GetRenderIndex()))) {
+    GLF_GROUP_FUNCTION();
+
+    if (!_IsStormRenderer( delegate->GetRenderIndex().GetRenderDelegate() )) {
         return;
     }
 
@@ -280,7 +284,7 @@ HdxPickTask::Sync(HdSceneDelegate* delegate,
         TF_RUNTIME_ERROR("framebuffer object not supported");
         return;
     }
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     GlfGLContextSharedPtr context;
     if (isOpenGL) {
         context = GlfGLContext::GetCurrentGLContext();
@@ -388,6 +392,8 @@ HdxPickTask::Prepare(HdTaskContext* ctx,
 void
 HdxPickTask::Execute(HdTaskContext* ctx)
 {
+    GLF_GROUP_FUNCTION();
+
     if (!_drawTarget) {
         return;
     }
@@ -406,13 +412,13 @@ HdxPickTask::Execute(HdTaskContext* ctx)
     drawTarget->Bind();
 
     bool usingOpenGLEngine = false;
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     usingOpenGLEngine |= HdStResourceFactory::GetInstance()->IsOpenGL();
 #endif
     
     GLuint vao;
     if (usingOpenGLEngine) {
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
         //
         // Setup GL raster state
         //
@@ -461,7 +467,7 @@ HdxPickTask::Execute(HdTaskContext* ctx)
         // Enable conservative rasterization, if available.
         //
         // XXX: This wont work until it's in the Glew build.
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
         bool convRstr = glewIsSupported("GL_NV_conservative_raster");
         if (convRstr) {
             // XXX: this should come from Glew
@@ -483,7 +489,7 @@ HdxPickTask::Execute(HdTaskContext* ctx)
     _pickableRenderPassState->Unbind();
 
     if (usingOpenGLEngine) {
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
         glDisable(GL_STENCIL_TEST);
 
         if (convRstr) {
@@ -528,7 +534,7 @@ HdxPickTask::Execute(HdTaskContext* ctx)
     GLfloat p[2];
     
     if (usingOpenGLEngine) {
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
         drawTarget->Unbind();
         GLF_POST_PENDING_GL_ERRORS();
         glGetFloatv(GL_DEPTH_RANGE, &p[0]);
@@ -590,13 +596,13 @@ HdxPickResult::HdxPickResult(
         GfVec2f const& depthRange,
         GfVec2i const& bufferSize,
         GfVec4i const& subRect)
-    : _primIds(std::move(primIds))
-    , _instanceIds(std::move(instanceIds))
-    , _elementIds(std::move(elementIds))
-    , _edgeIds(std::move(edgeIds))
-    , _pointIds(std::move(pointIds))
-    , _neyes(std::move(neyes))
-    , _depths(std::move(depths))
+    : _primIds(primIds)
+    , _instanceIds(instanceIds)
+    , _elementIds(elementIds)
+    , _edgeIds(edgeIds)
+    , _pointIds(pointIds)
+    , _neyes(neyes)
+    , _depths(depths)
     , _index(index)
     , _pickTarget(pickTarget)
     , _depthRange(depthRange)

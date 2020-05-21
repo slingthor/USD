@@ -87,7 +87,6 @@ public:
 
     // GPU compute
     bool gpuComputeEnabled;           // GPU subdivision                  (4.3)
-	bool gpuComputeNormalsEnabled;    // GPU smooth normals               (4.3)
     
     // Texture vertical flip
     bool flipTexturesOnLoad;

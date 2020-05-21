@@ -22,6 +22,9 @@
 // language governing permissions and limitations under the Apache License.
 //
 #include "pxr/pxr.h"
+#include "pxr/usd/usd/attribute.h"
+#include "pxr/usd/usd/property.h"
+#include "pxr/usd/usd/relationship.h"
 #include "pxr/usd/usd/stage.h"
 #include "pxr/usd/usd/primRange.h"
 
@@ -395,6 +398,7 @@ void wrapUsdStage()
 
         .def("Save", &UsdStage::Save)
         .def("SaveSessionLayers", &UsdStage::SaveSessionLayers)
+        .def("WriteFallbackPrimTypes", &UsdStage::WriteFallbackPrimTypes)
 
         .def("GetGlobalVariantFallbacks",
              &UsdStage::GetGlobalVariantFallbacks,
@@ -440,6 +444,9 @@ void wrapUsdStage()
 
         .def("GetPrimAtPath", &UsdStage::GetPrimAtPath, arg("path"))
         .def("GetObjectAtPath", &UsdStage::GetObjectAtPath, arg("path"))
+        .def("GetPropertyAtPath", &UsdStage::GetPropertyAtPath, arg("path"))
+        .def("GetAttributeAtPath", &UsdStage::GetAttributeAtPath, arg("path"))
+        .def("GetRelationshipAtPath", &UsdStage::GetRelationshipAtPath, arg("path"))
         .def("Traverse", (UsdPrimRange (UsdStage::*)())
              &UsdStage::Traverse)
         .def("Traverse",

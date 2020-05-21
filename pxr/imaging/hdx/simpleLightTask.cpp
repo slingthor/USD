@@ -25,12 +25,12 @@
 #include "pxr/imaging/hdx/simpleLightTask.h"
 
 #include "pxr/imaging/hdx/shadowMatrixComputation.h"
-#include "pxr/imaging/hdx/simpleLightingShader.h"
 #include "pxr/imaging/hdx/tokens.h"
 
-#include "pxr/imaging/hd/camera.h"
 #include "pxr/imaging/hdSt/light.h"
+#include "pxr/imaging/hdSt/simpleLightingShader.h"
 
+#include "pxr/imaging/hd/camera.h"
 #include "pxr/imaging/hd/perfLog.h"
 #include "pxr/imaging/hd/primGather.h"
 #include "pxr/imaging/hd/renderIndex.h"
@@ -42,8 +42,6 @@
 
 #include "pxr/base/gf/frustum.h"
 
-#include <boost/bind.hpp>
-
 PXR_NAMESPACE_OPEN_SCOPE
 
 
@@ -51,14 +49,16 @@ static const GfVec2i _defaultShadowRes = GfVec2i(1024, 1024);
 
 // -------------------------------------------------------------------------- //
 
-HdxSimpleLightTask::HdxSimpleLightTask(HdSceneDelegate* delegate, SdfPath const& id)
+HdxSimpleLightTask::HdxSimpleLightTask(
+    HdSceneDelegate* delegate, 
+    SdfPath const& id)
     : HdTask(id) 
     , _cameraId()
     , _lightIds()
     , _lightIncludePaths()
     , _lightExcludePaths()
     , _numLights(0)
-    , _lightingShader(new HdxSimpleLightingShader())
+    , _lightingShader(new HdStSimpleLightingShader())
     , _enableShadows(false)
     , _viewport(0.0f, 0.0f, 0.0f, 0.0f)
     , _material()
@@ -83,7 +83,7 @@ HdxSimpleLightTask::Sync(HdSceneDelegate* delegate,
     // so later on other tasks can use this information 
     // draw shadows or other purposes
     (*ctx)[HdxTokens->lightingShader] =
-        boost::dynamic_pointer_cast<HdStLightingShader>(_lightingShader);
+        std::dynamic_pointer_cast<HdStLightingShader>(_lightingShader);
 
 
     HdRenderIndex &renderIndex = delegate->GetRenderIndex();
@@ -194,7 +194,7 @@ HdxSimpleLightTask::Sync(HdSceneDelegate* delegate,
 
             // If the light is in camera space we need to transform
             // the position and spot direction to world space for
-            // HdxSimpleLightingShader.
+            // HdStSimpleLightingShader.
             if (garchl.IsCameraSpaceLight()) {
                 GfVec4f lightPos = garchl.GetPosition();
                 garchl.SetPosition(lightPos * viewInverseMatrix);
@@ -229,17 +229,28 @@ HdxSimpleLightTask::Sync(HdSceneDelegate* delegate,
                     continue;
                 }
 
-                GfMatrix4d shadowMatrix =
+                std::vector<GfMatrix4d> shadowMatrices =
                     lightShadowParams.shadowMatrix->Compute(_viewport,
                                                             windowPolicy);
-                garchl.SetShadowIndex(++shadowIndex);
-                garchl.SetShadowMatrix(shadowMatrix);
+
+                if (shadowMatrices.size() == 0) {
+                    garchl.SetHasShadow(false);
+                    continue;
+                }
+
+                garchl.SetShadowIndexStart(shadowIndex + 1);
+                garchl.SetShadowIndexEnd(shadowIndex + shadowMatrices.size());
+                shadowIndex += shadowMatrices.size();
+
+                garchl.SetShadowMatrices(shadowMatrices);
                 garchl.SetShadowBias(lightShadowParams.bias);
                 garchl.SetShadowBlur(lightShadowParams.blur);
                 garchl.SetShadowResolution(lightShadowParams.resolution);
 
-                shadowMapResolutions.push_back(
-                    GfVec2i(lightShadowParams.resolution));
+                for (size_t i = 0; i < shadowMatrices.size(); ++i) {
+                    shadowMapResolutions.push_back(
+                        GfVec2i(lightShadowParams.resolution));
+                }
             }
         }
     }
@@ -276,12 +287,17 @@ HdxSimpleLightTask::Sync(HdSceneDelegate* delegate,
                 continue;
             }
             // Complete the shadow setup for this light
-            int shadowId = _simpleLights[lightId].GetShadowIndex();
+            int shadowStart = _simpleLights[lightId].GetShadowIndexStart();
+            int shadowEnd = _simpleLights[lightId].GetShadowIndexEnd();
+            std::vector<GfMatrix4d> shadowMatrices =
+                _simpleLights[lightId].GetShadowMatrices();
 
-            shadows->SetViewMatrix(shadowId,
-                _simpleLights[lightId].GetTransform());
-            shadows->SetProjectionMatrix(shadowId,
-                _simpleLights[lightId].GetShadowMatrix());
+            for (int shadowId = shadowStart; shadowId <= shadowEnd; ++shadowId) {
+                shadows->SetViewMatrix(shadowId,
+                    _simpleLights[lightId].GetTransform());
+                shadows->SetProjectionMatrix(shadowId,
+                    shadowMatrices[shadowId - shadowStart]);
+            }
         }
     }
 

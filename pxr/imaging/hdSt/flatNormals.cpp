@@ -22,17 +22,17 @@
 // language governing permissions and limitations under the Apache License.
 //
 
-#include "pxr/imaging/hdSt/program.h"
-#include "pxr/imaging/hdSt/resourceRegistry.h"
-#include "pxr/imaging/hdSt/flatNormals.h"
-#include "pxr/imaging/hdSt/tokens.h"
-
 #include "pxr/imaging/hd/bufferArrayRange.h"
 #include "pxr/imaging/hd/bufferResource.h"
 #include "pxr/imaging/hd/engine.h"
 #include "pxr/imaging/hd/perfLog.h"
 #include "pxr/imaging/hd/tokens.h"
 #include "pxr/imaging/hd/vtBufferSource.h"
+
+#include "pxr/imaging/hdSt/program.h"
+#include "pxr/imaging/hdSt/resourceRegistry.h"
+#include "pxr/imaging/hdSt/flatNormals.h"
+#include "pxr/imaging/hdSt/tokens.h"
 
 #include "pxr/imaging/hf/perfLog.h"
 
@@ -132,11 +132,11 @@ HdSt_FlatNormalsComputationGPU::Execute(
     Uniform uniform;
 
     // coherent vertex offset in aggregated buffer array
-    uniform.vertexOffset = _vertexRange->GetOffset();
+    uniform.vertexOffset = _vertexRange->GetElementOffset();
     // coherent element offset in aggregated buffer array
-    uniform.elementOffset = range->GetOffset();
+    uniform.elementOffset = range->GetElementOffset();
     // coherent topology offset in aggregated buffer array
-    uniform.topologyOffset = _topologyRange->GetOffset();
+    uniform.topologyOffset = _topologyRange->GetElementOffset();
     // interleaved offset/stride to points
     // note: this code (and the glsl flat normal compute shader) assumes
     // components in interleaved vertex array are always same data type.

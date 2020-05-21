@@ -29,6 +29,8 @@
 #include "pxr/imaging/mtlf/diagnostic.h"
 #include "pxr/imaging/mtlf/utils.h"
 
+#include "pxr/imaging/hgiMetal/hgi.h"
+
 #include "pxr/imaging/garch/image.h"
 #include "pxr/imaging/garch/utils.h"
 
@@ -254,8 +256,8 @@ MtlfDrawTarget::_GenFrameBuffer()
 void
 MtlfDrawTarget::_BindAttachment( MtlfAttachmentRefPtr const & a )
 {
-    id<MTLTexture> tid = a->GetTextureName().multiTexture.forCurrentGPU();
-    id<MTLTexture> tidMS = a->GetTextureMSName().multiTexture.forCurrentGPU();
+    id<MTLTexture> tid = a->GetTextureName();
+    id<MTLTexture> tidMS = a->GetTextureMSName();
 
     int attach = a->GetAttach();
 
@@ -278,9 +280,9 @@ MtlfDrawTarget::_BindAttachment( MtlfAttachmentRefPtr const & a )
             MTLRenderPassStencilAttachmentDescriptor *stencilAttachment = _mtlRenderPassDescriptor.stencilAttachment;
             
             if (HasMSAA()) {
-                stencilAttachment.texture = a->GetStencilTextureMSName().multiTexture.forCurrentGPU();
+                stencilAttachment.texture = a->GetStencilTextureMSName();
             } else {
-                stencilAttachment.texture = a->GetStencilTextureName().multiTexture.forCurrentGPU();
+                stencilAttachment.texture = a->GetStencilTextureName();
             }
             
             // make sure to clear every frame for best performance
@@ -328,18 +330,7 @@ MtlfDrawTarget::Bind()
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
    
     context->SetDrawTarget(this);
-//    context->CreateCommandBuffer();
-//    context->LabelCommandBuffer(@"DrawTarget:Bind");
-    
-//#pragma message("Unconditionally enabling GS buffer creation for now")
-
-    // Create a command buffer for the geometry shaders and make the default/render queue dependent on it completeing
-//    context->CreateCommandBuffer(METALWORKQUEUE_GEOMETRY_SHADER);
-//    context->LabelCommandBuffer(@"DrawTarget CommandBuffer GS", METALWORKQUEUE_GEOMETRY_SHADER);
-
-//    context->StartFrameForThread();
     context->SetRenderPassDescriptor(_mtlRenderPassDescriptor);
-//    context->EndFrameForThread();
 }
 
 void
@@ -368,16 +359,7 @@ MtlfDrawTarget::Unbind()
     }
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
     context->SetDrawTarget(NULL);
-
-    // Terminate the render encoder containing all the draw commands
-//    context->GetRenderEncoder();
-//    context->ReleaseEncoder(true);
-
-    // Generate an event to indicate that the GS buffer has completed then commit it
-    //context->CommitCommandBufferForThread(false, false, METALWORKQUEUE_GEOMETRY_SHADER);
-    
-//    context->CommitCommandBufferForThread(false, false);
-    
+        
     TouchContents();
 }
 
@@ -441,7 +423,16 @@ MtlfDrawTarget::GetImage(std::string const & name, void* buffer) const
 {
     MtlfAttachmentRefPtr attachment = TfStatic_cast<TfRefPtr<MtlfDrawTarget::MtlfAttachment>>(_GetAttachments().at(name));
 
-    id<MTLTexture> texture = attachment->GetTextureName().multiTexture.forCurrentGPU();
+    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
+
+    id<MTLDevice> device = context->currentDevice;
+    HgiMetal* hgiMetal = context->GetHgi();
+    
+    id<MTLTexture> texture = attachment->GetTextureName();
+ 
+    if (hgiMetal->_useFinalTextureForGetImage) {
+        texture = hgiMetal->_finalTexture;
+    }
     int bytesPerPixel = attachment->GetBytesPerPixel();
     int width = [texture width];
     int height = [texture height];
@@ -461,24 +452,37 @@ MtlfDrawTarget::GetImage(std::string const & name, void* buffer) const
     if (mtlFormat == MTLPixelFormatDepth32Float) {
         bytesPerPixel = 4;
     }
-    
-    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
-    id<MTLDevice> device = context->currentDevice;
-    context->CreateCommandBuffer();
-    context->LabelCommandBuffer(@"Get Image");
-    id<MTLBlitCommandEncoder> blitEncoder = context->GetBlitEncoder();
-    
-    MtlfMetalContext::MtlfMultiBuffer const &cpuBuffer = context->GetMetalBuffer((bytesPerPixel * width * height), MTLResourceStorageModeDefault);
-    
-    [blitEncoder copyFromTexture:texture sourceSlice:0 sourceLevel:0 sourceOrigin:MTLOriginMake(0, 0, 0) sourceSize:MTLSizeMake(width, height, 1) toBuffer:cpuBuffer.forCurrentGPU() destinationOffset:0 destinationBytesPerRow:(bytesPerPixel * width) destinationBytesPerImage:(bytesPerPixel * width * height) options:blitOptions];
-#if defined(ARCH_OS_MACOS)
-    [blitEncoder synchronizeResource:cpuBuffer.forCurrentGPU()];
-#endif
 
-    context->ReleaseEncoder(true);
-    context->CommitCommandBufferForThread(false, true);
+    // While Mtlf exists, we need to force a flush and generation of a new
+    // command buffer, to ensure the blit happens after any work Mtlf has
+    // queued
+    hgiMetal->CommitCommandBuffer(HgiMetal::CommitCommandBuffer_NoWait, true);
+    
+    id<MTLCommandBuffer> commandBuffer = hgiMetal->GetCommandBuffer();
+    id<MTLBlitCommandEncoder> blitEncoder =
+        [commandBuffer blitCommandEncoder];
+    
+    id<MTLBuffer> const &cpuBuffer =
+        context->GetMetalBuffer((bytesPerPixel * width * height),
+                                MTLResourceStorageModeShared);
+    
+    [blitEncoder copyFromTexture:texture
+                     sourceSlice:0
+                     sourceLevel:0
+                    sourceOrigin:MTLOriginMake(0, 0, 0)
+                      sourceSize:MTLSizeMake(width, height, 1)
+                        toBuffer:cpuBuffer
+               destinationOffset:0
+          destinationBytesPerRow:(bytesPerPixel * width)
+        destinationBytesPerImage:(bytesPerPixel * width * height)
+                         options:blitOptions];
 
-    memcpy(buffer, [cpuBuffer.forCurrentGPU() contents], bytesPerPixel * width * height);
+    [blitEncoder endEncoding];
+
+    hgiMetal->CommitCommandBuffer(
+        HgiMetal::CommitCommandBuffer_WaitUntilCompleted);
+
+    memcpy(buffer, [cpuBuffer contents], bytesPerPixel * width * height);
 	context->ReleaseMetalBuffer(cpuBuffer);
 }
 
@@ -506,6 +510,30 @@ MtlfDrawTarget::WriteToFile(std::string const & name,
 
     void * buf = malloc( bufsize );
     GetImage(name, buf);
+    
+    if (a->GetFormat() == GL_RGBA && a->GetType() == GL_FLOAT) {
+        // The data we just got is actually halfs rather than floats. Convert.
+        union float32 {
+            float f;
+            uint32_t u;
+        };
+        float32 *floats = static_cast<float32*>(buf);
+        uint16_t *halfs = static_cast<uint16_t*>(buf);
+        float32 convert;
+        convert.u = (254 - 15) << 23;
+
+        int pixel = _size[0] * _size[1] * 4;
+        do {
+            float32 out;
+            uint16_t in = halfs[pixel];
+
+            out.u = (in & 0x7fff) << 13;
+            out.f *= convert.f;
+            out.u |= (in & 0x8000) << 16;
+            
+            floats[pixel] = out;
+        } while(pixel--);
+    }
 
     VtDictionary metadata;
 
@@ -528,12 +556,14 @@ MtlfDrawTarget::WriteToFile(std::string const & name,
         metadata["NP"] = worldToScreenTransform;
     }
 
+    HgiMetal* hgiMetal = MtlfMetalContext::GetMetalContext()->GetHgi();
+
     GarchImage::StorageSpec storage;
     storage.width = _size[0];
     storage.height = _size[1];
     storage.format = a->GetFormat();
     storage.type = a->GetType();
-    storage.flipped = false;
+    storage.flipped = hgiMetal->_needsFlip;
     storage.data = buf;
 
     GarchImageSharedPtr image = GarchImage::OpenForWriting(filename);
@@ -601,6 +631,8 @@ MtlfDrawTarget::MtlfAttachment::_GenTexture()
 
     int numChannel;
     bool depth24stencil8 = false;
+    uint32_t bytesPerValue = 1;
+
     MTLPixelFormat mtlFormat = MTLPixelFormatInvalid;
     id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->currentDevice;
 
@@ -609,7 +641,8 @@ MtlfDrawTarget::MtlfAttachment::_GenTexture()
         case GL_RG:
             numChannel = 2;
             if (type == GL_FLOAT) {
-                mtlFormat = MTLPixelFormatRG32Float;
+                mtlFormat = MTLPixelFormatRG16Float;
+                bytesPerValue = 2;
             }
             break;
 
@@ -620,7 +653,8 @@ MtlfDrawTarget::MtlfAttachment::_GenTexture()
         case GL_RGBA:
             numChannel = 4;
             if (type == GL_FLOAT) {
-                mtlFormat = MTLPixelFormatRGBA32Float;
+                mtlFormat = MTLPixelFormatRGBA16Float;
+                bytesPerValue = 2;
             }
             else if (type == GL_UNSIGNED_BYTE) {
                 mtlFormat = MTLPixelFormatRGBA8Unorm;
@@ -634,6 +668,7 @@ MtlfDrawTarget::MtlfAttachment::_GenTexture()
                     mtlFormat = MTLPixelFormatDepth32Float;
                 else
                     mtlFormat = MTLPixelFormatR32Float;
+                bytesPerValue = 4;
             }
             else if (type == GL_UNSIGNED_INT_24_8) {
 #if defined(ARCH_OS_MACOS)
@@ -644,6 +679,7 @@ MtlfDrawTarget::MtlfAttachment::_GenTexture()
 //                else
 #endif
                     mtlFormat = MTLPixelFormatDepth32Float_Stencil8;
+                bytesPerValue = 5;
             }
             else if (type == GL_UNSIGNED_BYTE) {
                 mtlFormat = MTLPixelFormatR8Unorm;
@@ -651,11 +687,6 @@ MtlfDrawTarget::MtlfAttachment::_GenTexture()
             break;
     }
     
-    uint32_t bytesPerValue = 1;
-    if(_type == GL_FLOAT || depth24stencil8)
-        bytesPerValue = 4;
-    else if(mtlFormat == MTLPixelFormatDepth32Float_Stencil8)
-        bytesPerValue = 5;
     _bytesPerPixel = numChannel * bytesPerValue;
 
     if (mtlFormat == MTLPixelFormatInvalid) {
@@ -673,13 +704,14 @@ MtlfDrawTarget::MtlfAttachment::_GenTexture()
                                                        mipmapped:NO];
     desc.usage = MTLTextureUsageRenderTarget;
     desc.resourceOptions = MTLResourceStorageModePrivate;
-    _textureName = MtlfMultiTexture(desc);
+    _textureName = [device newTextureWithDescriptor:desc];
 
     memoryUsed += baseImageSize;
 
     if (_numSamples > 1) {
         desc.sampleCount = _numSamples;
-        _textureNameMS = MtlfMultiTexture(desc);
+        desc.textureType = MTLTextureType2DMultisample;
+        _textureNameMS = [device newTextureWithDescriptor:desc];
         memoryUsed = baseImageSize * _numSamples;
     }
     
@@ -695,25 +727,25 @@ MtlfDrawTarget::MtlfAttachment::_GenTexture()
 void
 MtlfDrawTarget::MtlfAttachment::_DeleteTexture()
 {
-    if (_textureName.IsSet()) {
-        _textureName.release();
-        _textureName.Clear();
+    if (_textureName) {
+        [_textureName release];
+        _textureName = nil;
     }
 
-    if (_textureNameMS.IsSet()) {
-        _textureNameMS.release();
-        _textureNameMS.Clear();
+    if (_textureNameMS) {
+        [_textureNameMS release];
+        _textureNameMS = nil;
     }
     
     if (_format != GL_DEPTH_STENCIL) {
-        if (_stencilTextureName.IsSet()) {
-            _stencilTextureName.release();
-            _stencilTextureName.Clear();
+        if (_stencilTextureName) {
+            [_stencilTextureName release];
+            _stencilTextureName = nil;
         }
     
-        if (_stencilTextureNameMS.IsSet()) {
-            _stencilTextureNameMS.release();
-            _stencilTextureNameMS.Clear();
+        if (_stencilTextureNameMS) {
+            [_stencilTextureNameMS release];
+            _stencilTextureNameMS = nil;
         }
     }
 }
@@ -730,7 +762,7 @@ MtlfDrawTarget::MtlfAttachment::ResizeTexture(const GfVec2i &size)
 /* virtual */
 GarchTexture::BindingVector
 MtlfDrawTarget::MtlfAttachment::GetBindings(TfToken const & identifier,
-                                            GarchSamplerGPUHandle samplerName)
+                                            GarchSamplerGPUHandle const& samplerName)
 {
     return BindingVector(1,
                 Binding(identifier, GarchTextureTokens->texels,

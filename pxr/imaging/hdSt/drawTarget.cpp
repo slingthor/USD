@@ -173,7 +173,7 @@ HdStDrawTarget::WriteToFile(const HdRenderIndex &renderIndex,
     HF_MALLOC_TAG_FUNCTION();
 
     // Check the draw target's been allocated
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     if (!_drawTarget ||
         (HdStResourceFactory::GetInstance()->IsOpenGL()
           && !_drawTargetContextGL)) {
@@ -203,7 +203,7 @@ HdStDrawTarget::WriteToFile(const HdRenderIndex &renderIndex,
     const GfMatrix4d &viewMatrix = camera->GetViewMatrix();
     const GfMatrix4d &projMatrix = camera->GetProjectionMatrix();
 
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     GlfGLContextSharedPtr oldContext;
     if (HdStResourceFactory::GetInstance()->IsOpenGL())
     {
@@ -215,7 +215,7 @@ HdStDrawTarget::WriteToFile(const HdRenderIndex &renderIndex,
 #endif
     bool result = _drawTarget->WriteToFile(attachment, path,
                                            viewMatrix, projMatrix);
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     if (HdStResourceFactory::GetInstance()->IsOpenGL())
         GlfGLContext::MakeCurrent(oldContext);
 #endif
@@ -229,7 +229,7 @@ HdStDrawTarget::_SetAttachments(
                            const HdStDrawTargetAttachmentDescArray &attachments)
 {
     HF_MALLOC_TAG_FUNCTION();
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     if (HdStResourceFactory::GetInstance()->IsOpenGL()) {
         if (!_drawTargetContextGL) {
             // Use one of the shared contexts as the master.
@@ -241,7 +241,7 @@ HdStDrawTarget::_SetAttachments(
     _colorTextureResourceHandles.clear();
     _depthTextureResourceHandle.reset();
 
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     GlfGLContextSharedPtr oldContext;
 
     // Make sure all draw target operations happen on the same
@@ -352,7 +352,7 @@ HdStDrawTarget::_SetAttachments(
 
 	_renderPassState.SetDepthPriority(attachments.GetDepthPriority());
 
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     if (HdStResourceFactory::GetInstance()->IsOpenGL())
         GlfGLContext::MakeCurrent(oldContext);
 #endif
@@ -374,7 +374,7 @@ HdStDrawTarget::_ResizeDrawTarget()
 {
     HF_MALLOC_TAG_FUNCTION();
     
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     // Make sure all draw target operations happen on the same
     // context.
     GlfGLContextSharedPtr oldContext;
@@ -391,7 +391,7 @@ HdStDrawTarget::_ResizeDrawTarget()
     // The texture bindings might have changed so increment the version
     ++_version;
 
-#if defined(ARCH_GFX_OPENGL)
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     if (HdStResourceFactory::GetInstance()->IsOpenGL())
         GlfGLContext::MakeCurrent(oldContext);
 #endif
@@ -406,7 +406,7 @@ HdStDrawTarget::_RegisterTextureResourceHandle(
     HF_MALLOC_TAG_FUNCTION();
 
     HdStResourceRegistrySharedPtr const& resourceRegistry =
-         boost::static_pointer_cast<HdStResourceRegistry>(
+         std::static_pointer_cast<HdStResourceRegistry>(
              sceneDelegate->GetRenderIndex().GetResourceRegistry());
 
     // Create Path for the texture resource

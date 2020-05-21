@@ -63,6 +63,11 @@ public:
     // in composable/compatible shader constraints
     GARCH_API
     int GetNumLightsUsed() const;
+    
+    // returns the number of shadow maps needed, by summing shadow maps
+    // allocated to each light.
+    GARCH_API
+    int ComputeNumShadowsUsed() const;
 
     GARCH_API
     void SetShadows(GarchSimpleShadowArrayRefPtr const & shadows);

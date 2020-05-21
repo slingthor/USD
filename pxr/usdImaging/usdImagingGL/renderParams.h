@@ -91,12 +91,12 @@ public:
     bool enableUsdDrawModes;
     GfVec4f clearColor;
     TfToken colorCorrectionMode;
-    GfVec2i renderResolution;
+    int lut3dSizeOCIO;
     unsigned long sampleCount;
     
     UsdImagingGLRenderParams();
     
-#if defined(ARCH_GFX_METAL)
+#if defined(PXR_METAL_SUPPORT_ENABLED)
     MTLRenderPassDescriptor *mtlRenderPassDescriptorForNativeMetal;
 #else
     void *_dummyPtr;
@@ -136,7 +136,7 @@ UsdImagingGLRenderParams::operator==(const UsdImagingGLRenderParams &other)
         && enableUsdDrawModes          == other.enableUsdDrawModes
         && clearColor                  == other.clearColor
         && colorCorrectionMode         == other.colorCorrectionMode
-        && renderResolution            == other.renderResolution
+        && lut3dSizeOCIO               == other.lut3dSizeOCIO
         && sampleCount                 == other.sampleCount;
 }
 

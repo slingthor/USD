@@ -52,8 +52,8 @@ HdSt_DomeLightComputationGPUGL::HdSt_DomeLightComputationGPUGL(
 void
 HdSt_DomeLightComputationGPUGL::_Execute(HdStProgramSharedPtr computeProgram)
 {
-    HdStGLSLProgramSharedPtr const &glslProgram(
-        boost::dynamic_pointer_cast<HdStGLSLProgram>(computeProgram));
+    HdStGLSLProgram const *glslProgram(
+        dynamic_cast<const HdStGLSLProgram*>(computeProgram.get()));
     GLuint programId = glslProgram->GetGLProgram();
 
     // bind the input and output textures
@@ -65,7 +65,7 @@ HdSt_DomeLightComputationGPUGL::_Execute(HdStProgramSharedPtr computeProgram)
     glBindImageTexture(1, _destTextureId, _level, _layered, _layer, 
                         GL_WRITE_ONLY, GL_RGBA16F);
 
-    glUseProgram(programId);
+    computeProgram->SetProgram();
 
     // if we are calculating the irradiance map we do not need to send over
     // the roughness value to the shader
@@ -78,7 +78,7 @@ HdSt_DomeLightComputationGPUGL::_Execute(HdStProgramSharedPtr computeProgram)
     glDispatchCompute(  (GLuint)_textureWidth / 32, 
                         (GLuint)_textureHeight / 32, 1);
 
-    glUseProgram(0);
+    computeProgram->UnsetProgram();
     glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
     glMemoryBarrier(GL_TEXTURE_FETCH_BARRIER_BIT);
 

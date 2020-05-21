@@ -31,7 +31,6 @@
 #include "pxr/imaging/hdSt/resourceFactory.h"
 #include "pxr/imaging/mtlf/mtlDevice.h"
 
-#include <boost/make_shared.hpp>
 #include <vector>
 
 #include "pxr/base/arch/hash.h"
@@ -80,7 +79,7 @@ HdStVBOMemoryBufferMetal::Reallocate(
     HD_PERF_COUNTER_INCR(HdPerfTokens->vboRelocated);
 
     HdStVBOMemoryManager::_StripedBufferArraySharedPtr curRangeOwner_ =
-        boost::static_pointer_cast<_StripedBufferArray> (curRangeOwner);
+        std::static_pointer_cast<_StripedBufferArray> (curRangeOwner);
 
     if (!TF_VERIFY(GetResources().size() ==
                       curRangeOwner_->GetResources().size())) {
@@ -134,9 +133,9 @@ HdStVBOMemoryBufferMetal::Reallocate(
     HdBufferResourceNamedList const& resources = GetResources();
     for (size_t bresIdx=0; bresIdx<resources.size(); ++bresIdx) {
         HdStBufferResourceMetalSharedPtr const &bres =
-            boost::static_pointer_cast<HdStBufferResourceMetal>(resources[bresIdx].second);
+            std::static_pointer_cast<HdStBufferResourceMetal>(resources[bresIdx].second);
         HdStBufferResourceMetalSharedPtr const &curRes =
-            boost::static_pointer_cast<HdStBufferResourceMetal>(curRangeOwner_->GetResources()[bresIdx].second);
+            std::static_pointer_cast<HdStBufferResourceMetal>(curRangeOwner_->GetResources()[bresIdx].second);
 
         int const bytesPerElement = HdDataSizeOfTupleType(bres->GetTupleType());
         TF_VERIFY(bytesPerElement > 0);
@@ -155,7 +154,8 @@ HdStVBOMemoryBufferMetal::Reallocate(
             
             // Disable triple buffering
             if (i == 0) {
-                newId[i] = context->GetMetalBuffer(bufferSize, MTLResourceStorageModeDefault);
+//                newId[i] = context->GetMetalBuffer(bufferSize, MTLResourceStorageModeDefault);
+                newId[i] = context->GetMetalBuffer(bufferSize, MTLResourceStorageModeShared);
             }
             else {
                 newId[i].Clear();
@@ -169,19 +169,19 @@ HdStVBOMemoryBufferMetal::Reallocate(
             std::vector<size_t>::iterator newOffsetIt = newOffsets.begin();
 
             // pre-pass to combine consecutive buffer range relocation
-            HdStBufferRelocator* relocator[3];
+            std::unique_ptr<HdStBufferRelocator> relocator[3];
             
             for (int i = 0; i < 3; i++) {
                 int const curIndex = curId[i].IsSet() ? i : 0;
                 if (newId[i].IsSet())
-                    relocator[i] = HdStResourceFactory::GetInstance()->NewBufferRelocator(curId[curIndex], newId[i]);
+                    relocator[i].reset(HdStResourceFactory::GetInstance()->NewBufferRelocator(curId[curIndex], newId[i]));
                 else
                     relocator[i] = NULL;
             }
 
             TF_FOR_ALL (it, ranges) {
                 HdStVBOMemoryManager::_StripedBufferArrayRangeSharedPtr range =
-                    boost::static_pointer_cast<HdStVBOMemoryManager::_StripedBufferArrayRange>(*it);
+                    std::static_pointer_cast<HdStVBOMemoryManager::_StripedBufferArrayRange>(*it);
                 if (!range) {
                     TF_CODING_ERROR("_StripedBufferArrayRange "
                                     "expired unexpectedly.");
@@ -206,7 +206,7 @@ HdStVBOMemoryBufferMetal::Reallocate(
                 int const newSize = range->GetNumElements();
                 size_t const copySize =
                     std::min(oldSize, newSize) * bytesPerElement;
-                int const oldOffset = range->GetOffset();
+                int const oldOffset = range->GetElementOffset();
                 if (copySize > 0) {
                     ptrdiff_t const readOffset = oldOffset * bytesPerElement;
                     ptrdiff_t const writeOffset = *newOffsetIt * bytesPerElement;
@@ -224,7 +224,6 @@ HdStVBOMemoryBufferMetal::Reallocate(
             for (int i = 0; i < 3; i++) {
                 if (relocator[i]) {
                     relocator[i]->Commit();
-                    delete relocator[i];
                 }
             }
         }
@@ -243,12 +242,12 @@ HdStVBOMemoryBufferMetal::Reallocate(
     // update ranges
     for (size_t idx = 0; idx < ranges.size(); ++idx) {
         HdStVBOMemoryManager::_StripedBufferArrayRangeSharedPtr range =
-            boost::static_pointer_cast<HdStVBOMemoryManager::_StripedBufferArrayRange>(ranges[idx]);
+            std::static_pointer_cast<HdStVBOMemoryManager::_StripedBufferArrayRange>(ranges[idx]);
         if (!range) {
             TF_CODING_ERROR("_StripedBufferArrayRange expired unexpectedly.");
             continue;
         }
-        range->SetOffset(newOffsets[idx]);
+        range->SetElementOffset(newOffsets[idx]);
         range->SetCapacity(range->GetNumElements());
     }
     _needsReallocation = false;
@@ -263,7 +262,7 @@ HdStVBOMemoryBufferMetal::_DeallocateResources()
 {
     TF_FOR_ALL (it, GetResources()) {
         HdStBufferResourceMetalSharedPtr const &bres =
-            boost::static_pointer_cast<HdStBufferResourceMetal>(it->second);
+            std::static_pointer_cast<HdStBufferResourceMetal>(it->second);
 
         for (int i = 0; i < 3; i++) {
             HdResourceGPUHandle oldId(bres->GetIdAtIndex(i));

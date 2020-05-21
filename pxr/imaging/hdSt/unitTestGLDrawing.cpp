@@ -25,9 +25,11 @@
 #include "pxr/imaging/glf/diagnostic.h"
 
 #include "pxr/imaging/hdSt/unitTestGLDrawing.h"
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
 #include "pxr/imaging/glf/contextCaps.h"
+#endif
 #include "pxr/imaging/glf/diagnostic.h"
-#include "pxr/imaging/glf/drawTarget.h"
+#include "pxr/imaging/garch/drawTarget.h"
 #include "pxr/imaging/garch/glDebugWindow.h"
 
 #include "pxr/base/gf/frustum.h"
@@ -42,7 +44,8 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 
-class HdSt_UnitTestWindow : public GarchGLDebugWindow {
+class HdSt_UnitTestWindow : public GarchGLDebugWindow
+{
 public:
     typedef HdSt_UnitTestWindow This;
 
@@ -90,6 +93,7 @@ HdSt_UnitTestWindow::~HdSt_UnitTestWindow()
 void
 HdSt_UnitTestWindow::OnInitializeGL()
 {
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     GlfGlewInit();
     GlfRegisterDefaultDebugOutputMessageCallback();
     GlfContextCaps::InitInstance();
@@ -97,7 +101,7 @@ HdSt_UnitTestWindow::OnInitializeGL()
     std::cout << glGetString(GL_VENDOR) << "\n";
     std::cout << glGetString(GL_RENDERER) << "\n";
     std::cout << glGetString(GL_VERSION) << "\n";
-
+#endif
     //
     // Create an offscreen draw target which is the same size as this
     // widget and initialize the unit test with the draw target bound.
@@ -122,6 +126,7 @@ void
 HdSt_UnitTestWindow::OnUninitializeGL()
 {
     _drawTarget = GarchDrawTargetRefPtr();
+    _unitTest->UninitTest();
 }
 
 /* virtual */
@@ -138,7 +143,7 @@ HdSt_UnitTestWindow::OnPaintGL()
     _unitTest->DrawTest();
 
     _drawTarget->Unbind();
-
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     //
     // Blit the resulting color buffer to the window (this is a noop
     // if we're drawing offscreen).
@@ -153,6 +158,7 @@ HdSt_UnitTestWindow::OnPaintGL()
 
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
     glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+#endif
 }
 
 void
@@ -207,21 +213,21 @@ HdSt_UnitTestWindow::OnKeyRelease(int key)
 void
 HdSt_UnitTestWindow::OnMousePress(int button, int x, int y, int modKeys)
 {
-    _unitTest->MousePress(button, x, y);
+    _unitTest->MousePress(button, x, y, modKeys);
 }
 
 /* virtual */
 void
 HdSt_UnitTestWindow::OnMouseRelease(int button, int x, int y, int modKeys)
 {
-    _unitTest->MouseRelease(button, x, y);
+    _unitTest->MouseRelease(button, x, y, modKeys);
 }
 
 /* virtual */
 void
 HdSt_UnitTestWindow::OnMouseMove(int x, int y, int modKeys)
 {
-    _unitTest->MouseMove(x, y);
+    _unitTest->MouseMove(x, y, modKeys);
 }
 
 ////////////////////////////////////////////////////////////
@@ -301,8 +307,14 @@ HdSt_UnitTestGLDrawing::ParseArgs(int argc, char *argv[])
 }
 
 /* virtual */
+void 
+HdSt_UnitTestGLDrawing::UninitTest()
+{
+}
+
+/* virtual */
 void
-HdSt_UnitTestGLDrawing::MousePress(int button, int x, int y)
+HdSt_UnitTestGLDrawing::MousePress(int button, int x, int y, int modKeys)
 {
     _mouseButton[button] = true;
     _mousePos[0] = x;
@@ -311,26 +323,28 @@ HdSt_UnitTestGLDrawing::MousePress(int button, int x, int y)
 
 /* virtual */
 void
-HdSt_UnitTestGLDrawing::MouseRelease(int button, int x, int y)
+HdSt_UnitTestGLDrawing::MouseRelease(int button, int x, int y, int modKeys)
 {
     _mouseButton[button] = false;
 }
 
 /* virtual */
 void
-HdSt_UnitTestGLDrawing::MouseMove(int x, int y)
+HdSt_UnitTestGLDrawing::MouseMove(int x, int y, int modKeys)
 {
     int dx = x - _mousePos[0];
     int dy = y - _mousePos[1];
 
-    if (_mouseButton[0]) {
-        _rotate[1] += dx;
-        _rotate[0] += dy;
-    } else if (_mouseButton[1]) {
-        _translate[0] += 0.1*dx;
-        _translate[1] -= 0.1*dy;
-    } else if (_mouseButton[2]) {
-        _translate[2] += 0.1*dx;
+    if (modKeys & GarchGLDebugWindow::Alt) {
+        if (_mouseButton[0]) {
+            _rotate[1] += dx;
+            _rotate[0] += dy;
+        } else if (_mouseButton[1]) {
+            _translate[0] += 0.1*dx;
+            _translate[1] -= 0.1*dy;
+        } else if (_mouseButton[2]) {
+            _translate[2] += 0.1*dx;
+        }
     }
 
     _mousePos[0] = x;

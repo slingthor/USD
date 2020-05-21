@@ -50,9 +50,7 @@
 #include <opensubdiv/osd/cpuEvaluator.h>
 #include <opensubdiv/osd/mesh.h>
 
-#include <boost/scoped_ptr.hpp>
-
-#if OPENSUBDIV_HAS_METAL_COMPUTE && defined(ARCH_GFX_METAL)// MTL_CHANGE
+#if OPENSUBDIV_HAS_METAL_COMPUTE && defined(PXR_METAL_SUPPORT_ENABLED)// MTL_CHANGE
 #include <opensubdiv/osd/mtlVertexBuffer.h>
 #include "pxr/imaging/mtlf/mtlDevice.h"
 #include "pxr/imaging/mtlf/OSDMetalContext.h"
@@ -71,10 +69,10 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-#if OPENSUBDIV_HAS_METAL_COMPUTE  && defined(ARCH_GFX_METAL) // MTL_CHANGE
+#if OPENSUBDIV_HAS_METAL_COMPUTE  && defined(PXR_METAL_SUPPORT_ENABLED) // MTL_CHANGE
 typedef OpenSubdiv::Osd::MTLStencilTable     HdSt_OsdGpuStencilTable;
 typedef OpenSubdiv::Osd::MTLComputeEvaluator HdSt_OsdGpuEvaluator;
-typedef OpenSubdiv::Osd::CPUMTLVertexBuffer  HdSt_OsdCpuVertexBuffer;
+typedef OpenSubdiv::Osd::CpuVertexBuffer     HdSt_OsdCpuVertexBuffer;
 typedef pxr::OSDMetalContext                 HdSt_OsdGpuDeviceContext;
 typedef pxr::OSDMetalContext*                HdSt_OsdGpuDeviceContextPtr;
 #pragma message("Building for Metal OpenSubDiv")
@@ -181,7 +179,7 @@ private:
     HdSt_OsdGpuDeviceContext     _deviceContext; //MTL_CHANGE
     
     HdSt_OsdGpuDeviceContextPtr GetDeviceContextPtr() { //MTL_CHANGE
- #if OPENSUBDIV_HAS_METAL_COMPUTE && defined(ARCH_GFX_METAL)
+ #if OPENSUBDIV_HAS_METAL_COMPUTE && defined(PXR_METAL_SUPPORT_ENABLED)
         _deviceContext.Init();
         return &_deviceContext;
 #else
@@ -355,7 +353,7 @@ HdSt_Osd3Subdivision::RefineGPU(HdBufferArrayRangeSharedPtr const &range,
     // filling coarse vertices has been done at resource registry.
 
     HdBufferArrayRangeSharedPtr range_ =
-        boost::static_pointer_cast<HdBufferArrayRange> (range);
+        std::static_pointer_cast<HdBufferArrayRange> (range);
 
     // vertex buffer wrapper for OpenSubdiv API
     HdSt_OsdRefineComputationGPU::VertexBuffer vertexBuffer(
@@ -367,11 +365,11 @@ HdSt_Osd3Subdivision::RefineGPU(HdBufferArrayRangeSharedPtr const &range,
     int numCoarseVertices = _vertexStencils->GetNumControlVertices();
 
     OpenSubdiv::Osd::BufferDescriptor srcDesc(
-        /*offset=*/range->GetOffset() * stride,
+        /*offset=*/range->GetElementOffset() * stride,
         /*length=*/stride,
         /*stride=*/stride);
     OpenSubdiv::Osd::BufferDescriptor dstDesc(
-        /*offset=*/(range->GetOffset() + numCoarseVertices) * stride,
+        /*offset=*/(range->GetElementOffset() + numCoarseVertices) * stride,
         /*length=*/stride,
         /*stride=*/stride);
 
@@ -404,11 +402,6 @@ HdSt_Osd3Subdivision::RefineGPU(HdBufferArrayRangeSharedPtr const &range,
                                        _GetGpuStencilTable(),
                                        instance,
                                        HdSt_Osd3Subdivision::GetDeviceContextPtr());
-
-#if OPENSUBDIV_HAS_METAL_COMPUTE && defined(ARCH_GFX_METAL)
-    // The Metal layer needs to know whether to generate data that might be required by OSD immediately or if it can be deferred (more performance)
-    MtlfMetalContext::GetMetalContext()->SetOSDEnabledThisFrame(true);
-#endif
     
 #else
     TF_CODING_ERROR("No GPU kernel available.\n");

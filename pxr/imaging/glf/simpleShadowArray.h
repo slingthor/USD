@@ -31,7 +31,6 @@
 #include "pxr/imaging/garch/gl.h"
 #include "pxr/imaging/garch/simpleShadowArray.h"
 
-#include <boost/noncopyable.hpp>
 #include <vector>
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -39,6 +38,10 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 class GlfSimpleShadowArray : public GarchSimpleShadowArray {
 public:
+
+    // Disallow copies
+    GlfSimpleShadowArray(const GlfSimpleShadowArray&) = delete;
+    GlfSimpleShadowArray& operator=(const GlfSimpleShadowArray&) = delete;
 
     GLF_API
     virtual void SetSize(GfVec2i const & size) override;

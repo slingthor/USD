@@ -48,6 +48,8 @@
 #include "pxr/usd/usdGeom/metrics.h"
 #include "pxr/usd/usdGeom/tokens.h"
 
+#include "pxr/imaging/hgiMetal/hgi.h"
+
 #include <string>
 
 
@@ -60,7 +62,8 @@ UsdAppUtilsFrameRecorder::UsdAppUtilsFrameRecorder(
     _imageWidth(960u),
     _complexity(1.0f),
     _colorCorrectionMode("disabled"),
-    _purposes({UsdGeomTokens->default_, UsdGeomTokens->proxy})
+    _purposes({UsdGeomTokens->default_, UsdGeomTokens->proxy}),
+    _api(api)
 {
     GlfGlewInit();
 }
@@ -178,6 +181,11 @@ UsdAppUtilsFrameRecorder::Record(
     const GfFrustum frustum = gfCamera.GetFrustum();
     const GfVec3d cameraPos = frustum.GetPosition();
 
+    const TfToken& interopDst =
+        _api == UsdImagingGLEngine::RenderAPI::Metal?
+            HgiTokens->Metal:HgiTokens->OpenGL;
+    _imagingEngine.SetRendererAov(HdAovTokens->color, interopDst);
+
     _imagingEngine.SetCameraState(
         frustum.ComputeViewMatrix(),
         frustum.ComputeProjectionMatrix());
@@ -208,14 +216,20 @@ UsdAppUtilsFrameRecorder::Record(
     renderParams.complexity = _complexity;
     renderParams.colorCorrectionMode = _colorCorrectionMode;
     renderParams.clearColor = CLEAR_COLOR;
-    renderParams.renderResolution = renderResolution;
     renderParams.showProxy = _HasPurpose(_purposes, UsdGeomTokens->proxy);
     renderParams.showRender = _HasPurpose(_purposes, UsdGeomTokens->render);
     renderParams.showGuides = _HasPurpose(_purposes, UsdGeomTokens->guide);
+
 #if defined(ARCH_GFX_OPENGL)
     glEnable(GL_DEPTH_TEST);
 #endif
 
+    UsdImagingGLEngine::ResourceFactoryGuard guard(
+        _imagingEngine.GetResourceFactory());
+
+    HgiMetal *hgiMetal = static_cast<HgiMetal*>(_imagingEngine.GetHgi());
+    hgiMetal->_useFinalTextureForGetImage = true;
+    
     GarchDrawTargetRefPtr drawTarget = GarchDrawTarget::New(renderResolution);
 
     std::vector<GarchDrawTarget::AttachmentDesc> attachmentDesc;
