@@ -1105,7 +1105,6 @@ function(pxr_monolithic_epilogue)
         OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/usd-targets-$<CONFIG>.cmake"
         CONTENT "${export}"
     )
-<<<<<<< HEAD
     # set(export "")
     # set(export "${export}# Boilerplate for export of usd_ms.  Replace FIXMEs with appropriate paths\n")
     # set(export "${export}# or include usd-targets-$<CONFIG>.cmake in your own build and generate your\n")
@@ -1121,24 +1120,6 @@ function(pxr_monolithic_epilogue)
     #     OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/usd-imports-$<CONFIG>.cmake"
     #     CONTENT "${export}"
     # )
-=======
-    set(export "")
-    set(export "${export}# Boilerplate for export of usd_ms.  Replace FIXMEs with appropriate paths\n")
-    set(export "${export}# or include usd-targets-$<CONFIG>.cmake in your own build and generate your\n")
-    set(export "${export}# own export file.  Configure with PXR_MONOLITHIC_IMPORT set to the path of\n")
-    set(export "${export}# the export file.\n")
-    set(export "${export}add_library(usd_ms SHARED IMPORTED)\n")
-    set(export "${export}set_property(TARGET usd_ms PROPERTY IMPORTED_LOCATION FIXME)\n")
-    set(export "${export}#set_property(TARGET usd_ms PROPERTY IMPORTED_IMPLIB FIXME)\n")
-    set(export "${export}set_property(TARGET usd_ms PROPERTY INTERFACE_COMPILE_DEFINITIONS $<TARGET_PROPERTY:usd_m,INTERFACE_COMPILE_DEFINITIONS>)\n")
-    set(export "${export}set_property(TARGET usd_ms PROPERTY INTERFACE_INCLUDE_DIRECTORIES $<TARGET_PROPERTY:usd_m,INTERFACE_INCLUDE_DIRECTORIES>)\n")
-    set(export "${export}set_property(TARGET usd_ms PROPERTY INTERFACE_SYSTEM_INCLUDE_DIRECTORIES $<TARGET_PROPERTY:usd_m,INTERFACE_SYSTEM_INCLUDE_DIRECTORIES>)\n")
-    set(export "${export}set_property(TARGET usd_ms PROPERTY INTERFACE_LINK_LIBRARIES $<TARGET_PROPERTY:usd_m,INTERFACE_LINK_LIBRARIES>)\n")
-    file(GENERATE
-        OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/usd-imports-$<CONFIG>.cmake"
-        CONTENT "${export}"
-    )
->>>>>>> Demo
 
     # Convenient name for building the monolithic library.
     add_custom_target(monolithic
