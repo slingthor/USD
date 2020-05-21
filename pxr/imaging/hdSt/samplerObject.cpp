@@ -54,7 +54,7 @@ _GenGLSampler(HdSamplerParameters const &samplerParameters,
     }
 
     GLuint result = 0;
-#if defined(PXR_OPENGL_SUPPORT_ENABLED)
+#if defined(___PXR_OPENGL_SUPPORT_ENABLED)
     glGenSamplers(1, &result);
 
     glSamplerParameteri(
@@ -118,7 +118,7 @@ _GenGLTextureSamplerHandle(const GLuint textureName,
     if (samplerName == 0) {
         return 0;
     }
-#if defined(PXR_OPENGL_SUPPORT_ENABLED)
+#if defined(___PXR_OPENGL_SUPPORT_ENABLED)
     const GLuint64EXT result =
         glGetTextureSamplerHandleARB(textureName, samplerName);
 
@@ -176,7 +176,7 @@ _GenGlTextureHandle(const GLuint textureName,
     if (textureName == 0) {
         return 0;
     }
-#if defined(PXR_OPENGL_SUPPORT_ENABLED)
+#if defined(___PXR_OPENGL_SUPPORT_ENABLED)
     const GLuint64EXT result = glGetTextureHandleARB(textureName);
     glMakeTextureHandleResidentARB(result);
 

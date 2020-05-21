@@ -36,5 +36,4 @@ TF_WRAP_MODULE
     TF_WRAP( BaseTexture );
     TF_WRAP( UVTexture );
     TF_WRAP( UVTextureStorage );
-    TF_WRAP( VdbTexture );
 }

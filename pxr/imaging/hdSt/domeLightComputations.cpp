@@ -26,6 +26,7 @@
 #include "pxr/imaging/garch/resourceFactory.h"
 
 #include "pxr/imaging/hdSt/domeLightComputations.h"
+#include "pxr/imaging/hdSt/simpleLightingShader.h"
 #include "pxr/imaging/hdSt/program.h"
 #include "pxr/imaging/hdSt/resourceFactory.h"
 #include "pxr/imaging/hdSt/resourceRegistry.h"
@@ -41,40 +42,38 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 HdSt_DomeLightComputationGPUSharedPtr
 HdSt_DomeLightComputationGPU::New(
-    TfToken token,
-    GarchTextureGPUHandle const &sourceId,
-    GarchTextureGPUHandle const &destId,
-    int width, int height, unsigned int numLevels, unsigned int level,
+    const TfToken & shaderToken,
+    HgiTextureHandle const& sourceGLTextureName,
+    HdStSimpleLightingShaderPtr const &lightingShader,
+    unsigned int numLevels,
+    unsigned int level ,
     float roughness)
 {
     return HdSt_DomeLightComputationGPUSharedPtr(
             HdStResourceFactory::GetInstance()->NewDomeLightComputationGPU(
-                token, sourceId, destId, width, height, numLevels, level,
+                shaderToken, sourceGLTextureName, lightingShader, numLevels, level,
                 roughness));
 }
 
 HdSt_DomeLightComputationGPU::HdSt_DomeLightComputationGPU(
-    TfToken token,
-    GarchTextureGPUHandle const &sourceId, GarchTextureGPUHandle const &destId,
-    int width, int height, unsigned int numLevels, unsigned int level, 
-    float roughness) 
-    : _shaderToken(token), 
-    _sourceTextureId(sourceId), 
-    _destTextureId(destId), 
-    _textureWidth(width), 
-    _textureHeight(height), 
+    const TfToken &shaderToken,
+    const GarchTextureGPUHandle sourceGLTextureName,
+    HdStSimpleLightingShaderPtr const &lightingShader,
+    const unsigned int numLevels,
+    const unsigned int level, 
+    const float roughness) 
+  : _shaderToken(shaderToken),
+    _lightingShader(lightingShader),
+    _sourceGLTextureName(sourceGLTextureName),
     _numLevels(numLevels), 
     _level(level), 
-    _layered(GL_FALSE), 
-    _layer(0), 
     _roughness(roughness)
 {
 }
 
-
 void
 HdSt_DomeLightComputationGPU::Execute(HdBufferArrayRangeSharedPtr const &range,
-                                        HdResourceRegistry *resourceRegistry)
+                                      HdResourceRegistry * const resourceRegistry)
 {
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
@@ -84,12 +83,15 @@ HdSt_DomeLightComputationGPU::Execute(HdBufferArrayRangeSharedPtr const &range,
         return;
     }
 
-    HdStProgramSharedPtr computeProgram =
-            HdStProgram::GetComputeProgram(HdStPackageDomeLightShader(),
+    HdStProgramSharedPtr const computeProgram = 
+        HdStProgram::GetComputeProgram(
+            HdStPackageDomeLightShader(), 
             _shaderToken,
             static_cast<HdStResourceRegistry*>(resourceRegistry));
 
-    if (!TF_VERIFY(computeProgram)) return;
+    if (!TF_VERIFY(computeProgram)) {
+        return;
+    }
 
     _Execute(computeProgram);
 }

@@ -106,8 +106,6 @@ pxr_library(garch
         uvTextureData
         uvTextureStorage
         uvTextureStorageData
-        vdbTexture
-        vdbTextureContainer
         ${optionalPublicClasses}
 
     PRIVATE_CLASSES
@@ -117,7 +115,6 @@ pxr_library(garch
         api.h
         gl.h
         glPlatformContext.h
-        textureContainer.h
         ${GARCH_GLPLATFORMCONTEXT}.h
 
     PRIVATE_HEADERS
@@ -126,7 +123,6 @@ pxr_library(garch
         stb/stb_image.h
         stb/stb_image_resize.h
         stb/stb_image_write.h
-        textureContainerImpl.h
 
     PYTHON_CPPFILES
         moduleDeps.cpp
@@ -148,7 +144,6 @@ pxr_library(garch
         wrapTextureRegistry.cpp
         wrapUVTexture.cpp
         wrapUVTextureStorage.cpp
-        wrapVdbTexture.cpp
 
     PYMODULE_FILES
         __init__.py

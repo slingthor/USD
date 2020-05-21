@@ -29,6 +29,7 @@
 #include "pxr/imaging/hdSt/lightingShader.h"
 
 #include "pxr/imaging/hd/resource.h"
+#include "pxr/imaging/hd/texture.h"
 #include "pxr/imaging/hd/version.h"
 
 #include "pxr/imaging/hio/glslfx.h"
@@ -47,6 +48,7 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+class HdSceneDelegate;
 using HdStSimpleLightingShaderSharedPtr =
     std::shared_ptr<class HdStSimpleLightingShader>;
 
@@ -78,6 +80,11 @@ public:
     HDST_API
     void AddBindings(HdBindingRequestVector *customBindings) override;
 
+    /// Adds computations to create the dome light textures that
+    /// are pre-calculated from the environment map texture.
+    HDST_API
+    void AddResourcesFromTextures(ResourceContext &ctx) const override;
+
     /// HdStShaderCode overrides
     HDST_API
     HdSt_MaterialParamVector const& GetParams() const override;
@@ -96,13 +103,58 @@ public:
         return _lightingContext;
     };
 
+    /// Allocates texture handles (texture loading happens later during commit)
+    /// needed for lights.
+    ///
+    /// Call after lighting context has been set or updated in Sync-phase.
+    ///
+    HDST_API
+    void AllocateTextureHandles(HdSceneDelegate *delegate);
+
+    /// Get GL texture name for a dome light texture of given time.
+    HDST_API
+    GarchTextureGPUHandle GetGLTextureName(const TfToken &token) const;
+
+    /// Set GL texture name for a dome light texture of given time.
+    HDST_API
+    void SetGLTextureName(const TfToken &token, const GarchTextureGPUHandle glName);
+
+    /// Get GL sampler name for a dome light texture of given time.
+    HDST_API
+    GarchSamplerGPUHandle GetGLSamplerName(const TfToken &token) const;
+
+    /// Set GL sampler name for a dome light texture of given time.
+    HDST_API
+    void SetGLSamplerName(const TfToken &token, const GarchSamplerGPUHandle glName);
+
+private:
+    // Create samplers for dome light textures if not previously created.
+    void _CreateSamplersIfNecessary();
+
 private:
     GarchSimpleLightingContextRefPtr _lightingContext;
     GarchBindingMapRefPtr _bindingMap;
     bool _useLighting;
     std::unique_ptr<HioGlslfx> _glslfx;
 
+    // The environment map used as source for the dome light textures.
+    //
+    // Handle is allocated in AllocateTextureHandles. Actual loading
+    // happens during commit.
+    HdStTextureHandleSharedPtr _domeLightTextureHandle;
+
+    // The pre-calculated dome light textures.
+    // Created by HdSt_DomelightComputationGPU.
+    GarchTextureGPUHandle _domeLightIrradianceGLName;
+    GarchTextureGPUHandle _domeLightPrefilterGLName;
+    GarchTextureGPUHandle _domeLightBrdfGLName;
+
+    GarchSamplerGPUHandle _domeLightIrradianceGLSampler;
+    GarchSamplerGPUHandle _domeLightPrefilterGLSampler;
+    GarchSamplerGPUHandle _domeLightBrdfGLSampler;
+
     HdSt_MaterialParamVector _lightTextureParams;
+    bool _isOpenGL;
 };
 
 

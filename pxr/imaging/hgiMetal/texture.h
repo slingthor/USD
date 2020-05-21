@@ -48,7 +48,8 @@ public:
     HGIMETAL_API
     ~HgiMetalTexture() override;
 
-    id<MTLTexture> GetTextureId() const {return _textureId;}
+    HGIMETAL_API
+    id<MTLTexture> GetTextureId() const;
 
 private:
     HgiMetalTexture() = delete;

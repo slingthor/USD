@@ -34,18 +34,21 @@ class HdSt_DomeLightComputationGPUGL : public HdSt_DomeLightComputationGPU {
 protected:
     /// Constructor
     HDST_API
-    HdSt_DomeLightComputationGPUGL(TfToken token,
-                                 GarchTextureGPUHandle const &sourceId,
-                                 GarchTextureGPUHandle const &destId, 
-                                 int width, int height, 
-                                 unsigned int numLevels, 
-                                 unsigned int level, 
-                                 float roughness);
+    HdSt_DomeLightComputationGPUGL(const TfToken & shaderToken,
+                                   HgiTextureHandle const& sourceGLTextureName,
+                                   HdStSimpleLightingShaderPtr const &lightingShader,
+                                   unsigned int numLevels,
+                                   unsigned int level,
+                                   float roughness);
     
     friend class HdStResourceFactoryGL;
 
     HDST_API
-    virtual void _Execute(HdStProgramSharedPtr computeProgram) override;
+    void _Execute(HdStProgramSharedPtr computeProgram) override;
+    
+    HDST_API
+    GarchTextureGPUHandle
+    _CreateGLTexture(const int32_t width, const int32_t height) const override;
 };
 
 

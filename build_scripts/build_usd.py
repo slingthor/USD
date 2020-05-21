@@ -849,7 +849,7 @@ def InstallBoost(context, force, buildArgs):
                 ';'
             ]
 
-            iOSVersion = subprocess.GetCommandOutput('xcodebuild -sdk ' + sdkPath + ' -version  SDKVersion').strip()
+            iOSVersion = GetCommandOutput('xcodebuild -sdk ' + sdkPath + ' -version  SDKVersion').strip()
 
             b2_settings.append("macosx-version=iphone-{IOS_SDK_VERSION}".format(
                 IOS_SDK_VERSION=iOSVersion))

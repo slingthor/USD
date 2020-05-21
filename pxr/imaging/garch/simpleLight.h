@@ -34,6 +34,7 @@
 #include "pxr/base/gf/vec3f.h"
 #include "pxr/base/gf/vec4f.h"
 #include "pxr/usd/sdf/path.h"
+#include "pxr/usd/sdf/assetPath.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -140,39 +141,15 @@ public:
     bool IsDomeLight() const;
     GARCH_API
     void SetIsDomeLight(bool isDomeLight);
-        
-    // the following Id's are GL resource handles for the precomputed textures
-    // created by HdStLight
-    GARCH_API
-    GarchTextureGPUHandle const & GetIrradianceId() const;
-    GARCH_API
-    void SetIrradianceId(GarchTextureGPUHandle const & irradianceId);
-    
-    GARCH_API
-    GarchTextureGPUHandle const & GetPrefilterId() const;
-    GARCH_API
-    void SetPrefilterId(GarchTextureGPUHandle const & prefilterId);
-    
-    GARCH_API
-    GarchTextureGPUHandle const & GetBrdfId() const;
-    GARCH_API
-    void SetBrdfId(GarchTextureGPUHandle const & brdfId);
 
-    // .. and the samplers
+    /// The path to the (unprocessed) environment map texture.
+    ///
+    /// All textures actually used by the dome light (irradiance, prefilter,
+    /// brdf) are derived from this texture in a pre-calculation step.
     GARCH_API
-    GarchSamplerGPUHandle const & GetIrradianceSamplerId() const;
+    const SdfAssetPath &GetDomeLightTextureFile() const;
     GARCH_API
-    void SetIrradianceSamplerId(GarchSamplerGPUHandle const & irradianceSamplerId);
-    
-    GARCH_API
-    GarchSamplerGPUHandle const & GetPrefilterSamplerId() const;
-    GARCH_API
-    void SetPrefilterSamplerId(GarchSamplerGPUHandle const & prefilterSamplerId);
-    
-    GARCH_API
-    GarchSamplerGPUHandle const & GetBrdfSamplerId() const;
-    GARCH_API
-    void SetBrdfSamplerId(GarchSamplerGPUHandle const & brdfSamplerId);
+    void SetDomeLightTextureFile(const SdfAssetPath &);
     
     GARCH_API
     virtual bool operator ==(GarchSimpleLight const & other) const;
@@ -205,15 +182,8 @@ private:
     
     // domeLight specific parameters
     bool _isDomeLight;
-
-    // handles for the resource bindings from HdXSimpleLightingShader
-    GarchTextureGPUHandle _irradianceId; // pre-computed irradiance map
-    GarchTextureGPUHandle _prefilterId;  // pre-computed preFiltered map
-    GarchTextureGPUHandle _brdfId;       // pre-computed BRDF look up texture
-
-    GarchSamplerGPUHandle _irradianceSamplerId;
-    GarchSamplerGPUHandle _prefilterSamplerId;
-    GarchSamplerGPUHandle _brdfSamplerId;
+    // path to texture for dome light.
+    SdfAssetPath _domeLightTextureFile;
 
     SdfPath _id;
 };

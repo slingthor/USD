@@ -23,11 +23,13 @@
 //
 
 #include "pxr/imaging/hdSt/Metal/domeLightComputationsMetal.h"
+#include "pxr/imaging/hdSt/simpleLightingShader.h"
 #include "pxr/imaging/hdSt/resourceRegistry.h"
 #include "pxr/imaging/hdSt/package.h"
 #include "pxr/imaging/hdSt/tokens.h"
 
 #include "pxr/imaging/hdSt/Metal/mslProgram.h"
+#include "pxr/imaging/hgiMetal/texture.h"
 
 #include "pxr/base/tf/token.h"
 
@@ -35,22 +37,80 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 
 HdSt_DomeLightComputationGPUMetal::HdSt_DomeLightComputationGPUMetal(
-    TfToken token,
-    GarchTextureGPUHandle const &sourceId,
-    GarchTextureGPUHandle const &destId,
-    int width, int height, unsigned int numLevels, unsigned int level, 
+    const TfToken & shaderToken,
+    HgiTextureHandle const& sourceGLTextureName,
+    HdStSimpleLightingShaderPtr const &lightingShader,
+    unsigned int numLevels,
+    unsigned int level,
     float roughness)
-    : HdSt_DomeLightComputationGPU(token, sourceId, destId,
-        width, height, numLevels, level, roughness)
+    : HdSt_DomeLightComputationGPU(
+       shaderToken,
+       dynamic_cast<HgiMetalTexture*>(sourceGLTextureName.Get())->GetTextureId(),
+       lightingShader,
+       numLevels,
+       level,
+       roughness)
 {
 }
 
+GarchTextureGPUHandle
+HdSt_DomeLightComputationGPUMetal::_CreateGLTexture(
+    const int32_t width, const int32_t height) const
+{
+    id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->currentDevice;
+    MTLTextureDescriptor* desc =
+        [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA16Float
+                                                           width:width
+                                                          height:height
+                                                       mipmapped:NO];
+    desc.mipmapLevelCount = _numLevels;
+    desc.resourceOptions = MTLResourceStorageModeDefault;
+    desc.usage = MTLTextureUsageShaderRead|MTLTextureUsageShaderWrite;
+    return [device newTextureWithDescriptor:desc];
+}
 
 void
 HdSt_DomeLightComputationGPUMetal::_Execute(HdStProgramSharedPtr computeProgram)
 {
+    if (_level != 0) {
+        // Metal generates mipmaps along with the top level
+        return;
+    }
+
+    HdStSimpleLightingShaderSharedPtr const shader = _lightingShader.lock();
+    if (!TF_VERIFY(shader)) {
+        return;
+    }
+
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
     HdStMSLProgramSharedPtr const &mslProgram(std::dynamic_pointer_cast<HdStMSLProgram>(computeProgram));
+
+    // Get texture name from lighting shader.
+
+    id<MTLTexture> dstGLTextureName = shader->GetGLTextureName(_shaderToken);
+
+    // Get size of source texture
+    id<MTLTexture> sourceTexture = _sourceGLTextureName;
+    uint32_t srcWidth  = sourceTexture.width;
+    uint32_t srcHeight = sourceTexture.height;
+
+    // Size of texture to be created.
+    const uint32_t width  = srcWidth  / 2;
+    const uint32_t height = srcHeight / 2;
+    
+    // Computation for level 0 is responsible for freeing/allocating
+    // the texture.
+    if (_level == 0) {
+        if (dstGLTextureName) {
+            // Free previously allocated texture.
+            [dstGLTextureName release];
+        }
+
+        // Create new texture.
+        dstGLTextureName = _CreateGLTexture(width, height);
+        // And set on shader.
+        shader->SetGLTextureName(_shaderToken, dstGLTextureName);
+    }
 
     struct Uniforms {
         Uniforms(float _roughness, int _level)
@@ -72,47 +132,40 @@ HdSt_DomeLightComputationGPUMetal::_Execute(HdStProgramSharedPtr computeProgram)
     NSUInteger exeWidth = [pipelineState threadExecutionWidth];
     NSUInteger maxThreadsPerThreadgroup = [pipelineState maxTotalThreadsPerThreadgroup];
     MTLSize threadgroupCount = MTLSizeMake(exeWidth, maxThreadsPerThreadgroup / exeWidth, 1);
-    MTLSize threadsPerGrid   = MTLSizeMake(([_destTextureId width] + (threadgroupCount.width - 1)) / threadgroupCount.width,
-                                           1,
+    MTLSize threadsPerGrid   = MTLSizeMake(([dstGLTextureName width] + (threadgroupCount.width - 1)) / threadgroupCount.width,
+                                           ([dstGLTextureName height] + (threadgroupCount.height - 1)) / threadgroupCount.height,
                                            1);
 
-    int numRows = ([_destTextureId height] + (threadgroupCount.height - 1)) / threadgroupCount.height;
+    id<MTLCommandBuffer> commandBuffer = [context->gpus.commandQueue commandBuffer];
+    id<MTLComputeCommandEncoder> computeEncoder = [commandBuffer computeCommandEncoder];
     
-    for (int i = 0; i < numRows; i++) {
-        id<MTLCommandBuffer> commandBuffer = [context->gpus.commandQueue commandBuffer];
-        id<MTLComputeCommandEncoder> computeEncoder = [commandBuffer computeCommandEncoder];
-        
-        [computeEncoder setComputePipelineState:pipelineState];
-        
-        context->SetComputeEncoderState(computeEncoder);
+    [computeEncoder setComputePipelineState:pipelineState];
+    [computeEncoder useResource:dstGLTextureName usage:MTLResourceUsageWrite];
+    
+    context->SetComputeEncoderState(computeEncoder);
 
-        _uniforms.rowOffset = i * threadgroupCount.height;
-        [computeEncoder setBytes:(const void *)&_uniforms
-                          length:sizeof(_uniforms)
-                         atIndex:0];
-        
-        [computeEncoder setTexture:_sourceTextureId
-                           atIndex:0];
-        [computeEncoder setTexture:_destTextureId
-                           atIndex:1];
+    [computeEncoder setBytes:(const void *)&_uniforms
+                      length:sizeof(_uniforms)
+                     atIndex:0];
+    
+    [computeEncoder setTexture:sourceTexture
+                       atIndex:0];
+    [computeEncoder setTexture:dstGLTextureName
+                       atIndex:1];
 
-        [computeEncoder dispatchThreadgroups:threadsPerGrid threadsPerThreadgroup:threadgroupCount];
-        
-        [computeEncoder endEncoding];
-        [commandBuffer commit];
-    }
+    [computeEncoder dispatchThreadgroups:threadsPerGrid threadsPerThreadgroup:threadgroupCount];
+    
+    [computeEncoder endEncoding];
     
     if (_numLevels > 1) {
-        id<MTLCommandBuffer> commandBuffer = [context->gpus.commandQueue commandBuffer];
-
         // Generate the rest of the mip chain
         id<MTLBlitCommandEncoder> blitEncoder = [commandBuffer blitCommandEncoder];
         
-        [blitEncoder generateMipmapsForTexture:_destTextureId];
+        [blitEncoder generateMipmapsForTexture:dstGLTextureName];
         [blitEncoder endEncoding];
-
-        [commandBuffer commit];
     }
+    
+    [commandBuffer commit];
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

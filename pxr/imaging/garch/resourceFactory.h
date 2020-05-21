@@ -119,12 +119,6 @@ public:
                                                   GarchImage::ImageOriginLocation originLocation,
                                                   std::vector<std::tuple<int, TfToken>>&& tiles) const = 0;
 
-    // Vdb Texture
-    GARCH_API
-    virtual GarchVdbTextureRefPtr NewVdbTexture(
-                GarchVdbTextureContainerRefPtr const &textureContainer,
-                TfToken const &gridName) const = 0;
-
 protected:
 	GARCH_API
     GarchResourceFactoryInterface() {}

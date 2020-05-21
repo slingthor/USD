@@ -77,7 +77,6 @@ std::mutex engineCountMutex;
 int engineCount = 0;
 #endif
 
-static
 bool
 _GetHydraEnabledEnvVar()
 {
@@ -88,7 +87,6 @@ _GetHydraEnabledEnvVar()
     return TfGetenv("HD_ENABLED", "1") == "1";
 }
 
-static
 SdfPath const&
 _GetUsdImagingDelegateId()
 {
@@ -98,7 +96,6 @@ _GetUsdImagingDelegateId()
     return delegateId;
 }
 
-static
 void _InitGL()
 {
 #if defined(PXR_OPENGL_SUPPORT_ENABLED)
@@ -119,7 +116,6 @@ void _InitGL()
 #endif
 }
 
-static
 bool
 _IsHydraEnabled(const UsdImagingGLEngine::RenderAPI api)
 {
@@ -179,72 +175,14 @@ UsdImagingGLEngine::IsHydraEnabled()
 // Construction
 //----------------------------------------------------------------------------
 
-UsdImagingGLEngine::UsdImagingGLEngine(const RenderAPI api, Hgi* hgi)
-    : _engine(nullptr)
-    , _renderIndex(nullptr)
-    , _hgi(hgi)
-    , _hgiDriver{HgiTokens->renderDriver, VtValue(_hgi)}
-    , _selTracker(new HdxSelectionTracker)
-    , _delegateID(_GetUsdImagingDelegateId())
-    , _delegate(nullptr)
-    , _rendererPlugin(nullptr)
-    , _taskController(nullptr)
-    , _selectionColor(1.0f, 1.0f, 0.0f, 1.0f)
-    , _rootPath(SdfPath::AbsoluteRootPath())
-    , _excludedPrimPaths()
-    , _invisedPrimPaths()
-    , _isPopulated(false)
-    , _renderAPI(api)
-#if defined(PXR_METAL_SUPPORT_ENABLED)
-    , _legacyImpl(nullptr)
-#endif
+UsdImagingGLEngine::UsdImagingGLEngine(const RenderAPI api,
+                                       Hgi* hgi)
+    : UsdImagingGLEngine(api, SdfPath::AbsoluteRootPath(),
+                         {},
+                         {},
+                         _GetUsdImagingDelegateId(),
+                         hgi)
 {
-
-#if defined(PXR_METAL_SUPPORT_ENABLED)
-    engineCountMutex.lock();
-    engineCount++;
-#endif
-
-    
-    _engine = new HdEngine();
-#if defined(PXR_METAL_SUPPORT_ENABLED)
-    if (_renderAPI == Metal) {
-        _resourceFactory = new HdStResourceFactoryMetal();
-    }
-    else
-#endif
-#if defined(PXR_OPENGL_SUPPORT_ENABLED)
-    if (_renderAPI == OpenGL) {
-    	_InitGL();
-
-        _resourceFactory = new HdStResourceFactoryGL();
-    }
-    else
-#endif
-    {
-        TF_FATAL_CODING_ERROR("No valid rendering API specified: %d", _renderAPI);
-    }
-    
-    if (IsHydraEnabled()) {
-
-        // _renderIndex, _taskController, and _delegate are initialized
-        // by the plugin system.
-        if (!SetRendererPlugin(GetDefaultRendererPluginId())) {
-            TF_CODING_ERROR("No renderer plugins found! "
-                            "Check before creation.");
-        }
-
-    } else {
-
-        SdfPathVector excluded;
-#if defined(PXR_OPENGL_SUPPORT_ENABLED)
-        _legacyImpl.reset(new UsdImagingGLLegacyEngine(excluded));
-#endif
-    }
-
-#if defined(PXR_METAL_SUPPORT_ENABLED)
-    engineCountMutex.unlock();
-#endif
 }
 
 UsdImagingGLEngine::UsdImagingGLEngine(
@@ -254,10 +192,9 @@ UsdImagingGLEngine::UsdImagingGLEngine(
     const SdfPathVector& invisedPaths,
     const SdfPath& delegateID,
     Hgi* hgi)
-    : _engine(nullptr)
-    , _renderIndex(nullptr)
-    , _hgi(hgi)
+    : _hgi(hgi)
     , _hgiDriver{HgiTokens->renderDriver, VtValue(_hgi)}
+    , _renderIndex(nullptr)
     , _selTracker(new HdxSelectionTracker)
     , _delegateID(delegateID)
     , _delegate(nullptr)
@@ -314,7 +251,7 @@ UsdImagingGLEngine::UsdImagingGLEngine(
         pathsToExclude.insert(pathsToExclude.end(), 
             invisedPaths.begin(), invisedPaths.end());
 #if defined(PXR_OPENGL_SUPPORT_ENABLED)
-        _legacyImpl.reset(new UsdImagingGLLegacyEngine(pathsToExclude));
+        _legacyImpl =std::make_unique<UsdImagingGLLegacyEngine>(pathsToExclude);
 #endif
     }
 

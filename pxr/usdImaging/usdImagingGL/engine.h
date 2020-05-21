@@ -502,14 +502,17 @@ protected:
     USDIMAGINGGL_API
     void _DeleteHydraResources();
 
-    USDIMAGINGGL_API
+
+    // _hgi is first field so that it is guaranteed to
+    // be destructed last and thus available while any other
+    // Hydra objects have a pointer to Hgi.
+    class Hgi *_hgi;
+    // Similar for HdDriver.
+    HdDriver _hgiDriver;
     HdEngine *_engine;
     HdStResourceFactoryInterface *_resourceFactory;
 
     HdRenderIndex *_renderIndex;
-
-    Hgi* _hgi;
-    HdDriver _hgiDriver;
 
     HdxSelectionTrackerSharedPtr _selTracker;
     HdRprimCollection _renderCollection;

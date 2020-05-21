@@ -1,5 +1,5 @@
 //
-// Copyright 2019 Pixar
+// Copyright 2020 Pixar
 //
 // Licensed under the Apache License, Version 2.0 (the "Apache License")
 // with the following modification; you may not use this file except in
@@ -21,30 +21,48 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#include "pxr/imaging/garch/vdbTexture.h"
+#ifndef PXR_IMAGING_HGIGL_SAMPLER_H
+#define PXR_IMAGING_HGIGL_SAMPLER_H
 
-#include "pxr/base/tf/makePyConstructor.h"
-#include "pxr/base/tf/pyPtrHelpers.h"
+#include "pxr/imaging/hgi/sampler.h"
 
-#include <boost/python/bases.hpp>
-#include <boost/python/class.hpp>
+#include "pxr/imaging/hgiGL/api.h"
 
-using namespace boost::python;
 
-PXR_NAMESPACE_USING_DIRECTIVE
+PXR_NAMESPACE_OPEN_SCOPE
 
-void wrapVdbTexture()
-{    
-    using This = GarchVdbTexture;
-    using ThisPtr = GarchVdbTexturePtr;
 
-    using NewSig = GarchVdbTextureRefPtr(*)(const std::string &);
+///
+/// \class HgiGLSampler
+///
+/// OpenGL implementation of HgiSampler
+///
+class HgiGLSampler final : public HgiSampler
+{
+public:
+    HGIGL_API
+    ~HgiGLSampler() override;
 
-    class_<This, bases<GarchBaseTexture>, ThisPtr,
-           boost::noncopyable>("VdbTexture", no_init)
-        .def(TfPyRefAndWeakPtr())
-        .def(TfMakePyConstructor(NewSig(&This::New)))
-        ;
-}
+    /// Returns the gl resource id of the sampler.
+    HGIGL_API
+    uint32_t GetSamplerId() const;
 
-TF_REFPTR_CONST_VOLATILE_GET(GarchVdbTexture)
+protected:
+    friend class HgiGL;
+
+    HGIGL_API
+    HgiGLSampler(HgiSamplerDesc const& desc);
+
+private:
+    HgiGLSampler() = delete;
+    HgiGLSampler & operator=(const HgiGLSampler&) = delete;
+    HgiGLSampler(const HgiGLSampler&) = delete;
+
+private:
+    uint32_t _samplerId;
+};
+
+
+PXR_NAMESPACE_CLOSE_SCOPE
+
+#endif
