@@ -56,7 +56,6 @@ layout (early_fragment_tests) in;
 
 #if defined(HD_HAS_hdxOitDataBuffer)
 #if defined(ARCH_GFX_METAL)
-	#define gl_FragCoord gl_Position
 	#define atomicAdd(value, addend) atomic_fetch_add_explicit(&value, addend, memory_order_relaxed)
 	#define atomicExchange(target, desired) atomic_exchange_explicit(&target, desired, memory_order_relaxed)
 #endif

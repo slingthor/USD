@@ -61,10 +61,6 @@ public:
     HGIMETAL_API
     ~HgiMetal() override;
 
-    /// Returns the Metal device.
-    HGIMETAL_API
-    id<MTLDevice> GetPrimaryDevice() const;
-
     HGIMETAL_API
     void SubmitCmds(HgiCmds* cmds, uint32_t count=1) override;
 
@@ -80,6 +76,12 @@ public:
 
     HGIMETAL_API
     void DestroyTexture(HgiTextureHandle* texHandle) override;
+
+    HGIMETAL_API
+    HgiSamplerHandle CreateSampler(HgiSamplerDesc const & desc) override;
+
+    HGIMETAL_API
+    void DestroySampler(HgiSamplerHandle* smpHandle) override;
 
     HGIMETAL_API
     HgiBufferHandle CreateBuffer(HgiBufferDesc const & desc) override;
@@ -129,7 +131,11 @@ public:
     //
     // HgiMetal specific
     //
-        
+
+    /// Returns the primary Metal device.
+    HGIMETAL_API
+    id<MTLDevice> GetPrimaryDevice() const;
+
     HGIMETAL_API
     id<MTLCommandQueue> GetQueue() const {
         return _commandQueue;

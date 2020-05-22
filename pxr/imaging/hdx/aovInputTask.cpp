@@ -47,6 +47,9 @@ HdxAovInputTask::~HdxAovInputTask()
     if (_aovTexture) {
         _GetHgi()->DestroyTexture(&_aovTexture);
     }
+    if (_aovTextureIntermediate) {
+        _GetHgi()->DestroyTexture(&_aovTextureIntermediate);
+    }
     if (_depthTexture) {
         _GetHgi()->DestroyTexture(&_depthTexture);
     }
@@ -95,6 +98,10 @@ HdxAovInputTask::Prepare(HdTaskContext* ctx, HdRenderIndex *renderIndex)
             renderIndex->GetBprim(
                 HdPrimTypeTokens->renderBuffer, _depthBufferPath));
     }
+    
+    if (_aovBuffer) {
+        _UpdateIntermediateTexture(_aovTextureIntermediate, _aovBuffer);
+    }
 }
 
 void
@@ -126,6 +133,7 @@ HdxAovInputTask::Execute(HdTaskContext* ctx)
     // These are last frames textures and we may be visualizing different aovs.
     ctx->erase(HdAovTokens->color);
     ctx->erase(HdAovTokens->depth);
+    ctx->erase(HdAovTokens->colorIntermediate);
 
     // If the aov is already backed by a HgiTexture we skip creating a new
     // GPU HgiTexture for it and place it directly on the shared task context
@@ -140,6 +148,7 @@ HdxAovInputTask::Execute(HdTaskContext* ctx)
         hgiHandleProvidedByAov = true;
         (*ctx)[HdAovTokens->color] = aov;
     }
+    (*ctx)[HdAovTokens->colorIntermediate] = VtValue(_aovTextureIntermediate);
 
     if (_depthBuffer) {
         VtValue depth = _depthBuffer->GetResource(mulSmp);
@@ -211,6 +220,43 @@ HdxAovInputTask::_UpdateTexture(
     texture = _GetHgi()->CreateTexture(texDesc);
 
     buffer->Unmap();
+}
+
+void
+HdxAovInputTask::_UpdateIntermediateTexture(
+    HgiTextureHandle& texture,
+    HdRenderBuffer* buffer)
+{
+    GfVec3i dim(
+        buffer->GetWidth(),
+        buffer->GetHeight(),
+        buffer->GetDepth());
+    HgiFormat hgiFormat =
+        HdxHgiConversions::GetHgiFormat(buffer->GetFormat());
+
+    if (texture) {
+        HgiTextureDesc const& desc =
+            texture->GetDescriptor();
+        if (dim != desc.dimensions || hgiFormat != desc.format) {
+            _GetHgi()->DestroyTexture(&texture);
+        }
+    }
+    
+    if (!_aovTextureIntermediate) {
+                
+        HgiTextureDesc texDesc;
+        texDesc.debugName = "AovInput Intermediate Texture";
+        texDesc.dimensions = dim;
+
+        texDesc.format = hgiFormat;
+        texDesc.layerCount = 1;
+        texDesc.mipLevels = 1;
+        texDesc.sampleCount = HgiSampleCount1;
+        texDesc.usage = HgiTextureUsageBitsColorTarget |
+                        HgiTextureUsageBitsShaderRead;
+
+        texture = _GetHgi()->CreateTexture(texDesc);
+    }
 }
 
 // --------------------------------------------------------------------------- //

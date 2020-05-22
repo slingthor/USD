@@ -26,22 +26,18 @@ pxr_library(hgiMetal
     PUBLIC_HEADERS
         api.h
         capabilities.h
+	conversions.h
         diagnostic.h
         hgi.h
         texture.h
-
-    PRIVATE_HEADERS
         blitCmds.h
         buffer.h
-        conversions.h
         graphicsCmds.h
         pipeline.h
         resourceBindings.h
+        sampler.h
         shaderFunction.h
         shaderProgram.h
-
-    PRIVATE_HEADERS
-        conversions.h
 
     CPPFILES
         blitCmds.mm
@@ -53,6 +49,7 @@ pxr_library(hgiMetal
         hgi.mm
         pipeline.mm
         resourceBindings.mm
+        sampler.mm
         shaderFunction.mm
         shaderProgram.mm
         texture.mm

@@ -23,11 +23,6 @@
                         "textureTypes": ["*"],
                         "precedence": 0
                     },
-                    "GarchVdbTextureContainer" : {
-                        "bases": ["GarchTexture"],
-                        "textureTypes": ["vdb"],
-                        "precedence": 0
-                    },
                     "GarchBaseTexture" : {
                         "bases": ["GarchTexture"],
                         "textureTypes": [],

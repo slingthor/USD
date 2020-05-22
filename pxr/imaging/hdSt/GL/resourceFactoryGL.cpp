@@ -249,16 +249,15 @@ HdStResourceFactoryGL::NewExtCompGPUComputationGPU(
 
 HdSt_DomeLightComputationGPU*
 HdStResourceFactoryGL::NewDomeLightComputationGPU(
-    TfToken token,
-    GarchTextureGPUHandle const &sourceId,
-    GarchTextureGPUHandle const &destId,
-    int width, int height,
+    const TfToken & shaderToken,
+    HgiTextureHandle const& sourceGLTextureName,
+    HdStSimpleLightingShaderPtr const &lightingShader,
     unsigned int numLevels,
     unsigned int level,
     float roughness) const
 {
-    return new HdSt_DomeLightComputationGPUGL(token, sourceId, destId,
-                                                 width, height, numLevels, level, roughness);
+    return new HdSt_DomeLightComputationGPUGL(shaderToken, sourceGLTextureName,
+        lightingShader, numLevels, level, roughness);
 }
 
 HdStRenderPassShaderSharedPtr HdStResourceFactoryGL::NewRenderPassShader() const

@@ -276,6 +276,7 @@ PXR_NAMESPACE_OPEN_SCOPE
      * using Hydra, it should have pre-multiplied alpha.
      */                                         \
     (color)                                     \
+    (colorIntermediate)                         \
     /* HdAovTokens->depth represents the clip-space
      * depth of the final fragment.
      */                                         \

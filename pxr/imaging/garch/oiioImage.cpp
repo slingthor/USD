@@ -333,7 +333,11 @@ Garch_OIIOImage::GetHeight() const
 GLenum
 Garch_OIIOImage::GetFormat() const
 {
-    return _FormatFromImageData(_imagespec.nchannels);
+    int nChannels = _imagespec.nchannels;
+    if (nChannels == 3) {
+        nChannels = 4;
+    }
+    return _FormatFromImageData(nChannels);
 }
 
 /* virtual */
@@ -576,9 +580,16 @@ Garch_OIIOImage::ReadCropped(int const cropTop,
         TF_CODING_ERROR("Unable to seek subimage");
         return false;
     }
-   
-    int strideLength = imageInput->spec().width * 
-                       imageInput->spec().pixel_bytes();
+
+    int pixelStride;
+    if (imageInput->spec().nchannels == 3) {
+        // Pad out to four channels
+        pixelStride = imageInput->spec().channel_bytes() * 4;
+    }
+    else {
+        pixelStride = imageInput->spec().pixel_bytes();
+    }
+    int strideLength = imageInput->spec().width * pixelStride;
     int readStride = (storage.flipped)? 
                      (-strideLength) : (strideLength);
     int size = imageInput->spec().height * strideLength;
@@ -594,21 +605,31 @@ Garch_OIIOImage::ReadCropped(int const cropTop,
     if (imageInput->spec().format == TypeDesc::DOUBLE) {
         imageInput->read_image(TypeDesc::FLOAT,
                                start,
-                               AutoStride,
+                               pixelStride,
                                readStride,
                                AutoStride);
     } else{
         imageInput->read_image(imageInput->spec().format,
                          start,
-                         AutoStride,
+                         pixelStride,
                          readStride,
                          AutoStride);
     }
     
     imageInput->close();
     
+    if (imageInput->spec().nchannels == 3) {
+        // We read it in as 4 channels
+        _imagespec = ImageSpec(
+            imageInput->spec().width, imageInput->spec().height, 4,
+            TypeDesc::BASETYPE(imageInput->spec().format.basetype));
+    }
+    else {
+        _imagespec = imageInput->spec();
+    }
+
     // Construct ImageBuf that wraps around allocated pixels memory
-    ImageBuf imagebuf =ImageBuf(imageInput->spec(), pixels);
+    ImageBuf imagebuf = ImageBuf(_imagespec, pixels);
     ImageBuf *image = &imagebuf;
 
     // Convert color images to linear (unless they are sRGB)

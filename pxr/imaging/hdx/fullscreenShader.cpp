@@ -97,11 +97,6 @@ HdxFullscreenShader::~HdxFullscreenShader()
         _hgi->DestroyBuffer(&_indexBuffer);
     }
 
-    // We don't own these textures
-//    for (auto& texture : _textures) {
-//        _hgi->DestroyTexture(&texture.second);
-//    }
-
     if (_shaderProgram) {
         _DestroyShaderProgram();
     }

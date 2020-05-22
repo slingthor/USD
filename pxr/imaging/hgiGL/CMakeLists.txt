@@ -3,7 +3,7 @@ set(PXR_PACKAGE hgiGL)
 
 if (NOT ${PXR_BUILD_GPU_SUPPORT} OR NOT ${PXR_ENABLE_GL_SUPPORT})
     message(STATUS
-        "Skipping ${PXR_PACKAGE} because {PXR_BUILD_GPU_SUPPORT} or PXR_ENABLE_GL_SUPPORT is OFF")
+        "Skipping ${PXR_PACKAGE} because PXR_BUILD_GPU_SUPPORT or PXR_ENABLE_GL_SUPPORT is OFF")
     return()
 endif()
 
@@ -36,6 +36,7 @@ pxr_library(hgiGL
         ops
         pipeline
         resourceBindings
+        sampler
         shaderFunction
         shaderProgram
         texture

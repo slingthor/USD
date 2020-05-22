@@ -1,7 +1,5 @@
--- glslfx version 0.1
-
 //
-// Copyright 2016 Pixar
+// Copyright 2020 Pixar
 //
 // Licensed under the Apache License, Version 2.0 (the "Apache License")
 // with the following modification; you may not use this file except in
@@ -24,35 +22,47 @@
 // language governing permissions and limitations under the Apache License.
 //
 
--- configuration
-{
-    "metadata": {
-        "materialTag": "translucent"
-    },
-    "techniques": {
-        "default": {
-            "surfaceShader": {
-                "source": [ "Surface.Fallback" ]
-            }
-        }
-    }
-}
+#ifndef PXR_IMAGING_HGI_METAL_SAMPLER_H
+#define PXR_IMAGING_HGI_METAL_SAMPLER_H
 
---- --------------------------------------------------------------------------
--- glsl Surface.Fallback
+#include "pxr/imaging/hgi/sampler.h"
 
-float checker(vec2 uv, float scale) 
-{
-  float x = floor(scale * uv.x);
-  float y = floor(scale * uv.y); 
-  float result = mod(x+y, 2.0);
-  return sign(result);
-}
+#include "pxr/imaging/hgiMetal/api.h"
 
-vec4 surfaceShader(vec4 Peye, vec3 Neye, vec4 color, vec4 patchCoord)
+
+PXR_NAMESPACE_OPEN_SCOPE
+
+class HgiMetal;
+
+///
+/// \class HgiMetalSampler
+///
+/// Metal implementation of HgiSampler
+///
+class HgiMetalSampler final : public HgiSampler
 {
-    color.rgb = HdGet_displayColor().rgb;
-    float a = checker(gl_FragCoord.xy, 0.05);
-    color.a = min(a+0.5, 1.0);
-    return color;
-}
+public:
+    HGIMETAL_API
+    HgiMetalSampler(HgiMetal *hgi,
+                    HgiSamplerDesc const & desc);
+
+    HGIMETAL_API
+    ~HgiMetalSampler() override;
+
+    HGIMETAL_API
+    id<MTLSamplerState> GetSamplerId() const;
+
+private:
+    HgiMetalSampler() = delete;
+    HgiMetalSampler & operator=(const HgiMetalSampler&) = delete;
+    HgiMetalSampler(const HgiMetalSampler&) = delete;
+
+private:
+    id<MTLSamplerState> _samplerId;
+    NSString* _label;
+};
+
+
+PXR_NAMESPACE_CLOSE_SCOPE
+
+#endif

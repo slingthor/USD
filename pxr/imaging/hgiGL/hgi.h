@@ -53,10 +53,6 @@ public:
     HGIGL_API
     ~HgiGL() override;
 
-    /// Returns the opengl device.
-    HGIGL_API
-    HgiGLDevice* GetPrimaryDevice() const;
-
     HGIGL_API
     void SubmitCmds(HgiCmds* cmds, uint32_t count=1) override;
 
@@ -72,6 +68,12 @@ public:
 
     HGIGL_API
     void DestroyTexture(HgiTextureHandle* texHandle) override;
+
+    HGIGL_API
+    HgiSamplerHandle CreateSampler(HgiSamplerDesc const & desc) override;
+
+    HGIGL_API
+    void DestroySampler(HgiSamplerHandle* smpHandle) override;
 
     HGIGL_API
     HgiBufferHandle CreateBuffer(HgiBufferDesc const & desc) override;
@@ -117,6 +119,14 @@ public:
 
     HGIGL_API
     void EndFrame() override {};
+
+    //
+    // HgiGL specific
+    //
+
+    /// Returns the opengl device.
+    HGIGL_API
+    HgiGLDevice* GetPrimaryDevice() const;
 
 private:
     HgiGL & operator=(const HgiGL&) = delete;

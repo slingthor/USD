@@ -153,10 +153,9 @@ public:
     /// Creates a new HdSt_DomeLightComputationGPU computation
     HDST_API
     virtual HdSt_DomeLightComputationGPU *NewDomeLightComputationGPU(
-        TfToken token,
-        GarchTextureGPUHandle const &sourceId,
-        GarchTextureGPUHandle const &destId,
-        int width, int height,
+        const TfToken & shaderToken,
+        HgiTextureHandle const& sourceGLTextureName,
+        HdStSimpleLightingShaderPtr const &lightingShader,
         unsigned int numLevels,
         unsigned int level,
         float roughness) const override;

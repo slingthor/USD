@@ -97,12 +97,6 @@ public:
     virtual GarchUdimTextureRefPtr NewUdimTexture(TfToken const& imageFilePath,
                                                   GarchImage::ImageOriginLocation originLocation,
                                                   std::vector<std::tuple<int, TfToken>>&& tiles) const override;
-    
-    // Vdb Texture
-    MTLF_API
-    virtual GarchVdbTextureRefPtr NewVdbTexture(
-                GarchVdbTextureContainerRefPtr const &textureContainer,
-                TfToken const &gridName) const override;
 
 private:
     MtlfContextCaps contextCaps;

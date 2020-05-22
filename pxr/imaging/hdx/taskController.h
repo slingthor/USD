@@ -120,12 +120,6 @@ public:
     HDX_API
     void SetViewportRenderOutput(TfToken const& name);
 
-    /// Get the buffer for a rendered output. Note: the caller should call
-    /// Resolve(), as HdxTaskController doesn't guarantee the buffer will
-    /// be resolved.
-    HDX_API
-    HdRenderBuffer* GetRenderOutput(TfToken const& name);
-
     /// Set custom parameters for an AOV.
     HDX_API
     void SetRenderOutputSettings(TfToken const& name,
@@ -221,7 +215,7 @@ public:
     /// Configure color channel by settings params.
     HDX_API
     void SetColorChannelParams(HdxColorChannelTaskParams const& params);
-    
+
 private:
     ///
     /// This class is not intended to be copied.

@@ -23,10 +23,10 @@
 //
 #include <Metal/Metal.h>
 
-#include "pxr/imaging/hgiMetal/hgi.h"
-#include "pxr/imaging/hgiMetal/diagnostic.h"
 #include "pxr/imaging/hgiMetal/capabilities.h"
 #include "pxr/imaging/hgiMetal/conversions.h"
+#include "pxr/imaging/hgiMetal/diagnostic.h"
+#include "pxr/imaging/hgiMetal/hgi.h"
 #include "pxr/imaging/hgiMetal/texture.h"
 
 
@@ -39,7 +39,7 @@ HgiMetalTexture::HgiMetalTexture(HgiMetal *hgi, HgiTextureDesc const & desc)
     MTLPixelFormat mtlFormat;
     MTLResourceOptions resourceOptions = MTLResourceStorageModePrivate;
     MTLTextureUsage usage = MTLTextureUsageUnknown;
-    
+
     if (desc.initialData && desc.pixelsByteSize > 0) {
         resourceOptions = hgi->GetCapabilities().defaultStorageMode;
     }
@@ -53,7 +53,7 @@ HgiMetalTexture::HgiMetalTexture(HgiMetal *hgi, HgiTextureDesc const & desc)
         mtlFormat = MTLPixelFormatDepth32Float;
         usage = MTLTextureUsageRenderTarget;
     }
-    
+
 //    if (desc.usage & HgiTextureUsageBitsShaderRead) {
         usage |= MTLTextureUsageShaderRead;
 //    }
@@ -64,9 +64,9 @@ HgiMetalTexture::HgiMetalTexture(HgiMetal *hgi, HgiTextureDesc const & desc)
     const size_t width = desc.dimensions[0];
     const size_t height = desc.dimensions[1];
     const size_t depth = desc.dimensions[2];
-    
+
     MTLTextureDescriptor* texDesc;
-    
+
     texDesc =
         [MTLTextureDescriptor
          texture2DDescriptorWithPixelFormat:mtlFormat
@@ -91,23 +91,38 @@ HgiMetalTexture::HgiMetalTexture(HgiMetal *hgi, HgiTextureDesc const & desc)
     }
 
     _textureId = [hgi->GetPrimaryDevice() newTextureWithDescriptor:texDesc];
-    
+
     if (desc.initialData && desc.pixelsByteSize > 0) {
-        TF_VERIFY(desc.mipLevels == 1, "Mipmap upload not implemented");
-        if(depth <= 1) {
-            [_textureId replaceRegion:MTLRegionMake2D(0, 0, width, height)
-                            mipmapLevel:0
-                              withBytes:desc.initialData
-                            bytesPerRow:desc.pixelsByteSize / height];
-        }
-        else {
-            [_textureId replaceRegion:MTLRegionMake3D(0, 0, 0, width, height, depth)
-                            mipmapLevel:0 slice:0 withBytes:desc.initialData
-                          bytesPerRow:desc.pixelsByteSize / height / width
-                        bytesPerImage:desc.pixelsByteSize / depth];
+        size_t mipWidth = width;
+        size_t mipHeight = height;
+        size_t pixelSize = HgiDataSizeOfFormat(desc.format);
+        const uint8_t *byteData = static_cast<const uint8_t*>(desc.initialData);
+        for (int i = 0 ; i < desc.mipLevels; i++) {
+            size_t byteSize = mipWidth * mipHeight * pixelSize;
+            if(depth <= 1) {
+                [_textureId replaceRegion:MTLRegionMake2D(0, 0, mipWidth, mipHeight)
+                              mipmapLevel:i
+                                withBytes:byteData
+                              bytesPerRow:byteSize / mipHeight];
+            }
+            else {
+                [_textureId replaceRegion:MTLRegionMake3D(0, 0, 0, mipWidth, mipHeight, depth)
+                              mipmapLevel:i
+                                    slice:0
+                                withBytes:byteData
+                              bytesPerRow:byteSize / mipHeight / mipWidth
+                            bytesPerImage:byteSize / depth];
+            }
+            if (mipWidth > 1) {
+                mipWidth >>= 1;
+            }
+            if (mipHeight > 1) {
+                mipHeight >>= 1;
+            }
+            byteData += byteSize;
         }
     }
-    
+
     HGIMETAL_DEBUG_LABEL(_textureId, _descriptor.debugName.c_str());
 }
 
@@ -119,5 +134,10 @@ HgiMetalTexture::~HgiMetalTexture()
     }
 }
 
+id<MTLTexture>
+HgiMetalTexture::GetTextureId() const
+{
+    return _textureId;
+}
 
 PXR_NAMESPACE_CLOSE_SCOPE

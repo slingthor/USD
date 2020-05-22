@@ -261,11 +261,6 @@ public:
     GARCH_API
     bool IsOriginLowerLeft() const;
     
-    /// An opportunity to throw out unused textures if this is
-    /// a container for textures.
-    GARCH_API
-    virtual void GarbageCollect();
-
 protected:
     GARCH_API
     GarchTexture();

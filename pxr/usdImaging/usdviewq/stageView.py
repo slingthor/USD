@@ -2067,41 +2067,6 @@ class StageView(QtOpenGL.QGLWidget):
                 1-max(-0.5,min(0.5,(event.angleDelta().y()/1000.))))
         self.updateGL()
 
-    def processWSADPressEvent(self, event):
-        self.switchToFreeCamera()
-        step = 5.0
-        rotStep = 1.0
-        if (event.modifiers() & QtCore.Qt.ShiftModifier):
-            step *= 10.0
-            rotStep *= 10.0
-        elif (event.modifiers() & QtCore.Qt.AltModifier):
-            step *= 0.1
-            rotStep *= 0.1
-
-        key = event.key()
-
-        if key == QtCore.Qt.Key_W:
-            self._dataModel.viewSettings.freeCamera.Walk(step, 0)
-        elif key == QtCore.Qt.Key_S:
-            self._dataModel.viewSettings.freeCamera.Walk(-step, 0)
-
-        if key == QtCore.Qt.Key_J:
-            self._dataModel.viewSettings.freeCamera.Walk(0, -step)
-        elif key == QtCore.Qt.Key_L:
-            self._dataModel.viewSettings.freeCamera.Walk(0, step)
-
-        if key == QtCore.Qt.Key_A:
-            self._dataModel.viewSettings.freeCamera.PanTilt(rotStep, 0)
-        elif key == QtCore.Qt.Key_D:
-            self._dataModel.viewSettings.freeCamera.PanTilt(-rotStep, 0)
-
-        if key == QtCore.Qt.Key_I:
-            self._dataModel.viewSettings.freeCamera.Truck(0, step)
-        elif key == QtCore.Qt.Key_K:
-            self._dataModel.viewSettings.freeCamera.Truck(0, -step)
-
-        self.updateGL()
-
     def detachAndReClipFromCurrentCamera(self):
         """If we are currently rendering from a prim camera, switch to the
         FreeCamera.  Then reset the near/far clipping planes based on

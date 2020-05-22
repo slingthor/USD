@@ -49,18 +49,9 @@ GarchSimpleLight::GarchSimpleLight(GfVec4f const & position) :
     _isDomeLight(false),
     _id()
 {
-    _irradianceId.Clear();
-    _prefilterId.Clear();
-    _brdfId.Clear();
-
-    _irradianceSamplerId.Clear();
-    _prefilterSamplerId.Clear();
-    _brdfSamplerId.Clear();
 }
 
-GarchSimpleLight::~GarchSimpleLight()
-{
-}
+GarchSimpleLight::~GarchSimpleLight() = default;
 
 GfMatrix4d const &
 GarchSimpleLight::GetTransform() const
@@ -291,64 +282,16 @@ GarchSimpleLight::SetIsDomeLight(bool isDomeLight)
     _isDomeLight = isDomeLight;
 }
 
-GarchTextureGPUHandle const & GarchSimpleLight::GetIrradianceId() const
+const SdfAssetPath &
+GarchSimpleLight::GetDomeLightTextureFile() const
 {
-    return _irradianceId;
+    return _domeLightTextureFile;
 }
 
-void GarchSimpleLight::SetIrradianceId(GarchTextureGPUHandle const & irradianceId)
+void
+GarchSimpleLight::SetDomeLightTextureFile(const SdfAssetPath &path)
 {
-    _irradianceId = irradianceId;
-}
-
-GarchTextureGPUHandle const & GarchSimpleLight::GetPrefilterId() const
-{
-    return _prefilterId;
-}
-
-void GarchSimpleLight::SetPrefilterId(GarchTextureGPUHandle const & prefilterId)
-{
-    _prefilterId = prefilterId;
-}
-
-GarchTextureGPUHandle const & GarchSimpleLight::GetBrdfId() const
-{
-    return _brdfId;
-}
-
-void GarchSimpleLight::SetBrdfId(GarchTextureGPUHandle const & brdfId)
-{
-    _brdfId = brdfId;
-}
-
-GarchSamplerGPUHandle const & GarchSimpleLight::GetIrradianceSamplerId() const
-{
-    return _irradianceSamplerId;
-}
-
-void GarchSimpleLight::SetIrradianceSamplerId(GarchSamplerGPUHandle const & irradianceSamplerId)
-{
-    _irradianceSamplerId = irradianceSamplerId;
-}
-
-GarchSamplerGPUHandle const & GarchSimpleLight::GetPrefilterSamplerId() const
-{
-    return _prefilterSamplerId;
-}
-
-void GarchSimpleLight::SetPrefilterSamplerId(GarchSamplerGPUHandle const & prefilterSamplerId)
-{
-    _prefilterSamplerId = prefilterSamplerId;
-}
-
-GarchSamplerGPUHandle const & GarchSimpleLight::GetBrdfSamplerId() const
-{
-    return _brdfSamplerId;
-}
-
-void GarchSimpleLight::SetBrdfSamplerId(GarchSamplerGPUHandle const & brdfSamplerId)
-{
-    _brdfSamplerId = brdfSamplerId;
+    _domeLightTextureFile = path;
 }
 
 // -------------------------------------------------------------------------- //
@@ -376,12 +319,7 @@ GarchSimpleLight::operator==(const GarchSimpleLight& other) const
         &&  _shadowMatrices == other._shadowMatrices
         &&  _isCameraSpaceLight == other._isCameraSpaceLight
         &&  _isDomeLight == other._isDomeLight
-        &&  _irradianceId == other._irradianceId
-        &&  _prefilterId == other._prefilterId
-        &&  _brdfId == other._brdfId
-        &&  _irradianceSamplerId == other._irradianceSamplerId
-        &&  _prefilterSamplerId == other._prefilterSamplerId
-        &&  _brdfSamplerId == other._brdfSamplerId
+        &&  _domeLightTextureFile == other._domeLightTextureFile
         &&  _id == other._id;
 }
 
@@ -409,9 +347,7 @@ std::ostream& operator<<(std::ostream& out, const GarchSimpleLight& v)
         << v._transform
         << v._isCameraSpaceLight
         << v._isDomeLight
-        << (uint64_t)v._irradianceId.handle
-        << (uint64_t)v._prefilterId.handle
-        << (uint64_t)v._brdfId.handle
+        << v._domeLightTextureFile
         << v._id;
     for (auto const& m : v._shadowMatrices) {
         out << m;

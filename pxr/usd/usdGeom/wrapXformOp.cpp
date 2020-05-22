@@ -84,6 +84,18 @@ _GetOpName(const UsdGeomXformOp &self)
     return self.GetOpName();
 }
 
+static TfToken
+_GetOpTypeToken(const UsdGeomXformOp::Type &opType)
+{
+    return UsdGeomXformOp::GetOpTypeToken(opType);
+}
+
+static UsdGeomXformOp::Type
+_GetOpTypeEnum(const TfToken& opTypeToken)
+{
+    return UsdGeomXformOp::GetOpTypeEnum(opTypeToken);
+}
+
 } // anonymous namespace 
 
 
@@ -107,16 +119,14 @@ __getattribute__(object selfObj, const char *name) {
          extract<UsdGeomXformOp &>(selfObj)().GetAttr().GetPrim().IsValid()) ||
         // prim is valid, but attr is invalid, let a few things through.
         (extract<UsdGeomXformOp &>(selfObj)().GetAttr().GetPrim().IsValid() &&
-         (strcmp(name, "IsInverseOp") == 0 ||
-          strcmp(name, "IsDefined") == 0 ||
-          strcmp(name, "GetName") == 0 ||
+         (strcmp(name, "GetName") == 0 ||
           strcmp(name, "GetBaseName") == 0 ||
           strcmp(name, "GetNamespace") == 0 ||
-          strcmp(name, "GetOpTransform") == 0 ||
-          strcmp(name, "GetOpName") == 0 ||
-          strcmp(name, "GetOpType") == 0 ||
           strcmp(name, "SplitName") == 0)) ||
         // prim and attr are both invalid, let almost nothing through.
+          strcmp(name, "IsDefined") == 0 ||
+          strcmp(name, "GetOpTypeToken") == 0 ||
+          strcmp(name, "GetOpTypeEnum") == 0 ||
           strcmp(name, "GetAttr") == 0) {
         // Dispatch to object's __getattribute__.
         return (*_object__getattribute__)(selfObj, name);
@@ -176,6 +186,12 @@ void wrapUsdGeomXformOp()
         .def("GetOpType", &XformOp::GetOpType)
 
         .def("GetPrecision", &XformOp::GetPrecision)
+
+        .def("GetOpTypeToken", _GetOpTypeToken)
+        .staticmethod("GetOpTypeToken")
+
+        .def("GetOpTypeEnum", _GetOpTypeEnum)
+        .staticmethod("GetOpTypeEnum")
 
         .def("MightBeTimeVarying", &XformOp::MightBeTimeVarying)
         ;

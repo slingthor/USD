@@ -28,10 +28,8 @@
 #include "pxr/imaging/hdSt/api.h"
 #include "pxr/imaging/hd/computation.h"
 
-#include "pxr/base/tf/token.h"
-
 #include "pxr/imaging/garch/texture.h"
-#include <memory>
+#include "pxr/imaging/hgi/texture.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -40,62 +38,77 @@ PXR_NAMESPACE_OPEN_SCOPE
 ///
 using HdSt_DomeLightComputationGPUSharedPtr =
     std::shared_ptr<class HdSt_DomeLightComputationGPU>;
+using HdStSimpleLightingShaderPtr =
+    std::weak_ptr<class HdStSimpleLightingShader>;
 using HdStProgramSharedPtr =
     std::shared_ptr<class HdStProgram>;
 
-                            
+////
+//// \class HdSt_DomeLightComputationGPU
+///
+/// Given an OpenGL texture at construction time, create a new OpenGL
+/// texture (computed from the contents of the given texture) and sets
+/// the GL name on the given lighting shader during Execute (also
+/// freeing previous texture).
+///
+/// If the texture to be created has several mip levels, the texture
+/// will only be created by the computation with level = 0 and the
+/// computations with level > 0 will use the same texture.
+///
 class HdSt_DomeLightComputationGPU : public HdComputation {
 public:
     /// Constructor
     HDST_API
-    static HdSt_DomeLightComputationGPUSharedPtr New(TfToken token,
-                                 GarchTextureGPUHandle const &sourceId,
-                                 GarchTextureGPUHandle const &destId,
-                                 int width, int height,
-                                 unsigned int numLevels,
-                                 unsigned int level,
-                                 float roughness=-1.0);
+    static HdSt_DomeLightComputationGPUSharedPtr New(
+        // Name of computation shader to use, also used as
+        // key when setting the GL name on the lighting shader
+        const TfToken & shaderToken, 
+        // OpenGL texture name of texture serving as source
+        HgiTextureHandle const& sourceGLTextureName,
+        // Lighting shader that remembers the GL texture names
+        HdStSimpleLightingShaderPtr const &lightingShader,
+        // Number of mip levels.
+        unsigned int numLevels = 1,
+        // Level to be filled (0 means also to allocate texture)
+        unsigned int level = 0, 
+        float roughness = -1.0);
 
     HDST_API
-    virtual void GetBufferSpecs(HdBufferSpecVector *specs) const override {}
+    void GetBufferSpecs(HdBufferSpecVector *specs) const override {}
    
     HDST_API
-    virtual void Execute(HdBufferArrayRangeSharedPtr const &range,
-                         HdResourceRegistry *resourceRegistry) override;
+    void Execute(HdBufferArrayRangeSharedPtr const &range,
+                 HdResourceRegistry *resourceRegistry) override;
 
     /// This computation doesn't generate buffer source (i.e. 2nd phase)
     /// This is a gpu computation, but no need to resize the destination
     /// since it belongs the same range as src buffer.
-    virtual int GetNumOutputElements() const override { return 0; }
+    int GetNumOutputElements() const override { return 0; }
 
 protected:
     
     /// Constructor
     HDST_API
-    HdSt_DomeLightComputationGPU(TfToken token,
-                                 GarchTextureGPUHandle const &sourceId,
-                                 GarchTextureGPUHandle const &destId,
-                                 int width, int height,
-                                 unsigned int numLevels,
-                                 unsigned int level,
-                                 float roughness);
+    HdSt_DomeLightComputationGPU(
+        const TfToken & shaderToken, 
+        GarchTextureGPUHandle sourceGLTextureName,
+        HdStSimpleLightingShaderPtr const &lightingShader,
+        unsigned int numLevels,
+        unsigned int level , 
+        float roughness);
 
     HDST_API
     virtual void _Execute(HdStProgramSharedPtr computeProgram) = 0;
+    virtual GarchTextureGPUHandle _CreateGLTexture(
+                int32_t width, int32_t height) const = 0;
 
-    TfToken _shaderToken;
-
-    GarchTextureGPUHandle _sourceTextureId;
-    GarchTextureGPUHandle _destTextureId;
-    int _textureWidth;
-    int _textureHeight;
-
-    unsigned int _numLevels;
-    unsigned int _level;
-    bool _layered;
-    unsigned int _layer;
-
-    float _roughness;
+protected:
+    const TfToken _shaderToken;
+    HdStSimpleLightingShaderPtr const _lightingShader;
+    const GarchTextureGPUHandle _sourceGLTextureName;
+    const unsigned int _numLevels;
+    const unsigned int _level;
+    const float _roughness;
 };
 
 

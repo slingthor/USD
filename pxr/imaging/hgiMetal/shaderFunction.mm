@@ -235,6 +235,8 @@ _ComputeHeader(id<MTLDevice> device)
             << "#define notEqual(a, b) ((a) != (b))\n"
 
             << "template <typename T>\n"
+            << "T mod(T y, T x) { return fmod(y, x); }\n\n"
+            << "template <typename T>\n"
             << "T atan(T y, T x) { return atan2(y, x); }\n\n"
             << "template <typename T>\n"
             << "T bitfieldReverse(T x) { return reverse_bits(x); }\n\n"

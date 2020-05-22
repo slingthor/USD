@@ -77,6 +77,8 @@ protected:
         HdSceneDelegate* delegate,
         HdTaskContext* ctx,
         HdDirtyBits* dirtyBits) = 0;
+    
+    void _ToggleRenderTarget(HdTaskContext* ctx);
 
     // Return pointer to Hydra Graphics Interface.
     HDX_API

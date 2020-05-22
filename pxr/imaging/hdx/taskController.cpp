@@ -287,7 +287,6 @@ HdxTaskController::_CreateRenderGraph()
             _CreateOitResolveTask();
             _CreateSelectionTask();
             _CreateColorCorrectionTask();
-            _CreateColorChannelTask();
             _CreatePresentTask();
         }
 
@@ -307,7 +306,6 @@ HdxTaskController::_CreateRenderGraph()
             _CreateColorizeSelectionTask();
             _CreatePickFromRenderBufferTask();
             _CreateColorCorrectionTask();
-            _CreateColorChannelTask();
             _CreatePresentTask();
             // Initialize the AOV system to render color. Note:
             // SetRenderOutputs special-cases color to include support for
@@ -820,6 +818,11 @@ HdxTaskController::_SetParameters(SdfPath const& pathName,
     if (light.IsDomeLight()) {
         _delegate.SetParameter(pathName, HdLightTokens->textureResource, 
             _defaultDomeLightTextureResource);
+        _delegate.SetParameter(pathName, HdLightTokens->textureFile,
+                               SdfAssetPath(
+                                   HdxPackageDefaultDomeLightTexture(),
+                                   HdxPackageDefaultDomeLightTexture()));
+        
     }
 }
 
@@ -1146,19 +1149,6 @@ HdxTaskController::SetViewportRenderOutput(TfToken const& name)
         GetRenderIndex()->GetChangeTracker().MarkTaskDirty(
             _presentTaskId, HdChangeTracker::DirtyParams);
     }
-}
-
-HdRenderBuffer*
-HdxTaskController::GetRenderOutput(TfToken const& name)
-{
-    if (!_AovsSupported()) {
-        return nullptr;
-    }
-
-    SdfPath renderBufferId = _GetAovPath(name);
-    return static_cast<HdRenderBuffer*>(
-        GetRenderIndex()->GetBprim(HdPrimTypeTokens->renderBuffer,
-            renderBufferId));
 }
 
 void
@@ -1619,6 +1609,11 @@ HdxTaskController::SetLightingState(GarchSimpleLightingContextPtr const& src)
                 _delegate.SetParameter(_lightIds[i], 
                                     HdLightTokens->textureResource, 
                                     _defaultDomeLightTextureResource);
+                _delegate.SetParameter(
+                    _lightIds[i], HdLightTokens->textureFile,
+                    SdfAssetPath(
+                        HdxPackageDefaultDomeLightTexture(),
+                        HdxPackageDefaultDomeLightTexture()));
             }
             GetRenderIndex()->GetChangeTracker().MarkSprimDirty(
                 _lightIds[i], HdLight::DirtyParams);
