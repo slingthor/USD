@@ -38,7 +38,8 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 using HdStSurfaceShaderSharedPtr = std::shared_ptr<class HdStSurfaceShader>;
 
-using HdStTextureResourceSharedPtr = std::shared_ptr<class HdStTextureResource>;
+using HdStTextureResourceSharedPtr = 
+    std::shared_ptr<class HdStTextureResource>;
 using HdStTextureResourceHandleSharedPtr =
     std::shared_ptr<class HdStTextureResourceHandle>;
 using HdStTextureResourceHandleSharedPtrVector =

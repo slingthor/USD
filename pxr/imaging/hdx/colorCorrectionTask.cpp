@@ -358,7 +358,7 @@ HdxColorCorrectionTask::_CreateShaderResources()
     fragDesc.shaderCode += glslfx.GetSource(_tokens->colorCorrectionFragment);
     if (useOCIO) {
         std::string ocioGpuShaderText = _CreateOpenColorIOResources();
-        fragDesc.shaderCode += ocioGpuShaderText + fragDesc.shaderCode;
+        fragDesc.shaderCode = ocioGpuShaderText + fragDesc.shaderCode;
     }
     HgiShaderFunctionHandle fragFn = _GetHgi()->CreateShaderFunction(fragDesc);
 

@@ -31,7 +31,6 @@ endif()
 pxr_library(hgiInterop
     LIBRARIES
         gf
-        plug
         tf
         hgi
         ${GLEW_LIBRARY}

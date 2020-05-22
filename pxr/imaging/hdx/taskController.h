@@ -221,7 +221,7 @@ public:
     /// Configure color channel by settings params.
     HDX_API
     void SetColorChannelParams(HdxColorChannelTaskParams const& params);
-    
+
 private:
     ///
     /// This class is not intended to be copied.

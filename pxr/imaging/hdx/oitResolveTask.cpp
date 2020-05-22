@@ -248,7 +248,7 @@ HdxOitResolveTask::Prepare(HdTaskContext* ctx,
             HdBlendOp::HdBlendOpAdd,
             HdBlendFactor::HdBlendFactorOne,
             HdBlendFactor::HdBlendFactorOneMinusSrcAlpha,
-            HdBlendOp::HdBlendOpAdd, 
+            HdBlendOp::HdBlendOpAdd,
             HdBlendFactor::HdBlendFactorOne,
             HdBlendFactor::HdBlendFactorOne);
 
