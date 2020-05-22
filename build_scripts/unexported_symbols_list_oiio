@@ -34,3 +34,5 @@ __ZNSt3__112__cxx03_bool12__true_valueEv
 __ZZN5boost1*
 __ZNK5boost16cpp_regex_traitsIcE3toiERPKcS3_i
 __ZNK5boost16re_detail_10610031cpp_regex_traits_implementationI*
+__ZN16OpenImageIO*
+__ZZN16OpenImageIO*
