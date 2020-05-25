@@ -419,7 +419,7 @@ def RunCMake(context, force, buildArgs = None, hostPlatform = False):
                     generator=(generator or ""),
                     extraArgs=(" ".join(extraArgs) if extraArgs else "")))
 
-        Run("cmake --build . --config {config} --target install -- {multiproc}"
+        Run("cmake --build . --config {config} --target install {multiproc}"
             .format(config=config,
                     multiproc=FormatMultiProcs(context.numJobs, generator)))
 

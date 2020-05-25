@@ -170,16 +170,16 @@ HdStMaterial::Sync(HdSceneDelegate *sceneDelegate,
     if (vtMat.IsHolding<HdMaterialNetworkMap>()) {
         HdMaterialNetworkMap const& hdNetworkMap =
             vtMat.UncheckedGet<HdMaterialNetworkMap>();
-            if (!hdNetworkMap.terminals.empty() && !hdNetworkMap.map.empty()) {
-                _networkProcessor.ProcessMaterialNetwork(GetId(), hdNetworkMap);
-                fragmentSource = _networkProcessor.GetFragmentCode();
-                geometrySource = _networkProcessor.GetGeometryCode();
-                materialMetadata = _networkProcessor.GetMetadata();
-                materialTag = _networkProcessor.GetMaterialTag();
-                params = _networkProcessor.GetMaterialParams();
-                textureDescriptors = _networkProcessor.GetTextureDescriptors();
-            }
+        if (!hdNetworkMap.terminals.empty() && !hdNetworkMap.map.empty()) {
+            _networkProcessor.ProcessMaterialNetwork(GetId(), hdNetworkMap);
+            fragmentSource = _networkProcessor.GetFragmentCode();
+            geometrySource = _networkProcessor.GetGeometryCode();
+            materialMetadata = _networkProcessor.GetMetadata();
+            materialTag = _networkProcessor.GetMaterialTag();
+            params = _networkProcessor.GetMaterialParams();
+            textureDescriptors = _networkProcessor.GetTextureDescriptors();
         }
+    }
 
     if (fragmentSource.empty() && geometrySource.empty()) {
         _InitFallbackShader();
