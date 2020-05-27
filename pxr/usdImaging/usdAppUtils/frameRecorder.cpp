@@ -38,8 +38,10 @@
 #include "pxr/base/tf/diagnostic.h"
 #include "pxr/imaging/garch/gl.h"
 #include "pxr/imaging/garch/drawTarget.h"
+#include "pxr/imaging/garch/image.h"
 #include "pxr/imaging/garch/simpleLight.h"
 #include "pxr/imaging/garch/simpleMaterial.h"
+#include "pxr/imaging/glf/diagnostic.h"
 #include "pxr/usd/sdf/path.h"
 #include "pxr/usd/usd/prim.h"
 #include "pxr/usd/usd/stage.h"
@@ -147,6 +149,73 @@ _ComputeCameraToFrameStage(const UsdStagePtr& stage, UsdTimeCode timeCode,
     return gfCamera;
 }
 
+/// Debug api to output the contents of the draw target to a png file.
+static bool
+_WriteToFile(std::string const & filename,
+             size_t imageWidth,
+             size_t imageHeight)
+{
+    
+    int nelems = 4, // GL_RGBA
+        elemsize = sizeof(GLfloat),
+        stride = imageWidth * nelems * elemsize,
+        bufsize = imageHeight * stride;
+    
+    std::unique_ptr<char[]> buf(new char[bufsize]);
+    
+    {
+        glPushClientAttrib(GL_CLIENT_PIXEL_STORE_BIT);
+
+        glPixelStorei(GL_PACK_ROW_LENGTH, 0);
+        glPixelStorei(GL_PACK_ALIGNMENT, 1);
+        glPixelStorei(GL_PACK_SKIP_PIXELS, 0);
+        glPixelStorei(GL_PACK_SKIP_ROWS, 0);
+
+        GLint restoreBinding, restoreActiveTexture;
+        glGetIntegerv( GL_TEXTURE_BINDING_2D, &restoreBinding );
+        glGetIntegerv( GL_ACTIVE_TEXTURE, & restoreActiveTexture);
+
+        glActiveTexture( GL_TEXTURE0 );
+        glBindTexture( GL_TEXTURE_2D, 0 );
+
+        {
+            TRACE_FUNCTION_SCOPE("glGetTexImage");
+            glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_FLOAT, buf.get());
+        }
+
+        glActiveTexture( restoreActiveTexture );
+        glBindTexture( GL_TEXTURE_2D, restoreBinding );
+
+        glPopClientAttrib();
+    }
+    
+    VtDictionary metadata;
+
+    GarchImage::StorageSpec storage;
+    storage.width = imageWidth;
+    storage.height = imageHeight;
+    storage.format = GL_RGBA;
+    storage.type = GL_FLOAT;
+    storage.flipped = true;
+    storage.data = buf.get();
+
+    {
+        TRACE_FUNCTION_SCOPE("writing image");
+
+        GarchImageSharedPtr const image = GarchImage::OpenForWriting(filename);
+        const bool writeSuccess = image && image->Write(storage, metadata);
+        
+        if (!writeSuccess) {
+            TF_RUNTIME_ERROR("Failed to write image to %s", filename.c_str());
+            return false;
+        }
+    }
+
+    GLF_POST_PENDING_GL_ERRORS();
+
+    return true;
+}
+
 bool
 UsdAppUtilsFrameRecorder::Record(
         const UsdStagePtr& stage,
@@ -229,7 +298,8 @@ UsdAppUtilsFrameRecorder::Record(
     renderParams.showProxy = _HasPurpose(_purposes, UsdGeomTokens->proxy);
     renderParams.showRender = _HasPurpose(_purposes, UsdGeomTokens->render);
     renderParams.showGuides = _HasPurpose(_purposes, UsdGeomTokens->guide);
-
+    
+    if (false) {
 #if defined(ARCH_GFX_OPENGL)
     glEnable(GL_DEPTH_TEST);
 #endif
@@ -273,6 +343,21 @@ UsdAppUtilsFrameRecorder::Record(
     drawTarget->Unbind();
 
     return drawTarget->WriteToFile("color", outputImagePath);
+    } else {
+        glEnable(GL_DEPTH_TEST);
+        glViewport(0, 0, _imageWidth, imageHeight);
+
+        const GLfloat CLEAR_DEPTH[1] = { 1.0f };
+        const UsdPrim& pseudoRoot = stage->GetPseudoRoot();
+
+        do {
+            glClearBufferfv(GL_COLOR, 0, CLEAR_COLOR.data());
+            glClearBufferfv(GL_DEPTH, 0, CLEAR_DEPTH);
+            _imagingEngine.Render(pseudoRoot, renderParams);
+        } while (!_imagingEngine.IsConverged());
+
+        return _WriteToFile(outputImagePath, _imageWidth, imageHeight);
+    }
 }
 
 
