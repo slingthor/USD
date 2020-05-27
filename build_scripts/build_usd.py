@@ -676,11 +676,14 @@ ZLIB = Dependency("zlib", InstallZlib, "include/zlib.h")
 ############################################################
 # boost
 
-if Linux() or MacOS() or iOS():
+if Linux():
     if Python3():
         BOOST_URL = "https://downloads.sourceforge.net/project/boost/boost/1.70.0/boost_1_70_0.tar.gz"
     else:
         BOOST_URL = "https://downloads.sourceforge.net/project/boost/boost/1.61.0/boost_1_61_0.tar.bz2"
+    BOOST_VERSION_FILE = "include/boost/version.hpp"
+elif MacOS() or iOS():
+    BOOST_URL = "https://downloads.sourceforge.net/project/boost/boost/1.70.0/boost_1_70_0.tar.gz"
     BOOST_VERSION_FILE = "include/boost/version.hpp"
 elif Windows():
     # The default installation of boost on Windows puts headers in a versioned 
@@ -1421,6 +1424,14 @@ def InstallBLOSC(context, force, buildArgs):
         if skip_x86_intrinsics:
             extraArgs.append('-DDEACTIVATE_SSE2=ON')
             extraArgs.append('-DDEACTIVATE_AVX2=ON')
+
+        if MacOS() or iOS():
+            PatchFile("internal-complibs/zlib-1.2.8/gzlib.c",
+                [("#  define LSEEK lseek\n", "#include <unistd.h>\n#  define LSEEK lseek\n")])
+            PatchFile("internal-complibs/zlib-1.2.8/gzread.c",
+                [('#include "gzguts.h"', '#include <unistd.h>\n#include "gzguts.h"')])
+            PatchFile("internal-complibs/zlib-1.2.8/gzwrite.c",
+                [('#include "gzguts.h"', '#include <unistd.h>\n#include "gzguts.h"')])
 
         # Add on any user-specified extra arguments.
         extraArgs += buildArgs
