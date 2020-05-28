@@ -32,18 +32,10 @@
 #include "pxr/imaging/hd/vtBufferSource.h"
 #if defined(PXR_OPENGL_SUPPORT_ENABLED)
 #include "pxr/imaging/hgiGL/texture.h"
+#include "pxr/imaging/hgiGL/sampler.h"
 #endif
 
-#include "pxr/imaging/garch/contextCaps.h"
-#include "pxr/imaging/garch/resourceFactory.h"
-
 PXR_NAMESPACE_OPEN_SCOPE
-
-bool
-HdSt_TextureBinder::UsesBindlessTextures()
-{
-    return GarchResourceFactory::GetInstance()->GetContextCaps().bindlessTextureEnabled;
-}
 
 static const HdTupleType _bindlessHandleTupleType{ HdTypeUInt32Vec2, 1 };
 
@@ -57,12 +49,13 @@ _Concat(const TfToken &a, const TfToken &b)
 void
 HdSt_TextureBinder::GetBufferSpecs(
     const NamedTextureHandleVector &textures,
+    const bool useBindlessHandles,
     HdBufferSpecVector * const specs)
 {
     for (const NamedTextureHandle & texture : textures) {
         switch (texture.type) {
         case HdTextureType::Uv:
-            if (UsesBindlessTextures()) {
+            if (useBindlessHandles) {
                 specs->emplace_back(
                     texture.name,
                     _bindlessHandleTupleType);
@@ -75,7 +68,7 @@ HdSt_TextureBinder::GetBufferSpecs(
             }
             break;
         case HdTextureType::Field:
-            if (UsesBindlessTextures()) {
+            if (useBindlessHandles) {
                 specs->emplace_back(
                     texture.name,
                     _bindlessHandleTupleType);
@@ -93,7 +86,7 @@ HdSt_TextureBinder::GetBufferSpecs(
                 HdTupleType{HdTypeDoubleMat4, 1});
             break;
         case HdTextureType::Ptex:
-            if (UsesBindlessTextures()) {
+            if (useBindlessHandles) {
                 specs->emplace_back(
                     texture.name,
                     _bindlessHandleTupleType);
@@ -105,7 +98,7 @@ HdSt_TextureBinder::GetBufferSpecs(
             }
             break;
         case HdTextureType::Udim:
-            if (UsesBindlessTextures()) {
+            if (useBindlessHandles) {
                 specs->emplace_back(
                     texture.name,
                     _bindlessHandleTupleType);
@@ -174,9 +167,10 @@ public:
         TfToken const &name,
         HdStUvTextureObject const &texture,
         HdStUvSamplerObject const &sampler,
+        const bool useBindlessHandles,
         HdBufferSourceSharedPtrVector * const sources)
     {
-        if (HdSt_TextureBinder::UsesBindlessTextures()) {
+        if (useBindlessHandles) {
             sources->push_back(
                 std::make_shared<HdSt_BindlessSamplerBufferSource>(
                     name,
@@ -195,6 +189,7 @@ public:
         TfToken const &name,
         HdStFieldTextureObject const &texture,
         HdStFieldSamplerObject const &sampler,
+        const bool useBindlessHandles,
         HdBufferSourceSharedPtrVector * const sources)
     {
         sources->push_back(
@@ -204,7 +199,7 @@ public:
                     HdSt_ResourceBindingSuffixTokens->samplingTransform),
                 VtValue(texture.GetSamplingTransform())));
 
-        if (HdSt_TextureBinder::UsesBindlessTextures()) {
+        if (useBindlessHandles) {
             sources->push_back(
                 std::make_shared<HdSt_BindlessSamplerBufferSource>(
                     name,
@@ -223,9 +218,10 @@ public:
         TfToken const &name,
         HdStPtexTextureObject const &texture,
         HdStPtexSamplerObject const &sampler,
+        const bool useBindlessHandles,
         HdBufferSourceSharedPtrVector * const sources)
     {
-        if (!HdSt_TextureBinder::UsesBindlessTextures()) {
+        if (!useBindlessHandles) {
             return;
         }
 
@@ -246,9 +242,10 @@ public:
         TfToken const &name,
         HdStUdimTextureObject const &texture,
         HdStUdimSamplerObject const &sampler,
+        const bool useBindlessHandles,
         HdBufferSourceSharedPtrVector * const sources)
     {
-        if (!HdSt_TextureBinder::UsesBindlessTextures()) {
+        if (!useBindlessHandles) {
             return;
         }
 
@@ -269,7 +266,7 @@ public:
 void
 _BindTexture(const GLenum target,
              HgiTextureHandle const &textureHandle,
-             GLuint glSamplerName,
+             HgiSamplerHandle const &samplerHandle,
              const TfToken &name,
              HdSt_ResourceBinder const &binder,
              const bool bind)
@@ -279,16 +276,29 @@ _BindTexture(const GLenum target,
 #if defined(PXR_OPENGL_SUPPORT_ENABLED)
     glActiveTexture(GL_TEXTURE0 + samplerUnit);
 
+    const HgiTexture * const tex = textureHandle.Get();
     const HgiGLTexture * const glTex =
-        bind ? dynamic_cast<HgiGLTexture*>(textureHandle.Get()) : nullptr;
+        dynamic_cast<const HgiGLTexture*>(tex);
 
-    if (glTex) {
-        glBindTexture(target, glTex->GetTextureId());
-    } else {
-        glBindTexture(target, 0);
+    if (tex && !glTex) {
+        TF_CODING_ERROR("Storm texture binder only supports OpenGL");
     }
 
-    glBindSampler(samplerUnit, bind ? glSamplerName : 0);
+    const GLuint texName =
+        (bind && glTex) ? glTex->GetTextureId() : 0;
+    glBindTexture(target, texName);
+
+    const HgiSampler * const sampler = samplerHandle.Get();
+    const HgiGLSampler * const glSampler =
+        dynamic_cast<const HgiGLSampler*>(sampler);
+
+    if (sampler && !glSampler) {
+        TF_CODING_ERROR("Storm texture binder only supports OpenGL");
+    }
+
+    const GLuint samplerName =
+        (bind && glSampler) ? glSampler->GetSamplerId() : 0;
+    glBindSampler(samplerUnit, samplerName);
 #endif
 }
 
@@ -304,7 +314,7 @@ public:
         _BindTexture(
             GL_TEXTURE_2D,
             texture.GetTexture(),
-            sampler.GetGLSamplerName(),
+            sampler.GetSampler(),
             name,
             binder,
             bind);
@@ -320,7 +330,7 @@ public:
         _BindTexture(
             GL_TEXTURE_3D,
             texture.GetTexture(),
-            sampler.GetGLSamplerName(),
+            sampler.GetSampler(),
             name,
             binder,
             bind);
@@ -363,8 +373,17 @@ public:
         glActiveTexture(GL_TEXTURE0 + texelSamplerUnit);
         glBindTexture(GL_TEXTURE_2D_ARRAY,
                       bind ? (GLuint)texture.GetTexelGLTextureName() : 0);
-        glBindSampler(texelSamplerUnit,
-                      bind ? (GLuint)sampler.GetTexelsGLSamplerName() : 0);
+
+        HgiSampler * const texelSampler = sampler.GetTexelsSampler().Get();
+
+        const HgiGLSampler * const glSampler =
+            bind ? dynamic_cast<HgiGLSampler*>(texelSampler) : nullptr;
+
+        if (glSampler) {
+            glBindSampler(texelSamplerUnit, (GLuint)glSampler->GetSamplerId());
+        } else {
+            glBindSampler(texelSamplerUnit, 0);
+        }
 
         const HdBinding layoutBinding = binder.GetBinding(
             _Concat(name, HdSt_ResourceBindingSuffixTokens->layout));
@@ -447,17 +466,20 @@ void _Dispatch(
 void
 HdSt_TextureBinder::ComputeBufferSources(
     const NamedTextureHandleVector &textures,
+    const bool useBindlessHandles,
     HdBufferSourceSharedPtrVector * const sources)
 {
-    _Dispatch<_ComputeBufferSourcesFunctor>(textures, sources);
+    _Dispatch<_ComputeBufferSourcesFunctor>(
+        textures, useBindlessHandles, sources);
 }
 
 void
 HdSt_TextureBinder::BindResources(
     HdSt_ResourceBinder const &binder,
+    const bool useBindlessHandles,
     const NamedTextureHandleVector &textures)
 {
-    if (UsesBindlessTextures()) {
+    if (useBindlessHandles) {
         return;
     }
 
@@ -467,9 +489,10 @@ HdSt_TextureBinder::BindResources(
 void
 HdSt_TextureBinder::UnbindResources(
     HdSt_ResourceBinder const &binder,
+    const bool useBindlessHandles,
     const NamedTextureHandleVector &textures)
 {
-    if (UsesBindlessTextures()) {
+    if (useBindlessHandles) {
         return;
     }
 

@@ -58,14 +58,24 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 UsdAppUtilsFrameRecorder::UsdAppUtilsFrameRecorder(
     UsdImagingGLEngine::RenderAPI api) :
-    _imagingEngine(api),
     _imageWidth(960u),
     _complexity(1.0f),
     _colorCorrectionMode("disabled"),
     _purposes({UsdGeomTokens->default_, UsdGeomTokens->proxy}),
     _api(api)
 {
+    _hgi = Hgi::CreatePlatformDefaultHgi();
+    _driver.name = HgiTokens->renderDriver;
+    _driver.driver = VtValue(_hgi.get());
+
+    _imagingEngine.reset(new UsdImagingGLEngine(api, _driver));
+    
     GlfGlewInit();
+}
+
+UsdAppUtilsFrameRecorder::~UsdAppUtilsFrameRecorder()
+{
+    _imagingEngine.reset(nullptr);
 }
 
 static bool
@@ -184,12 +194,12 @@ UsdAppUtilsFrameRecorder::Record(
     const TfToken& interopDst =
         _api == UsdImagingGLEngine::RenderAPI::Metal?
             HgiTokens->Metal:HgiTokens->OpenGL;
-    _imagingEngine.SetRendererAov(HdAovTokens->color, interopDst);
+    _imagingEngine->SetRendererAov(HdAovTokens->color, interopDst);
 
-    _imagingEngine.SetCameraState(
+    _imagingEngine->SetCameraState(
         frustum.ComputeViewMatrix(),
         frustum.ComputeProjectionMatrix());
-    _imagingEngine.SetRenderViewport(
+    _imagingEngine->SetRenderViewport(
         GfVec4d(
             0.0,
             0.0,
@@ -209,7 +219,7 @@ UsdAppUtilsFrameRecorder::Record(
     material.SetSpecular(SPECULAR_DEFAULT);
     material.SetShininess(SHININESS_DEFAULT);
 
-    _imagingEngine.SetLightingState(lights, material, SCENE_AMBIENT);
+    _imagingEngine->SetLightingState(lights, material, SCENE_AMBIENT);
 
     UsdImagingGLRenderParams renderParams;
     renderParams.frame = timeCode;
@@ -225,9 +235,9 @@ UsdAppUtilsFrameRecorder::Record(
 #endif
 
     UsdImagingGLEngine::ResourceFactoryGuard guard(
-        _imagingEngine.GetResourceFactory());
+        _imagingEngine->GetResourceFactory());
 
-    HgiMetal *hgiMetal = static_cast<HgiMetal*>(_imagingEngine.GetHgi());
+    HgiMetal *hgiMetal = static_cast<HgiMetal*>(_hgi.get());
     hgiMetal->_useFinalTextureForGetImage = true;
     
     GarchDrawTargetRefPtr drawTarget = GarchDrawTarget::New(renderResolution);
@@ -257,8 +267,8 @@ UsdAppUtilsFrameRecorder::Record(
         glClearBufferfv(GL_COLOR, 0, CLEAR_COLOR.data());
         glClearBufferfv(GL_DEPTH, 0, CLEAR_DEPTH);
 #endif
-        _imagingEngine.Render(pseudoRoot, renderParams);
-    } while (!_imagingEngine.IsConverged());
+        _imagingEngine->Render(pseudoRoot, renderParams);
+    } while (!_imagingEngine->IsConverged());
 
     drawTarget->Unbind();
 

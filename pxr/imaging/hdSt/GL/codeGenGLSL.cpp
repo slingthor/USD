@@ -464,7 +464,7 @@ namespace {
 }
 
 HdStProgramSharedPtr
-HdSt_CodeGenGLSL::Compile()
+HdSt_CodeGenGLSL::Compile(HdStResourceRegistry *const registry)
 {
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
@@ -489,7 +489,8 @@ HdSt_CodeGenGLSL::Compile()
     bool hasFS  = (!fragmentShader.empty());
 
     // create GLSL program.
-    HdStProgramSharedPtr glslProgram(new HdStGLSLProgram(HdTokens->drawingShader));
+    HdStProgramSharedPtr glslProgram(
+        new HdStGLSLProgram(HdTokens->drawingShader, registry));
 
     // initialize autogen source buckets
     _genCommon.str(""); _genVS.str(""); _genTCS.str(""); _genTES.str("");
@@ -866,7 +867,7 @@ HdSt_CodeGenGLSL::Compile()
 }
 
 HdStProgramSharedPtr
-HdSt_CodeGenGLSL::CompileComputeProgram()
+HdSt_CodeGenGLSL::CompileComputeProgram(HdStResourceRegistry* const registry)
 {
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
@@ -1016,7 +1017,8 @@ HdSt_CodeGenGLSL::CompileComputeProgram()
     _genCS << "}\n";
     
     // create GLSL program.
-    HdStProgramSharedPtr glslProgram(new HdStGLSLProgram(HdTokens->computeShader));
+    HdStProgramSharedPtr glslProgram(
+        new HdStGLSLProgram(HdTokens->computeShader, registry));
     
     // compile shaders
     {

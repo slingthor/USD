@@ -130,7 +130,7 @@ _BuildArray(T values[], int numValues)
 }
 
 HdSt_TestDriver::HdSt_TestDriver()
- : _hgi(Hgi::GetPlatformDefaultHgi())
+ : _hgi(Hgi::CreatePlatformDefaultHgi())
  , _hgiDriver{HgiTokens->renderDriver, VtValue(_hgi.get())}
  , _engine()
  , _renderDelegate(new HdStRenderDelegateTest)
@@ -151,7 +151,7 @@ HdSt_TestDriver::HdSt_TestDriver()
 }
 
 HdSt_TestDriver::HdSt_TestDriver(TfToken const &reprName)
- : _hgi(Hgi::GetPlatformDefaultHgi())
+ : _hgi(Hgi::CreatePlatformDefaultHgi())
  , _hgiDriver{HgiTokens->renderDriver, VtValue(_hgi.get())}
  , _engine()
  , _renderDelegate(new HdStRenderDelegateTest)
@@ -167,7 +167,7 @@ HdSt_TestDriver::HdSt_TestDriver(TfToken const &reprName)
 }
 
 HdSt_TestDriver::HdSt_TestDriver(HdReprSelector const &reprToken)
- : _hgi(Hgi::GetPlatformDefaultHgi())
+ : _hgi(Hgi::CreatePlatformDefaultHgi())
  , _hgiDriver{HgiTokens->renderDriver, VtValue(_hgi.get())}
  , _engine()
  , _renderDelegate(new HdStRenderDelegateTest)

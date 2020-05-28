@@ -135,7 +135,9 @@ HdStBufferResourceMetal::SetAllocations(HdResourceGPUHandle idBuffer0,
 
     HdResource::SetSize(size);
 
-    _lastFrameModified = MtlfMetalContext::GetMetalContext()->GetCurrentFrame();
+    if (context) {
+        _lastFrameModified = context->GetCurrentFrame();
+    }
     _activeBuffer = 0;
     id<MTLBuffer> b = _id[1];
     _firstFrameBeingFilled = b != nil;

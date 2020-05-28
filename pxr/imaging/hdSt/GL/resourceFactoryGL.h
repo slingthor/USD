@@ -59,7 +59,7 @@ public:
     
     /// commandNumUints is given in how many integers.
     HDST_API
-    virtual HdStDispatchBuffer *NewDispatchBuffer(
+    virtual HdStDispatchBufferSharedPtr NewDispatchBuffer(
         TfToken const &role, int count,
         unsigned int commandNumUints) const override;
     
@@ -114,7 +114,7 @@ public:
     
     /// Creates a persistent buffer for OpenGL
     HDST_API
-    virtual HdStPersistentBuffer *NewPersistentBuffer(
+    virtual HdStPersistentBufferSharedPtr NewPersistentBuffer(
         TfToken const &role, size_t dataSize, void* data) const override;
     
     /// Creates a graphics API specific GPU quadrangulate computation
@@ -206,7 +206,7 @@ public:
       
     HDST_API
     virtual HdStProgram *NewProgram(
-        TfToken const &role) const override;
+        TfToken const &role, HdStResourceRegistry *const registry) const override;
       
     HDST_API
     virtual HdStRenderPassShaderSharedPtr NewRenderPassShader() const override;

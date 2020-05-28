@@ -34,8 +34,7 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-
-typedef std::vector<HdBindingRequest> HdBindingRequestVector;
+using HdBindingRequestVector = std::vector<HdBindingRequest>;
 
 /// \class HdSt_IndirectDrawBatch
 ///
@@ -45,34 +44,35 @@ typedef std::vector<HdBindingRequest> HdBindingRequestVector;
 /// primitive mode and that share aggregated drawing resources,
 /// e.g. uniform and non uniform primvar buffers.
 ///
-class HdSt_IndirectDrawBatch : public HdSt_DrawBatch {
+class HdSt_IndirectDrawBatch : public HdSt_DrawBatch
+{
 public:
 
     HDST_API
-    virtual ~HdSt_IndirectDrawBatch();
+    ~HdSt_IndirectDrawBatch() override;
 
     // HdSt_DrawBatch overrides
     HDST_API
-    bool Validate(bool deepValidation);
+    bool Validate(bool deepValidation) override;
 
     /// Prepare draw commands and apply view frustum culling for this batch.
     HDST_API
-    virtual void PrepareDraw(
+    void PrepareDraw(
         HdStRenderPassStateSharedPtr const &renderPassState,
         HdStResourceRegistrySharedPtr const &resourceRegistry) override;
 
     /// Executes the drawing commands for this batch.
     HDST_API
-    virtual void ExecuteDraw(
+    void ExecuteDraw(
         HdStRenderPassStateSharedPtr const &renderPassState,
         HdStResourceRegistrySharedPtr const &resourceRegistry) override;
 
     HDST_API
-    virtual void DrawItemInstanceChanged(
+    void DrawItemInstanceChanged(
         HdStDrawItemInstance const* instance) override;
 
     HDST_API
-    virtual void SetEnableTinyPrimCulling(bool tinyPrimCulling) override;
+    void SetEnableTinyPrimCulling(bool tinyPrimCulling) override;
 
 protected:
     HDST_API
@@ -114,7 +114,8 @@ protected:
                         HdStProgramSharedPtr const &program) = 0;
 
     // Culling requires custom resource binding.
-    class _CullingProgram : public _DrawingProgram {
+    class _CullingProgram : public _DrawingProgram
+    {
     public:
         void Initialize(bool useDrawArrays, bool useInstanceCulling,
                         size_t bufferArrayHash);
@@ -127,7 +128,7 @@ protected:
         virtual ~_CullingProgram() {}
         
         // _DrawingProgram overrides
-        virtual void _GetCustomBindings(HdBindingRequestVector *customBindings,
+        void _GetCustomBindings(HdBindingRequestVector *customBindings,
                                         bool *enableInstanceDraw) const;
         virtual bool _Link(HdStProgramSharedPtr const & program) = 0;
 

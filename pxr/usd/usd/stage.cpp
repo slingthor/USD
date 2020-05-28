@@ -28,6 +28,7 @@
 #include "pxr/usd/usd/attributeQuery.h"
 #include "pxr/usd/usd/clip.h"
 #include "pxr/usd/usd/clipCache.h"
+#include "pxr/usd/usd/clipSet.h"
 #include "pxr/usd/usd/common.h"
 #include "pxr/usd/usd/debugCodes.h"
 #include "pxr/usd/usd/instanceCache.h"
@@ -3054,9 +3055,10 @@ UsdStage::_DestroyPrimsInParallel(const vector<SdfPath>& paths)
 
     for (const auto& path : paths) {
         Usd_PrimDataPtr prim = _GetPrimDataAtPath(path);
-        // XXX: This should be converted to a TF_VERIFY once
-        // bug 141575 is fixed.
-        if (prim) {
+        // We *expect* every prim in paths to be valid as we iterate, but at
+        // one time had issues with deactivated master prims, so we preserve
+        // a guard for resiliency.  See testUsdBug141491.py
+        if (TF_VERIFY(prim)) {
             _dispatcher->Run(&UsdStage::_DestroyPrim, this, prim);
         }
     }
@@ -6686,21 +6688,21 @@ _ClipAppliesToLayerStackSite(
 
 static bool
 _ClipsApplyToNode(
-    const Usd_ClipCache::Clips& clips, 
+    const Usd_ClipSetRefPtr& clips, 
     const PcpNodeRef& node)
 {
-    return (node.GetLayerStack() == clips.sourceLayerStack
-            && node.GetPath().HasPrefix(clips.sourcePrimPath));
+    return (node.GetLayerStack() == clips->sourceLayerStack
+            && node.GetPath().HasPrefix(clips->sourcePrimPath));
 }
 
 static
-const std::vector<const Usd_ClipCache::Clips*>
+const std::vector<Usd_ClipSetRefPtr>
 _GetClipsThatApplyToNode(
-    const std::vector<Usd_ClipCache::Clips>& clipsAffectingPrim,
+    const std::vector<Usd_ClipSetRefPtr>& clipsAffectingPrim,
     const PcpNodeRef& node,
     const SdfPath& specPath)
 {
-    std::vector<const Usd_ClipCache::Clips*> relevantClips;
+    std::vector<Usd_ClipSetRefPtr> relevantClips;
 
     for (const auto& localClips : clipsAffectingPrim) {
         if (_ClipsApplyToNode(localClips, node)) {
@@ -6716,16 +6718,16 @@ _GetClipsThatApplyToNode(
             // This is also convenient for users, since it allows them 
             // to reuse assets that may have both uniform and varying 
             // attributes as manifests.
-            if (localClips.manifestClip) {
+            if (localClips->manifestClip) {
                 SdfVariability attrVariability = SdfVariabilityUniform;
-                if (!localClips.manifestClip->HasField(
+                if (!localClips->manifestClip->HasField(
                         specPath, SdfFieldKeys->Variability, &attrVariability)
                     || attrVariability != SdfVariabilityVarying) {
                     continue;
                 }
             }
 
-            relevantClips.push_back(&localClips);
+            relevantClips.push_back(localClips);
         }
     }
 
@@ -7360,7 +7362,7 @@ UsdStage::_GetResolvedValueImpl(const UsdProperty &prop,
     // Retrieve all clips that may contribute time samples for this
     // attribute at the given time. Clips never contribute default
     // values.
-    const std::vector<Usd_ClipCache::Clips>* clipsAffectingPrim = nullptr;
+    const std::vector<Usd_ClipSetRefPtr>* clipsAffectingPrim = nullptr;
     if (primHandle->MayHaveOpinionsInClips()
         && (!time || !time->IsDefault())) {
         clipsAffectingPrim =
@@ -7384,7 +7386,7 @@ UsdStage::_GetResolvedValueImpl(const UsdProperty &prop,
         const SdfPath specPath = node.GetPath().AppendProperty(prop.GetName());
         const SdfLayerRefPtrVector& layerStack 
             = node.GetLayerStack()->GetLayers();
-        boost::optional<std::vector<const Usd_ClipCache::Clips*>> clips;
+        boost::optional<std::vector<Usd_ClipSetRefPtr>> clips;
         for (size_t i = 0, e = layerStack.size(); i < e; ++i) {
             if (nodeHasSpecs) { 
                 if (resolver->ProcessLayer(i, specPath, node, 
@@ -7409,7 +7411,7 @@ UsdStage::_GetResolvedValueImpl(const UsdProperty &prop,
                 ARCH_PRAGMA_PUSH
                 ARCH_PRAGMA_MAYBE_UNINITIALIZED
 
-                for (const Usd_ClipCache::Clips* clipSet : *clips) {
+                for (const Usd_ClipSetRefPtr& clipSet : *clips) {
                     // We only care about clips that were introduced at this
                     // position within the LayerStack.
                     if (clipSet->sourceLayerIndex != i) {
@@ -7476,11 +7478,11 @@ UsdStage::_GetValueFromResolveInfoImpl(const UsdResolveInfo &info,
             info._primPathInLayerStack.AppendProperty(attr.GetName());
 
         const UsdPrim prim = attr.GetPrim();
-        const std::vector<Usd_ClipCache::Clips>& clipsAffectingPrim =
+        const std::vector<Usd_ClipSetRefPtr>& clipsAffectingPrim =
             _clipCache->GetClipsForPrim(prim.GetPath());
 
         for (const auto& clipAffectingPrim : clipsAffectingPrim) {
-            const Usd_ClipRefPtrVector& clips = clipAffectingPrim.valueClips;
+            const Usd_ClipRefPtrVector& clips = clipAffectingPrim->valueClips;
             for (size_t i = 0, numClips = clips.size(); i < numClips; ++i) {
                 // Note that we do not apply layer offsets to the time.
                 // Because clip metadata may be authored in different 
@@ -7654,7 +7656,7 @@ UsdStage::_GetTimeSamplesInIntervalFromResolveInfo(
         const UsdPrim prim = attr.GetPrim();
 
         // See comments in _GetValueImpl regarding clips.
-        const std::vector<Usd_ClipCache::Clips>& clipsAffectingPrim =
+        const std::vector<Usd_ClipSetRefPtr>& clipsAffectingPrim =
             _clipCache->GetClipsForPrim(prim.GetPath());
 
         const SdfPath specPath =
@@ -7665,7 +7667,7 @@ UsdStage::_GetTimeSamplesInIntervalFromResolveInfo(
         // Loop through all the clips that apply to this node and
         // combine all the time samples that are provided.
         for (const auto& clipAffectingPrim : clipsAffectingPrim) {
-            for (const auto& clip : clipAffectingPrim.valueClips) {
+            for (const auto& clip : clipAffectingPrim->valueClips) {
                 if (!_ClipAppliesToLayerStackSite(
                         clip, info._layerStack, info._primPathInLayerStack)) {
                     continue;
@@ -7860,11 +7862,11 @@ UsdStage::_GetBracketingTimeSamplesFromResolveInfo(const UsdResolveInfo &info,
         const UsdPrim prim = attr.GetPrim();
 
         // See comments in _GetValueImpl regarding clips.
-        const std::vector<Usd_ClipCache::Clips>& clipsAffectingPrim =
+        const std::vector<Usd_ClipSetRefPtr>& clipsAffectingPrim =
             _clipCache->GetClipsForPrim(prim.GetPath());
 
         for (const auto& clipAffectingPrim : clipsAffectingPrim) {
-            for (const auto& clip : clipAffectingPrim.valueClips) {
+            for (const auto& clip : clipAffectingPrim->valueClips) {
                 if (!_ClipAppliesToLayerStackSite(
                         clip, info._layerStack, info._primPathInLayerStack)
                     || desiredTime < clip->startTime
@@ -8010,10 +8012,10 @@ UsdStage::_ValueMightBeTimeVaryingFromResolveInfo(const UsdResolveInfo &info,
         const SdfPath specPath =
             info._primPathInLayerStack.AppendProperty(attr.GetName());
 
-        const std::vector<Usd_ClipCache::Clips>& clipsAffectingPrim =
+        const std::vector<Usd_ClipSetRefPtr>& clipsAffectingPrim =
             _clipCache->GetClipsForPrim(attr.GetPrim().GetPath());
         for (const auto& clipAffectingPrim : clipsAffectingPrim) {
-            for (const auto& clip : clipAffectingPrim.valueClips) {
+            for (const auto& clip : clipAffectingPrim->valueClips) {
                 if (_ClipAppliesToLayerStackSite(
                         clip, info._layerStack, info._primPathInLayerStack)
                     && _HasTimeSamples(clip, specPath)) {
@@ -8445,17 +8447,12 @@ UsdStage::HasAuthoredTimeCodeRange() const
 double 
 UsdStage::GetTimeCodesPerSecond() const
 {
-    // Imitate what SdfLayer does: prefer TCPS, but if it isn't set, fall back
-    // dynamically to FPS.  Adapt that rule to include the session layer.  In
-    // order of priority, use: session TCPS, root layer TCPS, session FPS, root
-    // layer FPS.
-    if (HasAuthoredMetadata(SdfFieldKeys->TimeCodesPerSecond)) {
-        double result = 0;
-        GetMetadata(SdfFieldKeys->TimeCodesPerSecond, &result);
-        return result;
-    }
-
-    return GetFramesPerSecond();
+    // PcpLayerStack computes timeCodesPerSecond for its map function layer 
+    // offsets. The root layer stack will always have the stage's fully
+    // computed timeCodesPerSecond value accounting for the unique interaction
+    // between the root and session layer.
+    const PcpLayerStackPtr localLayerStack = _GetPcpCache()->GetLayerStack();
+    return localLayerStack->GetTimeCodesPerSecond();
 }
 
 void 

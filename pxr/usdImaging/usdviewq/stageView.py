@@ -1485,8 +1485,8 @@ class StageView(QtOpenGL.QGLWidget):
         return windowPolicy
     
     def computeWindowSize(self):
-         size = self._scaleMouseCoords(self.size())
-         return (int(size.width()), int(size.height()))
+        size = self.size() * self.devicePixelRatioF()
+        return (int(size.width()), int(size.height()))
 
     def computeWindowViewport(self):
         return (0, 0) + self.computeWindowSize()
@@ -1989,9 +1989,12 @@ class StageView(QtOpenGL.QGLWidget):
         # initiated by this mouse-press
         self._dragActive = True
 
-        coord = self._scaleMouseCoords(event.pos())
+        # Note: multiplying by devicePixelRatio is only necessary because this
+        # is a QGLWidget.
+        x = event.x() * self.devicePixelRatioF()
+        y = event.y() * self.devicePixelRatioF()
 
-		# Allow for either meta or alt key, since meta maps to Windows and Apple
+        # Allow for either meta or alt key, since meta maps to Windows and Apple
         # keys on various hardware/os combos, and some windowing systems consume
         # one or the other by default, but hopefully not both.
         if (event.modifiers() & (QtCore.Qt.AltModifier | QtCore.Qt.MetaModifier)):
@@ -2007,22 +2010,24 @@ class StageView(QtOpenGL.QGLWidget):
                 self._cameraMode = "zoom"
         else:
             self._cameraMode = "pick"
-            self.pickObject(coord.x(), coord.y(), event.button(), event.modifiers())
+            self.pickObject(x, y, event.button(), event.modifiers())
 
-        self._lastX = coord.x()
-        self._lastY = coord.y()
+        self._lastX = x
+        self._lastY = y
 
     def mouseReleaseEvent(self, event):
         self._cameraMode = "none"
         self._dragActive = False
 
     def mouseMoveEvent(self, event):
-
-        coord = self._scaleMouseCoords(event.pos())
+        # Note: multiplying by devicePixelRatio is only necessary because this
+        # is a QGLWidget.
+        x = event.x() * self.devicePixelRatioF()
+        y = event.y() * self.devicePixelRatioF()
 
         if self._dragActive:
-            dx = coord.x() - self._lastX
-            dy = coord.y() - self._lastY
+            dx = x - self._lastX
+            dy = y - self._lastY
             if dx == 0 and dy == 0:
                 return
 
@@ -2048,8 +2053,8 @@ class StageView(QtOpenGL.QGLWidget):
                         -dx * pixelsToWorld, 
                          dy * pixelsToWorld)
 
-            self._lastX = coord.x()
-            self._lastY = coord.y()
+            self._lastX = x
+            self._lastY = y
             self.updateGL()
 
             self.signalMouseDrag.emit()

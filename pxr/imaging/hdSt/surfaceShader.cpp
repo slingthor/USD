@@ -159,7 +159,11 @@ HdStSurfaceShader::BindResources(HdStProgram const &program,
     program.BindResources(this, binder);
 
 
-    HdSt_TextureBinder::BindResources(binder, _namedTextureHandles);
+    const bool bindlessTextureEnabled =
+        GarchResourceFactory::GetInstance()->GetContextCaps().bindlessTextureEnabled;
+
+    HdSt_TextureBinder::BindResources(
+        binder, bindlessTextureEnabled, _namedTextureHandles);
 
 
     binder.BindShaderResources(this);
@@ -173,7 +177,11 @@ HdStSurfaceShader::UnbindResources(HdStProgram const &program,
     binder.UnbindShaderResources(this);
     program.UnbindResources(this, binder);
 
-    HdSt_TextureBinder::UnbindResources(binder, _namedTextureHandles);
+    const bool bindlessTextureEnabled =
+        GarchResourceFactory::GetInstance()->GetContextCaps().bindlessTextureEnabled;
+
+    HdSt_TextureBinder::UnbindResources(
+        binder, bindlessTextureEnabled, _namedTextureHandles);
 
 }
 /*virtual*/
@@ -290,7 +298,7 @@ HdStSurfaceShader::SetNamedTextureHandles(
 void
 HdStSurfaceShader::SetBufferSources(
     HdBufferSpecVector const &bufferSpecs,
-    HdBufferSourceSharedPtrVector &bufferSources,
+    HdBufferSourceSharedPtrVector &&bufferSources,
     HdStResourceRegistrySharedPtr const &resourceRegistry)
 {
     if (bufferSpecs.empty()) {
@@ -321,7 +329,8 @@ HdStSurfaceShader::SetBufferSources(
 
         if (_paramArray->IsValid()) {
             if (!bufferSources.empty()) {
-                resourceRegistry->AddSources(_paramArray, bufferSources);
+                resourceRegistry->AddSources(_paramArray,
+                                             std::move(bufferSources));
             }
         }
     }
@@ -463,15 +472,18 @@ _CollectPrimvarNames(const HdSt_MaterialParamVector &params)
 void
 HdStSurfaceShader::AddResourcesFromTextures(ResourceContext &ctx) const
 {
+    const bool bindlessTextureEnabled =
+        GarchResourceFactory::GetInstance()->GetContextCaps().bindlessTextureEnabled;
+
     // Add buffer sources for bindless texture handles (and
     // other texture metadata such as the sampling transform for
     // a field texture).
     HdBufferSourceSharedPtrVector result;
     HdSt_TextureBinder::ComputeBufferSources(
-        GetNamedTextureHandles(), &result);
+        GetNamedTextureHandles(), bindlessTextureEnabled, &result);
 
     if (!result.empty()) {
-        ctx.AddSources(GetShaderData(), result);
+        ctx.AddSources(GetShaderData(), std::move(result));
     }
 }
 

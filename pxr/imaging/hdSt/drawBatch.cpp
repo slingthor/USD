@@ -335,7 +335,8 @@ HdSt_DrawBatch::_DrawingProgram::CompileShader(
                                 resourceRegistry->RegisterProgram(hash);
 
         if (programInstance.IsFirstInstance()) {
-            HdStProgramSharedPtr program = codeGen->Compile();
+            HdStProgramSharedPtr program = codeGen->Compile(
+                resourceRegistry.get());
             if (program && _Link(program)) {
                 // store the program into the program registry.
                 programInstance.SetValue(program);
