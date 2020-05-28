@@ -1596,5 +1596,12 @@ HgiTextureHandle UsdImagingGLEngine::GetPresentationTextureHandle(
     return aovTexture;
 }
 
+USDIMAGINGGL_API
+HdRenderBuffer* UsdImagingGLEngine::GetRenderOutput(TfToken const &name) const
+{
+    TF_VERIFY(_taskController);
+    return _taskController->GetRenderOutput(name);
+}
+
 PXR_NAMESPACE_CLOSE_SCOPE
 

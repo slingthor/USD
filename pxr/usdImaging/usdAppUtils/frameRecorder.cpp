@@ -43,6 +43,7 @@
 #include "pxr/imaging/garch/simpleMaterial.h"
 #include "pxr/imaging/glf/diagnostic.h"
 #include "pxr/imaging/hgi/texture.h"
+#include "pxr/imaging/hgi/types.h"
 #include "pxr/usd/sdf/path.h"
 #include "pxr/usd/usd/prim.h"
 #include "pxr/usd/usd/stage.h"
@@ -54,6 +55,7 @@
 #include "pxr/imaging/hgi/blitCmds.h"
 #include "pxr/imaging/hgi/blitCmdsOps.h"
 #include "pxr/imaging/hgiMetal/hgi.h"
+#include "pxr/imaging/hd/renderBuffer.h"
 
 #include <string>
 
@@ -154,30 +156,36 @@ _ComputeCameraToFrameStage(const UsdStagePtr& stage, UsdTimeCode timeCode,
 
 /// Debug api to output the contents of the draw target to a png file.
 static bool
-_WriteToFile(std::string const & filename,
-             HgiTextureHandle const & textureHandle)
+_WriteToFile(std::string const &filename,
+             Hgi *hgi,
+             HgiTextureHandle const &textureHandle)
 {
+    const auto &textureDesc = textureHandle.Get()->GetDescriptor();
+    
     constexpr GLenum format = GL_RGBA;
     constexpr GLenum type = GL_FLOAT;
-    constexpr size_t nelems = 4; // For GL_RGBA
-    constexpr size_t elemsize = sizeof(GLfloat); // For GL_FLOAT
-    
-    const auto &textureDesc = textureHandle.Get()->GetDescriptor();
+    const size_t formatByteSize = HgiDataSizeOfFormat(textureDesc.format);
     const size_t width = textureDesc.dimensions[0];
     const size_t height = textureDesc.dimensions[1];
-    const size_t stride = width * nelems * elemsize;
-    const size_t bufsize = height * stride;
+    const size_t dataByteSize = textureDesc.dimensions[0] *
+                                textureDesc.dimensions[1] *
+                                formatByteSize * 2;
     
-    std::unique_ptr<char[]> buf(new char[bufsize]);
-    
-    HgiMetal* hgiMetal = MtlfMetalContext::GetMetalContext()->GetHgi();
-    HgiBlitCmdsUniquePtr const blitCmds = hgiMetal->CreateBlitCmds();
+    std::vector<uint8_t> buffer;
+    buffer.resize(dataByteSize);
+
+    HgiBlitCmdsUniquePtr const blitCmds = hgi->CreateBlitCmds();
     HgiTextureGpuToCpuOp copyOp;
     copyOp.gpuSourceTexture = textureHandle;
-    copyOp.cpuDestinationBuffer = buf.get();
-    copyOp.destinationBufferByteSize = bufsize;
+    copyOp.sourceTexelOffset = GfVec3i(0);
+    copyOp.mipLevel = 0;
+    copyOp.startLayer = 0;
+    copyOp.numLayers = 1;
+    copyOp.cpuDestinationBuffer = buffer.data();
+    copyOp.destinationByteOffset = 0;
+    copyOp.destinationBufferByteSize = dataByteSize;
     blitCmds->CopyTextureGpuToCpu(copyOp);
-    hgiMetal->SubmitCmds(blitCmds.get(), 1);
+    hgi->SubmitCmds(blitCmds.get(), 1);
     
     VtDictionary metadata;
 
@@ -187,7 +195,7 @@ _WriteToFile(std::string const & filename,
     storage.format = format;
     storage.type = type;
     storage.flipped = true;
-    storage.data = buf.get();
+    storage.data = buffer.data();
 
     {
         TRACE_FUNCTION_SCOPE("writing image");
@@ -289,11 +297,11 @@ UsdAppUtilsFrameRecorder::Record(
     renderParams.showRender = _HasPurpose(_purposes, UsdGeomTokens->render);
     renderParams.showGuides = _HasPurpose(_purposes, UsdGeomTokens->guide);
     
-    if (false) {
-#if defined(ARCH_GFX_OPENGL)
-    glEnable(GL_DEPTH_TEST);
-#endif
+    #if defined(ARCH_GFX_OPENGL)
+        glEnable(GL_DEPTH_TEST);
+    #endif
 
+    if (false) {
     UsdImagingGLEngine::ResourceFactoryGuard guard(
         _imagingEngine->GetResourceFactory());
 
@@ -334,22 +342,34 @@ UsdAppUtilsFrameRecorder::Record(
 
     return drawTarget->WriteToFile("color", outputImagePath);
     } else {
-        glEnable(GL_DEPTH_TEST);
+        HgiMetal *hgiMetal = static_cast<HgiMetal*>(_imagingEngine.GetHgi());
+        hgiMetal->_useFinalTextureForGetImage = true;
+        
+#if defined(ARCH_GFX_OPENGL)
         glViewport(0, 0, _imageWidth, imageHeight);
 
         const GLfloat CLEAR_DEPTH[1] = { 1.0f };
+        glClearBufferfv(GL_COLOR, 0, CLEAR_COLOR.data());
+        glClearBufferfv(GL_DEPTH, 0, CLEAR_DEPTH);
+#endif
+
         const UsdPrim& pseudoRoot = stage->GetPseudoRoot();
 
         do {
+#if defined(ARCH_GFX_OPENGL)
             glClearBufferfv(GL_COLOR, 0, CLEAR_COLOR.data());
             glClearBufferfv(GL_DEPTH, 0, CLEAR_DEPTH);
+#endif
             _imagingEngine.Render(pseudoRoot, renderParams);
         } while (!_imagingEngine.IsConverged());
         
         HgiTextureHandle presentationTexture =
             _imagingEngine.GetPresentationTextureHandle(HdAovTokens->color);
 
-        return _WriteToFile(outputImagePath, presentationTexture);
+        bool succeeded = _WriteToFile(outputImagePath, hgiMetal, presentationTexture);
+        
+        
+        return succeeded;
     }
 }
 
