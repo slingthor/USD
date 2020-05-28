@@ -1151,6 +1151,19 @@ HdxTaskController::SetViewportRenderOutput(TfToken const& name)
     }
 }
 
+HdRenderBuffer*
+HdxTaskController::GetRenderOutput(TfToken const& name)
+{
+    if (!_AovsSupported()) {
+        return nullptr;
+    }
+
+    SdfPath renderBufferId = _GetAovPath(name);
+    return static_cast<HdRenderBuffer*>(
+        GetRenderIndex()->GetBprim(HdPrimTypeTokens->renderBuffer,
+            renderBufferId));
+}
+
 void
 HdxTaskController::SetRenderOutputSettings(TfToken const& name,
                                            HdAovDescriptor const& desc)
