@@ -113,7 +113,7 @@ public:
     typedef std::map<std::string, int> BindingLocationMap;
 
     HDST_API
-    HdStMSLProgram(TfToken const &role);
+    HdStMSLProgram(TfToken const &role, HdStResourceRegistry *const registry);
     HDST_API
     virtual ~HdStMSLProgram();
 

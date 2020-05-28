@@ -135,8 +135,10 @@ MSL_ShaderBinding const* MSL_FindBinding(MSL_ShaderBindingMap const& bindings,
 }
 
 
-HdStMSLProgram::HdStMSLProgram(TfToken const &role)
-: HdStProgram(role)
+HdStMSLProgram::HdStMSLProgram(
+    TfToken const &role,
+    HdStResourceRegistry *const registry)
+    : HdStProgram(role, registry)
 , _role(role)
 , _valid(false)
 , _uniformBuffer(role)

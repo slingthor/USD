@@ -75,11 +75,12 @@ HdSt_CodeGen *HdStResourceFactoryMetal::NewCodeGen(
     return new HdSt_CodeGenMSL(shaders);
 }
 
-HdStDispatchBuffer *HdStResourceFactoryMetal::NewDispatchBuffer(
+HdStDispatchBufferSharedPtr HdStResourceFactoryMetal::NewDispatchBuffer(
     TfToken const &role, int count,
     unsigned int commandNumUints) const
 {
-    return new HdStDispatchBufferMetal(role, count, commandNumUints);
+    return std::make_shared<HdStDispatchBufferMetal>(
+        role, count, commandNumUints);
 }
 
 HdStBufferRelocator *HdStResourceFactoryMetal::NewBufferRelocator(
@@ -144,10 +145,10 @@ HdSt_DrawBatchSharedPtr HdStResourceFactoryMetal::NewIndirectDrawBatch(
         new HdSt_IndirectDrawBatchMetal(drawItemInstance));
 }
 
-HdStPersistentBuffer *HdStResourceFactoryMetal::NewPersistentBuffer(
+HdStPersistentBufferSharedPtr HdStResourceFactoryMetal::NewPersistentBuffer(
     TfToken const &role, size_t dataSize, void* data) const
 {
-    return new HdStPersistentBufferMetal(role, dataSize, data);
+    return std::make_shared<HdStPersistentBufferMetal>(role, dataSize, data);
 }
 
 /// Create a GPU quadrangulation computation
@@ -233,9 +234,9 @@ HdBufferArraySharedPtr HdStResourceFactoryMetal::NewVBOSimpleMemoryBuffer(
 }
 
 HdStProgram *HdStResourceFactoryMetal::NewProgram(
-    TfToken const &role) const
+    TfToken const &role, HdStResourceRegistry *const registry) const
 {
-    return new HdStMSLProgram(role);
+    return new HdStMSLProgram(role, registry);
 }
 
 HdStExtCompGpuComputation*

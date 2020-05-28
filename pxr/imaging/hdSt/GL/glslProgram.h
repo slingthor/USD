@@ -47,7 +47,7 @@ class HdStGLSLProgram: public HdStProgram
 {
 public:
     HDST_API
-    HdStGLSLProgram(TfToken const &role);
+    HdStGLSLProgram(TfToken const &role, HdStResourceRegistry *const registry);
     HDST_API
     virtual ~HdStGLSLProgram();
 

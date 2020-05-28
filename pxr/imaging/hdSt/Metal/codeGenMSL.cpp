@@ -2340,7 +2340,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
 }
 
 HdStProgramSharedPtr
-HdSt_CodeGenMSL::Compile()
+HdSt_CodeGenMSL::Compile(HdStResourceRegistry* const registry)
 {
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
@@ -2370,7 +2370,8 @@ HdSt_CodeGenMSL::Compile()
     _buildTarget = (_hasGS ? kMSL_BuildTarget_MVA_ComputeGS : kMSL_BuildTarget_MVA);
     
     // create MSL program.
-    HdStMSLProgramSharedPtr mslProgram(new HdStMSLProgram(HdTokens->drawingShader));
+    HdStMSLProgramSharedPtr mslProgram(
+        new HdStMSLProgram(HdTokens->drawingShader, registry));
     
     // initialize autogen source buckets
     _genDefinitions.str(""); _genOSDDefinitions.str(""); _genCommon.str("");
@@ -2788,7 +2789,7 @@ HdSt_CodeGenMSL::GetComputeHeader()
 }
                 
 HdStProgramSharedPtr
-HdSt_CodeGenMSL::CompileComputeProgram()
+HdSt_CodeGenMSL::CompileComputeProgram(HdStResourceRegistry* const registry)
 {
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
@@ -2897,7 +2898,8 @@ HdSt_CodeGenMSL::CompileComputeProgram()
     glueVS.str(""); gluePS.str(""); glueGS.str(""); glueCS.str("");
     
     // create Metal function.
-    HdStMSLProgramSharedPtr program(new HdStMSLProgram(HdTokens->drawingShader));
+    HdStMSLProgramSharedPtr program(
+        new HdStMSLProgram(HdTokens->drawingShader, registry));
 
     _GenerateGlue(glueVS, glueGS, gluePS, glueCS, program);
     

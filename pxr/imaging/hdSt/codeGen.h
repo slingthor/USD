@@ -60,7 +60,8 @@ public:
 
     /// Generate shader source and compile it.
     HDST_API
-    virtual HdStProgramSharedPtr Compile() = 0;
+    virtual HdStProgramSharedPtr Compile(
+        HdStResourceRegistry* const registry) = 0;
 
     /// Generate compute shader source and compile it.
     /// It uses the compute information in the meta data to determine
@@ -78,7 +79,8 @@ public:
     /// \see GetComputeShaderSource
     /// \see HdSt_ResourceBinder::ResolveBindings
     HDST_API
-    virtual HdStProgramSharedPtr CompileComputeProgram() = 0;
+    virtual HdStProgramSharedPtr CompileComputeProgram(
+        HdStResourceRegistry*const registry) = 0;
     
     /// Return the generated vertex shader source
     virtual const std::string &GetVertexShaderSource() const = 0;

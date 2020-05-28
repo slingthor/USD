@@ -46,12 +46,15 @@
 #include "pxr/imaging/hd/driver.h"
 #include "pxr/imaging/hd/engine.h"
 #include "pxr/imaging/hd/rprimCollection.h"
+#include "pxr/imaging/hd/pluginRenderDelegateUniqueHandle.h"
 
 #include "pxr/imaging/hdSt/resourceFactory.h"
 
 #include "pxr/imaging/hdx/selectionTracker.h"
 #include "pxr/imaging/hdx/renderSetupTask.h"
 #include "pxr/imaging/hdx/pickTask.h"
+
+#include "pxr/imaging/hgi/hgi.h"
 
 #include "pxr/imaging/garch/drawTarget.h"
 #include "pxr/imaging/garch/simpleLight.h"
@@ -76,7 +79,6 @@ PXR_NAMESPACE_OPEN_SCOPE
 class UsdPrim;
 class HdRenderBuffer;
 class HdRenderIndex;
-class HdRendererPlugin;
 class HdxTaskController;
 class UsdImagingDelegate;
 class UsdImagingGLLegacyEngine;
@@ -117,17 +119,22 @@ public:
     /// \name Construction
     /// @{
     // ---------------------------------------------------------------------
+
+    /// A HdDriver, containing the Hgi of your choice, can be optionally passed
+    /// in during construction. This can be helpful if you application creates
+    /// multiple UsdImagingGLEngine that wish to use the same HdDriver / Hgi.
     USDIMAGINGGL_API
     UsdImagingGLEngine(const RenderAPI api,
-                       Hgi* hgi = Hgi::GetPlatformDefaultHgi());
+	                   const HdDriver& driver = HdDriver());
 
     USDIMAGINGGL_API
     UsdImagingGLEngine(const RenderAPI api,
                        const SdfPath& rootPath,
                        const SdfPathVector& excludedPaths,
                        const SdfPathVector& invisedPaths=SdfPathVector(),
-                       const SdfPath& delegateID = SdfPath::AbsoluteRootPath(),
-                       Hgi* hgi = Hgi::GetPlatformDefaultHgi());
+                       const SdfPath& sceneDelegateID =
+                                        SdfPath::AbsoluteRootPath(),
+                       const HdDriver& driver = HdDriver());
 
     // Disallow copies
     UsdImagingGLEngine(const UsdImagingGLEngine&) = delete;
@@ -444,11 +451,6 @@ public:
     }
     
     USDIMAGINGGL_API
-    Hgi *GetHgi() const {
-        return _hgi;
-    }
-    
-    USDIMAGINGGL_API
     HgiTextureHandle GetPresentationTextureHandle(TfToken const &name) const;
     
     struct ResourceFactoryGuard {
@@ -497,33 +499,53 @@ protected:
     static void _ComputeRenderTags(UsdImagingGLRenderParams const& params,
                           TfTokenVector *renderTags);
 
-    // This function disposes of: the render index, the render plugin,
-    // the task controller, and the usd imaging delegate.
     USDIMAGINGGL_API
-    void _DeleteHydraResources();
+    void _InitializeHgiIfNecessary();
 
+    USDIMAGINGGL_API
+    void _SetRenderDelegateAndRestoreState(
+        HdPluginRenderDelegateUniqueHandle &&);
+
+    USDIMAGINGGL_API
+    void _SetRenderDelegate(HdPluginRenderDelegateUniqueHandle &&);
+
+    USDIMAGINGGL_API
+    SdfPath _ComputeControllerPath(const HdPluginRenderDelegateUniqueHandle &);
+
+
+    USDIMAGINGGL_API
+    UsdImagingDelegate *_GetSceneDelegate() const;
+
+    USDIMAGINGGL_API
+    HdSelectionSharedPtr _GetSelection() const;
 
     // _hgi is first field so that it is guaranteed to
     // be destructed last and thus available while any other
     // Hydra objects have a pointer to Hgi.
-    class Hgi *_hgi;
+    HgiUniquePtr _hgi;
     // Similar for HdDriver.
     HdDriver _hgiDriver;
     HdEngine *_engine;
     HdStResourceFactoryInterface *_resourceFactory;
 
-    HdRenderIndex *_renderIndex;
+    // ... and the other Hydra resources
+    HdPluginRenderDelegateUniqueHandle _renderDelegate;
+    std::unique_ptr<HdRenderIndex> _renderIndex;
+
+    SdfPath const _sceneDelegateId;
+
+private:
+    // Note that the order of construction/destruction matters,
+    // thus the switches between protected and private are necessary
+    // until we have created getters for _taskController, ... as well.
+    std::unique_ptr<UsdImagingDelegate> _sceneDelegate;
+
+protected:
+    std::unique_ptr<HdxTaskController> _taskController;
 
     HdxSelectionTrackerSharedPtr _selTracker;
     HdRprimCollection _renderCollection;
     HdRprimCollection _intersectCollection;
-
-    SdfPath const _delegateID;
-    UsdImagingDelegate *_delegate;
-
-    HdRendererPlugin *_rendererPlugin;
-    TfToken _rendererId;
-    HdxTaskController *_taskController;
 
     GarchSimpleLightingContextRefPtr _lightingContextForOpenGLState;
 

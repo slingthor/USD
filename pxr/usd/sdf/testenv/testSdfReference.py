@@ -31,7 +31,7 @@ class TestSdfReferences(unittest.TestCase):
     def test_Basic(self):
         # Test all combinations of the following keyword arguments.
         args = [
-            ['assetPath', '//menv30/layer.sdf'],
+            ['assetPath', '//unit/layer.sdf'],
             ['primPath', '/rootPrim'],
             ['layerOffset', Sdf.LayerOffset(48, -2)],
             ['customData', {'key': 42, 'other': 'yes'}],
@@ -60,7 +60,7 @@ class TestSdfReferences(unittest.TestCase):
         # way to support nested proxies).  Make sure the user can't modify
         # temporary Reference objects.
         with self.assertRaises(AttributeError):
-            Sdf.Reference().assetPath = '//menv30/blah.sdf'
+            Sdf.Reference().assetPath = '//unit/blah.sdf'
 
         with self.assertRaises(AttributeError):
             Sdf.Reference().primPath = '/root'
@@ -93,6 +93,14 @@ class TestSdfReferences(unittest.TestCase):
         r2 = Sdf.Reference('//test/layer.sdf', layerOffset=Sdf.LayerOffset(48, -2))
         self.assertTrue(r1 < r2)
         self.assertFalse(r2 < r1)
+
+        # Test IsInternal()
+
+        # r2 can not be an internal reference since it's assetPath is not empty
+        self.assertFalse(r2.IsInternal())
+
+        # ref0 is an internal referennce because it has an empty assetPath
+        self.assertTrue(ref0.IsInternal())
 
 if __name__ == "__main__":
     unittest.main()

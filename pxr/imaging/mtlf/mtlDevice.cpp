@@ -1947,6 +1947,10 @@ id<MTLBuffer> MtlfMetalContext::GetMetalBuffer(NSUInteger length, MTLResourceOpt
 
 void MtlfMetalContext::ReleaseMetalBuffer(id<MTLBuffer> const buffer)
 {
+    if (!this) {
+        [buffer release];
+        return;
+    }
     MetalBufferListEntry bufferEntry;
     bufferEntry.buffer = buffer;
     bufferEntry.releasedOnFrame = frameCount;

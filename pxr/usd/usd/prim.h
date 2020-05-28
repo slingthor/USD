@@ -434,6 +434,11 @@ public:
     /// Remove all scene description for the property with the
     /// given \p propName <em>in the current UsdEditTarget</em>.
     /// Return true if the property is removed, false otherwise.
+    ///
+    /// Because this method can only remove opinions about the property from
+    /// the current EditTarget, you may generally find it more useful to use
+    /// UsdAttribute::Block(), which will ensure that all values from the 
+    /// EditTarget and weaker layers for the property will be ignored.
     USD_API
     bool RemoveProperty(const TfToken &propName);
 
@@ -508,8 +513,8 @@ public:
     /// <b>Using HasAPI in C++</b>
     /// \code 
     /// UsdPrim prim = stage->OverridePrim("/path/to/prim");
-    /// UsdModelAPI modelAPI = UsdModelAPI::Apply(prim);
-    /// assert(prim.HasAPI<UsdModelAPI>());
+    /// MyDomainBozAPI = MyDomainBozAPI::Apply(prim);
+    /// assert(prim.HasAPI<MyDomainBozAPI>());
     /// 
     /// UsdCollectionAPI collAPI = UsdCollectionAPI::Apply(prim, 
     ///         /*instanceName*/ TfToken("geom"))
@@ -525,8 +530,8 @@ public:
     /// <b>Using HasAPI in Python</b>
     /// \code{.py}
     /// prim = stage.OverridePrim("/path/to/prim")
-    /// modelAPI = Usd.ModelAPI.Apply(prim)
-    /// assert prim.HasAPI(Usd.ModelAPI)
+    /// bozAPI = MyDomain.BozAPI.Apply(prim)
+    /// assert prim.HasAPI(MyDomain.BozAPI)
     /// 
     /// collAPI = Usd.CollectionAPI.Apply(prim, "geom")
     /// assert(prim.HasAPI(Usd.CollectionAPI))

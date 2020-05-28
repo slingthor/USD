@@ -142,12 +142,14 @@ public:
 
 protected:
     HDST_API
-    HdStProgram(TfToken const &role);
+    HdStProgram(TfToken const &role,
+                HdStResourceRegistry const* resourceRegistry);
 
     HDST_API
     virtual std::string GetComputeHeader() const = 0;
     
     TfToken const _role;
+    HdStResourceRegistry const* _registry;
 };
 
 

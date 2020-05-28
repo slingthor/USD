@@ -99,8 +99,8 @@ HdStMaterial::_ProcessTextureDescriptors(
     const bool useNewTextureSystem =
         TfGetEnvSetting(HDST_USE_NEW_TEXTURE_SYSTEM);
 
-    const bool usesBindlessTextures =
-        HdSt_TextureBinder::UsesBindlessTextures();
+    const bool bindlessTextureEnabled
+        = GarchResourceFactory::GetInstance()->GetContextCaps().bindlessTextureEnabled;
 
     for (HdStMaterialNetwork::TextureDescriptor const &desc : descs) {
         if (desc.askSceneDelegateForTexture || !useNewTextureSystem) {
@@ -116,23 +116,25 @@ HdStMaterial::_ProcessTextureDescriptors(
                     textureResource,
                     specs, sources, texturesFromSceneDelegate);
         } else {
-        HdStTextureHandleSharedPtr const textureHandle =
-            resourceRegistry->AllocateTextureHandle(
-                desc.textureId,
-                desc.type,
-                desc.samplerParameters,
-                desc.memoryRequest,
-                usesBindlessTextures,
-                shaderCode);
-        
-            texturesFromStorm->push_back({ desc.name,
-                           desc.type,
-                           textureHandle,
-                           desc.texturePrim});
+            HdStTextureHandleSharedPtr const textureHandle =
+                resourceRegistry->AllocateTextureHandle(
+                    desc.textureId,
+                    desc.type,
+                    desc.samplerParameters,
+                    desc.memoryRequest,
+                    bindlessTextureEnabled,
+                    shaderCode);
+            
+            texturesFromStorm->push_back(
+                { desc.name,
+                  desc.type,
+                  textureHandle,
+                  desc.texturePrim});
         }
     }
 
-    HdSt_TextureBinder::GetBufferSpecs(*texturesFromStorm, specs);
+    HdSt_TextureBinder::GetBufferSpecs(
+        *texturesFromStorm, bindlessTextureEnabled, specs);
 }
 
 /* virtual */
@@ -177,9 +179,9 @@ HdStMaterial::Sync(HdSceneDelegate *sceneDelegate,
             materialMetadata = _networkProcessor.GetMetadata();
             materialTag = _networkProcessor.GetMaterialTag();
             params = _networkProcessor.GetMaterialParams();
-                textureDescriptors = _networkProcessor.GetTextureDescriptors();
-            }
+            textureDescriptors = _networkProcessor.GetTextureDescriptors();
         }
+    }
 
     if (fragmentSource.empty() && geometrySource.empty()) {
         _InitFallbackShader();
@@ -283,16 +285,17 @@ HdStMaterial::Sync(HdSceneDelegate *sceneDelegate,
     _ProcessTextureDescriptors(
         sceneDelegate,
         resourceRegistry,
-                _surfaceShader,
+        _surfaceShader,
         textureDescriptors,
         &textures,
         &textureResourceDescriptors,
         &specs,
         &sources);
 
-        _surfaceShader->SetNamedTextureHandles(textures);
+    _surfaceShader->SetNamedTextureHandles(textures);
     _surfaceShader->SetTextureDescriptors(textureResourceDescriptors);    
-    _surfaceShader->SetBufferSources(specs, sources, resourceRegistry);
+    _surfaceShader->SetBufferSources(
+        specs, std::move(sources), resourceRegistry);
 
     if (_hasPtex != hasPtex) {
         _hasPtex = hasPtex;

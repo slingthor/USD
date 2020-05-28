@@ -34,6 +34,8 @@
 #include "pxr/imaging/hdSt/resourceRegistry.h"
 #include "pxr/imaging/hd/renderDelegate.h"
 #include "pxr/imaging/hd/vtBufferSource.h"
+#include "pxr/imaging/garch/contextCaps.h"
+#include "pxr/imaging/garch/resourceFactory.h"
 #include "pxr/base/tf/staticTokens.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -284,12 +286,15 @@ _ComputePoints(const GfBBox3d &bbox)
 void
 HdSt_VolumeShader::AddResourcesFromTextures(ResourceContext &ctx) const
 {
+    const bool bindlessTextureEnabled
+        = GarchResourceFactory::GetInstance()->GetContextCaps().bindlessTextureEnabled;
+
     HdBufferSourceSharedPtrVector shaderBarSources;
 
     // Fills in sampling transforms for textures and also texture
     // handles for bindless textures.
     HdSt_TextureBinder::ComputeBufferSources(
-        GetNamedTextureHandles(), &shaderBarSources);
+        GetNamedTextureHandles(), bindlessTextureEnabled, &shaderBarSources);
 
     if (_fillsPointsBar) {
         // Compute volume bounding box from field bounding boxes
@@ -307,7 +312,7 @@ HdSt_VolumeShader::AddResourcesFromTextures(ResourceContext &ctx) const
     }
 
     if (!shaderBarSources.empty()) {
-        ctx.AddSources(GetShaderData(), shaderBarSources);
+        ctx.AddSources(GetShaderData(), std::move(shaderBarSources));
     }
 }
 
@@ -333,6 +338,9 @@ HdSt_VolumeShader::UpdateTextureHandles(
     if (!TF_VERIFY(textureHandles.size() == _fieldDescriptors.size())) {
         return;
     }
+
+    const bool bindlessTextureEnabled
+        = GarchResourceFactory::GetInstance()->GetContextCaps().bindlessTextureEnabled;
 
     // Walk through the vector of named texture handles and field descriptors
     // simultaneously.
@@ -366,7 +374,7 @@ HdSt_VolumeShader::UpdateTextureHandles(
                 textureType,
                 samplerParams,
                 textureMemory,
-                HdSt_TextureBinder::UsesBindlessTextures(),
+                bindlessTextureEnabled,
                 shared_from_this());
     }
 
