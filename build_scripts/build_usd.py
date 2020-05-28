@@ -1652,6 +1652,9 @@ def InstallOpenSubdiv(context, force, buildArgs):
         # Add on any user-specified extra arguments.
         extraArgs += buildArgs
         sdkroot = os.environ.get('SDKROOT')
+        
+        if context.static_dependencies_macOS:
+            extraArgs.append('-DBUILD_SHARED_LIBS=OFF')
 
         if iOS():
             PatchFile(srcOSDDir + "/cmake/iOSToolchain.cmake", 
