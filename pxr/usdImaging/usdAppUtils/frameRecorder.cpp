@@ -342,7 +342,7 @@ UsdAppUtilsFrameRecorder::Record(
 
     return drawTarget->WriteToFile("color", outputImagePath);
     } else {
-        HgiMetal *hgiMetal = static_cast<HgiMetal*>(_imagingEngine.GetHgi());
+        HgiMetal *hgiMetal = static_cast<HgiMetal*>(_imagingEngine->GetHgi());
         hgiMetal->_useFinalTextureForGetImage = true;
         
 #if defined(ARCH_GFX_OPENGL)
@@ -360,11 +360,11 @@ UsdAppUtilsFrameRecorder::Record(
             glClearBufferfv(GL_COLOR, 0, CLEAR_COLOR.data());
             glClearBufferfv(GL_DEPTH, 0, CLEAR_DEPTH);
 #endif
-            _imagingEngine.Render(pseudoRoot, renderParams);
-        } while (!_imagingEngine.IsConverged());
+            _imagingEngine->Render(pseudoRoot, renderParams);
+        } while (!_imagingEngine->IsConverged());
         
         HgiTextureHandle presentationTexture =
-            _imagingEngine.GetPresentationTextureHandle(HdAovTokens->color);
+            _imagingEngine->GetPresentationTextureHandle(HdAovTokens->color);
 
         bool succeeded = _WriteToFile(outputImagePath, hgiMetal, presentationTexture);
         
