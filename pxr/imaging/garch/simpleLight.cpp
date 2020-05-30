@@ -342,6 +342,7 @@ std::ostream& operator<<(std::ostream& out, const GarchSimpleLight& v)
         << v._hasShadow
         << v._shadowResolution
         << v._shadowBias
+        << v._shadowBlur
         << v._shadowIndexStart
         << v._shadowIndexEnd
         << v._transform
