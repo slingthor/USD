@@ -1786,8 +1786,7 @@ _ReadCompressedInts(Reader reader, Int *out, size_t size)
         sizeof(Int) == 4,
         Usd_IntegerCompression,
         Usd_IntegerCompression64>::type;
-    // @AAPL: rdar://62855661
-    // (Crash#1 - Usd_CrateFile::_MmapStream - global-buffer-overflow)
+
     size_t bufferSize = Compressor::GetCompressedBufferSize(size);
     std::unique_ptr<char[]> compBuffer(
         new char[bufferSize]);
@@ -3139,8 +3138,6 @@ CrateFile::_ReadFieldSets(Reader reader)
             _fieldSets.resize(numFieldSets);
 
             // Create temporary space for decompressing.
-            // @AAPL rdar://63657220
-            // (Crash#2 - Heap Overflow Write in CrateFile::ReadFieldSets)
             size_t compressedBufferSize = 
                 Usd_IntegerCompression::GetCompressedBufferSize(numFieldSets);
             std::unique_ptr<char[]> compBuffer(
@@ -3152,8 +3149,6 @@ CrateFile::_ReadFieldSets(Reader reader)
 
             auto fsetsSize = reader.template Read<uint64_t>();
 
-            // @AAPL rdar://63657220
-            // (Crash#2 - Heap Overflow Write in CrateFile::ReadFieldSets)
             if (fsetsSize > compressedBufferSize) {
                 TF_RUNTIME_ERROR("Failed read fsets, buffer overflow.");
             }
@@ -3232,8 +3227,6 @@ CrateFile::_ReadSpecs(Reader reader)
             _specs.resize(numSpecs);
 
             // Create temporary space for decompressing.
-            // @AAPL rdar://63657477
-            // (Crash#4 - Heap Overflow Write in CrateFile::ReadSpecs)
             size_t compressedBufferSize =
                 Usd_IntegerCompression::GetCompressedBufferSize(numSpecs);
             std::unique_ptr<char[]> compBuffer(
@@ -3245,8 +3238,6 @@ CrateFile::_ReadSpecs(Reader reader)
 
             // pathIndexes.
             auto pathIndexesSize = reader.template Read<uint64_t>();
-            // @AAPL rdar://63657477
-            // (Crash#4 - Heap Overflow Write in CrateFile::ReadSpecs)
             if (pathIndexesSize > compressedBufferSize) {
                 TF_RUNTIME_ERROR("Failed read pathIndexes, buffer overflow.");
                 return;
@@ -3261,8 +3252,6 @@ CrateFile::_ReadSpecs(Reader reader)
 
             // fieldSetIndexes.
             auto fsetIndexesSize = reader.template Read<uint64_t>();
-            // @AAPL rdar://63657477
-            // (Crash#4 - Heap Overflow Write in CrateFile::ReadSpecs)
             if (fsetIndexesSize > compressedBufferSize) {
                 TF_RUNTIME_ERROR("Failed read fsetIndexes, buffer overflow.");
                 return;
@@ -3277,8 +3266,6 @@ CrateFile::_ReadSpecs(Reader reader)
             
             // specTypes.
             auto specTypesSize = reader.template Read<uint64_t>();
-            // @AAPL rdar://63657477
-            // (Crash#4 - Heap Overflow Write in CrateFile::ReadSpecs)
             if (specTypesSize > compressedBufferSize) {
                 TF_RUNTIME_ERROR("Failed read spectypes, buffer overflow.");
                 return;
@@ -3464,8 +3451,6 @@ CrateFile::_ReadCompressedPaths(Reader reader,
     jumps.resize(numPaths);
 
     // Create temporary space for decompressing.
-    // @AAPL rdar://63657471
-    //  (Crash#3 - Heap Overflow Write in CrateFile::ReadCompressedPaths)
     size_t compressedBufferSize =
         Usd_IntegerCompression::GetCompressedBufferSize(numPaths);
     std::unique_ptr<char[]> compBuffer(
@@ -3476,8 +3461,6 @@ CrateFile::_ReadCompressedPaths(Reader reader,
 
     // pathIndexes.
     auto pathIndexesSize = reader.template Read<uint64_t>();
-    // @AAPL rdar://63657471
-    // (Crash#3 - Heap Overflow Write in CrateFile::ReadCompressedPaths)
     if (pathIndexesSize > compressedBufferSize) {
         TF_RUNTIME_ERROR("Failed read pathIndexes, buffer overflow.");
         return;
@@ -3489,8 +3472,6 @@ CrateFile::_ReadCompressedPaths(Reader reader,
 
     // elementTokenIndexes.
     auto elementTokenIndexesSize = reader.template Read<uint64_t>();
-    // @AAPL rdar://63657471
-    // (Crash#3 - Heap Overflow Write in CrateFile::ReadCompressedPaths)
     if (elementTokenIndexesSize > compressedBufferSize) {
         TF_RUNTIME_ERROR("Failed read elementTokenIndexes, buffer overflow.");
         return;
@@ -3502,8 +3483,6 @@ CrateFile::_ReadCompressedPaths(Reader reader,
 
     // jumps.
     auto jumpsSize = reader.template Read<uint64_t>();
-    // @AAPL rdar://63657471
-    // (Crash#3 - Heap Overflow Write in CrateFile::ReadCompressedPaths)
     if (jumpsSize > compressedBufferSize) {
         TF_RUNTIME_ERROR("Failed read jumps, buffer overflow.");
         return;
