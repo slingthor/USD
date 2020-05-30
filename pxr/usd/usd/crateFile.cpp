@@ -1786,11 +1786,16 @@ _ReadCompressedInts(Reader reader, Int *out, size_t size)
         sizeof(Int) == 4,
         Usd_IntegerCompression,
         Usd_IntegerCompression64>::type;
+    // @AAPL: rdar://62855661
+    // (Crash#1 - Usd_CrateFile::_MmapStream - global-buffer-overflow)
+    size_t bufferSize = Compressor::GetCompressedBufferSize(size);
     std::unique_ptr<char[]> compBuffer(
-        new char[Compressor::GetCompressedBufferSize(size)]);
+        new char[bufferSize]);
     auto compSize = reader.template Read<uint64_t>();
-    reader.ReadContiguous(compBuffer.get(), compSize);
+    if (compSize <= bufferSize && compSize > 0) {
+        reader.ReadContiguous(compBuffer.get(), compSize);
         Compressor::DecompressFromBuffer(compBuffer.get(), compSize, out, size);
+    }
 }
 
 template <class Reader, class T>
@@ -2094,8 +2099,8 @@ CrateFile::Open(string const &assetPath)
 TfToken const &
 CrateFile::GetSoftwareVersionToken()
 {
-    static const auto tok = new TfToken(_SoftwareVersion.AsString());
-    return *tok;
+    static TfToken tok(_SoftwareVersion.AsString());
+    return tok;
 }
 
 TfToken
@@ -2226,7 +2231,7 @@ CrateFile::_InitAsset()
 
 CrateFile::~CrateFile()
 {
-    static auto outputMutex = new std::mutex;
+    static std::mutex outputMutex;
 
     // Dump a debug page map if requested.
     if (_useMmap && _mmapSrc && _debugPageMap) {
@@ -2260,7 +2265,7 @@ CrateFile::~CrateFile()
             }
         }
 
-        std::lock_guard<std::mutex> lock(*outputMutex);
+        std::lock_guard<std::mutex> lock(outputMutex);
 
         printf(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>"
                ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n"
@@ -3134,15 +3139,24 @@ CrateFile::_ReadFieldSets(Reader reader)
             _fieldSets.resize(numFieldSets);
 
             // Create temporary space for decompressing.
+            // @AAPL rdar://63657220
+            // (Crash#2 - Heap Overflow Write in CrateFile::ReadFieldSets)
+            size_t compressedBufferSize = 
+                Usd_IntegerCompression::GetCompressedBufferSize(numFieldSets);
             std::unique_ptr<char[]> compBuffer(
-                new char[Usd_IntegerCompression::
-                         GetCompressedBufferSize(numFieldSets)]);
+                new char[compressedBufferSize]);
             vector<uint32_t> tmp(numFieldSets);
             std::unique_ptr<char[]> workingSpace(
                 new char[Usd_IntegerCompression::
                          GetDecompressionWorkingSpaceSize(numFieldSets)]);
 
             auto fsetsSize = reader.template Read<uint64_t>();
+
+            // @AAPL rdar://63657220
+            // (Crash#2 - Heap Overflow Write in CrateFile::ReadFieldSets)
+            if (fsetsSize > compressedBufferSize) {
+                TF_RUNTIME_ERROR("Failed read fsets, buffer overflow.");
+            }
             reader.ReadContiguous(compBuffer.get(), fsetsSize);
             Usd_IntegerCompression::DecompressFromBuffer(
                 compBuffer.get(), fsetsSize, tmp.data(), numFieldSets,
@@ -3218,9 +3232,12 @@ CrateFile::_ReadSpecs(Reader reader)
             _specs.resize(numSpecs);
 
             // Create temporary space for decompressing.
+            // @AAPL rdar://63657477
+            // (Crash#4 - Heap Overflow Write in CrateFile::ReadSpecs)
+            size_t compressedBufferSize =
+                Usd_IntegerCompression::GetCompressedBufferSize(numSpecs);
             std::unique_ptr<char[]> compBuffer(
-                new char[Usd_IntegerCompression::
-                         GetCompressedBufferSize(numSpecs)]);
+                new char[compressedBufferSize]);
             vector<uint32_t> tmp(_specs.size());
             std::unique_ptr<char[]> workingSpace(
                 new char[Usd_IntegerCompression::
@@ -3228,6 +3245,12 @@ CrateFile::_ReadSpecs(Reader reader)
 
             // pathIndexes.
             auto pathIndexesSize = reader.template Read<uint64_t>();
+            // @AAPL rdar://63657477
+            // (Crash#4 - Heap Overflow Write in CrateFile::ReadSpecs)
+            if (pathIndexesSize > compressedBufferSize) {
+                TF_RUNTIME_ERROR("Failed read pathIndexes, buffer overflow.");
+                return;
+            }
             reader.ReadContiguous(compBuffer.get(), pathIndexesSize);
             Usd_IntegerCompression::DecompressFromBuffer(
                 compBuffer.get(), pathIndexesSize, tmp.data(), numSpecs,
@@ -3238,6 +3261,12 @@ CrateFile::_ReadSpecs(Reader reader)
 
             // fieldSetIndexes.
             auto fsetIndexesSize = reader.template Read<uint64_t>();
+            // @AAPL rdar://63657477
+            // (Crash#4 - Heap Overflow Write in CrateFile::ReadSpecs)
+            if (fsetIndexesSize > compressedBufferSize) {
+                TF_RUNTIME_ERROR("Failed read fsetIndexes, buffer overflow.");
+                return;
+            }
             reader.ReadContiguous(compBuffer.get(), fsetIndexesSize);
             Usd_IntegerCompression::DecompressFromBuffer(
                 compBuffer.get(), fsetIndexesSize, tmp.data(), numSpecs,
@@ -3248,6 +3277,12 @@ CrateFile::_ReadSpecs(Reader reader)
             
             // specTypes.
             auto specTypesSize = reader.template Read<uint64_t>();
+            // @AAPL rdar://63657477
+            // (Crash#4 - Heap Overflow Write in CrateFile::ReadSpecs)
+            if (specTypesSize > compressedBufferSize) {
+                TF_RUNTIME_ERROR("Failed read spectypes, buffer overflow.");
+                return;
+            }
             reader.ReadContiguous(compBuffer.get(), specTypesSize);
             Usd_IntegerCompression::DecompressFromBuffer(
                 compBuffer.get(), specTypesSize, tmp.data(), numSpecs,
@@ -3429,14 +3464,24 @@ CrateFile::_ReadCompressedPaths(Reader reader,
     jumps.resize(numPaths);
 
     // Create temporary space for decompressing.
+    // @AAPL rdar://63657471
+    //  (Crash#3 - Heap Overflow Write in CrateFile::ReadCompressedPaths)
+    size_t compressedBufferSize =
+        Usd_IntegerCompression::GetCompressedBufferSize(numPaths);
     std::unique_ptr<char[]> compBuffer(
-        new char[Usd_IntegerCompression::GetCompressedBufferSize(numPaths)]);
+        new char[compressedBufferSize]);
     std::unique_ptr<char[]> workingSpace(
         new char[Usd_IntegerCompression::
                  GetDecompressionWorkingSpaceSize(numPaths)]);
 
     // pathIndexes.
     auto pathIndexesSize = reader.template Read<uint64_t>();
+    // @AAPL rdar://63657471
+    // (Crash#3 - Heap Overflow Write in CrateFile::ReadCompressedPaths)
+    if (pathIndexesSize > compressedBufferSize) {
+        TF_RUNTIME_ERROR("Failed read pathIndexes, buffer overflow.");
+        return;
+    }
     reader.ReadContiguous(compBuffer.get(), pathIndexesSize);
     Usd_IntegerCompression::DecompressFromBuffer(
         compBuffer.get(), pathIndexesSize, pathIndexes.data(), numPaths,
@@ -3444,6 +3489,12 @@ CrateFile::_ReadCompressedPaths(Reader reader,
 
     // elementTokenIndexes.
     auto elementTokenIndexesSize = reader.template Read<uint64_t>();
+    // @AAPL rdar://63657471
+    // (Crash#3 - Heap Overflow Write in CrateFile::ReadCompressedPaths)
+    if (elementTokenIndexesSize > compressedBufferSize) {
+        TF_RUNTIME_ERROR("Failed read elementTokenIndexes, buffer overflow.");
+        return;
+    }
     reader.ReadContiguous(compBuffer.get(), elementTokenIndexesSize);
     Usd_IntegerCompression::DecompressFromBuffer(
         compBuffer.get(), elementTokenIndexesSize,
@@ -3451,6 +3502,12 @@ CrateFile::_ReadCompressedPaths(Reader reader,
 
     // jumps.
     auto jumpsSize = reader.template Read<uint64_t>();
+    // @AAPL rdar://63657471
+    // (Crash#3 - Heap Overflow Write in CrateFile::ReadCompressedPaths)
+    if (jumpsSize > compressedBufferSize) {
+        TF_RUNTIME_ERROR("Failed read jumps, buffer overflow.");
+        return;
+    }
     reader.ReadContiguous(compBuffer.get(), jumpsSize);
     Usd_IntegerCompression::DecompressFromBuffer(
         compBuffer.get(), jumpsSize, jumps.data(), numPaths,
@@ -3922,3 +3979,4 @@ static_assert(sizeof(_PathItemHeader_0_0_1) == 16, "");
 
 
 PXR_NAMESPACE_CLOSE_SCOPE
+
