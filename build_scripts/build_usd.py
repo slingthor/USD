@@ -2826,9 +2826,13 @@ if args.make_relocatable:
     SDKVersion  = GetCommandOutput('xcodebuild -version').strip()[6:10]
     codeSignIDs = GetCommandOutput('security find-identity -v -p codesigning')
 
-    codeSignID = None
-    if os.environ.get('XCODE_ATTRIBUTE_CODE_SIGN_ID'):
-        codeSignID = os.environ.get('XCODE_ATTRIBUTE_CODE_SIGN_ID')
+    codeSignID = os.environ.get('XCODE_ATTRIBUTE_CODE_SIGN_ID')
+    if codeSignID is not None:
+        # Edge case for ad-hoc codesigning in iOS, which requires setting 
+        # CMAKE_XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY = "" to generate an Xcode project
+        # while "-" is being used by the codesign command line tool
+        if codeSignID == "":
+            codeSignID = "-"
     elif SDKVersion >= "11.0" and codeSignIDs.find("Apple Development") != -1:
         codeSignID = "Apple Development"
     elif codeSignIDs.find("Mac Developer") != -1:

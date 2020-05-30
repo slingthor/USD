@@ -1152,7 +1152,7 @@ HdxTaskController::SetViewportRenderOutput(TfToken const& name)
 }
 
 HdRenderBuffer*
-HdxTaskController::GetRenderOutput(TfToken const& name)
+HdxTaskController::GetRenderOutput(TfToken const& name) const
 {
     if (!_AovsSupported()) {
         return nullptr;
