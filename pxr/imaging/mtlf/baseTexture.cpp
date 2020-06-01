@@ -409,7 +409,6 @@ MtlfBaseTexture::_CreateTexture(GarchBaseTextureDataConstPtr texData,
                                                                mipmapped:genMips?YES:NO];
             desc.resourceOptions = MTLResourceStorageModeDefault;
             desc.usage = MTLTextureUsageShaderRead;
-            _textureName = [device newTextureWithDescriptor:desc];
             
             if (numChannels == 1) {
 #if (__MAC_OS_X_VERSION_MAX_ALLOWED >= 101500) || (__IPHONE_OS_VERSION_MAX_ALLOWED >= 130000) /* __MAC_10_15 __IOS_13_00 */
@@ -418,6 +417,8 @@ MtlfBaseTexture::_CreateTexture(GarchBaseTextureDataConstPtr texData,
                 }
 #endif
             }
+
+            _textureName = [device newTextureWithDescriptor:desc];
 
             char *rawData = (char*)texBuffer + (unpackSkipRows * unpackRowLength * pixelByteSize)
                 + (unpackSkipPixels * pixelByteSize);
