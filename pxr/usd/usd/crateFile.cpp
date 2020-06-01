@@ -2098,8 +2098,8 @@ CrateFile::Open(string const &assetPath)
 TfToken const &
 CrateFile::GetSoftwareVersionToken()
 {
-    static TfToken tok(_SoftwareVersion.AsString());
-    return tok;
+    static const auto tok = new TfToken(_SoftwareVersion.AsString());
+    return *tok;
 }
 
 TfToken
@@ -2230,7 +2230,7 @@ CrateFile::_InitAsset()
 
 CrateFile::~CrateFile()
 {
-    static std::mutex outputMutex;
+    static auto outputMutex = new std::mutex;
 
     // Dump a debug page map if requested.
     if (_useMmap && _mmapSrc && _debugPageMap) {
@@ -2264,7 +2264,7 @@ CrateFile::~CrateFile()
             }
         }
 
-        std::lock_guard<std::mutex> lock(outputMutex);
+        std::lock_guard<std::mutex> lock(*outputMutex);
 
         printf(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>"
                ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n"
