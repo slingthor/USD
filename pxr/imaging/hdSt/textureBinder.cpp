@@ -29,10 +29,16 @@
 #include "pxr/imaging/hdSt/textureObject.h"
 #include "pxr/imaging/hdSt/samplerObject.h"
 #include "pxr/imaging/hdSt/resourceBinder.h"
+#include "pxr/imaging/hdSt/resourceFactory.h"
 #include "pxr/imaging/hd/vtBufferSource.h"
 #if defined(PXR_OPENGL_SUPPORT_ENABLED)
 #include "pxr/imaging/hgiGL/texture.h"
 #include "pxr/imaging/hgiGL/sampler.h"
+#endif
+#if defined(PXR_METAL_SUPPORT_ENABLED)
+#include "pxr/imaging/hgiMetal/texture.h"
+#include "pxr/imaging/hgiMetal/sampler.h"
+#include "pxr/imaging/hdSt/Metal/mslProgram.h"
 #endif
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -263,16 +269,98 @@ public:
     }
 };
 
+static
+void
+_BindToMetal(
+    MSL_ShaderBindingMap const &bindingMap,
+    TfToken &bindTextureName,
+    TfToken &bindSamplerName,
+    HgiTextureHandle const &textureHandle,
+    HgiSamplerHandle const &samplerHandle)
+{
+    MSL_ShaderBinding const* const textureBinding = MSL_FindBinding(
+        bindingMap,
+        bindTextureName,
+        kMSL_BindingType_Texture,
+        0xFFFFFFFF,
+        0);
+    if(!textureBinding)
+    {
+        TF_FATAL_CODING_ERROR("Could not bind a texture to the shader?!");
+    }
+    
+    auto texture = dynamic_cast<HgiMetalTexture const*>( textureHandle.Get());
+    
+    MtlfMetalContext::GetMetalContext()->SetTexture(
+        textureBinding->_index,
+        texture->GetTextureId(),
+        bindTextureName,
+        textureBinding->_stage);
+
+    MSL_ShaderBinding const* const samplerBinding = MSL_FindBinding(
+        bindingMap,
+        bindSamplerName,
+        kMSL_BindingType_Sampler,
+        0xFFFFFFFF,
+        0);
+
+    if(!samplerBinding)
+    {
+        TF_FATAL_CODING_ERROR("Could not bind a sampler to the shader?!");
+    }
+     
+    auto sampler = dynamic_cast<HgiMetalSampler const*>(samplerHandle.Get());
+    
+    MtlfMetalContext::GetMetalContext()->SetSampler(
+        samplerBinding->_index,
+        sampler->GetSamplerId(),
+        bindSamplerName,
+        samplerBinding->_stage);
+}
+
+static
+void
+_BindTextureAndSampler(HdStProgram const &program,
+                       HdSt_ResourceBinder const &binder,
+                       TfToken const &token,
+                       HgiTextureHandle const &textureHandle,
+                       HgiSamplerHandle const &samplerHandle)
+{
+    const HdBinding binding = binder.GetBinding(token);
+    if (binding.GetType() != HdBinding::TEXTURE_2D) {
+        return;
+    }
+
+    std::string textureName("textureBind_" + token.GetString());
+    TfToken textureNameToken(textureName, TfToken::Immortal);
+    std::string samplerName("samplerBind_" + token.GetString());
+    TfToken samplerNameToken(samplerName, TfToken::Immortal);
+
+    HdStMSLProgram const &mslProgram(
+        dynamic_cast<const HdStMSLProgram&>(program));
+
+    _BindToMetal(
+        mslProgram.GetBindingMap(),
+        textureNameToken,
+        samplerNameToken,
+        textureHandle,
+        samplerHandle);
+}
+
 void
 _BindTexture(const GLenum target,
              HgiTextureHandle const &textureHandle,
              HgiSamplerHandle const &samplerHandle,
              const TfToken &name,
              HdSt_ResourceBinder const &binder,
+             HdStProgram const &program,
              const bool bind)
 {
     const HdBinding binding = binder.GetBinding(name);
     const int samplerUnit = binding.GetTextureUnit();
+
+    if (HdStResourceFactory::GetInstance()->IsOpenGL())
+    {
 #if defined(PXR_OPENGL_SUPPORT_ENABLED)
     glActiveTexture(GL_TEXTURE0 + samplerUnit);
 
@@ -300,6 +388,11 @@ _BindTexture(const GLenum target,
         (bind && glSampler) ? glSampler->GetSamplerId() : 0;
     glBindSampler(samplerUnit, samplerName);
 #endif
+    } else {
+#if defined(PXR_METAL_SUPPORT_ENABLED)
+        _BindTextureAndSampler(program, binder, name, textureHandle, samplerHandle);
+#endif
+    }
 }
 
 class _BindFunctor {
@@ -309,6 +402,7 @@ public:
         HdStUvTextureObject const &texture,
         HdStUvSamplerObject const &sampler,
         HdSt_ResourceBinder const &binder,
+        HdStProgram const &program,
         const bool bind)
     {
         _BindTexture(
@@ -317,6 +411,7 @@ public:
             sampler.GetSampler(),
             name,
             binder,
+            program,
             bind);
     }
 
@@ -325,6 +420,7 @@ public:
         HdStFieldTextureObject const &texture,
         HdStFieldSamplerObject const &sampler,
         HdSt_ResourceBinder const &binder,
+        HdStProgram const &program,
         const bool bind)
     {
         _BindTexture(
@@ -333,6 +429,7 @@ public:
             sampler.GetSampler(),
             name,
             binder,
+            program,
             bind);
     }
     
@@ -341,10 +438,14 @@ public:
         HdStPtexTextureObject const &texture,
         HdStPtexSamplerObject const &sampler,
         HdSt_ResourceBinder const &binder,
+        HdStProgram const &program,
         const bool bind)
     {
         const HdBinding texelBinding = binder.GetBinding(name);
         const int texelSamplerUnit = texelBinding.GetTextureUnit();
+
+        if (HdStResourceFactory::GetInstance()->IsOpenGL())
+        {
 #if defined(PXR_OPENGL_SUPPORT_ENABLED)
         glActiveTexture(GL_TEXTURE0 + texelSamplerUnit);
         glBindTexture(GL_TEXTURE_2D_ARRAY,
@@ -358,6 +459,8 @@ public:
         glBindTexture(GL_TEXTURE_BUFFER,
                       bind ? (GLuint)texture.GetLayoutGLTextureName() : 0);
 #endif
+        } else {
+        }
     }
 
     static void Compute(
@@ -365,10 +468,14 @@ public:
         HdStUdimTextureObject const &texture,
         HdStUdimSamplerObject const &sampler,
         HdSt_ResourceBinder const &binder,
+        HdStProgram const &program,
         const bool bind)
     {
         const HdBinding texelBinding = binder.GetBinding(name);
         const int texelSamplerUnit = texelBinding.GetTextureUnit();
+        
+        if (HdStResourceFactory::GetInstance()->IsOpenGL())
+        {
 #if defined(PXR_OPENGL_SUPPORT_ENABLED)
         glActiveTexture(GL_TEXTURE0 + texelSamplerUnit);
         glBindTexture(GL_TEXTURE_2D_ARRAY,
@@ -393,6 +500,8 @@ public:
         glBindTexture(GL_TEXTURE_1D,
                       bind ? (GLuint)texture.GetLayoutGLTextureName() : 0);
 #endif
+        } else {
+        }
     }
 };
 
@@ -476,6 +585,7 @@ HdSt_TextureBinder::ComputeBufferSources(
 void
 HdSt_TextureBinder::BindResources(
     HdSt_ResourceBinder const &binder,
+    HdStProgram const &program,
     const bool useBindlessHandles,
     const NamedTextureHandleVector &textures)
 {
@@ -483,12 +593,13 @@ HdSt_TextureBinder::BindResources(
         return;
     }
 
-    _Dispatch<_BindFunctor>(textures, binder, /* bind = */ true);
+    _Dispatch<_BindFunctor>(textures, binder, program, /* bind = */ true);
 }
 
 void
 HdSt_TextureBinder::UnbindResources(
     HdSt_ResourceBinder const &binder,
+    HdStProgram const &program,
     const bool useBindlessHandles,
     const NamedTextureHandleVector &textures)
 {
@@ -496,7 +607,7 @@ HdSt_TextureBinder::UnbindResources(
         return;
     }
 
-    _Dispatch<_BindFunctor>(textures, binder, /* bind = */ false);
+    _Dispatch<_BindFunctor>(textures, binder, program, /* bind = */ false);
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

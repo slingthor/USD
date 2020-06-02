@@ -163,7 +163,7 @@ HdStSurfaceShader::BindResources(HdStProgram const &program,
         GarchResourceFactory::GetInstance()->GetContextCaps().bindlessTextureEnabled;
 
     HdSt_TextureBinder::BindResources(
-        binder, bindlessTextureEnabled, _namedTextureHandles);
+        binder, program, bindlessTextureEnabled, _namedTextureHandles);
 
 
     binder.BindShaderResources(this);
@@ -181,7 +181,7 @@ HdStSurfaceShader::UnbindResources(HdStProgram const &program,
         GarchResourceFactory::GetInstance()->GetContextCaps().bindlessTextureEnabled;
 
     HdSt_TextureBinder::UnbindResources(
-        binder, bindlessTextureEnabled, _namedTextureHandles);
+        binder, program, bindlessTextureEnabled, _namedTextureHandles);
 
 }
 /*virtual*/
