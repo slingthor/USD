@@ -186,17 +186,12 @@ static void _BindToMetal(
     {
         TF_FATAL_CODING_ERROR("Could not bind a texture to the shader?!");
     }
-
-    HdBinding::Type type = textureBinding->_binding.GetType();
     
     MtlfMetalContext::GetMetalContext()->SetTexture(
         textureBinding->_index,
         textureHandle,
         bindTextureName,
         textureBinding->_stage);
-
-    static std::string samplerName("samplerBind_" + _tokens->domeLightIrradiance.GetString());
-    static TfToken samplerNameToken(samplerName, TfToken::Immortal);
 
     MSL_ShaderBinding const* const samplerBinding = MSL_FindBinding(
         bindingMap,
