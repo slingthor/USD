@@ -31,7 +31,6 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 using HdBufferSpecVector = std::vector<struct HdBufferSpec>;
-class HdStProgram;
 
 /// \class HdSt_TextureBinder
 ///
