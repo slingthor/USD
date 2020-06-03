@@ -320,11 +320,12 @@ _BindToMetal(
 
 static
 void
-_BindTextureAndSampler(HdStProgram const &program,
-                       HdSt_ResourceBinder const &binder,
-                       TfToken const &token,
-                       HgiTextureHandle const &textureHandle,
-                       HgiSamplerHandle const &samplerHandle)
+_BindMetalTexture(
+    HdStProgram const &program,
+    HdSt_ResourceBinder const &binder,
+    TfToken const &token,
+    HgiTextureHandle const &textureHandle,
+    HgiSamplerHandle const &samplerHandle)
 {
     const HdBinding binding = binder.GetBinding(token);
     if (binding.GetType() != HdBinding::TEXTURE_2D) {
@@ -348,49 +349,56 @@ _BindTextureAndSampler(HdStProgram const &program,
 }
 
 void
-_BindTexture(const GLenum target,
-             HgiTextureHandle const &textureHandle,
-             HgiSamplerHandle const &samplerHandle,
-             const TfToken &name,
-             HdSt_ResourceBinder const &binder,
-             HdStProgram const &program,
-             const bool bind)
+_BindTexture(
+    const GLenum target,
+    HgiTextureHandle const &textureHandle,
+    HgiSamplerHandle const &samplerHandle,
+    const TfToken &name,
+    HdSt_ResourceBinder const &binder,
+    HdStProgram const &program,
+    const bool bind)
 {
     const HdBinding binding = binder.GetBinding(name);
     const int samplerUnit = binding.GetTextureUnit();
 
-    if (HdStResourceFactory::GetInstance()->IsOpenGL())
-    {
+    if (HdStResourceFactory::GetInstance()->IsOpenGL()) {
 #if defined(PXR_OPENGL_SUPPORT_ENABLED)
-    glActiveTexture(GL_TEXTURE0 + samplerUnit);
+        glActiveTexture(GL_TEXTURE0 + samplerUnit);
 
-    const HgiTexture * const tex = textureHandle.Get();
-    const HgiGLTexture * const glTex =
-        dynamic_cast<const HgiGLTexture*>(tex);
+        const HgiTexture * const tex = textureHandle.Get();
+        const HgiGLTexture * const glTex =
+            dynamic_cast<const HgiGLTexture*>(tex);
 
-    if (tex && !glTex) {
-        TF_CODING_ERROR("Storm texture binder only supports OpenGL");
-    }
+        if (tex && !glTex) {
+            TF_CODING_ERROR("Storm texture binder only supports OpenGL");
+        }
 
-    const GLuint texName =
-        (bind && glTex) ? glTex->GetTextureId() : 0;
-    glBindTexture(target, texName);
+        const GLuint texName =
+            (bind && glTex) ? glTex->GetTextureId() : 0;
+        glBindTexture(target, texName);
 
-    const HgiSampler * const sampler = samplerHandle.Get();
-    const HgiGLSampler * const glSampler =
-        dynamic_cast<const HgiGLSampler*>(sampler);
+        const HgiSampler * const sampler = samplerHandle.Get();
+        const HgiGLSampler * const glSampler =
+            dynamic_cast<const HgiGLSampler*>(sampler);
 
-    if (sampler && !glSampler) {
-        TF_CODING_ERROR("Storm texture binder only supports OpenGL");
-    }
+        if (sampler && !glSampler) {
+            TF_CODING_ERROR("Storm texture binder only supports OpenGL");
+        }
 
-    const GLuint samplerName =
-        (bind && glSampler) ? glSampler->GetSamplerId() : 0;
-    glBindSampler(samplerUnit, samplerName);
+        const GLuint samplerName =
+            (bind && glSampler) ? glSampler->GetSamplerId() : 0;
+        glBindSampler(samplerUnit, samplerName);
 #endif
     } else {
 #if defined(PXR_METAL_SUPPORT_ENABLED)
-        _BindTextureAndSampler(program, binder, name, textureHandle, samplerHandle);
+        if (bind) {
+            _BindMetalTexture(
+                program,
+                binder,
+                name,
+                textureHandle,
+                samplerHandle);
+        }
 #endif
     }
 }
@@ -444,20 +452,19 @@ public:
         const HdBinding texelBinding = binder.GetBinding(name);
         const int texelSamplerUnit = texelBinding.GetTextureUnit();
 
-        if (HdStResourceFactory::GetInstance()->IsOpenGL())
-        {
+        if (HdStResourceFactory::GetInstance()->IsOpenGL()) {
 #if defined(PXR_OPENGL_SUPPORT_ENABLED)
-        glActiveTexture(GL_TEXTURE0 + texelSamplerUnit);
-        glBindTexture(GL_TEXTURE_2D_ARRAY,
-                      bind ? (GLuint)texture.GetTexelGLTextureName() : 0);
+            glActiveTexture(GL_TEXTURE0 + texelSamplerUnit);
+            glBindTexture(GL_TEXTURE_2D_ARRAY,
+                          bind ? (GLuint)texture.GetTexelGLTextureName() : 0);
 
-        const HdBinding layoutBinding = binder.GetBinding(
-            _Concat(name, HdSt_ResourceBindingSuffixTokens->layout));
-        const int layoutSamplerUnit = layoutBinding.GetTextureUnit();
+            const HdBinding layoutBinding = binder.GetBinding(
+                _Concat(name, HdSt_ResourceBindingSuffixTokens->layout));
+            const int layoutSamplerUnit = layoutBinding.GetTextureUnit();
 
-        glActiveTexture(GL_TEXTURE0 + layoutSamplerUnit);
-        glBindTexture(GL_TEXTURE_BUFFER,
-                      bind ? (GLuint)texture.GetLayoutGLTextureName() : 0);
+            glActiveTexture(GL_TEXTURE0 + layoutSamplerUnit);
+            glBindTexture(GL_TEXTURE_BUFFER,
+                          bind ? (GLuint)texture.GetLayoutGLTextureName() : 0);
 #endif
         } else {
         }
@@ -474,8 +481,7 @@ public:
         const HdBinding texelBinding = binder.GetBinding(name);
         const int texelSamplerUnit = texelBinding.GetTextureUnit();
         
-        if (HdStResourceFactory::GetInstance()->IsOpenGL())
-        {
+        if (HdStResourceFactory::GetInstance()->IsOpenGL()) {
 #if defined(PXR_OPENGL_SUPPORT_ENABLED)
         glActiveTexture(GL_TEXTURE0 + texelSamplerUnit);
         glBindTexture(GL_TEXTURE_2D_ARRAY,
