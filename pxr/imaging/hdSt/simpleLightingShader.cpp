@@ -186,7 +186,7 @@ static void _BindToMetal(
     {
         TF_FATAL_CODING_ERROR("Could not bind a texture to the shader?!");
     }
-  
+    
     MtlfMetalContext::GetMetalContext()->SetTexture(
         textureBinding->_index,
         textureHandle,
