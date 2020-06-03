@@ -295,5 +295,19 @@ HdSt_ResourceBinderMetal::IntrospectBindings(HdStProgramSharedPtr programResourc
     }
 }
 
+void
+HdSt_ResourceBinderMetal::BindTextures(
+    const HdStShaderCode::NamedTextureHandleVector &textures,
+    HdStProgram const &shaderProgram) const
+{
+}
+
+void
+HdSt_ResourceBinderMetal::UnbindTextures(
+    const HdStShaderCode::NamedTextureHandleVector &textures,
+    HdStProgram const &shaderProgram) const
+{
+}
+
 PXR_NAMESPACE_CLOSE_SCOPE
 

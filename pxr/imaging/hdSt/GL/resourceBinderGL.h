@@ -79,6 +79,18 @@ public:
     /// bind a standalone uniform (float, vec2, vec3, vec4, mat4)
     HDST_API
     virtual void BindUniformf(TfToken const &name, int count, const float *value) const override;
+    
+    /// bind/unbind texture and sampler
+    HDST_API
+    virtual void BindTextures(
+        const HdStShaderCode::NamedTextureHandleVector &textures,
+        HdStProgram const &shaderProgram) const override;
+
+    HDST_API
+    virtual void UnbindTextures(
+        const HdStShaderCode::NamedTextureHandleVector &textures,
+        HdStProgram const &shaderProgram) const override;
+    
 };
 
 

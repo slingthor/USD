@@ -26,6 +26,7 @@
 
 #include "pxr/pxr.h"
 #include "pxr/imaging/hdSt/api.h"
+#include "pxr/imaging/hdSt/shaderCode.h"
 #include "pxr/imaging/hd/version.h"
 
 #include "pxr/imaging/hd/binding.h"
@@ -405,6 +406,18 @@ public:
     int GetNumReservedTextureUnits() const {
         return _numReservedTextureUnits;
     }
+    
+    /// bind/unbind texture and sampler
+    HDST_API
+    virtual void BindTextures(
+        const HdStShaderCode::NamedTextureHandleVector &textures,
+        HdStProgram const &shaderProgram) const = 0;
+
+    HDST_API
+    virtual void UnbindTextures(
+        const HdStShaderCode::NamedTextureHandleVector &textures,
+        HdStProgram const &shaderProgram) const = 0;
+    
 
 protected:
     /// Constructor
