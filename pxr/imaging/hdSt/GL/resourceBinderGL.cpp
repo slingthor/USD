@@ -27,16 +27,21 @@
 #include "pxr/imaging/garch/resourceFactory.h"
 
 #include "pxr/imaging/hdSt/GL/resourceBinderGL.h"
-#include "pxr/imaging/hdSt/GL/glslProgram.h"
 #include "pxr/imaging/hdSt/bufferResource.h"
-#include "pxr/imaging/hdSt/shaderCode.h"
 #include "pxr/imaging/hdSt/drawItem.h"
 #include "pxr/imaging/hdSt/glConversions.h"
+#include "pxr/imaging/hdSt/samplerObject.h"
+#include "pxr/imaging/hdSt/textureHandle.h"
+#include "pxr/imaging/hdSt/textureObject.h"
+#include "pxr/imaging/hdSt/GL/glslProgram.h"
 
 #include "pxr/imaging/hd/bufferArrayRange.h"
 #include "pxr/imaging/hd/bufferSpec.h"
 #include "pxr/imaging/hd/resource.h"
 #include "pxr/imaging/hd/tokens.h"
+
+#include "pxr/imaging/hgiGL/texture.h"
+#include "pxr/imaging/hgiGL/sampler.h"
 
 #include "pxr/base/tf/staticTokens.h"
 
@@ -554,11 +559,221 @@ HdSt_ResourceBinderGL::IntrospectBindings(HdStProgramSharedPtr programResource) 
     }
 }
 
+namespace {
+
+static
+TfToken
+_TokenConcat(const TfToken &a, const TfToken &b)
+{
+    return TfToken(a.GetString() + b.GetString());
+}
+
+void
+_BindTexture(
+    const GLenum target,
+    HgiTextureHandle const &textureHandle,
+    HgiSamplerHandle const &samplerHandle,
+    const TfToken &name,
+    HdSt_ResourceBinder const &binder,
+    const bool bind)
+{
+    const HdBinding binding = binder.GetBinding(name);
+    const int samplerUnit = binding.GetTextureUnit();
+
+    glActiveTexture(GL_TEXTURE0 + samplerUnit);
+
+    const HgiTexture * const tex = textureHandle.Get();
+    const HgiGLTexture * const glTex =
+        dynamic_cast<const HgiGLTexture*>(tex);
+
+    if (tex && !glTex) {
+        TF_CODING_ERROR("Storm texture binder only supports OpenGL");
+    }
+
+    const GLuint texName =
+        (bind && glTex) ? glTex->GetTextureId() : 0;
+    glBindTexture(target, texName);
+
+    const HgiSampler * const sampler = samplerHandle.Get();
+    const HgiGLSampler * const glSampler =
+        dynamic_cast<const HgiGLSampler*>(sampler);
+
+    if (sampler && !glSampler) {
+        TF_CODING_ERROR("Storm texture binder only supports OpenGL");
+    }
+
+    const GLuint samplerName =
+        (bind && glSampler) ? glSampler->GetSamplerId() : 0;
+    glBindSampler(samplerUnit, samplerName);
+}
+
+class _BindTextureFunctor {
+public:
+    static void Compute(
+        TfToken const &name,
+        HdStUvTextureObject const &texture,
+        HdStUvSamplerObject const &sampler,
+        HdSt_ResourceBinder const &binder,
+        const bool bind)
+    {
+        _BindTexture(
+            GL_TEXTURE_2D,
+            texture.GetTexture(),
+            sampler.GetSampler(),
+            name,
+            binder,
+            bind);
+    }
+
+    static void Compute(
+        TfToken const &name,
+        HdStFieldTextureObject const &texture,
+        HdStFieldSamplerObject const &sampler,
+        HdSt_ResourceBinder const &binder,
+        const bool bind)
+    {
+        _BindTexture(
+            GL_TEXTURE_3D,
+            texture.GetTexture(),
+            sampler.GetSampler(),
+            name,
+            binder,
+            bind);
+    }
+    
+    static void Compute(
+        TfToken const &name,
+        HdStPtexTextureObject const &texture,
+        HdStPtexSamplerObject const &sampler,
+        HdSt_ResourceBinder const &binder,
+        const bool bind)
+    {
+        const HdBinding texelBinding = binder.GetBinding(name);
+        const int texelSamplerUnit = texelBinding.GetTextureUnit();
+
+        glActiveTexture(GL_TEXTURE0 + texelSamplerUnit);
+        glBindTexture(GL_TEXTURE_2D_ARRAY,
+                      bind ? (GLuint)texture.GetTexelGLTextureName() : 0);
+
+        const HdBinding layoutBinding = binder.GetBinding(
+            _TokenConcat(name, HdSt_ResourceBindingSuffixTokens->layout));
+        const int layoutSamplerUnit = layoutBinding.GetTextureUnit();
+
+        glActiveTexture(GL_TEXTURE0 + layoutSamplerUnit);
+        glBindTexture(GL_TEXTURE_BUFFER,
+                      bind ? (GLuint)texture.GetLayoutGLTextureName() : 0);
+    }
+
+    static void Compute(
+        TfToken const &name,
+        HdStUdimTextureObject const &texture,
+        HdStUdimSamplerObject const &sampler,
+        HdSt_ResourceBinder const &binder,
+        const bool bind)
+    {
+        const HdBinding texelBinding = binder.GetBinding(name);
+        const int texelSamplerUnit = texelBinding.GetTextureUnit();
+        
+        glActiveTexture(GL_TEXTURE0 + texelSamplerUnit);
+        glBindTexture(GL_TEXTURE_2D_ARRAY,
+                      bind ? (GLuint)texture.GetTexelGLTextureName() : 0);
+
+        HgiSampler * const texelSampler = sampler.GetTexelsSampler().Get();
+
+        const HgiGLSampler * const glSampler =
+            bind ? dynamic_cast<HgiGLSampler*>(texelSampler) : nullptr;
+
+        if (glSampler) {
+            glBindSampler(texelSamplerUnit, (GLuint)glSampler->GetSamplerId());
+        } else {
+            glBindSampler(texelSamplerUnit, 0);
+        }
+
+        const HdBinding layoutBinding = binder.GetBinding(
+            _TokenConcat(name, HdSt_ResourceBindingSuffixTokens->layout));
+        const int layoutSamplerUnit = layoutBinding.GetTextureUnit();
+
+        glActiveTexture(GL_TEXTURE0 + layoutSamplerUnit);
+        glBindTexture(GL_TEXTURE_1D,
+                      bind ? (GLuint)texture.GetLayoutGLTextureName() : 0);
+    }
+};
+
+template<HdTextureType textureType, class Functor, typename ...Args>
+void _CastAndCompute(
+    HdStShaderCode::NamedTextureHandle const &namedTextureHandle,
+    Args&& ...args)
+{
+    // e.g. HdStUvTextureObject
+    using TextureObject = HdStTypedTextureObject<textureType>;
+    // e.g. HdStUvSamplerObject
+    using SamplerObject = HdStTypedSamplerObject<textureType>;
+
+    const TextureObject * const typedTexture =
+        dynamic_cast<TextureObject *>(
+            namedTextureHandle.handle->GetTextureObject().get());
+    if (!typedTexture) {
+        TF_CODING_ERROR("Bad texture object");
+        return;
+    }
+
+    const SamplerObject * const typedSampler =
+        dynamic_cast<SamplerObject *>(
+            namedTextureHandle.handle->GetSamplerObject().get());
+    if (!typedSampler) {
+        TF_CODING_ERROR("Bad sampler object");
+        return;
+    }
+
+    Functor::Compute(namedTextureHandle.name, *typedTexture, *typedSampler,
+                     std::forward<Args>(args)...);
+}
+
+template<class Functor, typename ...Args>
+void _BindTextureDispatch(
+    HdStShaderCode::NamedTextureHandle const &namedTextureHandle,
+    Args&& ...args)
+{
+    switch (namedTextureHandle.type) {
+    case HdTextureType::Uv:
+        _CastAndCompute<HdTextureType::Uv, Functor>(
+            namedTextureHandle, std::forward<Args>(args)...);
+        break;
+    case HdTextureType::Field:
+        _CastAndCompute<HdTextureType::Field, Functor>(
+            namedTextureHandle, std::forward<Args>(args)...);
+        break;
+    case HdTextureType::Ptex:
+        _CastAndCompute<HdTextureType::Ptex, Functor>(
+            namedTextureHandle, std::forward<Args>(args)...);
+        break;
+    case HdTextureType::Udim:
+        _CastAndCompute<HdTextureType::Udim, Functor>(
+            namedTextureHandle, std::forward<Args>(args)...);
+        break;
+    }
+}
+
+template<class Functor, typename ...Args>
+void _BindTextureDispatch(
+    HdStShaderCode::NamedTextureHandleVector const &textures,
+    Args &&... args)
+{
+    for (const HdStShaderCode::NamedTextureHandle & texture : textures) {
+        _BindTextureDispatch<Functor>(texture, std::forward<Args>(args)...);
+    }
+}
+
+} // end anonymous namespace
+
 void
 HdSt_ResourceBinderGL::BindTextures(
     const HdStShaderCode::NamedTextureHandleVector &textures,
     HdStProgram const &shaderProgram) const
 {
+    TF_UNUSED(shaderProgram);
+    _BindTextureDispatch<_BindTextureFunctor>(
+        textures, *this, /* bind = */ true);
 }
 
 void
@@ -566,6 +781,9 @@ HdSt_ResourceBinderGL::UnbindTextures(
     const HdStShaderCode::NamedTextureHandleVector &textures,
     HdStProgram const &shaderProgram) const
 {
+    TF_UNUSED(shaderProgram);
+    _BindTextureDispatch<_BindTextureFunctor>(
+        textures, *this, /* bind = */ false);
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

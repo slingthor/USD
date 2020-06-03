@@ -29,7 +29,6 @@
 #include "pxr/imaging/hdSt/textureResource.h"
 #include "pxr/imaging/hdSt/textureResourceHandle.h"
 #include "pxr/imaging/hdSt/textureBinder.h"
-#include "pxr/imaging/hdSt/textureHandle.h"
 #include "pxr/imaging/hdSt/materialParam.h"
 
 #include "pxr/imaging/hd/binding.h"
@@ -158,13 +157,7 @@ HdStSurfaceShader::BindResources(HdStProgram const &program,
 {
     program.BindResources(this, binder);
 
-
-    const bool bindlessTextureEnabled =
-        GarchResourceFactory::GetInstance()->GetContextCaps().bindlessTextureEnabled;
-
-    HdSt_TextureBinder::BindResources(
-        binder, program, bindlessTextureEnabled, _namedTextureHandles);
-
+    binder.BindTextures(_namedTextureHandles, program);
 
     binder.BindShaderResources(this);
 }
@@ -175,14 +168,10 @@ HdStSurfaceShader::UnbindResources(HdStProgram const &program,
                                    HdRenderPassState const &state)
 {
     binder.UnbindShaderResources(this);
+    
+    binder.UnbindTextures(_namedTextureHandles, program);
+
     program.UnbindResources(this, binder);
-
-    const bool bindlessTextureEnabled =
-        GarchResourceFactory::GetInstance()->GetContextCaps().bindlessTextureEnabled;
-
-    HdSt_TextureBinder::UnbindResources(
-        binder, program, bindlessTextureEnabled, _namedTextureHandles);
-
 }
 /*virtual*/
 void

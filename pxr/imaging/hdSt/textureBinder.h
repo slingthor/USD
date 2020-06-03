@@ -77,30 +77,6 @@ public:
         const NamedTextureHandleVector &textures,
         bool useBindlessHandles,
         HdBufferSourceSharedPtrVector * sources);
-
-    /// Bind textures.
-    ///
-    /// Specify whether to use the texture by binding it or by
-    /// using bindless handles with useBindlessHandles.
-    ///
-    static void
-    BindResources(
-        HdSt_ResourceBinder const &binder,
-        HdStProgram const &program,
-        bool useBindlessHandles,
-        const NamedTextureHandleVector &textures);
-
-    /// Unbind textures.
-    ///
-    /// Specify whether to use the texture by binding it or by
-    /// using bindless handles with useBindlessHandles.
-    ///
-    static void
-    UnbindResources(
-        HdSt_ResourceBinder const &binder,
-        HdStProgram const &program,
-        bool useBindlessHandles,
-        const NamedTextureHandleVector &textures);
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE
