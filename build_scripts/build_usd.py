@@ -1136,6 +1136,10 @@ PNG = Dependency("PNG", InstallPNG, "include/png.h")
 ############################################################
 # IlmBase/OpenEXR
 
+# Security vulnerability in future versions:
+# https://github.com/AcademySoftwareFoundation/openexr/issues/728
+# We might need to apply the following patch when bumping up the version:
+# https://github.com/AcademySoftwareFoundation/openexr/pull/730
 OPENEXR_URL = "https://github.com/openexr/openexr/archive/v2.2.0.zip"
 
 def InstallOpenEXR(context, force, buildArgs):
