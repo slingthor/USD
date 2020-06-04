@@ -358,7 +358,19 @@ HdSt_TextureObjectCpuData::_DetermineFormatAndConvertIfNecessary(
         case GL_HALF_FLOAT:
             return _CheckValid<HgiFormatFloat16Vec3>();
         case GL_FLOAT:
-            return _CheckValid<HgiFormatFloat32Vec3>();
+            // RGB (24bit) is not supported on MTL, so we need to convert it.
+            _convertedRawData =
+                _ConvertRGBToRGBA<float>(
+                    reinterpret_cast<const unsigned char *>(
+                        _textureDesc.initialData),
+                    _textureDesc.dimensions,
+                    1.0f);
+            // Point to the buffer with the converted data.
+            _textureDesc.initialData = _convertedRawData.get();
+            // Drop the old buffer.
+            _textureData = TfNullPtr;
+
+            return _CheckValid<HgiFormatFloat32Vec4>();
         default:
             TF_CODING_ERROR("Unsupported texture format GL_RGBA 0x%04x",
                             glType);
