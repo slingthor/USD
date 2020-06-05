@@ -199,7 +199,13 @@ public:
         HdBinding const &binding, MSL_BindingType bindingType,
         MSL_ProgramStage programStage, int offsetWithinResource = 0,
         int uniformBufferSize = 0);
-
+    
+    HDST_API
+    void BindTexture(
+        const TfToken &name,
+        id<MTLTexture> textureId,
+        id<MTLSamplerState> samplerId) const;
+    
     HDST_API
     void UpdateUniformBinding(std::string const &name, int index);
 

@@ -754,16 +754,6 @@ void _BindTextureDispatch(
     }
 }
 
-template<class Functor, typename ...Args>
-void _BindTextureDispatch(
-    HdStShaderCode::NamedTextureHandleVector const &textures,
-    Args &&... args)
-{
-    for (const HdStShaderCode::NamedTextureHandle & texture : textures) {
-        _BindTextureDispatch<Functor>(texture, std::forward<Args>(args)...);
-    }
-}
-
 } // end anonymous namespace
 
 void
@@ -772,8 +762,10 @@ HdSt_ResourceBinderGL::BindTextures(
     HdStProgram const &shaderProgram) const
 {
     TF_UNUSED(shaderProgram);
-    _BindTextureDispatch<_BindTextureFunctor>(
-        textures, *this, /* bind = */ true);
+
+    for (const HdStShaderCode::NamedTextureHandle & texture : textures) {
+        _BindTextureDispatch<_BindTextureFunctor>(texture, *this, /* bind = */ true);
+    }
 }
 
 void
@@ -782,8 +774,10 @@ HdSt_ResourceBinderGL::UnbindTextures(
     HdStProgram const &shaderProgram) const
 {
     TF_UNUSED(shaderProgram);
-    _BindTextureDispatch<_BindTextureFunctor>(
-        textures, *this, /* bind = */ false);
+
+    for (const HdStShaderCode::NamedTextureHandle & texture : textures) {
+        _BindTextureDispatch<_BindTextureFunctor>(texture, *this, /* bind = */ false);
+    }
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

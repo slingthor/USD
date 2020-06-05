@@ -501,7 +501,7 @@ MtlfBaseTexture::_CreateTexture(GarchBaseTextureDataConstPtr texData,
                 }
 #endif
             }
-
+            
             _textureName = [device newTextureWithDescriptor:desc];
 
             if (useAsncTextureUploads) {
