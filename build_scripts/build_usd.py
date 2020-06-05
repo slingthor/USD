@@ -676,14 +676,11 @@ ZLIB = Dependency("zlib", InstallZlib, "include/zlib.h")
 ############################################################
 # boost
 
-if Linux():
+if Linux() or MacOS() or iOS():
     if Python3():
         BOOST_URL = "https://downloads.sourceforge.net/project/boost/boost/1.70.0/boost_1_70_0.tar.gz"
     else:
         BOOST_URL = "https://downloads.sourceforge.net/project/boost/boost/1.61.0/boost_1_61_0.tar.bz2"
-    BOOST_VERSION_FILE = "include/boost/version.hpp"
-elif MacOS() or iOS():
-    BOOST_URL = "https://downloads.sourceforge.net/project/boost/boost/1.70.0/boost_1_70_0.tar.gz"
     BOOST_VERSION_FILE = "include/boost/version.hpp"
 elif Windows():
     # The default installation of boost on Windows puts headers in a versioned 
@@ -707,6 +704,22 @@ def InstallBoost(context, force, buildArgs):
 
     with CurrentWorkingDirectory(DownloadURL(BOOST_URL, context, force, 
                                              dontExtract)):
+
+        # The following 4 patches could be discarded if we bump up boost version
+        if (MacOS() or iOS()) and not Python3():
+            PatchFile("tools/build/src/engine/make.c",
+                [('#include "jam.h"\n', '#include "jam.h"\n#include "output.h"\n')])
+            PatchFile("tools/build/src/engine/execcmd.c",
+                [('#include "jam.h"\n', '#include "jam.h"\n#include "output.h"\n')])
+            PatchFile("tools/build/src/engine/filesys.h",
+                [('void filelist_free( FILELIST * list );\n',
+                  'void filelist_free( FILELIST * list );\n'
+                  'int filelist_empty( FILELIST * list );\n'
+                  'file_info_t * file_query( OBJECT * const path );\n'
+                  'int file_collect_dir_content_( file_info_t * const dir );\n'
+                  'int file_collect_archive_content_( file_archive_info_t * const archive );')])
+            PatchFile("tools/build/src/engine/modules/path.c",
+                [('#include "../timestamp.h"\n', '#include "../timestamp.h"\n#include "../filesys.h"\n')])
 
         # GitHub: https://github.com/boostorg/build/issues/440
         # Incorrect comparison of version number on Darwin #440
