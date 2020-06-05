@@ -193,18 +193,6 @@ HdSt_ResourceBinderMetal::UnbindBuffer(TfToken const &name,
 }
 
 void
-HdSt_ResourceBinderMetal::BindShaderResources(HdStShaderCode const *shader) const
-{
-    // Nothing
-}
-
-void
-HdSt_ResourceBinderMetal::UnbindShaderResources(HdStShaderCode const *shader) const
-{
-    // Nothing
-}
-
-void
 HdSt_ResourceBinderMetal::BindUniformi(TfToken const &name,
                                 int count, const int *value) const
 {
@@ -443,20 +431,22 @@ void _BindTextureDispatch(
 } // end anonymous namespace
 
 void
-HdSt_ResourceBinderMetal::BindTextures(
-    const HdStShaderCode::NamedTextureHandleVector &textures,
+HdSt_ResourceBinderMetal::BindShaderResources(
+    HdStShaderCode const *shader,
     HdStProgram const &shaderProgram) const
 {
+    auto const & textures = shader->GetNamedTextureHandles();
     for (const HdStShaderCode::NamedTextureHandle & texture : textures) {
         _BindTextureDispatch(texture, *this, shaderProgram, /* bind = */ true);
     }
 }
 
 void
-HdSt_ResourceBinderMetal::UnbindTextures(
-    const HdStShaderCode::NamedTextureHandleVector &textures,
+HdSt_ResourceBinderMetal::UnbindShaderResources(
+    HdStShaderCode const *shader,
     HdStProgram const &shaderProgram) const
 {
+    auto const & textures = shader->GetNamedTextureHandles();
     for (const HdStShaderCode::NamedTextureHandle & texture : textures) {
         _BindTextureDispatch(texture, *this, shaderProgram, /* bind = */ false);
     }

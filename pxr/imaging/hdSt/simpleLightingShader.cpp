@@ -303,7 +303,7 @@ HdStSimpleLightingShader::BindResources(HdStProgram const &program,
         glActiveTexture(GL_TEXTURE0);
 #endif
     }
-    binder.BindShaderResources(this);
+    binder.BindShaderResources(this, program);
 }
 
 /* virtual */

@@ -338,60 +338,6 @@ HdSt_ResourceBinderGL::UnbindBuffer(TfToken const &name,
 }
 
 void
-HdSt_ResourceBinderGL::BindShaderResources(HdStShaderCode const *shader) const
-{
-    // bind fallback values and sampler uniforms (unit#? or bindless address)
-
-    // this is bound in batches.
-    //BindBufferArray(shader->GetShaderData());
-
-    // bind textures
-    HdStShaderCode::TextureDescriptorVector textures = shader->GetTextures();
-    TF_FOR_ALL(it, textures) {
-        HdBinding binding = GetBinding(it->name);
-        HdBinding::Type type = binding.GetType();
-
-        if (type == HdBinding::TEXTURE_2D ||
-            type == HdBinding::TEXTURE_FIELD) {
-        } else if (type == HdBinding::BINDLESS_TEXTURE_2D
-                || type == HdBinding::BINDLESS_TEXTURE_FIELD
-                || type == HdBinding::BINDLESS_TEXTURE_PTEX_TEXEL
-                || type == HdBinding::BINDLESS_TEXTURE_PTEX_LAYOUT) {
-            // nothing? or make it resident?? but it only binds the first one.
-            // XXX: it looks like this function should take all textures in the batch.
-
-//            if (!glIsTextureHandleResidentARB(it->handle)) {
-//                glMakeTextureHandleResidentARB(it->handle);
-//            }
-        }
-    }
-}
-
-void
-HdSt_ResourceBinderGL::UnbindShaderResources(HdStShaderCode const *shader) const
-{
-//    UnbindBufferArray(shader->GetShaderData());
-
-    HdStShaderCode::TextureDescriptorVector textures = shader->GetTextures();
-    TF_FOR_ALL(it, textures) {
-        HdBinding binding = GetBinding(it->name);
-        HdBinding::Type type = binding.GetType();
-
-        if (type == HdBinding::TEXTURE_2D ||
-            type == HdBinding::TEXTURE_FIELD) {
-        } else if (type == HdBinding::BINDLESS_TEXTURE_2D
-                || type == HdBinding::BINDLESS_TEXTURE_FIELD
-                || type == HdBinding::BINDLESS_TEXTURE_PTEX_TEXEL
-                || type == HdBinding::BINDLESS_TEXTURE_PTEX_LAYOUT) {
-//            if (glIsTextureHandleResidentNV(it->handle)) {
-//                glMakeTextureHandleNonResidentNV(it->handle);
-//            }
-        }
-        // XXX: unbind
-    }
-}
-
-void
 HdSt_ResourceBinderGL::BindUniformi(TfToken const &name,
                                 int count, const int *value) const
 {
@@ -757,24 +703,34 @@ void _BindTextureDispatch(
 } // end anonymous namespace
 
 void
-HdSt_ResourceBinderGL::BindTextures(
-    const HdStShaderCode::NamedTextureHandleVector &textures,
+HdSt_ResourceBinderGL::BindShaderResources(
+    HdStShaderCode const *shader,
     HdStProgram const &shaderProgram) const
 {
-    TF_UNUSED(shaderProgram);
+    // bind fallback values and sampler uniforms (unit#? or bindless address)
 
+    // this is bound in batches.
+    //BindBufferArray(shader->GetShaderData());
+
+    // bind textures
+    TF_UNUSED(shaderProgram);
+    
+    auto const & textures = shader->GetNamedTextureHandles();
     for (const HdStShaderCode::NamedTextureHandle & texture : textures) {
         _BindTextureDispatch<_BindTextureFunctor>(texture, *this, /* bind = */ true);
     }
 }
 
 void
-HdSt_ResourceBinderGL::UnbindTextures(
-    const HdStShaderCode::NamedTextureHandleVector &textures,
+HdSt_ResourceBinderGL::UnbindShaderResources(
+    HdStShaderCode const *shader,
     HdStProgram const &shaderProgram) const
 {
+//    UnbindBufferArray(shader->GetShaderData());
+
     TF_UNUSED(shaderProgram);
 
+    auto const & textures = shader->GetNamedTextureHandles();
     for (const HdStShaderCode::NamedTextureHandle & texture : textures) {
         _BindTextureDispatch<_BindTextureFunctor>(texture, *this, /* bind = */ false);
     }

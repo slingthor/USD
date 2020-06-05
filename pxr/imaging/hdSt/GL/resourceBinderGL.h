@@ -48,9 +48,14 @@ public:
     
     /// bind/unbind shader parameters and textures
     HDST_API
-    virtual void BindShaderResources(HdStShaderCode const *shader) const override;
+    virtual void BindShaderResources(
+        HdStShaderCode const *shader,
+        HdStProgram const &shaderProgram) const override;
+
     HDST_API
-    virtual void UnbindShaderResources(HdStShaderCode const *shader) const override;
+    virtual void UnbindShaderResources(
+        HdStShaderCode const *shader,
+        HdStProgram const &shaderProgram) const override;
     
     /// piecewise buffer binding utility
     /// (to be used for frustum culling, draw indirect result)
@@ -79,18 +84,6 @@ public:
     /// bind a standalone uniform (float, vec2, vec3, vec4, mat4)
     HDST_API
     virtual void BindUniformf(TfToken const &name, int count, const float *value) const override;
-    
-    /// bind/unbind texture and sampler
-    HDST_API
-    virtual void BindTextures(
-        const HdStShaderCode::NamedTextureHandleVector &textures,
-        HdStProgram const &shaderProgram) const override;
-
-    HDST_API
-    virtual void UnbindTextures(
-        const HdStShaderCode::NamedTextureHandleVector &textures,
-        HdStProgram const &shaderProgram) const override;
-    
 };
 
 

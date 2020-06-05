@@ -359,9 +359,14 @@ public:
 
     /// bind/unbind shader parameters and textures
     HDST_API
-    virtual void BindShaderResources(HdStShaderCode const *shader) const = 0;
+    virtual void BindShaderResources(
+        HdStShaderCode const *shader,
+        HdStProgram const &shaderProgram) const = 0;
+
     HDST_API
-    virtual void UnbindShaderResources(HdStShaderCode const *shader) const = 0;
+    virtual void UnbindShaderResources(
+        HdStShaderCode const *shader,
+        HdStProgram const &shaderProgram) const = 0;
 
     /// piecewise buffer binding utility
     /// (to be used for frustum culling, draw indirect result)
@@ -406,17 +411,6 @@ public:
     int GetNumReservedTextureUnits() const {
         return _numReservedTextureUnits;
     }
-    
-    /// bind/unbind texture and sampler
-    HDST_API
-    virtual void BindTextures(
-        const HdStShaderCode::NamedTextureHandleVector &textures,
-        HdStProgram const &shaderProgram) const = 0;
-
-    HDST_API
-    virtual void UnbindTextures(
-        const HdStShaderCode::NamedTextureHandleVector &textures,
-        HdStProgram const &shaderProgram) const = 0;
     
 
 protected:
