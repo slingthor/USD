@@ -167,12 +167,13 @@ HdStSurfaceShader::UnbindResources(HdStProgram const &program,
                                    HdSt_ResourceBinder const &binder,
                                    HdRenderPassState const &state)
 {
-    // New texture system.
-    binder.UnbindShaderResources(this, program);
-    
     // Old texture system.
     program.UnbindResources(this, binder);
+
+    // New texture system.
+    binder.UnbindShaderResources(this, program);
 }
+
 /*virtual*/
 void
 HdStSurfaceShader::AddBindings(HdBindingRequestVector *customBindings)

@@ -519,24 +519,26 @@ HdStMSLProgram::BindTexture(
         textureId,
         textureNameToken,
         textureBinding->_stage);
-    
-    std::string samplerName("samplerBind_" + name.GetString());
-    TfToken samplerNameToken(samplerName, TfToken::Immortal);
 
-    MSL_ShaderBinding const* const samplerBinding = MSL_FindBinding(
-        _bindingMap,
-        samplerNameToken,
-        kMSL_BindingType_Sampler,
-        0xFFFFFFFF,
-        0);
-    
-    // UDIM and PTEX textures don't have samplers, so the binding will be null.
-    if (samplerBinding) {
-        MtlfMetalContext::GetMetalContext()->SetSampler(
-            samplerBinding->_index,
-            samplerId,
+    // UDIM and PTEX layout don't have samplers.
+    if (samplerId != nil) {
+        std::string samplerName("samplerBind_" + name.GetString());
+        TfToken samplerNameToken(samplerName, TfToken::Immortal);
+
+        MSL_ShaderBinding const* const samplerBinding = MSL_FindBinding(
+            _bindingMap,
             samplerNameToken,
-            samplerBinding->_stage);
+            kMSL_BindingType_Sampler,
+            0xFFFFFFFF,
+            0);
+        
+        if (samplerBinding) {
+            MtlfMetalContext::GetMetalContext()->SetSampler(
+                samplerBinding->_index,
+                samplerId,
+                samplerNameToken,
+                samplerBinding->_stage);
+        }
     }
 }
 
@@ -559,21 +561,23 @@ void HdStMSLProgram::BindResources(HdStSurfaceShader* surfaceShader, HdSt_Resour
             TF_FATAL_CODING_ERROR("Could not bind a texture to the shader?!");
         }
 
-        GarchTextureGPUHandle texture;
         HdBinding::Type type = textureBinding->_binding.GetType();
         HdStTextureResourceSharedPtr const & textureResource =
             it->handle->GetTextureResource();
+        id<MTLTexture> textureID = nil;
+        id<MTLSamplerState> samplerID = nil;
         
         if (type == HdBinding::TEXTURE_UDIM_LAYOUT ||
             type == HdBinding::TEXTURE_PTEX_LAYOUT) {
-            texture = textureResource->GetLayoutTextureId();
+            textureID = textureResource->GetLayoutTextureId();
+            samplerID = nil;
         }
         else {
-            texture = textureResource->GetTexelsTextureId();
+            textureID = textureResource->GetTexelsTextureId();
+            samplerID = textureResource->GetTexelsSamplerId();
         }
         
-        BindTexture(it->name, textureResource->GetLayoutTextureId(), textureResource->GetTexelsSamplerId());
-
+        BindTexture(it->name, textureID, samplerID);
     }
 }
 
