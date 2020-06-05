@@ -402,6 +402,7 @@ public:
     /// Returns binding point.
     /// XXX: exposed temporarily for drawIndirectResult
     /// see Hd_IndirectDrawBatch::_BeginGPUCountVisibleInstances()
+    HDST_API
     HdBinding GetBinding(TfToken const &name, int level=-1) const {
         HdBinding binding;
         TfMapLookup(_bindingMap, NameAndLevel(name, level), &binding);
@@ -412,6 +413,18 @@ public:
         return _numReservedTextureUnits;
     }
     
+    /// Add buffer specs necessary for the textures (e.g., for
+    /// bindless texture sampler handles or sampling transform).
+    ///
+    /// Specify whether to use the texture by binding it or by
+    /// using bindless handles with useBindlessHandles.
+    ///
+    HDST_API
+    static void
+    GetBufferSpecs(
+        const HdStShaderCode::NamedTextureHandleVector &textures,
+        bool useBindlessHandles,
+        HdBufferSpecVector * specs);
 
 protected:
     /// Constructor

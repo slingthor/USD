@@ -34,11 +34,11 @@
 #include "pxr/imaging/hdSt/materialBufferSourceAndTextureHelper.h"
 #include "pxr/imaging/hdSt/debugCodes.h"
 #include "pxr/imaging/hdSt/package.h"
-#include "pxr/imaging/hdSt/resourceRegistry.h"
+#include "pxr/imaging/hdSt/resourceBinder.h"
 #include "pxr/imaging/hdSt/resourceFactory.h"
+#include "pxr/imaging/hdSt/resourceRegistry.h"
 #include "pxr/imaging/hdSt/shaderCode.h"
 #include "pxr/imaging/hdSt/surfaceShader.h"
-#include "pxr/imaging/hdSt/textureBinder.h"
 #include "pxr/imaging/hdSt/textureHandle.h"
 #include "pxr/imaging/hdSt/textureResource.h"
 #include "pxr/imaging/hdSt/textureResourceHandle.h"
@@ -133,7 +133,7 @@ HdStMaterial::_ProcessTextureDescriptors(
         }
     }
 
-    HdSt_TextureBinder::GetBufferSpecs(
+    HdSt_ResourceBinder::GetBufferSpecs(
         *texturesFromStorm, bindlessTextureEnabled, specs);
 }
 
