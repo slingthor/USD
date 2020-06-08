@@ -374,37 +374,62 @@ GarchUVTextureData::Read(int degradeLevel, bool generateMipmap,
     }
 
     // Check if the image is providing a mip chain and check if it is valid
-    // Also, if the user wants cropping/resize then the mip chain 
-    // will be discarded.
-    bool usePregeneratedMips = !needsResizeOnLoad && generateMipmap;
-    int numMipLevels = usePregeneratedMips ? degradedImage.images.size() : 1;
-
+    // If the user wants cropping/resize then the mip chain will be discarded.
+    size_t computedMips = _ComputeNumMipLevels(_resizedWidth, _resizedHeight, 1);
+    bool regenerateMips = generateMipmap || needsResizeOnLoad;
+    size_t numMipLevels = regenerateMips ? computedMips : degradedImage.images.size();
+    
     // If rawbuffer has any memory let's clean it now before we load the 
     // new textures in memory
     _rawBufferMips.clear();
     _rawBufferMips.resize(numMipLevels);
+    
+    if (regenerateMips) {
+        int mipWidth = _resizedWidth;
+        int mipHeight = _resizedHeight;
 
-    // Read the metadata for the degraded mips in the structure that keeps
-    // track of all the mips
-    for(int i = 0 ; i < numMipLevels; i++) {
-        GarchImageSharedPtr image = degradedImage.images[i];
-        if (!image) {
-            TF_RUNTIME_ERROR("Unable to load mip from Texture '%s'.", 
-                _filePath.c_str());
-            return false;
+        // Read the metadata for the degraded mips in the structure that keeps
+        // track of all the mips
+        for (size_t i = 0 ; i < numMipLevels; i++) {
+            // Create the new mipmap
+            Mip & mip  = _rawBufferMips[i];
+            mip.width  = mipWidth;
+            mip.height = mipHeight;
+            
+            const size_t numPixels = mip.width * mip.height;
+            mip.size   = isCompressed ? GarchGetCompressedTextureSize(
+                                         mip.width, mip.height, _glFormat, _glType):
+                                        numPixels * _bytesPerPixel;
+            mip.offset = _size;
+            _size += mip.size;
+
+            if (mipWidth > 1) {
+                mipWidth >>= 1;
+            }
+            if (mipHeight > 1) {
+                mipHeight >>= 1;
+            }
         }
+    } else {
+        for (size_t i = 0 ; i < degradedImage.images.size(); i++) {
+            GarchImageSharedPtr image = degradedImage.images[i];
+            if (!image) {
+                TF_RUNTIME_ERROR("Unable to load mip from Texture '%s'.",
+                    _filePath.c_str());
+                return false;
+            }
 
-        // Create the new mipmap
-        Mip & mip  = _rawBufferMips[i];
-        mip.width  = needsResizeOnLoad ? _resizedWidth : image->GetWidth();
-        mip.height = needsResizeOnLoad ? _resizedHeight : image->GetHeight();
-        
-        const size_t numPixels = mip.width * mip.height;
-        mip.size   = isCompressed ? GarchGetCompressedTextureSize( 
-                                     mip.width, mip.height, _glFormat, _glType):
-                                    numPixels * _bytesPerPixel;
-        mip.offset = _size;
-        _size += mip.size;
+            Mip & mip  = _rawBufferMips[i];
+            mip.width  = image->GetWidth();
+            mip.height = image->GetHeight();
+            
+            const size_t numPixels = mip.width * mip.height;
+            mip.size   = isCompressed ? GarchGetCompressedTextureSize(
+                                         mip.width, mip.height, _glFormat, _glType):
+                                        numPixels * _bytesPerPixel;
+            mip.offset = _size;
+            _size += mip.size;
+        }
     }
 
     {
@@ -434,7 +459,7 @@ GarchUVTextureData::Read(int degradeLevel, bool generateMipmap,
 
     std::atomic<bool> returnVal(true);
 
-    WorkParallelForN(numMipLevels, 
+    WorkParallelForN(degradedImage.images.size(),
         [this, &degradedImage, cropTop, cropBottom, cropLeft, cropRight, 
         &commonStorageSpec, &returnVal] (size_t begin, size_t end) {
 

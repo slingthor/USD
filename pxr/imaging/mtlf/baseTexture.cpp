@@ -489,7 +489,7 @@ MtlfBaseTexture::_CreateTexture(GarchBaseTextureDataConstPtr texData,
                 [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:mtlFormat
                                                                    width:texData->ResizedWidth()
                                                                   height:texData->ResizedHeight()
-                                                               mipmapped:genMips?YES:NO];
+                                                               mipmapped:(numMipLevels > 1)?YES:NO];
             
             desc.resourceOptions = MTLResourceStorageModeDefault;
             desc.usage = MTLTextureUsageShaderRead;
