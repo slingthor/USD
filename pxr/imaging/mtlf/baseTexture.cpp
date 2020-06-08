@@ -493,6 +493,15 @@ MtlfBaseTexture::_CreateTexture(GarchBaseTextureDataConstPtr texData,
             
             desc.resourceOptions = MTLResourceStorageModeDefault;
             desc.usage = MTLTextureUsageShaderRead;
+
+            if (numChannels == 1) {
+#if (__MAC_OS_X_VERSION_MAX_ALLOWED >= 101500) || (__IPHONE_OS_VERSION_MAX_ALLOWED >= 130000) /* __MAC_10_15 __IOS_13_00 */
+                if (GarchResourceFactory::GetInstance()->GetContextCaps().apiVersion >= MtlfContextCaps::APIVersion_Metal3_0) {
+                    desc.swizzle = MTLTextureSwizzleChannelsMake(MTLTextureSwizzleRed, MTLTextureSwizzleRed, MTLTextureSwizzleRed, MTLTextureSwizzleRed);
+                }
+#endif
+            }
+
             _textureName = [device newTextureWithDescriptor:desc];
 
             if (useAsncTextureUploads) {
