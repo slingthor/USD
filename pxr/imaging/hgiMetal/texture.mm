@@ -95,29 +95,35 @@ HgiMetalTexture::HgiMetalTexture(HgiMetal *hgi, HgiTextureDesc const & desc)
     if (desc.initialData && desc.pixelsByteSize > 0) {
         size_t mipWidth = width;
         size_t mipHeight = height;
+        size_t mipDepth = (depth > 1) ? depth : 1;
         size_t pixelSize = HgiDataSizeOfFormat(desc.format);
         const uint8_t *byteData = static_cast<const uint8_t*>(desc.initialData);
+        
         for (int i = 0 ; i < desc.mipLevels; i++) {
-            size_t byteSize = mipWidth * mipHeight * pixelSize;
-            if(depth <= 1) {
+            size_t byteSize = mipWidth * mipHeight * mipDepth * pixelSize;
+
+            if (depth <= 1) {
                 [_textureId replaceRegion:MTLRegionMake2D(0, 0, mipWidth, mipHeight)
                               mipmapLevel:i
                                 withBytes:byteData
-                              bytesPerRow:byteSize / mipHeight];
+                              bytesPerRow:mipWidth * pixelSize];
             }
             else {
-                [_textureId replaceRegion:MTLRegionMake3D(0, 0, 0, mipWidth, mipHeight, depth)
+                [_textureId replaceRegion:MTLRegionMake3D(0, 0, 0, mipWidth, mipHeight, mipDepth)
                               mipmapLevel:i
                                     slice:0
                                 withBytes:byteData
-                              bytesPerRow:byteSize / mipHeight / mipWidth
-                            bytesPerImage:byteSize / depth];
+                              bytesPerRow:mipWidth * pixelSize
+                            bytesPerImage:mipWidth * mipHeight * pixelSize];
             }
             if (mipWidth > 1) {
                 mipWidth >>= 1;
             }
             if (mipHeight > 1) {
                 mipHeight >>= 1;
+            }
+            if (mipDepth > 1) {
+                mipDepth >>= 1;
             }
             byteData += byteSize;
         }

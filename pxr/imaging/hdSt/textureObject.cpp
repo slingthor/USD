@@ -217,7 +217,7 @@ HdSt_TextureObjectCpuData::HdSt_TextureObjectCpuData(
     }
 
     // Read texture file
-    if (!textureData->Read(0, false, originLocation)) {
+    if (!textureData->Read(0, generateMips, originLocation)) {
         return;
     }
 
