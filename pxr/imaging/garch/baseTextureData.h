@@ -96,7 +96,10 @@ public:
     virtual int GetNumMipLevels() const = 0;
 
     virtual bool IsCompressed() const;
-
+    
+    static size_t _ComputeNumMipLevels(size_t width,
+                                       size_t height,
+                                       size_t depth);
 protected:
     // Map image format and type and encoding to GL format.
     GARCH_API

@@ -57,6 +57,23 @@ GarchBaseTextureData::_GLInternalFormatFromImageData(
                                : (isSRGB ? GL_SRGB : GL_RGB));
     }
 }
+/* static */
+size_t
+GarchBaseTextureData::_ComputeNumMipLevels(size_t width, size_t height, size_t depth)
+{
+    const size_t maxDim = std::max({width, height, depth});
+
+    for (size_t i = 1; i < 8 * sizeof(int) - 1; i++) {
+        const size_t powerTwo = 1 << i;
+        if (powerTwo > maxDim) {
+            return i;
+        }
+    }
+    
+    // Can never be reached, but compiler doesn't know that.
+    return 1;
+}
+
 
 bool GarchBaseTextureData::IsCompressed() const
 {
