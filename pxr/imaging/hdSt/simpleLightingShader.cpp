@@ -21,9 +21,7 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#include "pxr/imaging/glf/glew.h"
 #include "pxr/imaging/hdSt/simpleLightingShader.h"
-#include "pxr/imaging/hdSt/textureResource.h"
 #include "pxr/imaging/hdSt/textureIdentifier.h"
 #include "pxr/imaging/hdSt/subtextureIdentifier.h"
 #include "pxr/imaging/hdSt/textureObject.h"
@@ -33,19 +31,20 @@
 #include "pxr/imaging/hdSt/resourceBinder.h"
 #include "pxr/imaging/hdSt/resourceRegistry.h"
 #include "pxr/imaging/hdSt/domeLightComputations.h"
+#include "pxr/imaging/hdSt/dynamicUvTextureObject.h"
+#include "pxr/imaging/hdSt/textureBinder.h"
 
 #include "pxr/imaging/hd/sceneDelegate.h"
 #include "pxr/imaging/hd/binding.h"
 #include "pxr/imaging/hd/perfLog.h"
-#include "pxr/imaging/hd/tokens.h"
 
 #include "pxr/imaging/hf/perfLog.h"
 
 #include "pxr/imaging/hio/glslfx.h"
 #include "pxr/imaging/hgi/enums.h"
-#include "pxr/imaging/hgi/texture.h"
 
 #include "pxr/imaging/garch/bindingMap.h"
+#include "pxr/imaging/garch/simpleLightingContext.h"
 
 #include "pxr/base/tf/staticTokens.h"
 
@@ -61,7 +60,6 @@
 
 #include <boost/functional/hash.hpp>
 
-#include <string>
 #include <sstream>
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -82,31 +80,9 @@ HdStSimpleLightingShader::HdStSimpleLightingShader()
 {
     _lightingContext->InitUniformBlockBindings(_bindingMap);
     _lightingContext->InitSamplerUnitBindings(_bindingMap);
-    _isOpenGL = HdStResourceFactory::GetInstance()->IsOpenGL();
 }
 
-HdStSimpleLightingShader::~HdStSimpleLightingShader()
-{
-#if defined(PXR_OPENGL_SUPPORT_ENABLED)
-    if (_isOpenGL) {
-        uint32_t t[] = { _domeLightIrradianceGLName, _domeLightPrefilterGLName, _domeLightBrdfGLName };
-        uint32_t s[] = { _domeLightIrradianceGLSampler, _domeLightPrefilterGLSampler, _domeLightBrdfGLSampler };
-        glDeleteTextures(sizeof(t) / sizeof(t[0]), t);
-        glDeleteTextures(sizeof(s) / sizeof(s[0]), s);
-    }
-#endif
-#if defined(PXR_METAL_SUPPORT_ENABLED)
-    if (!_isOpenGL) {
-        [_domeLightIrradianceGLName release];
-        [_domeLightPrefilterGLName release];
-        [_domeLightBrdfGLName release];
-
-        [_domeLightIrradianceGLSampler release];
-        [_domeLightPrefilterGLSampler release];
-        [_domeLightBrdfGLSampler release];
-    }
-#endif
-}
+HdStSimpleLightingShader::~HdStSimpleLightingShader() = default;
 
 /* virtual */
 HdStSimpleLightingShader::ID
@@ -169,48 +145,6 @@ HdStSimpleLightingShader::SetCamera(GfMatrix4d const &worldToViewMatrix,
     _lightingContext->SetCamera(worldToViewMatrix, projectionMatrix);
 }
 
-static void _BindToMetal(
-    MSL_ShaderBindingMap const &bindingMap,
-    TfToken &bindTextureName,
-    TfToken &bindSamplerName,
-    GarchTextureGPUHandle const &textureHandle,
-    GarchSamplerGPUHandle const &samplerHandle)
-{
-    MSL_ShaderBinding const* const textureBinding = MSL_FindBinding(
-        bindingMap,
-        bindTextureName,
-        kMSL_BindingType_Texture,
-        0xFFFFFFFF,
-        0);
-    if(!textureBinding)
-    {
-        TF_FATAL_CODING_ERROR("Could not bind a texture to the shader?!");
-    }
-    
-    MtlfMetalContext::GetMetalContext()->SetTexture(
-        textureBinding->_index,
-        textureHandle,
-        bindTextureName,
-        textureBinding->_stage);
-
-    MSL_ShaderBinding const* const samplerBinding = MSL_FindBinding(
-        bindingMap,
-        bindSamplerName,
-        kMSL_BindingType_Sampler,
-        0xFFFFFFFF,
-        0);
-
-    if(!samplerBinding)
-    {
-        TF_FATAL_CODING_ERROR("Could not bind a sampler to the shader?!");
-    }
-    MtlfMetalContext::GetMetalContext()->SetSampler(
-        samplerBinding->_index,
-        samplerHandle,
-        bindSamplerName,
-        samplerBinding->_stage);
-}
-
 static
 bool
 _HasDomeLight(GarchSimpleLightingContextRefPtr const &ctx)
@@ -221,47 +155,6 @@ _HasDomeLight(GarchSimpleLightingContextRefPtr const &ctx)
         }
     }
     return false;
-}
-
-static
-void
-_BindTextureAndSampler(HdStProgram const &program,
-                       HdSt_ResourceBinder const &binder,
-                       TfToken const &token,
-                       const GarchTextureGPUHandle glName,
-                       const GarchSamplerGPUHandle glSampler)
-{
-    const HdBinding binding = binder.GetBinding(token);
-    if (binding.GetType() != HdBinding::TEXTURE_2D) {
-        return;
-    }
-    
-    bool isOpenGL = HdStResourceFactory::GetInstance()->IsOpenGL();
-    
-    if (isOpenGL) {
-#if defined(PXR_OPENGL_SUPPORT_ENABLED)
-        const int samplerUnit = binding.GetTextureUnit();
-        glActiveTexture(GL_TEXTURE0 + samplerUnit);
-        glBindTexture(GL_TEXTURE_2D, glName);
-        glBindSampler(samplerUnit, glSampler);
-#endif
-    }
-    else {
-        std::string textureName("textureBind_" + token.GetString());
-        TfToken textureNameToken(textureName, TfToken::Immortal);
-        std::string samplerName("samplerBind_" + token.GetString());
-        TfToken samplerNameToken(samplerName, TfToken::Immortal);
-
-        HdStMSLProgram const &mslProgram(
-            dynamic_cast<const HdStMSLProgram&>(program));
-
-        _BindToMetal(
-            mslProgram.GetBindingMap(),
-            textureNameToken,
-            samplerNameToken,
-            glName,
-            glSampler);
-    }
 }
 
 /* virtual */
@@ -281,66 +174,22 @@ HdStSimpleLightingShader::BindResources(HdStProgram const &program,
     program.AssignSamplerUnits(_bindingMap);
     _lightingContext->BindSamplers(_bindingMap);
 
-    if(_HasDomeLight(_lightingContext)) {
-        _BindTextureAndSampler(program,
-                               binder,
-                               _tokens->domeLightIrradiance,
-                               _domeLightIrradianceGLName,
-                               _domeLightIrradianceGLSampler);
-        _BindTextureAndSampler(program,
-                               binder,
-                               _tokens->domeLightPrefilter,
-                               _domeLightPrefilterGLName,
-                               _domeLightPrefilterGLSampler);
-        _BindTextureAndSampler(program,
-                               binder,
-                               _tokens->domeLightBRDF,
-                               _domeLightBrdfGLName,
-                               _domeLightBrdfGLSampler);
-    }
-    if (_isOpenGL) {
-#if defined(PXR_OPENGL_SUPPORT_ENABLED)
-        glActiveTexture(GL_TEXTURE0);
-#endif
-    }
+    HdSt_TextureBinder::BindResources(binder, false, _namedTextureHandles);
+
     binder.BindShaderResources(this);
 }
 
 /* virtual */
 void
 HdStSimpleLightingShader::UnbindResources(HdStProgram const &program,
-                                         HdSt_ResourceBinder const &binder,
-                                         HdRenderPassState const &state)
+                                          HdSt_ResourceBinder const &binder,
+                                          HdRenderPassState const &state)
 {
     // XXX: we'd like to use HdSt_ResourceBinder instead of GlfBindingMap.
     //
     _lightingContext->UnbindSamplers(_bindingMap);
-    
-    if (HdStResourceFactory::GetInstance()->IsOpenGL()) {
-#if defined(PXR_OPENGL_SUPPORT_ENABLED)
-        if(_HasDomeLight(_lightingContext)) {
-            GarchTextureGPUHandle t;
-            GarchSamplerGPUHandle s;
-            _BindTextureAndSampler(program,
-                                   binder,
-                                   _tokens->domeLightIrradiance,
-                                   t,
-                                   s);
-            _BindTextureAndSampler(program,
-                                   binder,
-                                   _tokens->domeLightPrefilter,
-                                   t,
-                                   s);
-            _BindTextureAndSampler(program,
-                                   binder,
-                                   _tokens->domeLightBRDF,
-                                   t,
-                                   s);
-        }
 
-        glActiveTexture(GL_TEXTURE0);
-#endif
-    }
+    HdSt_TextureBinder::UnbindResources(binder, false, _namedTextureHandles);
 }
 
 /*virtual*/
@@ -416,26 +265,89 @@ HdStSimpleLightingShader::SetLightingState(
     }
 }
 
-void
-HdStSimpleLightingShader::AllocateTextureHandles(HdSceneDelegate *const delegate)
+static
+const std::string &
+_GetResolvedDomeLightEnvironmentFilePath(
+    const GarchSimpleLightingContextRefPtr &ctx)
 {
-    SdfAssetPath path;
+    static const std::string empty;
 
-    for (auto const& light : _lightingContext->GetLights()){
-        if (light.IsDomeLight()) {
-            path = light.GetDomeLightTextureFile();
+    if (!ctx) {
+        return empty;
+    }
+    
+    const GarchSimpleLightVector & lights = ctx->GetLights();
+    for (auto it = lights.rbegin(); it != lights.rend(); ++it) {
+        if (it->IsDomeLight()) {
+            return it->GetDomeLightTextureFile().GetResolvedPath();
         }
     }
 
-    const std::string &resolvedPath = path.GetResolvedPath();
+    return empty;
+}
+
+const HdStTextureHandleSharedPtr &
+HdStSimpleLightingShader::GetTextureHandle(const TfToken &name) const
+{
+    for (auto const & namedTextureHandle : _namedTextureHandles) {
+        if (namedTextureHandle.name == name) {
+            return namedTextureHandle.handle;
+        }
+    }
+
+    static const HdStTextureHandleSharedPtr empty;
+    return empty;
+}
+
+static
+HdStShaderCode::NamedTextureHandle
+_MakeNamedTextureHandle(
+    const TfToken &name,
+    const std::string &texturePath,
+    const HdWrap wrapMode,
+    const HdMinFilter minFilter,
+    HdStResourceRegistry * const resourceRegistry,
+    HdStShaderCodeSharedPtr const &shader)
+{
+    const HdStTextureIdentifier textureId(
+        TfToken(texturePath + "[" + name.GetString() + "]"),
+        std::make_unique<HdStDynamicUvSubtextureIdentifier>());
+
+    const HdSamplerParameters samplerParameters{
+        wrapMode, wrapMode, wrapMode,
+        minFilter, HdMagFilterLinear};
+
+    HdStTextureHandleSharedPtr const textureHandle =
+        resourceRegistry->AllocateTextureHandle(
+            textureId,
+            HdTextureType::Uv,
+            samplerParameters,
+            /* memoryRequest = */ 0,
+            /* createBindlessHandle = */ false,
+            shader);
+
+    return { name,
+             HdTextureType::Uv,
+             textureHandle,
+             SdfPath::AbsoluteRootPath().AppendChild(name) };
+}
+
+void
+HdStSimpleLightingShader::AllocateTextureHandles(HdSceneDelegate *const delegate)
+{
+    const std::string &resolvedPath =
+        _GetResolvedDomeLightEnvironmentFilePath(_lightingContext);
     if (resolvedPath.empty()) {
-        _domeLightTextureHandle = nullptr;
+        _domeLightEnvironmentTextureHandle = nullptr;
+        _namedTextureHandles.clear();
         return;
     }
 
-    if (_domeLightTextureHandle) {
+    if (_domeLightEnvironmentTextureHandle) {
+        HdStTextureObjectSharedPtr const &textureObject =
+            _domeLightEnvironmentTextureHandle->GetTextureObject();
         HdStTextureIdentifier const &textureId =
-            _domeLightTextureHandle->GetTextureObject()->GetTextureIdentifier();
+            textureObject->GetTextureIdentifier();
         if (textureId.GetFilePath() != resolvedPath) {
             return;
         }
@@ -447,50 +359,57 @@ HdStSimpleLightingShader::AllocateTextureHandles(HdSceneDelegate *const delegate
     if (!TF_VERIFY(resourceRegistry)) {
         return;
     }
-        
+
     const HdStTextureIdentifier textureId(
         TfToken(resolvedPath),
         std::make_unique<HdStUvOrientationSubtextureIdentifier>(
             /* flipVertically = */ true));
 
-    static const HdSamplerParameters samplerParameters{
+    static const HdSamplerParameters envSamplerParameters{
         HdWrapRepeat, HdWrapRepeat, HdWrapRepeat,
         HdMinFilterLinear, HdMagFilterLinear};
 
-    _domeLightTextureHandle = resourceRegistry->AllocateTextureHandle(
-        textureId, 
-        HdTextureType::Uv,
-        samplerParameters,
-        /* targetMemory = */ 0,
-        /* createBindlessHandle = */ false,
-        shared_from_this());
+    _domeLightEnvironmentTextureHandle =
+        resourceRegistry->AllocateTextureHandle(
+            textureId,
+            HdTextureType::Uv,
+            envSamplerParameters,
+            /* targetMemory = */ 0,
+            /* createBindlessHandle = */ false,
+            shared_from_this());
+
+    _namedTextureHandles = {
+        _MakeNamedTextureHandle(
+            _tokens->domeLightIrradiance,
+            resolvedPath,
+            HdWrapRepeat,
+            HdMinFilterLinear,
+            resourceRegistry,
+            shared_from_this()),
+
+        _MakeNamedTextureHandle(
+            _tokens->domeLightPrefilter,
+            resolvedPath,
+            HdWrapRepeat,
+            HdMinFilterLinearMipmapLinear,
+            resourceRegistry,
+            shared_from_this()),
+
+        _MakeNamedTextureHandle(
+            _tokens->domeLightBRDF,
+            resolvedPath,
+            HdWrapClamp,
+            HdMinFilterLinear,
+            resourceRegistry,
+            shared_from_this())
+    };
 }
 
 void
 HdStSimpleLightingShader::AddResourcesFromTextures(ResourceContext &ctx) const
 {
-    if (!_domeLightTextureHandle) {
+    if (!_domeLightEnvironmentTextureHandle) {
         // No dome lights, bail.
-        return;
-    }
-    
-    // Get the GL name of the environment map that
-    // was loaded during commit.
-    HdStTextureObjectSharedPtr const &textureObject =
-        _domeLightTextureHandle->GetTextureObject();
-    HdStUvTextureObject const *uvTextureObject =
-        dynamic_cast<HdStUvTextureObject*>(
-            textureObject.get());
-    if (!TF_VERIFY(uvTextureObject)) {
-        return;
-    }
-    HgiTextureHandle const& texture = uvTextureObject->GetTexture();
-    if (!TF_VERIFY(texture)) {
-        return;
-    }
-    
-    // TEMP - work around for continuous building of textures
-    if (_domeLightIrradianceGLSampler.IsSet()) {
         return;
     }
 
@@ -505,7 +424,6 @@ HdStSimpleLightingShader::AddResourcesFromTextures(ResourceContext &ctx) const
         nullptr,
         HdSt_DomeLightComputationGPU::New(
             _tokens->domeLightIrradiance,
-            texture,
             thisShader));
     
     static const GLuint numPrefilterLevels = 5;
@@ -519,7 +437,6 @@ HdStSimpleLightingShader::AddResourcesFromTextures(ResourceContext &ctx) const
             nullptr,
             HdSt_DomeLightComputationGPU::New(
                 _tokens->domeLightPrefilter, 
-                texture,
                 thisShader,
                 numPrefilterLevels,
                 mipLevel,
@@ -531,93 +448,13 @@ HdStSimpleLightingShader::AddResourcesFromTextures(ResourceContext &ctx) const
         nullptr,
         HdSt_DomeLightComputationGPU::New(
             _tokens->domeLightBRDF,
-            texture,
             thisShader));
 }
 
-static
-void
-_CreateSampler(GarchSamplerGPUHandle & samplerName,
-               const HgiSamplerAddressMode wrapMode,
-               const HgiMipFilter mipFilter)
+HdStShaderCode::NamedTextureHandleVector const &
+HdStSimpleLightingShader::GetNamedTextureHandles() const
 {
-    if (samplerName.IsSet()) {
-        return;
-    }
-    
-    bool isOpenGL = HdStResourceFactory::GetInstance()->IsOpenGL();
-    if (isOpenGL) {
-#if defined(PXR_OPENGL_SUPPORT_ENABLED)
-        uint32_t s;
-        glGenSamplers(1, &s);
-        glSamplerParameteri(s, GL_TEXTURE_WRAP_S, HgiGLConversions::GetSamplerAddressMode(wrapMode));
-        glSamplerParameteri(s, GL_TEXTURE_WRAP_T, HgiGLConversions::GetSamplerAddressMode(wrapMode));
-        glSamplerParameteri(s, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glSamplerParameteri(s, GL_TEXTURE_MIN_FILTER,
-            HgiGLConversions::GetMinFilter(HgiSamplerFilterLinear, mipFilter));
-        samplerName = s;
-#endif
-    }
-    else {
-#if defined(PXR_METAL_SUPPORT_ENABLED)
-        MTLSamplerDescriptor* samplerDescriptor = [[MTLSamplerDescriptor alloc] init];
-        samplerDescriptor.sAddressMode = HgiMetalConversions::GetSamplerAddressMode(wrapMode);
-        samplerDescriptor.tAddressMode = samplerDescriptor.sAddressMode;
-        samplerDescriptor.minFilter = HgiMetalConversions::GetMinMagFilter(HgiSamplerFilterLinear);
-        samplerDescriptor.magFilter = samplerDescriptor.minFilter;
-        samplerDescriptor.mipFilter = HgiMetalConversions::GetMipFilter(mipFilter);
-        
-        id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->currentDevice;
-        samplerName = [device newSamplerStateWithDescriptor:samplerDescriptor];
-#endif
-    }
-}
-
-void
-HdStSimpleLightingShader::_CreateSamplersIfNecessary()
-{
-    _CreateSampler(_domeLightIrradianceGLSampler,
-                   HgiSamplerAddressModeRepeat,
-                   HgiMipFilterNotMipmapped);
-    _CreateSampler(_domeLightPrefilterGLSampler,
-                   HgiSamplerAddressModeRepeat,
-                   HgiMipFilterLinear);
-    _CreateSampler(_domeLightBrdfGLSampler,
-                   HgiSamplerAddressModeClampToEdge,
-                   HgiMipFilterNotMipmapped);
-}
-
-void
-HdStSimpleLightingShader::SetGLTextureName(
-    const TfToken &token, const GarchTextureGPUHandle glName)
-{
-    _CreateSamplersIfNecessary();
-
-    if (token == _tokens->domeLightIrradiance) {
-        _domeLightIrradianceGLName = glName;
-    } else if (token == _tokens->domeLightPrefilter) {
-        _domeLightPrefilterGLName = glName;
-    } else if (token == _tokens->domeLightBRDF) {
-        _domeLightBrdfGLName = glName;
-    } else {
-        TF_CODING_ERROR("Unsupported texture token %s", token.GetText());
-    }
-}
-
-GarchTextureGPUHandle
-HdStSimpleLightingShader::GetGLTextureName(const TfToken &token) const
-{
-    if (token == _tokens->domeLightIrradiance) {
-        return _domeLightIrradianceGLName;
-    }
-    if (token == _tokens->domeLightPrefilter) {
-        return _domeLightPrefilterGLName;
-    }
-    if (token == _tokens->domeLightBRDF) {
-        return _domeLightBrdfGLName;
-    }
-    TF_CODING_ERROR("Unsupported texture token %s", token.GetText());
-    return GarchTextureGPUHandle();
+    return _namedTextureHandles;
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

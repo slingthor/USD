@@ -3,13 +3,8 @@
         {
         	"Info": {
 			    "Types": {
-	                    "UsdImagingGLMaterialTextureAdapter" : {
-	                        "bases": ["UsdImagingMaterialAdapter"],
-	                        "isInternal": true,
-	                        "primTypeName": "MaterialTexture"
 	                    }
-		          }
-            },
+		          },
             "LibraryPath": "@PLUG_INFO_LIBRARY_PATH@",
             "Name": "usdImagingGL",
             "ResourcePath": "@PLUG_INFO_RESOURCE_PATH@",

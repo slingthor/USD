@@ -215,7 +215,7 @@ HdSt_IndirectDrawBatchGL::_ExecuteDraw(_DrawingProgram &program, int batchCount)
 }
 
 void
-HdSt_IndirectDrawBatchGL::_GPUFrustumCullingExecute(
+HdSt_IndirectDrawBatchGL::_GPUFrustumInstanceCullingExecute(
     HdStResourceRegistrySharedPtr const &resourceRegistry,
     HdStProgramSharedPtr const &program,
     HdSt_ResourceBinder const &binder,
@@ -273,32 +273,41 @@ HdSt_IndirectDrawBatchGL::_SyncFence() {
 }
 
 void
-HdSt_IndirectDrawBatchGL::_GPUFrustumCullingXFBExecute(
+HdSt_IndirectDrawBatchGL::_GPUFrustumNonInstanceCullingExecute(
     HdStResourceRegistrySharedPtr const &resourceRegistry,
-    HdStProgramSharedPtr const &program)
+    HdStProgramSharedPtr const &program,
+    const HdSt_ResourceBinder &binder)
 {
     GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
     if (caps.IsEnabledGPUCountVisibleInstances()) {
         _BeginGPUCountVisibleInstances(resourceRegistry);
     }
 
-    glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0,
-                     (GLuint)(uint64_t)_dispatchBuffer->GetEntireResource()->GetId());
-    glBeginTransformFeedback(GL_POINTS);
+    // bind destination buffer (using entire buffer bind to start from offset=0)
+    binder.BindBuffer(HdStIndirectDrawTokens->dispatchBuffer,
+                      _dispatchBuffer->GetEntireResource());
 
     glEnable(GL_RASTERIZER_DISCARD);
     glDrawArrays(GL_POINTS, 0, _dispatchBufferCullInput->GetCount());
     glDisable(GL_RASTERIZER_DISCARD);
 
+    // unbind destination dispatch buffer
+    binder.UnbindBuffer(HdStIndirectDrawTokens->dispatchBuffer,
+                        _dispatchBuffer->GetEntireResource());
+
+    // make sure the culling results (instanceCount)
+    // are synchronized for the next drawing.
+    glMemoryBarrier(
+        GL_COMMAND_BARRIER_BIT |      // instanceCount for MDI
+        GL_SHADER_STORAGE_BARRIER_BIT // instanceCount for shader
+    );
+    
+    // a fence has to be added after the memory barrier.
     if (caps.IsEnabledGPUCountVisibleInstances()) {
-        glMemoryBarrier(GL_TRANSFORM_FEEDBACK_BARRIER_BIT);
         _cullResultSync = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
     } else {
         _cullResultSync = 0;
     }
-
-    glEndTransformFeedback();
-    glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0, 0);
 }
 
 void

@@ -145,13 +145,19 @@ FrustumCullIsVisible(MAT4 toClip, vec4 localMin, vec4 localMax)
 
 #if defined(ARCH_GFX_METAL)
 in int instanceCountInput;
+in int drawCommandIndex;
+uniform uint drawCommandNumUints;
 uniform mat4 ulocCullMatrix;
 #else
 layout (location = instanceCountInput_Binding) in int instanceCountInput;
+layout (location = drawCommandIndex_Binding) in int drawCommandIndex;
+layout (location = ulocDrawCommandNumUints_Binding) uniform uint drawCommandNumUints;
 layout (location = ulocCullMatrix_Binding) uniform mat4 ulocCullMatrix;
 #endif
 
-out int resultInstanceCount;
+layout (std430, binding = dispatchBuffer_Binding) buffer DispatchBuffer {
+    uint drawCommands[];
+};
 
 MAT4 GetCullMatrix()
 {
@@ -160,6 +166,10 @@ MAT4 GetCullMatrix()
 
 void main()
 {
+    // instanceCountOffset is a relative offset in drawcommand struct.
+    // it's a second entry in both DrawArraysCommand and DrawElementsCommand.
+    const uint instanceCountOffset = 1;
+
     MAT4 transform = HdGet_transform();
     MAT4 toClip = GetCullMatrix() * transform;
 
@@ -168,11 +178,15 @@ void main()
 
     bool isVisible = FrustumCullIsVisible(toClip, localMin, localMax);
 
+    // Compute the index to the 'instanceCount' struct member in drawCommands.
+    uint index = uint(drawCommandIndex) * drawCommandNumUints + instanceCountOffset;
+
     // Set the resulting instance count to 0 if the primitive is culled
     // otherwise pass through the original incoming instance count.
-    resultInstanceCount = int(isVisible) * instanceCountInput;
+    uint resultInstanceCount = instanceCountInput * uint(isVisible);
+    drawCommands[index] = resultInstanceCount;
 
-    FrustumCullCountVisibleInstances(resultInstanceCount);
+    FrustumCullCountVisibleInstances(int(resultInstanceCount));
 }
 
 
@@ -252,7 +266,7 @@ void main()
 {
     // instanceCountOffset is a relative offset in drawcommand struct.
     // it's a second entry in both DrawArraysCommand and DrawElementsCommand.
-    const int instanceCountOffset = 1;
+    const uint instanceCountOffset = 1;
 
     // reset pass
     if (ulocResetPass == 1) {

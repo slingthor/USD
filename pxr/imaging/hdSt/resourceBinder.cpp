@@ -226,6 +226,7 @@ HdSt_ResourceBinder::ResolveBindings(HdStDrawItem const *drawItem,
     int shaderFallbackLocation = 0;
     int shaderPrimvarRedirectLocation = 0;
     int shaderFieldRedirectLocation = 0;
+    int shaderTransform2dLocation = 0;
 
     // clear all
     _bindingMap.clear();
@@ -733,6 +734,15 @@ HdSt_ResourceBinder::ResolveBindings(HdStDrawItem const *drawItem,
                     /*type=*/glType,
                     /*swizzle=*/glSwizzle,
                     /*inPrimvars=*/glNames);
+            } else if (param.IsTransform2d()) {
+                HdBinding binding = HdBinding(HdBinding::TRANSFORM_2D,
+                                              shaderTransform2dLocation++);
+                metaDataOut->shaderParameterBinding[binding] =
+                    MetaData::ShaderParameterAccessor(
+                        /*name=*/glName,
+                        /*type=*/glType,
+                        /*swizzle=*/glSwizzle,
+                        /*inPrimvars=*/param.samplerCoords);            
             } else if (param.IsAdditionalPrimvar()) {
                 // Additional primvars is used so certain primvars survive
                 // primvar filtering. We can ignore them here, because primvars

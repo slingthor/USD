@@ -310,7 +310,7 @@ HgiMetalShaderFunction::HgiMetalShaderFunction(
                                               options:options
                                                 error:&error];
 
-    NSString *entryPoint;
+    NSString *entryPoint = nullptr;
     switch (_descriptor.shaderStage) {
         case HgiShaderStageVertex:
             entryPoint = @"vertexEntryPoint";
@@ -320,6 +320,11 @@ HgiMetalShaderFunction::HgiMetalShaderFunction(
             break;
         case HgiShaderStageCompute:
             entryPoint = @"computeEntryPoint";
+            break;
+        case HgiShaderStageTessellationControl:
+        case HgiShaderStageTessellationEval:
+        case HgiShaderStageGeometry:
+            TF_CODING_ERROR("Todo: Unsupported shader stage");
             break;
     }
     

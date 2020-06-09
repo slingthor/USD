@@ -54,20 +54,33 @@ using HdStShaderCodeSharedPtrVector = std::vector<HdStShaderCodeSharedPtr>;
 ///
 /// Parameters are expressed as GL states, uniforms or shaders.
 ///
-class HdStRenderPassState : public HdRenderPassState {
+class HdStRenderPassState : public HdRenderPassState
+{
 public:
     HDST_API
-    virtual ~HdStRenderPassState();
+    ~HdStRenderPassState() override;
 
     HDST_API
-    virtual void
+    void
     Prepare(HdResourceRegistrySharedPtr const &resourceRegistry) override;
 
+    /// Apply the GL states.
+    /// Following states may be changed and restored to
+    /// the GL default at Unbind().
+    ///   glEnable(GL_POLYGON_OFFSET_FILL)
+    ///   glEnable(GL_SAMPLE_ALPHA_TO_COVERAGE)
+    ///   glEnable(GL_PROGRAM_POINT_SIZE);
+    ///   glEnable(GL_STENCIL_TEST);
+    ///   glPolygonOffset()
+    ///   glDepthFunc()
+    ///   glStencilFunc()
+    ///   glStencilOp()
+    ///   glLineWidth()
     HDST_API
-    virtual void Bind() override;
+    void Bind() override;
 
     HDST_API
-    virtual void Unbind() override;
+    void Unbind() override;
 
     /// Set lighting shader
     HDST_API
@@ -97,12 +110,24 @@ public:
     HDST_API
     size_t GetShaderHash() const;
 
-    // Helper to convert AOV bindings to HgiGraphicsCmds descriptor
+    // Helper to get graphics cmds descriptor describing textures
+    // we render into and the blend state.
+    //
+    // By default, converts AOV bindings to HgiGraphicsCmds descriptor
+    HDST_API
     HgiGraphicsCmdsDesc MakeGraphicsCmdsDesc() const;
-    
-    GfVec2f
-    GetAovDimensions() const;
 
+    // Use custom graphics cmds descriptor instead of creating one from
+    // AOV bindings.
+    HDST_API
+    void SetCustomGraphicsCmdsDesc(const HgiGraphicsCmdsDesc &graphicsCmdDesc);
+
+    // Go back to using AOV bindings again.
+    HDST_API
+    void ClearCustomGraphicsCmdsDesc();
+
+	HDST_API GfVec2f
+    GetAovDimensions() const;
 protected:
     HdStRenderPassState();
     HDST_API
@@ -121,6 +146,9 @@ protected:
     HdBufferArrayRangeSharedPtr _renderPassStateBar;
     size_t _clipPlanesBufferSize;
     float _alphaThresholdCurrent;
+
+    HgiGraphicsCmdsDesc _customGraphicsCmdsDesc;
+    bool _hasCustomGraphicsCmdsDesc;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

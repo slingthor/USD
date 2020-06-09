@@ -89,7 +89,8 @@ public:
                 FRONT_FACING,        // boolean indicating if fragment belongs to a front-facing primitive
                 SAMPLER,             // texture sampler in non-GL APIs
                 INSTANCE_ID,         // instance ID
-                FRAG_COORD           // screen space frament position
+                FRAG_COORD,          // screen space frament position
+				TRANSFORM_2D         // transform2d  
     };
     enum Location {
                 // NOT_EXIST is a special value of location for a uniform

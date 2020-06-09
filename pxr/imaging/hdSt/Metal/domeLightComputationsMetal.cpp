@@ -26,6 +26,8 @@
 #include "pxr/imaging/hdSt/simpleLightingShader.h"
 #include "pxr/imaging/hdSt/resourceRegistry.h"
 #include "pxr/imaging/hdSt/package.h"
+#include "pxr/imaging/hdSt/dynamicUvTextureObject.h"
+#include "pxr/imaging/hdSt/textureHandle.h"
 #include "pxr/imaging/hdSt/tokens.h"
 
 #include "pxr/imaging/hdSt/Metal/mslProgram.h"
@@ -38,14 +40,12 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 HdSt_DomeLightComputationGPUMetal::HdSt_DomeLightComputationGPUMetal(
     const TfToken & shaderToken,
-    HgiTextureHandle const& sourceGLTextureName,
     HdStSimpleLightingShaderPtr const &lightingShader,
     unsigned int numLevels,
     unsigned int level,
     float roughness)
     : HdSt_DomeLightComputationGPU(
        shaderToken,
-       dynamic_cast<HgiMetalTexture*>(sourceGLTextureName.Get())->GetTextureId(),
        lightingShader,
        numLevels,
        level,
@@ -54,19 +54,21 @@ HdSt_DomeLightComputationGPUMetal::HdSt_DomeLightComputationGPUMetal(
 }
 
 GarchTextureGPUHandle
-HdSt_DomeLightComputationGPUMetal::_CreateGLTexture(
-    const int32_t width, const int32_t height) const
+HdSt_DomeLightComputationGPUMetal::_GetGlTextureName(const HgiTexture * const hgiTexture)
 {
-    id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->currentDevice;
-    MTLTextureDescriptor* desc =
-        [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA16Float
-                                                           width:width
-                                                          height:height
-                                                       mipmapped:NO];
-    desc.mipmapLevelCount = _numLevels;
-    desc.resourceOptions = MTLResourceStorageModeDefault;
-    desc.usage = MTLTextureUsageShaderRead|MTLTextureUsageShaderWrite;
-    return [device newTextureWithDescriptor:desc];
+    const HgiMetalTexture * const metalTexture =
+        dynamic_cast<const HgiMetalTexture*>(hgiTexture);
+    if (!metalTexture) {
+        TF_CODING_ERROR(
+            "Texture in dome light computation is not HgiMetalTexture");
+        return GarchTextureGPUHandle();
+    }
+    const GarchTextureGPUHandle textureName = metalTexture->GetTextureId();
+    if (!textureName.IsSet()) {
+        TF_CODING_ERROR(
+            "Texture in dome light computation has zero GL name");
+    }
+    return textureName;
 }
 
 void
@@ -85,32 +87,50 @@ HdSt_DomeLightComputationGPUMetal::_Execute(HdStProgramSharedPtr computeProgram)
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
     HdStMSLProgramSharedPtr const &mslProgram(std::dynamic_pointer_cast<HdStMSLProgram>(computeProgram));
 
-    // Get texture name from lighting shader.
-
-    id<MTLTexture> dstGLTextureName = shader->GetGLTextureName(_shaderToken);
-
-    // Get size of source texture
-    id<MTLTexture> sourceTexture = _sourceGLTextureName;
-    uint32_t srcWidth  = sourceTexture.width;
-    uint32_t srcHeight = sourceTexture.height;
+    // Size of source texture (the dome light environment map)
+    GfVec3i srcDim;
+    // GL name of source texture
+    GarchTextureGPUHandle srcGLTextureName;
+    if (!_GetSrcTextureDimensionsAndGLName(
+            shader, &srcDim, &srcGLTextureName)) {
+        return;
+    }
 
     // Size of texture to be created.
-    const uint32_t width  = srcWidth  / 2;
-    const uint32_t height = srcHeight / 2;
-    
-    // Computation for level 0 is responsible for freeing/allocating
-    // the texture.
-    if (_level == 0) {
-        if (dstGLTextureName) {
-            // Free previously allocated texture.
-            [dstGLTextureName release];
-        }
+    const GLint width  = srcDim[0] / 2;
+    const GLint height = srcDim[1] / 2;
 
-        // Create new texture.
-        dstGLTextureName = _CreateGLTexture(width, height);
-        // And set on shader.
-        shader->SetGLTextureName(_shaderToken, dstGLTextureName);
+    // Get texture object from lighting shader that this
+    // computation is supposed to populate
+    HdStTextureHandleSharedPtr const &dstTextureHandle =
+        shader->GetTextureHandle(_shaderToken);
+
+    if (!TF_VERIFY(dstTextureHandle)) {
+        return;
     }
+
+    HdStDynamicUvTextureObject * const dstUvTextureObject =
+      dynamic_cast<HdStDynamicUvTextureObject*>(
+          dstTextureHandle->GetTextureObject().get());
+    if (!TF_VERIFY(dstUvTextureObject)) {
+        return;
+    }
+
+    if (_level == 0) {
+        // Level zero is in charge of actually creating the
+        // GPU resource.
+        HgiTextureDesc desc;
+        desc.debugName = _shaderToken.GetText();
+        desc.format = HgiFormatFloat16Vec4;
+        desc.dimensions = GfVec3i(width, height, 1);
+        desc.layerCount = 1;
+        desc.mipLevels = _numLevels;
+        _FillPixelsByteSize(&desc);
+        dstUvTextureObject->CreateTexture(desc);
+    }
+
+    const GarchTextureGPUHandle dstGLTextureName = _GetGlTextureName(
+        dstUvTextureObject->GetTexture().Get());
 
     struct Uniforms {
         Uniforms(float _roughness, int _level)
@@ -148,7 +168,7 @@ HdSt_DomeLightComputationGPUMetal::_Execute(HdStProgramSharedPtr computeProgram)
                       length:sizeof(_uniforms)
                      atIndex:0];
     
-    [computeEncoder setTexture:sourceTexture
+    [computeEncoder setTexture:srcGLTextureName
                        atIndex:0];
     [computeEncoder setTexture:dstGLTextureName
                        atIndex:1];

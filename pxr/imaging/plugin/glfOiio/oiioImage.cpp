@@ -66,13 +66,13 @@ TF_MAKE_STATIC_DATA(std::vector<std::string>, _ioProxySupportedExtensions)
     _ioProxySupportedExtensions->push_back("exr");
 }
 
-class Garch_OIIOImage : public GarchImage {
+class GarchOIIOImage : public GarchImage {
 public:
     typedef GarchImage Base;
 
-    Garch_OIIOImage();
+    GarchOIIOImage();
 
-    virtual ~Garch_OIIOImage();
+    virtual ~GarchOIIOImage();
 
     // GarchImage overrides
     virtual std::string const & GetFilename() const;
@@ -99,9 +99,9 @@ public:
                        VtDictionary const & metadata);
 
 protected:
-    virtual bool _OpenForReading(std::string const & filename, int subimage,
-                                 int mip, bool suppressErrors);
-    virtual bool _OpenForWriting(std::string const & filename);
+    bool _OpenForReading(std::string const & filename, 
+                         int subimage, int mip, bool suppressErrors) override;
+    bool _OpenForWriting(std::string const & filename) override;
 
 private:
     std::string _GetFilenameExtension() const;
@@ -120,7 +120,7 @@ private:
 
 TF_REGISTRY_FUNCTION(TfType)
 {
-    typedef Garch_OIIOImage Image;
+    using Image = GarchOIIOImage;
     TfType t = TfType::Define<Image, TfType::Bases<Image::Base> >();
     t.SetFactory< GarchImageFactory<Image> >();
 }
@@ -298,40 +298,40 @@ _SetAttribute(ImageSpec * spec,
     }
 }
 
-Garch_OIIOImage::Garch_OIIOImage()
+GarchOIIOImage::GarchOIIOImage()
     : _subimage(0), _miplevel(0)
 {
 }
 
 /* virtual */
-Garch_OIIOImage::~Garch_OIIOImage()
+GarchOIIOImage::~GarchOIIOImage()
 {
 }
 
 /* virtual */
 std::string const &
-Garch_OIIOImage::GetFilename() const
+GarchOIIOImage::GetFilename() const
 {
     return _filename;
 }
 
 /* virtual */
 int
-Garch_OIIOImage::GetWidth() const
+GarchOIIOImage::GetWidth() const
 {
     return _imagespec.width;
 }
 
 /* virtual */
 int
-Garch_OIIOImage::GetHeight() const
+GarchOIIOImage::GetHeight() const
 {
     return _imagespec.height;
 }
 
 /* virtual */
 GLenum
-Garch_OIIOImage::GetFormat() const
+GarchOIIOImage::GetFormat() const
 {
     int nChannels = _imagespec.nchannels;
     if (nChannels == 3) {
@@ -342,21 +342,21 @@ Garch_OIIOImage::GetFormat() const
 
 /* virtual */
 GLenum
-Garch_OIIOImage::GetType() const
+GarchOIIOImage::GetType() const
 {
     return _TypeFromImageData(_imagespec.format);
 }
 
 /* virtual */
 int
-Garch_OIIOImage::GetBytesPerPixel() const
+GarchOIIOImage::GetBytesPerPixel() const
 {
     return _imagespec.pixel_bytes();
 }
 
 /* virtual */
 bool
-Garch_OIIOImage::IsColorSpaceSRGB() const
+GarchOIIOImage::IsColorSpaceSRGB() const
 {
     return ((_imagespec.nchannels == 3  ||
              _imagespec.nchannels == 4) &&
@@ -365,7 +365,7 @@ Garch_OIIOImage::IsColorSpaceSRGB() const
 
 /* virtual */
 bool
-Garch_OIIOImage::GetMetadata(TfToken const & key, VtValue * value) const
+GarchOIIOImage::GetMetadata(TfToken const & key, VtValue * value) const
 {
     VtValue result = _FindAttribute(_imagespec, key.GetString());
     if (!result.IsEmpty()) {
@@ -392,7 +392,7 @@ _TranslateWrap(std::string const & wrapMode)
 
 /* virtual */
 bool
-Garch_OIIOImage::GetSamplerMetadata(GLenum pname, VtValue * param) const
+GarchOIIOImage::GetSamplerMetadata(GLenum pname, VtValue * param) const
 {
     switch (pname) {
         case GL_TEXTURE_WRAP_S: {
@@ -416,14 +416,14 @@ Garch_OIIOImage::GetSamplerMetadata(GLenum pname, VtValue * param) const
 
 /* virtual */
 int
-Garch_OIIOImage::GetNumMipLevels() const
+GarchOIIOImage::GetNumMipLevels() const
 {
     // XXX Add support for mip counting
     return 1;
 }
 
 std::string
-Garch_OIIOImage::_GetFilenameExtension() const
+GarchOIIOImage::_GetFilenameExtension() const
 {
     std::string fileExtension = ArGetResolver().GetExtension(_filename);
     return TfStringToLower(fileExtension);
@@ -431,8 +431,8 @@ Garch_OIIOImage::_GetFilenameExtension() const
 
 #if OIIO_VERSION >= 20003
 cspan<unsigned char>
-Garch_OIIOImage::_GenerateBufferCSpan(const std::shared_ptr<const char>& buffer,
-                                    int bufferSize) const
+GarchOIIOImage::_GenerateBufferCSpan(const std::shared_ptr<const char>& buffer,
+                                      int bufferSize) const
 {
     const char* bufferPtr = buffer.get();
     const unsigned char* bufferPtrUnsigned = (const unsigned char *) bufferPtr;
@@ -442,8 +442,8 @@ Garch_OIIOImage::_GenerateBufferCSpan(const std::shared_ptr<const char>& buffer,
 #endif
 
 bool
-Garch_OIIOImage::_CanUseIOProxyForExtension(std::string extension,
-                                          const ImageSpec & config) const
+GarchOIIOImage::_CanUseIOProxyForExtension(std::string extension,
+                                            const ImageSpec & config) const
 {
     if (std::find(_ioProxySupportedExtensions->begin(),
                   _ioProxySupportedExtensions->end(),
@@ -467,8 +467,8 @@ Garch_OIIOImage::_CanUseIOProxyForExtension(std::string extension,
 
 /* virtual */
 bool
-Garch_OIIOImage::_OpenForReading(std::string const & filename, int subimage,
-                               int mip, bool suppressErrors)
+GarchOIIOImage::_OpenForReading(std::string const & filename, int subimage,
+                                 int mip, bool suppressErrors)
 {
     _filename = filename;
     _subimage = subimage;
@@ -522,14 +522,14 @@ Garch_OIIOImage::_OpenForReading(std::string const & filename, int subimage,
 
 /* virtual */
 bool
-Garch_OIIOImage::Read(StorageSpec const & storage)
+GarchOIIOImage::Read(StorageSpec const & storage)
 {
     return ReadCropped(0, 0, 0, 0, storage);
 }
 
 /* virtual */
 bool
-Garch_OIIOImage::ReadCropped(int const cropTop,
+GarchOIIOImage::ReadCropped(int const cropTop,
                            int const cropBottom,
                            int const cropLeft,
                            int const cropRight,
@@ -674,7 +674,7 @@ Garch_OIIOImage::ReadCropped(int const cropTop,
 
 /* virtual */
 bool
-Garch_OIIOImage::_OpenForWriting(std::string const & filename)
+GarchOIIOImage::_OpenForWriting(std::string const & filename)
 {
     _filename = filename;
     _imagespec = ImageSpec();
@@ -682,8 +682,8 @@ Garch_OIIOImage::_OpenForWriting(std::string const & filename)
 }
 
 bool
-Garch_OIIOImage::Write(StorageSpec const & storage,
-                     VtDictionary const & metadata)
+GarchOIIOImage::Write(StorageSpec const & storage,
+                       VtDictionary const & metadata)
 {
     int nchannels = GarchGetNumElements(storage.format);
     TypeDesc format = _GetOIIOBaseType(storage.type);

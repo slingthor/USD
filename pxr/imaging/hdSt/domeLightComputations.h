@@ -40,6 +40,8 @@ using HdSt_DomeLightComputationGPUSharedPtr =
     std::shared_ptr<class HdSt_DomeLightComputationGPU>;
 using HdStSimpleLightingShaderPtr =
     std::weak_ptr<class HdStSimpleLightingShader>;
+using HdStSimpleLightingShaderSharedPtr =
+    std::shared_ptr<class HdStSimpleLightingShader>;
 using HdStProgramSharedPtr =
     std::shared_ptr<class HdStProgram>;
 
@@ -63,8 +65,6 @@ public:
         // Name of computation shader to use, also used as
         // key when setting the GL name on the lighting shader
         const TfToken & shaderToken, 
-        // OpenGL texture name of texture serving as source
-        HgiTextureHandle const& sourceGLTextureName,
         // Lighting shader that remembers the GL texture names
         HdStSimpleLightingShaderPtr const &lightingShader,
         // Number of mip levels.
@@ -91,21 +91,30 @@ protected:
     HDST_API
     HdSt_DomeLightComputationGPU(
         const TfToken & shaderToken, 
-        GarchTextureGPUHandle sourceGLTextureName,
         HdStSimpleLightingShaderPtr const &lightingShader,
         unsigned int numLevels,
         unsigned int level , 
         float roughness);
+    
+    HDST_API
+    bool _GetSrcTextureDimensionsAndGLName(
+        HdStSimpleLightingShaderSharedPtr const &shader,
+        GfVec3i * srcDim,
+        GarchTextureGPUHandle * srcGLTextureName);
+    
+    HDST_API
+    void _FillPixelsByteSize(HgiTextureDesc * const desc);
+
+    HDST_API
+    virtual GarchTextureGPUHandle _GetGlTextureName(
+        const HgiTexture * const hgiTexture) = 0;
 
     HDST_API
     virtual void _Execute(HdStProgramSharedPtr computeProgram) = 0;
-    virtual GarchTextureGPUHandle _CreateGLTexture(
-                int32_t width, int32_t height) const = 0;
 
 protected:
     const TfToken _shaderToken;
     HdStSimpleLightingShaderPtr const _lightingShader;
-    const GarchTextureGPUHandle _sourceGLTextureName;
     const unsigned int _numLevels;
     const unsigned int _level;
     const float _roughness;

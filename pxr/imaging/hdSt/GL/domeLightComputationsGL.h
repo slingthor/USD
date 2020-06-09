@@ -35,20 +35,19 @@ protected:
     /// Constructor
     HDST_API
     HdSt_DomeLightComputationGPUGL(const TfToken & shaderToken,
-                                   HgiTextureHandle const& sourceGLTextureName,
                                    HdStSimpleLightingShaderPtr const &lightingShader,
                                    unsigned int numLevels,
                                    unsigned int level,
                                    float roughness);
     
     friend class HdStResourceFactoryGL;
+    
+    HDST_API
+    GarchTextureGPUHandle _GetGlTextureName(
+        const HgiTexture * const hgiTexture) override;
 
     HDST_API
     void _Execute(HdStProgramSharedPtr computeProgram) override;
-    
-    HDST_API
-    GarchTextureGPUHandle
-    _CreateGLTexture(const int32_t width, const int32_t height) const override;
 };
 
 
