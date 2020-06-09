@@ -29,7 +29,6 @@
 #include "pxr/imaging/hdSt/textureResource.h"
 #include "pxr/imaging/hdSt/textureResourceHandle.h"
 #include "pxr/imaging/hdSt/textureBinder.h"
-#include "pxr/imaging/hdSt/textureHandle.h"
 #include "pxr/imaging/hdSt/materialParam.h"
 
 #include "pxr/imaging/hd/binding.h"
@@ -156,17 +155,11 @@ HdStSurfaceShader::BindResources(HdStProgram const &program,
 								 HdSt_ResourceBinder const &binder,
                                  HdRenderPassState const &state)
 {
+    // Old texture system.
     program.BindResources(this, binder);
 
-
-    const bool bindlessTextureEnabled =
-        GarchResourceFactory::GetInstance()->GetContextCaps().bindlessTextureEnabled;
-
-    HdSt_TextureBinder::BindResources(
-        binder, bindlessTextureEnabled, _namedTextureHandles);
-
-
-    binder.BindShaderResources(this);
+    // New texture system.
+    binder.BindShaderResources(this, program);
 }
 /*virtual*/
 void
@@ -174,16 +167,13 @@ HdStSurfaceShader::UnbindResources(HdStProgram const &program,
                                    HdSt_ResourceBinder const &binder,
                                    HdRenderPassState const &state)
 {
-    binder.UnbindShaderResources(this);
+    // Old texture system.
     program.UnbindResources(this, binder);
 
-    const bool bindlessTextureEnabled =
-        GarchResourceFactory::GetInstance()->GetContextCaps().bindlessTextureEnabled;
-
-    HdSt_TextureBinder::UnbindResources(
-        binder, bindlessTextureEnabled, _namedTextureHandles);
-
+    // New texture system.
+    binder.UnbindShaderResources(this, program);
 }
+
 /*virtual*/
 void
 HdStSurfaceShader::AddBindings(HdBindingRequestVector *customBindings)

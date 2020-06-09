@@ -26,6 +26,7 @@
 
 #include "pxr/pxr.h"
 #include "pxr/imaging/hdSt/api.h"
+#include "pxr/imaging/hdSt/shaderCode.h"
 #include "pxr/imaging/hd/version.h"
 
 #include "pxr/imaging/hd/binding.h"
@@ -358,9 +359,14 @@ public:
 
     /// bind/unbind shader parameters and textures
     HDST_API
-    virtual void BindShaderResources(HdStShaderCode const *shader) const = 0;
+    virtual void BindShaderResources(
+        HdStShaderCode const *shader,
+        HdStProgram const &shaderProgram) const = 0;
+
     HDST_API
-    virtual void UnbindShaderResources(HdStShaderCode const *shader) const = 0;
+    virtual void UnbindShaderResources(
+        HdStShaderCode const *shader,
+        HdStProgram const &shaderProgram) const = 0;
 
     /// piecewise buffer binding utility
     /// (to be used for frustum culling, draw indirect result)
@@ -396,6 +402,7 @@ public:
     /// Returns binding point.
     /// XXX: exposed temporarily for drawIndirectResult
     /// see Hd_IndirectDrawBatch::_BeginGPUCountVisibleInstances()
+    HDST_API
     HdBinding GetBinding(TfToken const &name, int level=-1) const {
         HdBinding binding;
         TfMapLookup(_bindingMap, NameAndLevel(name, level), &binding);
@@ -405,6 +412,19 @@ public:
     int GetNumReservedTextureUnits() const {
         return _numReservedTextureUnits;
     }
+    
+    /// Add buffer specs necessary for the textures (e.g., for
+    /// bindless texture sampler handles or sampling transform).
+    ///
+    /// Specify whether to use the texture by binding it or by
+    /// using bindless handles with useBindlessHandles.
+    ///
+    HDST_API
+    static void
+    GetBufferSpecs(
+        const HdStShaderCode::NamedTextureHandleVector &textures,
+        bool useBindlessHandles,
+        HdBufferSpecVector * specs);
 
 protected:
     /// Constructor

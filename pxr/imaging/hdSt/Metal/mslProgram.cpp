@@ -39,8 +39,10 @@
 #include "pxr/imaging/hd/perfLog.h"
 #include "pxr/imaging/hd/resourceRegistry.h"
 #include "pxr/imaging/hd/tokens.h"
+
 #include "pxr/base/tf/diagnostic.h"
 #include "pxr/base/tf/envSetting.h"
+
 #include <string>
 #include <fstream>
 #include <iostream>
@@ -492,6 +494,54 @@ void HdStMSLProgram::AddCustomBindings(GarchBindingMapRefPtr bindingMap) const
     TF_FATAL_CODING_ERROR("Not Implemented");
 }
 
+void
+HdStMSLProgram::BindTexture(
+    const TfToken &name,
+    id<MTLTexture> textureId,
+    id<MTLSamplerState> samplerId) const
+{
+    std::string textureName("textureBind_" + name.GetString());
+    TfToken textureNameToken(textureName, TfToken::Immortal);
+   
+    MSL_ShaderBinding const* const textureBinding = MSL_FindBinding(
+        _bindingMap,
+        textureNameToken,
+        kMSL_BindingType_Texture,
+        0xFFFFFFFF,
+        0);
+
+    if(!textureBinding) {
+        TF_FATAL_CODING_ERROR("Could not bind a texture to the shader?!");
+    }
+ 
+    MtlfMetalContext::GetMetalContext()->SetTexture(
+        textureBinding->_index,
+        textureId,
+        textureNameToken,
+        textureBinding->_stage);
+
+    // UDIM and PTEX layout don't have samplers.
+    if (samplerId != nil) {
+        std::string samplerName("samplerBind_" + name.GetString());
+        TfToken samplerNameToken(samplerName, TfToken::Immortal);
+
+        MSL_ShaderBinding const* const samplerBinding = MSL_FindBinding(
+            _bindingMap,
+            samplerNameToken,
+            kMSL_BindingType_Sampler,
+            0xFFFFFFFF,
+            0);
+        
+        if (samplerBinding) {
+            MtlfMetalContext::GetMetalContext()->SetSampler(
+                samplerBinding->_index,
+                samplerId,
+                samplerNameToken,
+                samplerBinding->_stage);
+        }
+    }
+}
+
 void HdStMSLProgram::BindResources(HdStSurfaceShader* surfaceShader, HdSt_ResourceBinder const &binder) const
 {
     // XXX: there's an issue where other shaders try to use textures.
@@ -511,26 +561,23 @@ void HdStMSLProgram::BindResources(HdStSurfaceShader* surfaceShader, HdSt_Resour
             TF_FATAL_CODING_ERROR("Could not bind a texture to the shader?!");
         }
 
-        GarchTextureGPUHandle texture;
         HdBinding::Type type = textureBinding->_binding.GetType();
+        HdStTextureResourceSharedPtr const & textureResource =
+            it->handle->GetTextureResource();
+        id<MTLTexture> textureID = nil;
+        id<MTLSamplerState> samplerID = nil;
         
         if (type == HdBinding::TEXTURE_UDIM_LAYOUT ||
             type == HdBinding::TEXTURE_PTEX_LAYOUT) {
-            texture = it->handle->GetTextureResource()->GetLayoutTextureId();
+            textureID = textureResource->GetLayoutTextureId();
+            samplerID = nil;
         }
         else {
-            texture = it->handle->GetTextureResource()->GetTexelsTextureId();
+            textureID = textureResource->GetTexelsTextureId();
+            samplerID = textureResource->GetTexelsSamplerId();
         }
-        MtlfMetalContext::GetMetalContext()->SetTexture(textureBinding->_index, texture, textureNameToken, textureBinding->_stage);
-
-        samplerName = "samplerBind_" + it->name.GetString();
-        TfToken samplerNameToken(samplerName, TfToken::Immortal);
-
-        MSL_ShaderBinding const* const samplerBinding = MSL_FindBinding(_bindingMap, samplerNameToken, kMSL_BindingType_Sampler, 0xFFFFFFFF, 0);
-        if(samplerBinding) {
-            MtlfMetalContext::GetMetalContext()->SetSampler(
-                samplerBinding->_index, it->handle->GetTextureResource()->GetTexelsSamplerId(), samplerNameToken, samplerBinding->_stage);
-        }
+        
+        BindTexture(it->name, textureID, samplerID);
     }
 }
 

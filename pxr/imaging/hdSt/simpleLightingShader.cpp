@@ -174,9 +174,7 @@ HdStSimpleLightingShader::BindResources(HdStProgram const &program,
     program.AssignSamplerUnits(_bindingMap);
     _lightingContext->BindSamplers(_bindingMap);
 
-    HdSt_TextureBinder::BindResources(binder, false, _namedTextureHandles);
-
-    binder.BindShaderResources(this);
+    binder.BindShaderResources(this, program);
 }
 
 /* virtual */
@@ -188,8 +186,8 @@ HdStSimpleLightingShader::UnbindResources(HdStProgram const &program,
     // XXX: we'd like to use HdSt_ResourceBinder instead of GlfBindingMap.
     //
     _lightingContext->UnbindSamplers(_bindingMap);
-
-    HdSt_TextureBinder::UnbindResources(binder, false, _namedTextureHandles);
+    
+    binder.UnbindShaderResources(this, program);
 }
 
 /*virtual*/

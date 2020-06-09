@@ -432,24 +432,24 @@ MtlfBaseTexture::_CreateTexture(GarchBaseTextureDataConstPtr texData,
                                          withBytes:rawData
                                        bytesPerRow:pixelByteSize * unpackRowLength];
                        
-                       if (isThreeChannelTexture) {
+                        if (isThreeChannelTexture) {
                            delete[] (uint8_t*)texBuffer;
-                       }
+                        }
                        
-                      if (genMips) {
-                          // Blit command encoder to generate mips
-                          MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
-                          
-                          id<MTLCommandBuffer> commandBuffer = [context->gpus.commandQueue commandBuffer];
-                          id<MTLBlitCommandEncoder> blitEncoder = [commandBuffer blitCommandEncoder];
-                          
-                          [blitEncoder generateMipmapsForTexture:_textureName];
-                          [blitEncoder endEncoding];
-                          
-                          [commandBuffer commit];
-                      }
+                        if (genMips) {
+                            // Blit command encoder to generate mips
+                            MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
+
+                            id<MTLCommandBuffer> commandBuffer = [context->gpus.commandQueue commandBuffer];
+                            id<MTLBlitCommandEncoder> blitEncoder = [commandBuffer blitCommandEncoder];
+
+                            [blitEncoder generateMipmapsForTexture:_textureName];
+                            [blitEncoder endEncoding];
+
+                            [commandBuffer commit];
+                        }
                     delete asyncOwnedTexData;
-                   });
+                });
             }
             else {
                 [_textureName replaceRegion:MTLRegionMake2D(0, 0, texDataWidth, texDataHeight)
@@ -501,7 +501,7 @@ MtlfBaseTexture::_CreateTexture(GarchBaseTextureDataConstPtr texData,
                 }
 #endif
             }
-
+            
             _textureName = [device newTextureWithDescriptor:desc];
 
             if (useAsncTextureUploads) {

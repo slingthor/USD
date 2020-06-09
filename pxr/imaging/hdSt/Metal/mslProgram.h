@@ -24,7 +24,7 @@
 #ifndef HDST_MSL_PROGRAM_H
 #define HDST_MSL_PROGRAM_H
 
-//#define GENERATE_METAL_DEBUG_SOURCE_CODE
+#define GENERATE_METAL_DEBUG_SOURCE_CODE
 
 #include "pxr/pxr.h"
 #include "pxr/imaging/hdSt/api.h"
@@ -199,7 +199,13 @@ public:
         HdBinding const &binding, MSL_BindingType bindingType,
         MSL_ProgramStage programStage, int offsetWithinResource = 0,
         int uniformBufferSize = 0);
-
+    
+    HDST_API
+    void BindTexture(
+        const TfToken &name,
+        id<MTLTexture> textureId,
+        id<MTLSamplerState> samplerId) const;
+    
     HDST_API
     void UpdateUniformBinding(std::string const &name, int index);
 
