@@ -300,17 +300,10 @@ public:
         HdStMSLProgram const &mslProgram,
         const bool bind)
     {
-        auto metalTexture = dynamic_cast<HgiMetalTexture const*>(
-            texture.GetTexture().Get());
-        auto metalSampler = dynamic_cast<HgiMetalSampler const*>(
-            sampler.GetSampler().Get());
+        auto metalTexture = dynamic_cast<HgiMetalTexture const*>(texture.GetTexture().Get());
+        id<MTLTexture> textureID = metalTexture->GetTextureId();
+        mslProgram.BindTexture(name, textureID);
 
-        id<MTLTexture> textureID =
-            metalTexture ? metalTexture->GetTextureId() : nil;
-        id<MTLSamplerState> samplerID =
-            metalSampler ? metalSampler->GetSamplerId() : nil;
-
-        mslProgram.BindTexture(name, textureID, samplerID);
     }
 
     static void Compute(
@@ -320,47 +313,60 @@ public:
         HdStMSLProgram const &mslProgram,
         const bool bind)
     {
-        auto metalTexture = dynamic_cast<HgiMetalTexture const*>(
-            texture.GetTexture().Get());
-        auto metalSampler = dynamic_cast<HgiMetalSampler const*>(
-            sampler.GetSampler().Get());
+        auto metalTexture = dynamic_cast<HgiMetalTexture const*>(texture.GetTexture().Get());
+        id<MTLTexture> textureID = metalTexture->GetTextureId();
+        mslProgram.BindTexture(name, textureID);
 
-        id<MTLTexture> textureID =
-            metalTexture ? metalTexture->GetTextureId() : nil;
-        id<MTLSamplerState> samplerID =
-            metalSampler ? metalSampler->GetSamplerId() : nil;
-
-        mslProgram.BindTexture(name, textureID, samplerID);
+        auto metalSampler = dynamic_cast<HgiMetalSampler const*>(sampler.GetSampler().Get());
+        id<MTLSamplerState> samplerID = metalSampler->GetSamplerId();
+        mslProgram.BindSampler(name, samplerID);
     }
     
     static void Compute(
         TfToken const &name,
         HdStPtexTextureObject const &texture,
         HdStPtexSamplerObject const &sampler,
-        HdStMSLProgram const &program,
+        HdStMSLProgram const &mslProgram,
         const bool bind)
     {
-        // TODO: support these with the texel and layout.
-        TF_CODING_ERROR("Unsupported/unimplemented texture format");
+        // Bind the texels
+        GarchTextureGPUHandle texelHandle = texture.GetTexelGLTextureName();
+        mslProgram.BindTexture(name, texelHandle);
+        
+        // Bind the layout
+        TfToken layoutName = HdSt_ResourceBinder::_Concat(name, HdSt_ResourceBindingSuffixTokens->layout);
+        GarchTextureGPUHandle layoutHandle = texture.GetLayoutGLTextureName();
+        mslProgram.BindTexture(layoutName, layoutHandle);
     }
 
     static void Compute(
         TfToken const &name,
         HdStUdimTextureObject const &texture,
         HdStUdimSamplerObject const &sampler,
-        HdStMSLProgram const &program,
+        HdStMSLProgram const &mslProgram,
         const bool bind)
     {
-        // TODO: support these with the array and layout.
-        TF_CODING_ERROR("Unsupported/unimplemented texture format");
+        // Bind the texels
+        GarchTextureGPUHandle texelHandle = texture.GetTexelGLTextureName();
+        mslProgram.BindTexture(name, texelHandle);
+        
+        // Bind the layout
+        GarchTextureGPUHandle layoutHandle = texture.GetLayoutGLTextureName();
+        mslProgram.BindTexture(name, layoutHandle);
+
+        // Bind the sampler
+        auto metalSampler = dynamic_cast<HgiMetalSampler const*>(
+            sampler.GetTexelsSampler().Get());
+        id<MTLSamplerState> samplerID = metalSampler->GetSamplerId();
+        mslProgram.BindSampler(name, samplerID);
     }
 };
 
-template<HdTextureType textureType>
+template<HdTextureType textureType, typename ...Args>
 void _CastAndCompute(
     HdStShaderCode::NamedTextureHandle const &namedTexture,
     HdStProgram const &program,
-    bool bind)
+    Args&& ...args)
 {
     // e.g. HdStUvTextureObject
     using TextureObject = HdStTypedTextureObject<textureType>;
@@ -391,7 +397,7 @@ void _CastAndCompute(
         *typedTexture,
         *typedSampler,
         mslProgram,
-        bind);
+        std::forward<Args>(args)...);
 }
 
 void _BindTextureDispatch(
@@ -400,38 +406,28 @@ void _BindTextureDispatch(
     HdStProgram const &program,
     bool bind)
 {
-    HdBinding::Type bindType = binder.GetBinding(namedTexture.name).GetType();
     HdStMSLProgram const &mslProgram(
         dynamic_cast<const HdStMSLProgram&>(program));
 
     switch (namedTexture.type) {
     case HdTextureType::Uv:
-        if (bindType == HdBinding::TEXTURE_2D) {
-            _CastAndCompute<HdTextureType::Uv>(
-                namedTexture, mslProgram, bind);
-        }
+        _CastAndCompute<HdTextureType::Uv>(
+            namedTexture, mslProgram, bind);
         break;
     case HdTextureType::Field:
-        if (bindType == HdBinding::TEXTURE_FIELD) {
             _CastAndCompute<HdTextureType::Field>(
                 namedTexture, mslProgram, bind);
-        }
         break;
     case HdTextureType::Ptex:
-        if (bindType == HdBinding::TEXTURE_PTEX_TEXEL) {
             _CastAndCompute<HdTextureType::Ptex>(
                 namedTexture, mslProgram, bind);
-        }
         break;
     case HdTextureType::Udim:
-        if (bindType == HdBinding::TEXTURE_UDIM_ARRAY) {
-            _CastAndCompute<HdTextureType::Udim>(
-                namedTexture, mslProgram, bind);
-        }
+        _CastAndCompute<HdTextureType::Udim>(
+            namedTexture, mslProgram, bind);
         break;
     }
 }
-
 } // end anonymous namespace
 
 void
