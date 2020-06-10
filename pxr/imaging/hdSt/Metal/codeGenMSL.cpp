@@ -5305,16 +5305,16 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
         } else if (bindingType == HdBinding::TEXTURE_UDIM_ARRAY) {
             declarations
                 << "sampler samplerBind_" << it->second.name << ";\n"
-                << "texture2d<float> textureBind_" << it->second.name << ";\n";
+                << "texture2d_array<float> textureBind_" << it->second.name << ";\n";
             
             _AddInputParam(_mslPSInputParams, TfToken("samplerBind_" + it->second.name.GetString()), TfToken("sampler"), TfToken()).usage
                 |= HdSt_CodeGenMSL::TParam::Sampler;
-            _AddInputParam(_mslPSInputParams, TfToken("textureBind_" + it->second.name.GetString()), TfToken("texture2d<float>"), TfToken()).usage
+            _AddInputParam(_mslPSInputParams, TfToken("textureBind_" + it->second.name.GetString()), TfToken("texture2d_array<float>"), TfToken()).usage
                 |= HdSt_CodeGenMSL::TParam::Texture;
             
             if (caps.glslVersion >= 430) {
                 accessors
-                    << "texture2d<float>\n"
+                    << "texture2d_array<float>\n"
                     << "HdGetSampler_" << it->second.name << "() {\n"
                     << "  return textureBind_" << it->second.name << ";"
                     << "}\n";
@@ -5327,13 +5327,14 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
                 << it->second.dataType
                 << " HdGet_" << it->second.name
                 << "(vec2 coord) { vec3 c = hd_sample_udim(coord);\n"
-                << "  c.z = sampler1d_"
+                << "  c.z = textureBind_"
                 << it->second.name << HdSt_ResourceBindingSuffixTokens->layout
                 << ".read(uint(c.z), 0).x - 1;\n"
                 << "if (c.z < -0.5) { return vec4(0, 0, 0, 0)"
                 << swizzle << "; } else {\n"
-                << "  return texture(sampler2dArray_"
-                << it->second.name << ", c)" << swizzle << ";}}\n";
+                << "  return textureBind_" << it->second.name
+                << ".sample(samplerBind_"
+                << it->second.name << ", c.xy, c.z)" << swizzle << ";}}\n";
                 // vec4 HdGet_name() { return HdGet_name(HdGet_st().xy); }
             accessors
                 << it->second.dataType
@@ -5360,8 +5361,8 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
                 TfToken("textureBind_" + it->second.name.GetString()),
                 TfToken("texture1d<float>"),
                 TfToken(),
-                it->first).usage
-                    |= HdSt_CodeGenMSL::TParam::Texture;
+                it->first).usage |= HdSt_CodeGenMSL::TParam::Texture;
+            addScalarAccessor = false;
 
         } else if (bindingType == HdBinding::BINDLESS_TEXTURE_PTEX_TEXEL) {
             accessors
