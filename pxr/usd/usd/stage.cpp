@@ -631,13 +631,12 @@ UsdStage::_InstantiateStage(const SdfLayerRefPtr &rootLayer,
     }
 
     // Debug timing info
-    boost::optional<TfStopwatch> stopwatch;
+    TfStopwatch stopwatch;
     const bool usdInstantiationTimeDebugCodeActive = 
         TfDebug::IsEnabled(USD_STAGE_INSTANTIATION_TIME);
 
     if (usdInstantiationTimeDebugCodeActive) {
-        stopwatch = TfStopwatch();
-        stopwatch->Start();
+        stopwatch.Start();
     }
 
     if (!rootLayer)
@@ -692,10 +691,10 @@ UsdStage::_InstantiateStage(const SdfLayerRefPtr &rootLayer,
 
     // Debug timing info
     if (usdInstantiationTimeDebugCodeActive) {
-        stopwatch->Stop();
+        stopwatch.Stop();
         TF_DEBUG(USD_STAGE_INSTANTIATION_TIME)
             .Msg("UsdStage::_InstantiateStage: Time elapsed (s): %f\n",
-                 stopwatch->GetSeconds());
+                 stopwatch.GetSeconds());
     }
     
     return stage;
@@ -5922,6 +5921,45 @@ _ComposeGeneralMetadataImpl(Usd_PrimDataConstPtr primData,
     return gotOpinion || composer->IsDone();
 }
 
+// Special composing for just the pseudoroot. The pseudoroot only composes
+// metadata opinions on the absolute root path from the session and root layers.
+// Note that the pseudoroot itself doesn't provide fallbacks.
+// Returns true if an opinion was found.
+template <class Composer>
+static bool
+_ComposePseudoRootMetadataImpl(Usd_PrimDataConstPtr primData,
+                               const TfToken& fieldName,
+                               const TfToken& keyPath,
+                               const SdfLayerRefPtr &rootLayer,
+                               const SdfLayerRefPtr &sessionLayer,
+                               Composer *composer)
+{
+    const SdfPath &specPath = SdfPath::AbsoluteRootPath();
+    bool gotOpinion = false;
+
+    PcpNodeRef node = primData->GetPrimIndex().GetRootNode();
+
+    // If we a have a session layer and it isn't muted, we try to consume its
+    // opinion first. The session layer will be the first layer in the 
+    // layer stack unless it is muted.
+    if (sessionLayer && 
+        node.GetLayerStack()->GetLayers().front() == sessionLayer) {
+        // Consume an authored opinion here, if one exists.
+        gotOpinion = composer->ConsumeAuthored(
+            node, sessionLayer, specPath, fieldName, keyPath);
+        if (composer->IsDone()) {
+            return true;
+        }
+    }
+
+    // Consume an authored opinion from the root layer (which cannot be muted).
+    gotOpinion |= composer->ConsumeAuthored(
+        node, rootLayer, specPath, fieldName, keyPath);
+
+    // Return whether we got an opinion from either layer.
+    return gotOpinion;
+}
+
 // --------------------------------------------------------------------- //
 // Specialized Metadata Resolution
 // --------------------------------------------------------------------- //
@@ -6243,12 +6281,12 @@ UsdStage::_GetPropCustomImpl(const UsdProperty &prop, bool useFallbacks,
 }
 
 template <class Composer>
-void
-UsdStage::_GetPrimTypeNameImpl(const UsdPrim &prim, bool useFallbacks,
-                               Composer *composer) const
+static void
+_GetPrimTypeNameImpl(Usd_PrimDataConstPtr primData, 
+                     bool useFallbacks, Composer *composer)
 {
     TRACE_FUNCTION();
-    for (Usd_Resolver res(&prim.GetPrimIndex());
+    for (Usd_Resolver res(&primData->GetPrimIndex());
          res.IsValid(); res.NextLayer()) {
         TfToken tok;
         if (res.GetLayer()->HasField(
@@ -6445,53 +6483,60 @@ _GetListOpMetadataImpl(Usd_PrimDataConstPtr primData,
 
 template <class Composer>
 bool
-UsdStage::_GetSpecialMetadataImpl(const UsdObject &obj,
-                                  const TfToken &fieldName,
-                                  const TfToken &keyPath,
-                                  bool useFallbacks,
-                                  Composer *composer) const
+UsdStage::_GetSpecialPropMetadataImpl(const UsdObject &obj,
+                                      const TfToken &fieldName,
+                                      const TfToken &keyPath,
+                                      bool useFallbacks,
+                                      Composer *composer) const
 {
     // Dispatch to special-case composition rules based on type and field.
     // Return true if the given field was handled, false otherwise.
-    if (obj.Is<UsdProperty>()) {
-        if (obj.Is<UsdAttribute>()) {
-            if (fieldName == SdfFieldKeys->TypeName) {
-                _GetAttrTypeImpl(
-                    obj.As<UsdAttribute>(), fieldName, useFallbacks, composer);
-                return true;
-            } else if (fieldName == SdfFieldKeys->Variability) {
-                _GetAttrVariabilityImpl(
-                    obj.As<UsdAttribute>(), useFallbacks, composer);
-                return true;
-            }
-        }
-        if (fieldName == SdfFieldKeys->Custom) {
-            _GetPropCustomImpl(obj.As<UsdProperty>(), useFallbacks, composer);
-            return true;
-        }
-    } else if (obj.Is<UsdPrim>()) {
+    if (obj.Is<UsdAttribute>()) {
         if (fieldName == SdfFieldKeys->TypeName) {
-            _GetPrimTypeNameImpl(obj.As<UsdPrim>(), useFallbacks, composer);
+            _GetAttrTypeImpl(
+                obj.As<UsdAttribute>(), fieldName, useFallbacks, composer);
             return true;
-        } else if (fieldName == SdfFieldKeys->Specifier) {
-            _GetPrimSpecifierImpl(
-                get_pointer(obj._Prim()), useFallbacks, composer);
-            return true;
-        } else if (fieldName == SdfFieldKeys->Kind) {
-            // XXX: We do not not respect fallback kind values during
-            // Usd_PrimData composition (see _GetKind), but we do allow
-            // fallback values here to maintain existing behavior. However,
-            // we may want to force the useFallbacks flag to false here for
-            // consistency.
-            _GetPrimKindImpl(
-                get_pointer(obj._Prim()), useFallbacks, composer);
-            return true;
-        } else if (fieldName == SdfFieldKeys->Active) {
-            // XXX: See comment in the handling of 'kind' re: fallback values.
-            _GetPrimActiveImpl(
-                get_pointer(obj._Prim()), useFallbacks, composer);
+        } else if (fieldName == SdfFieldKeys->Variability) {
+            _GetAttrVariabilityImpl(
+                obj.As<UsdAttribute>(), useFallbacks, composer);
             return true;
         }
+    }
+    if (fieldName == SdfFieldKeys->Custom) {
+        _GetPropCustomImpl(obj.As<UsdProperty>(), useFallbacks, composer);
+        return true;
+    }
+    return false;
+}
+
+template <class Composer>
+static bool
+_GetSpecialPrimMetadataImpl(Usd_PrimDataConstPtr primData,
+                            const TfToken &fieldName,
+                            const TfToken &keyPath,
+                            bool useFallbacks,
+                            Composer *composer)
+{
+    // Dispatch to special-case composition rules based on type and field.
+    // Return true if the given field was handled, false otherwise.
+    if (fieldName == SdfFieldKeys->TypeName) {
+        _GetPrimTypeNameImpl(primData, useFallbacks, composer);
+        return true;
+    } else if (fieldName == SdfFieldKeys->Specifier) {
+        _GetPrimSpecifierImpl(primData, useFallbacks, composer);
+        return true;
+    } else if (fieldName == SdfFieldKeys->Kind) {
+        // XXX: We do not not respect fallback kind values during
+        // Usd_PrimData composition (see _GetKind), but we do allow
+        // fallback values here to maintain existing behavior. However,
+        // we may want to force the useFallbacks flag to false here for
+        // consistency.
+        _GetPrimKindImpl(primData, useFallbacks, composer);
+        return true;
+    } else if (fieldName == SdfFieldKeys->Active) {
+        // XXX: See comment in the handling of 'kind' re: fallback values.
+        _GetPrimActiveImpl(primData, useFallbacks, composer);
+        return true;
     }
 
     return false;
@@ -6510,9 +6555,28 @@ UsdStage::_GetMetadataImpl(
     TfErrorMark m;
 
     // Handle special cases.
-    if (_GetSpecialMetadataImpl(
-            obj, fieldName, keyPath, useFallbacks, composer)) {
-        return composer->IsDone() && m.IsClean();
+    if (obj.Is<UsdProperty>()) {
+        if (_GetSpecialPropMetadataImpl(
+                obj, fieldName, keyPath, useFallbacks, composer)) {
+            return composer->IsDone() && m.IsClean();
+        }
+    } else if (obj.Is<UsdPrim>()) {
+        // If the prim is the pseudo root, we have a special metadata 
+        // composition to perform as the pseudoroot only composes metadata
+        // opinions from the session layer and root layer.
+        if (obj._Prim()->IsPseudoRoot()) {
+            // Note that this function returns true if an opinion was found so
+            // we don't need to check composer->IsDone(). IsDone will always
+            // return false for dictionary metadata on the pseudo root since
+            // we don't have fallbacks.
+            return _ComposePseudoRootMetadataImpl(
+                get_pointer(obj._Prim()), fieldName, keyPath,
+                _rootLayer, _sessionLayer, composer) && m.IsClean();
+        } else if (_GetSpecialPrimMetadataImpl(
+            get_pointer(obj._Prim()), fieldName, keyPath, useFallbacks, 
+            composer)) {
+            return composer->IsDone() && m.IsClean();
+        }
     }
 
     return _GetGeneralMetadataImpl(
@@ -6590,25 +6654,24 @@ UsdStage::_HasMetadata(const UsdObject &obj, const TfToken& fieldName,
     return composer.IsDone();
 }
 
-TfTokenVector
-UsdStage::_ListMetadataFields(const UsdObject &obj, bool useFallbacks) const
+static
+SdfSpecType
+_ListMetadataFieldsImpl(Usd_PrimDataConstPtr primData,
+                        const TfToken &propName,
+                        bool useFallbacks,
+                        TfTokenVector *result)
 {
     TRACE_FUNCTION();
 
-    TfTokenVector result;
-
-    static const auto empty = new TfToken;
-    const TfToken &propName = obj.Is<UsdProperty>() ? obj.GetName() : *empty;
-
-    Usd_Resolver res(&obj.GetPrim().GetPrimIndex());
+    Usd_Resolver res(&primData->GetPrimIndex());
     SdfPath specPath = res.GetLocalPath(propName);
     PcpNodeRef lastNode = res.GetNode();
     SdfSpecType specType = SdfSpecTypeUnknown;
 
-    const UsdPrimDefinition &primDef = obj.GetPrim().GetPrimDefinition();
+    const UsdPrimDefinition &primDef = primData->GetPrimDefinition();
 
     // If this is a builtin property, determine specType from the definition.
-    if (obj.Is<UsdProperty>()) {
+    if (!propName.IsEmpty()) {
         specType = primDef.GetSpecType(propName);
     }
 
@@ -6624,8 +6687,79 @@ UsdStage::_ListMetadataFields(const UsdObject &obj, bool useFallbacks) const
 
         for (const auto& fieldName : layer->ListFields(specPath)) {
             if (!_IsPrivateFieldKey(fieldName))
-                result.push_back(fieldName);
+                result->push_back(fieldName);
         }
+    }
+
+    // If including fallbacks, add any defined metadata fields from the prim
+    // definition for the property (or the prim if the prop name is empty). 
+    if (useFallbacks) {
+        const TfTokenVector fallbackFields = propName.IsEmpty() ?
+            primDef.ListMetadataFields() : 
+            primDef.ListPropertyMetadataFields(propName);
+        result->insert(result->end(), 
+                       fallbackFields.begin(), fallbackFields.end());
+    }
+
+    return specType;
+}
+
+static
+SdfSpecType
+_ListPseudoRootMetadataFieldsImpl(Usd_PrimDataConstPtr primData, 
+                                  const SdfLayerRefPtr &rootLayer,
+                                  const SdfLayerRefPtr &sessionLayer,
+                                  TfTokenVector *result)
+{
+    TRACE_FUNCTION();
+
+    const SdfPath &specPath = SdfPath::AbsoluteRootPath();
+    PcpNodeRef node = primData->GetPrimIndex().GetRootNode();
+
+    // If we a have a session layer and it isn't muted, get its authored layer
+    // metadata fields. The session layer will be the first layer in the 
+    // layer stack unless it is muted.
+    if (sessionLayer && 
+        node.GetLayerStack()->GetLayers().front() == sessionLayer) {
+        for (const auto& fieldName : sessionLayer->ListFields(specPath)) {
+            if (!_IsPrivateFieldKey(fieldName)) {
+                result->push_back(fieldName);
+            }
+        }
+    }
+
+    // Get all authored layer metadata fields from the root layer (which can't
+    // be muted).
+    for (const auto& fieldName : rootLayer->ListFields(specPath)) {
+        if (!_IsPrivateFieldKey(fieldName)) {
+            result->push_back(fieldName);
+        }
+    }
+
+    return SdfSpecTypePseudoRoot;
+}
+
+TfTokenVector
+UsdStage::_ListMetadataFields(const UsdObject &obj, bool useFallbacks) const
+{
+    TRACE_FUNCTION();
+
+    TfTokenVector result;
+
+    SdfSpecType specType = SdfSpecTypeUnknown;
+    Usd_PrimDataConstPtr primData = get_pointer(obj._Prim());
+    if (obj.Is<UsdProperty>()) {
+        // List metadata fields for property
+        specType = _ListMetadataFieldsImpl(
+            primData, obj.GetName(), useFallbacks, &result);
+    } else if (obj._Prim()->IsPseudoRoot()) {
+        // Custom implementation for listing metadata for the pseudo root.
+        specType = _ListPseudoRootMetadataFieldsImpl(
+            primData, _rootLayer, _sessionLayer, &result);
+    } else {
+        // List metadata fields for non pseudo root prims.
+        specType = _ListMetadataFieldsImpl(
+            primData, TfToken(), useFallbacks, &result);
     }
 
     // Insert required fields for spec type.
@@ -6636,15 +6770,6 @@ UsdStage::_ListMetadataFields(const UsdObject &obj, bool useFallbacks) const
             if (!_IsPrivateFieldKey(fieldName))
                 result.push_back(fieldName);
         }
-    }
-
-    // If including fallbacks, add any defined metadata fields from the prim
-    // definition for the property (or the prim if the prop name is empty). 
-    if (useFallbacks) {
-        const TfTokenVector fallbackFields = propName.IsEmpty() ?
-            primDef.ListMetadataFields() : 
-            primDef.ListPropertyMetadataFields(propName);
-        result.insert(result.end(), fallbackFields.begin(), fallbackFields.end());
     }
 
     // Sort & remove duplicate fields.
@@ -8030,62 +8155,6 @@ UsdStage::_ValueMightBeTimeVaryingFromResolveInfo(const UsdResolveInfo &info,
     return _GetNumTimeSamplesFromResolveInfo(info, attr) > 1;
 }
 
-static
-bool 
-_HasLayerFieldOrDictKey(const SdfLayerHandle &layer, 
-                        const ArResolverContext &context,
-                        const TfToken &key, const TfToken &keyPath, VtValue *val)
-{
-    bool hasVal =  keyPath.IsEmpty() ?
-        layer->HasField(SdfPath::AbsoluteRootPath(), key, val) :
-        layer->HasFieldDictKey(SdfPath::AbsoluteRootPath(), key, keyPath, val);
-
-    if (hasVal && val){
-        // Resolve asset paths. Note that we don't need to resolve time 
-        // codes as this function is only used to get layer level metadata
-        // on the stage's root or session layer. There is no mapping that
-        // applies to time codes in this context.
-        _TryResolveValuesInDictionary(val, layer, context, 
-            /* layerOffsetGetter = */ nullptr, 
-            /* anchorAssetPathsOnly = */ false) ||
-        _TryResolveAssetPaths(val, context, layer,
-                              /* anchorAssetPathsOnly = */ false);
-    }
-
-    return hasVal;
-}
-
-static
-bool
-_HasStageMetadataOrDictKey(const UsdStage &stage, 
-                           const TfToken &key, const TfToken &keyPath,
-                           VtValue *value)
-{
-    SdfLayerHandle sessionLayer = stage.GetSessionLayer();
-    const ArResolverContext &context = stage.GetPathResolverContext();
-    
-    if (sessionLayer && 
-        _HasLayerFieldOrDictKey(sessionLayer, context, key, keyPath, value)){
-        VtValue rootValue;
-        if (value && 
-            value->IsHolding<VtDictionary>() &&
-            _HasLayerFieldOrDictKey(stage.GetRootLayer(), context, key, keyPath, 
-                                    &rootValue) && 
-            rootValue.IsHolding<VtDictionary>() ){
-            const VtDictionary &rootDict = rootValue.UncheckedGet<VtDictionary>();
-            VtDictionary dict;
-            value->UncheckedSwap<VtDictionary>(dict);
-            VtDictionaryOverRecursive(&dict, rootDict);
-            value->UncheckedSwap<VtDictionary>(dict);
-        }
-
-        return true;
-    }
-     
-    return _HasLayerFieldOrDictKey(stage.GetRootLayer(), context, 
-                                   key, keyPath, value);
-}
-
 bool
 UsdStage::GetMetadata(const TfToken &key, VtValue *value) const
 {
@@ -8102,10 +8171,9 @@ UsdStage::GetMetadata(const TfToken &key, VtValue *value) const
         return false;
     }
     
-    if (!_HasStageMetadataOrDictKey(*this, key, TfToken(), value)){
+    if (!GetPseudoRoot().GetMetadata(key, value)) {
         *value = SdfSchema::GetInstance().GetFallback(key);
-    } 
-    else if (value->IsHolding<VtDictionary>()){
+    } else if (value->IsHolding<VtDictionary>()){
         const VtDictionary &fallback = SdfSchema::GetInstance().GetFallback(key).Get<VtDictionary>();
         
         VtDictionary dict;
@@ -8124,7 +8192,7 @@ UsdStage::HasMetadata(const TfToken &key) const
     if (!schema.IsValidFieldForSpec(key, SdfSpecTypePseudoRoot))
         return false;
 
-    return (HasAuthoredMetadata(key) ||
+    return (GetPseudoRoot().HasAuthoredMetadata(key) ||
             !schema.GetFallback(key).IsEmpty());
 }
 
@@ -8136,7 +8204,7 @@ UsdStage::HasAuthoredMetadata(const TfToken& key) const
     if (!schema.IsValidFieldForSpec(key, SdfSpecTypePseudoRoot))
         return false;
 
-    return _HasStageMetadataOrDictKey(*this, key, TfToken(), nullptr);
+    return GetPseudoRoot().HasAuthoredMetadata(key);
 }
 
 static
@@ -8264,7 +8332,7 @@ UsdStage::GetMetadataByDictKey(const TfToken& key, const TfToken &keyPath,
     if (!schema.IsValidFieldForSpec(key, SdfSpecTypePseudoRoot))
         return false;
 
-    if (!_HasStageMetadataOrDictKey(*this, key, keyPath, value)){
+    if (!GetPseudoRoot().GetMetadataByDictKey(key, keyPath, value)) {
         const VtValue &fallback =  SdfSchema::GetInstance().GetFallback(key);
         if (!fallback.IsEmpty()){
             const VtValue *elt = fallback.Get<VtDictionary>().
@@ -8299,8 +8367,9 @@ UsdStage::HasMetadataDictKey(const TfToken& key, const TfToken &keyPath) const
         !schema.IsValidFieldForSpec(key, SdfSpecTypePseudoRoot))
         return false;
 
-    if (HasAuthoredMetadataDictKey(key, keyPath))
+    if (GetPseudoRoot().HasAuthoredMetadataDictKey(key, keyPath)) {
         return true;
+    }
 
     const VtValue &fallback =  schema.GetFallback(key);
     
@@ -8315,7 +8384,7 @@ UsdStage::HasAuthoredMetadataDictKey(
     if (keyPath.IsEmpty())
         return false;
 
-    return _HasStageMetadataOrDictKey(*this, key, keyPath, nullptr);
+    return GetPseudoRoot().HasAuthoredMetadataDictKey(key, keyPath);
 }
 
 bool

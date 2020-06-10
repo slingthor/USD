@@ -39,6 +39,7 @@
 
 #include "pxr/imaging/garch/contextCaps.h"
 #include "pxr/imaging/garch/simpleLight.h"
+#include "pxr/imaging/garch/simpleLightingContext.h"
 
 #include "pxr/base/gf/frustum.h"
 

@@ -518,7 +518,6 @@ HdStMSLProgram::BindTexture(
         textureId,
         textureNameToken,
         textureBinding->_stage);
-}
 
 
 void

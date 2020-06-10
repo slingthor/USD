@@ -58,7 +58,6 @@ pxr_library(usdImagingGL
 
     PUBLIC_CLASSES
         engine
-        materialTextureAdapter
         renderParams
 
     PUBLIC_HEADERS

@@ -99,7 +99,8 @@ HgiMetalTexture::HgiMetalTexture(HgiMetal *hgi, HgiTextureDesc const & desc)
         size_t pixelSize = HgiDataSizeOfFormat(desc.format);
         const uint8_t *byteData = static_cast<const uint8_t*>(desc.initialData);
         
-        for (int i = 0 ; i < desc.mipLevels; i++) {
+//        for (int i = 0 ; i < desc.mipLevels; i++) {
+        for (int i = 0 ; i < 1; i++) {
             size_t byteSize = mipWidth * mipHeight * mipDepth * pixelSize;
 
             if (depth <= 1) {

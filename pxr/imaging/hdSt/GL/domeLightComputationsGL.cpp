@@ -27,6 +27,8 @@
 #include "pxr/imaging/hdSt/simpleLightingShader.h"
 #include "pxr/imaging/hdSt/resourceRegistry.h"
 #include "pxr/imaging/hdSt/package.h"
+#include "pxr/imaging/hdSt/dynamicUvTextureObject.h"
+#include "pxr/imaging/hdSt/textureHandle.h"
 #include "pxr/imaging/hdSt/tokens.h"
 
 #include "pxr/imaging/hdSt/GL/glslProgram.h"
@@ -42,14 +44,12 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 HdSt_DomeLightComputationGPUGL::HdSt_DomeLightComputationGPUGL(
     const TfToken & shaderToken,
-    HgiTextureHandle const& sourceGLTextureName,
     HdStSimpleLightingShaderPtr const &lightingShader,
     unsigned int numLevels,
     unsigned int level,
     float roughness)
     : HdSt_DomeLightComputationGPU(
         shaderToken,
-        dynamic_cast<HgiGLTexture*>(sourceGLTextureName.Get())->GetTextureId(),
         lightingShader,
         numLevels,
         level,
@@ -58,17 +58,21 @@ HdSt_DomeLightComputationGPUGL::HdSt_DomeLightComputationGPUGL(
 }
 
 GarchTextureGPUHandle
-HdSt_DomeLightComputationGPUGL::_CreateGLTexture(
-    const int32_t width, const int32_t height) const
+HdSt_DomeLightComputationGPUGL::_GetGlTextureName(const HgiTexture * const hgiTexture)
 {
-    uint32_t result;
-    glGenTextures(1, &result);
-
-    glBindTexture(GL_TEXTURE_2D, result);
-
-    glTexStorage2D(GL_TEXTURE_2D, _numLevels, GL_RGBA16F, width, height);
-    
-    return result;
+    const HgiGLTexture * const glTexture =
+        dynamic_cast<const HgiGLTexture*>(hgiTexture);
+    if (!glTexture) {
+        TF_CODING_ERROR(
+            "Texture in dome light computation is not HgiGLTexture");
+        return GarchTextureGPUHandle();
+    }
+    const GarchTextureGPUHandle textureName = glTexture->GetTextureId();
+    if (!textureName.IsSet()) {
+        TF_CODING_ERROR(
+            "Texture in dome light computation has zero GL name");
+    }
+    return textureName;
 }
 
 void
@@ -83,39 +87,54 @@ HdSt_DomeLightComputationGPUGL::_Execute(HdStProgramSharedPtr computeProgram)
         return;
     }
     
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, _sourceGLTextureName);
-
-    // Get size of source texture
-    GLint srcWidth  = 0;
-    GLint srcHeight = 0;
-    glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH,  &srcWidth );
-    glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &srcHeight);
+    // Size of source texture (the dome light environment map)
+    GfVec3i srcDim;
+    // GL name of source texture
+    GarchTextureGPUHandle srcGLTextureName;
+    if (!_GetSrcTextureDimensionsAndGLName(
+            shader, &srcDim, &srcGLTextureName)) {
+        return;
+    }
 
     // Size of texture to be created.
-    const GLint width  = srcWidth  / 2;
-    const GLint height = srcHeight / 2;
+    const GLint width  = srcDim[0] / 2;
+    const GLint height = srcDim[1] / 2;
 
-    // Get texture name from lighting shader.
-    uint32_t dstGLTextureName = shader->GetGLTextureName(_shaderToken);
+    // Get texture object from lighting shader that this
+    // computation is supposed to populate
+    HdStTextureHandleSharedPtr const &dstTextureHandle =
+        shader->GetTextureHandle(_shaderToken);
 
-    // Computation for level 0 is responsible for freeing/allocating
-    // the texture.
-    if (_level == 0) {
-        if (dstGLTextureName) {
-            // Free previously allocated texture.
-            glDeleteTextures(1, &dstGLTextureName);
-        }
-
-        // Create new texture.
-        dstGLTextureName = _CreateGLTexture(width, height);
-        // And set on shader.
-        shader->SetGLTextureName(_shaderToken, dstGLTextureName);
+    if (!TF_VERIFY(dstTextureHandle)) {
+        return;
     }
+
+    HdStDynamicUvTextureObject * const dstUvTextureObject =
+      dynamic_cast<HdStDynamicUvTextureObject*>(
+          dstTextureHandle->GetTextureObject().get());
+    if (!TF_VERIFY(dstUvTextureObject)) {
+        return;
+    }
+      
+    if (_level == 0) {
+        // Level zero is in charge of actually creating the
+        // GPU resource.
+        HgiTextureDesc desc;
+        desc.debugName = _shaderToken.GetText();
+        desc.format = HgiFormatFloat16Vec4;
+        desc.dimensions = GfVec3i(width, height, 1);
+        desc.layerCount = 1;
+        desc.mipLevels = _numLevels;
+        _FillPixelsByteSize(&desc);
+        dstUvTextureObject->CreateTexture(desc);
+    }
+
+    const GarchTextureGPUHandle dstGLTextureName = _GetGlTextureName(
+        dstUvTextureObject->GetTexture().Get());
 
     // Now bind the textures and launch GPU computation
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, _sourceGLTextureName);
+    glBindTexture(GL_TEXTURE_2D, srcGLTextureName);
 
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, dstGLTextureName);

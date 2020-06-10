@@ -114,8 +114,8 @@ _GetPackedTypeDefinitions()
     "    return *(thread int*)&pi;\n"
     "}\n"
     
-    "mat4 inverse(float4x4 a) { return transpose(a); }\n"
-    "mat4 _inverse(float4x4 a) {\n"
+    "mat4 inverse_fast(float4x4 a) { return transpose(a); }\n"
+    "mat4 inverse(float4x4 a) {\n"
     "    float b00 = a[0][0] * a[1][1] - a[0][1] * a[1][0];\n"
     "    float b01 = a[0][0] * a[1][2] - a[0][2] * a[1][0];\n"
     "    float b02 = a[0][0] * a[1][3] - a[0][3] * a[1][0];\n"
@@ -310,7 +310,7 @@ HgiMetalShaderFunction::HgiMetalShaderFunction(
                                               options:options
                                                 error:&error];
 
-    NSString *entryPoint;
+    NSString *entryPoint = nullptr;
     switch (_descriptor.shaderStage) {
         case HgiShaderStageVertex:
             entryPoint = @"vertexEntryPoint";
@@ -320,6 +320,11 @@ HgiMetalShaderFunction::HgiMetalShaderFunction(
             break;
         case HgiShaderStageCompute:
             entryPoint = @"computeEntryPoint";
+            break;
+        case HgiShaderStageTessellationControl:
+        case HgiShaderStageTessellationEval:
+        case HgiShaderStageGeometry:
+            TF_CODING_ERROR("Todo: Unsupported shader stage");
             break;
     }
     

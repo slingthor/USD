@@ -55,16 +55,17 @@ public:
     virtual void _SyncFence() override;
     
     HDST_API
-    virtual void _GPUFrustumCullingExecute(
+    virtual void _GPUFrustumInstanceCullingExecute(
                        HdStResourceRegistrySharedPtr const &resourceRegistry,
                        HdStProgramSharedPtr const &program,
                        HdSt_ResourceBinder const &binder,
                        HdBufferResourceSharedPtr cullCommandBuffer) override;
     
     HDST_API
-    virtual void _GPUFrustumCullingXFBExecute(
+    virtual void _GPUFrustumNonInstanceCullingExecute(
                       HdStResourceRegistrySharedPtr const &resourceRegistry,
-                      HdStProgramSharedPtr const &program) override;
+                      HdStProgramSharedPtr const &program,
+                      HdSt_ResourceBinder const &binder) override;
     
 protected:
     HDST_API

@@ -250,13 +250,12 @@ HdStResourceFactoryGL::NewExtCompGPUComputationGPU(
 HdSt_DomeLightComputationGPU*
 HdStResourceFactoryGL::NewDomeLightComputationGPU(
     const TfToken & shaderToken,
-    HgiTextureHandle const& sourceGLTextureName,
     HdStSimpleLightingShaderPtr const &lightingShader,
     unsigned int numLevels,
     unsigned int level,
     float roughness) const
 {
-    return new HdSt_DomeLightComputationGPUGL(shaderToken, sourceGLTextureName,
+    return new HdSt_DomeLightComputationGPUGL(shaderToken,
         lightingShader, numLevels, level, roughness);
 }
 

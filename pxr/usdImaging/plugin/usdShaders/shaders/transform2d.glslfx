@@ -1,5 +1,7 @@
+-- glslfx version 0.1
+
 //
-// Copyright 2018 Pixar
+// Copyright 2020 Pixar
 //
 // Licensed under the Apache License, Version 2.0 (the "Apache License")
 // with the following modification; you may not use this file except in
@@ -21,28 +23,13 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#ifndef PXR_USD_IMAGING_USD_IMAGING_GL_TEXTURE_UTILS_H
-#define PXR_USD_IMAGING_USD_IMAGING_GL_TEXTURE_UTILS_H
 
-#include "pxr/pxr.h"
-#include "pxr/usd/sdf/path.h"
-#include "pxr/usd/usd/prim.h"
-#include "pxr/usd/usd/timeCode.h"
-#include "pxr/imaging/hd/textureResource.h"
+-- configuration
+{
+    "techniques": {
+        "default": {
+        }
+    }
+}
 
-PXR_NAMESPACE_OPEN_SCOPE
-
-HdTextureResource::ID
-UsdImagingGL_GetTextureResourceID(UsdPrim const& usdPrim,
-                                  SdfPath const& usdPath,
-                                  UsdTimeCode time,
-                                  size_t salt);
-
-HdTextureResourceSharedPtr
-UsdImagingGL_GetTextureResource(UsdPrim const& usdPrim,
-                                SdfPath const& usdPath,
-                                UsdTimeCode time);
-
-PXR_NAMESPACE_CLOSE_SCOPE
-
-#endif // PXR_USD_IMAGING_USD_IMAGING_GL_TEXTURE_UTILS_H
+-- This file is intentionally empty. 
