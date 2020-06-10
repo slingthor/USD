@@ -203,9 +203,13 @@ public:
     HDST_API
     void BindTexture(
         const TfToken &name,
-        id<MTLTexture> textureId,
+        id<MTLTexture> textureId) const;
+
+    HDST_API
+    void BindSampler(
+        const TfToken &name,
         id<MTLSamplerState> samplerId) const;
-    
+        
     HDST_API
     void UpdateUniformBinding(std::string const &name, int index);
 
