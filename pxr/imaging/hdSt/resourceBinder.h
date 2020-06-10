@@ -425,11 +425,16 @@ public:
         const HdStShaderCode::NamedTextureHandleVector &textures,
         bool useBindlessHandles,
         HdBufferSpecVector * specs);
+    
+    HDST_API
+    static TfToken
+    _Concat(const TfToken &a, const TfToken &b);
 
 protected:
     /// Constructor
     HDST_API
     HdSt_ResourceBinder();
+
 
     // for batch execution
     struct NameAndLevel {

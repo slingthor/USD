@@ -507,13 +507,6 @@ HdSt_ResourceBinderGL::IntrospectBindings(HdStProgramSharedPtr programResource) 
 
 namespace {
 
-static
-TfToken
-_TokenConcat(const TfToken &a, const TfToken &b)
-{
-    return TfToken(a.GetString() + b.GetString());
-}
-
 void
 _BindTexture(
     const GLenum target,
@@ -602,7 +595,7 @@ public:
                       bind ? (GLuint)texture.GetTexelGLTextureName() : 0);
 
         const HdBinding layoutBinding = binder.GetBinding(
-            _TokenConcat(name, HdSt_ResourceBindingSuffixTokens->layout));
+            HdSt_ResourceBinder::_Concat(name, HdSt_ResourceBindingSuffixTokens->layout));
         const int layoutSamplerUnit = layoutBinding.GetTextureUnit();
 
         glActiveTexture(GL_TEXTURE0 + layoutSamplerUnit);
@@ -636,7 +629,7 @@ public:
         }
 
         const HdBinding layoutBinding = binder.GetBinding(
-            _TokenConcat(name, HdSt_ResourceBindingSuffixTokens->layout));
+            HdSt_ResourceBinder::_Concat(name, HdSt_ResourceBindingSuffixTokens->layout));
         const int layoutSamplerUnit = layoutBinding.GetTextureUnit();
 
         glActiveTexture(GL_TEXTURE0 + layoutSamplerUnit);
