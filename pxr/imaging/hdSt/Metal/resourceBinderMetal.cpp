@@ -365,7 +365,10 @@ public:
         
         // Bind the layout
         GarchTextureGPUHandle layoutHandle = texture.GetLayoutGLTextureName();
-        mslProgram.BindTexture(name, layoutHandle);
+        mslProgram.BindTexture(
+            HdSt_ResourceBinder::_Concat(
+                name, HdSt_ResourceBindingSuffixTokens->layout),
+            layoutHandle);
 
         // Bind the sampler
         auto metalSampler = dynamic_cast<HgiMetalSampler const*>(
