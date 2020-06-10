@@ -497,8 +497,7 @@ void HdStMSLProgram::AddCustomBindings(GarchBindingMapRefPtr bindingMap) const
 void
 HdStMSLProgram::BindTexture(
     const TfToken &name,
-    id<MTLTexture> textureId,
-    id<MTLSamplerState> samplerId) const
+    id<MTLTexture> textureId) const
 {
     std::string textureName("textureBind_" + name.GetString());
     TfToken textureNameToken(textureName, TfToken::Immortal);
@@ -519,27 +518,32 @@ HdStMSLProgram::BindTexture(
         textureId,
         textureNameToken,
         textureBinding->_stage);
+}
 
-    // UDIM and PTEX layout don't have samplers.
-    //if (samplerId != nil) {
-        std::string samplerName("samplerBind_" + name.GetString());
-        TfToken samplerNameToken(samplerName, TfToken::Immortal);
+void
+HdStMSLProgram::BindSampler(
+    const TfToken &name,
+    id<MTLSamplerState> samplerId) const
+{
+    std::string samplerName("samplerBind_" + name.GetString());
+    TfToken samplerNameToken(samplerName, TfToken::Immortal);
 
-        MSL_ShaderBinding const* const samplerBinding = MSL_FindBinding(
-            _bindingMap,
-            samplerNameToken,
-            kMSL_BindingType_Sampler,
-            0xFFFFFFFF,
-            0);
-        
-        if (samplerBinding) {
-            MtlfMetalContext::GetMetalContext()->SetSampler(
-                samplerBinding->_index,
-                samplerId,
-                samplerNameToken,
-                samplerBinding->_stage);
-        }
-    //}
+    MSL_ShaderBinding const* const samplerBinding = MSL_FindBinding(
+        _bindingMap,
+        samplerNameToken,
+        kMSL_BindingType_Sampler,
+        0xFFFFFFFF,
+        0);
+
+    if(!samplerBinding) {
+        TF_FATAL_CODING_ERROR("Could not bind a sampler to the shader?!");
+    }
+
+    MtlfMetalContext::GetMetalContext()->SetSampler(
+        samplerBinding->_index,
+        samplerId,
+        samplerNameToken,
+        samplerBinding->_stage);
 }
 
 void HdStMSLProgram::BindResources(HdStSurfaceShader* surfaceShader, HdSt_ResourceBinder const &binder) const
@@ -564,20 +568,15 @@ void HdStMSLProgram::BindResources(HdStSurfaceShader* surfaceShader, HdSt_Resour
         HdBinding::Type type = textureBinding->_binding.GetType();
         HdStTextureResourceSharedPtr const & textureResource =
             it->handle->GetTextureResource();
-        id<MTLTexture> textureID = nil;
-        id<MTLSamplerState> samplerID = nil;
         
         if (type == HdBinding::TEXTURE_UDIM_LAYOUT ||
             type == HdBinding::TEXTURE_PTEX_LAYOUT) {
-            textureID = textureResource->GetLayoutTextureId();
-            samplerID = nil;
+            BindTexture(it->name, textureResource->GetLayoutTextureId());
         }
         else {
-            textureID = textureResource->GetTexelsTextureId();
-            samplerID = textureResource->GetTexelsSamplerId();
+            BindTexture(it->name, textureResource->GetTexelsTextureId());
+            BindSampler(it->name, textureResource->GetTexelsSamplerId());
         }
-        
-        BindTexture(it->name, textureID, samplerID);
     }
 }
 
