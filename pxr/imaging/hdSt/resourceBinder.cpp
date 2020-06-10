@@ -155,9 +155,9 @@ HdSt_ResourceBinder::HdSt_ResourceBinder()
 {
 }
 
-static
+// static
 TfToken
-_Concat(const TfToken &a, const TfToken &b)
+HdSt_ResourceBinder::_Concat(const TfToken &a, const TfToken &b)
 {
     return TfToken(a.GetString() + b.GetString());
 }
