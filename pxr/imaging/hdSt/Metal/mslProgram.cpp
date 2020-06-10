@@ -518,7 +518,7 @@ HdStMSLProgram::BindTexture(
         textureId,
         textureNameToken,
         textureBinding->_stage);
-
+}
 
 void
 HdStMSLProgram::BindSampler(
@@ -534,14 +534,16 @@ HdStMSLProgram::BindSampler(
         kMSL_BindingType_Sampler,
         0xFFFFFFFF,
         0);
-    
-    if (samplerBinding) {
-        MtlfMetalContext::GetMetalContext()->SetSampler(
-            samplerBinding->_index,
-            samplerId,
-            samplerNameToken,
-            samplerBinding->_stage);
+
+    if(!samplerBinding) {
+        TF_FATAL_CODING_ERROR("Could not bind a sampler to the shader?!");
     }
+
+    MtlfMetalContext::GetMetalContext()->SetSampler(
+        samplerBinding->_index,
+        samplerId,
+        samplerNameToken,
+        samplerBinding->_stage);
 }
 
 void HdStMSLProgram::BindResources(HdStSurfaceShader* surfaceShader, HdSt_ResourceBinder const &binder) const
