@@ -133,13 +133,16 @@ protected:
     // Culling requires custom resource binding.
     class _CullingProgram : public _DrawingProgram
     {
+    public:
+        void Initialize(bool useDrawArrays, bool useInstanceCulling,
+                        size_t bufferArrayHash);
+
     protected:
         _CullingProgram()
             : _useDrawArrays(false)
             , _useInstanceCulling(false)
             , _bufferArrayHash(0) { }
-        void Initialize(bool useDrawArrays, bool useInstanceCulling,
-                        size_t bufferArrayHash);
+
     protected:
         // _DrawingProgram overrides
         void _GetCustomBindings(

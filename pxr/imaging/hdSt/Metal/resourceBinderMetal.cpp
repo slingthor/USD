@@ -305,8 +305,10 @@ public:
         auto metalSampler = dynamic_cast<HgiMetalSampler const*>(
             sampler.GetSampler().Get());
 
-        id<MTLTexture> textureID = metalTexture->GetTextureId();
-        id<MTLSamplerState> samplerID = metalSampler->GetSamplerId();
+        id<MTLTexture> textureID =
+            metalTexture ? metalTexture->GetTextureId() : nil;
+        id<MTLSamplerState> samplerID =
+            metalSampler ? metalSampler->GetSamplerId() : nil;
 
         mslProgram.BindTexture(name, textureID, samplerID);
     }
@@ -323,8 +325,10 @@ public:
         auto metalSampler = dynamic_cast<HgiMetalSampler const*>(
             sampler.GetSampler().Get());
 
-        id<MTLTexture> textureID = metalTexture->GetTextureId();
-        id<MTLSamplerState> samplerID = metalSampler->GetSamplerId();
+        id<MTLTexture> textureID =
+            metalTexture ? metalTexture->GetTextureId() : nil;
+        id<MTLSamplerState> samplerID =
+            metalSampler ? metalSampler->GetSamplerId() : nil;
 
         mslProgram.BindTexture(name, textureID, samplerID);
     }

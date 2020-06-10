@@ -3,8 +3,8 @@
     {
       "Info": {
         "Types": {
-          "GlfOIIO_Image" : {
-            "bases": ["GlfImage"],
+          "GarchOIIOImage" : {
+            "bases": ["GarchImage"],
             "imageTypes": ["exr", "tif", "zfile", "tx"],
             "precedence": 0
           }

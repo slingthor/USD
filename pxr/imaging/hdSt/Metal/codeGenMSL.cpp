@@ -283,8 +283,8 @@ _GetPackedTypeDefinitions()
     "    return *(thread int*)&pi;\n"
     "}\n"
     
-    "mat4 inverse(float4x4 const a) { return transpose(a); }\n"
-    "mat4 _inverse(float4x4 const a) {\n"
+    "mat4 inverse_fast(float4x4 const a) { return transpose(a); }\n"
+    "mat4 inverse(float4x4 const a) {\n"
     "    float b00 = a[0][0] * a[1][1] - a[0][1] * a[1][0];\n"
     "    float b01 = a[0][0] * a[1][2] - a[0][2] * a[1][0];\n"
     "    float b02 = a[0][0] * a[1][3] - a[0][3] * a[1][0];\n"
@@ -3271,14 +3271,6 @@ static void _EmitTextureAccessors(
         << "}\n";
     
     TfTokenVector const &inPrimvars = acc.inPrimvars;
-    
-    // Forward declare getter for inPrimvars in case it's a transform2d
-    if (!inPrimvars.empty()) {
-        accessors
-            << "#if defined(HD_HAS_" << inPrimvars[0] << ")\n"
-            << "vec" << dim << " HdGet_" << inPrimvars[0] << "(int localIndex);\n"
-            << "#endif\n";
-    }
 
     // vec4 HdGet_name(int localIndex)
     accessors

@@ -521,7 +521,7 @@ HdStMSLProgram::BindTexture(
         textureBinding->_stage);
 
     // UDIM and PTEX layout don't have samplers.
-    if (samplerId != nil) {
+    //if (samplerId != nil) {
         std::string samplerName("samplerBind_" + name.GetString());
         TfToken samplerNameToken(samplerName, TfToken::Immortal);
 
@@ -539,7 +539,7 @@ HdStMSLProgram::BindTexture(
                 samplerNameToken,
                 samplerBinding->_stage);
         }
-    }
+    //}
 }
 
 void HdStMSLProgram::BindResources(HdStSurfaceShader* surfaceShader, HdSt_ResourceBinder const &binder) const

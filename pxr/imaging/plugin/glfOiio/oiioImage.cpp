@@ -530,10 +530,10 @@ GarchOIIOImage::Read(StorageSpec const & storage)
 /* virtual */
 bool
 GarchOIIOImage::ReadCropped(int const cropTop,
-                           int const cropBottom,
-                           int const cropLeft,
-                           int const cropRight,
-                           StorageSpec const & storage)
+                            int const cropBottom,
+                            int const cropLeft,
+                            int const cropRight,
+                            StorageSpec const & storage)
 {
 #if OIIO_VERSION >= 20003
     std::shared_ptr<ArAsset> asset = ArGetResolver().OpenAsset(_filename);
@@ -590,13 +590,13 @@ GarchOIIOImage::ReadCropped(int const cropTop,
         pixelStride = imageInput->spec().pixel_bytes();
     }
     int strideLength = imageInput->spec().width * pixelStride;
-    int readStride = (storage.flipped)? 
+    int readStride = (storage.flipped)?
                      (-strideLength) : (strideLength);
     int size = imageInput->spec().height * strideLength;
 
     std::unique_ptr<uint8_t[]>pixelData(new uint8_t[size]);
     unsigned char *pixels = pixelData.get();
-    void *start = (storage.flipped)? 
+    void *start = (storage.flipped)?
                   (pixels + size - strideLength) : (pixels);
 
     // Read Image into pixels, flipping upon load so that
@@ -635,7 +635,7 @@ GarchOIIOImage::ReadCropped(int const cropTop,
     // Convert color images to linear (unless they are sRGB)
     // (Currently unimplemented, requires OpenColorIO support from OpenImageIO)
 
-    // Crop 
+    // Crop
     ImageBuf cropped;
     if (cropTop || cropBottom || cropLeft || cropRight) {
         ImageBufAlgo::cut(cropped, *image,
@@ -646,7 +646,7 @@ GarchOIIOImage::ReadCropped(int const cropTop,
 
     // Reformat
     ImageBuf scaled;
-    if (image->spec().width != storage.width || 
+    if (image->spec().width != storage.width ||
         image->spec().height != storage.height) {
         ImageBufAlgo::resample(scaled, *image, /*interpolate=*/false,
                 ROI(0, storage.width, 0, storage.height));
