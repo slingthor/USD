@@ -39,6 +39,7 @@
 #include "pxr/imaging/hdSt/vboSimpleMemoryManager.h"
 #include "pxr/imaging/hdSt/shaderCode.h"
 #include "pxr/imaging/hdSt/textureHandleRegistry.h"
+#include "pxr/imaging/hdSt/textureObjectRegistry.h"
 
 #include "pxr/imaging/hd/engine.h"
 #include "pxr/imaging/hd/tokens.h"
@@ -113,6 +114,12 @@ HdStResourceRegistry::HdStResourceRegistry()
 {
 }
 
+HdStResourceRegistry::HdStResourceRegistry(Hgi* hgi)
+    : HdStResourceRegistry()
+{
+    SetHgi(hgi);
+}
+
 HdStResourceRegistry::~HdStResourceRegistry() = default;
 
 void HdStResourceRegistry::InvalidateShaderRegistry()
@@ -165,6 +172,12 @@ HdStResourceRegistry::GetResourceAllocation() const
     HD_PERF_COUNTER_SET(HdPerfTokens->gpuMemoryUsed, gpuMemoryUsed);
 
     return result;
+}
+
+Hgi*
+HdStResourceRegistry::GetHgi()
+{
+    return _hgi;
 }
 
 void
@@ -1088,6 +1101,19 @@ HdStResourceRegistry::AllocateTextureHandle(
         samplerParams, memoryRequest, createBindlessHandle,
         shaderCode);
 }
+
+HdStTextureObjectSharedPtr
+HdStResourceRegistry::AllocateTextureObject(
+        HdStTextureIdentifier const &textureId,
+        const HdTextureType textureType)
+{
+    HdSt_TextureObjectRegistry * const reg = 
+        _textureHandleRegistry->GetTextureObjectRegistry();
+        
+    return reg->AllocateTextureObject(
+        textureId, textureType);
+            
+}    
 
 
 PXR_NAMESPACE_CLOSE_SCOPE

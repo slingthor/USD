@@ -37,6 +37,7 @@
 #include "pxr/imaging/hdSt/resourceRegistry.h"
 #include "pxr/imaging/hdSt/shaderCode.h"
 
+#include "pxr/imaging/hd/aov.h"
 #include "pxr/imaging/hd/bufferArrayRange.h"
 #include "pxr/imaging/hd/changeTracker.h"
 #include "pxr/imaging/hd/engine.h"
@@ -61,30 +62,23 @@ TF_DEFINE_PRIVATE_TOKENS(
 );
 
 HdStRenderPassState::HdStRenderPassState()
-    : HdRenderPassState()
-    , _renderPassShader(HdStResourceFactory::GetInstance()->NewRenderPassShader())
-    , _fallbackLightingShader(new HdSt_FallbackLightingShader())
-    , _clipPlanesBufferSize(0)
-    , _alphaThresholdCurrent(0)
+    : HdStRenderPassState(std::make_shared<HdStRenderPassShader>())
 {
-    _lightingShader = _fallbackLightingShader;
 }
 
 HdStRenderPassState::HdStRenderPassState(
     HdStRenderPassShaderSharedPtr const &renderPassShader)
     : HdRenderPassState()
     , _renderPassShader(renderPassShader)
-    , _fallbackLightingShader(new HdSt_FallbackLightingShader())
+    , _fallbackLightingShader(std::make_shared<HdSt_FallbackLightingShader>())
     , _clipPlanesBufferSize(0)
     , _alphaThresholdCurrent(0)
+    , _hasCustomGraphicsCmdsDesc(false)
 {
     _lightingShader = _fallbackLightingShader;
 }
 
-HdStRenderPassState::~HdStRenderPassState()
-{
-    /*NOTHING*/
-}
+HdStRenderPassState::~HdStRenderPassState() = default;
 
 bool
 HdStRenderPassState::_UseAlphaMask() const
@@ -371,8 +365,19 @@ HdStRenderPassState::GetAovDimensions() const
 HgiGraphicsCmdsDesc
 HdStRenderPassState::MakeGraphicsCmdsDesc() const
 {
-    const size_t maxColorTex = 8;
     const HdRenderPassAovBindingVector& aovBindings = GetAovBindings();
+
+    if (_hasCustomGraphicsCmdsDesc) {
+        if (!aovBindings.empty()) {
+            TF_CODING_ERROR(
+                "Cannot specify a graphics cmds desc and aov bindings "
+                "at the same time.");
+        }
+
+        return _customGraphicsCmdsDesc;
+    }
+
+    static const size_t maxColorTex = 8;
     const bool useMultiSample = GetUseAovMultiSample();
 
     HgiGraphicsCmdsDesc desc;
@@ -450,7 +455,7 @@ HdStRenderPassState::MakeGraphicsCmdsDesc() const
         attachmentDesc.dstAlphaBlendFactor=HgiBlendFactor(_blendAlphaDstFactor);
         attachmentDesc.alphaBlendOp = HgiBlendOp(_blendAlphaOp);
 
-        if (aov.aovName == HdAovTokens->depth) {
+        if (HdAovHasDepthSemantic(aov.aovName)) {
             desc.depthAttachmentDesc = std::move(attachmentDesc);
             desc.depthTexture = hgiTexHandle;
             if (hgiResolveHandle) {
@@ -469,5 +474,21 @@ HdStRenderPassState::MakeGraphicsCmdsDesc() const
 
     return desc;
 }
+
+void
+HdStRenderPassState::SetCustomGraphicsCmdsDesc(
+    const HgiGraphicsCmdsDesc &graphicsCmdDesc)
+{
+    _customGraphicsCmdsDesc = graphicsCmdDesc;
+    _hasCustomGraphicsCmdsDesc = true;
+}
+
+void
+HdStRenderPassState::ClearCustomGraphicsCmdsDesc()
+{
+    _customGraphicsCmdsDesc = HgiGraphicsCmdsDesc();
+    _hasCustomGraphicsCmdsDesc = false;
+}
+
 
 PXR_NAMESPACE_CLOSE_SCOPE

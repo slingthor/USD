@@ -97,7 +97,7 @@ HdStComputeShader::BindResources(HdStProgram const &program,
                                  HdSt_ResourceBinder const &binder,
                                  HdRenderPassState const &state)
 {
-    binder.BindShaderResources(this);
+    binder.BindShaderResources(this, program);
 }
 /*virtual*/
 void
@@ -105,7 +105,7 @@ HdStComputeShader::UnbindResources(HdStProgram const &program,
                                    HdSt_ResourceBinder const &binder,
                                    HdRenderPassState const &state)
 {
-    binder.UnbindShaderResources(this);
+    binder.UnbindShaderResources(this, program);
 }
 /*virtual*/
 void

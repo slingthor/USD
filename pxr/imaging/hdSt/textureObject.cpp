@@ -217,7 +217,7 @@ HdSt_TextureObjectCpuData::HdSt_TextureObjectCpuData(
     }
 
     // Read texture file
-    if (!textureData->Read(0, false, originLocation)) {
+    if (!textureData->Read(0, generateMips, originLocation)) {
         return;
     }
 
@@ -356,9 +356,32 @@ HdSt_TextureObjectCpuData::_DetermineFormatAndConvertIfNecessary(
                 return _CheckValid<HgiFormatUNorm8Vec4>();
             }
         case GL_HALF_FLOAT:
-            return _CheckValid<HgiFormatFloat16Vec3>();
+            // RGB textures are not supported on MTL, so we need to convert.
+            _convertedRawData =
+                _ConvertRGBToRGBA<GfHalf>(
+                    reinterpret_cast<const unsigned char *>(
+                        _textureDesc.initialData),
+                    _textureDesc.dimensions,
+                    1.0f);
+            // Point to the buffer with the converted data.
+            _textureDesc.initialData = _convertedRawData.get();
+            // Drop the old buffer.
+            _textureData = TfNullPtr;
+            return _CheckValid<HgiFormatFloat16Vec4>();
         case GL_FLOAT:
-            return _CheckValid<HgiFormatFloat32Vec3>();
+            // RGB textures are not supported on MTL, so we need to convert.
+            _convertedRawData =
+                _ConvertRGBToRGBA<float>(
+                    reinterpret_cast<const unsigned char *>(
+                        _textureDesc.initialData),
+                    _textureDesc.dimensions,
+                    1.0f);
+            // Point to the buffer with the converted data.
+            _textureDesc.initialData = _convertedRawData.get();
+            // Drop the old buffer.
+            _textureData = TfNullPtr;
+
+            return _CheckValid<HgiFormatFloat32Vec4>();
         default:
             TF_CODING_ERROR("Unsupported texture format GL_RGBA 0x%04x",
                             glType);
@@ -412,6 +435,23 @@ HdSt_TextureObjectCpuData::_DetermineFormatAndConvertIfNecessary(
 
 ///////////////////////////////////////////////////////////////////////////////
 // Uv texture
+
+HdStUvTextureObject::HdStUvTextureObject(
+    const HdStTextureIdentifier &textureId,
+    HdSt_TextureObjectRegistry * textureObjectRegistry)
+  : HdStTextureObject(textureId, textureObjectRegistry)
+{
+}
+
+
+HdTextureType
+HdStUvTextureObject::GetTextureType() const
+{
+    return HdTextureType::Uv;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// Uv asset texture
 
 static
 HdWrap
@@ -475,15 +515,15 @@ _GetImageOriginLocation(const HdStSubtextureIdentifier * const subId)
     return GarchImage::OriginLowerLeft;
 }
 
-HdStUvTextureObject::HdStUvTextureObject(
+HdStAssetUvTextureObject::HdStAssetUvTextureObject(
     const HdStTextureIdentifier &textureId,
     HdSt_TextureObjectRegistry * const textureObjectRegistry)
-  : HdStTextureObject(textureId, textureObjectRegistry)
+  : HdStUvTextureObject(textureId, textureObjectRegistry)
   , _wrapParameters{HdWrapUseMetadata, HdWrapUseMetadata}
 {
 }
 
-HdStUvTextureObject::~HdStUvTextureObject()
+HdStAssetUvTextureObject::~HdStAssetUvTextureObject()
 {
     if (Hgi * hgi = _GetHgi()) {
         hgi->DestroyTexture(&_gpuTexture);
@@ -491,7 +531,7 @@ HdStUvTextureObject::~HdStUvTextureObject()
 }
 
 void
-HdStUvTextureObject::_Load()
+HdStAssetUvTextureObject::_Load()
 {
     TRACE_FUNCTION();
 
@@ -520,7 +560,7 @@ HdStUvTextureObject::_Load()
 }
 
 void
-HdStUvTextureObject::_Commit()
+HdStAssetUvTextureObject::_Commit()
 {
     TRACE_FUNCTION();
 
@@ -550,15 +590,9 @@ HdStUvTextureObject::_Commit()
 }
 
 bool
-HdStUvTextureObject::IsValid() const
+HdStAssetUvTextureObject::IsValid() const
 {
     return _gpuTexture;
-}
-
-HdTextureType
-HdStUvTextureObject::GetTextureType() const
-{
-    return HdTextureType::Uv;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

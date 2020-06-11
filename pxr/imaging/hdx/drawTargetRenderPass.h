@@ -121,6 +121,8 @@ private:
     HdxDrawTargetRenderPass()                                            = delete;
     HdxDrawTargetRenderPass(const HdxDrawTargetRenderPass &)             = delete;
     HdxDrawTargetRenderPass &operator =(const HdxDrawTargetRenderPass &) = delete;
+    
+    bool _isOpenGL;
 };
 
 

@@ -33,7 +33,6 @@
 #include "pxr/imaging/hdSt/tokens.h"
 #include "pxr/imaging/hdSt/volumeShader.h"
 #include "pxr/imaging/hdSt/volumeShaderKey.h"
-#include "pxr/imaging/hdSt/textureBinder.h"
 #include "pxr/imaging/hdSt/materialParam.h"
 #include "pxr/imaging/hdSt/resourceBinder.h"
 
@@ -408,7 +407,7 @@ _ComputeMaterialShader(
 
     // Get buffer specs for textures (i.e., for
     // field sampling transforms and bindless texture handles).
-    HdSt_TextureBinder::GetBufferSpecs(
+    HdSt_ResourceBinder::GetBufferSpecs(
         namedTextureHandles, bindlessTextureEnabled, &bufferSpecs);
 
     // Create params (so that HdGet_... are created) and buffer specs,

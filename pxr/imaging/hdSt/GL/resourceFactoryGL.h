@@ -154,7 +154,6 @@ public:
     HDST_API
     virtual HdSt_DomeLightComputationGPU *NewDomeLightComputationGPU(
         const TfToken & shaderToken,
-        HgiTextureHandle const& sourceGLTextureName,
         HdStSimpleLightingShaderPtr const &lightingShader,
         unsigned int numLevels,
         unsigned int level,

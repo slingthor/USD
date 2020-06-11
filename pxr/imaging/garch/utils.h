@@ -40,6 +40,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 /// Returns the base image format for the given number of components
 ///
 /// Supported number of components: 1, 2, 3, 4
+GARCH_API
 GLenum GarchGetBaseFormat(int numComponents);
 
 /// Number of elements.

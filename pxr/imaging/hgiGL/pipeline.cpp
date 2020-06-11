@@ -38,7 +38,10 @@ HgiGLPipeline::HgiGLPipeline(
     , _vao()
 {
     glCreateVertexArrays(1, &_vao);
-    glObjectLabel(GL_VERTEX_ARRAY, _vao, -1, _descriptor.debugName.c_str());
+
+    if (!_descriptor.debugName.empty()) {
+        glObjectLabel(GL_VERTEX_ARRAY, _vao, -1, _descriptor.debugName.c_str());
+    }
 
     // Configure the vertex buffers in the vertex array object.
     for (HgiVertexBufferDesc const& vbo : _descriptor.vertexBuffers) {
@@ -131,6 +134,12 @@ HgiGLPipeline::BindPipeline()
 
     if (_descriptor.rasterizationState.lineWidth != 1.0f) {
         glLineWidth(_descriptor.rasterizationState.lineWidth);
+    }
+
+    if (_descriptor.rasterizationState.rasterizerEnabled) {
+        glDisable(GL_RASTERIZER_DISCARD);
+    } else {
+        glEnable(GL_RASTERIZER_DISCARD);
     }
 
     //

@@ -140,7 +140,7 @@ HdSt_IndirectDrawBatchMetal::_ExecuteDraw(_DrawingProgram &program, int batchCou
 }
 
 void
-HdSt_IndirectDrawBatchMetal::_GPUFrustumCullingExecute(
+HdSt_IndirectDrawBatchMetal::_GPUFrustumInstanceCullingExecute(
     HdStResourceRegistrySharedPtr const &resourceRegistry,
     HdStProgramSharedPtr const &program,
     HdSt_ResourceBinder const &binder,
@@ -184,9 +184,10 @@ HdSt_IndirectDrawBatchMetal::_SyncFence() {
 }
 
 void
-HdSt_IndirectDrawBatchMetal::_GPUFrustumCullingXFBExecute(
+HdSt_IndirectDrawBatchMetal::_GPUFrustumNonInstanceCullingExecute(
       HdStResourceRegistrySharedPtr const &resourceRegistry,
-      HdStProgramSharedPtr const &program)
+      HdStProgramSharedPtr const &program,
+      HdSt_ResourceBinder const &binder)
 {
     GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
     if (caps.IsEnabledGPUCountVisibleInstances()) {

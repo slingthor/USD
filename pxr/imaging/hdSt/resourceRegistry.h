@@ -66,6 +66,8 @@ using HdStTextureResourceHandleSharedPtr =
 
 using HdStTextureHandleSharedPtr =
     std::shared_ptr<class HdStTextureHandle>;
+using HdStTextureObjectSharedPtr =
+    std::shared_ptr<class HdStTextureObject>;
 using HdStPersistentBufferSharedPtr =
     std::shared_ptr<class HdStPersistentBuffer>; 
 using HdStResourceRegistrySharedPtr = 
@@ -90,6 +92,9 @@ public:
     HdStResourceRegistry();
 
     HDST_API
+    HdStResourceRegistry(Hgi* hgi);
+
+    HDST_API
     ~HdStResourceRegistry() override;
 
     HDST_API
@@ -98,6 +103,11 @@ public:
     HDST_API
     VtDictionary GetResourceAllocation() const override;
 
+    /// Returns Hgi used to create/destroy GPU resources.
+    HDST_API
+    Hgi* GetHgi();
+
+    /// Set Hgi
     HDST_API
     void SetHgi(Hgi* hgi);
 
@@ -106,9 +116,13 @@ public:
     /// ------------------------------------------------------------------------
     ///
 
-    /// Allocate texture handle. The actual allocation of the
-    /// associated GPU texture and sampler resources and loading of
-    /// the texture file is delayed until the commit phase.
+    /// Allocate texture handle (encapsulates texture and sampler
+    /// object, bindless texture sampler handle, memory request and
+    /// callback to shader).
+    ///
+    /// The actual allocation of the associated GPU texture and
+    /// sampler resources and loading of the texture file is delayed
+    /// until the commit phase.
     HDST_API
     HdStTextureHandleSharedPtr AllocateTextureHandle(
         /// Path to file and information to identify a texture if the
@@ -133,6 +147,20 @@ public:
         /// sources and computations using the texture metadata with
         /// AddResourcesFromTextures.
         HdStShaderCodePtr const &shaderCode);
+
+    /// Allocate texture object.
+    ///
+    /// The actual allocation of the associated GPU texture and
+    /// sampler resources and loading of the texture file is delayed
+    /// until the commit phase.
+    HDST_API
+    HdStTextureObjectSharedPtr AllocateTextureObject(
+        /// Path to file and information to identify a texture if the
+        /// file is a container for several textures (e.g., OpenVDB
+        /// file containing several grids, movie file containing frames).
+        const HdStTextureIdentifier &textureId,
+        /// Texture type, e.g., uv, ptex, ...
+        HdTextureType textureType);
 
     /// ------------------------------------------------------------------------
     /// BAR allocation API

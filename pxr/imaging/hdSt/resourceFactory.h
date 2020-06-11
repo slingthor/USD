@@ -202,8 +202,6 @@ public:
         // Name of computation shader to use, also used as
         // key when setting the GL name on the lighting shader
         const TfToken & shaderToken,
-        // OpenGL texture name of texture serving as source
-        HgiTextureHandle const& sourceGLTextureName,
         // Lighting shader that remembers the GL texture names
         HdStSimpleLightingShaderPtr const &lightingShader,
         // Number of mip levels.

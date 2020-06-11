@@ -36,6 +36,22 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 using HdBindingRequestVector = std::vector<HdBindingRequest>;
 
+#define HDST_INDIRECT_DRAW_TOKENS           \
+    (dispatchBuffer)                        \
+    (drawCommandIndex)                      \
+    (drawIndirect)                          \
+    (drawIndirectCull)                      \
+    (drawIndirectResult)                    \
+    (instanceCountInput)                    \
+    (ulocDrawCommandNumUints)               \
+    (ulocResetPass)                         \
+    (ulocCullMatrix)                        \
+    (ulocDrawRangeNDC)
+
+TF_DECLARE_PUBLIC_TOKENS(HdStIndirectDrawTokens, HDST_API,
+                         HDST_INDIRECT_DRAW_TOKENS);
+
+
 /// \class HdSt_IndirectDrawBatch
 ///
 /// Drawing batch that is executed from an indirect dispatch buffer.
@@ -102,16 +118,17 @@ protected:
     virtual void _SyncFence() = 0;
     
     HDST_API
-    virtual void _GPUFrustumCullingExecute(
+    virtual void _GPUFrustumInstanceCullingExecute(
                        HdStResourceRegistrySharedPtr const &resourceRegistry,
                        HdStProgramSharedPtr const &program,
                        HdSt_ResourceBinder const &binder,
                        HdBufferResourceSharedPtr cullCommandBuffer) = 0;
     
     HDST_API
-    virtual void _GPUFrustumCullingXFBExecute(
+    virtual void _GPUFrustumNonInstanceCullingExecute(
                         HdStResourceRegistrySharedPtr const &resourceRegistry,
-                        HdStProgramSharedPtr const &program) = 0;
+                        HdStProgramSharedPtr const &program,
+                        HdSt_ResourceBinder const &binder) = 0;
 
     // Culling requires custom resource binding.
     class _CullingProgram : public _DrawingProgram
@@ -119,18 +136,18 @@ protected:
     public:
         void Initialize(bool useDrawArrays, bool useInstanceCulling,
                         size_t bufferArrayHash);
+
     protected:
         _CullingProgram()
             : _useDrawArrays(false)
             , _useInstanceCulling(false)
             , _bufferArrayHash(0) { }
-        
-        virtual ~_CullingProgram() {}
-        
+
+    protected:
         // _DrawingProgram overrides
-        void _GetCustomBindings(HdBindingRequestVector *customBindings,
-                                        bool *enableInstanceDraw) const;
-        virtual bool _Link(HdStProgramSharedPtr const & program) = 0;
+        void _GetCustomBindings(
+            HdBindingRequestVector *customBindings,
+            bool *enableInstanceDraw) const override;
 
         bool _useDrawArrays;
         bool _useInstanceCulling;
@@ -144,11 +161,11 @@ protected:
     
     void _CompileBatch(HdStResourceRegistrySharedPtr const &resourceRegistry);
     
-    void _GPUFrustumCulling(HdStDrawItem const *item,
+    void _GPUFrustumInstanceCulling(HdStDrawItem const *item,
                             HdStRenderPassStateSharedPtr const &renderPassState,
                             HdStResourceRegistrySharedPtr const &resourceRegistry);
     
-    void _GPUFrustumCullingXFB(HdStDrawItem const *item,
+    void _GPUFrustumNonInstanceCulling(HdStDrawItem const *item,
                                HdStRenderPassStateSharedPtr const &renderPassState,
                                HdStResourceRegistrySharedPtr const &resourceRegistry);
     

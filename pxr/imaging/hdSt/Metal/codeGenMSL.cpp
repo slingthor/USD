@@ -283,8 +283,8 @@ _GetPackedTypeDefinitions()
     "    return *(thread int*)&pi;\n"
     "}\n"
     
-    "mat4 inverse(float4x4 const a) { return transpose(a); }\n"
-    "mat4 _inverse(float4x4 const a) {\n"
+    "mat4 inverse_fast(float4x4 const a) { return transpose(a); }\n"
+    "mat4 inverse(float4x4 const a) {\n"
     "    float b00 = a[0][0] * a[1][1] - a[0][1] * a[1][0];\n"
     "    float b01 = a[0][0] * a[1][2] - a[0][2] * a[1][0];\n"
     "    float b02 = a[0][0] * a[1][3] - a[0][3] * a[1][0];\n"
@@ -2753,14 +2753,8 @@ HdSt_CodeGenMSL::GetComputeHeader()
     // wrapper for type float and int to deal with .x accessors and the like that are valid in GLSL
     header  << "struct wrapped_float {\n"
             << "    union {\n"
-            << "        float x;\n"
-            << "        float xx;\n"
-            << "        float xxx;\n"
-            << "        float xxxx;\n"
-            << "        float r;\n"
-            << "        float rr;\n"
-            << "        float rrr;\n"
-            << "        float rrrr;\n"
+            << "        float x, xx, xxx, xxxx, y, z, w;\n"
+            << "        float r, rr, rrr, rrrr, g, b, a;\n"
             << "    };\n"
             << "    wrapped_float(float _x) { x = _x;}\n"
             << "    operator float () {\n"
@@ -2770,14 +2764,8 @@ HdSt_CodeGenMSL::GetComputeHeader()
     
     header  << "struct wrapped_int {\n"
             << "    union {\n"
-            << "        int x;\n"
-            << "        int xx;\n"
-            << "        int xxx;\n"
-            << "        int xxxx;\n"
-            << "        int r;\n"
-            << "        int rr;\n"
-            << "        int rrr;\n"
-            << "        int rrrr;\n"
+            << "        int x, xx, xxx, xxxx, y, z, w;\n"
+            << "        int r, rr, rrr, rrrr, g, b, a;\n"
             << "    };\n"
             << "    wrapped_int(int _x) { x = _x;}\n"
             << "    operator int () {\n"
@@ -5027,6 +5015,21 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
               isamplerBuffers[<offset_ptex_layouts> + drawIndex * <stride>],
               patchCoord).xxx;
       }
+     
+     * transform2d
+     vec2 HdGet_<name>(int localIndex=0) {
+         float angleRad = HdGet_<name>_rotation() * 3.1415926f / 180.f;
+         mat2 rotMat = mat2(cos(angleRad), sin(angleRad),
+                            -sin(angleRad), cos(angleRad));
+     #if defined(HD_HAS_<primvarName>)
+         return vec2(HdGet_<name>_translation() + rotMat *
+           (HdGet_<name>_scale() * HdGet_<primvarName>(localIndex)));
+     #else
+         int shaderCoord = GetDrawingCoord().shaderCoord;
+         return vec2(HdGet_<name>_translation() + rotMat *
+          (HdGet_<name>_scale() * shaderData[shaderCoord].<name>_fallback.xy));
+     #endif
+     }
 
     */
 
@@ -5302,16 +5305,16 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
         } else if (bindingType == HdBinding::TEXTURE_UDIM_ARRAY) {
             declarations
                 << "sampler samplerBind_" << it->second.name << ";\n"
-                << "texture2d<float> textureBind_" << it->second.name << ";\n";
+                << "texture2d_array<float> textureBind_" << it->second.name << ";\n";
             
             _AddInputParam(_mslPSInputParams, TfToken("samplerBind_" + it->second.name.GetString()), TfToken("sampler"), TfToken()).usage
                 |= HdSt_CodeGenMSL::TParam::Sampler;
-            _AddInputParam(_mslPSInputParams, TfToken("textureBind_" + it->second.name.GetString()), TfToken("texture2d<float>"), TfToken()).usage
+            _AddInputParam(_mslPSInputParams, TfToken("textureBind_" + it->second.name.GetString()), TfToken("texture2d_array<float>"), TfToken()).usage
                 |= HdSt_CodeGenMSL::TParam::Texture;
             
             if (caps.glslVersion >= 430) {
                 accessors
-                    << "texture2d<float>\n"
+                    << "texture2d_array<float>\n"
                     << "HdGetSampler_" << it->second.name << "() {\n"
                     << "  return textureBind_" << it->second.name << ";"
                     << "}\n";
@@ -5324,13 +5327,14 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
                 << it->second.dataType
                 << " HdGet_" << it->second.name
                 << "(vec2 coord) { vec3 c = hd_sample_udim(coord);\n"
-                << "  c.z = sampler1d_"
+                << "  c.z = textureBind_"
                 << it->second.name << HdSt_ResourceBindingSuffixTokens->layout
                 << ".read(uint(c.z), 0).x - 1;\n"
                 << "if (c.z < -0.5) { return vec4(0, 0, 0, 0)"
                 << swizzle << "; } else {\n"
-                << "  return texture(sampler2dArray_"
-                << it->second.name << ", c)" << swizzle << ";}}\n";
+                << "  return textureBind_" << it->second.name
+                << ".sample(samplerBind_"
+                << it->second.name << ", c.xy, c.z)" << swizzle << ";}}\n";
                 // vec4 HdGet_name() { return HdGet_name(HdGet_st().xy); }
             accessors
                 << it->second.dataType
@@ -5357,8 +5361,8 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
                 TfToken("textureBind_" + it->second.name.GetString()),
                 TfToken("texture1d<float>"),
                 TfToken(),
-                it->first).usage
-                    |= HdSt_CodeGenMSL::TParam::Texture;
+                it->first).usage |= HdSt_CodeGenMSL::TParam::Texture;
+            addScalarAccessor = false;
 
         } else if (bindingType == HdBinding::BINDLESS_TEXTURE_PTEX_TEXEL) {
             accessors
@@ -5500,6 +5504,55 @@ HdSt_CodeGenMSL::_GenerateShaderParameters()
                 accessors
                     << "#endif\n";
             }
+        } else if (bindingType == HdBinding::TRANSFORM_2D) {
+            // Forward declare rotation, scale, and translation
+            accessors
+                << "float HdGet_" << it->second.name << "_"
+                << HdStTokens->rotation  << "();\n"
+                << "vec2 HdGet_" << it->second.name << "_"
+                << HdStTokens->scale  << "();\n"
+                << "vec2 HdGet_" << it->second.name << "_"
+                << HdStTokens->translation  << "();\n";
+
+            // vec2 HdGet_name(int localIndex)
+            accessors
+                << _GetUnpackedType(it->second.dataType, false)
+                << " HdGet_" << it->second.name << "(int localIndex) {\n"
+                << "  float angleRad = HdGet_" << it->second.name << "_"
+                << HdStTokens->rotation  << "()"
+                << " * 3.1415926f / 180.f;\n"
+                << "  mat2 rotMat = mat2(cos(angleRad), sin(angleRad), "
+                << "-sin(angleRad), cos(angleRad)); \n";
+            // If primvar exists, use it
+            if (!it->second.inPrimvars.empty()) {
+                accessors
+                    << "#if defined(HD_HAS_" << it->second.inPrimvars[0] << ")\n"
+                    << "  return vec2(HdGet_" << it->second.name << "_"
+                    << HdStTokens->translation << "() + rotMat * (HdGet_"
+                    << it->second.name << "_" << HdStTokens->scale << "() * "
+                    << "HdGet_" << it->second.inPrimvars[0] << "(localIndex)));\n"
+                    << "#else\n";
+            }
+            // Otherwise use default value.
+            accessors
+                << "  int shaderCoord = GetDrawingCoord().shaderCoord;\n"
+                << "  return vec2(HdGet_" << it->second.name << "_"
+                << HdStTokens->translation << "() + rotMat * (HdGet_"
+                << it->second.name << "_" << HdStTokens->scale << "() * "
+                << "shaderData[shaderCoord]." << it->second.name
+                << HdSt_ResourceBindingSuffixTokens->fallback << swizzle
+                << "));\n";
+            if (!it->second.inPrimvars.empty()) {
+                accessors << "#endif\n";
+            }
+            accessors << "}\n";
+
+            // vec2 HdGet_name()
+            accessors
+                << _GetUnpackedType(it->second.dataType, false)
+                << " HdGet_" << it->second.name << "() {\n"
+                << "  return HdGet_" << it->second.name << "(0);\n"
+                << "}\n";
         }
         
         if (addScalarAccessor) {

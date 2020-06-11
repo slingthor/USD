@@ -46,17 +46,10 @@ endif()
 
 set (optionalPublicClasses "")
 set (optionalCppFiles "")
-set (plugInfo plugInfo_NoOIIO.json)
 if (PXR_ENABLE_PTEX_SUPPORT)
     list(APPEND optionalPublicClasses ptexMipmapTextureLoader)
     list(APPEND optionalLibs ${PTEX_LIBRARY})
     list(APPEND optionalIncludeDirs ${PTEX_INCLUDE_DIR})
-endif()
-if (PXR_BUILD_OPENIMAGEIO_PLUGIN)
-    set (plugInfo plugInfo.json)
-    list(APPEND optionalCppFiles oiioImage.cpp)
-    list(APPEND optionalLibs ${OIIO_LIBRARIES})
-    list(APPEND optionalIncludeDirs ${OIIO_INCLUDE_DIRS})
 endif()
 if (PXR_ENABLE_OPENVDB_SUPPORT)
     list(APPEND optionalPublicClasses vdbTextureData)
@@ -149,5 +142,5 @@ pxr_library(garch
         __init__.py
 
     RESOURCE_FILES
-        ${plugInfo}:plugInfo.json
+        plugInfo.json
 )

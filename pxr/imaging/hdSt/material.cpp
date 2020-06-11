@@ -23,22 +23,17 @@
 //
 #include "pxr/imaging/glf/glew.h"
 
-#include "pxr/imaging/garch/contextCaps.h"
-#include "pxr/imaging/garch/gl.h"
-#include "pxr/imaging/garch/resourceFactory.h"
-#include "pxr/imaging/garch/textureHandle.h"
-#include "pxr/imaging/garch/textureRegistry.h"
-#include "pxr/imaging/garch/uvTextureStorage.h"
-
+#include "pxr/imaging/hdSt/drawTargetAttachmentDescArray.h"
 #include "pxr/imaging/hdSt/material.h"
 #include "pxr/imaging/hdSt/materialBufferSourceAndTextureHelper.h"
 #include "pxr/imaging/hdSt/debugCodes.h"
 #include "pxr/imaging/hdSt/package.h"
-#include "pxr/imaging/hdSt/resourceRegistry.h"
+#include "pxr/imaging/hdSt/resourceBinder.h"
 #include "pxr/imaging/hdSt/resourceFactory.h"
+#include "pxr/imaging/hdSt/resourceRegistry.h"
 #include "pxr/imaging/hdSt/shaderCode.h"
 #include "pxr/imaging/hdSt/surfaceShader.h"
-#include "pxr/imaging/hdSt/textureBinder.h"
+#include "pxr/imaging/hdSt/drawTarget.h"
 #include "pxr/imaging/hdSt/textureHandle.h"
 #include "pxr/imaging/hdSt/textureResource.h"
 #include "pxr/imaging/hdSt/textureResourceHandle.h"
@@ -47,15 +42,18 @@
 #include "pxr/imaging/hd/changeTracker.h"
 #include "pxr/imaging/hd/tokens.h"
 
+#include "pxr/imaging/garch/contextCaps.h"
+#include "pxr/imaging/garch/gl.h"
+#include "pxr/imaging/garch/resourceFactory.h"
+#include "pxr/imaging/garch/textureHandle.h"
+#include "pxr/imaging/garch/textureRegistry.h"
+#include "pxr/imaging/garch/uvTextureStorage.h"
 #include "pxr/imaging/hio/glslfx.h"
 
 #include "pxr/base/tf/envSetting.h"
 #include "pxr/base/tf/staticTokens.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
-
-TF_DEFINE_ENV_SETTING(HDST_USE_NEW_TEXTURE_SYSTEM, false,
-                      "Use new texture system for Storm.");
 
 TF_DEFINE_PRIVATE_TOKENS(
     _tokens,
@@ -85,6 +83,129 @@ HdStMaterial::~HdStMaterial()
                                         GetId().GetText());
 }
 
+// Retrieve sampler parameters for draw target, see _GetDrawTargetHandle
+// for further details.
+static
+HdSamplerParameters
+_GetDrawTargetSamplerParameters(
+    const SdfPath &primPath,
+    const TfToken &attachmentName,
+    HdSceneDelegate * const sceneDelegate)
+{
+    const VtValue vtValue =
+        sceneDelegate->Get(primPath, HdStDrawTargetTokens->attachments);
+    
+    const HdStDrawTargetAttachmentDescArray &attachments =
+        vtValue.GetWithDefault<HdStDrawTargetAttachmentDescArray>(
+            HdStDrawTargetAttachmentDescArray());
+
+    if (attachmentName == HdStDrawTargetTokens->depth.GetString()) {
+        return { attachments.GetDepthWrapS(),
+                 attachments.GetDepthWrapT(),
+                 HdWrapClamp,
+                 attachments.GetDepthMinFilter(),
+                 attachments.GetDepthMagFilter() };
+    }
+
+    const size_t n = attachments.GetNumAttachments();
+    for (size_t i = 0; i <n ; ++i) {
+        const HdStDrawTargetAttachmentDesc &desc =
+            attachments.GetAttachment(i);
+        if (desc.GetName() == attachmentName) {
+            return { desc.GetWrapS(),
+                     desc.GetWrapT(),
+                     HdWrapClamp,
+                     desc.GetMinFilter(),
+                     desc.GetMagFilter() };
+        }
+    }
+    
+    return { HdWrapClamp, HdWrapClamp, HdWrapClamp,
+             HdMinFilterLinear, HdMagFilterLinear };
+}
+
+// Check whether the texture node corresponds to a draw target and
+// use information from it to get the texture handle.
+//
+// Note that this is function is tightly knit to how scene delegates
+// are currently setting up draw targets in material networks which
+// is a bit weird:
+// - the node type is a UsdUvTexture even though the it is not
+//   baked by a file and the node has several outputs for the different
+//   attachments
+// - the node path in the material network is actually a property path
+//   with the attachment name given as property name
+// - the sampling parameters are not node parameters but need to be
+//   queried separately from the scene delegate (and they cannot be
+//   retrieved from HdStDrawTarget because it might be synced after
+//   the material since both are sprims).
+//
+// Draw targets in material networks should probably be its own
+// node type to better account for the differences to UsdUvTexture.
+//
+static
+HdStTextureHandleSharedPtr
+_GetDrawTargetHandle(
+    HdStResourceRegistrySharedPtr const& resourceRegistry,
+    HdSceneDelegate * const sceneDelegate,
+    HdStMaterialNetwork::TextureDescriptor const &desc,
+    std::weak_ptr<HdStShaderCode> const &shaderCode)
+{
+    // Unless we use the storm texture system for draw targets,
+    // continue to go through the scene delegate for the
+    // texture resources.
+    if (!HdStDrawTarget::GetUseStormTextureSystem()) {
+        return nullptr;
+    }
+
+    // Texture nodes with an asset path valued file attribute
+    // are not draw targets.
+    if (!desc.useTexturePrimToFindTexture) {
+        return nullptr;
+    }
+
+    // Scene delegate gives a property path to specify the attachment
+    // as well.
+    if (!desc.texturePrim.IsPrimPropertyPath()) {
+        return nullptr;
+    }
+
+    // Path to draw target prim.
+    const SdfPath primPath = desc.texturePrim.GetPrimPath();
+
+    // Look at draw target prim.
+    HdSprim * const sprim =
+        sceneDelegate->GetRenderIndex().GetSprim(
+            HdPrimTypeTokens->drawTarget, primPath);
+    if (!sprim) {
+        return nullptr;
+    }
+
+    HdStDrawTarget * const drawTarget =
+        dynamic_cast<HdStDrawTarget*>(sprim);
+    if (!drawTarget) {
+        // If not a draw target prim, continue to use scene delegate
+        // to retrieve texture resource.
+        return nullptr;
+    }
+
+    // Scene delegate specifies attachment name as property name.
+    const TfToken attachmentName(desc.texturePrim.GetName());
+
+    return
+        resourceRegistry->AllocateTextureHandle(
+            drawTarget->GetTextureIdentifier(
+                attachmentName, sceneDelegate),
+            HdTextureType::Uv,
+            _GetDrawTargetSamplerParameters(
+                primPath, attachmentName, sceneDelegate),
+            desc.memoryRequest,
+            // Bindless textures not supported when using draw
+            // targets.
+            /* createBindlessHandle = */ false,
+            shaderCode);
+}
+
 void
 HdStMaterial::_ProcessTextureDescriptors(
     HdSceneDelegate * const sceneDelegate,
@@ -96,25 +217,34 @@ HdStMaterial::_ProcessTextureDescriptors(
     HdBufferSpecVector * const specs,
     HdBufferSourceSharedPtrVector * const sources)
 {
-    const bool useNewTextureSystem =
-        TfGetEnvSetting(HDST_USE_NEW_TEXTURE_SYSTEM);
 
     const bool bindlessTextureEnabled
         = GarchResourceFactory::GetInstance()->GetContextCaps().bindlessTextureEnabled;
 
     for (HdStMaterialNetwork::TextureDescriptor const &desc : descs) {
-        if (desc.askSceneDelegateForTexture || !useNewTextureSystem) {
-            HdStTextureResourceHandleSharedPtr const textureResource =
-                _GetTextureResourceHandleFromSceneDelegate(
-                    sceneDelegate,
-                    resourceRegistry,
-                    desc);
-
-            HdSt_MaterialBufferSourceAndTextureHelper::
-                ProcessTextureMaterialParam(
-                    desc.name, desc.texturePrim,
-                    textureResource,
-                    specs, sources, texturesFromSceneDelegate);
+        if (desc.useTexturePrimToFindTexture) {
+            // Extra logic to retrieve texture handle from draw target.
+            if (HdStTextureHandleSharedPtr const textureHandle = 
+                    _GetDrawTargetHandle(
+                        resourceRegistry, sceneDelegate, desc, shaderCode)) {
+                texturesFromStorm->push_back(
+                    { desc.name,
+                      desc.type,
+                      textureHandle,
+                      desc.texturePrim});
+            } else {
+                HdStTextureResourceHandleSharedPtr const textureResource =
+                    _GetTextureResourceHandleFromSceneDelegate(
+                        sceneDelegate,
+                        resourceRegistry,
+                        desc);
+                
+                HdSt_MaterialBufferSourceAndTextureHelper::
+                    ProcessTextureMaterialParam(
+                        desc.name, desc.texturePrim,
+                        textureResource,
+                        specs, sources, texturesFromSceneDelegate);
+            }
         } else {
             HdStTextureHandleSharedPtr const textureHandle =
                 resourceRegistry->AllocateTextureHandle(
@@ -133,7 +263,7 @@ HdStMaterial::_ProcessTextureDescriptors(
         }
     }
 
-    HdSt_TextureBinder::GetBufferSpecs(
+    HdSt_ResourceBinder::GetBufferSpecs(
         *texturesFromStorm, bindlessTextureEnabled, specs);
 }
 
@@ -260,7 +390,8 @@ HdStMaterial::Sync(HdSceneDelegate *sceneDelegate,
 
     bool hasPtex = false;
     for (HdSt_MaterialParam const & param: params) {
-        if (param.IsPrimvarRedirect() || param.IsFallback()) {
+        if (param.IsPrimvarRedirect() || param.IsFallback() || 
+            param.IsTransform2d()) {
             HdStSurfaceShader::AddFallbackValueToSpecsAndSources(
                 param, &specs, &sources);
         } else if (param.IsTexture()) {

@@ -52,9 +52,13 @@ public:
 
     /// bind/unbind shader parameters and textures
     HDST_API
-    virtual void BindShaderResources(HdStShaderCode const *shader) const override;
+    virtual void BindShaderResources(
+        HdStShaderCode const *shader,
+        HdStProgram const &shaderProgram) const override;
     HDST_API
-    virtual void UnbindShaderResources(HdStShaderCode const *shader) const override;
+    virtual void UnbindShaderResources(
+        HdStShaderCode const *shader,
+        HdStProgram const &shaderProgram) const override;
     
     /// piecewise buffer binding utility
     /// (to be used for frustum culling, draw indirect result)

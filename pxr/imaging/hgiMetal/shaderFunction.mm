@@ -114,8 +114,8 @@ _GetPackedTypeDefinitions()
     "    return *(thread int*)&pi;\n"
     "}\n"
     
-    "mat4 inverse(float4x4 a) { return transpose(a); }\n"
-    "mat4 _inverse(float4x4 a) {\n"
+    "mat4 inverse_fast(float4x4 a) { return transpose(a); }\n"
+    "mat4 inverse(float4x4 a) {\n"
     "    float b00 = a[0][0] * a[1][1] - a[0][1] * a[1][0];\n"
     "    float b01 = a[0][0] * a[1][2] - a[0][2] * a[1][0];\n"
     "    float b02 = a[0][0] * a[1][3] - a[0][3] * a[1][0];\n"
@@ -257,14 +257,8 @@ _ComputeHeader(id<MTLDevice> device)
     // like that are valid in GLSL
     header  << "struct wrapped_float {\n"
             << "    union {\n"
-            << "        float x;\n"
-            << "        float xx;\n"
-            << "        float xxx;\n"
-            << "        float xxxx;\n"
-            << "        float r;\n"
-            << "        float rr;\n"
-            << "        float rrr;\n"
-            << "        float rrrr;\n"
+            << "        float x, xx, xxx, xxxx, y, z, w;\n"
+            << "        float r, rr, rrr, rrrr, g, b, a;\n"
             << "    };\n"
             << "    wrapped_float(float _x) { x = _x;}\n"
             << "    operator float () {\n"
@@ -274,14 +268,8 @@ _ComputeHeader(id<MTLDevice> device)
     
     header  << "struct wrapped_int {\n"
             << "    union {\n"
-            << "        int x;\n"
-            << "        int xx;\n"
-            << "        int xxx;\n"
-            << "        int xxxx;\n"
-            << "        int r;\n"
-            << "        int rr;\n"
-            << "        int rrr;\n"
-            << "        int rrrr;\n"
+            << "        int x, xx, xxx, xxxx, y, z, w;\n"
+            << "        int r, rr, rrr, rrrr, g, b, a;\n"
             << "    };\n"
             << "    wrapped_int(int _x) { x = _x;}\n"
             << "    operator int () {\n"
@@ -322,7 +310,7 @@ HgiMetalShaderFunction::HgiMetalShaderFunction(
                                               options:options
                                                 error:&error];
 
-    NSString *entryPoint;
+    NSString *entryPoint = nullptr;
     switch (_descriptor.shaderStage) {
         case HgiShaderStageVertex:
             entryPoint = @"vertexEntryPoint";
@@ -332,6 +320,11 @@ HgiMetalShaderFunction::HgiMetalShaderFunction(
             break;
         case HgiShaderStageCompute:
             entryPoint = @"computeEntryPoint";
+            break;
+        case HgiShaderStageTessellationControl:
+        case HgiShaderStageTessellationEval:
+        case HgiShaderStageGeometry:
+            TF_CODING_ERROR("Todo: Unsupported shader stage");
             break;
     }
     
