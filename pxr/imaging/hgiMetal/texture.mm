@@ -36,7 +36,6 @@ HgiMetalTexture::HgiMetalTexture(HgiMetal *hgi, HgiTextureDesc const & desc)
     : HgiTexture(desc)
     , _textureId(nil)
 {
-    MTLPixelFormat mtlFormat;
     MTLResourceOptions resourceOptions = MTLResourceStorageModePrivate;
     MTLTextureUsage usage = MTLTextureUsageUnknown;
 
@@ -44,10 +43,12 @@ HgiMetalTexture::HgiMetalTexture(HgiMetal *hgi, HgiTextureDesc const & desc)
         resourceOptions = hgi->GetCapabilities().defaultStorageMode;
     }
 
-    mtlFormat = HgiMetalConversions::GetPixelFormat(desc.format);
-
+    MTLPixelFormat mtlFormat = HgiMetalConversions::GetPixelFormat(desc.format);
+    
+    
     if (desc.usage & HgiTextureUsageBitsColorTarget) {
         usage = MTLTextureUsageRenderTarget;
+        
     } else if (desc.usage & HgiTextureUsageBitsDepthTarget) {
         TF_VERIFY(desc.format == HgiFormatFloat32);
         mtlFormat = MTLPixelFormatDepth32Float;
@@ -79,6 +80,15 @@ HgiMetalTexture::HgiMetalTexture(HgiMetal *hgi, HgiTextureDesc const & desc)
     texDesc.arrayLength = desc.layerCount;
     texDesc.resourceOptions = resourceOptions;
     texDesc.usage = usage;
+    
+    size_t numChannels = HgiGetComponentCount(desc.format);
+
+    if (usage == MTLTextureUsageShaderRead && numChannels == 1) {
+#if (__MAC_OS_X_VERSION_MAX_ALLOWED >= 101500) || (__IPHONE_OS_VERSION_MAX_ALLOWED >= 130000) /* __MAC_10_15 __IOS_13_00 */
+        texDesc.usage = MTLTextureUsageShaderRead;
+        texDesc.swizzle = MTLTextureSwizzleChannelsMake(MTLTextureSwizzleRed, MTLTextureSwizzleRed, MTLTextureSwizzleRed, MTLTextureSwizzleRed);
+#endif
+    }
 
     if (depth > 1) {
         texDesc.depth = depth;
