@@ -911,14 +911,16 @@ def InstallBoost(context, force, buildArgs):
     # building its libraries. We make sure to remove it in case of
     # any failure to ensure that the build script detects boost as a 
     # dependency to build the next time it's run.
+    p = ""
     try:
-        InstallBoost_Helper(context, force, buildArgs)
+        p = InstallBoost_Helper(context, force, buildArgs)
     except:
         versionHeader = os.path.join(context.instDir, BOOST_VERSION_FILE)
         if os.path.isfile(versionHeader):
             try: os.path.remove(versionHeader)
             except: pass
         raise
+    return p
 
 BOOST = Dependency("boost", InstallBoost, BOOST_VERSION_FILE)
 
