@@ -305,13 +305,8 @@ public:
         auto metalSampler = dynamic_cast<HgiMetalSampler const*>(
             sampler.GetSampler().Get());
         
-        if (metalTexture) {
-            mslProgram.BindTexture(name, metalTexture->GetTextureId());
-        }
-        
-        if (metalSampler) {
-            mslProgram.BindSampler(name,  metalSampler->GetSamplerId());
-        }
+        mslProgram.BindTexture(name, metalTexture?metalTexture->GetTextureId():nil);
+        mslProgram.BindSampler(name,  metalSampler?metalSampler->GetSamplerId():nil);
     }
 
     static void Compute(
@@ -326,13 +321,8 @@ public:
         auto metalSampler = dynamic_cast<HgiMetalSampler const*>(
             sampler.GetSampler().Get());
 
-        if (metalTexture) {
-            mslProgram.BindTexture(name, metalTexture->GetTextureId());
-        }
-        
-        if (metalSampler) {
-            mslProgram.BindSampler(name,  metalSampler->GetSamplerId());
-        }
+        mslProgram.BindTexture(name, metalTexture?metalTexture->GetTextureId():nil);
+        mslProgram.BindSampler(name, metalSampler?metalSampler->GetSamplerId():nil);
     }
     
     static void Compute(
@@ -373,7 +363,7 @@ public:
         // Bind the sampler
         auto metalSampler = dynamic_cast<HgiMetalSampler const*>(
             sampler.GetTexelsSampler().Get());
-        id<MTLSamplerState> samplerID = metalSampler->GetSamplerId();
+        id<MTLSamplerState> samplerID = metalSampler?metalSampler->GetSamplerId():nil;
         mslProgram.BindSampler(name, samplerID);
     }
 };
