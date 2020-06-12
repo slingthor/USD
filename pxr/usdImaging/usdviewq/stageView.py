@@ -389,8 +389,8 @@ class Prim2DDrawTask():
 
         GL.glBindBuffer(GL.GL_ARRAY_BUFFER, 0)
         GL.glDisableVertexAttribArray(0)
-        if (bool(GL.glBindVertexArray)):
-            GL.glBindVertexArray(0)
+#        if (bool(GL.glBindVertexArray)):
+#            GL.glBindVertexArray(0)
         GL.glUseProgram(0)
 
 class Outline(Prim2DDrawTask):
