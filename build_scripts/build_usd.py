@@ -367,6 +367,11 @@ def RunCMake(context, force, buildArgs = None, hostPlatform = False):
         osx_rpath = "-DCMAKE_MACOSX_RPATH=ON"
 
     extraArgs = buildArgs
+
+    # TEMPORARY WORKAROUND
+    if targetMacOS or targetIOS:
+        extraArgs.append('-DCMAKE_IGNORE_PATH="/usr/lib;/usr/local/lib;/lib" ')
+
     if targetIOS:
         # Add the default iOS toolchain file if one isn't aready specified
         if not any("-DCMAKE_TOOLCHAIN_FILE=" in s for s in extraArgs):

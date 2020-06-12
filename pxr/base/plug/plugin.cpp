@@ -336,7 +336,7 @@ PlugPlugin::Load()
         // thread has the plugin loadMutex and is waiting on the GIL (for
         // example if we're concurrently loading a python plugin in another
         // thread).
-        void();
+        TF_PY_ALLOW_THREADS_IN_SCOPE();
 
         std::lock_guard<std::recursive_mutex> lock(*loadMutex);
         loadedInSecondaryThread = !_isLoaded && !ArchIsMainThread();
