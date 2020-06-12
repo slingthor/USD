@@ -29,7 +29,6 @@
 #include "pxr/imaging/hdSt/textureResource.h"
 #include "pxr/imaging/hdSt/textureResourceHandle.h"
 #include "pxr/imaging/hdSt/textureBinder.h"
-#include "pxr/imaging/hdSt/textureHandle.h"
 #include "pxr/imaging/hdSt/materialParam.h"
 
 #include "pxr/imaging/hd/binding.h"
@@ -156,13 +155,11 @@ HdStSurfaceShader::BindResources(HdStProgram const &program,
 								 HdSt_ResourceBinder const &binder,
                                  HdRenderPassState const &state)
 {
+    // Old texture system.
     program.BindResources(this, binder);
 
-
-    HdSt_TextureBinder::BindResources(binder, _namedTextureHandles);
-
-
-    binder.BindShaderResources(this);
+    // New texture system.
+    binder.BindShaderResources(this, program);
 }
 /*virtual*/
 void
@@ -170,12 +167,13 @@ HdStSurfaceShader::UnbindResources(HdStProgram const &program,
                                    HdSt_ResourceBinder const &binder,
                                    HdRenderPassState const &state)
 {
-    binder.UnbindShaderResources(this);
+    // Old texture system.
     program.UnbindResources(this, binder);
 
-    HdSt_TextureBinder::UnbindResources(binder, _namedTextureHandles);
-
+    // New texture system.
+    binder.UnbindShaderResources(this, program);
 }
+
 /*virtual*/
 void
 HdStSurfaceShader::AddBindings(HdBindingRequestVector *customBindings)
@@ -290,7 +288,7 @@ HdStSurfaceShader::SetNamedTextureHandles(
 void
 HdStSurfaceShader::SetBufferSources(
     HdBufferSpecVector const &bufferSpecs,
-    HdBufferSourceSharedPtrVector &bufferSources,
+    HdBufferSourceSharedPtrVector &&bufferSources,
     HdStResourceRegistrySharedPtr const &resourceRegistry)
 {
     if (bufferSpecs.empty()) {
@@ -321,7 +319,8 @@ HdStSurfaceShader::SetBufferSources(
 
         if (_paramArray->IsValid()) {
             if (!bufferSources.empty()) {
-                resourceRegistry->AddSources(_paramArray, bufferSources);
+                resourceRegistry->AddSources(_paramArray,
+                                             std::move(bufferSources));
             }
         }
     }
@@ -460,20 +459,21 @@ _CollectPrimvarNames(const HdSt_MaterialParamVector &params)
     return primvarNames;
 }
 
-std::vector<HdStShaderCode::BarAndSources>
-HdStSurfaceShader::ComputeBufferSourcesFromTextures() const
+void
+HdStSurfaceShader::AddResourcesFromTextures(ResourceContext &ctx) const
 {
+    const bool bindlessTextureEnabled =
+        GarchResourceFactory::GetInstance()->GetContextCaps().bindlessTextureEnabled;
+
     // Add buffer sources for bindless texture handles (and
     // other texture metadata such as the sampling transform for
     // a field texture).
     HdBufferSourceSharedPtrVector result;
     HdSt_TextureBinder::ComputeBufferSources(
-        GetNamedTextureHandles(), &result);
+        GetNamedTextureHandles(), bindlessTextureEnabled, &result);
 
-    if (result.empty()) {
-        return { };
-    } else {
-        return { { GetShaderData(), std::move(result) } };
+    if (!result.empty()) {
+        ctx.AddSources(GetShaderData(), std::move(result));
     }
 }
 

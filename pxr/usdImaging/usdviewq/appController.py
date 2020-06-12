@@ -62,8 +62,7 @@ from .selectionDataModel import ALL_INSTANCES, SelectionDataModel
 from .common import (UIBaseColors, UIPropertyValueSourceColors, UIFonts,
                      GetPropertyColor, GetPropertyTextFont,
                      Timer, Drange, BusyContext, DumpMallocTags,
-                     GetValueAtFrame, GetShortStringForValue,
-                     GetInstanceIdForIndex,
+                     GetValueAndDisplayString, GetInstanceIdForIndex,
                      ResetSessionVisibility, InvisRootPrims, GetAssetCreationTime,
                      PropertyViewIndex, PropertyViewIcons, PropertyViewDataRoles,
                      RenderModes, ColorCorrectionModes, ShadedRenderModes,
@@ -2748,11 +2747,11 @@ class AppController(QtCore.QObject):
     def _reopenStage(self):
         QtWidgets.QApplication.setOverrideCursor(QtCore.Qt.BusyCursor)
 
-        try:
-            # Pause the stage view while we update
-            if self._stageView:
-                self._stageView.setUpdatesEnabled(False)
+        # Pause the stage view while we update
+        if self._stageView:
+            self._stageView.setUpdatesEnabled(False)
 
+        try:
             # Clear out any Usd objects that may become invalid.
             self._dataModel.selection.clear()
             self._currentSpec = None
@@ -2775,12 +2774,12 @@ class AppController(QtCore.QObject):
             self._resetView()
 
             self._stepSizeChanged()
-            if self._stageView:
-                self._stageView.setUpdatesEnabled(True)
         except Exception as err:
             self.statusMessage('Error occurred reopening Stage: %s' % err)
             traceback.print_exc()
         finally:
+            if self._stageView:
+                self._stageView.setUpdatesEnabled(True)
             QtWidgets.QApplication.restoreOverrideCursor()
 
         self.statusMessage('Stage Reopened')
@@ -3724,10 +3723,9 @@ class AppController(QtCore.QObject):
                     (key, type(primProperty)))
                 continue
 
-            val = GetValueAtFrame(primProperty, frame)
-            attrText = GetShortStringForValue(primProperty, val)
+            valFunc, attrText = GetValueAndDisplayString(primProperty, frame)
             item = QtWidgets.QTreeWidgetItem(["", str(key), attrText])
-            item.rawValue = val
+            item.rawValue = valFunc()
             treeWidget.addTopLevelItem(item)
 
             treeWidget.topLevelItem(currRow).setIcon(PropertyViewIndex.TYPE, 
@@ -4251,17 +4249,16 @@ class AppController(QtCore.QObject):
                 tableWidget.setItem(i, 1, pathItem)
 
                 if path.IsPropertyPath():
-                    val = GetValueAtFrame(spec, self._dataModel.currentFrame)
-                    valStr = GetShortStringForValue(spec, val)
+                    _, valStr = GetValueAndDisplayString(spec, 
+                                                    self._dataModel.currentFrame)
                     ttStr = valStr
                     valueItem = QtWidgets.QTableWidgetItem(valStr)
-                    sampleBased = (spec.HasInfo('timeSamples') and
-                        spec.layer.GetNumTimeSamplesForPath(path) != -1)
+                    sampleBased = spec.layer.GetNumTimeSamplesForPath(path) > 0
                     valueItemColor = (UIPropertyValueSourceColors.TIME_SAMPLE if
                         sampleBased else UIPropertyValueSourceColors.DEFAULT)
                     valueItem.setForeground(valueItemColor)
                     valueItem.setToolTip(ttStr)
-
+                    
                 else:
                     metadataKeys = spec.GetMetaDataInfoKeys()
                     metadataDict = {}

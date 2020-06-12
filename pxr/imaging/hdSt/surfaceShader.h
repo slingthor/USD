@@ -120,7 +120,7 @@ public:
     HDST_API
     void SetBufferSources(
         HdBufferSpecVector const &bufferSpecs,
-        HdBufferSourceSharedPtrVector &bufferSources, 
+        HdBufferSourceSharedPtrVector &&bufferSources, 
         HdStResourceRegistrySharedPtr const &resourceRegistry);
 
     /// Called after textures have been committed.
@@ -131,8 +131,7 @@ public:
     /// commit.
     ///
     HDST_API
-    std::vector<BarAndSources>
-    ComputeBufferSourcesFromTextures() const override;
+    void AddResourcesFromTextures(ResourceContext &ctx) const override;
 
     HDST_API
     void SetMaterialTag(TfToken const &materialTag);

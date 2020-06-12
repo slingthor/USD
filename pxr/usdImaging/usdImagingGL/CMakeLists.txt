@@ -57,9 +57,7 @@ pxr_library(usdImagingGL
         ${TBB_INCLUDE_DIRS}
 
     PUBLIC_CLASSES
-        domeLightAdapter
         engine
-        materialTextureAdapter
         renderParams
 
     PUBLIC_HEADERS

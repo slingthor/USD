@@ -105,7 +105,7 @@ public:
     /// Mark shader dirty (thread-safe).
     ///
     /// If set, the shader is scheduled to be updated (i.e., have its
-    /// ComputeBufferSourcesFromTextures called) on the next commit.
+    /// AddResourcesFromTextures called) on the next commit.
     ///
     void MarkDirty(HdStShaderCodePtr const &shader);
 
@@ -113,6 +113,12 @@ public:
     /// next commit (thead-safe).
     ///
     void MarkSamplerGarbageCollectionNeeded();
+
+    /// Get texture object registry.
+    ///
+    HdSt_TextureObjectRegistry * GetTextureObjectRegistry() const {
+        return _textureObjectRegistry.get();
+    }
 
     /// Get sampler object registry.
     ///

@@ -150,8 +150,10 @@ _DumpShaderSource(const char *shaderType, std::string const &shaderSource)
     std::cout << std::flush;
 }
 
-HdStGLSLProgram::HdStGLSLProgram(TfToken const &role)
-    : HdStProgram(role), _program(0), _programSize(0), _uniformBuffer(role)
+HdStGLSLProgram::HdStGLSLProgram(
+    TfToken const &role,
+    HdStResourceRegistry *const registry)
+    : HdStProgram(role, registry), _program(0), _programSize(0), _uniformBuffer(role)
 {
     static size_t globalDebugID = 0;
     _debugID = globalDebugID++;

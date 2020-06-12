@@ -35,14 +35,18 @@
 #include "pxr/imaging/hgi/graphicsCmdsDesc.h"
 #include "pxr/imaging/hgi/pipeline.h"
 #include "pxr/imaging/hgi/resourceBindings.h"
+#include "pxr/imaging/hgi/sampler.h"
 #include "pxr/imaging/hgi/shaderFunction.h"
 #include "pxr/imaging/hgi/shaderProgram.h"
 #include "pxr/imaging/hgi/texture.h"
 #include "pxr/imaging/hgi/types.h"
 
 #include <atomic>
+#include <memory>
 
 PXR_NAMESPACE_OPEN_SCOPE
+
+using HgiUniquePtr = std::unique_ptr<class Hgi>;
 
 
 /// \class Hgi
@@ -72,12 +76,16 @@ public:
     HGI_API
     virtual void SubmitCmds(HgiCmds* cmds, uint32_t count=1) = 0;
 
-    /// Helper function to return a Hgi object for the current platform.
-    /// For example on Linux this may return HgiGL while on macOS HgiMetal.
-    /// Caller, usually the application, owns the lifetime of the returned Hgi
-    /// pointer and must destroy it during shutdown.
+    /// *** DEPRECATED *** Please use: CreatePlatformDefaultHgi
     HGI_API
     static Hgi* GetPlatformDefaultHgi();
+
+    /// Helper function to return a Hgi object for the current platform.
+    /// For example on Linux this may return HgiGL while on macOS HgiMetal.
+    /// Caller, usually the application, owns the lifetime of the Hgi object and
+    /// the object is destroyed when the caller drops the unique ptr.
+    HGI_API
+    static HgiUniquePtr CreatePlatformDefaultHgi();
 
     /// Returns a GraphicsCmds object (for temporary use) that is ready to
     /// record draw commands. GraphicsCmds is a lightweight object that
@@ -101,6 +109,14 @@ public:
     /// Destroy a texture in rendering backend.
     HGI_API
     virtual void DestroyTexture(HgiTextureHandle* texHandle) = 0;
+
+    /// Create a sampler in rendering backend.
+    HGI_API
+    virtual HgiSamplerHandle CreateSampler(HgiSamplerDesc const & desc) = 0;
+
+    /// Destroy a sampler in rendering backend.
+    HGI_API
+    virtual void DestroySampler(HgiSamplerHandle* smpHandle) = 0;
 
     /// Create a buffer in rendering backend.
     HGI_API

@@ -34,8 +34,23 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+using HdBindingRequestVector = std::vector<HdBindingRequest>;
 
-typedef std::vector<HdBindingRequest> HdBindingRequestVector;
+#define HDST_INDIRECT_DRAW_TOKENS           \
+    (dispatchBuffer)                        \
+    (drawCommandIndex)                      \
+    (drawIndirect)                          \
+    (drawIndirectCull)                      \
+    (drawIndirectResult)                    \
+    (instanceCountInput)                    \
+    (ulocDrawCommandNumUints)               \
+    (ulocResetPass)                         \
+    (ulocCullMatrix)                        \
+    (ulocDrawRangeNDC)
+
+TF_DECLARE_PUBLIC_TOKENS(HdStIndirectDrawTokens, HDST_API,
+                         HDST_INDIRECT_DRAW_TOKENS);
+
 
 /// \class HdSt_IndirectDrawBatch
 ///
@@ -45,34 +60,35 @@ typedef std::vector<HdBindingRequest> HdBindingRequestVector;
 /// primitive mode and that share aggregated drawing resources,
 /// e.g. uniform and non uniform primvar buffers.
 ///
-class HdSt_IndirectDrawBatch : public HdSt_DrawBatch {
+class HdSt_IndirectDrawBatch : public HdSt_DrawBatch
+{
 public:
 
     HDST_API
-    virtual ~HdSt_IndirectDrawBatch();
+    ~HdSt_IndirectDrawBatch() override;
 
     // HdSt_DrawBatch overrides
     HDST_API
-    bool Validate(bool deepValidation);
+    bool Validate(bool deepValidation) override;
 
     /// Prepare draw commands and apply view frustum culling for this batch.
     HDST_API
-    virtual void PrepareDraw(
+    void PrepareDraw(
         HdStRenderPassStateSharedPtr const &renderPassState,
         HdStResourceRegistrySharedPtr const &resourceRegistry) override;
 
     /// Executes the drawing commands for this batch.
     HDST_API
-    virtual void ExecuteDraw(
+    void ExecuteDraw(
         HdStRenderPassStateSharedPtr const &renderPassState,
         HdStResourceRegistrySharedPtr const &resourceRegistry) override;
 
     HDST_API
-    virtual void DrawItemInstanceChanged(
+    void DrawItemInstanceChanged(
         HdStDrawItemInstance const* instance) override;
 
     HDST_API
-    virtual void SetEnableTinyPrimCulling(bool tinyPrimCulling) override;
+    void SetEnableTinyPrimCulling(bool tinyPrimCulling) override;
 
 protected:
     HDST_API
@@ -102,34 +118,36 @@ protected:
     virtual void _SyncFence() = 0;
     
     HDST_API
-    virtual void _GPUFrustumCullingExecute(
+    virtual void _GPUFrustumInstanceCullingExecute(
                        HdStResourceRegistrySharedPtr const &resourceRegistry,
                        HdStProgramSharedPtr const &program,
                        HdSt_ResourceBinder const &binder,
                        HdBufferResourceSharedPtr cullCommandBuffer) = 0;
     
     HDST_API
-    virtual void _GPUFrustumCullingXFBExecute(
+    virtual void _GPUFrustumNonInstanceCullingExecute(
                         HdStResourceRegistrySharedPtr const &resourceRegistry,
-                        HdStProgramSharedPtr const &program) = 0;
+                        HdStProgramSharedPtr const &program,
+                        HdSt_ResourceBinder const &binder) = 0;
 
     // Culling requires custom resource binding.
-    class _CullingProgram : public _DrawingProgram {
+    class _CullingProgram : public _DrawingProgram
+    {
     public:
         void Initialize(bool useDrawArrays, bool useInstanceCulling,
                         size_t bufferArrayHash);
+
     protected:
         _CullingProgram()
             : _useDrawArrays(false)
             , _useInstanceCulling(false)
             , _bufferArrayHash(0) { }
-        
-        virtual ~_CullingProgram() {}
-        
+
+    protected:
         // _DrawingProgram overrides
-        virtual void _GetCustomBindings(HdBindingRequestVector *customBindings,
-                                        bool *enableInstanceDraw) const;
-        virtual bool _Link(HdStProgramSharedPtr const & program) = 0;
+        void _GetCustomBindings(
+            HdBindingRequestVector *customBindings,
+            bool *enableInstanceDraw) const override;
 
         bool _useDrawArrays;
         bool _useInstanceCulling;
@@ -143,11 +161,11 @@ protected:
     
     void _CompileBatch(HdStResourceRegistrySharedPtr const &resourceRegistry);
     
-    void _GPUFrustumCulling(HdStDrawItem const *item,
+    void _GPUFrustumInstanceCulling(HdStDrawItem const *item,
                             HdStRenderPassStateSharedPtr const &renderPassState,
                             HdStResourceRegistrySharedPtr const &resourceRegistry);
     
-    void _GPUFrustumCullingXFB(HdStDrawItem const *item,
+    void _GPUFrustumNonInstanceCulling(HdStDrawItem const *item,
                                HdStRenderPassStateSharedPtr const &renderPassState,
                                HdStResourceRegistrySharedPtr const &resourceRegistry);
     

@@ -320,14 +320,6 @@ GarchTextureRegistry::GarbageCollectIfNeeded()
     while (it != _textureRegistry.end()){
         const GarchTextureHandleRefPtr &handle = it->second.GetHandle();
 
-        // Call garbage collection on texture containers first, see
-        // GlfTextureContainer::GarbageCollect() for reason.
-        if (TF_VERIFY(handle)) {
-            if (GarchTexturePtr texture = handle->GetTexture()) {
-                texture->GarbageCollect();
-            }
-        }
-
         // Null handles should not have been added to the registry
         if (TF_VERIFY(handle) && handle->IsUnique()) {
             it = _textureRegistry.erase(it);

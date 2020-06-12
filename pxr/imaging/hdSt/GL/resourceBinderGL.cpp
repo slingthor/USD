@@ -27,16 +27,21 @@
 #include "pxr/imaging/garch/resourceFactory.h"
 
 #include "pxr/imaging/hdSt/GL/resourceBinderGL.h"
-#include "pxr/imaging/hdSt/GL/glslProgram.h"
 #include "pxr/imaging/hdSt/bufferResource.h"
-#include "pxr/imaging/hdSt/shaderCode.h"
 #include "pxr/imaging/hdSt/drawItem.h"
 #include "pxr/imaging/hdSt/glConversions.h"
+#include "pxr/imaging/hdSt/samplerObject.h"
+#include "pxr/imaging/hdSt/textureHandle.h"
+#include "pxr/imaging/hdSt/textureObject.h"
+#include "pxr/imaging/hdSt/GL/glslProgram.h"
 
 #include "pxr/imaging/hd/bufferArrayRange.h"
 #include "pxr/imaging/hd/bufferSpec.h"
 #include "pxr/imaging/hd/resource.h"
 #include "pxr/imaging/hd/tokens.h"
+
+#include "pxr/imaging/hgiGL/texture.h"
+#include "pxr/imaging/hgiGL/sampler.h"
 
 #include "pxr/base/tf/staticTokens.h"
 
@@ -333,60 +338,6 @@ HdSt_ResourceBinderGL::UnbindBuffer(TfToken const &name,
 }
 
 void
-HdSt_ResourceBinderGL::BindShaderResources(HdStShaderCode const *shader) const
-{
-    // bind fallback values and sampler uniforms (unit#? or bindless address)
-
-    // this is bound in batches.
-    //BindBufferArray(shader->GetShaderData());
-
-    // bind textures
-    HdStShaderCode::TextureDescriptorVector textures = shader->GetTextures();
-    TF_FOR_ALL(it, textures) {
-        HdBinding binding = GetBinding(it->name);
-        HdBinding::Type type = binding.GetType();
-
-        if (type == HdBinding::TEXTURE_2D ||
-            type == HdBinding::TEXTURE_FIELD) {
-        } else if (type == HdBinding::BINDLESS_TEXTURE_2D
-                || type == HdBinding::BINDLESS_TEXTURE_FIELD
-                || type == HdBinding::BINDLESS_TEXTURE_PTEX_TEXEL
-                || type == HdBinding::BINDLESS_TEXTURE_PTEX_LAYOUT) {
-            // nothing? or make it resident?? but it only binds the first one.
-            // XXX: it looks like this function should take all textures in the batch.
-
-//            if (!glIsTextureHandleResidentARB(it->handle)) {
-//                glMakeTextureHandleResidentARB(it->handle);
-//            }
-        }
-    }
-}
-
-void
-HdSt_ResourceBinderGL::UnbindShaderResources(HdStShaderCode const *shader) const
-{
-//    UnbindBufferArray(shader->GetShaderData());
-
-    HdStShaderCode::TextureDescriptorVector textures = shader->GetTextures();
-    TF_FOR_ALL(it, textures) {
-        HdBinding binding = GetBinding(it->name);
-        HdBinding::Type type = binding.GetType();
-
-        if (type == HdBinding::TEXTURE_2D ||
-            type == HdBinding::TEXTURE_FIELD) {
-        } else if (type == HdBinding::BINDLESS_TEXTURE_2D
-                || type == HdBinding::BINDLESS_TEXTURE_FIELD
-                || type == HdBinding::BINDLESS_TEXTURE_PTEX_TEXEL
-                || type == HdBinding::BINDLESS_TEXTURE_PTEX_LAYOUT) {
-//            if (glIsTextureHandleResidentNV(it->handle)) {
-//                glMakeTextureHandleNonResidentNV(it->handle);
-//            }
-        }
-        // XXX: unbind
-    }
-}
-
-void
 HdSt_ResourceBinderGL::BindUniformi(TfToken const &name,
                                 int count, const int *value) const
 {
@@ -551,6 +502,230 @@ HdSt_ResourceBinderGL::IntrospectBindings(HdStProgramSharedPtr programResource) 
                 it.second.Set(type, loc, binding.GetTextureUnit());
             }
         }
+    }
+}
+
+namespace {
+
+void
+_BindTexture(
+    const GLenum target,
+    HgiTextureHandle const &textureHandle,
+    HgiSamplerHandle const &samplerHandle,
+    const TfToken &name,
+    HdSt_ResourceBinder const &binder,
+    const bool bind)
+{
+    const HdBinding binding = binder.GetBinding(name);
+    const int samplerUnit = binding.GetTextureUnit();
+
+    glActiveTexture(GL_TEXTURE0 + samplerUnit);
+
+    const HgiTexture * const tex = textureHandle.Get();
+    const HgiGLTexture * const glTex =
+        dynamic_cast<const HgiGLTexture*>(tex);
+
+    if (tex && !glTex) {
+        TF_CODING_ERROR("Storm texture binder only supports OpenGL");
+    }
+
+    const GLuint texName =
+        (bind && glTex) ? glTex->GetTextureId() : 0;
+    glBindTexture(target, texName);
+
+    const HgiSampler * const sampler = samplerHandle.Get();
+    const HgiGLSampler * const glSampler =
+        dynamic_cast<const HgiGLSampler*>(sampler);
+
+    if (sampler && !glSampler) {
+        TF_CODING_ERROR("Storm texture binder only supports OpenGL");
+    }
+
+    const GLuint samplerName =
+        (bind && glSampler) ? glSampler->GetSamplerId() : 0;
+    glBindSampler(samplerUnit, samplerName);
+}
+
+class _BindTextureFunctor {
+public:
+    static void Compute(
+        TfToken const &name,
+        HdStUvTextureObject const &texture,
+        HdStUvSamplerObject const &sampler,
+        HdSt_ResourceBinder const &binder,
+        const bool bind)
+    {
+        _BindTexture(
+            GL_TEXTURE_2D,
+            texture.GetTexture(),
+            sampler.GetSampler(),
+            name,
+            binder,
+            bind);
+    }
+
+    static void Compute(
+        TfToken const &name,
+        HdStFieldTextureObject const &texture,
+        HdStFieldSamplerObject const &sampler,
+        HdSt_ResourceBinder const &binder,
+        const bool bind)
+    {
+        _BindTexture(
+            GL_TEXTURE_3D,
+            texture.GetTexture(),
+            sampler.GetSampler(),
+            name,
+            binder,
+            bind);
+    }
+    
+    static void Compute(
+        TfToken const &name,
+        HdStPtexTextureObject const &texture,
+        HdStPtexSamplerObject const &sampler,
+        HdSt_ResourceBinder const &binder,
+        const bool bind)
+    {
+        const HdBinding texelBinding = binder.GetBinding(name);
+        const int texelSamplerUnit = texelBinding.GetTextureUnit();
+
+        glActiveTexture(GL_TEXTURE0 + texelSamplerUnit);
+        glBindTexture(GL_TEXTURE_2D_ARRAY,
+                      bind ? (GLuint)texture.GetTexelGLTextureName() : 0);
+
+        const HdBinding layoutBinding = binder.GetBinding(
+            HdSt_ResourceBinder::_Concat(name, HdSt_ResourceBindingSuffixTokens->layout));
+        const int layoutSamplerUnit = layoutBinding.GetTextureUnit();
+
+        glActiveTexture(GL_TEXTURE0 + layoutSamplerUnit);
+        glBindTexture(GL_TEXTURE_BUFFER,
+                      bind ? (GLuint)texture.GetLayoutGLTextureName() : 0);
+    }
+
+    static void Compute(
+        TfToken const &name,
+        HdStUdimTextureObject const &texture,
+        HdStUdimSamplerObject const &sampler,
+        HdSt_ResourceBinder const &binder,
+        const bool bind)
+    {
+        const HdBinding texelBinding = binder.GetBinding(name);
+        const int texelSamplerUnit = texelBinding.GetTextureUnit();
+        
+        glActiveTexture(GL_TEXTURE0 + texelSamplerUnit);
+        glBindTexture(GL_TEXTURE_2D_ARRAY,
+                      bind ? (GLuint)texture.GetTexelGLTextureName() : 0);
+
+        HgiSampler * const texelSampler = sampler.GetTexelsSampler().Get();
+
+        const HgiGLSampler * const glSampler =
+            bind ? dynamic_cast<HgiGLSampler*>(texelSampler) : nullptr;
+
+        if (glSampler) {
+            glBindSampler(texelSamplerUnit, (GLuint)glSampler->GetSamplerId());
+        } else {
+            glBindSampler(texelSamplerUnit, 0);
+        }
+
+        const HdBinding layoutBinding = binder.GetBinding(
+            HdSt_ResourceBinder::_Concat(name, HdSt_ResourceBindingSuffixTokens->layout));
+        const int layoutSamplerUnit = layoutBinding.GetTextureUnit();
+
+        glActiveTexture(GL_TEXTURE0 + layoutSamplerUnit);
+        glBindTexture(GL_TEXTURE_1D,
+                      bind ? (GLuint)texture.GetLayoutGLTextureName() : 0);
+    }
+};
+
+template<HdTextureType textureType, class Functor, typename ...Args>
+void _CastAndCompute(
+    HdStShaderCode::NamedTextureHandle const &namedTextureHandle,
+    Args&& ...args)
+{
+    // e.g. HdStUvTextureObject
+    using TextureObject = HdStTypedTextureObject<textureType>;
+    // e.g. HdStUvSamplerObject
+    using SamplerObject = HdStTypedSamplerObject<textureType>;
+
+    const TextureObject * const typedTexture =
+        dynamic_cast<TextureObject *>(
+            namedTextureHandle.handle->GetTextureObject().get());
+    if (!typedTexture) {
+        TF_CODING_ERROR("Bad texture object");
+        return;
+    }
+
+    const SamplerObject * const typedSampler =
+        dynamic_cast<SamplerObject *>(
+            namedTextureHandle.handle->GetSamplerObject().get());
+    if (!typedSampler) {
+        TF_CODING_ERROR("Bad sampler object");
+        return;
+    }
+
+    Functor::Compute(namedTextureHandle.name, *typedTexture, *typedSampler,
+                     std::forward<Args>(args)...);
+}
+
+template<class Functor, typename ...Args>
+void _BindTextureDispatch(
+    HdStShaderCode::NamedTextureHandle const &namedTextureHandle,
+    Args&& ...args)
+{
+    switch (namedTextureHandle.type) {
+    case HdTextureType::Uv:
+        _CastAndCompute<HdTextureType::Uv, Functor>(
+            namedTextureHandle, std::forward<Args>(args)...);
+        break;
+    case HdTextureType::Field:
+        _CastAndCompute<HdTextureType::Field, Functor>(
+            namedTextureHandle, std::forward<Args>(args)...);
+        break;
+    case HdTextureType::Ptex:
+        _CastAndCompute<HdTextureType::Ptex, Functor>(
+            namedTextureHandle, std::forward<Args>(args)...);
+        break;
+    case HdTextureType::Udim:
+        _CastAndCompute<HdTextureType::Udim, Functor>(
+            namedTextureHandle, std::forward<Args>(args)...);
+        break;
+    }
+}
+
+} // end anonymous namespace
+
+void
+HdSt_ResourceBinderGL::BindShaderResources(
+    HdStShaderCode const *shader,
+    HdStProgram const &shaderProgram) const
+{
+    // bind fallback values and sampler uniforms (unit#? or bindless address)
+
+    // this is bound in batches.
+    //BindBufferArray(shader->GetShaderData());
+
+    // bind textures
+    TF_UNUSED(shaderProgram);
+    
+    auto const & textures = shader->GetNamedTextureHandles();
+    for (const HdStShaderCode::NamedTextureHandle & texture : textures) {
+        _BindTextureDispatch<_BindTextureFunctor>(texture, *this, /* bind = */ true);
+    }
+}
+
+void
+HdSt_ResourceBinderGL::UnbindShaderResources(
+    HdStShaderCode const *shader,
+    HdStProgram const &shaderProgram) const
+{
+//    UnbindBufferArray(shader->GetShaderData());
+
+    TF_UNUSED(shaderProgram);
+
+    auto const & textures = shader->GetNamedTextureHandles();
+    for (const HdStShaderCode::NamedTextureHandle & texture : textures) {
+        _BindTextureDispatch<_BindTextureFunctor>(texture, *this, /* bind = */ false);
     }
 }
 

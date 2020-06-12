@@ -40,8 +40,8 @@ vec3 GetNormal(vec3 Neye, int index)
     normal = vec3(HdGet_normals(index).xyz);
 #endif
 
-    MAT4 transform = ApplyInstanceTransform(HdGet_transform());
-    normal = vec4(transpose(inverse(GetWorldToViewMatrix() * transform)) *
+    MAT4 transformInv = ApplyInstanceTransformInverse(HdGet_transformInverse());
+    normal = vec4(transpose(transformInv * GetWorldToViewInverseMatrix()) *
                   vec4(normal,0)).xyz;
 
     if (length(normal) > 0.0)
@@ -63,8 +63,8 @@ vec3 GetNormal(vec3 Neye, int index)
     normal = vec3(HdGet_packedSmoothNormals(index).xyz);
 #endif
 
-    MAT4 transform = ApplyInstanceTransform(HdGet_transform());
-    normal = vec4(transpose(inverse(GetWorldToViewMatrix() * transform)) *
+    MAT4 transformInv = ApplyInstanceTransformInverse(HdGet_transformInverse());
+    normal = vec4(transpose(transformInv * GetWorldToViewInverseMatrix()) *
                   vec4(normal,0)).xyz;
 
     if (length(normal) > 0.0)
@@ -86,8 +86,8 @@ vec3 GetNormal(vec3 Neye, int index)
     normal = vec3(HdGet_packedFlatNormals(index).xyz);
 #endif
 
-    MAT4 transform = ApplyInstanceTransform(HdGet_transform());
-    normal = vec4(transpose(inverse(GetWorldToViewMatrix() * transform)) *
+    MAT4 transformInv = ApplyInstanceTransformInverse(HdGet_transformInverse());
+    normal = vec4(transpose(transformInv * GetWorldToViewInverseMatrix()) *
                   vec4(normal,0)).xyz;
 
     if (length(normal) > 0.0)

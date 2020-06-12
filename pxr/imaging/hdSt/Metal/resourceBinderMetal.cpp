@@ -21,21 +21,27 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#include "pxr/imaging/glf/glew.h"
 #include "pxr/imaging/mtlf/mtlDevice.h"
 
-#include "pxr/imaging/hdSt/Metal/bufferResourceMetal.h"
 #include "pxr/imaging/hdSt/Metal/resourceBinderMetal.h"
-#include "pxr/imaging/hdSt/Metal/mslProgram.h"
 #include "pxr/imaging/hdSt/bufferResource.h"
-#include "pxr/imaging/hdSt/shaderCode.h"
 #include "pxr/imaging/hdSt/drawItem.h"
+#include "pxr/imaging/hdSt/textureHandle.h"
+#include "pxr/imaging/hdSt/textureObject.h"
+#include "pxr/imaging/hdSt/samplerObject.h"
+#include "pxr/imaging/hdSt/shaderCode.h"
+
+#include "pxr/imaging/hdSt/Metal/bufferResourceMetal.h"
 #include "pxr/imaging/hdSt/Metal/metalConversions.h"
+#include "pxr/imaging/hdSt/Metal/mslProgram.h"
 
 #include "pxr/imaging/hd/bufferArrayRange.h"
 #include "pxr/imaging/hd/bufferSpec.h"
 #include "pxr/imaging/hd/resource.h"
 #include "pxr/imaging/hd/tokens.h"
+
+#include "pxr/imaging/hgiMetal/texture.h"
+#include "pxr/imaging/hgiMetal/sampler.h"
 
 #include "pxr/base/tf/staticTokens.h"
 
@@ -187,18 +193,6 @@ HdSt_ResourceBinderMetal::UnbindBuffer(TfToken const &name,
 }
 
 void
-HdSt_ResourceBinderMetal::BindShaderResources(HdStShaderCode const *shader) const
-{
-    // Nothing
-}
-
-void
-HdSt_ResourceBinderMetal::UnbindShaderResources(HdStShaderCode const *shader) const
-{
-    // Nothing
-}
-
-void
 HdSt_ResourceBinderMetal::BindUniformi(TfToken const &name,
                                 int count, const int *value) const
 {
@@ -292,6 +286,185 @@ HdSt_ResourceBinderMetal::IntrospectBindings(HdStProgramSharedPtr programResourc
         // some uniforms may be optimized out.
         if (loc < 0) loc = HdBinding::NOT_EXIST;
         it->second.Set(type, loc, binding.GetTextureUnit());
+    }
+}
+
+namespace {
+
+class _BindTextureFunctor {
+public:
+    static void Compute(
+        TfToken const &name,
+        HdStUvTextureObject const &texture,
+        HdStUvSamplerObject const &sampler,
+        HdStMSLProgram const &mslProgram,
+        const bool bind)
+    {
+        auto metalTexture = dynamic_cast<HgiMetalTexture const*>(
+            texture.GetTexture().Get());
+        auto metalSampler = dynamic_cast<HgiMetalSampler const*>(
+            sampler.GetSampler().Get());
+        
+        if (metalTexture) {
+            mslProgram.BindTexture(name, metalTexture->GetTextureId());
+        }
+        
+        if (metalSampler) {
+            mslProgram.BindSampler(name,  metalSampler->GetSamplerId());
+        }
+    }
+
+    static void Compute(
+        TfToken const &name,
+        HdStFieldTextureObject const &texture,
+        HdStFieldSamplerObject const &sampler,
+        HdStMSLProgram const &mslProgram,
+        const bool bind)
+    {
+        auto metalTexture = dynamic_cast<HgiMetalTexture const*>(
+            texture.GetTexture().Get());
+        auto metalSampler = dynamic_cast<HgiMetalSampler const*>(
+            sampler.GetSampler().Get());
+
+        if (metalTexture) {
+            mslProgram.BindTexture(name, metalTexture->GetTextureId());
+        }
+        
+        if (metalSampler) {
+            mslProgram.BindSampler(name,  metalSampler->GetSamplerId());
+        }
+    }
+    
+    static void Compute(
+        TfToken const &name,
+        HdStPtexTextureObject const &texture,
+        HdStPtexSamplerObject const &sampler,
+        HdStMSLProgram const &mslProgram,
+        const bool bind)
+    {
+        // Bind the texels
+        GarchTextureGPUHandle texelHandle = texture.GetTexelGLTextureName();
+        mslProgram.BindTexture(name, texelHandle);
+        
+        // Bind the layout
+        TfToken layoutName = HdSt_ResourceBinder::_Concat(name, HdSt_ResourceBindingSuffixTokens->layout);
+        GarchTextureGPUHandle layoutHandle = texture.GetLayoutGLTextureName();
+        mslProgram.BindTexture(layoutName, layoutHandle);
+    }
+
+    static void Compute(
+        TfToken const &name,
+        HdStUdimTextureObject const &texture,
+        HdStUdimSamplerObject const &sampler,
+        HdStMSLProgram const &mslProgram,
+        const bool bind)
+    {
+        // Bind the texels
+        GarchTextureGPUHandle texelHandle = texture.GetTexelGLTextureName();
+        mslProgram.BindTexture(name, texelHandle);
+        
+        // Bind the layout
+        GarchTextureGPUHandle layoutHandle = texture.GetLayoutGLTextureName();
+        mslProgram.BindTexture(
+            HdSt_ResourceBinder::_Concat(
+                name, HdSt_ResourceBindingSuffixTokens->layout),
+            layoutHandle);
+
+        // Bind the sampler
+        auto metalSampler = dynamic_cast<HgiMetalSampler const*>(
+            sampler.GetTexelsSampler().Get());
+        id<MTLSamplerState> samplerID = metalSampler->GetSamplerId();
+        mslProgram.BindSampler(name, samplerID);
+    }
+};
+
+template<HdTextureType textureType, typename ...Args>
+void _CastAndCompute(
+    HdStShaderCode::NamedTextureHandle const &namedTexture,
+    HdStProgram const &program,
+    Args&& ...args)
+{
+    // e.g. HdStUvTextureObject
+    using TextureObject = HdStTypedTextureObject<textureType>;
+    // e.g. HdStUvSamplerObject
+    using SamplerObject = HdStTypedSamplerObject<textureType>;
+    
+    const HdStTextureHandleSharedPtr textureHandle = namedTexture.handle;
+
+    const TextureObject * const typedTexture =
+        dynamic_cast<TextureObject *>(textureHandle->GetTextureObject().get());
+    if (!typedTexture) {
+        TF_CODING_ERROR("Bad texture object");
+        return;
+    }
+
+    const SamplerObject * const typedSampler =
+        dynamic_cast<SamplerObject *>(textureHandle->GetSamplerObject().get());
+    if (!typedSampler) {
+        TF_CODING_ERROR("Bad sampler object");
+        return;
+    }
+
+    HdStMSLProgram const &mslProgram(
+        dynamic_cast<const HdStMSLProgram&>(program));
+
+    _BindTextureFunctor::Compute(
+        namedTexture.name,
+        *typedTexture,
+        *typedSampler,
+        mslProgram,
+        std::forward<Args>(args)...);
+}
+
+void _BindTextureDispatch(
+    HdStShaderCode::NamedTextureHandle const &namedTexture,
+    HdSt_ResourceBinder const &binder,
+    HdStProgram const &program,
+    bool bind)
+{
+    HdStMSLProgram const &mslProgram(
+        dynamic_cast<const HdStMSLProgram&>(program));
+
+    switch (namedTexture.type) {
+    case HdTextureType::Uv:
+        _CastAndCompute<HdTextureType::Uv>(
+            namedTexture, mslProgram, bind);
+        break;
+    case HdTextureType::Field:
+            _CastAndCompute<HdTextureType::Field>(
+                namedTexture, mslProgram, bind);
+        break;
+    case HdTextureType::Ptex:
+            _CastAndCompute<HdTextureType::Ptex>(
+                namedTexture, mslProgram, bind);
+        break;
+    case HdTextureType::Udim:
+        _CastAndCompute<HdTextureType::Udim>(
+            namedTexture, mslProgram, bind);
+        break;
+    }
+}
+} // end anonymous namespace
+
+void
+HdSt_ResourceBinderMetal::BindShaderResources(
+    HdStShaderCode const *shader,
+    HdStProgram const &shaderProgram) const
+{
+    auto const & textures = shader->GetNamedTextureHandles();
+    for (const HdStShaderCode::NamedTextureHandle & texture : textures) {
+        _BindTextureDispatch(texture, *this, shaderProgram, /* bind = */ true);
+    }
+}
+
+void
+HdSt_ResourceBinderMetal::UnbindShaderResources(
+    HdStShaderCode const *shader,
+    HdStProgram const &shaderProgram) const
+{
+    auto const & textures = shader->GetNamedTextureHandles();
+    for (const HdStShaderCode::NamedTextureHandle & texture : textures) {
+        _BindTextureDispatch(texture, *this, shaderProgram, /* bind = */ false);
     }
 }
 

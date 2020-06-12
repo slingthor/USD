@@ -33,7 +33,6 @@
 #include "pxr/imaging/hdSt/tokens.h"
 #include "pxr/imaging/hdSt/volumeShader.h"
 #include "pxr/imaging/hdSt/volumeShaderKey.h"
-#include "pxr/imaging/hdSt/textureBinder.h"
 #include "pxr/imaging/hdSt/materialParam.h"
 #include "pxr/imaging/hdSt/resourceBinder.h"
 
@@ -43,6 +42,9 @@
 #include "pxr/imaging/hf/diagnostic.h"
 
 #include "pxr/imaging/hio/glslfx.h"
+
+#include "pxr/imaging/garch/contextCaps.h"
+#include "pxr/imaging/garch/resourceFactory.h"
 
 #include "pxr/base/tf/staticTokens.h"
 
@@ -104,9 +106,9 @@ HdStVolume::_InitRepr(TfToken const &reprToken, HdDirtyBits* dirtyBits)
 {
     // All representations point to _volumeRepr.
     if (!_volumeRepr) {
-        _volumeRepr = HdReprSharedPtr(new HdRepr());
-        HdDrawItem * const drawItem = new HdStDrawItem(&_sharedData);
-        _volumeRepr->AddDrawItem(drawItem);
+        _volumeRepr = std::make_shared<HdRepr>();
+        _volumeRepr->AddDrawItem(
+            std::make_unique<HdStDrawItem>(&_sharedData));
         *dirtyBits |= HdChangeTracker::NewRepr;
     }
     
@@ -400,10 +402,13 @@ _ComputeMaterialShader(
             { textureName, textureType, nullptr, desc->fieldId });
     }
 
+    const bool bindlessTextureEnabled
+        = GarchResourceFactory::GetInstance()->GetContextCaps().bindlessTextureEnabled;
+
     // Get buffer specs for textures (i.e., for
     // field sampling transforms and bindless texture handles).
-    HdSt_TextureBinder::GetBufferSpecs(
-        namedTextureHandles, &bufferSpecs);
+    HdSt_ResourceBinder::GetBufferSpecs(
+        namedTextureHandles, bindlessTextureEnabled, &bufferSpecs);
 
     // Create params (so that HdGet_... are created) and buffer specs,
     // to communicate volume bounding box to shader.
@@ -425,7 +430,7 @@ _ComputeMaterialShader(
     result->SetFillsPointsBar(hasField);
     result->SetParams(params);
     result->SetBufferSources(
-        bufferSpecs, bufferSources, resourceRegistry);
+        bufferSpecs, std::move(bufferSources), resourceRegistry);
     result->SetNamedTextureHandles(namedTextureHandles);
     result->SetFieldDescriptors(fieldDescs);
 
@@ -626,7 +631,7 @@ HdStVolume::_UpdateDrawItem(HdSceneDelegate *sceneDelegate,
             }
             
             resourceRegistry->AddSources(drawItem->GetTopologyRange(),
-                                         sources);
+                                         std::move(sources));
         }
     }
 }

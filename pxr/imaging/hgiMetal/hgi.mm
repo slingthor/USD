@@ -32,6 +32,7 @@
 #include "pxr/imaging/hgiMetal/graphicsCmds.h"
 #include "pxr/imaging/hgiMetal/pipeline.h"
 #include "pxr/imaging/hgiMetal/resourceBindings.h"
+#include "pxr/imaging/hgiMetal/sampler.h"
 #include "pxr/imaging/hgiMetal/shaderFunction.h"
 #include "pxr/imaging/hgiMetal/shaderProgram.h"
 #include "pxr/imaging/hgiMetal/texture.h"
@@ -188,6 +189,18 @@ HgiMetal::DestroyTexture(HgiTextureHandle* texHandle)
     DestroyObject(texHandle);
 }
 
+HgiSamplerHandle
+HgiMetal::CreateSampler(HgiSamplerDesc const & desc)
+{
+    return HgiSamplerHandle(new HgiMetalSampler(this, desc), GetUniqueId());
+}
+
+void
+HgiMetal::DestroySampler(HgiSamplerHandle* smpHandle)
+{
+    DestroyObject(smpHandle);
+}
+
 HgiBufferHandle
 HgiMetal::CreateBuffer(HgiBufferDesc const & desc)
 {
@@ -303,7 +316,7 @@ HgiMetal::CommitCommandBuffer(CommitCommandBufferWaitType waitType,
     if (!_workToFlush && !forceNewBuffer) {
         return;
     }
-
+    
     [_commandBuffer commit];
     if (waitType == CommitCommandBuffer_WaitUntilScheduled) {
         [_commandBuffer waitUntilScheduled];

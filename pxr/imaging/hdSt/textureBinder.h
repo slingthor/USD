@@ -48,44 +48,22 @@ public:
     using NamedTextureHandleVector =
         HdStShaderCode::NamedTextureHandleVector;
 
-    /// Whether to use bindless textures.
-    static bool
-    UsesBindlessTextures();
-
-    /// Add buffer specs necessary for the textures (e.g., for
-    /// bindless texture sampler handles or sampling transform).
-    ///
-    static void
-    GetBufferSpecs(
-        const NamedTextureHandleVector &textures,
-        HdBufferSpecVector * specs);
-
     /// Compute buffer sources for shader bar.
     ///
     /// This works in conjunction with GetBufferSpecs, but unlike
     /// GetBufferSpecs is extracting information from the texture
     /// handles and thus can only be called after the textures have
     /// been committed in
-    /// HdStShaderCode::ComputeBufferSourcesFromTextures.
+    /// HdStShaderCode::AddResourcesFromTextures().
+    ///
+    /// Specify whether to use the texture by binding it or by
+    /// using bindless handles with useBindlessHandles.
     ///
     static void
     ComputeBufferSources(
         const NamedTextureHandleVector &textures,
+        bool useBindlessHandles,
         HdBufferSourceSharedPtrVector * sources);
-
-    /// Bind non-bindless textures.
-    ///
-    static void
-    BindResources(
-        HdSt_ResourceBinder const &binder,
-        const NamedTextureHandleVector &textures);
-
-    /// Unbind non-bindless textures.
-    ///
-    static void
-    UnbindResources(
-        HdSt_ResourceBinder const &binder,
-        const NamedTextureHandleVector &textures);
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

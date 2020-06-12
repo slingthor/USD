@@ -36,18 +36,20 @@ class HdSt_DomeLightComputationGPUMetal : public HdSt_DomeLightComputationGPU {
 protected:
     /// Constructor
     HDST_API
-    HdSt_DomeLightComputationGPUMetal(TfToken token,
-                                 GarchTextureGPUHandle const &sourceId,
-                                 GarchTextureGPUHandle const &destId, 
-                                 int width, int height, 
-                                 unsigned int numLevels, 
-                                 unsigned int level, 
-                                 float roughness);
+    HdSt_DomeLightComputationGPUMetal(const TfToken & shaderToken,
+                                      HdStSimpleLightingShaderPtr const &lightingShader,
+                                      unsigned int numLevels,
+                                      unsigned int level,
+                                      float roughness);
 
     friend class HdStResourceFactoryMetal;
     
     HDST_API
-    virtual void _Execute(HdStProgramSharedPtr computeProgram) override;
+    GarchTextureGPUHandle _GetGlTextureName(
+        const HgiTexture * const hgiTexture) override;
+    
+    HDST_API
+    void _Execute(HdStProgramSharedPtr computeProgram) override;
 };
 
 

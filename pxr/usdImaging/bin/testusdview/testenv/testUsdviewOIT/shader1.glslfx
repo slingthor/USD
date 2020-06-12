@@ -41,18 +41,11 @@
 --- --------------------------------------------------------------------------
 -- glsl Surface.Fallback
 
-#ifdef ARCH_GFX_METAL
-#define mod fmod
-#define gl_FragCoord gl_Position
-#endif
-
 float checker(vec2 uv, float scale) 
 {
   float x = floor(scale * uv.x);
-  float y = floor(scale * uv.y);
-
+  float y = floor(scale * uv.y); 
   float result = mod(x+y, 2.0);
-
   return sign(result);
 }
 
@@ -60,7 +53,6 @@ vec4 surfaceShader(vec4 Peye, vec3 Neye, vec4 color, vec4 patchCoord)
 {
     color.rgb = HdGet_displayColor().rgb;
     float a = checker(gl_FragCoord.xy, 0.05);
-
     color.a = min(a+0.5, 1.0);
     return color;
 }

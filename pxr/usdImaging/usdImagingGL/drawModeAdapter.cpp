@@ -23,18 +23,13 @@
 //
 #include "pxr/usdImaging/usdImagingGL/drawModeAdapter.h"
 #include "pxr/usdImaging/usdImagingGL/package.h"
-#include "pxr/usdImaging/usdImagingGL/textureUtils.h"
 
-#include "pxr/usdImaging/usdImaging/debugCodes.h"
-#include "pxr/usdImaging/usdImaging/delegate.h"
 #include "pxr/usdImaging/usdImaging/gprimAdapter.h"
 #include "pxr/usdImaging/usdImaging/indexProxy.h"
 #include "pxr/usdImaging/usdImaging/instancerContext.h"
 #include "pxr/usdImaging/usdImaging/tokens.h"
 
-#include "pxr/imaging/hdSt/material.h"
-#include "pxr/imaging/hd/enums.h"
-#include "pxr/imaging/hd/perfLog.h"
+#include "pxr/imaging/hd/material.h"
 
 #include "pxr/imaging/hio/glslfx.h"
 #include "pxr/imaging/glf/image.h"
@@ -180,8 +175,8 @@ UsdImagingGLDrawModeAdapter::Populate(UsdPrim const& prim,
         drawMode == UsdGeomTokens->bounds) {
         // Origin and bounds both draw as basis curves
         if (!index->IsRprimTypeSupported(HdPrimTypeTokens->basisCurves)) {
-            TF_WARN("Unable to load cards for model %s, "
-                    "basis curves not supported", cachePath.GetText());
+            TF_WARN("Unable to display origin or bounds draw mode for model "
+                    "%s, basis curves not supported", cachePath.GetText());
             return SdfPath();
         }
         index->InsertRprim(HdPrimTypeTokens->basisCurves,
@@ -190,7 +185,7 @@ UsdImagingGLDrawModeAdapter::Populate(UsdPrim const& prim,
     } else if (drawMode == UsdGeomTokens->cards) {
         // Cards draw as a mesh
         if (!index->IsRprimTypeSupported(HdPrimTypeTokens->mesh)) {
-            TF_WARN("Unable to load cards for model %s, "
+            TF_WARN("Unable to display cards draw mode for model %s, "
                     "meshes not supported", cachePath.GetText());
             return SdfPath();
         }
@@ -942,11 +937,8 @@ UsdImagingGLDrawModeAdapter::_GenerateCardsFromTextureGeometry(
         GfVec3f(-1, -1,  0), GfVec3f(-1,  1,  0),
         GfVec3f( 1,  1,  0), GfVec3f( 1, -1,  0) };
     static const std::array<GfVec2f, 4> std_uvs = 
-        TfGetEnvSetting(HDST_USE_NEW_TEXTURE_SYSTEM)
-        ? std::array<GfVec2f, 4>(
-            {GfVec2f(0,1), GfVec2f(0,0), GfVec2f(1,0), GfVec2f(1,1) })
-        : std::array<GfVec2f, 4>(
-            {GfVec2f(0,0), GfVec2f(0,1), GfVec2f(1,1), GfVec2f(1,0) });
+        std::array<GfVec2f, 4>(
+            {GfVec2f(0,1), GfVec2f(0,0), GfVec2f(1,0), GfVec2f(1,1) });
 
     for(size_t i = 0; i < faces.size(); ++i) {
         GfMatrix4d screenToWorld = faces[i].first.GetInverse();
@@ -1060,8 +1052,6 @@ static
 std::array<GfVec2f, 4>
 _GetUVsForQuad(const bool flipU, bool flipV)
 {
-    flipV ^= !TfGetEnvSetting(HDST_USE_NEW_TEXTURE_SYSTEM);
-
     return {
         GfVec2f(flipU ? 0.0 : 1.0, flipV ? 0.0 : 1.0),
         GfVec2f(flipU ? 1.0 : 0.0, flipV ? 0.0 : 1.0),
@@ -1188,35 +1178,6 @@ UsdImagingGLDrawModeAdapter::_ComputeExtent(UsdPrim const& prim) const
         }
         return extent;
     }
-}
-
-HdTextureResource::ID
-UsdImagingGLDrawModeAdapter::GetTextureResourceID(UsdPrim const& usdPrim,
-                                                       SdfPath const &id,
-                                                       UsdTimeCode time,
-                                                       size_t salt) const
-{
-    return UsdImagingGL_GetTextureResourceID(usdPrim, id, time, salt);
-}
-
-HdTextureResourceSharedPtr
-UsdImagingGLDrawModeAdapter::GetTextureResource(UsdPrim const& usdPrim,
-                                                     SdfPath const &id,
-                                                     UsdTimeCode time) const
-{
-    // When we inserted the material network, the texture node used a path
-    // that inserted the material Sprim path so we can find the primInfo.
-    //    /World/MyPIXform/PI/Protos/P1/material.model:cardTextureXPos
-    // The actual textures are authored on the prim, so convert path to:
-    //    /World/MyPIXform/PI/Protos/P1.model:cardTextureXPos
-
-    SdfPath materialPath = id.GetParentPath();
-    SdfPath primPath = materialPath.GetParentPath();
-    SdfPath textureAttrPath = primPath.AppendProperty(id.GetNameToken());
-
-    UsdPrim texturePrim = _GetPrim(primPath);
-
-    return UsdImagingGL_GetTextureResource(texturePrim, textureAttrPath, time);
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

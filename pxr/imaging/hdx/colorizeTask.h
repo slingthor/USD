@@ -87,7 +87,7 @@ private:
     size_t _outputBufferSize;
     bool _converged;
 #if defined(PXR_OPENGL_SUPPORT_ENABLED)
-    HdxFullscreenShaderGL _compositor;
+    std::unique_ptr<HdxFullscreenShaderGL> _compositor;
 #endif
     bool _needsValidation;
 

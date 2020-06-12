@@ -26,7 +26,6 @@
 #include "pxr/imaging/garch/image.h"
 #include "pxr/imaging/garch/utils.h"
 #include "pxr/imaging/garch/vdbTextureData.h"
-#include "pxr/imaging/garch/vdbTextureContainer.h"
 
 #include "pxr/base/tf/fileUtils.h"
 #include "pxr/base/trace/trace.h"

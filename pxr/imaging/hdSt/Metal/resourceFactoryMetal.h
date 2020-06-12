@@ -59,7 +59,7 @@ public:
     
     /// commandNumUints is given in how many integers.
     HDST_API
-    virtual HdStDispatchBuffer *NewDispatchBuffer(
+    virtual HdStDispatchBufferSharedPtr NewDispatchBuffer(
         TfToken const &role, int count,
         unsigned int commandNumUints) const override;
     
@@ -114,7 +114,7 @@ public:
     
     /// Creates a persistent buffer for Metal
     HDST_API
-    virtual HdStPersistentBuffer *NewPersistentBuffer(
+    virtual HdStPersistentBufferSharedPtr NewPersistentBuffer(
         TfToken const &role, size_t dataSize, void* data) const override;
 
     /// Creates a graphics API specific GPU quadrangulate computation
@@ -153,10 +153,8 @@ public:
     /// Creates a new HdSt_DomeLightComputationGPU computation
     HDST_API
     virtual HdSt_DomeLightComputationGPU *NewDomeLightComputationGPU(
-        TfToken token,
-        GarchTextureGPUHandle const &sourceId,
-        GarchTextureGPUHandle const &destId,
-        int width, int height,
+        const TfToken & shaderToken,
+        HdStSimpleLightingShaderPtr const &lightingShader,
         unsigned int numLevels,
         unsigned int level,
         float roughness) const override;
@@ -207,7 +205,7 @@ public:
       
     HDST_API
     virtual HdStProgram *NewProgram(
-        TfToken const &role) const override;
+        TfToken const &role, HdStResourceRegistry *const registry) const override;
       
     HDST_API
     virtual HdStRenderPassShaderSharedPtr NewRenderPassShader() const override;

@@ -8,11 +8,6 @@
                         "textureTypes": ["ptx", "ptex"],
                         "precedence": 1
                     },
-                    "Garch_OIIOImage" : {
-                        "bases": ["GarchImage"],
-                        "imageTypes": ["exr", "tif", "zfile", "tx"],
-                        "precedence": 0
-                    },
                     "Garch_StbImage" : {
                         "bases": ["GarchImage"],
                         "imageTypes": ["bmp", "jpg", "png", "tga", "hdr"],
@@ -21,11 +16,6 @@
                     "GarchUVTexture" : {
                         "bases": ["GarchBaseTexture"],
                         "textureTypes": ["*"],
-                        "precedence": 0
-                    },
-                    "GarchVdbTextureContainer" : {
-                        "bases": ["GarchTexture"],
-                        "textureTypes": ["vdb"],
                         "precedence": 0
                     },
                     "GarchBaseTexture" : {

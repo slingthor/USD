@@ -126,7 +126,8 @@ public:
 
     /// Generate shader source and compile it.
     HD_API
-    virtual HdStProgramSharedPtr Compile();
+    HdStProgramSharedPtr Compile(
+        HdStResourceRegistry* const registry) override;
 
     /// Generate compute shader source and compile it.
     /// It uses the compute information in the meta data to determine
@@ -144,7 +145,8 @@ public:
     /// \see GetComputeShaderSource
     /// \see Hd_ResourceBinder::ResolveBindings
     HD_API
-    virtual HdStProgramSharedPtr CompileComputeProgram();
+    HdStProgramSharedPtr CompileComputeProgram(
+        HdStResourceRegistry* const registry) override;
     
     /// Return the generated vertex shader source
     virtual const std::string &GetVertexShaderSource() const { return _vsSource; }

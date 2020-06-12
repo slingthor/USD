@@ -165,14 +165,18 @@ public:
     /// Return this prim's composed specifier.
     SdfSpecifier GetSpecifier() const { return _Prim()->GetSpecifier(); };
 
-    /// Return a list of PrimSpecs that provide opinions for this prim
-    /// (i.e. the prim's metadata fields, including composition
-    /// metadata). These specs are ordered from strongest to weakest opinion.
+    /// Return all the authored SdfPrimSpecs that may contain opinions for this
+    /// prim in order from strong to weak.
     ///
-    /// \note The results returned by this method are meant for debugging
-    /// and diagnostic purposes.  It is **not** advisable to retain a 
-    /// PrimStack for the purposes of expedited value resolution for prim
-    /// metadata, since not all metadata resolves with simple "strongest
+    /// This does not include all the places where contributing prim specs could
+    /// potentially be created; rather, it includes only those prim specs that
+    /// already exist.  To discover all the places that prim specs could be
+    /// authored that would contribute opinions, see
+    /// \ref "Composition Structure"
+    ///
+    /// \note Use this method for debugging and diagnostic purposes.  It is
+    /// **not** advisable to retain a PrimStack for expedited metadata value
+    /// resolution, since not all metadata resolves with simple "strongest
     /// opinion wins" semantics.
     USD_API
     SdfPrimSpecHandleVector GetPrimStack() const;
@@ -430,6 +434,11 @@ public:
     /// Remove all scene description for the property with the
     /// given \p propName <em>in the current UsdEditTarget</em>.
     /// Return true if the property is removed, false otherwise.
+    ///
+    /// Because this method can only remove opinions about the property from
+    /// the current EditTarget, you may generally find it more useful to use
+    /// UsdAttribute::Block(), which will ensure that all values from the 
+    /// EditTarget and weaker layers for the property will be ignored.
     USD_API
     bool RemoveProperty(const TfToken &propName);
 
@@ -504,8 +513,8 @@ public:
     /// <b>Using HasAPI in C++</b>
     /// \code 
     /// UsdPrim prim = stage->OverridePrim("/path/to/prim");
-    /// UsdModelAPI modelAPI = UsdModelAPI::Apply(prim);
-    /// assert(prim.HasAPI<UsdModelAPI>());
+    /// MyDomainBozAPI = MyDomainBozAPI::Apply(prim);
+    /// assert(prim.HasAPI<MyDomainBozAPI>());
     /// 
     /// UsdCollectionAPI collAPI = UsdCollectionAPI::Apply(prim, 
     ///         /*instanceName*/ TfToken("geom"))
@@ -521,8 +530,8 @@ public:
     /// <b>Using HasAPI in Python</b>
     /// \code{.py}
     /// prim = stage.OverridePrim("/path/to/prim")
-    /// modelAPI = Usd.ModelAPI.Apply(prim)
-    /// assert prim.HasAPI(Usd.ModelAPI)
+    /// bozAPI = MyDomain.BozAPI.Apply(prim)
+    /// assert prim.HasAPI(MyDomain.BozAPI)
     /// 
     /// collAPI = Usd.CollectionAPI.Apply(prim, "geom")
     /// assert(prim.HasAPI(Usd.CollectionAPI))
@@ -1201,12 +1210,12 @@ public:
     /// @{
     // --------------------------------------------------------------------- //
 
-    /// Return the cached prim index containing all sites that contribute 
+    /// Return the cached prim index containing all sites that can contribute 
     /// opinions to this prim.
     ///
-    /// The prim index can be used to examine the composition arcs and scene 
-    /// description sites that contribute to this prim's property and metadata 
-    /// values. 
+    /// The prim index can be used to examine the composition arcs and scene
+    /// description sites that can contribute to this prim's property and
+    /// metadata values.
     ///
     /// The prim index returned by this function is optimized and may not
     /// include sites that do not contribute opinions to this prim. Use 

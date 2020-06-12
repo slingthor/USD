@@ -66,6 +66,8 @@ using HdStTextureResourceHandleSharedPtr =
 
 using HdStTextureHandleSharedPtr =
     std::shared_ptr<class HdStTextureHandle>;
+using HdStTextureObjectSharedPtr =
+    std::shared_ptr<class HdStTextureObject>;
 using HdStPersistentBufferSharedPtr =
     std::shared_ptr<class HdStPersistentBuffer>; 
 using HdStResourceRegistrySharedPtr = 
@@ -81,7 +83,8 @@ class HdSamplerParameters;
 ///
 /// A central registry of all GPU resources.
 ///
-class HdStResourceRegistry : public HdResourceRegistry  {
+class HdStResourceRegistry final : public HdResourceRegistry 
+{
 public:
     HF_MALLOC_TAG_NEW("new HdStResourceRegistry");
 
@@ -89,7 +92,10 @@ public:
     HdStResourceRegistry();
 
     HDST_API
-    virtual ~HdStResourceRegistry();
+    HdStResourceRegistry(Hgi* hgi);
+
+    HDST_API
+    ~HdStResourceRegistry() override;
 
     HDST_API
     void InvalidateShaderRegistry() override;
@@ -97,6 +103,11 @@ public:
     HDST_API
     VtDictionary GetResourceAllocation() const override;
 
+    /// Returns Hgi used to create/destroy GPU resources.
+    HDST_API
+    Hgi* GetHgi();
+
+    /// Set Hgi
     HDST_API
     void SetHgi(Hgi* hgi);
 
@@ -105,9 +116,13 @@ public:
     /// ------------------------------------------------------------------------
     ///
 
-    /// Allocate texture handle. The actual allocation of the
-    /// associated GPU texture and sampler resources and loading of
-    /// the texture file is delayed until the commit phase.
+    /// Allocate texture handle (encapsulates texture and sampler
+    /// object, bindless texture sampler handle, memory request and
+    /// callback to shader).
+    ///
+    /// The actual allocation of the associated GPU texture and
+    /// sampler resources and loading of the texture file is delayed
+    /// until the commit phase.
     HDST_API
     HdStTextureHandleSharedPtr AllocateTextureHandle(
         /// Path to file and information to identify a texture if the
@@ -129,9 +144,23 @@ public:
         bool createBindlessHandle,
         /// After the texture is committed (or after it has been
         /// changed) the given shader code can add additional buffer
-        /// sources using the texture metadata with
-        /// ComputeBufferSourcesFromTextures.
+        /// sources and computations using the texture metadata with
+        /// AddResourcesFromTextures.
         HdStShaderCodePtr const &shaderCode);
+
+    /// Allocate texture object.
+    ///
+    /// The actual allocation of the associated GPU texture and
+    /// sampler resources and loading of the texture file is delayed
+    /// until the commit phase.
+    HDST_API
+    HdStTextureObjectSharedPtr AllocateTextureObject(
+        /// Path to file and information to identify a texture if the
+        /// file is a container for several textures (e.g., OpenVDB
+        /// file containing several grids, movie file containing frames).
+        const HdStTextureIdentifier &textureId,
+        /// Texture type, e.g., uv, ptex, ...
+        HdTextureType textureType);
 
     /// ------------------------------------------------------------------------
     /// BAR allocation API
@@ -225,7 +254,7 @@ public:
     /// Append source data for given range to be committed later.
     HDST_API
     void AddSources(HdBufferArrayRangeSharedPtr const &range,
-                    HdBufferSourceSharedPtrVector &sources);
+                    HdBufferSourceSharedPtrVector &&sources);
 
     /// Append a source data for given range to be committed later.
     HDST_API
@@ -378,34 +407,38 @@ public:
     /// Set the aggregation strategy for non uniform parameters
     /// (vertex, varying, facevarying)
     /// Takes ownership of the passed in strategy object.
-    void SetNonUniformAggregationStrategy(HdAggregationStrategy *strategy) {
-        _nonUniformAggregationStrategy.reset(strategy);
+    void SetNonUniformAggregationStrategy(
+                std::unique_ptr<HdAggregationStrategy> &&strategy) {
+        _nonUniformAggregationStrategy = std::move(strategy);
     }
 
     /// Set the aggregation strategy for non uniform immutable parameters
     /// (vertex, varying, facevarying)
     /// Takes ownership of the passed in strategy object.
     void SetNonUniformImmutableAggregationStrategy(
-        HdAggregationStrategy *strategy) {
-        _nonUniformImmutableAggregationStrategy.reset(strategy);
+                std::unique_ptr<HdAggregationStrategy> &&strategy) {
+        _nonUniformImmutableAggregationStrategy = std::move(strategy);
     }
 
     /// Set the aggregation strategy for uniform (shader globals)
     /// Takes ownership of the passed in strategy object.
-    void SetUniformAggregationStrategy(HdAggregationStrategy *strategy) {
-        _uniformUboAggregationStrategy.reset(strategy);
+    void SetUniformAggregationStrategy(
+                std::unique_ptr<HdAggregationStrategy> &&strategy) {
+        _uniformUboAggregationStrategy = std::move(strategy);
     }
 
     /// Set the aggregation strategy for SSBO (uniform primvars)
     /// Takes ownership of the passed in strategy object.
-    void SetShaderStorageAggregationStrategy(HdAggregationStrategy *strategy) {
-        _uniformSsboAggregationStrategy.reset(strategy);
+    void SetShaderStorageAggregationStrategy(
+                std::unique_ptr<HdAggregationStrategy> &&strategy) {
+        _uniformSsboAggregationStrategy = std::move(strategy);
     }
 
     /// Set the aggregation strategy for single buffers (for nested instancer).
     /// Takes ownership of the passed in strategy object.
-    void SetSingleStorageAggregationStrategy(HdAggregationStrategy *strategy) {
-        _singleAggregationStrategy.reset(strategy);
+    void SetSingleStorageAggregationStrategy(
+                std::unique_ptr<HdAggregationStrategy> &&strategy) {
+        _singleAggregationStrategy = std::move(strategy);
     }
 
     /// Debug dump
@@ -456,6 +489,13 @@ private:
                        HdBufferSourceSharedPtr     const &source)
             : range(range)
             , sources(1, source)
+        {
+        }
+
+        _PendingSource(HdBufferArrayRangeSharedPtr const &range,
+                       HdBufferSourceSharedPtrVector     && sources)
+            : range(range)
+            , sources(std::move(sources))
         {
         }
 

@@ -93,7 +93,7 @@ class HgiMetal;
 #endif
 
 class MtlfDrawTarget;
-typedef boost::shared_ptr<class MtlfMetalContext> MtlfMetalContextSharedPtr;
+typedef std::shared_ptr<class MtlfMetalContext> MtlfMetalContextSharedPtr;
 
 /// \class MtlfMetalContext
 ///

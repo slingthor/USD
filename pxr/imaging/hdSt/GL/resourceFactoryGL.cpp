@@ -73,11 +73,11 @@ HdSt_CodeGen *HdStResourceFactoryGL::NewCodeGen(
     return new HdSt_CodeGenGLSL(shaders);
 }
 
-HdStDispatchBuffer *HdStResourceFactoryGL::NewDispatchBuffer(
+HdStDispatchBufferSharedPtr HdStResourceFactoryGL::NewDispatchBuffer(
     TfToken const &role, int count,
     unsigned int commandNumUints) const
 {
-    return new HdStDispatchBufferGL(role, count, commandNumUints);
+    return std::make_shared<HdStDispatchBufferGL>(role, count, commandNumUints);
 }
 
 HdStBufferRelocator *HdStResourceFactoryGL::NewBufferRelocator(
@@ -141,10 +141,10 @@ HdSt_DrawBatchSharedPtr HdStResourceFactoryGL::NewIndirectDrawBatch(
         new HdSt_IndirectDrawBatchGL(drawItemInstance));
 }
 
-HdStPersistentBuffer *HdStResourceFactoryGL::NewPersistentBuffer(
+HdStPersistentBufferSharedPtr HdStResourceFactoryGL::NewPersistentBuffer(
     TfToken const &role, size_t dataSize, void* data) const
 {
-    return new HdStPersistentBufferGL(role, dataSize, data);
+    return std::make_shared<HdStPersistentBufferGL>(role, dataSize, data);
 }
 
 /// Create a GPU quadrangulation computation
@@ -230,9 +230,9 @@ HdBufferArraySharedPtr HdStResourceFactoryGL::NewVBOSimpleMemoryBuffer(
 }
 
 HdStProgram *HdStResourceFactoryGL::NewProgram(
-    TfToken const &role) const
+    TfToken const &role, HdStResourceRegistry *const registry) const
 {
-    return new HdStGLSLProgram(role);
+    return new HdStGLSLProgram(role, registry);
 }
 
 HdStExtCompGpuComputation *
@@ -249,16 +249,14 @@ HdStResourceFactoryGL::NewExtCompGPUComputationGPU(
 
 HdSt_DomeLightComputationGPU*
 HdStResourceFactoryGL::NewDomeLightComputationGPU(
-    TfToken token,
-    GarchTextureGPUHandle const &sourceId,
-    GarchTextureGPUHandle const &destId,
-    int width, int height,
+    const TfToken & shaderToken,
+    HdStSimpleLightingShaderPtr const &lightingShader,
     unsigned int numLevels,
     unsigned int level,
     float roughness) const
 {
-    return new HdSt_DomeLightComputationGPUGL(token, sourceId, destId,
-                                                 width, height, numLevels, level, roughness);
+    return new HdSt_DomeLightComputationGPUGL(shaderToken,
+        lightingShader, numLevels, level, roughness);
 }
 
 HdStRenderPassShaderSharedPtr HdStResourceFactoryGL::NewRenderPassShader() const

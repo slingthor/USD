@@ -41,7 +41,6 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-
 /// \class UsdAppUtilsFrameRecorder
 ///
 /// A utility class for recording images of USD stages.
@@ -57,16 +56,19 @@ class UsdAppUtilsFrameRecorder
 public:
     USDAPPUTILS_API
     UsdAppUtilsFrameRecorder(UsdImagingGLEngine::RenderAPI const api);
+    
+    USDAPPUTILS_API
+    ~UsdAppUtilsFrameRecorder();
 
     /// Gets the ID of the Hydra renderer plugin that will be used for
     /// recording.
     TfToken GetCurrentRendererId() const {
-        return _imagingEngine.GetCurrentRendererId();
+        return _imagingEngine->GetCurrentRendererId();
     }
 
     /// Sets the Hydra renderer plugin to be used for recording.
     bool SetRendererPlugin(const TfToken& id) {
-        return _imagingEngine.SetRendererPlugin(id);
+        return _imagingEngine->SetRendererPlugin(id);
     }
 
     /// Sets the width of the recorded image.
@@ -124,7 +126,9 @@ public:
             const std::string& outputImagePath);
 
 private:
-    UsdImagingGLEngine _imagingEngine;
+    HgiUniquePtr _hgi;
+    HdDriver _driver;
+    std::unique_ptr<UsdImagingGLEngine> _imagingEngine;
     size_t _imageWidth;
     float _complexity;
     TfToken _colorCorrectionMode;

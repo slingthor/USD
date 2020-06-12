@@ -46,17 +46,10 @@ endif()
 
 set (optionalPublicClasses "")
 set (optionalCppFiles "")
-set (plugInfo plugInfo_NoOIIO.json)
 if (PXR_ENABLE_PTEX_SUPPORT)
     list(APPEND optionalPublicClasses ptexMipmapTextureLoader)
     list(APPEND optionalLibs ${PTEX_LIBRARY})
     list(APPEND optionalIncludeDirs ${PTEX_INCLUDE_DIR})
-endif()
-if (PXR_BUILD_OPENIMAGEIO_PLUGIN)
-    set (plugInfo plugInfo.json)
-    list(APPEND optionalCppFiles oiioImage.cpp)
-    list(APPEND optionalLibs ${OIIO_LIBRARIES})
-    list(APPEND optionalIncludeDirs ${OIIO_INCLUDE_DIRS})
 endif()
 if (PXR_ENABLE_OPENVDB_SUPPORT)
     list(APPEND optionalPublicClasses vdbTextureData)
@@ -106,8 +99,6 @@ pxr_library(garch
         uvTextureData
         uvTextureStorage
         uvTextureStorageData
-        vdbTexture
-        vdbTextureContainer
         ${optionalPublicClasses}
 
     PRIVATE_CLASSES
@@ -117,7 +108,6 @@ pxr_library(garch
         api.h
         gl.h
         glPlatformContext.h
-        textureContainer.h
         ${GARCH_GLPLATFORMCONTEXT}.h
 
     PRIVATE_HEADERS
@@ -126,7 +116,6 @@ pxr_library(garch
         stb/stb_image.h
         stb/stb_image_resize.h
         stb/stb_image_write.h
-        textureContainerImpl.h
 
     PYTHON_CPPFILES
         moduleDeps.cpp
@@ -148,11 +137,10 @@ pxr_library(garch
         wrapTextureRegistry.cpp
         wrapUVTexture.cpp
         wrapUVTextureStorage.cpp
-        wrapVdbTexture.cpp
 
     PYMODULE_FILES
         __init__.py
 
     RESOURCE_FILES
-        ${plugInfo}:plugInfo.json
+        plugInfo.json
 )

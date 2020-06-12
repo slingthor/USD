@@ -274,17 +274,16 @@ HdStMetalConversions::GetWrap(HdWrap wrap)
 {
     switch (wrap) {
         case HdWrapClamp : return MTLSamplerAddressModeClampToEdge;
+        case HdWrapLegacyNoOpinionFallbackRepeat:
         case HdWrapRepeat : return MTLSamplerAddressModeRepeat;
-        case HdWrapMirror : return MTLSamplerAddressModeMirrorRepeat;
+        case HdWrapNoOpinion:
 #if defined(ARCH_OS_MACOS)
         case HdWrapBlack : return MTLSamplerAddressModeClampToBorderColor;
-        case HdWrapUseMetadata : return MTLSamplerAddressModeClampToBorderColor;
 #else
         case HdWrapBlack : return MTLSamplerAddressModeClampToEdge;
-        case HdWrapUseMetadata : return MTLSamplerAddressModeClampToEdge;
 #endif
-        case HdWrapLegacy : return MTLSamplerAddressModeRepeat;
-        case HdWrapLegacyClamp : return MTLSamplerAddressModeClampToEdge;
+        case HdWrapMirror : return MTLSamplerAddressModeMirrorRepeat;
+
     }
 
     TF_CODING_ERROR("Unexpected HdWrap type %d", wrap);

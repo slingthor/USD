@@ -21,14 +21,8 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#include "pxr/imaging/glf/glew.h"
-
 #include "pxr/imaging/hdSt/light.h"
 #include "pxr/imaging/hdSt/tokens.h"
-#include "pxr/imaging/hdSt/textureResource.h"
-#include "pxr/imaging/hdSt/resourceFactory.h"
-#include "pxr/imaging/hdSt/domeLightComputations.h"
-#include "pxr/imaging/hdSt/resourceRegistry.h"
 
 #include "pxr/imaging/hd/perfLog.h"
 #include "pxr/imaging/hd/sceneDelegate.h"
@@ -37,54 +31,15 @@
 
 #include "pxr/base/gf/matrix4d.h"
 
-#include "pxr/imaging/garch/contextCaps.h"
-#include "pxr/imaging/garch/resourceFactory.h"
-
-#include "pxr/base/tf/staticTokens.h"
-
 PXR_NAMESPACE_OPEN_SCOPE
-
-TF_DEFINE_PRIVATE_TOKENS(
-    _tokens,
-    (domeLightIrradiance)
-    (domeLightPrefilter) 
-    (domeLightBRDF)
-);
 
 HdStLight::HdStLight(SdfPath const &id, TfToken const &lightType)
     : HdLight(id),
     _lightType(lightType)
 {
-    _irradianceTexture.Clear();
-    _prefilterTexture.Clear();
-    _brdfTexture.Clear();
-
-    _irradianceSampler.Clear();
-    _prefilterSampler.Clear();
-    _brdfSampler.Clear();
 }
 
-HdStLight::~HdStLight()
-{
-    bool isOpenGL = HdStResourceFactory::GetInstance()->IsOpenGL();
-#if defined(PXR_OPENGL_SUPPORT_ENABLED)
-    if (isOpenGL) {
-        uint32_t t[] = { _irradianceTexture, _prefilterTexture, _brdfTexture };
-        glDeleteTextures(sizeof(t) / sizeof(t[0]), t);
-    }
-#endif
-#if defined(PXR_METAL_SUPPORT_ENABLED)
-    if (!isOpenGL) {
-        [_irradianceTexture release];
-        [_prefilterTexture release];
-        [_brdfTexture release];
-
-        [_irradianceSampler release];
-        [_prefilterSampler release];
-        [_brdfSampler release];
-    }
-#endif
-}
+HdStLight::~HdStLight() = default;
 
 GarchSimpleLight
 HdStLight::_ApproximateAreaLight(SdfPath const &id, 
@@ -125,248 +80,38 @@ HdStLight::_ApproximateAreaLight(SdfPath const &id,
 GarchSimpleLight
 HdStLight::_PrepareDomeLight(
     SdfPath const &id, 
-    HdSceneDelegate *sceneDelegate)
+    HdSceneDelegate * const sceneDelegate)
 {
-    // get/load the environment map texture resource
-    GarchTextureGPUHandle textureId;
-    VtValue textureResourceValue = sceneDelegate->GetLightParamValue(id, 
-                                            HdLightTokens->textureResource);
-        
-    TF_VERIFY(textureResourceValue.IsHolding<HdTextureResourceSharedPtr>());
-    if (textureResourceValue.IsHolding<HdTextureResourceSharedPtr>()) {
-        
-        _textureResource = std::dynamic_pointer_cast<HdStTextureResource>(
-                    textureResourceValue.Get<HdTextureResourceSharedPtr>());
-
-        // texture resource would be empty if the path could not be resolved
-        if (_textureResource) {
-
-            // Use the texture resource (environment map) to pre-compute 
-            // the necessary maps (irradiance, pre-filtered, BRDF LUT)
-            textureId = _textureResource->GetTexelsTextureId();
-
-            HdRenderIndex& index = sceneDelegate->GetRenderIndex();
-            HdStResourceRegistry* hdStResourceRegistry =
-                static_cast<HdStResourceRegistry*>(
-                    index.GetResourceRegistry().get());
-
-            // Schedule texture computations
-            _SetupComputations(textureId, hdStResourceRegistry);
-        }
-    } 
-
-    VtValue transform = sceneDelegate->GetLightParamValue(
-                                                id, HdTokens->transform);
-    
     // Create the Garch Simple Light object that will be used by the rest
     // of the pipeline. No support for shadows for dome light.
     GarchSimpleLight l;
     l.SetHasShadow(false);
     l.SetIsDomeLight(true);
-    l.SetIrradianceId(_irradianceTexture);
-    l.SetPrefilterId(_prefilterTexture);
-    l.SetBrdfId(_brdfTexture);
-    l.SetIrradianceSamplerId(_irradianceSampler);
-    l.SetPrefilterSamplerId(_prefilterSampler);
-    l.SetBrdfSamplerId(_brdfSampler);
-    if (transform.IsHolding<GfMatrix4d>()) {
-        l.SetTransform(transform.UncheckedGet<GfMatrix4d>());
-    }
-    return l;
-}
 
-void 
-HdStLight::_SetupComputations(
-    GarchTextureGPUHandle const &sourceTexture, 
-    HdStResourceRegistry *resourceRegistry)
-{
-    bool isOpenGL = HdStResourceFactory::GetInstance()->IsOpenGL();
-    GarchContextCaps const &caps =
-        GarchResourceFactory::GetInstance()->GetContextCaps();
-    // verify that the GL version supports compute shaders
-    if (isOpenGL && caps.apiVersion < 430) {
-        TF_WARN("Need OpenGL version 4.30 or higher to use DomeLight");
-        return;
-    }
-    
-    // get the width and height of the source texture
-    int textureWidth = 0, textureHeight = 0;
-    if (isOpenGL) {
-#if defined(PXR_OPENGL_SUPPORT_ENABLED)
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, sourceTexture);
-        glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &textureWidth);
-        glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT,
-                                &textureHeight);
-#endif
-    }
-    else {
-#if defined(PXR_METAL_SUPPORT_ENABLED)
-        id<MTLTexture> tex = sourceTexture;
-        textureWidth = [tex width];
-        textureHeight = [tex height];
-#endif
-    }
-    
-    if (!textureWidth || !textureHeight) {
-        TF_WARN("DomeLight source texture has a zero dimension");
-        return;
-    }
-
-    // initialize the 3 textures and add computations to the resource registry
-    GLuint numLevels = 1, numPrefilterLevels = 5, level = 0;
-    // make the computed textures half the size of the given environment map
-    textureHeight = textureHeight/2;
-    textureWidth = textureWidth/2;
-
-    // Diffuse Irradiance
-    if (isOpenGL) {
-#if defined(PXR_OPENGL_SUPPORT_ENABLED)
-        uint32_t t;
-        glGenTextures(1, &t);
-        _irradianceTexture = t;
-        glBindTexture(GL_TEXTURE_2D, _irradianceTexture);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glTexStorage2D(GL_TEXTURE_2D, numLevels, GL_RGBA16F, textureWidth,
-                        textureHeight);
-#endif
-    }
-    else
     {
-#if defined(PXR_METAL_SUPPORT_ENABLED)
-        id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->currentDevice;
-        MTLTextureDescriptor* desc =
-            [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA16Float
-                                                               width:textureWidth
-                                                              height:textureHeight
-                                                           mipmapped:NO];
-        desc.resourceOptions = MTLResourceStorageModeDefault;
-        desc.usage = MTLTextureUsageShaderRead|MTLTextureUsageShaderWrite;
-        _irradianceTexture = [device newTextureWithDescriptor:desc];
-        
-        MTLSamplerDescriptor* samplerDescriptor = [[MTLSamplerDescriptor alloc] init];
-        samplerDescriptor.sAddressMode = MTLSamplerAddressModeRepeat;
-        samplerDescriptor.tAddressMode = MTLSamplerAddressModeRepeat;
-        samplerDescriptor.minFilter = MTLSamplerMinMagFilterLinear;
-        samplerDescriptor.magFilter = MTLSamplerMinMagFilterLinear;
-        _irradianceSampler = [device newSamplerStateWithDescriptor:samplerDescriptor];
-#endif
-    }
-
-    // Add Computation 
-    HdSt_DomeLightComputationGPUSharedPtr irradianceComputation(
-        HdSt_DomeLightComputationGPU::New(_tokens->domeLightIrradiance, 
-            sourceTexture, _irradianceTexture, textureWidth, textureHeight,
-            numLevels, level));
-    resourceRegistry->AddComputation(nullptr, irradianceComputation);
-
-    // PreFilter
-    if (isOpenGL) {
-#if defined(PXR_OPENGL_SUPPORT_ENABLED)
-        uint32_t t;
-        glGenTextures(1, &t);
-        _prefilterTexture = t;
-        glBindTexture(GL_TEXTURE_2D, _prefilterTexture);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
-                        GL_LINEAR_MIPMAP_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glTexStorage2D(GL_TEXTURE_2D, numPrefilterLevels, GL_RGBA16F,
-                        textureWidth, textureHeight);
-#endif
-    }
-    else
-    {
-#if defined(PXR_METAL_SUPPORT_ENABLED)
-        id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->currentDevice;
-        MTLTextureDescriptor* desc =
-            [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA16Float
-                                                               width:textureWidth
-                                                              height:textureHeight
-                                                           mipmapped:YES];
-        desc.resourceOptions = MTLResourceStorageModeDefault;
-        desc.mipmapLevelCount = numPrefilterLevels;
-        desc.usage = MTLTextureUsageShaderRead|MTLTextureUsageShaderWrite;
-        _prefilterTexture = [device newTextureWithDescriptor:desc];
-        
-        MTLSamplerDescriptor* samplerDescriptor = [[MTLSamplerDescriptor alloc] init];
-        samplerDescriptor.sAddressMode = MTLSamplerAddressModeRepeat;
-        samplerDescriptor.tAddressMode = MTLSamplerAddressModeRepeat;
-        samplerDescriptor.minFilter = MTLSamplerMinMagFilterLinear;
-        samplerDescriptor.magFilter = MTLSamplerMinMagFilterLinear;
-        samplerDescriptor.mipFilter = MTLSamplerMipFilterLinear;
-        _prefilterSampler = [device newSamplerStateWithDescriptor:samplerDescriptor];
-#endif
-    }
-
-    if (caps.hasMipLevelTextureWrite) {
-        // Add Computation for each of the mipLevels
-        for (unsigned int mipLevel = 0; mipLevel < numPrefilterLevels; ++mipLevel) {
-
-            float roughness = (float)mipLevel / (float)(numPrefilterLevels - 1);
-            HdSt_DomeLightComputationGPUSharedPtr preFilterComputation(
-                    HdSt_DomeLightComputationGPU::New(_tokens->domeLightPrefilter,
-                    sourceTexture, _prefilterTexture, textureWidth, textureHeight,
-                    numPrefilterLevels, mipLevel, roughness));
-            resourceRegistry->AddComputation(nullptr, preFilterComputation);
+        const VtValue v = sceneDelegate->GetLightParamValue(
+            id, HdTokens->transform);
+        if (!v.IsEmpty()) {
+            if (v.IsHolding<GfMatrix4d>()) {
+                l.SetTransform(v.UncheckedGet<GfMatrix4d>());
+            } else {
+                TF_CODING_ERROR("Dome light transform not a matrix.");
+            }
         }
     }
-    else {
-        float roughness = 0.0f;
-        HdSt_DomeLightComputationGPUSharedPtr preFilterComputation(
-                HdSt_DomeLightComputationGPU::New(_tokens->domeLightPrefilter,
-                sourceTexture, _prefilterTexture, textureWidth, textureHeight,
-                numPrefilterLevels, 0, roughness));
-        resourceRegistry->AddComputation(nullptr, preFilterComputation);
-    }
 
-    // BRDF LUT
-    if (isOpenGL) {
-#if defined(PXR_OPENGL_SUPPORT_ENABLED)
-        uint32_t t;
-        glGenTextures(1, &t);
-        _brdfTexture = t;
-        glBindTexture(GL_TEXTURE_2D, _brdfTexture);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glTexStorage2D(GL_TEXTURE_2D, numLevels, GL_RGBA16F,
-                        textureHeight, textureHeight);
-#endif
-    }
-    else
     {
-#if defined(PXR_METAL_SUPPORT_ENABLED)
-        id<MTLDevice> device = MtlfMetalContext::GetMetalContext()->currentDevice;
-        MTLTextureDescriptor* desc =
-            [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA16Float
-                                                               width:textureHeight
-                                                              height:textureHeight
-                                                           mipmapped:NO];
-        desc.resourceOptions = MTLResourceStorageModeDefault;
-        desc.usage = MTLTextureUsageShaderRead|MTLTextureUsageShaderWrite;
-        _brdfTexture = [device newTextureWithDescriptor:desc];
-        
-        MTLSamplerDescriptor* samplerDescriptor = [[MTLSamplerDescriptor alloc] init];
-        samplerDescriptor.sAddressMode = MTLSamplerAddressModeClampToEdge;
-        samplerDescriptor.tAddressMode = MTLSamplerAddressModeClampToEdge;
-        samplerDescriptor.minFilter = MTLSamplerMinMagFilterLinear;
-        samplerDescriptor.magFilter = MTLSamplerMinMagFilterLinear;
-        _brdfSampler = [device newSamplerStateWithDescriptor:samplerDescriptor];
-#endif
+        const VtValue v = sceneDelegate->GetLightParamValue(
+                id, HdLightTokens->textureFile);
+        if (!v.IsEmpty()) {
+            if (v.IsHolding<SdfAssetPath>()) {
+                l.SetDomeLightTextureFile(v.UncheckedGet<SdfAssetPath>());
+            } else {
+                TF_CODING_ERROR("Dome light texture file not an asset path.");
+            }
+        }
     }
-
-    // Add Computation 
-    HdSt_DomeLightComputationGPUSharedPtr brdfComputation(
-            HdSt_DomeLightComputationGPU::New(_tokens->domeLightBRDF, 
-            sourceTexture, _brdfTexture, textureHeight, textureHeight, 
-            numLevels, level));
-    resourceRegistry->AddComputation(nullptr, brdfComputation);
+    return l;
 }
 
 /* virtual */

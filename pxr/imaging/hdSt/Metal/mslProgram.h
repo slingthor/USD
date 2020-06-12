@@ -113,7 +113,7 @@ public:
     typedef std::map<std::string, int> BindingLocationMap;
 
     HDST_API
-    HdStMSLProgram(TfToken const &role);
+    HdStMSLProgram(TfToken const &role, HdStResourceRegistry *const registry);
     HDST_API
     virtual ~HdStMSLProgram();
 
@@ -199,7 +199,17 @@ public:
         HdBinding const &binding, MSL_BindingType bindingType,
         MSL_ProgramStage programStage, int offsetWithinResource = 0,
         int uniformBufferSize = 0);
+    
+    HDST_API
+    void BindTexture(
+        const TfToken &name,
+        id<MTLTexture> textureId) const;
 
+    HDST_API
+    void BindSampler(
+        const TfToken &name,
+        id<MTLSamplerState> samplerId) const;
+        
     HDST_API
     void UpdateUniformBinding(std::string const &name, int index);
 

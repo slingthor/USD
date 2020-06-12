@@ -37,8 +37,10 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-HdStProgram::HdStProgram(TfToken const &role)
+HdStProgram::HdStProgram(TfToken const &role,
+                         HdStResourceRegistry const* resourceRegistry)
 : _role(role)
+, _registry(resourceRegistry)
 {
 
 }
@@ -84,7 +86,7 @@ HdStProgram::GetComputeProgram(
         // if not exists, create new one
         HdStProgramSharedPtr newProgram(
             HdStResourceFactory::GetInstance()->NewProgram(
-                HdTokens->computeShader));
+                HdTokens->computeShader, resourceRegistry));
         
         std::unique_ptr<HioGlslfx> glslfx(
             new HioGlslfx(shaderFileName));

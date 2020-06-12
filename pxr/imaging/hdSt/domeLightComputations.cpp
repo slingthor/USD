@@ -26,11 +26,15 @@
 #include "pxr/imaging/garch/resourceFactory.h"
 
 #include "pxr/imaging/hdSt/domeLightComputations.h"
+#include "pxr/imaging/hdSt/simpleLightingShader.h"
 #include "pxr/imaging/hdSt/program.h"
 #include "pxr/imaging/hdSt/resourceFactory.h"
 #include "pxr/imaging/hdSt/resourceRegistry.h"
 #include "pxr/imaging/hdSt/package.h"
 #include "pxr/imaging/hdSt/tokens.h"
+#include "pxr/imaging/hdSt/textureObject.h"
+#include "pxr/imaging/hdSt/textureHandle.h"
+#include "pxr/imaging/hdSt/dynamicUvTextureObject.h"
 
 #include "pxr/imaging/hd/perfLog.h"
 #include "pxr/imaging/hf/perfLog.h"
@@ -41,40 +45,70 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 HdSt_DomeLightComputationGPUSharedPtr
 HdSt_DomeLightComputationGPU::New(
-    TfToken token,
-    GarchTextureGPUHandle const &sourceId,
-    GarchTextureGPUHandle const &destId,
-    int width, int height, unsigned int numLevels, unsigned int level,
+    const TfToken & shaderToken,
+    HdStSimpleLightingShaderPtr const &lightingShader,
+    unsigned int numLevels,
+    unsigned int level ,
     float roughness)
 {
     return HdSt_DomeLightComputationGPUSharedPtr(
             HdStResourceFactory::GetInstance()->NewDomeLightComputationGPU(
-                token, sourceId, destId, width, height, numLevels, level,
+                shaderToken, lightingShader, numLevels, level,
                 roughness));
 }
 
 HdSt_DomeLightComputationGPU::HdSt_DomeLightComputationGPU(
-    TfToken token,
-    GarchTextureGPUHandle const &sourceId, GarchTextureGPUHandle const &destId,
-    int width, int height, unsigned int numLevels, unsigned int level, 
-    float roughness) 
-    : _shaderToken(token), 
-    _sourceTextureId(sourceId), 
-    _destTextureId(destId), 
-    _textureWidth(width), 
-    _textureHeight(height), 
+    const TfToken &shaderToken,
+    HdStSimpleLightingShaderPtr const &lightingShader,
+    const unsigned int numLevels,
+    const unsigned int level, 
+    const float roughness) 
+  : _shaderToken(shaderToken),
+    _lightingShader(lightingShader),
     _numLevels(numLevels), 
     _level(level), 
-    _layered(GL_FALSE), 
-    _layer(0), 
     _roughness(roughness)
 {
 }
 
+void
+HdSt_DomeLightComputationGPU::_FillPixelsByteSize(HgiTextureDesc * const desc)
+{
+    const size_t s = HgiDataSizeOfFormat(desc->format);
+    desc->pixelsByteSize =
+        s * desc->dimensions[0] * desc->dimensions[1] * desc->dimensions[2];
+}
+
+bool
+HdSt_DomeLightComputationGPU::_GetSrcTextureDimensionsAndGLName(
+    HdStSimpleLightingShaderSharedPtr const &shader,
+    GfVec3i * srcDim,
+    GarchTextureGPUHandle * srcGLTextureName)
+{
+    // Get source texture, the dome light environment map
+    HdStTextureHandleSharedPtr const &srcTextureHandle =
+        shader->GetDomeLightEnvironmentTextureHandle();
+    if (!TF_VERIFY(srcTextureHandle)) {
+        return false;
+    }
+    const HdStUvTextureObject * const srcTextureObject =
+        dynamic_cast<HdStUvTextureObject*>(
+            srcTextureHandle->GetTextureObject().get());
+    if (!TF_VERIFY(srcTextureObject)) {
+        return false;
+    }
+    const HgiTexture * const srcTexture = srcTextureObject->GetTexture().Get();
+    if (!TF_VERIFY(srcTexture)) {
+        return false;
+    }
+    *srcDim = srcTexture->GetDescriptor().dimensions;
+    *srcGLTextureName = _GetGlTextureName(srcTexture);
+    return srcGLTextureName->IsSet();
+}
 
 void
 HdSt_DomeLightComputationGPU::Execute(HdBufferArrayRangeSharedPtr const &range,
-                                        HdResourceRegistry *resourceRegistry)
+                                      HdResourceRegistry * const resourceRegistry)
 {
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
@@ -84,12 +118,15 @@ HdSt_DomeLightComputationGPU::Execute(HdBufferArrayRangeSharedPtr const &range,
         return;
     }
 
-    HdStProgramSharedPtr computeProgram =
-            HdStProgram::GetComputeProgram(HdStPackageDomeLightShader(),
+    HdStProgramSharedPtr const computeProgram = 
+        HdStProgram::GetComputeProgram(
+            HdStPackageDomeLightShader(), 
             _shaderToken,
             static_cast<HdStResourceRegistry*>(resourceRegistry));
 
-    if (!TF_VERIFY(computeProgram)) return;
+    if (!TF_VERIFY(computeProgram)) {
+        return;
+    }
 
     _Execute(computeProgram);
 }

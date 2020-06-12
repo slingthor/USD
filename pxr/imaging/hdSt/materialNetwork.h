@@ -29,9 +29,6 @@
 #include "pxr/imaging/hd/material.h"
 #include "pxr/imaging/hdSt/textureIdentifier.h"
 
-// Needed just for HdSamplerParameters
-#include "pxr/imaging/hdSt/samplerObject.h"
-
 PXR_NAMESPACE_OPEN_SCOPE
 
 using HioGlslfxUniquePtr =
@@ -43,7 +40,8 @@ using HdSt_MaterialParamVector =
 ///
 /// Helps HdStMaterial process a Hydra material network into shader source code
 /// and parameters values.
-class HdStMaterialNetwork final {
+class HdStMaterialNetwork final
+{
 public:
     HDST_API
     HdStMaterialNetwork();
@@ -74,7 +72,8 @@ public:
     HdSt_MaterialParamVector const& GetMaterialParams() const;
 
     // Information necessary to allocate a texture.
-    struct TextureDescriptor {
+    struct TextureDescriptor
+    {
         // Name by which the texture will be accessed, i.e., the name
         // of the accesor for thexture will be HdGet_name(...).
         // It is generated from the input name the corresponding texture
@@ -86,10 +85,15 @@ public:
         // Memory request in bytes.
         size_t memoryRequest;
 
-        // Use HdSceneDelegate::GetTextureResourceID and
-        // HdSceneDelegate::GetTextureResource instead of allocating
-        // the texture using the Storm texture system.
-        bool askSceneDelegateForTexture;
+        // The texture is not just identified by a file path attribute
+        // on the texture prim but there is special API to texture prim
+        // to obtain the texture.
+        //
+        // This is used for draw targets and for scene delegates that
+        // provide textures through
+        // HdSceneDelegate::GetTextureResourceID and
+        // HdSceneDelegate::GetTextureResource.
+        bool useTexturePrimToFindTexture;
         // The value passed to HdSceneDelegate::GetTextureResourceID.
         SdfPath texturePrim;
         // Fallback value from texture node used when the texture

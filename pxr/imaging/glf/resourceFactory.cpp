@@ -36,8 +36,6 @@
 #include <pxr/imaging/glf/udimTexture.h>
 #include <pxr/imaging/glf/uniformBlock.h>
 
-#include <pxr/imaging/garch/vdbTexture.h>
-
 #include <pxr/base/tf/diagnostic.h>
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -115,13 +113,6 @@ GarchUdimTextureRefPtr GlfResourceFactory::NewUdimTexture(
                             std::vector<std::tuple<int, TfToken>>&& tiles) const
 {
     return TfCreateRefPtr(new GlfUdimTexture(imageFilePath, originLocation, std::move(tiles)));
-}
-
-GarchVdbTextureRefPtr GlfResourceFactory::NewVdbTexture(
-    GarchVdbTextureContainerRefPtr const &textureContainer,
-    TfToken const &gridName) const
-{
-    return TfCreateRefPtr(new GarchVdbTexture(textureContainer, gridName));
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

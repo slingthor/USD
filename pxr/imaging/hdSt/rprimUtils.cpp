@@ -541,7 +541,7 @@ HdStPopulateConstantPrimvars(
 
     if (!sources.empty()) {
         hdStResourceRegistry->AddSources(
-            drawItem->GetConstantPrimvarRange(), sources);
+            drawItem->GetConstantPrimvarRange(), std::move(sources));
     }
 }
 
@@ -650,7 +650,7 @@ void HdStProcessTopologyVisibility(
     TF_VERIFY(drawItem->GetTopologyVisibilityRange()->IsValid());
 
     resourceRegistry->AddSources(
-        drawItem->GetTopologyVisibilityRange(), sources);
+        drawItem->GetTopologyVisibilityRange(), std::move(sources));
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

@@ -34,6 +34,8 @@
 #include "pxr/imaging/hd/sceneDelegate.h"
 #include "pxr/imaging/hd/types.h"
 
+#include "pxr/imaging/hgi/texture.h"
+
 #include "pxr/base/tf/singleton.h"
 
 #include <boost/noncopyable.hpp>
@@ -46,11 +48,9 @@ class Hd_VertexAdjacency;
 class HdStBufferRelocator;
 class HdStBufferResource;
 class HdSt_CodeGen;
-class HdStDispatchBuffer;
 class HdStDrawItemInstance;
 class HdSt_FlatNormalsComputationGPU;
 class HdSt_MeshTopology;
-class HdStPersistentBuffer;
 class HdStProgram;
 class HdStRenderPassState;
 class HdSt_ResourceBinder;
@@ -59,6 +59,7 @@ class HdSt_SmoothNormalsComputationGPU;
 class HdStSimpleTextureResource;
 class HdStExtCompGpuComputation;
 class HdSt_DomeLightComputation;
+class HdStResourceRegistry;
 
 using HdBufferArrayRangeSharedPtr = std::shared_ptr<class HdBufferArrayRange>;
 using HdBufferArraySharedPtr = std::shared_ptr<class HdBufferArray>;
@@ -72,11 +73,17 @@ using HdStShaderCodeSharedPtr = std::shared_ptr<class HdStShaderCode>;
 using HdSt_DomeLightComputationGPUSharedPtr =
     std::shared_ptr<class HdSt_DomeLightComputationGPU>;
 using HdStShaderCodeSharedPtrVector = std::vector<HdStShaderCodeSharedPtr>;
+using HdStSimpleLightingShaderPtr =
+    std::weak_ptr<class HdStSimpleLightingShader>;
 
 using HdStExtCompGpuComputationResourceSharedPtr =
     std::shared_ptr<class HdStExtCompGpuComputationResource>;
 using HdExtComputationPrimvarDescriptorVector =
     std::vector<HdExtComputationPrimvarDescriptor>;
+using HdStDispatchBufferSharedPtr =
+    std::shared_ptr<class HdStDispatchBuffer>;
+using HdStPersistentBufferSharedPtr =
+    std::shared_ptr<class HdStPersistentBuffer>;
 
 class HdStResourceFactoryInterface {
 public:
@@ -99,7 +106,7 @@ public:
     
     /// commandNumUints is given in how many integers.
     HDST_API
-    virtual HdStDispatchBuffer *NewDispatchBuffer(
+    virtual HdStDispatchBufferSharedPtr NewDispatchBuffer(
         TfToken const &role, int count,
         unsigned int commandNumUints) const = 0;
     
@@ -153,7 +160,7 @@ public:
     
     /// Creates a persistent buffer
     HDST_API
-    virtual HdStPersistentBuffer *NewPersistentBuffer(
+    virtual HdStPersistentBufferSharedPtr NewPersistentBuffer(
         TfToken const &role, size_t dataSize, void* data) const = 0;
 
     /// Creates a graphics API specific GPU quadrangulate computation
@@ -192,13 +199,16 @@ public:
     /// Creates a new HdSt_DomeLightComputationGPU computation
     HDST_API
     virtual HdSt_DomeLightComputationGPU *NewDomeLightComputationGPU(
-        TfToken token,
-        GarchTextureGPUHandle const &sourceId,
-        GarchTextureGPUHandle const &destId,
-        int width, int height,
-        unsigned int numLevels,
-        unsigned int level,
-        float roughness) const = 0;
+        // Name of computation shader to use, also used as
+        // key when setting the GL name on the lighting shader
+        const TfToken & shaderToken,
+        // Lighting shader that remembers the GL texture names
+        HdStSimpleLightingShaderPtr const &lightingShader,
+        // Number of mip levels.
+        unsigned int numLevels = 1,
+        // Level to be filled (0 means also to allocate texture)
+        unsigned int level = 0,
+        float roughness = -1.0) const = 0;
 
     /// Creates a new render pass state
     HDST_API
@@ -243,7 +253,7 @@ public:
     /// Creates a graphics API specific program
     HDST_API
     virtual HdStProgram *NewProgram(
-        TfToken const &role) const = 0;
+        TfToken const &role, HdStResourceRegistry *const registry) const = 0;
     
     HDST_API
     virtual HdStRenderPassShaderSharedPtr NewRenderPassShader() const = 0;

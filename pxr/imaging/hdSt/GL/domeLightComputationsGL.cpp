@@ -24,11 +24,15 @@
 #include "pxr/imaging/glf/glew.h"
 
 #include "pxr/imaging/hdSt/GL/domeLightComputationsGL.h"
+#include "pxr/imaging/hdSt/simpleLightingShader.h"
 #include "pxr/imaging/hdSt/resourceRegistry.h"
 #include "pxr/imaging/hdSt/package.h"
+#include "pxr/imaging/hdSt/dynamicUvTextureObject.h"
+#include "pxr/imaging/hdSt/textureHandle.h"
 #include "pxr/imaging/hdSt/tokens.h"
 
 #include "pxr/imaging/hdSt/GL/glslProgram.h"
+#include "pxr/imaging/hgiGL/texture.h"
 
 #include "pxr/imaging/hd/perfLog.h"
 #include "pxr/imaging/hf/perfLog.h"
@@ -39,33 +43,108 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 
 HdSt_DomeLightComputationGPUGL::HdSt_DomeLightComputationGPUGL(
-    TfToken token,
-    GarchTextureGPUHandle const &sourceId, GarchTextureGPUHandle const &destId, 
-    int width, int height, unsigned int numLevels, unsigned int level, 
-    float roughness) 
-    : HdSt_DomeLightComputationGPU(token, sourceId, destId,
-        width, height, numLevels, level, roughness)
+    const TfToken & shaderToken,
+    HdStSimpleLightingShaderPtr const &lightingShader,
+    unsigned int numLevels,
+    unsigned int level,
+    float roughness)
+    : HdSt_DomeLightComputationGPU(
+        shaderToken,
+        lightingShader,
+        numLevels,
+        level,
+        roughness)
 {
 }
 
+GarchTextureGPUHandle
+HdSt_DomeLightComputationGPUGL::_GetGlTextureName(const HgiTexture * const hgiTexture)
+{
+    const HgiGLTexture * const glTexture =
+        dynamic_cast<const HgiGLTexture*>(hgiTexture);
+    if (!glTexture) {
+        TF_CODING_ERROR(
+            "Texture in dome light computation is not HgiGLTexture");
+        return GarchTextureGPUHandle();
+    }
+    const GarchTextureGPUHandle textureName = glTexture->GetTextureId();
+    if (!textureName.IsSet()) {
+        TF_CODING_ERROR(
+            "Texture in dome light computation has zero GL name");
+    }
+    return textureName;
+}
 
 void
 HdSt_DomeLightComputationGPUGL::_Execute(HdStProgramSharedPtr computeProgram)
 {
     HdStGLSLProgram const *glslProgram(
         dynamic_cast<const HdStGLSLProgram*>(computeProgram.get()));
-    GLuint programId = glslProgram->GetGLProgram();
+    const GLuint programId = glslProgram->GetGLProgram();
 
-    // bind the input and output textures
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, _sourceTextureId);
+    HdStSimpleLightingShaderSharedPtr const shader = _lightingShader.lock();
+    if (!TF_VERIFY(shader)) {
+        return;
+    }
     
-    glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, _destTextureId);
-    glBindImageTexture(1, _destTextureId, _level, _layered, _layer, 
-                        GL_WRITE_ONLY, GL_RGBA16F);
+    // Size of source texture (the dome light environment map)
+    GfVec3i srcDim;
+    // GL name of source texture
+    GarchTextureGPUHandle srcGLTextureName;
+    if (!_GetSrcTextureDimensionsAndGLName(
+            shader, &srcDim, &srcGLTextureName)) {
+        return;
+    }
 
-    computeProgram->SetProgram();
+    // Size of texture to be created.
+    const GLint width  = srcDim[0] / 2;
+    const GLint height = srcDim[1] / 2;
+
+    // Get texture object from lighting shader that this
+    // computation is supposed to populate
+    HdStTextureHandleSharedPtr const &dstTextureHandle =
+        shader->GetTextureHandle(_shaderToken);
+
+    if (!TF_VERIFY(dstTextureHandle)) {
+        return;
+    }
+
+    HdStDynamicUvTextureObject * const dstUvTextureObject =
+      dynamic_cast<HdStDynamicUvTextureObject*>(
+          dstTextureHandle->GetTextureObject().get());
+    if (!TF_VERIFY(dstUvTextureObject)) {
+        return;
+    }
+      
+    if (_level == 0) {
+        // Level zero is in charge of actually creating the
+        // GPU resource.
+        HgiTextureDesc desc;
+        desc.debugName = _shaderToken.GetText();
+        desc.format = HgiFormatFloat16Vec4;
+        desc.dimensions = GfVec3i(width, height, 1);
+        desc.layerCount = 1;
+        desc.mipLevels = _numLevels;
+        _FillPixelsByteSize(&desc);
+        dstUvTextureObject->CreateTexture(desc);
+    }
+
+    const GarchTextureGPUHandle dstGLTextureName = _GetGlTextureName(
+        dstUvTextureObject->GetTexture().Get());
+
+    // Now bind the textures and launch GPU computation
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, srcGLTextureName);
+
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, dstGLTextureName);
+    glBindImageTexture(1, dstGLTextureName,
+                       _level,
+                       /* layered = */ GL_FALSE,
+                       /* layer = */ 0,
+                       GL_WRITE_ONLY, GL_RGBA16F);
+
+    glUseProgram(programId);
 
     // if we are calculating the irradiance map we do not need to send over
     // the roughness value to the shader
@@ -75,10 +154,9 @@ HdSt_DomeLightComputationGPUGL::_Execute(HdStProgramSharedPtr computeProgram)
     }
 
     // dispatch compute kernel
-    glDispatchCompute(  (GLuint)_textureWidth / 32, 
-                        (GLuint)_textureHeight / 32, 1);
+    glDispatchCompute( (GLuint)width / 32, (GLuint)height / 32, 1);
 
-    computeProgram->UnsetProgram();
+    glUseProgram(0);
     glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
     glMemoryBarrier(GL_TEXTURE_FETCH_BARRIER_BIT);
 

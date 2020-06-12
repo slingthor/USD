@@ -155,13 +155,11 @@ HdSt_ResourceBinder::HdSt_ResourceBinder()
 {
 }
 
-static
+// static
 TfToken
-_ConcatLayout(const TfToken &token)
+HdSt_ResourceBinder::_Concat(const TfToken &a, const TfToken &b)
 {
-    return TfToken(
-        token.GetString()
-        + HdSt_ResourceBindingSuffixTokens->layout.GetString());
+    return TfToken(a.GetString() + b.GetString());
 }
 
 void
@@ -226,6 +224,7 @@ HdSt_ResourceBinder::ResolveBindings(HdStDrawItem const *drawItem,
     int shaderFallbackLocation = 0;
     int shaderPrimvarRedirectLocation = 0;
     int shaderFieldRedirectLocation = 0;
+    int shaderTransform2dLocation = 0;
 
     // clear all
     _bindingMap.clear();
@@ -598,8 +597,8 @@ HdSt_ResourceBinder::ResolveBindings(HdStDrawItem const *drawItem,
                 HdStGLConversions::GetGLSLTypename(_AdjustHdType(valueType.type,
                                                                  glSwizzle));
             TfToken const& name = param.name;
-            TfToken glName =  HdStGLConversions::GetGLSLIdentifier(name);
-
+            TfToken glName = HdStGLConversions::GetGLSLIdentifier(name);
+            TfToken layoutToken = HdSt_ResourceBindingSuffixTokens->layout;
             if (param.IsFallback()) {
                 metaDataOut->shaderParameterBinding[
                             HdBinding(HdBinding::FALLBACK, 
@@ -631,7 +630,7 @@ HdSt_ResourceBinder::ResolveBindings(HdStDrawItem const *drawItem,
                                     locator.uniformLocation++,
                                     locator.textureUnit++);
 
-                    const TfToken glLayoutName(_ConcatLayout(glName));
+                    const TfToken glLayoutName(_Concat(glName, layoutToken));
                     metaDataOut->shaderParameterBinding[layoutBinding] =
                         MetaData::ShaderParameterAccessor(
                             /*name=*/glLayoutName,
@@ -639,7 +638,7 @@ HdSt_ResourceBinder::ResolveBindings(HdStDrawItem const *drawItem,
                                 HdType::HdTypeInt32));
 
                     // Layout for Ptex
-                    const TfToken layoutName(_ConcatLayout(name));
+                    const TfToken layoutName(_Concat(name, layoutToken));
                     // used for non-bindless
                     _bindingMap[layoutName] = layoutBinding; 
                 } else if (param.textureType == HdTextureType::Udim) {
@@ -661,7 +660,7 @@ HdSt_ResourceBinder::ResolveBindings(HdStDrawItem const *drawItem,
                     _bindingMap[param.name] = textureBinding;
 
                     // Layout for UDIM
-                    const TfToken layoutName(_ConcatLayout(param.name));
+                    const TfToken layoutName(_Concat(param.name, layoutToken));
 
                     HdBinding layoutBinding = bindless
                         ? HdBinding(HdBinding::BINDLESS_TEXTURE_UDIM_LAYOUT,
@@ -733,6 +732,15 @@ HdSt_ResourceBinder::ResolveBindings(HdStDrawItem const *drawItem,
                     /*type=*/glType,
                     /*swizzle=*/glSwizzle,
                     /*inPrimvars=*/glNames);
+            } else if (param.IsTransform2d()) {
+                HdBinding binding = HdBinding(HdBinding::TRANSFORM_2D,
+                                              shaderTransform2dLocation++);
+                metaDataOut->shaderParameterBinding[binding] =
+                    MetaData::ShaderParameterAccessor(
+                        /*name=*/glName,
+                        /*type=*/glType,
+                        /*swizzle=*/glSwizzle,
+                        /*inPrimvars=*/param.samplerCoords);            
             } else if (param.IsAdditionalPrimvar()) {
                 // Additional primvars is used so certain primvars survive
                 // primvar filtering. We can ignore them here, because primvars
@@ -1102,6 +1110,75 @@ HdSt_ResourceBinder::MetaData::ComputeHash() const
     }
 
     return hash;
+}
+
+void
+HdSt_ResourceBinder::GetBufferSpecs(
+    const HdStShaderCode::NamedTextureHandleVector &textures,
+    const bool useBindlessHandles,
+    HdBufferSpecVector * const specs)
+{
+    static const HdTupleType bindlessHandleTupleType{ HdTypeUInt32Vec2, 1 };
+    
+    for (const HdStShaderCode::NamedTextureHandle & texture : textures) {
+        switch (texture.type) {
+        case HdTextureType::Uv:
+            if (useBindlessHandles) {
+                specs->emplace_back(
+                    texture.name,
+                    bindlessHandleTupleType);
+            } else {
+                specs->emplace_back(
+                    _Concat(
+                        texture.name,
+                        HdSt_ResourceBindingSuffixTokens->valid),
+                    HdTupleType{HdTypeUInt32, 1});
+            }
+            break;
+        case HdTextureType::Field:
+            if (useBindlessHandles) {
+                specs->emplace_back(
+                    texture.name,
+                    bindlessHandleTupleType);
+            } else {
+                specs->emplace_back(
+                    _Concat(
+                        texture.name,
+                        HdSt_ResourceBindingSuffixTokens->valid),
+                    HdTupleType{HdTypeUInt32, 1});
+            }
+            specs->emplace_back(
+                _Concat(
+                    texture.name,
+                    HdSt_ResourceBindingSuffixTokens->samplingTransform),
+                HdTupleType{HdTypeDoubleMat4, 1});
+            break;
+        case HdTextureType::Ptex:
+            if (useBindlessHandles) {
+                specs->emplace_back(
+                    texture.name,
+                    bindlessHandleTupleType);
+                specs->emplace_back(
+                    _Concat(
+                        texture.name,
+                        HdSt_ResourceBindingSuffixTokens->layout),
+                    bindlessHandleTupleType);
+            }
+            break;
+        case HdTextureType::Udim:
+            if (useBindlessHandles) {
+                specs->emplace_back(
+                    texture.name,
+                    bindlessHandleTupleType);
+                specs->emplace_back(
+                    _Concat(
+                        texture.name,
+                        HdSt_ResourceBindingSuffixTokens->layout),
+                    bindlessHandleTupleType);
+            }
+            break;
+        }
+    }
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

@@ -299,6 +299,45 @@ struct {
 static_assert(TfArraySize(_compareFnTable) == HgiCompareFunctionCount,
               "_compareFnTable array out of sync with HgiFormat enum");
 
+struct {
+    HgiSamplerAddressMode hgiAddressMode;
+    MTLSamplerAddressMode metalAM;
+} static const _samplerAddressModeTable[HgiSamplerAddressModeCount] =
+{
+    {HgiSamplerAddressModeClampToEdge,        MTLSamplerAddressModeClampToEdge},
+#if defined(ARCH_OS_IOS)
+    {HgiSamplerAddressModeClampToEdge,        MTLSamplerAddressModeClampToEdge},
+#else
+    {HgiSamplerAddressModeMirrorClampToEdge,  MTLSamplerAddressModeMirrorClampToEdge},
+#endif
+    {HgiSamplerAddressModeRepeat,             MTLSamplerAddressModeRepeat},
+    {HgiSamplerAddressModeMirrorRepeat,       MTLSamplerAddressModeMirrorRepeat},
+#if defined(ARCH_OS_IOS)
+    {HgiSamplerAddressModeClampToBorderColor, MTLSamplerAddressModeClampToZero}
+#else
+    {HgiSamplerAddressModeClampToBorderColor, MTLSamplerAddressModeClampToBorderColor}
+#endif
+};
+
+struct {
+    HgiSamplerFilter hgiSamplerFilter;
+    MTLSamplerMinMagFilter metalSF;
+} static const _samplerFilterTable[HgiSamplerFilterCount] =
+{
+    {HgiSamplerFilterNearest, MTLSamplerMinMagFilterNearest},
+    {HgiSamplerFilterLinear,  MTLSamplerMinMagFilterLinear}
+};
+
+struct {
+    HgiMipFilter hgiMipFilter;
+    MTLSamplerMipFilter metalMF;
+} static const _mipFilterTable[HgiMipFilterCount] =
+{
+    {HgiMipFilterNotMipmapped, MTLSamplerMipFilterNotMipmapped},
+    {HgiMipFilterNearest,      MTLSamplerMipFilterNearest},
+    {HgiMipFilterLinear,       MTLSamplerMipFilterLinear}
+};
+
 MTLPixelFormat
 HgiMetalConversions::GetPixelFormat(HgiFormat inFormat)
 {
@@ -393,5 +432,22 @@ HgiMetalConversions::GetTextureType(HgiTextureType tt)
     return _textureTypeTable[tt].metalTT;
 }
 
+MTLSamplerAddressMode
+HgiMetalConversions::GetSamplerAddressMode(HgiSamplerAddressMode a)
+{
+    return _samplerAddressModeTable[a].metalAM;
+}
+
+MTLSamplerMinMagFilter
+HgiMetalConversions::GetMinMagFilter(HgiSamplerFilter mf)
+{
+    return _samplerFilterTable[mf].metalSF;
+}
+
+MTLSamplerMipFilter
+HgiMetalConversions::GetMipFilter(HgiMipFilter mf)
+{
+    return _mipFilterTable[mf].metalMF;
+}
 
 PXR_NAMESPACE_CLOSE_SCOPE

@@ -22,17 +22,11 @@
 // language governing permissions and limitations under the Apache License.
 //
 #include "pxr/imaging/hdSt/field.h"
-#include "pxr/imaging/hdSt/resourceRegistry.h"
 #include "pxr/imaging/hdSt/subtextureIdentifier.h"
 
-#include "pxr/imaging/hd/volume.h"
 #include "pxr/imaging/hd/sceneDelegate.h"
-#include "pxr/imaging/garch/textureRegistry.h"
-#include "pxr/imaging/garch/textureHandle.h"
-#include "pxr/imaging/garch/vdbTexture.h"
-#include "pxr/imaging/garch/vdbTextureContainer.h"
 
-#include "pxr/usd/sdf/types.h"
+#include "pxr/usd/sdf/assetPath.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 

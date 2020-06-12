@@ -110,7 +110,8 @@ HdStExtCompGpuComputationResource::Resolve()
                                 _registry->RegisterProgram(registryID);
 
             if (programInstance.IsFirstInstance()) {
-                HdStProgramSharedPtr program = codeGen->CompileComputeProgram();
+                HdStProgramSharedPtr program =
+                    codeGen->CompileComputeProgram(_registry.get());
                 if (!TF_VERIFY(program)) {
                     return false;
                 }
