@@ -45,7 +45,6 @@ HgiMetalTexture::HgiMetalTexture(HgiMetal *hgi, HgiTextureDesc const & desc)
 
     MTLPixelFormat mtlFormat = HgiMetalConversions::GetPixelFormat(desc.format);
     
-    
     if (desc.usage & HgiTextureUsageBitsColorTarget) {
         usage = MTLTextureUsageRenderTarget;
     } else if (desc.usage & HgiTextureUsageBitsDepthTarget) {
@@ -79,13 +78,17 @@ HgiMetalTexture::HgiMetalTexture(HgiMetal *hgi, HgiTextureDesc const & desc)
     texDesc.arrayLength = desc.layerCount;
     texDesc.resourceOptions = resourceOptions;
     texDesc.usage = usage;
-    
-    size_t numChannels = HgiGetComponentCount(desc.format);
 
-    if (usage == MTLTextureUsageShaderRead && numChannels == 1) {
-#if (__MAC_OS_X_VERSION_MAX_ALLOWED >= 101500) || (__IPHONE_OS_VERSION_MAX_ALLOWED >= 130000) /* __MAC_10_15 __IOS_13_00 */
-        texDesc.swizzle = MTLTextureSwizzleChannelsMake(MTLTextureSwizzleRed, MTLTextureSwizzleRed, MTLTextureSwizzleRed, MTLTextureSwizzleRed);
-#endif
+    if (@available(macOS 10.15, ios 13.0, *)) {
+        size_t numChannels = HgiGetComponentCount(desc.format);
+
+        if (usage == MTLTextureUsageShaderRead && numChannels == 1) {
+            texDesc.swizzle = MTLTextureSwizzleChannelsMake(
+                MTLTextureSwizzleRed,
+                MTLTextureSwizzleRed,
+                MTLTextureSwizzleRed,
+                MTLTextureSwizzleOne);
+        }
     }
 
     if (depth > 1) {
