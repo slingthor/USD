@@ -37,13 +37,8 @@
 #include "pxr/base/gf/vec4f.h"
 #include "pxr/base/tf/diagnostic.h"
 #include "pxr/imaging/garch/gl.h"
-#include "pxr/imaging/garch/drawTarget.h"
-#include "pxr/imaging/garch/image.h"
 #include "pxr/imaging/garch/simpleLight.h"
 #include "pxr/imaging/garch/simpleMaterial.h"
-#include "pxr/imaging/glf/diagnostic.h"
-#include "pxr/imaging/hgi/texture.h"
-#include "pxr/imaging/hgi/types.h"
 #include "pxr/imaging/hgiGL/conversions.h"
 #include "pxr/usd/sdf/path.h"
 #include "pxr/usd/usd/prim.h"
@@ -56,8 +51,6 @@
 #include "pxr/imaging/hgi/blitCmds.h"
 #include "pxr/imaging/hgi/blitCmdsOps.h"
 #include "pxr/imaging/hgiMetal/hgi.h"
-#include "pxr/imaging/hd/renderBuffer.h"
-
 
 #include <string>
 
@@ -156,44 +149,51 @@ _ComputeCameraToFrameStage(const UsdStagePtr& stage, UsdTimeCode timeCode,
     return gfCamera;
 }
 
-/// Debug api to output the contents of the draw target to a png file.
-static bool
-_WriteToFile(std::string const &filename,
-             Hgi *hgi,
-             HgiTextureHandle const &textureHandle)
+static void
+_ReadbackTexture(Hgi *hgi,
+                 HgiTextureHandle const &textureHandle,
+                 std::vector<uint8_t>& buffer)
 {
     const auto &textureDesc = textureHandle.Get()->GetDescriptor();
-    
     const size_t formatByteSize = HgiDataSizeOfFormat(textureDesc.format);
     const size_t width = textureDesc.dimensions[0];
     const size_t height = textureDesc.dimensions[1];
-    const size_t dataByteSize = textureDesc.dimensions[0] *
-                                textureDesc.dimensions[1] *
-                                formatByteSize;
+    const size_t dataByteSize = width * height * formatByteSize;
     
-    // Have to round up to 4096 bytes.
+    // For Metal the CPU buffer has to be rounded up to multiple of 4096 bytes.
     const size_t alignedByteSize = (dataByteSize + 0xFFF) & (~0xFFF);
     
-    std::vector<uint8_t> buffer;
     buffer.resize(alignedByteSize);
+
+    HgiBlitCmdsUniquePtr const blitCmds = hgi->CreateBlitCmds();
+    HgiTextureGpuToCpuOp copyOp;
+    copyOp.gpuSourceTexture = textureHandle;
+    copyOp.sourceTexelOffset = GfVec3i(0);
+    copyOp.mipLevel = 0;
+    copyOp.startLayer = 0;
+    copyOp.numLayers = 1;
+    copyOp.cpuDestinationBuffer = buffer.data();
+    copyOp.destinationByteOffset = 0;
+    copyOp.destinationBufferByteSize = alignedByteSize;
+    blitCmds->CopyTextureGpuToCpu(copyOp);
+    hgi->SubmitCmds(blitCmds.get(), 1);
+}
+
+static bool
+_WriteImageToFile(std::vector<uint8_t> const& buffer,
+                  HgiTextureDesc const& textureDesc,
+                  std::string const &filename,
+                  bool flipped)
+{
+    const size_t formatByteSize = HgiDataSizeOfFormat(textureDesc.format);
+    const size_t width = textureDesc.dimensions[0];
+    const size_t height = textureDesc.dimensions[1];
+    const size_t dataByteSize = width * height * formatByteSize;
     
-    if (alignedByteSize > 0) {
-        HgiBlitCmdsUniquePtr const blitCmds = hgi->CreateBlitCmds();
-        HgiTextureGpuToCpuOp copyOp;
-        copyOp.gpuSourceTexture = textureHandle;
-        copyOp.sourceTexelOffset = GfVec3i(0);
-        copyOp.mipLevel = 0;
-        copyOp.startLayer = 0;
-        copyOp.numLayers = 1;
-        copyOp.cpuDestinationBuffer = buffer.data();
-        copyOp.destinationByteOffset = 0;
-        copyOp.destinationBufferByteSize = alignedByteSize;
-        blitCmds->CopyTextureGpuToCpu(copyOp);
-        hgi->SubmitCmds(blitCmds.get(), 1);
+    if (buffer.size() < dataByteSize) {
+        return false;
     }
-    
-    VtDictionary metadata;
-    
+
     GLenum outputFormat = GL_RGBA;
     GLenum outputType = GL_HALF_FLOAT;
     GLenum outputInternal = GL_RGBA16F;
@@ -205,12 +205,13 @@ _WriteToFile(std::string const &filename,
     storage.height = height;
     storage.format = outputFormat;
     storage.type = outputType;
-    storage.flipped = true;
-    storage.data = buffer.data();
+    storage.flipped = flipped;
+    storage.data = (void*)buffer.data();
 
     {
         TRACE_FUNCTION_SCOPE("writing image");
-
+        VtDictionary metadata;
+        
         GarchImageSharedPtr const image = GarchImage::OpenForWriting(filename);
         const bool writeSuccess = image && image->Write(storage, metadata);
         
@@ -220,12 +221,8 @@ _WriteToFile(std::string const &filename,
         }
     }
 
-    GLF_POST_PENDING_GL_ERRORS();
-
     return true;
 }
-
-#define KAPTURE 0
 
 bool
 UsdAppUtilsFrameRecorder::Record(
@@ -310,22 +307,9 @@ UsdAppUtilsFrameRecorder::Record(
     renderParams.showRender = _HasPurpose(_purposes, UsdGeomTokens->render);
     renderParams.showGuides = _HasPurpose(_purposes, UsdGeomTokens->guide);
 
-#if KAPTURE
-    MTLCaptureManager* captureManager = [MTLCaptureManager sharedCaptureManager];
-    MTLCaptureDescriptor* captureDescriptor = [[MTLCaptureDescriptor alloc] init];
-    
-    HgiMetal *hgiMetal = static_cast<HgiMetal*>(_hgi.get());
-    
-    captureDescriptor.captureObject = hgiMetal->GetPrimaryDevice();
-
-    NSError *error;
-    if (![captureManager startCaptureWithDescriptor: captureDescriptor error:&error])
-    {
-        NSLog(@"Failed to start capture, error %@", error);
-    }
-#endif
-
+#if defined(ARCH_GFX_OPENGL)
     glEnable(GL_DEPTH_TEST);
+#endif
 
     glViewport(0, 0, _imageWidth, imageHeight);
 
@@ -333,21 +317,18 @@ UsdAppUtilsFrameRecorder::Record(
     const UsdPrim& pseudoRoot = stage->GetPseudoRoot();
 
     do {
+#if defined(ARCH_GFX_OPENGL)
         glClearBufferfv(GL_COLOR, 0, CLEAR_COLOR.data());
         glClearBufferfv(GL_DEPTH, 0, CLEAR_DEPTH);
+#endif
         _imagingEngine->Render(pseudoRoot, renderParams);
     } while (!_imagingEngine->IsConverged());
     
-    auto presentationTexture = _imagingEngine->GetPresentationTextureHandle(HdAovTokens->color);
+    auto handle = _imagingEngine->GetPresentationTextureHandle(HdAovTokens->color);
+    std::vector<uint8_t> buffer;
+    _ReadbackTexture(_hgi.get(), handle, buffer);
 
-    bool succeeded = _WriteToFile(outputImagePath, _hgi.get(), presentationTexture);
-
-    #if KAPTURE
-        [captureManager stopCapture];
-    #endif
-        
-    return succeeded;
+    return _WriteImageToFile(buffer, handle.Get()->GetDescriptor(), outputImagePath, false);
 }
-
 
 PXR_NAMESPACE_CLOSE_SCOPE
