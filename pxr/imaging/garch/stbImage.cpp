@@ -573,8 +573,8 @@ static
 uint8_t
 _Quantize(float value)
 {
-    static const int min = 0;
-    static const int max = std::numeric_limits<uint8_t>::max();
+    static constexpr int min = 0;
+    static constexpr int max = std::numeric_limits<uint8_t>::max();
 
     int result = min + std::floor((max - min) * value + 0.499999f);
     return std::min(max, std::max(min, result));
@@ -624,11 +624,10 @@ Garch_StbImage::Write(StorageSpec const & storageIn,
 
     StorageSpec quantizedSpec;
     std::unique_ptr<uint8_t[]> quantizedData;
-    if (storageIn.type == GL_FLOAT && fileExtension != "hdr") 
-    {
+    if (storageIn.type == GL_FLOAT && fileExtension != "hdr") {
         quantizedSpec = _Quantize<float>(storageIn, quantizedData);
-    } else if (storageIn.type == GL_HALF_FLOAT && fileExtension != "hdr")
-    {
+    }
+    else if (storageIn.type == GL_HALF_FLOAT && fileExtension != "hdr") {
         quantizedSpec = _Quantize<GfHalf>(storageIn, quantizedData);
     }
     else if (storageIn.type != GL_UNSIGNED_BYTE && fileExtension != "hdr") {
