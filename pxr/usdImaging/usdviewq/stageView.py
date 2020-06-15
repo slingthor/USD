@@ -377,6 +377,8 @@ class Prim2DDrawTask():
     def __init__(self):
         self._prims = []
         self._colors = []
+        self._pixelRatio = QtWidgets.QApplication.instance().devicePixelRatio()
+
 
     def Sync(self, ctx):
         for prim in self._prims:
@@ -389,8 +391,8 @@ class Prim2DDrawTask():
 
         GL.glBindBuffer(GL.GL_ARRAY_BUFFER, 0)
         GL.glDisableVertexAttribArray(0)
-#        if (bool(GL.glBindVertexArray)):
-#            GL.glBindVertexArray(0)
+        if (int(GL.glGetString(GL.GL_VERSION)[0]) >= 3 and hasattr(GL, 'glGenVertexArrays')):
+            GL.glBindVertexArray(0)
         GL.glUseProgram(0)
 
 class Outline(Prim2DDrawTask):
@@ -399,8 +401,8 @@ class Outline(Prim2DDrawTask):
         self._outlineColor = Gf.ConvertDisplayToLinear(Gf.Vec4f(0.0, 0.0, 0.0, 1.0))
 
     def updatePrims(self, croppedViewport, qglwidget):
-        width = float(qglwidget.width())
-        height = float(qglwidget.height())
+        width = float(qglwidget.width()) * self._pixelRatio
+        height = float(qglwidget.height()) * self._pixelRatio
         prims = [ OutlineRect.fromXYWH(croppedViewport) ]
         self._prims = [p.scaledAndBiased((2.0 / width, 2.0 / height), (-1, -1))
                 for p in prims]
@@ -415,8 +417,8 @@ class Reticles(Prim2DDrawTask):
         self._outlineColor = Gf.ConvertDisplayToLinear(Gf.Vec4f(*color))
 
     def updatePrims(self, croppedViewport, qglwidget, inside, outside):
-        width = float(qglwidget.width())
-        height = float(qglwidget.height())
+        width = float(qglwidget.width()) * self._pixelRatio
+        height = float(qglwidget.height()) * self._pixelRatio
         prims = [ ]
         ascenders = [0, 0]
         descenders = [0, 0]
@@ -456,8 +458,8 @@ class Mask(Prim2DDrawTask):
         self._maskColor = Gf.ConvertDisplayToLinear(Gf.Vec4f(*color))
 
     def updatePrims(self, croppedViewport, qglwidget):
-        width = float(qglwidget.width())
-        height = float(qglwidget.height())
+        width = float(qglwidget.width()) * self._pixelRatio
+        height = float(qglwidget.height()) * self._pixelRatio
         rect = FilledRect.fromXYWH((0, 0, width, height))
         prims = rect.difference(croppedViewport)
         self._prims = [p.scaledAndBiased((2.0 / width, 2.0 / height), (-1, -1))
