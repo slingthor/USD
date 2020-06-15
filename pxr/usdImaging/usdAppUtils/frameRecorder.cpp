@@ -147,6 +147,81 @@ _ComputeCameraToFrameStage(const UsdStagePtr& stage, UsdTimeCode timeCode,
     return gfCamera;
 }
 
+static void
+_ReadbackTexture(Hgi *hgi,
+                 HgiTextureHandle const &textureHandle,
+                 std::vector<uint8_t>& buffer)
+{
+    const auto &textureDesc = textureHandle.Get()->GetDescriptor();
+    const size_t formatByteSize = HgiDataSizeOfFormat(textureDesc.format);
+    const size_t width = textureDesc.dimensions[0];
+    const size_t height = textureDesc.dimensions[1];
+    const size_t dataByteSize = width * height * formatByteSize;
+    
+    // For Metal the CPU buffer has to be rounded up to multiple of 4096 bytes.
+    const size_t alignedByteSize = (dataByteSize + 0xFFF) & (~0xFFF);
+    
+    buffer.resize(alignedByteSize);
+
+    HgiBlitCmdsUniquePtr const blitCmds = hgi->CreateBlitCmds();
+    HgiTextureGpuToCpuOp copyOp;
+    copyOp.gpuSourceTexture = textureHandle;
+    copyOp.sourceTexelOffset = GfVec3i(0);
+    copyOp.mipLevel = 0;
+    copyOp.startLayer = 0;
+    copyOp.numLayers = 1;
+    copyOp.cpuDestinationBuffer = buffer.data();
+    copyOp.destinationByteOffset = 0;
+    copyOp.destinationBufferByteSize = alignedByteSize;
+    blitCmds->CopyTextureGpuToCpu(copyOp);
+    hgi->SubmitCmds(blitCmds.get(), 1);
+}
+
+static bool
+_WriteImageToFile(std::vector<uint8_t> const& buffer,
+                  HgiTextureDesc const& textureDesc,
+                  std::string const &filename,
+                  bool flipped)
+{
+    const size_t formatByteSize = HgiDataSizeOfFormat(textureDesc.format);
+    const size_t width = textureDesc.dimensions[0];
+    const size_t height = textureDesc.dimensions[1];
+    const size_t dataByteSize = width * height * formatByteSize;
+    
+    if (buffer.size() < dataByteSize) {
+        return false;
+    }
+
+    GLenum outputFormat = GL_RGBA;
+    GLenum outputType = GL_HALF_FLOAT;
+    GLenum outputInternal = GL_RGBA16F;
+    
+    HgiGLConversions::GetFormat(textureDesc.format,
+                                &outputFormat, &outputType, &outputInternal);
+    GarchImage::StorageSpec storage;
+    storage.width = width;
+    storage.height = height;
+    storage.format = outputFormat;
+    storage.type = outputType;
+    storage.flipped = flipped;
+    storage.data = (void*)buffer.data();
+
+    {
+        TRACE_FUNCTION_SCOPE("writing image");
+        VtDictionary metadata;
+        
+        GarchImageSharedPtr const image = GarchImage::OpenForWriting(filename);
+        const bool writeSuccess = image && image->Write(storage, metadata);
+        
+        if (!writeSuccess) {
+            TF_RUNTIME_ERROR("Failed to write image to %s", filename.c_str());
+            return false;
+        }
+    }
+
+    return true;
+}
+
 bool
 UsdAppUtilsFrameRecorder::Record(
         const UsdStagePtr& stage,
