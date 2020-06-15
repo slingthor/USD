@@ -37,9 +37,9 @@
 #include "pxr/base/gf/vec4f.h"
 #include "pxr/base/tf/diagnostic.h"
 #include "pxr/imaging/garch/gl.h"
-#include "pxr/imaging/garch/drawTarget.h"
 #include "pxr/imaging/garch/simpleLight.h"
 #include "pxr/imaging/garch/simpleMaterial.h"
+#include "pxr/imaging/hgiGL/conversions.h"
 #include "pxr/usd/sdf/path.h"
 #include "pxr/usd/usd/prim.h"
 #include "pxr/usd/usd/stage.h"
@@ -48,6 +48,8 @@
 #include "pxr/usd/usdGeom/metrics.h"
 #include "pxr/usd/usdGeom/tokens.h"
 
+#include "pxr/imaging/hgi/blitCmds.h"
+#include "pxr/imaging/hgi/blitCmdsOps.h"
 #include "pxr/imaging/hgiMetal/hgi.h"
 
 #include <string>
@@ -307,27 +309,6 @@ UsdAppUtilsFrameRecorder::Record(
 
 #if defined(ARCH_GFX_OPENGL)
     glEnable(GL_DEPTH_TEST);
-#endif
-
-    UsdImagingGLEngine::ResourceFactoryGuard guard(
-        _imagingEngine->GetResourceFactory());
-
-    HgiMetal *hgiMetal = static_cast<HgiMetal*>(_hgi.get());
-    hgiMetal->_useFinalTextureForGetImage = true;
-    
-    GarchDrawTargetRefPtr drawTarget = GarchDrawTarget::New(renderResolution);
-
-    std::vector<GarchDrawTarget::AttachmentDesc> attachmentDesc;
-    attachmentDesc.push_back(
-        GarchDrawTarget::AttachmentDesc(
-            "color", GL_RGBA, GL_FLOAT, GL_RGBA16F));
-    attachmentDesc.push_back(
-        GarchDrawTarget::AttachmentDesc(
-            "depth", GL_DEPTH_COMPONENT, GL_FLOAT, GL_DEPTH_COMPONENT32F));
-    drawTarget->SetAttachments(attachmentDesc);
-    drawTarget->Bind();
-    
-#if defined(ARCH_GFX_OPENGL)
     glViewport(0, 0, _imageWidth, imageHeight);
 
     const GLfloat CLEAR_DEPTH[1] = { 1.0f };
@@ -344,11 +325,12 @@ UsdAppUtilsFrameRecorder::Record(
 #endif
         _imagingEngine->Render(pseudoRoot, renderParams);
     } while (!_imagingEngine->IsConverged());
+    
+    auto handle = _imagingEngine->GetPresentationTextureHandle(HdAovTokens->color);
+    std::vector<uint8_t> buffer;
+    _ReadbackTexture(_hgi.get(), handle, buffer);
 
-    drawTarget->Unbind();
-
-    return drawTarget->WriteToFile("color", outputImagePath);
+    return _WriteImageToFile(buffer, handle.Get()->GetDescriptor(), outputImagePath, false);
 }
-
 
 PXR_NAMESPACE_CLOSE_SCOPE
