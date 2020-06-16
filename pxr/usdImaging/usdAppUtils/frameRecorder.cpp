@@ -150,18 +150,19 @@ _ComputeCameraToFrameStage(const UsdStagePtr& stage, UsdTimeCode timeCode,
 }
 
 static void
-_ReadbackTexture(Hgi *hgi,
-                 HgiTextureHandle const &textureHandle,
+_ReadbackTexture(Hgi* const hgi,
+                 HgiTextureHandle const& textureHandle,
                  std::vector<uint8_t>& buffer)
 {
-    const auto &textureDesc = textureHandle.Get()->GetDescriptor();
+    const HgiTextureDesc& textureDesc = textureHandle.Get()->GetDescriptor();
     const size_t formatByteSize = HgiDataSizeOfFormat(textureDesc.format);
     const size_t width = textureDesc.dimensions[0];
     const size_t height = textureDesc.dimensions[1];
     const size_t dataByteSize = width * height * formatByteSize;
     
     // For Metal the CPU buffer has to be rounded up to multiple of 4096 bytes.
-    const size_t alignedByteSize = (dataByteSize + 0xFFF) & (~0xFFF);
+    constexpr size_t bitMask = 4096 - 1;
+    const size_t alignedByteSize = (dataByteSize + bitMask) & (~bitMask);
     
     buffer.resize(alignedByteSize);
 
@@ -180,10 +181,10 @@ _ReadbackTexture(Hgi *hgi,
 }
 
 static bool
-_WriteImageToFile(std::vector<uint8_t> const& buffer,
-                  HgiTextureDesc const& textureDesc,
-                  std::string const &filename,
-                  bool flipped)
+_WriteTextureToFile(HgiTextureDesc const& textureDesc,
+                    std::vector<uint8_t> const& buffer,
+                    std::string const& filename,
+                    const bool flipped)
 {
     const size_t formatByteSize = HgiDataSizeOfFormat(textureDesc.format);
     const size_t width = textureDesc.dimensions[0];
@@ -330,7 +331,10 @@ UsdAppUtilsFrameRecorder::Record(
     std::vector<uint8_t> buffer;
     _ReadbackTexture(_hgi.get(), handle, buffer);
 
-    return _WriteImageToFile(buffer, handle.Get()->GetDescriptor(), outputImagePath, false);
+    return _WriteTextureToFile(handle.Get()->GetDescriptor(),
+                               buffer,
+                               outputImagePath,
+                               false);
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE
