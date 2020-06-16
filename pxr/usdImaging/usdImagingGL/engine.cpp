@@ -1583,16 +1583,18 @@ UsdImagingGLEngine::_GetSceneDelegate() const
 }
 
 USDIMAGINGGL_API
-HgiTextureHandle UsdImagingGLEngine::GetPresentationTextureHandle(
+HgiTextureHandle UsdImagingGLEngine::GetPresentationTexture(
     TfToken const &name) const
 {
     VtValue aov;
-    _engine->GetTaskContextData(name, &aov);
-    
     HgiTextureHandle aovTexture;
-    if (aov.IsHolding<HgiTextureHandle>()) {
-        aovTexture = aov.Get<HgiTextureHandle>();
+
+    if (_engine->GetTaskContextData(name, &aov)) {
+        if (aov.IsHolding<HgiTextureHandle>()) {
+            aovTexture = aov.Get<HgiTextureHandle>();
+        }
     }
+
     return aovTexture;
 }
 
