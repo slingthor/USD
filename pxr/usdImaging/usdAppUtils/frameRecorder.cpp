@@ -310,11 +310,13 @@ UsdAppUtilsFrameRecorder::Record(
 
 #if defined(ARCH_GFX_OPENGL)
     glEnable(GL_DEPTH_TEST);
-#endif
-
     glViewport(0, 0, _imageWidth, imageHeight);
 
     const GLfloat CLEAR_DEPTH[1] = { 1.0f };
+    glClearBufferfv(GL_COLOR, 0, CLEAR_COLOR.data());
+    glClearBufferfv(GL_DEPTH, 0, CLEAR_DEPTH);
+#endif
+
     const UsdPrim& pseudoRoot = stage->GetPseudoRoot();
 
     do {
