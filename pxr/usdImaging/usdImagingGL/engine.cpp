@@ -1582,8 +1582,8 @@ UsdImagingGLEngine::_GetSceneDelegate() const
     return _sceneDelegate.get();
 }
 
-USDIMAGINGGL_API
-HgiTextureHandle UsdImagingGLEngine::GetPresentationTexture(
+HgiTextureHandle
+UsdImagingGLEngine::GetPresentationTexture(
     TfToken const &name) const
 {
     VtValue aov;

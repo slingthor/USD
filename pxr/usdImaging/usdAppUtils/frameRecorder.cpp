@@ -356,7 +356,8 @@ UsdAppUtilsFrameRecorder::Record(
         _imagingEngine->Render(pseudoRoot, renderParams);
     } while (!_imagingEngine->IsConverged());
 
-    auto handle = _imagingEngine->GetPresentationTexture(HdAovTokens->color);
+    HgiTextureHandle handle =
+        _imagingEngine->GetPresentationTexture(HdAovTokens->color);
     
     if (!handle) {
         TF_CODING_ERROR("No color presentation texture");
