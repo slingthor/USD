@@ -29,28 +29,17 @@
 #include "pxr/usdImaging/usdAppUtils/frameRecorder.h"
 
 #include "pxr/base/gf/camera.h"
-#include "pxr/base/gf/math.h"
-#include "pxr/base/gf/frustum.h"
-#include "pxr/base/gf/vec2i.h"
-#include "pxr/base/gf/vec3d.h"
-#include "pxr/base/gf/vec4d.h"
-#include "pxr/base/gf/vec4f.h"
-#include "pxr/base/tf/diagnostic.h"
-#include "pxr/imaging/garch/gl.h"
+
 #include "pxr/imaging/garch/simpleLight.h"
 #include "pxr/imaging/garch/simpleMaterial.h"
-#include "pxr/imaging/hgiGL/conversions.h"
-#include "pxr/usd/sdf/path.h"
-#include "pxr/usd/usd/prim.h"
 #include "pxr/usd/usd/stage.h"
 #include "pxr/usd/usdGeom/bboxCache.h"
-#include "pxr/usd/usdGeom/camera.h"
 #include "pxr/usd/usdGeom/metrics.h"
 #include "pxr/usd/usdGeom/tokens.h"
 
 #include "pxr/imaging/hgi/blitCmds.h"
 #include "pxr/imaging/hgi/blitCmdsOps.h"
-#include "pxr/imaging/hgiMetal/hgi.h"
+#include "pxr/imaging/hgi/hgi.h"
 
 #include <string>
 
@@ -180,6 +169,46 @@ _ReadbackTexture(Hgi* const hgi,
     hgi->SubmitCmds(blitCmds.get(), 1);
 }
 
+struct _FormatDesc {
+    GLenum format;
+    GLenum type;
+};
+
+static constexpr _FormatDesc FORMAT_DESC[HgiFormatCount] =
+{
+    // format,  type
+    {GL_RED,  GL_UNSIGNED_BYTE }, // UNorm8
+    {GL_RG,   GL_UNSIGNED_BYTE }, // UNorm8Vec2
+//  {GL_RGB,  GL_UNSIGNED_BYTE }, // Unsupported by HgiFormat
+    {GL_RGBA, GL_UNSIGNED_BYTE }, // UNorm8Vec4
+
+    {GL_RED,  GL_BYTE          }, // SNorm8
+    {GL_RG,   GL_BYTE          }, // SNorm8Vec2
+//  {GL_RGB,  GL_BYTE          }, // Unsupported by HgiFormat
+    {GL_RGBA, GL_BYTE          }, // SNorm8Vec4
+
+    {GL_RED,  GL_HALF_FLOAT    }, // Float16
+    {GL_RG,   GL_HALF_FLOAT    }, // Float16Vec2
+    {GL_RGB,  GL_HALF_FLOAT    }, // Float16Vec3
+    {GL_RGBA, GL_HALF_FLOAT    }, // Float16Vec4
+
+    {GL_RED,  GL_FLOAT         }, // Float32
+    {GL_RG,   GL_FLOAT         }, // Float32Vec2
+    {GL_RGB,  GL_FLOAT         }, // Float32Vec3
+    {GL_RGBA, GL_FLOAT         }, // Float32Vec4
+
+    {GL_RED,  GL_INT           }, // Int32
+    {GL_RG,   GL_INT           }, // Int32Vec2
+    {GL_RGB,  GL_INT           }, // Int32Vec3
+    {GL_RGBA, GL_INT           }, // Int32Vec4
+
+//  {GL_RGB, GL_UNSIGNED_BYTE  }, // Unsupported by HgiFormat
+    {GL_RGBA, GL_UNSIGNED_BYTE }, // UNorm8Vec4sRGB,
+
+    {GL_RGB, GL_FLOAT          }, // BC6FloatVec3
+    {GL_RGB, GL_FLOAT          }
+};
+
 static bool
 _WriteTextureToFile(HgiTextureDesc const& textureDesc,
                     std::vector<uint8_t> const& buffer,
@@ -194,18 +223,18 @@ _WriteTextureToFile(HgiTextureDesc const& textureDesc,
     if (buffer.size() < dataByteSize) {
         return false;
     }
-
-    GLenum outputFormat = GL_RGBA;
-    GLenum outputType = GL_HALF_FLOAT;
-    GLenum outputInternal = GL_RGBA16F;
     
-    HgiGLConversions::GetFormat(textureDesc.format,
-                                &outputFormat, &outputType, &outputInternal);
+    if (textureDesc.format < 0 || textureDesc.format >= HgiFormatCount) {
+        return false;
+    }
+
+    _FormatDesc formatDesc = FORMAT_DESC[textureDesc.format];
+    
     GarchImage::StorageSpec storage;
     storage.width = width;
     storage.height = height;
-    storage.format = outputFormat;
-    storage.type = outputType;
+    storage.format = formatDesc.format;
+    storage.type = formatDesc.type;
     storage.flipped = flipped;
     storage.data = (void*)buffer.data();
 
@@ -326,8 +355,15 @@ UsdAppUtilsFrameRecorder::Record(
 #endif
         _imagingEngine->Render(pseudoRoot, renderParams);
     } while (!_imagingEngine->IsConverged());
+
+    HgiTextureHandle handle =
+        _imagingEngine->GetPresentationTexture(HdAovTokens->color);
     
-    auto handle = _imagingEngine->GetPresentationTextureHandle(HdAovTokens->color);
+    if (!handle) {
+        TF_CODING_ERROR("No color presentation texture");
+        return false;
+    }
+    
     std::vector<uint8_t> buffer;
     _ReadbackTexture(_hgi.get(), handle, buffer);
 
