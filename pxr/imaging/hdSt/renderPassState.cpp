@@ -317,14 +317,13 @@ void
 HdStRenderPassState::Bind()
 {
     GLF_GROUP_FUNCTION();
-    
+
     // notify view-transform to the lighting shader to update its uniform block
     // this needs to be done in execute as a multi camera setup may have been 
     // synced with a different view matrix baked in for shadows.
     // SetCamera will no-op if the transforms are the same as before.
-    
-    // METALTODO: THIS IS A TEMP FIX - INVESTIGAGE WITH LINUX
-//    _lightingShader->SetCamera(_worldToViewMatrix, _projectionMatrix);
+    _lightingShader->SetCamera(GetWorldToViewMatrix(),
+                               GetProjectionMatrix());
 }
 
 void

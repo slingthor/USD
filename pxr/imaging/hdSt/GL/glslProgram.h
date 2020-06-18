@@ -49,75 +49,75 @@ public:
     HDST_API
     HdStGLSLProgram(TfToken const &role, HdStResourceRegistry *const registry);
     HDST_API
-    virtual ~HdStGLSLProgram();
+    ~HdStGLSLProgram() override;
 
     /// Compile shader source of type
     HDST_API
-    virtual bool CompileShader(GLenum type, std::string const & source) override;
+    bool CompileShader(GLenum type, std::string const & source) override;
 
     /// Link the compiled shaders together.
     HDST_API
-    virtual bool Link() override;
+    bool Link() override;
 
     /// Validate if this program is a valid progam in the current context.
     HDST_API
-    virtual bool Validate() const override;
+    bool Validate() const override;
 
     /// Returns HdResource of the global uniform buffer object for this program.
     HDST_API
-    virtual HdResource const &GetGlobalUniformBuffer() const override {
+    HdResource const &GetGlobalUniformBuffer() const override {
         return _uniformBuffer;
     }
     
     /// Returns true if the program has been successfully linked.
     /// if not, returns false and fills the error log into reason.
     HDST_API
-    virtual bool GetProgramLinkStatus(std::string * reason) const override;
+    bool GetProgramLinkStatus(std::string * reason) const override;
 
     /// Returns the binary size of the program (if available)
     HDST_API
-    virtual uint32_t GetProgramSize() const { return _programSize; }
+    uint32_t GetProgramSize() const { return _programSize; }
     
     HDST_API
-    virtual void AssignUniformBindings(GarchBindingMapRefPtr bindingMap) const override;
+    void AssignUniformBindings(GarchBindingMapRefPtr bindingMap) const override;
     
     HDST_API
-    virtual void AssignSamplerUnits(GarchBindingMapRefPtr bindingMap) const override;
+    void AssignSamplerUnits(GarchBindingMapRefPtr bindingMap) const override;
     
     HDST_API
-    virtual void AddCustomBindings(GarchBindingMapRefPtr bindingMap) const override;
+    void AddCustomBindings(GarchBindingMapRefPtr bindingMap) const override;
     
     HDST_API
-    virtual void BindResources(HdStSurfaceShader* surfaceShader, HdSt_ResourceBinder const &binder) const override;
+    void BindResources(HdStSurfaceShader* surfaceShader, HdSt_ResourceBinder const &binder) const override;
     
     HDST_API
-    virtual void UnbindResources(HdStSurfaceShader* surfaceShader, HdSt_ResourceBinder const &binder) const override;
+    void UnbindResources(HdStSurfaceShader* surfaceShader, HdSt_ResourceBinder const &binder) const override;
 
     HDST_API
-    virtual void SetProgram(char const* const label) override;
+    void SetProgram(char const* const label) override;
     
     HDST_API
-    virtual void UnsetProgram() override;
+    void UnsetProgram() override;
     
     HDST_API
-    virtual void DrawElementsInstancedBaseVertex(int primitiveMode,
-                                                 int indexCount,
-                                                 int indexType,
-                                                 int firstIndex,
-                                                 int instanceCount,
-                                                 int baseVertex) const override;
+    void DrawElementsInstancedBaseVertex(int primitiveMode,
+                                         int indexCount,
+                                         int indexType,
+                                         int firstIndex,
+                                         int instanceCount,
+                                         int baseVertex) const override;
+
+    HDST_API
+    void DrawArraysInstanced(int primitiveMode,
+                             int baseVertex,
+                             int vertexCount,
+                             int instanceCount) const override;
     
     HDST_API
-    virtual void DrawArraysInstanced(int primitiveMode,
-                                     int baseVertex,
-                                     int vertexCount,
-                                     int instanceCount) const override;
-    
-    HDST_API
-    virtual void DrawArrays(int primitiveMode,
-                            int baseVertex,
-                            int vertexCount) const override;
-    
+    void DrawArrays(int primitiveMode,
+                    int baseVertex,
+                    int vertexCount) const override;
+
     /// Returns the GL program object.
     HDST_API
     GLuint GetGLProgram() const { return _program; }
@@ -127,8 +127,7 @@ protected:
     virtual std::string GetComputeHeader() const override;
 
 private:
-    GLuint _program;
-    GLuint _programSize;
+    size_t _programSize;
     HdStResourceGL _uniformBuffer;
     // An identifier for uniquely identifying the program, for debugging
     // purposes - programs that fail to compile for one reason or another

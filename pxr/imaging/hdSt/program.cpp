@@ -38,7 +38,7 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 HdStProgram::HdStProgram(TfToken const &role,
-                         HdStResourceRegistry const* resourceRegistry)
+                         HdStResourceRegistry* resourceRegistry)
 : _role(role)
 , _registry(resourceRegistry)
 {
@@ -99,7 +99,7 @@ HdStProgram::GetComputeProgram(
 
         std::string header = newProgram->GetComputeHeader();
         if (!newProgram->CompileShader(
-                GL_COMPUTE_SHADER, header + glslfx->GetSource(shaderToken))) {
+                HgiShaderStageCompute, header + glslfx->GetSource(shaderToken))) {
             TF_CODING_ERROR("Fail to compile " + shaderToken.GetString());
             return HdStProgramSharedPtr();
         }

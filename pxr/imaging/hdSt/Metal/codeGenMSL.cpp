@@ -2586,7 +2586,7 @@ HdSt_CodeGenMSL::Compile(HdStResourceRegistry* const registry)
                 _genVS.str() + termination.str() + glueVS.str();
         _vsSource = replaceStringAll(_vsSource, "<st>", "_Vert");
         
-        if (!mslProgram->CompileShader(GL_VERTEX_SHADER, _vsSource)) {
+        if (!mslProgram->CompileShader(HgiShaderStageVertex, _vsSource)) {
             shaderCompiled = false;
         }
     }
@@ -2608,7 +2608,7 @@ HdSt_CodeGenMSL::Compile(HdStResourceRegistry* const registry)
         _gsSource = replaceStringAll(_gsSource, "<osd_ppbi>", "0");
         _gsSource = replaceStringAll(_gsSource, "<vbi>", "0");
         
-        if (!mslProgram->CompileShader(GL_GEOMETRY_SHADER, _gsSource))
+        if (!mslProgram->CompileShader(HgiShaderStageGeometry, _gsSource))
             shaderCompiled = false;
         
         mslProgram->SetGSOutStructsSize(_mslGSVertOutStructSize, _mslGSPrimOutStructSize);
@@ -2619,25 +2619,25 @@ HdSt_CodeGenMSL::Compile(HdStResourceRegistry* const registry)
                 _genFS.str() + termination.str() + gluePS.str();
         _fsSource = replaceStringAll(_fsSource, "<st>", "_Frag");
 
-        if (!mslProgram->CompileShader(GL_FRAGMENT_SHADER, _fsSource)) {
+        if (!mslProgram->CompileShader(HgiShaderStageFragment, _fsSource)) {
             shaderCompiled = false;
         }
     }
 //    if (hasTCS) {
 //        _tcsSource = _genCommon.str() + _genTCS.str() + termination.str();
-//        if (!mslProgram->CompileShader(GL_TESS_CONTROL_SHADER, _tcsSource)) {
+//        if (!mslProgram->CompileShader(HgiShaderStageTesselationControl, _tcsSource)) {
 //            shaderCompiled = false;
 //        }
 //    }
 //    if (hasTES) {
 //        _tesSource = _genCommon.str() + _genTES.str() + termination.str();
-//        if (!mslProgram->CompileShader(GL_TESS_EVALUATION_SHADER, _tesSource)) {
+//        if (!mslProgram->CompileShader(HgiShaderStageTesselationEval, _tesSource)) {
 //            shaderCompiled = false;
 //        }
 //    }
 //    if (hasGS) {
 //        _gsSource = gsConfigString.str() + _genCommon.str() + _genGS.str() + termination.str();
-//        if (!mslProgram->CompileShader(GL_GEOMETRY_SHADER, _gsSource)) { //REMOVE ME
+//        if (!mslProgram->CompileShader(HgiShaderStageGeometry, _gsSource)) { //REMOVE ME
 //            shaderCompiled = false;
 //        }
 //    }
@@ -2896,7 +2896,7 @@ HdSt_CodeGenMSL::CompileComputeProgram(HdStResourceRegistry* const registry)
         _csSource = _genCommon.str() + _genCS.str() + glueCS.str();
         _csSource = replaceStringAll(_csSource, "<st>", "_Compute");
 
-        if (!program->CompileShader(GL_COMPUTE_SHADER, _csSource)) {
+        if (!program->CompileShader(HgiShaderStageCompute, _csSource)) {
             return HdStProgramSharedPtr();
         }
     }

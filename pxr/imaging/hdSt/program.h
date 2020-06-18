@@ -30,6 +30,9 @@
 #include "pxr/base/tf/declarePtrs.h"
 #include "pxr/base/tf/token.h"
 
+#include "pxr/imaging/hgi/shaderProgram.h"
+#include "pxr/imaging/hgi/enums.h"
+
 #include <boost/shared_ptr.hpp>
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -41,6 +44,8 @@ class HdSt_ResourceBinder;
 
 using HdStProgramSharedPtr =
     std::shared_ptr<class HdStProgram>;
+
+using HgiShaderProgramHandle = HgiHandle<class HgiShaderProgram>;
 
 TF_DECLARE_WEAK_AND_REF_PTRS(GarchBindingMap);
 
@@ -60,9 +65,9 @@ public:
     /// Returns the role of the GPU data in this resource.
     TfToken const & GetRole() const { return _role; }
 
-    /// Compile shader source of type
+    /// Compile shader source for a shader stage.
     HDST_API
-    virtual bool CompileShader(uint32_t type, std::string const & source) = 0;
+    virtual bool CompileShader(HgiShaderStage type, std::string const & source) = 0;
 
     /// Link the compiled shaders together.
     HDST_API
@@ -143,13 +148,16 @@ public:
 protected:
     HDST_API
     HdStProgram(TfToken const &role,
-                HdStResourceRegistry const* resourceRegistry);
+                HdStResourceRegistry* resourceRegistry);
 
     HDST_API
     virtual std::string GetComputeHeader() const = 0;
     
     TfToken const _role;
-    HdStResourceRegistry const* _registry;
+    HdStResourceRegistry* _registry;
+    
+    HgiShaderProgramDesc _programDesc;
+    HgiShaderProgramHandle _program;
 };
 
 

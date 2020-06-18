@@ -185,6 +185,18 @@ void
 HdStRenderPassStateMetal::Unbind()
 {
     HdStRenderPassState::Unbind();
+    
+    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
+    
+    context->SetAlphaCoverageEnable(false);
+
+    context->SetAlphaBlendingEnable(false);
+    context->SetBlendOps(MTLBlendOperationAdd, MTLBlendOperationAdd);
+    context->SetBlendFactors(MTLBlendFactorOne, MTLBlendFactorZero,
+                             MTLBlendFactorOne, MTLBlendFactorZero);
+
+    context->SetDepthWriteEnable(true);
+
 /*
     glDisable(GL_POLYGON_OFFSET_FILL);
     glDisable(GL_SAMPLE_ALPHA_TO_COVERAGE);

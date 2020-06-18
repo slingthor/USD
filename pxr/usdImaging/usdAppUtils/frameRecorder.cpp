@@ -166,7 +166,7 @@ _ReadbackTexture(Hgi* const hgi,
     copyOp.destinationByteOffset = 0;
     copyOp.destinationBufferByteSize = alignedByteSize;
     blitCmds->CopyTextureGpuToCpu(copyOp);
-    hgi->SubmitCmds(blitCmds.get(), 1);
+    hgi->SubmitCmds(blitCmds.get());
 }
 
 struct _FormatDesc {
