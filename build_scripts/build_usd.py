@@ -289,6 +289,27 @@ def CurrentWorkingDirectory(dir):
     try: yield
     finally: os.chdir(curdir)
 
+def CreateUniversalBinaries(context, libNames, x86Dir, armDir):
+    xcodeRoot = subprocess.check_output(["xcode-select", "--print-path"]).strip()
+    lipoBinary = "{XCODE_ROOT}/Toolchains/XcodeDefault.xctoolchain/usr/bin/lipo".format(XCODE_ROOT=xcodeRoot)
+    for libName in libNames:
+        outputName = os.path.join(context.instDir, "lib", libName)
+        if not os.path.islink("{x86Dir}/{libName}".format(x86Dir=x86Dir, libName=libName)):
+            if os.path.exists(outputName):
+                os.remove(outputName)
+            lipoCmd = "{lipo} -create {x86Dir}/{libName} {armDir}/{libName} -output {outputName}".format(
+                lipo=lipoBinary, x86Dir=x86Dir, armDir=armDir, libName=libName, outputName=outputName)
+            Run(lipoCmd)
+    for libName in libNames:
+        if os.path.islink("{x86Dir}/{libName}".format(x86Dir=x86Dir, libName=libName)):
+            outputName = os.path.join(context.instDir, "lib", libName)
+            if os.path.exists(outputName):
+                os.unlink(outputName)
+            targetName = os.readlink("{x86Dir}/{libName}".format(x86Dir=x86Dir, libName=libName))
+            targetName = os.path.basename(targetName)
+            os.symlink("{instDir}/lib/{libName}".format(instDir=context.instDir, libName=targetName),
+                outputName)
+
 def CopyFiles(context, src, dest):
     """Copy files like shutil.copy, but src may be a glob pattern."""
     filesToCopy = glob.glob(src)
@@ -371,6 +392,7 @@ def RunCMake(context, force, buildArgs = None, hostPlatform = False):
     # TEMPORARY WORKAROUND
     if targetMacOS or targetIOS:
         extraArgs.append('-DCMAKE_IGNORE_PATH="/usr/lib;/usr/local/lib;/lib" ')
+        extraArgs.append('-DCMAKE_XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH=NO')
 
     if targetIOS:
         # Add the default iOS toolchain file if one isn't aready specified
@@ -891,9 +913,44 @@ def InstallBoost_Helper(context, force, buildArgs):
         b2_settings += buildArgs
 
         b2 = "b2" if Windows() else "./b2"
+
+        newLines = [
+            'using clang-darwin : x86_64\n',
+            ': {XCODE_ROOT}/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang++\n'
+                .format(XCODE_ROOT=xcodeRoot),
+            ': <compileflags>"-target x86_64-apple-macos10.15 -isysroot {SDK_PATH} -std=c++14 -stdlib=libc++" <linkflags>"-target x86_64-apple-macos10.15 -isysroot {SDK_PATH}" address-model=64 architecture=x86_64\n'
+                .format(SDK_PATH=sdkPath),
+            ';\n\n'
+            'using clang-darwin : arm64\n',
+            ': {XCODE_ROOT}/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang++\n'
+                .format(XCODE_ROOT=xcodeRoot),
+            ': <compileflags>"-target arm64-apple-macos10.15 -isysroot {SDK_PATH} -std=c++14 -stdlib=libc++" <linkflags>"-target arm64-apple-macos10.15 -isysroot {SDK_PATH}" address-model=64 architecture=arm64\n'
+                .format(SDK_PATH=sdkPath),
+            ';\n\n'
+        ]
+
+        with open(projectPath, 'a') as projectFile:
+            projectFile.writelines(newLines)
+        b2_toolset = "toolset=clang-darwin-x86_64"
+        b2_settings[0] = '--prefix="{instDir}/_tmp/x86_64"'.format(instDir=context.instDir)
+        b2Cmd = '{b2} {toolset} {options} install'.format(
+            b2=b2, toolset=b2_toolset, options=" ".join(b2_settings))
+        Run( b2Cmd )
+
+        b2_toolset = "toolset=clang-darwin-arm64"
+        b2_settings[0] = '--prefix="{instDir}/_tmp/arm64"'.format(instDir=context.instDir)
         b2Cmd = '{b2} {toolset} {options} install'.format(
             b2=b2, toolset=b2_toolset, options=" ".join(b2_settings))
         Run(b2Cmd)
+
+        CopyDirectory(context, os.path.join(context.instDir, "_tmp/x86_64/include/boost"), "include/boost")
+
+        x86Dir = os.path.join(context.instDir, "_tmp/x86_64/lib")
+        armDir = os.path.join(context.instDir, "_tmp/arm64/lib")
+        libNames = [f for f in os.listdir(x86Dir) if os.path.isfile(os.path.join(x86Dir, f))]
+        CreateUniversalBinaries(context, libNames, x86Dir, armDir)
+
+        shutil.rmtree(os.path.join(context.instDir, "_tmp"))
 
         # Output paths that are of interest
         with open(os.path.join(context.usdInstDir, 'boostBuild.txt'), 'wt') as file:
@@ -1015,6 +1072,15 @@ def InstallTBB_LinuxOrMacOS(context, force, buildArgs):
         makeTBBCmd = 'make -j{procs} {buildArgs}'.format(
             procs=context.numJobs, 
             buildArgs=" ".join(buildArgs))
+        PatchFile("build/macos.clang.inc", 
+            [("ifeq ($(arch),$(filter $(arch),armv7 armv7s arm64))",
+              "ifeq ($(arch),$(filter $(arch),armv7 armv7s arm64 arm64e))")])
+        Run(makeTBBCmd)
+
+        buildArgs.append("arch=arm64")
+        makeTBBCmd = "make -j{procs} {buildArgs}".format(
+            procs=context.numJobs,
+            buildArgs=" ".join(buildArgs))
         Run(makeTBBCmd)
 
         # Output paths that are of interest
@@ -1028,7 +1094,13 @@ def InstallTBB_LinuxOrMacOS(context, force, buildArgs):
         # makes it easier for users to install dependencies in some
         # location that can be shared by both release and debug USD
         # builds. Plus, the TBB build system builds both versions anyway.
-        CopyFiles(context, "build/*_release/libtbb*.*", "lib")
+        x86Files = glob.glob("build/*intel64*_release/libtbb*.*")
+        armFiles = glob.glob("build/*arm64*_release/libtbb*.*")
+        libNames = [os.path.basename(x) for x in x86Files]
+        x86Dir = os.path.dirname(x86Files[0])
+        armDir = os.path.dirname(armFiles[0])
+
+        CreateUniversalBinaries(context, libNames, x86Dir, armDir)
         CopyFiles(context, "build/*_debug/libtbb*.*", "lib")
         CopyDirectory(context, "include/serial", "include/serial")
         CopyDirectory(context, "include/tbb", "include/tbb")
@@ -1091,6 +1163,28 @@ def InstallJPEG_Turbo(jpeg_url, context, force, buildArgs):
                   "add_library(jpegtran STATIC ../jpegtran.c ../cdjpeg.c ../rdswitch.c ../transupp.c)"),
                  ("add_executable(jcstest ../jcstest.c)",
                   "add_library(jcstest STATIC ../jcstest.c)")])
+
+        extraJPEGArgs.append("-DWITH_SIMD=FALSE")
+        PatchFile("CMakeLists.txt", 
+            [("add_library(simd OBJECT jsimd_none.c)", "add_library(simd STATIC jsimd_none.c)"),
+             ("add_executable(wrjpgcom wrjpgcom.c)",
+              "add_executable(wrjpgcom wrjpgcom.c)\n\n"
+              "if(ENABLE_STATIC)\n"
+              "  target_link_libraries(jpeg-static simd)\n"
+              "  if(WITH_TURBOJPEG)\n"
+              "    target_link_libraries(turbojpeg-static simd)\n"
+              "  endif()\n"
+              "endif()\n"
+              "if(WITH_TURBOJPEG)\n"
+              "  target_link_libraries(turbojpeg simd)\n"
+              "endif()\n")])
+        PatchFile("sharedlib/CMakeLists.txt", 
+            [("target_link_libraries(cjpeg jpeg)",
+              "target_link_libraries(jpeg simd)\n\n"
+              "target_link_libraries(cjpeg jpeg)")
+             ])
+        PatchFile("CMakeLists.txt", [("$<TARGET_OBJECTS:simd>", "")], True)
+        PatchFile("sharedlib/CMakeLists.txt", [("$<TARGET_OBJECTS:simd>", "")], True)
 
         RunCMake(context, force, extraJPEGArgs)
         return os.getcwd()
@@ -1190,6 +1284,7 @@ PNG_URL = "https://downloads.sourceforge.net/project/libpng/libpng16/older-relea
 def InstallPNG(context, force, buildArgs):
     with CurrentWorkingDirectory(DownloadURL(PNG_URL, context, force)):
         extraPNGArgs = buildArgs;
+        extraPNGArgs.append("-DCMAKE_C_FLAGS=\"-DPNG_ARM_NEON_OPT=0\"");
 
         if iOS():
             extraPNGArgs.append('-DCMAKE_SYSTEM_PROCESSOR=aarch64');
@@ -1392,10 +1487,43 @@ def InstallGLEW_Windows(context, force):
 
 def InstallGLEW_LinuxOrMacOS(context, force, buildArgs):
     with CurrentWorkingDirectory(DownloadURL(GLEW_URL, context, force)):
-        Run('make GLEW_DEST="{instDir}" -j{procs} {buildArgs} install'
+        sdkPath = subprocess.check_output(['xcrun', '--sdk', 'macosx', '--show-sdk-path']).strip()
+        PatchFile("config/Makefile.darwin", 
+            [("CFLAGS.EXTRA = -arch arm64 -dynamic -fno-common -isysroot {SDK_PATH}".format(SDK_PATH=sdkPath),
+              "CFLAGS.EXTRA = -dynamic -fno-common"),
+             ("LDFLAGS.EXTRA = -arch arm64 -isysroot {SDK_PATH}".format(SDK_PATH=sdkPath),
+              "LDFLAGS.EXTRA =")])
+        Run('make clean')
+        Run('make GLEW_DEST="{instDir}/_tmp/x86_64" -j{procs} {buildArgs} install'
+            .format(instDir=context.instDir,
+                procs=context.numJobs,
+                buildArgs=" ".join(buildArgs)))
+
+        PatchFile("config/Makefile.darwin", 
+            [("CFLAGS.EXTRA = -dynamic -fno-common",
+              "CFLAGS.EXTRA = -arch arm64 -dynamic -fno-common -isysroot {SDK_PATH}".format(SDK_PATH=sdkPath)),
+             ("LDFLAGS.EXTRA =",
+              "LDFLAGS.EXTRA = -arch arm64 -isysroot {SDK_PATH}".format(SDK_PATH=sdkPath))]),
+        Run('make clean')
+        Run('make GLEW_DEST="{instDir}/_tmp/arm64" -j{procs} {buildArgs} install'
             .format(instDir=context.instDir,
                     procs=context.numJobs,
                     buildArgs=" ".join(buildArgs)))
+        x86Dir = os.path.join(context.instDir, "_tmp/x86_64/lib")
+        armDir = os.path.join(context.instDir, "_tmp/arm64/lib")
+        libNames = [f for f in os.listdir(x86Dir) if os.path.isfile(os.path.join(x86Dir, f))]
+        CreateUniversalBinaries(context, libNames, x86Dir, armDir)
+
+        for libName in libNames:
+            filename, file_extension = os.path.splitext(libName)
+            if not os.path.islink("{instDir}/lib/{libName}".format(instDir=context.instDir, libName=libName)) and \
+              file_extension == ".dylib":
+                Run('install_name_tool -id "@rpath/{libName}" {instDir}/lib/{libName}'.format(
+                    instDir=context.instDir, libName=libName))
+        CopyDirectory(context, os.path.join(context.instDir, "_tmp/x86_64/include/GL"), "include/GL")
+
+        shutil.rmtree(os.path.join(context.instDir, "_tmp"))
+
         glewCWD = os.getcwd()
         return glewCWD
 
@@ -1460,7 +1588,7 @@ def InstallBLOSC(context, force, buildArgs):
         extraArgs = []
 
         skip_x86_intrinsics = False
-        if iOS():
+        if MacOS or iOS():
             skip_x86_intrinsics = True
 
         if skip_x86_intrinsics:
@@ -1608,7 +1736,8 @@ def InstallOpenColorIO(context, force, buildArgs):
                      '-DOCIO_BUILD_TESTS=OFF',
                      '-DOCIO_BUILD_PYGLUE=OFF',
                      '-DOCIO_BUILD_JNIGLUE=OFF',
-                     '-DOCIO_STATIC_JNIGLUE=OFF']
+                     '-DOCIO_STATIC_JNIGLUE=OFF',
+                     '-DOCIO_USE_SSE=OFF']
 
         # The OCIO build treats all warnings as errors but several come up
         # on various platforms, including:
