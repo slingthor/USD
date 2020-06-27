@@ -109,7 +109,6 @@ def GetCommandOutput(command):
 
 def MacOSUniversalBinaries():
     MacOS_SDK = GetCommandOutput('xcrun --show-sdk-version').strip()
-    print(MacOS_SDK)
     return MacOS() and MacOS_SDK >= "11.0"
 
 def GetXcodeDeveloperDirectory():
