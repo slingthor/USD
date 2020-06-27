@@ -1072,9 +1072,6 @@ def InstallTBB_LinuxOrMacOS(context, force, buildArgs):
             buildArgs=" ".join(buildArgs))
         
         if MacOSUniversalBinaries():
-            PatchFile("build/macos.clang.inc", 
-                [("ifeq ($(arch),$(filter $(arch),armv7 armv7s arm64))",
-                "ifeq ($(arch),$(filter $(arch),armv7 armv7s arm64 arm64e))")])
             Run(makeTBBCmd)
 
             buildArgs.append("arch=arm64")
