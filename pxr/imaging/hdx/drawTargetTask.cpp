@@ -593,7 +593,7 @@ HdxDrawTargetTask::Execute(HdTaskContext* ctx)
     glFrontFace(GL_CW);
 #else
     TF_FATAL_CODING_ERROR("Not Implemented!"); //MTL_FIXME
-#endif asdasd
+#endif
 
     const size_t numRenderPasses = _renderPassesInfo.size();
     for (size_t renderPassIdx = 0;
