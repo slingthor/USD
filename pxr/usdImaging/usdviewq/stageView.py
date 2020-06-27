@@ -958,9 +958,6 @@ class StageView(QtOpenGL.QGLWidget):
         # Presto, so we default AOVs OFF until everything is AOV ready.
         self.SetRendererAov(self.rendererAovName)
 
-    def _scaleMouseCoords(self, point):
-        return point * QtWidgets.QApplication.instance().devicePixelRatio()
-
     def closeRenderer(self):
         '''Close the current renderer.'''
         with Timer() as t:
