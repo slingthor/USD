@@ -2211,10 +2211,8 @@ class StageView(QtOpenGL.QGLWidget):
                     None, Sdf.Path.emptyPath, None, None
         
 			# Correct for high DPI displays
-            coord = self._scaleMouseCoords( \
-                QtCore.QPoint(selectedPoint[0], selectedPoint[1]))
-            selectedPoint[0] = coord.x()
-            selectedPoint[1] = coord.y()
+            selectedPoint[0] = selectedPoint[0] * self.devicePixelRatioF()
+            selectedPoint[1] = selectedPoint[1] * self.devicePixelRatioF()
 
             if button:
                 self.signalPrimSelected.emit(
