@@ -107,7 +107,7 @@ def GetCommandOutput(command):
         pass
     return None
 
-def MacOSUniversalBinaries():
+def SupportsMacOSUniversalBinaries():
     MacOS_SDK = GetCommandOutput('xcrun --show-sdk-version').strip()
     return MacOS() and MacOS_SDK >= "10.16"
 
@@ -397,8 +397,14 @@ def RunCMake(context, force, buildArgs = None, hostPlatform = False):
     if targetMacOS or targetIOS:
         extraArgs.append('-DCMAKE_IGNORE_PATH="/usr/lib;/usr/local/lib;/lib" ')
 
-    if MacOSUniversalBinaries():
+    if context.buildUniversal and SupportsMacOSUniversalBinaries():
         extraArgs.append('-DCMAKE_XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH=NO')
+    else:
+        MacArch = GetCommandOutput('arch').strip()
+        if MacArch == "i386" or MacArch == "x86_64":
+            extraArgs.append('-DCMAKE_OSX_ARCHITECTURES=x86_64')
+        else:
+            extraArgs.append('-DCMAKE_OSX_ARCHITECTURES=arm64')
 
     if targetIOS:
         # Add the default iOS toolchain file if one isn't aready specified
@@ -914,7 +920,7 @@ def InstallBoost_Helper(context, force, buildArgs):
 
         b2 = "b2" if Windows() else "./b2"
 
-        if MacOSUniversalBinaries():
+        if context.buildUniversal and SupportsMacOSUniversalBinaries():
             newLines = [
                 'using clang-darwin : x86_64\n',
                 ': {XCODE_ROOT}/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang++\n'
@@ -945,7 +951,7 @@ def InstallBoost_Helper(context, force, buildArgs):
             b2=b2, toolset=b2_toolset, options=" ".join(b2_settings))
         Run(b2Cmd)
 
-        if MacOSUniversalBinaries():
+        if context.buildUniversal and SupportsMacOSUniversalBinaries():
             CopyDirectory(context, os.path.join(context.instDir, "_tmp/x86_64/include/boost"), "include/boost")
 
             x86Dir = os.path.join(context.instDir, "_tmp/x86_64/lib")
@@ -1071,7 +1077,7 @@ def InstallTBB_LinuxOrMacOS(context, force, buildArgs):
             procs=context.numJobs, 
             buildArgs=" ".join(buildArgs))
         
-        if MacOSUniversalBinaries():
+        if context.buildUniversal and SupportsMacOSUniversalBinaries():
             Run(makeTBBCmd)
 
             buildArgs.append("arch=arm64")
@@ -1092,7 +1098,7 @@ def InstallTBB_LinuxOrMacOS(context, force, buildArgs):
         # makes it easier for users to install dependencies in some
         # location that can be shared by both release and debug USD
         # builds. Plus, the TBB build system builds both versions anyway.
-        if MacOSUniversalBinaries():
+        if context.buildUniversal and SupportsMacOSUniversalBinaries():
             x86Files = glob.glob("build/*intel64*_release/libtbb*.*")
             armFiles = glob.glob("build/*arm64*_release/libtbb*.*")
             libNames = [os.path.basename(x) for x in x86Files]
@@ -1166,7 +1172,7 @@ def InstallJPEG_Turbo(jpeg_url, context, force, buildArgs):
                  ("add_executable(jcstest ../jcstest.c)",
                   "add_library(jcstest STATIC ../jcstest.c)")])
 
-        if MacOSUniversalBinaries():
+        if context.buildUniversal and SupportsMacOSUniversalBinaries():
             extraJPEGArgs.append("-DWITH_SIMD=FALSE")
             PatchFile("CMakeLists.txt", 
                 [("add_library(simd OBJECT jsimd_none.c)", "add_library(simd STATIC jsimd_none.c)"),
@@ -1256,7 +1262,7 @@ def InstallPNG(context, force, buildArgs):
     with CurrentWorkingDirectory(DownloadURL(PNG_URL, context, force)):
         extraPNGArgs = buildArgs;
 
-        if MacOSUniversalBinaries():
+        if context.buildUniversal and SupportsMacOSUniversalBinaries():
             extraPNGArgs.append("-DCMAKE_C_FLAGS=\"-DPNG_ARM_NEON_OPT=0\"");
 
         if iOS():
@@ -1456,7 +1462,7 @@ def InstallGLEW_Windows(context, force):
 def InstallGLEW_LinuxOrMacOS(context, force, buildArgs):
     with CurrentWorkingDirectory(DownloadURL(GLEW_URL, context, force)):
 
-        if MacOSUniversalBinaries():
+        if context.buildUniversal and SupportsMacOSUniversalBinaries():
             sdkPath = subprocess.check_output(['xcrun', '--sdk', 'macosx', '--show-sdk-path']).strip()
             PatchFile("config/Makefile.darwin", 
                 [("CFLAGS.EXTRA = -arch arm64 -dynamic -fno-common -isysroot {SDK_PATH}".format(SDK_PATH=sdkPath),
@@ -2341,6 +2347,11 @@ subgroup.add_argument("--python", dest="build_python", action="store_true",
                                          "(default)")
 subgroup.add_argument("--no-python", dest="build_python", action="store_false",
                       help="Do not build python based components")
+subgroup = group.add_mutually_exclusive_group()
+subgroup.add_argument("--universal", dest="universal", action="store_true",
+                      default=False, help="Build universal binaries on MacOS ")
+subgroup.add_argument("--no-universal", dest="universal", action="store_false",
+                      help="Do not build universal binaries on MacOS (default)")
 
 (NO_IMAGING, IMAGING, USD_IMAGING) = (0, 1, 2)
 
@@ -2523,6 +2534,7 @@ class InstallContext:
         self.buildDebug = args.build_debug;
         self.buildShared = (args.build_type == SHARED_LIBS)
         self.buildMonolithic = (args.build_type == MONOLITHIC_LIB)
+        self.buildUniversal = args.universal
 
         # Dependencies that are forced to be built
         self.forceBuildAll = args.force_all
@@ -2801,6 +2813,7 @@ Building with settings:
   Downloader                    {downloader}
   
   MacOS:
+    Build universal binaries    {buildUniversalBinaries}
     Use download cache          {use_download_cache}
     Make relocatable            {make_relocatable}
 
@@ -2854,6 +2867,7 @@ summaryMsg = summaryMsg.format(
     cmakeGenerator=("Default" if not context.cmakeGenerator
                     else context.cmakeGenerator),
     downloader=(context.downloaderName),
+    buildUniversalBinaries=("On" if context.buildUniversal and SupportsMacOSUniversalBinaries() else "Off"),
     use_download_cache=("On" if context.use_download_cache and MacOS() else "Off"),
     make_relocatable=("On" if context.make_relocatable and MacOS() else "Off"),
     dependencies=("None" if not dependenciesToBuild else 
