@@ -1051,10 +1051,19 @@ def InstallTBB_LinuxOrMacOS(context, force, buildArgs):
             buildArgs.append('compiler=clang target=ios arch=arm64 extra_inc=big_iron.inc ')
 
 
-        if MacOS() or iOS():
+        if iOS():
             PatchFile("include/tbb/machine/macos_common.h", 
                 [("#define __TBB_Yield()  sched_yield()",
                   "#define __TBB_Yield()  __TBB_Pause(1)")])
+        elif MacOS():
+            PatchFile("include/tbb/machine/macos_common.h", 
+                [("#define __TBB_Yield()  sched_yield()",
+                  "#if defined(__aarch64__)\n"
+                  "#define __TBB_Yield()  sched_yield()\n"
+                  "#else\n"
+                  "#define __TBB_Yield()  __TBB_Pause(1)\n"
+                  "#endif\n")])
+        if MacOS() or iOS():
             PatchFile("src/tbb/custom_scheduler.h", 
                 [("const int yield_threshold = 100;",
                   "const int yield_threshold = 10;")])
@@ -1065,21 +1074,22 @@ def InstallTBB_LinuxOrMacOS(context, force, buildArgs):
                 PatchFile("build/macos.clang.inc", 
                     [("LIBDL = -ldl",
                       "LIBDL = -ldl\n"
-                      "export SDKROOT:=$(shell xcodebuild -sdk -version | grep -o -E '/.*SDKs/MacOSX.*' 2>/dev/null | head -1)")])
+                      "export SDKROOT:=$(shell xcodebuild -sdk -version | grep -o -E '/.*SDKs/MacOSX.*' 2>/dev/null | head -1)"),
+                     ("-m64",
+                      "-m64 -arch x86_64")],
+                    True)
 
-        makeTBBCmd = 'make -j{procs} {buildArgs}'.format(
+        makeTBBCmd = 'make -j{procs} arch=intel64 {buildArgs}'.format(
             procs=context.numJobs, 
             buildArgs=" ".join(buildArgs))
+        Run(makeTBBCmd)
         
         if MacOSUniversalBinaries():
-            Run(makeTBBCmd)
-
-            buildArgs.append("arch=arm64")
-            makeTBBCmd = "make -j{procs} {buildArgs}".format(
+            makeTBBCmd = "make -j{procs} arch=arm64 {buildArgs}".format(
                 procs=context.numJobs,
                 buildArgs=" ".join(buildArgs))
 
-        Run(makeTBBCmd)
+            Run(makeTBBCmd)
 
         # Output paths that are of interest
         with open(os.path.join(context.usdInstDir, 'tbbBuild.txt'), 'wt') as file:
@@ -1457,12 +1467,17 @@ def InstallGLEW_LinuxOrMacOS(context, force, buildArgs):
     with CurrentWorkingDirectory(DownloadURL(GLEW_URL, context, force)):
 
         if MacOSUniversalBinaries():
+            PatchFile("config/Makefile.darwin", 
+                [("CFLAGS.EXTRA = -dynamic -fno-common",
+                  "CFLAGS.EXTRA = -arch x86_64 -dynamic -fno-common"),
+                 ("LDFLAGS.EXTRA =",
+                  "LDFLAGS.EXTRA = -arch x86_64")])
             sdkPath = subprocess.check_output(['xcrun', '--sdk', 'macosx', '--show-sdk-path']).strip()
             PatchFile("config/Makefile.darwin", 
                 [("CFLAGS.EXTRA = -arch arm64 -dynamic -fno-common -isysroot {SDK_PATH}".format(SDK_PATH=sdkPath),
-                "CFLAGS.EXTRA = -dynamic -fno-common"),
-                ("LDFLAGS.EXTRA = -arch arm64 -isysroot {SDK_PATH}".format(SDK_PATH=sdkPath),
-                "LDFLAGS.EXTRA =")])
+                  "CFLAGS.EXTRA = -arch x86_64 -dynamic -fno-common"),
+                 ("LDFLAGS.EXTRA = -arch arm64 -isysroot {SDK_PATH}".format(SDK_PATH=sdkPath),
+                  "LDFLAGS.EXTRA = -arch x86_64")])
             Run('make clean')
             Run('make GLEW_DEST="{instDir}/_tmp/x86_64" -j{procs} {buildArgs} install'
                 .format(instDir=context.instDir,
@@ -1470,10 +1485,10 @@ def InstallGLEW_LinuxOrMacOS(context, force, buildArgs):
                     buildArgs=" ".join(buildArgs)))
 
             PatchFile("config/Makefile.darwin", 
-                [("CFLAGS.EXTRA = -dynamic -fno-common",
-                "CFLAGS.EXTRA = -arch arm64 -dynamic -fno-common -isysroot {SDK_PATH}".format(SDK_PATH=sdkPath)),
-                ("LDFLAGS.EXTRA =",
-                "LDFLAGS.EXTRA = -arch arm64 -isysroot {SDK_PATH}".format(SDK_PATH=sdkPath))]),
+                [("CFLAGS.EXTRA = -arch x86_64 -dynamic -fno-common",
+                  "CFLAGS.EXTRA = -arch arm64 -dynamic -fno-common -isysroot {SDK_PATH}".format(SDK_PATH=sdkPath)),
+                 ("LDFLAGS.EXTRA = -arch x86_64",
+                  "LDFLAGS.EXTRA = -arch arm64 -isysroot {SDK_PATH}".format(SDK_PATH=sdkPath))]),
             Run('make clean')
             Run('make GLEW_DEST="{instDir}/_tmp/arm64" -j{procs} {buildArgs} install'
                 .format(instDir=context.instDir,
