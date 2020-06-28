@@ -1289,18 +1289,10 @@ UsdImagingGLEngine::_Execute(const UsdImagingGLRenderParams &params,
             params.enableSampleAlphaToCoverage,
             params.sampleCount,
             params.drawMode,
-#if defined(PXR_METAL_SUPPORT_ENABLED)
-            ((_renderAPI == Metal &&
-              params.mtlRenderPassDescriptorForNativeMetal) ||
-             MtlfMetalContext::GetMetalContext()->GetDrawTarget()) ?
-            HdStRenderDelegate::DelegateParams::RenderOutput::Metal :
-#endif
-            HdStRenderDelegate::DelegateParams::RenderOutput::OpenGL
+            params.skipInterop?
+                HdStRenderDelegate::DelegateParams::RenderOutput::Metal :
+                HdStRenderDelegate::DelegateParams::RenderOutput::OpenGL
               );
-#if defined(PXR_METAL_SUPPORT_ENABLED)
-            delegateParams.mtlRenderPassDescriptorForNativeMetal =
-                params.mtlRenderPassDescriptorForNativeMetal;
-#endif
         hdStRenderDelegate->PrepareRender(delegateParams);
     }
     

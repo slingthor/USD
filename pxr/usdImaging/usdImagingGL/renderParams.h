@@ -93,14 +93,9 @@ public:
     TfToken colorCorrectionMode;
     int lut3dSizeOCIO;
     unsigned long sampleCount;
+    bool skipInterop;
     
     UsdImagingGLRenderParams();
-    
-#if defined(PXR_METAL_SUPPORT_ENABLED)
-    MTLRenderPassDescriptor *mtlRenderPassDescriptorForNativeMetal;
-#else
-    void *_dummyPtr;
-#endif
 
     inline bool operator==(const UsdImagingGLRenderParams &other) const;
 
