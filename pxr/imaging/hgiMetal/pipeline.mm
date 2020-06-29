@@ -207,7 +207,7 @@ HgiMetalPipeline::_CreateDepthStencilState(id<MTLDevice> device)
     }
     else {
         depthStencilStateDescriptor.depthCompareFunction =
-            MTLCompareFunctionNever;
+            MTLCompareFunctionAlways;
     }
     
     if (_descriptor.depthState.stencilTestEnabled) {
