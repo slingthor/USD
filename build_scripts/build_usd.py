@@ -1347,6 +1347,16 @@ def InstallOpenEXR(context, force, buildArgs):
              ("ADD_EXECUTABLE ( b44ExpLogTable",
               "ADD_LIBRARY ( b44ExpLogTable STATIC")])
 
+    if MacOS():
+        PatchFile(srcDir + "/OpenEXR/CMakeLists.txt",
+            [("SET (OPENEXR_LIBSUFFIX \"\")",
+              "SET (OPENEXR_LIBSUFFIX \"\")\n"
+              "FILE ( APPEND ${CMAKE_CURRENT_BINARY_DIR}/config/OpenEXRConfig.h \"\n"
+              "#undef OPENEXR_IMF_HAVE_GCC_INLINE_ASM_AVX\n"
+              "#ifndef __aarch64__\n"
+              "#define OPENEXR_IMF_HAVE_GCC_INLINE_ASM_AVX 1\n"
+              "#endif\n\")\n")])
+
     ilmbaseSrcDir = os.path.join(srcDir, "IlmBase")
     with CurrentWorkingDirectory(ilmbaseSrcDir):
         # openexr 2.2 has a bug with Ninja:
