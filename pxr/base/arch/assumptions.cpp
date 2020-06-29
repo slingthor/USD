@@ -125,8 +125,8 @@ Arch_ValidateAssumptions()
      * Make sure that the ARCH_CACHE_LINE_SIZE constant is set as expected
      * on the current hardware architecture.
      */
-    if ((ARCH_CACHE_LINE_SIZE % Arch_ObtainCacheLineSize() != 0)) {
-        ARCH_WARNING("(ARCH_CACHE_LINE_SIZE % Arch_ObtainCacheLineSize()) != 0");
+    if ((ARCH_CACHE_LINE_SIZE > Arch_ObtainCacheLineSize())) {
+        ARCH_WARNING("ARCH_CACHE_LINE_SIZE > Arch_ObtainCacheLineSize()");
     }
 }
 
