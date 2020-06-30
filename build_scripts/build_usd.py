@@ -1753,6 +1753,13 @@ def InstallOpenColorIO(context, force, buildArgs):
                      '-DOCIO_BUILD_JNIGLUE=OFF',
                      '-DOCIO_STATIC_JNIGLUE=OFF']
 
+        if context.buildUniversal and SupportsMacOSUniversalBinaries():
+            PatchFile("CMakeLists.txt",
+                    [('CMAKE_ARGS      ${TINYXML_CMAKE_ARGS}',
+                      'CMAKE_ARGS      ${TINYXML_CMAKE_ARGS}\n            CMAKE_CACHE_ARGS -DCMAKE_XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH:BOOL=TRUE -DCMAKE_OSX_ARCHITECTURES:STRING="x86_64;arm64"'),
+                     ('CMAKE_ARGS      ${YAML_CPP_CMAKE_ARGS}',
+                      'CMAKE_ARGS      ${YAML_CPP_CMAKE_ARGS}\n            CMAKE_CACHE_ARGS -DCMAKE_XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH:BOOL=TRUE -DCMAKE_OSX_ARCHITECTURES:STRING="x86_64;arm64"')])
+            
         # The OCIO build treats all warnings as errors but several come up
         # on various platforms, including:
         # - On gcc6, v1.1.0 emits many -Wdeprecated-declaration warnings for
