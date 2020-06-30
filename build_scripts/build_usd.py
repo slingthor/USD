@@ -399,7 +399,9 @@ def RunCMake(context, force, buildArgs = None, hostPlatform = False):
 
     if context.buildUniversal and SupportsMacOSUniversalBinaries():
         extraArgs.append('-DCMAKE_XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH=NO')
+        extraArgs.append('-DCMAKE_OSX_ARCHITECTURES=x86_64;arm64')
     else:
+        extraArgs.append('-DCMAKE_XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH=YES')
         MacArch = GetCommandOutput('arch').strip()
         if MacArch == "i386" or MacArch == "x86_64":
             extraArgs.append('-DCMAKE_OSX_ARCHITECTURES=x86_64')
@@ -1288,6 +1290,19 @@ def InstallPNG(context, force, buildArgs):
                   "add_library(pngfix STATIC ${pngfix_sources})"),
                  ("add_executable(png-fix-itxt ${png_fix_itxt_sources})",
                   "add_library(png-fix-itxt STATIC ${png_fix_itxt_sources})")])
+
+        if context.buildUniversal and SupportsMacOSUniversalBinaries():
+            PatchFile("scripts/genout.cmake.in",
+                [("CMAKE_OSX_ARCHITECTURES",
+                  "CMAKE_OSX_INTERNAL_ARCHITECTURES")])
+
+            MacArch = GetCommandOutput('arch').strip()
+            if MacArch == "i386" or MacArch == "x86_64":
+                MacArch = "x86_64"
+            else:
+                MacArch = "arm64"
+            
+            extraPNGArgs.append('-DCMAKE_OSX_INTERNAL_ARCHITECTURES={arch}'.format(arch=MacArch))
 
         RunCMake(context, force, extraPNGArgs)
         return os.getcwd()
