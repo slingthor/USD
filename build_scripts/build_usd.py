@@ -107,6 +107,14 @@ def GetCommandOutput(command):
         pass
     return None
 
+def GetMacArch():
+    macArch = GetCommandOutput('arch').strip()
+    if macArch == "i386" or macArch == "x86_64":
+        macArch = "x86_64"
+    else:
+        macArch = "arm64"
+    return macArch;
+
 def SupportsMacOSUniversalBinaries():
     MacOS_SDK = GetCommandOutput('xcrun --show-sdk-version').strip()
     return MacOS() and MacOS_SDK >= "10.16"
@@ -1087,13 +1095,23 @@ def InstallTBB_LinuxOrMacOS(context, force, buildArgs):
                       "-m64 -arch x86_64")],
                     True)
 
-        makeTBBCmd = 'make -j{procs} arch=intel64 {buildArgs}'.format(
+        archPrimary = GetMacArch()
+        archSecondary = ""
+        if (archPrimary == "x86_64"):
+            archPimary = "intel64"
+            archSecondary = "arm64"
+        else:
+            archSecondary = "arm64"
+
+        makeTBBCmd = 'make -j{procs} arch={arch} {buildArgs}'.format(
+            arch=archPrimary,
             procs=context.numJobs, 
             buildArgs=" ".join(buildArgs))
         Run(makeTBBCmd)
         
         if context.buildUniversal and SupportsMacOSUniversalBinaries():
-            makeTBBCmd = "make -j{procs} arch=arm64 {buildArgs}".format(
+            makeTBBCmd = "make -j{procs} arch={arch} {buildArgs}".format(
+                arch=archSecondary,
                 procs=context.numJobs,
                 buildArgs=" ".join(buildArgs))
 
@@ -1274,7 +1292,7 @@ def InstallPNG(context, force, buildArgs):
     with CurrentWorkingDirectory(DownloadURL(PNG_URL, context, force)):
         extraPNGArgs = buildArgs;
 
-        if context.buildUniversal and SupportsMacOSUniversalBinaries():
+        if (context.buildUniversal and SupportsMacOSUniversalBinaries()) or (GetMacArch() == "arm64"):
             extraPNGArgs.append("-DCMAKE_C_FLAGS=\"-DPNG_ARM_NEON_OPT=0\"");
 
         if iOS():
@@ -1296,13 +1314,7 @@ def InstallPNG(context, force, buildArgs):
                 [("CMAKE_OSX_ARCHITECTURES",
                   "CMAKE_OSX_INTERNAL_ARCHITECTURES")])
 
-            MacArch = GetCommandOutput('arch').strip()
-            if MacArch == "i386" or MacArch == "x86_64":
-                MacArch = "x86_64"
-            else:
-                MacArch = "arm64"
-            
-            extraPNGArgs.append('-DCMAKE_OSX_INTERNAL_ARCHITECTURES={arch}'.format(arch=MacArch))
+            extraPNGArgs.append('-DCMAKE_OSX_INTERNAL_ARCHITECTURES=' + GetMacArch())
 
         RunCMake(context, force, extraPNGArgs)
         return os.getcwd()
@@ -1754,11 +1766,19 @@ def InstallOpenColorIO(context, force, buildArgs):
                      '-DOCIO_STATIC_JNIGLUE=OFF']
 
         if context.buildUniversal and SupportsMacOSUniversalBinaries():
-            PatchFile("CMakeLists.txt",
-                    [('CMAKE_ARGS      ${TINYXML_CMAKE_ARGS}',
-                      'CMAKE_ARGS      ${TINYXML_CMAKE_ARGS}\n            CMAKE_CACHE_ARGS -DCMAKE_XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH:BOOL=TRUE -DCMAKE_OSX_ARCHITECTURES:STRING="x86_64;arm64"'),
-                     ('CMAKE_ARGS      ${YAML_CPP_CMAKE_ARGS}',
-                      'CMAKE_ARGS      ${YAML_CPP_CMAKE_ARGS}\n            CMAKE_CACHE_ARGS -DCMAKE_XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH:BOOL=TRUE -DCMAKE_OSX_ARCHITECTURES:STRING="x86_64;arm64"')])
+            arch = "x86_64;arm64"
+        else:
+            arch = GetMacArch()
+
+        PatchFile("CMakeLists.txt",
+                [('CMAKE_ARGS      ${TINYXML_CMAKE_ARGS}',
+                  'CMAKE_ARGS      ${TINYXML_CMAKE_ARGS}\n' +
+                  '            CMAKE_CACHE_ARGS -DCMAKE_XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH:BOOL=TRUE'
+                  ' -DCMAKE_OSX_ARCHITECTURES:STRING="{arch}"'.format(arch=arch)),
+                 ('CMAKE_ARGS      ${YAML_CPP_CMAKE_ARGS}',
+                  'CMAKE_ARGS      ${YAML_CPP_CMAKE_ARGS}\n' +
+                  '            CMAKE_CACHE_ARGS -DCMAKE_XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH:BOOL=TRUE'
+                  ' -DCMAKE_OSX_ARCHITECTURES:STRING="{arch}"'.format(arch=arch))])
             
         # The OCIO build treats all warnings as errors but several come up
         # on various platforms, including:
