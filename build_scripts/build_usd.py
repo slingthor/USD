@@ -2998,6 +2998,8 @@ if Windows():
 if args.make_relocatable:
     SDKVersion  = GetCommandOutput('xcodebuild -version').strip()[6:10]
     codeSignIDs = GetCommandOutput('security find-identity -v -p codesigning')
+    if codeSignIDs is None:
+        codeSignIDs = ""
 
     codeSignID = os.environ.get('XCODE_ATTRIBUTE_CODE_SIGN_ID')
     if codeSignID is not None:
