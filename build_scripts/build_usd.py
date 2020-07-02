@@ -290,6 +290,7 @@ def CurrentWorkingDirectory(dir):
     finally: os.chdir(curdir)
 
 def CreateUniversalBinaries(context, libNames, x86Dir, armDir):
+    lipoCommands = []
     xcodeRoot = subprocess.check_output(["xcode-select", "--print-path"]).strip()
     lipoBinary = "{XCODE_ROOT}/Toolchains/XcodeDefault.xctoolchain/usr/bin/lipo".format(XCODE_ROOT=xcodeRoot)
     for libName in libNames:
@@ -299,6 +300,7 @@ def CreateUniversalBinaries(context, libNames, x86Dir, armDir):
                 os.remove(outputName)
             lipoCmd = "{lipo} -create {x86Dir}/{libName} {armDir}/{libName} -output {outputName}".format(
                 lipo=lipoBinary, x86Dir=x86Dir, armDir=armDir, libName=libName, outputName=outputName)
+            lipoCommands.append(lipoCmd)
             Run(lipoCmd)
     for libName in libNames:
         if os.path.islink("{x86Dir}/{libName}".format(x86Dir=x86Dir, libName=libName)):
@@ -309,6 +311,7 @@ def CreateUniversalBinaries(context, libNames, x86Dir, armDir):
             targetName = os.path.basename(targetName)
             os.symlink("{instDir}/lib/{libName}".format(instDir=context.instDir, libName=targetName),
                 outputName)
+    return lipoCommands
 
 def CopyFiles(context, src, dest):
     """Copy files like shutil.copy, but src may be a glob pattern."""
@@ -933,22 +936,22 @@ def InstallBoost_Helper(context, force, buildArgs):
             projectFile.writelines(newLines)
         b2_toolset = "toolset=clang-darwin-x86_64"
         b2_settings[0] = '--prefix="{instDir}/_tmp/x86_64"'.format(instDir=context.instDir)
-        b2Cmd = '{b2} {toolset} {options} install'.format(
+        b2CmdIntel = '{b2} {toolset} {options} install'.format(
             b2=b2, toolset=b2_toolset, options=" ".join(b2_settings))
-        Run( b2Cmd )
+        Run( b2CmdIntel )
 
         b2_toolset = "toolset=clang-darwin-arm64"
         b2_settings[0] = '--prefix="{instDir}/_tmp/arm64"'.format(instDir=context.instDir)
-        b2Cmd = '{b2} {toolset} {options} install'.format(
+        b2CmdArm = '{b2} {toolset} {options} install'.format(
             b2=b2, toolset=b2_toolset, options=" ".join(b2_settings))
-        Run(b2Cmd)
+        Run(b2CmdArm)
 
         CopyDirectory(context, os.path.join(context.instDir, "_tmp/x86_64/include/boost"), "include/boost")
 
         x86Dir = os.path.join(context.instDir, "_tmp/x86_64/lib")
         armDir = os.path.join(context.instDir, "_tmp/arm64/lib")
         libNames = [f for f in os.listdir(x86Dir) if os.path.isfile(os.path.join(x86Dir, f))]
-        CreateUniversalBinaries(context, libNames, x86Dir, armDir)
+        lipoCommands = CreateUniversalBinaries(context, libNames, x86Dir, armDir)
 
         shutil.rmtree(os.path.join(context.instDir, "_tmp"))
 
@@ -957,7 +960,9 @@ def InstallBoost_Helper(context, force, buildArgs):
             file.write('ARCHIVE:' + BOOST_URL.split("/")[-1] + '\n')
             file.write('BUILDFOLDER:' + os.path.split(os.getcwd())[1] + '\n')
             file.write('BOOTSTRAP:' + bootstrapCmd + '\n')
-            file.write('B2:' + b2Cmd + '\n')
+            file.write('B2INTEL:' + b2CmdIntel + '\n')
+            file.write('B2ARM:' + b2CmdArm + '\n')
+            file.write('LIPO:' + ','.join(lipoCommands) + '\n')
 
         if iOS():
             for filename in os.listdir(context.instDir + "/lib"):
@@ -1069,38 +1074,38 @@ def InstallTBB_LinuxOrMacOS(context, force, buildArgs):
             buildArgs.append('extra_inc=big_iron.inc ')
 
 
-        makeTBBCmd = 'make -j{procs} {buildArgs}'.format(
+        makeTBBCmdIntel = 'make -j{procs} {buildArgs} '.format(
             procs=context.numJobs, 
             buildArgs=" ".join(buildArgs))
-        PatchFile("build/macos.clang.inc", 
-            [("ifeq ($(arch),$(filter $(arch),armv7 armv7s arm64))",
-              "ifeq ($(arch),$(filter $(arch),armv7 armv7s arm64 arm64e))")])
-        Run(makeTBBCmd)
+        Run(makeTBBCmdIntel)
 
         buildArgs.append("arch=arm64")
-        makeTBBCmd = "make -j{procs} {buildArgs}".format(
+        makeTBBCmdArm = "make -j{procs} {buildArgs} ".format(
             procs=context.numJobs,
             buildArgs=" ".join(buildArgs))
-        Run(makeTBBCmd)
-
-        # Output paths that are of interest
-        with open(os.path.join(context.usdInstDir, 'tbbBuild.txt'), 'wt') as file:
-            file.write('ARCHIVE:' + TBB_URL.split("/")[-1] + '\n')
-            file.write('BUILDFOLDER:' + os.path.split(os.getcwd())[1] + '\n')
-            file.write('MAKE:' + makeTBBCmd + '\n')
+        Run(makeTBBCmdArm)
 
         # Install both release and debug builds. USD requires the debug
         # libraries when building in debug mode, and installing both
         # makes it easier for users to install dependencies in some
         # location that can be shared by both release and debug USD
         # builds. Plus, the TBB build system builds both versions anyway.
-        x86Files = glob.glob("build/*intel64*_release/libtbb*.*")
-        armFiles = glob.glob("build/*arm64*_release/libtbb*.*")
+        x86Files = glob.glob(os.getcwd() + "/build/*intel64*_release/libtbb*.*")
+        armFiles = glob.glob(os.getcwd() + "/build/*arm64*_release/libtbb*.*")
         libNames = [os.path.basename(x) for x in x86Files]
         x86Dir = os.path.dirname(x86Files[0])
         armDir = os.path.dirname(armFiles[0])
 
-        CreateUniversalBinaries(context, libNames, x86Dir, armDir)
+        lipoCommands = CreateUniversalBinaries(context, libNames, x86Dir, armDir)
+
+        # Output paths that are of interest
+        with open(os.path.join(context.usdInstDir, 'tbbBuild.txt'), 'wt') as file:
+            file.write('ARCHIVE:' + TBB_URL.split("/")[-1] + '\n')
+            file.write('BUILDFOLDER:' + os.path.split(os.getcwd())[1] + '\n')
+            file.write('MAKEINTEL:' + makeTBBCmdIntel + '\n')
+            file.write('MAKEARM:' + makeTBBCmdArm + '\n')
+            file.write('LIPO:' + ','.join(lipoCommands) + '\n')
+
         CopyFiles(context, "build/*_debug/libtbb*.*", "lib")
         CopyDirectory(context, "include/serial", "include/serial")
         CopyDirectory(context, "include/tbb", "include/tbb")
@@ -1128,6 +1133,7 @@ def InstallJPEG_Turbo(jpeg_url, context, force, buildArgs):
 
         if MacOS():
             extraJPEGArgs.append("-DWITH_SIMD=FALSE")
+            extraJPEGArgs.append("-DENABLE_STATIC=TRUE")
 
         if iOS():
             extraJPEGArgs.append('-DCMAKE_SYSTEM_PROCESSOR=aarch64');
@@ -1164,27 +1170,28 @@ def InstallJPEG_Turbo(jpeg_url, context, force, buildArgs):
                  ("add_executable(jcstest ../jcstest.c)",
                   "add_library(jcstest STATIC ../jcstest.c)")])
 
-        extraJPEGArgs.append("-DWITH_SIMD=FALSE")
-        PatchFile("CMakeLists.txt", 
-            [("add_library(simd OBJECT jsimd_none.c)", "add_library(simd STATIC jsimd_none.c)"),
-             ("add_executable(wrjpgcom wrjpgcom.c)",
-              "add_executable(wrjpgcom wrjpgcom.c)\n\n"
-              "if(ENABLE_STATIC)\n"
-              "  target_link_libraries(jpeg-static simd)\n"
-              "  if(WITH_TURBOJPEG)\n"
-              "    target_link_libraries(turbojpeg-static simd)\n"
-              "  endif()\n"
-              "endif()\n"
-              "if(WITH_TURBOJPEG)\n"
-              "  target_link_libraries(turbojpeg simd)\n"
-              "endif()\n")])
-        PatchFile("sharedlib/CMakeLists.txt", 
-            [("target_link_libraries(cjpeg jpeg)",
-              "target_link_libraries(jpeg simd)\n\n"
-              "target_link_libraries(cjpeg jpeg)")
-             ])
-        PatchFile("CMakeLists.txt", [("$<TARGET_OBJECTS:simd>", "")], True)
-        PatchFile("sharedlib/CMakeLists.txt", [("$<TARGET_OBJECTS:simd>", "")], True)
+        if not context.static_dependencies_macOS:
+            PatchFile("CMakeLists.txt", 
+                [("add_library(simd OBJECT jsimd_none.c)", "add_library(simd STATIC jsimd_none.c)"),
+                ("$<TARGET_OBJECTS:simd>", ""),
+                ("add_executable(wrjpgcom wrjpgcom.c)",
+                "add_executable(wrjpgcom wrjpgcom.c)\n\n"
+                "if(ENABLE_STATIC)\n"
+                "  target_link_libraries(jpeg-static simd)\n"
+                "  if(WITH_TURBOJPEG)\n"
+                "    target_link_libraries(turbojpeg-static simd)\n"
+                "  endif()\n"
+                "endif()\n"
+                "if(WITH_TURBOJPEG)\n"
+                "  target_link_libraries(turbojpeg simd)\n"
+                "endif()\n")])
+            PatchFile("sharedlib/CMakeLists.txt", 
+                [("target_link_libraries(cjpeg jpeg)",
+                "target_link_libraries(jpeg simd)\n\n"
+                "target_link_libraries(cjpeg jpeg)")
+                ])
+            PatchFile("CMakeLists.txt", [("$<TARGET_OBJECTS:simd>", "")], True)
+            PatchFile("sharedlib/CMakeLists.txt", [("$<TARGET_OBJECTS:simd>", "")], True)
 
         RunCMake(context, force, extraJPEGArgs)
         return os.getcwd()
