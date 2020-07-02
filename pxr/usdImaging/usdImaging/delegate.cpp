@@ -1210,7 +1210,6 @@ UsdImagingDelegate::_RefreshUsdObject(SdfPath const& usdPath,
         SdfPath const& usdPrimPath = usdPath.GetPrimPath();
         TfToken const& attrName = usdPath.GetNameToken();
         UsdPrim usdPrim = _stage->GetPrimAtPath(usdPrimPath);
-        static std::string primvarsNS = "primvars:";
 
         // If either model:drawMode or model:applyDrawMode changes, we need to
         // repopulate the whole subtree starting at the owning prim.
@@ -1236,7 +1235,7 @@ UsdImagingDelegate::_RefreshUsdObject(SdfPath const& usdPath,
             // Because these are inherited attributes, we must update all
             // children.
             _GatherDependencies(usdPrimPath, &affectedCachePaths);
-        } else if (TfStringStartsWith(attrName.GetString(), primvarsNS)) {
+        } else if (UsdGeomPrimvar::IsPrimvarRelatedPropertyName(attrName)) {
             // Primvars can be inherited, so we need to invalidate everything
             // downstream.  Technically, only constant primvars on non-leaf
             // prims are inherited, but we can't check the interpolation mode
@@ -2192,10 +2191,17 @@ UsdImagingDelegate::SampleTransform(SdfPath const & id,
     SdfPath cachePath = ConvertIndexPathToCachePath(id);
     _HdPrimInfo *primInfo = _GetHdPrimInfo(cachePath);
     if (TF_VERIFY(primInfo)) {
-        return primInfo->adapter
+        // Now, return the multi-sampled result.
+        size_t nSamples = primInfo->adapter
             ->SampleTransform(primInfo->usdPrim, cachePath,
                               _time, maxNumSamples,
                               sampleTimes, sampleValues);
+        // Make sure to clear the transform out of the value cache so we don't
+        // leak memory...
+        GfMatrix4d ctm(1.0);
+        _valueCache.ExtractTransform(cachePath, &ctm);
+
+        return nSamples;
     }
     return 0;
 }
@@ -2321,8 +2327,8 @@ UsdImagingDelegate::Get(SdfPath const& id, TfToken const& key)
             // XXX(UsdImaging): We use cachePath directly as usdPath here,
             // but should do the proper transformation.  Maybe we can use
             // the primInfo.usdPrim?
-            TF_VERIFY(_GetUsdPrim(cachePath).GetAttribute(key)
-                      .Get(&value, _time),
+            UsdPrim prim = _GetUsdPrim(cachePath);
+            TF_VERIFY(prim && prim.GetAttribute(key).Get(&value, _time),
                       "%s, %s\n", id.GetText(), key.GetText());
         }
     }
@@ -2364,9 +2370,16 @@ UsdImagingDelegate::SamplePrimvar(SdfPath const& id,
     SdfPath cachePath = ConvertIndexPathToCachePath(id);
     _HdPrimInfo *primInfo = _GetHdPrimInfo(cachePath);
     if (TF_VERIFY(primInfo)) {
-        return primInfo->adapter
+        // Retrieve the multi-sampled result.
+        size_t nSamples = primInfo->adapter
             ->SamplePrimvar(primInfo->usdPrim, cachePath, key,
                             _time, maxNumSamples, sampleTimes, sampleValues);
+        // Make sure to clear the primvar out of the value cache so we don't
+        // leak memory...
+        VtValue value;
+        _valueCache.ExtractPrimvar(cachePath, key, &value);
+
+        return nSamples;
     }
     return 0;
 }

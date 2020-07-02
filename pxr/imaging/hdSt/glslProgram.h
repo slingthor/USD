@@ -28,17 +28,20 @@
 #include "pxr/imaging/hd/version.h"
 #include "pxr/imaging/hdSt/api.h"
 #include "pxr/imaging/hdSt/resourceGL.h"
+#include "pxr/imaging/hgi/shaderProgram.h"
+#include "pxr/imaging/hgi/enums.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
 class HdStResourceRegistry;
 using HdStGLSLProgramSharedPtr = std::shared_ptr<class HdStGLSLProgram>;
 
+using HgiShaderProgramHandle = HgiHandle<class HgiShaderProgram>;
+
 /// \class HdStGLSLProgram
 ///
 /// An instance of a glsl program.
 ///
-// XXX: this design is transitional and will be revised soon.
 class HdStGLSLProgram final
 {
 public:
@@ -53,9 +56,9 @@ public:
     HDST_API
     static ID ComputeHash(TfToken const & sourceFile);
 
-    /// Compile shader source of type
+    /// Compile shader source for a shader stage.
     HDST_API
-    bool CompileShader(GLenum type, std::string const & source);
+    bool CompileShader(HgiShaderStage stage, std::string const & source);
 
     /// Link the compiled shaders together.
     HDST_API
@@ -66,7 +69,7 @@ public:
     bool Validate() const;
 
     /// Returns HdResource of the program object.
-    HdStResourceGL const &GetProgram() const { return _program; }
+    HdStResourceGL const &GetProgram() const { return _programResource; }
 
     /// Returns HdResource of the global uniform buffer object for this program.
     HdStResourceGL const &GetGlobalUniformBuffer() const {
@@ -87,8 +90,12 @@ public:
 
 private:
     HdStResourceRegistry *const _registry;
-    HdStResourceGL _program;
+    HdStResourceGL _programResource;
     HdStResourceGL _uniformBuffer;
+
+    HgiShaderProgramDesc _programDesc;
+    HgiShaderProgramHandle _program;
+
     // An identifier for uniquely identifying the program, for debugging
     // purposes - programs that fail to compile for one reason or another
     // will get deleted, and their GL program IDs reused, so we can't use

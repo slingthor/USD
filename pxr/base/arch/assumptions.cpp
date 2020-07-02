@@ -37,6 +37,7 @@
 #include <unistd.h>
 #elif defined(ARCH_OS_DARWIN)
 #include <sys/sysctl.h>
+#include <mach-o/arch.h>
 #elif defined(ARCH_OS_WINDOWS)
 #include <Windows.h>
 #include <memory>
@@ -120,14 +121,32 @@ Arch_ValidateAssumptions()
     if (ArchGetDemangled<int>() != "int") {
         ARCH_WARNING("C++ demangling appears badly broken.");
     }
-
+    
+    size_t cacheLineSize = Arch_ObtainCacheLineSize();
+    
+#if defined(ARCH_OS_DARWIN) && defined(ARCH_CPU_INTEL)
+    /*
+     * On MacOS with Rossetta 2, we may be an Intel x86_64 binary running on
+     * an Apple Silicon arm64 cpu. macOS always returns the underlying
+     * HW's cache line size, so we explicitly whitelist this exception here
+     * by setting the detected cache line size to be what we expect
+     */
+    NXArchInfo const* archInfo = NXGetLocalArchInfo();
+    if (archInfo && ((archInfo->cputype & ~CPU_ARCH_MASK) == CPU_TYPE_ARM)) {
+        if ((128 != cacheLineSize)) {
+            ARCH_WARNING("128 != Arch_ObtainCacheLineSize()");
+        }
+        cacheLineSize = ARCH_CACHE_LINE_SIZE;
+    }
+#endif
     /*
      * Make sure that the ARCH_CACHE_LINE_SIZE constant is set as expected
      * on the current hardware architecture.
      */
-    if ((ARCH_CACHE_LINE_SIZE % Arch_ObtainCacheLineSize() != 0)) {
-        ARCH_WARNING("(ARCH_CACHE_LINE_SIZE % Arch_ObtainCacheLineSize()) != 0");
+    if ((ARCH_CACHE_LINE_SIZE != cacheLineSize)) {
+        ARCH_WARNING("ARCH_CACHE_LINE_SIZE != Arch_ObtainCacheLineSize()");
     }
+
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

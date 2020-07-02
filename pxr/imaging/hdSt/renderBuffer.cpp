@@ -114,15 +114,18 @@ HdStRenderBuffer::Map()
 {
     _mappers.fetch_add(1);
 
-    size_t formatByteSize = HdDataSizeOfFormat(_format);
-    size_t dataByteSize = _dimensions[0] *
-                          _dimensions[1] *
-                          _dimensions[2] *
-                          formatByteSize;
+    const size_t formatByteSize = HdDataSizeOfFormat(_format);
+    const size_t dataByteSize = _dimensions[0] *
+                                _dimensions[1] *
+                                _dimensions[2] *
+                                formatByteSize;
+    
+    // For Metal the CPU buffer has to be rounded up to multiple of 4096 bytes.
+    const size_t alignedByteSize = (dataByteSize + 0xFFF) & (~0xFFF);
+    
+    _mappedBuffer.resize(alignedByteSize);
 
-    _mappedBuffer.resize(dataByteSize);
-
-    if (dataByteSize > 0) {
+    if (alignedByteSize > 0) {
         HgiTextureGpuToCpuOp copyOp;
         copyOp.gpuSourceTexture = _texture;
         copyOp.sourceTexelOffset = GfVec3i(0);
@@ -131,12 +134,12 @@ HdStRenderBuffer::Map()
         copyOp.numLayers = 1;
         copyOp.cpuDestinationBuffer = _mappedBuffer.data();
         copyOp.destinationByteOffset = 0;
-        copyOp.destinationBufferByteSize = dataByteSize;
+        copyOp.destinationBufferByteSize = alignedByteSize;
 
         // Use blit work to record resource copy commands.
         HgiBlitCmdsUniquePtr blitCmds = _hgi->CreateBlitCmds();
         blitCmds->CopyTextureGpuToCpu(copyOp);
-        _hgi->SubmitCmds(blitCmds.get(), 1);
+        _hgi->SubmitCmds(blitCmds.get());
     }
 
     return _mappedBuffer.data();

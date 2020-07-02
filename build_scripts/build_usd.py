@@ -107,6 +107,18 @@ def GetCommandOutput(command):
         pass
     return None
 
+def GetMacArch():
+    macArch = GetCommandOutput('arch').strip()
+    if macArch == "i386" or macArch == "x86_64":
+        macArch = "x86_64"
+    else:
+        macArch = "arm64"
+    return macArch
+
+def SupportsMacOSUniversalBinaries():
+    MacOS_SDK = GetCommandOutput('xcrun --show-sdk-version').strip()
+    return MacOS() and MacOS_SDK >= "10.16"
+
 def GetXcodeDeveloperDirectory():
     """Returns the active developer directory as reported by 'xcode-select -p'.
     Returns None if none is set."""
@@ -395,7 +407,17 @@ def RunCMake(context, force, buildArgs = None, hostPlatform = False):
     # TEMPORARY WORKAROUND
     if targetMacOS or targetIOS:
         extraArgs.append('-DCMAKE_IGNORE_PATH="/usr/lib;/usr/local/lib;/lib" ')
+
+    if context.buildUniversal and SupportsMacOSUniversalBinaries():
         extraArgs.append('-DCMAKE_XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH=NO')
+        extraArgs.append('-DCMAKE_OSX_ARCHITECTURES=x86_64;arm64')
+    else:
+        extraArgs.append('-DCMAKE_XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH=YES')
+        MacArch = GetCommandOutput('arch').strip()
+        if MacArch == "i386" or MacArch == "x86_64":
+            extraArgs.append('-DCMAKE_OSX_ARCHITECTURES=x86_64')
+        else:
+            extraArgs.append('-DCMAKE_OSX_ARCHITECTURES=arm64')
 
     if targetIOS:
         # Add the default iOS toolchain file if one isn't aready specified
@@ -917,34 +939,39 @@ def InstallBoost_Helper(context, force, buildArgs):
 
         b2 = "b2" if Windows() else "./b2"
 
-        newLines = [
-            'using clang-darwin : x86_64\n',
-            ': {XCODE_ROOT}/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang++\n'
-                .format(XCODE_ROOT=xcodeRoot),
-            ': <compileflags>"-target x86_64-apple-macos10.15 -isysroot {SDK_PATH} -std=c++14 -stdlib=libc++" <linkflags>"-target x86_64-apple-macos10.15 -isysroot {SDK_PATH}" address-model=64 architecture=x86_64\n'
-                .format(SDK_PATH=sdkPath),
-            ';\n\n'
-            'using clang-darwin : arm64\n',
-            ': {XCODE_ROOT}/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang++\n'
-                .format(XCODE_ROOT=xcodeRoot),
-            ': <compileflags>"-target arm64-apple-macos10.15 -isysroot {SDK_PATH} -std=c++14 -stdlib=libc++" <linkflags>"-target arm64-apple-macos10.15 -isysroot {SDK_PATH}" address-model=64 architecture=arm64\n'
-                .format(SDK_PATH=sdkPath),
-            ';\n\n'
-        ]
+        if context.buildUniversal and SupportsMacOSUniversalBinaries():
+            newLines = [
+                'using clang-darwin : x86_64\n',
+                ': {XCODE_ROOT}/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang++\n'
+                    .format(XCODE_ROOT=xcodeRoot),
+                ': <compileflags>"-target x86_64-apple-macos10.15 -isysroot {SDK_PATH} -std=c++14 -stdlib=libc++" <linkflags>"-target x86_64-apple-macos10.15 -isysroot {SDK_PATH}" address-model=64 architecture=x86_64\n'
+                    .format(SDK_PATH=sdkPath),
+                ';\n\n'
+                'using clang-darwin : arm64\n',
+                ': {XCODE_ROOT}/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang++\n'
+                    .format(XCODE_ROOT=xcodeRoot),
+                ': <compileflags>"-target arm64-apple-macos10.15 -isysroot {SDK_PATH} -std=c++14 -stdlib=libc++" <linkflags>"-target arm64-apple-macos10.15 -isysroot {SDK_PATH}" address-model=64 architecture=arm64\n'
+                    .format(SDK_PATH=sdkPath),
+                ';\n\n'
+            ]
 
-        with open(projectPath, 'a') as projectFile:
-            projectFile.writelines(newLines)
+            with open(projectPath, 'a') as projectFile:
+                projectFile.writelines(newLines)
+
+
         b2_toolset = "toolset=clang-darwin-x86_64"
         b2_settings[0] = '--prefix="{instDir}/_tmp/x86_64"'.format(instDir=context.instDir)
-        b2CmdIntel = '{b2} {toolset} {options} install'.format(
+        b2CmdPrimary = '{b2} {toolset} {options} install'.format(
             b2=b2, toolset=b2_toolset, options=" ".join(b2_settings))
-        Run( b2CmdIntel )
+        Run(b2CmdPrimary)
 
-        b2_toolset = "toolset=clang-darwin-arm64"
-        b2_settings[0] = '--prefix="{instDir}/_tmp/arm64"'.format(instDir=context.instDir)
-        b2CmdArm = '{b2} {toolset} {options} install'.format(
-            b2=b2, toolset=b2_toolset, options=" ".join(b2_settings))
-        Run(b2CmdArm)
+        if context.buildUniversal and SupportsMacOSUniversalBinaries():
+            b2_toolset = "toolset=clang-darwin-arm64"
+            b2_settings[0] = '--prefix="{instDir}/_tmp/arm64"'.format(instDir=context.instDir)
+                
+            b2CmdSecondary = '{b2} {toolset} {options} install'.format(
+                b2=b2, toolset=b2_toolset, options=" ".join(b2_settings))
+            Run(b2CmdSecondary)
 
         CopyDirectory(context, os.path.join(context.instDir, "_tmp/x86_64/include/boost"), "include/boost")
 
@@ -955,14 +982,25 @@ def InstallBoost_Helper(context, force, buildArgs):
 
         shutil.rmtree(os.path.join(context.instDir, "_tmp"))
 
+        if context.buildUniversal and SupportsMacOSUniversalBinaries():
+            CopyDirectory(context, os.path.join(context.instDir, "_tmp/x86_64/include/boost"), "include/boost")
+
+            x86Dir = os.path.join(context.instDir, "_tmp/x86_64/lib")
+            armDir = os.path.join(context.instDir, "_tmp/arm64/lib")
+            libNames = [f for f in os.listdir(x86Dir) if os.path.isfile(os.path.join(x86Dir, f))]
+            CreateUniversalBinaries(context, libNames, x86Dir, armDir)
+
+            shutil.rmtree(os.path.join(context.instDir, "_tmp"))
+
         # Output paths that are of interest
         with open(os.path.join(context.usdInstDir, 'boostBuild.txt'), 'wt') as file:
             file.write('ARCHIVE:' + BOOST_URL.split("/")[-1] + '\n')
             file.write('BUILDFOLDER:' + os.path.split(os.getcwd())[1] + '\n')
             file.write('BOOTSTRAP:' + bootstrapCmd + '\n')
-            file.write('B2INTEL:' + b2CmdIntel + '\n')
-            file.write('B2ARM:' + b2CmdArm + '\n')
-            file.write('LIPO:' + ','.join(lipoCommands) + '\n')
+            file.write('B2PRIMARY:' + b2CmdPrimary + '\n')
+            if context.buildUniversal and SupportsMacOSUniversalBinaries():
+                file.write('B2SECONDARY:' + b2CmdSecondary + '\n')
+                file.write('LIPO:' + ','.join(lipoCommands) + '\n')
 
         if iOS():
             for filename in os.listdir(context.instDir + "/lib"):
@@ -1053,11 +1091,19 @@ def InstallTBB_LinuxOrMacOS(context, force, buildArgs):
             buildArgs.append('compiler=clang target=ios arch=arm64 extra_inc=big_iron.inc ')
 
 
-        if MacOS() or iOS():
+        if iOS():
             PatchFile("include/tbb/machine/macos_common.h", 
                 [("#define __TBB_Yield()  sched_yield()",
                   "#define __TBB_Yield()  __TBB_Pause(1)")])
-            
+        elif MacOS():
+            PatchFile("include/tbb/machine/macos_common.h", 
+                [("#define __TBB_Yield()  sched_yield()",
+                  "#if defined(__aarch64__)\n"
+                  "#define __TBB_Yield()  sched_yield()\n"
+                  "#else\n"
+                  "#define __TBB_Yield()  __TBB_Pause(1)\n"
+                  "#endif\n")])
+        if MacOS() or iOS():
             PatchFile("src/tbb/custom_scheduler.h", 
                 [("const int yield_threshold = 100;",
                   "const int yield_threshold = 10;")])
@@ -1068,16 +1114,35 @@ def InstallTBB_LinuxOrMacOS(context, force, buildArgs):
                 PatchFile("build/macos.clang.inc", 
                     [("LIBDL = -ldl",
                       "LIBDL = -ldl\n"
-                      "export SDKROOT:=$(shell xcodebuild -sdk -version | grep -o -E '/.*SDKs/MacOSX.*' 2>/dev/null | head -1)")])
+                      "export SDKROOT:=$(shell xcodebuild -sdk -version | grep -o -E '/.*SDKs/MacOSX.*' 2>/dev/null | head -1)"),
+                     ("-m64",
+                      "-m64 -arch x86_64")],
+                    True)
+
+        archPrimary = GetMacArch()
+        archSecondary = ""
+        if (archPrimary == "x86_64"):
+            archPimary = "intel64"
+            archSecondary = "arm64"
+        else:
+            archSecondary = "arm64"
 
         if context.static_dependencies_macOS:
             buildArgs.append('extra_inc=big_iron.inc ')
 
-
-        makeTBBCmdIntel = 'make -j{procs} {buildArgs} '.format(
+        makeTBBCmdPrimary = 'make -j{procs} arch={arch} {buildArgs}'.format(
+            arch=archPrimary,
             procs=context.numJobs, 
             buildArgs=" ".join(buildArgs))
-        Run(makeTBBCmdIntel)
+        Run(makeTBBCmdPrimary)
+        
+        if context.buildUniversal and SupportsMacOSUniversalBinaries():
+            makeTBBCmdSecondary = "make -j{procs} arch={arch} {buildArgs}".format(
+                arch=archSecondary,
+                procs=context.numJobs,
+                buildArgs=" ".join(buildArgs))
+
+            Run(makeTBBCmdSecondary)
 
         buildArgs.append("arch=arm64")
         makeTBBCmdArm = "make -j{procs} {buildArgs} ".format(
@@ -1090,21 +1155,26 @@ def InstallTBB_LinuxOrMacOS(context, force, buildArgs):
         # makes it easier for users to install dependencies in some
         # location that can be shared by both release and debug USD
         # builds. Plus, the TBB build system builds both versions anyway.
-        x86Files = glob.glob(os.getcwd() + "/build/*intel64*_release/libtbb*.*")
-        armFiles = glob.glob(os.getcwd() + "/build/*arm64*_release/libtbb*.*")
-        libNames = [os.path.basename(x) for x in x86Files]
-        x86Dir = os.path.dirname(x86Files[0])
-        armDir = os.path.dirname(armFiles[0])
+        if context.buildUniversal and SupportsMacOSUniversalBinaries():
+            x86Files = glob.glob(os.getcwd() + "/build/*intel64*_release/libtbb*.*")
+            armFiles = glob.glob(os.getcwd() + "/build/*arm64*_release/libtbb*.*")
+            libNames = [os.path.basename(x) for x in x86Files]
+            x86Dir = os.path.dirname(x86Files[0])
+            armDir = os.path.dirname(armFiles[0])
 
-        lipoCommands = CreateUniversalBinaries(context, libNames, x86Dir, armDir)
+            lipoCommands = CreateUniversalBinaries(context, libNames, x86Dir, armDir)
+        else:
+            CopyFiles(context, "build/*_release/libtbb*.*", "lib")
 
         # Output paths that are of interest
         with open(os.path.join(context.usdInstDir, 'tbbBuild.txt'), 'wt') as file:
             file.write('ARCHIVE:' + TBB_URL.split("/")[-1] + '\n')
             file.write('BUILDFOLDER:' + os.path.split(os.getcwd())[1] + '\n')
-            file.write('MAKEINTEL:' + makeTBBCmdIntel + '\n')
-            file.write('MAKEARM:' + makeTBBCmdArm + '\n')
-            file.write('LIPO:' + ','.join(lipoCommands) + '\n')
+            file.write('MAKEPRIMARY:' + makeTBBCmdPrimary + '\n')
+
+            if context.buildUniversal and SupportsMacOSUniversalBinaries():
+                file.write('MAKESECONDARY:' + makeTBBCmdSecondary + '\n')
+                file.write('LIPO:' + ','.join(lipoCommands) + '\n')
 
         CopyFiles(context, "build/*_debug/libtbb*.*", "lib")
         CopyDirectory(context, "include/serial", "include/serial")
@@ -1170,10 +1240,10 @@ def InstallJPEG_Turbo(jpeg_url, context, force, buildArgs):
                  ("add_executable(jcstest ../jcstest.c)",
                   "add_library(jcstest STATIC ../jcstest.c)")])
 
-        if not context.static_dependencies_macOS:
+        if not context.static_dependencies_macOS and context.buildUniversal and SupportsMacOSUniversalBinaries():
+            extraJPEGArgs.append("-DWITH_SIMD=FALSE")
             PatchFile("CMakeLists.txt", 
                 [("add_library(simd OBJECT jsimd_none.c)", "add_library(simd STATIC jsimd_none.c)"),
-                ("$<TARGET_OBJECTS:simd>", ""),
                 ("add_executable(wrjpgcom wrjpgcom.c)",
                 "add_executable(wrjpgcom wrjpgcom.c)\n\n"
                 "if(ENABLE_STATIC)\n"
@@ -1293,6 +1363,9 @@ def InstallPNG(context, force, buildArgs):
         extraPNGArgs = buildArgs;
         extraPNGArgs.append("-DCMAKE_C_FLAGS=\"-DPNG_ARM_NEON_OPT=0\"");
 
+        if (context.buildUniversal and SupportsMacOSUniversalBinaries()) or (GetMacArch() == "arm64"):
+            extraPNGArgs.append("-DCMAKE_C_FLAGS=\"-DPNG_ARM_NEON_OPT=0\"");
+
         if iOS():
             extraPNGArgs.append('-DCMAKE_SYSTEM_PROCESSOR=aarch64');
             extraPNGArgs.append('-DPNG_ARM_NEON=off');
@@ -1306,6 +1379,13 @@ def InstallPNG(context, force, buildArgs):
                   "add_library(pngfix STATIC ${pngfix_sources})"),
                  ("add_executable(png-fix-itxt ${png_fix_itxt_sources})",
                   "add_library(png-fix-itxt STATIC ${png_fix_itxt_sources})")])
+
+        if context.buildUniversal and SupportsMacOSUniversalBinaries():
+            PatchFile("scripts/genout.cmake.in",
+                [("CMAKE_OSX_ARCHITECTURES",
+                  "CMAKE_OSX_INTERNAL_ARCHITECTURES")])
+
+            extraPNGArgs.append('-DCMAKE_OSX_INTERNAL_ARCHITECTURES=' + GetMacArch())
 
         RunCMake(context, force, extraPNGArgs)
         return os.getcwd()
@@ -1365,6 +1445,16 @@ def InstallOpenEXR(context, force, buildArgs):
               "ADD_LIBRARY ( dwaLookups STATIC"),
              ("ADD_EXECUTABLE ( b44ExpLogTable",
               "ADD_LIBRARY ( b44ExpLogTable STATIC")])
+
+    if MacOS():
+        PatchFile(srcDir + "/OpenEXR/CMakeLists.txt",
+            [("SET (OPENEXR_LIBSUFFIX \"\")",
+              "SET (OPENEXR_LIBSUFFIX \"\")\n"
+              "FILE ( APPEND ${CMAKE_CURRENT_BINARY_DIR}/config/OpenEXRConfig.h \"\n"
+              "#undef OPENEXR_IMF_HAVE_GCC_INLINE_ASM_AVX\n"
+              "#ifndef __aarch64__\n"
+              "#define OPENEXR_IMF_HAVE_GCC_INLINE_ASM_AVX 1\n"
+              "#endif\n\")\n")])
 
     ilmbaseSrcDir = os.path.join(srcDir, "IlmBase")
     with CurrentWorkingDirectory(ilmbaseSrcDir):
@@ -1494,42 +1584,55 @@ def InstallGLEW_Windows(context, force):
 
 def InstallGLEW_LinuxOrMacOS(context, force, buildArgs):
     with CurrentWorkingDirectory(DownloadURL(GLEW_URL, context, force)):
-        sdkPath = subprocess.check_output(['xcrun', '--sdk', 'macosx', '--show-sdk-path']).strip()
-        PatchFile("config/Makefile.darwin", 
-            [("CFLAGS.EXTRA = -arch arm64 -dynamic -fno-common -isysroot {SDK_PATH}".format(SDK_PATH=sdkPath),
-              "CFLAGS.EXTRA = -dynamic -fno-common"),
-             ("LDFLAGS.EXTRA = -arch arm64 -isysroot {SDK_PATH}".format(SDK_PATH=sdkPath),
-              "LDFLAGS.EXTRA =")])
-        Run('make clean')
-        Run('make GLEW_DEST="{instDir}/_tmp/x86_64" -j{procs} {buildArgs} install'
-            .format(instDir=context.instDir,
-                procs=context.numJobs,
-                buildArgs=" ".join(buildArgs)))
 
-        PatchFile("config/Makefile.darwin", 
-            [("CFLAGS.EXTRA = -dynamic -fno-common",
-              "CFLAGS.EXTRA = -arch arm64 -dynamic -fno-common -isysroot {SDK_PATH}".format(SDK_PATH=sdkPath)),
-             ("LDFLAGS.EXTRA =",
-              "LDFLAGS.EXTRA = -arch arm64 -isysroot {SDK_PATH}".format(SDK_PATH=sdkPath))]),
-        Run('make clean')
-        Run('make GLEW_DEST="{instDir}/_tmp/arm64" -j{procs} {buildArgs} install'
-            .format(instDir=context.instDir,
+        if context.buildUniversal and SupportsMacOSUniversalBinaries():
+            PatchFile("config/Makefile.darwin", 
+                [("CFLAGS.EXTRA = -dynamic -fno-common",
+                  "CFLAGS.EXTRA = -arch x86_64 -dynamic -fno-common"),
+                 ("LDFLAGS.EXTRA =",
+                  "LDFLAGS.EXTRA = -arch x86_64")])
+            sdkPath = subprocess.check_output(['xcrun', '--sdk', 'macosx', '--show-sdk-path']).strip()
+            PatchFile("config/Makefile.darwin", 
+                [("CFLAGS.EXTRA = -arch arm64 -dynamic -fno-common -isysroot {SDK_PATH}".format(SDK_PATH=sdkPath),
+                  "CFLAGS.EXTRA = -arch x86_64 -dynamic -fno-common"),
+                 ("LDFLAGS.EXTRA = -arch arm64 -isysroot {SDK_PATH}".format(SDK_PATH=sdkPath),
+                  "LDFLAGS.EXTRA = -arch x86_64")])
+            Run('make clean')
+            Run('make GLEW_DEST="{instDir}/_tmp/x86_64" -j{procs} {buildArgs} install'
+                .format(instDir=context.instDir,
                     procs=context.numJobs,
                     buildArgs=" ".join(buildArgs)))
-        x86Dir = os.path.join(context.instDir, "_tmp/x86_64/lib")
-        armDir = os.path.join(context.instDir, "_tmp/arm64/lib")
-        libNames = [f for f in os.listdir(x86Dir) if os.path.isfile(os.path.join(x86Dir, f))]
-        CreateUniversalBinaries(context, libNames, x86Dir, armDir)
 
-        for libName in libNames:
-            filename, file_extension = os.path.splitext(libName)
-            if not os.path.islink("{instDir}/lib/{libName}".format(instDir=context.instDir, libName=libName)) and \
-              file_extension == ".dylib":
-                Run('install_name_tool -id "@rpath/{libName}" {instDir}/lib/{libName}'.format(
-                    instDir=context.instDir, libName=libName))
-        CopyDirectory(context, os.path.join(context.instDir, "_tmp/x86_64/include/GL"), "include/GL")
+            PatchFile("config/Makefile.darwin", 
+                [("CFLAGS.EXTRA = -arch x86_64 -dynamic -fno-common",
+                  "CFLAGS.EXTRA = -arch arm64 -dynamic -fno-common -isysroot {SDK_PATH}".format(SDK_PATH=sdkPath)),
+                 ("LDFLAGS.EXTRA = -arch x86_64",
+                  "LDFLAGS.EXTRA = -arch arm64 -isysroot {SDK_PATH}".format(SDK_PATH=sdkPath))]),
+            Run('make clean')
+            Run('make GLEW_DEST="{instDir}/_tmp/arm64" -j{procs} {buildArgs} install'
+                .format(instDir=context.instDir,
+                        procs=context.numJobs,
+                        buildArgs=" ".join(buildArgs)))
 
-        shutil.rmtree(os.path.join(context.instDir, "_tmp"))
+            x86Dir = os.path.join(context.instDir, "_tmp/x86_64/lib")
+            armDir = os.path.join(context.instDir, "_tmp/arm64/lib")
+            libNames = [f for f in os.listdir(x86Dir) if os.path.isfile(os.path.join(x86Dir, f))]
+            CreateUniversalBinaries(context, libNames, x86Dir, armDir)
+
+            for libName in libNames:
+                filename, file_extension = os.path.splitext(libName)
+                if not os.path.islink("{instDir}/lib/{libName}".format(instDir=context.instDir, libName=libName)) and \
+                file_extension == ".dylib":
+                    Run('install_name_tool -id "@rpath/{libName}" {instDir}/lib/{libName}'.format(
+                        instDir=context.instDir, libName=libName))
+            CopyDirectory(context, os.path.join(context.instDir, "_tmp/x86_64/include/GL"), "include/GL")
+
+            shutil.rmtree(os.path.join(context.instDir, "_tmp"))
+        else :
+            Run('make GLEW_DEST="{instDir}" -j{procs} {buildArgs} install'
+                .format(instDir=context.instDir,
+                        procs=context.numJobs,
+                        buildArgs=" ".join(buildArgs)))
 
         glewCWD = os.getcwd()
         return glewCWD
@@ -1746,6 +1849,21 @@ def InstallOpenColorIO(context, force, buildArgs):
                      '-DOCIO_STATIC_JNIGLUE=OFF',
                      '-DOCIO_USE_SSE=OFF']
 
+        if context.buildUniversal and SupportsMacOSUniversalBinaries():
+            arch = "x86_64;arm64"
+        else:
+            arch = GetMacArch()
+
+        PatchFile("CMakeLists.txt",
+                [('CMAKE_ARGS      ${TINYXML_CMAKE_ARGS}',
+                  'CMAKE_ARGS      ${TINYXML_CMAKE_ARGS}\n' +
+                  '            CMAKE_CACHE_ARGS -DCMAKE_XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH:BOOL=TRUE'
+                  ' -DCMAKE_OSX_ARCHITECTURES:STRING="{arch}"'.format(arch=arch)),
+                 ('CMAKE_ARGS      ${YAML_CPP_CMAKE_ARGS}',
+                  'CMAKE_ARGS      ${YAML_CPP_CMAKE_ARGS}\n' +
+                  '            CMAKE_CACHE_ARGS -DCMAKE_XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH:BOOL=TRUE'
+                  ' -DCMAKE_OSX_ARCHITECTURES:STRING="{arch}"'.format(arch=arch))])
+            
         # The OCIO build treats all warnings as errors but several come up
         # on various platforms, including:
         # - On gcc6, v1.1.0 emits many -Wdeprecated-declaration warnings for
@@ -1775,6 +1893,7 @@ def InstallOpenColorIO(context, force, buildArgs):
 
         if iOS() or MacOS():
             extraArgs.append('-DCMAKE_CXX_FLAGS="-Wno-unused-function -Wno-unused-const-variable -Wno-unused-private-field"')
+            extraArgs.append('-DOCIO_USE_SSE=OFF')
 
         # Add on any user-specified extra arguments.
         extraArgs += buildArgs
@@ -2403,6 +2522,11 @@ subgroup.add_argument("--python", dest="build_python", action="store_true",
                                          "(default)")
 subgroup.add_argument("--no-python", dest="build_python", action="store_false",
                       help="Do not build python based components")
+subgroup = group.add_mutually_exclusive_group()
+subgroup.add_argument("--universal", dest="universal", action="store_true",
+                      default=False, help="Build universal binaries on MacOS ")
+subgroup.add_argument("--no-universal", dest="universal", action="store_false",
+                      help="Do not build universal binaries on MacOS (default)")
 
 (NO_IMAGING, IMAGING, USD_IMAGING) = (0, 1, 2)
 
@@ -2586,6 +2710,7 @@ class InstallContext:
         self.buildDebug = args.build_debug;
         self.buildShared = (args.build_type == SHARED_LIBS)
         self.buildMonolithic = (args.build_type == MONOLITHIC_LIB)
+        self.buildUniversal = args.universal
 
         # Dependencies that are forced to be built
         self.forceBuildAll = args.force_all
@@ -2864,6 +2989,7 @@ Building with settings:
   Downloader                    {downloader}
   
   MacOS:
+    Build universal binaries    {buildUniversalBinaries}
     Use download cache          {use_download_cache}
     Make relocatable            {make_relocatable}
     Static dependencies         {static_dependencies_macOS}
@@ -2918,6 +3044,7 @@ summaryMsg = summaryMsg.format(
     cmakeGenerator=("Default" if not context.cmakeGenerator
                     else context.cmakeGenerator),
     downloader=(context.downloaderName),
+    buildUniversalBinaries=("On" if context.buildUniversal and SupportsMacOSUniversalBinaries() else "Off"),
     use_download_cache=("On" if context.use_download_cache and MacOS() else "Off"),
     make_relocatable=("On" if context.make_relocatable and MacOS() else "Off"),
     static_dependencies_macOS=("On" if context.static_dependencies_macOS and MacOS() else "Off"),
@@ -3024,6 +3151,8 @@ if Windows():
 if args.make_relocatable:
     SDKVersion  = GetCommandOutput('xcodebuild -version').strip()[6:10]
     codeSignIDs = GetCommandOutput('security find-identity -v -p codesigning')
+    if codeSignIDs is None:
+        codeSignIDs = ""
 
     codeSignID = os.environ.get('XCODE_ATTRIBUTE_CODE_SIGN_ID')
     if codeSignID is not None:

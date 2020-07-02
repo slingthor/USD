@@ -125,7 +125,8 @@ HdSt_DomeLightComputationGPUMetal::_Execute(HdStProgramSharedPtr computeProgram)
         desc.dimensions = GfVec3i(width, height, 1);
         desc.layerCount = 1;
         desc.mipLevels = _numLevels;
-        desc.usage = HgiTextureUsageBitsShaderWrite;
+        desc.usage =
+            HgiTextureUsageBitsShaderRead | HgiTextureUsageBitsShaderWrite;
         _FillPixelsByteSize(&desc);
         dstUvTextureObject->CreateTexture(desc);
     }

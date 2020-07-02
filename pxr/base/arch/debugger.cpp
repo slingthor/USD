@@ -588,7 +588,7 @@ ArchDebuggerTrap()
     // Trap if a debugger is attached or we try and fail to attach one.
     // If we attach one we assume it will automatically stop this process.
     if (ArchDebuggerIsAttached() || !Arch_DebuggerAttach()) {
-    if (_archDebuggerEnabled) {
+        if (_archDebuggerEnabled) {
 #if defined(ARCH_OS_WINDOWS)
             DebugBreak();
 #elif defined(ARCH_CPU_INTEL)
@@ -596,8 +596,8 @@ ArchDebuggerTrap()
 #else
             raise(SIGTRAP);
 #endif
+        }
     }
-}
 }
 
 void

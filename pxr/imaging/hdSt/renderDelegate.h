@@ -82,10 +82,6 @@ public:
         HdStDrawMode drawMode;
         RenderOutput renderOutput;
         
-#if defined(PXR_METAL_SUPPORT_ENABLED)
-        MTLRenderPassDescriptor *mtlRenderPassDescriptorForNativeMetal;
-#endif
-        
         DelegateParams(bool _flipFrontFacing,
                        bool _applyRenderState,
                        bool _enableIdRender,
@@ -101,9 +97,6 @@ public:
         , drawMode(_drawMode)
         , renderOutput(_renderOutput)
         {
-#if defined(PXR_METAL_SUPPORT_ENABLED)
-            mtlRenderPassDescriptorForNativeMetal = nil;
-#endif
         }
 
     private:
