@@ -308,7 +308,7 @@ HgiInteropMetal::HgiInteropMetal(Hgi* hgi)
         "#else\n"
         "    gl_FragColor = texture2DRect(interopTexture, uv.st);\n"
         "#endif\n"
-        "    gl_FragDepth = depth;\n"
+        "    gl_FragDepth = (1.0 + depth) * 0.5;\n"
         "}\n";
 
     GLuint fsColor = _compileShader(fragmentShaderColor, GL_FRAGMENT_SHADER);
