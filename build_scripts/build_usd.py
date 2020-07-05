@@ -958,9 +958,9 @@ def InstallBoost_Helper(context, force, buildArgs):
             with open(projectPath, 'a') as projectFile:
                 projectFile.writelines(newLines)
 
-
-        b2_toolset = "toolset=clang-darwin-x86_64"
-        b2_settings[0] = '--prefix="{instDir}/_tmp/x86_64"'.format(instDir=context.instDir)
+        if context.buildUniversal and SupportsMacOSUniversalBinaries():
+            b2_toolset = "toolset=clang-darwin-x86_64"
+            b2_settings[0] = '--prefix="{instDir}/_tmp/x86_64"'.format(instDir=context.instDir)
         b2CmdPrimary = '{b2} {toolset} {options} install'.format(
             b2=b2, toolset=b2_toolset, options=" ".join(b2_settings))
         Run(b2CmdPrimary)
@@ -973,22 +973,13 @@ def InstallBoost_Helper(context, force, buildArgs):
                 b2=b2, toolset=b2_toolset, options=" ".join(b2_settings))
             Run(b2CmdSecondary)
 
-        CopyDirectory(context, os.path.join(context.instDir, "_tmp/x86_64/include/boost"), "include/boost")
-
-        x86Dir = os.path.join(context.instDir, "_tmp/x86_64/lib")
-        armDir = os.path.join(context.instDir, "_tmp/arm64/lib")
-        libNames = [f for f in os.listdir(x86Dir) if os.path.isfile(os.path.join(x86Dir, f))]
-        lipoCommands = CreateUniversalBinaries(context, libNames, x86Dir, armDir)
-
-        shutil.rmtree(os.path.join(context.instDir, "_tmp"))
-
         if context.buildUniversal and SupportsMacOSUniversalBinaries():
             CopyDirectory(context, os.path.join(context.instDir, "_tmp/x86_64/include/boost"), "include/boost")
 
             x86Dir = os.path.join(context.instDir, "_tmp/x86_64/lib")
             armDir = os.path.join(context.instDir, "_tmp/arm64/lib")
             libNames = [f for f in os.listdir(x86Dir) if os.path.isfile(os.path.join(x86Dir, f))]
-            CreateUniversalBinaries(context, libNames, x86Dir, armDir)
+            lipoCommands = CreateUniversalBinaries(context, libNames, x86Dir, armDir)
 
             shutil.rmtree(os.path.join(context.instDir, "_tmp"))
 
@@ -1122,7 +1113,7 @@ def InstallTBB_LinuxOrMacOS(context, force, buildArgs):
         archPrimary = GetMacArch()
         archSecondary = ""
         if (archPrimary == "x86_64"):
-            archPimary = "intel64"
+            archPrimary = "intel64"
             archSecondary = "arm64"
         else:
             archSecondary = "arm64"
@@ -1143,12 +1134,6 @@ def InstallTBB_LinuxOrMacOS(context, force, buildArgs):
                 buildArgs=" ".join(buildArgs))
 
             Run(makeTBBCmdSecondary)
-
-        buildArgs.append("arch=arm64")
-        makeTBBCmdArm = "make -j{procs} {buildArgs} ".format(
-            procs=context.numJobs,
-            buildArgs=" ".join(buildArgs))
-        Run(makeTBBCmdArm)
 
         # Install both release and debug builds. USD requires the debug
         # libraries when building in debug mode, and installing both
