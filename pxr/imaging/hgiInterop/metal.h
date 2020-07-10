@@ -75,7 +75,8 @@ private:
         int32_t texAttrib;
         int32_t samplerColorLoc;
         int32_t samplerDepthLoc;
-        uint32_t blitTexSizeUniform;
+        int32_t blitTexSizeUniform;
+        int32_t blitDepthScaleOffsetUniform;
     };
 
     struct VertexAttribState {
