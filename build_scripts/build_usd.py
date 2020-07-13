@@ -1976,6 +1976,10 @@ HDF5_URL = "https://support.hdfgroup.org/ftp/HDF5/releases/hdf5-1.10/hdf5-1.10.0
 
 def InstallHDF5(context, force, buildArgs):
     with CurrentWorkingDirectory(DownloadURL(HDF5_URL, context, force)):
+        if context.buildUniversal and SupportsMacOSUniversalBinaries():
+            PatchFile("config/cmake_ext_mod/ConfigureChecks.cmake", 
+                    [("if (ARCH_LENGTH GREATER 1)", "if (FALSE)")])
+
         RunCMake(context, force,
                  ['-DBUILD_TESTING=OFF',
                   '-DHDF5_BUILD_TOOLS=OFF',

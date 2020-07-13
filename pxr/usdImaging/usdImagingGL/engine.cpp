@@ -501,26 +501,9 @@ UsdImagingGLEngine::SetCameraState(const GfMatrix4d& viewMatrix,
         return;
     }
 
-#if defined(PXR_METAL_SUPPORT_ENABLED)
-    GfMatrix4d modifiedProjMatrix;
-    static GfMatrix4d zTransform;
-    
-    // Transform from [-1, 1] to [0, 1] clip space
-    static bool _zTransformSet = false;
-    if (!_zTransformSet) {
-        _zTransformSet = true;
-        zTransform.SetIdentity();
-        zTransform.SetScale(GfVec3d(1.0, 1.0, 0.5));
-        zTransform.SetTranslateOnly(GfVec3d(0.0, 0.0, 0.5));
-    }
-    
-    modifiedProjMatrix = projectionMatrix * zTransform;
-#else
-    GfMatrix4d const &modifiedProjMatrix = projectionMatrix;
-#endif
 
     TF_VERIFY(_taskController);
-    _taskController->SetFreeCameraMatrices(viewMatrix, modifiedProjMatrix);
+    _taskController->SetFreeCameraMatrices(viewMatrix, projectionMatrix);
 }
 
 void
@@ -695,7 +678,7 @@ UsdImagingGLEngine::SetSelectionColor(GfVec4f const& color)
 bool 
 UsdImagingGLEngine::TestIntersection(
     const GfMatrix4d &viewMatrix,
-    const GfMatrix4d &inProjectionMatrix,
+    const GfMatrix4d &projectionMatrix,
     const UsdPrim& root,
     const UsdImagingGLRenderParams& params,
     GfVec3d *outHitPoint,
@@ -708,7 +691,7 @@ UsdImagingGLEngine::TestIntersection(
 #if defined(PXR_OPENGL_SUPPORT_ENABLED)
         return _legacyImpl->TestIntersection(
             viewMatrix,
-            inProjectionMatrix,
+            projectionMatrix,
             root,
             params,
             outHitPoint,
@@ -721,24 +704,6 @@ UsdImagingGLEngine::TestIntersection(
     ResourceFactoryGuard guard(_resourceFactory);
 
     TF_VERIFY(_sceneDelegate);
-#if defined(PXR_METAL_SUPPORT_ENABLED)
-    GfMatrix4d projectionMatrix;
-    static GfMatrix4d zTransform;
-    
-    // Transform from [-1, 1] to [0, 1] clip space
-    static bool _zTransformSet = false;
-    if (!_zTransformSet) {
-        _zTransformSet = true;
-        zTransform.SetIdentity();
-        zTransform.SetScale(GfVec3d(1.0, 1.0, 0.5));
-        zTransform.SetTranslateOnly(GfVec3d(0.0, 0.0, 0.5));
-    }
-    
-    projectionMatrix = inProjectionMatrix * zTransform;
-#else
-    GfMatrix4d const &projectionMatrix = inProjectionMatrix;
-#endif
-
     TF_VERIFY(_taskController);
 
     // XXX(UsdImagingPaths): This is incorrect...  "Root" points to a USD

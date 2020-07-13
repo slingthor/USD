@@ -160,6 +160,8 @@ HgiInteropMetal::_CreateShaderContext(
     shader.samplerColorLoc = glGetUniformLocation(program, "interopTexture");
     shader.samplerDepthLoc = glGetUniformLocation(program, "depthTexture");
     shader.blitTexSizeUniform = glGetUniformLocation(program, "texSize");
+    shader.blitDepthScaleOffsetUniform =
+        glGetUniformLocation(program, "depthScaleOffset");
 
     shader.vao = 0;
     glGenVertexArrays(1, &shader.vao);
@@ -292,6 +294,7 @@ HgiInteropMetal::HgiInteropMetal(Hgi* hgi)
         // a GL_TEXTURE_RECTANGLE are in pixels,
         // rather than the usual normalised 0..1 range.
         "uniform vec2 texSize;\n"
+        "uniform vec2 depthScaleOffset;\n"
         "\n"
         "void main(void)\n"
         "{\n"
@@ -308,7 +311,7 @@ HgiInteropMetal::HgiInteropMetal(Hgi* hgi)
         "#else\n"
         "    gl_FragColor = texture2DRect(interopTexture, uv.st);\n"
         "#endif\n"
-        "    gl_FragDepth = depth;\n"
+        "    gl_FragDepth = (depthScaleOffset.y + depth) * depthScaleOffset.x;\n"
         "}\n";
 
     GLuint fsColor = _compileShader(fragmentShaderColor, GL_FRAGMENT_SHADER);
@@ -831,9 +834,15 @@ HgiInteropMetal::_BlitToOpenGL(bool flipY, int shaderIndex)
                 _mtlAliasedColorTexture.height);
     
     if (flipY) {
+        if (shader.blitDepthScaleOffsetUniform != -1) {
+            glUniform2f(shader.blitDepthScaleOffsetUniform, 1.0f, 0.0f);
+        }
         glDrawArrays(GL_TRIANGLES, 6, 12);
     }
     else {
+        if (shader.blitDepthScaleOffsetUniform != -1) {
+            glUniform2f(shader.blitDepthScaleOffsetUniform, 0.5f, 1.0f);
+        }
         glDrawArrays(GL_TRIANGLES, 0, 6);
     }
 
