@@ -1766,7 +1766,7 @@ def InstallOpenColorIO(context, force, buildArgs):
                      '-DOCIO_BUILD_JNIGLUE=OFF',
                      '-DOCIO_STATIC_JNIGLUE=OFF']
 
-        if targetMacOS:
+        if MacOS():
             if context.buildUniversal and SupportsMacOSUniversalBinaries():
                 arch = "x86_64;arm64"
             else:
