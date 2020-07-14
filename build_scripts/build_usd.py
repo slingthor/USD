@@ -405,16 +405,17 @@ def RunCMake(context, force, buildArgs = None, hostPlatform = False):
     if targetMacOS or targetIOS:
         extraArgs.append('-DCMAKE_IGNORE_PATH="/usr/lib;/usr/local/lib;/lib" ')
 
-    if context.buildUniversal and SupportsMacOSUniversalBinaries():
-        extraArgs.append('-DCMAKE_XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH=NO')
-        extraArgs.append('-DCMAKE_OSX_ARCHITECTURES=x86_64;arm64')
-    else:
-        extraArgs.append('-DCMAKE_XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH=YES')
-        MacArch = GetCommandOutput('arch').strip()
-        if MacArch == "i386" or MacArch == "x86_64":
-            extraArgs.append('-DCMAKE_OSX_ARCHITECTURES=x86_64')
+    if targetMacOS:
+        if context.buildUniversal and SupportsMacOSUniversalBinaries():
+            extraArgs.append('-DCMAKE_XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH=NO')
+            extraArgs.append('-DCMAKE_OSX_ARCHITECTURES=x86_64;arm64')
         else:
-            extraArgs.append('-DCMAKE_OSX_ARCHITECTURES=arm64')
+            extraArgs.append('-DCMAKE_XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH=YES')
+            MacArch = GetCommandOutput('arch').strip()
+            if MacArch == "i386" or MacArch == "x86_64":
+                extraArgs.append('-DCMAKE_OSX_ARCHITECTURES=x86_64')
+            else:
+                extraArgs.append('-DCMAKE_OSX_ARCHITECTURES=arm64')
 
     if targetIOS:
         # Add the default iOS toolchain file if one isn't aready specified
@@ -1101,7 +1102,7 @@ def InstallTBB_LinuxOrMacOS(context, force, buildArgs):
             archPimary = "intel64"
             archSecondary = "arm64"
         else:
-            archSecondary = "intel64"
+            archSecondary = "arm64"
 
         makeTBBCmd = 'make -j{procs} arch={arch} {buildArgs}'.format(
             arch=archPrimary,
@@ -1765,20 +1766,21 @@ def InstallOpenColorIO(context, force, buildArgs):
                      '-DOCIO_BUILD_JNIGLUE=OFF',
                      '-DOCIO_STATIC_JNIGLUE=OFF']
 
-        if context.buildUniversal and SupportsMacOSUniversalBinaries():
-            arch = "x86_64;arm64"
-        else:
-            arch = GetMacArch()
+        if MacOS():
+            if context.buildUniversal and SupportsMacOSUniversalBinaries():
+                arch = "x86_64;arm64"
+            else:
+                arch = GetMacArch()
 
-        PatchFile("CMakeLists.txt",
-                [('CMAKE_ARGS      ${TINYXML_CMAKE_ARGS}',
-                  'CMAKE_ARGS      ${TINYXML_CMAKE_ARGS}\n' +
-                  '            CMAKE_CACHE_ARGS -DCMAKE_XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH:BOOL=TRUE'
-                  ' -DCMAKE_OSX_ARCHITECTURES:STRING="{arch}"'.format(arch=arch)),
-                 ('CMAKE_ARGS      ${YAML_CPP_CMAKE_ARGS}',
-                  'CMAKE_ARGS      ${YAML_CPP_CMAKE_ARGS}\n' +
-                  '            CMAKE_CACHE_ARGS -DCMAKE_XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH:BOOL=TRUE'
-                  ' -DCMAKE_OSX_ARCHITECTURES:STRING="{arch}"'.format(arch=arch))])
+            PatchFile("CMakeLists.txt",
+                    [('CMAKE_ARGS      ${TINYXML_CMAKE_ARGS}',
+                    'CMAKE_ARGS      ${TINYXML_CMAKE_ARGS}\n' +
+                    '            CMAKE_CACHE_ARGS -DCMAKE_XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH:BOOL=TRUE'
+                    ' -DCMAKE_OSX_ARCHITECTURES:STRING="{arch}"'.format(arch=arch)),
+                    ('CMAKE_ARGS      ${YAML_CPP_CMAKE_ARGS}',
+                    'CMAKE_ARGS      ${YAML_CPP_CMAKE_ARGS}\n' +
+                    '            CMAKE_CACHE_ARGS -DCMAKE_XCODE_ATTRIBUTE_ONLY_ACTIVE_ARCH:BOOL=TRUE'
+                    ' -DCMAKE_OSX_ARCHITECTURES:STRING="{arch}"'.format(arch=arch))])
             
         # The OCIO build treats all warnings as errors but several come up
         # on various platforms, including:
@@ -1893,6 +1895,7 @@ def InstallOpenSubdiv(context, force, buildArgs):
                              .format(buildDirmacOS=buildDirmacOS, variant="Debug" if context.buildDebug else "Release"))
             extraArgs.append('-DCMAKE_TOOLCHAIN_FILE={srcOSDDir}/cmake/iOSToolchain.cmake'
                              .format(srcOSDDir=srcOSDDir))
+            extraArgs.append('-DCMAKE_OSX_ARCHITECTURES=arm64')
 
             os.environ['SDKROOT'] = GetCommandOutput('xcrun --sdk iphoneos --show-sdk-path').strip()
 
