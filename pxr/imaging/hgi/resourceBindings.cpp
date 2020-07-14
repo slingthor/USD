@@ -30,9 +30,7 @@ HgiResourceBindings::HgiResourceBindings(HgiResourceBindingsDesc const& desc)
 {
 }
 
-HgiResourceBindings::~HgiResourceBindings()
-{
-}
+HgiResourceBindings::~HgiResourceBindings() = default;
 
 HgiResourceBindingsDesc const&
 HgiResourceBindings::GetDescriptor() const
@@ -65,7 +63,7 @@ bool operator!=(
 }
 
 HgiTextureBindDesc::HgiTextureBindDesc()
-    : resourceType(HgiBindResourceTypeCombinedImageSampler)
+    : resourceType(HgiBindResourceTypeSamplerImage)
     , bindingIndex(0)
     , stageUsage(HgiShaderStageFragment)
 {
