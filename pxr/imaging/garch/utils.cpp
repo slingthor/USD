@@ -53,7 +53,7 @@ int
 GarchGetNumElements(GLenum format)
 {
     switch (format) {
-        case GL_DEPTH_COMPONENT:
+    case GL_DEPTH_COMPONENT:
 	case GL_COLOR_INDEX:
 	case GL_ALPHA:
 	case GL_LUMINANCE:
@@ -62,13 +62,13 @@ GarchGetNumElements(GLenum format)
 	case GL_LUMINANCE_ALPHA :
     case GL_RG:
 	    return 2;
-        case GL_RGB:
-            return 3;
-        case GL_RGBA:
-            return 4;
-        default:
-            TF_CODING_ERROR("Unsupported format");
-            return 1;
+    case GL_RGB:
+        return 3;
+    case GL_RGBA:
+        return 4;
+    default:
+        TF_CODING_ERROR("Unsupported format");
+        return 1;
     }
 }
 
