@@ -45,6 +45,7 @@ pxr_library(hdx
     PUBLIC_CLASSES
         aovInputTask
         colorizeSelectionTask
+        colorizeTask
         colorChannelTask
         colorCorrectionTask
         drawTargetRenderPass
