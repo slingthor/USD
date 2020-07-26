@@ -337,7 +337,7 @@ MtlfBaseTexture::_CreateTexture(GarchBaseTextureDataConstPtr texData,
             
             size_t pixelByteSize;
             int numPixels = texDataWidth * texDataHeight;
-            int numChannels = false;
+            int numChannels;
             MTLPixelFormat mtlFormat = GetMetalFormat(texData->GLInternalFormat(), texData->GLType(), &pixelByteSize, &numChannels);
             int isThreeChannelTexture = numChannels == 3;
             

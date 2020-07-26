@@ -36,7 +36,6 @@ HgiMetalTexture::HgiMetalTexture(HgiMetal *hgi, HgiTextureDesc const & desc)
     : HgiTexture(desc)
     , _textureId(nil)
 {
-    MTLPixelFormat mtlFormat;
     MTLResourceOptions resourceOptions = MTLResourceStorageModePrivate;
     MTLTextureUsage usage = MTLTextureUsageUnknown;
 
@@ -44,8 +43,8 @@ HgiMetalTexture::HgiMetalTexture(HgiMetal *hgi, HgiTextureDesc const & desc)
         resourceOptions = hgi->GetCapabilities().defaultStorageMode;
     }
 
-    mtlFormat = HgiMetalConversions::GetPixelFormat(desc.format);
-
+    MTLPixelFormat mtlFormat = HgiMetalConversions::GetPixelFormat(desc.format);
+    
     if (desc.usage & HgiTextureUsageBitsColorTarget) {
         usage = MTLTextureUsageRenderTarget;
     } else if (desc.usage & HgiTextureUsageBitsDepthTarget) {
@@ -79,6 +78,18 @@ HgiMetalTexture::HgiMetalTexture(HgiMetal *hgi, HgiTextureDesc const & desc)
     texDesc.arrayLength = desc.layerCount;
     texDesc.resourceOptions = resourceOptions;
     texDesc.usage = usage;
+
+    if (@available(macOS 10.15, ios 13.0, *)) {
+        size_t numChannels = HgiGetComponentCount(desc.format);
+
+        if (usage == MTLTextureUsageShaderRead && numChannels == 1) {
+            texDesc.swizzle = MTLTextureSwizzleChannelsMake(
+                MTLTextureSwizzleRed,
+                MTLTextureSwizzleRed,
+                MTLTextureSwizzleRed,
+                MTLTextureSwizzleOne);
+        }
+    }
 
     if (depth > 1) {
         texDesc.depth = depth;
@@ -139,6 +150,12 @@ HgiMetalTexture::~HgiMetalTexture()
         [_textureId release];
         _textureId = nil;
     }
+}
+
+uint64_t
+HgiMetalTexture::GetRawResource() const
+{
+    return (uint64_t) _textureId;
 }
 
 id<MTLTexture>

@@ -1289,18 +1289,10 @@ UsdImagingGLEngine::_Execute(const UsdImagingGLRenderParams &params,
             params.enableSampleAlphaToCoverage,
             params.sampleCount,
             params.drawMode,
-#if defined(PXR_METAL_SUPPORT_ENABLED)
-            ((_renderAPI == Metal &&
-              params.mtlRenderPassDescriptorForNativeMetal) ||
-             MtlfMetalContext::GetMetalContext()->GetDrawTarget()) ?
-            HdStRenderDelegate::DelegateParams::RenderOutput::Metal :
-#endif
-            HdStRenderDelegate::DelegateParams::RenderOutput::OpenGL
+            params.skipInterop?
+                HdStRenderDelegate::DelegateParams::RenderOutput::Metal :
+                HdStRenderDelegate::DelegateParams::RenderOutput::OpenGL
               );
-#if defined(PXR_METAL_SUPPORT_ENABLED)
-            delegateParams.mtlRenderPassDescriptorForNativeMetal =
-                params.mtlRenderPassDescriptorForNativeMetal;
-#endif
         hdStRenderDelegate->PrepareRender(delegateParams);
     }
     
@@ -1582,17 +1574,19 @@ UsdImagingGLEngine::_GetSceneDelegate() const
     return _sceneDelegate.get();
 }
 
-USDIMAGINGGL_API
-HgiTextureHandle UsdImagingGLEngine::GetPresentationTextureHandle(
+HgiTextureHandle
+UsdImagingGLEngine::GetPresentationTexture(
     TfToken const &name) const
 {
     VtValue aov;
-    _engine->GetTaskContextData(name, &aov);
-    
     HgiTextureHandle aovTexture;
-    if (aov.IsHolding<HgiTextureHandle>()) {
-        aovTexture = aov.Get<HgiTextureHandle>();
+
+    if (_engine->GetTaskContextData(name, &aov)) {
+        if (aov.IsHolding<HgiTextureHandle>()) {
+            aovTexture = aov.Get<HgiTextureHandle>();
+        }
     }
+
     return aovTexture;
 }
 

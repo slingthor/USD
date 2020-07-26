@@ -41,7 +41,6 @@
 #include "pxr/imaging/hd/tokens.h"
 
 #include "pxr/base/tf/diagnostic.h"
-#include "pxr/base/tf/envSetting.h"
 
 #include <string>
 #include <fstream>
@@ -254,7 +253,7 @@ NSString *LoadPreviousMetalSource(const HdStProgram* program, NSString *metalSrc
 #endif
 
 bool
-HdStMSLProgram::CompileShader(GLenum type,
+HdStMSLProgram::CompileShader(HgiShaderStage stage,
                               std::string const &shaderSourceOriginal)
 {
     HD_TRACE_FUNCTION();
@@ -266,11 +265,11 @@ HdStMSLProgram::CompileShader(GLenum type,
     if (shaderSourceOriginal.empty()) return false;
     
     const char *shaderType = NULL;
-    switch (type) {
-        case GL_TESS_CONTROL_SHADER:
-        case GL_TESS_EVALUATION_SHADER:
+    switch (stage) {
+        case HgiShaderStageTessellationControl:
+        case HgiShaderStageTessellationEval:
             //TF_CODING_ERROR("Unsupported shader type on Metal %d\n", type);
-            NSLog(@"Unsupported shader type on Metal %d\n", type); //MTL_FIXME - remove the above error so it doesn't propogate all the way back but really we should never see these types of shaders
+            NSLog(@"Unsupported shader type on Metal %d\n", stage); //MTL_FIXME - remove the above error so it doesn't propogate all the way back but really we should never see these types of shaders
             DumpMetalSource(this, [NSString stringWithUTF8String:shaderSourceOriginal.c_str()], @"InvalidType", nil); //MTL_FIXME
             return true;
         default:
@@ -283,11 +282,11 @@ HdStMSLProgram::CompileShader(GLenum type,
     
     bool success = true;
     NSString *entryPoint = nil;
-    switch (type) {
-    case GL_VERTEX_SHADER: shaderType = "VS"; entryPoint = @"vertexEntryPoint"; break;
-    case GL_FRAGMENT_SHADER: shaderType = "FS"; entryPoint = @"fragmentEntryPoint"; break;
-    case GL_GEOMETRY_SHADER: shaderType = "Compute_GS"; entryPoint = @"computeEntryPoint"; break;
-    case GL_COMPUTE_SHADER: shaderType = "CS"; entryPoint = @"computeEntryPoint"; break;
+    switch (stage) {
+    case HgiShaderStageVertex: shaderType = "VS"; entryPoint = @"vertexEntryPoint"; break;
+    case HgiShaderStageFragment: shaderType = "FS"; entryPoint = @"fragmentEntryPoint"; break;
+    case HgiShaderStageGeometry: shaderType = "Compute_GS"; entryPoint = @"computeEntryPoint"; break;
+    case HgiShaderStageCompute: shaderType = "CS"; entryPoint = @"computeEntryPoint"; break;
     default: TF_FATAL_CODING_ERROR("Not allowed!");
     }
     
@@ -323,9 +322,9 @@ HdStMSLProgram::CompileShader(GLenum type,
     options.fastMathEnabled = YES;
     options.languageVersion = MTLLanguageVersion2_1;
     options.preprocessorMacros = @{
-        @"HD_MTL_VERTEXSHADER":(type==GL_VERTEX_SHADER)?@1:@0,
-        @"HD_MTL_COMPUTESHADER":(type==GL_GEOMETRY_SHADER || type==GL_COMPUTE_SHADER)?@1:@0,
-        @"HD_MTL_FRAGMENTSHADER":(type==GL_FRAGMENT_SHADER)?@1:@0,
+        @"HD_MTL_VERTEXSHADER":(stage==HgiShaderStageVertex)?@1:@0,
+        @"HD_MTL_COMPUTESHADER":(stage==HgiShaderStageGeometry || stage==HgiShaderStageCompute)?@1:@0,
+        @"HD_MTL_FRAGMENTSHADER":(stage==HgiShaderStageFragment)?@1:@0,
     };
 
     id<MTLLibrary> library = [context->currentDevice newLibraryWithSource:@(shaderSource.c_str())
@@ -347,13 +346,13 @@ HdStMSLProgram::CompileShader(GLenum type,
         success = false;
     }
     
-    if (type == GL_VERTEX_SHADER) {
+    if (stage == HgiShaderStageVertex) {
         _vertexFunction = function;
-    } else if (type == GL_FRAGMENT_SHADER) {
+    } else if (stage == HgiShaderStageFragment) {
         _fragmentFunction = function;
-    } else if (type == GL_COMPUTE_SHADER) {
+    } else if (stage == HgiShaderStageCompute) {
         _computeFunction = function;
-    } else if (type == GL_GEOMETRY_SHADER) {
+    } else if (stage == HgiShaderStageGeometry) {
         _computeGeometryFunction = function;
     }
     [library release];

@@ -343,7 +343,7 @@ integrateLightsDefault(vec4 Peye, vec3 Neye, LightingInterfaceProperties props)
         float d = NdotL;
         
         //Blinn-Phong
-        float s = (shininess == 0) ? NdotH : pow(NdotH, shininess); //Protect against pow(0, 0) -> NaN
+        float s = (shininess == 0) ? 1.0f : pow(NdotH, shininess); //Protect against pow(0, 0) -> NaN
 
         float atten = lightDistanceAttenuation(Peye, i);
         atten *= lightSpotAttenuation(l, i);

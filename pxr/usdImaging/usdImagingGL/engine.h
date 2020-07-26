@@ -451,7 +451,7 @@ public:
     }
     
     USDIMAGINGGL_API
-    HgiTextureHandle GetPresentationTextureHandle(TfToken const &name) const;
+    HgiTextureHandle GetPresentationTexture(TfToken const &name) const;
     
     struct ResourceFactoryGuard {
         ResourceFactoryGuard(HdStResourceFactoryInterface *resourceFactory);

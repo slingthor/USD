@@ -49,9 +49,7 @@ UsdImagingGLRenderParams::UsdImagingGLRenderParams() :
     enableUsdDrawModes(true),
     clearColor(0,0,0,1),
     lut3dSizeOCIO(65),
-    sampleCount(1)
+    sampleCount(1),
+    skipInterop(false)
 {
-#if defined(PXR_METAL_SUPPORT_ENABLED)
-    mtlRenderPassDescriptorForNativeMetal = nil;
-#endif
 }

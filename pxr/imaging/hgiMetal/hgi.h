@@ -62,7 +62,7 @@ public:
     ~HgiMetal() override;
 
     HGIMETAL_API
-    void SubmitCmds(HgiCmds* cmds, uint32_t count=1) override;
+    void SubmitCmds(HgiCmds* cmds) override;
 
     HGIMETAL_API
     HgiGraphicsCmdsUniquePtr CreateGraphicsCmds(
