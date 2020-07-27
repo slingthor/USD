@@ -206,9 +206,7 @@ static constexpr _FormatDesc FORMAT_DESC[HgiFormatCount] =
     {GL_RGBA, GL_UNSIGNED_BYTE }, // UNorm8Vec4sRGB,
 
     {GL_RGB, GL_FLOAT          }, // BC6FloatVec3
-    {GL_RGB, GL_FLOAT          },
-    
-    {GL_DEPTH_STENCIL, GL_FLOAT}
+    {GL_RGB, GL_FLOAT          }
 };
 
 static bool

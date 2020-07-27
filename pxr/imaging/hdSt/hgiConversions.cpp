@@ -59,15 +59,13 @@ const _FormatDesc FORMAT_DESC[] =
     {HdFormatInt32Vec2, HgiFormatInt32Vec2}, 
     {HdFormatInt32Vec3, HgiFormatInt32Vec3}, 
     {HdFormatInt32Vec4, HgiFormatInt32Vec4}, 
-
-    {HdFormatFloat32UInt8, HgiFormatFloat32UInt8},
 };
 
 // A few random format validations to make sure that the format conversion
 // table stays up-to-date with changes to HdFormat and HgiFormat.
 constexpr bool _CompileTimeValidateFormatTable() {
     return
-        HdFormatCount == 21 &&
+        HdFormatCount == 20 &&
         HdFormatUNorm8 == 0 && HgiFormatUNorm8 == 0 &&
         HdFormatFloat16Vec4 == 11 && HgiFormatFloat16Vec4 == 9 &&
         HdFormatFloat32Vec4 == 15 && HgiFormatFloat32Vec4 == 13 &&

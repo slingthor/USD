@@ -419,9 +419,6 @@ enum HdFormat
     HdFormatInt32Vec3,
     HdFormatInt32Vec4,
 
-    // Depth-stencil format
-    HdFormatFloat32UInt8,
-
     HdFormatCount
 };
 

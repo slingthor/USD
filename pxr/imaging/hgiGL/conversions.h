@@ -47,7 +47,7 @@ public:
         HgiFormat inFormat,
         GLenum *outFormat,
         GLenum *outType,
-        GLenum *outInternalFormat = nullptr);
+        GLenum *outInternalFormat);
 
     HGIGL_API
     static GLenum GetFormatType(HgiFormat inFormat);

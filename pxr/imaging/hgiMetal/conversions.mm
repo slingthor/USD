@@ -72,9 +72,6 @@ static const MTLPixelFormat _PIXEL_FORMAT_DESC[] =
     MTLPixelFormatBC6H_RGBFloat,  // HgiFormatBC6FloatVec3
     MTLPixelFormatBC6H_RGBUfloat, // HgiFormatBC6UFloatVec3
 #endif
-    MTLPixelFormatDepth32Float_Stencil8, // HgiFormatFloat32UInt8
-    
-    // Note: Update _VERTEX_FORMAT_DESC as well.
 };
 
 // A few random format validations to make sure out GL table stays aligned
@@ -126,8 +123,6 @@ static const MTLVertexFormat _VERTEX_FORMAT_DESC[] =
 
     MTLVertexFormatInvalid,             // HgiFormatBC6FloatVec3
     MTLVertexFormatInvalid,             // HgiFormatBC6UFloatVec3
-
-    MTLVertexFormatInvalid,             // HgiFormatFloat32UInt8
 };
 
 constexpr bool _CompileTimeValidateHgiVertexFormatTable() {

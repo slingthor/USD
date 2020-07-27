@@ -48,7 +48,7 @@ public:
     typedef TfType mapped_type;
     typedef int Precedence;
 
-    /// Add key/value pairs from plugins.  If \p includeList isn't empty then
+    /// Add key/value pairs from plugins.  If \p whitelist isn't empty the
     /// it's a comma separated list of types and only those types are added.
     /// \p keyMetadataName has the metadata key with the single key or a
     /// list of keys to map to the type.  All types derived from \p baseType
@@ -57,7 +57,7 @@ public:
     void Add(const mapped_type& baseType,
              const std::string& keyMetadataName,
              DEBUG_TYPE debugType,
-             const std::string& includeList = std::string());
+             const std::string& whitelist = std::string());
 
     /// Add a key/value pair if it's not in the map or the given precedence
     /// is larger than the current precedence.  This does nothing if the
@@ -97,7 +97,7 @@ GlfRankedTypeMap::Add(
     const mapped_type& baseType,
     const std::string& keyMetadataName,
     DEBUG_TYPE debugType,
-    const std::string& includeList)
+    const std::string& whitelist)
 {
     // Statically load all plugin information, note that Plug does not crack
     // open the libraries, it only reads metadata from text files.
@@ -105,8 +105,7 @@ GlfRankedTypeMap::Add(
     std::set<TfType> types;
     PlugRegistry::GetAllDerivedTypes(baseType, &types);
 
-    const std::vector<std::string> restrictions = TfStringSplit(includeList, 
-                                                                ",");
+    const std::vector<std::string> restrictions = TfStringSplit(whitelist, ",");
 
     for (auto type: types) {
         // Get the plugin.
@@ -119,7 +118,7 @@ GlfRankedTypeMap::Add(
             continue;
         }
 
-        // Check the includeList.
+        // Check the whitelist.
         if (!restrictions.empty()) {
             bool goodPlugin = false;
             for (const auto& restriction: restrictions) {
