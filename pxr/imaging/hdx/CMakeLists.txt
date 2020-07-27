@@ -24,6 +24,7 @@ if (PXR_ENABLE_GL_SUPPORT)
     list(APPEND optionalPublicClasses fullscreenShaderGL)
 endif()
 
+
 pxr_library(hdx
     LIBRARIES
         plug
@@ -49,8 +50,8 @@ pxr_library(hdx
 
     PUBLIC_CLASSES
         aovInputTask
-        colorizeTask
         colorizeSelectionTask
+        colorizeTask
         colorChannelTask
         colorCorrectionTask
         drawTargetRenderPass
