@@ -167,7 +167,7 @@ HdSt_RenderPass::_Execute(HdRenderPassStateSharedPtr const &renderPassState,
                     metalTexture =
                         static_cast<HgiMetalTexture*>(desc.colorResolveTextures[i].Get());
                     rpd.colorAttachments[i].resolveTexture = metalTexture->GetTextureId();
-                    rpd.colorAttachments[i].storeAction = MTLStoreActionMultisampleResolve;
+                    rpd.colorAttachments[i].storeAction = MTLStoreActionStoreAndMultisampleResolve;
                 }
                 else {
                     rpd.colorAttachments[i].storeAction = MTLStoreActionStore;
@@ -188,7 +188,7 @@ HdSt_RenderPass::_Execute(HdRenderPassStateSharedPtr const &renderPassState,
                     metalTexture =
                         static_cast<HgiMetalTexture*>(desc.depthResolveTexture.Get());
                     rpd.depthAttachment.resolveTexture = metalTexture->GetTextureId();
-                    rpd.depthAttachment.storeAction = MTLStoreActionMultisampleResolve;
+                    rpd.depthAttachment.storeAction = MTLStoreActionStoreAndMultisampleResolve;
                 }
                 else {
                     rpd.depthAttachment.storeAction = MTLStoreActionStore;

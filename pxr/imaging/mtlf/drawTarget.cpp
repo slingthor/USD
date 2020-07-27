@@ -304,7 +304,7 @@ MtlfDrawTarget::_BindAttachment( MtlfAttachmentRefPtr const & a )
             colorAttachment.texture = tidMS;
             colorAttachment.resolveTexture = tid;
             
-            colorAttachment.storeAction = MTLStoreActionMultisampleResolve;
+            colorAttachment.storeAction = MTLStoreActionStoreAndMultisampleResolve;
         } else {
             colorAttachment.texture = tid;
             
