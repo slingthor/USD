@@ -364,6 +364,10 @@ public:
     bool SetRendererAov(TfToken const& id,
                         TfToken const& interopDst);
 
+    /// Returns an AOV texture handle for the given token.
+    USDIMAGINGGL_API
+    HgiTextureHandle GetAovTexture(TfToken const& name) const;
+
     /// Returns the list of renderer settings.
     USDIMAGINGGL_API
     UsdImagingGLRendererSettingsList GetRendererSettingsList() const;
@@ -449,9 +453,6 @@ public:
     HdStResourceFactoryInterface *GetResourceFactory() {
         return _resourceFactory;
     }
-    
-    USDIMAGINGGL_API
-    HgiTextureHandle GetPresentationTexture(TfToken const &name) const;
     
     struct ResourceFactoryGuard {
         ResourceFactoryGuard(HdStResourceFactoryInterface *resourceFactory);
