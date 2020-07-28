@@ -428,7 +428,10 @@ void
 HdStVBOMemoryManager::_StripedBufferArray::_DeallocateResources()
 {
     TF_FOR_ALL (it, GetResources()) {
-        _hgi->DestroyBuffer(&it->second->GetId());
+        HdStBufferResourceGLSharedPtr bufferRes = it->second;
+        _hgi->DestroyBuffer(&bufferRes->GetId(0));
+        _hgi->DestroyBuffer(&bufferRes->GetId(1));
+        _hgi->DestroyBuffer(&bufferRes->GetId(2));
     }
 }
 

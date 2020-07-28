@@ -432,21 +432,31 @@ HdStInterleavedMemoryManager::_StripedInterleavedBuffer::Reallocate(
     // allocate new one
     // curId and oldId will be different when we are adopting ranges
     // from another buffer array.
-    HgiBufferHandle& oldId = GetResources().begin()->second->GetId();
-
     _StripedInterleavedBufferSharedPtr curRangeOwner_ =
-        std::static_pointer_cast<_StripedInterleavedBuffer> (curRangeOwner);
+        std::static_pointer_cast<_StripedInterleavedBuffer>(curRangeOwner);
+    
+    HdStBufferResourceGLSharedPtr oldBuffer = GetResources().begin()->second;
+    HdStBufferResourceGLSharedPtr currentBuffer =
+        curRangeOwner_->GetResources().begin()->second;
 
-    HgiBufferHandle const& curId = 
-        curRangeOwner_->GetResources().begin()->second->GetId();
-    HgiBufferHandle newId;
+    HgiBufferHandle newId[3];
+    HgiBufferHandle oldId[3];
+    HgiBufferHandle curId[3];
+
+    for (int32_t i = 0; i < 3; i++) {
+        oldId[i] = oldBuffer->GetId(i);
+        curId[i] = currentBuffer->GetId(i);
+    }
 
     // Skip buffers of zero size.
     if (totalSize > 0) {
         HgiBufferDesc bufDesc;
         bufDesc.byteSize = totalSize;
         bufDesc.usage = HgiBufferUsageUniform;
-        newId = _hgi->CreateBuffer(bufDesc);
+
+        for (int32_t i = 0; i < 3; i++) {
+            newId[i] = _hgi->CreateBuffer(bufDesc);
+        }
     }
 
     // if old and new buffer exist, copy unchanged data
@@ -456,7 +466,14 @@ HdStInterleavedMemoryManager::_StripedInterleavedBuffer::Reallocate(
         size_t rangeCount = GetRangeCount();
 
         // pre-pass to combine consecutive buffer range relocation
-        HdStGLBufferRelocator relocator(curId, newId);
+        std::unique_ptr<HdStGLBufferRelocator> relocator[3];
+        
+        for(int i = 0; i < 3; i++) {
+            int const curIndex = curId[i] ? i : 0;
+            if (newId[i]) {
+                relocator[i] = std::make_unique<HdStGLBufferRelocator>(curId[curIndex], newId[i]);
+            }
+        }
         for (size_t rangeIdx = 0; rangeIdx < rangeCount; ++rangeIdx) {
             _StripedInterleavedBufferRangeSharedPtr range = _GetRangeSharedPtr(rangeIdx);
 
@@ -471,8 +488,12 @@ HdStInterleavedMemoryManager::_StripedInterleavedBuffer::Reallocate(
                 GLintptr readOffset = oldIndex * _stride;
                 GLintptr writeOffset = index * _stride;
                 GLsizeiptr copySize = _stride * range->GetNumElements();
-
-                relocator.AddRange(readOffset, writeOffset, copySize);
+                
+                for(int i = 0; i < 3; i++) {
+                    if (relocator[i]) {
+                        relocator[i]->AddRange(readOffset, writeOffset, copySize);
+                    }
+                }
             }
 
             range->SetIndex(index);
@@ -480,8 +501,11 @@ HdStInterleavedMemoryManager::_StripedInterleavedBuffer::Reallocate(
         }
 
         // buffer copy
-        relocator.Commit(_hgi);
-
+        for(int i = 0; i < 3; i++) {
+            if (relocator[i]) {
+                relocator[i]->Commit(_hgi);
+            }
+        }
     } else {
         // just set index
         int index = 0;
@@ -499,14 +523,16 @@ HdStInterleavedMemoryManager::_StripedInterleavedBuffer::Reallocate(
             index += range->GetNumElements();
         }
     }
-    if (oldId) {
-        // delete old buffer
-        _hgi->DestroyBuffer(&oldId);
+    for(int i = 0; i < 3; i++) {
+        if (oldId[i]) {
+            // delete old buffer
+            _hgi->DestroyBuffer(&oldId[i]);
+        }
     }
 
     // update id to all buffer resources
     TF_FOR_ALL(it, GetResources()) {
-        it->second->SetAllocation(newId, totalSize);
+        it->second->SetAllocations(newId[0], newId[1], newId[2], totalSize);
     }
 
     _needsReallocation = false;
@@ -523,7 +549,9 @@ HdStInterleavedMemoryManager::_StripedInterleavedBuffer::_DeallocateResources()
 {
     HdStBufferResourceGLSharedPtr resource = GetResource();
     if (resource) {
-        _hgi->DestroyBuffer(&resource->GetId());
+        _hgi->DestroyBuffer(&resource->GetId(0));
+        _hgi->DestroyBuffer(&resource->GetId(1));
+        _hgi->DestroyBuffer(&resource->GetId(2));
     }
 }
 
