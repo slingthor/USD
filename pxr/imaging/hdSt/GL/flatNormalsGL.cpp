@@ -31,12 +31,15 @@
 #include "pxr/imaging/hdSt/tokens.h"
 
 #include "pxr/imaging/hdSt/GL/flatNormalsGL.h"
+#include "pxr/imaging/hdSt/GL/resourceGL.h"
 
 #include "pxr/imaging/hd/bufferArrayRange.h"
 #include "pxr/imaging/hd/bufferResource.h"
 #include "pxr/imaging/hd/perfLog.h"
 #include "pxr/imaging/hd/tokens.h"
 #include "pxr/imaging/hd/vtBufferSource.h"
+
+#include "pxr/imaging/hgiGL/shaderProgram.h"
 
 #include "pxr/imaging/hf/perfLog.h"
 
@@ -67,17 +70,19 @@ void
 HdSt_FlatNormalsComputationGL::_Execute(
     HdStProgramSharedPtr computeProgram,
     Uniform const& uniform,
-    HdBufferResourceSharedPtr points,
-    HdBufferResourceSharedPtr normals,
-    HdBufferResourceSharedPtr indices,
-    HdBufferResourceSharedPtr primitiveParam,
+    HdStBufferResourceGLSharedPtr points,
+    HdStBufferResourceGLSharedPtr normals,
+    HdStBufferResourceGLSharedPtr indices,
+    HdStBufferResourceGLSharedPtr primitiveParam,
     int numPrims)
 {
     if (!glDispatchCompute)
         return;
  
     // transfer uniform buffer
-    GLuint ubo = computeProgram->GetGlobalUniformBuffer().GetId();
+    // APPLE METAL: Need to up-cast this to get to the GL implementation.
+    const HdResource& uboResource = computeProgram->GetGlobalUniformBuffer();
+    GLuint ubo = static_cast<const HdStResourceGL&>(uboResource).GetId();
     GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
     if (caps.directStateAccessEnabled) {
         glNamedBufferData(ubo, sizeof(uniform), &uniform, GL_STATIC_DRAW);
@@ -87,11 +92,24 @@ HdSt_FlatNormalsComputationGL::_Execute(
         glBindBuffer(GL_UNIFORM_BUFFER, 0);
     }
 
+    GLuint pointsId =
+        points->GetId() ? points->GetId()->GetRawResource() : 0;
+    GLuint normalsId =
+        normals->GetId() ? normals->GetId()->GetRawResource() : 0;
+    GLuint indicesId =
+        indices->GetId() ? indices->GetId()->GetRawResource() : 0;
+    GLuint primitiveParamId =
+        primitiveParam->GetId() ? primitiveParam->GetId()->GetRawResource() : 0;
+
     glBindBufferBase(GL_UNIFORM_BUFFER, 0, ubo);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, points->GetId());
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, normals->GetId());
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, indices->GetId());
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, primitiveParam->GetId());
+    glBindBufferBase(
+        GL_SHADER_STORAGE_BUFFER, 0, pointsId);
+    glBindBufferBase(
+        GL_SHADER_STORAGE_BUFFER, 1, normalsId);
+    glBindBufferBase(
+        GL_SHADER_STORAGE_BUFFER, 2, indicesId);
+    glBindBufferBase(
+        GL_SHADER_STORAGE_BUFFER, 3, primitiveParamId);
 
     glDispatchCompute(numPrims, 1, 1);
 

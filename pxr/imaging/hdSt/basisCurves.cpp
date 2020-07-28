@@ -854,26 +854,26 @@ HdSt_HasResource(HdStDrawItem* drawItem, const TfToken& resourceToken){
 
     typedef HdBufferArrayRangeSharedPtr HdBarPtr;
     if (HdBarPtr const& bar = drawItem->GetConstantPrimvarRange()){
-        HdBufferArrayRangeSharedPtr bar_ =
-            std::static_pointer_cast<HdBufferArrayRange> (bar);
+        HdStBufferArrayRangeGLSharedPtr bar_ =
+            std::static_pointer_cast<HdStBufferArrayRangeGL> (bar);
         hasAuthoredResouce |= bool(bar_->GetResource(resourceToken));
     }
     if (HdBarPtr const& bar = drawItem->GetVertexPrimvarRange()) {
-        HdBufferArrayRangeSharedPtr bar_ =
-            std::static_pointer_cast<HdBufferArrayRange> (bar);
+        HdStBufferArrayRangeGLSharedPtr bar_ =
+            std::static_pointer_cast<HdStBufferArrayRangeGL> (bar);
         hasAuthoredResouce |= bool(bar_->GetResource(resourceToken));
     }
     if (HdBarPtr const& bar = drawItem->GetElementPrimvarRange()){
-        HdBufferArrayRangeSharedPtr bar_ =
-            std::static_pointer_cast<HdBufferArrayRange> (bar);
+        HdStBufferArrayRangeGLSharedPtr bar_ =
+            std::static_pointer_cast<HdStBufferArrayRangeGL> (bar);
 
         hasAuthoredResouce |= bool(bar_->GetResource(resourceToken));
     }
     int instanceNumLevels = drawItem->GetInstancePrimvarNumLevels();
     for (int i = 0; i < instanceNumLevels; ++i) {
         if (HdBarPtr const& bar = drawItem->GetInstancePrimvarRange(i)) {
-            HdBufferArrayRangeSharedPtr bar_ =
-                std::static_pointer_cast<HdBufferArrayRange> (bar);
+            HdStBufferArrayRangeGLSharedPtr bar_ =
+                std::static_pointer_cast<HdStBufferArrayRangeGL> (bar);
 
             hasAuthoredResouce |= bool(bar_->GetResource(resourceToken));
         }

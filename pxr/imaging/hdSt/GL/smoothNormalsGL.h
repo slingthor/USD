@@ -46,9 +46,9 @@ protected:
     HDST_API
     virtual void _Execute(HdStProgramSharedPtr computeProgram,
                           Uniform const &uniform,
-                          HdBufferResourceSharedPtr points,
-                          HdBufferResourceSharedPtr normals,
-                          HdBufferResourceSharedPtr adjacency,
+                          HdStBufferResourceGLSharedPtr points,
+                          HdStBufferResourceGLSharedPtr normals,
+                          HdStBufferResourceGLSharedPtr adjacency,
                           int numPoints) override;
 };
 

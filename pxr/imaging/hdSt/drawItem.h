@@ -59,6 +59,30 @@ public:
     void SetMaterialShader(HdStShaderCodeSharedPtr const &shader) {
         _materialShader = shader;
     }
+    
+    int GetNumVisible() const {
+        return _numVisible;
+    }
+    
+    void SetNumVisible(int visibleCount) const {
+        _numVisible = visibleCount;
+    }
+    
+    const std::vector<GfBBox3f>* GetInstanceBounds() const {
+        return &_instancedCullingBounds;
+    }
+
+    /// Tests the intersection with the view projection matrix.
+    /// Returns true if this drawItem is in the frustum.
+    HDST_API
+    bool IntersectsViewVolume(matrix_float4x4 const &viewProjMatrix,
+                              vector_float2 windowDimensions) const;
+    
+    HDST_API
+    void CalculateCullingBounds() const;
+
+    HDST_API
+    int BuildInstanceBuffer(uint8_t** instanceVisibility) const;
 
 protected:
     size_t _GetBufferArraysHash() const override;
@@ -66,6 +90,11 @@ protected:
 private:
     HdSt_GeometricShaderSharedPtr _geometricShader;
     HdStShaderCodeSharedPtr _materialShader;
+    
+    // CPU culling
+    mutable std::vector<GfBBox3f> _instancedCullingBounds;
+    mutable bool _instancedCullingBoundsCalculated = false;
+    mutable int _numVisible = 1;
 };
 
 

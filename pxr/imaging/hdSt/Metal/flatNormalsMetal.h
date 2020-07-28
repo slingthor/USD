@@ -52,10 +52,10 @@ protected:
     virtual void _Execute(
                       HdStProgramSharedPtr computeProgram,
                       Uniform const& uniform,
-                      HdBufferResourceSharedPtr points,
-                      HdBufferResourceSharedPtr normals,
-                      HdBufferResourceSharedPtr indices,
-                      HdBufferResourceSharedPtr primitiveParam,
+                      HdStBufferResourceGLSharedPtr points,
+                      HdStBufferResourceGLSharedPtr normals,
+                      HdStBufferResourceGLSharedPtr indices,
+                      HdStBufferResourceGLSharedPtr primitiveParam,
                       int numPrims) override;
     };
 

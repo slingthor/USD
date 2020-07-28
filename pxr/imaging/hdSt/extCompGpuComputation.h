@@ -26,6 +26,7 @@
 
 #include "pxr/pxr.h"
 #include "pxr/imaging/hdSt/api.h"
+#include "pxr/imaging/hdSt/bufferArrayRangeGL.h"
 #include "pxr/imaging/hdSt/extCompGpuComputationBufferSource.h"
 #include "pxr/imaging/hd/bufferSource.h"
 #include "pxr/imaging/hd/computation.h"
@@ -168,7 +169,7 @@ protected:
     HDST_API
     virtual void _Execute(HdStProgramSharedPtr const &computeProgram,
                           std::vector<int32_t> const &_uniforms,
-                          HdBufferArrayRangeSharedPtr outputBar) = 0;
+                          HdStBufferArrayRangeGLSharedPtr outputBar) = 0;
 
     SdfPath                                      _id;
     HdStExtCompGpuComputationResourceSharedPtr   _resource;

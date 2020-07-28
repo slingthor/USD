@@ -25,10 +25,13 @@
 #include "pxr/imaging/glf/glew.h"
 
 #include "pxr/imaging/hdSt/GL/quadrangulateGL.h"
+#include "pxr/imaging/hdSt/GL/glslProgram.h"
 
-#include "pxr/imaging/hdSt/bufferResource.h"
+#include "pxr/imaging/hdSt/bufferArrayRangeGL.h"
+#include "pxr/imaging/hdSt/bufferResourceGL.h"
 #include "pxr/imaging/hdSt/program.h"
 #include "pxr/imaging/hdSt/meshTopology.h"
+#include "pxr/imaging/hdSt/resourceBinder.h"
 #include "pxr/imaging/hdSt/resourceRegistry.h"
 #include "pxr/imaging/hdSt/tokens.h"
 
@@ -42,6 +45,8 @@
 #include "pxr/imaging/hio/glslfx.h"
 #include "pxr/imaging/garch/resourceFactory.h"
 
+#include "pxr/imaging/hgi/buffer.h"
+#include "pxr/imaging/hgiGL/shaderProgram.h"
 
 #include "pxr/base/gf/vec2i.h"
 #include "pxr/base/gf/vec4i.h"
@@ -98,21 +103,22 @@ HdSt_QuadrangulateComputationGPUGL::Execute(
         
     if (!computeProgram) return;
 
-    HdBufferArrayRangeSharedPtr range_ =
-        std::static_pointer_cast<HdBufferArrayRange> (range);
+    HdStGLSLProgram* computeProgramGL = dynamic_cast<HdStGLSLProgram*>(computeProgram.get());
+    GLuint program = computeProgramGL->GetGLProgram();
+
+    HdStBufferArrayRangeGLSharedPtr range_ =
+        std::static_pointer_cast<HdStBufferArrayRangeGL> (range);
 
     // buffer resources for GPU computation
-    HdBufferResourceSharedPtr primvar_ = range_->GetResource(_name);
-    HdStBufferResourceSharedPtr primvar =
-        std::static_pointer_cast<HdStBufferResource> (primvar_);
+    HdStBufferResourceGLSharedPtr primvar = range_->GetResource(_name);
 
-    HdBufferArrayRangeSharedPtr quadrangulateTableRange_ =
-        std::static_pointer_cast<HdBufferArrayRange> (quadrangulateTableRange);
+    HdStBufferArrayRangeGLSharedPtr quadrangulateTableRange_ =
+        std::static_pointer_cast<HdStBufferArrayRangeGL> (quadrangulateTableRange);
 
     HdBufferResourceSharedPtr quadrangulateTable_ =
         quadrangulateTableRange_->GetResource();
-    HdStBufferResourceSharedPtr quadrangulateTable =
-        std::static_pointer_cast<HdStBufferResource> (quadrangulateTable_);
+    HdStBufferResourceGLSharedPtr quadrangulateTable =
+        std::static_pointer_cast<HdStBufferResourceGL> (quadrangulateTable_);
 
     // prepare uniform buffer for GPU computation
     struct Uniform {
@@ -146,30 +152,39 @@ HdSt_QuadrangulateComputationGPUGL::Execute(
         HdGetComponentCount(primvar->GetTupleType().type);
 
     // transfer uniform buffer
-    GLuint ubo = computeProgram->GetGlobalUniformBuffer().GetId();
+    // XXX Accessing shader program until we can use Hgi::SetConstantValues via
+    // GfxCmds.
+    const size_t uboSize = sizeof(uniform);
+    // APPLE METAL: Need to up-cast this to get to the GL implementation.
+    const HdResource& uboResource = computeProgram->GetGlobalUniformBuffer();
+    GLuint ubo = static_cast<const HdStResourceGL&>(uboResource).GetId();
     GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
     // XXX: workaround for 319.xx driver bug of glNamedBufferDataEXT on UBO
     // XXX: move this workaround to renderContextCaps
     if (caps.directStateAccessEnabled) {
-        glNamedBufferData(ubo, sizeof(uniform), &uniform, GL_STATIC_DRAW);
+        glNamedBufferData(ubo, uboSize, &uniform, GL_STATIC_DRAW);
     } else {
         glBindBuffer(GL_UNIFORM_BUFFER, ubo);
-        glBufferData(GL_UNIFORM_BUFFER, sizeof(uniform), &uniform, GL_STATIC_DRAW);
+        glBufferData(GL_UNIFORM_BUFFER, uboSize, &uniform, GL_STATIC_DRAW);
         glBindBuffer(GL_UNIFORM_BUFFER, 0);
     }
+    
+    uint64_t sb0 = primvar->GetId()->GetRawResource();
+    uint64_t sb1 = quadrangulateTable->GetId()->GetRawResource();
 
     glBindBufferBase(GL_UNIFORM_BUFFER, 0, ubo);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, primvar->GetId());
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, quadrangulateTable->GetId());
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, sb0);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, sb1);
 
     // dispatch compute kernel
-    computeProgram->SetProgram();
+    computeProgram->SetProgram(nullptr);
 
     int numNonQuads = (int)quadInfo->numVerts.size();
 
     glDispatchCompute(numNonQuads, 1, 1);
 
     computeProgram->UnsetProgram();
+
     glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 
     glBindBufferBase(GL_UNIFORM_BUFFER, 0, 0);

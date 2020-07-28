@@ -61,11 +61,11 @@ public:
     /// (to be used for frustum culling, draw indirect result)
     HDST_API
     virtual void BindBuffer(TfToken const &name,
-                            HdBufferResourceSharedPtr const &resource,
+                            HdStBufferResourceGLSharedPtr const &resource,
                             int offset, int level=-1) const override;
     HDST_API
     virtual void UnbindBuffer(TfToken const &name,
-                              HdBufferResourceSharedPtr const &resource,
+                              HdStBufferResourceGLSharedPtr const &resource,
                               int level=-1) const override;
     
     /// bind(update) a standalone uniform (unsigned int)

@@ -33,9 +33,14 @@
 #include "pxr/imaging/garch/resourceFactory.h"
 #include "pxr/imaging/garch/contextCaps.h"
 
-#include "pxr/imaging/hd/bufferArrayRange.h"
-#include "pxr/imaging/hdSt/bufferResource.h"
+
+#include "pxr/imaging/hdSt/bufferArrayRangeGL.h"
+#include "pxr/imaging/hdSt/bufferResourceGL.h"
 #include "pxr/imaging/hdSt/renderPassShader.h"
+
+// XXX todo tmp needed until we remove direct gl calls below.
+#include "pxr/imaging/hgiGL/buffer.h"
+#include "pxr/imaging/hgiMetal/buffer.h"
 
 #include "pxr/imaging/hdx/tokens.h"
 
@@ -161,8 +166,8 @@ HdxOitBufferAccessor::InitializeOitBuffersIfNecessary()
     // The shader determines what elements in each buffer are used based on
     // finding -1 in the counter buffer. We can skip clearing the other buffers.
 
-    HdBufferArrayRangeSharedPtr stCounterBar =
-        std::dynamic_pointer_cast<HdBufferArrayRange>(
+    HdStBufferArrayRangeGLSharedPtr stCounterBar =
+        std::dynamic_pointer_cast<HdStBufferArrayRangeGL>(
             _GetBar(HdxTokens->oitCounterBufferBar));
 
     if (!stCounterBar) {
@@ -171,7 +176,7 @@ HdxOitBufferAccessor::InitializeOitBuffersIfNecessary()
         return;
     }
 
-    HdBufferResourceSharedPtr stCounterResource =
+    HdStBufferResourceGLSharedPtr stCounterResource = 
         stCounterBar->GetResource(HdxTokens->hdxOitCounterBuffer);
 
     GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
@@ -180,7 +185,7 @@ HdxOitBufferAccessor::InitializeOitBuffersIfNecessary()
     uint8_t clearCounter = 255; // -1
 
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
-    id<MTLBuffer> mtlBuffer = stCounterResource->GetId();
+    id<MTLBuffer> mtlBuffer = HgiMetalBuffer::MTLBuffer(stCounterResource->GetId());
 
     id<MTLCommandBuffer> commandBuffer = [context->gpus.commandQueue commandBuffer];
     id<MTLBlitCommandEncoder> blitEncoder = [commandBuffer blitCommandEncoder];
@@ -193,15 +198,24 @@ HdxOitBufferAccessor::InitializeOitBuffersIfNecessary()
 #elif defined(PXR_OPENGL_SUPPORT_ENABLED)
     const GLint clearCounter = -1;
 
+    // XXX todo add a Clear() fn on HdStBufferResourceGL so that we do not have
+    // to use direct gl calls. below.
+    HgiBufferHandle& buffer = stCounterResource->GetId();
+    HgiGLBuffer* glBuffer = dynamic_cast<HgiGLBuffer*>(buffer.Get());
+    if (!glBuffer) {
+        TF_CODING_ERROR("Todo: Add HdStBufferResourceGL::Clear");
+        return;
+    }
+
     // Old versions of glew may be missing glClearNamedBufferData
     if (ARCH_LIKELY(caps.directStateAccessEnabled) && glClearNamedBufferData) {
-        glClearNamedBufferData(stCounterResource->GetId(),
+        glClearNamedBufferData(glBuffer->GetBufferId(),
                                 GL_R32I,
                                 GL_RED_INTEGER,
                                 GL_INT,
                                 &clearCounter);
     } else {
-        glBindBuffer(GL_SHADER_STORAGE_BUFFER, stCounterResource->GetId());
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, glBuffer->GetBufferId());
         glClearBufferData(
             GL_SHADER_STORAGE_BUFFER, GL_R32I, GL_RED_INTEGER, GL_INT,
             &clearCounter);

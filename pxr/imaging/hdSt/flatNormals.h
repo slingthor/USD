@@ -26,6 +26,8 @@
 
 #include "pxr/pxr.h"
 #include "pxr/imaging/hdSt/api.h"
+#include "pxr/imaging/hdSt/bufferArrayRangeGL.h"
+#include "pxr/imaging/hdSt/bufferResourceGL.h"
 #include "pxr/imaging/hd/bufferSource.h"
 #include "pxr/imaging/hd/computation.h"
 
@@ -82,10 +84,10 @@ protected:
     virtual void _Execute(
                       HdStProgramSharedPtr computeProgram,
                       Uniform const& uniform,
-                      HdBufferResourceSharedPtr points,
-                      HdBufferResourceSharedPtr normals,
-                      HdBufferResourceSharedPtr indices,
-                      HdBufferResourceSharedPtr primitiveParam,
+                      HdStBufferResourceGLSharedPtr points,
+                      HdStBufferResourceGLSharedPtr normals,
+                      HdStBufferResourceGLSharedPtr indices,
+                      HdStBufferResourceGLSharedPtr primitiveParam,
                       int numPrims) = 0;
     
     HdBufferArrayRangeSharedPtr const _topologyRange;

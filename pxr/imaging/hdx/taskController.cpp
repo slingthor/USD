@@ -29,7 +29,6 @@
 #include "pxr/imaging/hd/sceneDelegate.h"
 #include "pxr/imaging/hdx/aovInputTask.h"
 #include "pxr/imaging/hdx/colorizeSelectionTask.h"
-#include "pxr/imaging/hdx/colorizeTask.h"
 #include "pxr/imaging/hdx/colorChannelTask.h"
 #include "pxr/imaging/hdx/colorCorrectionTask.h"
 #include "pxr/imaging/hdx/oitRenderTask.h"
@@ -65,7 +64,6 @@ TF_DEFINE_PRIVATE_TOKENS(
     (shadowTask)
     (aovInputTask)
     (selectionTask)
-    (colorizeTask)
     (colorizeSelectionTask)
     (oitResolveTask)
     (colorCorrectionTask)

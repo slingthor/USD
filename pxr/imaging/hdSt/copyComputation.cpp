@@ -29,8 +29,8 @@
 #include "pxr/imaging/glf/diagnostic.h"
 
 #include "pxr/imaging/hdSt/copyComputation.h"
-#include "pxr/imaging/hdSt/bufferResource.h"
-#include "pxr/imaging/hd/bufferArrayRange.h"
+#include "pxr/imaging/hdSt/bufferResourceGL.h"
+#include "pxr/imaging/hdSt/bufferArrayRangeGL.h"
 #include "pxr/imaging/hd/perfLog.h"
 #include "pxr/imaging/hd/tokens.h"
 #include "pxr/imaging/hd/types.h"
@@ -57,10 +57,10 @@ HdStCopyComputationGPU::Execute(HdBufferArrayRangeSharedPtr const &range_,
         return;
     }
 
-    HdBufferArrayRangeSharedPtr srcRange =
-        std::static_pointer_cast<HdBufferArrayRange> (_src);
-    HdBufferArrayRangeSharedPtr dstRange =
-        std::static_pointer_cast<HdBufferArrayRange> (range_);
+    HdStBufferArrayRangeGLSharedPtr srcRange =
+        std::static_pointer_cast<HdStBufferArrayRangeGL> (_src);
+    HdStBufferArrayRangeGLSharedPtr dstRange =
+        std::static_pointer_cast<HdStBufferArrayRangeGL> (range_);
 
     HdBufferResourceSharedPtr srcRes = srcRange->GetResource(_name);
     HdBufferResourceSharedPtr dstRes = dstRange->GetResource(_name);
@@ -105,8 +105,8 @@ HdStCopyComputationGPU::Execute(HdBufferArrayRangeSharedPtr const &range_,
         // Create a virtual copy method on the ArrayRange object to do the below block
         TF_FATAL_CODING_ERROR("Not Implemented");
         {/*
-        	GLint srcId = srcRes->GetId();
-        	GLint dstId = dstRes->GetId();
+        	GLint srcId = srcRes->GetId()->GetRawResource();
+        	GLint dstId = dstRes->GetId()->GetRawResource();
 
             if (!TF_VERIFY(srcId)) {
                 return;
@@ -144,8 +144,8 @@ HdStCopyComputationGPU::GetNumOutputElements() const
 void
 HdStCopyComputationGPU::GetBufferSpecs(HdBufferSpecVector *specs) const
 {
-    HdBufferArrayRangeSharedPtr srcRange =
-        std::static_pointer_cast<HdBufferArrayRange> (_src);
+    HdStBufferArrayRangeGLSharedPtr srcRange =
+        std::static_pointer_cast<HdStBufferArrayRangeGL> (_src);
 
     specs->emplace_back(_name, srcRange->GetResource(_name)->GetTupleType());
 }

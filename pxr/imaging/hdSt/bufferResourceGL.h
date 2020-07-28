@@ -24,12 +24,12 @@
 #ifndef PXR_IMAGING_HD_ST_BUFFER_RESOURCE_GL_H
 #define PXR_IMAGING_HD_ST_BUFFER_RESOURCE_GL_H
 
-#include "pxr/imaging/garch/gl.h"
-
 #include "pxr/pxr.h"
 #include "pxr/imaging/hdSt/api.h"
 #include "pxr/imaging/hd/version.h"
 #include "pxr/imaging/hd/bufferResource.h"
+
+#include "pxr/imaging/hgi/buffer.h"
 
 #include "pxr/base/tf/token.h"
 
@@ -48,6 +48,8 @@ using HdStBufferResourceGLNamedPair =
 using HdStBufferResourceGLNamedList =
     std::vector<HdStBufferResourceGLNamedPair>;
 
+class Hgi;
+
 /// \class HdStBufferResourceGL
 ///
 /// A specific type of HdBufferResource (GPU resource) representing an 
@@ -63,26 +65,57 @@ public:
                          int stride);
     HDST_API
     ~HdStBufferResourceGL();
-
+    
     /// Sets the OpenGL name/identifier for this resource and its size.
     /// also caches the gpu address of the buffer.
     HDST_API
-    void SetAllocation(GLuint id, size_t size);
+    void SetAllocation(HgiBufferHandle const& id, size_t size);
+    
+    // APPLE METAL: Multibuffering support.
+    void SetAllocations(HgiBufferHandle const& id0,
+                        HgiBufferHandle const& id1,
+                        HgiBufferHandle const& id2,
+                        size_t size);
 
-    /// Returns the OpenGL id for this GPU resource
-    GLuint GetId() const { return _id; }
+    /// Returns the Hgi id for this GPU resource
+    HgiBufferHandle& GetId() { return _ids[_activeBuffer]; }
+    
+    // APPLE METAL: Multibuffering support.
+    /// Returns the Metal object at the triple buffer index for this GPU resource
+    HgiBufferHandle& GetId(int32_t const index) {
+        return _ids[index];
+    }
+    
+    // APPLE METAL: Multibuffering support.
+    HDST_API
+    virtual void CopyData(Hgi* hgi,
+                          size_t vboOffset,
+                          size_t dataSize,
+                          void const *data);
+    
+    // APPLE METAL: Multibuffering support.
+    HDST_API
+    virtual VtValue ReadBuffer(Hgi* hgi,
+                               HdTupleType tupleType,
+                               int vboOffset,
+                               int stride,
+                               int numElements);
 
     /// Returns the gpu address (if available. otherwise returns 0).
-    uint64_t GetGPUAddress() const { return _gpuAddr; }
-
-    /// Returns the texture buffer view
-    HDST_API
-    GLuint GetTextureBuffer();
+    uint64_t GetGPUAddress() const {
+        return _gpuAddr[_activeBuffer];
+    }
+    
+    // APPLE METAL: Multibuffering support.
+    static constexpr int32_t MULTIBUFFERING = 3;
 
 private:
-    uint64_t _gpuAddr;
-    GLuint _texId;
-    GLuint _id;
+    // APPLE METAL: Multibuffering support.
+    uint64_t _gpuAddr[MULTIBUFFERING];
+    HgiBufferHandle _ids[MULTIBUFFERING];
+    int32_t _lastFrameModified;
+    int32_t _activeBuffer;
+    bool _firstFrameBeingFilled;
 };
 
 

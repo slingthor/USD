@@ -76,28 +76,6 @@ public:
     /// Returns the stride (in bytes) of underlying buffer.
     int GetStride() const {return _stride;}
 
-    HD_API
-    virtual void CopyData(size_t vboOffset, size_t dataSize, void const *data) = 0;
-
-    HD_API
-    virtual HdResourceGPUHandle GetId() const = 0;
-
-    HD_API
-    virtual VtValue ReadBuffer(HdTupleType tupleType,
-                               int vboOffset,
-                               int stride,
-                               int numElements) = 0;
-
-    HD_API
-    virtual uint8_t const* GetBufferContents() const = 0;
-    
-    /// Returns the gpu address (if available. otherwise returns 0).
-    HD_API
-    virtual uint64_t GetGPUAddress() const = 0;
-    
-    HD_API
-    virtual GarchTextureGPUHandle GetTextureBuffer() = 0;
-
 protected:
     HdTupleType _tupleType;
     int _offset;

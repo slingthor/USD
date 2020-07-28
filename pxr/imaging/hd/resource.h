@@ -126,15 +126,6 @@ public:
     /// Returns the size of the resource allocated in the GPU
     HD_API
     size_t GetSize() const {return _size;}
-    
-    /// Sets the OpenGL name/identifier for this resource and its size.
-    /// also caches the gpu address of the buffer.
-    HD_API
-    virtual void SetAllocation(HdResourceGPUHandle id, size_t size) = 0;
-    
-    /// The graphics API name/identifier for this resource
-    HD_API
-    virtual HdResourceGPUHandle GetId() const = 0;
 
 protected:
     /// Stores the size of the resource allocated in the GPU

@@ -28,7 +28,7 @@
 #include "pxr/base/gf/vec4i.h"
 #include "pxr/imaging/hgi/api.h"
 #include "pxr/imaging/hgi/graphicsCmdsDesc.h"
-#include "pxr/imaging/hgi/pipeline.h"
+#include "pxr/imaging/hgi/graphicsPipeline.h"
 #include "pxr/imaging/hgi/resourceBindings.h"
 #include "pxr/imaging/hgi/cmds.h"
 #include <memory>
@@ -72,13 +72,29 @@ public:
     /// The resource bindings used when creating the pipeline must be compatible
     /// with the resources bound via BindResources().
     HGI_API
-    virtual void BindPipeline(HgiPipelineHandle pipeline) = 0;
+    virtual void BindPipeline(HgiGraphicsPipelineHandle pipeline) = 0;
 
     /// Bind resources such as textures and uniform buffers.
     /// Usually you call this right after BindPipeline() and the resources bound
     /// must be compatible with the bound pipeline.
     HGI_API
     virtual void BindResources(HgiResourceBindingsHandle resources) = 0;
+
+    /// Set Push / Function constants.
+    /// `pipeline` is the pipeline that you are binding before the draw call. It
+    /// contains the program used for the uniform buffer
+    /// `stages` describes for what shader stage you are setting the push
+    /// constant values for. Each stage can have its own (or none) binding
+    /// and they must match what is described in the shader functions.
+    /// `byteSize` is the size of the data you are updating.
+    /// `data` is the data you are copying into the push constants block.
+    HGI_API
+    virtual void SetConstantValues(
+        HgiGraphicsPipelineHandle pipeline,
+        HgiShaderStage stages,
+        uint32_t bindIndex,
+        uint32_t byteSize,
+        const void* data) = 0;
 
     /// Binds the vertex buffer(s) that describe the vertex attributes.
     /// `firstBinding` the first index to which buffers are bound (usually 0).

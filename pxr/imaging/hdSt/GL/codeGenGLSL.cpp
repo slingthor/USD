@@ -36,7 +36,7 @@
 #include "pxr/imaging/hdSt/tokens.h"
 #include "pxr/imaging/hdSt/GL/codeGenGLSL.h"
 #include "pxr/imaging/hdSt/GL/glslProgram.h"
-#include "pxr/imaging/hdSt/GL/glUtils.h"
+#include "pxr/imaging/hdSt/glUtils.h"
 
 #include "pxr/imaging/hd/binding.h"
 #include "pxr/imaging/hd/engine.h"

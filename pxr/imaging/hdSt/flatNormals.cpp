@@ -70,7 +70,7 @@ HdSt_FlatNormalsComputationGPU::GetNumOutputElements() const
 
 void
 HdSt_FlatNormalsComputationGPU::Execute(
-    HdBufferArrayRangeSharedPtr const &range,
+    HdBufferArrayRangeSharedPtr const &range_,
     HdResourceRegistry *resourceRegistry)
 {
     HD_TRACE_FUNCTION();
@@ -78,13 +78,20 @@ HdSt_FlatNormalsComputationGPU::Execute(
 
     if (_srcDataType == HdTypeInvalid)
         return;
+    
+    HdStBufferArrayRangeGLSharedPtr range =
+        std::static_pointer_cast<HdStBufferArrayRangeGL> (range_);
+    HdStBufferArrayRangeGLSharedPtr vertexRange =
+        std::static_pointer_cast<HdStBufferArrayRangeGL> (_vertexRange);
+    HdStBufferArrayRangeGLSharedPtr topologyRange =
+        std::static_pointer_cast<HdStBufferArrayRangeGL> (_topologyRange);
 
     // buffer resources for GPU computation
-    HdBufferResourceSharedPtr points = _vertexRange->GetResource(_srcName);
-    HdBufferResourceSharedPtr normals = range->GetResource(_dstName);
-    HdBufferResourceSharedPtr indices = _topologyRange->GetResource(
+    HdStBufferResourceGLSharedPtr points = vertexRange->GetResource(_srcName);
+    HdStBufferResourceGLSharedPtr normals = range->GetResource(_dstName);
+    HdStBufferResourceGLSharedPtr indices = topologyRange->GetResource(
         HdTokens->indices);
-    HdBufferResourceSharedPtr primitiveParam = _topologyRange->GetResource(
+    HdStBufferResourceGLSharedPtr primitiveParam = topologyRange->GetResource(
         HdTokens->primitiveParam);
 
     // select shader by datatype

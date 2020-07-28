@@ -35,6 +35,8 @@
 
 #include "pxr/imaging/hio/glslfx.h"
 
+#include "pxr/base/arch/hash.h"
+
 PXR_NAMESPACE_OPEN_SCOPE
 
 HdStProgram::HdStProgram(TfToken const &role,

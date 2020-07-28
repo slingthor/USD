@@ -44,10 +44,10 @@ PXR_NAMESPACE_OPEN_SCOPE
 /// <ul>
 /// <li>debugName:
 ///   This label can be applied as debug label for gpu debugging.</li>
-/// <li>shaderCode:
-///   The ascii shader code.</li>
 /// <li>shaderStage:
-///   The shader stage this function represents (e.g. vertex or fragment shader).</li>
+///   The shader stage this function represents.</li>
+/// <li>shaderCode:
+///   The ascii shader code used to compile the shader.</li>
 /// </ul>
 ///
 struct HgiShaderFunctionDesc
@@ -57,7 +57,7 @@ struct HgiShaderFunctionDesc
 
     std::string debugName;
     HgiShaderStage shaderStage;
-    std::string shaderCode;
+    const char* shaderCode;
 };
 
 HGI_API
@@ -99,6 +99,11 @@ public:
     /// Returns shader compile errors.
     HGI_API
     virtual std::string const& GetCompileErrors() = 0;
+
+    /// Returns the byte size of the GPU shader function.
+    /// This can be helpful if the application wishes to tally up memory usage.
+    HGI_API
+    virtual size_t GetByteSizeOfResource() const = 0;
 
     /// This function returns the handle to the Hgi backend's gpu resource, cast
     /// to a uint64_t. Clients should avoid using this function and instead

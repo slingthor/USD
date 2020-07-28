@@ -22,28 +22,39 @@
 // language governing permissions and limitations under the Apache License.
 //
 #include "pxr/imaging/glf/glew.h"
-
-#include "pxr/imaging/garch/contextCaps.h"
-#include "pxr/imaging/garch/resourceFactory.h"
-
-#include "pxr/imaging/hd/engine.h"
-#include "pxr/imaging/hd/perfLog.h"
+#include "pxr/imaging/glf/contextCaps.h"
 
 #include "pxr/imaging/hdSt/persistentBuffer.h"
+#include "pxr/imaging/hd/perfLog.h"
 
 #include "pxr/imaging/hf/perfLog.h"
 
+#include "pxr/imaging/hgi/hgi.h"
+#include "pxr/imaging/hgi/buffer.h"
+
 PXR_NAMESPACE_OPEN_SCOPE
 
-HdStPersistentBuffer::HdStPersistentBuffer(HdResourceSharedPtr resource):
-    _resource(resource)
+
+HdStPersistentBuffer::HdStPersistentBuffer(
+    Hgi* hgi, TfToken const &role, size_t dataSize, void* data)
+    : HdResource(role)
+    , _hgi(hgi)
 {
-    /*NOTHING*/
+    HD_TRACE_FUNCTION();
+    HF_MALLOC_TAG_FUNCTION();
+
+    HgiBufferDesc bufDesc;
+    bufDesc.byteSize = dataSize;
+    bufDesc.usage = HgiBufferUsageUniform;
+    bufDesc.initialData = data;
+    _buffer = _hgi->CreateBuffer(bufDesc);
+    
+    SetSize(dataSize);
 }
 
 HdStPersistentBuffer::~HdStPersistentBuffer()
 {
-    /*NOTHING*/
+    _hgi->DestroyBuffer(&_buffer);
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

@@ -26,11 +26,13 @@
 #include "pxr/imaging/hgiMetal/hgi.h"
 #include "pxr/imaging/hgiMetal/buffer.h"
 #include "pxr/imaging/hgiMetal/blitCmds.h"
+#include "pxr/imaging/hgiMetal/computeCmds.h"
+#include "pxr/imaging/hgiMetal/computePipeline.h"
 #include "pxr/imaging/hgiMetal/capabilities.h"
 #include "pxr/imaging/hgiMetal/conversions.h"
 #include "pxr/imaging/hgiMetal/diagnostic.h"
 #include "pxr/imaging/hgiMetal/graphicsCmds.h"
-#include "pxr/imaging/hgiMetal/pipeline.h"
+#include "pxr/imaging/hgiMetal/graphicsPipeline.h"
 #include "pxr/imaging/hgiMetal/resourceBindings.h"
 #include "pxr/imaging/hgiMetal/sampler.h"
 #include "pxr/imaging/hgiMetal/shaderFunction.h"
@@ -123,28 +125,6 @@ HgiMetal::GetPrimaryDevice() const
     return _device;
 }
 
-void
-HgiMetal::SubmitCmds(HgiCmds* cmds)
-{
-    TRACE_FUNCTION();
-
-    if (!cmds) {
-        return;
-    }
-
-    if (HgiMetalGraphicsCmds* gw = dynamic_cast<HgiMetalGraphicsCmds*>(cmds)) {
-        if (gw->Commit()) {
-            _workToFlush = true;
-        }
-    } else if (HgiMetalBlitCmds* bw = dynamic_cast<HgiMetalBlitCmds*>(cmds)) {
-        if (bw->Commit()) {
-            _workToFlush = true;
-        }
-    }
-
-    CommitCommandBuffer();
-}
-
 HgiGraphicsCmdsUniquePtr
 HgiMetal::CreateGraphicsCmds(
     HgiGraphicsCmdsDesc const& desc)
@@ -165,6 +145,12 @@ HgiMetal::CreateGraphicsCmds(
     return HgiGraphicsCmdsUniquePtr(encoder);
 }
 
+HgiComputeCmdsUniquePtr
+HgiMetal::CreateComputeCmds()
+{
+    return HgiComputeCmdsUniquePtr(new HgiMetalComputeCmds(this));
+}
+
 HgiBlitCmdsUniquePtr
 HgiMetal::CreateBlitCmds()
 {
@@ -180,7 +166,7 @@ HgiMetal::CreateTexture(HgiTextureDesc const & desc)
 void
 HgiMetal::DestroyTexture(HgiTextureHandle* texHandle)
 {
-    DestroyObject(texHandle);
+    _TrashObject(texHandle);
 }
 
 HgiSamplerHandle
@@ -192,7 +178,7 @@ HgiMetal::CreateSampler(HgiSamplerDesc const & desc)
 void
 HgiMetal::DestroySampler(HgiSamplerHandle* smpHandle)
 {
-    DestroyObject(smpHandle);
+    _TrashObject(smpHandle);
 }
 
 HgiBufferHandle
@@ -204,7 +190,7 @@ HgiMetal::CreateBuffer(HgiBufferDesc const & desc)
 void
 HgiMetal::DestroyBuffer(HgiBufferHandle* bufHandle)
 {
-    DestroyObject(bufHandle);
+    _TrashObject(bufHandle);
 }
 
 HgiShaderFunctionHandle
@@ -217,7 +203,7 @@ HgiMetal::CreateShaderFunction(HgiShaderFunctionDesc const& desc)
 void
 HgiMetal::DestroyShaderFunction(HgiShaderFunctionHandle* shaderFunctionHandle)
 {
-    DestroyObject(shaderFunctionHandle);
+    _TrashObject(shaderFunctionHandle);
 }
 
 HgiShaderProgramHandle
@@ -230,7 +216,7 @@ HgiMetal::CreateShaderProgram(HgiShaderProgramDesc const& desc)
 void
 HgiMetal::DestroyShaderProgram(HgiShaderProgramHandle* shaderProgramHandle)
 {
-    DestroyObject(shaderProgramHandle);
+    _TrashObject(shaderProgramHandle);
 }
 
 
@@ -244,19 +230,33 @@ HgiMetal::CreateResourceBindings(HgiResourceBindingsDesc const& desc)
 void
 HgiMetal::DestroyResourceBindings(HgiResourceBindingsHandle* resHandle)
 {
-    DestroyObject(resHandle);
+    _TrashObject(resHandle);
 }
 
-HgiPipelineHandle
-HgiMetal::CreatePipeline(HgiPipelineDesc const& desc)
+HgiGraphicsPipelineHandle
+HgiMetal::CreateGraphicsPipeline(HgiGraphicsPipelineDesc const& desc)
 {
-    return HgiPipelineHandle(new HgiMetalPipeline(this, desc), GetUniqueId());
+    return HgiGraphicsPipelineHandle(
+        new HgiMetalGraphicsPipeline(this, desc), GetUniqueId());
 }
 
 void
-HgiMetal::DestroyPipeline(HgiPipelineHandle* pipeHandle)
+HgiMetal::DestroyGraphicsPipeline(HgiGraphicsPipelineHandle* pipeHandle)
 {
-    DestroyObject(pipeHandle);
+    _TrashObject(pipeHandle);
+}
+
+HgiComputePipelineHandle
+HgiMetal::CreateComputePipeline(HgiComputePipelineDesc const& desc)
+{
+    return HgiComputePipelineHandle(
+        new HgiMetalComputePipeline(this, desc), GetUniqueId());
+}
+
+void
+HgiMetal::DestroyComputePipeline(HgiComputePipelineHandle* pipeHandle)
+{
+    _TrashObject(pipeHandle);
 }
 
 TfToken const&
@@ -336,12 +336,26 @@ HgiMetal::BeginMtlf()
 
     if (_encoder) {
         _sampleCount = _encoder->_descriptor.colorTextures[0]->GetDescriptor().sampleCount;
-        _encoder->Commit();
+        _encoder->_Submit(this);
         CommitCommandBuffer();
         return true;
     }
     
     return false;
+}
+
+bool
+HgiMetal::_SubmitCmds(HgiCmds* cmds)
+{
+    TRACE_FUNCTION();
+
+    if (cmds) {
+        _workToFlush = Hgi::_SubmitCmds(cmds);
+    }
+
+    CommitCommandBuffer();
+
+    return _workToFlush;
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

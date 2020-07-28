@@ -40,6 +40,9 @@
 #include "pxr/imaging/hd/tokens.h"
 #include "pxr/imaging/hd/vtBufferSource.h"
 
+#include "pxr/imaging/hgiMetal/buffer.h"
+#include "pxr/imaging/hgiMetal/shaderProgram.h"
+
 #include "pxr/imaging/hf/perfLog.h"
 
 #include "pxr/base/vt/array.h"
@@ -69,10 +72,10 @@ void
 HdSt_FlatNormalsComputationMetal::_Execute(
     HdStProgramSharedPtr computeProgram,
     Uniform const& uniform,
-    HdBufferResourceSharedPtr points,
-    HdBufferResourceSharedPtr normals,
-    HdBufferResourceSharedPtr indices,
-    HdBufferResourceSharedPtr primitiveParam,
+    HdStBufferResourceGLSharedPtr points,
+    HdStBufferResourceGLSharedPtr normals,
+    HdStBufferResourceGLSharedPtr indices,
+    HdStBufferResourceGLSharedPtr primitiveParam,
     int numPrims)
 {
     
@@ -88,10 +91,10 @@ HdSt_FlatNormalsComputationMetal::_Execute(
     //  All but the normals are immutable
     unsigned long immutableBufferMask = (1 << 0) | (1 << 2) | (1 << 3) | (1 << 4);
 
-    id<MTLBuffer> const& pointsBuffer = points->GetId();
-    id<MTLBuffer> const& normalsBuffer = normals->GetId();
-    id<MTLBuffer> const& indicesBuffer = indices->GetId();
-    id<MTLBuffer> const& primitiveParamBuffer = primitiveParam->GetId();
+    id<MTLBuffer> pointsBuffer = HgiMetalBuffer::MTLBuffer(points->GetId());
+    id<MTLBuffer> normalsBuffer = HgiMetalBuffer::MTLBuffer(normals->GetId());
+    id<MTLBuffer> indicesBuffer = HgiMetalBuffer::MTLBuffer(indices->GetId());
+    id<MTLBuffer> primitiveParamBuffer = HgiMetalBuffer::MTLBuffer(primitiveParam->GetId());
     
     context->FlushBuffers();
     context->PrepareBufferFlush();

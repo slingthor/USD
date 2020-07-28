@@ -26,12 +26,13 @@
 #include "pxr/imaging/garch/contextCaps.h"
 #include "pxr/imaging/garch/resourceFactory.h"
 
-#include "pxr/imaging/hdSt/bufferResource.h"
+#include "pxr/imaging/hdSt/bufferResourceGL.h"
 #include "pxr/imaging/hdSt/program.h"
 #include "pxr/imaging/hdSt/resourceRegistry.h"
 #include "pxr/imaging/hdSt/tokens.h"
 
 #include "pxr/imaging/hdSt/GL/smoothNormalsGL.h"
+#include "pxr/imaging/hdSt/GL/resourceGL.h"
 
 #include "pxr/imaging/hd/bufferArrayRange.h"
 #include "pxr/imaging/hd/perfLog.h"
@@ -69,16 +70,18 @@ void
 HdSt_SmoothNormalsComputationGL::_Execute(
     HdStProgramSharedPtr computeProgram,
     Uniform const &uniform,
-    HdBufferResourceSharedPtr points,
-    HdBufferResourceSharedPtr normals,
-    HdBufferResourceSharedPtr adjacency,
+    HdStBufferResourceGLSharedPtr points,
+    HdStBufferResourceGLSharedPtr normals,
+    HdStBufferResourceGLSharedPtr adjacency,
     int numPoints)
 {
     if (!glDispatchCompute)
         return;
 
     // transfer uniform buffer
-    GLuint ubo = computeProgram->GetGlobalUniformBuffer().GetId();
+    // APPLE METAL: Need to up-cast this to get to the GL implementation.
+    const HdResource& uboResource = computeProgram->GetGlobalUniformBuffer();
+    GLuint ubo = static_cast<const HdStResourceGL&>(uboResource).GetId();
     GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
     if (caps.directStateAccessEnabled) {
         glNamedBufferData(ubo, sizeof(uniform), &uniform, GL_STATIC_DRAW);
@@ -88,10 +91,20 @@ HdSt_SmoothNormalsComputationGL::_Execute(
         glBindBuffer(GL_UNIFORM_BUFFER, 0);
     }
 
+    GLuint pointsId =
+        points->GetId() ? points->GetId()->GetRawResource() : 0;
+    GLuint normalsId = 
+        normals->GetId() ? normals->GetId()->GetRawResource() : 0;
+    GLuint adjacencyId = 
+        adjacency->GetId() ? adjacency->GetId()->GetRawResource() : 0;
+
     glBindBufferBase(GL_UNIFORM_BUFFER, 0, ubo);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, points->GetId());
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, normals->GetId());
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, adjacency->GetId());
+    glBindBufferBase(
+        GL_SHADER_STORAGE_BUFFER, 0, pointsId);
+    glBindBufferBase(
+        GL_SHADER_STORAGE_BUFFER, 1, normalsId);
+    glBindBufferBase(
+        GL_SHADER_STORAGE_BUFFER, 2, adjacencyId);
 
     // dispatch compute kernel
     computeProgram->SetProgram();

@@ -26,7 +26,7 @@
 #include "pxr/imaging/hdSt/Metal/extCompGpuComputationMetal.h"
 #include "pxr/imaging/hdSt/Metal/mslProgram.h"
 
-#include "pxr/imaging/hdSt/bufferResource.h"
+#include "pxr/imaging/hdSt/bufferResourceGL.h"
 #include "pxr/imaging/hdSt/extCompGpuComputationBufferSource.h"
 #include "pxr/imaging/hdSt/extCompGpuPrimvarBufferSource.h"
 #include "pxr/imaging/hdSt/extComputation.h"
@@ -61,7 +61,7 @@ void
 HdStExtCompGpuComputationMetal::_Execute(
      HdStProgramSharedPtr const &computeProgram,
      std::vector<int32_t> const &_uniforms,
-     HdBufferArrayRangeSharedPtr outputBar)
+     HdStBufferArrayRangeGLSharedPtr outputBar)
 {
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
     HdStMSLProgramSharedPtr const &mslProgram(std::dynamic_pointer_cast<HdStMSLProgram>(computeProgram));

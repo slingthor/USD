@@ -23,11 +23,13 @@
 //
 #include "pxr/imaging/hgiGL/ops.h"
 #include "pxr/imaging/hgiGL/buffer.h"
+#include "pxr/imaging/hgiGL/computePipeline.h"
 #include "pxr/imaging/hgiGL/conversions.h"
 #include "pxr/imaging/hgiGL/diagnostic.h"
 #include "pxr/imaging/hgiGL/graphicsCmds.h"
-#include "pxr/imaging/hgiGL/pipeline.h"
+#include "pxr/imaging/hgiGL/graphicsPipeline.h"
 #include "pxr/imaging/hgiGL/resourceBindings.h"
+#include "pxr/imaging/hgiGL/shaderProgram.h"
 #include "pxr/imaging/hgiGL/texture.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -85,21 +87,25 @@ HgiGLOps::CopyTextureGpuToCpu(HgiTextureGpuToCpuOp const& copyOp)
             return;
         }
 
-        GLenum glInternalFormat = 0;
         GLenum glFormat = 0;
         GLenum glPixelType = 0;
 
         if (texDesc.usage & HgiTextureUsageBitsDepthTarget) {
-            TF_VERIFY(texDesc.format == HgiFormatFloat32);
+            TF_VERIFY(texDesc.format == HgiFormatFloat32 ||
+                      texDesc.format == HgiFormatFloat32UInt8);
+            // XXX: Copy only the depth component. To copy stencil, we'd need
+            // to set the format to GL_STENCIL_INDEX separately..
             glFormat = GL_DEPTH_COMPONENT;
             glPixelType = GL_FLOAT;
-            glInternalFormat = GL_DEPTH_COMPONENT32F;
+        } else if (texDesc.usage & HgiTextureUsageBitsStencilTarget) {
+            TF_WARN("Copying a stencil-only texture is unsupported currently\n"
+                   );
+            return;
         } else {
             HgiGLConversions::GetFormat(
                 texDesc.format,
                 &glFormat,
-                &glPixelType,
-                &glInternalFormat);
+                &glPixelType);
         }
 
         if (HgiIsCompressed(texDesc.format)) {
@@ -119,13 +125,46 @@ HgiGLOps::CopyTextureGpuToCpu(HgiTextureGpuToCpuOp const& copyOp)
             copyOp.sourceTexelOffset[2], // z offset
             texDesc.dimensions[0], // width
             texDesc.dimensions[1], // height
-            texDesc.dimensions[2], // layerCnt
+            texDesc.dimensions[2], // layerCnt or depth
             glFormat,
             glPixelType,
             copyOp.destinationBufferByteSize,
             copyOp.cpuDestinationBuffer);
 
         HGIGL_POST_PENDING_GL_ERRORS();
+    };
+}
+
+HgiGLOpsFn
+HgiGLOps::CopyBufferGpuToGpu(HgiBufferGpuToGpuOp const& copyOp)
+{
+    return [copyOp] {
+        HgiBufferHandle const& srcBufHandle = copyOp.gpuSourceBuffer;
+        HgiGLBuffer* srcBuffer = static_cast<HgiGLBuffer*>(srcBufHandle.Get());
+
+        if (!TF_VERIFY(srcBuffer && srcBuffer->GetBufferId(),
+            "Invalid source buffer handle")) {
+            return;
+        }
+
+        HgiBufferHandle const& dstBufHandle = copyOp.gpuDestinationBuffer;
+        HgiGLBuffer* dstBuffer = static_cast<HgiGLBuffer*>(dstBufHandle.Get());
+
+        if (!TF_VERIFY(dstBuffer && dstBuffer->GetBufferId(),
+            "Invalid destination buffer handle")) {
+            return;
+        }
+
+        if (copyOp.byteSize == 0) {
+            TF_WARN("The size of the data to copy was zero (aborted)");
+            return;
+        }
+
+        glCopyNamedBufferSubData(srcBuffer->GetBufferId(),
+                                 dstBuffer->GetBufferId(),
+                                 copyOp.sourceByteOffset,
+                                 copyOp.destinationByteOffset,
+                                 copyOp.byteSize);
     };
 }
 
@@ -297,10 +336,20 @@ HgiGLOps::SetScissor(GfVec4i const& sc)
 }
 
 HgiGLOpsFn
-HgiGLOps::BindPipeline(HgiPipelineHandle pipeline)
+HgiGLOps::BindPipeline(HgiGraphicsPipelineHandle pipeline)
 {
     return [pipeline] {
-        if (HgiGLPipeline* p = static_cast<HgiGLPipeline*>(pipeline.Get())) {
+        if (HgiGLGraphicsPipeline* p = static_cast<HgiGLGraphicsPipeline*>(pipeline.Get())) {
+            p->BindPipeline();
+        }
+    };
+}
+
+HgiGLOpsFn
+HgiGLOps::BindPipeline(HgiComputePipelineHandle pipeline)
+{
+    return [pipeline] {
+        if (HgiGLComputePipeline* p = static_cast<HgiGLComputePipeline*>(pipeline.Get())) {
             p->BindPipeline();
         }
     };
@@ -315,6 +364,41 @@ HgiGLOps::BindResources(HgiResourceBindingsHandle res)
         {
             rb->BindResources();
         }
+    };
+}
+
+HgiGLOpsFn
+HgiGLOps::SetConstantValues(
+    HgiGraphicsPipelineHandle pipeline,
+    HgiShaderStage stages,
+    uint32_t bindIndex,
+    uint32_t byteSize,
+    const void* data)
+{
+    return [pipeline, bindIndex, byteSize, data] {
+        HgiGLShaderProgram* glProgram =
+            static_cast<HgiGLShaderProgram*>(
+                pipeline->GetDescriptor().shaderProgram.Get());
+        uint32_t ubo = glProgram->GetUniformBuffer(byteSize);
+        glNamedBufferData(ubo, byteSize, data, GL_STATIC_DRAW);
+        glBindBufferBase(GL_UNIFORM_BUFFER, bindIndex, ubo);
+    };
+}
+
+HgiGLOpsFn
+HgiGLOps::SetConstantValues(
+    HgiComputePipelineHandle pipeline,
+    uint32_t bindIndex,
+    uint32_t byteSize,
+    const void* data)
+{
+    return [pipeline, bindIndex, byteSize, data] {
+        HgiGLShaderProgram* glProgram =
+            static_cast<HgiGLShaderProgram*>(
+                pipeline->GetDescriptor().shaderProgram.Get());
+        uint32_t ubo = glProgram->GetUniformBuffer(byteSize);
+        glNamedBufferData(ubo, byteSize, data, GL_STATIC_DRAW);
+        glBindBufferBase(GL_UNIFORM_BUFFER, bindIndex, ubo);
     };
 }
 
@@ -375,6 +459,16 @@ HgiGLOps::DrawIndexed(
             (void*)(uintptr_t(indexBufferByteOffset)),
             instanceCount,
             vertexOffset);
+
+        HGIGL_POST_PENDING_GL_ERRORS();
+    };
+}
+
+HgiGLOpsFn
+HgiGLOps::Dispatch(int dimX, int dimY)
+{
+    return [dimX, dimY] {
+        glDispatchCompute(dimX, dimY, 1);
 
         HGIGL_POST_PENDING_GL_ERRORS();
     };

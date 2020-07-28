@@ -29,6 +29,7 @@
 #include "pxr/pxr.h"
 #include "pxr/imaging/hdSt/api.h"
 #include "pxr/imaging/hdSt/resourceFactory.h"
+#include "pxr/imaging/hdSt/bufferResourceGL.h"
 
 #include "pxr/imaging/glf/resourceFactory.h"
 
@@ -56,66 +57,16 @@ public:
     HDST_API
     virtual HdSt_CodeGen *NewCodeGen(
         HdStShaderCodeSharedPtrVector const &shaders) const override;
-    
-    /// commandNumUints is given in how many integers.
-    HDST_API
-    virtual HdStDispatchBufferSharedPtr NewDispatchBuffer(
-        TfToken const &role, int count,
-        unsigned int commandNumUints) const override;
-    
-    /// Creates a buffer relocator for OpenGL
-    HDST_API
-    virtual HdStBufferRelocator *NewBufferRelocator(
-        HdResourceGPUHandle srcBuffer,
-        HdResourceGPUHandle dstBuffer) const override;
-    
-    /// Creates a buffer resource for OpenGL
-    HDST_API
-    virtual HdStBufferResource *NewBufferResource(
-        TfToken const &role,
-        HdTupleType tupleType,
-        int offset,
-        int stride) const override;
-    
+
     /// Creates a draw target texture resource for OpenGL
     HDST_API
     virtual HdStTextureResourceSharedPtr
         NewDrawTargetTextureResource() const override;
     
-    /// Create a striped interleaved buffer for OpenGL
-    HDST_API
-    virtual HdBufferArraySharedPtr NewStripedInterleavedBuffer(
-        TfToken const &role,
-        HdBufferSpecVector const &bufferSpecs,
-        HdBufferArrayUsageHint usageHint,
-        int bufferOffsetAlignment,
-        int structAlignment,
-        size_t maxSize,
-        TfToken const &garbageCollectionPerfToken) const override;
-    
-    /// Create a VBO simple memory buffer for OpenGL
-    HDST_API
-    virtual HdBufferArraySharedPtr NewVBOSimpleMemoryBuffer(
-        TfToken const &role,
-        HdBufferSpecVector const &bufferSpecs,
-        HdBufferArrayUsageHint usageHint) const override;
-    
-    /// Create a VBO memory buffer for OpenGL
-    HDST_API
-    virtual HdBufferArraySharedPtr NewVBOMemoryBuffer(
-        TfToken const &role,
-        HdBufferSpecVector const &bufferSpecs,
-        HdBufferArrayUsageHint usageHint) const override;
-    
     /// Creates an indirect draw batch for OpenGL
     HDST_API
     virtual HdSt_DrawBatchSharedPtr NewIndirectDrawBatch(
         HdStDrawItemInstance * drawItemInstance) const override;
-    
-    /// Creates a persistent buffer for OpenGL
-    HDST_API
-    virtual HdStPersistentBufferSharedPtr NewPersistentBuffer(
-        TfToken const &role, size_t dataSize, void* data) const override;
     
     /// Creates a graphics API specific GPU quadrangulate computation
     /// This computaion doesn't generate buffer source (i.e. 2nd phase)

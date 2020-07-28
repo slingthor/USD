@@ -68,10 +68,26 @@ HgiMetalBuffer::~HgiMetalBuffer()
     }
 }
 
+size_t
+HgiMetalBuffer::GetByteSizeOfResource() const
+{
+    return _descriptor.byteSize;
+}
+
 uint64_t
 HgiMetalBuffer::GetRawResource() const
 {
     return (uint64_t) _bufferId;
 }
 
+id<MTLBuffer> HgiMetalBuffer::MTLBuffer(HgiBufferHandle const& bufferHandle)
+{
+    HgiMetalBuffer const* metalBuffer = dynamic_cast<HgiMetalBuffer*>(bufferHandle.Get());
+    
+    if (metalBuffer) {
+        return metalBuffer->GetBufferId();
+    }
+    
+    return nil;
+}
 PXR_NAMESPACE_CLOSE_SCOPE

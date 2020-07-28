@@ -62,8 +62,8 @@ from .selectionDataModel import ALL_INSTANCES, SelectionDataModel
 from .common import (UIBaseColors, UIPropertyValueSourceColors, UIFonts,
                      GetPropertyColor, GetPropertyTextFont,
                      Timer, Drange, BusyContext, DumpMallocTags,
-                     GetValueAndDisplayString, GetInstanceIdForIndex,
-                     ResetSessionVisibility, InvisRootPrims, GetAssetCreationTime,
+                     GetValueAndDisplayString, ResetSessionVisibility,
+                     InvisRootPrims, GetAssetCreationTime,
                      PropertyViewIndex, PropertyViewIcons, PropertyViewDataRoles,
                      RenderModes, ColorCorrectionModes, ShadedRenderModes,
                      PickModes, SelectionHighlightModes, CameraMaskModes,
@@ -685,7 +685,8 @@ class AppController(QtCore.QObject):
             self._pickModeActions = (
                 self._ui.actionPick_Prims,
                 self._ui.actionPick_Models,
-                self._ui.actionPick_Instances)
+                self._ui.actionPick_Instances,
+                self._ui.actionPick_Prototypes)
             for action in self._pickModeActions:
                 self._ui.pickModeActionGroup.addAction(action)
 
@@ -1679,6 +1680,11 @@ class AppController(QtCore.QObject):
                 self._stageView.IsStopRendererSupported())
             self._ui.actionStop.setChecked(self._stopped and
                 self._stageView.IsStopRendererSupported())
+
+    def _configureColorManagement(self):
+        enableMenu = (not self._noRender and 
+                      UsdImagingGL.Engine.IsColorCorrectionCapable())
+        self._ui.menuColorCorrection.setEnabled(enableMenu)
 
     # Topology-dependent UI changes
     def _reloadVaryingUI(self):
@@ -4634,7 +4640,7 @@ class AppController(QtCore.QObject):
     def onStageViewMouseDrag(self):
         return
 
-    def onPrimSelected(self, path, instanceIndex, point, button, modifiers):
+    def onPrimSelected(self, path, instanceIndex, topLevelPath, topLevelInstanceIndex, point, button, modifiers):
 
         # Ignoring middle button until we have something
         # meaningfully different for it to do
@@ -4661,6 +4667,8 @@ class AppController(QtCore.QObject):
                 if path != Sdf.Path.emptyPath:
                     prim = self._dataModel.stage.GetPrimAtPath(path)
 
+                    # Model picking ignores instancing, but selects the enclosing
+                    # model of the picked prim.
                     if self._dataModel.viewSettings.pickMode == PickModes.MODELS:
                         if prim.IsModel():
                             model = prim
@@ -4668,30 +4676,48 @@ class AppController(QtCore.QObject):
                             model = GetEnclosingModelPrim(prim)
                         if model:
                             prim = model
-
-                    if self._dataModel.viewSettings.pickMode != PickModes.INSTANCES:
                         instanceIndex = ALL_INSTANCES
 
-                    instance = instanceIndex
-                    if instanceIndex != ALL_INSTANCES:
-                        instanceId = GetInstanceIdForIndex(prim, instanceIndex,
-                            self._dataModel.currentFrame)
-                        if instanceId is not None:
-                            instance = instanceId
+                    # Prim picking selects the top level boundable: either a
+                    # gprim, or the top-level point instancer of a point
+                    # instanced gprim.  It discards the instance index.
+                    elif self._dataModel.viewSettings.pickMode == PickModes.PRIMS:
+                        topLevelPrim = self._dataModel.stage.GetPrimAtPath(topLevelPath)
+                        if topLevelPrim:
+                            prim = topLevelPrim
+                        instanceIndex = ALL_INSTANCES
+
+                    # Instance picking is like prim picking, but selects a
+                    # particular instance of the top-level point instancer
+                    # (if applicable).
+                    elif self._dataModel.viewSettings.pickMode == PickModes.INSTANCES:
+                        topLevelPrim = self._dataModel.stage.GetPrimAtPath(topLevelPath)
+                        if topLevelPrim:
+                            prim = topLevelPrim
+                            instanceIndex = topLevelInstanceIndex
+
+                    # Prototype picking selects a specific instance of the
+                    # actual picked gprim, if the gprim is point-instanced.
+                    # This differs from instance picking by selecting the gprim,
+                    # rather than the prototype subtree; and selecting only one
+                    # drawn instance, rather than all sub-instances of a top-level
+                    # instance (for nested point instancers).
+                    # elif self._dataModel.viewSettings.pickMode == PickModes.PROTOTYPES:
+                        # Just pass the selection info through!
 
                     if shiftPressed:
                         # Clicking prim while holding shift adds it to the
                         # selection.
-                        self._dataModel.selection.addPrim(prim, instance)
+                        self._dataModel.selection.addPrim(prim, instanceIndex)
                     elif ctrlPressed:
                         # Clicking prim while holding ctrl toggles it in the
                         # selection.
-                        self._dataModel.selection.togglePrim(prim, instance)
+                        self._dataModel.selection.togglePrim(prim, instanceIndex)
                     else:
                         # Clicking prim with no modifiers sets it as the
                         # selection.
                         self._dataModel.selection.switchToPrimPath(
-                            prim.GetPath(), instance)
+                            prim.GetPath(), instanceIndex)
 
                 elif not shiftPressed and not ctrlPressed:
                     # Clicking the background with no modifiers clears the
@@ -4712,7 +4738,7 @@ class AppController(QtCore.QObject):
                                             QtCore.Qt.KeyboardModifiers())
                 QtWidgets.QApplication.sendEvent(self._stageView, mrEvent)
 
-    def onRollover(self, path, instanceIndex, modifiers):
+    def onRollover(self, path, instanceIndex, topLevelPath, topLevelInstanceIndex, modifiers):
         prim = self._dataModel.stage.GetPrimAtPath(path)
         if prim:
             headerStr = ""
@@ -4809,15 +4835,16 @@ class AppController(QtCore.QObject):
             if mesh:
                 propertyStr += "<br> -- <em>subdivisionScheme</em> = %s" %\
                     mesh.GetSubdivisionSchemeAttr().Get()
-            pi = UsdGeom.PointInstancer(prim)
+            topLevelPrim = self._dataModel.stage.GetPrimAtPath(topLevelPath)
+            pi = UsdGeom.PointInstancer(topLevelPrim)
             if pi:
                 indices = pi.GetProtoIndicesAttr().Get(
                     self._dataModel.currentFrame)
                 propertyStr += "<br> -- <em>%d instances</em>" % len(indices)
                 protos = pi.GetPrototypesRel().GetForwardedTargets()
                 propertyStr += "<br> -- <em>%d unique prototypes</em>" % len(protos)
-                if instanceIndex >= 0 and instanceIndex < len(indices):
-                    protoIndex = indices[instanceIndex]
+                if topLevelInstanceIndex >= 0 and topLevelInstanceIndex < len(indices):
+                    protoIndex = indices[topLevelInstanceIndex]
                     if protoIndex < len(protos):
                         currProtoPath = protos[protoIndex]
                         # If, as is common, proto is beneath the PI,
@@ -4872,12 +4899,8 @@ class AppController(QtCore.QObject):
                 instanceStr = "<hr><b>Instancing:</b><br>"
                 instanceStr += "<nobr><small><em>Instance of master:</em></small> %s</nobr>" % \
                     str(prim.GetMaster().GetPath())
-            elif instanceIndex != -1:
-                instanceStr = "<hr><b>Instance Index:</b> %d" % instanceIndex
-                instanceId = GetInstanceIdForIndex(prim, instanceIndex,
-                    self._dataModel.currentFrame)
-                if instanceId is not None:
-                    instanceStr += "<br><b>Instance Id:</b> %d" % instanceId
+            elif topLevelInstanceIndex != -1:
+                instanceStr = "<hr><b>Instance Id:</b> %d" % topLevelInstanceIndex
 
             # Then put it all together
             tip = headerStr + propertyStr + materialStr + instanceStr + aiStr + vsStr

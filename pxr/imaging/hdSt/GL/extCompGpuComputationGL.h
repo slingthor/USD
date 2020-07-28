@@ -108,7 +108,7 @@ private:
     HDST_API
     virtual void _Execute(HdStProgramSharedPtr const &computeProgram,
                           std::vector<int32_t> const &_uniforms,
-                          HdBufferArrayRangeSharedPtr outputBar) override;
+                          HdStBufferArrayRangeGLSharedPtr outputBar) override;
 
     HdStExtCompGpuComputationGL()                                      = delete;
     HdStExtCompGpuComputationGL(const HdStExtCompGpuComputation &)     = delete;

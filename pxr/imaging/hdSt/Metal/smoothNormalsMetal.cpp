@@ -28,12 +28,14 @@
 #include "pxr/imaging/garch/contextCaps.h"
 #include "pxr/imaging/garch/resourceFactory.h"
 
-#include "pxr/imaging/hdSt/bufferResource.h"
+#include "pxr/imaging/hdSt/bufferResourceGL.h"
 #include "pxr/imaging/hdSt/program.h"
 #include "pxr/imaging/hdSt/resourceRegistry.h"
 #include "pxr/imaging/hdSt/tokens.h"
 
 #include "pxr/imaging/hdSt/Metal/smoothNormalsMetal.h"
+
+#include "pxr/imaging/hgiMetal/buffer.h"
 
 #include "pxr/imaging/hd/bufferArrayRange.h"
 #include "pxr/imaging/hd/perfLog.h"
@@ -71,9 +73,9 @@ void
 HdSt_SmoothNormalsComputationMetal::_Execute(
     HdStProgramSharedPtr computeProgram,
     Uniform const &uniform,
-    HdBufferResourceSharedPtr points,
-    HdBufferResourceSharedPtr normals,
-    HdBufferResourceSharedPtr adjacency,
+    HdStBufferResourceGLSharedPtr points,
+    HdStBufferResourceGLSharedPtr normals,
+    HdStBufferResourceGLSharedPtr adjacency,
     int numPoints)
 {
     
@@ -89,9 +91,9 @@ HdSt_SmoothNormalsComputationMetal::_Execute(
     // Only the normals are writebale
     unsigned long immutableBufferMask = (1 << 0) | (1 << 2) | (1 << 3);
 
-    id<MTLBuffer> const& pointsBuffer = points->GetId();
-    id<MTLBuffer> const& normalsBuffer = normals->GetId();
-    id<MTLBuffer> const& adjacencyBuffer = adjacency->GetId();
+    id<MTLBuffer> pointsBuffer = HgiMetalBuffer::MTLBuffer(points->GetId());
+    id<MTLBuffer> normalsBuffer = HgiMetalBuffer::MTLBuffer(normals->GetId());
+    id<MTLBuffer> adjacencyBuffer = HgiMetalBuffer::MTLBuffer(adjacency->GetId());
 
     context->FlushBuffers();
     context->PrepareBufferFlush();
