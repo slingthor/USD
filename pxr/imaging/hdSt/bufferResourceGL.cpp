@@ -117,6 +117,8 @@ HdStBufferResourceGL::SetAllocations(HgiBufferHandle const& id0,
     _ids[1] = id1;
     _ids[2] = id2;
 
+    // APPLE METAL: Platform-specific code should be pushed down to hgi.
+    // Need to pass hgi in to resolve it.
 #if defined(PXR_METAL_SUPPORT_ENABLED)
     for (int32_t i = 0; i < MULTIBUFFERING; i++) {
         id<MTLBuffer> b = HgiMetalBuffer::MTLBuffer(_ids[i]);
@@ -202,6 +204,8 @@ VtValue HdStBufferResourceGL::ReadBuffer(Hgi* hgi,
     uint8_t* data = nullptr;
     size_t dataSize = 0;
 
+    // APPLE METAL: Platform-specific code should be pushed down to hgi.
+    // Complexity will be that the Metal path is optimised.
 #if defined(PXR_OPENGL_SUPPORT_ENABLED)
     GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
     
