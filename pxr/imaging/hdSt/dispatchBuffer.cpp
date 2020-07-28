@@ -22,11 +22,8 @@
 // language governing permissions and limitations under the Apache License.
 //
 #include "pxr/imaging/glf/glew.h"
-#include "pxr/imaging/garch/contextCaps.h"
-#include "pxr/imaging/garch/resourceFactory.h"
 
 #include "pxr/imaging/hdSt/dispatchBuffer.h"
-#include "pxr/imaging/hdSt/resourceFactory.h"
 #include "pxr/imaging/hd/perfLog.h"
 
 #include "pxr/imaging/hf/perfLog.h"
