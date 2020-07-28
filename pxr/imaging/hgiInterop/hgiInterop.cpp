@@ -55,15 +55,6 @@ void HgiInterop::TransferToApp(
     HgiTextureHandle const &depth)
 {
     TfToken const& gfxApi = hgi->GetAPIName();
-
-    // Temp
-#if defined(PXR_METAL_SUPPORT_ENABLED)
-    if (gfxApi==HgiTokens->Metal) {
-        HgiMetal *hgiMetal = dynamic_cast<HgiMetal*>(hgi);
-        HgiMetalTexture *metalColor = static_cast<HgiMetalTexture*>(color.Get());
-        hgiMetal->_finalTexture = metalColor->GetTextureId();
-    }
-#endif
     
 #if defined(HGIINTEROP_METAL_TO_GL_ENABLED)
     if (gfxApi==HgiTokens->Metal && interopDst==HgiTokens->OpenGL) {

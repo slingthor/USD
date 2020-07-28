@@ -190,8 +190,6 @@ public:
     
     int _sampleCount;
     bool _needsFlip;
-    bool _useFinalTextureForGetImage;
-    id<MTLTexture> _finalTexture;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE
