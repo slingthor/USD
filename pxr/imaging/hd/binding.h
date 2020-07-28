@@ -29,8 +29,8 @@
 #include "pxr/imaging/hd/version.h"
 #include "pxr/imaging/hd/types.h"
 
-#include "pxr/imaging/hd/bufferArrayRange.h"
 #include "pxr/imaging/hd/bufferResource.h"
+#include "pxr/imaging/hd/bufferArrayRange.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 

@@ -3,7 +3,6 @@ set(PXR_PACKAGE rmanArgsParser)
 
 pxr_plugin(rmanArgsParser
     LIBRARIES
-        arch
         gf
         tf
         vt

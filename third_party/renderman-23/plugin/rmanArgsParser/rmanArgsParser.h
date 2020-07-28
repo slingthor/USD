@@ -176,8 +176,6 @@ private:
 
     float _Get(const NdrTokenMap& map, const TfToken& key,
         float defaultValue) const;
-
-    std::string _GetDsoPathFromArgsPath(const std::string &argsPath);
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

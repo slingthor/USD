@@ -35,7 +35,6 @@ size_t HgiGetComponentCount(const HgiFormat f)
     case HgiFormatFloat16:
     case HgiFormatFloat32:
     case HgiFormatInt32:
-    case HgiFormatFloat32UInt8: // treat as a single component
         return 1;
     case HgiFormatUNorm8Vec2:
     case HgiFormatSNorm8Vec2:
@@ -96,7 +95,6 @@ size_t HgiDataSizeOfFormat(const HgiFormat f)
         return 4;
     case HgiFormatFloat32Vec2:
     case HgiFormatInt32Vec2:
-    case HgiFormatFloat32UInt8: // XXX: implementation dependent
         return 8;
     case HgiFormatFloat32Vec3:
     case HgiFormatInt32Vec3:
