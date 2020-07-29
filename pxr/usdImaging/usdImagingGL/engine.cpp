@@ -1080,22 +1080,6 @@ UsdImagingGLEngine::GetAovTexture(
     return aovTexture;
 }
 
-HgiTextureHandle
-UsdImagingGLEngine::GetAovTexture(
-    TfToken const& name) const
-{
-    VtValue aov;
-    HgiTextureHandle aovTexture;
-
-    if (_engine->GetTaskContextData(name, &aov)) {
-        if (aov.IsHolding<HgiTextureHandle>()) {
-            aovTexture = aov.Get<HgiTextureHandle>();
-        }
-    }
-
-    return aovTexture;
-}
-
 UsdImagingGLRendererSettingsList
 UsdImagingGLEngine::GetRendererSettingsList() const
 {

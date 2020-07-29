@@ -627,7 +627,7 @@ Garch_StbImage::Write(StorageSpec const & storageIn,
 
     if (storageIn.type == GL_FLOAT && fileExtension != "hdr") {
         quantizedSpec = _Quantize<float>(storageIn, quantizedData);
-        }
+    }
     else if (storageIn.type == GL_HALF_FLOAT && fileExtension != "hdr") {
         quantizedSpec = _Quantize<GfHalf>(storageIn, quantizedData);
     }
