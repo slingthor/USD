@@ -339,24 +339,40 @@ HdStVBOMemoryManager::_StripedBufferArray::Reallocate(
         // allocate new one
         // curId and oldId will be different when we are adopting ranges
         // from another buffer array.
-        HgiBufferHandle& oldId = bres->GetId();
-        HgiBufferHandle& curId = curRes->GetId();
-        HgiBufferHandle newId;
+        HgiBufferHandle newIds[3];
+        HgiBufferHandle oldIds[3];
+        HgiBufferHandle curIds[3];
 
-        // Skip buffers of zero size
-        if (bufferSize > 0) {
-            HgiBufferDesc bufDesc;
-            bufDesc.usage = HgiBufferUsageUniform;
-            bufDesc.byteSize = bufferSize;
-            newId = _hgi->CreateBuffer(bufDesc);
+        HgiBufferDesc bufDesc;
+        bufDesc.usage = HgiBufferUsageUniform;
+        bufDesc.byteSize = bufferSize;
+
+        for (int32_t i = 0; i < 3; i++) {
+            oldIds[i] = bres->GetId(i);
+            curIds[i] = curRes->GetId(i);
+                        
+            // Skip buffers of zero size
+            if (bufferSize > 0) {
+                // Disable triple buffering
+                if (i == 0) {
+                    newIds[i] = _hgi->CreateBuffer(bufDesc);
+                }
+            }
         }
 
         // if old and new buffer exist, copy unchanged data
-        if (curId && newId) {
+        if (curIds[0] && newIds[0]) {
             std::vector<size_t>::iterator newOffsetIt = newOffsets.begin();
 
             // pre-pass to combine consecutive buffer range relocation
-            HdStGLBufferRelocator relocator(curId, newId);
+            std::unique_ptr<HdStGLBufferRelocator> relocators[3];
+            
+            for (int i = 0; i < 3; i++) {
+                int const curIndex = curIds[i] ? i : 0;
+                if (newIds[i]) {
+                    relocators[i] = std::make_unique<HdStGLBufferRelocator>(curIds[curIndex], newIds[i]);
+                }
+            }
             TF_FOR_ALL (it, ranges) {
                 _StripedBufferArrayRangeSharedPtr range =
                     std::static_pointer_cast<_StripedBufferArrayRange>(*it);
@@ -389,21 +405,32 @@ HdStVBOMemoryManager::_StripedBufferArray::Reallocate(
                     GLintptr readOffset = oldOffset * bytesPerElement;
                     GLintptr writeOffset = *newOffsetIt * bytesPerElement;
 
-                    relocator.AddRange(readOffset, writeOffset, copySize);
+                    for (int i = 0; i < 3; i++) {
+                        if (relocators[i]) {
+                            relocators[i]->AddRange(readOffset, writeOffset, copySize);
+                        }
+                    }
                 }
                 ++newOffsetIt;
             }
 
             // buffer copy
-            relocator.Commit(_hgi);
+            for (int i = 0; i < 3; i++) {
+                if (relocators[i]) {
+                    relocators[i]->Commit(_hgi);
+                }
+            }
         }
-        if (oldId) {
-            // delete old buffer
-            _hgi->DestroyBuffer(&oldId);
+
+        for (int i = 0; i < 3; i++) {
+            if (oldIds[i]) {
+                // delete old buffer
+                _hgi->DestroyBuffer(&oldIds[i]);
+            }
         }
 
         // update id of buffer resource
-        bres->SetAllocation(newId, bufferSize);
+        bres->SetAllocations(newIds[0], newIds[1], newIds[2], bufferSize);
     }
 
     // update ranges

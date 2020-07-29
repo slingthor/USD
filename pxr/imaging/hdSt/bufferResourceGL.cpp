@@ -104,7 +104,7 @@ HdStBufferResourceGL::~HdStBufferResourceGL()
 void
 HdStBufferResourceGL::SetAllocation(HgiBufferHandle const& id, size_t size)
 {
-    SetAllocations(id, id, id, size);
+    SetAllocations(id, HgiBufferHandle(), HgiBufferHandle(), size);
 }
 
 void

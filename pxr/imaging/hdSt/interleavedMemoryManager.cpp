@@ -439,13 +439,13 @@ HdStInterleavedMemoryManager::_StripedInterleavedBuffer::Reallocate(
     HdStBufferResourceGLSharedPtr currentBuffer =
         curRangeOwner_->GetResources().begin()->second;
 
-    HgiBufferHandle newId[3];
-    HgiBufferHandle oldId[3];
-    HgiBufferHandle curId[3];
+    HgiBufferHandle newIds[3];
+    HgiBufferHandle oldIds[3];
+    HgiBufferHandle curIds[3];
 
     for (int32_t i = 0; i < 3; i++) {
-        oldId[i] = oldBuffer->GetId(i);
-        curId[i] = currentBuffer->GetId(i);
+        oldIds[i] = oldBuffer->GetId(i);
+        curIds[i] = currentBuffer->GetId(i);
     }
 
     // Skip buffers of zero size.
@@ -454,24 +454,30 @@ HdStInterleavedMemoryManager::_StripedInterleavedBuffer::Reallocate(
         bufDesc.byteSize = totalSize;
         bufDesc.usage = HgiBufferUsageUniform;
 
+#if defined(ARCH_OS_MACOS)
+        {
+            int32_t i = 0;
+#else
+        // Triple buffer everything
         for (int32_t i = 0; i < 3; i++) {
-            newId[i] = _hgi->CreateBuffer(bufDesc);
+#endif
+            newIds[i] = _hgi->CreateBuffer(bufDesc);
         }
     }
 
     // if old and new buffer exist, copy unchanged data
-    if (curId && newId) {
+    if (curIds[0] && newIds[0]) {
         int index = 0;
 
         size_t rangeCount = GetRangeCount();
 
         // pre-pass to combine consecutive buffer range relocation
-        std::unique_ptr<HdStGLBufferRelocator> relocator[3];
+        std::unique_ptr<HdStGLBufferRelocator> relocators[3];
         
         for(int i = 0; i < 3; i++) {
-            int const curIndex = curId[i] ? i : 0;
-            if (newId[i]) {
-                relocator[i] = std::make_unique<HdStGLBufferRelocator>(curId[curIndex], newId[i]);
+            int const curIndex = curIds[i] ? i : 0;
+            if (newIds[i]) {
+                relocators[i] = std::make_unique<HdStGLBufferRelocator>(curIds[curIndex], newIds[i]);
             }
         }
         for (size_t rangeIdx = 0; rangeIdx < rangeCount; ++rangeIdx) {
@@ -490,8 +496,8 @@ HdStInterleavedMemoryManager::_StripedInterleavedBuffer::Reallocate(
                 GLsizeiptr copySize = _stride * range->GetNumElements();
                 
                 for(int i = 0; i < 3; i++) {
-                    if (relocator[i]) {
-                        relocator[i]->AddRange(readOffset, writeOffset, copySize);
+                    if (relocators[i]) {
+                        relocators[i]->AddRange(readOffset, writeOffset, copySize);
                     }
                 }
             }
@@ -502,8 +508,8 @@ HdStInterleavedMemoryManager::_StripedInterleavedBuffer::Reallocate(
 
         // buffer copy
         for(int i = 0; i < 3; i++) {
-            if (relocator[i]) {
-                relocator[i]->Commit(_hgi);
+            if (relocators[i]) {
+                relocators[i]->Commit(_hgi);
             }
         }
     } else {
@@ -524,15 +530,15 @@ HdStInterleavedMemoryManager::_StripedInterleavedBuffer::Reallocate(
         }
     }
     for(int i = 0; i < 3; i++) {
-        if (oldId[i]) {
+        if (oldIds[i]) {
             // delete old buffer
-            _hgi->DestroyBuffer(&oldId[i]);
+            _hgi->DestroyBuffer(&oldIds[i]);
         }
     }
 
     // update id to all buffer resources
     TF_FOR_ALL(it, GetResources()) {
-        it->second->SetAllocations(newId[0], newId[1], newId[2], totalSize);
+        it->second->SetAllocations(newIds[0], newIds[1], newIds[2], totalSize);
     }
 
     _needsReallocation = false;

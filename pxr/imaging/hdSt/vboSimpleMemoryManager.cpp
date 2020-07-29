@@ -297,14 +297,25 @@ HdStVBOSimpleMemoryManager::_SimpleBufferArray::Reallocate(
         // APPLE METAL: Clamp for 0-sized buffers, Metal doesn't support them.
         bufferSize = (bufferSize > 256) ? bufferSize : 256;
         
-        HgiBufferHandle oldId = bres->GetId();
-        HgiBufferHandle newId;
+        HgiBufferHandle newIds[3];
+        HgiBufferHandle oldIds[3];
 
-        if(bufferSize > 0) {
-            HgiBufferDesc bufDesc;
-            bufDesc.byteSize = bufferSize;
-            bufDesc.usage = HgiBufferUsageUniform;
-            newId = _hgi->CreateBuffer(bufDesc);
+        HgiBufferDesc bufDesc;
+        bufDesc.byteSize = bufferSize;
+        bufDesc.usage = HgiBufferUsageUniform;
+
+        for (int32_t i = 0; i < 3; i++) {
+            oldIds[i] = bres->GetId(i);
+            
+#if defined(ARCH_OS_MACOS)
+            if (i == 0)
+#else
+            // Triple buffer everything
+            if (true)
+#endif
+            {
+                newIds[i] = _hgi->CreateBuffer(bufDesc);
+            }
         }
 
         // copy the range. There are three cases:
@@ -324,22 +335,28 @@ HdStVBOSimpleMemoryManager::_SimpleBufferArray::Reallocate(
         int oldSize = range->GetCapacity();
         int newSize = range->GetNumElements();
         size_t copySize = std::min(oldSize, newSize) * bytesPerElement;
-        if (copySize > 0 && oldId) {
+        if (copySize > 0) {
             HD_PERF_COUNTER_INCR(HdPerfTokens->glCopyBufferSubData);
 
-            HgiBufferGpuToGpuOp blitOp;
-            blitOp.gpuSourceBuffer = oldId;
-            blitOp.gpuDestinationBuffer = newId;
-            blitOp.byteSize = copySize;
-            blitCmds->CopyBufferGpuToGpu(blitOp);
+            for (int i = 0; i < 3; i++) {
+                if (newIds[i]) {
+                    HgiBufferGpuToGpuOp blitOp;
+                    blitOp.gpuSourceBuffer = oldIds[i];
+                    blitOp.gpuDestinationBuffer = newIds[i];
+                    blitOp.byteSize = copySize;
+                    blitCmds->CopyBufferGpuToGpu(blitOp);
+                }
+            }
         }
 
         // delete old buffer
-        if (oldId) {
-            _hgi->DestroyBuffer(&oldId);
+        for (int i = 0; i < 3; i++) {
+            if (oldIds[i]) {
+                _hgi->DestroyBuffer(&oldIds[i]);
+            }
         }
 
-        bres->SetAllocation(newId, bufferSize);
+        bres->SetAllocations(newIds[0], newIds[1], newIds[2], bufferSize);
     }
 
     _hgi->SubmitCmds(blitCmds.get());
