@@ -93,31 +93,25 @@ _Register(ID id, HdInstanceRegistry<T> &registry, TfToken const &perfToken)
     }
 }
 
-HdStResourceRegistry::HdStResourceRegistry()
-    : _hgi(nullptr)
+HdStResourceRegistry::HdStResourceRegistry(Hgi * const hgi)
+    : _hgi(hgi)
     , _numBufferSourcesToResolve(0)
     // default aggregation strategies for varying (vertex, varying) primvars
     , _nonUniformAggregationStrategy(
-        std::make_unique<HdStVBOMemoryManager>())
+        std::make_unique<HdStVBOMemoryManager>(_hgi))
     , _nonUniformImmutableAggregationStrategy(
-        std::make_unique<HdStVBOMemoryManager>())
+        std::make_unique<HdStVBOMemoryManager>(_hgi))
     // default aggregation strategy for uniform on UBO (for globals)
     , _uniformUboAggregationStrategy(
-        std::make_unique<HdStInterleavedUBOMemoryManager>())
+        std::make_unique<HdStInterleavedUBOMemoryManager>(_hgi))
     // default aggregation strategy for uniform on SSBO (for primvars)
     , _uniformSsboAggregationStrategy(
-        std::make_unique<HdStInterleavedSSBOMemoryManager>())
+        std::make_unique<HdStInterleavedSSBOMemoryManager>(_hgi))
     // default aggregation strategy for single buffers (for nested instancer)
     , _singleAggregationStrategy(
-        std::make_unique<HdStVBOSimpleMemoryManager>())
-    , _textureHandleRegistry(std::make_unique<HdSt_TextureHandleRegistry>())
+        std::make_unique<HdStVBOSimpleMemoryManager>(_hgi))
+    , _textureHandleRegistry(std::make_unique<HdSt_TextureHandleRegistry>(hgi))
 {
-}
-
-HdStResourceRegistry::HdStResourceRegistry(Hgi* hgi)
-    : HdStResourceRegistry()
-{
-    SetHgi(hgi);
 }
 
 HdStResourceRegistry::~HdStResourceRegistry() = default;
@@ -178,13 +172,6 @@ Hgi*
 HdStResourceRegistry::GetHgi()
 {
     return _hgi;
-}
-
-void
-HdStResourceRegistry::SetHgi(Hgi* hgi)
-{
-    _hgi = hgi;
-    _textureHandleRegistry->SetHgi(hgi);
 }
 
 /// ------------------------------------------------------------------------
@@ -479,9 +466,9 @@ HdStDispatchBufferSharedPtr
 HdStResourceRegistry::RegisterDispatchBuffer(
     TfToken const &role, int count, int commandNumUints)
 {
-    HdStDispatchBufferSharedPtr result(
-        HdStResourceFactory::GetInstance()->NewDispatchBuffer(
-            role, count, commandNumUints));
+    HdStDispatchBufferSharedPtr const result =
+        std::make_shared<HdStDispatchBuffer>(
+            _hgi, role, count, commandNumUints);
 
     _dispatchBufferRegistry.push_back(result);
 
@@ -492,9 +479,9 @@ HdStPersistentBufferSharedPtr
 HdStResourceRegistry::RegisterPersistentBuffer(
         TfToken const &role, size_t dataSize, void *data)
 {
-    HdStPersistentBufferSharedPtr result(
-        HdStResourceFactory::GetInstance()->NewPersistentBuffer(
-            role, dataSize, data));
+    HdStPersistentBufferSharedPtr const result =
+        std::make_shared<HdStPersistentBuffer>(
+            _hgi, role, dataSize, data);
 
     _persistentBufferRegistry.push_back(result);
 
@@ -1026,8 +1013,8 @@ HdStResourceRegistry::_TallyResourceAllocation(VtDictionary *result) const
             continue;
         }
 
-        std::string const & role = buffer->GetResource()->GetRole().GetString();
-        size_t size = size_t(buffer->GetResource()->GetSize());
+        std::string const & role = buffer->GetRole().GetString();
+        size_t size = size_t(buffer->GetSize());
 
         (*result)[role] = VtDictionaryGet<size_t>(*result, role,
                                                   VtDefault = 0) + size;

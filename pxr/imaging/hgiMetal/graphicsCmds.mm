@@ -27,7 +27,7 @@
 #include "pxr/imaging/hgiMetal/diagnostic.h"
 #include "pxr/imaging/hgiMetal/graphicsCmds.h"
 #include "pxr/imaging/hgiMetal/hgi.h"
-#include "pxr/imaging/hgiMetal/pipeline.h"
+#include "pxr/imaging/hgiMetal/graphicsPipeline.h"
 #include "pxr/imaging/hgiMetal/resourceBindings.h"
 #include "pxr/imaging/hgiMetal/texture.h"
 
@@ -163,17 +163,6 @@ HgiMetalGraphicsCmds::~HgiMetalGraphicsCmds()
     TF_VERIFY(_encoder == nil, "Encoder created, but never commited.");
 }
 
-bool
-HgiMetalGraphicsCmds::Commit()
-{
-    if (_encoder) {
-        [_encoder endEncoding];
-        _encoder = nil;
-    }
-
-    return _hasWork;
-}
-
 void
 HgiMetalGraphicsCmds::SetViewport(GfVec4i const& vp)
 {
@@ -195,9 +184,10 @@ HgiMetalGraphicsCmds::SetScissor(GfVec4i const& sc)
 }
 
 void
-HgiMetalGraphicsCmds::BindPipeline(HgiPipelineHandle pipeline)
+HgiMetalGraphicsCmds::BindPipeline(HgiGraphicsPipelineHandle pipeline)
 {
-    if (HgiMetalPipeline* p = static_cast<HgiMetalPipeline*>(pipeline.Get())) {
+    if (HgiMetalGraphicsPipeline* p =
+        static_cast<HgiMetalGraphicsPipeline*>(pipeline.Get())) {
         p->BindPipeline(_encoder);
     }
 }
@@ -209,6 +199,26 @@ HgiMetalGraphicsCmds::BindResources(HgiResourceBindingsHandle r)
         static_cast<HgiMetalResourceBindings*>(r.Get()))
     {
         rb->BindResources(_encoder);
+    }
+}
+
+void
+HgiMetalGraphicsCmds::SetConstantValues(
+    HgiGraphicsPipelineHandle pipeline,
+    HgiShaderStage stages,
+    uint32_t bindIndex,
+    uint32_t byteSize,
+    const void* data)
+{
+    if (stages & HgiShaderStageVertex) {
+        [_encoder setVertexBytes:data
+                          length:byteSize
+                         atIndex:bindIndex];
+    }
+    if (stages & HgiShaderStageFragment) {
+        [_encoder setFragmentBytes:data
+                            length:byteSize
+                           atIndex:bindIndex];
     }
 }
 
@@ -274,5 +284,15 @@ HgiMetalGraphicsCmds::PopDebugGroup()
 {
 }
 
+bool
+HgiMetalGraphicsCmds::_Submit(Hgi* hgi)
+{
+    if (_encoder) {
+        [_encoder endEncoding];
+        _encoder = nil;
+    }
+
+    return _hasWork;
+}
 
 PXR_NAMESPACE_CLOSE_SCOPE

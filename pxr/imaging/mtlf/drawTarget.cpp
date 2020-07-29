@@ -430,6 +430,9 @@ MtlfDrawTarget::GetImage(std::string const & name, void* buffer) const
     
     id<MTLTexture> texture = attachment->GetTextureName();
  
+    if (hgiMetal->_useFinalTextureForGetImage) {
+        texture = hgiMetal->_finalTexture;
+    }
     int bytesPerPixel = attachment->GetBytesPerPixel();
     int width = [texture width];
     int height = [texture height];

@@ -26,7 +26,6 @@
 
 #include "pxr/imaging/hdx/drawTargetRenderPass.h"
 #include "pxr/imaging/hdx/tokens.h"
-#include "pxr/imaging/hdSt/drawTarget.h"
 #include "pxr/imaging/hdSt/drawTargetRenderPassState.h"
 #include "pxr/imaging/hdSt/resourceFactory.h"
 #include "pxr/imaging/hd/renderPassState.h"
@@ -81,13 +80,15 @@ HdxDrawTargetRenderPass::~HdxDrawTargetRenderPass() = default;
 void
 HdxDrawTargetRenderPass::SetDrawTarget(const GarchDrawTargetRefPtr &drawTarget)
 {
-    // XXX: The Draw Target may have been created on a different GL
-    // context, so create a local copy here to use on this context.
-    if (!drawTarget) {
-        return;
+    if (drawTarget) {
+        // XXX: The Draw Target may have been created on a different GL
+        // context, so create a local copy here to use on this context.
+        _drawTarget = GarchDrawTarget::New(drawTarget);
+        _drawTargetContext = GlfGLContext::GetCurrentGLContext();
+    } else {
+        _drawTarget = TfNullPtr;
+        _drawTargetContext = nullptr;
     }
-    _drawTarget = GarchDrawTarget::New(drawTarget);
-    _drawTargetContext = GlfGLContext::GetCurrentGLContext();
 }
 
 void
@@ -134,12 +135,17 @@ HdxDrawTargetRenderPass::Sync()
 void
 HdxDrawTargetRenderPass::Prepare()
 {
-    if(HdStDrawTarget::GetUseStormTextureSystem()) {
+    if (!_drawTarget) {
         return;
     }
 
-    // Check the draw target is still valid on the context.
-    if (!TF_VERIFY(_drawTargetContext == GlfGLContext::GetCurrentGLContext())) {
+    // Check that draw target was created on current context.
+    if (_drawTargetContext != GlfGLContext::GetCurrentGLContext()) {
+
+        // If not, create yet another draw target so that it is valid
+        // on the current context.
+
+        TF_CODING_ERROR("Given draw target was for different GL context");
         SetDrawTarget(_drawTarget);
     }
 }
@@ -149,21 +155,12 @@ HdxDrawTargetRenderPass::Execute(
     HdRenderPassStateSharedPtr const &renderPassState,
     TfTokenVector const &renderTags)
 {
-    const bool useStormTextureSystem =
-        HdStDrawTarget::GetUseStormTextureSystem();
-
-    if (!(_drawTarget || useStormTextureSystem)) {
-        return;
-    }
-
     if (_drawTarget) {
         _drawTarget->Bind();
-    }
-
-    // The draw target task is already settings flags on
-    // HgiGraphicsCmdsDesc to clear the buffers if the Storm texture
-    // system is used.
-    if (!useStormTextureSystem) {
+        // The draw target task is already settings flags on
+        // HgiGraphicsCmdsDesc to clear the render buffers if the Storm texture
+        // system is used, so clear buffers is only necessary if using
+        // GlfDrawTarget's.
         _ClearBuffers();
     }
 #if defined(PXR_OPENGL_SUPPORT_ENABLED)

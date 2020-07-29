@@ -26,7 +26,6 @@
 
 #include "pxr/imaging/hdSt/Metal/quadrangulateMetal.h"
 
-#include "pxr/imaging/hdSt/bufferResource.h"
 #include "pxr/imaging/hdSt/program.h"
 #include "pxr/imaging/hdSt/meshTopology.h"
 #include "pxr/imaging/hdSt/resourceRegistry.h"

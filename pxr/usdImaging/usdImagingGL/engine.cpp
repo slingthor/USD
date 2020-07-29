@@ -144,6 +144,8 @@ _IsHydraEnabled(const UsdImagingGLEngine::RenderAPI api)
 
 } // anonymous namespace
 
+bool UsdImagingGLEngine::_floatingPointBuffersEnabled = true;
+
 std::recursive_mutex UsdImagingGLEngine::ResourceFactoryGuard::contextLock;
 
 UsdImagingGLEngine::ResourceFactoryGuard::ResourceFactoryGuard(HdStResourceFactoryInterface *resourceFactory) {
@@ -213,8 +215,6 @@ UsdImagingGLEngine::UsdImagingGLEngine(
     engineCountMutex.lock();
     engineCount++;
 #endif
-
-    _engine = new HdEngine();
 #if defined(PXR_METAL_SUPPORT_ENABLED)
     if (_renderAPI == Metal) {
         _resourceFactory = new HdStResourceFactoryMetal();
@@ -258,13 +258,16 @@ UsdImagingGLEngine::UsdImagingGLEngine(
 #endif
 }
 
-UsdImagingGLEngine::~UsdImagingGLEngine()
+void
+UsdImagingGLEngine::_DestroyHydraObjects()
 {
-    delete _engine;
-    _engine = NULL;
-    
-    delete _resourceFactory;
-    _resourceFactory = NULL;
+    // Destroy objects in opposite order of construction.
+    _engine = nullptr;
+    _taskController = nullptr;
+    _sceneDelegate = nullptr;
+    _renderIndex = nullptr;
+    _renderDelegate = nullptr;    
+
 
 #if defined(PXR_METAL_SUPPORT_ENABLED)
     engineCountMutex.lock();
@@ -274,6 +277,17 @@ UsdImagingGLEngine::~UsdImagingGLEngine()
     }
     engineCountMutex.unlock();
 #endif
+}
+
+UsdImagingGLEngine::~UsdImagingGLEngine()
+{
+    TF_PY_ALLOW_THREADS_IN_SCOPE();
+
+	delete _resourceFactory;
+    _resourceFactory = nullptr;
+
+    _DestroyHydraObjects();
+
 }
 
 //----------------------------------------------------------------------------
@@ -790,6 +804,11 @@ UsdImagingGLEngine::DecodeIntersection(
     const int instanceIdx = HdxPickTask::DecodeIDRenderColor(instanceIdColor);
     SdfPath primPath =
         _sceneDelegate->GetRenderIndex().GetRprimPathFromPrimId(primId);
+
+    if (primPath.IsEmpty()) {
+        return false;
+    }
+
     SdfPath delegateId, instancerId;
     _sceneDelegate->GetRenderIndex().GetSceneDelegateAndInstancerIds(
         primPath, &delegateId, &instancerId);
@@ -809,7 +828,7 @@ UsdImagingGLEngine::DecodeIntersection(
         *outHitInstanceIndex = instanceIdx;
     }
 
-    return !primPath.IsEmpty();
+    return true;
 }
 
 //----------------------------------------------------------------------------
@@ -903,6 +922,8 @@ UsdImagingGLEngine::SetRendererPlugin(TfToken const &pluginId, bool forceReload)
         return true;
     }
 
+    TF_PY_ALLOW_THREADS_IN_SCOPE();
+
     HdPluginRenderDelegateUniqueHandle renderDelegate =
         registry.CreateRenderDelegate(resolvedId);
     if(!renderDelegate) {
@@ -910,6 +931,11 @@ UsdImagingGLEngine::SetRendererPlugin(TfToken const &pluginId, bool forceReload)
     }
 
     _SetRenderDelegateAndRestoreState(std::move(renderDelegate));
+ 
+    // Cache the state of the floatingPointBuffersEnabled flag for static method.
+    GarchContextCaps const &caps =
+        GarchResourceFactory::GetInstance()->GetContextCaps();
+    _floatingPointBuffersEnabled = caps.floatingPointBuffersEnabled;
 
     return true;
 }
@@ -951,6 +977,8 @@ void
 UsdImagingGLEngine::_SetRenderDelegate(
     HdPluginRenderDelegateUniqueHandle &&renderDelegate)
 {
+    // This relies on SetRendererPlugin to release the GIL...
+
     // Destruction
 
     // Destroy objects in opposite order of construction.
@@ -980,6 +1008,10 @@ UsdImagingGLEngine::_SetRenderDelegate(
         _renderIndex.get(),
         _ComputeControllerPath(_renderDelegate));
 
+    // The task context holds on to resources in the render
+    // delegate, so we want to destroy it first and thus
+    // create it last.
+    _engine = std::make_unique<HdEngine>();
 }
 
 //----------------------------------------------------------------------------
@@ -1139,6 +1171,8 @@ UsdImagingGLEngine::PauseRenderer()
         return false;
     }
 
+    TF_PY_ALLOW_THREADS_IN_SCOPE();
+
     TF_VERIFY(_renderDelegate);
     return _renderDelegate->Pause();
 }
@@ -1149,6 +1183,8 @@ UsdImagingGLEngine::ResumeRenderer()
     if (ARCH_UNLIKELY(_legacyImpl)) {
         return false;
     }
+
+    TF_PY_ALLOW_THREADS_IN_SCOPE();
 
     TF_VERIFY(_renderDelegate);
     return _renderDelegate->Resume();
@@ -1172,6 +1208,8 @@ UsdImagingGLEngine::StopRenderer()
         return false;
     }
 
+    TF_PY_ALLOW_THREADS_IN_SCOPE();
+
     TF_VERIFY(_renderDelegate);
     return _renderDelegate->Stop();
 }
@@ -1182,6 +1220,8 @@ UsdImagingGLEngine::RestartRenderer()
     if (ARCH_UNLIKELY(_legacyImpl)) {
         return false;
     }
+
+    TF_PY_ALLOW_THREADS_IN_SCOPE();
 
     TF_VERIFY(_renderDelegate);
     return _renderDelegate->Restart();
@@ -1198,12 +1238,23 @@ UsdImagingGLEngine::SetColorCorrectionSettings(
         return;
     }
 
+    if (!IsColorCorrectionCapable()) {
+        return;
+    }
+
     TF_VERIFY(_taskController);
 
     HdxColorCorrectionTaskParams hdParams;
     hdParams.colorCorrectionMode = id;
     _taskController->SetColorCorrectionParams(hdParams);
 }
+
+bool 
+UsdImagingGLEngine::IsColorCorrectionCapable()
+{
+    return _floatingPointBuffersEnabled && IsHydraEnabled();
+}
+
 
 //----------------------------------------------------------------------------
 // Resource Information
@@ -1218,6 +1269,12 @@ UsdImagingGLEngine::GetRenderStats() const
 
     TF_VERIFY(_renderDelegate);
     return _renderDelegate->GetRenderStats();
+}
+
+Hgi*
+UsdImagingGLEngine::GetHgi()
+{
+    return _hgi.get();
 }
 
 //----------------------------------------------------------------------------
@@ -1276,8 +1333,13 @@ UsdImagingGLEngine::_Execute(const UsdImagingGLRenderParams &params,
               );
         hdStRenderDelegate->PrepareRender(delegateParams);
     }
-    
-    _engine->Execute(_renderIndex.get(), &tasks);
+
+    {
+        // Release the GIL before calling into hydra, in case any hydra plugins
+        // call into python.
+        TF_PY_ALLOW_THREADS_IN_SCOPE();
+        _engine->Execute(_renderIndex.get(), &tasks);
+    }
 
     if (hdStRenderDelegate) {
         hdStRenderDelegate->FinalizeRender();
@@ -1553,6 +1615,24 @@ UsdImagingDelegate *
 UsdImagingGLEngine::_GetSceneDelegate() const
 {
     return _sceneDelegate.get();
+}
+
+HdEngine *
+UsdImagingGLEngine::_GetHdEngine()
+{
+    return _engine.get();
+}
+
+HdxTaskController *
+UsdImagingGLEngine::_GetTaskController() const
+{
+    return _taskController.get();
+}
+
+bool
+UsdImagingGLEngine::_IsUsingLegacyImpl() const
+{
+    return bool(_legacyImpl);
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

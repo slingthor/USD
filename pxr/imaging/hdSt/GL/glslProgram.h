@@ -120,7 +120,7 @@ public:
 
     /// Returns the GL program object.
     HDST_API
-    GLuint GetGLProgram() const { return _program; }
+    GLuint GetGLProgram() const { return _program->GetRawResource(); }
     
 protected:
     HDST_API

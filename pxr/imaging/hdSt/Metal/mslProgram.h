@@ -29,7 +29,6 @@
 #include "pxr/pxr.h"
 #include "pxr/imaging/hdSt/api.h"
 #include "pxr/imaging/hdSt/program.h"
-#include "pxr/imaging/hdSt/Metal/resourceMetal.h"
 #include "pxr/imaging/mtlf/mtlDevice.h"
 
 #include "pxr/imaging/hd/binding.h"
@@ -254,7 +253,7 @@ private:
     id<MTLRenderPipelineState> _pipelineState;
 
     bool _valid;
-    HdStResourceMetal  _uniformBuffer;
+    HdResource  _uniformBuffer;
     MSL_ShaderBindingMap _bindingMap;
     BindingLocationMap _locationMap;
     

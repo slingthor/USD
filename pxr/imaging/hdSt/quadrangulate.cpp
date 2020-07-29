@@ -27,7 +27,7 @@
 #include "pxr/imaging/garch/contextCaps.h"
 #include "pxr/imaging/garch/resourceFactory.h"
 
-#include "pxr/imaging/hdSt/bufferResource.h"
+#include "pxr/imaging/hdSt/bufferResourceGL.h"
 #include "pxr/imaging/hdSt/program.h"
 #include "pxr/imaging/hdSt/meshTopology.h"
 #include "pxr/imaging/hdSt/quadrangulate.h"
@@ -393,7 +393,6 @@ HdSt_QuadrangulateFaceVaryingComputation::_CheckValid() const
 }
 
 // ---------------------------------------------------------------------------
-
 
 HdSt_QuadrangulateComputationGPU::HdSt_QuadrangulateComputationGPU(
     HdSt_MeshTopology *topology, TfToken const &sourceName, HdType dataType,

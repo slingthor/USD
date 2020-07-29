@@ -30,7 +30,7 @@
 #include "pxr/imaging/hgi/buffer.h"
 #include "pxr/imaging/hgi/blitCmdsOps.h"
 #include "pxr/imaging/hgi/graphicsCmdsDesc.h"
-#include "pxr/imaging/hgi/pipeline.h"
+#include "pxr/imaging/hgi/graphicsPipeline.h"
 #include "pxr/imaging/hgi/resourceBindings.h"
 
 #include "pxr/imaging/hgiGL/api.h"
@@ -48,9 +48,25 @@ using HgiGLOpsFn = std::function<void(void)>;
 ///
 /// A collection of functions used by cmds objects to do deferred cmd recording.
 /// Modern API's support command buffer recording of gfx commands ('deferred').
+/// Meaning: No commands are executed on the GPU until we Submit the cmd buffer.
+///
 /// OpenGL uses 'immediate' mode instead where gfx commands are immediately
-/// processed. We use 'Ops' functions to record our OpenGL function in a list
-/// and only emit them to OpenGL during the submit cmds phase.
+/// processed and given to the GPU at a time of the drivers choosing.
+/// We use 'Ops' functions to record our OpenGL function in a list and only
+/// execute them in OpenGL during the SubmitCmds phase.
+///
+/// This has two benefits:
+///
+/// 1. OpenGL behaves more like Metal and Vulkan. So when clients write Hgi code
+///    they get similar behavior in gpu command execution across all backends.
+///    For example, if you are running with HgiGL and recording commands into a
+///    Hgi***Cmds object and forget to call 'SubmitCmds' you will notice that
+///    your commands are not executed on the GPU, just like what would happen if
+///    you were running with HgiMetal.
+///
+/// 2. It lets us satisfy the Hgi requirement that Hgi***Cmds objects must be
+///    able to do their recording on secondary threads.
+///
 class HgiGLOps
 {
 public:
@@ -62,6 +78,9 @@ public:
 
     HGIGL_API
     static HgiGLOpsFn CopyTextureGpuToCpu(HgiTextureGpuToCpuOp const& copyOp);
+    
+    HGIGL_API
+    static HgiGLOpsFn CopyBufferGpuToGpu(HgiBufferGpuToGpuOp const& copyOp);
 
     HGIGL_API
     static HgiGLOpsFn CopyBufferCpuToGpu(HgiBufferCpuToGpuOp const& copyOp);
@@ -80,10 +99,28 @@ public:
     static HgiGLOpsFn SetScissor(GfVec4i const& sc);
 
     HGIGL_API
-    static HgiGLOpsFn BindPipeline(HgiPipelineHandle pipeline);
+    static HgiGLOpsFn BindPipeline(HgiGraphicsPipelineHandle pipeline);
+
+    HGIGL_API
+    static HgiGLOpsFn BindPipeline(HgiComputePipelineHandle pipeline);
 
     HGIGL_API
     static HgiGLOpsFn BindResources(HgiResourceBindingsHandle resources);
+
+    HGIGL_API
+    static HgiGLOpsFn SetConstantValues(
+        HgiGraphicsPipelineHandle pipeline,
+        HgiShaderStage stages,
+        uint32_t bindIndex,
+        uint32_t byteSize,
+        const void* data);
+
+    HGIGL_API
+    static HgiGLOpsFn SetConstantValues(
+        HgiComputePipelineHandle pipeline,
+        uint32_t bindIndex,
+        uint32_t byteSize,
+        const void* data);
 
     HGIGL_API
     static HgiGLOpsFn BindVertexBuffers(
@@ -104,6 +141,9 @@ public:
     static HgiGLOpsFn BindFramebufferOp(
         HgiGLDevice* device,
         HgiGraphicsCmdsDesc const& desc);
+
+    HGIGL_API
+    static HgiGLOpsFn Dispatch(int dimX, int dimY);
 
     HGIGL_API
     static HgiGLOpsFn GenerateMipMaps(HgiTextureHandle const& texture);

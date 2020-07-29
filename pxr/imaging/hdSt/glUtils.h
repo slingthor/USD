@@ -28,25 +28,14 @@
 #include "pxr/imaging/garch/gl.h"
 #include "pxr/imaging/hdSt/api.h"
 #include "pxr/imaging/hd/types.h"
+#include "pxr/imaging/hgi/buffer.h"
+
 #include "pxr/base/vt/value.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
 class HdStGLUtils {
 public:
-
-    HDST_API
-    static bool IsGpuComputeEnabled();
-
-    /// Reads the content of VBO back to VtArray.
-    /// The \p vboOffset is expressed in bytes.
-    HDST_API
-    static VtValue ReadBuffer(GLint vbo,
-                              HdTupleType tupleType,
-                              int vboOffset,
-                              int stride,
-                              int numElements);
-
     /// Returns true if the shader has been successfully compiled.
     /// if not, returns false and fills the error log into reason.
     HDST_API
@@ -66,7 +55,8 @@ public:
 ///
 class HdStGLBufferRelocator {
 public:
-    HdStGLBufferRelocator(GLint srcBuffer, GLint dstBuffer) :
+    HdStGLBufferRelocator(
+        HgiBufferHandle const& srcBuffer, HgiBufferHandle const& dstBuffer) :
         _srcBuffer(srcBuffer), _dstBuffer(dstBuffer) {}
 
     /// Schedule the range to be copied. The consecutive ranges could be
@@ -76,9 +66,9 @@ public:
                   ptrdiff_t writeOffset,
                   ptrdiff_t copySize);
 
-    /// Execute GL buffer copy command to flush all scheduled range copies.
+    /// Execute Hgi buffer copy command to flush all scheduled range copies.
     HDST_API
-    void Commit();
+    void Commit(class Hgi* hgi);
 
 private:
     struct _CopyUnit {
@@ -100,8 +90,8 @@ private:
     };
 
     std::vector<_CopyUnit> _queue;
-    GLint _srcBuffer;
-    GLint _dstBuffer;
+    HgiBufferHandle const& _srcBuffer;
+    HgiBufferHandle const& _dstBuffer;
 };
 
 

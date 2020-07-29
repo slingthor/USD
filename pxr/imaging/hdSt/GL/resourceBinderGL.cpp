@@ -27,7 +27,7 @@
 #include "pxr/imaging/garch/resourceFactory.h"
 
 #include "pxr/imaging/hdSt/GL/resourceBinderGL.h"
-#include "pxr/imaging/hdSt/bufferResource.h"
+#include "pxr/imaging/hdSt/bufferResourceGL.h"
 #include "pxr/imaging/hdSt/drawItem.h"
 #include "pxr/imaging/hdSt/glConversions.h"
 #include "pxr/imaging/hdSt/samplerObject.h"
@@ -136,15 +136,17 @@ HdSt_ResourceBinderGL::HdSt_ResourceBinderGL()
 
 void
 HdSt_ResourceBinderGL::BindBuffer(TfToken const &name,
-                                  HdBufferResourceSharedPtr const &buffer,
+                                  HdStBufferResourceGLSharedPtr const &buffer,
                                   int offset,
                                   int level) const
 {
     HD_TRACE_FUNCTION();
+    
+    HdStBufferResourceGLSharedPtr bufferGL = std::static_pointer_cast<HdStBufferResourceGL>(buffer);
 
     // it is possible that the buffer has not been initialized when
     // the instanceIndex is empty (e.g. FX points. see bug 120354)
-    GLuint bufferId = (GLuint)(uint64_t)buffer->GetId();
+    uint64_t bufferId = bufferGL->GetId()->GetRawResource();
     if (bufferId == 0) return;
 
     HdBinding binding = GetBinding(name, level);
@@ -152,7 +154,7 @@ HdSt_ResourceBinderGL::BindBuffer(TfToken const &name,
     int loc              = binding.GetLocation();
     int textureUnit      = binding.GetTextureUnit();
 
-    HdTupleType tupleType = buffer->GetTupleType();
+    HdTupleType tupleType = bufferGL->GetTupleType();
 
     void const* offsetPtr =
         reinterpret_cast<const void*>(
@@ -164,7 +166,7 @@ HdSt_ResourceBinderGL::BindBuffer(TfToken const &name,
                   _GetNumComponents(tupleType.type),
                   HdStGLConversions::GetGLAttribType(tupleType.type),
                   _ShouldBeNormalized(tupleType.type),
-                              buffer->GetStride(),
+                              bufferGL->GetStride(),
                               offsetPtr);
         glBindBuffer(GL_ARRAY_BUFFER, 0);
 
@@ -175,7 +177,7 @@ HdSt_ResourceBinderGL::BindBuffer(TfToken const &name,
         glVertexAttribIPointer(loc,
                                HdGetComponentCount(tupleType.type),
                                GL_INT,
-                               buffer->GetStride(),
+                               bufferGL->GetStride(),
                                offsetPtr);
         glBindBuffer(GL_ARRAY_BUFFER, 0);
         glEnableVertexAttribArray(loc);
@@ -185,7 +187,7 @@ HdSt_ResourceBinderGL::BindBuffer(TfToken const &name,
         glVertexAttribIPointer(loc,
                                HdGetComponentCount(tupleType.type),
                                GL_INT,
-                               buffer->GetStride(),
+                               bufferGL->GetStride(),
                                offsetPtr);
         glBindBuffer(GL_ARRAY_BUFFER, 0);
 
@@ -199,9 +201,9 @@ HdSt_ResourceBinderGL::BindBuffer(TfToken const &name,
         glBindBuffer(GL_ARRAY_BUFFER, bufferId);
         // instancerNumLevels is represented by the tuple size.
         // We unroll this to an array of int[1] attributes.
-        for (size_t i = 0; i < buffer->GetTupleType().count; ++i) {
+        for (size_t i = 0; i < bufferGL->GetTupleType().count; ++i) {
             offsetPtr = reinterpret_cast<const void*>(offset + i*sizeof(int));
-            glVertexAttribIPointer(loc, 1, GL_INT, buffer->GetStride(),
+            glVertexAttribIPointer(loc, 1, GL_INT, bufferGL->GetStride(),
                                    offsetPtr);
             // set the divisor to uint-max so that the same base value is used
             // for all instances.
@@ -220,7 +222,7 @@ HdSt_ResourceBinderGL::BindBuffer(TfToken const &name,
         if (!glIsNamedBufferResidentNV(bufferId)) {
             glMakeNamedBufferResidentNV(bufferId, GL_READ_WRITE);
         }
-        glUniformui64NV(loc, buffer->GetGPUAddress());
+        glUniformui64NV(loc, bufferGL->GetGPUAddress());
         break;
     case HdBinding::SSBO:
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, loc,
@@ -229,10 +231,10 @@ HdSt_ResourceBinderGL::BindBuffer(TfToken const &name,
     case HdBinding::BINDLESS_SSBO_RANGE:
         // at least in nvidia driver 346.59, this query call doesn't show
         // any pipeline stall.
-        if (!glIsNamedBufferResidentNV(buffer->GetId())) {
-            glMakeNamedBufferResidentNV(buffer->GetId(), GL_READ_WRITE);
+        if (!glIsNamedBufferResidentNV(bufferId)) {
+            glMakeNamedBufferResidentNV(bufferId, GL_READ_WRITE);
         }
-        glUniformui64NV(loc, buffer->GetGPUAddress()+offset);
+        glUniformui64NV(loc, bufferGL->GetGPUAddress()+offset);
         break;
     case HdBinding::DISPATCH:
         glBindBuffer(GL_DRAW_INDIRECT_BUFFER, bufferId);
@@ -242,14 +244,14 @@ HdSt_ResourceBinderGL::BindBuffer(TfToken const &name,
         glBindBufferRange(GL_UNIFORM_BUFFER, loc,
                           bufferId,
                           offset,
-                          buffer->GetStride());
+                          bufferGL->GetStride());
         break;
     case HdBinding::TBO:
         if (loc != HdBinding::NOT_EXIST) {
             glUniform1i(loc, textureUnit);
             glActiveTexture(GL_TEXTURE0 + textureUnit);
             glBindSampler(textureUnit, 0);
-            glBindTexture(GL_TEXTURE_BUFFER, buffer->GetTextureBuffer());
+            glBindTexture(GL_TEXTURE_BUFFER, bufferId);
         }
         break;
     case HdBinding::TEXTURE_2D:
@@ -265,14 +267,16 @@ HdSt_ResourceBinderGL::BindBuffer(TfToken const &name,
 
 void
 HdSt_ResourceBinderGL::UnbindBuffer(TfToken const &name,
-                                    HdBufferResourceSharedPtr const &buffer,
+                                    HdStBufferResourceGLSharedPtr const &buffer,
                                     int level) const
 {
     HD_TRACE_FUNCTION();
+    
+    HdStBufferResourceGLSharedPtr bufferGL = std::static_pointer_cast<HdStBufferResourceGL>(buffer);
 
     // it is possible that the buffer has not been initialized when
     // the instanceIndex is empty (e.g. FX points)
-    if (!buffer->GetId().IsSet()) return;
+    if (!bufferGL->GetId()) return;
 
     HdBinding binding = GetBinding(name, level);
     HdBinding::Type type = binding.GetType();
@@ -291,7 +295,7 @@ HdSt_ResourceBinderGL::UnbindBuffer(TfToken const &name,
         break;
     case HdBinding::DRAW_INDEX_INSTANCE_ARRAY:
         // instancerNumLevels is represented by the tuple size.
-        for (size_t i = 0; i < buffer->GetTupleType().count; ++i) {
+        for (size_t i = 0; i < bufferGL->GetTupleType().count; ++i) {
             glDisableVertexAttribArray(loc);
             glVertexAttribDivisor(loc, 0);
             ++loc;
@@ -301,16 +305,16 @@ HdSt_ResourceBinderGL::UnbindBuffer(TfToken const &name,
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
         break;
     case HdBinding::BINDLESS_UNIFORM:
-        if (glIsNamedBufferResidentNV((GLuint)(uint64_t)buffer->GetId())) {
-            glMakeNamedBufferNonResidentNV((GLuint)(uint64_t)buffer->GetId());
+        if (glIsNamedBufferResidentNV(bufferGL->GetId()->GetRawResource())) {
+            glMakeNamedBufferNonResidentNV(bufferGL->GetId()->GetRawResource());
         }
         break;
     case HdBinding::SSBO:
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, loc, 0);
         break;
     case HdBinding::BINDLESS_SSBO_RANGE:
-        if (glIsNamedBufferResidentNV(buffer->GetId())) {
-            glMakeNamedBufferNonResidentNV(buffer->GetId());
+        if (glIsNamedBufferResidentNV(bufferGL->GetId()->GetRawResource())) {
+            glMakeNamedBufferNonResidentNV(bufferGL->GetId()->GetRawResource());
         }
         break;
     case HdBinding::DISPATCH:

@@ -3,7 +3,7 @@ set(PXR_PACKAGE hdx)
 
 # XXX We tmp check for PXR_ENABLE_GL_SUPPORT since Hdx currently still uses
 # OpenGL directly. Once Hdx uses only Hgi, remove GL_SUPPORT check.
-if (NOT ${PXR_BUILD_GPU_SUPPORT})
+if (NOT ${PXR_BUILD_GPU_SUPPORT} OR NOT ${PXR_ENABLE_GL_SUPPORT})
     message(STATUS
         "Skipping ${PXR_PACKAGE} because PXR_BUILD_GPU_SUPPORT is OFF")
     return()
@@ -14,16 +14,6 @@ if (PXR_BUILD_OPENCOLORIO_PLUGIN)
     list(APPEND optionalLibs ${OCIO_LIBRARIES})
     list(APPEND optionalIncludeDirs ${OCIO_INCLUDE_DIRS})
 endif()
-
-if (PXR_ENABLE_GL_SUPPORT AND PXR_ENABLE_METAL_SUPPORT)
-    list(APPEND optionalLibs hgiInterop)
-endif()
-
-set (optionalPublicClasses "")
-if (PXR_ENABLE_GL_SUPPORT)
-    list(APPEND optionalPublicClasses fullscreenShaderGL)
-endif()
-
 
 pxr_library(hdx
     LIBRARIES
@@ -50,7 +40,6 @@ pxr_library(hdx
 
     PUBLIC_CLASSES
         aovInputTask
-        colorizeTask
         colorizeSelectionTask
         colorChannelTask
         colorCorrectionTask
@@ -77,7 +66,6 @@ pxr_library(hdx
         taskController
         tokens
         types
-        ${optionalPublicClasses}
 
     PUBLIC_HEADERS
         shadowMatrixComputation.h

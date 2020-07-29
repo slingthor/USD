@@ -34,6 +34,7 @@ import datetime
 import distutils
 import fnmatch
 import glob
+import locale
 import multiprocessing
 import os
 import platform
@@ -97,12 +98,15 @@ def iOS():
 def Python3():
     return sys.version_info.major == 3
 
+def GetLocale():
+    return sys.stdout.encoding or locale.getdefaultlocale()[1] or "UTF-8"
+
 def GetCommandOutput(command):
     """Executes the specified command and returns output or None."""
     try:
         return subprocess.check_output(
             shlex.split(command), 
-            stderr=subprocess.STDOUT).decode('utf-8').strip()
+            stderr=subprocess.STDOUT).decode(GetLocale(), 'replace').strip()
     except subprocess.CalledProcessError:
         pass
     return None
@@ -271,9 +275,8 @@ def Run(cmd, logCommandOutput = True):
         if logCommandOutput:
             p = subprocess.Popen(shlex.split(cmd), stdout=subprocess.PIPE, 
                                  stderr=subprocess.STDOUT)
-            encoding = sys.stdout.encoding or "UTF-8"
             while True:
-                l = p.stdout.readline().decode(encoding)
+                l = p.stdout.readline().decode(GetLocale(), 'replace')
                 if l:
                     logfile.write(l)
                     PrintCommandOutput(l)
@@ -1593,6 +1596,14 @@ def InstallPtex_Windows(context, force, buildArgs):
                   [("add_definitions(-DPTEX_STATIC)", 
                     "# add_definitions(-DPTEX_STATIC)")])
 
+        # Patch Ptex::String to export symbol for operator<< 
+        # This is required for newer versions of OIIO, which make use of the
+        # this operator on Windows platform specifically.
+        PatchFile('src\\ptex\\Ptexture.h',
+                  [("std::ostream& operator << (std::ostream& stream, const Ptex::String& str);",
+                    "PTEXAPI std::ostream& operator << (std::ostream& stream, const Ptex::String& str);")])
+
+
         RunCMake(context, force, buildArgs)
         return os.getcwd()
 
@@ -1685,7 +1696,7 @@ OPENVDB = Dependency("OpenVDB", InstallOpenVDB, "include/openvdb/openvdb.h")
 ############################################################
 # OpenImageIO
 
-OIIO_URL = "https://github.com/OpenImageIO/oiio/archive/Release-1.8.9.zip"
+OIIO_URL = "https://github.com/OpenImageIO/oiio/archive/Release-2.1.16.0.zip"
 
 def InstallOpenImageIO(context, force, buildArgs):
     with CurrentWorkingDirectory(DownloadURL(OIIO_URL, context, force)):
@@ -2025,12 +2036,12 @@ def InstallDraco(context, force, buildArgs):
         RunCMake(context, force, cmakeOptions)
         return os.getcwd()
 
-DRACO = Dependency("Draco", InstallDraco, "include/Draco/src/draco/compression/decode.h")
+DRACO = Dependency("Draco", InstallDraco, "include/draco/compression/decode.h")
 
 ############################################################
 # MaterialX
 
-MATERIALX_URL = "https://github.com/materialx/MaterialX/archive/v1.36.0.zip"
+MATERIALX_URL = "https://github.com/materialx/MaterialX/archive/v1.37.1.zip"
 
 def InstallMaterialX(context, force, buildArgs):
     with CurrentWorkingDirectory(DownloadURL(MATERIALX_URL, context, force)):

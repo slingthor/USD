@@ -27,26 +27,19 @@
 
 #include "pxr/imaging/hdSt/Metal/resourceFactoryMetal.h"
 
-#include "pxr/imaging/hdSt/Metal/bufferRelocatorMetal.h"
-#include "pxr/imaging/hdSt/Metal/bufferResourceMetal.h"
 #include "pxr/imaging/hdSt/Metal/codeGenMSL.h"
-#include "pxr/imaging/hdSt/Metal/dispatchBufferMetal.h"
 #include "pxr/imaging/hdSt/Metal/domeLightComputationsMetal.h"
 #include "pxr/imaging/hdSt/Metal/drawTargetTextureResourceMetal.h"
 #include "pxr/imaging/hdSt/Metal/extCompGpuComputationMetal.h"
 #include "pxr/imaging/hdSt/Metal/flatNormalsMetal.h"
 #include "pxr/imaging/hdSt/Metal/indirectDrawBatchMetal.h"
-#include "pxr/imaging/hdSt/Metal/interleavedMemoryBufferMetal.h"
 #include "pxr/imaging/hdSt/Metal/mslProgram.h"
-#include "pxr/imaging/hdSt/Metal/persistentBufferMetal.h"
 #include "pxr/imaging/hdSt/Metal/renderPassShaderMetal.h"
 #include "pxr/imaging/hdSt/Metal/renderPassStateMetal.h"
 #include "pxr/imaging/hdSt/Metal/resourceBinderMetal.h"
 #include "pxr/imaging/hdSt/Metal/quadrangulateMetal.h"
 #include "pxr/imaging/hdSt/Metal/smoothNormalsMetal.h"
 #include "pxr/imaging/hdSt/Metal/textureResourceMetal.h"
-#include "pxr/imaging/hdSt/Metal/vboMemoryBufferMetal.h"
-#include "pxr/imaging/hdSt/Metal/vboSimpleMemoryBufferMetal.h"
 
 #include <boost/smart_ptr.hpp>
 
@@ -75,30 +68,6 @@ HdSt_CodeGen *HdStResourceFactoryMetal::NewCodeGen(
     return new HdSt_CodeGenMSL(shaders);
 }
 
-HdStDispatchBufferSharedPtr HdStResourceFactoryMetal::NewDispatchBuffer(
-    TfToken const &role, int count,
-    unsigned int commandNumUints) const
-{
-    return std::make_shared<HdStDispatchBufferMetal>(
-        role, count, commandNumUints);
-}
-
-HdStBufferRelocator *HdStResourceFactoryMetal::NewBufferRelocator(
-    HdResourceGPUHandle srcBuffer,
-    HdResourceGPUHandle dstBuffer) const
-{
-    return new HdStBufferRelocatorMetal(srcBuffer, dstBuffer);
-}
-
-HdStBufferResource *HdStResourceFactoryMetal::NewBufferResource(
-    TfToken const &role,
-    HdTupleType tupleType,
-    int offset,
-    int stride) const
-{
-    return new HdStBufferResourceMetal(role, tupleType, offset, stride);
-}
-
 HdStTextureResourceSharedPtr
 HdStResourceFactoryMetal::NewDrawTargetTextureResource() const
 {
@@ -118,37 +87,11 @@ HdStResourceFactoryMetal::NewFlatNormalsComputationGPU(
         packed);
 }
 
-HdBufferArraySharedPtr
-HdStResourceFactoryMetal::NewStripedInterleavedBuffer(
-    TfToken const &role,
-    HdBufferSpecVector const &bufferSpecs,
-    HdBufferArrayUsageHint usageHint,
-    int bufferOffsetAlignment,
-    int structAlignment,
-    size_t maxSize,
-    TfToken const &garbageCollectionPerfToken) const
-{
-    return std::make_shared<
-            HdStStripedInterleavedBufferMetal>(role,
-                                               bufferSpecs,
-                                               usageHint,
-                                               bufferOffsetAlignment,
-                                               structAlignment,
-                                               maxSize,
-                                               garbageCollectionPerfToken);
-}
-
 HdSt_DrawBatchSharedPtr HdStResourceFactoryMetal::NewIndirectDrawBatch(
     HdStDrawItemInstance * drawItemInstance) const
 {
     return HdSt_DrawBatchSharedPtr(
         new HdSt_IndirectDrawBatchMetal(drawItemInstance));
-}
-
-HdStPersistentBufferSharedPtr HdStResourceFactoryMetal::NewPersistentBuffer(
-    TfToken const &role, size_t dataSize, void* data) const
-{
-    return std::make_shared<HdStPersistentBufferMetal>(role, dataSize, data);
 }
 
 /// Create a GPU quadrangulation computation
@@ -213,24 +156,6 @@ HdStResourceFactoryMetal::NewSimpleTextureResource(
     return new HdStSimpleTextureResourceMetal(
         textureHandle, textureType, wrapS, wrapT, wrapR, minFilter, magFilter,
         memoryRequest);
-}
-
-HdBufferArraySharedPtr HdStResourceFactoryMetal::NewVBOMemoryBuffer(
-    TfToken const &role,
-    HdBufferSpecVector const &bufferSpecs,
-    HdBufferArrayUsageHint usageHint) const
-{
-    return std::make_shared<HdStVBOMemoryBufferMetal>(
-        role, bufferSpecs, usageHint);
-}
-
-HdBufferArraySharedPtr HdStResourceFactoryMetal::NewVBOSimpleMemoryBuffer(
-    TfToken const &role,
-    HdBufferSpecVector const &bufferSpecs,
-    HdBufferArrayUsageHint usageHint) const
-{
-    return std::make_shared<HdStVBOSimpleMemoryBufferMetal>(
-        role, bufferSpecs, usageHint);
 }
 
 HdStProgram *HdStResourceFactoryMetal::NewProgram(

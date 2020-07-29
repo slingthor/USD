@@ -21,13 +21,13 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#include "pxr/imaging/glf/glew.h"
+
 #include "pxr/imaging/hdSt/GL/resourceGL.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
 
-HdStResourceGL::HdStResourceGL(TfToken const & role)
+HdStResourceGL::HdStResourceGL(TfToken const & role) 
     : HdResource(role)
     , _id(0)
 {
@@ -40,17 +40,11 @@ HdStResourceGL::~HdStResourceGL()
 }
 
 void
-HdStResourceGL::SetAllocation(HdResourceGPUHandle id, size_t size)
+HdStResourceGL::SetAllocation(GLuint id, size_t size)
 {
     _id = id;
     HdResource::SetSize(size);
 }
 
-HdResourceGPUHandle
-GetId()
-{
-    TF_FATAL_CODING_ERROR("Not a valid call - HdStResourceGL was instantiated directly");
-    return HdResourceGPUHandle();
-}
 
 PXR_NAMESPACE_CLOSE_SCOPE

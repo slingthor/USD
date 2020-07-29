@@ -340,6 +340,7 @@ HgiMetalShaderFunction::HgiMetalShaderFunction(
         HGIMETAL_DEBUG_LABEL(_shaderId, _descriptor.debugName.c_str());
     }
 
+    _descriptor.shaderCode = nullptr;
     [library release];
 }
 
@@ -359,6 +360,12 @@ std::string const&
 HgiMetalShaderFunction::GetCompileErrors()
 {
     return _errors;
+}
+
+size_t
+HgiMetalShaderFunction::GetByteSizeOfResource() const
+{
+    return 0;
 }
 
 uint64_t

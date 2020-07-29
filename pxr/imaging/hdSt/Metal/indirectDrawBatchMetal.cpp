@@ -41,7 +41,7 @@
 
 #include "pxr/imaging/hdSt/Metal/indirectDrawBatchMetal.h"
 #include "pxr/imaging/hdSt/Metal/mslProgram.h"
-#include "pxr/imaging/hdSt/Metal/persistentBufferMetal.h"
+#include "pxr/imaging/hdSt/persistentBuffer.h"
 
 #include "pxr/imaging/hd/binding.h"
 #include "pxr/imaging/hd/bufferArrayRange.h"
@@ -222,13 +222,14 @@ HdSt_IndirectDrawBatchMetal::_BeginGPUCountVisibleInstances(
     HdStResourceRegistrySharedPtr const &resourceRegistry)
 {
     if (!_resultBuffer) {
-        _resultBuffer = std::dynamic_pointer_cast<HdStPersistentBufferMetal>(
-            resourceRegistry->RegisterPersistentBuffer(
-                _tokens->drawIndirectResult, sizeof(GLint), 0));
+        // APPLE METAL: Removed dynamic cast
+        _resultBuffer = resourceRegistry->RegisterPersistentBuffer(
+                _tokens->drawIndirectResult, sizeof(GLint), 0);
     }
 
     // Reset visible item count
-    *((GLint *)_resultBuffer->GetMappedAddress()) = 0;
+    // APPLE METAL: Don't understand how this was
+    //*((GLint *)_resultBuffer->GetMappedAddress()) = 0;
 }
 
 void

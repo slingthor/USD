@@ -26,15 +26,13 @@
 #include "pxr/imaging/garch/contextCaps.h"
 #include "pxr/imaging/garch/resourceFactory.h"
 
-#include "pxr/imaging/hdSt/smoothNormals.h"
-
-#include "pxr/imaging/hdSt/bufferResource.h"
+#include "pxr/imaging/hdSt/bufferArrayRangeGL.h"
+#include "pxr/imaging/hdSt/bufferResourceGL.h"
 #include "pxr/imaging/hdSt/program.h"
 #include "pxr/imaging/hdSt/resourceRegistry.h"
+#include "pxr/imaging/hdSt/smoothNormals.h"
 #include "pxr/imaging/hdSt/tokens.h"
 
-#include "pxr/imaging/hd/bufferArrayRange.h"
-#include "pxr/imaging/hd/engine.h"
 #include "pxr/imaging/hd/perfLog.h"
 #include "pxr/imaging/hd/vertexAdjacency.h"
 #include "pxr/imaging/hd/vtBufferSource.h"
@@ -67,7 +65,7 @@ HdSt_SmoothNormalsComputationGPU::HdSt_SmoothNormalsComputationGPU(
 
 void
 HdSt_SmoothNormalsComputationGPU::Execute(
-    HdBufferArrayRangeSharedPtr const &range,
+    HdBufferArrayRangeSharedPtr const &range_,
     HdResourceRegistry *resourceRegistry)
 {
     HD_TRACE_FUNCTION();
@@ -77,9 +75,12 @@ HdSt_SmoothNormalsComputationGPU::Execute(
         return;
 
     TF_VERIFY(_adjacency);
-    HdBufferArrayRangeSharedPtr const &adjacencyRange =
+    HdBufferArrayRangeSharedPtr const &adjacencyRange_ = 
         _adjacency->GetAdjacencyRange();
-    TF_VERIFY(adjacencyRange);
+    TF_VERIFY(adjacencyRange_);
+
+    HdStBufferArrayRangeGLSharedPtr adjacencyRange =
+        std::static_pointer_cast<HdStBufferArrayRangeGL> (adjacencyRange_);
 
     // select shader by datatype
     TfToken shaderToken;
@@ -103,10 +104,13 @@ HdSt_SmoothNormalsComputationGPU::Execute(
             static_cast<HdStResourceRegistry*>(resourceRegistry));
     if (!computeProgram) return;
 
+    HdStBufferArrayRangeGLSharedPtr range =
+        std::static_pointer_cast<HdStBufferArrayRangeGL> (range_);
+
     // buffer resources for GPU computation
-    HdBufferResourceSharedPtr points = range->GetResource(_srcName);
-    HdBufferResourceSharedPtr normals = range->GetResource(_dstName);
-    HdBufferResourceSharedPtr adjacency = adjacencyRange->GetResource();
+    HdStBufferResourceGLSharedPtr points = range->GetResource(_srcName);
+    HdStBufferResourceGLSharedPtr normals = range->GetResource(_dstName);
+    HdStBufferResourceGLSharedPtr adjacency = adjacencyRange->GetResource();
 
     // prepare uniform buffer for GPU computation
     Uniform uniform;

@@ -107,7 +107,7 @@ HdxFullscreenShader::~HdxFullscreenShader()
     }
 
     if (_pipeline) {
-        _hgi->DestroyPipeline(&_pipeline);
+        _hgi->DestroyGraphicsPipeline(&_pipeline);
     }
 
     if (_sampler) {
@@ -139,19 +139,23 @@ HdxFullscreenShader::SetProgram(
     HioGlslfx fsGlslfx(glslfx, technique);
 
     // Setup the vertex shader
+    std::string vsCode;
     HgiShaderFunctionDesc vertDesc;
     vertDesc.debugName = _tokens->fullscreenVertex.GetString();
     vertDesc.shaderStage = HgiShaderStageVertex;
-    vertDesc.shaderCode = vsGlslfx.GetSource(_tokens->fullscreenVertex);
-    TF_VERIFY(!vertDesc.shaderCode.empty());
+    vsCode = vsGlslfx.GetSource(_tokens->fullscreenVertex);
+    TF_VERIFY(!vsCode.empty());
+    vertDesc.shaderCode = vsCode.c_str();
     HgiShaderFunctionHandle vertFn = _hgi->CreateShaderFunction(vertDesc);
 
     // Setup the fragment shader
+    std::string fsCode;
     HgiShaderFunctionDesc fragDesc;
     fragDesc.debugName = _shaderName.GetString();
     fragDesc.shaderStage = HgiShaderStageFragment;
-    fragDesc.shaderCode = fsGlslfx.GetSource(_shaderName);
-    TF_VERIFY(!fragDesc.shaderCode.empty());
+    fsCode = fsGlslfx.GetSource(_shaderName);
+    TF_VERIFY(!fsCode.empty());
+    fragDesc.shaderCode = fsCode.c_str();
     HgiShaderFunctionHandle fragFn = _hgi->CreateShaderFunction(fragDesc);
 
     // Setup the shader program
@@ -185,7 +189,7 @@ HdxFullscreenShader::SetDepthState(HgiDepthStencilState const& state)
     }
 
     if (_pipeline) {
-        _hgi->DestroyPipeline(&_pipeline);
+        _hgi->DestroyGraphicsPipeline(&_pipeline);
     }
 
     _depthState = state;
@@ -213,7 +217,7 @@ HdxFullscreenShader::SetBlendState(
     }
 
     if (_pipeline) {
-        _hgi->DestroyPipeline(&_pipeline);
+        _hgi->DestroyGraphicsPipeline(&_pipeline);
     }
 
     _blendingEnabled = enableBlending;
@@ -395,7 +399,7 @@ HdxFullscreenShader::_CreatePipeline(
             return true;
         }
 
-        _hgi->DestroyPipeline(&_pipeline);
+        _hgi->DestroyGraphicsPipeline(&_pipeline);
     }
 
     // Setup attachments
@@ -418,9 +422,8 @@ HdxFullscreenShader::_CreatePipeline(
         _depthAttachment.format = depthDst.Get()->GetDescriptor().format;
     }
 
-    HgiPipelineDesc desc;
+    HgiGraphicsPipelineDesc desc;
     desc.debugName = _debugName + " Pipeline";
-    desc.pipelineType = HgiPipelineTypeGraphics;
     desc.resourceBindings = _resourceBindings;
     desc.shaderProgram = _shaderProgram;
     desc.colorAttachmentDescs.push_back(_attachment0);
@@ -444,7 +447,6 @@ HdxFullscreenShader::_CreatePipeline(
     desc.rasterizationState.winding = HgiWindingCounterClockwise;
 
     // Set resource bindings (texture, buffers) and shader
-    desc.pipelineType = HgiPipelineTypeGraphics;
     desc.resourceBindings = _resourceBindings;
     desc.shaderProgram = _shaderProgram;
 
@@ -453,7 +455,7 @@ HdxFullscreenShader::_CreatePipeline(
     desc.vertexBuffers.clear();
     desc.vertexBuffers.push_back(_vboDesc);
 
-    _pipeline = _hgi->CreatePipeline(desc);
+    _pipeline = _hgi->CreateGraphicsPipeline(desc);
 
     return true;
 }

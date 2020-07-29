@@ -29,7 +29,7 @@
 #include "pxr/imaging/garch/contextCaps.h"
 #include "pxr/imaging/garch/resourceFactory.h"
 
-#include "pxr/imaging/hdSt/bufferResource.h"
+#include "pxr/imaging/hdSt/bufferResourceGL.h"
 #include "pxr/imaging/hdSt/extCompGpuComputationBufferSource.h"
 #include "pxr/imaging/hdSt/extCompGpuPrimvarBufferSource.h"
 #include "pxr/imaging/hdSt/extCompGpuComputation.h"
@@ -95,7 +95,8 @@ HdStExtCompGpuComputation::Execute(
             "GPU computation '%s' executed for primvars: %s\n",
             _id.GetText(), _GetDebugPrimvarNames(_compPrimvars).c_str());
 
-    bool hasDispatchCompute = GarchResourceFactory::GetInstance()->GetContextCaps().hasDispatchCompute;
+    GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
+    bool hasDispatchCompute = caps.hasDispatchCompute;
     if (!hasDispatchCompute) {
         TF_WARN("Compute Dispatch not available");
         return;
@@ -108,14 +109,15 @@ HdStExtCompGpuComputation::Execute(
         return;
     }
 
+
     if (!_introspectedBindings) {
         binder.IntrospectBindings(computeProgram);
         _introspectedBindings = true;
     }
     computeProgram->SetProgram();
-
-    HdBufferArrayRangeSharedPtr outputBar =
-        std::static_pointer_cast<HdBufferArrayRange>(outputRange);
+	
+    HdStBufferArrayRangeGLSharedPtr outputBar =
+        std::static_pointer_cast<HdStBufferArrayRangeGL>(outputRange);
     TF_VERIFY(outputBar);
 
     // Prepare uniform buffer for GPU computation
@@ -126,30 +128,30 @@ HdStExtCompGpuComputation::Execute(
     // Bind buffers as SSBOs to the indices matching the layout in the shader
     for (HdExtComputationPrimvarDescriptor const &compPrimvar: _compPrimvars) {
         TfToken const & name = compPrimvar.sourceComputationOutputName;
-        HdBufferResourceSharedPtr const & buffer =
+        HdStBufferResourceGLSharedPtr const & buffer =
                 outputBar->GetResource(compPrimvar.name);
 
         HdBinding const &binding = binder.GetBinding(name);
         // These should all be valid as they are required outputs
-        if (TF_VERIFY(binding.IsValid()) && TF_VERIFY(buffer->GetId().IsSet())) {
+        if (TF_VERIFY(binding.IsValid()) && TF_VERIFY(buffer->GetId())) {
             size_t componentSize = HdDataSizeOfType(
                 HdGetComponentType(buffer->GetTupleType().type));
             _uniforms.push_back(buffer->GetOffset() / componentSize);
             // Assumes non-SSBO allocator for the stride
             _uniforms.push_back(buffer->GetStride() / componentSize);
-            binder.BindBuffer(name, std::dynamic_pointer_cast<HdStBufferResource>(buffer));
+            binder.BindBuffer(name, buffer);
         } 
     }
 
-    GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
-    for (HdBufferArrayRangeSharedPtr const & input: _resource->GetInputs()) {
-        HdBufferArrayRangeSharedPtr const & inputBar =
-            std::static_pointer_cast<HdBufferArrayRange>(input);
 
-        for (HdStBufferResourceNamedPair const & it:
+    for (HdBufferArrayRangeSharedPtr const & input: _resource->GetInputs()) {
+        HdStBufferArrayRangeGLSharedPtr const & inputBar =
+            std::static_pointer_cast<HdStBufferArrayRangeGL>(input);
+
+        for (HdStBufferResourceGLNamedPair const & it:
                         inputBar->GetResources()) {
             TfToken const &name = it.first;
-            HdBufferResourceSharedPtr const &buffer = it.second;
+            HdStBufferResourceGLSharedPtr const &buffer = it.second;
 
             HdBinding const &binding = binder.GetBinding(name);
             // These should all be valid as they are required inputs
@@ -174,6 +176,7 @@ HdStExtCompGpuComputation::Execute(
         }
     }
     
+
     _Execute(computeProgram, _uniforms, outputBar);
 
     computeProgram->UnsetProgram();

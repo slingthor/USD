@@ -33,7 +33,7 @@ pxr_library(usdImaging
         delegate
         drawModeAdapter
         indexProxy
-        inheritedCache
+        resolvedAttributeCache
         instancerContext
         package
         tokens

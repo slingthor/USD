@@ -119,19 +119,6 @@ public:
 
     /// Gets the bufferSpecs for all resources.
     virtual void GetBufferSpecs(HdBufferSpecVector *bufferSpecs) const = 0;
-    
-    /// Returns the GPU resource. If the buffer array contains more than one
-    /// resource, this method raises a coding error.
-    HD_API
-    virtual HdBufferResourceSharedPtr GetResource() const = 0;
-    
-    /// Returns the named GPU resource.
-    HD_API
-    virtual HdBufferResourceSharedPtr GetResource(TfToken const& name) = 0;
-    
-    /// Returns the list of all named GPU resources for this bufferArrayRange.
-    HD_API
-    virtual HdBufferResourceNamedList const& GetResources() const = 0;
 
 protected:
     /// Returns the aggregation container to be used in IsAggregatedWith()
@@ -165,16 +152,7 @@ public:
     /// Returns the bar at \p index. returns null if either the index
     // is out of range or not yet set.
     HD_API
-    HdBufferArrayRangeSharedPtr const &Get(int index) const
-    {
-        if (index < 0 || static_cast<size_t>(index) >= _ranges.size()) {
-            // out of range access is not an errorneous path.
-            // (i.e. element/instance bars can be null if not exists)
-            static HdBufferArrayRangeSharedPtr empty;
-            return empty;
-        }
-        return _ranges[index];
-    }
+    HdBufferArrayRangeSharedPtr const &Get(int index) const;
 
 private:
     std::vector<HdBufferArrayRangeSharedPtr> _ranges;

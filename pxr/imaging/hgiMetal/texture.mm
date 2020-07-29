@@ -36,6 +36,10 @@ HgiMetalTexture::HgiMetalTexture(HgiMetal *hgi, HgiTextureDesc const & desc)
     : HgiTexture(desc)
     , _textureId(nil)
 {
+    if (desc.type != HgiTextureType2D && desc.type != HgiTextureType3D) {
+        TF_CODING_ERROR("Unsupported HgiTextureType enum value");
+    }
+
     MTLResourceOptions resourceOptions = MTLResourceStorageModePrivate;
     MTLTextureUsage usage = MTLTextureUsageUnknown;
 
@@ -48,8 +52,15 @@ HgiMetalTexture::HgiMetalTexture(HgiMetal *hgi, HgiTextureDesc const & desc)
     if (desc.usage & HgiTextureUsageBitsColorTarget) {
         usage = MTLTextureUsageRenderTarget;
     } else if (desc.usage & HgiTextureUsageBitsDepthTarget) {
-        TF_VERIFY(desc.format == HgiFormatFloat32);
-        mtlFormat = MTLPixelFormatDepth32Float;
+        TF_VERIFY(desc.format == HgiFormatFloat32 ||
+                  desc.format == HgiFormatFloat32UInt8);
+        
+        // XXX: MTLPixelFormatDepth32Float isn't in the conversions table..
+        if (desc.usage & HgiTextureUsageBitsStencilTarget) {
+            mtlFormat = MTLPixelFormatDepth32Float_Stencil8;
+        } else {
+            mtlFormat = MTLPixelFormatDepth32Float;
+        }
         usage = MTLTextureUsageRenderTarget;
     }
 
@@ -79,19 +90,22 @@ HgiMetalTexture::HgiMetalTexture(HgiMetal *hgi, HgiTextureDesc const & desc)
     texDesc.resourceOptions = resourceOptions;
     texDesc.usage = usage;
 
-    if (@available(macOS 10.15, ios 13.0, *)) {
-        size_t numChannels = HgiGetComponentCount(desc.format);
+#if (defined(__MAC_10_15) && __MAC_OS_X_VERSION_MAX_ALLOWED >= __MAC_10_15) \
+    || __IPHONE_OS_VERSION_MAX_ALLOWED >= 130000
+        if (@available(macOS 10.15, ios 13.0, *)) {
+            size_t numChannels = HgiGetComponentCount(desc.format);
 
-        if (usage == MTLTextureUsageShaderRead && numChannels == 1) {
-            texDesc.swizzle = MTLTextureSwizzleChannelsMake(
-                MTLTextureSwizzleRed,
-                MTLTextureSwizzleRed,
-                MTLTextureSwizzleRed,
-                MTLTextureSwizzleOne);
+            if (usage == MTLTextureUsageShaderRead && numChannels == 1) {
+                texDesc.swizzle = MTLTextureSwizzleChannelsMake(
+                    MTLTextureSwizzleRed,
+                    MTLTextureSwizzleRed,
+                    MTLTextureSwizzleRed,
+                    MTLTextureSwizzleOne);
+            }
         }
-    }
+#endif
 
-    if (depth > 1) {
+    if (desc.type == HgiTextureType3D) {
         texDesc.depth = depth;
         texDesc.textureType = MTLTextureType3D;
     }
@@ -150,6 +164,14 @@ HgiMetalTexture::~HgiMetalTexture()
         [_textureId release];
         _textureId = nil;
     }
+}
+
+size_t
+HgiMetalTexture::GetByteSizeOfResource() const
+{
+    GfVec3i const& s = _descriptor.dimensions;
+    return HgiDataSizeOfFormat(_descriptor.format) * 
+        s[0] * s[1] * std::max(s[2], 1);
 }
 
 uint64_t

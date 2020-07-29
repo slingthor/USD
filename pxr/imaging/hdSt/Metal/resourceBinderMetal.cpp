@@ -24,14 +24,13 @@
 #include "pxr/imaging/mtlf/mtlDevice.h"
 
 #include "pxr/imaging/hdSt/Metal/resourceBinderMetal.h"
-#include "pxr/imaging/hdSt/bufferResource.h"
+#include "pxr/imaging/hdSt/bufferResourceGL.h"
 #include "pxr/imaging/hdSt/drawItem.h"
 #include "pxr/imaging/hdSt/textureHandle.h"
 #include "pxr/imaging/hdSt/textureObject.h"
 #include "pxr/imaging/hdSt/samplerObject.h"
 #include "pxr/imaging/hdSt/shaderCode.h"
 
-#include "pxr/imaging/hdSt/Metal/bufferResourceMetal.h"
 #include "pxr/imaging/hdSt/Metal/metalConversions.h"
 #include "pxr/imaging/hdSt/Metal/mslProgram.h"
 
@@ -40,6 +39,7 @@
 #include "pxr/imaging/hd/resource.h"
 #include "pxr/imaging/hd/tokens.h"
 
+#include "pxr/imaging/hgiMetal/buffer.h"
 #include "pxr/imaging/hgiMetal/texture.h"
 #include "pxr/imaging/hgiMetal/sampler.h"
 
@@ -136,7 +136,7 @@ HdSt_ResourceBinderMetal::HdSt_ResourceBinderMetal()
 
 void
 HdSt_ResourceBinderMetal::BindBuffer(TfToken const &name,
-                                     HdBufferResourceSharedPtr const &buffer,
+                                     HdStBufferResourceGLSharedPtr const &buffer,
                                      int offset,
                                      int level) const
 {
@@ -145,11 +145,10 @@ HdSt_ResourceBinderMetal::BindBuffer(TfToken const &name,
     //NSLog(@"Binding buffer %s", name.GetText());
     // it is possible that the buffer has not been initialized when
     // the instanceIndex is empty (e.g. FX points. see bug 120354)
-    if (!buffer->GetId().IsSet())
+    if (!buffer->GetId())
         return;
     
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
-    HdStBufferResourceMetalSharedPtr const metalBuffer = std::dynamic_pointer_cast<HdStBufferResourceMetal>(buffer);
     HdTupleType tupleType = buffer->GetTupleType();
 
     auto shaderBindings = MSL_FindBinding(_shaderBindingMap, name, level);
@@ -157,6 +156,7 @@ HdSt_ResourceBinderMetal::BindBuffer(TfToken const &name,
     
     for(; it != shaderBindings.second; ++it) {
         MSL_ShaderBinding const* const shaderBinding = (*it).second;
+        id<MTLBuffer> metalBuffer = HgiMetalBuffer::MTLBuffer(buffer->GetId());
 
         switch(shaderBinding->_type)
         {
@@ -168,15 +168,15 @@ HdSt_ResourceBinderMetal::BindBuffer(TfToken const &name,
                 buffer->GetStride(),
                 offset,
                 name);
-            MtlfMetalContext::GetMetalContext()->SetBuffer(shaderBinding->_index, metalBuffer->GetId(), name);
+            MtlfMetalContext::GetMetalContext()->SetBuffer(shaderBinding->_index, metalBuffer, name);
             break;
         case kMSL_BindingType_UniformBuffer:
-            context->SetUniformBuffer(shaderBinding->_index, metalBuffer->GetId(), name, shaderBinding->_stage, offset);
+            context->SetUniformBuffer(shaderBinding->_index, metalBuffer, name, shaderBinding->_stage, offset);
             break;
         case kMSL_BindingType_IndexBuffer:
             if(offset != 0)
                 TF_FATAL_CODING_ERROR("Not implemented!");
-            context->SetIndexBuffer(metalBuffer->GetId());
+            context->SetIndexBuffer(metalBuffer);
             break;
         default:
             TF_FATAL_CODING_ERROR("Not allowed!");
@@ -186,7 +186,7 @@ HdSt_ResourceBinderMetal::BindBuffer(TfToken const &name,
 
 void
 HdSt_ResourceBinderMetal::UnbindBuffer(TfToken const &name,
-                                  HdBufferResourceSharedPtr const &buffer,
+                                  HdStBufferResourceGLSharedPtr const &buffer,
                                   int level) const
 {
     HD_TRACE_FUNCTION();

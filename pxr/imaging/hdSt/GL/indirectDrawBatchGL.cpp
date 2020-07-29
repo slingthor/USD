@@ -40,7 +40,7 @@
 
 #include "pxr/imaging/hdSt/GL/glslProgram.h"
 #include "pxr/imaging/hdSt/GL/indirectDrawBatchGL.h"
-#include "pxr/imaging/hdSt/GL/persistentBufferGL.h"
+#include "pxr/imaging/hdSt/persistentBuffer.h"
 
 #include "pxr/imaging/hd/binding.h"
 #include "pxr/imaging/hd/bufferArrayRange.h"
@@ -110,13 +110,14 @@ HdSt_IndirectDrawBatchGL::_PrepareDraw(bool gpuCulling, bool freezeCulling)
             _dispatchBuffer->GetEntireResource()->GetStride();
 
         if (gpuCulling) {
+            HgiBufferHandle const& buffer =
+                _dispatchBuffer->GetEntireResource()->GetId();
             if (caps.directStateAccessEnabled) {
                 bufferData = glMapNamedBufferEXT(
-                     _dispatchBuffer->GetEntireResource()->GetId(),
-                     GL_READ_ONLY);
+                    buffer->GetRawResource(), GL_READ_ONLY);
+
             } else {
-                glBindBuffer(GL_ARRAY_BUFFER,
-                             _dispatchBuffer->GetEntireResource()->GetId());
+                glBindBuffer(GL_ARRAY_BUFFER, buffer->GetRawResource());
                 bufferData = glMapBuffer(GL_ARRAY_BUFFER, GL_READ_ONLY);
                 glBindBuffer(GL_ARRAY_BUFFER, 0);
             }
@@ -152,11 +153,12 @@ HdSt_IndirectDrawBatchGL::_PrepareDraw(bool gpuCulling, bool freezeCulling)
         }
 
         if (gpuCulling) {
+            HgiBufferHandle const& buffer =
+                _dispatchBuffer->GetEntireResource()->GetId();
             if (caps.directStateAccessEnabled) {
-                glUnmapNamedBuffer((GLuint)(uint64_t)_dispatchBuffer->GetEntireResource()->GetId());
+                glUnmapNamedBuffer(buffer->GetRawResource());
             } else {
-                glBindBuffer(GL_ARRAY_BUFFER,
-                             (GLuint)(uint64_t)_dispatchBuffer->GetEntireResource()->GetId());
+                glBindBuffer(GL_ARRAY_BUFFER, buffer->GetRawResource());
                 glUnmapBuffer(GL_ARRAY_BUFFER);
                 glBindBuffer(GL_ARRAY_BUFFER, 0);
             }
@@ -315,22 +317,23 @@ HdSt_IndirectDrawBatchGL::_BeginGPUCountVisibleInstances(
     HdStResourceRegistrySharedPtr const &resourceRegistry)
 {
     if (!_resultBuffer) {
-        _resultBuffer = std::dynamic_pointer_cast<HdStPersistentBufferGL>(
+        _resultBuffer =
             resourceRegistry->RegisterPersistentBuffer(
-                _tokens->drawIndirectResult, sizeof(GLint), 0));
+                _tokens->drawIndirectResult, sizeof(GLint), 0);
     }
 
     // Reset visible item count
-    if (_resultBuffer->GetMappedAddress()) {
-        *((GLint *)_resultBuffer->GetMappedAddress()) = 0;
-    } else {
+//    if (_resultBuffer->GetMappedAddress()) {
+//        *((GLint *)_resultBuffer->GetMappedAddress()) = 0;
+//    } else {
+    {
         GLint count = 0;
         GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
         if (caps.directStateAccessEnabled) {
-            glNamedBufferSubData(_resultBuffer->GetId(), 0,
+            glNamedBufferSubData(_resultBuffer->GetBuffer()->GetRawResource(), 0,
                                  sizeof(count), &count);
         } else {
-            glBindBuffer(GL_ARRAY_BUFFER, _resultBuffer->GetId());
+            glBindBuffer(GL_ARRAY_BUFFER, _resultBuffer->GetBuffer()->GetRawResource());
             glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(count), &count);
             glBindBuffer(GL_ARRAY_BUFFER, 0);
         }
@@ -340,7 +343,8 @@ HdSt_IndirectDrawBatchGL::_BeginGPUCountVisibleInstances(
     // we'd like to use the same API as other buffers.
     int binding = _cullingProgram->GetBinder().GetBinding(
         _tokens->drawIndirectResult).GetLocation();
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, binding, _resultBuffer->GetId());
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, binding,
+        _resultBuffer->GetBuffer()->GetRawResource());
 }
 
 void
@@ -357,16 +361,18 @@ HdSt_IndirectDrawBatchGL::_EndGPUCountVisibleInstances(GLsync resultSync, size_t
     }
 
     // Return visible item count
-    if (_resultBuffer->GetMappedAddress()) {
-        *result = *((GLint *)_resultBuffer->GetMappedAddress());
-    } else {
+    HgiBufferHandle const & hgiBuffer = _resultBuffer->GetBuffer();
+//    if (_resultBuffer->GetMappedAddress()) {
+//        *result = *((GLint *)_resultBuffer->GetMappedAddress());
+//    } else {
+    {
         GLint count = 0;
         GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
         if (caps.directStateAccessEnabled) {
-            glGetNamedBufferSubData(_resultBuffer->GetId(), 0,
+            glGetNamedBufferSubData(_resultBuffer->GetBuffer()->GetRawResource(), 0,
                                     sizeof(count), &count);
         } else {
-            glBindBuffer(GL_ARRAY_BUFFER, _resultBuffer->GetId());
+            glBindBuffer(GL_ARRAY_BUFFER, _resultBuffer->GetBuffer()->GetRawResource());
             glGetBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(count), &count);
             glBindBuffer(GL_ARRAY_BUFFER, 0);
         }

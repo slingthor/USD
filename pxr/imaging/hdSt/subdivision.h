@@ -32,11 +32,10 @@
 
 #include "pxr/pxr.h"
 #include "pxr/imaging/hd/version.h"
-#include "pxr/imaging/hd/bufferResource.h"
 #include "pxr/imaging/hd/bufferSource.h"
 #include "pxr/imaging/hd/computation.h"
 #include "pxr/imaging/hd/tokens.h"
-#include "pxr/imaging/hdSt/bufferResource.h"
+#include "pxr/imaging/hdSt/bufferResourceGL.h"
 #include "pxr/imaging/hdSt/meshTopology.h"
 #include "pxr/imaging/hf/perfLog.h"
 #include "pxr/usd/sdf/path.h"
@@ -44,6 +43,7 @@
 #if OPENSUBDIV_HAS_METAL_COMPUTE && defined(PXR_METAL_SUPPORT_ENABLED)// MTL_CHANGE
 #include <opensubdiv/osd/mtlComputeEvaluator.h>
 #include "pxr/imaging/mtlf/mtlDevice.h"
+#include "pxr/imaging/hgiMetal/buffer.h"
 #endif
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -220,7 +220,7 @@ public:
     public:
         VertexBuffer(HdBufferResourceSharedPtr const &resource) { 
             _resource =
-                std::static_pointer_cast<HdStBufferResource> (resource);
+                std::static_pointer_cast<HdStBufferResourceGL> (resource);
         }
 
         // bit confusing, osd expects 'GetNumElements()' returns the num 
@@ -228,15 +228,15 @@ public:
         size_t GetNumElements() const {
             return HdGetComponentCount(_resource->GetTupleType().type);
         }
-        HdResourceGPUHandle BindVBO() {
-            return _resource->GetId();
+        GLuint BindVBO() {
+            return _resource->GetId()->GetRawResource();
         }
 #if OPENSUBDIV_HAS_METAL_COMPUTE && defined(PXR_METAL_SUPPORT_ENABLED)
         id<MTLBuffer> BindMTLBuffer(OpenSubdiv::v3_4_3::Osd::MTLContext* context) {
-            return _resource->GetId();
+            return HgiMetalBuffer::MTLBuffer(_resource->GetId());
         }
 #endif
-        HdStBufferResourceSharedPtr _resource;
+        HdStBufferResourceGLSharedPtr _resource;
     };
 
 private:

@@ -37,8 +37,8 @@ class Hd_VertexAdjacency;
 
 using HdStProgramSharedPtr =
     std::shared_ptr<class HdStProgram>;
-using HdBufferResourceSharedPtr =
-    std::shared_ptr<class HdBufferResource>;
+using HdStBufferResourceGLSharedPtr =
+    std::shared_ptr<class HdStBufferResourceGL>;
 
 
 /// smooth normal computation GPU
@@ -80,9 +80,9 @@ protected:
     HDST_API
     virtual void _Execute(HdStProgramSharedPtr computeProgram,
                           Uniform const &uniform,
-                          HdBufferResourceSharedPtr points,
-                          HdBufferResourceSharedPtr normals,
-                          HdBufferResourceSharedPtr adjacency,
+                          HdStBufferResourceGLSharedPtr points,
+                          HdStBufferResourceGLSharedPtr normals,
+                          HdStBufferResourceGLSharedPtr adjacency,
                           int numPoints) = 0;
 
     Hd_VertexAdjacency const *_adjacency;

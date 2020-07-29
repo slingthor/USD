@@ -40,14 +40,11 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 
 class HdStDrawItem;
-class HdStResource;
 
-using HdStBufferResourceSharedPtr =
-    std::shared_ptr<class HdStBufferResource>;
-using HdBufferArrayRangeSharedPtr =
-    std::shared_ptr<class HdBufferArrayRange>;
-using HdStProgramSharedPtr =
-    std::shared_ptr<class HdStProgram>;
+using HdStBufferResourceGLSharedPtr = 
+    std::shared_ptr<class HdStBufferResourceGL>;
+using HdStBufferArrayRangeGLSharedPtr =
+    std::shared_ptr<class HdStBufferArrayRangeGL>;
 using HdSt_ResourceBinderSharedPtr =
     std::shared_ptr<class HdSt_ResourceBinder>;
 
@@ -245,8 +242,8 @@ public:
         struct BindingDeclaration {
             BindingDeclaration() {}
             BindingDeclaration(TfToken const &name,
-                               TfToken const &dataType,
-                               HdBinding binding)
+                         TfToken const &dataType,
+                         HdBinding binding)
             : name(name), dataType(dataType), binding(binding), typeIsAtomic(false), writable(false) {}
             
             BindingDeclaration(TfToken const &name,
@@ -291,7 +288,7 @@ public:
         StructBlockBinding customInterleavedBindings;
         std::vector<BindingDeclaration> customBindings;
     };
-    
+
     /// Destructor
     HDST_API
     virtual ~HdSt_ResourceBinder() {}
@@ -327,35 +324,35 @@ public:
 
     /// bind/unbind BufferArray
     HDST_API
-    void BindBufferArray(HdBufferArrayRangeSharedPtr const &bar) const;
+    void BindBufferArray(HdStBufferArrayRangeGLSharedPtr const &bar) const;
     HDST_API
-    void UnbindBufferArray(HdBufferArrayRangeSharedPtr const &bar) const;
+    void UnbindBufferArray(HdStBufferArrayRangeGLSharedPtr const &bar) const;
 
     /// bind/unbind interleaved constant buffer
     HDST_API
     void BindConstantBuffer(
-        HdBufferArrayRangeSharedPtr const & constantBar) const;
+        HdStBufferArrayRangeGLSharedPtr const & constantBar) const;
     HDST_API
     void UnbindConstantBuffer(
-        HdBufferArrayRangeSharedPtr const &constantBar) const;
+        HdStBufferArrayRangeGLSharedPtr const &constantBar) const;
 
     /// bind/unbind interleaved buffer
     HDST_API
     void BindInterleavedBuffer(
-        HdBufferArrayRangeSharedPtr const & constantBar,
+        HdStBufferArrayRangeGLSharedPtr const & constantBar,
         TfToken const &name) const;
     HDST_API
     void UnbindInterleavedBuffer(
-        HdBufferArrayRangeSharedPtr const &constantBar,
+        HdStBufferArrayRangeGLSharedPtr const &constantBar,
         TfToken const &name) const;
 
     /// bind/unbind nested instance BufferArray
     HDST_API
     void BindInstanceBufferArray(
-        HdBufferArrayRangeSharedPtr const &bar, int level) const;
+        HdStBufferArrayRangeGLSharedPtr const &bar, int level) const;
     HDST_API
     void UnbindInstanceBufferArray(
-        HdBufferArrayRangeSharedPtr const &bar, int level) const;
+        HdStBufferArrayRangeGLSharedPtr const &bar, int level) const;
 
     /// bind/unbind shader parameters and textures
     HDST_API
@@ -372,14 +369,14 @@ public:
     /// (to be used for frustum culling, draw indirect result)
     HDST_API
     void BindBuffer(TfToken const &name,
-                    HdBufferResourceSharedPtr const &resource) const;
+                    HdStBufferResourceGLSharedPtr const &resource) const;
     HDST_API
     virtual void BindBuffer(TfToken const &name,
-                    HdBufferResourceSharedPtr const &resource,
+                    HdStBufferResourceGLSharedPtr const &resource,
                     int offset, int level=-1) const = 0;
     HDST_API
     virtual void UnbindBuffer(TfToken const &name,
-                      HdBufferResourceSharedPtr const &resource,
+                      HdStBufferResourceGLSharedPtr const &resource,
                       int level=-1) const = 0;
 
     /// bind(update) a standalone uniform (unsigned int)
@@ -402,7 +399,6 @@ public:
     /// Returns binding point.
     /// XXX: exposed temporarily for drawIndirectResult
     /// see Hd_IndirectDrawBatch::_BeginGPUCountVisibleInstances()
-    HDST_API
     HdBinding GetBinding(TfToken const &name, int level=-1) const {
         HdBinding binding;
         TfMapLookup(_bindingMap, NameAndLevel(name, level), &binding);
@@ -412,7 +408,7 @@ public:
     int GetNumReservedTextureUnits() const {
         return _numReservedTextureUnits;
     }
-    
+
     /// Add buffer specs necessary for the textures (e.g., for
     /// bindless texture sampler handles or sampling transform).
     ///

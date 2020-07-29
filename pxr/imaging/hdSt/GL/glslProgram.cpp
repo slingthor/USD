@@ -35,7 +35,7 @@
 #include "pxr/imaging/hdSt/textureResource.h"
 #include "pxr/imaging/hdSt/textureResourceHandle.h"
 #include "pxr/imaging/hdSt/GL/glslProgram.h"
-#include "pxr/imaging/hdSt/GL/glUtils.h"
+#include "pxr/imaging/hdSt/glUtils.h"
 
 #include "pxr/imaging/hd/perfLog.h"
 #include "pxr/imaging/hd/resourceRegistry.h"
@@ -167,8 +167,6 @@ HdStGLSLProgram::~HdStGLSLProgram()
         }
         hgi->DestroyShaderProgram(&_program);
     }
-    //_programResource.SetAllocation(0, 0);
-
     GLuint uniformBuffer = _uniformBuffer.GetId();
     if (uniformBuffer) {
         if (glDeleteBuffers)
@@ -228,7 +226,7 @@ HdStGLSLProgram::CompileShader(
 
     // Create a shader, compile it
     HgiShaderFunctionDesc shaderFnDesc;
-    shaderFnDesc.shaderCode = shaderSource;
+    shaderFnDesc.shaderCode = shaderSource.c_str();
     shaderFnDesc.shaderStage = stage;
     HgiShaderFunctionHandle shaderFn = hgi->CreateShaderFunction(shaderFnDesc);
 
@@ -386,13 +384,13 @@ HdStGLSLProgram::GetProgramLinkStatus(std::string * reason) const
     if (!glGetProgramiv) return true;
     
     GLint status = 0;
-    glGetProgramiv(_program, GL_LINK_STATUS, &status);
+    glGetProgramiv(_program->GetRawResource(), GL_LINK_STATUS, &status);
     if (reason) {
         GLint infoLength = 0;
-        glGetProgramiv(_program, GL_INFO_LOG_LENGTH, &infoLength);
+        glGetProgramiv(_program->GetRawResource(), GL_INFO_LOG_LENGTH, &infoLength);
         if (infoLength > 0) {
             char *infoLog = new char[infoLength];;
-            glGetProgramInfoLog(_program, infoLength, NULL, infoLog);
+            glGetProgramInfoLog(_program->GetRawResource(), infoLength, NULL, infoLog);
             reason->assign(infoLog, infoLength);
             delete[] infoLog;
         }
@@ -438,39 +436,39 @@ void HdStGLSLProgram::BindResources(HdStSurfaceShader* surfaceShader, HdSt_Resou
             glBindTexture(GL_TEXTURE_2D, resource->GetTexelsTextureId());
             glBindSampler(samplerUnit, resource->GetTexelsSamplerId());
             
-            glProgramUniform1i(_program, binding.GetLocation(), samplerUnit);
+            glProgramUniform1i(_program->GetRawResource(), binding.GetLocation(), samplerUnit);
         } else if (binding.GetType() == HdBinding::TEXTURE_FIELD) {
             int samplerUnit = binding.GetTextureUnit();
             glActiveTexture(GL_TEXTURE0 + samplerUnit);
             glBindTexture(GL_TEXTURE_3D, resource->GetTexelsTextureId());
             glBindSampler(samplerUnit, resource->GetTexelsSamplerId());
             
-            glProgramUniform1i(_program, binding.GetLocation(), samplerUnit);
+            glProgramUniform1i(_program->GetRawResource(), binding.GetLocation(), samplerUnit);
         } else if (binding.GetType() == HdBinding::TEXTURE_UDIM_ARRAY) {
             int samplerUnit = binding.GetTextureUnit();
             glActiveTexture(GL_TEXTURE0 + samplerUnit);
             glBindTexture(GL_TEXTURE_2D_ARRAY, resource->GetTexelsTextureId());
             glBindSampler(samplerUnit, resource->GetTexelsSamplerId());
             
-            glProgramUniform1i(_program, binding.GetLocation(), samplerUnit);
+            glProgramUniform1i(_program->GetRawResource(), binding.GetLocation(), samplerUnit);
         } else if (binding.GetType() == HdBinding::TEXTURE_UDIM_LAYOUT) {
             int samplerUnit = binding.GetTextureUnit();
             glActiveTexture(GL_TEXTURE0 + samplerUnit);
             glBindTexture(GL_TEXTURE_1D, resource->GetLayoutTextureId());
             
-            glProgramUniform1i(_program, binding.GetLocation(), samplerUnit);
+            glProgramUniform1i(_program->GetRawResource(), binding.GetLocation(), samplerUnit);
         } else if (binding.GetType() == HdBinding::TEXTURE_PTEX_TEXEL) {
             int samplerUnit = binding.GetTextureUnit();
             glActiveTexture(GL_TEXTURE0 + samplerUnit);
             glBindTexture(GL_TEXTURE_2D_ARRAY, resource->GetTexelsTextureId());
             
-            glProgramUniform1i(_program, binding.GetLocation(), samplerUnit);
+            glProgramUniform1i(_program->GetRawResource(), binding.GetLocation(), samplerUnit);
         } else if (binding.GetType() == HdBinding::TEXTURE_PTEX_LAYOUT) {
             int samplerUnit = binding.GetTextureUnit();
             glActiveTexture(GL_TEXTURE0 + samplerUnit);
             glBindTexture(GL_TEXTURE_BUFFER, resource->GetLayoutTextureId());
             
-            glProgramUniform1i(_program, binding.GetLocation(), samplerUnit);
+            glProgramUniform1i(_program->GetRawResource(), binding.GetLocation(), samplerUnit);
         }
     }
     glActiveTexture(GL_TEXTURE0);
@@ -516,9 +514,9 @@ void HdStGLSLProgram::UnbindResources(HdStSurfaceShader* surfaceShader, HdSt_Res
 
 void HdStGLSLProgram::SetProgram(char const* const label) {
     if (label) {
-        GlfDebugLabelProgram(_program, label);
+        GlfDebugLabelProgram(_program->GetRawResource(), label);
     }
-    glUseProgram(_program);
+    glUseProgram(_program->GetRawResource());
 }
 
 void HdStGLSLProgram::UnsetProgram() {

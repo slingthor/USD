@@ -47,6 +47,7 @@ using HdStRenderPassShaderSharedPtr =
 using HdSt_FallbackLightingShaderSharedPtr =
     std::shared_ptr<class HdSt_FallbackLightingShader>;
 using HdStShaderCodeSharedPtrVector = std::vector<HdStShaderCodeSharedPtr>;
+class HdRenderIndex;
 
 /// \class HdStRenderPassState
 ///
@@ -111,20 +112,11 @@ public:
     size_t GetShaderHash() const;
 
     // Helper to get graphics cmds descriptor describing textures
-    // we render into and the blend state.
-    //
-    // By default, converts AOV bindings to HgiGraphicsCmds descriptor
-    HDST_API
-    HgiGraphicsCmdsDesc MakeGraphicsCmdsDesc() const;
-
-    // Use custom graphics cmds descriptor instead of creating one from
+    // we render into and the blend state, constructed from
     // AOV bindings.
+    //
     HDST_API
-    void SetCustomGraphicsCmdsDesc(const HgiGraphicsCmdsDesc &graphicsCmdDesc);
-
-    // Go back to using AOV bindings again.
-    HDST_API
-    void ClearCustomGraphicsCmdsDesc();
+    HgiGraphicsCmdsDesc MakeGraphicsCmdsDesc(const HdRenderIndex *) const;
 
 	HDST_API GfVec2f
     GetAovDimensions() const;
@@ -146,9 +138,6 @@ protected:
     HdBufferArrayRangeSharedPtr _renderPassStateBar;
     size_t _clipPlanesBufferSize;
     float _alphaThresholdCurrent;
-
-    HgiGraphicsCmdsDesc _customGraphicsCmdsDesc;
-    bool _hasCustomGraphicsCmdsDesc;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

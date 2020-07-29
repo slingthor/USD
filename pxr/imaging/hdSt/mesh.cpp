@@ -25,8 +25,8 @@
 
 #include "pxr/imaging/garch/contextCaps.h"
 #include "pxr/imaging/garch/resourceFactory.h"
-
-#include "pxr/imaging/hdSt/bufferResource.h"
+#include "pxr/imaging/hdSt/bufferArrayRangeGL.h"
+#include "pxr/imaging/hdSt/bufferResourceGL.h"
 #include "pxr/imaging/hdSt/drawItem.h"
 #include "pxr/imaging/hdSt/extCompGpuComputation.h"
 #include "pxr/imaging/hdSt/flatNormals.h"
@@ -45,11 +45,12 @@
 #include "pxr/imaging/hdSt/surfaceShader.h"
 #include "pxr/imaging/hdSt/tokens.h"
 
+#include "pxr/base/arch/hash.h"
+
 #include "pxr/base/gf/matrix4d.h"
 #include "pxr/base/gf/matrix4f.h"
 #include "pxr/base/tf/envSetting.h"
 
-#include "pxr/imaging/hd/bufferArrayRange.h"
 #include "pxr/imaging/hd/bufferSource.h"
 #include "pxr/imaging/hd/computation.h"
 #include "pxr/imaging/hd/flatNormals.h"
@@ -1367,10 +1368,10 @@ HdStMesh::_GetPointsDataTypeFromBar(HdStDrawItem *drawItem) const
     if (HdBufferArrayRangeSharedPtr const &bar =
             drawItem->GetVertexPrimvarRange()) {
         if (bar->IsValid()) {
-            HdBufferArrayRangeSharedPtr bar_ =
-                std::static_pointer_cast<HdBufferArrayRange>
+            HdStBufferArrayRangeGLSharedPtr bar_ =
+                std::static_pointer_cast<HdStBufferArrayRangeGL>
                 (bar);
-            HdBufferResourceSharedPtr pointsResource =
+            HdStBufferResourceGLSharedPtr pointsResource =
                 bar_->GetResource(HdTokens->points);
             if (pointsResource) {
                 pointsDataType = pointsResource->GetTupleType().type;
