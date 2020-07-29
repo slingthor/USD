@@ -90,7 +90,7 @@ HdStInterleavedMemoryManager::GetResourceAllocation(
         HgiBufferHandle buffer = resource->GetId();
 
         // XXX avoid double counting of resources shared within a buffer
-        GLuint id = buffer ? buffer->GetRawResource() : 0;
+        HdResourceGPUHandle id(buffer ? buffer->GetRawResource() : 0);
         if (idSet.count(id) == 0) {
             idSet.insert(id);
 

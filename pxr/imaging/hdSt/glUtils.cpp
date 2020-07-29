@@ -53,6 +53,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 bool
 HdStGLUtils::GetShaderCompileStatus(GLuint shader, std::string * reason)
 {
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     // glew has to be initialized
     if (!glGetShaderiv) return true;
 
@@ -69,11 +70,15 @@ HdStGLUtils::GetShaderCompileStatus(GLuint shader, std::string * reason)
         }
     }
     return (status == GL_TRUE);
+#else
+    return true;
+#endif
 }
 
 bool
 HdStGLUtils::GetProgramLinkStatus(GLuint program, std::string * reason)
 {
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     // glew has to be initialized
     if (!glGetProgramiv) return true;
 
@@ -90,6 +95,9 @@ HdStGLUtils::GetProgramLinkStatus(GLuint program, std::string * reason)
         }
     }
     return (status == GL_TRUE);
+#else
+    return true;
+#endif
 }
 
 // ---------------------------------------------------------------------------

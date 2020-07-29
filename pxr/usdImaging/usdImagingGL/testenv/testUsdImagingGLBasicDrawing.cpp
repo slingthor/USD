@@ -283,11 +283,11 @@ My_TestGLDrawing::DrawTest(bool offscreen)
     params.showRender = IsShowRender();
     params.showProxy = IsShowProxy();
     params.clearColor = GetClearColor();
-
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     glViewport(0, 0, width, height);
 
     glEnable(GL_DEPTH_TEST);
-
+#endif
     if (useAovs) {
         Hgi* hgi = _engine->GetHgi();
         _engine->SetRendererAov(GetRendererAov(), hgi->GetAPIName());
@@ -300,14 +300,14 @@ My_TestGLDrawing::DrawTest(bool offscreen)
             _engine->SetLightingStateFromOpenGL();
         }
     }
-
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
     if (!GetClipPlanes().empty()) {
         params.clipPlanes = GetClipPlanes();
         for (size_t i=0; i<GetClipPlanes().size(); ++i) {
             glEnable(GL_CLIP_PLANE0 + i);
         }
     }
-
+#endif
     for (double const &t : GetTimes()) {
         UsdTimeCode time = t;
         if (t == -999) {

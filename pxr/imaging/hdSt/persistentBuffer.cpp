@@ -22,7 +22,7 @@
 // language governing permissions and limitations under the Apache License.
 //
 #include "pxr/imaging/glf/glew.h"
-#include "pxr/imaging/glf/contextCaps.h"
+#include "pxr/imaging/garch/contextCaps.h"
 
 #include "pxr/imaging/hdSt/persistentBuffer.h"
 #include "pxr/imaging/hd/perfLog.h"

@@ -39,8 +39,12 @@
 #include "pxr/imaging/hdSt/renderPassShader.h"
 
 // XXX todo tmp needed until we remove direct gl calls below.
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
 #include "pxr/imaging/hgiGL/buffer.h"
+#endif
+#if defined(PXR_METAL_SUPPORT_ENABLED)
 #include "pxr/imaging/hgiMetal/buffer.h"
+#endif
 
 #include "pxr/imaging/hdx/tokens.h"
 
