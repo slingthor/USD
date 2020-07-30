@@ -478,7 +478,7 @@ MtlfMetalContext::GetTriListIndexBuffer(MTLIndexType indexTypeMetal, uint32_t nu
         uint32_t *destData = (uint32_t *)[triIndexBuffer contents];
         for (int i = 0; i < numIndices; i++)
         {
-            *destData = i++;
+            *destData++ = i++;
         }
 #if defined(ARCH_OS_MACOS)
         [triIndexBuffer didModifyRange:(NSMakeRange(0, triIndexBuffer.length))];
