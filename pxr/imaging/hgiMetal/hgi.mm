@@ -283,12 +283,12 @@ HgiMetal::StartFrame()
 
         [_captureScopeFullFrame beginScope];
 
-//        if ([[MTLCaptureManager sharedCaptureManager] isCapturing]) {
+        if ([[MTLCaptureManager sharedCaptureManager] isCapturing]) {
             // We need to grab a new command buffer otherwise the previous one
             // (if it was allocated at the end of the last frame) won't appear in
             // this frame's capture, and it will confuse us!
             CommitCommandBuffer(CommitCommandBuffer_NoWait, true);
-//        }
+        }
     }
     
     _needsFlip = true;
