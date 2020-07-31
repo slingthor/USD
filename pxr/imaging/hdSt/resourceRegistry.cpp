@@ -870,9 +870,9 @@ HdStResourceRegistry::_Commit()
     }
 
     // submit the work queued by the computations
-    if (_blitCmds) {
-        _hgi->SubmitCmds(_blitCmds.get());
-        _blitCmds.reset();
+    if (_computeCmds) {
+        _hgi->SubmitCmds(_computeCmds.get());
+        _computeCmds.reset();
     }
     if (_computeCmds) {
         _hgi->SubmitCmds(_computeCmds.get());
