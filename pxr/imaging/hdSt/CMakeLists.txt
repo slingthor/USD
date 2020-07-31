@@ -30,15 +30,11 @@ if (PXR_ENABLE_GL_SUPPORT)
                         GL/domeLightComputationsGL
                         GL/drawTargetTextureResourceGL
                         GL/extCompGpuComputationGL
-                        GL/flatNormalsGL
-                        GL/glslProgram
+                        GL/glslProgramGL
                         GL/indirectDrawBatchGL
-                        GL/quadrangulateGL
                         GL/renderPassShaderGL
                         GL/renderPassStateGL
                         GL/resourceBinderGL
-                        GL/resourceGL
-                        GL/smoothNormalsGL
                         GL/textureResourceGL)
 
     list(APPEND GFXADDITIONALPUBLIC
@@ -54,15 +50,12 @@ if (PXR_ENABLE_METAL_SUPPORT)
                         Metal/domeLightComputationsMetal
                         Metal/drawTargetTextureResourceMetal
                         Metal/extCompGpuComputationMetal
-                        Metal/flatNormalsMetal
                         Metal/indirectDrawBatchMetal
                         Metal/metalConversions
-                        Metal/mslProgram
-                        Metal/quadrangulateMetal
+                        Metal/glslProgramMetal
                         Metal/renderPassShaderMetal
                         Metal/renderPassStateMetal
                         Metal/resourceBinderMetal
-                        Metal/smoothNormalsMetal
                         Metal/textureResourceMetal)
 
     list(APPEND GFXADDITIONALPUBLIC
@@ -89,8 +82,8 @@ pxr_library(hdSt
 
     PUBLIC_CLASSES
         basisCurves
-        bufferArrayRangeGL
-        bufferResourceGL
+        bufferArrayRange
+        bufferResource
         commandBuffer
         computeShader
         copyComputation
@@ -129,7 +122,7 @@ pxr_library(hdSt
         package
         persistentBuffer
         points
-        program
+        glslProgram
         renderBuffer
         renderDelegate
         renderPass

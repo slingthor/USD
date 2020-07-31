@@ -50,7 +50,7 @@ class HdSt_CodeGen;
 class HdStDrawItemInstance;
 class HdSt_FlatNormalsComputationGPU;
 class HdSt_MeshTopology;
-class HdStProgram;
+class HdStGLSLProgram;
 class HdStRenderPassState;
 class HdSt_ResourceBinder;
 class HdSt_QuadrangulateComputationGPU;
@@ -60,7 +60,7 @@ class HdStExtCompGpuComputation;
 class HdSt_DomeLightComputation;
 class HdStResourceRegistry;
 
-using HdStBufferArrayRangeGLSharedPtr = std::shared_ptr<class HdStBufferArrayRangeGL>;
+using HdStBufferArrayRangeSharedPtr = std::shared_ptr<class HdStBufferArrayRange>;
 using HdBufferArraySharedPtr = std::shared_ptr<class HdBufferArray>;
 using HdStTextureResourceSharedPtr = std::shared_ptr<class HdStTextureResource>;
 
@@ -111,30 +111,6 @@ public:
     HDST_API
     virtual HdSt_DrawBatchSharedPtr NewIndirectDrawBatch(
         HdStDrawItemInstance * drawItemInstance) const = 0;
-
-    /// Creates a graphics API specific GPU quadrangulate computation
-    /// This computaion doesn't generate buffer source (i.e. 2nd phase)
-    HDST_API
-    virtual HdSt_QuadrangulateComputationGPU *NewQuadrangulateComputationGPU(
-        HdSt_MeshTopology *topology,
-        TfToken const &sourceName,
-        HdType dataType,
-        SdfPath const &id) const = 0;
-    
-    /// Creates a new smooth normals GPU computation
-    HDST_API
-    virtual HdSt_SmoothNormalsComputationGPU *NewSmoothNormalsComputationGPU(
-        Hd_VertexAdjacency const *adjacency,
-        TfToken const &srcName, TfToken const &dstName,
-        HdType srcDataType, bool packed) const = 0;
-    
-    /// Creates a new flat normals GPU computation
-    HDST_API
-    virtual HdSt_FlatNormalsComputationGPU *NewFlatNormalsComputationGPU(
-        HdBufferArrayRangeSharedPtr const &topologyRange,
-        HdBufferArrayRangeSharedPtr const &vertexRange,
-        int numFaces, TfToken const &srcName, TfToken const &dstName,
-        HdType srcDataType, bool packed) const = 0;
 
     /// Creates a new ExtCompGPUComputation computation
     HDST_API
@@ -201,7 +177,7 @@ public:
 
     /// Creates a graphics API specific program
     HDST_API
-    virtual HdStProgram *NewProgram(
+    virtual HdStGLSLProgram *NewProgram(
         TfToken const &role, HdStResourceRegistry *const registry) const = 0;
     
     HDST_API

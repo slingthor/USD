@@ -42,8 +42,8 @@ class HdResource;
 class HdStSurfaceShader;
 class HdSt_ResourceBinder;
 
-using HdStProgramSharedPtr =
-    std::shared_ptr<class HdStProgram>;
+using HdStGLSLProgramSharedPtr =
+    std::shared_ptr<class HdStGLSLProgram>;
 
 using HgiShaderProgramHandle = HgiHandle<class HgiShaderProgram>;
 
@@ -54,13 +54,13 @@ TF_DECLARE_WEAK_AND_REF_PTRS(GarchBindingMap);
 /// An instance of a shader language program.
 ///
 // XXX: this design is transitional and will be revised soon.
-class HdStProgram
+class HdStGLSLProgram
 {
 public:
     typedef size_t ID;
     
     HDST_API
-    virtual ~HdStProgram();
+    virtual ~HdStGLSLProgram();
     
     /// Returns the role of the GPU data in this resource.
     TfToken const & GetRole() const { return _role; }
@@ -77,9 +77,8 @@ public:
     HDST_API
     virtual bool Validate() const = 0;
 
-    /// Returns HdResource of the global uniform buffer object for this program.
-    HDST_API
-    virtual HdResource const &GetGlobalUniformBuffer() const = 0;
+    /// Returns HdResource of the program object.
+    HgiShaderProgramHandle const &GetProgram() const { return _program; }
 
     /// Returns true if the program has been successfully linked.
     /// if not, returns false and fills the error log into reason.
@@ -136,18 +135,18 @@ public:
 
     /// Convenience method to get a shared compute shader program
     HDST_API
-    static HdStProgramSharedPtr GetComputeProgram(TfToken const &shaderToken,
+    static HdStGLSLProgramSharedPtr GetComputeProgram(TfToken const &shaderToken,
         HdStResourceRegistry *resourceRegistry);
     
     HDST_API
-    static HdStProgramSharedPtr GetComputeProgram(
+    static HdStGLSLProgramSharedPtr GetComputeProgram(
         TfToken const &shaderFileName,
         TfToken const &shaderToken,
         HdStResourceRegistry *resourceRegistry);
 
 protected:
     HDST_API
-    HdStProgram(TfToken const &role,
+    HdStGLSLProgram(TfToken const &role,
                 HdStResourceRegistry* resourceRegistry);
 
     HDST_API

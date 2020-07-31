@@ -72,7 +72,7 @@ HdStRenderPassShaderMetal::~HdStRenderPassShaderMetal()
 // by \p program.
 static
 void
-_BindTexture(HdStProgram const &program,
+_BindTexture(HdStGLSLProgram const &program,
              const HdRenderPassAovBinding &aov,
              const HdBinding &binding)
 {
@@ -126,7 +126,7 @@ _BindTexture(HdStProgram const &program,
 
 /*virtual*/
 void
-HdStRenderPassShaderMetal::BindResources(HdStProgram const &program,
+HdStRenderPassShaderMetal::BindResources(HdStGLSLProgram const &program,
                                          HdSt_ResourceBinder const &binder,
                                          HdRenderPassState const &state)
 {
@@ -181,7 +181,7 @@ _UnbindTexture(const HdBinding &binding)
 
 /*virtual*/
 void
-HdStRenderPassShaderMetal::UnbindResources(HdStProgram const &program,
+HdStRenderPassShaderMetal::UnbindResources(HdStGLSLProgram const &program,
                                            HdSt_ResourceBinder const &binder,
                                            HdRenderPassState const &state)
 {

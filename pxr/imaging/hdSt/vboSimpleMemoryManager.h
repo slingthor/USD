@@ -26,7 +26,7 @@
 
 #include "pxr/pxr.h"
 #include "pxr/imaging/hdSt/api.h"
-#include "pxr/imaging/hdSt/bufferArrayRangeGL.h"
+#include "pxr/imaging/hdSt/bufferArrayRange.h"
 #include "pxr/imaging/hdSt/resourceRegistry.h"
 #include "pxr/imaging/hd/version.h"
 #include "pxr/imaging/hd/strategyBase.h"
@@ -83,7 +83,7 @@ protected:
     ///
     /// Specialized buffer array range for SimpleBufferArray.
     ///
-    class _SimpleBufferArrayRange : public HdStBufferArrayRangeGL
+    class _SimpleBufferArrayRange : public HdStBufferArrayRange
     {
     public:
         /// Constructor.
@@ -162,15 +162,15 @@ protected:
         /// Returns the GPU resource. If the buffer array contains more than one
         /// resource, this method raises a coding error.
         HDST_API
-        virtual HdStBufferResourceGLSharedPtr GetResource() const;
+        virtual HdStBufferResourceSharedPtr GetResource() const;
 
         /// Returns the named GPU resource.
         HDST_API
-        virtual HdStBufferResourceGLSharedPtr GetResource(TfToken const& name);
+        virtual HdStBufferResourceSharedPtr GetResource(TfToken const& name);
 
         /// Returns the list of all named GPU resources for this bufferArrayRange.
         HDST_API
-        virtual HdStBufferResourceGLNamedList const& GetResources() const;
+        virtual HdStBufferResourceNamedList const& GetResources() const;
 
         /// Sets the buffer array associated with this buffer;
         HDST_API
@@ -192,7 +192,7 @@ protected:
 
         /// Adds a new, named GPU resource and returns it.
         HDST_API
-        HdStBufferResourceGLSharedPtr _AddResource(TfToken const& name,
+        HdStBufferResourceSharedPtr _AddResource(TfToken const& name,
                                                    HdTupleType tupleType,
                                                    int offset,
                                                    int stride);
@@ -263,24 +263,25 @@ protected:
         /// Returns the GPU resource. If the buffer array contains more than one
         /// resource, this method raises a coding error.
         HDST_API
-        HdStBufferResourceGLSharedPtr GetResource() const;
+        HdStBufferResourceSharedPtr GetResource() const;
 
         /// Returns the named GPU resource. This method returns the first found
         /// resource. In HD_SAFE_MODE it checks all underlying GL buffers
         /// in _resourceMap and raises a coding error if there are more than
         /// one GL buffers exist.
         HDST_API
-        HdStBufferResourceGLSharedPtr GetResource(TfToken const& name);
+        HdStBufferResourceSharedPtr GetResource(TfToken const& name);
 
         /// Returns the list of all named GPU resources for this bufferArray.
-        HdStBufferResourceGLNamedList const& GetResources() const {return _resourceList;}
+        HdStBufferResourceNamedList const& GetResources() const {return _resourceList;}
 
         /// Reconstructs the bufferspecs and returns it (for buffer splitting)
         HDST_API
         HdBufferSpecVector GetBufferSpecs() const;
         
-        /// APPLE METAL: HGI accessor needed for _SimpleBufferArrayRange::CopyData()
+        /// APPLE METAL: HGI accessors needed for _SimpleBufferArrayRange::CopyData()
         Hgi* GetHgi() { return _resourceRegistry->GetHgi(); }
+        HgiBlitCmds* GetBlitCmds() { return _resourceRegistry->GetBlitCmds(); }
 
     protected:
         HDST_API
@@ -288,7 +289,7 @@ protected:
 
         /// Adds a new, named GPU resource and returns it.
         HDST_API
-        HdStBufferResourceGLSharedPtr _AddResource(TfToken const& name,
+        HdStBufferResourceSharedPtr _AddResource(TfToken const& name,
                                                    HdTupleType tupleType,
                                                    int offset,
                                                    int stride);
@@ -297,7 +298,7 @@ protected:
         int _capacity;
         size_t _maxBytesPerElement;
 
-        HdStBufferResourceGLNamedList _resourceList;
+        HdStBufferResourceNamedList _resourceList;
 
         _SimpleBufferArrayRangeSharedPtr _GetRangeSharedPtr() const {
             return GetRangeCount() > 0

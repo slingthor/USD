@@ -41,10 +41,10 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 class HdStDrawItem;
 
-using HdStBufferResourceGLSharedPtr = 
-    std::shared_ptr<class HdStBufferResourceGL>;
-using HdStBufferArrayRangeGLSharedPtr =
-    std::shared_ptr<class HdStBufferArrayRangeGL>;
+using HdStBufferResourceSharedPtr = 
+    std::shared_ptr<class HdStBufferResource>;
+using HdStBufferArrayRangeSharedPtr =
+    std::shared_ptr<class HdStBufferArrayRange>;
 using HdSt_ResourceBinderSharedPtr =
     std::shared_ptr<class HdSt_ResourceBinder>;
 
@@ -315,7 +315,7 @@ public:
     /// in case if explicit resource location qualifier is not available
     /// (GL 4.2 or before)
     HDST_API
-    virtual void IntrospectBindings(HdStProgramSharedPtr programResource) const = 0;
+    virtual void IntrospectBindings(HdStGLSLProgramSharedPtr programResource) const = 0;
 
     HDST_API
     void Bind(HdBindingRequest const& req) const;
@@ -324,59 +324,59 @@ public:
 
     /// bind/unbind BufferArray
     HDST_API
-    void BindBufferArray(HdStBufferArrayRangeGLSharedPtr const &bar) const;
+    void BindBufferArray(HdStBufferArrayRangeSharedPtr const &bar) const;
     HDST_API
-    void UnbindBufferArray(HdStBufferArrayRangeGLSharedPtr const &bar) const;
+    void UnbindBufferArray(HdStBufferArrayRangeSharedPtr const &bar) const;
 
     /// bind/unbind interleaved constant buffer
     HDST_API
     void BindConstantBuffer(
-        HdStBufferArrayRangeGLSharedPtr const & constantBar) const;
+        HdStBufferArrayRangeSharedPtr const & constantBar) const;
     HDST_API
     void UnbindConstantBuffer(
-        HdStBufferArrayRangeGLSharedPtr const &constantBar) const;
+        HdStBufferArrayRangeSharedPtr const &constantBar) const;
 
     /// bind/unbind interleaved buffer
     HDST_API
     void BindInterleavedBuffer(
-        HdStBufferArrayRangeGLSharedPtr const & constantBar,
+        HdStBufferArrayRangeSharedPtr const & constantBar,
         TfToken const &name) const;
     HDST_API
     void UnbindInterleavedBuffer(
-        HdStBufferArrayRangeGLSharedPtr const &constantBar,
+        HdStBufferArrayRangeSharedPtr const &constantBar,
         TfToken const &name) const;
 
     /// bind/unbind nested instance BufferArray
     HDST_API
     void BindInstanceBufferArray(
-        HdStBufferArrayRangeGLSharedPtr const &bar, int level) const;
+        HdStBufferArrayRangeSharedPtr const &bar, int level) const;
     HDST_API
     void UnbindInstanceBufferArray(
-        HdStBufferArrayRangeGLSharedPtr const &bar, int level) const;
+        HdStBufferArrayRangeSharedPtr const &bar, int level) const;
 
     /// bind/unbind shader parameters and textures
     HDST_API
     virtual void BindShaderResources(
         HdStShaderCode const *shader,
-        HdStProgram const &shaderProgram) const = 0;
+        HdStGLSLProgram const &shaderProgram) const = 0;
 
     HDST_API
     virtual void UnbindShaderResources(
         HdStShaderCode const *shader,
-        HdStProgram const &shaderProgram) const = 0;
+        HdStGLSLProgram const &shaderProgram) const = 0;
 
     /// piecewise buffer binding utility
     /// (to be used for frustum culling, draw indirect result)
     HDST_API
     void BindBuffer(TfToken const &name,
-                    HdStBufferResourceGLSharedPtr const &resource) const;
+                    HdStBufferResourceSharedPtr const &resource) const;
     HDST_API
     virtual void BindBuffer(TfToken const &name,
-                    HdStBufferResourceGLSharedPtr const &resource,
+                    HdStBufferResourceSharedPtr const &resource,
                     int offset, int level=-1) const = 0;
     HDST_API
     virtual void UnbindBuffer(TfToken const &name,
-                      HdStBufferResourceGLSharedPtr const &resource,
+                      HdStBufferResourceSharedPtr const &resource,
                       int level=-1) const = 0;
 
     /// bind(update) a standalone uniform (unsigned int)

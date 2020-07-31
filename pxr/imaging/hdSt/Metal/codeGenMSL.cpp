@@ -32,7 +32,7 @@
 #include "pxr/imaging/hio/glslfx.h"
 
 #include "pxr/imaging/hdSt/Metal/codeGenMSL.h"
-#include "pxr/imaging/hdSt/Metal/mslProgram.h"
+#include "pxr/imaging/hdSt/Metal/glslProgramMetal.h"
 
 #include "pxr/imaging/hdSt/geometricShader.h"
 #include "pxr/imaging/hdSt/package.h"
@@ -1153,7 +1153,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
                                     std::stringstream& glueGS,
                                     std::stringstream& gluePS,
                                     std::stringstream& glueCS,
-                                    HdStMSLProgramSharedPtr mslProgram)
+                                    HdStGLSLProgramMSLSharedPtr mslProgram)
 {
     std::stringstream   glueCommon, copyInputsVtx, copyOutputsVtx, copyInputsVtxStruct_Compute,
                         copyInputsVtx_Compute, copyGSOutputsIntoVSOutputs, fragExtrasStruct;
@@ -2339,7 +2339,7 @@ void HdSt_CodeGenMSL::_GenerateGlue(std::stringstream& glueVS,
     METAL_DEBUG_COMMENT(&glueCS, "End of _GenerateGlue(glueCS)\n\n"); //MTL_FIXME
 }
 
-HdStProgramSharedPtr
+HdStGLSLProgramSharedPtr
 HdSt_CodeGenMSL::Compile(HdStResourceRegistry* const registry)
 {
     HD_TRACE_FUNCTION();
@@ -2370,8 +2370,8 @@ HdSt_CodeGenMSL::Compile(HdStResourceRegistry* const registry)
     _buildTarget = (_hasGS ? kMSL_BuildTarget_MVA_ComputeGS : kMSL_BuildTarget_MVA);
     
     // create MSL program.
-    HdStMSLProgramSharedPtr mslProgram(
-        new HdStMSLProgram(HdTokens->drawingShader, registry));
+    HdStGLSLProgramMSLSharedPtr mslProgram(
+        new HdStGLSLProgramMSL(HdTokens->drawingShader, registry));
     
     // initialize autogen source buckets
     _genDefinitions.str(""); _genOSDDefinitions.str(""); _genCommon.str("");
@@ -2643,7 +2643,7 @@ HdSt_CodeGenMSL::Compile(HdStResourceRegistry* const registry)
 //    }
     
     if (!shaderCompiled) {
-        return HdStProgramSharedPtr();
+        return HdStGLSLProgramSharedPtr();
     }
     
     return mslProgram;
@@ -2776,7 +2776,7 @@ HdSt_CodeGenMSL::GetComputeHeader()
     return header.str();
 }
                 
-HdStProgramSharedPtr
+HdStGLSLProgramSharedPtr
 HdSt_CodeGenMSL::CompileComputeProgram(HdStResourceRegistry* const registry)
 {
     HD_TRACE_FUNCTION();
@@ -2886,8 +2886,8 @@ HdSt_CodeGenMSL::CompileComputeProgram(HdStResourceRegistry* const registry)
     glueVS.str(""); gluePS.str(""); glueGS.str(""); glueCS.str("");
     
     // create Metal function.
-    HdStMSLProgramSharedPtr program(
-        new HdStMSLProgram(HdTokens->drawingShader, registry));
+    HdStGLSLProgramMSLSharedPtr program(
+        new HdStGLSLProgramMSL(HdTokens->drawingShader, registry));
 
     _GenerateGlue(glueVS, glueGS, gluePS, glueCS, program);
     
@@ -2897,7 +2897,7 @@ HdSt_CodeGenMSL::CompileComputeProgram(HdStResourceRegistry* const registry)
         _csSource = replaceStringAll(_csSource, "<st>", "_Compute");
 
         if (!program->CompileShader(HgiShaderStageCompute, _csSource)) {
-            return HdStProgramSharedPtr();
+            return HdStGLSLProgramSharedPtr();
         }
     }
 

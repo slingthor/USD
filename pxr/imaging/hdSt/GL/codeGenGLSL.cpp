@@ -35,7 +35,7 @@
 #include "pxr/imaging/hdSt/shaderCode.h"
 #include "pxr/imaging/hdSt/tokens.h"
 #include "pxr/imaging/hdSt/GL/codeGenGLSL.h"
-#include "pxr/imaging/hdSt/GL/glslProgram.h"
+#include "pxr/imaging/hdSt/GL/glslProgramGL.h"
 #include "pxr/imaging/hdSt/glUtils.h"
 
 #include "pxr/imaging/hd/binding.h"
@@ -463,7 +463,7 @@ namespace {
     }
 }
 
-HdStProgramSharedPtr
+HdStGLSLProgramSharedPtr
 HdSt_CodeGenGLSL::Compile(HdStResourceRegistry *const registry)
 {
     HD_TRACE_FUNCTION();
@@ -489,8 +489,8 @@ HdSt_CodeGenGLSL::Compile(HdStResourceRegistry *const registry)
     bool hasFS  = (!fragmentShader.empty());
 
     // create GLSL program.
-    HdStProgramSharedPtr glslProgram(
-        new HdStGLSLProgram(HdTokens->drawingShader, registry));
+    HdStGLSLProgramSharedPtr glslProgram(
+        new HdStglslProgramGLSL(HdTokens->drawingShader, registry));
 
     // initialize autogen source buckets
     _genCommon.str(""); _genVS.str(""); _genTCS.str(""); _genTES.str("");
@@ -825,14 +825,14 @@ HdSt_CodeGenGLSL::Compile(HdStResourceRegistry *const registry)
     if (hasVS) {
         _vsSource = _genCommon.str() + _genVS.str();
         if (!glslProgram->CompileShader(HgiShaderStageVertex, _vsSource)) {
-            return HdStProgramSharedPtr();
+            return HdStGLSLProgramSharedPtr();
         }
         shaderCompiled = true;
     }
     if (hasFS) {
         _fsSource = _genCommon.str() + _genFS.str();
         if (!glslProgram->CompileShader(HgiShaderStageFragment, _fsSource)) {
-            return HdStProgramSharedPtr();
+            return HdStGLSLProgramSharedPtr();
         }
         shaderCompiled = true;
     }
@@ -840,7 +840,7 @@ HdSt_CodeGenGLSL::Compile(HdStResourceRegistry *const registry)
         _tcsSource = _genCommon.str() + _genTCS.str();
         if (!glslProgram->CompileShader(
                 HgiShaderStageTessellationControl, _tcsSource)) {
-            return HdStProgramSharedPtr();
+            return HdStGLSLProgramSharedPtr();
         }
         shaderCompiled = true;
     }
@@ -848,26 +848,26 @@ HdSt_CodeGenGLSL::Compile(HdStResourceRegistry *const registry)
         _tesSource = _genCommon.str() + _genTES.str();
         if (!glslProgram->CompileShader(
                     HgiShaderStageTessellationEval, _tesSource)) {
-            return HdStProgramSharedPtr();
+            return HdStGLSLProgramSharedPtr();
         }
         shaderCompiled = true;
     }
     if (hasGS) {
         _gsSource = _genCommon.str() + _genGS.str();
         if (!glslProgram->CompileShader(HgiShaderStageGeometry, _gsSource)) {
-            return HdStProgramSharedPtr();
+            return HdStGLSLProgramSharedPtr();
         }
         shaderCompiled = true;
     }
 
     if (!shaderCompiled) {
-        return HdStProgramSharedPtr();
+        return HdStGLSLProgramSharedPtr();
     }
 
     return glslProgram;
 }
 
-HdStProgramSharedPtr
+HdStGLSLProgramSharedPtr
 HdSt_CodeGenGLSL::CompileComputeProgram(HdStResourceRegistry* const registry)
 {
     HD_TRACE_FUNCTION();
@@ -1018,8 +1018,8 @@ HdSt_CodeGenGLSL::CompileComputeProgram(HdStResourceRegistry* const registry)
     _genCS << "}\n";
     
     // create GLSL program.
-    HdStProgramSharedPtr glslProgram(
-        new HdStGLSLProgram(HdTokens->computeShader, registry));
+    HdStGLSLProgramSharedPtr glslProgram(
+        new HdStglslProgramGLSL(HdTokens->computeShader, registry));
     
     // compile shaders
     {
@@ -1036,7 +1036,7 @@ HdSt_CodeGenGLSL::CompileComputeProgram(HdStResourceRegistry* const registry)
             TF_WARN("Failed to compile compute shader: %s",
                     logString.c_str());
             glDeleteShader(shader);
-            return HdStProgramSharedPtr();
+            return HdStGLSLProgramSharedPtr();
         }
     }
     

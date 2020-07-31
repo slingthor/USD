@@ -80,7 +80,7 @@ HdSt_VolumeShader::AddBindings(HdBindingRequestVector * const customBindings)
 }
 
 void 
-HdSt_VolumeShader::BindResources(HdStProgram const &program,
+HdSt_VolumeShader::BindResources(HdStGLSLProgram const &program,
                                  HdSt_ResourceBinder const &binder,
                                  HdRenderPassState const &state)
 {
@@ -104,7 +104,7 @@ HdSt_VolumeShader::BindResources(HdStProgram const &program,
 }
 
 void
-HdSt_VolumeShader::UnbindResources(HdStProgram const &program,
+HdSt_VolumeShader::UnbindResources(HdStGLSLProgram const &program,
                                    HdSt_ResourceBinder const &binder,
                                    HdRenderPassState const &state)
 {

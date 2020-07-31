@@ -25,8 +25,8 @@
 
 #include "pxr/imaging/garch/contextCaps.h"
 #include "pxr/imaging/garch/resourceFactory.h"
-#include "pxr/imaging/hdSt/bufferArrayRangeGL.h"
-#include "pxr/imaging/hdSt/bufferResourceGL.h"
+#include "pxr/imaging/hdSt/bufferArrayRange.h"
+#include "pxr/imaging/hdSt/bufferResource.h"
 #include "pxr/imaging/hdSt/drawItem.h"
 #include "pxr/imaging/hdSt/extCompGpuComputation.h"
 #include "pxr/imaging/hdSt/flatNormals.h"
@@ -854,7 +854,7 @@ HdStMesh::_PopulateVertexPrimvars(HdSceneDelegate *sceneDelegate,
                 // as points, unless we ask for packed normals.
                 // This is unfortunate; can we force them to be float?
                 HdComputationSharedPtr smoothNormalsComputation(
-                    HdStResourceFactory::GetInstance()->NewSmoothNormalsComputationGPU(
+                    new HdSt_SmoothNormalsComputationGPU(
                         _vertexAdjacency.get(),
                         HdTokens->points,
                         normalsName,
@@ -1291,7 +1291,7 @@ HdStMesh::_PopulateElementPrimvars(HdSceneDelegate *sceneDelegate,
                 // as points, unless we ask for packed normals.
                 // This is unfortunate; can we force them to be float?
                 HdComputationSharedPtr flatNormalsComputation(
-                    HdStResourceFactory::GetInstance()->NewFlatNormalsComputationGPU(
+                    new HdSt_FlatNormalsComputationGPU(
                         drawItem->GetTopologyRange(),
                         drawItem->GetVertexPrimvarRange(),
                         numFaces,
@@ -1368,10 +1368,10 @@ HdStMesh::_GetPointsDataTypeFromBar(HdStDrawItem *drawItem) const
     if (HdBufferArrayRangeSharedPtr const &bar =
             drawItem->GetVertexPrimvarRange()) {
         if (bar->IsValid()) {
-            HdStBufferArrayRangeGLSharedPtr bar_ =
-                std::static_pointer_cast<HdStBufferArrayRangeGL>
+            HdStBufferArrayRangeSharedPtr bar_ =
+                std::static_pointer_cast<HdStBufferArrayRange>
                 (bar);
-            HdStBufferResourceGLSharedPtr pointsResource =
+            HdStBufferResourceSharedPtr pointsResource =
                 bar_->GetResource(HdTokens->points);
             if (pointsResource) {
                 pointsDataType = pointsResource->GetTupleType().type;

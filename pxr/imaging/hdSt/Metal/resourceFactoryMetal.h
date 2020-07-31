@@ -68,30 +68,6 @@ public:
     virtual HdSt_DrawBatchSharedPtr NewIndirectDrawBatch(
         HdStDrawItemInstance * drawItemInstance) const override;
 
-    /// Creates a graphics API specific GPU quadrangulate computation
-    /// This computaion doesn't generate buffer source (i.e. 2nd phase)
-    HDST_API
-    virtual HdSt_QuadrangulateComputationGPU *NewQuadrangulateComputationGPU(
-        HdSt_MeshTopology *topology,
-        TfToken const &sourceName,
-        HdType dataType,
-        SdfPath const &id) const override;
-    
-    /// Creates a new smooth normals GPU computation for Metal
-    HDST_API
-    virtual HdSt_SmoothNormalsComputationGPU *NewSmoothNormalsComputationGPU(
-        Hd_VertexAdjacency const *adjacency,
-        TfToken const &srcName, TfToken const &dstName,
-        HdType srcDataType, bool packed) const override;
-    
-    /// Creates a GPU flat normals computation for Metal
-    HDST_API
-    virtual HdSt_FlatNormalsComputationGPU *NewFlatNormalsComputationGPU(
-        HdBufferArrayRangeSharedPtr const &topologyRange,
-        HdBufferArrayRangeSharedPtr const &vertexRange,
-        int numFaces, TfToken const &srcName, TfToken const &dstName,
-        HdType srcDataType, bool packed) const override;
-
     /// Creates a new ExtCompGPUComputation computation
     HDST_API
     virtual HdStExtCompGpuComputation *NewExtCompGPUComputationGPU(
@@ -155,7 +131,7 @@ public:
     }
       
     HDST_API
-    virtual HdStProgram *NewProgram(
+    virtual HdStGLSLProgram *NewProgram(
         TfToken const &role, HdStResourceRegistry *const registry) const override;
       
     HDST_API

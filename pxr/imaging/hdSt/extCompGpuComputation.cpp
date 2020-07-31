@@ -29,12 +29,12 @@
 #include "pxr/imaging/garch/contextCaps.h"
 #include "pxr/imaging/garch/resourceFactory.h"
 
-#include "pxr/imaging/hdSt/bufferResourceGL.h"
+#include "pxr/imaging/hdSt/bufferResource.h"
 #include "pxr/imaging/hdSt/extCompGpuComputationBufferSource.h"
 #include "pxr/imaging/hdSt/extCompGpuPrimvarBufferSource.h"
 #include "pxr/imaging/hdSt/extCompGpuComputation.h"
 #include "pxr/imaging/hdSt/extComputation.h"
-#include "pxr/imaging/hdSt/program.h"
+#include "pxr/imaging/hdSt/glslProgram.h"
 #include "pxr/imaging/hdSt/resourceFactory.h"
 #include "pxr/imaging/hdSt/resourceRegistry.h"
 #include "pxr/imaging/hd/bufferArrayRange.h"
@@ -102,7 +102,7 @@ HdStExtCompGpuComputation::Execute(
         return;
     }
 
-    HdStProgramSharedPtr const &computeProgram = _resource->GetProgram();
+    HdStGLSLProgramSharedPtr const &computeProgram = _resource->GetProgram();
     HdSt_ResourceBinder const &binder = _resource->GetResourceBinder();
 
     if (!TF_VERIFY(computeProgram)) {
@@ -116,8 +116,8 @@ HdStExtCompGpuComputation::Execute(
     }
     computeProgram->SetProgram();
 	
-    HdStBufferArrayRangeGLSharedPtr outputBar =
-        std::static_pointer_cast<HdStBufferArrayRangeGL>(outputRange);
+    HdStBufferArrayRangeSharedPtr outputBar =
+        std::static_pointer_cast<HdStBufferArrayRange>(outputRange);
     TF_VERIFY(outputBar);
 
     // Prepare uniform buffer for GPU computation
@@ -128,7 +128,7 @@ HdStExtCompGpuComputation::Execute(
     // Bind buffers as SSBOs to the indices matching the layout in the shader
     for (HdExtComputationPrimvarDescriptor const &compPrimvar: _compPrimvars) {
         TfToken const & name = compPrimvar.sourceComputationOutputName;
-        HdStBufferResourceGLSharedPtr const & buffer =
+        HdStBufferResourceSharedPtr const & buffer =
                 outputBar->GetResource(compPrimvar.name);
 
         HdBinding const &binding = binder.GetBinding(name);
@@ -145,13 +145,13 @@ HdStExtCompGpuComputation::Execute(
 
 
     for (HdBufferArrayRangeSharedPtr const & input: _resource->GetInputs()) {
-        HdStBufferArrayRangeGLSharedPtr const & inputBar =
-            std::static_pointer_cast<HdStBufferArrayRangeGL>(input);
+        HdStBufferArrayRangeSharedPtr const & inputBar =
+            std::static_pointer_cast<HdStBufferArrayRange>(input);
 
-        for (HdStBufferResourceGLNamedPair const & it:
+        for (HdStBufferResourceNamedPair const & it:
                         inputBar->GetResources()) {
             TfToken const &name = it.first;
-            HdStBufferResourceGLSharedPtr const &buffer = it.second;
+            HdStBufferResourceSharedPtr const &buffer = it.second;
 
             HdBinding const &binding = binder.GetBinding(name);
             // These should all be valid as they are required inputs

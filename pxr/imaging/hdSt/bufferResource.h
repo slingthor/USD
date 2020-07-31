@@ -21,8 +21,8 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#ifndef PXR_IMAGING_HD_ST_BUFFER_RESOURCE_GL_H
-#define PXR_IMAGING_HD_ST_BUFFER_RESOURCE_GL_H
+#ifndef PXR_IMAGING_HD_ST_BUFFER_RESOURCE_H
+#define PXR_IMAGING_HD_ST_BUFFER_RESOURCE_H
 
 #include "pxr/pxr.h"
 #include "pxr/imaging/hdSt/api.h"
@@ -40,32 +40,30 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-using HdStBufferResourceGLSharedPtr =
-    std::shared_ptr<class HdStBufferResourceGL>;
+using HdStBufferResourceSharedPtr =
+    std::shared_ptr<class HdStBufferResource>;
 
-using HdStBufferResourceGLNamedPair =
-    std::pair<TfToken, HdStBufferResourceGLSharedPtr>;
-using HdStBufferResourceGLNamedList =
-    std::vector<HdStBufferResourceGLNamedPair>;
+using HdStBufferResourceNamedPair =
+    std::pair<TfToken, HdStBufferResourceSharedPtr>;
+using HdStBufferResourceNamedList =
+    std::vector<HdStBufferResourceNamedPair>;
 
-class Hgi;
-
-/// \class HdStBufferResourceGL
+/// \class HdStBufferResource
 ///
 /// A specific type of HdBufferResource (GPU resource) representing an 
 /// OpenGL buffer object.
 ///
-class HdStBufferResourceGL final : public HdBufferResource
+class HdStBufferResource final : public HdBufferResource
 {
 public:
     HDST_API
-    HdStBufferResourceGL(TfToken const &role,
+    HdStBufferResource(TfToken const &role,
                          HdTupleType tupleType,
                          int offset,
                          int stride);
     HDST_API
-    ~HdStBufferResourceGL();
-    
+    ~HdStBufferResource();
+
     /// Sets the OpenGL name/identifier for this resource and its size.
     /// also caches the gpu address of the buffer.
     HDST_API
@@ -88,14 +86,14 @@ public:
     
     // APPLE METAL: Multibuffering support.
     HDST_API
-    virtual void CopyData(Hgi* hgi,
+    virtual void CopyData(class HgiBlitCmds* blitCmds,
                           size_t vboOffset,
                           size_t dataSize,
                           void const *data);
     
     // APPLE METAL: Multibuffering support.
     HDST_API
-    virtual VtValue ReadBuffer(Hgi* hgi,
+    virtual VtValue ReadBuffer(class Hgi* hgi,
                                HdTupleType tupleType,
                                int vboOffset,
                                int stride,

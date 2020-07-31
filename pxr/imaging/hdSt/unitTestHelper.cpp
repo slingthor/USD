@@ -364,7 +364,7 @@ HdSt_TestLightingShader::SetCamera(GfMatrix4d const &worldToViewMatrix,
 
 /* virtual */
 void
-HdSt_TestLightingShader::BindResources(HdStProgram const &program,
+HdSt_TestLightingShader::BindResources(HdStGLSLProgram const &program,
                                        HdSt_ResourceBinder const &binder,
                                        HdRenderPassState const &state)
 {
@@ -377,7 +377,7 @@ HdSt_TestLightingShader::BindResources(HdStProgram const &program,
 
 /* virtual */
 void
-HdSt_TestLightingShader::UnbindResources(HdStProgram const &program,
+HdSt_TestLightingShader::UnbindResources(HdStGLSLProgram const &program,
                                          HdSt_ResourceBinder const &binder,
                                          HdRenderPassState const &state)
 {

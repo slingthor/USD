@@ -30,7 +30,7 @@
 #include "pxr/imaging/garch/texture.h"
 
 #include "pxr/imaging/hdSt/api.h"
-#include "pxr/imaging/hdSt/program.h"
+#include "pxr/imaging/hdSt/glslProgram.h"
 #include "pxr/imaging/hd/enums.h"
 #include "pxr/imaging/hd/version.h"
 
@@ -207,12 +207,12 @@ public:
     /// Binds shader-specific resources to \a program
     /// XXX: this interface is meant to be used for bridging
     /// the GlfSimpleLightingContext mechanism, and not for generic use-cases.
-    virtual void BindResources(HdStProgram const &program,
+    virtual void BindResources(HdStGLSLProgram const &program,
                                HdSt_ResourceBinder const &binder,
                                HdRenderPassState const &state) = 0;
 
     /// Unbinds shader-specific resources.
-    virtual void UnbindResources(HdStProgram const &program,
+    virtual void UnbindResources(HdStGLSLProgram const &program,
                                  HdSt_ResourceBinder const &binder,
                                  HdRenderPassState const &state) = 0;
 
