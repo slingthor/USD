@@ -34,7 +34,7 @@
 #include "pxr/imaging/hdSt/surfaceShader.h"
 #include "pxr/imaging/hdSt/textureResource.h"
 #include "pxr/imaging/hdSt/textureResourceHandle.h"
-#include "pxr/imaging/hdSt/GL/glslProgram.h"
+#include "pxr/imaging/hdSt/GL/glslProgramGL.h"
 #include "pxr/imaging/hdSt/glUtils.h"
 
 #include "pxr/imaging/hd/perfLog.h"
@@ -148,16 +148,16 @@ _DumpShaderSource(const char *shaderType, std::string const &shaderSource)
     std::cout << std::flush;
 }
 
-HdStGLSLProgram::HdStGLSLProgram(
+HdStglslProgramGLSL::HdStglslProgramGLSL(
     TfToken const &role,
     HdStResourceRegistry *const registry)
-    : HdStProgram(role, registry), _programSize(0), _uniformBuffer(role)
+    : HdStGLSLProgram(role, registry), _programSize(0)
 {
     static size_t globalDebugID = 0;
     _debugID = globalDebugID++;
 }
 
-HdStGLSLProgram::~HdStGLSLProgram()
+HdStglslProgramGLSL::~HdStglslProgramGLSL()
 {
     Hgi *const hgi = _registry->GetHgi();
 
@@ -167,16 +167,10 @@ HdStGLSLProgram::~HdStGLSLProgram()
         }
         hgi->DestroyShaderProgram(&_program);
     }
-    GLuint uniformBuffer = _uniformBuffer.GetId();
-    if (uniformBuffer) {
-        if (glDeleteBuffers)
-            glDeleteBuffers(1, &uniformBuffer);
-        _uniformBuffer.SetAllocation((GLuint)0, 0);
-    }
 }
 
 bool
-HdStGLSLProgram::CompileShader(
+HdStglslProgramGLSL::CompileShader(
     HgiShaderStage stage,
     std::string const &shaderSource)
 {
@@ -318,7 +312,7 @@ _DebugLinkSource(HgiShaderProgramHandle const& program)
 }
 
 bool
-HdStGLSLProgram::Link()
+HdStglslProgramGLSL::Link()
 {
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
@@ -346,29 +340,11 @@ HdStGLSLProgram::Link()
         }
     }
 
-    // update the program resource allocation.
-    TF_VERIFY(hgi->GetAPIName() == HgiTokens->OpenGL, "TODO Hgi transition");
-    uint32_t glProgram = _program.Get()->GetRawResource();
-    //_programResource.SetAllocation(glProgram, 0);
-
-    // create an uniform buffer
-    GLuint uniformBuffer = _uniformBuffer.GetId();
-    GarchContextCaps const &caps =
-        GarchResourceFactory::GetInstance()->GetContextCaps();
-    if (uniformBuffer == 0) {
-        if (ARCH_LIKELY(caps.directStateAccessEnabled)) {
-            glCreateBuffers(1, &uniformBuffer);
-        } else {
-            glGenBuffers(1, &uniformBuffer);
-        }
-        _uniformBuffer.SetAllocation(uniformBuffer, 0);
-    }
-
     return success;
 }
 
 bool
-HdStGLSLProgram::Validate() const
+HdStglslProgramGLSL::Validate() const
 {
     if (!_program || !_program->IsValid()) {
         return false;
@@ -378,7 +354,7 @@ HdStGLSLProgram::Validate() const
 }
 
 bool
-HdStGLSLProgram::GetProgramLinkStatus(std::string * reason) const
+HdStglslProgramGLSL::GetProgramLinkStatus(std::string * reason) const
 {
     // glew has to be initialized
     if (!glGetProgramiv) return true;
@@ -398,28 +374,28 @@ HdStGLSLProgram::GetProgramLinkStatus(std::string * reason) const
     return (status == GL_TRUE);
 }
 
-void HdStGLSLProgram::AssignUniformBindings(GarchBindingMapRefPtr bindingMap) const
+void HdStglslProgramGLSL::AssignUniformBindings(GarchBindingMapRefPtr bindingMap) const
 {
     GlfBindingMapRefPtr glfBindingMap(TfDynamic_cast<GlfBindingMapRefPtr>(bindingMap));
     
     glfBindingMap->AssignUniformBindingsToProgram(GetGLProgram());
 }
 
-void HdStGLSLProgram::AssignSamplerUnits(GarchBindingMapRefPtr bindingMap) const
+void HdStglslProgramGLSL::AssignSamplerUnits(GarchBindingMapRefPtr bindingMap) const
 {
     GlfBindingMapRefPtr glfBindingMap(TfDynamic_cast<GlfBindingMapRefPtr>(bindingMap));
     
     glfBindingMap->AssignSamplerUnitsToProgram(GetGLProgram());
 }
 
-void HdStGLSLProgram::AddCustomBindings(GarchBindingMapRefPtr bindingMap) const
+void HdStglslProgramGLSL::AddCustomBindings(GarchBindingMapRefPtr bindingMap) const
 {
     GlfBindingMapRefPtr glfBindingMap(TfDynamic_cast<GlfBindingMapRefPtr>(bindingMap));
     
     glfBindingMap->AddCustomBindings(GetGLProgram());
 }
 
-void HdStGLSLProgram::BindResources(HdStSurfaceShader* surfaceShader, HdSt_ResourceBinder const &binder) const
+void HdStglslProgramGLSL::BindResources(HdStSurfaceShader* surfaceShader, HdSt_ResourceBinder const &binder) const
 {
     for (auto const & it : surfaceShader->GetTextureDescriptors()) {
         HdBinding binding = binder.GetBinding(it.name);
@@ -474,7 +450,7 @@ void HdStGLSLProgram::BindResources(HdStSurfaceShader* surfaceShader, HdSt_Resou
     glActiveTexture(GL_TEXTURE0);
 }
 
-void HdStGLSLProgram::UnbindResources(HdStSurfaceShader* surfaceShader, HdSt_ResourceBinder const &binder) const
+void HdStglslProgramGLSL::UnbindResources(HdStSurfaceShader* surfaceShader, HdSt_ResourceBinder const &binder) const
 {
     int samplerUnit = binder.GetNumReservedTextureUnits();
     for (auto const & it : surfaceShader->GetTextureDescriptors()) {
@@ -512,18 +488,18 @@ void HdStGLSLProgram::UnbindResources(HdStSurfaceShader* surfaceShader, HdSt_Res
 
 }
 
-void HdStGLSLProgram::SetProgram(char const* const label) {
+void HdStglslProgramGLSL::SetProgram(char const* const label) {
     if (label) {
         GlfDebugLabelProgram(_program->GetRawResource(), label);
     }
     glUseProgram(_program->GetRawResource());
 }
 
-void HdStGLSLProgram::UnsetProgram() {
+void HdStglslProgramGLSL::UnsetProgram() {
     glUseProgram(0);
 }
 
-void HdStGLSLProgram::DrawElementsInstancedBaseVertex(int primitiveMode,
+void HdStglslProgramGLSL::DrawElementsInstancedBaseVertex(int primitiveMode,
                                                       int indexCount,
                                                       int indexType,
                                                       int firstIndex,
@@ -550,20 +526,20 @@ void HdStGLSLProgram::DrawElementsInstancedBaseVertex(int primitiveMode,
                                       baseVertex);
 }
 
-void HdStGLSLProgram::DrawArraysInstanced(int primitiveMode,
+void HdStglslProgramGLSL::DrawArraysInstanced(int primitiveMode,
                                           int baseVertex,
                                           int vertexCount,
                                           int instanceCount) const {
     glDrawArraysInstanced(primitiveMode, baseVertex, vertexCount, instanceCount);
 }
 
-void HdStGLSLProgram::DrawArrays(int primitiveMode,
+void HdStglslProgramGLSL::DrawArrays(int primitiveMode,
                                  int baseVertex,
                                  int vertexCount) const {
     glDrawArrays(primitiveMode, baseVertex, vertexCount);
 }
 
-std::string HdStGLSLProgram::GetComputeHeader() const
+std::string HdStglslProgramGLSL::GetComputeHeader() const
 {
     return "#version 430\n";
 }

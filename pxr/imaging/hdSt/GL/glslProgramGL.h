@@ -27,7 +27,7 @@
 #include "pxr/pxr.h"
 #include "pxr/imaging/hdSt/api.h"
 
-#include "pxr/imaging/hdSt/program.h"
+#include "pxr/imaging/hdSt/glslProgram.h"
 #include "pxr/imaging/hdSt/GL/resourceGL.h"
 
 #include <boost/shared_ptr.hpp>
@@ -35,21 +35,21 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 class HdResourceRegistry;
-using HdStProgramSharedPtr =
-    std::shared_ptr<class HdStProgram>;
+using HdStGLSLProgramSharedPtr =
+    std::shared_ptr<class HdStGLSLProgram>;
 
 /// \class HdGLSLProgram
 ///
 /// An instance of a glsl program.
 ///
 // XXX: this design is transitional and will be revised soon.
-class HdStGLSLProgram: public HdStProgram
+class HdStglslProgramGLSL: public HdStGLSLProgram
 {
 public:
     HDST_API
-    HdStGLSLProgram(TfToken const &role, HdStResourceRegistry *const registry);
+    HdStglslProgramGLSL(TfToken const &role, HdStResourceRegistry *const registry);
     HDST_API
-    ~HdStGLSLProgram() override;
+    ~HdStglslProgramGLSL() override;
 
     /// Compile shader source of type
     HDST_API
@@ -62,12 +62,6 @@ public:
     /// Validate if this program is a valid progam in the current context.
     HDST_API
     bool Validate() const override;
-
-    /// Returns HdResource of the global uniform buffer object for this program.
-    HDST_API
-    HdResource const &GetGlobalUniformBuffer() const override {
-        return _uniformBuffer;
-    }
     
     /// Returns true if the program has been successfully linked.
     /// if not, returns false and fills the error log into reason.
@@ -128,7 +122,6 @@ protected:
 
 private:
     size_t _programSize;
-    HdStResourceGL _uniformBuffer;
     // An identifier for uniquely identifying the program, for debugging
     // purposes - programs that fail to compile for one reason or another
     // will get deleted, and their GL program IDs reused, so we can't use

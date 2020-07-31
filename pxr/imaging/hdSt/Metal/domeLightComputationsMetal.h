@@ -49,7 +49,7 @@ protected:
         const HgiTexture * const hgiTexture) override;
     
     HDST_API
-    void _Execute(HdStProgramSharedPtr computeProgram) override;
+    void _Execute(HdStGLSLProgramSharedPtr computeProgram) override;
 };
 
 

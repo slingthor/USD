@@ -103,7 +103,7 @@ HdSt_GeometricShader::GetSource(TfToken const &shaderStageKey) const
 }
 
 void
-HdSt_GeometricShader::BindResources(HdStProgram const &program,
+HdSt_GeometricShader::BindResources(HdStGLSLProgram const &program,
                                     HdSt_ResourceBinder const &binder,
                                     HdRenderPassState const &state)
 {
@@ -130,7 +130,7 @@ HdSt_GeometricShader::BindResources(HdStProgram const &program,
 }
 
 void
-HdSt_GeometricShader::UnbindResources(HdStProgram const &program,
+HdSt_GeometricShader::UnbindResources(HdStGLSLProgram const &program,
                                       HdSt_ResourceBinder const &binder,
                                       HdRenderPassState const &state)
 {

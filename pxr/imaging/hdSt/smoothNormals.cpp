@@ -21,14 +21,9 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#include "pxr/imaging/glf/glew.h"
-
-#include "pxr/imaging/garch/contextCaps.h"
-#include "pxr/imaging/garch/resourceFactory.h"
-
-#include "pxr/imaging/hdSt/bufferArrayRangeGL.h"
-#include "pxr/imaging/hdSt/bufferResourceGL.h"
-#include "pxr/imaging/hdSt/program.h"
+#include "pxr/imaging/hdSt/bufferArrayRange.h"
+#include "pxr/imaging/hdSt/bufferResource.h"
+#include "pxr/imaging/hdSt/glslProgram.h"
 #include "pxr/imaging/hdSt/resourceRegistry.h"
 #include "pxr/imaging/hdSt/smoothNormals.h"
 #include "pxr/imaging/hdSt/tokens.h"
@@ -39,13 +34,79 @@
 
 #include "pxr/imaging/hf/perfLog.h"
 
+#include "pxr/imaging/hgi/hgi.h"
+#include "pxr/imaging/hgi/computeCmds.h"
+#include "pxr/imaging/hgi/computePipeline.h"
+#include "pxr/imaging/hgi/shaderProgram.h"
+#include "pxr/imaging/hgi/tokens.h"
+
 #include "pxr/base/vt/array.h"
 
 #include "pxr/base/gf/vec3d.h"
 #include "pxr/base/gf/vec3f.h"
 #include "pxr/base/tf/token.h"
+#include "pxr/base/tf/hash.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
+
+static HgiResourceBindingsSharedPtr
+_CreateResourceBindings(
+    Hgi* hgi,
+    HgiBufferHandle const& points,
+    HgiBufferHandle const& normals,
+    HgiBufferHandle const& adjacency)
+{
+    // Begin the resource set
+    HgiResourceBindingsDesc resourceDesc;
+    resourceDesc.debugName = "SmoothNormals";
+
+    if (points) {
+        HgiBufferBindDesc bufBind0;
+        bufBind0.bindingIndex = 0;
+        bufBind0.resourceType = HgiBindResourceTypeStorageBuffer;
+        bufBind0.stageUsage = HgiShaderStageCompute;
+        bufBind0.offsets.push_back(0);
+        bufBind0.buffers.push_back(points);
+        resourceDesc.buffers.push_back(std::move(bufBind0));
+    }
+
+    if (normals) {
+        HgiBufferBindDesc bufBind1;
+        bufBind1.bindingIndex = 1;
+        bufBind1.resourceType = HgiBindResourceTypeStorageBuffer;
+        bufBind1.stageUsage = HgiShaderStageCompute;
+        bufBind1.offsets.push_back(0);
+        bufBind1.buffers.push_back(normals);
+        resourceDesc.buffers.push_back(std::move(bufBind1));
+    }
+
+    if (adjacency) {
+        HgiBufferBindDesc bufBind2;
+        bufBind2.bindingIndex = 2;
+        bufBind2.resourceType = HgiBindResourceTypeStorageBuffer;
+        bufBind2.stageUsage = HgiShaderStageCompute;
+        bufBind2.offsets.push_back(0);
+        bufBind2.buffers.push_back(adjacency);
+        resourceDesc.buffers.push_back(std::move(bufBind2));
+    }
+
+    return std::make_shared<HgiResourceBindingsHandle>(
+        hgi->CreateResourceBindings(resourceDesc));
+}
+
+static HgiComputePipelineSharedPtr
+_CreatePipeline(
+    Hgi* hgi,
+    uint32_t constantValuesSize,
+    HgiShaderProgramHandle const& program)
+{
+    HgiComputePipelineDesc desc;
+    desc.debugName = "SmoothNormals";
+    desc.shaderProgram = program;
+    desc.shaderConstantsDesc.byteSize = constantValuesSize;
+    return std::make_shared<HgiComputePipelineHandle>(
+        hgi->CreateComputePipeline(desc));
+}
 
 HdSt_SmoothNormalsComputationGPU::HdSt_SmoothNormalsComputationGPU(
     Hd_VertexAdjacency const *adjacency,
@@ -79,8 +140,8 @@ HdSt_SmoothNormalsComputationGPU::Execute(
         _adjacency->GetAdjacencyRange();
     TF_VERIFY(adjacencyRange_);
 
-    HdStBufferArrayRangeGLSharedPtr adjacencyRange =
-        std::static_pointer_cast<HdStBufferArrayRangeGL> (adjacencyRange_);
+    HdStBufferArrayRangeSharedPtr adjacencyRange =
+        std::static_pointer_cast<HdStBufferArrayRange> (adjacencyRange_);
 
     // select shader by datatype
     TfToken shaderToken;
@@ -99,21 +160,29 @@ HdSt_SmoothNormalsComputationGPU::Execute(
     }
     if (!TF_VERIFY(!shaderToken.IsEmpty())) return;
 
-    HdStProgramSharedPtr computeProgram
-        = HdStProgram::GetComputeProgram(shaderToken,
-            static_cast<HdStResourceRegistry*>(resourceRegistry));
+    HdStResourceRegistry* hdStResourceRegistry =
+        static_cast<HdStResourceRegistry*>(resourceRegistry);
+    HdStGLSLProgramSharedPtr computeProgram
+        = HdStGLSLProgram::GetComputeProgram(shaderToken, hdStResourceRegistry);
     if (!computeProgram) return;
 
-    HdStBufferArrayRangeGLSharedPtr range =
-        std::static_pointer_cast<HdStBufferArrayRangeGL> (range_);
+    HdStBufferArrayRangeSharedPtr range =
+        std::static_pointer_cast<HdStBufferArrayRange> (range_);
 
     // buffer resources for GPU computation
-    HdStBufferResourceGLSharedPtr points = range->GetResource(_srcName);
-    HdStBufferResourceGLSharedPtr normals = range->GetResource(_dstName);
-    HdStBufferResourceGLSharedPtr adjacency = adjacencyRange->GetResource();
+    HdStBufferResourceSharedPtr points = range->GetResource(_srcName);
+    HdStBufferResourceSharedPtr normals = range->GetResource(_dstName);
+    HdStBufferResourceSharedPtr adjacency = adjacencyRange->GetResource();
 
     // prepare uniform buffer for GPU computation
-    Uniform uniform;
+    struct Uniform {
+        int vertexOffset;
+        int adjacencyOffset;
+        int pointsOffset;
+        int pointsStride;
+        int normalsOffset;
+        int normalsStride;
+    } uniform;
 
     // coherent vertex offset in aggregated buffer array
     uniform.vertexOffset = range->GetElementOffset();
@@ -138,8 +207,6 @@ HdSt_SmoothNormalsComputationGPU::Execute(
         HdDataSizeOfType(HdGetComponentType(normals->GetTupleType().type));
     uniform.normalsOffset = normals->GetOffset() / normalComponentSize;
     uniform.normalsStride = normals->GetStride() / normalComponentSize;
-    
-    uniform.invocationOffset = 0;
 
     // The number of points is based off the size of the output,
     // However, the number of points in the adjacency table
@@ -152,8 +219,62 @@ HdSt_SmoothNormalsComputationGPU::Execute(
     int numSrcPoints = _adjacency->GetNumPoints();
 
     int numPoints = std::min(numSrcPoints, numDestPoints);
-    
-    _Execute(computeProgram, uniform, points, normals, adjacency, numPoints);
+
+    Hgi* hgi = hdStResourceRegistry->GetHgi();
+
+    // Generate hash for resource bindings and pipeline.
+    // XXX Needs fingerprint hash to avoid collisions
+    uint64_t rbHash = (uint64_t) TfHash::Combine(
+        points->GetId().Get(),
+        normals->GetId().Get(),
+        adjacency->GetId().Get());
+
+    uint64_t pHash = (uint64_t) TfHash::Combine(
+        computeProgram->GetProgram().Get(),
+        sizeof(uniform));
+
+    // Get or add resource bindings in registry.
+    HdInstance<HgiResourceBindingsSharedPtr> resourceBindingsInstance =
+        hdStResourceRegistry->RegisterResourceBindings(rbHash);
+    if (resourceBindingsInstance.IsFirstInstance()) {
+        HgiResourceBindingsSharedPtr rb = _CreateResourceBindings(
+            hgi, points->GetId(), normals->GetId(), adjacency->GetId());
+        resourceBindingsInstance.SetValue(rb);
+    }
+
+    HgiResourceBindingsSharedPtr const& resourceBindindsPtr =
+        resourceBindingsInstance.GetValue();
+    HgiResourceBindingsHandle resourceBindings = *resourceBindindsPtr.get();
+
+    // Get or add pipeline in registry.
+    HdInstance<HgiComputePipelineSharedPtr> computePipelineInstance =
+        hdStResourceRegistry->RegisterComputePipeline(pHash);
+    if (computePipelineInstance.IsFirstInstance()) {
+        HgiComputePipelineSharedPtr pipe = _CreatePipeline(
+            hgi, sizeof(uniform), computeProgram->GetProgram());
+        computePipelineInstance.SetValue(pipe);
+    }
+
+    HgiComputePipelineSharedPtr const& pipelinePtr =
+        computePipelineInstance.GetValue();
+    HgiComputePipelineHandle pipeline = *pipelinePtr.get();
+
+    HgiComputeCmds* computeCmds = hdStResourceRegistry->GetComputeCmds();
+    computeCmds->PushDebugGroup("Smooth Normals Cmds");
+    computeCmds->BindResources(resourceBindings);
+    computeCmds->BindPipeline(pipeline);
+
+    // transfer uniform buffer
+    int slotIndex = 0;
+    if (hgi->GetAPIName() == HgiTokens->Metal) {
+        slotIndex = 3;
+    }
+    computeCmds->SetConstantValues(pipeline, slotIndex, sizeof(uniform), &uniform);
+
+    // dispatch compute kernel
+    computeCmds->Dispatch(numPoints, 1);
+
+    computeCmds->PopDebugGroup();
 }
 
 void

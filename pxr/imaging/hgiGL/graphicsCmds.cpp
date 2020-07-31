@@ -42,6 +42,7 @@ HgiGLGraphicsCmds::HgiGLGraphicsCmds(
     : HgiGraphicsCmds()
     , _recording(true)
     , _descriptor(desc)
+    , _pushStack(0)
 {
     if (desc.HasAttachments()) {
         _ops.push_back( HgiGLOps::BindFramebufferOp(device, desc) );
@@ -131,13 +132,19 @@ HgiGLGraphicsCmds::DrawIndexed(
 void
 HgiGLGraphicsCmds::PushDebugGroup(const char* label)
 {
-    _ops.push_back( HgiGLOps::PushDebugGroup(label) );
+    if (HgiGLDebugEnabled()) {
+        _pushStack++;
+        _ops.push_back( HgiGLOps::PushDebugGroup(label) );
+    }
 }
 
 void
 HgiGLGraphicsCmds::PopDebugGroup()
 {
-    _ops.push_back( HgiGLOps::PopDebugGroup() );
+    if (HgiGLDebugEnabled()) {
+        _pushStack--;
+        _ops.push_back( HgiGLOps::PopDebugGroup() );
+    }
 }
 
 bool
@@ -146,6 +153,8 @@ HgiGLGraphicsCmds::_Submit(Hgi* hgi)
     if (_ops.empty()) {
         return false;
     }
+
+    TF_VERIFY(_pushStack==0, "Push and PopDebugGroup do not even out");
 
     // Capture OpenGL state before executing the 'ops' and restore it when this
     // function ends. We do this defensively because parts of our pipeline may

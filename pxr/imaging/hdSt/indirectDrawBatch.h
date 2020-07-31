@@ -99,15 +99,15 @@ protected:
     void _Init(HdStDrawItemInstance * drawItemInstance) override;
 
     void _ValidateCompatibility(
-        HdStBufferArrayRangeGLSharedPtr const& constantBar,
-        HdStBufferArrayRangeGLSharedPtr const& indexBar,
-        HdStBufferArrayRangeGLSharedPtr const& topologyVisibilityBar,
-        HdStBufferArrayRangeGLSharedPtr const& elementBar,
-        HdStBufferArrayRangeGLSharedPtr const& fvarBar,
-        HdStBufferArrayRangeGLSharedPtr const& vertexBar,
+        HdStBufferArrayRangeSharedPtr const& constantBar,
+        HdStBufferArrayRangeSharedPtr const& indexBar,
+        HdStBufferArrayRangeSharedPtr const& topologyVisibilityBar,
+        HdStBufferArrayRangeSharedPtr const& elementBar,
+        HdStBufferArrayRangeSharedPtr const& fvarBar,
+        HdStBufferArrayRangeSharedPtr const& vertexBar,
         int instancerNumLevels,
-        HdStBufferArrayRangeGLSharedPtr const& instanceIndexBar,
-        std::vector<HdStBufferArrayRangeGLSharedPtr> const& instanceBars) const;
+        HdStBufferArrayRangeSharedPtr const& instanceIndexBar,
+        std::vector<HdStBufferArrayRangeSharedPtr> const& instanceBars) const;
     
     HDST_API
     virtual void _PrepareDraw(bool gpuCulling, bool freezeCulling) = 0;
@@ -121,14 +121,14 @@ protected:
     HDST_API
     virtual void _GPUFrustumInstanceCullingExecute(
                        HdStResourceRegistrySharedPtr const &resourceRegistry,
-                       HdStProgramSharedPtr const &program,
+                       HdStGLSLProgramSharedPtr const &program,
                        HdSt_ResourceBinder const &binder,
                        HdBufferResourceSharedPtr cullCommandBuffer) = 0;
     
     HDST_API
     virtual void _GPUFrustumNonInstanceCullingExecute(
                         HdStResourceRegistrySharedPtr const &resourceRegistry,
-                        HdStProgramSharedPtr const &program,
+                        HdStGLSLProgramSharedPtr const &program,
                         HdSt_ResourceBinder const &binder) = 0;
 
     // Culling requires custom resource binding.

@@ -32,13 +32,13 @@
 #include "pxr/imaging/hdSt/cullingShaderKey.h"
 #include "pxr/imaging/hdSt/drawItemInstance.h"
 #include "pxr/imaging/hdSt/geometricShader.h"
-#include "pxr/imaging/hdSt/program.h"
+#include "pxr/imaging/hdSt/glslProgram.h"
 #include "pxr/imaging/hdSt/renderPassState.h"
 #include "pxr/imaging/hdSt/resourceRegistry.h"
 #include "pxr/imaging/hdSt/shaderCode.h"
 #include "pxr/imaging/hdSt/shaderKey.h"
 
-#include "pxr/imaging/hdSt/GL/glslProgram.h"
+#include "pxr/imaging/hdSt/GL/glslProgramGL.h"
 #include "pxr/imaging/hdSt/GL/indirectDrawBatchGL.h"
 #include "pxr/imaging/hdSt/persistentBuffer.h"
 
@@ -219,7 +219,7 @@ HdSt_IndirectDrawBatchGL::_ExecuteDraw(_DrawingProgram &program, int batchCount)
 void
 HdSt_IndirectDrawBatchGL::_GPUFrustumInstanceCullingExecute(
     HdStResourceRegistrySharedPtr const &resourceRegistry,
-    HdStProgramSharedPtr const &program,
+    HdStGLSLProgramSharedPtr const &program,
     HdSt_ResourceBinder const &binder,
     HdBufferResourceSharedPtr cullCommandBuffer)
 {
@@ -277,7 +277,7 @@ HdSt_IndirectDrawBatchGL::_SyncFence() {
 void
 HdSt_IndirectDrawBatchGL::_GPUFrustumNonInstanceCullingExecute(
     HdStResourceRegistrySharedPtr const &resourceRegistry,
-    HdStProgramSharedPtr const &program,
+    HdStGLSLProgramSharedPtr const &program,
     const HdSt_ResourceBinder &binder)
 {
     GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
@@ -389,7 +389,7 @@ HdSt_IndirectDrawBatchGL::_EndGPUCountVisibleInstances(GLsync resultSync, size_t
 /* virtual */
 bool
 HdSt_IndirectDrawBatchGL::_CullingProgramGL::_Link(
-    HdStProgramSharedPtr const & program)
+    HdStGLSLProgramSharedPtr const & program)
 {
     if (!TF_VERIFY(program)) return false;
     if (!glTransformFeedbackVaryings) return false; // glew initialized
@@ -431,7 +431,7 @@ HdSt_IndirectDrawBatchGL::_CullingProgramGL::_Link(
                       == nOutputs,
                       "Size of drawElementsOutputs element must equal nOutputs.");
         
-        glTransformFeedbackVaryings(std::dynamic_pointer_cast<HdStGLSLProgram>(program)->GetGLProgram(),
+        glTransformFeedbackVaryings(std::dynamic_pointer_cast<HdStglslProgramGLSL>(program)->GetGLProgram(),
                                     nOutputs,
                                     outputs, GL_INTERLEAVED_ATTRIBS);
     }

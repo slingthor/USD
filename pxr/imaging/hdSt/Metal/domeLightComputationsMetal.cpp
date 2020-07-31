@@ -30,7 +30,7 @@
 #include "pxr/imaging/hdSt/textureHandle.h"
 #include "pxr/imaging/hdSt/tokens.h"
 
-#include "pxr/imaging/hdSt/Metal/mslProgram.h"
+#include "pxr/imaging/hdSt/Metal/glslProgramMetal.h"
 #include "pxr/imaging/hgiMetal/texture.h"
 
 #include "pxr/base/tf/token.h"
@@ -72,7 +72,7 @@ HdSt_DomeLightComputationGPUMetal::_GetGlTextureName(const HgiTexture * const hg
 }
 
 void
-HdSt_DomeLightComputationGPUMetal::_Execute(HdStProgramSharedPtr computeProgram)
+HdSt_DomeLightComputationGPUMetal::_Execute(HdStGLSLProgramSharedPtr computeProgram)
 {
     if (_level != 0) {
         // Metal generates mipmaps along with the top level
@@ -85,7 +85,7 @@ HdSt_DomeLightComputationGPUMetal::_Execute(HdStProgramSharedPtr computeProgram)
     }
 
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
-    HdStMSLProgramSharedPtr const &mslProgram(std::dynamic_pointer_cast<HdStMSLProgram>(computeProgram));
+    HdStGLSLProgramMSLSharedPtr const &mslProgram(std::dynamic_pointer_cast<HdStGLSLProgramMSL>(computeProgram));
 
     // Size of source texture (the dome light environment map)
     GfVec3i srcDim;

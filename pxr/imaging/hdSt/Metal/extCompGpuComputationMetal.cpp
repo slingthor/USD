@@ -24,9 +24,9 @@
 #include "pxr/imaging/garch/contextCaps.h"
 
 #include "pxr/imaging/hdSt/Metal/extCompGpuComputationMetal.h"
-#include "pxr/imaging/hdSt/Metal/mslProgram.h"
+#include "pxr/imaging/hdSt/Metal/glslProgramMetal.h"
 
-#include "pxr/imaging/hdSt/bufferResourceGL.h"
+#include "pxr/imaging/hdSt/bufferResource.h"
 #include "pxr/imaging/hdSt/extCompGpuComputationBufferSource.h"
 #include "pxr/imaging/hdSt/extCompGpuPrimvarBufferSource.h"
 #include "pxr/imaging/hdSt/extComputation.h"
@@ -59,12 +59,12 @@ HdStExtCompGpuComputationMetal::HdStExtCompGpuComputationMetal(
 
 void
 HdStExtCompGpuComputationMetal::_Execute(
-     HdStProgramSharedPtr const &computeProgram,
+     HdStGLSLProgramSharedPtr const &computeProgram,
      std::vector<int32_t> const &_uniforms,
-     HdStBufferArrayRangeGLSharedPtr outputBar)
+     HdStBufferArrayRangeSharedPtr outputBar)
 {
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
-    HdStMSLProgramSharedPtr const &mslProgram(std::dynamic_pointer_cast<HdStMSLProgram>(computeProgram));
+    HdStGLSLProgramMSLSharedPtr const &mslProgram(std::dynamic_pointer_cast<HdStGLSLProgramMSL>(computeProgram));
     
     unsigned long immutableBufferMask = 0;//(1 << 0) | (1 << 2) | (1 << 3);
 

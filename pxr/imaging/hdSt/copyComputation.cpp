@@ -29,11 +29,15 @@
 #include "pxr/imaging/glf/diagnostic.h"
 
 #include "pxr/imaging/hdSt/copyComputation.h"
-#include "pxr/imaging/hdSt/bufferResourceGL.h"
-#include "pxr/imaging/hdSt/bufferArrayRangeGL.h"
+#include "pxr/imaging/hdSt/bufferResource.h"
+#include "pxr/imaging/hdSt/bufferArrayRange.h"
+#include "pxr/imaging/hdSt/resourceRegistry.h"
 #include "pxr/imaging/hd/perfLog.h"
 #include "pxr/imaging/hd/tokens.h"
 #include "pxr/imaging/hd/types.h"
+
+#include "pxr/imaging/hgi/blitCmds.h"
+#include "pxr/imaging/hgi/blitCmdsOps.h"
 
 #include "pxr/imaging/hf/perfLog.h"
 
@@ -53,17 +57,13 @@ HdStCopyComputationGPU::Execute(HdBufferArrayRangeSharedPtr const &range_,
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
 
-    if (!glBufferSubData) {
-        return;
-    }
+    HdStBufferArrayRangeSharedPtr srcRange =
+        std::static_pointer_cast<HdStBufferArrayRange> (_src);
+    HdStBufferArrayRangeSharedPtr dstRange =
+        std::static_pointer_cast<HdStBufferArrayRange> (range_);
 
-    HdStBufferArrayRangeGLSharedPtr srcRange =
-        std::static_pointer_cast<HdStBufferArrayRangeGL> (_src);
-    HdStBufferArrayRangeGLSharedPtr dstRange =
-        std::static_pointer_cast<HdStBufferArrayRangeGL> (range_);
-
-    HdBufferResourceSharedPtr srcRes = srcRange->GetResource(_name);
-    HdBufferResourceSharedPtr dstRes = dstRange->GetResource(_name);
+    HdStBufferResourceSharedPtr srcRes = srcRange->GetResource(_name);
+    HdStBufferResourceSharedPtr dstRes = dstRange->GetResource(_name);
 
     if (!TF_VERIFY(srcRes)) {
         return;
@@ -103,33 +103,28 @@ HdStCopyComputationGPU::Execute(HdBufferArrayRangeSharedPtr const &range_,
         // until after the copy size check.
 
         // Create a virtual copy method on the ArrayRange object to do the below block
-        TF_FATAL_CODING_ERROR("Not Implemented");
-        {/*
-        	GLint srcId = srcRes->GetId()->GetRawResource();
-        	GLint dstId = dstRes->GetId()->GetRawResource();
+        GLint srcId = srcRes->GetId()->GetRawResource();
+        GLint dstId = dstRes->GetId()->GetRawResource();
 
-            if (!TF_VERIFY(srcId)) {
-                return;
-            }
-            if (!TF_VERIFY(dstId)) {
-                return;
-            }
-
-            HD_PERF_COUNTER_INCR(HdPerfTokens->glCopyBufferSubData);
-
-            if (caps.directStateAccessEnabled) {
-                glCopyBufferSubData((GLint)srcId, (GLint)dstId,
-                                            readOffset, writeOffset, copySize);
-            } else {
-                glBindBuffer(GL_COPY_READ_BUFFER, (GLint)srcId);
-                glBindBuffer(GL_COPY_WRITE_BUFFER, (GLint)dstId);
-                glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER,
-                                    readOffset, writeOffset, copySize);
-
-                glBindBuffer(GL_COPY_READ_BUFFER, 0);
-                glBindBuffer(GL_COPY_WRITE_BUFFER, 0);
-            }*/
+        if (!TF_VERIFY(srcId)) {
+            return;
         }
+        if (!TF_VERIFY(dstId)) {
+            return;
+        }
+
+        HD_PERF_COUNTER_INCR(HdPerfTokens->glCopyBufferSubData);
+        
+        HdStResourceRegistry* hdStResourceRegistry =
+            static_cast<HdStResourceRegistry*>(resourceRegistry);
+
+        HgiBufferGpuToGpuOp blitOp;
+        blitOp.gpuSourceBuffer = srcRes->GetId();
+        blitOp.gpuDestinationBuffer = dstRes->GetId();
+        blitOp.sourceByteOffset = readOffset;
+        blitOp.byteSize = copySize;
+        blitOp.destinationByteOffset = writeOffset;
+        hdStResourceRegistry->GetBlitCmds()->CopyBufferGpuToGpu(blitOp);
     }
 
     GLF_POST_PENDING_GL_ERRORS();
@@ -144,8 +139,8 @@ HdStCopyComputationGPU::GetNumOutputElements() const
 void
 HdStCopyComputationGPU::GetBufferSpecs(HdBufferSpecVector *specs) const
 {
-    HdStBufferArrayRangeGLSharedPtr srcRange =
-        std::static_pointer_cast<HdStBufferArrayRangeGL> (_src);
+    HdStBufferArrayRangeSharedPtr srcRange =
+        std::static_pointer_cast<HdStBufferArrayRange> (_src);
 
     specs->emplace_back(_name, srcRange->GetResource(_name)->GetTupleType());
 }

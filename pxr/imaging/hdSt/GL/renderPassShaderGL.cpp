@@ -34,7 +34,7 @@
 #include "pxr/imaging/hdSt/resourceBinder.h"
 #include "pxr/imaging/hdSt/package.h"
 #include "pxr/imaging/hdSt/GL/renderPassShaderGL.h"
-#include "pxr/imaging/hdSt/GL/glslProgram.h"
+#include "pxr/imaging/hdSt/GL/glslProgramGL.h"
 
 #include "pxr/imaging/hio/glslfx.h"
 
@@ -120,7 +120,7 @@ _BindTexture(const HdRenderPassAovBinding &aov,
 
 /*virtual*/
 void
-HdStRenderPassShaderGL::BindResources(HdStProgram const &program,
+HdStRenderPassShaderGL::BindResources(HdStGLSLProgram const &program,
                                       HdSt_ResourceBinder const &binder,
                                       HdRenderPassState const &state)
 {
@@ -165,7 +165,7 @@ _UnbindTexture(const HdBinding &binding)
 
 /*virtual*/
 void
-HdStRenderPassShaderGL::UnbindResources(HdStProgram const &program,
+HdStRenderPassShaderGL::UnbindResources(HdStGLSLProgram const &program,
                                       HdSt_ResourceBinder const &binder,
                                       HdRenderPassState const &state)
 {

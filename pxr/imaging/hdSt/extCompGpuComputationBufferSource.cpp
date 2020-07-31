@@ -22,7 +22,7 @@
 // language governing permissions and limitations under the Apache License.
 //
 #include "pxr/imaging/glf/glew.h"
-#include "pxr/imaging/hdSt/bufferResourceGL.h"
+#include "pxr/imaging/hdSt/bufferResource.h"
 #include "pxr/imaging/hdSt/codeGen.h"
 #include "pxr/imaging/hdSt/computeShader.h"
 #include "pxr/imaging/hdSt/extCompGpuComputationBufferSource.h"

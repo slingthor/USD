@@ -29,7 +29,7 @@
 #include "pxr/imaging/hdSt/resourceBinder.h"
 #include "pxr/imaging/hdSt/codeGen.h"
 
-#include "pxr/imaging/hdSt/Metal/mslProgram.h"
+#include "pxr/imaging/hdSt/Metal/glslProgramMetal.h"
 
 #include <boost/shared_ptr.hpp>
 
@@ -126,7 +126,7 @@ public:
 
     /// Generate shader source and compile it.
     HD_API
-    HdStProgramSharedPtr Compile(
+    HdStGLSLProgramSharedPtr Compile(
         HdStResourceRegistry* const registry) override;
 
     /// Generate compute shader source and compile it.
@@ -145,7 +145,7 @@ public:
     /// \see GetComputeShaderSource
     /// \see Hd_ResourceBinder::ResolveBindings
     HD_API
-    HdStProgramSharedPtr CompileComputeProgram(
+    HdStGLSLProgramSharedPtr CompileComputeProgram(
         HdStResourceRegistry* const registry) override;
     
     /// Return the generated vertex shader source
@@ -199,7 +199,7 @@ private:
                        std::stringstream& glueGS,
                        std::stringstream& gluePS,
                        std::stringstream& glueCS,
-                       HdStMSLProgramSharedPtr mslProgram);
+                       HdStGLSLProgramMSLSharedPtr mslProgram);
 //    void _MSL_GenerateVSWrapper(UInt32& inout_slotIndex, UInt32 vtxUniformBufferSize, std::stringstream& shader, std::stringstream& inout_ComputeGSArguments);
 
     HdSt_ResourceBinder::MetaData _metaData;

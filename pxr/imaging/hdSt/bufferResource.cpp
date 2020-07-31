@@ -21,7 +21,7 @@
 // KIND, either express or implied. See the Apache License for the specific
 // language governing permissions and limitations under the Apache License.
 //
-#include "pxr/imaging/hdSt/bufferResourceGL.h"
+#include "pxr/imaging/hdSt/bufferResource.h"
 
 #include "pxr/imaging/garch/contextCaps.h"
 #include "pxr/imaging/garch/resourceFactory.h"
@@ -81,7 +81,7 @@ _CreateVtArray(int numElements, int arraySize, int stride,
     return VtValue(array);
 }
 
-HdStBufferResourceGL::HdStBufferResourceGL(TfToken const &role,
+HdStBufferResource::HdStBufferResource(TfToken const &role,
                                            HdTupleType tupleType,
                                            int offset,
                                            int stride)
@@ -91,24 +91,23 @@ HdStBufferResourceGL::HdStBufferResourceGL(TfToken const &role,
     , _firstFrameBeingFilled(true)
 {
     for (int32_t i = 0; i < MULTIBUFFERING; i++) {
-        _ids[i] = HgiBufferHandle();
         _gpuAddr[i] = 0;
     }
 }
 
-HdStBufferResourceGL::~HdStBufferResourceGL()
+HdStBufferResource::~HdStBufferResource()
 {
     /*NOTHING*/
 }
 
 void
-HdStBufferResourceGL::SetAllocation(HgiBufferHandle const& id, size_t size)
+HdStBufferResource::SetAllocation(HgiBufferHandle const& id, size_t size)
 {
     SetAllocations(id, HgiBufferHandle(), HgiBufferHandle(), size);
 }
 
 void
-HdStBufferResourceGL::SetAllocations(HgiBufferHandle const& id0,
+HdStBufferResource::SetAllocations(HgiBufferHandle const& id0,
                                      HgiBufferHandle const& id1,
                                      HgiBufferHandle const& id2,
                                      size_t size)
@@ -149,7 +148,7 @@ HdStBufferResourceGL::SetAllocations(HgiBufferHandle const& id0,
 }
 
 // APPLE METAL: Multibuffering support.
-void HdStBufferResourceGL::CopyData(Hgi* hgi,
+void HdStBufferResource::CopyData(HgiBlitCmds* blitCmds,
                                     size_t vboOffset,
                                     size_t dataSize,
                                     void const *data)
@@ -167,7 +166,6 @@ void HdStBufferResourceGL::CopyData(Hgi* hgi,
         _lastFrameModified = currentFrame;
     }
 
-    HgiBlitCmdsUniquePtr blitCmds = hgi->CreateBlitCmds();
     HgiBufferCpuToGpuOp blitOp;
     blitOp.byteSize = dataSize;
     blitOp.cpuSourceBuffer = data;
@@ -175,11 +173,10 @@ void HdStBufferResourceGL::CopyData(Hgi* hgi,
     blitOp.gpuDestinationBuffer = GetId();
     blitOp.destinationByteOffset = vboOffset;
     blitCmds->CopyBufferCpuToGpu(blitOp);
-    hgi->SubmitCmds(blitCmds.get());
 }
 
 // APPLE METAL: Multibuffering support.
-VtValue HdStBufferResourceGL::ReadBuffer(Hgi* hgi,
+VtValue HdStBufferResource::ReadBuffer(Hgi* hgi,
                                          HdTupleType tupleType,
                                          int vboOffset,
                                          int stride,
@@ -206,37 +203,9 @@ VtValue HdStBufferResourceGL::ReadBuffer(Hgi* hgi,
 
     // APPLE METAL: Platform-specific code should be pushed down to hgi.
     // Complexity will be that the Metal path is optimised.
-#if defined(PXR_OPENGL_SUPPORT_ENABLED)
-    GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
-    
-    if (!caps.hasSubDataCopy) return VtValue();
-    
-    GLsizeiptr vboSize = stride * (numElems - 1) + bytesPerElement * arraySize;
-    std::vector<uint8_t> tmp(vboSize);
-    
-    if (hgi->GetAPIName() == HgiTokens->OpenGL) {
-        data = tmp.data();
-        dataSize = vboSize;
-
-        if (caps.directStateAccessEnabled) {
-            glGetNamedBufferSubDataEXT(_ids[_activeBuffer]->GetRawResource(), vboOffset, vboSize, data);
-        } else {
-            glBindBuffer(GL_ARRAY_BUFFER, _ids[_activeBuffer]->GetRawResource());
-            glGetBufferSubData(GL_ARRAY_BUFFER, vboOffset, vboSize, data);
-            glBindBuffer(GL_ARRAY_BUFFER, 0);
-        }
-    }
-    else
-#endif
-#if defined(PXR_METAL_SUPPORT_ENABLED)
     if (hgi->GetAPIName() == HgiTokens->Metal) {
         data = (uint8_t*)_gpuAddr[_activeBuffer];
         dataSize = GetSize();
-    }
-    else
-#endif
-    {
-        TF_FATAL_CODING_ERROR("No valid rendering API specified");
     }
 
     VtValue result;

@@ -26,8 +26,6 @@
 
 #include "pxr/pxr.h"
 #include "pxr/imaging/hdSt/api.h"
-#include "pxr/imaging/hdSt/bufferArrayRangeGL.h"
-#include "pxr/imaging/hdSt/bufferResourceGL.h"
 #include "pxr/imaging/hd/bufferSource.h"
 #include "pxr/imaging/hd/computation.h"
 
@@ -44,52 +42,27 @@ class Hd_FaceCoords;
 class HdSt_FlatNormalsComputationGPU : public HdComputation {
 public:
 
-    HDST_API
-    virtual void GetBufferSpecs(HdBufferSpecVector *specs) const override;
-    HDST_API
-    virtual void Execute(HdBufferArrayRangeSharedPtr const &range,
-                         HdResourceRegistry *resourceRegistry) override;
-    HDST_API
-    virtual int GetNumOutputElements() const override;
-
-protected:
-    
+    /// Constructor
     HDST_API
     HdSt_FlatNormalsComputationGPU(HdBufferArrayRangeSharedPtr const
-                                   &topologyRange,
+                                       &topologyRange,
                                    HdBufferArrayRangeSharedPtr const
-                                   &vertexRange,
+                                       &vertexRange,
                                    int numFaces,
                                    TfToken const &srcName,
                                    TfToken const &dstName,
                                    HdType srcDataType,
                                    bool packed);
 
-    struct Uniform {
-        int vertexOffset;
-        int elementOffset;
-        int topologyOffset;
-        int pointsOffset;
-        int pointsStride;
-        int normalsOffset;
-        int normalsStride;
-        int indexOffset;
-        int indexStride;
-        int pParamOffset;
-        int pParamStride;
-        int invocationOffset;
-    };
-
     HDST_API
-    virtual void _Execute(
-                      HdStProgramSharedPtr computeProgram,
-                      Uniform const& uniform,
-                      HdStBufferResourceGLSharedPtr points,
-                      HdStBufferResourceGLSharedPtr normals,
-                      HdStBufferResourceGLSharedPtr indices,
-                      HdStBufferResourceGLSharedPtr primitiveParam,
-                      int numPrims) = 0;
-    
+    virtual void GetBufferSpecs(HdBufferSpecVector *specs) const override;
+    HDST_API
+    virtual void Execute(HdBufferArrayRangeSharedPtr const &range,
+                         HdResourceRegistry *resourceRegistry) override;
+
+    virtual int GetNumOutputElements() const override;
+
+private:
     HdBufferArrayRangeSharedPtr const _topologyRange;
     HdBufferArrayRangeSharedPtr const _vertexRange;
     int _numFaces;
