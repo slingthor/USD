@@ -70,7 +70,7 @@ HdStVBOSimpleMemoryManager::CreateBufferArray(
     HdBufferArrayUsageHint usageHint)
 {
     return std::make_shared<HdStVBOSimpleMemoryManager::_SimpleBufferArray>(
-        _hgi, role, bufferSpecs, usageHint);
+        _resourceRegistry, role, bufferSpecs, usageHint);
 }
 
 HdBufferArrayRangeSharedPtr
@@ -146,12 +146,12 @@ HdStVBOSimpleMemoryManager::GetResourceAllocation(
 //  _SimpleBufferArray
 // ---------------------------------------------------------------------------
 HdStVBOSimpleMemoryManager::_SimpleBufferArray::_SimpleBufferArray(
-    Hgi* hgi,
+    HdStResourceRegistry* resourceRegistry,
     TfToken const &role,
     HdBufferSpecVector const &bufferSpecs,
     HdBufferArrayUsageHint usageHint)
  : HdBufferArray(role, TfToken(), usageHint)
- , _hgi(hgi)
+ , _resourceRegistry(resourceRegistry)
  , _capacity(0)
  , _maxBytesPerElement(0)
 {
@@ -284,7 +284,8 @@ HdStVBOSimpleMemoryManager::_SimpleBufferArray::Reallocate(
     int numElements = range->GetNumElements();
 
     // Use blit work to record resource copy commands.
-    HgiBlitCmdsUniquePtr blitCmds = _hgi->CreateBlitCmds();
+    Hgi* hgi = _resourceRegistry->GetHgi();
+    HgiBlitCmds* blitCmds = _resourceRegistry->GetBlitCmds();
     
     TF_FOR_ALL (bresIt, GetResources()) {
         HdStBufferResourceGLSharedPtr const &bres = bresIt->second;
@@ -314,7 +315,7 @@ HdStVBOSimpleMemoryManager::_SimpleBufferArray::Reallocate(
             if (true)
 #endif
             {
-                newIds[i] = _hgi->CreateBuffer(bufDesc);
+                newIds[i] = hgi->CreateBuffer(bufDesc);
             }
         }
 
@@ -352,14 +353,12 @@ HdStVBOSimpleMemoryManager::_SimpleBufferArray::Reallocate(
         // delete old buffer
         for (int i = 0; i < 3; i++) {
             if (oldIds[i]) {
-                _hgi->DestroyBuffer(&oldIds[i]);
+                hgi->DestroyBuffer(&oldIds[i]);
             }
         }
 
         bres->SetAllocations(newIds[0], newIds[1], newIds[2], bufferSize);
     }
-
-    _hgi->SubmitCmds(blitCmds.get());
 
     _capacity = numElements;
     _needsReallocation = false;
@@ -377,11 +376,12 @@ HdStVBOSimpleMemoryManager::_SimpleBufferArray::GetMaxNumElements() const
 void
 HdStVBOSimpleMemoryManager::_SimpleBufferArray::_DeallocateResources()
 {
+    Hgi* hgi = _resourceRegistry->GetHgi();
     TF_FOR_ALL (it, GetResources()) {
         HdStBufferResourceGLSharedPtr bufferRes = it->second;
-        _hgi->DestroyBuffer(&bufferRes->GetId(0));
-        _hgi->DestroyBuffer(&bufferRes->GetId(1));
-        _hgi->DestroyBuffer(&bufferRes->GetId(2));
+        hgi->DestroyBuffer(&bufferRes->GetId(0));
+        hgi->DestroyBuffer(&bufferRes->GetId(1));
+        hgi->DestroyBuffer(&bufferRes->GetId(2));
     }
 }
 HdStBufferResourceGLSharedPtr

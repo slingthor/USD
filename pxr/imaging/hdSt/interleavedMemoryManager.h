@@ -28,6 +28,7 @@
 #include "pxr/imaging/hdSt/api.h"
 #include "pxr/imaging/hdSt/bufferArrayRangeGL.h"
 #include "pxr/imaging/hdSt/bufferResourceGL.h"
+#include "pxr/imaging/hdSt/resourceRegistry.h"
 
 #include "pxr/imaging/hd/bufferArray.h"
 #include "pxr/imaging/hd/bufferSpec.h"
@@ -45,7 +46,6 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 class HdStResourceRegistry;
-class Hgi;
 
 /// \class HdStInterleavedMemoryManager
 ///
@@ -199,7 +199,7 @@ public:
     public:
         /// Constructor.
         HDST_API
-        _StripedInterleavedBuffer(Hgi* hgi,
+        _StripedInterleavedBuffer(HdStResourceRegistry* resourceRegistry,
                                   TfToken const &role,
                                   HdBufferSpecVector const &bufferSpecs,
                                   HdBufferArrayUsageHint usageHint,
@@ -267,7 +267,7 @@ public:
         HdBufferSpecVector GetBufferSpecs() const;
         
         /// APPLE METAL: HGI accessor needed for _StripedInterleavedBufferRange::CopyData()
-        Hgi* GetHgi() { return _hgi; }
+        Hgi* GetHgi() { return _resourceRegistry->GetHgi(); }
 
     protected:
         HDST_API
@@ -281,7 +281,7 @@ public:
                                                    int stride);
 
     private:
-        Hgi* _hgi;
+        HdStResourceRegistry* const _resourceRegistry;
         bool _needsCompaction;
         int _stride;
         int _bufferOffsetAlignment;  // ranged binding offset alignment
@@ -295,7 +295,8 @@ public:
 
     };
     
-    HdStInterleavedMemoryManager(Hgi* hgi): _hgi(hgi) {}
+    HdStInterleavedMemoryManager(HdStResourceRegistry* resourceRegistry)
+        : _resourceRegistry(resourceRegistry) {}
 
 protected:
     /// Factory for creating HdBufferArrayRange
@@ -310,13 +311,13 @@ protected:
         HdBufferArraySharedPtr const &bufferArray, 
         VtDictionary &result) const;
     
-    Hgi* _hgi;
+    HdStResourceRegistry* const _resourceRegistry;
 };
 
 class HdStInterleavedUBOMemoryManager : public HdStInterleavedMemoryManager {
 public:
-    HdStInterleavedUBOMemoryManager(Hgi* hgi)
-    : HdStInterleavedMemoryManager(hgi) {}
+    HdStInterleavedUBOMemoryManager(HdStResourceRegistry* resourceRegistry)
+    : HdStInterleavedMemoryManager(resourceRegistry) {}
 
     /// Factory for creating HdBufferArray managed by
     /// HdStVBOMemoryManager aggregation.
@@ -335,8 +336,8 @@ public:
 
 class HdStInterleavedSSBOMemoryManager : public HdStInterleavedMemoryManager {
 public:
-    HdStInterleavedSSBOMemoryManager(Hgi* hgi)
-    : HdStInterleavedMemoryManager(hgi) {}
+    HdStInterleavedSSBOMemoryManager(HdStResourceRegistry* resourceRegistry)
+    : HdStInterleavedMemoryManager(resourceRegistry) {}
 
     /// Factory for creating HdBufferArray managed by
     /// HdStVBOMemoryManager aggregation.

@@ -76,6 +76,13 @@ using Hd_VertexAdjacencySharedPtr =
     std::shared_ptr<class Hd_VertexAdjacency>;
 using HdSt_MeshTopologySharedPtr = 
     std::shared_ptr<class HdSt_MeshTopology>;
+using HgiResourceBindingsSharedPtr = 
+    std::shared_ptr<HgiResourceBindingsHandle>;
+using HgiGraphicsPipelineSharedPtr = 
+    std::shared_ptr<HgiGraphicsPipelineHandle>;
+using HgiComputePipelineSharedPtr = 
+    std::shared_ptr<HgiComputePipelineHandle>;
+
 class HdStTextureIdentifier;
 class HdSamplerParameters;
 
@@ -392,6 +399,27 @@ public:
     FindTextureResourceHandle(
         HdInstance<HdStTextureResourceHandleSharedPtr>::ID id, bool *found);
 
+    /// Register a Hgi resource bindings into the registry.
+    HDST_API
+    HdInstance<HgiResourceBindingsSharedPtr>
+    RegisterResourceBindings(HdInstance<HgiResourceBindingsSharedPtr>::ID id);
+
+    /// Register a Hgi graphics pipeline into the registry.
+    HDST_API
+    HdInstance<HgiGraphicsPipelineSharedPtr>
+    RegisterGraphicsPipeline(HdInstance<HgiGraphicsPipelineSharedPtr>::ID id);
+
+    /// Register a Hgi compute pipeline into the registry.
+    HDST_API
+    HdInstance<HgiComputePipelineSharedPtr>
+    RegisterComputePipeline(HdInstance<HgiComputePipelineSharedPtr>::ID id);
+
+    /// Returns the global hgi compute command queue for registering computation work
+    HgiComputeCmds* GetComputeCmds();
+    
+    /// Returns the global hgi blit command queue for registering blitting work
+    HgiBlitCmds* GetBlitCmds();
+
 public:
     //
     // Unit test API
@@ -584,6 +612,21 @@ private:
 
     // texture handle registry
     std::unique_ptr<class HdSt_TextureHandleRegistry> _textureHandleRegistry;
+
+    // Hgi resource bindings registry
+    HdInstanceRegistry<HgiResourceBindingsSharedPtr>
+        _resourceBindingsRegistry;
+
+    // Hgi graphics pipeline registry
+    HdInstanceRegistry<HgiGraphicsPipelineSharedPtr>
+        _graphicsPipelineRegistry;
+
+    // Hgi compute pipeline registry
+    HdInstanceRegistry<HgiComputePipelineSharedPtr>
+        _computePipelineRegistry;
+
+    HgiComputeCmdsUniquePtr _computeCmds;
+    HgiBlitCmdsUniquePtr _blitCmds;
 };
 
 

@@ -30,6 +30,7 @@
 #include "pxr/imaging/hdSt/interleavedMemoryManager.h"
 #include "pxr/imaging/hdSt/bufferResourceGL.h"
 #include "pxr/imaging/hdSt/resourceFactory.h"
+#include "pxr/imaging/hdSt/resourceRegistry.h"
 #include "pxr/imaging/hdSt/glUtils.h"
 
 #include "pxr/imaging/hgi/blitCmds.h"
@@ -124,7 +125,7 @@ HdStInterleavedUBOMemoryManager::CreateBufferArray(
 
     return std::make_shared<
         HdStInterleavedMemoryManager::_StripedInterleavedBuffer>(
-            _hgi,
+            _resourceRegistry,
             role,
             bufferSpecs,
             usageHint,
@@ -163,7 +164,7 @@ HdStInterleavedSSBOMemoryManager::CreateBufferArray(
 
     return std::make_shared<
         HdStInterleavedMemoryManager::_StripedInterleavedBuffer>(
-            _hgi,
+            _resourceRegistry,
             role,
             bufferSpecs,
             usageHint,
@@ -229,7 +230,7 @@ _ComputeAlignment(HdTupleType tupleType)
 }
 
 HdStInterleavedMemoryManager::_StripedInterleavedBuffer::_StripedInterleavedBuffer(
-    Hgi* hgi,
+    HdStResourceRegistry* resourceRegistry,
     TfToken const &role,
     HdBufferSpecVector const &bufferSpecs,
     HdBufferArrayUsageHint usageHint,
@@ -238,7 +239,7 @@ HdStInterleavedMemoryManager::_StripedInterleavedBuffer::_StripedInterleavedBuff
     size_t maxSize = 0,
     TfToken const &garbageCollectionPerfToken = HdPerfTokens->garbageCollectedUbo)
     : HdBufferArray(role, garbageCollectionPerfToken, usageHint),
-      _hgi(hgi),
+      _resourceRegistry(resourceRegistry),
       _needsCompaction(false),
       _stride(0),
       _bufferOffsetAlignment(bufferOffsetAlignment),
@@ -439,6 +440,8 @@ HdStInterleavedMemoryManager::_StripedInterleavedBuffer::Reallocate(
     HdStBufferResourceGLSharedPtr currentBuffer =
         curRangeOwner_->GetResources().begin()->second;
 
+    Hgi* hgi = _resourceRegistry->GetHgi();
+    
     HgiBufferHandle newIds[3];
     HgiBufferHandle oldIds[3];
     HgiBufferHandle curIds[3];
@@ -461,7 +464,7 @@ HdStInterleavedMemoryManager::_StripedInterleavedBuffer::Reallocate(
         // Triple buffer everything
         for (int32_t i = 0; i < 3; i++) {
 #endif
-            newIds[i] = _hgi->CreateBuffer(bufDesc);
+            newIds[i] = hgi->CreateBuffer(bufDesc);
         }
     }
 
@@ -471,6 +474,8 @@ HdStInterleavedMemoryManager::_StripedInterleavedBuffer::Reallocate(
 
         size_t rangeCount = GetRangeCount();
 
+        HgiBlitCmds* blitCmds = _resourceRegistry->GetBlitCmds();
+        
         // pre-pass to combine consecutive buffer range relocation
         std::unique_ptr<HdStGLBufferRelocator> relocators[3];
         
@@ -509,7 +514,7 @@ HdStInterleavedMemoryManager::_StripedInterleavedBuffer::Reallocate(
         // buffer copy
         for(int i = 0; i < 3; i++) {
             if (relocators[i]) {
-                relocators[i]->Commit(_hgi);
+                relocators[i]->Commit(blitCmds);
             }
         }
     } else {
@@ -532,7 +537,7 @@ HdStInterleavedMemoryManager::_StripedInterleavedBuffer::Reallocate(
     for(int i = 0; i < 3; i++) {
         if (oldIds[i]) {
             // delete old buffer
-            _hgi->DestroyBuffer(&oldIds[i]);
+            hgi->DestroyBuffer(&oldIds[i]);
         }
     }
 
@@ -554,10 +559,11 @@ void
 HdStInterleavedMemoryManager::_StripedInterleavedBuffer::_DeallocateResources()
 {
     HdStBufferResourceGLSharedPtr resource = GetResource();
+    Hgi* hgi = _resourceRegistry->GetHgi();
     if (resource) {
-        _hgi->DestroyBuffer(&resource->GetId(0));
-        _hgi->DestroyBuffer(&resource->GetId(1));
-        _hgi->DestroyBuffer(&resource->GetId(2));
+        hgi->DestroyBuffer(&resource->GetId(0));
+        hgi->DestroyBuffer(&resource->GetId(1));
+        hgi->DestroyBuffer(&resource->GetId(2));
     }
 }
 

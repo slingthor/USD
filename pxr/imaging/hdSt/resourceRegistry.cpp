@@ -41,6 +41,8 @@
 #include "pxr/imaging/hdSt/textureHandleRegistry.h"
 #include "pxr/imaging/hdSt/textureObjectRegistry.h"
 
+#include "pxr/imaging/hgi/hgi.h"
+
 #include "pxr/imaging/hd/engine.h"
 #include "pxr/imaging/hd/tokens.h"
 
@@ -98,18 +100,18 @@ HdStResourceRegistry::HdStResourceRegistry(Hgi * const hgi)
     , _numBufferSourcesToResolve(0)
     // default aggregation strategies for varying (vertex, varying) primvars
     , _nonUniformAggregationStrategy(
-        std::make_unique<HdStVBOMemoryManager>(_hgi))
+        std::make_unique<HdStVBOMemoryManager>(this))
     , _nonUniformImmutableAggregationStrategy(
-        std::make_unique<HdStVBOMemoryManager>(_hgi))
+        std::make_unique<HdStVBOMemoryManager>(this))
     // default aggregation strategy for uniform on UBO (for globals)
     , _uniformUboAggregationStrategy(
-        std::make_unique<HdStInterleavedUBOMemoryManager>(_hgi))
+        std::make_unique<HdStInterleavedUBOMemoryManager>(this))
     // default aggregation strategy for uniform on SSBO (for primvars)
     , _uniformSsboAggregationStrategy(
-        std::make_unique<HdStInterleavedSSBOMemoryManager>(_hgi))
+        std::make_unique<HdStInterleavedSSBOMemoryManager>(this))
     // default aggregation strategy for single buffers (for nested instancer)
     , _singleAggregationStrategy(
-        std::make_unique<HdStVBOSimpleMemoryManager>(_hgi))
+        std::make_unique<HdStVBOSimpleMemoryManager>(this))
     , _textureHandleRegistry(std::make_unique<HdSt_TextureHandleRegistry>(hgi))
 {
 }
@@ -468,7 +470,7 @@ HdStResourceRegistry::RegisterDispatchBuffer(
 {
     HdStDispatchBufferSharedPtr const result =
         std::make_shared<HdStDispatchBuffer>(
-            _hgi, role, count, commandNumUints);
+            this, role, count, commandNumUints);
 
     _dispatchBufferRegistry.push_back(result);
 
@@ -614,6 +616,27 @@ HdStResourceRegistry::FindTextureResourceHandle(
     return _textureResourceHandleRegistry.FindInstance(id, found);
 }
 
+HdInstance<HgiResourceBindingsSharedPtr>
+HdStResourceRegistry::RegisterResourceBindings(
+    HdInstance<HgiResourceBindingsSharedPtr>::ID id)
+{
+    return _resourceBindingsRegistry.GetInstance(id);
+}
+
+HdInstance<HgiGraphicsPipelineSharedPtr>
+HdStResourceRegistry::RegisterGraphicsPipeline(
+    HdInstance<HgiGraphicsPipelineSharedPtr>::ID id)
+{
+    return _graphicsPipelineRegistry.GetInstance(id);
+}
+
+HdInstance<HgiComputePipelineSharedPtr>
+HdStResourceRegistry::RegisterComputePipeline(
+    HdInstance<HgiComputePipelineSharedPtr>::ID id)
+{
+    return _computePipelineRegistry.GetInstance(id);
+}
+
 std::ostream &operator <<(
     std::ostream &out,
     const HdStResourceRegistry& self)
@@ -627,6 +650,18 @@ std::ostream &operator <<(
     out << self._singleBufferArrayRegistry;
 
     return out;
+}
+
+HgiComputeCmds*
+HdStResourceRegistry::GetComputeCmds()
+{
+   return _computeCmds.get();
+}
+
+HgiBlitCmds*
+HdStResourceRegistry::GetBlitCmds()
+{
+   return _blitCmds.get();
 }
 
 void
@@ -734,6 +769,10 @@ HdStResourceRegistry::_Commit()
         }
     }
 
+    // Create an Hgi blit work queue for memory managers to encode their
+    // GPU work to
+    _blitCmds = _hgi->CreateBlitCmds();
+
     {
         HD_TRACE_SCOPE("Reallocate buffer arrays");
         // 3. reallocation phase:
@@ -786,6 +825,10 @@ HdStResourceRegistry::_Commit()
         }
     }
 
+    // submit the blit work queued by the computations
+    _hgi->SubmitCmds(_blitCmds.get());
+    _blitCmds.reset();
+
     {
         // HD_TRACE_SCOPE("Flush");
         // 5. flush phase:
@@ -801,10 +844,20 @@ HdStResourceRegistry::_Commit()
         // they are registered.
         //   e.g. smooth normals -> quadrangulation.
         //
-        TF_FOR_ALL(it, _pendingComputations) {
-            it->computation->Execute(it->range, this);
+        if (_pendingComputations.size() > 0) {
+            // Create an Hgi compute work queue for Computations to encode their
+            // GPU work to
+            _computeCmds = _hgi->CreateComputeCmds();
 
-            HD_PERF_COUNTER_INCR(HdPerfTokens->computationsCommited);
+            TF_FOR_ALL(it, _pendingComputations) {
+                it->computation->Execute(it->range, this);
+
+                HD_PERF_COUNTER_INCR(HdPerfTokens->computationsCommited);
+            }
+
+            // submit the work queued by the computations
+            _hgi->SubmitCmds(_computeCmds.get());
+            _computeCmds.reset();
         }
     }
 
@@ -823,6 +876,9 @@ HdStResourceRegistry::_Commit()
 void
 HdStResourceRegistry::_GarbageCollect()
 {
+    // Ensure there's a blit command queue ready to encode memory ops onto.
+    _blitCmds = _hgi->CreateBlitCmds();
+
     // The sequence in which we run garbage collection is significant.
     // We want to clean objects first which might be holding references
     // to other objects which will be subsequently cleaned up.
@@ -876,6 +932,11 @@ HdStResourceRegistry::_GarbageCollect()
     _programRegistry.GarbageCollect();
     _textureResourceHandleRegistry.GarbageCollect();
 
+    // Cleanup Hgi resources bindings and pipelines
+    _resourceBindingsRegistry.GarbageCollect();
+    _graphicsPipelineRegistry.GarbageCollect();
+    _computePipelineRegistry.GarbageCollect();
+
     // cleanup buffer array
     // buffer array retains weak_ptrs of range. All unused ranges should be
     // deleted (expired) at this point.
@@ -884,6 +945,10 @@ HdStResourceRegistry::_GarbageCollect()
     _uniformUboBufferArrayRegistry.GarbageCollect();
     _uniformSsboBufferArrayRegistry.GarbageCollect();
     _singleBufferArrayRegistry.GarbageCollect();
+    
+    // submit the blit work queued by the computations
+    _hgi->SubmitCmds(_blitCmds.get());
+    _blitCmds.reset();
 }
 
 void

@@ -41,7 +41,7 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-class Hgi;
+class HdStResourceRegistry;
 
 /// \class HdStVBOMemoryManager
 ///
@@ -49,9 +49,9 @@ class Hgi;
 ///
 class HdStVBOMemoryManager : public HdAggregationStrategy {
 public:
-    HdStVBOMemoryManager(Hgi *hgi)
+    HdStVBOMemoryManager(HdStResourceRegistry *resourceRegistry)
     : HdAggregationStrategy()
-    , _hgi(hgi) {}
+    , _resourceRegistry(resourceRegistry) {}
 
     /// Factory for creating HdBufferArray managed by
     /// HdStVBOMemoryManager aggregation.
@@ -234,7 +234,7 @@ protected:
     public:
         /// Constructor.
         HDST_API
-        _StripedBufferArray(Hgi* _hgi,
+        _StripedBufferArray(HdStResourceRegistry* _resourceRegistry,
                             TfToken const &role,
                             HdBufferSpecVector const &bufferSpecs,
                             HdBufferArrayUsageHint usageHint);
@@ -299,7 +299,7 @@ protected:
         HdBufferSpecVector GetBufferSpecs() const;
         
         /// APPLE METAL: HGI accessor needed for _StripedBufferArrayRange::CopyData()
-        Hgi* GetHgi() { return _hgi; }
+        Hgi* GetHgi() { return _resourceRegistry->GetHgi(); }
 
     protected:
         HDST_API
@@ -314,7 +314,7 @@ protected:
 
     private:
 
-        Hgi* _hgi;
+        HdStResourceRegistry* _resourceRegistry;
         bool _needsCompaction;
         int _totalCapacity;
         size_t _maxBytesPerElement;
@@ -327,7 +327,7 @@ protected:
         }
     };
     
-    Hgi* _hgi;
+    HdStResourceRegistry* _resourceRegistry;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

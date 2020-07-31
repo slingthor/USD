@@ -36,6 +36,7 @@
 
 #include "pxr/imaging/hdSt/bufferResourceGL.h"
 #include "pxr/imaging/hdSt/glUtils.h"
+#include "pxr/imaging/hdSt/resourceRegistry.h"
 #include "pxr/imaging/hdSt/vboMemoryManager.h"
 #include "pxr/imaging/hd/perfLog.h"
 #include "pxr/imaging/hd/tokens.h"
@@ -63,7 +64,7 @@ HdStVBOMemoryManager::CreateBufferArray(
     HdBufferArrayUsageHint usageHint)
 {
     return std::make_shared<HdStVBOMemoryManager::_StripedBufferArray>(
-        _hgi, role, bufferSpecs, usageHint);
+        _resourceRegistry, role, bufferSpecs, usageHint);
 }
 
 
@@ -146,12 +147,12 @@ HdStVBOMemoryManager::GetResourceAllocation(
 //  _StripedBufferArray
 // ---------------------------------------------------------------------------
 HdStVBOMemoryManager::_StripedBufferArray::_StripedBufferArray(
-    Hgi* hgi,
+    HdStResourceRegistry* resourceRegistry,
     TfToken const &role,
     HdBufferSpecVector const &bufferSpecs,
     HdBufferArrayUsageHint usageHint)
     : HdBufferArray(role, HdPerfTokens->garbageCollectedVbo, usageHint),
-      _hgi(hgi),
+      _resourceRegistry(resourceRegistry),
       _needsCompaction(false),
       _totalCapacity(0),
       _maxBytesPerElement(0)
@@ -324,6 +325,9 @@ HdStVBOMemoryManager::_StripedBufferArray::Reallocate(
     _SetRangeList(ranges);
 
     _totalCapacity = totalNumElements;
+    
+    Hgi* hgi = _resourceRegistry->GetHgi();
+    HgiBlitCmds* blitCmds = _resourceRegistry->GetBlitCmds();
 
     // resize each BufferResource
     HdStBufferResourceGLNamedList const& resources = GetResources();
@@ -355,7 +359,7 @@ HdStVBOMemoryManager::_StripedBufferArray::Reallocate(
             if (bufferSize > 0) {
                 // Disable triple buffering
                 if (i == 0) {
-                    newIds[i] = _hgi->CreateBuffer(bufDesc);
+                    newIds[i] = hgi->CreateBuffer(bufDesc);
                 }
             }
         }
@@ -417,7 +421,7 @@ HdStVBOMemoryManager::_StripedBufferArray::Reallocate(
             // buffer copy
             for (int i = 0; i < 3; i++) {
                 if (relocators[i]) {
-                    relocators[i]->Commit(_hgi);
+                    relocators[i]->Commit(blitCmds);
                 }
             }
         }
@@ -425,7 +429,7 @@ HdStVBOMemoryManager::_StripedBufferArray::Reallocate(
         for (int i = 0; i < 3; i++) {
             if (oldIds[i]) {
                 // delete old buffer
-                _hgi->DestroyBuffer(&oldIds[i]);
+                hgi->DestroyBuffer(&oldIds[i]);
             }
         }
 
@@ -454,11 +458,12 @@ HdStVBOMemoryManager::_StripedBufferArray::Reallocate(
 void
 HdStVBOMemoryManager::_StripedBufferArray::_DeallocateResources()
 {
+    Hgi* hgi = _resourceRegistry->GetHgi();
     TF_FOR_ALL (it, GetResources()) {
         HdStBufferResourceGLSharedPtr bufferRes = it->second;
-        _hgi->DestroyBuffer(&bufferRes->GetId(0));
-        _hgi->DestroyBuffer(&bufferRes->GetId(1));
-        _hgi->DestroyBuffer(&bufferRes->GetId(2));
+        hgi->DestroyBuffer(&bufferRes->GetId(0));
+        hgi->DestroyBuffer(&bufferRes->GetId(1));
+        hgi->DestroyBuffer(&bufferRes->GetId(2));
     }
 }
 

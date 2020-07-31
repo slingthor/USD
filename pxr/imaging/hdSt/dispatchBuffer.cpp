@@ -24,6 +24,7 @@
 #include "pxr/imaging/glf/glew.h"
 
 #include "pxr/imaging/hdSt/dispatchBuffer.h"
+#include "pxr/imaging/hdSt/resourceRegistry.h"
 #include "pxr/imaging/hd/perfLog.h"
 
 #include "pxr/imaging/hf/perfLog.h"
@@ -165,10 +166,13 @@ private:
 };
 
 
-HdStDispatchBuffer::HdStDispatchBuffer(Hgi* hgi, TfToken const &role, int count,
-                                   unsigned int commandNumUints)
+HdStDispatchBuffer::HdStDispatchBuffer(
+    HdStResourceRegistry* resourceRegistry,
+    TfToken const &role,
+    int count,
+    unsigned int commandNumUints)
  : HdBufferArray(role, TfToken(), HdBufferArrayUsageHint())
- , _hgi(hgi)
+ , _resourceRegistry(resourceRegistry)
  , _count(count)
  , _commandNumUints(commandNumUints)
 {
@@ -182,7 +186,7 @@ HdStDispatchBuffer::HdStDispatchBuffer(Hgi* hgi, TfToken const &role, int count,
     HgiBufferDesc bufDesc;
     bufDesc.usage = HgiBufferUsageUniform;
     bufDesc.byteSize = dataSize;
-    HgiBufferHandle newId = _hgi->CreateBuffer(bufDesc);
+    HgiBufferHandle newId = _resourceRegistry->GetHgi()->CreateBuffer(bufDesc);
 
     // monolithic resource
     _entireResource = HdStBufferResourceGLSharedPtr(
@@ -199,7 +203,7 @@ HdStDispatchBuffer::HdStDispatchBuffer(Hgi* hgi, TfToken const &role, int count,
 HdStDispatchBuffer::~HdStDispatchBuffer()
 {
     HgiBufferHandle& id = _entireResource->GetId();
-    _hgi->DestroyBuffer(&id);
+    _resourceRegistry->GetHgi()->DestroyBuffer(&id);
     _entireResource->SetAllocation(HgiBufferHandle(), 0);
 }
 
@@ -210,7 +214,7 @@ HdStDispatchBuffer::CopyData(std::vector<GLuint> const &data)
         return;
 
     // Use blit op to copy over the data.
-    HgiBlitCmdsUniquePtr blitCmds = _hgi->CreateBlitCmds();
+    HgiBlitCmds* blitCmds = _resourceRegistry->GetBlitCmds();
     HgiBufferCpuToGpuOp blitOp;
     blitOp.byteSize = _entireResource->GetSize();
     blitOp.cpuSourceBuffer = data.data();
@@ -218,7 +222,6 @@ HdStDispatchBuffer::CopyData(std::vector<GLuint> const &data)
     blitOp.gpuDestinationBuffer = _entireResource->GetId();
     blitOp.destinationByteOffset = 0;
     blitCmds->CopyBufferCpuToGpu(blitOp);
-    _hgi->SubmitCmds(blitCmds.get());
 }
 
 void

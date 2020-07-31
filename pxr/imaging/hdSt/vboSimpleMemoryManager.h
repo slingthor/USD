@@ -27,6 +27,7 @@
 #include "pxr/pxr.h"
 #include "pxr/imaging/hdSt/api.h"
 #include "pxr/imaging/hdSt/bufferArrayRangeGL.h"
+#include "pxr/imaging/hdSt/resourceRegistry.h"
 #include "pxr/imaging/hd/version.h"
 #include "pxr/imaging/hd/strategyBase.h"
 #include "pxr/imaging/hd/bufferArray.h"
@@ -35,7 +36,7 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-class Hgi;
+class HdStResourceRegistry;
 
 /// \class HdStVBOSimpleMemoryManager
 ///
@@ -45,7 +46,8 @@ class Hgi;
 ///
 class HdStVBOSimpleMemoryManager : public HdAggregationStrategy {
 public:
-    HdStVBOSimpleMemoryManager(Hgi* hgi): _hgi(hgi) {}
+    HdStVBOSimpleMemoryManager(HdStResourceRegistry* resourceRegistry)
+        : _resourceRegistry(resourceRegistry) {}
     
     /// Factory for creating HdBufferArray managed by
     /// HdStVBOSimpleMemoryManager.
@@ -216,7 +218,7 @@ protected:
     public:
         /// Constructor.
         HDST_API
-        _SimpleBufferArray(Hgi* hgi,
+        _SimpleBufferArray(HdStResourceRegistry* resourceRegistry,
                            TfToken const &role,
                            HdBufferSpecVector const &bufferSpecs,
                            HdBufferArrayUsageHint usageHint);
@@ -278,7 +280,7 @@ protected:
         HdBufferSpecVector GetBufferSpecs() const;
         
         /// APPLE METAL: HGI accessor needed for _SimpleBufferArrayRange::CopyData()
-        Hgi* GetHgi() { return _hgi; }
+        Hgi* GetHgi() { return _resourceRegistry->GetHgi(); }
 
     protected:
         HDST_API
@@ -291,7 +293,7 @@ protected:
                                                    int offset,
                                                    int stride);
     private:
-        Hgi* _hgi;
+        HdStResourceRegistry* const _resourceRegistry;
         int _capacity;
         size_t _maxBytesPerElement;
 
@@ -304,7 +306,7 @@ protected:
         }
     };
     
-    Hgi* _hgi;
+    HdStResourceRegistry* const _resourceRegistry;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE
