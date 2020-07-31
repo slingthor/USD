@@ -64,6 +64,7 @@ public:
     HGIMETAL_API
     void SetShaderId(id<MTLFunction> func) {
         _shaderId = func;
+        [_shaderId retain];
     }
     
 protected:
