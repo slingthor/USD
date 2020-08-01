@@ -28,7 +28,6 @@
 #include "pxr/imaging/hdSt/api.h"
 
 #include "pxr/imaging/hdSt/glslProgram.h"
-#include "pxr/imaging/hdSt/GL/resourceGL.h"
 
 #include <boost/shared_ptr.hpp>
 
