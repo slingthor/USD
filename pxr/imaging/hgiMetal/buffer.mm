@@ -82,7 +82,7 @@ HgiMetalBuffer::GetRawResource() const
 
 id<MTLBuffer> HgiMetalBuffer::MTLBuffer(HgiBufferHandle const& bufferHandle)
 {
-    if (metalBuffer) {
+    if (bufferHandle) {
         return (id<MTLBuffer>)bufferHandle->GetRawResource();
     }
     
