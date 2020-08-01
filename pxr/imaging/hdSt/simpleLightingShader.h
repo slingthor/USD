@@ -63,11 +63,11 @@ public:
     HDST_API
     std::string GetSource(TfToken const &shaderStageKey) const override;
     HDST_API
-    void BindResources(HdStProgram const &program,
+    void BindResources(HdStGLSLProgram const &program,
                        HdSt_ResourceBinder const &binder,
                        HdRenderPassState const &state) override;
     HDST_API
-    void UnbindResources(HdStProgram const &program,
+    void UnbindResources(HdStGLSLProgram const &program,
                          HdSt_ResourceBinder const &binder,
                          HdRenderPassState const &state) override;
     HDST_API

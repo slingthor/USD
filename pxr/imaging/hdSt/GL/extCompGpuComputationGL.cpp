@@ -32,12 +32,12 @@
 #include "pxr/imaging/hdSt/GL/extCompGpuComputationGL.h"
 #include "pxr/imaging/hdSt/GL/resourceGL.h"
 
-#include "pxr/imaging/hdSt/bufferArrayRangeGL.h"
-#include "pxr/imaging/hdSt/bufferResourceGL.h"
+#include "pxr/imaging/hdSt/bufferArrayRange.h"
+#include "pxr/imaging/hdSt/bufferResource.h"
 #include "pxr/imaging/hdSt/extCompGpuComputationBufferSource.h"
 #include "pxr/imaging/hdSt/extCompGpuPrimvarBufferSource.h"
 #include "pxr/imaging/hdSt/extComputation.h"
-#include "pxr/imaging/hdSt/program.h"
+#include "pxr/imaging/hdSt/glslProgram.h"
 #include "pxr/imaging/hdSt/resourceRegistry.h"
 #include "pxr/imaging/hd/bufferArrayRange.h"
 #include "pxr/imaging/hd/compExtCompInputSource.h"
@@ -47,6 +47,8 @@
 #include "pxr/imaging/hd/sceneDelegate.h"
 #include "pxr/imaging/hd/sceneExtCompInputSource.h"
 #include "pxr/imaging/hd/vtBufferSource.h"
+
+#include "pxr/imaging/hgiGL/shaderProgram.h"
 
 #include <limits>
 
@@ -67,16 +69,18 @@ HdStExtCompGpuComputationGL::HdStExtCompGpuComputationGL(
 
 void
 HdStExtCompGpuComputationGL::_Execute(
-    HdStProgramSharedPtr const &computeProgram,
+    HdStGLSLProgramSharedPtr const &computeProgram,
     std::vector<int32_t> const &_uniforms,
-    HdStBufferArrayRangeGLSharedPtr outputBar)
+    HdStBufferArrayRangeSharedPtr outputBar)
 {
     HdSt_ResourceBinder const &binder = _resource->GetResourceBinder();
 
     // Prepare uniform buffer for GPU computation
-    // APPLE METAL: Need to up-cast this to get to the GL implementation.
-    const HdResource& uboResource = computeProgram->GetGlobalUniformBuffer();
-    GLuint ubo = static_cast<const HdStResourceGL&>(uboResource).GetId();
+    HgiShaderProgramHandle const& hgiProgram = computeProgram->GetProgram();
+    const size_t uboSize = sizeof(int32_t) * _uniforms.size();
+    HgiGLShaderProgram * const hgiGLProgram =
+            dynamic_cast<HgiGLShaderProgram*>(hgiProgram.Get());
+    GLuint ubo = hgiGLProgram->GetUniformBuffer(uboSize);
     glBindBuffer(GL_UNIFORM_BUFFER, ubo);
     glBufferData(GL_UNIFORM_BUFFER,
             sizeof(int32_t) * _uniforms.size(),
@@ -98,9 +102,9 @@ HdStExtCompGpuComputationGL::_Execute(
     // XXX this should go away once we use a graphics abstraction
     // as that would take care of cleaning state.
     glBindBufferBase(GL_UNIFORM_BUFFER, 0, 0);
-    for (HdStBufferResourceGLNamedPair const & it: outputBar->GetResources()) {
+    for (HdStBufferResourceNamedPair const & it: outputBar->GetResources()) {
         TfToken const &name = it.first;
-        HdStBufferResourceGLSharedPtr const &buffer = it.second;
+        HdStBufferResourceSharedPtr const &buffer = it.second;
 
         HdBinding const &binding = binder.GetBinding(name);
         // XXX we need a better way than this to pick
@@ -112,13 +116,13 @@ HdStExtCompGpuComputationGL::_Execute(
         }
     }
     for (HdBufferArrayRangeSharedPtr const & input: _resource->GetInputs()) {
-        HdStBufferArrayRangeGLSharedPtr const & inputBar =
-            std::static_pointer_cast<HdStBufferArrayRangeGL>(input);
+        HdStBufferArrayRangeSharedPtr const & inputBar =
+            std::static_pointer_cast<HdStBufferArrayRange>(input);
 
-        for (HdStBufferResourceGLNamedPair const & it:
+        for (HdStBufferResourceNamedPair const & it:
                         inputBar->GetResources()) {
             TfToken const &name = it.first;
-            HdStBufferResourceGLSharedPtr const &buffer = it.second;
+            HdStBufferResourceSharedPtr const &buffer = it.second;
 
             HdBinding const &binding = binder.GetBinding(name);
             // These should all be valid as they are required inputs

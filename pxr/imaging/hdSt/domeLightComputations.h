@@ -42,8 +42,8 @@ using HdStSimpleLightingShaderPtr =
     std::weak_ptr<class HdStSimpleLightingShader>;
 using HdStSimpleLightingShaderSharedPtr =
     std::shared_ptr<class HdStSimpleLightingShader>;
-using HdStProgramSharedPtr =
-    std::shared_ptr<class HdStProgram>;
+using HdStGLSLProgramSharedPtr =
+    std::shared_ptr<class HdStGLSLProgram>;
 
 ////
 //// \class HdSt_DomeLightComputationGPU
@@ -110,7 +110,7 @@ protected:
         const HgiTexture * const hgiTexture) = 0;
 
     HDST_API
-    virtual void _Execute(HdStProgramSharedPtr computeProgram) = 0;
+    virtual void _Execute(HdStGLSLProgramSharedPtr computeProgram) = 0;
 
 protected:
     const TfToken _shaderToken;

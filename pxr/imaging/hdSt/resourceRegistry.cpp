@@ -29,7 +29,7 @@
 
 #include "pxr/imaging/hdSt/copyComputation.h"
 #include "pxr/imaging/hdSt/dispatchBuffer.h"
-#include "pxr/imaging/hdSt/program.h"
+#include "pxr/imaging/hdSt/glslProgram.h"
 #include "pxr/imaging/hdSt/interleavedMemoryManager.h"
 #include "pxr/imaging/hdSt/persistentBuffer.h"
 #include "pxr/imaging/hdSt/resourceFactory.h"
@@ -47,6 +47,9 @@
 #include "pxr/imaging/hd/tokens.h"
 
 #include "pxr/base/tf/envSetting.h"
+
+// APPLE METAL: Remove once cast to HgiMetal is gone
+#include "pxr/imaging/hgiMetal/hgi.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -595,11 +598,11 @@ HdStResourceRegistry::RegisterGeometricShader(
     return _geometricShaderRegistry.GetInstance(id);
 }
 
-HdInstance<HdStProgramSharedPtr>
+HdInstance<HdStGLSLProgramSharedPtr>
 HdStResourceRegistry::RegisterProgram(
-        HdInstance<HdStProgramSharedPtr>::ID id)
+        HdInstance<HdStGLSLProgramSharedPtr>::ID id)
 {
-    return _programRegistry.GetInstance(id);
+    return _glslProgramRegistry.GetInstance(id);
 }
 
 HdInstance<HdStTextureResourceHandleSharedPtr>
@@ -655,13 +658,27 @@ std::ostream &operator <<(
 HgiComputeCmds*
 HdStResourceRegistry::GetComputeCmds()
 {
-   return _computeCmds.get();
+    if (_blitCmds) {
+        _hgi->SubmitCmds(_blitCmds.get());
+        _blitCmds.reset();
+    }
+    if (!_computeCmds) {
+        _computeCmds = _hgi->CreateComputeCmds();
+    }
+    return _computeCmds.get();
 }
 
 HgiBlitCmds*
 HdStResourceRegistry::GetBlitCmds()
 {
-   return _blitCmds.get();
+    if (_computeCmds) {
+        _hgi->SubmitCmds(_computeCmds.get());
+        _computeCmds.reset();
+    }
+    if (!_blitCmds) {
+        _blitCmds = _hgi->CreateBlitCmds();
+    }
+    return _blitCmds.get();
 }
 
 void
@@ -769,9 +786,9 @@ HdStResourceRegistry::_Commit()
         }
     }
 
-    // Create an Hgi blit work queue for memory managers to encode their
-    // GPU work to
-    _blitCmds = _hgi->CreateBlitCmds();
+    // APPLE METAL: Only here to ensure Mtlf flushes it's buffer updates
+    HgiMetal* hgiMetal = static_cast<HgiMetal*>(_hgi);
+    hgiMetal->CommitCommandBuffer(HgiMetal::CommitCommandBuffer_NoWait, true);
 
     {
         HD_TRACE_SCOPE("Reallocate buffer arrays");
@@ -825,10 +842,11 @@ HdStResourceRegistry::_Commit()
         }
     }
 
-    // submit the blit work queued by the computations
-    _hgi->SubmitCmds(_blitCmds.get());
-    _blitCmds.reset();
-
+    // APPLE METAL: Only here to ensure Mtlf flushes it's buffer updates
+    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
+    context->FlushBuffers();
+    context->PrepareBufferFlush();
+    
     {
         // HD_TRACE_SCOPE("Flush");
         // 5. flush phase:
@@ -844,21 +862,21 @@ HdStResourceRegistry::_Commit()
         // they are registered.
         //   e.g. smooth normals -> quadrangulation.
         //
-        if (_pendingComputations.size() > 0) {
-            // Create an Hgi compute work queue for Computations to encode their
-            // GPU work to
-            _computeCmds = _hgi->CreateComputeCmds();
+        TF_FOR_ALL(it, _pendingComputations) {
+            it->computation->Execute(it->range, this);
 
-            TF_FOR_ALL(it, _pendingComputations) {
-                it->computation->Execute(it->range, this);
-
-                HD_PERF_COUNTER_INCR(HdPerfTokens->computationsCommited);
-            }
-
-            // submit the work queued by the computations
-            _hgi->SubmitCmds(_computeCmds.get());
-            _computeCmds.reset();
+            HD_PERF_COUNTER_INCR(HdPerfTokens->computationsCommited);
         }
+    }
+
+    // submit the work queued by the computations
+    if (_blitCmds) {
+        _hgi->SubmitCmds(_blitCmds.get());
+        _blitCmds.reset();
+    }
+    if (_computeCmds) {
+        _hgi->SubmitCmds(_computeCmds.get());
+        _computeCmds.reset();
     }
 
     // release sources
@@ -876,9 +894,6 @@ HdStResourceRegistry::_Commit()
 void
 HdStResourceRegistry::_GarbageCollect()
 {
-    // Ensure there's a blit command queue ready to encode memory ops onto.
-    _blitCmds = _hgi->CreateBlitCmds();
-
     // The sequence in which we run garbage collection is significant.
     // We want to clean objects first which might be holding references
     // to other objects which will be subsequently cleaned up.
@@ -929,7 +944,7 @@ HdStResourceRegistry::_GarbageCollect()
 
     // Cleanup Shader registries
     _geometricShaderRegistry.GarbageCollect();
-    _programRegistry.GarbageCollect();
+    _glslProgramRegistry.GarbageCollect();
     _textureResourceHandleRegistry.GarbageCollect();
 
     // Cleanup Hgi resources bindings and pipelines
@@ -1088,15 +1103,15 @@ HdStResourceRegistry::_TallyResourceAllocation(VtDictionary *result) const
     }
 
     // glsl program & ubo allocation
-    for (auto const & it: _programRegistry) {
-        HdStProgramSharedPtr const & program = it.second.value;
+    for (auto const & it: _glslProgramRegistry) {
+        HdStGLSLProgramSharedPtr const & program = it.second.value;
         // In the event of a compile or link error, programs can be null
         if (!program) {
             continue;
         }
-        size_t size =
-            program->GetProgramSize() +
-            program->GetGlobalUniformBuffer().GetSize();
+
+        HgiShaderProgramHandle const& prgHandle =  program->GetProgram();
+        size_t size = prgHandle ? prgHandle->GetByteSizeOfResource() : 0;
 
         // the role of program and global uniform buffer is always same.
         std::string const &role = program->GetRole().GetString();

@@ -56,14 +56,9 @@ void HgiInterop::TransferToApp(
 {
     TfToken const& gfxApi = hgi->GetAPIName();
 
-    // Temp
-#if defined(PXR_METAL_SUPPORT_ENABLED)
-    if (gfxApi==HgiTokens->Metal) {
-        HgiMetal *hgiMetal = dynamic_cast<HgiMetal*>(hgi);
-        HgiMetalTexture *metalColor = static_cast<HgiMetalTexture*>(color.Get());
-        hgiMetal->_finalTexture = metalColor->GetTextureId();
+    if (interopDst==HgiTokens->None) {
+        return;
     }
-#endif
     
 #if defined(HGIINTEROP_METAL_TO_GL_ENABLED)
     if (gfxApi==HgiTokens->Metal && interopDst==HgiTokens->OpenGL) {
@@ -72,9 +67,6 @@ void HgiInterop::TransferToApp(
             _metalToOpenGL.reset(new HgiInteropMetal(hgi));
         }
         _metalToOpenGL->CompositeToInterop(color, depth);
-    } else if (gfxApi==HgiTokens->Metal && interopDst==HgiTokens->Metal) {
-        // This is fine - we assume host App will reach in and grab presentation
-        // texture
     } else {
         TF_CODING_ERROR("Unsupported Hgi backed: %s", gfxApi.GetText());
     }

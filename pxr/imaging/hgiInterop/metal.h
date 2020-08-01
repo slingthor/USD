@@ -75,7 +75,7 @@ private:
         int32_t texAttrib;
         int32_t samplerColorLoc;
         int32_t samplerDepthLoc;
-        int32_t blitTexSizeUniform;
+        uint32_t blitTexSizeUniform;
         int32_t blitDepthScaleOffsetUniform;
     };
 

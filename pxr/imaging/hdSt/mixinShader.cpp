@@ -101,7 +101,7 @@ HdStMixinShader::GetTextures() const
 }
 
 void
-HdStMixinShader::BindResources(HdStProgram const &program,
+HdStMixinShader::BindResources(HdStGLSLProgram const &program,
                                HdSt_ResourceBinder const &binder,
                                HdRenderPassState const &state)
 {
@@ -109,7 +109,7 @@ HdStMixinShader::BindResources(HdStProgram const &program,
 }
 
 void
-HdStMixinShader::UnbindResources(HdStProgram const &program,
+HdStMixinShader::UnbindResources(HdStGLSLProgram const &program,
                                  HdSt_ResourceBinder const &binder,
                                  HdRenderPassState const &state)
 {

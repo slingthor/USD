@@ -27,13 +27,13 @@
 #include "pxr/imaging/garch/resourceFactory.h"
 
 #include "pxr/imaging/hdSt/GL/resourceBinderGL.h"
-#include "pxr/imaging/hdSt/bufferResourceGL.h"
+#include "pxr/imaging/hdSt/bufferResource.h"
 #include "pxr/imaging/hdSt/drawItem.h"
 #include "pxr/imaging/hdSt/glConversions.h"
 #include "pxr/imaging/hdSt/samplerObject.h"
 #include "pxr/imaging/hdSt/textureHandle.h"
 #include "pxr/imaging/hdSt/textureObject.h"
-#include "pxr/imaging/hdSt/GL/glslProgram.h"
+#include "pxr/imaging/hdSt/GL/glslProgramGL.h"
 
 #include "pxr/imaging/hd/bufferArrayRange.h"
 #include "pxr/imaging/hd/bufferSpec.h"
@@ -136,7 +136,7 @@ HdSt_ResourceBinderGL::HdSt_ResourceBinderGL()
 
 void
 HdSt_ResourceBinderGL::BindBuffer(TfToken const &name,
-                                  HdStBufferResourceGLSharedPtr const &buffer,
+                                  HdStBufferResourceSharedPtr const &buffer,
                                   int offset,
                                   int level) const
 {
@@ -265,7 +265,7 @@ HdSt_ResourceBinderGL::BindBuffer(TfToken const &name,
 
 void
 HdSt_ResourceBinderGL::UnbindBuffer(TfToken const &name,
-                                    HdStBufferResourceGLSharedPtr const &buffer,
+                                    HdStBufferResourceSharedPtr const &buffer,
                                     int level) const
 {
     HD_TRACE_FUNCTION();
@@ -423,10 +423,10 @@ HdSt_ResourceBinderGL::BindUniformf(TfToken const &name,
 }
 
 void
-HdSt_ResourceBinderGL::IntrospectBindings(HdStProgramSharedPtr programResource) const
+HdSt_ResourceBinderGL::IntrospectBindings(HdStGLSLProgramSharedPtr programResource) const
 {
     GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
-    GLuint program = std::dynamic_pointer_cast<HdStGLSLProgram>(programResource)->GetGLProgram();
+    GLuint program = std::dynamic_pointer_cast<HdStglslProgramGLSL>(programResource)->GetGLProgram();
 
     if (ARCH_UNLIKELY(!caps.shadingLanguage420pack)) {
         GLint numUBO = 0;
@@ -698,7 +698,7 @@ void _BindTextureDispatch(
 void
 HdSt_ResourceBinderGL::BindShaderResources(
     HdStShaderCode const *shader,
-    HdStProgram const &shaderProgram) const
+    HdStGLSLProgram const &shaderProgram) const
 {
     // bind fallback values and sampler uniforms (unit#? or bindless address)
 
@@ -717,7 +717,7 @@ HdSt_ResourceBinderGL::BindShaderResources(
 void
 HdSt_ResourceBinderGL::UnbindShaderResources(
     HdStShaderCode const *shader,
-    HdStProgram const &shaderProgram) const
+    HdStGLSLProgram const &shaderProgram) const
 {
 //    UnbindBufferArray(shader->GetShaderData());
 

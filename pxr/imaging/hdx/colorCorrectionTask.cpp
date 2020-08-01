@@ -432,7 +432,6 @@ HdxColorCorrectionTask::_CreateResourceBindings(
     // Begin the resource set
     HgiResourceBindingsDesc resourceDesc;
     resourceDesc.debugName = "ColorCorrection";
-    resourceDesc.pipelineType = HgiPipelineTypeGraphics;
 
     HgiTextureBindDesc texBind0;
     texBind0.bindingIndex = 0;
@@ -479,7 +478,6 @@ HdxColorCorrectionTask::_CreatePipeline(HgiTextureHandle const& aovTexture)
 
     HgiGraphicsPipelineDesc desc;
     desc.debugName = "ColorCorrection Pipeline";
-    desc.resourceBindings = _resourceBindings;
     desc.shaderProgram = _shaderProgram;
     
     // Describe the vertex buffer

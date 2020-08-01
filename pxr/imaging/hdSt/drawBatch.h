@@ -45,7 +45,7 @@ using HdSt_DrawBatchSharedPtr = std::shared_ptr<class HdSt_DrawBatch>;
 using HdSt_DrawBatchSharedPtrVector = std::vector<HdSt_DrawBatchSharedPtr>;
 using HdSt_GeometricShaderSharedPtr =
     std::shared_ptr<class HdSt_GeometricShader>;
-using HdStProgramSharedPtr= std::shared_ptr<class HdStProgram>;
+using HdStGLSLProgramSharedPtr= std::shared_ptr<class HdStGLSLProgram>;
 
 using HdStRenderPassStateSharedPtr = std::shared_ptr<class HdStRenderPassState>;
 using HdStResourceRegistrySharedPtr = 
@@ -130,7 +130,7 @@ protected:
                 bool indirect,
                 HdStResourceRegistrySharedPtr const &resourceRegistry);
 
-        HdStProgramSharedPtr GetProgram() const {
+        HdStGLSLProgramSharedPtr GetProgram() const {
             return _program;
         }
 
@@ -197,10 +197,10 @@ protected:
             bool *enableInstanceDraw) const;
 
         HDST_API
-        virtual bool _Link(HdStProgramSharedPtr const & glslProgram);
+        virtual bool _Link(HdStGLSLProgramSharedPtr const & glslProgram);
 
     private:
-        HdStProgramSharedPtr _program;
+        HdStGLSLProgramSharedPtr _program;
         HdSt_ResourceBinderSharedPtr _resourceBinder;
         HdStShaderCodeSharedPtrVector _shaders;
         HdSt_GeometricShaderSharedPtr _geometricShader;

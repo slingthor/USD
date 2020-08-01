@@ -152,7 +152,7 @@ HdStSurfaceShader::GetNamedTextureHandles() const
 
 /*virtual*/
 void
-HdStSurfaceShader::BindResources(HdStProgram const &program,
+HdStSurfaceShader::BindResources(HdStGLSLProgram const &program,
 								 HdSt_ResourceBinder const &binder,
                                  HdRenderPassState const &state)
 {
@@ -164,7 +164,7 @@ HdStSurfaceShader::BindResources(HdStProgram const &program,
 }
 /*virtual*/
 void
-HdStSurfaceShader::UnbindResources(HdStProgram const &program,
+HdStSurfaceShader::UnbindResources(HdStGLSLProgram const &program,
                                    HdSt_ResourceBinder const &binder,
                                    HdRenderPassState const &state)
 {

@@ -74,8 +74,6 @@ HgiMetal::HgiMetal(id<MTLDevice> device)
 , _encoder(nil)
 , _sampleCount(1)
 , _needsFlip(true)
-, _useFinalTextureForGetImage(false)
-, _finalTexture(nil)
 {
     if (!_device) {
 #if defined(ARCH_OS_MACOS)

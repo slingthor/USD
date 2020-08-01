@@ -24,7 +24,7 @@
 #include "pxr/imaging/glf/glew.h"
 #include "pxr/imaging/hdSt/codeGen.h"
 #include "pxr/imaging/hdSt/extCompGpuComputationResource.h"
-#include "pxr/imaging/hdSt/program.h"
+#include "pxr/imaging/hdSt/glslProgram.h"
 #include "pxr/imaging/hdSt/resourceFactory.h"
 #include "pxr/imaging/hd/bufferArrayRange.h"
 #include "pxr/imaging/hd/engine.h"
@@ -102,15 +102,15 @@ HdStExtCompGpuComputationResource::Resolve()
                                                shaders,
                                                codeGen->GetMetaData());
 
-        HdStProgram::ID registryID = codeGen->ComputeHash();
+        HdStGLSLProgram::ID registryID = codeGen->ComputeHash();
 
         {
             // ask registry to see if there's already compiled program
-            HdInstance<HdStProgramSharedPtr> programInstance =
+            HdInstance<HdStGLSLProgramSharedPtr> programInstance =
                                 _registry->RegisterProgram(registryID);
 
             if (programInstance.IsFirstInstance()) {
-                HdStProgramSharedPtr program =
+                HdStGLSLProgramSharedPtr program =
                     codeGen->CompileComputeProgram(_registry.get());
                 if (!TF_VERIFY(program)) {
                     return false;

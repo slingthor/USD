@@ -40,7 +40,7 @@
 #include "pxr/imaging/hdSt/shaderKey.h"
 
 #include "pxr/imaging/hdSt/Metal/indirectDrawBatchMetal.h"
-#include "pxr/imaging/hdSt/Metal/mslProgram.h"
+#include "pxr/imaging/hdSt/Metal/glslProgramMetal.h"
 #include "pxr/imaging/hdSt/persistentBuffer.h"
 
 #include "pxr/imaging/hd/binding.h"
@@ -142,7 +142,7 @@ HdSt_IndirectDrawBatchMetal::_ExecuteDraw(_DrawingProgram &program, int batchCou
 void
 HdSt_IndirectDrawBatchMetal::_GPUFrustumInstanceCullingExecute(
     HdStResourceRegistrySharedPtr const &resourceRegistry,
-    HdStProgramSharedPtr const &program,
+    HdStGLSLProgramSharedPtr const &program,
     HdSt_ResourceBinder const &binder,
     HdBufferResourceSharedPtr cullCommandBuffer)
 {
@@ -186,7 +186,7 @@ HdSt_IndirectDrawBatchMetal::_SyncFence() {
 void
 HdSt_IndirectDrawBatchMetal::_GPUFrustumNonInstanceCullingExecute(
       HdStResourceRegistrySharedPtr const &resourceRegistry,
-      HdStProgramSharedPtr const &program,
+      HdStGLSLProgramSharedPtr const &program,
       HdSt_ResourceBinder const &binder)
 {
     GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
@@ -259,7 +259,7 @@ HdSt_IndirectDrawBatchMetal::_EndGPUCountVisibleInstances(GLsync resultSync, siz
 /* virtual */
 bool
 HdSt_IndirectDrawBatchMetal::_CullingProgramMetal::_Link(
-        HdStProgramSharedPtr const & program)
+        HdStGLSLProgramSharedPtr const & program)
 {
     if (!TF_VERIFY(program)) return false;
 

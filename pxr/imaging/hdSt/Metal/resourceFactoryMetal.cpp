@@ -31,14 +31,11 @@
 #include "pxr/imaging/hdSt/Metal/domeLightComputationsMetal.h"
 #include "pxr/imaging/hdSt/Metal/drawTargetTextureResourceMetal.h"
 #include "pxr/imaging/hdSt/Metal/extCompGpuComputationMetal.h"
-#include "pxr/imaging/hdSt/Metal/flatNormalsMetal.h"
 #include "pxr/imaging/hdSt/Metal/indirectDrawBatchMetal.h"
-#include "pxr/imaging/hdSt/Metal/mslProgram.h"
+#include "pxr/imaging/hdSt/Metal/glslProgramMetal.h"
 #include "pxr/imaging/hdSt/Metal/renderPassShaderMetal.h"
 #include "pxr/imaging/hdSt/Metal/renderPassStateMetal.h"
 #include "pxr/imaging/hdSt/Metal/resourceBinderMetal.h"
-#include "pxr/imaging/hdSt/Metal/quadrangulateMetal.h"
-#include "pxr/imaging/hdSt/Metal/smoothNormalsMetal.h"
 #include "pxr/imaging/hdSt/Metal/textureResourceMetal.h"
 
 #include <boost/smart_ptr.hpp>
@@ -75,37 +72,11 @@ HdStResourceFactoryMetal::NewDrawTargetTextureResource() const
         new HdSt_DrawTargetTextureResourceMetal());
 }
 
-HdSt_FlatNormalsComputationGPU*
-HdStResourceFactoryMetal::NewFlatNormalsComputationGPU(
-    HdBufferArrayRangeSharedPtr const &topologyRange,
-    HdBufferArrayRangeSharedPtr const &vertexRange,
-    int numFaces, TfToken const &srcName, TfToken const &dstName,
-    HdType srcDataType, bool packed) const
-{
-    return new HdSt_FlatNormalsComputationMetal(
-        topologyRange, vertexRange, numFaces, srcName, dstName, srcDataType,
-        packed);
-}
-
 HdSt_DrawBatchSharedPtr HdStResourceFactoryMetal::NewIndirectDrawBatch(
     HdStDrawItemInstance * drawItemInstance) const
 {
     return HdSt_DrawBatchSharedPtr(
         new HdSt_IndirectDrawBatchMetal(drawItemInstance));
-}
-
-/// Create a GPU quadrangulation computation
-HdSt_QuadrangulateComputationGPU *
-HdStResourceFactoryMetal::NewQuadrangulateComputationGPU(
-    HdSt_MeshTopology *topology,
-    TfToken const &sourceName,
-    HdType dataType,
-    SdfPath const &id) const
-{
-    return new HdSt_QuadrangulateComputationGPUMetal(topology,
-                                                     sourceName,
-                                                     dataType,
-                                                     id);
 }
 
 HdStRenderPassState *HdStResourceFactoryMetal::NewRenderPassState() const
@@ -122,17 +93,6 @@ HdStRenderPassState *HdStResourceFactoryMetal::NewRenderPassState(
 HdSt_ResourceBinder *HdStResourceFactoryMetal::NewResourceBinder() const
 {
     return new HdSt_ResourceBinderMetal();
-}
-
-/// Creates a new smooth normals GPU computation
-HdSt_SmoothNormalsComputationGPU *
-HdStResourceFactoryMetal::NewSmoothNormalsComputationGPU(
-    Hd_VertexAdjacency const *adjacency,
-    TfToken const &srcName, TfToken const &dstName,
-    HdType srcDataType, bool packed) const
-{
-    return new HdSt_SmoothNormalsComputationMetal(
-        adjacency, srcName, dstName, srcDataType, packed);
 }
 
 HdStSimpleTextureResource *
@@ -158,10 +118,10 @@ HdStResourceFactoryMetal::NewSimpleTextureResource(
         memoryRequest);
 }
 
-HdStProgram *HdStResourceFactoryMetal::NewProgram(
+HdStGLSLProgram *HdStResourceFactoryMetal::NewProgram(
     TfToken const &role, HdStResourceRegistry *const registry) const
 {
-    return new HdStMSLProgram(role, registry);
+    return new HdStGLSLProgramMSL(role, registry);
 }
 
 HdStExtCompGpuComputation*
