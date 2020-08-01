@@ -204,8 +204,7 @@ HdxOitBufferAccessor::InitializeOitBuffersIfNecessary()
 
     // XXX todo add a Clear() fn on HdStBufferResource so that we do not have
     // to use direct gl calls. below.
-    HgiBufferHandle& buffer = stCounterResource->GetId();
-    HgiGLBuffer* glBuffer = dynamic_cast<HgiGLBuffer*>(buffer.Get());
+    HgiBufferHandle const& buffer = stCounterResource->GetId();
     if (!glBuffer) {
         TF_CODING_ERROR("Todo: Add HdStBufferResource::Clear");
         return;
@@ -213,13 +212,13 @@ HdxOitBufferAccessor::InitializeOitBuffersIfNecessary()
 
     // Old versions of glew may be missing glClearNamedBufferData
     if (ARCH_LIKELY(caps.directStateAccessEnabled) && glClearNamedBufferData) {
-        glClearNamedBufferData(glBuffer->GetBufferId(),
+        glClearNamedBufferData(buffer->GetRawResource(),
                                 GL_R32I,
                                 GL_RED_INTEGER,
                                 GL_INT,
                                 &clearCounter);
     } else {
-        glBindBuffer(GL_SHADER_STORAGE_BUFFER, glBuffer->GetBufferId());
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, glBuffer->GetRawResource());
         glClearBufferData(
             GL_SHADER_STORAGE_BUFFER, GL_R32I, GL_RED_INTEGER, GL_INT,
             &clearCounter);

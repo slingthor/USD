@@ -82,10 +82,8 @@ HgiMetalBuffer::GetRawResource() const
 
 id<MTLBuffer> HgiMetalBuffer::MTLBuffer(HgiBufferHandle const& bufferHandle)
 {
-    HgiMetalBuffer const* metalBuffer = dynamic_cast<HgiMetalBuffer*>(bufferHandle.Get());
-    
     if (metalBuffer) {
-        return metalBuffer->GetBufferId();
+        return (id<MTLBuffer>)bufferHandle->GetRawResource();
     }
     
     return nil;

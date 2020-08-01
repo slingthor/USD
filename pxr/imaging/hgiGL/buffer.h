@@ -47,8 +47,6 @@ public:
     HGIGL_API
     uint64_t GetRawResource() const override;
 
-    uint32_t GetBufferId() const {return _bufferId;}
-
 protected:
     friend class HgiGL;
 
