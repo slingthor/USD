@@ -30,7 +30,6 @@
 #include "pxr/imaging/garch/resourceFactory.h"
 
 #include "pxr/imaging/hdSt/GL/extCompGpuComputationGL.h"
-#include "pxr/imaging/hdSt/GL/resourceGL.h"
 
 #include "pxr/imaging/hdSt/bufferArrayRange.h"
 #include "pxr/imaging/hdSt/bufferResource.h"
