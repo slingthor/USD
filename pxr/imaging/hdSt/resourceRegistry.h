@@ -419,6 +419,9 @@ public:
     
     /// Returns the global hgi blit command queue for registering blitting work
     HgiBlitCmds* GetBlitCmds();
+    
+    /// Submits any queued compute/blit work for GPU execution
+    void SubmitHgiWork();
 
 public:
     //

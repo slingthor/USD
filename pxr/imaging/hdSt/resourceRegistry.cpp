@@ -681,6 +681,19 @@ HdStResourceRegistry::GetBlitCmds()
     return _blitCmds.get();
 }
 
+void HdStResourceRegistry::SubmitHgiWork()
+{
+    // submit the work queued by the computations
+    if (_blitCmds) {
+        _hgi->SubmitCmds(_blitCmds.get());
+        _blitCmds.reset();
+    }
+    if (_computeCmds) {
+        _hgi->SubmitCmds(_computeCmds.get());
+        _computeCmds.reset();
+    }
+}
+
 void
 HdStResourceRegistry::_CommitTextures()
 {
@@ -787,8 +800,8 @@ HdStResourceRegistry::_Commit()
     }
 
     // APPLE METAL: Only here to ensure Mtlf flushes it's buffer updates
-    HgiMetal* hgiMetal = static_cast<HgiMetal*>(_hgi);
-    hgiMetal->CommitCommandBuffer(HgiMetal::CommitCommandBuffer_NoWait, true);
+//    HgiMetal* hgiMetal = static_cast<HgiMetal*>(_hgi);
+//    hgiMetal->CommitCommandBuffer(HgiMetal::CommitCommandBuffer_NoWait, true);
 
     {
         HD_TRACE_SCOPE("Reallocate buffer arrays");
@@ -842,11 +855,6 @@ HdStResourceRegistry::_Commit()
         }
     }
 
-    // APPLE METAL: Only here to ensure Mtlf flushes it's buffer updates
-    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
-    context->FlushBuffers();
-    context->PrepareBufferFlush();
-    
     {
         // HD_TRACE_SCOPE("Flush");
         // 5. flush phase:
@@ -869,16 +877,8 @@ HdStResourceRegistry::_Commit()
         }
     }
 
-    // submit the work queued by the computations
-    if (_blitCmds) {
-        _hgi->SubmitCmds(_blitCmds.get());
-        _blitCmds.reset();
-    }
-    if (_computeCmds) {
-        _hgi->SubmitCmds(_computeCmds.get());
-        _computeCmds.reset();
-    }
-
+    SubmitHgiWork();
+    
     // release sources
     WorkParallelForEach(_pendingSources.begin(), _pendingSources.end(),
                         [](_PendingSource &ps) {
