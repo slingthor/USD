@@ -599,7 +599,7 @@ HdStResourceRegistry::RegisterGeometricShader(
 }
 
 HdInstance<HdStGLSLProgramSharedPtr>
-HdStResourceRegistry::RegisterProgram(
+HdStResourceRegistry::RegisterGLSLProgram(
         HdInstance<HdStGLSLProgramSharedPtr>::ID id)
 {
     return _glslProgramRegistry.GetInstance(id);
