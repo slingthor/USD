@@ -85,6 +85,9 @@ public:
 
     HGIMETAL_API
     static MTLSamplerMipFilter GetMipFilter(HgiMipFilter mf);
+    
+    HGIMETAL_API
+    static MTLTextureSwizzle GetComponentSwizzle(HgiComponentSwizzle);
 };
 
 

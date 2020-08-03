@@ -26,7 +26,7 @@
 
 #include "pxr/pxr.h"
 #include "pxr/imaging/hdSt/api.h"
-#include "pxr/imaging/hdSt/bufferArrayRangeGL.h"
+#include "pxr/imaging/hdSt/bufferArrayRange.h"
 #include "pxr/imaging/hdSt/extCompGpuComputationBufferSource.h"
 #include "pxr/imaging/hd/bufferSource.h"
 #include "pxr/imaging/hd/computation.h"
@@ -42,7 +42,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 class HdSceneDelegate;
 class HdExtComputation;
-using HdStProgramSharedPtr= std::shared_ptr<class HdStProgram>;
+using HdStGLSLProgramSharedPtr= std::shared_ptr<class HdStGLSLProgram>;
 using HdExtComputationPrimvarDescriptorVector =
     std::vector<struct HdExtComputationPrimvarDescriptor>;
 
@@ -167,9 +167,9 @@ protected:
           int elementCount);
 
     HDST_API
-    virtual void _Execute(HdStProgramSharedPtr const &computeProgram,
+    virtual void _Execute(HdStGLSLProgramSharedPtr const &computeProgram,
                           std::vector<int32_t> const &_uniforms,
-                          HdStBufferArrayRangeGLSharedPtr outputBar) = 0;
+                          HdStBufferArrayRangeSharedPtr outputBar) = 0;
 
     SdfPath                                      _id;
     HdStExtCompGpuComputationResourceSharedPtr   _resource;

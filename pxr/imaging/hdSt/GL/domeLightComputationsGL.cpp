@@ -24,7 +24,7 @@
 #include "pxr/imaging/glf/glew.h"
 
 #include "pxr/imaging/hdSt/GL/domeLightComputationsGL.h"
-#include "pxr/imaging/hdSt/GL/glslProgram.h"
+#include "pxr/imaging/hdSt/GL/glslProgramGL.h"
 #include "pxr/imaging/hdSt/simpleLightingShader.h"
 #include "pxr/imaging/hdSt/resourceRegistry.h"
 #include "pxr/imaging/hdSt/package.h"
@@ -76,10 +76,10 @@ HdSt_DomeLightComputationGPUGL::_GetGlTextureName(const HgiTexture * const hgiTe
 }
 
 void
-HdSt_DomeLightComputationGPUGL::_Execute(HdStProgramSharedPtr computeProgram)
+HdSt_DomeLightComputationGPUGL::_Execute(HdStGLSLProgramSharedPtr computeProgram)
 {
-    HdStGLSLProgram const *glslProgram(
-        dynamic_cast<const HdStGLSLProgram*>(computeProgram.get()));
+    HdStglslProgramGLSL const *glslProgram(
+        dynamic_cast<const HdStglslProgramGLSL*>(computeProgram.get()));
     const GLuint programId = glslProgram->GetGLProgram();
 
     HdStSimpleLightingShaderSharedPtr const shader = _lightingShader.lock();

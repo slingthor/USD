@@ -29,7 +29,7 @@
 #include "pxr/imaging/hdSt/api.h"
 #include "pxr/imaging/hd/version.h"
 #include "pxr/imaging/hdSt/resourceBinder.h"
-#include "pxr/imaging/hdSt/program.h"
+#include "pxr/imaging/hdSt/glslProgram.h"
 
 #include <map>
 #include <vector>
@@ -60,7 +60,7 @@ public:
 
     /// Generate shader source and compile it.
     HDST_API
-    virtual HdStProgramSharedPtr Compile(
+    virtual HdStGLSLProgramSharedPtr Compile(
         HdStResourceRegistry* const registry) = 0;
 
     /// Generate compute shader source and compile it.
@@ -79,7 +79,7 @@ public:
     /// \see GetComputeShaderSource
     /// \see HdSt_ResourceBinder::ResolveBindings
     HDST_API
-    virtual HdStProgramSharedPtr CompileComputeProgram(
+    virtual HdStGLSLProgramSharedPtr CompileComputeProgram(
         HdStResourceRegistry*const registry) = 0;
     
     /// Return the generated vertex shader source

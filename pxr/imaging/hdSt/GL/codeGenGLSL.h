@@ -29,7 +29,7 @@
 #include "pxr/imaging/hdSt/codeGen.h"
 #include "pxr/imaging/hdSt/resourceBinder.h"
 
-#include "pxr/imaging/hdSt/GL/glslProgram.h"
+#include "pxr/imaging/hdSt/GL/glslProgramGL.h"
 
 #include <boost/shared_ptr.hpp>
 
@@ -66,7 +66,7 @@ public:
 
     /// Generate shader source and compile it.
     HDST_API
-    HdStProgramSharedPtr Compile(
+    HdStGLSLProgramSharedPtr Compile(
         HdStResourceRegistry *const registry) override;
 
     /// Generate compute shader source and compile it.
@@ -85,7 +85,7 @@ public:
     /// \see GetComputeShaderSource
     /// \see Hd_ResourceBinder::ResolveBindings
     HDST_API
-    HdStProgramSharedPtr CompileComputeProgram(
+    HdStGLSLProgramSharedPtr CompileComputeProgram(
         HdStResourceRegistry* const registry) override;
     
     /// Return the generated vertex shader source

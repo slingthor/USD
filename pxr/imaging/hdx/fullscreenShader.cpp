@@ -317,7 +317,6 @@ HdxFullscreenShader::_CreateResourceBindings(TextureMap const& textures)
     // Begin the resource set
     HgiResourceBindingsDesc resourceDesc;
     resourceDesc.debugName = "HdxFullscreenShader";
-    resourceDesc.pipelineType = HgiPipelineTypeGraphics;
 
     // XXX OpenGL / Metal both re-use slot indices between buffers and textures.
     // Vulkan uses unique slot indices in descriptor set.
@@ -424,7 +423,6 @@ HdxFullscreenShader::_CreatePipeline(
 
     HgiGraphicsPipelineDesc desc;
     desc.debugName = _debugName + " Pipeline";
-    desc.resourceBindings = _resourceBindings;
     desc.shaderProgram = _shaderProgram;
     desc.colorAttachmentDescs.push_back(_attachment0);
     desc.depthAttachmentDesc = _depthAttachment;
@@ -446,8 +444,7 @@ HdxFullscreenShader::_CreatePipeline(
     desc.rasterizationState.polygonMode = HgiPolygonModeFill;
     desc.rasterizationState.winding = HgiWindingCounterClockwise;
 
-    // Set resource bindings (texture, buffers) and shader
-    desc.resourceBindings = _resourceBindings;
+    // Set the shaders
     desc.shaderProgram = _shaderProgram;
 
     // Ignore user provided vertex buffers. The VBO must always match the
@@ -534,7 +531,7 @@ HdxFullscreenShader::_Draw(
 
     // create pipeline (first time)
     _CreatePipeline(colorDst, depthDst, writeDepth);
-
+    
     // If a destination color target is provided we can use it as the
     // dimensions of the backbuffer. If not destination textures are provided
     // it means we are rendering to the framebuffer.

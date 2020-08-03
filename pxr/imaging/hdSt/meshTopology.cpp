@@ -187,7 +187,7 @@ HdSt_MeshTopology::GetQuadrangulateComputationGPU(
         return HdComputationSharedPtr();
     }
     return HdComputationSharedPtr(
-            HdStResourceFactory::GetInstance()->NewQuadrangulateComputationGPU(
+            new HdSt_QuadrangulateComputationGPU(
                 this, name, dataType, id));
 }
 

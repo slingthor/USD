@@ -24,6 +24,7 @@
 #include "pxr/imaging/glf/glew.h"
 
 #include "pxr/imaging/hdSt/dispatchBuffer.h"
+#include "pxr/imaging/hdSt/resourceRegistry.h"
 #include "pxr/imaging/hd/perfLog.h"
 
 #include "pxr/imaging/hf/perfLog.h"
@@ -36,7 +37,7 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 
-class Hd_DispatchBufferArrayRange : public HdStBufferArrayRangeGL {
+class Hd_DispatchBufferArrayRange : public HdStBufferArrayRange {
 public:
     /// Constructor.
     Hd_DispatchBufferArrayRange(HdStDispatchBuffer *buffer) :
@@ -126,17 +127,17 @@ public:
 
     /// Returns the GPU resource. If the buffer array contains more than one
     /// resource, this method raises a coding error.
-    virtual HdStBufferResourceGLSharedPtr GetResource() const {
+    virtual HdStBufferResourceSharedPtr GetResource() const {
         return _buffer->GetResource();
     }
 
     /// Returns the named GPU resource.
-    virtual HdStBufferResourceGLSharedPtr GetResource(TfToken const& name) {
+    virtual HdStBufferResourceSharedPtr GetResource(TfToken const& name) {
         return _buffer->GetResource(name);
     }
 
     /// Returns the list of all named GPU resources for this bufferArrayRange.
-    virtual HdStBufferResourceGLNamedList const& GetResources() const {
+    virtual HdStBufferResourceNamedList const& GetResources() const {
         return _buffer->GetResources();
     }
 
@@ -165,10 +166,13 @@ private:
 };
 
 
-HdStDispatchBuffer::HdStDispatchBuffer(Hgi* hgi, TfToken const &role, int count,
-                                   unsigned int commandNumUints)
+HdStDispatchBuffer::HdStDispatchBuffer(
+    HdStResourceRegistry* resourceRegistry,
+    TfToken const &role,
+    int count,
+    unsigned int commandNumUints)
  : HdBufferArray(role, TfToken(), HdBufferArrayUsageHint())
- , _hgi(hgi)
+ , _resourceRegistry(resourceRegistry)
  , _count(count)
  , _commandNumUints(commandNumUints)
 {
@@ -182,24 +186,24 @@ HdStDispatchBuffer::HdStDispatchBuffer(Hgi* hgi, TfToken const &role, int count,
     HgiBufferDesc bufDesc;
     bufDesc.usage = HgiBufferUsageUniform;
     bufDesc.byteSize = dataSize;
-    HgiBufferHandle newId = _hgi->CreateBuffer(bufDesc);
+    HgiBufferHandle newId = _resourceRegistry->GetHgi()->CreateBuffer(bufDesc);
 
     // monolithic resource
-    _entireResource = HdStBufferResourceGLSharedPtr(
-        new HdStBufferResourceGL(
+    _entireResource = HdStBufferResourceSharedPtr(
+        new HdStBufferResource(
             role, {HdTypeInt32, 1},
             /*offset=*/0, stride));
     _entireResource->SetAllocation(newId, dataSize);
 
     // create a buffer array range, which aggregates all views
     // (will be added by AddBufferResourceView)
-    _bar = HdStBufferArrayRangeGLSharedPtr(new Hd_DispatchBufferArrayRange(this));
+    _bar = HdStBufferArrayRangeSharedPtr(new Hd_DispatchBufferArrayRange(this));
 }
 
 HdStDispatchBuffer::~HdStDispatchBuffer()
 {
     HgiBufferHandle& id = _entireResource->GetId();
-    _hgi->DestroyBuffer(&id);
+    _resourceRegistry->GetHgi()->DestroyBuffer(&id);
     _entireResource->SetAllocation(HgiBufferHandle(), 0);
 }
 
@@ -210,7 +214,7 @@ HdStDispatchBuffer::CopyData(std::vector<GLuint> const &data)
         return;
 
     // Use blit op to copy over the data.
-    HgiBlitCmdsUniquePtr blitCmds = _hgi->CreateBlitCmds();
+    HgiBlitCmds* blitCmds = _resourceRegistry->GetBlitCmds();
     HgiBufferCpuToGpuOp blitOp;
     blitOp.byteSize = _entireResource->GetSize();
     blitOp.cpuSourceBuffer = data.data();
@@ -218,7 +222,6 @@ HdStDispatchBuffer::CopyData(std::vector<GLuint> const &data)
     blitOp.gpuDestinationBuffer = _entireResource->GetId();
     blitOp.destinationByteOffset = 0;
     blitCmds->CopyBufferCpuToGpu(blitOp);
-    _hgi->SubmitCmds(blitCmds.get());
 }
 
 void
@@ -228,7 +231,7 @@ HdStDispatchBuffer::AddBufferResourceView(
     size_t stride = _commandNumUints * sizeof(GLuint);
 
     // add a binding view (resource binder iterates and automatically binds)
-    HdStBufferResourceGLSharedPtr view =
+    HdStBufferResourceSharedPtr view =
         _AddResource(name, tupleType, offset, stride);
 
     // this is just a view, not consuming memory
@@ -257,12 +260,12 @@ HdStDispatchBuffer::DebugDump(std::ostream &out) const
     /*nothing*/
 }
 
-HdStBufferResourceGLSharedPtr
+HdStBufferResourceSharedPtr
 HdStDispatchBuffer::GetResource() const
 {
     HD_TRACE_FUNCTION();
 
-    if (_resourceList.empty()) return HdStBufferResourceGLSharedPtr();
+    if (_resourceList.empty()) return HdStBufferResourceSharedPtr();
 
     if (TfDebug::IsEnabled(HD_SAFE_MODE)) {
         // make sure this buffer array has only one resource.
@@ -279,21 +282,21 @@ HdStDispatchBuffer::GetResource() const
     return _resourceList.begin()->second;
 }
 
-HdStBufferResourceGLSharedPtr
+HdStBufferResourceSharedPtr
 HdStDispatchBuffer::GetResource(TfToken const& name)
 {
     HD_TRACE_FUNCTION();
 
     // linear search.
     // The number of buffer resources should be small (<10 or so).
-    for (HdStBufferResourceGLNamedList::iterator it = _resourceList.begin();
+    for (HdStBufferResourceNamedList::iterator it = _resourceList.begin();
          it != _resourceList.end(); ++it) {
         if (it->first == name) return it->second;
     }
-    return HdStBufferResourceGLSharedPtr();
+    return HdStBufferResourceSharedPtr();
 }
 
-HdStBufferResourceGLSharedPtr
+HdStBufferResourceSharedPtr
 HdStDispatchBuffer::_AddResource(TfToken const& name,
                                  HdTupleType tupleType,
                                  int offset,
@@ -303,14 +306,14 @@ HdStDispatchBuffer::_AddResource(TfToken const& name,
 
     if (TfDebug::IsEnabled(HD_SAFE_MODE)) {
         // duplication check
-        HdStBufferResourceGLSharedPtr bufferRes = GetResource(name);
+        HdStBufferResourceSharedPtr bufferRes = GetResource(name);
         if (!TF_VERIFY(!bufferRes)) {
             return bufferRes;
         }
     }
 
-    HdStBufferResourceGLSharedPtr bufferRes = HdStBufferResourceGLSharedPtr(
-        new HdStBufferResourceGL(GetRole(), tupleType,
+    HdStBufferResourceSharedPtr bufferRes = HdStBufferResourceSharedPtr(
+        new HdStBufferResource(GetRole(), tupleType,
                                  offset, stride));
 
     _resourceList.emplace_back(name, bufferRes);

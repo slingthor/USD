@@ -117,20 +117,8 @@ void _InitGL()
 }
 
 bool
-_IsHydraEnabled(const UsdImagingGLEngine::RenderAPI api)
+_IsHydraEnabled()
 {
-#if defined(PXR_OPENGL_SUPPORT_ENABLED)
-    if (api == UsdImagingGLEngine::OpenGL) {
-        // Make sure there is an OpenGL context when
-        // trying to initialize Hydra/Reference
-        GlfGLContextSharedPtr context = GlfGLContext::GetCurrentGLContext();
-        if (!context || !context->IsValid()) {
-            TF_CODING_ERROR("OpenGL context required, "
-                "using reference renderer");
-            return false;
-        }
-    }
-#endif
     if (!_GetHydraEnabledEnvVar()) {
         return false;
     }
@@ -169,7 +157,7 @@ UsdImagingGLEngine::ResourceFactoryGuard::~ResourceFactoryGuard() {
 bool
 UsdImagingGLEngine::IsHydraEnabled()
 {
-    static bool isHydraEnabled = _IsHydraEnabled(Unset);
+    static bool isHydraEnabled = _IsHydraEnabled();
     return isHydraEnabled;
 }
 
@@ -177,10 +165,8 @@ UsdImagingGLEngine::IsHydraEnabled()
 // Construction
 //----------------------------------------------------------------------------
 
-UsdImagingGLEngine::UsdImagingGLEngine(const RenderAPI api,
-                                       const HdDriver& driver)
-    : UsdImagingGLEngine(api,
-            SdfPath::AbsoluteRootPath(),
+UsdImagingGLEngine::UsdImagingGLEngine(const HdDriver& driver)
+    : UsdImagingGLEngine(SdfPath::AbsoluteRootPath(),
             {},
             {},
             _GetUsdImagingDelegateId(),
@@ -190,7 +176,6 @@ UsdImagingGLEngine::UsdImagingGLEngine(const RenderAPI api,
 }
 
 UsdImagingGLEngine::UsdImagingGLEngine(
-    const RenderAPI api,
     const SdfPath& rootPath,
     const SdfPathVector& excludedPaths,
     const SdfPathVector& invisedPaths,
@@ -205,7 +190,6 @@ UsdImagingGLEngine::UsdImagingGLEngine(
     , _excludedPrimPaths(excludedPaths)
     , _invisedPrimPaths(invisedPaths)
     , _isPopulated(false)
-    , _renderAPI(api)
 #if defined(PXR_METAL_SUPPORT_ENABLED)
     , _legacyImpl(nullptr)
 #endif
@@ -214,23 +198,9 @@ UsdImagingGLEngine::UsdImagingGLEngine(
 #if defined(PXR_METAL_SUPPORT_ENABLED)
     engineCountMutex.lock();
     engineCount++;
+
+    _resourceFactory = new HdStResourceFactoryMetal();
 #endif
-#if defined(PXR_METAL_SUPPORT_ENABLED)
-    if (_renderAPI == Metal) {
-        _resourceFactory = new HdStResourceFactoryMetal();
-    }
-    else
-#endif
-#if defined(PXR_OPENGL_SUPPORT_ENABLED)
-    if (_renderAPI == OpenGL) {
-		_InitGL();
-        _resourceFactory = new HdStResourceFactoryGL();
-    }
-    else
-#endif
-    {
-        TF_FATAL_CODING_ERROR("No valid rendering API specified: %d", _renderAPI);
-    }
 
     if (IsHydraEnabled()) {
 
@@ -523,20 +493,7 @@ UsdImagingGLEngine::SetCameraState(const GfMatrix4d& viewMatrix,
 void
 UsdImagingGLEngine::SetCameraStateFromOpenGL()
 {
-#if defined(PXR_OPENGL_SUPPORT_ENABLED)
-    if (_renderAPI == OpenGL) {
-        GfMatrix4d viewMatrix, projectionMatrix;
-        GfVec4d viewport;
-        glGetDoublev(GL_MODELVIEW_MATRIX, viewMatrix.GetArray());
-        glGetDoublev(GL_PROJECTION_MATRIX, projectionMatrix.GetArray());
-        glGetDoublev(GL_VIEWPORT, &viewport[0]);
-
-        SetCameraState(viewMatrix, projectionMatrix);
-		SetRenderViewport(viewport);
-    }
-#else
     TF_FATAL_CODING_ERROR("No OpenGL support available");
-#endif
 }
 
 void

@@ -28,7 +28,7 @@
 
 #include "pxr/pxr.h"
 #include "pxr/imaging/hdSt/api.h"
-#include "pxr/imaging/hdSt/program.h"
+#include "pxr/imaging/hdSt/glslProgram.h"
 #include "pxr/imaging/mtlf/mtlDevice.h"
 
 #include "pxr/imaging/hd/binding.h"
@@ -38,7 +38,7 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 class HdResourceRegistry;
-using HdStMSLProgramSharedPtr = std::shared_ptr<class HdStMSLProgram>;
+using HdStGLSLProgramMSLSharedPtr = std::shared_ptr<class HdStGLSLProgramMSL>;
 
 enum MSL_BindingType
 {
@@ -102,19 +102,19 @@ MSL_ShaderBindingMapResults MSL_FindBinding(
     TfToken const& name,
     int32_t level = -1);
 
-/// \class HdStMSLProgram
+/// \class HdStGLSLProgramMSL
 ///
 /// An instance of an MSL program.
 ///
-class HdStMSLProgram: public HdStProgram
+class HdStGLSLProgramMSL: public HdStGLSLProgram
 {
 public:
     typedef std::map<std::string, int> BindingLocationMap;
 
     HDST_API
-    HdStMSLProgram(TfToken const &role, HdStResourceRegistry *const registry);
+    HdStGLSLProgramMSL(TfToken const &role, HdStResourceRegistry *const registry);
     HDST_API
-    ~HdStMSLProgram() override;
+    ~HdStGLSLProgramMSL() override;
 
     /// Compile shader source of type
     HDST_API
@@ -127,12 +127,6 @@ public:
     /// Validate if this program is a valid progam in the current context.
     HDST_API
     bool Validate() const override;
-
-    /// Returns HdResource of the global uniform buffer object for this program.
-    HDST_API
-    HdResource const &GetGlobalUniformBuffer() const override {
-        return _uniformBuffer;
-    }
 
     /// Returns true if the program has been successfully linked.
     /// if not, returns false and fills the error log into reason.
@@ -253,7 +247,6 @@ private:
     id<MTLRenderPipelineState> _pipelineState;
 
     bool _valid;
-    HdResource  _uniformBuffer;
     MSL_ShaderBindingMap _bindingMap;
     BindingLocationMap _locationMap;
     

@@ -55,7 +55,7 @@ class UsdAppUtilsFrameRecorder
 {
 public:
     USDAPPUTILS_API
-    UsdAppUtilsFrameRecorder(UsdImagingGLEngine::RenderAPI const api);
+    UsdAppUtilsFrameRecorder();
     
     USDAPPUTILS_API
     ~UsdAppUtilsFrameRecorder();
@@ -133,7 +133,6 @@ private:
     float _complexity;
     TfToken _colorCorrectionMode;
     TfTokenVector _purposes;
-    UsdImagingGLEngine::RenderAPI _api;
 };
 
 

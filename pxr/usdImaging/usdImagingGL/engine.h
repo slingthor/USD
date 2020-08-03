@@ -95,13 +95,6 @@ class UsdImagingGLEngine
 {
 public:
 
-    enum RenderAPI {
-        Unset = -1,
-        OpenGL,
-        Metal,
-        NumRenderers
-    };
-
     // ---------------------------------------------------------------------
     /// \name Global State
     /// @{
@@ -126,12 +119,10 @@ public:
     /// in during construction. This can be helpful if you application creates
     /// multiple UsdImagingGLEngine that wish to use the same HdDriver / Hgi.
     USDIMAGINGGL_API
-    UsdImagingGLEngine(const RenderAPI api,
-	                   const HdDriver& driver = HdDriver());
+    UsdImagingGLEngine(const HdDriver& driver = HdDriver());
 
     USDIMAGINGGL_API
-    UsdImagingGLEngine(const RenderAPI api,
-                       const SdfPath& rootPath,
+    UsdImagingGLEngine(const SdfPath& rootPath,
                        const SdfPathVector& excludedPaths,
                        const SdfPathVector& invisedPaths=SdfPathVector(),
                        const SdfPath& sceneDelegateID =
@@ -577,8 +568,6 @@ protected:
     SdfPathVector _invisedPrimPaths;
     bool _isPopulated;
 
-    RenderAPI _renderAPI;
-    
     // An implementation of much of the engine functionality that doesn't
     // invoke any of the advanced Hydra features.  It is kept around for 
     // backwards compatibility and may one day be deprecated.  Most of the 

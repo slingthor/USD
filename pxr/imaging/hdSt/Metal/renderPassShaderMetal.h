@@ -51,11 +51,11 @@ public:
 protected:
 
     HDST_API
-    virtual void BindResources(HdStProgram const &program,
+    virtual void BindResources(HdStGLSLProgram const &program,
                                HdSt_ResourceBinder const &binder,
                                HdRenderPassState const &state) override;
     HDST_API
-    virtual void UnbindResources(HdStProgram const &program,
+    virtual void UnbindResources(HdStGLSLProgram const &program,
                                  HdSt_ResourceBinder const &binder,
                                  HdRenderPassState const &state) override;
 

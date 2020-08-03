@@ -23,7 +23,7 @@
 //
 #include "pxr/imaging/glf/glew.h"
 
-#include "pxr/imaging/hdSt/program.h"
+#include "pxr/imaging/hdSt/glslProgram.h"
 #include "pxr/imaging/hdSt/package.h"
 #include "pxr/imaging/hdSt/resourceFactory.h"
 #include "pxr/imaging/hdSt/resourceRegistry.h"
@@ -39,7 +39,7 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-HdStProgram::HdStProgram(TfToken const &role,
+HdStGLSLProgram::HdStGLSLProgram(TfToken const &role,
                          HdStResourceRegistry* resourceRegistry)
 : _role(role)
 , _registry(resourceRegistry)
@@ -47,13 +47,13 @@ HdStProgram::HdStProgram(TfToken const &role,
 
 }
 
-HdStProgram::~HdStProgram() {
+HdStGLSLProgram::~HdStGLSLProgram() {
     
 }
 
 /* static */
-HdStProgram::ID
-HdStProgram::ComputeHash(TfToken const &sourceFile)
+HdStGLSLProgram::ID
+HdStGLSLProgram::ComputeHash(TfToken const &sourceFile)
 {
     HD_TRACE_FUNCTION();
 
@@ -64,8 +64,8 @@ HdStProgram::ComputeHash(TfToken const &sourceFile)
     return hash;
 }
 
-HdStProgramSharedPtr
-HdStProgram::GetComputeProgram(
+HdStGLSLProgramSharedPtr
+HdStGLSLProgram::GetComputeProgram(
     TfToken const &shaderToken,
     HdStResourceRegistry *resourceRegistry)
 {
@@ -73,20 +73,20 @@ HdStProgram::GetComputeProgram(
                              resourceRegistry);
 }
 
-HdStProgramSharedPtr
-HdStProgram::GetComputeProgram(
+HdStGLSLProgramSharedPtr
+HdStGLSLProgram::GetComputeProgram(
     TfToken const &shaderFileName,
     TfToken const &shaderToken,
     HdStResourceRegistry *resourceRegistry)
 {
     // Find the program from registry
-    HdInstance<HdStProgramSharedPtr> programInstance =
-                resourceRegistry->RegisterProgram(
-                        HdStProgram::ComputeHash(shaderToken));
+    HdInstance<HdStGLSLProgramSharedPtr> programInstance =
+                resourceRegistry->RegisterGLSLProgram(
+                        HdStGLSLProgram::ComputeHash(shaderToken));
 
     if (programInstance.IsFirstInstance()) {
         // if not exists, create new one
-        HdStProgramSharedPtr newProgram(
+        HdStGLSLProgramSharedPtr newProgram(
             HdStResourceFactory::GetInstance()->NewProgram(
                 HdTokens->computeShader, resourceRegistry));
         
@@ -96,18 +96,18 @@ HdStProgram::GetComputeProgram(
         if (!glslfx->IsValid(&errorString)){
             TF_CODING_ERROR("Failed to parse " + shaderFileName.GetString()
                             + ": " + errorString);
-            return HdStProgramSharedPtr();
+            return HdStGLSLProgramSharedPtr();
         }
 
         std::string header = newProgram->GetComputeHeader();
         if (!newProgram->CompileShader(
                 HgiShaderStageCompute, header + glslfx->GetSource(shaderToken))) {
             TF_CODING_ERROR("Fail to compile " + shaderToken.GetString());
-            return HdStProgramSharedPtr();
+            return HdStGLSLProgramSharedPtr();
         }
         if (!newProgram->Link()) {
             TF_CODING_ERROR("Fail to link " + shaderToken.GetString());
-            return HdStProgramSharedPtr();
+            return HdStGLSLProgramSharedPtr();
         }
         programInstance.SetValue(newProgram);
     }

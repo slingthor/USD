@@ -28,7 +28,7 @@
 #include "pxr/imaging/hdSt/api.h"
 #include "pxr/imaging/hd/version.h"
 #include "pxr/imaging/hd/bufferArray.h"
-#include "pxr/imaging/hdSt/bufferArrayRangeGL.h"
+#include "pxr/imaging/hdSt/bufferArrayRange.h"
 #include "pxr/imaging/hd/bufferSpec.h"
 #include "pxr/imaging/hd/bufferSource.h"
 #include "pxr/imaging/hd/strategyBase.h"
@@ -41,7 +41,7 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-class Hgi;
+class HdStResourceRegistry;
 
 /// \class HdStVBOMemoryManager
 ///
@@ -49,9 +49,9 @@ class Hgi;
 ///
 class HdStVBOMemoryManager : public HdAggregationStrategy {
 public:
-    HdStVBOMemoryManager(Hgi *hgi)
+    HdStVBOMemoryManager(HdStResourceRegistry *resourceRegistry)
     : HdAggregationStrategy()
-    , _hgi(hgi) {}
+    , _resourceRegistry(resourceRegistry) {}
 
     /// Factory for creating HdBufferArray managed by
     /// HdStVBOMemoryManager aggregation.
@@ -85,7 +85,7 @@ protected:
     class _StripedBufferArray;
 
     /// specialized buffer array range
-    class _StripedBufferArrayRange : public HdStBufferArrayRangeGL {
+    class _StripedBufferArrayRange : public HdStBufferArrayRange {
     public:
         /// Constructor.
         _StripedBufferArrayRange()
@@ -160,15 +160,15 @@ protected:
         /// Returns the GPU resource. If the buffer array contains more than one
         /// resource, this method raises a coding error.
         HDST_API
-        virtual HdStBufferResourceGLSharedPtr GetResource() const;
+        virtual HdStBufferResourceSharedPtr GetResource() const;
 
         /// Returns the named GPU resource.
         HDST_API
-        virtual HdStBufferResourceGLSharedPtr GetResource(TfToken const& name);
+        virtual HdStBufferResourceSharedPtr GetResource(TfToken const& name);
 
         /// Returns the list of all named GPU resources for this bufferArrayRange.
         HDST_API
-        virtual HdStBufferResourceGLNamedList const& GetResources() const;
+        virtual HdStBufferResourceNamedList const& GetResources() const;
 
         /// Sets the buffer array associated with this buffer;
         HDST_API
@@ -210,7 +210,7 @@ protected:
 
     private:
         // Returns the byte offset at which the BAR begins for the resource.
-        size_t _GetByteOffset(HdStBufferResourceGLSharedPtr const& resource)
+        size_t _GetByteOffset(HdStBufferResourceSharedPtr const& resource)
             const;
 
         // holding a weak reference to container.
@@ -234,7 +234,7 @@ protected:
     public:
         /// Constructor.
         HDST_API
-        _StripedBufferArray(Hgi* _hgi,
+        _StripedBufferArray(HdStResourceRegistry* _resourceRegistry,
                             TfToken const &role,
                             HdBufferSpecVector const &bufferSpecs,
                             HdBufferArrayUsageHint usageHint);
@@ -281,25 +281,26 @@ protected:
         /// Returns the GPU resource. If the buffer array contains more than one
         /// resource, this method raises a coding error.
         HDST_API
-        HdStBufferResourceGLSharedPtr GetResource() const;
+        HdStBufferResourceSharedPtr GetResource() const;
 
         /// Returns the named GPU resource. This method returns the first found
         /// resource. In HD_SAFE_MODE it checks all underlying GL buffers
         /// in _resourceMap and raises a coding error if there are more than
         /// one GL buffers exist.
         HDST_API
-        HdStBufferResourceGLSharedPtr GetResource(TfToken const& name);
+        HdStBufferResourceSharedPtr GetResource(TfToken const& name);
 
         /// Returns the list of all named GPU resources for this bufferArray.
-        HdStBufferResourceGLNamedList const& GetResources() const 
+        HdStBufferResourceNamedList const& GetResources() const 
             {return _resourceList;}
 
         /// Reconstructs the bufferspecs and returns it (for buffer splitting)
         HDST_API
         HdBufferSpecVector GetBufferSpecs() const;
         
-        /// APPLE METAL: HGI accessor needed for _StripedBufferArrayRange::CopyData()
-        Hgi* GetHgi() { return _hgi; }
+        /// APPLE METAL: HGI accessors needed for _StripedBufferArrayRange::CopyData()
+        Hgi* GetHgi() { return _resourceRegistry->GetHgi(); }
+        HgiBlitCmds* GetBlitCmds() { return _resourceRegistry->GetBlitCmds(); }
 
     protected:
         HDST_API
@@ -307,19 +308,19 @@ protected:
 
         /// Adds a new, named GPU resource and returns it.
         HDST_API
-        HdStBufferResourceGLSharedPtr _AddResource(TfToken const& name,
+        HdStBufferResourceSharedPtr _AddResource(TfToken const& name,
                                                    HdTupleType tupleType,
                                                    int offset,
                                                    int stride);
 
     private:
 
-        Hgi* _hgi;
+        HdStResourceRegistry* _resourceRegistry;
         bool _needsCompaction;
         int _totalCapacity;
         size_t _maxBytesPerElement;
 
-        HdStBufferResourceGLNamedList _resourceList;
+        HdStBufferResourceNamedList _resourceList;
 
         // Helper routine to cast the range shared pointer.
         _StripedBufferArrayRangeSharedPtr _GetRangeSharedPtr(size_t idx) const {
@@ -327,7 +328,7 @@ protected:
         }
     };
     
-    Hgi* _hgi;
+    HdStResourceRegistry* _resourceRegistry;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

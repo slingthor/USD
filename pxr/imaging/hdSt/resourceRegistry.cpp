@@ -29,7 +29,7 @@
 
 #include "pxr/imaging/hdSt/copyComputation.h"
 #include "pxr/imaging/hdSt/dispatchBuffer.h"
-#include "pxr/imaging/hdSt/program.h"
+#include "pxr/imaging/hdSt/glslProgram.h"
 #include "pxr/imaging/hdSt/interleavedMemoryManager.h"
 #include "pxr/imaging/hdSt/persistentBuffer.h"
 #include "pxr/imaging/hdSt/resourceFactory.h"
@@ -41,10 +41,15 @@
 #include "pxr/imaging/hdSt/textureHandleRegistry.h"
 #include "pxr/imaging/hdSt/textureObjectRegistry.h"
 
+#include "pxr/imaging/hgi/hgi.h"
+
 #include "pxr/imaging/hd/engine.h"
 #include "pxr/imaging/hd/tokens.h"
 
 #include "pxr/base/tf/envSetting.h"
+
+// APPLE METAL: Remove once cast to HgiMetal is gone
+#include "pxr/imaging/hgiMetal/hgi.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -98,18 +103,18 @@ HdStResourceRegistry::HdStResourceRegistry(Hgi * const hgi)
     , _numBufferSourcesToResolve(0)
     // default aggregation strategies for varying (vertex, varying) primvars
     , _nonUniformAggregationStrategy(
-        std::make_unique<HdStVBOMemoryManager>(_hgi))
+        std::make_unique<HdStVBOMemoryManager>(this))
     , _nonUniformImmutableAggregationStrategy(
-        std::make_unique<HdStVBOMemoryManager>(_hgi))
+        std::make_unique<HdStVBOMemoryManager>(this))
     // default aggregation strategy for uniform on UBO (for globals)
     , _uniformUboAggregationStrategy(
-        std::make_unique<HdStInterleavedUBOMemoryManager>(_hgi))
+        std::make_unique<HdStInterleavedUBOMemoryManager>(this))
     // default aggregation strategy for uniform on SSBO (for primvars)
     , _uniformSsboAggregationStrategy(
-        std::make_unique<HdStInterleavedSSBOMemoryManager>(_hgi))
+        std::make_unique<HdStInterleavedSSBOMemoryManager>(this))
     // default aggregation strategy for single buffers (for nested instancer)
     , _singleAggregationStrategy(
-        std::make_unique<HdStVBOSimpleMemoryManager>(_hgi))
+        std::make_unique<HdStVBOSimpleMemoryManager>(this))
     , _textureHandleRegistry(std::make_unique<HdSt_TextureHandleRegistry>(hgi))
 {
 }
@@ -468,7 +473,7 @@ HdStResourceRegistry::RegisterDispatchBuffer(
 {
     HdStDispatchBufferSharedPtr const result =
         std::make_shared<HdStDispatchBuffer>(
-            _hgi, role, count, commandNumUints);
+            this, role, count, commandNumUints);
 
     _dispatchBufferRegistry.push_back(result);
 
@@ -593,11 +598,11 @@ HdStResourceRegistry::RegisterGeometricShader(
     return _geometricShaderRegistry.GetInstance(id);
 }
 
-HdInstance<HdStProgramSharedPtr>
-HdStResourceRegistry::RegisterProgram(
-        HdInstance<HdStProgramSharedPtr>::ID id)
+HdInstance<HdStGLSLProgramSharedPtr>
+HdStResourceRegistry::RegisterGLSLProgram(
+        HdInstance<HdStGLSLProgramSharedPtr>::ID id)
 {
-    return _programRegistry.GetInstance(id);
+    return _glslProgramRegistry.GetInstance(id);
 }
 
 HdInstance<HdStTextureResourceHandleSharedPtr>
@@ -614,6 +619,27 @@ HdStResourceRegistry::FindTextureResourceHandle(
     return _textureResourceHandleRegistry.FindInstance(id, found);
 }
 
+HdInstance<HgiResourceBindingsSharedPtr>
+HdStResourceRegistry::RegisterResourceBindings(
+    HdInstance<HgiResourceBindingsSharedPtr>::ID id)
+{
+    return _resourceBindingsRegistry.GetInstance(id);
+}
+
+HdInstance<HgiGraphicsPipelineSharedPtr>
+HdStResourceRegistry::RegisterGraphicsPipeline(
+    HdInstance<HgiGraphicsPipelineSharedPtr>::ID id)
+{
+    return _graphicsPipelineRegistry.GetInstance(id);
+}
+
+HdInstance<HgiComputePipelineSharedPtr>
+HdStResourceRegistry::RegisterComputePipeline(
+    HdInstance<HgiComputePipelineSharedPtr>::ID id)
+{
+    return _computePipelineRegistry.GetInstance(id);
+}
+
 std::ostream &operator <<(
     std::ostream &out,
     const HdStResourceRegistry& self)
@@ -627,6 +653,45 @@ std::ostream &operator <<(
     out << self._singleBufferArrayRegistry;
 
     return out;
+}
+
+HgiComputeCmds*
+HdStResourceRegistry::GetComputeCmds()
+{
+    if (_blitCmds) {
+        _hgi->SubmitCmds(_blitCmds.get());
+        _blitCmds.reset();
+    }
+    if (!_computeCmds) {
+        _computeCmds = _hgi->CreateComputeCmds();
+    }
+    return _computeCmds.get();
+}
+
+HgiBlitCmds*
+HdStResourceRegistry::GetBlitCmds()
+{
+    if (_computeCmds) {
+        _hgi->SubmitCmds(_computeCmds.get());
+        _computeCmds.reset();
+    }
+    if (!_blitCmds) {
+        _blitCmds = _hgi->CreateBlitCmds();
+    }
+    return _blitCmds.get();
+}
+
+void HdStResourceRegistry::SubmitHgiWork()
+{
+    // submit the work queued by the computations
+    if (_blitCmds) {
+        _hgi->SubmitCmds(_blitCmds.get());
+        _blitCmds.reset();
+    }
+    if (_computeCmds) {
+        _hgi->SubmitCmds(_computeCmds.get());
+        _computeCmds.reset();
+    }
 }
 
 void
@@ -734,6 +799,10 @@ HdStResourceRegistry::_Commit()
         }
     }
 
+    // APPLE METAL: Only here to ensure Mtlf flushes it's buffer updates
+//    HgiMetal* hgiMetal = static_cast<HgiMetal*>(_hgi);
+//    hgiMetal->CommitCommandBuffer(HgiMetal::CommitCommandBuffer_NoWait, true);
+
     {
         HD_TRACE_SCOPE("Reallocate buffer arrays");
         // 3. reallocation phase:
@@ -808,6 +877,8 @@ HdStResourceRegistry::_Commit()
         }
     }
 
+    SubmitHgiWork();
+    
     // release sources
     WorkParallelForEach(_pendingSources.begin(), _pendingSources.end(),
                         [](_PendingSource &ps) {
@@ -873,8 +944,13 @@ HdStResourceRegistry::_GarbageCollect()
 
     // Cleanup Shader registries
     _geometricShaderRegistry.GarbageCollect();
-    _programRegistry.GarbageCollect();
+    _glslProgramRegistry.GarbageCollect();
     _textureResourceHandleRegistry.GarbageCollect();
+
+    // Cleanup Hgi resources bindings and pipelines
+    _resourceBindingsRegistry.GarbageCollect();
+    _graphicsPipelineRegistry.GarbageCollect();
+    _computePipelineRegistry.GarbageCollect();
 
     // cleanup buffer array
     // buffer array retains weak_ptrs of range. All unused ranges should be
@@ -884,6 +960,10 @@ HdStResourceRegistry::_GarbageCollect()
     _uniformUboBufferArrayRegistry.GarbageCollect();
     _uniformSsboBufferArrayRegistry.GarbageCollect();
     _singleBufferArrayRegistry.GarbageCollect();
+    
+    // submit the blit work queued by the computations
+    _hgi->SubmitCmds(_blitCmds.get());
+    _blitCmds.reset();
 }
 
 void
@@ -1023,15 +1103,15 @@ HdStResourceRegistry::_TallyResourceAllocation(VtDictionary *result) const
     }
 
     // glsl program & ubo allocation
-    for (auto const & it: _programRegistry) {
-        HdStProgramSharedPtr const & program = it.second.value;
+    for (auto const & it: _glslProgramRegistry) {
+        HdStGLSLProgramSharedPtr const & program = it.second.value;
         // In the event of a compile or link error, programs can be null
         if (!program) {
             continue;
         }
-        size_t size =
-            program->GetProgramSize() +
-            program->GetGlobalUniformBuffer().GetSize();
+
+        HgiShaderProgramHandle const& prgHandle =  program->GetProgram();
+        size_t size = prgHandle ? prgHandle->GetByteSizeOfResource() : 0;
 
         // the role of program and global uniform buffer is always same.
         std::string const &role = program->GetRole().GetString();

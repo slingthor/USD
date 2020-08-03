@@ -58,14 +58,14 @@ protected:
     HDST_API
     virtual void _GPUFrustumInstanceCullingExecute(
                        HdStResourceRegistrySharedPtr const &resourceRegistry,
-                       HdStProgramSharedPtr const &program,
+                       HdStGLSLProgramSharedPtr const &program,
                        HdSt_ResourceBinder const &binder,
                        HdBufferResourceSharedPtr cullCommandBuffer) override;
     
     HDST_API
     virtual void _GPUFrustumNonInstanceCullingExecute(
                       HdStResourceRegistrySharedPtr const &resourceRegistry,
-                      HdStProgramSharedPtr const &program,
+                      HdStGLSLProgramSharedPtr const &program,
                       HdSt_ResourceBinder const &binder) override;
 
     HDST_API
@@ -77,7 +77,7 @@ protected:
         virtual ~_CullingProgramGL() {}
 
     protected:
-        virtual bool _Link(HdStProgramSharedPtr const & program) override;
+        virtual bool _Link(HdStGLSLProgramSharedPtr const & program) override;
         
         friend class HdSt_IndirectDrawBatch::_CullingProgram;
     };

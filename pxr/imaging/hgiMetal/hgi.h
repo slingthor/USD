@@ -27,7 +27,6 @@
 #include "pxr/pxr.h"
 #include "pxr/imaging/hgiMetal/api.h"
 #include "pxr/imaging/hgi/hgi.h"
-#include "pxr/imaging/hgi/texture.h"
 #include "pxr/imaging/hgi/tokens.h"
 
 #import <Metal/Metal.h>
@@ -210,8 +209,6 @@ public:
     
     int _sampleCount;
     bool _needsFlip;
-    bool _useFinalTextureForGetImage;
-    id<MTLTexture> _finalTexture;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

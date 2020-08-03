@@ -68,7 +68,7 @@ public:
 
     /// Execute Hgi buffer copy command to flush all scheduled range copies.
     HDST_API
-    void Commit(class Hgi* hgi);
+    void Commit(class HgiBlitCmds* blitCmds);
 
 private:
     struct _CopyUnit {
@@ -90,8 +90,8 @@ private:
     };
 
     std::vector<_CopyUnit> _queue;
-    HgiBufferHandle const& _srcBuffer;
-    HgiBufferHandle const& _dstBuffer;
+    HgiBufferHandle _srcBuffer;
+    HgiBufferHandle _dstBuffer;
 };
 
 

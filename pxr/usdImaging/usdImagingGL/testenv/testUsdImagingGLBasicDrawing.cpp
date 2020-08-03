@@ -103,7 +103,6 @@ My_TestGLDrawing::InitTest()
     if (UsdImagingGLEngine::IsHydraEnabled()) {
         std::cout << "Using HD Renderer.\n";
         _engine.reset(new UsdImagingGLEngine(
-            PXR_UNITTEST_GFX_ARCH,
             _stage->GetPseudoRoot().GetPath(),
             excludedPaths));
         if (!_GetRenderer().IsEmpty()) {
@@ -120,7 +119,6 @@ My_TestGLDrawing::InitTest()
         std::cout << "Using Reference Renderer.\n"; 
         _engine.reset(
             new UsdImagingGLEngine(
-                    PXR_UNITTEST_GFX_ARCH,
                     _stage->GetPseudoRoot().GetPath(),
                     excludedPaths));
     }

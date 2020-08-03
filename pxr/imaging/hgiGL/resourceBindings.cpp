@@ -107,9 +107,8 @@ HgiGLResourceBindings::BindResources()
             dst->resize(unit+1, 0);
         }
         HgiBufferHandle const& bufHandle = bufDesc.buffers.front();
-        HgiGLBuffer* glbuffer = static_cast<HgiGLBuffer*>(bufHandle.Get());
 
-        (*dst)[bufDesc.bindingIndex] = glbuffer->GetBufferId();
+        (*dst)[bufDesc.bindingIndex] = bufHandle->GetRawResource();
     }
 
     if (!ubos.empty()) {

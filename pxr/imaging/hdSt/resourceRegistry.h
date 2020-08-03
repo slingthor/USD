@@ -49,7 +49,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 using HdComputationSharedPtr = std::shared_ptr<class HdComputation>;
 using HdStDispatchBufferSharedPtr = std::shared_ptr<class HdStDispatchBuffer>;
-using HdStProgramSharedPtr = std::shared_ptr<class HdStProgram>;
+using HdStGLSLProgramSharedPtr = std::shared_ptr<class HdStGLSLProgram>;
 
 using HdSt_BasisCurvesTopologySharedPtr =
     std::shared_ptr<class HdSt_BasisCurvesTopology>;
@@ -76,6 +76,13 @@ using Hd_VertexAdjacencySharedPtr =
     std::shared_ptr<class Hd_VertexAdjacency>;
 using HdSt_MeshTopologySharedPtr = 
     std::shared_ptr<class HdSt_MeshTopology>;
+using HgiResourceBindingsSharedPtr = 
+    std::shared_ptr<HgiResourceBindingsHandle>;
+using HgiGraphicsPipelineSharedPtr = 
+    std::shared_ptr<HgiGraphicsPipelineHandle>;
+using HgiComputePipelineSharedPtr = 
+    std::shared_ptr<HgiComputePipelineHandle>;
+
 class HdStTextureIdentifier;
 class HdSamplerParameters;
 
@@ -377,8 +384,8 @@ public:
 
     /// Register a GLSL program into the program registry.
     HDST_API
-    HdInstance<HdStProgramSharedPtr>
-    RegisterProgram(HdInstance<HdStProgramSharedPtr>::ID id);
+    HdInstance<HdStGLSLProgramSharedPtr>
+    RegisterGLSLProgram(HdInstance<HdStGLSLProgramSharedPtr>::ID id);
 
     /// Register a texture resource handle.
     HDST_API
@@ -391,6 +398,30 @@ public:
     HdInstance<HdStTextureResourceHandleSharedPtr>
     FindTextureResourceHandle(
         HdInstance<HdStTextureResourceHandleSharedPtr>::ID id, bool *found);
+
+    /// Register a Hgi resource bindings into the registry.
+    HDST_API
+    HdInstance<HgiResourceBindingsSharedPtr>
+    RegisterResourceBindings(HdInstance<HgiResourceBindingsSharedPtr>::ID id);
+
+    /// Register a Hgi graphics pipeline into the registry.
+    HDST_API
+    HdInstance<HgiGraphicsPipelineSharedPtr>
+    RegisterGraphicsPipeline(HdInstance<HgiGraphicsPipelineSharedPtr>::ID id);
+
+    /// Register a Hgi compute pipeline into the registry.
+    HDST_API
+    HdInstance<HgiComputePipelineSharedPtr>
+    RegisterComputePipeline(HdInstance<HgiComputePipelineSharedPtr>::ID id);
+
+    /// Returns the global hgi compute command queue for registering computation work
+    HgiComputeCmds* GetComputeCmds();
+    
+    /// Returns the global hgi blit command queue for registering blitting work
+    HgiBlitCmds* GetBlitCmds();
+    
+    /// Submits any queued compute/blit work for GPU execution
+    void SubmitHgiWork();
 
 public:
     //
@@ -575,8 +606,8 @@ private:
         _geometricShaderRegistry;
 
     // glsl shader program registry
-    HdInstanceRegistry<HdStProgramSharedPtr>
-        _programRegistry;
+    HdInstanceRegistry<HdStGLSLProgramSharedPtr>
+        _glslProgramRegistry;
 
     // texture resource handle registry
     HdInstanceRegistry<HdStTextureResourceHandleSharedPtr>
@@ -584,6 +615,21 @@ private:
 
     // texture handle registry
     std::unique_ptr<class HdSt_TextureHandleRegistry> _textureHandleRegistry;
+
+    // Hgi resource bindings registry
+    HdInstanceRegistry<HgiResourceBindingsSharedPtr>
+        _resourceBindingsRegistry;
+
+    // Hgi graphics pipeline registry
+    HdInstanceRegistry<HgiGraphicsPipelineSharedPtr>
+        _graphicsPipelineRegistry;
+
+    // Hgi compute pipeline registry
+    HdInstanceRegistry<HgiComputePipelineSharedPtr>
+        _computePipelineRegistry;
+
+    HgiComputeCmdsUniquePtr _computeCmds;
+    HgiBlitCmdsUniquePtr _blitCmds;
 };
 
 

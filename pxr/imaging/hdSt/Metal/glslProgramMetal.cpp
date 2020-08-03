@@ -30,15 +30,17 @@
 
 #include "pxr/imaging/hdSt/debugCodes.h"
 #include "pxr/imaging/hdSt/Metal/codeGenMSL.h"
-#include "pxr/imaging/hdSt/Metal/mslProgram.h"
+#include "pxr/imaging/hdSt/Metal/glslProgramMetal.h"
 #include "pxr/imaging/hdSt/package.h"
+#include "pxr/imaging/hdSt/resourceRegistry.h"
 #include "pxr/imaging/hdSt/surfaceShader.h"
 #include "pxr/imaging/hdSt/textureResourceHandle.h"
 #include "pxr/imaging/hdSt/textureResource.h"
 
 #include "pxr/imaging/hd/perfLog.h"
-#include "pxr/imaging/hd/resourceRegistry.h"
 #include "pxr/imaging/hd/tokens.h"
+
+#include "pxr/imaging/hgiMetal/shaderFunction.h"
 
 #include "pxr/base/tf/diagnostic.h"
 
@@ -136,13 +138,12 @@ MSL_ShaderBinding const* MSL_FindBinding(MSL_ShaderBindingMap const& bindings,
 }
 
 
-HdStMSLProgram::HdStMSLProgram(
+HdStGLSLProgramMSL::HdStGLSLProgramMSL(
     TfToken const &role,
     HdStResourceRegistry *const registry)
-    : HdStProgram(role, registry)
+    : HdStGLSLProgram(role, registry)
 , _role(role)
 , _valid(false)
-, _uniformBuffer(role)
 , _buildTarget(kMSL_BuildTarget_Regular)
 , _gsVertOutBufferSlot(-1), _gsPrimOutBufferSlot(-1), _gsVertOutStructSize(-1), _gsPrimOutStructSize(-1)
 , _drawArgsSlot(-1), _indicesSlot(-1), _fragExtrasSlot(-1)
@@ -155,7 +156,7 @@ HdStMSLProgram::HdStMSLProgram(
     _computeGeometryFunction = 0;
 }
 
-HdStMSLProgram::~HdStMSLProgram()
+HdStGLSLProgramMSL::~HdStGLSLProgramMSL()
 {
     for(auto it = _bindingMap.begin(); it != _bindingMap.end(); ++it)
         delete (*it).second;
@@ -169,6 +170,15 @@ HdStMSLProgram::~HdStMSLProgram()
         [_computeFunction release];
     if (_computeGeometryFunction)
         [_computeGeometryFunction release];
+    
+    Hgi *const hgi = _registry->GetHgi();
+
+    if (_program) {
+        for (HgiShaderFunctionHandle fn : _program->GetShaderFunctions()) {
+            hgi->DestroyShaderFunction(&fn);
+        }
+        hgi->DestroyShaderProgram(&_program);
+    }
 }
 
 #if defined(GENERATE_METAL_DEBUG_SOURCE_CODE)
@@ -176,10 +186,10 @@ HdStMSLProgram::~HdStMSLProgram()
 NSUInteger dumpedFileCount = 0;
 
 static std::mutex _DebugDumpSourceMutex;
-const HdStProgram* previousProgram = 0;
+const HdStGLSLProgram* previousProgram = 0;
 NSUInteger totalPrograms = 0;
 
-void DumpMetalSource(const HdStProgram* program, NSString *metalSrc, NSString *fileSuffix, NSString *compilerMessages)
+void DumpMetalSource(const HdStGLSLProgram* program, NSString *metalSrc, NSString *fileSuffix, NSString *compilerMessages)
 {
     std::lock_guard<std::mutex> lock(_DebugDumpSourceMutex);
 
@@ -216,7 +226,7 @@ void DumpMetalSource(const HdStProgram* program, NSString *metalSrc, NSString *f
     NSLog(@"Dumping Metal Source to %@", srcDumpFilePath);
 }
 
-NSString *LoadPreviousMetalSource(const HdStProgram* program, NSString *metalSrc, NSString *fileSuffix)
+NSString *LoadPreviousMetalSource(const HdStGLSLProgram* program, NSString *metalSrc, NSString *fileSuffix)
 {
     std::lock_guard<std::mutex> lock(_DebugDumpSourceMutex);
 
@@ -253,7 +263,7 @@ NSString *LoadPreviousMetalSource(const HdStProgram* program, NSString *metalSrc
 #endif
 
 bool
-HdStMSLProgram::CompileShader(HgiShaderStage stage,
+HdStGLSLProgramMSL::CompileShader(HgiShaderStage stage,
                               std::string const &shaderSourceOriginal)
 {
     HD_TRACE_FUNCTION();
@@ -359,6 +369,22 @@ HdStMSLProgram::CompileShader(HgiShaderStage stage,
 
     [options release];
     options = nil;
+    
+    Hgi *const hgi = _registry->GetHgi();
+
+    // Create a shader, compile it
+    HgiShaderFunctionDesc shaderFnDesc;
+    shaderFnDesc.shaderCode = nullptr;
+    shaderFnDesc.shaderStage = stage;
+    HgiShaderFunctionHandle shaderFn = hgi->CreateShaderFunction(shaderFnDesc);
+    
+    HgiMetalShaderFunction* metalShaderFn =
+        static_cast<HgiMetalShaderFunction*>(shaderFn.Get());
+    metalShaderFn->SetShaderId(function);
+
+    // Store the shader function in the program descriptor so it can be used
+    // during Link time.
+    _programDesc.shaderFunctions.push_back(shaderFn);
 
     //MTL_FIXME: Remove this debug line once done.
     DumpMetalSource(this, [NSString stringWithUTF8String:shaderSource.c_str()], [NSString stringWithUTF8String:filePostFix.c_str()], error != nil ? [error localizedDescription] : nil);
@@ -367,7 +393,7 @@ HdStMSLProgram::CompileShader(HgiShaderStage stage,
 }
 
 bool
-HdStMSLProgram::Link()
+HdStGLSLProgramMSL::Link()
 {
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
@@ -406,23 +432,32 @@ HdStMSLProgram::Link()
                 _fragExtrasSlot = binding._index;
         }
     }
+    
+    Hgi *const hgi = _registry->GetHgi();
+
+    // Create the shader program.
+    if (_program) {
+        hgi->DestroyShaderProgram(&_program);
+    }
+    _program = hgi->CreateShaderProgram(_programDesc);
+
 
     return true;
 }
 
 bool
-HdStMSLProgram::GetProgramLinkStatus(std::string * reason) const
+HdStGLSLProgramMSL::GetProgramLinkStatus(std::string * reason) const
 {
     return _valid;
 }
 
 bool
-HdStMSLProgram::Validate() const
+HdStGLSLProgramMSL::Validate() const
 {
     return _valid;
 }
 
-void HdStMSLProgram::AssignUniformBindings(GarchBindingMapRefPtr bindingMap) const
+void HdStGLSLProgramMSL::AssignUniformBindings(GarchBindingMapRefPtr bindingMap) const
 {
     MtlfBindingMapRefPtr mtlfBindingMap(TfDynamic_cast<MtlfBindingMapRefPtr>(bindingMap));
     
@@ -439,7 +474,7 @@ void HdStMSLProgram::AssignUniformBindings(GarchBindingMapRefPtr bindingMap) con
     }
 }
 
-void HdStMSLProgram::AssignSamplerUnits(GarchBindingMapRefPtr bindingMap) const
+void HdStGLSLProgramMSL::AssignSamplerUnits(GarchBindingMapRefPtr bindingMap) const
 {
     //Samplers really means OpenGL style samplers (ancient style) where a sampler is both a texture and an actual sampler.
     //For us this means a texture always needs to have an accompanying sampler that is bound to the same slot index.
@@ -460,7 +495,7 @@ void HdStMSLProgram::AssignSamplerUnits(GarchBindingMapRefPtr bindingMap) const
     }
 }
 
-void HdStMSLProgram::AddBinding(std::string const &name, int index,
+void HdStGLSLProgramMSL::AddBinding(std::string const &name, int index,
     HdBinding const &binding, MSL_BindingType bindingType,
     MSL_ProgramStage programStage, int offsetWithinResource,
     int uniformBufferSize)
@@ -472,7 +507,7 @@ void HdStMSLProgram::AddBinding(std::string const &name, int index,
     _bindingMap.insert(std::make_pair(newBinding->_nameToken.Hash(), newBinding));
 }
 
-void HdStMSLProgram::UpdateUniformBinding(std::string const &name, int index)
+void HdStGLSLProgramMSL::UpdateUniformBinding(std::string const &name, int index)
 {
     TfToken nameToken(name);
     auto it_range = _bindingMap.equal_range(nameToken.Hash());
@@ -486,7 +521,7 @@ void HdStMSLProgram::UpdateUniformBinding(std::string const &name, int index)
     TF_FATAL_CODING_ERROR("Failed to find binding %s", name.c_str());
 }
 
-void HdStMSLProgram::AddCustomBindings(GarchBindingMapRefPtr bindingMap) const
+void HdStGLSLProgramMSL::AddCustomBindings(GarchBindingMapRefPtr bindingMap) const
 {
     MtlfBindingMapRefPtr mtlfBindingMap(TfDynamic_cast<MtlfBindingMapRefPtr>(bindingMap));
     
@@ -494,7 +529,7 @@ void HdStMSLProgram::AddCustomBindings(GarchBindingMapRefPtr bindingMap) const
 }
 
 void
-HdStMSLProgram::BindTexture(
+HdStGLSLProgramMSL::BindTexture(
     const TfToken &name,
     id<MTLTexture> textureId) const
 {
@@ -520,7 +555,7 @@ HdStMSLProgram::BindTexture(
 }
 
 void
-HdStMSLProgram::BindSampler(
+HdStGLSLProgramMSL::BindSampler(
     const TfToken &name,
     id<MTLSamplerState> samplerId) const
 {
@@ -545,7 +580,7 @@ HdStMSLProgram::BindSampler(
         samplerBinding->_stage);
 }
 
-void HdStMSLProgram::BindResources(HdStSurfaceShader* surfaceShader, HdSt_ResourceBinder const &binder) const
+void HdStGLSLProgramMSL::BindResources(HdStSurfaceShader* surfaceShader, HdSt_ResourceBinder const &binder) const
 {
     // XXX: there's an issue where other shaders try to use textures.
     std::string textureName;
@@ -579,12 +614,12 @@ void HdStMSLProgram::BindResources(HdStSurfaceShader* surfaceShader, HdSt_Resour
     }
 }
 
-void HdStMSLProgram::UnbindResources(HdStSurfaceShader* surfaceShader, HdSt_ResourceBinder const &binder) const
+void HdStGLSLProgramMSL::UnbindResources(HdStSurfaceShader* surfaceShader, HdSt_ResourceBinder const &binder) const
 {
     // Nothing
 }
 
-void HdStMSLProgram::SetProgram(char const* const label) {
+void HdStGLSLProgramMSL::SetProgram(char const* const label) {
     
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
     
@@ -627,7 +662,7 @@ void HdStMSLProgram::SetProgram(char const* const label) {
     }
 }
 
-void HdStMSLProgram::UnsetProgram() {
+void HdStGLSLProgramMSL::UnsetProgram() {
     MtlfMetalContext::GetMetalContext()->ClearRenderEncoderState();
 
     if (!_currentlySet) {
@@ -637,7 +672,7 @@ void HdStMSLProgram::UnsetProgram() {
 }
 
 
-void HdStMSLProgram::DrawElementsInstancedBaseVertex(int primitiveMode,
+void HdStGLSLProgramMSL::DrawElementsInstancedBaseVertex(int primitiveMode,
                                                      int indexCount,
                                                      int indexType,
                                                      int firstIndex,
@@ -734,7 +769,7 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(int primitiveMode,
         
         id<MTLRenderCommandEncoder>  renderEncoder = context->GetRenderEncoder(METALWORKQUEUE_DEFAULT);
 
-        const_cast<HdStMSLProgram*>(this)->BakeState();
+        const_cast<HdStGLSLProgramMSL*>(this)->BakeState();
 
         id<MTLComputeCommandEncoder> computeEncoder = doMVAComputeGS ? context->GetComputeEncoder(METALWORKQUEUE_GEOMETRY_SHADER) : nil;
         
@@ -844,7 +879,7 @@ void HdStMSLProgram::DrawElementsInstancedBaseVertex(int primitiveMode,
     context->IncNumberPrimsDrawn((indexCount / vertsPerPrimitive) * instanceCount, false);
 }
 
-void HdStMSLProgram::DrawArraysInstanced(int primitiveMode,
+void HdStGLSLProgramMSL::DrawArraysInstanced(int primitiveMode,
                                          int baseVertex,
                                          int vertexCount,
                                          int instanceCount) const {
@@ -858,7 +893,7 @@ void HdStMSLProgram::DrawArraysInstanced(int primitiveMode,
     return;
 }
 
-void HdStMSLProgram::DrawArrays(int primitiveMode,
+void HdStGLSLProgramMSL::DrawArrays(int primitiveMode,
                                 int baseVertex,
                                 int vertexCount) const {
     
@@ -869,7 +904,7 @@ void HdStMSLProgram::DrawArrays(int primitiveMode,
     // Possibly move this outside this function as we shouldn't need to get a render encoder every draw call
     id <MTLRenderCommandEncoder> renderEncoder = context->GetRenderEncoder();
     
-    const_cast<HdStMSLProgram*>(this)->BakeState();
+    const_cast<HdStGLSLProgramMSL*>(this)->BakeState();
     
     [renderEncoder drawPrimitives:primType vertexStart:baseVertex vertexCount:vertexCount];
     
@@ -881,12 +916,12 @@ void HdStMSLProgram::DrawArrays(int primitiveMode,
     context->IncNumberPrimsDrawn(vertexCount / vertsPerPrimitive, false);
 }
 
-void HdStMSLProgram::BakeState()
+void HdStGLSLProgramMSL::BakeState()
 {
     MtlfMetalContext::GetMetalContext()->SetRenderEncoderState();
 }
 
-std::string HdStMSLProgram::GetComputeHeader() const
+std::string HdStGLSLProgramMSL::GetComputeHeader() const
 {
     return HdSt_CodeGenMSL::GetComputeHeader();
 }

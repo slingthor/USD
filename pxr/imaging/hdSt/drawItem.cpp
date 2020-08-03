@@ -31,8 +31,8 @@
 
 #include "pxr/imaging/hdSt/drawItem.h"
 #include "pxr/imaging/hdSt/shaderCode.h"
-#include "pxr/imaging/hdSt/bufferArrayRangeGL.h"
-#include "pxr/imaging/hdSt/bufferResourceGL.h"
+#include "pxr/imaging/hdSt/bufferArrayRange.h"
+#include "pxr/imaging/hdSt/bufferResource.h"
 
 #include "pxr/imaging/hgiMetal/buffer.h"
 
@@ -87,7 +87,7 @@ _BakeBoundsTransform(GfBBox3f const& bounds)
 
 static
 uint8_t const*
-_GetBufferContents(HdStBufferResourceGLSharedPtr const & buffer)
+_GetBufferContents(HdStBufferResourceSharedPtr const & buffer)
 {
 #if defined(PXR_METAL_SUPPORT_ENABLED)
     return (uint8_t const*)buffer->GetGPUAddress();
@@ -112,7 +112,7 @@ HdStDrawItem::IntersectsViewVolume(matrix_float4x4 const &viewProjMatrix,
                                    vector_float2 windowDimensions) const
 {
     HdBufferArrayRangeSharedPtr const & instanceIndexRange = GetInstanceIndexRange();
-    HdStBufferArrayRangeGLSharedPtr instanceIndexRangeGL = std::static_pointer_cast<HdStBufferArrayRangeGL>(instanceIndexRange);
+    HdStBufferArrayRangeSharedPtr instanceIndexRangeGL = std::static_pointer_cast<HdStBufferArrayRange>(instanceIndexRange);
 
     if (instanceIndexRange) {
         int instancerNumLevels = GetInstancePrimvarNumLevels();
@@ -122,7 +122,7 @@ HdStDrawItem::IntersectsViewVolume(matrix_float4x4 const &viewProjMatrix,
         if (instancerNumLevels == 1) {
             int instanceOffset = instanceIndexRange->GetElementOffset();
 
-            HdStBufferResourceGLSharedPtr const & instanceIndexRes = instanceIndexRangeGL->GetResource(HdInstancerTokens->instanceIndices);
+            HdStBufferResourceSharedPtr const & instanceIndexRes = instanceIndexRangeGL->GetResource(HdInstancerTokens->instanceIndices);
             
             uint8_t *instanceIndexBuffer = const_cast<uint8_t*>(_GetBufferContents(instanceIndexRes));
             uint32_t *instanceBuffer = reinterpret_cast<uint32_t*>(instanceIndexBuffer) + instanceOffset;
@@ -131,16 +131,16 @@ HdStDrawItem::IntersectsViewVolume(matrix_float4x4 const &viewProjMatrix,
                 _instancedCullingBoundsCalculated = true;
 
                 HdBufferArrayRangeSharedPtr const & primvar = GetConstantPrimvarRange();
-                HdStBufferArrayRangeGLSharedPtr primvarGL = std::static_pointer_cast<HdStBufferArrayRangeGL>(primvar);
-                HdStBufferResourceGLSharedPtr const & transformRes = primvarGL->GetResource(HdTokens->transform);
-                HdStBufferResourceGLSharedPtr const & instancerTransformRes = primvarGL->GetResource(HdInstancerTokens->instancerTransform);
+                HdStBufferArrayRangeSharedPtr primvarGL = std::static_pointer_cast<HdStBufferArrayRange>(primvar);
+                HdStBufferResourceSharedPtr const & transformRes = primvarGL->GetResource(HdTokens->transform);
+                HdStBufferResourceSharedPtr const & instancerTransformRes = primvarGL->GetResource(HdInstancerTokens->instancerTransform);
 
                 HdBufferArrayRangeSharedPtr const & instanceBar = GetInstancePrimvarRange(0);
-                HdStBufferArrayRangeGLSharedPtr instanceBarGL = std::static_pointer_cast<HdStBufferArrayRangeGL>(instanceBar);
-                HdStBufferResourceGLSharedPtr const & instanceTransformRes = instanceBarGL->GetResource(HdInstancerTokens->instanceTransform);
-                HdStBufferResourceGLSharedPtr const & translateRes = instanceBarGL->GetResource(HdInstancerTokens->translate);
-                HdStBufferResourceGLSharedPtr const & rotateRes = instanceBarGL->GetResource(HdInstancerTokens->rotate);
-                HdStBufferResourceGLSharedPtr const & scaleRes = instanceBarGL->GetResource(HdInstancerTokens->scale);
+                HdStBufferArrayRangeSharedPtr instanceBarGL = std::static_pointer_cast<HdStBufferArrayRange>(instanceBar);
+                HdStBufferResourceSharedPtr const & instanceTransformRes = instanceBarGL->GetResource(HdInstancerTokens->instanceTransform);
+                HdStBufferResourceSharedPtr const & translateRes = instanceBarGL->GetResource(HdInstancerTokens->translate);
+                HdStBufferResourceSharedPtr const & rotateRes = instanceBarGL->GetResource(HdInstancerTokens->rotate);
+                HdStBufferResourceSharedPtr const & scaleRes = instanceBarGL->GetResource(HdInstancerTokens->scale);
 
                 // Item transform
                 size_t stride = transformRes->GetStride();
@@ -221,7 +221,7 @@ HdStDrawItem::IntersectsViewVolume(matrix_float4x4 const &viewProjMatrix,
             }
 
             bool result = false;
-            HdStBufferResourceGLSharedPtr const & culledInstanceIndexRes = instanceIndexRangeGL->GetResource(HdInstancerTokens->culledInstanceIndices);
+            HdStBufferResourceSharedPtr const & culledInstanceIndexRes = instanceIndexRangeGL->GetResource(HdInstancerTokens->culledInstanceIndices);
 
             uint8_t *culledInstanceIndexBuffer = const_cast<uint8_t*>(_GetBufferContents(culledInstanceIndexRes));
             uint32_t *culledInstanceBuffer = reinterpret_cast<uint32_t*>(culledInstanceIndexBuffer) + instanceOffset;
@@ -285,7 +285,7 @@ HdStDrawItem::CalculateCullingBounds() const
     
     HdBufferArrayRangeSharedPtr const & instanceIndexRange = GetInstanceIndexRange();
     if (instanceIndexRange) {
-        HdStBufferArrayRangeGLSharedPtr instanceIndexRangeGL = std::static_pointer_cast<HdStBufferArrayRangeGL>(instanceIndexRange);
+        HdStBufferArrayRangeSharedPtr instanceIndexRangeGL = std::static_pointer_cast<HdStBufferArrayRange>(instanceIndexRange);
         int instancerNumLevels = GetInstancePrimvarNumLevels();
         int instanceIndexWidth = instancerNumLevels + 1;
         int numInstances = instanceIndexRange->GetNumElements() / instanceIndexWidth;
@@ -293,22 +293,22 @@ HdStDrawItem::CalculateCullingBounds() const
         if (instancerNumLevels == 1) {
             int instanceOffset = instanceIndexRange->GetElementOffset();
             
-            HdStBufferResourceGLSharedPtr const & instanceIndexRes = instanceIndexRangeGL->GetResource(HdInstancerTokens->instanceIndices);
+            HdStBufferResourceSharedPtr const & instanceIndexRes = instanceIndexRangeGL->GetResource(HdInstancerTokens->instanceIndices);
             
             uint8_t *instanceIndexBuffer = const_cast<uint8_t*>(_GetBufferContents(instanceIndexRes));
             uint32_t *instanceBuffer = reinterpret_cast<uint32_t*>(instanceIndexBuffer) + instanceOffset;
             
             HdBufferArrayRangeSharedPtr const & primvar = GetConstantPrimvarRange();
-            HdStBufferArrayRangeGLSharedPtr primvarGL = std::static_pointer_cast<HdStBufferArrayRangeGL>(primvar);
-            HdStBufferResourceGLSharedPtr const & transformRes = primvarGL->GetResource(HdTokens->transform);
-            HdStBufferResourceGLSharedPtr const & instancerTransformRes = primvarGL->GetResource(HdInstancerTokens->instancerTransform);
+            HdStBufferArrayRangeSharedPtr primvarGL = std::static_pointer_cast<HdStBufferArrayRange>(primvar);
+            HdStBufferResourceSharedPtr const & transformRes = primvarGL->GetResource(HdTokens->transform);
+            HdStBufferResourceSharedPtr const & instancerTransformRes = primvarGL->GetResource(HdInstancerTokens->instancerTransform);
 
             HdBufferArrayRangeSharedPtr const & instanceBar = GetInstancePrimvarRange(0);
-            HdStBufferArrayRangeGLSharedPtr instanceBarGL = std::static_pointer_cast<HdStBufferArrayRangeGL>(instanceBar);
-            HdStBufferResourceGLSharedPtr const & instanceTransformRes = instanceBarGL->GetResource(HdInstancerTokens->instanceTransform);
-            HdStBufferResourceGLSharedPtr const & translateRes = instanceBarGL->GetResource(HdTokens->translate);
-            HdStBufferResourceGLSharedPtr const & rotateRes = instanceBarGL->GetResource(HdTokens->rotate);
-            HdStBufferResourceGLSharedPtr const & scaleRes = instanceBarGL->GetResource(HdTokens->scale);
+            HdStBufferArrayRangeSharedPtr instanceBarGL = std::static_pointer_cast<HdStBufferArrayRange>(instanceBar);
+            HdStBufferResourceSharedPtr const & instanceTransformRes = instanceBarGL->GetResource(HdInstancerTokens->instanceTransform);
+            HdStBufferResourceSharedPtr const & translateRes = instanceBarGL->GetResource(HdTokens->translate);
+            HdStBufferResourceSharedPtr const & rotateRes = instanceBarGL->GetResource(HdTokens->rotate);
+            HdStBufferResourceSharedPtr const & scaleRes = instanceBarGL->GetResource(HdTokens->scale);
             
             // Item transform
             size_t stride = transformRes->GetStride();
@@ -405,15 +405,15 @@ HdStDrawItem::BuildInstanceBuffer(uint8_t** instanceVisibility) const
     }
 
     HdBufferArrayRangeSharedPtr const & instanceIndexRange = GetInstanceIndexRange();
-    HdStBufferArrayRangeGLSharedPtr instanceIndexRangeGL = std::static_pointer_cast<HdStBufferArrayRangeGL>(instanceIndexRange);
+    HdStBufferArrayRangeSharedPtr instanceIndexRangeGL = std::static_pointer_cast<HdStBufferArrayRange>(instanceIndexRange);
     int instanceOffset = instanceIndexRange->GetElementOffset();
     
-    HdStBufferResourceGLSharedPtr const & instanceIndexRes = instanceIndexRangeGL->GetResource(HdInstancerTokens->instanceIndices);
+    HdStBufferResourceSharedPtr const & instanceIndexRes = instanceIndexRangeGL->GetResource(HdInstancerTokens->instanceIndices);
     
     uint8_t *instanceIndexBuffer = const_cast<uint8_t*>(_GetBufferContents(instanceIndexRes));
     uint32_t *instanceBuffer = reinterpret_cast<uint32_t*>(instanceIndexBuffer) + instanceOffset;
 
-    HdStBufferResourceGLSharedPtr const & culledInstanceIndexRes = instanceIndexRangeGL->GetResource(HdInstancerTokens->culledInstanceIndices);
+    HdStBufferResourceSharedPtr const & culledInstanceIndexRes = instanceIndexRangeGL->GetResource(HdInstancerTokens->culledInstanceIndices);
     
     uint8_t *culledInstanceIndexBuffer = const_cast<uint8_t*>(_GetBufferContents(culledInstanceIndexRes));
     uint32_t *culledInstanceBuffer = reinterpret_cast<uint32_t*>(culledInstanceIndexBuffer) + instanceOffset;

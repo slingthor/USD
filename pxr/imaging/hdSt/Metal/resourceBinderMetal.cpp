@@ -24,7 +24,7 @@
 #include "pxr/imaging/mtlf/mtlDevice.h"
 
 #include "pxr/imaging/hdSt/Metal/resourceBinderMetal.h"
-#include "pxr/imaging/hdSt/bufferResourceGL.h"
+#include "pxr/imaging/hdSt/bufferResource.h"
 #include "pxr/imaging/hdSt/drawItem.h"
 #include "pxr/imaging/hdSt/textureHandle.h"
 #include "pxr/imaging/hdSt/textureObject.h"
@@ -32,7 +32,7 @@
 #include "pxr/imaging/hdSt/shaderCode.h"
 
 #include "pxr/imaging/hdSt/Metal/metalConversions.h"
-#include "pxr/imaging/hdSt/Metal/mslProgram.h"
+#include "pxr/imaging/hdSt/Metal/glslProgramMetal.h"
 
 #include "pxr/imaging/hd/bufferArrayRange.h"
 #include "pxr/imaging/hd/bufferSpec.h"
@@ -136,7 +136,7 @@ HdSt_ResourceBinderMetal::HdSt_ResourceBinderMetal()
 
 void
 HdSt_ResourceBinderMetal::BindBuffer(TfToken const &name,
-                                     HdStBufferResourceGLSharedPtr const &buffer,
+                                     HdStBufferResourceSharedPtr const &buffer,
                                      int offset,
                                      int level) const
 {
@@ -186,7 +186,7 @@ HdSt_ResourceBinderMetal::BindBuffer(TfToken const &name,
 
 void
 HdSt_ResourceBinderMetal::UnbindBuffer(TfToken const &name,
-                                  HdStBufferResourceGLSharedPtr const &buffer,
+                                  HdStBufferResourceSharedPtr const &buffer,
                                   int level) const
 {
     HD_TRACE_FUNCTION();
@@ -256,9 +256,9 @@ HdSt_ResourceBinderMetal::BindUniformf(TfToken const &name,
 }
 
 void
-HdSt_ResourceBinderMetal::IntrospectBindings(HdStProgramSharedPtr programResource) const
+HdSt_ResourceBinderMetal::IntrospectBindings(HdStGLSLProgramSharedPtr programResource) const
 {
-    HdStMSLProgramSharedPtr program(std::dynamic_pointer_cast<HdStMSLProgram>(programResource));
+    HdStGLSLProgramMSLSharedPtr program(std::dynamic_pointer_cast<HdStGLSLProgramMSL>(programResource));
     
     //Copy the all shader bindings from the program.
     _shaderBindingMap = program->GetBindingMap();
@@ -297,7 +297,7 @@ public:
         TfToken const &name,
         HdStUvTextureObject const &texture,
         HdStUvSamplerObject const &sampler,
-        HdStMSLProgram const &mslProgram,
+        HdStGLSLProgramMSL const &mslProgram,
         const bool bind)
     {
         auto metalTexture = dynamic_cast<HgiMetalTexture const*>(
@@ -313,7 +313,7 @@ public:
         TfToken const &name,
         HdStFieldTextureObject const &texture,
         HdStFieldSamplerObject const &sampler,
-        HdStMSLProgram const &mslProgram,
+        HdStGLSLProgramMSL const &mslProgram,
         const bool bind)
     {
         auto metalTexture = dynamic_cast<HgiMetalTexture const*>(
@@ -329,7 +329,7 @@ public:
         TfToken const &name,
         HdStPtexTextureObject const &texture,
         HdStPtexSamplerObject const &sampler,
-        HdStMSLProgram const &mslProgram,
+        HdStGLSLProgramMSL const &mslProgram,
         const bool bind)
     {
         // Bind the texels
@@ -346,7 +346,7 @@ public:
         TfToken const &name,
         HdStUdimTextureObject const &texture,
         HdStUdimSamplerObject const &sampler,
-        HdStMSLProgram const &mslProgram,
+        HdStGLSLProgramMSL const &mslProgram,
         const bool bind)
     {
         // Bind the texels
@@ -371,7 +371,7 @@ public:
 template<HdTextureType textureType, typename ...Args>
 void _CastAndCompute(
     HdStShaderCode::NamedTextureHandle const &namedTexture,
-    HdStProgram const &program,
+    HdStGLSLProgram const &program,
     Args&& ...args)
 {
     // e.g. HdStUvTextureObject
@@ -395,8 +395,8 @@ void _CastAndCompute(
         return;
     }
 
-    HdStMSLProgram const &mslProgram(
-        dynamic_cast<const HdStMSLProgram&>(program));
+    HdStGLSLProgramMSL const &mslProgram(
+        dynamic_cast<const HdStGLSLProgramMSL&>(program));
 
     _BindTextureFunctor::Compute(
         namedTexture.name,
@@ -409,11 +409,11 @@ void _CastAndCompute(
 void _BindTextureDispatch(
     HdStShaderCode::NamedTextureHandle const &namedTexture,
     HdSt_ResourceBinder const &binder,
-    HdStProgram const &program,
+    HdStGLSLProgram const &program,
     bool bind)
 {
-    HdStMSLProgram const &mslProgram(
-        dynamic_cast<const HdStMSLProgram&>(program));
+    HdStGLSLProgramMSL const &mslProgram(
+        dynamic_cast<const HdStGLSLProgramMSL&>(program));
 
     switch (namedTexture.type) {
     case HdTextureType::Uv:
@@ -439,7 +439,7 @@ void _BindTextureDispatch(
 void
 HdSt_ResourceBinderMetal::BindShaderResources(
     HdStShaderCode const *shader,
-    HdStProgram const &shaderProgram) const
+    HdStGLSLProgram const &shaderProgram) const
 {
     auto const & textures = shader->GetNamedTextureHandles();
     for (const HdStShaderCode::NamedTextureHandle & texture : textures) {
@@ -450,7 +450,7 @@ HdSt_ResourceBinderMetal::BindShaderResources(
 void
 HdSt_ResourceBinderMetal::UnbindShaderResources(
     HdStShaderCode const *shader,
-    HdStProgram const &shaderProgram) const
+    HdStGLSLProgram const &shaderProgram) const
 {
     auto const & textures = shader->GetNamedTextureHandles();
     for (const HdStShaderCode::NamedTextureHandle & texture : textures) {

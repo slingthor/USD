@@ -29,7 +29,7 @@
 
 #include "pxr/imaging/hdSt/resourceBinder.h"
 
-#include "pxr/imaging/hdSt/Metal/mslProgram.h"
+#include "pxr/imaging/hdSt/Metal/glslProgramMetal.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -48,27 +48,27 @@ public:
     /// in case if explicit resource location qualifier is not available
     /// (GL 4.2 or before)
     HDST_API
-    virtual void IntrospectBindings(HdStProgramSharedPtr programResource) const override;
+    virtual void IntrospectBindings(HdStGLSLProgramSharedPtr programResource) const override;
 
     /// bind/unbind shader parameters and textures
     HDST_API
     virtual void BindShaderResources(
         HdStShaderCode const *shader,
-        HdStProgram const &shaderProgram) const override;
+        HdStGLSLProgram const &shaderProgram) const override;
     HDST_API
     virtual void UnbindShaderResources(
         HdStShaderCode const *shader,
-        HdStProgram const &shaderProgram) const override;
+        HdStGLSLProgram const &shaderProgram) const override;
     
     /// piecewise buffer binding utility
     /// (to be used for frustum culling, draw indirect result)
     HDST_API
     virtual void BindBuffer(TfToken const &name,
-                    HdStBufferResourceGLSharedPtr const &resource,
+                    HdStBufferResourceSharedPtr const &resource,
                     int offset, int level=-1) const override;
     HDST_API
     virtual void UnbindBuffer(TfToken const &name,
-                      HdStBufferResourceGLSharedPtr const &resource,
+                      HdStBufferResourceSharedPtr const &resource,
                       int level=-1) const override;
     
     /// bind(update) a standalone uniform (unsigned int)

@@ -35,7 +35,7 @@
 #include "pxr/imaging/hd/bufferSource.h"
 #include "pxr/imaging/hd/computation.h"
 #include "pxr/imaging/hd/tokens.h"
-#include "pxr/imaging/hdSt/bufferResourceGL.h"
+#include "pxr/imaging/hdSt/bufferResource.h"
 #include "pxr/imaging/hdSt/meshTopology.h"
 #include "pxr/imaging/hf/perfLog.h"
 #include "pxr/usd/sdf/path.h"
@@ -220,7 +220,7 @@ public:
     public:
         VertexBuffer(HdBufferResourceSharedPtr const &resource) { 
             _resource =
-                std::static_pointer_cast<HdStBufferResourceGL> (resource);
+                std::static_pointer_cast<HdStBufferResource> (resource);
         }
 
         // bit confusing, osd expects 'GetNumElements()' returns the num 
@@ -236,7 +236,7 @@ public:
             return HgiMetalBuffer::MTLBuffer(_resource->GetId());
         }
 #endif
-        HdStBufferResourceGLSharedPtr _resource;
+        HdStBufferResourceSharedPtr _resource;
     };
 
 private:
