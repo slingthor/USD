@@ -39,13 +39,10 @@ from pxr import Sdf, Usd, UsdGeom
 from pxr import CameraUtil
 from pxr import UsdImagingGL
 
-renderAPI = None
 if sys.platform != "darwin":
     from pxr import Glf as _gfxAPI
-    renderAPI = UsdImagingGL.RenderAPI.OpenGL
 else:
     from pxr import Mtlf as _gfxAPI
-    renderAPI = UsdImagingGL.RenderAPI.Metal
 
 from .common import (RenderModes, ColorCorrectionModes, ShadedRenderModes, Timer,
                      ReportMetricSize, SelectionHighlightModes, DEBUG_CLIPPING)
@@ -944,7 +941,7 @@ class StageView(QtOpenGL.QGLWidget):
         if not self._renderer:
             if self.context().isValid():
                 if self.context().initialized():
-                    self._renderer = UsdImagingGL.Engine(renderAPI)
+                    self._renderer = UsdImagingGL.Engine()
                     self._handleRendererChanged(self.GetCurrentRendererId())
             elif not self._reportedContextError:
                 self._reportedContextError = True

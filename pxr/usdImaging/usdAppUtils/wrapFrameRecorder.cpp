@@ -40,9 +40,8 @@ wrapFrameRecorder()
 {
     using This = UsdAppUtilsFrameRecorder;
 
-    scope s = class_<This, boost::noncopyable>(
-        "FrameRecorder", "FraneRecorder class",
-        init<UsdImagingGLEngine::RenderAPI const>())
+    scope s = class_<This, boost::noncopyable>("FrameRecorder")
+        .def(init<>())
         .def("GetCurrentRendererId", &This::GetCurrentRendererId)
         .def("SetRendererPlugin", &This::SetRendererPlugin)
         .def("SetImageWidth", &This::SetImageWidth)

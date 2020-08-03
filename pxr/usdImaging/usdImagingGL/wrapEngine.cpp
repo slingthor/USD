@@ -93,10 +93,9 @@ void wrapEngine()
 {
     { 
         scope engineScope = class_<UsdImagingGLEngine, boost::noncopyable>(
-                "Engine", "UsdImaging Renderer class",
-                init<const UsdImagingGLEngine::RenderAPI>())
-            .def( init<const UsdImagingGLEngine::RenderAPI,
-                    const SdfPath &, const SdfPathVector&,
+                "Engine", "UsdImaging Renderer class")
+            .def( init<>() )
+            .def( init<const SdfPath &, const SdfPathVector&,
                     const SdfPathVector& >() )
             .def("Render", &UsdImagingGLEngine::Render)
             .def("SetWindowPolicy", &UsdImagingGLEngine::SetWindowPolicy)
@@ -158,12 +157,6 @@ void wrapEngine()
     // Wrap the constants.
     scope().attr("ALL_INSTANCES") = UsdImagingDelegate::ALL_INSTANCES;
     
-    // Wrap the RenderAPI enum. Accessible as UsdImagingGL.RenderAPI
-    enum_<UsdImagingGLEngine::RenderAPI>("RenderAPI")
-    .value("OpenGL", UsdImagingGLEngine::OpenGL)
-    .value("Metal", UsdImagingGLEngine::Metal)
-    ;
-
     TfPyContainerConversions::from_python_sequence<
         std::vector<GarchSimpleLight>,
         TfPyContainerConversions::variable_capacity_policy>();
