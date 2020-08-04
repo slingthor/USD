@@ -81,7 +81,7 @@ HdStGLSLProgram::GetComputeProgram(
 {
     // Find the program from registry
     HdInstance<HdStGLSLProgramSharedPtr> programInstance =
-                resourceRegistry->RegisterProgram(
+                resourceRegistry->RegisterGLSLProgram(
                         HdStGLSLProgram::ComputeHash(shaderToken));
 
     if (programInstance.IsFirstInstance()) {

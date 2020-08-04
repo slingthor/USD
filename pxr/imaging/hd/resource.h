@@ -47,6 +47,10 @@ using HdResourceSharedPtr = std::shared_ptr<class HdResource>;
 
 struct HdResourceGPUHandle {
 
+    HdResourceGPUHandle(uint64_t const _handle) {
+        handle = (void*)_handle;
+    }
+
     void Clear() {
         handle = 0;
     }

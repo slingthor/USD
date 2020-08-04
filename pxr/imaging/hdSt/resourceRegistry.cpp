@@ -599,7 +599,7 @@ HdStResourceRegistry::RegisterGeometricShader(
 }
 
 HdInstance<HdStGLSLProgramSharedPtr>
-HdStResourceRegistry::RegisterProgram(
+HdStResourceRegistry::RegisterGLSLProgram(
         HdInstance<HdStGLSLProgramSharedPtr>::ID id)
 {
     return _glslProgramRegistry.GetInstance(id);
@@ -679,6 +679,19 @@ HdStResourceRegistry::GetBlitCmds()
         _blitCmds = _hgi->CreateBlitCmds();
     }
     return _blitCmds.get();
+}
+
+void HdStResourceRegistry::SubmitHgiWork()
+{
+    // submit the work queued by the computations
+    if (_blitCmds) {
+        _hgi->SubmitCmds(_blitCmds.get());
+        _blitCmds.reset();
+    }
+    if (_computeCmds) {
+        _hgi->SubmitCmds(_computeCmds.get());
+        _computeCmds.reset();
+    }
 }
 
 void
@@ -787,8 +800,8 @@ HdStResourceRegistry::_Commit()
     }
 
     // APPLE METAL: Only here to ensure Mtlf flushes it's buffer updates
-    HgiMetal* hgiMetal = static_cast<HgiMetal*>(_hgi);
-    hgiMetal->CommitCommandBuffer(HgiMetal::CommitCommandBuffer_NoWait, true);
+//    HgiMetal* hgiMetal = static_cast<HgiMetal*>(_hgi);
+//    hgiMetal->CommitCommandBuffer(HgiMetal::CommitCommandBuffer_NoWait, true);
 
     {
         HD_TRACE_SCOPE("Reallocate buffer arrays");
@@ -842,11 +855,6 @@ HdStResourceRegistry::_Commit()
         }
     }
 
-    // APPLE METAL: Only here to ensure Mtlf flushes it's buffer updates
-    MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
-    context->FlushBuffers();
-    context->PrepareBufferFlush();
-    
     {
         // HD_TRACE_SCOPE("Flush");
         // 5. flush phase:
@@ -869,16 +877,9 @@ HdStResourceRegistry::_Commit()
         }
     }
 
-    // submit the work queued by the computations
-    if (_blitCmds) {
-        _hgi->SubmitCmds(_blitCmds.get());
-        _blitCmds.reset();
-    }
-    if (_computeCmds) {
-        _hgi->SubmitCmds(_computeCmds.get());
-        _computeCmds.reset();
-    }
-
+    // submit the GPU work queued
+    SubmitHgiWork();
+    
     // release sources
     WorkParallelForEach(_pendingSources.begin(), _pendingSources.end(),
                         [](_PendingSource &ps) {
@@ -961,9 +962,8 @@ HdStResourceRegistry::_GarbageCollect()
     _uniformSsboBufferArrayRegistry.GarbageCollect();
     _singleBufferArrayRegistry.GarbageCollect();
     
-    // submit the blit work queued by the computations
-    _hgi->SubmitCmds(_blitCmds.get());
-    _blitCmds.reset();
+    // submit the GPU work queued
+    SubmitHgiWork();
 }
 
 void

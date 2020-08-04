@@ -108,7 +108,7 @@ HdStExtCompGpuComputationResource::Resolve()
         {
             // ask registry to see if there's already compiled program
             HdInstance<HdStGLSLProgramSharedPtr> programInstance =
-                                _registry->RegisterProgram(registryID);
+                                _registry->RegisterGLSLProgram(registryID);
 
             if (programInstance.IsFirstInstance()) {
                 HdStGLSLProgramSharedPtr program =

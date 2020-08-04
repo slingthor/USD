@@ -332,7 +332,7 @@ HdSt_DrawBatch::_DrawingProgram::CompileShader(
     {
         // ask registry to see if there's already compiled program
         HdInstance<HdStGLSLProgramSharedPtr> programInstance =
-                                resourceRegistry->RegisterProgram(hash);
+                                resourceRegistry->RegisterGLSLProgram(hash);
 
         if (programInstance.IsFirstInstance()) {
             HdStGLSLProgramSharedPtr program = codeGen->Compile(

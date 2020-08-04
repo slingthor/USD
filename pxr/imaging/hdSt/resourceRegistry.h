@@ -385,7 +385,7 @@ public:
     /// Register a GLSL program into the program registry.
     HDST_API
     HdInstance<HdStGLSLProgramSharedPtr>
-    RegisterProgram(HdInstance<HdStGLSLProgramSharedPtr>::ID id);
+    RegisterGLSLProgram(HdInstance<HdStGLSLProgramSharedPtr>::ID id);
 
     /// Register a texture resource handle.
     HDST_API
@@ -419,6 +419,9 @@ public:
     
     /// Returns the global hgi blit command queue for registering blitting work
     HgiBlitCmds* GetBlitCmds();
+    
+    /// Submits any queued compute/blit work for GPU execution
+    void SubmitHgiWork();
 
 public:
     //

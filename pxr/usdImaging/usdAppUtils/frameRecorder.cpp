@@ -47,19 +47,17 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 
-UsdAppUtilsFrameRecorder::UsdAppUtilsFrameRecorder(
-    UsdImagingGLEngine::RenderAPI api) :
+UsdAppUtilsFrameRecorder::UsdAppUtilsFrameRecorder() :
     _imageWidth(960u),
     _complexity(1.0f),
     _colorCorrectionMode("disabled"),
-    _purposes({UsdGeomTokens->default_, UsdGeomTokens->proxy}),
-    _api(api)
+    _purposes({UsdGeomTokens->default_, UsdGeomTokens->proxy})
 {
     _hgi = Hgi::CreatePlatformDefaultHgi();
     _driver.name = HgiTokens->renderDriver;
     _driver.driver = VtValue(_hgi.get());
 
-    _imagingEngine.reset(new UsdImagingGLEngine(api, _driver));
+    _imagingEngine.reset(new UsdImagingGLEngine(_driver));
     
     GlfGlewInit();
 }
@@ -298,10 +296,7 @@ UsdAppUtilsFrameRecorder::Record(
     const GfFrustum frustum = gfCamera.GetFrustum();
     const GfVec3d cameraPos = frustum.GetPosition();
 
-    const TfToken& interopDst =
-        _api == UsdImagingGLEngine::RenderAPI::Metal?
-            HgiTokens->Metal:HgiTokens->OpenGL;
-    _imagingEngine->SetRendererAov(HdAovTokens->color, interopDst);
+    _imagingEngine->SetRendererAov(HdAovTokens->color, HgiTokens->Metal);
 
     _imagingEngine->SetCameraState(
         frustum.ComputeViewMatrix(),
