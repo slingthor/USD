@@ -884,6 +884,9 @@ void HdStGLSLProgramMSL::DrawArraysInstanced(int primitiveMode,
                                          int vertexCount,
                                          int instanceCount) const {
     MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
+    if (primitiveMode == GL_POINTS) {
+        vertexCount += 2;
+    }
     context->SetIndexBuffer(context->GetTriListIndexBuffer(MTLIndexTypeUInt32, vertexCount / 3));
 
     _reapplyIndexBuffer = _indicesSlot >= 0;
