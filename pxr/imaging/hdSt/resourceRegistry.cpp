@@ -877,6 +877,7 @@ HdStResourceRegistry::_Commit()
         }
     }
 
+    // submit the GPU work queued
     SubmitHgiWork();
     
     // release sources
@@ -961,9 +962,8 @@ HdStResourceRegistry::_GarbageCollect()
     _uniformSsboBufferArrayRegistry.GarbageCollect();
     _singleBufferArrayRegistry.GarbageCollect();
     
-    // submit the blit work queued by the computations
-    _hgi->SubmitCmds(_blitCmds.get());
-    _blitCmds.reset();
+    // submit the GPU work queued
+    SubmitHgiWork();
 }
 
 void
