@@ -78,7 +78,10 @@ public:
 
     HGIGL_API
     static HgiGLOpsFn CopyTextureGpuToCpu(HgiTextureGpuToCpuOp const& copyOp);
-    
+
+    HGIGL_API
+    static HgiGLOpsFn CopyTextureCpuToGpu(HgiTextureCpuToGpuOp const& copyOp);
+
     HGIGL_API
     static HgiGLOpsFn CopyBufferGpuToGpu(HgiBufferGpuToGpuOp const& copyOp);
 
@@ -86,11 +89,9 @@ public:
     static HgiGLOpsFn CopyBufferCpuToGpu(HgiBufferCpuToGpuOp const& copyOp);
 
     HGIGL_API
-    static HgiGLOpsFn ResolveImage(
-        HgiTextureHandle const& src,
-        HgiTextureHandle const& dst,
-        GfVec4i const& region,
-        bool isDepthResolve);
+    static HgiGLOpsFn ResolveFramebuffer(
+        HgiGLDevice* device,
+        HgiGraphicsCmdsDesc const &graphicsCmds);
     
     HGIGL_API
     static HgiGLOpsFn SetViewport(GfVec4i const& vp);
@@ -130,6 +131,7 @@ public:
 
     HGIGL_API
     static HgiGLOpsFn DrawIndexed(
+        HgiPrimitiveType primitiveType,
         HgiBufferHandle const& indexBuffer,
         uint32_t indexCount,
         uint32_t indexBufferByteOffset,

@@ -422,7 +422,6 @@ namespace {
             break;
         case HdBinding::UNIFORM:
         case HdBinding::UNIFORM_ARRAY:
-        case HdBinding::TBO:
         case HdBinding::BINDLESS_UNIFORM:
         case HdBinding::BINDLESS_SSBO_RANGE:
             if (caps.explicitUniformLocation) {
@@ -1032,7 +1031,7 @@ HdSt_CodeGenGLSL::CompileComputeProgram(HdStResourceRegistry* const registry)
             glCompileShader(shader);
 
             std::string logString;
-            HdStGLUtils::GetShaderCompileStatus(shader, &logString);
+            //HdStGLUtils::GetShaderCompileStatus(shader, &logString);
             TF_WARN("Failed to compile compute shader: %s",
                     logString.c_str());
             glDeleteShader(shader);
@@ -1124,10 +1123,6 @@ static void _EmitDeclaration(std::stringstream &str,
         case HdBinding::BINDLESS_SSBO_RANGE:
             str << "uniform " << _GetPackedType(type, true)
             << " *" << name << ";\n";
-            break;
-        case HdBinding::TBO:
-            str << "uniform " << _GetSamplerBufferType(type)
-            << " " << name << ";\n";
             break;
         case HdBinding::BINDLESS_UNIFORM:
             str << "uniform " << _GetPackedType(type, true)
@@ -1257,13 +1252,7 @@ static void _EmitComputeAccessor(
     if (index) {
         str << _GetUnpackedType(type, false)
             << " HdGet_" << name << "(int localIndex) {\n";
-        if (binding.GetType() == HdBinding::TBO) {
-            str << "  int index = " << index << ";\n";
-            str << "  return "
-                << _GetPackedTypeAccessor(type, false)
-                << "(texelFetch(" << name << ", index)"
-                << _GetSwizzleString(type) << ");\n}\n";
-        } else if (binding.GetType() == HdBinding::SSBO) {
+        if (binding.GetType() == HdBinding::SSBO) {
             str << "  int index = " << index << ";\n";
             str << "  return " << _GetPackedTypeAccessor(type, false) << "("
                 << _GetPackedType(type, false) << "(";
@@ -1353,15 +1342,9 @@ static void _EmitAccessor(std::stringstream &str,
         str << _GetUnpackedType(type, false)
             << " HdGet_" << name << "(int localIndex) {\n"
             << "  int index = " << index << ";\n";
-        if (binding.GetType() == HdBinding::TBO) {
-            str << "  return "
-                << _GetPackedTypeAccessor(type, false)
-                << "(texelFetch(" << name << ", index)"
-                << _GetSwizzleString(type) << ");\n}\n";
-        } else {
-            str << "  return " << _GetPackedTypeAccessor(type, true) << "("
-                << name << "[index]);\n}\n";
-        }
+
+        str << "  return " << _GetPackedTypeAccessor(type, true) << "("
+            << name << "[index]);\n}\n";
     } else {
         // non-indexed, only makes sense for uniform or vertex.
         if (binding.GetType() == HdBinding::UNIFORM ||
@@ -1582,17 +1565,10 @@ static void _EmitFVarGSAccessor(
     str << _GetUnpackedType(type, false)
         << " HdGet_" << name << "_Coarse(int localIndex) {\n"
         << "  int fvarIndex = GetFVarIndex(localIndex);\n";
-    
-    if (binding.GetType() == HdBinding::TBO) {
-        str << "  return "
-            << _GetPackedTypeAccessor(type, false)
-            << "(texelFetch(" << name << ", fvarIndex)"
-            << _GetSwizzleString(type) << ");\n}\n";
-    } else {
-        str << "  return " << _GetPackedTypeAccessor(type, true) << "("
-            << name << "[fvarIndex]);\n}\n";
-    }
-    
+
+    str << "  return " << _GetPackedTypeAccessor(type, true) << "("
+        << name << "[fvarIndex]);\n}\n";
+
     // emit the (public) accessor for the fvar data, accounting for refinement
     // interpolation
     str << "vec4 GetPatchCoord(int index);\n"; // forward decl

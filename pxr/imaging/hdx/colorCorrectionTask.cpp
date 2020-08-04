@@ -80,7 +80,7 @@ HdxColorCorrectionTask::~HdxColorCorrectionTask()
     if (_texture3dLUT) {
         _GetHgi()->DestroyTexture(&_texture3dLUT);
     }
-    
+
     if (_sampler) {
         _GetHgi()->DestroySampler(&_sampler);
     }
@@ -530,13 +530,13 @@ HdxColorCorrectionTask::_CreateSampler()
     }
 
     HgiSamplerDesc sampDesc;
-    
+
     sampDesc.magFilter = HgiSamplerFilterLinear;
     sampDesc.minFilter = HgiSamplerFilterLinear;
 
     sampDesc.addressModeU = HgiSamplerAddressModeClampToEdge;
     sampDesc.addressModeV = HgiSamplerAddressModeClampToEdge;
-    
+
     _sampler = _GetHgi()->CreateSampler(sampDesc);
 
     return true;

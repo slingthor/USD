@@ -69,11 +69,6 @@ TF_DEFINE_ENV_SETTING(HD_ENABLE_GPU_COMPUTE, false,
 TF_DEFINE_ENV_SETTING(GARCH_GLSL_VERSION, 0,
                       "GLSL version");
 
-bool GarchContextCaps::IsGPUComputeEnabled()
-{
-    return TfGetEnvSetting(HD_ENABLE_GPU_COMPUTE);
-}
-
 // Initialize members to ensure a sane starting state.
 GarchContextCaps::GarchContextCaps()
     : apiVersion(0)
@@ -99,7 +94,6 @@ GarchContextCaps::GarchContextCaps()
     , shaderDrawParametersEnabled(false)
 
     , copyBufferEnabled(true)
-    , gpuComputeEnabled(false)
 
     , flipTexturesOnLoad(true)
     , hasSubDataCopy(false)

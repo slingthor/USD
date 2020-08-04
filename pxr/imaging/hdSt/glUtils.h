@@ -34,28 +34,13 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-class HdStGLUtils {
-public:
-    /// Returns true if the shader has been successfully compiled.
-    /// if not, returns false and fills the error log into reason.
-    HDST_API
-    static bool GetShaderCompileStatus(GLuint shader,
-                                       std::string * reason = NULL);
-
-    /// Returns true if the program has been successfully linked.
-    /// if not, returns false and fills the error log into reason.
-    HDST_API
-    static bool GetProgramLinkStatus(GLuint program,
-                                     std::string * reason = NULL);
-};
-
-/// \class HdStGLBufferRelocator
+/// \class HdStBufferRelocator
 ///
 /// A utility class to perform batched buffer copy.
 ///
-class HdStGLBufferRelocator {
+class HdStBufferRelocator {
 public:
-    HdStGLBufferRelocator(
+    HdStBufferRelocator(
         HgiBufferHandle const& srcBuffer, HgiBufferHandle const& dstBuffer) :
         _srcBuffer(srcBuffer), _dstBuffer(dstBuffer) {}
 

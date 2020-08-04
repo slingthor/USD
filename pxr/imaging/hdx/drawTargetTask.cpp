@@ -324,14 +324,16 @@ HdxDrawTargetTask::Sync(HdSceneDelegate* delegate,
         for (_DrawTargetEntry const &entry : drawTargetEntries) {
             if (HdStDrawTarget * const drawTarget = entry.drawTarget) {
                 if (drawTarget->IsEnabled()) {
-                    HdxDrawTargetRenderPassUniquePtr pass =
+                    HdxDrawTargetRenderPassUniquePtr drawTargetPass =
                         std::make_unique<HdxDrawTargetRenderPass>(&renderIndex);
 
-                    pass->SetDrawTarget(drawTarget->GetGarchDrawTarget());
-                    pass->SetRenderPassState(drawTarget->GetRenderPassState());
-                    pass->SetHasDependentDrawTargets(
+                    drawTargetPass->SetDrawTarget(
+                        drawTarget->GetGarchDrawTarget());
+                    drawTargetPass->SetDrawTargetRenderPassState(
+                        drawTarget->GetDrawTargetRenderPassState());
+                    drawTargetPass->SetHasDependentDrawTargets(
                         entry.hasDependentDrawTargets);
-                    _renderPasses.push_back(std::move(pass));
+                    _renderPasses.push_back(std::move(drawTargetPass));
 
                     _renderPassesInfo.push_back(
                         { HdStRenderPassStateSharedPtr(
@@ -380,14 +382,15 @@ HdxDrawTargetTask::Sync(HdSceneDelegate* delegate,
          renderPassIdx < numRenderPasses;
          ++renderPassIdx) {
 
-        _RenderPassInfo &renderPassInfo =  _renderPassesInfo[renderPassIdx];
+        const _RenderPassInfo &renderPassInfo =
+            _renderPassesInfo[renderPassIdx];
         HdxDrawTargetRenderPass * const renderPass = 
             _renderPasses[renderPassIdx].get();
-        HdStRenderPassStateSharedPtr &renderPassState = 
+        HdStRenderPassStateSharedPtr const &renderPassState = 
             renderPassInfo.renderPassState;
         HdStDrawTarget * const drawTarget = renderPassInfo.target;
         const HdStDrawTargetRenderPassState * const drawTargetRenderPassState =
-            drawTarget->GetRenderPassState();
+            drawTarget->GetDrawTargetRenderPassState();
         const SdfPath &cameraId = drawTargetRenderPassState->GetCamera();
 
         // XXX: Need to detect when camera changes and only update if
@@ -480,13 +483,7 @@ void
 HdxDrawTargetTask::Prepare(HdTaskContext* ctx,
                            HdRenderIndex* renderIndex)
 {
-    const size_t numRenderPasses = _renderPassesInfo.size();
-    for (size_t renderPassIdx = 0;
-         renderPassIdx < numRenderPasses;
-         ++renderPassIdx) {
-
-        HdxDrawTargetRenderPass * const renderPass =
-            _renderPasses[renderPassIdx].get();
+    for (const HdxDrawTargetRenderPassUniquePtr & renderPass : _renderPasses) {
         renderPass->Prepare();
     }
 }

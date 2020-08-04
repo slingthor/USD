@@ -29,9 +29,10 @@
 #include "pxr/imaging/glf/diagnostic.h"
 
 #include "pxr/imaging/hdSt/copyComputation.h"
-#include "pxr/imaging/hdSt/bufferResource.h"
 #include "pxr/imaging/hdSt/bufferArrayRange.h"
+#include "pxr/imaging/hdSt/bufferResource.h"
 #include "pxr/imaging/hdSt/resourceRegistry.h"
+#include "pxr/imaging/hdSt/tokens.h"
 #include "pxr/imaging/hd/perfLog.h"
 #include "pxr/imaging/hd/tokens.h"
 #include "pxr/imaging/hd/types.h"
@@ -112,8 +113,6 @@ HdStCopyComputationGPU::Execute(HdBufferArrayRangeSharedPtr const &range_,
         if (!TF_VERIFY(dstId)) {
             return;
         }
-
-        HD_PERF_COUNTER_INCR(HdPerfTokens->glCopyBufferSubData);
         
         HdStResourceRegistry* hdStResourceRegistry =
             static_cast<HdStResourceRegistry*>(resourceRegistry);

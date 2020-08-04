@@ -23,6 +23,7 @@
 //
 #include "pxr/imaging/glf/glew.h"
 #include "pxr/imaging/hdSt/glUtils.h"
+#include "pxr/imaging/hdSt/tokens.h"
 
 #include "pxr/imaging/hgi/hgi.h"
 #include "pxr/imaging/hgi/blitCmds.h"
@@ -50,60 +51,11 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-bool
-HdStGLUtils::GetShaderCompileStatus(GLuint shader, std::string * reason)
-{
-#if defined(PXR_OPENGL_SUPPORT_ENABLED)
-    // glew has to be initialized
-    if (!glGetShaderiv) return true;
-
-    GLint status = 0;
-    glGetShaderiv(shader, GL_COMPILE_STATUS, &status);
-    if (reason) {
-        GLint infoLength = 0;
-        glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &infoLength);
-        if (infoLength > 0) {
-            char *infoLog = new char[infoLength];;
-            glGetShaderInfoLog(shader, infoLength, NULL, infoLog);
-            reason->assign(infoLog, infoLength);
-            delete[] infoLog;
-        }
-    }
-    return (status == GL_TRUE);
-#else
-    return true;
-#endif
-}
-
-bool
-HdStGLUtils::GetProgramLinkStatus(GLuint program, std::string * reason)
-{
-#if defined(PXR_OPENGL_SUPPORT_ENABLED)
-    // glew has to be initialized
-    if (!glGetProgramiv) return true;
-
-    GLint status = 0;
-    glGetProgramiv(program, GL_LINK_STATUS, &status);
-    if (reason) {
-        GLint infoLength = 0;
-        glGetProgramiv(program, GL_INFO_LOG_LENGTH, &infoLength);
-        if (infoLength > 0) {
-            char *infoLog = new char[infoLength];;
-            glGetProgramInfoLog(program, infoLength, NULL, infoLog);
-            reason->assign(infoLog, infoLength);
-            delete[] infoLog;
-        }
-    }
-    return (status == GL_TRUE);
-#else
-    return true;
-#endif
-}
 
 // ---------------------------------------------------------------------------
 
 void
-HdStGLBufferRelocator::AddRange(GLintptr readOffset,
+HdStBufferRelocator::AddRange(GLintptr readOffset,
                               GLintptr writeOffset,
                               GLsizeiptr copySize)
 {
@@ -114,7 +66,7 @@ HdStGLBufferRelocator::AddRange(GLintptr readOffset,
 }
 
 void
-HdStGLBufferRelocator::Commit(HgiBlitCmds* blitCmds)
+HdStBufferRelocator::Commit(HgiBlitCmds* blitCmds)
 {
     HgiBufferGpuToGpuOp blitOp;
     blitOp.gpuSourceBuffer = _srcBuffer;
@@ -127,8 +79,7 @@ HdStGLBufferRelocator::Commit(HgiBlitCmds* blitCmds)
 
         blitCmds->CopyBufferGpuToGpu(blitOp);
     }
-
-    HD_PERF_COUNTER_ADD(HdPerfTokens->glCopyBufferSubData,
+    HD_PERF_COUNTER_ADD(HdStPerfTokens->copyBufferGpuToGpu,
                         (double)_queue.size());
 
     _queue.clear();

@@ -102,9 +102,8 @@ HgiMetalBlitCmds::CopyTextureGpuToCpu(
 
     HgiTextureDesc const& texDesc = srcTexture->GetDescriptor();
 
-    uint32_t layerCnt = copyOp.startLayer + copyOp.numLayers;
-    if (!TF_VERIFY(texDesc.layerCount >= layerCnt,
-        "Texture has less layers than attempted to be copied")) {
+    if (!TF_VERIFY(texDesc.layerCount > copyOp.sourceTexelOffset[2],
+        "Trying to copy an invalid texture layer/slice")) {
         return;
     }
 
@@ -131,22 +130,25 @@ HgiMetalBlitCmds::CopyTextureGpuToCpu(
                                  options:options
                              deallocator:nil];
 
+    bool isTexArray = texDesc.layerCount>1;
+    int depthOffset = isTexArray ? 0 : copyOp.sourceTexelOffset[2];
+
     MTLOrigin origin = MTLOriginMake(
         copyOp.sourceTexelOffset[0],
         copyOp.sourceTexelOffset[1],
-        copyOp.sourceTexelOffset[2]);
+        depthOffset);
     MTLSize size = MTLSizeMake(
         texDesc.dimensions[0] - copyOp.sourceTexelOffset[0],
         texDesc.dimensions[1] - copyOp.sourceTexelOffset[1],
-        texDesc.dimensions[2] - copyOp.sourceTexelOffset[2]);
+        texDesc.dimensions[2] - depthOffset);
     
     MTLBlitOption blitOptions = MTLBlitOptionNone;
 
     _CreateEncoder();
 
     [_blitEncoder copyFromTexture:srcTexture->GetTextureId()
-                      sourceSlice:0
-                      sourceLevel:copyOp.startLayer
+                      sourceSlice:isTexArray ? copyOp.sourceTexelOffset[2] : 0
+                      sourceLevel:copyOp.mipLevel
                      sourceOrigin:origin
                        sourceSize:size
                          toBuffer:cpuBuffer
@@ -163,6 +165,43 @@ HgiMetalBlitCmds::CopyTextureGpuToCpu(
     memcpy(copyOp.cpuDestinationBuffer,
         [cpuBuffer contents], copyOp.destinationBufferByteSize);
     [cpuBuffer release];
+}
+
+void
+HgiMetalBlitCmds::CopyTextureCpuToGpu(
+    HgiTextureCpuToGpuOp const& copyOp)
+{
+    HgiMetalTexture* dstTexture = static_cast<HgiMetalTexture*>(
+        copyOp.gpuDestinationTexture.Get());
+    HgiTextureDesc const& texDesc = dstTexture->GetDescriptor();
+
+    const size_t width = texDesc.dimensions[0];
+    const size_t height = texDesc.dimensions[1];
+    const size_t depth = texDesc.dimensions[2];
+
+    bool isTexArray = texDesc.layerCount>1;
+
+    GfVec3i const& offsets = copyOp.destinationTexelOffset;
+    int depthOffset = isTexArray ? 0 : offsets[2];
+
+    if (texDesc.type == HgiTextureType2D) {
+        [dstTexture->GetTextureId()
+            replaceRegion:MTLRegionMake2D(
+                offsets[0], offsets[1], width, height)
+              mipmapLevel:copyOp.mipLevel
+                withBytes:copyOp.cpuSourceBuffer
+              bytesPerRow:copyOp.bufferByteSize / height];
+    }
+    else {
+        [dstTexture->GetTextureId()
+            replaceRegion:MTLRegionMake3D(
+                offsets[0], offsets[1], depthOffset, width, height, depth)
+              mipmapLevel:copyOp.mipLevel 
+                    slice:isTexArray ? offsets[2] : 0
+                withBytes:copyOp.cpuSourceBuffer
+              bytesPerRow:copyOp.bufferByteSize / height / width
+            bytesPerImage:copyOp.bufferByteSize / depth];
+    }
 }
 
 void

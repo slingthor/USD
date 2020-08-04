@@ -23,7 +23,6 @@
 //
 #if defined(PXR_OPENGL_SUPPORT_ENABLED)
 #include "pxr/imaging/glf/glew.h"
-#include "pxr/imaging/glf/diagnostic.h"
 #endif
 
 #include "pxr/imaging/garch/contextCaps.h"
@@ -37,12 +36,10 @@
 #include "pxr/imaging/hdSt/glslProgram.h"
 #include "pxr/imaging/hdSt/resourceFactory.h"
 #include "pxr/imaging/hdSt/resourceRegistry.h"
-#include "pxr/imaging/hd/bufferArrayRange.h"
-#include "pxr/imaging/hd/compExtCompInputSource.h"
+#include "pxr/imaging/hd/sceneDelegate.h"
 #include "pxr/imaging/hd/extComputation.h"
 #include "pxr/imaging/hd/extCompPrimvarBufferSource.h"
 #include "pxr/imaging/hd/extCompCpuComputation.h"
-#include "pxr/imaging/hd/sceneDelegate.h"
 #include "pxr/imaging/hd/sceneExtCompInputSource.h"
 #include "pxr/imaging/hd/vtBufferSource.h"
 
@@ -306,8 +303,6 @@ HdSt_GetExtComputationPrimvarsComputations(
         byComputation[compPrimvar.sourceComputationId].push_back(compPrimvar);
     }
 
-    bool gpuComputeEnabled = GarchResourceFactory::GetInstance()->GetContextCaps().gpuComputeEnabled;
-
     // Create computation primvar buffer sources by source computation
     for (CompPrimvarsByComputation::value_type it: byComputation) { 
         SdfPath const &computationId = it.first;
@@ -322,8 +317,7 @@ HdSt_GetExtComputationPrimvarsComputations(
             continue;
         }
 
-        if (gpuComputeEnabled &&
-            !sourceComp->GetGpuKernelSource().empty()) {
+        if (!sourceComp->GetGpuKernelSource().empty()) {
 
             HdStExtCompGpuComputationSharedPtr gpuComputation;
             for (HdExtComputationPrimvarDescriptor const & compPrimvar:
