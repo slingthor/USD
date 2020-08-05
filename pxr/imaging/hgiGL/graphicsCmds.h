@@ -34,7 +34,7 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 struct HgiGraphicsCmdsDesc;
-
+class HgiGLDevice;
 
 /// \class HgiGLGraphicsCmds
 ///
@@ -112,10 +112,11 @@ private:
     HgiGLGraphicsCmds(const HgiGLGraphicsCmds&) = delete;
 
     /// This performs multisample resolve when needed at the end of recording.
-    void _Resolve();
+    void _AddResolveToOps(HgiGLDevice* device);
 
     bool _recording;
     HgiGraphicsCmdsDesc _descriptor;
+    HgiPrimitiveType _primitiveType;
     HgiGLOpsVector _ops;
     int _pushStack;
 

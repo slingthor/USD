@@ -25,6 +25,9 @@
 
 #include "pxr/imaging/glf/glew.h"
 
+
+#include "pxr/base/gf/math.h"
+#include "pxr/base/gf/vec3i.h"
 #include "pxr/imaging/glf/glContext.h"
 #include "pxr/imaging/glf/diagnostic.h"
 #include "pxr/imaging/glf/udimTexture.h"
@@ -48,8 +51,9 @@ TF_REGISTRY_FUNCTION(TfType)
 GlfUdimTexture::GlfUdimTexture(
     TfToken const& imageFilePath,
     GarchImage::ImageOriginLocation originLocation,
-    std::vector<std::tuple<int, TfToken>>&& tiles)
-    : GarchUdimTexture(imageFilePath, originLocation, std::move(tiles))
+    std::vector<std::tuple<int, TfToken>>&& tiles,
+    bool const premultiplyAlpha)
+    : GarchUdimTexture(imageFilePath, originLocation, std::move(tiles), premultiplyAlpha)
 {
 }
 

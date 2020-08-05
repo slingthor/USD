@@ -45,12 +45,28 @@ public:
     GLF_API
     virtual ~GlfUdimTexture();
 
+    GLF_API
+    static GlfUdimTextureRefPtr New(
+        TfToken const& imageFilePath,
+        GarchImage::ImageOriginLocation originLocation,
+        std::vector<std::tuple<int, TfToken>>&& tiles,
+        bool const premultiplyAlpha = false);
+
+
+    GLuint GetGlTextureName();
+
+    GLuint GetGlLayoutName() {
+        _ReadImage();
+        return _layout;
+    }
+
 protected:
     GLF_API
     GlfUdimTexture(
         TfToken const& imageFilePath,
         GarchImage::ImageOriginLocation originLocation,
-        std::vector<std::tuple<int, TfToken>>&& tiles);
+        std::vector<std::tuple<int, TfToken>>&& tiles,
+        bool const premultiplyAlpha);
 
     friend class GlfResourceFactory;
 

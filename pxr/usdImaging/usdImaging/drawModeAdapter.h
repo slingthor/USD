@@ -123,10 +123,10 @@ public:
     // ---------------------------------------------------------------------- //
 
     virtual HdTextureResource::ID
-    GetTextureResourceID(UsdPrim const& usdPrim, SdfPath const &id, UsdTimeCode time, size_t salt) const override;
+    GetTextureResourceID(UsdPrim const& usdPrim, SdfPath const &id, UsdTimeCode time, size_t salt) const;
 
     virtual HdTextureResourceSharedPtr
-    GetTextureResource(UsdPrim const& usdPrim, SdfPath const &id, UsdTimeCode time) const override;
+    GetTextureResource(UsdPrim const& usdPrim, SdfPath const &id, UsdTimeCode time) const;
 
 protected:
     USDIMAGING_API

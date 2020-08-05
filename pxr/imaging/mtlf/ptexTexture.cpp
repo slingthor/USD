@@ -56,8 +56,9 @@ using namespace boost;
 PXR_NAMESPACE_OPEN_SCOPE
 
 //------------------------------------------------------------------------------
-MtlfPtexTexture::MtlfPtexTexture(const TfToken &imageFilePath)
-: GarchPtexTexture(imageFilePath)
+MtlfPtexTexture::MtlfPtexTexture(const TfToken &imageFilePath,
+                                 const bool premultiplyAlpha)
+: GarchPtexTexture(imageFilePath, premultiplyAlpha)
 {
 }
 

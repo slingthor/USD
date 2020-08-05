@@ -55,9 +55,25 @@ using std::string;
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+TF_REGISTRY_FUNCTION(TfType)
+{
+    typedef GlfPtexTexture Type;
+    TfType t = TfType::Define<Type, TfType::Bases<GlfTexture> >();
+    t.SetFactory< GlfTextureFactory<Type> >();
+}
+
 //------------------------------------------------------------------------------
-GlfPtexTexture::GlfPtexTexture(const TfToken &imageFilePath)
+GlfPtexTextureRefPtr
+GlfPtexTexture::New(const TfToken &imageFilePath, const bool premultiplyAlpha)
+{
+    return TfCreateRefPtr(new GlfPtexTexture(imageFilePath, premultiplyAlpha));
+}
+
+//------------------------------------------------------------------------------
+GlfPtexTexture::GlfPtexTexture(const TfToken &imageFilePath, 
+                               const bool premultiplyAlpha) :
 : GarchPtexTexture(imageFilePath)
+, _premultiplyAlpha(premultiplyAlpha)
 { 
 }
 
@@ -86,7 +102,8 @@ GlfPtexTexture::_ReadImage()
     // create a temporary ptex cache
     // (required to build guttering pixels efficiently)
     static const int PTEX_MAX_CACHE_SIZE = 128*1024*1024;
-    PtexCache *cache = PtexCache::create(1, PTEX_MAX_CACHE_SIZE);
+    PtexCache *cache = PtexCache::create(1, PTEX_MAX_CACHE_SIZE, 
+                                         _premultiplyAlpha);
     if (!cache) {
         TF_WARN("Unable to create PtexCache");
         return false;

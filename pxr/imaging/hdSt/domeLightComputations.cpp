@@ -97,6 +97,15 @@ HdSt_DomeLightComputationGPU::_GetSrcTextureDimensionsAndGLName(
     if (!TF_VERIFY(srcTextureObject)) {
         return false;
     }
+
+    if (!srcTextureObject->IsValid()) {
+        const std::string &filePath =
+            srcTextureObject->GetTextureIdentifier().GetFilePath();
+        TF_WARN("Could not open dome light texture file at %s.",
+                filePath.c_str());
+        return false;
+    }
+
     const HgiTexture * const srcTexture = srcTextureObject->GetTexture().Get();
     if (!TF_VERIFY(srcTexture)) {
         return false;

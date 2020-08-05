@@ -493,8 +493,6 @@ HdSt_QuadrangulateComputationGPU::Execute(
         = HdStGLSLProgram::GetComputeProgram(shaderToken, hdStResourceRegistry);
     if (!computeProgram) return;
 
-    HgiShaderProgramHandle const& hgiProgram = computeProgram->GetProgram();
-
     HdStBufferArrayRangeSharedPtr range_ =
         std::static_pointer_cast<HdStBufferArrayRange> (range);
 

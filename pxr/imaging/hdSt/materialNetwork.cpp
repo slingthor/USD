@@ -57,6 +57,8 @@ TF_DEFINE_PRIVATE_TOKENS(
     (st)
     (uv)
     (fieldname)
+    (diffuseColor)
+    (a)
 
     (HwUvTexture_1)
 
@@ -785,23 +787,28 @@ _GetSamplerParameters(
 }
 
 //
-// We need to flip the image for the legacy HwUvTexture_1 shader node.
+// We need to flip the image for the legacy HwUvTexture_1 shader node and 
+// pre-multiply textures by their alpha if applicable
 //
 static
 std::unique_ptr<HdStSubtextureIdentifier>
 _GetSubtextureIdentifier(
     const HdTextureType textureType,
-    const TfToken &nodeType)
+    const TfToken &nodeType,
+    const bool premultiplyAlpha)
 {
-    if (textureType != HdTextureType::Uv) {
-        return nullptr;
+    if (textureType == HdTextureType::Uv) {
+        const bool flipVertically = (nodeType == _tokens->HwUvTexture_1);
+        return std::make_unique<HdStAssetUvSubtextureIdentifier>(flipVertically, 
+            premultiplyAlpha);
+    } 
+    if (textureType == HdTextureType::Udim) {
+        return std::make_unique<HdStUdimSubtextureIdentifier>(premultiplyAlpha);
     }
-
-    const bool flipVertically = (nodeType == _tokens->HwUvTexture_1);
-
-    return
-        std::make_unique<HdStUvOrientationSubtextureIdentifier>(
-            flipVertically);
+    if (textureType == HdTextureType::Ptex) {
+        return std::make_unique<HdStPtexSubtextureIdentifier>(premultiplyAlpha);
+    }
+    return nullptr;
 }
 
 static void
@@ -836,11 +843,34 @@ _MakeMaterialParamsForTexture(
         }
     }
 
+    // Determine the texture type
+    texParam.textureType = HdTextureType::Uv;
+    if (sdrNode && sdrNode->GetMetadata().count(_tokens->isPtex)) {
+        texParam.textureType = HdTextureType::Ptex;
+    }
+
+    // Determine if texture should be pre-multiplied on CPU
+    // Currently, this will only happen if the texture param is called 
+    // "diffuseColor" and if there is another param "opacity" connected to the
+    // same texture node via output "a"
+    bool premultiplyTexture = false;
+    if (paramName == _tokens->diffuseColor) {
+        auto const& opacityConIt = downstreamNode.inputConnections.find(
+            _tokens->opacity);
+        if (opacityConIt != downstreamNode.inputConnections.end()) {
+            HdSt_MaterialConnection const& con = opacityConIt->second.front();
+            premultiplyTexture = ((nodePath == con.upstreamNode) && 
+                                  (con.upstreamOutputName == _tokens->a));
+        } 
+    }
+    texParam.isPremultiplied = premultiplyTexture;
+
     // Extract texture file path
-    std::string filePath;
     bool useTexturePrimToFindTexture = true;
     
     SdfPath texturePrimPathForSceneDelegate;
+
+    HdStTextureIdentifier textureId;
 
     NdrTokenVec const& assetIdentifierPropertyNames = 
         sdrNode->GetAssetIdentifierInputNames();
@@ -856,39 +886,56 @@ _MakeMaterialParamsForTexture(
             // prim (by path) to query the file attribute value for filepath.
             // The reason for this re-direct is to support other texture uses
             // such as render-targets.
-            filePath = _ResolveAssetPath(v);
             texturePrimPathForSceneDelegate = nodePath;
 
+            // Use the type of the filePath attribute to determine
+            // whether to use the Storm texture system (for
+            // SdfAssetPath/std::string/ HdStTextureIdentifier) or use
+            // the HdSceneDelegate::GetTextureResource/ID (for all
+            // other types). The
+            // HdSceneDelegate::GetTextureResource/ID path will be
+            // obsoleted and probably removed at some point.
+
+            if (v.IsHolding<HdStTextureIdentifier>()) {
+                //
+                // Clients can explicitly give an HdStTextureIdentifier for
+                // more direct control since they can give an instance of
+                // HdStSubtextureIdentifier.
+                //
+                // Examples are, e.g., HdStUvAssetSubtextureIdentifier
+                // allowing clients to flip the texture. Clients can even
+                // subclass from HdStDynamicUvSubtextureIdentifier and
+                // HdStDynamicUvTextureImplementation to implement their own
+                // texture loading and commit.
+                //
+                useTexturePrimToFindTexture = false;
+                textureId = v.UncheckedGet<HdStTextureIdentifier>();
+            } else if (v.IsHolding<std::string>() ||
+                       v.IsHolding<SdfAssetPath>()) {
+                const std::string filePath = _ResolveAssetPath(v);
+
+                if (GarchIsSupportedUdimTexture(filePath)) {
+                    texParam.textureType = HdTextureType::Udim;
+                }
+                
+                useTexturePrimToFindTexture = false;
+                textureId = HdStTextureIdentifier(
+                    TfToken(filePath),
+                    _GetSubtextureIdentifier(
+                        texParam.textureType, 
+                        node.nodeTypeId, 
+                        premultiplyTexture));
             // If the file attribute is an SdfPath, interpret it as path
             // to a prim holding the texture resource (e.g., a render buffer).
-            if (HdStDrawTarget::GetUseStormTextureSystem()) {
-                if (v.IsHolding<SdfPath>()) {
-                    texturePrimPathForSceneDelegate = v.UncheckedGet<SdfPath>();
-                }
-            }
-            
-            // Use the type of the filePath attribute to determine whether
-            // to use the Storm texture system (for SdfAssetPath/std::string)
-            // or use the HdSceneDelegate::GetTextureResource/ID (for all other
-            // types). The HdSceneDelegate::GetTextureResource/ID path will
-            // be obsoleted and probably removed at some point.
-            if (v.IsHolding<SdfAssetPath>() || v.IsHolding<std::string>()) {
-                useTexturePrimToFindTexture = false;
+            } else if (HdStDrawTarget::GetUseStormTextureSystem() &&
+                       v.IsHolding<SdfPath>()) {
+                texturePrimPathForSceneDelegate = v.UncheckedGet<SdfPath>();
             }
         }
     } else {
         TF_WARN("Invalid number of asset identifier input names: %s",
                 nodePath.GetText());
     }
-
-    // Determine the texture type
-    HdTextureType textureType = HdTextureType::Uv;
-    if (sdrNode && sdrNode->GetMetadata().count(_tokens->isPtex)) {
-        textureType = HdTextureType::Ptex;
-    } else if (GarchIsSupportedUdimTexture(filePath)) {
-        textureType = HdTextureType::Udim;
-    }
-    texParam.textureType = textureType;
 
     // Check to see if a primvar or transform2d node is connected to 'st' or 
     // 'uv'.
@@ -1001,10 +1048,10 @@ _MakeMaterialParamsForTexture(
                                                            GfVec4f(0.0f)));
     params->push_back(std::move(texBiasParam));
 
-    // Note that the memory request is apparently authored as
-    // float even though it is in bytes and thus should be an integral
-    // type.
+    // Attribute is in Mebibytes, but Storm texture system expects
+    // bytes.
     const size_t memoryRequest =
+        1048576 *
         _ResolveParameter<float>(node, sdrNode, _tokens->textureMemory, 0.0f);
 
     // Given to HdSceneDelegate::GetTextureResourceID.
@@ -1015,10 +1062,8 @@ _MakeMaterialParamsForTexture(
     //
     textureDescriptors->push_back(
         { paramName,
-          HdStTextureIdentifier(
-              TfToken(filePath),
-              _GetSubtextureIdentifier(textureType, node.nodeTypeId)),
-          textureType,
+          textureId,
+          texParam.textureType,
           _GetSamplerParameters(nodePath, node, sdrNode),
           memoryRequest,
           useTexturePrimToFindTexture,
@@ -1114,7 +1159,6 @@ _MakeParamsForInputParameter(
                 if (upstreamSdr) {
                     TfToken sdrRole(upstreamSdr->GetRole());
                     if (sdrRole == SdrNodeRole->Texture) {
-
                         _MakeMaterialParamsForTexture(
                             network,
                             upstreamNode,
@@ -1126,9 +1170,7 @@ _MakeParamsForInputParameter(
                             params,
                             textureDescriptors);
                         return;
-
                     } else if (sdrRole == SdrNodeRole->Primvar) {
-
                         _MakeMaterialParamsForPrimvarReader(
                             network,
                             upstreamNode,
@@ -1137,7 +1179,6 @@ _MakeParamsForInputParameter(
                             visitedNodes,
                             params);
                         return;
-
                     } else if (sdrRole == SdrNodeRole->Field) {
                         _MakeMaterialParamsForFieldReader(
                             network,

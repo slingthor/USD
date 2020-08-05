@@ -323,8 +323,7 @@ HdStMesh::_PopulateTopology(HdSceneDelegate *sceneDelegate,
                     // Quadrangulate preprocessing
                     HdSt_QuadInfoBuilderComputationSharedPtr quadInfoBuilder =
                         topology->GetQuadInfoBuilderComputation(
-                            GarchResourceFactory::GetInstance()->GetContextCaps().gpuComputeEnabled,
-                            id, resourceRegistry.get());
+                            /*GPU*/ true, id, resourceRegistry.get());
                     resourceRegistry->AddSource(quadInfoBuilder);
                 }
             }
@@ -461,24 +460,22 @@ HdStMesh::_PopulateAdjacency(HdStResourceRegistrySharedPtr const &resourceRegist
 
         resourceRegistry->AddSource(adjacencyComputation);
 
-        if (GarchResourceFactory::GetInstance()->GetContextCaps().gpuComputeEnabled) {
-            // also send adjacency table to gpu
-            HdBufferSourceSharedPtr adjacencyForGpuComputation =
-                HdBufferSourceSharedPtr(
-                    new Hd_AdjacencyBufferSource(
-                        adjacency.get(), adjacencyComputation));
+        // also send adjacency table to gpu
+        HdBufferSourceSharedPtr adjacencyForGpuComputation =
+            HdBufferSourceSharedPtr(
+                new Hd_AdjacencyBufferSource(
+                    adjacency.get(), adjacencyComputation));
 
-            HdBufferSpecVector bufferSpecs;
-            adjacencyForGpuComputation->GetBufferSpecs(&bufferSpecs);
+        HdBufferSpecVector bufferSpecs;
+        adjacencyForGpuComputation->GetBufferSpecs(&bufferSpecs);
 
-            HdBufferArrayRangeSharedPtr adjRange =
-                resourceRegistry->AllocateNonUniformBufferArrayRange(
-                    HdTokens->topology, bufferSpecs, HdBufferArrayUsageHint());
+        HdBufferArrayRangeSharedPtr adjRange =
+            resourceRegistry->AllocateNonUniformBufferArrayRange(
+                HdTokens->topology, bufferSpecs, HdBufferArrayUsageHint());
 
-            adjacency->SetAdjacencyRange(adjRange);
-            resourceRegistry->AddSource(adjRange,
-                                        adjacencyForGpuComputation);
-        }
+        adjacency->SetAdjacencyRange(adjRange);
+        resourceRegistry->AddSource(adjRange,
+                                    adjacencyForGpuComputation);
 
         adjacencyInstance.SetValue(adjacency);
     }
@@ -494,31 +491,15 @@ _QuadrangulatePrimvar(HdBufferSourceSharedPtr const &source,
 {
     if (!TF_VERIFY(computations)) return source;
 
-    if (!GarchResourceFactory::GetInstance()->GetContextCaps().gpuComputeEnabled) {
-        // CPU quadrangulation
-        // set quadrangulation as source instead of original source.
-        HdBufferSourceSharedPtr quadsource =
-            topology->GetQuadrangulateComputation(source, id);
-
-        if (quadsource) {
-            // don't transfer source to gpu, it needs to be quadrangulated.
-            // It will be resolved as a pre-chained source.
-            return quadsource;
-        } else {
-            return source;
-        }
-    } else {
-        // GPU quadrangulation computation needs original vertices to be
-        // transfered
-        HdComputationSharedPtr computation =
-            topology->GetQuadrangulateComputationGPU(
-                source->GetName(), source->GetTupleType().type, id);
-        // computation can be null for all quad mesh.
-        if (computation) {
-            computations->push_back(computation);
-        }
-        return source;
+    // GPU quadrangulation computation needs original vertices to be transfered
+    HdComputationSharedPtr computation =
+        topology->GetQuadrangulateComputationGPU(
+            source->GetName(), source->GetTupleType().type, id);
+    // computation can be null for all quad mesh.
+    if (computation) {
+        computations->push_back(computation);
     }
+    return source;
 }
 
 static HdBufferSourceSharedPtr
@@ -564,22 +545,14 @@ _RefinePrimvar(HdBufferSourceSharedPtr const &source,
 {
     if (!TF_VERIFY(computations)) return source;
 
-    if (!GarchResourceFactory::GetInstance()->GetContextCaps().gpuComputeEnabled) {
-        // CPU subdivision
-        // note: if the topology is empty, the source will be returned
-        //       without change. We still need the type of buffer
-        //       to get the codegen work even for empty meshes
-        return topology->GetOsdRefineComputation(source, varying);
-    } else {
-        // GPU subdivision
-        HdComputationSharedPtr computation =
-            topology->GetOsdRefineComputationGPU(
-                source->GetName(),
-                source->GetTupleType().type);
-        // computation can be null for empty mesh
-        if (computation)
-            computations->push_back(computation);
-    }
+    // GPU subdivision
+    HdComputationSharedPtr computation =
+        topology->GetOsdRefineComputationGPU(
+            source->GetName(),
+            source->GetTupleType().type);
+    // computation can be null for empty mesh
+    if (computation)
+        computations->push_back(computation);
 
     return source;
 }
@@ -628,9 +601,6 @@ HdStMesh::_PopulateVertexPrimvars(HdSceneDelegate *sceneDelegate,
 
     int numPoints = _topology ? _topology->GetNumPoints() : 0;
     int refineLevel = _topology ? _topology->GetRefineLevel() : 0;
-
-    bool cpuNormals = (!GarchResourceFactory::GetInstance()->
-                            GetContextCaps().gpuComputeEnabled);
 
     // Don't call _GetRefineLevelForDesc(desc) instead of GetRefineLevel(). Why?
     //
@@ -809,86 +779,55 @@ HdStMesh::_PopulateVertexPrimvars(HdSceneDelegate *sceneDelegate,
         
         // The smooth normals computation uses the points primvar as a source.
         //
-        if (cpuNormals) {
-            // CPU smooth normals require the points source data
-            // So it is expected to be dirty.  So if the
-            // points variable is not set it means the points primvar is
-            // missing or invalid, so we skip smooth normals.
-            if (points) {
-                // CPU smooth normals depends on CPU adjacency.
-                //
-                HdBufferSourceSharedPtr normal =
-                    HdBufferSourceSharedPtr(
-                        new Hd_SmoothNormalsComputation(
-                            _vertexAdjacency.get(), points, normalsName,
-                            _vertexAdjacency->GetSharedAdjacencyBuilderComputation(
-                                _topology.get()),
-                            usePackedSmoothNormals));
-
-                if (doRefine) {
-                    normal = _RefinePrimvar(normal, /*varying=*/false,
-                                                      &computations, _topology);
-                } else if (doQuadrangulate) {
-                    normal = _QuadrangulatePrimvar(normal,
-                                                   &computations,
-                                                   _topology,
-                                                   id,
-                                                   resourceRegistry);
-                }
-
-                sources.push_back(normal);
-            }
+        // If we don't have the buffer source, we can get the points
+        // data type from the bufferspec in the vertex bar. We need it
+        // so we know what type normals should be.
+        HdType pointsDataType = HdTypeInvalid;
+        if (points) {
+            pointsDataType = points->GetTupleType().type;
         } else {
-            // If we don't have the buffer source, we can get the points
-            // data type from the bufferspec in the vertex bar. We need it
-            // so we know what type normals should be.
-            HdType pointsDataType = HdTypeInvalid;
-            if (points) {
-                pointsDataType = points->GetTupleType().type;
-            } else {
-                pointsDataType = _GetPointsDataTypeFromBar(drawItem);
-            }
+            pointsDataType = _GetPointsDataTypeFromBar(drawItem);
+        }
 
-            if (pointsDataType != HdTypeInvalid) {
-                // Smooth normals will compute normals as the same datatype
-                // as points, unless we ask for packed normals.
-                // This is unfortunate; can we force them to be float?
-                HdComputationSharedPtr smoothNormalsComputation(
-                    new HdSt_SmoothNormalsComputationGPU(
-                        _vertexAdjacency.get(),
-                        HdTokens->points,
-                        normalsName,
-                        pointsDataType,
-                        usePackedSmoothNormals));
-                computations.push_back(smoothNormalsComputation);
+        if (pointsDataType != HdTypeInvalid) {
+            // Smooth normals will compute normals as the same datatype
+            // as points, unless we ask for packed normals.
+            // This is unfortunate; can we force them to be float?
+            HdComputationSharedPtr smoothNormalsComputation(
+                new HdSt_SmoothNormalsComputationGPU(
+                    _vertexAdjacency.get(),
+                    HdTokens->points,
+                    normalsName,
+                    pointsDataType,
+                    usePackedSmoothNormals));
+            computations.push_back(smoothNormalsComputation);
 
-                // note: we haven't had explicit dependency for GPU
-                // computations just yet. Currently they are executed
-                // sequentially, so the dependency is expressed by
-                // registering order.
-                //
-                // note: we can use "pointsDataType" as the normals data type
-                // because, if we decided to refine/quadrangulate, we will have
-                // forced unpacked normals.
-                if (doRefine) {
-                    HdComputationSharedPtr computation =
-                        _topology->GetOsdRefineComputationGPU(
-                            HdStTokens->smoothNormals, pointsDataType);
+            // note: we haven't had explicit dependency for GPU
+            // computations just yet. Currently they are executed
+            // sequentially, so the dependency is expressed by
+            // registering order.
+            //
+            // note: we can use "pointsDataType" as the normals data type
+            // because, if we decided to refine/quadrangulate, we will have
+            // forced unpacked normals.
+            if (doRefine) {
+                HdComputationSharedPtr computation =
+                    _topology->GetOsdRefineComputationGPU(
+                        HdStTokens->smoothNormals, pointsDataType);
 
-                    // computation can be null for empty mesh
-                    if (computation) {
+                // computation can be null for empty mesh
+                if (computation) {
+                    computations.push_back(computation);
+                }
+            } else if (doQuadrangulate) {
+                HdComputationSharedPtr computation =
+                    _topology->GetQuadrangulateComputationGPU(
+                        HdStTokens->smoothNormals,
+                        pointsDataType, GetId());
+
+                // computation can be null for all-quad mesh
+                if (computation) {
                         computations.push_back(computation);
-                    }
-                } else if (doQuadrangulate) {
-                    HdComputationSharedPtr computation =
-                        _topology->GetQuadrangulateComputationGPU(
-                            HdStTokens->smoothNormals,
-                            pointsDataType, GetId());
-
-                    // computation can be null for all-quad mesh
-                    if (computation) {
-                            computations.push_back(computation);
-                    }
                 }
             }
         }
@@ -1265,42 +1204,32 @@ HdStMesh::_PopulateElementPrimvars(HdSceneDelegate *sceneDelegate,
         TfToken normalsName = usePackedNormals ?
             HdStTokens->packedFlatNormals : HdStTokens->flatNormals;
 
-        bool cpuNormals = (!GarchResourceFactory::GetInstance()->GetContextCaps().gpuComputeEnabled);
         // the flat normals computation uses the points primvar as a source.
-        if (cpuNormals) {
-            if (points) {
-                HdBufferSourceSharedPtr normal(
-                    new Hd_FlatNormalsComputation(
-                        _topology.get(),
-                        points, normalsName, usePackedNormals));
-                sources.push_back(normal);
-            }
+        //
+        // If we don't have the buffer source, we can get the points
+        // data type from the bufferspec in the vertex bar. We need it
+        // so we know what type normals should be.
+        HdType pointsDataType = HdTypeInvalid;
+        if (points) {
+            pointsDataType = points->GetTupleType().type;
         } else {
-            // If we don't have the buffer source, we can get the points
-            // data type from the bufferspec in the vertex bar. We need it
-            // so we know what type normals should be.
-            HdType pointsDataType = HdTypeInvalid;
-            if (points) {
-                pointsDataType = points->GetTupleType().type;
-            } else {
-                pointsDataType = _GetPointsDataTypeFromBar(drawItem);
-            }
+            pointsDataType = _GetPointsDataTypeFromBar(drawItem);
+        }
 
-            if (pointsDataType != HdTypeInvalid) {
-                // Flat normals will compute normals as the same datatype
-                // as points, unless we ask for packed normals.
-                // This is unfortunate; can we force them to be float?
-                HdComputationSharedPtr flatNormalsComputation(
-                    new HdSt_FlatNormalsComputationGPU(
-                        drawItem->GetTopologyRange(),
-                        drawItem->GetVertexPrimvarRange(),
-                        numFaces,
-                        HdTokens->points,
-                        normalsName,
-                        pointsDataType,
-                        usePackedNormals));
-                computations.push_back(flatNormalsComputation);
-            }
+        if (pointsDataType != HdTypeInvalid) {
+            // Flat normals will compute normals as the same datatype
+            // as points, unless we ask for packed normals.
+            // This is unfortunate; can we force them to be float?
+            HdComputationSharedPtr flatNormalsComputation(
+                new HdSt_FlatNormalsComputationGPU(
+                    drawItem->GetTopologyRange(),
+                    drawItem->GetVertexPrimvarRange(),
+                    numFaces,
+                    HdTokens->points,
+                    normalsName,
+                    pointsDataType,
+                    usePackedNormals));
+            computations.push_back(flatNormalsComputation);
         }
     }
 
@@ -1848,15 +1777,6 @@ HdStMesh::_PropagateDirtyBits(HdDirtyBits bits) const
                    (DirtyIndices      |
                     DirtyHullIndices  |
                     DirtyPointsIndices);
-    }
-
-    // If normals are dirty and we are doing CPU normals
-    // then the normals computation needs the points primvar
-    // so mark points as dirty, so that the scene delegate will provide
-    // the data.
-    if ((bits & (DirtySmoothNormals | DirtyFlatNormals)) &&
-        !GarchResourceFactory::GetInstance()->GetContextCaps().gpuComputeEnabled) {
-        bits |= HdChangeTracker::DirtyPoints;
     }
 
     return bits;

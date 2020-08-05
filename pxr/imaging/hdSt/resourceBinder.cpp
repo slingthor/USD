@@ -22,17 +22,15 @@
 // language governing permissions and limitations under the Apache License.
 //
 #include "pxr/imaging/glf/glew.h"
-
 #include "pxr/imaging/garch/contextCaps.h"
 #include "pxr/imaging/garch/resourceFactory.h"
 
+#include "pxr/imaging/hdSt/resourceBinder.h"
+#include "pxr/imaging/hdSt/glConversions.h"
 #include "pxr/imaging/hdSt/bufferArrayRange.h"
 #include "pxr/imaging/hdSt/bufferResource.h"
-#include "pxr/imaging/hdSt/drawItem.h"
-#include "pxr/imaging/hdSt/glConversions.h"
-#include "pxr/imaging/hdSt/resourceBinder.h"
 #include "pxr/imaging/hdSt/shaderCode.h"
-
+#include "pxr/imaging/hdSt/drawItem.h"
 #include "pxr/imaging/hdSt/materialParam.h"
 #include "pxr/imaging/hdSt/textureBinder.h"
 #include "pxr/imaging/hd/bufferSpec.h"
@@ -89,9 +87,6 @@ namespace {
                 break;
             case HdBinding::BINDLESS_SSBO_RANGE:
                 return HdBinding(HdBinding::BINDLESS_SSBO_RANGE, uniformLocation++);
-            case HdBinding::TBO:
-                return HdBinding(HdBinding::TBO, uniformLocation++, textureUnit++);
-                break;
             case HdBinding::BINDLESS_UNIFORM:
                 return HdBinding(HdBinding::BINDLESS_UNIFORM, uniformLocation++);
                 break;
@@ -188,11 +183,9 @@ HdSt_ResourceBinder::ResolveBindings(HdStDrawItem const *drawItem,
     const bool bindlessTextureEnabled
         = caps.bindlessTextureEnabled;
 
-    HdBinding::Type arrayBufferBindingType = HdBinding::TBO;  // 3.0
+    HdBinding::Type arrayBufferBindingType = HdBinding::SSBO;
     if (bindlessUniformEnabled) {
         arrayBufferBindingType = HdBinding::BINDLESS_UNIFORM; // EXT
-    } else if (ssboEnabled) {
-        arrayBufferBindingType = HdBinding::SSBO;             // 4.3
     }
 
     HdBinding::Type structBufferBindingType = HdBinding::UBO;  // 3.1
@@ -622,7 +615,9 @@ HdSt_ResourceBinder::ResolveBindings(HdStDrawItem const *drawItem,
                         MetaData::ShaderParameterAccessor(
                             /*name=*/glName,
                             /*type=*/glType,
-                            /*swizzle=*/glSwizzle);
+                            /*swizzle=*/glSwizzle,
+                            /*inPrimvars=*/param.samplerCoords,
+                            /*isPremultiplied=*/param.isPremultiplied);
                     _bindingMap[name] = texelBinding; // used for non-bindless
 
                     HdBinding layoutBinding = bindless
@@ -657,7 +652,8 @@ HdSt_ResourceBinder::ResolveBindings(HdStDrawItem const *drawItem,
                             /*name=*/param.name,
                             /*type=*/glType,
                             /*swizzle=*/glSwizzle,
-                            /*inPrimvars=*/param.samplerCoords);
+                            /*inPrimvars=*/param.samplerCoords,
+                            /*isPremultiplied=*/param.isPremultiplied);
                     // used for non-bindless
                     _bindingMap[param.name] = textureBinding;
 
@@ -694,6 +690,7 @@ HdSt_ResourceBinder::ResolveBindings(HdStDrawItem const *drawItem,
                             /*type=*/glType,
                             /*swizzle=*/glSwizzle,
                             /*inPrimvars=*/param.samplerCoords,
+                            /*isPremultiplied=*/param.isPremultiplied,
                             /*processTextureFallbackValue=*/isMaterialShader);
                     _bindingMap[name] = textureBinding; // used for non-bindless
                 } else if (param.textureType == HdTextureType::Field) {
@@ -711,6 +708,7 @@ HdSt_ResourceBinder::ResolveBindings(HdStDrawItem const *drawItem,
                             /*type=*/glType,
                             /*swizzle=*/glSwizzle,
                             /*inPrimvars=*/param.samplerCoords,
+                            /*isPremultiplied=*/param.isPremultiplied,
                             /*processTextureFallbackValue=*/isMaterialShader);
                     _bindingMap[name] = textureBinding; // used for non-bindless
                 }
@@ -795,7 +793,7 @@ HdSt_ResourceBinder::ResolveBindings(HdStDrawItem const *drawItem,
                     auto tupleType = nameRes.second->GetTupleType().type;
                     auto glslTypename = HdStGLConversions::GetGLSLTypename(tupleType);
                     BindingDeclaration b(nameRes.first, glslTypename,
-                        binding, HdStGLConversions::TypeIsAtomic(tupleType), it->isWritable());
+                        binding, HdStGLConversions::TypeIsAtomic(tupleType));
                     metaDataOut->customBindings.push_back(b);
                     _bindingMap[nameRes.first] = binding;
                 }
@@ -1035,7 +1033,6 @@ HdSt_ResourceBinder::MetaData::ComputeHash() const
         boost::hash_combine(hash, binDecl->dataType);
         boost::hash_combine(hash, binDecl->binding.GetType());
         boost::hash_combine(hash, binDecl->binding.GetLocation());
-        boost::hash_combine(hash, binDecl->writable);
     }
 
     boost::hash_combine(hash, 0); // separator

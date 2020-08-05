@@ -62,9 +62,11 @@ public:
     GLF_API
     virtual ~GlfPtexTexture();
 
+    static GlfPtexTextureRefPtr New(const TfToken &imageFilePath,
+                                    const bool premultiplyAlpha=false);
 protected:
     GLF_API
-    GlfPtexTexture(const TfToken &imageFilePath);
+    GlfPtexTexture(const TfToken &imageFilePath, const bool premultiplyAlpha);
     
     friend class GlfResourceFactory;
 

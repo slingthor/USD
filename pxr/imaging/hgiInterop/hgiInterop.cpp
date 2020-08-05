@@ -50,7 +50,8 @@ HgiInterop::~HgiInterop()
 
 void HgiInterop::TransferToApp(
     Hgi *hgi,
-    TfToken const& interopDst,
+    TfToken const &interopDst,
+    GfVec4i const &compRegion,
     HgiTextureHandle const &color,
     HgiTextureHandle const &depth)
 {
@@ -66,7 +67,7 @@ void HgiInterop::TransferToApp(
         if (!_metalToOpenGL) {
             _metalToOpenGL.reset(new HgiInteropMetal(hgi));
         }
-        _metalToOpenGL->CompositeToInterop(color, depth);
+        _metalToOpenGL->CompositeToInterop(color, depth, compRegion);
     } else {
         TF_CODING_ERROR("Unsupported Hgi backed: %s", gfxApi.GetText());
     }
@@ -76,7 +77,7 @@ void HgiInterop::TransferToApp(
         if (!_openGLToOpenGL) {
             _openGLToOpenGL.reset(new HgiInteropOpenGL());
         }
-        _openGLToOpenGL->CompositeToInterop(color, depth);
+        _openGLToOpenGL->CompositeToInterop(color, depth, compRegion);
     } else if (gfxApi==HgiTokens->Vulkan && interopDst==HgiTokens->OpenGL) {
         // Transfer Vulkan textures to OpenGL application
         TF_CODING_ERROR("TODO Implement Vulkan/GL interop");

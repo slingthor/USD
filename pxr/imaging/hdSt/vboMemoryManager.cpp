@@ -369,12 +369,12 @@ HdStVBOMemoryManager::_StripedBufferArray::Reallocate(
             std::vector<size_t>::iterator newOffsetIt = newOffsets.begin();
 
             // pre-pass to combine consecutive buffer range relocation
-            std::unique_ptr<HdStGLBufferRelocator> relocators[3];
+            std::unique_ptr<HdStBufferRelocator> relocators[3];
             
             for (int i = 0; i < 3; i++) {
                 int const curIndex = curIds[i] ? i : 0;
                 if (newIds[i]) {
-                    relocators[i] = std::make_unique<HdStGLBufferRelocator>(curIds[curIndex], newIds[i]);
+                    relocators[i] = std::make_unique<HdStBufferRelocator>(curIds[curIndex], newIds[i]);
                 }
             }
             TF_FOR_ALL (it, ranges) {

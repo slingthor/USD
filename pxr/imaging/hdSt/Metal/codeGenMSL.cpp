@@ -196,7 +196,6 @@ static bool InDeviceMemory(const HdBinding binding)
     switch (binding.GetType()) {
         case HdBinding::SSBO:
         case HdBinding::UBO:
-        case HdBinding::TBO:
             return true;
         default:
             return false;
@@ -535,7 +534,7 @@ static HdSt_CodeGenMSL::TParam& _AddInputPtrParam(
 {
     return _AddInputPtrParam(inputParams,
                         bd.name, bd.dataType, attribute,
-                        bd.binding, arraySize, programScope, bd.writable);
+                        bd.binding, arraySize, programScope);
 }
 
 static void _EmitDeclaration(std::stringstream &str,
@@ -744,7 +743,6 @@ namespace {
             break;
         case HdBinding::UNIFORM:
         case HdBinding::UNIFORM_ARRAY:
-        case HdBinding::TBO:
         case HdBinding::SSBO:
         case HdBinding::BINDLESS_UNIFORM:
         case HdBinding::TEXTURE_2D:
@@ -3018,10 +3016,7 @@ static void _EmitComputeAccessor(
         str << _GetUnpackedType(type, false)
             << " HdGet_" << name << "(int localIndex) {\n"
             << "  int index = " << index << ";\n";
-        if (binding.GetType() == HdBinding::TBO) {
-            str << "  return texelFetch("
-                << name << ", index)" << _GetPackedTypeAccessor(type, false) << ";\n}\n";
-        } else if (binding.GetType() == HdBinding::SSBO) {
+        if (binding.GetType() == HdBinding::SSBO) {
             str << "  return " << _GetPackedTypeAccessor(type, false) << "(";
             int numComponents = _GetNumComponents(type);
             for (int c = 0; c < numComponents; ++c) {
@@ -3109,15 +3104,8 @@ static void _EmitAccessor(std::stringstream &str,
         str << _GetUnpackedType(type, false)
             << " HdGet_" << name << "(int localIndex) {\n"
             << "  int index = " << index << ";\n";
-        if (binding.GetType() == HdBinding::TBO) {
-            str << "  return "
-                << _GetPackedTypeAccessor(type, false)
-                << "(texelFetch(" << name << ", index)"
-                << _GetSwizzleString(type) << ");\n}\n";
-        } else {
-            str << "  return " << _GetPackedTypeAccessor(type, true) << "("
-                << name << "[index]);\n}\n";
-        }
+        str << "  return " << _GetPackedTypeAccessor(type, true) << "("
+            << name << "[index]);\n}\n";
     } else {
         // non-indexed, only makes sense for uniform or vertex.
         if (binding.GetType() == HdBinding::UNIFORM ||
@@ -3537,7 +3525,7 @@ HdSt_CodeGenMSL::_GenerateBindingsCode()
             if (binDecl->binding.GetType() == HdBinding::SSBO)
             {
                 indexStr = "localIndex";
-                if (binDecl->typeIsAtomic || binDecl->writable)
+                if (binDecl->typeIsAtomic)
                 {
                     _EmitDeclarationMutablePtr(_genCommon, *binDecl);
                 }

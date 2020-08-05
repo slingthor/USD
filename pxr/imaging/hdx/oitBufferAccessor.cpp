@@ -112,29 +112,25 @@ HdxOitBufferAccessor::AddOitBufferBindings(
             HdBindingRequest(HdBinding::SSBO,
                              HdxTokens->oitCounterBufferBar,
                              counterBar,
-                             /*interleave = */ false,
-                             true));
+                             /*interleave = */ false));
 
         shader->AddBufferBinding(
             HdBindingRequest(HdBinding::SSBO,
                              HdxTokens->oitDataBufferBar,
                              dataBar,
-                             /*interleave = */ false,
-                             true));
+                             /*interleave = */ false));
         
         shader->AddBufferBinding(
             HdBindingRequest(HdBinding::SSBO,
                              HdxTokens->oitDepthBufferBar,
                              depthBar,
-                             /*interleave = */ false,
-                             true));
+                             /*interleave = */ false));
         
         shader->AddBufferBinding(
             HdBindingRequest(HdBinding::SSBO,
                              HdxTokens->oitIndexBufferBar,
                              indexBar,
-                             /*interleave = */ false,
-                             true));
+                             /*interleave = */ false));
         
         shader->AddBufferBinding(
             HdBindingRequest(HdBinding::UBO, 
