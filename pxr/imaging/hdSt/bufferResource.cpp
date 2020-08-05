@@ -48,7 +48,7 @@
 #include "pxr/imaging/hgi/hgi.h"
 #include "pxr/imaging/hgi/tokens.h"
 
-#if defined(ARCH_OS_MACOS)
+#if defined(ARCH_OS_MACOS) || defined(ARCH_OS_IOS)
 #include "pxr/imaging/hgiMetal/buffer.h"
 #endif
 
