@@ -22,10 +22,6 @@
 // language governing permissions and limitations under the Apache License.
 //
 #include "pxr/imaging/glf/glew.h"
-
-#include "pxr/imaging/garch/contextCaps.h"
-#include "pxr/imaging/garch/resourceFactory.h"
-
 #include "pxr/imaging/glf/diagnostic.h"
 
 #include "pxr/imaging/hdSt/copyComputation.h"
@@ -53,7 +49,7 @@ HdStCopyComputationGPU::HdStCopyComputationGPU(
 
 void
 HdStCopyComputationGPU::Execute(HdBufferArrayRangeSharedPtr const &range_,
-                              HdResourceRegistry *resourceRegistry)
+                                HdResourceRegistry *resourceRegistry)
 {
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
@@ -92,8 +88,6 @@ HdStCopyComputationGPU::Execute(HdBufferArrayRangeSharedPtr const &range_,
     GLintptr writeOffset = dstRange->GetByteOffset(_name) + dstRes->GetOffset();
     GLsizeiptr copySize = srcResSize;
 
-    GarchContextCaps const &caps = GarchResourceFactory::GetInstance()->GetContextCaps();
-
     // Unfortunately at the time the copy computation is added, we don't
     // know if the source buffer has 0 length.  So we can get here with
     // a zero sized copy.
@@ -103,7 +97,6 @@ HdStCopyComputationGPU::Execute(HdBufferArrayRangeSharedPtr const &range_,
         // be allocated, so the check for resource allocation has been moved
         // until after the copy size check.
 
-        // Create a virtual copy method on the ArrayRange object to do the below block
         GLint srcId = srcRes->GetId()->GetRawResource();
         GLint dstId = dstRes->GetId()->GetRawResource();
 
@@ -113,7 +106,9 @@ HdStCopyComputationGPU::Execute(HdBufferArrayRangeSharedPtr const &range_,
         if (!TF_VERIFY(dstId)) {
             return;
         }
-        
+
+        HD_PERF_COUNTER_INCR(HdStPerfTokens->copyBufferGpuToGpu);
+
         HdStResourceRegistry* hdStResourceRegistry =
             static_cast<HdStResourceRegistry*>(resourceRegistry);
 

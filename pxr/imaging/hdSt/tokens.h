@@ -61,7 +61,6 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 #define HDST_RENDER_SETTINGS_TOKENS             \
     (enableTinyPrimCulling)                     \
-    (graphicsAPI)                               \
     (volumeRaymarchingStepSize)                 \
     (volumeRaymarchingStepSizeLighting)
 
