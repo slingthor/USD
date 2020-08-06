@@ -55,25 +55,10 @@ using std::string;
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-TF_REGISTRY_FUNCTION(TfType)
-{
-    typedef GlfPtexTexture Type;
-    TfType t = TfType::Define<Type, TfType::Bases<GlfTexture> >();
-    t.SetFactory< GlfTextureFactory<Type> >();
-}
-
-//------------------------------------------------------------------------------
-GlfPtexTextureRefPtr
-GlfPtexTexture::New(const TfToken &imageFilePath, const bool premultiplyAlpha)
-{
-    return TfCreateRefPtr(new GlfPtexTexture(imageFilePath, premultiplyAlpha));
-}
-
 //------------------------------------------------------------------------------
 GlfPtexTexture::GlfPtexTexture(const TfToken &imageFilePath, 
                                const bool premultiplyAlpha) :
-: GarchPtexTexture(imageFilePath)
-, _premultiplyAlpha(premultiplyAlpha)
+: GarchPtexTexture(imageFilePath, premultiplyAlpha)
 { 
 }
 
