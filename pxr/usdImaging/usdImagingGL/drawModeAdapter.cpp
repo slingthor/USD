@@ -198,6 +198,15 @@ UsdImagingGLDrawModeAdapter::Populate(UsdPrim const& prim,
         return SdfPath();
     }
 
+    // As long as we're passing cachePrim to InsertRprim, we need to fix up
+    // the dependency map ourselves. For USD edit purposes, we depend on the
+    // prototype prim ("prim"), rather than the instancer prim.
+    // See similar code in GprimAdapter::_AddRprim.
+    if (instancerContext != nullptr) {
+        index->RemovePrimInfoDependency(cachePath);
+        index->AddDependency(cachePath, prim);
+    }
+
     // Additionally, insert the material.
     SdfPath materialPath = _GetMaterialPath(prim);
     if (index->IsSprimTypeSupported(HdPrimTypeTokens->material) &&
@@ -321,11 +330,15 @@ UsdImagingGLDrawModeAdapter::TrackVariability(UsdPrim const& prim,
 
     UsdImagingValueCache* valueCache = _GetValueCache();
 
-    // Discover time-varying transforms.
-    _IsTransformVarying(prim,
+    // Discover time-varying transforms. If this card is instantiated on an
+    // instance, skip since the instance adapter will handle transforms
+    // and master roots always have identity transform.
+    if (!prim.IsInstance()) {
+        _IsTransformVarying(prim,
             HdChangeTracker::DirtyTransform,
             UsdImagingTokens->usdVaryingXform,
             timeVaryingBits);
+    }
 
     // Discover time-varying visibility.
     _IsVarying(prim,
@@ -473,7 +486,14 @@ UsdImagingGLDrawModeAdapter::UpdateForTime(UsdPrim const& prim,
     HdPrimvarDescriptorVector& primvars = valueCache->GetPrimvars(cachePath);
 
     if (requestedBits & HdChangeTracker::DirtyTransform) {
-        valueCache->GetTransform(cachePath) = GetTransform(prim, time);
+        // If the draw mode is instantiated on an instance, prim will be
+        // the instance prim, but we want to ignore transforms on that
+        // prim since the instance adapter will handle them.
+        if (prim.IsInstance()) {
+            valueCache->GetTransform(cachePath) = GfMatrix4d(1.0);
+        } else {
+            valueCache->GetTransform(cachePath) = GetTransform(prim, time);
+        }
     }
 
     if (requestedBits & HdChangeTracker::DirtyVisibility) {
@@ -641,22 +661,51 @@ UsdImagingGLDrawModeAdapter::ProcessPropertyChange(UsdPrim const& prim,
                                                  SdfPath const& cachePath,
                                                  TfToken const& propertyName)
 {
+    const std::array<TfToken, 6> textureAttrs = {
+        UsdGeomTokens->modelCardTextureXPos,
+        UsdGeomTokens->modelCardTextureYPos,
+        UsdGeomTokens->modelCardTextureZPos,
+        UsdGeomTokens->modelCardTextureXNeg,
+        UsdGeomTokens->modelCardTextureYNeg,
+        UsdGeomTokens->modelCardTextureZNeg,
+    };
+
+    if (_IsMaterialPath(cachePath)) {
+        // Check if a texture has been changed.
+        for (const TfToken& attr : textureAttrs) {
+            if (propertyName == attr) {
+                return HdMaterial::DirtyResource;
+            }
+        }
+        return HdChangeTracker::Clean;
+    }
+
+    HdDirtyBits dirtyGeo =
+        HdChangeTracker::DirtyTopology | HdChangeTracker::DirtyPoints |
+        HdChangeTracker::DirtyPrimvar | HdChangeTracker::DirtyExtent;
+
     if (propertyName == UsdGeomTokens->modelDrawModeColor)
         return HdChangeTracker::DirtyPrimvar;
-    else if (propertyName == UsdGeomTokens->modelCardGeometry)
-        return (HdChangeTracker::DirtyTopology | HdChangeTracker::DirtyPoints);
-    else if (propertyName == UsdGeomTokens->extent)
-        return (HdChangeTracker::DirtyExtent | HdChangeTracker::DirtyPoints);
+    else if (propertyName == UsdGeomTokens->modelCardGeometry ||
+             propertyName == UsdGeomTokens->extent ||
+             propertyName == UsdGeomTokens->extentsHint)
+        return dirtyGeo;
     else if (propertyName == UsdGeomTokens->visibility ||
              propertyName == UsdGeomTokens->purpose)
         return HdChangeTracker::DirtyVisibility;
-    else if (propertyName == UsdGeomTokens->doubleSided)
-        return HdChangeTracker::Clean;
     else if (UsdGeomXformable::IsTransformationAffectedByAttrNamed(
                 propertyName))
         return HdChangeTracker::DirtyTransform;
 
-    return HdChangeTracker::AllDirty;
+    // In "cards" mode the texture assignments change what geometry
+    // is generated.
+    for (const TfToken& attr : textureAttrs) {
+        if (propertyName == attr) {
+            return dirtyGeo;
+        }
+    }
+
+    return HdChangeTracker::Clean;
 }
 
 void

@@ -29,8 +29,10 @@
 #include "pxr/imaging/hd/version.h"
 #include "pxr/imaging/hd/types.h"
 
-#include "pxr/imaging/hd/bufferArrayRange.h"
 #include "pxr/imaging/hd/bufferResource.h"
+#include "pxr/imaging/hd/bufferArrayRange.h"
+
+#include "pxr/base/tf/hash.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -60,7 +62,6 @@ public:
                 BINDLESS_UNIFORM,    //
                 UNIFORM,             //
                 UNIFORM_ARRAY,       //
-                TBO,                 //
 
                 // shader parameter bindings
                 FALLBACK,             // fallback value
@@ -140,7 +141,6 @@ public:
         , _resource(nullptr)
         , _bar(nullptr)
         , _isInterleaved(false)
-        , _isWritable(false)
     {}
 
     /// A data binding, not backed by neither BufferArrayRange nor
@@ -153,7 +153,6 @@ public:
         , _resource(nullptr)
         , _bar(nullptr)
         , _isInterleaved(false)
-        , _isWritable(false)
     {}
 
     /// A buffer resource binding. Binds a given buffer resource to a specified
@@ -166,7 +165,6 @@ public:
         , _resource(resource)
         , _bar(nullptr)
         , _isInterleaved(false)
-        , _isWritable(false)
     {}
 
     /// A named struct binding. From an interleaved BufferArray, an array of
@@ -176,14 +174,13 @@ public:
     /// Data types can be derived from each HdBufferResource of bar.
     HdBindingRequest(HdBinding::Type type, TfToken const& name,
                     HdBufferArrayRangeSharedPtr bar,
-                    bool interleave, bool writable = false)
+                    bool interleave)
         : _bindingType(type)
         , _dataType(HdTypeInvalid)
         , _name(name)
         , _resource(nullptr)
         , _bar(bar)
         , _isInterleaved(interleave)
-        , _isWritable(writable)
     {}
 
     // ---------------------------------------------------------------------- //
@@ -211,12 +208,6 @@ public:
         return _bar && _isInterleaved;
     }
 
-    /// True when the resource is being bound so that it can be written to. This affects whether
-    /// it will be declared 'const' or not.
-    bool isWritable() const {
-        return _bar && _isWritable;
-    }
-    
     /// This binding is typelss. CodeGen only allocate location and
     /// skip emitting declarations and accessors.
     bool IsTypeless() const {
@@ -270,6 +261,15 @@ public:
     HD_API
     size_t ComputeHash() const;
 
+    // TfHash support.
+    template <class HashState>
+    friend void TfHashAppend(HashState &h, HdBindingRequest const &br) {
+        h.Append(br._name,
+                 br._bindingType,
+                 br._dataType,
+                 br._isInterleaved);
+    }
+
 private:
     // This class unfortunately represents several concepts packed into a single
     // class.  Ideally, we would break this out as one class per concept,
@@ -287,8 +287,7 @@ private:
     // Struct binding request
     HdBufferArrayRangeSharedPtr _bar;
     bool _isInterleaved;
-    bool _isWritable;
-    
+
 };
 
 

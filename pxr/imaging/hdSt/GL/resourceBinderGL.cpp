@@ -85,9 +85,6 @@ namespace {
             case HdBinding::SSBO:
                 return HdBinding(HdBinding::SSBO, ssboLocation++);
                 break;
-            case HdBinding::TBO:
-                return HdBinding(HdBinding::TBO, uniformLocation++, textureUnit++);
-                break;
             case HdBinding::BINDLESS_UNIFORM:
                 return HdBinding(HdBinding::BINDLESS_UNIFORM, uniformLocation++);
                 break;
@@ -244,14 +241,6 @@ HdSt_ResourceBinderGL::BindBuffer(TfToken const &name,
                           offset,
                           buffer->GetStride());
         break;
-    case HdBinding::TBO:
-        if (loc != HdBinding::NOT_EXIST) {
-            glUniform1i(loc, textureUnit);
-            glActiveTexture(GL_TEXTURE0 + textureUnit);
-            glBindSampler(textureUnit, 0);
-            glBindTexture(GL_TEXTURE_BUFFER, bufferId);
-        }
-        break;
     case HdBinding::TEXTURE_2D:
     case HdBinding::TEXTURE_FIELD:
         // nothing
@@ -319,12 +308,6 @@ HdSt_ResourceBinderGL::UnbindBuffer(TfToken const &name,
     case HdBinding::UBO:
     case HdBinding::UNIFORM:
         glBindBufferBase(GL_UNIFORM_BUFFER, loc, 0);
-        break;
-    case HdBinding::TBO:
-        if (loc != HdBinding::NOT_EXIST) {
-            glActiveTexture(GL_TEXTURE0 + binding.GetTextureUnit());
-            glBindTexture(GL_TEXTURE_BUFFER, 0);
-        }
         break;
     case HdBinding::TEXTURE_2D:
     case HdBinding::TEXTURE_FIELD:
@@ -461,8 +444,7 @@ HdSt_ResourceBinderGL::IntrospectBindings(HdStGLSLProgramSharedPtr programResour
                 name = n.str();
             }
             if (type == HdBinding::UNIFORM       ||
-                type == HdBinding::UNIFORM_ARRAY ||
-                type == HdBinding::TBO) {
+                type == HdBinding::UNIFORM_ARRAY) {
                 GLint loc = glGetUniformLocation(program, name.c_str());
                 // update location in resource binder.
                 // some uniforms may be optimized out.

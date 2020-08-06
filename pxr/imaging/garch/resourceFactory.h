@@ -102,7 +102,7 @@ public:
                                                     unsigned int cropLeft,
                                                     unsigned int cropRight,
                                                     GarchImage::ImageOriginLocation originLocation) const = 0;
-    
+
     // BaseTexture
 	GARCH_API
     virtual GarchBaseTexture *NewBaseTexture() const = 0;
@@ -110,14 +110,16 @@ public:
 #ifdef PXR_PTEX_SUPPORT_ENABLED
     // Ptex Texture
     GARCH_API
-    virtual GarchPtexTextureRefPtr NewPtexTexture(const TfToken &imageFilePath) const = 0;
+    virtual GarchPtexTextureRefPtr NewPtexTexture(const TfToken &imageFilePath,
+                                                  const bool premultiplyAlpha) const = 0;
 #endif
     
     // UDIM Texture
     GARCH_API
     virtual GarchUdimTextureRefPtr NewUdimTexture(TfToken const& imageFilePath,
                                                   GarchImage::ImageOriginLocation originLocation,
-                                                  std::vector<std::tuple<int, TfToken>>&& tiles) const = 0;
+                                                  std::vector<std::tuple<int, TfToken>>&& tiles,
+                                                  const bool premultiplyAlpha) const = 0;
 
 protected:
 	GARCH_API

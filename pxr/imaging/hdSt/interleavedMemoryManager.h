@@ -135,15 +135,15 @@ public:
         /// Returns the GPU resource. If the buffer array contains more than one
         /// resource, this method raises a coding error.
         HDST_API
-        virtual HdStBufferResourceSharedPtr GetResource() const override;
+        virtual HdStBufferResourceSharedPtr GetResource() const;
 
         /// Returns the named GPU resource.
         HDST_API
-        virtual HdStBufferResourceSharedPtr GetResource(TfToken const& name) override;
+        virtual HdStBufferResourceSharedPtr GetResource(TfToken const& name);
 
         /// Returns the list of all named GPU resources for this bufferArrayRange.
         HDST_API
-        virtual HdStBufferResourceNamedList const& GetResources() const override;
+        virtual HdStBufferResourceNamedList const& GetResources() const;
 
         /// Sets the buffer array associated with this buffer;
         HDST_API

@@ -50,7 +50,8 @@ protected:
     GlfUdimTexture(
         TfToken const& imageFilePath,
         GarchImage::ImageOriginLocation originLocation,
-        std::vector<std::tuple<int, TfToken>>&& tiles);
+        std::vector<std::tuple<int, TfToken>>&& tiles,
+        bool const premultiplyAlpha);
 
     friend class GlfResourceFactory;
 

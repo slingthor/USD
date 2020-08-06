@@ -32,9 +32,9 @@
 #include "pxr/base/tf/iterator.h"
 
 #include "pxr/imaging/hdSt/bufferResource.h"
-
 #include "pxr/imaging/hdSt/glUtils.h"
 #include "pxr/imaging/hdSt/resourceFactory.h"
+#include "pxr/imaging/hdSt/tokens.h"
 #include "pxr/imaging/hdSt/vboSimpleMemoryManager.h"
 
 #include "pxr/imaging/hd/bufferArrayRange.h"
@@ -337,7 +337,7 @@ HdStVBOSimpleMemoryManager::_SimpleBufferArray::Reallocate(
         int newSize = range->GetNumElements();
         size_t copySize = std::min(oldSize, newSize) * bytesPerElement;
         if (copySize > 0) {
-            HD_PERF_COUNTER_INCR(HdPerfTokens->glCopyBufferSubData);
+            HD_PERF_COUNTER_INCR(HdStPerfTokens->copyBufferGpuToGpu);
 
             for (int i = 0; i < 3; i++) {
                 if (newIds[i]) {

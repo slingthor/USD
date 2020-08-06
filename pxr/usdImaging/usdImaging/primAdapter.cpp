@@ -433,23 +433,6 @@ UsdImagingPrimAdapter::PopulateSelection(
     return true;
 }
 
-HdTextureResource::ID
-UsdImagingPrimAdapter::GetTextureResourceID(UsdPrim const& usdPrim,
-                                            SdfPath const &id,
-                                            UsdTimeCode time,
-                                            size_t salt) const
-{
-    return HdTextureResource::ID(-1);
-}
-
-HdTextureResourceSharedPtr
-UsdImagingPrimAdapter::GetTextureResource(UsdPrim const& usdPrim,
-                                          SdfPath const &id,
-                                          UsdTimeCode time) const
-{
-    return nullptr;
-}
-
 HdVolumeFieldDescriptorVector
 UsdImagingPrimAdapter::GetVolumeFieldDescriptors(UsdPrim const& usdPrim,
 	                                         SdfPath const &id,
@@ -905,9 +888,6 @@ UsdImagingPrimAdapter::_IsVarying(UsdPrim prim,
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
 
-    // Unset the bit initially.
-    (*dirtyFlags) &= ~dirtyFlag;
-
     if (exists != nullptr) {
         *exists = false;
     }
@@ -938,9 +918,6 @@ UsdImagingPrimAdapter::_IsTransformVarying(UsdPrim prim,
 {
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
-
-    // Unset the bit initially.
-    (*dirtyFlags) &= ~dirtyFlag;
 
     UsdImaging_XformCache &xfCache = _delegate->_xformCache;
 

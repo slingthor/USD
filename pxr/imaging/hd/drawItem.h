@@ -196,6 +196,9 @@ public:
     void CountPrimitives(std::atomic_ulong &primCount, int numIndicesPerPrimitive) const;
     
 protected:
+    // TfHash support.
+    template <class HashState>
+    friend void TfHashAppend(HashState &h, HdDrawItem const &di);
 
     /// Returns the shared data
     HD_API

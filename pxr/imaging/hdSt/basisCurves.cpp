@@ -27,6 +27,7 @@
 #include "pxr/imaging/hdSt/basisCurvesComputations.h"
 #include "pxr/imaging/hdSt/basisCurvesShaderKey.h"
 #include "pxr/imaging/hdSt/basisCurvesTopology.h"
+#include "pxr/imaging/hdSt/bufferArrayRange.h"
 #include "pxr/imaging/hdSt/drawItem.h"
 #include "pxr/imaging/hdSt/extCompGpuComputation.h"
 #include "pxr/imaging/hdSt/geometricShader.h"
@@ -41,7 +42,6 @@
 #include "pxr/base/gf/matrix4f.h"
 #include "pxr/base/gf/vec2i.h"
 
-#include "pxr/imaging/hd/bufferArrayRange.h"
 #include "pxr/imaging/hd/bufferSource.h"
 #include "pxr/imaging/hd/computation.h"
 #include "pxr/imaging/hd/perfLog.h"

@@ -764,7 +764,13 @@ HgiInteropMetal::_RestoreOpenGlState()
     if (!_restoreVao) {
         for (int i = 0; i < 2; i++) {
             VertexAttribState &state(_restoreVertexAttribState[i]);
-            
+            if (state.enabled) {
+                glVertexAttribPointer(state.bufferBinding, state.size,
+                    state.type, state.normalized, state.stride, state.pointer);
+                glEnableVertexAttribArray(state.bufferBinding);
+            } else {
+                glDisableVertexAttribArray(state.bufferBinding);
+            }
         }
     }
     
@@ -779,7 +785,8 @@ HgiInteropMetal::_RestoreOpenGlState()
 }
 
 void
-HgiInteropMetal::_BlitToOpenGL(bool flipY, int shaderIndex)
+HgiInteropMetal::_BlitToOpenGL(GfVec4i const &compRegion,
+                               bool flipY, int shaderIndex)
 {
     // Clear GL error state
     _ProcessGLErrors(true);
@@ -839,6 +846,9 @@ HgiInteropMetal::_BlitToOpenGL(bool flipY, int shaderIndex)
                 _mtlAliasedColorTexture.width,
                 _mtlAliasedColorTexture.height);
     
+    // Region of the framebuffer over which to composite.
+    glViewport(compRegion[0], compRegion[1], compRegion[2], compRegion[3]);
+
     if (flipY) {
         if (shader.blitDepthScaleOffsetUniform != -1) {
             glUniform2f(shader.blitDepthScaleOffsetUniform, 1.0f, 0.0f);
@@ -859,7 +869,8 @@ HgiInteropMetal::_BlitToOpenGL(bool flipY, int shaderIndex)
 void
 HgiInteropMetal::CompositeToInterop(
     HgiTextureHandle const &color,
-    HgiTextureHandle const &depth)
+    HgiTextureHandle const &depth,
+    GfVec4i const &compRegion)
 {
     if (!ARCH_UNLIKELY(color)) {
         TF_CODING_ERROR("No valid color texture provided");
@@ -976,7 +987,7 @@ HgiInteropMetal::CompositeToInterop(
         HgiMetal::CommitCommandBuffer_WaitUntilScheduled);
 
     if (glShaderIndex != -1) {
-        _BlitToOpenGL(flipImage, glShaderIndex);
+        _BlitToOpenGL(compRegion, flipImage, glShaderIndex);
 
         _ProcessGLErrors();
     }
