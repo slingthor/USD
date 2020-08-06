@@ -57,7 +57,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 //------------------------------------------------------------------------------
 GlfPtexTexture::GlfPtexTexture(const TfToken &imageFilePath, 
-                               const bool premultiplyAlpha) :
+                               const bool premultiplyAlpha)
 : GarchPtexTexture(imageFilePath, premultiplyAlpha)
 { 
 }
