@@ -57,6 +57,7 @@ typedef GLvoid (*ArchGLCallbackType)(...);
 #define GL_RGBA32F 0x8814
 #define GL_RGB32F 0x8815
 #define GL_COMPRESSED_RGBA_BPTC_UNORM 0x8E8C
+#define GL_COMPRESSED_SRGB_ALPHA_BPTC_UNORM 0x8E8D
 #define GL_COMPRESSED_RGB_BPTC_SIGNED_FLOAT 0x8E8E
 #define GL_COMPRESSED_RGB_BPTC_UNSIGNED_FLOAT 0x8E8F
 #define GL_TEXTURE_2D_ARRAY 0x8C1A
@@ -91,6 +92,7 @@ typedef GLvoid (*ArchGLCallbackType)(...);
 #if defined(ARCH_OS_IOS)
 #define GL_DOUBLE 0x140A
 #define GL_R16 0x822A
+#define GL_RG16 0x822C
 #define GL_RGB16 0x8054
 #define GL_RGBA16 0x805B
 #define GL_SRGB_ALPHA 0x8C42
