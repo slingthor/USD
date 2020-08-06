@@ -46,8 +46,9 @@ TF_REGISTRY_FUNCTION(TfType)
 MtlfUdimTexture::MtlfUdimTexture(
     TfToken const& imageFilePath,
     GarchImage::ImageOriginLocation originLocation,
-    std::vector<std::tuple<int, TfToken>>&& tiles)
-    : GarchUdimTexture(imageFilePath, originLocation, std::move(tiles))
+    std::vector<std::tuple<int, TfToken>>&& tiles,
+    bool const premultiplyAlpha)
+    : GarchUdimTexture(imageFilePath, originLocation, std::move(tiles), premultiplyAlpha)
 {
 }
 

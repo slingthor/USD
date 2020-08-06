@@ -130,7 +130,7 @@ HdStResourceFactoryMetal::NewExtCompGPUComputationGPU(
     HdStExtCompGpuComputationResourceSharedPtr const &resource,
     HdExtComputationPrimvarDescriptorVector const &compPrimvars,
     int dispatchCount,
-                           int elementCount) const
+    int elementCount) const
 {
     return new HdStExtCompGpuComputationMetal(
         id, resource, compPrimvars, dispatchCount, elementCount);

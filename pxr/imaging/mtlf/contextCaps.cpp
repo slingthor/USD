@@ -86,8 +86,6 @@ MtlfContextCaps::_LoadCaps()
 #else
     hasMipLevelTextureWrite      = false;
 #endif
-
-    gpuComputeEnabled            = IsGPUComputeEnabled();
 }
 
 

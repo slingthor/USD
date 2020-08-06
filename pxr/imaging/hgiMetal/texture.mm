@@ -96,11 +96,20 @@ HgiMetalTexture::HgiMetalTexture(HgiMetal *hgi, HgiTextureDesc const & desc)
             size_t numChannels = HgiGetComponentCount(desc.format);
 
             if (usage == MTLTextureUsageShaderRead && numChannels == 1) {
+                MTLTextureSwizzle s = HgiMetalConversions::GetComponentSwizzle(
+                    desc.componentMapping.r);
+                texDesc.swizzle = MTLTextureSwizzleChannelsMake(s, s, s, s);
+            }
+            else {
                 texDesc.swizzle = MTLTextureSwizzleChannelsMake(
-                    MTLTextureSwizzleRed,
-                    MTLTextureSwizzleRed,
-                    MTLTextureSwizzleRed,
-                    MTLTextureSwizzleOne);
+                    HgiMetalConversions::GetComponentSwizzle(
+                        desc.componentMapping.r),
+                    HgiMetalConversions::GetComponentSwizzle(
+                        desc.componentMapping.g),
+                    HgiMetalConversions::GetComponentSwizzle(
+                        desc.componentMapping.b),
+                    HgiMetalConversions::GetComponentSwizzle(
+                        desc.componentMapping.a));
             }
         }
 #endif
@@ -118,40 +127,19 @@ HgiMetalTexture::HgiMetalTexture(HgiMetal *hgi, HgiTextureDesc const & desc)
     _textureId = [hgi->GetPrimaryDevice() newTextureWithDescriptor:texDesc];
 
     if (desc.initialData && desc.pixelsByteSize > 0) {
-        size_t mipWidth = width;
-        size_t mipHeight = height;
-        size_t mipDepth = (depth > 1) ? depth : 1;
-        size_t pixelSize = HgiDataSizeOfFormat(desc.format);
-        const uint8_t *byteData = static_cast<const uint8_t*>(desc.initialData);
-        
-//        for (int i = 0 ; i < desc.mipLevels; i++) {
-        for (int i = 0 ; i < 1; i++) {
-            size_t byteSize = mipWidth * mipHeight * mipDepth * pixelSize;
-
-            if (depth <= 1) {
-                [_textureId replaceRegion:MTLRegionMake2D(0, 0, mipWidth, mipHeight)
-                              mipmapLevel:i
-                                withBytes:byteData
-                              bytesPerRow:mipWidth * pixelSize];
-            }
-            else {
-                [_textureId replaceRegion:MTLRegionMake3D(0, 0, 0, mipWidth, mipHeight, mipDepth)
-                              mipmapLevel:i
-                                    slice:0
-                                withBytes:byteData
-                              bytesPerRow:mipWidth * pixelSize
-                            bytesPerImage:mipWidth * mipHeight * pixelSize];
-            }
-            if (mipWidth > 1) {
-                mipWidth >>= 1;
-            }
-            if (mipHeight > 1) {
-                mipHeight >>= 1;
-            }
-            if (mipDepth > 1) {
-                mipDepth >>= 1;
-            }
-            byteData += byteSize;
+        TF_VERIFY(desc.mipLevels == 1, "Mipmap upload not implemented");
+        if (desc.type == HgiTextureType2D) {
+            [_textureId replaceRegion:MTLRegionMake2D(0, 0, width, height)
+                          mipmapLevel:0
+                            withBytes:desc.initialData
+                          bytesPerRow:desc.pixelsByteSize / height];
+        }
+        else {
+            [_textureId 
+                replaceRegion:MTLRegionMake3D(0, 0, 0, width, height, depth)
+                  mipmapLevel:0 slice:0 withBytes:desc.initialData
+                  bytesPerRow:desc.pixelsByteSize / height / width
+                bytesPerImage:desc.pixelsByteSize / depth];
         }
     }
 

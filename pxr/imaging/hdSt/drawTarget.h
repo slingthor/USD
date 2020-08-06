@@ -145,9 +145,9 @@ public:
     bool                       IsEnabled()        const { return  _enabled;    }
     const GarchDrawTargetRefPtr &GetGarchDrawTarget() const { return  _drawTarget; }
 
-    const HdStDrawTargetRenderPassState *GetRenderPassState() const
+    const HdStDrawTargetRenderPassState *GetDrawTargetRenderPassState() const
     {
-        return &_renderPassState;
+        return &_drawTargetRenderPassState;
     }
 
     /// Returns collection of rprims the draw target draws.
@@ -182,7 +182,7 @@ private:
     float                   _depthClearValue;
     HdRprimCollection       _collection;
 
-    HdStDrawTargetRenderPassState _renderPassState;
+    HdStDrawTargetRenderPassState _drawTargetRenderPassState;
     std::vector<HdStTextureResourceHandleSharedPtr> _colorTextureResourceHandles;
     HdStTextureResourceHandleSharedPtr              _depthTextureResourceHandle;
 
