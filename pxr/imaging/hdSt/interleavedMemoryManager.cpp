@@ -477,12 +477,12 @@ HdStInterleavedMemoryManager::_StripedInterleavedBuffer::Reallocate(
         HgiBlitCmds* blitCmds = _resourceRegistry->GetBlitCmds();
         
         // pre-pass to combine consecutive buffer range relocation
-        std::unique_ptr<HdStGLBufferRelocator> relocators[3];
+        std::unique_ptr<HdStBufferRelocator> relocators[3];
         
         for(int i = 0; i < 3; i++) {
             int const curIndex = curIds[i] ? i : 0;
             if (newIds[i]) {
-                relocators[i] = std::make_unique<HdStGLBufferRelocator>(curIds[curIndex], newIds[i]);
+                relocators[i] = std::make_unique<HdStBufferRelocator>(curIds[curIndex], newIds[i]);
             }
         }
         for (size_t rangeIdx = 0; rangeIdx < rangeCount; ++rangeIdx) {

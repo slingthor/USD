@@ -114,19 +114,15 @@ HgiMetalResourceBindings::BindResources(
         HgiMetalTexture* metalTexture =
             static_cast<HgiMetalTexture*>(texHandle.Get());
 
-        HgiMetalSampler* metalSmp = nullptr;
-        if (!texDesc.samplers.empty()) {
-            HgiSamplerHandle const& smpHandle = texDesc.samplers.front();
-            metalSmp = static_cast<HgiMetalSampler*>(smpHandle.Get());
-        }
+        HgiSamplerHandle const& smpHandle = texDesc.samplers.front();
+        HgiMetalSampler* metalSmp =
+            static_cast<HgiMetalSampler*>(smpHandle.Get());
 
         if (texDesc.stageUsage & HgiShaderStageCompute) {
             [computeEncoder setTexture:metalTexture->GetTextureId()
                                atIndex:texDesc.bindingIndex];
-            if (metalSmp) {
-                [computeEncoder setSamplerState:metalSmp->GetSamplerId()
-                                        atIndex:texDesc.bindingIndex];
-            }
+            [computeEncoder setSamplerState:metalSmp->GetSamplerId()
+                                    atIndex:texDesc.bindingIndex];
         }
     }
 

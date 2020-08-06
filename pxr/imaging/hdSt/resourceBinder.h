@@ -218,15 +218,18 @@ public:
                                      TfToken const &dataType,
                                      std::string const &swizzle=std::string(),
                                      TfTokenVector const &inPrimvars=TfTokenVector(),
-                                     bool const processTextureFallbackValue = false)
+                                     bool const isPremultiplied=false,
+                                     bool const processTextureFallbackValue=false)
                  : name(name), dataType(dataType), swizzle(swizzle),
-                  inPrimvars(inPrimvars),
+                  inPrimvars(inPrimvars), isPremultiplied(isPremultiplied),
                   processTextureFallbackValue(processTextureFallbackValue) {}
              TfToken name;        // e.g. Kd
              TfToken dataType;    // e.g. vec4
              std::string swizzle; // e.g. xyzw
              TfTokenVector inPrimvars; // for primvar renaming and texture
                                        // coordinates,
+             bool isPremultiplied; // indicates if texture parameter has been 
+                                   // pre-multiplied by alpha on the CPU
              bool processTextureFallbackValue; // use NAME_fallback from shader
                                                // bar if texture is not valid
                                                // (determineed from bool
@@ -244,20 +247,18 @@ public:
             BindingDeclaration(TfToken const &name,
                          TfToken const &dataType,
                          HdBinding binding)
-            : name(name), dataType(dataType), binding(binding), typeIsAtomic(false), writable(false) {}
+            : name(name), dataType(dataType), binding(binding), typeIsAtomic(false) {}
             
             BindingDeclaration(TfToken const &name,
                                TfToken const &dataType,
                                HdBinding binding,
-                               bool isAtomic,
-                               bool isWritable)
-            : name(name), dataType(dataType), binding(binding), typeIsAtomic(isAtomic), writable(isWritable) {}
+                               bool isAtomic)
+            : name(name), dataType(dataType), binding(binding), typeIsAtomic(isAtomic) {}
             
             TfToken name;
             TfToken dataType;
             HdBinding binding;
             bool typeIsAtomic;
-            bool writable;
         };
 
         // -------------------------------------------------------------------

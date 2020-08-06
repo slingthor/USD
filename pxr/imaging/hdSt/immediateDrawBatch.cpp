@@ -26,6 +26,8 @@
 
 #include "pxr/imaging/glf/diagnostic.h"
 
+#include "pxr/imaging/hdSt/immediateDrawBatch.h"
+
 #include "pxr/imaging/hdSt/bufferArrayRange.h"
 #include "pxr/imaging/hdSt/bufferResource.h"
 #include "pxr/imaging/hdSt/commandBuffer.h"
@@ -45,8 +47,6 @@
 
 #include "pxr/base/tf/diagnostic.h"
 #include "pxr/base/tf/iterator.h"
-
-using namespace boost;
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -120,7 +120,7 @@ HdSt_ImmediateDrawBatch::PrepareDraw(
 }
 
 static int
-_GetElementOffset(HdBufferArrayRangeSharedPtr const& range)
+_GetElementOffset(HdStBufferArrayRangeSharedPtr const& range)
 {
     return range? range->GetElementOffset() : 0;
 }

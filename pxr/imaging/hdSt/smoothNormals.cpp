@@ -182,6 +182,7 @@ HdSt_SmoothNormalsComputationGPU::Execute(
         int pointsStride;
         int normalsOffset;
         int normalsStride;
+        int padding;    // APPLE METAL: alignment issue?
     } uniform;
 
     // coherent vertex offset in aggregated buffer array

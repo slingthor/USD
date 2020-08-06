@@ -2034,43 +2034,81 @@ _EvalNodePayloads(
     // However, only process the payload if it's been requested.
     index->GetGraph()->SetHasPayloads(true);
 
-    const PcpPrimIndexInputs::PayloadSet* includedPayloads = 
-        indexer->inputs.includedPayloads;
+    // First thing we check is if this payload arc is being composed because it
+    // will be an ancestral payload arc for a subgraph being being built for a 
+    // subroot reference or payload.
+    // The prim index stack frame tells us whether we're building a subgraph 
+    // for a reference or payload and we can compare the stack frame
+    // arc's requested site against the site we're building to check if this 
+    // we're building an ancestor of the actual target site.
+    const bool isAncestralPayloadOfSubrootReference =
+        indexer->previousFrame &&
+        (indexer->previousFrame->arcToParent->type == PcpArcTypePayload ||
+         indexer->previousFrame->arcToParent->type == PcpArcTypeReference) &&
+        index->GetRootNode().GetSite() != indexer->previousFrame->requestedSite;
 
-    // If includedPayloads is nullptr, we never include payloads.  Otherwise if
-    // it does not have this path, we invoke the predicate.  If the predicate
-    // returns true we set the output bit includedDiscoveredPayload and we
-    // compose it.
-    if (!includedPayloads) {
-        PCP_INDEXING_MSG(indexer, node, "Payload was not included, skipping");
-        return;
-    }
-    SdfPath const &path = indexer->rootSite.path;
+    // If this payload arc is an ancestral arc of the target of a subroot 
+    // reference/payload, then we always compose this payload. This is because 
+    // this ancestral prim index is not necessarily a one that would be 
+    // present on its own in the PcpCache and there may be no explicit way to 
+    // include it. So our policy is to always include the payload in this 
+    // context.
+    //
+    // Example:
+    // Prim </A> in layer1 has a payload to another prim </B> in layer2
+    // Prim </B> has a child prim </B/C>
+    // Prim </B/C> has a payload to another prim </D> in layer3 
+    // Prim </E> on the root layer has a subroot reference to </A/C> in layer1
+    //
+    // When composing the reference arc for prim </E> we build a prim index for
+    // </A/C> which builds the ancestral prim index for </A> first. In order for
+    // </A/C> to exist, the ancestral payload for </A> to </B> must be included.
+    // Because it will be an ancestral arc of a subroot reference subgraph, the
+    // payload will always be included.
+    // 
+    // However when we continue to compose </A/C> -> </B/C> and we encounter the
+    // payload to </D>, this payload is NOT automatically included as it is a 
+    // direct arc from the subroot reference arc and can be included or excluded
+    // via including/excluding </E>
+    if (!isAncestralPayloadOfSubrootReference) {
+        const PcpPrimIndexInputs::PayloadSet* includedPayloads = 
+            indexer->inputs.includedPayloads;
 
-    // If there's a payload predicate, we invoke that to decide whether or not
-    // this payload should be included.
-    bool composePayload = false;
-    if (auto const &pred = indexer->inputs.includePayloadPredicate) {
-        composePayload = pred(path);
-        indexer->outputs->payloadState = composePayload ?
-            PcpPrimIndexOutputs::IncludedByPredicate : 
-            PcpPrimIndexOutputs::ExcludedByPredicate;
-    }
-    else {
-        tbb::spin_rw_mutex::scoped_lock lock;
-        auto *mutex = indexer->inputs.includedPayloadsMutex;
-        if (mutex) { lock.acquire(*mutex, /*write=*/false); }
-        composePayload = includedPayloads->count(path);
-        indexer->outputs->payloadState = composePayload ?
-            PcpPrimIndexOutputs::IncludedByIncludeSet : 
-            PcpPrimIndexOutputs::ExcludedByIncludeSet;
-    }
-     
-    if (!composePayload) {
-        PCP_INDEXING_MSG(indexer, node,
-                         "Payload <%s> was not included, skipping",
-                         path.GetText());
-        return;
+        // If includedPayloads is nullptr, we never include payloads.  Otherwise if
+        // it does not have this path, we invoke the predicate.  If the predicate
+        // returns true we set the output bit includedDiscoveredPayload and we
+        // compose it.
+        if (!includedPayloads) {
+            PCP_INDEXING_MSG(indexer, node, "Payload was not included, skipping");
+            return;
+        }
+        SdfPath const &path = indexer->rootSite.path;
+
+        // If there's a payload predicate, we invoke that to decide whether or not
+        // this payload should be included.
+        bool composePayload = false;
+        if (auto const &pred = indexer->inputs.includePayloadPredicate) {
+            composePayload = pred(path);
+            indexer->outputs->payloadState = composePayload ?
+                PcpPrimIndexOutputs::IncludedByPredicate : 
+                PcpPrimIndexOutputs::ExcludedByPredicate;
+        }
+        else {
+            tbb::spin_rw_mutex::scoped_lock lock;
+            auto *mutex = indexer->inputs.includedPayloadsMutex;
+            if (mutex) { lock.acquire(*mutex, /*write=*/false); }
+            composePayload = includedPayloads->count(path);
+            indexer->outputs->payloadState = composePayload ?
+                PcpPrimIndexOutputs::IncludedByIncludeSet : 
+                PcpPrimIndexOutputs::ExcludedByIncludeSet;
+        }
+         
+        if (!composePayload) {
+            PCP_INDEXING_MSG(indexer, node,
+                             "Payload <%s> was not included, skipping",
+                             path.GetText());
+            return;
+        }
     }
 
     _EvalRefOrPayloadArcs<SdfPayload, PcpArcTypePayload>(
@@ -3362,30 +3400,55 @@ _ComposeVariantSelectionForNode(
 }
 
 // Check the tree of nodes rooted at the given node for any node
-// representing a prior selection for the given variant set.
+// representing a prior selection for the given variant set for the path.
 static bool
 _FindPriorVariantSelection(
     const PcpNodeRef& node,
+    const SdfPath &pathInNode,
     int ancestorRecursionDepth,
     const std::string & vset,
     std::string *vsel,
     PcpNodeRef *nodeWithVsel)
 {
+    // The path of the variant arc we're searching for a selection for has been 
+    // mapped up to the parent of this node. So we have to map it back down to 
+    // this node to correctly check if the node's path can provide us an already 
+    // composed variant selection.
+    // 
+    // If the path can't be mapped to the node, skip it and its children. This
+    // can happen while recursively building namespace ancestors for a subgraph
+    // being composed for subroot inherit arc. In _ComposeVariantSelection, 
+    // these ancestor paths may succesfully be mapped across the inherit's stack 
+    // frame into the parent graph because of the identity mapping in all 
+    // inherits. But it may not be able to be mapped back down through reference
+    // arcs that may exist in the parent graph as we traverse to find a prior 
+    // variant selection.
+    const SdfPath sourcePath = 
+        node.GetMapToParent().MapTargetToSource(pathInNode);
+    if (sourcePath.IsEmpty()) {
+        return false;
+    }
     if (node.GetArcType() == PcpArcTypeVariant &&
         node.GetDepthBelowIntroduction() == ancestorRecursionDepth) {
+        const SdfPath pathAtIntroduction = node.GetPathAtIntroduction();
         // If this node represents a variant selection at the same
-        // effective depth of namespace, check its selection.
-        const std::pair<std::string, std::string> nodeVsel =
-            node.GetPathAtIntroduction().GetVariantSelection();
-        if (nodeVsel.first == vset) {
-            *vsel = nodeVsel.second;
-            *nodeWithVsel = node;
-            return true;
+        // effective depth of namespace, and the path that introduced the 
+        // variant matches the path which we're choosing the selection for, 
+        // then check its selection.
+        if (pathAtIntroduction.GetPrimPath() == sourcePath) {
+            const std::pair<std::string, std::string> nodeVsel =
+                pathAtIntroduction.GetVariantSelection();
+            if (nodeVsel.first == vset) {
+                *vsel = nodeVsel.second;
+                *nodeWithVsel = node;
+                return true;
+            }
         }
     }
     TF_FOR_ALL(child, Pcp_GetChildrenRange(node)) {
         if (_FindPriorVariantSelection(
-                *child, ancestorRecursionDepth, vset, vsel, nodeWithVsel)) {
+                *child, sourcePath, ancestorRecursionDepth, 
+                vset, vsel, nodeWithVsel)) {
             return true;
         }
     }
@@ -3458,6 +3521,23 @@ _ComposeVariantSelectionAcrossStackFrames(
     return false;
 }
 
+// Convert from the given node and the given path at the node to the
+// root node and the path mapped to the root node by traversing up the 
+// parent nodes. 
+static bool
+_ConvertToRootNodeAndPath(PcpNodeRef *node, SdfPath *path)
+{
+    // This function assumes the given path is not empty to begin with so 
+    // return true if this is already the root node.
+    if (!node->GetParentNode()) {
+        return true;
+    }
+    *path = node->GetMapToRoot().MapSourceToTarget(*path);
+    *node = node->GetRootNode();
+    // Return whether the path translates fully up to the root node.
+    return !path->IsEmpty();
+}
+
 static void
 _ComposeVariantSelection(
     int ancestorRecursionDepth,
@@ -3473,27 +3553,6 @@ _ComposeVariantSelection(
     TF_VERIFY(!pathInNode.IsEmpty());
     TF_VERIFY(!pathInNode.ContainsPrimVariantSelection(),
               "%s", pathInNode.GetText());
-
-    // First check if we have already resolved this variant set.
-    // Try all nodes in all parent frames; ancestorRecursionDepth
-    // accounts for any ancestral recursion.
-    {
-        PcpNodeRef rootNode = node.GetRootNode();
-        PcpPrimIndex_StackFrame *prevFrame = previousFrame;
-        while (rootNode) {
-            if (_FindPriorVariantSelection(rootNode,
-                                           ancestorRecursionDepth,
-                                           vset, vsel, nodeWithVsel)) {
-                return;
-            } 
-            if (prevFrame) {
-                rootNode = prevFrame->parentNode.GetRootNode();
-                prevFrame = prevFrame->previousFrame;
-            } else {
-                break;
-            }
-        }
-    }
 
     // We want to look for variant selections in all nodes that have been 
     // added up to this point.  Note that Pcp may pick up variant
@@ -3512,23 +3571,22 @@ _ComposeVariantSelection(
     //
     // Translate the given path up to the root node of the *entire* 
     // prim index under construction, keeping track of when we need
-    // to hop across a stack frame. Note that we cannot use mapToRoot 
-    // here, since it is not valid until the graph is finalized.
+    // to hop across a stack frame.
     _StackFrameAndChildNodeVector previousStackFrames;
     PcpNodeRef rootNode = node;
     SdfPath pathInRoot = pathInNode;
+    _ConvertToRootNodeAndPath(&rootNode, &pathInRoot);
 
-    while (1) {
-        while (rootNode.GetParentNode()) {
-            pathInRoot = rootNode.
-                GetMapToParent().MapSourceToTarget(pathInRoot);
-            rootNode = rootNode.GetParentNode();
-        }
+    // First check if we have already resolved this variant set in the current
+    // stack frame. Try all nodes in all parent frames; ancestorRecursionDepth
+    // accounts for any ancestral recursion.
+    if (_FindPriorVariantSelection(rootNode, pathInRoot,
+                                   ancestorRecursionDepth,
+                                   vset, vsel, nodeWithVsel)) {
+        return;
+    }
 
-        if (!previousFrame) {
-            break;
-        }
-
+    while (previousFrame) {
         // There may not be a valid mapping for the current path across 
         // the previous stack frame. For example, this may happen when
         // trying to compose ancestral variant selections on a sub-root
@@ -3537,18 +3595,43 @@ _ComposeVariantSelection(
         // variant selection opinions across this stack frame. In this case, 
         // we break out of the loop and only search the portion of the prim
         // index we've traversed.
-        const SdfPath pathInPreviousFrame = 
+        SdfPath pathInPreviousFrame =
             previousFrame->arcToParent->mapToParent.MapSourceToTarget(
                 pathInRoot);
-        if (pathInPreviousFrame.IsEmpty()) {
+        PcpNodeRef rootNodeInPreviousFrame = previousFrame->parentNode;
+        // Note that even if the path can be mapped across the stack frame it 
+        // may not map all the way up to the root of the previous stack frame. 
+        // This can happen when composing an ancestor with a variant set for a 
+        // subroot inherit. Inherit arcs always have an identity mapping so an 
+        // ancestral prim path can still map across the inherit's stack frame, 
+        // but it may not map across other arcs, like references, on the way up 
+        // to the root. In this case we break out of the loop and only search 
+        // the the portion of the index before the stack frame jump.
+        if (pathInPreviousFrame.IsEmpty() ||
+            !_ConvertToRootNodeAndPath(&rootNodeInPreviousFrame, 
+                                       &pathInPreviousFrame)) {
             break;
         }
 
+        // Check if we have already resolved this variant set in this previous
+        // stack as well.
+        if (_FindPriorVariantSelection(rootNodeInPreviousFrame, 
+                                       pathInPreviousFrame,
+                                       ancestorRecursionDepth,
+                                       vset, vsel, nodeWithVsel)) {
+            return;
+        }
+
+        // rootNode is still set to be child of the previous frame's arc which
+        // is why do this first.
         previousStackFrames.push_back(
             _StackFrameAndChildNode(previousFrame, rootNode));
 
+        // Update the root node and path to be the root of this previous stack
+        // frame.
+        rootNode = rootNodeInPreviousFrame;
         pathInRoot = pathInPreviousFrame;
-        rootNode = previousFrame->parentNode;
+
         previousFrame = previousFrame->previousFrame;
     }
 

@@ -1216,7 +1216,7 @@ HdSt_IndirectDrawBatch::_GPUFrustumInstanceCulling(
     bool validProgram = true;
     
     // XXX: should we cache cull command offset?
-    HdBufferResourceSharedPtr cullCommandBuffer =
+    HdStBufferResourceSharedPtr cullCommandBuffer =
         _dispatchBufferCullInput->GetResource(HdTokens->drawDispatch);
     if (!TF_VERIFY(cullCommandBuffer)) {
         validProgram = false;

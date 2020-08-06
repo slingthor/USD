@@ -75,7 +75,8 @@ public:
     static GarchUdimTextureRefPtr New(
         TfToken const& imageFilePath,
         GarchImage::ImageOriginLocation originLocation,
-        std::vector<std::tuple<int, TfToken>>&& tiles);
+        std::vector<std::tuple<int, TfToken>>&& tiles,
+        bool const premultiplyAlpha = false);
 
     GARCH_API
     GarchTexture::BindingVector GetBindings(
@@ -102,7 +103,8 @@ protected:
     GarchUdimTexture(
         TfToken const& imageFilePath,
         GarchImage::ImageOriginLocation originLocation,
-        std::vector<std::tuple<int, TfToken>>&& tiles);
+        std::vector<std::tuple<int, TfToken>>&& tiles,
+        bool const premultiplyAlpha);
 
     GARCH_API
     virtual void _ReadTexture() override;
@@ -131,6 +133,7 @@ protected:
     GarchTextureGPUHandle _imageArray;
     GarchTextureGPUHandle _layout;
     bool _loaded = false;
+    bool _premultiplyAlpha = false;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

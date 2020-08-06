@@ -790,8 +790,8 @@ UsdImagingPointInstancerAdapter::ProcessPropertyChange(UsdPrim const& prim,
             // deletion is deferred until the end of the edit batch.
             // That means, if GetProtoPrim fails we've already
             // queued the prototype for resync and we can safely
-            // return AllDirty.
-            return HdChangeTracker::AllDirty;
+            // return clean (no-work).
+            return HdChangeTracker::Clean;
         }
 
         // XXX: Specifically disallow visibility and transform updates: in
@@ -833,7 +833,7 @@ UsdImagingPointInstancerAdapter::ProcessPropertyChange(UsdPrim const& prim,
     }
 
     // Is the property a primvar?
-    if (UsdGeomPrimvar::IsPrimvarRelatedPropertyName(propertyName)) {
+    if (UsdGeomPrimvarsAPI::CanContainPropertyName(propertyName)) {
         // Ignore local constant/uniform primvars.
         UsdGeomPrimvar pv = UsdGeomPrimvarsAPI(prim).GetPrimvar(propertyName);
         if (pv && (pv.GetInterpolation() == UsdGeomTokens->constant ||
@@ -850,7 +850,12 @@ UsdImagingPointInstancerAdapter::ProcessPropertyChange(UsdPrim const& prim,
 
     // XXX: Treat transform & visibility changes as re-sync, until we untangle
     // instancer vs proto data.
-    return HdChangeTracker::AllDirty;
+    if (propertyName == UsdGeomTokens->visibility ||
+        UsdGeomXformable::IsTransformationAffectedByAttrNamed(propertyName)) {
+        return HdChangeTracker::AllDirty;
+    }
+
+    return HdChangeTracker::Clean;
 }
 
 void
