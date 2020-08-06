@@ -391,7 +391,9 @@ HdStDrawTarget::_SetAttachments(
 
    _drawTargetRenderPassState.SetDepthPriority(attachments.GetDepthPriority());
 
+#if defined(PXR_OPENGL_SUPPORT_ENABLED)
    GlfGLContext::MakeCurrent(oldContext);
+#endif
 
    // The texture bindings have changed so increment the version
    ++_version;
