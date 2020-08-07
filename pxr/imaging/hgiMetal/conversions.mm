@@ -68,12 +68,14 @@ static const MTLPixelFormat _PIXEL_FORMAT_DESC[] =
 #if defined(ARCH_OS_IOS)
     MTLPixelFormatInvalid,      // Unsupported by iOS Metal
     MTLPixelFormatInvalid,      // Unsupported by iOS Metal
+    MTLPixelFormatInvalid,      // Unsupported by iOS Metal
+    MTLPixelFormatInvalid,      // Unsupported by iOS Metal
 #else
     MTLPixelFormatBC6H_RGBFloat,  // HgiFormatBC6FloatVec3
     MTLPixelFormatBC6H_RGBUfloat, // HgiFormatBC6UFloatVec3
-#endif
     MTLPixelFormatBC7_RGBAUnorm,      // HgiFormatBC7UNorm8Vec4
     MTLPixelFormatBC7_RGBAUnorm_sRGB, // HgiFormatBC7UNorm8Vec4srgb
+#endif
 
     MTLPixelFormatDepth32Float_Stencil8, // HgiFormatFloat32UInt8
     
