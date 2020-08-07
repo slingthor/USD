@@ -138,71 +138,76 @@ HdSt_RenderPass::_Execute(HdRenderPassStateSharedPtr const &renderPassState,
     const HgiGraphicsCmdsDesc desc =
         stRenderPassState->MakeGraphicsCmdsDesc(GetRenderIndex());
     HgiGraphicsCmdsUniquePtr gfxCmds = _hgi->CreateGraphicsCmds(desc);
-    if (!TF_VERIFY(gfxCmds)) {
-        return;
-    }
-    HdRprimCollection const &collection = GetRprimCollection();
-    std::string passName = "HdSt_RenderPass: " +
-        collection.GetMaterialTag().GetString();
-    gfxCmds->PushDebugGroup(passName.c_str());
-    if (!HdStResourceFactory::GetInstance()->IsOpenGL()) {
-        MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
-        // Set the render pass descriptor to use for the render encoders
-        MTLRenderPassDescriptor* rpd = context->GetRenderPassDescriptor();
-        MTLPixelFormat colorFormat = MTLPixelFormatInvalid;
-        MTLPixelFormat depthFormat = MTLPixelFormatInvalid;
-        size_t i;
-        bool resolve = !desc.colorResolveTextures.empty();
-        for (i=0; i<desc.colorTextures.size(); i++) {
-            HgiMetalTexture *metalTexture =
-                static_cast<HgiMetalTexture*>(desc.colorTextures[i].Get());
-            rpd.colorAttachments[i].texture = metalTexture->GetTextureId();
-            colorFormat = rpd.colorAttachments[i].texture.pixelFormat;
 
-            if (resolve) {
-                metalTexture =
-                    static_cast<HgiMetalTexture*>(desc.colorResolveTextures[i].Get());
-                rpd.colorAttachments[i].resolveTexture = metalTexture->GetTextureId();
-                rpd.colorAttachments[i].storeAction = MTLStoreActionStoreAndMultisampleResolve;
+    // XXX When there are no aovBindings we get a null work object.
+    // This would ideally never happen, but currently happens for some
+    // custom prims that spawn an imagingGLengine  with a task controller that
+    // has no aovBindings.
+
+    if (gfxCmds) {
+        HdRprimCollection const &collection = GetRprimCollection();
+        std::string passName = "HdSt_RenderPass: " +
+            collection.GetMaterialTag().GetString();
+        gfxCmds->PushDebugGroup(passName.c_str());
+        if (!HdStResourceFactory::GetInstance()->IsOpenGL()) {
+            MtlfMetalContextSharedPtr context = MtlfMetalContext::GetMetalContext();
+            // Set the render pass descriptor to use for the render encoders
+            MTLRenderPassDescriptor* rpd = context->GetRenderPassDescriptor();
+            MTLPixelFormat colorFormat = MTLPixelFormatInvalid;
+            MTLPixelFormat depthFormat = MTLPixelFormatInvalid;
+            size_t i;
+            bool resolve = !desc.colorResolveTextures.empty();
+            for (i=0; i<desc.colorTextures.size(); i++) {
+                HgiMetalTexture *metalTexture =
+                    static_cast<HgiMetalTexture*>(desc.colorTextures[i].Get());
+                rpd.colorAttachments[i].texture = metalTexture->GetTextureId();
+                colorFormat = rpd.colorAttachments[i].texture.pixelFormat;
+
+                if (resolve) {
+                    metalTexture =
+                        static_cast<HgiMetalTexture*>(desc.colorResolveTextures[i].Get());
+                    rpd.colorAttachments[i].resolveTexture = metalTexture->GetTextureId();
+                    rpd.colorAttachments[i].storeAction = MTLStoreActionStoreAndMultisampleResolve;
+                }
+                else {
+                    rpd.colorAttachments[i].storeAction = MTLStoreActionStore;
+                }
+            }
+            while (i<8) {
+                rpd.colorAttachments[i].texture = nil;
+                rpd.colorAttachments[i].resolveTexture = nil;
+                i++;
+            }
+            if (desc.depthTexture) {
+                HgiMetalTexture *metalTexture =
+                    static_cast<HgiMetalTexture*>(desc.depthTexture.Get());
+                rpd.depthAttachment.texture = metalTexture->GetTextureId();
+                depthFormat = rpd.depthAttachment.texture.pixelFormat;
+                    
+                if (resolve) {
+                    metalTexture =
+                        static_cast<HgiMetalTexture*>(desc.depthResolveTexture.Get());
+                    rpd.depthAttachment.resolveTexture = metalTexture->GetTextureId();
+                    rpd.depthAttachment.storeAction = MTLStoreActionStoreAndMultisampleResolve;
+                }
+                else {
+                    rpd.depthAttachment.storeAction = MTLStoreActionStore;
+                }
             }
             else {
-                rpd.colorAttachments[i].storeAction = MTLStoreActionStore;
+                rpd.depthAttachment.texture = nil;
+                rpd.depthAttachment.resolveTexture = nil;
             }
+            context->SetRenderPassDescriptor(rpd);
+            context->SetOutputPixelFormats(colorFormat, depthFormat);
         }
-        while (i<8) {
-            rpd.colorAttachments[i].texture = nil;
-            rpd.colorAttachments[i].resolveTexture = nil;
-            i++;
-        }
-        if (desc.depthTexture) {
-            HgiMetalTexture *metalTexture =
-                static_cast<HgiMetalTexture*>(desc.depthTexture.Get());
-            rpd.depthAttachment.texture = metalTexture->GetTextureId();
-            depthFormat = rpd.depthAttachment.texture.pixelFormat;
-                
-            if (resolve) {
-                metalTexture =
-                    static_cast<HgiMetalTexture*>(desc.depthResolveTexture.Get());
-                rpd.depthAttachment.resolveTexture = metalTexture->GetTextureId();
-                rpd.depthAttachment.storeAction = MTLStoreActionStoreAndMultisampleResolve;
-            }
-            else {
-                rpd.depthAttachment.storeAction = MTLStoreActionStore;
-            }
-        }
-        else {
-            rpd.depthAttachment.texture = nil;
-            rpd.depthAttachment.resolveTexture = nil;
-        }
-        context->SetRenderPassDescriptor(rpd);
-        context->SetOutputPixelFormats(colorFormat, depthFormat);
+
+        GfVec4f const& viewport = renderPassState->GetViewport();
+        gfxCmds->SetViewport(GfVec4i(int(viewport[0]), int(viewport[1]),
+                                     int(viewport[2]), int(viewport[3])));
     }
 
     // Draw
-    GfVec4f const& viewport = renderPassState->GetViewport();
-    gfxCmds->SetViewport(GfVec4i(int(viewport[0]), int(viewport[1]), 
-                                 int(viewport[2]), int(viewport[3])));
-
     HdStCommandBuffer* cmdBuffer = &_cmdBuffer;
 #if defined(PXR_OPENGL_SUPPORT_ENABLED)
     HgiGLGraphicsCmds* glGfxCmds = 
