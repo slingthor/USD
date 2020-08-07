@@ -236,17 +236,7 @@ UsdImagingGLEngine::_DestroyHydraObjects()
     _taskController = nullptr;
     _sceneDelegate = nullptr;
     _renderIndex = nullptr;
-    _renderDelegate = nullptr;    
-
-
-#if defined(PXR_METAL_SUPPORT_ENABLED)
-    engineCountMutex.lock();
-    engineCount--;
-    if (MtlfMetalContext::context && engineCount == 0)  {
-        MtlfMetalContext::context = NULL;
-    }
-    engineCountMutex.unlock();
-#endif
+    _renderDelegate = nullptr;
 }
 
 UsdImagingGLEngine::~UsdImagingGLEngine()
@@ -258,6 +248,14 @@ UsdImagingGLEngine::~UsdImagingGLEngine()
 
     _DestroyHydraObjects();
 
+    #if defined(PXR_METAL_SUPPORT_ENABLED)
+        engineCountMutex.lock();
+        engineCount--;
+        if (MtlfMetalContext::context && engineCount == 0)  {
+            MtlfMetalContext::context = NULL;
+        }
+        engineCountMutex.unlock();
+    #endif
 }
 
 //----------------------------------------------------------------------------
@@ -937,12 +935,7 @@ UsdImagingGLEngine::_SetRenderDelegate(
     // This relies on SetRendererPlugin to release the GIL...
 
     // Destruction
-
-    // Destroy objects in opposite order of construction.
-    _taskController = nullptr;
-    _sceneDelegate = nullptr;
-    _renderIndex = nullptr;
-    _renderDelegate = nullptr;
+    _DestroyHydraObjects();
 
     _isPopulated = false;
 
