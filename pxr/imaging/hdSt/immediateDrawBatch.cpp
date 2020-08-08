@@ -48,8 +48,6 @@
 #include "pxr/base/tf/diagnostic.h"
 #include "pxr/base/tf/iterator.h"
 
-#include <memory>
-
 PXR_NAMESPACE_OPEN_SCOPE
 
 
@@ -333,8 +331,7 @@ HdSt_ImmediateDrawBatch::ExecuteDraw(
             //    binder.UnbindBuffer(HdTokens->materialParams,
             //                        dynamic_pointer_cast<HdStBufferResource>(shaderBarCurrent->GetResource()));
             //}
-            binder.BindBuffer(HdTokens->materialParams,
-                              std::dynamic_pointer_cast<HdStBufferResource>(shaderBar->GetResource()));
+            binder.BindBuffer(HdTokens->materialParams, shaderBar->GetResource());
             shaderBarCurrent = shaderBar;
         }
 
@@ -486,8 +483,7 @@ HdSt_ImmediateDrawBatch::ExecuteDraw(
     if (topVisBarCurrent)
         binder.UnbindBufferArray(topVisBarCurrent);
     if (shaderBarCurrent) {
-        binder.UnbindBuffer(HdTokens->materialParams,
-                            std::dynamic_pointer_cast<HdStBufferResource>(shaderBarCurrent->GetResource()));
+        binder.UnbindBuffer(HdTokens->materialParams, shaderBarCurrent->GetResource());
     }
 */
     gpuProgram->UnsetProgram();
