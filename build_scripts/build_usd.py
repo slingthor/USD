@@ -116,8 +116,9 @@ def GetMacArch():
     return macArch
 
 def SupportsMacOSUniversalBinaries():
-    MacOS_SDK = GetCommandOutput('xcrun --show-sdk-version').strip()
-    return MacOS() and MacOS_SDK >= "10.16"
+    # MacOS_SDK = GetCommandOutput('xcrun --show-sdk-version').strip()
+    # return MacOS() and MacOS_SDK >= "10.16"
+    return True
 
 def GetXcodeDeveloperDirectory():
     """Returns the active developer directory as reported by 'xcode-select -p'.
