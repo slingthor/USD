@@ -551,8 +551,6 @@ HdStInterleavedMemoryManager::_StripedInterleavedBuffer::Reallocate(
 
     // increment version to rebuild dispatch buffers.
     IncrementVersion();
-
-    GLF_POST_PENDING_GL_ERRORS();
 }
 
 void

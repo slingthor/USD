@@ -62,14 +62,19 @@ void HgiInterop::TransferToApp(
     }
     
 #if defined(HGIINTEROP_METAL_TO_GL_ENABLED)
-    if (gfxApi==HgiTokens->Metal && interopDst==HgiTokens->OpenGL) {
-        // Transfer Metal textures to OpenGL application
-        if (!_metalToOpenGL) {
-            _metalToOpenGL.reset(new HgiInteropMetal(hgi));
+    if (gfxApi==HgiTokens->Metal) {
+        if (interopDst==HgiTokens->OpenGL) {
+            // Transfer Metal textures to OpenGL application
+            if (!_metalToOpenGL) {
+                _metalToOpenGL.reset(new HgiInteropMetal(hgi));
+            }
+            _metalToOpenGL->CompositeToInterop(color, depth, compRegion);
+        } else if (interopDst==HgiTokens->Metal) {
+            // APPLE METAL: For Hydraplayer we are using the MetalKitView so
+            // there is no need to do a composite.
+        } else {
+            TF_CODING_ERROR("Unsupported Hgi backed: %s", gfxApi.GetText());
         }
-        _metalToOpenGL->CompositeToInterop(color, depth, compRegion);
-    } else {
-        TF_CODING_ERROR("Unsupported Hgi backed: %s", gfxApi.GetText());
     }
 #elif defined(HGIINTEROP_GL_TO_GL_ENABLED)
     if (gfxApi==HgiTokens->OpenGL && interopDst==HgiTokens->OpenGL) {
